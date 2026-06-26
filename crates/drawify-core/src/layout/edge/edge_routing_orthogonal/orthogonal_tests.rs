@@ -636,7 +636,7 @@
             to: to_ep,
         };
 
-        let path = select_best_path_with_scorer_stats(&ctx, &pair, &DefaultScorer, None);
+        let path = select_best_path_with_scorer_stats(&ctx, &pair, &DefaultScorer, None, false);
         assert!(
             path_is_clean(
                 &path,

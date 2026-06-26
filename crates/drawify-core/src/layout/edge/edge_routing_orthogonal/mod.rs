@@ -164,6 +164,15 @@ impl EdgeRoutingStrategy for OrthogonalRouting {
         reroute_edges_touching_nodes(diagram, result, self.config, moved_node_ids)
     }
 
+    fn route_preserve(
+        &self,
+        diagram: &Diagram,
+        result: LayoutResult,
+        preserve_edges: &std::collections::HashSet<usize>,
+    ) -> LayoutResult {
+        reroute_edges_preserve(diagram, result, self.config, preserve_edges)
+    }
+
     /// orthogonal 输出 Polyline（折线路径），需要 refine 检测穿障并推开问题节点。
     fn supports_refine(&self) -> bool {
         true
@@ -230,6 +239,25 @@ pub fn reroute_edges_touching_nodes(
         return route_edges_orthogonal(diagram, result, cfg);
     }
     route_edges_orthogonal_inner(diagram, result, cfg, Some(preserve))
+}
+
+/// refine / 局部更新：保留 `preserve_edges` 中的边，仅重算其余边。
+///
+/// 若可保留边占比过低（< 15%），回退为全图重路由。
+pub fn reroute_edges_preserve(
+    diagram: &Diagram,
+    result: LayoutResult,
+    cfg: OrthoConfig,
+    preserve_edges: &std::collections::HashSet<usize>,
+) -> LayoutResult {
+    let n = diagram.relations.len();
+    if n == 0 || preserve_edges.is_empty() {
+        return route_edges_orthogonal(diagram, result, cfg);
+    }
+    if (preserve_edges.len() as f64 / n as f64) < 0.15 {
+        return route_edges_orthogonal(diagram, result, cfg);
+    }
+    route_edges_orthogonal_inner(diagram, result, cfg, Some(preserve_edges.clone()))
 }
 
 /// 正交路由内核。`preserve_edges` 中的边保留已有路径，仅将其段加入避让索引。
@@ -507,6 +535,7 @@ fn route_edges_orthogonal_inner(
             &pair,
             &DefaultScorer,
             Some(&mut path_stats),
+            false,
         );
         ortho_stats.total_candidates += path_stats.candidate_count;
         ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
@@ -848,11 +877,10 @@ fn swap_endpoint_anchors(
         endpoint_map.entry(kb).and_modify(|e| e.anchor = anchor_a);
     }
 
-    // 3. 移除旧路径的 segments
-    grid.remove_by_edge(ei_a);
-    grid.remove_by_edge(ei_b);
+    // 3. 移除旧路径的 segments（批量一次重建）
+    grid.remove_by_edges(&[ei_a, ei_b]);
 
-    // 4. 重路由两条边
+    // 4. 重路由两条边（倒挂修正只需 Phase-1 候选）
     for &ei in &[ei_a, ei_b] {
         let Some(from_ep) = endpoint_map.get(&(ei, true)) else {
             continue;
@@ -879,6 +907,7 @@ fn swap_endpoint_anchors(
             &pair,
             &DefaultScorer,
             Some(&mut path_stats),
+            true,
         );
         ortho_stats.total_candidates += path_stats.candidate_count;
         ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;

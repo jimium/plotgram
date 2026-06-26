@@ -5,7 +5,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-DRAWIFY_BIN="$ROOT_DIR/target/debug/drawify"
+# 默认 release：计时反映真实渲染性能；开发时可 DRAWIFY_PROFILE=debug
+DRAWIFY_PROFILE="${DRAWIFY_PROFILE:-release}"
+DRAWIFY_BIN="$ROOT_DIR/target/$DRAWIFY_PROFILE/drawify"
 export DRAWIFY_FONTS_DIR="${DRAWIFY_FONTS_DIR:-$ROOT_DIR/fonts}"
 
 FORMATS=("svg")
@@ -73,8 +75,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 build_drawify() {
-  echo "构建 drawify-cli (debug)..."
-  (cd "$ROOT_DIR" && cargo build -p drawify-cli)
+  echo "构建 drawify-cli ($DRAWIFY_PROFILE)..."
+  if [[ "$DRAWIFY_PROFILE" == "release" ]]; then
+    (cd "$ROOT_DIR" && cargo build --release -p drawify-cli)
+  else
+    (cd "$ROOT_DIR" && cargo build -p drawify-cli)
+  fi
   echo
 }
 
@@ -86,12 +92,17 @@ run_drawify() {
   "$DRAWIFY_BIN" "$@"
 }
 
-now_ms() {
-  python3 -c 'import time; print(int(time.time() * 1000))'
+format_duration_ms() {
+  awk -v ms="$1" 'BEGIN { printf "%.3fs\n", ms / 1000 }'
 }
 
-format_duration_ms() {
-  python3 -c "print(f'{int(\"$1\") / 1000:.3f}s')"
+# 仅统计 drawify render 进程耗时
+run_timed_render() {
+  local timing
+  timing="$(
+    { /usr/bin/time -p "$DRAWIFY_BIN" render "$1" -f "$2" -o "$3"; } 2>&1 1>/dev/null
+  )" || return 1
+  awk '/^real / { printf "%.0f\n", $2 * 1000; exit }' <<<"$timing"
 }
 
 output_ext() {
@@ -125,7 +136,6 @@ current=0
 success=0
 failed=0
 total_ms=0
-batch_start_ms=$(now_ms)
 
 echo "开始渲染: $total_files 个文件 × ${#FORMATS[@]} 种格式 = $total_jobs 个输出"
 echo "格式: ${FORMATS[*]}"
@@ -155,9 +165,7 @@ while IFS= read -r -d '' dfy_file; do
       render_out="${out}.rendering.$$"
     fi
 
-    start_ms=$(now_ms)
-    if run_drawify render "$dfy_file" -f "$format" -o "$render_out" >/dev/null 2>&1; then
-      elapsed_ms=$(( $(now_ms) - start_ms ))
+    if elapsed_ms="$(run_timed_render "$dfy_file" "$format" "$render_out")"; then
       total_ms=$((total_ms + elapsed_ms))
       if [[ "$format" == "svg" ]]; then
         history_result="$(python3 "$SCRIPT_DIR/svg-history.py" commit "$rel" "$render_out" "$out")"
@@ -170,32 +178,29 @@ while IFS= read -r -d '' dfy_file; do
       printf '[%d/%d] %s -> %s (%s)%s\n' \
         "$current" "$total_jobs" "$rel" "$(basename "$out")" "$(format_duration_ms "$elapsed_ms")" "$history_note"
     else
-      elapsed_ms=$(( $(now_ms) - start_ms ))
-      total_ms=$((total_ms + elapsed_ms))
       failed=$((failed + 1))
       if [[ "$format" == "svg" && -f "$render_out" ]]; then
         rm -f "$render_out"
       fi
-      printf '[%d/%d] %s -> %s (%s)\n' \
-        "$current" "$total_jobs" "$rel" "$(basename "$out")" "$(format_duration_ms "$elapsed_ms")" >&2
+      printf '[%d/%d] %s -> %s\n' \
+        "$current" "$total_jobs" "$rel" "$(basename "$out")" >&2
       echo "  ✗ 失败" >&2
     fi
   done
 done < <(find "$SCRIPT_DIR" -name '*.dfy' -not -path '*/.*' -print0 | sort -z)
 
 rendered=$((success + failed))
-batch_elapsed_ms=$(( $(now_ms) - batch_start_ms ))
 
 echo
 echo "完成: 成功 ${success} 个，失败 ${failed} 个（共 ${total_jobs} 个输出）"
 if [[ "$rendered" -gt 0 ]]; then
-  python3 -c "
-rendered = $rendered
-total = $total_ms / 1000
-avg = total / rendered
-wall = $batch_elapsed_ms / 1000
-print(f'耗时: 渲染总计 {total:.3f}s，平均 {avg:.3f}s（{rendered} 次）；墙钟 {wall:.3f}s')
-"
+  awk -v rendered="$rendered" -v total_ms="$total_ms" '
+    BEGIN {
+      total = total_ms / 1000
+      avg = total / rendered
+      printf "耗时: 渲染总计 %.3fs，平均 %.3fs（%d 次）\n", total, avg, rendered
+    }
+  '
 fi
 
 echo

@@ -905,6 +905,19 @@ pub trait EdgeRoutingStrategy {
         let _ = moved_node_ids;
         self.route(diagram, result)
     }
+
+    /// refine 增量重路由：保留 `preserve_edges` 中的已有路径，仅重算其余边。
+    ///
+    /// 默认实现回退为全图重路由；orthogonal 覆写为 `preserve_edges` 增量模式。
+    fn route_preserve(
+        &self,
+        diagram: &Diagram,
+        result: LayoutResult,
+        preserve_edges: &std::collections::HashSet<usize>,
+    ) -> LayoutResult {
+        let _ = preserve_edges;
+        self.route(diagram, result)
+    }
 }
 
 // ─── Layout 调度 ─────────────────────────────────────────

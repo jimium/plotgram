@@ -100,7 +100,16 @@ impl SegmentGrid {
 
     /// 移除指定边的所有段并重建网格。
     pub fn remove_by_edge(&mut self, edge_index: usize) {
-        self.segments.retain(|seg| seg.edge_index != edge_index);
+        self.remove_by_edges(&[edge_index]);
+    }
+
+    /// 批量移除多条边的段，只重建一次网格（P0-C）。
+    pub fn remove_by_edges(&mut self, edge_indices: &[usize]) {
+        if edge_indices.is_empty() {
+            return;
+        }
+        let remove: std::collections::HashSet<usize> = edge_indices.iter().copied().collect();
+        self.segments.retain(|seg| !remove.contains(&seg.edge_index));
         self.rebuild();
     }
 

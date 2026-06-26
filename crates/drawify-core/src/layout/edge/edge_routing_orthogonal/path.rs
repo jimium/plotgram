@@ -6,18 +6,69 @@ use crate::layout::group::{prefer_corridor_coord, CorridorAxis, GroupCorridor};
 use crate::layout::{GroupLayout, Port};
 use std::collections::{HashMap, HashSet};
 
+/// 单条边的路由走廊 bbox，用于裁剪折点/通道候选（P0-B）。
+#[derive(Clone, Copy)]
+struct EdgeCorridor {
+    x_lo: f64,
+    y_lo: f64,
+    x_hi: f64,
+    y_hi: f64,
+}
+
+impl EdgeCorridor {
+    fn from_endpoints(sx: f64, sy: f64, ex: f64, ey: f64, margin: f64) -> Self {
+        let pad = NODE_OBSTACLE_PAD + margin + PORT_CLEARANCE;
+        Self {
+            x_lo: sx.min(ex) - pad,
+            y_lo: sy.min(ey) - pad,
+            x_hi: sx.max(ex) + pad,
+            y_hi: sy.max(ey) + pad,
+        }
+    }
+
+    fn overlaps_travel_band(self, r: &Rect, fold_axis: Axis, pad: f64) -> bool {
+        let travel = fold_axis.other();
+        let (band_lo, band_hi) = self.main_range(travel);
+        let (o_lo, o_hi) = r.range_on_axis(travel);
+        o_hi + pad >= band_lo && o_lo - pad <= band_hi
+    }
+
+    fn main_range(self, axis: Axis) -> (f64, f64) {
+        match axis {
+            Axis::Horizontal => (self.x_lo, self.x_hi),
+            Axis::Vertical => (self.y_lo, self.y_hi),
+        }
+    }
+
+    fn contains_cross_coord(self, axis: Axis, coord: f64) -> bool {
+        let (lo, hi) = match axis {
+            Axis::Horizontal => (self.y_lo, self.y_hi),
+            Axis::Vertical => (self.x_lo, self.x_hi),
+        };
+        coord >= lo && coord <= hi
+    }
+}
+
 /// 计算分组间垂直于指定段方向的通道间隙中点坐标。
 /// - axis=Vertical：段沿垂直方向延伸（y 轴为主轴），找 x 方向间隙中点（垂直通道 x 坐标）；
 /// - axis=Horizontal：段沿水平方向延伸（x 轴为主轴），找 y 方向间隙中点（水平通道 y 坐标）。
 /// 只考虑主轴范围重叠的分组对（同一行/列），避免不同行/列分组的干扰。
-fn group_gap_midpoints_on_axis(groups: &HashMap<String, GroupLayout>, axis: Axis) -> Vec<f64> {
+fn group_gap_midpoints_on_axis(
+    groups: &HashMap<String, GroupLayout>,
+    axis: Axis,
+    corridor: EdgeCorridor,
+) -> Vec<f64> {
+    let (main_lo, main_hi) = corridor.main_range(axis);
     let mut ranges: Vec<(f64, f64, f64, f64)> = groups
         .values()
-        .map(|g| {
+        .filter_map(|g| {
             let r = Rect::from(g);
-            let (main_lo, main_hi) = r.range_on_axis(axis);
+            if !corridor.overlaps_travel_band(&r, axis, GROUP_OBSTACLE_PAD) {
+                return None;
+            }
             let (cross_lo, cross_hi) = r.cross_range_on_axis(axis);
-            (cross_lo, cross_hi, main_lo, main_hi)
+            let (m_lo, m_hi) = r.range_on_axis(axis);
+            Some((cross_lo, cross_hi, m_lo, m_hi))
         })
         .collect();
     ranges.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
@@ -29,8 +80,14 @@ fn group_gap_midpoints_on_axis(groups: &HashMap<String, GroupLayout>, axis: Axis
             if am_hi <= bm_lo || bm_hi <= am_lo {
                 continue;
             }
+            if am_hi <= main_lo || main_hi <= am_lo {
+                continue;
+            }
             if ac_hi < bc_lo {
-                mids.push((ac_hi + bc_lo) / 2.0);
+                let mid = (ac_hi + bc_lo) / 2.0;
+                if corridor.contains_cross_coord(axis, mid) {
+                    mids.push(mid);
+                }
             }
         }
     }
@@ -52,6 +109,7 @@ fn collect_obstacle_boundaries_on_axis(
     margin: f64,
     sorted_node_ids: &[String],
     sorted_group_ids: &[String],
+    corridor: EdgeCorridor,
 ) -> Vec<f64> {
     let mut coords = Vec::new();
 
@@ -60,6 +118,9 @@ fn collect_obstacle_boundaries_on_axis(
             continue;
         }
         let r = Rect::from(&nodes[nid]);
+        if !corridor.overlaps_travel_band(&r, axis, node_pad + margin) {
+            continue;
+        }
         let (lo, hi) = r.cross_range_on_axis(axis);
         coords.push((lo - node_pad) - margin);
         coords.push((hi + node_pad) + margin);
@@ -71,6 +132,9 @@ fn collect_obstacle_boundaries_on_axis(
         }
         if let Some(gl) = groups.get(gid) {
             let r = Rect::from(gl);
+            if !corridor.overlaps_travel_band(&r, axis, group_pad + margin) {
+                continue;
+            }
             let (lo, hi) = r.cross_range_on_axis(axis);
             coords.push((lo - group_pad) - margin);
             coords.push((hi + group_pad) + margin);
@@ -105,12 +169,82 @@ pub struct PathSelectStats {
     pub degraded: bool,
 }
 
+/// 额外 channel_margin 档位（P1-B：base 档无 strict 干净候选时再逐档尝试）。
+const EXTRA_CHANNEL_MARGINS: [f64; 2] = [28.0, 40.0];
+
+struct PathEvalState {
+    best_strict: Option<(f64, Vec<Point>)>,
+    best_nodes_only: Option<(f64, Vec<Point>)>,
+    best_dirty: Option<(f64, Vec<Point>)>,
+    strict_count: usize,
+    nodes_only_count: usize,
+    candidate_count: usize,
+}
+
+fn evaluate_path_batch(
+    paths: Vec<Vec<Point>>,
+    ctx: &RoutingContext,
+    pair: &EndpointPair,
+    scorer: &dyn CandidateScorer,
+    from_id: &str,
+    to_id: &str,
+    state: &mut PathEvalState,
+) {
+    state.candidate_count += paths.len();
+    for path in paths {
+        if path_is_clean(
+            &path,
+            from_id,
+            to_id,
+            ctx.nodes,
+            ctx.group_ctx,
+            &ctx.obstacles.sorted_node_ids,
+        ) {
+            let lower_bound =
+                path_length(&path) + path.len().saturating_sub(2) as f64 * BEND_PENALTY;
+            if path_avoids_group_interiors(
+                &path,
+                from_id,
+                to_id,
+                ctx.group_ctx,
+                &ctx.obstacles.sorted_group_ids,
+            ) {
+                state.strict_count += 1;
+                if state.best_strict.as_ref().is_none_or(|(bs, _)| lower_bound < *bs) {
+                    let score = scorer.score(&path, ctx, pair);
+                    if state.best_strict.as_ref().is_none_or(|(bs, _)| score < *bs) {
+                        state.best_strict = Some((score, path));
+                    }
+                }
+            } else {
+                state.nodes_only_count += 1;
+                if state.best_nodes_only.as_ref().is_none_or(|(bs, _)| lower_bound < *bs) {
+                    let score = scorer.score(&path, ctx, pair);
+                    if state.best_nodes_only.as_ref().is_none_or(|(bs, _)| score < *bs) {
+                        state.best_nodes_only = Some((score, path));
+                    }
+                }
+            }
+        } else {
+            let score = path_length(&path) + path.len().saturating_sub(2) as f64 * BEND_PENALTY;
+            if state.best_dirty.as_ref().is_none_or(|(bs, _)| score < *bs) {
+                state.best_dirty = Some((score, path));
+            }
+        }
+    }
+}
+
 /// P2-1: 带 debug 统计的路径选择
+///
+/// `phase1_only`: 为 true 时跳过阶梯候选，供 `fix_slot_inversions` 轻量重路由使用。
+///
+/// P1-A 渐进式候选：L 形 → channel（单档 margin）→ channel（加档 margin）→ z-fold → 阶梯。
 pub fn select_best_path_with_scorer_stats(
     ctx: &RoutingContext,
     pair: &EndpointPair,
     scorer: &dyn CandidateScorer,
     mut stats: Option<&mut PathSelectStats>,
+    phase1_only: bool,
 ) -> Vec<Point> {
     let start = pair.from_anchor();
     let end = pair.to_anchor();
@@ -123,112 +257,99 @@ pub fn select_best_path_with_scorer_stats(
 
     let from_id = pair.from_id();
     let to_id = pair.to_id();
+    let corridor = EdgeCorridor::from_endpoints(sx, sy, ex, ey, ctx.cfg.channel_margin);
 
-    // P0-1: 三阶段硬过滤 + 退化。
-    // 优先级：严格干净（避开节点+分组）> 节点干净（避开节点，可能穿分组）> 脏候选（穿节点）
-    // 当分组铺满画布时，严格干净候选可能不存在，退化为节点干净候选以避免穿节点。
-    // 先检查 path_is_clean（节点），通过后再检查 path_avoids_group_interiors（分组），
-    // 避免 nodes_only 候选重复执行节点检查。
-    let mut best_strict: Option<(f64, Vec<Point>)> = None;
-    let mut best_nodes_only: Option<(f64, Vec<Point>)> = None;
-    let mut best_dirty: Option<(f64, Vec<Point>)> = None;
-    let mut strict_count = 0usize;
-    let mut nodes_only_count = 0usize;
-    let mut candidate_count = 0usize;
+    let mut state = PathEvalState {
+        best_strict: None,
+        best_nodes_only: None,
+        best_dirty: None,
+        strict_count: 0,
+        nodes_only_count: 0,
+        candidate_count: 0,
+    };
 
-    // Phase 1: 基础候选 + 通道绕行 + Z-fold（开销低，覆盖大多数场景）
-    let mut phase1 = build_candidate_paths(
-        sx, sy, from_side, ex, ey, to_side, PORT_CLEARANCE, PORT_CLEARANCE,
+    // Level 0: 基础 L 形 + 混合端口扩展
+    evaluate_path_batch(
+        build_candidate_paths(sx, sy, from_side, ex, ey, to_side, PORT_CLEARANCE, PORT_CLEARANCE),
+        ctx,
+        pair,
+        scorer,
+        from_id,
+        to_id,
+        &mut state,
     );
-    phase1.extend(build_channel_detours(
-        sx, sy, from_side, ex, ey, to_side, pair, ctx,
-    ));
-    phase1.extend(build_obstacle_aware_z_folds(
-        sx, sy, from_side, ex, ey, to_side, pair, ctx,
-    ));
-    candidate_count += phase1.len();
 
-    for path in phase1 {
-        if path_is_clean(&path, from_id, to_id, ctx.nodes, ctx.group_ctx, &ctx.obstacles.sorted_node_ids) {
-            // 方案 3：早剪枝——`path_length + bends*BEND_PENALTY` 是 score 的可采纳下界
-            //（所有惩罚项非负：obstacle/edge_overlap/corridor 均只增不减）。
-            // 先定桶（strict / nodes_only），若下界已 ≥ 该桶当前最优，跳过昂贵的 scorer.score。
-            let lower_bound = path_length(&path) + path.len().saturating_sub(2) as f64 * BEND_PENALTY;
-            if path_avoids_group_interiors(&path, from_id, to_id, ctx.group_ctx, &ctx.obstacles.sorted_group_ids) {
-                strict_count += 1;
-                if best_strict.as_ref().is_none_or(|(bs, _)| lower_bound < *bs) {
-                    let score = scorer.score(&path, ctx, pair);
-                    if best_strict.as_ref().is_none_or(|(bs, _)| score < *bs) {
-                        best_strict = Some((score, path));
-                    }
-                }
-            } else {
-                nodes_only_count += 1;
-                if best_nodes_only.as_ref().is_none_or(|(bs, _)| lower_bound < *bs) {
-                    let score = scorer.score(&path, ctx, pair);
-                    if best_nodes_only.as_ref().is_none_or(|(bs, _)| score < *bs) {
-                        best_nodes_only = Some((score, path));
-                    }
-                }
+    // Level 1 + P1-B: channel detour——先 base margin，无 strict 再加档
+    if state.best_strict.is_none() {
+        let base_margin = ctx.cfg.channel_margin;
+        evaluate_path_batch(
+            build_channel_detours(
+                sx, sy, from_side, ex, ey, to_side, pair, ctx, corridor, &[base_margin],
+            ),
+            ctx,
+            pair,
+            scorer,
+            from_id,
+            to_id,
+            &mut state,
+        );
+        for &extra in &EXTRA_CHANNEL_MARGINS {
+            if state.best_strict.is_some() {
+                break;
             }
-        } else {
-            let score = path_length(&path) + path.len().saturating_sub(2) as f64 * BEND_PENALTY;
-            if best_dirty.as_ref().is_none_or(|(bs, _)| score < *bs) {
-                best_dirty = Some((score, path));
+            if extra <= base_margin + EPS {
+                continue;
             }
+            evaluate_path_batch(
+                build_channel_detours(
+                    sx, sy, from_side, ex, ey, to_side, pair, ctx, corridor, &[extra],
+                ),
+                ctx,
+                pair,
+                scorer,
+                from_id,
+                to_id,
+                &mut state,
+            );
         }
     }
 
-    // Phase 2: 若 Phase 1 未找到严格干净候选，生成阶梯候选（开销高，但覆盖复杂场景）
-    if best_strict.is_none() {
+    // Level 2: 障碍物感知 z-fold
+    if state.best_strict.is_none() {
+        evaluate_path_batch(
+            build_obstacle_aware_z_folds(sx, sy, from_side, ex, ey, to_side, pair, ctx, corridor),
+            ctx,
+            pair,
+            scorer,
+            from_id,
+            to_id,
+            &mut state,
+        );
+    }
+
+    // Level 3: 阶梯候选（开销最高）
+    if !phase1_only && state.best_strict.is_none() {
         let mut phase2 = build_staircase_candidates(
-            sx, sy, from_side, ex, ey, to_side, pair, ctx, FoldOrder::VerticalFirst,
+            sx, sy, from_side, ex, ey, to_side, pair, ctx, FoldOrder::VerticalFirst, corridor,
         );
         phase2.extend(build_staircase_candidates(
-            sx, sy, from_side, ex, ey, to_side, pair, ctx, FoldOrder::HorizontalFirst,
+            sx, sy, from_side, ex, ey, to_side, pair, ctx, FoldOrder::HorizontalFirst, corridor,
         ));
-        candidate_count += phase2.len();
-
-        for path in phase2 {
-            if path_is_clean(&path, from_id, to_id, ctx.nodes, ctx.group_ctx, &ctx.obstacles.sorted_node_ids) {
-                // 方案 3：早剪枝（同 Phase 1）
-                let lower_bound = path_length(&path) + path.len().saturating_sub(2) as f64 * BEND_PENALTY;
-                if path_avoids_group_interiors(&path, from_id, to_id, ctx.group_ctx, &ctx.obstacles.sorted_group_ids) {
-                    strict_count += 1;
-                    if best_strict.as_ref().is_none_or(|(bs, _)| lower_bound < *bs) {
-                        let score = scorer.score(&path, ctx, pair);
-                        if best_strict.as_ref().is_none_or(|(bs, _)| score < *bs) {
-                            best_strict = Some((score, path));
-                        }
-                    }
-                } else {
-                    nodes_only_count += 1;
-                    if best_nodes_only.as_ref().is_none_or(|(bs, _)| lower_bound < *bs) {
-                        let score = scorer.score(&path, ctx, pair);
-                        if best_nodes_only.as_ref().is_none_or(|(bs, _)| score < *bs) {
-                            best_nodes_only = Some((score, path));
-                        }
-                    }
-                }
-            } else {
-                let score = path_length(&path) + path.len().saturating_sub(2) as f64 * BEND_PENALTY;
-                if best_dirty.as_ref().is_none_or(|(bs, _)| score < *bs) {
-                    best_dirty = Some((score, path));
-                }
-            }
-        }
+        evaluate_path_batch(phase2, ctx, pair, scorer, from_id, to_id, &mut state);
     }
 
-    // P2-1: 记录统计
     if let Some(s) = stats.as_mut() {
-        s.candidate_count = candidate_count;
-        s.hard_filter_reject_count = candidate_count.saturating_sub(strict_count + nodes_only_count);
-        s.degraded = best_strict.is_none() && best_nodes_only.is_none();
+        s.candidate_count = state.candidate_count;
+        s.hard_filter_reject_count = state
+            .candidate_count
+            .saturating_sub(state.strict_count + state.nodes_only_count);
+        s.degraded = state.best_strict.is_none() && state.best_nodes_only.is_none();
     }
 
-    best_strict
-        .or(best_nodes_only)
-        .or(best_dirty)
+    state
+        .best_strict
+        .or(state.best_nodes_only)
+        .or(state.best_dirty)
         .map(|(_, p)| p)
         .unwrap_or_else(|| vec![start, end])
 }
@@ -320,6 +441,7 @@ fn generate_axis_folds(
     ctx: &RoutingContext,
     endpoint_groups: &HashSet<&str>,
     margin: f64,
+    corridor: EdgeCorridor,
 ) -> Vec<Vec<Point>> {
     let nodes = ctx.nodes;
     let groups = &ctx.group_ctx.groups;
@@ -330,8 +452,9 @@ fn generate_axis_folds(
         axis, nodes, groups, endpoint_groups, from_id, to_id,
         NODE_OBSTACLE_PAD, GROUP_OBSTACLE_PAD, margin,
         &ctx.obstacles.sorted_node_ids, &ctx.obstacles.sorted_group_ids,
+        corridor,
     );
-    folds.extend(group_gap_midpoints_on_axis(groups, axis));
+    folds.extend(group_gap_midpoints_on_axis(groups, axis, corridor));
 
     folds.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     folds.dedup_by(|a, b| (*a - *b).abs() < 1.0);
@@ -365,6 +488,7 @@ fn build_obstacle_aware_z_folds(
     to_side: Port,
     pair: &EndpointPair,
     ctx: &RoutingContext,
+    corridor: EdgeCorridor,
 ) -> Vec<Vec<Point>> {
     let from_vertical = is_vertical_port(from_side);
     let to_vertical = is_vertical_port(to_side);
@@ -390,12 +514,12 @@ fn build_obstacle_aware_z_folds(
 
     if from_vertical || mixed {
         candidates.extend(generate_axis_folds(
-            Axis::Horizontal, s1, e1, sx, sy, ex, ey, pair, ctx, &endpoint_groups, margin,
+            Axis::Horizontal, s1, e1, sx, sy, ex, ey, pair, ctx, &endpoint_groups, margin, corridor,
         ));
     }
     if !from_vertical || mixed {
         candidates.extend(generate_axis_folds(
-            Axis::Vertical, s1, e1, sx, sy, ex, ey, pair, ctx, &endpoint_groups, margin,
+            Axis::Vertical, s1, e1, sx, sy, ex, ey, pair, ctx, &endpoint_groups, margin, corridor,
         ));
     }
 
@@ -434,6 +558,7 @@ fn build_staircase_candidates(
     pair: &EndpointPair,
     ctx: &RoutingContext,
     fold_order: FoldOrder,
+    corridor: EdgeCorridor,
 ) -> Vec<Vec<Point>> {
     let from_id = pair.from_id();
     let to_id = pair.to_id();
@@ -465,15 +590,17 @@ fn build_staircase_candidates(
         axis.other(), nodes, groups, &endpoint_groups, from_id, to_id,
         NODE_OBSTACLE_PAD, GROUP_OBSTACLE_PAD, margin,
         &ctx.obstacles.sorted_node_ids, &ctx.obstacles.sorted_group_ids,
+        corridor,
     );
     let mut channel_coords = collect_obstacle_boundaries_on_axis(
         axis, nodes, groups, &endpoint_groups, from_id, to_id,
         NODE_OBSTACLE_PAD, GROUP_OBSTACLE_PAD, margin,
         &ctx.obstacles.sorted_node_ids, &ctx.obstacles.sorted_group_ids,
+        corridor,
     );
 
-    fold_coords.extend(group_gap_midpoints_on_axis(groups, axis.other()));
-    channel_coords.extend(group_gap_midpoints_on_axis(groups, axis));
+    fold_coords.extend(group_gap_midpoints_on_axis(groups, axis.other(), corridor));
+    channel_coords.extend(group_gap_midpoints_on_axis(groups, axis, corridor));
 
     prepare_coords(&mut fold_coords);
     prepare_coords(&mut channel_coords);
@@ -529,6 +656,7 @@ fn build_channel_detours_on_axis(
     endpoint_groups: &HashSet<&str>,
     margins: &[f64],
     base_margin: f64,
+    _corridor: EdgeCorridor,
 ) -> Vec<Vec<Point>> {
     let from_id = pair.from_id();
     let to_id = pair.to_id();
@@ -666,16 +794,7 @@ fn build_channel_detours_on_axis(
     candidates
 }
 
-/// Side-channel detour candidates: when start/end nodes span across intermediate nodes,
-/// open a channel from the side of the node column to bypass them.
-///
-/// Only generated when start/end ports are co-axial (both vertical / both horizontal)
-/// and there are actual obstacle nodes between them.
-///
-/// P0-1: 多档 channel_margin [18, 28, 40]，逐档尝试以提供更多绕行候选。
-///
-/// 改进：不仅在全球 min_left/max_right 处生成通道，还在每个障碍物边界处
-/// 生成通道候选（含相邻障碍物之间的间隙），大幅增加找到干净路径的概率。
+/// P0-1: 多档 channel_margin；P1-B 由调用方按档懒加载传入 `margins`。
 fn build_channel_detours(
     sx: f64,
     sy: f64,
@@ -685,10 +804,15 @@ fn build_channel_detours(
     to_side: Port,
     pair: &EndpointPair,
     ctx: &RoutingContext,
+    corridor: EdgeCorridor,
+    margins: &[f64],
 ) -> Vec<Vec<Point>> {
+    if margins.is_empty() {
+        return Vec::new();
+    }
+
     let from_id = pair.from_id();
     let to_id = pair.to_id();
-    let base_margin = ctx.cfg.channel_margin;
 
     let endpoint_groups: HashSet<&str> = ctx
         .group_ctx
@@ -706,12 +830,12 @@ fn build_channel_detours(
         return Vec::new();
     }
 
-    let margins = [base_margin, 28.0, 40.0];
     let axis = if from_vertical { Axis::Vertical } else { Axis::Horizontal };
+    let base_margin = margins[0];
 
     build_channel_detours_on_axis(
         axis, sx, sy, from_side, ex, ey, to_side, pair, ctx,
-        &endpoint_groups, &margins, base_margin,
+        &endpoint_groups, margins, base_margin, corridor,
     )
 }
 
