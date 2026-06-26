@@ -71,7 +71,9 @@ pub fn run_refine(
         return result;
     }
 
-    let mut best_metrics = crossing::analyze_crossings(&result, diagram, config);
+    let t_cross = std::time::Instant::now();
+    let best_metrics = crossing::analyze_crossings(&result, diagram, config);
+    eprintln!("[perf]         analyze_crossings: {:.2}ms", t_cross.elapsed().as_secs_f64() * 1000.0);
     let mut best_score = combined_crossing_score(&best_metrics);
     if best_metrics.edge_node_crossings == 0 {
         return result;
@@ -88,28 +90,7 @@ pub fn run_refine(
             break;
         }
 
-        let crossing_edges: HashSet<usize> = metrics
-            .problem_nodes
-            .values()
-            .flat_map(|info| info.edge_indices.iter().copied())
-            .collect();
-        if !crossing_edges.is_empty() {
-            let mut trial = result.clone();
-            reroute::reroute_subset(&mut trial, diagram, router, &crossing_edges);
-            let trial_metrics = crossing::analyze_crossings(&trial, diagram, config);
-            let trial_score = combined_crossing_score(&trial_metrics);
-            if trial_score < best_score {
-                result = trial;
-                best_result = result.clone();
-                best_metrics = trial_metrics;
-                best_score = trial_score;
-                passes_executed += 1;
-                if best_metrics.edge_node_crossings == 0 {
-                    break;
-                }
-                continue;
-            }
-        }
+        // 直接推节点 + 重路由，跳过 trial reroute（不推节点时重路由几乎无效）
 
         let mut edges_to_reroute: HashSet<usize> = HashSet::new();
         for info in metrics.problem_nodes.values() {

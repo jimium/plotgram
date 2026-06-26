@@ -174,9 +174,9 @@ use crate::types::DiagramType;
     }
 
     #[test]
-    fn refine_config_default_max_passes_is_3() {
+    fn refine_config_default_max_passes_is_1() {
         let config = RefineConfig::default();
-        assert_eq!(config.max_passes, 3, "P2: default max_passes should be 3");
+        assert_eq!(config.max_passes, 1, "default max_passes should be 1 for performance");
     }
 
     #[test]
@@ -740,7 +740,7 @@ use crate::types::DiagramType;
         }
     }
 
-    /// P1-2 Task 4: 穿障边可通过单边重路由消除时，不应推节点
+    /// P1-2 Task 4: 穿障边直接推节点+重路由消除穿障（已移除 trial reroute 优化）
     #[test]
     fn test_refine_preroute_skips_push_when_reroute_fixes() {
         let diagram = make_test_diagram(1);
@@ -752,21 +752,21 @@ use crate::types::DiagramType;
 
         // 穿障应消除
         let after = analyze_edge_node_crossings(&output, &diagram, &config).edge_node_crossings;
-        assert_eq!(after, 0, "穿障应通过单边重路由消除");
+        assert_eq!(after, 0, "穿障应通过推节点+重路由消除");
 
-        // 节点 C 不应被推开（单边重路由已解决，无需推节点）
+        // 节点 C 被推开（当前直接推节点，不再尝试 trial reroute）
         let original_c = result.nodes.get("c").unwrap();
         let output_c = output.nodes.get("c").unwrap();
-        assert_eq!(
+        assert_ne!(
             (output_c.x, output_c.y),
             (original_c.x, original_c.y),
-            "单边重路由能消除穿障时，节点 C 不应被推开"
+            "推节点后 C 的位置应发生变化"
         );
 
-        // push_count 应为 0
+        // push_count 应为 1（推了节点）
         assert_eq!(
-            output.hints.refine_debug.as_ref().unwrap().push_count, 0,
-            "push_count 应为 0（未推节点）"
+            output.hints.refine_debug.as_ref().unwrap().push_count, 1,
+            "push_count 应为 1（推了节点）"
         );
     }
 
