@@ -37,9 +37,9 @@ pub(super) mod simplify;
 pub(super) mod slot;
 
 // Re-exports for cross-submodule access via `use super::*;`
-pub(super) use context::{EndpointPair, RoutingContext};
-pub(super) use path::{append_routed_segments, select_best_path_with_scorer_stats, PathSelectStats, RoutedSegment};
-pub(super) use scoring::{CandidateScorer, DefaultScorer, GROUP_OBSTACLE_PAD, NODE_OBSTACLE_PAD, path_avoids_group_interiors, path_is_clean, path_is_clean_strict, path_length};
+pub(super) use context::{EndpointPair, PreparedObstacles, RoutingContext, SegmentGrid};
+pub(super) use path::{select_best_path_with_scorer_stats, PathSelectStats, RoutedSegment};
+pub(super) use scoring::{CandidateScorer, DefaultScorer, GROUP_OBSTACLE_PAD, NODE_OBSTACLE_PAD, path_avoids_group_interiors, path_is_clean, path_length};
 pub(super) use simplify::{simplify_path, simplify_path_preserving_stubs};
 #[allow(unused_imports)] // used by tests via `use super::*;`
 pub(super) use simplify::is_collinear;
@@ -250,6 +250,9 @@ fn route_edges_orthogonal_inner(
     );
     result.hints.group_routing = Some(group_ctx.routing_hints());
 
+    // 预排序节点/分组 ID，避免路由循环内重复排序（方案 2）
+    let obstacles = PreparedObstacles::build(&result.nodes, &group_ctx);
+
     // ── 1. 按无向节点对分组，并确定每条边的端口（连接边） ──
     let mut pair_groups: HashMap<String, Vec<usize>> = HashMap::new();
     for (i, rel) in relations.iter().enumerate() {
@@ -446,7 +449,7 @@ fn route_edges_orthogonal_inner(
     } else {
         (0..n).map(|_| EdgeLayout::empty()).collect()
     };
-    let mut routed_segments: Vec<RoutedSegment> = Vec::new();
+    let mut grid = SegmentGrid::new();
 
     // P2-1: 路由 debug 统计
     let mut ortho_stats = crate::layout::OrthoDebugStats {
@@ -462,7 +465,7 @@ fn route_edges_orthogonal_inner(
         if let Some(ref preserve) = preserve_edges {
             if preserve.contains(&i) && edges[i].path_len() >= 2 {
                 let path: Vec<Point> = edges[i].path_points().into_owned();
-                append_routed_segments(&mut routed_segments, &path, i);
+                grid.insert_path(&path, i);
                 continue;
             }
         }
@@ -483,8 +486,9 @@ fn route_edges_orthogonal_inner(
         let ctx = RoutingContext {
             nodes: &result.nodes,
             group_ctx: &group_ctx,
-            routed_segments: &routed_segments,
+            grid: &grid,
             cfg: &cfg,
+            obstacles: &obstacles,
         };
         let pair = EndpointPair {
             from: from_ep.clone(),
@@ -518,7 +522,7 @@ fn route_edges_orthogonal_inner(
             Vec::new()
         };
 
-        append_routed_segments(&mut routed_segments, &path, i);
+        grid.insert_path(&path, i);
 
         let mut edge = EdgeLayout {
             // 临时占位，下面用 set_polyline_points 根据 path 点数自动选择 Straight/Polyline
@@ -545,9 +549,10 @@ fn route_edges_orthogonal_inner(
         &to_side,
         &mut endpoint_map,
         &mut edges,
-        &mut routed_segments,
+        &mut grid,
         &cfg,
         &group_ctx,
+        &obstacles,
         &mut ortho_stats,
     );
 
@@ -599,9 +604,10 @@ fn fix_slot_inversions(
     to_side: &[Port],
     endpoint_map: &mut HashMap<(usize, bool), Endpoint>,
     edges: &mut Vec<EdgeLayout>,
-    routed_segments: &mut Vec<RoutedSegment>,
+    grid: &mut SegmentGrid,
     cfg: &OrthoConfig,
     group_ctx: &crate::layout::group::GroupRoutingContext,
+    obstacles: &PreparedObstacles,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
 ) {
     use std::collections::BTreeMap;
@@ -703,13 +709,14 @@ fn fix_slot_inversions(
                         ei_right,
                         endpoint_map,
                         edges,
-                        routed_segments,
+                        grid,
                         nodes,
                         relations,
                         from_side,
                         to_side,
                         cfg,
                         group_ctx,
+                        obstacles,
                         ortho_stats,
                     );
                     found_inversion = true;
@@ -792,13 +799,14 @@ fn swap_endpoint_anchors(
     ei_b: usize,
     endpoint_map: &mut HashMap<(usize, bool), Endpoint>,
     edges: &mut Vec<EdgeLayout>,
-    routed_segments: &mut Vec<RoutedSegment>,
+    grid: &mut SegmentGrid,
     nodes: &HashMap<String, NodeLayout>,
     relations: &[crate::ast::Relation],
     from_side: &[Port],
     to_side: &[Port],
     cfg: &OrthoConfig,
     group_ctx: &crate::layout::group::GroupRoutingContext,
+    obstacles: &PreparedObstacles,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
 ) {
     // 1. 收集两条边在 endpoint_map 中的所有端点 key
@@ -828,8 +836,9 @@ fn swap_endpoint_anchors(
         endpoint_map.entry(kb).and_modify(|e| e.anchor = anchor_a);
     }
 
-    // 3. 移除旧路径的 routed_segments
-    routed_segments.retain(|seg| seg.edge_index != ei_a && seg.edge_index != ei_b);
+    // 3. 移除旧路径的 segments
+    grid.remove_by_edge(ei_a);
+    grid.remove_by_edge(ei_b);
 
     // 4. 重路由两条边
     for &ei in &[ei_a, ei_b] {
@@ -843,8 +852,9 @@ fn swap_endpoint_anchors(
         let ctx = RoutingContext {
             nodes,
             group_ctx,
-            routed_segments,
+            grid,
             cfg,
+            obstacles,
         };
         let pair = EndpointPair {
             from: from_ep.clone(),
@@ -877,7 +887,7 @@ fn swap_endpoint_anchors(
             Vec::new()
         };
 
-        append_routed_segments(routed_segments, &path, ei);
+        grid.insert_path(&path, ei);
 
         let mut edge = EdgeLayout {
             geometry: PathGeometry::Polyline { points: Vec::new() },

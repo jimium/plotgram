@@ -150,8 +150,8 @@ mod tests {
     use super::canvas::{truncate_string, DisplayCanvas, GridMapper};
     use super::draw::{direction_arrow, draw_box, draw_segment, route_edge_points, RouteBusInfo};
     use crate::ast::{
-        ArrowType, AttributeMap, AttributeValue, Diagram, DiagramAttribute, Entity, Identifier,
-        Relation, SourceInfo, Span, TextValue,
+        ArrowType, AttributeMap, Diagram, Entity, Identifier,
+        Relation, SourceInfo, Span,
     };
     use crate::types::DiagramType;
     use crate::layout::{EdgeLayout, PathGeometry, Port};

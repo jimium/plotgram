@@ -847,8 +847,6 @@ mod tests {
     use super::*;
     use drawify_core::ast::*;
     use drawify_core::types::DiagramType;
-    use drawify_core::layout::NodeLayout;
-    use std::collections::HashMap;
 
     fn sample_diagram() -> Diagram {
         Diagram {

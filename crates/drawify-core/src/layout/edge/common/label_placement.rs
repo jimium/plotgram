@@ -11,7 +11,6 @@
 //! 不再需要传入 `relations`。
 
 use crate::layout::constants::DEFAULT_MAX_LABEL_ITERATIONS;
-use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
 use crate::layout::edge::common::edge_geometry::node_center;
 use std::collections::HashMap;
@@ -241,6 +240,7 @@ fn separation_vector(
 mod tests {
     use super::*;
     use crate::layout::edge::common::label_avoidance::{aabb_overlap, label_bbox};
+    use crate::layout::geometry::Point;
     use crate::layout::{EdgeLabelLayout, EdgeLayout, GroupLayout, NodeLayout, PathGeometry, Port};
 
     fn labeled_edge(label_center: Point) -> EdgeLayout {

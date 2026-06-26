@@ -1,8 +1,6 @@
 //! 顶层分组宽度策略：fit（内容贴合）与 uniform（等宽阶段条带）
 
 use crate::ast::Diagram;
-use crate::layout::{GroupLayout, LayoutResult, NodeLayout};
-use std::collections::HashMap;
 
 /// 图级分组宽度策略
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,18 +84,9 @@ pub fn apply_group_sizing_policy<B: GroupWidthBlock>(
     }
 }
 
-/// 顶层 group ID 列表（无嵌套父组）
-pub fn top_level_group_ids(diagram: &Diagram) -> Vec<String> {
-    diagram
-        .groups
-        .iter()
-        .filter(|g| g.parent_id.is_none())
-        .map(|g| g.id.as_str().to_string())
-        .collect()
-}
-
 /// 与 [`crate::layout::node::common::group_bounds::GroupPadding`] 对齐的 padding 参数
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub struct GroupPaddingLike {
     pub x: f64,
     pub y_top: f64,
@@ -105,6 +94,7 @@ pub struct GroupPaddingLike {
     pub y_delta: f64,
 }
 
+#[allow(dead_code)]
 impl GroupPaddingLike {
     pub fn architecture_v2() -> Self {
         Self {

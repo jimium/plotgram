@@ -1,4 +1,5 @@
 use super::*;
+use super::overlap::{analyze_edge_overlaps, segments_conflict_xy};
 use std::collections::HashMap;
 use crate::layout::geometry::{Point, Rect};
 use crate::layout::{EdgeLayout, LayoutResult, NodeLayout, PathGeometry, Port};

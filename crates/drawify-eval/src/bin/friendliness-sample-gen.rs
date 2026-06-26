@@ -344,7 +344,7 @@ fn gen_dag(buf: &mut String, layers: usize, per_layer: usize, seed: u64) {
     buf.push_str(&format!("diagram flowchart \"dag-L{}P{}\" {{\n\n", layers, per_layer));
     let mut id = 0usize;
     let mut layer_nodes: Vec<Vec<usize>> = Vec::new();
-    for l in 0..layers {
+    for _l in 0..layers {
         let mut layer = Vec::new();
         for _ in 0..per_layer {
             buf.push_str(&format!("    entity n{} \"N{}\" {{ type: process }}\n", id, id));
@@ -366,7 +366,7 @@ fn gen_dag(buf: &mut String, layers: usize, per_layer: usize, seed: u64) {
             let next = &layer_nodes[l + 1];
             // 连 1-2 个
             let n_conn = 1 + (rng() % 2) as usize;
-            for k in 0..n_conn {
+            for _k in 0..n_conn {
                 let target = next[(rng() as usize) % next.len()];
                 buf.push_str(&format!("    n{} -> n{}\n", node, target));
             }
@@ -445,7 +445,7 @@ fn gen_wide_layer(buf: &mut String, layers: usize, per_layer: usize) {
     buf.push_str(&format!("diagram flowchart \"wide-L{}P{}\" {{\n\n", layers, per_layer));
     let mut id = 0usize;
     let mut layer_nodes: Vec<Vec<usize>> = Vec::new();
-    for l in 0..layers {
+    for _l in 0..layers {
         let mut layer = Vec::new();
         for _ in 0..per_layer {
             buf.push_str(&format!("    entity n{} \"N{}\" {{ type: process }}\n", id, id));
@@ -563,7 +563,7 @@ fn gen_sparse_layer(buf: &mut String, layers: usize, per_layer: usize) {
     buf.push_str(&format!("diagram flowchart \"sparse-L{}P{}\" {{\n\n", layers, per_layer));
     let mut id = 0usize;
     let mut layer_nodes: Vec<Vec<usize>> = Vec::new();
-    for l in 0..layers {
+    for _l in 0..layers {
         let mut layer = Vec::new();
         for _ in 0..per_layer {
             buf.push_str(&format!("    entity n{} \"N{}\" {{ type: process }}\n", id, id));

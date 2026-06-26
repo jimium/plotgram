@@ -1,5 +1,5 @@
 use super::*;
-use super::constants::{GROUP_LABEL_HEIGHT, NODE_GAP, PADDING};
+use super::constants::{GROUP_LABEL_HEIGHT, NODE_GAP};
 use crate::layout::constants;
 use crate::layout::NodeLayout;
 use crate::ast::{

@@ -178,7 +178,7 @@ impl<'a> LayoutPipeline<'a> {
     fn run_routing_pipeline(
         &self,
         algo: &str,
-        mut result: LayoutResult,
+        result: LayoutResult,
         pinned: &intent::PinSet,
         report: &mut RefinementReport,
     ) -> Result<LayoutResult, DiagnosticError> {

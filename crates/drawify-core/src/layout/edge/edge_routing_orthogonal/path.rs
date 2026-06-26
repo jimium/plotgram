@@ -50,28 +50,26 @@ fn collect_obstacle_boundaries_on_axis(
     node_pad: f64,
     group_pad: f64,
     margin: f64,
+    sorted_node_ids: &[String],
+    sorted_group_ids: &[String],
 ) -> Vec<f64> {
     let mut coords = Vec::new();
 
-    let mut node_ids: Vec<&String> = nodes.keys().collect();
-    node_ids.sort();
-    for nid in &node_ids {
+    for nid in sorted_node_ids {
         if nid.as_str() == from_id || nid.as_str() == to_id {
             continue;
         }
-        let r = Rect::from(&nodes[*nid]);
+        let r = Rect::from(&nodes[nid]);
         let (lo, hi) = r.cross_range_on_axis(axis);
         coords.push((lo - node_pad) - margin);
         coords.push((hi + node_pad) + margin);
     }
 
-    let mut group_ids: Vec<&String> = groups.keys().collect();
-    group_ids.sort();
-    for gid in &group_ids {
+    for gid in sorted_group_ids {
         if endpoint_groups.contains(gid.as_str()) {
             continue;
         }
-        if let Some(gl) = groups.get(*gid) {
+        if let Some(gl) = groups.get(gid) {
             let r = Rect::from(gl);
             let (lo, hi) = r.cross_range_on_axis(axis);
             coords.push((lo - group_pad) - margin);
@@ -151,17 +149,26 @@ pub fn select_best_path_with_scorer_stats(
     candidate_count += phase1.len();
 
     for path in phase1 {
-        if path_is_clean(&path, from_id, to_id, ctx.nodes, ctx.group_ctx) {
-            let score = scorer.score(&path, ctx, pair);
-            if path_avoids_group_interiors(&path, from_id, to_id, ctx.group_ctx) {
+        if path_is_clean(&path, from_id, to_id, ctx.nodes, ctx.group_ctx, &ctx.obstacles.sorted_node_ids) {
+            // 方案 3：早剪枝——`path_length + bends*BEND_PENALTY` 是 score 的可采纳下界
+            //（所有惩罚项非负：obstacle/edge_overlap/corridor 均只增不减）。
+            // 先定桶（strict / nodes_only），若下界已 ≥ 该桶当前最优，跳过昂贵的 scorer.score。
+            let lower_bound = path_length(&path) + path.len().saturating_sub(2) as f64 * BEND_PENALTY;
+            if path_avoids_group_interiors(&path, from_id, to_id, ctx.group_ctx, &ctx.obstacles.sorted_group_ids) {
                 strict_count += 1;
-                if best_strict.as_ref().is_none_or(|(bs, _)| score < *bs) {
-                    best_strict = Some((score, path));
+                if best_strict.as_ref().is_none_or(|(bs, _)| lower_bound < *bs) {
+                    let score = scorer.score(&path, ctx, pair);
+                    if best_strict.as_ref().is_none_or(|(bs, _)| score < *bs) {
+                        best_strict = Some((score, path));
+                    }
                 }
             } else {
                 nodes_only_count += 1;
-                if best_nodes_only.as_ref().is_none_or(|(bs, _)| score < *bs) {
-                    best_nodes_only = Some((score, path));
+                if best_nodes_only.as_ref().is_none_or(|(bs, _)| lower_bound < *bs) {
+                    let score = scorer.score(&path, ctx, pair);
+                    if best_nodes_only.as_ref().is_none_or(|(bs, _)| score < *bs) {
+                        best_nodes_only = Some((score, path));
+                    }
                 }
             }
         } else {
@@ -183,17 +190,24 @@ pub fn select_best_path_with_scorer_stats(
         candidate_count += phase2.len();
 
         for path in phase2 {
-            if path_is_clean(&path, from_id, to_id, ctx.nodes, ctx.group_ctx) {
-                let score = scorer.score(&path, ctx, pair);
-                if path_avoids_group_interiors(&path, from_id, to_id, ctx.group_ctx) {
+            if path_is_clean(&path, from_id, to_id, ctx.nodes, ctx.group_ctx, &ctx.obstacles.sorted_node_ids) {
+                // 方案 3：早剪枝（同 Phase 1）
+                let lower_bound = path_length(&path) + path.len().saturating_sub(2) as f64 * BEND_PENALTY;
+                if path_avoids_group_interiors(&path, from_id, to_id, ctx.group_ctx, &ctx.obstacles.sorted_group_ids) {
                     strict_count += 1;
-                    if best_strict.as_ref().is_none_or(|(bs, _)| score < *bs) {
-                        best_strict = Some((score, path));
+                    if best_strict.as_ref().is_none_or(|(bs, _)| lower_bound < *bs) {
+                        let score = scorer.score(&path, ctx, pair);
+                        if best_strict.as_ref().is_none_or(|(bs, _)| score < *bs) {
+                            best_strict = Some((score, path));
+                        }
                     }
                 } else {
                     nodes_only_count += 1;
-                    if best_nodes_only.as_ref().is_none_or(|(bs, _)| score < *bs) {
-                        best_nodes_only = Some((score, path));
+                    if best_nodes_only.as_ref().is_none_or(|(bs, _)| lower_bound < *bs) {
+                        let score = scorer.score(&path, ctx, pair);
+                        if best_nodes_only.as_ref().is_none_or(|(bs, _)| score < *bs) {
+                            best_nodes_only = Some((score, path));
+                        }
                     }
                 }
             } else {
@@ -315,6 +329,7 @@ fn generate_axis_folds(
     let mut folds = collect_obstacle_boundaries_on_axis(
         axis, nodes, groups, endpoint_groups, from_id, to_id,
         NODE_OBSTACLE_PAD, GROUP_OBSTACLE_PAD, margin,
+        &ctx.obstacles.sorted_node_ids, &ctx.obstacles.sorted_group_ids,
     );
     folds.extend(group_gap_midpoints_on_axis(groups, axis));
 
@@ -449,10 +464,12 @@ fn build_staircase_candidates(
     let mut fold_coords = collect_obstacle_boundaries_on_axis(
         axis.other(), nodes, groups, &endpoint_groups, from_id, to_id,
         NODE_OBSTACLE_PAD, GROUP_OBSTACLE_PAD, margin,
+        &ctx.obstacles.sorted_node_ids, &ctx.obstacles.sorted_group_ids,
     );
     let mut channel_coords = collect_obstacle_boundaries_on_axis(
         axis, nodes, groups, &endpoint_groups, from_id, to_id,
         NODE_OBSTACLE_PAD, GROUP_OBSTACLE_PAD, margin,
+        &ctx.obstacles.sorted_node_ids, &ctx.obstacles.sorted_group_ids,
     );
 
     fold_coords.extend(group_gap_midpoints_on_axis(groups, axis.other()));
@@ -530,13 +547,12 @@ fn build_channel_detours_on_axis(
     let mut min_cross = f64::MAX;
     let mut max_cross = f64::MIN;
 
-    let mut node_ids: Vec<&String> = nodes.keys().collect();
-    node_ids.sort();
-    for nid in &node_ids {
+    // 使用预排序的 node_ids / group_ids（方案 2，确定性 AGENTS.md §2）
+    for nid in &ctx.obstacles.sorted_node_ids {
         if nid.as_str() == from_id || nid.as_str() == to_id {
             continue;
         }
-        let r = Rect::from(&nodes[*nid]);
+        let r = Rect::from(&nodes[nid]);
         let pad = NODE_OBSTACLE_PAD;
         let (m_lo, m_hi) = r.range_on_axis(axis);
         let (c_lo, c_hi) = r.cross_range_on_axis(axis);
@@ -554,13 +570,11 @@ fn build_channel_detours_on_axis(
         }
     }
 
-    let mut group_ids: Vec<&String> = groups.keys().collect();
-    group_ids.sort();
-    for gid in &group_ids {
+    for gid in &ctx.obstacles.sorted_group_ids {
         if endpoint_groups.contains(gid.as_str()) {
             continue;
         }
-        if let Some(gl) = groups.get(*gid) {
+        if let Some(gl) = groups.get(gid) {
             let r = Rect::from(gl);
             let pad = GROUP_OBSTACLE_PAD;
             let (m_lo, m_hi) = r.range_on_axis(axis);
@@ -860,21 +874,5 @@ fn same_side_path(sx: f64, sy: f64, from_side: Port, ex: f64, ey: f64) -> Vec<Po
             let x_out = sx.max(ex) + SAME_SIDE_PADDING;
             vec![Point::new(sx, sy), Point::new(x_out, sy), Point::new(x_out, ey), Point::new(ex, ey)]
         }
-    }
-}
-
-pub fn append_routed_segments(
-    segments: &mut Vec<RoutedSegment>,
-    path: &[Point],
-    edge_index: usize,
-) {
-    for window in path.windows(2) {
-        segments.push(RoutedSegment {
-            x1: window[0].x,
-            y1: window[0].y,
-            x2: window[1].x,
-            y2: window[1].y,
-            edge_index,
-        });
     }
 }

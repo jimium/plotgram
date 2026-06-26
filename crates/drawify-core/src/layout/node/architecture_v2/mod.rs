@@ -10,6 +10,6 @@ mod two_phase;
 pub(crate) use group_layout_hint::{is_valid_group_layout_atom, VALID_GROUP_LAYOUTS};
 pub(crate) use group_sizing::{
     is_valid_group_sizing_atom,
-    GroupPaddingLike, VALID_GROUP_SIZING,
+    VALID_GROUP_SIZING,
 };
 pub use layout::ArchitectureV2Layout;

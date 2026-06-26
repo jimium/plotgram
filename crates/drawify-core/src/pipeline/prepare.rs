@@ -63,17 +63,6 @@ impl PipelineOutput {
 }
 
 impl PipelineOutput {
-    fn empty() -> Self {
-        Self {
-            diagram: None,
-            errors: Vec::new(),
-            warnings: Vec::new(),
-            total_errors: 0,
-            total_warnings: 0,
-            truncated: false,
-        }
-    }
-
     fn from_parse(diagram: Option<PreparedDiagram>, errors: Vec<DiagnosticError>, warnings: Vec<DiagnosticError>) -> Self {
         let total_errors = errors.len();
         let total_warnings = warnings.len();

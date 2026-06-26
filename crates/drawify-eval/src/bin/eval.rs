@@ -376,7 +376,7 @@ fn cmd_batch(args: &[String]) {
 
     // 保存历史
     if cli.save_history {
-        if let Ok(mut report) = serde_json::from_str::<drawify_eval::EvalReport>(&content) {
+        if let Ok(report) = serde_json::from_str::<drawify_eval::EvalReport>(&content) {
             save_to_history(&report, "batch");
         }
     }
@@ -573,7 +573,7 @@ fn cmd_algo(args: &[String]) {
     dfy_files.sort();
 
     let engine = EvalEngine::new();
-    let mut report = drawify_eval::EvalReport::new(&format!("算法评估: {}", algo_name));
+    let report = drawify_eval::EvalReport::new(&format!("算法评估: {}", algo_name));
     let mut all_results: Vec<drawify_eval::EvalResult> = Vec::new();
 
     for path in &dfy_files {

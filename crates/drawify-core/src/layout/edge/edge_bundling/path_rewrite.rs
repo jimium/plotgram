@@ -33,7 +33,6 @@ use crate::layout::{EdgeLayout, NodeLayout, Port};
 
 use super::compatibility::EdgeFeatures;
 use super::trunk::allocate_trunks;
-use super::clustering::BundleCandidate;
 use super::types::{
     Axis, BundlingConfig, BundlingResult, EdgeBundle, EdgeBundlingDebugStats, EdgePathRoles, SegmentRole, SegmentSpan,
     TrunkKeepout,
@@ -475,7 +474,7 @@ mod tests {
     use crate::ast::{
         ArrowType, AttributeMap, Identifier, Relation, Span,
     };
-    use crate::layout::{EdgeLayout, PathGeometry, Port};
+    use crate::layout::{EdgeLayout, Port};
     use std::collections::HashMap;
 
     fn make_relation(from: &str, to: &str, arrow: ArrowType) -> Relation {

@@ -3,7 +3,7 @@
 use crate::layout::LayoutResult;
 use std::collections::HashMap;
 
-use super::{NodePushInfo, RefineConfig, RefineMetrics};
+use super::{RefineConfig, RefineMetrics};
 
 /// 节点推动 momentum 历史，检测方向反转并施加衰减以抑制震荡。
 #[derive(Default)]
