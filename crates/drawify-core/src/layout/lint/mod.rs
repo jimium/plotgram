@@ -15,6 +15,7 @@ pub use violation::{
 };
 
 use crate::ast::Diagram;
+use crate::layout::edge::edge_bundling::types::BundlingResult;
 use crate::layout::geometry::Point;
 use crate::layout::refine::segment_intersects_node;
 use crate::layout::{ContainmentViolationKind, LayoutResult};
@@ -74,6 +75,28 @@ impl LayoutLinter {
         }
         if cfg.is_enabled(LintRuleId::EdgeCrossesGroupInterior) {
             check_edge_crosses_group_interior(diagram, result, &mut violations);
+        }
+
+        // ── Edge Bundling 专项检查 ──
+        if let Some(bundle_hints) = &result.hints.edge_bundling {
+            let bundling = &bundle_hints.result;
+            if !bundling.bundles.is_empty() {
+                if cfg.is_enabled(LintRuleId::BundledArrowConvergence) {
+                    check_bundled_arrow_convergence(diagram, bundling, &mut violations);
+                }
+                if cfg.is_enabled(LintRuleId::BundledOppositeFlow) {
+                    check_bundled_opposite_flow(diagram, bundling, &mut violations);
+                }
+                if cfg.is_enabled(LintRuleId::BundleMergeDensity) {
+                    check_bundle_merge_density(bundling, &mut violations);
+                }
+                if cfg.is_enabled(LintRuleId::BundleForkOverlap) {
+                    check_bundle_fork_overlap(result, bundling, &mut violations);
+                }
+                if cfg.is_enabled(LintRuleId::BundleTrunkThroughNode) {
+                    check_bundle_trunk_through_node(diagram, result, bundling, &mut violations);
+                }
+            }
         }
 
         let mut violations = finalize_violations(cfg, violations);
@@ -540,6 +563,255 @@ fn endpoint_related_groups(
         .get(direct)
         .cloned()
         .unwrap_or_else(|| HashSet::from([direct.clone()]))
+}
+
+// ─── Edge Bundling Lint 检查 ───────────────────────────────────────
+
+/// 检查同 bundle 内多条边指向同一节点（箭头冗余）。
+///
+/// 当 2+ 条边从同一 bundle 指向同一目标节点时，这些箭头在视觉上冗余，
+/// 可能只需要一个合并的箭头。
+fn check_bundled_arrow_convergence(
+    diagram: &Diagram,
+    bundling: &BundlingResult,
+    out: &mut Vec<LayoutViolation>,
+) {
+    for bundle in &bundling.bundles {
+        if bundle.edges.len() < 2 {
+            continue;
+        }
+        // 统计 bundle 内每条边指向的 to 节点
+        let mut to_groups: HashMap<&str, Vec<usize>> = HashMap::new();
+        for &ei in &bundle.edges {
+            if let Some(rel) = diagram.relations.get(ei) {
+                to_groups.entry(rel.to.as_str()).or_default().push(ei);
+            }
+        }
+        for (to_id, edge_indices) in &to_groups {
+            if edge_indices.len() >= 2 {
+                let edge_list: Vec<String> = edge_indices.iter().map(|i| i.to_string()).collect();
+                out.push(
+                    LayoutViolation::new(
+                        LintRuleId::BundledArrowConvergence,
+                        format!(
+                            "bundle {} 中有 {} 条边汇聚到节点 '{}'（索引: {}），箭头冗余",
+                            bundle.id,
+                            edge_indices.len(),
+                            to_id,
+                            edge_list.join(", "),
+                        ),
+                    )
+                    .with_metric(edge_indices.len() as f64)
+                    .with_entities(edge_indices.iter().map(|i| i.to_string())),
+                );
+            }
+        }
+    }
+}
+
+/// 检查同 bundle 内存在语义反向的边。
+///
+/// 当 bundle 中包含出入方向相反的边时（例如 A→B 与 B→A 或 C→B），
+/// 说明出入方向不一致，合并到同一主干会造成视觉混淆。
+fn check_bundled_opposite_flow(
+    diagram: &Diagram,
+    bundling: &BundlingResult,
+    out: &mut Vec<LayoutViolation>,
+) {
+    for bundle in &bundling.bundles {
+        if bundle.edges.len() < 2 {
+            continue;
+        }
+        // 收集 bundle 内每条边的 (from, to)
+        let pairs: Vec<(usize, &str, &str)> = bundle
+            .edges
+            .iter()
+            .filter_map(|&ei| {
+                diagram
+                    .relations
+                    .get(ei)
+                    .map(|r| (ei, r.from.as_str(), r.to.as_str()))
+            })
+            .collect();
+
+        // 检查反向边：若存在 (A→B) 和 (B→A)，即方向相反
+        for i in 0..pairs.len() {
+            for j in (i + 1)..pairs.len() {
+                let (ei_a, from_a, to_a) = pairs[i];
+                let (ei_b, from_b, to_b) = pairs[j];
+                // 反向边：A→B vs B→A，或 B→A vs A→B
+                if from_a == to_b && to_a == from_b {
+                    out.push(
+                        LayoutViolation::new(
+                            LintRuleId::BundledOppositeFlow,
+                            format!(
+                                "bundle {} 中包含反向边: index={} ({}→{}) 与 index={} ({}→{})",
+                                bundle.id, ei_a, from_a, to_a, ei_b, from_b, to_b,
+                            ),
+                        )
+                        .with_entities([ei_a.to_string(), ei_b.to_string()]),
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// 检查 bundle 的 merge leg 分叉点过密。
+///
+/// 当同一 bundle 的 entry_points 间距过近时，合入腿（merge leg）过于密集，
+/// 可能导致视觉重叠。阈值取 `fork_spacing` 默认值 8px。
+fn check_bundle_merge_density(
+    bundling: &BundlingResult,
+    out: &mut Vec<LayoutViolation>,
+) {
+    const MIN_ENTRY_SPACING: f64 = 8.0;
+
+    for bundle in &bundling.bundles {
+        if bundle.entry_points.len() < 2 {
+            continue;
+        }
+        for i in 0..bundle.entry_points.len() {
+            for j in (i + 1)..bundle.entry_points.len() {
+                let a = bundle.entry_points[i];
+                let b = bundle.entry_points[j];
+                let dist = ((a.x - b.x).powi(2) + (a.y - b.y).powi(2)).sqrt();
+                if dist > 0.0 && dist < MIN_ENTRY_SPACING {
+                    // 确保两条边都存在
+                    let ei_a = bundle.edges.get(i).copied();
+                    let ei_b = bundle.edges.get(j).copied();
+                    if let (Some(a), Some(b)) = (ei_a, ei_b) {
+                        out.push(
+                            LayoutViolation::new(
+                                LintRuleId::BundleMergeDensity,
+                                format!(
+                                    "bundle {} 中 merge leg 分叉点过密: index={} 与 index={} 间距 {:.1}px",
+                                    bundle.id, a, b, dist,
+                                ),
+                            )
+                            .with_metric(dist)
+                            .with_entities([a.to_string(), b.to_string()]),
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 检查 bundle 的 fork leg 交叉。
+///
+/// 同一 bundle 内不同边的 fork leg（从 exit_point 到 to 端口的路径段）可能交叉，
+/// 造成视觉混乱。
+fn check_bundle_fork_overlap(
+    result: &LayoutResult,
+    bundling: &BundlingResult,
+    out: &mut Vec<LayoutViolation>,
+) {
+    for bundle in &bundling.bundles {
+        if bundle.edges.len() < 2 {
+            continue;
+        }
+        // 收集 bundle 内每条边的 fork leg 段（从 exit_point 到路径终点）
+        let fork_segments: Vec<(usize, Vec<Point>)> = bundle
+            .edges
+            .iter()
+            .filter_map(|&ei| {
+                let edge = result.edges.get(ei)?;
+                let path = edge.path_points();
+                if path.len() < 2 {
+                    return None;
+                }
+                // 找 exit_point 在路径中的位置，取之后的段作为 fork leg
+                if let Some(&exit) = bundle.exit_points.get(
+                    bundle.edges.iter().position(|&e| e == ei)?
+                ) {
+                    // 从离 exit_point 最近的点开始
+                    let start_idx = path
+                        .iter()
+                        .position(|p| (p.x - exit.x).abs() < 1.0 && (p.y - exit.y).abs() < 1.0)
+                        .unwrap_or(0);
+                    let fork = path[start_idx..].to_vec();
+                    if fork.len() >= 2 {
+                        return Some((ei, fork));
+                    }
+                }
+                None
+            })
+            .collect();
+
+        for i in 0..fork_segments.len() {
+            for j in (i + 1)..fork_segments.len() {
+                let (ei_a, seg_a) = &fork_segments[i];
+                let (ei_b, seg_b) = &fork_segments[j];
+                if polylines_cross(seg_a, seg_b) {
+                    out.push(
+                        LayoutViolation::new(
+                            LintRuleId::BundleForkOverlap,
+                            format!(
+                                "bundle {} 中 fork leg 交叉: index={} 与 index={}",
+                                bundle.id, ei_a, ei_b,
+                            ),
+                        )
+                        .with_entities([ei_a.to_string(), ei_b.to_string()]),
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// 检查 bundle 主干是否穿过节点。
+///
+/// 主干段（trunk_start → trunk_end）是 bundle 内所有边的共享路径，
+/// 不应穿过任何非端点节点。
+fn check_bundle_trunk_through_node(
+    diagram: &Diagram,
+    result: &LayoutResult,
+    bundling: &BundlingResult,
+    out: &mut Vec<LayoutViolation>,
+) {
+    for bundle in &bundling.bundles {
+        let trunk_start = bundle.trunk_start;
+        let trunk_end = bundle.trunk_end;
+        // 跳过退化主干
+        let trunk_len = ((trunk_end.x - trunk_start.x).powi(2)
+            + (trunk_end.y - trunk_start.y).powi(2))
+        .sqrt();
+        if trunk_len < 1.0 {
+            continue;
+        }
+
+        // 收集 bundle 内所有边涉及的节点（端点节点不应被报告）
+        let mut endpoint_nodes: HashSet<&str> = HashSet::new();
+        for &ei in &bundle.edges {
+            if let Some(rel) = diagram.relations.get(ei) {
+                endpoint_nodes.insert(rel.from.as_str());
+                endpoint_nodes.insert(rel.to.as_str());
+            }
+        }
+
+        let mut node_ids: Vec<&String> = result.nodes.keys().collect();
+        node_ids.sort();
+        for node_id in node_ids {
+            if endpoint_nodes.contains(node_id.as_str()) {
+                continue;
+            }
+            let nl = &result.nodes[node_id];
+            if segment_intersects_node(trunk_start, trunk_end, nl) {
+                out.push(
+                    LayoutViolation::new(
+                        LintRuleId::BundleTrunkThroughNode,
+                        format!(
+                            "bundle {} 主干穿过节点 '{}'",
+                            bundle.id, node_id,
+                        ),
+                    )
+                    .with_entities([node_id.as_str()]),
+                );
+            }
+        }
+    }
 }
 
 #[cfg(test)]

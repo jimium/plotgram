@@ -195,8 +195,15 @@ pub fn compute_compatibility(e1: &EdgeFeatures, e2: &EdgeFeatures, config: &Bund
         return 0.0;
     }
 
-    // ── 硬条件 2: 流向兼容（非反向：不构成 A→B + B→A）──
+    // ── 硬条件 2: 流向兼容（非反向）──
+    // 禁止合并：
+    // 1. 完全反向边 A→B + B→A
+    // 2. 出入边合并：A→B + B→C（B 对一侧是 to，对另一侧是 from，方向相反）
     if e1.from_id == e2.to_id && e1.to_id == e2.from_id {
+        return 0.0;
+    }
+    // 出入边合并：一条边的 to 是另一条边的 from（语义流向相反）
+    if e1.to_id == e2.from_id || e1.from_id == e2.to_id {
         return 0.0;
     }
 

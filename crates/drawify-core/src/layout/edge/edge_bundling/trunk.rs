@@ -426,14 +426,15 @@ fn enforce_fork_spacing(
     let mut result: Vec<f64> = coords.to_vec();
 
     // 迭代调整，直到所有相邻间距 ≥ spacing 或达到上限
-    for _iteration in 0..8 {
+    for _iteration in 0..16 {
         let mut adjusted = false;
         for i in 1..result.len() {
             let gap = result[i] - result[i - 1];
             if gap < spacing - EPS {
-                // 需要推开
+                // 需要推开：向两侧均匀推开
                 let deficit = spacing - gap;
                 let push = deficit / 2.0;
+                // 向两侧推开，但优先向外侧（远离中心）推开
                 result[i - 1] -= push;
                 result[i] += push;
                 adjusted = true;
@@ -444,7 +445,7 @@ fn enforce_fork_spacing(
         }
     }
 
-    // 钳制到主干范围
+    // 钳制到主干范围，但保留更多空间
     for coord in &mut result {
         *coord = coord.clamp(min_bound, max_bound);
     }
