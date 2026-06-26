@@ -3,28 +3,23 @@
 diagram er {
     title: "学校管理系统"
 
-    entity student "Student" {
-        type: database
+    entity[database] student "Student" {
         meta.pk: "id"
         meta.fields: "name\ngrade"
     }
-    entity course "Course" {
-        type: database
+    entity[database] course "Course" {
         meta.pk: "id"
         meta.fields: "title\ncredits"
     }
-    entity teacher "Teacher" {
-        type: database
+    entity[database] teacher "Teacher" {
         meta.pk: "id"
         meta.fields: "name\ndepartment"
     }
-    entity enrollment "Enrollment" {
-        type: database
+    entity[database] enrollment "Enrollment" {
         meta.pk: "id"
         meta.fields: "fk.student_id\nfk.course_id\nenrolled_at"
     }
-    entity classroom "Classroom" {
-        type: database
+    entity[database] classroom "Classroom" {
         meta.pk: "id"
         meta.fields: "building\nroom_no"
     }

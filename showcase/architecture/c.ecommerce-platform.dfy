@@ -4,53 +4,49 @@ diagram architecture {
     title: "电商平台架构"
 
     group client_layer "接入层" {
-        entity web "Web 商城" { type: frontend }
-        entity app "移动 App" { type: frontend }
-        entity admin "运营后台" { type: frontend }
+        entity[frontend] web "Web 商城"
+        entity[frontend] app "移动 App"
+        entity[frontend] admin "运营后台"
     }
 
     group gateway_layer "网关层" {
-        entity cdn "CDN" { type: external }
-        entity lb "负载均衡" { type: gateway }
-        entity api_gw "API 网关" { type: gateway }
+        entity[external] cdn "CDN"
+        entity[gateway] lb "负载均衡"
+        entity[gateway] api_gw "API 网关"
 
         cdn -> lb
         lb -> api_gw
     }
 
     group service_layer "业务服务" {
-        entity user_svc "用户服务" { type: service }
-        entity product_svc "商品服务" { type: service }
-        entity order_svc "订单服务" { type: service }
-        entity payment_svc "支付服务" { type: service }
-        entity search_svc "搜索服务" { type: service }
-        entity notify_svc "通知服务" { type: service }
+        entity[service] user_svc "用户服务"
+        entity[service] product_svc "商品服务"
+        entity[service] order_svc "订单服务"
+        entity[service] payment_svc "支付服务"
+        entity[service] search_svc "搜索服务"
+        entity[service] notify_svc "通知服务"
 
         order_svc -> payment_svc
     }
 
     group data_layer "数据层" {
-        entity mysql "MySQL 集群" {
-            type: database
+        entity[database] mysql "MySQL 集群" {
             semantic: mysql
         }
-        entity redis "Redis 缓存" {
-            type: cache
+        entity[cache] redis "Redis 缓存" {
             semantic: redis
         }
-        entity es "Elasticsearch" {
-            type: database
+        entity[database] es "Elasticsearch" {
             semantic: elasticsearch
         }
-        entity mq "RabbitMQ" {
-            type: queue
+        entity[queue] mq "RabbitMQ" {
             semantic: rabbitmq
         }
     }
 
     group external "外部系统" {
-        entity alipay "支付宝" { type: external }
-        entity sms "短信网关" { type: external }
+        entity[external] alipay "支付宝"
+        entity[external] sms "短信网关"
     }
 
     web -> cdn

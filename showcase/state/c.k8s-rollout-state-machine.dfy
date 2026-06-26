@@ -3,17 +3,17 @@
 diagram state {
     title: "K8s 发布状态机"
 
-    entity init "初始化" { type: initial }
-    entity created "Created" { type: state }
-    entity progressing "Progressing" { type: state }
-    entity paused "Paused" { type: state }
-    entity verifying "Verifying" { type: state }
-    entity promoted "Promoted" { type: state }
-    entity degraded "Degraded" { type: state }
-    entity rollback "RollingBack" { type: state }
-    entity completed "Completed" { type: final }
-    entity failed "Failed" { type: final }
-    entity gate "健康检查通过？" { type: choice }
+    entity[initial] init "初始化"
+    entity[state] created "Created"
+    entity[state] progressing "Progressing"
+    entity[state] paused "Paused"
+    entity[state] verifying "Verifying"
+    entity[state] promoted "Promoted"
+    entity[state] degraded "Degraded"
+    entity[state] rollback "RollingBack"
+    entity[final] completed "Completed"
+    entity[final] failed "Failed"
+    entity[choice] gate "健康检查通过？"
 
     init -> created
     created -> progressing "开始发布"

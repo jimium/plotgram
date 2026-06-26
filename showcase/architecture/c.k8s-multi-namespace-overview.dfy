@@ -4,47 +4,47 @@ diagram architecture {
     title: "K8s 多命名空间生产集群总览"
 
     group edge "流量入口" {
-        entity cdn "Global CDN" { type: external }
-        entity waf "WAF" { type: gateway }
-        entity ingress "Ingress Gateway" { type: gateway }
-        entity dns "DNS" { type: external }
+        entity[external] cdn "Global CDN"
+        entity[gateway] waf "WAF"
+        entity[gateway] ingress "Ingress Gateway"
+        entity[external] dns "DNS"
     }
 
     group payment_ns "payment-prod" {
-        entity pay_gateway "pay-gateway x6" { type: service }
-        entity pay_core "pay-core x18" { type: service }
-        entity pay_risk "pay-risk x8" { type: service }
-        entity pay_worker "pay-worker x24" { type: service }
+        entity[service] pay_gateway "pay-gateway x6"
+        entity[service] pay_core "pay-core x18"
+        entity[service] pay_risk "pay-risk x8"
+        entity[service] pay_worker "pay-worker x24"
     }
 
     group order_ns "order-prod" {
-        entity order_api "order-api x10" { type: service }
-        entity order_core "order-core x16" { type: service }
-        entity order_fulfill "order-fulfillment x12" { type: service }
-        entity order_worker "order-worker x20" { type: service }
+        entity[service] order_api "order-api x10"
+        entity[service] order_core "order-core x16"
+        entity[service] order_fulfill "order-fulfillment x12"
+        entity[service] order_worker "order-worker x20"
     }
 
     group user_ns "user-prod" {
-        entity user_api "user-api x8" { type: service }
-        entity profile_svc "profile-service x6" { type: service }
-        entity auth_svc "auth-service x12" { type: service }
-        entity session_svc "session-service x10" { type: service }
+        entity[service] user_api "user-api x8"
+        entity[service] profile_svc "profile-service x6"
+        entity[service] auth_svc "auth-service x12"
+        entity[service] session_svc "session-service x10"
     }
 
     group platform_ns "platform-system" {
-        entity service_mesh "Service Mesh" { type: service }
-        entity config_center "Config Center" { type: service }
-        entity secrets "Secrets Manager" { type: service }
-        entity argo "Argo CD" { type: service }
-        entity metrics "Prometheus" { type: service }
-        entity logs "Loki" { type: service }
+        entity[service] service_mesh "Service Mesh"
+        entity[service] config_center "Config Center"
+        entity[service] secrets "Secrets Manager"
+        entity[service] argo "Argo CD"
+        entity[service] metrics "Prometheus"
+        entity[service] logs "Loki"
     }
 
     group data_ns "stateful-data" {
-        entity postgres "PostgreSQL Cluster" { type: database }
-        entity redis "Redis Cluster" { type: cache }
-        entity kafka "Kafka" { type: queue }
-        entity object_store "Object Storage" { type: storage }
+        entity[database] postgres "PostgreSQL Cluster"
+        entity[cache] redis "Redis Cluster"
+        entity[queue] kafka "Kafka"
+        entity[storage] object_store "Object Storage"
     }
 
     dns -> cdn

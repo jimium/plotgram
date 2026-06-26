@@ -3,15 +3,15 @@
 diagram sequence {
     title: "K8s 金丝雀回滚链路"
 
-    entity developer "开发者" { type: actor }
-    entity ci "CI Pipeline" { type: control }
-    entity argo "Argo Rollouts" { type: control }
-    entity apiserver "API Server" { type: control }
-    entity ingress "Ingress Gateway" { type: boundary }
-    entity stable "Stable Pods" { type: boundary }
-    entity canary "Canary Pods" { type: boundary }
-    entity metrics "Prometheus" { type: database }
-    entity alerts "告警系统" { type: boundary }
+    entity[actor] developer "开发者"
+    entity[control] ci "CI Pipeline"
+    entity[control] argo "Argo Rollouts"
+    entity[control] apiserver "API Server"
+    entity[boundary] ingress "Ingress Gateway"
+    entity[boundary] stable "Stable Pods"
+    entity[boundary] canary "Canary Pods"
+    entity[database] metrics "Prometheus"
+    entity[boundary] alerts "告警系统"
 
     developer -> ci "merge release branch"
     ci -> argo "publish canary spec"

@@ -6,9 +6,9 @@ diagram flowchart {
         direction: left-to-right
     }
 
-    entity start "开始" { type: start }
-    entity process "处理" { type: process }
-    entity end "结束" { type: end }
+    entity[start] start "开始"
+    entity[process] process "处理"
+    entity[end] end "结束"
 
     start -> process
     process -> end

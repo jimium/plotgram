@@ -3,13 +3,11 @@
 diagram er {
     title: "客户与订单"
 
-    entity customer "Customer" {
-        type: database
+    entity[database] customer "Customer" {
         meta.pk: "id"
         meta.fields: "name\nemail"
     }
-    entity order "Order" {
-        type: database
+    entity[database] order "Order" {
         meta.pk: "id"
         meta.fk: "customer_id"
         meta.fields: "total\nstatus"

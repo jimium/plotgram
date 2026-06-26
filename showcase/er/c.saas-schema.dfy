@@ -4,58 +4,49 @@ diagram er {
     title: "SaaS 多租户模型"
 
     group core "核心身份" {
-        entity tenant "Tenant" {
-            type: database
+        entity[database] tenant "Tenant" {
             meta.pk: "id"
             meta.fields: "name\nplan"
         }
-        entity user "User" {
-            type: database
+        entity[database] user "User" {
             meta.pk: "id"
             meta.fk: "tenant_id"
             meta.fields: "email\nstatus"
         }
-        entity role "Role" {
-            type: database
+        entity[database] role "Role" {
             meta.pk: "id"
             meta.fk: "tenant_id"
             meta.fields: "name"
         }
-        entity permission "Permission" {
-            type: database
+        entity[database] permission "Permission" {
             meta.pk: "id"
             meta.fields: "code"
         }
     }
 
     group rbac "权限关联" {
-        entity user_role "UserRole" {
-            type: database
+        entity[database] user_role "UserRole" {
             meta.pk: "id"
             meta.fields: "fk.user_id\nfk.role_id"
         }
-        entity role_perm "RolePermission" {
-            type: database
+        entity[database] role_perm "RolePermission" {
             meta.pk: "id"
             meta.fields: "fk.role_id\nfk.permission_id"
         }
     }
 
     group workspace "工作区" {
-        entity project "Project" {
-            type: database
+        entity[database] project "Project" {
             meta.pk: "id"
             meta.fk: "tenant_id"
             meta.fields: "name"
         }
-        entity ws "Workspace" {
-            type: database
+        entity[database] ws "Workspace" {
             meta.pk: "id"
             meta.fk: "tenant_id"
             meta.fields: "name"
         }
-        entity audit_log "AuditLog" {
-            type: database
+        entity[database] audit_log "AuditLog" {
             meta.pk: "id"
             meta.fields: "fk.user_id\nfk.project_id\naction"
         }

@@ -3,10 +3,10 @@
 diagram sequence {
     title: "API 调用链"
 
-    entity client "客户端" { type: boundary }
-    entity gateway "API 网关" { type: boundary }
-    entity user_svc "用户服务" { type: control }
-    entity db "数据库" { type: database }
+    entity[boundary] client "客户端"
+    entity[boundary] gateway "API 网关"
+    entity[control] user_svc "用户服务"
+    entity[database] db "数据库"
 
     client -> gateway "GET /users/me"
     gateway -> user_svc "转发请求"

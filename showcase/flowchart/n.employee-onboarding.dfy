@@ -7,14 +7,14 @@ diagram flowchart {
         direction: top-to-bottom
     }
 
-    entity offer "接受 Offer" { type: start }
-    entity hr_doc "HR收集材料" { type: process }
-    entity sign "签订合同" { type: process }
-    entity check "材料是否齐全" { type: decision }
-    entity it_setup "IT开通账号" { type: service }
-    entity admin_setup "行政分配工位" { type: service }
-    entity welcome "入职培训" { type: process }
-    entity done "完成入职" { type: end }
+    entity[start] offer "接受 Offer"
+    entity[process] hr_doc "HR收集材料"
+    entity[process] sign "签订合同"
+    entity[decision] check "材料是否齐全"
+    entity[service] it_setup "IT开通账号"
+    entity[service] admin_setup "行政分配工位"
+    entity[process] welcome "入职培训"
+    entity[end] done "完成入职"
 
     offer -> hr_doc
     hr_doc -> check

@@ -3,19 +3,19 @@
 diagram mindmap {
     title: "技术栈选型"
 
-    entity stack "全栈技术" { type: root }
+    entity[root] stack "全栈技术"
 
-    entity frontend "前端" { type: main }
-    entity react "React" { type: leaf }
-    entity wasm "WASM" { type: leaf }
+    entity[main] frontend "前端"
+    entity[leaf] react "React"
+    entity[leaf] wasm "WASM"
 
-    entity backend "后端" { type: main }
-    entity rust "Rust" { type: leaf }
-    entity postgres "PostgreSQL" { type: leaf }
+    entity[main] backend "后端"
+    entity[leaf] rust "Rust"
+    entity[leaf] postgres "PostgreSQL"
 
-    entity devops "运维" { type: main }
-    entity docker "Docker" { type: leaf }
-    entity k8s "Kubernetes" { type: leaf }
+    entity[main] devops "运维"
+    entity[leaf] docker "Docker"
+    entity[leaf] k8s "Kubernetes"
 
     stack -> frontend
     frontend -> react

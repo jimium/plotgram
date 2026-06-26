@@ -4,37 +4,28 @@ diagram architecture {
     title: "MCP 服务集群架构"
 
     group clients "客户端" {
-        entity cursor "Cursor MCP" {
-            type: frontend
-        }
-        entity studio "Studio" {
-            type: frontend
-        }
+        entity[frontend] cursor "Cursor MCP"
+        entity[frontend] studio "Studio"
     }
 
     group edge "入口" {
-        entity lb "LB / API Gateway" {
-            type: gateway
-        }
+        entity[gateway] lb "LB / API Gateway"
     }
 
     group stateless "无状态（可水平扩展）" {
-        entity mcp_server_1 "mcp-server-1" { type: service }
-        entity mcp_server_2 "mcp-server-2" { type: service }
-        entity mcp_server_n "mcp-server-n" { type: service }
+        entity[service] mcp_server_1 "mcp-server-1"
+        entity[service] mcp_server_2 "mcp-server-2"
+        entity[service] mcp_server_n "mcp-server-n"
     }
 
     group shared "共享状态" {
-        entity pg "Postgres\ndiagram + revision 元数据" {
-            type: database
+        entity[database] pg "Postgres\ndiagram + revision 元数据" {
             semantic: postgres
         }
-        entity redis "Redis\n可选：锁 / 缓存" {
-            type: cache
+        entity[cache] redis "Redis\n可选：锁 / 缓存" {
             semantic: redis
         }
-        entity object_store "Object Store\n大 DSL / 渲染缓存" {
-            type: storage
+        entity[storage] object_store "Object Store\n大 DSL / 渲染缓存" {
             semantic: s3
         }
     }

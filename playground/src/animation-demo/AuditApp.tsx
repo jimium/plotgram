@@ -19,24 +19,24 @@ const SCENARIOS: AuditScenario[] = [
     description: '在 API 网关与后端服务之间新增 WAF、鉴权、审计日志三层安全防护',
     dsl1: `diagram architecture {
   title: "线上服务架构 (变更前)"
-  entity user "用户" { type: frontend }
-  entity api "API 网关" { type: gateway }
-  entity app "业务服务" { type: service }
-  entity db "主数据库" { type: database }
+  entity[frontend] user "用户"
+  entity[gateway] api "API 网关"
+  entity[service] app "业务服务"
+  entity[database] db "主数据库"
   user -> api "HTTPS"
   api -> app "转发"
   app -> db "读写"
 }`,
     dsl2: `diagram architecture {
   title: "线上服务架构 (变更后)"
-  entity user "用户" { type: frontend }
-  entity cdn "CDN" { type: external }
-  entity waf "WAF 防火墙" { type: gateway }
-  entity api "API 网关" { type: gateway }
-  entity auth "鉴权服务" { type: service }
-  entity audit "审计日志" { type: service }
-  entity app "业务服务" { type: service }
-  entity db "主数据库" { type: database }
+  entity[frontend] user "用户"
+  entity[external] cdn "CDN"
+  entity[gateway] waf "WAF 防火墙"
+  entity[gateway] api "API 网关"
+  entity[service] auth "鉴权服务"
+  entity[service] audit "审计日志"
+  entity[service] app "业务服务"
+  entity[database] db "主数据库"
   user -> cdn
   cdn -> waf "HTTPS"
   waf -> api "清洗后"
@@ -53,18 +53,18 @@ const SCENARIOS: AuditScenario[] = [
     description: '单库扩展为读写分离 + 分库分表架构，新增 Proxy 与从库',
     dsl1: `diagram architecture {
   title: "数据层 (变更前)"
-  entity app "应用" { type: service }
-  entity db "MySQL" { type: database }
+  entity[service] app "应用"
+  entity[database] db "MySQL"
   app -> db "读写"
 }`,
     dsl2: `diagram architecture {
   title: "数据层 (变更后)"
-  entity app "应用" { type: service }
-  entity proxy "ShardingProxy" { type: gateway }
-  entity m0 "主库 M0" { type: database }
-  entity s0 "从库 S0" { type: database }
-  entity s1 "从库 S1" { type: database }
-  entity cache "Redis 缓存" { type: cache }
+  entity[service] app "应用"
+  entity[gateway] proxy "ShardingProxy"
+  entity[database] m0 "主库 M0"
+  entity[database] s0 "从库 S0"
+  entity[database] s1 "从库 S1"
+  entity[cache] cache "Redis 缓存"
   app -> proxy "SQL"
   app -> cache "查询"
   proxy -> m0 "写"
@@ -81,11 +81,11 @@ const SCENARIOS: AuditScenario[] = [
     dsl1: `diagram flowchart {
   title: "CI/CD 流水线 (变更前)"
   config { direction: top-to-bottom }
-  entity dev "开发者" { type: start }
-  entity ci "CI 构建" { type: process }
-  entity test "测试" { type: decision }
-  entity deploy "部署生产" { type: process }
-  entity prod "生产" { type: end }
+  entity[start] dev "开发者"
+  entity[process] ci "CI 构建"
+  entity[decision] test "测试"
+  entity[process] deploy "部署生产"
+  entity[end] prod "生产"
   dev -> ci
   ci -> test
   test -> deploy "通过"
@@ -94,15 +94,15 @@ const SCENARIOS: AuditScenario[] = [
     dsl2: `diagram flowchart {
   title: "CI/CD 流水线 (变更后)"
   config { direction: top-to-bottom }
-  entity dev "开发者" { type: start }
-  entity ci "CI 构建" { type: process }
-  entity test "自动化测试" { type: decision }
-  entity approval "审批" { type: decision }
-  entity canary "金丝雀发布" { type: process }
-  entity monitor "监控观察" { type: decision }
-  entity rollback "自动回滚" { type: process }
-  entity full "全量发布" { type: process }
-  entity prod "生产" { type: end }
+  entity[start] dev "开发者"
+  entity[process] ci "CI 构建"
+  entity[decision] test "自动化测试"
+  entity[decision] approval "审批"
+  entity[process] canary "金丝雀发布"
+  entity[decision] monitor "监控观察"
+  entity[process] rollback "自动回滚"
+  entity[process] full "全量发布"
+  entity[end] prod "生产"
   dev -> ci
   ci -> test
   test -> approval "通过"

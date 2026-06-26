@@ -1,8 +1,8 @@
 # 实体类型 (entity type) 标准
 
-> 版本：0.2.0-draft | 状态：设计中
+> 版本：0.3.0 | 状态：与实现同步
 
-本文档定义 Drawify 中 `entity { type: ... }` 的**图表内结构角色**、**全局语义标签**与视觉形状规则。图表级写作规范见 [diagrams/](./diagrams/) 目录；语法约束见 [language-spec.md](../language-spec.md)。
+本文档定义 Drawify 中 `entity[type]` 的**图表内结构角色**、**全局语义标签**与视觉形状规则。图表级写作规范见 [diagrams/](./diagrams/) 目录；语法约束见 [language-spec.md](../language-spec.md)。
 
 ---
 
@@ -14,7 +14,7 @@ entity semantic（可选）         →  图标推断（全局词表）
 entity icon（可选）             →  显式图标 / icon: none 压制推断
 ```
 
-1. 用户在 `entity` 属性块中声明 `type`（**当前图表的规范枚举**，严格校验，无别名）。
+1. 用户在 `entity` 声明中通过方括号标注 `type`（`entity[type] id "label"`），或省略方括号使用图表默认 type。`type` 也可在属性块中通过 `type: xxx` 声明（推荐使用方括号语法糖）。
 2. 引擎按 `diagram` 类型查 profile 闭集；非法 `type` 报错。
 3. theme cascade 按 **原始 `type`** 查 `entity_types` 样式（不做归一化）。
 4. 可选 `semantic` 驱动内侧图标推断；可选 `icon` 显式覆盖或 `icon: none` 关闭。
@@ -42,9 +42,7 @@ entity icon（可选）             →  显式图标 / icon: none 压制推断
 
 ### 2.2 时序图 (`sequence`)
 
-`participant`, `actor`, `boundary`, `control`, `entity`, `database`
-
-> 注意：规范 type `entity` 与 DSL 关键字 `entity` 同名，parser 暂不支持 `type: entity` 写法；表持久化参与者可用 `type: control` + `semantic: database` 等。
+`participant`, `actor`, `boundary`, `control`, `lifeline`, `database`
 
 ### 2.3 架构图 (`architecture`)
 
@@ -93,7 +91,7 @@ entity icon（可选）             →  显式图标 / icon: none 压制推断
 | `actor` | — | ✓ | — | — | * | — |
 | `boundary` | — | ✓ | — | — | * | — |
 | `control` | — | ✓ | — | — | * | — |
-| `entity` | — | ✓* | — | — | * | — |
+| `lifeline` | — | ✓ | — | — | * | — |
 | **状态专用** |
 | `initial` | — | — | — | ✓ | * | — |
 | `state` | — | — | — | ✓ | * | — |
@@ -149,19 +147,16 @@ entity icon（可选）             →  显式图标 / icon: none 压制推断
 
 **示例**（架构图）：
 
-```flowml
-entity db "订单库" {
-    type: database
+```drawify
+entity[database] db "订单库" {
     semantic: mysql
 }
 
-entity web "Web 端" {
-    type: frontend
+entity[frontend] web "Web 端" {
     semantic: browser
 }
 
-entity cache "会话" {
-    type: cache
+entity[cache] cache "会话" {
     semantic: redis
     icon: none
 }

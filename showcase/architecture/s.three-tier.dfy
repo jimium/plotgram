@@ -3,13 +3,11 @@
 diagram architecture {
     title: "三层架构"
 
-    entity client "客户端" {
-        type: frontend
+    entity[frontend] client "客户端" {
         semantic: browser
     }
-    entity api "API 服务" { type: service }
-    entity db "数据库" {
-        type: database
+    entity[service] api "API 服务"
+    entity[database] db "数据库" {
         semantic: postgres
     }
 

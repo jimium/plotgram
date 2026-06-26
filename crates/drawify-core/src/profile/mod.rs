@@ -100,7 +100,7 @@ const SEQUENCE_ENTITY_TYPES: &[&str] = &[
     entity_type::ACTOR,
     entity_type::BOUNDARY,
     entity_type::CONTROL,
-    entity_type::ENTITY,
+    entity_type::LIFELINE,
     entity_type::DATABASE,
 ];
 

@@ -3,13 +3,11 @@
 diagram architecture {
     title: "单向数据流"
 
-    entity user "用户" {
-        type: frontend
+    entity[frontend] user "用户" {
         semantic: user
     }
-    entity app "应用" { type: service }
-    entity db "数据存储" {
-        type: database
+    entity[service] app "应用"
+    entity[database] db "数据存储" {
         semantic: postgres
     }
 

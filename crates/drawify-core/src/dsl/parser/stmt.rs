@@ -52,6 +52,25 @@ impl Parser {
         let start = self.current().span;
         self.advance(); // consume 'entity'
 
+        // entity[type] syntax sugar: optional type annotation
+        let bracket_type = if matches!(self.peek_kind(), TokenKind::LBracket) {
+            self.advance(); // consume '['
+            let type_span = self.current().span;
+            let (type_name, _) = self.expect_word()?;
+            if !matches!(self.peek_kind(), TokenKind::RBracket) {
+                self.errors.push(DiagnosticError::unexpected_token(
+                    self.current().span,
+                    self.peek_kind().display_name(),
+                    &["']'"],
+                ));
+            } else {
+                self.advance(); // consume ']'
+            }
+            Some((type_name, type_span))
+        } else {
+            None
+        };
+
         let (id_str, id_span) = self.expect_ident()?;
         let id = match Identifier::new(&id_str) {
             Ok(id) => id,
@@ -66,11 +85,28 @@ impl Parser {
         let (label, _) = self.expect_string()?;
         self.register_id(id.as_str(), id_span);
 
-        let attributes = if matches!(self.peek_kind(), TokenKind::LBrace) {
+        let mut attributes = if matches!(self.peek_kind(), TokenKind::LBrace) {
             self.parse_attribute_block(&id)
         } else {
             AttributeMap::default()
         };
+
+        if let Some((type_name, type_span)) = bracket_type {
+            if attributes.standard.contains_key("type") {
+                self.errors.push(DiagnosticError::structure_violation(
+                    type_span,
+                    format!(
+                        "entity '{}' 在 [ ] 中已指定 type 为 '{}'，不能在属性块中再次指定 type",
+                        id.as_str(),
+                        type_name
+                    ),
+                ));
+            }
+            attributes.standard.insert(
+                "type".to_string(),
+                AttributeValue::String(TextValue::unquoted(type_name)),
+            );
+        }
 
         Some(Entity {
             id,

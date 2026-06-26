@@ -3,17 +3,17 @@
 diagram state {
     title: "K8s 节点压力与恢复状态机"
 
-    entity init "初始化" { type: initial }
-    entity ready "Ready" { type: state }
-    entity memory_pressure "MemoryPressure" { type: state }
-    entity disk_pressure "DiskPressure" { type: state }
-    entity not_ready "NotReady" { type: state }
-    entity cordoned "Cordoned" { type: state }
-    entity draining "Draining" { type: state }
-    entity recovering "Recovering" { type: state }
-    entity replaced "Replaced" { type: final }
-    entity healthy "Healthy" { type: final }
-    entity decide "Can Recover?" { type: choice }
+    entity[initial] init "初始化"
+    entity[state] ready "Ready"
+    entity[state] memory_pressure "MemoryPressure"
+    entity[state] disk_pressure "DiskPressure"
+    entity[state] not_ready "NotReady"
+    entity[state] cordoned "Cordoned"
+    entity[state] draining "Draining"
+    entity[state] recovering "Recovering"
+    entity[final] replaced "Replaced"
+    entity[final] healthy "Healthy"
+    entity[choice] decide "Can Recover?"
 
     init -> ready
     ready -> memory_pressure "memory threshold exceeded"

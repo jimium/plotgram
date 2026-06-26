@@ -5,27 +5,27 @@ diagram architecture {
     title: "布局测试：深度嵌套分组与跨组路由"
 
     group external "外部网络" {
-        entity client "客户端终端" { type: frontend }
-        entity third_party "第三方服务" { type: external }
+        entity[frontend] client "客户端终端"
+        entity[external] third_party "第三方服务"
     }
 
     group cloud "云端基础设施" {
         group public_subnet "公有子网" {
-            entity gateway "API 网关" { type: gateway }
-            entity lb "负载均衡器" { type: service }
+            entity[gateway] gateway "API 网关"
+            entity[service] lb "负载均衡器"
         }
         
         group private_subnet "私有子网" {
-            entity auth_svc "认证微服务" { type: service }
-            entity biz_svc "核心业务服务" { type: service }
-            entity async_worker "异步任务节点" { type: service }
+            entity[service] auth_svc "认证微服务"
+            entity[service] biz_svc "核心业务服务"
+            entity[service] async_worker "异步任务节点"
         }
         
         group data_subnet "数据子网" {
-            entity db_master "主数据库" { type: database }
-            entity db_replica "只读副本" { type: database }
-            entity redis "Redis 集群" { type: cache }
-            entity mq "消息队列 Kafka" { type: queue }
+            entity[database] db_master "主数据库"
+            entity[database] db_replica "只读副本"
+            entity[cache] redis "Redis 集群"
+            entity[queue] mq "消息队列 Kafka"
         }
     }
 

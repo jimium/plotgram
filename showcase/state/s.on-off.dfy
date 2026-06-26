@@ -3,9 +3,9 @@
 diagram state {
     title: "开关状态"
 
-    entity init "" { type: initial }
-    entity off "关闭" { type: state }
-    entity on "开启" { type: state }
+    entity[initial] init ""
+    entity[state] off "关闭"
+    entity[state] on "开启"
 
     init -> off
     off -> on "按下开关"

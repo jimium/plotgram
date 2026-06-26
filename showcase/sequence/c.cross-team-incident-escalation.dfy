@@ -3,14 +3,14 @@
 diagram sequence {
     title: "跨团队故障升级协同"
 
-    entity monitor "监控平台" { type: boundary }
-    entity oncall "值班工程师" { type: actor }
-    entity sre "SRE 团队" { type: control }
-    entity app_team "应用团队" { type: control }
-    entity db_team "数据库团队" { type: control }
-    entity security "安全团队" { type: control }
-    entity comms "应急沟通频道" { type: boundary }
-    entity exec "值班经理" { type: actor }
+    entity[boundary] monitor "监控平台"
+    entity[actor] oncall "值班工程师"
+    entity[control] sre "SRE 团队"
+    entity[control] app_team "应用团队"
+    entity[control] db_team "数据库团队"
+    entity[control] security "安全团队"
+    entity[boundary] comms "应急沟通频道"
+    entity[actor] exec "值班经理"
 
     monitor --> oncall "critical alert"
     oncall -> comms "open incident bridge"

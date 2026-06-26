@@ -3,16 +3,16 @@
 diagram state {
     title: "文档同步生命周期"
 
-    entity init "初始化" { type: initial }
-    entity in_sync "InSync" { type: state }
-    entity stale "Stale" { type: state }
-    entity analyzing "Analyzing" { type: state }
-    entity drafting "Drafting" { type: state }
-    entity reviewing "Reviewing" { type: state }
-    entity published "Published" { type: final }
-    entity rejected "Rejected" { type: state }
-    entity failed "Failed" { type: final }
-    entity gate "评审通过？" { type: choice }
+    entity[initial] init "初始化"
+    entity[state] in_sync "InSync"
+    entity[state] stale "Stale"
+    entity[state] analyzing "Analyzing"
+    entity[state] drafting "Drafting"
+    entity[state] reviewing "Reviewing"
+    entity[final] published "Published"
+    entity[state] rejected "Rejected"
+    entity[final] failed "Failed"
+    entity[choice] gate "评审通过？"
 
     init -> in_sync
     in_sync -> stale "source changed"

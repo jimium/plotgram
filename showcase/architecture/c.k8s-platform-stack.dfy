@@ -4,9 +4,9 @@ diagram architecture {
     title: "K8s 平台栈与业务工作负载"
 
     group client_layer "入口与访问" {
-        entity mobile "Mobile App" { type: frontend }
-        entity web "Web Portal" { type: frontend }
-        entity api_gateway "API Gateway" { type: gateway }
+        entity[frontend] mobile "Mobile App"
+        entity[frontend] web "Web Portal"
+        entity[gateway] api_gateway "API Gateway"
 
         mobile -> api_gateway
         web -> api_gateway
@@ -14,18 +14,18 @@ diagram architecture {
 
     group workload_layer "业务命名空间" {
         group commerce_ns "commerce" {
-            entity cart_svc "cart-service x8" { type: service }
-            entity checkout_svc "checkout-service x12" { type: service }
-            entity pricing_svc "pricing-service x6" { type: service }
+            entity[service] cart_svc "cart-service x8"
+            entity[service] checkout_svc "checkout-service x12"
+            entity[service] pricing_svc "pricing-service x6"
 
             cart_svc -> pricing_svc
             checkout_svc -> pricing_svc
         }
 
         group ops_ns "ops" {
-            entity ops_console "ops-console x3" { type: frontend }
-            entity report_svc "report-service x5" { type: service }
-            entity audit_svc "audit-service x4" { type: service }
+            entity[frontend] ops_console "ops-console x3"
+            entity[service] report_svc "report-service x5"
+            entity[service] audit_svc "audit-service x4"
         }
 
         // 跨子 group 的边：写在父 group 内
@@ -33,22 +33,22 @@ diagram architecture {
     }
 
     group platform_layer "平台能力" {
-        entity ingress_nginx "Ingress NGINX" { type: gateway }
-        entity cert_manager "cert-manager" { type: service }
-        entity cni "CNI Plugin" { type: service }
-        entity csi "CSI Driver" { type: service }
-        entity external_dns "external-dns" { type: service }
-        entity argo_rollouts "Argo Rollouts" { type: service }
+        entity[gateway] ingress_nginx "Ingress NGINX"
+        entity[service] cert_manager "cert-manager"
+        entity[service] cni "CNI Plugin"
+        entity[service] csi "CSI Driver"
+        entity[service] external_dns "external-dns"
+        entity[service] argo_rollouts "Argo Rollouts"
 
         cert_manager -> ingress_nginx
         external_dns -> ingress_nginx
     }
 
     group obs_layer "可观测与运维" {
-        entity prometheus "Prometheus" { type: service }
-        entity loki "Loki" { type: service }
-        entity tempo "Tempo" { type: service }
-        entity grafana "Grafana" { type: frontend }
+        entity[service] prometheus "Prometheus"
+        entity[service] loki "Loki"
+        entity[service] tempo "Tempo"
+        entity[frontend] grafana "Grafana"
 
         prometheus --> grafana
         loki --> grafana
@@ -56,10 +56,10 @@ diagram architecture {
     }
 
     group data_layer "数据与中间件" {
-        entity mysql "MySQL Cluster" { type: database }
-        entity redis "Redis" { type: cache }
-        entity kafka "Kafka" { type: queue }
-        entity minio "MinIO" { type: storage }
+        entity[database] mysql "MySQL Cluster"
+        entity[cache] redis "Redis"
+        entity[queue] kafka "Kafka"
+        entity[storage] minio "MinIO"
     }
 
     api_gateway -> ingress_nginx

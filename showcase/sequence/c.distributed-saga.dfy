@@ -3,10 +3,10 @@
 diagram sequence {
     title: "分布式 Saga 事务"
 
-    entity orchestrator "编排器" { type: control }
-    entity order "订单服务" { type: control }
-    entity payment "支付服务" { type: control }
-    entity shipping "物流服务" { type: control }
+    entity[control] orchestrator "编排器"
+    entity[control] order "订单服务"
+    entity[control] payment "支付服务"
+    entity[control] shipping "物流服务"
 
     orchestrator -> order "创建订单"
     order --> orchestrator "订单已创建"

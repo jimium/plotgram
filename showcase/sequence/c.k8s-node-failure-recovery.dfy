@@ -3,15 +3,15 @@
 diagram sequence {
     title: "K8s 节点故障恢复链路"
 
-    entity monitor "监控系统" { type: boundary }
-    entity apiserver "API Server" { type: control }
-    entity controller "Node Controller" { type: control }
-    entity scheduler "Scheduler" { type: control }
-    entity autoscaler "Cluster Autoscaler" { type: control }
-    entity kubelet "故障节点 Kubelet" { type: control }
-    entity workloads "受影响工作负载" { type: boundary }
-    entity new_node "新节点" { type: boundary }
-    entity oncall "值班工程师" { type: actor }
+    entity[boundary] monitor "监控系统"
+    entity[control] apiserver "API Server"
+    entity[control] controller "Node Controller"
+    entity[control] scheduler "Scheduler"
+    entity[control] autoscaler "Cluster Autoscaler"
+    entity[control] kubelet "故障节点 Kubelet"
+    entity[boundary] workloads "受影响工作负载"
+    entity[boundary] new_node "新节点"
+    entity[actor] oncall "值班工程师"
 
     kubelet --> apiserver "heartbeat timeout"
     apiserver -> controller "node status lost"

@@ -4,25 +4,25 @@
 diagram mindmap {
     title: "Rust 编程学习大纲"
 
-    entity root "Rust 语言" { type: root }
+    entity[root] root "Rust 语言"
 
-    entity basic "基础语法" { type: main }
-    entity vars "变量与可变性" { type: branch }
-    entity types "数据类型" { type: leaf }
-    entity control "控制流" { type: leaf }
+    entity[main] basic "基础语法"
+    entity[branch] vars "变量与可变性"
+    entity[leaf] types "数据类型"
+    entity[leaf] control "控制流"
 
-    entity ownership "所有权系统" { type: main }
-    entity borrow "所有权与借用" { type: branch }
-    entity lifetime "生命周期" { type: leaf }
+    entity[main] ownership "所有权系统"
+    entity[branch] borrow "所有权与借用"
+    entity[leaf] lifetime "生命周期"
 
-    entity advanced "高级特性" { type: main }
-    entity generic "泛型与 Traits" { type: branch }
-    entity error "错误处理" { type: leaf }
-    entity macro "宏 (Macros)" { type: leaf }
+    entity[main] advanced "高级特性"
+    entity[branch] generic "泛型与 Traits"
+    entity[leaf] error "错误处理"
+    entity[leaf] macro "宏 (Macros)"
 
-    entity concurrency "并发编程" { type: main }
-    entity threads "线程与消息传递" { type: branch }
-    entity async "Async/Await" { type: leaf }
+    entity[main] concurrency "并发编程"
+    entity[branch] threads "线程与消息传递"
+    entity[leaf] async "Async/Await"
 
     root -> basic
     basic -> vars

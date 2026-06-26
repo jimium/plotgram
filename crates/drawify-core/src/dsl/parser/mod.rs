@@ -142,6 +142,31 @@ impl Parser {
         }
     }
 
+    fn expect_word(&mut self) -> Option<(String, Span)> {
+        let kind = self.peek_kind().clone();
+        match kind {
+            TokenKind::Ident(name) => {
+                let span = self.current().span;
+                self.advance();
+                Some((name, span))
+            }
+            _ if kind.keyword_str().is_some() => {
+                let span = self.current().span;
+                let name = kind.keyword_str().unwrap().to_string();
+                self.advance();
+                Some((name, span))
+            }
+            _ => {
+                self.errors.push(DiagnosticError::unexpected_token(
+                    self.current().span,
+                    self.peek_kind().display_name(),
+                    &["identifier"],
+                ));
+                None
+            }
+        }
+    }
+
     fn expect_string(&mut self) -> Option<(String, Span)> {
         if let TokenKind::StringLit(s) = self.peek_kind().clone() {
             let span = self.current().span;

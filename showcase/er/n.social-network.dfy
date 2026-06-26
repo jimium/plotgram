@@ -4,30 +4,25 @@
 diagram er {
     title: "社交互动核心数据模型"
 
-    entity user "User (用户)" {
-        type: database
+    entity[database] user "User (用户)" {
         meta.pk: "id"
         meta.fields: "username\navatar\nbio"
     }
-    entity follow "Follow (关注关系)" {
-        type: database
+    entity[database] follow "Follow (关注关系)" {
         meta.pk: "id"
         meta.fields: "fk.follower_id\nfk.following_id\ncreated_at"
     }
-    entity post "Post (动态)" {
-        type: database
+    entity[database] post "Post (动态)" {
         meta.pk: "id"
         meta.fk: "user_id"
         meta.fields: "content\nmedia_urls"
     }
-    entity comment "Comment (评论)" {
-        type: database
+    entity[database] comment "Comment (评论)" {
         meta.pk: "id"
         meta.fk: "post_id\nuser_id"
         meta.fields: "content\nparent_id"
     }
-    entity like "Like (点赞)" {
-        type: database
+    entity[database] like "Like (点赞)" {
         meta.pk: "id"
         meta.fields: "fk.user_id\nfk.target_id\ntarget_type"
     }

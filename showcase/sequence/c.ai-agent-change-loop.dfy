@@ -3,14 +3,14 @@
 diagram sequence {
     title: "AI Agent 变更分析闭环"
 
-    entity developer "开发者" { type: actor }
-    entity repo "代码仓库" { type: database }
-    entity agent "Diagram Agent" { type: control }
-    entity context "Context Retriever" { type: control }
-    entity validator "Drawify Validator" { type: control }
-    entity patcher "Patch Agent" { type: control }
-    entity renderer "Renderer" { type: control }
-    entity review_bot "PR Review Bot" { type: boundary }
+    entity[actor] developer "开发者"
+    entity[database] repo "代码仓库"
+    entity[control] agent "Diagram Agent"
+    entity[control] context "Context Retriever"
+    entity[control] validator "Drawify Validator"
+    entity[control] patcher "Patch Agent"
+    entity[control] renderer "Renderer"
+    entity[boundary] review_bot "PR Review Bot"
 
     developer -> repo "push change set"
     repo -> agent "emit repository event"

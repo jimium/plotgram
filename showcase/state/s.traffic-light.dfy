@@ -3,9 +3,9 @@
 diagram state {
     title: "红绿灯"
 
-    entity red "红灯" { type: state }
-    entity green "绿灯" { type: state }
-    entity yellow "黄灯" { type: state }
+    entity[state] red "红灯"
+    entity[state] green "绿灯"
+    entity[state] yellow "黄灯"
 
     red -> green "30s 后"
     green -> yellow "25s 后"

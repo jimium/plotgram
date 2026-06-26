@@ -7,33 +7,33 @@ diagram flowchart {
     }
 
     group payment "支付阶段" {
-        entity place_order "下单" { type: start }
-        entity risk_check "风控核查" { type: process }
-        entity risk_gate "风控通过？" { type: decision }
-        entity pay "执行支付" { type: process }
-        entity pay_gate "支付成功？" { type: decision }
-        entity retry_pay "重试支付" { type: process }
-        entity cancel "订单取消" { type: process }
+        entity[start] place_order "下单"
+        entity[process] risk_check "风控核查"
+        entity[decision] risk_gate "风控通过？"
+        entity[process] pay "执行支付"
+        entity[decision] pay_gate "支付成功？"
+        entity[process] retry_pay "重试支付"
+        entity[process] cancel "订单取消"
     }
 
     group warehouse "仓储阶段" {
-        entity alloc "库存分配" { type: process }
-        entity pick "拣货" { type: process }
-        entity pack "打包" { type: process }
-        entity stock_gate "有库存？" { type: decision }
-        entity restock "补货" { type: process }
-        entity qc "质检" { type: process }
-        entity qc_gate "质检通过？" { type: decision }
+        entity[process] alloc "库存分配"
+        entity[process] pick "拣货"
+        entity[process] pack "打包"
+        entity[decision] stock_gate "有库存？"
+        entity[process] restock "补货"
+        entity[process] qc "质检"
+        entity[decision] qc_gate "质检通过？"
     }
 
     group logistics "物流阶段" {
-        entity dispatch "分拣出库" { type: process }
-        entity ship "揽收发运" { type: process }
-        entity transit "运输中" { type: process }
-        entity deliver "派送" { type: process }
-        entity sign_gate "签收成功？" { type: decision }
-        entity retry_deliver "再次派送" { type: process }
-        entity done "订单完成" { type: end }
+        entity[process] dispatch "分拣出库"
+        entity[process] ship "揽收发运"
+        entity[process] transit "运输中"
+        entity[process] deliver "派送"
+        entity[decision] sign_gate "签收成功？"
+        entity[process] retry_deliver "再次派送"
+        entity[end] done "订单完成"
     }
 
     place_order -> risk_check

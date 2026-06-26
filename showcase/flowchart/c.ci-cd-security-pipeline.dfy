@@ -7,35 +7,35 @@ diagram flowchart {
     }
 
     group source "源码阶段" {
-        entity commit "代码提交" { type: start }
-        entity lint "静态检查" { type: process }
-        entity lint_gate "检查通过？" { type: decision }
-        entity build "构建镜像" { type: process }
-        entity unit_test "单元测试" { type: process }
-        entity test_gate "测试通过？" { type: decision }
-        entity notify_dev "通知开发修复" { type: process }
+        entity[start] commit "代码提交"
+        entity[process] lint "静态检查"
+        entity[decision] lint_gate "检查通过？"
+        entity[process] build "构建镜像"
+        entity[process] unit_test "单元测试"
+        entity[decision] test_gate "测试通过？"
+        entity[process] notify_dev "通知开发修复"
     }
 
     group security "安全扫描阶段" {
-        entity sast "SAST 静态扫描" { type: process }
-        entity sast_gate "SAST 通过？" { type: decision }
-        entity sca "依赖与许可证扫描" { type: process }
-        entity sca_gate "许可证合规？" { type: decision }
-        entity image_scan "镜像漏洞扫描" { type: process }
-        entity image_gate "镜像合规？" { type: decision }
-        entity sign "镜像签名" { type: process }
-        entity security_review "安全评审" { type: process }
+        entity[process] sast "SAST 静态扫描"
+        entity[decision] sast_gate "SAST 通过？"
+        entity[process] sca "依赖与许可证扫描"
+        entity[decision] sca_gate "许可证合规？"
+        entity[process] image_scan "镜像漏洞扫描"
+        entity[decision] image_gate "镜像合规？"
+        entity[process] sign "镜像签名"
+        entity[process] security_review "安全评审"
     }
 
     group deploy "部署阶段" {
-        entity stage "预发部署" { type: process }
-        entity smoke "冒烟测试" { type: process }
-        entity smoke_gate "冒烟通过？" { type: decision }
-        entity canary "金丝雀发布" { type: process }
-        entity canary_gate "金丝雀健康？" { type: decision }
-        entity prod "全量上线" { type: process }
-        entity rollback "自动回滚" { type: process }
-        entity done "发布完成" { type: end }
+        entity[process] stage "预发部署"
+        entity[process] smoke "冒烟测试"
+        entity[decision] smoke_gate "冒烟通过？"
+        entity[process] canary "金丝雀发布"
+        entity[decision] canary_gate "金丝雀健康？"
+        entity[process] prod "全量上线"
+        entity[process] rollback "自动回滚"
+        entity[end] done "发布完成"
     }
 
     commit -> lint

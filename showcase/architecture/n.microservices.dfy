@@ -4,31 +4,26 @@ diagram architecture {
     title: "微服务架构"
 
     group frontend "前端层" {
-        entity web "Web 客户端" {
-            type: frontend
+        entity[frontend] web "Web 客户端" {
             semantic: browser
         }
-        entity mobile "移动客户端" {
-            type: frontend
+        entity[frontend] mobile "移动客户端" {
             semantic: mobile
         }
     }
 
     group backend "后端层" {
-        entity gateway "API 网关" {
-            type: gateway
+        entity[gateway] gateway "API 网关" {
             semantic: nginx
         }
-        entity user_svc "用户服务" { type: service }
-        entity order_svc "订单服务" { type: service }
+        entity[service] user_svc "用户服务"
+        entity[service] order_svc "订单服务"
     }
 
-    entity db "PostgreSQL" {
-        type: database
+    entity[database] db "PostgreSQL" {
         semantic: postgres
     }
-    entity mq "消息队列" {
-        type: queue
+    entity[queue] mq "消息队列" {
         semantic: kafka
     }
 

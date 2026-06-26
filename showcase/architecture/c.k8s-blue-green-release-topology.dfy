@@ -4,37 +4,37 @@ diagram architecture {
     title: "K8s 蓝绿发布拓扑"
 
     group edge "入口流量" {
-        entity dns "DNS" { type: external }
-        entity cdn "CDN" { type: external }
-        entity waf "WAF" { type: gateway }
-        entity ingress "Ingress Gateway" { type: gateway }
+        entity[external] dns "DNS"
+        entity[external] cdn "CDN"
+        entity[gateway] waf "WAF"
+        entity[gateway] ingress "Ingress Gateway"
     }
 
     group blue_env "Blue 生产环境" {
-        entity blue_gateway "gateway-blue x8" { type: service }
-        entity blue_checkout "checkout-blue x12" { type: service }
-        entity blue_payment "payment-blue x10" { type: service }
-        entity blue_worker "worker-blue x16" { type: service }
+        entity[service] blue_gateway "gateway-blue x8"
+        entity[service] blue_checkout "checkout-blue x12"
+        entity[service] blue_payment "payment-blue x10"
+        entity[service] blue_worker "worker-blue x16"
     }
 
     group green_env "Green 候选环境" {
-        entity green_gateway "gateway-green x8" { type: service }
-        entity green_checkout "checkout-green x12" { type: service }
-        entity green_payment "payment-green x10" { type: service }
-        entity green_worker "worker-green x16" { type: service }
+        entity[service] green_gateway "gateway-green x8"
+        entity[service] green_checkout "checkout-green x12"
+        entity[service] green_payment "payment-green x10"
+        entity[service] green_worker "worker-green x16"
     }
 
     group control_plane "发布控制面" {
-        entity argo_rollouts "Argo Rollouts" { type: service }
-        entity metrics "Prometheus" { type: service }
-        entity logs "Loki" { type: service }
-        entity feature_flag "Feature Flag Service" { type: service }
+        entity[service] argo_rollouts "Argo Rollouts"
+        entity[service] metrics "Prometheus"
+        entity[service] logs "Loki"
+        entity[service] feature_flag "Feature Flag Service"
     }
 
     group shared_backend "共享后端" {
-        entity postgres "PostgreSQL" { type: database }
-        entity redis "Redis" { type: cache }
-        entity kafka "Kafka" { type: queue }
+        entity[database] postgres "PostgreSQL"
+        entity[cache] redis "Redis"
+        entity[queue] kafka "Kafka"
     }
 
     dns -> cdn

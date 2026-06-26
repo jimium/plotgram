@@ -4,31 +4,31 @@ diagram architecture {
     title: "供应链控制塔"
 
     group upstream "上游与计划" {
-        entity supplier "Supplier Portal" { type: external }
-        entity procurement "Procurement Service" { type: service }
-        entity planning "Demand Planning" { type: service }
-        entity forecast "Forecast Engine" { type: service }
+        entity[external] supplier "Supplier Portal"
+        entity[service] procurement "Procurement Service"
+        entity[service] planning "Demand Planning"
+        entity[service] forecast "Forecast Engine"
     }
 
     group operations "运营与履约" {
-        entity order_mgmt "Order Management" { type: service }
-        entity inventory "Inventory Service" { type: service }
-        entity warehouse_ops "Warehouse Operations" { type: service }
-        entity allocation "Allocation Engine" { type: service }
+        entity[service] order_mgmt "Order Management"
+        entity[service] inventory "Inventory Service"
+        entity[service] warehouse_ops "Warehouse Operations"
+        entity[service] allocation "Allocation Engine"
     }
 
     group logistics "物流协同" {
-        entity carrier "Carrier Network" { type: external }
-        entity shipment "Shipment Service" { type: service }
-        entity tracking "Tracking Hub" { type: service }
-        entity eta "ETA Predictor" { type: service }
+        entity[external] carrier "Carrier Network"
+        entity[service] shipment "Shipment Service"
+        entity[service] tracking "Tracking Hub"
+        entity[service] eta "ETA Predictor"
     }
 
     group visibility "控制塔能力" {
-        entity event_bus "Supply Event Bus" { type: queue }
-        entity control_tower "Control Tower UI" { type: frontend }
-        entity alerting "Alerting Engine" { type: service }
-        entity analytics "Operations Analytics" { type: database }
+        entity[queue] event_bus "Supply Event Bus"
+        entity[frontend] control_tower "Control Tower UI"
+        entity[service] alerting "Alerting Engine"
+        entity[database] analytics "Operations Analytics"
     }
 
     supplier -> procurement

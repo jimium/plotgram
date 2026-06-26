@@ -6,17 +6,15 @@ diagram flowchart {
         direction: top-to-bottom
     }
 
-    entity client "移动客户端" { type: client }
-    entity gateway "API 网关" {
-        type: gateway
+    entity[client] client "移动客户端"
+    entity[gateway] gateway "API 网关" {
         status: healthy
     }
-    entity auth "认证服务" {
-        type: service
+    entity[service] auth "认证服务" {
         owner: "安全团队"
     }
-    entity db "用户数据库" { type: database }
-    entity cache "Token 缓存" { type: cache }
+    entity[database] db "用户数据库"
+    entity[cache] cache "Token 缓存"
 
     client -> gateway "HTTPS 请求"
     gateway -> auth "转发认证请求"

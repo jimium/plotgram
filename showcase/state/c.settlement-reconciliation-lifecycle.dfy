@@ -3,16 +3,16 @@
 diagram state {
     title: "清结算对账生命周期"
 
-    entity init "初始化" { type: initial }
-    entity pending "Pending" { type: state }
-    entity clearing "Clearing" { type: state }
-    entity settling "Settling" { type: state }
-    entity reconciling "Reconciling" { type: state }
-    entity exception "Exception" { type: state }
-    entity adjusting "Adjusting" { type: state }
-    entity closed "Closed" { type: final }
-    entity failed "Failed" { type: final }
-    entity gate "是否平账？" { type: choice }
+    entity[initial] init "初始化"
+    entity[state] pending "Pending"
+    entity[state] clearing "Clearing"
+    entity[state] settling "Settling"
+    entity[state] reconciling "Reconciling"
+    entity[state] exception "Exception"
+    entity[state] adjusting "Adjusting"
+    entity[final] closed "Closed"
+    entity[final] failed "Failed"
+    entity[choice] gate "是否平账？"
 
     init -> pending
     pending -> clearing "receive cutoff batch"

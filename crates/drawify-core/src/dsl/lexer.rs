@@ -32,6 +32,8 @@ pub enum TokenKind {
     // 符号
     LBrace,
     RBrace,
+    LBracket,    // [
+    RBracket,    // ]
     Colon,
     Dot,         // .
     Arrow,       // ->
@@ -44,6 +46,26 @@ pub enum TokenKind {
 }
 
 impl TokenKind {
+    pub fn keyword_str(&self) -> Option<&'static str> {
+        match self {
+            TokenKind::Diagram => Some("diagram"),
+            TokenKind::Entity => Some("entity"),
+            TokenKind::Group => Some("group"),
+            TokenKind::NodeStyle => Some("node_style"),
+            TokenKind::EdgeStyle => Some("edge_style"),
+            TokenKind::Config => Some("config"),
+            TokenKind::Flowchart => Some("flowchart"),
+            TokenKind::Sequence => Some("sequence"),
+            TokenKind::Architecture => Some("architecture"),
+            TokenKind::State => Some("state"),
+            TokenKind::Er => Some("er"),
+            TokenKind::Mindmap => Some("mindmap"),
+            TokenKind::True => Some("true"),
+            TokenKind::False => Some("false"),
+            _ => None,
+        }
+    }
+
     pub fn display_name(&self) -> &str {
         match self {
             TokenKind::Diagram => "'diagram'",
@@ -65,6 +87,8 @@ impl TokenKind {
             TokenKind::NumberLit(_) => "number",
             TokenKind::LBrace => "'{'",
             TokenKind::RBrace => "'}'",
+            TokenKind::LBracket => "'['",
+            TokenKind::RBracket => "']'",
             TokenKind::Colon => "':'",
             TokenKind::Dot => "'.'",
             TokenKind::Arrow => "'->'",
@@ -238,6 +262,20 @@ impl<'a> Lexer<'a> {
                 self.advance();
                 Some(Token {
                     kind: TokenKind::RBrace,
+                    span: Span::new(start, self.current_pos()),
+                })
+            }
+            '[' => {
+                self.advance();
+                Some(Token {
+                    kind: TokenKind::LBracket,
+                    span: Span::new(start, self.current_pos()),
+                })
+            }
+            ']' => {
+                self.advance();
+                Some(Token {
+                    kind: TokenKind::RBracket,
                     span: Span::new(start, self.current_pos()),
                 })
             }

@@ -3,8 +3,8 @@
 diagram sequence {
     title: "Ping-Pong"
 
-    entity alice "Alice" { type: actor }
-    entity bob "Bob" { type: actor }
+    entity[actor] alice "Alice"
+    entity[actor] bob "Bob"
 
     alice -> bob "ping"
     bob --> alice "pong"

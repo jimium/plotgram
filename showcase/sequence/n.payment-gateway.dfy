@@ -4,11 +4,11 @@
 diagram sequence {
     title: "支付网关交互时序"
 
-    entity user "用户" { type: actor }
-    entity shop "电商前端" { type: boundary }
-    entity order_svc "订单服务" { type: control }
-    entity pay_gw "第三方支付网关" { type: control }
-    entity bank "银行系统" { type: database }
+    entity[actor] user "用户"
+    entity[boundary] shop "电商前端"
+    entity[control] order_svc "订单服务"
+    entity[control] pay_gw "第三方支付网关"
+    entity[database] bank "银行系统"
 
     user -> shop "1. 点击支付"
     shop -> order_svc "2. 发起支付请求"
