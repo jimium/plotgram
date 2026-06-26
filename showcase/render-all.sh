@@ -186,7 +186,6 @@ while IFS= read -r -d '' dfy_file; do
       if [[ "$format" == "svg" ]]; then
         history_result="$(python3 "$SCRIPT_DIR/svg-history.py" commit "$rel" "$render_out" "$out")"
         case "$history_result" in
-          unchanged) history_note=" [无变化，未写盘]" ;;
           archived) history_note=" [已归档旧版]" ;;
           created)  history_note=" [新建]" ;;
         esac
