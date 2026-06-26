@@ -195,7 +195,6 @@ impl<'a> LayoutPipeline<'a> {
         let feedback = LayoutRouteFeedback::new(self.diagram, self.plan, algo);
         let PreRouteFeedback {
             result: mut result_v2,
-            baseline: mut result_pre_v2,
         } = feedback.apply_pre_route(result);
         eprintln!("[perf]   pre-route: {:.2}ms", t0.elapsed().as_secs_f64() * 1000.0);
 
@@ -215,9 +214,6 @@ impl<'a> LayoutPipeline<'a> {
         let gf_pass = GroupFramePass::resolve(self.diagram, self.plan, algo);
         if !self.diagram.groups.is_empty() {
             gf_pass.refresh_before_route(self.diagram, &mut result_v2, pinned, algo);
-            if let Some(ref mut pre_v2) = result_pre_v2 {
-                gf_pass.refresh_before_route(self.diagram, pre_v2, pinned, algo);
-            }
         }
 
         let refine_config = refine::RefineConfig::default();
@@ -225,7 +221,6 @@ impl<'a> LayoutPipeline<'a> {
         let mut result = feedback.complete_routing(
             router.as_ref(),
             result_v2,
-            result_pre_v2,
             &refine_config,
         );
         eprintln!("[perf]   route: {:.2}ms", t_route.elapsed().as_secs_f64() * 1000.0);
