@@ -141,9 +141,10 @@
         let empty_groups: HashMap<String, crate::layout::GroupLayout> = HashMap::new();
         let empty_n2g: HashMap<String, Vec<String>> = HashMap::new();
         let group_ctx = test_group_ctx(empty_groups, empty_n2g);
+        let obstacles = PreparedObstacles::build(&nodes, &group_ctx);
         assert!(
-            obstacle_penalty(&under_path, "mq", "user", &nodes, &group_ctx)
-                > obstacle_penalty(&over_path, "mq", "user", &nodes, &group_ctx)
+            obstacle_penalty(&under_path, "mq", "user", &nodes, &group_ctx, &obstacles)
+                > obstacle_penalty(&over_path, "mq", "user", &nodes, &group_ctx, &obstacles)
         );
     }
 
@@ -538,13 +539,16 @@
         assert_eq!(routed.edges.len(), 1);
 
         let points: Vec<Point> = routed.edges[0].path_points().into_owned();
+        let group_ctx = test_group_ctx(routed.groups.clone(), HashMap::new());
+        let obstacles = PreparedObstacles::build(&routed.nodes, &group_ctx);
         assert!(
             path_is_clean(
                 &points,
                 "a",
                 "c",
                 &routed.nodes,
-                &test_group_ctx(routed.groups.clone(), HashMap::new()),
+                &group_ctx,
+                &obstacles.sorted_node_ids,
             ),
             "A→C 路径不得穿过 B 的膨胀区域（硬过滤保证零穿障）"
         );
@@ -595,13 +599,15 @@
         );
 
         let cfg = OrthoConfig::from_spec_defaults();
-        let routed_segments: Vec<RoutedSegment> = Vec::new();
+        let grid = SegmentGrid::new();
         let group_ctx = test_group_ctx(HashMap::new(), HashMap::new());
+        let obstacles = PreparedObstacles::build(&nodes, &group_ctx);
         let ctx = RoutingContext {
             nodes: &nodes,
             group_ctx: &group_ctx,
-            routed_segments: &routed_segments,
+            grid: &grid,
             cfg: &cfg,
+            obstacles: &obstacles,
         };
 
         // A bottom anchor: (180, 150)，B left anchor: (400, 325)
@@ -637,7 +643,8 @@
                 "a",
                 "b",
                 &nodes,
-                &test_group_ctx(HashMap::new(), HashMap::new()),
+                &group_ctx,
+                &obstacles.sorted_node_ids,
             ),
             "混合端口绕行候选应避开障碍物 c 和 d（G1 修复）"
         );
@@ -882,13 +889,16 @@
 
         let points: Vec<Point> = routed.edges[0].path_points().into_owned();
         // 路径不得穿过 G1 包围框（a、c 都不在 G1 内）
+        let group_ctx = test_group_ctx(routed.groups.clone(), HashMap::new());
+        let obstacles = PreparedObstacles::build(&routed.nodes, &group_ctx);
         assert!(
             path_is_clean(
                 &points,
                 "a",
                 "c",
                 &routed.nodes,
-                &test_group_ctx(routed.groups.clone(), HashMap::new()),
+                &group_ctx,
+                &obstacles.sorted_node_ids,
             ),
             "a→c 路径不得穿过 G1 分组边框（P1-3 硬过滤），got points: {:?}",
             points
@@ -965,13 +975,16 @@
         let mut n2g: HashMap<String, Vec<String>> = HashMap::new();
         n2g.insert("a".to_string(), vec!["g1".to_string()]);
         n2g.insert("b".to_string(), vec!["g1".to_string()]);
+        let group_ctx = test_group_ctx(routed.groups.clone(), n2g);
+        let obstacles = PreparedObstacles::build(&routed.nodes, &group_ctx);
         assert!(
             path_is_clean(
                 &points,
                 "a",
                 "b",
                 &routed.nodes,
-                &test_group_ctx(routed.groups.clone(), n2g),
+                &group_ctx,
+                &obstacles.sorted_node_ids,
             ),
             "组内边 a→b 路径不应被 G1 边框阻挡，got points: {:?}",
             points
@@ -1097,13 +1110,16 @@
 
         let points: Vec<Point> = routed.edges[0].path_points().into_owned();
         // 硬过滤应生成绕行路径，不穿过 B
+        let group_ctx = test_group_ctx(routed.groups.clone(), HashMap::new());
+        let obstacles = PreparedObstacles::build(&routed.nodes, &group_ctx);
         assert!(
             path_is_clean(
                 &points,
                 "a",
                 "c",
                 &routed.nodes,
-                &test_group_ctx(routed.groups.clone(), HashMap::new()),
+                &group_ctx,
+                &obstacles.sorted_node_ids,
             ),
             "硬过滤后的路径不应穿障，got points: {:?}",
             points

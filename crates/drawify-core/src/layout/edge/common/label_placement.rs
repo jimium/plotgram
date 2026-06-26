@@ -240,6 +240,7 @@ fn separation_vector(
 mod tests {
     use super::*;
     use crate::layout::edge::common::label_avoidance::{aabb_overlap, label_bbox};
+    use crate::layout::geometry::Point;
     use crate::layout::{EdgeLabelLayout, EdgeLayout, GroupLayout, NodeLayout, PathGeometry, Port};
 
     fn labeled_edge(label_center: Point) -> EdgeLayout {

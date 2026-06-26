@@ -52,10 +52,11 @@ impl CandidateScorer for DefaultScorer {
             pair.to_id(),
             ctx.nodes,
             ctx.group_ctx,
+            &ctx.obstacles,
         );
         score += edge_overlap_penalty(
             path,
-            ctx.routed_segments,
+            ctx.grid,
         );
         if !ctx.group_ctx.corridors.is_empty() {
             score += corridor_misalignment_penalty(
@@ -84,16 +85,15 @@ pub fn obstacle_penalty(
     to_id: &str,
     nodes: &HashMap<String, NodeLayout>,
     group_ctx: &GroupRoutingContext,
+    obstacles: &PreparedObstacles,
 ) -> f64 {
     let mut penalty = 0.0;
     let last_segment_index = path.len().saturating_sub(2);
     let endpoint_groups = group_ctx.endpoint_group_set(from_id, to_id);
 
-    // 预排序 node_ids（确定性，AGENTS.md §2）
-    let mut node_ids: Vec<&String> = nodes.keys().collect();
-    node_ids.sort();
-    let mut group_ids: Vec<&String> = group_ctx.groups.keys().collect();
-    group_ids.sort();
+    // 使用预排序的 node_ids / group_ids（确定性，AGENTS.md §2）
+    let node_ids = &obstacles.sorted_node_ids;
+    let group_ids = &obstacles.sorted_group_ids;
 
     for (segment_index, window) in path.windows(2).enumerate() {
         let a = window[0];
@@ -106,13 +106,13 @@ pub fn obstacle_penalty(
         let seg_ny_min = a.y.min(b.y) - node_pad_ext;
         let seg_ny_max = a.y.max(b.y) + node_pad_ext;
 
-        for nid in &node_ids {
+        for nid in node_ids {
             let is_source_allowed = nid.as_str() == from_id && segment_index == 0;
             let is_target_allowed = nid.as_str() == to_id && segment_index == last_segment_index;
             if is_source_allowed || is_target_allowed {
                 continue;
             }
-            let Some(nl) = nodes.get(*nid) else { continue };
+            let Some(nl) = nodes.get(nid) else { continue };
             // bbox 预筛选——跳过远离段的节点
             if nl.x + nl.width < seg_nx_min || nl.x > seg_nx_max
                 || nl.y + nl.height < seg_ny_min || nl.y > seg_ny_max {
@@ -133,8 +133,8 @@ pub fn obstacle_penalty(
         let seg_gy_min = a.y.min(b.y) - grp_pad_ext;
         let seg_gy_max = a.y.max(b.y) + grp_pad_ext;
 
-        for gid in &group_ids {
-            let Some(gl) = group_ctx.groups.get(*gid) else {
+        for gid in group_ids {
+            let Some(gl) = group_ctx.groups.get(gid) else {
                 continue;
             };
             // bbox 预筛选——跳过远离段的分组
@@ -177,12 +177,11 @@ pub fn path_is_clean(
     to_id: &str,
     nodes: &HashMap<String, NodeLayout>,
     _group_ctx: &GroupRoutingContext,
+    sorted_node_ids: &[String],
 ) -> bool {
     if path.len() < 2 {
         return true;
     }
-    let mut node_ids: Vec<&String> = nodes.keys().collect();
-    node_ids.sort();
 
     for window in path.windows(2) {
         let a = window[0];
@@ -192,7 +191,7 @@ pub fn path_is_clean(
         let seg_xmax = a.x.max(b.x) + NODE_OBSTACLE_PAD;
         let seg_ymin = a.y.min(b.y) - NODE_OBSTACLE_PAD;
         let seg_ymax = a.y.max(b.y) + NODE_OBSTACLE_PAD;
-        for node_id in &node_ids {
+        for node_id in sorted_node_ids {
             let nid = node_id.as_str();
             if nid == from_id || nid == to_id {
                 continue;
@@ -221,13 +220,12 @@ pub fn path_avoids_group_interiors(
     from_id: &str,
     to_id: &str,
     group_ctx: &GroupRoutingContext,
+    sorted_group_ids: &[String],
 ) -> bool {
     if path.len() < 2 {
         return true;
     }
     let endpoint_groups = group_ctx.endpoint_group_set(from_id, to_id);
-    let mut group_ids: Vec<&String> = group_ctx.groups.keys().collect();
-    group_ids.sort();
 
     for window in path.windows(2) {
         let a = window[0];
@@ -237,11 +235,11 @@ pub fn path_avoids_group_interiors(
         let seg_xmax = a.x.max(b.x);
         let seg_ymin = a.y.min(b.y);
         let seg_ymax = a.y.max(b.y);
-        for gid in &group_ids {
+        for gid in sorted_group_ids {
             if endpoint_groups.contains(gid.as_str()) {
                 continue;
             }
-            let Some(gl) = group_ctx.groups.get(*gid) else {
+            let Some(gl) = group_ctx.groups.get(gid) else {
                 continue;
             };
             if gl.width <= 0.0 || gl.height <= 0.0 {
@@ -271,11 +269,11 @@ fn segment_crosses_rect_interior(
 
 /// 计算边段重叠惩罚。
 ///
-/// P2-1: bbox 预筛选——对每个段先做 bbox 扩张检查，跳过明显远离的已路由段，
-/// 减少不必要的 `segments_conflict` 调用。
+/// 使用 `SegmentGrid` 空间索引加速段-段重叠检测（方案 1），
+/// 将 O(R) 线性扫描降为 O(k)（k 为网格命中数）。
 pub fn edge_overlap_penalty(
     path: &[Point],
-    routed_segments: &[RoutedSegment],
+    grid: &SegmentGrid,
 ) -> f64 {
     let mut penalty = 0.0;
     for window in path.windows(2) {
@@ -286,20 +284,8 @@ pub fn edge_overlap_penalty(
             y2: window[1].y,
             edge_index: usize::MAX,
         };
-        // P2-1: 当前段的 bbox（扩张 BBOX_EXPAND）
-        let seg_xmin = seg.x1.min(seg.x2) - BBOX_EXPAND;
-        let seg_xmax = seg.x1.max(seg.x2) + BBOX_EXPAND;
-        let seg_ymin = seg.y1.min(seg.y2) - BBOX_EXPAND;
-        let seg_ymax = seg.y1.max(seg.y2) + BBOX_EXPAND;
-        for existing in routed_segments {
-            // P2-1: bbox 预筛选——跳过 bbox 不相交的段
-            let ex_xmin = existing.x1.min(existing.x2);
-            let ex_xmax = existing.x1.max(existing.x2);
-            let ex_ymin = existing.y1.min(existing.y2);
-            let ex_ymax = existing.y1.max(existing.y2);
-            if ex_xmax < seg_xmin || ex_xmin > seg_xmax || ex_ymax < seg_ymin || ex_ymin > seg_ymax {
-                continue;
-            }
+        // 方案 1: 使用网格空间索引查询邻近段，而非线性扫描全部
+        for existing in grid.query_overlapping(&seg, BBOX_EXPAND) {
             if segments_conflict(&seg, existing) {
                 penalty += EDGE_OVERLAP_PENALTY;
             }
@@ -406,7 +392,7 @@ fn segment_near_misses_node(a: Point, b: Point, nl: &NodeLayout, pad: f64) -> bo
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layout::group::GroupRoutingContext;
+    use crate::layout::group::{GroupRoutingContext, PORT_STUB_CLEARANCE};
     use crate::layout::GroupLayout;
 
     fn test_group_ctx(
@@ -512,8 +498,9 @@ mod tests {
     fn test_edge_overlap_penalty_includes_crossings() {
         // 端到端测试：路径包含与已路由段交叉的段时，penalty 应非零
         let path = vec![pt(100.0, 200.0), pt(300.0, 200.0)];
-        let routed = vec![seg(200.0, 100.0, 200.0, 300.0, 1)];
-        let penalty = edge_overlap_penalty(&path, &routed);
+        let mut grid = SegmentGrid::new();
+        grid.insert_path(&[pt(200.0, 100.0), pt(200.0, 300.0)], 1);
+        let penalty = edge_overlap_penalty(&path, &grid);
         assert!(
             penalty > 0.0,
             "包含交叉段的路径应有非零 overlap penalty"
@@ -542,13 +529,14 @@ mod tests {
 
         // 水平线段从 (100, 200) 到 (500, 200)，穿过分组 G1
         let path = vec![pt(100.0, 200.0), pt(500.0, 200.0)];
+        let obstacles = PreparedObstacles::build(&nodes, &group_ctx);
         // 分组穿越改为软惩罚后，path_is_clean 不再硬性拒绝分组穿越
         assert!(
-            path_is_clean(&path, "a", "c", &nodes, &group_ctx),
+            path_is_clean(&path, "a", "c", &nodes, &group_ctx, &obstacles.sorted_node_ids),
             "分组穿越不再由 path_is_clean 硬过滤拦截，改由 obstacle_penalty 软惩罚"
         );
         // 但 obstacle_penalty 仍应惩罚分组穿越
-        let penalty = obstacle_penalty(&path, "a", "c", &nodes, &group_ctx);
+        let penalty = obstacle_penalty(&path, "a", "c", &nodes, &group_ctx, &obstacles);
         assert!(
             penalty >= GROUP_TRANSIT_PENALTY,
             "穿过分组应触发 GROUP_TRANSIT_PENALTY 软惩罚"
@@ -576,8 +564,9 @@ mod tests {
 
         // 水平线段从 (250, 200)（G1 内部）到 (500, 200)（G1 外部），穿过 G1 右边界
         let path = vec![pt(250.0, 200.0), pt(500.0, 200.0)];
+        let obstacles = PreparedObstacles::build(&nodes, &group_ctx);
         assert!(
-            path_is_clean(&path, "a", "c", &nodes, &group_ctx),
+            path_is_clean(&path, "a", "c", &nodes, &group_ctx, &obstacles.sorted_node_ids),
             "边 a→c 的 a 在 G1 内，路径穿过 G1 边界应被允许"
         );
     }
@@ -601,8 +590,9 @@ mod tests {
 
         let through_path = vec![pt(100.0, 200.0), pt(500.0, 200.0)]; // 穿过 G1
         let around_path = vec![pt(100.0, 50.0), pt(500.0, 50.0)]; // 在 G1 上方
-        let penalty_through = obstacle_penalty(&through_path, "a", "c", &nodes, &group_ctx);
-        let penalty_around = obstacle_penalty(&around_path, "a", "c", &nodes, &group_ctx);
+        let obstacles = PreparedObstacles::build(&nodes, &group_ctx);
+        let penalty_through = obstacle_penalty(&through_path, "a", "c", &nodes, &group_ctx, &obstacles);
+        let penalty_around = obstacle_penalty(&around_path, "a", "c", &nodes, &group_ctx, &obstacles);
         assert!(
             penalty_through > penalty_around,
             "穿过分组的路径惩罚 ({}) 应大于绕行路径 ({})",
@@ -641,9 +631,10 @@ mod tests {
 
         // 沿 G1 左边界外侧竖直行走（x=189，左边框 x=200，间距 11px < pad）
         let path = vec![pt(189.0, 80.0), pt(189.0, 320.0)];
+        let obstacles = PreparedObstacles::build(&nodes, &group_ctx);
         // 分组贴边改为软惩罚后，path_is_clean 不再硬性拒绝
         assert!(
-            path_is_clean(&path, "a", "b", &nodes, &group_ctx),
+            path_is_clean(&path, "a", "b", &nodes, &group_ctx, &obstacles.sorted_node_ids),
             "分组贴边不再由 path_is_clean 硬过滤拦截，改由 obstacle_penalty 软惩罚"
         );
     }
@@ -667,9 +658,10 @@ mod tests {
 
         // 沿 G1 左边界内侧竖直行走（x=208，左边框 x=200，间距 8px < pad）
         let path = vec![pt(208.0, 120.0), pt(208.0, 280.0)];
+        let obstacles = PreparedObstacles::build(&nodes, &group_ctx);
         // 分组贴边改为软惩罚后，path_is_clean 不再硬性拒绝
         assert!(
-            path_is_clean(&path, "a", "c", &nodes, &group_ctx),
+            path_is_clean(&path, "a", "c", &nodes, &group_ctx, &obstacles.sorted_node_ids),
             "组内贴边平行不再由 path_is_clean 硬过滤拦截，改由 obstacle_penalty 软惩罚"
         );
     }
@@ -692,8 +684,9 @@ mod tests {
         let group_ctx = test_group_ctx(groups, node_to_groups);
 
         let path = vec![pt(250.0, 200.0), pt(500.0, 200.0)];
+        let obstacles = PreparedObstacles::build(&nodes, &group_ctx);
         assert!(
-            path_is_clean(&path, "a", "c", &nodes, &group_ctx),
+            path_is_clean(&path, "a", "c", &nodes, &group_ctx, &obstacles.sorted_node_ids),
             "合法穿出分组边界仍应允许"
         );
     }
