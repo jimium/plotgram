@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-06-26T11:46:16+00:00",
+  "updated": "2026-06-26T12:13:14+00:00",
   "charts": {
     "flowchart/s.linear-chain.svg": {
       "dfy": "flowchart/s.linear-chain.dfy",
@@ -1290,6 +1290,16 @@
     "architecture/c.data-lineage-platform.svg": {
       "dfy": "architecture/c.data-lineage-platform.dfy",
       "entries": [
+        {
+          "id": "20260626-121314",
+          "file": ".history/architecture/c.data-lineage-platform/20260626-121314.svg",
+          "savedAt": "2026-06-26T12:13:14+00:00"
+        },
+        {
+          "id": "20260626-120857",
+          "file": ".history/architecture/c.data-lineage-platform/20260626-120857.svg",
+          "savedAt": "2026-06-26T12:08:57+00:00"
+        },
         {
           "id": "20260626-114609",
           "file": ".history/architecture/c.data-lineage-platform/20260626-114609.svg",
