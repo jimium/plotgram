@@ -33,7 +33,6 @@ use crate::layout::{EdgeLayout, NodeLayout, Port};
 
 use super::compatibility::EdgeFeatures;
 use super::trunk::allocate_trunks;
-use super::clustering::BundleCandidate;
 use super::types::{
     Axis, BundlingConfig, BundlingResult, EdgeBundle, EdgeBundlingDebugStats, EdgePathRoles, SegmentRole, SegmentSpan,
     TrunkKeepout,

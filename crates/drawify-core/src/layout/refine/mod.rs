@@ -16,7 +16,6 @@ mod reroute;
 pub use crossing::analyze_edge_node_crossings;
 pub use geometry::segment_intersects_node;
 pub(crate) use geometry::segment_intersects_aabb;
-pub(crate) use overlap::{analyze_edge_overlaps, segments_conflict_xy};
 
 pub use push::MomentumHistory;
 

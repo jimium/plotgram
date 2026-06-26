@@ -11,7 +11,6 @@
 //! 不再需要传入 `relations`。
 
 use crate::layout::constants::DEFAULT_MAX_LABEL_ITERATIONS;
-use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
 use crate::layout::edge::common::edge_geometry::node_center;
 use std::collections::HashMap;

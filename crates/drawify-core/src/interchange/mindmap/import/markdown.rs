@@ -91,12 +91,14 @@ enum LineKind {
     /// ATX 标题：level (1-6), label text
     AtxHeading { level: u8, text: String },
     /// 无序列表项：indent depth, text
+    #[allow(dead_code)]
     ListItem { indent: usize, text: String },
     /// HTML 注释：raw content between <!-- and -->
     HtmlComment(String),
     /// 空行
     Blank,
     /// 其他内容（段落、代码块等）
+    #[allow(dead_code)]
     Other(String),
 }
 

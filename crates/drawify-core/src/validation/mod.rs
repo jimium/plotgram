@@ -9,7 +9,7 @@ pub mod attrs;
 pub mod common;
 
 use crate::ast::{Diagram, PreparedDiagram};
-use crate::error::{ErrorCode, ValidationResult};
+use crate::error::ValidationResult;
 
 pub fn validate(diagram: &PreparedDiagram) -> ValidationResult {
     let mut result = ValidationResult::new();

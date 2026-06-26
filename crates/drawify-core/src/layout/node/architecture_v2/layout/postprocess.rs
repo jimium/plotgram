@@ -7,7 +7,7 @@ use crate::layout::node::common::overlap::{
 use crate::layout::{GroupLayout, NodeLayout};
 use std::collections::HashMap;
 
-use super::constants::{GROUP_LABEL_HEIGHT, MIN_GROUP_GAP, PADDING};
+use super::constants::{MIN_GROUP_GAP, PADDING};
 
 pub(in super::super) fn remove_node_overlaps(
     nodes: &mut HashMap<String, NodeLayout>,

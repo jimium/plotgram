@@ -39,7 +39,7 @@ pub(super) mod slot;
 // Re-exports for cross-submodule access via `use super::*;`
 pub(super) use context::{EndpointPair, RoutingContext};
 pub(super) use path::{append_routed_segments, select_best_path_with_scorer_stats, PathSelectStats, RoutedSegment};
-pub(super) use scoring::{CandidateScorer, DefaultScorer, GROUP_OBSTACLE_PAD, NODE_OBSTACLE_PAD, path_avoids_group_interiors, path_is_clean, path_is_clean_strict, path_length};
+pub(super) use scoring::{CandidateScorer, DefaultScorer, GROUP_OBSTACLE_PAD, NODE_OBSTACLE_PAD, path_avoids_group_interiors, path_is_clean, path_length};
 pub(super) use simplify::{simplify_path, simplify_path_preserving_stubs};
 #[allow(unused_imports)] // used by tests via `use super::*;`
 pub(super) use simplify::is_collinear;

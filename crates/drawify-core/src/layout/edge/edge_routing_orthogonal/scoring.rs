@@ -4,7 +4,7 @@ use super::*;
 use crate::layout::geometry::{Point, Rect};
 use crate::layout::group::{
     corridor_misalignment_penalty, segment_near_misses_group_shell, GroupRoutingContext,
-    GROUP_BORDER_SHELL_PAD, PORT_STUB_CLEARANCE,
+    GROUP_BORDER_SHELL_PAD,
 };
 use crate::layout::{GroupLayout, NodeLayout};
 use std::collections::HashMap;
@@ -258,21 +258,6 @@ pub fn path_avoids_group_interiors(
         }
     }
     true
-}
-
-/// 严格硬过滤（节点 + 分组内部）：`path_is_clean` + `path_avoids_group_interiors`。
-///
-/// 用于需要同时检查节点和分组的场景。在候选选择中，建议分别调用两个函数
-/// 以实现三阶段选择（strict → nodes_only → dirty），避免对 nodes_only 候选重复检查节点。
-pub fn path_is_clean_strict(
-    path: &[Point],
-    from_id: &str,
-    to_id: &str,
-    nodes: &HashMap<String, NodeLayout>,
-    group_ctx: &GroupRoutingContext,
-) -> bool {
-    path_is_clean(path, from_id, to_id, nodes, group_ctx)
-        && path_avoids_group_interiors(path, from_id, to_id, group_ctx)
 }
 
 /// 检查线段是否穿越矩形的严格内部（不含边界）。

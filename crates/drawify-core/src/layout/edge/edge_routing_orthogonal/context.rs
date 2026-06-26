@@ -5,8 +5,8 @@
 //! single context reference instead of a long parameter list.
 
 use crate::layout::geometry::Point;
-use crate::layout::group::{GroupCorridor, GroupRoutingContext};
-use crate::layout::{GroupLayout, NodeLayout};
+use crate::layout::group::GroupRoutingContext;
+use crate::layout::NodeLayout;
 use std::collections::HashMap;
 
 use super::{OrthoConfig, RoutedSegment};

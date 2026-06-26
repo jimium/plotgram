@@ -17,7 +17,7 @@ use super::group_layout_hint::{
 };
 use super::layout::acyclic::is_effective_edge;
 use super::layout::constants::{
-    GROUP_GAP_X, GROUP_LABEL_HEIGHT, INTRA_LAYER_GAP, LAYER_GAP, NEIGHBOR_PULL_FACTOR, NODE_GAP,
+    GROUP_GAP_X, GROUP_LABEL_HEIGHT, INTRA_LAYER_GAP, LAYER_GAP, NEIGHBOR_PULL_FACTOR,
 };
 use super::layout::coordinate::{
     align_client_nodes_to_hubs, center_group_hub_nodes, layer_centers_from_placed,
@@ -410,6 +410,7 @@ impl super::group_sizing::GroupWidthBlock for IntraMacroBlock {
 /// `compute_two_phase_layout` 的 Phase A 需要对每个顶层 group 调用一次组内布局，
 /// 并在 Phase B 中复用 `group_tree` / `graph` / `sizes` / `reversed` 等上下文。
 /// 强行改为 trait 调度会增加间接层而无功能收益。
+#[allow(dead_code)]
 pub struct ArchitectureV2IntraLayouter<'a> {
     diagram: &'a Diagram,
     group_tree: &'a GroupTree,
@@ -419,6 +420,7 @@ pub struct ArchitectureV2IntraLayouter<'a> {
     padding: &'a GroupPadding,
 }
 
+#[allow(dead_code)]
 impl<'a> ArchitectureV2IntraLayouter<'a> {
     pub fn new(
         diagram: &'a Diagram,
