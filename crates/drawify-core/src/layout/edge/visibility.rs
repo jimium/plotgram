@@ -12,9 +12,80 @@
 
 use crate::layout::geometry::{Point, Rect};
 use crate::layout::{constants, NodeLayout};
+use std::collections::HashMap;
 
 /// 坐标比较容差
 const EPS: f64 = 0.1;
+
+/// 障碍物均匀网格 cell 边长（像素）。
+const OBSTACLE_GRID_CELL: f64 = 64.0;
+
+fn obstacle_cell_coord(v: f64) -> i32 {
+    (v / OBSTACLE_GRID_CELL).floor() as i32
+}
+
+/// 障碍物 bbox 均匀网格空间索引。
+///
+/// `ObstacleIndex::build` 原本对每对角点（(4N)² 对）线性扫描全部 N 个障碍物，
+/// 复杂度 O(N³)；`is_visible_point`（逐边 start/end→角点）也是 O(N)。
+/// 本索引将障碍物按 bbox 插入网格，查询段 bbox 时只返回可能相交的障碍物，
+/// 将两处内层循环降为 O(k)（k 为邻近障碍物数，通常 ≤ 几个）。
+///
+/// 段-障碍物相交的交点必然同时落在段 bbox 与障碍物 bbox 内，故 bbox 预筛选
+/// 不会漏检（安全）。
+struct ObstacleGrid {
+    cells: HashMap<(i32, i32), Vec<usize>>,
+}
+
+impl ObstacleGrid {
+    fn build(obstacles: &[Obstacle]) -> Self {
+        let mut cells: HashMap<(i32, i32), Vec<usize>> = HashMap::new();
+        for (oi, obs) in obstacles.iter().enumerate() {
+            let cx0 = obstacle_cell_coord(obs.rect.left());
+            let cx1 = obstacle_cell_coord(obs.rect.right());
+            let cy0 = obstacle_cell_coord(obs.rect.top());
+            let cy1 = obstacle_cell_coord(obs.rect.bottom());
+            for cx in cx0..=cx1 {
+                for cy in cy0..=cy1 {
+                    cells.entry((cx, cy)).or_default().push(oi);
+                }
+            }
+        }
+        // 每个 cell 内按障碍物索引排序去重，保证查询返回顺序确定（AGENTS.md §2）
+        for list in cells.values_mut() {
+            list.sort_unstable();
+            list.dedup();
+        }
+        Self { cells }
+    }
+
+    /// 返回 bbox 与查询段 bbox（含 EPS 余量）相交的障碍物索引，按索引升序去重。
+    fn query_segment(&self, a: Point, b: Point) -> Vec<usize> {
+        let xmin = a.x.min(b.x) - EPS;
+        let xmax = a.x.max(b.x) + EPS;
+        let ymin = a.y.min(b.y) - EPS;
+        let ymax = a.y.max(b.y) + EPS;
+        let cx0 = obstacle_cell_coord(xmin);
+        let cx1 = obstacle_cell_coord(xmax);
+        let cy0 = obstacle_cell_coord(ymin);
+        let cy1 = obstacle_cell_coord(ymax);
+        // 命中数通常很小（< 邻近障碍物数），用 Vec 线性去重比 HashSet 快
+        let mut seen: Vec<usize> = Vec::new();
+        for cx in cx0..=cx1 {
+            for cy in cy0..=cy1 {
+                if let Some(list) = self.cells.get(&(cx, cy)) {
+                    for &oi in list {
+                        if !seen.contains(&oi) {
+                            seen.push(oi);
+                        }
+                    }
+                }
+            }
+        }
+        seen.sort_unstable();
+        seen
+    }
+}
 
 /// 膨胀后的矩形障碍物
 #[derive(Debug, Clone)]
@@ -74,6 +145,8 @@ pub struct ObstacleIndex {
     /// 空列表表示无阻挡（对全部障碍物可见）。
     blockers: Vec<Vec<usize>>,
     num_corners: usize,
+    /// 障碍物 bbox 空间索引，加速逐边 `is_visible_point` 的段-障碍物查询（方案 5）。
+    grid: ObstacleGrid,
 }
 
 impl ObstacleIndex {
@@ -85,6 +158,8 @@ impl ObstacleIndex {
             .iter()
             .map(|&(idx, nl)| Obstacle::from_node(idx, nl))
             .collect();
+
+        let grid = ObstacleGrid::build(&obstacles);
 
         let corners: Vec<(Point, usize)> = obstacles
             .iter()
@@ -100,8 +175,10 @@ impl ObstacleIndex {
                 let (pi, _) = corners[i];
                 let (pj, _) = corners[j];
                 let mut bl = Vec::new();
-                for (oi, obs) in obstacles.iter().enumerate() {
-                    if segment_intersects_obstacle(&pi, &pj, obs) {
+                // 方案 4：用障碍物网格只检查 bbox 与该角点对段相交的障碍物，
+                // 将内层 O(N) 降为 O(k)。返回值已按索引升序去重，故 bl 顺序确定。
+                for oi in grid.query_segment(pi, pj) {
+                    if segment_intersects_obstacle(&pi, &pj, &obstacles[oi]) {
                         bl.push(oi);
                     }
                 }
@@ -116,17 +193,20 @@ impl ObstacleIndex {
             corners,
             blockers,
             num_corners,
+            grid,
         }
     }
 
     /// 检查两个任意点之间是否可见（连线不穿过任何非 skip 障碍物）。
     /// 用于 start/end 到角点的可见性（逐边计算，不可缓存）。
     fn is_visible_point(&self, a: &Point, b: &Point, skip: &[usize]) -> bool {
-        for (oi, obs) in self.obstacles.iter().enumerate() {
+        // 方案 5：用障碍物网格只检查 bbox 与该段相交的障碍物，
+        // 将逐边 O(N) 降为 O(k)。skip 集合通常很小（起止节点），线性 contains 足够。
+        for oi in self.grid.query_segment(*a, *b) {
             if skip.contains(&oi) {
                 continue;
             }
-            if segment_intersects_obstacle(a, b, obs) {
+            if segment_intersects_obstacle(a, b, &self.obstacles[oi]) {
                 return false;
             }
         }

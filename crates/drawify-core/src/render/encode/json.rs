@@ -85,8 +85,8 @@ pub fn encode_scene_inner(scene: &ExportScene<'_>) -> Result<String> {
 mod tests {
     use super::*;
     use crate::ast::{
-        ArrowType, AttributeMap, AttributeValue, Diagram, DiagramAttribute, Entity, Identifier,
-        PreparedDiagram, Relation, SourceInfo, Span, TextValue,
+        ArrowType, AttributeMap, Diagram, Entity, Identifier,
+        PreparedDiagram, Relation, SourceInfo, Span,
     };
     use crate::types::DiagramType;
 

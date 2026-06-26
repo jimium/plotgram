@@ -299,7 +299,7 @@ mod tests {
     use crate::ast::{
         ArrowType, AttributeMap, Identifier, Relation, Span,
     };
-    use crate::layout::{EdgeLayout, PathGeometry, Port};
+    use crate::layout::{EdgeLayout, Port};
 
     fn pt(x: f64, y: f64) -> Point { Point::new(x, y) }
 

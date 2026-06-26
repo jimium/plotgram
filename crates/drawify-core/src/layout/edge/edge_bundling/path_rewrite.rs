@@ -474,7 +474,7 @@ mod tests {
     use crate::ast::{
         ArrowType, AttributeMap, Identifier, Relation, Span,
     };
-    use crate::layout::{EdgeLayout, PathGeometry, Port};
+    use crate::layout::{EdgeLayout, Port};
     use std::collections::HashMap;
 
     fn make_relation(from: &str, to: &str, arrow: ArrowType) -> Relation {

@@ -58,8 +58,8 @@ pub fn render_svg_to_webp_file(svg_data: &str, output_path: &str, _diagram: &Dia
 mod tests {
     use super::*;
     use crate::ast::{
-        ArrowType, AttributeMap, AttributeValue, Diagram, DiagramAttribute, Entity, Identifier,
-        PreparedDiagram, Relation, SourceInfo, Span, TextValue,
+        ArrowType, AttributeMap, Diagram, Entity, Identifier,
+        PreparedDiagram, Relation, SourceInfo, Span,
     };
     use crate::types::DiagramType;
 
