@@ -71,9 +71,9 @@ pub fn run_refine(
         return result;
     }
 
-    let t_cross = std::time::Instant::now();
+    let t_cross = crate::layout::perf::Instant::now();
     let best_metrics = crossing::analyze_crossings(&result, diagram, config);
-    eprintln!("[perf]         analyze_crossings: {:.2}ms", t_cross.elapsed().as_secs_f64() * 1000.0);
+    crate::perf_log!("[perf]         analyze_crossings: {:.2}ms", t_cross.elapsed().as_secs_f64() * 1000.0);
     let mut best_score = combined_crossing_score(&best_metrics);
     if best_metrics.edge_node_crossings == 0 {
         return result;

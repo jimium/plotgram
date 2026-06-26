@@ -484,7 +484,7 @@ pub fn apply_bundling(
     nodes: &std::collections::HashMap<String, NodeLayout>,
     config: &BundlingConfig,
 ) -> (BundlingResult, EdgeBundlingDebugStats) {
-    let started = std::time::Instant::now();
+    let started = crate::layout::perf::Instant::now();
     let mut stats = EdgeBundlingDebugStats {
         edge_count: features.len(),
         ..Default::default()

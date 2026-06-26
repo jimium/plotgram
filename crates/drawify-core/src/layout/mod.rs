@@ -51,6 +51,7 @@ pub mod intent;
 pub mod lint;
 pub mod node;
 pub mod plan;
+pub mod perf;
 pub mod pipeline;
 pub mod postprocess;
 pub mod refine;

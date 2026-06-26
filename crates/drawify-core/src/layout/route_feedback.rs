@@ -55,14 +55,14 @@ impl<'a> LayoutRouteFeedback<'a> {
         layout: LayoutResult,
         refine_config: &RefineConfig,
     ) -> LayoutResult {
-        let t_route = std::time::Instant::now();
+        let t_route = crate::layout::perf::Instant::now();
         let mut routed = router.route(self.diagram, layout);
-        eprintln!("[perf]       router.route: {:.2}ms", t_route.elapsed().as_secs_f64() * 1000.0);
+        crate::perf_log!("[perf]       router.route: {:.2}ms", t_route.elapsed().as_secs_f64() * 1000.0);
 
         if router.supports_refine() {
-            let t_refine = std::time::Instant::now();
+            let t_refine = crate::layout::perf::Instant::now();
             routed = run_refine(self.diagram, routed, router, refine_config);
-            eprintln!("[perf]       run_refine: {:.2}ms", t_refine.elapsed().as_secs_f64() * 1000.0);
+            crate::perf_log!("[perf]       run_refine: {:.2}ms", t_refine.elapsed().as_secs_f64() * 1000.0);
         }
 
         routed

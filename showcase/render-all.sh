@@ -93,16 +93,27 @@ run_drawify() {
 }
 
 format_duration_ms() {
-  awk -v ms="$1" 'BEGIN { printf "%.3fs\n", ms / 1000 }'
+  awk -v ms="$1" 'BEGIN { printf "%.3fs", ms / 1000 }'
 }
 
-# 仅统计 drawify render 进程耗时
+# 仅统计 drawify render 墙钟耗时（毫秒精度）；不含 svg-history 归档/写盘。
+# 子进程 stdout/stderr 重定向到 /dev/null，避免 [perf] 等日志污染输出。
 run_timed_render() {
-  local timing
-  timing="$(
-    { /usr/bin/time -p "$DRAWIFY_BIN" render "$1" -f "$2" -o "$3"; } 2>&1 1>/dev/null
-  )" || return 1
-  awk '/^real / { printf "%.0f\n", $2 * 1000; exit }' <<<"$timing"
+  perl -MTime::HiRes=time -e '
+    use strict;
+    my $start = time();
+    my $pid = fork();
+    if (!defined $pid) { exit 1; }
+    if ($pid == 0) {
+      open(STDOUT, ">", "/dev/null");
+      open(STDERR, ">", "/dev/null");
+      exec @ARGV or exit 127;
+    }
+    waitpid($pid, 0);
+    my $rc = $? >> 8;
+    print int((time() - $start) * 1000 + 0.5), "\n";
+    exit($rc);
+  ' -- "$DRAWIFY_BIN" render "$1" -f "$2" -o "$3"
 }
 
 output_ext() {
@@ -120,6 +131,11 @@ output_ext() {
 }
 
 build_drawify
+
+# 清理上次中断留下的临时渲染文件，避免污染 svg-history
+while IFS= read -r -d '' stale; do
+  rm -f "$stale"
+done < <(find "$SCRIPT_DIR" -name '*.rendering.*' -not -path '*/.*' -print0 2>/dev/null || true)
 
 total_files=0
 while IFS= read -r -d '' _; do
@@ -170,6 +186,7 @@ while IFS= read -r -d '' dfy_file; do
       if [[ "$format" == "svg" ]]; then
         history_result="$(python3 "$SCRIPT_DIR/svg-history.py" commit "$rel" "$render_out" "$out")"
         case "$history_result" in
+          unchanged) history_note=" [无变化，未写盘]" ;;
           archived) history_note=" [已归档旧版]" ;;
           created)  history_note=" [新建]" ;;
         esac
@@ -198,7 +215,7 @@ if [[ "$rendered" -gt 0 ]]; then
     BEGIN {
       total = total_ms / 1000
       avg = total / rendered
-      printf "耗时: 渲染总计 %.3fs，平均 %.3fs（%d 次）\n", total, avg, rendered
+      printf "渲染计算耗时: 总计 %.3fs，平均 %.3fs（%d 次 drawify render）\n", total, avg, rendered
     }
   '
 fi
