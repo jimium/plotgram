@@ -32,7 +32,7 @@ impl Default for RefineConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            max_passes: 3,
+            max_passes: 1,
             push_distance: 40.0,
             node_shrink: 2.0,
         }

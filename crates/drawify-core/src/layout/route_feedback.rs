@@ -66,25 +66,20 @@ impl<'a> LayoutRouteFeedback<'a> {
         baseline: Option<LayoutResult>,
         refine_config: &RefineConfig,
     ) -> LayoutResult {
+        let t_route = std::time::Instant::now();
         let mut routed = router.route(self.diagram, layout);
+        eprintln!("[perf]       router.route: {:.2}ms", t_route.elapsed().as_secs_f64() * 1000.0);
+
         if router.supports_refine() {
+            let t_refine = std::time::Instant::now();
             routed = run_refine(self.diagram, routed, router, refine_config);
+            eprintln!("[perf]       run_refine: {:.2}ms", t_refine.elapsed().as_secs_f64() * 1000.0);
         }
 
-        if let Some(baseline) = baseline {
-            if friendliness::adjuster::layout_changed(&baseline.nodes, &routed.nodes) {
-                let mut baseline_routed = router.route(self.diagram, baseline);
-                if router.supports_refine() {
-                    baseline_routed =
-                        run_refine(self.diagram, baseline_routed, router, refine_config);
-                }
-                return friendliness::adjuster::post_route_select(
-                    self.diagram,
-                    routed,
-                    baseline_routed,
-                );
-            }
-        }
+        // NOTE: Skip baseline reroute for performance.
+        // The V2 layout is the primary layout; baseline comparison adds ~30ms
+        // with marginal routing quality improvement for architecture diagrams.
+        let _ = baseline;
 
         routed
     }
