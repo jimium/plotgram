@@ -173,12 +173,32 @@ pub fn rewrite_bundle_paths(
         stats.bundle_count += 1;
     }
 
+    // 计算箭头抑制：同 bundle 内多条边指向同一节点时，只保留第一条边的箭头
+    let mut arrow_suppressed = std::collections::HashSet::new();
+    for bundle in bundles {
+        if bundle.edges.len() < 2 {
+            continue;
+        }
+        // 按 to_id 分组，同一个目标上只保留第一个箭头
+        let mut seen_targets = std::collections::HashSet::new();
+        for &edge_idx in &bundle.edges {
+            let to_id = &features[edge_idx].to_id;
+            if seen_targets.contains(to_id) {
+                // 已经有同目标的边，抑制当前边（以及所有后续同目标边）的箭头
+                arrow_suppressed.insert(edge_idx);
+            } else {
+                seen_targets.insert(to_id.clone());
+            }
+        }
+    }
+
     BundlingResult {
         bundles: bundles.to_vec(),
         edge_to_bundle,
         total_ink_saved,
         edge_roles,
         trunk_keepouts,
+        arrow_suppressed,
     }
 }
 

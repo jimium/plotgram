@@ -370,6 +370,8 @@ impl<'a> LayoutPipeline<'a> {
                         to_rank: None,
                         arrow_tag: "active",
                         line_style: String::new(),
+                        stroke_color: String::new(),
+                        stroke_width: String::new(),
                         path_length: 0.0,
                         path_points: Vec::new(),
                         direction: (1.0, 0.0),

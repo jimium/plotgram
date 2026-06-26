@@ -20,7 +20,8 @@
 use crate::ast::Relation;
 use crate::layout::geometry::Point;
 use crate::layout::edge::common::edge_geometry::{
-    arrow_type_tag, edge_line_style_signature, node_center,
+    arrow_type_tag, edge_line_style_signature, edge_stroke_color_signature,
+    edge_stroke_width_signature, node_center,
 };
 use crate::layout::NodeLayout;
 
@@ -67,6 +68,10 @@ pub struct EdgeFeatures {
     pub arrow_tag: &'static str,
     /// 线型签名（"solid" / "dashed" / "dash:..."）
     pub line_style: String,
+    /// 描边颜色签名（"stroke:<color>" / "default"）
+    pub stroke_color: String,
+    /// 描边宽度签名（"width:<value>" / "default"）
+    pub stroke_width: String,
     /// 路径总长度（像素）
     pub path_length: f64,
     /// 路径折线点（供距离计算）
@@ -132,6 +137,8 @@ impl EdgeFeatures {
             direction,
             has_label: rel.label.is_some(),
             label_text: rel.label.clone(),
+            stroke_color: edge_stroke_color_signature(rel),
+            stroke_width: edge_stroke_width_signature(rel),
         })
     }
 }
@@ -190,8 +197,12 @@ pub fn decompose_path(edge_index: usize, points: &[Point]) -> Vec<PathSegment> {
 ///
 /// 返回值 ∈ [0.0, 1.0]。0.0 表示不兼容（硬条件不满足），≥ threshold 表示可捆绑。
 pub fn compute_compatibility(e1: &EdgeFeatures, e2: &EdgeFeatures, config: &BundlingConfig) -> f64 {
-    // ── 硬条件 1: L1 语义约束（arrow_type + line_style 必须相同）──
-    if e1.arrow_tag != e2.arrow_tag || e1.line_style != e2.line_style {
+    // ── 硬条件 1: L1 语义约束（arrow_type + line_style + stroke_color + stroke_width 必须相同）──
+    if e1.arrow_tag != e2.arrow_tag
+        || e1.line_style != e2.line_style
+        || e1.stroke_color != e2.stroke_color
+        || e1.stroke_width != e2.stroke_width
+    {
         return 0.0;
     }
 
@@ -419,7 +430,7 @@ fn point_distance(p1: Point, p2: Point) -> f64 {
 
 /// 兼容性分桶键（§4.4 加速策略 1）。
 ///
-/// 按 `(from_rank, to_rank, arrow_tag, line_style)` 分桶，
+/// 按 `(from_rank, to_rank, arrow_tag, line_style, stroke_color, stroke_width)` 分桶，
 /// 只有同桶的边对才可能兼容（硬条件预筛），把 O(E²) 降到 O(Σ bucket_size²)。
 ///
 /// 无 rank 信息时用空字符串占位。
@@ -429,6 +440,8 @@ pub struct CompatibilityBucket {
     pub to_rank: Option<usize>,
     pub arrow_tag: &'static str,
     pub line_style: String,
+    pub stroke_color: String,
+    pub stroke_width: String,
 }
 
 impl CompatibilityBucket {
@@ -438,6 +451,8 @@ impl CompatibilityBucket {
             to_rank: features.to_rank,
             arrow_tag: features.arrow_tag,
             line_style: features.line_style.clone(),
+            stroke_color: features.stroke_color.clone(),
+            stroke_width: features.stroke_width.clone(),
         }
     }
 }

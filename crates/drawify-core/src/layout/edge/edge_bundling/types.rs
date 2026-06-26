@@ -189,6 +189,8 @@ pub struct BundlingResult {
     pub edge_roles: Vec<EdgePathRoles>,
     /// 主干禁放区，供 §4.10.5 后置 label 与渲染查询
     pub trunk_keepouts: Vec<TrunkKeepout>,
+    /// 箭头被抑制的边索引集合（同 bundle 内多条边指向同一节点时，只保留第一条边的箭头）
+    pub arrow_suppressed: std::collections::HashSet<usize>,
 }
 
 /// Edge Bundling 调试统计（供 LayoutHints 可观测性）。

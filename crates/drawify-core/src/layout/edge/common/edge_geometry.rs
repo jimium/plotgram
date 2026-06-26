@@ -89,6 +89,45 @@ pub fn edge_line_style_signature(rel: &crate::ast::Relation) -> String {
     "solid".to_string()
 }
 
+/// 计算边的描边颜色签名，用于并线分组时区分不同颜色的边。
+///
+/// 签名规则：
+/// - 若设置了 `stroke`，返回 `stroke:<color>`（trim 后小写）
+/// - 否则返回 `default`
+///
+/// 同签名的边在视觉上颜色一致，才允许并线。
+pub fn edge_stroke_color_signature(rel: &crate::ast::Relation) -> String {
+    use crate::types::style_attr_keys::STROKE;
+    let v = rel.attributes.style.get(STROKE);
+    match v {
+        Some(crate::ast::AttributeValue::String(s)) => {
+            let s = s.trim().to_lowercase();
+            if s.is_empty() { "default".to_string() } else { format!("stroke:{s}") }
+        }
+        _ => "default".to_string(),
+    }
+}
+
+/// 计算边的描边宽度签名，用于并线分组时区分不同粗细的边。
+///
+/// 签名规则：
+/// - 若设置了 `stroke_width`，返回 `width:<value>`（数值）
+/// - 否则返回 `default`
+///
+/// 同签名的边在视觉上粗细一致，才允许并线。
+pub fn edge_stroke_width_signature(rel: &crate::ast::Relation) -> String {
+    use crate::types::style_attr_keys::STROKE_WIDTH;
+    let v = rel.attributes.style.get(STROKE_WIDTH);
+    match v {
+        Some(crate::ast::AttributeValue::Number(n)) => format!("width:{n}"),
+        Some(crate::ast::AttributeValue::String(s)) => {
+            let s = s.trim();
+            if let Ok(n) = s.parse::<f64>() { format!("width:{n}") } else { "default".to_string() }
+        }
+        _ => "default".to_string(),
+    }
+}
+
 /// 根据连接点在节点上的位置选择端口
 pub fn select_port(px: f64, py: f64, nl: &NodeLayout) -> Port {
     let cx = nl.x + nl.width / 2.0;

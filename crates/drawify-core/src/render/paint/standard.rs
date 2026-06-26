@@ -68,6 +68,7 @@ fn extract_bundle_info<'a>(scene: &'a ExportScene<'a>, edge_index: usize) -> Opt
     Some(BundleRenderInfo {
         bundle_size: bundle.edges.len(),
         roles,
+        arrow_suppressed: result.arrow_suppressed.contains(&edge_index),
     })
 }
 

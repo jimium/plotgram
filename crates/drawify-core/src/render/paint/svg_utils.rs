@@ -326,6 +326,8 @@ pub struct BundleRenderInfo<'a> {
     pub bundle_size: usize,
     /// 路径区段分解（含 FromStub/MergeLeg/Trunk/ForkLeg/ToStub 角色）
     pub roles: &'a EdgePathRoles,
+    /// 该边箭头是否应抑制（同 bundle 内多条边指向同一节点时）
+    pub arrow_suppressed: bool,
 }
 
 /// P6 §6: bundled 边的低 stroke-opacity（透明度叠加）。
@@ -387,7 +389,11 @@ pub fn render_bundled_edge_path(
         } else {
             base_width
         };
-        let m_end = if i == n - 1 { marker_end } else { "" };
+        let m_end = if i == n - 1 && !bundle.arrow_suppressed {
+            marker_end
+        } else {
+            ""
+        };
         let m_start = if i == 0 { marker_start } else { "" };
 
         writeln!(
