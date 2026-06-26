@@ -3,16 +3,16 @@
 diagram state {
     title: "服务降级生命周期"
 
-    entity init "初始化" { type: initial }
-    entity healthy "Healthy" { type: state }
-    entity warning "Warning" { type: state }
-    entity degraded "Degraded" { type: state }
-    entity limited "Limited" { type: state }
-    entity failover "Failover" { type: state }
-    entity recovering "Recovering" { type: state }
-    entity stable "Stable" { type: final }
-    entity failed "Failed" { type: final }
-    entity gate "恢复成功？" { type: choice }
+    entity[initial] init "初始化"
+    entity[state] healthy "Healthy"
+    entity[state] warning "Warning"
+    entity[state] degraded "Degraded"
+    entity[state] limited "Limited"
+    entity[state] failover "Failover"
+    entity[state] recovering "Recovering"
+    entity[final] stable "Stable"
+    entity[final] failed "Failed"
+    entity[choice] gate "恢复成功？"
 
     init -> healthy
     healthy -> warning "latency rising"

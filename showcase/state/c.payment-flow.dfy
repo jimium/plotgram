@@ -3,16 +3,16 @@
 diagram state {
     title: "支付状态机"
 
-    entity init "初始化" { type: initial }
-    entity pending "待支付" { type: state }
-    entity processing "支付处理中" { type: state }
-    entity success "支付成功" { type: final }
-    entity failed "支付失败" { type: state }
-    entity retry "重试中" { type: state }
-    entity refunding "退款中" { type: state }
-    entity refunded "已退款" { type: final }
-    entity expired "已过期" { type: final }
-    entity check_retry "是否可重试" { type: choice }
+    entity[initial] init "初始化"
+    entity[state] pending "待支付"
+    entity[state] processing "支付处理中"
+    entity[final] success "支付成功"
+    entity[state] failed "支付失败"
+    entity[state] retry "重试中"
+    entity[state] refunding "退款中"
+    entity[final] refunded "已退款"
+    entity[final] expired "已过期"
+    entity[choice] check_retry "是否可重试"
 
     init -> pending
     pending -> processing "用户确认支付"

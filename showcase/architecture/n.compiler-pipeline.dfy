@@ -4,19 +4,19 @@ diagram architecture {
     title: "Drawify 编译管线与分散关注点"
 
     group pipeline "编译主流程" {
-        entity parser_lexer "Parser/Lexer" { type: service }
-        entity ast "AST" { type: service }
-        entity validator "Validator" { type: service }
-        entity layout_mod "Layout" { type: service }
-        entity renderer_diagram "Renderer.diagram" { type: service }
-        entity renderer_format "Renderer.format" { type: service }
+        entity[service] parser_lexer "Parser/Lexer"
+        entity[service] ast "AST"
+        entity[service] validator "Validator"
+        entity[service] layout_mod "Layout"
+        entity[service] renderer_diagram "Renderer.diagram"
+        entity[service] renderer_format "Renderer.format"
     }
 
     group concerns "分散关注点" {
-        entity diagram_semantics "图表类型语义" { type: external }
-        entity default_layout "默认布局配置" { type: external }
-        entity style_extension "样式扩展" { type: external }
-        entity output_contract "输出契约" { type: external }
+        entity[external] diagram_semantics "图表类型语义"
+        entity[external] default_layout "默认布局配置"
+        entity[external] style_extension "样式扩展"
+        entity[external] output_contract "输出契约"
     }
 
     // 主流程

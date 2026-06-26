@@ -10,14 +10,14 @@ const SNIPPET = `diagram architecture {
     title: "服务架构"
 
     group frontend "前端层" {
-        entity web "Web" { type: frontend }
-        entity app "Mobile" { type: frontend }
+        entity[frontend] web "Web"
+        entity[frontend] app "Mobile"
     }
 
     group backend "后端层" {
-        entity api "API" { type: service }
-        entity worker "Worker" { type: service }
-        entity db "DB" { type: database }
+        entity[service] api "API"
+        entity[service] worker "Worker"
+        entity[database] db "DB"
 
         // 组内边：两端都在本 group 内
         api -> worker "dispatch"
@@ -72,7 +72,7 @@ export function HelpPanel({ open, onClose }: HelpPanelProps) {
             <table className="help-table">
               <tbody>
                 <Row name="diagram <type> { … }" desc="声明图表，type 为 flowchart / sequence / architecture / state / er / mindmap" />
-                <Row name='entity <id> "标签" { … }' desc="声明实体，花括号内写属性（如 type）" />
+                <Row name='entity[&lt;type&gt;] <id> "标签" { … }' desc="声明实体，语义类型写在方括号中，花括号内写其他属性" />
                 <Row name='group <id> "标签" { … }' desc="分组；组内可写 entity、嵌套 group、属性，以及组内 edge（两端必须属于本 group 后代）" />
               </tbody>
             </table>
@@ -101,7 +101,7 @@ export function HelpPanel({ open, onClose }: HelpPanelProps) {
                 <Row name="snap: true | false" desc="网格吸附（默认 true，flowchart / er / sugiyama-v2 / architecture-v2）" />
                 <Row name="theme: common.clean-light | common.dracula | mindmap.vivid-branches | …" desc="颜色/字体主题（StyleSheet ID）" />
                 <Row name="render_style: standard | excalidraw | …" desc="笔触皮肤（与 theme 正交）" />
-                <Row name="type: start | process | decision | service | …" desc="实体语义类型，决定形状与图标" />
+                <Row name="entity[&lt;type&gt;]" desc="实体语义类型写在方括号中（如 start / process / decision / service 等），决定形状与图标" />
               </tbody>
             </table>
           </section>

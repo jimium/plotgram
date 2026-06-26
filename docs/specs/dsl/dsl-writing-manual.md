@@ -47,8 +47,8 @@ diagram <类型> {
     // 分组（可选）
     group <id> "<标签>" { ... }
 
-    // 实体声明
-    entity <id> "<标签>" { ... }
+    // 实体声明（type 写在方括号中，可选）
+    entity[<type>] <id> "<标签>" { ... }
 
     // 关系声明
     <from> -> <to> "<标签>"
@@ -100,24 +100,22 @@ entity <id> "<显示标签>"
 
 ### 3.2 带 type
 
-`type` 决定渲染形状，是最常用的 entity 属性：
+`type` 决定渲染形状，是最常用的 entity 属性，使用 `entity[<type>]` 方括号语法在 entity 关键字后直接指定：
 
 ```drawify
-entity db "用户数据库" { type: database }
-entity api "API 网关" { type: gateway }
-entity user "用户" { type: person }
+entity[database] db "用户数据库"
+entity[gateway] api "API 网关"
+entity[person] user "用户"
 ```
 
 ### 3.3 带状态
 
 ```drawify
-entity db "主数据库" {
-    type: database
+entity[database] db "主数据库" {
     status: healthy
 }
 
-entity cache "缓存" {
-    type: cache
+entity[cache] cache "缓存" {
     status: degraded
 }
 ```
@@ -127,8 +125,7 @@ entity cache "缓存" {
 ### 3.4 带描述和负责人
 
 ```drawify
-entity auth "认证服务" {
-    type: service
+entity[service] auth "认证服务" {
     owner: "安全团队"
     description: "处理用户认证和授权"
 }
@@ -137,8 +134,7 @@ entity auth "认证服务" {
 ### 3.5 带 semantic 和 icon
 
 ```drawify
-entity api "API 服务" {
-    type: service
+entity[service] api "API 服务" {
     semantic: auth
     icon: shield
 }
@@ -150,8 +146,7 @@ entity api "API 服务" {
 ### 3.6 带 meta 自定义属性
 
 ```drawify
-entity api "API 服务" {
-    type: service
+entity[service] api "API 服务" {
     meta.version: "2.1.0"
     meta.port: 8080
     meta.protocol: "gRPC"
@@ -165,7 +160,7 @@ meta 属性不参与渲染，仅供程序化消费。
 | 图表类型 | 可用 type 值 |
 | --- | --- |
 | `flowchart` | `service`, `database`, `person`, `client`, `queue`, `cache`, `gateway`, `storage`, `external`, `decision`, `process`, `start`, `end` |
-| `sequence` | `participant`, `actor`, `boundary`, `control`, `entity`, `database` |
+| `sequence` | `participant`, `actor`, `boundary`, `control`, `lifeline`, `database` |
 | `architecture` | `frontend`, `backend`, `service`, `database`, `gateway`, `cache`, `queue`, `storage`, `external` |
 | `state` | `initial`, `state`, `final`, `choice` |
 | `mindmap` | `root`, `main`, `branch`, `leaf` |
@@ -242,8 +237,8 @@ group <id> "<标签>" {
     border_style: <边框样式>
     color: "<颜色标签>"
 
-    // entity 声明
-    entity <id> "<标签>" { ... }
+    // entity 声明（type 写在方括号中，可选）
+    entity[<type>] <id> "<标签>" { ... }
 
     // 组内 edge 连线（两端 entity 必须都在本 group 内）
     <from> -> <to> "<标签>"
@@ -259,24 +254,24 @@ group <id> "<标签>" {
 
 ```drawify
 group frontend "前端层" {
-    entity web "Web 应用" { type: frontend }
-    entity mobile "移动端" { type: frontend }
+    entity[frontend] web "Web 应用"
+    entity[frontend] mobile "移动端"
 }
 
 group backend "后端层" {
     layout: horizontal
     border_style: dashed
 
-    entity api "API 服务" { type: service }
-    entity worker "Worker" { type: service }
+    entity[service] api "API 服务"
+    entity[service] worker "Worker"
 
     // 组内 edge：api -> worker 都在 backend 内
     api -> worker "dispatch"
 }
 
 group data "数据层" {
-    entity db "主数据库" { type: database }
-    entity cache "缓存" { type: cache }
+    entity[database] db "主数据库"
+    entity[cache] cache "缓存"
 }
 
 // 跨组 edge 在顶层声明
@@ -535,8 +530,7 @@ db --> api "返回" { line_style: success }
 在 entity/relation 的属性块中用 `style.*` 覆盖：
 
 ```drawify
-entity api "API 服务" {
-    type: service
+entity[service] api "API 服务" {
     style.fill: "#C8E6C9"     // 覆盖 node_style service 的 fill
     style.shape: hexagon      // 覆盖 shape
 }
@@ -601,11 +595,11 @@ diagram flowchart {
         layout: flowchart { friendliness: adjust }
     }
 
-    entity start "开始" { type: start }
-    entity input "输入凭证" { type: process }
-    entity check "验证凭证" { type: decision }
-    entity success "登录成功" { type: end }
-    entity fail "登录失败" { type: end }
+    entity[start] start "开始"
+    entity[process] input "输入凭证"
+    entity[decision] check "验证凭证"
+    entity[end] success "登录成功"
+    entity[end] fail "登录失败"
 
     start -> input
     input -> check
@@ -620,9 +614,9 @@ diagram flowchart {
 diagram sequence {
     title: "API 调用时序"
 
-    entity client "客户端" { type: actor }
-    entity server "服务端" { type: participant }
-    entity db "数据库" { type: participant }
+    entity[actor] client "客户端"
+    entity[participant] server "服务端"
+    entity[participant] db "数据库"
 
     client -> server "请求"
     server -> db "查询"
@@ -651,24 +645,24 @@ diagram architecture {
     group gateway "网关层" {
         layout: horizontal
 
-        entity lb "负载均衡" { type: gateway }
-        entity api "API 网关" { type: gateway }
+        entity[gateway] lb "负载均衡"
+        entity[gateway] api "API 网关"
     }
 
     group service "服务层" {
         layout: horizontal
 
-        entity auth "认证服务" { type: service }
-        entity user "用户服务" { type: service }
-        entity order "订单服务" { type: service }
+        entity[service] auth "认证服务"
+        entity[service] user "用户服务"
+        entity[service] order "订单服务"
     }
 
     group data "数据层" {
         layout: horizontal
 
-        entity db "主数据库" { type: database }
-        entity cache "缓存" { type: cache }
-        entity queue "消息队列" { type: queue }
+        entity[database] db "主数据库"
+        entity[cache] cache "缓存"
+        entity[queue] queue "消息队列"
     }
 
     lb -> api
@@ -691,20 +685,17 @@ diagram er {
         direction: left-to-right
     }
 
-    entity user "用户表" {
-        type: database
+    entity[database] user "用户表" {
         meta.pk: "id"
         meta.fields: "username\nemail\ncreated_at"
     }
 
-    entity post "文章表" {
-        type: database
+    entity[database] post "文章表" {
         meta.pk: "id"
         meta.fields: "title\ncontent\nuser_id"
     }
 
-    entity comment "评论表" {
-        type: database
+    entity[database] comment "评论表" {
         meta.pk: "id"
         meta.fields: "content\npost_id\nuser_id"
     }
@@ -721,11 +712,11 @@ diagram er {
 diagram state {
     title: "订单状态机"
 
-    entity pending "待支付" { type: initial }
-    entity paid "已支付" { type: state }
-    entity shipped "已发货" { type: state }
-    entity delivered "已签收" { type: state }
-    entity cancelled "已取消" { type: final }
+    entity[initial] pending "待支付"
+    entity[state] paid "已支付"
+    entity[state] shipped "已发货"
+    entity[state] delivered "已签收"
+    entity[final] cancelled "已取消"
 
     pending -> paid "支付"
     paid -> shipped "发货"
@@ -744,19 +735,19 @@ diagram mindmap {
         direction: left-to-right
     }
 
-    entity product "产品" { type: root }
-    entity design "设计" { type: main }
-    entity dev "开发" { type: main }
-    entity ops "运维" { type: main }
+    entity[root] product "产品"
+    entity[main] design "设计"
+    entity[main] dev "开发"
+    entity[main] ops "运维"
 
-    entity ui "UI/UX" { type: branch }
-    entity research "用户研究" { type: branch }
+    entity[branch] ui "UI/UX"
+    entity[branch] research "用户研究"
 
-    entity frontend "前端" { type: branch }
-    entity backend "后端" { type: branch }
+    entity[branch] frontend "前端"
+    entity[branch] backend "后端"
 
-    entity ci "CI/CD" { type: branch }
-    entity monitor "监控" { type: branch }
+    entity[branch] ci "CI/CD"
+    entity[branch] monitor "监控"
 
     product -> design
     product -> dev
@@ -784,16 +775,16 @@ diagram flowchart {
     }
 
     group customer "客户" {
-        entity order "下单" { type: start }
-        entity pay "支付" { type: process }
+        entity[start] order "下单"
+        entity[process] pay "支付"
     }
     group warehouse "仓库" {
-        entity pick "拣货" { type: process }
-        entity pack "打包" { type: process }
+        entity[process] pick "拣货"
+        entity[process] pack "打包"
     }
     group shipping "配送" {
-        entity ship "发货" { type: process }
-        entity deliver "送达" { type: end }
+        entity[process] ship "发货"
+        entity[end] deliver "送达"
     }
 
     order -> pay
@@ -819,21 +810,21 @@ diagram flowchart {
         }
     }
 
-    entity gateway "API Gateway" { type: gateway }
+    entity[gateway] gateway "API Gateway"
 
     group services "业务服务" {
         layout: vertical
-        entity user "用户服务" { type: service }
-        entity order "订单服务" { type: service }
-        entity pay "支付服务" { type: service }
-        entity notify "通知服务" { type: service }
+        entity[service] user "用户服务"
+        entity[service] order "订单服务"
+        entity[service] pay "支付服务"
+        entity[service] notify "通知服务"
     }
 
     group data "数据层" {
         layout: vertical
-        entity mysql "MySQL" { type: database }
-        entity redis "Redis" { type: cache }
-        entity mq "消息队列" { type: queue }
+        entity[database] mysql "MySQL"
+        entity[cache] redis "Redis"
+        entity[queue] mq "消息队列"
     }
 
     gateway -> user
@@ -949,12 +940,12 @@ user -> api "请求"
 ```drawify
 // ✗ 错误：sequence 图不支持 type: service
 diagram sequence {
-    entity api "API" { type: service }
+    entity[service] api "API"
 }
 
 // ✓ 正确：用 sequence 支持的 type
 diagram sequence {
-    entity api "API" { type: participant }
+    entity[participant] api "API"
 }
 ```
 

@@ -3,19 +3,19 @@
 diagram mindmap {
     title: "项目计划"
 
-    entity project "Drawify 项目" { type: root }
+    entity[root] project "Drawify 项目"
 
-    entity parser "解析器" { type: main }
-    entity lexer "词法分析" { type: leaf }
-    entity syntax "语法分析" { type: leaf }
+    entity[main] parser "解析器"
+    entity[leaf] lexer "词法分析"
+    entity[leaf] syntax "语法分析"
 
-    entity layout "布局引擎" { type: main }
-    entity sugiyama "Sugiyama" { type: leaf }
-    entity routing "边路由" { type: leaf }
+    entity[main] layout "布局引擎"
+    entity[leaf] sugiyama "Sugiyama"
+    entity[leaf] routing "边路由"
 
-    entity render "渲染器" { type: main }
-    entity svg "SVG 输出" { type: leaf }
-    entity ascii "ASCII 输出" { type: leaf }
+    entity[main] render "渲染器"
+    entity[leaf] svg "SVG 输出"
+    entity[leaf] ascii "ASCII 输出"
 
     project -> parser
     parser -> lexer

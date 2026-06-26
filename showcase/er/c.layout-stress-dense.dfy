@@ -4,13 +4,13 @@
 diagram er {
     title: "布局测试：高密度网状图连线路由"
 
-    entity order "订单表 (Order)" { type: database }
-    entity user "用户表 (User)" { type: database }
-    entity product "商品表 (Product)" { type: database }
-    entity store "店铺表 (Store)" { type: database }
-    entity coupon "优惠券表 (Coupon)" { type: database }
-    entity payment "支付表 (Payment)" { type: database }
-    entity log "日志表 (Log)" { type: database }
+    entity[database] order "订单表 (Order)"
+    entity[database] user "用户表 (User)"
+    entity[database] product "商品表 (Product)"
+    entity[database] store "店铺表 (Store)"
+    entity[database] coupon "优惠券表 (Coupon)"
+    entity[database] payment "支付表 (Payment)"
+    entity[database] log "日志表 (Log)"
 
     // User 的高频连出
     user -> order "创建"

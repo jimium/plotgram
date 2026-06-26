@@ -4,56 +4,47 @@ diagram architecture {
     title: "云原生技术栈"
 
     group ingress "入口" {
-        entity ingress_ctrl "Ingress Controller" {
-            type: gateway
+        entity[gateway] ingress_ctrl "Ingress Controller" {
             semantic: ingress
         }
-        entity cert_mgr "证书管理" {
-            type: service
+        entity[service] cert_mgr "证书管理" {
             semantic: cert_manager
         }
     }
 
     group k8s "Kubernetes 集群" {
         group apps "应用 Pod" {
-            entity api "API 服务" {
-                type: service
+            entity[service] api "API 服务" {
                 status: healthy
             }
-            entity worker "后台 Worker" { type: service }
+            entity[service] worker "后台 Worker"
         }
         group platform "平台组件" {
-            entity config_center "配置中心" { type: service }
-            entity discovery "服务发现" { type: service }
+            entity[service] config_center "配置中心"
+            entity[service] discovery "服务发现"
         }
     }
 
     group observability "可观测性" {
-        entity metrics "Prometheus" {
-            type: service
+        entity[service] metrics "Prometheus" {
             semantic: prometheus
         }
-        entity logs "Loki" {
-            type: service
+        entity[service] logs "Loki" {
             semantic: loki
         }
-        entity traces "Jaeger" {
-            type: service
+        entity[service] traces "Jaeger" {
             semantic: jaeger
         }
-        entity grafana "Grafana" {
-            type: frontend
+        entity[frontend] grafana "Grafana" {
             semantic: grafana
         }
     }
 
     group data "持久化" {
-        entity pg "PostgreSQL" {
-            type: database
+        entity[database] pg "PostgreSQL" {
             semantic: postgres
         }
-        entity s3 "对象存储" {
-            type: storage
+        entity[storage] s3 "对象存储" {
             semantic: s3
         }
     }

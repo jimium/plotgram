@@ -6,26 +6,26 @@ diagram flowchart {
         direction: top-to-bottom
     }
 
-    entity n0 "触发意图" { type: start }
-    entity n1 "给前端提示进入开咖啡店流程" { type: process }
-    entity n9 "最后完成赋值" { type: process }
-    entity n11 "AssignNode" { type: process }
-    entity n13 "AssignNode" { type: process }
-    entity n16 "购物车:酒类商品零售许可证" { type: process }
-    entity n18 "购物车加入营业执照事项" { type: process }
-    entity n10 "ResponseNode" { type: end }
-    entity n21 "ResponseNode" { type: end }
-    entity n2 "提前告知" { type: decision }
-    entity n4 "选择：是否申领了营业执照" { type: decision }
-    entity n5 "选择：酒类商品" { type: decision }
-    entity n6 "选择题:店铺所在位置" { type: decision }
-    entity n7 "选择题：使用面300平方米" { type: decision }
-    entity n8 "是否委托他人办理？" { type: decision }
-    entity n14 "选择店铺产权类型" { type: decision }
-    entity n15 "是否属于钢结构的户外招牌" { type: decision }
-    entity n17 "选择题:法人类型" { type: decision }
-    entity n19 "是否以登陆的法人身份进行申请" { type: decision }
-    entity n3 "分支" { type: decision }
+    entity[start] n0 "触发意图"
+    entity[process] n1 "给前端提示进入开咖啡店流程"
+    entity[process] n9 "最后完成赋值"
+    entity[process] n11 "AssignNode"
+    entity[process] n13 "AssignNode"
+    entity[process] n16 "购物车:酒类商品零售许可证"
+    entity[process] n18 "购物车加入营业执照事项"
+    entity[end] n10 "ResponseNode"
+    entity[end] n21 "ResponseNode"
+    entity[decision] n2 "提前告知"
+    entity[decision] n4 "选择：是否申领了营业执照"
+    entity[decision] n5 "选择：酒类商品"
+    entity[decision] n6 "选择题:店铺所在位置"
+    entity[decision] n7 "选择题：使用面300平方米"
+    entity[decision] n8 "是否委托他人办理？"
+    entity[decision] n14 "选择店铺产权类型"
+    entity[decision] n15 "是否属于钢结构的户外招牌"
+    entity[decision] n17 "选择题:法人类型"
+    entity[decision] n19 "是否以登陆的法人身份进行申请"
+    entity[decision] n3 "分支"
 
     n0 -> n1
     n1 -> n2

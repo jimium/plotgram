@@ -3,10 +3,10 @@
 diagram sequence {
     title: "OAuth 授权码登录"
 
-    entity user "用户" { type: actor }
-    entity browser "浏览器" { type: boundary }
-    entity auth "认证服务" { type: control }
-    entity resource "资源服务" { type: control }
+    entity[actor] user "用户"
+    entity[boundary] browser "浏览器"
+    entity[control] auth "认证服务"
+    entity[control] resource "资源服务"
 
     user -> browser "点击登录"
     browser -> auth "重定向到授权页"

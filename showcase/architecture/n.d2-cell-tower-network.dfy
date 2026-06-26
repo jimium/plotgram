@@ -44,38 +44,33 @@ diagram architecture {
         theme: common.clean-dark
     }
 
-    entity user "User" {
-        type: frontend
+    entity[frontend] user "User" {
         semantic: user
         style.width: 130
     }
 
-    entity api_server "API Server" { type: service }
+    entity[service] api_server "API Server"
 
-    entity logs "Logs" {
-        type: storage
+    entity[storage] logs "Logs" {
         style.shape: rounded_rect
     }
 
     group network "Network" {
         group cell_tower "Cell Tower" {
-            entity satellites "Satellites" {
-                type: storage
+            entity[storage] satellites "Satellites" {
                 style.shape: rounded_rect
             }
-            entity transmitter "Transmitter" { type: service }
+            entity[service] transmitter "Transmitter"
         }
 
         group online_portal "Online Portal" {
-            entity ui "UI" {
-                type: gateway
+            entity[gateway] ui "UI" {
                 style.shape: hexagon
             }
         }
 
         group data_processor "Data Processor" {
-            entity storage "Storage" {
-                type: database
+            entity[database] storage "Storage" {
                 style.shape: cylinder
             }
         }

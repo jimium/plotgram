@@ -4,37 +4,37 @@ diagram architecture {
     title: "K8s 多租户隔离拓扑"
 
     group edge "统一入口" {
-        entity global_dns "Global DNS" { type: external }
-        entity api_gateway "Tenant API Gateway" { type: gateway }
-        entity auth_proxy "Auth Proxy" { type: gateway }
+        entity[external] global_dns "Global DNS"
+        entity[gateway] api_gateway "Tenant API Gateway"
+        entity[gateway] auth_proxy "Auth Proxy"
     }
 
     group tenant_a "tenant-a" {
-        entity a_web "tenant-a-web x4" { type: frontend }
-        entity a_api "tenant-a-api x8" { type: service }
-        entity a_worker "tenant-a-worker x12" { type: service }
-        entity a_cache "tenant-a-redis" { type: cache }
+        entity[frontend] a_web "tenant-a-web x4"
+        entity[service] a_api "tenant-a-api x8"
+        entity[service] a_worker "tenant-a-worker x12"
+        entity[cache] a_cache "tenant-a-redis"
     }
 
     group tenant_b "tenant-b" {
-        entity b_web "tenant-b-web x4" { type: frontend }
-        entity b_api "tenant-b-api x8" { type: service }
-        entity b_worker "tenant-b-worker x12" { type: service }
-        entity b_cache "tenant-b-redis" { type: cache }
+        entity[frontend] b_web "tenant-b-web x4"
+        entity[service] b_api "tenant-b-api x8"
+        entity[service] b_worker "tenant-b-worker x12"
+        entity[cache] b_cache "tenant-b-redis"
     }
 
     group shared_platform "共享平台" {
-        entity tenant_ctrl "Tenant Control Plane" { type: service }
-        entity policy "Policy Engine" { type: service }
-        entity secrets "Secrets Manager" { type: service }
-        entity billing "Billing Service" { type: service }
-        entity audit "Audit Log Service" { type: service }
+        entity[service] tenant_ctrl "Tenant Control Plane"
+        entity[service] policy "Policy Engine"
+        entity[service] secrets "Secrets Manager"
+        entity[service] billing "Billing Service"
+        entity[service] audit "Audit Log Service"
     }
 
     group shared_data "共享数据层" {
-        entity postgres "Shared PostgreSQL" { type: database }
-        entity kafka "Shared Kafka" { type: queue }
-        entity object_store "Object Storage" { type: storage }
+        entity[database] postgres "Shared PostgreSQL"
+        entity[queue] kafka "Shared Kafka"
+        entity[storage] object_store "Object Storage"
     }
 
     global_dns -> api_gateway

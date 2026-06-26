@@ -4,39 +4,39 @@ diagram architecture {
     title: "K8s 多集群跨地域拓扑"
 
     group global_edge "全球接入" {
-        entity global_dns "Global DNS" { type: external }
-        entity traffic_mgr "Traffic Manager" { type: gateway }
-        entity edge_waf "Edge WAF" { type: gateway }
+        entity[external] global_dns "Global DNS"
+        entity[gateway] traffic_mgr "Traffic Manager"
+        entity[gateway] edge_waf "Edge WAF"
     }
 
     group cn_east "华东主集群" {
-        entity east_ingress "Ingress East" { type: gateway }
-        entity east_gateway "api-gateway x8" { type: service }
-        entity east_order "order-core x14" { type: service }
-        entity east_payment "payment-core x12" { type: service }
-        entity east_user "user-core x10" { type: service }
+        entity[gateway] east_ingress "Ingress East"
+        entity[service] east_gateway "api-gateway x8"
+        entity[service] east_order "order-core x14"
+        entity[service] east_payment "payment-core x12"
+        entity[service] east_user "user-core x10"
     }
 
     group cn_north "华北灾备集群" {
-        entity north_ingress "Ingress North" { type: gateway }
-        entity north_gateway "api-gateway x4" { type: service }
-        entity north_order "order-core x8" { type: service }
-        entity north_payment "payment-core x6" { type: service }
-        entity north_user "user-core x6" { type: service }
+        entity[gateway] north_ingress "Ingress North"
+        entity[service] north_gateway "api-gateway x4"
+        entity[service] north_order "order-core x8"
+        entity[service] north_payment "payment-core x6"
+        entity[service] north_user "user-core x6"
     }
 
     group global_platform "全局平台能力" {
-        entity mesh_cp "Service Mesh Control Plane" { type: service }
-        entity gitops "GitOps Controller" { type: service }
-        entity registry "Container Registry" { type: storage }
-        entity monitor "Unified Monitoring" { type: service }
+        entity[service] mesh_cp "Service Mesh Control Plane"
+        entity[service] gitops "GitOps Controller"
+        entity[storage] registry "Container Registry"
+        entity[service] monitor "Unified Monitoring"
     }
 
     group shared_data "共享数据与消息" {
-        entity mysql_primary "MySQL Primary" { type: database }
-        entity mysql_replica "MySQL Replica" { type: database }
-        entity redis_global "Redis Global Cache" { type: cache }
-        entity mq_global "Global Event Bus" { type: queue }
+        entity[database] mysql_primary "MySQL Primary"
+        entity[database] mysql_replica "MySQL Replica"
+        entity[cache] redis_global "Redis Global Cache"
+        entity[queue] mq_global "Global Event Bus"
     }
 
     global_dns -> traffic_mgr

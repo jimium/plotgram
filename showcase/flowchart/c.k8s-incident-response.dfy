@@ -6,25 +6,25 @@ diagram flowchart {
         direction: top-to-bottom
     }
 
-    entity alert "告警触发" { type: start }
-    entity identify "识别异常服务" { type: process }
-    entity classify "故障类型判断" { type: decision }
-    entity node_check "节点健康检查" { type: process }
-    entity release_check "近期发布检查" { type: process }
-    entity traffic_check "流量与依赖检查" { type: process }
-    entity node_gate "节点异常？" { type: decision }
-    entity release_gate "发布导致？" { type: decision }
-    entity traffic_gate "流量激增？" { type: decision }
-    entity cordon "隔离异常节点" { type: process }
-    entity reschedule "迁移工作负载" { type: process }
-    entity rollback "执行回滚" { type: process }
-    entity freeze "冻结继续发布" { type: process }
-    entity scale "扩容关键服务" { type: process }
-    entity rate_limit "启用限流与降级" { type: process }
-    entity dependency "通知依赖团队排查" { type: process }
-    entity verify "恢复验证" { type: process }
-    entity resolved "故障恢复" { type: end }
-    entity postmortem "复盘与补救项" { type: process }
+    entity[start] alert "告警触发"
+    entity[process] identify "识别异常服务"
+    entity[decision] classify "故障类型判断"
+    entity[process] node_check "节点健康检查"
+    entity[process] release_check "近期发布检查"
+    entity[process] traffic_check "流量与依赖检查"
+    entity[decision] node_gate "节点异常？"
+    entity[decision] release_gate "发布导致？"
+    entity[decision] traffic_gate "流量激增？"
+    entity[process] cordon "隔离异常节点"
+    entity[process] reschedule "迁移工作负载"
+    entity[process] rollback "执行回滚"
+    entity[process] freeze "冻结继续发布"
+    entity[process] scale "扩容关键服务"
+    entity[process] rate_limit "启用限流与降级"
+    entity[process] dependency "通知依赖团队排查"
+    entity[process] verify "恢复验证"
+    entity[end] resolved "故障恢复"
+    entity[process] postmortem "复盘与补救项"
 
     alert -> identify
     identify -> classify

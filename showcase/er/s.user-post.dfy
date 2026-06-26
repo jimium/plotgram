@@ -6,13 +6,11 @@ diagram er {
         direction: left-to-right
     }
 
-    entity user "User" {
-        type: database
+    entity[database] user "User" {
         meta.pk: "id"
         meta.fields: "username\nemail"
     }
-    entity post "Post" {
-        type: database
+    entity[database] post "Post" {
         meta.pk: "id"
         meta.fk: "user_id"
         meta.fields: "title\ncontent"

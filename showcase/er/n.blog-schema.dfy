@@ -3,30 +3,25 @@
 diagram er {
     title: "博客系统数据模型"
 
-    entity user "User" {
-        type: database
+    entity[database] user "User" {
         meta.pk: "id"
         meta.fields: "username\nemail"
     }
-    entity post "Post" {
-        type: database
+    entity[database] post "Post" {
         meta.pk: "id"
         meta.fk: "user_id"
         meta.fields: "title\nbody"
     }
-    entity comment "Comment" {
-        type: database
+    entity[database] comment "Comment" {
         meta.pk: "id"
         meta.fk: "post_id"
         meta.fields: "content"
     }
-    entity tag "Tag" {
-        type: database
+    entity[database] tag "Tag" {
         meta.pk: "id"
         meta.fields: "name"
     }
-    entity post_tag "PostTag" {
-        type: database
+    entity[database] post_tag "PostTag" {
         meta.pk: "id"
         meta.fields: "fk.post_id\nfk.tag_id"
     }

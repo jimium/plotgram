@@ -15,30 +15,30 @@ export const SCENES: AnimationScene[] = [
     dsls: [
       `diagram architecture {
   title: "微服务架构演化"
-  entity client "用户端" { type: frontend }
-  entity app "单体应用" { type: service }
-  entity db "主数据库" { type: database }
+  entity[frontend] client "用户端"
+  entity[service] app "单体应用"
+  entity[database] db "主数据库"
   client -> app "请求"
   app -> db "读写"
 }`,
       `diagram architecture {
   title: "微服务架构演化"
-  entity client "用户端" { type: frontend }
-  entity lb "负载均衡" { type: gateway }
-  entity app "单体应用" { type: service }
-  entity db "主数据库" { type: database }
+  entity[frontend] client "用户端"
+  entity[gateway] lb "负载均衡"
+  entity[service] app "单体应用"
+  entity[database] db "主数据库"
   client -> lb "HTTPS"
   lb -> app "转发"
   app -> db "读写"
 }`,
       `diagram architecture {
   title: "微服务架构演化"
-  entity client "用户端" { type: frontend }
-  entity lb "负载均衡" { type: gateway }
-  entity user "用户服务" { type: service }
-  entity order "订单服务" { type: service }
-  entity product "商品服务" { type: service }
-  entity db "主数据库" { type: database }
+  entity[frontend] client "用户端"
+  entity[gateway] lb "负载均衡"
+  entity[service] user "用户服务"
+  entity[service] order "订单服务"
+  entity[service] product "商品服务"
+  entity[database] db "主数据库"
   client -> lb "HTTPS"
   lb -> user
   lb -> order
@@ -49,13 +49,13 @@ export const SCENES: AnimationScene[] = [
 }`,
       `diagram architecture {
   title: "微服务架构演化"
-  entity client "用户端" { type: frontend }
-  entity lb "负载均衡" { type: gateway }
-  entity user "用户服务" { type: service }
-  entity order "订单服务" { type: service }
-  entity product "商品服务" { type: service }
-  entity mq "消息队列" { type: queue }
-  entity db "主数据库" { type: database }
+  entity[frontend] client "用户端"
+  entity[gateway] lb "负载均衡"
+  entity[service] user "用户服务"
+  entity[service] order "订单服务"
+  entity[service] product "商品服务"
+  entity[queue] mq "消息队列"
+  entity[database] db "主数据库"
   client -> lb "HTTPS"
   lb -> user
   lb -> order
@@ -68,14 +68,14 @@ export const SCENES: AnimationScene[] = [
 }`,
       `diagram architecture {
   title: "微服务架构演化"
-  entity client "用户端" { type: frontend }
-  entity lb "负载均衡" { type: gateway }
-  entity user "用户服务" { type: service }
-  entity order "订单服务" { type: service }
-  entity product "商品服务" { type: service }
-  entity mq "消息队列" { type: queue }
-  entity cache "Redis 缓存" { type: cache }
-  entity db "主数据库" { type: database }
+  entity[frontend] client "用户端"
+  entity[gateway] lb "负载均衡"
+  entity[service] user "用户服务"
+  entity[service] order "订单服务"
+  entity[service] product "商品服务"
+  entity[queue] mq "消息队列"
+  entity[cache] cache "Redis 缓存"
+  entity[database] db "主数据库"
   client -> lb "HTTPS"
   lb -> user
   lb -> order
@@ -90,20 +90,20 @@ export const SCENES: AnimationScene[] = [
 }`,
       `diagram architecture {
   title: "微服务架构演化"
-  entity client "用户端" { type: frontend }
-  entity cdn "CDN" { type: external }
-  entity waf "WAF" { type: gateway }
-  entity lb "负载均衡" { type: gateway }
-  entity user "用户服务" { type: service }
-  entity order "订单服务" { type: service }
-  entity product "商品服务" { type: service }
-  entity payment "支付服务" { type: service }
-  entity mq "Kafka" { type: queue }
-  entity cache "Redis 集群" { type: cache }
-  entity user_db "用户库" { type: database }
-  entity order_db "订单库" { type: database }
-  entity product_db "商品库" { type: database }
-  entity s3 "对象存储" { type: storage }
+  entity[frontend] client "用户端"
+  entity[external] cdn "CDN"
+  entity[gateway] waf "WAF"
+  entity[gateway] lb "负载均衡"
+  entity[service] user "用户服务"
+  entity[service] order "订单服务"
+  entity[service] product "商品服务"
+  entity[service] payment "支付服务"
+  entity[queue] mq "Kafka"
+  entity[cache] cache "Redis 集群"
+  entity[database] user_db "用户库"
+  entity[database] order_db "订单库"
+  entity[database] product_db "商品库"
+  entity[storage] s3 "对象存储"
   client -> cdn "静态资源"
   cdn -> waf
   waf -> lb "HTTPS"
@@ -134,20 +134,20 @@ export const SCENES: AnimationScene[] = [
       `diagram flowchart {
   title: "CI/CD 流水线"
   config { direction: top-to-bottom }
-  entity dev "开发者" { type: start }
-  entity deploy "手动部署" { type: process }
-  entity prod "生产环境" { type: end }
+  entity[start] dev "开发者"
+  entity[process] deploy "手动部署"
+  entity[end] prod "生产环境"
   dev -> deploy "git push"
   deploy -> prod
 }`,
       `diagram flowchart {
   title: "CI/CD 流水线"
   config { direction: top-to-bottom }
-  entity dev "开发者" { type: start }
-  entity push "推送代码" { type: process }
-  entity ci "CI 构建" { type: process }
-  entity deploy "部署" { type: process }
-  entity prod "生产环境" { type: end }
+  entity[start] dev "开发者"
+  entity[process] push "推送代码"
+  entity[process] ci "CI 构建"
+  entity[process] deploy "部署"
+  entity[end] prod "生产环境"
   dev -> push
   push -> ci "触发"
   ci -> deploy
@@ -156,13 +156,13 @@ export const SCENES: AnimationScene[] = [
       `diagram flowchart {
   title: "CI/CD 流水线"
   config { direction: top-to-bottom }
-  entity dev "开发者" { type: start }
-  entity push "推送代码" { type: process }
-  entity ci "CI 构建" { type: process }
-  entity test "自动化测试" { type: decision }
-  entity fix "修复问题" { type: process }
-  entity deploy "部署" { type: process }
-  entity prod "生产环境" { type: end }
+  entity[start] dev "开发者"
+  entity[process] push "推送代码"
+  entity[process] ci "CI 构建"
+  entity[decision] test "自动化测试"
+  entity[process] fix "修复问题"
+  entity[process] deploy "部署"
+  entity[end] prod "生产环境"
   dev -> push
   push -> ci
   ci -> test "构建完成"
@@ -174,16 +174,16 @@ export const SCENES: AnimationScene[] = [
       `diagram flowchart {
   title: "CI/CD 流水线"
   config { direction: top-to-bottom }
-  entity dev "开发者" { type: start }
-  entity push "推送代码" { type: process }
-  entity ci "CI 构建" { type: process }
-  entity test "自动化测试" { type: decision }
-  entity fix "修复问题" { type: process }
-  entity staging "部署 Staging" { type: process }
-  entity approval "人工审核" { type: decision }
-  entity prod_deploy "部署生产" { type: process }
-  entity staging_env "Staging 环境" { type: process }
-  entity prod "生产环境" { type: end }
+  entity[start] dev "开发者"
+  entity[process] push "推送代码"
+  entity[process] ci "CI 构建"
+  entity[decision] test "自动化测试"
+  entity[process] fix "修复问题"
+  entity[process] staging "部署 Staging"
+  entity[decision] approval "人工审核"
+  entity[process] prod_deploy "部署生产"
+  entity[process] staging_env "Staging 环境"
+  entity[end] prod "生产环境"
   dev -> push
   push -> ci
   ci -> test
@@ -199,25 +199,25 @@ export const SCENES: AnimationScene[] = [
       `diagram flowchart {
   title: "CI/CD 流水线"
   config { direction: top-to-bottom }
-  entity dev "开发者" { type: start }
-  entity pr "Pull Request" { type: process }
-  entity review "代码审查" { type: decision }
-  entity merge "合并主分支" { type: process }
-  entity ci "CI 构建" { type: process }
-  entity lint "Lint 检查" { type: process }
-  entity unit "单元测试" { type: process }
-  entity integration "集成测试" { type: process }
-  entity fix "修复问题" { type: process }
-  entity build "构建镜像" { type: process }
-  entity registry "镜像仓库" { type: database }
-  entity staging "Staging 部署" { type: process }
-  entity e2e "E2E 测试" { type: decision }
-  entity approval "生产审批" { type: decision }
-  entity canary "金丝雀发布" { type: process }
-  entity prod "全量发布" { type: process }
-  entity prod_env "生产环境" { type: end }
-  entity monitor "监控告警" { type: process }
-  entity rollback "回滚" { type: process }
+  entity[start] dev "开发者"
+  entity[process] pr "Pull Request"
+  entity[decision] review "代码审查"
+  entity[process] merge "合并主分支"
+  entity[process] ci "CI 构建"
+  entity[process] lint "Lint 检查"
+  entity[process] unit "单元测试"
+  entity[process] integration "集成测试"
+  entity[process] fix "修复问题"
+  entity[process] build "构建镜像"
+  entity[database] registry "镜像仓库"
+  entity[process] staging "Staging 部署"
+  entity[decision] e2e "E2E 测试"
+  entity[decision] approval "生产审批"
+  entity[process] canary "金丝雀发布"
+  entity[process] prod "全量发布"
+  entity[end] prod_env "生产环境"
+  entity[process] monitor "监控告警"
+  entity[process] rollback "回滚"
   dev -> pr
   pr -> review
   review -> merge "通过"
@@ -251,30 +251,30 @@ export const SCENES: AnimationScene[] = [
     dsls: [
       `diagram state {
   title: "订单状态机"
-  entity init "" { type: initial }
-  entity pending "待处理" { type: state }
-  entity done "已完成" { type: final }
+  entity[initial] init ""
+  entity[state] pending "待处理"
+  entity[final] done "已完成"
   init -> pending
   pending -> done "处理"
 }`,
       `diagram state {
   title: "订单状态机"
-  entity init "" { type: initial }
-  entity created "已创建" { type: state }
-  entity paid "已支付" { type: state }
-  entity done "已完成" { type: final }
+  entity[initial] init ""
+  entity[state] created "已创建"
+  entity[state] paid "已支付"
+  entity[final] done "已完成"
   init -> created
   created -> paid "支付"
   paid -> done "完成"
 }`,
       `diagram state {
   title: "订单状态机"
-  entity init "" { type: initial }
-  entity created "已创建" { type: state }
-  entity paid "已支付" { type: state }
-  entity shipped "已发货" { type: state }
-  entity delivered "已送达" { type: state }
-  entity done "已完成" { type: final }
+  entity[initial] init ""
+  entity[state] created "已创建"
+  entity[state] paid "已支付"
+  entity[state] shipped "已发货"
+  entity[state] delivered "已送达"
+  entity[final] done "已完成"
   init -> created
   created -> paid "支付"
   paid -> shipped "发货"
@@ -283,15 +283,15 @@ export const SCENES: AnimationScene[] = [
 }`,
       `diagram state {
   title: "订单状态机"
-  entity init "" { type: initial }
-  entity created "已创建" { type: state }
-  entity paid "已支付" { type: state }
-  entity shipped "已发货" { type: state }
-  entity delivered "已送达" { type: state }
-  entity done "已完成" { type: final }
-  entity cancelled "已取消" { type: final }
-  entity refund "退款中" { type: state }
-  entity refunded "已退款" { type: final }
+  entity[initial] init ""
+  entity[state] created "已创建"
+  entity[state] paid "已支付"
+  entity[state] shipped "已发货"
+  entity[state] delivered "已送达"
+  entity[final] done "已完成"
+  entity[final] cancelled "已取消"
+  entity[state] refund "退款中"
+  entity[final] refunded "已退款"
   init -> created
   created -> paid "支付"
   created -> cancelled "取消"
@@ -306,21 +306,21 @@ export const SCENES: AnimationScene[] = [
 }`,
       `diagram state {
   title: "订单状态机"
-  entity init "" { type: initial }
-  entity created "已创建" { type: state }
-  entity paying "支付中" { type: state }
-  entity paid "已支付" { type: state }
-  entity packing "备货中" { type: state }
-  entity shipped "已发货" { type: state }
-  entity delivered "已送达" { type: state }
-  entity done "已完成" { type: final }
-  entity cancelled "已取消" { type: final }
-  entity refund_apply "退款申请" { type: state }
-  entity refund_review "退款审核" { type: choice }
-  entity refunding "退款中" { type: state }
-  entity refunded "已退款" { type: final }
-  entity ret "退货中" { type: state }
-  entity returned "已退货" { type: final }
+  entity[initial] init ""
+  entity[state] created "已创建"
+  entity[state] paying "支付中"
+  entity[state] paid "已支付"
+  entity[state] packing "备货中"
+  entity[state] shipped "已发货"
+  entity[state] delivered "已送达"
+  entity[final] done "已完成"
+  entity[final] cancelled "已取消"
+  entity[state] refund_apply "退款申请"
+  entity[choice] refund_review "退款审核"
+  entity[state] refunding "退款中"
+  entity[final] refunded "已退款"
+  entity[state] ret "退货中"
+  entity[final] returned "已退货"
   init -> created
   created -> paying "发起支付"
   paying -> paid "支付成功"
@@ -354,29 +354,29 @@ export const SCENES: AnimationScene[] = [
     dsls: [
       `diagram mindmap {
   title: "产品规划"
-  entity root "FlowML" { type: root }
+  entity[root] root "FlowML"
 }`,
       `diagram mindmap {
   title: "产品规划"
-  entity root "FlowML" { type: root }
-  entity core "核心引擎" { type: main }
-  entity dsl "DSL 语言" { type: main }
-  entity render "渲染输出" { type: main }
+  entity[root] root "FlowML"
+  entity[main] core "核心引擎"
+  entity[main] dsl "DSL 语言"
+  entity[main] render "渲染输出"
   root -> core
   root -> dsl
   root -> render
 }`,
       `diagram mindmap {
   title: "产品规划"
-  entity root "FlowML" { type: root }
-  entity core "核心引擎" { type: main }
-  entity dsl "DSL 语言" { type: main }
-  entity render "渲染输出" { type: main }
-  entity layout "布局算法" { type: branch }
-  entity routing "边路由" { type: branch }
-  entity parser "解析器" { type: branch }
-  entity svg "SVG" { type: branch }
-  entity drawio "Draw.io" { type: branch }
+  entity[root] root "FlowML"
+  entity[main] core "核心引擎"
+  entity[main] dsl "DSL 语言"
+  entity[main] render "渲染输出"
+  entity[branch] layout "布局算法"
+  entity[branch] routing "边路由"
+  entity[branch] parser "解析器"
+  entity[branch] svg "SVG"
+  entity[branch] drawio "Draw.io"
   root -> core
   root -> dsl
   root -> render
@@ -388,20 +388,24 @@ export const SCENES: AnimationScene[] = [
 }`,
       `diagram mindmap {
   title: "产品规划"
-  entity root "FlowML" { type: root }
-  entity core "核心引擎" { type: main }
-  entity dsl "DSL 语言" { type: main }
-  entity render "渲染输出" { type: main }
-  entity tooling "工具链" { type: main }
-  entity layout "布局算法" { type: branch }
-  entity routing "边路由" { type: branch }
-  entity parser "解析器" { type: branch }
-  entity validate "语义校验" { type: branch }
-  entity svg "SVG" { type: branch }
-  entity drawio "Draw.io" { type: branch }
-  entity ascii "ASCII" { type: branch }
-  entity wasm "WASM" { type: branch }
-  entity cli "CLI" { type: branch }
+  entity[root] root "FlowML"
+  entity[main] core "核心引擎"
+  entity[main] dsl "DSL 语言"
+  entity[main] render "渲染输出"
+  entity[main] tooling "工具链"
+  entity[branch] layout "布局算法"
+  entity[branch] routing "边路由"
+  entity[branch] parser "解析器"
+  entity[branch] validate "语义校验"
+  entity[branch] svg "SVG"
+  entity[branch] drawio "Draw.io"
+  entity[branch] ascii "ASCII"
+  entity[branch] wasm "WASM"
+  entity[branch] cli "CLI"
+  entity[leaf] sugiyama "Sugiyama"
+  entity[leaf] force "Force-Directed"
+  entity[leaf] orthogonal "Orthogonal"
+  entity[leaf] bezier "Bezier"
   root -> core
   root -> dsl
   root -> render
@@ -415,35 +419,50 @@ export const SCENES: AnimationScene[] = [
   render -> ascii
   tooling -> wasm
   tooling -> cli
-  layout -> "Sugiyama" { type: leaf }
-  layout -> "Force-Directed" { type: leaf }
-  routing -> "Orthogonal" { type: leaf }
-  routing -> "Bezier" { type: leaf }
+  layout -> sugiyama
+  layout -> force
+  routing -> orthogonal
+  routing -> bezier
 }`,
       `diagram mindmap {
   title: "产品规划"
-  entity root "FlowML" { type: root }
-  entity core "核心引擎" { type: main }
-  entity dsl "DSL 语言" { type: main }
-  entity render "渲染输出" { type: main }
-  entity tooling "工具链" { type: main }
-  entity themes "主题样式" { type: main }
-  entity layout "布局算法" { type: branch }
-  entity routing "边路由" { type: branch }
-  entity bundling "边聚合" { type: branch }
-  entity parser "解析器" { type: branch }
-  entity validate "语义校验" { type: branch }
-  entity diff "Diff/Patch" { type: branch }
-  entity svg "SVG" { type: branch }
-  entity drawio "Draw.io" { type: branch }
-  entity ascii "ASCII Art" { type: branch }
-  entity png "PNG" { type: branch }
-  entity wasm "WASM" { type: branch }
-  entity cli "CLI" { type: branch }
-  entity playground "Playground" { type: branch }
-  entity light "浅色主题" { type: branch }
-  entity dark "深色主题" { type: branch }
-  entity hand "手绘风格" { type: branch }
+  entity[root] root "FlowML"
+  entity[main] core "核心引擎"
+  entity[main] dsl "DSL 语言"
+  entity[main] render "渲染输出"
+  entity[main] tooling "工具链"
+  entity[main] themes "主题样式"
+  entity[branch] layout "布局算法"
+  entity[branch] routing "边路由"
+  entity[branch] bundling "边聚合"
+  entity[branch] parser "解析器"
+  entity[branch] validate "语义校验"
+  entity[branch] diff "Diff/Patch"
+  entity[branch] svg "SVG"
+  entity[branch] drawio "Draw.io"
+  entity[branch] ascii "ASCII Art"
+  entity[branch] png "PNG"
+  entity[branch] wasm "WASM"
+  entity[branch] cli "CLI"
+  entity[branch] playground "Playground"
+  entity[branch] light "浅色主题"
+  entity[branch] dark "深色主题"
+  entity[branch] hand "手绘风格"
+  entity[leaf] l_sugiyama "Sugiyama 分层"
+  entity[leaf] l_force "Force-Directed"
+  entity[leaf] l_circular "Circular 环形"
+  entity[leaf] l_mindmap "Mindmap 树状"
+  entity[leaf] r_ortho "Orthogonal 正交"
+  entity[leaf] r_bezier "Bezier 贝塞尔"
+  entity[leaf] r_spline "Spline 样条"
+  entity[leaf] r_organic "Organic 自然"
+  entity[leaf] b_trunk "主干聚合"
+  entity[leaf] b_channel "通道分流"
+  entity[leaf] d_semantic "语义比较"
+  entity[leaf] d_patch "增量补丁"
+  entity[leaf] d_anim "动画过渡"
+  entity[leaf] p_live "实时编辑"
+  entity[leaf] p_anim "动画演示"
   root -> core
   root -> dsl
   root -> render
@@ -465,21 +484,21 @@ export const SCENES: AnimationScene[] = [
   themes -> light
   themes -> dark
   themes -> hand
-  layout -> "Sugiyama 分层" { type: leaf }
-  layout -> "Force-Directed" { type: leaf }
-  layout -> "Circular 环形" { type: leaf }
-  layout -> "Mindmap 树状" { type: leaf }
-  routing -> "Orthogonal 正交" { type: leaf }
-  routing -> "Bezier 贝塞尔" { type: leaf }
-  routing -> "Spline 样条" { type: leaf }
-  routing -> "Organic 自然" { type: leaf }
-  bundling -> "主干聚合" { type: leaf }
-  bundling -> "通道分流" { type: leaf }
-  diff -> "语义比较" { type: leaf }
-  diff -> "增量补丁" { type: leaf }
-  diff -> "动画过渡" { type: leaf }
-  playground -> "实时编辑" { type: leaf }
-  playground -> "动画演示" { type: leaf }
+  layout -> l_sugiyama
+  layout -> l_force
+  layout -> l_circular
+  layout -> l_mindmap
+  routing -> r_ortho
+  routing -> r_bezier
+  routing -> r_spline
+  routing -> r_organic
+  bundling -> b_trunk
+  bundling -> b_channel
+  diff -> d_semantic
+  diff -> d_patch
+  diff -> d_anim
+  playground -> p_live
+  playground -> p_anim
 }`,
     ],
   },

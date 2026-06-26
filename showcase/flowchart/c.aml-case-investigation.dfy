@@ -6,19 +6,19 @@ diagram flowchart {
         direction: top-to-bottom
     }
 
-    entity alert "命中可疑告警" { type: start }
-    entity collect "收集交易与客户信息" { type: process }
-    entity screen "名单与规则复筛" { type: process }
-    entity false_gate "是否误报？" { type: decision }
-    entity close_case "关闭案件" { type: process }
-    entity analyst "人工调查" { type: process }
-    entity risk_gate "是否高风险？" { type: decision }
-    entity freeze "冻结账户或交易" { type: process }
-    entity escalate "升级合规经理" { type: process }
-    entity report_gate "需要监管报送？" { type: decision }
-    entity sar "提交可疑报告" { type: process }
-    entity archive "归档证据与结论" { type: process }
-    entity done "调查完成" { type: end }
+    entity[start] alert "命中可疑告警"
+    entity[process] collect "收集交易与客户信息"
+    entity[process] screen "名单与规则复筛"
+    entity[decision] false_gate "是否误报？"
+    entity[process] close_case "关闭案件"
+    entity[process] analyst "人工调查"
+    entity[decision] risk_gate "是否高风险？"
+    entity[process] freeze "冻结账户或交易"
+    entity[process] escalate "升级合规经理"
+    entity[decision] report_gate "需要监管报送？"
+    entity[process] sar "提交可疑报告"
+    entity[process] archive "归档证据与结论"
+    entity[end] done "调查完成"
 
     alert -> collect
     collect -> screen

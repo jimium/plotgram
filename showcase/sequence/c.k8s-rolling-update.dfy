@@ -3,17 +3,17 @@
 diagram sequence {
     title: "K8s 滚动发布链路"
 
-    entity developer "开发者" { type: actor }
-    entity ci "CI Pipeline" { type: control }
-    entity registry "镜像仓库" { type: database }
-    entity argo "Argo CD" { type: control }
-    entity apiserver "K8s API Server" { type: control }
-    entity scheduler "Scheduler" { type: control }
-    entity kubelet "Kubelet" { type: control }
-    entity deployment "Deployment" { type: control }
-    entity pods "新 Pod 副本集" { type: boundary }
-    entity ingress "Ingress Service" { type: boundary }
-    entity monitor "监控告警" { type: boundary }
+    entity[actor] developer "开发者"
+    entity[control] ci "CI Pipeline"
+    entity[database] registry "镜像仓库"
+    entity[control] argo "Argo CD"
+    entity[control] apiserver "K8s API Server"
+    entity[control] scheduler "Scheduler"
+    entity[control] kubelet "Kubelet"
+    entity[control] deployment "Deployment"
+    entity[boundary] pods "新 Pod 副本集"
+    entity[boundary] ingress "Ingress Service"
+    entity[boundary] monitor "监控告警"
 
     developer -> ci "push release tag"
     ci -> registry "build and push image"

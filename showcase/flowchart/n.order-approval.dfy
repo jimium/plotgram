@@ -6,13 +6,13 @@ diagram flowchart {
         direction: top-to-bottom
     }
 
-    entity submit "提交订单" { type: start }
-    entity review "经理审核" { type: process }
-    entity approved "审批通过" { type: process }
-    entity rejected "驳回修改" { type: process }
-    entity done "完成" { type: end }
-    entity check "金额是否超限" { type: decision }
-    entity finance "财务复核" { type: process }
+    entity[start] submit "提交订单"
+    entity[process] review "经理审核"
+    entity[process] approved "审批通过"
+    entity[process] rejected "驳回修改"
+    entity[end] done "完成"
+    entity[decision] check "金额是否超限"
+    entity[process] finance "财务复核"
 
     submit -> review
     review -> check

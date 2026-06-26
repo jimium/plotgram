@@ -4,18 +4,18 @@ diagram architecture {
     title: "事件驱动架构"
 
     group producers "生产者" {
-        entity order_svc "订单服务" { type: service }
-        entity user_svc "用户服务" { type: service }
+        entity[service] order_svc "订单服务"
+        entity[service] user_svc "用户服务"
     }
 
     group messaging "消息中间件" {
-        entity kafka "Kafka" { type: queue }
+        entity[queue] kafka "Kafka"
     }
 
     group consumers "消费者" {
-        entity analytics "分析服务" { type: service }
-        entity notify "通知服务" { type: service }
-        entity search "搜索服务" { type: service }
+        entity[service] analytics "分析服务"
+        entity[service] notify "通知服务"
+        entity[service] search "搜索服务"
     }
 
     order_svc -> kafka "OrderCreated"

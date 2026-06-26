@@ -3,14 +3,14 @@
 diagram sequence {
     title: "实时风控决策链路"
 
-    entity user "用户" { type: actor }
-    entity app "业务前端" { type: boundary }
-    entity gateway "Transaction Gateway" { type: control }
-    entity risk_api "Risk API" { type: control }
-    entity feature_store "Feature Store" { type: database }
-    entity rules "Rule Engine" { type: control }
-    entity model "Model Scoring" { type: control }
-    entity analyst "Risk Analyst Console" { type: boundary }
+    entity[actor] user "用户"
+    entity[boundary] app "业务前端"
+    entity[control] gateway "Transaction Gateway"
+    entity[control] risk_api "Risk API"
+    entity[database] feature_store "Feature Store"
+    entity[control] rules "Rule Engine"
+    entity[control] model "Model Scoring"
+    entity[boundary] analyst "Risk Analyst Console"
 
     user -> app "submit transaction"
     app -> gateway "authorize request"

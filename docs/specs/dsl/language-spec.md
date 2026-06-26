@@ -369,12 +369,12 @@ diagram flowchart {
     }
 
     group customer "客户" {
-        entity order "下单" { type: start }
-        entity pay "支付" { type: process }
+        entity[start] order "下单"
+        entity[process] pay "支付"
     }
     group warehouse "仓库" {
-        entity pick "拣货" { type: process }
-        entity pack "打包" { type: process }
+        entity[process] pick "拣货"
+        entity[process] pack "打包"
     }
 
     order -> pay
@@ -396,12 +396,20 @@ diagram flowchart {
 ### 5.1 语法
 
 ```
-<entity_declaration> ::= "entity" <identifier> <string> [<attribute_block>]
+<entity_declaration> ::= "entity" ["[" <type_atom> "]"] <identifier> <string> [<attribute_block>]
 ```
 
+- `[<type_atom>]` — **可选的类型标注**（语法糖）。`type` 是 entity 最高频的属性，使用方括号直接跟在 `entity` 关键字后指定，省去 `{ type: xxx }` 的写法
 - `identifier` — 实体的程序化 ID（用于关系引用）
 - `string` — 实体的显示标签（人类可读）
-- `attribute_block` — 可选的属性块
+- `attribute_block` — 可选的属性块（用于 type 以外的其他属性）
+
+**语法糖说明：**
+
+- `entity[gateway] api "API 网关"` 等价于 `entity api "API 网关" { type: gateway }`
+- 若 entity 不需要指定 type（使用图表默认 type），省略方括号：`entity login "用户登录"`
+- 若同时指定 type 和其他属性，type 在方括号中，其他属性在 `{ }` 中：`entity[database] db "主库" { status: healthy }`
+- 不允许同时在 `[ ]` 和 `{ }` 中指定 type（重复声明报错）
 
 ### 5.2 属性块（Attribute Block）
 
@@ -474,7 +482,7 @@ diagram flowchart {
 | `actor`      | 外部角色     | 人形图标   | sequence |
 | `boundary`   | 边界对象     | 矩形     | sequence |
 | `control`    | 控制对象     | 矩形     | sequence |
-| `entity`     | 通用实体     | 矩形     | sequence |
+| `lifeline`   | 通用实体     | 矩形     | sequence |
 | `frontend`   | 前端层     | 矩形     | architecture |
 | `backend`    | 后端层     | 矩形     | architecture |
 | `initial`    | 初始状态     | 圆形     | state |
@@ -509,17 +517,24 @@ entity api "API 服务" {
 
 ### 5.5 Entity 示例
 
-**最简形式（无属性）：**
+**最简形式（使用默认 type，无额外属性）：**
 
 ```drawify
 entity login "用户登录"
 ```
 
-**带属性形式：**
+**指定 type（语法糖形式，推荐）：**
 
 ```drawify
-entity db "主数据库" {
-    type: database
+entity[gateway] api "API 网关"
+entity[database] db "主数据库"
+entity[start] begin "开始"
+```
+
+**指定 type 并带其他属性：**
+
+```drawify
+entity[database] db "主数据库" {
     status: healthy
     owner: "DBA 团队"
 }
@@ -656,9 +671,9 @@ api -> db "查询" { line_style: error }
 group process "数据计算层" {
     layout: fan-out
 
-    entity kafka "消息队列(Kafka)" { type: queue }
-    entity spark "批处理(Spark)" { type: service }
-    entity flink "流计算(Flink)" { type: service }
+    entity[queue] kafka "消息队列(Kafka)"
+    entity[service] spark "批处理(Spark)"
+    entity[service] flink "流计算(Flink)"
 
     // 组内 edge：两端 entity 都在本 group 内
     kafka -> spark "batch consume"
@@ -668,8 +683,8 @@ group process "数据计算层" {
 group storage "数据存储层" {
     layout: vertical
 
-    entity hive "数仓(Hive)" { type: database }
-    entity clickhouse "OLAP 引擎" { type: database }
+    entity[database] hive "数仓(Hive)"
+    entity[database] clickhouse "OLAP 引擎"
 }
 ```
 
@@ -679,8 +694,8 @@ group storage "数据存储层" {
 group backend "后端层" {
     border_style: dashed
 
-    entity api "API 服务" { type: service }
-    entity worker "Worker" { type: service }
+    entity[service] api "API 服务"
+    entity[service] worker "Worker"
 
     api -> worker "dispatch job"
 }
@@ -700,7 +715,7 @@ group frontend "前端" {
 
 group backend "后端" {
     entity api "API"
-    entity db "Database" { type: database }
+    entity[database] db "Database"
 
     // 组内 edge 写在 group 内
     api -> db "query"
@@ -756,17 +771,13 @@ diagram flowchart {
     }
 
     // 内联样式覆盖（优先级高于声明式规则）
-    entity api "API 服务" {
-        type: service
+    entity[service] api "API 服务" {
         style.fill: "#C8E6C9"    // 覆盖 node_style service 的 fill
     }
 
-    entity db "用户数据库" {
-        type: database            // 使用 node_style database 的全部属性
-    }
+    entity[database] db "用户数据库"
 
-    entity cache "Token 缓存" {
-        type: cache
+    entity[cache] cache "Token 缓存" {
         style.shape: diamond      // 只覆盖 shape，其余从 StyleSheet entity_types 展开
     }
 
@@ -871,7 +882,7 @@ entity api "API 服务"   // 行尾注释也允许
 <config_block>          ::= "config" "{" <diagram_attribute>* "}"
 <diagram_attribute>     ::= <identifier> ":" <attribute_value>
 
-<entity_declaration>    ::= "entity" <identifier> <string> [<attribute_block>]
+<entity_declaration>    ::= "entity" ["[" <atom> "]"] <identifier> <string> [<attribute_block>]
 <attribute_block>       ::= "{" <attribute>* "}"
 <attribute>             ::= <namespaced_key> ":" <attribute_value>
 <namespaced_key>        ::= <identifier> ("." <identifier>)?
@@ -973,27 +984,19 @@ diagram flowchart {
     }
 
     // 实体声明
-    entity client "移动客户端" {
-        type: client
-    }
+    entity[client] client "移动客户端"
 
-    entity gateway "API 网关" {
-        type: gateway
+    entity[gateway] gateway "API 网关" {
         status: healthy
     }
 
-    entity auth "认证服务" {
-        type: service
+    entity[service] auth "认证服务" {
         owner: "安全团队"
     }
 
-    entity db "用户数据库" {
-        type: database
-    }
+    entity[database] db "用户数据库"
 
-    entity cache "Token 缓存" {
-        type: cache
-    }
+    entity[cache] cache "Token 缓存"
 
     // 关系声明
     client -> gateway "HTTPS 请求"
@@ -1015,7 +1018,7 @@ diagram flowchart {
 | ------------------- | ------------------------------------------------------------ | ------------ |
 | `graph TD`          | `diagram flowchart { config { direction: top-to-bottom } }` | 图表声明         |
 | `A[节点名]`            | `entity a "节点名"`                                             | 节点声明         |
-| `A((圆形))`           | `entity a "圆形" { type: start }`                              | 形状通过 type 表达 |
+| `A((圆形))`           | `entity[start] a "圆形"`                                         | 形状通过 type 表达 |
 | `A --> B`           | `a -> b`                                                     | 关系           |
 | `A --文本--> B`       | `a -> b "文本"`                                                | 带标签关系        |
 | `A -.-> B`          | `a --> b`                                                    | 虚线 → 被动流向    |

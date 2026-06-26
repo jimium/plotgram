@@ -4,17 +4,17 @@ diagram architecture {
     title: "企业数据血缘平台"
 
     group sources "数据源" {
-        entity app_db "业务数据库" { type: database }
-        entity crm "CRM 系统" { type: service }
-        entity data_lake "对象存储湖仓" { type: storage }
-        entity logs "应用日志" { type: service }
+        entity[database] app_db "业务数据库"
+        entity[service] crm "CRM 系统"
+        entity[storage] data_lake "对象存储湖仓"
+        entity[service] logs "应用日志"
     }
 
     group ingest "采集与处理" {
-        entity cdc "CDC Connector" { type: service }
-        entity kafka "Kafka" { type: queue }
-        entity flink "Flink" { type: service }
-        entity batch "Batch ETL" { type: service }
+        entity[service] cdc "CDC Connector"
+        entity[queue] kafka "Kafka"
+        entity[service] flink "Flink"
+        entity[service] batch "Batch ETL"
 
         cdc -> kafka "change events"
         kafka -> flink "stream processing"
@@ -22,20 +22,20 @@ diagram architecture {
     }
 
     group governance "治理与血缘" {
-        entity catalog "Metadata Catalog" { type: service }
-        entity lineage "Lineage Engine" { type: service }
-        entity quality "Data Quality Rules" { type: service }
-        entity policy "Access Policy Engine" { type: service }
+        entity[service] catalog "Metadata Catalog"
+        entity[service] lineage "Lineage Engine"
+        entity[service] quality "Data Quality Rules"
+        entity[service] policy "Access Policy Engine"
 
         quality -> catalog "quality status"
         catalog -> policy "classified assets"
     }
 
     group analytics "分析与消费" {
-        entity warehouse "Data Warehouse" { type: database }
-        entity semantic "Semantic Layer" { type: service }
-        entity bi "BI Dashboard" { type: frontend }
-        entity ml "Feature Store" { type: database }
+        entity[database] warehouse "Data Warehouse"
+        entity[service] semantic "Semantic Layer"
+        entity[frontend] bi "BI Dashboard"
+        entity[database] ml "Feature Store"
 
         warehouse -> semantic
         semantic -> bi

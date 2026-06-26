@@ -9,40 +9,34 @@ diagram architecture {
 
     group source "数据源层" {
         layout: horizontal
-        entity app_db "业务数据库" { type: database }
-        entity log_server "日志服务器" { type: service }
+        entity[database] app_db "业务数据库"
+        entity[service] log_server "日志服务器"
     }
 
     group process "数据计算层" {
         layout: fan-out
-        entity kafka "消息队列(Kafka)" {
-            type: queue
+        entity[queue] kafka "消息队列(Kafka)" {
             semantic: kafka
         }
-        entity flink "流计算(Flink)" {
-            type: service
+        entity[service] flink "流计算(Flink)" {
             semantic: flink
         }
-        entity spark "批处理(Spark)" {
-            type: service
+        entity[service] spark "批处理(Spark)" {
             semantic: spark
         }
     }
 
     group storage "数据存储层" {
         layout: vertical
-        entity hive "数仓(Hive)" {
-            type: database
+        entity[database] hive "数仓(Hive)" {
             semantic: hive
         }
-        entity clickhouse "OLAP引擎" {
-            type: database
+        entity[database] clickhouse "OLAP引擎" {
             semantic: clickhouse
         }
     }
 
-    entity bi "BI可视化看板" {
-        type: frontend
+    entity[frontend] bi "BI可视化看板" {
         semantic: grafana
     }
 

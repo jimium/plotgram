@@ -6,20 +6,20 @@ diagram flowchart {
         direction: top-to-bottom
     }
 
-    entity commit "代码提交" { type: start }
-    entity build "构建" { type: process }
-    entity unit_test "单元测试" { type: process }
-    entity integration "集成测试" { type: process }
-    entity staging "预发部署" { type: process }
-    entity canary "金丝雀发布" { type: process }
-    entity prod "全量上线" { type: process }
-    entity rollback "回滚" { type: process }
-    entity done "发布完成" { type: end }
-    entity gate_build "构建通过？" { type: decision }
-    entity gate_test "测试通过？" { type: decision }
-    entity gate_staging "预发验证？" { type: decision }
-    entity gate_canary "金丝雀健康？" { type: decision }
-    entity notify "通知开发修复" { type: process }
+    entity[start] commit "代码提交"
+    entity[process] build "构建"
+    entity[process] unit_test "单元测试"
+    entity[process] integration "集成测试"
+    entity[process] staging "预发部署"
+    entity[process] canary "金丝雀发布"
+    entity[process] prod "全量上线"
+    entity[process] rollback "回滚"
+    entity[end] done "发布完成"
+    entity[decision] gate_build "构建通过？"
+    entity[decision] gate_test "测试通过？"
+    entity[decision] gate_staging "预发验证？"
+    entity[decision] gate_canary "金丝雀健康？"
+    entity[process] notify "通知开发修复"
 
     commit -> build
     build -> gate_build

@@ -3,17 +3,17 @@
 diagram state {
     title: "TCP 连接状态"
 
-    entity closed "CLOSED" { type: state }
-    entity listen "LISTEN" { type: state }
-    entity syn_sent "SYN_SENT" { type: state }
-    entity syn_rcvd "SYN_RCVD" { type: state }
-    entity established "ESTABLISHED" { type: state }
-    entity fin_wait1 "FIN_WAIT_1" { type: state }
-    entity fin_wait2 "FIN_WAIT_2" { type: state }
-    entity close_wait "CLOSE_WAIT" { type: state }
-    entity closing "CLOSING" { type: state }
-    entity last_ack "LAST_ACK" { type: state }
-    entity time_wait "TIME_WAIT" { type: state }
+    entity[state] closed "CLOSED"
+    entity[state] listen "LISTEN"
+    entity[state] syn_sent "SYN_SENT"
+    entity[state] syn_rcvd "SYN_RCVD"
+    entity[state] established "ESTABLISHED"
+    entity[state] fin_wait1 "FIN_WAIT_1"
+    entity[state] fin_wait2 "FIN_WAIT_2"
+    entity[state] close_wait "CLOSE_WAIT"
+    entity[state] closing "CLOSING"
+    entity[state] last_ack "LAST_ACK"
+    entity[state] time_wait "TIME_WAIT"
 
     closed -> listen "被动打开"
     closed -> syn_sent "主动打开"

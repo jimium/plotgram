@@ -25,7 +25,7 @@ pub mod entity_type {
     pub const ACTOR: &str = "actor";
     pub const BOUNDARY: &str = "boundary";
     pub const CONTROL: &str = "control";
-    pub const ENTITY: &str = "entity";
+    pub const LIFELINE: &str = "lifeline";
     pub const DATABASE: &str = "database";
     pub const FRONTEND: &str = "frontend";
     pub const BACKEND: &str = "backend";
@@ -42,7 +42,7 @@ pub mod entity_type {
 
     pub const ALL: &[&str] = &[
         CLIENT, QUEUE, CACHE, GATEWAY, STORAGE, EXTERNAL, DECISION, PROCESS, START, END,
-        PARTICIPANT, ACTOR, BOUNDARY, CONTROL, ENTITY, DATABASE, FRONTEND, BACKEND, SERVICE,
+        PARTICIPANT, ACTOR, BOUNDARY, CONTROL, LIFELINE, DATABASE, FRONTEND, BACKEND, SERVICE,
         PERSON, INITIAL, STATE, FINAL, CHOICE, ROOT, MAIN, BRANCH, LEAF,
     ];
 }

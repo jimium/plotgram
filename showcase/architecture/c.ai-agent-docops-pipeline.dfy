@@ -16,37 +16,37 @@ diagram architecture {
     group inputs "输入源" {
         layout: horizontal
 
-        entity repo "代码仓库" { type: storage }
-        entity pr "Pull Request" { type: service }
-        entity cmdb "服务目录 / CMDB" { type: service }
-        entity prompt_lib "Prompt Library" { type: storage }
+        entity[storage] repo "代码仓库"
+        entity[service] pr "Pull Request"
+        entity[service] cmdb "服务目录 / CMDB"
+        entity[storage] prompt_lib "Prompt Library"
     }
 
     group agent_runtime "Agent 运行时" {
         layout: fan-out
 
-        entity orchestrator "Agent Orchestrator" { type: service }
-        entity planner "Planning Agent" { type: service }
-        entity graph_agent "Diagram Agent" { type: service }
-        entity patch_agent "Patch Agent" { type: service }
+        entity[service] orchestrator "Agent Orchestrator"
+        entity[service] planner "Planning Agent"
+        entity[service] graph_agent "Diagram Agent"
+        entity[service] patch_agent "Patch Agent"
     }
 
     group drawify_stack "Drawify 栈" {
         layout: horizontal
 
-        entity validate "Drawify Validator" { type: service }
-        entity render "Drawify Renderer" { type: service }
-        entity diff "Diagram Diff Engine" { type: service }
-        entity artifact "Diagram Artifact Store" { type: storage }
+        entity[service] validate "Drawify Validator"
+        entity[service] render "Drawify Renderer"
+        entity[service] diff "Diagram Diff Engine"
+        entity[storage] artifact "Diagram Artifact Store"
     }
 
     group delivery "交付与反馈" {
         layout: horizontal
 
-        entity docs "Docs Portal" { type: frontend }
-        entity review "PR Review Bot" { type: service }
-        entity wiki "Knowledge Base" { type: frontend }
-        entity telemetry "Agent Telemetry" { type: service }
+        entity[frontend] docs "Docs Portal"
+        entity[service] review "PR Review Bot"
+        entity[frontend] wiki "Knowledge Base"
+        entity[service] telemetry "Agent Telemetry"
     }
 
     repo -> orchestrator "code context"

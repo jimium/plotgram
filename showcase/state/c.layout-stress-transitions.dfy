@@ -4,15 +4,15 @@
 diagram state {
     title: "布局测试：复杂状态循环与多重回环"
 
-    entity init "初始化" { type: initial }
-    entity pending "等待处理" { type: state }
-    entity locked "资源锁定" { type: state }
-    entity processing "处理中" { type: state }
-    entity success "处理成功" { type: state }
-    entity fail "处理失败" { type: state }
-    entity refunding "退款中" { type: state }
-    entity check "超时检查" { type: choice }
-    entity done "结束" { type: final }
+    entity[initial] init "初始化"
+    entity[state] pending "等待处理"
+    entity[state] locked "资源锁定"
+    entity[state] processing "处理中"
+    entity[state] success "处理成功"
+    entity[state] fail "处理失败"
+    entity[state] refunding "退款中"
+    entity[choice] check "超时检查"
+    entity[final] done "结束"
 
     init -> pending
     pending -> locked

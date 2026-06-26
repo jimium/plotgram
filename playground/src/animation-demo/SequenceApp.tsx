@@ -20,10 +20,10 @@ const SCENES: SequenceScene[] = [
     dsl: `diagram sequence {
     title: "OAuth 授权码登录"
 
-    entity user "用户" { type: actor }
-    entity browser "浏览器" { type: boundary }
-    entity auth "认证服务" { type: control }
-    entity resource "资源服务" { type: control }
+    entity[actor] user "用户"
+    entity[boundary] browser "浏览器"
+    entity[control] auth "认证服务"
+    entity[control] resource "资源服务"
 
     user -> browser "点击登录"
     browser -> auth "重定向到授权页"
@@ -42,14 +42,14 @@ const SCENES: SequenceScene[] = [
     dsl: `diagram sequence {
     title: "微服务结账流程"
 
-    entity user "用户" { type: actor }
-    entity web "Web 前端" { type: boundary }
-    entity gateway "API 网关" { type: boundary }
-    entity order "订单服务" { type: control }
-    entity inventory "库存服务" { type: control }
-    entity payment "支付服务" { type: control }
-    entity mq "消息队列" { type: control }
-    entity notify "通知服务" { type: control }
+    entity[actor] user "用户"
+    entity[boundary] web "Web 前端"
+    entity[boundary] gateway "API 网关"
+    entity[control] order "订单服务"
+    entity[control] inventory "库存服务"
+    entity[control] payment "支付服务"
+    entity[control] mq "消息队列"
+    entity[control] notify "通知服务"
 
     user -> web "提交订单"
     web -> gateway "POST /checkout"
@@ -73,9 +73,9 @@ const SCENES: SequenceScene[] = [
     dsl: `diagram sequence {
     title: "HTTP 请求响应"
 
-    entity client "客户端" { type: boundary }
-    entity server "服务器" { type: control }
-    entity db "数据库" { type: database }
+    entity[boundary] client "客户端"
+    entity[control] server "服务器"
+    entity[database] db "数据库"
 
     client -> server "HTTP Request"
     server -> db "SELECT * FROM users"

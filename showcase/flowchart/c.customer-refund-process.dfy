@@ -7,35 +7,35 @@ diagram flowchart {
     }
 
     group intake "申请受理" {
-        entity request "提交退款申请" { type: start }
-        entity classify "退款类型识别" { type: process }
-        entity classify_gate "是否符合政策？" { type: decision }
-        entity collect_evidence "补充凭证材料" { type: process }
-        entity evidence_gate "材料齐全？" { type: decision }
-        entity reject "拒绝退款" { type: process }
-        entity rejected_end "申请关闭" { type: end }
+        entity[start] request "提交退款申请"
+        entity[process] classify "退款类型识别"
+        entity[decision] classify_gate "是否符合政策？"
+        entity[process] collect_evidence "补充凭证材料"
+        entity[decision] evidence_gate "材料齐全？"
+        entity[process] reject "拒绝退款"
+        entity[end] rejected_end "申请关闭"
     }
 
     group review "审核阶段" {
-        entity cs_review "客服初审" { type: process }
-        entity cs_gate "客服通过？" { type: decision }
-        entity supervisor "主管复核" { type: process }
-        entity sup_gate "复核通过？" { type: decision }
-        entity fraud_check "反欺诈核查" { type: process }
-        entity fraud_gate "存在风险？" { type: decision }
-        entity escalate "升级风控团队" { type: process }
-        entity back_to_cs "退回客服补充" { type: process }
+        entity[process] cs_review "客服初审"
+        entity[decision] cs_gate "客服通过？"
+        entity[process] supervisor "主管复核"
+        entity[decision] sup_gate "复核通过？"
+        entity[process] fraud_check "反欺诈核查"
+        entity[decision] fraud_gate "存在风险？"
+        entity[process] escalate "升级风控团队"
+        entity[process] back_to_cs "退回客服补充"
     }
 
     group finance "财务处理" {
-        entity approve "审批通过" { type: process }
-        entity refund_calc "退款金额计算" { type: process }
-        entity refund_pay "执行退款" { type: process }
-        entity pay_gate "退款到账？" { type: decision }
-        entity retry_pay "重新发起退款" { type: process }
-        entity notify "通知客户" { type: process }
-        entity archive "归档与对账" { type: process }
-        entity done "退款完成" { type: end }
+        entity[process] approve "审批通过"
+        entity[process] refund_calc "退款金额计算"
+        entity[process] refund_pay "执行退款"
+        entity[decision] pay_gate "退款到账？"
+        entity[process] retry_pay "重新发起退款"
+        entity[process] notify "通知客户"
+        entity[process] archive "归档与对账"
+        entity[end] done "退款完成"
     }
 
     request -> classify

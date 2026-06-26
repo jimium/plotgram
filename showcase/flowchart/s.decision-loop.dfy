@@ -6,10 +6,10 @@ diagram flowchart {
         direction: left-to-right
     }
 
-    entity request "用户请求" { type: client }
-    entity gateway "API 网关" { type: gateway }
-    entity auth "认证服务" { type: service }
-    entity db "数据库" { type: database }
+    entity[client] request "用户请求"
+    entity[gateway] gateway "API 网关"
+    entity[service] auth "认证服务"
+    entity[database] db "数据库"
 
     request -> gateway
     gateway -> auth

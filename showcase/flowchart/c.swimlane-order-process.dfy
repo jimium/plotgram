@@ -10,23 +10,23 @@ diagram flowchart {
     }
 
     group customer "客户" {
-        entity place_order "下单" { type: start }
-        entity receive_goods "收货" { type: end }
+        entity[start] place_order "下单"
+        entity[end] receive_goods "收货"
     }
 
     group sales "销售" {
-        entity verify_order "审核订单" { type: process }
-        entity confirm_order "确认订单" { type: process }
+        entity[process] verify_order "审核订单"
+        entity[process] confirm_order "确认订单"
     }
 
     group warehouse "仓库" {
-        entity pick_goods "拣货" { type: process }
-        entity pack_goods "打包" { type: process }
+        entity[process] pick_goods "拣货"
+        entity[process] pack_goods "打包"
     }
 
     group shipping "物流" {
-        entity dispatch "发货" { type: process }
-        entity deliver "配送" { type: process }
+        entity[process] dispatch "发货"
+        entity[process] deliver "配送"
     }
 
     place_order -> verify_order

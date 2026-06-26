@@ -3,15 +3,14 @@
 diagram sequence {
     title: "微服务结账流程"
 
-    entity user "用户" { type: actor }
-    entity web "Web 前端" { type: boundary }
-    entity gateway "API 网关" { type: boundary }
-    entity order "订单服务" { type: control }
-    entity inventory "库存服务" { type: control }
-    entity payment "支付服务" { type: control }
-    entity notify "通知服务" { type: control }
-    entity mq "消息队列" {
-        type: control
+    entity[actor] user "用户"
+    entity[boundary] web "Web 前端"
+    entity[boundary] gateway "API 网关"
+    entity[control] order "订单服务"
+    entity[control] inventory "库存服务"
+    entity[control] payment "支付服务"
+    entity[control] notify "通知服务"
+    entity[control] mq "消息队列" {
         semantic: kafka
     }
 

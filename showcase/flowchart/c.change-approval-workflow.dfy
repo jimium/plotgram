@@ -6,22 +6,22 @@ diagram flowchart {
         direction: top-to-bottom
     }
 
-    entity request "提交变更申请" { type: start }
-    entity classify "识别变更类型" { type: process }
-    entity risk_gate "高风险变更？" { type: decision }
-    entity impact "补充影响评估" { type: process }
-    entity test_evidence "附加测试证据" { type: process }
-    entity security_review "安全评审" { type: process }
-    entity arch_review "架构评审" { type: process }
-    entity cab_gate "CAB 审批通过？" { type: decision }
-    entity schedule "安排变更窗口" { type: process }
-    entity deploy "执行生产发布" { type: process }
-    entity verify "发布后验证" { type: process }
-    entity verify_gate "验证通过？" { type: decision }
-    entity rollback "执行回滚" { type: process }
-    entity archive "归档审计材料" { type: process }
-    entity reject "驳回并补充材料" { type: process }
-    entity done "变更完成" { type: end }
+    entity[start] request "提交变更申请"
+    entity[process] classify "识别变更类型"
+    entity[decision] risk_gate "高风险变更？"
+    entity[process] impact "补充影响评估"
+    entity[process] test_evidence "附加测试证据"
+    entity[process] security_review "安全评审"
+    entity[process] arch_review "架构评审"
+    entity[decision] cab_gate "CAB 审批通过？"
+    entity[process] schedule "安排变更窗口"
+    entity[process] deploy "执行生产发布"
+    entity[process] verify "发布后验证"
+    entity[decision] verify_gate "验证通过？"
+    entity[process] rollback "执行回滚"
+    entity[process] archive "归档审计材料"
+    entity[process] reject "驳回并补充材料"
+    entity[end] done "变更完成"
 
     request -> classify
     classify -> risk_gate

@@ -3,14 +3,14 @@
 diagram state {
     title: "订单生命周期"
 
-    entity init "" { type: initial }
-    entity created "已创建" { type: state }
-    entity paid "已支付" { type: state }
-    entity shipped "已发货" { type: state }
-    entity delivered "已签收" { type: state }
-    entity completed "已完成" { type: final }
-    entity cancelled "已取消" { type: final }
-    entity timeout "支付超时" { type: choice }
+    entity[initial] init ""
+    entity[state] created "已创建"
+    entity[state] paid "已支付"
+    entity[state] shipped "已发货"
+    entity[state] delivered "已签收"
+    entity[final] completed "已完成"
+    entity[final] cancelled "已取消"
+    entity[choice] timeout "支付超时"
 
     init -> created
     created -> timeout

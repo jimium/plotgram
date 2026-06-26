@@ -3,14 +3,14 @@
 diagram state {
     title: "工单流转"
 
-    entity init "" { type: initial }
-    entity open "待处理" { type: state }
-    entity assigned "已分配" { type: state }
-    entity in_progress "处理中" { type: state }
-    entity pending "等待用户" { type: state }
-    entity resolved "已解决" { type: state }
-    entity closed "已关闭" { type: final }
-    entity reopened "重新打开" { type: state }
+    entity[initial] init ""
+    entity[state] open "待处理"
+    entity[state] assigned "已分配"
+    entity[state] in_progress "处理中"
+    entity[state] pending "等待用户"
+    entity[state] resolved "已解决"
+    entity[final] closed "已关闭"
+    entity[state] reopened "重新打开"
 
     init -> open
     open -> assigned "分配工程师"

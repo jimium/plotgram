@@ -4,32 +4,32 @@ diagram architecture {
     title: "混合云灾备拓扑"
 
     group internet "互联网入口" {
-        entity dns "Authoritative DNS" { type: external }
-        entity traffic_mgr "Traffic Manager" { type: gateway }
-        entity waf "WAF" { type: gateway }
+        entity[external] dns "Authoritative DNS"
+        entity[gateway] traffic_mgr "Traffic Manager"
+        entity[gateway] waf "WAF"
     }
 
     group primary_dc "主数据中心" {
-        entity primary_ingress "Primary Ingress" { type: gateway }
-        entity primary_app "core-app x16" { type: service }
-        entity primary_risk "risk-engine x10" { type: service }
-        entity primary_batch "settlement-batch x8" { type: service }
-        entity primary_db "Primary Oracle" { type: database }
+        entity[gateway] primary_ingress "Primary Ingress"
+        entity[service] primary_app "core-app x16"
+        entity[service] primary_risk "risk-engine x10"
+        entity[service] primary_batch "settlement-batch x8"
+        entity[database] primary_db "Primary Oracle"
     }
 
     group dr_cloud "公有云灾备" {
-        entity dr_ingress "DR Ingress" { type: gateway }
-        entity dr_app "core-app-dr x8" { type: service }
-        entity dr_risk "risk-engine-dr x6" { type: service }
-        entity dr_batch "settlement-batch-dr x4" { type: service }
-        entity dr_db "DR PostgreSQL" { type: database }
+        entity[gateway] dr_ingress "DR Ingress"
+        entity[service] dr_app "core-app-dr x8"
+        entity[service] dr_risk "risk-engine-dr x6"
+        entity[service] dr_batch "settlement-batch-dr x4"
+        entity[database] dr_db "DR PostgreSQL"
     }
 
     group governance "治理与合规" {
-        entity iam "Central IAM" { type: service }
-        entity cmdb "CMDB" { type: service }
-        entity audit "Audit Archive" { type: storage }
-        entity observability "Unified Observability" { type: service }
+        entity[service] iam "Central IAM"
+        entity[service] cmdb "CMDB"
+        entity[storage] audit "Audit Archive"
+        entity[service] observability "Unified Observability"
     }
 
     dns -> traffic_mgr

@@ -3,56 +3,46 @@
 diagram er {
     title: "电商数据模型"
 
-    entity customer "Customer" {
-        type: database
+    entity[database] customer "Customer" {
         meta.pk: "id"
         meta.fields: "name\nemail"
     }
-    entity address "Address" {
-        type: database
+    entity[database] address "Address" {
         meta.pk: "id"
         meta.fk: "customer_id"
         meta.fields: "street\ncity"
     }
-    entity product "Product" {
-        type: database
+    entity[database] product "Product" {
         meta.pk: "id"
         meta.fields: "name\nprice"
     }
-    entity category "Category" {
-        type: database
+    entity[database] category "Category" {
         meta.pk: "id"
         meta.fields: "name"
     }
-    entity cart "Cart" {
-        type: database
+    entity[database] cart "Cart" {
         meta.pk: "id"
         meta.fk: "customer_id"
     }
-    entity cart_item "CartItem" {
-        type: database
+    entity[database] cart_item "CartItem" {
         meta.pk: "id"
         meta.fields: "fk.cart_id\nfk.product_id\nqty"
     }
-    entity order "Order" {
-        type: database
+    entity[database] order "Order" {
         meta.pk: "id"
         meta.fk: "customer_id"
         meta.fields: "total\nstatus"
     }
-    entity order_item "OrderItem" {
-        type: database
+    entity[database] order_item "OrderItem" {
         meta.pk: "id"
         meta.fields: "fk.order_id\nfk.product_id\nqty"
     }
-    entity payment "Payment" {
-        type: database
+    entity[database] payment "Payment" {
         meta.pk: "id"
         meta.fk: "order_id"
         meta.fields: "amount\nmethod"
     }
-    entity shipment "Shipment" {
-        type: database
+    entity[database] shipment "Shipment" {
         meta.pk: "id"
         meta.fk: "order_id"
         meta.fields: "carrier\ntracking_no"

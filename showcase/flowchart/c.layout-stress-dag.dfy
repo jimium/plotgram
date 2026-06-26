@@ -7,17 +7,17 @@ diagram flowchart {
         direction: top-to-bottom
     }
 
-    entity start "启动" { type: start }
-    entity n1 "节点 1" { type: process }
-    entity n2 "节点 2" { type: decision }
-    entity n3 "节点 3" { type: process }
-    entity n4 "节点 4" { type: decision }
-    entity n5 "节点 5" { type: decision }
-    entity n6 "节点 6" { type: process }
-    entity n7 "节点 7" { type: process }
-    entity n8 "节点 8" { type: decision }
-    entity n9 "节点 9" { type: decision }
-    entity end "结束" { type: end }
+    entity[start] start "启动"
+    entity[process] n1 "节点 1"
+    entity[decision] n2 "节点 2"
+    entity[process] n3 "节点 3"
+    entity[decision] n4 "节点 4"
+    entity[decision] n5 "节点 5"
+    entity[process] n6 "节点 6"
+    entity[process] n7 "节点 7"
+    entity[decision] n8 "节点 8"
+    entity[decision] n9 "节点 9"
+    entity[end] end "结束"
 
     start -> n1
     start -> n2 "旁路"

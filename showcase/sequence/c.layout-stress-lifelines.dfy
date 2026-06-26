@@ -4,11 +4,11 @@
 diagram sequence {
     title: "布局测试：密集时序消息与长跨度回调"
 
-    entity client "移动端" { type: actor }
-    entity gateway "API 网关" { type: boundary }
-    entity svc_a "微服务 A" { type: control }
-    entity svc_b "微服务 B" { type: control }
-    entity db "分布式数据库" { type: database }
+    entity[actor] client "移动端"
+    entity[boundary] gateway "API 网关"
+    entity[control] svc_a "微服务 A"
+    entity[control] svc_b "微服务 B"
+    entity[database] db "分布式数据库"
 
     client -> gateway "1. 发起同步请求"
     gateway -> svc_a "2. 路由转发"
