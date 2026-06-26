@@ -16,6 +16,7 @@ use crate::layout::registry;
 use crate::layout::route_feedback::{LayoutRouteFeedback, PreRouteFeedback};
 use crate::layout::{resolve_effective_direction, EdgeRoutingStrategy, LayoutResult};
 use std::collections::{HashMap, HashSet};
+use std::time::Instant;
 
 /// 带意图叠加层的布局管线。
 pub(crate) struct LayoutPipeline<'a> {
@@ -53,7 +54,11 @@ impl<'a> LayoutPipeline<'a> {
         let mut report = RefinementReport::default();
         let valid_topology = self.validate_topology_intents(&mut report);
 
+        let t_layout = Instant::now();
         let mut result = strategy.compute_with_overlay(self.diagram, Some(&valid_topology));
+        let layout_elapsed = t_layout.elapsed();
+        eprintln!("[perf] layout: {:.2}ms", layout_elapsed.as_secs_f64() * 1000.0);
+
         self.evaluate_topology_satisfaction(&valid_topology, &mut result, &mut report);
 
         let mut pinned = intent::PinSet::default();
@@ -75,7 +80,11 @@ impl<'a> LayoutPipeline<'a> {
             return Ok((result, report_opt));
         }
 
+        let t_routing = Instant::now();
         let mut result = self.run_routing_pipeline(algo, result, &pinned, &mut report)?;
+        let routing_elapsed = t_routing.elapsed();
+        eprintln!("[perf] routing: {:.2}ms", routing_elapsed.as_secs_f64() * 1000.0);
+
         postprocess::finalize_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
 
         let report_opt = if self.overlay.is_some() {
@@ -182,11 +191,12 @@ impl<'a> LayoutPipeline<'a> {
         pinned: &intent::PinSet,
         report: &mut RefinementReport,
     ) -> Result<LayoutResult, DiagnosticError> {
+        let t0 = Instant::now();
         let feedback = LayoutRouteFeedback::new(self.diagram, self.plan, algo);
         let PreRouteFeedback {
             result: mut result_v2,
-            baseline: mut result_pre_v2,
         } = feedback.apply_pre_route(result);
+        eprintln!("[perf]   pre-route: {:.2}ms", t0.elapsed().as_secs_f64() * 1000.0);
 
         let edge_routing_style = self.plan.edge_routing.as_str();
         let router = registry::build_edge_routing_strategy(edge_routing_style, self.plan).ok_or_else(
@@ -204,19 +214,18 @@ impl<'a> LayoutPipeline<'a> {
         let gf_pass = GroupFramePass::resolve(self.diagram, self.plan, algo);
         if !self.diagram.groups.is_empty() {
             gf_pass.refresh_before_route(self.diagram, &mut result_v2, pinned, algo);
-            if let Some(ref mut pre_v2) = result_pre_v2 {
-                gf_pass.refresh_before_route(self.diagram, pre_v2, pinned, algo);
-            }
         }
 
         let refine_config = refine::RefineConfig::default();
+        let t_route = Instant::now();
         let mut result = feedback.complete_routing(
             router.as_ref(),
             result_v2,
-            result_pre_v2,
             &refine_config,
         );
+        eprintln!("[perf]   route: {:.2}ms", t_route.elapsed().as_secs_f64() * 1000.0);
 
+        let t_post = Instant::now();
         edge_postprocess::snap_and_repulse_edges(
             &mut result.edges,
             &result.groups,
@@ -235,6 +244,7 @@ impl<'a> LayoutPipeline<'a> {
         if is_orthogonal && self.plan.edge_bundling.enabled {
             result = self.apply_edge_bundling(result)?;
         }
+        eprintln!("[perf]   post-process: {:.2}ms", t_post.elapsed().as_secs_f64() * 1000.0);
 
         Ok(result)
     }

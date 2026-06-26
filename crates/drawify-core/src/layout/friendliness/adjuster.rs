@@ -15,14 +15,14 @@
 use crate::ast::Diagram;
 use crate::layout::geometry::{Point, Rect};
 use crate::layout::LayoutResult;
-use crate::layout::refine::{segment_intersects_aabb, segment_intersects_node};
+use crate::layout::refine::segment_intersects_aabb;
 use super::node_outside_segment_bbox;
 use std::collections::HashMap;
 
 /// 低于此预测穿障数时不调整：低穿障数通常被路由器绕行解决，
 /// 强行调整反而可能引入新穿障（Phase 2 实测 0→14 enc 恶化案例）。
 ///
-/// Phase 2 调参：从 3 降至 2。路由后验证（post_route_select）会回退无效调整，
+/// Phase 2 调参：从 3 降至 2。
 /// 因此可以更激进地尝试低穿障场景。
 const MIN_CROSSINGS_TO_ADJUST: usize = 2;
 
@@ -289,87 +289,6 @@ pub fn overlap_pairs(nodes: &HashMap<String, crate::layout::NodeLayout>) -> std:
         }
     }
     pairs
-}
-
-/// 计算实际边-节点穿障数（路由后，基于折线路径）
-///
-/// 与 drawify-eval::metrics::count_edge_node_crossings 算法一致：
-/// 对每条边的每段折线，检测是否穿过非端点节点的矩形（含 0.5px 容差）。
-///
-/// 注意：使用 `segment_intersects_node`（与评估器一致），而非 `segment_intersects_aabb`
-/// （slab method，无容差）。两者在边界情况下判定不同，必须与评估器使用相同标准。
-pub fn count_actual_edge_node_crossings(diagram: &Diagram, result: &LayoutResult) -> usize {
-    let mut count = 0;
-    for (i, edge) in result.edges.iter().enumerate() {
-        if edge.path_len() < 2 {
-            continue;
-        }
-        let rel = &diagram.relations[i];
-        let from_id = rel.from.as_str();
-        let to_id = rel.to.as_str();
-
-        let path = edge.path_points();
-        for window in path.windows(2) {
-            let a = window[0];
-            let b = window[1];
-            for (node_id, nl) in &result.nodes {
-                if node_id == from_id || node_id == to_id {
-                    continue;
-                }
-                if segment_intersects_node(a, b, nl) {
-                    count += 1;
-                }
-            }
-        }
-    }
-    count
-}
-
-/// 检测 V2 调整是否实际改变了节点位置
-pub fn layout_changed(
-    a: &HashMap<String, crate::layout::NodeLayout>,
-    b: &HashMap<String, crate::layout::NodeLayout>,
-) -> bool {
-    if a.len() != b.len() {
-        return true;
-    }
-    for (id, nl_a) in a {
-        match b.get(id) {
-            None => return true,
-            Some(nl_b) => {
-                if (nl_a.x - nl_b.x).abs() > 0.01 || (nl_a.y - nl_b.y).abs() > 0.01 {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
-/// 路由后验证：比较 V2 调整结果与基线，选择更优的
-///
-/// 接受 V2 当且仅当：
-/// - 实际 `edge_node_crossings` 严格减少，且
-/// - 无新增 `node_overlap_pairs`（V2 的重叠对是基线的子集）
-///
-/// 否则回退到基线，确保 V2 永远不会让布局变差。
-pub fn post_route_select(
-    diagram: &Diagram,
-    v2_result: LayoutResult,
-    baseline_result: LayoutResult,
-) -> LayoutResult {
-    let enc_v2 = count_actual_edge_node_crossings(diagram, &v2_result);
-    let enc_baseline = count_actual_edge_node_crossings(diagram, &baseline_result);
-
-    let overlaps_v2 = overlap_pairs(&v2_result.nodes);
-    let overlaps_baseline = overlap_pairs(&baseline_result.nodes);
-    let has_new_overlap = overlaps_v2.iter().any(|p| !overlaps_baseline.contains(p));
-
-    if enc_v2 < enc_baseline && !has_new_overlap {
-        v2_result
-    } else {
-        baseline_result
-    }
 }
 
 #[cfg(test)]

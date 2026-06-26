@@ -254,6 +254,7 @@ fn route_edges_orthogonal_inner(
     let obstacles = PreparedObstacles::build(&result.nodes, &group_ctx);
 
     // ── 1. 按无向节点对分组，并确定每条边的端口（连接边） ──
+    let t1 = std::time::Instant::now();
     let mut pair_groups: HashMap<String, Vec<usize>> = HashMap::new();
     for (i, rel) in relations.iter().enumerate() {
         let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
@@ -295,6 +296,7 @@ fn route_edges_orthogonal_inner(
     // 导致节点附近不必要的交叉。此阶段对每个节点的多条边做"同侧偏好"协调：
     // 统计各侧边数，让少数派边在几何可接受时切换到多数派侧。
     coordinate_port_sides(relations, &result.nodes, &mut from_side, &mut to_side);
+    eprintln!("[perf]     step1_ports: {:.2}ms", t1.elapsed().as_secs_f64() * 1000.0);
 
     // ── 2. 为每个连接点分配磁吸 slot 坐标 ──
     //
@@ -435,12 +437,14 @@ fn route_edges_orthogonal_inner(
     }
 
     // ── 3. 分层批量边序（有 rank 时低层先占通道，层内按连接度） ──
+    let t2 = std::time::Instant::now();
     let node_degree = layer_order::compute_node_degrees(relations);
     let edge_order = layer_order::compute_edge_order(
         relations,
         result.hints.sugiyama_ranks.as_ref(),
         &node_degree,
     );
+    eprintln!("[perf]     step2_slots+step3_order: {:.2}ms", t2.elapsed().as_secs_f64() * 1000.0);
 
     // ── 4. 逐边构建路径 ──
     let incremental = preserve_edges.is_some();
@@ -458,6 +462,7 @@ fn route_edges_orthogonal_inner(
     };
 
     for &i in &edge_order {
+        let t_edge = std::time::Instant::now();
         let rel = &relations[i];
         let from_id = rel.from.as_str();
         let to_id = rel.to.as_str();
@@ -534,9 +539,15 @@ fn route_edges_orthogonal_inner(
         edge.set_polyline_points(path);
 
         edges[i] = edge;
+        eprintln!(
+            "[perf]     edge[{}] {}->{}: {} candidates, {:.2}ms",
+            i, from_id, to_id, path_stats.candidate_count,
+            t_edge.elapsed().as_secs_f64() * 1000.0
+        );
     }
 
     // ── 4b. 后置交叉检测：修正 slot 排序与实际路由方向不一致的锚点 ──
+    let t_fix = std::time::Instant::now();
     //
     // slot 排序（步骤 2）按对端节点中心坐标排列，但当边的实际路由方向与对端位置
     // 方向不一致时（如需要绕过中间节点），排序结果会导致出边交叉。
@@ -562,6 +573,7 @@ fn route_edges_orthogonal_inner(
     if !cfg.bundling {
         resolve_label_overlaps(&mut edges, &result.nodes, &result.groups);
     }
+    eprintln!("[perf]     fix_inversions+labels: {:.2}ms", t_fix.elapsed().as_secs_f64() * 1000.0);
 
     result.edges = edges;
     // P2-1: 导出 orthogonal 路由 debug 统计
