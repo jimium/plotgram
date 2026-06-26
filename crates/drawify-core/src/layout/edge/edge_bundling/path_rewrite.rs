@@ -428,22 +428,37 @@ fn trunk_collides_with_nodes(
     false
 }
 
-/// 构建主干禁放区（TrunkKeepout）。
+/// 构建主干禁放区（TrunkKeepout），含 merge/fork leg 分叉点避让。
 fn build_trunk_keepout(bundle: &EdgeBundle, config: &BundlingConfig) -> TrunkKeepout {
     let sx = bundle.trunk_start.x;
     let sy = bundle.trunk_start.y;
     let ex = bundle.trunk_end.x;
     let ey = bundle.trunk_end.y;
     let pad = config.label_trunk_pad;
+    let fork_pad = pad * 0.75; // 分叉点避让带稍小
 
-    let zone = match bundle.trunk_axis {
+    let mut zones: Vec<(f64, f64, f64, f64)> = Vec::new();
+
+    // 主干避让带
+    let trunk_zone = match bundle.trunk_axis {
         Axis::Horizontal => (sx - pad, sy - pad, ex + pad, sy + pad),
         Axis::Vertical => (sx - pad, sy - pad, ex + pad, ey + pad),
     };
+    zones.push(trunk_zone);
+
+    // Entry 分叉点避让（merge leg 根部）
+    for &pt in &bundle.entry_points {
+        zones.push((pt.x - fork_pad, pt.y - fork_pad, pt.x + fork_pad, pt.y + fork_pad));
+    }
+
+    // Exit 分叉点避让（fork leg 根部）
+    for &pt in &bundle.exit_points {
+        zones.push((pt.x - fork_pad, pt.y - fork_pad, pt.x + fork_pad, pt.y + fork_pad));
+    }
 
     TrunkKeepout {
         bundle_id: bundle.id,
-        zones: vec![zone],
+        zones,
     }
 }
 

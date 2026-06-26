@@ -331,6 +331,27 @@ fn compute_fork_points(
     let mut entry_data: Vec<(usize, f64, f64)> = Vec::with_capacity(edges.len()); // (edge_idx, perp_coord, axis_proj)
     let mut exit_data: Vec<(usize, f64, f64)> = Vec::with_capacity(edges.len());
 
+    // 先计算多数边的行进方向，确保主干方向一致
+    let mut forward_count = 0usize;
+    for &edge_idx in edges {
+        let feat = &features[edge_idx];
+        let path = &feat.path_points;
+        if path.is_empty() {
+            continue;
+        }
+        let from_anchor = path[0];
+        let to_anchor = path[path.len() - 1];
+        let (from_proj, to_proj) = match axis {
+            Axis::Horizontal => (from_anchor.x, to_anchor.x),
+            Axis::Vertical => (from_anchor.y, to_anchor.y),
+        };
+        if to_proj >= from_proj {
+            forward_count += 1;
+        }
+    }
+    let majority_forward = forward_count * 2 >= edges.len();
+    let majority_dir_sign = if majority_forward { 1.0 } else { -1.0 };
+
     for &edge_idx in edges {
         let feat = &features[edge_idx];
         // 使用路径端点（from_anchor / to_anchor）而非节点中心。
@@ -355,8 +376,8 @@ fn compute_fork_points(
             ),
         };
 
-        // §4.7: 向行进方向偏移 fork_distance，使 entry/exit 落在 stub 终点之外
-        let dir_sign = if to_proj >= from_proj { 1.0 } else { -1.0 };
+        // §4.7: 使用多数边方向，确保 bundle 内主干方向一致
+        let dir_sign = majority_dir_sign;
         let entry_proj = (from_proj + dir_sign * config.fork_distance).clamp(axis_min, axis_max);
         let exit_proj = (to_proj - dir_sign * config.fork_distance).clamp(axis_min, axis_max);
 
@@ -377,14 +398,19 @@ fn compute_fork_points(
     });
 
     // 提取轴上坐标并确保 fork_spacing 间距
-    let entry_axis_coords = enforce_fork_spacing(
-        &entry_data.iter().map(|d| d.2).collect::<Vec<_>>(),
+    // 同源/同宿边额外增加间距，避免视觉重叠
+    let entry_axis_coords = enforce_fork_spacing_with_groups(
+        &entry_data,
+        features,
+        true, // entry: 按 from_id 分组
         config.fork_spacing,
         axis_min,
         axis_max,
     );
-    let exit_axis_coords = enforce_fork_spacing(
-        &exit_data.iter().map(|d| d.2).collect::<Vec<_>>(),
+    let exit_axis_coords = enforce_fork_spacing_with_groups(
+        &exit_data,
+        features,
+        false, // exit: 按 to_id 分组
         config.fork_spacing,
         axis_min,
         axis_max,
@@ -409,32 +435,55 @@ fn compute_fork_points(
     (entry_points, exit_points)
 }
 
-/// 确保分叉点之间的最小间距。
+/// 同源/同宿感知的分叉点间距调整。
 ///
-/// 若相邻点间距 < `spacing`，均匀错开。
-/// 输入 coords 应已排序。
-fn enforce_fork_spacing(
-    coords: &[f64],
+/// 当多条边共享同一 from_id（entry）或 to_id（exit）时，
+/// 它们的分叉点应该在视觉上更分散，避免密集重叠。
+/// 对同组边使用 `spacing * 2` 的间距，跨组边使用普通 `spacing`。
+fn enforce_fork_spacing_with_groups(
+    data: &[(usize, f64, f64)], // (edge_idx, perp_coord, axis_proj)
+    features: &[EdgeFeatures],
+    use_from: bool, // true → 按 from_id 分组, false → 按 to_id 分组
     spacing: f64,
     min_bound: f64,
     max_bound: f64,
 ) -> Vec<f64> {
-    if coords.is_empty() {
+    if data.is_empty() {
         return Vec::new();
     }
 
-    let mut result: Vec<f64> = coords.to_vec();
+    let mut result: Vec<f64> = data.iter().map(|d| d.2).collect();
 
-    // 迭代调整，直到所有相邻间距 ≥ spacing 或达到上限
+    // 分组：按 from_id 或 to_id 分组
+    let mut groups: Vec<Vec<usize>> = Vec::new();
+    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for (i, &(edge_idx, _, _)) in data.iter().enumerate() {
+        let key = if use_from {
+            features[edge_idx].from_id.clone()
+        } else {
+            features[edge_idx].to_id.clone()
+        };
+        if let Some(&g) = seen.get(&key) {
+            groups[g].push(i);
+        } else {
+            seen.insert(key, groups.len());
+            groups.push(vec![i]);
+        }
+    }
+
+    // 对同组内（≥2 条边）使用加倍间距
+    let group_spacing = spacing * 2.0;
+
     for _iteration in 0..16 {
         let mut adjusted = false;
         for i in 1..result.len() {
             let gap = result[i] - result[i - 1];
-            if gap < spacing - EPS {
-                // 需要推开：向两侧均匀推开
-                let deficit = spacing - gap;
+            // 检查 i-1 和 i 是否同组，同组使用加倍间距
+            let same_group = groups.iter().any(|g| g.contains(&(i - 1)) && g.contains(&i));
+            let min_gap = if same_group { group_spacing } else { spacing };
+            if gap < min_gap - EPS {
+                let deficit = min_gap - gap;
                 let push = deficit / 2.0;
-                // 向两侧推开，但优先向外侧（远离中心）推开
                 result[i - 1] -= push;
                 result[i] += push;
                 adjusted = true;
@@ -445,7 +494,6 @@ fn enforce_fork_spacing(
         }
     }
 
-    // 钳制到主干范围，但保留更多空间
     for coord in &mut result {
         *coord = coord.clamp(min_bound, max_bound);
     }
