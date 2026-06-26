@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mindmap Radial 径向模式 — Drawify 算法文档</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --bg-card: #1a1d27;
+    --bg-card-alt: #14161e;
+    --border: #2a2d3a;
+    --text: #e2e4ed;
+    --text-secondary: #9499b3;
+    --accent: #6c8cff;
+    --accent-dim: #4a5fa8;
+    --accent-glow: rgba(108, 140, 255, 0.15);
+    --ring1: #6c8cff;
+    --ring2: #8b6cff;
+    --ring3: #cf6cff;
+    --root-color: #ff6c8c;
+    --edge-color: #3d4260;
+    --code-bg: #12141c;
+    --tag-bg: rgba(108, 140, 255, 0.12);
+    --tag-text: #8ca4ff;
+    --shadow: 0 2px 12px rgba(0,0,0,0.3);
+    --radius: 12px;
+  }
+
+  [data-theme="light"] {
+    --bg: #f5f6fa;
+    --bg-card: #ffffff;
+    --bg-card-alt: #f0f1f7;
+    --border: #dfe1ea;
+    --text: #1a1d2e;
+    --text-secondary: #6b7094;
+    --accent: #4a6cf7;
+    --accent-dim: #7b8fd4;
+    --accent-glow: rgba(74, 108, 247, 0.08);
+    --ring1: #4a6cf7;
+    --ring2: #7c5cf7;
+    --ring3: #b95cf7;
+    --root-color: #f74a6c;
+    --edge-color: #c5c9de;
+    --code-bg: #f0f1f7;
+    --tag-bg: rgba(74, 108, 247, 0.08);
+    --tag-text: #4a6cf7;
+    --shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 40px;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    transition: background 0.2s;
+  }
+
+  .back-link:hover {
+    background: var(--accent-glow);
+  }
+
+  .theme-toggle {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.2s;
+  }
+
+  .theme-toggle:hover {
+    background: var(--accent-glow);
+  }
+
+  .page-title {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+
+  .page-title span {
+    color: var(--accent);
+  }
+
+  .page-subtitle {
+    color: var(--text-secondary);
+    font-size: 16px;
+    margin-bottom: 32px;
+  }
+
+  .tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+
+  .tag {
+    background: var(--tag-bg);
+    color: var(--tag-text);
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+    transition: background 0.3s, border-color 0.3s;
+  }
+
+  .card h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .card h2 .icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .card h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 20px 0 10px;
+    color: var(--accent);
+  }
+
+  .card p {
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+  }
+
+  .card ul, .card ol {
+    color: var(--text-secondary);
+    padding-left: 20px;
+    margin-bottom: 12px;
+  }
+
+  .card li {
+    margin-bottom: 6px;
+  }
+
+  .card code {
+    background: var(--code-bg);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+    color: var(--accent);
+  }
+
+  .card pre {
+    background: var(--code-bg);
+    padding: 16px 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 12px 0;
+    font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+
+  /* SVG container */
+  .svg-wrap {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0;
+  }
+
+  .svg-wrap svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Steps */
+  .step-list {
+    list-style: none;
+    padding-left: 0;
+    counter-reset: step;
+  }
+
+  .step-list li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 40px;
+    margin-bottom: 16px;
+  }
+
+  .step-list li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  /* Param table */
+  .param-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+
+  .param-table th,
+  .param-table td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .param-table th {
+    color: var(--text);
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .param-table td {
+    color: var(--text-secondary);
+  }
+
+  .param-table td code {
+    font-size: 12px;
+  }
+
+  /* Score breakdown */
+  .score-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .score-item:last-child {
+    border-bottom: none;
+  }
+
+  .score-rank {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: var(--accent-glow);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .score-label {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text);
+  }
+
+  .score-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+
+  .footer a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  /* BFS Demo */
+  .bfs-demo-canvas {
+    display: block;
+    margin: 0 auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-card-alt);
+    max-width: 100%;
+    height: auto;
+  }
+
+  .bfs-controls {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 16px 0 12px;
+    flex-wrap: wrap;
+  }
+
+  .bfs-btn {
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-card-alt);
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: inherit;
+  }
+
+  .bfs-btn:hover {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+  }
+
+  .bfs-btn.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .bfs-btn.primary:hover {
+    opacity: 0.9;
+  }
+
+  .bfs-status {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+    min-height: 24px;
+    margin-top: 8px;
+  }
+
+  .bfs-progress-wrap {
+    margin: 12px auto 0;
+    max-width: 400px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .bfs-progress-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .bfs-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.4s ease;
+  }
+
+  .bfs-step-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <a class="back-link" href="layout-algorithms-index.html">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        算法索引
+      </a>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()">切换主题</button>
+  </div>
+
+  <h1 class="page-title">Mindmap Radial <span>径向模式</span></h1>
+  <p class="page-subtitle">Mindmap 布局的默认模式，根节点居中辐射展开，一级分支左右交替排列，适合思维导图与知识树</p>
+
+  <div class="tags">
+    <span class="tag">BFS</span>
+    <span class="tag">左右交替辐射</span>
+    <span class="tag">Mindmap 模式</span>
+    <span class="tag">确定性</span>
+    <span class="tag">≤ 200 节点</span>
+  </div>
+
+  <!-- Algorithm Overview -->
+  <div class="card">
+    <h2><span class="icon" style="background:var(--accent-glow);color:var(--accent);">&#9678;</span> 模式概述</h2>
+    <p>
+      <strong>Radial 是 Mindmap 布局的一种模式</strong>，而非独立算法。在 <code>mindmap.rs</code> 中，
+      Mindmap 布局支持三种展开方向：<code>radial</code>（径向，默认）、<code>top-to-bottom</code>（自上而下）、
+      <code>left-to-right</code>（自左向右）。本页专门描述 Radial 模式的实现细节。
+    </p>
+    <p>
+      Radial 模式以根节点为中心，一级子节点左右交替辐射展开——偶数序号分支向右，奇数序号分支向左。
+      每个子树递归布局，y 方向按子树高度累进，x 方向按深度等间距。
+      节点尺寸根据角色差异化：根节点最大，主干节点中等，分支/叶节点较小。
+    </p>
+    <p>
+      该模式是<strong>确定性</strong>的——相同输入始终产生相同输出，适合 ≤ 200 个节点的图。
+    </p>
+  </div>
+
+  <!-- SVG Visualization -->
+  <div class="card">
+    <h2><span class="icon" style="background:rgba(108,140,255,0.12);color:var(--ring1);">&#9711;</span> 径向布局可视化</h2>
+    <p>根节点位于中心，第一环 3 个节点，第二环 5 个节点，边连接父子关系：</p>
+    <div class="svg-wrap">
+      <svg width="520" height="520" viewBox="0 0 520 520" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- Background -->
+        <rect width="520" height="520" fill="none"/>
+
+        <!-- Concentric ring guides (dashed) -->
+        <circle cx="260" cy="260" r="110" fill="none" stroke="var(--edge-color)" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>
+        <circle cx="260" cy="260" r="220" fill="none" stroke="var(--edge-color)" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>
+
+        <!-- Ring labels -->
+        <text x="260" y="148" text-anchor="middle" fill="var(--text-secondary)" font-size="11" opacity="0.6">Ring 1 (r=110)</text>
+        <text x="260" y="38" text-anchor="middle" fill="var(--text-secondary)" font-size="11" opacity="0.6">Ring 2 (r=220)</text>
+
+        <!-- Edges: root → ring1 -->
+        <line x1="260" y1="260" x2="260" y2="150" stroke="var(--edge-color)" stroke-width="1.5"/>
+        <line x1="260" y1="260" x2="164.7" y2="315" stroke="var(--edge-color)" stroke-width="1.5"/>
+        <line x1="260" y1="260" x2="355.3" y2="315" stroke="var(--edge-color)" stroke-width="1.5"/>
+
+        <!-- Edges: ring1 → ring2 -->
+        <!-- A → D, A → E -->
+        <line x1="260" y1="150" x2="160" y2="60" stroke="var(--edge-color)" stroke-width="1.5"/>
+        <line x1="260" y1="150" x2="360" y2="60" stroke="var(--edge-color)" stroke-width="1.5"/>
+        <!-- B → F -->
+        <line x1="164.7" y1="315" x2="50" y2="260" stroke="var(--edge-color)" stroke-width="1.5"/>
+        <!-- B → G -->
+        <line x1="164.7" y1="315" x2="95" y2="440" stroke="var(--edge-color)" stroke-width="1.5"/>
+        <!-- C → H -->
+        <line x1="355.3" y1="315" x2="460" y2="440" stroke="var(--edge-color)" stroke-width="1.5"/>
+
+        <!-- Root node -->
+        <circle cx="260" cy="260" r="22" fill="var(--root-color)" filter="url(#glow)" opacity="0.9"/>
+        <text x="260" y="265" text-anchor="middle" fill="#fff" font-size="12" font-weight="600">Root</text>
+
+        <!-- Ring 1 nodes -->
+        <circle cx="260" cy="150" r="18" fill="var(--ring1)" opacity="0.85"/>
+        <text x="260" y="155" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">A</text>
+
+        <circle cx="164.7" cy="315" r="18" fill="var(--ring1)" opacity="0.85"/>
+        <text x="164.7" y="320" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">B</text>
+
+        <circle cx="355.3" cy="315" r="18" fill="var(--ring1)" opacity="0.85"/>
+        <text x="355.3" y="320" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">C</text>
+
+        <!-- Ring 2 nodes -->
+        <circle cx="160" cy="60" r="16" fill="var(--ring2)" opacity="0.8"/>
+        <text x="160" y="65" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">D</text>
+
+        <circle cx="360" cy="60" r="16" fill="var(--ring2)" opacity="0.8"/>
+        <text x="360" y="65" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">E</text>
+
+        <circle cx="50" cy="260" r="16" fill="var(--ring2)" opacity="0.8"/>
+        <text x="50" y="265" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">F</text>
+
+        <circle cx="95" cy="440" r="16" fill="var(--ring2)" opacity="0.8"/>
+        <text x="95" y="445" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">G</text>
+
+        <circle cx="460" cy="440" r="16" fill="var(--ring2)" opacity="0.8"/>
+        <text x="460" y="445" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">H</text>
+
+        <!-- Legend -->
+        <circle cx="30" cy="500" r="6" fill="var(--root-color)"/>
+        <text x="42" y="504" fill="var(--text-secondary)" font-size="11">根节点 (Level 0)</text>
+        <circle cx="150" cy="500" r="6" fill="var(--ring1)"/>
+        <text x="162" y="504" fill="var(--text-secondary)" font-size="11">环1 (Level 1)</text>
+        <circle cx="260" cy="500" r="6" fill="var(--ring2)"/>
+        <text x="272" y="504" fill="var(--text-secondary)" font-size="11">环2 (Level 2)</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Interactive BFS Demo -->
+  <div class="card">
+    <h2><span class="icon" style="background:rgba(255,108,140,0.12);color:var(--root-color);">&#9654;</span> 🎬 交互式动画：BFS 环扩展过程</h2>
+    <p>点击按钮观察径向布局如何从根节点出发，通过 BFS 逐环展开：</p>
+    <div style="display:flex;justify-content:center;">
+      <canvas id="bfs-canvas" class="bfs-demo-canvas" width="600" height="600"></canvas>
+    </div>
+    <div class="bfs-controls">
+      <button class="bfs-btn primary" onclick="bfsDemo.autoPlay()">&#9654; 开始演示</button>
+      <button class="bfs-btn" onclick="bfsDemo.nextStep()">&#8594; 下一步</button>
+      <button class="bfs-btn" onclick="bfsDemo.reset()">&#8634; 重置</button>
+    </div>
+    <div class="bfs-progress-wrap">
+      <span class="bfs-step-label" id="bfs-step-label">步骤 1 / 5</span>
+      <div class="bfs-progress-bar"><div class="bfs-progress-fill" id="bfs-progress-fill" style="width:20%"></div></div>
+    </div>
+    <div class="bfs-status" id="bfs-status">所有节点随机散布，根节点高亮显示</div>
+  </div>
+
+  <!-- BFS Level Assignment -->
+  <div class="card">
+    <h2><span class="icon" style="background:rgba(139,108,255,0.12);color:var(--ring2);">&#8680;</span> 左右交替辐射策略</h2>
+    <p>
+      Radial 模式的核心策略是<strong>左右交替辐射</strong>：一级子节点按声明顺序，偶数序号（0, 2, 4…）分支向右展开，奇数序号（1, 3, 5…）分支向左展开。
+      每个子树在各自方向上递归布局，y 方向按子树高度累进，x 方向按深度等间距递增。
+    </p>
+
+    <h3>分配过程</h3>
+    <ol class="step-list">
+      <li>识别根节点（类型为 root/initial/start 的节点，或按度数评分选择）</li>
+      <li>一级子节点按声明顺序，偶数序号分支向右，奇数序号分支向左</li>
+      <li>每个分支递归布局子树：y 方向按子树高度累进，x 方向按深度等间距</li>
+      <li>根节点居中，左右两侧的子树分别向上/下累进排列</li>
+    </ol>
+
+    <div class="svg-wrap">
+      <svg width="480" height="200" viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg">
+        <!-- Level 0 -->
+        <rect x="16" y="20" width="448" height="44" rx="8" fill="var(--accent-glow)" stroke="var(--accent)" stroke-width="1" opacity="0.5"/>
+        <text x="30" y="47" fill="var(--root-color)" font-size="13" font-weight="600">Level 0</text>
+        <rect x="100" y="28" width="60" height="28" rx="6" fill="var(--root-color)" opacity="0.9"/>
+        <text x="130" y="47" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">Root</text>
+
+        <!-- Arrow -->
+        <path d="M260 64 L260 76" stroke="var(--text-secondary)" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <defs><marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="var(--text-secondary)"/></marker></defs>
+
+        <!-- Level 1 -->
+        <rect x="16" y="78" width="448" height="44" rx="8" fill="rgba(108,140,255,0.06)" stroke="var(--ring1)" stroke-width="1" opacity="0.5"/>
+        <text x="30" y="105" fill="var(--ring1)" font-size="13" font-weight="600">Level 1</text>
+        <rect x="100" y="86" width="50" height="28" rx="6" fill="var(--ring1)" opacity="0.85"/>
+        <text x="125" y="105" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">A</text>
+        <rect x="160" y="86" width="50" height="28" rx="6" fill="var(--ring1)" opacity="0.85"/>
+        <text x="185" y="105" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">B</text>
+        <rect x="220" y="86" width="50" height="28" rx="6" fill="var(--ring1)" opacity="0.85"/>
+        <text x="245" y="105" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">C</text>
+
+        <!-- Arrow -->
+        <path d="M260 122 L260 134" stroke="var(--text-secondary)" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+        <!-- Level 2 -->
+        <rect x="16" y="136" width="448" height="44" rx="8" fill="rgba(139,108,255,0.06)" stroke="var(--ring2)" stroke-width="1" opacity="0.5"/>
+        <text x="30" y="163" fill="var(--ring2)" font-size="13" font-weight="600">Level 2</text>
+        <rect x="100" y="144" width="44" height="28" rx="6" fill="var(--ring2)" opacity="0.8"/>
+        <text x="122" y="163" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">D</text>
+        <rect x="152" y="144" width="44" height="28" rx="6" fill="var(--ring2)" opacity="0.8"/>
+        <text x="174" y="163" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">E</text>
+        <rect x="204" y="144" width="44" height="28" rx="6" fill="var(--ring2)" opacity="0.8"/>
+        <text x="226" y="163" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">F</text>
+        <rect x="256" y="144" width="44" height="28" rx="6" fill="var(--ring2)" opacity="0.8"/>
+        <text x="278" y="163" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">G</text>
+        <rect x="308" y="144" width="44" height="28" rx="6" fill="var(--ring2)" opacity="0.8"/>
+        <text x="330" y="163" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">H</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Root Selection -->
+  <div class="card">
+    <h2><span class="icon" style="background:rgba(255,108,140,0.12);color:var(--root-color);">&#9733;</span> 根节点选择</h2>
+    <p>
+      根节点的选择直接影响思维导图的整体结构。算法采用两阶段策略：
+    </p>
+
+    <h3>阶段一：类型匹配</h3>
+    <p>
+      遍历连通分量中的所有节点，若某节点的 <code>type</code> 属性为 <code>"root"</code>、<code>"initial"</code> 或 <code>"start"</code>，则直接选为根节点。这允许用户通过声明式标注指定根。
+    </p>
+
+    <h3>阶段二：评分排序</h3>
+    <p>
+      若无类型匹配，则对每个节点计算四元组评分，选取最高分者作为根：
+    </p>
+
+    <div class="score-item">
+      <span class="score-rank">1</span>
+      <div>
+        <div class="score-label"><code>-indegree</code> — 入度取负</div>
+        <div class="score-desc">入度越低越好，根节点通常不应有入边</div>
+      </div>
+    </div>
+    <div class="score-item">
+      <span class="score-rank">2</span>
+      <div>
+        <div class="score-label"><code>outdegree</code> — 出度</div>
+        <div class="score-desc">出度越高越好，根应连接尽可能多的子节点</div>
+      </div>
+    </div>
+    <div class="score-item">
+      <span class="score-rank">3</span>
+      <div>
+        <div class="score-label"><code>total_degree</code> — 总度数</div>
+        <div class="score-desc">总连接数越高，越适合作为图的中心</div>
+      </div>
+    </div>
+    <div class="score-item">
+      <span class="score-rank">4</span>
+      <div>
+        <div class="score-label"><code>-entity_order</code> — 声明顺序取负</div>
+        <div class="score-desc">同分时优先选择声明更早的节点，保证确定性</div>
+      </div>
+    </div>
+
+    <pre>fn root_score(node_id, component_set, graph) -&gt; (i32, i32, i32, i32) {
+    (-indegree, outdegree, total_degree, -entity_order)
+}</pre>
+  </div>
+
+  <!-- Ring Layout -->
+  <div class="card">
+    <h2><span class="icon" style="background:rgba(108,140,255,0.12);color:var(--ring1);">&#9712;</span> 分支布局策略</h2>
+    <p>
+      每个一级分支独立递归布局子树，涉及子树高度计算和坐标分配两个核心步骤。
+    </p>
+
+    <h3>1. 子树高度计算</h3>
+    <p>
+      递归计算每个子树的总高度：叶节点高度 = 自身高度；内部节点高度 = 所有子树高度之和 + 子树间 <code>V_GAP</code> 间距。
+      子树高度决定了同方向相邻分支的 y 坐标累进量。
+    </p>
+
+    <h3>2. 坐标分配</h3>
+    <p>
+      对每个分支递归分配坐标：
+    </p>
+
+    <table class="param-table">
+      <thead>
+        <tr><th>方向</th><th>坐标计算</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>x（水平）</td>
+          <td><code>root_x ± (depth × LEVEL_GAP + CENTER_GAP)</code></td>
+          <td>右侧分支 +，左侧分支 -，深度递增</td>
+        </tr>
+        <tr>
+          <td>y（垂直）</td>
+          <td><code>parent_y + subtree_offset</code></td>
+          <td>按子树高度累进，同方向分支依次排列</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Multi-Component -->
+  <div class="card">
+    <h2><span class="icon" style="background:rgba(207,108,255,0.12);color:var(--ring3);">&#9638;</span> 多连通分量支持</h2>
+    <p>
+      当图包含多个不连通的分量时，算法对每个分量独立执行布局，然后将各分量水平排列打包：
+    </p>
+    <ol class="step-list">
+      <li>通过父子关系检测所有连通分量</li>
+      <li>每个分量独立选择根节点并布局</li>
+      <li>各分量归一化坐标后，水平排列打包</li>
+    </ol>
+    <p>
+      这保证了即使图不连通，布局仍然清晰有序，各分量互不干扰。
+    </p>
+  </div>
+
+  <!-- Parameters -->
+  <div class="card">
+    <h2><span class="icon" style="background:var(--accent-glow);color:var(--accent);">&#9881;</span> 关键参数</h2>
+    <p style="margin-bottom:12px;color:var(--text-secondary);font-size:13px;">以下常量来自 <code>mindmap.rs</code>，Radial 模式与其他模式共享</p>
+    <table class="param-table">
+      <thead>
+        <tr><th>参数</th><th>默认值</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>PADDING</code></td><td>48px</td><td>画布边距</td></tr>
+        <tr><td><code>V_GAP</code></td><td>22px</td><td>同方向相邻分支的垂直间距</td></tr>
+        <tr><td><code>H_GAP</code></td><td>70px</td><td>父子节点之间的水平间距</td></tr>
+        <tr><td><code>LEVEL_GAP</code></td><td>200px</td><td>层级之间的水平间距</td></tr>
+        <tr><td><code>CENTER_GAP</code></td><td>100px</td><td>根节点与一级分支之间的间距</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Best For -->
+  <div class="card">
+    <h2><span class="icon" style="background:rgba(108,255,140,0.12);color:#6cff8c;">&#10003;</span> 适用场景</h2>
+    <ul>
+      <li><strong>思维导图</strong> — 中心主题 + 左右辐射展开，最经典的导图形态</li>
+      <li><strong>知识树</strong> — 从核心概念出发，分支向外展开</li>
+      <li><strong>会议笔记</strong> — 中心议题 + 分支论点</li>
+      <li><strong>树状结构</strong> — 天然具有根和层次的结构</li>
+    </ul>
+    <h3>不适用场景</h3>
+    <ul>
+      <li>节点数超过 200 的大图（分支过密导致可读性下降）</li>
+      <li>非树形结构（网状图、有环图）——应考虑 Force-Directed 或 Circular</li>
+      <li>需要强调垂直/水平层次的方向图——可使用 Mindmap 的 top-to-bottom / left-to-right 模式</li>
+    </ul>
+  </div>
+
+  <!-- Algorithm Flow -->
+  <div class="card">
+    <h2><span class="icon" style="background:var(--accent-glow);color:var(--accent);">&#9654;</span> 算法流程</h2>
+    <pre>MindmapLayout::compute(diagram)  [mode = Radial]
+  ├─ build_children_map()         // 构建父子关系映射
+  ├─ find_root_id()               // 选择根节点
+  │   ├─ 类型匹配: type=root/initial/start
+  │   └─ 评分排序: (-indeg, outdeg, total_deg, -order)
+  │
+  ├─ layout_mode() = Radial       // 解析 layout_direction 属性
+  │
+  ├─ layout_radial(root, children, sizes)
+  │   ├─ 按声明顺序遍历一级子节点
+  │   │   ├─ 偶数序号 → 右侧分支
+  │   │   └─ 奇数序号 → 左侧分支
+  │   │
+  │   ├─ 对每个分支递归布局子树
+  │   │   ├─ compute_subtree_height()  // 计算子树高度
+  │   │   └─ layout_subtree()          // 递归布局
+  │   │       ├─ y: 按子树高度累进
+  │   │       └─ x: 按深度 × LEVEL_GAP
+  │   │
+  │   ├─ 根节点居中 (CENTER_GAP)
+  │   └─ 合并左右两侧子树坐标
+  │
+  ├─ build_node_sizes()           // 根据角色差异化尺寸
+  │   ├─ root: 最大尺寸
+  │   ├─ trunk: 中等尺寸
+  │   └─ branch/leaf: 较小尺寸
+  │
+  ├─ compute_group_bounds()       // 计算分组边界
+  └─ bounds_from_layout()         // 计算总尺寸</pre>
+  </div>
+
+  <div class="footer">
+    <a href="layout-algorithms-index.html">返回算法索引</a>
+    &nbsp;&middot;&nbsp;
+    Drawify 算法文档
+  </div>
+
+</div>
+
+<script>
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme', current === 'light' ? '' : 'light');
+  }
+</script>
+
+<script>
+// BFS Ring Expansion Demo
+(function() {
+  var canvas = document.getElementById('bfs-canvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var statusEl = document.getElementById('bfs-status');
+  var progressFill = document.getElementById('bfs-progress-fill');
+  var stepLabel = document.getElementById('bfs-step-label');
+
+  var W = 600, H = 600, CX = 300, CY = 300;
+  var RING1_R = 120, RING2_R = 240;
+
+  // HiDPI
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.scale(dpr, dpr);
+
+  // Node definitions
+  var nodeDefs = [
+    { id: 'Root', level: 0, parent: null },
+    { id: 'A', level: 1, parent: 'Root' },
+    { id: 'B', level: 1, parent: 'Root' },
+    { id: 'C', level: 1, parent: 'Root' },
+    { id: 'D', level: 1, parent: 'Root' },
+    { id: 'A1', level: 2, parent: 'A' },
+    { id: 'A2', level: 2, parent: 'A' },
+    { id: 'B1', level: 2, parent: 'B' },
+    { id: 'C1', level: 2, parent: 'C' },
+    { id: 'C2', level: 2, parent: 'C' },
+    { id: 'C3', level: 2, parent: 'C' },
+    { id: 'D1', level: 2, parent: 'D' },
+  ];
+
+  // Ring 1 angles (90° intervals from top)
+  var r1a = { A: -Math.PI/2, B: 0, C: Math.PI/2, D: Math.PI };
+  // Ring 2 angles (near parent)
+  var r2a = {
+    A1: -Math.PI/2 - 0.25, A2: -Math.PI/2 + 0.25,
+    B1: 0,
+    C1: Math.PI/2 - 0.35, C2: Math.PI/2, C3: Math.PI/2 + 0.35,
+    D1: Math.PI
+  };
+
+  function polar(r, a) { return { x: CX + r * Math.cos(a), y: CY + r * Math.sin(a) }; }
+
+  var finalPos = {
+    Root: { x: CX, y: CY },
+    A: polar(RING1_R, r1a.A), B: polar(RING1_R, r1a.B),
+    C: polar(RING1_R, r1a.C), D: polar(RING1_R, r1a.D),
+    A1: polar(RING2_R, r2a.A1), A2: polar(RING2_R, r2a.A2),
+    B1: polar(RING2_R, r2a.B1),
+    C1: polar(RING2_R, r2a.C1), C2: polar(RING2_R, r2a.C2), C3: polar(RING2_R, r2a.C3),
+    D1: polar(RING2_R, r2a.D1)
+  };
+
+  var scatteredPos = {
+    Root: { x: 150, y: 130 }, A: { x: 460, y: 90 },
+    B: { x: 80, y: 360 }, C: { x: 510, y: 410 }, D: { x: 210, y: 510 },
+    A1: { x: 390, y: 190 }, A2: { x: 110, y: 210 }, B1: { x: 530, y: 260 },
+    C1: { x: 360, y: 530 }, C2: { x: 490, y: 510 }, C3: { x: 60, y: 490 },
+    D1: { x: 260, y: 50 }
+  };
+
+  var curPos = {};
+  for (var id in scatteredPos) curPos[id] = { x: scatteredPos[id].x, y: scatteredPos[id].y };
+
+  var allEdges = [
+    ['Root','A'],['Root','B'],['Root','C'],['Root','D'],
+    ['A','A1'],['A','A2'],['B','B1'],
+    ['C','C1'],['C','C2'],['C','C3'],['D','D1']
+  ];
+
+  var ring1Edges = [['Root','A'],['Root','B'],['Root','C'],['Root','D']];
+
+  var steps = [
+    {
+      status: '所有节点随机散布，根节点高亮显示',
+      targets: copyPos(scatteredPos),
+      edges: [], rings: false, labels: false
+    },
+    {
+      status: '选择根节点（最高出度 / type=root）',
+      targets: (function() { var p = copyPos(scatteredPos); p.Root = { x: finalPos.Root.x, y: finalPos.Root.y }; return p; })(),
+      edges: [], rings: false, labels: false
+    },
+    {
+      status: 'BFS 第 1 层：4 个子节点均匀分布在第一环',
+      targets: (function() {
+        var p = copyPos(scatteredPos);
+        p.Root = { x: finalPos.Root.x, y: finalPos.Root.y };
+        p.A = { x: finalPos.A.x, y: finalPos.A.y };
+        p.B = { x: finalPos.B.x, y: finalPos.B.y };
+        p.C = { x: finalPos.C.x, y: finalPos.C.y };
+        p.D = { x: finalPos.D.x, y: finalPos.D.y };
+        return p;
+      })(),
+      edges: ring1Edges, rings: false, labels: false
+    },
+    {
+      status: 'BFS 第 2 层：7 个节点按父节点角度锚定分布',
+      targets: copyPos(finalPos),
+      edges: allEdges, rings: false, labels: false
+    },
+    {
+      status: '完成：径向布局以根为中心向外展开',
+      targets: copyPos(finalPos),
+      edges: allEdges, rings: true, labels: true
+    }
+  ];
+
+  function copyPos(src) {
+    var dst = {};
+    for (var k in src) dst[k] = { x: src[k].x, y: src[k].y };
+    return dst;
+  }
+
+  var curStep = 0, animating = false, animProg = 0;
+  var startPos = {}, rafId = null, autoTimer = null;
+  var ANIM_DUR = 800, AUTO_DELAY = 1500;
+
+  function ease(t) { return 1 - Math.pow(1 - t, 3); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    var step = steps[curStep];
+    var t = ease(animProg);
+
+    // Ring guides
+    if (step.rings) {
+      var rOp = (animating && curStep === 4) ? t * 0.5 : 0.5;
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = cssVar('--edge-color') || '#3d4260';
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = rOp;
+      ctx.beginPath(); ctx.arc(CX, CY, RING1_R, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(CX, CY, RING2_R, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillStyle = cssVar('--text-secondary') || '#9499b3';
+      ctx.textAlign = 'center';
+      ctx.globalAlpha = rOp;
+      ctx.fillText('Ring 1', CX, CY - RING1_R - 8);
+      ctx.fillText('Ring 2', CX, CY - RING2_R - 8);
+      ctx.restore();
+    }
+
+    // Edges
+    for (var ei = 0; ei < step.edges.length; ei++) {
+      var from = step.edges[ei][0], to = step.edges[ei][1];
+      var fp = curPos[from], tp = curPos[to];
+      if (!fp || !tp) continue;
+      ctx.save();
+      ctx.strokeStyle = cssVar('--edge-color') || '#3d4260';
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.7;
+      var mx = (fp.x + tp.x) / 2, my = (fp.y + tp.y) / 2;
+      var dx = tp.x - fp.x, dy = tp.y - fp.y;
+      var len = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+      var cpx = mx + (-dy / len) * 12, cpy = my + (dx / len) * 12;
+      ctx.beginPath();
+      ctx.moveTo(fp.x, fp.y);
+      ctx.quadraticCurveTo(cpx, cpy, tp.x, tp.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Nodes
+    for (var ni = 0; ni < nodeDefs.length; ni++) {
+      var nd = nodeDefs[ni];
+      var pos = curPos[nd.id];
+      if (!pos) continue;
+      ctx.save();
+
+      var showLabel = step.labels || nd.level === 0;
+      var labelAlpha = step.labels ? ((animating && curStep === 4) ? t : 1) : (nd.level === 0 ? 1 : 0);
+
+      if (nd.level === 0) {
+        var col = cssVar('--root-color') || '#ff6c8c';
+        ctx.shadowColor = col;
+        ctx.shadowBlur = 20;
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, 22, 0, Math.PI * 2);
+        ctx.fillStyle = col; ctx.globalAlpha = 0.9; ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.font = 'bold 12px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.globalAlpha = 1; ctx.fillText(nd.id, pos.x, pos.y);
+      } else if (nd.level === 1) {
+        var col1 = cssVar('--ring1') || '#6c8cff';
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, 16, 0, Math.PI * 2);
+        ctx.fillStyle = col1; ctx.globalAlpha = 0.85; ctx.fill();
+        if (showLabel) {
+          ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.globalAlpha = labelAlpha; ctx.fillText(nd.id, pos.x, pos.y);
+        }
+      } else {
+        var col2 = cssVar('--ring2') || '#8b6cff';
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, 13, 0, Math.PI * 2);
+        ctx.fillStyle = col2; ctx.globalAlpha = 0.8; ctx.fill();
+        if (showLabel) {
+          ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.globalAlpha = labelAlpha; ctx.fillText(nd.id, pos.x, pos.y);
+        }
+      }
+      ctx.restore();
+    }
+  }
+
+  function animateTo(idx) {
+    if (animating || idx < 0 || idx >= steps.length) return;
+    curStep = idx;
+    startPos = {};
+    for (var id in curPos) startPos[id] = { x: curPos[id].x, y: curPos[id].y };
+    animating = true;
+    animProg = 0;
+    var t0 = performance.now();
+    function tick(now) {
+      animProg = Math.min(1, (now - t0) / ANIM_DUR);
+      var t = ease(animProg);
+      var tgt = steps[curStep].targets;
+      for (var id in tgt) {
+        if (startPos[id] && tgt[id]) {
+          curPos[id].x = lerp(startPos[id].x, tgt[id].x, t);
+          curPos[id].y = lerp(startPos[id].y, tgt[id].y, t);
+        }
+      }
+      draw();
+      if (animProg < 1) { rafId = requestAnimationFrame(tick); }
+      else { animating = false; updateUI(); }
+    }
+    rafId = requestAnimationFrame(tick);
+    updateUI();
+  }
+
+  function updateUI() {
+    statusEl.textContent = steps[curStep].status;
+    progressFill.style.width = ((curStep + 1) / steps.length * 100) + '%';
+    stepLabel.textContent = '\u6B65\u9AA4 ' + (curStep + 1) + ' / ' + steps.length;
+  }
+
+  function reset() {
+    if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    animating = false; curStep = 0; animProg = 0;
+    for (var id in scatteredPos) curPos[id] = { x: scatteredPos[id].x, y: scatteredPos[id].y };
+    draw(); updateUI();
+  }
+
+  function nextStep() {
+    if (!animating && curStep < steps.length - 1) animateTo(curStep + 1);
+  }
+
+  function autoPlay() {
+    if (animating) return;
+    if (curStep >= steps.length - 1) reset();
+    function play() {
+      if (curStep >= steps.length - 1) { autoTimer = null; return; }
+      animateTo(curStep + 1);
+      autoTimer = setTimeout(play, ANIM_DUR + AUTO_DELAY);
+    }
+    play();
+  }
+
+  window.bfsDemo = { reset: reset, nextStep: nextStep, autoPlay: autoPlay };
+
+  // Redraw on theme change
+  if (typeof MutationObserver !== 'undefined') {
+    new MutationObserver(function() { if (!animating) draw(); })
+      .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+
+  draw(); updateUI();
+})();
+</script>
+</body>
+</html>

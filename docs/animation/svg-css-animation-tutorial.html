@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVG 内嵌 CSS 动画简明教程</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 32px 20px 60px;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  h1 {
+    font-size: 26px;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .lead {
+    color: #888;
+    font-size: 14px;
+    margin-bottom: 28px;
+  }
+  .lead code {
+    background: #0f0f23;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #ff9800;
+    font-size: 12px;
+  }
+  section {
+    background: #16213e;
+    border: 1px solid #2a2a4a;
+    border-radius: 14px;
+    padding: 20px 22px;
+    margin-bottom: 20px;
+  }
+  section h2 {
+    font-size: 16px;
+    color: #fff;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  section h2 .num {
+    display: inline-flex;
+    width: 22px; height: 22px;
+    align-items: center; justify-content: center;
+    background: #667eea;
+    color: #fff;
+    border-radius: 6px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .explain {
+    font-size: 13px;
+    color: #999;
+    margin-bottom: 14px;
+  }
+  .explain strong { color: #ccc; font-weight: 500; }
+  .demo {
+    background: #0f0f23;
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 160px;
+    margin-bottom: 12px;
+  }
+  .demo svg { max-width: 100%; height: auto; display: block; }
+  pre {
+    background: #0f0f23;
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 11px;
+    line-height: 1.55;
+    overflow-x: auto;
+    color: #a8b9cc;
+  }
+  pre .kw { color: #c792ea; }
+  pre .prop { color: #82aaff; }
+  pre .val { color: #c3e88d; }
+  pre .cmt { color: #546e7a; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  button {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  button.secondary { background: #2a2a4a; }
+  button:hover { opacity: 0.9; }
+  .tip {
+    margin-top: 20px;
+    padding: 14px 16px;
+    background: #1a2a1a;
+    border: 1px solid #2d4a2f;
+    border-radius: 10px;
+    font-size: 13px;
+    color: #a5d6a7;
+  }
+  .tip strong { color: #4caf50; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  th, td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #2a2a4a;
+    text-align: left;
+  }
+  th { color: #888; font-weight: 500; }
+  td code { color: #64b5f6; font-size: 11px; }
+  .ok { color: #4caf50; }
+  .warn { color: #ffc107; }
+  .foot {
+    margin-top: 24px;
+    font-size: 12px;
+    color: #666;
+    text-align: center;
+  }
+  .foot a { color: #667eea; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>SVG 内嵌 CSS 动画简明教程</h1>
+<p class="lead">
+  CSS 写在 SVG 的 <code>&lt;defs&gt;&lt;style&gt;</code> 里，文件自包含。
+  用 <code>&lt;img&gt;</code> 嵌入、双击打开、或内联到 HTML，<strong>内部动画都能播放</strong>。
+  详见 <a href="svg-embed-comparison.html" style="color:#667eea">嵌入方式对比</a>。
+</p>
+
+<!-- 1. 写法 -->
+<section>
+  <h2><span class="num">1</span>基本写法</h2>
+  <p class="explain">
+    动画样式放在 SVG 文档内部，与图形结构同文件。推荐用 <strong>CDATA</strong> 包裹，避免 <code>&lt;</code> 被 XML 解析器误读。
+  </p>
+  <div class="demo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 100" width="320" height="100">
+      <defs>
+        <style><![CDATA[
+          @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+          .box { animation: fade 1.2s ease-out infinite alternate; }
+        ]]></style>
+      </defs>
+      <rect width="320" height="100" fill="#0f0f23" rx="8"/>
+      <rect class="box" x="130" y="30" width="60" height="40" rx="8" fill="#667eea"/>
+      <text x="160" y="92" text-anchor="middle" fill="#666" font-size="10" font-family="sans-serif">opacity 呼吸</text>
+    </svg>
+  </div>
+  <pre><span class="cmt">&lt;!-- SVG 文件结构 --&gt;</span>
+<span class="kw">&lt;svg&gt;</span>
+  <span class="kw">&lt;defs&gt;</span>
+    <span class="kw">&lt;style&gt;</span><span class="cmt">&lt;![CDATA[</span>
+      <span class="kw">@keyframes</span> <span class="val">fade</span> { <span class="prop">from</span> { <span class="prop">opacity</span>: <span class="val">0</span>; } <span class="prop">to</span> { <span class="prop">opacity</span>: <span class="val">1</span>; } }
+      <span class="val">.box</span> { <span class="prop">animation</span>: <span class="val">fade 1.2s ease-out infinite alternate</span>; }
+    <span class="cmt">]]&gt;</span><span class="kw">&lt;/style&gt;</span>
+  <span class="kw">&lt;/defs&gt;</span>
+  <span class="kw">&lt;rect</span> <span class="prop">class</span>=<span class="val">"box"</span> <span class="prop">...</span><span class="kw">/&gt;</span>
+<span class="kw">&lt;/svg&gt;</span></pre>
+</section>
+
+<!-- 2. transition vs keyframes -->
+<section>
+  <h2><span class="num">2</span>transition 与 @keyframes</h2>
+  <p class="explain">
+    <strong>transition</strong>：属性从 A 平滑变到 B，通常由 class 切换或 <code>:hover</code> 触发，适合 Patch 后「滑到新位置」。<br>
+    <strong>@keyframes</strong>：定义多关键帧时间轴，适合入场、循环、绘制线条。
+  </p>
+  <div class="demo" id="demo-transition">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 120" width="340" height="120">
+      <defs>
+        <style><![CDATA[
+          .t-node {
+            transition: transform 0.5s cubic-bezier(0.34,1.2,0.64,1);
+            transform-box: fill-box;
+            transform-origin: center;
+          }
+          .t-node.moved { transform: translate(90px, 0); }
+          .k-node {
+            opacity: 0;
+            animation: pop 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards;
+            transform-box: fill-box;
+            transform-origin: center;
+          }
+          @keyframes pop {
+            0% { opacity: 0; transform: scale(0); }
+            70% { transform: scale(1.12); }
+            100% { opacity: 1; transform: scale(1); }
+          }
+          .lbl { font: 10px sans-serif; fill: #666; text-anchor: middle; }
+        ]]></style>
+      </defs>
+      <rect width="340" height="120" fill="#0f0f23" rx="8"/>
+      <text x="85" y="18" class="lbl" fill="#888">transition（点按钮）</text>
+      <g class="t-node" id="t-box">
+        <rect x="40" y="35" width="50" height="36" rx="6" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+        <text x="65" y="58" text-anchor="middle" fill="#fff" font-size="13" font-family="sans-serif">A</text>
+      </g>
+      <text x="255" y="18" class="lbl" fill="#888">@keyframes 入场</text>
+      <g class="k-node" style="animation-delay:0.1s">
+        <rect x="210" y="35" width="50" height="36" rx="6" fill="#2e7d32" stroke="#4caf50" stroke-width="2"/>
+        <text x="235" y="58" text-anchor="middle" fill="#fff" font-size="13" font-family="sans-serif">B</text>
+      </g>
+      <text x="170" y="108" class="lbl">左：状态驱动过渡 · 右：时间轴驱动</text>
+    </svg>
+  </div>
+  <div class="row">
+    <button onclick="document.getElementById('t-box').classList.toggle('moved')">切换 A 的位置</button>
+    <button class="secondary" onclick="replayKeyframes()">重播 B 入场</button>
+  </div>
+  <pre><span class="cmt">/* transition：两个状态之间插值 */</span>
+<span class="val">.node</span> { <span class="prop">transition</span>: <span class="val">transform 0.5s ease</span>; }
+<span class="val">.node.moved</span> { <span class="prop">transform</span>: <span class="val">translate(90px, 0)</span>; }
+
+<span class="cmt">/* @keyframes：按时间百分比定义 */</span>
+<span class="kw">@keyframes</span> <span class="val">pop</span> {
+  <span class="val">0%</span>   { <span class="prop">opacity</span>: <span class="val">0</span>; <span class="prop">transform</span>: <span class="val">scale(0)</span>; }
+  <span class="val">100%</span> { <span class="prop">opacity</span>: <span class="val">1</span>; <span class="prop">transform</span>: <span class="val">scale(1)</span>; }
+}</pre>
+</section>
+
+<!-- 3. transform -->
+<section>
+  <h2><span class="num">3</span>transform：位移、缩放</h2>
+  <p class="explain">
+    节点动画优先用 <strong>transform</strong> 和 <strong>opacity</strong>（GPU 合成，性能好）。
+    SVG 元素默认按画布坐标变换，加 <code>transform-box: fill-box</code> + <code>transform-origin: center</code> 可让缩放绕图形中心。
+  </p>
+  <div class="demo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 130" width="400" height="130">
+      <defs>
+        <style><![CDATA[
+          .n {
+            transform-box: fill-box;
+            transform-origin: center;
+            animation: slide 2s ease-in-out infinite alternate;
+          }
+          .n2 { animation-delay: 0.3s; }
+          @keyframes slide {
+            from { opacity: 0.4; transform: translate(-20px,0) scale(0.85); }
+            to   { opacity: 1;   transform: translate(20px,0) scale(1.1); }
+          }
+          .lbl { font: 10px sans-serif; fill: #666; text-anchor: middle; }
+        ]]></style>
+      </defs>
+      <rect width="400" height="130" fill="#0f0f23" rx="8"/>
+      <g class="n">
+        <rect x="80" y="45" width="56" height="40" rx="8" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+        <text x="108" y="70" text-anchor="middle" fill="#fff" font-size="13" font-family="sans-serif">translate</text>
+      </g>
+      <g class="n n2">
+        <rect x="240" y="45" width="56" height="40" rx="8" fill="#6a4a8a" stroke="#b388ff" stroke-width="2"/>
+        <text x="268" y="70" text-anchor="middle" fill="#fff" font-size="13" font-family="sans-serif">scale</text>
+      </g>
+      <text x="200" y="115" class="lbl">transform-box: fill-box · transform-origin: center</text>
+    </svg>
+  </div>
+</section>
+
+<!-- 4. 边绘制 & 数据流 -->
+<section>
+  <h2><span class="num">4</span>边的绘制与数据流动</h2>
+  <p class="explain">
+    <strong>stroke-dasharray</strong> + <strong>stroke-dashoffset</strong> 是 SVG 边动画的核心技巧。
+    绘制效果：从大 offset 动画到 0；流动效果：循环改变 offset，表达调用方向。
+  </p>
+  <div class="demo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 130" width="400" height="130">
+      <defs>
+        <style><![CDATA[
+          .draw {
+            stroke-dasharray: 180;
+            stroke-dashoffset: 180;
+            animation: draw-line 1.2s ease-out infinite;
+          }
+          .flow {
+            stroke-dasharray: 8 6;
+            animation: flow-line 0.7s linear infinite;
+          }
+          @keyframes draw-line { to { stroke-dashoffset: 0; } }
+          @keyframes flow-line { to { stroke-dashoffset: -28; } }
+          .lbl { font: 10px sans-serif; fill: #666; }
+        ]]></style>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M0 0 L10 5 L0 10z" fill="#667eea"/>
+        </marker>
+        <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M0 0 L10 5 L0 10z" fill="#ff6b35"/>
+        </marker>
+      </defs>
+      <rect width="400" height="130" fill="#0f0f23" rx="8"/>
+      <text x="20" y="22" class="lbl" fill="#888">绘制（draw）</text>
+      <path class="draw" d="M30 55 L170 55" stroke="#667eea" stroke-width="2.5" fill="none" marker-end="url(#arr)"/>
+      <text x="20" y="82" class="lbl" fill="#888">数据流（flow）</text>
+      <path class="flow" d="M30 100 L370 100" stroke="#ff6b35" stroke-width="2.5" fill="none" marker-end="url(#arr2)"/>
+    </svg>
+  </div>
+  <pre><span class="val">.edge-draw</span> {
+  <span class="prop">stroke-dasharray</span>: <span class="val">180</span>;
+  <span class="prop">stroke-dashoffset</span>: <span class="val">180</span>;
+  <span class="prop">animation</span>: <span class="val">draw 1.2s ease-out forwards</span>;
+}
+<span class="kw">@keyframes</span> <span class="val">draw</span> { <span class="prop">to</span> { <span class="prop">stroke-dashoffset</span>: <span class="val">0</span>; } }</pre>
+</section>
+
+<!-- 5. 延迟与交错 -->
+<section>
+  <h2><span class="num">5</span>animation-delay：交错入场</h2>
+  <p class="explain">
+    多个节点依次出现：同一 <code>@keyframes</code>，不同 <code>animation-delay</code>。
+    Drawify Patch 动画中，Add 节点常用此模式表达「逐个落地」。
+  </p>
+  <div class="demo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 110" width="400" height="110" id="stagger-svg">
+      <defs>
+        <style><![CDATA[
+          .st {
+            opacity: 0;
+            animation: st-in 0.45s cubic-bezier(0.34,1.4,0.64,1) forwards;
+            transform-box: fill-box;
+            transform-origin: center;
+          }
+          @keyframes st-in {
+            from { opacity: 0; transform: translateY(12px) scale(0.8); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+          }
+          .d0 { animation-delay: 0s; }
+          .d1 { animation-delay: 0.15s; }
+          .d2 { animation-delay: 0.30s; }
+          .d3 { animation-delay: 0.45s; }
+        ]]></style>
+      </defs>
+      <rect width="400" height="110" fill="#0f0f23" rx="8"/>
+      <g class="st d0"><rect x="40"  y="35" width="48" height="38" rx="7" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/><text x="64"  y="59" text-anchor="middle" fill="#fff" font-size="12" font-family="sans-serif">1</text></g>
+      <g class="st d1"><rect x="120" y="35" width="48" height="38" rx="7" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/><text x="144" y="59" text-anchor="middle" fill="#fff" font-size="12" font-family="sans-serif">2</text></g>
+      <g class="st d2"><rect x="200" y="35" width="48" height="38" rx="7" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/><text x="224" y="59" text-anchor="middle" fill="#fff" font-size="12" font-family="sans-serif">3</text></g>
+      <g class="st d3"><rect x="280" y="35" width="48" height="38" rx="7" fill="#2e7d32" stroke="#4caf50" stroke-width="2"/><text x="304" y="59" text-anchor="middle" fill="#fff" font-size="12" font-family="sans-serif">4</text></g>
+    </svg>
+  </div>
+  <div class="row"><button onclick="replayStagger()">重新播放</button></div>
+</section>
+
+<!-- 6. 淡入淡出 / 路径变更 -->
+<section>
+  <h2><span class="num">6</span>淡入淡出：增删与路径变更</h2>
+  <p class="explain">
+  节点 <strong>Add</strong> → opacity 0→1；<strong>Remove</strong> → 1→0。
+  边路径点数变化时，不做 <code>d</code> 属性插值（点对不齐会失败），用<strong>旧边淡出 + 新边淡入</strong>交叉渐变。
+  </p>
+  <div class="demo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 130" width="400" height="130" id="fade-svg">
+      <defs>
+        <style><![CDATA[
+          .edge-old { animation: fade-out 1.5s ease-in-out infinite; }
+          .edge-new { animation: fade-in  1.5s ease-in-out infinite; opacity: 0; }
+          @keyframes fade-out { 0%,40% { opacity:1 } 50%,90% { opacity:0 } 100% { opacity:1 } }
+          @keyframes fade-in  { 0%,40% { opacity:0 } 50%,90% { opacity:1 } 100% { opacity:0 } }
+          .lbl { font: 10px sans-serif; fill: #666; text-anchor: middle; }
+        ]]></style>
+        <marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#667eea"/></marker>
+        <marker id="m2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#4caf50"/></marker>
+      </defs>
+      <rect width="400" height="130" fill="#0f0f23" rx="8"/>
+      <text x="200" y="20" class="lbl" fill="#888">路径变更：折线 ↔ 曲线（交叉淡入淡出）</text>
+      <path class="edge-old" d="M40 70 L120 70 L120 100 L200 100" stroke="#667eea" stroke-width="2" fill="none" marker-end="url(#m1)"/>
+      <path class="edge-new" d="M40 70 Q120 40 200 100" stroke="#4caf50" stroke-width="2.5" fill="none" marker-end="url(#m2)"/>
+      <circle cx="40" cy="70" r="5" fill="#667eea"/>
+      <circle cx="200" cy="100" r="5" fill="#4caf50"/>
+    </svg>
+  </div>
+</section>
+
+<!-- 7. hover -->
+<section>
+  <h2><span class="num">7</span>:hover 交互（非 &lt;img&gt; 嵌入时）</h2>
+  <p class="explain">
+    <code>transition</code> 配合 <code>:hover</code> 可做悬浮高亮。
+    <strong>注意</strong>：用 <code>&lt;img src="x.svg"&gt;</code> 嵌入时，指针事件进不去，hover 不生效；直接打开 SVG 或用 <code>&lt;object&gt;</code> / 内联 SVG 可以。
+  </p>
+  <div class="demo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 110" width="320" height="110">
+      <defs>
+        <style><![CDATA[
+          .hv rect {
+            transition: transform 0.2s, stroke-width 0.2s, filter 0.2s;
+            transform-box: fill-box;
+            transform-origin: center;
+            cursor: pointer;
+          }
+          .hv:hover rect {
+            transform: scale(1.08);
+            stroke-width: 3;
+            filter: drop-shadow(0 0 8px #667eea);
+          }
+          .hint { font: 11px sans-serif; fill: #666; text-anchor: middle; }
+        ]]></style>
+      </defs>
+      <rect width="320" height="110" fill="#0f0f23" rx="8"/>
+      <g class="hv">
+        <rect x="110" y="30" width="100" height="44" rx="10" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+        <text x="160" y="58" text-anchor="middle" fill="#fff" font-size="14" font-family="sans-serif">悬停我</text>
+      </g>
+      <text x="160" y="95" class="hint">鼠标移入：scale + 描边 + 阴影</text>
+    </svg>
+  </div>
+</section>
+
+<!-- 8. 能力边界 -->
+<section>
+  <h2><span class="num">8</span>能力边界与性能</h2>
+  <p class="explain">做架构图动画时的实用对照表。</p>
+  <table>
+    <thead>
+      <tr><th>能力</th><th>CSS 方案</th><th>说明</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>节点入场 / 出场</td>
+        <td><code>opacity</code> + <code>transform</code></td>
+        <td class="ok">推荐，性能好</td>
+      </tr>
+      <tr>
+        <td>位置变更（Patch）</td>
+        <td><code>transition: transform</code></td>
+        <td class="ok">初始 translate + 过渡到目标</td>
+      </tr>
+      <tr>
+        <td>边绘制 / 数据流</td>
+        <td><code>stroke-dashoffset</code></td>
+        <td class="ok">架构图标配</td>
+      </tr>
+      <tr>
+        <td>边路径变形</td>
+        <td>交叉淡入淡出</td>
+        <td class="warn">勿动画 <code>d</code> 属性</td>
+      </tr>
+      <tr>
+        <td>颜色渐变</td>
+        <td><code>transition: fill</code></td>
+        <td class="warn">可用，但触发重绘</td>
+      </tr>
+      <tr>
+        <td>分步 Steps 切换</td>
+        <td>外部 JS 改 class</td>
+        <td class="warn">纯 SVG 不行，需 HTML 播放器</td>
+      </tr>
+      <tr>
+        <td>无障碍</td>
+        <td><code>prefers-reduced-motion</code></td>
+        <td class="ok">一行媒体查询关闭动画</td>
+      </tr>
+    </tbody>
+  </table>
+  <pre style="margin-top:12px"><span class="kw">@media</span> (<span class="prop">prefers-reduced-motion</span>: <span class="val">reduce</span>) {
+  <span class="val">*</span> { <span class="prop">animation</span>: <span class="val">none</span> <span class="val">!important</span>; <span class="prop">transition</span>: <span class="val">none</span> <span class="val">!important</span>; }
+}</pre>
+</section>
+
+<div class="tip">
+  <strong>Drawify 路线：</strong>
+  全面使用 SVG 内嵌 CSS，放弃 SMIL。
+  纯 <code>.svg</code> 导出即可自播放（GitHub <code>![](url)</code> 也行）；
+  Steps 分步播放用 <code>.html</code> 内联 SVG + 轻量 JS 切 class。
+  更多选型见 <a href="export-format-guide.md" style="color:#4caf50">export-format-guide.md</a>。
+</div>
+
+<p class="foot">
+  相关：<a href="svg-embed-comparison.html">嵌入方式对比</a> ·
+  <a href="standalone-animated.svg">独立动画 SVG 样例</a> ·
+  <a href="animation-demo.html">完整效果演示</a>
+</p>
+
+</div>
+
+<script>
+function replayKeyframes() {
+  const g = document.querySelector('#demo-transition .k-node');
+  g.style.animation = 'none';
+  g.offsetHeight;
+  g.style.animation = '';
+}
+function replayStagger() {
+  const svg = document.getElementById('stagger-svg');
+  const clone = svg.cloneNode(true);
+  svg.replaceWith(clone);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+node_modules/
+out/
+*.vsix
+
+# WASM build artifacts (built via npm run build:wasm)
+media/wasm/
+media/node/

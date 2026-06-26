@@ -1,0 +1,75 @@
+{
+  "name": "drawify",
+  "displayName": "Drawify",
+  "description": "Drawify DSL language support, diagram preview, and Markdown embedding",
+  "version": "0.1.0",
+  "publisher": "drawify",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Visualization"
+  ],
+  "activationEvents": [
+    "onLanguage:drawify"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "drawify",
+        "aliases": [
+          "Drawify",
+          "drawify"
+        ],
+        "extensions": [
+          ".dfy"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "drawify",
+        "scopeName": "source.drawify",
+        "path": "./syntaxes/drawify.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "drawify.openPreview",
+        "title": "Open Drawify Preview",
+        "category": "Drawify",
+        "icon": "$(preview)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "drawify.openPreview",
+          "when": "resourceLangId == drawify",
+          "group": "navigation"
+        }
+      ]
+    },
+    "markdown.markdownItPlugins": true,
+    "markdown.previewStyles": [
+      "./media/markdown-preview.css"
+    ]
+  },
+  "scripts": {
+    "build:wasm": "bash scripts/build-wasm.sh",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "build": "npm run build:wasm && npm run compile",
+    "vscode:prepublish": "npm run build",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 56" fill="none" role="img" aria-label="Drawquill" shape-rendering="geometricPrecision">
+  <defs>
+    <linearGradient id="g-brand" gradientUnits="objectBoundingBox" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+    <linearGradient id="g-text" gradientUnits="objectBoundingBox" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+    <linearGradient id="g-shine" gradientUnits="objectBoundingBox" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.14"/>
+      <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="ambient" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="b"/>
+      <feComponentTransfer in="b" result="dim">
+        <feFuncA type="linear" slope="0.2"/>
+      </feComponentTransfer>
+    </filter>
+  </defs>
+
+  <g filter="url(#ambient)" opacity="0.9">
+    <rect x="7" y="9" width="36" height="36" rx="8" fill="none" stroke="url(#g-brand)" stroke-width="2"/>
+    <path fill="url(#g-brand)" d="
+      M 17.125, 18
+      H 25
+      A 9, 9, 0 0 1 34, 27
+      V 27
+      A 9, 9, 0 0 1 25, 36
+      H 17.125
+      A 1.125, 1.125, 0 0 1 16, 34.875
+      V 19.125
+      A 1.125, 1.125, 0 0 1 17.125, 18
+      Z
+    "/>
+  </g>
+
+  <rect x="7" y="9" width="36" height="36" rx="8" fill="none" stroke="url(#g-brand)" stroke-width="2"/>
+  <path fill="url(#g-brand)" d="
+    M 17.125, 18
+    H 25
+    A 9, 9, 0 0 1 34, 27
+    V 27
+    A 9, 9, 0 0 1 25, 36
+    H 17.125
+    A 1.125, 1.125, 0 0 1 16, 34.875
+    V 19.125
+    A 1.125, 1.125, 0 0 1 17.125, 18
+    Z
+  "/>
+  <path fill="url(#g-shine)" d="
+    M 17.125, 18
+    H 25
+    A 9, 9, 0 0 1 34, 27
+    V 27
+    A 9, 9, 0 0 1 25, 36
+    H 17.125
+    A 1.125, 1.125, 0 0 1 16, 34.875
+    V 19.125
+    A 1.125, 1.125, 0 0 1 17.125, 18
+    Z
+  "/>
+
+  <text
+    x="52"
+    y="38"
+    font-family="Inter, 'Segoe UI', system-ui, -apple-system, sans-serif"
+    font-size="30"
+    font-weight="700"
+    letter-spacing="-0.02em"
+    fill="#1E1033"
+  >Draw<tspan fill="url(#g-text)" dx="2">quill</tspan></text>
+</svg>

@@ -1,0 +1,2337 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drawify Showcase Gallery</title>
+  <link rel="icon" href="../assets/brand/logo-icon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --panel: rgba(255, 255, 255, 0.88);
+      --panel-strong: #ffffff;
+      --border: rgba(15, 23, 42, 0.08);
+      --text: #0f172a;
+      --muted: #475569;
+      --muted-soft: #64748b;
+      --shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+      --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+      --blue: #2563eb;
+      --blue-soft: rgba(37, 99, 235, 0.1);
+      --chip: #e2e8f0;
+      --chip-active: #dbeafe;
+      --chip-text: #1e293b;
+      --radius: 18px;
+      --radius-sm: 12px;
+      --hero: linear-gradient(135deg, #eff6ff 0%, #f8fafc 55%, #eef2ff 100%);
+      --preview-bg: radial-gradient(circle at top left, rgba(96, 165, 250, 0.14), rgba(255, 255, 255, 0.96));
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top, rgba(59, 130, 246, 0.08), transparent 32%),
+        linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+      min-height: 100vh;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .shell {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 28px 24px 56px;
+    }
+
+    .site-brand {
+      display: flex;
+      align-items: center;
+      margin-bottom: 22px;
+    }
+
+    .site-brand-logo {
+      height: 30px;
+      width: auto;
+      display: block;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      background: var(--hero);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 28px;
+      padding: 34px 36px 28px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: auto -80px -80px auto;
+      width: 260px;
+      height: 260px;
+      background: radial-gradient(circle, rgba(96, 165, 250, 0.16), transparent 68%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.75);
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      backdrop-filter: blur(10px);
+    }
+
+    .hero h1 {
+      margin: 18px 0 12px;
+      font-size: clamp(30px, 5vw, 48px);
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+    }
+
+    .hero p {
+      max-width: 820px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.7;
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 22px;
+    }
+
+    .hero-stat {
+      min-width: 148px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.74);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      backdrop-filter: blur(12px);
+    }
+
+    .hero-stat strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1.1;
+      margin-bottom: 6px;
+    }
+
+    .hero-stat span {
+      color: var(--muted-soft);
+      font-size: 13px;
+    }
+
+    .audience-section {
+      margin-top: 22px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .audience-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin: 4px 2px 0;
+    }
+
+    .audience-head h2 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .audience-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .audience-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    .audience-card {
+      text-align: left;
+      padding: 18px 18px 16px;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.76);
+      box-shadow: var(--shadow-soft);
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+      backdrop-filter: blur(14px);
+    }
+
+    .audience-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(37, 99, 235, 0.18);
+    }
+
+    .audience-card.active {
+      background: linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(255, 255, 255, 0.98));
+      border-color: rgba(59, 130, 246, 0.26);
+      box-shadow: 0 16px 32px rgba(37, 99, 235, 0.12);
+    }
+
+    .audience-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(37, 99, 235, 0.1);
+      color: var(--blue);
+      font-size: 20px;
+      margin-bottom: 14px;
+    }
+
+    .audience-card h3 {
+      margin: 0 0 6px;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .audience-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .audience-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .audience-tag {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.08);
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 24px;
+      padding: 18px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(16px);
+    }
+
+    .toolbar-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .search-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .toolbar-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .search-box {
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      height: 52px;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.94);
+      padding: 0 16px 0 46px;
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .search-box input:focus {
+      border-color: rgba(37, 99, 235, 0.4);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+    }
+
+    .search-box svg {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      color: var(--muted-soft);
+      pointer-events: none;
+    }
+
+    .toolbar-btn {
+      height: 52px;
+      border: 0;
+      border-radius: 16px;
+      padding: 0 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+
+    .toolbar-btn.primary {
+      color: #fff;
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.22);
+    }
+
+    .toolbar-btn.ghost {
+      color: var(--chip-text);
+      background: #f8fafc;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    .toolbar-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .toolbar-btn:active {
+      transform: translateY(0);
+    }
+
+    .filter-group {
+      display: grid;
+      gap: 10px;
+    }
+
+    .toolbar-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .toolbar-head strong {
+      font-size: 15px;
+      letter-spacing: -0.01em;
+    }
+
+    .toolbar-head span {
+      color: var(--muted-soft);
+      font-size: 13px;
+    }
+
+    .toolbar-head-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-mini-btn {
+      height: 30px;
+      padding: 0 10px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+
+    .toolbar-mini-btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(59, 130, 246, 0.22);
+      color: var(--blue);
+    }
+
+    .accordion-group {
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 18px;
+      background: rgba(248, 250, 252, 0.78);
+      overflow: hidden;
+    }
+
+    .accordion-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 14px 13px;
+      border: 0;
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .accordion-toggle:hover {
+      background: rgba(255, 255, 255, 0.6);
+    }
+
+    .accordion-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .accordion-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted-soft);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .accordion-count {
+      flex: 0 0 auto;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.08);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .accordion-meta {
+      color: var(--muted-soft);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .accordion-icon {
+      flex: 0 0 auto;
+      color: var(--muted-soft);
+      font-size: 18px;
+      line-height: 1;
+      transition: transform 0.2s ease, color 0.2s ease;
+    }
+
+    .accordion-group.open .accordion-icon {
+      transform: rotate(180deg);
+      color: var(--blue);
+    }
+
+    .accordion-panel {
+      padding: 0 14px 14px;
+      display: none;
+    }
+
+    .accordion-group.open .accordion-panel {
+      display: block;
+    }
+
+    .filter-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted-soft);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      background: var(--chip);
+      color: var(--chip-text);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.15s ease;
+    }
+
+    .chip:hover {
+      transform: translateY(-1px);
+    }
+
+    .chip.active {
+      background: var(--chip-active);
+      color: var(--blue);
+      border-color: rgba(59, 130, 246, 0.18);
+    }
+
+    .chip small {
+      color: var(--muted-soft);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .chip.active small {
+      color: var(--blue);
+    }
+
+    .summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin: 0 2px 16px;
+    }
+
+    .summary h2 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: -0.02em;
+    }
+
+    .summary p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(305px, 1fr));
+      gap: 18px;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 22px;
+      align-items: start;
+      margin-top: 22px;
+    }
+
+    .sidebar {
+      min-width: 0;
+    }
+
+    .content {
+      min-width: 0;
+      display: grid;
+      gap: 18px;
+    }
+
+    .content-panel {
+      padding: 18px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.74);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(14px);
+    }
+
+    .active-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .active-filter {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.08);
+      color: #1d4ed8;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .active-filter.muted {
+      background: #f8fafc;
+      color: var(--muted);
+    }
+
+    .summary-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .summary-btn {
+      height: 40px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 12px;
+      background: #fff;
+      color: var(--text);
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .summary-btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(59, 130, 246, 0.24);
+      box-shadow: 0 10px 18px rgba(15, 23, 42, 0.06);
+    }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      min-height: 360px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: var(--shadow-soft);
+      transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease, border-color 0.25s ease;
+      backdrop-filter: blur(16px);
+    }
+
+    .card:hover {
+      transform: translateY(-6px) scale(1.008);
+      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(59, 130, 246, 0.08);
+      border-color: rgba(59, 130, 246, 0.26);
+    }
+
+    .card-preview {
+      position: relative;
+      display: block;
+      aspect-ratio: 16 / 10;
+      padding: 16px;
+      background: var(--preview-bg);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+      overflow: hidden;
+      cursor: zoom-in;
+    }
+
+    .card-preview::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent 50%, rgba(15, 23, 42, 0.04) 100%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .card:hover .card-preview::before {
+      opacity: 1;
+    }
+
+    .card-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
+    }
+
+    .card:hover .card-preview img {
+      transform: scale(1.04);
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+    }
+
+    .card-preview::after {
+      content: "查看大图";
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      background: rgba(15, 23, 42, 0.66);
+      backdrop-filter: blur(12px);
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 2;
+    }
+
+    .card:hover .card-preview::after {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px 16px 18px;
+      flex: 1;
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.3;
+      letter-spacing: -0.02em;
+      transition: color 0.2s ease;
+    }
+
+    .card:hover .card-title {
+      color: var(--blue);
+    }
+
+    .card-path {
+      margin: 4px 0 0;
+      color: var(--muted-soft);
+      font-size: 12px;
+      line-height: 1.5;
+      word-break: break-all;
+    }
+
+    .complexity {
+      flex: 0 0 auto;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .complexity.s {
+      color: #166534;
+      background: rgba(34, 197, 94, 0.12);
+    }
+
+    .complexity.n {
+      color: #92400e;
+      background: rgba(251, 191, 36, 0.18);
+    }
+
+    .complexity.c {
+      color: #1d4ed8;
+      background: rgba(59, 130, 246, 0.14);
+    }
+
+    .meta-row,
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .meta-pill,
+    .tag-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .meta-pill {
+      color: var(--muted);
+      background: #f8fafc;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    .tag-pill {
+      color: #1e3a8a;
+      background: rgba(37, 99, 235, 0.08);
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: auto;
+    }
+
+    .action {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 42px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .action.primary {
+      color: #fff;
+      background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+    }
+
+    .card:hover .action.primary {
+      box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28);
+    }
+
+    .action.secondary {
+      color: var(--text);
+      background: #f8fafc;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+
+    .card:hover .action.secondary {
+      border-color: rgba(148, 163, 184, 0.32);
+      background: #fff;
+    }
+
+    .action:hover {
+      transform: translateY(-2px);
+    }
+
+    .empty {
+      display: none;
+      margin-top: 18px;
+      padding: 46px 22px;
+      text-align: center;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px dashed rgba(148, 163, 184, 0.26);
+      color: var(--muted);
+    }
+
+    .empty strong {
+      display: block;
+      color: var(--text);
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(15, 23, 42, 0.72);
+      backdrop-filter: blur(16px);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .modal.open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-panel {
+      width: min(1440px, 100%);
+      height: min(92vh, 980px);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      background: #fff;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 32px 72px rgba(15, 23, 42, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.06);
+      transform: scale(0.94) translateY(12px);
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .modal.open .modal-panel {
+      transform: scale(1) translateY(0);
+    }
+
+    .modal-preview {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+      min-height: 0;
+      padding: 28px;
+      position: relative;
+      background:
+        radial-gradient(circle at top left, rgba(96, 165, 250, 0.14), transparent 32%),
+        radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.06), transparent 28%),
+        linear-gradient(180deg, #f0f5ff 0%, #ffffff 100%);
+    }
+
+    .modal-preview img {
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 48px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(15, 23, 42, 0.04);
+      object-fit: contain;
+      transition: box-shadow 0.3s ease;
+    }
+
+    .modal-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 22px;
+      border-left: 1px solid rgba(148, 163, 184, 0.16);
+      overflow: auto;
+      min-width: 0;
+    }
+
+    .modal-close {
+      align-self: flex-end;
+      width: 38px;
+      height: 38px;
+      border: 0;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 1;
+      transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+    }
+
+    .modal-close:hover {
+      background: #e2e8f0;
+      transform: scale(1.08);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+    }
+
+    .modal-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 44px;
+      height: 44px;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 22px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+      transition: background 0.2s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease;
+      z-index: 3;
+    }
+
+    .modal-nav:hover {
+      background: #fff;
+      transform: translateY(-50%) scale(1.1);
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+    }
+
+    .modal-nav:active {
+      transform: translateY(-50%) scale(0.96);
+    }
+
+    .modal-nav.prev {
+      left: 16px;
+    }
+
+    .modal-nav.next {
+      right: 16px;
+    }
+
+    .modal-counter {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.56);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      backdrop-filter: blur(12px);
+      z-index: 3;
+    }
+
+    .modal-sidebar h3 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+    }
+
+    .modal-sidebar p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .modal-info {
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+      border-radius: 16px;
+      background: #f8fafc;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    .modal-info-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .modal-info-row strong {
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .modal-actions {
+      display: grid;
+      gap: 10px;
+    }
+
+    .modal-hint {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(37, 99, 235, 0.06);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .modal-history {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 16px;
+      background: #f8fafc;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    .modal-history-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .modal-history-head strong {
+      font-size: 13px;
+      letter-spacing: 0.02em;
+    }
+
+    .modal-history-head span {
+      color: var(--muted-soft);
+      font-size: 12px;
+    }
+
+    .compare-toggle {
+      height: 30px;
+      padding: 0 12px;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+    }
+
+    .compare-toggle:hover {
+      border-color: rgba(59, 130, 246, 0.24);
+      color: var(--blue);
+    }
+
+    .compare-toggle.active {
+      background: rgba(37, 99, 235, 0.1);
+      border-color: rgba(59, 130, 246, 0.24);
+      color: var(--blue);
+    }
+
+    .version-list {
+      display: grid;
+      gap: 8px;
+      max-height: 220px;
+      overflow: auto;
+    }
+
+    .version-item {
+      display: grid;
+      gap: 4px;
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 12px;
+      background: #fff;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+    }
+
+    .version-item:hover {
+      transform: translateY(-1px);
+      border-color: rgba(59, 130, 246, 0.2);
+    }
+
+    .version-item.active {
+      border-color: rgba(59, 130, 246, 0.34);
+      background: rgba(239, 246, 255, 0.92);
+    }
+
+    .version-item strong {
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .version-item span {
+      font-size: 12px;
+      color: var(--muted-soft);
+      word-break: break-all;
+    }
+
+    .version-empty {
+      margin: 0;
+      color: var(--muted-soft);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .version-nav-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .version-nav-btn {
+      flex: 1;
+      height: 34px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease;
+    }
+
+    .version-nav-btn:hover:not(:disabled) {
+      border-color: rgba(59, 130, 246, 0.24);
+      color: var(--blue);
+    }
+
+    .version-nav-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .modal-image-stack {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .modal-image-stack.hidden {
+      display: none;
+    }
+
+    .modal-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .modal-compare.hidden {
+      display: none;
+    }
+
+    .compare-pane {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .compare-pane-label {
+      align-self: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.56);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      backdrop-filter: blur(12px);
+    }
+
+    .compare-pane img {
+      width: 100%;
+      height: 100%;
+      max-height: calc(92vh - 120px);
+      object-fit: contain;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
+    }
+
+    .footer-note {
+      margin-top: 26px;
+      color: var(--muted-soft);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    @media (max-width: 1180px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar {
+        position: static;
+      }
+
+      .summary {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+
+    @media (max-width: 1080px) {
+      .modal-panel {
+        grid-template-columns: 1fr;
+        height: min(92vh, 1100px);
+      }
+
+      .modal-sidebar {
+        border-left: 0;
+        border-top: 1px solid rgba(148, 163, 184, 0.16);
+      }
+
+      .modal-preview {
+        min-height: 320px;
+      }
+
+      .modal-compare {
+        grid-template-columns: 1fr;
+        overflow: auto;
+      }
+
+      .compare-pane img {
+        max-height: 42vh;
+      }
+
+      .modal-nav.prev {
+        left: 10px;
+      }
+
+      .modal-nav.next {
+        right: 10px;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .shell {
+        padding: 18px 14px 40px;
+      }
+
+      .hero {
+        padding: 24px 20px 22px;
+        border-radius: 22px;
+      }
+
+      .toolbar {
+        border-radius: 20px;
+        padding: 14px;
+      }
+
+      .toolbar-actions {
+        grid-template-columns: 1fr;
+      }
+
+      .summary {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="site-brand">
+      <img class="site-brand-logo" src="../assets/brand/logo.svg" alt="Drawify" />
+    </header>
+
+    <section class="hero">
+      <div class="eyebrow">Drawify Showcase Gallery</div>
+      <h1>像画廊一样浏览全部示例</h1>
+      <p>
+        这个单文件页面用于离线浏览 `showcase/` 下的所有样例。你可以按图类型、复杂度、业务场景筛选，
+        直接预览对应的 SVG，并快速打开 `.dfy` 源文件或独立 SVG。
+      </p>
+      <div class="hero-meta" id="heroMeta"></div>
+    </section>
+
+    <section class="audience-section">
+      <div class="audience-head">
+        <div>
+          <h2>按受众浏览</h2>
+          <p>如果你是第一次看这套样例，可以直接按角色切换到更相关的一组案例。</p>
+        </div>
+      </div>
+      <div class="audience-grid" id="audienceGrid"></div>
+    </section>
+
+    <section class="workspace">
+      <aside class="sidebar">
+        <section class="toolbar">
+          <div class="toolbar-grid">
+            <div class="search-row">
+              <label class="search-box" aria-label="搜索示例">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="7"></circle>
+                  <path d="m20 20-3.5-3.5"></path>
+                </svg>
+                <input id="searchInput" type="search" placeholder="搜索文件名、标题、图类型、标签..." />
+              </label>
+              <div class="toolbar-actions">
+                <button class="toolbar-btn primary" id="scrollFeatured">查看精选</button>
+                <button class="toolbar-btn ghost" id="resetFilters">重置筛选</button>
+              </div>
+            </div>
+
+            <div class="toolbar-head">
+              <div>
+                <strong>筛选面板</strong>
+                <span>支持折叠分组，减少长列表干扰。</span>
+              </div>
+              <div class="toolbar-head-actions">
+                <button class="toolbar-mini-btn" id="expandAllFilters" type="button">展开全部</button>
+                <button class="toolbar-mini-btn" id="collapseAllFilters" type="button">收起全部</button>
+              </div>
+            </div>
+
+            <section class="accordion-group open" data-accordion-group="type">
+              <button class="accordion-toggle" type="button" data-accordion-toggle="type" aria-expanded="true">
+                <span class="accordion-main">
+                  <span class="accordion-label">图类型</span>
+                  <span class="accordion-count" id="typeFilterCount">0</span>
+                </span>
+                <span class="accordion-meta" id="typeFilterMeta">全部</span>
+                <span class="accordion-icon">⌃</span>
+              </button>
+              <div class="accordion-panel" id="typeFiltersPanel">
+                <div class="filter-group">
+                  <div class="chip-row" id="typeFilters"></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="accordion-group open" data-accordion-group="complexity">
+              <button class="accordion-toggle" type="button" data-accordion-toggle="complexity" aria-expanded="true">
+                <span class="accordion-main">
+                  <span class="accordion-label">复杂度</span>
+                  <span class="accordion-count" id="complexityFilterCount">0</span>
+                </span>
+                <span class="accordion-meta" id="complexityFilterMeta">全部</span>
+                <span class="accordion-icon">⌃</span>
+              </button>
+              <div class="accordion-panel" id="complexityFiltersPanel">
+                <div class="filter-group">
+                  <div class="chip-row" id="complexityFilters"></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="accordion-group open" data-accordion-group="tag">
+              <button class="accordion-toggle" type="button" data-accordion-toggle="tag" aria-expanded="true">
+                <span class="accordion-main">
+                  <span class="accordion-label">场景标签</span>
+                  <span class="accordion-count" id="tagFilterCount">0</span>
+                </span>
+                <span class="accordion-meta" id="tagFilterMeta">全部</span>
+                <span class="accordion-icon">⌃</span>
+              </button>
+              <div class="accordion-panel" id="tagFiltersPanel">
+                <div class="filter-group">
+                  <div class="chip-row" id="tagFilters"></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </aside>
+
+      <div class="content">
+        <section class="content-panel">
+          <section class="summary">
+            <div>
+              <h2 id="resultTitle">全部示例</h2>
+              <p id="resultMeta">正在整理样例索引...</p>
+              <div class="active-filters" id="activeFilters"></div>
+            </div>
+            <div class="summary-actions">
+              <button class="summary-btn" id="clearSearchBtn">清空关键词</button>
+              <button class="summary-btn" id="showAllBtn">显示全部样例</button>
+            </div>
+          </section>
+
+          <section class="grid" id="galleryGrid"></section>
+
+          <section class="empty" id="emptyState">
+            <strong>没有匹配的示例</strong>
+            <span>可以尝试清空关键词，或者取消部分筛选标签。</span>
+          </section>
+        </section>
+      </div>
+    </section>
+
+    <div class="footer-note">
+      单文件离线页面，默认假定每个 `.dfy` 都存在同名 `.svg` 文件。
+    </div>
+  </div>
+
+  <div class="modal" id="previewModal" aria-hidden="true">
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-preview">
+        <button class="modal-nav prev" id="modalPrev" aria-label="上一个">‹</button>
+        <div class="modal-image-stack" id="modalImageStack">
+          <img id="modalImage" alt="" />
+        </div>
+        <div class="modal-compare hidden" id="modalCompare">
+          <div class="compare-pane">
+            <span class="compare-pane-label" id="modalCompareLeftLabel">旧版</span>
+            <img id="modalCompareLeft" alt="" />
+          </div>
+          <div class="compare-pane">
+            <span class="compare-pane-label" id="modalCompareRightLabel">新版</span>
+            <img id="modalCompareRight" alt="" />
+          </div>
+        </div>
+        <button class="modal-nav next" id="modalNext" aria-label="下一个">›</button>
+        <span class="modal-counter" id="modalCounter"></span>
+      </div>
+      <aside class="modal-sidebar">
+        <button class="modal-close" id="modalClose" aria-label="关闭预览">×</button>
+        <h3 id="modalTitle"></h3>
+        <p id="modalDescription"></p>
+        <div class="meta-row" id="modalPills"></div>
+        <div class="tag-row" id="modalTags"></div>
+        <div class="modal-info">
+          <div class="modal-info-row"><span>文件</span><strong id="modalPath"></strong></div>
+          <div class="modal-info-row"><span>SVG</span><strong id="modalSvgPath"></strong></div>
+          <div class="modal-info-row"><span>图类型</span><strong id="modalType"></strong></div>
+          <div class="modal-info-row"><span>复杂度</span><strong id="modalComplexity"></strong></div>
+        </div>
+        <div class="modal-history" id="modalHistory">
+          <div class="modal-history-head">
+            <div>
+              <strong>版本历史</strong>
+              <span id="modalHistoryMeta">加载中...</span>
+            </div>
+            <button class="compare-toggle" id="modalCompareToggle" type="button" hidden>对比相邻版本</button>
+          </div>
+          <div class="version-nav-row">
+            <button class="version-nav-btn" id="modalVersionOlder" type="button">更旧版本 [</button>
+            <button class="version-nav-btn" id="modalVersionNewer" type="button">更新版本 ]</button>
+          </div>
+          <div class="version-list" id="modalVersionList"></div>
+        </div>
+        <div class="modal-hint">默认按窗口完整适配显示整张图。使用 <code>[</code> / <code>]</code> 在同一图的历史版本间切换；左右方向键仍用于切换不同示例。</div>
+        <div class="modal-actions">
+          <a class="action primary" id="modalOpenSvg" target="_blank" rel="noopener">打开 SVG</a>
+          <a class="action secondary" id="modalOpenDfy" target="_blank" rel="noopener">打开 DSL</a>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    // manifest:start
+    const SAMPLE_PATHS = [
+      "architecture/c.ai-agent-docops-pipeline.dfy",
+      "architecture/c.cloud-native.dfy",
+      "architecture/c.data-lineage-platform.dfy",
+      "architecture/c.drawify-core-mod-deps.dfy",
+      "architecture/c.ecommerce-platform.dfy",
+      "architecture/c.hybrid-cloud-dr-topology.dfy",
+      "architecture/c.k8s-blue-green-release-topology.dfy",
+      "architecture/c.k8s-multi-cluster-federation.dfy",
+      "architecture/c.k8s-multi-namespace-overview.dfy",
+      "architecture/c.k8s-platform-stack.dfy",
+      "architecture/c.k8s-tenant-isolation.dfy",
+      "architecture/c.layout-stress-nested.dfy",
+      "architecture/c.mcp-server-cluster-architecture.dfy",
+      "architecture/c.payment-clearing-platform.dfy",
+      "architecture/c.supply-chain-control-tower.dfy",
+      "architecture/n.compiler-pipeline.dfy",
+      "architecture/n.d2-cell-tower-network.dfy",
+      "architecture/n.data-pipeline.dfy",
+      "architecture/n.event-driven.dfy",
+      "architecture/n.microservices.dfy",
+      "architecture/s.client-api-db.dfy",
+      "architecture/s.three-tier.dfy",
+      "er/c.ecommerce-schema.dfy",
+      "er/c.layout-stress-dense.dfy",
+      "er/c.saas-schema.dfy",
+      "er/n.blog-schema.dfy",
+      "er/n.school-schema.dfy",
+      "er/n.social-network.dfy",
+      "er/s.two-tables.dfy",
+      "er/s.user-post.dfy",
+      "flowchart/c.aml-case-investigation.dfy",
+      "flowchart/c.caffe-shop.dfy",
+      "flowchart/c.change-approval-workflow.dfy",
+      "flowchart/c.ci-cd-security-pipeline.dfy",
+      "flowchart/c.customer-refund-process.dfy",
+      "flowchart/c.e-commerce-order-fulfillment.dfy",
+      "flowchart/c.k8s-incident-response.dfy",
+      "flowchart/c.layout-stress-dag.dfy",
+      "flowchart/c.pr-architecture-review.dfy",
+      "flowchart/c.software-release.dfy",
+      "flowchart/c.swimlane-order-process.dfy",
+      "flowchart/n.employee-onboarding.dfy",
+      "flowchart/n.order-approval.dfy",
+      "flowchart/n.user-auth.dfy",
+      "flowchart/s.decision-loop.dfy",
+      "flowchart/s.linear-chain.dfy",
+      "mindmap/c.knowledge-map.dfy",
+      "mindmap/c.product-roadmap.dfy",
+      "mindmap/n.programming-learning.dfy",
+      "mindmap/n.project-plan.dfy",
+      "mindmap/n.tech-stack.dfy",
+      "mindmap/s.brainstorm.dfy",
+      "mindmap/s.root-branches.dfy",
+      "sequence/c.ai-agent-change-loop.dfy",
+      "sequence/c.cross-team-incident-escalation.dfy",
+      "sequence/c.distributed-saga.dfy",
+      "sequence/c.k8s-canary-rollback.dfy",
+      "sequence/c.k8s-node-failure-recovery.dfy",
+      "sequence/c.k8s-rolling-update.dfy",
+      "sequence/c.layout-stress-lifelines.dfy",
+      "sequence/c.microservice-checkout.dfy",
+      "sequence/c.real-time-risk-decisioning.dfy",
+      "sequence/n.api-call-chain.dfy",
+      "sequence/n.oauth-login.dfy",
+      "sequence/n.payment-gateway.dfy",
+      "sequence/s.ping-pong.dfy",
+      "sequence/s.request-response.dfy",
+      "state/c.document-sync-lifecycle.dfy",
+      "state/c.k8s-node-pressure-lifecycle.dfy",
+      "state/c.k8s-rollout-state-machine.dfy",
+      "state/c.layout-stress-transitions.dfy",
+      "state/c.payment-flow.dfy",
+      "state/c.service-degradation-lifecycle.dfy",
+      "state/c.settlement-reconciliation-lifecycle.dfy",
+      "state/c.tcp-connection.dfy",
+      "state/n.order-lifecycle.dfy",
+      "state/n.ticket-workflow.dfy",
+      "state/s.on-off.dfy",
+      "state/s.traffic-light.dfy"
+    ];
+// manifest:end
+
+    const TYPE_LABELS = {
+      architecture: "Architecture",
+      sequence: "Sequence",
+      flowchart: "Flowchart",
+      state: "State",
+      er: "ER",
+      mindmap: "Mindmap"
+    };
+
+    const COMPLEXITY_LABELS = {
+      s: "Simple",
+      n: "Normal",
+      c: "Complex"
+    };
+
+    const FEATURED_FILES = new Set([
+      "architecture/c.k8s-multi-namespace-overview.dfy",
+      "architecture/c.ai-agent-docops-pipeline.dfy",
+      "architecture/c.payment-clearing-platform.dfy",
+      "architecture/c.supply-chain-control-tower.dfy",
+      "sequence/c.k8s-rolling-update.dfy",
+      "sequence/c.real-time-risk-decisioning.dfy",
+      "flowchart/c.k8s-incident-response.dfy",
+      "flowchart/c.aml-case-investigation.dfy",
+      "state/c.k8s-rollout-state-machine.dfy",
+      "state/c.settlement-reconciliation-lifecycle.dfy"
+    ]);
+
+    const TITLE_OVERRIDES = {
+      "architecture/c.k8s-multi-namespace-overview.dfy": "K8s 多命名空间生产集群总览",
+      "architecture/c.k8s-multi-cluster-federation.dfy": "K8s 多集群跨地域拓扑",
+      "architecture/c.k8s-platform-stack.dfy": "K8s 平台栈与业务工作负载",
+      "architecture/c.k8s-blue-green-release-topology.dfy": "K8s 蓝绿发布拓扑",
+      "architecture/c.k8s-tenant-isolation.dfy": "K8s 多租户隔离拓扑",
+      "architecture/c.hybrid-cloud-dr-topology.dfy": "混合云灾备拓扑",
+      "architecture/c.data-lineage-platform.dfy": "企业数据血缘平台",
+      "architecture/c.ai-agent-docops-pipeline.dfy": "AI Agent 文档自动化管线",
+      "architecture/c.payment-clearing-platform.dfy": "支付清结算平台",
+      "architecture/c.supply-chain-control-tower.dfy": "供应链控制塔",
+      "sequence/c.k8s-rolling-update.dfy": "K8s 滚动发布链路",
+      "sequence/c.k8s-node-failure-recovery.dfy": "K8s 节点故障恢复链路",
+      "sequence/c.k8s-canary-rollback.dfy": "K8s 金丝雀回滚链路",
+      "sequence/c.cross-team-incident-escalation.dfy": "跨团队故障升级协同",
+      "sequence/c.ai-agent-change-loop.dfy": "AI Agent 变更分析闭环",
+      "sequence/c.real-time-risk-decisioning.dfy": "实时风控决策链路",
+      "flowchart/c.k8s-incident-response.dfy": "K8s 生产集群故障响应流程",
+      "flowchart/c.change-approval-workflow.dfy": "生产变更审批流程",
+      "flowchart/c.pr-architecture-review.dfy": "PR 架构评审流程",
+      "flowchart/c.aml-case-investigation.dfy": "反洗钱案件调查流程",
+      "state/c.k8s-rollout-state-machine.dfy": "K8s 发布状态机",
+      "state/c.k8s-node-pressure-lifecycle.dfy": "K8s 节点压力与恢复状态机",
+      "state/c.service-degradation-lifecycle.dfy": "服务降级生命周期",
+      "state/c.document-sync-lifecycle.dfy": "文档同步生命周期",
+      "state/c.settlement-reconciliation-lifecycle.dfy": "清结算对账生命周期"
+    };
+
+    const AUDIENCE_PRESETS = [
+      {
+        id: "all",
+        icon: "◎",
+        title: "全部访客",
+        description: "不加限制，查看完整样例库。",
+        tags: ["All", "Gallery"]
+      },
+      {
+        id: "architect",
+        icon: "▣",
+        title: "架构师",
+        description: "优先看系统全景、多集群、数据治理和高价值业务架构。",
+        tags: ["Architecture", "全景", "系统设计"]
+      },
+      {
+        id: "platform",
+        icon: "◇",
+        title: "平台工程师",
+        description: "聚焦 K8s、发布治理、故障恢复和平台栈样例。",
+        tags: ["K8s", "发布治理", "稳定性"]
+      },
+      {
+        id: "compliance",
+        icon: "◫",
+        title: "合规与风控",
+        description: "优先看审批、反洗钱、清结算、混合云灾备等治理场景。",
+        tags: ["合规", "金融", "审计"]
+      },
+      {
+        id: "ai",
+        icon: "✦",
+        title: "AI 应用开发者",
+        description: "优先看 Agent、DocOps、PR review 和自动修复闭环。",
+        tags: ["AI Agent", "DocOps", "自动化"]
+      },
+      {
+        id: "data",
+        icon: "◩",
+        title: "数据团队",
+        description: "优先看数据血缘、文档同步、实时决策和分析平台。",
+        tags: ["数据治理", "血缘", "分析"]
+      }
+    ];
+
+    function humanizeSlug(slug) {
+      return slug
+        .replace(/-/g, " ")
+        .replace(/\b\w/g, (ch) => ch.toUpperCase());
+    }
+
+    function deriveTags(path) {
+      const tags = new Set();
+      const lower = path.toLowerCase();
+
+      if (lower.includes("k8s")) tags.add("K8s");
+      if (lower.includes("cluster")) tags.add("平台工程");
+      if (lower.includes("rollout") || lower.includes("rollback") || lower.includes("release") || lower.includes("canary") || lower.includes("blue-green")) tags.add("发布治理");
+      if (lower.includes("incident") || lower.includes("failure") || lower.includes("degradation") || lower.includes("pressure")) tags.add("稳定性");
+      if (lower.includes("tenant") || lower.includes("hybrid-cloud") || lower.includes("approval")) tags.add("合规");
+      if (lower.includes("ai-agent") || lower.includes("pr-architecture") || lower.includes("document-sync") || lower.includes("docops")) tags.add("AI Agent");
+      if (lower.includes("data-lineage") || lower.includes("data-pipeline")) tags.add("数据治理");
+      if (lower.includes("payment") || lower.includes("settlement") || lower.includes("aml") || lower.includes("risk")) tags.add("金融");
+      if (lower.includes("supply-chain")) tags.add("供应链");
+      if (lower.includes("mindmap")) tags.add("知识组织");
+      if (lower.includes("layout-stress")) tags.add("布局压力");
+      if (lower.includes("ecommerce")) tags.add("电商");
+      if (lower.includes("compiler")) tags.add("工程系统");
+      if (lower.includes("oauth") || lower.includes("auth")) tags.add("认证");
+      if (lower.includes("social-network") || lower.includes("blog") || lower.includes("school")) tags.add("业务建模");
+
+      if (!tags.size) tags.add("通用");
+      return Array.from(tags);
+    }
+
+    function deriveAudiences(sample) {
+      const audiences = new Set(["all"]);
+      const tags = sample.tags;
+
+      if (sample.type === "architecture" || tags.includes("工程系统") || tags.includes("供应链") || tags.includes("金融")) {
+        audiences.add("architect");
+      }
+      if (tags.includes("K8s") || tags.includes("平台工程") || tags.includes("发布治理") || tags.includes("稳定性")) {
+        audiences.add("platform");
+      }
+      if (tags.includes("合规") || tags.includes("金融")) {
+        audiences.add("compliance");
+      }
+      if (tags.includes("AI Agent")) {
+        audiences.add("ai");
+      }
+      if (tags.includes("数据治理") || sample.path.includes("document-sync") || sample.path.includes("risk-decisioning")) {
+        audiences.add("data");
+      }
+
+      return Array.from(audiences);
+    }
+
+    function buildDescription(sample) {
+      const tagText = sample.tags.slice(0, 3).join(" / ");
+      const typeText = TYPE_LABELS[sample.type];
+      const complexityText = COMPLEXITY_LABELS[sample.complexity];
+      return `${typeText} · ${complexityText} · ${tagText}`;
+    }
+
+    function getAudienceTitle(audienceId) {
+      return AUDIENCE_PRESETS.find((preset) => preset.id === audienceId)?.title || "全部访客";
+    }
+
+    const samples = SAMPLE_PATHS.map((path) => {
+      const [type, file] = path.split("/");
+      const [complexity, slug] = file.replace(".dfy", "").split(".", 2);
+      const title = TITLE_OVERRIDES[path] || humanizeSlug(slug);
+      const svgPath = path.replace(/\.dfy$/, ".svg");
+      const tags = deriveTags(path);
+      return {
+        path,
+        svgPath,
+        type,
+        typeLabel: TYPE_LABELS[type] || type,
+        complexity,
+        complexityLabel: COMPLEXITY_LABELS[complexity] || complexity.toUpperCase(),
+        slug,
+        title,
+        tags,
+        audiences: deriveAudiences({ path, type, tags }),
+        featured: FEATURED_FILES.has(path)
+      };
+    });
+
+    const state = {
+      search: "",
+      type: "all",
+      complexity: "all",
+      tag: "all",
+      audience: "all"
+    };
+
+    const heroMeta = document.getElementById("heroMeta");
+    const audienceGrid = document.getElementById("audienceGrid");
+    const typeFilters = document.getElementById("typeFilters");
+    const complexityFilters = document.getElementById("complexityFilters");
+    const tagFilters = document.getElementById("tagFilters");
+    const typeFilterCount = document.getElementById("typeFilterCount");
+    const complexityFilterCount = document.getElementById("complexityFilterCount");
+    const tagFilterCount = document.getElementById("tagFilterCount");
+    const typeFilterMeta = document.getElementById("typeFilterMeta");
+    const complexityFilterMeta = document.getElementById("complexityFilterMeta");
+    const tagFilterMeta = document.getElementById("tagFilterMeta");
+    const galleryGrid = document.getElementById("galleryGrid");
+    const resultTitle = document.getElementById("resultTitle");
+    const resultMeta = document.getElementById("resultMeta");
+    const activeFilters = document.getElementById("activeFilters");
+    const emptyState = document.getElementById("emptyState");
+    const searchInput = document.getElementById("searchInput");
+    const clearSearchBtn = document.getElementById("clearSearchBtn");
+    const showAllBtn = document.getElementById("showAllBtn");
+
+    const previewModal = document.getElementById("previewModal");
+    const modalClose = document.getElementById("modalClose");
+    const modalImage = document.getElementById("modalImage");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalDescription = document.getElementById("modalDescription");
+    const modalPills = document.getElementById("modalPills");
+    const modalTags = document.getElementById("modalTags");
+    const modalPath = document.getElementById("modalPath");
+    const modalSvgPath = document.getElementById("modalSvgPath");
+    const modalType = document.getElementById("modalType");
+    const modalComplexity = document.getElementById("modalComplexity");
+    const modalOpenSvg = document.getElementById("modalOpenSvg");
+    const modalOpenDfy = document.getElementById("modalOpenDfy");
+    const expandAllFilters = document.getElementById("expandAllFilters");
+    const collapseAllFilters = document.getElementById("collapseAllFilters");
+    const modalPrev = document.getElementById("modalPrev");
+    const modalNext = document.getElementById("modalNext");
+    const modalCounter = document.getElementById("modalCounter");
+    const modalImageStack = document.getElementById("modalImageStack");
+    const modalCompare = document.getElementById("modalCompare");
+    const modalCompareLeft = document.getElementById("modalCompareLeft");
+    const modalCompareRight = document.getElementById("modalCompareRight");
+    const modalCompareLeftLabel = document.getElementById("modalCompareLeftLabel");
+    const modalCompareRightLabel = document.getElementById("modalCompareRightLabel");
+    const modalHistoryMeta = document.getElementById("modalHistoryMeta");
+    const modalVersionList = document.getElementById("modalVersionList");
+    const modalCompareToggle = document.getElementById("modalCompareToggle");
+    const modalVersionOlder = document.getElementById("modalVersionOlder");
+    const modalVersionNewer = document.getElementById("modalVersionNewer");
+
+    let currentModalIndex = -1;
+    let currentVisibleSamples = [];
+    let historyManifest = { charts: {} };
+    let currentModalSample = null;
+    let currentVersionTimeline = [];
+    let currentVersionIndex = 0;
+    let compareMode = false;
+
+    function renderHeroStats() {
+      const counts = {
+        total: samples.length,
+        featured: samples.filter((item) => item.featured).length,
+        categories: new Set(samples.map((item) => item.type)).size,
+        tags: new Set(samples.flatMap((item) => item.tags)).size
+      };
+
+      heroMeta.innerHTML = `
+        <div class="hero-stat"><strong>${counts.total}</strong><span>全部示例</span></div>
+        <div class="hero-stat"><strong>${counts.featured}</strong><span>精选场景</span></div>
+        <div class="hero-stat"><strong>${counts.categories}</strong><span>图类型</span></div>
+        <div class="hero-stat"><strong>${counts.tags}</strong><span>场景标签</span></div>
+      `;
+    }
+
+    function renderAudiencePresets() {
+      audienceGrid.innerHTML = "";
+      AUDIENCE_PRESETS.forEach((preset) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "audience-card";
+        if (state.audience === preset.id) button.classList.add("active");
+        button.innerHTML = `
+          <span class="audience-icon">${preset.icon}</span>
+          <h3>${preset.title}</h3>
+          <p>${preset.description}</p>
+          <div class="audience-tags">
+            ${preset.tags.map((tag) => `<span class="audience-tag">${tag}</span>`).join("")}
+          </div>
+        `;
+        button.addEventListener("click", () => {
+          state.audience = preset.id;
+          state.search = "";
+          searchInput.value = "";
+          renderAll();
+        });
+        audienceGrid.appendChild(button);
+      });
+    }
+
+    function createChip(label, value, group, count) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "chip";
+      if (state[group] === value) button.classList.add("active");
+      button.dataset.group = group;
+      button.dataset.value = value;
+      button.innerHTML = `<span>${label}</span>${typeof count === "number" ? `<small>${count}</small>` : ""}`;
+      button.addEventListener("click", () => {
+        state[group] = value;
+        renderAll();
+      });
+      return button;
+    }
+
+    function renderFilters() {
+      const typeCounts = countBy(samples, (item) => item.type);
+      const complexityCounts = countBy(samples, (item) => item.complexity);
+      const tagCounts = countBy(samples.flatMap((item) => item.tags), (item) => item);
+
+      typeFilters.innerHTML = "";
+      typeFilters.appendChild(createChip("全部", "all", "type", samples.length));
+      Object.keys(TYPE_LABELS).forEach((type) => {
+        if (typeCounts[type]) {
+          typeFilters.appendChild(createChip(TYPE_LABELS[type], type, "type", typeCounts[type]));
+        }
+      });
+
+      complexityFilters.innerHTML = "";
+      complexityFilters.appendChild(createChip("全部", "all", "complexity", samples.length));
+      ["s", "n", "c"].forEach((level) => {
+        if (complexityCounts[level]) {
+          complexityFilters.appendChild(createChip(COMPLEXITY_LABELS[level], level, "complexity", complexityCounts[level]));
+        }
+      });
+
+      tagFilters.innerHTML = "";
+      tagFilters.appendChild(createChip("全部", "all", "tag", samples.length));
+      Object.entries(tagCounts)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh-CN"))
+        .forEach(([tag, count]) => {
+          tagFilters.appendChild(createChip(tag, tag, "tag", count));
+        });
+
+      typeFilterCount.textContent = String(Object.keys(typeCounts).length);
+      complexityFilterCount.textContent = String(Object.keys(complexityCounts).length);
+      tagFilterCount.textContent = String(Object.keys(tagCounts).length);
+      typeFilterMeta.textContent = state.type === "all" ? "全部" : TYPE_LABELS[state.type];
+      complexityFilterMeta.textContent = state.complexity === "all" ? "全部" : COMPLEXITY_LABELS[state.complexity];
+      tagFilterMeta.textContent = state.tag === "all" ? "全部" : state.tag;
+    }
+
+    function renderActiveFilters() {
+      const filters = [];
+      if (state.audience !== "all") filters.push(`受众: ${getAudienceTitle(state.audience)}`);
+      if (state.type !== "all") filters.push(`图类型: ${TYPE_LABELS[state.type]}`);
+      if (state.complexity !== "all") filters.push(`复杂度: ${COMPLEXITY_LABELS[state.complexity]}`);
+      if (state.tag !== "all") filters.push(`标签: ${state.tag}`);
+      if (state.search.trim()) filters.push(`关键词: ${state.search.trim()}`);
+
+      activeFilters.innerHTML = filters.length
+        ? filters.map((item) => `<span class="active-filter">${item}</span>`).join("")
+        : '<span class="active-filter muted">当前未启用任何筛选条件</span>';
+    }
+
+    function countBy(items, getter) {
+      return items.reduce((acc, item) => {
+        const key = getter(item);
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+    }
+
+    function matches(sample) {
+      const haystack = [sample.title, sample.path, sample.typeLabel, sample.complexityLabel, ...sample.tags]
+        .join(" ")
+        .toLowerCase();
+      const keyword = state.search.trim().toLowerCase();
+
+      if (keyword && !haystack.includes(keyword)) return false;
+      if (state.audience !== "all" && !sample.audiences.includes(state.audience)) return false;
+      if (state.type !== "all" && sample.type !== state.type) return false;
+      if (state.complexity !== "all" && sample.complexity !== state.complexity) return false;
+      if (state.tag !== "all" && !sample.tags.includes(state.tag)) return false;
+      return true;
+    }
+
+    function sortSamples(items) {
+      return items.sort((a, b) => {
+        if (a.featured !== b.featured) return a.featured ? -1 : 1;
+        if (a.type !== b.type) return a.type.localeCompare(b.type);
+        if (a.complexity !== b.complexity) return "scn".indexOf(a.complexity) - "scn".indexOf(b.complexity);
+        return a.title.localeCompare(b.title, "zh-CN");
+      });
+    }
+
+    function renderCards() {
+      const visible = sortSamples(samples.filter(matches));
+      currentVisibleSamples = visible;
+      const featuredVisible = visible.filter((item) => item.featured).length;
+      const filtering = state.search || state.type !== "all" || state.complexity !== "all" || state.tag !== "all" || state.audience !== "all";
+
+      resultTitle.textContent = filtering ? "筛选结果" : "全部示例";
+      resultMeta.textContent = `共 ${visible.length} 个示例，精选 ${featuredVisible} 个。当前受众视角：${getAudienceTitle(state.audience)}。支持直接预览 SVG、打开源 DSL 和独立 SVG。`;
+      renderActiveFilters();
+
+      galleryGrid.innerHTML = "";
+      emptyState.style.display = visible.length ? "none" : "block";
+
+      visible.forEach((sample) => {
+        const card = document.createElement("article");
+        card.className = "card";
+        if (sample.featured) card.dataset.featured = "true";
+
+        const tagsMarkup = sample.tags.slice(0, 4).map((tag) => `<span class="tag-pill">${tag}</span>`).join("");
+
+        card.innerHTML = `
+          <a class="card-preview" href="${sample.svgPath}" data-preview="${sample.path}">
+            <img src="${sample.svgPath}" alt="${sample.title}" loading="lazy" />
+          </a>
+          <div class="card-body">
+            <div class="card-top">
+              <div>
+                <h3 class="card-title">${sample.title}</h3>
+                <p class="card-path">${sample.path}</p>
+              </div>
+              <span class="complexity ${sample.complexity}">${sample.complexityLabel}</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-pill">${sample.typeLabel}</span>
+              ${sample.featured ? '<span class="meta-pill">精选</span>' : ""}
+            </div>
+            <div class="tag-row">${tagsMarkup}</div>
+            <div class="card-actions">
+              <a class="action primary" href="${sample.svgPath}" target="_blank" rel="noopener">打开 SVG</a>
+              <a class="action secondary" href="${sample.path}" target="_blank" rel="noopener">打开 DSL</a>
+            </div>
+          </div>
+        `;
+
+        const preview = card.querySelector("[data-preview]");
+        preview.addEventListener("click", (event) => {
+          event.preventDefault();
+          openModal(sample);
+        });
+
+        const img = card.querySelector("img");
+        img.addEventListener("error", () => {
+          img.alt = `${sample.title} (SVG not found)`;
+          img.src =
+            "data:image/svg+xml;utf8," +
+            encodeURIComponent(`
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480">
+                <rect width="800" height="480" rx="24" fill="#f8fafc"/>
+                <rect x="24" y="24" width="752" height="432" rx="20" fill="#ffffff" stroke="#cbd5e1" stroke-dasharray="8 8"/>
+                <text x="50%" y="45%" text-anchor="middle" font-size="28" font-family="Arial, sans-serif" fill="#0f172a">SVG not found</text>
+                <text x="50%" y="56%" text-anchor="middle" font-size="18" font-family="Arial, sans-serif" fill="#64748b">${sample.svgPath}</text>
+              </svg>
+            `);
+        });
+
+        galleryGrid.appendChild(card);
+      });
+    }
+
+    function formatVersionTime(isoString) {
+      if (!isoString) return "当前版本";
+      const date = new Date(isoString);
+      if (Number.isNaN(date.getTime())) return isoString;
+      return date.toLocaleString("zh-CN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+      });
+    }
+
+    async function loadHistoryManifest() {
+      try {
+        const response = await fetch(".history/manifest.json", { cache: "no-store" });
+        if (!response.ok) return;
+        historyManifest = await response.json();
+      } catch {
+        historyManifest = { charts: {} };
+      }
+    }
+
+    function buildVersionTimeline(sample) {
+      const chart = historyManifest.charts?.[sample.svgPath];
+      const historyEntries = chart?.entries || [];
+      const timeline = [
+        {
+          id: "current",
+          label: "当前版本",
+          file: sample.svgPath,
+          savedAt: null
+        }
+      ];
+      historyEntries.forEach((entry) => {
+        timeline.push({
+          id: entry.id,
+          label: formatVersionTime(entry.savedAt),
+          file: entry.file,
+          savedAt: entry.savedAt
+        });
+      });
+      return timeline;
+    }
+
+    function renderVersionList() {
+      modalVersionList.innerHTML = "";
+      if (!currentVersionTimeline.length) {
+        modalVersionList.innerHTML = '<p class="version-empty">暂无历史版本。运行 render-all 后，SVG 发生变化时会自动归档旧版。</p>';
+        return;
+      }
+
+      currentVersionTimeline.forEach((version, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "version-item";
+        if (index === currentVersionIndex) button.classList.add("active");
+        button.innerHTML = `
+          <strong>${version.label}</strong>
+          <span>${version.file}</span>
+        `;
+        button.addEventListener("click", () => selectVersion(index));
+        modalVersionList.appendChild(button);
+      });
+    }
+
+    function updateVersionControls() {
+      const historyCount = Math.max(0, currentVersionTimeline.length - 1);
+      modalHistoryMeta.textContent = historyCount
+        ? `共 ${historyCount} 个历史快照`
+        : "尚无历史快照";
+
+      const canCompare = currentVersionTimeline.length > 1;
+      modalCompareToggle.hidden = !canCompare;
+      if (!canCompare) {
+        compareMode = false;
+        modalCompareToggle.classList.remove("active");
+      }
+
+      modalVersionOlder.disabled = currentVersionIndex >= currentVersionTimeline.length - 1;
+      modalVersionNewer.disabled = currentVersionIndex <= 0;
+      renderVersionList();
+      updateVersionPreview();
+    }
+
+    function updateVersionPreview() {
+      const version = currentVersionTimeline[currentVersionIndex];
+      if (!version) return;
+
+      const comparePair = compareMode && currentVersionTimeline.length > 1
+        ? {
+            newer: version,
+            older: currentVersionTimeline[currentVersionIndex + 1] || null
+          }
+        : null;
+
+      if (comparePair?.older) {
+        modalImageStack.classList.add("hidden");
+        modalCompare.classList.remove("hidden");
+        modalCompareLeft.src = comparePair.older.file;
+        modalCompareRight.src = comparePair.newer.file;
+        modalCompareLeft.alt = `${currentModalSample.title} - ${comparePair.older.label}`;
+        modalCompareRight.alt = `${currentModalSample.title} - ${comparePair.newer.label}`;
+        modalCompareLeftLabel.textContent = comparePair.older.label;
+        modalCompareRightLabel.textContent = comparePair.newer.label;
+      } else {
+        modalCompare.classList.add("hidden");
+        modalImageStack.classList.remove("hidden");
+        modalImage.src = version.file;
+        modalImage.alt = `${currentModalSample.title} - ${version.label}`;
+      }
+
+      modalOpenSvg.href = version.file;
+      modalCounter.textContent = comparePair?.older
+        ? `${currentModalIndex + 1} / ${currentVisibleSamples.length} · 对比 ${comparePair.older.label} ↔ ${comparePair.newer.label}`
+        : `${currentModalIndex + 1} / ${currentVisibleSamples.length} · ${version.label}`;
+    }
+
+    function selectVersion(index) {
+      if (index < 0 || index >= currentVersionTimeline.length) return;
+      currentVersionIndex = index;
+      updateVersionControls();
+    }
+
+    function navigateVersion(direction) {
+      selectVersion(currentVersionIndex + direction);
+    }
+
+    function openModal(sample) {
+      currentModalIndex = currentVisibleSamples.indexOf(sample);
+      currentModalSample = sample;
+      currentVersionTimeline = buildVersionTimeline(sample);
+      currentVersionIndex = 0;
+      compareMode = false;
+      modalCompareToggle.classList.remove("active");
+      updateModalContent(sample);
+      previewModal.classList.add("open");
+      previewModal.setAttribute("aria-hidden", "false");
+    }
+
+    function updateModalContent(sample) {
+      currentModalSample = sample;
+      modalTitle.textContent = sample.title;
+      modalDescription.textContent = buildDescription(sample);
+      modalPath.textContent = sample.path;
+      modalSvgPath.textContent = sample.svgPath;
+      modalType.textContent = sample.typeLabel;
+      modalComplexity.textContent = sample.complexityLabel;
+      modalOpenDfy.href = sample.path;
+      modalPills.innerHTML = `
+        <span class="meta-pill">${sample.typeLabel}</span>
+        <span class="meta-pill">${sample.complexityLabel}</span>
+        ${sample.featured ? '<span class="meta-pill">精选样例</span>' : ""}
+      `;
+      modalTags.innerHTML = sample.tags.map((tag) => `<span class="tag-pill">${tag}</span>`).join("");
+      modalPrev.style.visibility = currentModalIndex > 0 ? "visible" : "hidden";
+      modalNext.style.visibility = currentModalIndex < currentVisibleSamples.length - 1 ? "visible" : "hidden";
+      currentVersionTimeline = buildVersionTimeline(sample);
+      if (currentVersionIndex >= currentVersionTimeline.length) {
+        currentVersionIndex = 0;
+      }
+      updateVersionControls();
+    }
+
+    function navigateModal(direction) {
+      const nextIndex = currentModalIndex + direction;
+      if (nextIndex < 0 || nextIndex >= currentVisibleSamples.length) return;
+      currentModalIndex = nextIndex;
+      currentVersionIndex = 0;
+      compareMode = false;
+      modalCompareToggle.classList.remove("active");
+      updateModalContent(currentVisibleSamples[currentModalIndex]);
+    }
+
+    function closeModal() {
+      previewModal.classList.remove("open");
+      previewModal.setAttribute("aria-hidden", "true");
+      currentModalIndex = -1;
+      currentModalSample = null;
+      compareMode = false;
+      modalCompareToggle.classList.remove("active");
+      setTimeout(() => {
+        modalImage.removeAttribute("src");
+        modalCompareLeft.removeAttribute("src");
+        modalCompareRight.removeAttribute("src");
+      }, 300);
+    }
+
+    function renderAll() {
+      renderAudiencePresets();
+      renderFilters();
+      renderCards();
+    }
+
+    function setAccordionState(group, open) {
+      const container = document.querySelector(`[data-accordion-group="${group}"]`);
+      const toggle = document.querySelector(`[data-accordion-toggle="${group}"]`);
+      if (!container || !toggle) return;
+      container.classList.toggle("open", open);
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
+    function bindAccordionEvents() {
+      document.querySelectorAll("[data-accordion-toggle]").forEach((toggle) => {
+        toggle.addEventListener("click", () => {
+          const group = toggle.getAttribute("data-accordion-toggle");
+          const container = document.querySelector(`[data-accordion-group="${group}"]`);
+          const nextOpen = !container.classList.contains("open");
+          setAccordionState(group, nextOpen);
+        });
+      });
+
+      expandAllFilters.addEventListener("click", () => {
+        ["type", "complexity", "tag"].forEach((group) => setAccordionState(group, true));
+      });
+
+      collapseAllFilters.addEventListener("click", () => {
+        ["type", "complexity", "tag"].forEach((group) => setAccordionState(group, false));
+      });
+    }
+
+    searchInput.addEventListener("input", (event) => {
+      state.search = event.target.value;
+      renderCards();
+    });
+
+    document.getElementById("resetFilters").addEventListener("click", () => {
+      state.search = "";
+      state.type = "all";
+      state.complexity = "all";
+      state.tag = "all";
+      state.audience = "all";
+      searchInput.value = "";
+      renderAll();
+    });
+
+    clearSearchBtn.addEventListener("click", () => {
+      state.search = "";
+      searchInput.value = "";
+      renderCards();
+    });
+
+    showAllBtn.addEventListener("click", () => {
+      state.search = "";
+      state.type = "all";
+      state.complexity = "all";
+      state.tag = "all";
+      state.audience = "all";
+      searchInput.value = "";
+      renderAll();
+    });
+
+    document.getElementById("scrollFeatured").addEventListener("click", () => {
+      const firstFeatured = document.querySelector('[data-featured="true"]');
+      if (firstFeatured) {
+        firstFeatured.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+
+    modalClose.addEventListener("click", closeModal);
+    modalPrev.addEventListener("click", () => navigateModal(-1));
+    modalNext.addEventListener("click", () => navigateModal(1));
+    modalCompareToggle.addEventListener("click", () => {
+      compareMode = !compareMode;
+      modalCompareToggle.classList.toggle("active", compareMode);
+      updateVersionPreview();
+    });
+    modalVersionOlder.addEventListener("click", () => navigateVersion(1));
+    modalVersionNewer.addEventListener("click", () => navigateVersion(-1));
+    previewModal.addEventListener("click", (event) => {
+      if (event.target === previewModal) closeModal();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (!previewModal.classList.contains("open")) return;
+      if (event.key === "Escape") closeModal();
+      if (event.key === "ArrowLeft") navigateModal(-1);
+      if (event.key === "ArrowRight") navigateModal(1);
+      if (event.key === "[") navigateVersion(1);
+      if (event.key === "]") navigateVersion(-1);
+    });
+
+    bindAccordionEvents();
+    renderHeroStats();
+    loadHistoryManifest().finally(() => {
+      renderAll();
+    });
+  </script>
+</body>
+</html>

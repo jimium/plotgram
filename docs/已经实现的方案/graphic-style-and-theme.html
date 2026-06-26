@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Graphic Style 与 Theme 架构 — Drawify</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #1a1d26;
+      --muted: #5c6370;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --theme: #7c3aed;
+      --theme-soft: #ede9fe;
+      --graphic: #059669;
+      --graphic-soft: #d1fae5;
+      --border: #e2e5eb;
+      --code-bg: #f0f2f5;
+      --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 55%, #059669 100%);
+      color: #fff;
+      padding: 2.5rem 1.5rem 2rem;
+    }
+
+    header h1 {
+      margin: 0 0 0.5rem;
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      margin: 0;
+      max-width: 52rem;
+      opacity: 0.92;
+      font-size: 1.05rem;
+    }
+
+    main {
+      max-width: 52rem;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem 1.75rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    h2 {
+      margin: 0 0 1rem;
+      font-size: 1.25rem;
+      font-weight: 650;
+      letter-spacing: -0.01em;
+    }
+
+    h3 {
+      margin: 1.5rem 0 0.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    p { margin: 0 0 1rem; }
+    p:last-child { margin-bottom: 0; }
+
+    .lead {
+      font-size: 1.05rem;
+      color: var(--muted);
+    }
+
+    .figure {
+      margin: 1.25rem 0;
+      padding: 1rem;
+      background: var(--code-bg);
+      border-radius: 10px;
+      overflow-x: auto;
+    }
+
+    .figure figcaption {
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+      margin: 1rem 0;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.55rem 0.75rem;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { background: var(--code-bg); font-weight: 600; }
+
+    code, .mono {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--code-bg);
+      padding: 0.12em 0.35em;
+      border-radius: 4px;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 0.15em 0.55em;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .pill-theme { background: var(--theme-soft); color: var(--theme); }
+    .pill-graphic { background: var(--graphic-soft); color: var(--graphic); }
+
+    ul { margin: 0.5rem 0 1rem; padding-left: 1.25rem; }
+    li { margin-bottom: 0.35rem; }
+
+    .refs {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .refs a { color: var(--accent); }
+
+    footer {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+      padding: 0 1.5rem 2rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Graphic Style 与 Theme 架构</h1>
+  <p>
+    Drawify 将<strong>配色与排版 token</strong>（theme）和<strong>几何笔触皮肤</strong>（graphic style）拆成两条正交维度，
+    使同一套色板可以叠加不同画法，而无需为每种组合重写布局或图表逻辑。
+  </p>
+</header>
+
+<main>
+
+  <section>
+    <h2>一句话总结</h2>
+    <p class="lead">
+      <span class="pill pill-theme">theme</span> 回答「画成什么颜色、字号、背景」；
+      <span class="pill pill-graphic">graphic_style</span> 回答「节点和边在 SVG 里怎么画出来」。
+    </p>
+    <p>
+      两者在 <code>ResolvedRenderContext</code> 中合并，渲染时先读取 theme 物化后的
+      <code>fill</code> / <code>stroke</code>，再交给 <code>GraphicStylePainter</code> 决定描边参数、填充纹理、滤镜与箭头形态。
+    </p>
+  </section>
+
+  <section>
+    <h2>管线中的位置</h2>
+    <figure class="figure">
+      <svg viewBox="0 0 720 320" width="720" height="320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="prepare 与 render 阶段分工">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/>
+          </marker>
+          <linearGradient id="prepareGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#7c3aed"/>
+            <stop offset="100%" stop-color="#a78bfa"/>
+          </linearGradient>
+          <linearGradient id="renderGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#059669"/>
+            <stop offset="100%" stop-color="#34d399"/>
+          </linearGradient>
+        </defs>
+
+        <!-- prepare lane -->
+        <rect x="20" y="24" width="680" height="118" rx="10" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1.5"/>
+        <text x="36" y="48" font-size="13" font-weight="700" fill="#5b21b6">prepare 阶段</text>
+        <text x="36" y="68" font-size="11" fill="#6d28d9">style_id → StyleSheet cascade → materialize_styles</text>
+
+        <rect x="40" y="82" width="100" height="44" rx="6" fill="#fff" stroke="#a78bfa"/>
+        <text x="90" y="108" text-anchor="middle" font-size="11" fill="#1e1b4b">DSL 源码</text>
+
+        <line x1="140" y1="104" x2="168" y2="104" stroke="#64748b" marker-end="url(#arrow)"/>
+
+        <rect x="168" y="82" width="120" height="44" rx="6" fill="#fff" stroke="#a78bfa"/>
+        <text x="228" y="100" text-anchor="middle" font-size="11" fill="#1e1b4b">theme</text>
+        <text x="228" y="116" text-anchor="middle" font-size="9" fill="#64748b">ResolvedStyleContext</text>
+
+        <line x1="288" y1="104" x2="316" y2="104" stroke="#64748b" marker-end="url(#arrow)"/>
+
+        <rect x="316" y="82" width="160" height="44" rx="6" fill="url(#prepareGrad)"/>
+        <text x="396" y="100" text-anchor="middle" font-size="11" fill="#fff" font-weight="600">materialize_styles</text>
+        <text x="396" y="116" text-anchor="middle" font-size="9" fill="#ede9fe">物化到 attributes.style</text>
+
+        <line x1="476" y1="104" x2="504" y2="104" stroke="#64748b" marker-end="url(#arrow)"/>
+
+        <rect x="504" y="82" width="176" height="44" rx="6" fill="#fff" stroke="#a78bfa"/>
+        <text x="592" y="100" text-anchor="middle" font-size="11" fill="#1e1b4b">PreparedDiagram</text>
+        <text x="592" y="116" text-anchor="middle" font-size="9" fill="#64748b">fill / stroke / text_fill …</text>
+
+        <!-- render lane -->
+        <rect x="20" y="168" width="680" height="132" rx="10" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1.5"/>
+        <text x="36" y="192" font-size="13" font-weight="700" fill="#065f46">render 阶段</text>
+        <text x="36" y="212" font-size="11" fill="#047857">layout + graphic_style 解析 + SVG 生成</text>
+
+        <rect x="40" y="226" width="120" height="44" rx="6" fill="#fff" stroke="#34d399"/>
+        <text x="100" y="244" text-anchor="middle" font-size="11" fill="#064e3b">layout</text>
+        <text x="100" y="260" text-anchor="middle" font-size="9" fill="#64748b">坐标 / 路径</text>
+
+        <line x1="160" y1="248" x2="188" y2="248" stroke="#64748b" marker-end="url(#arrow)"/>
+
+        <rect x="188" y="226" width="140" height="44" rx="6" fill="url(#renderGrad)"/>
+        <text x="258" y="244" text-anchor="middle" font-size="11" fill="#fff" font-weight="600">graphic_style</text>
+        <text x="258" y="260" text-anchor="middle" font-size="9" fill="#d1fae5">GraphicStylePainter</text>
+
+        <line x1="328" y1="248" x2="356" y2="248" stroke="#64748b" marker-end="url(#arrow)"/>
+
+        <rect x="356" y="226" width="160" height="44" rx="6" fill="#fff" stroke="#34d399"/>
+        <text x="436" y="244" text-anchor="middle" font-size="11" fill="#064e3b">kinds</text>
+        <text x="436" y="260" text-anchor="middle" font-size="9" fill="#64748b">节点 / 边 SVG 片段</text>
+
+        <line x1="516" y1="248" x2="544" y2="248" stroke="#64748b" marker-end="url(#arrow)"/>
+
+        <rect x="544" y="226" width="136" height="44" rx="6" fill="#fff" stroke="#34d399"/>
+        <text x="612" y="252" text-anchor="middle" font-size="11" fill="#064e3b">render::encode</text>
+
+        <!-- vertical bridge -->
+        <line x1="592" y1="126" x2="592" y2="168" stroke="#94a3b8" stroke-dasharray="4 3"/>
+        <text x="604" y="152" font-size="9" fill="#64748b">颜色 token</text>
+        <text x="604" y="164" font-size="9" fill="#64748b">已进入 style</text>
+      </svg>
+      <figcaption>theme 在 prepare 时物化；graphic_style 在 render 时解析并作用于 SVG 生成</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>职责对比</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>维度</th>
+          <th><span class="pill pill-theme">theme</span></th>
+          <th><span class="pill pill-graphic">graphic_style</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>配置入口</td>
+          <td><code>style_id</code>（如 <code>builtin.clean-light</code>）</td>
+          <td><code>graphic_style</code>（如 <code>excalidraw</code>）</td>
+        </tr>
+        <tr>
+          <td>解析时机</td>
+          <td><code>prepare()</code> → <code>materialize_styles</code></td>
+          <td><code>render()</code> → <code>resolve_graphic_style()</code></td>
+        </tr>
+        <tr>
+          <td>产出</td>
+          <td>写入 <code>entity.attributes.style</code> 的 token</td>
+          <td>不修改 AST 属性，只影响 SVG 输出</td>
+        </tr>
+        <tr>
+          <td>管什么</td>
+          <td>颜色、字号、画布背景、按 type 的配色 cascade</td>
+          <td>描边粗细/线帽、填充纹理、阴影/发光、箭头形态</td>
+        </tr>
+        <tr>
+          <td>不管什么</td>
+          <td>手绘抖动算法、点描填充、圆角路径算法</td>
+          <td>主题色板本身、布局坐标</td>
+        </tr>
+        <tr>
+          <td>核心模块</td>
+          <td><code>crates/drawify-core/src/theme/</code></td>
+          <td><code>crates/drawify-core/src/graphic_style/</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>正交叠加示意</h2>
+    <p>同一布局、同一 theme，只换 graphic_style，颜色 token 不变，画法改变：</p>
+    <figure class="figure">
+      <svg viewBox="0 0 720 200" width="720" height="200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="三种 graphic style 对比">
+        <!-- shared theme bar -->
+        <rect x="24" y="16" width="672" height="28" rx="6" fill="#ede9fe" stroke="#a78bfa"/>
+        <text x="360" y="35" text-anchor="middle" font-size="11" fill="#5b21b6" font-weight="600">
+          共用 theme：builtin.clean-light → fill=#e8f4fc stroke=#2563eb
+        </text>
+
+        <!-- standard -->
+        <text x="120" y="68" text-anchor="middle" font-size="11" fill="#64748b" font-weight="600">standard</text>
+        <rect x="60" y="78" width="120" height="72" rx="8" fill="#e8f4fc" stroke="#2563eb" stroke-width="2"/>
+        <text x="120" y="122" text-anchor="middle" font-size="12" fill="#1e40af">节点</text>
+
+        <!-- excalidraw -->
+        <text x="360" y="68" text-anchor="middle" font-size="11" fill="#64748b" font-weight="600">excalidraw</text>
+        <rect x="300" y="78" width="120" height="72" rx="8" fill="#e8f4fc" stroke="#2563eb" stroke-width="1.8" stroke-linecap="round"/>
+        <!-- dot pattern hint -->
+        <circle cx="318" cy="96" r="1.2" fill="#2563eb" opacity="0.35"/>
+        <circle cx="330" cy="108" r="1.2" fill="#2563eb" opacity="0.35"/>
+        <circle cx="342" cy="96" r="1.2" fill="#2563eb" opacity="0.35"/>
+        <circle cx="354" cy="108" r="1.2" fill="#2563eb" opacity="0.35"/>
+        <circle cx="366" cy="96" r="1.2" fill="#2563eb" opacity="0.35"/>
+        <circle cx="378" cy="108" r="1.2" fill="#2563eb" opacity="0.35"/>
+        <circle cx="390" cy="96" r="1.2" fill="#2563eb" opacity="0.35"/>
+        <circle cx="402" cy="108" r="1.2" fill="#2563eb" opacity="0.35"/>
+        <!-- wobbly outline -->
+        <path d="M302,82 Q305,80 310,82 L408,84 Q412,86 410,90 L412,146 Q410,150 406,148 L304,150 Q300,148 302,144 Z" fill="none" stroke="#2563eb" stroke-width="1.2" opacity="0.45"/>
+        <text x="360" y="122" text-anchor="middle" font-size="12" fill="#1e40af">节点</text>
+
+        <!-- spatial-clarity -->
+        <text x="600" y="68" text-anchor="middle" font-size="11" fill="#64748b" font-weight="600">spatial-clarity</text>
+        <rect x="540" y="82" width="120" height="64" rx="12" fill="#e8f4fc" stroke="#2563eb" stroke-width="1" stroke-opacity="0.25"/>
+        <rect x="542" y="84" width="116" height="60" rx="11" fill="none" stroke="#000" stroke-opacity="0.08" filter="url(#softShadow)"/>
+        <defs>
+          <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity="0.15"/>
+          </filter>
+        </defs>
+        <text x="600" y="122" text-anchor="middle" font-size="12" fill="#1e40af">节点</text>
+
+        <text x="360" y="178" text-anchor="middle" font-size="10" fill="#64748b">
+          色值来自 theme · 几何画法来自 graphic_style
+        </text>
+      </svg>
+      <figcaption>相同 fill/stroke token，不同笔触皮肤</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>GraphicStylePainter 抽象</h2>
+    <p>
+      <code>graphic_style</code> 模块的核心是 <code>GraphicStylePainter</code> trait（策略模式）。
+      每个风格（standard、excalidraw、blueprint…）实现该 trait，并在 <code>painter_for()</code> 注册。
+    </p>
+
+    <figure class="figure">
+      <svg viewBox="0 0 720 280" width="720" height="280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GraphicStylePainter 钩子">
+        <rect x="240" y="16" width="240" height="56" rx="8" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+        <text x="360" y="40" text-anchor="middle" font-size="13" font-weight="700" fill="#065f46">GraphicStylePainter</text>
+        <text x="360" y="58" text-anchor="middle" font-size="10" fill="#047857">trait · 笔触策略</text>
+
+        <!-- hooks -->
+        <line x1="360" y1="72" x2="360" y2="88" stroke="#059669" stroke-width="1.5"/>
+        <line x1="120" y1="88" x2="600" y2="88" stroke="#059669" stroke-width="1.5"/>
+
+        <line x1="120" y1="88" x2="120" y2="108" stroke="#059669"/>
+        <line x1="240" y1="88" x2="240" y2="108" stroke="#059669"/>
+        <line x1="360" y1="88" x2="360" y2="108" stroke="#059669"/>
+        <line x1="480" y1="88" x2="480" y2="108" stroke="#059669"/>
+        <line x1="600" y1="88" x2="600" y2="108" stroke="#059669"/>
+
+        <rect x="48" y="108" width="144" height="72" rx="8" fill="#fff" stroke="#6ee7b7"/>
+        <text x="120" y="132" text-anchor="middle" font-size="10" font-weight="600" fill="#064e3b">decorate_*</text>
+        <text x="120" y="150" text-anchor="middle" font-size="9" fill="#64748b">线宽 / 线帽</text>
+        <text x="120" y="166" text-anchor="middle" font-size="9" fill="#64748b">hand_drawn 标记</text>
+
+        <rect x="168" y="108" width="144" height="72" rx="8" fill="#fff" stroke="#6ee7b7"/>
+        <text x="240" y="132" text-anchor="middle" font-size="10" font-weight="600" fill="#064e3b">render_node_shape</text>
+        <text x="240" y="150" text-anchor="middle" font-size="9" fill="#64748b">自定义形状 SVG</text>
+        <text x="240" y="166" text-anchor="middle" font-size="9" fill="#64748b">None → 标准几何兜底</text>
+
+        <rect x="288" y="108" width="144" height="72" rx="8" fill="#fff" stroke="#6ee7b7"/>
+        <text x="360" y="132" text-anchor="middle" font-size="10" font-weight="600" fill="#064e3b">render_edge_*</text>
+        <text x="360" y="150" text-anchor="middle" font-size="9" fill="#64748b">抖动线 / 圆角路径</text>
+        <text x="360" y="166" text-anchor="middle" font-size="9" fill="#64748b">霓虹光晕层</text>
+
+        <rect x="408" y="108" width="144" height="72" rx="8" fill="#fff" stroke="#6ee7b7"/>
+        <text x="480" y="132" text-anchor="middle" font-size="10" font-weight="600" fill="#064e3b">marker_defs</text>
+        <text x="480" y="150" text-anchor="middle" font-size="9" fill="#64748b">箭头 marker 形态</text>
+        <text x="480" y="166" text-anchor="middle" font-size="9" fill="#64748b">按风格差异化</text>
+
+        <rect x="528" y="108" width="144" height="72" rx="8" fill="#fff" stroke="#6ee7b7"/>
+        <text x="600" y="132" text-anchor="middle" font-size="10" font-weight="600" fill="#064e3b">shared_svg_defs</text>
+        <text x="600" y="150" text-anchor="middle" font-size="9" fill="#64748b">feDropShadow</text>
+        <text x="600" y="166" text-anchor="middle" font-size="9" fill="#64748b">feGaussianBlur …</text>
+
+        <!-- render flow below -->
+        <text x="360" y="210" text-anchor="middle" font-size="11" font-weight="600" fill="#334155">单节点渲染链</text>
+
+        <rect x="24" y="222" width="110" height="40" rx="6" fill="#ede9fe" stroke="#a78bfa"/>
+        <text x="79" y="246" text-anchor="middle" font-size="9" fill="#5b21b6">NodeStyle</text>
+
+        <line x1="134" y1="242" x2="158" y2="242" stroke="#64748b" marker-end="url(#arrow)"/>
+
+        <rect x="158" y="222" width="110" height="40" rx="6" fill="#d1fae5" stroke="#34d399"/>
+        <text x="213" y="238" text-anchor="middle" font-size="9" fill="#065f46">decorate</text>
+        <text x="213" y="252" text-anchor="middle" font-size="8" fill="#64748b">描边参数</text>
+
+        <line x1="268" y1="242" x2="292" y2="242" stroke="#64748b" marker-end="url(#arrow)"/>
+
+        <rect x="292" y="222" width="130" height="40" rx="6" fill="#d1fae5" stroke="#34d399"/>
+        <text x="357" y="238" text-anchor="middle" font-size="9" fill="#065f46">render_node_shape</text>
+        <text x="357" y="252" text-anchor="middle" font-size="8" fill="#64748b">自定义 or 兜底</text>
+
+        <line x1="422" y1="242" x2="446" y2="242" stroke="#64748b" marker-end="url(#arrow)"/>
+
+        <rect x="446" y="222" width="110" height="40" rx="6" fill="#f1f5f9" stroke="#94a3b8"/>
+        <text x="501" y="246" text-anchor="middle" font-size="9" fill="#334155">SVG 片段</text>
+
+        <line x1="556" y1="242" x2="580" y2="242" stroke="#64748b" marker-end="url(#arrow)"/>
+
+        <rect x="580" y="222" width="110" height="40" rx="6" fill="#ede9fe" stroke="#a78bfa"/>
+        <text x="635" y="238" text-anchor="middle" font-size="9" fill="#5b21b6">+ 标签文字</text>
+        <text x="635" y="252" text-anchor="middle" font-size="8" fill="#64748b">theme 查色</text>
+      </svg>
+      <figcaption>颜色在 NodeStyle 中；画法由 Painter 决定；标签颜色仍走 theme cascade</figcaption>
+    </figure>
+
+    <h3>兜底机制</h3>
+    <p>
+      <code>NodeShape::render_with_context</code> 先调用 <code>graphic_painter().render_node_shape()</code>。
+      若返回 <code>None</code>（如 <code>standard</code> 风格），则回退到默认几何 SVG（<code>&lt;rect&gt;</code>、<code>&lt;path&gt;</code> 等）。
+      因此新增风格可以只覆盖需要差异化的形状，而不必重写全部图表渲染器。
+    </p>
+  </section>
+
+  <section>
+    <h2>解析优先级</h2>
+    <figure class="figure">
+      <svg viewBox="0 0 480 100" width="480" height="100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="graphic_style 解析优先级">
+        <rect x="8" y="30" width="88" height="40" rx="6" fill="#fef3c7" stroke="#f59e0b"/>
+        <text x="52" y="48" text-anchor="middle" font-size="9" font-weight="600">API 显式</text>
+        <text x="52" y="62" text-anchor="middle" font-size="8">explicit</text>
+
+        <text x="108" y="52" font-size="14" fill="#94a3b8">›</text>
+
+        <rect x="118" y="30" width="88" height="40" rx="6" fill="#fef3c7" stroke="#f59e0b"/>
+        <text x="162" y="48" text-anchor="middle" font-size="9" font-weight="600">场景级</text>
+        <text x="162" y="62" text-anchor="middle" font-size="8">scene</text>
+
+        <text x="218" y="52" font-size="14" fill="#94a3b8">›</text>
+
+        <rect x="228" y="30" width="100" height="40" rx="6" fill="#e0f2fe" stroke="#38bdf8"/>
+        <text x="278" y="48" text-anchor="middle" font-size="9" font-weight="600">diagram 属性</text>
+        <text x="278" y="62" text-anchor="middle" font-size="8">graphic_style:</text>
+
+        <text x="338" y="52" font-size="14" fill="#94a3b8">›</text>
+
+        <rect x="348" y="30" width="120" height="40" rx="6" fill="#f1f5f9" stroke="#94a3b8"/>
+        <text x="408" y="48" text-anchor="middle" font-size="9" font-weight="600">DiagramProfile</text>
+        <text x="408" y="62" text-anchor="middle" font-size="8">default_graphic_style</text>
+
+        <text x="240" y="18" text-anchor="middle" font-size="10" fill="#64748b">优先级：左高右低</text>
+      </svg>
+      <figcaption>实现：<code>render/request.rs</code> → <code>resolve_graphic_style()</code></figcaption>
+    </figure>
+
+    <p>
+      <code>GraphicStyleId</code> 枚举定义在 <code>spec/profile.rs</code>（规格层），而非 <code>graphic_style</code> 模块内。
+      这样 <code>DiagramProfile.default_graphic_style</code> 与 layout、edge_routing 等默认值同级，
+      且 <code>spec</code> 不必依赖 SVG 绘制实现，避免循环依赖。
+    </p>
+  </section>
+
+  <section>
+    <h2>内置风格一览</h2>
+    <p>规范名与 <code>GraphicStyleId::as_str()</code> 一致，不支持别名。详见代码内 README。</p>
+    <table>
+      <thead>
+        <tr><th>规范名</th><th>简述</th><th>Painter 行为要点</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>standard</code></td><td>标准纯色</td><td>不自定义 render，走默认几何</td></tr>
+        <tr><td><code>excalidraw</code></td><td>手绘点描</td><td>clip-path 点描 + 双层抖动描边</td></tr>
+        <tr><td><code>cross-hatch</code></td><td>略密点描</td><td>同 excalidraw，点距更密</td></tr>
+        <tr><td><code>blueprint</code></td><td>工程蓝图</td><td>细线、miter、中心十字标记</td></tr>
+        <tr><td><code>spatial-clarity</code></td><td>现代UI风</td><td>双层阴影 + 圆角边线</td></tr>
+        <tr><td><code>neon-glow</code></td><td>霓虹光晕</td><td>高斯模糊 glow 层 + 细亮描边</td></tr>
+        <tr><td><code>stipple</code></td><td>圆点填充</td><td>点阵填充 + 轻粗糙轮廓</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>模块边界（刻意不交叉）</h2>
+    <ul>
+      <li><strong>layout</strong> — 坐标与边路径，与视觉皮肤无关</li>
+      <li><strong>theme</strong> — StyleSheet cascade，物化颜色/字号 token</li>
+      <li><strong>kinds</strong> — 图表语义、实体规则、scene 物化与绘制分派</li>
+      <li><strong>graphic_style</strong> — 笔触策略与 SVG 画法，读取 NodeStyle 中的色值</li>
+      <li><strong>render::encode</strong> — 格式编码（SVG / PNG / WebP / ASCII / JSON）</li>
+    </ul>
+    <p>
+      graphic_style <strong>不</strong>参与 prepare 阶段的 AST 改写；
+      theme <strong>不</strong>决定手绘抖动或点描算法。
+      二者仅在 <code>ResolvedRenderContext</code> 汇合。
+    </p>
+  </section>
+
+  <section class="refs">
+    <h2>相关文档与代码</h2>
+    <ul>
+      <li><a href="../../crates/drawify-core/src/graphic_style/README.md">graphic_style 实现说明</a></li>
+      <li><a href="../specs/style-system/style-sheet-spec.md">StyleSheet / theme 规范</a></li>
+      <li><a href="./drawify-server-api.md">Server API（graphic_style 请求字段）</a></li>
+      <li><a href="./overview.md">Drawify 整体架构</a></li>
+      <li>代码入口：<code>render/request.rs</code>、<code>graphic_style/mod.rs</code>、<code>render/visual.rs</code>、<code>kinds/registry.rs</code></li>
+    </ul>
+  </section>
+
+</main>
+
+<footer>
+  Drawify Architecture · graphic-style-and-theme.html
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,77 @@
+{
+  "version": "0.2",
+  "id": "common.solarized-light",
+  "name": "Solarized Light",
+  "meta": {
+    "author": "Drawify",
+    "description": "灵感来自 Solarized Light：经典科学配色，护眼低对比，长期阅读与打印友好",
+    "tags": ["solarized", "light", "classic", "inspired"]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#fdf6e3",
+      "text": "#657b83",
+      "muted_text": "#93a1a1",
+      "border": "#eee8d5",
+      "primary": "#268bd2",
+      "neutral_fill": "#eee8d5",
+      "neutral_stroke": "#657b83",
+      "group_fill": "#fdf6e3",
+      "group_stroke": "#93a1a1"
+    },
+    "palette": {
+      "blue": { "fill": "#eee8d5", "stroke": "#268bd2" },
+      "orange": { "fill": "#fdf6e3", "stroke": "#cb4b16" },
+      "green": { "fill": "#eee8d5", "stroke": "#859900" },
+      "purple": { "fill": "#eee8d5", "stroke": "#6c71c4" },
+      "yellow": { "fill": "#fdf6e3", "stroke": "#b58900" },
+      "red": { "fill": "#fdf6e3", "stroke": "#dc322f" },
+      "cyan": { "fill": "#eee8d5", "stroke": "#2aa198" },
+      "brown": { "fill": "#eee8d5", "stroke": "#cb4b16" },
+      "gray": { "fill": "#fdf6e3", "stroke": "#93a1a1" },
+      "amber": { "fill": "#fdf6e3", "stroke": "#cb4b16" },
+      "blue_gray": { "fill": "#eee8d5", "stroke": "#657b83" },
+      "start_green": { "fill": "#eee8d5", "stroke": "#859900" },
+      "end_red": { "fill": "#fdf6e3", "stroke": "#dc322f" },
+      "arch_blue": { "fill": "#eee8d5", "stroke": "#268bd2" },
+      "root": { "fill": "#268bd2", "stroke": "#073642", "text_fill": "#fdf6e3" }
+    }
+  },
+  "diagrams": {
+    "flowchart": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "sequence": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "state": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "architecture": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "er": {
+      "node": { "fill": "#fdf6e3", "stroke": "#268bd2" },
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "mindmap": {
+      "edge": { "stroke_width": "{strokes.normal}" },
+      "entity_types": {
+        "leaf": { "fill": "#eee8d5" }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#eee8d5", "stroke": "#268bd2", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

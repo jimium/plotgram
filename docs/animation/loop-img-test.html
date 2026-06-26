@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>img 标签循环动画测试</title>
+<style>
+body { background: #1a1a2e; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; font-family: sans-serif; color: #e0e0e0; }
+h2 { margin-bottom: 20px; font-size: 18px; }
+.test-area { background: #0f0f23; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+.note { color: #888; font-size: 13px; max-width: 500px; text-align: center; line-height: 1.7; }
+.note code { background: #16213e; padding: 2px 6px; border-radius: 4px; color: #ff9800; }
+</style>
+</head>
+<body>
+<h2>&lt;img src="loop-via-img.svg"&gt; — 循环动画测试</h2>
+<div class="test-area">
+  <img src="loop-via-img.svg" width="500" height="200" alt="looping svg via img">
+</div>
+<div class="note">
+  你应该看到：橙色虚线<strong>持续流动</strong>、蓝色圆环<strong>持续旋转</strong>、绿色圆点<strong>持续脉冲</strong>、方块<strong>持续变色</strong>——全部是 <code>animation: ... infinite</code> 循环动画，且这个 SVG 是通过 <code>&lt;img&gt;</code> 标签加载的。
+</div>
+</body>
+</html>

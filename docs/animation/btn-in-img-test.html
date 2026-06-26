@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>SVG 按钮在不同嵌入方式下是否可点击？</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 30px 20px;
+  }
+  h1 { text-align: center; font-size: 22px; margin-bottom: 8px; color: #fff; }
+  .subtitle { text-align: center; color: #888; font-size: 13px; margin-bottom: 20px; }
+  .answer {
+    max-width: 900px; margin: 0 auto 25px; background: #2a1a1a;
+    border-radius: 12px; padding: 18px 20px; border-left: 4px solid #f44336;
+    font-size: 14px; line-height: 1.8;
+  }
+  .answer strong { color: #f44336; }
+  .answer code { background: #0f0f23; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #ff9800; }
+  .answer .green { color: #4caf50; }
+  .answer .yellow { color: #ffc107; }
+  .grid { max-width: 900px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .card { background: #16213e; border-radius: 12px; padding: 14px; border: 1px solid #2a2a4a; }
+  .card h3 { font-size: 14px; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .tag { font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 600; }
+  .tag-no { background: #4a2a2a; color: #f44336; }
+  .tag-yes { background: #2d4a2f; color: #4caf50; }
+  .tag-warn { background: #4a4a2f; color: #ffc107; }
+  .code-label { font-size: 11px; color: #888; font-family: monospace; background: #0f0f23; padding: 5px 8px; border-radius: 4px; margin-bottom: 8px; white-space: nowrap; overflow-x: auto; }
+  .desc { font-size: 12px; color: #888; margin-bottom: 8px; line-height: 1.5; }
+  .demo { background: #0f0f23; border-radius: 8px; padding: 10px; display: flex; justify-content: center; min-height: 230px; align-items: center; }
+  .demo img, .demo object, .demo iframe { max-width: 100%; border-radius: 6px; }
+  .checks { margin-top: 8px; font-size: 11px; line-height: 1.7; }
+  .ok { color: #4caf50; } .warn { color: #ffc107; } .no { color: #f44336; }
+  .note-box {
+    max-width: 900px; margin: 25px auto 0; background: #16213e;
+    border-radius: 12px; padding: 20px; border: 1px solid #2a2a4a;
+  }
+  .note-box h3 { color: #fff; margin-bottom: 12px; font-size: 15px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #2a2a4a; }
+  th { color: #888; font-size: 12px; font-weight: 500; }
+  td:first-child { text-align: left; font-family: monospace; font-size: 12px; color: #64b5f6; }
+  .y { color: #4caf50; font-weight: 600; }
+  .n { color: #f44336; }
+  .p { color: #ffc107; }
+  .conclusion {
+    max-width: 900px; margin: 20px auto; background: #1a2a1a;
+    border: 1px solid #2d4a2f; border-radius: 10px; padding: 16px;
+    font-size: 13px; line-height: 1.8; color: #a5d6a7;
+  }
+  .conclusion strong { color: #4caf50; }
+</style>
+</head>
+<body>
+
+<h1>SVG 内部按钮在 &lt;img&gt; 中能工作吗？</h1>
+<p class="subtitle">同一个带 SMIL 按钮的 SVG，用四种方式嵌入</p>
+
+<div class="answer">
+  <strong>答案：不能。</strong> <code>&lt;img&gt;</code> 将 SVG 视为<strong>静态光栅图像</strong>，浏览器对其施加严格的安全隔离：
+  <ul style="margin:8px 0 0 20px;">
+    <li>❌ SMIL 的 <code>begin="btn.click"</code> <strong>不触发</strong>——点击事件不会穿透到 SVG 文档内部</li>
+    <li>❌ CSS <code>:hover</code> 伪类<strong>不生效</strong>——鼠标悬停在 img 上，SVG 内部元素感知不到</li>
+    <li>❌ SVG 内的 <code>&lt;a xlink:href&gt;</code> 链接<strong>不可点击</strong></li>
+    <li>❌ SVG 内的 <code>&lt;script&gt;</code> <strong>不执行</strong></li>
+  </ul>
+  但在 <code>&lt;object&gt;</code>/<code>&lt;iframe&gt;</code>/<span class="green">直接打开 SVG</span>/<span class="green">内联 SVG</span> 中按钮<strong class="green">完全正常</strong>。
+</div>
+
+<div class="grid">
+
+  <div class="card">
+    <h3>❌ &lt;img src&gt; <span class="tag tag-no">按钮不工作</span></h3>
+    <div class="code-label">&lt;img src="btn-in-svg.svg"&gt;</div>
+    <p class="desc">按钮点不动、hover 不变色、链接打不开。SVG 被当作静态图片。<strong>循环动画生效，但交互完全失效。</strong></p>
+    <div class="demo">
+      <img src="btn-in-svg.svg" width="360" height="234" alt="svg with buttons via img">
+    </div>
+    <div class="checks">
+      <span class="no">❌ SMIL 按钮点击</span> ·
+      <span class="no">❌ CSS :hover</span> ·
+      <span class="no">❌ 链接点击</span> ·
+      <span class="ok">✅ CSS 动画(循环)</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>✅ 直接打开 .svg <span class="tag tag-yes">按钮正常</span></h3>
+    <div class="code-label"><a href="btn-in-svg.svg" target="_blank" style="color:#64b5f6;">点击在新窗口打开 btn-in-svg.svg →</a></div>
+    <p class="desc">SVG 作为独立文档加载。<strong>按钮点击、hover 变色、链接跳转全部正常</strong>。SMIL begin="click" 正常工作。</p>
+    <div class="demo" style="background:#16213e;padding:0;">
+      <iframe src="btn-in-svg.svg" width="360" height="234" style="border:none;border-radius:6px;"></iframe>
+    </div>
+    <div class="checks">
+      <span class="ok">✅ SMIL 按钮点击</span> ·
+      <span class="ok">✅ CSS :hover</span> ·
+      <span class="ok">✅ 链接点击</span> ·
+      <span class="ok">✅ 动画</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>✅ &lt;object data&gt; <span class="tag tag-yes">按钮正常</span></h3>
+    <div class="code-label">&lt;object data="btn-in-svg.svg"&gt;</div>
+    <p class="desc">SVG 作为独立插件文档加载。<strong>交互完全正常</strong>，可以点击按钮、hover、点链接。</p>
+    <div class="demo">
+      <object data="btn-in-svg.svg" width="360" height="234" type="image/svg+xml"></object>
+    </div>
+    <div class="checks">
+      <span class="ok">✅ SMIL 按钮点击</span> ·
+      <span class="ok">✅ CSS :hover</span> ·
+      <span class="ok">✅ 链接点击</span> ·
+      <span class="warn">⚠️ 同域 JS 可控</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>✅ &lt;iframe src&gt; <span class="tag tag-yes">按钮正常</span></h3>
+    <div class="code-label">&lt;iframe src="btn-in-svg.svg"&gt;</div>
+    <p class="desc">SVG 在独立 frame 中加载。<strong>交互完全正常</strong>，有沙箱隔离。</p>
+    <div class="demo">
+      <iframe src="btn-in-svg.svg" width="360" height="234" style="border:none;border-radius:6px;"></iframe>
+    </div>
+    <div class="checks">
+      <span class="ok">✅ SMIL 按钮点击</span> ·
+      <span class="ok">✅ CSS :hover</span> ·
+      <span class="ok">✅ 链接点击</span> ·
+      <span class="warn">⚠️ 同域 JS 可控</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="note-box">
+  <h3>交互能力对比表</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>嵌入方式</th>
+        <th>CSS 动画<br>(含循环)</th>
+        <th>SMIL 按钮<br>begin="click"</th>
+        <th>CSS :hover</th>
+        <th>&lt;a&gt; 链接</th>
+        <th>SVG 内<br>&lt;script&gt;</th>
+        <th>外部 JS<br>控制</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>直接打开 .svg</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="n">—</td>
+      </tr>
+      <tr>
+        <td>&lt;img src&gt;</td>
+        <td class="y">✅</td>
+        <td class="n">❌</td>
+        <td class="n">❌</td>
+        <td class="n">❌</td>
+        <td class="n">❌</td>
+        <td class="n">❌</td>
+      </tr>
+      <tr>
+        <td>&lt;object data&gt;</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="p">⚠️ 同域</td>
+      </tr>
+      <tr>
+        <td>&lt;iframe src&gt;</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="p">⚠️ 同域</td>
+      </tr>
+      <tr>
+        <td>内联 &lt;svg&gt;</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+        <td class="y">✅</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="conclusion">
+  <strong>对 Drawify 的设计影响：</strong><br>
+  1. <strong>纯 SVG 导出（无交互版）</strong>：适合 <code>&lt;img&gt;</code> 嵌入 GitHub README、文档——只放<strong>循环动画（边数据流）和一次性入场动画</strong>，不放按钮。用户双击打开 .svg 时按钮可用，但通过 img 嵌入时按钮不工作也不影响（因为无按钮场景不需要交互）。<br>
+  2. <strong>Steps 分步演示</strong>：需要按钮控制，所以<strong>不能用纯 SVG + <code>&lt;img&gt;</code> 嵌入</strong>。有两个选择：
+  <ul style="margin:4px 0 0 20px;">
+    <li>用 <strong>HTML 导出（内联 SVG）</strong>：按钮放在 HTML 中（HTML &lt;button&gt;），JS 控制内联 SVG——最灵活，推荐为主力格式</li>
+    <li>用 <strong>纯 SVG 导出但要求用 &lt;object&gt;/&lt;iframe&gt; 或直接打开</strong>：按钮画在 SVG 内部（SVG &lt;rect&gt; + SMIL 或 CSS :target），适用于 Notion/Confluence 支持 object 的场景</li>
+  </ul>
+  3. <strong>GitHub README 嵌入</strong>：只能用 <code>&lt;img&gt;</code>，所以只能展示<strong>自动播放的循环动画</strong>（数据流、脉冲等），不展示 Steps 交互——这是可接受的，GitHub 里的 README 本来就不需要交互。
+</div>
+
+</body>
+</html>

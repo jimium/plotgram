@@ -1,0 +1,112 @@
+{
+  "version": "0.2",
+  "id": "common.brand-vivid",
+  "name": "Brand Vivid",
+  "meta": {
+    "author": "Drawify",
+    "description": "品牌化鲜明样式：高饱和、层次突出，适合产品展示与对外宣传",
+    "tags": ["brand", "vivid", "marketing"]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#FFF8FF",
+      "text": "#2B124C",
+      "muted_text": "#5B3A7A",
+      "border": "#CE93D8",
+      "primary": "#7B1FA2",
+      "neutral_fill": "#F7ECFF",
+      "neutral_stroke": "#6A1B9A",
+      "group_fill": "#F3E5F5",
+      "group_stroke": "#AB47BC"
+    },
+    "palette": {
+      "blue": { "fill": "#E1BEE7", "stroke": "#6A1B9A" },
+      "orange": { "fill": "#FFE0B2", "stroke": "#E65100" },
+      "green": { "fill": "#C8E6C9", "stroke": "#2E7D32" },
+      "purple": { "fill": "#F8BBD9", "stroke": "#AD1457" },
+      "yellow": { "fill": "#FFF59D", "stroke": "#F9A825" },
+      "red": { "fill": "#FFCDD2", "stroke": "#C62828" },
+      "cyan": { "fill": "#B2EBF2", "stroke": "#00838F" },
+      "brown": { "fill": "#D7CCC8", "stroke": "#4E342E" },
+      "gray": { "fill": "#F5F5F5", "stroke": "#9E9E9E" },
+      "amber": { "fill": "#FFE082", "stroke": "#FF6F00" },
+      "blue_gray": { "fill": "#E1BEE7", "stroke": "#7B1FA2" },
+      "start_green": { "fill": "#A5D6A7", "stroke": "#1B5E20" },
+      "end_red": { "fill": "#EF9A9A", "stroke": "#B71C1C" },
+      "arch_blue": { "fill": "#E1BEE7", "stroke": "#6A1B9A" },
+      "root": { "fill": "#7B1FA2", "stroke": "#4A148C", "text_fill": "#FFFFFF" }
+    },
+    "typography": {
+      "title_size": 17,
+      "label_size": 14,
+      "font_weight_medium": 600
+    },
+    "strokes": {
+      "thin": 1.25,
+      "normal": 2.0,
+      "thick": 2.5
+    },
+    "radius": {
+      "sm": 6,
+      "md": 10,
+      "lg": 14
+    },
+    "spacing": {
+      "node_padding_x": 13,
+      "node_padding_y": 9,
+      "group_padding": 18,
+      "label_gap": 7
+    }
+  },
+  "diagrams": {
+    "flowchart": { "edge": { "stroke": "{colors.neutral_stroke}" } },
+    "sequence": {
+      "edge": { "stroke": "{colors.neutral_stroke}" },
+      "entity_types": { "participant": { "fill": "#F3E5F5" } }
+    },
+    "state": { "edge": { "stroke": "{colors.neutral_stroke}" } },
+    "architecture": {
+      "edge": { "stroke": "{colors.neutral_stroke}" },
+      "group": {
+        "stroke": "#7B1FA2",
+        "stroke_width": "{strokes.thick}",
+        "fill": "#F3E5F5"
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "{lighten(#F3E5F5, 0.0)}", "stroke": "{lighten(#7B1FA2, 0.0)}", "stroke_width": 2.0, "border_radius": 8.0 },
+            { "fill": "{lighten(#F3E5F5, 0.35)}", "stroke": "{lighten(#7B1FA2, 0.30)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{lighten(#F3E5F5, 0.55)}", "stroke": "{lighten(#7B1FA2, 0.50)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{lighten(#F3E5F5, 0.70)}", "stroke": "{lighten(#7B1FA2, 0.65)}", "stroke_width": 1.5, "border_radius": 6.0 }
+          ],
+          "index": { "from": "group_depth", "cap": 3 },
+          "bindings": [
+            { "target": "group", "fields": { "fill": "fill", "stroke": "stroke", "stroke_width": "stroke_width", "border_radius": "border_radius" } }
+          ]
+        }
+      }
+    },
+    "er": {
+      "node": { "fill": "#FFFFFF", "stroke": "#7B1FA2" },
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "mindmap": {
+      "edge": { "stroke_width": "{strokes.normal}" },
+      "entity_types": { "leaf": { "fill": "#FCE4EC" } },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#F3E5F5", "stroke": "#7B1FA2", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

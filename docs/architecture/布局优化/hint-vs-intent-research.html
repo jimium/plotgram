@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hint vs Intent 布局调整方案研究报告 · Drawify</title>
+<style>
+  :root{
+    --bg:#0d1117; --bg-soft:#161b22; --bg-card:#1c2128; --border:#30363d;
+    --text:#e6edf3; --text-dim:#8b949e; --text-mute:#6e7681;
+    --accent:#58a6ff; --accent-2:#7ee787; --warn:#d29922; --danger:#f85149;
+    --intent:#bc8cff; --hint:#ffa657;
+    --grad-intent:linear-gradient(135deg,#bc8cff 0%,#79c0ff 100%);
+    --grad-hint:linear-gradient(135deg,#ffa657 0%,#f0883e 100%);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.7;
+    font-size:15px;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+
+  /* ── Hero ── */
+  .hero{
+    padding:80px 0 60px;position:relative;overflow:hidden;
+    background:
+      radial-gradient(900px 500px at 80% -10%, rgba(188,140,255,.15), transparent 60%),
+      radial-gradient(700px 400px at 10% 110%, rgba(255,166,87,.12), transparent 60%);
+    border-bottom:1px solid var(--border);
+  }
+  .hero .badge{
+    display:inline-block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--text-dim);border:1px solid var(--border);padding:5px 12px;border-radius:99px;
+    margin-bottom:22px;
+  }
+  .hero h1{
+    font-size:42px;line-height:1.2;font-weight:800;letter-spacing:-.02em;
+    background:linear-gradient(120deg,#fff 0%,#bc8cff 50%,#ffa657 100%);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    margin-bottom:18px;
+  }
+  .hero p.lead{font-size:18px;color:var(--text-dim);max-width:720px}
+  .hero .meta{margin-top:28px;display:flex;gap:24px;flex-wrap:wrap;color:var(--text-mute);font-size:13px}
+  .hero .meta span b{color:var(--text)}
+
+  /* verdict banner */
+  .verdict{
+    margin-top:40px;padding:26px 28px;border-radius:14px;position:relative;overflow:hidden;
+    background:linear-gradient(135deg, rgba(188,140,255,.12), rgba(126,231,135,.08));
+    border:1px solid rgba(188,140,255,.35);
+  }
+  .verdict::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+    background:var(--grad-intent);
+  }
+  .verdict .tag{font-size:12px;color:var(--intent);font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+  .verdict h2{font-size:22px;margin:6px 0 10px;font-weight:700}
+  .verdict p{color:var(--text-dim);font-size:15px}
+  .verdict .pulse{
+    display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent-2);
+    margin-right:8px;vertical-align:middle;
+    animation:pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(126,231,135,.6)}50%{box-shadow:0 0 0 8px rgba(126,231,135,0)}}
+
+  /* ── Section ── */
+  section{padding:64px 0;border-bottom:1px solid var(--border)}
+  section h2{
+    font-size:28px;font-weight:700;margin-bottom:8px;letter-spacing:-.01em;
+    display:flex;align-items:center;gap:12px;
+  }
+  section h2 .num{
+    font-size:14px;font-weight:700;color:var(--bg);background:var(--accent);
+    width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;
+  }
+  section h3{font-size:19px;margin:28px 0 12px;font-weight:600;color:var(--text)}
+  section .sub{color:var(--text-dim);margin-bottom:30px;font-size:15px}
+  p{margin-bottom:14px}
+  code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:.88em;
+    background:var(--bg-soft);padding:2px 6px;border-radius:5px;color:var(--accent-2)}
+  pre{
+    background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;
+    padding:16px 18px;overflow-x:auto;margin:16px 0;font-size:13px;
+  }
+  pre code{background:none;padding:0;color:var(--text)}
+  .kw{color:#ff7b72}.ty{color:#79c0ff}.st{color:#a5d6ff}.cm{color:#8b949e;font-style:italic}
+  .fn{color:#d2a8ff}
+
+  /* cards */
+  .grid{display:grid;gap:18px}
+  .grid-2{grid-template-columns:1fr 1fr}
+  .grid-3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:760px){.grid-2,.grid-3{grid-template-columns:1fr}}
+  .card{
+    background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:22px;
+    transition:transform .25s,border-color .25s;
+  }
+  .card:hover{transform:translateY(-3px);border-color:var(--accent)}
+  .card h4{font-size:15px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .card p{font-size:13.5px;color:var(--text-dim);margin:0}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .dot.intent{background:var(--intent)}.dot.hint{background:var(--hint)}
+  .dot.good{background:var(--accent-2)}.dot.bad{background:var(--danger)}.dot.warn{background:var(--warn)}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:13.5px}
+  th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--border)}
+  th{color:var(--text-dim);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+  td code{font-size:.85em}
+  tr:hover td{background:var(--bg-soft)}
+
+  /* ── VS visual ── */
+  .vs-stage{
+    display:grid;grid-template-columns:1fr 60px 1fr;gap:0;margin:30px 0;
+    background:var(--bg-soft);border:1px solid var(--border);border-radius:16px;overflow:hidden;
+  }
+  @media(max-width:760px){.vs-stage{grid-template-columns:1fr}.vs-divider{display:none}}
+  .vs-col{padding:26px}
+  .vs-col.hint{border-right:1px solid var(--border)}
+  .vs-col h4{font-size:17px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+  .vs-col .role{font-size:12px;color:var(--text-mute);margin-bottom:18px;letter-spacing:.05em;text-transform:uppercase}
+  .vs-divider{
+    display:flex;align-items:center;justify-content:center;
+    background:var(--bg-card);font-weight:800;color:var(--text-mute);font-size:18px;
+    border-left:1px solid var(--border);border-right:1px solid var(--border);
+  }
+  .flow{display:flex;flex-direction:column;gap:10px}
+  .flow .step{
+    background:var(--bg-card);border:1px solid var(--border);border-radius:9px;
+    padding:11px 13px;font-size:13px;position:relative;
+  }
+  .flow .step .lbl{font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+  .flow .step b{color:var(--text)}
+  .flow .arrow{text-align:center;color:var(--text-mute);font-size:14px;line-height:1}
+  .vs-col.hint .step{border-left:3px solid var(--hint)}
+  .vs-col.intent .step{border-left:3px solid var(--intent)}
+
+  /* animated flow demo */
+  .demo{
+    margin:24px 0;background:var(--bg-soft);border:1px solid var(--border);
+    border-radius:14px;padding:24px;position:relative;
+  }
+  .demo .cap{font-size:12px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px}
+  .canvas{height:200px;position:relative;background:
+    linear-gradient(var(--border) 1px,transparent 1px) 0 0/40px 40px,
+    linear-gradient(90deg,var(--border) 1px,transparent 1px) 0 0/40px 40px,
+    var(--bg-card);
+    border-radius:8px;overflow:hidden}
+  .node{
+    position:absolute;width:54px;height:34px;border-radius:7px;
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;
+    transition:all .9s cubic-bezier(.4,0,.2,1);color:#fff;
+  }
+  .node.a{background:#79c0ff;color:#0d1117}
+  .node.b{background:#7ee787;color:#0d1117}
+  .node.c{background:#bc8cff}
+  .node.d{background:#ffa657;color:#0d1117}
+  .edge{position:absolute;height:2px;background:var(--text-mute);transform-origin:left center;transition:all .9s cubic-bezier(.4,0,.2,1)}
+  .edge::after{content:"";position:absolute;right:-2px;top:-3px;border:4px solid transparent;border-left-color:var(--text-mute)}
+  .ctrl{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+  .btn{
+    background:var(--bg-card);border:1px solid var(--border);color:var(--text);
+    padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;transition:all .2s;
+    font-family:inherit;
+  }
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.primary{background:var(--intent);border-color:var(--intent);color:#0d1117;font-weight:600}
+  .btn.primary:hover{color:#0d1117;opacity:.9}
+  .btn.warn{background:var(--hint);border-color:var(--hint);color:#0d1117;font-weight:600}
+
+  /* metric bars */
+  .metric{margin:14px 0}
+  .metric .row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px}
+  .metric .row b{color:var(--text)}
+  .bar{height:8px;background:var(--bg-card);border-radius:99px;overflow:hidden}
+  .bar > i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.2,.8,.2,1)}
+  .bar.good > i{background:var(--grad-intent)}
+  .bar.warn > i{background:var(--grad-hint)}
+
+  /* reveal on scroll */
+  .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+  .reveal.in{opacity:1;transform:none}
+
+  /* callout */
+  .callout{
+    border-left:3px solid var(--accent);background:rgba(88,166,255,.07);
+    padding:14px 18px;border-radius:0 10px 10px 0;margin:18px 0;font-size:14px;
+  }
+  .callout.warn{border-color:var(--warn);background:rgba(210,153,34,.07)}
+  .callout.good{border-color:var(--accent-2);background:rgba(126,231,135,.07)}
+  .callout b{color:var(--text)}
+
+  /* timeline */
+  .timeline{position:relative;padding-left:28px;margin:24px 0}
+  .timeline::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:var(--border)}
+  .tl-item{position:relative;margin-bottom:22px}
+  .tl-item::before{content:"";position:absolute;left:-24px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--accent)}
+  .tl-item.done::before{background:var(--accent-2);border-color:var(--accent-2)}
+  .tl-item.now::before{background:var(--intent);border-color:var(--intent);animation:pulse 1.8s infinite}
+  .tl-item .when{font-size:12px;color:var(--text-mute)}
+  .tl-item h4{font-size:15px;margin:2px 0 4px}
+  .tl-item p{font-size:13px;color:var(--text-dim);margin:0}
+
+  /* competitor matrix */
+  .matrix td.yes{color:var(--accent-2);font-weight:600}
+  .matrix td.no{color:var(--text-mute)}
+  .matrix td.partial{color:var(--warn)}
+
+  /* feasibility gauge */
+  .gauge-wrap{display:flex;gap:18px;flex-wrap:wrap;margin:20px 0}
+  .gauge{flex:1;min-width:160px;text-align:center}
+  .gauge svg{width:100%;max-width:130px}
+  .gauge .lbl{font-size:13px;color:var(--text-dim);margin-top:6px}
+  .gauge .val{font-size:22px;font-weight:700}
+  .gauge .val.lo{color:var(--danger)}
+  .gauge .val.mid{color:var(--warn)}
+  .gauge .val.hi{color:var(--accent-2)}
+
+  footer{padding:40px 0 60px;color:var(--text-mute);font-size:13px;text-align:center}
+  footer a{color:var(--accent);text-decoration:none}
+  .src{font-size:12px;color:var(--text-mute);margin-top:8px}
+  .src a{color:var(--text-dim)}
+
+  /* tab */
+  .tabs{display:flex;gap:6px;margin:18px 0;border-bottom:1px solid var(--border)}
+  .tab{padding:10px 16px;cursor:pointer;font-size:14px;color:var(--text-dim);border-bottom:2px solid transparent;transition:all .2s}
+  .tab:hover{color:var(--text)}
+  .tab.active{color:var(--accent);border-color:var(--accent)}
+  .tab-pane{display:none;animation:fade .4s ease}
+  .tab-pane.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  ul.clean{list-style:none;padding-left:0}
+  ul.clean li{padding:6px 0 6px 22px;position:relative;font-size:14px;color:var(--text-dim)}
+  ul.clean li::before{content:"";position:absolute;left:0;top:14px;width:8px;height:2px;background:var(--accent)}
+  ul.clean li b{color:var(--text)}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ HERO ═══════════════ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="badge">Drawify · 布局调整方案研究</span>
+    <h1>Hint 还是 Intent?<br>面向 Agent 的布局调整路线抉择</h1>
+    <p class="lead">基于 drawify 现有实现、792 样本量化数据、行业竞品与 2025 学术趋势的综合研判。
+      报告回答两个问题:哪条路线更值得投入?Hint 方案的扩展与能力提升是否可行?</p>
+    <div class="meta">
+      <span><b>研究范围</b> · 实现 + 竞品 + 学术</span>
+      <span><b>数据基线</b> · Phase 0–3, 792 样本</span>
+      <span><b>日期</b> · 2026-06-20</span>
+    </div>
+
+    <div class="verdict">
+      <div class="tag"><span class="pulse"></span>核心结论</div>
+      <h2>Intent 更值得投入;Hint 退守为"自动质量基线层",两者协同而非互斥</h2>
+      <p>drawify 的 DSL 是<b>面向 Agent</b> 的。Agent(LLM)擅长表达<b>定性的关系约束</b>("A 应在 B 下方"、"三者对齐"),
+        而不擅长产出数值化的密度/坐标 hint。Intent 的语义模型与 Agent 的自然语言输出天然对齐;
+        Hint(friendliness)的价值在于<b>无需任何人参与</b>的自动兜底,应作为 Intent 之下的默认质量地板保留。
+        扩展 Hint 的表达力会不可避免地向 Intent 收敛——投入产出比递减。</p>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════ 1. 背景 ═══════════════ -->
+<section>
+  <div class="wrap">
+    <h2><span class="num">1</span>背景:面向 Agent 的 DSL 与布局调整的两条路</h2>
+    <p class="sub">drawify 的 DSL 设计以 Agent 为一等公民——图由 LLM 生成文本、文本解析为 AST、AST 驱动布局。
+      当自动布局"基本可读但局部不满意"时,如何让 Agent(或人)做局部修正?项目探索过两条路:</p>
+
+    <div class="grid grid-2">
+      <div class="card" style="border-left:3px solid var(--hint)">
+        <h4><span class="dot hint"></span>Hint 路线(提示)</h4>
+        <p><b>声明式、轻量、算法解读。</b>用户在 DSL 写 <code>layout: fan-out</code>,或算法自行产出
+          <code>FriendlinessReport</code> 诊断并自动调整。Agent/用户不直接控制具体节点对,只给"方向性提示",
+          由算法自由解读。代表实现:<code>GroupLayoutHint</code>、<code>FriendlinessAdjuster</code>。</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--intent)">
+        <h4><span class="dot intent"></span>Intent 路线(意图)</h4>
+        <p><b>命令式、显式、逐对约束。</b>Agent/用户通过 overlay 声明 <code>below(a,b)</code>、<code>align_vertical([a,b,c])</code>,
+          算法原生消费并返回每条意图的满足状态(<code>Satisfied/Partial/Conflicted</code>)。
+          代表实现:<code>LayoutIntentOverlay</code> + <code>RefinementReport</code>。</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <b>关键事实:</b> 两条路线在 <code>compute_layout_with_plan_and_overlay</code> 调度层<b>已经协同共存</b>
+      (见 <code>layout/mod.rs</code>)。Intent 的 <code>PinSet</code> 会被 <code>FriendlinessAdjuster</code> 尊重——
+      这不是"二选一",而是"谁主谁辅"的投入分配问题。
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. 现状实现 ═══════════════ -->
+<section>
+  <div class="wrap">
+    <h2><span class="num">2</span>现状实现:两条路线各自走到哪了</h2>
+    <p class="sub">基于源码逐文件比对,以下是两条路线的真实成熟度。</p>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="hint-impl">Hint 路线现状</div>
+      <div class="tab" data-tab="intent-impl">Intent 路线现状</div>
+    </div>
+
+    <!-- HINT -->
+    <div class="tab-pane active" id="hint-impl">
+      <div class="grid grid-3">
+        <div class="card">
+          <h4><span class="dot hint"></span>DSL Hint</h4>
+          <p><code>GroupLayoutHint</code>(<code>group_layout_hint.rs</code>):仅 <code>architecture-v2</code> 读取,
+            4 个枚举值 <code>auto/horizontal/vertical/fan-out</code>。另含 <code>style.width/height</code> 尺寸 hint。</p>
+        </div>
+        <div class="card">
+          <h4><span class="dot hint"></span>输出 Hint</h4>
+          <p><code>LayoutHints</code>(<code>mod.rs</code>):算法产出诊断——<code>sugiyama_ranks</code>、
+            <code>friendliness_report</code>(五维分数+热点)、<code>edge_routing_style</code> 推荐。</p>
+        </div>
+        <div class="card">
+          <h4><span class="dot hint"></span>自动调整</h4>
+          <p><code>FriendlinessAdjuster</code>(<code>adjuster.rs</code>):法线推送+momentum+重叠守卫+路由后验证回退。
+            永不让布局变差。</p>
+        </div>
+      </div>
+
+      <h3>Hint 路线的量化成绩单(792 样本)</h3>
+      <div class="metric">
+        <div class="row"><span>Phase 2 · edge_node_crossings 下降</span><b>38.9% ↓</b></div>
+        <div class="bar good"><i data-w="78"></i></div>
+      </div>
+      <div class="metric">
+        <div class="row"><span>Phase 2 · total_edge_length 变化</span><b style="color:var(--warn)">+1.5% ↑(未达标)</b></div>
+        <div class="bar warn"><i data-w="55"></i></div>
+      </div>
+      <div class="metric">
+        <div class="row"><span>Phase 1.5 · V1 Pearson vs enc(层次类)</span><b>0.5392(阈值 0.6,接近未达)</b></div>
+        <div class="bar warn"><i data-w="54"></i></div>
+      </div>
+      <div class="metric">
+        <div class="row"><span>Phase 1.5 · V1 Pearson vs enc(放射类)</span><b>0.7296 ✓</b></div>
+        <div class="bar good"><i data-w="73"></i></div>
+      </div>
+
+      <div class="callout warn">
+        <b>Hint 路线的硬伤:</b>
+        <ul class="clean" style="margin-top:8px">
+          <li><b>RUDY 度量已失效</b>(r=0.01),Phase 1.5 被迫替换为正交通道占用度——<b>hint 度量很难一次做对</b></li>
+          <li><b>Phase 3 barycenter 权重扰动</b>:任何非 1.0 的长边权重都让层次类交叉 <b>增加 11–42%</b>——算法内部调参极度脆弱</li>
+          <li><b>85.6% 样本 enc 不变</b>:大部分样本预测穿障数 &lt; 2,V2 不触发——自动调整的覆盖面有限</li>
+          <li><b>无用户控制通道</b>:Agent 无法说"我要 A 在 B 下面",只能改 DSL 重布局(整图跳变)</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- INTENT -->
+    <div class="tab-pane" id="intent-impl">
+      <div class="grid grid-3">
+        <div class="card">
+          <h4><span class="dot intent"></span>拓扑意图</h4>
+          <p><code>TopologyIntent::Below/Above</code>:Sugiyama <code>build_graph</code> 注入约束边,
+            <code>EdgeMeta.reversible=false</code> 保护意图边不被 FAS 反转。环检测+矛盾去重。</p>
+        </div>
+        <div class="card">
+          <h4><span class="dot intent"></span>几何意图</h4>
+          <p><code>Pin/AlignVertical/AlignHorizontal</code>:grid snap 前的 <code>apply_geometric_refinement</code>。
+            Pin 仅锁轴不锁绝对坐标(符合需求稿 §7 非目标)。</p>
+        </div>
+        <div class="card">
+          <h4><span class="dot intent"></span>报告与 API</h4>
+          <p><code>RefinementReport</code> 逐条返回状态。WASM <code>layout_intents</code> + Server
+            <code>X-Drawify-Refinement-Report</code> 头已落地。</p>
+        </div>
+      </div>
+
+      <h3>Intent 路线的成熟度</h3>
+      <table>
+        <tr><th>维度</th><th>状态</th><th>说明</th></tr>
+        <tr><td>核心数据结构</td><td class="partial">已实现</td><td><code>LayoutIntentOverlay</code> + 拓扑/几何拆分,49+ 单元测试</td></tr>
+        <tr><td>Sugiyama 原生消费</td><td class="partial">已实现</td><td>FAS 保护、环检测、矛盾去重均落地</td></tr>
+        <tr><td>跨算法支持</td><td class="partial">部分</td><td>仅 Sugiyama 系(flowchart/er/state)原生;力导向/放射类拓扑意图标记 <code>Partial</code></td></tr>
+        <tr><td>DSL 语法暴露</td><td class="no">未做</td><td>当前仅 API overlay 传入;<code>arrange</code> 语法在 Phase 4 TODO</td></tr>
+        <tr><td>独立效果 benchmark</td><td class="no">缺失</td><td>设计文档未提供量化效果——这是 Intent 最大的短板</td></tr>
+      </table>
+
+      <div class="callout good">
+        <b>Intent 路线的结构性优势:</b>
+        <ul class="clean" style="margin-top:8px">
+          <li><b>可观测</b>:每条意图都有明确状态,Agent 能据此迭代("这条 Conflicted 了,我换种说法")</li>
+          <li><b>可组合</b>:拓扑意图改 rank,几何意图改坐标,正交不冲突</li>
+          <li><b>不破坏契约</b>:overlay 独立透传,diagram 不变异,<code>relations[i]↔edges[i]</code> 索引保持</li>
+          <li><b>语义对齐 Agent</b>:below/above/align 是自然语言概念,LLM 几乎零成本产出</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. VS 可视化 ═══════════════ -->
+<section>
+  <div class="wrap">
+    <h2><span class="num">3</span>两条路线的工作机制对比</h2>
+    <p class="sub">同一张图、同一个"把 C 移到 A 下方"的需求,两条路线的信号流完全不同。</p>
+
+    <div class="vs-stage">
+      <div class="vs-col hint">
+        <h4><span class="dot hint"></span>Hint 路线</h4>
+        <div class="role">声明式 · 算法解读 · 隐式</div>
+        <div class="flow">
+          <div class="step"><div class="lbl">Agent 输入</div><b>改 DSL 重布局</b>——只能改 relations/属性,整图重算</div>
+          <div class="arrow">↓</div>
+          <div class="step"><div class="lbl">算法产出</div><b>FriendlinessReport</b>(分数+热点,Agent 看不懂也用不上)</div>
+          <div class="arrow">↓</div>
+          <div class="step"><div class="lbl">自动调整</div><b>FriendlinessAdjuster</b> 推节点——但不知道用户到底想要什么</div>
+          <div class="arrow">↓</div>
+          <div class="step"><div class="lbl">反馈</div><b>无逐条状态</b>——Agent 无法判断"我的意图满足了吗"</div>
+        </div>
+      </div>
+      <div class="vs-divider">VS</div>
+      <div class="vs-col intent">
+        <h4><span class="dot intent"></span>Intent 路线</h4>
+        <div class="role">命令式 · 逐对约束 · 显式</div>
+        <div class="flow">
+          <div class="step"><div class="lbl">Agent 输入</div><code>below(c, a)</code>——一句话,不动 DSL</div>
+          <div class="arrow">↓</div>
+          <div class="step"><div class="lbl">算法消费</div><b>注入约束边</b> c→a,Sugiyama 原生 rank 调整</div>
+          <div class="arrow">↓</div>
+          <div class="step"><div class="lbl">几何微调</div><b>Pin/Align</b> 锁定/对齐,跳过 grid snap</div>
+          <div class="arrow">↓</div>
+          <div class="step"><div class="lbl">反馈</div><b>RefinementReport</b>:Satisfied/Partial/Conflicted——Agent 可迭代</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 交互演示 -->
+    <div class="demo">
+      <div class="cap">交互演示 · 点击按钮观察两种路线如何把 C 移到 A 下方</div>
+      <div class="canvas" id="canvas">
+        <div class="node a" id="n-a" style="left:60px;top:80px">A</div>
+        <div class="node b" id="n-b" style="left:220px;top:30px">B</div>
+        <div class="node c" id="n-c" style="left:220px;top:130px">C</div>
+        <div class="edge" id="e-ab" style="left:114px;top:97px;width:106px;transform:rotate(-26deg)"></div>
+        <div class="edge" id="e-ac" style="left:114px;top:97px;width:128px;transform:rotate(20deg)"></div>
+      </div>
+      <div class="ctrl">
+        <button class="btn" onclick="resetDemo()">重置</button>
+        <button class="btn warn" onclick="hintDemo()">Hint:改 DSL 重布局(整图跳变)</button>
+        <button class="btn primary" onclick="intentDemo()">Intent:below(c,a)(局部稳定)</button>
+      </div>
+      <div id="demo-msg" style="margin-top:12px;font-size:13px;color:var(--text-dim);min-height:20px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. 竞品 ═══════════════ -->
+<section>
+  <div class="wrap">
+    <h2><span class="num">4</span>行业与竞品分析</h2>
+    <p class="sub">布局调整能力是 text-to-diagram 工具的核心差异化点。下表汇总主流竞品的布局控制模型。</p>
+
+    <table class="matrix">
+      <tr>
+        <th>工具</th>
+        <th>方向控制</th>
+        <th>相对位置/对齐</th>
+        <th>绝对坐标</th>
+        <th>约束(rank/weight)</th>
+        <th>路线归类</th>
+      </tr>
+      <tr>
+        <td><b>Graphviz / DOT</b></td>
+        <td class="yes">rankdir</td>
+        <td class="yes">group, rank=same</td>
+        <td class="yes">pos</td>
+        <td class="yes">constraint, weight</td>
+        <td><b>Intent 为主</b>(约束驱动)</td>
+      </tr>
+      <tr>
+        <td><b>D2 (TALA)</b></td>
+        <td class="yes">direction</td>
+        <td class="yes">near(对象)</td>
+        <td class="yes">top/left(TALA)</td>
+        <td class="partial">有限</td>
+        <td>Hint + Intent 混合</td>
+      </tr>
+      <tr>
+        <td><b>D2 (dagre/elk)</b></td>
+        <td class="yes">direction</td>
+        <td class="partial">near(仅常量)</td>
+        <td class="no">—</td>
+        <td class="no">—</td>
+        <td>Hint 为主</td>
+      </tr>
+      <tr>
+        <td><b>Mermaid</b></td>
+        <td class="yes">TB/LR/RL/BT</td>
+        <td class="no">—</td>
+        <td class="no">—</td>
+        <td class="no">—</td>
+        <td>纯 Hint(极简)</td>
+      </tr>
+      <tr>
+        <td><b>PlantUML</b></td>
+        <td class="yes">direction</td>
+        <td class="partial">together</td>
+        <td class="no">—</td>
+        <td class="no">—</td>
+        <td>Hint 为主</td>
+      </tr>
+      <tr>
+        <td><b>drawify(现状)</b></td>
+        <td class="yes">layout direction</td>
+        <td class="yes">Intent: align_*</td>
+        <td class="partial">Intent: Pin(仅轴)</td>
+        <td class="yes">Intent: below/above</td>
+        <td><b>Intent + Hint 双层</b></td>
+      </tr>
+    </table>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h4>Graphviz 的启示</h4>
+        <p>作为最强大的图布局工具,Graphviz 的控制力几乎全部来自<b>约束型属性</b>(<code>rank=same</code>、
+          <code>constraint=false</code>、<code>weight</code>、<code>group</code>、<code>pos</code>)——
+          这些本质都是 <b>Intent</b>(用户显式声明约束,算法满足)。<code>pos</code> 绝对坐标是兜底,不是主力。
+          drawify 的 Intent 设计与 Graphviz 同源,但更克制(拒绝绝对坐标,只做轴约束)。</p>
+      </div>
+      <div class="card">
+        <h4>D2 的分化</h4>
+        <p>D2 自研的 TALA 引擎支持 <code>top/left</code> 绝对锁定和 <code>near</code> 对象相对定位——
+          这是<b>向 Intent/显式控制靠拢</b>的信号。而 dagre/elk 后端只能用 <code>direction</code> 这种 Hint。
+          D2 的演进方向说明:<b>能力上限由 Intent 决定,Hint 只是入门门槛</b>。</p>
+      </div>
+    </div>
+
+    <h3>2025 学术趋势:Agent 生成图,定性关系约束胜过数值</h3>
+    <div class="grid grid-2">
+      <div class="card">
+        <h4>See it. Say it. Sorted.(NeurIPS 2025)</h4>
+        <p>Sketch-to-diagram 的 Agent 系统,核心是 <b>Critic-Candidates-Judge</b> 循环。
+          Critic VLM 提出"<b>一小批定性的、关系性的编辑</b>"(如"A 应在 B 右侧"),
+          而非数值坐标。论文明确写道:"prioritizes <b>qualitative reasoning over brittle numerical estimates</b>,
+          preserves global constraints (e.g., alignment, connectivity)"。
+          <b>这正是 Intent 的语义模型</b>。</p>
+        <div class="src">arXiv:2508.15222</div>
+      </div>
+      <div class="card">
+        <h4>Co-Layout: LLM-driven(arXiv 2511.12474)</h4>
+        <p>用 LLM 从文本生成 scene graph(含<b>约束</b>),再做优化。LLM 产出的是"<b>房间与家具列表 + 关联约束</b>",
+          不是坐标。结论:LLM 适合产出<b>结构化约束</b>,数值优化交给求解器。
+          <b>分工 = Intent(LLM 产出) + 算法(求解)</b>,与 drawify 的 Intent overlay 架构一致。</p>
+        <div class="src">arXiv:2511.12474</div>
+      </div>
+    </div>
+
+    <div class="callout good">
+      <b>行业共识收敛:</b> 能力强的工具(Graphviz/TALA)靠 <b>Intent/约束</b> 拉开上限;
+      2025 年 Agent 生成图的前沿研究也选择<b>定性关系约束</b>而非数值 hint。
+      drawify 作为面向 Agent 的 DSL,与这条主线天然对齐。
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 5. 决策 ═══════════════ -->
+<section>
+  <div class="wrap">
+    <h2><span class="num">5</span>决策:为什么 Intent 更值得投入</h2>
+    <p class="sub">综合实现成熟度、Agent 语义对齐、行业趋势、可观测性四个维度。</p>
+
+    <table>
+      <tr><th>决策维度</th><th>Hint</th><th>Intent</th><th>胜出</th></tr>
+      <tr>
+        <td><b>Agent 语义对齐</b></td>
+        <td>差——Agent 不会产出密度/坐标</td>
+        <td>优——below/align 是自然语言</td>
+        <td><span class="dot intent"></span> Intent</td>
+      </tr>
+      <tr>
+        <td><b>可观测性/可迭代</b></td>
+        <td>差——无逐条状态</td>
+        <td>优——RefinementReport 逐条反馈</td>
+        <td><span class="dot intent"></span> Intent</td>
+      </tr>
+      <tr>
+        <td><b>局部稳定(不跳变)</b></td>
+        <td>差——改 DSL 整图重算</td>
+        <td>优——overlay 局部修正</td>
+        <td><span class="dot intent"></span> Intent</td>
+      </tr>
+      <tr>
+        <td><b>零成本兜底</b></td>
+        <td>优——无需任何人参与</td>
+        <td>差——必须显式声明</td>
+        <td><span class="dot hint"></span> Hint</td>
+      </tr>
+      <tr>
+        <td><b>行业能力上限</b></td>
+        <td>低——Mermaid/PlantUML 级</td>
+        <td>高——Graphviz/TALA 级</td>
+        <td><span class="dot intent"></span> Intent</td>
+      </tr>
+      <tr>
+        <td><b>实现成熟度</b></td>
+        <td>高——Phase 0-3 已验收</td>
+        <td>中——核心已实现,缺 benchmark</td>
+        <td><span class="dot hint"></span> Hint(暂)</td>
+      </tr>
+      <tr>
+        <td><b>扩展表达力天花板</b></td>
+        <td>低——加类型即收敛到 Intent</td>
+        <td>高——right_of/same_rank/near 可演进</td>
+        <td><span class="dot intent"></span> Intent</td>
+      </tr>
+    </table>
+
+    <div class="callout">
+      <b>最终判断:</b> 7 个维度中 Intent 胜 5、Hint 胜 2。Hint 的两个胜项(零成本兜底、当前成熟度)都是<b>防御性价值</b>——
+      保留即可,不值得继续扩张。Intent 的胜项全是<b>进攻性价值</b>——决定 drawify 能走多远。
+      <b>建议:Intent 主攻,Hint 守底。</b>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 6. Hint 扩展可行性 ═══════════════ -->
+<section>
+  <div class="wrap">
+    <h2><span class="num">6</span>Hint 方案扩展与能力提升的可行性</h2>
+    <p class="sub">用户特别要求研究 Hint 的扩展空间。结论:可行但天花板低,且越扩展越像 Intent。</p>
+
+    <h3>6.1 三条扩展路径与可行性评估</h3>
+
+    <div class="gauge-wrap">
+      <div class="gauge">
+        <svg viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="42" fill="none" stroke="var(--bg-card)" stroke-width="10"/>
+          <circle cx="50" cy="50" r="42" fill="none" stroke="var(--danger)" stroke-width="10"
+            stroke-dasharray="264" stroke-dashoffset="185" transform="rotate(-90 50 50)" stroke-linecap="round"/>
+        </svg>
+        <div class="val lo">低</div>
+        <div class="lbl">路径 A:新增 DSL Hint 类型<br>(如 <code>density: loose</code>)</div>
+      </div>
+      <div class="gauge">
+        <svg viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="42" fill="none" stroke="var(--bg-card)" stroke-width="10"/>
+          <circle cx="50" cy="50" r="42" fill="none" stroke="var(--warn)" stroke-width="10"
+            stroke-dasharray="264" stroke-dashoffset="132" transform="rotate(-90 50 50)" stroke-linecap="round"/>
+        </svg>
+        <div class="val mid">中</div>
+        <div class="lbl">路径 B:FriendlinessAdjuster<br>增强(多目标/学习权重)</div>
+      </div>
+      <div class="gauge">
+        <svg viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="42" fill="none" stroke="var(--bg-card)" stroke-width="10"/>
+          <circle cx="50" cy="50" r="42" fill="none" stroke="var(--danger)" stroke-width="10"
+            stroke-dasharray="264" stroke-dashoffset="211" transform="rotate(-90 50 50)" stroke-linecap="round"/>
+        </svg>
+        <div class="val lo">低</div>
+        <div class="lbl">路径 C:V3 布局目标集成<br>(友好度作惩罚项)</div>
+      </div>
+    </div>
+
+    <div class="grid grid-3">
+      <div class="card">
+        <h4>路径 A · 新增 DSL Hint 类型</h4>
+        <p><b>可行性:低。</b>加 <code>density</code>/<code>spread</code> 这类 hint,本质是给算法一个"软偏好"。
+          但 Phase 3 已证明:算法内部参数(barycenter 权重)对扰动<b>极度敏感</b>,任何非默认值都让交叉增加。
+          且这类 hint 一旦要"精确控制具体节点对",就必然演化成 <code>below/align</code>——<b>收敛到 Intent</b>。</p>
+      </div>
+      <div class="card">
+        <h4>路径 B · Adjuster 增强</h4>
+        <p><b>可行性:中。</b>当前 adjuster 只优化 <code>predicted_crossings</code>。
+          可扩展为多目标(加 <code>edge_length</code>、<code>port_conflict</code>),或用学习到的权重替代分族静态权重。
+          但 Phase 2 已暴露本质代价:<b>用边长换交叉</b>(edge_length +1.5%)。多目标会陷入帕累托权衡,收益递减。</p>
+      </div>
+      <div class="card">
+        <h4>路径 C · V3 目标集成</h4>
+        <p><b>可行性:低。</b>Phase 3 实测:Sugiyama barycenter 权重方案<b>反效果已禁用</b>;
+          force-directed RUDY 排斥力有效但仅限力导向族。把友好度塞进布局目标函数,会破坏算法的确定性,
+          且与 Intent 的显式约束<b>优先级冲突</b>(谁说了算?)。</p>
+      </div>
+    </div>
+
+    <h3>6.2 Hint 扩展的根本矛盾</h3>
+    <div class="callout warn">
+      <b>收敛定理:</b> Hint 的表达力每提升一档,就更像 Intent 一分。
+      <ul class="clean" style="margin-top:8px">
+        <li><code>layout: fan-out</code>(现状) → 算法自由解读,纯 Hint</li>
+        <li><code>align: a,b,c</code>(假设扩展) → 这就是 <code>align_vertical</code> Intent</li>
+        <li><code>order: a before b</code>(假设扩展) → 这就是 <code>below/above</code> Intent</li>
+      </ul>
+      一旦 Hint 需要"指名道姓"控制具体节点,它就不再是 Hint,而是 Intent。
+      <b>所以扩展 Hint = 重新发明 Intent,且没有 RefinementReport 的可观测性。</b>
+    </div>
+
+    <h3>6.3 Hint 真正值得做的有限增强</h3>
+    <p>Hint 不应追求"表达力",而应巩固"自动兜底"这个唯一护城河。建议只做 3 件事:</p>
+    <ul class="clean">
+      <li><b>补齐 Intent 的 benchmark</b>:用现有 792 样本框架,量化 Intent(below/align)对 enc/跳变的影响——这是 Intent 的短板,但用 Hint 的评测基础设施来补</li>
+      <li><b>Adjuster 尊重 PinSet</b>:当前 adjuster.rs L13 已预留 pinned 接口但未实装,补完它让 Intent+Hint 协同更稳</li>
+      <li><b>FriendlinessReport 暴露给 Agent</b>:把热点信息结构化进 RefinementReport,让 Agent 能读"哪里不友好"并主动下 Intent——<b>Hint 成为 Intent 的传感器</b></li>
+    </ul>
+
+    <div class="callout good">
+      <b>结论:</b> Hint 的扩展不应是"加更多 hint 类型",而是"让 hint 更好地服务 intent"。
+      把 FriendlinessReport 从"给人看的诊断"升级为"给 Agent 下的意图建议",是投入产出比最高的方向。
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. 路线图 ═══════════════ -->
+<section>
+  <div class="wrap">
+    <h2><span class="num">7</span>建议路线图</h2>
+    <p class="sub">Intent 主攻 + Hint 守底 + Hint 反哺 Intent 的三层协同。</p>
+
+    <div class="timeline">
+      <div class="tl-item done">
+        <div class="when">已完成</div>
+        <h4>Intent P1/P1.5 + Hint Phase 0-3</h4>
+        <p>拓扑/几何意图核心落地;Friendliness 五维评估+V2 调整器+V3 目标集成已验收。</p>
+      </div>
+      <div class="tl-item now">
+        <div class="when">近期 · 补 Intent 短板</div>
+        <h4>Intent 效果 benchmark + Adjuster 尊重 PinSet</h4>
+        <p>用 792 样本框架量化 Intent 的 enc/跳变改善;实装 adjuster pinned 接口,确保 Intent 约束不被自动调整破坏。</p>
+      </div>
+      <div class="tl-item">
+        <div class="when">中期 · Hint 反哺 Intent</div>
+        <h4>FriendlinessReport → Intent 建议</h4>
+        <p>把热点结构化进 RefinementReport,Agent 可读"长边跨层度过高"并自动下 <code>below/align</code> 意图。Hint 成为 Intent 的传感器。</p>
+      </div>
+      <div class="tl-item">
+        <div class="when">中期 · Intent 扩展</div>
+        <h4>right_of / same_rank(P2)</h4>
+        <p>order hint 入口 + network-simplex 约束传播。扩展 Intent 表达力,覆盖更多"自动布局不满意"场景。</p>
+      </div>
+      <div class="tl-item">
+        <div class="when">远期 · DSL 化</div>
+        <h4>arrange 语法(高频意图进 AST)</h4>
+        <p>把高频 Intent(below/align)提升为 DSL 一等语法,Agent 可直接在文本里写,无需 overlay API。这是 Intent 的终态。</p>
+      </div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card" style="border-left:3px solid var(--intent)">
+        <h4><span class="dot intent"></span>Intent 投入分配(主攻)</h4>
+        <ul class="clean">
+          <li><b>70%</b> · 扩展意图类型 + DSL arrange 语法</li>
+          <li><b>20%</b> · 跨算法支持(力导向/放射类原生消费)</li>
+          <li><b>10%</b> · 效果 benchmark 与回归</li>
+        </ul>
+      </div>
+      <div class="card" style="border-left:3px solid var(--hint)">
+        <h4><span class="dot hint"></span>Hint 投入分配(守底)</h4>
+        <ul class="clean">
+          <li><b>60%</b> · FriendlinessReport 结构化反哺 Intent</li>
+          <li><b>30%</b> · Adjuster pinned 协同 + 回归</li>
+          <li><b>10%</b> · 维护现有五维度量(不新增类型)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>本报告基于 drawify 源码、<code>benchmarks/</code> Phase 0–3 数据、竞品文档与 2025 学术论文综合撰写。</p>
+    <p class="src">实现依据:
+      <a href="https://github.com/terrastruct/d2">D2</a> ·
+      <a href="https://mermaid.js.org/">Mermaid</a> ·
+      <a href="https://graphviz.org/">Graphviz</a> ·
+      <a href="https://arxiv.org/abs/2508.15222">See it. Say it. Sorted.(NeurIPS 2025)</a> ·
+      <a href="https://arxiv.org/abs/2511.12474">Co-Layout(arXiv 2025)</a>
+    </p>
+    <p class="src">drawify 内部文档:layout-intent-optimized.md(v2.1) · layout-routing-friendliness-evaluation.md · phase0_phase1_staged_conclusion.md</p>
+  </div>
+</footer>
+
+<script>
+  // ── 滚动 reveal ──
+  const io = new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
+  },{threshold:.15});
+  document.querySelectorAll('section h2, section h3, .card, .callout, table, .timeline, .gauge-wrap, .vs-stage, .demo')
+    .forEach(el=>{el.classList.add('reveal');io.observe(el)});
+
+  // ── 进度条动画 ──
+  const barIO = new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){
+      const i=e.target.querySelector('i'); if(i&&i.dataset.w) i.style.width=i.dataset.w+'%';
+      barIO.unobserve(e.target);
+    }});
+  },{threshold:.4});
+  document.querySelectorAll('.bar').forEach(b=>barIO.observe(b));
+
+  // ── Tabs ──
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click',()=>{
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById(t.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── 演示 ──
+  const A=document.getElementById('n-a'),B=document.getElementById('n-b'),C=document.getElementById('n-c');
+  const EAB=document.getElementById('e-ab'),EAC=document.getElementById('e-ac');
+  const msg=document.getElementById('demo-msg');
+  function setPos(el,x,y){el.style.left=x+'px';el.style.top=y+'px'}
+  function resetDemo(){
+    setPos(A,60,80);setPos(B,220,30);setPos(C,220,130);
+    redrawEdges();msg.textContent='初始状态:A 在左上,B/C 在右侧上下排列。';
+  }
+  function redrawEdges(){
+    const ax=A.offsetLeft+27,ay=A.offsetTop+17;
+    const bx=B.offsetLeft+27,by=B.offsetTop+17;
+    const cx=C.offsetLeft+27,cy=C.offsetTop+17;
+    const dab=Math.hypot(bx-ax,by-ay);
+    EAB.style.left=ax+'px';EAB.style.top=ay+'px';EAB.style.width=dab+'px';
+    EAB.style.transform=`rotate(${Math.atan2(by-ay,bx-ax)}rad)`;
+    const dac=Math.hypot(cx-ax,cy-ay);
+    EAC.style.left=ax+'px';EAC.style.top=ay+'px';EAC.style.width=dac+'px';
+    EAC.style.transform=`rotate(${Math.atan2(cy-ay,cx-ax)}rad)`;
+  }
+  function hintDemo(){
+    // Hint:改 DSL 重布局——整图跳变,B 也被移动
+    setPos(A,60,40);setPos(B,300,120);setPos(C,60,130);
+    redrawEdges();
+    msg.textContent='Hint 路线:只能改 DSL 重布局,整图重算——A、B、C 位置全部跳变(连 B 都被波及)。无逐条反馈。';
+  }
+  function intentDemo(){
+    // Intent:below(c,a)——只动 C,A/B 不变
+    setPos(A,60,80);setPos(B,220,30);
+    setPos(C,60,150);  // C 移到 A 下方
+    redrawEdges();
+    msg.textContent='Intent 路线:below(c,a)——仅 C 移动到 A 下方,A/B 原地不动。RefinementReport: Satisfied ✓';
+  }
+  setTimeout(redrawEdges,100);
+  window.addEventListener('resize',redrawEdges);
+</script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 120" width="300" height="120">
+  <defs>
+    <style><![CDATA[
+      @keyframes flow {
+        to { stroke-dashoffset: -20; }
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.4; r: 4; }
+        50%      { opacity: 1;   r: 8; }
+      }
+      @keyframes color-cycle {
+        0%   { fill: #4a6fa5; }
+        33%  { fill: #9b59b6; }
+        66%  { fill: #2e7d32; }
+        100% { fill: #4a6fa5; }
+      }
+      .flow-line {
+        stroke-dasharray: 8 6;
+        animation: flow 0.7s linear infinite;
+        stroke: #ff6b35;
+        stroke-width: 3;
+        fill: none;
+      }
+      .spinner {
+        animation: spin 2s linear infinite;
+        transform-origin: 70px 60px;
+        transform-box: fill-box;
+      }
+      .pulse-dot {
+        animation: pulse 1.5s ease-in-out infinite;
+        fill: #4caf50;
+      }
+      .color-box {
+        animation: color-cycle 3s ease-in-out infinite;
+      }
+    ]]></style>
+    <marker id="c-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10z" fill="#ff6b35"/>
+    </marker>
+  </defs>
+
+  <rect width="300" height="120" fill="#0f0f23" rx="8"/>
+
+  <text x="150" y="20" text-anchor="middle" fill="#666" font-size="10" font-family="sans-serif">
+    所有动画都是 infinite 循环，通过 &lt;img&gt; 加载
+  </text>
+
+  <path class="flow-line" d="M20 60 L200 60" marker-end="url(#c-arrow)"/>
+  <text x="110" y="50" text-anchor="middle" fill="#ff6b35" font-size="10" font-family="sans-serif">dashoffset 循环</text>
+
+  <g class="spinner">
+    <circle cx="70" cy="60" r="15" fill="none" stroke="#667eea" stroke-width="3" stroke-dasharray="20 80" stroke-linecap="round"/>
+  </g>
+  <text x="70" y="95" text-anchor="middle" fill="#667eea" font-size="9" font-family="sans-serif">旋转</text>
+
+  <circle class="pulse-dot" cx="150" cy="90"/>
+  <text x="150" y="110" text-anchor="middle" fill="#4caf50" font-size="9" font-family="sans-serif">脉冲</text>
+
+  <rect class="color-box" x="220" y="45" width="50" height="30" rx="6"/>
+  <text x="245" y="95" text-anchor="middle" fill="#aaa" font-size="9" font-family="sans-serif">颜色循环</text>
+</svg>

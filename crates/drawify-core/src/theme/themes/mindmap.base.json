@@ -1,0 +1,155 @@
+{
+  "version": "0.2",
+  "id": "mindmap.base",
+  "name": "Mindmap Base",
+  "meta": {
+    "author": "Drawify",
+    "description": "内部基座：mindmap 专用主题的默认结构（不暴露给用户）",
+    "tags": [
+      "mindmap",
+      "internal",
+      "base"
+    ]
+  },
+  "tokens": {
+    "colors": {
+      "canvas": "#FFFFFF",
+      "text": "#2D3436",
+      "muted_text": "#636E72",
+      "border": "#DFE6E9",
+      "primary": "#6C5CE7",
+      "neutral_fill": "#F8F9FA",
+      "neutral_stroke": "#B2BEC3",
+      "group_fill": "#F1F2F6",
+      "group_stroke": "#B2BEC3"
+    },
+    "palette": {
+      "root": { "fill": "#6C5CE7", "stroke": "#5A4BD1", "text_fill": "#FFFFFF" }
+    },
+    "typography": {
+      "font_family": "'Noto Sans CJK SC', 'Segoe UI', sans-serif",
+      "title_size": 16,
+      "label_size": 13,
+      "small_size": 11,
+      "font_weight_regular": 400,
+      "font_weight_medium": 500,
+      "font_weight_bold": 700
+    },
+    "strokes": {
+      "thin": 1.0,
+      "normal": 1.5,
+      "thick": 2.0,
+      "dashed": [6, 3],
+      "dotted": [2, 4]
+    },
+    "radius": {
+      "sm": 4,
+      "md": 8,
+      "lg": 12,
+      "pill": 999
+    },
+    "spacing": {
+      "node_padding_x": 12,
+      "node_padding_y": 8,
+      "group_padding": 16,
+      "label_gap": 6
+    },
+    "effects": {
+      "shadow": false
+    }
+  },
+  "defaults": {
+    "canvas": {
+      "background": "{colors.canvas}"
+    },
+    "title": {
+      "fill": "{colors.text}",
+      "font_size": "{typography.title_size}",
+      "font_weight": "{typography.font_weight_bold}"
+    },
+    "node": {
+      "fill": "{colors.neutral_fill}",
+      "stroke": "{colors.neutral_stroke}",
+      "stroke_width": "{strokes.normal}",
+      "text_fill": "{colors.text}",
+      "font_size": "{typography.label_size}",
+      "radius": "{radius.lg}",
+      "shape": "rounded_rect"
+    },
+    "edge": {
+      "stroke": "{colors.neutral_stroke}",
+      "stroke_width": "{strokes.normal}",
+      "text_fill": "{colors.muted_text}",
+      "font_size": "{typography.small_size}"
+    },
+    "group": {
+      "fill": "{colors.group_fill}",
+      "stroke": "{colors.group_stroke}",
+      "stroke_width": "{strokes.normal}",
+      "text_fill": "{colors.muted_text}",
+      "radius": "{radius.sm}"
+    }
+  },
+  "diagrams": {
+    "mindmap": {
+      "edge": {
+        "stroke_width": "{strokes.thin}"
+      },
+      "node": {
+        "radius": "{radius.lg}"
+      },
+      "entity_types": {
+        "root": {
+          "shape": "circle",
+          "label_weight": "bold",
+          "fill": "{role.root.fill}",
+          "stroke": "{role.root.stroke}",
+          "text_fill": "{role.root.text_fill}",
+          "font_size": "{typography.title_size}"
+        },
+        "main": {
+          "shape": "rounded_rect",
+          "label_weight": "medium",
+          "font_size": "{typography.label_size}"
+        },
+        "branch": {
+          "shape": "rounded_rect"
+        },
+        "leaf": {
+          "shape": "rounded_rect",
+          "stroke": "#00000000",
+          "font_size": "{typography.small_size}"
+        }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#E8DAEF", "stroke": "#8E44AD", "edge_stroke": "#8E44AD" },
+            { "fill": "#D5F5E3", "stroke": "#27AE60", "edge_stroke": "#27AE60" },
+            { "fill": "#FDEBD0", "stroke": "#E67E22", "edge_stroke": "#E67E22" },
+            { "fill": "#D6EAF8", "stroke": "#2980B9", "edge_stroke": "#2980B9" },
+            { "fill": "#FADBD8", "stroke": "#E74C3C", "edge_stroke": "#E74C3C" },
+            { "fill": "#FCF3CF", "stroke": "#F1C40F", "edge_stroke": "#F1C40F" }
+          ],
+          "index": { "from": "branch_slot", "wrap": true },
+          "bindings": [
+            { "target": "entity", "types": ["main", "branch"], "fields": { "fill": "fill", "stroke": "stroke" } },
+            { "target": "entity", "types": ["leaf"], "fields": { "fill": "fill" } },
+            { "target": "edge", "fields": { "stroke": "edge_stroke" } }
+          ]
+        },
+        "edge_depth": {
+          "entries": [
+            { "stroke_width": 3.0 },
+            { "stroke_width": 2.25 },
+            { "stroke_width": 1.75 }
+          ],
+          "index": { "from": "tree_depth" },
+          "bindings": [
+            { "target": "edge", "fields": { "stroke_width": "stroke_width" } }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,413 @@
+{
+  "version": "0.2",
+  "id": "common.clean-light",
+  "name": "Clean Light",
+  "meta": {
+    "author": "Drawify",
+    "description": "默认浅色基础样式：通用、清晰、低干扰，适合文档与网页嵌入",
+    "tags": [
+      "light",
+      "clean",
+      "default"
+    ]
+  },
+  "tokens": {
+    "colors": {
+      "canvas": "#FAFAFA",
+      "text": "#333333",
+      "muted_text": "#666666",
+      "border": "#CFD8DC",
+      "primary": "#1976D2",
+      "neutral_fill": "#ECEFF1",
+      "neutral_stroke": "#455A64",
+      "group_fill": "#F5F5F5",
+      "group_stroke": "#CFD8DC"
+    },
+    "palette": {
+      "blue": { "fill": "#E3F2FD", "stroke": "#1976D2" },
+      "orange": { "fill": "#FFF3E0", "stroke": "#E65100" },
+      "green": { "fill": "#E8F5E9", "stroke": "#2E7D32" },
+      "purple": { "fill": "#F3E5F5", "stroke": "#7B1FA2" },
+      "yellow": { "fill": "#FFF9C4", "stroke": "#F9A825" },
+      "red": { "fill": "#FFEBEE", "stroke": "#C62828" },
+      "cyan": { "fill": "#E0F7FA", "stroke": "#00838F" },
+      "brown": { "fill": "#EFEBE9", "stroke": "#4E342E" },
+      "gray": { "fill": "#F5F5F5", "stroke": "#9E9E9E" },
+      "amber": { "fill": "#FFF8E1", "stroke": "#FF8F00" },
+      "blue_gray": { "fill": "#ECEFF1", "stroke": "#455A64" },
+      "start_green": { "fill": "#C8E6C9", "stroke": "#2E7D32" },
+      "end_red": { "fill": "#FFCDD2", "stroke": "#C62828" },
+      "arch_blue": { "fill": "#E3F2FD", "stroke": "#1565C0" },
+      "root": { "fill": "#6A1B9A", "stroke": "#4A148C", "text_fill": "#FFFFFF" }
+    },
+    "typography": {
+      "font_family": "'Noto Sans CJK SC', 'Segoe UI', sans-serif",
+      "title_size": 16,
+      "label_size": 13,
+      "small_size": 11,
+      "font_weight_regular": 400,
+      "font_weight_medium": 500,
+      "font_weight_bold": 700
+    },
+    "strokes": {
+      "thin": 1.0,
+      "normal": 1.5,
+      "thick": 2.0,
+      "dashed": [
+        6,
+        3
+      ],
+      "dotted": [
+        2,
+        4
+      ]
+    },
+    "radius": {
+      "sm": 4,
+      "md": 8,
+      "lg": 12,
+      "pill": 999
+    },
+    "spacing": {
+      "node_padding_x": 12,
+      "node_padding_y": 8,
+      "group_padding": 16,
+      "label_gap": 6
+    },
+    "effects": {
+      "shadow": false
+    }
+  },
+  "defaults": {
+    "canvas": {
+      "background": "{colors.canvas}"
+    },
+    "title": {
+      "fill": "{colors.text}",
+      "font_size": "{typography.title_size}",
+      "font_weight": "{typography.font_weight_bold}"
+    },
+    "node": {
+      "fill": "{colors.neutral_fill}",
+      "stroke": "{colors.neutral_stroke}",
+      "stroke_width": "{strokes.normal}",
+      "text_fill": "{colors.text}",
+      "font_size": "{typography.label_size}",
+      "radius": "{radius.md}",
+      "shape": "rounded_rect"
+    },
+    "edge": {
+      "stroke": "{colors.neutral_stroke}",
+      "stroke_width": "{strokes.normal}",
+      "text_fill": "{colors.muted_text}",
+      "font_size": "{typography.small_size}"
+    },
+    "group": {
+      "fill": "{colors.group_fill}",
+      "stroke": "{colors.group_stroke}",
+      "stroke_width": "{strokes.normal}",
+      "text_fill": "{colors.muted_text}",
+      "radius": "{radius.sm}"
+    }
+  },
+  "diagrams": {
+    "flowchart": {
+      "edge": {
+        "stroke": "#555555"
+      },
+      "entity_types": {
+        "service": {
+          "shape": "rounded_rect",
+          "fill": "{role.blue.fill}",
+          "stroke": "{role.blue.stroke}"
+        },
+        "database": {
+          "shape": "cylinder",
+          "fill": "{role.orange.fill}",
+          "stroke": "{role.orange.stroke}"
+        },
+        "person": {
+          "shape": "person",
+          "fill": "{role.green.fill}",
+          "stroke": "{role.green.stroke}"
+        },
+        "client": {
+          "shape": "rounded_rect",
+          "fill": "{role.purple.fill}",
+          "stroke": "{role.purple.stroke}"
+        },
+        "queue": {
+          "shape": "rounded_rect",
+          "fill": "{role.yellow.fill}",
+          "stroke": "{role.yellow.stroke}"
+        },
+        "cache": {
+          "shape": "rounded_rect",
+          "fill": "{role.red.fill}",
+          "stroke": "{role.red.stroke}"
+        },
+        "gateway": {
+          "shape": "rounded_rect",
+          "fill": "{role.cyan.fill}",
+          "stroke": "{role.cyan.stroke}"
+        },
+        "storage": {
+          "shape": "rounded_rect",
+          "fill": "{role.brown.fill}",
+          "stroke": "{role.brown.stroke}"
+        },
+        "external": {
+          "shape": "rounded_rect",
+          "stroke_dasharray": "5,3",
+          "fill": "{role.gray.fill}",
+          "stroke": "{role.gray.stroke}"
+        },
+        "decision": {
+          "shape": "diamond",
+          "fill": "{role.amber.fill}",
+          "stroke": "{role.amber.stroke}"
+        },
+        "process": {
+          "shape": "rounded_rect",
+          "fill": "{role.blue_gray.fill}",
+          "stroke": "{role.blue_gray.stroke}"
+        },
+        "start": {
+          "shape": "stadium",
+          "fill": "{role.start_green.fill}",
+          "stroke": "{role.start_green.stroke}"
+        },
+        "end": {
+          "shape": "stadium",
+          "fill": "{role.end_red.fill}",
+          "stroke": "{role.end_red.stroke}"
+        }
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "{lighten({colors.group_fill}, 0.0)}", "stroke": "{lighten({colors.group_stroke}, 0.0)}", "stroke_width": 2.0, "border_radius": 8.0 },
+            { "fill": "{lighten({colors.group_fill}, 0.35)}", "stroke": "{lighten({colors.group_stroke}, 0.30)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{lighten({colors.group_fill}, 0.55)}", "stroke": "{lighten({colors.group_stroke}, 0.50)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{lighten({colors.group_fill}, 0.70)}", "stroke": "{lighten({colors.group_stroke}, 0.65)}", "stroke_width": 1.5, "border_radius": 6.0 }
+          ],
+          "index": { "from": "group_depth", "cap": 3 },
+          "bindings": [
+            { "target": "group", "fields": { "fill": "fill", "stroke": "stroke", "stroke_width": "stroke_width", "border_radius": "border_radius" } }
+          ]
+        }
+      }
+    },
+    "sequence": {
+      "edge": {
+        "stroke": "#555555"
+      },
+      "entity_types": {
+        "participant": {
+          "shape": "rect",
+          "fill": "{role.blue_gray.fill}",
+          "stroke": "{role.blue_gray.stroke}"
+        },
+        "actor": {
+          "shape": "rect",
+          "fill": "{role.blue.fill}",
+          "stroke": "{role.blue.stroke}"
+        },
+        "boundary": {
+          "shape": "rect",
+          "fill": "{role.orange.fill}",
+          "stroke": "{role.orange.stroke}"
+        },
+        "control": {
+          "shape": "rect",
+          "fill": "{role.green.fill}",
+          "stroke": "{role.green.stroke}"
+        },
+        "entity": {
+          "shape": "rect",
+          "fill": "{role.purple.fill}",
+          "stroke": "{role.purple.stroke}"
+        },
+        "database": {
+          "shape": "cylinder",
+          "fill": "{role.yellow.fill}",
+          "stroke": "{role.yellow.stroke}"
+        }
+      }
+    },
+    "state": {
+      "edge": {
+        "stroke": "#555555"
+      },
+      "entity_types": {
+        "initial": {
+          "shape": "circle",
+          "fill": "{role.start_green.fill}",
+          "stroke": "{role.start_green.stroke}"
+        },
+        "state": {
+          "shape": "rounded_rect",
+          "fill": "{role.blue.fill}",
+          "stroke": "{role.blue.stroke}"
+        },
+        "final": {
+          "shape": "circle",
+          "fill": "{role.end_red.fill}",
+          "stroke": "{role.end_red.stroke}"
+        },
+        "choice": {
+          "shape": "diamond",
+          "fill": "{role.amber.fill}",
+          "stroke": "{role.amber.stroke}"
+        }
+      }
+    },
+    "architecture": {
+      "edge": {
+        "stroke": "#455A64"
+      },
+      "entity_types": {
+        "frontend": {
+          "shape": "rect",
+          "fill": "{role.arch_blue.fill}",
+          "stroke": "{role.arch_blue.stroke}"
+        },
+        "backend": {
+          "shape": "rounded_rect",
+          "fill": "{role.green.fill}",
+          "stroke": "{role.green.stroke}"
+        },
+        "service": {
+          "shape": "rounded_rect",
+          "fill": "{role.green.fill}",
+          "stroke": "{role.green.stroke}"
+        },
+        "database": {
+          "shape": "cylinder",
+          "fill": "{role.orange.fill}",
+          "stroke": "{role.orange.stroke}"
+        },
+        "gateway": {
+          "shape": "hexagon",
+          "fill": "{role.cyan.fill}",
+          "stroke": "{role.cyan.stroke}"
+        },
+        "cache": {
+          "shape": "diamond",
+          "fill": "{role.red.fill}",
+          "stroke": "{role.red.stroke}"
+        },
+        "queue": {
+          "shape": "rect",
+          "transform": "skewX(-10)",
+          "fill": "{role.yellow.fill}",
+          "stroke": "{role.yellow.stroke}"
+        },
+        "storage": {
+          "shape": "rect",
+          "fill": "{role.brown.fill}",
+          "stroke": "{role.brown.stroke}"
+        },
+        "external": {
+          "shape": "rect",
+          "stroke_dasharray": "5,3",
+          "fill": "{role.gray.fill}",
+          "stroke": "{role.gray.stroke}"
+        },
+        "client": {
+          "shape": "rect",
+          "fill": "{role.purple.fill}",
+          "stroke": "{role.purple.stroke}"
+        },
+        "person": {
+          "shape": "person",
+          "fill": "{role.green.fill}",
+          "stroke": "{role.green.stroke}"
+        }
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "{lighten({colors.group_fill}, 0.0)}", "stroke": "{lighten({colors.group_stroke}, 0.0)}", "stroke_width": 2.0, "border_radius": 8.0 },
+            { "fill": "{lighten({colors.group_fill}, 0.35)}", "stroke": "{lighten({colors.group_stroke}, 0.30)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{lighten({colors.group_fill}, 0.55)}", "stroke": "{lighten({colors.group_stroke}, 0.50)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{lighten({colors.group_fill}, 0.70)}", "stroke": "{lighten({colors.group_stroke}, 0.65)}", "stroke_width": 1.5, "border_radius": 6.0 }
+          ],
+          "index": { "from": "group_depth", "cap": 3 },
+          "bindings": [
+            { "target": "group", "fields": { "fill": "fill", "stroke": "stroke", "stroke_width": "stroke_width", "border_radius": "border_radius" } }
+          ]
+        }
+      }
+    },
+    "er": {
+      "node": {
+        "fill": "#FFFFFF",
+        "stroke": "#1976D2",
+        "stroke_width": "{strokes.normal}",
+        "radius": "{radius.sm}"
+      },
+      "edge": {
+        "stroke": "#455A64"
+      }
+    },
+    "mindmap": {
+      "edge": {
+        "stroke_width": "{strokes.thin}"
+      },
+      "node": {
+        "radius": "{radius.lg}"
+      },
+      "entity_types": {
+        "root": {
+          "shape": "circle",
+          "label_weight": "bold",
+          "fill": "{role.root.fill}",
+          "stroke": "{role.root.stroke}",
+          "text_fill": "{role.root.text_fill}"
+        },
+        "main": {
+          "shape": "rounded_rect",
+          "label_weight": "medium"
+        },
+        "branch": {
+          "shape": "rounded_rect"
+        },
+        "leaf": {
+          "shape": "rounded_rect",
+          "fill": "#EEF0FB",
+          "font_size": "{typography.small_size}"
+        }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#EEF0FB", "stroke": "#5C6BC0", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ],
+          "index": { "from": "branch_slot", "wrap": true },
+          "bindings": [
+            { "target": "entity", "types": ["main", "branch"], "fields": { "fill": "fill", "stroke": "stroke" } },
+            { "target": "entity", "types": ["leaf"], "fields": { "stroke": "stroke" } },
+            { "target": "edge", "fields": { "stroke": "edge_stroke" } }
+          ]
+        },
+        "edge_depth": {
+          "entries": [
+            { "stroke_width": 3.0 },
+            { "stroke_width": 2.25 },
+            { "stroke_width": 1.75 }
+          ],
+          "index": { "from": "tree_depth" },
+          "bindings": [
+            { "target": "edge", "fields": { "stroke_width": "stroke_width" } }
+          ]
+        }
+      }
+    }
+  }
+}

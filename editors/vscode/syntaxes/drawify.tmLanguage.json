@@ -1,0 +1,88 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/mql/master/schema/tmLanguage.schema.json",
+  "name": "Drawify",
+  "scopeName": "source.drawify",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#keywords" },
+    { "include": "#diagram-types" },
+    { "include": "#arrows" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#booleans" },
+    { "include": "#identifiers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.drawify",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.drawify",
+          "match": "\\b(diagram|entity|group|relation|style|import|meta|node_style|edge_style|true|false)\\b"
+        }
+      ]
+    },
+    "diagram-types": {
+      "patterns": [
+        {
+          "name": "entity.name.type.drawify",
+          "match": "\\b(flowchart|sequence|architecture|state|er|mindmap)\\b"
+        }
+      ]
+    },
+    "arrows": {
+      "patterns": [
+        {
+          "name": "keyword.operator.arrow.drawify",
+          "match": "<-->|-->|->|<->"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.drawify",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.drawify",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.drawify",
+          "match": "\\b[0-9]+(\\.[0-9]+)?\\b"
+        }
+      ]
+    },
+    "booleans": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.drawify",
+          "match": "\\b(true|false)\\b"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "variable.other.drawify",
+          "match": "\\b[a-z][a-z0-9_]*\\b"
+        }
+      ]
+    }
+  }
+}

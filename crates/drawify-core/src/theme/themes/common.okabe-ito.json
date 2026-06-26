@@ -1,0 +1,74 @@
+{
+  "version": "0.2",
+  "id": "common.okabe-ito",
+  "name": "Okabe-Ito",
+  "meta": {
+    "author": "Drawify",
+    "description": "色盲友好：Okabe-Ito 配色（Wong, Nature Methods 2011）。避免红绿对立，蓝/橙/青绿/紫可区分，适合 deuteranopia 与 protanopia",
+    "tags": ["okabe-ito", "wong", "light", "accessible", "colorblind-safe", "a11y"]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#FFFFFF",
+      "text": "#000000",
+      "muted_text": "#666666",
+      "border": "#999999",
+      "primary": "#0072B2",
+      "neutral_fill": "#F5F5F5",
+      "neutral_stroke": "#666666",
+      "group_fill": "#FAFAFA",
+      "group_stroke": "#999999"
+    },
+    "palette": {
+      "blue": { "fill": "#D6EAF8", "stroke": "#0072B2" },
+      "orange": { "fill": "#FDEBD0", "stroke": "#D55E00" },
+      "green": { "fill": "#D1F2EB", "stroke": "#009E73" },
+      "purple": { "fill": "#F5E0F0", "stroke": "#CC79A7" },
+      "yellow": { "fill": "#FCF3CF", "stroke": "#E69F00" },
+      "red": { "fill": "#FADBD8", "stroke": "#CC6677" },
+      "cyan": { "fill": "#D4E6F1", "stroke": "#56B4E9" },
+      "brown": { "fill": "#EEEEEE", "stroke": "#999999" },
+      "gray": { "fill": "#FAFAFA", "stroke": "#999999" },
+      "amber": { "fill": "#FEF9E7", "stroke": "#E69F00" },
+      "blue_gray": { "fill": "#F0F0F0", "stroke": "#666666" },
+      "start_green": { "fill": "#D1F2EB", "stroke": "#009E73" },
+      "end_red": { "fill": "#FADBD8", "stroke": "#CC6677" },
+      "arch_blue": { "fill": "#D6EAF8", "stroke": "#0072B2" },
+      "root": { "fill": "#0072B2", "stroke": "#000000", "text_fill": "#FFFFFF" }
+    },
+    "strokes": {
+      "thin": 1.25,
+      "normal": 2.0,
+      "thick": 2.5,
+      "dashed": [8, 4],
+      "dotted": [3, 4]
+    }
+  },
+  "diagrams": {
+    "flowchart": { "edge": { "stroke": "#333333" } },
+    "sequence": { "edge": { "stroke": "#333333" } },
+    "state": { "edge": { "stroke": "#333333" } },
+    "architecture": { "edge": { "stroke": "#333333" } },
+    "er": {
+      "node": { "fill": "#FFFFFF", "stroke": "#0072B2" },
+      "edge": { "stroke": "#333333" }
+    },
+    "mindmap": {
+      "edge": { "stroke_width": "{strokes.normal}" },
+      "entity_types": { "leaf": { "fill": "#F5F5F5" } },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#D6EAF8", "stroke": "#0072B2", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "version": "0.2",
+  "id": "common.catppuccin-mocha",
+  "name": "Catppuccin Mocha",
+  "meta": {
+    "author": "Drawify",
+    "description": "灵感来自 Catppuccin Mocha：柔和马卡龙暗色，近年开发者社区最热门主题之一",
+    "tags": ["catppuccin", "mocha", "dark", "pastel", "inspired"]
+  },
+  "extends": "common.clean-dark",
+  "tokens": {
+    "colors": {
+      "canvas": "#1e1e2e",
+      "text": "#cdd6f4",
+      "muted_text": "#a6adc8",
+      "border": "#45475a",
+      "primary": "#89b4fa",
+      "neutral_fill": "#313244",
+      "neutral_stroke": "#6c7086",
+      "group_fill": "#181825",
+      "group_stroke": "#45475a"
+    },
+    "palette": {
+      "blue": { "fill": "#313244", "stroke": "#89b4fa" },
+      "orange": { "fill": "#313244", "stroke": "#fab387" },
+      "green": { "fill": "#313244", "stroke": "#a6e3a1" },
+      "purple": { "fill": "#313244", "stroke": "#cba6f7" },
+      "yellow": { "fill": "#313244", "stroke": "#f9e2af" },
+      "red": { "fill": "#313244", "stroke": "#f38ba8" },
+      "cyan": { "fill": "#313244", "stroke": "#94e2d5" },
+      "brown": { "fill": "#313244", "stroke": "#fab387" },
+      "gray": { "fill": "#1e1e2e", "stroke": "#6c7086" },
+      "amber": { "fill": "#45475a", "stroke": "#fab387" },
+      "blue_gray": { "fill": "#313244", "stroke": "#cdd6f4" },
+      "start_green": { "fill": "#313244", "stroke": "#a6e3a1" },
+      "end_red": { "fill": "#313244", "stroke": "#f38ba8" },
+      "arch_blue": { "fill": "#313244", "stroke": "#89b4fa" },
+      "root": { "fill": "#cba6f7", "stroke": "#89b4fa", "text_fill": "#1e1e2e" }
+    }
+  },
+  "diagrams": {
+    "architecture": {
+      "group": {
+        "stroke": "{colors.group_stroke}",
+        "stroke_width": "{strokes.normal}"
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "{darken({colors.group_fill}, 0.0)}", "stroke": "{darken({colors.group_stroke}, 0.0)}", "stroke_width": 2.0, "border_radius": 8.0 },
+            { "fill": "{darken({colors.group_fill}, 0.15)}", "stroke": "{darken({colors.group_stroke}, 0.12)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{darken({colors.group_fill}, 0.25)}", "stroke": "{darken({colors.group_stroke}, 0.20)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{darken({colors.group_fill}, 0.35)}", "stroke": "{darken({colors.group_stroke}, 0.28)}", "stroke_width": 1.5, "border_radius": 6.0 }
+          ]
+        }
+      }
+    },
+    "er": {
+      "node": {
+        "fill": "#313244",
+        "stroke": "#89b4fa"
+      }
+    },
+    "mindmap": {
+      "edge": {
+        "stroke_width": "{strokes.normal}"
+      },
+      "entity_types": {
+        "leaf": {
+          "fill": "#313244"
+        }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#313244", "stroke": "#89b4fa", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

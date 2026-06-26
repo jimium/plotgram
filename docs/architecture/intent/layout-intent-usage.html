@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Layout Intent 使用指南 — Drawify</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #1a1d26;
+      --muted: #5c6370;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --theme: #7c3aed;
+      --theme-soft: #ede9fe;
+      --good: #059669;
+      --good-soft: #d1fae5;
+      --warn: #d97706;
+      --warn-soft: #fef3c7;
+      --danger: #dc2626;
+      --danger-soft: #fee2e2;
+      --border: #e2e5eb;
+      --code-bg: #f0f2f5;
+      --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115;
+        --card: #1a1d26;
+        --text: #e6e8ee;
+        --muted: #9aa2b1;
+        --accent: #60a5fa;
+        --accent-soft: #1e3a5f;
+        --theme: #a78bfa;
+        --theme-soft: #2e2140;
+        --good: #34d399;
+        --good-soft: #0a3322;
+        --warn: #fbbf24;
+        --warn-soft: #3d2a05;
+        --danger: #f87171;
+        --danger-soft: #3d1717;
+        --border: #2a2f3a;
+        --code-bg: #151821;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .topnav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.9rem;
+    }
+    .topnav a.back {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .topnav .crumb { color: var(--muted); }
+    .topnav .theme-toggle {
+      margin-left: auto;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--muted);
+      font: inherit;
+      border-radius: 999px;
+      padding: 0.35rem 0.8rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    header.hero {
+      background: linear-gradient(135deg, #1e3a5f 0%, #7c3aed 55%, #d97706 100%);
+      color: #fff;
+      padding: 2.5rem 1.5rem 2.5rem;
+    }
+    header.hero .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+    header.hero h1 {
+      margin: 0 0 0.75rem;
+      font-size: 1.9rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    header.hero p {
+      margin: 0;
+      font-size: 1.02rem;
+      opacity: 0.92;
+      max-width: 780px;
+    }
+    header.hero .tags {
+      margin-top: 1.2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    header.hero .tag {
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.22);
+      color: #fff;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 500;
+    }
+
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem 1.5rem 1.25rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .card h2 {
+      margin: 0 0 0.5rem;
+      font-size: 1.25rem;
+      letter-spacing: -0.01em;
+    }
+    .card h3 {
+      margin: 1.25rem 0 0.4rem;
+      font-size: 1.05rem;
+    }
+    .card h4 {
+      margin: 1rem 0 0.3rem;
+      font-size: 0.98rem;
+    }
+    .card p { margin: 0.5rem 0; }
+    .card ul { padding-left: 1.2rem; margin: 0.4rem 0; }
+    .card li { margin: 0.2rem 0; }
+
+    code {
+      font-family: var(--mono);
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 0.05rem 0.35rem;
+      border-radius: 5px;
+      font-size: 0.88em;
+    }
+
+    pre {
+      font-family: var(--mono);
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.9rem 1rem;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      margin: 0.75rem 0;
+    }
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+    }
+
+    .pill {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+    }
+    .pill.theme { background: var(--theme-soft); color: var(--theme); }
+    .pill.good { background: var(--good-soft); color: var(--good); }
+    .pill.warn { background: var(--warn-soft); color: var(--warn); }
+    .pill.danger { background: var(--danger-soft); color: var(--danger); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      font-size: 0.92rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.55rem 0.75rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: var(--code-bg);
+      font-weight: 600;
+    }
+
+    .callout {
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+      padding: 0.75rem 1rem;
+      border-radius: 0 8px 8px 0;
+      margin: 0.75rem 0;
+      font-size: 0.92rem;
+    }
+    .callout.warn {
+      border-left-color: var(--warn);
+      background: var(--warn-soft);
+    }
+    .callout.good {
+      border-left-color: var(--good);
+      background: var(--good-soft);
+    }
+
+    .status-grid {
+      display: grid;
+      gap: 0.8rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      margin-top: 0.75rem;
+    }
+    .status-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      border-left: 4px solid var(--muted);
+    }
+    .status-card.satisfied { border-left-color: var(--good); }
+    .status-card.partial { border-left-color: var(--warn); }
+    .status-card.conflicted { border-left-color: var(--danger); }
+    .status-card.notfound { border-left-color: var(--muted); }
+    .status-card h4 { margin: 0 0 0.3rem; font-size: 0.95rem; }
+    .status-card p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
+    .intent-grid {
+      display: grid;
+      gap: 1.2rem;
+      grid-template-columns: 1fr;
+      margin-top: 0.75rem;
+    }
+    @media (min-width: 720px) {
+      .intent-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .intent-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.1rem 1.2rem;
+    }
+    .intent-card h4 {
+      margin: 0 0 0.4rem;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .intent-card p { margin: 0.3rem 0; font-size: 0.9rem; }
+
+    .scenario {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-top: 0.75rem;
+    }
+    .scenario-header {
+      background: var(--code-bg);
+      padding: 0.6rem 1rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .scenario-body {
+      padding: 1rem;
+    }
+    .scenario-body h5 {
+      margin: 0.5rem 0 0.3rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    footer {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 1rem 1.5rem 2.5rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    footer a.back-bottom {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--accent);
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <nav class="topnav" aria-label="面包屑">
+    <a class="back" href="../README.md">← 返回架构文档</a>
+    <span class="crumb">/</span>
+    <span>Layout Intent 使用指南</span>
+    <button class="theme-toggle" id="themeBtn" title="切换主题">🌓 主题</button>
+  </nav>
+
+  <header class="hero">
+    <div class="wrap">
+      <h1>Layout Intent 使用指南</h1>
+      <p>
+        Layout Intent(布局意图)是 Drawify 的布局叠加层,允许在不修改 diagram 源码 <code>relations</code> 的前提下,
+        向布局算法注入额外的拓扑/几何约束,并返回每条意图的满足度报告。
+      </p>
+      <div class="tags">
+        <span class="tag">Topology Intent</span>
+        <span class="tag">Geometric Intent</span>
+        <span class="tag">Refinement Report</span>
+        <span class="tag">WASM + Server API</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- 核心概念 -->
+    <section class="card" id="concepts">
+      <h2>📌 核心概念</h2>
+
+      <h3>为什么需要 Intent?</h3>
+      <p>
+        传统布局完全由 <code>diagram.relations</code>(真实边)驱动。但有时用户希望施加额外的布局约束
+        (如"A 应在 B 下方"、"A、B、C 垂直对齐"),而又不想在 diagram 里画幽灵边(会破坏
+        <code>relations[i] ↔ edges[i]</code> 索引契约)或修改源码。
+      </p>
+      <p>
+        Layout Intent 通过 <strong>overlay 叠加层</strong> 解决:意图作为独立参数传入,布局算法消费后产出
+        <code>RefinementReport</code> 报告每条意图的满足状态。
+      </p>
+
+      <h3>两类意图</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>类型</th>
+            <th>枚举</th>
+            <th>消费阶段</th>
+            <th>作用</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>拓扑意图</strong> <code>TopologyIntent</code></td>
+            <td><code>Below</code> / <code>Above</code></td>
+            <td><code>strategy.compute_with_overlay</code> 内部</td>
+            <td>影响 Sugiyama 分层 rank 排序</td>
+          </tr>
+          <tr>
+            <td><strong>几何意图</strong> <code>GeometricIntent</code></td>
+            <td><code>Pin</code> / <code>AlignVertical</code> / <code>AlignHorizontal</code></td>
+            <td>grid snap 前的 <code>apply_geometric_refinement</code></td>
+            <td>锁定节点坐标 / 对齐节点中心</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>满足状态 <code>IntentStatus</code></h3>
+      <div class="status-grid">
+        <div class="status-card satisfied">
+          <h4><span class="pill good">Satisfied</span></h4>
+          <p>意图被完全满足</p>
+        </div>
+        <div class="status-card partial">
+          <h4><span class="pill warn">Partial</span></h4>
+          <p>意图部分满足(如跨组对齐仅对齐同组节点、穿障修正破坏了对齐)</p>
+        </div>
+        <div class="status-card conflicted">
+          <h4><span class="pill danger">Conflicted</span></h4>
+          <p>意图冲突(如引入环、矛盾意图),被跳过</p>
+        </div>
+        <div class="status-card notfound">
+          <h4><span class="pill">NotFound</span></h4>
+          <p>意图引用的节点不存在</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 数据结构 -->
+    <section class="card" id="data-structures">
+      <h2>🗂️ 数据结构</h2>
+
+      <h3><code>LayoutIntentOverlay</code></h3>
+      <p>意图叠加层,包含 <code>topology</code> 和 <code>geometric</code> 两个向量。</p>
+      <pre><code>{
+  "topology": [
+    { "kind": "below", "from": "a", "to": "b" },
+    { "kind": "above", "from": "c", "to": "d" }
+  ],
+  "geometric": [
+    { "kind": "pin", "node": "a", "axis": "both" },
+    { "kind": "align_vertical", "nodes": ["a", "b", "c"] },
+    { "kind": "align_horizontal", "nodes": ["d", "e"] }
+  ]
+}</code></pre>
+
+      <h3>拓扑意图 <code>TopologyIntent</code></h3>
+      <div class="intent-grid">
+        <div class="intent-card">
+          <h4><span class="pill theme">Below</span> A 应在 B 下方</h4>
+          <p>注入边 <code>B → A</code>,使 <code>rank(A) &gt; rank(B)</code>,A 显示在 B 下方。</p>
+        </div>
+        <div class="intent-card">
+          <h4><span class="pill theme">Above</span> A 应在 B 上方</h4>
+          <p>注入边 <code>A → B</code>,使 <code>rank(A) &lt; rank(B)</code>,A 显示在 B 上方。</p>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>语义说明:</strong>在 Sugiyama 布局中,边 <code>X → Y</code> 意味着
+        <code>rank(X) &lt; rank(Y)</code>(X 在 Y 上方)。
+      </div>
+
+      <h3>几何意图 <code>GeometricIntent</code></h3>
+      <div class="intent-grid">
+        <div class="intent-card">
+          <h4><span class="pill theme">Pin</span> 锁定节点坐标</h4>
+          <p>锁定节点当前坐标,标记为 pinned 跳过后续 grid snap。</p>
+          <p><code>axis</code>: <code>both</code> / <code>x</code> / <code>y</code></p>
+        </div>
+        <div class="intent-card">
+          <h4><span class="pill theme">AlignVertical</span> 垂直对齐</h4>
+          <p>将 nodes 的 x 中心对齐到均值,沿 y 轴单轮推开重叠。</p>
+        </div>
+        <div class="intent-card">
+          <h4><span class="pill theme">AlignHorizontal</span> 水平对齐</h4>
+          <p>将 nodes 的 y 中心对齐到均值,沿 x 轴单轮推开重叠。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 冲突处理 -->
+    <section class="card" id="conflicts">
+      <h2>⚠️ 冲突处理</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>冲突类型</th>
+            <th>检测时机</th>
+            <th>处理</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>意图节点不存在</td>
+            <td>overlay 解析时</td>
+            <td><span class="pill">NotFound</span>,跳过</td>
+          </tr>
+          <tr>
+            <td>拓扑意图引入环</td>
+            <td><code>build_graph_with_overlay</code> 后 DFS</td>
+            <td><span class="pill danger">Conflicted</span>,跳过该意图边</td>
+          </tr>
+          <tr>
+            <td><code>Below(A,B)</code> + <code>Above(A,B)</code> 矛盾</td>
+            <td>overlay 解析时去重</td>
+            <td>保留先声明者,后者 <span class="pill danger">Conflicted</span></td>
+          </tr>
+          <tr>
+            <td>跨组拓扑意图(Architecture V2)</td>
+            <td>strategy 内部判断</td>
+            <td><span class="pill warn">Partial</span>,仅组内生效</td>
+          </tr>
+          <tr>
+            <td>对齐节点跨组</td>
+            <td><code>apply_geometric_refinement</code></td>
+            <td><span class="pill warn">Partial</span>,仅对齐同组节点</td>
+          </tr>
+          <tr>
+            <td>对齐后重叠无法消除</td>
+            <td>重叠消除单轮失败</td>
+            <td><span class="pill warn">Partial</span></td>
+          </tr>
+          <tr>
+            <td>穿障修正破坏对齐</td>
+            <td><code>refine::run_refine</code> 后比对</td>
+            <td><span class="pill warn">Partial</span>(首期仅观测,不回滚)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 使用方式 -->
+    <section class="card" id="usage">
+      <h2>🚀 使用方式</h2>
+
+      <h3>1. Rust 核心 API</h3>
+      <h4><code>compute_layout_with_plan_and_overlay</code></h4>
+      <p>布局 dispatch 入口,接受 overlay 参数并返回 <code>RefinementReport</code>。</p>
+      <pre><code>use drawify_core::layout::{
+    compute_layout_with_plan_and_overlay,
+    LayoutIntentOverlay, TopologyIntent,
+};
+
+let overlay = LayoutIntentOverlay {
+    topology: vec![TopologyIntent::Below {
+        from: "a".into(),
+        to: "b".into(),
+    }],
+    geometric: vec![],
+};
+
+let (layout, report) = compute_layout_with_plan_and_overlay(
+    diagram,
+    layout_plan,
+    Some(&overlay),
+)?;
+
+if let Some(report) = report {
+    println!("satisfied: {}, conflicted: {}",
+        report.satisfied, report.conflicted);
+    for r in &report.results {
+        println!("  [{}] {:?}: {}", r.index, r.status,
+            r.message.as_deref().unwrap_or(""));
+    }
+}</code></pre>
+
+      <h4><code>render_output_with_report</code></h4>
+      <p>渲染流水线入口,返回 <code>RenderOutputWithReport { output, report }</code>。</p>
+      <pre><code>use drawify_core::pipeline::render_output_with_report;
+use drawify_core::render::{RenderRequest, RenderFormat};
+
+let mut request = RenderRequest::new(&prepared, RenderFormat::Svg);
+request.layout_overlay = Some(&overlay);
+
+let result = render_output_with_report(&request)?;
+let svg_text = match result.output {
+    RenderOutput::Text(t) => t,
+    _ => unreachable!(),
+};
+if let Some(report) = result.report {
+    // 处理报告
+}</code></pre>
+
+      <h3>2. WASM API</h3>
+      <h4><code>WasmRenderOptions.layout_intents</code></h4>
+      <pre><code>// JavaScript
+const options = {
+  theme_id: "builtin.clean-light",
+  layout_intents: {
+    topology: [
+      { kind: "below", from: "a", to: "b" },
+      { kind: "above", from: "c", to: "d" }
+    ],
+    geometric: [
+      { kind: "pin", node: "a", axis: "both" },
+      { kind: "align_vertical", nodes: ["a", "b", "c"] }
+    ]
+  }
+};
+
+const json = wasm.render_with_options(source, "svg", JSON.stringify(options));
+const result = JSON.parse(json);
+console.log(result.success);            // true
+console.log(result.text);              // SVG 字符串
+console.log(result.refinement_report); // { satisfied: 3, partial: 0, ... }</code></pre>
+
+      <h4><code>RenderResult.refinement_report</code></h4>
+      <pre><code>interface RenderResult {
+  success: boolean;
+  format: string;
+  text: string | null;
+  errors: string[];
+  warnings: string[];
+  refinement_report?: RefinementReport;  // 仅当 layout_intents 存在时
+}
+
+interface RefinementReport {
+  results: IntentResult[];
+  satisfied: number;
+  partial: number;
+  conflicted: number;
+  not_found: number;
+}</code></pre>
+
+      <h3>3. Server HTTP API</h3>
+      <h4><code>POST /render</code> 请求体</h4>
+      <pre><code>curl -X POST http://localhost:6080/render \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": "diagram flowchart { entity a \"A\"; entity b \"B\"; a -> b }",
+    "format": "svg",
+    "layout_intents": {
+      "topology": [
+        { "kind": "below", "from": "a", "to": "b" }
+      ],
+      "geometric": []
+    }
+  }'</code></pre>
+
+      <h4><code>X-Drawify-Refinement-Report</code> 响应头</h4>
+      <p>成功响应会携带 <code>X-Drawify-Refinement-Report</code> 头(仅当请求体包含 <code>layout_intents</code> 时),值为 JSON 序列化的 <code>RefinementReport</code>:</p>
+      <pre><code>HTTP/1.1 200 OK
+Content-Type: image/svg+xml
+X-Drawify-Format: svg
+X-Drawify-Valid: true
+X-Drawify-Refinement-Report: {"results":[{"index":0,"kind":"below","status":"Conflicted","message":"..."}],"satisfied":0,"partial":0,"conflicted":1,"not_found":0}
+
+&lt;svg&gt;...&lt;/svg&gt;</code></pre>
+      <p>解析示例(Node.js):</p>
+      <pre><code>const report = JSON.parse(response.headers['x-drawify-refinement-report']);
+console.log(`Satisfied: ${report.satisfied}, Conflicted: ${report.conflicted}`);</code></pre>
+    </section>
+
+    <!-- 示例场景 -->
+    <section class="card" id="scenarios">
+      <h2>📋 示例场景</h2>
+
+      <div class="scenario">
+        <div class="scenario-header">场景 1:强制节点上下顺序</div>
+        <div class="scenario-body">
+          <h5>需求</h5>
+          <p>A 必须在 B 下方,但 diagram 中没有 A→B 的边。</p>
+          <h5>Overlay</h5>
+          <pre><code>{ "topology": [{ "kind": "below", "from": "a", "to": "b" }], "geometric": [] }</code></pre>
+          <h5>效果</h5>
+          <p>注入边 <code>B → A</code>,Sugiyama 分层后 <code>rank(A) &gt; rank(B)</code>,A 显示在 B 下方。</p>
+        </div>
+      </div>
+
+      <div class="scenario">
+        <div class="scenario-header">场景 2:节点垂直对齐</div>
+        <div class="scenario-body">
+          <h5>需求</h5>
+          <p>A、B、C 三个节点的 x 中心对齐。</p>
+          <h5>Overlay</h5>
+          <pre><code>{ "topology": [], "geometric": [{ "kind": "align_vertical", "nodes": ["a", "b", "c"] }] }</code></pre>
+          <h5>效果</h5>
+          <p>三个节点的 x 中心对齐到均值,沿 y 轴单轮推开重叠,对齐节点跳过后续 grid snap。</p>
+        </div>
+      </div>
+
+      <div class="scenario">
+        <div class="scenario-header">场景 3:锁定节点位置</div>
+        <div class="scenario-body">
+          <h5>需求</h5>
+          <p>节点 A 的位置在 grid snap 时不被移动。</p>
+          <h5>Overlay</h5>
+          <pre><code>{ "topology": [], "geometric": [{ "kind": "pin", "node": "a", "axis": "both" }] }</code></pre>
+          <h5>效果</h5>
+          <p>节点 A 在 grid snap 阶段被跳过(x、y 都不吸附)。</p>
+        </div>
+      </div>
+
+      <div class="scenario">
+        <div class="scenario-header">场景 4:混合意图</div>
+        <div class="scenario-body">
+          <h5>Overlay</h5>
+          <pre><code>{
+  "topology": [
+    { "kind": "below", "from": "a", "to": "b" },
+    { "kind": "above", "from": "c", "to": "d" }
+  ],
+  "geometric": [
+    { "kind": "pin", "node": "a", "axis": "x" },
+    { "kind": "align_vertical", "nodes": ["b", "c", "d"] }
+  ]
+}</code></pre>
+          <h5>报告示例</h5>
+          <pre><code>{
+  "results": [
+    { "index": 0, "kind": "below", "status": "Satisfied", "message": null },
+    { "index": 1, "kind": "above", "status": "Satisfied", "message": null },
+    { "index": 0, "kind": "pin", "status": "Satisfied", "message": null },
+    { "index": 1, "kind": "align_vertical", "status": "Satisfied", "message": null }
+  ],
+  "satisfied": 4, "partial": 0, "conflicted": 0, "not_found": 0
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="scenario">
+        <div class="scenario-header">场景 5:冲突检测</div>
+        <div class="scenario-body">
+          <h5>需求</h5>
+          <p>真实边 <code>A → B</code>,意图 <code>Below(A, B)</code> → 注入边 <code>B → A</code> → 环 <code>A → B → A</code>。</p>
+          <h5>Overlay</h5>
+          <pre><code>{ "topology": [{ "kind": "below", "from": "a", "to": "b" }], "geometric": [] }</code></pre>
+          <h5>报告</h5>
+          <pre><code>{
+  "results": [{
+    "index": 0,
+    "kind": "below",
+    "status": "Conflicted",
+    "message": "intent edge b→a forms a cycle with existing edges"
+  }],
+  "satisfied": 0, "partial": 0, "conflicted": 1, "not_found": 0
+}</code></pre>
+          <p>意图被跳过,布局按真实边 <code>A → B</code> 进行(<code>rank(A) &lt; rank(B)</code>,A 在 B 上方)。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 支持的布局算法 -->
+    <section class="card" id="algorithms">
+      <h2>⚙️ 支持的布局算法</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>算法</th>
+            <th>拓扑意图</th>
+            <th>几何意图</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>sugiyama-v2</code></td>
+            <td><span class="pill good">原生</span></td>
+            <td><span class="pill good">支持</span></td>
+            <td>通过 <code>EdgeMeta</code> 保护意图边不被 FAS 反转</td>
+          </tr>
+          <tr>
+            <td><code>flowchart</code></td>
+            <td><span class="pill good">原生</span></td>
+            <td><span class="pill good">支持</span></td>
+            <td>同上(FLOWCHART_PRESET)</td>
+          </tr>
+          <tr>
+            <td><code>er</code></td>
+            <td><span class="pill good">原生</span></td>
+            <td><span class="pill good">支持</span></td>
+            <td>同上(ER_PRESET)</td>
+          </tr>
+          <tr>
+            <td><code>architecture</code></td>
+            <td><span class="pill warn">仅组内</span></td>
+            <td><span class="pill good">支持</span></td>
+            <td>跨组拓扑意图标记 <code>Partial</code> 并跳过</td>
+          </tr>
+          <tr>
+            <td>其他</td>
+            <td><span class="pill">忽略</span></td>
+            <td><span class="pill good">支持</span></td>
+            <td>非 Sugiyama 系布局无 rank 概念,拓扑意图标记 <code>Partial</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 实现细节 -->
+    <section class="card" id="implementation">
+      <h2>🔧 实现细节</h2>
+
+      <h3>FAS 保护(避免意图边被反转)</h3>
+      <p>Sugiyama 的 <code>greedy_cycle_reversal</code> 会反转边以破环。意图边被标记为 <code>reversible: false</code>,不参与 FAS 反转:</p>
+      <pre><code>// crates/drawify-core/src/layout/node/sugiyama_v2/graph.rs
+pub(super) struct EdgeMeta {
+    pub kind: EdgeKind,        // Real | Intent
+    pub reversible: bool,      // 意图边 = false
+}</code></pre>
+      <p>Architecture V2 采用不同策略:在 FAS <strong>之后</strong>注入意图边,因此意图边永不被反转。</p>
+
+      <h3>穿障修正后对齐完整性检查</h3>
+      <p><code>refine::run_refine</code> 可能推开节点破坏对齐。设计 §5.3.1 规定首期"仅观测,不回滚":若对齐被破坏(节点中心偏移 &gt; 1.0px),对应的 <code>align_*</code> 意图从 <code>Satisfied</code> 降级为 <code>Partial</code>。</p>
+
+      <h3><code>PinSet</code> 结构</h3>
+      <p>记录被 <code>Pin</code> / <code>Align*</code> 保护的节点,供 <code>grid_snap::snap_layout_to_grid</code> 跳过:</p>
+      <pre><code>pub struct PinSet {
+    pub full: HashSet&lt;String&gt;,              // PinAxis::Both
+    pub x_only: HashSet&lt;String&gt;,            // PinAxis::X
+    pub y_only: HashSet&lt;String&gt;,            // PinAxis::Y
+    pub aligned_vertical: HashSet&lt;String&gt;,   // AlignVertical
+    pub aligned_horizontal: HashSet&lt;String&gt;, // AlignHorizontal
+}</code></pre>
+    </section>
+
+    <!-- 性能影响 -->
+    <section class="card" id="performance">
+      <h2>📊 性能影响</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>操作</th>
+            <th>复杂度</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>意图校验</td><td>O(I + V + E)</td><td>I = 意图数,环检测 DFS</td></tr>
+          <tr><td><code>build_graph_with_overlay</code></td><td>O(V + E + I)</td><td>额外 I 条意图边</td></tr>
+          <tr><td><code>greedy_cycle_reversal</code> 改造</td><td>O(V + E + I)</td><td>额外判断 reversible 标记</td></tr>
+          <tr><td><code>apply_pin</code></td><td>O(1) per node</td><td></td></tr>
+          <tr><td><code>apply_align_*</code></td><td>O(K log K)</td><td>K = 对齐节点数</td></tr>
+          <tr><td>重叠消除</td><td>O(K²) 最坏</td><td>K 通常 &lt; 10</td></tr>
+          <tr><td><code>snap_layout_to_grid</code> pinned 跳过</td><td>O(1) 查找</td><td>HashSet</td></tr>
+        </tbody>
+      </table>
+      <div class="callout good">
+        <strong>结论:</strong>性能影响可忽略(&lt; 1ms),远小于布局算法本身。
+      </div>
+    </section>
+
+    <!-- 测试覆盖 -->
+    <section class="card" id="tests">
+      <h2>🧪 测试覆盖</h2>
+      <p>实现包含以下测试(共 49 个 intent 相关测试 + 7 个端到端测试):</p>
+      <ul>
+        <li><strong>拓扑意图校验</strong> (topology.rs):节点存在性、矛盾去重、环检测、自环、重复意图</li>
+        <li><strong>拓扑意图集成</strong> (integration_tests):below/above rank 排序、环检测拒绝、FAS 保护、多意图混合状态</li>
+        <li><strong>几何意图</strong> (geometric.rs):pin 标记、align 对齐、重叠消除、跨组对齐、单节点/不存在节点</li>
+        <li><strong>穿障修正后对齐检查</strong>:对齐保持 Satisfied、对齐破坏降级 Partial、不覆盖更严重状态</li>
+        <li><strong>端到端</strong> (pipeline/render.rs):SVG/ASCII 路径、Satisfied/Conflicted/NotFound/空报告</li>
+      </ul>
+      <p>运行测试:</p>
+      <pre><code>cargo test -p drawify-core --lib layout::intent
+cargo test -p drawify-core --lib pipeline::render</code></pre>
+    </section>
+  </main>
+
+  <footer>
+    <a class="back-bottom" href="../README.md">← 返回架构文档</a>
+    <p style="margin-top:0.5rem">
+      © Drawify · Layout Intent 使用指南 ·
+      <a href="layout-intent-optimized.md">设计文档</a> ·
+      <a href="layout-intent-usage.md">Markdown 版本</a>
+    </p>
+  </footer>
+
+  <script>
+    // Theme toggle
+    (function () {
+      var btn = document.getElementById('themeBtn');
+      var mql = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+      var key = 'layout-intent-theme';
+      function apply(mode) {
+        if (mode === 'light') { document.documentElement.setAttribute('data-theme', 'light'); }
+        else if (mode === 'dark') { document.documentElement.setAttribute('data-theme', 'dark'); }
+        else { document.documentElement.removeAttribute('data-theme'); }
+      }
+      var saved = localStorage.getItem(key);
+      if (saved) apply(saved);
+      btn.addEventListener('click', function () {
+        var cur = document.documentElement.getAttribute('data-theme');
+        var next;
+        if (!cur) next = mql && mql.matches ? 'light' : 'dark';
+        else next = cur === 'dark' ? 'light' : 'dark';
+        if (next) { localStorage.setItem(key, next); apply(next); }
+      });
+    })();
+  </script>
+</body>
+</html>

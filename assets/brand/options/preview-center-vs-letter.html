@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drawify Logo — 居中 vs 字母 对比</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0F0B1A;
+    color: #E2E8F0;
+    font-family: -apple-system, 'Inter', system-ui, sans-serif;
+    padding: 48px 32px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 8px;
+    background: linear-gradient(90deg, #A78BFA, #22D3EE);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { color: #94A3B8; font-size: 15px; margin-bottom: 12px; max-width: 720px; line-height: 1.6; }
+  .note {
+    color: #64748B;
+    font-size: 13px;
+    margin-bottom: 48px;
+    max-width: 720px;
+    line-height: 1.6;
+    padding: 16px 20px;
+    background: #1A1530;
+    border-radius: 12px;
+    border-left: 3px solid #7C3AED;
+  }
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #A78BFA;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 40px 0 20px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 24px;
+    max-width: 1200px;
+  }
+  .card {
+    background: #1A1530;
+    border: 1px solid #2D2748;
+    border-radius: 16px;
+    padding: 28px 24px;
+    transition: border-color 0.2s;
+  }
+  .card.recommended { border-color: #7C3AED; box-shadow: 0 0 0 1px #7C3AED33; }
+  .card:hover { border-color: #7C3AED; }
+  .card .tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+  .tag.current { background: #334155; color: #94A3B8; }
+  .tag.rec { background: #7C3AED33; color: #A78BFA; }
+  .tag.alt { background: #0E749033; color: #22D3EE; }
+  .card .num {
+    font-size: 12px;
+    font-weight: 600;
+    color: #7C3AED;
+    letter-spacing: 0.1em;
+    margin-bottom: 16px;
+  }
+  .sizes {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 24px;
+    height: 100px;
+    margin-bottom: 20px;
+  }
+  .size-item { text-align: center; }
+  .size-item .label { font-size: 10px; color: #64748B; margin-top: 6px; }
+  .card .name {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #F1F5F9;
+  }
+  .card .desc {
+    font-size: 13px;
+    color: #94A3B8;
+    line-height: 1.55;
+  }
+  .card .verdict {
+    font-size: 12px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #2D2748;
+    line-height: 1.5;
+  }
+  .verdict.good { color: #34D399; }
+  .verdict.warn { color: #FBBF24; }
+  .verdict.bad { color: #F87171; }
+  .combo-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: #0F0B1A;
+    border-radius: 10px;
+  }
+  .combo-row.light { background: #F8FAFC; }
+  .combo-row svg.full { height: 40px; width: auto; }
+</style>
+</head>
+<body>
+
+<h1>居中 vs 字母 — 设计对比</h1>
+<p class="subtitle">当前生产版本使用 17-D「偏心嵌套」。以下对比居中、微偏、以及在内核加入 D / IFY 的可读性与品牌感。</p>
+<p class="note">打开此文件后，重点看 <strong>16px</strong> 和 <strong>32px</strong> 两档——favicon 与导航栏实际尺寸。字母方案在小尺寸下往往最先失效。</p>
+
+<div class="section-title">一、构图：居中 vs 偏心</div>
+<div class="grid">
+
+  <!-- Current: Offset -->
+  <div class="card">
+    <span class="tag current">当前生产</span>
+    <div class="num">17-D Offset</div>
+    <div class="sizes">
+      <div class="size-item"><svg viewBox="0 0 48 48" width="16" height="16" fill="none"><defs><linearGradient id="d1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="6" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#d1)" stroke-width="2.5"/><rect x="20" y="16" width="16" height="16" rx="4" fill="url(#d1)"/></svg><div class="label">16px</div></div>
+      <div class="size-item"><svg viewBox="0 0 48 48" width="32" height="32" fill="none"><defs><linearGradient id="d1b" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="6" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#d1b)" stroke-width="2.5"/><rect x="20" y="16" width="16" height="16" rx="4" fill="url(#d1b)"/></svg><div class="label">32px</div></div>
+      <div class="size-item"><svg viewBox="0 0 48 48" width="56" height="56" fill="none"><defs><linearGradient id="d1c" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="6" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#d1c)" stroke-width="2.5"/><rect x="20" y="16" width="16" height="16" rx="4" fill="url(#d1c)"/></svg><div class="label">56px</div></div>
+    </div>
+    <div class="name">偏心嵌套（现状）</div>
+    <div class="desc">内核右偏 4px。视觉重心偏右，有「向右跳」的动势。大尺寸尚可，小尺寸像「贴边的小方块」。</div>
+    <div class="verdict warn">⚠ 科技 B2B 产品常见预期是稳定、对称；偏心容易显得「没对齐」而非「有流动感」</div>
+  </div>
+
+  <!-- Centered -->
+  <div class="card recommended">
+    <span class="tag rec">推荐</span>
+    <div class="num">17-A Centered</div>
+    <div class="sizes">
+      <div class="size-item"><svg viewBox="0 0 48 48" width="16" height="16" fill="none"><defs><linearGradient id="a1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#a1)" stroke-width="2.5"/><rect x="16" y="16" width="16" height="16" rx="4" fill="url(#a1)"/></svg><div class="label">16px</div></div>
+      <div class="size-item"><svg viewBox="0 0 48 48" width="32" height="32" fill="none"><defs><linearGradient id="a1b" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#a1b)" stroke-width="2.5"/><rect x="16" y="16" width="16" height="16" rx="4" fill="url(#a1b)"/></svg><div class="label">32px</div></div>
+      <div class="size-item"><svg viewBox="0 0 48 48" width="56" height="56" fill="none"><defs><linearGradient id="a1c" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#a1c)" stroke-width="2.5"/><rect x="16" y="16" width="16" height="16" rx="4" fill="url(#a1c)"/></svg><div class="label">56px</div></div>
+    </div>
+    <div class="name">绝对居中</div>
+    <div class="desc">外框与内核同心，间距 8px 均匀。嵌套语义保留（抽象层包裹语义核），但去掉动势，立刻「稳」了。</div>
+    <div class="verdict good">✓ 与 Linear / Notion / Stripe 等同理：几何 icon 靠对称传达可靠</div>
+  </div>
+
+  <!-- Slight offset -->
+  <div class="card">
+    <span class="tag alt">折中</span>
+    <div class="num">17-A½ Micro-offset</div>
+    <div class="sizes">
+      <div class="size-item"><svg viewBox="0 0 48 48" width="16" height="16" fill="none"><defs><linearGradient id="h1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#h1)" stroke-width="2.5"/><rect x="18" y="16" width="16" height="16" rx="4" fill="url(#h1)"/></svg><div class="label">16px</div></div>
+      <div class="size-item"><svg viewBox="0 0 48 48" width="32" height="32" fill="none"><defs><linearGradient id="h1b" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#h1b)" stroke-width="2.5"/><rect x="18" y="16" width="16" height="16" rx="4" fill="url(#h1b)"/></svg><div class="label">32px</div></div>
+      <div class="size-item"><svg viewBox="0 0 48 48" width="56" height="56" fill="none"><defs><linearGradient id="h1c" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#h1c)" stroke-width="2.5"/><rect x="18" y="16" width="16" height="16" rx="4" fill="url(#h1c)"/></svg><div class="label">56px</div></div>
+    </div>
+    <div class="name">微偏（+2px 右）</div>
+    <div class="desc">若仍想保留一丝方向感，只偏 2px 而非 4px。大尺寸几乎看不出，小尺寸不再「贴边」。</div>
+    <div class="verdict warn">△ 折中可行，但收益不大；不如直接居中干净</div>
+  </div>
+
+</div>
+
+<div class="section-title">二、内核加字母：D vs IFY vs 纯几何</div>
+<div class="grid">
+
+  <!-- Pure geometric centered -->
+  <div class="card recommended">
+    <span class="tag rec">推荐</span>
+    <div class="num">Pure + Centered</div>
+    <div class="sizes">
+      <div class="size-item"><svg viewBox="0 0 48 48" width="16" height="16" fill="none"><defs><linearGradient id="p1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#p1)" stroke-width="2.5"/><rect x="16" y="16" width="16" height="16" rx="4" fill="url(#p1)"/></svg><div class="label">16px</div></div>
+      <div class="size-item"><svg viewBox="0 0 48 48" width="32" height="32" fill="none"><defs><linearGradient id="p1b" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#p1b)" stroke-width="2.5"/><rect x="16" y="16" width="16" height="16" rx="4" fill="url(#p1b)"/></svg><div class="label">32px</div></div>
+      <div class="size-item"><svg viewBox="0 0 48 48" width="56" height="56" fill="none"><defs><linearGradient id="p1c" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#p1c)" stroke-width="2.5"/><rect x="16" y="16" width="16" height="16" rx="4" fill="url(#p1c)"/></svg><div class="label">56px</div></div>
+    </div>
+    <div class="name">纯几何，不加字母</div>
+    <div class="desc">Icon 负责识别形状，Wordmark 负责「Drawify」文字。分工清晰，各尺寸都清晰。</div>
+    <div class="verdict good">✓ Figma / Linear / Vercel 模式：icon 不含字，wordmark 含全名</div>
+    <div class="combo-row">
+      <svg class="full" viewBox="0 0 240 56" fill="none"><defs><linearGradient id="pw" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient><linearGradient id="pt" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="7" y="9" width="36" height="36" rx="8" fill="none" stroke="url(#pw)" stroke-width="2.5"/><rect x="15" y="17" width="20" height="20" rx="5" fill="url(#pw)"/><text x="52" y="38" font-family="Inter, system-ui, sans-serif" font-size="30" font-weight="700" letter-spacing="-0.02em" fill="#F5F3FF">Draw<tspan fill="url(#pt)">ify</tspan></text></svg>
+    </div>
+  </div>
+
+  <!-- D monogram -->
+  <div class="card">
+    <span class="tag alt">可选</span>
+    <div class="num">D Monogram</div>
+    <div class="sizes">
+      <div class="size-item"><svg viewBox="0 0 48 48" width="16" height="16" fill="none"><defs><linearGradient id="dm1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#dm1)" stroke-width="2.5"/><rect x="16" y="16" width="16" height="16" rx="4" fill="url(#dm1)"/><text x="24" y="27" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="800" fill="white">D</text></svg><div class="label">16px</div></div>
+      <div class="size-item"><svg viewBox="0 0 48 48" width="32" height="32" fill="none"><defs><linearGradient id="dm1b" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#dm1b)" stroke-width="2.5"/><rect x="16" y="16" width="16" height="16" rx="4" fill="url(#dm1b)"/><text x="24" y="27" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="800" fill="white">D</text></svg><div class="label">32px</div></div>
+      <div class="size-item"><svg viewBox="0 0 48 48" width="56" height="56" fill="none"><defs><linearGradient id="dm1c" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#dm1c)" stroke-width="2.5"/><rect x="16" y="16" width="16" height="16" rx="4" fill="url(#dm1c)"/><text x="24" y="27" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="800" fill="white">D</text></svg><div class="label">56px</div></div>
+    </div>
+    <div class="name">内核加 D</div>
+    <div class="desc">Monogram 经典做法。56px 以上可读；16px favicon 时 D 几乎消失，只剩色块。</div>
+    <div class="verdict warn">△ 大尺寸 App Icon 可用；favicon 场景收益为零，且与 wordmark 的 D 重复</div>
+  </div>
+
+  <!-- IFY -->
+  <div class="card">
+    <span class="tag current">不推荐</span>
+    <div class="num">IFY Trigraph</div>
+    <div class="sizes">
+      <div class="size-item"><svg viewBox="0 0 48 48" width="16" height="16" fill="none"><defs><linearGradient id="if1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#if1)" stroke-width="2.5"/><rect x="14" y="16" width="20" height="16" rx="4" fill="url(#if1)"/><text x="24" y="27" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="7.5" font-weight="800" fill="white" letter-spacing="-0.05em">IFY</text></svg><div class="label">16px</div></div>
+      <div class="size-item"><svg viewBox="0 0 48 48" width="32" height="32" fill="none"><defs><linearGradient id="if1b" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#if1b)" stroke-width="2.5"/><rect x="14" y="16" width="20" height="16" rx="4" fill="url(#if1b)"/><text x="24" y="27" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="7.5" font-weight="800" fill="white" letter-spacing="-0.05em">IFY</text></svg><div class="label">32px</div></div>
+      <div class="size-item"><svg viewBox="0 0 48 48" width="56" height="56" fill="none"><defs><linearGradient id="if1c" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#if1c)" stroke-width="2.5"/><rect x="14" y="16" width="20" height="16" rx="4" fill="url(#if1c)"/><text x="24" y="27" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="7.5" font-weight="800" fill="white" letter-spacing="-0.05em">IFY</text></svg><div class="label">56px</div></div>
+    </div>
+    <div class="name">内核加 IFY</div>
+    <div class="desc">三字母挤在 16×16 区域，任何尺寸都糊成一团。且 wordmark 已高亮「ify」，icon 再写一遍语义重复。</div>
+    <div class="verdict bad">✗ 16px 完全不可读；32px 仍吃力。不建议</div>
+  </div>
+
+  <!-- D as negative space -->
+  <div class="card">
+    <span class="tag alt">探索</span>
+    <div class="num">D Negative Space</div>
+    <div class="sizes">
+      <div class="size-item"><svg viewBox="0 0 48 48" width="16" height="16" fill="none"><defs><linearGradient id="dn1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient><mask id="mn1"><rect width="48" height="48" fill="white"/><path d="M18,16 L18,32 L24,32 Q30,32 30,24 Q30,16 24,16 Z" fill="black"/></mask></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#dn1)" stroke-width="2.5"/><rect x="16" y="16" width="16" height="16" rx="4" fill="url(#dn1)" mask="url(#mn1)"/></svg><div class="label">16px</div></div>
+      <div class="size-item"><svg viewBox="0 0 48 48" width="32" height="32" fill="none"><defs><linearGradient id="dn1b" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient><mask id="mn1b"><rect width="48" height="48" fill="white"/><path d="M18,16 L18,32 L24,32 Q30,32 30,24 Q30,16 24,16 Z" fill="black"/></mask></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#dn1b)" stroke-width="2.5"/><rect x="16" y="16" width="16" height="16" rx="4" fill="url(#dn1b)" mask="url(#mn1b)"/></svg><div class="label">32px</div></div>
+      <div class="size-item"><svg viewBox="0 0 48 48" width="56" height="56" fill="none"><defs><linearGradient id="dn1c" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient><mask id="mn1c"><rect width="48" height="48" fill="white"/><path d="M18,16 L18,32 L24,32 Q30,32 30,24 Q30,16 24,16 Z" fill="black"/></mask></defs><rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#dn1c)" stroke-width="2.5"/><rect x="16" y="16" width="16" height="16" rx="4" fill="url(#dn1c)" mask="url(#mn1c)"/></svg><div class="label">56px</div></div>
+    </div>
+    <div class="name">负空间 D（内核镂空）</div>
+    <div class="desc">不用文字，用形状暗示 D。比填字 D 在小尺寸略好，但 16px 时 D 形仍难辨认，且增加复杂度。</div>
+    <div class="verdict warn">△ 设计上有趣，但 ROI 不高；纯几何更干净</div>
+  </div>
+
+</div>
+
+</body>
+</html>

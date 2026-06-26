@@ -1,0 +1,99 @@
+{
+  "version": "0.2",
+  "id": "common.blueprint",
+  "name": "Blueprint",
+  "meta": {
+    "author": "Drawify",
+    "description": "工程制图风格：蓝灰体系、边框清晰、结构感强，适合架构图、ER 图与系统设计文档",
+    "tags": ["blueprint", "technical", "architecture"]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#F6FBFF",
+      "text": "#154360",
+      "muted_text": "#5D7A8A",
+      "border": "#90A4BE",
+      "primary": "#1565C0",
+      "neutral_fill": "#ECEFF1",
+      "neutral_stroke": "#455A64",
+      "group_fill": "#EEF4FA",
+      "group_stroke": "#7BA3C4"
+    },
+    "palette": {
+      "blue": { "fill": "#E3F2FD", "stroke": "#1565C0" },
+      "orange": { "fill": "#E8EEF4", "stroke": "#0D47A1" },
+      "green": { "fill": "#E8F5E9", "stroke": "#2E7D32" },
+      "purple": { "fill": "#EDE7F6", "stroke": "#5E35B1" },
+      "yellow": { "fill": "#FFF8E1", "stroke": "#F9A825" },
+      "red": { "fill": "#FFEBEE", "stroke": "#C62828" },
+      "cyan": { "fill": "#E0F7FA", "stroke": "#00838F" },
+      "brown": { "fill": "#ECEFF1", "stroke": "#546E7A" },
+      "gray": { "fill": "#F5F8FA", "stroke": "#90A4BE" },
+      "amber": { "fill": "#FFF3E0", "stroke": "#E65100" },
+      "blue_gray": { "fill": "#ECEFF1", "stroke": "#455A64" },
+      "start_green": { "fill": "#C8E6C9", "stroke": "#2E7D32" },
+      "end_red": { "fill": "#FFCDD2", "stroke": "#C62828" },
+      "arch_blue": { "fill": "#E3F2FD", "stroke": "#1565C0" },
+      "root": { "fill": "#1565C0", "stroke": "#0D47A1", "text_fill": "#FFFFFF" }
+    },
+    "radius": {
+      "md": 6,
+      "lg": 10
+    },
+    "spacing": {
+      "group_padding": 18
+    }
+  },
+  "diagrams": {
+    "flowchart": {
+      "edge": { "stroke": "#4A6278" },
+      "group": { "stroke_width": "{strokes.thick}" }
+    },
+    "sequence": {
+      "edge": { "stroke": "#4A6278" },
+      "entity_types": { "entity": { "stroke": "#7B1FA2" } }
+    },
+    "state": { "edge": { "stroke": "#4A6278" } },
+    "architecture": {
+      "group": {
+        "stroke": "#1565C0",
+        "stroke_width": "{strokes.thick}",
+        "fill": "#EEF4FA"
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "{lighten(#EEF4FA, 0.0)}", "stroke": "{lighten(#1565C0, 0.0)}", "stroke_width": 2.0, "border_radius": 8.0 },
+            { "fill": "{lighten(#EEF4FA, 0.35)}", "stroke": "{lighten(#1565C0, 0.30)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{lighten(#EEF4FA, 0.55)}", "stroke": "{lighten(#1565C0, 0.50)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{lighten(#EEF4FA, 0.70)}", "stroke": "{lighten(#1565C0, 0.65)}", "stroke_width": 1.5, "border_radius": 6.0 }
+          ],
+          "index": { "from": "group_depth", "cap": 3 },
+          "bindings": [
+            { "target": "group", "fields": { "fill": "fill", "stroke": "stroke", "stroke_width": "stroke_width", "border_radius": "border_radius" } }
+          ]
+        }
+      }
+    },
+    "er": {
+      "node": { "fill": "#FFFFFF", "stroke": "#1565C0" },
+      "group": { "stroke": "#7BA3C4" }
+    },
+    "mindmap": {
+      "entity_types": { "leaf": { "fill": "#FFFFFF" } },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#E3F2FD", "stroke": "#1565C0", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

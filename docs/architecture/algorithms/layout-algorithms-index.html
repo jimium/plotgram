@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>布局与路由算法文档索引 — Drawify</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #1a1d26;
+      --muted: #5c6370;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --theme: #7c3aed;
+      --theme-soft: #ede9fe;
+      --good: #059669;
+      --good-soft: #d1fae5;
+      --warn: #d97706;
+      --warn-soft: #fef3c7;
+      --danger: #dc2626;
+      --danger-soft: #fee2e2;
+      --border: #e2e5eb;
+      --code-bg: #f0f2f5;
+      --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115;
+        --card: #1a1d26;
+        --text: #e6e8ee;
+        --muted: #9aa2b1;
+        --accent: #60a5fa;
+        --accent-soft: #1e3a5f;
+        --theme: #a78bfa;
+        --theme-soft: #2e2140;
+        --good: #34d399;
+        --good-soft: #0a3322;
+        --warn: #fbbf24;
+        --warn-soft: #3d2a05;
+        --danger: #f87171;
+        --danger-soft: #3d1717;
+        --border: #2a2f3a;
+        --code-bg: #151821;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Top Nav ── */
+    .topnav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.9rem;
+    }
+    .topnav .crumb { color: var(--muted); font-weight: 600; }
+    .topnav .theme-toggle {
+      margin-left: auto;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--muted);
+      font: inherit;
+      border-radius: 999px;
+      padding: 0.35rem 0.8rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: background 0.2s, color 0.2s;
+    }
+    .topnav .theme-toggle:hover {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    /* ── Hero ── */
+    header.hero {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 30%, #7c3aed 60%, #db2777 90%, #d97706 100%);
+      color: #fff;
+      padding: 3.5rem 1.5rem 3rem;
+      text-align: center;
+    }
+    header.hero h1 {
+      margin: 0 0 0.6rem;
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+    header.hero p.subtitle {
+      margin: 0 auto;
+      font-size: 1.08rem;
+      opacity: 0.9;
+      max-width: 680px;
+      line-height: 1.7;
+    }
+    header.hero .stats {
+      margin-top: 1.5rem;
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+    header.hero .stat {
+      text-align: center;
+    }
+    header.hero .stat-num {
+      font-size: 1.8rem;
+      font-weight: 700;
+      display: block;
+    }
+    header.hero .stat-label {
+      font-size: 0.82rem;
+      opacity: 0.78;
+    }
+
+    /* ── Main Container ── */
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+    }
+
+    /* ── Section ── */
+    .section-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin: 2.5rem 0 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .section-title .icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+    .section-title .icon.layout {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .section-title .icon.routing {
+      background: var(--theme-soft);
+      color: var(--theme);
+    }
+    .section-desc {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Card Grid ── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1.25rem;
+    }
+
+    /* ── Algorithm Card ── */
+    .algo-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .algo-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--theme));
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .algo-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+      border-color: var(--accent);
+    }
+    .algo-card:hover::before {
+      opacity: 1;
+    }
+
+    .algo-card .card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+    }
+    .algo-card .card-icon {
+      flex-shrink: 0;
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .algo-card .card-icon svg {
+      width: 28px;
+      height: 28px;
+    }
+    .algo-card .card-icon.layout-icon {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .algo-card .card-icon.routing-icon {
+      background: var(--theme-soft);
+      color: var(--theme);
+    }
+
+    .algo-card .card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 0;
+      line-height: 1.3;
+    }
+    .algo-card .card-title-en {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-weight: 400;
+      margin-top: 2px;
+    }
+
+    .algo-card .card-desc {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .algo-card .card-props {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.25rem;
+    }
+    .algo-card .prop {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.78rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      background: var(--code-bg);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .algo-card .prop .prop-label {
+      font-weight: 600;
+      color: var(--text);
+    }
+    .algo-card .prop.yes { color: var(--good); border-color: var(--good-soft); background: var(--good-soft); }
+    .algo-card .prop.no  { color: var(--warn); border-color: var(--warn-soft); background: var(--warn-soft); }
+
+    .algo-card .card-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-top: auto;
+      padding-top: 0.5rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--accent);
+      transition: gap 0.2s;
+    }
+    .algo-card:hover .card-link {
+      gap: 0.55rem;
+    }
+    .algo-card .card-link svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* ── Recommendation Table ── */
+    .rec-section {
+      margin-top: 3.5rem;
+    }
+    .rec-section .section-title {
+      margin-bottom: 0.5rem;
+    }
+
+    .rec-table-wrap {
+      overflow-x: auto;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--card);
+    }
+
+    table.rec-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    table.rec-table thead {
+      background: var(--code-bg);
+    }
+    table.rec-table th {
+      text-align: left;
+      padding: 0.85rem 1rem;
+      font-weight: 700;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      border-bottom: 2px solid var(--border);
+    }
+    table.rec-table td {
+      padding: 0.8rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    table.rec-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+    table.rec-table tbody tr {
+      transition: background 0.15s;
+    }
+    table.rec-table tbody tr:hover {
+      background: var(--accent-soft);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.55rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .badge.layout-badge {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .badge.routing-badge {
+      background: var(--theme-soft);
+      color: var(--theme);
+    }
+    .badge.builtin-badge {
+      background: var(--good-soft);
+      color: var(--good);
+    }
+
+    .scenario-name {
+      font-weight: 600;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--muted);
+      font-size: 0.82rem;
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      header.hero h1 { font-size: 1.6rem; }
+      header.hero .stats { gap: 1.2rem; }
+      .card-grid { grid-template-columns: 1fr; }
+      .container { padding: 1.5rem 1rem 3rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Nav -->
+  <nav class="topnav">
+    <span class="crumb">Drawify 算法文档</span>
+    <button class="theme-toggle" onclick="toggleTheme()">切换主题</button>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <h1>Drawify 布局与路由算法文档</h1>
+    <p class="subtitle">
+      涵盖节点布局算法与边路由算法的完整索引，帮助你在不同业务场景下快速选型。
+      每个算法均提供原理、复杂度、适用规模与实现细节的详细文档。
+    </p>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-num">7</span>
+        <span class="stat-label">布局算法</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num">5</span>
+        <span class="stat-label">路由算法</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num">8</span>
+        <span class="stat-label">推荐场景</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- ═══════════════ 节点布局算法 ═══════════════ -->
+    <h2 class="section-title">
+      <span class="icon layout">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="2" width="5" height="3" rx="0.8"/><rect x="9" y="2" width="5" height="3" rx="0.8"/><rect x="2" y="7" width="5" height="3" rx="0.8"/><rect x="9" y="7" width="5" height="3" rx="0.8"/><rect x="5.5" y="12" width="5" height="3" rx="0.8"/></svg>
+      </span>
+      节点布局算法
+    </h2>
+    <p class="section-desc">决定图中节点位置的算法，是图可视化的核心。选择合适的布局算法直接决定图形的可读性与美观度。</p>
+
+    <div class="card-grid">
+
+      <!-- Sugiyama -->
+      <div class="algo-card">
+        <div class="card-header">
+          <div class="card-icon layout-icon">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <rect x="10" y="2" width="12" height="5" rx="1.5"/>
+              <rect x="3" y="13" width="12" height="5" rx="1.5"/>
+              <rect x="17" y="13" width="12" height="5" rx="1.5"/>
+              <rect x="10" y="25" width="12" height="5" rx="1.5"/>
+              <line x1="16" y1="7" x2="9" y2="13"/><line x1="16" y1="7" x2="23" y2="13"/>
+              <line x1="9" y1="18" x2="16" y2="25"/><line x1="23" y1="18" x2="16" y2="25"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="card-title">Sugiyama 分层布局</h3>
+            <div class="card-title-en">Sugiyama Hierarchical Layout</div>
+          </div>
+        </div>
+        <p class="card-desc">经典 DAG 分层布局，通过层级分配、交叉最小化与坐标优化，生成清晰的上下/左右流向图。</p>
+        <div class="card-props">
+          <span class="prop yes"><span class="prop-label">确定性</span> ✓</span>
+          <span class="prop"><span class="prop-label">规模</span> ≤ 300 节点</span>
+          <span class="prop"><span class="prop-label">适用</span> DAG / 流程图</span>
+        </div>
+        <a href="layout-sugiyama.html" class="card-link">
+          查看详情
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </a>
+      </div>
+
+      <!-- Fruchterman-Reingold -->
+      <div class="algo-card">
+        <div class="card-header">
+          <div class="card-icon layout-icon">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <circle cx="8" cy="8" r="2.5"/><circle cx="24" cy="6" r="2.5"/>
+              <circle cx="6" cy="22" r="2.5"/><circle cx="22" cy="24" r="2.5"/>
+              <circle cx="15" cy="15" r="2.5"/><circle cx="27" cy="16" r="2.5"/>
+              <line x1="10" y1="8" x2="12.5" y2="13.5" opacity="0.5"/>
+              <line x1="17.5" y1="15" x2="21.5" y2="23" opacity="0.5"/>
+              <line x1="8.5" y1="19.5" x2="12.5" y2="16.5" opacity="0.5"/>
+              <line x1="17.5" y1="13.5" x2="21.5" y2="7.5" opacity="0.5"/>
+              <line x1="17.5" y1="15" x2="24.5" y2="16" opacity="0.5"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="card-title">Fruchterman-Reingold 力导向</h3>
+            <div class="card-title-en">Force-Directed (FR) Layout</div>
+          </div>
+        </div>
+        <p class="card-desc">基于 Fruchterman-Reingold 引斥力模拟的力导向布局，增强分组语义，适合架构图与微服务拓扑。</p>
+        <div class="card-props">
+          <span class="prop no"><span class="prop-label">确定性</span> ✗</span>
+          <span class="prop"><span class="prop-label">规模</span> ≤ 180 节点</span>
+          <span class="prop"><span class="prop-label">适用</span> 架构图 / 微服务拓扑</span>
+        </div>
+        <a href="layout-node-algorithms.html#force-directed" class="card-link">
+          查看详情
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </a>
+      </div>
+
+      <!-- Mindmap -->
+      <div class="algo-card">
+        <div class="card-header">
+          <div class="card-icon layout-icon">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <circle cx="16" cy="16" r="3"/>
+              <circle cx="16" cy="16" r="8" stroke-dasharray="3 2" opacity="0.5"/>
+              <circle cx="16" cy="8" r="2"/><circle cx="23" cy="12" r="2"/>
+              <circle cx="23" cy="20" r="2"/><circle cx="16" cy="24" r="2"/>
+              <circle cx="9" cy="20" r="2"/><circle cx="9" cy="12" r="2"/>
+              <line x1="16" y1="13" x2="16" y2="10" opacity="0.5"/>
+              <line x1="18.5" y1="14" x2="21" y2="13" opacity="0.5"/>
+              <line x1="18.5" y1="18" x2="21" y2="19" opacity="0.5"/>
+              <line x1="16" y1="19" x2="16" y2="22" opacity="0.5"/>
+              <line x1="13.5" y1="18" x2="11" y2="19" opacity="0.5"/>
+              <line x1="13.5" y1="14" x2="11" y2="13" opacity="0.5"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="card-title">Mindmap 思维导图布局</h3>
+            <div class="card-title-en">Mindmap Layout</div>
+          </div>
+        </div>
+        <p class="card-desc">面向树形结构的专用布局，支持径向/自上而下/自左向右三种展开方向，根/主干/分支/叶节点差异化尺寸。</p>
+        <div class="card-props">
+          <span class="prop yes"><span class="prop-label">确定性</span> ✓</span>
+          <span class="prop"><span class="prop-label">规模</span> ≤ 200 节点</span>
+          <span class="prop"><span class="prop-label">适用</span> 思维导图 / 知识树</span>
+        </div>
+        <a href="layout-node-algorithms.html#mindmap" class="card-link">
+          查看详情
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </a>
+      </div>
+
+      <!-- Circular -->
+      <div class="algo-card">
+        <div class="card-header">
+          <div class="card-icon layout-icon">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <circle cx="16" cy="16" r="12" stroke-dasharray="3 2" opacity="0.5"/>
+              <circle cx="16" cy="4" r="2.5"/><circle cx="27" cy="12" r="2.5"/>
+              <circle cx="24" cy="25" r="2.5"/><circle cx="8" cy="25" r="2.5"/>
+              <circle cx="5" cy="12" r="2.5"/>
+              <line x1="16" y1="6.5" x2="24" y2="10" opacity="0.4"/>
+              <line x1="25" y1="14" x2="22" y2="23" opacity="0.4"/>
+              <line x1="6" y1="14" x2="10" y2="23" opacity="0.4"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="card-title">Circular 圆形布局</h3>
+            <div class="card-title-en">Circular Layout</div>
+          </div>
+        </div>
+        <p class="card-desc">节点排列在圆周上，支持单环和多环模式（基于双连通分量分解），使环结构和闭环关系直观可见。</p>
+        <div class="card-props">
+          <span class="prop yes"><span class="prop-label">确定性</span> ✓</span>
+          <span class="prop"><span class="prop-label">规模</span> ≤ 120 节点</span>
+          <span class="prop"><span class="prop-label">适用</span> 状态图 / 闭环关系</span>
+        </div>
+        <a href="layout-node-algorithms.html#circular" class="card-link">
+          查看详情
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </a>
+      </div>
+
+      <!-- Sequence -->
+      <div class="algo-card">
+        <div class="card-header">
+          <div class="card-icon layout-icon">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <rect x="2" y="2" width="7" height="5" rx="1"/><rect x="12" y="2" width="7" height="5" rx="1"/><rect x="23" y="2" width="7" height="5" rx="1"/>
+              <line x1="5.5" y1="7" x2="5.5" y2="30" stroke-dasharray="2 2" opacity="0.5"/>
+              <line x1="15.5" y1="7" x2="15.5" y2="30" stroke-dasharray="2 2" opacity="0.5"/>
+              <line x1="26.5" y1="7" x2="26.5" y2="30" stroke-dasharray="2 2" opacity="0.5"/>
+              <line x1="5.5" y1="12" x2="15.5" y2="12" marker-end="url(#arr-seq)"/>
+              <line x1="15.5" y1="18" x2="26.5" y2="18" marker-end="url(#arr-seq)"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="card-title">Sequence 时序图布局</h3>
+            <div class="card-title-en">Sequence Layout</div>
+          </div>
+        </div>
+        <p class="card-desc">专为时序图设计：参与者水平展开，消息按声明顺序垂直排列，内置边几何生成。</p>
+        <div class="card-props">
+          <span class="prop yes"><span class="prop-label">确定性</span> ✓</span>
+          <span class="prop"><span class="prop-label">规模</span> ≤ 200 消息</span>
+          <span class="prop"><span class="prop-label">适用</span> 时序图</span>
+        </div>
+        <a href="layout-node-algorithms.html#sequence" class="card-link">
+          查看详情
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </a>
+      </div>
+
+      <!-- Sugiyama V2 -->
+      <div class="algo-card">
+        <div class="card-header">
+          <div class="card-icon layout-icon">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <rect x="10" y="2" width="12" height="5" rx="1.5"/>
+              <rect x="3" y="13" width="12" height="5" rx="1.5"/>
+              <rect x="17" y="13" width="12" height="5" rx="1.5"/>
+              <rect x="10" y="25" width="12" height="5" rx="1.5"/>
+              <line x1="16" y1="7" x2="9" y2="13"/><line x1="16" y1="7" x2="23" y2="13"/>
+              <line x1="9" y1="18" x2="16" y2="25"/><line x1="23" y1="18" x2="16" y2="25"/>
+              <circle cx="16" cy="7" r="1.5" fill="currentColor" opacity="0.5"/>
+              <circle cx="16" cy="18" r="1.5" fill="currentColor" opacity="0.5"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="card-title">Sugiyama V2 增强分层布局</h3>
+            <div class="card-title-en">Sugiyama V2 Hierarchical Layout</div>
+          </div>
+        </div>
+        <p class="card-desc">Greedy 去环 + NS-style 紧边压缩 + 加权中位数排序 + BK-style 坐标分配，更紧凑的层级与更均匀的横向分布。</p>
+        <div class="card-props">
+          <span class="prop yes"><span class="prop-label">确定性</span> ✓</span>
+          <span class="prop"><span class="prop-label">规模</span> ≤ 320 节点</span>
+          <span class="prop"><span class="prop-label">适用</span> 复杂 DAG / 流程编排</span>
+        </div>
+        <a href="layout-node-algorithms.html#sugiyama-v2" class="card-link">
+          查看详情
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </a>
+      </div>
+
+      <!-- Architecture V2 -->
+      <div class="algo-card">
+        <div class="card-header">
+          <div class="card-icon layout-icon">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <rect x="2" y="2" width="12" height="10" rx="2" stroke-dasharray="3 2"/>
+              <rect x="18" y="2" width="12" height="10" rx="2" stroke-dasharray="3 2"/>
+              <rect x="4" y="4" width="4" height="3" rx="1"/><rect x="10" y="4" width="4" height="3" rx="1"/>
+              <rect x="20" y="4" width="4" height="3" rx="1"/><rect x="26" y="4" width="4" height="3" rx="1"/>
+              <rect x="2" y="18" width="28" height="10" rx="2" stroke-dasharray="3 2"/>
+              <rect x="4" y="20" width="4" height="3" rx="1"/><rect x="10" y="20" width="4" height="3" rx="1"/>
+              <rect x="20" y="20" width="4" height="3" rx="1"/>
+              <line x1="8" y1="12" x2="16" y2="18" opacity="0.5"/>
+              <line x1="24" y1="12" x2="16" y2="18" opacity="0.5"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="card-title">Architecture V2 架构图布局</h3>
+            <div class="card-title-en">Architecture V2 Layout</div>
+          </div>
+        </div>
+        <p class="card-desc">专为架构图设计的混合布局：宏观层将分组视为超级节点做拓扑分层，微观层对组内节点做 Sugiyama 分层。</p>
+        <div class="card-props">
+          <span class="prop yes"><span class="prop-label">确定性</span> ✓</span>
+          <span class="prop"><span class="prop-label">规模</span> ≤ 250 节点</span>
+          <span class="prop"><span class="prop-label">适用</span> 架构图 / 微服务拓扑</span>
+        </div>
+        <a href="layout-node-algorithms.html#architecture-v2" class="card-link">
+          查看详情
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </a>
+      </div>
+
+    </div>
+
+    <!-- ═══════════════ 边路由算法 ═══════════════ -->
+    <h2 class="section-title">
+      <span class="icon routing">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 8 C5 4, 11 12, 14 8"/><circle cx="2" cy="8" r="1.2" fill="currentColor"/><circle cx="14" cy="8" r="1.2" fill="currentColor"/></svg>
+      </span>
+      边路由算法
+    </h2>
+    <p class="section-desc">决定节点之间连线路径的算法。好的路由算法能减少边交叉、避免遮挡，显著提升图形可读性。</p>
+
+    <div class="card-grid">
+
+      <!-- Edge Routing Algorithms (multi) -->
+      <div class="algo-card">
+        <div class="card-header">
+          <div class="card-icon routing-icon">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <line x1="4" y1="6" x2="28" y2="6" opacity="0.6"/>
+              <path d="M4 14 L12 14 L12 20 L28 20" opacity="0.6"/>
+              <path d="M4 26 C10 20, 22 32, 28 26" opacity="0.6"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="card-title">边路由算法集</h3>
+            <div class="card-title-en">Straight / Orthogonal / Bezier / Circular / Spline</div>
+          </div>
+        </div>
+        <p class="card-desc">5 种路由策略：直线、正交折线、贝塞尔曲线、环形弧线、避障样条，满足不同视觉风格与可读性需求。</p>
+        <div class="card-props">
+          <span class="prop yes"><span class="prop-label">确定性</span> ✓</span>
+          <span class="prop"><span class="prop-label">规模</span> 任意</span>
+          <span class="prop"><span class="prop-label">适用</span> 全场景覆盖</span>
+        </div>
+        <a href="edge-routing-algorithms.html" class="card-link">
+          查看详情
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </a>
+      </div>
+
+    </div>
+
+    <!-- ═══════════════ 推荐选型 ═══════════════ -->
+    <div class="rec-section">
+      <h2 class="section-title">
+        <span class="icon layout">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h12"/></svg>
+        </span>
+        推荐选型
+      </h2>
+      <p class="section-desc">根据业务场景选择最佳布局 + 路由组合，快速定位适合你需求的算法方案。</p>
+
+      <div class="rec-table-wrap">
+        <table class="rec-table">
+          <thead>
+            <tr>
+              <th>业务场景</th>
+              <th>布局算法</th>
+              <th>路由算法</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="scenario-name">流程图 / 审批流</td>
+              <td><span class="badge layout-badge">Sugiyama</span></td>
+              <td><span class="badge routing-badge">Orthogonal</span></td>
+              <td>经典分层 + 正交折线，流程步骤清晰可读</td>
+            </tr>
+            <tr>
+              <td class="scenario-name">思维导图 / 知识树</td>
+              <td><span class="badge layout-badge">Mindmap</span></td>
+              <td><span class="badge routing-badge">Bezier</span></td>
+              <td>中心发散 + 贝塞尔曲线，自然贴合导图风格</td>
+            </tr>
+            <tr>
+              <td class="scenario-name">状态机 / 闭环关系</td>
+              <td><span class="badge layout-badge">Circular</span></td>
+              <td><span class="badge routing-badge">Circular</span></td>
+              <td>环形排列 + 弧线连接，状态流转直观展示</td>
+            </tr>
+            <tr>
+              <td class="scenario-name">架构图 / 分组组件图</td>
+              <td><span class="badge layout-badge">Architecture V2</span></td>
+              <td><span class="badge routing-badge">Orthogonal</span></td>
+              <td>分组感知分层 + 正交折线，组件边界清晰</td>
+            </tr>
+            <tr>
+              <td class="scenario-name">网络拓扑 / 自由依赖图</td>
+              <td><span class="badge layout-badge">Force-Directed</span></td>
+              <td><span class="badge routing-badge">Orthogonal</span></td>
+              <td>FR 力导向分散 + 正交折线，高密度网络清晰可辨</td>
+            </tr>
+            <tr>
+              <td class="scenario-name">时序交互</td>
+              <td><span class="badge layout-badge">Sequence</span></td>
+              <td><span class="badge builtin-badge">内置路由</span></td>
+              <td>时序图自带消息线路由，无需额外选择</td>
+            </tr>
+            <tr>
+              <td class="scenario-name">ER 关系图</td>
+              <td><span class="badge layout-badge">Sugiyama</span></td>
+              <td><span class="badge routing-badge">Straight</span></td>
+              <td>分层布局 + 直线连接，实体关系简洁明了</td>
+            </tr>
+            <tr>
+              <td class="scenario-name">高密度流程 DAG</td>
+              <td><span class="badge layout-badge">Sugiyama V2</span></td>
+              <td><span class="badge routing-badge">Orthogonal</span></td>
+              <td>优化版分层 + 正交折线，大规模 DAG 性能与可读性兼得</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    Drawify 算法文档 · 布局与路由算法索引
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('drawify-theme', next);
+    }
+
+    (function initTheme() {
+      const saved = localStorage.getItem('drawify-theme');
+      if (saved) {
+        document.documentElement.setAttribute('data-theme', saved);
+      }
+    })();
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 400 260" width="400" height="260">
+  <defs>
+    <style><![CDATA[
+      .btn {
+        cursor: pointer;
+        fill: #2a2a4a;
+        stroke: #667eea;
+        stroke-width: 1.5;
+        transition: fill 0.2s;
+      }
+      .btn:hover { fill: #667eea; }
+      .btn-text {
+        pointer-events: none;
+        fill: #ccc;
+        font-size: 13px;
+        text-anchor: middle;
+        font-family: -apple-system, sans-serif;
+      }
+      .box { fill: #4a6fa5; stroke: #667eea; stroke-width: 2; }
+      .label { fill: white; font-size: 14px; text-anchor: middle; font-family: -apple-system, sans-serif; pointer-events: none; }
+      .hint { fill: #666; font-size: 10px; text-anchor: middle; font-family: -apple-system, sans-serif; }
+    ]]></style>
+  </defs>
+
+  <rect width="400" height="260" fill="#0f0f23" rx="8"/>
+  <text x="200" y="25" class="hint">测试 SVG 内部按钮在不同嵌入方式下是否可点击</text>
+
+  <g id="status-default">
+    <text x="200" y="50" class="label" font-size="16">状态：未点击任何按钮</text>
+    <set attributeName="opacity" to="0" begin="btn1.click" fill="freeze"/>
+    <set attributeName="opacity" to="1" begin="btn2.click+1.5s" fill="freeze"/>
+  </g>
+
+  <g id="status-added" opacity="0">
+    <text x="200" y="50" class="label" font-size="16" fill="#4caf50">状态：已添加 B 和 C</text>
+    <set attributeName="opacity" to="1" begin="btn1.click" fill="freeze"/>
+    <set attributeName="opacity" to="0" begin="btn2.click" fill="freeze"/>
+  </g>
+
+  <g id="status-reset" opacity="0">
+    <text x="200" y="50" class="label" font-size="16" fill="#ff9800">状态：已重置</text>
+    <set attributeName="opacity" to="1" begin="btn2.click" fill="freeze"/>
+    <set attributeName="opacity" to="0" begin="btn2.click+1.5s" fill="freeze"/>
+  </g>
+
+  <g id="box-a">
+    <rect class="box" x="40" y="80" width="70" height="50" rx="8"/>
+    <text x="75" y="110" class="label">A</text>
+  </g>
+
+  <g id="box-b" opacity="0">
+    <rect class="box" x="165" y="80" width="70" height="50" rx="8" fill="#9b59b6" stroke="#8e44ad"/>
+    <text x="200" y="110" class="label">B</text>
+    <animate attributeName="opacity" from="0" to="1" dur="0.4s" fill="freeze" begin="btn1.click"/>
+    <animate attributeName="opacity" from="1" to="0" dur="0.4s" fill="freeze" begin="btn2.click"/>
+  </g>
+
+  <g id="box-c" opacity="0">
+    <rect class="box" x="290" y="80" width="70" height="50" rx="8" fill="#2e7d32" stroke="#4caf50"/>
+    <text x="325" y="110" class="label">C</text>
+    <animate attributeName="opacity" from="0" to="1" dur="0.4s" fill="freeze" begin="btn1.click"/>
+    <animate attributeName="opacity" from="1" to="0" dur="0.4s" fill="freeze" begin="btn2.click"/>
+  </g>
+
+  <path id="line-ab" d="M110 105 L165 105" stroke="#667eea" stroke-width="2" opacity="0">
+    <animate attributeName="opacity" from="0" to="1" dur="0.3s" fill="freeze" begin="btn1.click"/>
+    <animate attributeName="opacity" from="1" to="0" dur="0.3s" fill="freeze" begin="btn2.click"/>
+  </path>
+  <path id="line-bc" d="M235 105 L290 105" stroke="#667eea" stroke-width="2" opacity="0">
+    <animate attributeName="opacity" from="0" to="1" dur="0.3s" fill="freeze" begin="btn1.click+0.2s"/>
+    <animate attributeName="opacity" from="1" to="0" dur="0.3s" fill="freeze" begin="btn2.click"/>
+  </path>
+
+  <rect class="btn" id="btn1" x="100" y="180" width="90" height="36" rx="8"/>
+  <text x="145" y="203" class="btn-text">添加 B + C</text>
+
+  <rect class="btn" id="btn2" x="210" y="180" width="90" height="36" rx="8"/>
+  <text x="255" y="203" class="btn-text">重置</text>
+
+  <a xlink:href="https://example.com" xlink:show="new">
+    <rect class="btn" x="310" y="220" width="70" height="28" rx="8" fill="none" stroke="#ff6b35"/>
+    <text x="345" y="238" class="btn-text" fill="#ff6b35" font-size="11">链接↗</text>
+  </a>
+
+  <text x="30" y="235" class="hint">↑ 可点击链接</text>
+  <text x="200" y="250" class="hint">按钮用 SMIL begin="btn.click" + CSS :hover 实现</text>
+</svg>

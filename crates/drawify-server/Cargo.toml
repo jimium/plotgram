@@ -1,0 +1,18 @@
+[package]
+name = "drawify-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Web server for Drawify rendering API"
+
+[[bin]]
+name = "drawify-server"
+path = "src/main.rs"
+
+[dependencies]
+drawify-core = { workspace = true, features = ["raster", "svg-debug"] }
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true

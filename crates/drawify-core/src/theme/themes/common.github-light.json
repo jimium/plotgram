@@ -1,0 +1,77 @@
+{
+  "version": "0.2",
+  "id": "common.github-light",
+  "name": "GitHub Light",
+  "meta": {
+    "author": "Drawify",
+    "description": "灵感来自 GitHub Primer 浅色主题：开发者最熟悉的白底蓝链配色，适合 README 与文档嵌入",
+    "tags": ["github", "primer", "light", "inspired"]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#ffffff",
+      "text": "#1f2328",
+      "muted_text": "#656d76",
+      "border": "#d0d7de",
+      "primary": "#0969da",
+      "neutral_fill": "#f6f8fa",
+      "neutral_stroke": "#656d76",
+      "group_fill": "#f6f8fa",
+      "group_stroke": "#d0d7de"
+    },
+    "palette": {
+      "blue": { "fill": "#ddf4ff", "stroke": "#0969da" },
+      "orange": { "fill": "#fff1e5", "stroke": "#bc4c00" },
+      "green": { "fill": "#dafbe1", "stroke": "#1a7f37" },
+      "purple": { "fill": "#fbefff", "stroke": "#8250df" },
+      "yellow": { "fill": "#fff8c5", "stroke": "#9a6700" },
+      "red": { "fill": "#ffebe9", "stroke": "#cf222e" },
+      "cyan": { "fill": "#b6e3ff", "stroke": "#0598bc" },
+      "brown": { "fill": "#f0f0f0", "stroke": "#57606a" },
+      "gray": { "fill": "#f6f8fa", "stroke": "#8c959f" },
+      "amber": { "fill": "#fff1e5", "stroke": "#bc4c00" },
+      "blue_gray": { "fill": "#f6f8fa", "stroke": "#656d76" },
+      "start_green": { "fill": "#dafbe1", "stroke": "#1a7f37" },
+      "end_red": { "fill": "#ffebe9", "stroke": "#cf222e" },
+      "arch_blue": { "fill": "#ddf4ff", "stroke": "#0969da" },
+      "root": { "fill": "#0969da", "stroke": "#0550ae", "text_fill": "#ffffff" }
+    }
+  },
+  "diagrams": {
+    "flowchart": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "sequence": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "state": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "architecture": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "er": {
+      "node": { "fill": "#ffffff", "stroke": "#0969da" },
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "mindmap": {
+      "edge": { "stroke_width": "{strokes.normal}" },
+      "entity_types": {
+        "leaf": { "fill": "#f6f8fa" }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#ddf4ff", "stroke": "#0969da", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

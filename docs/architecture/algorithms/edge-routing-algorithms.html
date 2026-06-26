@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>边路由算法集 — Drawify 算法文档</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #1a1d26;
+      --muted: #5c6370;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --theme: #7c3aed;
+      --theme-soft: #ede9fe;
+      --good: #059669;
+      --good-soft: #d1fae5;
+      --warn: #d97706;
+      --warn-soft: #fef3c7;
+      --danger: #dc2626;
+      --danger-soft: #fee2e2;
+      --border: #e2e5eb;
+      --code-bg: #f0f2f5;
+      --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115;
+        --card: #1a1d26;
+        --text: #e6e8ee;
+        --muted: #9aa2b1;
+        --accent: #60a5fa;
+        --accent-soft: #1e3a5f;
+        --theme: #a78bfa;
+        --theme-soft: #2e2140;
+        --good: #34d399;
+        --good-soft: #0a3322;
+        --warn: #fbbf24;
+        --warn-soft: #3d2a05;
+        --danger: #f87171;
+        --danger-soft: #3d1717;
+        --border: #2a2f3a;
+        --code-bg: #151821;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .topnav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.9rem;
+    }
+    .topnav a.back {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .topnav .crumb { color: var(--muted); }
+    .topnav .theme-toggle {
+      margin-left: auto;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--muted);
+      font: inherit;
+      border-radius: 999px;
+      padding: 0.35rem 0.8rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    header.hero {
+      background: linear-gradient(135deg, #1e3a5f 0%, #7c3aed 55%, #d97706 100%);
+      color: #fff;
+      padding: 2.5rem 1.5rem 2.5rem;
+    }
+    header.hero .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+    header.hero h1 {
+      margin: 0 0 0.75rem;
+      font-size: 1.9rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    header.hero p {
+      margin: 0;
+      font-size: 1.02rem;
+      opacity: 0.92;
+      max-width: 780px;
+    }
+    header.hero .tags {
+      margin-top: 1.2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    header.hero .tag {
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.22);
+      color: #fff;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 500;
+    }
+
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem 1.5rem 1.25rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .card h2 {
+      margin: 0 0 0.5rem;
+      font-size: 1.25rem;
+      letter-spacing: -0.01em;
+    }
+    .card h3 {
+      margin: 1.25rem 0 0.4rem;
+      font-size: 1.05rem;
+    }
+    .card p { margin: 0.5rem 0; }
+    .card ul { padding-left: 1.2rem; margin: 0.4rem 0; }
+    .card li { margin: 0.2rem 0; }
+
+    code {
+      font-family: var(--mono);
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 0.05rem 0.35rem;
+      border-radius: 5px;
+      font-size: 0.88em;
+    }
+
+    .pill {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+    }
+    .pill.theme { background: var(--theme-soft); color: var(--theme); }
+    .pill.good { background: var(--good-soft); color: var(--good); }
+    .pill.warn { background: var(--warn-soft); color: var(--warn); }
+    .pill.danger { background: var(--danger-soft); color: var(--danger); }
+
+    /* Algorithm card grid */
+    .algo-grid {
+      display: grid;
+      gap: 1.2rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 720px) {
+      .algo-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .algo-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem 1.3rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .algo-card .algo-head {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .algo-card .algo-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .algo-card .algo-icon svg {
+      width: 26px;
+      height: 26px;
+    }
+    .algo-card .algo-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 0;
+    }
+    .algo-card .algo-subtitle {
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-family: var(--mono);
+      margin: 0;
+    }
+    .algo-card .algo-viz {
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      background: var(--code-bg);
+      padding: 0.75rem;
+      margin: 0.25rem 0;
+    }
+    .algo-card .algo-viz svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 8px;
+      background: var(--card);
+    }
+    .algo-card .algo-key {
+      font-size: 0.92rem;
+      color: var(--text);
+      margin: 0;
+    }
+    .algo-card .algo-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.2rem;
+    }
+    .algo-card .algo-scenario {
+      font-size: 0.88rem;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    /* Utility card */
+    .util-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+    .util-card {
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--theme);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+    }
+    .util-card h4 { margin: 0 0 0.4rem; font-size: 1rem; }
+    .util-card p { margin: 0.3rem 0; font-size: 0.92rem; color: var(--muted); }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      font-size: 0.92rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.55rem 0.75rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: var(--code-bg);
+      font-weight: 600;
+    }
+
+    /* Interactive demo */
+    .demo-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .demo-card h2 {
+      margin: 0 0 0.5rem;
+      font-size: 1.25rem;
+      letter-spacing: -0.01em;
+    }
+    .demo-card p { margin: 0.5rem 0; }
+    .demo-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.6rem;
+      margin: 0.8rem 0;
+    }
+    .demo-controls button {
+      font: inherit;
+      font-size: 0.88rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.45rem 1rem;
+      cursor: pointer;
+      background: var(--card);
+      color: var(--text);
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .demo-controls button:hover {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+    }
+    .demo-controls button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .demo-controls button.active-btn {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .demo-controls .style-btns {
+      display: flex;
+      gap: 0.35rem;
+    }
+    .demo-controls .style-btns button {
+      font-size: 0.82rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+    }
+    .demo-canvas-wrap {
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      background: var(--code-bg);
+      padding: 0.5rem;
+      margin-top: 0.5rem;
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+    }
+    .demo-canvas-wrap canvas {
+      border-radius: 8px;
+      background: var(--card);
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+    .demo-status {
+      margin-top: 0.6rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+      min-height: 1.4em;
+    }
+
+    footer {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 1rem 1.5rem 2.5rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    footer a.back-bottom {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--accent);
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <nav class="topnav" aria-label="面包屑">
+    <a class="back" href="layout-algorithms-index.html">← 返回布局算法索引</a>
+    <span class="crumb">/</span>
+    <span>边路由算法集</span>
+    <button class="theme-toggle" id="themeBtn" title="切换主题">🌓 主题</button>
+  </nav>
+
+  <header class="hero">
+    <div class="wrap">
+      <h1>边路由算法集</h1>
+      <p>
+        Drawify 提供了 <strong>5 种边路由算法</strong>，从最简单的直线连接到高级样条避障路径。
+        每种算法针对不同的可视化场景优化，与布局算法搭配使用以获得最佳效果。
+      </p>
+      <div class="tags">
+        <span class="tag">5 Algorithms</span>
+        <span class="tag">Orthogonal Default</span>
+        <span class="tag">Obstacle Avoidance</span>
+        <span class="tag">Parallel Edge Handling</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1. 算法概览 -->
+    <section class="card" id="overview">
+      <h2>📌 算法概览</h2>
+      <p>
+        边路由（Edge Routing）决定了图中<strong>节点之间连线的形状与走向</strong>。
+        好的边路由能减少交叉、避免遮挡、提升可读性。Drawify 的边路由算法体系分为三个层次：
+      </p>
+      <div style="display:grid; gap:0.8rem; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top:0.8rem;">
+        <div style="border:1px solid var(--border); border-radius:10px; padding:0.9rem 1rem;">
+          <strong style="color:var(--good)">基础层</strong>
+          <p style="margin:0.3rem 0 0; font-size:0.92rem; color:var(--muted)">Straight、Bezier — 简洁高效，适合边数较少的场景</p>
+        </div>
+        <div style="border:1px solid var(--border); border-radius:10px; padding:0.9rem 1rem;">
+          <strong style="color:var(--accent)">结构层</strong>
+          <p style="margin:0.3rem 0 0; font-size:0.92rem; color:var(--muted)">Orthogonal — 规整折线，适合工程/架构图（渲染层自动圆角）</p>
+        </div>
+        <div style="border:1px solid var(--border); border-radius:10px; padding:0.9rem 1rem;">
+          <strong style="color:var(--theme)">高级层</strong>
+          <p style="margin:0.3rem 0 0; font-size:0.92rem; color:var(--muted)">Circular、Spline — 环形布局适配 / 避障样条</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. 五种算法卡片 -->
+    <section class="card" id="algorithms">
+      <h2>🧩 五种边路由算法</h2>
+      <div class="algo-grid">
+
+        <!-- Straight -->
+        <div class="algo-card" id="straight">
+          <div class="algo-head">
+            <div class="algo-icon" style="background:var(--good-soft)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--good)" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="20" x2="20" y2="4"/></svg>
+            </div>
+            <div>
+              <p class="algo-title">Straight</p>
+              <p class="algo-subtitle">edge_routing.rs</p>
+            </div>
+          </div>
+          <div class="algo-viz">
+            <svg viewBox="0 0 240 120" aria-label="Straight 直线连接示意">
+              <defs>
+                <marker id="arr-st" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--good)"/>
+                </marker>
+              </defs>
+              <rect x="20" y="30" width="50" height="30" rx="6" fill="var(--good-soft)" stroke="var(--good)" stroke-width="1.5"/>
+              <text x="45" y="50" text-anchor="middle" font-size="11" fill="var(--good)" font-weight="600" font-family="var(--sans)">A</text>
+              <rect x="170" y="55" width="50" height="30" rx="6" fill="var(--good-soft)" stroke="var(--good)" stroke-width="1.5"/>
+              <text x="195" y="75" text-anchor="middle" font-size="11" fill="var(--good)" font-weight="600" font-family="var(--sans)">B</text>
+              <line x1="70" y1="45" x2="170" y2="70" stroke="var(--good)" stroke-width="2" marker-end="url(#arr-st)"/>
+              <!-- parallel offset demo -->
+              <line x1="70" y1="40" x2="170" y2="65" stroke="var(--good)" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.45"/>
+            </svg>
+          </div>
+          <p class="algo-key"><strong>核心思想：</strong>源端口到目标端口的直线连接。平行边通过偏移量（offset）避免重叠。</p>
+          <div class="algo-meta">
+            <span class="pill good">低复杂度</span>
+            <span class="pill">无避障</span>
+            <span class="pill">平行边偏移</span>
+          </div>
+          <p class="algo-scenario"><strong>适用场景：</strong>简单关系图、ER 图、边数较少的图</p>
+        </div>
+
+        <!-- Orthogonal -->
+        <div class="algo-card" id="orthogonal">
+          <div class="algo-head">
+            <div class="algo-icon" style="background:var(--accent-soft)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,20 4,12 20,12 20,4"/></svg>
+            </div>
+            <div>
+              <p class="algo-title">Orthogonal</p>
+              <p class="algo-subtitle">edge_routing_orthogonal/</p>
+            </div>
+          </div>
+          <div class="algo-viz">
+            <svg viewBox="0 0 240 120" aria-label="Orthogonal 正交折线示意">
+              <defs>
+                <marker id="arr-or" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/>
+                </marker>
+              </defs>
+              <rect x="20" y="25" width="50" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+              <text x="45" y="45" text-anchor="middle" font-size="11" fill="var(--accent)" font-weight="600" font-family="var(--sans)">A</text>
+              <rect x="170" y="60" width="50" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+              <text x="195" y="80" text-anchor="middle" font-size="11" fill="var(--accent)" font-weight="600" font-family="var(--sans)">B</text>
+              <polyline points="70,40 120,40 120,75 170,75" fill="none" stroke="var(--accent)" stroke-width="2" marker-end="url(#arr-or)"/>
+              <!-- channel/slot hint -->
+              <line x1="120" y1="20" x2="120" y2="100" stroke="var(--accent)" stroke-width="0.8" stroke-dasharray="3 3" opacity="0.3"/>
+            </svg>
+          </div>
+          <p class="algo-key"><strong>核心思想：</strong>创建直角折线路径。使用通道/槽位（channel/slot）系统寻找可用的水平/垂直走廊，基于评分选择路径（惩罚弯折、交叉、长绕行），最后简化路径。</p>
+          <div class="algo-meta">
+            <span class="pill">中等复杂度</span>
+            <span class="pill good">推荐默认</span>
+            <span class="pill">避障评分</span>
+            <span class="pill">路径简化</span>
+          </div>
+          <p class="algo-scenario"><strong>适用场景：</strong>流程图、架构图（搭配 Sugiyama 布局的默认推荐）</p>
+        </div>
+
+        <!-- Bezier -->
+        <div class="algo-card" id="bezier">
+          <div class="algo-head">
+            <div class="algo-icon" style="background:var(--theme-soft)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--theme)" stroke-width="2.5" stroke-linecap="round"><path d="M4,20 C4,10 20,14 20,4"/></svg>
+            </div>
+            <div>
+              <p class="algo-title">Bezier</p>
+              <p class="algo-subtitle">edge_routing_bezier.rs</p>
+            </div>
+          </div>
+          <div class="algo-viz">
+            <svg viewBox="0 0 240 120" aria-label="Bezier 贝塞尔曲线示意">
+              <defs>
+                <marker id="arr-bz" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--theme)"/>
+                </marker>
+              </defs>
+              <rect x="20" y="25" width="50" height="30" rx="6" fill="var(--theme-soft)" stroke="var(--theme)" stroke-width="1.5"/>
+              <text x="45" y="45" text-anchor="middle" font-size="11" fill="var(--theme)" font-weight="600" font-family="var(--sans)">A</text>
+              <rect x="170" y="60" width="50" height="30" rx="6" fill="var(--theme-soft)" stroke="var(--theme)" stroke-width="1.5"/>
+              <text x="195" y="80" text-anchor="middle" font-size="11" fill="var(--theme)" font-weight="600" font-family="var(--sans)">B</text>
+              <path d="M70,40 C110,40 130,75 170,75" fill="none" stroke="var(--theme)" stroke-width="2" marker-end="url(#arr-bz)"/>
+              <!-- control point hints -->
+              <circle cx="110" cy="40" r="3" fill="var(--theme)" opacity="0.35"/>
+              <circle cx="130" cy="75" r="3" fill="var(--theme)" opacity="0.35"/>
+              <line x1="70" y1="40" x2="110" y2="40" stroke="var(--theme)" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.3"/>
+              <line x1="170" y1="75" x2="130" y2="75" stroke="var(--theme)" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.3"/>
+            </svg>
+          </div>
+          <p class="algo-key"><strong>核心思想：</strong>端口感知的自适应三次贝塞尔曲线。控制点沿端口方向延伸，并根据节点间距与转角关系自动调整；可通过 <code>edge_routing: bezier { tension: … }</code> 调节弧度。</p>
+          <div class="algo-meta">
+            <span class="pill good">低-中复杂度</span>
+            <span class="pill">平滑曲线</span>
+            <span class="pill">可调曲率</span>
+          </div>
+          <p class="algo-scenario"><strong>适用场景：</strong>思维导图、轻量可视化图、需要柔和曲线的通用图</p>
+        </div>
+
+        <!-- Circular -->
+        <div class="algo-card" id="circular">
+          <div class="algo-head">
+            <div class="algo-icon" style="background:var(--warn-soft)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2.5" stroke-linecap="round"><path d="M12,4 A8,8 0 0,1 20,12"/></svg>
+            </div>
+            <div>
+              <p class="algo-title">Circular</p>
+              <p class="algo-subtitle">edge_routing_circular.rs</p>
+            </div>
+          </div>
+          <div class="algo-viz">
+            <svg viewBox="0 0 240 120" aria-label="Circular 弧形边示意">
+              <defs>
+                <marker id="arr-ci" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--warn)"/>
+                </marker>
+              </defs>
+              <!-- circle hint -->
+              <circle cx="120" cy="60" r="48" fill="none" stroke="var(--border)" stroke-width="1" stroke-dasharray="4 3"/>
+              <!-- nodes on circle -->
+              <circle cx="72" cy="28" r="14" fill="var(--warn-soft)" stroke="var(--warn)" stroke-width="1.5"/>
+              <text x="72" y="32" text-anchor="middle" font-size="10" fill="var(--warn)" font-weight="600" font-family="var(--sans)">A</text>
+              <circle cx="168" cy="28" r="14" fill="var(--warn-soft)" stroke="var(--warn)" stroke-width="1.5"/>
+              <text x="168" y="32" text-anchor="middle" font-size="10" fill="var(--warn)" font-weight="600" font-family="var(--sans)">B</text>
+              <circle cx="168" cy="92" r="14" fill="var(--warn-soft)" stroke="var(--warn)" stroke-width="1.5"/>
+              <text x="168" y="96" text-anchor="middle" font-size="10" fill="var(--warn)" font-weight="600" font-family="var(--sans)">C</text>
+              <!-- arc edges along circle -->
+              <path d="M86,28 A48,48 0 0,1 154,28" fill="none" stroke="var(--warn)" stroke-width="2" marker-end="url(#arr-ci)"/>
+              <path d="M168,42 A48,48 0 0,1 168,78" fill="none" stroke="var(--warn)" stroke-width="2" marker-end="url(#arr-ci)" opacity="0.6"/>
+            </svg>
+          </div>
+          <p class="algo-key"><strong>核心思想：</strong>弧形边，专为环形布局设计。边沿圆弧路径行进，与圆形节点排列自然契合。</p>
+          <div class="algo-meta">
+            <span class="pill">中等复杂度</span>
+            <span class="pill warn">环形布局专用</span>
+            <span class="pill">弧形路径</span>
+          </div>
+          <p class="algo-scenario"><strong>适用场景：</strong>状态图、循环关系图（搭配 circular 节点布局）</p>
+        </div>
+
+        <!-- Spline -->
+        <div class="algo-card" id="spline">
+          <div class="algo-head">
+            <div class="algo-icon" style="background:var(--danger-soft)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2.5" stroke-linecap="round"><path d="M4,20 C8,8 16,16 20,4"/></svg>
+            </div>
+            <div>
+              <p class="algo-title">Spline</p>
+              <p class="algo-subtitle">edge_routing_spline.rs</p>
+            </div>
+          </div>
+          <div class="algo-viz">
+            <svg viewBox="0 0 240 120" aria-label="Spline 样条路由示意">
+              <defs>
+                <marker id="arr-sp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--danger)"/>
+                </marker>
+              </defs>
+              <rect x="20" y="25" width="50" height="30" rx="6" fill="var(--danger-soft)" stroke="var(--danger)" stroke-width="1.5"/>
+              <text x="45" y="45" text-anchor="middle" font-size="11" fill="var(--danger)" font-weight="600" font-family="var(--sans)">A</text>
+              <rect x="170" y="60" width="50" height="30" rx="6" fill="var(--danger-soft)" stroke="var(--danger)" stroke-width="1.5"/>
+              <text x="195" y="80" text-anchor="middle" font-size="11" fill="var(--danger)" font-weight="600" font-family="var(--sans)">B</text>
+              <!-- obstacle -->
+              <rect x="100" y="40" width="40" height="25" rx="4" fill="var(--code-bg)" stroke="var(--border)" stroke-width="1" stroke-dasharray="3 2"/>
+              <text x="120" y="56" text-anchor="middle" font-size="9" fill="var(--muted)" font-family="var(--sans)">障碍</text>
+              <!-- spline avoiding obstacle -->
+              <path d="M70,40 C85,40 90,15 120,15 C150,15 155,75 170,75" fill="none" stroke="var(--danger)" stroke-width="2" marker-end="url(#arr-sp)"/>
+            </svg>
+          </div>
+          <p class="algo-key"><strong>核心思想：</strong>可见性图避障 + Catmull-Rom 多段样条拟合。比 Bezier 更平滑，能绕开中间节点。</p>
+          <div class="algo-meta">
+            <span class="pill danger">高复杂度</span>
+            <span class="pill">障碍避让</span>
+            <span class="pill">多段样条</span>
+            <span class="pill">C1 连续</span>
+          </div>
+          <p class="algo-scenario"><strong>适用场景：</strong>节点密集、需要避障的高质量路径；复杂图可视化</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 交互式演示 -->
+    <section class="demo-card" id="interactive-demo">
+      <h2>🎬 交互式演示：正交路由路径搜索</h2>
+      <p>观看不同路由算法如何在节点间寻找路径、避开障碍物。点击「开始搜索」启动动画，切换路由风格查看差异。</p>
+      <div class="demo-controls">
+        <button id="demoStartBtn">▶ 开始搜索</button>
+        <button id="demoResetBtn">⟲ 重置</button>
+        <span style="color:var(--muted);font-size:0.85rem;margin-left:0.3rem">路由风格：</span>
+        <div class="style-btns">
+          <button class="active-btn" data-style="orthogonal">Orthogonal</button>
+          <button data-style="bezier">Bezier</button>
+        </div>
+      </div>
+      <div class="demo-canvas-wrap">
+        <canvas id="demoCanvas" width="700" height="400"></canvas>
+      </div>
+      <div class="demo-status" id="demoStatus">就绪 — 点击「开始搜索」观看路由动画</div>
+    </section>
+
+    <!-- 3. 公共基础设施 -->
+    <section class="card" id="utilities">
+      <h2>🔧 公共基础设施</h2>
+      <p>
+        边路由算法共享一组底层工具模块，负责几何计算、标签定位和平行边处理。
+      </p>
+      <div class="util-grid">
+        <div class="util-card">
+          <h4><code>visibility.rs</code> — 可见性图</h4>
+          <p>构建节点间的可见性图（Visibility Graph），用于计算绕过障碍物的最短路径。部分路由算法（如 Spline）依赖此模块实现障碍物感知。</p>
+        </div>
+        <div class="util-card">
+          <h4><code>edge_geometry.rs</code> — 几何计算</h4>
+          <p>提供边路由通用的几何计算工具：线段交点、点到线段距离、贝塞尔曲线求值、路径简化等。</p>
+        </div>
+        <div class="util-card">
+          <h4><code>label_avoidance.rs</code> — 标签避让</h4>
+          <p>边标签（Edge Label）的智能定位。计算标签在边上的最佳放置位置，避免遮挡节点或其他标签。</p>
+        </div>
+        <div class="util-card">
+          <h4><code>parallel_edges.rs</code> — 平行边处理</h4>
+          <p>处理同一对节点之间的多条边（平行边 / 多重边）。通过偏移量、不同曲率等方式使平行边在视觉上可区分。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 对比表 -->
+    <section class="card" id="comparison">
+      <h2>📊 算法对比表</h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>算法</th>
+              <th>源文件</th>
+              <th>复杂度</th>
+              <th>路径形状</th>
+              <th>避障</th>
+              <th>推荐布局搭配</th>
+              <th>典型场景</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Straight</strong></td>
+              <td><code>edge_routing.rs</code></td>
+              <td><span class="pill good">低</span></td>
+              <td>直线</td>
+              <td>无</td>
+              <td>任意</td>
+              <td>简单关系图、ER 图</td>
+            </tr>
+            <tr>
+              <td><strong>Orthogonal</strong></td>
+              <td><code>edge_routing_orthogonal/</code></td>
+              <td><span class="pill">中</span></td>
+              <td>直角折线</td>
+              <td>评分式避障</td>
+              <td><span class="pill good">Sugiyama（推荐）</span></td>
+              <td>流程图、架构图</td>
+            </tr>
+            <tr>
+              <td><strong>Bezier</strong></td>
+              <td><code>edge_routing_bezier.rs</code></td>
+              <td><span class="pill good">低-中</span></td>
+              <td>自适应三次贝塞尔曲线</td>
+              <td>无</td>
+              <td>力导向、树状、轻量图</td>
+              <td>思维导图、柔和曲线图</td>
+            </tr>
+            <tr>
+              <td><strong>Circular</strong></td>
+              <td><code>edge_routing_circular.rs</code></td>
+              <td><span class="pill">中</span></td>
+              <td>圆弧</td>
+              <td>无</td>
+              <td><span class="pill warn">Circular</span></td>
+              <td>状态图、循环关系图</td>
+            </tr>
+            <tr>
+              <td><strong>Spline</strong></td>
+              <td><code>edge_routing_spline.rs</code></td>
+              <td><span class="pill danger">高</span></td>
+              <td>样条曲线</td>
+              <td><span class="pill good">可见性图避障</span></td>
+              <td>任意（密集图）</td>
+              <td>密集节点图、高质量路径</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 style="margin-top:1.5rem">选择决策指南</h3>
+      <div style="display:grid; gap:0.8rem; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+        <div style="border:1px solid var(--border); border-left:4px solid var(--good); border-radius:10px; padding:0.9rem 1rem;">
+          <h4 style="margin:0 0 0.3rem; font-size:0.95rem;">✅ 追求清晰规整</h4>
+          <p style="margin:0; font-size:0.9rem; color:var(--muted)">选 <strong>Orthogonal</strong>（默认推荐；SVG 渲染自动圆角）</p>
+        </div>
+        <div style="border:1px solid var(--border); border-left:4px solid var(--theme); border-radius:10px; padding:0.9rem 1rem;">
+          <h4 style="margin:0 0 0.3rem; font-size:0.95rem;">🎨 追求美观柔和</h4>
+          <p style="margin:0; font-size:0.9rem; color:var(--muted)">选 <strong>Bezier</strong>（<code>bezier { tension }</code>）或 <strong>Spline</strong></p>
+        </div>
+        <div style="border:1px solid var(--border); border-left:4px solid var(--warn); border-radius:10px; padding:0.9rem 1rem;">
+          <h4 style="margin:0 0 0.3rem; font-size:0.95rem;">🔄 环形布局</h4>
+          <p style="margin:0; font-size:0.9rem; color:var(--muted)">必须选 <strong>Circular</strong>，弧形边与圆形排列天然契合</p>
+        </div>
+        <div style="border:1px solid var(--border); border-left:4px solid var(--danger); border-radius:10px; padding:0.9rem 1rem;">
+          <h4 style="margin:0 0 0.3rem; font-size:0.95rem;">🧱 节点密集需避障</h4>
+          <p style="margin:0; font-size:0.9rem; color:var(--muted)">选 <strong>Spline</strong>，基于可见性图的避障多段样条路由</p>
+        </div>
+        <div style="border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:10px; padding:0.9rem 1rem;">
+          <h4 style="margin:0 0 0.3rem; font-size:0.95rem;">⚡ 追求性能</h4>
+          <p style="margin:0; font-size:0.9rem; color:var(--muted)">选 <strong>Straight</strong>，最低复杂度，适合边数少的场景</p>
+        </div>
+        <div style="border:1px solid var(--border); border-left:4px solid var(--muted); border-radius:10px; padding:0.9rem 1rem;">
+          <h4 style="margin:0 0 0.3rem; font-size:0.95rem;">📝 ER 图 / 简单关系</h4>
+          <p style="margin:0; font-size:0.9rem; color:var(--muted)">选 <strong>Straight</strong>，直线 + 平行边偏移即可</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Orthogonal 深入 -->
+    <section class="card" id="orthogonal-detail">
+      <h2>🔍 Orthogonal 路由深入</h2>
+      <p>
+        Orthogonal 是 Drawify 的<strong>默认推荐路由算法</strong>，也是复杂度最高、功能最完善的基础路由。
+        以下是其核心机制的详细说明。
+      </p>
+
+      <h3>通道/槽位系统（Channel / Slot）</h3>
+      <p>
+        在节点之间的空白区域划分<strong>水平通道</strong>和<strong>垂直通道</strong>。每条通道由多个槽位组成，
+        路由时为边分配不重叠的槽位，从而避免边与边、边与节点的重叠。
+      </p>
+
+      <h3>评分式路径选择</h3>
+      <p>
+        对候选路径进行评分，选择总惩罚最低的路径。评分维度包括：
+      </p>
+      <ul>
+        <li><span class="pill danger">弯折惩罚</span> — 每个拐角增加惩罚，鼓励直线路径</li>
+        <li><span class="pill warn">交叉惩罚</span> — 与已有边交叉增加惩罚</li>
+        <li><span class="pill">绕行惩罚</span> — 路径长度超出曼哈顿距离越多，惩罚越大</li>
+      </ul>
+
+      <h3>路径简化</h3>
+      <p>
+        初步路由后，对折线进行简化：移除共线的冗余中间点、合并相邻的同方向段，
+        减少路径点数并提升渲染性能。
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <a class="back-bottom" href="layout-algorithms-index.html">← 返回布局算法索引 · layout-algorithms-index.html</a>
+    <p style="margin-top:0.5rem">© Drawify · 算法文档 · 边路由算法集</p>
+  </footer>
+
+  <script>
+    // Theme toggle
+    (function () {
+      var btn = document.getElementById('themeBtn');
+      var mql = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+      var key = 'edge-routing-theme';
+      function apply(mode) {
+        if (mode === 'light') { document.documentElement.setAttribute('data-theme', 'light'); }
+        else if (mode === 'dark') { document.documentElement.setAttribute('data-theme', 'dark'); }
+        else { document.documentElement.removeAttribute('data-theme'); }
+      }
+      var saved = localStorage.getItem(key);
+      if (saved) apply(saved);
+      btn.addEventListener('click', function () {
+        var cur = document.documentElement.getAttribute('data-theme');
+        var next;
+        if (!cur) next = mql && mql.matches ? 'light' : 'dark';
+        else next = cur === 'dark' ? 'light' : 'dark';
+        if (next) { localStorage.setItem(key, next); apply(next); }
+      });
+    })();
+
+    // ── Interactive Edge Routing Demo ──
+    (function () {
+      var canvas = document.getElementById('demoCanvas');
+      var ctx = canvas.getContext('2d');
+      var startBtn = document.getElementById('demoStartBtn');
+      var resetBtn = document.getElementById('demoResetBtn');
+      var statusEl = document.getElementById('demoStatus');
+      var styleBtns = document.querySelectorAll('.style-btns button');
+
+      var W = 700, H = 400;
+      var dpr = window.devicePixelRatio || 1;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.scale(dpr, dpr);
+
+      // Color helper — reads CSS vars
+      function cssVar(name) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      }
+      function colors() {
+        return {
+          card: cssVar('--card'),
+          text: cssVar('--text'),
+          muted: cssVar('--muted'),
+          accent: cssVar('--accent'),
+          accentSoft: cssVar('--accent-soft'),
+          good: cssVar('--good'),
+          goodSoft: cssVar('--good-soft'),
+          border: cssVar('--border'),
+          codeBg: cssVar('--code-bg'),
+          theme: cssVar('--theme'),
+          themeSoft: cssVar('--theme-soft'),
+        };
+      }
+
+      // Node definitions
+      var nodes = [
+        { id: 'src',  x: 40,  y: 40,  w: 100, h: 50, label: 'Source',  type: 'source' },
+        { id: 'o1',   x: 260, y: 80,  w: 90,  h: 55, label: 'Obstacle A', type: 'obstacle' },
+        { id: 'o2',   x: 180, y: 220, w: 100, h: 50, label: 'Obstacle B', type: 'obstacle' },
+        { id: 'o3',   x: 420, y: 160, w: 90,  h: 55, label: 'Obstacle C', type: 'obstacle' },
+        { id: 'tgt',  x: 560, y: 310, w: 100, h: 50, label: 'Target',  type: 'target' },
+      ];
+
+      var srcNode = nodes[0];
+      var tgtNode = nodes[4];
+
+      // Port positions (right-center of source, left-center of target)
+      function srcPort() { return { x: srcNode.x + srcNode.w, y: srcNode.y + srcNode.h / 2 }; }
+      function tgtPort() { return { x: tgtNode.x, y: tgtNode.y + tgtNode.h / 2 }; }
+
+      // Orthogonal path waypoints (pre-computed to avoid obstacles)
+      function orthoPath() {
+        var s = srcPort(), t = tgtPort();
+        return [
+          { x: s.x, y: s.y },
+          { x: 180, y: s.y },
+          { x: 180, y: 160 },
+          { x: 390, y: 160 },
+          { x: 390, y: t.y },
+          { x: t.x, y: t.y },
+        ];
+      }
+
+      // Candidate paths explored during animation
+      function candidatePaths() {
+        var s = srcPort(), t = tgtPort();
+        return [
+          // Path 1: go right then down (blocked by o1)
+          [
+            { x: s.x, y: s.y },
+            { x: 310, y: s.y },
+            { x: 310, y: 200 },
+            { x: t.x, y: 200 },
+            { x: t.x, y: t.y },
+          ],
+          // Path 2: go down then right (blocked by o2)
+          [
+            { x: s.x, y: s.y },
+            { x: 140, y: s.y },
+            { x: 140, y: 260 },
+            { x: 500, y: 260 },
+            { x: 500, y: t.y },
+            { x: t.x, y: t.y },
+          ],
+          // Path 3: the winning path
+          orthoPath(),
+        ];
+      }
+
+      // Channel lines for scanning animation
+      function channelLines() {
+        var s = srcPort(), t = tgtPort();
+        return {
+          vertical: [
+            { x: 180, y1: 20, y2: 380 },
+            { x: 390, y1: 20, y2: 380 },
+            { x: 500, y1: 20, y2: 380 },
+          ],
+          horizontal: [
+            { y: s.y, x1: 40, x2: 660 },
+            { y: 160, x1: 40, x2: 660 },
+            { y: t.y, x1: 40, x2: 660 },
+          ],
+        };
+      }
+
+      // State
+      var currentStyle = 'orthogonal';
+      var animState = 'idle'; // idle | running | done
+      var animFrame = null;
+      var animStart = 0;
+      var animPhase = 0; // sub-phase within animation
+
+      // Style switching
+      styleBtns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          styleBtns.forEach(function (b) { b.classList.remove('active-btn'); });
+          btn.classList.add('active-btn');
+          currentStyle = btn.getAttribute('data-style');
+          resetDemo();
+        });
+      });
+
+      startBtn.addEventListener('click', function () {
+        if (animState === 'running') return;
+        startAnimation();
+      });
+      resetBtn.addEventListener('click', function () { resetDemo(); });
+
+      function resetDemo() {
+        if (animFrame) cancelAnimationFrame(animFrame);
+        animFrame = null;
+        animState = 'idle';
+        animPhase = 0;
+        startBtn.disabled = false;
+        statusEl.textContent = '就绪 — 点击「开始搜索」观看路由动画';
+        drawScene(0);
+      }
+
+      function setStatus(msg) { statusEl.textContent = msg; }
+
+      // ── Drawing helpers ──
+      function drawRoundedRect(cx, x, y, w, h, r, fill, stroke, lineW) {
+        cx.beginPath();
+        cx.moveTo(x + r, y);
+        cx.lineTo(x + w - r, y);
+        cx.quadraticCurveTo(x + w, y, x + w, y + r);
+        cx.lineTo(x + w, y + h - r);
+        cx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        cx.lineTo(x + r, y + h);
+        cx.quadraticCurveTo(x, y + h, x, y + h - r);
+        cx.lineTo(x, y + r);
+        cx.quadraticCurveTo(x, y, x + r, y);
+        cx.closePath();
+        if (fill) { cx.fillStyle = fill; cx.fill(); }
+        if (stroke) { cx.strokeStyle = stroke; cx.lineWidth = lineW || 1.5; cx.stroke(); }
+      }
+
+      function drawNode(c, node, highlight) {
+        var fill, stroke;
+        if (node.type === 'source' || node.type === 'target') {
+          fill = c.goodSoft; stroke = c.good;
+        } else {
+          fill = c.codeBg; stroke = c.border;
+        }
+        drawRoundedRect(ctx, node.x, node.y, node.w, node.h, 8, fill, stroke, highlight ? 2.5 : 1.5);
+        if (highlight) {
+          ctx.save();
+          ctx.shadowColor = c.good;
+          ctx.shadowBlur = 10;
+          drawRoundedRect(ctx, node.x, node.y, node.w, node.h, 8, null, c.good, 2);
+          ctx.restore();
+        }
+        ctx.fillStyle = (node.type === 'source' || node.type === 'target') ? c.good : c.muted;
+        ctx.font = '600 13px ' + cssVar('--sans');
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(node.label, node.x + node.w / 2, node.y + node.h / 2);
+      }
+
+      function drawNodes(c, highlightSrcTgt) {
+        nodes.forEach(function (n) {
+          var hl = highlightSrcTgt && (n.type === 'source' || n.type === 'target');
+          drawNode(c, n, hl);
+        });
+      }
+
+      function drawPolyline(points, color, width, dash, alpha) {
+        if (points.length < 2) return;
+        ctx.save();
+        ctx.globalAlpha = alpha != null ? alpha : 1;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width || 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        if (dash) ctx.setLineDash(dash);
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (var i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+
+      function drawPartialPolyline(points, progress, color, width, dash, alpha) {
+        // Draw polyline up to `progress` (0..1) along total length
+        if (points.length < 2 || progress <= 0) return;
+        var segs = [];
+        var totalLen = 0;
+        for (var i = 1; i < points.length; i++) {
+          var dx = points[i].x - points[i-1].x;
+          var dy = points[i].y - points[i-1].y;
+          var len = Math.sqrt(dx*dx + dy*dy);
+          segs.push(len);
+          totalLen += len;
+        }
+        var target = progress * totalLen;
+        var drawn = [];
+        drawn.push({ x: points[0].x, y: points[0].y });
+        var accum = 0;
+        for (var i = 0; i < segs.length; i++) {
+          if (accum + segs[i] <= target) {
+            drawn.push({ x: points[i+1].x, y: points[i+1].y });
+            accum += segs[i];
+          } else {
+            var remain = target - accum;
+            var t = remain / segs[i];
+            drawn.push({
+              x: points[i].x + (points[i+1].x - points[i].x) * t,
+              y: points[i].y + (points[i+1].y - points[i].y) * t,
+            });
+            break;
+          }
+        }
+        drawPolyline(drawn, color, width, dash, alpha);
+      }
+
+      function drawArrowHead(x, y, angle, size, color) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-size, -size * 0.5);
+        ctx.lineTo(-size, size * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawBezier(c, p0, p1, p2, p3, color, width, alpha, progress) {
+        ctx.save();
+        ctx.globalAlpha = alpha != null ? alpha : 1;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width || 2;
+        ctx.lineCap = 'round';
+        if (progress != null && progress < 1) {
+          // Draw partial bezier using de Casteljau subdivision
+          var steps = Math.floor(progress * 80);
+          ctx.beginPath();
+          for (var i = 0; i <= steps; i++) {
+            var t = i / 80;
+            var mt = 1 - t;
+            var bx = mt*mt*mt*p0.x + 3*mt*mt*t*p1.x + 3*mt*t*t*p2.x + t*t*t*p3.x;
+            var by = mt*mt*mt*p0.y + 3*mt*mt*t*p1.y + 3*mt*t*t*p2.y + t*t*t*p3.y;
+            if (i === 0) ctx.moveTo(bx, by);
+            else ctx.lineTo(bx, by);
+          }
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(p0.x, p0.y);
+          ctx.bezierCurveTo(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawControlPoint(c, x, y, color) {
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // ── Scene drawing ──
+      function drawScene(progress) {
+        var c = colors();
+        ctx.clearRect(0, 0, W, H);
+
+        // Background grid dots
+        ctx.save();
+        ctx.fillStyle = c.border;
+        ctx.globalAlpha = 0.3;
+        for (var gx = 20; gx < W; gx += 20) {
+          for (var gy = 20; gy < H; gy += 20) {
+            ctx.beginPath();
+            ctx.arc(gx, gy, 0.8, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+
+        if (animState === 'idle') {
+          drawNodes(c, false);
+          return;
+        }
+
+        // ── Orthogonal animation ──
+        if (currentStyle === 'orthogonal') {
+          drawOrthogonalAnim(c, progress);
+        }
+        // ── Bezier animation ──
+        else if (currentStyle === 'bezier') {
+          drawBezierAnim(c, progress);
+        }
+      }
+
+      function drawOrthogonalAnim(c, progress) {
+        var ch = channelLines();
+        var cands = candidatePaths();
+        var winner = orthoPath();
+
+        // Phase 1: 0..0.15 — highlight source & target
+        if (progress < 0.15) {
+          drawNodes(c, true);
+          setStatus('🔍 识别源节点与目标节点…');
+          return;
+        }
+
+        // Phase 2: 0.15..0.35 — scan channel lines
+        drawNodes(c, true);
+        var chProgress = Math.min(1, (progress - 0.15) / 0.20);
+        ctx.save();
+        ctx.globalAlpha = 0.25;
+        ctx.strokeStyle = c.accent;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ch.vertical.forEach(function (l, i) {
+          var p = Math.max(0, Math.min(1, chProgress * 3 - i * 0.3));
+          if (p > 0) {
+            ctx.beginPath();
+            ctx.moveTo(l.x, l.y1);
+            ctx.lineTo(l.x, l.y1 + (l.y2 - l.y1) * p);
+            ctx.stroke();
+          }
+        });
+        ch.horizontal.forEach(function (l, i) {
+          var p = Math.max(0, Math.min(1, chProgress * 3 - i * 0.3));
+          if (p > 0) {
+            ctx.beginPath();
+            ctx.moveTo(l.x1, l.y);
+            ctx.lineTo(l.x1 + (l.x2 - l.x1) * p, l.y);
+            ctx.stroke();
+          }
+        });
+        ctx.setLineDash([]);
+        ctx.restore();
+        setStatus('📐 扫描水平/垂直通道…');
+
+        if (progress < 0.35) return;
+
+        // Phase 3: 0.35..0.65 — explore candidate paths
+        var candProgress = (progress - 0.35) / 0.30;
+        for (var i = 0; i < cands.length; i++) {
+          var cp = Math.max(0, Math.min(1, candProgress * 3 - i * 0.5));
+          if (cp <= 0) continue;
+          var isWinner = (i === cands.length - 1);
+          if (isWinner) continue; // draw winner later
+          drawPartialPolyline(cands[i], cp, c.accent, 2, [6, 4], 0.3);
+        }
+        setStatus('🧭 探索候选路径（蓝色虚线）…');
+
+        if (progress < 0.65) return;
+
+        // Phase 4: 0.65..0.85 — winning path lights up
+        var winProgress = (progress - 0.65) / 0.20;
+        drawPartialPolyline(winner, winProgress, c.accent, 3, null, 1);
+
+        // Glow effect
+        ctx.save();
+        ctx.shadowColor = c.accent;
+        ctx.shadowBlur = 8;
+        drawPartialPolyline(winner, winProgress, c.accent, 2.5, null, 0.5);
+        ctx.restore();
+
+        setStatus('✨ 找到最优路径！');
+
+        if (progress < 0.85) return;
+
+        // Phase 5: 0.85..1.0 — draw arrowhead
+        var last = winner[winner.length - 1];
+        var prev = winner[winner.length - 2];
+        var angle = Math.atan2(last.y - prev.y, last.x - prev.x);
+        drawArrowHead(last.x, last.y, angle, 10, c.accent);
+
+        // Draw small dots at bend points
+        for (var i = 1; i < winner.length - 1; i++) {
+          ctx.save();
+          ctx.fillStyle = c.accent;
+          ctx.beginPath();
+          ctx.arc(winner[i].x, winner[i].y, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        setStatus('✅ 正交路由完成 — 直角折线路径已生成');
+      }
+
+      function drawBezierAnim(c, progress) {
+        var s = srcPort(), t = tgtPort();
+        // Control points for a nice bezier that curves around obstacles
+        var cp1 = { x: s.x + 140, y: s.y - 60 };
+        var cp2 = { x: t.x - 140, y: t.y + 60 };
+
+        // Phase 1: 0..0.15 — highlight nodes
+        if (progress < 0.15) {
+          drawNodes(c, true);
+          setStatus('🔍 识别源节点与目标节点…');
+          return;
+        }
+
+        drawNodes(c, true);
+
+        // Phase 2: 0.15..0.35 — show control points appearing
+        var cpProgress = (progress - 0.15) / 0.20;
+        if (cpProgress > 0) {
+          var cpAlpha = Math.min(1, cpProgress);
+          // Control point 1
+          drawControlPoint(c, cp1.x, cp1.y, c.theme);
+          // Control point 2
+          if (cpProgress > 0.4) {
+            drawControlPoint(c, cp2.x, cp2.y, c.theme);
+          }
+          // Dashed lines to control points
+          ctx.save();
+          ctx.globalAlpha = 0.25 * cpAlpha;
+          ctx.strokeStyle = c.theme;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(s.x, s.y);
+          ctx.lineTo(cp1.x, cp1.y);
+          ctx.stroke();
+          if (cpProgress > 0.4) {
+            ctx.beginPath();
+            ctx.moveTo(t.x, t.y);
+            ctx.lineTo(cp2.x, cp2.y);
+            ctx.stroke();
+          }
+          ctx.setLineDash([]);
+          ctx.restore();
+          setStatus('🎯 计算贝塞尔控制点…');
+        }
+
+        if (progress < 0.35) return;
+
+        // Phase 3: 0.35..0.80 — draw bezier curve progressively
+        var bezProgress = Math.min(1, (progress - 0.35) / 0.45);
+        drawBezier(c, s, cp1, cp2, t, c.theme, 3, 1, bezProgress);
+
+        // Glow
+        ctx.save();
+        ctx.shadowColor = c.theme;
+        ctx.shadowBlur = 8;
+        drawBezier(c, s, cp1, cp2, t, c.theme, 2, 0.4, bezProgress);
+        ctx.restore();
+
+        setStatus('🎨 绘制贝塞尔曲线…');
+
+        if (progress < 0.80) return;
+
+        // Phase 4: 0.80..1.0 — arrowhead
+        var endT = 0.98;
+        var mt = 1 - endT;
+        var ex = mt*mt*mt*s.x + 3*mt*mt*endT*cp1.x + 3*mt*endT*endT*cp2.x + endT*endT*endT*t.x;
+        var ey = mt*mt*mt*s.y + 3*mt*mt*endT*cp1.y + 3*mt*endT*endT*cp2.y + endT*endT*endT*t.y;
+        // Tangent
+        var dx = 3*mt*mt*(cp1.x-s.x) + 6*mt*endT*(cp2.x-cp1.x) + 3*endT*endT*(t.x-cp2.x);
+        var dy = 3*mt*mt*(cp1.y-s.y) + 6*mt*endT*(cp2.y-cp1.y) + 3*endT*endT*(t.y-cp2.y);
+        drawArrowHead(ex, ey, Math.atan2(dy, dx), 10, c.theme);
+
+        setStatus('✅ 贝塞尔路由完成 — 平滑曲线已生成');
+      }
+
+      // ── Animation loop ──
+      var ANIM_DURATION = 4000; // ms
+
+      function startAnimation() {
+        animState = 'running';
+        animStart = performance.now();
+        startBtn.disabled = true;
+        tick();
+      }
+
+      function tick() {
+        var elapsed = performance.now() - animStart;
+        var progress = Math.min(1, elapsed / ANIM_DURATION);
+        // Ease in-out
+        progress = progress < 0.5
+          ? 2 * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+        drawScene(progress);
+
+        if (elapsed < ANIM_DURATION) {
+          animFrame = requestAnimationFrame(tick);
+        } else {
+          animState = 'done';
+          startBtn.disabled = false;
+          drawScene(1);
+        }
+      }
+
+      // Initial draw
+      drawScene(0);
+
+      // Redraw on theme change (observer)
+      var observer = new MutationObserver(function () {
+        if (animState !== 'running') drawScene(animState === 'done' ? 1 : 0);
+      });
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    })();
+  </script>
+</body>
+</html>

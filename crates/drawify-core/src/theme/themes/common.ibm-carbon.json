@@ -1,0 +1,85 @@
+{
+  "version": "0.2",
+  "id": "common.ibm-carbon",
+  "name": "IBM Carbon Accessible",
+  "meta": {
+    "author": "Drawify",
+    "description": "色盲友好：IBM Carbon 语义色延伸。深蓝底 + 蓝/橙/紫高对比，适合暗色界面下的无障碍阅读",
+    "tags": ["ibm", "carbon", "dark", "accessible", "colorblind-safe", "a11y"]
+  },
+  "extends": "common.clean-dark",
+  "tokens": {
+    "colors": {
+      "canvas": "#161616",
+      "text": "#F4F4F4",
+      "muted_text": "#A8A8A8",
+      "border": "#525252",
+      "primary": "#78A9FF",
+      "neutral_fill": "#262626",
+      "neutral_stroke": "#A8A8A8",
+      "group_fill": "#1C1C1C",
+      "group_stroke": "#6F6F6F"
+    },
+    "palette": {
+      "blue": { "fill": "#262626", "stroke": "#4589FF" },
+      "orange": { "fill": "#2A1F14", "stroke": "#FF832B" },
+      "green": { "fill": "#1A2E1A", "stroke": "#42BE65" },
+      "purple": { "fill": "#2A1F2E", "stroke": "#A56EFF" },
+      "yellow": { "fill": "#2E2A14", "stroke": "#F1C21B" },
+      "red": { "fill": "#2E1A1A", "stroke": "#FA4D56" },
+      "cyan": { "fill": "#142A2A", "stroke": "#08BDBA" },
+      "brown": { "fill": "#262626", "stroke": "#8D8D8D" },
+      "gray": { "fill": "#161616", "stroke": "#6F6F6F" },
+      "amber": { "fill": "#2A1F14", "stroke": "#FF832B" },
+      "blue_gray": { "fill": "#262626", "stroke": "#F4F4F4" },
+      "start_green": { "fill": "#1A2E1A", "stroke": "#42BE65" },
+      "end_red": { "fill": "#2E1A1A", "stroke": "#FA4D56" },
+      "arch_blue": { "fill": "#262626", "stroke": "#4589FF" },
+      "root": { "fill": "#4589FF", "stroke": "#A56EFF", "text_fill": "#161616" }
+    },
+    "strokes": {
+      "thin": 1.25,
+      "normal": 2.0,
+      "thick": 2.5,
+      "dashed": [8, 4],
+      "dotted": [3, 4]
+    }
+  },
+  "diagrams": {
+    "architecture": {
+      "group": {
+        "stroke": "{colors.group_stroke}",
+        "stroke_width": "{strokes.normal}"
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "{darken({colors.group_fill}, 0.0)}", "stroke": "{darken({colors.group_stroke}, 0.0)}", "stroke_width": 2.0, "border_radius": 8.0 },
+            { "fill": "{darken({colors.group_fill}, 0.15)}", "stroke": "{darken({colors.group_stroke}, 0.12)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{darken({colors.group_fill}, 0.25)}", "stroke": "{darken({colors.group_stroke}, 0.20)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{darken({colors.group_fill}, 0.35)}", "stroke": "{darken({colors.group_stroke}, 0.28)}", "stroke_width": 1.5, "border_radius": 6.0 }
+          ]
+        }
+      }
+    },
+    "er": {
+      "node": { "fill": "#262626", "stroke": "#78A9FF" }
+    },
+    "mindmap": {
+      "edge": { "stroke_width": "{strokes.normal}" },
+      "entity_types": { "leaf": { "fill": "#262626" } },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#262626", "stroke": "#4589FF", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

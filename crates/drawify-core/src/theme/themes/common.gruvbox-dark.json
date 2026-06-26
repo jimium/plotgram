@@ -1,0 +1,87 @@
+{
+  "version": "0.2",
+  "id": "common.gruvbox-dark",
+  "name": "Gruvbox Dark",
+  "meta": {
+    "author": "Drawify",
+    "description": "灵感来自 Gruvbox Dark：复古暖色暗调，终端/Neovim 社区经典高分主题",
+    "tags": ["gruvbox", "dark", "retro", "warm", "inspired"]
+  },
+  "extends": "common.clean-dark",
+  "tokens": {
+    "colors": {
+      "canvas": "#282828",
+      "text": "#ebdbb2",
+      "muted_text": "#928374",
+      "border": "#3c3836",
+      "primary": "#83a598",
+      "neutral_fill": "#3c3836",
+      "neutral_stroke": "#928374",
+      "group_fill": "#32302f",
+      "group_stroke": "#665c54"
+    },
+    "palette": {
+      "blue": { "fill": "#3c3836", "stroke": "#83a598" },
+      "orange": { "fill": "#3c3836", "stroke": "#fe8019" },
+      "green": { "fill": "#3c3836", "stroke": "#b8bb26" },
+      "purple": { "fill": "#3c3836", "stroke": "#d3869b" },
+      "yellow": { "fill": "#3c3836", "stroke": "#fabd2f" },
+      "red": { "fill": "#3c3836", "stroke": "#fb4934" },
+      "cyan": { "fill": "#3c3836", "stroke": "#8ec07c" },
+      "brown": { "fill": "#3c3836", "stroke": "#d65d0e" },
+      "gray": { "fill": "#282828", "stroke": "#928374" },
+      "amber": { "fill": "#504945", "stroke": "#fe8019" },
+      "blue_gray": { "fill": "#3c3836", "stroke": "#ebdbb2" },
+      "start_green": { "fill": "#3c3836", "stroke": "#b8bb26" },
+      "end_red": { "fill": "#3c3836", "stroke": "#fb4934" },
+      "arch_blue": { "fill": "#3c3836", "stroke": "#83a598" },
+      "root": { "fill": "#d3869b", "stroke": "#fb4934", "text_fill": "#282828" }
+    }
+  },
+  "diagrams": {
+    "architecture": {
+      "group": {
+        "stroke": "{colors.group_stroke}",
+        "stroke_width": "{strokes.normal}"
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "{darken({colors.group_fill}, 0.0)}", "stroke": "{darken({colors.group_stroke}, 0.0)}", "stroke_width": 2.0, "border_radius": 8.0 },
+            { "fill": "{darken({colors.group_fill}, 0.15)}", "stroke": "{darken({colors.group_stroke}, 0.12)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{darken({colors.group_fill}, 0.25)}", "stroke": "{darken({colors.group_stroke}, 0.20)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{darken({colors.group_fill}, 0.35)}", "stroke": "{darken({colors.group_stroke}, 0.28)}", "stroke_width": 1.5, "border_radius": 6.0 }
+          ]
+        }
+      }
+    },
+    "er": {
+      "node": {
+        "fill": "#3c3836",
+        "stroke": "#83a598"
+      }
+    },
+    "mindmap": {
+      "edge": {
+        "stroke_width": "{strokes.normal}"
+      },
+      "entity_types": {
+        "leaf": {
+          "fill": "#3c3836"
+        }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#3c3836", "stroke": "#83a598", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

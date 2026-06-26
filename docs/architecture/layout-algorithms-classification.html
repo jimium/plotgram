@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drawify 布局算法分类</title>
+  <style>
+    :root {
+      --text: #111;
+      --muted: #444;
+      --border: #999;
+      --border-light: #ccc;
+      --bg-stripe: #f5f5f5;
+      --font: "Helvetica Neue", Helvetica, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      --mono: "SF Mono", "Menlo", "Consolas", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 2rem 2.5rem;
+      font-family: var(--font);
+      font-size: 10.5pt;
+      line-height: 1.55;
+      color: var(--text);
+      background: #fff;
+      max-width: 210mm;
+    }
+
+    h1 {
+      font-size: 18pt;
+      font-weight: 700;
+      margin: 0 0 0.35rem;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 9.5pt;
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 2px solid var(--text);
+    }
+
+    h2 {
+      font-size: 12pt;
+      font-weight: 700;
+      margin: 1.75rem 0 0.6rem;
+      padding-bottom: 0.25rem;
+      border-bottom: 1px solid var(--border);
+      page-break-after: avoid;
+    }
+
+    h3 {
+      font-size: 10.5pt;
+      font-weight: 700;
+      margin: 1.25rem 0 0.45rem;
+      page-break-after: avoid;
+    }
+
+    p { margin: 0.4rem 0 0.65rem; }
+
+    ul, ol {
+      margin: 0.35rem 0 0.75rem;
+      padding-left: 1.35rem;
+    }
+
+    li { margin-bottom: 0.25rem; }
+
+    code, .algo {
+      font-family: var(--mono);
+      font-size: 9pt;
+      background: var(--bg-stripe);
+      border: 1px solid var(--border-light);
+      padding: 0.05rem 0.3rem;
+      border-radius: 2px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.5rem 0 1rem;
+      font-size: 9.5pt;
+      page-break-inside: avoid;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.35rem 0.5rem;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--bg-stripe);
+      font-weight: 700;
+    }
+
+    tr:nth-child(even) td { background: #fafafa; }
+
+    .summary-box {
+      border: 1.5px solid var(--text);
+      padding: 0.75rem 1rem;
+      margin: 0.75rem 0 1.25rem;
+      page-break-inside: avoid;
+    }
+
+    .summary-box p:last-child { margin-bottom: 0; }
+
+    .tree {
+      font-family: var(--mono);
+      font-size: 9pt;
+      line-height: 1.45;
+      border: 1px solid var(--border);
+      padding: 0.75rem 1rem;
+      margin: 0.5rem 0 1rem;
+      white-space: pre;
+      background: #fafafa;
+      page-break-inside: avoid;
+    }
+
+    .diagram {
+      border: 1px solid var(--border);
+      padding: 1rem;
+      margin: 0.75rem 0 1rem;
+      text-align: center;
+      page-break-inside: avoid;
+    }
+
+    .diagram svg { max-width: 100%; height: auto; }
+
+    .footnote {
+      font-size: 8.5pt;
+      color: var(--muted);
+      margin-top: 2rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--border-light);
+    }
+
+    .tag {
+      display: inline-block;
+      border: 1px solid var(--text);
+      padding: 0 0.35rem;
+      font-size: 8pt;
+      font-weight: 700;
+      margin-right: 0.25rem;
+      letter-spacing: 0.02em;
+    }
+
+    @media print {
+      body {
+        padding: 0;
+        max-width: none;
+        font-size: 10pt;
+      }
+
+      h2 { page-break-before: auto; }
+
+      a { color: inherit; text-decoration: none; }
+
+      .no-print { display: none; }
+    }
+
+    @page {
+      size: A4;
+      margin: 18mm 16mm;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Drawify 布局算法分类</h1>
+  <p class="subtitle">
+    节点布局与边路由的分层类型 · 分类体系 · 图类型适用矩阵<br>
+    版本参考：<code>crates/drawify-core/src/layout</code> · 生成用途：黑白打印
+  </p>
+
+  <div class="summary-box">
+    <p><strong>一句话结论</strong></p>
+    <p>
+      「分层类型」指 <strong>Sugiyama 流水线</strong>（去环 → rank 层分配 → 层内排序 → 坐标分配）：
+      共 5 个算法名 — <code>sugiyama</code>、<code>sugiyama-v2</code>、<code>flowchart</code>、<code>er</code>、<code>architecture</code>。
+      <code>mindmap</code> / <code>sequence</code> 有层级阅读感但算法不同；
+      <code>force-directed</code> / <code>circular</code> / <code>state</code> 不属于 Sugiyama 分层。
+      项目用<strong>四套并行标准</strong>分类，没有单一的「分层 / 非分层」枚举。
+    </p>
+  </div>
+
+  <!-- §1 -->
+  <h2>1. 两个独立维度</h2>
+  <p>
+    布局系统分为<strong>节点布局</strong>与<strong>边路由</strong>两层，职责不同，注册名也不同。
+    <code>orthogonal</code> 是边路由算法，不是节点布局算法。
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:22%">维度</th>
+        <th style="width:38%">职责</th>
+        <th>注册名示例</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>节点布局</strong><br><code>LayoutStrategy</code></td>
+        <td>决定节点与 group 的几何位置</td>
+        <td><code>sugiyama-v2</code>、<code>architecture</code>、<code>force-directed</code> …</td>
+      </tr>
+      <tr>
+        <td><strong>边路由</strong><br><code>EdgeRoutingStrategy</code></td>
+        <td>节点定好后，计算边的路径与标签位置</td>
+        <td><code>orthogonal</code>、<code>straight</code>、<code>bezier</code>、<code>circular</code> …</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- §2 -->
+  <h2>2. 哪些是「分层类型」</h2>
+  <p>
+    项目中的「分层」主要指 <strong>Sugiyama 分层布局</strong>：将有向边沿统一主方向（自上而下或自左而右）排列，
+    使控制流 / 依赖方向可读。
+  </p>
+
+  <h3>2.1 Sugiyama 分层家族（明确分层）</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>算法名</th>
+        <th>本质</th>
+        <th>适用图类型</th>
+        <th>备注</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>sugiyama-v2</code></td>
+        <td>通用 Sugiyama 引擎（NS 层分配 + 加权中位数排序 + BK 坐标）</td>
+        <td>flowchart、state、er、custom</td>
+        <td>高级通用选项</td>
+      </tr>
+      <tr>
+        <td><code>flowchart</code></td>
+        <td>门面 → <code>sugiyama-v2</code> + FLOWCHART_PRESET</td>
+        <td>flowchart、custom</td>
+        <td><strong>流程图默认</strong></td>
+      </tr>
+      <tr>
+        <td><code>er</code></td>
+        <td>门面 → <code>sugiyama-v2</code> + ER_PRESET</td>
+        <td>er</td>
+        <td><strong>ER 图默认</strong></td>
+      </tr>
+      <tr>
+        <td><code>sugiyama</code></td>
+        <td>旧版 Sugiyama（backup/，A/B 对照）</td>
+        <td>flowchart、er、custom</td>
+        <td>保留旧实现</td>
+      </tr>
+      <tr>
+        <td><code>architecture</code></td>
+        <td>混合分层：组间宏观 Sugiyama + 组内 Sugiyama / layout hint</td>
+        <td>architecture、custom</td>
+        <td><strong>架构图默认</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>2.2 有层级感，但不是 Sugiyama 分层</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>算法</th>
+        <th>层级方式</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>mindmap</code></td>
+        <td>树深度</td>
+        <td>根节点向外辐射或 TB/LR 展开；假设树 / 近树拓扑，不做 DAG rank 分配</td>
+      </tr>
+      <tr>
+        <td><code>sequence</code></td>
+        <td>固定语义网格</td>
+        <td>参与者水平一行，消息按声明顺序纵向堆叠；布局阶段内置边几何</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>2.3 非分层</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>算法</th>
+        <th>范式</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>force-directed</code></td>
+        <td>力导向</td>
+        <td>库仑斥力 + 弹簧引力模拟；无固定层；非完全确定性</td>
+      </tr>
+      <tr>
+        <td><code>circular</code></td>
+        <td>圆周排列</td>
+        <td>节点排列在圆周上；适合环结构 / 强连通分量</td>
+      </tr>
+      <tr>
+        <td><code>state</code></td>
+        <td>圆周排列（门面）</td>
+        <td>底层共享 <code>circular</code> 引擎；<strong>状态图默认</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- §3 -->
+  <h2>3. 分类体系（四套并行标准）</h2>
+  <p>代码中没有 <code>LayoutKind::Layered</code> 之类单一枚举，而是通过以下标准组合描述算法。</p>
+
+  <h3>3.1 按几何范式</h3>
+  <div class="tree">节点布局（LayoutStrategy）
+├── 分层（Sugiyama 系）    sugiyama, sugiyama-v2, flowchart, er, architecture
+├── 树形 / 辐射             mindmap
+├── 圆周                    circular, state
+├── 力导向                  force-directed
+└── 语义约束                sequence</div>
+
+  <h3>3.2 按图拓扑特征（选型依据）</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>拓扑特征</th>
+        <th>推荐布局</th>
+        <th>原因</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>有向无环图（DAG）</td>
+        <td><code>sugiyama-v2</code></td>
+        <td>分层布局天然适配 DAG，层级方向与边方向一致</td>
+      </tr>
+      <tr>
+        <td>有环有向图</td>
+        <td><code>sugiyama-v2</code></td>
+        <td>去环阶段处理环，分层后环变为跨层回边</td>
+      </tr>
+      <tr>
+        <td>树 / 近似树</td>
+        <td><code>mindmap</code></td>
+        <td>专用树布局，根节点突出，子树紧凑</td>
+      </tr>
+      <tr>
+        <td>强连通 / 环结构</td>
+        <td><code>circular</code></td>
+        <td>圆周排列使环结构直观可见</td>
+      </tr>
+      <tr>
+        <td>网状 / 弱层级</td>
+        <td><code>force-directed</code></td>
+        <td>力导向自然散开，不强制分层</td>
+      </tr>
+      <tr>
+        <td>分组语义强</td>
+        <td><code>architecture</code></td>
+        <td>两层 Sugiyama：组间宏观 + 组内紧凑</td>
+      </tr>
+      <tr>
+        <td>时序语义</td>
+        <td><code>sequence</code></td>
+        <td>强语义专用布局（参与者 + 时间步）</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>3.3 按图类型适用关系</h3>
+  <p>
+    每个算法通过 <code>LayoutStrategy::applicable_diagram_types()</code> 与可选的
+    <code>supports_custom()</code> 声明适用范围；校验与 Playground catalog 均走此路径。
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>图类型</th>
+        <th>默认布局</th>
+        <th>可选布局</th>
+        <th>默认边路由</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>flowchart</td>
+        <td><code>flowchart</code></td>
+        <td><code>sugiyama-v2</code>、<code>sugiyama</code>、<code>force-directed</code></td>
+        <td><code>orthogonal</code></td>
+      </tr>
+      <tr>
+        <td>architecture</td>
+        <td><code>architecture</code></td>
+        <td><code>force-directed</code></td>
+        <td><code>orthogonal</code></td>
+      </tr>
+      <tr>
+        <td>state</td>
+        <td><code>state</code></td>
+        <td><code>circular</code>、<code>sugiyama-v2</code></td>
+        <td><code>circular</code></td>
+      </tr>
+      <tr>
+        <td>er</td>
+        <td><code>er</code></td>
+        <td><code>sugiyama-v2</code>、<code>sugiyama</code>、<code>circular</code></td>
+        <td><code>straight</code></td>
+      </tr>
+      <tr>
+        <td>sequence</td>
+        <td><code>sequence</code></td>
+        <td>（仅自身）</td>
+        <td>内置，无 edge_routing</td>
+      </tr>
+      <tr>
+        <td>mindmap</td>
+        <td><code>mindmap</code></td>
+        <td>（仅自身）</td>
+        <td><code>bezier</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>3.4 按实现结构（引擎 vs 门面）</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>底层引擎</th>
+        <th>门面 / 直连</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>sugiyama_v2</code></td>
+        <td><code>flowchart</code>、<code>er</code>、<code>sugiyama-v2</code></td>
+        <td>不同 preset：FLOWCHART / ER / GENERIC</td>
+      </tr>
+      <tr>
+        <td><code>circular</code></td>
+        <td><code>state</code>、<code>circular</code></td>
+        <td>state 为图类型默认门面</td>
+      </tr>
+      <tr>
+        <td><code>architecture_v2</code></td>
+        <td><code>architecture</code></td>
+        <td>含 group 时两阶段布局；无力导向混合</td>
+      </tr>
+      <tr>
+        <td>独立实现</td>
+        <td><code>mindmap</code>、<code>sequence</code>、<code>force-directed</code></td>
+        <td>无共享引擎</td>
+      </tr>
+      <tr>
+        <td><code>backup/sugiyama</code></td>
+        <td><code>sugiyama</code></td>
+        <td>旧版保留，便于 A/B</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- §4 diagram -->
+  <h2>4. 关系示意</h2>
+  <div class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 300" width="520" height="300" role="img" aria-label="布局算法关系示意">
+      <!-- Sugiyama box -->
+      <rect x="10" y="10" width="240" height="130" fill="none" stroke="#111" stroke-width="1.5"/>
+      <text x="20" y="30" font-family="Helvetica, Arial, sans-serif" font-size="11" font-weight="bold">Sugiyama 分层系</text>
+      <rect x="30" y="45" width="90" height="28" fill="#f5f5f5" stroke="#666" stroke-width="1"/>
+      <text x="75" y="63" text-anchor="middle" font-family="monospace" font-size="10">sugiyama-v2</text>
+      <rect x="140" y="45" width="90" height="28" fill="#fff" stroke="#666" stroke-width="1"/>
+      <text x="185" y="63" text-anchor="middle" font-family="monospace" font-size="10">architecture</text>
+      <rect x="55" y="85" width="80" height="24" fill="#fff" stroke="#666" stroke-width="1"/>
+      <text x="95" y="101" text-anchor="middle" font-family="monospace" font-size="9">flowchart</text>
+      <rect x="145" y="85" width="60" height="24" fill="#fff" stroke="#666" stroke-width="1"/>
+      <text x="175" y="101" text-anchor="middle" font-family="monospace" font-size="9">er</text>
+      <rect x="55" y="115" width="80" height="22" fill="#fff" stroke="#999" stroke-width="1" stroke-dasharray="4 2"/>
+      <text x="95" y="130" text-anchor="middle" font-family="monospace" font-size="9">sugiyama</text>
+      <line x1="95" y1="73" x2="95" y2="85" stroke="#666" stroke-width="1"/>
+      <line x1="175" y1="73" x2="175" y2="85" stroke="#666" stroke-width="1"/>
+      <line x1="75" y1="73" x2="95" y2="85" stroke="#666" stroke-width="1"/>
+
+      <!-- Non-layered box -->
+      <rect x="270" y="10" width="240" height="130" fill="none" stroke="#111" stroke-width="1.5"/>
+      <text x="280" y="30" font-family="Helvetica, Arial, sans-serif" font-size="11" font-weight="bold">非 Sugiyama 分层</text>
+      <rect x="290" y="45" width="95" height="28" fill="#fff" stroke="#666" stroke-width="1"/>
+      <text x="337" y="63" text-anchor="middle" font-family="monospace" font-size="10">mindmap</text>
+      <rect x="400" y="45" width="95" height="28" fill="#fff" stroke="#666" stroke-width="1"/>
+      <text x="447" y="63" text-anchor="middle" font-family="monospace" font-size="10">sequence</text>
+      <rect x="290" y="85" width="95" height="28" fill="#fff" stroke="#666" stroke-width="1"/>
+      <text x="337" y="103" text-anchor="middle" font-family="monospace" font-size="9">force-directed</text>
+      <rect x="400" y="85" width="95" height="28" fill="#fff" stroke="#666" stroke-width="1"/>
+      <text x="447" y="103" text-anchor="middle" font-family="monospace" font-size="9">circular</text>
+      <rect x="400" y="118" width="95" height="22" fill="#fff" stroke="#999" stroke-width="1" stroke-dasharray="4 2"/>
+      <text x="447" y="133" text-anchor="middle" font-family="monospace" font-size="9">state → circular</text>
+
+      <!-- Edge routing -->
+      <rect x="10" y="160" width="500" height="130" fill="none" stroke="#111" stroke-width="1.5"/>
+      <text x="20" y="180" font-family="Helvetica, Arial, sans-serif" font-size="11" font-weight="bold">边路由（独立维度，非节点布局）</text>
+      <rect x="30" y="195" width="85" height="26" fill="#f5f5f5" stroke="#666" stroke-width="1"/>
+      <text x="72" y="212" text-anchor="middle" font-family="monospace" font-size="9">orthogonal</text>
+      <rect x="125" y="195" width="75" height="26" fill="#fff" stroke="#666" stroke-width="1"/>
+      <text x="162" y="212" text-anchor="middle" font-family="monospace" font-size="9">straight</text>
+      <rect x="210" y="195" width="70" height="26" fill="#fff" stroke="#666" stroke-width="1"/>
+      <text x="245" y="212" text-anchor="middle" font-family="monospace" font-size="9">bezier</text>
+      <rect x="290" y="195" width="70" height="26" fill="#fff" stroke="#666" stroke-width="1"/>
+      <text x="325" y="212" text-anchor="middle" font-family="monospace" font-size="9">spline</text>
+      <rect x="370" y="195" width="70" height="26" fill="#fff" stroke="#666" stroke-width="1"/>
+      <text x="405" y="212" text-anchor="middle" font-family="monospace" font-size="9">circular</text>
+
+      <text x="30" y="245" font-family="Helvetica, Arial, sans-serif" font-size="9" fill="#444">
+        虚线框 = 门面算法（共享底层引擎） · 灰底 = 常用默认配对
+      </text>
+      <text x="30" y="262" font-family="Helvetica, Arial, sans-serif" font-size="9" fill="#444">
+        sequence 布局在 compute 阶段产出边几何，edge_routing 不生效
+      </text>
+    </svg>
+  </div>
+
+  <!-- §5 -->
+  <h2>5. 与 group 的关系（流程图 vs 架构图）</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:18%"></th>
+        <th>架构图</th>
+        <th>流程图</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>group 角色</strong></td>
+        <td>语义舞台 — 先定组，再在框内摆节点</td>
+        <td>阅读辅助 — 主轴仍是控制流</td>
+      </tr>
+      <tr>
+        <td><strong>布局驱动</strong></td>
+        <td><code>architecture-v2</code> 两阶段：组内 → 组间</td>
+        <td><code>sugiyama-v2</code> 全局分层，group 为后验包围框</td>
+      </tr>
+      <tr>
+        <td><strong>group 属性</strong></td>
+        <td><code>layout</code>、<code>group_sizing: uniform</code> 等</td>
+        <td>语法支持，暂无组内 / 组间专用 layout hint</td>
+      </tr>
+      <tr>
+        <td><strong>推荐强度</strong></td>
+        <td>复杂系统强烈推荐</td>
+        <td>按需使用（增强项，非定义性特征）</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- §6 -->
+  <h2>6. 全部已注册算法名</h2>
+  <p>来源：<code>layout/registry.rs</code> · <code>LAYOUT_ALGORITHM_NAMES</code></p>
+  <p>
+    <span class="tag">分层</span><code>sugiyama</code>
+    <span class="tag">分层</span><code>sugiyama-v2</code>
+    <span class="tag">分层</span><code>flowchart</code>
+    <span class="tag">分层</span><code>er</code>
+    <span class="tag">分层</span><code>architecture</code>
+    &nbsp;|&nbsp;
+    <code>mindmap</code>
+    <code>sequence</code>
+    <code>force-directed</code>
+    <code>circular</code>
+    <code>state</code>
+  </p>
+  <p>边路由：<code>straight</code> · <code>bezier</code> · <code>spline</code> · <code>circular</code> · <code>orthogonal</code></p>
+
+  <p class="footnote">
+    详细实现说明见 <code>crates/drawify-core/src/layout/readme.md</code>。
+    流程图 profile 默认 <code>layout_algo: flowchart</code>，与显式指定 <code>sugiyama-v2</code> 共享同一引擎，仅 preset 不同。
+  </p>
+
+</body>
+</html>

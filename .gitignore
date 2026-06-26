@@ -1,0 +1,35 @@
+# Build artifacts
+/target/
+
+# IDE
+.idea/
+.vscode/
+!editors/vscode/.vscode/
+!editors/vscode/.vscode/**
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Rust
+*.rs.bk
+# CLI entry points (override global ~/.gitignore `bin`)
+!**/src/bin/
+!**/src/bin/**
+
+# WASM build artifacts
+/crates/drawify-wasm/pkg/
+/crates/drawify-wasm/dist/
+
+# VS Code extension
+/editors/vscode/node_modules/
+/editors/vscode/out/
+/editors/vscode/*.vsix
+/editors/vscode/media/wasm/
+/editors/vscode/media/node/
+
+# Environment
+.env
+.env.local

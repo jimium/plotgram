@@ -1,0 +1,98 @@
+{
+  "benchmark": "ascii_export_round01",
+  "generated_at_unix_ms": 1781438977825,
+  "environment": {
+    "rust_package": "drawify-eval",
+    "target_os": "macos",
+    "target_arch": "aarch64"
+  },
+  "scenarios": [
+    {
+      "name": "normalize_mixed_utf8_string",
+      "mode": "string",
+      "iterations": 50,
+      "input_bytes": 212992,
+      "output_bytes": 278528,
+      "average_ms": 12.747169980000002,
+      "min_ms": 12.24875,
+      "max_ms": 14.648708,
+      "throughput_mib_per_s": 15.934909499025913,
+      "bounded_forward_buffer_bytes": 2048,
+      "sample_metadata": {
+        "detected_input_encoding": "utf8",
+        "output_encoding": "utf8",
+        "newline": "lf",
+        "field_separator": " | ",
+        "chunk_size": 2048,
+        "input_bytes": 212992,
+        "output_bytes": 278528,
+        "chunks_processed": 1,
+        "escaped_control_chars": 8192,
+        "escaped_non_ascii": 16384,
+        "approximated_non_ascii": 8192,
+        "replaced_non_ascii": 0,
+        "dropped_non_ascii": 0,
+        "invalid_input_replacements": 0,
+        "metadata_appended": false
+      }
+    },
+    {
+      "name": "stream_large_utf8_to_sink",
+      "mode": "stream",
+      "iterations": 8,
+      "input_bytes": 10500000,
+      "output_bytes": 13300000,
+      "average_ms": 346.348177,
+      "min_ms": 343.375625,
+      "max_ms": 351.073708,
+      "throughput_mib_per_s": 28.911889789636813,
+      "bounded_forward_buffer_bytes": 4096,
+      "sample_metadata": {
+        "detected_input_encoding": "utf8",
+        "output_encoding": "utf8",
+        "newline": "lf",
+        "field_separator": " | ",
+        "chunk_size": 4096,
+        "input_bytes": 10500000,
+        "output_bytes": 13300000,
+        "chunks_processed": 2564,
+        "escaped_control_chars": 0,
+        "escaped_non_ascii": 700000,
+        "approximated_non_ascii": 0,
+        "replaced_non_ascii": 0,
+        "dropped_non_ascii": 0,
+        "invalid_input_replacements": 0,
+        "metadata_appended": false
+      }
+    },
+    {
+      "name": "render_sequence_ascii",
+      "mode": "render",
+      "iterations": 40,
+      "input_bytes": 244,
+      "output_bytes": 890,
+      "average_ms": 0.6795292250000002,
+      "min_ms": 0.642875,
+      "max_ms": 0.867417,
+      "throughput_mib_per_s": 0.34243785939173543,
+      "bounded_forward_buffer_bytes": 0,
+      "sample_metadata": {
+        "detected_input_encoding": "utf8",
+        "output_encoding": "utf8",
+        "newline": "lf",
+        "field_separator": " | ",
+        "chunk_size": 8192,
+        "input_bytes": 623,
+        "output_bytes": 890,
+        "chunks_processed": 1,
+        "escaped_control_chars": 0,
+        "escaped_non_ascii": 0,
+        "approximated_non_ascii": 0,
+        "replaced_non_ascii": 0,
+        "dropped_non_ascii": 0,
+        "invalid_input_replacements": 0,
+        "metadata_appended": true
+      }
+    }
+  ]
+}

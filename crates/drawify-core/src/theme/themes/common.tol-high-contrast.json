@@ -1,0 +1,74 @@
+{
+  "version": "0.2",
+  "id": "common.tol-high-contrast",
+  "name": "Tol High Contrast",
+  "meta": {
+    "author": "Drawify",
+    "description": "色盲友好：Paul Tol 高对比配色。更高亮度对比，兼顾色盲与低视力阅读",
+    "tags": ["tol", "high-contrast", "light", "accessible", "colorblind-safe", "a11y", "low-vision"]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#FFFFFF",
+      "text": "#000000",
+      "muted_text": "#555555",
+      "border": "#888888",
+      "primary": "#004488",
+      "neutral_fill": "#EEEEEE",
+      "neutral_stroke": "#333333",
+      "group_fill": "#F8F8F8",
+      "group_stroke": "#888888"
+    },
+    "palette": {
+      "blue": { "fill": "#CCE0FF", "stroke": "#004488" },
+      "orange": { "fill": "#FFE0CC", "stroke": "#DD6600" },
+      "green": { "fill": "#CCEECC", "stroke": "#009988" },
+      "purple": { "fill": "#FFD0EE", "stroke": "#BB5566" },
+      "yellow": { "fill": "#FFEEAA", "stroke": "#DDAA33" },
+      "red": { "fill": "#FFCCCC", "stroke": "#BB5566" },
+      "cyan": { "fill": "#CCF5EE", "stroke": "#009988" },
+      "brown": { "fill": "#DDDDDD", "stroke": "#666666" },
+      "gray": { "fill": "#F5F5F5", "stroke": "#888888" },
+      "amber": { "fill": "#FFEEAA", "stroke": "#DD6600" },
+      "blue_gray": { "fill": "#E8E8E8", "stroke": "#333333" },
+      "start_green": { "fill": "#CCEECC", "stroke": "#009988" },
+      "end_red": { "fill": "#FFCCCC", "stroke": "#BB5566" },
+      "arch_blue": { "fill": "#CCE0FF", "stroke": "#004488" },
+      "root": { "fill": "#004488", "stroke": "#000000", "text_fill": "#FFFFFF" }
+    },
+    "strokes": {
+      "thin": 1.5,
+      "normal": 2.25,
+      "thick": 3.0,
+      "dashed": [8, 4],
+      "dotted": [3, 4]
+    }
+  },
+  "diagrams": {
+    "flowchart": { "edge": { "stroke": "#000000" } },
+    "sequence": { "edge": { "stroke": "#000000" } },
+    "state": { "edge": { "stroke": "#000000" } },
+    "architecture": { "edge": { "stroke": "#000000" } },
+    "er": {
+      "node": { "fill": "#FFFFFF", "stroke": "#004488" },
+      "edge": { "stroke": "#000000" }
+    },
+    "mindmap": {
+      "edge": { "stroke_width": "{strokes.normal}" },
+      "entity_types": { "leaf": { "fill": "#EEEEEE" } },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#CCE0FF", "stroke": "#004488", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drawify Core Pipeline</title>
+  <style>
+    :root {
+      --bg:        #0f1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --accent:    #58a6ff;
+      --green:     #3fb950;
+      --orange:    #d29922;
+      --red:       #f85149;
+      --purple:    #bc8cff;
+      --cyan:      #39c5cf;
+      --pink:      #f778ba;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 48px 24px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1020px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--text);
+    }
+    header h1 span { color: var(--accent); }
+    header p {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    /* ── Pipeline ── */
+    .pipeline {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    /* ── Data Block ── */
+    .data-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      position: relative;
+    }
+    .data-block .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .data-block .value {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .data-block .desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* color variants */
+    .data-block.input  { border-color: var(--cyan);   }
+    .data-block.input  .value { color: var(--cyan);   }
+    .data-block.raw    { border-color: var(--orange); }
+    .data-block.raw    .value { color: var(--orange); }
+    .data-block.prepared { border-color: var(--green); }
+    .data-block.prepared .value { color: var(--green); }
+    .data-block.result { border-color: var(--purple); }
+    .data-block.result .value { color: var(--purple); }
+    .data-block.scene  { border-color: var(--pink);   }
+    .data-block.scene  .value { color: var(--pink);   }
+    .data-block.output { border-color: var(--accent); }
+    .data-block.output .value { color: var(--accent); }
+
+    /* ── Arrow ── */
+    .arrow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 6px 0;
+      color: var(--muted);
+    }
+    .arrow .shaft {
+      width: 2px;
+      height: 18px;
+      background: var(--border);
+    }
+    .arrow .head {
+      width: 0; height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 7px solid var(--border);
+    }
+
+    /* ── Stage ── */
+    .stage {
+      border-radius: 12px;
+      padding: 20px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .stage::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      pointer-events: none;
+    }
+    .stage-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .stage-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .stage-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .stage-mod {
+      margin-left: auto;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.06);
+      color: var(--muted);
+    }
+
+    /* ── Steps inside stage ── */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .step {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 8px;
+      border-left: 3px solid transparent;
+    }
+    .step:hover {
+      background: rgba(255,255,255,0.06);
+    }
+    .step-fn {
+      flex-shrink: 0;
+      min-width: 260px;
+      font-size: 12px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .step-desc {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .step-tag {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      font-size: 10px;
+      border-radius: 3px;
+      background: rgba(248,81,73,0.15);
+      color: var(--red);
+      font-weight: 600;
+    }
+    .step-tag.new { background: rgba(63,185,80,0.15); color: var(--green); }
+
+    /* stage color themes */
+    .stage.parse    { background: rgba(57,197,207,0.04); }
+    .stage.parse::before { border-color: rgba(57,197,207,0.3); }
+    .stage.parse .stage-num { background: rgba(57,197,207,0.2); color: var(--cyan); }
+    .stage.parse .stage-title { color: var(--cyan); }
+    .stage.parse .step { border-left-color: rgba(57,197,207,0.4); }
+
+    .stage.prepare  { background: rgba(63,185,80,0.04); }
+    .stage.prepare::before { border-color: rgba(63,185,80,0.3); }
+    .stage.prepare .stage-num { background: rgba(63,185,80,0.2); color: var(--green); }
+    .stage.prepare .stage-title { color: var(--green); }
+    .stage.prepare .step { border-left-color: rgba(63,185,80,0.4); }
+
+    .stage.validate { background: rgba(210,153,34,0.04); }
+    .stage.validate::before { border-color: rgba(210,153,34,0.3); }
+    .stage.validate .stage-num { background: rgba(210,153,34,0.2); color: var(--orange); }
+    .stage.validate .stage-title { color: var(--orange); }
+    .stage.validate .step { border-left-color: rgba(210,153,34,0.4); }
+
+    .stage.render   { background: rgba(247,120,186,0.04); }
+    .stage.render::before { border-color: rgba(247,120,186,0.3); }
+    .stage.render .stage-num { background: rgba(247,120,186,0.2); color: var(--pink); }
+    .stage.render .stage-title { color: var(--pink); }
+    .stage.render .step { border-left-color: rgba(247,120,186,0.4); }
+
+    .stage.export   { background: rgba(88,166,255,0.04); }
+    .stage.export::before { border-color: rgba(88,166,255,0.3); }
+    .stage.export .stage-num { background: rgba(88,166,255,0.2); color: var(--accent); }
+    .stage.export .stage-title { color: var(--accent); }
+    .stage.export .step { border-left-color: rgba(88,166,255,0.4); }
+
+    /* ── Sub-stage (layout / scene inside render) ── */
+    .sub-stage {
+      margin: 10px 0 6px 0;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: rgba(188,140,255,0.05);
+      border: 1px dashed rgba(188,140,255,0.3);
+    }
+    .sub-stage.scene-sub {
+      background: rgba(247,120,186,0.05);
+      border-color: rgba(247,120,186,0.3);
+    }
+    .sub-stage-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--purple);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sub-stage.scene-sub .sub-stage-title { color: var(--pink); }
+    .sub-stage .step { border-left-color: rgba(188,140,255,0.4); background: rgba(255,255,255,0.02); }
+    .sub-stage.scene-sub .step { border-left-color: rgba(247,120,186,0.4); }
+
+    /* ── Branch (ASCII shortcut) ── */
+    .branch {
+      margin: 10px 0;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: rgba(248,81,73,0.06);
+      border: 1px dashed rgba(248,81,73,0.35);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .branch strong { color: var(--red); }
+    .branch code { color: var(--accent); }
+
+    /* ── Algo grid ── */
+    .algo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .algo-chip {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      text-align: center;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--muted);
+    }
+    .algo-chip .name { color: var(--text); font-weight: 600; }
+    .algo-chip.alias { background: rgba(139,148,158,0.08); }
+    .algo-chip.alias .name { color: var(--muted); }
+
+    /* ── Format cards ── */
+    .format-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .format-card {
+      text-align: center;
+      padding: 10px 8px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .format-card:hover { background: rgba(255,255,255,0.08); }
+    .format-card.shortcut { border-color: rgba(248,81,73,0.4); background: rgba(248,81,73,0.04); }
+    .format-card .fmt-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .format-card.shortcut .fmt-name { color: var(--red); }
+    .format-card .fmt-mod {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    /* ── Entry points section ── */
+    .entry-points {
+      margin-top: 48px;
+      padding: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .entry-points h2 {
+      font-size: 16px;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .entry-points .hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .entry-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 10px;
+    }
+    .entry-card {
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.03);
+      border-left: 3px solid var(--accent);
+    }
+    .entry-card .fn {
+      font-size: 12px;
+      color: var(--accent);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .entry-card .ret {
+      font-size: 11px;
+      color: var(--green);
+      margin-bottom: 4px;
+    }
+    .entry-card .desc {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* ── Callers section ── */
+    .callers {
+      margin-top: 24px;
+      padding: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .callers h2 {
+      font-size: 16px;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+    .caller-row {
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .caller-row:last-child { border-bottom: none; }
+    .caller-name {
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .caller-name.cli  { color: var(--cyan); }
+    .caller-name.srv  { color: var(--green); }
+    .caller-name.wasm { color: var(--orange); }
+    .caller-fn {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .caller-fn code {
+      color: var(--accent);
+    }
+    .caller-fn .cmd {
+      display: inline-block;
+      margin-right: 6px;
+      padding: 1px 6px;
+      font-size: 10px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* ── Legend ── */
+    .legend {
+      margin-top: 40px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      margin-top: 56px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Drawify <span>Core Pipeline</span></h1>
+    <p>DSL 源码 → 最终输出的完整调用链路 &nbsp;·&nbsp; 涉及 mod / 入口函数一目了然</p>
+  </header>
+
+  <div class="pipeline">
+
+    <!-- ═══ INPUT ═══ -->
+    <div class="data-block input">
+      <div class="label">Input</div>
+      <div class="value">DSL 源码（.dfy 文本）</div>
+      <div class="desc">用户编写的 Drawify DSL，例如 <code>diagram flowchart { entity a "A" ... }</code></div>
+    </div>
+
+    <div class="arrow"><div class="shaft"></div><div class="head"></div></div>
+
+    <!-- ═══ STAGE 1: PARSE ═══ -->
+    <div class="stage parse">
+      <div class="stage-header">
+        <div class="stage-num">1</div>
+        <div class="stage-title">Parse</div>
+        <div class="stage-mod">pipeline::parse → dsl::parser</div>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="step-fn">dsl::lexer::tokenize()</div>
+          <div class="step-desc">词法分析：源文本 → Token 流（关键字、标识符、箭头符号等）</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">dsl::parser::parse()</div>
+          <div class="step-desc">语法分析：Token 流 → Diagram AST，识别 entities / relations / groups / attributes / style_decls</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">dsl::parser::parse_with_diagnostics()</div>
+          <div class="step-desc">降级解析入口：即使有错误也尽量返回部分 AST（fallback diagram），同时收集结构化 errors / warnings</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="shaft"></div><div class="head"></div></div>
+
+    <!-- ═══ DATA: RawDiagram ═══ -->
+    <div class="data-block raw">
+      <div class="label">中间产物</div>
+      <div class="value">RawDiagram</div>
+      <div class="desc">Parser 直接产出（封装 Diagram）；可能缺少 entity.type 等默认属性，style 未物化，layout_plan 未解析</div>
+    </div>
+
+    <div class="arrow"><div class="shaft"></div><div class="head"></div></div>
+
+    <!-- ═══ STAGE 2: PREPARE ═══ -->
+    <div class="stage prepare">
+      <div class="stage-header">
+        <div class="stage-num">2</div>
+        <div class="stage-title">Prepare</div>
+        <div class="stage-mod">pipeline::prepare → prepare::*</div>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="step-fn">prepare::apply_profile_defaults()</div>
+          <div class="step-desc">按图表类型 profile 补全缺失的 entity.type（如 flowchart 默认 process，state 默认 state）</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">prepare::resolve_style_context()</div>
+          <div class="step-desc">解析主题：StyleRequest { theme_id, dark_mode } + diagram theme 属性 → ThemeIdResolver → builtin_style_sheet → ResolvedStyleContext</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">prepare::validate_style_decls()</div>
+          <div class="step-desc">校验 style 声明块（错误阻断，警告收集）</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">prepare::materialize_styles()</div>
+          <div class="step-desc">将 theme cascade 物化到每个 entity / relation 的 attributes.style（fill, stroke 等），内联 style 不被覆盖</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">PreparedDiagram::new()</div>
+          <div class="step-desc">封装 diagram 并调用 LayoutPlan::resolve：解析 layout_algo / edge_routing 及其 option，挂在 layout_plan() 上供下游复用</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">debug_assert_prepared_invariants()</div>
+          <div class="step-desc">[debug only] 断言 PreparedDiagram 不变量 I1（style_decls 已清空）/ I2（entity.type 已补全）/ I3（style 含 fill 或 stroke）</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="shaft"></div><div class="head"></div></div>
+
+    <!-- ═══ DATA: PreparedDiagram ═══ -->
+    <div class="data-block prepared">
+      <div class="label">核心中间产物</div>
+      <div class="value">PreparedDiagram</div>
+      <div class="desc">满足不变量的规范图表：所有 entity 有 type，style 已物化，layout_plan 已解析，可被下游直接消费</div>
+    </div>
+
+    <div class="arrow"><div class="shaft"></div><div class="head"></div></div>
+
+    <!-- ═══ STAGE 3: VALIDATION ═══ -->
+    <div class="stage validate">
+      <div class="stage-header">
+        <div class="stage-num">3</div>
+        <div class="stage-title">Validation</div>
+        <div class="stage-mod">validation::validate → common / attrs / kinds / icons / layout</div>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="step-fn">common::validate_diagram_attributes()</div>
+          <div class="step-desc">校验 diagram 级属性：layout / layout_algo / edge_routing / theme / graphic_style / group_sizing / snap / title 等</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">attrs::validate_entity_attributes()</div>
+          <div class="step-desc">校验 entity 标准属性键（profile::STANDARD_ENTITY_ATTRS）+ style 属性值域；TYPE 值域按 profile 开放或闭集</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">icons::validate_entity_semantic_icon()</div>
+          <div class="step-desc">校验 semantic / icon 属性：未知 semantic 发 W301，未知 icon 发 W302，icon: none 不警告<span class="step-tag new">新增</span></div>
+        </div>
+        <div class="step">
+          <div class="step-fn">attrs::validate_relation_attributes()</div>
+          <div class="step-desc">校验 relation 标准属性键（profile::STANDARD_RELATION_ATTRS）+ style 属性</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">common::validate_relations()</div>
+          <div class="step-desc">检查 from/to 引用是否存在，group 不可直接参与连线</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">common::validate_groups()</div>
+          <div class="step-desc">校验 group 属性（style/color/layout），空 group 发出警告</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">common::check_orphan_entities()</div>
+          <div class="step-desc">检测无任何连线的孤立实体（warning 级别）</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">kinds::validate_diagram_type()</div>
+          <div class="step-desc">图表类型专属规则分派：flowchart / state / mindmap / sequence / architecture / er（经 kinds::registry::entry_for 分派）</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">layout::algorithm_config::validate_algorithm_config_warnings()</div>
+          <div class="step-desc">布局配置块的语义校验警告（算法名 / option 是否合法）</div>
+        </div>
+        <div class="step">
+          <div class="step-fn">layout::validate_layout_plan_warnings()</div>
+          <div class="step-desc">基于已解析 LayoutPlan 的警告（option 组合是否合理）<span class="step-tag new">新增</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="shaft"></div><div class="head"></div></div>
+
+    <!-- ═══ DATA: ValidationResult ═══ -->
+    <div class="data-block result">
+      <div class="label">校验产出</div>
+      <div class="value">ValidationResult { errors, warnings }</div>
+      <div class="desc">有 error 则中断（CLI exit 1 / Server 返回错误 / WASM 不进入渲染）；只有 warning 或为空则继续</div>
+    </div>
+
+    <div class="arrow"><div class="shaft"></div><div class="head"></div></div>
+
+    <!-- ═══ STAGE 4: RENDER ═══ -->
+    <div class="stage render">
+      <div class="stage-header">
+        <div class="stage-num">4</div>
+        <div class="stage-title">Render（layout → scene → encode）</div>
+        <div class="stage-mod">pipeline::render → scene + encode</div>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-fn">scene::compute_layout()</div>
+          <div class="step-desc">入口：PreparedDiagram → LayoutResult（复用 layout_plan，避免重复解析）</div>
+        </div>
+      </div>
+
+      <!-- ASCII branch -->
+      <div class="branch">
+        <strong>分支：</strong>若 <code>format == Ascii</code>，跳过 <code>build_scene</code> 视觉物化，直接走
+        <code>ascii::encode_direct(diagram, layout, options)</code> → <code>RenderOutput::Text</code>。
+        ASCII 只消费 diagram + layout，不需要 fill/stroke/width 等视觉属性。
+      </div>
+
+      <!-- layout sub-stage -->
+      <div class="sub-stage">
+        <div class="sub-stage-title">
+          <span>⚙</span> layout::compute_layout_with_plan — 布局计算（嵌入 scene::compute_layout）
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="step-fn">validate_layout_config()</div>
+            <div class="step-desc">校验布局配置：算法是否存在、是否适用于当前图表类型；layout 方向 / edge_routing 合法性</div>
+          </div>
+          <div class="step">
+            <div class="step-fn">registry::build_layout_strategy(algo, plan).compute()</div>
+            <div class="step-desc">执行具体布局策略：计算节点坐标 + 分组包围框（plan.layout_algo + plan.layout_options）</div>
+          </div>
+          <div class="step">
+            <div class="step-fn">grid_snap::snap_layout_to_grid()</div>
+            <div class="step-desc">[可选] 网格吸附：节点对齐到像素网格，刷新分组与画布边界</div>
+          </div>
+          <div class="step">
+            <div class="step-fn">registry::build_edge_routing_strategy().route()</div>
+            <div class="step-desc">边路由：为每条边计算几何路径（path 点 + 控制点 + 标签位置 + from/to port）</div>
+          </div>
+          <div class="step">
+            <div class="step-fn">refine::run_refine()</div>
+            <div class="step-desc">layout ↔ route 反馈循环：检测折线穿障 → 局部推开问题节点 → re-route<span class="step-tag new">新增</span></div>
+          </div>
+          <div class="step">
+            <div class="step-fn">grid_snap::snap_edge_waypoints()</div>
+            <div class="step-desc">[可选] 边路径点网格吸附</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px">
+          <div style="font-size:11px; color:var(--purple); font-weight:600; margin-bottom:6px;">布局算法注册表（LAYOUT_ALGORITHM_NAMES）</div>
+          <div class="algo-grid">
+            <div class="algo-chip"><span class="name">flowchart</span></div>
+            <div class="algo-chip"><span class="name">er</span></div>
+            <div class="algo-chip"><span class="name">state</span></div>
+            <div class="algo-chip"><span class="name">sequence</span></div>
+            <div class="algo-chip"><span class="name">mindmap</span></div>
+            <div class="algo-chip"><span class="name">architecture</span></div>
+            <div class="algo-chip"><span class="name">sugiyama-v2</span></div>
+            <div class="algo-chip"><span class="name">circular</span></div>
+            <div class="algo-chip"><span class="name">force-directed</span></div>
+            <div class="algo-chip alias"><span class="name">sugiyama</span>（旧版）</div>
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <div style="font-size:11px; color:var(--purple); font-weight:600; margin-bottom:6px;">边路由算法注册表（EDGE_ROUTING_NAMES）</div>
+          <div class="algo-grid">
+            <div class="algo-chip"><span class="name">orthogonal</span>（默认）</div>
+            <div class="algo-chip"><span class="name">straight</span></div>
+            <div class="algo-chip"><span class="name">bezier</span></div>
+            <div class="algo-chip"><span class="name">spline</span></div>
+            <div class="algo-chip"><span class="name">circular</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- scene build sub-stage -->
+      <div class="sub-stage scene-sub">
+        <div class="sub-stage-title">
+          <span>✦</span> scene::build_scene — 视觉物化（ASCII 跳过此步）
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="step-fn">request.resolve_context()</div>
+            <div class="step-desc">解析主题 ID → builtin_style_sheet / explicit_style_json → resolve_style_sheet → ResolvedRenderContext（含 ResolvedStyleContext + GraphicStyleId + icon_resolve）</div>
+          </div>
+          <div class="step">
+            <div class="step-fn">kinds::entry_for(diagram_type)</div>
+            <div class="step-desc">从图表类型注册表获取 DiagramTypeEntry（函数指针：materialize_node_style / materialize_edge_style / paint_export_node / paint_export_edge / paint_svg_defs）</div>
+          </div>
+          <div class="step">
+            <div class="step-fn">entry.materialize_node_style()</div>
+            <div class="step-desc">为每个节点物化最终基础视觉属性（NodeStyle：shape / fill / stroke / font 等）</div>
+          </div>
+          <div class="step">
+            <div class="step-fn">entry.materialize_edge_style()</div>
+            <div class="step-desc">为每条边物化最终基础视觉属性（EdgeStyle：stroke / arrow / label 等）</div>
+          </div>
+          <div class="step">
+            <div class="step-fn">color_queries::canvas_background() / title_color() / group_fill() / group_stroke() / group_label_color() / group_style_by_depth()</div>
+            <div class="step-desc">查询画布背景色、标题色、分组填充/描边/标签色（按 depth 派生颜色，z_index 排序确保嵌套层级正确）</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="shaft"></div><div class="head"></div></div>
+
+    <!-- ═══ DATA: ExportScene ═══ -->
+    <div class="data-block scene">
+      <div class="label">渲染器无关的中间场景</div>
+      <div class="value">ExportScene { prepared, canvas, layout, context, nodes[], edges[], groups[] }</div>
+      <div class="desc">已解析主题 + 已计算布局 + 已物化视觉属性，供所有格式编码器共享（ASCII 不经过此层）</div>
+    </div>
+
+    <div class="arrow"><div class="shaft"></div><div class="head"></div></div>
+
+    <!-- ═══ STAGE 5: EXPORT ═══ -->
+    <div class="stage export">
+      <div class="stage-header">
+        <div class="stage-num">5</div>
+        <div class="stage-title">Format Encode</div>
+        <div class="stage-mod">render::encode::encoder_for(format).encode_scene()</div>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="step-fn">render::encode::encoder_for(format)</div>
+          <div class="step-desc">按 RenderFormat 选择具体 FormatEncoder（静态单例：SVG_RENDERER / ASCII_RENDERER / JSON_RENDERER / PNG_RENDERER / WEBP_RENDERER）</div>
+        </div>
+      </div>
+      <div class="format-grid">
+        <div class="format-card">
+          <div class="fmt-name">SVG</div>
+          <div class="fmt-mod">render::encode::svg<br/>SvgRenderer.encode_scene()<br/>→ paint::scene_svg::encode<br/>→ entry.paint_export_node/edge<br/>→ paint::svg_utils</div>
+        </div>
+        <div class="format-card shortcut">
+          <div class="fmt-name">ASCII</div>
+          <div class="fmt-mod">render::encode::ascii<br/>AsciiRenderer<br/>→ encode_direct（独立路径）<br/>跳过 build_scene<br/>只用 diagram + layout</div>
+        </div>
+        <div class="format-card">
+          <div class="fmt-name">JSON</div>
+          <div class="fmt-mod">render::encode::json<br/>JsonRenderer<br/>→ serde 序列化<br/>ExportScene</div>
+        </div>
+        <div class="format-card">
+          <div class="fmt-name">PNG</div>
+          <div class="fmt-mod">render::encode::png<br/>PngRenderer<br/>→ rasterize SVG<br/>[feature: raster]<br/>需 fonts_dir</div>
+        </div>
+        <div class="format-card">
+          <div class="fmt-name">WebP</div>
+          <div class="fmt-mod">render::encode::webp<br/>WebpRenderer<br/>→ rasterize SVG<br/>[feature: raster]<br/>需 fonts_dir</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow"><div class="shaft"></div><div class="head"></div></div>
+
+    <!-- ═══ OUTPUT ═══ -->
+    <div class="data-block output">
+      <div class="label">Final Output</div>
+      <div class="value">RenderOutput::Text(String) &nbsp;|&nbsp; RenderOutput::Binary(Vec&lt;u8&gt;)</div>
+      <div class="desc">SVG / ASCII / JSON → Text &nbsp;&nbsp;|&nbsp;&nbsp; PNG / WebP → Binary</div>
+    </div>
+
+  </div><!-- /pipeline -->
+
+  <!-- ═══ ENTRY POINTS ═══ -->
+  <div class="entry-points">
+    <h2>pipeline 模块入口函数</h2>
+    <div class="hint">编排逻辑集中在 pipeline/，只做串联，不实现具体逻辑。各服务模块提供纯函数。</div>
+    <div class="entry-grid">
+      <div class="entry-card">
+        <div class="fn">pipeline::parse(source)</div>
+        <div class="ret">→ Result&lt;RawDiagram&gt;</div>
+        <div class="desc">仅解析，不 prepare / validate</div>
+      </div>
+      <div class="entry-card">
+        <div class="fn">pipeline::prepare(raw, style_request)</div>
+        <div class="ret">→ Result&lt;PrepareOutput&gt;</div>
+        <div class="desc">规范化 RawDiagram → PreparedDiagram（含 layout_plan 解析）</div>
+      </div>
+      <div class="entry-card">
+        <div class="fn">pipeline::parse_prepare(source, style_request)</div>
+        <div class="ret">→ PipelineOutput</div>
+        <div class="desc">解析 + prepare，跳过 validate（diff / export / patch 场景）</div>
+      </div>
+      <div class="entry-card">
+        <div class="fn">pipeline::parse_prepare_validate(source, style_request)</div>
+        <div class="ret">→ PipelineOutput</div>
+        <div class="desc">解析 + prepare + validate。CLI / Server / WASM 渲染与校验的标准入口</div>
+      </div>
+      <div class="entry-card">
+        <div class="fn">pipeline::run(source, style_request, format)</div>
+        <div class="ret">→ PipelineResult&lt;RenderOutput&gt;</div>
+        <div class="desc">端到端：DSL 源码一步到 RenderOutput</div>
+      </div>
+      <div class="entry-card">
+        <div class="fn">pipeline::render_output(request)</div>
+        <div class="ret">→ Result&lt;RenderOutput&gt;</div>
+        <div class="desc">渲染编排：compute_layout → (ASCII 分支 | build_scene → encode)</div>
+      </div>
+      <div class="entry-card">
+        <div class="fn">pipeline::render_text(request)</div>
+        <div class="ret">→ Result&lt;String&gt;</div>
+        <div class="desc">渲染为文本（SVG / ASCII / JSON），二进制格式报错</div>
+      </div>
+      <div class="entry-card">
+        <div class="fn">pipeline::render_bytes(request)</div>
+        <div class="ret">→ Result&lt;Vec&lt;u8&gt;&gt;</div>
+        <div class="desc">渲染为字节（PNG / WebP），文本格式报错</div>
+      </div>
+      <div class="entry-card">
+        <div class="fn">pipeline::render_json(diagram)</div>
+        <div class="ret">→ String</div>
+        <div class="desc">便捷入口：从 PreparedDiagram 直接渲染 JSON（diff / export 场景）</div>
+      </div>
+      <div class="entry-card">
+        <div class="fn">pipeline::render_with_style_json(diagram, format, style_json)</div>
+        <div class="ret">→ Result&lt;RenderOutput&gt;</div>
+        <div class="desc">使用内联 style JSON 渲染（CLI / Server 传入自定义主题）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CALLERS ═══ -->
+  <div class="callers">
+    <h2>三个前端入口的调用序列</h2>
+    <div class="caller-row">
+      <div class="caller-name cli">CLI</div>
+      <div class="caller-fn">
+        <span class="cmd">render</span><code>parse_prepare_validate()</code> → <code>RenderRequest::new() + render_text() / render_bytes()</code>，错误时 <code>exit(1)</code><br/>
+        <span class="cmd">validate</span><code>parse_prepare_validate()</code>，错误时 <code>exit(1)</code><br/>
+        <span class="cmd">export</span><span class="cmd">diff</span><span class="cmd">patch</span>使用 <code>parse_prepare()</code>（跳过 validate）；diff 调 <code>diff::diff()</code>，export 调 <code>render_json()</code>
+      </div>
+    </div>
+    <div class="caller-row">
+      <div class="caller-name srv">Server</div>
+      <div class="caller-fn">
+        <code>api.rs::check_source()</code> → <code>pipeline::parse_prepare_validate()</code><br/>
+        渲染端点：校验通过后 <code>render_output(&RenderRequest)</code>；HTTP 响应头携带 <code>X-Drawify-Valid</code> / <code>X-Drawify-Format</code> / <code>X-Drawify-Warnings</code>
+      </div>
+    </div>
+    <div class="caller-row">
+      <div class="caller-name wasm">WASM</div>
+      <div class="caller-fn">
+        <code>render(source, format)</code> / <code>render_with_options(source, format, options_json)</code> → <code>parse_prepare_validate()</code> → 无 error 则 <code>render_output(&amp;request)</code>（单格式）<br/>
+        另有 <code>parse_to_json()</code>（仅 parse）与 <code>validate()</code> 独立入口；产出 JSON：<code>{ success, format, text, errors, warnings }</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ LEGEND ═══ -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div> Parse</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> Prepare</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div> Validation</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div> Layout</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--pink)"></div> Scene Build</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div> Format Encode</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div> ASCII 独立分支</div>
+  </div>
+
+  <footer>
+    Drawify Core Pipeline &nbsp;·&nbsp; crates/drawify-core/src &nbsp;·&nbsp; Generated from source code analysis
+  </footer>
+
+</div><!-- /container -->
+</body>
+</html>

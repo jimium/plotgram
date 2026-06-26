@@ -1,0 +1,77 @@
+{
+  "version": "0.2",
+  "id": "common.rose-pine",
+  "name": "Rosé Pine",
+  "meta": {
+    "author": "Drawify",
+    "description": "灵感来自 Rosé Pine：文艺暖灰底色 + 玫瑰金点缀，设计社区高口碑浅色主题",
+    "tags": ["rose-pine", "light", "aesthetic", "inspired"]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#faf4ed",
+      "text": "#575279",
+      "muted_text": "#9893a5",
+      "border": "#dfdad9",
+      "primary": "#286983",
+      "neutral_fill": "#f2e9e1",
+      "neutral_stroke": "#797593",
+      "group_fill": "#fffaf3",
+      "group_stroke": "#cecacd"
+    },
+    "palette": {
+      "blue": { "fill": "#e0f0f5", "stroke": "#286983" },
+      "orange": { "fill": "#f8ede8", "stroke": "#ea9d34" },
+      "green": { "fill": "#e8f5e8", "stroke": "#56949f" },
+      "purple": { "fill": "#f0e8f5", "stroke": "#907aa9" },
+      "yellow": { "fill": "#faf4ed", "stroke": "#ea9d34" },
+      "red": { "fill": "#f8e8e8", "stroke": "#b4637a" },
+      "cyan": { "fill": "#e0f5f0", "stroke": "#56949f" },
+      "brown": { "fill": "#f2e9e1", "stroke": "#797593" },
+      "gray": { "fill": "#faf4ed", "stroke": "#9893a5" },
+      "amber": { "fill": "#f8ede8", "stroke": "#ea9d34" },
+      "blue_gray": { "fill": "#f2e9e1", "stroke": "#575279" },
+      "start_green": { "fill": "#e8f5e8", "stroke": "#56949f" },
+      "end_red": { "fill": "#f8e8e8", "stroke": "#b4637a" },
+      "arch_blue": { "fill": "#e0f0f5", "stroke": "#286983" },
+      "root": { "fill": "#907aa9", "stroke": "#286983", "text_fill": "#faf4ed" }
+    }
+  },
+  "diagrams": {
+    "flowchart": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "sequence": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "state": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "architecture": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "er": {
+      "node": { "fill": "#fffaf3", "stroke": "#286983" },
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "mindmap": {
+      "edge": { "stroke_width": "{strokes.normal}" },
+      "entity_types": {
+        "leaf": { "fill": "#f2e9e1" }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#e0f0f5", "stroke": "#286983", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "version": "0.2",
+  "id": "mindmap.vivid-branches",
+  "extends": "mindmap.base",
+  "name": "Vivid Branches",
+  "meta": {
+    "author": "Drawify",
+    "description": "XMind 风格：粗壮的彩色分支、饱和配色、圆润节点，适合头脑风暴与创意发散",
+    "tags": ["mindmap", "light", "vivid", "colorful"]
+  },
+  "tokens": {
+    "typography": {
+      "title_size": 18,
+      "label_size": 14,
+      "small_size": 12,
+      "font_weight_medium": 600
+    },
+    "strokes": {
+      "thin": 1.5,
+      "normal": 2.5,
+      "thick": 3.5,
+      "dashed": [8, 4],
+      "dotted": [3, 5]
+    },
+    "radius": {
+      "sm": 6,
+      "md": 12,
+      "lg": 18
+    },
+    "spacing": {
+      "node_padding_x": 16,
+      "node_padding_y": 10,
+      "group_padding": 20,
+      "label_gap": 8
+    }
+  },
+  "diagrams": {
+    "mindmap": {
+      "edge": {
+        "stroke_width": "{strokes.thick}"
+      },
+      "node": {
+        "stroke_width": "{strokes.thin}"
+      },
+      "entity_types": {
+        "main": {
+          "label_weight": "bold"
+        },
+        "branch": {
+          "label_weight": "medium"
+        }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#E8DAEF", "stroke": "#8E44AD", "edge_stroke": "#8E44AD" },
+            { "fill": "#D5F5E3", "stroke": "#27AE60", "edge_stroke": "#27AE60" },
+            { "fill": "#FDEBD0", "stroke": "#E67E22", "edge_stroke": "#E67E22" },
+            { "fill": "#D6EAF8", "stroke": "#2980B9", "edge_stroke": "#2980B9" },
+            { "fill": "#FADBD8", "stroke": "#E74C3C", "edge_stroke": "#E74C3C" },
+            { "fill": "#FCF3CF", "stroke": "#F1C40F", "edge_stroke": "#F1C40F" },
+            { "fill": "#D1F2EB", "stroke": "#1ABC9C", "edge_stroke": "#1ABC9C" },
+            { "fill": "#EBDEF0", "stroke": "#9B59B6", "edge_stroke": "#9B59B6" }
+          ]
+        },
+        "edge_depth": {
+          "entries": [
+            { "stroke_width": 4.0 },
+            { "stroke_width": 3.0 },
+            { "stroke_width": 2.0 }
+          ]
+        }
+      }
+    }
+  }
+}

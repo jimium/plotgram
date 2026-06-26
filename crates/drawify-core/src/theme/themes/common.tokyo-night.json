@@ -1,0 +1,87 @@
+{
+  "version": "0.2",
+  "id": "common.tokyo-night",
+  "name": "Tokyo Night",
+  "meta": {
+    "author": "Drawify",
+    "description": "灵感来自 Tokyo Night：深蓝紫底色、霓虹点缀，程序员社区高人气暗色主题",
+    "tags": ["tokyo-night", "dark", "neon", "inspired"]
+  },
+  "extends": "common.clean-dark",
+  "tokens": {
+    "colors": {
+      "canvas": "#1a1b26",
+      "text": "#a9b1d6",
+      "muted_text": "#565f89",
+      "border": "#3b4261",
+      "primary": "#7aa2f7",
+      "neutral_fill": "#24283b",
+      "neutral_stroke": "#565f89",
+      "group_fill": "#1f2335",
+      "group_stroke": "#3b4261"
+    },
+    "palette": {
+      "blue": { "fill": "#24283b", "stroke": "#7aa2f7" },
+      "orange": { "fill": "#24283b", "stroke": "#ff9e64" },
+      "green": { "fill": "#24283b", "stroke": "#9ece6a" },
+      "purple": { "fill": "#24283b", "stroke": "#bb9af7" },
+      "yellow": { "fill": "#24283b", "stroke": "#e0af68" },
+      "red": { "fill": "#24283b", "stroke": "#f7768e" },
+      "cyan": { "fill": "#24283b", "stroke": "#7dcfff" },
+      "brown": { "fill": "#24283b", "stroke": "#ff9e64" },
+      "gray": { "fill": "#1a1b26", "stroke": "#565f89" },
+      "amber": { "fill": "#292e42", "stroke": "#ff9e64" },
+      "blue_gray": { "fill": "#24283b", "stroke": "#a9b1d6" },
+      "start_green": { "fill": "#24283b", "stroke": "#9ece6a" },
+      "end_red": { "fill": "#24283b", "stroke": "#f7768e" },
+      "arch_blue": { "fill": "#24283b", "stroke": "#7aa2f7" },
+      "root": { "fill": "#7aa2f7", "stroke": "#bb9af7", "text_fill": "#1a1b26" }
+    }
+  },
+  "diagrams": {
+    "architecture": {
+      "group": {
+        "stroke": "{colors.group_stroke}",
+        "stroke_width": "{strokes.normal}"
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "{darken({colors.group_fill}, 0.0)}", "stroke": "{darken({colors.group_stroke}, 0.0)}", "stroke_width": 2.0, "border_radius": 8.0 },
+            { "fill": "{darken({colors.group_fill}, 0.15)}", "stroke": "{darken({colors.group_stroke}, 0.12)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{darken({colors.group_fill}, 0.25)}", "stroke": "{darken({colors.group_stroke}, 0.20)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{darken({colors.group_fill}, 0.35)}", "stroke": "{darken({colors.group_stroke}, 0.28)}", "stroke_width": 1.5, "border_radius": 6.0 }
+          ]
+        }
+      }
+    },
+    "er": {
+      "node": {
+        "fill": "#24283b",
+        "stroke": "#7aa2f7"
+      }
+    },
+    "mindmap": {
+      "edge": {
+        "stroke_width": "{strokes.normal}"
+      },
+      "entity_types": {
+        "leaf": {
+          "fill": "#24283b"
+        }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#24283b", "stroke": "#7aa2f7", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+[package]
+name = "drawify-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "CLI tool for Drawify — Turn anything into a diagram"
+
+[[bin]]
+name = "drawify"
+path = "src/main.rs"
+
+[dependencies]
+drawify-core = { workspace = true, features = ["raster", "svg-debug"] }
+clap = { version = "4", features = ["derive"] }
+serde_json.workspace = true
+
+

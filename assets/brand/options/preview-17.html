@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drawify Logo — 17 号嵌套系列变体</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0F0B1A;
+    color: #E2E8F0;
+    font-family: -apple-system, 'Inter', system-ui, sans-serif;
+    padding: 48px 32px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 8px;
+    background: linear-gradient(90deg, #A78BFA, #22D3EE);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { color: #94A3B8; font-size: 15px; margin-bottom: 48px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 24px;
+    max-width: 1200px;
+  }
+  .card {
+    background: #1A1530;
+    border: 1px solid #2D2748;
+    border-radius: 16px;
+    padding: 32px 24px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: #7C3AED; }
+  .card .num {
+    font-size: 12px;
+    font-weight: 600;
+    color: #7C3AED;
+    letter-spacing: 0.1em;
+    margin-bottom: 16px;
+  }
+  .card .icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 80px;
+    margin-bottom: 20px;
+  }
+  .card .icon-wrap svg { width: 56px; height: 56px; }
+  .card .name {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #F1F5F9;
+  }
+  .card .desc {
+    font-size: 13px;
+    color: #94A3B8;
+    line-height: 1.5;
+  }
+  .card .ref {
+    font-size: 11px;
+    color: #6D28D9;
+    margin-top: 8px;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<h1>Drawify Logo — 17 号「嵌套」系列变体</h1>
+<p class="subtitle">基于嵌套概念（外框+内核 = 多层抽象）的 10 组优化方向</p>
+
+<div class="grid">
+
+  <!-- 17-A: Refined Original -->
+  <div class="card">
+    <div class="num">17-A</div>
+    <div class="icon-wrap">
+      <svg viewBox="0 0 48 48" fill="none" shape-rendering="geometricPrecision">
+        <defs><linearGradient id="ga" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs>
+        <rect x="8" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#ga)" stroke-width="2.5"/>
+        <rect x="16" y="16" width="16" height="16" rx="4" fill="url(#ga)"/>
+      </svg>
+    </div>
+    <div class="name">精修原版 Refined</div>
+    <div class="desc">原版比例微调：外框圆角 7px，内核圆角 4px，间距 8px。更协调的视觉比例。</div>
+    <div class="ref">baseline</div>
+  </div>
+
+  <!-- 17-B: Triple Nested -->
+  <div class="card">
+    <div class="num">17-B</div>
+    <div class="icon-wrap">
+      <svg viewBox="0 0 48 48" fill="none" shape-rendering="geometricPrecision">
+        <defs><linearGradient id="gb" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs>
+        <rect x="6" y="6" width="36" height="36" rx="8" fill="none" stroke="url(#gb)" stroke-width="2"/>
+        <rect x="14" y="14" width="20" height="20" rx="5" fill="none" stroke="url(#gb)" stroke-width="2"/>
+        <rect x="20" y="20" width="8" height="8" rx="2" fill="url(#gb)"/>
+      </svg>
+    </div>
+    <div class="name">三层嵌套 Triple</div>
+    <div class="desc">三层结构：外框→中框→内核。精确对应 AST → 语义 → 渲染三层抽象。</div>
+    <div class="ref">三层抽象</div>
+  </div>
+
+  <!-- 17-C: Concentric Circles -->
+  <div class="card">
+    <div class="num">17-C</div>
+    <div class="icon-wrap">
+      <svg viewBox="0 0 48 48" fill="none" shape-rendering="geometricPrecision">
+        <defs><linearGradient id="gc" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs>
+        <circle cx="24" cy="24" r="16" fill="none" stroke="url(#gc)" stroke-width="2.5"/>
+        <circle cx="24" cy="24" r="8" fill="url(#gc)"/>
+      </svg>
+    </div>
+    <div class="name">同心圆 Circles</div>
+    <div class="desc">圆形版本。外环+内核。更柔和、更包容的嵌套表达。</div>
+    <div class="ref">ref: Target, Orbit</div>
+  </div>
+
+  <!-- 17-D: Offset Nested -->
+  <div class="card">
+    <div class="num">17-D</div>
+    <div class="icon-wrap">
+      <svg viewBox="0 0 48 48" fill="none" shape-rendering="geometricPrecision">
+        <defs><linearGradient id="gd" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs>
+        <rect x="6" y="8" width="32" height="32" rx="7" fill="none" stroke="url(#gd)" stroke-width="2.5"/>
+        <rect x="20" y="16" width="16" height="16" rx="4" fill="url(#gd)"/>
+      </svg>
+    </div>
+    <div class="name">偏心嵌套 Offset</div>
+    <div class="desc">内核向右偏移 6px。打破对称，制造"流动/转化"的方向感。内核像在向外框右侧移动。</div>
+    <div class="ref">ref: Motion, Transformation</div>
+  </div>
+
+  <!-- 17-E: Square + Circle -->
+  <div class="card">
+    <div class="num">17-E</div>
+    <div class="icon-wrap">
+      <svg viewBox="0 0 48 48" fill="none" shape-rendering="geometricPrecision">
+        <defs><linearGradient id="ge" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs>
+        <rect x="6" y="6" width="36" height="36" rx="7" fill="none" stroke="url(#ge)" stroke-width="2.5"/>
+        <circle cx="24" cy="24" r="9" fill="url(#ge)"/>
+      </svg>
+    </div>
+    <div class="name">方圆嵌套 Hybrid</div>
+    <div class="desc">外方内圆。方形=代码结构，圆形=视觉图表。嵌套即转化——结构包裹着视觉。</div>
+    <div class="ref">ref: Morph + Nested</div>
+  </div>
+
+  <!-- 17-F: Depth Gradient -->
+  <div class="card">
+    <div class="num">17-F</div>
+    <div class="icon-wrap">
+      <svg viewBox="0 0 48 48" fill="none" shape-rendering="geometricPrecision">
+        <defs><linearGradient id="gf" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs>
+        <rect x="6" y="6" width="36" height="36" rx="7" fill="url(#gf)" opacity="0.2"/>
+        <rect x="13" y="13" width="22" height="22" rx="5" fill="url(#gf)" opacity="0.5"/>
+        <rect x="19" y="19" width="10" height="10" rx="3" fill="url(#gf)"/>
+      </svg>
+    </div>
+    <div class="name">深度渐变 Depth</div>
+    <div class="desc">三层实心，透明度递增（20%→50%→100%）。像从远到近聚焦，内核最实。</div>
+    <div class="ref">ref: Z-depth, Focus</div>
+  </div>
+
+  <!-- 17-G: Wide Gap -->
+  <div class="card">
+    <div class="num">17-G</div>
+    <div class="icon-wrap">
+      <svg viewBox="0 0 48 48" fill="none" shape-rendering="geometricPrecision">
+        <defs><linearGradient id="gg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs>
+        <rect x="4" y="4" width="40" height="40" rx="9" fill="none" stroke="url(#gg)" stroke-width="2.5"/>
+        <rect x="18" y="18" width="12" height="12" rx="3" fill="url(#gg)"/>
+      </svg>
+    </div>
+    <div class="name">宽距嵌套 Wide Gap</div>
+    <div class="desc">更大的外框+更小的内核。留白更多，呼吸感更强。极简且精致。</div>
+    <div class="ref">ref: Airy, Minimal</div>
+  </div>
+
+  <!-- 17-H: Double Outline -->
+  <div class="card">
+    <div class="num">17-H</div>
+    <div class="icon-wrap">
+      <svg viewBox="0 0 48 48" fill="none" shape-rendering="geometricPrecision">
+        <defs><linearGradient id="gh" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs>
+        <rect x="6" y="6" width="36" height="36" rx="8" fill="none" stroke="url(#gh)" stroke-width="2.5"/>
+        <rect x="16" y="16" width="16" height="16" rx="4" fill="none" stroke="url(#gh)" stroke-width="2.5"/>
+      </svg>
+    </div>
+    <div class="name">双描边 Outline</div>
+    <div class="desc">两层都是描边，无填充。最通透、最克制的版本。轻盈如纸。</div>
+    <div class="ref">ref: Wireframe, Blueprint</div>
+  </div>
+
+  <!-- 17-I: Frame + Dot -->
+  <div class="card">
+    <div class="num">17-I</div>
+    <div class="icon-wrap">
+      <svg viewBox="0 0 48 48" fill="none" shape-rendering="geometricPrecision">
+        <defs><linearGradient id="gi" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs>
+        <rect x="6" y="6" width="36" height="36" rx="8" fill="none" stroke="url(#gi)" stroke-width="2.5"/>
+        <circle cx="24" cy="24" r="5" fill="url(#gi)"/>
+      </svg>
+    </div>
+    <div class="name">框+点 Dot Core</div>
+    <div class="desc">外框+中心圆点。最极简的嵌套——框架包裹着一个语义核心。点即一切。</div>
+    <div class="ref">ref: Seed, Core</div>
+  </div>
+
+  <!-- 17-J: Hexagon Nested -->
+  <div class="card">
+    <div class="num">17-J</div>
+    <div class="icon-wrap">
+      <svg viewBox="0 0 48 48" fill="none" shape-rendering="geometricPrecision">
+        <defs><linearGradient id="gj" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7C3AED"/><stop offset="100%" stop-color="#06B6D4"/></linearGradient></defs>
+        <polygon points="24,4 40,13 40,35 24,44 8,35 8,13" fill="none" stroke="url(#gj)" stroke-width="2.5"/>
+        <polygon points="24,16 32,20 32,28 24,32 16,28 16,20" fill="url(#gj)"/>
+      </svg>
+    </div>
+    <div class="name">六边嵌套 Hexagon</div>
+    <div class="desc">六边形嵌套。外框是图表节点的经典形状，内核是语义核心。与产品领域强关联。</div>
+    <div class="ref">ref: Honeycomb, Node</div>
+  </div>
+
+</div>
+
+</body>
+</html>

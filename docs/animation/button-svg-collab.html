@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>按钮与 SVG 协作方式对比</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 40px 20px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 24px;
+    margin-bottom: 30px;
+    color: #fff;
+  }
+  .compare-grid {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  .mode-card {
+    background: #16213e;
+    border-radius: 14px;
+    padding: 20px;
+    border: 1px solid #2a2a4a;
+  }
+  .mode-card h2 {
+    font-size: 16px;
+    color: #667eea;
+    margin-bottom: 4px;
+  }
+  .mode-card .tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+  }
+  .tag-auto { background: #2d4a2f; color: #4caf50; }
+  .tag-svg { background: #4a3d2f; color: #ff9800; }
+  .tag-html { background: #2f3a4a; color: #64b5f6; }
+  .mode-card .desc {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 14px;
+    line-height: 1.6;
+  }
+  .svg-box {
+    background: #0f0f23;
+    border-radius: 10px;
+    padding: 12px;
+    display: flex;
+    justify-content: center;
+  }
+  .svg-box svg { max-width: 100%; height: auto; }
+  .note {
+    font-size: 11px;
+    color: #666;
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+
+  /* ============ 模式1：纯 SVG 自动播放（无按钮） ============ */
+  @keyframes auto-pop {
+    0% { opacity: 0; transform: scale(0); }
+    60% { transform: scale(1.1); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes auto-flow {
+    to { stroke-dashoffset: -20; }
+  }
+  @keyframes auto-draw {
+    from { stroke-dashoffset: 200; }
+    to { stroke-dashoffset: 0; }
+  }
+  .auto-node {
+    opacity: 0;
+    animation: auto-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .auto-edge {
+    stroke-dasharray: 200;
+    stroke-dashoffset: 200;
+    animation: auto-draw 0.6s ease-out forwards;
+  }
+  .auto-flow-edge {
+    stroke-dasharray: 8 6;
+    animation: auto-flow 0.8s linear infinite;
+    animation-delay: 0.6s;
+  }
+  .d1 { animation-delay: 0s; }
+  .d2 { animation-delay: 0.15s; }
+  .d3 { animation-delay: 0.3s; }
+
+  /* ============ 模式2：按钮画在 SVG 内部（纯 SVG 也能控制） ============ */
+  @keyframes step-pop {
+    from { opacity: 0; transform: scale(0); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .svg-btn {
+    cursor: pointer;
+    fill: #2a2a4a;
+    stroke: #667eea;
+    stroke-width: 1.5;
+    rx: 6;
+    transition: fill 0.2s;
+  }
+  .svg-btn:hover { fill: #667eea; }
+  .svg-btn-text {
+    pointer-events: none;
+    fill: #ccc;
+    font-size: 13px;
+    text-anchor: middle;
+  }
+
+  /* Steps 状态通过 :target 切换 */
+  #svg-steps .step-item {
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  /* 默认显示 step1 */
+  #svg-steps #s-step1 { opacity: 1; }
+  /* 当 URL hash 是 #step2 时显示 step2 */
+  #svg-steps:target #s-step1 { opacity: 0; }
+
+  /* 用 SMIL begin 实现点击控制 */
+  #smil-node { opacity: 0; }
+
+  /* ============ 模式3：HTML 按钮控制 SVG（最灵活） ============ */
+  @keyframes html-pop {
+    from { opacity: 0; transform: scale(0); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .html-node {
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .html-node.show {
+    animation: html-pop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  }
+  .html-edge-draw {
+    stroke-dasharray: 200;
+    stroke-dashoffset: 200;
+    transition: stroke-dashoffset 0.5s ease-out;
+  }
+  .html-edge-draw.show {
+    stroke-dashoffset: 0;
+  }
+  .html-controls {
+    margin-top: 10px;
+    display: flex;
+    gap: 6px;
+  }
+  .html-controls button {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .html-controls button:hover { opacity: 0.85; }
+  .html-controls button.secondary { background: #2a2a4a; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<h1>三种按钮 × SVG 协作模式</h1>
+
+<div class="compare-grid">
+
+  <!-- 模式 1 -->
+  <div class="mode-card">
+    <h2>模式 A：无按钮，自动播放</h2>
+    <span class="tag tag-auto">纯 SVG · 零 JS</span>
+    <p class="desc">
+      Patch 动画、参数化指令、循环动画。打开 SVG 即播放，不需要用户操作。
+      CSS animation-delay 做 stagger，SMIL/CSS 自动执行。
+    </p>
+    <div class="svg-box">
+      <svg width="280" height="200" viewBox="0 0 280 200" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+            <path d="M0 0 L10 5 L0 10z" fill="#667eea"/>
+          </marker>
+        </defs>
+        <!-- 边先画 -->
+        <path class="auto-edge" d="M80 100 L200 100" stroke="#667eea" stroke-width="2" fill="none" marker-end="url(#m1)"/>
+        <path class="auto-edge auto-flow-edge" d="M80 130 L200 130" stroke="#ff6b35" stroke-width="2" fill="none" marker-end="url(#m1)" style="animation-delay:0.7s"/>
+        <!-- 节点弹入 -->
+        <g class="auto-node d1">
+          <rect x="35" y="75" width="55" height="45" rx="8" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="62" y="102" text-anchor="middle" fill="white" font-size="13">A</text>
+        </g>
+        <g class="auto-node d2">
+          <rect x="195" y="75" width="55" height="45" rx="8" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="222" y="102" text-anchor="middle" fill="white" font-size="13">B</text>
+        </g>
+        <text x="140" y="170" text-anchor="middle" fill="#666" font-size="11">打开即播放，无需交互</text>
+      </svg>
+    </div>
+    <p class="note">
+      ✅ 单文件 SVG，双击打开就有动画<br>
+      ✅ 适合 Patch 过渡、入场动画、边数据流<br>
+      ❌ 无法控制暂停/播放
+    </p>
+  </div>
+
+  <!-- 模式 2 -->
+  <div class="mode-card">
+    <h2>模式 B：按钮画在 SVG 里</h2>
+    <span class="tag tag-svg">纯 SVG · 零外部 JS</span>
+    <p class="desc">
+      按钮本身也是 SVG 元素（<code>&lt;rect&gt;</code>+<code>&lt;text&gt;</code>），
+      用 SMIL <code>begin="btn.click"</code> 或 CSS <code>:target</code> 控制。
+      单个 .svg 文件即可交互。
+    </p>
+    <div class="svg-box">
+      <svg width="280" height="220" viewBox="0 0 280 220" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <defs>
+          <marker id="m2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+            <path d="M0 0 L10 5 L0 10z" fill="#667eea"/>
+          </marker>
+        </defs>
+
+        <!-- Step 1: 单节点 -->
+        <g id="s-step1">
+          <rect x="105" y="70" width="70" height="50" rx="8" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="140" y="100" text-anchor="middle" fill="white" font-size="13">Step 1</text>
+          <animate attributeName="opacity" from="1" to="0" dur="0.4s" fill="freeze" begin="btn2.click"/>
+          <animate attributeName="opacity" from="0" to="1" dur="0.4s" fill="freeze" begin="btn1.click"/>
+        </g>
+
+        <!-- Step 2: 三节点 + 边 -->
+        <g id="s-step2" opacity="0">
+          <rect x="30" y="70" width="60" height="50" rx="8" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="60" y="100" text-anchor="middle" fill="white" font-size="12">A</text>
+          <rect x="110" y="70" width="60" height="50" rx="8" fill="#9b59b6" stroke="#8e44ad" stroke-width="2"/>
+          <text x="140" y="100" text-anchor="middle" fill="white" font-size="12">B (新)</text>
+          <rect x="190" y="70" width="60" height="50" rx="8" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="220" y="100" text-anchor="middle" fill="white" font-size="12">C</text>
+          <path d="M90 95 L110 95" stroke="#667eea" stroke-width="2" fill="none" marker-end="url(#m2)"/>
+          <path d="M170 95 L190 95" stroke="#667eea" stroke-width="2" fill="none" marker-end="url(#m2)"/>
+          <animate attributeName="opacity" from="0" to="1" dur="0.4s" fill="freeze" begin="btn2.click"/>
+          <animate attributeName="opacity" from="1" to="0" dur="0.4s" fill="freeze" begin="btn1.click"/>
+        </g>
+
+        <!-- 按钮：SVG 内部的 rect + text，SMIL 监听其 click 事件 -->
+        <rect x="20" y="160" width="60" height="28" rx="6" class="svg-btn" id="btn1"/>
+        <text x="50" y="178" class="svg-btn-text">Step 1</text>
+
+        <rect x="90" y="160" width="60" height="28" rx="6" class="svg-btn" id="btn2"/>
+        <text x="120" y="178" class="svg-btn-text">Step 2</text>
+
+        <text x="210" y="178" fill="#666" font-size="10">← 点这两个按钮</text>
+      </svg>
+    </div>
+    <p class="note">
+      ✅ 仍是单文件 SVG，GitHub 可嵌入<br>
+      ✅ 按钮是 SVG <code>&lt;rect&gt;</code>，SMIL 监听 <code>begin="id.click"</code><br>
+      ❌ 控制能力有限（不能做复杂逻辑），按钮样式简单
+    </p>
+  </div>
+
+  <!-- 模式 3 -->
+  <div class="mode-card">
+    <h2>模式 C：HTML 按钮 + JS 控制</h2>
+    <span class="tag tag-html">HTML 导出 · 最灵活</span>
+    <p class="desc">
+      按钮是 HTML <code>&lt;button&gt;</code>，在 SVG 外面。
+      JS 通过 <code>document.getElementById</code> 操作 SVG 内部元素，
+      添加/移除 CSS class 来触发动画。
+    </p>
+    <div class="svg-box">
+      <svg width="280" height="180" viewBox="0 0 280 180" xmlns="http://www.w3.org/2000/svg" id="html-demo-svg">
+        <defs>
+          <marker id="m3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+            <path d="M0 0 L10 5 L0 10z" fill="#667eea"/>
+          </marker>
+        </defs>
+        <path id="html-edge" class="html-edge-draw" d="M95 90 L185 90" stroke="#667eea" stroke-width="2" fill="none" marker-end="url(#m3)"/>
+        <g id="html-node-a" class="html-node">
+          <rect x="50" y="65" width="55" height="45" rx="8" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="77" y="92" text-anchor="middle" fill="white" font-size="13">A</text>
+        </g>
+        <g id="html-node-b" class="html-node">
+          <rect x="180" y="65" width="55" height="45" rx="8" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="207" y="92" text-anchor="middle" fill="white" font-size="13">B</text>
+        </g>
+      </svg>
+    </div>
+    <div class="html-controls">
+      <button onclick="htmlPlay()">▶ 播放</button>
+      <button class="secondary" onclick="htmlReset()">↺ 重置</button>
+      <button onclick="addNodeC()">+ 加 C</button>
+    </div>
+    <p class="note">
+      ✅ 按钮样式丰富，可做时间轴、进度条等复杂 UI<br>
+      ✅ JS 可实现任意逻辑（自动播放、跳转、循环）<br>
+      ❌ 需要 HTML 文件（SVG 单独文件无按钮）
+    </p>
+  </div>
+
+</div>
+
+<div style="max-width:1100px;margin:30px auto 0;background:#16213e;border-radius:12px;padding:20px;border:1px solid #2a2a4a;">
+  <h3 style="color:#fff;margin-bottom:12px;font-size:15px;">三种模式与导出格式的对应关系</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead>
+      <tr style="color:#888;border-bottom:1px solid #2a2a4a;">
+        <th style="text-align:left;padding:8px;">导出格式</th>
+        <th style="text-align:left;padding:8px;">按钮模式</th>
+        <th style="text-align:left;padding:8px;">协作方式</th>
+        <th style="text-align:left;padding:8px;">适用场景</th>
+      </tr>
+    </thead>
+    <tbody style="color:#ccc;">
+      <tr style="border-bottom:1px solid #1f2f4a;">
+        <td style="padding:8px;"><code>.svg</code>（Patch/参数化）</td>
+        <td style="padding:8px;">模式 A：无按钮</td>
+        <td style="padding:8px;">CSS/SMIL 自动播放</td>
+        <td style="padding:8px;">Agent 微调过渡、高亮截图</td>
+      </tr>
+      <tr style="border-bottom:1px solid #1f2f4a;">
+        <td style="padding:8px;"><code>.svg</code>（Steps 纯 SVG 版）</td>
+        <td style="padding:8px;">模式 B：SVG 内按钮</td>
+        <td style="padding:8px;">SMIL <code>begin="id.click"</code></td>
+        <td style="padding:8px;">GitHub/Notion 嵌入（只接受 SVG）</td>
+      </tr>
+      <tr>
+        <td style="padding:8px;"><code>.html</code>（Steps 完整版）</td>
+        <td style="padding:8px;">模式 C：HTML 按钮</td>
+        <td style="padding:8px;">JS DOM 操作 class/属性</td>
+        <td style="padding:8px;">演示、培训、架构讲解（浏览器打开）</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  // 模式 C 的 JS 逻辑：HTML 按钮控制 SVG 元素
+  function htmlPlay() {
+    // 通过 ID 拿到 SVG 内部元素
+    const a = document.getElementById('html-node-a');
+    const b = document.getElementById('html-node-b');
+    const edge = document.getElementById('html-edge');
+
+    // 先重置，再触发动画
+    a.classList.remove('show');
+    b.classList.remove('show');
+    edge.classList.remove('show');
+    a.offsetHeight; // 强制 reflow
+
+    edge.classList.add('show');
+    setTimeout(() => a.classList.add('show'), 100);
+    setTimeout(() => b.classList.add('show'), 250);
+  }
+
+  function htmlReset() {
+    document.getElementById('html-node-a').classList.remove('show');
+    document.getElementById('html-node-b').classList.remove('show');
+    document.getElementById('html-edge').classList.remove('show');
+    const c = document.getElementById('html-node-c');
+    const ec = document.getElementById('html-edge-bc');
+    if (c) c.remove();
+    if (ec) ec.remove();
+  }
+
+  function addNodeC() {
+    const svg = document.getElementById('html-demo-svg');
+    if (document.getElementById('html-node-c')) return;
+
+    // JS 动态创建 SVG 元素！
+    const xmlns = 'http://www.w3.org/2000/svg';
+
+    // 加边
+    const edge = document.createElementNS(xmlns, 'path');
+    edge.setAttribute('id', 'html-edge-bc');
+    edge.setAttribute('d', 'M235 90 L280 90');
+    edge.setAttribute('stroke', '#ff6b35');
+    edge.setAttribute('stroke-width', '2');
+    edge.setAttribute('fill', 'none');
+    edge.classList.add('html-edge-draw');
+    svg.querySelector('defs').after(edge);
+    setTimeout(() => edge.classList.add('show'), 30);
+
+    // 加节点
+    const g = document.createElementNS(xmlns, 'g');
+    g.setAttribute('id', 'html-node-c');
+    g.classList.add('html-node');
+    g.innerHTML = `
+      <rect x="275" y="65" width="0" height="0" rx="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+      <text x="302" y="92" text-anchor="middle" fill="white" font-size="13" opacity="0">C</text>
+    `;
+    svg.appendChild(g);
+    setTimeout(() => {
+      g.classList.add('show');
+      g.querySelector('rect').setAttribute('width', '55');
+      g.querySelector('rect').setAttribute('height', '45');
+    }, 200);
+
+    // 扩大 viewBox
+    svg.setAttribute('viewBox', '0 0 350 180');
+  }
+
+  // 模式 B 的 Reset 补充逻辑（SMIL 重启比较麻烦，这里用 JS 刷新 SVG 动画）
+  document.getElementById('btn1')?.addEventListener('click', () => {
+    // SMIL 回到 step1 已通过 animate 标签实现，无需额外 JS
+  });
+</script>
+
+</body>
+</html>

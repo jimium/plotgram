@@ -1,0 +1,30 @@
+%% Drawify 编译管线与分散关注点（Mermaid 原版，用于与 compiler-pipeline.dfy 对比）
+flowchart LR
+    A[Parser/Lexer] --> B[AST]
+    B --> C[Validator]
+    B --> D[Layout]
+    D --> E[Renderer.diagram]
+    E --> F[Renderer.format]
+
+    X[图表类型语义]
+    Y[默认布局配置]
+    Z[样式扩展]
+    W[输出契约]
+
+    X -. 当前分散 .-> C
+    X -. 当前分散 .-> E
+    Y -. 三处定义 .-> D
+    Y -. 三处定义 .-> E
+    Z -. 声明未落地 .-> E
+    W -. String 混合文本/二进制 .-> F
+
+    style A fill:#bbdefb,color:#0d47a1
+    style B fill:#c8e6c9,color:#1a5e20
+    style C fill:#fff3e0,color:#e65100
+    style D fill:#fff3e0,color:#e65100
+    style E fill:#f3e5f5,color:#7b1fa2
+    style F fill:#f3e5f5,color:#7b1fa2
+    style X fill:#ffcdd2,color:#b71c1c
+    style Y fill:#ffcdd2,color:#b71c1c
+    style Z fill:#ffcdd2,color:#b71c1c
+    style W fill:#ffcdd2,color:#b71c1c

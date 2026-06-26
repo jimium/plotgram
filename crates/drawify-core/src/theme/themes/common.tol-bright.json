@@ -1,0 +1,74 @@
+{
+  "version": "0.2",
+  "id": "common.tol-bright",
+  "name": "Tol Bright",
+  "meta": {
+    "author": "Drawify",
+    "description": "色盲友好：Paul Tol Bright 配色。科学可视化社区公认，各色在灰度打印下仍可区分",
+    "tags": ["tol", "bright", "light", "accessible", "colorblind-safe", "a11y"]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#FFFFFF",
+      "text": "#222222",
+      "muted_text": "#666666",
+      "border": "#BBBBBB",
+      "primary": "#4477AA",
+      "neutral_fill": "#F4F4F4",
+      "neutral_stroke": "#666666",
+      "group_fill": "#FAFAFA",
+      "group_stroke": "#BBBBBB"
+    },
+    "palette": {
+      "blue": { "fill": "#DDEEFF", "stroke": "#4477AA" },
+      "orange": { "fill": "#FFE8DD", "stroke": "#EE7733" },
+      "green": { "fill": "#DDFFDD", "stroke": "#228833" },
+      "purple": { "fill": "#FFE0F0", "stroke": "#AA3377" },
+      "yellow": { "fill": "#FFFFDD", "stroke": "#CCBB44" },
+      "red": { "fill": "#FFDDDD", "stroke": "#EE6677" },
+      "cyan": { "fill": "#DDF5FF", "stroke": "#66CCEE" },
+      "brown": { "fill": "#EEEEEE", "stroke": "#BBBBBB" },
+      "gray": { "fill": "#FAFAFA", "stroke": "#BBBBBB" },
+      "amber": { "fill": "#FFF3DD", "stroke": "#EE7733" },
+      "blue_gray": { "fill": "#F0F0F0", "stroke": "#666666" },
+      "start_green": { "fill": "#DDFFDD", "stroke": "#228833" },
+      "end_red": { "fill": "#FFDDDD", "stroke": "#EE6677" },
+      "arch_blue": { "fill": "#DDEEFF", "stroke": "#4477AA" },
+      "root": { "fill": "#4477AA", "stroke": "#222222", "text_fill": "#FFFFFF" }
+    },
+    "strokes": {
+      "thin": 1.25,
+      "normal": 2.0,
+      "thick": 2.5,
+      "dashed": [8, 4],
+      "dotted": [3, 4]
+    }
+  },
+  "diagrams": {
+    "flowchart": { "edge": { "stroke": "#444444" } },
+    "sequence": { "edge": { "stroke": "#444444" } },
+    "state": { "edge": { "stroke": "#444444" } },
+    "architecture": { "edge": { "stroke": "#444444" } },
+    "er": {
+      "node": { "fill": "#FFFFFF", "stroke": "#4477AA" },
+      "edge": { "stroke": "#444444" }
+    },
+    "mindmap": {
+      "edge": { "stroke_width": "{strokes.normal}" },
+      "entity_types": { "leaf": { "fill": "#F4F4F4" } },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#DDEEFF", "stroke": "#4477AA", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

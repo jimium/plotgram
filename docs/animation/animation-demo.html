@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drawify SVG CSS 动画效果演示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 40px 20px;
+    min-height: 100vh;
+  }
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    text-align: center;
+    color: #888;
+    margin-bottom: 40px;
+    font-size: 14px;
+  }
+  .demo-grid {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+    gap: 24px;
+  }
+  .demo-card {
+    background: #16213e;
+    border-radius: 16px;
+    padding: 24px;
+    border: 1px solid #2a2a4a;
+    transition: border-color 0.3s;
+  }
+  .demo-card:hover {
+    border-color: #667eea;
+  }
+  .demo-card h2 {
+    font-size: 18px;
+    margin-bottom: 6px;
+    color: #fff;
+  }
+  .demo-card .desc {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 16px;
+    line-height: 1.5;
+  }
+  .svg-container {
+    background: #0f0f23;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 260px;
+    overflow: hidden;
+  }
+  .svg-container svg {
+    max-width: 100%;
+    height: auto;
+  }
+  .controls {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: transform 0.15s, opacity 0.15s;
+  }
+  button:hover { transform: translateY(-1px); opacity: 0.9; }
+  button:active { transform: translateY(0); }
+  button.secondary {
+    background: #2a2a4a;
+  }
+
+  /* ========== SVG 内嵌动画样式（演示用，实际是嵌入 SVG 内部的） ========== */
+
+  /* 通用入场动画 */
+  @keyframes dfy-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes dfy-pop-in {
+    from { opacity: 0; transform: scale(0); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes dfy-slide-in-right {
+    from { opacity: 0; transform: translate(80px, 0); }
+    to   { opacity: 1; transform: translate(0, 0); }
+  }
+  @keyframes dfy-slide-left {
+    from { transform: translate(0, 0); }
+    to   { transform: translate(-70px, 0); }
+  }
+  @keyframes dfy-fade-out {
+    from { opacity: 1; transform: scale(1); }
+    to   { opacity: 0; transform: scale(0.5); }
+  }
+  @keyframes dfy-edge-flow {
+    to { stroke-dashoffset: -24; }
+  }
+  @keyframes dfy-pulse {
+    0%, 100% { filter: drop-shadow(0 0 4px #4caf50); }
+    50%      { filter: drop-shadow(0 0 12px #4caf50); }
+  }
+  @keyframes dfy-highlight-pulse {
+    0%, 100% { stroke-width: 2; }
+    50%      { stroke-width: 4; }
+  }
+  @keyframes dfy-draw-line {
+    from { stroke-dashoffset: 300; }
+    to   { stroke-dashoffset: 0; }
+  }
+
+  .enter-pop {
+    opacity: 0;
+    animation: dfy-pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+  .enter-fade {
+    opacity: 0;
+    animation: dfy-fade-in 0.4s ease-out forwards;
+  }
+  .enter-slide {
+    opacity: 0;
+    animation: dfy-slide-in-right 0.5s ease-out forwards;
+  }
+  .enter-draw {
+    stroke-dasharray: 300;
+    stroke-dashoffset: 300;
+    animation: dfy-draw-line 0.6s ease-out forwards;
+  }
+  .exit-fade {
+    animation: dfy-fade-out 0.4s ease-in forwards;
+  }
+  .move-left {
+    animation: dfy-slide-left 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  .edge-flow {
+    stroke-dasharray: 8 6;
+    animation: dfy-edge-flow 0.8s linear infinite;
+  }
+  .node-pulse {
+    animation: dfy-pulse 2s ease-in-out infinite;
+  }
+  .highlighted {
+    animation: dfy-highlight-pulse 1s ease-in-out infinite;
+    stroke: #ff6b35 !important;
+    stroke-width: 3 !important;
+  }
+  .dimmed {
+    opacity: 0.25;
+    transition: opacity 0.4s;
+  }
+
+  /* Hover 交互 */
+  .hover-node {
+    cursor: pointer;
+    transition: transform 0.2s, filter 0.2s;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .hover-node:hover {
+    transform: scale(1.08);
+    filter: drop-shadow(0 4px 12px rgba(102, 126, 234, 0.5));
+  }
+
+  /* 延迟 stagger */
+  .delay-1 { animation-delay: 0.1s; }
+  .delay-2 { animation-delay: 0.2s; }
+  .delay-3 { animation-delay: 0.3s; }
+  .delay-4 { animation-delay: 0.4s; }
+  .delay-5 { animation-delay: 0.5s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Drawify SVG + CSS 动画效果演示</h1>
+<p class="subtitle">所有动画纯 CSS 实现，内嵌于 SVG，零 JS 依赖（页面控制按钮除外）</p>
+
+<div class="demo-grid">
+
+  <!-- Demo 1: 节点入场动画 -->
+  <div class="demo-card">
+    <h2>1. 节点入场动画</h2>
+    <p class="desc">新增节点 → 弹性缩放 + 淡入。stagger 延迟依次出现，模拟 Patch Add。</p>
+    <div class="svg-container">
+      <svg width="480" height="220" viewBox="0 0 480 220" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#667eea"/>
+          </marker>
+        </defs>
+        <path d="M130 110 L350 110" stroke="#667eea" stroke-width="2" fill="none" marker-end="url(#arrow1)" class="enter-draw"/>
+        <g class="enter-pop">
+          <rect x="50" y="80" width="80" height="60" rx="10" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="90" y="115" text-anchor="middle" fill="white" font-size="16" font-weight="500">Client</text>
+        </g>
+        <g class="enter-pop delay-3">
+          <rect x="350" y="80" width="80" height="60" rx="10" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="390" y="115" text-anchor="middle" fill="white" font-size="16" font-weight="500">API</text>
+        </g>
+      </svg>
+    </div>
+    <div class="controls">
+      <button onclick="replayAnim(this)">重新播放</button>
+    </div>
+  </div>
+
+  <!-- Demo 2: 边数据流动画 -->
+  <div class="demo-card">
+    <h2>2. 边数据流（自动循环）</h2>
+    <p class="desc">stroke-dashoffset 循环动画，表达"调用方向"。纯 CSS，零 JS。</p>
+    <div class="svg-container">
+      <svg width="480" height="220" viewBox="0 0 480 220" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#667eea"/>
+          </marker>
+        </defs>
+        <path d="M130 70 L350 70" stroke="#ff6b35" stroke-width="2.5" fill="none" marker-end="url(#arrow2)" class="edge-flow"/>
+        <path d="M350 110 L250 110 L250 150 L130 150" stroke="#4caf50" stroke-width="2.5" fill="none" marker-end="url(#arrow2)" class="edge-flow" style="animation-delay: -0.4s"/>
+        <path d="M130 110 L350 110" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow2)" stroke-dasharray="4 4"/>
+        <rect x="50" y="40" width="80" height="60" rx="10" fill="#2d4a6f" stroke="#4a6fa5" stroke-width="2"/>
+        <text x="90" y="75" text-anchor="middle" fill="white" font-size="14">Client</text>
+        <rect x="350" y="40" width="80" height="60" rx="10" fill="#2d4a6f" stroke="#4a6fa5" stroke-width="2"/>
+        <text x="390" y="75" text-anchor="middle" fill="white" font-size="14">API</text>
+        <rect x="50" y="120" width="80" height="60" rx="10" fill="#2d4a6f" stroke="#4a6fa5" stroke-width="2"/>
+        <text x="90" y="155" text-anchor="middle" fill="white" font-size="14">Auth</text>
+        <text x="240" y="60" text-anchor="middle" fill="#ff6b35" font-size="11">请求（流动）</text>
+        <text x="240" y="140" text-anchor="middle" fill="#4caf50" font-size="11">响应（流动）</text>
+        <text x="240" y="105" text-anchor="middle" fill="#888" font-size="11">静态边</text>
+      </svg>
+    </div>
+    <div class="controls">
+      <button class="secondary" onclick="toggleFlow(this)">暂停/继续</button>
+    </div>
+  </div>
+
+  <!-- Demo 3: 节点位置变更（平移动画） -->
+  <div class="demo-card">
+    <h2>3. 节点位置平移</h2>
+    <p class="desc">Layout Intent 微调时，节点从旧位置平滑移动到新位置。点击按钮触发。</p>
+    <div class="svg-container">
+      <svg width="480" height="220" viewBox="0 0 480 220" xmlns="http://www.w3.org/2000/svg" id="svg3">
+        <defs>
+          <marker id="arrow3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#667eea"/>
+          </marker>
+        </defs>
+        <g id="g3-a">
+          <rect x="50" y="80" width="80" height="60" rx="10" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="90" y="115" text-anchor="middle" fill="white" font-size="14">A</text>
+        </g>
+        <g id="g3-b">
+          <rect x="200" y="80" width="80" height="60" rx="10" fill="#9b59b6" stroke="#8e44ad" stroke-width="2"/>
+          <text x="240" y="115" text-anchor="middle" fill="white" font-size="14">B (移动)</text>
+        </g>
+        <g id="g3-c">
+          <rect x="350" y="80" width="80" height="60" rx="10" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="390" y="115" text-anchor="middle" fill="white" font-size="14">C</text>
+        </g>
+        <path id="edge3-ab" d="M130 110 L200 110" stroke="#667eea" stroke-width="2" fill="none"/>
+        <path id="edge3-bc" d="M280 110 L350 110" stroke="#667eea" stroke-width="2" fill="none" marker-end="url(#arrow3)"/>
+      </svg>
+    </div>
+    <div class="controls">
+      <button onclick="moveNodeB()">移动 B 到右边</button>
+      <button class="secondary" onclick="resetNodeB()">重置位置</button>
+    </div>
+  </div>
+
+  <!-- Demo 4: 节点删除动画 -->
+  <div class="demo-card">
+    <h2>4. 节点删除（淡出+缩小）</h2>
+    <p class="desc">删除节点时，不是瞬间消失，而是平滑淡出缩小。点击按钮模拟。</p>
+    <div class="svg-container">
+      <svg width="480" height="220" viewBox="0 0 480 220" xmlns="http://www.w3.org/2000/svg" id="svg4">
+        <defs>
+          <marker id="arrow4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#667eea"/>
+          </marker>
+        </defs>
+        <g id="n4-a">
+          <rect x="50" y="80" width="80" height="60" rx="10" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="90" y="115" text-anchor="middle" fill="white" font-size="14">A</text>
+        </g>
+        <g id="n4-b">
+          <rect x="200" y="80" width="80" height="60" rx="10" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+          <text x="240" y="115" text-anchor="middle" fill="white" font-size="14">B (删除)</text>
+        </g>
+        <g id="n4-c">
+          <rect x="350" y="80" width="80" height="60" rx="10" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="390" y="115" text-anchor="middle" fill="white" font-size="14">C</text>
+        </g>
+        <path id="e4-ab" d="M130 110 L200 110" stroke="#667eea" stroke-width="2" fill="none"/>
+        <path id="e4-bc" d="M280 110 L350 110" stroke="#667eea" stroke-width="2" fill="none" marker-end="url(#arrow4)"/>
+      </svg>
+    </div>
+    <div class="controls">
+      <button onclick="deleteNodeB()">删除 B</button>
+      <button class="secondary" onclick="resetNodeB_del()">恢复 B</button>
+    </div>
+  </div>
+
+  <!-- Demo 5: Hover 交互 + 聚焦高亮 -->
+  <div class="demo-card">
+    <h2>5. Hover 交互 & 聚焦高亮</h2>
+    <p class="desc">悬浮节点放大+阴影；点击"聚焦"按钮，其他元素淡化。纯 CSS。</p>
+    <div class="svg-container">
+      <svg width="480" height="220" viewBox="0 0 480 220" xmlns="http://www.w3.org/2000/svg" id="svg5">
+        <defs>
+          <marker id="arrow5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#667eea"/>
+          </marker>
+        </defs>
+        <g class="hover-node focusable" data-id="a">
+          <rect x="40" y="80" width="70" height="55" rx="10" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="75" y="112" text-anchor="middle" fill="white" font-size="13">Client</text>
+        </g>
+        <g class="hover-node focusable" data-id="b">
+          <rect x="150" y="80" width="70" height="55" rx="10" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="185" y="112" text-anchor="middle" fill="white" font-size="13">API</text>
+        </g>
+        <g class="hover-node focusable" data-id="c">
+          <rect x="260" y="80" width="70" height="55" rx="10" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="295" y="112" text-anchor="middle" fill="white" font-size="13">Auth</text>
+        </g>
+        <g class="hover-node focusable" data-id="d">
+          <rect x="370" y="80" width="70" height="55" rx="10" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="405" y="112" text-anchor="middle" fill="white" font-size="13">DB</text>
+        </g>
+        <path d="M110 107 L150 107" stroke="#667eea" stroke-width="2" fill="none" class="focus-edge" data-from="a" data-to="b"/>
+        <path d="M220 107 L260 107" stroke="#667eea" stroke-width="2" fill="none" class="focus-edge" data-from="b" data-to="c"/>
+        <path d="M330 107 L370 107" stroke="#667eea" stroke-width="2" fill="none" marker-end="url(#arrow5)" class="focus-edge" data-from="c" data-to="d"/>
+      </svg>
+    </div>
+    <div class="controls">
+      <button onclick="focusNode('b')">聚焦 API</button>
+      <button onclick="focusNode('c')">聚焦 Auth</button>
+      <button class="secondary" onclick="clearFocus()">清除聚焦</button>
+    </div>
+  </div>
+
+  <!-- Demo 6: 参数化指令（激活态+高亮） -->
+  <div class="demo-card">
+    <h2>6. 参数化指令（activate/highlight）</h2>
+    <p class="desc">渲染参数指定 activate(node) → 脉冲发光；highlight(edge) → 加粗闪烁。</p>
+    <div class="svg-container">
+      <svg width="480" height="220" viewBox="0 0 480 220" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#888"/>
+          </marker>
+        </defs>
+        <rect x="50" y="80" width="80" height="60" rx="10" fill="#2d4a6f" stroke="#555" stroke-width="2"/>
+        <text x="90" y="115" text-anchor="middle" fill="#aaa" font-size="14">Idle</text>
+        <g class="node-pulse">
+          <rect x="200" y="80" width="80" height="60" rx="10" fill="#2e7d32" stroke="#4caf50" stroke-width="3"/>
+          <text x="240" y="115" text-anchor="middle" fill="white" font-size="14" font-weight="600">Active</text>
+        </g>
+        <rect x="350" y="80" width="80" height="60" rx="10" fill="#2d4a6f" stroke="#555" stroke-width="2"/>
+        <text x="390" y="115" text-anchor="middle" fill="#aaa" font-size="14">Idle</text>
+        <path d="M130 110 L200 110" stroke="#666" stroke-width="2" fill="none"/>
+        <path d="M280 110 L350 110" stroke="#666" stroke-width="2" fill="none" marker-end="url(#arrow6)" class="highlighted"/>
+      </svg>
+    </div>
+    <div class="controls">
+      <span style="font-size:12px;color:#888;line-height:32px;">activate(active_node) + highlight(edge_to_db)</span>
+    </div>
+  </div>
+
+  <!-- Demo 7: Steps 分步演示（无 JS 版本） -->
+  <div class="demo-card" style="grid-column: 1 / -1;">
+    <h2>7. Steps 分步演示（纯 CSS :target 无 JS 控制）</h2>
+    <p class="desc">点击按钮切换步骤。每个步骤是完整图，帧间用 Patch 动画过渡（这里演示淡入+移动，实际是 diff 自动生成）。</p>
+    <div class="svg-container">
+      <svg width="700" height="300" viewBox="0 0 700 300" xmlns="http://www.w3.org/2000/svg" id="svg7">
+        <defs>
+          <marker id="arrow7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#667eea"/>
+          </marker>
+        </defs>
+        <text id="step7-label" x="350" y="35" text-anchor="middle" fill="#888" font-size="16">Step 1: 初始请求</text>
+
+        <g id="s7-client">
+          <rect x="80" y="120" width="90" height="60" rx="10" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="125" y="155" text-anchor="middle" fill="white" font-size="14">Client</text>
+        </g>
+        <g id="s7-api">
+          <rect x="305" y="120" width="90" height="60" rx="10" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="350" y="155" text-anchor="middle" fill="white" font-size="14">API</text>
+        </g>
+        <g id="s7-auth" opacity="0">
+          <rect x="530" y="120" width="90" height="60" rx="10" fill="#4a6fa5" stroke="#667eea" stroke-width="2"/>
+          <text x="575" y="155" text-anchor="middle" fill="white" font-size="14">Auth</text>
+        </g>
+
+        <path id="s7-e1" d="M170 150 L305 150" stroke="#667eea" stroke-width="2.5" fill="none" marker-end="url(#arrow7)" class="edge-flow"/>
+        <path id="s7-e2" d="M395 150 L530 150" stroke="#667eea" stroke-width="2" fill="none" opacity="0"/>
+        <path id="s7-e3" d="M530 165 L395 165" stroke="#4caf50" stroke-width="2" fill="none" opacity="0"/>
+        <path id="s7-e4" d="M305 165 L170 165" stroke="#4caf50" stroke-width="2.5" fill="none" opacity="0" marker-end="url(#arrow7)"/>
+
+        <text id="s7-l1" x="237" y="140" text-anchor="middle" fill="#ff6b35" font-size="11" opacity="1">GET /resource</text>
+        <text id="s7-l2" x="462" y="140" text-anchor="middle" fill="#ff6b35" font-size="11" opacity="0">verify token</text>
+        <text id="s7-l3" x="462" y="185" text-anchor="middle" fill="#4caf50" font-size="11" opacity="0">valid</text>
+        <text id="s7-l4" x="237" y="185" text-anchor="middle" fill="#4caf50" font-size="11" opacity="0">200 OK</text>
+      </svg>
+    </div>
+    <div class="controls">
+      <button onclick="goStep(1)">Step 1: 请求</button>
+      <button onclick="goStep(2)">Step 2: 鉴权</button>
+      <button onclick="goStep(3)">Step 3: 响应</button>
+      <button class="secondary" onclick="autoPlaySteps()">自动播放</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // 页面交互控制（实际导出 SVG/HTML 时，这个 JS 是播放器逻辑，<2KB）
+
+  function replayAnim(btn) {
+    const svg = btn.closest('.demo-card').querySelector('svg');
+    const animated = svg.querySelectorAll('[class*="enter-"], [class*="exit-"], [class*="move-"]');
+    animated.forEach(el => {
+      el.style.animation = 'none';
+      el.offsetHeight;
+      el.style.animation = '';
+    });
+  }
+
+  let flowPaused = false;
+  function toggleFlow(btn) {
+    flowPaused = !flowPaused;
+    const svg = btn.closest('.demo-card').querySelector('svg');
+    svg.querySelectorAll('.edge-flow').forEach(el => {
+      el.style.animationPlayState = flowPaused ? 'paused' : 'running';
+    });
+    btn.textContent = flowPaused ? '继续' : '暂停/继续';
+  }
+
+  let bMoved = false;
+  function moveNodeB() {
+    if (bMoved) return;
+    const g = document.getElementById('g3-b');
+    g.style.transition = 'transform 0.5s cubic-bezier(0.25,0.46,0.45,0.94)';
+    g.style.transform = 'translate(80px, 0)';
+    const ab = document.getElementById('edge3-ab');
+    const bc = document.getElementById('edge3-bc');
+    ab.style.transition = 'd 0.5s';
+    bc.style.transition = 'd 0.5s';
+    setTimeout(() => {
+      ab.setAttribute('d', 'M130 110 L280 110');
+      bc.setAttribute('d', 'M360 110 L350 110');
+    }, 50);
+    bMoved = true;
+  }
+  function resetNodeB() {
+    const g = document.getElementById('g3-b');
+    g.style.transform = '';
+    document.getElementById('edge3-ab').setAttribute('d', 'M130 110 L200 110');
+    document.getElementById('edge3-bc').setAttribute('d', 'M280 110 L350 110');
+    bMoved = false;
+  }
+
+  let bDeleted = false;
+  function deleteNodeB() {
+    if (bDeleted) return;
+    const b = document.getElementById('n4-b');
+    const ab = document.getElementById('e4-ab');
+    const bc = document.getElementById('e4-bc');
+    b.style.animation = 'dfy-fade-out 0.4s ease-in forwards';
+    ab.style.animation = 'dfy-fade-out 0.3s ease-in forwards';
+    bc.style.animation = 'dfy-fade-out 0.3s ease-in forwards';
+    bDeleted = true;
+  }
+  function resetNodeB_del() {
+    location.reload();
+  }
+
+  let focused = null;
+  function focusNode(id) {
+    clearFocus();
+    focused = id;
+    document.querySelectorAll('#svg5 .focusable').forEach(el => {
+      if (el.dataset.id !== id) el.classList.add('dimmed');
+    });
+    document.querySelectorAll('#svg5 .focus-edge').forEach(el => {
+      if (el.dataset.from !== id && el.dataset.to !== id) el.classList.add('dimmed');
+    });
+  }
+  function clearFocus() {
+    document.querySelectorAll('#svg5 .dimmed').forEach(el => el.classList.remove('dimmed'));
+    focused = null;
+  }
+
+  let currentStep = 1;
+  function setStep(s) {
+    const label = document.getElementById('step7-label');
+    const auth = document.getElementById('s7-auth');
+    const e2 = document.getElementById('s7-e2');
+    const e3 = document.getElementById('s7-e3');
+    const e4 = document.getElementById('s7-e4');
+    const l2 = document.getElementById('s7-l2');
+    const l3 = document.getElementById('s7-l3');
+    const l4 = document.getElementById('s7-l4');
+    const e1 = document.getElementById('s7-e1');
+
+    const t = '0.4s ease-out';
+    [auth, e2, e3, e4, l2, l3, l4].forEach(el => {
+      el.style.transition = `opacity ${t}`;
+    });
+
+    if (s >= 1) {
+      label.textContent = 'Step 1: 初始请求';
+      e1.style.opacity = '1';
+      e1.classList.add('edge-flow');
+    }
+    if (s >= 2) {
+      label.textContent = 'Step 2: 鉴权验证';
+      auth.style.opacity = '1';
+      auth.style.animation = 'dfy-pop-in 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards';
+      e2.style.opacity = '1';
+      e2.classList.add('edge-flow');
+      e2.style.animationDelay = '0.2s';
+      l2.style.opacity = '1';
+    } else {
+      auth.style.opacity = '0';
+      auth.style.animation = '';
+      e2.style.opacity = '0';
+      e2.classList.remove('edge-flow');
+      l2.style.opacity = '0';
+    }
+    if (s >= 3) {
+      label.textContent = 'Step 3: 返回响应';
+      e3.style.opacity = '1';
+      e3.classList.add('edge-flow');
+      e4.style.opacity = '1';
+      e4.classList.add('edge-flow');
+      l3.style.opacity = '1';
+      l4.style.opacity = '1';
+      e1.classList.remove('edge-flow');
+      e2.classList.remove('edge-flow');
+    } else {
+      e3.style.opacity = '0';
+      e4.style.opacity = '0';
+      l3.style.opacity = '0';
+      l4.style.opacity = '0';
+      e3.classList.remove('edge-flow');
+      e4.classList.remove('edge-flow');
+    }
+    currentStep = s;
+  }
+  function goStep(s) { setStep(s); }
+  function autoPlaySteps() {
+    setStep(1);
+    let s = 1;
+    const timer = setInterval(() => {
+      s++;
+      if (s > 3) { clearInterval(timer); return; }
+      setStep(s);
+    }, 1500);
+  }
+</script>
+
+</body>
+</html>

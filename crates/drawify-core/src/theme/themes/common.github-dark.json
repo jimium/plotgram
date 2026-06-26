@@ -1,0 +1,87 @@
+{
+  "version": "0.2",
+  "id": "common.github-dark",
+  "name": "GitHub Dark",
+  "meta": {
+    "author": "Drawify",
+    "description": "灵感来自 GitHub Primer 深色主题：#0d1117 底 + 蓝绿语义色，适合深色文档站与 IDE 预览",
+    "tags": ["github", "primer", "dark", "inspired"]
+  },
+  "extends": "common.clean-dark",
+  "tokens": {
+    "colors": {
+      "canvas": "#0d1117",
+      "text": "#e6edf3",
+      "muted_text": "#7d8590",
+      "border": "#30363d",
+      "primary": "#4493f8",
+      "neutral_fill": "#161b22",
+      "neutral_stroke": "#7d8590",
+      "group_fill": "#161b22",
+      "group_stroke": "#30363d"
+    },
+    "palette": {
+      "blue": { "fill": "#161b22", "stroke": "#4493f8" },
+      "orange": { "fill": "#1c1410", "stroke": "#db6d28" },
+      "green": { "fill": "#121f16", "stroke": "#3fb950" },
+      "purple": { "fill": "#1a1425", "stroke": "#a371f7" },
+      "yellow": { "fill": "#1f1a0a", "stroke": "#d29922" },
+      "red": { "fill": "#1f1211", "stroke": "#f85149" },
+      "cyan": { "fill": "#0d1929", "stroke": "#39c5cf" },
+      "brown": { "fill": "#161b22", "stroke": "#6e7681" },
+      "gray": { "fill": "#0d1117", "stroke": "#484f58" },
+      "amber": { "fill": "#1c1410", "stroke": "#db6d28" },
+      "blue_gray": { "fill": "#161b22", "stroke": "#e6edf3" },
+      "start_green": { "fill": "#121f16", "stroke": "#3fb950" },
+      "end_red": { "fill": "#1f1211", "stroke": "#f85149" },
+      "arch_blue": { "fill": "#161b22", "stroke": "#4493f8" },
+      "root": { "fill": "#4493f8", "stroke": "#a371f7", "text_fill": "#0d1117" }
+    }
+  },
+  "diagrams": {
+    "architecture": {
+      "group": {
+        "stroke": "{colors.group_stroke}",
+        "stroke_width": "{strokes.normal}"
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "{darken({colors.group_fill}, 0.0)}", "stroke": "{darken({colors.group_stroke}, 0.0)}", "stroke_width": 2.0, "border_radius": 8.0 },
+            { "fill": "{darken({colors.group_fill}, 0.15)}", "stroke": "{darken({colors.group_stroke}, 0.12)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{darken({colors.group_fill}, 0.25)}", "stroke": "{darken({colors.group_stroke}, 0.20)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{darken({colors.group_fill}, 0.35)}", "stroke": "{darken({colors.group_stroke}, 0.28)}", "stroke_width": 1.5, "border_radius": 6.0 }
+          ]
+        }
+      }
+    },
+    "er": {
+      "node": {
+        "fill": "#161b22",
+        "stroke": "#4493f8"
+      }
+    },
+    "mindmap": {
+      "edge": {
+        "stroke_width": "{strokes.normal}"
+      },
+      "entity_types": {
+        "leaf": {
+          "fill": "#161b22"
+        }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#161b22", "stroke": "#4493f8", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

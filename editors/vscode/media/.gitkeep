@@ -1,0 +1,5 @@
+# 静态资源目录
+#
+# - preview.js / markdown-preview.js / markdown-preview.css — 手写的 Webview 脚本
+# - wasm/  — wasm-pack web 产物（npm run build:wasm）
+# - node/  — wasm-pack nodejs 产物（扩展宿主诊断）

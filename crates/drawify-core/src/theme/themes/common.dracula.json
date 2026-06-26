@@ -1,0 +1,87 @@
+{
+  "version": "0.2",
+  "id": "common.dracula",
+  "name": "Dracula",
+  "meta": {
+    "author": "Drawify",
+    "description": "灵感来自 Dracula Theme：开发者社区最流行的暗色主题之一，紫粉青高对比",
+    "tags": ["dracula", "dark", "developer", "inspired"]
+  },
+  "extends": "common.clean-dark",
+  "tokens": {
+    "colors": {
+      "canvas": "#282a36",
+      "text": "#f8f8f2",
+      "muted_text": "#6272a4",
+      "border": "#44475a",
+      "primary": "#bd93f9",
+      "neutral_fill": "#383a59",
+      "neutral_stroke": "#6272a4",
+      "group_fill": "#313341",
+      "group_stroke": "#6272a4"
+    },
+    "palette": {
+      "blue": { "fill": "#383a59", "stroke": "#8be9fd" },
+      "orange": { "fill": "#383a59", "stroke": "#ffb86c" },
+      "green": { "fill": "#383a59", "stroke": "#50fa7b" },
+      "purple": { "fill": "#383a59", "stroke": "#bd93f9" },
+      "yellow": { "fill": "#383a59", "stroke": "#f1fa8c" },
+      "red": { "fill": "#383a59", "stroke": "#ff5555" },
+      "cyan": { "fill": "#383a59", "stroke": "#8be9fd" },
+      "brown": { "fill": "#383a59", "stroke": "#ffb86c" },
+      "gray": { "fill": "#282a36", "stroke": "#6272a4" },
+      "amber": { "fill": "#44475a", "stroke": "#ffb86c" },
+      "blue_gray": { "fill": "#383a59", "stroke": "#f8f8f2" },
+      "start_green": { "fill": "#383a59", "stroke": "#50fa7b" },
+      "end_red": { "fill": "#383a59", "stroke": "#ff5555" },
+      "arch_blue": { "fill": "#383a59", "stroke": "#8be9fd" },
+      "root": { "fill": "#bd93f9", "stroke": "#ff79c6", "text_fill": "#282a36" }
+    }
+  },
+  "diagrams": {
+    "architecture": {
+      "group": {
+        "stroke": "{colors.group_stroke}",
+        "stroke_width": "{strokes.normal}"
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "{darken({colors.group_fill}, 0.0)}", "stroke": "{darken({colors.group_stroke}, 0.0)}", "stroke_width": 2.0, "border_radius": 8.0 },
+            { "fill": "{darken({colors.group_fill}, 0.15)}", "stroke": "{darken({colors.group_stroke}, 0.12)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{darken({colors.group_fill}, 0.25)}", "stroke": "{darken({colors.group_stroke}, 0.20)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{darken({colors.group_fill}, 0.35)}", "stroke": "{darken({colors.group_stroke}, 0.28)}", "stroke_width": 1.5, "border_radius": 6.0 }
+          ]
+        }
+      }
+    },
+    "er": {
+      "node": {
+        "fill": "#44475a",
+        "stroke": "#bd93f9"
+      }
+    },
+    "mindmap": {
+      "edge": {
+        "stroke_width": "{strokes.normal}"
+      },
+      "entity_types": {
+        "leaf": {
+          "fill": "#383a59"
+        }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#383a59", "stroke": "#8be9fd", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

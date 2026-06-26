@@ -1,0 +1,107 @@
+{
+  "version": "0.2",
+  "id": "common.minimal-gray",
+  "name": "Minimal Gray",
+  "meta": {
+    "author": "Drawify",
+    "description": "极简灰阶样式：低彩度、弱装饰，适合打印、论文与低干扰报告",
+    "tags": ["minimal", "gray", "print"]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#F5F5F5",
+      "text": "#444444",
+      "muted_text": "#757575",
+      "border": "#BDBDBD",
+      "primary": "#616161",
+      "neutral_fill": "#EEEEEE",
+      "neutral_stroke": "#757575",
+      "group_fill": "#FAFAFA",
+      "group_stroke": "#9E9E9E"
+    },
+    "palette": {
+      "blue": { "fill": "#F0F0F0", "stroke": "#616161" },
+      "orange": { "fill": "#ECECEC", "stroke": "#525252" },
+      "green": { "fill": "#F0F0F0", "stroke": "#616161" },
+      "purple": { "fill": "#ECECEC", "stroke": "#525252" },
+      "yellow": { "fill": "#F0F0F0", "stroke": "#616161" },
+      "red": { "fill": "#ECECEC", "stroke": "#525252" },
+      "cyan": { "fill": "#F0F0F0", "stroke": "#616161" },
+      "brown": { "fill": "#E8E8E8", "stroke": "#424242" },
+      "gray": { "fill": "#FAFAFA", "stroke": "#9E9E9E" },
+      "amber": { "fill": "#E0E0E0", "stroke": "#424242" },
+      "blue_gray": { "fill": "#EEEEEE", "stroke": "#757575" },
+      "start_green": { "fill": "#E8F5E9", "stroke": "#558B2F" },
+      "end_red": { "fill": "#FFEBEE", "stroke": "#C62828" },
+      "arch_blue": { "fill": "#F0F0F0", "stroke": "#616161" },
+      "root": { "fill": "#616161", "stroke": "#424242", "text_fill": "#FFFFFF" }
+    },
+    "typography": {
+      "title_size": 15,
+      "label_size": 12,
+      "small_size": 10,
+      "font_weight_bold": 600
+    },
+    "strokes": {
+      "thin": 1.0,
+      "normal": 1.25,
+      "thick": 1.75,
+      "dashed": [5, 3],
+      "dotted": [2, 3]
+    },
+    "radius": {
+      "sm": 3,
+      "md": 6,
+      "lg": 8
+    },
+    "spacing": {
+      "node_padding_x": 10,
+      "node_padding_y": 7,
+      "group_padding": 14,
+      "label_gap": 5
+    }
+  },
+  "diagrams": {
+    "flowchart": { "edge": { "stroke": "{colors.neutral_stroke}" } },
+    "sequence": {
+      "edge": { "stroke": "{colors.neutral_stroke}" },
+      "entity_types": { "database": { "fill": "#E8E8E8", "stroke": "#424242" } }
+    },
+    "state": {
+      "edge": { "stroke": "{colors.neutral_stroke}" },
+      "entity_types": { "state": { "fill": "#EEEEEE", "stroke": "#757575" } }
+    },
+    "architecture": {
+      "edge": { "stroke": "{colors.neutral_stroke}" },
+      "entity_types": {
+        "backend": { "fill": "#ECECEC", "stroke": "#525252" },
+        "database": { "fill": "#E8E8E8", "stroke": "#424242" },
+        "gateway": { "fill": "#ECECEC", "stroke": "#525252" },
+        "cache": { "fill": "#F0F0F0", "stroke": "#616161" },
+        "queue": { "fill": "#ECECEC", "stroke": "#525252" },
+        "client": { "fill": "#F0F0F0", "stroke": "#616161" },
+        "person": { "fill": "#ECECEC", "stroke": "#525252" }
+      }
+    },
+    "er": {
+      "node": { "fill": "#FFFFFF", "stroke": "#616161" },
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "mindmap": {
+      "entity_types": { "leaf": { "fill": "#F5F5F5" } },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#EEEEEE", "stroke": "#616161", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

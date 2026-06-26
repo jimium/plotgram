@@ -1,0 +1,1807 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>C4 模型支持方案 — Drawify</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #1a1d26;
+      --muted: #5c6370;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --c4-person: #08427b;
+      --c4-system: #08427b;
+      --c4-container: #1168bd;
+      --c4-component: #438dd5;
+      --c4-code: #85bbf0;
+      --c4-ext: #999999;
+      --border: #e2e5eb;
+      --code-bg: #f0f2f5;
+      --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+      --ok: #059669;
+      --warn: #d97706;
+      --gap: #dc2626;
+      --sidebar-width: 15.5rem;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font-family: var(--sans); font-size: 16px; line-height: 1.65; color: var(--text); background: var(--bg); }
+    header {
+      background: linear-gradient(135deg, #08427b 0%, #1168bd 40%, #438dd5 80%, #85bbf0 100%);
+      color: #fff; padding: 2.5rem 1.5rem 2rem;
+    }
+    header h1 { margin: 0 0 0.5rem; font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
+    header .meta { margin: 0.75rem 0 0; font-size: 0.9rem; opacity: 0.85; }
+    header p { margin: 0.5rem 0 0; max-width: 54rem; opacity: 0.92; font-size: 1.05rem; }
+
+    /* ── 左侧固定目录 + 右侧正文 ── */
+    .doc-shell {
+      display: flex;
+      align-items: flex-start;
+      max-width: 90rem;
+      margin: 0 auto;
+      padding: 0 1.25rem;
+      gap: 2rem;
+    }
+    .doc-nav {
+      width: var(--sidebar-width);
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
+      max-height: 100vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 1.5rem 0 2rem;
+      border-right: 1px solid var(--border);
+      background: var(--bg);
+      z-index: 20;
+    }
+    .doc-nav-inner { padding-right: 1rem; }
+    .doc-nav-title {
+      margin: 0 0 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+    .doc-nav ol {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: toc;
+    }
+    .doc-nav li {
+      margin: 0;
+      counter-increment: toc;
+    }
+    .doc-nav li::before {
+      content: counter(toc) ".";
+      display: inline-block;
+      width: 1.5rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      opacity: 0.7;
+    }
+    .doc-nav a {
+      color: var(--text);
+      text-decoration: none;
+      font-size: 0.84rem;
+      line-height: 1.45;
+      display: inline;
+      padding: 0.28rem 0;
+      border-left: 2px solid transparent;
+      margin-left: -2px;
+      padding-left: 0.5rem;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .doc-nav a:hover { color: var(--accent); }
+    .doc-nav a.active {
+      color: var(--accent);
+      font-weight: 600;
+      border-left-color: var(--accent);
+    }
+    .doc-main {
+      flex: 1;
+      min-width: 0;
+      max-width: 58rem;
+      padding: 2rem 0 0;
+    }
+    main { padding-bottom: 2rem; }
+    section[id] { scroll-margin-top: 1rem; }
+    section {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 1.5rem 1.75rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    h2 { margin: 0 0 1rem; font-size: 1.25rem; font-weight: 650; letter-spacing: -0.01em; }
+    h3 { margin: 1.5rem 0 0.75rem; font-size: 1.05rem; font-weight: 600; color: var(--muted); }
+    h4 { margin: 1rem 0 0.5rem; font-size: 0.95rem; font-weight: 600; }
+    p { margin: 0 0 1rem; }
+    p:last-child { margin-bottom: 0; }
+    .lead { font-size: 1.05rem; color: var(--muted); }
+    .figure { margin: 1.25rem 0; padding: 1rem; background: var(--code-bg); border-radius: 10px; overflow-x: auto; }
+    .figure figcaption { margin-top: 0.75rem; font-size: 0.85rem; color: var(--muted); text-align: center; }
+    svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 1rem 0; }
+    th, td { border: 1px solid var(--border); padding: 0.5rem 0.7rem; text-align: left; vertical-align: top; }
+    th { background: var(--code-bg); font-weight: 600; }
+    code, .mono { font-family: var(--mono); font-size: 0.86em; background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; }
+    pre {
+      background: var(--code-bg); border-radius: 8px; padding: 1rem 1.25rem; overflow-x: auto;
+      font-family: var(--mono); font-size: 0.84rem; line-height: 1.55; margin: 1rem 0;
+    }
+    .pill { display: inline-block; padding: 0.12em 0.5em; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+    .pill-p0 { background: #fee2e2; color: #b91c1c; }
+    .pill-p1 { background: #fef3c7; color: #92400e; }
+    .pill-p2 { background: #d1fae5; color: #065f46; }
+    .pill-p3 { background: #e0e7ff; color: #3730a3; }
+    .pill-ok { background: #d1fae5; color: var(--ok); }
+    .pill-gap { background: #fee2e2; color: var(--gap); }
+    .pill-warn { background: #fef3c7; color: var(--warn); }
+    ul, ol { margin: 0.5rem 0 1rem; padding-left: 1.25rem; }
+    li { margin-bottom: 0.35rem; }
+    .callout {
+      border-left: 4px solid var(--accent); background: var(--accent-soft);
+      padding: 0.85rem 1rem; border-radius: 0 8px 8px 0; margin: 1rem 0; font-size: 0.95rem;
+    }
+    .callout strong { color: var(--accent); }
+    .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    @media (max-width: 720px) { .compare-grid { grid-template-columns: 1fr; } }
+    .compare-card { border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+    .compare-card h4 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+    .level-tag { display: inline-block; padding: 0.2em 0.6em; border-radius: 4px; font-size: 0.82rem; font-weight: 600; color: #fff; }
+    .level-context { background: var(--c4-person); }
+    .level-container { background: var(--c4-container); }
+    .level-component { background: var(--c4-component); }
+    .level-code { background: var(--c4-code); color: #1a1d26; }
+    .status-yes { color: var(--ok); font-weight: 600; }
+    .status-partial { color: var(--warn); font-weight: 600; }
+    .status-no { color: var(--gap); font-weight: 600; }
+    footer {
+      text-align: center; font-size: 0.85rem; color: var(--muted);
+      padding: 1.5rem 0 2.5rem; margin-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .refs a { color: var(--accent); }
+
+    @media (max-width: 960px) {
+      .doc-shell { flex-direction: column; gap: 0; padding: 0; }
+      .doc-nav {
+        position: sticky;
+        top: 0;
+        width: 100%;
+        max-height: 11rem;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 0.75rem 1rem 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      }
+      .doc-nav-inner { padding-right: 0; }
+      .doc-nav ol {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.15rem 0.75rem;
+      }
+      .doc-nav li::before { display: none; }
+      .doc-nav a {
+        display: inline-block;
+        padding: 0.2rem 0.45rem;
+        border-left: none;
+        margin-left: 0;
+        padding-left: 0.45rem;
+        background: var(--code-bg);
+        border-radius: 4px;
+        font-size: 0.8rem;
+      }
+      .doc-nav a.active { background: var(--accent-soft); }
+      .doc-main { max-width: none; padding: 1.25rem 1rem 0; }
+      header { padding: 1.75rem 1rem 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>C4 模型支持方案</h1>
+  <p>
+    在 Drawify 现有 <code>architecture</code> 图表类型与企业 Compose 管线上，以<strong>单一语义模型 + 多视图投影</strong>的方式支持 C4，
+    服务 AI Agent 生成、架构师手写与企业 Connector 自动出图。
+  </p>
+  <p class="meta">版本 0.3.0-draft · 2026-06-25 · 状态：方案设计中 · 路径：<code>docs/specs/visual-language/diagrams/c4/index.html</code></p>
+</header>
+
+<div class="doc-shell">
+  <aside class="doc-nav" aria-label="文档目录">
+    <nav class="doc-nav-inner">
+      <p class="doc-nav-title">目录</p>
+      <ol>
+        <li><a href="#summary">执行摘要</a></li>
+        <li><a href="#needs">用户需求与场景</a></li>
+        <li><a href="#competitors">竞品能力对照</a></li>
+        <li><a href="#inventory">Drawify 现状盘点</a></li>
+        <li><a href="#principles">设计原则</a></li>
+        <li><a href="#mapping">C4 概念映射</a></li>
+        <li><a href="#design">核心方案：模型 + 视图</a></li>
+        <li><a href="#dsl">DSL 与 AST 规范</a></li>
+        <li><a href="#projection">视图投影算法</a></li>
+        <li><a href="#style">C4 视觉与主题</a></li>
+        <li><a href="#enterprise">企业管线集成</a></li>
+        <li><a href="#agent">Agent / MCP 指引</a></li>
+        <li><a href="#impl">实现架构与文件落点</a></li>
+        <li><a href="#roadmap">分阶段路线图</a></li>
+        <li><a href="#organization">四层组织与多视图</a></li>
+        <li><a href="#linking">链接语义与下钻</a></li>
+        <li><a href="#export">导出与交付规范</a></li>
+        <li><a href="#scope">范围外与开放问题</a></li>
+        <li><a href="#refs">参考资料</a></li>
+      </ol>
+    </nav>
+  </aside>
+
+  <div class="doc-main">
+<main>
+
+  <!-- ─── 1. 执行摘要 ─── -->
+  <section id="summary">
+    <h2>1. 执行摘要</h2>
+    <div class="callout">
+      <strong>核心结论：</strong>不新增 <code>diagram c4</code> 类型。C4 是 <code>architecture</code> 上的<strong>分层语义 + 视图投影</strong>模式；
+      手写/Agent 走 DSL 属性；企业规模化走 Compose 多视图 API。差异化在「一份模型、多视图、可 Diff」而非复刻 Structurizr 全功能。
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>决策项</th><th>选择</th><th>理由</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>图表类型</td>
+          <td>扩展 <code>architecture</code></td>
+          <td>entity / relation / group 与 C4 组件模型同构；复用 <code>architecture-v2</code> 布局与正交路由</td>
+        </tr>
+        <tr>
+          <td>模型与视图</td>
+          <td>单一 AST + <code>view</code> 投影</td>
+          <td>对齐 Structurizr「一模型多视图」；避免 Mermaid 每种视图重写 DSL</td>
+        </tr>
+        <tr>
+          <td>包含关系</td>
+          <td><code>group</code> 嵌套 + <code>level</code> 标注</td>
+          <td>Software System / Container 用 group 边界；Component 为组内 entity</td>
+        </tr>
+        <tr>
+          <td>企业出图</td>
+          <td>Connector → Compose <code>views</code></td>
+          <td>K8s Namespace→Container 聚合与 C4 Container 视图天然契合（见 enterprise 战略文档）</td>
+        </tr>
+        <tr>
+          <td>第一交付</td>
+          <td>Context + Container 视图</td>
+          <td>覆盖 80% 架构评审与 AI 对话场景；Component 次之；Code / Deployment 后置</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>1.1 C4 四层与 Drawify 覆盖范围</h3>
+    <div class="figure">
+      <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg">
+        <rect x="20" y="20" width="680" height="52" rx="8" fill="#08427b" opacity="0.12" stroke="#08427b"/>
+        <text x="40" y="42" font-size="12" font-weight="700" fill="#08427b">L1 Context</text>
+        <text x="140" y="42" font-size="11" fill="#5c6370">Person · Software System · External System</text>
+        <text x="520" y="42" font-size="10" fill="#059669" font-weight="600">P0 目标</text>
+
+        <rect x="20" y="82" width="680" height="52" rx="8" fill="#1168bd" opacity="0.12" stroke="#1168bd"/>
+        <text x="40" y="104" font-size="12" font-weight="700" fill="#1168bd">L2 Container</text>
+        <text x="140" y="104" font-size="11" fill="#5c6370">Web · API · DB · Queue · Mobile App</text>
+        <text x="520" y="104" font-size="10" fill="#059669" font-weight="600">P0 目标</text>
+
+        <rect x="20" y="144" width="680" height="52" rx="8" fill="#438dd5" opacity="0.12" stroke="#438dd5"/>
+        <text x="40" y="166" font-size="12" font-weight="700" fill="#438dd5">L3 Component</text>
+        <text x="140" y="166" font-size="11" fill="#5c6370">Controller · Service · Repository</text>
+        <text x="520" y="166" font-size="10" fill="#d97706" font-weight="600">P1 目标</text>
+
+        <rect x="20" y="206" width="680" height="52" rx="8" fill="#85bbf0" opacity="0.2" stroke="#85bbf0"/>
+        <text x="40" y="228" font-size="12" font-weight="700" fill="#438dd5">L4 Code</text>
+        <text x="140" y="228" font-size="11" fill="#5c6370">Class / Interface — IDE 工具为主</text>
+        <text x="520" y="228" font-size="10" fill="#9ca3af" font-weight="600">P3 可选</text>
+
+        <rect x="20" y="268" width="320" height="24" rx="4" fill="#fef3c7"/>
+        <text x="30" y="284" font-size="10" fill="#92400e">+ Deployment View（部署节点）→ P2，用 group + meta 表达</text>
+        <rect x="360" y="268" width="340" height="24" rx="4" fill="#fef3c7"/>
+        <text x="370" y="284" font-size="10" fill="#92400e">+ Dynamic View（运行时序）→ 复用 sequence 或 P2 扩展</text>
+      </svg>
+      <figcaption>Drawify C4 分期：优先 Context / Container，与主战场「架构图」一致</figcaption>
+    </div>
+  </section>
+
+  <!-- ─── 2. 用户需求 ─── -->
+  <section id="needs">
+    <h2>2. 用户需求与场景</h2>
+
+    <h3>2.1 按角色</h3>
+    <table>
+      <thead>
+        <tr><th>角色</th><th>典型诉求</th><th>C4 视图</th><th>Drawify 触点</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>AI Agent</td>
+          <td>对话中「画系统架构」「画微服务拓扑」</td>
+          <td>Context / Container</td>
+          <td>DSL 生成 → validate → render；结构化错误闭环</td>
+        </tr>
+        <tr>
+          <td>架构师</td>
+          <td>技术方案、评审材料、招投标</td>
+          <td>Context + Container + Component</td>
+          <td>手写 .dfy；C4 配色主题；group 分层</td>
+        </tr>
+        <tr>
+          <td>开发者</td>
+          <td>理解模块边界与依赖</td>
+          <td>Component</td>
+          <td>group 内组件图；IDE 插件预览</td>
+        </tr>
+        <tr>
+          <td>SRE / 平台</td>
+          <td>K8s 部署结构、发布复盘</td>
+          <td>Container + Deployment</td>
+          <td>K8s Connector → Compose 聚合视图</td>
+        </tr>
+        <tr>
+          <td>合规 / 审计</td>
+          <td>系统边界、跨区数据流、变更留痕</td>
+          <td>Context + 带 meta 的 Container</td>
+          <td>diff2 语义 Diff；snapshot-id；PNG 归档</td>
+        </tr>
+        <tr>
+          <td>企业架构（EA）</td>
+          <td>多系统全景、系统目录</td>
+          <td>System Landscape</td>
+          <td>多 Software System 的 Context 图 + Compose 合并</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>2.2 高频场景与验收标准</h3>
+    <table>
+      <thead>
+        <tr><th>场景</th><th>用户故事</th><th>验收标准</th><th>优先级</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>对话出图</td>
+          <td>「画互联网银行 C4 上下文图」</td>
+          <td>Agent 一次生成通过 validate；Person/System/External 配色正确</td>
+          <td><span class="pill pill-p0">P0</span></td>
+        </tr>
+        <tr>
+          <td>视图切换</td>
+          <td>同一份模型看 Container 细节</td>
+          <td>改 <code>view: container</code> 即可重渲染，entity ID 不变</td>
+          <td><span class="pill pill-p0">P0</span></td>
+        </tr>
+        <tr>
+          <td>域内下钻</td>
+          <td>点击 API 应用看内部 Component</td>
+          <td>Component 视图仅展示目标 group 内节点（<code>scope</code>）</td>
+          <td><span class="pill pill-p1">P1</span></td>
+        </tr>
+        <tr>
+          <td>PR 架构变更</td>
+          <td>新增 Redis、删除直连 DB</td>
+          <td>diff2 输出「+entity / -relation」；可选 Diff 高亮渲染</td>
+          <td><span class="pill pill-p1">P1</span></td>
+        </tr>
+        <tr>
+          <td>K8s 拓扑</td>
+          <td>Namespace 级部署图</td>
+          <td>Connector 产出 Container 级 AST；非 Pod 清单</td>
+          <td><span class="pill pill-p1">P1</span></td>
+        </tr>
+        <tr>
+          <td>部署视图</td>
+          <td>服务跑在哪个 K8s 集群 / AZ</td>
+          <td>Deployment group + <code>meta.zone</code></td>
+          <td><span class="pill pill-p2">P2</span></td>
+        </tr>
+        <tr>
+          <td>动态视图</td>
+          <td>OAuth 登录每步交互</td>
+          <td>推荐 <code>sequence</code>；或 dynamic view 扩展</td>
+          <td><span class="pill pill-p2">P2</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>2.3 用户真正买的是「分层沟通」，不是第四层代码图</h3>
+    <p>
+      调研 Structurizr 官方文档与企业实践：绝大多数团队停留在 <strong>Context + Container</strong>，
+      Component 用于核心子系统，Code 层几乎只出现在 IDE 反向工程演示中。
+      Drawify 应将工程资源集中在<strong>视图投影、关系聚合、Diff、Connector</strong>，而非类图渲染。
+    </p>
+  </section>
+
+  <!-- ─── 3. 竞品 ─── -->
+  <section id="competitors">
+    <h2>3. 竞品能力对照</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>能力维度</th>
+          <th>Structurizr</th>
+          <th>Mermaid C4</th>
+          <th>PlantUML C4</th>
+          <th>D2</th>
+          <th>Drawify（目标）</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>定位</td>
+          <td>C4 作者官方工具；模型即代码</td>
+          <td>GitHub 生态内嵌图</td>
+          <td>UML 体系内的 C4 扩展</td>
+          <td>通用 diagram-as-code</td>
+          <td>AI-native DSL + 渲染引擎</td>
+        </tr>
+        <tr>
+          <td>模型 / 视图分离</td>
+          <td class="status-yes">强 — <code>model</code> + <code>views</code></td>
+          <td class="status-no">弱 — 每视图独立语法块</td>
+          <td class="status-partial">中 — include 片段</td>
+          <td class="status-partial">中 — 嵌套容器</td>
+          <td class="status-partial">目标 — 单 AST + view 投影</td>
+        </tr>
+        <tr>
+          <td>视图类型</td>
+          <td>Context / Container / Component / Deployment / Dynamic / Filtered / Landscape</td>
+          <td>Context / Container / Component / Deployment</td>
+          <td>同上 + 丰富样式</td>
+          <td>无正式 C4 分层；主题 C4 皮肤</td>
+          <td>P0–P2 分期覆盖左列子集</td>
+        </tr>
+        <tr>
+          <td>隐含关系</td>
+          <td class="status-yes">自动推导父子关系</td>
+          <td class="status-no">无</td>
+          <td class="status-partial">部分</td>
+          <td class="status-no">无</td>
+          <td class="status-partial">P2 — 投影阶段聚合</td>
+        </tr>
+        <tr>
+          <td>交互下钻</td>
+          <td class="status-yes">官方 UI 支持</td>
+          <td class="status-no">静态 SVG</td>
+          <td class="status-no">静态</td>
+          <td class="status-no">静态</td>
+          <td class="status-partial">P1 API 参数；P2 Playground 点击下钻</td>
+        </tr>
+        <tr>
+          <td>AI / Agent</td>
+          <td>MCP Server + DSL 校验</td>
+          <td>高使用率但错误率高</td>
+          <td>低 — Java 依赖</td>
+          <td>中</td>
+          <td class="status-yes">核心卖点 — 固定语法 + 结构化错误</td>
+        </tr>
+        <tr>
+          <td>语义 Diff</td>
+          <td class="status-partial">模型文本 diff</td>
+          <td class="status-no">文本 diff</td>
+          <td class="status-no">弱</td>
+          <td class="status-partial">Oracle API</td>
+          <td class="status-yes">diff2 ChangeSet + 企业 Compare</td>
+        </tr>
+        <tr>
+          <td>从基础设施出图</td>
+          <td>插件 / 导出</td>
+          <td>无</td>
+          <td>无</td>
+          <td>无</td>
+          <td class="status-yes">Connector + Compose（战略规划）</td>
+        </tr>
+        <tr>
+          <td>学习成本</td>
+          <td>高 — 完整 DSL + workspace</td>
+          <td>中 — 多种 C4* 关键字</td>
+          <td>高</td>
+          <td>低</td>
+          <td class="status-yes">低 — 扩展 architecture 属性</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>3.1 竞品启示</h3>
+    <ul>
+      <li><strong>向 Structurizr 学</strong>：单一模型、多视图、层级标识符；企业 Landscape 用 workspace 扩展合并。</li>
+      <li><strong>避开 Structurizr 的复杂度</strong>：不引入完整 workspace DSL；用 Drawify 已有 group + Compose 达到 80% 效果。</li>
+      <li><strong>碾压 Mermaid 的点</strong>：一份 DSL 切换视图、全局 entity ID、validate 可修复、Diff 可审查。</li>
+      <li><strong>不对标 PlantUML</strong>：不在 Code 层与 UML 类图竞争。</li>
+    </ul>
+
+    <h3>3.2 Mermaid vs Drawify 语法对比（Container 视图）</h3>
+    <pre><code>// Mermaid — 每种视图是不同 diagram type，实体需重复声明
+C4Context
+    Person(customer, "Customer")
+    System(banking, "Internet Banking")
+    Rel(customer, banking, "Uses")
+
+C4Container
+    Person(customer, "Customer")
+    Container(web, "Web App", "React")
+    Container(api, "API", "Spring Boot")
+    ContainerDb(db, "DB", "PostgreSQL")
+    Rel(customer, web, "HTTPS")
+    Rel(web, api, "JSON")
+    Rel(api, db, "SQL")</code></pre>
+
+    <pre><code>// Drawify — 统一 architecture，view 切换投影
+diagram architecture {
+    title: "Internet Banking"
+    view: container
+    theme: builtin.c4
+
+    entity customer "Customer" { type: frontend; level: context }
+    group banking "Internet Banking" {
+        level: context
+        entity web "Web App"       { type: frontend;  level: container }
+        entity api "API Application" { type: service; level: container }
+        entity db  "Database"      { type: database; level: container }
+        web -> api "JSON/HTTPS"
+        api -> db  "SQL"
+    }
+    customer -> web "HTTPS"
+}</code></pre>
+  </section>
+
+  <!-- ─── 4. 现状盘点 ─── -->
+  <section id="inventory">
+    <h2>4. Drawify 现状盘点</h2>
+    <p class="lead">基于当前代码库（<code>drawify-core</code>）与文档，标注 C4 方案可复用与待建设能力。</p>
+
+    <table>
+      <thead>
+        <tr><th>模块</th><th>现状</th><th>C4 相关性</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>diagram architecture</code></td>
+          <td><span class="status-yes">Stable</span> — profile <code>implemented: true</code></td>
+          <td>C4 载体图表类型</td>
+        </tr>
+        <tr>
+          <td><code>architecture-v2</code> 布局</td>
+          <td>两阶段：组内布局 → 组间超级图；支持 <code>group_sizing: uniform</code></td>
+          <td>契合 Container/域边界分层</td>
+        </tr>
+        <tr>
+          <td><code>group</code> 嵌套</td>
+          <td>最多 2 层；<code>parent_id</code>；组内 layout hint</td>
+          <td>Software System / Container 边界</td>
+        </tr>
+        <tr>
+          <td>entity <code>type:</code></td>
+          <td>frontend / service / database / external 等 9 类</td>
+          <td>映射 C4 Person / Container 技术类型</td>
+        </tr>
+        <tr>
+          <td>正交边路由</td>
+          <td>architecture 默认 <code>orthogonal</code></td>
+          <td>符合 C4 图纸风格</td>
+        </tr>
+        <tr>
+          <td>管线</td>
+          <td>parse → prepare → validate → layout → render</td>
+          <td>视图投影插入点：<strong>prepare 之后</strong>或独立 <code>project_view()</code></td>
+        </tr>
+        <tr>
+          <td><code>diff2</code></td>
+          <td>RawDiagram 级 diff/patch/format（49 tests）</td>
+          <td>追踪 level / group 变更</td>
+        </tr>
+        <tr>
+          <td>企业 <code>meta.*</code></td>
+          <td>文档规划：source_id / zone / owner 等</td>
+          <td>Deployment / 合规视图</td>
+        </tr>
+        <tr>
+          <td>Compose / Connector</td>
+          <td>战略文档；K8s POC 设计</td>
+          <td>自动标注 level、批量多视图</td>
+        </tr>
+        <tr>
+          <td>C4 <code>level</code> / <code>view</code></td>
+          <td><span class="status-no">未实现</span></td>
+          <td>本方案核心增量</td>
+        </tr>
+        <tr>
+          <td><code>builtin.c4</code> 主题</td>
+          <td><span class="status-no">未实现</span>（现有 blueprint 等）</td>
+          <td>C4 官方色板</td>
+        </tr>
+        <tr>
+          <td>关系聚合 / 隐含边</td>
+          <td><span class="status-no">未实现</span></td>
+          <td>Container 视图收起 Component 时必需</td>
+        </tr>
+        <tr>
+          <td>交互下钻</td>
+          <td><span class="status-no">未实现</span></td>
+          <td>Playground / WASM 后续</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>4.1 管线插入点</h3>
+    <div class="figure">
+      <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg">
+        <rect x="10" y="70" width="70" height="40" rx="6" fill="#e2e5eb"/><text x="22" y="95" font-size="10" font-weight="600">parse</text>
+        <rect x="95" y="70" width="70" height="40" rx="6" fill="#e2e5eb"/><text x="105" y="95" font-size="10" font-weight="600">prepare</text>
+        <rect x="180" y="60" width="90" height="60" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="192" y="88" font-size="10" font-weight="700" fill="#2563eb">project_c4</text>
+        <text x="188" y="104" font-size="8" fill="#2563eb">视图过滤+聚合</text>
+        <rect x="285" y="70" width="70" height="40" rx="6" fill="#e2e5eb"/><text x="295" y="95" font-size="10" font-weight="600">validate</text>
+        <rect x="370" y="70" width="70" height="40" rx="6" fill="#e2e5eb"/><text x="385" y="95" font-size="10" font-weight="600">layout</text>
+        <rect x="455" y="70" width="70" height="40" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="468" y="95" font-size="10" font-weight="600" fill="#2563eb">render</text>
+        <rect x="540" y="70" width="70" height="40" rx="6" fill="#e2e5eb"/><text x="555" y="95" font-size="10" font-weight="600">export</text>
+        <line x1="80" y1="90" x2="95" y2="90" stroke="#666" marker-end="url(#a1)"/>
+        <line x1="165" y1="90" x2="180" y2="90" stroke="#666" marker-end="url(#a1)"/>
+        <line x1="270" y1="90" x2="285" y2="90" stroke="#666" marker-end="url(#a1)"/>
+        <line x1="355" y1="90" x2="370" y2="90" stroke="#666" marker-end="url(#a1)"/>
+        <line x1="440" y1="90" x2="455" y2="90" stroke="#666" marker-end="url(#a1)"/>
+        <line x1="525" y1="90" x2="540" y2="90" stroke="#666" marker-end="url(#a1)"/>
+        <text x="180" y="145" font-size="9" fill="#5c6370">无 view 属性时跳过，零开销</text>
+        <defs><marker id="a1" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,6 2.5,0 5" fill="#666"/></marker></defs>
+      </svg>
+      <figcaption>建议在 prepare 之后、validate 之前执行 C4 视图投影（新模块 <code>prepare/c4_view.rs</code>）</figcaption>
+    </div>
+  </section>
+
+  <!-- ─── 5. 设计原则 ─── -->
+  <section id="principles">
+    <h2>5. 设计原则</h2>
+    <ol>
+      <li><strong>C4 是视图模式，不是新图表物种</strong> — 避免 <code>DiagramType::C4</code> 膨胀。</li>
+      <li><strong>语法增量极小</strong> — 仅增加标准属性 <code>level</code>、diagram 属性 <code>view</code> / <code>scope</code>；符合「为 AI 设计」。</li>
+      <li><strong>单一事实来源</strong> — 全量模型存一份 AST；视图是投影，不复制 entity。</li>
+      <li><strong>group 表达边界</strong> — Software System 与 Container 优先用 group；减少「扁平 entity + level」歧义。</li>
+      <li><strong>确定性</strong> — 投影、聚合、过滤均按 id 排序（遵循 AGENTS.md §2）。</li>
+      <li><strong>手写与自动同源</strong> — Connector 写的 JSON AST 与 Agent 写的 DSL 解析后结构一致。</li>
+      <li><strong>渐进交付</strong> — 无 <code>view</code> 时行为与今日 architecture 完全相同。</li>
+    </ol>
+  </section>
+
+  <!-- ─── 6. 概念映射 ─── -->
+  <section id="mapping">
+    <h2>6. C4 概念 → Drawify 映射</h2>
+
+    <table>
+      <thead>
+        <tr><th>C4 元素</th><th>Drawify 表达</th><th>level</th><th>type 建议</th><th>备注</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Person</td>
+          <td><code>entity</code></td>
+          <td><code>context</code></td>
+          <td><code>frontend</code></td>
+          <td>规范允许 <code>person</code> 别名归一化为 frontend</td>
+        </tr>
+        <tr>
+          <td>Software System</td>
+          <td><code>group</code> 或 <code>entity</code></td>
+          <td><code>context</code></td>
+          <td><code>service</code> / <code>backend</code></td>
+          <td>复杂系统用 group 包裹 Container</td>
+        </tr>
+        <tr>
+          <td>External System</td>
+          <td><code>entity</code></td>
+          <td><code>context</code></td>
+          <td><code>external</code></td>
+          <td>渲染虚线边框</td>
+        </tr>
+        <tr>
+          <td>Container</td>
+          <td><code>entity</code> 或 <code>group</code></td>
+          <td><code>container</code></td>
+          <td>按技术：frontend / service / database / queue …</td>
+          <td>含 Component 时用 group</td>
+        </tr>
+        <tr>
+          <td>Component</td>
+          <td>group 内 <code>entity</code></td>
+          <td><code>component</code></td>
+          <td><code>service</code> / <code>database</code></td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>Deployment Node</td>
+          <td><code>group</code></td>
+          <td><code>deployment</code></td>
+          <td>—</td>
+          <td>P2；<code>meta.zone</code> / <code>meta.platform</code></td>
+        </tr>
+        <tr>
+          <td>Relationship</td>
+          <td><code>relation</code>（3 种箭头）</td>
+          <td>—</td>
+          <td>—</td>
+          <td>标签写协议/用途；<code>meta.protocol</code> 可选</td>
+        </tr>
+        <tr>
+          <td>System Landscape</td>
+          <td>多个 <code>level:context</code> 的 Software System + 跨系统 relation</td>
+          <td><code>context</code></td>
+          <td>—</td>
+          <td><code>view: landscape</code>（P2）</td>
+        </tr>
+        <tr>
+          <td>Dynamic View</td>
+          <td><code>diagram sequence</code> 或 dynamic 扩展</td>
+          <td>—</td>
+          <td>—</td>
+          <td>不强行塞进 architecture</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>6.1 level 序（用于过滤与比较）</h3>
+    <pre><code>context (0) &lt; container (1) &lt; component (2) &lt; code (3)
+deployment 与 container 正交，仅在 deployment 视图激活</code></pre>
+  </section>
+
+  <!-- ─── 7. 核心方案 ─── -->
+  <section id="design">
+    <h2>7. 核心方案：单一模型 + 多视图投影</h2>
+
+    <h3>7.1 双入口，同一语义</h3>
+    <div class="compare-grid">
+      <div class="compare-card">
+        <h4>入口 A — 手写 / Agent DSL</h4>
+        <p>架构师或 LLM 编写完整 <code>architecture</code> 模型，通过 <code>view</code> 选择投影。</p>
+        <ul>
+          <li>适合 PR 小改、对话出图</li>
+          <li>diff2 直接比较完整模型</li>
+        </ul>
+      </div>
+      <div class="compare-card">
+        <h4>入口 B — Connector + Compose</h4>
+        <p>从 K8s / CMDB 构建 JSON AST，Compose 规则标注 level 并生成多视图请求。</p>
+        <ul>
+          <li>适合规模化、定时同步</li>
+          <li>同一 <code>snapshot-id</code> 多 view 输出</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>7.2 diagram 级视图属性</h3>
+    <table>
+      <thead>
+        <tr><th>属性</th><th>合法值</th><th>含义</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>view</code></td>
+          <td><code>context</code> | <code>container</code> | <code>component</code> | <code>deployment</code> | <code>landscape</code></td>
+          <td>激活 C4 投影；缺省则不投影</td>
+        </tr>
+        <tr>
+          <td><code>scope</code></td>
+          <td>group / entity id</td>
+          <td>component 视图聚焦某一 Container（group）</td>
+        </tr>
+        <tr>
+          <td><code>theme</code></td>
+          <td><code>builtin.c4</code></td>
+          <td>推荐与 C4 视图联用</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>7.3 entity / group 级属性</h3>
+    <table>
+      <thead>
+        <tr><th>属性</th><th>挂载</th><th>合法值</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>level</code></td>
+          <td>entity, group</td>
+          <td><code>context</code> | <code>container</code> | <code>component</code> | <code>code</code> | <code>deployment</code></td>
+          <td>C4 层级标注；参与投影过滤</td>
+        </tr>
+        <tr>
+          <td><code>description</code></td>
+          <td>entity, group</td>
+          <td>字符串</td>
+          <td>对应 C4 副标题（技术栈说明）</td>
+        </tr>
+        <tr>
+          <td><code>tags</code></td>
+          <td>entity</td>
+          <td>字符串列表</td>
+          <td>过滤视图、样式分支（可选 P2）</td>
+        </tr>
+        <tr>
+          <td><code>drilldown</code></td>
+          <td>entity, group（可手写；通常由引擎注入）</td>
+          <td>对象 <code>{ view, scope?, title? }</code></td>
+          <td>视图间导航元数据，见 <a href="#linking">§18.3</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>7.4 完整示例（单文件多视图模型）</h3>
+    <pre><code>diagram architecture {
+    title: "Internet Banking System"
+    view: container
+    theme: builtin.c4
+
+    // ── Context 层实体 ──
+    entity customer "Personal Banking Customer" {
+        type: frontend
+        level: context
+        description: "A customer of the bank, with personal banking accounts"
+    }
+    entity email "E-mail System" {
+        type: external
+        level: context
+        description: "Internal Microsoft Exchange system"
+    }
+
+    // ── 目标系统（Software System）──
+    group banking "Internet Banking System" {
+        level: context
+        description: "Allows customers to view accounts and make payments"
+
+        entity web "Web Application" {
+            type: frontend
+            level: container
+            description: "Delivers the static content and SPA"
+        }
+        entity app "API Application" {
+            type: service
+            level: container
+            description: "Provides Internet banking functionality via API"
+        }
+        entity db "Database" {
+            type: database
+            level: container
+            description: "Stores user registration, auth, account data"
+        }
+
+        web -> app "JSON/HTTPS"
+        app -> db  "JDBC"
+    }
+
+    customer -> web "Visits pages using HTTPS"
+    customer -> app "Uses API using HTTPS"
+    banking -> email "Sends e-mail using SMTP"
+}</code></pre>
+    <p>将 <code>view: context</code> 时，投影保留 customer、banking（折叠 group）、email，并聚合组内关系为 <code>customer → banking</code>、<code>banking → email</code>。</p>
+  </section>
+
+  <!-- ─── 8. DSL 与 AST ─── -->
+  <section id="dsl">
+    <h2>8. DSL 与 AST 规范</h2>
+
+    <h3>8.1 与现有规范的关系</h3>
+    <ul>
+      <li>图表类型仍为 <code>diagram architecture</code>（见 <code>architecture.md</code>）。</li>
+      <li><code>level</code>、<code>view</code>、<code>scope</code> 注册为<strong>标准属性</strong>（与 <code>type</code> 同级），进入 <code>attributes.standard</code>。</li>
+      <li>不新增箭头类型；C4 的「同步/异步」用 relation 标签或 <code>meta.protocol</code> 表达。</li>
+    </ul>
+
+    <h3>8.2 校验规则（validation 增量）</h3>
+    <table>
+      <thead>
+        <tr><th>规则 ID</th><th>级别</th><th>规则</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>C4-001</td><td>Error</td><td><code>view</code> 值必须在枚举内</td></tr>
+        <tr><td>C4-002</td><td>Error</td><td><code>level</code> 值必须在枚举内</td></tr>
+        <tr><td>C4-003</td><td>Warning</td><td>声明 <code>view</code> 但无 entity/group 带 <code>level</code></td></tr>
+        <tr><td>C4-004</td><td>Warning</td><td>Component 实体不在任何 <code>level:container</code> group 内</td></tr>
+        <tr><td>C4-005</td><td>Warning</td><td>Context 视图出现 <code>level:component</code> 实体（投影前检查）</td></tr>
+        <tr><td>C4-006</td><td>Error</td><td><code>scope</code> 指向不存在的 id</td></tr>
+        <tr><td>C4-007</td><td>Warning</td><td>Software System group 嵌套超过 2 层（与全局 group 限制一致）</td></tr>
+        <tr><td>C4-008</td><td>Warning</td><td>粗视图专用 relation（两端均在将被折叠的子图内）在细层视图中不可见 — 提示改写在细层</td></tr>
+      </tbody>
+    </table>
+
+    <h3>8.3 diff2 扩展</h3>
+    <p>
+      <code>level</code>、<code>view</code>、<code>scope</code> 变更纳入 <code>ChangeTarget::Diagram | Entity | Group</code> 属性 diff。
+      PR 审查文案示例：「Container <code>api</code> 下新增 Component <code>PaymentService</code>」。
+    </p>
+  </section>
+
+  <!-- ─── 9. 视图投影算法 ─── -->
+  <section id="projection">
+    <h2>9. 视图投影算法</h2>
+    <p>函数签名建议：<code>project_c4_view(diagram: &amp;mut Diagram) -&gt; Result&lt;(), C4ProjectError&gt;</code></p>
+
+    <h3>9.1 步骤（确定性顺序）</h3>
+    <p class="lead">投影在<strong>副本</strong>上执行，不修改 canonical model（见 <a href="#organization">§17</a>、<a href="#linking">§18</a>）。</p>
+    <ol>
+      <li><strong>克隆</strong> diagram → <code>projected_diagram</code>（保留原 AST 供 diff / 多视图）。</li>
+      <li><strong>读取</strong> <code>view</code>；若缺失则 return（no-op）。</li>
+      <li><strong>收集</strong> 带 <code>level</code> 的 entity / group，按 id 排序。</li>
+      <li><strong>过滤</strong> 保留 <code>level_order(level) ≤ level_order(view)</code> 的元素（landscape 仅 context 系统间关系）。</li>
+      <li><strong>折叠 group</strong>：若 view 粗于组内子级别，将 group 提升为单一超级节点（保留 label、level、description）。</li>
+      <li><strong>关系聚合</strong>：按 <a href="#linking">§18.2</a> 规则合并跨折叠边；多边标签默认 <code>;</code> 拼接。</li>
+      <li><strong>scope 裁剪</strong>（component 视图）：仅保留 <code>scope</code> 指定 group 及其子 entity、相关边。</li>
+      <li><strong>注入 drilldown</strong>：为可下钻节点写入 <code>drilldown</code> 元数据（导出 HTML/SVG 时用）。</li>
+      <li><strong>清理</strong> 悬空 relation；按 relation 源目标 id 排序。</li>
+    </ol>
+
+    <h3>9.2 关系聚合示意</h3>
+    <div class="figure">
+      <svg viewBox="0 0 640 160" xmlns="http://www.w3.org/2000/svg">
+        <text x="20" y="25" font-size="11" font-weight="600">投影前（component 级）</text>
+        <rect x="20" y="40" width="50" height="30" rx="4" fill="#438dd5"/><text x="28" y="58" font-size="8" fill="#fff">web</text>
+        <rect x="100" y="40" width="50" height="30" rx="4" fill="#438dd5"/><text x="108" y="58" font-size="8" fill="#fff">api</text>
+        <rect x="180" y="40" width="50" height="30" rx="4" fill="#438dd5"/><text x="188" y="58" font-size="8" fill="#fff">db</text>
+        <line x1="70" y1="55" x2="100" y2="55" stroke="#666"/><line x1="150" y1="55" x2="180" y2="55" stroke="#666"/>
+
+        <text x="280" y="55" font-size="18" fill="#5c6370">→</text>
+
+        <text x="320" y="25" font-size="11" font-weight="600">view: context 聚合后</text>
+        <rect x="320" y="40" width="120" height="30" rx="4" fill="#08427b"/><text x="340" y="58" font-size="9" fill="#fff">Banking System</text>
+        <rect x="480" y="40" width="80" height="30" rx="4" fill="#999"/><text x="492" y="58" font-size="8" fill="#fff">External</text>
+        <line x1="440" y1="55" x2="480" y2="55" stroke="#666"/>
+
+        <text x="20" y="120" font-size="10" fill="#5c6370">组内 web→api→db 在 context 视图消失，对外边 interface 聚合为 banking→external</text>
+      </svg>
+    </div>
+
+    <h3>9.3 API 层多视图批量渲染</h3>
+    <pre><code>POST /render
+{
+  "source": "... full model dsl ...",
+  "views": ["context", "container"],
+  "format": "svg"
+}
+→ { "context": "&lt;svg&gt;...", "container": "&lt;svg&gt;..." }</code></pre>
+    <p>Server 对同一 PreparedDiagram 调用两次投影 + layout（layout seed 一致以保证节点位置可关联）。</p>
+  </section>
+
+  <!-- ─── 10. 样式 ─── -->
+  <section id="style">
+    <h2>10. C4 视觉与主题</h2>
+
+    <h3>10.1 <code>builtin.c4</code> 主题</h3>
+    <p>在 <code>theme/</code> 增加 C4 官方色板（Simon Brown 默认色）：</p>
+    <table>
+      <thead>
+        <tr><th>Token / 条件</th><th>颜色</th><th>用途</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>level:context</code> + person</td><td>#08427b</td><td>Person / System</td></tr>
+        <tr><td><code>level:container</code></td><td>#1168bd</td><td>Container 主体</td></tr>
+        <tr><td><code>level:component</code></td><td>#438dd5</td><td>Component</td></tr>
+        <tr><td><code>type:external</code></td><td>#999999 + dashed border</td><td>外部系统</td></tr>
+        <tr><td>group 边框</td><td>比内部深一级</td><td>Software System 边界</td></tr>
+      </tbody>
+    </table>
+
+    <h3>10.2 与 GraphicStyle 关系</h3>
+    <p>
+      C4 主题管<strong>颜色与形状语义</strong>；Excalidraw / Blueprint 等笔触皮肤可叠加。
+      企业客户可在 C4 配色基础上切换笔触，作为 Drawify 相对 Structurizr 的展示层差异化。
+    </p>
+
+    <h3>10.3 图例（Legend）</h3>
+    <p><span class="pill pill-p2">P2</span> 渲染时在 SVG 角落自动生成图例块（Person / Container / External），对标 Structurizr 自动图例。</p>
+  </section>
+
+  <!-- ─── 11. 企业集成 ─── -->
+  <section id="enterprise">
+    <h2>11. 企业管线集成</h2>
+
+    <h3>11.1 K8s → C4 Container 映射</h3>
+    <table>
+      <thead>
+        <tr><th>K8s 资源</th><th>C4 层级</th><th>Drawify 结构</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Namespace</td><td>（域边界）</td><td><code>group</code> + <code>meta.source_id</code></td></tr>
+        <tr><td>Deployment / StatefulSet</td><td>Container</td><td><code>entity</code> <code>level:container</code></td></tr>
+        <tr><td>Service</td><td>—</td><td>relation 端点或 meta 注解</td></tr>
+        <tr><td>Pod</td><td>默认不展示</td><td>troubleshooting 视图可选展开</td></tr>
+        <tr><td>Ingress / Gateway</td><td>Container</td><td><code>type:gateway</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>11.2 Compose 视图配置示例</h3>
+    <pre><code># compose-rules.yaml（非 DSL — 企业聚合层）
+views:
+  overview:
+    diagram:
+      view: container
+      title: "{{ cluster }} — Production"
+    filter:
+      namespace_labels: { env: prod }
+    aggregate:
+      workload: deployment  # 折叠 Pod
+
+  context:
+    diagram:
+      view: context
+    collapse:
+      namespaces_to: software_system  # 多个 NS 合成一个系统框</code></pre>
+
+    <h3>11.3 治理与 Diff</h3>
+    <p>
+      结合 <code>snapshot-id</code>、<code>meta.source_hash</code> 与 diff2：
+      两次发布间「新增 Container」「删除跨区 relation」进入合规报告。
+      这是 Drawify 相对 Mermaid/手绘 C4 的企业护城河。
+    </p>
+  </section>
+
+  <!-- ─── 12. Agent ─── -->
+  <section id="agent">
+    <h2>12. Agent / MCP 指引</h2>
+
+    <h3>12.1 图种选择</h3>
+    <table>
+      <thead>
+        <tr><th>用户意图</th><th>输出</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>「C4 上下文 / 系统全景 / 谁用谁」</td><td><code>architecture</code> + <code>view: context</code></td></tr>
+        <tr><td>「C4 容器 / 微服务 / 技术栈」</td><td><code>architecture</code> + <code>view: container</code></td></tr>
+        <tr><td>「模块内部 / Controller Service Repo」</td><td><code>architecture</code> + <code>view: component</code> + <code>scope</code></td></tr>
+        <tr><td>「登录时序 / OAuth 步骤」</td><td><code>sequence</code>（非 C4 dynamic）</td></tr>
+        <tr><td>「业务流程 / 审批步骤」</td><td><code>flowchart</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>12.2 System Prompt 片段（建议写入 MCP Skill）</h3>
+    <pre><code>绘制 C4 图时使用 diagram architecture，并遵守：
+1. 必须设置 view: context | container | component 之一
+2. 每个 entity/group 必须设置 level，与 view 层级体系一致
+3. Software System 用 group 包裹其 Container
+4. Person 用 type:frontend + level:context；外部系统用 type:external
+5. 关系标签写清协议（HTTPS / JSON / JDBC / Kafka）
+6. 不要使用 Mermaid 的 C4Context / C4Container 关键字</code></pre>
+
+    <h3>12.3 常见错误与修复提示</h3>
+    <table>
+      <thead>
+        <tr><th>错误</th><th>修复建议</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>view:container 但全是 level:context</td><td>为 Web/API/DB 添加 level:container</td></tr>
+        <tr><td>Component 散落在顶层</td><td>放入 level:container 的 group 内</td></tr>
+        <tr><td>混淆 flowchart</td><td>步骤顺序场景改用 flowchart</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ─── 13. 实现架构 ─── -->
+  <section id="impl">
+    <h2>13. 实现架构与文件落点</h2>
+
+    <table>
+      <thead>
+        <tr><th>阶段</th><th>文件 / 模块</th><th>工作项</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td rowspan="4"><span class="pill pill-p0">P0</span></td>
+          <td><code>src/types/standard_attr_keys.rs</code></td>
+          <td>增加 <code>level</code>、<code>view</code>、<code>scope</code>、<code>description</code> 键</td>
+        </tr>
+        <tr>
+          <td><code>src/profile/mod.rs</code></td>
+          <td>Architecture profile 注册 diagram 级合法属性</td>
+        </tr>
+        <tr>
+          <td><code>src/prepare/c4_view.rs</code>（新）</td>
+          <td><code>project_c4_view</code>：过滤 + 基础折叠</td>
+        </tr>
+        <tr>
+          <td><code>src/pipeline/prepare.rs</code></td>
+          <td>在 prepare 末尾调用 c4_view（若 view 存在）</td>
+        </tr>
+        <tr>
+          <td rowspan="3"><span class="pill pill-p0">P0</span></td>
+          <td><code>src/kinds/architecture/validate.rs</code></td>
+          <td>C4-001 ~ C4-007 规则</td>
+        </tr>
+        <tr>
+          <td><code>themes/builtin.c4.json</code>（新）</td>
+          <td>C4 色板 + level 条件样式</td>
+        </tr>
+        <tr>
+          <td><code>showcase/architecture/</code></td>
+          <td>新增 <code>n.c4-internet-banking.dfy</code> 等示例</td>
+        </tr>
+        <tr>
+          <td rowspan="3"><span class="pill pill-p1">P1</span></td>
+          <td><code>src/prepare/c4_view.rs</code></td>
+          <td>关系聚合、scope 裁剪</td>
+        </tr>
+        <tr>
+          <td><code>src/diff2/</code></td>
+          <td>level 变更友好描述</td>
+        </tr>
+        <tr>
+          <td><code>docs/specs/visual-language/diagrams/architecture.md</code></td>
+          <td>增加 C4 章节交叉链接</td>
+        </tr>
+        <tr>
+          <td rowspan="2"><span class="pill pill-p1">P1</span></td>
+          <td><code>src/export/c4_manifest.rs</code>（新）</td>
+          <td>生成 <code>manifest.json</code>；drilldown 映射</td>
+        </tr>
+        <tr>
+          <td><code>drawify-cli</code></td>
+          <td><code>--c4-views</code> 多视图批量导出；<code>--c4-bundle zip|html</code></td>
+        </tr>
+        <tr>
+          <td rowspan="2"><span class="pill pill-p2">P2</span></td>
+          <td><code>src/export/c4_html_bundle.rs</code>（新）</td>
+          <td>单文件 HTML 多视图 + 侧栏切换 + 节点下钻</td>
+        </tr>
+        <tr>
+          <td>Compose 服务</td>
+          <td>views 配置 → 批量投影渲染 + 合规 ZIP</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p2">P2</span></td>
+          <td><code>drawify-server</code></td>
+          <td><code>POST /render</code> 的 <code>views[]</code>；<code>GET /c4/manifest</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>13.1 测试策略</h3>
+    <ul>
+      <li>单元测试：投影前后 entity/relation 集合（确定性快照）。</li>
+      <li>金样例：<code>c4-internet-banking</code> 的 context/container SVG hash。</li>
+      <li>回归：无 <code>view</code> 的 architecture 图输出字节级不变。</li>
+    </ul>
+  </section>
+
+  <!-- ─── 14. 路线图 ─── -->
+  <section id="roadmap">
+    <h2>14. 分阶段路线图</h2>
+
+    <table>
+      <thead>
+        <tr><th>阶段</th><th>交付物</th><th>成功指标</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="level-tag level-context">Phase 1</span><br/>P0 · 2–3 周</td>
+          <td>
+            <code>level</code> + <code>view</code> 属性；context/container 投影；<code>builtin.c4</code> 主题；showcase + Agent prompt
+          </td>
+          <td>Agent 生成 C4 Container 图首次 validate 通过率 &gt;90%；showcase 可渲染</td>
+        </tr>
+        <tr>
+          <td><span class="level-tag level-container">Phase 2</span><br/>P1 · 3–4 周</td>
+          <td>
+            关系聚合；<code>scope</code> component 视图；<code>drilldown</code> 元数据；diff2 level 变更；
+            <code>--c4-views</code> CLI + <code>manifest.json</code>（见 <a href="#export">§19</a>）
+          </td>
+          <td>同一 DSL 切换 view 输出正确；PR diff 可读；多 SVG 一键导出</td>
+        </tr>
+        <tr>
+          <td><span class="level-tag level-component">Phase 3</span><br/>P1 · 4–6 周</td>
+          <td>
+            K8s Connector POC → Container AST；Compose overview 视图；合规 ZIP 包
+          </td>
+          <td>真实集群聚合图 &lt;50 节点；归档包可交付审计</td>
+        </tr>
+        <tr>
+          <td><span class="level-tag level-code">Phase 4</span><br/>P2</td>
+          <td>
+            deployment 视图；landscape；SVG 图例；<strong>C4 HTML 多视图包</strong>（点击下钻）
+          </td>
+          <td>企业 POC 演示完整闭环；体验对标 Structurizr 导航</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ─── 17. 四层组织 ─── -->
+  <section id="organization">
+    <h2>17. 四层组织与多视图架构</h2>
+
+    <div class="callout">
+      <strong>关键心智模型：</strong>C4 的「四层」不是一张图里的四个图层（像 Photoshop），而是<strong>同一套模型上的四个缩放级别</strong>——类似地图从全国到街区。每一级通常渲染为<strong>一张独立视图</strong>，而不是四层叠在一起。
+    </div>
+
+    <h3>17.1 存储 vs 展示</h3>
+    <div class="figure">
+      <svg viewBox="0 0 700 220" xmlns="http://www.w3.org/2000/svg">
+        <rect x="20" y="20" width="660" height="70" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+        <text x="40" y="48" font-size="12" font-weight="700" fill="#2563eb">Canonical Model（单一事实来源）</text>
+        <text x="40" y="68" font-size="10" fill="#5c6370">一份 .dfy 或 JSON AST · 含所有 level 的 entity/group/relation · 全局 id 唯一</text>
+        <text x="40" y="82" font-size="10" fill="#5c6370">不直接给人阅读 · diff2 / Connector / Agent Patch 均作用于此层</text>
+
+        <text x="340" y="108" font-size="11" fill="#5c6370">view 投影（非复制四份 DSL）</text>
+        <line x1="350" y1="95" x2="350" y2="118" stroke="#5c6370" marker-end="url(#arr-org)"/>
+
+        <rect x="30" y="125" width="150" height="45" rx="6" fill="#08427b"/><text x="55" y="152" font-size="10" fill="#fff">context.svg</text>
+        <rect x="200" y="125" width="150" height="45" rx="6" fill="#1168bd"/><text x="220" y="152" font-size="10" fill="#fff">container.svg</text>
+        <rect x="370" y="125" width="150" height="45" rx="6" fill="#438dd5"/><text x="385" y="152" font-size="10" fill="#fff">component-api.svg</text>
+        <rect x="540" y="125" width="130" height="45" rx="6" fill="#f0f2f5" stroke="#e2e5eb"/>
+        <text x="555" y="145" font-size="9" fill="#5c6370">manifest.json</text>
+        <text x="555" y="160" font-size="8" fill="#5c6370">视图清单+下钻</text>
+
+        <text x="30" y="195" font-size="10" fill="#5c6370">L1 全景 · L2 技术栈 · L3 单 Container 内部（scope） · L4 Code 不纳入主链路</text>
+        <defs><marker id="arr-org" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0,6 2.5,0 5" fill="#5c6370"/></marker></defs>
+      </svg>
+      <figcaption>组织方式：一个模型，多张视图，一份 manifest 描述视图间导航</figcaption>
+    </div>
+
+    <h3>17.2 组织方式对比</h3>
+    <table>
+      <thead>
+        <tr><th>方式</th><th>做法</th><th>评价</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pill pill-ok">推荐</span> 单模型 + view 投影</td>
+          <td>一个 <code>.dfy</code>，渲染时指定 <code>view</code> 或 CLI <code>--c4-views</code></td>
+          <td>Diff、Agent、ID 一致性最好；与 Structurizr 模型/视图分离同构</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-ok">推荐</span> 单模型 + 批量导出</td>
+          <td>CI 一次导出 <code>context.svg</code> + <code>container.svg</code> + <code>manifest.json</code></td>
+          <td>文档站 / PR / 合规归档最实用</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-ok">推荐</span> HTML 多视图包</td>
+          <td>单个 <code>.html</code> 内嵌多视图 + 侧栏切换 + 点击下钻</td>
+          <td>评审演示体验最佳；P2 交付</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-gap">避免</span> 四个独立 .dfy</td>
+          <td>context.dfy / container.dfy 各写各的</td>
+          <td>entity id 漂移、关系不一致、diff 无意义</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-warn">例外</span> 企业多域拆分</td>
+          <td>Compose 按业务域生成多 AST，用 <code>meta.source_id</code> 对齐</td>
+          <td>仅规模化场景；Landscape 再合并，非手写四文件</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>17.3 在 DSL 中如何「长在一起」</h3>
+    <p>用 <strong><code>group</code> 表边界</strong> + <strong><code>level</code> 表缩放级</strong>，全写进同一 <code>diagram architecture</code>：</p>
+    <ul>
+      <li><strong>Software System</strong> → 顶层 <code>group</code>，<code>level: context</code></li>
+      <li><strong>Container</strong> → group 内 <code>entity</code>（或「含 Component 的 Container」本身也是 group），<code>level: container</code></li>
+      <li><strong>Component</strong> → Container group 内 <code>entity</code>，<code>level: component</code></li>
+      <li><strong>Person / External</strong> → 顶层 <code>entity</code>，<code>level: context</code></li>
+    </ul>
+    <p>渲染某一级时：设置 diagram 的 <code>view</code>，引擎投影后只 layout 该视图可见子图。<strong>不需要</strong>为每一层各维护一套 relation 副本。</p>
+
+    <h3>17.4 与「多张图」的关系</h3>
+    <table>
+      <thead>
+        <tr><th>概念</th><th>数量</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>模型文件</td><td>1</td><td><code>model.dfy</code> 或等效 JSON AST</td></tr>
+        <tr><td>逻辑视图</td><td>3–5</td><td>context / container / component×N / deployment（可选）</td></tr>
+        <tr><td>导出成品</td><td>N 张 SVG/PNG + 1 manifest</td><td>或 1 个 HTML 包内含全部</td></tr>
+        <tr><td>Code 层图</td><td>0</td><td>默认不做；类图交给 IDE</td></tr>
+      </tbody>
+    </table>
+
+    <h3>17.5 综合架构（端到端）</h3>
+    <pre><code>存储：     1 × canonical model（.dfy / JSON AST）
+投影：     N × view（context | container | component[+scope]）
+层内关系： relation 写在最细层 + 粗层由聚合推导（§18）
+层间导航： drilldown 元数据 → HTML / SVG 超链接（§18.3）
+默认导出： SVG×N + manifest.json [+ PNG]
+企业归档： ZIP（dfy + svg + png + manifest + diff 报告 + snapshot-id）
+精修通道： draw.io（单视图导出，.dfy 仍为 source of truth）
+动态交互： diagram sequence（另图；entity id 与模型对齐）</code></pre>
+  </section>
+
+  <!-- ─── 18. 链接语义 ─── -->
+  <section id="linking">
+    <h2>18. 链接语义：relation、包含与下钻</h2>
+    <p class="lead">C4 里存在<strong>三种不同的「链接」</strong>，必须用不同机制表达，不能混为一种箭头语法。</p>
+
+    <h3>18.1 三种链接对照</h3>
+    <table>
+      <thead>
+        <tr><th>类型</th><th>含义</th><th>Drawify 表达</th><th>示例</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>A. 业务关系</strong></td>
+          <td>调用、数据流、依赖</td>
+          <td><code>relation</code>（<code>-&gt;</code> / <code>--&gt;</code> / <code>&lt;-&gt;</code>）</td>
+          <td><code>api -&gt; db "JDBC"</code></td>
+        </tr>
+        <tr>
+          <td><strong>B. 包含关系</strong></td>
+          <td>系统包含容器、容器包含组件</td>
+          <td><code>group</code> 嵌套 + <code>group_id</code>（<strong>不是</strong> relation）</td>
+          <td><code>group banking { entity api ... }</code></td>
+        </tr>
+        <tr>
+          <td><strong>C. 视图导航</strong></td>
+          <td>从 Context 图点进 Container 详图</td>
+          <td><code>drilldown</code> 元数据（<strong>不是</strong> relation）</td>
+          <td>点击 banking → 打开 container 视图</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <strong>常见错误：</strong>用 <code>banking -&gt; api</code> 表示「系统包含 API」——包含应靠 group；<code>banking -&gt; email</code> 才是跨系统业务关系。
+    </div>
+
+    <h3>18.2 业务关系：写在细层，粗层靠聚合</h3>
+    <p><strong>原则：</strong>relation 写在模型中<strong>最细、最准确</strong>的一层（通常为 container 或 component）。粗视图<strong>禁止</strong>再手写一套「context 专用边」。</p>
+
+    <h4>聚合规则（投影时确定性执行）</h4>
+    <table>
+      <thead>
+        <tr><th>规则 ID</th><th>条件</th><th>动作</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>AGG-01</td>
+          <td>边两端都被折叠进<strong>同一</strong> group</td>
+          <td>删除该边（内部流量，粗视图不可见）</td>
+        </tr>
+        <tr>
+          <td>AGG-02</td>
+          <td>边一端在 group 外，另一端在 group 内</td>
+          <td>将组内端点提升为 group 节点：<code>customer -&gt; web</code> ⇒ <code>customer -&gt; banking</code></td>
+        </tr>
+        <tr>
+          <td>AGG-03</td>
+          <td>边两端在不同 group</td>
+          <td>两端分别提升到各自 group（若已折叠）</td>
+        </tr>
+        <tr>
+          <td>AGG-04</td>
+          <td>投影后存在多条相同 <code>(from, to)</code> 边</td>
+          <td>合并为一条；标签用 <code>;</code> 连接（可配置为取首条）</td>
+        </tr>
+        <tr>
+          <td>AGG-05</td>
+          <td>自环在粗视图</td>
+          <td>丢弃或标 warning（架构图自环通常无意义）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h4>聚合示例</h4>
+    <pre><code>// 模型（细层 relations）
+customer -> web "HTTPS"
+web -> app "JSON"
+app -> db "JDBC"
+banking -> email "SMTP"    // banking 为 group id
+
+// view: context 投影后
+customer -> banking "HTTPS"           // AGG-02：web 被折叠
+banking -> email "SMTP"               // 跨 group 边保留</code></pre>
+
+    <h3>18.3 视图导航：drilldown 元数据</h3>
+    <p>Context 图上点击「Internet Banking」应打开 Container 视图——这是<strong>超链接</strong>，不是图上的箭头。</p>
+
+    <h4>AST / Scene 字段（P1）</h4>
+    <pre><code>// entity 或 group 的 standard 属性，或 ExportNode 扩展字段
+"drilldown": {
+  "view": "container",
+  "scope": "banking",       // 可选；component 视图时必填
+  "title": "Internet Banking — Containers"
+}</code></pre>
+
+    <h4>自动生成规则</h4>
+    <table>
+      <thead>
+        <tr><th>当前 view</th><th>节点</th><th>生成的 drilldown</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>context</code></td>
+          <td><code>level:context</code> 的 group（Software System）</td>
+          <td><code>{ view: "container", scope: &lt;group_id&gt; }</code></td>
+        </tr>
+        <tr>
+          <td><code>container</code></td>
+          <td>含 component 子节点的 group 或 container entity</td>
+          <td><code>{ view: "component", scope: &lt;id&gt; }</code></td>
+        </tr>
+        <tr>
+          <td><code>component</code></td>
+          <td>—</td>
+          <td>无下钻（或 P3 链到外部 Code 工具 URL）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h4>各导出格式中的下钻能力</h4>
+    <table>
+      <thead>
+        <tr><th>格式</th><th>下钻实现</th><th>优先级</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>HTML 多视图包</strong></td>
+          <td>JS 切换 <code>view</code> + <code>scope</code>；侧栏列视图列表</td>
+          <td><span class="pill pill-p2">P2</span> 体验最佳</td>
+        </tr>
+        <tr>
+          <td><strong>SVG</strong></td>
+          <td><code>&lt;a xlink:href="container.svg#banking"&gt;</code> 包裹节点</td>
+          <td><span class="pill pill-p1">P1</span></td>
+        </tr>
+        <tr>
+          <td><strong>draw.io</strong></td>
+          <td>链接到另一 Page（单视图导出后人工可改）</td>
+          <td><span class="pill pill-p2">P2</span></td>
+        </tr>
+        <tr>
+          <td><strong>PNG</strong></td>
+          <td>无交互；文档内并排多图 + 标题导航</td>
+          <td>静态兜底</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>18.4 隐含关系（Implied Relationships）</h3>
+    <p><span class="pill pill-p2">P2</span> Structurizr 可根据层级自动推导「父到子」的隐含边。Drawify 初期<strong>不实现</strong>，要求作者写显式 relation；待聚合稳定后再评估，避免 Agent 困惑。</p>
+
+    <h3>18.5 Dynamic View 与 sequence 的关系</h3>
+    <p>
+      C4 Dynamic View（按时间展示交互）不塞进 <code>architecture</code> 投影。
+      使用 <code>diagram sequence</code>，participant id 与模型 entity id 对齐；
+      manifest 中可增加 <code>dynamic_views</code> 条目指向对应 sequence 文件或内嵌 DSL 片段。
+    </p>
+  </section>
+
+  <!-- ─── 19. 导出规范 ─── -->
+  <section id="export">
+    <h2>19. 导出格式与交付物规范</h2>
+
+    <h3>19.1 格式优先级（实用导向）</h3>
+    <table>
+      <thead>
+        <tr><th>梯队</th><th>格式</th><th>主要用户</th><th>典型用途</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pill pill-p0">T1 必做</span></td>
+          <td><strong>SVG</strong>（多视图）</td>
+          <td>开发、技术写作</td>
+          <td>README、PR、内部 Wiki；矢量可缩放</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p0">T1 必做</span></td>
+          <td><strong>PNG</strong></td>
+          <td>合规、飞书/Notion</td>
+          <td>审批附件；SVG 被平台净化时的兜底</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p0">T1 必做</span></td>
+          <td><strong>JSON AST</strong></td>
+          <td>Agent、Connector、CI</td>
+          <td>真源、diff2、Compose；非给人眼读</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p0">T1 必做</span></td>
+          <td><strong>manifest.json</strong></td>
+          <td>文档站、HTML 包、Server</td>
+          <td>视图清单 + drilldown 映射（见 §19.2）</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p1">T2 强烈推荐</span></td>
+          <td><strong>HTML 多视图包</strong></td>
+          <td>架构评审、培训</td>
+          <td>侧栏切换视图 + 点击下钻；最接近 Structurizr UI</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p1">T2</span></td>
+          <td><strong>draw.io</strong></td>
+          <td>架构师精修</td>
+          <td>导出单视图 <code>.drawio</code>；<code>.dfy</code> 仍为 source of truth</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p1">T2</span></td>
+          <td><strong>ZIP 合规包</strong></td>
+          <td>银行、审计</td>
+          <td>dfy + svg + png + manifest + diff 报告 + snapshot-id</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p2">T3 按需</span></td>
+          <td>PDF</td>
+          <td>打印、签字</td>
+          <td>多页 PDF = 各 view 的 PNG 拼接</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p2">T3</span></td>
+          <td>Markdown outline</td>
+          <td>文档</td>
+          <td>文字大纲；配图仍用 SVG</td>
+        </tr>
+        <tr>
+          <td><span class="pill pill-p3">T4 生态</span></td>
+          <td>Mermaid 导出</td>
+          <td>互操作</td>
+          <td>路线图能力；非 C4 主交付</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>19.2 manifest.json 规范</h3>
+    <p>每次批量导出 C4 视图时，在输出目录生成 <code>manifest.json</code>（schema <code>drawify.c4_manifest/0.1</code>）：</p>
+    <pre><code>{
+  "schema_version": "0.1",
+  "format": "drawify.c4_manifest",
+  "model": {
+    "source": "model.dfy",
+    "title": "Internet Banking System",
+    "snapshot_id": "banking-2026-06-25"
+  },
+  "views": [
+    {
+      "id": "context",
+      "view": "context",
+      "title": "System Context",
+      "outputs": {
+        "svg": "views/context.svg",
+        "png": "views/context.png"
+      }
+    },
+    {
+      "id": "container",
+      "view": "container",
+      "title": "Containers",
+      "outputs": { "svg": "views/container.svg" }
+    },
+    {
+      "id": "component-api",
+      "view": "component",
+      "scope": "app",
+      "title": "API Application — Components",
+      "outputs": { "svg": "views/component-api.svg" }
+    }
+  ],
+  "drilldown": [
+    {
+      "from_view": "context",
+      "node_id": "banking",
+      "to_view": "container",
+      "scope": "banking"
+    },
+    {
+      "from_view": "container",
+      "node_id": "app",
+      "to_view": "component",
+      "scope": "app"
+    }
+  ],
+  "dynamic_views": [
+    {
+      "id": "login-flow",
+      "title": "Login (Dynamic)",
+      "sequence_source": "sequences/login.dfy"
+    }
+  ]
+}</code></pre>
+
+    <h3>19.3 CLI 多视图导出</h3>
+    <pre><code># 从单一模型批量导出默认 C4 视图集
+drawify export model.dfy \
+  --c4-views context,container \
+  --format svg \
+  --output-dir ./dist/views/
+
+# 同时生成 PNG 与 manifest
+drawify export model.dfy \
+  --c4-views context,container,component:app \
+  --format svg,png \
+  --c4-manifest ./dist/manifest.json
+
+# 合规 ZIP 包（dfy + 全部视图 + manifest + 可选 diff）
+drawify export model.dfy \
+  --c4-bundle zip \
+  --c4-views context,container \
+  --snapshot-id banking-2026-06-25 \
+  --output ./dist/banking-architecture.zip
+
+# 交互式 HTML 包（P2）
+drawify export model.dfy \
+  --c4-bundle html \
+  --c4-views context,container,component:app \
+  --output ./dist/banking-c4.html</code></pre>
+
+    <h3>19.4 Server API</h3>
+    <pre><code>POST /v1/render
+{
+  "source": "&lt;full model dsl&gt;",
+  "c4_views": ["context", "container"],
+  "formats": ["svg", "png"],
+  "include_manifest": true
+}
+
+→ {
+  "manifest": { ... },
+  "renders": {
+    "context": { "svg": "...", "png": "..." },
+    "container": { "svg": "..." }
+  }
+}</code></pre>
+
+    <h3>19.5 HTML 多视图包结构（P2）</h3>
+    <pre><code>banking-c4.html
+├── 内联 WASM 或预渲染 SVG 字符串
+├── 侧栏：context | container | component (API)
+├── 点击 Software System → 切换 view+scope
+└── 可选：深链 hash  #view=container&amp;scope=banking</code></pre>
+
+    <h3>19.6 按角色的一键推荐</h3>
+    <table>
+      <thead>
+        <tr><th>角色</th><th>推荐命令 / 交付物</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>AI Agent / CI</td>
+          <td>validate JSON + patch；归档 <code>model.dfy</code> + JSON AST</td>
+        </tr>
+        <tr>
+          <td>开发者 PR</td>
+          <td><code>--c4-views context,container --format svg</code> + diff2 摘要评论</td>
+        </tr>
+        <tr>
+          <td>技术写作者</td>
+          <td>SVG 组嵌入文档；Notion 用 PNG</td>
+        </tr>
+        <tr>
+          <td>架构师评审</td>
+          <td><code>--c4-bundle html</code> 或 draw.io 精修版</td>
+        </tr>
+        <tr>
+          <td>合规审计</td>
+          <td><code>--c4-bundle zip</code> + snapshot-id + 语义 diff 报告</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>19.7 合规 ZIP 包内容清单</h3>
+    <table>
+      <thead>
+        <tr><th>路径</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>model.dfy</code></td><td>Canonical DSL 源文件</td></tr>
+        <tr><td><code>model.ast.json</code></td><td>JSON AST 快照</td></tr>
+        <tr><td><code>manifest.json</code></td><td>视图清单与 drilldown</td></tr>
+        <tr><td><code>views/*.svg</code></td><td>各投影视图矢量图</td></tr>
+        <tr><td><code>views/*.png</code></td><td>各位图（可选）</td></tr>
+        <tr><td><code>diff/report.json</code></td><td>与上一 snapshot 的语义 diff（可选）</td></tr>
+        <tr><td><code>METADATA.json</code></td><td>snapshot-id、generated_at、source_hash</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ─── 15. 范围外 ─── -->
+  <section id="scope">
+    <h2>15. 范围外与开放问题</h2>
+
+    <h3>15.1 明确不做（短期内）</h3>
+    <ul>
+      <li>Structurizr DSL 完整兼容 / 导入</li>
+      <li>Code 层 UML 类图（交给 IDE）</li>
+      <li>ADR / 文档块（Structurizr <code>!docs</code>）— 可用外部 Markdown 链接</li>
+      <li>实时协作编辑</li>
+    </ul>
+
+    <h3>15.2 开放问题</h3>
+    <table>
+      <thead>
+        <tr><th>问题</th><th>选项</th><th>倾向</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>投影是否破坏原始 AST？</td>
+          <td>A. 可变投影 B. 投影层副本</td>
+          <td><strong>B（已决）</strong> — 见 <a href="#projection">§9.1</a>、<a href="#organization">§17</a></td>
+        </tr>
+        <tr>
+          <td>多视图存储</td>
+          <td>单文件 vs 多文件</td>
+          <td>单文件模型 + API 多 view 渲染；Compose 可拆快照</td>
+        </tr>
+        <tr>
+          <td>Person 是否独立 type？</td>
+          <td><code>frontend</code> vs 新增 <code>person</code></td>
+          <td>短期用 frontend；P1 增加 <code>person</code> 并映射人形图标</td>
+        </tr>
+        <tr>
+          <td>聚合边标签冲突</td>
+          <td>合并 / 省略 / 取第一条</td>
+          <td>默认合并；企业视图可配置</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ─── 16. 参考 ─── -->
+  <section id="refs" class="refs">
+    <h2>16. 参考资料</h2>
+    <ul>
+      <li><a href="https://c4model.com/">C4 Model 官网</a> — Simon Brown</li>
+      <li><a href="https://docs.structurizr.com/dsl">Structurizr DSL</a> — 模型 / 视图参考实现</li>
+      <li><a href="https://mermaid.js.org/syntax/c4.html">Mermaid C4 语法</a></li>
+      <li><a href="../architecture.md">Drawify architecture 视觉语言</a></li>
+      <li><a href="../../../../enterprise/scale-diagram-strategy.md">企业规模化架构图战略</a></li>
+      <li><a href="../../../../enterprise/capability-roadmap.md">企业能力路线图</a></li>
+      <li><a href="../../../../product/competitive-strategy.md">竞争策略 — 语义微调护城河</a></li>
+      <li><code>docs/animation/export-format-guide.md</code> — 导出格式选型（SVG/PNG/HTML）</li>
+      <li><code>crates/drawify-core/src/render/encode/drawio/README.md</code> — draw.io 导出</li>
+      <li><code>crates/drawify-core/src/diff2/README.md</code> — 语义 Diff 模块</li>
+    </ul>
+  </section>
+
+</main>
+
+<footer>
+  Drawify C4 支持方案 · v0.3.0-draft · 2026-06-25
+</footer>
+
+  </div><!-- .doc-main -->
+</div><!-- .doc-shell -->
+
+<script>
+(function () {
+  var links = document.querySelectorAll('.doc-nav a[href^="#"]');
+  var sections = [];
+  links.forEach(function (a) {
+    var id = a.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if (el) sections.push({ id: id, el: el, link: a });
+  });
+  function setActive() {
+    var y = window.scrollY + 80;
+    var current = sections[0];
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i].el.offsetTop <= y) current = sections[i];
+    }
+    links.forEach(function (a) { a.classList.remove('active'); });
+    if (current) {
+      current.link.classList.add('active');
+      if (window.matchMedia('(min-width: 961px)').matches) {
+        var nav = document.querySelector('.doc-nav');
+        var link = current.link;
+        var navRect = nav.getBoundingClientRect();
+        var linkRect = link.getBoundingClientRect();
+        if (linkRect.top < navRect.top + 8 || linkRect.bottom > navRect.bottom - 8) {
+          link.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }
+    }
+  }
+  window.addEventListener('scroll', setActive, { passive: true });
+  setActive();
+})();
+</script>
+
+</body>
+</html>

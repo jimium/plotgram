@@ -1,0 +1,92 @@
+{
+  "version": "0.2",
+  "id": "mindmap.ink-dark",
+  "extends": "mindmap.base",
+  "name": "Ink Dark",
+  "meta": {
+    "author": "Drawify",
+    "description": "暗色思维导图：深色画布、荧光分支、高对比节点，适合暗色环境与专注模式",
+    "tags": ["mindmap", "dark", "neon", "focus"]
+  },
+  "tokens": {
+    "colors": {
+      "canvas": "#1A1B2E",
+      "text": "#E8EAF0",
+      "muted_text": "#8B8FA3",
+      "border": "#2E3047",
+      "primary": "#7C5CFC",
+      "neutral_fill": "#252640",
+      "neutral_stroke": "#4A4C6A",
+      "group_fill": "#1F2035",
+      "group_stroke": "#3D3F5C"
+    },
+    "palette": {
+      "root": { "fill": "#7C5CFC", "stroke": "#9B7FFF", "text_fill": "#FFFFFF" }
+    },
+    "typography": {
+      "title_size": 17,
+      "label_size": 14,
+      "small_size": 12
+    },
+    "strokes": {
+      "thin": 1.5,
+      "normal": 2.0,
+      "thick": 3.0,
+      "dashed": [8, 4],
+      "dotted": [3, 5]
+    },
+    "radius": {
+      "sm": 6,
+      "md": 10,
+      "lg": 16
+    },
+    "spacing": {
+      "node_padding_x": 14,
+      "node_padding_y": 10,
+      "group_padding": 18,
+      "label_gap": 7
+    }
+  },
+  "defaults": {
+    "node": {
+      "radius": "{radius.md}"
+    }
+  },
+  "diagrams": {
+    "mindmap": {
+      "edge": {
+        "stroke_width": "{strokes.thick}"
+      },
+      "node": {
+        "stroke_width": "{strokes.thin}"
+      },
+      "entity_types": {
+        "main": {
+          "label_weight": "bold"
+        },
+        "branch": {
+          "label_weight": "medium"
+        }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#2A2650", "stroke": "#7C5CFC", "edge_stroke": "#9B7FFF" },
+            { "fill": "#1A3330", "stroke": "#2ED8A3", "edge_stroke": "#5EEBBF" },
+            { "fill": "#331F2E", "stroke": "#E84393", "edge_stroke": "#F06DAF" },
+            { "fill": "#332B1A", "stroke": "#FDCB6E", "edge_stroke": "#FDD98A" },
+            { "fill": "#1A2A3A", "stroke": "#74B9FF", "edge_stroke": "#99CBFF" },
+            { "fill": "#2A1A33", "stroke": "#A29BFE", "edge_stroke": "#BDB6FF" }
+          ]
+        },
+        "edge_depth": {
+          "entries": [
+            { "stroke_width": 3.5 },
+            { "stroke_width": 2.5 },
+            { "stroke_width": 1.5 }
+          ]
+        }
+      }
+    }
+  }
+}

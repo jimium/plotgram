@@ -1,0 +1,69 @@
+{
+  "_comment": "entity type → 角色名对照表（文档 + 测试 oracle）。compile 解析 {role.X.Y} 时直接查 tokens.palette.X.Y，不读本文件。主题作者撰写基座 entity_types 时按此表映射 entity type → 角色名，确保命名一致。",
+  "roles": {
+    "blue": { "fill": "#E3F2FD", "stroke": "#1976D2" },
+    "orange": { "fill": "#FFF3E0", "stroke": "#E65100" },
+    "green": { "fill": "#E8F5E9", "stroke": "#2E7D32" },
+    "purple": { "fill": "#F3E5F5", "stroke": "#7B1FA2" },
+    "yellow": { "fill": "#FFF9C4", "stroke": "#F9A825" },
+    "red": { "fill": "#FFEBEE", "stroke": "#C62828" },
+    "cyan": { "fill": "#E0F7FA", "stroke": "#00838F" },
+    "brown": { "fill": "#EFEBE9", "stroke": "#4E342E" },
+    "gray": { "fill": "#F5F5F5", "stroke": "#9E9E9E" },
+    "amber": { "fill": "#FFF8E1", "stroke": "#FF8F00" },
+    "blue_gray": { "fill": "#ECEFF1", "stroke": "#455A64" },
+    "start_green": { "fill": "#C8E6C9", "stroke": "#2E7D32" },
+    "end_red": { "fill": "#FFCDD2", "stroke": "#C62828" },
+    "arch_blue": { "fill": "#E3F2FD", "stroke": "#1565C0" },
+    "root": { "fill": "#6A1B9A", "stroke": "#4A148C", "text_fill": "#FFFFFF" }
+  },
+  "mapping": {
+    "flowchart": {
+      "service": "blue",
+      "database": "orange",
+      "person": "green",
+      "client": "purple",
+      "queue": "yellow",
+      "cache": "red",
+      "gateway": "cyan",
+      "storage": "brown",
+      "external": "gray",
+      "decision": "amber",
+      "process": "blue_gray",
+      "start": "start_green",
+      "end": "end_red"
+    },
+    "sequence": {
+      "participant": "blue_gray",
+      "actor": "blue",
+      "boundary": "orange",
+      "control": "green",
+      "entity": "purple",
+      "database": "yellow"
+    },
+    "state": {
+      "initial": "start_green",
+      "state": "blue",
+      "final": "end_red",
+      "choice": "amber"
+    },
+    "architecture": {
+      "frontend": "arch_blue",
+      "backend": "green",
+      "service": "green",
+      "database": "orange",
+      "gateway": "cyan",
+      "cache": "red",
+      "queue": "yellow",
+      "storage": "brown",
+      "external": "gray",
+      "client": "purple",
+      "person": "green"
+    },
+    "er": {},
+    "mindmap": {
+      "_comment": "mindmap root 使用 root 角色（固定色）；main/branch/leaf 由 context_palettes.branch 驱动",
+      "root": "root"
+    }
+  }
+}

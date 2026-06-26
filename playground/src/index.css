@@ -1,0 +1,114 @@
+:root {
+  /* ── 字体 ─────────────────────────────────────────────── */
+  --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto,
+    'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', ui-monospace, 'Menlo', 'Consolas', monospace;
+
+  /* ── 圆角（统一 6px，更工具化） ─────────────────────── */
+  --radius: 6px;
+  --radius-sm: 4px;
+  --radius-lg: 8px;
+
+  /* ── 动画 ─────────────────────────────────────────────── */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+}
+
+/* ── 深色（默认）— 略暖的 #0f1419，减少「代码托管」感 ── */
+:root,
+[data-theme='dark'] {
+  --bg: #0f1419;
+  --panel: #151b23;
+  --panel-2: #1b2230;
+  --panel-3: #222a38;
+  --border: #3a4556;
+  --border-strong: #55617a;
+  --text: #e2e8f0;
+  --text-muted: #8b99ad;
+  --text-faint: #5a6a7e;
+  --accent: #6366f1;
+  --accent-hover: #5457e5;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(99, 102, 241, 0.15);
+  --accent-cyan: #22d3ee;
+  --accent-cyan-soft: rgba(34, 211, 238, 0.12);
+  --error: #f87171;
+  --error-soft: rgba(248, 113, 113, 0.12);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.12);
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.12);
+  --editor-bg: #0f1419;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --glow-success: 0 0 0 1px rgba(52, 211, 153, 0.3);
+  color-scheme: dark;
+}
+
+/* ── 浅色 ─────────────────────────────────────────────── */
+[data-theme='light'] {
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --panel-2: #eef0f3;
+  --panel-3: #e4e7ec;
+  --border: #dfe3ea;
+  --border-strong: #c5cbd5;
+  --text: #1a2030;
+  --text-muted: #5a6573;
+  --text-faint: #97a0ad;
+  --accent: #6366f1;
+  --accent-hover: #5457e5;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(99, 102, 241, 0.1);
+  --accent-cyan: #0891b2;
+  --accent-cyan-soft: rgba(8, 145, 178, 0.1);
+  --error: #dc2626;
+  --error-soft: rgba(220, 38, 38, 0.08);
+  --warning: #d97706;
+  --warning-soft: rgba(217, 119, 6, 0.08);
+  --success: #059669;
+  --success-soft: rgba(5, 150, 105, 0.08);
+  --editor-bg: #ffffff;
+  --overlay: rgba(15, 23, 42, 0.35);
+  --shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.08);
+  --glow-success: 0 0 0 1px rgba(5, 150, 105, 0.25);
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--sans);
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+code,
+kbd,
+pre {
+  font-family: var(--mono);
+}

@@ -1,0 +1,97 @@
+{
+  "version": "0.2",
+  "id": "mindmap.pastel-soft",
+  "extends": "mindmap.base",
+  "name": "Pastel Soft",
+  "meta": {
+    "author": "Drawify",
+    "description": "MindNode 风格：柔和粉彩色、纤细分支、药丸形节点，适合笔记整理与学习梳理",
+    "tags": ["mindmap", "light", "pastel", "soft"]
+  },
+  "tokens": {
+    "colors": {
+      "canvas": "#FAFBFC",
+      "text": "#3C4858",
+      "muted_text": "#8395A7",
+      "border": "#DFE4EA",
+      "primary": "#778BEB",
+      "neutral_fill": "#F1F2F6",
+      "neutral_stroke": "#A4B0BE",
+      "group_fill": "#F5F6FA",
+      "group_stroke": "#A4B0BE"
+    },
+    "palette": {
+      "root": { "fill": "#778BEB", "stroke": "#5F6FDB", "text_fill": "#FFFFFF" }
+    },
+    "typography": {
+      "font_weight_bold": 600
+    },
+    "radius": {
+      "sm": 6,
+      "md": 10,
+      "lg": 14
+    },
+    "spacing": {
+      "node_padding_x": 14,
+      "group_padding": 18
+    }
+  },
+  "defaults": {
+    "node": {
+      "stroke_width": "{strokes.thin}",
+      "radius": "{radius.pill}"
+    },
+    "edge": {
+      "stroke_width": "{strokes.thin}"
+    },
+    "group": {
+      "stroke_width": "{strokes.thin}"
+    }
+  },
+  "diagrams": {
+    "mindmap": {
+      "node": {
+        "stroke_width": "{strokes.thin}",
+        "radius": "{radius.pill}"
+      },
+      "entity_types": {
+        "main": {
+          "radius": "{radius.pill}"
+        },
+        "branch": {
+          "stroke": "#00000000",
+          "radius": "{radius.pill}"
+        },
+        "leaf": {
+          "fill": "#00000000",
+          "text_fill": "{colors.muted_text}",
+          "radius": "{radius.pill}"
+        }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#E8ECF8", "stroke": "#778BEB", "edge_stroke": "#A3B1E8" },
+            { "fill": "#E2F3EC", "stroke": "#55B88D", "edge_stroke": "#8ECEB0" },
+            { "fill": "#FCE8E6", "stroke": "#E77C7C", "edge_stroke": "#F0A8A8" },
+            { "fill": "#FFF3E0", "stroke": "#F0A04B", "edge_stroke": "#F5C28A" },
+            { "fill": "#F3E8F9", "stroke": "#A87FCA", "edge_stroke": "#C8A8E0" },
+            { "fill": "#E4F0F8", "stroke": "#5DA8C0", "edge_stroke": "#90C8DA" }
+          ],
+          "bindings": [
+            { "target": "entity", "types": ["main"], "fields": { "fill": "fill", "stroke": "stroke" } },
+            { "target": "entity", "types": ["branch"], "fields": { "fill": "fill" } },
+            { "target": "edge", "fields": { "stroke": "edge_stroke" } }
+          ]
+        },
+        "edge_depth": {
+          "entries": [
+            { "stroke_width": 2.0 },
+            { "stroke_width": 1.5 },
+            { "stroke_width": 1.0 }
+          ]
+        }
+      }
+    }
+  }
+}

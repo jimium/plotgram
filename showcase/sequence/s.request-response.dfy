@@ -1,0 +1,11 @@
+// 经典请求-响应：Client ↔ Server
+// Mermaid 对照: sequenceDiagram; Client->>Server: request; Server-->>Client: response
+diagram sequence {
+    title: "请求-响应"
+
+    entity client "客户端" { type: boundary }
+    entity server "服务端" { type: control }
+
+    client -> server "GET /api/health"
+    server --> client "200 OK"
+}

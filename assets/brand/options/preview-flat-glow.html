@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drawify Logo — 正式版（扁平+微光）</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'Inter', system-ui, sans-serif;
+    padding: 48px 32px;
+    background: #F8FAFC;
+    color: #1E293B;
+  }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 8px; }
+  .subtitle { color: #64748B; font-size: 14px; margin-bottom: 40px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 720px; }
+  .panel {
+    border-radius: 16px;
+    padding: 40px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  .panel.light { background: #FFFFFF; border: 1px solid #E2E8F0; }
+  .panel.dark { background: #0F0B1A; border: 1px solid #2D2748; }
+  .panel h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #94A3B8; align-self: flex-start; }
+  .panel img { height: 48px; width: auto; }
+  .panel .icon { height: 56px; width: 56px; }
+  .label { font-size: 12px; color: #64748B; }
+</style>
+</head>
+<body>
+<h1>Drawify Logo — 正式版</h1>
+<p class="subtitle">扁平 + 微光：底层环境光 + 顶层锐利图形 + 顶部高光</p>
+<div class="row">
+  <div class="panel light">
+    <h2>Light</h2>
+    <img src="../logo.svg" alt="logo">
+    <img class="icon" src="../logo-icon.svg" alt="icon">
+    <div class="label">logo.svg · logo-icon.svg</div>
+  </div>
+  <div class="panel dark">
+    <h2>Dark</h2>
+    <img src="../logo-dark.svg" alt="logo dark">
+    <div class="label">logo-dark.svg</div>
+  </div>
+</div>
+</body>
+</html>

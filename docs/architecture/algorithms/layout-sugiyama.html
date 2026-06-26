@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sugiyama 分层布局算法 — Drawify 算法文档</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #1a1d26;
+      --muted: #5c6370;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --theme: #7c3aed;
+      --theme-soft: #ede9fe;
+      --good: #059669;
+      --good-soft: #d1fae5;
+      --warn: #d97706;
+      --warn-soft: #fef3c7;
+      --danger: #dc2626;
+      --danger-soft: #fee2e2;
+      --border: #e2e5eb;
+      --code-bg: #f0f2f5;
+      --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115;
+        --card: #1a1d26;
+        --text: #e6e8ee;
+        --muted: #9aa2b1;
+        --accent: #60a5fa;
+        --accent-soft: #1e3a5f;
+        --theme: #a78bfa;
+        --theme-soft: #2e2140;
+        --good: #34d399;
+        --good-soft: #0a3322;
+        --warn: #fbbf24;
+        --warn-soft: #3d2a05;
+        --danger: #f87171;
+        --danger-soft: #3d1717;
+        --border: #2a2f3a;
+        --code-bg: #151821;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .topnav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.9rem;
+    }
+    .topnav a.back {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .topnav .crumb { color: var(--muted); }
+    .topnav .theme-toggle {
+      margin-left: auto;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--muted);
+      font: inherit;
+      border-radius: 999px;
+      padding: 0.35rem 0.8rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    header.hero {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 55%, #059669 100%);
+      color: #fff;
+      padding: 2.5rem 1.5rem 2.5rem;
+    }
+    header.hero .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+    header.hero h1 {
+      margin: 0 0 0.75rem;
+      font-size: 1.9rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    header.hero p {
+      margin: 0;
+      font-size: 1.02rem;
+      opacity: 0.92;
+      max-width: 780px;
+    }
+    header.hero .tags {
+      margin-top: 1.2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    header.hero .tag {
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.22);
+      color: #fff;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 500;
+    }
+
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem 1.5rem 1.25rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .card h2 {
+      margin: 0 0 0.5rem;
+      font-size: 1.25rem;
+      letter-spacing: -0.01em;
+    }
+    .card h3 {
+      margin: 1.25rem 0 0.4rem;
+      font-size: 1.05rem;
+    }
+    .card p { margin: 0.5rem 0; }
+    .card ul { padding-left: 1.2rem; margin: 0.4rem 0; }
+    .card li { margin: 0.2rem 0; }
+
+    code {
+      font-family: var(--mono);
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 0.05rem 0.35rem;
+      border-radius: 5px;
+      font-size: 0.88em;
+    }
+
+    .grid-2 {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+
+    .pill {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+    }
+    .pill.theme { background: var(--theme-soft); color: var(--theme); }
+    .pill.good { background: var(--good-soft); color: var(--good); }
+    .pill.warn { background: var(--warn-soft); color: var(--warn); }
+    .pill.danger { background: var(--danger-soft); color: var(--danger); }
+
+    /* Four-phase pipeline */
+    .pipeline {
+      display: grid;
+      gap: 0.9rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 720px) {
+      .pipeline { grid-template-columns: repeat(2, 1fr); }
+    }
+    .phase {
+      position: relative;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.1rem 1.2rem 1rem;
+    }
+    .phase .num {
+      position: absolute;
+      top: -14px;
+      left: 18px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+    }
+    .phase h3 {
+      margin: 0.25rem 0 0.4rem;
+      font-size: 1.05rem;
+    }
+    .phase ul { margin: 0.4rem 0 0; padding-left: 1.1rem; }
+    .phase .subtle { color: var(--muted); font-size: 0.9rem; }
+
+    /* SVG visualization */
+    .viz-shell {
+      margin-top: 1rem;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      background: var(--code-bg);
+      padding: 1rem;
+    }
+    .viz-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .viz-tab {
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      padding: 0.4rem 0.9rem;
+      border-radius: 8px;
+      font: inherit;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all .15s ease;
+    }
+    .viz-tab[aria-selected="true"] {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .viz-panel {
+      display: none;
+    }
+    .viz-panel.active { display: block; }
+    .viz-panel svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 10px;
+      background: var(--card);
+    }
+    .viz-caption {
+      margin-top: 0.6rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 0.6rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+    .legend i {
+      width: 10px; height: 10px; border-radius: 3px; display: inline-block;
+    }
+
+    /* Compare toggle (before/after) */
+    .compare-wrap {
+      margin-top: 1rem;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      background: var(--code-bg);
+      padding: 1rem;
+    }
+    .compare-switch {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.9rem;
+    }
+    .switch {
+      position: relative;
+      width: 48px; height: 26px;
+      background: var(--border);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background .15s ease;
+    }
+    .switch::after {
+      content: "";
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 20px; height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      transition: left .2s ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+    .switch.on { background: var(--good); }
+    .switch.on::after { left: 25px; }
+    .compare-status {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .compare-panel { display: none; }
+    .compare-panel.active { display: block; }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      font-size: 0.92rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.55rem 0.75rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: var(--code-bg);
+      font-weight: 600;
+    }
+
+    /* Tips */
+    .tips {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      margin-top: 0.5rem;
+    }
+    .tip {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+    }
+    .tip.good { border-left: 4px solid var(--good); }
+    .tip.warn { border-left: 4px solid var(--warn); }
+    .tip.theme { border-left: 4px solid var(--theme); }
+    .tip h4 { margin: 0 0 0.4rem; font-size: 1rem; }
+    .tip ul { padding-left: 1.1rem; margin: 0.2rem 0; }
+
+    /* Const table */
+    .consts {
+      margin-top: 0.5rem;
+      display: grid;
+      gap: 0.6rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+    .const-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.7rem 0.9rem;
+      background: var(--code-bg);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+    }
+    .const-item b { color: var(--accent); }
+
+    footer {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 1rem 1.5rem 2.5rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    footer a.back-bottom {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* ── Sugiyama animated pipeline demo ── */
+    .sugi-demo-controls { display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; margin:1rem 0 0.6rem; }
+    .sugi-btn { padding:0.45rem 1rem; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--text); cursor:pointer; font-size:0.88rem; font-family:var(--sans); transition:all .15s; }
+    .sugi-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .sugi-btn-primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .sugi-btn-primary:hover { opacity:0.88; }
+    .sugi-status { margin-left:0.5rem; font-size:0.82rem; color:var(--muted); font-family:var(--mono); }
+    .sugi-progress-wrap { margin:0.5rem 0 0.8rem; }
+    .sugi-progress-bar { height:6px; border-radius:3px; background:var(--border); overflow:hidden; }
+    .sugi-progress-fill { height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--theme)); border-radius:3px; transition:width .4s ease; }
+    .sugi-step-labels { display:flex; justify-content:space-between; margin-top:0.3rem; font-size:0.7rem; color:var(--muted); }
+    .sugi-step-labels span { text-align:center; flex:1; transition:color .2s; }
+    .sugi-step-labels span.active { color:var(--accent); font-weight:600; }
+    .sugi-canvas-wrap { background:var(--code-bg); border-radius:12px; border:1px solid var(--border); overflow:hidden; display:flex; justify-content:center; }
+    .sugi-canvas-wrap canvas { max-width:100%; height:auto; display:block; }
+    .sugi-desc { margin-top:0.7rem; font-size:0.88rem; color:var(--muted); line-height:1.5; min-height:2.4em; }
+  </style>
+</head>
+<body>
+  <nav class="topnav" aria-label="面包屑">
+    <a class="back" href="layout-algorithms-index.html">← 返回布局算法索引</a>
+    <span class="crumb">/</span>
+    <span>Sugiyama 分层布局</span>
+    <button class="theme-toggle" id="themeBtn" title="切换主题">🌓 主题</button>
+  </nav>
+
+  <header class="hero">
+    <div class="wrap">
+      <h1>Sugiyama 分层布局算法</h1>
+      <p>
+        一套面向<strong>有向图 / DAG</strong> 的经典四阶段分层布局流水线。在 Drawify 中用于
+        <em>流程图、架构图、状态机、活动图</em> 等需要体现"方向性"与"层次关系"的可视化场景。
+      </p>
+      <div class="tags">
+        <span class="tag">4-Phase Layered</span>
+        <span class="tag">DAG</span>
+        <span class="tag">Barycenter Crossing Min</span>
+        <span class="tag">Iterative Coordinate</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1. 算法概览 -->
+    <section class="card" id="overview">
+      <h2>📌 算法概览</h2>
+      <p>
+        Sugiyama 算法（Kozo Sugiyama, 1981）将布局问题分解为
+        <strong>四步串行流水线</strong>。每一步专注一个美学目标，并把复杂问题降维成可快速求解的子问题。
+      </p>
+      <div class="grid-2">
+        <div>
+          <h3>适用场景</h3>
+          <ul>
+            <li><strong>流程图 Flowchart</strong>：步骤顺序明确、依赖单向</li>
+            <li><strong>架构图 Architecture</strong>：层 / 模块依赖、调用链</li>
+            <li><strong>状态机 State diagram</strong>：状态转移有向</li>
+            <li><strong>活动图 / 任务依赖图</strong>：有明确的"完成→进行"关系</li>
+          </ul>
+        </div>
+        <div>
+          <h3>不适用场景</h3>
+          <ul>
+            <li>无向图、社交网络（建议力导向 <code>force_directed</code>）</li>
+            <li>大量环（环需要被反转，会产生"绕回"边）</li>
+            <li>语义分组优先、层次不明显（建议 <code>mindmap</code> 或力导向）</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>核心常量（来自 <code>sugiyama.rs</code>）</h3>
+      <div class="consts">
+        <div class="const-item"><b>H_GAP</b> = 60 px</div>
+        <div class="const-item"><b>V_GAP</b> = 80 px</div>
+        <div class="const-item"><b>CROSSING_ITERATIONS</b> = 6</div>
+        <div class="const-item"><b>CROSSING_WEIGHT</b> = 1.0</div>
+        <div class="const-item"><b>BENDING_WEIGHT</b> = 0.5</div>
+        <div class="const-item"><b>EDGE_LENGTH_WEIGHT</b> = 0.3</div>
+      </div>
+      <p class="subtle" style="color:var(--muted); font-size:0.9rem">
+        ER 模式会使用真实节点尺寸与中心坐标来对齐网格，从而在 ER 图上得到更紧凑的布局。
+      </p>
+    </section>
+
+    <!-- 2. 四阶段流水线 -->
+    <section class="card" id="pipeline">
+      <h2>🧩 四阶段流水线</h2>
+      <div class="pipeline">
+        <div class="phase">
+          <span class="num">P1</span>
+          <h3>Cycle Removal · 环消除</h3>
+          <p>
+            使用 <strong>DFS</strong> 遍历，识别 <em>back edge</em>（在 DFS 树上指向祖先的边），
+            然后在布局阶段把这些边<strong>反向</strong>，从而把原图变成 <strong>DAG</strong>。
+          </p>
+          <ul>
+            <li>不删除边，只是在"分层/排序"阶段反向使用</li>
+            <li>最终渲染时按原方向绘制，因此环会以"绕回"方式呈现</li>
+          </ul>
+          <p class="subtle">复杂度 O(V + E)，线性。</p>
+        </div>
+
+        <div class="phase">
+          <span class="num">P2</span>
+          <h3>Layer Assignment · 层分配</h3>
+          <p>
+            对 DAG 进行<strong>拓扑排序</strong>，按最长路径分配层：
+          </p>
+          <ul>
+            <li>每个节点的 <code>layer[v]</code> = <code>max(layer[u]) + 1</code>，u 为前驱</li>
+            <li>源节点 layer = 0（或最顶层）</li>
+            <li>同一层的节点理论上没有"先后"语义，为 P3 留出自由度</li>
+          </ul>
+          <p class="subtle">复杂度 O(V + E)。垂直（纵向）布局时，layer 对应 y 坐标；水平布局时，layer 对应 x 坐标。</p>
+        </div>
+
+        <div class="phase">
+          <span class="num">P3</span>
+          <h3>Crossing Min + Bend Optimization · 交叉与弯折优化</h3>
+          <p>
+            使用 <strong>Barycenter（重心）启发式</strong>，在相邻层之间做
+            <strong>上扫 / 下扫</strong>（up/down sweeps）迭代排序。
+          </p>
+          <ul>
+            <li>把每个节点排序到其邻居（上一层 / 下一层）的<strong>加权平均位置</strong></li>
+            <li>目标：最小化加权和 ——
+              <span class="pill">crossing × 1.0</span> +
+              <span class="pill">bending_var × 0.5</span>
+            </li>
+            <li>弯折权重较低，允许少量平滑折线路径，以换取更少交叉</li>
+          </ul>
+          <p class="subtle">每 sweep O(E + L log L)；通常 5~20 次 sweep 后稳定。</p>
+        </div>
+
+        <div class="phase">
+          <span class="num">P4</span>
+          <h3>Coordinate Assignment · 坐标分配</h3>
+          <p>
+            在层内顺序已固定的前提下，再次 <strong>上下扫迭代</strong>，
+            把每个节点推向其父 / 子 barycenter，使得长边缩短，节点向"父-子重心"靠拢。
+          </p>
+          <ul>
+            <li>目标项：<span class="pill">edge_length × 0.3</span></li>
+            <li>坐标优化后再 <strong>对齐网格</strong>（以 H_GAP / V_GAP 为步长）</li>
+            <li>支持 <strong>左→右（水平）</strong> 与 <strong>上→下（垂直）</strong> 两种流向</li>
+          </ul>
+          <p class="subtle">最后计算 group bounds 与 padding，输出中心坐标。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. 可视化：一个 6 节点示例 -->
+    <section class="card" id="visualization">
+      <h2>🎨 可视化：6 节点流程图示例</h2>
+      <p>
+        下面以一个 <strong>A → B, A → C; B → D; C → D, C → E; D → F; E → F</strong> 的有向图为例，
+        逐步观察 P2（层分配）→ P3（交叉最小化）→ P4（坐标对齐）的效果。
+      </p>
+
+      <div class="viz-shell">
+        <div class="viz-tabs" role="tablist">
+          <button class="viz-tab" role="tab" aria-selected="true" data-step="raw">原始图（未布局）</button>
+          <button class="viz-tab" role="tab" aria-selected="false" data-step="rank">P2 · 层分配</button>
+          <button class="viz-tab" role="tab" aria-selected="false" data-step="order">P3 · 层内排序</button>
+          <button class="viz-tab" role="tab" aria-selected="false" data-step="coord">P4 · 坐标对齐</button>
+        </div>
+
+        <!-- 原始图 -->
+        <div class="viz-panel active" data-step="raw">
+          <svg viewBox="0 0 560 300" role="img" aria-label="原始未布局的 6 节点 DAG">
+            <defs>
+              <marker id="arr-raw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+              </marker>
+            </defs>
+            <!-- edges -->
+            <g stroke="#94a3b8" stroke-width="1.8" fill="none" marker-end="url(#arr-raw)">
+              <path d="M90,60  L230,50"/>
+              <path d="M90,60  L220,160"/>
+              <path d="M290,50 L380,130"/>
+              <path d="M290,170 L390,135"/>
+              <path d="M290,170 L360,240"/>
+              <path d="M440,150 L500,210"/>
+              <path d="M440,260 L490,215"/>
+            </g>
+            <!-- nodes -->
+            <g font-family="system-ui, sans-serif" font-size="13" font-weight="600">
+              <g><rect x="50" y="40" width="80" height="40" rx="8" fill="#1e293b" stroke="#334155"/><text x="90" y="65" text-anchor="middle" fill="#e2e8f0">A</text></g>
+              <g><rect x="250" y="30" width="80" height="40" rx="8" fill="#334155" stroke="#475569"/><text x="290" y="55" text-anchor="middle" fill="#f1f5f9">B</text></g>
+              <g><rect x="250" y="150" width="80" height="40" rx="8" fill="#334155" stroke="#475569"/><text x="290" y="175" text-anchor="middle" fill="#f1f5f9">C</text></g>
+              <g><rect x="400" y="125" width="80" height="50" rx="8" fill="#334155" stroke="#475569"/><text x="440" y="155" text-anchor="middle" fill="#f1f5f9">D</text></g>
+              <g><rect x="320" y="235" width="80" height="50" rx="8" fill="#334155" stroke="#475569"/><text x="360" y="265" text-anchor="middle" fill="#f1f5f9">E</text></g>
+              <g><rect x="480" y="195" width="60" height="40" rx="8" fill="#1e293b" stroke="#334155"/><text x="510" y="220" text-anchor="middle" fill="#e2e8f0">F</text></g>
+            </g>
+          </svg>
+          <div class="viz-caption">节点没有规律排布，边大量交叉，难以阅读。</div>
+        </div>
+
+        <!-- P2 层分配 -->
+        <div class="viz-panel" data-step="rank">
+          <svg viewBox="0 0 600 300" role="img" aria-label="P2 层分配">
+            <defs>
+              <marker id="arr-rank" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/>
+              </marker>
+            </defs>
+            <!-- layer guide lines -->
+            <g stroke="#cbd5e1" stroke-dasharray="4 4" stroke-width="1">
+              <line x1="0" y1="60" x2="600" y2="60"/>
+              <line x1="0" y1="140" x2="600" y2="140"/>
+              <line x1="0" y1="220" x2="600" y2="220"/>
+            </g>
+            <g fill="#94a3b8" font-family="system-ui, sans-serif" font-size="11">
+              <text x="10" y="56">layer 0</text>
+              <text x="10" y="136">layer 1</text>
+              <text x="10" y="216">layer 2</text>
+              <text x="10" y="276">layer 3</text>
+            </g>
+            <g stroke="#60a5fa" stroke-width="1.8" fill="none" marker-end="url(#arr-rank)">
+              <path d="M130,50  L250,130"/>
+              <path d="M130,50  L250,130" style="display:none"/>
+              <path d="M130,50  L270,130"/>
+              <path d="M290,130 L390,210"/>
+              <path d="M310,130 L410,210"/>
+              <path d="M330,130 L430,250"/>
+              <path d="M450,210 L530,250"/>
+              <path d="M470,250 L550,250"/>
+            </g>
+            <g font-family="system-ui, sans-serif" font-size="13" font-weight="600">
+              <g><rect x="90" y="30" width="80" height="40" rx="8" fill="#2563eb"/><text x="130" y="55" text-anchor="middle" fill="#fff">A</text></g>
+              <g><rect x="250" y="110" width="80" height="40" rx="8" fill="#3b82f6"/><text x="290" y="135" text-anchor="middle" fill="#fff">B</text></g>
+              <g><rect x="270" y="110" width="80" height="40" rx="8" fill="#3b82f6" opacity="0.65"><title>C 与 B 在同层但位置未定</title></rect><text x="310" y="135" text-anchor="middle" fill="#fff">C</text></g>
+              <g><rect x="390" y="190" width="80" height="40" rx="8" fill="#0ea5e9"/><text x="430" y="215" text-anchor="middle" fill="#fff">D</text></g>
+              <g><rect x="410" y="230" width="80" height="40" rx="8" fill="#0ea5e9" opacity="0.65"><rect x="0" y="0" width="0" height="0"/></rect><text x="450" y="255" text-anchor="middle" fill="#fff">E</text></g>
+              <g><rect x="520" y="230" width="60" height="40" rx="8" fill="#059669"/><text x="550" y="255" text-anchor="middle" fill="#fff">F</text></g>
+            </g>
+          </svg>
+          <div class="viz-caption">根据最长路径：A(layer 0) → B/C(layer 1) → D/E(layer 2) → F(layer 3)。层内顺序尚随意。</div>
+        </div>
+
+        <!-- P3 层内排序 -->
+        <div class="viz-panel" data-step="order">
+          <svg viewBox="0 0 620 300" role="img" aria-label="P3 层内排序">
+            <defs>
+              <marker id="arr-ord" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#a78bfa"/>
+              </marker>
+            </defs>
+            <g stroke="#cbd5e1" stroke-dasharray="4 4" stroke-width="1">
+              <line x1="0" y1="60" x2="620" y2="60"/>
+              <line x1="0" y1="140" x2="620" y2="140"/>
+              <line x1="0" y1="220" x2="620" y2="220"/>
+            </g>
+            <g fill="#94a3b8" font-family="system-ui, sans-serif" font-size="11">
+              <text x="10" y="56">layer 0</text>
+              <text x="10" y="136">layer 1</text>
+              <text x="10" y="216">layer 2</text>
+              <text x="10" y="276">layer 3</text>
+            </g>
+            <g stroke="#a78bfa" stroke-width="1.8" fill="none" marker-end="url(#arr-ord)">
+              <path d="M130,50 L260,130"/>
+              <path d="M130,50 L420,130"/>
+              <path d="M300,130 L340,210"/>
+              <path d="M460,130 L380,210"/>
+              <path d="M460,130 L500,210"/>
+              <path d="M380,210 L560,250"/>
+              <path d="M540,210 L580,250"/>
+            </g>
+            <g font-family="system-ui, sans-serif" font-size="13" font-weight="600">
+              <g><rect x="90" y="30" width="80" height="40" rx="8" fill="#2563eb"/><text x="130" y="55" text-anchor="middle" fill="#fff">A</text></g>
+              <g><rect x="260" y="110" width="80" height="40" rx="8" fill="#7c3aed"/><text x="300" y="135" text-anchor="middle" fill="#fff">B</text></g>
+              <g><rect x="420" y="110" width="80" height="40" rx="8" fill="#7c3aed"/><text x="460" y="135" text-anchor="middle" fill="#fff">C</text></g>
+              <g><rect x="340" y="190" width="80" height="40" rx="8" fill="#a78bfa"/><text x="380" y="215" text-anchor="middle" fill="#fff">D</text></g>
+              <g><rect x="500" y="190" width="80" height="40" rx="8" fill="#a78bfa"/><text x="540" y="215" text-anchor="middle" fill="#fff">E</text></g>
+              <g><rect x="560" y="230" width="60" height="40" rx="8" fill="#059669"/><text x="590" y="255" text-anchor="middle" fill="#fff">F</text></g>
+            </g>
+          </svg>
+          <div class="viz-caption">Barycenter 把 B 放在 D 上方、C 放在 E 上方；D、E 顺序参考下层 F 的父节点重心，使边尽量平行。</div>
+        </div>
+
+        <!-- P4 坐标对齐 -->
+        <div class="viz-panel" data-step="coord">
+          <svg viewBox="0 0 620 300" role="img" aria-label="P4 坐标对齐完成">
+            <defs>
+              <marker id="arr-cd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#34d399"/>
+              </marker>
+            </defs>
+            <g stroke="#cbd5e1" stroke-dasharray="4 4" stroke-width="1">
+              <line x1="0" y1="60" x2="620" y2="60"/>
+              <line x1="0" y1="140" x2="620" y2="140"/>
+              <line x1="0" y1="220" x2="620" y2="220"/>
+            </g>
+            <g fill="#94a3b8" font-family="system-ui, sans-serif" font-size="11">
+              <text x="10" y="56">layer 0</text>
+              <text x="10" y="136">layer 1</text>
+              <text x="10" y="216">layer 2</text>
+              <text x="10" y="276">layer 3</text>
+            </g>
+            <g stroke="#15803d" stroke-width="2" fill="none" marker-end="url(#arr-cd)">
+              <path d="M130,50 L260,130"/>
+              <path d="M130,50 L460,130"/>
+              <path d="M300,130 L380,210"/>
+              <path d="M500,130 L420,210"/>
+              <path d="M500,130 L540,210"/>
+              <path d="M420,210 L580,250"/>
+              <path d="M580,210 L610,250"/>
+            </g>
+            <g font-family="system-ui, sans-serif" font-size="13" font-weight="600">
+              <g><rect x="90" y="30" width="80" height="40" rx="8" fill="#059669"/><text x="130" y="55" text-anchor="middle" fill="#fff">A</text></g>
+              <g><rect x="260" y="110" width="80" height="40" rx="8" fill="#10b981"/><text x="300" y="135" text-anchor="middle" fill="#fff">B</text></g>
+              <g><rect x="460" y="110" width="80" height="40" rx="8" fill="#10b981"/><text x="500" y="135" text-anchor="middle" fill="#fff">C</text></g>
+              <g><rect x="380" y="190" width="80" height="40" rx="8" fill="#34d399"/><text x="420" y="215" text-anchor="middle" fill="#052e16">D</text></g>
+              <g><rect x="540" y="190" width="80" height="40" rx="8" fill="#34d399"/><text x="580" y="215" text-anchor="middle" fill="#052e16">E</text></g>
+              <g><rect x="580" y="230" width="60" height="40" rx="8" fill="#065f46"/><text x="610" y="255" text-anchor="middle" fill="#fff">F</text></g>
+            </g>
+          </svg>
+          <div class="viz-caption">节点向父/子重心靠拢，再对齐到 H_GAP / V_GAP 网格；最终输出节点中心坐标与 group bounds。</div>
+        </div>
+
+        <div class="legend">
+          <span><i style="background:#2563eb"></i>源 / 顶层</span>
+          <span><i style="background:#7c3aed"></i>中间层</span>
+          <span><i style="background:#059669"></i>汇 / 末层</span>
+          <span><i style="background:#cbd5e1"></i>层辅助线</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 交互式：交叉最小化前后对比 -->
+    <section class="card" id="compare">
+      <h2>🔁 交互演示：交叉最小化 前后对比</h2>
+      <p>
+        这是同一个 6 节点图在 <strong>层内随机顺序</strong> 与 <strong>Barycenter 排序后</strong> 的对比——
+        注意边交叉次数的变化。
+      </p>
+      <div class="compare-wrap">
+        <div class="compare-switch">
+          <span>Before</span>
+          <span class="switch" id="cmpSwitch" role="switch" aria-checked="false" tabindex="0"></span>
+          <span>After</span>
+          <span class="compare-status" id="cmpStatus">状态：Before · 交叉 ≈ 4</span>
+        </div>
+
+        <!-- before -->
+        <div class="compare-panel active" data-state="before">
+          <svg viewBox="0 0 620 340" role="img" aria-label="交叉最小化之前">
+            <defs>
+              <marker id="arr-bf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444"/>
+              </marker>
+            </defs>
+            <g stroke="#cbd5e1" stroke-dasharray="4 4" stroke-width="1">
+              <line x1="0" y1="70" x2="620" y2="70"/>
+              <line x1="0" y1="170" x2="620" y2="170"/>
+              <line x1="0" y1="270" x2="620" y2="270"/>
+            </g>
+            <!-- highlight crossing -->
+            <circle cx="330" cy="170" r="14" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="3 3"/>
+            <g stroke="#ef4444" stroke-width="2" fill="none" marker-end="url(#arr-bf)" opacity="0.85">
+              <path d="M130,60 L480,160"/>
+              <path d="M130,60 L250,160"/>
+              <path d="M270,160 L290,260"/>
+              <path d="M510,160 L330,260"/>
+              <path d="M510,160 L550,260"/>
+              <path d="M330,260 L580,300"/>
+              <path d="M590,260 L610,300"/>
+            </g>
+            <g font-family="system-ui, sans-serif" font-size="13" font-weight="700">
+              <g><rect x="90" y="40" width="80" height="40" rx="8" fill="#7f1d1d"/><text x="130" y="65" text-anchor="middle" fill="#fff">A</text></g>
+              <g><rect x="470" y="140" width="80" height="40" rx="8" fill="#b91c1c"/><text x="510" y="165" text-anchor="middle" fill="#fff">B</text></g>
+              <g><rect x="230" y="140" width="80" height="40" rx="8" fill="#b91c1c"/><text x="270" y="165" text-anchor="middle" fill="#fff">C</text></g>
+              <g><rect x="250" y="240" width="80" height="40" rx="8" fill="#dc2626"/><text x="290" y="265" text-anchor="middle" fill="#fff">D</text></g>
+              <g><rect x="510" y="240" width="80" height="40" rx="8" fill="#dc2626"/><text x="550" y="265" text-anchor="middle" fill="#fff">E</text></g>
+              <g><rect x="580" y="280" width="60" height="40" rx="8" fill="#7f1d1d"/><text x="610" y="305" text-anchor="middle" fill="#fff">F</text></g>
+            </g>
+            <text x="10" y="335" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="12">⚠ 层内顺序随机，B 与 C 位置"颠倒"，引入大量边交叉。</text>
+          </svg>
+        </div>
+
+        <!-- after -->
+        <div class="compare-panel" data-state="after">
+          <svg viewBox="0 0 620 340" role="img" aria-label="交叉最小化之后">
+            <defs>
+              <marker id="arr-af" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#10b981"/>
+              </marker>
+            </defs>
+            <g stroke="#cbd5e1" stroke-dasharray="4 4" stroke-width="1">
+              <line x1="0" y1="70" x2="620" y2="70"/>
+              <line x1="0" y1="170" x2="620" y2="170"/>
+              <line x1="0" y1="270" x2="620" y2="270"/>
+            </g>
+            <g stroke="#10b981" stroke-width="2" fill="none" marker-end="url(#arr-af)">
+              <path d="M130,60 L260,160"/>
+              <path d="M130,60 L480,160"/>
+              <path d="M300,160 L340,260"/>
+              <path d="M520,160 L380,260"/>
+              <path d="M520,160 L540,260"/>
+              <path d="M380,260 L580,300"/>
+              <path d="M580,260 L610,300"/>
+            </g>
+            <g font-family="system-ui, sans-serif" font-size="13" font-weight="700">
+              <g><rect x="90" y="40" width="80" height="40" rx="8" fill="#065f46"/><text x="130" y="65" text-anchor="middle" fill="#fff">A</text></g>
+              <g><rect x="260" y="140" width="80" height="40" rx="8" fill="#047857"/><text x="300" y="165" text-anchor="middle" fill="#fff">B</text></g>
+              <g><rect x="480" y="140" width="80" height="40" rx="8" fill="#047857"/><text x="520" y="165" text-anchor="middle" fill="#fff">C</text></g>
+              <g><rect x="340" y="240" width="80" height="40" rx="8" fill="#10b981"/><text x="380" y="265" text-anchor="middle" fill="#052e16">D</text></g>
+              <g><rect x="540" y="240" width="80" height="40" rx="8" fill="#10b981"/><text x="580" y="265" text-anchor="middle" fill="#052e16">E</text></g>
+              <g><rect x="580" y="280" width="60" height="40" rx="8" fill="#065f46"/><text x="610" y="305" text-anchor="middle" fill="#fff">F</text></g>
+            </g>
+            <text x="10" y="335" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="12">✓ Barycenter 排序后，B 在 D 上方、C 在 E 上方，交叉降至 0。</text>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. 交互式动画：四阶段逐步执行 -->
+    <section class="card" id="animated-pipeline">
+      <h2>🎬 交互式动画：Sugiyama 四阶段逐步执行</h2>
+      <p>
+        观察一个含回边的 7 节点有向图如何经过 <strong>去环 → 层分配 → 交叉最小化 → 坐标分配</strong> 四个阶段，
+        逐步变成清晰的分层布局。点击按钮控制演示节奏。
+      </p>
+      <div class="sugi-demo-controls">
+        <button class="sugi-btn sugi-btn-primary" id="sugiPlayBtn">▶ 开始演示</button>
+        <button class="sugi-btn" id="sugiStepBtn">→ 下一步</button>
+        <button class="sugi-btn" id="sugiResetBtn">⟲ 重置</button>
+        <span class="sugi-status" id="sugiStatus">步骤 0/6 · 初始状态</span>
+      </div>
+      <div class="sugi-progress-wrap">
+        <div class="sugi-progress-bar"><div class="sugi-progress-fill" id="sugiProgress"></div></div>
+        <div class="sugi-step-labels">
+          <span data-i="0">初始图</span><span data-i="1">P1 去环</span><span data-i="2">P2 层分配</span><span data-i="3">P3a 交叉前</span><span data-i="4">P3b 交叉后</span><span data-i="5">P4 坐标</span>
+        </div>
+      </div>
+      <div class="sugi-canvas-wrap">
+        <canvas id="sugiCanvas" width="700" height="420"></canvas>
+      </div>
+      <p class="sugi-desc" id="sugiDesc">7 节点有向图，含回边 D→A（红色）。点击"开始演示"或"下一步"观察布局过程。</p>
+    </section>
+
+    <!-- 6. 复杂度 & 适用图类型 -->
+    <section class="card" id="complexity">
+      <h2>⚙️ 复杂度与适用图类型</h2>
+
+      <h3>理论复杂度</h3>
+      <table>
+        <thead>
+          <tr><th>阶段</th><th>方法</th><th>时间复杂度</th><th>备注</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>P1 环消除</td><td>DFS + back-edge 反转</td><td>O(V + E)</td><td>线性</td></tr>
+          <tr><td>P2 层分配</td><td>拓扑排序 + 最长路径</td><td>O(V + E)</td><td>线性</td></tr>
+          <tr><td>P3 交叉最小化</td><td>Barycenter + up/down sweeps</td><td>O(k · (E + L log L))</td><td>k = CROSSING_ITERATIONS = 6，L 为每层最大节点数</td></tr>
+          <tr><td>P4 坐标分配</td><td>迭代 barycenter + 网格对齐</td><td>O(k' · (V + E))</td><td>k' ≈ 5~15</td></tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:1.2rem">适用图类型对比</h3>
+      <table>
+        <thead>
+          <tr><th>图类型</th><th>是否推荐</th><th>理由</th><th>替代</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>流程图 Flowchart</td>
+            <td><span class="pill good">强烈推荐</span></td>
+            <td>单向步骤，层次天然存在</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>架构 / 系统依赖图</td>
+            <td><span class="pill good">推荐</span></td>
+            <td>模块分层清晰，调用链有向</td>
+            <td><code>architecture_v2</code></td>
+          </tr>
+          <tr>
+            <td>状态机</td>
+            <td><span class="pill">可用</span></td>
+            <td>有状态"流程"语义，但常含环</td>
+            <td><code>circular</code></td>
+          </tr>
+          <tr>
+            <td>ER 图（Drawify ER-mode）</td>
+            <td><span class="pill">默认</span></td>
+            <td>用真实节点尺寸 + 中心坐标做网格对齐</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>无向图 / 社交网络</td>
+            <td><span class="pill danger">不推荐</span></td>
+            <td>没有"方向"语义，力导向更自然</td>
+            <td><code>force_directed</code></td>
+          </tr>
+          <tr>
+            <td>思维导图</td>
+            <td><span class="pill warn">次优</span></td>
+            <td>语义分组优先，建议放射/树状布局</td>
+            <td><code>mindmap</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 6. Tips：什么时候该用 Sugiyama -->
+    <section class="card" id="tips">
+      <h2>💡 Tips：什么时候选择 Sugiyama</h2>
+      <div class="tips">
+        <div class="tip good">
+          <h4>✅ 当你需要"阅读顺序"</h4>
+          <ul>
+            <li>读者可以顺着 layer 顺序自上而下/自左向右理解流程</li>
+            <li>同层=同级语义，适合步骤 / 阶段可视化</li>
+          </ul>
+        </div>
+        <div class="tip warn">
+          <h4>⚠️ 当图里有环时</h4>
+          <ul>
+            <li>P1 会把环"绕回"以虚线或反向路径呈现</li>
+            <li>环越多，布局越"绕"；此时考虑 <code>circular</code> 或 <code>force_directed</code></li>
+          </ul>
+        </div>
+        <div class="tip theme">
+          <h4>🎯 当你想控制流向</h4>
+          <ul>
+            <li>支持 top→bottom 与 left→right</li>
+            <li>结合 ER-mode 可让节点以真实尺寸对齐到规则网格</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <a class="back-bottom" href="layout-algorithms-index.html">← 返回布局算法索引 · layout-algorithms-index.html</a>
+    <p style="margin-top:0.5rem">© Drawify · 算法文档 · Sugiyama 分层布局</p>
+  </footer>
+
+  <script>
+    // Step tabs
+    (function () {
+      var tabs = document.querySelectorAll('.viz-tab');
+      var panels = document.querySelectorAll('.viz-panel');
+      tabs.forEach(function (t) {
+        t.addEventListener('click', function () {
+          var step = t.getAttribute('data-step');
+          tabs.forEach(function (x) { x.setAttribute('aria-selected', x === t ? 'true' : 'false'); });
+          panels.forEach(function (p) {
+            p.classList.toggle('active', p.getAttribute('data-step') === step);
+          });
+        });
+      });
+    })();
+
+    // Compare switch
+    (function () {
+      var sw = document.getElementById('cmpSwitch');
+      var status = document.getElementById('cmpStatus');
+      var panels = document.querySelectorAll('.compare-panel');
+      function setState(on) {
+        sw.classList.toggle('on', on);
+        sw.setAttribute('aria-checked', on ? 'true' : 'false');
+        panels.forEach(function (p) {
+          p.classList.toggle('active',
+            (on && p.getAttribute('data-state') === 'after') ||
+            (!on && p.getAttribute('data-state') === 'before')
+          );
+        });
+        status.textContent = on
+          ? '状态：After · 交叉 ≈ 0'
+          : '状态：Before · 交叉 ≈ 4';
+      }
+      sw.addEventListener('click', function () { setState(!sw.classList.contains('on')); });
+      sw.addEventListener('keydown', function (e) {
+        if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setState(!sw.classList.contains('on')); }
+      });
+      setState(false);
+    })();
+
+    // Theme toggle（在系统自动基础上再加一层手动切换）
+    (function () {
+      var btn = document.getElementById('themeBtn');
+      var mql = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+      var key = 'sugiyama-theme';
+      function apply(mode) {
+        if (mode === 'light') { document.documentElement.setAttribute('data-theme', 'light'); }
+        else if (mode === 'dark') { document.documentElement.setAttribute('data-theme', 'dark'); }
+        else { document.documentElement.removeAttribute('data-theme'); }
+      }
+      var saved = localStorage.getItem(key);
+      if (saved) apply(saved);
+      btn.addEventListener('click', function () {
+        var cur = document.documentElement.getAttribute('data-theme');
+        var next;
+        if (!cur) next = mql && mql.matches ? 'light' : 'dark';
+        else next = cur === 'dark' ? 'light' : 'dark';
+        if (next) { localStorage.setItem(key, next); apply(next); }
+      });
+    })();
+
+    // ========== Sugiyama animated pipeline ==========
+    (function () {
+      var canvas = document.getElementById('sugiCanvas');
+      var ctx = canvas.getContext('2d');
+      var dpr = window.devicePixelRatio || 1;
+      var W = 700, H = 420;
+      canvas.width = W * dpr; canvas.height = H * dpr;
+      canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+      ctx.scale(dpr, dpr);
+
+      var playBtn = document.getElementById('sugiPlayBtn');
+      var stepBtn = document.getElementById('sugiStepBtn');
+      var resetBtn = document.getElementById('sugiResetBtn');
+      var statusEl = document.getElementById('sugiStatus');
+      var progressEl = document.getElementById('sugiProgress');
+      var descEl = document.getElementById('sugiDesc');
+      var stepLabels = document.querySelectorAll('.sugi-step-labels span');
+
+      // Node definitions: id, label, layer colors
+      var nodeIds = ['A','B','C','D','E','F','G'];
+      var layerColors = ['#3b82f6','#6366f1','#8b5cf6','#a855f7'];
+      var layerOf = { A:0, B:1, C:1, D:2, E:2, F:3, G:3 };
+
+      // Edges: [from, to, isBackEdge]
+      var edges = [
+        ['A','B',false],['A','C',false],['B','D',false],['C','D',false],
+        ['C','E',false],['D','F',false],['E','F',false],['F','G',false],
+        ['E','G',false],['D','A',true]  // back edge
+      ];
+
+      // Positions for each step (7 nodes x {x,y})
+      var NW = 64, NH = 32;
+      var PAD = 50, HGAP = 100, VGAP = 90;
+
+      // Step 0: scattered random
+      var scattered = { A:{x:120,y:60}, B:{x:350,y:30}, C:{x:530,y:80}, D:{x:200,y:200}, E:{x:480,y:180}, F:{x:300,y:320}, G:{x:560,y:340} };
+      // Step 1: same but back edge reversed (visual cue only)
+      // Step 2: assigned to layers
+      function layerX(layer, idx, count) { return PAD + 80 + idx * HGAP + (3 - count) * HGAP / 2; }
+      function layerY(layer) { return PAD + 30 + layer * VGAP; }
+      var layered = {
+        A: {x: layerX(0,0,1), y: layerY(0)},
+        B: {x: layerX(1,0,2), y: layerY(1)}, C: {x: layerX(1,1,2), y: layerY(1)},
+        D: {x: layerX(2,0,2), y: layerY(2)}, E: {x: layerX(2,1,2), y: layerY(2)},
+        F: {x: layerX(3,0,2), y: layerY(3)}, G: {x: layerX(3,1,2), y: layerY(3)}
+      };
+      // Step 3: bad ordering (C before B on layer 1)
+      var badOrder = {
+        A: {x: layerX(0,0,1), y: layerY(0)},
+        C: {x: layerX(1,0,2), y: layerY(1)}, B: {x: layerX(1,1,2), y: layerY(1)},
+        D: {x: layerX(2,0,2), y: layerY(2)}, E: {x: layerX(2,1,2), y: layerY(2)},
+        F: {x: layerX(3,0,2), y: layerY(3)}, G: {x: layerX(3,1,2), y: layerY(3)}
+      };
+      // Step 4: good ordering (B before C)
+      var goodOrder = JSON.parse(JSON.stringify(layered));
+      // Step 5: final optimized coordinates (centered, better spacing)
+      var final_ = {
+        A: {x: 320, y: layerY(0)},
+        B: {x: 200, y: layerY(1)}, C: {x: 440, y: layerY(1)},
+        D: {x: 240, y: layerY(2)}, E: {x: 480, y: layerY(2)},
+        F: {x: 300, y: layerY(3)}, G: {x: 500, y: layerY(3)}
+      };
+
+      var stepPositions = [scattered, scattered, layered, badOrder, goodOrder, final_];
+      var stepDescs = [
+        '7 节点有向图，含回边 D→A（红色）。这是布局前的原始图。',
+        'Phase 1 完成：DFS 检测到回边 D→A，将其反转（绿色虚线 A→D），图变为 DAG。',
+        'Phase 2 完成：最长路径法分配层级。A→层0，B/C→层1，D/E→层2，F/G→层3。',
+        'Phase 3a：层内随机排列，C 在 B 前面。注意边交叉（红色圆圈标记）。',
+        'Phase 3b：Barycenter 排序后 B、C 互换，交叉数降为 0。边不再交叉。',
+        'Phase 4 完成：迭代优化坐标，节点居中对齐，边长更均匀。最终布局。'
+      ];
+      var stepStatuses = [
+        '步骤 0/6 · 初始状态',
+        '步骤 1/6 · P1 去环',
+        '步骤 2/6 · P2 层分配',
+        '步骤 3/6 · P3a 交叉前',
+        '步骤 4/6 · P3b 交叉后',
+        '步骤 5/6 · P4 坐标分配'
+      ];
+
+      var currentStep = 0;
+      var animating = false;
+      var animPositions = {};
+      var autoTimer = null;
+
+      // Initialize anim positions
+      function initAnimPositions() {
+        nodeIds.forEach(function(id) { animPositions[id] = {x: stepPositions[0][id].x, y: stepPositions[0][id].y}; });
+      }
+      initAnimPositions();
+
+      function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+      function lerp(a, b, t) { return a + (b - a) * t; }
+
+      function animateTo(step, cb) {
+        if (animating) return;
+        animating = true;
+        var target = stepPositions[step];
+        var start = {};
+        nodeIds.forEach(function(id) { start[id] = {x: animPositions[id].x, y: animPositions[id].y}; });
+        var duration = 700;
+        var t0 = null;
+        function frame(ts) {
+          if (!t0) t0 = ts;
+          var p = Math.min((ts - t0) / duration, 1);
+          var ep = easeOut(p);
+          nodeIds.forEach(function(id) {
+            animPositions[id].x = lerp(start[id].x, target[id].x, ep);
+            animPositions[id].y = lerp(start[id].y, target[id].y, ep);
+          });
+          draw(step);
+          if (p < 1) { requestAnimationFrame(frame); }
+          else { animating = false; if (cb) cb(); }
+        }
+        requestAnimationFrame(frame);
+      }
+
+      function draw(step) {
+        ctx.clearRect(0, 0, W, H);
+        // Background grid
+        ctx.save();
+        ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#e2e5eb';
+        ctx.lineWidth = 0.5;
+        for (var gx = 0; gx < W; gx += 40) { ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+        for (var gy = 0; gy < H; gy += 40) { ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
+        ctx.restore();
+
+        // Layer lines (from step 2+)
+        if (step >= 2) {
+          ctx.save();
+          ctx.setLineDash([6, 4]);
+          ctx.strokeStyle = '#94a3b8';
+          ctx.lineWidth = 1;
+          for (var li = 0; li < 4; li++) {
+            var ly = PAD + 30 + li * VGAP + NH / 2;
+            ctx.beginPath(); ctx.moveTo(PAD - 20, ly); ctx.lineTo(W - PAD + 20, ly); ctx.stroke();
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '11px system-ui, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText('Layer ' + li, PAD - 25, ly + 4);
+          }
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
+
+        // Edges
+        edges.forEach(function(e) {
+          var from = animPositions[e[0]], to = animPositions[e[1]];
+          var isBack = e[2];
+          ctx.save();
+          ctx.beginPath();
+          if (step === 1 && isBack) {
+            // Reversed: draw as A→D with green dashed
+            ctx.setLineDash([5, 3]);
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 2.5;
+            ctx.moveTo(from.x + NW/2, from.y + NH);
+            ctx.lineTo(to.x + NW/2, to.y);
+          } else if (isBack && step < 1) {
+            // Back edge: red
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            ctx.moveTo(from.x + NW/2, from.y + NH);
+            ctx.bezierCurveTo(from.x + NW/2 + 60, from.y + NH + 40, to.x + NW/2 - 60, to.y - 40, to.x + NW/2, to.y);
+          } else if (isBack) {
+            // After reversal, show as normal green dashed
+            ctx.setLineDash([5, 3]);
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 1.5;
+            ctx.moveTo(from.x + NW/2, from.y + NH);
+            ctx.lineTo(to.x + NW/2, to.y);
+          } else {
+            ctx.strokeStyle = step >= 4 ? '#10b981' : (step === 3 ? '#ef4444' : '#64748b');
+            ctx.lineWidth = 1.8;
+            var fx = from.x + NW/2, fy = from.y + NH;
+            var tx = to.x + NW/2, ty = to.y;
+            if (step >= 2) {
+              ctx.moveTo(fx, fy); ctx.lineTo(tx, ty);
+            } else {
+              ctx.moveTo(fx, fy);
+              ctx.bezierCurveTo(fx, fy + 30, tx, ty - 30, tx, ty);
+            }
+          }
+          ctx.stroke();
+          // Arrowhead
+          if (!isBack || step >= 1) {
+            var ax, ay, angle;
+            if (step >= 2 && !(isBack && step < 1)) {
+              var src = (step === 1 && isBack) ? from : (isBack ? from : from);
+              var tgt = (step === 1 && isBack) ? to : (isBack ? to : to);
+              ax = tgt.x + NW/2; ay = tgt.y;
+              angle = Math.atan2(ay - (src.y + NH), ax - (src.x + NW/2));
+            } else {
+              ax = to.x + NW/2; ay = to.y;
+              angle = Math.atan2(ay - (from.y + NH), ax - (from.x + NW/2));
+            }
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(ax, ay);
+            ctx.lineTo(ax - 8 * Math.cos(angle - 0.35), ay - 8 * Math.sin(angle - 0.35));
+            ctx.lineTo(ax - 8 * Math.cos(angle + 0.35), ay - 8 * Math.sin(angle + 0.35));
+            ctx.closePath();
+            ctx.fillStyle = step >= 4 ? '#10b981' : (step === 3 ? '#ef4444' : (isBack && step >= 1 ? '#10b981' : '#64748b'));
+            ctx.fill();
+          }
+          ctx.restore();
+        });
+
+        // Crossing markers for step 3
+        if (step === 3) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(320, layerY(1) + NH/2 + VGAP/2, 16, 0, Math.PI * 2);
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([3, 3]);
+          ctx.stroke();
+          ctx.fillStyle = '#ef4444';
+          ctx.font = 'bold 11px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('交叉!', 320, layerY(1) + NH/2 + VGAP/2 + 4);
+          ctx.restore();
+        }
+
+        // Nodes
+        nodeIds.forEach(function(id) {
+          var pos = animPositions[id];
+          var layer = layerOf[id];
+          var color = layerColors[layer];
+          ctx.save();
+          // Shadow
+          ctx.shadowColor = 'rgba(0,0,0,0.15)';
+          ctx.shadowBlur = 6;
+          ctx.shadowOffsetY = 2;
+          // Rounded rect
+          var rx = pos.x, ry = pos.y;
+          ctx.beginPath();
+          ctx.moveTo(rx + 8, ry);
+          ctx.lineTo(rx + NW - 8, ry);
+          ctx.quadraticCurveTo(rx + NW, ry, rx + NW, ry + 8);
+          ctx.lineTo(rx + NW, ry + NH - 8);
+          ctx.quadraticCurveTo(rx + NW, ry + NH, rx + NW - 8, ry + NH);
+          ctx.lineTo(rx + 8, ry + NH);
+          ctx.quadraticCurveTo(rx, ry + NH, rx, ry + NH - 8);
+          ctx.lineTo(rx, ry + 8);
+          ctx.quadraticCurveTo(rx, ry, rx + 8, ry);
+          ctx.closePath();
+          ctx.fillStyle = color;
+          ctx.fill();
+          ctx.shadowColor = 'transparent';
+          ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          // Label
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 13px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(id, rx + NW/2, ry + NH/2);
+          ctx.restore();
+        });
+
+        // Step indicator overlay
+        ctx.save();
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#5c6370';
+        ctx.font = '12px system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        var labels = ['初始图','P1: 去环','P2: 层分配','P3a: 交叉前','P3b: 交叉后','P4: 坐标'];
+        ctx.fillText('当前: ' + labels[step], 12, H - 12);
+        ctx.restore();
+      }
+
+      function setStep(step) {
+        currentStep = step;
+        statusEl.textContent = stepStatuses[step];
+        descEl.textContent = stepDescs[step];
+        progressEl.style.width = (step / 5 * 100) + '%';
+        stepLabels.forEach(function(s) {
+          s.classList.toggle('active', parseInt(s.getAttribute('data-i')) === step);
+        });
+      }
+
+      function advanceStep() {
+        if (animating) return;
+        if (currentStep >= 5) return;
+        var next = currentStep + 1;
+        animateTo(next, function() { setStep(next); });
+        setStep(next);
+      }
+
+      function reset() {
+        if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+        animating = false;
+        currentStep = 0;
+        initAnimPositions();
+        setStep(0);
+        draw(0);
+      }
+
+      function autoPlay() {
+        if (currentStep >= 5) reset();
+        function go() {
+          if (currentStep >= 5) return;
+          advanceStep();
+          autoTimer = setTimeout(go, 1200);
+        }
+        go();
+      }
+
+      playBtn.addEventListener('click', autoPlay);
+      stepBtn.addEventListener('click', function() { if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; } advanceStep(); });
+      resetBtn.addEventListener('click', reset);
+
+      // Theme change redraw
+      var observer = new MutationObserver(function() { draw(currentStep); });
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+      draw(0);
+    })();
+  </script>
+</body>
+</html>

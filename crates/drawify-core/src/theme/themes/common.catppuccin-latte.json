@@ -1,0 +1,77 @@
+{
+  "version": "0.2",
+  "id": "common.catppuccin-latte",
+  "name": "Catppuccin Latte",
+  "meta": {
+    "author": "Drawify",
+    "description": "灵感来自 Catppuccin Latte：Mocha 的浅色姊妹版，柔和粉彩底 + 饱和强调色",
+    "tags": ["catppuccin", "latte", "light", "pastel", "inspired"]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#eff1f5",
+      "text": "#4c4f69",
+      "muted_text": "#6c6f85",
+      "border": "#ccd0da",
+      "primary": "#1e66f5",
+      "neutral_fill": "#e6e9ef",
+      "neutral_stroke": "#6c6f85",
+      "group_fill": "#e6e9ef",
+      "group_stroke": "#ccd0da"
+    },
+    "palette": {
+      "blue": { "fill": "#dce5ff", "stroke": "#1e66f5" },
+      "orange": { "fill": "#ffe5d0", "stroke": "#fe640b" },
+      "green": { "fill": "#d8f0d0", "stroke": "#40a02b" },
+      "purple": { "fill": "#ede0ff", "stroke": "#8839ef" },
+      "yellow": { "fill": "#fff0c0", "stroke": "#df8e1d" },
+      "red": { "fill": "#ffd0d8", "stroke": "#d20f39" },
+      "cyan": { "fill": "#d0f0f8", "stroke": "#04a5e5" },
+      "brown": { "fill": "#e6e9ef", "stroke": "#6c6f85" },
+      "gray": { "fill": "#eff1f5", "stroke": "#9ca0b0" },
+      "amber": { "fill": "#ffe5d0", "stroke": "#fe640b" },
+      "blue_gray": { "fill": "#e6e9ef", "stroke": "#4c4f69" },
+      "start_green": { "fill": "#d8f0d0", "stroke": "#40a02b" },
+      "end_red": { "fill": "#ffd0d8", "stroke": "#d20f39" },
+      "arch_blue": { "fill": "#dce5ff", "stroke": "#1e66f5" },
+      "root": { "fill": "#8839ef", "stroke": "#1e66f5", "text_fill": "#eff1f5" }
+    }
+  },
+  "diagrams": {
+    "flowchart": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "sequence": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "state": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "architecture": {
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "er": {
+      "node": { "fill": "#eff1f5", "stroke": "#1e66f5" },
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "mindmap": {
+      "edge": { "stroke_width": "{strokes.normal}" },
+      "entity_types": {
+        "leaf": { "fill": "#e6e9ef" }
+      },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#dce5ff", "stroke": "#1e66f5", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>节点布局算法集 — Drawify 算法文档</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #1a1d26;
+      --muted: #5c6370;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --theme: #7c3aed;
+      --theme-soft: #ede9fe;
+      --good: #059669;
+      --good-soft: #d1fae5;
+      --warn: #d97706;
+      --warn-soft: #fef3c7;
+      --danger: #dc2626;
+      --danger-soft: #fee2e2;
+      --border: #e2e5eb;
+      --code-bg: #f0f2f5;
+      --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      --sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115;
+        --card: #1a1d26;
+        --text: #e6e8ee;
+        --muted: #9aa2b1;
+        --accent: #60a5fa;
+        --accent-soft: #1e3a5f;
+        --theme: #a78bfa;
+        --theme-soft: #2e2140;
+        --good: #34d399;
+        --good-soft: #0a3322;
+        --warn: #fbbf24;
+        --warn-soft: #3d2a05;
+        --danger: #f87171;
+        --danger-soft: #3d1717;
+        --border: #2a2f3a;
+        --code-bg: #151821;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-beavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .topnav {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.9rem;
+    }
+    .topnav a.back {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .topnav .crumb { color: var(--muted); }
+    .topnav .theme-toggle {
+      margin-left: auto;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--muted);
+      font: inherit;
+      border-radius: 999px;
+      padding: 0.35rem 0.8rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    header.hero {
+      background: linear-gradient(135deg, #0f4c75 0%, #2563eb 40%, #7c3aed 70%, #db2777 100%);
+      color: #fff;
+      padding: 2.5rem 1.5rem 2.5rem;
+    }
+    header.hero .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+    header.hero h1 {
+      margin: 0 0 0.75rem;
+      font-size: 1.9rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    header.hero p {
+      margin: 0;
+      font-size: 1.02rem;
+      opacity: 0.92;
+      max-width: 780px;
+    }
+    header.hero .tags {
+      margin-top: 1.2rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    header.hero .tag {
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.22);
+      color: #fff;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 500;
+    }
+
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    /* Quick nav */
+    .quick-nav {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem 1.5rem;
+    }
+    .quick-nav h2 { margin: 0 0 0.75rem; font-size: 1.15rem; }
+    .quick-nav .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .quick-nav .nav-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.35rem 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 0.88rem;
+      color: var(--text);
+      background: var(--code-bg);
+      transition: all .15s ease;
+    }
+    .quick-nav .nav-link:hover {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    /* Algorithm card */
+    .algo-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem 1.5rem 1.25rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .algo-card h2 {
+      margin: 0 0 0.5rem;
+      font-size: 1.25rem;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .algo-card h3 {
+      margin: 1.25rem 0 0.4rem;
+      font-size: 1.05rem;
+    }
+    .algo-card p { margin: 0.5rem 0; }
+    .algo-card ul { padding-left: 1.2rem; margin: 0.4rem 0; }
+    .algo-card li { margin: 0.2rem 0; }
+
+    .algo-header {
+      display: flex;
+      gap: 1.25rem;
+      align-items: flex-start;
+    }
+    @media (max-width: 600px) {
+      .algo-header { flex-direction: column; }
+    }
+    .algo-header .viz-mini {
+      flex-shrink: 0;
+      width: 180px;
+      height: 140px;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      background: var(--code-bg);
+      overflow: hidden;
+    }
+    .algo-header .viz-mini svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .algo-header .info { flex: 1; min-width: 0; }
+    .algo-header .info .key-idea {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin: 0.3rem 0 0.6rem;
+    }
+
+    code {
+      font-family: var(--mono);
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 0.05rem 0.35rem;
+      border-radius: 5px;
+      font-size: 0.88em;
+    }
+
+    .pill {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+    }
+    .pill.theme { background: var(--theme-soft); color: var(--theme); }
+    .pill.good { background: var(--good-soft); color: var(--good); }
+    .pill.warn { background: var(--warn-soft); color: var(--warn); }
+    .pill.danger { background: var(--danger-soft); color: var(--danger); }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin: 0.6rem 0 0;
+    }
+
+    .grid-2 {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+
+    /* Tips */
+    .tips {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      margin-top: 0.5rem;
+    }
+    .tip {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+    }
+    .tip.good { border-left: 4px solid var(--good); }
+    .tip.warn { border-left: 4px solid var(--warn); }
+    .tip.theme { border-left: 4px solid var(--theme); }
+    .tip.danger { border-left: 4px solid var(--danger); }
+    .tip h4 { margin: 0 0 0.4rem; font-size: 1rem; }
+    .tip ul { padding-left: 1.1rem; margin: 0.2rem 0; }
+
+    /* Const cards */
+    .consts {
+      margin-top: 0.5rem;
+      display: grid;
+      gap: 0.6rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+    .const-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.7rem 0.9rem;
+      background: var(--code-bg);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+    }
+    .const-item b { color: var(--accent); }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      font-size: 0.92rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.55rem 0.75rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: var(--code-bg);
+      font-weight: 600;
+    }
+
+    /* Comparison table */
+    .compare-table-wrap { overflow-x: auto; }
+
+    /* Interactive Demo */
+    .demo-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .demo-section h2 {
+      margin: 0 0 0.75rem;
+      font-size: 1.25rem;
+      letter-spacing: -0.01em;
+    }
+    .demo-canvas-wrap {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .demo-canvas-wrap canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+    .demo-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .demo-btn {
+      padding: 0.4rem 0.9rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--code-bg);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+    .demo-btn:hover {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .demo-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .demo-btn-action {
+      padding: 0.4rem 1rem;
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      font: inherit;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: all .15s ease;
+      font-weight: 600;
+    }
+    .demo-btn-action:hover { opacity: 0.85; }
+    .demo-btn-action.reset {
+      background: transparent;
+      color: var(--muted);
+      border-color: var(--border);
+    }
+    .demo-btn-action.reset:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: var(--danger-soft);
+    }
+    .demo-separator {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+      margin: 0 0.25rem;
+    }
+
+    footer {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 1rem 1.5rem 2.5rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    footer a.back-bottom {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: var(--accent);
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <nav class="topnav" aria-label="面包屑">
+    <a class="back" href="layout-algorithms-index.html">← 返回布局算法索引</a>
+    <span class="crumb">/</span>
+    <span>节点布局算法集</span>
+    <button class="theme-toggle" id="themeBtn" title="切换主题">🌓 主题</button>
+  </nav>
+
+  <header class="hero">
+    <div class="wrap">
+      <h1>节点布局算法集</h1>
+      <p>
+        Drawify 内置 <strong>7 种</strong>节点布局算法，
+        覆盖从简单 DAG 到序列图、从思维导图到架构图的多种可视化场景。其中 6 种为<strong>确定性</strong>输出——
+        相同输入始终产生相同布局，适合文档渲染与自动化流水线；Force-Directed 为非确定性。
+      </p>
+      <div class="tags">
+        <span class="tag">6 Deterministic + 1 Non-det</span>
+        <span class="tag">O(V+E) 级别</span>
+        <span class="tag">10–320 nodes</span>
+        <span class="tag">7 Algorithms</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Quick Nav -->
+    <section class="quick-nav">
+      <h2>📑 快速导航</h2>
+      <div class="nav-links">
+        <a class="nav-link" href="#mindmap">🧠 Mindmap</a>
+        <a class="nav-link" href="#circular">🔄 Circular</a>
+        <a class="nav-link" href="#sequence">📨 Sequence</a>
+        <a class="nav-link" href="#force-directed">🧲 Force-Directed</a>
+        <a class="nav-link" href="#sugiyama-v2">✨ Sugiyama V2</a>
+        <a class="nav-link" href="#architecture-v2">🏗️ Architecture V2</a>
+      </div>
+    </section>
+
+    <!-- Interactive Demo -->
+    <section class="demo-section">
+      <h2>🎬 交互式演示：布局算法对比</h2>
+      <p style="margin:0 0 1rem;color:var(--muted);font-size:0.95rem">
+        同一张图（8 节点 DAG：A→B, A→C, B→D, C→D, C→E, D→F, E→G, F→H, G→H）在不同布局算法下的实时动画对比。点击算法按钮即时切换，或选择后点击「应用布局」查看平滑过渡。
+      </p>
+      <div class="demo-canvas-wrap">
+        <canvas id="layoutDemoCanvas" width="700" height="400"></canvas>
+      </div>
+      <div class="demo-controls">
+        <button class="demo-btn" data-layout="circular">Circular</button>
+        <button class="demo-btn" data-layout="radial">Radial</button>
+        <button class="demo-btn" data-layout="force-directed">Force-Directed</button>
+        <button class="demo-btn" data-layout="sugiyama">Sugiyama</button>
+        <span class="demo-separator"></span>
+        <button class="demo-btn-action" id="demoApplyBtn">▶ 应用布局</button>
+        <button class="demo-btn-action reset" id="demoResetBtn">⟲ 重置</button>
+      </div>
+    </section>
+
+    <!-- ==================== 1. Mindmap ==================== -->
+    <section class="algo-card" id="mindmap">
+      <h2>🧠 Mindmap · 思维导图布局</h2>
+      <div class="algo-header">
+        <div class="viz-mini">
+          <svg viewBox="0 0 180 140" role="img" aria-label="Mindmap 布局示意">
+            <defs>
+              <marker id="arr-m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#a78bfa"/>
+              </marker>
+            </defs>
+            <!-- Edges (radial from center) -->
+            <g stroke="#a78bfa" stroke-width="1.2" fill="none" marker-end="url(#arr-m)">
+              <path d="M90,70 L40,30"/>
+              <path d="M90,70 L150,30"/>
+              <path d="M90,70 L30,90"/>
+              <path d="M90,70 L150,100"/>
+              <path d="M40,30 L20,12"/>
+              <path d="M40,30 L55,12"/>
+              <path d="M150,30 L135,12"/>
+              <path d="M150,30 L168,12"/>
+              <path d="M30,90 L14,110"/>
+              <path d="M150,100 L168,118"/>
+            </g>
+            <!-- Root -->
+            <ellipse cx="90" cy="70" rx="22" ry="14" fill="#7c3aed"/><text x="90" y="74" text-anchor="middle" fill="#fff" font-family="system-ui" font-size="9" font-weight="700">Root</text>
+            <!-- Main branches -->
+            <g font-family="system-ui, sans-serif" font-size="8" font-weight="600">
+              <rect x="24" y="20" width="32" height="16" rx="8" fill="#a78bfa"/><text x="40" y="31" text-anchor="middle" fill="#fff">M1</text>
+              <rect x="134" y="20" width="32" height="16" rx="8" fill="#a78bfa"/><text x="150" y="31" text-anchor="middle" fill="#fff">M2</text>
+              <rect x="14" y="80" width="32" height="16" rx="8" fill="#a78bfa"/><text x="30" y="91" text-anchor="middle" fill="#fff">M3</text>
+              <rect x="134" y="90" width="32" height="16" rx="8" fill="#a78bfa"/><text x="150" y="101" text-anchor="middle" fill="#fff">M4</text>
+            </g>
+            <!-- Leaves -->
+            <g font-family="system-ui, sans-serif" font-size="7">
+              <rect x="6" y="4" width="24" height="12" rx="6" fill="#c4b5fd"/><text x="18" y="13" text-anchor="middle" fill="#4c1d95">L</text>
+              <rect x="42" y="4" width="24" height="12" rx="6" fill="#c4b5fd"/><text x="54" y="13" text-anchor="middle" fill="#4c1d95">L</text>
+              <rect x="122" y="4" width="24" height="12" rx="6" fill="#c4b5fd"/><text x="134" y="13" text-anchor="middle" fill="#4c1d95">L</text>
+              <rect x="156" y="4" width="24" height="12" rx="6" fill="#c4b5fd"/><text x="168" y="13" text-anchor="middle" fill="#4c1d95">L</text>
+              <rect x="0" y="104" width="24" height="12" rx="6" fill="#c4b5fd"/><text x="12" y="113" text-anchor="middle" fill="#4c1d95">L</text>
+              <rect x="156" y="112" width="24" height="12" rx="6" fill="#c4b5fd"/><text x="168" y="121" text-anchor="middle" fill="#4c1d95">L</text>
+            </g>
+          </svg>
+        </div>
+        <div class="info">
+          <div class="key-idea">中心辐射 / 单向树布局，支持 radial / top-to-bottom / left-to-right 方向，根 / 主干 / 分支 / 叶节点差异化尺寸</div>
+          <div class="meta-row">
+            <span class="pill">O(V+E)</span>
+            <span class="pill good">确定性</span>
+            <span class="pill theme">10–200 nodes</span>
+            <span class="pill warn">mindmap.rs</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>核心思想</h3>
+      <p>
+        以根节点为中心，子节点沿指定方向（径向 / 自上而下 / 自左向右）逐层展开。
+        不同层级节点采用<strong>差异化尺寸</strong>：根节点最大，主干次之，分支较小，叶节点最小——
+        视觉上自然呈现"主干→分支→叶子"的层次感。
+      </p>
+
+      <h3>方向模式</h3>
+      <div class="consts">
+        <div class="const-item"><b>radial</b> · 中心辐射（默认）</div>
+        <div class="const-item"><b>top-to-bottom</b> · 自上而下树</div>
+        <div class="const-item"><b>left-to-right</b> · 自左向右树</div>
+      </div>
+
+      <h3>节点尺寸分级</h3>
+      <table>
+        <thead>
+          <tr><th>层级</th><th>相对尺寸</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Root（根）</td><td>最大</td><td>居中放置，视觉焦点</td></tr>
+          <tr><td>Main（主干）</td><td>较大</td><td>一级子节点，粗线条连接</td></tr>
+          <tr><td>Branch（分支）</td><td>中等</td><td>二级及以下子节点</td></tr>
+          <tr><td>Leaf（叶）</td><td>最小</td><td>无子节点的末端</td></tr>
+        </tbody>
+      </table>
+
+      <h3>适用场景</h3>
+      <ul>
+        <li><strong>知识树</strong>：概念层级、分类体系</li>
+        <li><strong>会议笔记</strong>：主题→要点→细节</li>
+        <li><strong>学习路径</strong>：课程→章节→知识点</li>
+      </ul>
+
+      <div class="tips">
+        <div class="tip good">
+          <h4>✅ 优势</h4>
+          <ul>
+            <li>天然符合"中心→外围"认知模型</li>
+            <li>差异化尺寸让层级一目了然</li>
+            <li>支持三种方向，灵活适配场景</li>
+            <li>确定性输出，O(V+E) 线性复杂度</li>
+          </ul>
+        </div>
+        <div class="tip warn">
+          <h4>⚠️ 劣势</h4>
+          <ul>
+            <li>仅支持树结构，非树图需先提取生成树</li>
+            <li>大宽度树在 radial 模式下外围节点可能过密</li>
+            <li>不支持交叉边 / 回边</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 3. Circular ==================== -->
+    <section class="algo-card" id="circular">
+      <h2>🔄 Circular · 环形布局</h2>
+      <div class="algo-header">
+        <div class="viz-mini">
+          <svg viewBox="0 0 180 140" role="img" aria-label="Circular 布局示意">
+            <defs>
+              <marker id="arr-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#34d399"/>
+              </marker>
+            </defs>
+            <!-- Circle guide -->
+            <circle cx="90" cy="70" r="48" fill="none" stroke="#cbd5e1" stroke-width="0.8" stroke-dasharray="3 3"/>
+            <!-- Arc edges -->
+            <g stroke="#34d399" stroke-width="1.2" fill="none" marker-end="url(#arr-c)">
+              <path d="M90,22 Q 140,30 138,70"/>
+              <path d="M138,70 Q 140,110 90,118"/>
+              <path d="M90,118 Q 40,110 42,70"/>
+              <path d="M42,70 Q 40,30 82,22"/>
+              <path d="M90,22 Q 60,60 42,70"/>
+            </g>
+            <!-- Nodes on circle -->
+            <g font-family="system-ui, sans-serif" font-size="9" font-weight="600">
+              <circle cx="90" cy="22" r="12" fill="#059669"/><text x="90" y="26" text-anchor="middle" fill="#fff">S1</text>
+              <circle cx="138" cy="70" r="12" fill="#10b981"/><text x="138" y="74" text-anchor="middle" fill="#fff">S2</text>
+              <circle cx="90" cy="118" r="12" fill="#10b981"/><text x="90" y="122" text-anchor="middle" fill="#fff">S3</text>
+              <circle cx="42" cy="70" r="12" fill="#10b981"/><text x="42" y="74" text-anchor="middle" fill="#fff">S4</text>
+            </g>
+          </svg>
+        </div>
+        <div class="info">
+          <div class="key-idea">节点沿圆环排列，边沿弧线路由，环排序 + 弧边路由一体化</div>
+          <div class="meta-row">
+            <span class="pill">O(V+E+R)</span>
+            <span class="pill good">确定性</span>
+            <span class="pill theme">10–120 nodes</span>
+            <span class="pill warn">circular.rs</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>核心思想</h3>
+      <p>
+        将所有节点均匀分布在圆周上，边使用<strong>弧线路由</strong>（arc routing）而非直线连接。
+        环上的节点排序经过优化，使频繁交互的节点相邻，减少弧线交叉。
+        R 代表弧线路由的额外计算量。
+      </p>
+
+      <h3>关键特性</h3>
+      <ul>
+        <li><strong>环排序优化</strong>：根据邻接关系调整圆周顺序，减少边交叉</li>
+        <li><strong>弧线边路由</strong>：边沿圆弧绘制，避免直线穿越圆心区域</li>
+        <li><strong>闭环友好</strong>：天然适合有环 / 闭环关系的图</li>
+      </ul>
+
+      <h3>适用场景</h3>
+      <ul>
+        <li><strong>状态机</strong>：状态之间的转移形成闭环</li>
+        <li><strong>闭环关系图</strong>：循环依赖、反馈回路</li>
+        <li><strong>环形流程</strong>：迭代流程、周期性过程</li>
+      </ul>
+
+      <div class="tips">
+        <div class="tip good">
+          <h4>✅ 优势</h4>
+          <ul>
+            <li>闭环关系一目了然</li>
+            <li>弧线边避免视觉混乱</li>
+            <li>所有节点地位平等（无"顶层"偏见）</li>
+            <li>确定性输出</li>
+          </ul>
+        </div>
+        <div class="tip warn">
+          <h4>⚠️ 劣势</h4>
+          <ul>
+            <li>节点超过 120 个时圆周过密</li>
+            <li>不适合有明显层次 / 方向性的图</li>
+            <li>弧线路由增加渲染复杂度</li>
+            <li>非连通图需额外处理</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 4. Architecture V2 ==================== -->
+    <section class="algo-card" id="architecture-v2">
+      <h2>🏗️ Architecture V2 · 架构图专用布局</h2>
+      <div class="algo-header">
+        <div class="viz-mini">
+          <svg viewBox="0 0 180 140" role="img" aria-label="Architecture V2 布局示意">
+            <!-- Group A boundary -->
+            <rect x="10" y="10" width="70" height="55" rx="6" fill="none" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="4 2"/>
+            <text x="45" y="8" text-anchor="middle" fill="#2563eb" font-family="system-ui" font-size="7" font-weight="600">Service A</text>
+            <!-- Group B boundary -->
+            <rect x="100" y="10" width="70" height="55" rx="6" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4 2"/>
+            <text x="135" y="8" text-anchor="middle" fill="#7c3aed" font-family="system-ui" font-size="7" font-weight="600">Service B</text>
+            <!-- Group C boundary -->
+            <rect x="40" y="85" width="100" height="50" rx="6" fill="none" stroke="#059669" stroke-width="1.5" stroke-dasharray="4 2"/>
+            <text x="90" y="83" text-anchor="middle" fill="#059669" font-family="system-ui" font-size="7" font-weight="600">Data Layer</text>
+            <!-- Nodes in groups -->
+            <g font-family="system-ui, sans-serif" font-size="7" font-weight="600">
+              <rect x="15" y="20" width="26" height="14" rx="3" fill="#2563eb"/><text x="28" y="30" text-anchor="middle" fill="#fff">API</text>
+              <rect x="48" y="20" width="26" height="14" rx="3" fill="#3b82f6"/><text x="61" y="30" text-anchor="middle" fill="#fff">Auth</text>
+              <rect x="15" y="42" width="26" height="14" rx="3" fill="#3b82f6"/><text x="28" y="52" text-anchor="middle" fill="#fff">Core</text>
+              <rect x="105" y="20" width="26" height="14" rx="3" fill="#7c3aed"/><text x="118" y="30" text-anchor="middle" fill="#fff">GW</text>
+              <rect x="138" y="20" width="26" height="14" rx="3" fill="#8b5cf6"/><text x="151" y="30" text-anchor="middle" fill="#fff">BFF</text>
+              <rect x="105" y="42" width="26" height="14" rx="3" fill="#8b5cf6"/><text x="118" y="52" text-anchor="middle" fill="#fff">SVC</text>
+              <rect x="50" y="95" width="30" height="14" rx="3" fill="#059669"/><text x="65" y="105" text-anchor="middle" fill="#fff">DB</text>
+              <rect x="100" y="95" width="30" height="14" rx="3" fill="#10b981"/><text x="115" y="105" text-anchor="middle" fill="#fff">Cache</text>
+            </g>
+            <!-- Inter-group edges -->
+            <g stroke="#94a3b8" stroke-width="0.8" fill="none" stroke-dasharray="3 2">
+              <line x1="61" y1="65" x2="90" y2="85"/>
+              <line x1="118" y1="65" x2="90" y2="85"/>
+            </g>
+          </svg>
+        </div>
+        <div class="info">
+          <div class="key-idea">两层 Sugiyama：宏观层分组拓扑分层 + 微观层组内节点分层，分组感知紧凑排列</div>
+          <div class="meta-row">
+            <span class="pill">O(V+E+G×S)</span>
+            <span class="pill good">确定性</span>
+            <span class="pill theme">20–250 nodes</span>
+            <span class="pill warn">architecture_v2.rs</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>核心思想</h3>
+      <p>
+        专为架构图设计的<strong>混合布局算法</strong>，结合 Sugiyama 分层布局的层级优化能力和分组感知的紧凑排列能力。
+        核心思路是<strong>两层 Sugiyama</strong>：宏观层将分组视为"超级节点"做拓扑分层，确定组的层级位置；
+        微观层对组内节点做 Sugiyama 分层，同时考虑跨组边的端口位置。
+        坐标分配采用 Brandes-Kopf 风格，确保组边界紧凑。
+      </p>
+
+      <h3>关键特性</h3>
+      <ul>
+        <li><strong>分组感知分层</strong>：组作为整体参与拓扑排序，同组节点保持紧凑</li>
+        <li><strong>跨组边端口</strong>：微观层布局考虑跨组边的连接方向</li>
+        <li><strong>重叠消除</strong>：后处理阶段检测并消除节点/分组重叠</li>
+        <li><strong>宽高比优化</strong>：调整分组间距使整体布局更均衡</li>
+      </ul>
+
+      <h3>核心常量（来自 <code>architecture_v2.rs</code>）</h3>
+      <div class="consts">
+        <div class="const-item"><b>LAYER_GAP</b> = 80 px</div>
+        <div class="const-item"><b>NODE_GAP</b> = 48 px</div>
+        <div class="const-item"><b>GROUP_GAP_X</b> = 50 px</div>
+        <div class="const-item"><b>CROSSING_SWEEPS</b> = 12</div>
+        <div class="const-item"><b>GROUP_PADDING</b> = 28 px</div>
+      </div>
+
+      <h3>适用场景</h3>
+      <ul>
+        <li><strong>架构图</strong>：微服务拓扑、系统组件图</li>
+        <li><strong>分组组件图</strong>：需要体现模块边界的依赖图</li>
+        <li><strong>有分组语义的有向图</strong>：层次 + 分组双重约束</li>
+      </ul>
+
+      <div class="tips">
+        <div class="tip good">
+          <h4>✅ 优势</h4>
+          <ul>
+            <li>分组感知，同组节点紧凑排列</li>
+            <li>确定性输出，适合自动化流水线</li>
+            <li>比力导向更清晰的层级结构</li>
+            <li>比纯 Sugiyama 更好的分组语义</li>
+          </ul>
+        </div>
+        <div class="tip warn">
+          <h4>⚠️ 劣势</h4>
+          <ul>
+            <li>仅适用于 <code>DiagramType::Architecture</code></li>
+            <li>分组间拓扑复杂时宏观层分层可能不够紧凑</li>
+            <li>两层 Sugiyama 计算量较大</li>
+            <li>不支持无分组语义的图</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 5. Sequence ==================== -->
+    <section class="algo-card" id="sequence">
+      <h2>📨 Sequence · 序列图布局</h2>
+      <div class="algo-header">
+        <div class="viz-mini">
+          <svg viewBox="0 0 180 140" role="img" aria-label="Sequence 布局示意">
+            <!-- Participant lifelines -->
+            <g stroke="#64748b" stroke-width="1" stroke-dasharray="3 2">
+              <line x1="40" y1="28" x2="40" y2="130"/>
+              <line x1="90" y1="28" x2="90" y2="130"/>
+              <line x1="140" y1="28" x2="140" y2="130"/>
+            </g>
+            <!-- Participant boxes -->
+            <g font-family="system-ui, sans-serif" font-size="8" font-weight="600">
+              <rect x="20" y="10" width="40" height="16" rx="3" fill="#2563eb"/><text x="40" y="22" text-anchor="middle" fill="#fff">Client</text>
+              <rect x="70" y="10" width="40" height="16" rx="3" fill="#7c3aed"/><text x="90" y="22" text-anchor="middle" fill="#fff">Server</text>
+              <rect x="120" y="10" width="40" height="16" rx="3" fill="#059669"/><text x="140" y="22" text-anchor="middle" fill="#fff">DB</text>
+            </g>
+            <!-- Messages -->
+            <defs>
+              <marker id="arr-s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#60a5fa"/>
+              </marker>
+              <marker id="arr-s2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#34d399"/>
+              </marker>
+            </defs>
+            <g stroke="#60a5fa" stroke-width="1.2" fill="none" marker-end="url(#arr-s)">
+              <line x1="45" y1="48" x2="85" y2="48"/>
+              <line x1="95" y1="68" x2="135" y2="68"/>
+            </g>
+            <g stroke="#34d399" stroke-width="1.2" fill="none" marker-end="url(#arr-s2)" stroke-dasharray="4 2">
+              <line x1="135" y1="88" x2="95" y2="88"/>
+              <line x1="85" y1="108" x2="45" y2="108"/>
+            </g>
+            <!-- Labels -->
+            <g font-family="system-ui, sans-serif" font-size="7" fill="#94a3b8">
+              <text x="65" y="44">request</text>
+              <text x="115" y="64">query</text>
+              <text x="115" y="84">result</text>
+              <text x="65" y="104">response</text>
+            </g>
+          </svg>
+        </div>
+        <div class="info">
+          <div class="key-idea">参与者水平展开，消息按时间步纵向排列，布局直接生成消息路径（跳过通用边路由）</div>
+          <div class="meta-row">
+            <span class="pill">O(V+E)</span>
+            <span class="pill good">确定性</span>
+            <span class="pill theme">10–200 msgs</span>
+            <span class="pill warn">sequence.rs</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>核心思想</h3>
+      <p>
+        序列图布局与传统图布局有本质区别：<strong>参与者（participant）水平排列</strong>，
+        <strong>消息（message）按时间步纵向排列</strong>。布局引擎直接生成消息的箭头路径，
+        <strong>完全跳过通用边路由阶段</strong>，因为序列图的消息路径是确定的（水平箭头 + 可选的自身回调折线）。
+      </p>
+
+      <h3>关键特性</h3>
+      <ul>
+        <li><strong>参与者生命线</strong>：每个参与者一条垂直虚线</li>
+        <li><strong>消息路径直出</strong>：布局引擎直接计算箭头起止坐标</li>
+        <li><strong>自身消息</strong>：支持参与者发给自己（折线路径）</li>
+        <li><strong>同步 / 异步</strong>：实线箭头 = 同步调用，虚线箭头 = 异步返回</li>
+      </ul>
+
+      <h3>适用场景</h3>
+      <ul>
+        <li><strong>API 交互</strong>：客户端→服务端→数据库的请求/响应流</li>
+        <li><strong>服务调用链</strong>：微服务之间的调用时序</li>
+        <li><strong>协议序列</strong>：通信协议的握手 / 数据交换步骤</li>
+      </ul>
+
+      <div class="tips">
+        <div class="tip good">
+          <h4>✅ 优势</h4>
+          <ul>
+            <li>时序语义清晰，消息顺序一目了然</li>
+            <li>跳过通用边路由，性能极佳</li>
+            <li>确定性输出</li>
+            <li>天然支持"请求→响应"的往返表达</li>
+          </ul>
+        </div>
+        <div class="tip warn">
+          <h4>⚠️ 劣势</h4>
+          <ul>
+            <li>仅适用于序列图语义，非通用布局</li>
+            <li>参与者过多时水平方向拥挤</li>
+            <li>不支持分支 / 并行 / 循环结构</li>
+            <li>消息过多时纵向过长</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 6. Force-Directed ==================== -->
+    <section class="algo-card" id="force-directed">
+      <h2>🧲 Force-Directed · 分组感知力导向布局</h2>
+      <div class="algo-header">
+        <div class="viz-mini">
+          <svg viewBox="0 0 180 140" role="img" aria-label="Force-Directed legacy 布局示意">
+            <!-- Group A boundary -->
+            <rect x="10" y="15" width="72" height="60" rx="8" fill="none" stroke="#60a5fa" stroke-width="1.2" stroke-dasharray="4 2"/>
+            <text x="46" y="12" text-anchor="middle" fill="#60a5fa" font-family="system-ui" font-size="7" font-weight="600">Group A</text>
+            <!-- Group B boundary -->
+            <rect x="98" y="55" width="72" height="60" rx="8" fill="none" stroke="#a78bfa" stroke-width="1.2" stroke-dasharray="4 2"/>
+            <text x="134" y="52" text-anchor="middle" fill="#a78bfa" font-family="system-ui" font-size="7" font-weight="600">Group B</text>
+            <!-- Intra-group edges -->
+            <g stroke="#60a5fa" stroke-width="0.8" fill="none" opacity="0.6">
+              <line x1="30" y1="38" x2="62" y2="38"/>
+              <line x1="30" y1="38" x2="46" y2="58"/>
+              <line x1="62" y1="38" x2="46" y2="58"/>
+            </g>
+            <g stroke="#a78bfa" stroke-width="0.8" fill="none" opacity="0.6">
+              <line x1="118" y1="78" x2="150" y2="78"/>
+              <line x1="118" y1="78" x2="134" y2="98"/>
+              <line x1="150" y1="78" x2="134" y2="98"/>
+            </g>
+            <!-- Inter-group edge -->
+            <line x1="62" y1="48" x2="118" y2="78" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 2"/>
+            <!-- Nodes in Group A (grid) -->
+            <g font-family="system-ui, sans-serif" font-size="8" font-weight="600">
+              <circle cx="30" cy="38" r="8" fill="#2563eb"/><text x="30" y="41" text-anchor="middle" fill="#fff">A1</text>
+              <circle cx="62" cy="38" r="8" fill="#2563eb"/><text x="62" y="41" text-anchor="middle" fill="#fff">A2</text>
+              <circle cx="46" cy="58" r="8" fill="#3b82f6"/><text x="46" y="61" text-anchor="middle" fill="#fff">A3</text>
+            </g>
+            <!-- Nodes in Group B (grid) -->
+            <g font-family="system-ui, sans-serif" font-size="8" font-weight="600">
+              <circle cx="118" cy="78" r="8" fill="#7c3aed"/><text x="118" y="81" text-anchor="middle" fill="#fff">B1</text>
+              <circle cx="150" cy="78" r="8" fill="#7c3aed"/><text x="150" y="81" text-anchor="middle" fill="#fff">B2</text>
+              <circle cx="134" cy="98" r="8" fill="#8b5cf6"/><text x="134" y="101" text-anchor="middle" fill="#fff">B3</text>
+            </g>
+          </svg>
+        </div>
+        <div class="info">
+          <div class="key-idea">Fruchterman-Reingold 力导向 + 组内引力 / 组间斥力，适合架构图与流程图</div>
+          <div class="meta-row">
+            <span class="pill">O(I·V²)</span>
+            <span class="pill warn">非确定性</span>
+            <span class="pill theme">10–180 nodes</span>
+            <span class="pill warn">force_directed.rs</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>核心思想</h3>
+      <p>
+        基于 <strong>Fruchterman-Reingold</strong> 力导向：节点间库仑斥力、边弹簧引力，通过模拟退火迭代收敛。
+        在 FR 基础上增强<strong>分组语义</strong>——同组节点互相吸引形成簇，不同组之间保持分离。
+        多连通分量独立布局后并排打包。
+      </p>
+
+      <h3>适用场景</h3>
+      <ul>
+        <li><strong>架构图</strong>：组件关系复杂、需自然散开，同时保留 group 边界</li>
+        <li><strong>流程图</strong>：网状依赖、层次不明显的流程</li>
+        <li><strong>微服务拓扑</strong>：服务间多向依赖、无明显阅读顺序</li>
+      </ul>
+
+      <div class="tips">
+        <div class="tip good">
+          <h4>✅ 优势</h4>
+          <ul>
+            <li>真实力导向，边长分布自然</li>
+            <li>分组引力保留模块语义</li>
+            <li>适合网状、弱层级图</li>
+          </ul>
+        </div>
+        <div class="tip warn">
+          <h4>⚠️ 劣势</h4>
+          <ul>
+            <li>非完全确定性（迭代 + 初值）</li>
+            <li>大图 O(V²) 成本较高</li>
+            <li>有明确阅读顺序时不如 Sugiyama / architecture-v2</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 7. Sugiyama V2 ==================== -->
+    <section class="algo-card" id="sugiyama-v2">
+      <h2>✨ Sugiyama V2 · 增强分层布局</h2>
+      <div class="algo-header">
+        <div class="viz-mini">
+          <svg viewBox="0 0 180 140" role="img" aria-label="Sugiyama V2 布局示意">
+            <defs>
+              <marker id="arr-sv" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#f472b6"/>
+              </marker>
+            </defs>
+            <!-- Layer guides -->
+            <g stroke="#cbd5e1" stroke-dasharray="3 3" stroke-width="0.6">
+              <line x1="10" y1="20" x2="170" y2="20"/>
+              <line x1="10" y1="50" x2="170" y2="50"/>
+              <line x1="10" y1="80" x2="170" y2="80"/>
+              <line x1="10" y1="110" x2="170" y2="110"/>
+            </g>
+            <!-- Edges (tighter, more uniform) -->
+            <g stroke="#f472b6" stroke-width="1" fill="none" marker-end="url(#arr-sv)">
+              <path d="M90,28 L45,42"/>
+              <path d="M90,28 L135,42"/>
+              <path d="M45,58 L30,72"/>
+              <path d="M45,58 L65,72"/>
+              <path d="M135,58 L115,72"/>
+              <path d="M135,58 L150,72"/>
+              <path d="M30,88 L70,102"/>
+              <path d="M65,88 L70,102"/>
+              <path d="M115,88 L110,102"/>
+              <path d="M150,88 L110,102"/>
+            </g>
+            <!-- Nodes (more uniform horizontal distribution) -->
+            <g font-family="system-ui, sans-serif" font-size="8" font-weight="600">
+              <rect x="74" y="12" width="32" height="16" rx="4" fill="#db2777"/><text x="90" y="23" text-anchor="middle" fill="#fff">A</text>
+              <rect x="29" y="42" width="32" height="16" rx="4" fill="#ec4899"/><text x="45" y="53" text-anchor="middle" fill="#fff">B</text>
+              <rect x="119" y="42" width="32" height="16" rx="4" fill="#ec4899"/><text x="135" y="53" text-anchor="middle" fill="#fff">C</text>
+              <rect x="14" y="72" width="32" height="16" rx="4" fill="#f472b6"/><text x="30" y="83" text-anchor="middle" fill="#fff">D</text>
+              <rect x="49" y="72" width="32" height="16" rx="4" fill="#f472b6"/><text x="65" y="83" text-anchor="middle" fill="#fff">E</text>
+              <rect x="99" y="72" width="32" height="16" rx="4" fill="#f472b6"/><text x="115" y="83" text-anchor="middle" fill="#fff">F</text>
+              <rect x="134" y="72" width="32" height="16" rx="4" fill="#f472b6"/><text x="150" y="83" text-anchor="middle" fill="#fff">G</text>
+              <rect x="54" y="102" width="32" height="16" rx="4" fill="#f9a8d4"/><text x="70" y="113" text-anchor="middle" fill="#831843">H</text>
+              <rect x="94" y="102" width="32" height="16" rx="4" fill="#f9a8d4"/><text x="110" y="113" text-anchor="middle" fill="#831843">I</text>
+            </g>
+          </svg>
+        </div>
+        <div class="info">
+          <div class="key-idea">贪心环消除 + NS 式 rank 压缩 + BK 式 4-pass 中位对齐 + 紧凑化</div>
+          <div class="meta-row">
+            <span class="pill">O(V+E+S×C)</span>
+            <span class="pill good">确定性</span>
+            <span class="pill theme">20–320 nodes</span>
+            <span class="pill warn">sugiyama_v2.rs</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>核心思想</h3>
+      <p>
+        Sugiyama V2 是 V1 的增强版，在四个阶段都做了升级：
+        <strong>贪心环消除</strong>替代 DFS 反转，
+        <strong>NS 式 rank 压缩</strong>让层更紧凑，
+        <strong>BK 式 4-pass 中位对齐</strong>让水平分布更均匀，
+        最后再做<strong>紧凑化（compaction）</strong>消除多余空白。
+        S = sweep 次数，C = 每层节点数。
+      </p>
+
+      <h3>V1 vs V2 对比</h3>
+      <table>
+        <thead>
+          <tr><th>阶段</th><th>Sugiyama V1</th><th>Sugiyama V2</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>环消除</td>
+            <td>DFS + back-edge 反转</td>
+            <td><strong>贪心</strong>环消除（更少反转边）</td>
+          </tr>
+          <tr>
+            <td>层分配</td>
+            <td>最长路径</td>
+            <td><strong>NS 式 rank 压缩</strong>（更紧凑的层间距）</td>
+          </tr>
+          <tr>
+            <td>交叉最小化</td>
+            <td>Barycenter + up/down sweeps</td>
+            <td><strong>BK 式 4-pass 中位对齐</strong>（更均匀的水平分布）</td>
+          </tr>
+          <tr>
+            <td>坐标分配</td>
+            <td>迭代 barycenter + 网格对齐</td>
+            <td>4-pass 对齐 + <strong>紧凑化 compaction</strong></td>
+          </tr>
+          <tr>
+            <td>节点容量</td>
+            <td>~150</td>
+            <td><strong>20–320</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>适用场景</h3>
+      <ul>
+        <li><strong>高质量流程图</strong>：需要更少交叉、更紧凑的布局</li>
+        <li><strong>复杂 DAG</strong>：节点多、分支 / 汇合密集</li>
+        <li><strong>需要均匀水平分布</strong>：BK 4-pass 对齐让同层节点间距更一致</li>
+      </ul>
+
+      <div class="tips">
+        <div class="tip good">
+          <h4>✅ 优势</h4>
+          <ul>
+            <li>比 V1 更紧凑、更均匀</li>
+            <li>贪心环消除反转边更少</li>
+            <li>NS rank 压缩减少"空层"</li>
+            <li>BK 4-pass 对齐水平分布更优</li>
+            <li>支持更大图（320 节点）</li>
+          </ul>
+        </div>
+        <div class="tip warn">
+          <h4>⚠️ 劣势</h4>
+          <ul>
+            <li>比 V1 计算量更大（4-pass + compaction）</li>
+            <li>实现复杂度高，调试困难</li>
+            <li>对简单图可能"过度优化"</li>
+            <li>紧凑化可能让边过于密集</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 全局对比表 ==================== -->
+    <section class="algo-card" id="comparison">
+      <h2>📊 七种算法横向对比</h2>
+      <div class="compare-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>算法</th>
+              <th>复杂度</th>
+              <th>节点容量</th>
+              <th>确定性</th>
+              <th>核心特点</th>
+              <th>最佳场景</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><a href="#mindmap">Mindmap</a></td>
+              <td><span class="pill">O(V+E)</span></td>
+              <td>10–200</td>
+              <td><span class="pill good">是</span></td>
+              <td>中心辐射 + 差异化尺寸</td>
+              <td>知识树、会议笔记</td>
+            </tr>
+            <tr>
+              <td><a href="#circular">Circular</a></td>
+              <td><span class="pill">O(V+E+R)</span></td>
+              <td>10–120</td>
+              <td><span class="pill good">是</span></td>
+              <td>圆环排列 + 弧线边路由</td>
+              <td>状态机、闭环关系</td>
+            </tr>
+            <tr>
+              <td><a href="#architecture-v2">Architecture V2</a></td>
+              <td><span class="pill">O(V+E+G×S)</span></td>
+              <td>20–250</td>
+              <td><span class="pill good">是</span></td>
+              <td>两层 Sugiyama + 分组感知</td>
+              <td>架构图、分组组件图</td>
+            </tr>
+            <tr>
+              <td><a href="#sequence">Sequence</a></td>
+              <td><span class="pill">O(V+E)</span></td>
+              <td>10–200 msgs</td>
+              <td><span class="pill good">是</span></td>
+              <td>参与者×时间步矩阵</td>
+              <td>API 交互、协议序列</td>
+            </tr>
+            <tr>
+              <td><a href="#force-directed">Force-Directed</a></td>
+              <td><span class="pill">O(I·V²)</span></td>
+              <td>10–180</td>
+              <td><span class="pill warn">否</span></td>
+              <td>FR 力导向 + 分组引力</td>
+              <td>架构图、流程图、网状拓扑</td>
+            </tr>
+            <tr>
+              <td><a href="#sugiyama-v2">Sugiyama V2</a></td>
+              <td><span class="pill">O(V+E+S×C)</span></td>
+              <td>20–320</td>
+              <td><span class="pill good">是</span></td>
+              <td>BK 4-pass + 紧凑化</td>
+              <td>高质量流程图、复杂 DAG</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <a class="back-bottom" href="layout-algorithms-index.html">← 返回布局算法索引 · layout-algorithms-index.html</a>
+    <p style="margin-top:0.5rem">© Drawify · 算法文档 · 节点布局算法集</p>
+  </footer>
+
+  <script>
+    // Theme toggle
+    (function () {
+      var btn = document.getElementById('themeBtn');
+      var mql = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+      var key = 'algo-collection-theme';
+      function apply(mode) {
+        if (mode === 'light') { document.documentElement.setAttribute('data-theme', 'light'); }
+        else if (mode === 'dark') { document.documentElement.setAttribute('data-theme', 'dark'); }
+        else { document.documentElement.removeAttribute('data-theme'); }
+      }
+      var saved = localStorage.getItem(key);
+      if (saved) apply(saved);
+      btn.addEventListener('click', function () {
+        var cur = document.documentElement.getAttribute('data-theme');
+        var next;
+        if (!cur) next = mql && mql.matches ? 'light' : 'dark';
+        else next = cur === 'dark' ? 'light' : 'dark';
+        if (next) { localStorage.setItem(key, next); apply(next); }
+      });
+    })();
+
+    // Interactive layout demo
+    (function () {
+      var canvas = document.getElementById('layoutDemoCanvas');
+      if (!canvas) return;
+      var ctx = canvas.getContext('2d');
+      var dpr = window.devicePixelRatio || 1;
+      var W = 700, H = 400;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.scale(dpr, dpr);
+
+      // Graph data: 8-node DAG
+      var nodeIds = ['A','B','C','D','E','F','G','H'];
+      var edges = [
+        ['A','B'],['A','C'],['B','D'],['C','D'],['C','E'],
+        ['D','F'],['E','G'],['F','H'],['G','H']
+      ];
+
+      // Node state
+      var nodes = nodeIds.map(function (id) {
+        return {
+          id: id,
+          x: 50 + Math.random() * (W - 100),
+          y: 50 + Math.random() * (H - 100),
+          tx: 0, ty: 0
+        };
+      });
+
+      // ---- Layout algorithms ----
+
+      function layoutCircular() {
+        var cx = W / 2, cy = H / 2, r = Math.min(W, H) * 0.35;
+        var positions = {};
+        nodeIds.forEach(function (id, i) {
+          var angle = (2 * Math.PI * i / nodeIds.length) - Math.PI / 2;
+          positions[id] = { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+        });
+        return positions;
+      }
+
+      function layoutRadial() {
+        var rings = [['A'],['B','C'],['D','E'],['F','G'],['H']];
+        var cx = W / 2, cy = H / 2;
+        var maxR = Math.min(W, H) * 0.38;
+        var positions = {};
+        rings.forEach(function (ring, ri) {
+          var r = ri === 0 ? 0 : (maxR * ri / (rings.length - 1));
+          ring.forEach(function (id, ni) {
+            if (ri === 0) {
+              positions[id] = { x: cx, y: cy };
+            } else {
+              var angle = (2 * Math.PI * ni / ring.length) - Math.PI / 2;
+              positions[id] = { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+            }
+          });
+        });
+        return positions;
+      }
+
+      function layoutForceDirected() {
+        // Deterministic grid initialization
+        var pos = nodeIds.map(function (id, i) {
+          var col = i % 4, row = Math.floor(i / 4);
+          return { x: 120 + col * 140, y: 120 + row * 160 };
+        });
+        var area = W * H;
+        var k = Math.sqrt(area / nodeIds.length) * 0.55;
+
+        for (var iter = 0; iter < 50; iter++) {
+          var temp = 80 * (1 - iter / 50);
+          var disp = nodeIds.map(function () { return { x: 0, y: 0 }; });
+
+          // Repulsion between all pairs
+          for (var i = 0; i < nodeIds.length; i++) {
+            for (var j = i + 1; j < nodeIds.length; j++) {
+              var dx = pos[i].x - pos[j].x;
+              var dy = pos[i].y - pos[j].y;
+              var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+              var force = k * k / dist;
+              disp[i].x += dx / dist * force;
+              disp[i].y += dy / dist * force;
+              disp[j].x -= dx / dist * force;
+              disp[j].y -= dy / dist * force;
+            }
+          }
+
+          // Attraction along edges
+          edges.forEach(function (e) {
+            var ei = nodeIds.indexOf(e[0]);
+            var ej = nodeIds.indexOf(e[1]);
+            var dx = pos[ei].x - pos[ej].x;
+            var dy = pos[ei].y - pos[ej].y;
+            var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            var force = dist * dist / k;
+            disp[ei].x -= dx / dist * force;
+            disp[ei].y -= dy / dist * force;
+            disp[ej].x += dx / dist * force;
+            disp[ej].y += dy / dist * force;
+          });
+
+          // Apply displacement with temperature
+          for (var i = 0; i < nodeIds.length; i++) {
+            var dist = Math.sqrt(disp[i].x * disp[i].x + disp[i].y * disp[i].y) || 1;
+            var scale = Math.min(dist, temp) / dist;
+            pos[i].x += disp[i].x * scale;
+            pos[i].y += disp[i].y * scale;
+            pos[i].x = Math.max(40, Math.min(W - 40, pos[i].x));
+            pos[i].y = Math.max(40, Math.min(H - 40, pos[i].y));
+          }
+        }
+
+        var positions = {};
+        nodeIds.forEach(function (id, i) { positions[id] = { x: pos[i].x, y: pos[i].y }; });
+        return positions;
+      }
+
+      function layoutSugiyama() {
+        // Simple topological layer assignment
+        var inDeg = {};
+        nodeIds.forEach(function(id) { inDeg[id] = 0; });
+        edges.forEach(function(e) { inDeg[e[1]] = (inDeg[e[1]] || 0) + 1; });
+        var layers = {};
+        var queue = nodeIds.filter(function(id) { return inDeg[id] === 0; });
+        var visited = 0;
+        while (queue.length > 0) {
+          var next = [];
+          queue.forEach(function(id) {
+            layers[id] = visited;
+            edges.forEach(function(e) {
+              if (e[0] === id) {
+                inDeg[e[1]]--;
+                if (inDeg[e[1]] === 0) next.push(e[1]);
+              }
+            });
+          });
+          queue = next;
+          visited++;
+        }
+        // Position nodes in layers
+        var layerNodes = {};
+        nodeIds.forEach(function(id) {
+          var l = layers[id] || 0;
+          if (!layerNodes[l]) layerNodes[l] = [];
+          layerNodes[l].push(id);
+        });
+        var maxLayer = Object.keys(layerNodes).length - 1;
+        var positions = {};
+        Object.keys(layerNodes).forEach(function(l) {
+          var nodes = layerNodes[l];
+          var step = (W - 100) / (nodes.length + 1);
+          nodes.forEach(function(id, i) {
+            positions[id] = { x: 50 + step * (i + 1), y: 40 + (maxLayer > 0 ? (H - 80) * l / maxLayer : 0) };
+          });
+        });
+        return positions;
+      }
+
+      var layoutFns = {
+        circular: layoutCircular,
+        radial: layoutRadial,
+        'force-directed': layoutForceDirected,
+        sugiyama: layoutSugiyama
+      };
+
+      // ---- Animation state ----
+      var animating = false;
+      var animStart = 0;
+      var animDuration = 800;
+      var startPositions = [];
+      var currentLayout = null;
+
+      // Colors per algorithm
+      var algoColors = {
+        circular: '#059669',
+        radial: '#7c3aed',
+        'force-directed': '#d97706',
+        timeline: '#dc2626'
+      };
+
+      function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+      // ---- Drawing ----
+
+      function draw() {
+        var algoColor = currentLayout ? algoColors[currentLayout] : '#2563eb';
+        ctx.clearRect(0, 0, W, H);
+
+        // Draw edges (curved with subtle opacity)
+        ctx.lineWidth = 1.5;
+        edges.forEach(function (e) {
+          var sn = null, tn = null;
+          for (var i = 0; i < nodes.length; i++) {
+            if (nodes[i].id === e[0]) sn = nodes[i];
+            if (nodes[i].id === e[1]) tn = nodes[i];
+          }
+          var mx = (sn.x + tn.x) / 2;
+          var my = (sn.y + tn.y) / 2;
+          var dx = tn.x - sn.x;
+          var dy = tn.y - sn.y;
+          var cx = mx - dy * 0.12;
+          var cy = my + dx * 0.12;
+
+          ctx.beginPath();
+          ctx.moveTo(sn.x, sn.y);
+          ctx.quadraticCurveTo(cx, cy, tn.x, tn.y);
+          ctx.strokeStyle = algoColor + '44';
+          ctx.stroke();
+        });
+
+        // Draw nodes
+        var nodeR = 22;
+        nodes.forEach(function (n) {
+          var grad = ctx.createRadialGradient(n.x - 3, n.y - 3, 2, n.x, n.y, nodeR);
+          grad.addColorStop(0, algoColor + 'ee');
+          grad.addColorStop(1, algoColor);
+
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, nodeR, 0, Math.PI * 2);
+          ctx.fillStyle = grad;
+          ctx.fill();
+          ctx.strokeStyle = algoColor + '66';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Label
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(n.id, n.x, n.y + 1);
+        });
+      }
+
+      // ---- Animation loop ----
+
+      function animateFrame(timestamp) {
+        if (!animating) return;
+        if (!animStart) animStart = timestamp;
+
+        var elapsed = timestamp - animStart;
+        var progress = Math.min(elapsed / animDuration, 1);
+        var eased = easeOutCubic(progress);
+
+        nodes.forEach(function (n, i) {
+          n.x = startPositions[i].x + (n.tx - startPositions[i].x) * eased;
+          n.y = startPositions[i].y + (n.ty - startPositions[i].y) * eased;
+        });
+
+        draw();
+
+        if (progress < 1) {
+          requestAnimationFrame(animateFrame);
+        } else {
+          animating = false;
+        }
+      }
+
+      function applyLayout(name) {
+        var positions = layoutFns[name]();
+        currentLayout = name;
+        startPositions = nodes.map(function (n) { return { x: n.x, y: n.y }; });
+        nodes.forEach(function (n) {
+          n.tx = positions[n.id].x;
+          n.ty = positions[n.id].y;
+        });
+        animating = true;
+        animStart = 0;
+        requestAnimationFrame(animateFrame);
+
+        // Update active button
+        document.querySelectorAll('.demo-btn').forEach(function (b) { b.classList.remove('active'); });
+        var activeBtn = document.querySelector('.demo-btn[data-layout="' + name + '"]');
+        if (activeBtn) activeBtn.classList.add('active');
+      }
+
+      function resetPositions() {
+        currentLayout = null;
+        startPositions = nodes.map(function (n) { return { x: n.x, y: n.y }; });
+        nodes.forEach(function (n) {
+          n.tx = 50 + Math.random() * (W - 100);
+          n.ty = 50 + Math.random() * (H - 100);
+        });
+        animating = true;
+        animStart = 0;
+        requestAnimationFrame(animateFrame);
+
+        document.querySelectorAll('.demo-btn').forEach(function (b) { b.classList.remove('active'); });
+      }
+
+      // ---- Wire up controls ----
+
+      document.querySelectorAll('.demo-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          applyLayout(btn.dataset.layout);
+        });
+      });
+      document.getElementById('demoApplyBtn').addEventListener('click', function () {
+        var active = document.querySelector('.demo-btn.active');
+        if (active) applyLayout(active.dataset.layout);
+      });
+      document.getElementById('demoResetBtn').addEventListener('click', resetPositions);
+
+      // ---- Theme awareness ----
+
+      var observer = new MutationObserver(function () { if (!animating) draw(); });
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+      if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { if (!animating) draw(); });
+      }
+
+      // Initial draw
+      draw();
+    })();
+  </script>
+</body>
+</html>

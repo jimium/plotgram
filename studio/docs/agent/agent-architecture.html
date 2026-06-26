@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drawify Studio - Agent 实现逻辑说明</title>
+<style>
+  :root {
+    --primary: #7c3aed;
+    --primary-light: #ede9fe;
+    --primary-dark: #5b21b6;
+    --bg: #f9fafb;
+    --card-bg: #ffffff;
+    --border: #e5e7eb;
+    --text: #1f2937;
+    --text-secondary: #6b7280;
+    --code-bg: #1e1e2e;
+    --code-text: #cdd6f4;
+    --success: #10b981;
+    --success-light: #d1fae5;
+    --warning: #f59e0b;
+    --warning-light: #fef3c7;
+    --error: #ef4444;
+    --info: #3b82f6;
+    --info-light: #dbeafe;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+    padding: 48px 32px;
+    border-radius: 16px;
+    margin-bottom: 40px;
+    box-shadow: 0 10px 40px rgba(124, 58, 237, 0.2);
+  }
+
+  header h1 { font-size: 30px; margin-bottom: 8px; font-weight: 700; letter-spacing: -0.5px; }
+  header .subtitle { font-size: 15px; opacity: 0.9; line-height: 1.6; }
+  header .meta { margin-top: 20px; font-size: 13px; opacity: 0.75; }
+
+  section {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 36px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+    border: 1px solid var(--border);
+  }
+
+  h2 {
+    font-size: 24px;
+    color: var(--primary-dark);
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--primary-light);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  h2 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: var(--primary);
+    color: white;
+    border-radius: 10px;
+    font-size: 17px;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+  }
+
+  h3 {
+    font-size: 18px;
+    color: var(--text);
+    margin: 28px 0 14px;
+    font-weight: 600;
+  }
+
+  h4 {
+    font-size: 15px;
+    color: var(--primary-dark);
+    margin: 18px 0 10px;
+    font-weight: 600;
+  }
+
+  p { margin-bottom: 12px; }
+
+  ul, ol { margin: 8px 0 16px 24px; }
+  li { margin: 4px 0; }
+
+  code {
+    font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+    background: var(--primary-light);
+    color: var(--primary-dark);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 18px 22px;
+    border-radius: 10px;
+    overflow-x: auto;
+    margin: 14px 0 22px;
+    font-size: 13px;
+    line-height: 1.65;
+    border: 1px solid #313244;
+  }
+
+  pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    font-size: 13px;
+  }
+
+  .keyword { color: #cba6f7; }
+  .string { color: #a6e3a1; }
+  .comment { color: #6c7086; font-style: italic; }
+  .function { color: #89b4fa; }
+  .type { color: #f9e2af; }
+  .number { color: #fab387; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 22px;
+    font-size: 14px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  th, td {
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    text-align: left;
+  }
+
+  th {
+    background: var(--primary-light);
+    color: var(--primary-dark);
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  tr:nth-child(even) { background: #fafafa; }
+  tr:hover { background: var(--primary-light); }
+
+  /* ============ 流程图样式 ============ */
+  .flowchart {
+    background: #fafafa;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 20px;
+    margin: 18px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .fc-node {
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: 2px solid;
+    font-weight: 600;
+    text-align: center;
+    min-width: 240px;
+    max-width: 520px;
+    font-size: 14px;
+    line-height: 1.5;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    background: white;
+  }
+
+  .fc-node .fc-desc {
+    font-weight: 400;
+    font-size: 12px;
+    opacity: 0.75;
+    margin-top: 4px;
+  }
+
+  .fc-start { border-color: var(--success); color: #065f46; background: var(--success-light); }
+  .fc-end { border-color: var(--primary); color: var(--primary-dark); background: var(--primary-light); }
+  .fc-process { border-color: var(--info); color: #1e40af; background: var(--info-light); }
+  .fc-decision { border-color: var(--warning); color: #92400e; background: var(--warning-light); border-radius: 10px; }
+  .fc-tool { border-color: #ec4899; color: #9f1239; background: #fce7f3; }
+  .fc-data { border-color: #14b8a6; color: #115e59; background: #ccfbf1; }
+
+  .fc-arrow {
+    color: #9ca3af;
+    font-size: 22px;
+    line-height: 1;
+    margin: 6px 0;
+    font-weight: 300;
+  }
+
+  .fc-arrow-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    margin: 2px 0;
+    display: inline-block;
+  }
+
+  .fc-branch {
+    display: flex;
+    gap: 40px;
+    align-items: flex-start;
+    margin: 6px 0;
+  }
+
+  .fc-branch-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .fc-loop {
+    border: 2px dashed #d1d5db;
+    border-radius: 12px;
+    padding: 16px 12px;
+    margin: 8px 0;
+    background: rgba(124, 58, 237, 0.02);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    position: relative;
+  }
+
+  .fc-loop-label {
+    position: absolute;
+    top: -10px;
+    left: 16px;
+    background: white;
+    padding: 0 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .fc-sequence {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    max-width: 640px;
+    gap: 0;
+  }
+
+  .fc-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 14px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 4px 0;
+    font-size: 13px;
+  }
+
+  .fc-step-num {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .fc-step-body { flex: 1; }
+  .fc-step-title { font-weight: 600; color: var(--text); }
+  .fc-step-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .fc-step-code {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 11px;
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-top: 4px;
+    display: block;
+    overflow-x: auto;
+  }
+
+  /* ============ 提示框 ============ */
+  .highlight-box, .info-box, .success-box {
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .highlight-box {
+    background: var(--warning-light);
+    border-left: 4px solid var(--warning);
+  }
+  .info-box {
+    background: var(--info-light);
+    border-left: 4px solid var(--info);
+  }
+  .success-box {
+    background: var(--success-light);
+    border-left: 4px solid var(--success);
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin: 0 2px;
+  }
+  .tag-p0 { background: var(--info-light); color: #1e40af; }
+  .tag-p1 { background: var(--warning-light); color: #92400e; }
+  .tag-core { background: var(--primary-light); color: var(--primary-dark); }
+
+  /* ============ 架构层 ============ */
+  .arch-layer {
+    display: flex;
+    align-items: center;
+    padding: 16px 22px;
+    margin: 6px 0;
+    border-radius: 10px;
+    font-weight: 600;
+    border: 2px solid;
+    font-size: 14px;
+  }
+  .arch-layer .label { flex: 0 0 160px; }
+  .arch-layer .desc { font-weight: 400; font-size: 13px; opacity: 0.85; }
+  .layer-ui { background: var(--info-light); border-color: var(--info); color: #1e40af; }
+  .layer-hook { background: var(--primary-light); border-color: var(--primary); color: var(--primary-dark); }
+  .layer-agent { background: var(--warning-light); border-color: var(--warning); color: #92400e; }
+  .layer-wasm { background: var(--success-light); border-color: var(--success); color: #065f46; }
+  .layer-core { background: #fce7f3; border-color: #ec4899; color: #9f1239; }
+
+  .arrow-down {
+    text-align: center;
+    color: #9ca3af;
+    font-size: 20px;
+    margin: 2px 0;
+    line-height: 1;
+  }
+
+  /* ============ 目录 ============ */
+  .toc {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 32px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .toc h3 { margin-top: 0; color: var(--primary-dark); }
+  .toc ol { margin-left: 20px; }
+  .toc a { color: var(--text); text-decoration: none; transition: color 0.2s; }
+  .toc a:hover { color: var(--primary); }
+  .toc li { margin: 6px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Drawify Studio - Agent 实现逻辑说明</h1>
+  <div class="subtitle">基于 LLM 驱动的 Agent 绘图工具,通过 Tool-Calling 操控 drawify-wasm 生成与迭代图表</div>
+  <div class="meta">技术栈:React 19 + TypeScript 6 + Ant Design 5 + Vite 7 · WASM 桥接 drawify-core</div>
+</header>
+
+<div class="toc">
+  <h3>目录</h3>
+  <ol>
+    <li><a href="#overview">架构总览</a></li>
+    <li><a href="#loop">Agent 核心循环</a></li>
+    <li><a href="#drawing">绘图处理逻辑(重点)</a></li>
+    <li><a href="#tools">Tool-Calling 机制</a></li>
+    <li><a href="#context">上下文管理</a></li>
+    <li><a href="#llm">LLM Provider 抽象</a></li>
+    <li><a href="#codepath">关键代码路径</a></li>
+  </ol>
+</div>
+
+<!-- ==================== 1. 架构总览 ==================== -->
+<section id="overview">
+<h2><span class="num">1</span>架构总览</h2>
+
+<p>Drawify Studio 采用分层架构,从用户输入到图表渲染经过 5 层处理,每层职责单一、单向流动:</p>
+
+<div class="arch-layer layer-ui">
+  <span class="label">UI 层</span>
+  <span class="desc">ChatPanel / PreviewCanvas / DslViewer · 用户交互与结果展示</span>
+</div>
+<div class="arrow-down">↓</div>
+<div class="arch-layer layer-hook">
+  <span class="label">Hook 层</span>
+  <span class="desc">useAgent / useWasm · 状态管理与副作用编排</span>
+</div>
+<div class="arrow-down">↓</div>
+<div class="arch-layer layer-agent">
+  <span class="label">Agent 层</span>
+  <span class="desc">AgentLoop / tools / prompt / context · LLM 对话循环与 Tool 调用</span>
+</div>
+<div class="arrow-down">↓</div>
+<div class="arch-layer layer-wasm">
+  <span class="label">WASM 桥接层</span>
+  <span class="desc">lib/wasm.ts · TypeScript ↔ Rust 类型转换</span>
+</div>
+<div class="arrow-down">↓</div>
+<div class="arch-layer layer-core">
+  <span class="label">drawify-core</span>
+  <span class="desc">parse → prepare → validate → layout → scene → encode</span>
+</div>
+
+<h3>核心设计原则</h3>
+<ul>
+  <li><strong>LLM 驱动</strong>:用户用自然语言描述需求,LLM 生成 Drawify DSL 并通过 Tool 调用渲染</li>
+  <li><strong>Agent 绘图</strong>:LLM 通过 function-calling 操控 6 个 Tool(render/validate/parse/diff/apply_patch/layout_catalog)</li>
+  <li><strong>单格式输出</strong>:每次 render 调用只产出一种格式(默认 SVG),符合 drawify-core 的单格式渲染约定</li>
+  <li><strong>DSL 即真相</strong>:<code>context.source</code> 是图表的唯一真实状态,SVG 是其渲染产物</li>
+</ul>
+</section>
+
+<!-- ==================== 2. Agent 核心循环 ==================== -->
+<section id="loop">
+<h2><span class="num">2</span>Agent 核心循环</h2>
+
+<p>AgentLoop 是 Agent 的核心引擎,实现 <strong>THINKING → TOOL_EXEC → EVALUATE → RESPOND</strong> 循环,支持多轮 Tool 调用与错误自修复。</p>
+
+<div class="flowchart">
+  <div class="fc-node fc-start">用户输入<div class="fc-desc">"画一个微服务架构图"</div></div>
+  <div class="fc-arrow">↓</div>
+  <div class="fc-node fc-process">buildMessages()<div class="fc-desc">system prompt + 当前DSL + 历史 + 输入</div></div>
+  <div class="fc-arrow">↓</div>
+  <div class="fc-loop">
+    <span class="fc-loop-label">循环 (最多 10 次)</span>
+    <div class="fc-node fc-process">LLM.chat(messages, tools)</div>
+    <div class="fc-arrow">↓</div>
+    <div class="fc-node fc-decision">有 tool_calls?</div>
+    <div class="fc-arrow">↓</div>
+    <div class="fc-branch">
+      <div class="fc-branch-col">
+        <span class="fc-arrow-label">否</span>
+        <div class="fc-arrow">↓</div>
+        <div class="fc-node fc-end">返回最终回复<div class="fc-desc">AgentResult { message, source, svg, diff }</div></div>
+      </div>
+      <div class="fc-branch-col">
+        <span class="fc-arrow-label">是</span>
+        <div class="fc-arrow">↓</div>
+        <div class="fc-node fc-tool">执行 Tool<div class="fc-desc">render / validate / parse / diff / apply_patch</div></div>
+        <div class="fc-arrow">↓</div>
+        <div class="fc-node fc-data">更新 context<div class="fc-desc">source 同步 / 记录 lastSvg / lastDiff</div></div>
+        <div class="fc-arrow">↓</div>
+        <div class="fc-node fc-process">messages.push(tool 结果)<div class="fc-desc">继续下一轮迭代</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>循环退出条件</h3>
+<ul>
+  <li><strong>正常退出</strong>:LLM 返回无 <code>tool_calls</code> 的回复,进入 RESPOND 阶段</li>
+  <li><strong>迭代上限</strong>:达到 <code>maxIterations=10</code>,返回"请尝试更明确的指令"</li>
+  <li><strong>错误退出</strong>:LLM 调用失败(网络/鉴权/限流),返回错误消息</li>
+</ul>
+
+<div class="info-box">
+  <strong>关键设计</strong>:Tool 执行失败不会中断循环,而是将错误信息作为 tool result 返回给 LLM,让 LLM 有机会自修复(如修正 DSL 语法错误后重新 render)。
+</div>
+</section>
+
+<!-- ==================== 3. 绘图处理逻辑(重点) ==================== -->
+<section id="drawing">
+<h2><span class="num">3</span>绘图处理逻辑(重点)</h2>
+
+<p>这是 Studio 的核心链路,描述从用户自然语言到 SVG 图表渲染的完整数据流。</p>
+
+<h3>3.1 完整数据流</h3>
+
+<div class="flowchart">
+  <div class="fc-sequence">
+    <div class="fc-step">
+      <div class="fc-step-num">1</div>
+      <div class="fc-step-body">
+        <div class="fc-step-title">用户输入</div>
+        <div class="fc-step-desc">useAgent.sendMessage(text)</div>
+        <code class="fc-step-code">"帮我画一个系统登录的流程图"</code>
+      </div>
+    </div>
+    <div class="fc-step">
+      <div class="fc-step-num">2</div>
+      <div class="fc-step-body">
+        <div class="fc-step-title">buildMessages 组装上下文</div>
+        <div class="fc-step-desc">SYSTEM_PROMPT + 当前DSL(空) + 历史 + 用户输入</div>
+      </div>
+    </div>
+    <div class="fc-step">
+      <div class="fc-step-num">3</div>
+      <div class="fc-step-body">
+        <div class="fc-step-title">LLM 第一次调用</div>
+        <div class="fc-step-desc">LLM 返回 tool_calls,包含生成的 DSL</div>
+        <code class="fc-step-code">{ name: "render", arguments: { source: "diagram flowchart { ... }", format: "svg" } }</code>
+      </div>
+    </div>
+    <div class="fc-step">
+      <div class="fc-step-num">4</div>
+      <div class="fc-step-body">
+        <div class="fc-step-title">执行 render tool</div>
+        <div class="fc-step-desc">★ 同步更新 context.source = args.source</div>
+        <code class="fc-step-code">renderSource(wasm, source, "svg") → wasm.render(source, "svg")</code>
+      </div>
+    </div>
+    <div class="fc-step">
+      <div class="fc-step-num">5</div>
+      <div class="fc-step-body">
+        <div class="fc-step-title">WASM 渲染管线 (Rust)</div>
+        <div class="fc-step-desc">parse → prepare → validate → layout → scene → encode</div>
+        <code class="fc-step-code">返回 { success: true, text: "&lt;svg&gt;...&lt;/svg&gt;" }</code>
+      </div>
+    </div>
+    <div class="fc-step">
+      <div class="fc-step-num">6</div>
+      <div class="fc-step-body">
+        <div class="fc-step-title">AgentLoop 记录 lastSvg</div>
+        <div class="fc-step-desc">messages.push(assistant + tool_calls, tool result)</div>
+      </div>
+    </div>
+    <div class="fc-step">
+      <div class="fc-step-num">7</div>
+      <div class="fc-step-body">
+        <div class="fc-step-title">LLM 第二次调用</div>
+        <div class="fc-step-desc">LLM 返回无 tool_calls 的最终回复</div>
+        <code class="fc-step-code">"已为你生成系统登录流程图,包含..."</code>
+      </div>
+    </div>
+    <div class="fc-step">
+      <div class="fc-step-num">8</div>
+      <div class="fc-step-body">
+        <div class="fc-step-title">useAgent 更新 React state</div>
+        <div class="fc-step-desc">setCurrentSource / setCurrentSvg</div>
+      </div>
+    </div>
+    <div class="fc-step">
+      <div class="fc-step-num">9</div>
+      <div class="fc-step-body">
+        <div class="fc-step-title">UI 渲染</div>
+        <div class="fc-step-desc">PreviewCanvas 渲染 SVG · DslViewer 展示 DSL · ChatMessage 渲染 Markdown</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>3.2 DSL 生成与 source 同步</h3>
+
+<p>LLM 通过 <code>render</code> tool 的 <code>source</code> 参数传入生成的 Drawify DSL。这里有一个关键的 <strong>source 同步机制</strong>:</p>
+
+<pre><code><span class="comment">// src/agent/tools.ts - render executor</span>
+<span class="function">render</span>: <span class="keyword">async</span> (args, context) => {
+  <span class="keyword">const</span> wasm = <span class="keyword">await</span> <span class="function">getWasm</span>();
+  <span class="keyword">const</span> source = <span class="type">String</span>(args.source ?? <span class="string">''</span>);
+  <span class="keyword">const</span> format = <span class="type">String</span>(args.format ?? <span class="string">'svg'</span>) <span class="keyword">as</span> <span class="type">RenderFormat</span>;
+  <span class="keyword">const</span> options = args.options <span class="keyword">as</span> <span class="type">RenderOptions</span> | <span class="keyword">undefined</span>;
+  <span class="keyword">const</span> optionsJson = options ? <span class="type">JSON</span>.<span class="function">stringify</span>(options) : <span class="keyword">undefined</span>;
+
+  <span class="comment">// ★ LLM 通过 render 传入新生成的 DSL,同步到 context 以便 DslViewer 展示</span>
+  <span class="keyword">if</span> (source && source !== context.source) {
+    context.source = source;
+  }
+
+  <span class="keyword">return</span> <span class="function">renderSource</span>(wasm, source, format, optionsJson);
+},</code></pre>
+
+<div class="highlight-box">
+  <strong>为什么在 render tool 中同步 source?</strong><br>
+  P0 阶段(单轮生成)LLM 只调用 render 生成图表,不调用 apply_patch。如果不在 render 时同步 source,DslViewer 将看不到 LLM 生成的 DSL。P1 阶段(增量编辑)则由 apply_patch 更新 source。
+</div>
+
+<h3>3.3 WASM 渲染管线</h3>
+
+<p><code>renderSource</code> 是 TypeScript 与 Rust WASM 的桥接函数,负责调用 WASM 并解析返回的 JSON:</p>
+
+<pre><code><span class="comment">// src/lib/wasm.ts</span>
+<span class="keyword">export function</span> <span class="function">renderSource</span>(
+  wasm: <span class="type">DrawifyWasm</span>,
+  source: <span class="type">string</span>,
+  format: <span class="type">RenderFormat</span>,
+  optionsJson?: <span class="type">string</span>,
+): <span class="type">RenderResult</span> {
+  <span class="keyword">const</span> json =
+    optionsJson && <span class="keyword">typeof</span> wasm.render_with_options === <span class="string">'function'</span>
+      ? wasm.<span class="function">render_with_options</span>(source, format, optionsJson)
+      : wasm.<span class="function">render</span>(source, format);
+
+  <span class="keyword">return</span> <span class="function">safeParse</span>&lt;<span class="type">RenderResult</span>&gt;(json, {
+    success: <span class="keyword">false</span>,
+    format,
+    text: <span class="keyword">null</span>,
+    errors: [<span class="string">'无法解析渲染结果'</span>],
+    warnings: [],
+  });
+}</code></pre>
+
+<p>WASM 侧(Rust)的渲染管线遵循 drawify-core 的分层架构:</p>
+
+<pre><code><span class="comment">// crates/drawify-wasm/src/lib.rs - render_impl</span>
+<span class="keyword">fn</span> <span class="function">render_impl</span>(source, format_str, options) -&gt; <span class="type">String</span> {
+    <span class="comment">// 1. 解析格式</span>
+    <span class="keyword">let</span> format = <span class="type">RenderFormat</span>::<span class="function">from_str</span>(format_str)?;
+
+    <span class="comment">// 2. parse → prepare → validate</span>
+    <span class="keyword">let</span> output = <span class="function">parse_prepare_validate</span>(source, &style_request);
+
+    <span class="comment">// 3. 构造 RenderRequest</span>
+    <span class="keyword">let</span> <span class="keyword">mut</span> request = <span class="type">RenderRequest</span>::<span class="function">new</span>(&prepared, format);
+
+    <span class="comment">// 4. 应用 options(theme/graphic_style/dark_mode)</span>
+    <span class="function">apply_options_to_request</span>(&<span class="keyword">mut</span> request, options.as_ref())?;
+
+    <span class="comment">// 5. layout → scene → encode</span>
+    <span class="keyword">match</span> <span class="function">render_output</span>(&request) {
+        <span class="type">Ok</span>(<span class="type">RenderOutput</span>::<span class="type">Text</span>(text)) =&gt; {
+            <span class="comment">// 返回 { success:true, text:"&lt;svg&gt;...&lt;/svg&gt;" }</span>
+        }
+        <span class="type">Ok</span>(<span class="type">RenderOutput</span>::<span class="type">Binary</span>(_)) =&gt; { <span class="comment">/* png/webp */</span> }
+        <span class="type">Err</span>(e) =&gt; { <span class="comment">/* 错误诊断 */</span> }
+    }
+}</code></pre>
+
+<h3>3.4 SVG 提取与 UI 更新</h3>
+
+<p>AgentLoop 在每次 render tool 执行后,检查结果并记录 <code>lastSvg</code>:</p>
+
+<pre><code><span class="comment">// src/agent/AgentLoop.ts</span>
+<span class="comment">// 记录最后一次渲染的 SVG</span>
+<span class="keyword">if</span> (toolCall.name === <span class="string">'render'</span> && result && <span class="keyword">typeof</span> result === <span class="string">'object'</span>) {
+  <span class="keyword">const</span> renderResult = result <span class="keyword">as</span> { success: <span class="type">boolean</span>; text?: <span class="type">string</span> };
+  <span class="keyword">if</span> (renderResult.success && renderResult.text) {
+    lastSvg = renderResult.text;  <span class="comment">// ★ 提取 SVG 字符串</span>
+  }
+}</code></pre>
+
+<p>循环结束后,<code>useAgent</code> 从 result 中更新 React state:</p>
+
+<pre><code><span class="comment">// src/hooks/useAgent.ts</span>
+<span class="keyword">const</span> result = <span class="keyword">await</span> <span class="function">runAgentLoop</span>(text, contextRef.current, config);
+
+<span class="comment">// AgentLoop 会原地修改 contextRef.current.source(通过 render/apply_patch tool)</span>
+<span class="keyword">if</span> (contextRef.current.source && contextRef.current.source !== currentSource) {
+  <span class="function">setCurrentSource</span>(contextRef.current.source);  <span class="comment">// DSL 更新</span>
+}
+<span class="keyword">if</span> (result.svg) {
+  <span class="function">setCurrentSvg</span>(result.svg);  <span class="comment">// SVG 更新</span>
+}</code></pre>
+
+<div class="success-box">
+  <strong>最终效果</strong>:PreviewCanvas 实时显示渲染的 SVG,DslViewer 展示 DSL 源码,ChatMessage 用 Markdown 渲染 Agent 的自然语言回复。
+</div>
+
+<h3>3.5 tool_calls 格式转换(关键修复)</h3>
+
+<p>内部 <code>ToolCall</code> 是扁平结构,但 DeepSeek/OpenAI API 要求嵌套结构。<code>buildRequestBody</code> 负责转换:</p>
+
+<table>
+<tr><th>内部格式(TS)</th><th>API 格式(发送给 LLM)</th></tr>
+<tr>
+<td><code>{ id, name, arguments: object }</code></td>
+<td><code>{ id, type: "function", function: { name, arguments: "JSON字符串" } }</code></td>
+</tr>
+</table>
+
+<pre><code><span class="comment">// src/lib/llm.ts - buildRequestBody</span>
+<span class="keyword">const</span> apiMessages = messages.<span class="function">map</span>((msg) => {
+  <span class="keyword">if</span> (msg.role === <span class="string">'assistant'</span> && msg.tool_calls?.length) {
+    <span class="keyword">return</span> {
+      role: <span class="string">'assistant'</span>,
+      content: msg.content || <span class="keyword">null</span>,  <span class="comment">// 空字符串转 null</span>
+      tool_calls: msg.tool_calls.<span class="function">map</span>((tc) =&gt; ({
+        id: tc.id,
+        type: <span class="string">'function'</span>,  <span class="comment">// ★ 必须有</span>
+        function: {
+          name: tc.name,
+          arguments: <span class="keyword">typeof</span> tc.arguments === <span class="string">'string'</span>
+            ? tc.arguments
+            : <span class="type">JSON</span>.<span class="function">stringify</span>(tc.arguments ?? {}),  <span class="comment">// ★ 必须是字符串</span>
+        },
+      })),
+    };
+  }
+  <span class="keyword">return</span> msg;
+});</code></pre>
+</section>
+
+<!-- ==================== 4. Tool-Calling 机制 ==================== -->
+<section id="tools">
+<h2><span class="num">4</span>Tool-Calling 机制</h2>
+
+<p>Agent 通过 6 个 Tool 操控 drawify-wasm,每个 Tool 对应一种能力:</p>
+
+<table>
+<tr>
+<th>Tool</th>
+<th>用途</th>
+<th>WASM 绑定</th>
+<th>阶段</th>
+</tr>
+<tr>
+<td><code>render</code></td>
+<td>渲染 DSL 为 SVG/ASCII/JSON</td>
+<td><code>wasm.render</code> / <code>render_with_options</code></td>
+<td><span class="tag tag-p0">P0</span></td>
+</tr>
+<tr>
+<td><code>validate</code></td>
+<td>校验 DSL 语法语义,返回错误诊断</td>
+<td><code>wasm.validate</code></td>
+<td><span class="tag tag-p0">P0</span></td>
+</tr>
+<tr>
+<td><code>parse</code></td>
+<td>解析 DSL 为 AST JSON</td>
+<td><code>wasm.parse_to_json</code></td>
+<td><span class="tag tag-p0">P0</span></td>
+</tr>
+<tr>
+<td><code>layout_catalog</code></td>
+<td>查询可用布局算法</td>
+<td><code>wasm.layout_catalog</code></td>
+<td><span class="tag tag-p0">P0</span></td>
+</tr>
+<tr>
+<td><code>diff</code></td>
+<td>比较两份 DSL 的语义差异</td>
+<td><code>wasm.diff_sources</code> <span class="tag tag-p1">P1 待实现</span></td>
+<td><span class="tag tag-p1">P1</span></td>
+</tr>
+<tr>
+<td><code>apply_patch</code></td>
+<td>对 DSL 应用增量补丁(Change 列表)</td>
+<td><code>wasm.apply_patch</code> <span class="tag tag-p1">P1 待实现</span></td>
+<td><span class="tag tag-p1">P1</span></td>
+</tr>
+</table>
+
+<h3>Tool 执行器签名</h3>
+
+<pre><code><span class="keyword">export type</span> <span class="type">ToolExecutor</span> = (
+  args: <span class="type">Record</span>&lt;<span class="type">string</span>, <span class="keyword">unknown</span>&gt;,
+  context: <span class="type">AgentContext</span>,
+) =&gt; <span class="type">Promise</span>&lt;<span class="keyword">unknown</span>&gt;;</code></pre>
+
+<h3>render tool 的完整参数</h3>
+
+<pre><code>{
+  <span class="string">"source"</span>: <span class="string">"diagram flowchart { entity start { type: start } ... }"</span>,
+  <span class="string">"format"</span>: <span class="string">"svg"</span>,  <span class="comment">// svg | ascii | json</span>
+  <span class="string">"options"</span>: {
+    <span class="string">"theme_id"</span>: <span class="string">"default"</span>,
+    <span class="string">"graphic_style"</span>: <span class="string">"rounded"</span>,
+    <span class="string">"dark_mode"</span>: <span class="keyword">false</span>
+  }
+}</code></pre>
+
+<h3>render 返回值</h3>
+
+<pre><code>{
+  <span class="string">"success"</span>: <span class="keyword">true</span>,
+  <span class="string">"format"</span>: <span class="string">"svg"</span>,
+  <span class="string">"text"</span>: <span class="string">"&lt;svg xmlns='...'&gt;...&lt;/svg&gt;"</span>,  <span class="comment">// ★ SVG 字符串</span>
+  <span class="string">"errors"</span>: [],
+  <span class="string">"warnings"</span>: []
+}</code></pre>
+</section>
+
+<!-- ==================== 5. 上下文管理 ==================== -->
+<section id="context">
+<h2><span class="num">5</span>上下文管理</h2>
+
+<p>AgentContext 是 Agent 的状态容器,贯穿整个对话生命周期:</p>
+
+<pre><code><span class="keyword">export interface</span> <span class="type">AgentContext</span> {
+  source: <span class="type">string</span>;              <span class="comment">// 当前生效的 DSL 源码(图表真相)</span>
+  diagramType: <span class="type">DiagramKind</span> | <span class="keyword">null</span>;  <span class="comment">// 图表类型</span>
+  history: <span class="type">ChatMessage</span>[];       <span class="comment">// 对话历史</span>
+  maxIterations: <span class="type">number</span>;       <span class="comment">// 最大迭代次数(默认 10)</span>
+}</code></pre>
+
+<h3>buildMessages 的上下文注入策略</h3>
+
+<p>每次 runAgentLoop 调用时,<code>buildMessages</code> 重新组装发送给 LLM 的消息列表:</p>
+
+<div class="flowchart">
+  <div class="fc-sequence">
+    <div class="fc-step">
+      <div class="fc-step-num">1</div>
+      <div class="fc-step-body">
+        <div class="fc-step-title">System Prompt</div>
+        <div class="fc-step-desc">固定的 SYSTEM_PROMPT,描述 Agent 能力、DSL 语法、工作流程</div>
+      </div>
+    </div>
+    <div class="fc-step">
+      <div class="fc-step-num">2</div>
+      <div class="fc-step-body">
+        <div class="fc-step-title">当前 DSL</div>
+        <div class="fc-step-desc">如果 context.source 非空,注入为 system message,让 LLM 知道当前图表内容</div>
+      </div>
+    </div>
+    <div class="fc-step">
+      <div class="fc-step-num">3</div>
+      <div class="fc-step-body">
+        <div class="fc-step-title">对话历史</div>
+        <div class="fc-step-desc">最近 10 条 user/agent 消息(仅 content,不含 tool_calls)</div>
+      </div>
+    </div>
+    <div class="fc-step">
+      <div class="fc-step-num">4</div>
+      <div class="fc-step-body">
+        <div class="fc-step-title">当前用户输入</div>
+        <div class="fc-step-desc">本次用户消息</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<pre><code><span class="comment">// src/agent/prompt.ts</span>
+<span class="keyword">export function</span> <span class="function">buildMessages</span>(userMessage, context): <span class="type">LLMMessage</span>[] {
+  <span class="keyword">const</span> messages = [
+    { role: <span class="string">'system'</span>, content: <span class="type">SYSTEM_PROMPT</span> },
+  ];
+
+  <span class="comment">// 注入当前 DSL 状态</span>
+  <span class="keyword">if</span> (context.source) {
+    messages.<span class="function">push</span>({
+      role: <span class="string">'system'</span>,
+      content: <span class="string">`当前图表的 DSL 源码如下,后续修改基于此版本:\n\n\`\`\`drawify\n${context.source}\n\`\`\``</span>,
+    });
+  }
+
+  <span class="comment">// 注入对话历史(最近 10 条)</span>
+  <span class="keyword">const</span> recentHistory = context.history.<span class="function">slice</span>(-10);
+  <span class="keyword">for</span> (<span class="keyword">const</span> msg <span class="keyword">of</span> recentHistory) {
+    <span class="keyword">if</span> (msg.role === <span class="string">'user'</span>) messages.<span class="function">push</span>({ role: <span class="string">'user'</span>, content: msg.content });
+    <span class="keyword">else if</span> (msg.role === <span class="string">'agent'</span>) messages.<span class="function">push</span>({ role: <span class="string">'assistant'</span>, content: msg.content });
+  }
+
+  <span class="comment">// 当前用户输入</span>
+  messages.<span class="function">push</span>({ role: <span class="string">'user'</span>, content: userMessage });
+
+  <span class="keyword">return</span> messages;
+}</code></pre>
+
+<h3>历史压缩</h3>
+
+<p><code>compactHistory</code> 在每轮对话后调用,保留最近 20 条消息,避免上下文无限增长:</p>
+
+<pre><code><span class="keyword">export function</span> <span class="function">compactHistory</span>(context, keepLast = 20): <span class="type">AgentContext</span> {
+  <span class="keyword">if</span> (context.history.length &lt;= keepLast) <span class="keyword">return</span> context;
+  <span class="keyword">return</span> { ...context, history: context.history.<span class="function">slice</span>(-keepLast) };
+}</code></pre>
+
+<div class="info-box">
+  <strong>上下文处理要点</strong>:Tool 调用历史(tool_calls + tool results)不持久化到 context.history,只在单次 runAgentLoop 的 messages 数组中存活。这意味着跨轮次的 Tool 调用上下文会丢失,但 LLM 能通过注入的"当前 DSL" system message 知道图表状态,足以支持迭代修改。
+</div>
+</section>
+
+<!-- ==================== 6. LLM Provider 抽象 ==================== -->
+<section id="llm">
+<h2><span class="num">6</span>LLM Provider 抽象</h2>
+
+<p>统一接口支持 5 种 Provider,配置存 localStorage 不落盘:</p>
+
+<table>
+<tr><th>Provider</th><th>baseUrl</th><th>默认 model</th><th>鉴权方式</th></tr>
+<tr><td>OpenAI</td><td>https://api.openai.com/v1</td><td>gpt-4o</td><td>Bearer token</td></tr>
+<tr><td>Anthropic</td><td>https://api.anthropic.com/v1</td><td>claude-3-5-sonnet-20241022</td><td>x-api-key + anthropic-version</td></tr>
+<tr><td>DeepSeek</td><td>https://api.deepseek.com/v1</td><td>deepseek-chat</td><td>Bearer token</td></tr>
+<tr><td>Ollama</td><td>http://localhost:11434/v1</td><td>llama3</td><td>无需鉴权</td></tr>
+<tr><td>Custom</td><td>用户自定义</td><td>用户自定义</td><td>Bearer token</td></tr>
+</table>
+
+<h3>响应格式统一</h3>
+
+<p>不同 Provider 的响应格式不同,<code>parseResponse</code> 负责统一为 <code>LLMResponse</code>:</p>
+
+<pre><code><span class="keyword">function</span> <span class="function">parseResponse</span>(provider, data): <span class="type">LLMResponse</span> {
+  <span class="keyword">if</span> (provider === <span class="string">'anthropic'</span>) {
+    <span class="keyword">return</span> <span class="function">parseAnthropicResponse</span>(data);  <span class="comment">// content blocks: text | tool_use</span>
+  }
+  <span class="keyword">return</span> <span class="function">parseOpenAIResponse</span>(data);  <span class="comment">// choices[0].message.tool_calls</span>
+}</code></pre>
+
+<p>DeepSeek/Ollama/Custom 都走 OpenAI 兼容格式,Anthropic 走原生 messages 接口。</p>
+</section>
+
+<!-- ==================== 7. 关键代码路径 ==================== -->
+<section id="codepath">
+<h2><span class="num">7</span>关键代码路径</h2>
+
+<h3>用户发送消息的完整调用链</h3>
+
+<pre><code>用户输入
+  └─ ChatPanel.handleSend()
+      └─ useAgent.sendMessage(text)
+          ├─ createUserMessage(text) → appendMessage → setMessages
+          ├─ createLLMClient(llmConfig)
+          ├─ createToolExecutors(getWasm)
+          └─ runAgentLoop(text, context, config)
+              ├─ buildMessages(text, context)
+              │   └─ [system, DSL, history..., user]
+              ├─ for (iteration &lt; maxIterations):
+              │   ├─ llm.chat(messages, AGENT_TOOL_SCHEMAS)
+              │   ├─ if 无 tool_calls → return { message, source, svg, diff }
+              │   └─ for toolCall in response.tool_calls:
+              │       ├─ executor = config.tools[toolCall.name]
+              │       ├─ result = await executor(toolCall.arguments, context)
+              │       │   └─ render: wasm.render(source, format) → { success, text }
+              │       │       ★ context.source = source (同步更新)
+              │       ├─ if render: lastSvg = result.text
+              │       ├─ if diff: lastDiff = result
+              │       └─ messages.push(assistant + tool_calls, tool result)
+              └─ return AgentResult
+          └─ useAgent 更新 state:
+              ├─ setCurrentSource(contextRef.current.source)
+              ├─ setCurrentSvg(result.svg)
+              ├─ setLastDiff(result.diff)
+              └─ setMessages([...prev, agentMsg])</code></pre>
+
+<h3>文件职责索引</h3>
+
+<table>
+<tr><th>文件</th><th>职责</th></tr>
+<tr><td><code>src/agent/AgentLoop.ts</code></td><td>核心循环引擎,编排 LLM 调用与 Tool 执行</td></tr>
+<tr><td><code>src/agent/tools.ts</code></td><td>6 个 Tool 的 Schema 定义与 Executor 实现</td></tr>
+<tr><td><code>src/agent/prompt.ts</code></td><td>System Prompt 模板与 buildMessages 上下文组装</td></tr>
+<tr><td><code>src/agent/context.ts</code></td><td>AgentContext 创建、更新、历史压缩</td></tr>
+<tr><td><code>src/agent/types.ts</code></td><td>与 drawify-core 对齐的类型定义</td></tr>
+<tr><td><code>src/hooks/useAgent.ts</code></td><td>React Hook,管理对话状态,封装 AgentLoop</td></tr>
+<tr><td><code>src/hooks/useWasm.ts</code></td><td>WASM 模块加载与能力检测</td></tr>
+<tr><td><code>src/lib/wasm.ts</code></td><td>WASM 桥接层,renderSource/validateSource/diffSources</td></tr>
+<tr><td><code>src/lib/llm.ts</code></td><td>LLM 客户端,buildRequestBody 格式转换</td></tr>
+<tr><td><code>src/lib/configStorage.ts</code></td><td>LLM 配置 localStorage 存取</td></tr>
+<tr><td><code>src/components/ChatPanel.tsx</code></td><td>对话面板,消息列表与输入框</td></tr>
+<tr><td><code>src/components/ChatMessage.tsx</code></td><td>单条消息渲染,Agent 回复用 Markdown</td></tr>
+<tr><td><code>src/components/PreviewCanvas.tsx</code></td><td>SVG 预览,支持缩放平移</td></tr>
+<tr><td><code>src/components/DslViewer.tsx</code></td><td>DSL 源码查看(Drawer)</td></tr>
+<tr><td><code>src/components/LlmConfigModal.tsx</code></td><td>LLM 配置弹窗</td></tr>
+</table>
+
+<h3>P0/P1 阶段能力对照</h3>
+
+<table>
+<tr><th>能力</th><th>P0(单轮生成)</th><th>P1(增量编辑)</th></tr>
+<tr><td>生成图表</td><td>✅ render tool</td><td>✅</td></tr>
+<tr><td>校验 DSL</td><td>✅ validate tool</td><td>✅</td></tr>
+<tr><td>DSL 展示</td><td>✅ DslViewer</td><td>✅</td></tr>
+<tr><td>SVG 导出</td><td>✅ downloadSvg</td><td>✅</td></tr>
+<tr><td>增量修改</td><td>❌ 重写整个 DSL</td><td>✅ apply_patch</td></tr>
+<tr><td>差异展示</td><td>❌</td><td>✅ diff tool + DiffSummary</td></tr>
+<tr><td>变更确认</td><td>❌ 直接生效</td><td>✅ pendingChanges 机制</td></tr>
+</table>
+
+<div class="info-box">
+  <strong>P1 实现要点</strong>:需要在 drawify-wasm crate 新增 <code>diff_sources</code> / <code>apply_patch</code> / <code>ast_to_source</code> 三个绑定,并在 drawify-core 实现 AST → DSL 反序列化能力。前端侧的 Tool Schema 和 Executor 已就绪,只需 WASM 产物支持即可激活。
+</div>
+</section>
+
+</div>
+</body>
+</html>

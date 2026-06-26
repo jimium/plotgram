@@ -1,0 +1,28 @@
+[package]
+name = "drawify-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Core library for Drawify: parser, AST, validator, and renderer"
+
+[features]
+default = ["raster", "svg-debug"]
+raster = ["dep:resvg", "dep:usvg", "dep:image"]
+svg-debug = []
+compressed-drawio = ["dep:flate2", "dep:base64"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+petgraph = "0.8"
+resvg = { version = "0.44", optional = true }
+usvg = { version = "0.44", optional = true }
+image = { version = "0.25", features = ["png", "webp"], optional = true }
+unicode-width = "0.2"
+flate2 = { version = "1", optional = true }
+base64 = { version = "0.22", optional = true }
+
+[dev-dependencies]
+# 测试依赖

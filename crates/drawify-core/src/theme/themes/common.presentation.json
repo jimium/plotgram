@@ -1,0 +1,114 @@
+{
+  "version": "0.2",
+  "id": "common.presentation",
+  "name": "Presentation",
+  "meta": {
+    "author": "Drawify",
+    "description": "演示展示样式：更大字号、更强对比，适合幻灯片与投影场景",
+    "tags": ["presentation", "slides"]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#FFFDF8",
+      "text": "#1F2937",
+      "muted_text": "#4B5563",
+      "border": "#9CA3AF",
+      "primary": "#1D4ED8",
+      "neutral_fill": "#F3F4F6",
+      "neutral_stroke": "#374151",
+      "group_fill": "#FEF3C7",
+      "group_stroke": "#D97706"
+    },
+    "palette": {
+      "blue": { "fill": "#DBEAFE", "stroke": "#1D4ED8" },
+      "orange": { "fill": "#FFEDD5", "stroke": "#C2410C" },
+      "green": { "fill": "#DCFCE7", "stroke": "#15803D" },
+      "purple": { "fill": "#F3E8FF", "stroke": "#7E22CE" },
+      "yellow": { "fill": "#FEF9C3", "stroke": "#CA8A04" },
+      "red": { "fill": "#FEE2E2", "stroke": "#DC2626" },
+      "cyan": { "fill": "#CFFAFE", "stroke": "#0E7490" },
+      "brown": { "fill": "#F5F5F4", "stroke": "#57534E" },
+      "gray": { "fill": "#F9FAFB", "stroke": "#6B7280" },
+      "amber": { "fill": "#FEF3C7", "stroke": "#D97706" },
+      "blue_gray": { "fill": "#F3F4F6", "stroke": "#374151" },
+      "start_green": { "fill": "#BBF7D0", "stroke": "#15803D" },
+      "end_red": { "fill": "#FECACA", "stroke": "#DC2626" },
+      "arch_blue": { "fill": "#DBEAFE", "stroke": "#1D4ED8" },
+      "root": { "fill": "#4338CA", "stroke": "#312E81", "text_fill": "#FFFFFF" }
+    },
+    "typography": {
+      "title_size": 20,
+      "label_size": 15,
+      "small_size": 12,
+      "font_weight_medium": 600
+    },
+    "strokes": {
+      "thin": 1.25,
+      "normal": 2.0,
+      "thick": 2.5,
+      "dashed": [8, 4],
+      "dotted": [3, 4]
+    },
+    "radius": {
+      "sm": 6,
+      "md": 10,
+      "lg": 14
+    },
+    "spacing": {
+      "node_padding_x": 14,
+      "node_padding_y": 10,
+      "group_padding": 20,
+      "label_gap": 8
+    }
+  },
+  "diagrams": {
+    "flowchart": {
+      "edge": { "stroke": "{colors.neutral_stroke}" },
+      "group": { "stroke_width": "{strokes.thick}" }
+    },
+    "sequence": { "edge": { "stroke": "{colors.neutral_stroke}" } },
+    "state": { "edge": { "stroke": "{colors.neutral_stroke}" } },
+    "architecture": {
+      "edge": { "stroke": "{colors.neutral_stroke}" },
+      "group": {
+        "stroke": "#1D4ED8",
+        "stroke_width": "{strokes.thick}"
+      },
+      "context_palettes": {
+        "group_nest": {
+          "entries": [
+            { "fill": "{lighten(#FEF3C7, 0.0)}", "stroke": "{lighten(#1D4ED8, 0.0)}", "stroke_width": 2.0, "border_radius": 8.0 },
+            { "fill": "{lighten(#FEF3C7, 0.35)}", "stroke": "{lighten(#1D4ED8, 0.30)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{lighten(#FEF3C7, 0.55)}", "stroke": "{lighten(#1D4ED8, 0.50)}", "stroke_width": 1.5, "border_radius": 6.0 },
+            { "fill": "{lighten(#FEF3C7, 0.70)}", "stroke": "{lighten(#1D4ED8, 0.65)}", "stroke_width": 1.5, "border_radius": 6.0 }
+          ],
+          "index": { "from": "group_depth", "cap": 3 },
+          "bindings": [
+            { "target": "group", "fields": { "fill": "fill", "stroke": "stroke", "stroke_width": "stroke_width", "border_radius": "border_radius" } }
+          ]
+        }
+      }
+    },
+    "er": {
+      "node": { "fill": "#FFFFFF", "stroke": "#1D4ED8" },
+      "edge": { "stroke": "{colors.neutral_stroke}" }
+    },
+    "mindmap": {
+      "edge": { "stroke_width": "{strokes.normal}" },
+      "entity_types": { "leaf": { "fill": "#EEF2FF" } },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#E0E7FF", "stroke": "#4338CA", "edge_stroke": "#7986CB" },
+            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
+            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
+            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
+            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
+            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+          ]
+        }
+      }
+    }
+  }
+}
