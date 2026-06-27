@@ -407,6 +407,10 @@ mod tests {
             corridor_misalignment_penalty: 120.0,
             repulse_max_rounds: 2,
             corridors: vec![],
+            node_leaf_group: HashMap::new(),
+            sibling_sets: vec![],
+            sibling_orientation: HashMap::new(),
+            group_ancestors: HashMap::new(),
         }
     }
 

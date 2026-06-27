@@ -21,7 +21,7 @@ pub use border_shell::{
 };
 pub use config::{routing_algo_for_diagram, GroupRoutingProfile};
 pub use constants::{GROUP_BORDER_SHELL_PAD, PORT_STUB_CLEARANCE};
-pub use context::{build_node_to_groups, GroupRoutingContext, GroupRoutingHints};
+pub use context::{build_node_to_groups, GroupRoutingContext, GroupRoutingHints, SiblingOrientation};
 pub use corridor::{
     build_corridors_from_groups, build_stacking_corridors, corridor_misalignment_penalty,
     merge_corridors, prefer_corridor_coord, CorridorAxis, GroupCorridor,

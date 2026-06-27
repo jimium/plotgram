@@ -53,12 +53,34 @@ impl EdgeCorridor {
 /// - axis=Vertical：段沿垂直方向延伸（y 轴为主轴），找 x 方向间隙中点（垂直通道 x 坐标）；
 /// - axis=Horizontal：段沿水平方向延伸（x 轴为主轴），找 y 方向间隙中点（水平通道 y 坐标）。
 /// 只考虑主轴范围重叠的分组对（同一行/列），避免不同行/列分组的干扰。
+/// 优先使用 GroupCorridors 中预定义的走廊坐标。
 fn group_gap_midpoints_on_axis(
     groups: &HashMap<String, GroupLayout>,
+    corridors: &[GroupCorridor],
     axis: Axis,
     corridor: EdgeCorridor,
 ) -> Vec<f64> {
+    let corridor_axis = match axis {
+        Axis::Vertical => CorridorAxis::Vertical,
+        Axis::Horizontal => CorridorAxis::Horizontal,
+    };
     let (main_lo, main_hi) = corridor.main_range(axis);
+    let mut mids = Vec::new();
+
+    for c in corridors {
+        if c.axis != corridor_axis {
+            continue;
+        }
+        if !corridor.contains_cross_coord(axis, c.coord) {
+            continue;
+        }
+        let (c_lo, c_hi) = (c.span_min, c.span_max);
+        if c_hi <= main_lo + EPS || c_lo >= main_hi - EPS {
+            continue;
+        }
+        mids.push(c.coord);
+    }
+
     let mut ranges: Vec<(f64, f64, f64, f64)> = groups
         .values()
         .filter_map(|g| {
@@ -72,7 +94,7 @@ fn group_gap_midpoints_on_axis(
         })
         .collect();
     ranges.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-    let mut mids = Vec::new();
+
     for i in 0..ranges.len() {
         for j in i + 1..ranges.len() {
             let (_ac_lo, ac_hi, am_lo, am_hi) = ranges[i];
@@ -91,6 +113,8 @@ fn group_gap_midpoints_on_axis(
             }
         }
     }
+    mids.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    mids.dedup_by(|a, b| (*a - *b).abs() < 1.0);
     mids
 }
 
@@ -454,7 +478,7 @@ fn generate_axis_folds(
         &ctx.obstacles.sorted_node_ids, &ctx.obstacles.sorted_group_ids,
         corridor,
     );
-    folds.extend(group_gap_midpoints_on_axis(groups, axis, corridor));
+    folds.extend(group_gap_midpoints_on_axis(groups, &ctx.group_ctx.corridors, axis, corridor));
 
     folds.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     folds.dedup_by(|a, b| (*a - *b).abs() < 1.0);
@@ -494,15 +518,7 @@ fn build_obstacle_aware_z_folds(
     let to_vertical = is_vertical_port(to_side);
     let mixed = from_vertical != to_vertical;
 
-    let endpoint_groups: HashSet<&str> = ctx
-        .group_ctx
-        .node_to_groups
-        .get(pair.from_id())
-        .into_iter()
-        .flatten()
-        .chain(ctx.group_ctx.node_to_groups.get(pair.to_id()).into_iter().flatten())
-        .map(|s| s.as_str())
-        .collect();
+    let endpoint_groups = ctx.group_ctx.endpoint_group_set(pair.from_id(), pair.to_id());
 
     let (out_fx, out_fy) = port_outward(from_side);
     let (out_tx, out_ty) = port_outward(to_side);
@@ -569,15 +585,7 @@ fn build_staircase_candidates(
     let from_vertical = is_vertical_port(from_side);
     let _to_vertical = is_vertical_port(to_side);
 
-    let endpoint_groups: HashSet<&str> = ctx
-        .group_ctx
-        .node_to_groups
-        .get(from_id)
-        .into_iter()
-        .flatten()
-        .chain(ctx.group_ctx.node_to_groups.get(to_id).into_iter().flatten())
-        .map(|s| s.as_str())
-        .collect();
+    let endpoint_groups = ctx.group_ctx.endpoint_group_set(from_id, to_id);
 
     let (out_fx, out_fy) = port_outward(from_side);
     let (out_tx, out_ty) = port_outward(to_side);
@@ -599,8 +607,8 @@ fn build_staircase_candidates(
         corridor,
     );
 
-    fold_coords.extend(group_gap_midpoints_on_axis(groups, axis.other(), corridor));
-    channel_coords.extend(group_gap_midpoints_on_axis(groups, axis, corridor));
+    fold_coords.extend(group_gap_midpoints_on_axis(groups, &ctx.group_ctx.corridors, axis.other(), corridor));
+    channel_coords.extend(group_gap_midpoints_on_axis(groups, &ctx.group_ctx.corridors, axis, corridor));
 
     prepare_coords(&mut fold_coords);
     prepare_coords(&mut channel_coords);
@@ -814,15 +822,7 @@ fn build_channel_detours(
     let from_id = pair.from_id();
     let to_id = pair.to_id();
 
-    let endpoint_groups: HashSet<&str> = ctx
-        .group_ctx
-        .node_to_groups
-        .get(from_id)
-        .into_iter()
-        .flatten()
-        .chain(ctx.group_ctx.node_to_groups.get(to_id).into_iter().flatten())
-        .map(|s| s.as_str())
-        .collect();
+    let endpoint_groups = ctx.group_ctx.endpoint_group_set(from_id, to_id);
 
     let from_vertical = is_vertical_port(from_side);
     let to_vertical = is_vertical_port(to_side);

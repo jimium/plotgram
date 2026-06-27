@@ -44,7 +44,7 @@ pub(super) use simplify::{simplify_path, simplify_path_preserving_stubs};
 #[allow(unused_imports)] // used by tests via `use super::*;`
 pub(super) use simplify::is_collinear;
 pub(super) use slot::{
-    choose_docking_strategy, choose_pair_sides, is_vertical_port, slot_anchor, slot_fraction,
+    choose_docking_strategy, choose_pair_sides, choose_pair_sides_with_group, is_vertical_port, slot_anchor, slot_fraction,
     slot_fraction_around, DockingStrategy, Endpoint,
 };
 // P1-1: port_outward 仅在 mod.rs 内使用，不重导出
@@ -303,7 +303,7 @@ fn route_edges_orthogonal_inner(
             continue;
         };
 
-        let (side_a, side_b) = choose_pair_sides(a_nl, b_nl);
+        let (side_a, side_b) = choose_pair_sides_with_group(a_nl, b_nl, can_from, can_to, Some(&group_ctx));
 
         for (l, &i) in indices.iter().enumerate() {
             let rel = &relations[i];
@@ -323,7 +323,7 @@ fn route_edges_orthogonal_inner(
     // choose_pair_sides 逐对独立选端口，同一节点的多条边可能分散在不同侧出发，
     // 导致节点附近不必要的交叉。此阶段对每个节点的多条边做"同侧偏好"协调：
     // 统计各侧边数，让少数派边在几何可接受时切换到多数派侧。
-    coordinate_port_sides(relations, &result.nodes, &mut from_side, &mut to_side);
+    coordinate_port_sides(relations, &result.nodes, &mut from_side, &mut to_side, Some(&group_ctx));
     crate::perf_log!("[perf]     step1_ports: {:.2}ms", t1.elapsed().as_secs_f64() * 1000.0);
 
     // ── 2. 为每个连接点分配磁吸 slot 坐标 ──
@@ -582,7 +582,7 @@ fn route_edges_orthogonal_inner(
     // 方向不一致时（如需要绕过中间节点），排序结果会导致出边交叉。
     // 典型场景：节点 A 底部两条出边，左边 slot 的边实际向右绕行，右边 slot 的边
     // 直下，两者在节点下方交叉。交换 slot 后即可消除交叉。
-    fix_slot_inversions(
+    replan_slots(
         &result.nodes,
         &relations,
         &from_side,
@@ -769,6 +769,159 @@ fn fix_slot_inversions(
                 break; // 无倒挂，收敛完成
             }
         }
+    }
+}
+
+/// 全局 Slot 重规划（Layer 3）：路由完成后根据实际出口方向全局重排 slot，
+/// 替代 fix_slot_inversions 的冒泡交换+多次重路由。
+///
+/// 核心改进：
+/// 1. 一次性全局排序（按实际出口方向），而非冒泡相邻交换
+/// 2. 排序后一次性轻量重路由（phase1_only），而非每交换一对就重路由
+/// 3. 覆盖所有倒挂情况，而非仅相邻对
+fn replan_slots(
+    nodes: &HashMap<String, NodeLayout>,
+    relations: &[crate::ast::Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+    endpoint_map: &mut HashMap<(usize, bool), Endpoint>,
+    edges: &mut Vec<EdgeLayout>,
+    grid: &mut SegmentGrid,
+    cfg: &OrthoConfig,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    obstacles: &PreparedObstacles,
+    ortho_stats: &mut crate::layout::OrthoDebugStats,
+) {
+    use std::collections::{BTreeMap, HashSet};
+
+    let n = edges.len();
+
+    let mut bundling_groups: BTreeMap<String, Vec<(usize, bool)>> = BTreeMap::new();
+    for i in 0..n {
+        if edges[i].path_is_empty() {
+            continue;
+        }
+        for &is_from in &[true, false] {
+            if let Some(ep) = endpoint_map.get(&(i, is_from)) {
+                let rel = &relations[i];
+                let key = endpoint_bundling_key(&ep.node_id, ep.side, is_from, rel);
+                bundling_groups.entry(key).or_default().push((i, is_from));
+            }
+        }
+    }
+
+    let mut edges_to_reroute: HashSet<usize> = HashSet::new();
+
+    for (_bundling_key, ep_tuples) in &bundling_groups {
+        if ep_tuples.len() < 2 {
+            continue;
+        }
+
+        let first_ep = endpoint_map.get(&ep_tuples[0]).unwrap();
+        let side = first_ep.side;
+        let vertical_side = is_vertical_port(side);
+
+        let mut edge_info: Vec<(usize, bool, f64, f64)> = Vec::new();
+        let mut tangent_coords: Vec<f64> = Vec::new();
+
+        for &(ei, ef) in ep_tuples {
+            let ep = endpoint_map.get(&(ei, ef)).unwrap();
+            let effective_dir = compute_effective_exit_dir(edges, ei, ef, side);
+            let tangent = if vertical_side { ep.anchor.x } else { ep.anchor.y };
+            let sort_key = if vertical_side {
+                effective_dir
+            } else {
+                -effective_dir
+            };
+            edge_info.push((ei, ef, sort_key, tangent));
+            tangent_coords.push(tangent);
+        }
+
+        tangent_coords.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        let mut sorted_by_dir = edge_info.clone();
+        sorted_by_dir.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal));
+
+        for (idx, (ei, ef, _, _)) in sorted_by_dir.iter().enumerate() {
+            let new_tangent = tangent_coords[idx];
+            if let Some(ep) = endpoint_map.get_mut(&(*ei, *ef)) {
+                let current_tangent = if vertical_side { ep.anchor.x } else { ep.anchor.y };
+                if (current_tangent - new_tangent).abs() > EPS {
+                    if vertical_side {
+                        ep.anchor.x = new_tangent;
+                    } else {
+                        ep.anchor.y = new_tangent;
+                    }
+                    edges_to_reroute.insert(*ei);
+                }
+            }
+        }
+    }
+
+    if edges_to_reroute.is_empty() {
+        return;
+    }
+
+    let edge_vec: Vec<usize> = edges_to_reroute.into_iter().collect();
+    grid.remove_by_edges(&edge_vec);
+
+    for &ei in &edge_vec {
+        let Some(from_ep) = endpoint_map.get(&(ei, true)) else {
+            continue;
+        };
+        let Some(to_ep) = endpoint_map.get(&(ei, false)) else {
+            continue;
+        };
+
+        let ctx = RoutingContext {
+            nodes,
+            group_ctx,
+            grid,
+            cfg,
+            obstacles,
+        };
+        let pair = EndpointPair {
+            from: from_ep.clone(),
+            to: to_ep.clone(),
+        };
+
+        let mut path_stats = PathSelectStats::default();
+        let path = select_best_path_with_scorer_stats(
+            &ctx,
+            &pair,
+            &DefaultScorer,
+            Some(&mut path_stats),
+            true,
+        );
+        ortho_stats.total_candidates += path_stats.candidate_count;
+        ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
+        if path_stats.degraded {
+            ortho_stats.degraded_count += 1;
+        }
+
+        let labels = if path.len() >= 2 {
+            match relations.get(ei) {
+                Some(rel) => {
+                    let middle_t = parse_label_t(rel);
+                    build_edge_labels(rel, middle_t, Point::new(0.0, 0.0), |t| point_at_path_t(&path, t))
+                }
+                None => Vec::new(),
+            }
+        } else {
+            Vec::new()
+        };
+
+        grid.insert_path(&path, ei);
+
+        let mut edge = EdgeLayout {
+            geometry: PathGeometry::Polyline { points: Vec::new() },
+            labels,
+            from_port: from_side[ei],
+            to_port: to_side[ei],
+        };
+        edge.set_polyline_points(path);
+
+        edges[ei] = edge;
     }
 }
 
@@ -1006,6 +1159,7 @@ fn coordinate_port_sides(
     nodes: &HashMap<String, NodeLayout>,
     from_side: &mut [Port],
     to_side: &mut [Port],
+    group_ctx: Option<&crate::layout::group::GroupRoutingContext>,
 ) {
     use std::collections::{BTreeMap, BTreeSet};
     let n = relations.len();
@@ -1217,11 +1371,9 @@ fn side_acceptable(from: &NodeLayout, to: &NodeLayout, side: Port) -> bool {
 
     match side {
         Port::Top | Port::Bottom => {
-            // 垂直重叠强制水平 → 垂直端口不可接受
             if oy > EPS && ox <= EPS {
                 return false;
             }
-            // 方向检查
             let direction_ok = match side {
                 Port::Bottom => dy > EPS,
                 Port::Top => dy < -EPS,
@@ -1230,16 +1382,12 @@ fn side_acceptable(from: &NodeLayout, to: &NodeLayout, side: Port) -> bool {
             if !direction_ok {
                 return false;
             }
-            // 阈值检查
             if ox <= EPS && oy <= EPS {
-                // 无重叠：垂直可接受需 dy.abs() >= dx.abs() * 0.4
                 return dy.abs() >= dx.abs() * 0.4 - EPS;
             }
             if ox > EPS && oy > EPS {
-                // 双重叠：主轴判定
                 return dy.abs() >= dx.abs() - EPS;
             }
-            // ox > EPS && oy <= EPS：水平重叠强制垂直 → 可接受
             true
         }
         Port::Left | Port::Right => {
@@ -1260,7 +1408,6 @@ fn side_acceptable(from: &NodeLayout, to: &NodeLayout, side: Port) -> bool {
             if ox > EPS && oy > EPS {
                 return dx.abs() >= dy.abs() - EPS;
             }
-            // oy > EPS && ox <= EPS：垂直重叠强制水平 → 可接受
             true
         }
     }
