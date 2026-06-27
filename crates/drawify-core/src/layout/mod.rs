@@ -567,6 +567,20 @@ pub struct OrthoDebugStats {
     pub degraded_count: usize,
     /// 路由的边总数
     pub edge_count: usize,
+    /// 完全重合的平行段对数（间距≈0）
+    pub edge_exact_overlap_pairs: usize,
+    /// 间距不足的平行段对数（0 < gap < min_gap）
+    pub edge_tight_spacing_pairs: usize,
+    /// X-1 重路由迭代轮次
+    pub reroute_iterations: usize,
+    /// X-1 被重路由的边数
+    pub rerouted_edges: usize,
+    /// X-2 nudge 迭代轮次
+    pub nudge_iterations: usize,
+    /// X-2 被 nudge 的段数
+    pub nudged_segments: usize,
+    /// X-2 nudge 失败的段数
+    pub nudge_failed: usize,
 }
 
 impl OrthoDebugStats {

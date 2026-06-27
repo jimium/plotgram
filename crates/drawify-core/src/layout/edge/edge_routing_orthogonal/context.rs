@@ -180,6 +180,13 @@ impl SegmentGrid {
         }
         result
     }
+
+    /// 返回所有已路由段的只读切片（用于全局统计/调试）。
+    #[inline]
+    #[allow(dead_code)]
+    pub fn all_segments(&self) -> &[RoutedSegment] {
+        &self.segments
+    }
 }
 
 /// A pair of resolved endpoints (from / to) for a single edge.

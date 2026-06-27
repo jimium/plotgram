@@ -31,6 +31,7 @@ const APPLICABLE_TYPES: &[DiagramType] = &[
 
 pub(super) mod context;
 pub(super) mod layer_order;
+pub(super) mod nudge;
 pub(super) mod path;
 pub(super) mod scoring;
 pub(super) mod simplify;
@@ -39,7 +40,8 @@ pub(super) mod slot;
 // Re-exports for cross-submodule access via `use super::*;`
 pub(super) use context::{EndpointPair, PreparedObstacles, RoutingContext, SegmentGrid};
 pub(super) use path::{select_best_path_with_scorer_stats, PathSelectStats, RoutedSegment};
-pub(super) use scoring::{CandidateScorer, DefaultScorer, GROUP_OBSTACLE_PAD, NODE_OBSTACLE_PAD, path_avoids_group_interiors, path_is_clean, path_length};
+#[allow(unused_imports)] // SpacingViolationKind/segments_violate_spacing/path_edge_spacing_violations used in X-1
+pub(super) use scoring::{CandidateScorer, DefaultScorer, GROUP_OBSTACLE_PAD, NODE_OBSTACLE_PAD, path_avoids_group_interiors, path_is_clean, path_is_clean_from_edges, path_length, SpacingViolationKind, segments_violate_spacing, path_edge_spacing_violations, count_all_edge_spacing_violations};
 pub(super) use simplify::{simplify_path, simplify_path_preserving_stubs};
 #[allow(unused_imports)] // used by tests via `use super::*;`
 pub(super) use simplify::is_collinear;
@@ -194,6 +196,14 @@ const EDGE_OVERLAP_PENALTY: f64 = 1_200.0;
 /// 平行边重叠判定阈值（与 refine/segments_conflict_xy 共享）
 use crate::layout::constants::ORTHO_PARALLEL_GAP as EDGE_PARALLEL_GAP;
 
+/// X-1: stub 段保护长度——从端点出发的第一段（stub）在此长度内不做硬间距检查，
+/// 因为同节点相邻 slot 的 stub 天然平行近距（slot_pitch 可能小于 EDGE_PARALLEL_GAP）。
+pub(super) const STUB_GUARD_LENGTH: f64 = 24.0;
+/// X-1: 多轮重路由最大迭代次数
+const MAX_REROUTE_ROUNDS: usize = 3;
+/// X-1: 重路由时额外增大 channel_margin 以生成更多绕行候选
+const REROUTE_EXTRA_CHANNEL_MARGIN: f64 = 40.0;
+
 /// 每个折点的惩罚（鼓励更少拐弯）
 const BEND_PENALTY: f64 = 16.0;
 
@@ -201,7 +211,7 @@ const BEND_PENALTY: f64 = 16.0;
 const MIN_CHANNEL_CLEARANCE: f64 = 10.0;
 
 /// 坐标比较容差
-const EPS: f64 = 0.1;
+pub(super) const EPS: f64 = 0.1;
 
 /// 在节点布局完成后，为所有边计算正交路径与标签位置
 pub fn route_edges_orthogonal(
@@ -597,6 +607,49 @@ fn route_edges_orthogonal_inner(
         &mut ortho_stats,
     );
 
+    // ── 4d. X-1: 多轮冲突消解重路由 ──
+    let t_x1 = crate::layout::perf::Instant::now();
+    reroute_conflicting_edges(
+        &result.nodes,
+        &relations,
+        &from_side,
+        &to_side,
+        &endpoint_map,
+        &mut edges,
+        &mut grid,
+        &cfg,
+        &group_ctx,
+        &obstacles,
+        &mut ortho_stats,
+    );
+    crate::perf_log!("[perf]     x1_reroute: {:.2}ms", t_x1.elapsed().as_secs_f64() * 1000.0);
+
+    // ── 4e. X-2: Segment Nudging 轻推后处理 ──
+    let t_x2 = crate::layout::perf::Instant::now();
+    let nudge_stats = nudge::nudge_conflicting_segments(
+        &result.nodes,
+        &relations,
+        &from_side,
+        &to_side,
+        &mut edges,
+        &mut grid,
+        &cfg,
+        &group_ctx,
+        &obstacles,
+        &mut ortho_stats,
+    );
+    crate::perf_log!("[perf]     x2_nudge: {:.2}ms (nudged={}, failed={})",
+        t_x2.elapsed().as_secs_f64() * 1000.0,
+        nudge_stats.nudged_segments,
+        nudge_stats.nudge_failed,
+    );
+
+    // ── 4c. X-0: 统计边间距违规（排除 stub 段） ──
+    let (exact_overlap_pairs, tight_spacing_pairs) =
+        count_all_edge_spacing_violations(&edges, &grid, EDGE_PARALLEL_GAP);
+    ortho_stats.edge_exact_overlap_pairs = exact_overlap_pairs;
+    ortho_stats.edge_tight_spacing_pairs = tight_spacing_pairs;
+
     // ── 5. 标签自动避让 ──
     // §4.10.1: 启用 bundling 时跳过路由内 label 避障，
     // 由后置 label 流水线（relayout_edge_labels_after_bundling）统一处理。
@@ -820,6 +873,188 @@ fn replan_slots(
 
         edges[ei] = edge;
     }
+}
+
+/// X-1: 多轮冲突消解重路由。
+///
+/// 第一轮路由使用软惩罚（edge_overlap_penalty），可能产生边重合。
+/// 本函数在 replan_slots 之后执行，通过多轮迭代：
+/// 1. 检测所有边中段的间距违规
+/// 2. 按违规段数降序排列冲突边
+/// 3. 逐条移除冲突边，尝试用更宽的通道 margin 重新路由
+/// 4. 新路径必须通过 path_is_clean_from_edges 硬检查（节点+分组+边间距）
+/// 5. 若找不到干净路径，保留原路径（优雅降级）
+fn reroute_conflicting_edges(
+    nodes: &HashMap<String, NodeLayout>,
+    relations: &[crate::ast::Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+    endpoint_map: &HashMap<(usize, bool), Endpoint>,
+    edges: &mut Vec<EdgeLayout>,
+    grid: &mut SegmentGrid,
+    cfg: &OrthoConfig,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    obstacles: &PreparedObstacles,
+    ortho_stats: &mut crate::layout::OrthoDebugStats,
+) {
+    use std::collections::HashSet;
+
+    let n = edges.len();
+    if n < 2 {
+        return;
+    }
+
+    // 重路由时使用的 margin 档位：逐步增大以生成更多绕行候选
+    let reroute_margins: [f64; 3] = [
+        cfg.channel_margin + 10.0,
+        cfg.channel_margin + 25.0,
+        cfg.channel_margin + REROUTE_EXTRA_CHANNEL_MARGIN,
+    ];
+
+    let mut total_rerouted = 0usize;
+    let mut rounds_done = 0usize;
+    let mut failed_edges: HashSet<usize> = HashSet::new();
+
+    for round in 0..MAX_REROUTE_ROUNDS {
+        // 检测所有冲突边（path_edge_spacing_violations 内部已豁免 stub 段）
+        let mut conflicts: Vec<(usize, usize)> = Vec::new(); // (ei, violation_count)
+        for ei in 0..n {
+            if edges[ei].path_is_empty() || failed_edges.contains(&ei) {
+                continue;
+            }
+            let points: Vec<Point> = edges[ei].path_points().into_owned();
+            let viols = path_edge_spacing_violations(&points, grid, EDGE_PARALLEL_GAP);
+            if !viols.is_empty() {
+                conflicts.push((ei, viols.len()));
+            }
+        }
+
+        if conflicts.is_empty() {
+            break;
+        }
+
+        // 按违规数降序排列（稳定排序保证确定性）
+        conflicts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+
+        rounds_done = round + 1;
+
+        for &(ei, _) in &conflicts {
+            if failed_edges.contains(&ei) {
+                continue;
+            }
+            // 重新检查冲突——上一次重路由可能已解决了这条边的冲突
+            let current_points: Vec<Point> = edges[ei].path_points().into_owned();
+            if path_edge_spacing_violations(&current_points, grid, EDGE_PARALLEL_GAP).is_empty() {
+                continue;
+            }
+
+            let Some(from_ep) = endpoint_map.get(&(ei, true)) else {
+                continue;
+            };
+            let Some(to_ep) = endpoint_map.get(&(ei, false)) else {
+                continue;
+            };
+
+            // 先移除当前边
+            grid.remove_by_edges(&[ei]);
+            let old_points: Vec<Point> = edges[ei].path_points().into_owned();
+
+            let mut clean_path: Option<Vec<Point>> = None;
+
+            for &margin in &reroute_margins {
+                let r_cfg = OrthoConfig {
+                    channel_margin: margin,
+                    ..*cfg
+                };
+                let ctx = RoutingContext {
+                    nodes,
+                    group_ctx,
+                    grid,
+                    cfg: &r_cfg,
+                    obstacles,
+                };
+                let pair = EndpointPair {
+                    from: from_ep.clone(),
+                    to: to_ep.clone(),
+                };
+                let mut path_stats = PathSelectStats::default();
+                // 使用全候选（phase1_only=false），包含 staircases，增加找到干净路径的概率
+                let candidate = select_best_path_with_scorer_stats(
+                    &ctx,
+                    &pair,
+                    &DefaultScorer,
+                    Some(&mut path_stats),
+                    false,
+                );
+                ortho_stats.total_candidates += path_stats.candidate_count;
+                ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
+                if path_stats.degraded {
+                    ortho_stats.degraded_count += 1;
+                }
+
+                if candidate.len() >= 2
+                    && path_is_clean(
+                        &candidate,
+                        pair.from_id(),
+                        pair.to_id(),
+                        nodes,
+                        group_ctx,
+                        &obstacles.sorted_node_ids,
+                    )
+                    && path_avoids_group_interiors(
+                        &candidate,
+                        pair.from_id(),
+                        pair.to_id(),
+                        group_ctx,
+                        &obstacles.sorted_group_ids,
+                    )
+                    && path_is_clean_from_edges(&candidate, grid, EDGE_PARALLEL_GAP, STUB_GUARD_LENGTH)
+                {
+                    clean_path = Some(candidate);
+                    break;
+                }
+            }
+
+            match clean_path {
+                Some(path) => {
+                    let labels = if path.len() >= 2 {
+                        match relations.get(ei) {
+                            Some(rel) => {
+                                let middle_t = parse_label_t(rel);
+                                build_edge_labels(
+                                    rel,
+                                    middle_t,
+                                    Point::new(0.0, 0.0),
+                                    |t| point_at_path_t(&path, t),
+                                )
+                            }
+                            None => Vec::new(),
+                        }
+                    } else {
+                        Vec::new()
+                    };
+                    grid.insert_path(&path, ei);
+                    let mut edge = EdgeLayout {
+                        geometry: PathGeometry::Polyline { points: Vec::new() },
+                        labels,
+                        from_port: from_side[ei],
+                        to_port: to_side[ei],
+                    };
+                    edge.set_polyline_points(path);
+                    edges[ei] = edge;
+                    total_rerouted += 1;
+                }
+                None => {
+                    // 找不到干净路径，恢复原路径并标记为失败，后续轮次跳过
+                    grid.insert_path(&old_points, ei);
+                    failed_edges.insert(ei);
+                }
+            }
+        }
+    }
+
+    ortho_stats.reroute_iterations = rounds_done;
+    ortho_stats.rerouted_edges = total_rerouted;
 }
 
 /// 从已路由的边路径中提取"有效出口方向"——即锚点出发后第一个非 stub 的

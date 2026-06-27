@@ -6,7 +6,7 @@ use crate::layout::group::{
     corridor_misalignment_penalty, segment_near_misses_group_shell, GroupRoutingContext,
     GROUP_BORDER_SHELL_PAD,
 };
-use crate::layout::{GroupLayout, NodeLayout};
+use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
 use std::collections::HashMap;
 
 /// 节点障碍物膨胀间距（边路由时节点障碍物膨胀的固定间距）。
@@ -354,6 +354,212 @@ fn segments_cross_perpendicular(h: &RoutedSegment, v: &RoutedSegment) -> bool {
         && v_x < h_x_max - EPS
         && h_y > v_y_min + EPS
         && h_y < v_y_max - EPS
+}
+
+/// 边间距违规类型
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // used in X-1
+pub enum SpacingViolationKind {
+    /// 两条平行段完全重合（间距≈0），无法区分
+    ExactOverlap,
+    /// 两条平行段间距不足（0 < gap < min_gap），视觉上像粗线
+    TightSpacing,
+}
+
+/// 检测两条平行段是否违反最小间距要求。
+///
+/// 返回违规类型和实际间距；非平行段（正交交叉）或平行但投影不重叠的段返回 None。
+/// T/L 端点接触不算违规（与 segments_cross_perpendicular 一致）。
+pub fn segments_violate_spacing(
+    a: &RoutedSegment,
+    b: &RoutedSegment,
+    min_gap: f64,
+) -> Option<(SpacingViolationKind, f64)> {
+    if a.edge_index == b.edge_index {
+        return None;
+    }
+
+    let a_horiz = (a.y1 - a.y2).abs() < EPS;
+    let b_horiz = (b.y1 - b.y2).abs() < EPS;
+    let a_vert = (a.x1 - a.x2).abs() < EPS;
+    let b_vert = (b.x1 - b.x2).abs() < EPS;
+
+    if a_horiz && b_horiz {
+        let gap = (a.y1 - b.y1).abs();
+        let a_min = a.x1.min(a.x2);
+        let a_max = a.x1.max(a.x2);
+        let b_min = b.x1.min(b.x2);
+        let b_max = b.x1.max(b.x2);
+        if a_max <= b_min + EPS || b_max <= a_min + EPS {
+            return None;
+        }
+        if gap < EPS {
+            return Some((SpacingViolationKind::ExactOverlap, 0.0));
+        }
+        if gap < min_gap {
+            return Some((SpacingViolationKind::TightSpacing, gap));
+        }
+        return None;
+    }
+
+    if a_vert && b_vert {
+        let gap = (a.x1 - b.x1).abs();
+        let a_min = a.y1.min(a.y2);
+        let a_max = a.y1.max(a.y2);
+        let b_min = b.y1.min(b.y2);
+        let b_max = b.y1.max(b.y2);
+        if a_max <= b_min + EPS || b_max <= a_min + EPS {
+            return None;
+        }
+        if gap < EPS {
+            return Some((SpacingViolationKind::ExactOverlap, 0.0));
+        }
+        if gap < min_gap {
+            return Some((SpacingViolationKind::TightSpacing, gap));
+        }
+        return None;
+    }
+
+    None
+}
+
+/// 扫描一条路径与网格中所有已路由段的间距违规。
+///
+/// 返回违规列表：(路径中段索引, 违规类型, 实际间距)。
+/// 正交交叉不视为违规。stub 段（首尾短段，长度≤STUB_GUARD_LENGTH）豁免间距检查，
+/// 因为 Concentrate 汇流策略下边共享锚点，短 stub 段自然重合是设计行为。
+/// 用于统计重合量、定位冲突边优先级。
+#[allow(dead_code)] // used in X-1
+pub fn path_edge_spacing_violations(
+    path: &[Point],
+    grid: &SegmentGrid,
+    min_gap: f64,
+) -> Vec<(usize, SpacingViolationKind, f64)> {
+    let stub_guard = 24.0;
+    let mut violations = Vec::new();
+    if path.len() < 2 {
+        return violations;
+    }
+    let n_segs = path.len() - 1;
+    for (si, window) in path.windows(2).enumerate() {
+        let seg = RoutedSegment {
+            x1: window[0].x,
+            y1: window[0].y,
+            x2: window[1].x,
+            y2: window[1].y,
+            edge_index: usize::MAX,
+        };
+        let is_stub = si == 0 || si == n_segs - 1;
+        let seg_len = ((seg.x2 - seg.x1).powi(2) + (seg.y2 - seg.y1).powi(2)).sqrt();
+        if is_stub && seg_len <= stub_guard + EPS {
+            continue;
+        }
+        let expand = min_gap + 2.0;
+        for existing in grid.query_overlapping(&seg, expand) {
+            if let Some((kind, gap)) = segments_violate_spacing(&seg, existing, min_gap) {
+                violations.push((si, kind, gap));
+            }
+        }
+    }
+    violations
+}
+
+/// 统计所有非 stub 段的间距违规总数（排除 Concentrate 汇流导致的短 stub 重合）。
+///
+/// 需要传入所有边路径，以便识别每个段是否为 stub 段（路径首尾短段）。
+/// 返回 (完全重合段对数, 间距不足段对数)，已对双向计数除以 2。
+pub fn count_all_edge_spacing_violations(
+    edges: &[EdgeLayout],
+    grid: &SegmentGrid,
+    min_gap: f64,
+) -> (usize, usize) {
+    let stub_guard = 24.0;
+    let mut exact_overlap = 0usize;
+    let mut tight_spacing = 0usize;
+
+    for ei in 0..edges.len() {
+        if edges[ei].path_is_empty() {
+            continue;
+        }
+        let points: Vec<Point> = edges[ei].path_points().into_owned();
+        if points.len() < 2 {
+            continue;
+        }
+        let n_segs = points.len() - 1;
+        for (si, window) in points.windows(2).enumerate() {
+            let seg = RoutedSegment {
+                x1: window[0].x,
+                y1: window[0].y,
+                x2: window[1].x,
+                y2: window[1].y,
+                edge_index: ei,
+            };
+            let is_stub = si == 0 || si == n_segs - 1;
+            let seg_len = ((seg.x2 - seg.x1).powi(2) + (seg.y2 - seg.y1).powi(2)).sqrt();
+            if is_stub && seg_len <= stub_guard + EPS {
+                continue;
+            }
+            let expand = min_gap + 2.0;
+            for existing in grid.query_overlapping(&seg, expand) {
+                if existing.edge_index == ei {
+                    continue;
+                }
+                let Some((kind, _gap)) = segments_violate_spacing(&seg, existing, min_gap) else {
+                    continue;
+                };
+                match kind {
+                    SpacingViolationKind::ExactOverlap => exact_overlap += 1,
+                    SpacingViolationKind::TightSpacing => tight_spacing += 1,
+                }
+            }
+        }
+    }
+    (exact_overlap / 2, tight_spacing / 2)
+}
+
+/// 检查路径是否与网格中已路由边保持最小间距（硬约束）。
+///
+/// 与 path_is_clean（检查节点/分组障碍）配合使用。stub 段（首尾短段，长度≤stub_guard_length）
+/// 豁免间距检查：Concentrate 汇流策略下边共享锚点，短 stub 段自然重合/近距是设计行为。
+/// 中段严格执行 min_gap 间距要求。
+///
+/// 正交交叉（水平×垂直）和 T/L 端点接触不视为违规。
+pub fn path_is_clean_from_edges(
+    path: &[Point],
+    grid: &SegmentGrid,
+    min_gap: f64,
+    stub_guard_length: f64,
+) -> bool {
+    if path.len() < 2 {
+        return true;
+    }
+    let n_segs = path.len() - 1;
+    for (si, window) in path.windows(2).enumerate() {
+        let seg = RoutedSegment {
+            x1: window[0].x,
+            y1: window[0].y,
+            x2: window[1].x,
+            y2: window[1].y,
+            edge_index: usize::MAX,
+        };
+        let is_stub = si == 0 || si == n_segs - 1;
+        let seg_len = ((seg.x2 - seg.x1).powi(2) + (seg.y2 - seg.y1).powi(2)).sqrt();
+        if is_stub && seg_len <= stub_guard_length + EPS {
+            continue;
+        }
+        let expand = min_gap + 2.0;
+        for existing in grid.query_overlapping(&seg, expand) {
+            let Some((kind, _gap)) = segments_violate_spacing(&seg, existing, min_gap) else {
+                continue;
+            };
+            match kind {
+                SpacingViolationKind::ExactOverlap | SpacingViolationKind::TightSpacing => {
+                    return false;
+                }
+            }
+        }
+    }
+    true
 }
 
 fn segment_intersects_node(a: Point, b: Point, nl: &NodeLayout, pad: f64) -> bool {
@@ -731,5 +937,117 @@ mod tests {
             ctx.segment_violates_border_shell(&path, 2, &gl, true),
             "超出 PORT_CLEARANCE 的贴边段不应豁免"
         );
+    }
+
+    // ── X-0: 边间距违规检测测试 ──
+
+    #[test]
+    fn test_exact_overlap_horizontal() {
+        let a = seg(100.0, 200.0, 300.0, 200.0, 0);
+        let b = seg(150.0, 200.0, 280.0, 200.0, 1);
+        let result = segments_violate_spacing(&a, &b, 8.0);
+        assert!(result.is_some(), "完全重合的水平段应被检测");
+        assert_eq!(result.unwrap().0, SpacingViolationKind::ExactOverlap);
+    }
+
+    #[test]
+    fn test_tight_spacing_horizontal() {
+        let a = seg(100.0, 200.0, 300.0, 200.0, 0);
+        let b = seg(150.0, 204.0, 280.0, 204.0, 1);
+        let result = segments_violate_spacing(&a, &b, 8.0);
+        assert!(result.is_some(), "间距4px<8px应被检测为tight");
+        assert_eq!(result.unwrap().0, SpacingViolationKind::TightSpacing);
+    }
+
+    #[test]
+    fn test_adequate_spacing_horizontal() {
+        let a = seg(100.0, 200.0, 300.0, 200.0, 0);
+        let b = seg(150.0, 210.0, 280.0, 210.0, 1);
+        let result = segments_violate_spacing(&a, &b, 8.0);
+        assert!(result.is_none(), "间距10px≥8px应不违规");
+    }
+
+    #[test]
+    fn test_exact_overlap_vertical() {
+        let a = seg(200.0, 100.0, 200.0, 300.0, 0);
+        let b = seg(200.0, 150.0, 200.0, 280.0, 1);
+        let result = segments_violate_spacing(&a, &b, 8.0);
+        assert!(result.is_some(), "完全重合的垂直段应被检测");
+        assert_eq!(result.unwrap().0, SpacingViolationKind::ExactOverlap);
+    }
+
+    #[test]
+    fn test_perpendicular_not_violation() {
+        let h = seg(100.0, 200.0, 300.0, 200.0, 0);
+        let v = seg(200.0, 100.0, 200.0, 300.0, 1);
+        assert!(
+            segments_violate_spacing(&h, &v, 8.0).is_none(),
+            "正交交叉不视为间距违规"
+        );
+    }
+
+    #[test]
+    fn test_t_junction_not_violation() {
+        let h = seg(200.0, 200.0, 300.0, 200.0, 0);
+        let v = seg(200.0, 100.0, 200.0, 200.0, 1);
+        assert!(
+            segments_violate_spacing(&h, &v, 8.0).is_none(),
+            "T-junction端点接触不视为违规"
+        );
+    }
+
+    #[test]
+    fn test_l_junction_not_violation() {
+        let h = seg(100.0, 200.0, 200.0, 200.0, 0);
+        let v = seg(200.0, 200.0, 200.0, 300.0, 1);
+        assert!(
+            segments_violate_spacing(&h, &v, 8.0).is_none(),
+            "L-junction共享端点不视为违规"
+        );
+    }
+
+    #[test]
+    fn test_same_edge_not_violation() {
+        let a = seg(100.0, 200.0, 300.0, 200.0, 0);
+        let b = seg(150.0, 200.0, 280.0, 200.0, 0);
+        assert!(
+            segments_violate_spacing(&a, &b, 8.0).is_none(),
+            "同一条边的段不应触发违规"
+        );
+    }
+
+    #[test]
+    fn test_parallel_no_projection_overlap() {
+        let a = seg(100.0, 200.0, 200.0, 200.0, 0);
+        let b = seg(300.0, 200.0, 400.0, 200.0, 1);
+        assert!(
+            segments_violate_spacing(&a, &b, 8.0).is_none(),
+            "x投影不重叠的平行段不视为违规"
+        );
+    }
+
+    #[test]
+    fn test_count_all_violations() {
+        let mut grid = SegmentGrid::new();
+        let p0 = vec![pt(100.0, 200.0), pt(300.0, 200.0)];
+        let p1 = vec![pt(150.0, 200.0), pt(280.0, 200.0)];
+        let p2 = vec![pt(100.0, 220.0), pt(300.0, 220.0)];
+        grid.insert_path(&p0, 0);
+        grid.insert_path(&p1, 1);
+        grid.insert_path(&p2, 2);
+        let mk_edge = |pts: &[Point]| -> EdgeLayout {
+            let mut e = EdgeLayout {
+                geometry: crate::layout::PathGeometry::Polyline { points: Vec::new() },
+                labels: vec![],
+                from_port: crate::layout::Port::Bottom,
+                to_port: crate::layout::Port::Top,
+            };
+            e.set_polyline_points(pts.to_vec());
+            e
+        };
+        let edges = vec![mk_edge(&p0), mk_edge(&p1), mk_edge(&p2)];
+        let (exact, tight) = count_all_edge_spacing_violations(&edges, &grid, 8.0);
+        assert_eq!(exact, 1, "应有1对完全重合");
+        assert_eq!(tight, 0, "间距20px≥8px不应有tight");
     }
 }

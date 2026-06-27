@@ -79,6 +79,17 @@ fn main() {
         println!("  硬过滤拒绝:   {}", ortho.hard_filter_reject_count);
         println!("  退化数:       {}", ortho.degraded_count);
         println!("  边总数:       {}", ortho.edge_count);
+        println!("  完全重合段对: {}", ortho.edge_exact_overlap_pairs);
+        println!("  间距不足段对: {}", ortho.edge_tight_spacing_pairs);
+        if ortho.reroute_iterations > 0 {
+            println!("  重路由轮次:   {}", ortho.reroute_iterations);
+            println!("  重路由边数:   {}", ortho.rerouted_edges);
+        }
+        if ortho.nudge_iterations > 0 {
+            println!("  Nudge轮次:    {}", ortho.nudge_iterations);
+            println!("  Nudge段数:    {}", ortho.nudged_segments);
+            println!("  Nudge失败:    {}", ortho.nudge_failed);
+        }
     }
     if let Some(ref friendliness) = result.hints.friendliness_report {
         println!();
