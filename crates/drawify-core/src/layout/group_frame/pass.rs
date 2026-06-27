@@ -3,6 +3,7 @@
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::{ArchitectureV2LayoutConfig, SugiyamaLayoutConfig};
 use crate::layout::constants;
+#[allow(unused_imports)]
 use crate::layout::group;
 use crate::layout::intent::PinSet;
 use crate::layout::node::architecture_v2::post_layout;

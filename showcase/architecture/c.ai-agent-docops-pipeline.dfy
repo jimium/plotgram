@@ -10,7 +10,6 @@ diagram architecture {
             gap: 50
             border: shared
         }
-        edge_routing: orthogonal { bundling: 1.0 }
     }
 
     group inputs "输入源" {

@@ -8,6 +8,7 @@ use crate::layout::edge::common::edge_geometry::node_center;
 
 const VERTICAL_PREFERENCE_THRESHOLD_SAME_GROUP: f64 = 0.4;
 const VERTICAL_PREFERENCE_THRESHOLD_HORIZONTAL_SIBLINGS: f64 = 0.8;
+#[allow(dead_code)]
 const VERTICAL_PREFERENCE_THRESHOLD_VERTICAL_SIBLINGS_ALIGNED: f64 = 0.4;
 const VERTICAL_PREFERENCE_THRESHOLD_VERTICAL_SIBLINGS_UNALIGNED: f64 = 0.5;
 const VERTICAL_PREFERENCE_THRESHOLD_CROSS_ANCESTOR: f64 = 0.5;
@@ -60,6 +61,7 @@ pub struct Endpoint {
 /// Deterministically choose connection sides based on geometric relationship
 ///
 /// Returns `(side_a, side_b)`, the connection sides for nodes A and B in canonical order.
+#[allow(dead_code)]
 pub fn choose_pair_sides(a: &NodeLayout, b: &NodeLayout) -> (Port, Port) {
     choose_pair_sides_with_group(a, b, "", "", None)
 }
@@ -145,8 +147,8 @@ pub fn choose_pair_sides_with_group(
 }
 
 fn group_forced_side(
-    a: &NodeLayout,
-    b: &NodeLayout,
+    _a: &NodeLayout,
+    _b: &NodeLayout,
     a_id: &str,
     b_id: &str,
     acx: f64,
@@ -181,8 +183,8 @@ fn group_forced_side(
 }
 
 fn classify_threshold(
-    a: &NodeLayout,
-    b: &NodeLayout,
+    _a: &NodeLayout,
+    _b: &NodeLayout,
     a_id: &str,
     b_id: &str,
     _acx: f64,
@@ -256,6 +258,7 @@ fn fallback_by_axis(dx: f64, dy: f64, threshold: f64) -> (Port, Port) {
     }
 }
 
+#[allow(dead_code)]
 fn opposite_side(p: Port) -> Port {
     match p {
         Port::Top => Port::Bottom,

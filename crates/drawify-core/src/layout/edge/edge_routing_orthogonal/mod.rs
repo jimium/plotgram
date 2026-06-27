@@ -43,6 +43,7 @@ pub(super) use scoring::{CandidateScorer, DefaultScorer, GROUP_OBSTACLE_PAD, NOD
 pub(super) use simplify::{simplify_path, simplify_path_preserving_stubs};
 #[allow(unused_imports)] // used by tests via `use super::*;`
 pub(super) use simplify::is_collinear;
+#[allow(unused_imports)] // choose_pair_sides is used by tests
 pub(super) use slot::{
     choose_docking_strategy, choose_pair_sides, choose_pair_sides_with_group, is_vertical_port, slot_anchor, slot_fraction,
     slot_fraction_around, DockingStrategy, Endpoint,
@@ -610,168 +611,6 @@ fn route_edges_orthogonal_inner(
     result
 }
 
-// ═══════════════════════════════════════════════════════════
-//  后置交叉检测：修正 slot 排序与实际路由方向的倒挂
-// ═══════════════════════════════════════════════════════════
-
-/// 后置交叉检测：在路径构建完成后，检查同一节点同一侧的边是否因 slot 排序
-/// 与实际路由方向不一致而产生不必要的交叉，若发现则交换锚点并重路由。
-///
-/// ## 问题根因
-///
-/// slot 排序（步骤 2）按对端节点中心坐标排列锚点。当边的实际路由方向与对端
-/// 位置方向不一致时（典型：需要绕过中间节点），排序结果会导致出边交叉。
-///
-/// 例如：节点 A 底部两条出边——
-/// - 边 1 目标节点在 A 正下方（target_x ≈ A.center_x），slot 排在右侧
-/// - 边 2 目标节点在 A 远下方偏左，但路由需先向右绕行，slot 排在左侧
-/// 结果：边 2 从左侧出发后向右跨越边 1，产生交叉。交换两槽即可消除。
-///
-/// ## 检测方法
-///
-/// 对同一并线子组内的边，提取每条边从锚点出发后第一个非 stub 水平/垂直位移
-/// 方向（"有效出口方向"），若左侧 slot 的边有效出口方向向右、右侧 slot 的边
-/// 有效出口方向向左，则判定为倒挂。
-///
-/// ## 修复方法
-///
-/// 交换倒挂边的锚点坐标，然后重路由受影响的边。采用迭代至收敛策略：
-/// 每轮只交换一对相邻倒挂边，交换后重新计算有效出口方向，直到无新倒挂。
-/// 迭代上限防止异常情况下死循环。
-fn fix_slot_inversions(
-    nodes: &HashMap<String, NodeLayout>,
-    relations: &[crate::ast::Relation],
-    from_side: &[Port],
-    to_side: &[Port],
-    endpoint_map: &mut HashMap<(usize, bool), Endpoint>,
-    edges: &mut Vec<EdgeLayout>,
-    grid: &mut SegmentGrid,
-    cfg: &OrthoConfig,
-    group_ctx: &crate::layout::group::GroupRoutingContext,
-    obstacles: &PreparedObstacles,
-    ortho_stats: &mut crate::layout::OrthoDebugStats,
-) {
-    use std::collections::BTreeMap;
-
-    let n = edges.len();
-
-    // 1. 按并线分组键 (node_id, side, is_from, arrow_type, line_style) 分组，
-    //    仅在同一并线子组内检测倒挂，避免破坏不同子组间的锚点带分布。
-    let mut bundling_groups: BTreeMap<String, Vec<usize>> = BTreeMap::new();
-    for i in 0..n {
-        if edges[i].path_is_empty() {
-            continue;
-        }
-        // from 端
-        if let Some(ep) = endpoint_map.get(&(i, true)) {
-            let rel = &relations[i];
-            let key = endpoint_bundling_key(&ep.node_id, ep.side, true, rel);
-            bundling_groups.entry(key).or_default().push(i);
-        }
-        // to 端
-        if let Some(ep) = endpoint_map.get(&(i, false)) {
-            let rel = &relations[i];
-            let key = endpoint_bundling_key(&ep.node_id, ep.side, false, rel);
-            bundling_groups.entry(key).or_default().push(i);
-        }
-    }
-
-    // 2. 对每组迭代检测倒挂并交换，直到收敛
-    //    每轮只交换一对，交换后重路由会改变有效出口方向，
-    //    需要重新计算才能发现新产生的倒挂。
-    const MAX_ITERATIONS: usize = 8; // 安全上限，防止异常情况死循环
-
-    for (_bundling_key, edge_indices) in &bundling_groups {
-        if edge_indices.len() < 2 {
-            continue;
-        }
-
-        // 同一子组内的边共享同一 (node_id, side)
-        let first_ep = endpoint_map.get(&(edge_indices[0], true))
-            .or_else(|| endpoint_map.get(&(edge_indices[0], false)));
-        let Some(first_ep) = first_ep else { continue };
-        let side = first_ep.side;
-        let vertical_side = is_vertical_port(side);
-
-        for _iter in 0..MAX_ITERATIONS {
-            // 每轮重新收集锚点坐标和有效出口方向（上一轮交换可能改变路径）
-            let mut edge_dirs: Vec<(usize, f64, f64)> = Vec::new(); // (edge_index, tangent_coord, effective_dir)
-
-            for &ei in edge_indices {
-                let is_from_actual = endpoint_map
-                    .get(&(ei, true))
-                    .map_or(false, |ep| ep.side == side);
-
-                let ep_key = (ei, is_from_actual);
-                let Some(ep) = endpoint_map.get(&ep_key) else {
-                    continue;
-                };
-
-                let tangent_coord = if vertical_side { ep.anchor.x } else { ep.anchor.y };
-
-                // Concentrate 模式下所有边共享同一锚点，交换无意义，跳过
-                // 检测方式：如果该边与组内已有边的切线坐标差 < EPS，则视为同锚点
-                if !edge_dirs.is_empty() {
-                    let min_dist = edge_dirs.iter().map(|(_, tc, _)| (tc - tangent_coord).abs()).fold(f64::MAX, f64::min);
-                    if min_dist < EPS {
-                        continue;
-                    }
-                }
-
-                let effective_dir = compute_effective_exit_dir(edges, ei, is_from_actual, side);
-                edge_dirs.push((ei, tangent_coord, effective_dir));
-            }
-
-            if edge_dirs.len() < 2 {
-                break;
-            }
-
-            // 按切线坐标排序（左侧/上侧在前）
-            edge_dirs.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-
-            // 检测相邻对是否倒挂，找到第一对即交换后重新开始下一轮
-            let mut found_inversion = false;
-            for w in edge_dirs.windows(2) {
-                let (ei_left, _, dir_left) = w[0];
-                let (ei_right, _, dir_right) = w[1];
-
-                // 倒挂判定：左侧/上侧边的有效方向与右侧/下侧边的有效方向交叉
-                let inverted = if vertical_side {
-                    // 垂直端口：左槽向右(+)、右槽向左(-) → 倒挂
-                    dir_left > EPS && dir_right < -EPS
-                } else {
-                    // 水平端口：上槽向下(+)、下槽向上(-) → 倒挂
-                    dir_left > EPS && dir_right < -EPS
-                };
-
-                if inverted {
-                    swap_endpoint_anchors(
-                        ei_left,
-                        ei_right,
-                        endpoint_map,
-                        edges,
-                        grid,
-                        nodes,
-                        relations,
-                        from_side,
-                        to_side,
-                        cfg,
-                        group_ctx,
-                        obstacles,
-                        ortho_stats,
-                    );
-                    found_inversion = true;
-                    break; // 交换一对后立即重新开始下一轮迭代
-                }
-            }
-
-            if !found_inversion {
-                break; // 无倒挂，收敛完成
-            }
-        }
-    }
-}
-
 /// 全局 Slot 重规划（Layer 3）：路由完成后根据实际出口方向全局重排 slot，
 /// 替代 fix_slot_inversions 的冒泡交换+多次重路由。
 ///
@@ -796,23 +635,34 @@ fn replan_slots(
 
     let n = edges.len();
 
-    let mut bundling_groups: BTreeMap<String, Vec<(usize, bool)>> = BTreeMap::new();
+    // replan_slots 通用原则：
+    // 按 (node_id, side) 分组后，同一侧所有端点应按"实际走向"排列以消除 stub 交叉。
+    // 垂直端口(Top/Bottom)按 dx 升序（左→右）；水平端口(Left/Right)按 -dy 升序（上→下）。
+    //
+    // 不可拆分单元（锚点块）：初始分配中共享完全相同 tangent 坐标的端点集合
+    // （Concentrate策略：4+条边共享同一锚点形成扇形汇流）必须保持为整体，
+    // 不能被拆散。Compact(2-3条边)和Single(1条边)的端点各自有独立 tangent，
+    // 可以自由重排。
+    //
+    // 这比按 bundling_key(is_from+arrow+style)分块更通用：bundling_key 按
+    // "能否合并trunk"分组，但同组内 Compact 端点走向可能分化（一左一右），
+    // 强行作为块会导致跨方向交叉无法修复。
+    let mut side_endpoints: BTreeMap<String, Vec<(usize, bool)>> = BTreeMap::new();
     for i in 0..n {
         if edges[i].path_is_empty() {
             continue;
         }
         for &is_from in &[true, false] {
             if let Some(ep) = endpoint_map.get(&(i, is_from)) {
-                let rel = &relations[i];
-                let key = endpoint_bundling_key(&ep.node_id, ep.side, is_from, rel);
-                bundling_groups.entry(key).or_default().push((i, is_from));
+                let key = format!("{}|{:?}", ep.node_id, ep.side);
+                side_endpoints.entry(key).or_default().push((i, is_from));
             }
         }
     }
 
     let mut edges_to_reroute: HashSet<usize> = HashSet::new();
 
-    for (_bundling_key, ep_tuples) in &bundling_groups {
+    for (_side_key, ep_tuples) in &side_endpoints {
         if ep_tuples.len() < 2 {
             continue;
         }
@@ -821,9 +671,8 @@ fn replan_slots(
         let side = first_ep.side;
         let vertical_side = is_vertical_port(side);
 
-        let mut edge_info: Vec<(usize, bool, f64, f64)> = Vec::new();
-        let mut tangent_coords: Vec<f64> = Vec::new();
-
+        // 收集所有端点信息
+        let mut ep_info: Vec<(usize, bool, f64, f64)> = Vec::new(); // (ei, ef, sort_key, tangent)
         for &(ei, ef) in ep_tuples {
             let ep = endpoint_map.get(&(ei, ef)).unwrap();
             let effective_dir = compute_effective_exit_dir(edges, ei, ef, side);
@@ -833,26 +682,74 @@ fn replan_slots(
             } else {
                 -effective_dir
             };
-            edge_info.push((ei, ef, sort_key, tangent));
-            tangent_coords.push(tangent);
+            ep_info.push((ei, ef, sort_key, tangent));
         }
 
-        tangent_coords.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        // 按 tangent 值分组，构建锚点块（共享同一 tangent 的端点为不可拆分单元）
+        // 使用 BTreeMap 保证按 tangent 升序（即初始从左到右/从上到下顺序）
+        let mut tangent_groups: BTreeMap<i64, Vec<(usize, bool, f64, f64)>> = BTreeMap::new();
+        for info in &ep_info {
+            let tangent_key = (info.3 * 1000.0).round() as i64; // 0.001 精度
+            tangent_groups.entry(tangent_key).or_default().push(*info);
+        }
 
-        let mut sorted_by_dir = edge_info.clone();
-        sorted_by_dir.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal));
+        struct AnchorBlock {
+            members: Vec<(usize, bool, f64, f64)>, // (ei, ef, sort_key, tangent)
+            dir_key: f64,                         // 块代表方向
+            _center_tangent: f64,                 // 中心 tangent（stable tiebreak）
+        }
 
-        for (idx, (ei, ef, _, _)) in sorted_by_dir.iter().enumerate() {
-            let new_tangent = tangent_coords[idx];
-            if let Some(ep) = endpoint_map.get_mut(&(*ei, *ef)) {
-                let current_tangent = if vertical_side { ep.anchor.x } else { ep.anchor.y };
-                if (current_tangent - new_tangent).abs() > EPS {
-                    if vertical_side {
-                        ep.anchor.x = new_tangent;
-                    } else {
-                        ep.anchor.y = new_tangent;
+        let mut blocks: Vec<AnchorBlock> = Vec::new();
+        for (_, members) in tangent_groups {
+            let dir_sum: f64 = members.iter().map(|m| m.2).sum();
+            let dir_key = dir_sum / members.len() as f64;
+            let center_tangent: f64 = members.iter().map(|m| m.3).sum::<f64>() / members.len() as f64;
+            blocks.push(AnchorBlock {
+                members,
+                dir_key,
+                _center_tangent: center_tangent,
+            });
+        }
+
+        // 块内按 sort_key 排序端点
+        for block in &mut blocks {
+            block
+                .members
+                .sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal));
+        }
+
+        // 块间排序：先按中心 tangent 建立初始几何顺序，再用稳定排序按 dir_key 重排
+        blocks.sort_by(|a, b| {
+            a._center_tangent
+                .partial_cmp(&b._center_tangent)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        blocks.sort_by(|a, b| {
+            a.dir_key
+                .partial_cmp(&b.dir_key)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // 收集所有 tangent 值排序，按新顺序分配
+        let mut all_tangents: Vec<f64> = ep_info.iter().map(|m| m.3).collect();
+        all_tangents.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        let mut idx = 0;
+        for block in &blocks {
+            for m in &block.members {
+                let new_tangent = all_tangents[idx];
+                idx += 1;
+                let (ei, ef, _, _) = m;
+                if let Some(ep) = endpoint_map.get_mut(&(*ei, *ef)) {
+                    let current_tangent = if vertical_side { ep.anchor.x } else { ep.anchor.y };
+                    if (current_tangent - new_tangent).abs() > EPS {
+                        if vertical_side {
+                            ep.anchor.x = new_tangent;
+                        } else {
+                            ep.anchor.y = new_tangent;
+                        }
+                        edges_to_reroute.insert(*ei);
                     }
-                    edges_to_reroute.insert(*ei);
                 }
             }
         }
@@ -984,117 +881,6 @@ fn compute_effective_exit_dir(
     0.0
 }
 
-/// 交换两条边的端点锚点并重路由。
-///
-/// 交换后两条边的锚点坐标互换，然后分别重路由以生成与新锚点匹配的路径。
-/// 旧路径的 routed_segments 会被移除，新路径的 segments 会被追加。
-fn swap_endpoint_anchors(
-    ei_a: usize,
-    ei_b: usize,
-    endpoint_map: &mut HashMap<(usize, bool), Endpoint>,
-    edges: &mut Vec<EdgeLayout>,
-    grid: &mut SegmentGrid,
-    nodes: &HashMap<String, NodeLayout>,
-    relations: &[crate::ast::Relation],
-    from_side: &[Port],
-    to_side: &[Port],
-    cfg: &OrthoConfig,
-    group_ctx: &crate::layout::group::GroupRoutingContext,
-    obstacles: &PreparedObstacles,
-    ortho_stats: &mut crate::layout::OrthoDebugStats,
-) {
-    // 1. 收集两条边在 endpoint_map 中的所有端点 key
-    let keys_a = [(ei_a, true), (ei_a, false)];
-    let keys_b = [(ei_b, true), (ei_b, false)];
-
-    // 2. 找到需要交换锚点的端点：同一 (node_id, side) 上的端点
-    //    对于每条边，检查 from 和 to 端点，找到属于倒挂侧的那个
-    for &(ka, kb) in &[(keys_a[0], keys_b[0]), (keys_a[1], keys_b[1])] {
-        let Some(ep_a) = endpoint_map.get(&ka) else {
-            continue;
-        };
-        let Some(ep_b) = endpoint_map.get(&kb) else {
-            continue;
-        };
-
-        // 只交换同一节点同一侧的端点锚点
-        if ep_a.node_id != ep_b.node_id || ep_a.side != ep_b.side {
-            continue;
-        }
-
-        // 交换锚点
-        let anchor_a = ep_a.anchor;
-        let anchor_b = ep_b.anchor;
-
-        endpoint_map.entry(ka).and_modify(|e| e.anchor = anchor_b);
-        endpoint_map.entry(kb).and_modify(|e| e.anchor = anchor_a);
-    }
-
-    // 3. 移除旧路径的 segments（批量一次重建）
-    grid.remove_by_edges(&[ei_a, ei_b]);
-
-    // 4. 重路由两条边（倒挂修正只需 Phase-1 候选）
-    for &ei in &[ei_a, ei_b] {
-        let Some(from_ep) = endpoint_map.get(&(ei, true)) else {
-            continue;
-        };
-        let Some(to_ep) = endpoint_map.get(&(ei, false)) else {
-            continue;
-        };
-
-        let ctx = RoutingContext {
-            nodes,
-            group_ctx,
-            grid,
-            cfg,
-            obstacles,
-        };
-        let pair = EndpointPair {
-            from: from_ep.clone(),
-            to: to_ep.clone(),
-        };
-
-        let mut path_stats = PathSelectStats::default();
-        let path = select_best_path_with_scorer_stats(
-            &ctx,
-            &pair,
-            &DefaultScorer,
-            Some(&mut path_stats),
-            true,
-        );
-        ortho_stats.total_candidates += path_stats.candidate_count;
-        ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
-        if path_stats.degraded {
-            ortho_stats.degraded_count += 1;
-        }
-
-        // 重建标签
-        let labels = if path.len() >= 2 {
-            match relations.get(ei) {
-                Some(rel) => {
-                    let middle_t = parse_label_t(rel);
-                    build_edge_labels(rel, middle_t, Point::new(0.0, 0.0), |t| point_at_path_t(&path, t))
-                }
-                None => Vec::new(),
-            }
-        } else {
-            Vec::new()
-        };
-
-        grid.insert_path(&path, ei);
-
-        let mut edge = EdgeLayout {
-            geometry: PathGeometry::Polyline { points: Vec::new() },
-            labels,
-            from_port: from_side[ei],
-            to_port: to_side[ei],
-        };
-        edge.set_polyline_points(path);
-
-        edges[ei] = edge;
-    }
-}
-
 // ═══════════════════════════════════════════════════════════
 //  通用辅助
 // ═══════════════════════════════════════════════════════════
@@ -1159,7 +945,7 @@ fn coordinate_port_sides(
     nodes: &HashMap<String, NodeLayout>,
     from_side: &mut [Port],
     to_side: &mut [Port],
-    group_ctx: Option<&crate::layout::group::GroupRoutingContext>,
+    _group_ctx: Option<&crate::layout::group::GroupRoutingContext>,
 ) {
     use std::collections::{BTreeMap, BTreeSet};
     let n = relations.len();

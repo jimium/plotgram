@@ -3,6 +3,8 @@
 
 set -euo pipefail
 
+DRAWIFY_PROFILE=debug
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # 默认 release：计时反映真实渲染性能；开发时可 DRAWIFY_PROFILE=debug
