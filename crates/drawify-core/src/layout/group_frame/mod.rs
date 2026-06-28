@@ -20,7 +20,7 @@
 //! 详见 `docs/architecture/布局优化/group-frame-spec.md`（v0.2）。
 
 use crate::ast::{AttributeValue, Diagram};
-use crate::layout::grid_snap::{diagram_snap_attribute, should_snap, snap_floor, snap_ceil};
+use crate::layout::grid_snap::{diagram_snap_attribute, snap_floor, snap_ceil};
 use crate::layout::intent::PinSet;
 use crate::layout::node::common::group_bounds::{compute_group_bounds, GroupPadding as BoundsGroupPadding};
 use crate::layout::{GroupLayout, LayoutResult, NodeLayout};
@@ -201,23 +201,23 @@ const ARCH_GROUP_GAP: f64 = 50.0;
 /// | `flowchart` | `Stack(V)`（可由 `group_arrangement` 覆盖） | `Fit` | `Center`（可由 `group_align` 覆盖） | 60.0（可由 `group_gap` 覆盖） | `None` |
 /// | 其他含 group 算法 | `Stack(V)` | `Fit` | `Center` | 60.0 | `None` |
 ///
-/// `quantize.enabled` 由 `snap` 属性 + 算法白名单（[`should_snap`]）决定。
+/// `quantize.enabled` 由 `snap` 属性 + 节点 snap 是否启用决定。
 ///
 /// # `group_frame:` 配置块（spec §6.2 sugar）
 ///
 /// 若 diagram 声明了 `group_frame: stack { axis: horizontal, gap: 48, ... }` 配置块，
 /// 则以配置块覆盖算法默认值；未声明的字段保留算法默认。旧属性（`group_sizing` 等）
 /// 保留为 sugar，在无 `group_frame` 配置块时生效。
-pub fn resolve_group_frame_spec(diagram: &Diagram, algo: &str) -> GroupFrameSpec {
+pub fn resolve_group_frame_spec(diagram: &Diagram, algo: &str, node_snap_enabled: bool) -> GroupFrameSpec {
     // 优先消费 `group_frame:` 配置块（覆盖算法默认值）
-    if let Some(spec) = resolve_from_group_frame_config(diagram, algo) {
+    if let Some(spec) = resolve_from_group_frame_config(diagram, algo, node_snap_enabled) {
         return spec;
     }
     if algo == "architecture" {
-        resolve_architecture(diagram, algo)
+        resolve_architecture(diagram, node_snap_enabled)
     } else {
         // flowchart / er / sugiyama-v2 等含 group 的算法走通用 stack 解析
-        resolve_stack(diagram, algo)
+        resolve_stack(diagram, node_snap_enabled)
     }
 }
 
@@ -232,7 +232,7 @@ pub fn resolve_group_frame_spec(diagram: &Diagram, algo: &str) -> GroupFrameSpec
 /// - `snap`: number（量化步长）或 boolean（开关）
 ///
 /// 返回 `None` 表示未声明 `group_frame` 配置块。
-fn resolve_from_group_frame_config(diagram: &Diagram, algo: &str) -> Option<GroupFrameSpec> {
+fn resolve_from_group_frame_config(diagram: &Diagram, algo: &str, node_snap_enabled: bool) -> Option<GroupFrameSpec> {
     let attr = diagram
         .attributes
         .iter()
@@ -246,9 +246,9 @@ fn resolve_from_group_frame_config(diagram: &Diagram, algo: &str) -> Option<Grou
 
     // 以算法默认 Spec 为基底，逐字段覆盖
     let mut spec = if algo == "architecture" {
-        resolve_architecture(diagram, algo)
+        resolve_architecture(diagram, node_snap_enabled)
     } else {
-        resolve_stack(diagram, algo)
+        resolve_stack(diagram, node_snap_enabled)
     };
 
     // arrangement（algo 字段）
@@ -352,7 +352,7 @@ fn read_num_option(options: &HashMap<String, AttributeValue>, key: &str) -> Opti
 
 /// architecture 默认：`Stack(H) + Fit + Start + gap=50 + SharedLines`；
 /// `group_sizing: uniform` 时 `track_sizing = Equal`。
-fn resolve_architecture(diagram: &Diagram, algo: &str) -> GroupFrameSpec {
+fn resolve_architecture(diagram: &Diagram, node_snap_enabled: bool) -> GroupFrameSpec {
     let track_sizing = if diagram_group_sizing_is_uniform(diagram) {
         TrackSizing::Equal
     } else {
@@ -369,14 +369,14 @@ fn resolve_architecture(diagram: &Diagram, algo: &str) -> GroupFrameSpec {
         gap: ARCH_GROUP_GAP,
         padding: GroupPadding::architecture_v2(),
         border_align: BorderAlign::SharedLines,
-        quantize: resolve_quantize(diagram, algo),
+        quantize: resolve_quantize(diagram, node_snap_enabled),
     }
 }
 
 /// flowchart / 通用 stack：从 `group_arrangement` / `group_gap` / `group_align` / `group_sizing` 解析。
 ///
 /// `group_sizing: uniform` → `TrackSizing::Equal`（与 architecture 对齐，补齐 spec §4.1 缺口）。
-fn resolve_stack(diagram: &Diagram, algo: &str) -> GroupFrameSpec {
+fn resolve_stack(diagram: &Diagram, node_snap_enabled: bool) -> GroupFrameSpec {
     let mut gap = 60.0_f64;
     let mut cross_align = CrossAlign::Center;
     let mut axis = Axis::Vertical;
@@ -430,13 +430,13 @@ fn resolve_stack(diagram: &Diagram, algo: &str) -> GroupFrameSpec {
             GROUP_LABEL_HEIGHT,
         ),
         border_align: BorderAlign::None,
-        quantize: resolve_quantize(diagram, algo),
+        quantize: resolve_quantize(diagram, node_snap_enabled),
     }
 }
 
-/// 解析量化规格：`enabled` = 算法白名单 ∩ `snap` 属性（默认 true）。
-fn resolve_quantize(diagram: &Diagram, algo: &str) -> QuantizeSpec {
-    let enabled = should_snap(algo) && diagram_snap_attribute(diagram).unwrap_or(true);
+/// 解析量化规格：`enabled` = node_snap_enabled ∩ `snap` 属性（默认 true）。
+fn resolve_quantize(diagram: &Diagram, node_snap_enabled: bool) -> QuantizeSpec {
+    let enabled = node_snap_enabled && diagram_snap_attribute(diagram).unwrap_or(true);
     QuantizeSpec {
         enabled,
         step: DEFAULT_QUANTIZE_STEP,

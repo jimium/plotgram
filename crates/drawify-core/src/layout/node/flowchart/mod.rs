@@ -17,7 +17,7 @@ use crate::layout::algorithm_config::SugiyamaLayoutConfig;
 use crate::layout::intent::topology::ValidTopologyIntent;
 use crate::layout::node::sugiyama_v2::{engine, preset};
 use crate::layout::plan::ResolvedAlgoOptions;
-use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy};
+use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeSnapConfig};
 use crate::types::DiagramType;
 
 /// 流程图布局（`layout_algo: flowchart`）。
@@ -88,5 +88,9 @@ impl LayoutStrategy for FlowchartLayout {
             self.config,
             valid_topology,
         )
+    }
+
+    fn node_snap_config(&self) -> NodeSnapConfig {
+        NodeSnapConfig::default_sugiyama()
     }
 }

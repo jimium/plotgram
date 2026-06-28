@@ -26,7 +26,7 @@
     #[test]
     fn architecture_default_spec() {
         let diagram = Diagram::default();
-        let spec = resolve_group_frame_spec(&diagram, "architecture");
+        let spec = resolve_group_frame_spec(&diagram, "architecture", true);
 
         assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Horizontal });
         assert_eq!(spec.track_sizing, TrackSizing::Fit);
@@ -45,7 +45,7 @@
             attributes: vec![str_attr("group_sizing", "uniform")],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "architecture");
+        let spec = resolve_group_frame_spec(&diagram, "architecture", true);
         assert_eq!(spec.track_sizing, TrackSizing::Equal);
     }
 
@@ -55,7 +55,7 @@
             attributes: vec![str_attr("group_sizing", "fit")],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "architecture");
+        let spec = resolve_group_frame_spec(&diagram, "architecture", true);
         assert_eq!(spec.track_sizing, TrackSizing::Fit);
     }
 
@@ -65,7 +65,7 @@
             attributes: vec![bool_attr("snap", false)],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "architecture");
+        let spec = resolve_group_frame_spec(&diagram, "architecture", true);
         assert!(!spec.quantize.enabled);
         assert!(!spec.quantize.quantize_groups);
         assert!(!spec.quantize.quantize_nodes);
@@ -76,7 +76,7 @@
     #[test]
     fn flowchart_default_spec() {
         let diagram = Diagram::default();
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
 
         assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Vertical });
         assert_eq!(spec.track_sizing, TrackSizing::Fit);
@@ -92,7 +92,7 @@
             attributes: vec![str_attr("group_arrangement", "horizontal")],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Horizontal });
     }
 
@@ -102,7 +102,7 @@
             attributes: vec![str_attr("group_arrangement", "vertical")],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Vertical });
     }
 
@@ -112,7 +112,7 @@
             attributes: vec![num_attr("group_gap", 120.0)],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert!((spec.gap - 120.0).abs() < f64::EPSILON);
     }
 
@@ -122,7 +122,7 @@
             attributes: vec![num_attr("group_gap", -10.0)],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert!((spec.gap - 60.0).abs() < f64::EPSILON);
     }
 
@@ -132,7 +132,7 @@
             attributes: vec![str_attr("group_align", "left")],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert_eq!(spec.cross_align, CrossAlign::Start);
     }
 
@@ -142,7 +142,7 @@
             attributes: vec![str_attr("group_align", "center")],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert_eq!(spec.cross_align, CrossAlign::Center);
     }
 
@@ -152,7 +152,7 @@
             attributes: vec![str_attr("group_align", "invalid")],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert_eq!(spec.cross_align, CrossAlign::Center);
     }
 
@@ -166,7 +166,7 @@
             ],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Horizontal });
         assert_eq!(spec.cross_align, CrossAlign::Start);
         assert!((spec.gap - 100.0).abs() < f64::EPSILON);
@@ -178,14 +178,14 @@
             attributes: vec![str_attr("group_sizing", "uniform")],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert_eq!(spec.track_sizing, TrackSizing::Equal);
     }
 
     #[test]
     fn flowchart_group_sizing_fit_default() {
         let diagram = Diagram::default();
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert_eq!(spec.track_sizing, TrackSizing::Fit);
     }
 
@@ -233,7 +233,7 @@
             ])],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
 
         assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Horizontal });
         assert_eq!(spec.track_sizing, TrackSizing::Equal);
@@ -251,7 +251,7 @@
             attributes: vec![config_attr("stack", &[("gap", num_val(100.0))])],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
 
         // 覆盖项
         assert!((spec.gap - 100.0).abs() < f64::EPSILON);
@@ -268,7 +268,7 @@
             attributes: vec![config_attr("stack", &[("snap", bool_val(false))])],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert!(!spec.quantize.enabled);
     }
 
@@ -281,7 +281,7 @@
             ])],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert_eq!(spec.arrangement, GroupArrangement::Matrix { rows: Some(2), cols: Some(3) });
     }
 
@@ -293,7 +293,7 @@
             ])],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert_eq!(spec.track_sizing, TrackSizing::Fixed(200.0));
     }
 
@@ -308,7 +308,7 @@
             }],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Vertical });
         assert_eq!(spec.track_sizing, TrackSizing::Fit);
     }
@@ -318,14 +318,14 @@
     #[test]
     fn snap_disabled_for_non_whitelisted_algo() {
         let diagram = Diagram::default();
-        let spec = resolve_group_frame_spec(&diagram, "force-directed");
+        let spec = resolve_group_frame_spec(&diagram, "force-directed", false);
         assert!(!spec.quantize.enabled);
     }
 
     #[test]
     fn snap_enabled_for_sugiyama_v2() {
         let diagram = Diagram::default();
-        let spec = resolve_group_frame_spec(&diagram, "sugiyama-v2");
+        let spec = resolve_group_frame_spec(&diagram, "sugiyama-v2", true);
         assert!(spec.quantize.enabled);
     }
 
@@ -335,7 +335,7 @@
             attributes: vec![bool_attr("snap", false)],
             ..Default::default()
         };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        let spec = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert!(!spec.quantize.enabled);
     }
 
@@ -350,8 +350,8 @@
             ],
             ..Default::default()
         };
-        let s1 = resolve_group_frame_spec(&diagram, "flowchart");
-        let s2 = resolve_group_frame_spec(&diagram, "flowchart");
+        let s1 = resolve_group_frame_spec(&diagram, "flowchart", true);
+        let s2 = resolve_group_frame_spec(&diagram, "flowchart", true);
         assert_eq!(s1.arrangement, s2.arrangement);
         assert_eq!(s1.track_sizing, s2.track_sizing);
         assert_eq!(s1.cross_align, s2.cross_align);

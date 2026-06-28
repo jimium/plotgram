@@ -8,7 +8,7 @@ use crate::layout::algorithm_config::{ArchitectureV2LayoutConfig, ARCHITECTURE_V
 use crate::layout::intent::topology::ValidTopologyIntent;
 use crate::layout::node::common::node_sizing;
 use crate::layout::plan::ResolvedAlgoOptions;
-use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy};
+use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeSnapConfig};
 use crate::types::DiagramType;
 use std::collections::HashMap;
 
@@ -139,6 +139,10 @@ impl LayoutStrategy for ArchitectureV2Layout {
                 ..Default::default()
             },
         }
+    }
+
+    fn node_snap_config(&self) -> NodeSnapConfig {
+        NodeSnapConfig::default_architecture()
     }
 }
 

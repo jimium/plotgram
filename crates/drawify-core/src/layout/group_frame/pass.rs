@@ -25,10 +25,10 @@ pub struct GroupFramePass {
 
 impl GroupFramePass {
     /// 从 diagram 与 plan 解析 L1 Group Frame 参数。
-    pub fn resolve(diagram: &Diagram, plan: &LayoutPlan, algo: &str) -> Self {
+    pub fn resolve(diagram: &Diagram, plan: &LayoutPlan, algo: &str, node_snap_enabled: bool) -> Self {
         let group_padding = group_padding_from_plan(plan, algo);
         Self {
-            spec: resolve_group_frame_spec(diagram, algo),
+            spec: resolve_group_frame_spec(diagram, algo, node_snap_enabled),
             padding: group_padding_for_algo(algo, group_padding),
         }
     }

@@ -77,6 +77,7 @@ pub use lint::{
     LayoutViolation, LintConfig, LintProfile, LintReport, LintRuleId, LintSeverity, RuleConfig,
 };
 pub use registry::{EDGE_ROUTING_NAMES, LAYOUT_ALGORITHM_NAMES};
+pub use grid_snap::{NodeSnapConfig, EdgeSnapConfig};
 
 // 向后兼容：保持 `crate::layout::sugiyama` 等路径可用
 pub use edge::{
@@ -852,6 +853,14 @@ pub trait LayoutStrategy {
     fn supported_directions(&self) -> &'static [&'static str] {
         &[]
     }
+
+    /// 声明该布局算法的节点 snap 配置。
+    ///
+    /// 默认返回禁用配置；需要节点对齐/量化的算法（Sugiyama 系、Architecture 等）
+    /// 应覆写此方法返回对应的 [`NodeSnapConfig`]。
+    fn node_snap_config(&self) -> NodeSnapConfig {
+        NodeSnapConfig::disabled()
+    }
 }
 
 // ─── EdgeRouting Trait ───────────────────────────────────
@@ -932,6 +941,14 @@ pub trait EdgeRoutingStrategy {
     ) -> LayoutResult {
         let _ = preserve_edges;
         self.route(diagram, result)
+    }
+
+    /// 声明该路由算法的边 waypoint snap 配置。
+    ///
+    /// 默认返回禁用配置；输出正交折线的路由算法（如 orthogonal）
+    /// 应覆写此方法返回对应的 [`EdgeSnapConfig`]。
+    fn edge_snap_config(&self) -> EdgeSnapConfig {
+        EdgeSnapConfig::disabled()
     }
 }
 
@@ -1653,7 +1670,6 @@ mod tests {
             span,
         });
 
-        assert!(!grid_snap::snap_enabled_for_diagram(&diagram, "sugiyama-v2"));
         assert!(compute_layout(&diagram).is_ok());
     }
 

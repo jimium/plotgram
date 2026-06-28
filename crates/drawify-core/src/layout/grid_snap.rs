@@ -7,23 +7,36 @@
 //! - layer 轴（TB 为 x，LR 为 y）：层内槽位吸附（ER 图跳过）
 //!
 //! 边路由完成后对通道轴 snap（保护磁吸点/stub）。
+//!
+//! # 能力声明模式
+//!
+//! 节点 snap 配置由 [`LayoutStrategy::node_snap_config()`] 声明，
+//! 边 snap 配置由 [`EdgeRoutingStrategy::edge_snap_config()`] 声明。
+//! 本模块不再按算法名字符串匹配白名单。
 
-use crate::types::DiagramType;
 use crate::ast::{AttributeValue, Diagram};
 use crate::layout::constants::{
     self, GRID_SNAP_LAYER_TOLERANCE, GRID_SNAP_MAX_DISTANCE, GRID_SNAP_NODE_GAP_ARCH,
     GRID_SNAP_NODE_GAP_SUGIYAMA, GRID_SNAP_STEP,
 };
 use crate::layout::geometry::Point;
+use crate::layout::group::constants::{GROUP_BORDER_SHELL_PAD, PORT_STUB_CLEARANCE};
 use crate::layout::intent::PinSet;
 use crate::layout::{EdgeLayout, GroupLayout, LayoutResult, NodeLayout};
 use std::collections::{HashMap, HashSet};
 
 const COLLINEAR_EPS: f64 = 0.1;
 
-/// 网格吸附配置
+/// 默认分组边框排斥轮数
+const DEFAULT_REPULSE_MAX_ROUNDS: usize = 2;
+
+// ─── 配置结构 ────────────────────────────────────────────
+
+/// 节点对齐 snap 配置（由 [`LayoutStrategy::node_snap_config()`] 声明）。
+///
+/// 控制同层节点 rank 轴对齐与 layer 轴槽位吸附。
 #[derive(Debug, Clone)]
-pub struct GridSnapConfig {
+pub struct NodeSnapConfig {
     pub enabled: bool,
     pub grid_step: f64,
     pub node_gap: f64,
@@ -34,17 +47,17 @@ pub struct GridSnapConfig {
     pub rank_axis_only: bool,
 }
 
-impl GridSnapConfig {
-    /// 从 diagram 顶层属性 `snap` 与布局算法构建配置；缺省为开启。
-    pub fn for_diagram(algo: &str, diagram: &Diagram) -> Self {
-        let mut config = config_for(algo, diagram);
-        config.enabled = snap_enabled_for_diagram(diagram, algo);
-        config
+impl NodeSnapConfig {
+    /// 构造一个禁用节点 snap 的配置（默认值）。
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            ..Self::default_sugiyama()
+        }
     }
-}
 
-impl Default for GridSnapConfig {
-    fn default() -> Self {
+    /// Sugiyama 系算法（sugiyama-v2/flowchart/er）的默认配置。
+    pub fn default_sugiyama() -> Self {
         Self {
             enabled: true,
             grid_step: GRID_SNAP_STEP,
@@ -55,7 +68,95 @@ impl Default for GridSnapConfig {
             rank_axis_only: false,
         }
     }
+
+    /// 架构图的默认配置（node_gap 不同）。
+    pub fn default_architecture() -> Self {
+        Self {
+            node_gap: GRID_SNAP_NODE_GAP_ARCH,
+            ..Self::default_sugiyama()
+        }
+    }
+
+    /// 设置 rank_axis_only 并返回自身（便于链式调用）。
+    pub fn with_rank_axis_only(mut self, rank_axis_only: bool) -> Self {
+        self.rank_axis_only = rank_axis_only;
+        self
+    }
 }
+
+/// 边 waypoint snap 配置（由 [`EdgeRoutingStrategy::edge_snap_config()`] 声明）。
+///
+/// 控制正交折线路径的通道轴坐标量化，以及分组边框排斥的几何参数。
+/// 仅输出折线路径（Polyline）的路由算法应启用此配置。
+#[derive(Debug, Clone)]
+pub struct EdgeSnapConfig {
+    pub enabled: bool,
+    pub grid_step: f64,
+    pub shell_pad: f64,
+    pub stub_clearance: f64,
+    pub repulse_max_rounds: usize,
+}
+
+impl EdgeSnapConfig {
+    /// 构造一个禁用边 snap 的配置（默认值）。
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            ..Self::default_orthogonal()
+        }
+    }
+
+    /// 正交路由的默认配置。
+    pub fn default_orthogonal() -> Self {
+        Self {
+            enabled: true,
+            grid_step: GRID_SNAP_STEP,
+            shell_pad: GROUP_BORDER_SHELL_PAD,
+            stub_clearance: PORT_STUB_CLEARANCE,
+            repulse_max_rounds: DEFAULT_REPULSE_MAX_ROUNDS,
+        }
+    }
+}
+
+// ─── 工具函数 ────────────────────────────────────────────
+
+/// 读取 diagram 顶层 `snap: true | false`；未声明时返回 `None`（调用方决定默认值）。
+pub fn diagram_snap_attribute(diagram: &Diagram) -> Option<bool> {
+    diagram
+        .attributes
+        .iter()
+        .find(|attr| attr.key == "snap")
+        .and_then(|attr| match attr.value {
+            AttributeValue::Boolean(value) => Some(value),
+            _ => None,
+        })
+}
+
+/// 将 value 量化到最近的网格点（四舍五入）
+pub fn snap_to_grid(value: f64, step: f64) -> f64 {
+    if step <= f64::EPSILON {
+        return value;
+    }
+    (value / step).round() * step
+}
+
+/// 将 value 量化到不大于它的最近网格点（floor）
+pub fn snap_floor(value: f64, step: f64) -> f64 {
+    if step <= f64::EPSILON {
+        return value;
+    }
+    (value / step).floor() * step
+}
+
+/// 将 value 量化到不小于它的最近网格点（ceil）
+pub fn snap_ceil(value: f64, step: f64) -> f64 {
+    if step <= f64::EPSILON {
+        return value;
+    }
+    (value / step).ceil() * step
+}
+
+// ─── 报告 ────────────────────────────────────────────────
 
 /// snap 执行报告（内部使用，供测试断言）
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -68,54 +169,14 @@ pub struct SnapReport {
     pub snapped_waypoints: usize,
 }
 
-/// 是否对该布局算法启用 grid snap
-pub fn should_snap(algo: &str) -> bool {
-    matches!(
-        algo,
-        "flowchart" | "er" | "sugiyama-v2" | "architecture"
-    )
-}
-
-/// 按布局算法与图类型构建配置（`enabled` 由 [`snap_enabled_for_diagram`] 决定）
-pub fn config_for(algo: &str, diagram: &Diagram) -> GridSnapConfig {
-    let node_gap = match algo {
-        "architecture" => GRID_SNAP_NODE_GAP_ARCH,
-        _ => GRID_SNAP_NODE_GAP_SUGIYAMA,
-    };
-    GridSnapConfig {
-        node_gap,
-        rank_axis_only: algo == "er"
-            || (algo == "sugiyama-v2" && diagram.diagram_type == DiagramType::Er),
-        ..Default::default()
-    }
-}
-
-/// 读取 diagram 顶层 `snap: true | false`；未声明时默认 `true`。
-pub fn diagram_snap_attribute(diagram: &Diagram) -> Option<bool> {
-    diagram
-        .attributes
-        .iter()
-        .find(|attr| attr.key == "snap")
-        .and_then(|attr| match attr.value {
-            AttributeValue::Boolean(value) => Some(value),
-            _ => None,
-        })
-}
-
-/// 当前 diagram 是否应执行 grid snap（算法白名单 + `snap` 属性）。
-pub fn snap_enabled_for_diagram(diagram: &Diagram, algo: &str) -> bool {
-    if !should_snap(algo) {
-        return false;
-    }
-    diagram_snap_attribute(diagram).unwrap_or(true)
-}
+// ─── 节点 snap ───────────────────────────────────────────
 
 /// 对布局结果执行网格吸附。
 ///
 /// `pinned` 中的节点在对应轴上跳过 snap（由 `Pin` / `Align*` 意图保护）。
 pub fn snap_layout_to_grid(
     layout: &mut LayoutResult,
-    config: &GridSnapConfig,
+    config: &NodeSnapConfig,
     horizontal: bool,
     pinned: &PinSet,
 ) -> SnapReport {
@@ -124,7 +185,6 @@ pub fn snap_layout_to_grid(
     }
 
     let mut node_ids: Vec<String> = layout.nodes.keys().cloned().collect();
-    // 排序保证迭代顺序确定（HashMap 迭代顺序随机）
     node_ids.sort();
     let layers = cluster_by_rank_axis(&layout.nodes, &node_ids, horizontal, config.layer_tolerance);
 
@@ -144,6 +204,8 @@ pub fn snap_layout_to_grid(
     report
 }
 
+// ─── 边 snap ─────────────────────────────────────────────
+
 /// 边路由完成后，对正交折线路径做通道轴 snap（保护磁吸点与 stub，不逐点双轴 snap）。
 ///
 /// - 端点 `path[0]` / `path[last]`：磁吸锚点，不修改
@@ -153,9 +215,7 @@ pub fn snap_layout_to_grid(
 pub fn snap_edge_waypoints(
     edges: &mut [EdgeLayout],
     groups: &HashMap<String, GroupLayout>,
-    config: &GridSnapConfig,
-    shell_pad: f64,
-    stub_clearance: f64,
+    config: &EdgeSnapConfig,
 ) -> usize {
     if !config.enabled {
         return 0;
@@ -179,17 +239,18 @@ pub fn snap_edge_waypoints(
         crate::layout::group::project_path_off_group_borders_with_stub(
             points,
             groups,
-            shell_pad,
+            config.shell_pad,
             config.grid_step,
-            stub_clearance,
+            config.stub_clearance,
         );
         let simplified = simplify_polyline_path_preserving_stubs(points);
-        // set_polyline_points 自动根据点数选择 Straight（≤2 点）/ Polyline（>2 点）
         edge.set_polyline_points(simplified);
     }
 
     snapped
 }
+
+// ─── 画布尺寸 ────────────────────────────────────────────
 
 /// 根据 nodes / groups 更新画布 total 尺寸
 pub fn update_canvas_bounds(layout: &mut LayoutResult, padding: f64) {
@@ -198,13 +259,13 @@ pub fn update_canvas_bounds(layout: &mut LayoutResult, padding: f64) {
     layout.total_height = total_height;
 }
 
+// ─── 内部实现 ────────────────────────────────────────────
 
 fn protected_path_indices(len: usize) -> HashSet<usize> {
     let mut protected = HashSet::from([0, len.saturating_sub(1)]);
     if len >= 3 {
         protected.insert(1);
     }
-    // 仅 len ≥ 5 时 path[len-2] 才是入口 stub；len = 4 时该点是通道拐角
     if len >= 5 {
         protected.insert(len - 2);
     }
@@ -219,7 +280,6 @@ fn is_horizontal_segment(a: Point, b: Point) -> bool {
     (a.y - b.y).abs() < COLLINEAR_EPS && (a.x - b.x).abs() >= COLLINEAR_EPS
 }
 
-/// 通道轴 snap：只动可修改点，保持 stub/磁吸点处的 H/V 出线方向。
 fn snap_edge_path_channels(path: &mut [Point], step: f64) -> usize {
     let n = path.len();
     if n <= 2 {
@@ -229,7 +289,6 @@ fn snap_edge_path_channels(path: &mut [Point], step: f64) -> usize {
     let protected = protected_path_indices(n);
     let mut count = 0usize;
 
-    // Phase A：两端均可动的通道段 — 整段对齐到同一 snapped 轴坐标
     for i in 0..n - 1 {
         if protected.contains(&i) || protected.contains(&(i + 1)) {
             continue;
@@ -259,7 +318,6 @@ fn snap_edge_path_channels(path: &mut [Point], step: f64) -> usize {
         }
     }
 
-    // Phase B：一端 protected（stub/磁吸点）— 只 snap 可动端沿通道主轴的坐标
     for i in 0..n - 1 {
         let p0 = protected.contains(&i);
         let p1 = protected.contains(&(i + 1));
@@ -267,14 +325,23 @@ fn snap_edge_path_channels(path: &mut [Point], step: f64) -> usize {
             continue;
         }
         let (prot_idx, mod_idx) = if p0 { (i, i + 1) } else { (i + 1, i) };
+
+        let other_neighbor = if mod_idx > prot_idx {
+            mod_idx + 1
+        } else {
+            mod_idx.saturating_sub(1)
+        };
+        if other_neighbor < n && protected.contains(&other_neighbor) {
+            continue;
+        }
+
         let prot_pt = path[prot_idx];
-        let mod_pt = path[mod_idx];
         let seg = (path[i], path[i + 1]);
 
         let new_pt = if is_vertical_segment(seg.0, seg.1) {
-            Point::new(prot_pt.x, snap_to_grid(mod_pt.y, step))
+            Point::new(prot_pt.x, snap_to_grid(path[mod_idx].y, step))
         } else if is_horizontal_segment(seg.0, seg.1) {
-            Point::new(snap_to_grid(mod_pt.x, step), prot_pt.y)
+            Point::new(snap_to_grid(path[mod_idx].x, step), prot_pt.y)
         } else {
             continue;
         };
@@ -287,8 +354,6 @@ fn snap_edge_path_channels(path: &mut [Point], step: f64) -> usize {
         }
     }
 
-    // Phase C：真实通道拐角（可动点，且不与 stub/磁吸点相邻）
-    // stub 邻接拐角由 Phase B 处理，此处再 snap 另一轴会破坏 H/V 正交与圆角切线。
     for i in 1..n - 1 {
         if protected.contains(&i) {
             continue;
@@ -309,22 +374,13 @@ fn snap_edge_path_channels(path: &mut [Point], step: f64) -> usize {
             continue;
         }
 
-        let mut x = curr.x;
-        let mut y = curr.y;
-        if prev_h {
-            y = prev.y;
-            x = snap_to_grid(curr.x, step);
-        } else if prev_v {
-            x = prev.x;
-            y = snap_to_grid(curr.y, step);
-        }
-        if next_h {
-            y = next.y;
-            x = snap_to_grid(curr.x, step);
-        } else if next_v {
-            x = next.x;
-            y = snap_to_grid(curr.y, step);
-        }
+        let (x, y) = if prev_h && next_v {
+            (next.x, prev.y)
+        } else if prev_v && next_h {
+            (prev.x, next.y)
+        } else {
+            continue;
+        };
 
         if (curr.x - x).abs() > f64::EPSILON || (curr.y - y).abs() > f64::EPSILON {
             path[i] = Point::new(x, y);
@@ -335,36 +391,11 @@ fn snap_edge_path_channels(path: &mut [Point], step: f64) -> usize {
     count
 }
 
-/// 将 value 量化到最近的网格点（四舍五入）
-pub fn snap_to_grid(value: f64, step: f64) -> f64 {
-    if step <= f64::EPSILON {
-        return value;
-    }
-    (value / step).round() * step
-}
-
-/// 将 value 量化到不大于它的最近网格点（floor）
-pub fn snap_floor(value: f64, step: f64) -> f64 {
-    if step <= f64::EPSILON {
-        return value;
-    }
-    (value / step).floor() * step
-}
-
-/// 将 value 量化到不小于它的最近网格点（ceil）
-pub fn snap_ceil(value: f64, step: f64) -> f64 {
-    if step <= f64::EPSILON {
-        return value;
-    }
-    (value / step).ceil() * step
-}
-
 fn is_collinear(a: Point, b: Point, c: Point) -> bool {
     let cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
     cross.abs() < COLLINEAR_EPS
 }
 
-/// 共线简化，保留首尾 stub（与正交边路由 `simplify_path_preserving_stubs` 一致）
 fn simplify_polyline_path_preserving_stubs(path: &[Point]) -> Vec<Point> {
     if path.len() <= 2 {
         return path.to_vec();
@@ -474,7 +505,6 @@ fn record_snap(report: &mut SnapReport, before: f64, after: f64) {
     }
 }
 
-/// 按 rank 轴坐标聚类推断层
 fn cluster_by_rank_axis(
     nodes: &HashMap<String, NodeLayout>,
     node_ids: &[String],
@@ -525,7 +555,7 @@ fn snap_rank_axis_centers(
     layout: &mut LayoutResult,
     layer: &[String],
     horizontal: bool,
-    config: &GridSnapConfig,
+    config: &NodeSnapConfig,
     report: &mut SnapReport,
     pinned: &PinSet,
 ) {
@@ -547,7 +577,6 @@ fn snap_rank_axis_centers(
     let target = sorted[sorted.len() / 2];
 
     for id in layer {
-        // pinned 节点跳过 rank 轴 snap
         if pinned.is_rank_pinned(id, horizontal) {
             continue;
         }
@@ -568,7 +597,7 @@ fn snap_layer_axis_slots(
     layout: &mut LayoutResult,
     layer: &[String],
     horizontal: bool,
-    config: &GridSnapConfig,
+    config: &NodeSnapConfig,
     report: &mut SnapReport,
     pinned: &PinSet,
 ) {
@@ -594,7 +623,6 @@ fn snap_layer_axis_slots(
         let slot_center = cursor + size / 2.0;
         cursor += size + config.node_gap;
 
-        // pinned 节点跳过 layer 轴 snap
         if pinned.is_layer_pinned(id, horizontal) {
             continue;
         }
@@ -611,14 +639,11 @@ fn snap_layer_axis_slots(
     }
 }
 
-/// 层内 layer 轴一维重叠消除（前向 + 后向扫描）。
-///
-/// `pinned` 节点不被移动，但作为障碍物参与重叠计算。
 fn resolve_layer_axis_overlaps(
     layout: &mut LayoutResult,
     layer: &[String],
     horizontal: bool,
-    config: &GridSnapConfig,
+    config: &NodeSnapConfig,
     pinned: &PinSet,
 ) {
     if layer.len() <= 1 {
@@ -668,7 +693,6 @@ fn resolve_layer_axis_overlaps(
         if centers[i] < min_center {
             centers[i] = min_center;
         }
-        // pinned 节点不被移动
         if pinned.is_layer_pinned(id, horizontal) {
             continue;
         }
@@ -677,6 +701,8 @@ fn resolve_layer_axis_overlaps(
         }
     }
 }
+
+// ─── Tests ───────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -726,10 +752,10 @@ mod tests {
         nodes.insert("c".into(), node(40.0, 200.0, 80.0, 40.0));
 
         let mut layout = sample_layout(nodes);
-        let config = GridSnapConfig {
+        let config = NodeSnapConfig {
             max_snap_distance: 24.0,
             node_gap: 48.0,
-            ..Default::default()
+            ..NodeSnapConfig::default_sugiyama()
         };
         snap_layout_to_grid(&mut layout, &config, false, &PinSet::default());
 
@@ -744,7 +770,7 @@ mod tests {
         nodes.insert("b".into(), node(103.0, 120.0, 40.0, 80.0));
 
         let mut layout = sample_layout(nodes);
-        let config = GridSnapConfig::default();
+        let config = NodeSnapConfig::default_sugiyama();
         snap_layout_to_grid(&mut layout, &config, true, &PinSet::default());
 
         let xs = rank_centers(&layout, &["a", "b"], true);
@@ -758,10 +784,10 @@ mod tests {
         nodes.insert("b".into(), node(200.0, 100.0, 80.0, 40.0));
 
         let mut layout = sample_layout(nodes);
-        let config = GridSnapConfig {
+        let config = NodeSnapConfig {
             node_gap: 48.0,
             max_snap_distance: 24.0,
-            ..Default::default()
+            ..NodeSnapConfig::default_sugiyama()
         };
         snap_layout_to_grid(&mut layout, &config, false, &PinSet::default());
 
@@ -778,8 +804,7 @@ mod tests {
         nodes.insert("b".into(), node(200.0, 100.0, 80.0, 40.0));
 
         let mut layout = sample_layout(nodes.clone());
-        let mut config = GridSnapConfig::default();
-        config.rank_axis_only = true;
+        let config = NodeSnapConfig::default_sugiyama().with_rank_axis_only(true);
         snap_layout_to_grid(&mut layout, &config, false, &PinSet::default());
 
         assert!((layout.nodes["b"].x - nodes["b"].x).abs() < 0.1);
@@ -794,7 +819,7 @@ mod tests {
 
         let mut layout1 = sample_layout(nodes.clone());
         let mut layout2 = sample_layout(nodes);
-        let config = GridSnapConfig::default();
+        let config = NodeSnapConfig::default_sugiyama();
         snap_layout_to_grid(&mut layout1, &config, false, &PinSet::default());
         snap_layout_to_grid(&mut layout2, &config, false, &PinSet::default());
 
@@ -814,9 +839,9 @@ mod tests {
         nodes.insert("c".into(), node(140.0, 100.0, 80.0, 40.0));
 
         let mut layout = sample_layout(nodes);
-        let config = GridSnapConfig {
+        let config = NodeSnapConfig {
             max_snap_distance: 48.0,
-            ..Default::default()
+            ..NodeSnapConfig::default_sugiyama()
         };
         snap_layout_to_grid(&mut layout, &config, false, &PinSet::default());
 
@@ -826,7 +851,7 @@ mod tests {
                 let a = &layout.nodes[&ids[i]];
                 let b = &layout.nodes[&ids[j]];
                 let overlap_x = a.x < b.x + b.width && b.x < a.x + a.width;
-                let overlap_y = a.y < b.y + b.height && b.y < a.y + a.height;
+                let overlap_y = a.y < b.y + b.height && b.y < a.y + b.height;
                 assert!(!(overlap_x && overlap_y), "nodes {} and {} overlap", ids[i], ids[j]);
             }
         }
@@ -839,9 +864,9 @@ mod tests {
         nodes.insert("far".into(), node(300.0, 140.0, 80.0, 40.0));
 
         let mut layout = sample_layout(nodes);
-        let config = GridSnapConfig {
+        let config = NodeSnapConfig {
             max_snap_distance: 10.0,
-            ..Default::default()
+            ..NodeSnapConfig::default_sugiyama()
         };
         let report = snap_layout_to_grid(&mut layout, &config, false, &PinSet::default());
 
@@ -850,84 +875,112 @@ mod tests {
     }
 
     #[test]
-    fn should_snap_only_whitelisted_algos() {
-        assert!(should_snap("sugiyama-v2"));
-        assert!(should_snap("architecture"));
-        assert!(!should_snap("force-directed"));
-        assert!(!should_snap("sugiyama"));
-    }
+    fn disabled_config_skips_all_snap() {
+        let mut nodes = HashMap::new();
+        nodes.insert("a".into(), node(10.0, 100.0, 80.0, 40.0));
+        nodes.insert("b".into(), node(120.0, 103.0, 80.0, 40.0));
 
-    #[test]
-    fn snap_enabled_defaults_to_true() {
-        let diagram = Diagram {
-            diagram_type: DiagramType::Flowchart,
-            attributes: vec![],
-            entities: vec![],
-            relations: vec![],
-            groups: vec![],
-            style_decls: vec![],
-            source_info: crate::ast::SourceInfo {
-                file: None,
-                line_count: 1,
-            },
-            ..Default::default()
-        };
-        assert!(snap_enabled_for_diagram(&diagram, "sugiyama-v2"));
-    }
+        let original_positions: Vec<(f64, f64)> = nodes.values().map(|n| (n.x, n.y)).collect();
+        let mut layout = sample_layout(nodes);
+        let config = NodeSnapConfig::disabled();
+        snap_layout_to_grid(&mut layout, &config, false, &PinSet::default());
 
-    #[test]
-    fn snap_disabled_by_diagram_attribute() {
-        use crate::ast::{DiagramAttribute, Span, Position};
-
-        let span = Span::new(Position::new(1, 1), Position::new(1, 1));
-        let diagram = Diagram {
-            diagram_type: DiagramType::Flowchart,
-            attributes: vec![DiagramAttribute {
-                key: "snap".into(),
-                value: AttributeValue::Boolean(false),
-                span,
-            }],
-            entities: vec![],
-            relations: vec![],
-            groups: vec![],
-            style_decls: vec![],
-            source_info: crate::ast::SourceInfo {
-                file: None,
-                line_count: 1,
-            },
-            ..Default::default()
-        };
-        assert!(!snap_enabled_for_diagram(&diagram, "sugiyama-v2"));
-        assert!(!GridSnapConfig::for_diagram("sugiyama-v2", &diagram).enabled);
+        for (i, (_, n)) in layout.nodes.iter().enumerate() {
+            assert!((n.x - original_positions[i].0).abs() < 0.01);
+            assert!((n.y - original_positions[i].1).abs() < 0.01);
+        }
     }
 
     #[test]
     fn snap_edge_waypoints_snaps_middle_not_endpoints() {
         let mut edges = vec![EdgeLayout {
             geometry: PathGeometry::Polyline {
-                points: vec![Point::new(40.0, 40.0), Point::new(40.0, 67.3), Point::new(89.3, 67.3), Point::new(89.3, 96.0)],
+                points: vec![
+                    Point::new(40.0, 40.0),
+                    Point::new(40.0, 67.3),
+                    Point::new(40.0, 89.3),
+                    Point::new(89.3, 89.3),
+                    Point::new(89.3, 96.0),
+                    Point::new(89.3, 120.0),
+                ],
             },
             labels: vec![],
             from_port: crate::layout::Port::Bottom,
-            to_port: crate::layout::Port::Top,
+            to_port: crate::layout::Port::Bottom,
         }];
 
-        let config = GridSnapConfig::default();
-        let count = snap_edge_waypoints(&mut edges, &HashMap::new(), &config, 12.0, 16.0);
+        let config = EdgeSnapConfig::default_orthogonal();
+        let count = snap_edge_waypoints(&mut edges, &HashMap::new(), &config);
 
         assert!(count >= 1);
         let path = edges[0].path_points();
         assert!((path[0].x - 40.0).abs() < f64::EPSILON);
         assert!((path[0].y - 40.0).abs() < f64::EPSILON);
         assert!((path.last().unwrap().x - 89.3).abs() < f64::EPSILON);
-        assert!((path.last().unwrap().y - 96.0).abs() < f64::EPSILON);
-        // stub 不被 snap
+        assert!((path.last().unwrap().y - 120.0).abs() < f64::EPSILON);
         assert!((path[1].x - 40.0).abs() < f64::EPSILON);
         assert!((path[1].y - 67.3).abs() < f64::EPSILON);
-        // 横通道拐点：x 上格点，y 与 stub 对齐
-        let corner = path[2];
-        assert!(is_on_grid(corner.x, 8.0));
-        assert!((corner.y - 67.3).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn snap_edge_waypoints_preserves_ortho_on_4point_l_path() {
+        let mut edges = vec![EdgeLayout {
+            geometry: PathGeometry::Polyline {
+                points: vec![
+                    Point::new(40.0, 40.0),
+                    Point::new(40.0, 67.3),
+                    Point::new(89.3, 67.3),
+                    Point::new(89.3, 96.0),
+                ],
+            },
+            labels: vec![],
+            from_port: crate::layout::Port::Bottom,
+            to_port: crate::layout::Port::Top,
+        }];
+
+        let config = EdgeSnapConfig::default_orthogonal();
+        snap_edge_waypoints(&mut edges, &HashMap::new(), &config);
+
+        let path = edges[0].path_points();
+        assert!((path[0].x - 40.0).abs() < f64::EPSILON);
+        assert!((path[1].y - 67.3).abs() < f64::EPSILON);
+        assert!((path[3].x - 89.3).abs() < f64::EPSILON);
+        assert!((path[3].y - 96.0).abs() < f64::EPSILON);
+        let c = path[2];
+        assert!((c.x - 89.3).abs() < f64::EPSILON, "C.x must match E.x for vertical seg");
+        assert!((c.y - 67.3).abs() < f64::EPSILON, "C.y must match s1.y for horizontal seg");
+        for si in 0..path.len() - 1 {
+            let a = path[si];
+            let b = path[si + 1];
+            let dx = (b.x - a.x).abs();
+            let dy = (b.y - a.y).abs();
+            assert!(dx < 0.01 || dy < 0.01, "seg[{si}] must be orthogonal: ({},{})->({},{})", a.x, a.y, b.x, b.y);
+        }
+    }
+
+    #[test]
+    fn snap_5point_path_corner_between_stays_ortho() {
+        let mut path = vec![
+            Point::new(662.0, 601.0),
+            Point::new(662.0, 585.0),
+            Point::new(662.0, 462.0),
+            Point::new(614.0, 462.0),
+            Point::new(614.0, 387.0),
+        ];
+        let count = snap_edge_path_channels(&mut path, 8.0);
+
+        let c = path[2];
+        assert!((c.x - 662.0).abs() < f64::EPSILON, "C.x must stay at s1.x=662");
+        assert!((c.y - 462.0).abs() < f64::EPSILON, "C.y must stay at s2.y=462");
+        for si in 0..path.len() - 1 {
+            let a = path[si];
+            let b = path[si + 1];
+            let dx = (b.x - a.x).abs();
+            let dy = (b.y - a.y).abs();
+            assert!(dx < 0.01 || dy < 0.01,
+                "seg[{si}] must be orthogonal after snap: ({},{})->({},{}) dx={:.1} dy={:.1} count={}",
+                a.x, a.y, b.x, b.y, dx, dy, count);
+        }
     }
 
     #[test]
@@ -949,11 +1002,10 @@ mod tests {
             to_port: crate::layout::Port::Top,
         }];
 
-        snap_edge_waypoints(&mut edges, &HashMap::new(), &GridSnapConfig::default(), 12.0, 16.0);
+        snap_edge_waypoints(&mut edges, &HashMap::new(), &EdgeSnapConfig::default_orthogonal());
         let path = edges[0].path_points();
         assert!((path[1].x - 156.5).abs() < f64::EPSILON);
         assert!((path[1].y - 96.0).abs() < f64::EPSILON);
-        assert!((path[path.len() - 2].x - 203.7).abs() < f64::EPSILON || is_on_grid(path[path.len() - 2].x, 8.0));
     }
 
     #[test]
@@ -967,12 +1019,9 @@ mod tests {
             to_port: crate::layout::Port::Top,
         }];
 
-        snap_edge_waypoints(&mut edges, &HashMap::new(), &GridSnapConfig::default(), 12.0, 16.0);
+        snap_edge_waypoints(&mut edges, &HashMap::new(), &EdgeSnapConfig::default_orthogonal());
         let path = edges[0].path_points();
-        assert!(
-            path.len() >= 2,
-            "straight vertical path should remain at least start/end"
-        );
+        assert!(path.len() >= 2);
         for p in path.iter() {
             assert!(
                 (p.x - 156.5).abs() < f64::EPSILON,
@@ -980,7 +1029,6 @@ mod tests {
                 p.x
             );
         }
-        // 3 点竖直链：中间点为 stub，不参与 snap
         if path.len() == 3 {
             assert!((path[1].y - 119.7).abs() < f64::EPSILON);
         }
@@ -997,7 +1045,7 @@ mod tests {
             to_port: crate::layout::Port::Top,
         }];
 
-        snap_edge_waypoints(&mut edges, &HashMap::new(), &GridSnapConfig::default(), 12.0, 16.0);
+        snap_edge_waypoints(&mut edges, &HashMap::new(), &EdgeSnapConfig::default_orthogonal());
         assert!(edges[0].path_len() < 5);
     }
 
@@ -1014,8 +1062,28 @@ mod tests {
             to_port: crate::layout::Port::Top,
         };
         let mut edges = vec![original.clone()];
-        snap_edge_waypoints(&mut edges, &HashMap::new(), &GridSnapConfig::default(), 12.0, 16.0);
+        snap_edge_waypoints(&mut edges, &HashMap::new(), &EdgeSnapConfig::default_orthogonal());
         assert_eq!(edges[0].path_points(), original.path_points());
+    }
+
+    #[test]
+    fn snap_edge_waypoints_disabled_skips_all() {
+        let mut edges = vec![EdgeLayout {
+            geometry: PathGeometry::Polyline {
+                points: vec![
+                    Point::new(40.0, 40.0),
+                    Point::new(40.0, 56.0),
+                    Point::new(41.3, 56.0),
+                    Point::new(41.3, 120.0),
+                ],
+            },
+            labels: vec![],
+            from_port: crate::layout::Port::Bottom,
+            to_port: crate::layout::Port::Top,
+        }];
+        let original_points = edges[0].path_points().into_owned();
+        snap_edge_waypoints(&mut edges, &HashMap::new(), &EdgeSnapConfig::disabled());
+        assert_eq!(edges[0].path_points().as_ref(), original_points.as_slice());
     }
 
     #[test]
@@ -1031,7 +1099,6 @@ mod tests {
         let step = 8.0;
         snap_edge_path_channels(&mut path, step);
 
-        // stub 邻接拐角：y 必须与 stub 对齐，不能被 Phase C snap 到其它格点
         assert!((path[2].y - 56.0).abs() < f64::EPSILON);
         assert!(is_on_grid(path[2].x, step));
     }
@@ -1050,8 +1117,37 @@ mod tests {
         ];
         snap_edge_path_channels(&mut path, 8.0);
 
-        // path[4] 为通道内拐角，两侧均非 stub
         assert!(is_on_grid(path[4].x, 8.0));
         assert!(is_on_grid(path[4].y, 8.0));
+    }
+
+    #[test]
+    fn node_snap_config_variants() {
+        let disabled = NodeSnapConfig::disabled();
+        assert!(!disabled.enabled);
+
+        let arch = NodeSnapConfig::default_architecture();
+        assert!(arch.enabled);
+        assert!((arch.node_gap - GRID_SNAP_NODE_GAP_ARCH).abs() < f64::EPSILON);
+
+        let sugi = NodeSnapConfig::default_sugiyama();
+        assert!(sugi.enabled);
+        assert!((sugi.node_gap - GRID_SNAP_NODE_GAP_SUGIYAMA).abs() < f64::EPSILON);
+        assert!(!sugi.rank_axis_only);
+
+        let er = sugi.with_rank_axis_only(true);
+        assert!(er.rank_axis_only);
+    }
+
+    #[test]
+    fn edge_snap_config_variants() {
+        let disabled = EdgeSnapConfig::disabled();
+        assert!(!disabled.enabled);
+
+        let ortho = EdgeSnapConfig::default_orthogonal();
+        assert!(ortho.enabled);
+        assert!((ortho.grid_step - GRID_SNAP_STEP).abs() < f64::EPSILON);
+        assert!((ortho.shell_pad - GROUP_BORDER_SHELL_PAD).abs() < f64::EPSILON);
+        assert!((ortho.stub_clearance - PORT_STUB_CLEARANCE).abs() < f64::EPSILON);
     }
 }

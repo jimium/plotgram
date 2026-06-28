@@ -24,7 +24,7 @@ use crate::kinds::er::semantics::entity_node_size;
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
 use crate::layout::node::common::group_bounds::{self, GroupPadding};
 use crate::layout::constants;
-use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeLayout};
+use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeLayout, NodeSnapConfig};
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::Direction;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -152,6 +152,10 @@ impl LayoutStrategy for SugiyamaLayout {
         }
 
         result
+    }
+
+    fn node_snap_config(&self) -> NodeSnapConfig {
+        NodeSnapConfig::default_sugiyama()
     }
 }
 

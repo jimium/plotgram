@@ -50,6 +50,10 @@ impl<'a> LayoutPipeline<'a> {
             )
         })?;
         let produces_edges = strategy.produces_edge_geometry();
+        let mut node_snap_config = strategy.node_snap_config();
+        if let Some(false) = grid_snap::diagram_snap_attribute(self.diagram) {
+            node_snap_config.enabled = false;
+        }
 
         let mut report = RefinementReport::default();
         let valid_topology = self.validate_topology_intents(&mut report);
@@ -68,7 +72,7 @@ impl<'a> LayoutPipeline<'a> {
             report.merge(geo_report);
         }
 
-        self.apply_node_frame(algo, &mut result, &pinned)?;
+        self.apply_node_frame(&node_snap_config, &mut result, &pinned)?;
 
         if produces_edges {
             postprocess::finalize_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
@@ -81,7 +85,7 @@ impl<'a> LayoutPipeline<'a> {
         }
 
         let t_routing = Instant::now();
-        let mut result = self.run_routing_pipeline(algo, result, &pinned, &mut report)?;
+        let mut result = self.run_routing_pipeline(algo, result, &pinned, &node_snap_config, &mut report)?;
         let routing_elapsed = t_routing.elapsed();
         crate::perf_log!("[perf] routing: {:.2}ms", routing_elapsed.as_secs_f64() * 1000.0);
 
@@ -158,11 +162,11 @@ impl<'a> LayoutPipeline<'a> {
 
     fn apply_node_frame(
         &self,
-        algo: &str,
+        node_snap_config: &grid_snap::NodeSnapConfig,
         result: &mut LayoutResult,
         pinned: &intent::PinSet,
     ) -> Result<(), DiagnosticError> {
-        if !grid_snap::should_snap(algo) {
+        if !node_snap_config.enabled {
             return Ok(());
         }
 
@@ -172,13 +176,10 @@ impl<'a> LayoutPipeline<'a> {
         }
 
         let horizontal = effective_dir == Some("left-to-right");
-        let snap_config = grid_snap::GridSnapConfig::for_diagram(algo, self.diagram);
-        if !snap_config.enabled {
-            return Ok(());
-        }
 
-        grid_snap::snap_layout_to_grid(result, &snap_config, horizontal, pinned);
-        let gf_pass = GroupFramePass::resolve(self.diagram, self.plan, algo);
+        grid_snap::snap_layout_to_grid(result, node_snap_config, horizontal, pinned);
+        let algo = self.plan.layout_algo.as_str();
+        let gf_pass = GroupFramePass::resolve(self.diagram, self.plan, algo, node_snap_config.enabled);
         gf_pass.apply_after_node_snap(self.diagram, result, pinned, algo);
         grid_snap::update_canvas_bounds(result, constants::DEFAULT_PADDING);
         Ok(())
@@ -189,6 +190,7 @@ impl<'a> LayoutPipeline<'a> {
         algo: &str,
         result: LayoutResult,
         pinned: &intent::PinSet,
+        node_snap_config: &grid_snap::NodeSnapConfig,
         report: &mut RefinementReport,
     ) -> Result<LayoutResult, DiagnosticError> {
         let t0 = Instant::now();
@@ -209,9 +211,13 @@ impl<'a> LayoutPipeline<'a> {
                 )
             },
         )?;
+        let mut edge_snap_config = router.edge_snap_config();
+        if let Some(false) = grid_snap::diagram_snap_attribute(self.diagram) {
+            edge_snap_config.enabled = false;
+        }
         let is_orthogonal = router.name() == "orthogonal";
 
-        let gf_pass = GroupFramePass::resolve(self.diagram, self.plan, algo);
+        let gf_pass = GroupFramePass::resolve(self.diagram, self.plan, algo, node_snap_config.enabled);
         if !self.diagram.groups.is_empty() {
             gf_pass.refresh_before_route(self.diagram, &mut result_v2, pinned, algo);
         }
@@ -229,8 +235,7 @@ impl<'a> LayoutPipeline<'a> {
         edge_postprocess::snap_and_repulse_edges(
             &mut result.edges,
             &result.groups,
-            algo,
-            self.diagram,
+            &edge_snap_config,
         );
 
         if let Some(ov) = self.overlay {
@@ -239,7 +244,7 @@ impl<'a> LayoutPipeline<'a> {
             }
         }
 
-        result = self.run_post_route_group_frame(algo, result, pinned, &gf_pass, &*router)?;
+        result = self.run_post_route_group_frame(algo, result, pinned, &gf_pass, &*router, &edge_snap_config)?;
 
         if is_orthogonal && self.plan.edge_bundling.enabled {
             result = self.apply_edge_bundling(result)?;
@@ -256,8 +261,9 @@ impl<'a> LayoutPipeline<'a> {
         pinned: &intent::PinSet,
         gf_pass: &GroupFramePass,
         router: &dyn EdgeRoutingStrategy,
+        edge_snap_config: &grid_snap::EdgeSnapConfig,
     ) -> Result<LayoutResult, DiagnosticError> {
-        if !grid_snap::should_snap(algo) || result.groups.is_empty() {
+        if !edge_snap_config.enabled || result.groups.is_empty() {
             return Ok(result);
         }
 
@@ -316,8 +322,7 @@ impl<'a> LayoutPipeline<'a> {
             edge_postprocess::snap_and_repulse_edges(
                 &mut result.edges,
                 &result.groups,
-                algo,
-                self.diagram,
+                edge_snap_config,
             );
 
             let lint_maps = lint::GroupInteriorMaps::new(self.diagram);
@@ -337,8 +342,7 @@ impl<'a> LayoutPipeline<'a> {
             edge_postprocess::snap_and_repulse_edges(
                 &mut result.edges,
                 &result.groups,
-                algo,
-                self.diagram,
+                edge_snap_config,
             );
         }
 

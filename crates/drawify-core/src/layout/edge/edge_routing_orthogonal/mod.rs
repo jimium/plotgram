@@ -12,7 +12,7 @@
 
 use crate::layout::algorithm_config::{AlgorithmOptionSpec, OptionKind};
 use crate::layout::geometry::Point;
-use crate::layout::{EdgeLayout, EdgeRoutingStrategy, LayoutResult, NodeLayout, PathGeometry, Port};
+use crate::layout::{EdgeLayout, EdgeRoutingStrategy, EdgeSnapConfig, LayoutResult, NodeLayout, PathGeometry, Port};
 use crate::layout::edge::common::edge_geometry::{
     arrow_type_tag, build_edge_labels, canonical_pair, edge_line_style_signature, node_center,
     parse_label_t, point_at_path_t, undirected_pair_key,
@@ -179,6 +179,10 @@ impl EdgeRoutingStrategy for OrthogonalRouting {
     /// orthogonal 输出 Polyline（折线路径），需要 refine 检测穿障并推开问题节点。
     fn supports_refine(&self) -> bool {
         true
+    }
+
+    fn edge_snap_config(&self) -> EdgeSnapConfig {
+        EdgeSnapConfig::default_orthogonal()
     }
 }
 
@@ -625,24 +629,12 @@ fn route_edges_orthogonal_inner(
     crate::perf_log!("[perf]     x1_reroute: {:.2}ms", t_x1.elapsed().as_secs_f64() * 1000.0);
 
     // ── 4e. X-2: Segment Nudging 轻推后处理 ──
-    let t_x2 = crate::layout::perf::Instant::now();
-    let nudge_stats = nudge::nudge_conflicting_segments(
-        &result.nodes,
-        &relations,
-        &from_side,
-        &to_side,
-        &mut edges,
-        &mut grid,
-        &cfg,
-        &group_ctx,
-        &obstacles,
-        &mut ortho_stats,
-    );
-    crate::perf_log!("[perf]     x2_nudge: {:.2}ms (nudged={}, failed={})",
-        t_x2.elapsed().as_secs_f64() * 1000.0,
-        nudge_stats.nudged_segments,
-        nudge_stats.nudge_failed,
-    );
+    // DISABLED: nudge 在长直段中间插入Z字形补偿弯，视觉上明显扭曲线条；
+    // 且新增拐点可能被后续边框排斥逻辑破坏正交性，产生斜线。
+    // X-1 多轮重路由已解决绝大多数重合问题；残余结构性拥堵留给 X-3 Lane Assignment。
+    ortho_stats.nudge_iterations = 0;
+    ortho_stats.nudged_segments = 0;
+    ortho_stats.nudge_failed = 0;
 
     // ── 4c. X-0: 统计边间距违规（排除 stub 段） ──
     let (exact_overlap_pairs, tight_spacing_pairs) =
