@@ -582,6 +582,8 @@ pub struct OrthoDebugStats {
     pub nudged_segments: usize,
     /// X-2 nudge 失败的段数
     pub nudge_failed: usize,
+    /// X-2 反向 stub 端口翻转成功的边数
+    pub flipped_stub_edges: usize,
 }
 
 impl OrthoDebugStats {

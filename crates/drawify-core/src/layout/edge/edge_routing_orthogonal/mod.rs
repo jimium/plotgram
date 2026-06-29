@@ -479,6 +479,19 @@ fn route_edges_orthogonal_inner(
         }
     }
 
+    // ── 2b. 直连偏好对齐：正对端口边的 slot 锚点对齐修正 ──
+    //
+    // 问题场景：两个垂直/水平排列的节点，端口选择为正对(Bottom→Top/Left→Right)，
+    // 但因两端同侧边数不同导致 slot frac 不对称，锚点不对齐，产生不必要的小弯折。
+    // 例如：db_master(bottom有1条出边) → db_replica(top有2条入边)，
+    // master端锚点居中，replica端锚点偏左/偏右，路径走Z字而非直线。
+    //
+    // 修正策略（移至 4c replan_slots 之后执行）：对正对端口且节点投影有重叠的边，
+    // 将「自由度较高」端（该侧同方向仅1条边的Single端点）的锚点切线坐标调整为与另一端对齐，
+    // 形成直线路径。两端都有多个边时若节点中心线高度对齐（<16px），也强制对齐。
+    let t_align = crate::layout::perf::Instant::now();
+    crate::perf_log!("[perf]     step2b_straighten: {:.2}ms (moved to 4c)", t_align.elapsed().as_secs_f64() * 1000.0);
+
     // ── 3. 分层批量边序（有 rank 时低层先占通道，层内按连接度） ──
     let t2 = crate::layout::perf::Instant::now();
     let node_degree = layer_order::compute_node_degrees(relations);
@@ -611,6 +624,64 @@ fn route_edges_orthogonal_inner(
         &mut ortho_stats,
     );
 
+    // ── 4c. 直连偏好对齐：正对端口边的 slot 锚点对齐修正 ──
+    // 在 replan_slots 之后执行，确保anchor位置是最终的slot排序结果。
+    // 修改anchor后需要重路由受影响的边，因此放在 X-1 reroute 之前。
+    let t_align2 = crate::layout::perf::Instant::now();
+    let old_endpoints: HashMap<(usize, bool), Endpoint> = endpoint_map.clone();
+    straighten_preferred_alignments(&result.nodes, n, &from_side, &to_side, &mut endpoint_map);
+
+    // 找出anchor被修改的边，需要重路由
+    let mut align_reroute: Vec<usize> = Vec::new();
+    for i in 0..n {
+        for &is_from in &[true, false] {
+            let old_ep = old_endpoints.get(&(i, is_from));
+            let new_ep = endpoint_map.get(&(i, is_from));
+            if let (Some(o), Some(ne)) = (old_ep, new_ep) {
+                if (o.anchor.x - ne.anchor.x).abs() > EPS || (o.anchor.y - ne.anchor.y).abs() > EPS {
+                    align_reroute.push(i);
+                    break;
+                }
+            }
+        }
+    }
+    if !align_reroute.is_empty() {
+        grid.remove_by_edges(&align_reroute);
+        for &ei in &align_reroute {
+            let Some(from_ep) = endpoint_map.get(&(ei, true)) else { continue };
+            let Some(to_ep) = endpoint_map.get(&(ei, false)) else { continue };
+            let pair = EndpointPair { from: from_ep.clone(), to: to_ep.clone() };
+            let ctx = RoutingContext { nodes: &result.nodes, group_ctx: &group_ctx, grid: &grid, cfg: &cfg, obstacles: &obstacles };
+            let mut path_stats = PathSelectStats::default();
+            let candidate = select_best_path_with_scorer_stats(
+                &ctx,
+                &pair,
+                &DefaultScorer,
+                Some(&mut path_stats),
+                false,
+            );
+            if candidate.len() >= 2 {
+                grid.insert_path(&candidate, ei);
+                let labels = match relations.get(ei) {
+                    Some(rel) => {
+                        let middle_t = parse_label_t(rel);
+                        build_edge_labels(rel, middle_t, Point::new(0.0, 0.0), |t| point_at_path_t(&candidate, t))
+                    }
+                    None => Vec::new(),
+                };
+                let mut edge = EdgeLayout {
+                    geometry: PathGeometry::Polyline { points: Vec::new() },
+                    labels,
+                    from_port: from_side[ei],
+                    to_port: to_side[ei],
+                };
+                edge.set_polyline_points(candidate);
+                edges[ei] = edge;
+            }
+        }
+    }
+    crate::perf_log!("[perf]     4c_straighten_align: {:.2}ms (aligned {} edges)", t_align2.elapsed().as_secs_f64() * 1000.0, align_reroute.len());
+
     // ── 4d. X-1: 多轮冲突消解重路由 ──
     let t_x1 = crate::layout::perf::Instant::now();
     reroute_conflicting_edges(
@@ -628,7 +699,31 @@ fn route_edges_orthogonal_inner(
     );
     crate::perf_log!("[perf]     x1_reroute: {:.2}ms", t_x1.elapsed().as_secs_f64() * 1000.0);
 
-    // ── 4e. X-2: Segment Nudging 轻推后处理 ──
+    // ── 4e. X-2: 反向 stub 检测与端口翻转 ──
+    //
+    // 问题场景：由于分组障碍物/走廊限制，choose_pair_sides 基于几何中心选择的端口
+    // 在实际路由时被证明是"反向"的——路径从端口出发后不得不沿反方向折返穿过节点
+    // 投影平面才能到达目标，导致箭头方向与主路径方向冲突（视觉上"搞笑箭头"）。
+    //
+    // 修正策略：路由完成后检测路径上的反向stub端点，将其端口翻转到对面（Bottom↔Top,
+    // Left↔Right），重新计算anchor并重路由。若新路径无反向stub且质量可接受，则接受。
+    let t_flip = crate::layout::perf::Instant::now();
+    fix_reverse_stub_ports(
+        &result.nodes,
+        &relations,
+        &mut from_side,
+        &mut to_side,
+        &mut endpoint_map,
+        &mut edges,
+        &mut grid,
+        &cfg,
+        &group_ctx,
+        &obstacles,
+        &mut ortho_stats,
+    );
+    crate::perf_log!("[perf]     x2_flip_stub: {:.2}ms (flipped {} edges)", t_flip.elapsed().as_secs_f64() * 1000.0, ortho_stats.flipped_stub_edges);
+
+    // ── 4f. Segment Nudging 轻推后处理 ──
     // DISABLED: nudge 在长直段中间插入Z字形补偿弯，视觉上明显扭曲线条；
     // 且新增拐点可能被后续边框排斥逻辑破坏正交性，产生斜线。
     // X-1 多轮重路由已解决绝大多数重合问题；残余结构性拥堵留给 X-3 Lane Assignment。
@@ -1428,6 +1523,527 @@ fn side_acceptable(from: &NodeLayout, to: &NodeLayout, side: Port) -> bool {
 
 fn range_overlap_local(a_min: f64, a_max: f64, b_min: f64, b_max: f64) -> f64 {
     (a_max.min(b_max) - a_min.max(b_min)).max(0.0)
+}
+
+// ═══════════════════════════════════════════════════════════
+//  方案A：直连偏好对齐（Step 2b）
+// ═══════════════════════════════════════════════════════════
+
+/// 判断两端口是否为正对端口对（可直线连接）。
+/// 正对：Bottom-Top, Top-Bottom, Left-Right, Right-Left。
+fn is_opposite_port_pair(from: Port, to: Port) -> bool {
+    matches!(
+        (from, to),
+        (Port::Bottom, Port::Top)
+            | (Port::Top, Port::Bottom)
+            | (Port::Left, Port::Right)
+            | (Port::Right, Port::Left)
+    )
+}
+
+/// 直连偏好对齐：修正正对端口边因 slot 不对称导致的锚点错位。
+///
+/// 核心逻辑：
+/// 1. 统计每个 (node_id, side, is_from) 上的端点数，识别 Single 端点（自由度最高）。
+/// 2. 遍历所有边，检测正对端口对且节点在切线方向有投影重叠的边。
+/// 3. 若一端是 Single（该侧该方向只有这一条边），调整其锚点切线坐标与另一端对齐。
+/// 4. 若两端都是 Single，取两端节点中心连线的位置作为对齐坐标。
+fn straighten_preferred_alignments(
+    nodes: &HashMap<String, NodeLayout>,
+    n: usize,
+    from_side: &[Port],
+    to_side: &[Port],
+    endpoint_map: &mut HashMap<(usize, bool), Endpoint>,
+) {
+    use std::collections::HashMap;
+
+    // 统计每个 (node_id, side, is_from) 上的端点数
+    let mut side_dir_count: HashMap<(String, Port, bool), usize> = HashMap::new();
+    for i in 0..n {
+        if let Some(ep) = endpoint_map.get(&(i, true)) {
+            *side_dir_count.entry((ep.node_id.clone(), ep.side, true)).or_insert(0) += 1;
+        }
+        if let Some(ep) = endpoint_map.get(&(i, false)) {
+            *side_dir_count.entry((ep.node_id.clone(), ep.side, false)).or_insert(0) += 1;
+        }
+    }
+
+    // 收集需要对齐的边及其目标切线坐标
+    // 使用 Vec 收集后一次性应用，避免迭代过程中借用冲突
+    let mut alignments: Vec<(usize, bool, f64)> = Vec::new(); // (edge_index, is_from, target_tangent)
+
+    for i in 0..n {
+        let fs = from_side[i];
+        let ts = to_side[i];
+
+        if !is_opposite_port_pair(fs, ts) {
+            continue;
+        }
+
+        let Some(from_ep) = endpoint_map.get(&(i, true)) else { continue };
+        let Some(to_ep) = endpoint_map.get(&(i, false)) else { continue };
+
+        let Some(from_nl) = nodes.get(&from_ep.node_id) else { continue };
+        let Some(to_nl) = nodes.get(&to_ep.node_id) else { continue };
+
+        let vertical = is_vertical_port(fs); // Top/Bottom 端口 → 垂直连接，需对齐 x
+
+        // 检查节点在切线方向上的投影重叠（垂直连接看 x 范围，水平连接看 y 范围）
+        let overlap = if vertical {
+            let fx1 = from_nl.x;
+            let fx2 = from_nl.x + from_nl.width;
+            let tx1 = to_nl.x;
+            let tx2 = to_nl.x + to_nl.width;
+            // 投影有重叠或非常接近（间隙 < 16px）即认为可直连
+            let overlap_amt = range_overlap_local(fx1, fx2, tx1, tx2);
+            let gap = if fx2 < tx1 {
+                tx1 - fx2
+            } else if tx2 < fx1 {
+                fx1 - tx2
+            } else {
+                0.0
+            };
+            overlap_amt > EPS || gap < 16.0
+        } else {
+            let fy1 = from_nl.y;
+            let fy2 = from_nl.y + from_nl.height;
+            let ty1 = to_nl.y;
+            let ty2 = to_nl.y + to_nl.height;
+            let overlap_amt = range_overlap_local(fy1, fy2, ty1, ty2);
+            let gap = if fy2 < ty1 {
+                ty1 - fy2
+            } else if ty2 < fy1 {
+                fy1 - ty2
+            } else {
+                0.0
+            };
+            overlap_amt > EPS || gap < 16.0
+        };
+
+        if !overlap {
+            continue;
+        }
+
+        let from_count = side_dir_count.get(&(from_ep.node_id.clone(), fs, true)).copied().unwrap_or(0);
+        let to_count = side_dir_count.get(&(to_ep.node_id.clone(), ts, false)).copied().unwrap_or(0);
+
+        let from_single = from_count == 1;
+        let to_single = to_count == 1;
+
+        let from_tangent = if vertical { from_ep.anchor.x } else { from_ep.anchor.y };
+        let to_tangent = if vertical { to_ep.anchor.x } else { to_ep.anchor.y };
+
+        let tangent_diff = (from_tangent - to_tangent).abs();
+
+        // 已经对齐（差值 < 1px），无需调整
+        if tangent_diff < 1.0 {
+            continue;
+        }
+
+        match (from_single, to_single) {
+            (true, true) => {
+                // 两端都是 Single：取两端节点中心连线位置作为对齐坐标，最自然
+                let target = if vertical {
+                    let fc = from_nl.x + from_nl.width / 2.0;
+                    let tc = to_nl.x + to_nl.width / 2.0;
+                    // 取中点更自然，但若两端中心距离大则偏向中间位置
+                    (fc + tc) / 2.0
+                } else {
+                    let fc = from_nl.y + from_nl.height / 2.0;
+                    let tc = to_nl.y + to_nl.height / 2.0;
+                    (fc + tc) / 2.0
+                };
+                // 限制目标在节点边的有效范围内
+                let target_clamped = if vertical {
+                    let margin = from_nl.width * SLOT_MARGIN_RATIO;
+                    target.clamp(from_nl.x + margin, from_nl.x + from_nl.width - margin)
+                } else {
+                    let margin = from_nl.height * SLOT_MARGIN_RATIO;
+                    target.clamp(from_nl.y + margin, from_nl.y + from_nl.height - margin)
+                };
+                alignments.push((i, true, target_clamped));
+                // to 端需要单独 clamp
+                let target_clamped_to = if vertical {
+                    let margin = to_nl.width * SLOT_MARGIN_RATIO;
+                    target.clamp(to_nl.x + margin, to_nl.x + to_nl.width - margin)
+                } else {
+                    let margin = to_nl.height * SLOT_MARGIN_RATIO;
+                    target.clamp(to_nl.y + margin, to_nl.y + to_nl.height - margin)
+                };
+                alignments.push((i, false, target_clamped_to));
+            }
+            (true, false) => {
+                // from 端是 Single，to 端有多个边：将 from 端对齐到 to 端
+                let target = to_tangent;
+                let target_clamped = if vertical {
+                    let margin = from_nl.width * SLOT_MARGIN_RATIO;
+                    target.clamp(from_nl.x + margin, from_nl.x + from_nl.width - margin)
+                } else {
+                    let margin = from_nl.height * SLOT_MARGIN_RATIO;
+                    target.clamp(from_nl.y + margin, from_nl.y + from_nl.height - margin)
+                };
+                alignments.push((i, true, target_clamped));
+            }
+            (false, true) => {
+                // to 端是 Single，from 端有多个边：将 to 端对齐到 from 端
+                let target = from_tangent;
+                let target_clamped = if vertical {
+                    let margin = to_nl.width * SLOT_MARGIN_RATIO;
+                    target.clamp(to_nl.x + margin, to_nl.x + to_nl.width - margin)
+                } else {
+                    let margin = to_nl.height * SLOT_MARGIN_RATIO;
+                    target.clamp(to_nl.y + margin, to_nl.y + to_nl.height - margin)
+                };
+                alignments.push((i, false, target_clamped));
+            }
+            (false, false) => {
+                // 两端都有多个边：仅当两端节点的中心线高度对齐时（差值<16px）才强制对齐
+                // 这种情况通常是垂直堆叠或水平排列的同级节点，直线连接视觉效果最佳
+                let center_aligned = if vertical {
+                    let fc = from_nl.x + from_nl.width / 2.0;
+                    let tc = to_nl.x + to_nl.width / 2.0;
+                    (fc - tc).abs() < 16.0
+                } else {
+                    let fc = from_nl.y + from_nl.height / 2.0;
+                    let tc = to_nl.y + to_nl.height / 2.0;
+                    (fc - tc).abs() < 16.0
+                };
+
+                if center_aligned {
+                    let target = if vertical {
+                        let fc = from_nl.x + from_nl.width / 2.0;
+                        let tc = to_nl.x + to_nl.width / 2.0;
+                        (fc + tc) / 2.0
+                    } else {
+                        let fc = from_nl.y + from_nl.height / 2.0;
+                        let tc = to_nl.y + to_nl.height / 2.0;
+                        (fc + tc) / 2.0
+                    };
+                    let target_clamped_from = if vertical {
+                        let margin = from_nl.width * SLOT_MARGIN_RATIO;
+                        target.clamp(from_nl.x + margin, from_nl.x + from_nl.width - margin)
+                    } else {
+                        let margin = from_nl.height * SLOT_MARGIN_RATIO;
+                        target.clamp(from_nl.y + margin, from_nl.y + from_nl.height - margin)
+                    };
+                    let target_clamped_to = if vertical {
+                        let margin = to_nl.width * SLOT_MARGIN_RATIO;
+                        target.clamp(to_nl.x + margin, to_nl.x + to_nl.width - margin)
+                    } else {
+                        let margin = to_nl.height * SLOT_MARGIN_RATIO;
+                        target.clamp(to_nl.y + margin, to_nl.y + to_nl.height - margin)
+                    };
+                    alignments.push((i, true, target_clamped_from));
+                    alignments.push((i, false, target_clamped_to));
+                }
+            }
+        }
+    }
+
+    // 应用对齐调整
+    for (ei, is_from, target_tangent) in alignments {
+        if let Some(ep) = endpoint_map.get_mut(&(ei, is_from)) {
+            let vertical = is_vertical_port(ep.side);
+            if vertical {
+                ep.anchor.x = target_tangent;
+            } else {
+                ep.anchor.y = target_tangent;
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  方案B：反向 stub 检测与端口翻转（Step 4e）
+// ═══════════════════════════════════════════════════════════
+
+/// 反向stub判定阈值：stub段在反方向延伸超过此距离（像素）即判定为反向stub。
+/// 该值需大于 PORT_CLEARANCE(16px)，避免将正常stub段误判。
+const REVERSE_STUB_THRESHOLD: f64 = 24.0;
+
+/// 返回端口的对面端口
+fn opposite_port(p: Port) -> Port {
+    match p {
+        Port::Top => Port::Bottom,
+        Port::Bottom => Port::Top,
+        Port::Left => Port::Right,
+        Port::Right => Port::Left,
+    }
+}
+
+/// 检测单个端点是否存在反向stub。
+///
+/// 反向stub的两种情况：
+/// 1. **stub方向反了**：路径离开锚点后直接沿反方向走（max_forward < PORT_CLEARANCE
+///    且 max_reverse > REVERSE_STUB_THRESHOLD）。
+/// 2. **U型折返**：路径虽然在最后一小段（stub段，PORT_CLEARANCE长度内）方向正确，
+///    但走出stub后几乎立即掉头（沿垂直轴移动不超过CHANNEL_SPACING后就沿反方向走很远），
+///    说明路径为了接入错误端口而做了不必要的U型转弯。
+fn has_reverse_stub(points: &[Point], anchor_idx: usize, side: Port) -> bool {
+    if points.len() < 3 {
+        return false;
+    }
+    let anchor = points[anchor_idx];
+    let (out_dx, out_dy) = port_outward(side);
+
+    // 情况1：直接反向（stub段本身方向反了）
+    let mut max_forward = 0.0f64;
+    let mut max_reverse = 0.0f64;
+    for p in points {
+        let dx = p.x - anchor.x;
+        let dy = p.y - anchor.y;
+        let forward_proj = dx * out_dx + dy * out_dy;
+        if forward_proj > max_forward {
+            max_forward = forward_proj;
+        }
+        if -forward_proj > max_reverse {
+            max_reverse = -forward_proj;
+        }
+    }
+    if max_forward < 16.0 && max_reverse > REVERSE_STUB_THRESHOLD {
+        return true;
+    }
+
+    // 情况2：U型折返检测
+    // 沿路径从anchor出发向主体方向遍历，跟踪走出stub后的方向变化。
+    // 如果走出stub（fp>=16）后，在垂直于outward方向移动不超过 CHANNEL_SPACING*2
+    // 的距离内，fp降到 -REVERSE_STUB_THRESHOLD 以下，说明是U型折返。
+    let is_start = anchor_idx == 0;
+    let traversal: Vec<Point> = if is_start {
+        points.to_vec()
+    } else {
+        points.iter().rev().copied().collect()
+    };
+
+    // outward轴的垂直轴
+    let (perp_dx, perp_dy) = (-out_dy, out_dx);
+
+    let mut left_stub = false;
+    let mut perp_at_stub_exit = 0.0f64;
+    let mut max_perp_after_stub = 0.0f64;
+    const CHANNEL_SPACING: f64 = 48.0;
+    const U_TURN_PERP_LIMIT: f64 = CHANNEL_SPACING * 2.0;
+
+    for p in &traversal {
+        let dx = p.x - anchor.x;
+        let dy = p.y - anchor.y;
+        let fp = dx * out_dx + dy * out_dy;
+        let pp = dx * perp_dx + dy * perp_dy;
+
+        if !left_stub {
+            if fp >= 16.0 {
+                left_stub = true;
+                perp_at_stub_exit = pp;
+            }
+        } else {
+            let perp_since_exit = (pp - perp_at_stub_exit).abs();
+            if perp_since_exit > max_perp_after_stub {
+                max_perp_after_stub = perp_since_exit;
+            }
+            // 如果垂直轴移动距离还很小，但fp已经变负很多，说明U型折返
+            if perp_since_exit < U_TURN_PERP_LIMIT && fp < -(REVERSE_STUB_THRESHOLD) {
+                return true;
+            }
+            // 如果垂直轴已经移动很远了，说明是正常绕路，不再检查
+            if max_perp_after_stub > U_TURN_PERP_LIMIT * 2.0 {
+                break;
+            }
+        }
+    }
+
+    false
+}
+
+/// 反向 stub 检测与端口翻转。
+///
+/// 流程：
+/// 1. 遍历所有边，检测两端是否存在反向stub
+/// 2. 对存在反向stub的边，尝试翻转两端端口到对面（Bottom↔Top, Left↔Right）
+/// 3. 在新端口侧重新计算anchor（中心位置），临时重路由
+/// 4. 验证新路径：无反向stub + 不穿障 + 长度不过分增加
+/// 5. 验证通过则接受翻转，否则回退
+fn fix_reverse_stub_ports(
+    nodes: &HashMap<String, NodeLayout>,
+    relations: &[crate::ast::Relation],
+    from_side: &mut [Port],
+    to_side: &mut [Port],
+    endpoint_map: &mut HashMap<(usize, bool), Endpoint>,
+    edges: &mut Vec<EdgeLayout>,
+    grid: &mut SegmentGrid,
+    cfg: &OrthoConfig,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    obstacles: &PreparedObstacles,
+    ortho_stats: &mut crate::layout::OrthoDebugStats,
+) {
+    let n = edges.len();
+    if n == 0 {
+        return;
+    }
+
+    let mut flipped_count = 0usize;
+
+    // 先收集所有需要翻转的边，避免边遍历边修改
+    let mut edges_to_check: Vec<usize> = Vec::new();
+    for ei in 0..n {
+        if edges[ei].path_is_empty() {
+            continue;
+        }
+        let points: Vec<Point> = edges[ei].path_points().into_owned();
+        let from_rev = has_reverse_stub(&points, 0, from_side[ei]);
+        let to_rev = has_reverse_stub(&points, points.len() - 1, to_side[ei]);
+        if from_rev || to_rev {
+            edges_to_check.push(ei);
+        }
+    }
+
+    for ei in edges_to_check {
+        let old_from = from_side[ei];
+        let old_to = to_side[ei];
+
+        let Some(old_from_ep) = endpoint_map.get(&(ei, true)) else { continue };
+        let Some(old_to_ep) = endpoint_map.get(&(ei, false)) else { continue };
+        let Some(from_nl) = nodes.get(&old_from_ep.node_id) else { continue };
+        let Some(to_nl) = nodes.get(&old_to_ep.node_id) else { continue };
+
+        let old_points: Vec<Point> = edges[ei].path_points().into_owned();
+        let old_path_len = path_length(&old_points);
+
+        // 生成需要尝试的翻转组合：总是尝试所有三种组合（单端+双端），
+        // 因为翻转一端可能改变路径走向导致另一端也出现反向stub。
+        #[derive(Copy, Clone, Debug)]
+        enum Flip { From, To, Both }
+        let attempts: Vec<Flip> = vec![Flip::Both, Flip::From, Flip::To];
+
+        let mut best: Option<(Port, Port, Endpoint, Endpoint, Vec<Point>, f64)> = None;
+        // best: (new_from, new_to, new_from_ep, new_to_ep, candidate_path, path_len)
+
+        let r_cfg = OrthoConfig {
+            channel_margin: cfg.channel_margin + 10.0,
+            ..*cfg
+        };
+
+        // 从grid中移除旧路径（为所有尝试做准备）
+        grid.remove_by_edges(&[ei]);
+
+        for flip in &attempts {
+            let (new_from, new_to) = match flip {
+                Flip::From => (opposite_port(old_from), old_to),
+                Flip::To => (old_from, opposite_port(old_to)),
+                Flip::Both => (opposite_port(old_from), opposite_port(old_to)),
+            };
+
+            // 构建新endpoint
+            let (nf_anchor, nt_anchor) = match flip {
+                Flip::From => (slot_anchor(from_nl, new_from, 0.5), old_to_ep.anchor),
+                Flip::To => (old_from_ep.anchor, slot_anchor(to_nl, new_to, 0.5)),
+                Flip::Both => (slot_anchor(from_nl, new_from, 0.5), slot_anchor(to_nl, new_to, 0.5)),
+            };
+
+            let nf_ep = Endpoint {
+                edge_index: ei,
+                is_from: true,
+                target_x: old_from_ep.target_x,
+                target_y: old_from_ep.target_y,
+                lane: old_from_ep.lane,
+                node_id: old_from_ep.node_id.clone(),
+                side: new_from,
+                anchor: nf_anchor,
+            };
+            let nt_ep = Endpoint {
+                edge_index: ei,
+                is_from: false,
+                target_x: old_to_ep.target_x,
+                target_y: old_to_ep.target_y,
+                lane: old_to_ep.lane,
+                node_id: old_to_ep.node_id.clone(),
+                side: new_to,
+                anchor: nt_anchor,
+            };
+
+            let pair = EndpointPair { from: nf_ep.clone(), to: nt_ep.clone() };
+            let ctx = RoutingContext { nodes, group_ctx, grid, cfg: &r_cfg, obstacles };
+
+            let mut path_stats = PathSelectStats::default();
+            let candidate = select_best_path_with_scorer_stats(
+                &ctx,
+                &pair,
+                &DefaultScorer,
+                Some(&mut path_stats),
+                false,
+            );
+            ortho_stats.total_candidates += path_stats.candidate_count;
+            ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
+            if path_stats.degraded {
+                ortho_stats.degraded_count += 1;
+            }
+
+            if candidate.len() >= 2 {
+                let clean = path_is_clean(
+                    &candidate,
+                    pair.from_id(),
+                    pair.to_id(),
+                    nodes,
+                    group_ctx,
+                    &obstacles.sorted_node_ids,
+                ) && path_avoids_group_interiors(
+                    &candidate,
+                    pair.from_id(),
+                    pair.to_id(),
+                    group_ctx,
+                    &obstacles.sorted_group_ids,
+                );
+                let new_from_rev = has_reverse_stub(&candidate, 0, new_from);
+                let new_to_rev = has_reverse_stub(&candidate, candidate.len() - 1, new_to);
+                let no_reverse = !new_from_rev && !new_to_rev;
+                let new_len = path_length(&candidate);
+                let len_ok = new_len <= old_path_len * 2.0 + 120.0;
+
+                if clean && no_reverse && len_ok {
+                    let better = match &best {
+                        None => true,
+                        Some((_, _, _, _, _, best_len)) => new_len < *best_len,
+                    };
+                    if better {
+                        best = Some((new_from, new_to, nf_ep, nt_ep, candidate, new_len));
+                    }
+                }
+            }
+        }
+
+        match best {
+            Some((new_from, new_to, nf_ep, nt_ep, candidate, _)) => {
+                from_side[ei] = new_from;
+                to_side[ei] = new_to;
+                endpoint_map.insert((ei, true), nf_ep);
+                endpoint_map.insert((ei, false), nt_ep);
+
+                let labels = match relations.get(ei) {
+                    Some(rel) => {
+                        let middle_t = parse_label_t(rel);
+                        build_edge_labels(rel, middle_t, Point::new(0.0, 0.0), |t| {
+                            point_at_path_t(&candidate, t)
+                        })
+                    }
+                    None => Vec::new(),
+                };
+                grid.insert_path(&candidate, ei);
+                let mut edge = EdgeLayout {
+                    geometry: PathGeometry::Polyline { points: Vec::new() },
+                    labels,
+                    from_port: new_from,
+                    to_port: new_to,
+                };
+                edge.set_polyline_points(candidate);
+                edges[ei] = edge;
+                flipped_count += 1;
+            }
+            None => {
+                grid.insert_path(&old_points, ei);
+            }
+        }
+    }
+
+    ortho_stats.flipped_stub_edges = flipped_count;
 }
 
 // ═══════════════════════════════════════════════════════════
