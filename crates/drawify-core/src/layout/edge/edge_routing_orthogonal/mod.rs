@@ -1854,14 +1854,101 @@ fn has_reverse_stub(points: &[Point], anchor_idx: usize, side: Port) -> bool {
     false
 }
 
-/// 反向 stub 检测与端口翻转。
+/// 侧向接入检测：路径拐90度L弯才进入/离开端口，沿平行于边的方向走了较长距离。
 ///
-/// 流程：
-/// 1. 遍历所有边，检测两端是否存在反向stub
-/// 2. 对存在反向stub的边，尝试翻转两端端口到对面（Bottom↔Top, Left↔Right）
-/// 3. 在新端口侧重新计算anchor（中心位置），临时重路由
-/// 4. 验证新路径：无反向stub + 不穿障 + 长度不过分增加
-/// 5. 验证通过则接受翻转，否则回退
+/// 检测方式：从锚点沿路径前进，跳过所有沿outward轴向的连续段（标准stub 16px + 可能的扩展stub），
+/// 找到第一个方向改变的拐点，然后检查拐点相邻段的主要方向是否为perp（平行于边）。
+///
+/// 这能正确处理fallback路径中使用的扩展stub（2.5x/4x/6x PORT_CLEARANCE）。
+fn detect_side_approach(points: &[Point], anchor_idx: usize, side: Port) -> Option<Port> {
+    if points.len() < 4 {
+        return None;
+    }
+
+    let (out_dx, out_dy) = port_outward(side);
+    let (perp_dx, perp_dy) = (-out_dy, out_dx);
+
+    const SIDE_JOG_THRESHOLD: f64 = 48.0;
+
+    let (corner, far) = if anchor_idx == 0 {
+        // From端点：从p[0]（锚点）向前走，找到第一个不沿outward方向的拐点
+        let mut corner_idx = 1usize;
+        while corner_idx + 1 < points.len() {
+            let a = points[corner_idx];
+            let b = points[corner_idx + 1];
+            let seg_dx = b.x - a.x;
+            let seg_dy = b.y - a.y;
+            let seg_fwd = seg_dx * out_dx + seg_dy * out_dy;
+            let seg_perp = seg_dx * perp_dx + seg_dy * perp_dy;
+            if seg_fwd > seg_perp.abs() && seg_fwd > 0.0 {
+                corner_idx += 1;
+            } else {
+                break;
+            }
+        }
+        if corner_idx + 1 >= points.len() {
+            return None;
+        }
+        (points[corner_idx], points[corner_idx + 1])
+    } else {
+        // To端点：从p[last]（锚点）往回走，找到第一个不沿outward轴向的拐点
+        let len = points.len();
+        let mut corner_idx = len - 2;
+        while corner_idx > 0 {
+            let a = points[corner_idx - 1];
+            let b = points[corner_idx];
+            let seg_dx = b.x - a.x;
+            let seg_dy = b.y - a.y;
+            let seg_fwd = seg_dx * out_dx + seg_dy * out_dy;
+            let seg_perp = seg_dx * perp_dx + seg_dy * perp_dy;
+            if seg_fwd.abs() > seg_perp.abs() {
+                corner_idx -= 1;
+            } else {
+                break;
+            }
+        }
+        if corner_idx == 0 {
+            return None;
+        }
+        (points[corner_idx], points[corner_idx - 1])
+    };
+
+    let seg_dx = far.x - corner.x;
+    let seg_dy = far.y - corner.y;
+    let seg_len = (seg_dx * seg_dx + seg_dy * seg_dy).sqrt();
+    if seg_len < EPS {
+        return None;
+    }
+
+    let seg_fwd = seg_dx * out_dx + seg_dy * out_dy;
+    let seg_perp = seg_dx * perp_dx + seg_dy * perp_dy;
+
+    if seg_perp.abs() > seg_fwd.abs() && seg_perp.abs() > SIDE_JOG_THRESHOLD {
+        let suggested = match side {
+            Port::Top | Port::Bottom => {
+                if far.x > corner.x { Port::Right } else { Port::Left }
+            }
+            Port::Left | Port::Right => {
+                if far.y > corner.y { Port::Bottom } else { Port::Top }
+            }
+        };
+        return Some(suggested);
+    }
+
+    None
+}
+
+/// 反向 stub 与侧向接入检测、端口修正。
+///
+/// 问题场景：
+/// 1. 反向stub：路径离开/进入端口后沿反方向折返（U型折返或直接反向）
+/// 2. 侧向接入：路径拐90度L弯才进入端口（如从右侧来却进入Bottom端口），
+///    这通常因走廊/障碍物导致实际来向与几何方向不一致。
+///
+/// 修正策略：
+/// - 反向stub → 尝试翻转到对面端口（Bottom↔Top, Left↔Right）
+/// - 侧向接入 → 尝试旋转到相邻端口（如Bottom→Right）
+/// - 对每条有问题的边尝试多种端口组合，选最短且干净的路径
 fn fix_reverse_stub_ports(
     nodes: &HashMap<String, NodeLayout>,
     relations: &[crate::ast::Relation],
@@ -1882,8 +1969,15 @@ fn fix_reverse_stub_ports(
 
     let mut flipped_count = 0usize;
 
-    // 先收集所有需要翻转的边，避免边遍历边修改
-    let mut edges_to_check: Vec<usize> = Vec::new();
+    #[derive(Copy, Clone, Debug)]
+    enum PortFix {
+        None,
+        Flip,        // 翻转到对面端口（反向stub）
+        Rotate(Port), // 旋转到指定相邻端口（侧向接入）
+    }
+
+    // 先收集所有需要修正的边及建议修正方式，避免边遍历边修改
+    let mut edges_to_check: Vec<(usize, PortFix, PortFix, bool, bool)> = Vec::new();
     for ei in 0..n {
         if edges[ei].path_is_empty() {
             continue;
@@ -1891,12 +1985,33 @@ fn fix_reverse_stub_ports(
         let points: Vec<Point> = edges[ei].path_points().into_owned();
         let from_rev = has_reverse_stub(&points, 0, from_side[ei]);
         let to_rev = has_reverse_stub(&points, points.len() - 1, to_side[ei]);
-        if from_rev || to_rev {
-            edges_to_check.push(ei);
+        let from_side_approach = if from_rev { None } else { detect_side_approach(&points, 0, from_side[ei]) };
+        let to_side_approach = if to_rev { None } else { detect_side_approach(&points, points.len() - 1, to_side[ei]) };
+        let orig_from_side = from_side_approach.is_some();
+        let orig_to_side = to_side_approach.is_some();
+
+        let from_fix = if from_rev {
+            PortFix::Flip
+        } else if let Some(suggested) = from_side_approach {
+            PortFix::Rotate(suggested)
+        } else {
+            PortFix::None
+        };
+        let to_fix = if to_rev {
+            PortFix::Flip
+        } else if let Some(suggested) = to_side_approach {
+            PortFix::Rotate(suggested)
+        } else {
+            PortFix::None
+        };
+
+        if !matches!(from_fix, PortFix::None) || !matches!(to_fix, PortFix::None) {
+            edges_to_check.push((ei, from_fix, to_fix, orig_from_side, orig_to_side));
         }
     }
 
-    for ei in edges_to_check {
+    for (ei, from_fix, to_fix, orig_from_has_side, orig_to_has_side) in edges_to_check {
+        let orig_side_problems = (orig_from_has_side as i32) + (orig_to_has_side as i32);
         let old_from = from_side[ei];
         let old_to = to_side[ei];
 
@@ -1908,36 +2023,60 @@ fn fix_reverse_stub_ports(
         let old_points: Vec<Point> = edges[ei].path_points().into_owned();
         let old_path_len = path_length(&old_points);
 
-        // 生成需要尝试的翻转组合：总是尝试所有三种组合（单端+双端），
-        // 因为翻转一端可能改变路径走向导致另一端也出现反向stub。
+        // 生成需要尝试的端口组合：
+        // - Flip类型：尝试翻转到对面端口
+        // - Rotate类型：尝试旋转到建议的相邻端口
+        // - 同时尝试两端都修正的组合
         #[derive(Copy, Clone, Debug)]
-        enum Flip { From, To, Both }
-        let attempts: Vec<Flip> = vec![Flip::Both, Flip::From, Flip::To];
+        struct Attempt { from: Option<Port>, to: Option<Port> }
+
+        let mut attempts: Vec<Attempt> = Vec::new();
+
+        // 基于from_fix和to_fix生成候选端口列表（包含原端口作为选项）
+        let from_candidates: Vec<Port> = match from_fix {
+            PortFix::None => vec![old_from],
+            PortFix::Flip => vec![old_from, opposite_port(old_from)],
+            PortFix::Rotate(p) => vec![old_from, p],
+        };
+        let to_candidates: Vec<Port> = match to_fix {
+            PortFix::None => vec![old_to],
+            PortFix::Flip => vec![old_to, opposite_port(old_to)],
+            PortFix::Rotate(p) => vec![old_to, p],
+        };
+
+        // 笛卡尔积生成所有组合
+        for &fc in &from_candidates {
+            for &tc in &to_candidates {
+                if fc == old_from && tc == old_to {
+                    continue; // 跳过不修改的组合（保持原路径）
+                }
+                attempts.push(Attempt { from: if fc == old_from { None } else { Some(fc) }, to: if tc == old_to { None } else { Some(tc) } });
+            }
+        }
+
+        // 如果是反向stub单端问题，额外尝试双端翻转（翻转一端可能导致另一端也反向）
+        if matches!(from_fix, PortFix::Flip) && matches!(to_fix, PortFix::None) {
+            attempts.push(Attempt { from: Some(opposite_port(old_from)), to: Some(opposite_port(old_to)) });
+        }
+        if matches!(to_fix, PortFix::Flip) && matches!(from_fix, PortFix::None) {
+            attempts.push(Attempt { from: Some(opposite_port(old_from)), to: Some(opposite_port(old_to)) });
+        }
 
         let mut best: Option<(Port, Port, Endpoint, Endpoint, Vec<Point>, f64)> = None;
-        // best: (new_from, new_to, new_from_ep, new_to_ep, candidate_path, path_len)
 
         let r_cfg = OrthoConfig {
             channel_margin: cfg.channel_margin + 10.0,
             ..*cfg
         };
 
-        // 从grid中移除旧路径（为所有尝试做准备）
         grid.remove_by_edges(&[ei]);
 
-        for flip in &attempts {
-            let (new_from, new_to) = match flip {
-                Flip::From => (opposite_port(old_from), old_to),
-                Flip::To => (old_from, opposite_port(old_to)),
-                Flip::Both => (opposite_port(old_from), opposite_port(old_to)),
-            };
+        for attempt in &attempts {
+            let new_from = attempt.from.unwrap_or(old_from);
+            let new_to = attempt.to.unwrap_or(old_to);
 
-            // 构建新endpoint
-            let (nf_anchor, nt_anchor) = match flip {
-                Flip::From => (slot_anchor(from_nl, new_from, 0.5), old_to_ep.anchor),
-                Flip::To => (old_from_ep.anchor, slot_anchor(to_nl, new_to, 0.5)),
-                Flip::Both => (slot_anchor(from_nl, new_from, 0.5), slot_anchor(to_nl, new_to, 0.5)),
-            };
+            let nf_anchor = if attempt.from.is_some() { slot_anchor(from_nl, new_from, 0.5) } else { old_from_ep.anchor };
+            let nt_anchor = if attempt.to.is_some() { slot_anchor(to_nl, new_to, 0.5) } else { old_to_ep.anchor };
 
             let nf_ep = Endpoint {
                 edge_index: ei,
@@ -1978,6 +2117,7 @@ fn fix_reverse_stub_ports(
             }
 
             if candidate.len() >= 2 {
+                let candidate = simplify_path_preserving_stubs(candidate);
                 let clean = path_is_clean(
                     &candidate,
                     pair.from_id(),
@@ -1994,11 +2134,48 @@ fn fix_reverse_stub_ports(
                 );
                 let new_from_rev = has_reverse_stub(&candidate, 0, new_from);
                 let new_to_rev = has_reverse_stub(&candidate, candidate.len() - 1, new_to);
+                let new_from_side = if matches!(from_fix, PortFix::Rotate(_) | PortFix::Flip) {
+                    detect_side_approach(&candidate, 0, new_from)
+                } else {
+                    None
+                };
+                let new_to_side = if matches!(to_fix, PortFix::Rotate(_) | PortFix::Flip) {
+                    detect_side_approach(&candidate, candidate.len() - 1, new_to)
+                } else {
+                    None
+                };
                 let no_reverse = !new_from_rev && !new_to_rev;
                 let new_len = path_length(&candidate);
-                let len_ok = new_len <= old_path_len * 2.0 + 120.0;
+                // 允许最长比原路径长20%，但优先选择更短的路径
+                let len_ok = new_len <= old_path_len * 1.2 + 60.0;
 
-                if clean && no_reverse && len_ok {
+                // 接受条件：
+                // 1. 路径干净（不穿过节点/组内部）
+                // 2. 无反向stub
+                // 3. 长度可接受
+                // 4. 问题修复检查（满足任一）：
+                //    a) 总side_approach问题数减少
+                //    b) 总side_approach问题数不变且路径更短
+                //    c) 路径明显更短（<0.9倍原长）
+                let new_from_has_side = new_from_side.is_some();
+                let new_to_has_side = new_to_side.is_some();
+                let new_side_problems = (new_from_has_side as i32) + (new_to_has_side as i32);
+                let side_problems_improved = new_side_problems < orig_side_problems;
+                let side_problems_same_or_better = new_side_problems <= orig_side_problems;
+                let shorter = new_len < old_path_len;
+                let significantly_shorter = new_len < old_path_len * 0.9;
+
+                let accept = if side_problems_improved {
+                    true
+                } else if side_problems_same_or_better && shorter {
+                    true
+                } else if significantly_shorter {
+                    true
+                } else {
+                    false
+                };
+
+                if clean && no_reverse && len_ok && accept {
                     let better = match &best {
                         None => true,
                         Some((_, _, _, _, _, best_len)) => new_len < *best_len,
