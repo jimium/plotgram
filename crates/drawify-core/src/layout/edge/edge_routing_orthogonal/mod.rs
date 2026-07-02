@@ -29,7 +29,9 @@ const APPLICABLE_TYPES: &[DiagramType] = &[
     DiagramType::Er,
 ];
 
+pub(super) mod channel_load;
 pub(super) mod context;
+pub(super) mod lane_assignment;
 pub(super) mod layer_order;
 pub(super) mod nudge;
 pub(super) mod path;
@@ -38,7 +40,9 @@ pub(super) mod simplify;
 pub(super) mod slot;
 
 // Re-exports for cross-submodule access via `use super::*;`
+pub(super) use channel_load::{channel_load_penalty, ChannelLoadMap};
 pub(super) use context::{EndpointPair, PreparedObstacles, RoutingContext, SegmentGrid};
+pub(super) use lane_assignment::assign_lanes;
 pub(super) use path::{select_best_path_with_scorer_stats, PathSelectStats, RoutedSegment};
 #[allow(unused_imports)] // SpacingViolationKind/segments_violate_spacing/path_edge_spacing_violations used in X-1
 pub(super) use scoring::{CandidateScorer, DefaultScorer, GROUP_OBSTACLE_PAD, NODE_OBSTACLE_PAD, path_avoids_group_interiors, path_is_clean, path_is_clean_from_edges, path_length, SpacingViolationKind, segments_violate_spacing, path_edge_spacing_violations, count_all_edge_spacing_violations};
@@ -550,6 +554,7 @@ fn route_edges_orthogonal_inner(
             grid: &grid,
             cfg: &cfg,
             obstacles: &obstacles,
+            channel_load: None,
         };
         let pair = EndpointPair {
             from: from_ep.clone(),
@@ -651,7 +656,7 @@ fn route_edges_orthogonal_inner(
             let Some(from_ep) = endpoint_map.get(&(ei, true)) else { continue };
             let Some(to_ep) = endpoint_map.get(&(ei, false)) else { continue };
             let pair = EndpointPair { from: from_ep.clone(), to: to_ep.clone() };
-            let ctx = RoutingContext { nodes: &result.nodes, group_ctx: &group_ctx, grid: &grid, cfg: &cfg, obstacles: &obstacles };
+            let ctx = RoutingContext { nodes: &result.nodes, group_ctx: &group_ctx, grid: &grid, cfg: &cfg, obstacles: &obstacles, channel_load: None };
             let mut path_stats = PathSelectStats::default();
             let candidate = select_best_path_with_scorer_stats(
                 &ctx,
@@ -723,13 +728,30 @@ fn route_edges_orthogonal_inner(
     );
     crate::perf_log!("[perf]     x2_flip_stub: {:.2}ms (flipped {} edges)", t_flip.elapsed().as_secs_f64() * 1000.0, ortho_stats.flipped_stub_edges);
 
-    // ── 4f. Segment Nudging 轻推后处理 ──
-    // DISABLED: nudge 在长直段中间插入Z字形补偿弯，视觉上明显扭曲线条；
-    // 且新增拐点可能被后续边框排斥逻辑破坏正交性，产生斜线。
-    // X-1 多轮重路由已解决绝大多数重合问题；残余结构性拥堵留给 X-3 Lane Assignment。
-    ortho_stats.nudge_iterations = 0;
-    ortho_stats.nudged_segments = 0;
-    ortho_stats.nudge_failed = 0;
+    // ── 4f. X-3: Lane Assignment 车道分配 ──
+    // 对 bundling 无法合并的残余平行段，通过平移 cross-axis 坐标分离重合段。
+    // 不插入 Z 字弯，保持正交性。nudge 保持禁用（Z 字弯视觉不佳）。
+    let t_lane = crate::layout::perf::Instant::now();
+    let lane_stats = assign_lanes(
+        &mut edges,
+        &mut grid,
+        &result.nodes,
+        &obstacles.sorted_node_ids,
+        relations,
+        &from_side,
+        &to_side,
+        EDGE_PARALLEL_GAP,
+    );
+    ortho_stats.lane_groups = lane_stats.lane_groups;
+    ortho_stats.lane_segments_shifted = lane_stats.segments_shifted;
+    ortho_stats.lane_shifts_failed = lane_stats.shifts_failed;
+    crate::perf_log!(
+        "[perf]     x3_lane_assignment: {:.2}ms ({} groups, {} shifted, {} failed)",
+        t_lane.elapsed().as_secs_f64() * 1000.0,
+        lane_stats.lane_groups,
+        lane_stats.segments_shifted,
+        lane_stats.shifts_failed
+    );
 
     // ── 4c. X-0: 统计边间距违规（排除 stub 段） ──
     let (exact_overlap_pairs, tight_spacing_pairs) =
@@ -916,6 +938,7 @@ fn replan_slots(
             grid,
             cfg,
             obstacles,
+            channel_load: None,
         };
         let pair = EndpointPair {
             from: from_ep.clone(),
@@ -1001,6 +1024,7 @@ fn reroute_conflicting_edges(
     let mut total_rerouted = 0usize;
     let mut rounds_done = 0usize;
     let mut failed_edges: HashSet<usize> = HashSet::new();
+    let mut max_channel_load = 0usize;
 
     for round in 0..MAX_REROUTE_ROUNDS {
         // 检测所有冲突边（path_edge_spacing_violations 内部已豁免 stub 段）
@@ -1024,6 +1048,10 @@ fn reroute_conflicting_edges(
         conflicts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
 
         rounds_done = round + 1;
+
+        // Phase 3: 每轮构建通道负载图，让 scorer 偏好低负载通道，从源头减少拥堵
+        let load_map = ChannelLoadMap::build(edges, crate::layout::constants::GRID_SNAP_STEP);
+        max_channel_load = max_channel_load.max(load_map.max_load());
 
         for &(ei, _) in &conflicts {
             if failed_edges.contains(&ei) {
@@ -1059,6 +1087,7 @@ fn reroute_conflicting_edges(
                     grid,
                     cfg: &r_cfg,
                     obstacles,
+                    channel_load: Some(&load_map),
                 };
                 let pair = EndpointPair {
                     from: from_ep.clone(),
@@ -1142,6 +1171,7 @@ fn reroute_conflicting_edges(
 
     ortho_stats.reroute_iterations = rounds_done;
     ortho_stats.rerouted_edges = total_rerouted;
+    ortho_stats.max_channel_load = max_channel_load;
 }
 
 /// 从已路由的边路径中提取"有效出口方向"——即锚点出发后第一个非 stub 的
@@ -2100,7 +2130,7 @@ fn fix_reverse_stub_ports(
             };
 
             let pair = EndpointPair { from: nf_ep.clone(), to: nt_ep.clone() };
-            let ctx = RoutingContext { nodes, group_ctx, grid, cfg: &r_cfg, obstacles };
+            let ctx = RoutingContext { nodes, group_ctx, grid, cfg: &r_cfg, obstacles, channel_load: None };
 
             let mut path_stats = PathSelectStats::default();
             let candidate = select_best_path_with_scorer_stats(

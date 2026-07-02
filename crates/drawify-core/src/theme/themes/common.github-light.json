@@ -17,6 +17,7 @@
       "primary": "#0969da",
       "neutral_fill": "#f6f8fa",
       "neutral_stroke": "#656d76",
+      "edge_stroke": "#8c959f",
       "group_fill": "#f6f8fa",
       "group_stroke": "#d0d7de"
     },
@@ -38,37 +39,41 @@
       "root": { "fill": "#0969da", "stroke": "#0550ae", "text_fill": "#ffffff" }
     }
   },
+  "defaults": {
+    "edge": {
+      "stroke_opacity": 0.9
+    }
+  },
   "diagrams": {
     "flowchart": {
-      "edge": { "stroke": "{colors.neutral_stroke}" }
+      "edge": { "stroke": "{colors.edge_stroke}" }
     },
     "sequence": {
-      "edge": { "stroke": "{colors.neutral_stroke}" }
+      "edge": { "stroke": "{colors.edge_stroke}" }
     },
     "state": {
-      "edge": { "stroke": "{colors.neutral_stroke}" }
+      "edge": { "stroke": "{colors.edge_stroke}" }
     },
     "architecture": {
-      "edge": { "stroke": "{colors.neutral_stroke}" }
+      "edge": { "stroke": "{colors.border}" }
     },
     "er": {
       "node": { "fill": "#ffffff", "stroke": "#0969da" },
-      "edge": { "stroke": "{colors.neutral_stroke}" }
+      "edge": { "stroke": "{colors.border}" }
     },
     "mindmap": {
-      "edge": { "stroke_width": "{strokes.normal}" },
       "entity_types": {
         "leaf": { "fill": "#f6f8fa" }
       },
       "context_palettes": {
         "branch": {
           "entries": [
-            { "fill": "#ddf4ff", "stroke": "#0969da", "edge_stroke": "#7986CB" },
-            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
-            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
-            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
-            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
-            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+            { "fill": "#ddf4ff", "stroke": "#0969da", "text_fill": "#0550ae", "edge_stroke": "#54aeff" },
+            { "fill": "#dafbe1", "stroke": "#1a7f37", "text_fill": "#116329", "edge_stroke": "#4ac26b" },
+            { "fill": "#ffebe9", "stroke": "#cf222e", "text_fill": "#a40e26", "edge_stroke": "#ff8182" },
+            { "fill": "#fff1e5", "stroke": "#bc4c00", "text_fill": "#953800", "edge_stroke": "#fb8f44" },
+            { "fill": "#fbefff", "stroke": "#8250df", "text_fill": "#6639ba", "edge_stroke": "#b083f0" },
+            { "fill": "#b6e3ff", "stroke": "#0598bc", "text_fill": "#0c6b84", "edge_stroke": "#56d4dd" }
           ]
         }
       }

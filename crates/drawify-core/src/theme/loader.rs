@@ -203,9 +203,12 @@ fn validate_colors_in_block(block: &super::schema::StyleBlock, path_prefix: &str
     Ok(())
 }
 
-/// 检查颜色值是否符合 #RRGGBB 或 #RRGGBBAA 格式。
+/// 检查颜色值是否符合 #RRGGBB / #RRGGBBAA 格式，或是 SVG 标准透明关键字。
 pub fn is_valid_color(value: &str) -> bool {
     let value = value.trim();
+    if value.eq_ignore_ascii_case("none") || value.eq_ignore_ascii_case("transparent") {
+        return true;
+    }
     if !value.starts_with('#') {
         return false;
     }

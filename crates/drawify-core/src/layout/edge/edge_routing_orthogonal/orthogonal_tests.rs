@@ -612,6 +612,7 @@
             grid: &grid,
             cfg: &cfg,
             obstacles: &obstacles,
+            channel_load: None,
         };
 
         // A bottom anchor: (180, 150)，B left anchor: (400, 325)

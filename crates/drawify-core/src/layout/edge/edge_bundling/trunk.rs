@@ -29,7 +29,7 @@ const EPS: f64 = 0.1;
 const GRID_STEP: f64 = 8.0;
 
 /// 主干范围外扩余量（像素）
-const TRUNK_MARGIN: f64 = 24.0;
+pub const TRUNK_MARGIN: f64 = 24.0;
 
 /// 为所有 bundle candidate 分配主干通道和分叉点，生成 EdgeBundle 列表。
 ///
@@ -128,17 +128,7 @@ fn find_collision_free_coord(
     axis: Axis,
     _config: &BundlingConfig,
 ) -> Option<f64> {
-    const MAX_ATTEMPTS: usize = 8; // 每侧最多尝试 4 次（±4 × 8px = ±32px）
-
-    // 收集 bundle 的端点节点 ID，碰撞检测时排除这些节点
-    // （主干本就连接这些节点，靠近它们是正常的）
-    let endpoint_ids: std::collections::HashSet<&str> = edges
-        .iter()
-        .flat_map(|&i| {
-            let f = &features[i];
-            [f.from_id.as_str(), f.to_id.as_str()]
-        })
-        .collect();
+    const MAX_ATTEMPTS: usize = 12; // 每侧最多尝试 6 次（±6 × 8px = ±48px）
 
     for step in 0..=MAX_ATTEMPTS {
         // 交替尝试正负偏移：0, +1, -1, +2, -2, ...
@@ -148,9 +138,11 @@ fn find_collision_free_coord(
         };
         for offset in &offsets {
             let coord = quantize(base_coord + offset, GRID_STEP);
-            let (trunk_start, trunk_end) =
-                compute_trunk_range(edges, features, axis, coord);
-            if !trunk_segment_collides(trunk_start, trunk_end, nodes, &endpoint_ids) {
+            // 碰撞检测使用核心范围（margin=0），避免 TRUNK_MARGIN 扩展导致
+            // 与端点节点产生误碰撞（端口本身在节点边界上，不算穿障）
+            let (core_start, core_end) =
+                compute_trunk_range_with_margin(edges, features, axis, coord, 0.0);
+            if !trunk_segment_collides(core_start, core_end, nodes) {
                 return Some(coord);
             }
         }
@@ -158,18 +150,15 @@ fn find_collision_free_coord(
     None
 }
 
-/// 检查主干段是否穿过任何节点（排除 bundle 端点节点）。
+/// 检查主干段是否穿过任何节点。
+/// 使用 -2px pad 收缩节点矩形，避免端口位置（在节点边界上）触发误碰撞。
 fn trunk_segment_collides(
     trunk_start: Point,
     trunk_end: Point,
     nodes: &std::collections::HashMap<String, NodeLayout>,
-    excluded_ids: &std::collections::HashSet<&str>,
 ) -> bool {
-    for (id, nl) in nodes {
-        if excluded_ids.contains(id.as_str()) {
-            continue;
-        }
-        if Rect::from(nl).intersects_segment(trunk_start, trunk_end, 0.0) {
+    for (_id, nl) in nodes {
+        if Rect::from(nl).intersects_segment(trunk_start, trunk_end, -2.0) {
             return true;
         }
     }
@@ -274,6 +263,19 @@ fn compute_trunk_range(
     axis: Axis,
     trunk_coord: f64,
 ) -> (Point, Point) {
+    compute_trunk_range_with_margin(edges, features, axis, trunk_coord, TRUNK_MARGIN)
+}
+
+/// 计算主干范围，可指定 margin。
+/// margin=0 时返回核心范围（仅覆盖端口投影），用于碰撞检测；
+/// margin=TRUNK_MARGIN 时返回完整范围（含余量），用于分叉点钳制和 keepout。
+fn compute_trunk_range_with_margin(
+    edges: &[usize],
+    features: &[EdgeFeatures],
+    axis: Axis,
+    trunk_coord: f64,
+    margin: f64,
+) -> (Point, Point) {
     let mut min_proj = f64::INFINITY;
     let mut max_proj = f64::NEG_INFINITY;
 
@@ -294,8 +296,8 @@ fn compute_trunk_range(
         max_proj = max_proj.max(proj1).max(proj2);
     }
 
-    min_proj -= TRUNK_MARGIN;
-    max_proj += TRUNK_MARGIN;
+    min_proj -= margin;
+    max_proj += margin;
 
     match axis {
         Axis::Horizontal => (Point::new(min_proj, trunk_coord), Point::new(max_proj, trunk_coord)),

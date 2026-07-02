@@ -260,6 +260,10 @@ pub struct StyleSheet {
     /// 单层继承：指向基座 theme_id（基座不得有 `extends`）。
     #[serde(default)]
     pub extends: Option<String>,
+    /// 主题绑定的图形风格 ID（如 "blueprint"、"standard" 等）。
+    /// 当 RenderRequest 未显式指定 graphic_style 时，使用此值。
+    #[serde(default)]
+    pub graphic_style: Option<String>,
     #[serde(default)]
     pub meta: StyleMeta,
     #[serde(default)]
@@ -418,6 +422,8 @@ pub const SUPPORTED_VERSIONS: &[&str] = &["0.2"];
 pub struct CompiledTheme {
     pub id: String,
     pub name: String,
+    /// 主题绑定的图形风格 ID。
+    pub graphic_style: Option<GraphicStyleId>,
     pub canvas: StyleBlock,
     /// 全局 node 默认（来自 `defaults.node`，已展开 token）。
     /// 当 diagram 不存在时作为 fallback。

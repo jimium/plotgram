@@ -58,6 +58,10 @@ impl CandidateScorer for DefaultScorer {
             path,
             ctx.grid,
         );
+        // Phase 3: 通道负载感知——reroute 时偏好低负载通道，从源头减少拥堵
+        if let Some(load_map) = ctx.channel_load {
+            score += channel_load_penalty(path, load_map);
+        }
         if !ctx.group_ctx.corridors.is_empty() {
             score += corridor_misalignment_penalty(
                 path,

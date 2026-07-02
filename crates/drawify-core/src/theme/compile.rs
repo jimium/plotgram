@@ -5,6 +5,7 @@
 use std::collections::BTreeMap;
 
 use crate::error::{DrawifyError, Result};
+use crate::types::GraphicStyleId;
 use super::schema::{
     ContextBindingDef, ContextPaletteDef, DiagramStyles,
     IndexRuleDef, PaletteRole, StyleSheet, StyleBlock, StyleTokens, StyleValue,
@@ -183,9 +184,15 @@ pub fn compile_theme(sheet: StyleSheet) -> Result<CompiledTheme> {
         compiled_diagrams.insert(key.clone(), cd);
     }
 
+    let graphic_style = sheet
+        .graphic_style
+        .as_deref()
+        .and_then(|s| s.parse::<GraphicStyleId>().ok());
+
     Ok(CompiledTheme {
         id: sheet.id.clone(),
         name: sheet.name.clone(),
+        graphic_style,
         canvas,
         node_default: defaults_node,
         edge_default: defaults_edge,

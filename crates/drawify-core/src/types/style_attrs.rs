@@ -21,6 +21,10 @@ pub const VALID_ENTITY_STYLE_ATTRS: &[&str] = &[
     style_attr_keys::FONT_WEIGHT,
     style_attr_keys::RADIUS,
     style_attr_keys::TRANSFORM,
+    style_attr_keys::FILL_OPACITY,
+    style_attr_keys::STROKE_OPACITY,
+    style_attr_keys::STROKE_LINECAP,
+    style_attr_keys::STROKE_LINEJOIN,
 ];
 
 pub const VALID_RELATION_STYLE_ATTRS: &[&str] = &[
@@ -28,6 +32,10 @@ pub const VALID_RELATION_STYLE_ATTRS: &[&str] = &[
     style_attr_keys::STROKE_WIDTH,
     style_attr_keys::STROKE_DASHARRAY,
     style_attr_keys::DASHED,
+    style_attr_keys::ARROW_STYLE,
+    style_attr_keys::STROKE_OPACITY,
+    style_attr_keys::STROKE_LINECAP,
+    style_attr_keys::STROKE_LINEJOIN,
     style_attr_keys::LABEL_COLOR,
     style_attr_keys::TEXT_FILL,
     style_attr_keys::FONT_SIZE,
@@ -89,7 +97,8 @@ pub fn validate_style_property(
 
     let expected: Option<&'static str> = match key {
         "fill" | "stroke" | "stroke_dasharray" | "text_fill" | "transform"
-        | "label_color" | "label_bg" | "label_border" => {
+        | "label_color" | "label_bg" | "label_border" | "stroke_linecap"
+        | "stroke_linejoin" | "arrow_style" => {
             if !is_string_like(value) {
                 Some("String")
             } else {
@@ -98,7 +107,7 @@ pub fn validate_style_property(
         }
         "stroke_width" | "width" | "height" | "font_size" | "radius"
         | "label_bg_opacity" | "label_border_width" | "label_border_radius"
-        | "label_padding" | "label_font_size" => {
+        | "label_padding" | "label_font_size" | "fill_opacity" | "stroke_opacity" => {
             if !is_number_like(value) {
                 Some("Number")
             } else {

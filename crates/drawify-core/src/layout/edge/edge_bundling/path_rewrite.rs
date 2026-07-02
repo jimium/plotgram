@@ -115,17 +115,8 @@ pub fn rewrite_bundle_paths(
             rewritten.push(rewritten_edge);
         }
 
-        // 检查主干穿障（排除 bundle 端点节点）
-        let endpoint_ids: std::collections::HashSet<&str> = bundle
-            .edges
-            .iter()
-            .flat_map(|&i| {
-                let f = &features[i];
-                [f.from_id.as_str(), f.to_id.as_str()]
-            })
-            .collect();
-        let trunk_passes_nodes =
-            trunk_collides_with_nodes(bundle, nodes, &endpoint_ids);
+        // 检查主干穿障
+        let trunk_passes_nodes = trunk_collides_with_nodes(bundle, nodes);
         if trunk_passes_nodes {
             stats.obstacle_fallback_count += 1;
             continue; // 回退：不修改路径，不标记 bundle
@@ -148,14 +139,34 @@ pub fn rewrite_bundle_paths(
         }
         let new_ink = non_trunk_ink + max_trunk_ink;
 
-        // 检查 Ink 节省
+        // 检查 Ink 节省 / 长度约束
         if original_ink > EPS {
             let saving_ratio = (original_ink - new_ink) / original_ink;
-            if saving_ratio < config.min_ink_saving {
+            // 检测是否为段级兼容的 partial bundling（边本来就已重叠，bundling 是视觉合并而非 ink 节省）
+            let has_segment_overlap = bundle.edges.iter().enumerate().any(|(i, &ei)| {
+                bundle.edges[i + 1..].iter().any(|&ej| {
+                    super::compatibility::find_parallel_segment_overlap(
+                        &features[ei],
+                        &features[ej],
+                    ).is_some()
+                })
+            });
+            let accept = if has_segment_overlap {
+                // Partial bundling：允许长度增加（边本来重叠，fork leg 增加长度但消除视觉重叠）
+                // 限制最大长度增加 50%，防止极端绕路
+                new_ink <= original_ink * 1.5
+            } else {
+                // 传统 bundling：要求 ink 节省 ≥ min_ink_saving
+                saving_ratio >= config.min_ink_saving
+            };
+            if !accept {
                 stats.ink_fallback_count += 1;
-                continue; // 回退：Ink 节省不足
+                continue; // 回退
             }
-            total_ink_saved += original_ink - new_ink;
+            // 只累计正向 ink 节省（partial bundling 可能增加 ink，但提供视觉清晰度）
+            if original_ink > new_ink {
+                total_ink_saved += original_ink - new_ink;
+            }
         }
 
         // 应用重写
@@ -408,20 +419,39 @@ fn dedup_consecutive(mut path: Vec<Point>) -> Vec<Point> {
 
 /// 检查主干段是否穿过任何节点。
 ///
-/// 主干段是 bundle.trunk_start → bundle.trunk_end 的线段。
+/// 使用核心范围（去除 TRUNK_MARGIN 扩展）进行检测，避免端口附近的误碰撞。
 fn trunk_collides_with_nodes(
     bundle: &EdgeBundle,
     nodes: &std::collections::HashMap<String, NodeLayout>,
-    excluded_ids: &std::collections::HashSet<&str>,
 ) -> bool {
-    let p1 = bundle.trunk_start;
-    let p2 = bundle.trunk_end;
-
-    for (id, nl) in nodes {
-        if excluded_ids.contains(id.as_str()) {
-            continue;
+    // 收缩 TRUNK_MARGIN，只检查核心段
+    let (p1, p2) = match bundle.trunk_axis {
+        Axis::Horizontal => {
+            let dx = if bundle.trunk_end.x >= bundle.trunk_start.x {
+                super::trunk::TRUNK_MARGIN
+            } else {
+                -super::trunk::TRUNK_MARGIN
+            };
+            (
+                Point::new(bundle.trunk_start.x + dx, bundle.trunk_start.y),
+                Point::new(bundle.trunk_end.x - dx, bundle.trunk_end.y),
+            )
         }
-        if Rect::from(nl).intersects_segment(p1, p2, 0.0) {
+        Axis::Vertical => {
+            let dy = if bundle.trunk_end.y >= bundle.trunk_start.y {
+                super::trunk::TRUNK_MARGIN
+            } else {
+                -super::trunk::TRUNK_MARGIN
+            };
+            (
+                Point::new(bundle.trunk_start.x, bundle.trunk_start.y + dy),
+                Point::new(bundle.trunk_end.x, bundle.trunk_end.y - dy),
+            )
+        }
+    };
+
+    for (_id, nl) in nodes {
+        if Rect::from(nl).intersects_segment(p1, p2, -2.0) {
             return true;
         }
     }

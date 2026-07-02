@@ -19,6 +19,9 @@ impl GraphicStylePainter for BlueprintGraphicStylePainter {
         style.stroke_linecap = Some("butt".to_string());
         style.stroke_linejoin = Some("miter".to_string());
         style.hand_drawn = true;
+        if style.fill_opacity.is_none() {
+            style.fill_opacity = Some(0.15);
+        }
     }
 
     fn decorate_edge_style(&self, style: &mut EdgeStyle) {
@@ -69,7 +72,7 @@ impl GraphicStylePainter for BlueprintGraphicStylePainter {
 }
 
 // ---------------------------------------------------------------------------
-// Marker defs
+// Marker defs — hollow open arrowheads (engineering drawing style)
 // ---------------------------------------------------------------------------
 
 fn blueprint_marker_defs(active_stroke: &str, passive_stroke: &str) -> String {
@@ -105,19 +108,52 @@ fn render_blueprint_node_shape(
     )
 }
 
-/// Blueprint style: precise thin lines with dash patterns for secondary shapes,
-/// semi-transparent fill, miter joins.
-/// `dashed` controls whether the outline uses a dash pattern (for secondary shapes).
+fn blueprint_node_attrs(style: &NodeStyle, extra_dash: Option<&str>) -> String {
+    let mut parts = vec![
+        format!(r#"fill="{}""#, style.fill),
+        format!(r#"fill-opacity="{:.2}""#, style.fill_opacity.unwrap_or(1.0)),
+        format!(r#"stroke="{}""#, style.stroke),
+        format!(r#"stroke-width="{}""#, style.stroke_width),
+    ];
+    blueprint_push_stroke_attrs(&mut parts, style, extra_dash);
+    parts.join(" ")
+}
+
+fn blueprint_stroke_only_attrs(style: &NodeStyle, extra_dash: Option<&str>) -> String {
+    let mut parts = vec![
+        r#"fill="none""#.to_string(),
+        format!(r#"stroke="{}""#, style.stroke),
+        format!(r#"stroke-width="{}""#, style.stroke_width),
+    ];
+    blueprint_push_stroke_attrs(&mut parts, style, extra_dash);
+    parts.join(" ")
+}
+
+fn blueprint_push_stroke_attrs(parts: &mut Vec<String>, style: &NodeStyle, extra_dash: Option<&str>) {
+    if let Some(lc) = &style.stroke_linecap {
+        parts.push(format!(r#"stroke-linecap="{lc}""#));
+    }
+    if let Some(lj) = &style.stroke_linejoin {
+        parts.push(format!(r#"stroke-linejoin="{lj}""#));
+    }
+    if let Some(dash) = extra_dash {
+        parts.push(format!(r#"stroke-dasharray="{dash}""#));
+    } else if let Some(dash) = &style.stroke_dasharray {
+        parts.push(format!(r#"stroke-dasharray="{dash}""#));
+    }
+}
+
+/// Blueprint closed shapes: precise thin lines, semi-transparent fill,
+/// diamond/hexagon use dashed outlines (secondary geometry in engineering drawings).
 fn render_blueprint_closed_shape(points: &[Point], style: &NodeStyle, shape: &NodeShape) -> String {
-    let dashed = matches!(shape, NodeShape::Diamond | NodeShape::Hexagon);
+    let dashed = match shape {
+        NodeShape::Diamond | NodeShape::Hexagon => Some("6 3"),
+        _ => None,
+    };
     let (x, y, width, height) = bounding_box(points);
     let group_attrs = node_group_attrs(style, "blueprint", x, y, width, height);
     let fill_path = polyline_path(points, true);
-    let dash_attr = if dashed {
-        r#"stroke-dasharray="6 3""#
-    } else {
-        ""
-    };
+    let attrs = blueprint_node_attrs(style, dashed);
 
     let center_line = if matches!(shape, NodeShape::Circle) {
         blueprint_center_cross(points, style.stroke_width)
@@ -126,13 +162,10 @@ fn render_blueprint_closed_shape(points: &[Point], style: &NodeStyle, shape: &No
     };
 
     format!(
-        r##"{group_open}<path d="{fill_path}" fill="{fill}" fill-opacity="0.15" stroke="{stroke}" stroke-width="{stroke_width}" stroke-linejoin="miter" stroke-linecap="butt" {dash_attr}/>{center_line}</g>"##,
+        r##"{group_open}<path d="{fill_path}" {attrs}/>{center_line}</g>"##,
         group_open = group_open(&group_attrs),
         fill_path = fill_path,
-        fill = style.fill,
-        stroke = style.stroke,
-        stroke_width = style.stroke_width,
-        dash_attr = dash_attr,
+        attrs = attrs,
         center_line = center_line,
     )
 }
@@ -148,14 +181,16 @@ fn render_blueprint_cylinder(x: f64, y: f64, width: f64, height: f64, style: &No
         "M {x:.1} {top_cy:.1} A {rx:.1} {ry:.1} 0 0 1 {right:.1} {top_cy:.1} L {right:.1} {bottom_cy:.1} A {rx:.1} {ry:.1} 0 0 1 {x:.1} {bottom_cy:.1} Z",
         right = x + width,
     );
-    let top_path = format!(
+    let top_ellipse_path = format!(
         "M {x:.1} {top_cy:.1} A {rx:.1} {ry:.1} 0 0 1 {right:.1} {top_cy:.1} A {rx:.1} {ry:.1} 0 0 1 {x:.1} {top_cy:.1}",
         right = x + width,
     );
     let bottom_front = ellipse_arc_points(cx, bottom_cy, rx, ry, 0.0, std::f64::consts::PI, 16);
     let group_attrs = node_group_attrs(style, "blueprint", x, y, width, height);
+    let body_attrs = blueprint_node_attrs(style, None);
+    let top_ellipse_attrs = blueprint_node_attrs(style, None);
+    let hidden_attrs = blueprint_stroke_only_attrs(style, Some("4 2"));
 
-    // Center axis line for cylinder
     let center_line = format!(
         r#"<line x1="{cx:.1}" y1="{y:.1}" x2="{cx:.1}" y2="{bottom:.1}" stroke="{stroke}" stroke-width="{sw:.1}" stroke-dasharray="12 4 2 4" opacity="0.3"/>"#,
         cx = cx, y = y, bottom = y + height,
@@ -163,18 +198,18 @@ fn render_blueprint_cylinder(x: f64, y: f64, width: f64, height: f64, style: &No
     );
 
     format!(
-        r##"{group_open}<path d="{fill_body}" fill="{fill}" fill-opacity="0.15" stroke="{stroke}" stroke-width="{stroke_width}" stroke-linejoin="miter" stroke-linecap="butt"/><ellipse cx="{cx:.1}" cy="{top_cy:.1}" rx="{rx:.1}" ry="{ry:.1}" fill="{fill}" fill-opacity="0.15" stroke="{stroke}" stroke-width="{stroke_width}" stroke-linecap="butt"/><path d="{top_path}" fill="none" stroke="{stroke}" stroke-width="{stroke_width}" stroke-dasharray="4 2" stroke-linecap="butt"/><path d="{bottom_d}" fill="none" stroke="{stroke}" stroke-width="{stroke_width}" stroke-dasharray="4 2" stroke-linecap="butt"/>{center_line}</g>"##,
+        r##"{group_open}<path d="{fill_body}" {body_attrs}/><ellipse cx="{cx:.1}" cy="{top_cy:.1}" rx="{rx:.1}" ry="{ry:.1}" {top_ellipse_attrs}/><path d="{top_ellipse_path}" {hidden_attrs}/><path d="{bottom_d}" {hidden_attrs}/>{center_line}</g>"##,
         group_open = group_open(&group_attrs),
         fill_body = fill_body,
-        fill = style.fill,
-        stroke = style.stroke,
-        stroke_width = style.stroke_width,
+        body_attrs = body_attrs,
         cx = cx,
         top_cy = top_cy,
         rx = rx,
         ry = ry,
-        top_path = top_path,
+        top_ellipse_attrs = top_ellipse_attrs,
+        top_ellipse_path = top_ellipse_path,
         bottom_d = polyline_path(&bottom_front, false),
+        hidden_attrs = hidden_attrs,
         center_line = center_line,
     )
 }
@@ -192,15 +227,16 @@ fn render_blueprint_person(x: f64, y: f64, width: f64, height: f64, style: &Node
     let head_fill = polyline_path(&head, true);
     let body_fill = polyline_path(&body, true);
     let group_attrs = node_group_attrs(style, "blueprint", x, y, width, height);
+    let head_attrs = blueprint_node_attrs(style, None);
+    let body_attrs = blueprint_node_attrs(style, Some("6 3"));
 
     format!(
-        r##"{group_open}<path d="{head_fill}" fill="{fill}" fill-opacity="0.15" stroke="{stroke}" stroke-width="{stroke_width}" stroke-linejoin="miter" stroke-linecap="butt"/><path d="{body_fill}" fill="{fill}" fill-opacity="0.15" stroke="{stroke}" stroke-width="{stroke_width}" stroke-linejoin="miter" stroke-linecap="butt" stroke-dasharray="6 3"/></g>"##,
+        r##"{group_open}<path d="{head_fill}" {head_attrs}/><path d="{body_fill}" {body_attrs}/></g>"##,
         group_open = group_open(&group_attrs),
         head_fill = head_fill,
         body_fill = body_fill,
-        fill = style.fill,
-        stroke = style.stroke,
-        stroke_width = style.stroke_width,
+        head_attrs = head_attrs,
+        body_attrs = body_attrs,
     )
 }
 
@@ -209,22 +245,23 @@ fn render_blueprint_subprocess(x: f64, y: f64, width: f64, height: f64, style: &
     let outer = rect_points(x, y, width, height);
     let inner = rect_points(ix, iy, iw, ih);
     let group_attrs = node_group_attrs(style, "blueprint", x, y, width, height);
+    let outer_attrs = blueprint_node_attrs(style, None);
+    let inner_attrs = blueprint_stroke_only_attrs(style, None);
+
     format!(
-        r##"{group_open}<path d="{outer_d}" fill="{fill}" fill-opacity="0.15" stroke="{stroke}" stroke-width="{stroke_width}" stroke-linejoin="miter" stroke-linecap="butt"/><path d="{inner_d}" fill="none" stroke="{stroke}" stroke-width="{stroke_width}" stroke-linejoin="miter" stroke-linecap="butt"/></g>"##,
+        r##"{group_open}<path d="{outer_d}" {outer_attrs}/><path d="{inner_d}" {inner_attrs}/></g>"##,
         group_open = group_open(&group_attrs),
         outer_d = polyline_path(&outer, true),
         inner_d = polyline_path(&inner, true),
-        fill = style.fill,
-        stroke = style.stroke,
-        stroke_width = style.stroke_width,
+        outer_attrs = outer_attrs,
+        inner_attrs = inner_attrs,
     )
 }
 
 // ---------------------------------------------------------------------------
-// Blueprint center-line helpers
+// Blueprint center-line helpers (engineering drawing cross-hair markers)
 // ---------------------------------------------------------------------------
 
-/// Generate cross-hair center lines (engineering drawing style) for a closed shape.
 fn blueprint_center_cross(points: &[Point], stroke_width: f64) -> String {
     let bbox = bounding_box(points);
     let cx = bbox.0 + bbox.2 / 2.0;
@@ -254,7 +291,7 @@ fn render_blueprint_edge(
     let attrs = edge_attrs(style, "blueprint");
     let d = polyline_path(points, false);
     format!(
-        r##"<path d="{d}" fill="none" stroke="{stroke}" stroke-width="{stroke_width}" stroke-linecap="butt" stroke-linejoin="miter" {attrs} marker-end="{marker_end}" marker-start="{marker_start}"/>"##,
+        r##"<path d="{d}" fill="none" stroke="{stroke}" stroke-width="{stroke_width}" {attrs} marker-end="{marker_end}" marker-start="{marker_start}"/>"##,
         d = d,
         stroke = stroke,
         stroke_width = style.stroke_width,

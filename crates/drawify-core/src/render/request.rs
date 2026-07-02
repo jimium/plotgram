@@ -66,10 +66,11 @@ impl<'a> RenderRequest<'a> {
             .resolve()
     }
 
-    pub fn resolve_graphic_style(&self) -> GraphicStyleId {
+    pub fn resolve_graphic_style(&self, theme_graphic_style: Option<GraphicStyleId>) -> GraphicStyleId {
         self.explicit_graphic_style
             .or(self.scene_graphic_style)
             .or_else(|| graphic_style_from_diagram(self.diagram))
+            .or(theme_graphic_style)
             .unwrap_or_else(|| profile_for(&self.diagram.diagram_type).default_graphic_style)
     }
 
@@ -89,9 +90,10 @@ impl<'a> RenderRequest<'a> {
             crate::theme::compiled_builtin_theme(theme_id)
                 .ok_or_else(|| DrawifyError::Style(format!("unknown builtin theme '{theme_id}'")))?
         };
+        let graphic_style = self.resolve_graphic_style(compiled.graphic_style);
         Ok(CompiledRenderContext {
             compiled,
-            graphic_style: self.resolve_graphic_style(),
+            graphic_style,
             icon_resolve: crate::icons::ResolveOptions {
                 semantic_inference: self.semantic_inference,
             },
@@ -244,7 +246,7 @@ mod tests {
         };
 
         assert_eq!(
-            request.resolve_graphic_style(),
+            request.resolve_graphic_style(None),
             GraphicStyleId::SpatialClarity
         );
     }

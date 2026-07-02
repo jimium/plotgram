@@ -193,6 +193,127 @@ pub fn decompose_path(edge_index: usize, points: &[Point]) -> Vec<PathSegment> {
     segments
 }
 
+/// 段级平行重叠检测结果。
+///
+/// 当两条边的路径存在显著的平行段重叠时，即使端到端方向夹角超过 60°，
+/// 也可以进行 partial bundling（只在重叠段共享 trunk）。
+#[derive(Debug, Clone)]
+pub struct ParallelOverlap {
+    /// 重叠段的主轴方向
+    pub axis: Axis,
+    /// 重叠段的层坐标（两条边层坐标的平均值）
+    pub layer: f64,
+    /// 重叠投影起点（主轴方向坐标）
+    pub overlap_start: f64,
+    /// 重叠投影终点（主轴方向坐标）
+    pub overlap_end: f64,
+    /// 重叠长度
+    pub overlap_length: f64,
+}
+
+/// 段级平行重叠的层坐标容差：两条边同轴段的层坐标差 ≤ 此值视为同通道。
+const LAYER_TOLERANCE: f64 = 16.0;
+
+/// 段级平行重叠的最小长度：重叠段投影长度 ≥ 此值才视为显著重叠。
+const MIN_OVERLAP_LENGTH: f64 = 48.0;
+
+/// 检测两条边的路径是否存在显著的平行段重叠。
+///
+/// 判定逻辑：
+/// 1. 用 `decompose_path` 分解两条边的路径为段
+/// 2. 找出同轴、同方向的段对
+/// 3. 检查层坐标是否接近（|layer1 - layer2| ≤ LAYER_TOLERANCE）
+/// 4. 检查投影是否有重叠（重叠长度 ≥ MIN_OVERLAP_LENGTH）
+/// 5. 返回重叠最长的那个段对
+///
+/// 这是 partial bundling 的兼容性判定基础：两条边即使端到端方向不同，
+/// 只要局部段平行且重叠，就可以在重叠段共享 trunk。
+pub fn find_parallel_segment_overlap(
+    e1: &EdgeFeatures,
+    e2: &EdgeFeatures,
+) -> Option<ParallelOverlap> {
+    let segs1 = decompose_path(e1.edge_index, &e1.path_points);
+    let segs2 = decompose_path(e2.edge_index, &e2.path_points);
+
+    if segs1.is_empty() || segs2.is_empty() {
+        return None;
+    }
+
+    let mut best: Option<ParallelOverlap> = None;
+
+    for s1 in &segs1 {
+        for s2 in &segs2 {
+            // 必须同轴、同方向
+            if s1.axis != s2.axis || s1.direction != s2.direction {
+                continue;
+            }
+
+            // 层坐标接近
+            if (s1.layer - s2.layer).abs() > LAYER_TOLERANCE {
+                continue;
+            }
+
+            // 计算主轴方向的投影重叠
+            let (proj1_start, proj1_end, proj2_start, proj2_end) = match s1.axis {
+                Axis::Horizontal => {
+                    // 水平段：主轴是 x，投影是 [start.x, end.x]
+                    let (p1s, p1e) = if s1.start.x <= s1.end.x {
+                        (s1.start.x, s1.end.x)
+                    } else {
+                        (s1.end.x, s1.start.x)
+                    };
+                    let (p2s, p2e) = if s2.start.x <= s2.end.x {
+                        (s2.start.x, s2.end.x)
+                    } else {
+                        (s2.end.x, s2.start.x)
+                    };
+                    (p1s, p1e, p2s, p2e)
+                }
+                Axis::Vertical => {
+                    // 垂直段：主轴是 y，投影是 [start.y, end.y]
+                    let (p1s, p1e) = if s1.start.y <= s1.end.y {
+                        (s1.start.y, s1.end.y)
+                    } else {
+                        (s1.end.y, s1.start.y)
+                    };
+                    let (p2s, p2e) = if s2.start.y <= s2.end.y {
+                        (s2.start.y, s2.end.y)
+                    } else {
+                        (s2.end.y, s2.start.y)
+                    };
+                    (p1s, p1e, p2s, p2e)
+                }
+            };
+
+            let overlap_start = proj1_start.max(proj2_start);
+            let overlap_end = proj1_end.min(proj2_end);
+            let overlap_length = overlap_end - overlap_start;
+
+            if overlap_length < MIN_OVERLAP_LENGTH {
+                continue;
+            }
+
+            // 选择重叠最长的
+            let is_better = match &best {
+                None => true,
+                Some(b) => overlap_length > b.overlap_length,
+            };
+            if is_better {
+                let layer = (s1.layer + s2.layer) / 2.0;
+                best = Some(ParallelOverlap {
+                    axis: s1.axis,
+                    layer,
+                    overlap_start,
+                    overlap_end,
+                    overlap_length,
+                });
+            }
+        }
+    }
+
+    best
+}
+
 /// 计算两条边的兼容性分数（Step 2）。
 ///
 /// 返回值 ∈ [0.0, 1.0]。0.0 表示不兼容（硬条件不满足），≥ threshold 表示可捆绑。
@@ -218,14 +339,23 @@ pub fn compute_compatibility(e1: &EdgeFeatures, e2: &EdgeFeatures, config: &Bund
         return 0.0;
     }
 
-    // ── 硬条件 3: 方向兼容（端到端方向夹角 ≤ 60°）──
+    // ── 硬条件 3: 方向兼容 ──
+    // 两条路径满足以下任一即视为方向兼容：
+    //   a) 端到端方向夹角 ≤ 60°（原有逻辑）
+    //   b) 存在显著的平行段重叠（段级兼容，支持 partial bundling）
     let angle_deg = direction_angle_deg(e1.direction, e2.direction);
-    if angle_deg > MAX_COMPAT_ANGLE_DEG {
+    let angle_ok = angle_deg <= MAX_COMPAT_ANGLE_DEG;
+    let segment_overlap = find_parallel_segment_overlap(e1, e2);
+    let segment_ok = segment_overlap.is_some();
+
+    if !angle_ok && !segment_ok {
         return 0.0;
     }
 
-    // ── 硬条件 4: 区域兼容（起点同 rank 区间 且 终点同 rank 区间）──
-    if !region_compatible(e1, e2) {
+    // ── 硬条件 4: 区域兼容 ──
+    // 段级兼容时跳过区域检查（重叠段已证明空间邻近）；
+    // 仅端到端兼容且无段重叠时走原有区域检查
+    if !segment_ok && !region_compatible(e1, e2) {
         return 0.0;
     }
 
@@ -235,10 +365,17 @@ pub fn compute_compatibility(e1: &EdgeFeatures, e2: &EdgeFeatures, config: &Bund
     }
 
     // ── 加分项评分 ──
-    let angle_score = 1.0 - (angle_deg / MAX_COMPAT_ANGLE_DEG);
-    let region_score = region_score(e1, e2);
+    // 段级兼容但端到端不兼容时：重叠段证明局部平行且距离≈0，
+    // angle/region/distance 评分取满分，仅 scale 按实际计算。
+    let (angle_score, region_score, distance_score) = if segment_ok && !angle_ok {
+        (1.0, 1.0, 1.0)
+    } else {
+        let angle_score = 1.0 - (angle_deg / MAX_COMPAT_ANGLE_DEG);
+        let region_score = region_score(e1, e2);
+        let distance_score = distance_score(e1, e2);
+        (angle_score, region_score, distance_score)
+    };
     let scale_score = scale_score(e1, e2);
-    let distance_score = distance_score(e1, e2);
 
     let compatibility = W_ANGLE * angle_score
         + W_REGION * region_score

@@ -164,6 +164,12 @@ fn node_svg_attrs(style: &NodeStyle, cx: f64, cy: f64) -> String {
     if let Some(linejoin) = &style.stroke_linejoin {
         attrs.push(format!(r#"stroke-linejoin="{linejoin}""#));
     }
+    if let Some(op) = style.fill_opacity {
+        attrs.push(format!(r#"fill-opacity="{op:.2}""#));
+    }
+    if let Some(op) = style.stroke_opacity {
+        attrs.push(format!(r#"stroke-opacity="{op:.2}""#));
+    }
     if let Some(transform) = &style.transform {
         attrs.push(crate::graphic_style::common::centered_node_transform(transform, cx, cy));
     }

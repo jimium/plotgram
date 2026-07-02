@@ -61,6 +61,10 @@ pub struct ExportGroup<'a> {
     pub border_radius: f64,
     /// 是否绘制阴影。仅顶层分组（depth=0）启用阴影，嵌套分组不启用。
     pub has_shadow: bool,
+    /// 虚线 pattern（None 表示实线）
+    pub stroke_dasharray: Option<String>,
+    /// 描边不透明度（None 表示 1.0）
+    pub stroke_opacity: Option<f64>,
 }
 
 /// 渲染前的标准化导出场景。
@@ -174,6 +178,27 @@ pub fn build_scene<'a>(
                         _ => None,
                     })
                     .unwrap_or(if group.depth == 0 { 8.0 } else { 6.0 });
+                let stroke_dasharray = style
+                    .get("stroke_dasharray")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| {
+                        let trimmed = s.trim();
+                        if trimmed.is_empty()
+                            || trimmed.eq_ignore_ascii_case("none")
+                            || trimmed.eq_ignore_ascii_case("solid")
+                        {
+                            None
+                        } else {
+                            Some(trimmed.to_string())
+                        }
+                    });
+                let stroke_opacity = style
+                    .get("stroke_opacity")
+                    .and_then(|v| match v {
+                        crate::ast::AttributeValue::Number(n) => Some(*n),
+                        crate::ast::AttributeValue::String(s) => s.parse().ok(),
+                        _ => None,
+                    });
                 ExportGroup {
                     group,
                     layout: group_layout,
@@ -184,6 +209,8 @@ pub fn build_scene<'a>(
                     z_index: group.depth,
                     border_radius,
                     has_shadow: group.depth == 0,
+                    stroke_dasharray,
+                    stroke_opacity,
                 }
             })
         })

@@ -99,7 +99,7 @@ export function HelpPanel({ open, onClose }: HelpPanelProps) {
                 <Row name="layout: flowchart | er | sugiyama-v2 | …" desc="布局算法" />
                 <Row name="edge_routing: orthogonal | spline | bezier | …" desc="边路由方式" />
                 <Row name="snap: true | false" desc="网格吸附（默认 true，flowchart / er / sugiyama-v2 / architecture-v2）" />
-                <Row name="theme: common.clean-light | common.dracula | mindmap.vivid-branches | …" desc="颜色/字体主题（StyleSheet ID）" />
+                <Row name="theme: common.clean-light | common.github-dark | mindmap.vivid-branches | …" desc="颜色/字体主题（StyleSheet ID）" />
                 <Row name="render_style: standard | excalidraw | …" desc="笔触皮肤（与 theme 正交）" />
                 <Row name="entity[&lt;type&gt;]" desc="实体语义类型写在方括号中（如 start / process / decision / service 等），决定形状与图标" />
               </tbody>

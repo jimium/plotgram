@@ -9,7 +9,7 @@ use crate::layout::group::GroupRoutingContext;
 use crate::layout::NodeLayout;
 use std::collections::HashMap;
 
-use super::{OrthoConfig, RoutedSegment};
+use super::{ChannelLoadMap, OrthoConfig, RoutedSegment};
 use super::slot::Endpoint;
 
 /// Shared, read-only routing context for a single `route_edges_orthogonal` call.
@@ -24,6 +24,8 @@ pub struct RoutingContext<'a> {
     pub grid: &'a SegmentGrid,
     pub cfg: &'a OrthoConfig,
     pub obstacles: &'a PreparedObstacles,
+    /// Phase 3: 通道负载图（reroute 时传入 Some，初始路由为 None）
+    pub channel_load: Option<&'a ChannelLoadMap>,
 }
 
 /// 路由前预排序的障碍物索引，避免每次调用重复 `nodes.keys().collect() + sort()`。

@@ -41,6 +41,12 @@ impl GraphicStylePainter for SpatialClarityGraphicStylePainter {
         style.stroke_linecap = Some("round".to_string());
         style.stroke_linejoin = Some("round".to_string());
         style.hand_drawn = false;
+        if style.fill_opacity.is_none() {
+            style.fill_opacity = Some(SC_FILL_OPACITY);
+        }
+        if style.stroke_opacity.is_none() {
+            style.stroke_opacity = Some(SC_STROKE_OPACITY);
+        }
     }
 
     fn decorate_edge_style(&self, style: &mut EdgeStyle) {
@@ -190,9 +196,9 @@ fn render_sc_round_rect(
         height = height,
         rx = rx,
         fill = style.fill,
-        fill_op = SC_FILL_OPACITY,
+        fill_op = style.fill_opacity.unwrap_or(SC_FILL_OPACITY),
         stroke = style.stroke,
-        stroke_op = SC_STROKE_OPACITY,
+        stroke_op = style.stroke_opacity.unwrap_or(SC_STROKE_OPACITY),
         sw = style.stroke_width,
     )
 }
@@ -209,9 +215,9 @@ fn render_sc_circle(x: f64, y: f64, width: f64, height: f64, style: &NodeStyle) 
         cy = cy,
         r = r,
         fill = style.fill,
-        fill_op = SC_FILL_OPACITY,
+        fill_op = style.fill_opacity.unwrap_or(SC_FILL_OPACITY),
         stroke = style.stroke,
-        stroke_op = SC_STROKE_OPACITY,
+        stroke_op = style.stroke_opacity.unwrap_or(SC_STROKE_OPACITY),
         sw = style.stroke_width,
     )
 }
@@ -231,9 +237,9 @@ fn render_sc_subprocess(x: f64, y: f64, width: f64, height: f64, style: &NodeSty
         iw = iw,
         ih = ih,
         fill = style.fill,
-        fill_op = SC_FILL_OPACITY,
+        fill_op = style.fill_opacity.unwrap_or(SC_FILL_OPACITY),
         stroke = style.stroke,
-        stroke_op = SC_STROKE_OPACITY,
+        stroke_op = style.stroke_opacity.unwrap_or(SC_STROKE_OPACITY),
         sw = style.stroke_width,
     )
 }
@@ -247,9 +253,9 @@ fn render_sc_closed_path(points: &[Point], style: &NodeStyle) -> String {
         group_open = group_open(&group_attrs),
         d = d,
         fill = style.fill,
-        fill_op = SC_FILL_OPACITY,
+        fill_op = style.fill_opacity.unwrap_or(SC_FILL_OPACITY),
         stroke = style.stroke,
-        stroke_op = SC_STROKE_OPACITY,
+        stroke_op = style.stroke_opacity.unwrap_or(SC_STROKE_OPACITY),
         sw = style.stroke_width,
     )
 }
@@ -277,13 +283,13 @@ fn render_sc_cylinder(x: f64, y: f64, width: f64, height: f64, style: &NodeStyle
         body = body,
         top = top,
         fill = style.fill,
-        fill_op = SC_FILL_OPACITY,
+        fill_op = style.fill_opacity.unwrap_or(SC_FILL_OPACITY),
         cx = cx,
         top_cy = top_cy,
         rx = rx,
         ry = ry,
         stroke = style.stroke,
-        stroke_op = SC_STROKE_OPACITY,
+        stroke_op = style.stroke_opacity.unwrap_or(SC_STROKE_OPACITY),
         sw = style.stroke_width,
     )
 }
@@ -308,9 +314,9 @@ fn render_sc_person(x: f64, y: f64, width: f64, height: f64, style: &NodeStyle) 
         head_r = head_r,
         body_d = body_d,
         fill = style.fill,
-        fill_op = SC_FILL_OPACITY,
+        fill_op = style.fill_opacity.unwrap_or(SC_FILL_OPACITY),
         stroke = style.stroke,
-        stroke_op = SC_STROKE_OPACITY,
+        stroke_op = style.stroke_opacity.unwrap_or(SC_STROKE_OPACITY),
         sw = style.stroke_width,
     )
 }
@@ -324,19 +330,21 @@ fn render_spatial_clarity_edge(
 ) -> String {
     let d = smooth_polyline_path_from_points(points, SC_EDGE_CORNER_RADIUS);
     let attrs = edge_attrs(style, STYLE_NAME);
-    let stroke_opacity = if style
-        .stroke_dasharray
-        .as_deref()
-        .is_some_and(|d| !d.is_empty())
-        || style.dashed
-    {
-        SC_EDGE_PASSIVE_OPACITY
-    } else {
-        SC_EDGE_OPACITY
-    };
+    let stroke_opacity = style.stroke_opacity.unwrap_or_else(|| {
+        if style
+            .stroke_dasharray
+            .as_deref()
+            .is_some_and(|d| !d.is_empty())
+            || style.dashed
+        {
+            SC_EDGE_PASSIVE_OPACITY
+        } else {
+            SC_EDGE_OPACITY
+        }
+    });
 
     format!(
-        r##"<path d="{d}" fill="none" stroke="{stroke}" stroke-opacity="{stroke_opacity}" stroke-width="{stroke_width}" {attrs} marker-end="{marker_end}" marker-start="{marker_start}"/>"##,
+        r##"<path d="{d}" fill="none" stroke="{stroke}" stroke-opacity="{stroke_opacity:.2}" stroke-width="{stroke_width}" {attrs} marker-end="{marker_end}" marker-start="{marker_start}"/>"##,
         d = d,
         stroke = stroke,
         stroke_opacity = stroke_opacity,

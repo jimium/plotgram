@@ -32,11 +32,21 @@ pub const FONT_WEIGHT: &str = "font_weight";
 pub const RADIUS: &str = "radius";
 /// 变换
 pub const TRANSFORM: &str = "transform";
+/// 填充不透明度（0.0 ~ 1.0）
+pub const FILL_OPACITY: &str = "fill_opacity";
+/// 描边不透明度（0.0 ~ 1.0）
+pub const STROKE_OPACITY: &str = "stroke_opacity";
+/// 描边线帽（butt | round | square）
+pub const STROKE_LINECAP: &str = "stroke_linecap";
+/// 描边线连接（miter | round | bevel）
+pub const STROKE_LINEJOIN: &str = "stroke_linejoin";
 
 // ── 关系样式键 ──────────────────────────────────────────────
 
 /// 虚线
 pub const DASHED: &str = "dashed";
+/// 箭头样式（normal | hollow | none）
+pub const ARROW_STYLE: &str = "arrow_style";
 /// 标签颜色
 pub const LABEL_COLOR: &str = "label_color";
 

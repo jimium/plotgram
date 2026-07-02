@@ -128,8 +128,8 @@ mod tests {
     }
 
     #[test]
-    fn architecture_defaults_to_blueprint() {
+    fn architecture_defaults_to_clean_light() {
         let id = resolve_theme_id(&DiagramType::Architecture, None, None, false);
-        assert_eq!(id, "common.blueprint");
+        assert_eq!(id, "common.clean-light");
     }
 }

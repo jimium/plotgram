@@ -1,7 +1,7 @@
 //! AST style → Renderer style 映射工具。
 
 use crate::ast::*;
-use crate::render::visual::{EdgeStyle, LabelAnchor, LabelRotation, NodeStyle, NodeShape};
+use crate::render::visual::{ArrowStyle, EdgeStyle, LabelAnchor, LabelRotation, NodeStyle, NodeShape};
 use crate::types::style_attr_keys;
 
 /// 将 entity 的 `attributes.style` 映射为 `NodeStyle`。
@@ -20,6 +20,12 @@ pub fn node_style_from_attributes(entity: &Entity) -> NodeStyle {
     }
     if let Some(AttributeValue::String(v)) = s.get(style_attr_keys::STROKE_DASHARRAY) {
         style.stroke_dasharray = Some(v.to_string());
+    }
+    if let Some(AttributeValue::String(v)) = s.get(style_attr_keys::STROKE_LINECAP) {
+        style.stroke_linecap = Some(v.to_string());
+    }
+    if let Some(AttributeValue::String(v)) = s.get(style_attr_keys::STROKE_LINEJOIN) {
+        style.stroke_linejoin = Some(v.to_string());
     }
     if let Some(shape_value) = s.get(style_attr_keys::SHAPE) {
         let shape_name = match shape_value {
@@ -40,6 +46,12 @@ pub fn node_style_from_attributes(entity: &Entity) -> NodeStyle {
             style.transform = Some(t);
         }
     }
+    if let Some(n) = style_number(entity, style_attr_keys::FILL_OPACITY) {
+        style.fill_opacity = Some(n.clamp(0.0, 1.0));
+    }
+    if let Some(n) = style_number(entity, style_attr_keys::STROKE_OPACITY) {
+        style.stroke_opacity = Some(n.clamp(0.0, 1.0));
+    }
     style.radius = style_number(entity, style_attr_keys::RADIUS);
 
     style
@@ -59,8 +71,20 @@ pub fn edge_style_from_attributes(relation: &Relation) -> EdgeStyle {
     if let Some(AttributeValue::String(v)) = s.get(style_attr_keys::STROKE_DASHARRAY) {
         style.stroke_dasharray = Some(v.to_string());
     }
+    if let Some(AttributeValue::String(v)) = s.get(style_attr_keys::STROKE_LINECAP) {
+        style.stroke_linecap = Some(v.to_string());
+    }
+    if let Some(AttributeValue::String(v)) = s.get(style_attr_keys::STROKE_LINEJOIN) {
+        style.stroke_linejoin = Some(v.to_string());
+    }
     if let Some(AttributeValue::Boolean(v)) = s.get(style_attr_keys::DASHED) {
         style.dashed = *v;
+    }
+    if let Some(AttributeValue::String(v)) = s.get(style_attr_keys::ARROW_STYLE) {
+        style.arrow = parse_arrow_style(v);
+    }
+    if let Some(n) = style_number_from(s, style_attr_keys::STROKE_OPACITY) {
+        style.stroke_opacity = Some(n.clamp(0.0, 1.0));
     }
 
     // ── 边标签样式 ──
@@ -216,7 +240,23 @@ fn parse_node_shape(s: &str) -> NodeShape {
     }
 }
 
+fn parse_arrow_style(s: &str) -> ArrowStyle {
+    match s.trim().to_ascii_lowercase().as_str() {
+        "none" | "no" | "false" => ArrowStyle::None,
+        "hollow" | "outline" | "open" => ArrowStyle::Hollow,
+        _ => ArrowStyle::Normal,
+    }
+}
+
 pub fn edge_paint_attrs(style: &EdgeStyle, dash_pattern: Option<&str>) -> String {
+    edge_paint_attrs_impl(style, dash_pattern, true)
+}
+
+pub fn edge_paint_attrs_no_stroke_opacity(style: &EdgeStyle, dash_pattern: Option<&str>) -> String {
+    edge_paint_attrs_impl(style, dash_pattern, false)
+}
+
+fn edge_paint_attrs_impl(style: &EdgeStyle, dash_pattern: Option<&str>, include_stroke_opacity: bool) -> String {
     let mut attrs = Vec::new();
     let final_dash = style
         .stroke_dasharray
@@ -231,6 +271,11 @@ pub fn edge_paint_attrs(style: &EdgeStyle, dash_pattern: Option<&str>) -> String
     }
     if let Some(linejoin) = &style.stroke_linejoin {
         attrs.push(format!(r#"stroke-linejoin="{linejoin}""#));
+    }
+    if include_stroke_opacity {
+        if let Some(op) = style.stroke_opacity {
+            attrs.push(format!(r#"stroke-opacity="{op:.2}""#));
+        }
     }
     attrs.join(" ")
 }

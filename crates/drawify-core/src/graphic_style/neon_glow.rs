@@ -50,6 +50,9 @@ impl GraphicStylePainter for NeonGlowGraphicStylePainter {
         style.stroke_linecap = Some("round".to_string());
         style.stroke_linejoin = Some("round".to_string());
         style.hand_drawn = false;
+        if style.fill_opacity.is_none() {
+            style.fill_opacity = Some(NG_FILL_OPACITY);
+        }
     }
 
     fn decorate_edge_style(&self, style: &mut EdgeStyle) {
@@ -156,7 +159,7 @@ fn render_ng_closed_shape(points: &[Point], style: &NodeStyle, _shape: &NodeShap
         group_open = group_open(&group_attrs),
         d = d,
         fill = style.fill,
-        fill_op = NG_FILL_OPACITY,
+        fill_op = style.fill_opacity.unwrap_or(NG_FILL_OPACITY),
         stroke = style.stroke,
         glow_width = NG_GLOW_WIDTH,
         stroke_width = style.stroke_width,
@@ -186,7 +189,7 @@ fn render_ng_cylinder(x: f64, y: f64, width: f64, height: f64, style: &NodeStyle
         body = body,
         top = top,
         fill = style.fill,
-        fill_op = NG_FILL_OPACITY,
+        fill_op = style.fill_opacity.unwrap_or(NG_FILL_OPACITY),
         cx = cx,
         top_cy = top_cy,
         rx = rx,
@@ -217,7 +220,7 @@ fn render_ng_person(x: f64, y: f64, width: f64, height: f64, style: &NodeStyle) 
         head_r = head_r,
         body_d = body_d,
         fill = style.fill,
-        fill_op = NG_FILL_OPACITY,
+        fill_op = style.fill_opacity.unwrap_or(NG_FILL_OPACITY),
         stroke = style.stroke,
         glow_width = NG_GLOW_WIDTH,
         stroke_width = style.stroke_width,
@@ -251,16 +254,18 @@ fn render_neon_glow_edge(
 ) -> String {
     let d = smooth_polyline_path_from_points(points, NG_EDGE_CORNER_RADIUS);
     let attrs = edge_attrs(style, STYLE_NAME);
-    let stroke_opacity = if style
-        .stroke_dasharray
-        .as_deref()
-        .is_some_and(|d| !d.is_empty())
-        || style.dashed
-    {
-        0.35
-    } else {
-        0.55
-    };
+    let stroke_opacity = style.stroke_opacity.unwrap_or_else(|| {
+        if style
+            .stroke_dasharray
+            .as_deref()
+            .is_some_and(|d| !d.is_empty())
+            || style.dashed
+        {
+            0.35
+        } else {
+            0.55
+        }
+    });
 
     // Glow layer (thick, blurred) + core layer (thin, sharp)
     format!(

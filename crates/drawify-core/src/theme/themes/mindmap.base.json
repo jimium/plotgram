@@ -74,13 +74,19 @@
       "text_fill": "{colors.text}",
       "font_size": "{typography.label_size}",
       "radius": "{radius.lg}",
-      "shape": "rounded_rect"
+      "shape": "rounded_rect",
+      "stroke_linecap": "round",
+      "stroke_linejoin": "round"
     },
     "edge": {
       "stroke": "{colors.neutral_stroke}",
       "stroke_width": "{strokes.normal}",
       "text_fill": "{colors.muted_text}",
-      "font_size": "{typography.small_size}"
+      "font_size": "{typography.small_size}",
+      "stroke_linecap": "round",
+      "stroke_linejoin": "round",
+      "stroke_opacity": 0.7,
+      "arrow_style": "none"
     },
     "group": {
       "fill": "{colors.group_fill}",
@@ -140,13 +146,13 @@
         },
         "edge_depth": {
           "entries": [
-            { "stroke_width": 3.0 },
-            { "stroke_width": 2.25 },
-            { "stroke_width": 1.75 }
+            { "stroke_width": 3.0, "stroke_opacity": 0.85 },
+            { "stroke_width": 2.25, "stroke_opacity": 0.65 },
+            { "stroke_width": 1.75, "stroke_opacity": 0.45 }
           ],
           "index": { "from": "tree_depth" },
           "bindings": [
-            { "target": "edge", "fields": { "stroke_width": "stroke_width" } }
+            { "target": "edge", "fields": { "stroke_width": "stroke_width", "stroke_opacity": "stroke_opacity" } }
           ]
         }
       }

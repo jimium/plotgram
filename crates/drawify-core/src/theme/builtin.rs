@@ -21,34 +21,18 @@ pub const COMMON_THEME_IDS: &[&str] = &[
     "common.clean-dark",
     "common.blueprint",
     "common.presentation",
-    "common.minimal-gray",
-    "common.brand-vivid",
-    "common.catppuccin-latte",
-    "common.catppuccin-mocha",
-    "common.dracula",
-    "common.github-dark",
     "common.github-light",
-    "common.gruvbox-dark",
-    "common.monokai",
-    "common.nord",
-    "common.one-dark",
-    "common.rose-pine",
-    "common.solarized-light",
-    "common.tokyo-night",
-    "common.ibm-carbon",
+    "common.github-dark",
     "common.okabe-ito",
-    "common.tol-bright",
-    "common.tol-high-contrast",
 ];
 
 /// 所有 mindmap 专用主题 ID（仅覆盖 mindmap 图表类型）。
 pub const MINDMAP_THEME_IDS: &[&str] = &[
     "mindmap.vivid-branches",
-    "mindmap.pastel-soft",
     "mindmap.ink-dark",
 ];
 
-/// 所有用户可见主题 ID（通用 + mindmap 专用，共 25 个）。
+/// 所有用户可见主题 ID（通用 + mindmap 专用，共 9 个）。
 pub fn all_theme_ids() -> Vec<&'static str> {
     COMMON_THEME_IDS
         .iter()
@@ -70,26 +54,10 @@ fn builtin_style_sheet(id: &str) -> Option<StyleSheet> {
         "common.clean-dark" => include_str!("themes/common.clean-dark.json"),
         "common.blueprint" => include_str!("themes/common.blueprint.json"),
         "common.presentation" => include_str!("themes/common.presentation.json"),
-        "common.minimal-gray" => include_str!("themes/common.minimal-gray.json"),
-        "common.brand-vivid" => include_str!("themes/common.brand-vivid.json"),
-        "common.catppuccin-latte" => include_str!("themes/common.catppuccin-latte.json"),
-        "common.catppuccin-mocha" => include_str!("themes/common.catppuccin-mocha.json"),
-        "common.dracula" => include_str!("themes/common.dracula.json"),
-        "common.github-dark" => include_str!("themes/common.github-dark.json"),
         "common.github-light" => include_str!("themes/common.github-light.json"),
-        "common.gruvbox-dark" => include_str!("themes/common.gruvbox-dark.json"),
-        "common.monokai" => include_str!("themes/common.monokai.json"),
-        "common.nord" => include_str!("themes/common.nord.json"),
-        "common.one-dark" => include_str!("themes/common.one-dark.json"),
-        "common.rose-pine" => include_str!("themes/common.rose-pine.json"),
-        "common.solarized-light" => include_str!("themes/common.solarized-light.json"),
-        "common.tokyo-night" => include_str!("themes/common.tokyo-night.json"),
-        "common.ibm-carbon" => include_str!("themes/common.ibm-carbon.json"),
+        "common.github-dark" => include_str!("themes/common.github-dark.json"),
         "common.okabe-ito" => include_str!("themes/common.okabe-ito.json"),
-        "common.tol-bright" => include_str!("themes/common.tol-bright.json"),
-        "common.tol-high-contrast" => include_str!("themes/common.tol-high-contrast.json"),
         "mindmap.vivid-branches" => include_str!("themes/mindmap.vivid-branches.json"),
-        "mindmap.pastel-soft" => include_str!("themes/mindmap.pastel-soft.json"),
         "mindmap.ink-dark" => include_str!("themes/mindmap.ink-dark.json"),
         // 内部基座（mindmap.base，仅作 extends 用）
         "mindmap.base" => include_str!("themes/mindmap.base.json"),
@@ -195,7 +163,7 @@ mod tests {
 
     #[test]
     fn compiled_cache_is_idempotent() {
-        for id in ["common.clean-light", "common.nord", "mindmap.vivid-branches"] {
+        for id in ["common.clean-light", "common.github-dark", "mindmap.vivid-branches"] {
             let first = compiled_builtin_theme(id).unwrap();
             let second = compiled_builtin_theme(id).unwrap();
             assert_eq!(first.id, second.id);

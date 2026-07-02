@@ -4,73 +4,78 @@
   "name": "Clean Dark",
   "meta": {
     "author": "Drawify",
-    "description": "默认深色基础样式：高对比、柔和强调色，适合暗色界面与控制台预览",
+    "description": "默认深色基础样式：Notion/Linear 风极简暗色设计，hairline 描边+柔和色块+极细连线",
     "tags": [
       "dark",
-      "clean"
+      "clean",
+      "warm",
+      "modern",
+      "minimal"
     ]
   },
   "tokens": {
     "colors": {
-      "canvas": "#15171A",
-      "text": "#E8EAED",
-      "muted_text": "#9AA0A6",
-      "border": "#3D4450",
-      "primary": "#64B5F6",
-      "neutral_fill": "#2A2F36",
-      "neutral_stroke": "#8B95A5",
-      "group_fill": "#1E2228",
-      "group_stroke": "#4A5568"
+      "canvas": "#131316",
+      "text": "#E7E5E4",
+      "muted_text": "#78716C",
+      "border": "#2D2D33",
+      "border_strong": "#3F3F46",
+      "primary": "#818CF8",
+      "neutral_fill": "#1C1C21",
+      "neutral_stroke": "#2D2D33",
+      "edge_stroke": "#52525B",
+      "group_fill": "transparent",
+      "group_stroke": "#3F3F46"
     },
     "palette": {
-      "blue": { "fill": "#1E3A5F", "stroke": "#64B5F6" },
-      "orange": { "fill": "#3E2723", "stroke": "#FFAB91" },
-      "green": { "fill": "#1B3D2F", "stroke": "#81C784" },
-      "purple": { "fill": "#311B92", "stroke": "#B39DDB" },
-      "yellow": { "fill": "#3E3500", "stroke": "#FFD54F" },
-      "red": { "fill": "#4A1C1C", "stroke": "#EF9A9A" },
-      "cyan": { "fill": "#004D56", "stroke": "#4DD0E1" },
-      "brown": { "fill": "#2C2C2C", "stroke": "#A1887F" },
-      "gray": { "fill": "#2A2F36", "stroke": "#757575" },
-      "amber": { "fill": "#3E3000", "stroke": "#FFB74D" },
-      "blue_gray": { "fill": "#2A2F36", "stroke": "#90A4AE" },
-      "start_green": { "fill": "#1B4332", "stroke": "#81C784" },
-      "end_red": { "fill": "#4A1C1C", "stroke": "#EF9A9A" },
-      "arch_blue": { "fill": "#1E3A5F", "stroke": "#64B5F6" },
-      "root": { "fill": "#4A148C", "stroke": "#CE93D8", "text_fill": "#FFFFFF" }
+      "blue": { "fill": "#1E1B4B", "stroke": "#4338CA", "text_fill": "#C7D2FE" },
+      "orange": { "fill": "#431407", "stroke": "#9A3412", "text_fill": "#FED7AA" },
+      "green": { "fill": "#022C22", "stroke": "#047857", "text_fill": "#A7F3D0" },
+      "purple": { "fill": "#2E1065", "stroke": "#6D28D9", "text_fill": "#DDD6FE" },
+      "yellow": { "fill": "#422006", "stroke": "#A16207", "text_fill": "#FEF08A" },
+      "red": { "fill": "#4C0519", "stroke": "#BE123C", "text_fill": "#FDA4AF" },
+      "cyan": { "fill": "#083344", "stroke": "#0E7490", "text_fill": "#A5F3FC" },
+      "brown": { "fill": "#1C1C21", "stroke": "#2D2D33", "text_fill": "#D6D3D1" },
+      "gray": { "fill": "#1C1C21", "stroke": "#2D2D33", "text_fill": "#D6D3D1" },
+      "amber": { "fill": "#451A03", "stroke": "#B45309", "text_fill": "#FDE68A" },
+      "blue_gray": { "fill": "#18181B", "stroke": "#27272A", "text_fill": "#D4D4D8" },
+      "start_green": { "fill": "#059669", "stroke": "#10B981", "text_fill": "#FFFFFF" },
+      "end_red": { "fill": "#E11D48", "stroke": "#FB7185", "text_fill": "#FFFFFF" },
+      "arch_blue": { "fill": "#1E1B4B", "stroke": "#4338CA", "text_fill": "#C7D2FE" },
+      "root": { "fill": "#6366F1", "stroke": "#818CF8", "text_fill": "#FFFFFF" }
     },
     "typography": {
-      "font_family": "'Noto Sans CJK SC', 'Segoe UI', sans-serif",
+      "font_family": "'Inter', 'Noto Sans CJK SC', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif",
       "title_size": 16,
       "label_size": 13,
       "small_size": 11,
       "font_weight_regular": 400,
       "font_weight_medium": 500,
-      "font_weight_bold": 700
+      "font_weight_bold": 600
     },
     "strokes": {
-      "thin": 1.0,
-      "normal": 1.5,
-      "thick": 2.0,
+      "thin": 0.75,
+      "normal": 1.0,
+      "thick": 1.5,
       "dashed": [
-        6,
+        4,
         3
       ],
       "dotted": [
-        2,
-        4
+        1.5,
+        3
       ]
     },
     "radius": {
-      "sm": 4,
-      "md": 8,
-      "lg": 12,
+      "sm": 6,
+      "md": 10,
+      "lg": 14,
       "pill": 999
     },
     "spacing": {
-      "node_padding_x": 12,
-      "node_padding_y": 8,
-      "group_padding": 16,
+      "node_padding_x": 14,
+      "node_padding_y": 9,
+      "group_padding": 18,
       "label_gap": 6
     },
     "effects": {
@@ -93,270 +98,327 @@
       "text_fill": "{colors.text}",
       "font_size": "{typography.label_size}",
       "radius": "{radius.md}",
-      "shape": "rounded_rect"
+      "shape": "rounded_rect",
+      "stroke_linecap": "round",
+      "stroke_linejoin": "round"
     },
     "edge": {
-      "stroke": "{colors.neutral_stroke}",
+      "stroke": "{colors.edge_stroke}",
       "stroke_width": "{strokes.normal}",
       "text_fill": "{colors.muted_text}",
-      "font_size": "{typography.small_size}"
+      "font_size": "{typography.small_size}",
+      "stroke_linecap": "round",
+      "stroke_linejoin": "round",
+      "stroke_opacity": 0.45,
+      "arrow_style": "normal",
+      "label_bg": "none",
+      "label_border": "none",
+      "label_bg_opacity": 0,
+      "label_border_width": 0,
+      "label_border_radius": 4,
+      "label_padding": 3
     },
     "group": {
       "fill": "{colors.group_fill}",
       "stroke": "{colors.group_stroke}",
       "stroke_width": "{strokes.normal}",
+      "stroke_dasharray": "5,4",
       "text_fill": "{colors.muted_text}",
-      "radius": "{radius.sm}"
+      "radius": "{radius.md}"
     }
   },
   "diagrams": {
     "flowchart": {
       "edge": {
-        "stroke": "{colors.neutral_stroke}"
+        "stroke": "{colors.edge_stroke}"
       },
       "entity_types": {
         "service": {
           "shape": "rounded_rect",
           "fill": "{role.blue.fill}",
-          "stroke": "{role.blue.stroke}"
+          "stroke": "{role.blue.stroke}",
+          "text_fill": "{role.blue.text_fill}",
+          "font_weight": "{typography.font_weight_medium}"
         },
         "database": {
           "shape": "cylinder",
           "fill": "{role.orange.fill}",
-          "stroke": "{role.orange.stroke}"
+          "stroke": "{role.orange.stroke}",
+          "text_fill": "{role.orange.text_fill}"
         },
         "person": {
           "shape": "person",
           "fill": "{role.green.fill}",
-          "stroke": "{role.green.stroke}"
+          "stroke": "{role.green.stroke}",
+          "text_fill": "{role.green.text_fill}"
         },
         "client": {
           "shape": "rounded_rect",
           "fill": "{role.purple.fill}",
-          "stroke": "{role.purple.stroke}"
+          "stroke": "{role.purple.stroke}",
+          "text_fill": "{role.purple.text_fill}"
         },
         "queue": {
           "shape": "rounded_rect",
           "fill": "{role.yellow.fill}",
-          "stroke": "{role.yellow.stroke}"
+          "stroke": "{role.yellow.stroke}",
+          "text_fill": "{role.yellow.text_fill}"
         },
         "cache": {
           "shape": "rounded_rect",
           "fill": "{role.red.fill}",
-          "stroke": "{role.red.stroke}"
+          "stroke": "{role.red.stroke}",
+          "text_fill": "{role.red.text_fill}"
         },
         "gateway": {
-          "shape": "rounded_rect",
+          "shape": "diamond",
           "fill": "{role.cyan.fill}",
-          "stroke": "{role.cyan.stroke}"
+          "stroke": "{role.cyan.stroke}",
+          "text_fill": "{role.cyan.text_fill}"
         },
         "storage": {
           "shape": "rounded_rect",
           "fill": "{role.brown.fill}",
-          "stroke": "{role.brown.stroke}"
+          "stroke": "{role.brown.stroke}",
+          "text_fill": "{role.brown.text_fill}"
         },
         "external": {
           "shape": "rounded_rect",
-          "stroke_dasharray": "5,3",
+          "stroke_dasharray": "4,3",
           "fill": "{role.gray.fill}",
-          "stroke": "{role.gray.stroke}"
+          "stroke": "{role.gray.stroke}",
+          "text_fill": "{role.gray.text_fill}"
         },
         "decision": {
           "shape": "diamond",
           "fill": "{role.amber.fill}",
-          "stroke": "{role.amber.stroke}"
+          "stroke": "{role.amber.stroke}",
+          "text_fill": "{role.amber.text_fill}"
         },
         "process": {
           "shape": "rounded_rect",
-          "fill": "{role.blue_gray.fill}",
-          "stroke": "{role.blue_gray.stroke}"
+          "fill": "{colors.neutral_fill}",
+          "stroke": "{colors.neutral_stroke}",
+          "text_fill": "{colors.text}"
         },
         "start": {
           "shape": "stadium",
           "fill": "{role.start_green.fill}",
-          "stroke": "{role.start_green.stroke}"
+          "stroke": "{role.start_green.stroke}",
+          "text_fill": "{role.start_green.text_fill}",
+          "font_weight": "{typography.font_weight_medium}"
         },
         "end": {
           "shape": "stadium",
           "fill": "{role.end_red.fill}",
-          "stroke": "{role.end_red.stroke}"
+          "stroke": "{role.end_red.stroke}",
+          "text_fill": "{role.end_red.text_fill}",
+          "font_weight": "{typography.font_weight_medium}"
         }
       },
       "context_palettes": {
         "group_nest": {
           "entries": [
-            { "fill": "{darken({colors.group_fill}, 0.0)}", "stroke": "{darken({colors.group_stroke}, 0.0)}", "stroke_width": 2.0, "border_radius": 8.0 },
-            { "fill": "{darken({colors.group_fill}, 0.15)}", "stroke": "{darken({colors.group_stroke}, 0.12)}", "stroke_width": 1.5, "border_radius": 6.0 },
-            { "fill": "{darken({colors.group_fill}, 0.25)}", "stroke": "{darken({colors.group_stroke}, 0.20)}", "stroke_width": 1.5, "border_radius": 6.0 },
-            { "fill": "{darken({colors.group_fill}, 0.35)}", "stroke": "{darken({colors.group_stroke}, 0.28)}", "stroke_width": 1.5, "border_radius": 6.0 }
+            { "fill": "transparent", "stroke": "{colors.group_stroke}", "stroke_width": 1.0, "border_radius": 10.0, "stroke_dasharray": "5,4" },
+            { "fill": "{colors.neutral_fill}", "stroke": "{colors.border}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "{lighten({colors.neutral_fill}, 0.05)}", "stroke": "{colors.border}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "{lighten({colors.neutral_fill}, 0.10)}", "stroke": "{colors.group_stroke}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" }
           ],
           "index": { "from": "group_depth", "cap": 3 },
           "bindings": [
-            { "target": "group", "fields": { "fill": "fill", "stroke": "stroke", "stroke_width": "stroke_width", "border_radius": "border_radius" } }
+            { "target": "group", "fields": { "fill": "fill", "stroke": "stroke", "stroke_width": "stroke_width", "border_radius": "border_radius", "stroke_dasharray": "stroke_dasharray" } }
           ]
         }
       }
     },
     "sequence": {
       "edge": {
-        "stroke": "{colors.neutral_stroke}"
+        "stroke": "{colors.edge_stroke}",
+        "stroke_opacity": 0.5
       },
       "entity_types": {
         "participant": {
           "shape": "rect",
-          "fill": "{role.blue_gray.fill}",
-          "stroke": "{role.blue_gray.stroke}"
+          "fill": "{colors.neutral_fill}",
+          "stroke": "{colors.neutral_stroke}"
         },
         "actor": {
           "shape": "rect",
           "fill": "{role.blue.fill}",
-          "stroke": "{role.blue.stroke}"
+          "stroke": "{role.blue.stroke}",
+          "text_fill": "{role.blue.text_fill}"
         },
         "boundary": {
           "shape": "rect",
           "fill": "{role.orange.fill}",
-          "stroke": "{role.orange.stroke}"
+          "stroke": "{role.orange.stroke}",
+          "text_fill": "{role.orange.text_fill}"
         },
         "control": {
           "shape": "rect",
           "fill": "{role.green.fill}",
-          "stroke": "{role.green.stroke}"
+          "stroke": "{role.green.stroke}",
+          "text_fill": "{role.green.text_fill}"
         },
         "entity": {
           "shape": "rect",
           "fill": "{role.purple.fill}",
-          "stroke": "{role.purple.stroke}"
+          "stroke": "{role.purple.stroke}",
+          "text_fill": "{role.purple.text_fill}"
         },
         "database": {
           "shape": "cylinder",
           "fill": "{role.yellow.fill}",
-          "stroke": "{role.yellow.stroke}"
+          "stroke": "{role.yellow.stroke}",
+          "text_fill": "{role.yellow.text_fill}"
         }
       }
     },
     "state": {
       "edge": {
-        "stroke": "{colors.neutral_stroke}"
+        "stroke": "{colors.edge_stroke}"
       },
       "entity_types": {
         "initial": {
           "shape": "circle",
-          "fill": "{role.start_green.fill}",
-          "stroke": "{role.start_green.stroke}"
+          "fill": "{colors.text}",
+          "stroke": "{colors.text}",
+          "radius": 12
         },
         "state": {
           "shape": "rounded_rect",
           "fill": "{role.blue.fill}",
-          "stroke": "{role.blue.stroke}"
+          "stroke": "{role.blue.stroke}",
+          "text_fill": "{role.blue.text_fill}"
         },
         "final": {
           "shape": "circle",
           "fill": "{role.end_red.fill}",
-          "stroke": "{role.end_red.stroke}"
+          "stroke": "{role.end_red.stroke}",
+          "text_fill": "{role.end_red.text_fill}",
+          "radius": 14,
+          "stroke_width": 2.0
         },
         "choice": {
           "shape": "diamond",
           "fill": "{role.amber.fill}",
-          "stroke": "{role.amber.stroke}"
+          "stroke": "{role.amber.stroke}",
+          "text_fill": "{role.amber.text_fill}"
         }
       }
     },
     "architecture": {
       "edge": {
-        "stroke": "{colors.neutral_stroke}"
+        "stroke": "{colors.border_strong}",
+        "stroke_opacity": 0.4
       },
       "group": {
-        "stroke": "{colors.primary}",
-        "stroke_width": "{strokes.thick}"
+        "stroke": "{colors.border_strong}",
+        "stroke_width": "{strokes.normal}",
+        "stroke_dasharray": "none",
+        "fill": "{colors.neutral_fill}"
       },
       "entity_types": {
         "frontend": {
           "shape": "rect",
           "fill": "{role.arch_blue.fill}",
-          "stroke": "{role.arch_blue.stroke}"
+          "stroke": "{role.arch_blue.stroke}",
+          "text_fill": "{role.arch_blue.text_fill}"
         },
         "backend": {
           "shape": "rounded_rect",
           "fill": "{role.green.fill}",
-          "stroke": "{role.green.stroke}"
+          "stroke": "{role.green.stroke}",
+          "text_fill": "{role.green.text_fill}"
         },
         "service": {
           "shape": "rounded_rect",
           "fill": "{role.green.fill}",
-          "stroke": "{role.green.stroke}"
+          "stroke": "{role.green.stroke}",
+          "text_fill": "{role.green.text_fill}"
         },
         "database": {
           "shape": "cylinder",
           "fill": "{role.orange.fill}",
-          "stroke": "{role.orange.stroke}"
+          "stroke": "{role.orange.stroke}",
+          "text_fill": "{role.orange.text_fill}"
         },
         "gateway": {
           "shape": "hexagon",
           "fill": "{role.cyan.fill}",
-          "stroke": "{role.cyan.stroke}"
+          "stroke": "{role.cyan.stroke}",
+          "text_fill": "{role.cyan.text_fill}"
         },
         "cache": {
           "shape": "diamond",
           "fill": "{role.red.fill}",
-          "stroke": "{role.red.stroke}"
+          "stroke": "{role.red.stroke}",
+          "text_fill": "{role.red.text_fill}"
         },
         "queue": {
           "shape": "rect",
           "transform": "skewX(-10)",
           "fill": "{role.yellow.fill}",
-          "stroke": "{role.yellow.stroke}"
+          "stroke": "{role.yellow.stroke}",
+          "text_fill": "{role.yellow.text_fill}"
         },
         "storage": {
           "shape": "rect",
           "fill": "{role.brown.fill}",
-          "stroke": "{role.brown.stroke}"
+          "stroke": "{role.brown.stroke}",
+          "text_fill": "{role.brown.text_fill}"
         },
         "external": {
           "shape": "rect",
-          "stroke_dasharray": "5,3",
+          "stroke_dasharray": "4,3",
           "fill": "{role.gray.fill}",
-          "stroke": "{role.gray.stroke}"
+          "stroke": "{role.gray.stroke}",
+          "text_fill": "{role.gray.text_fill}"
         },
         "client": {
           "shape": "rect",
           "fill": "{role.purple.fill}",
-          "stroke": "{role.purple.stroke}"
+          "stroke": "{role.purple.stroke}",
+          "text_fill": "{role.purple.text_fill}"
         },
         "person": {
           "shape": "person",
           "fill": "{role.green.fill}",
-          "stroke": "{role.green.stroke}"
+          "stroke": "{role.green.stroke}",
+          "text_fill": "{role.green.text_fill}"
         }
       },
       "context_palettes": {
         "group_nest": {
           "entries": [
-            { "fill": "{darken({colors.group_fill}, 0.0)}", "stroke": "{darken({colors.primary}, 0.0)}", "stroke_width": 2.0, "border_radius": 8.0 },
-            { "fill": "{darken({colors.group_fill}, 0.15)}", "stroke": "{darken({colors.primary}, 0.12)}", "stroke_width": 1.5, "border_radius": 6.0 },
-            { "fill": "{darken({colors.group_fill}, 0.25)}", "stroke": "{darken({colors.primary}, 0.20)}", "stroke_width": 1.5, "border_radius": 6.0 },
-            { "fill": "{darken({colors.group_fill}, 0.35)}", "stroke": "{darken({colors.primary}, 0.28)}", "stroke_width": 1.5, "border_radius": 6.0 }
+            { "fill": "{colors.neutral_fill}", "stroke": "{colors.primary}", "stroke_width": 1.2, "border_radius": 10.0, "stroke_dasharray": "none", "stroke_opacity": 0.7 },
+            { "fill": "{lighten({colors.neutral_fill}, 0.04)}", "stroke": "{lighten({colors.primary}, 0.10)}", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none", "stroke_opacity": 0.45 },
+            { "fill": "{lighten({colors.neutral_fill}, 0.08)}", "stroke": "{lighten({colors.primary}, 0.20)}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none", "stroke_opacity": 0.3 },
+            { "fill": "{lighten({colors.neutral_fill}, 0.12)}", "stroke": "{lighten({colors.primary}, 0.30)}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none", "stroke_opacity": 0.2 }
           ],
           "index": { "from": "group_depth", "cap": 3 },
           "bindings": [
-            { "target": "group", "fields": { "fill": "fill", "stroke": "stroke", "stroke_width": "stroke_width", "border_radius": "border_radius" } }
+            { "target": "group", "fields": { "fill": "fill", "stroke": "stroke", "stroke_width": "stroke_width", "border_radius": "border_radius", "stroke_dasharray": "stroke_dasharray", "stroke_opacity": "stroke_opacity" } }
           ]
         }
       }
     },
     "er": {
       "node": {
-        "fill": "#22262B",
-        "stroke": "#64B5F6",
+        "fill": "{colors.neutral_fill}",
+        "stroke": "{colors.primary}",
         "stroke_width": "{strokes.normal}",
         "radius": "{radius.sm}"
       },
       "edge": {
-        "stroke": "{colors.neutral_stroke}"
+        "stroke": "{colors.border_strong}"
       }
     },
     "mindmap": {
       "edge": {
-        "stroke_width": "{strokes.thin}"
+        "stroke_width": "{strokes.thin}",
+        "stroke_opacity": 0.4,
+        "stroke": "{colors.edge_stroke}"
       },
       "node": {
         "radius": "{radius.lg}"
@@ -371,43 +433,47 @@
         },
         "main": {
           "shape": "rounded_rect",
-          "label_weight": "medium"
+          "label_weight": "medium",
+          "fill": "{role.blue.fill}",
+          "stroke": "{role.blue.stroke}",
+          "text_fill": "{role.blue.text_fill}"
         },
         "branch": {
           "shape": "rounded_rect"
         },
         "leaf": {
           "shape": "rounded_rect",
-          "fill": "#2D2B55",
+          "fill": "transparent",
+          "stroke": "transparent",
           "font_size": "{typography.small_size}"
         }
       },
       "context_palettes": {
         "branch": {
           "entries": [
-            { "fill": "#2D2B55", "stroke": "#7986CB", "edge_stroke": "#7986CB" },
-            { "fill": "#E5F5F3", "stroke": "#26A69A", "edge_stroke": "#4DB6AC" },
-            { "fill": "#FDECEC", "stroke": "#EF5350", "edge_stroke": "#E57373" },
-            { "fill": "#FFF4E5", "stroke": "#FB8C00", "edge_stroke": "#FFB74D" },
-            { "fill": "#F6EBFA", "stroke": "#AB47BC", "edge_stroke": "#BA68C8" },
-            { "fill": "#EAF5EB", "stroke": "#43A047", "edge_stroke": "#66BB6A" }
+            { "fill": "{role.blue.fill}", "stroke": "{role.blue.stroke}", "text_fill": "{role.blue.text_fill}", "edge_stroke": "#4338CA" },
+            { "fill": "{role.cyan.fill}", "stroke": "{role.cyan.stroke}", "text_fill": "{role.cyan.text_fill}", "edge_stroke": "#0E7490" },
+            { "fill": "{role.red.fill}", "stroke": "{role.red.stroke}", "text_fill": "{role.red.text_fill}", "edge_stroke": "#BE123C" },
+            { "fill": "{role.orange.fill}", "stroke": "{role.orange.stroke}", "text_fill": "{role.orange.text_fill}", "edge_stroke": "#9A3412" },
+            { "fill": "{role.purple.fill}", "stroke": "{role.purple.stroke}", "text_fill": "{role.purple.text_fill}", "edge_stroke": "#6D28D9" },
+            { "fill": "{role.green.fill}", "stroke": "{role.green.stroke}", "text_fill": "{role.green.text_fill}", "edge_stroke": "#047857" }
           ],
           "index": { "from": "branch_slot", "wrap": true },
           "bindings": [
-            { "target": "entity", "types": ["main", "branch"], "fields": { "fill": "fill", "stroke": "stroke" } },
+            { "target": "entity", "types": ["main", "branch"], "fields": { "fill": "fill", "stroke": "stroke", "text_fill": "text_fill" } },
             { "target": "entity", "types": ["leaf"], "fields": { "stroke": "stroke" } },
             { "target": "edge", "fields": { "stroke": "edge_stroke" } }
           ]
         },
         "edge_depth": {
           "entries": [
-            { "stroke_width": 3.0 },
-            { "stroke_width": 2.25 },
-            { "stroke_width": 1.75 }
+            { "stroke_width": 1.5, "stroke_opacity": 0.5 },
+            { "stroke_width": 1.0, "stroke_opacity": 0.35 },
+            { "stroke_width": 0.75, "stroke_opacity": 0.25 }
           ],
           "index": { "from": "tree_depth" },
           "bindings": [
-            { "target": "edge", "fields": { "stroke_width": "stroke_width" } }
+            { "target": "edge", "fields": { "stroke_width": "stroke_width", "stroke_opacity": "stroke_opacity" } }
           ]
         }
       }

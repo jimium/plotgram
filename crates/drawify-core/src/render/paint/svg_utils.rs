@@ -7,7 +7,7 @@ use crate::layout::geometry::Point;
 use crate::layout::{EdgeLabelLayout, EdgeLayout, PathGeometry};
 use crate::render::CompiledRenderContext;
 use crate::render::scene::ExportScene;
-use crate::render::visual::{EdgeLabelStyle, EdgeStyle, LabelRotation, NodeStyle};
+use crate::render::visual::{ArrowStyle, EdgeLabelStyle, EdgeStyle, LabelRotation, NodeStyle};
 use std::fmt::Write;
 
 pub const ARROW_SIZE: f64 = 8.0;
@@ -198,11 +198,15 @@ pub fn render_groups(
         let group = export_group.group;
         let gl = &export_group.layout;
         super::svg_debug::open_group_g(group, svg);
-        let stroke_dash = match group.attributes.standard.get("border_style") {
-            Some(AttributeValue::String(ref s)) if s == "dashed" => "stroke-dasharray=\"8,4\"",
-            Some(AttributeValue::String(ref s)) if s == "dotted" => "stroke-dasharray=\"2,4\"",
-            _ => "",
-        };
+        let dash_attr = export_group
+            .stroke_dasharray
+            .as_deref()
+            .map(|d| format!(r#" stroke-dasharray="{d}""#))
+            .unwrap_or_default();
+        let opacity_attr = export_group
+            .stroke_opacity
+            .map(|o| format!(r#" stroke-opacity="{o:.2}""#))
+            .unwrap_or_default();
         let label = escape_xml(&group.label);
         let shadow_attr = if export_group.has_shadow {
             r#" filter="url(#group-shadow)""#
@@ -212,7 +216,7 @@ pub fn render_groups(
 
         writeln!(
             svg,
-            r##"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_width}" {stroke_dash}{shadow_attr}/>"##,
+            r##"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_width}"{dash_attr}{opacity_attr}{shadow_attr}/>"##,
             x = gl.x, y = gl.y, w = gl.width, h = gl.height,
             rx = export_group.border_radius,
             fill = export_group.fill,
@@ -366,10 +370,11 @@ pub fn render_bundled_edge_path(
         return;
     }
 
-    let paint_attrs = super::style_mapping::edge_paint_attrs(style, dash_pattern);
+    let paint_attrs = super::style_mapping::edge_paint_attrs_no_stroke_opacity(style, dash_pattern);
     let base_width = style.stroke_width;
     let trunk_width = base_width * (bundle.bundle_size as f64).sqrt();
-    let alpha = BUNDLE_STROKE_ALPHA;
+    let base_alpha = style.stroke_opacity.unwrap_or(1.0);
+    let alpha = base_alpha * BUNDLE_STROKE_ALPHA;
     let n = spans.len();
 
     for (i, span) in spans.iter().enumerate() {
@@ -398,7 +403,7 @@ pub fn render_bundled_edge_path(
 
         writeln!(
             svg,
-            r##"<path d="{d}" fill="none" stroke="{stroke}" stroke-width="{width}" stroke-opacity="{alpha}" {paint_attrs} marker-end="{m_end}" marker-start="{m_start}"/>"##,
+            r##"<path d="{d}" fill="none" stroke="{stroke}" stroke-width="{width}" stroke-opacity="{alpha:.2}" {paint_attrs} marker-end="{m_end}" marker-start="{m_start}"/>"##,
         )
         .unwrap();
     }
@@ -474,12 +479,20 @@ fn unit(a: Point, b: Point) -> (f64, f64, f64) {
     }
 }
 
-/// 根据 ArrowType 获取箭头样式
+/// 根据 ArrowType 和 EdgeStyle.arrow 获取箭头样式
 pub fn arrow_style<'a>(
     relation: &Relation,
     style: &'a EdgeStyle,
     passive_stroke: &'a str,
 ) -> (&'a str, &'static str, &'static str, &'static str) {
+    if matches!(style.arrow, ArrowStyle::None) {
+        return match relation.arrow {
+            ArrowType::Active => (&style.stroke, "", "", ""),
+            ArrowType::Passive => (passive_stroke, "6,3", "", ""),
+            ArrowType::Bidirectional => (&style.stroke, "", "", ""),
+        };
+    }
+
     let dash = if matches!(relation.arrow, ArrowType::Passive) {
         "6,3"
     } else {

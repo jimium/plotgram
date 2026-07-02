@@ -16,6 +16,8 @@ pub struct NodeStyle {
     pub radius: Option<f64>,
     pub label_weight: Option<String>,
     pub hand_drawn: bool,
+    pub fill_opacity: Option<f64>,
+    pub stroke_opacity: Option<f64>,
 }
 
 impl Default for NodeStyle {
@@ -32,6 +34,8 @@ impl Default for NodeStyle {
             radius: None,
             label_weight: None,
             hand_drawn: false,
+            fill_opacity: None,
+            stroke_opacity: None,
         }
     }
 }
@@ -83,6 +87,7 @@ pub struct EdgeStyle {
     pub stroke_linejoin: Option<String>,
     pub hand_drawn: bool,
     pub arrow: ArrowStyle,
+    pub stroke_opacity: Option<f64>,
     /// 边标签样式（独立于边的描边样式）
     pub label_style: EdgeLabelStyle,
 }
@@ -98,6 +103,7 @@ impl Default for EdgeStyle {
             stroke_linejoin: None,
             hand_drawn: false,
             arrow: ArrowStyle::Normal,
+            stroke_opacity: None,
             label_style: EdgeLabelStyle::default(),
         }
     }

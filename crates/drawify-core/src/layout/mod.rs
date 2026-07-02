@@ -584,6 +584,14 @@ pub struct OrthoDebugStats {
     pub nudge_failed: usize,
     /// X-2 反向 stub 端口翻转成功的边数
     pub flipped_stub_edges: usize,
+    /// X-3 lane assignment 检测到的车道组数
+    pub lane_groups: usize,
+    /// X-3 lane assignment 成功偏移的段数
+    pub lane_segments_shifted: usize,
+    /// X-3 lane assignment 偏移失败的段数
+    pub lane_shifts_failed: usize,
+    /// Phase 3: reroute 时构建的通道负载图的最大负载值
+    pub max_channel_load: usize,
 }
 
 impl OrthoDebugStats {

@@ -1,10 +1,25 @@
 {
   "version": 1,
-  "updated": "2026-06-29T01:46:08+00:00",
+  "updated": "2026-06-30T16:55:34+00:00",
   "charts": {
     "flowchart/s.linear-chain.svg": {
       "dfy": "flowchart/s.linear-chain.dfy",
       "entries": [
+        {
+          "id": "20260630-165533",
+          "file": ".history/flowchart/s.linear-chain/20260630-165533.svg",
+          "savedAt": "2026-06-30T16:55:33+00:00"
+        },
+        {
+          "id": "20260630-162446",
+          "file": ".history/flowchart/s.linear-chain/20260630-162446.svg",
+          "savedAt": "2026-06-30T16:24:46+00:00"
+        },
+        {
+          "id": "20260630-140919",
+          "file": ".history/flowchart/s.linear-chain/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
         {
           "id": "20260624-185535",
           "file": ".history/flowchart/s.linear-chain/20260624-185535.svg",
@@ -35,6 +50,16 @@
     "architecture/c.drawify-core-mod-deps.svg": {
       "dfy": "architecture/c.drawify-core-mod-deps.dfy",
       "entries": [
+        {
+          "id": "20260630-165530",
+          "file": ".history/architecture/c.drawify-core-mod-deps/20260630-165530.svg",
+          "savedAt": "2026-06-30T16:55:30+00:00"
+        },
+        {
+          "id": "20260630-140917",
+          "file": ".history/architecture/c.drawify-core-mod-deps/20260630-140917.svg",
+          "savedAt": "2026-06-30T14:09:17+00:00"
+        },
         {
           "id": "20260629-014605",
           "file": ".history/architecture/c.drawify-core-mod-deps/20260629-014605.svg",
@@ -261,6 +286,16 @@
       "dfy": "architecture/c.hybrid-cloud-dr-topology.dfy",
       "entries": [
         {
+          "id": "20260630-165530",
+          "file": ".history/architecture/c.hybrid-cloud-dr-topology/20260630-165530.svg",
+          "savedAt": "2026-06-30T16:55:30+00:00"
+        },
+        {
+          "id": "20260630-140917",
+          "file": ".history/architecture/c.hybrid-cloud-dr-topology/20260630-140917.svg",
+          "savedAt": "2026-06-30T14:09:17+00:00"
+        },
+        {
           "id": "20260629-014605",
           "file": ".history/architecture/c.hybrid-cloud-dr-topology/20260629-014605.svg",
           "savedAt": "2026-06-29T01:46:05+00:00"
@@ -440,6 +475,16 @@
     "architecture/c.k8s-blue-green-release-topology.svg": {
       "dfy": "architecture/c.k8s-blue-green-release-topology.dfy",
       "entries": [
+        {
+          "id": "20260630-165530",
+          "file": ".history/architecture/c.k8s-blue-green-release-topology/20260630-165530.svg",
+          "savedAt": "2026-06-30T16:55:30+00:00"
+        },
+        {
+          "id": "20260630-140917",
+          "file": ".history/architecture/c.k8s-blue-green-release-topology/20260630-140917.svg",
+          "savedAt": "2026-06-30T14:09:17+00:00"
+        },
         {
           "id": "20260629-014605",
           "file": ".history/architecture/c.k8s-blue-green-release-topology/20260629-014605.svg",
@@ -631,6 +676,16 @@
       "dfy": "architecture/c.k8s-multi-namespace-overview.dfy",
       "entries": [
         {
+          "id": "20260630-165531",
+          "file": ".history/architecture/c.k8s-multi-namespace-overview/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-140917",
+          "file": ".history/architecture/c.k8s-multi-namespace-overview/20260630-140917.svg",
+          "savedAt": "2026-06-30T14:09:17+00:00"
+        },
+        {
           "id": "20260629-014606",
           "file": ".history/architecture/c.k8s-multi-namespace-overview/20260629-014606.svg",
           "savedAt": "2026-06-29T01:46:06+00:00"
@@ -790,6 +845,16 @@
     "architecture/c.k8s-tenant-isolation.svg": {
       "dfy": "architecture/c.k8s-tenant-isolation.dfy",
       "entries": [
+        {
+          "id": "20260630-165531",
+          "file": ".history/architecture/c.k8s-tenant-isolation/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-140917",
+          "file": ".history/architecture/c.k8s-tenant-isolation/20260630-140917.svg",
+          "savedAt": "2026-06-30T14:09:17+00:00"
+        },
         {
           "id": "20260629-014606",
           "file": ".history/architecture/c.k8s-tenant-isolation/20260629-014606.svg",
@@ -996,6 +1061,21 @@
       "dfy": "architecture/n.d2-cell-tower-network.dfy",
       "entries": [
         {
+          "id": "20260630-165531",
+          "file": ".history/architecture/n.d2-cell-tower-network/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-162444",
+          "file": ".history/architecture/n.d2-cell-tower-network/20260630-162444.svg",
+          "savedAt": "2026-06-30T16:24:44+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/architecture/n.d2-cell-tower-network/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
+        {
           "id": "20260629-014606",
           "file": ".history/architecture/n.d2-cell-tower-network/20260629-014606.svg",
           "savedAt": "2026-06-29T01:46:06+00:00"
@@ -1141,6 +1221,21 @@
       "dfy": "state/c.document-sync-lifecycle.dfy",
       "entries": [
         {
+          "id": "20260630-165534",
+          "file": ".history/state/c.document-sync-lifecycle/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/state/c.document-sync-lifecycle/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/state/c.document-sync-lifecycle/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
+        {
           "id": "20260624-185538",
           "file": ".history/state/c.document-sync-lifecycle/20260624-185538.svg",
           "savedAt": "2026-06-24T18:55:38+00:00"
@@ -1190,6 +1285,21 @@
     "state/c.k8s-node-pressure-lifecycle.svg": {
       "dfy": "state/c.k8s-node-pressure-lifecycle.dfy",
       "entries": [
+        {
+          "id": "20260630-165534",
+          "file": ".history/state/c.k8s-node-pressure-lifecycle/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/state/c.k8s-node-pressure-lifecycle/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/state/c.k8s-node-pressure-lifecycle/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
         {
           "id": "20260624-185538",
           "file": ".history/state/c.k8s-node-pressure-lifecycle/20260624-185538.svg",
@@ -1251,6 +1361,21 @@
       "dfy": "state/c.k8s-rollout-state-machine.dfy",
       "entries": [
         {
+          "id": "20260630-165534",
+          "file": ".history/state/c.k8s-rollout-state-machine/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/state/c.k8s-rollout-state-machine/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/state/c.k8s-rollout-state-machine/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
+        {
           "id": "20260624-185538",
           "file": ".history/state/c.k8s-rollout-state-machine/20260624-185538.svg",
           "savedAt": "2026-06-24T18:55:38+00:00"
@@ -1300,6 +1425,21 @@
     "state/c.payment-flow.svg": {
       "dfy": "state/c.payment-flow.dfy",
       "entries": [
+        {
+          "id": "20260630-165534",
+          "file": ".history/state/c.payment-flow/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/state/c.payment-flow/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140921",
+          "file": ".history/state/c.payment-flow/20260630-140921.svg",
+          "savedAt": "2026-06-30T14:09:21+00:00"
+        },
         {
           "id": "20260624-185538",
           "file": ".history/state/c.payment-flow/20260624-185538.svg",
@@ -1361,6 +1501,21 @@
       "dfy": "state/c.service-degradation-lifecycle.dfy",
       "entries": [
         {
+          "id": "20260630-165534",
+          "file": ".history/state/c.service-degradation-lifecycle/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/state/c.service-degradation-lifecycle/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140921",
+          "file": ".history/state/c.service-degradation-lifecycle/20260630-140921.svg",
+          "savedAt": "2026-06-30T14:09:21+00:00"
+        },
+        {
           "id": "20260624-185539",
           "file": ".history/state/c.service-degradation-lifecycle/20260624-185539.svg",
           "savedAt": "2026-06-24T18:55:39+00:00"
@@ -1421,6 +1576,21 @@
       "dfy": "state/c.settlement-reconciliation-lifecycle.dfy",
       "entries": [
         {
+          "id": "20260630-165534",
+          "file": ".history/state/c.settlement-reconciliation-lifecycle/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/state/c.settlement-reconciliation-lifecycle/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140921",
+          "file": ".history/state/c.settlement-reconciliation-lifecycle/20260630-140921.svg",
+          "savedAt": "2026-06-30T14:09:21+00:00"
+        },
+        {
           "id": "20260624-185539",
           "file": ".history/state/c.settlement-reconciliation-lifecycle/20260624-185539.svg",
           "savedAt": "2026-06-24T18:55:39+00:00"
@@ -1470,6 +1640,21 @@
     "state/c.tcp-connection.svg": {
       "dfy": "state/c.tcp-connection.dfy",
       "entries": [
+        {
+          "id": "20260630-165534",
+          "file": ".history/state/c.tcp-connection/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/state/c.tcp-connection/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140921",
+          "file": ".history/state/c.tcp-connection/20260630-140921.svg",
+          "savedAt": "2026-06-30T14:09:21+00:00"
+        },
         {
           "id": "20260626-080218",
           "file": ".history/state/c.tcp-connection/20260626-080218.svg",
@@ -1521,6 +1706,21 @@
       "dfy": "state/n.order-lifecycle.dfy",
       "entries": [
         {
+          "id": "20260630-165534",
+          "file": ".history/state/n.order-lifecycle/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/state/n.order-lifecycle/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140921",
+          "file": ".history/state/n.order-lifecycle/20260630-140921.svg",
+          "savedAt": "2026-06-30T14:09:21+00:00"
+        },
+        {
           "id": "20260624-185539",
           "file": ".history/state/n.order-lifecycle/20260624-185539.svg",
           "savedAt": "2026-06-24T18:55:39+00:00"
@@ -1571,6 +1771,21 @@
       "dfy": "state/n.ticket-workflow.dfy",
       "entries": [
         {
+          "id": "20260630-165534",
+          "file": ".history/state/n.ticket-workflow/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162448",
+          "file": ".history/state/n.ticket-workflow/20260630-162448.svg",
+          "savedAt": "2026-06-30T16:24:48+00:00"
+        },
+        {
+          "id": "20260630-140921",
+          "file": ".history/state/n.ticket-workflow/20260630-140921.svg",
+          "savedAt": "2026-06-30T14:09:21+00:00"
+        },
+        {
           "id": "20260624-185539",
           "file": ".history/state/n.ticket-workflow/20260624-185539.svg",
           "savedAt": "2026-06-24T18:55:39+00:00"
@@ -1620,6 +1835,21 @@
     "architecture/c.ai-agent-docops-pipeline.svg": {
       "dfy": "architecture/c.ai-agent-docops-pipeline.dfy",
       "entries": [
+        {
+          "id": "20260630-165530",
+          "file": ".history/architecture/c.ai-agent-docops-pipeline/20260630-165530.svg",
+          "savedAt": "2026-06-30T16:55:30+00:00"
+        },
+        {
+          "id": "20260630-162443",
+          "file": ".history/architecture/c.ai-agent-docops-pipeline/20260630-162443.svg",
+          "savedAt": "2026-06-30T16:24:43+00:00"
+        },
+        {
+          "id": "20260630-140916",
+          "file": ".history/architecture/c.ai-agent-docops-pipeline/20260630-140916.svg",
+          "savedAt": "2026-06-30T14:09:16+00:00"
+        },
         {
           "id": "20260629-014605",
           "file": ".history/architecture/c.ai-agent-docops-pipeline/20260629-014605.svg",
@@ -1796,6 +2026,16 @@
       "dfy": "architecture/c.data-lineage-platform.dfy",
       "entries": [
         {
+          "id": "20260630-165530",
+          "file": ".history/architecture/c.data-lineage-platform/20260630-165530.svg",
+          "savedAt": "2026-06-30T16:55:30+00:00"
+        },
+        {
+          "id": "20260630-140916",
+          "file": ".history/architecture/c.data-lineage-platform/20260630-140916.svg",
+          "savedAt": "2026-06-30T14:09:16+00:00"
+        },
+        {
           "id": "20260629-014605",
           "file": ".history/architecture/c.data-lineage-platform/20260629-014605.svg",
           "savedAt": "2026-06-29T01:46:05+00:00"
@@ -1950,6 +2190,16 @@
     "architecture/c.k8s-multi-cluster-federation.svg": {
       "dfy": "architecture/c.k8s-multi-cluster-federation.dfy",
       "entries": [
+        {
+          "id": "20260630-165530",
+          "file": ".history/architecture/c.k8s-multi-cluster-federation/20260630-165530.svg",
+          "savedAt": "2026-06-30T16:55:30+00:00"
+        },
+        {
+          "id": "20260630-140917",
+          "file": ".history/architecture/c.k8s-multi-cluster-federation/20260630-140917.svg",
+          "savedAt": "2026-06-30T14:09:17+00:00"
+        },
         {
           "id": "20260629-014605",
           "file": ".history/architecture/c.k8s-multi-cluster-federation/20260629-014605.svg",
@@ -2136,6 +2386,16 @@
       "dfy": "er/c.saas-schema.dfy",
       "entries": [
         {
+          "id": "20260630-165532",
+          "file": ".history/er/c.saas-schema/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/er/c.saas-schema/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
+        {
           "id": "20260626-175714",
           "file": ".history/er/c.saas-schema/20260626-175714.svg",
           "savedAt": "2026-06-26T17:57:14+00:00"
@@ -2180,6 +2440,21 @@
     "flowchart/c.layout-stress-dag.svg": {
       "dfy": "flowchart/c.layout-stress-dag.dfy",
       "entries": [
+        {
+          "id": "20260630-165532",
+          "file": ".history/flowchart/c.layout-stress-dag/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-162445",
+          "file": ".history/flowchart/c.layout-stress-dag/20260630-162445.svg",
+          "savedAt": "2026-06-30T16:24:45+00:00"
+        },
+        {
+          "id": "20260630-140919",
+          "file": ".history/flowchart/c.layout-stress-dag/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
         {
           "id": "20260629-014607",
           "file": ".history/flowchart/c.layout-stress-dag/20260629-014607.svg",
@@ -2280,6 +2555,16 @@
     "architecture/c.layout-stress-nested.svg": {
       "dfy": "architecture/c.layout-stress-nested.dfy",
       "entries": [
+        {
+          "id": "20260630-165531",
+          "file": ".history/architecture/c.layout-stress-nested/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-140917",
+          "file": ".history/architecture/c.layout-stress-nested/20260630-140917.svg",
+          "savedAt": "2026-06-30T14:09:17+00:00"
+        },
         {
           "id": "20260629-014606",
           "file": ".history/architecture/c.layout-stress-nested/20260629-014606.svg",
@@ -2436,6 +2721,16 @@
       "dfy": "architecture/c.payment-clearing-platform.dfy",
       "entries": [
         {
+          "id": "20260630-165531",
+          "file": ".history/architecture/c.payment-clearing-platform/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-140917",
+          "file": ".history/architecture/c.payment-clearing-platform/20260630-140917.svg",
+          "savedAt": "2026-06-30T14:09:17+00:00"
+        },
+        {
           "id": "20260629-014606",
           "file": ".history/architecture/c.payment-clearing-platform/20260629-014606.svg",
           "savedAt": "2026-06-29T01:46:06+00:00"
@@ -2586,6 +2881,16 @@
       "dfy": "architecture/c.cloud-native.dfy",
       "entries": [
         {
+          "id": "20260630-165530",
+          "file": ".history/architecture/c.cloud-native/20260630-165530.svg",
+          "savedAt": "2026-06-30T16:55:30+00:00"
+        },
+        {
+          "id": "20260630-140916",
+          "file": ".history/architecture/c.cloud-native/20260630-140916.svg",
+          "savedAt": "2026-06-30T14:09:16+00:00"
+        },
+        {
           "id": "20260629-014605",
           "file": ".history/architecture/c.cloud-native/20260629-014605.svg",
           "savedAt": "2026-06-29T01:46:05+00:00"
@@ -2710,6 +3015,16 @@
     "architecture/c.ecommerce-platform.svg": {
       "dfy": "architecture/c.ecommerce-platform.dfy",
       "entries": [
+        {
+          "id": "20260630-165530",
+          "file": ".history/architecture/c.ecommerce-platform/20260630-165530.svg",
+          "savedAt": "2026-06-30T16:55:30+00:00"
+        },
+        {
+          "id": "20260630-140917",
+          "file": ".history/architecture/c.ecommerce-platform/20260630-140917.svg",
+          "savedAt": "2026-06-30T14:09:17+00:00"
+        },
         {
           "id": "20260629-014605",
           "file": ".history/architecture/c.ecommerce-platform/20260629-014605.svg",
@@ -2850,6 +3165,16 @@
     "architecture/c.k8s-platform-stack.svg": {
       "dfy": "architecture/c.k8s-platform-stack.dfy",
       "entries": [
+        {
+          "id": "20260630-165531",
+          "file": ".history/architecture/c.k8s-platform-stack/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-140917",
+          "file": ".history/architecture/c.k8s-platform-stack/20260630-140917.svg",
+          "savedAt": "2026-06-30T14:09:17+00:00"
+        },
         {
           "id": "20260629-014606",
           "file": ".history/architecture/c.k8s-platform-stack/20260629-014606.svg",
@@ -2996,6 +3321,16 @@
       "dfy": "architecture/c.supply-chain-control-tower.dfy",
       "entries": [
         {
+          "id": "20260630-165531",
+          "file": ".history/architecture/c.supply-chain-control-tower/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-140917",
+          "file": ".history/architecture/c.supply-chain-control-tower/20260630-140917.svg",
+          "savedAt": "2026-06-30T14:09:17+00:00"
+        },
+        {
           "id": "20260629-014606",
           "file": ".history/architecture/c.supply-chain-control-tower/20260629-014606.svg",
           "savedAt": "2026-06-29T01:46:06+00:00"
@@ -3095,6 +3430,16 @@
     "architecture/n.compiler-pipeline.svg": {
       "dfy": "architecture/n.compiler-pipeline.dfy",
       "entries": [
+        {
+          "id": "20260630-165531",
+          "file": ".history/architecture/n.compiler-pipeline/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-140917",
+          "file": ".history/architecture/n.compiler-pipeline/20260630-140917.svg",
+          "savedAt": "2026-06-30T14:09:17+00:00"
+        },
         {
           "id": "20260629-014606",
           "file": ".history/architecture/n.compiler-pipeline/20260629-014606.svg",
@@ -3201,6 +3546,16 @@
       "dfy": "architecture/n.data-pipeline.dfy",
       "entries": [
         {
+          "id": "20260630-165531",
+          "file": ".history/architecture/n.data-pipeline/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/architecture/n.data-pipeline/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
+        {
           "id": "20260629-014606",
           "file": ".history/architecture/n.data-pipeline/20260629-014606.svg",
           "savedAt": "2026-06-29T01:46:06+00:00"
@@ -3290,6 +3645,16 @@
     "architecture/n.event-driven.svg": {
       "dfy": "architecture/n.event-driven.dfy",
       "entries": [
+        {
+          "id": "20260630-165531",
+          "file": ".history/architecture/n.event-driven/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/architecture/n.event-driven/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
         {
           "id": "20260629-014606",
           "file": ".history/architecture/n.event-driven/20260629-014606.svg",
@@ -3421,6 +3786,16 @@
       "dfy": "architecture/n.microservices.dfy",
       "entries": [
         {
+          "id": "20260630-165531",
+          "file": ".history/architecture/n.microservices/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/architecture/n.microservices/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
+        {
           "id": "20260629-014606",
           "file": ".history/architecture/n.microservices/20260629-014606.svg",
           "savedAt": "2026-06-29T01:46:06+00:00"
@@ -3506,6 +3881,16 @@
       "dfy": "er/c.ecommerce-schema.dfy",
       "entries": [
         {
+          "id": "20260630-165531",
+          "file": ".history/er/c.ecommerce-schema/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/er/c.ecommerce-schema/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
+        {
           "id": "20260626-175713",
           "file": ".history/er/c.ecommerce-schema/20260626-175713.svg",
           "savedAt": "2026-06-26T17:57:13+00:00"
@@ -3530,6 +3915,16 @@
     "er/c.layout-stress-dense.svg": {
       "dfy": "er/c.layout-stress-dense.dfy",
       "entries": [
+        {
+          "id": "20260630-165532",
+          "file": ".history/er/c.layout-stress-dense/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/er/c.layout-stress-dense/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
         {
           "id": "20260624-185532",
           "file": ".history/er/c.layout-stress-dense/20260624-185532.svg",
@@ -3561,6 +3956,16 @@
       "dfy": "er/n.blog-schema.dfy",
       "entries": [
         {
+          "id": "20260630-165532",
+          "file": ".history/er/n.blog-schema/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/er/n.blog-schema/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
+        {
           "id": "20260626-175714",
           "file": ".history/er/n.blog-schema/20260626-175714.svg",
           "savedAt": "2026-06-26T17:57:14+00:00"
@@ -3585,6 +3990,16 @@
     "er/n.school-schema.svg": {
       "dfy": "er/n.school-schema.dfy",
       "entries": [
+        {
+          "id": "20260630-165532",
+          "file": ".history/er/n.school-schema/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/er/n.school-schema/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
         {
           "id": "20260626-175714",
           "file": ".history/er/n.school-schema/20260626-175714.svg",
@@ -3611,6 +4026,16 @@
       "dfy": "er/n.social-network.dfy",
       "entries": [
         {
+          "id": "20260630-165532",
+          "file": ".history/er/n.social-network/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/er/n.social-network/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
+        {
           "id": "20260626-175714",
           "file": ".history/er/n.social-network/20260626-175714.svg",
           "savedAt": "2026-06-26T17:57:14+00:00"
@@ -3635,6 +4060,16 @@
     "er/s.two-tables.svg": {
       "dfy": "er/s.two-tables.dfy",
       "entries": [
+        {
+          "id": "20260630-165532",
+          "file": ".history/er/s.two-tables/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/er/s.two-tables/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
         {
           "id": "20260626-175714",
           "file": ".history/er/s.two-tables/20260626-175714.svg",
@@ -3661,6 +4096,16 @@
       "dfy": "er/s.user-post.dfy",
       "entries": [
         {
+          "id": "20260630-165532",
+          "file": ".history/er/s.user-post/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/er/s.user-post/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
+        {
           "id": "20260626-175714",
           "file": ".history/er/s.user-post/20260626-175714.svg",
           "savedAt": "2026-06-26T17:57:14+00:00"
@@ -3685,6 +4130,21 @@
     "flowchart/c.aml-case-investigation.svg": {
       "dfy": "flowchart/c.aml-case-investigation.dfy",
       "entries": [
+        {
+          "id": "20260630-165532",
+          "file": ".history/flowchart/c.aml-case-investigation/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-162445",
+          "file": ".history/flowchart/c.aml-case-investigation/20260630-162445.svg",
+          "savedAt": "2026-06-30T16:24:45+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/flowchart/c.aml-case-investigation/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
         {
           "id": "20260629-014607",
           "file": ".history/flowchart/c.aml-case-investigation/20260629-014607.svg",
@@ -3761,6 +4221,21 @@
       "dfy": "flowchart/c.caffe-shop.dfy",
       "entries": [
         {
+          "id": "20260630-165532",
+          "file": ".history/flowchart/c.caffe-shop/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-162445",
+          "file": ".history/flowchart/c.caffe-shop/20260630-162445.svg",
+          "savedAt": "2026-06-30T16:24:45+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/flowchart/c.caffe-shop/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
+        {
           "id": "20260629-014607",
           "file": ".history/flowchart/c.caffe-shop/20260629-014607.svg",
           "savedAt": "2026-06-29T01:46:07+00:00"
@@ -3825,6 +4300,21 @@
     "flowchart/c.change-approval-workflow.svg": {
       "dfy": "flowchart/c.change-approval-workflow.dfy",
       "entries": [
+        {
+          "id": "20260630-165532",
+          "file": ".history/flowchart/c.change-approval-workflow/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-162445",
+          "file": ".history/flowchart/c.change-approval-workflow/20260630-162445.svg",
+          "savedAt": "2026-06-30T16:24:45+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/flowchart/c.change-approval-workflow/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
         {
           "id": "20260629-014607",
           "file": ".history/flowchart/c.change-approval-workflow/20260629-014607.svg",
@@ -3910,6 +4400,21 @@
     "flowchart/c.k8s-incident-response.svg": {
       "dfy": "flowchart/c.k8s-incident-response.dfy",
       "entries": [
+        {
+          "id": "20260630-165532",
+          "file": ".history/flowchart/c.k8s-incident-response/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-162445",
+          "file": ".history/flowchart/c.k8s-incident-response/20260630-162445.svg",
+          "savedAt": "2026-06-30T16:24:45+00:00"
+        },
+        {
+          "id": "20260630-140919",
+          "file": ".history/flowchart/c.k8s-incident-response/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
         {
           "id": "20260629-014607",
           "file": ".history/flowchart/c.k8s-incident-response/20260629-014607.svg",
@@ -4016,6 +4521,21 @@
       "dfy": "flowchart/c.pr-architecture-review.dfy",
       "entries": [
         {
+          "id": "20260630-165532",
+          "file": ".history/flowchart/c.pr-architecture-review/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-162445",
+          "file": ".history/flowchart/c.pr-architecture-review/20260630-162445.svg",
+          "savedAt": "2026-06-30T16:24:45+00:00"
+        },
+        {
+          "id": "20260630-140919",
+          "file": ".history/flowchart/c.pr-architecture-review/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
+        {
           "id": "20260629-014607",
           "file": ".history/flowchart/c.pr-architecture-review/20260629-014607.svg",
           "savedAt": "2026-06-29T01:46:07+00:00"
@@ -4101,6 +4621,21 @@
       "dfy": "flowchart/c.software-release.dfy",
       "entries": [
         {
+          "id": "20260630-165532",
+          "file": ".history/flowchart/c.software-release/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-162445",
+          "file": ".history/flowchart/c.software-release/20260630-162445.svg",
+          "savedAt": "2026-06-30T16:24:45+00:00"
+        },
+        {
+          "id": "20260630-140919",
+          "file": ".history/flowchart/c.software-release/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
+        {
           "id": "20260629-014607",
           "file": ".history/flowchart/c.software-release/20260629-014607.svg",
           "savedAt": "2026-06-29T01:46:07+00:00"
@@ -4171,6 +4706,21 @@
       "dfy": "flowchart/n.employee-onboarding.dfy",
       "entries": [
         {
+          "id": "20260630-165533",
+          "file": ".history/flowchart/n.employee-onboarding/20260630-165533.svg",
+          "savedAt": "2026-06-30T16:55:33+00:00"
+        },
+        {
+          "id": "20260630-162446",
+          "file": ".history/flowchart/n.employee-onboarding/20260630-162446.svg",
+          "savedAt": "2026-06-30T16:24:46+00:00"
+        },
+        {
+          "id": "20260630-140919",
+          "file": ".history/flowchart/n.employee-onboarding/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
+        {
           "id": "20260629-014607",
           "file": ".history/flowchart/n.employee-onboarding/20260629-014607.svg",
           "savedAt": "2026-06-29T01:46:07+00:00"
@@ -4220,6 +4770,21 @@
     "flowchart/n.order-approval.svg": {
       "dfy": "flowchart/n.order-approval.dfy",
       "entries": [
+        {
+          "id": "20260630-165533",
+          "file": ".history/flowchart/n.order-approval/20260630-165533.svg",
+          "savedAt": "2026-06-30T16:55:33+00:00"
+        },
+        {
+          "id": "20260630-162446",
+          "file": ".history/flowchart/n.order-approval/20260630-162446.svg",
+          "savedAt": "2026-06-30T16:24:46+00:00"
+        },
+        {
+          "id": "20260630-140919",
+          "file": ".history/flowchart/n.order-approval/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
         {
           "id": "20260629-014607",
           "file": ".history/flowchart/n.order-approval/20260629-014607.svg",
@@ -4285,6 +4850,21 @@
     "flowchart/n.user-auth.svg": {
       "dfy": "flowchart/n.user-auth.dfy",
       "entries": [
+        {
+          "id": "20260630-165533",
+          "file": ".history/flowchart/n.user-auth/20260630-165533.svg",
+          "savedAt": "2026-06-30T16:55:33+00:00"
+        },
+        {
+          "id": "20260630-162446",
+          "file": ".history/flowchart/n.user-auth/20260630-162446.svg",
+          "savedAt": "2026-06-30T16:24:46+00:00"
+        },
+        {
+          "id": "20260630-140919",
+          "file": ".history/flowchart/n.user-auth/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
         {
           "id": "20260629-014607",
           "file": ".history/flowchart/n.user-auth/20260629-014607.svg",
@@ -4356,6 +4936,21 @@
       "dfy": "flowchart/s.decision-loop.dfy",
       "entries": [
         {
+          "id": "20260630-165533",
+          "file": ".history/flowchart/s.decision-loop/20260630-165533.svg",
+          "savedAt": "2026-06-30T16:55:33+00:00"
+        },
+        {
+          "id": "20260630-162446",
+          "file": ".history/flowchart/s.decision-loop/20260630-162446.svg",
+          "savedAt": "2026-06-30T16:24:46+00:00"
+        },
+        {
+          "id": "20260630-140919",
+          "file": ".history/flowchart/s.decision-loop/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
+        {
           "id": "20260629-014608",
           "file": ".history/flowchart/s.decision-loop/20260629-014608.svg",
           "savedAt": "2026-06-29T01:46:08+00:00"
@@ -4405,6 +5000,21 @@
     "flowchart/c.ci-cd-security-pipeline.svg": {
       "dfy": "flowchart/c.ci-cd-security-pipeline.dfy",
       "entries": [
+        {
+          "id": "20260630-165532",
+          "file": ".history/flowchart/c.ci-cd-security-pipeline/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-162445",
+          "file": ".history/flowchart/c.ci-cd-security-pipeline/20260630-162445.svg",
+          "savedAt": "2026-06-30T16:24:45+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/flowchart/c.ci-cd-security-pipeline/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
         {
           "id": "20260629-014607",
           "file": ".history/flowchart/c.ci-cd-security-pipeline/20260629-014607.svg",
@@ -4531,6 +5141,21 @@
       "dfy": "flowchart/c.customer-refund-process.dfy",
       "entries": [
         {
+          "id": "20260630-165532",
+          "file": ".history/flowchart/c.customer-refund-process/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-162445",
+          "file": ".history/flowchart/c.customer-refund-process/20260630-162445.svg",
+          "savedAt": "2026-06-30T16:24:45+00:00"
+        },
+        {
+          "id": "20260630-140919",
+          "file": ".history/flowchart/c.customer-refund-process/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
+        {
           "id": "20260629-014607",
           "file": ".history/flowchart/c.customer-refund-process/20260629-014607.svg",
           "savedAt": "2026-06-29T01:46:07+00:00"
@@ -4645,6 +5270,21 @@
     "flowchart/c.e-commerce-order-fulfillment.svg": {
       "dfy": "flowchart/c.e-commerce-order-fulfillment.dfy",
       "entries": [
+        {
+          "id": "20260630-165532",
+          "file": ".history/flowchart/c.e-commerce-order-fulfillment/20260630-165532.svg",
+          "savedAt": "2026-06-30T16:55:32+00:00"
+        },
+        {
+          "id": "20260630-162445",
+          "file": ".history/flowchart/c.e-commerce-order-fulfillment/20260630-162445.svg",
+          "savedAt": "2026-06-30T16:24:45+00:00"
+        },
+        {
+          "id": "20260630-140919",
+          "file": ".history/flowchart/c.e-commerce-order-fulfillment/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
         {
           "id": "20260629-014607",
           "file": ".history/flowchart/c.e-commerce-order-fulfillment/20260629-014607.svg",
@@ -4761,6 +5401,21 @@
       "dfy": "flowchart/c.swimlane-order-process.dfy",
       "entries": [
         {
+          "id": "20260630-165533",
+          "file": ".history/flowchart/c.swimlane-order-process/20260630-165533.svg",
+          "savedAt": "2026-06-30T16:55:33+00:00"
+        },
+        {
+          "id": "20260630-162445",
+          "file": ".history/flowchart/c.swimlane-order-process/20260630-162445.svg",
+          "savedAt": "2026-06-30T16:24:45+00:00"
+        },
+        {
+          "id": "20260630-140919",
+          "file": ".history/flowchart/c.swimlane-order-process/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
+        {
           "id": "20260627-171913",
           "file": ".history/flowchart/c.swimlane-order-process/20260627-171913.svg",
           "savedAt": "2026-06-27T17:19:13+00:00"
@@ -4841,6 +5496,11 @@
       "dfy": "mindmap/c.knowledge-map.dfy",
       "entries": [
         {
+          "id": "20260630-140919",
+          "file": ".history/mindmap/c.knowledge-map/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
+        {
           "id": "20260624-185535",
           "file": ".history/mindmap/c.knowledge-map/20260624-185535.svg",
           "savedAt": "2026-06-24T18:55:35+00:00"
@@ -4870,6 +5530,11 @@
     "mindmap/c.product-roadmap.svg": {
       "dfy": "mindmap/c.product-roadmap.dfy",
       "entries": [
+        {
+          "id": "20260630-140919",
+          "file": ".history/mindmap/c.product-roadmap/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
         {
           "id": "20260624-185535",
           "file": ".history/mindmap/c.product-roadmap/20260624-185535.svg",
@@ -4901,6 +5566,11 @@
       "dfy": "mindmap/n.programming-learning.dfy",
       "entries": [
         {
+          "id": "20260630-140919",
+          "file": ".history/mindmap/n.programming-learning/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
+        {
           "id": "20260624-185535",
           "file": ".history/mindmap/n.programming-learning/20260624-185535.svg",
           "savedAt": "2026-06-24T18:55:35+00:00"
@@ -4930,6 +5600,11 @@
     "mindmap/n.project-plan.svg": {
       "dfy": "mindmap/n.project-plan.dfy",
       "entries": [
+        {
+          "id": "20260630-140919",
+          "file": ".history/mindmap/n.project-plan/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
         {
           "id": "20260624-185536",
           "file": ".history/mindmap/n.project-plan/20260624-185536.svg",
@@ -4961,6 +5636,11 @@
       "dfy": "mindmap/n.tech-stack.dfy",
       "entries": [
         {
+          "id": "20260630-140919",
+          "file": ".history/mindmap/n.tech-stack/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
+        {
           "id": "20260624-185536",
           "file": ".history/mindmap/n.tech-stack/20260624-185536.svg",
           "savedAt": "2026-06-24T18:55:36+00:00"
@@ -4990,6 +5670,11 @@
     "mindmap/s.brainstorm.svg": {
       "dfy": "mindmap/s.brainstorm.dfy",
       "entries": [
+        {
+          "id": "20260630-140919",
+          "file": ".history/mindmap/s.brainstorm/20260630-140919.svg",
+          "savedAt": "2026-06-30T14:09:19+00:00"
+        },
         {
           "id": "20260624-185536",
           "file": ".history/mindmap/s.brainstorm/20260624-185536.svg",
@@ -5021,6 +5706,11 @@
       "dfy": "mindmap/s.root-branches.dfy",
       "entries": [
         {
+          "id": "20260630-140920",
+          "file": ".history/mindmap/s.root-branches/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
+        {
           "id": "20260624-185536",
           "file": ".history/mindmap/s.root-branches/20260624-185536.svg",
           "savedAt": "2026-06-24T18:55:36+00:00"
@@ -5051,6 +5741,21 @@
       "dfy": "state/c.layout-stress-transitions.dfy",
       "entries": [
         {
+          "id": "20260630-165534",
+          "file": ".history/state/c.layout-stress-transitions/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/state/c.layout-stress-transitions/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/state/c.layout-stress-transitions/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
+        {
           "id": "20260624-185538",
           "file": ".history/state/c.layout-stress-transitions/20260624-185538.svg",
           "savedAt": "2026-06-24T18:55:38+00:00"
@@ -5080,6 +5785,16 @@
     "architecture/c.mcp-server-cluster-architecture.svg": {
       "dfy": "architecture/c.mcp-server-cluster-architecture.dfy",
       "entries": [
+        {
+          "id": "20260630-165531",
+          "file": ".history/architecture/c.mcp-server-cluster-architecture/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-140917",
+          "file": ".history/architecture/c.mcp-server-cluster-architecture/20260630-140917.svg",
+          "savedAt": "2026-06-30T14:09:17+00:00"
+        },
         {
           "id": "20260629-014606",
           "file": ".history/architecture/c.mcp-server-cluster-architecture/20260629-014606.svg",
@@ -5176,6 +5891,16 @@
       "dfy": "architecture/s.client-api-db.dfy",
       "entries": [
         {
+          "id": "20260630-165531",
+          "file": ".history/architecture/s.client-api-db/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/architecture/s.client-api-db/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
+        {
           "id": "20260626-175713",
           "file": ".history/architecture/s.client-api-db/20260626-175713.svg",
           "savedAt": "2026-06-26T17:57:13+00:00"
@@ -5190,6 +5915,16 @@
     "architecture/s.three-tier.svg": {
       "dfy": "architecture/s.three-tier.dfy",
       "entries": [
+        {
+          "id": "20260630-165531",
+          "file": ".history/architecture/s.three-tier/20260630-165531.svg",
+          "savedAt": "2026-06-30T16:55:31+00:00"
+        },
+        {
+          "id": "20260630-140918",
+          "file": ".history/architecture/s.three-tier/20260630-140918.svg",
+          "savedAt": "2026-06-30T14:09:18+00:00"
+        },
         {
           "id": "20260626-175713",
           "file": ".history/architecture/s.three-tier/20260626-175713.svg",
@@ -5206,6 +5941,21 @@
       "dfy": "sequence/c.ai-agent-change-loop.dfy",
       "entries": [
         {
+          "id": "20260630-165533",
+          "file": ".history/sequence/c.ai-agent-change-loop/20260630-165533.svg",
+          "savedAt": "2026-06-30T16:55:33+00:00"
+        },
+        {
+          "id": "20260630-162446",
+          "file": ".history/sequence/c.ai-agent-change-loop/20260630-162446.svg",
+          "savedAt": "2026-06-30T16:24:46+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/sequence/c.ai-agent-change-loop/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
+        {
           "id": "20260624-185536",
           "file": ".history/sequence/c.ai-agent-change-loop/20260624-185536.svg",
           "savedAt": "2026-06-24T18:55:36+00:00"
@@ -5220,6 +5970,21 @@
     "sequence/c.cross-team-incident-escalation.svg": {
       "dfy": "sequence/c.cross-team-incident-escalation.dfy",
       "entries": [
+        {
+          "id": "20260630-165533",
+          "file": ".history/sequence/c.cross-team-incident-escalation/20260630-165533.svg",
+          "savedAt": "2026-06-30T16:55:33+00:00"
+        },
+        {
+          "id": "20260630-162446",
+          "file": ".history/sequence/c.cross-team-incident-escalation/20260630-162446.svg",
+          "savedAt": "2026-06-30T16:24:46+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/sequence/c.cross-team-incident-escalation/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
         {
           "id": "20260624-185536",
           "file": ".history/sequence/c.cross-team-incident-escalation/20260624-185536.svg",
@@ -5236,6 +6001,21 @@
       "dfy": "sequence/c.distributed-saga.dfy",
       "entries": [
         {
+          "id": "20260630-165533",
+          "file": ".history/sequence/c.distributed-saga/20260630-165533.svg",
+          "savedAt": "2026-06-30T16:55:33+00:00"
+        },
+        {
+          "id": "20260630-162446",
+          "file": ".history/sequence/c.distributed-saga/20260630-162446.svg",
+          "savedAt": "2026-06-30T16:24:46+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/sequence/c.distributed-saga/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
+        {
           "id": "20260624-185536",
           "file": ".history/sequence/c.distributed-saga/20260624-185536.svg",
           "savedAt": "2026-06-24T18:55:36+00:00"
@@ -5250,6 +6030,21 @@
     "sequence/c.k8s-canary-rollback.svg": {
       "dfy": "sequence/c.k8s-canary-rollback.dfy",
       "entries": [
+        {
+          "id": "20260630-165533",
+          "file": ".history/sequence/c.k8s-canary-rollback/20260630-165533.svg",
+          "savedAt": "2026-06-30T16:55:33+00:00"
+        },
+        {
+          "id": "20260630-162446",
+          "file": ".history/sequence/c.k8s-canary-rollback/20260630-162446.svg",
+          "savedAt": "2026-06-30T16:24:46+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/sequence/c.k8s-canary-rollback/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
         {
           "id": "20260624-185536",
           "file": ".history/sequence/c.k8s-canary-rollback/20260624-185536.svg",
@@ -5266,6 +6061,21 @@
       "dfy": "sequence/c.k8s-node-failure-recovery.dfy",
       "entries": [
         {
+          "id": "20260630-165533",
+          "file": ".history/sequence/c.k8s-node-failure-recovery/20260630-165533.svg",
+          "savedAt": "2026-06-30T16:55:33+00:00"
+        },
+        {
+          "id": "20260630-162446",
+          "file": ".history/sequence/c.k8s-node-failure-recovery/20260630-162446.svg",
+          "savedAt": "2026-06-30T16:24:46+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/sequence/c.k8s-node-failure-recovery/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
+        {
           "id": "20260624-185537",
           "file": ".history/sequence/c.k8s-node-failure-recovery/20260624-185537.svg",
           "savedAt": "2026-06-24T18:55:37+00:00"
@@ -5280,6 +6090,21 @@
     "sequence/c.k8s-rolling-update.svg": {
       "dfy": "sequence/c.k8s-rolling-update.dfy",
       "entries": [
+        {
+          "id": "20260630-165533",
+          "file": ".history/sequence/c.k8s-rolling-update/20260630-165533.svg",
+          "savedAt": "2026-06-30T16:55:33+00:00"
+        },
+        {
+          "id": "20260630-162446",
+          "file": ".history/sequence/c.k8s-rolling-update/20260630-162446.svg",
+          "savedAt": "2026-06-30T16:24:46+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/sequence/c.k8s-rolling-update/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
         {
           "id": "20260624-185537",
           "file": ".history/sequence/c.k8s-rolling-update/20260624-185537.svg",
@@ -5296,6 +6121,21 @@
       "dfy": "sequence/c.layout-stress-lifelines.dfy",
       "entries": [
         {
+          "id": "20260630-165533",
+          "file": ".history/sequence/c.layout-stress-lifelines/20260630-165533.svg",
+          "savedAt": "2026-06-30T16:55:33+00:00"
+        },
+        {
+          "id": "20260630-162446",
+          "file": ".history/sequence/c.layout-stress-lifelines/20260630-162446.svg",
+          "savedAt": "2026-06-30T16:24:46+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/sequence/c.layout-stress-lifelines/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
+        {
           "id": "20260624-185537",
           "file": ".history/sequence/c.layout-stress-lifelines/20260624-185537.svg",
           "savedAt": "2026-06-24T18:55:37+00:00"
@@ -5310,6 +6150,21 @@
     "sequence/c.microservice-checkout.svg": {
       "dfy": "sequence/c.microservice-checkout.dfy",
       "entries": [
+        {
+          "id": "20260630-165534",
+          "file": ".history/sequence/c.microservice-checkout/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/sequence/c.microservice-checkout/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/sequence/c.microservice-checkout/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
         {
           "id": "20260626-175716",
           "file": ".history/sequence/c.microservice-checkout/20260626-175716.svg",
@@ -5331,6 +6186,21 @@
       "dfy": "sequence/c.real-time-risk-decisioning.dfy",
       "entries": [
         {
+          "id": "20260630-165534",
+          "file": ".history/sequence/c.real-time-risk-decisioning/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/sequence/c.real-time-risk-decisioning/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/sequence/c.real-time-risk-decisioning/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
+        {
           "id": "20260624-185537",
           "file": ".history/sequence/c.real-time-risk-decisioning/20260624-185537.svg",
           "savedAt": "2026-06-24T18:55:37+00:00"
@@ -5345,6 +6215,21 @@
     "sequence/n.api-call-chain.svg": {
       "dfy": "sequence/n.api-call-chain.dfy",
       "entries": [
+        {
+          "id": "20260630-165534",
+          "file": ".history/sequence/n.api-call-chain/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/sequence/n.api-call-chain/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/sequence/n.api-call-chain/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
         {
           "id": "20260624-185537",
           "file": ".history/sequence/n.api-call-chain/20260624-185537.svg",
@@ -5361,6 +6246,21 @@
       "dfy": "sequence/n.oauth-login.dfy",
       "entries": [
         {
+          "id": "20260630-165534",
+          "file": ".history/sequence/n.oauth-login/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/sequence/n.oauth-login/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/sequence/n.oauth-login/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
+        {
           "id": "20260624-185537",
           "file": ".history/sequence/n.oauth-login/20260624-185537.svg",
           "savedAt": "2026-06-24T18:55:37+00:00"
@@ -5375,6 +6275,21 @@
     "sequence/n.payment-gateway.svg": {
       "dfy": "sequence/n.payment-gateway.dfy",
       "entries": [
+        {
+          "id": "20260630-165534",
+          "file": ".history/sequence/n.payment-gateway/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/sequence/n.payment-gateway/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/sequence/n.payment-gateway/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
         {
           "id": "20260624-185538",
           "file": ".history/sequence/n.payment-gateway/20260624-185538.svg",
@@ -5391,6 +6306,21 @@
       "dfy": "sequence/s.ping-pong.dfy",
       "entries": [
         {
+          "id": "20260630-165534",
+          "file": ".history/sequence/s.ping-pong/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/sequence/s.ping-pong/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/sequence/s.ping-pong/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
+        {
           "id": "20260624-185538",
           "file": ".history/sequence/s.ping-pong/20260624-185538.svg",
           "savedAt": "2026-06-24T18:55:38+00:00"
@@ -5405,6 +6335,21 @@
     "sequence/s.request-response.svg": {
       "dfy": "sequence/s.request-response.dfy",
       "entries": [
+        {
+          "id": "20260630-165534",
+          "file": ".history/sequence/s.request-response/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162447",
+          "file": ".history/sequence/s.request-response/20260630-162447.svg",
+          "savedAt": "2026-06-30T16:24:47+00:00"
+        },
+        {
+          "id": "20260630-140920",
+          "file": ".history/sequence/s.request-response/20260630-140920.svg",
+          "savedAt": "2026-06-30T14:09:20+00:00"
+        },
         {
           "id": "20260624-185538",
           "file": ".history/sequence/s.request-response/20260624-185538.svg",
@@ -5421,6 +6366,21 @@
       "dfy": "state/s.on-off.dfy",
       "entries": [
         {
+          "id": "20260630-165534",
+          "file": ".history/state/s.on-off/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162448",
+          "file": ".history/state/s.on-off/20260630-162448.svg",
+          "savedAt": "2026-06-30T16:24:48+00:00"
+        },
+        {
+          "id": "20260630-140921",
+          "file": ".history/state/s.on-off/20260630-140921.svg",
+          "savedAt": "2026-06-30T14:09:21+00:00"
+        },
+        {
           "id": "20260624-185539",
           "file": ".history/state/s.on-off/20260624-185539.svg",
           "savedAt": "2026-06-24T18:55:39+00:00"
@@ -5435,6 +6395,21 @@
     "state/s.traffic-light.svg": {
       "dfy": "state/s.traffic-light.dfy",
       "entries": [
+        {
+          "id": "20260630-165534",
+          "file": ".history/state/s.traffic-light/20260630-165534.svg",
+          "savedAt": "2026-06-30T16:55:34+00:00"
+        },
+        {
+          "id": "20260630-162448",
+          "file": ".history/state/s.traffic-light/20260630-162448.svg",
+          "savedAt": "2026-06-30T16:24:48+00:00"
+        },
+        {
+          "id": "20260630-140921",
+          "file": ".history/state/s.traffic-light/20260630-140921.svg",
+          "savedAt": "2026-06-30T14:09:21+00:00"
+        },
         {
           "id": "20260624-185540",
           "file": ".history/state/s.traffic-light/20260624-185540.svg",

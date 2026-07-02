@@ -3,6 +3,9 @@
 // 拓扑特征：3层深度嵌套，多条跨出/跨入边界的连接线，验证边界框计算与避障。
 diagram architecture {
     title: "布局测试：深度嵌套分组与跨组路由"
+    edge_routing: orthogonal {
+        bundling: 1.0
+    }
 
     group external "外部网络" {
         entity[frontend] client "客户端终端"
