@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { loadWasm, renderSource, type DrawifyWasm } from '../lib/wasm';
 import { SequenceAnimator, type StepInfo } from './SequenceAnimator';
+import { withBase } from '../lib/baseUrl';
 
 const RENDER_OPTS = JSON.stringify({ transparent_background: true });
 const STEP_DURATION = 900;
@@ -257,9 +258,9 @@ export default function SequenceApp() {
               <option key={s.id} value={i}>{s.title}</option>
             ))}
           </select>
-          <a href="/animation.html" className="demo-link">动画演示</a>
-          <a href="/audit.html" className="demo-link">审计演示</a>
-          <a href="/" className="demo-link">← Playground</a>
+          <a href={withBase('animation.html')} className="demo-link">动画演示</a>
+          <a href={withBase('audit.html')} className="demo-link">审计演示</a>
+          <a href={withBase('index.html')} className="demo-link">← Playground</a>
         </div>
       </header>
 

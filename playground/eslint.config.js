@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'drawify-wasm', 'drawify-wasm/**']),
+  globalIgnores(['dist', 'public/drawify-wasm', 'public/drawify-wasm/**']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [

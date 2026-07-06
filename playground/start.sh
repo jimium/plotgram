@@ -6,6 +6,7 @@ PORT=3000
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 WASM_CRATE_DIR="$ROOT_DIR/crates/drawify-wasm"
+WASM_OUT_DIR="$SCRIPT_DIR/public/drawify-wasm"
 
 echo "🔧 正在同步 WASM 产物..."
 if ! command -v wasm-pack >/dev/null 2>&1; then
@@ -15,7 +16,7 @@ fi
 
 (
   cd "$WASM_CRATE_DIR"
-  wasm-pack build --target web --out-dir ../../playground/drawify-wasm
+  wasm-pack build --target web --out-dir "$WASM_OUT_DIR"
 )
 
 echo "✅ WASM 产物已更新"

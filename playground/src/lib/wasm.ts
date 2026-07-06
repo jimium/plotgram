@@ -1,4 +1,5 @@
 import type { RefinementReport } from '../data/intentOptions';
+import { assetBase } from './baseUrl';
 
 /** drawio 导出降级报告。 */
 export interface ExportWarning {
@@ -144,9 +145,8 @@ let modulePromise: Promise<DrawifyWasm> | null = null;
 export function loadWasm(): Promise<DrawifyWasm> {
   if (!modulePromise) {
     modulePromise = (async () => {
-      const mod = (await import(
-        /* @vite-ignore */ '../../drawify-wasm/drawify_wasm.js'
-      )) as unknown as DrawifyWasm;
+      const wasmJs = `${assetBase()}drawify-wasm/drawify_wasm.js`;
+      const mod = (await import(/* @vite-ignore */ wasmJs)) as unknown as DrawifyWasm;
       await mod.default();
       return mod;
     })();

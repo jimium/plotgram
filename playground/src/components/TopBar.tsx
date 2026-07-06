@@ -12,6 +12,7 @@ import {
   IconSave,
   IconCommandPalette,
 } from './Icons';
+import { withBase } from '../lib/baseUrl';
 
 export interface ExportActions {
   downloadSvg: () => void;
@@ -163,7 +164,7 @@ export function TopBar({
     <header className="topbar">
       <div className="topbar-left">
         <div className="brand">
-          <img className="brand-logo" src={theme === 'dark' ? '/logo-dark.svg' : '/logo.svg'} alt="Drawify" />
+          <img className="brand-logo" src={withBase(theme === 'dark' ? 'logo-dark.svg' : 'logo.svg')} alt="Drawify" />
         </div>
 
         <div className="file-menu-wrap" ref={fileMenuRef}>

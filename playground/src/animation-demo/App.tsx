@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadWasm, renderSource, diffSources, formatSource, type DrawifyWasm, type ChangeSetJson, type ChangeJson } from '../lib/wasm';
 import { SvgAnimator } from './SvgAnimator';
 import { SCENES, type AnimationScene } from './scenes';
+import { withBase } from '../lib/baseUrl';
 
 type PlayState = 'idle' | 'playing' | 'paused';
 
@@ -193,9 +194,9 @@ export default function App() {
           </div>
         </div>
         <div className="demo-header-right">
-          <a href="/sequence.html" className="demo-link">时序演示 →</a>
-          <a href="/audit.html" className="demo-link">审计演示 →</a>
-          <a href="/" className="demo-link">← 返回 Playground</a>
+          <a href={withBase('sequence.html')} className="demo-link">时序演示 →</a>
+          <a href={withBase('audit.html')} className="demo-link">审计演示 →</a>
+          <a href={withBase('index.html')} className="demo-link">← 返回 Playground</a>
         </div>
       </header>
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadWasm, renderSource, diffSources, formatSource, type DrawifyWasm, type ChangeJson } from '../lib/wasm';
 import { AuditAnimator } from './AuditAnimator';
+import { withBase } from '../lib/baseUrl';
 
 const RENDER_OPTS = JSON.stringify({ transparent_background: true });
 
@@ -287,8 +288,8 @@ export default function AuditApp() {
               <option key={s.id} value={i}>{s.title}</option>
             ))}
           </select>
-          <a href="/animation.html" className="demo-link">← 动画演示</a>
-          <a href="/" className="demo-link">← 返回 Playground</a>
+          <a href={withBase('animation.html')} className="demo-link">← 动画演示</a>
+          <a href={withBase('index.html')} className="demo-link">← 返回 Playground</a>
         </div>
       </header>
 

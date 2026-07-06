@@ -22,6 +22,7 @@ Thumbs.db
 # WASM build artifacts
 /crates/drawify-wasm/pkg/
 /crates/drawify-wasm/dist/
+/playground/public/drawify-wasm/
 
 # VS Code extension
 /editors/vscode/node_modules/

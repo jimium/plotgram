@@ -1502,6 +1502,16 @@
   </div>
 
   <script>
+    // cdn:start
+    const CDN_BASE = "";
+    // cdn:end
+
+    function assetUrl(path) {
+      if (!CDN_BASE) return path;
+      const normalized = path.startsWith("/") ? path.slice(1) : path;
+      return `${CDN_BASE}showcase/${normalized}`;
+    }
+
     // manifest:start
     const SAMPLE_PATHS = [
       "architecture/c.ai-agent-docops-pipeline.dfy",
@@ -1996,8 +2006,8 @@
         const tagsMarkup = sample.tags.slice(0, 4).map((tag) => `<span class="tag-pill">${tag}</span>`).join("");
 
         card.innerHTML = `
-          <a class="card-preview" href="${sample.svgPath}" data-preview="${sample.path}">
-            <img src="${sample.svgPath}" alt="${sample.title}" loading="lazy" />
+          <a class="card-preview" href="${assetUrl(sample.svgPath)}" data-preview="${sample.path}">
+            <img src="${assetUrl(sample.svgPath)}" alt="${sample.title}" loading="lazy" />
           </a>
           <div class="card-body">
             <div class="card-top">
@@ -2013,7 +2023,7 @@
             </div>
             <div class="tag-row">${tagsMarkup}</div>
             <div class="card-actions">
-              <a class="action primary" href="${sample.svgPath}" target="_blank" rel="noopener">打开 SVG</a>
+              <a class="action primary" href="${assetUrl(sample.svgPath)}" target="_blank" rel="noopener">打开 SVG</a>
               <a class="action secondary" href="${sample.path}" target="_blank" rel="noopener">打开 DSL</a>
             </div>
           </div>
@@ -2076,7 +2086,7 @@
         {
           id: "current",
           label: "当前版本",
-          file: sample.svgPath,
+          file: assetUrl(sample.svgPath),
           savedAt: null
         }
       ];
@@ -2084,7 +2094,7 @@
         timeline.push({
           id: entry.id,
           label: formatVersionTime(entry.savedAt),
-          file: entry.file,
+          file: assetUrl(entry.file),
           savedAt: entry.savedAt
         });
       });
