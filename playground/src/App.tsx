@@ -575,6 +575,10 @@ function App() {
     setLayoutOptions(layoutOptionsFromDefaults(diagramDefaults));
   };
 
+  const handleResetAppearance = () => {
+    setAppearanceOptions(DEFAULT_APPEARANCE_OPTIONS);
+  };
+
   const handleReset = () => {
     handleResetLayout();
     setAppearanceOptions(DEFAULT_APPEARANCE_OPTIONS);
@@ -1040,6 +1044,7 @@ function App() {
             onLayoutConfigChange={handleLayoutConfigChange}
             onEdgeRoutingConfigChange={handleEdgeRoutingConfigChange}
             onAppearanceChange={handleAppearanceChange}
+            onResetAppearance={handleResetAppearance}
             onResetLayout={handleResetLayout}
             onReset={handleReset}
             onLayoutSourceChange={setLayoutSource}

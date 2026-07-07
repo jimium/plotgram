@@ -124,6 +124,8 @@ Access-Control-Allow-Origin: https://demo.plotgram.dev
 | Demo 站 | playground 页面、showcase 页面与 .pgm、品牌资源 | `assets/`、wasm、showcase SVG |
 | CDN | wasm、playground 打包 assets、showcase SVG 及历史快照 | 页面与 .pgm |
 
+WASM 缓存：构建时把 `plotgram_wasm_bg.wasm` 的 md5 注入 `VITE_WASM_BUILD_STAMP`，前端以 `?v=<md5>` 加载 wasm；CDN nginx 对 `/playground/plotgram-wasm/` 使用 `no-cache`。勿在 `public/plotgram-wasm/` 放置 wasm 副本。
+
 ---
 
 ## 运维备忘

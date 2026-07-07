@@ -391,14 +391,14 @@
       "context_palettes": {
         "group_nest": {
           "entries": [
-            { "fill": "{colors.neutral_fill}", "stroke": "{colors.primary}", "stroke_width": 1.2, "border_radius": 10.0, "stroke_dasharray": "none", "stroke_opacity": 0.7 },
-            { "fill": "{lighten({colors.neutral_fill}, 0.04)}", "stroke": "{lighten({colors.primary}, 0.10)}", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none", "stroke_opacity": 0.45 },
-            { "fill": "{lighten({colors.neutral_fill}, 0.08)}", "stroke": "{lighten({colors.primary}, 0.20)}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none", "stroke_opacity": 0.3 },
-            { "fill": "{lighten({colors.neutral_fill}, 0.12)}", "stroke": "{lighten({colors.primary}, 0.30)}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none", "stroke_opacity": 0.2 }
+            { "fill": "{colors.neutral_fill}", "stroke": "{colors.border_strong}", "stroke_width": 1.0, "border_radius": 10.0, "stroke_dasharray": "none" },
+            { "fill": "{lighten({colors.neutral_fill}, 0.04)}", "stroke": "{colors.border}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "{lighten({colors.neutral_fill}, 0.08)}", "stroke": "{colors.border}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "{lighten({colors.neutral_fill}, 0.12)}", "stroke": "{colors.border_strong}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" }
           ],
           "index": { "from": "group_depth", "cap": 3 },
           "bindings": [
-            { "target": "group", "fields": { "fill": "fill", "stroke": "stroke", "stroke_width": "stroke_width", "border_radius": "border_radius", "stroke_dasharray": "stroke_dasharray", "stroke_opacity": "stroke_opacity" } }
+            { "target": "group", "fields": { "fill": "fill", "stroke": "stroke", "stroke_width": "stroke_width", "border_radius": "border_radius", "stroke_dasharray": "stroke_dasharray" } }
           ]
         }
       }

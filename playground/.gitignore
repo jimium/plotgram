@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+public/plotgram-wasm
+.wasm-build-stamp
 *.local
 
 # Editor directories and files

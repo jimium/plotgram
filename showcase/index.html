@@ -1505,11 +1505,15 @@
     // cdn:start
     const CDN_BASE = "";
     // cdn:end
+    const BUILD_HASH = "{{BUILD_HASH}}";
 
     function assetUrl(path) {
-      if (!CDN_BASE) return path;
+      const isSvg = path.endsWith(".svg");
+      const cacheBust = BUILD_HASH && !BUILD_HASH.includes("{{") ? BUILD_HASH : "";
+      const suffix = cacheBust && isSvg ? `?v=${cacheBust}` : "";
+      if (!CDN_BASE) return path + suffix;
       const normalized = path.startsWith("/") ? path.slice(1) : path;
-      return `${CDN_BASE}showcase/${normalized}`;
+      return `${CDN_BASE}showcase/${normalized}${suffix}`;
     }
 
     // manifest:start

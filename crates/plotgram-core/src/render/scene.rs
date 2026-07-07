@@ -99,6 +99,17 @@ pub fn compute_layout(diagram: &PreparedDiagram) -> Result<LayoutResult> {
         .map_err(|e| PlotgramError::layout_failed_msg(e.to_string()))
 }
 
+/// 极简主题不绘制 group 卡片阴影（与 `tokens.effects.shadow: false` 一致）。
+fn theme_enables_group_shadow(compiled: &crate::theme::CompiledTheme) -> bool {
+    !matches!(
+        compiled.id.as_str(),
+        "common.clean-light"
+            | "common.clean-dark"
+            | "common.github-light"
+            | "common.okabe-ito"
+    )
+}
+
 /// 视觉物化(依赖 layout + context,不依赖编码格式)。
 ///
 /// 将 `RenderRequest` + 已算好的 `LayoutResult` 物化为渲染器无关的 `ExportScene`:
@@ -208,7 +219,7 @@ pub fn build_scene<'a>(
                     stroke_width,
                     z_index: group.depth,
                     border_radius,
-                    has_shadow: group.depth == 0,
+                    has_shadow: group.depth == 0 && theme_enables_group_shadow(&context.compiled),
                     stroke_dasharray,
                     stroke_opacity,
                 }

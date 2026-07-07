@@ -1,4 +1,5 @@
 import type { RefinementReport } from '../data/intentOptions';
+import { assetBase } from './baseUrl';
 
 /** drawio 导出降级报告。 */
 export interface ExportWarning {
@@ -140,15 +141,48 @@ export interface PlotgramWasm {
 
 let modulePromise: Promise<PlotgramWasm> | null = null;
 
+/** 开发调试：强制下次 loadWasm 重新拉取 WASM（配合 start.sh 的 build stamp）。 */
+export function resetWasmModule(): void {
+  modulePromise = null;
+}
+
+function wasmBuildStamp(): string {
+  return import.meta.env.VITE_WASM_BUILD_STAMP ?? '0';
+}
+
+function wasmAssetBase(): string {
+  const base = assetBase();
+  return base.endsWith('/') ? base : `${base}/`;
+}
+
+/** plotgram_wasm.js 加载地址（开发走 Vite 别名目录，生产走 CDN）。 */
+function plotgramWasmJsUrl(stamp: string): string {
+  if (import.meta.env.DEV) {
+    return `../../plotgram-wasm/plotgram_wasm.js?v=${stamp}`;
+  }
+  return `${wasmAssetBase()}plotgram-wasm/plotgram_wasm.js?v=${stamp}`;
+}
+
+/** wasm 二进制加载地址（显式带 ?v=，避免 plotgram_wasm.js 内相对路径无版本号被 CDN 长缓存）。 */
+function plotgramWasmBinaryUrl(stamp: string): string {
+  if (import.meta.env.DEV) {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${origin}/plotgram-wasm/plotgram_wasm_bg.wasm?v=${stamp}`;
+  }
+  return `${wasmAssetBase()}plotgram-wasm/plotgram_wasm_bg.wasm?v=${stamp}`;
+}
+
 /** 懒加载并初始化 WASM 模块（全局单例）。 */
 export function loadWasm(): Promise<PlotgramWasm> {
   if (!modulePromise) {
+    const stamp = wasmBuildStamp();
     modulePromise = (async () => {
       const mod = (await import(
-        /* @vite-ignore */ /* @ts-expect-error WASM 产物由 wasm-pack 生成，构建前不存在 */
-        '../../plotgram-wasm/plotgram_wasm.js'
+        /* @vite-ignore */ // @ts-ignore WASM 产物由 wasm-pack 生成，首次构建前不存在
+        /* webpackIgnore: true */
+        plotgramWasmJsUrl(stamp)
       )) as unknown as PlotgramWasm;
-      await mod.default();
+      await mod.default({ module_or_path: plotgramWasmBinaryUrl(stamp) });
       return mod;
     })();
   }

@@ -83,13 +83,36 @@ Path(path).write_text(updated, encoding="utf-8")
 PY
 }
 
+patch_build_hash() {
+  local index_html="$1"
+  local build_hash
+
+  build_hash=$(cd "$ROOT_DIR/showcase" && find . -name '*.svg' -type f -not -path '*/.history/*' | sort | xargs cat | shasum -a 256 | cut -d' ' -f1 | head -c 8)
+
+  if [[ -z "$build_hash" ]]; then
+    die "无法计算 BUILD_HASH（showcase 目录下没有 SVG 文件？）"
+  fi
+
+  log "BUILD_HASH=${build_hash}"
+  sed -i '' "s/{{BUILD_HASH}}/${build_hash}/g" "$index_html"
+}
+
 build_playground() {
   log "构建 plotgram-wasm…"
   require_cmd wasm-pack
-  (
-    cd "$ROOT_DIR/crates/plotgram-wasm"
-    wasm-pack build --target web --release --out-dir ../../playground/plotgram-wasm
-  )
+  local wasm_out="$ROOT_DIR/playground/plotgram-wasm"
+  wasm-pack build "$ROOT_DIR/crates/plotgram-wasm" --target web --release --out-dir "$wasm_out"
+
+  local wasm_bin="$wasm_out/plotgram_wasm_bg.wasm"
+  [[ -f "$wasm_bin" ]] || die "WASM 产物未生成: $wasm_bin"
+  local wasm_md5
+  wasm_md5=$(md5 -q "$wasm_bin" 2>/dev/null || md5sum "$wasm_bin" | awk '{print $1}')
+  log "plotgram-wasm md5=${wasm_md5}"
+
+  if [[ -d "$ROOT_DIR/playground/public/plotgram-wasm" ]]; then
+    log "删除过期的 public/plotgram-wasm（避免 vite build 写入 dist 旧副本）"
+    rm -rf "$ROOT_DIR/playground/public/plotgram-wasm"
+  fi
 
   log "构建 playground（base=${PLAYGROUND_BASE}, cdn=${PLAYGROUND_CDN_BASE}）…"
   require_cmd npm
@@ -98,6 +121,7 @@ build_playground() {
     npm ci --silent
     VITE_BASE_PATH="$PLAYGROUND_BASE" \
       VITE_CDN_BASE="$PLAYGROUND_CDN_BASE" \
+      VITE_WASM_BUILD_STAMP="$wasm_md5" \
       npm run build
   )
 }
@@ -192,6 +216,12 @@ upload() {
     "$STAGING_DIR/cdn/playground/" "$ASSET_HOST:$ASSET_REMOTE_DIR/playground/"
   rsync -avz --delete \
     "$STAGING_DIR/cdn/showcase/" "$ASSET_HOST:$ASSET_REMOTE_DIR/showcase/"
+
+  log "同步 nginx 配置 …"
+  scp "$ROOT_DIR/deploy/nginx/demo.plotgram.dev.conf" "$DEPLOY_HOST:/etc/nginx/sites-available/demo.plotgram.dev.conf"
+  ssh "$DEPLOY_HOST" 'nginx -t && systemctl reload nginx'
+  scp "$ROOT_DIR/deploy/nginx/assets.plotgram.cn.conf" "$ASSET_HOST:/etc/nginx/conf.d/assets.plotgram.cn.conf"
+  ssh "$ASSET_HOST" 'nginx -t && systemctl reload nginx'
 }
 
 main() {
@@ -199,6 +229,7 @@ main() {
   build_showcase
   build_playground
   stage_artifacts
+  patch_build_hash "$STAGING_DIR/demo/showcase/index.html"
   upload
 
   echo ""

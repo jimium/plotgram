@@ -29,6 +29,7 @@ import {
   GRAPHIC_STYLES,
   THEME_GROUPS,
   isAppearanceOverridden,
+  resolveEffectiveThemeId,
   type AppearanceOptions,
 } from '../data/appearanceOptions';
 import type { IntentDrafts } from '../data/intentOptions';
@@ -289,6 +290,7 @@ interface InspectorProps {
   onLayoutConfigChange: (key: string, value: number | null) => void;
   onEdgeRoutingConfigChange: (key: string, value: number | null) => void;
   onAppearanceChange: <K extends keyof AppearanceOptions>(key: K, value: AppearanceOptions[K]) => void;
+  onResetAppearance: () => void;
   onResetLayout: () => void;
   onReset: () => void;
   onLayoutSourceChange: (source: 'source' | 'panel') => void;
@@ -329,6 +331,7 @@ export function Inspector({
   onLayoutConfigChange,
   onEdgeRoutingConfigChange,
   onAppearanceChange,
+  onResetAppearance,
   onResetLayout,
   onReset,
   onLayoutSourceChange,
@@ -353,6 +356,10 @@ export function Inspector({
 }: InspectorProps) {
   const layoutOverridden = isLayoutOverridden(layoutOptions, layoutCatalog, diagramDefaults);
   const appearanceOverridden = isAppearanceOverridden(appearanceOptions);
+  const effectiveThemeId = useMemo(
+    () => resolveEffectiveThemeId(appearanceOptions, diagramType),
+    [appearanceOptions, diagramType],
+  );
   const [exportFormat, setExportFormat] = useState<'svg' | 'png' | 'webp' | 'ascii' | 'json' | 'drawio'>('svg');
 
   const effectiveLayout = useMemo(
@@ -596,10 +603,21 @@ export function Inspector({
               checked={appearanceOptions.darkMode}
               onChange={(e) => onAppearanceChange('darkMode', e.target.checked)}
             />
-            <span>启用深色模式偏好</span>
+            <span>图表深色主题（自动模式下切换 Clean Dark）</span>
           </label>
           <p className="hint">
-            主题控制配色与视觉 token，图形风格控制画法；深色模式偏好仅在「自动主题」时参与默认主题选择。
+            实际渲染主题：<code>{effectiveThemeId}</code>
+            {appearanceOptions.themeId === 'auto' && appearanceOptions.darkMode
+              ? ' — 已启用深色图表主题，与右侧 UI 浅色/深色无关。'
+              : ''}
+          </p>
+          {appearanceOverridden && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onResetAppearance}>
+              重置外观为默认
+            </button>
+          )}
+          <p className="hint">
+            主题控制配色与视觉 token，图形风格控制画法。若 group 框发紫，请检查是否误开了深色图表主题或选了 Presentation / Blueprint。
           </p>
         </Section>
 

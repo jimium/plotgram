@@ -4,45 +4,45 @@
   "name": "Clean Light",
   "meta": {
     "author": "Plotgram",
-    "description": "默认亮色基础样式：Notion/Linear 风极简轻盈设计，hairline 描边+柔和色块+极细连线",
+    "description": "默认亮色基础样式：借鉴 Linear/Figma 近白底与发丝级灰框，保留 Plotgram 语义色块分层",
     "tags": [
       "light",
       "clean",
-      "warm",
+      "cool",
       "modern",
       "minimal"
     ]
   },
   "tokens": {
     "colors": {
-      "canvas": "#FDFCF8",
-      "text": "#1C1917",
-      "muted_text": "#78716C",
-      "border": "#E7E5E4",
-      "border_strong": "#D6D3D1",
-      "primary": "#4F46E5",
+      "canvas": "#F7F8F8",
+      "text": "#18181B",
+      "muted_text": "#71717A",
+      "border": "#E4E4E7",
+      "border_strong": "#737373",
+      "primary": "#5E6AD2",
       "neutral_fill": "#FFFFFF",
-      "neutral_stroke": "#E7E5E4",
-      "edge_stroke": "#A8A29E",
+      "neutral_stroke": "#E4E4E7",
+      "edge_stroke": "#71717A",
       "group_fill": "transparent",
-      "group_stroke": "#D6D3D1"
+      "group_stroke": "#737373"
     },
     "palette": {
-      "blue": { "fill": "#EEF2FF", "stroke": "#C7D2FE", "text_fill": "#3730A3" },
-      "orange": { "fill": "#FFF7ED", "stroke": "#FED7AA", "text_fill": "#9A3412" },
-      "green": { "fill": "#ECFDF5", "stroke": "#A7F3D0", "text_fill": "#065F46" },
-      "purple": { "fill": "#F5F3FF", "stroke": "#DDD6FE", "text_fill": "#5B21B6" },
-      "yellow": { "fill": "#FEFCE8", "stroke": "#FEF08A", "text_fill": "#854D0E" },
-      "red": { "fill": "#FFF1F2", "stroke": "#FECDD3", "text_fill": "#9F1239" },
-      "cyan": { "fill": "#ECFEFF", "stroke": "#A5F3FC", "text_fill": "#155E75" },
-      "brown": { "fill": "#FAFAF9", "stroke": "#E7E5E4", "text_fill": "#44403C" },
-      "gray": { "fill": "#FAFAF9", "stroke": "#E7E5E4", "text_fill": "#44403C" },
-      "amber": { "fill": "#FFFBEB", "stroke": "#FDE68A", "text_fill": "#92400E" },
-      "blue_gray": { "fill": "#F5F5F4", "stroke": "#D6D3D1", "text_fill": "#44403C" },
+      "blue": { "fill": "#EEF2FF", "stroke": "#93C5FD", "text_fill": "#1E3A8A" },
+      "orange": { "fill": "#FFF7ED", "stroke": "#FDBA74", "text_fill": "#9A3412" },
+      "green": { "fill": "#ECFDF5", "stroke": "#86EFAC", "text_fill": "#166534" },
+      "purple": { "fill": "#F5F3FF", "stroke": "#C4B5FD", "text_fill": "#6D28D9" },
+      "yellow": { "fill": "#FEFCE8", "stroke": "#FDE047", "text_fill": "#854D0E" },
+      "red": { "fill": "#FFF1F2", "stroke": "#FDA4AF", "text_fill": "#9F1239" },
+      "cyan": { "fill": "#ECFEFF", "stroke": "#67E8F9", "text_fill": "#155E75" },
+      "brown": { "fill": "#FAFAF9", "stroke": "#D4D4D8", "text_fill": "#3F3F46" },
+      "gray": { "fill": "#F4F4F5", "stroke": "#D4D4D8", "text_fill": "#3F3F46" },
+      "amber": { "fill": "#FFFBEB", "stroke": "#FCD34D", "text_fill": "#92400E" },
+      "blue_gray": { "fill": "#F4F4F5", "stroke": "#A1A1AA", "text_fill": "#3F3F46" },
       "start_green": { "fill": "#10B981", "stroke": "#059669", "text_fill": "#FFFFFF" },
       "end_red": { "fill": "#F43F5E", "stroke": "#E11D48", "text_fill": "#FFFFFF" },
-      "arch_blue": { "fill": "#EEF2FF", "stroke": "#C7D2FE", "text_fill": "#3730A3" },
-      "root": { "fill": "#4F46E5", "stroke": "#4338CA", "text_fill": "#FFFFFF" }
+      "arch_blue": { "fill": "#EFF6FF", "stroke": "#3B82F6", "text_fill": "#1E40AF" },
+      "root": { "fill": "#5E6AD2", "stroke": "#4F55C4", "text_fill": "#FFFFFF" }
     },
     "typography": {
       "font_family": "'Inter', 'Noto Sans CJK SC', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif",
@@ -97,6 +97,7 @@
       "stroke_width": "{strokes.normal}",
       "text_fill": "{colors.text}",
       "font_size": "{typography.label_size}",
+      "font_weight": "{typography.font_weight_medium}",
       "radius": "{radius.md}",
       "shape": "rounded_rect",
       "stroke_linecap": "round",
@@ -109,11 +110,11 @@
       "font_size": "{typography.small_size}",
       "stroke_linecap": "round",
       "stroke_linejoin": "round",
-      "stroke_opacity": 0.55,
+      "stroke_opacity": 0.72,
       "arrow_style": "normal",
-      "label_bg": "none",
+      "label_bg": "{colors.neutral_fill}",
       "label_border": "none",
-      "label_bg_opacity": 0,
+      "label_bg_opacity": 0.9,
       "label_border_width": 0,
       "label_border_radius": 4,
       "label_padding": 3
@@ -220,9 +221,9 @@
         "group_nest": {
           "entries": [
             { "fill": "transparent", "stroke": "{colors.group_stroke}", "stroke_width": 1.0, "border_radius": 10.0, "stroke_dasharray": "5,4" },
-            { "fill": "{colors.neutral_fill}", "stroke": "{lighten({colors.group_stroke}, 0.15)}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" },
-            { "fill": "{darken({colors.neutral_fill}, 0.03)}", "stroke": "{lighten({colors.group_stroke}, 0.08)}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" },
-            { "fill": "{darken({colors.neutral_fill}, 0.06)}", "stroke": "{colors.group_stroke}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" }
+            { "fill": "{colors.neutral_fill}", "stroke": "{colors.border}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "{darken({colors.neutral_fill}, 0.03)}", "stroke": "{colors.border}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "{darken({colors.neutral_fill}, 0.06)}", "stroke": "{colors.border_strong}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" }
           ],
           "index": { "from": "group_depth", "cap": 3 },
           "bindings": [
@@ -234,7 +235,7 @@
     "sequence": {
       "edge": {
         "stroke": "{colors.edge_stroke}",
-        "stroke_opacity": 0.6
+        "stroke_opacity": 0.8
       },
       "entity_types": {
         "participant": {
@@ -309,8 +310,8 @@
     },
     "architecture": {
       "edge": {
-        "stroke": "{colors.border_strong}",
-        "stroke_opacity": 0.5
+        "stroke": "{colors.edge_stroke}",
+        "stroke_opacity": 0.7
       },
       "group": {
         "stroke": "{colors.border_strong}",
@@ -391,14 +392,14 @@
       "context_palettes": {
         "group_nest": {
           "entries": [
-            { "fill": "{colors.neutral_fill}", "stroke": "{colors.primary}", "stroke_width": 1.2, "border_radius": 10.0, "stroke_dasharray": "none", "stroke_opacity": 0.8 },
-            { "fill": "{darken({colors.neutral_fill}, 0.02)}", "stroke": "{darken({colors.primary}, 0.15)}", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none", "stroke_opacity": 0.5 },
-            { "fill": "{darken({colors.neutral_fill}, 0.04)}", "stroke": "{darken({colors.primary}, 0.25)}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none", "stroke_opacity": 0.35 },
-            { "fill": "{darken({colors.neutral_fill}, 0.06)}", "stroke": "{darken({colors.primary}, 0.35)}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none", "stroke_opacity": 0.25 }
+            { "fill": "{colors.neutral_fill}", "stroke": "{colors.border_strong}", "stroke_width": 1.0, "border_radius": 10.0, "stroke_dasharray": "none" },
+            { "fill": "{darken({colors.neutral_fill}, 0.02)}", "stroke": "{colors.border}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "{darken({colors.neutral_fill}, 0.04)}", "stroke": "{colors.border}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "{darken({colors.neutral_fill}, 0.06)}", "stroke": "{colors.border_strong}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" }
           ],
           "index": { "from": "group_depth", "cap": 3 },
           "bindings": [
-            { "target": "group", "fields": { "fill": "fill", "stroke": "stroke", "stroke_width": "stroke_width", "border_radius": "border_radius", "stroke_dasharray": "stroke_dasharray", "stroke_opacity": "stroke_opacity" } }
+            { "target": "group", "fields": { "fill": "fill", "stroke": "stroke", "stroke_width": "stroke_width", "border_radius": "border_radius", "stroke_dasharray": "stroke_dasharray" } }
           ]
         }
       }
@@ -417,7 +418,7 @@
     "mindmap": {
       "edge": {
         "stroke_width": "{strokes.thin}",
-        "stroke_opacity": 0.45,
+        "stroke_opacity": 0.6,
         "stroke": "{colors.edge_stroke}"
       },
       "node": {
@@ -451,12 +452,12 @@
       "context_palettes": {
         "branch": {
           "entries": [
-            { "fill": "{role.blue.fill}", "stroke": "{role.blue.stroke}", "text_fill": "{role.blue.text_fill}", "edge_stroke": "#C7D2FE" },
-            { "fill": "{role.cyan.fill}", "stroke": "{role.cyan.stroke}", "text_fill": "{role.cyan.text_fill}", "edge_stroke": "#A5F3FC" },
-            { "fill": "{role.red.fill}", "stroke": "{role.red.stroke}", "text_fill": "{role.red.text_fill}", "edge_stroke": "#FECDD3" },
-            { "fill": "{role.orange.fill}", "stroke": "{role.orange.stroke}", "text_fill": "{role.orange.text_fill}", "edge_stroke": "#FED7AA" },
-            { "fill": "{role.purple.fill}", "stroke": "{role.purple.stroke}", "text_fill": "{role.purple.text_fill}", "edge_stroke": "#DDD6FE" },
-            { "fill": "{role.green.fill}", "stroke": "{role.green.stroke}", "text_fill": "{role.green.text_fill}", "edge_stroke": "#A7F3D0" }
+            { "fill": "{role.blue.fill}", "stroke": "{role.blue.stroke}", "text_fill": "{role.blue.text_fill}", "edge_stroke": "#93C5FD" },
+            { "fill": "{role.cyan.fill}", "stroke": "{role.cyan.stroke}", "text_fill": "{role.cyan.text_fill}", "edge_stroke": "#67E8F9" },
+            { "fill": "{role.red.fill}", "stroke": "{role.red.stroke}", "text_fill": "{role.red.text_fill}", "edge_stroke": "#FDA4AF" },
+            { "fill": "{role.orange.fill}", "stroke": "{role.orange.stroke}", "text_fill": "{role.orange.text_fill}", "edge_stroke": "#FDBA74" },
+            { "fill": "{role.purple.fill}", "stroke": "{role.purple.stroke}", "text_fill": "{role.purple.text_fill}", "edge_stroke": "#C4B5FD" },
+            { "fill": "{role.green.fill}", "stroke": "{role.green.stroke}", "text_fill": "{role.green.text_fill}", "edge_stroke": "#86EFAC" }
           ],
           "index": { "from": "branch_slot", "wrap": true },
           "bindings": [
@@ -467,9 +468,9 @@
         },
         "edge_depth": {
           "entries": [
-            { "stroke_width": 1.5, "stroke_opacity": 0.55 },
-            { "stroke_width": 1.0, "stroke_opacity": 0.4 },
-            { "stroke_width": 0.75, "stroke_opacity": 0.3 }
+            { "stroke_width": 1.5, "stroke_opacity": 0.7 },
+            { "stroke_width": 1.0, "stroke_opacity": 0.55 },
+            { "stroke_width": 0.75, "stroke_opacity": 0.4 }
           ],
           "index": { "from": "tree_depth" },
           "bindings": [

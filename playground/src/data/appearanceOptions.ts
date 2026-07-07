@@ -123,3 +123,18 @@ export function buildRenderOptions(
 export function isAppearanceOverridden(opts: AppearanceOptions): boolean {
   return opts.themeId !== 'auto' || opts.graphicStyle !== 'auto' || opts.darkMode;
 }
+
+/** 预览用：在「自动主题」下推断实际会选用的内置主题 ID（与 Rust profile 对齐）。 */
+export function resolveEffectiveThemeId(
+  opts: AppearanceOptions,
+  diagramType: string | null,
+): string {
+  if (opts.themeId !== 'auto') {
+    return opts.themeId;
+  }
+  const isMindmap = diagramType === 'mindmap';
+  if (opts.darkMode) {
+    return isMindmap ? 'mindmap.ink-dark' : 'common.clean-dark';
+  }
+  return isMindmap ? 'mindmap.vivid-branches' : 'common.clean-light';
+}

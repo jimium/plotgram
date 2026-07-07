@@ -11,11 +11,19 @@
 
 ### 启动开发服务器
 
+主题与渲染逻辑在 Rust/WASM 里，**改 `plotgram-core` 后必须重新编译 WASM**。请用：
+
 ```bash
 cd playground
 npm install
-npm run dev
+./start.sh
 ```
+
+`start.sh` 会先 `wasm-pack build` 到 `plotgram-wasm/`，再启动 Vite（固定 **3000** 端口）。
+
+**不要**在 `public/plotgram-wasm/` 放 wasm 副本——Vite 会优先提供 `public/` 下的文件，导致浏览器加载过期 wasm（可与 `plotgram-wasm/plotgram_wasm_bg.wasm` 的 md5 对比排查）。
+
+仅 `npm run dev` 不会更新 WASM，强刷也可能因上述路径劫持看不到新主题。
 
 然后在浏览器中打开 [http://localhost:3000/](http://localhost:3000/)
 
