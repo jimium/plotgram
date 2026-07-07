@@ -217,7 +217,8 @@ diagram flowchart {
 | `render_style`| atom             | `standard`, `excalidraw`, `cross-hatch`, `blueprint`, `spatial-clarity`, `neon-glow`, `stipple` | `standard` | 笔触皮肤（与 theme 分工：theme 管颜色，render_style 管绘制风格） |
 | `group_frame`  | atom 或配置块        | `stack { ... }` \| `matrix { ... }` | 由算法默认决定 | **[新增]** Group Frame 统一配置块，统一控制组间排列/尺寸/对齐/间距/量化；旧属性 `group_sizing`/`group_arrangement`/`group_gap`/`group_align`/`snap` 保留为语法糖（见 §4.6） |
 | `group_sizing` | atom             | `fit`, `uniform` | `fit` | 顶层分组宽度策略（`group_frame` sugar，建议直接使用 `group_frame`）；适用于含 group 的布局 |
-| `snap`         | boolean          | `true`, `false` | `true` | 网格吸附开关（`group_frame` sugar，建议直接使用 `group_frame` 的 `snap` 选项） |
+| `snap`         | boolean          | `true`, `false` | `true` | 边路由后像素量化开关（`group_frame` sugar，建议直接使用 `group_frame` 的 `snap` 选项） |
+| `align`        | boolean / atom   | `true`, `false`, `rank`, `layer`, `full`, `off` | `true` | 节点结构对齐（L3 Node Frame）：rank/layer 轴独立控制，路由前执行（见 §4.8） |
 | `group_arrangement` | atom         | `vertical`, `horizontal` | `vertical` | group 间排列方向（`group_frame` sugar，建议直接使用 `group_frame: stack { axis: ... }`） |
 | `group_gap`    | number           | 正数            | `60`                  | group 间距（像素）（`group_frame` sugar，建议直接使用 `group_frame` 的 `gap` 选项） |
 | `group_align`  | atom             | `center`, `left` \| `start` | `center`             | group 间对齐方式（`group_frame` sugar，建议直接使用 `group_frame` 的 `cross` 选项） |
@@ -383,7 +384,57 @@ diagram flowchart {
 }
 ```
 
-### 4.8 约束
+### 4.8 `align` 节点结构对齐（L3 Node Frame）
+
+`align` 控制**路由前**的节点坐标修正（L3 Node Frame），与 `snap`（路由后的边/组框像素量化）相互独立。
+
+**与 `group_align` 的区别**：`group_align` 调节的是 **group 框**之间的对齐（L1 Group Frame）；`align` 调节的是**节点**在 rank/layer 轴上的结构对齐。
+
+#### 取值
+
+| 值 | 含义 |
+| --- | --- |
+| `true`（默认） | 使用当前布局算法的默认对齐策略（见下表） |
+| `false` / `off` | 完全禁用节点对齐 |
+| `rank` | 仅 rank 轴（流向轴上的同层中心线对齐） |
+| `layer` | 仅 layer 轴（垂直于流向的分布修正） |
+| `full` | rank + layer 轴均开启 |
+
+别名：`none` ≡ `off`，`default` ≡ `true`，`all` / `both` ≡ `full`。
+
+#### 两轴语义
+
+| 轴 | 作用 | 典型场景 |
+| --- | --- | --- |
+| **rank 轴** | 同层节点在流向轴上对齐到中位数（修正微小偏差） | 回路边导致同层 Y 略有参差 |
+| **layer 轴** | 同层节点在垂直于流向轴上消除重叠；**保持层重心**，不从画布 padding 重排 | 并行分支间距不足时分离，已排好的对称分布不被破坏 |
+
+#### 各布局算法默认策略
+
+| 布局算法 | `align: true` 时默认 | 说明 |
+| --- | --- | --- |
+| `flowchart` / `sugiyama-v2` | rank ✅ + layer `OverlapOnly` | layer 仅在重叠/间距不足时修正 |
+| `er` | rank ✅ + layer `Off` | 保留 Sugiyama 水平分布 |
+| `architecture` | rank ✅ + layer `Centroid` | 间距不足时均匀化并保持重心 |
+
+```plotgram
+// 仅修正同层 Y 偏差，不动并行分支水平位置
+diagram flowchart {
+    align: rank
+    config { direction: top-to-bottom }
+    // ...
+}
+
+// 完全交给 Sugiyama，不做后处理对齐
+diagram flowchart {
+    align: false
+    // ...
+}
+```
+
+> **注意**：`align` 在边路由**之前**执行，会改变节点坐标从而影响路由输入。`snap` 在路由**之后**执行，只做视觉量化，不改拓扑。
+
+### 4.9 约束
 
 - 图表属性不是必需的
 - 同一属性不能重复声明
@@ -1040,7 +1091,8 @@ diagram flowchart {
 | `theme` | atom | body / config | 主题 ID |
 | `render_style` | atom | body / config | 笔触皮肤 |
 | `group_sizing` | atom (enum) | body / config | `fit` \| `uniform` |
-| `snap` | boolean | body / config | 网格吸附开关 |
+| `snap` | boolean | body / config | 边路由后像素量化开关 |
+| `align` | boolean / atom | body / config | 节点结构对齐（L3）：`false`/`off`、`rank`、`layer`、`full`；见 language-spec §4.8 |
 | `group_arrangement` | atom (enum) | body / config | `vertical` \| `horizontal`（仅 flowchart 含 group 时生效） |
 | `group_gap` | number | body / config | group 间距像素（默认 `60`） |
 | `group_align` | atom (enum) | body / config | `center` \| `left`（仅 flowchart 含 group 时生效） |

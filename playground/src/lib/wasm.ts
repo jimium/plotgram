@@ -1,5 +1,4 @@
 import type { RefinementReport } from '../data/intentOptions';
-import { assetBase } from './baseUrl';
 
 /** drawio 导出降级报告。 */
 export interface ExportWarning {
@@ -145,8 +144,10 @@ let modulePromise: Promise<PlotgramWasm> | null = null;
 export function loadWasm(): Promise<PlotgramWasm> {
   if (!modulePromise) {
     modulePromise = (async () => {
-      const wasmJs = `${assetBase()}plotgram-wasm/plotgram_wasm.js`;
-      const mod = (await import(/* @vite-ignore */ wasmJs)) as unknown as PlotgramWasm;
+      const mod = (await import(
+        /* @vite-ignore */ /* @ts-expect-error WASM 产物由 wasm-pack 生成，构建前不存在 */
+        '../../plotgram-wasm/plotgram_wasm.js'
+      )) as unknown as PlotgramWasm;
       await mod.default();
       return mod;
     })();

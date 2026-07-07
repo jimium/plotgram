@@ -6,7 +6,7 @@ PORT=3000
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 WASM_CRATE_DIR="$ROOT_DIR/crates/plotgram-wasm"
-WASM_OUT_DIR="$SCRIPT_DIR/public/plotgram-wasm"
+WASM_OUT_DIR="$SCRIPT_DIR/plotgram-wasm"
 
 echo "🔧 正在同步 WASM 产物..."
 if ! command -v wasm-pack >/dev/null 2>&1; then

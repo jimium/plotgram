@@ -88,7 +88,7 @@ build_playground() {
   require_cmd wasm-pack
   (
     cd "$ROOT_DIR/crates/plotgram-wasm"
-    wasm-pack build --target web --release --out-dir ../../playground/public/plotgram-wasm
+    wasm-pack build --target web --release --out-dir ../../playground/plotgram-wasm
   )
 
   log "构建 playground（base=${PLAYGROUND_BASE}, cdn=${PLAYGROUND_CDN_BASE}）…"
@@ -157,7 +157,7 @@ stage_artifacts() {
 
   # CDN：wasm
   rsync -a --delete \
-    "$ROOT_DIR/playground/public/plotgram-wasm/" \
+    "$ROOT_DIR/playground/plotgram-wasm/" \
     "$STAGING_DIR/cdn/playground/plotgram-wasm/"
 
   # CDN：playground 打包 assets（js / css）

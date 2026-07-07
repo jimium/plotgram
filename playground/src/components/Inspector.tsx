@@ -17,6 +17,9 @@ import {
   type AlgorithmOptionInfo,
   type AlgorithmConfigValues,
   type EffectiveLayoutField,
+  ALIGN_MODE_LABELS,
+  ALIGN_MODE_OPTIONS,
+  type EffectiveAlignField,
   type EffectiveToggleField,
   type LayoutOptions,
   type LayoutCatalog,
@@ -235,11 +238,25 @@ function EffectiveLayoutSummary({ effective, showEdgeRouting }: EffectiveLayoutS
       )}
       <EffectiveLayoutRow label="布局方向" field={effective.layoutDirection} />
       {effective.gridAlign.applicable && (
-        <EffectiveToggleRow label="节点对齐" field={effective.gridAlign} />
+        <EffectiveAlignRow label="节点对齐" field={effective.gridAlign} />
       )}
       {effective.gridSnap.applicable && (
         <EffectiveToggleRow label="边像素量化" field={effective.gridSnap} />
       )}
+    </div>
+  );
+}
+
+function EffectiveAlignRow({ label, field }: { label: string; field: EffectiveAlignField }) {
+  return (
+    <div className="field-row effective-layout-row">
+      <span className="field-label">{label}</span>
+      <div className="effective-layout-value">
+        <code>{ALIGN_MODE_LABELS[field.mode]}</code>
+        <span className={`tag tag-origin tag-origin-${field.origin}`}>
+          {LAYOUT_ORIGIN_LABELS[field.origin]}
+        </span>
+      </div>
     </div>
   );
 }
@@ -472,14 +489,17 @@ export function Inspector({
 
               {showGridSnap && (
                 <>
-                  <label className="toggle">
-                    <input
-                      type="checkbox"
-                      checked={layoutOptions.gridAlign}
-                      onChange={(e) => onLayoutChange('gridAlign', e.target.checked)}
-                    />
-                    <span>节点对齐（align）</span>
-                  </label>
+                  <Field label="节点对齐（align）">
+                    <select
+                      className="select"
+                      value={layoutOptions.gridAlign}
+                      onChange={(e) => onLayoutChange('gridAlign', e.target.value)}
+                    >
+                      {ALIGN_MODE_OPTIONS.map(({ value, label }) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </Field>
                   <label className="toggle">
                     <input
                       type="checkbox"
@@ -488,6 +508,9 @@ export function Inspector({
                     />
                     <span>边像素量化（snap）</span>
                   </label>
+                  <p className="hint">
+                    <code>rank</code> 修正同层流向轴偏差；<code>layer</code> 仅处理同层重叠；默认策略保留 Sugiyama 对称分布。
+                  </p>
                 </>
               )}
 
@@ -501,14 +524,13 @@ export function Inspector({
             <>
               {showGridSnap && (
                 <>
-                  <label className="toggle">
-                    <input
-                      type="checkbox"
-                      checked={effectiveLayout.gridAlign.enabled}
-                      disabled
-                    />
-                    <span>节点对齐（align）</span>
-                  </label>
+                  <Field label="节点对齐（align）">
+                    <select className="select" value={effectiveLayout.gridAlign.mode} disabled>
+                      {ALIGN_MODE_OPTIONS.map(({ value, label }) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </Field>
                   <label className="toggle">
                     <input
                       type="checkbox"

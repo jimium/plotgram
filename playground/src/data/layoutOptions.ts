@@ -50,14 +50,69 @@ export interface LayoutCatalog {
 /** `null` 表示使用算法默认值，不写入 DSL 配置块 */
 export type AlgorithmConfigValues = Record<string, number | null>;
 
+/** `align` 属性模式；`default` 表示使用布局算法默认，不写入 DSL */
+export type AlignMode = 'default' | 'off' | 'rank' | 'layer' | 'full';
+
+export const ALIGN_MODE_LABELS: Record<AlignMode, string> = {
+  default: '默认（算法）',
+  off: '关闭',
+  rank: 'rank — 流向轴',
+  layer: 'layer — 同层分布',
+  full: 'full — rank + layer',
+};
+
+export const ALIGN_MODE_OPTIONS: SelectOption[] = (
+  Object.keys(ALIGN_MODE_LABELS) as AlignMode[]
+).map((value) => ({ value, label: ALIGN_MODE_LABELS[value] }));
+
+export function normalizeAlignMode(raw: unknown): AlignMode {
+  if (raw === false || raw === 'off' || raw === 'false') return 'off';
+  if (raw === 'rank' || raw === 'layer' || raw === 'full') return raw;
+  return 'default';
+}
+
+function parseAlignFromSource(token: string): AlignMode {
+  switch (token.toLowerCase()) {
+    case 'false':
+    case 'off':
+    case 'none':
+      return 'off';
+    case 'true':
+    case 'default':
+      return 'default';
+    case 'rank':
+    case 'layer':
+      return token.toLowerCase() as 'rank' | 'layer';
+    case 'full':
+    case 'all':
+    case 'both':
+      return 'full';
+    default:
+      return 'default';
+  }
+}
+
+function alignModeToDsl(mode: AlignMode): string | null {
+  switch (mode) {
+    case 'default':
+      return null;
+    case 'off':
+      return 'false';
+    case 'rank':
+    case 'layer':
+    case 'full':
+      return mode;
+  }
+}
+
 export interface LayoutOptions {
   layoutAlgo: string;
   edgeRouting: string;
   layoutDirection: string;
   /** 边像素量化（`snap` 属性）；默认 true（flowchart / er / sugiyama-v2 / architecture-v2 生效） */
   gridSnap: boolean;
-  /** 节点结构对齐（`align` 属性）；默认 true（flowchart / er / sugiyama-v2 / architecture-v2 生效） */
-  gridAlign: boolean;
+  /** 节点结构对齐（`align` 属性）；`default` 使用算法默认策略 */
+  gridAlign: AlignMode;
   layoutConfig: AlgorithmConfigValues;
   edgeRoutingConfig: AlgorithmConfigValues;
 }
@@ -76,7 +131,7 @@ export function layoutOptionsFromDefaults(defaults: DiagramDefaults): LayoutOpti
     edgeRouting: defaults.edgeRouting ?? '',
     layoutDirection: LAYOUT_DIRECTION_UNSPECIFIED,
     gridSnap: true,
-    gridAlign: true,
+    gridAlign: 'default',
     layoutConfig: {},
     edgeRoutingConfig: {},
   };
@@ -88,7 +143,7 @@ export const EMPTY_LAYOUT_OPTIONS: LayoutOptions = {
   edgeRouting: '',
   layoutDirection: LAYOUT_DIRECTION_UNSPECIFIED,
   gridSnap: true,
-  gridAlign: true,
+  gridAlign: 'default',
   layoutConfig: {},
   edgeRoutingConfig: {},
 };
@@ -117,7 +172,7 @@ export function normalizeLayoutOptions(
     edgeRouting,
     layoutDirection,
     gridSnap: raw?.gridSnap ?? true,
-    gridAlign: raw?.gridAlign ?? true,
+    gridAlign: normalizeAlignMode(raw?.gridAlign),
     layoutConfig: raw?.layoutConfig ?? {},
     edgeRoutingConfig: raw?.edgeRoutingConfig ?? {},
   };
@@ -160,12 +215,18 @@ export interface ParsedSourceLayout {
   layoutDirection?: string;
   /** 源码中的 snap（边像素量化）；缺省表示 true */
   gridSnap?: boolean;
-  /** 源码中的 align（节点结构对齐）；缺省表示 true */
-  gridAlign?: boolean;
+  /** 源码中的 align（节点结构对齐）；缺省表示算法默认 */
+  gridAlign?: AlignMode;
 }
 
 export interface EffectiveLayoutField {
   value: string | null;
+  origin: LayoutValueOrigin;
+}
+
+export interface EffectiveAlignField {
+  mode: AlignMode;
+  applicable: boolean;
   origin: LayoutValueOrigin;
 }
 
@@ -174,7 +235,7 @@ export interface EffectiveLayout {
   edgeRouting: EffectiveLayoutField | null;
   layoutDirection: EffectiveLayoutField;
   gridSnap: EffectiveToggleField;
-  gridAlign: EffectiveToggleField;
+  gridAlign: EffectiveAlignField;
 }
 
 /** 通用布尔开关生效字段（snap / align 共用） */
@@ -545,8 +606,8 @@ export function parseLayoutFromSource(source: string): ParsedSourceLayout {
       const snapMatch = line.match(/^\s*snap\s*:\s*(true|false)/);
       if (snapMatch) result.gridSnap = snapMatch[1] === 'true';
 
-      const alignMatch = line.match(/^\s*align\s*:\s*(true|false)/);
-      if (alignMatch) result.gridAlign = alignMatch[1] === 'true';
+      const alignMatch = line.match(/^\s*align\s*:\s*([\w-]+)/);
+      if (alignMatch) result.gridAlign = parseAlignFromSource(alignMatch[1]);
 
       let attrBalance = countBraceDelta(line);
       depth += attrBalance;
@@ -599,7 +660,26 @@ function resolveEffectiveDirection(
   return { value: null, origin: 'unspecified' };
 }
 
-/** 通用布尔开关 resolve（snap / align 共用）：算法不支持 → 不适用；面板覆盖 → 面板值；源码声明 → 源码值；否则 → 默认开启 */
+function resolveEffectiveAlign(
+  panelMode: AlignMode,
+  sourceMode: AlignMode | undefined,
+  layoutSource: 'source' | 'panel',
+  layoutAlgo: string | null,
+): EffectiveAlignField {
+  const applicable = layoutAlgoSupportsGridSnap(layoutAlgo);
+  if (!applicable) {
+    return { mode: 'default', applicable: false, origin: 'unspecified' };
+  }
+  if (layoutSource === 'panel') {
+    return { mode: panelMode, applicable: true, origin: 'panel' };
+  }
+  if (sourceMode !== undefined) {
+    return { mode: sourceMode, applicable: true, origin: 'source' };
+  }
+  return { mode: 'default', applicable: true, origin: 'diagram-default' };
+}
+
+/** 通用布尔开关 resolve（snap 专用）：算法不支持 → 不适用；面板覆盖 → 面板值；源码声明 → 源码值；否则 → 默认开启 */
 function resolveEffectiveToggle(
   panelEnabled: boolean,
   sourceValue: boolean | undefined,
@@ -663,7 +743,7 @@ export function resolveEffectiveLayout(
     layoutAlgo.value,
   );
 
-  const gridAlign = resolveEffectiveToggle(
+  const gridAlign = resolveEffectiveAlign(
     opts.gridAlign,
     parsed.gridAlign,
     layoutSource,
@@ -683,7 +763,7 @@ export function isLayoutAtDefaults(
   if (defaults.edgeRouting !== undefined && opts.edgeRouting !== defaults.edgeRouting) return false;
   if (opts.layoutDirection !== LAYOUT_DIRECTION_UNSPECIFIED) return false;
   if (opts.gridSnap === false) return false;
-  if (opts.gridAlign === false) return false;
+  if (opts.gridAlign !== 'default') return false;
   return true;
 }
 
@@ -777,11 +857,11 @@ export function applyLayoutOptions(
     injections.push('    snap: false');
   }
 
-  if (
-    layoutAlgoSupportsGridSnap(layoutAlgoName)
-    && opts.gridAlign === false
-  ) {
-    injections.push('    align: false');
+  if (layoutAlgoSupportsGridSnap(layoutAlgoName)) {
+    const alignDsl = alignModeToDsl(opts.gridAlign);
+    if (alignDsl !== null) {
+      injections.push(`    align: ${alignDsl}`);
+    }
   }
 
   const stripped = stripLayoutAttributes(source);
@@ -808,6 +888,6 @@ export function isLayoutOverridden(
       opts.edgeRoutingConfig,
     )
     || opts.gridSnap === false
-    || opts.gridAlign === false
+    || opts.gridAlign !== 'default'
   );
 }

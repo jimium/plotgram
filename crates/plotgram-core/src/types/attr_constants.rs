@@ -110,3 +110,23 @@ pub mod group_arrangement {
 
     pub const ALL: &[&str] = &[VERTICAL, HORIZONTAL];
 }
+
+/// 节点对齐模式枚举值（diagram 级 `align` 属性）。
+///
+/// 除下列 atom 外，也接受 boolean：`true`（算法默认）、`false`（关闭）。
+pub mod align {
+    pub const OFF: &str = "off";
+    pub const RANK: &str = "rank";
+    pub const LAYER: &str = "layer";
+    pub const FULL: &str = "full";
+    /// 别名，等价于 `off`
+    pub const NONE: &str = "none";
+    /// 别名，等价于 `true`（算法默认）
+    pub const DEFAULT: &str = "default";
+    /// 别名，等价于 `full`
+    pub const ALL: &str = "all";
+    /// 别名，等价于 `full`
+    pub const BOTH: &str = "both";
+
+    pub const ALL_ATOMS: &[&str] = &[OFF, RANK, LAYER, FULL, NONE, DEFAULT, ALL, BOTH];
+}

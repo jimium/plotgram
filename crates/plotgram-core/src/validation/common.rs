@@ -112,11 +112,26 @@ pub fn validate_diagram_attributes(diagram: &Diagram, result: &mut ValidationRes
                     ));
                 }
             }
-            diagram::ALIGN => {
-                if !matches!(attr.value, AttributeValue::Boolean(_)) {
+            diagram::ALIGN => match &attr.value {
+                AttributeValue::Boolean(_) => {}
+                AttributeValue::String(tv) => {
+                    let v = tv.as_str();
+                    if !attr_constants::align::ALL_ATOMS.contains(&v) {
+                        result.add_error(DiagnosticError::invalid_enum_value(
+                            attr.span,
+                            diagram::ALIGN,
+                            v,
+                            attr_constants::align::ALL_ATOMS,
+                        ));
+                    }
+                }
+                _ => {
                     result.add_error(DiagnosticError::structure_violation(
                         attr.span,
-                        format!("属性 '{}' 的值必须是 boolean（true 或 false）", diagram::ALIGN),
+                        format!(
+                            "属性 '{}' 的值必须是 boolean（true/false）或 atom（rank/layer/full/off）",
+                            diagram::ALIGN
+                        ),
                     ));
                 }
             }

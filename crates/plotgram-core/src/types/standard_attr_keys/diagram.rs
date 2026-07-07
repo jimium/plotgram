@@ -47,5 +47,5 @@ pub const GROUP_ARRANGEMENT: &str = "group_arrangement";
 /// 网格吸附开关（控制边像素量化 + L1 group quantize）
 pub const SNAP: &str = "snap";
 
-/// 节点结构对齐开关（控制同层 rank 轴对齐 + 层内槽位，影响路由输入）
+/// 节点结构对齐开关（rank/layer 轴独立控制，见 `align: rank | layer | full | false`）
 pub const ALIGN: &str = "align";

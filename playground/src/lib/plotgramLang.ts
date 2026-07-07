@@ -174,7 +174,7 @@ const KEYWORD_COMPLETIONS: Completion[] = [
   { label: 'layout', type: 'property', detail: '布局算法（可带 { options }）' },
   { label: 'edge_routing', type: 'property', detail: '边路由（可带 { options }）' },
   { label: 'snap', type: 'property', detail: '边像素量化（true | false，默认 true）' },
-  { label: 'align', type: 'property', detail: '节点结构对齐（true | false，默认 true）' },
+  { label: 'align', type: 'property', detail: '节点结构对齐（default | off | rank | layer | full）' },
   { label: 'theme', type: 'property', detail: '主题 ID（StyleSheet）' },
   { label: 'render_style', type: 'property', detail: '笔触皮肤' },
   { label: 'type', type: 'property', detail: '实体类型' },
@@ -215,7 +215,7 @@ export function plotgramCompletions(context: CompletionContext): CompletionResul
       case 'snap':
         return listResult(from, valueCompletions(['true', 'false']));
       case 'align':
-        return listResult(from, valueCompletions(['true', 'false']));
+        return listResult(from, valueCompletions(['default', 'off', 'rank', 'layer', 'full', 'true', 'false']));
       case 'render_style':
         return listResult(from, valueCompletions(RENDER_STYLE_VALUES));
       case 'theme':

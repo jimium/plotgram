@@ -77,10 +77,6 @@ const DEFAULT_CODE = getExample(DEFAULT_EXAMPLE_ID)?.source ?? EXAMPLES[0].sourc
 export const RASTER_EXPORT_SCALES = [1, 2, 3] as const;
 export type RasterExportScale = (typeof RASTER_EXPORT_SCALES)[number];
 
-function systemTheme(): Theme {
-  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-}
-
 let toastSeq = 0;
 
 /** 简单统计源码中 entity 和 edge 数量 */
@@ -108,7 +104,7 @@ function App() {
     'plotgram.appearance',
     DEFAULT_APPEARANCE_OPTIONS,
   );
-  const [theme, setTheme] = useLocalStorage<Theme>('plotgram.theme', systemTheme());
+  const [theme, setTheme] = useLocalStorage<Theme>('plotgram.theme', 'light');
   const [editorWidth, setEditorWidth] = useLocalStorage('plotgram.editorWidth', 380);
   const [inspectorWidth, setInspectorWidth] = useLocalStorage('plotgram.inspectorWidth', 300);
   const [rasterExportScale, setRasterExportScale] = useLocalStorage<RasterExportScale>(
@@ -521,7 +517,7 @@ function App() {
         return { ...next, gridSnap: Boolean(value) };
       }
       if (key === 'gridAlign') {
-        return { ...next, gridAlign: Boolean(value) };
+        return { ...next, gridAlign: value as LayoutOptions['gridAlign'] };
       }
       if (key === 'layoutAlgo' && value !== next.layoutAlgo) {
         return { ...next, layoutAlgo: value as string, layoutConfig: {} };

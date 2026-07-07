@@ -32,6 +32,8 @@ pub enum AttrValueType {
     Number,
     /// 布尔值
     Boolean,
+    /// boolean 或 atom 枚举（如 `align: false` / `align: rank`）
+    BooleanOrAtom,
     /// 算法配置块（`algo` 或 `algo { key: value }`）
     AlgorithmConfig,
 }
@@ -129,6 +131,12 @@ pub const DIAGRAM_ATTRS: &[AttrSchema] = &[
         AttrScope::Diagram,
         AttrValueType::Boolean,
         None,
+    ),
+    AttrSchema::new(
+        diagram::ALIGN,
+        AttrScope::Diagram,
+        AttrValueType::BooleanOrAtom,
+        Some(attr_constants::align::ALL_ATOMS),
     ),
 ];
 

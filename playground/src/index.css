@@ -15,39 +15,8 @@
   --duration-normal: 200ms;
 }
 
-/* ── 深色（默认）— 略暖的 #0f1419，减少「代码托管」感 ── */
+/* ── 浅色（默认） ─────────────────────────────────────── */
 :root,
-[data-theme='dark'] {
-  --bg: #0f1419;
-  --panel: #151b23;
-  --panel-2: #1b2230;
-  --panel-3: #222a38;
-  --border: #3a4556;
-  --border-strong: #55617a;
-  --text: #e2e8f0;
-  --text-muted: #8b99ad;
-  --text-faint: #5a6a7e;
-  --accent: #6366f1;
-  --accent-hover: #5457e5;
-  --accent-fg: #ffffff;
-  --accent-soft: rgba(99, 102, 241, 0.15);
-  --accent-cyan: #22d3ee;
-  --accent-cyan-soft: rgba(34, 211, 238, 0.12);
-  --error: #f87171;
-  --error-soft: rgba(248, 113, 113, 0.12);
-  --warning: #fbbf24;
-  --warning-soft: rgba(251, 191, 36, 0.12);
-  --success: #34d399;
-  --success-soft: rgba(52, 211, 153, 0.12);
-  --editor-bg: #0f1419;
-  --overlay: rgba(0, 0, 0, 0.6);
-  --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --glow-success: 0 0 0 1px rgba(52, 211, 153, 0.3);
-  color-scheme: dark;
-}
-
-/* ── 浅色 ─────────────────────────────────────────────── */
 [data-theme='light'] {
   --bg: #f4f5f7;
   --panel: #ffffff;
@@ -76,6 +45,37 @@
   --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.08);
   --glow-success: 0 0 0 1px rgba(5, 150, 105, 0.25);
   color-scheme: light;
+}
+
+/* ── 深色 — 略暖的 #0f1419，减少「代码托管」感 ─────────── */
+[data-theme='dark'] {
+  --bg: #0f1419;
+  --panel: #151b23;
+  --panel-2: #1b2230;
+  --panel-3: #222a38;
+  --border: #3a4556;
+  --border-strong: #55617a;
+  --text: #e2e8f0;
+  --text-muted: #8b99ad;
+  --text-faint: #5a6a7e;
+  --accent: #6366f1;
+  --accent-hover: #5457e5;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(99, 102, 241, 0.15);
+  --accent-cyan: #22d3ee;
+  --accent-cyan-soft: rgba(34, 211, 238, 0.12);
+  --error: #f87171;
+  --error-soft: rgba(248, 113, 113, 0.12);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.12);
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.12);
+  --editor-bg: #0f1419;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --glow-success: 0 0 0 1px rgba(52, 211, 153, 0.3);
+  color-scheme: dark;
 }
 
 * {

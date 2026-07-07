@@ -14,8 +14,9 @@
 //! ├──────────────────────────────────────────────────────────────┤
 //! │ apply_geometric_refinement（Intent Pin / Align*）→ PinSet     │
 //! ├──────────────────────────────────────────────────────────────┤
-//! │ L3 Node Frame（grid_snap::align_nodes）：rank/layer 结构对齐   │
-//! │   仅节点坐标调整，无像素量化；由 `align` 属性控制              │
+//! │ L3 Node Frame（grid_snap::align_nodes）：rank/layer 轴独立对齐       │
+//! │   rank 轴：同层中心线对齐；layer 轴：重叠消除（保持层重心）          │
+//! │   仅节点坐标调整；由 `align` 属性控制（rank/layer 分级）        │
 //! ├──────────────────────────────────────────────────────────────┤
 //! │ recompute group bounds from nodes（L3→L1 数据流桥梁）         │
 //! ├──────────────────────────────────────────────────────────────┤
@@ -82,7 +83,7 @@ pub use lint::{
     LayoutViolation, LintConfig, LintProfile, LintReport, LintRuleId, LintSeverity, RuleConfig,
 };
 pub use registry::{EDGE_ROUTING_NAMES, LAYOUT_ALGORITHM_NAMES};
-pub use grid_snap::{NodeAlignConfig, EdgeSnapConfig};
+pub use grid_snap::{DiagramAlignOverride, EdgeSnapConfig, LayerAxisAlign, NodeAlignConfig};
 
 // 向后兼容：保持 `crate::layout::sugiyama` 等路径可用
 pub use edge::{

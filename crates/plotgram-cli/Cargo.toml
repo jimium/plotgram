@@ -7,7 +7,7 @@ rust-version.workspace = true
 description = "CLI tool for Plotgram — Turn anything into a diagram"
 
 [[bin]]
-name = "drawify"
+name = "plotgram"
 path = "src/main.rs"
 
 [dependencies]

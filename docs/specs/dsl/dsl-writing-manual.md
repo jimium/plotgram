@@ -349,7 +349,8 @@ diagram flowchart {
 | `render_style` | atom | `standard` | `standard` / `excalidraw` / `cross-hatch` / `blueprint` / `spatial-clarity` / `neon-glow` / `stipple` |
 | `group_frame` | atom/config | 由算法默认决定 | **[推荐]** Group Frame 统一配置块，统一控制组间排列/尺寸/对齐/间距/量化 |
 | `group_sizing` | atom | `fit` | 顶层分组宽度策略（`group_frame` sugar，建议用 `group_frame`） |
-| `snap` | boolean | `true` | 网格吸附（`group_frame` sugar，建议用 `group_frame` 的 `snap` 选项） |
+| `snap` | boolean | `true` | 边路由后像素量化（`group_frame` sugar，建议用 `group_frame` 的 `snap` 选项） |
+| `align` | boolean / atom | `true` | 节点结构对齐（L3）：`false`/`off`、`rank`、`layer`、`full`；见 §6.7 |
 | `group_arrangement` | atom | `vertical` | group 间排列方向（`group_frame` sugar，建议用 `group_frame: stack { axis: ... }`） |
 | `group_gap` | number | `60` | group 间距像素（`group_frame` sugar，建议用 `group_frame` 的 `gap` 选项） |
 | `group_align` | atom | `center` | group 间对齐方式（`group_frame` sugar，建议用 `group_frame` 的 `cross` 选项） |
@@ -461,6 +462,44 @@ diagram flowchart {
             gap: 40
             cross: center
         }
+    }
+    // ...
+}
+```
+
+### 6.7 `align` 节点结构对齐
+
+`align` 与 `snap` 分工明确：
+
+| 属性 | 阶段 | 作用对象 | 说明 |
+| --- | --- | --- | --- |
+| `align` | 路由**前** | 节点坐标 | rank/layer 轴结构修正 |
+| `snap` | 路由**后** | 边折线、组框 | 像素量化，不改拓扑 |
+
+**不要与 `group_align` 混淆**：`group_align` 是 group 框之间的对齐（L1）；`align` 是节点对齐（L3）。
+
+#### 取值速查
+
+| 写法 | 效果 |
+| --- | --- |
+| `align: true` | 算法默认（flowchart：rank + 仅消除重叠） |
+| `align: false` | 完全关闭 |
+| `align: rank` | 只修正同层在流向轴上的偏差 |
+| `align: layer` | 只处理同层重叠/间距不足 |
+| `align: full` | rank + layer 均开启 |
+
+#### 何时调节
+
+- **并行分支被拉歪**：通常不需要关 align；默认 `OverlapOnly` 已保留 Sugiyama 对称分布。若仍异常，试 `align: rank`。
+- **同层节点 Y 参差**（回路边常见）：保持默认或 `align: full`。
+- **完全信任 Sugiyama 输出**：`align: false`。
+
+```plotgram
+diagram flowchart {
+    title: "员工入职协作流程"
+    align: rank          // 只修 Y，保留并行分支水平位置
+    config {
+        direction: top-to-bottom
     }
     // ...
 }

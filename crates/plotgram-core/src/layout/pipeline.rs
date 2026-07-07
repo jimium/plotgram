@@ -50,8 +50,8 @@ impl<'a> LayoutPipeline<'a> {
         })?;
         let produces_edges = strategy.produces_edge_geometry();
         let mut node_align_config = strategy.node_align_config();
-        if let Some(false) = grid_snap::diagram_align_attribute(self.diagram) {
-            node_align_config.enabled = false;
+        if let Some(override_mode) = grid_snap::diagram_align_override(self.diagram) {
+            node_align_config.apply_diagram_override(override_mode);
         }
 
         let mut report = RefinementReport::default();

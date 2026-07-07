@@ -72,6 +72,6 @@ impl LayoutStrategy for ErLayout {
     }
 
     fn node_align_config(&self) -> NodeAlignConfig {
-        NodeAlignConfig::default_sugiyama().with_rank_axis_only(true)
+        NodeAlignConfig::default_er()
     }
 }

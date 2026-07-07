@@ -219,16 +219,26 @@ pub struct GroupPadding {
 
 ### 3.3 L3 — Node Frame（节点对齐与量化）
 
-**定义**：对 **节点**（及边 waypoint）的 rank 轴对齐、layer 轴槽位、8px 量化。
+**定义**：对 **节点** 的 rank/layer 轴结构对齐（路由前），以及对边 waypoint 的像素量化（路由后）。
 
 对应现 `grid_snap.rs`：
 
-| 现函数 | L3 职责 |
+| 阶段 | 函数 / DSL | L3 职责 |
 |--------|---------|
-| `snap_layout_to_grid` | rank/layer 轴对齐 + 层内 overlap 消除 |
-| `snap_group_bounds` | **应迁移至 L1** 的 quantize 步骤 |
-| `align_group_borders` | **应迁移至 L1** 的 `border_align` |
-| `snap_edge_waypoints` | 边通道轴量化（路由后） |
+| 路由前 | `align_nodes` / `align:` | rank 轴同层中心线对齐；layer 轴重叠消除（保持层重心） |
+| 路由后 | `snap_edge_waypoints` / `snap:` | 边通道轴 8px 量化 |
+
+**`align` 分级语义**（diagram 级）：
+
+| DSL 值 | rank 轴 | layer 轴 |
+|--------|---------|----------|
+| `false` / `off` | — | — |
+| `true` | 算法默认 | 算法默认 |
+| `rank` | ✅ | — |
+| `layer` | — | `OverlapOnly` |
+| `full` | ✅ | `OverlapOnly` |
+
+各算法 `align: true` 默认：flowchart/sugiyama-v2 → rank + `OverlapOnly`；er → rank only；architecture → rank + `Centroid`。
 
 **命名建议**（实施期）：模块重命名为 `node_frame.rs` 或保留 `grid_snap` 但在文档中标注为 **L3 Node Frame**。
 

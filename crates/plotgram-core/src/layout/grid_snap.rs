@@ -1,18 +1,20 @@
 //! 节点对齐（NodeAlign）与边像素量化（EdgeSnap）。
 //!
 //! 本模块职责拆分为两个独立阶段：
-//! - **节点对齐**（[`align_nodes`]）：同层节点 rank 轴对齐 + 层内槽位重排 + 避碰。
-//!   属于结构对齐，**改坐标、影响路由输入**，在路由前执行。由 `align` 属性控制。
+//! - **节点对齐**（[`align_nodes`]）：rank 轴同层对齐 + layer 轴重叠消除（保持层重心）。
+//!   属于结构修正，**改坐标、影响路由输入**，在路由前执行。由 `align` 属性控制。
 //! - **边像素量化**（[`snap_edge_waypoints`]）：正交折线通道轴坐标量化到网格。
 //!   属于视觉优化，**不改拓扑**，在路由后执行。由 `snap` 属性控制。
 //!
-//! 两个阶段相互独立，各有自己的开关与配置，避免互相干扰。
+//! rank 轴与 layer 轴相互独立，各有开关；layer 轴不再从 padding 原点重排槽位，
+//! 以避免破坏 Sugiyama barycenter 对称分布。
 
 use crate::ast::{AttributeValue, Diagram};
 use crate::layout::constants::{
     self, GRID_SNAP_LAYER_TOLERANCE, GRID_SNAP_MAX_DISTANCE, GRID_SNAP_NODE_GAP_ARCH,
     GRID_SNAP_NODE_GAP_SUGIYAMA, GRID_SNAP_STEP,
 };
+use crate::types::attr_constants;
 use crate::layout::geometry::Point;
 use crate::layout::group::constants::{GROUP_BORDER_SHELL_PAD, PORT_STUB_CLEARANCE};
 use crate::layout::intent::PinSet;
@@ -30,23 +32,50 @@ const DEFAULT_REPULSE_MAX_ROUNDS: usize = 2;
 
 // ─── 配置结构 ────────────────────────────────────────────
 
+/// Layer 轴（同 rank 层内的垂直于流向轴）对齐模式。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LayerAxisAlign {
+    /// 不调整 layer 轴，完整保留主布局算法的 barycenter 分布。
+    Off,
+    /// 仅在同层节点重叠或间距不足时分离，并保持层重心不变。
+    OverlapOnly,
+    /// 在需要分离时均匀化至 `node_gap`，并保持层重心不变。
+    Centroid,
+}
+
+/// diagram 顶层 `align` 属性覆盖模式。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiagramAlignOverride {
+    /// `align: false` — 完全禁用节点对齐。
+    Off,
+    /// `align: true` — 使用布局算法声明的默认配置。
+    Default,
+    /// `align: rank` — 仅 rank 轴对齐。
+    RankOnly,
+    /// `align: layer` — 仅 layer 轴对齐。
+    LayerOnly,
+    /// `align: full` — rank + layer 轴均开启。
+    Full,
+}
+
 /// 节点结构对齐配置（由 [`LayoutStrategy::node_align_config()`] 声明）。
 ///
-/// 控制同层节点 rank 轴对齐与 layer 轴槽位吸附。
-/// 属于结构对齐阶段，在边路由之前执行，**改变节点坐标**。
+/// rank 轴与 layer 轴独立控制；layer 轴只做重叠消除/间距修正，不从 padding 重排槽位。
 #[derive(Debug, Clone)]
 pub struct NodeAlignConfig {
     pub enabled: bool,
+    /// rank 轴（流向轴上的层内对齐）：同层节点中心线对齐到中位数。
+    pub rank_axis: bool,
+    /// layer 轴（垂直于流向的分布修正）。
+    pub layer_axis: LayerAxisAlign,
     pub node_gap: f64,
     pub max_snap_distance: f64,
     pub layer_tolerance: f64,
     pub padding: f64,
-    /// ER 等图类型仅做 rank 轴对齐，跳过层内槽位吸附
-    pub rank_axis_only: bool,
 }
 
 impl NodeAlignConfig {
-    /// 构造一个禁用节点对齐的配置（默认值）。
+    /// 构造一个禁用节点对齐的配置。
     pub fn disabled() -> Self {
         Self {
             enabled: false,
@@ -54,30 +83,67 @@ impl NodeAlignConfig {
         }
     }
 
-    /// Sugiyama 系算法（sugiyama-v2/flowchart/er）的默认配置。
+    /// Sugiyama 系算法（sugiyama-v2）的默认配置。
     pub fn default_sugiyama() -> Self {
         Self {
             enabled: true,
+            rank_axis: true,
+            layer_axis: LayerAxisAlign::OverlapOnly,
             node_gap: GRID_SNAP_NODE_GAP_SUGIYAMA,
             max_snap_distance: GRID_SNAP_MAX_DISTANCE,
             layer_tolerance: GRID_SNAP_LAYER_TOLERANCE,
             padding: constants::DEFAULT_PADDING,
-            rank_axis_only: false,
         }
     }
 
-    /// 架构图的默认配置（node_gap 不同）。
-    pub fn default_architecture() -> Self {
+    /// 流程图的默认配置：rank 轴对齐 + layer 轴仅消除重叠。
+    pub fn default_flowchart() -> Self {
+        Self::default_sugiyama()
+    }
+
+    /// ER 图默认：仅 rank 轴对齐，layer 轴保持 Sugiyama 原始分布。
+    pub fn default_er() -> Self {
         Self {
-            node_gap: GRID_SNAP_NODE_GAP_ARCH,
+            layer_axis: LayerAxisAlign::Off,
             ..Self::default_sugiyama()
         }
     }
 
-    /// 设置 rank_axis_only 并返回自身（便于链式调用）。
-    pub fn with_rank_axis_only(mut self, rank_axis_only: bool) -> Self {
-        self.rank_axis_only = rank_axis_only;
+    /// 架构图的默认配置（node_gap 不同，layer 轴做间距均匀化）。
+    pub fn default_architecture() -> Self {
+        Self {
+            node_gap: GRID_SNAP_NODE_GAP_ARCH,
+            layer_axis: LayerAxisAlign::Centroid,
+            ..Self::default_sugiyama()
+        }
+    }
+
+    pub fn with_layer_axis(mut self, layer_axis: LayerAxisAlign) -> Self {
+        self.layer_axis = layer_axis;
         self
+    }
+
+    /// 应用 diagram 顶层 `align` 属性覆盖。
+    pub fn apply_diagram_override(&mut self, mode: DiagramAlignOverride) {
+        match mode {
+            DiagramAlignOverride::Off => self.enabled = false,
+            DiagramAlignOverride::Default => {}
+            DiagramAlignOverride::RankOnly => {
+                self.enabled = true;
+                self.rank_axis = true;
+                self.layer_axis = LayerAxisAlign::Off;
+            }
+            DiagramAlignOverride::LayerOnly => {
+                self.enabled = true;
+                self.rank_axis = false;
+                self.layer_axis = LayerAxisAlign::OverlapOnly;
+            }
+            DiagramAlignOverride::Full => {
+                self.enabled = true;
+                self.rank_axis = true;
+                self.layer_axis = LayerAxisAlign::OverlapOnly;
+            }
+        }
     }
 }
 
@@ -130,16 +196,32 @@ pub fn diagram_snap_attribute(diagram: &Diagram) -> Option<bool> {
         })
 }
 
-/// 读取 diagram 顶层 `align: true | false`（控制节点结构对齐）；未声明时返回 `None`（默认开启）。
-pub fn diagram_align_attribute(diagram: &Diagram) -> Option<bool> {
-    diagram
-        .attributes
-        .iter()
-        .find(|attr| attr.key == "align")
-        .and_then(|attr| match attr.value {
-            AttributeValue::Boolean(value) => Some(value),
+/// 读取 diagram 顶层 `align` 属性覆盖。
+///
+/// 支持：`false` / `true` / `"rank"` / `"layer"` / `"full"` / `"off"`。
+/// 未声明时返回 `None`（使用布局算法默认配置）。
+pub fn diagram_align_override(diagram: &Diagram) -> Option<DiagramAlignOverride> {
+    let attr = diagram.attributes.iter().find(|attr| attr.key == "align")?;
+    parse_align_override(&attr.value)
+}
+
+fn parse_align_override(value: &AttributeValue) -> Option<DiagramAlignOverride> {
+    match value {
+        AttributeValue::Boolean(false) => Some(DiagramAlignOverride::Off),
+        AttributeValue::Boolean(true) => Some(DiagramAlignOverride::Default),
+        AttributeValue::String(s) => match s.as_str().to_ascii_lowercase().as_str() {
+            attr_constants::align::OFF
+            | attr_constants::align::NONE => Some(DiagramAlignOverride::Off),
+            attr_constants::align::DEFAULT => Some(DiagramAlignOverride::Default),
+            attr_constants::align::RANK => Some(DiagramAlignOverride::RankOnly),
+            attr_constants::align::LAYER => Some(DiagramAlignOverride::LayerOnly),
+            attr_constants::align::FULL
+            | attr_constants::align::ALL
+            | attr_constants::align::BOTH => Some(DiagramAlignOverride::Full),
             _ => None,
-        })
+        },
+        _ => None,
+    }
 }
 
 /// 根据节点数量自适应选择网格步长（P5）。
@@ -196,7 +278,7 @@ pub struct SnapReport {
 
 // ─── 节点对齐 ───────────────────────────────────────────
 
-/// 对布局结果执行节点结构对齐（rank 轴中心线 + 层内槽位 + 避碰）。
+/// 对布局结果执行节点结构对齐（rank 轴中心线 + layer 轴重叠消除）。
 ///
 /// 属于结构对齐阶段，在边路由之前执行。
 /// `pinned` 中的节点在对应轴上跳过对齐（由 `Pin` / `Align*` 意图保护）。
@@ -216,14 +298,15 @@ pub fn align_nodes(
 
     let mut report = SnapReport::default();
 
-    for layer in &layers {
-        snap_rank_axis_centers(layout, layer, horizontal, config, &mut report, pinned);
+    if config.rank_axis {
+        for layer in &layers {
+            snap_rank_axis_centers(layout, layer, horizontal, config, &mut report, pinned);
+        }
     }
 
-    if !config.rank_axis_only {
+    if config.layer_axis != LayerAxisAlign::Off {
         for layer in &layers {
-            snap_layer_axis_slots(layout, layer, horizontal, config, &mut report, pinned);
-            resolve_layer_axis_overlaps(layout, layer, horizontal, config, pinned);
+            apply_layer_axis_align(layout, layer, horizontal, config, &mut report, pinned);
         }
     }
 
@@ -657,7 +740,37 @@ fn snap_rank_axis_centers(
     }
 }
 
-fn snap_layer_axis_slots(
+fn layer_axis_needs_adjustment(
+    centers: &[f64],
+    sizes: &[f64],
+    gap: f64,
+    mode: LayerAxisAlign,
+) -> bool {
+    if centers.len() <= 1 {
+        return false;
+    }
+    for i in 1..centers.len() {
+        let min_center = centers[i - 1] + sizes[i - 1] / 2.0 + gap + sizes[i] / 2.0;
+        match mode {
+            LayerAxisAlign::Off => return false,
+            LayerAxisAlign::OverlapOnly => {
+                if centers[i] < min_center - f64::EPSILON {
+                    return true;
+                }
+            }
+            LayerAxisAlign::Centroid => {
+                let actual_gap = centers[i] - centers[i - 1] - sizes[i - 1] / 2.0 - sizes[i] / 2.0;
+                if actual_gap < gap - f64::EPSILON {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// layer 轴对齐：仅在重叠或间距不足时分离，保持层重心不变。
+fn apply_layer_axis_align(
     layout: &mut LayoutResult,
     layer: &[String],
     horizontal: bool,
@@ -665,59 +778,22 @@ fn snap_layer_axis_slots(
     report: &mut SnapReport,
     pinned: &PinSet,
 ) {
-    if layer.len() <= 1 {
+    if layer.len() <= 1 || config.layer_axis == LayerAxisAlign::Off {
         return;
     }
 
     let mut ordered: Vec<String> = layer.to_vec();
     ordered.sort_by(|a, b| {
-        let ca = layout.nodes.get(a).map(|nl| layer_center(nl, horizontal)).unwrap_or(0.0);
-        let cb = layout.nodes.get(b).map(|nl| layer_center(nl, horizontal)).unwrap_or(0.0);
-        ca.partial_cmp(&cb)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| a.cmp(b))
-    });
-
-    let mut cursor = config.padding;
-    for id in &ordered {
-        let Some(node) = layout.nodes.get(id) else {
-            continue;
-        };
-        let size = layer_size(node, horizontal);
-        let slot_center = cursor + size / 2.0;
-        cursor += size + config.node_gap;
-
-        if pinned.is_layer_pinned(id, horizontal) {
-            continue;
-        }
-        let Some(node) = layout.nodes.get_mut(id) else {
-            continue;
-        };
-        let before = layer_center(node, horizontal);
-        if (before - slot_center).abs() <= config.max_snap_distance {
-            set_layer_center(node, slot_center, horizontal);
-            record_snap(report, before, slot_center);
-        } else {
-            report.skipped_nodes += 1;
-        }
-    }
-}
-
-fn resolve_layer_axis_overlaps(
-    layout: &mut LayoutResult,
-    layer: &[String],
-    horizontal: bool,
-    config: &NodeAlignConfig,
-    pinned: &PinSet,
-) {
-    if layer.len() <= 1 {
-        return;
-    }
-
-    let mut ordered: Vec<String> = layer.to_vec();
-    ordered.sort_by(|a, b| {
-        let ca = layout.nodes.get(a).map(|nl| layer_center(nl, horizontal)).unwrap_or(0.0);
-        let cb = layout.nodes.get(b).map(|nl| layer_center(nl, horizontal)).unwrap_or(0.0);
+        let ca = layout
+            .nodes
+            .get(a)
+            .map(|nl| layer_center(nl, horizontal))
+            .unwrap_or(0.0);
+        let cb = layout
+            .nodes
+            .get(b)
+            .map(|nl| layer_center(nl, horizontal))
+            .unwrap_or(0.0);
         ca.partial_cmp(&cb)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then_with(|| a.cmp(b))
@@ -738,6 +814,12 @@ fn resolve_layer_axis_overlaps(
         .map(|nl| layer_size(nl, horizontal))
         .collect();
 
+    if !layer_axis_needs_adjustment(&centers, &sizes, config.node_gap, config.layer_axis) {
+        return;
+    }
+
+    let original_centroid = centers.iter().sum::<f64>() / centers.len() as f64;
+
     for i in 1..centers.len() {
         let min_center = centers[i - 1] + sizes[i - 1] / 2.0 + config.node_gap + sizes[i] / 2.0;
         if centers[i] < min_center {
@@ -752,17 +834,30 @@ fn resolve_layer_axis_overlaps(
         }
     }
 
-    for (i, id) in ordered.iter().enumerate() {
-        let min_center = config.padding + sizes[i] / 2.0;
-        if centers[i] < min_center {
-            centers[i] = min_center;
+    let new_centroid = centers.iter().sum::<f64>() / centers.len() as f64;
+    let shift = original_centroid - new_centroid;
+    for center in &mut centers {
+        *center += shift;
+    }
+
+    let left_extent = centers[0] - sizes[0] / 2.0;
+    if left_extent < config.padding {
+        let delta = config.padding - left_extent;
+        for center in &mut centers {
+            *center += delta;
         }
+    }
+
+    for (i, id) in ordered.iter().enumerate() {
         if pinned.is_layer_pinned(id, horizontal) {
             continue;
         }
-        if let Some(node) = layout.nodes.get_mut(id) {
-            set_layer_center(node, centers[i], horizontal);
-        }
+        let Some(node) = layout.nodes.get_mut(id) else {
+            continue;
+        };
+        let before = layer_center(node, horizontal);
+        set_layer_center(node, centers[i], horizontal);
+        record_snap(report, before, centers[i]);
     }
 }
 
@@ -842,15 +937,15 @@ mod tests {
     }
 
     #[test]
-    fn slot_snap_respects_node_gap() {
+    fn overlap_only_separates_overlapping_siblings() {
         let mut nodes = HashMap::new();
         nodes.insert("a".into(), node(41.0, 100.0, 80.0, 40.0));
-        nodes.insert("b".into(), node(200.0, 100.0, 80.0, 40.0));
+        nodes.insert("b".into(), node(90.0, 100.0, 80.0, 40.0));
 
         let mut layout = sample_layout(nodes);
         let config = NodeAlignConfig {
             node_gap: 48.0,
-            max_snap_distance: 24.0,
+            layer_axis: LayerAxisAlign::OverlapOnly,
             ..NodeAlignConfig::default_sugiyama()
         };
         align_nodes(&mut layout, &config, false, &PinSet::default());
@@ -862,16 +957,57 @@ mod tests {
     }
 
     #[test]
-    fn rank_axis_only_skips_layer_slot_snap() {
+    fn overlap_only_preserves_well_spaced_parallel_branches() {
+        let mut nodes = HashMap::new();
+        nodes.insert("left".into(), node(70.0, 600.0, 160.0, 50.0));
+        nodes.insert("right".into(), node(294.0, 600.0, 160.0, 50.0));
+
+        let mut layout = sample_layout(nodes.clone());
+        let config = NodeAlignConfig::default_flowchart();
+        align_nodes(&mut layout, &config, false, &PinSet::default());
+
+        assert!((layout.nodes["left"].x - nodes["left"].x).abs() < 0.1);
+        assert!((layout.nodes["right"].x - nodes["right"].x).abs() < 0.1);
+    }
+
+    #[test]
+    fn layer_axis_off_preserves_layer_positions() {
         let mut nodes = HashMap::new();
         nodes.insert("a".into(), node(41.0, 100.0, 80.0, 40.0));
         nodes.insert("b".into(), node(200.0, 100.0, 80.0, 40.0));
 
         let mut layout = sample_layout(nodes.clone());
-        let config = NodeAlignConfig::default_sugiyama().with_rank_axis_only(true);
+        let config = NodeAlignConfig::default_er();
         align_nodes(&mut layout, &config, false, &PinSet::default());
 
         assert!((layout.nodes["b"].x - nodes["b"].x).abs() < 0.1);
+    }
+
+    #[test]
+    fn layer_align_preserves_centroid_when_separating() {
+        let mut nodes = HashMap::new();
+        nodes.insert("a".into(), node(200.0, 100.0, 80.0, 40.0));
+        nodes.insert("b".into(), node(230.0, 100.0, 80.0, 40.0));
+
+        let before_centroid =
+            (nodes["a"].x + nodes["a"].width / 2.0 + nodes["b"].x + nodes["b"].width / 2.0) / 2.0;
+
+        let mut layout = sample_layout(nodes);
+        let config = NodeAlignConfig {
+            node_gap: 48.0,
+            padding: 0.0,
+            layer_axis: LayerAxisAlign::OverlapOnly,
+            ..NodeAlignConfig::default_sugiyama()
+        };
+        align_nodes(&mut layout, &config, false, &PinSet::default());
+
+        let a_cx = layout.nodes["a"].x + layout.nodes["a"].width / 2.0;
+        let b_cx = layout.nodes["b"].x + layout.nodes["b"].width / 2.0;
+        let after_centroid = (a_cx + b_cx) / 2.0;
+        assert!(
+            (after_centroid - before_centroid).abs() < 1.0,
+            "centroid should be preserved: before={before_centroid}, after={after_centroid}"
+        );
     }
 
     #[test]
@@ -1193,14 +1329,44 @@ mod tests {
         let arch = NodeAlignConfig::default_architecture();
         assert!(arch.enabled);
         assert!((arch.node_gap - GRID_SNAP_NODE_GAP_ARCH).abs() < f64::EPSILON);
+        assert_eq!(arch.layer_axis, LayerAxisAlign::Centroid);
 
         let sugi = NodeAlignConfig::default_sugiyama();
         assert!(sugi.enabled);
-        assert!((sugi.node_gap - GRID_SNAP_NODE_GAP_SUGIYAMA).abs() < f64::EPSILON);
-        assert!(!sugi.rank_axis_only);
+        assert!(sugi.rank_axis);
+        assert_eq!(sugi.layer_axis, LayerAxisAlign::OverlapOnly);
 
-        let er = sugi.with_rank_axis_only(true);
-        assert!(er.rank_axis_only);
+        let er = NodeAlignConfig::default_er();
+        assert_eq!(er.layer_axis, LayerAxisAlign::Off);
+
+        let flow = NodeAlignConfig::default_flowchart();
+        assert_eq!(flow.layer_axis, LayerAxisAlign::OverlapOnly);
+    }
+
+    use crate::ast::TextValue;
+
+    #[test]
+    fn parse_align_override_values() {
+        assert_eq!(
+            parse_align_override(&AttributeValue::Boolean(false)),
+            Some(DiagramAlignOverride::Off)
+        );
+        assert_eq!(
+            parse_align_override(&AttributeValue::Boolean(true)),
+            Some(DiagramAlignOverride::Default)
+        );
+        assert_eq!(
+            parse_align_override(&AttributeValue::String(TextValue::unquoted("rank"))),
+            Some(DiagramAlignOverride::RankOnly)
+        );
+        assert_eq!(
+            parse_align_override(&AttributeValue::String(TextValue::unquoted("layer"))),
+            Some(DiagramAlignOverride::LayerOnly)
+        );
+        assert_eq!(
+            parse_align_override(&AttributeValue::String(TextValue::unquoted("full"))),
+            Some(DiagramAlignOverride::Full)
+        );
     }
 
     #[test]

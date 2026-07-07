@@ -24,7 +24,7 @@ Group Frame 在**主布局算法之后**执行（路由前、路由后各会幂�
 ```text
 L1  Group Frame   — 组间：track 等宽、cross 对齐、gap、border（本指南）
 L2  Intra Frame   — 组内：group { layout: horizontal | vertical | fan-out | auto }
-L3  Node Frame    — 节点：grid_snap（rank/layer 对齐 + 8px 量化）
+L3  Node Frame    — 节点：`align`（rank/layer 轴，路由前）+ `snap`（像素量化，路由后）
 ```
 
 调节「group 框是否对齐」用 **L1**；调节「group 里节点怎么排」用 **L2**。

@@ -22,7 +22,7 @@ Thumbs.db
 # WASM build artifacts
 /crates/plotgram-wasm/pkg/
 /crates/plotgram-wasm/dist/
-/playground/public/plotgram-wasm/
+/playground/plotgram-wasm/
 
 # VS Code extension
 /editors/vscode/node_modules/

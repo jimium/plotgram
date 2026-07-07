@@ -91,6 +91,6 @@ impl LayoutStrategy for FlowchartLayout {
     }
 
     fn node_align_config(&self) -> NodeAlignConfig {
-        NodeAlignConfig::default_sugiyama()
+        NodeAlignConfig::default_flowchart()
     }
 }

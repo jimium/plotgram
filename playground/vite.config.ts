@@ -8,8 +8,13 @@ const cdnBase = process.env.VITE_CDN_BASE || '';
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || '/',
   plugins: [react()],
+  resolve: {
+    alias: {
+      '../../plotgram-wasm/plotgram_wasm.js': resolve(__dirname, 'plotgram-wasm/plotgram_wasm.js'),
+    },
+  },
   optimizeDeps: {
-    exclude: ['plotgram-wasm', 'public/plotgram-wasm'],
+    exclude: ['plotgram-wasm'],
   },
   server: {
     port: 3000,
