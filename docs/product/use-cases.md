@@ -1,8 +1,8 @@
-# Drawify 使用场景与案例
+# Plotgram 使用场景与案例
 
 ## 场景总览
 
-Drawify 的核心使用场景围绕**AI 生成图表**展开。以下场景按优先级排列。
+Plotgram 的核心使用场景围绕**AI 生成图表**展开。以下场景按优先级排列。
 
 ---
 
@@ -17,16 +17,16 @@ Drawify 的核心使用场景围绕**AI 生成图表**展开。以下场景按�
 ```
 用户: "帮我画一下我们微服务系统的架构图，包含用户服务、订单服务、支付服务和消息队列"
   ↓
-AI Agent: 生成 Drawify 文本
+AI Agent: 生成 Plotgram 文本
   ↓
-渲染引擎: Drawify → SVG
+渲染引擎: Plotgram → SVG
   ↓
 用户: 看到架构图，满意
 ```
 
-### Drawify 输出示例
+### Plotgram 输出示例
 
-```drawify
+```plotgram
 diagram architecture {
     entity user_svc "用户服务" {
         type: service
@@ -74,7 +74,7 @@ graph TD
 - `|text|` 标注语法容易忘记或放错位置
 - 节点 ID（A, B, C）和标签分离，Agent 容易混淆
 
-**Drawify 的优势：**
+**Plotgram 的优势：**
 - 语义化的 entity 定义，ID 和 label 清晰分离
 - `type: queue` 自动渲染为队列形状，无需记忆形状语法
 - 布局由引擎自动决定，Agent 不需要管
@@ -94,16 +94,16 @@ PR 提交
   ↓
 CI Hook: 调用 AI Agent 分析代码变更
   ↓
-AI Agent: 理解变更内容，生成 Drawify
+AI Agent: 理解变更内容，生成 Plotgram
   ↓
-渲染引擎: Drawify → SVG
+渲染引擎: Plotgram → SVG
   ↓
 PR 描述: 自动附加流程图
 ```
 
-### Drawify 输出示例
+### Plotgram 输出示例
 
-```drawify
+```plotgram
 diagram flowchart {
     entity request "HTTP 请求"
     entity auth "鉴权中间件"
@@ -192,16 +192,16 @@ AI Agent: 生成 Patch（不是重新生成整张图）
 
 ---
 
-## 场景 4：IDE 插件实时预览 .dfy 文件
+## 场景 4：IDE 插件实时预览 .pgm 文件
 
 ### 用户故事
 
-> 作为开发者，我在编辑器里写 .dfy 文件时，希望能实时看到渲染结果，语法错误时立刻高亮提示。
+> 作为开发者，我在编辑器里写 .pgm 文件时，希望能实时看到渲染结果，语法错误时立刻高亮提示。
 
 ### 流程
 
 ```
-开发者编辑 diagram.dfy
+开发者编辑 diagram.pgm
   ↓
 IDE 插件 (WASM): 实时解析 + 渲染
   ↓
@@ -227,21 +227,21 @@ IDE 插件 (WASM): 实时解析 + 渲染
 ### 集成方式
 
 ```javascript
-// 1. Prompt 中要求 LLM 输出 Drawify
+// 1. Prompt 中要求 LLM 输出 Plotgram
 const systemPrompt = `
 你是一个技术助手。当用户要求画图时，请用以下格式输出：
-\`\`\`drawify
+\`\`\`plotgram
 diagram flowchart { ... }
 \`\`\`
 `;
 
-// 2. 解析 LLM 输出中的 Drawify 块
-const drawifyBlock = extractDrawify(llmResponse);
+// 2. 解析 LLM 输出中的 Plotgram 块
+const plotgramBlock = extractPlotgram(llmResponse);
 
-// 3. 调用 Drawify API 渲染
+// 3. 调用 Plotgram API 渲染
 const response = await fetch('/render', {
     method: 'POST',
-    body: JSON.stringify({ source: drawifyBlock, format: 'svg' })
+    body: JSON.stringify({ source: plotgramBlock, format: 'svg' })
 });
 
 const { output, errors } = await response.json();
@@ -277,16 +277,16 @@ displaySvg(output);
   ↓
 分析工具: 扫描代码结构、依赖关系
   ↓
-AI Agent: 将分析结果转化为 Drawify
+AI Agent: 将分析结果转化为 Plotgram
   ↓
-渲染引擎: Drawify → SVG/PNG
+渲染引擎: Plotgram → SVG/PNG
   ↓
 文档系统: 嵌入图表，自动更新
 ```
 
-### Drawify 输出示例
+### Plotgram 输出示例
 
-```drawify
+```plotgram
 diagram architecture {
     group services "微服务层" {
         entity auth "认证服务" { type: service; owner: "安全团队" }
@@ -313,7 +313,7 @@ diagram architecture {
 
 - `owner` 等元数据属性可以来自代码仓库的实际信息
 - 图表可以随代码变更自动重新生成
-- Drawify 的 Patch 能力使得增量更新（只改变更的部分）成为可能
+- Plotgram 的 Patch 能力使得增量更新（只改变更的部分）成为可能
 
 ---
 

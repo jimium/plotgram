@@ -457,8 +457,8 @@ Group Frame（L1）与 Border Shell 的职责切分（与 [group-border-shell-re
 **handoff 契约**：
 
 1. **权威输入**：Group Frame 输出的 `GroupLayout` 是 Border Shell 的**唯一权威输入**。Border Shell 不得自行重算 group 几何。
-2. **禁止旁路重算**：当前 `group::finalize_routing_groups`（[group/rect.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/group/rect.rs)）在路由前会从节点重算 `layout.groups`。迁移后，此重算必须走 `apply_group_frame` 入口（或其内部的 `compute_group_bounds` 步骤），禁止旁路直接赋值 `layout.groups`。
-3. **路由前 handoff 点**：`refresh_routing_groups_before_route`（[mod.rs:1218](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/mod.rs#L1218)）是 Group Frame → Border Shell 的显式 handoff。迁移后该函数应调用 `apply_group_frame` 而非各自为政。
+2. **禁止旁路重算**：当前 `group::finalize_routing_groups`（[group/rect.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/group/rect.rs)）在路由前会从节点重算 `layout.groups`。迁移后，此重算必须走 `apply_group_frame` 入口（或其内部的 `compute_group_bounds` 步骤），禁止旁路直接赋值 `layout.groups`。
+3. **路由前 handoff 点**：`refresh_routing_groups_before_route`（[mod.rs:1218](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/mod.rs#L1218)）是 Group Frame → Border Shell 的显式 handoff。迁移后该函数应调用 `apply_group_frame` 而非各自为政。
 4. **路由后不变**：Border Shell 阶段（路由 + refine）不得修改 `GroupLayout`；路由后若需恢复，必须回到 `apply_group_frame` 入口。
 5. **幂等保障**：上述契约是 §5.3 幂等性的前提——若 Border Shell 旁路修改了 `GroupLayout`，后续 `apply_group_frame` 的幂等重入将失效。
 
@@ -482,7 +482,7 @@ Group Frame（L1）与 Border Shell 的职责切分（与 [group-border-shell-re
 - [x] **L1 读 PinSet**：`track_sizing` 平移跳过 pinned 节点（当前 `apply_uniform_to_layout_result` / `align_top_groups_horizontally` 均未读 PinSet，属新增功能）
 - [x] **删除旧入口**（遵循 `AGENTS.md` §1 无向后兼容约束）：直接删除 `apply_uniform_to_layout_result`、`align_top_groups_horizontally` 的旧调用点，不保留 thin wrapper
 - [x] Border Shell handoff：`refresh_routing_groups_before_route` 改调 `apply_group_frame`（见 §7.1）
-- [x] showcase 回归：architecture `n.data-pipeline.dfy`、flowchart 含 group 样例
+- [x] showcase 回归：architecture `n.data-pipeline.pgm`、flowchart 含 group 样例
 
 ### P2 — DSL 统一 + L3 更名（可选，1 周）
 
@@ -519,13 +519,13 @@ Group Frame（L1）与 Border Shell 的职责切分（与 [group-border-shell-re
 
 | 模块 | 路径 |
 |------|------|
-| 布局调度 | `crates/drawify-core/src/layout/mod.rs` — `compute_layout_with_plan` |
-| 现 grid snap | `crates/drawify-core/src/layout/grid_snap.rs` |
-| uniform 策略 | `crates/drawify-core/src/layout/node/architecture_v2/group_sizing.rs` |
-| 流程图 stack | `crates/drawify-core/src/layout/node/flowchart/group_divide.rs` |
-| 架构对齐 Phase | `crates/drawify-core/src/layout/node/architecture_v2/pipeline.rs` |
-| 组内 hint | `crates/drawify-core/src/layout/node/architecture_v2/group_layout_hint.rs` |
-| Intent 几何 | `crates/drawify-core/src/layout/intent/geometric.rs` |
+| 布局调度 | `crates/plotgram-core/src/layout/mod.rs` — `compute_layout_with_plan` |
+| 现 grid snap | `crates/plotgram-core/src/layout/grid_snap.rs` |
+| uniform 策略 | `crates/plotgram-core/src/layout/node/architecture_v2/group_sizing.rs` |
+| 流程图 stack | `crates/plotgram-core/src/layout/node/flowchart/group_divide.rs` |
+| 架构对齐 Phase | `crates/plotgram-core/src/layout/node/architecture_v2/pipeline.rs` |
+| 组内 hint | `crates/plotgram-core/src/layout/node/architecture_v2/group_layout_hint.rs` |
+| Intent 几何 | `crates/plotgram-core/src/layout/intent/geometric.rs` |
 | DSL 属性 | `docs/specs/dsl/language-spec.md` — `group_sizing`、`group_arrangement` |
 
 ### B. 相关文档
@@ -553,7 +553,7 @@ Group Frame（L1）与 Border Shell 的职责切分（与 [group-border-shell-re
 1. **flowchart 默认是否改为 `track(equal)`？** 阶段式流程图多数期望等宽；可能与「内容贴合」冲突，建议默认 `Fit`，文档推荐 explicit equal。
 2. **L1 是否调整无 group 的纯节点图？** 否；无 group 时 Pass 为 no-op。
 3. **嵌套 group 的 Frame 递归深度？** ~~一期仅顶层 + architecture two_phase 已做的 nested Equal；全递归 P3。~~ **已解决（v0.3）**：`collect_sibling_sets` BFS 自顶向下收集所有 sibling set，`apply_group_frame` 对每层施加同一 `GroupFrameSpec`，全递归已实现（见 §8 P3）。
-4. **`align_group_borders` 节点联动问题**：历史版本曾「只改 width 不改 x」导致 group 偏移；L1 `apply_border_align_for`（[group_frame/mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/group_frame/mod.rs)）已承接，按 §2.1/§3.1 分级 invariant，border_align 微调（≤1 step）允许只改框不动节点——这不是 bug，而是设计选择。L1 Pass 需单测覆盖「border_align 后成员不溢出」。
+4. **`align_group_borders` 节点联动问题**：历史版本曾「只改 width 不改 x」导致 group 偏移；L1 `apply_border_align_for`（[group_frame/mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/group_frame/mod.rs)）已承接，按 §2.1/§3.1 分级 invariant，border_align 微调（≤1 step）允许只改框不动节点——这不是 bug，而是设计选择。L1 Pass 需单测覆盖「border_align 后成员不溢出」。
 
 ---
 

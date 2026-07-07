@@ -19,10 +19,10 @@
 
 | 文档 | 内容 |
 |------|------|
-| [drawify-cli.md](drawify-cli.md) | CLI 全命令：render / validate / lint / diff / patch |
+| [plotgram-cli.md](plotgram-cli.md) | CLI 全命令：render / validate / lint / diff / patch |
 | [render-pipeline.md](render-pipeline.md) | parse → prepare → layout → render 阶段与 Rust API |
 | [diff-and-patch.md](diff-and-patch.md) | diff2 语义差异与 Agent 增量改图 |
-| [drawify-eval.md](drawify-eval.md) | 布局与路由算法评分、对比、回归 |
+| [plotgram-eval.md](plotgram-eval.md) | 布局与路由算法评分、对比、回归 |
 | [showcase-workflow.md](showcase-workflow.md) | 样例集批量渲染与 CI 回归 |
 
 ### 布局与渲染
@@ -41,7 +41,7 @@
 
 **新贡献者（跑通工具链）**
 
-1. [drawify-cli.md](drawify-cli.md)
+1. [plotgram-cli.md](plotgram-cli.md)
 2. [render-pipeline.md](render-pipeline.md)
 3. [showcase-workflow.md](showcase-workflow.md)
 
@@ -49,7 +49,7 @@
 
 1. [layout-lint.md](layout-lint.md)
 2. [group-frame.md](group-frame.md)
-3. [drawify-eval.md](drawify-eval.md)
+3. [plotgram-eval.md](plotgram-eval.md)
 4. [layout-intent.md](layout-intent.md) → [完整 Intent 文档](../architecture/intent/layout-intent-usage.md)
 
 **Agent / 自动化改图**
@@ -63,9 +63,9 @@
 
 | 能力 | 路径 |
 |------|------|
-| LayoutLint | `crates/drawify-core/src/layout/lint/` |
-| pipeline | `crates/drawify-core/src/pipeline/` |
-| diff2 | `crates/drawify-core/src/diff2/` |
-| drawify-eval | `crates/drawify-eval/` |
-| CLI | `crates/drawify-cli/` |
-| SVG debug | `crates/drawify-core/src/render/paint/svg_debug.rs` |
+| LayoutLint | `crates/plotgram-core/src/layout/lint/` |
+| pipeline | `crates/plotgram-core/src/pipeline/` |
+| diff2 | `crates/plotgram-core/src/diff2/` |
+| plotgram-eval | `crates/plotgram-eval/` |
+| CLI | `crates/plotgram-cli/` |
+| SVG debug | `crates/plotgram-core/src/render/paint/svg_debug.rs` |

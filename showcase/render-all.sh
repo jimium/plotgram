@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# 一次性渲染 showcase 目录下所有 .dfy 文件
+# 一次性渲染 showcase 目录下所有 .pgm 文件
 
 set -euo pipefail
 
-#DRAWIFY_PROFILE=debug
+#PLOTGRAM_PROFILE=debug
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-# 默认 release：计时反映真实渲染性能；开发时可 DRAWIFY_PROFILE=debug
-DRAWIFY_PROFILE="${DRAWIFY_PROFILE:-release}"
-DRAWIFY_BIN="$ROOT_DIR/target/$DRAWIFY_PROFILE/drawify"
-export DRAWIFY_FONTS_DIR="${DRAWIFY_FONTS_DIR:-$ROOT_DIR/fonts}"
+# 默认 release：计时反映真实渲染性能；开发时可 PLOTGRAM_PROFILE=debug
+PLOTGRAM_PROFILE="${PLOTGRAM_PROFILE:-release}"
+PLOTGRAM_BIN="$ROOT_DIR/target/$PLOTGRAM_PROFILE/plotgram"
+export PLOTGRAM_FONTS_DIR="${PLOTGRAM_FONTS_DIR:-$ROOT_DIR/fonts}"
 
 FORMATS=("svg")
 VALIDATE=false
@@ -21,7 +21,7 @@ usage() {
   cat <<'EOF'
 用法: render-all.sh [选项]
 
-扫描 showcase 各类型目录（flowchart/、sequence/ 等）下的 .dfy 文件并批量渲染。
+扫描 showcase 各类型目录（flowchart/、sequence/ 等）下的 .pgm 文件并批量渲染。
 输出与源文件同目录、同名换后缀（如 flowchart/s.linear-chain.svg）。
 
 选项:
@@ -76,29 +76,29 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-build_drawify() {
-  echo "构建 drawify-cli ($DRAWIFY_PROFILE)..."
-  if [[ "$DRAWIFY_PROFILE" == "release" ]]; then
-    (cd "$ROOT_DIR" && cargo build --release -p drawify-cli)
+build_plotgram() {
+  echo "构建 plotgram-cli ($PLOTGRAM_PROFILE)..."
+  if [[ "$PLOTGRAM_PROFILE" == "release" ]]; then
+    (cd "$ROOT_DIR" && cargo build --release -p plotgram-cli)
   else
-    (cd "$ROOT_DIR" && cargo build -p drawify-cli)
+    (cd "$ROOT_DIR" && cargo build -p plotgram-cli)
   fi
   echo
 }
 
-run_drawify() {
-  if [[ ! -x "$DRAWIFY_BIN" ]]; then
-    echo "未找到二进制: $DRAWIFY_BIN" >&2
+run_plotgram() {
+  if [[ ! -x "$PLOTGRAM_BIN" ]]; then
+    echo "未找到二进制: $PLOTGRAM_BIN" >&2
     exit 1
   fi
-  "$DRAWIFY_BIN" "$@"
+  "$PLOTGRAM_BIN" "$@"
 }
 
 format_duration_ms() {
   awk -v ms="$1" 'BEGIN { printf "%.3fs", ms / 1000 }'
 }
 
-# 仅统计 drawify render 墙钟耗时（毫秒精度）；不含 svg-history 归档/写盘。
+# 仅统计 plotgram render 墙钟耗时（毫秒精度）；不含 svg-history 归档/写盘。
 # 子进程 stdout/stderr 重定向到 /dev/null，避免 [perf] 等日志污染输出。
 run_timed_render() {
   perl -MTime::HiRes=time -e '
@@ -115,7 +115,7 @@ run_timed_render() {
     my $rc = $? >> 8;
     print int((time() - $start) * 1000 + 0.5), "\n";
     exit($rc);
-  ' -- "$DRAWIFY_BIN" render "$1" -f "$2" -o "$3"
+  ' -- "$PLOTGRAM_BIN" render "$1" -f "$2" -o "$3"
 }
 
 output_ext() {
@@ -132,7 +132,7 @@ output_ext() {
   esac
 }
 
-build_drawify
+build_plotgram
 
 # 清理上次中断留下的临时渲染文件，避免污染 svg-history
 while IFS= read -r -d '' stale; do
@@ -142,10 +142,10 @@ done < <(find "$SCRIPT_DIR" -name '*.rendering.*' -not -path '*/.*' -print0 2>/d
 total_files=0
 while IFS= read -r -d '' _; do
   total_files=$((total_files + 1))
-done < <(find "$SCRIPT_DIR" -name '*.dfy' -not -path '*/.*' -print0)
+done < <(find "$SCRIPT_DIR" -name '*.pgm' -not -path '*/.*' -print0)
 
 if [[ "$total_files" -eq 0 ]]; then
-  echo "未找到 .dfy 文件" >&2
+  echo "未找到 .pgm 文件" >&2
   exit 1
 fi
 
@@ -161,10 +161,10 @@ echo
 
 while IFS= read -r -d '' dfy_file; do
   rel="${dfy_file#"$SCRIPT_DIR"/}"
-  base="${dfy_file%.dfy}"
+  base="${dfy_file%.pgm}"
 
   if $VALIDATE; then
-    if ! run_drawify validate "$dfy_file" >/dev/null 2>&1; then
+    if ! run_plotgram validate "$dfy_file" >/dev/null 2>&1; then
       echo "✗ 验证失败: $rel" >&2
       failed=$((failed + ${#FORMATS[@]}))
       current=$((current + ${#FORMATS[@]}))
@@ -205,7 +205,7 @@ while IFS= read -r -d '' dfy_file; do
       echo "  ✗ 失败" >&2
     fi
   done
-done < <(find "$SCRIPT_DIR" -name '*.dfy' -not -path '*/.*' -print0 | sort -z)
+done < <(find "$SCRIPT_DIR" -name '*.pgm' -not -path '*/.*' -print0 | sort -z)
 
 rendered=$((success + failed))
 
@@ -216,7 +216,7 @@ if [[ "$rendered" -gt 0 ]]; then
     BEGIN {
       total = total_ms / 1000
       avg = total / rendered
-      printf "渲染计算耗时: 总计 %.3fs，平均 %.3fs（%d 次 drawify render）\n", total, avg, rendered
+      printf "渲染计算耗时: 总计 %.3fs，平均 %.3fs（%d 次 plotgram render）\n", total, avg, rendered
     }
   '
 fi

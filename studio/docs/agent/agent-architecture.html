@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Drawify Studio - Agent 实现逻辑说明</title>
+<title>Plotgram Studio - Agent 实现逻辑说明</title>
 <style>
   :root {
     --primary: #7c3aed;
@@ -395,9 +395,9 @@
 <div class="container">
 
 <header>
-  <h1>Drawify Studio - Agent 实现逻辑说明</h1>
-  <div class="subtitle">基于 LLM 驱动的 Agent 绘图工具,通过 Tool-Calling 操控 drawify-wasm 生成与迭代图表</div>
-  <div class="meta">技术栈:React 19 + TypeScript 6 + Ant Design 5 + Vite 7 · WASM 桥接 drawify-core</div>
+  <h1>Plotgram Studio - Agent 实现逻辑说明</h1>
+  <div class="subtitle">基于 LLM 驱动的 Agent 绘图工具,通过 Tool-Calling 操控 plotgram-wasm 生成与迭代图表</div>
+  <div class="meta">技术栈:React 19 + TypeScript 6 + Ant Design 5 + Vite 7 · WASM 桥接 plotgram-core</div>
 </header>
 
 <div class="toc">
@@ -417,7 +417,7 @@
 <section id="overview">
 <h2><span class="num">1</span>架构总览</h2>
 
-<p>Drawify Studio 采用分层架构,从用户输入到图表渲染经过 5 层处理,每层职责单一、单向流动:</p>
+<p>Plotgram Studio 采用分层架构,从用户输入到图表渲染经过 5 层处理,每层职责单一、单向流动:</p>
 
 <div class="arch-layer layer-ui">
   <span class="label">UI 层</span>
@@ -440,15 +440,15 @@
 </div>
 <div class="arrow-down">↓</div>
 <div class="arch-layer layer-core">
-  <span class="label">drawify-core</span>
+  <span class="label">plotgram-core</span>
   <span class="desc">parse → prepare → validate → layout → scene → encode</span>
 </div>
 
 <h3>核心设计原则</h3>
 <ul>
-  <li><strong>LLM 驱动</strong>:用户用自然语言描述需求,LLM 生成 Drawify DSL 并通过 Tool 调用渲染</li>
+  <li><strong>LLM 驱动</strong>:用户用自然语言描述需求,LLM 生成 Plotgram DSL 并通过 Tool 调用渲染</li>
   <li><strong>Agent 绘图</strong>:LLM 通过 function-calling 操控 6 个 Tool(render/validate/parse/diff/apply_patch/layout_catalog)</li>
-  <li><strong>单格式输出</strong>:每次 render 调用只产出一种格式(默认 SVG),符合 drawify-core 的单格式渲染约定</li>
+  <li><strong>单格式输出</strong>:每次 render 调用只产出一种格式(默认 SVG),符合 plotgram-core 的单格式渲染约定</li>
   <li><strong>DSL 即真相</strong>:<code>context.source</code> 是图表的唯一真实状态,SVG 是其渲染产物</li>
 </ul>
 </section>
@@ -584,7 +584,7 @@
 
 <h3>3.2 DSL 生成与 source 同步</h3>
 
-<p>LLM 通过 <code>render</code> tool 的 <code>source</code> 参数传入生成的 Drawify DSL。这里有一个关键的 <strong>source 同步机制</strong>:</p>
+<p>LLM 通过 <code>render</code> tool 的 <code>source</code> 参数传入生成的 Plotgram DSL。这里有一个关键的 <strong>source 同步机制</strong>:</p>
 
 <pre><code><span class="comment">// src/agent/tools.ts - render executor</span>
 <span class="function">render</span>: <span class="keyword">async</span> (args, context) => {
@@ -613,7 +613,7 @@
 
 <pre><code><span class="comment">// src/lib/wasm.ts</span>
 <span class="keyword">export function</span> <span class="function">renderSource</span>(
-  wasm: <span class="type">DrawifyWasm</span>,
+  wasm: <span class="type">PlotgramWasm</span>,
   source: <span class="type">string</span>,
   format: <span class="type">RenderFormat</span>,
   optionsJson?: <span class="type">string</span>,
@@ -632,9 +632,9 @@
   });
 }</code></pre>
 
-<p>WASM 侧(Rust)的渲染管线遵循 drawify-core 的分层架构:</p>
+<p>WASM 侧(Rust)的渲染管线遵循 plotgram-core 的分层架构:</p>
 
-<pre><code><span class="comment">// crates/drawify-wasm/src/lib.rs - render_impl</span>
+<pre><code><span class="comment">// crates/plotgram-wasm/src/lib.rs - render_impl</span>
 <span class="keyword">fn</span> <span class="function">render_impl</span>(source, format_str, options) -&gt; <span class="type">String</span> {
     <span class="comment">// 1. 解析格式</span>
     <span class="keyword">let</span> format = <span class="type">RenderFormat</span>::<span class="function">from_str</span>(format_str)?;
@@ -726,7 +726,7 @@
 <section id="tools">
 <h2><span class="num">4</span>Tool-Calling 机制</h2>
 
-<p>Agent 通过 6 个 Tool 操控 drawify-wasm,每个 Tool 对应一种能力:</p>
+<p>Agent 通过 6 个 Tool 操控 plotgram-wasm,每个 Tool 对应一种能力:</p>
 
 <table>
 <tr>
@@ -863,7 +863,7 @@
   <span class="keyword">if</span> (context.source) {
     messages.<span class="function">push</span>({
       role: <span class="string">'system'</span>,
-      content: <span class="string">`当前图表的 DSL 源码如下,后续修改基于此版本:\n\n\`\`\`drawify\n${context.source}\n\`\`\``</span>,
+      content: <span class="string">`当前图表的 DSL 源码如下,后续修改基于此版本:\n\n\`\`\`plotgram\n${context.source}\n\`\`\``</span>,
     });
   }
 
@@ -964,7 +964,7 @@
 <tr><td><code>src/agent/tools.ts</code></td><td>6 个 Tool 的 Schema 定义与 Executor 实现</td></tr>
 <tr><td><code>src/agent/prompt.ts</code></td><td>System Prompt 模板与 buildMessages 上下文组装</td></tr>
 <tr><td><code>src/agent/context.ts</code></td><td>AgentContext 创建、更新、历史压缩</td></tr>
-<tr><td><code>src/agent/types.ts</code></td><td>与 drawify-core 对齐的类型定义</td></tr>
+<tr><td><code>src/agent/types.ts</code></td><td>与 plotgram-core 对齐的类型定义</td></tr>
 <tr><td><code>src/hooks/useAgent.ts</code></td><td>React Hook,管理对话状态,封装 AgentLoop</td></tr>
 <tr><td><code>src/hooks/useWasm.ts</code></td><td>WASM 模块加载与能力检测</td></tr>
 <tr><td><code>src/lib/wasm.ts</code></td><td>WASM 桥接层,renderSource/validateSource/diffSources</td></tr>
@@ -991,7 +991,7 @@
 </table>
 
 <div class="info-box">
-  <strong>P1 实现要点</strong>:需要在 drawify-wasm crate 新增 <code>diff_sources</code> / <code>apply_patch</code> / <code>ast_to_source</code> 三个绑定,并在 drawify-core 实现 AST → DSL 反序列化能力。前端侧的 Tool Schema 和 Executor 已就绪,只需 WASM 产物支持即可激活。
+  <strong>P1 实现要点</strong>:需要在 plotgram-wasm crate 新增 <code>diff_sources</code> / <code>apply_patch</code> / <code>ast_to_source</code> 三个绑定,并在 plotgram-core 实现 AST → DSL 反序列化能力。前端侧的 Tool Schema 和 Executor 已就绪,只需 WASM 产物支持即可激活。
 </div>
 </section>
 

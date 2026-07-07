@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-drawify-eval 算法评估看板
+plotgram-eval 算法评估看板
 
 纯 HTML/CSS 实现，零外部依赖，双击即可打开。
 布局算法和路由算法分开展示，避免笛卡尔积干扰。
@@ -265,7 +265,7 @@ def generate_html(data):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Drawify 算法评估看板</title>
+<title>Plotgram 算法评估看板</title>
 <style>
 :root {{
   --bg: #fafafa; --card: #fff; --border: #e5e7eb;
@@ -339,7 +339,7 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
 <body>
 
 <div class="header">
-  <h1>Drawify 算法评估看板</h1>
+  <h1>Plotgram 算法评估看板</h1>
   <p>{len(all_results)} 条评估 · {len(layout_results)} 布局 + {len(routing_results)} 路由 · {len(set(r['_diagram_type'] for r in all_results))} 种图类型</p>
   <div class="tabs">
     <div class="tab active" data-tab="overview">总览</div>
@@ -672,7 +672,7 @@ renderDetail();
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Drawify 算法评估看板")
+    parser = argparse.ArgumentParser(description="Plotgram 算法评估看板")
     parser.add_argument("input", help="bench 输出的 JSON 文件路径")
     parser.add_argument("-o", "--output", help="输出 HTML 文件路径")
     args = parser.parse_args()

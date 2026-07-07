@@ -4,7 +4,7 @@
 >
 > 本文档基于 [layout-intent-refinement.md](./layout-intent-refinement.md) v0.4 需求稿与
 > [layout-intent-implementation.md](./layout-intent-implementation.md) v1.0 实现稿，
-> 结合 `drawify-core` 当前代码现状进行二次评估后重写。原两份文档已被本文件取代并删除。
+> 结合 `plotgram-core` 当前代码现状进行二次评估后重写。原两份文档已被本文件取代并删除。
 
 ---
 
@@ -14,15 +14,15 @@
 
 逐文件比对两份原始文档与以下代码实体的实际契约：
 
-- [crates/drawify-core/src/layout/mod.rs](../../crates/drawify-core/src/layout/mod.rs) — `compute_layout` / `compute_layout_with_plan` 调度
-- [crates/drawify-core/src/layout/refine.rs](../../crates/drawify-core/src/layout/refine.rs) — 已存在的 layout↔route 反馈循环
-- [crates/drawify-core/src/layout/grid_snap.rs](../../crates/drawify-core/src/layout/grid_snap.rs) — Grid Snap Phase 1/2
-- [crates/drawify-core/src/ast.rs](../../crates/drawify-core/src/ast.rs) — `Relation` / `PreparedDiagram` / `LayoutPlan`
-- [crates/drawify-core/src/pipeline.rs](../../crates/drawify-core/src/pipeline.rs) — parse → prepare → validate
-- [crates/drawify-core/src/render/scene.rs](../../crates/drawify-core/src/render/scene.rs) — `export_scene` 边索引契约
-- [crates/drawify-core/src/layout/edge/edge_routing.rs](../../crates/drawify-core/src/layout/edge/edge_routing.rs) — 路由器与 relations 的索引对应
-- [crates/drawify-core/src/layout/node/sugiyama_v2/](../../crates/drawify-core/src/layout/node/sugiyama_v2/) — 分层引擎
-- [crates/drawify-wasm/src/lib.rs](../../crates/drawify-wasm/src/lib.rs) / [crates/drawify-server/src/api.rs](../../crates/drawify-server/src/api.rs) — 对外 API
+- [crates/plotgram-core/src/layout/mod.rs](../../crates/plotgram-core/src/layout/mod.rs) — `compute_layout` / `compute_layout_with_plan` 调度
+- [crates/plotgram-core/src/layout/refine.rs](../../crates/plotgram-core/src/layout/refine.rs) — 已存在的 layout↔route 反馈循环
+- [crates/plotgram-core/src/layout/grid_snap.rs](../../crates/plotgram-core/src/layout/grid_snap.rs) — Grid Snap Phase 1/2
+- [crates/plotgram-core/src/ast.rs](../../crates/plotgram-core/src/ast.rs) — `Relation` / `PreparedDiagram` / `LayoutPlan`
+- [crates/plotgram-core/src/pipeline.rs](../../crates/plotgram-core/src/pipeline.rs) — parse → prepare → validate
+- [crates/plotgram-core/src/render/scene.rs](../../crates/plotgram-core/src/render/scene.rs) — `export_scene` 边索引契约
+- [crates/plotgram-core/src/layout/edge/edge_routing.rs](../../crates/plotgram-core/src/layout/edge/edge_routing.rs) — 路由器与 relations 的索引对应
+- [crates/plotgram-core/src/layout/node/sugiyama_v2/](../../crates/plotgram-core/src/layout/node/sugiyama_v2/) — 分层引擎
+- [crates/plotgram-wasm/src/lib.rs](../../crates/plotgram-wasm/src/lib.rs) / [crates/plotgram-server/src/api.rs](../../crates/plotgram-server/src/api.rs) — 对外 API
 
 ### 0.2 总体结论
 
@@ -103,13 +103,13 @@ PreparedDiagram（携带 diagram + layout_plan）
 1. **`LayoutPlan` 是算法实例化的必经输入**：`registry::build_layout_strategy(algo, plan)` 需要 plan 解析出的 options。原实现稿的 `resolve_layout_algo` / `layout_strategy_for(algo)` 不存在。
 2. **`PreparedDiagram` 在 `prepare()` 阶段已 resolve plan**：下游不应再次 resolve。
 3. **`LayoutResult.edges` 由路由器产出**，非 strategy 产出（`sequence` 除外）。路由器 `route_edges` 按 `diagram.relations[i]` → `result.edges[i]` 一一对应。
-4. **`export_scene` 按 `diagram.relations[i]` → `layout.edges[i]` 映射**（[scene.rs#L102-L112](../../crates/drawify-core/src/render/scene.rs#L102-L112)）。任何破坏该索引对应关系的方案都会导致渲染错位。
+4. **`export_scene` 按 `diagram.relations[i]` → `layout.edges[i]` 映射**（[scene.rs#L102-L112](../../crates/plotgram-core/src/render/scene.rs#L102-L112)）。任何破坏该索引对应关系的方案都会导致渲染错位。
 5. **`refine::run_refine` 已存在**：做 edge-node 穿障检测 → 推开问题节点 → 全量 re-route。原实现稿完全未提及与此模块的交互。
 
 ### 2.2 `Relation` 结构（关键约束）
 
 ```rust
-// crates/drawify-core/src/ast.rs
+// crates/plotgram-core/src/ast.rs
 pub struct Relation {
     pub from: Identifier,
     pub to: Identifier,
@@ -265,7 +265,7 @@ pub struct LayoutIntentOverlay {
 | 入口 | 优化方案 |
 |------|----------|
 | WASM | `RenderResult` 增加 `refinement_report: Option<RefinementReport>` 字段；`render_with_options` 扩展 `WasmRenderOptions` 增加 `layout_intents` |
-| Server | 成功响应增加 `X-Drawify-Refinement-Report` 响应头（JSON），body 保持裸字节流；`RenderRequestBody` 增加 `layout_intents` 字段 |
+| Server | 成功响应增加 `X-Plotgram-Refinement-Report` 响应头（JSON），body 保持裸字节流；`RenderRequestBody` 增加 `layout_intents` 字段 |
 | `RenderRequest` | 增加 `layout_overlay: Option<&'a LayoutIntentOverlay>` 字段 |
 
 ### 4.5 命名层：消除冲突
@@ -281,7 +281,7 @@ pub struct LayoutIntentOverlay {
 ### 5.1 数据结构
 
 ```rust
-// crates/drawify-core/src/layout/intent/mod.rs
+// crates/plotgram-core/src/layout/intent/mod.rs
 
 use serde::{Deserialize, Serialize};
 
@@ -395,7 +395,7 @@ pub(super) fn greedy_cycle_reversal(
 
 **这是原方案完全遗漏的关键点**：不保护意图边，`below(A,B)` 注入的 A→B 边可能被 FAS 反转为 B→A，导致 A 排在 B 上游，与意图相反。
 
-**实施路径**：`greedy_cycle_reversal` 当前先重建邻接表再调用 `acyclic::greedy_fas`（见 [graph.rs#L49-L62](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/graph.rs#L49-L62)）。改造有两种路线：
+**实施路径**：`greedy_cycle_reversal` 当前先重建邻接表再调用 `acyclic::greedy_fas`（见 [graph.rs#L49-L62](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/graph.rs#L49-L62)）。改造有两种路线：
 
 - **路径 A（推荐）**：在 `greedy_cycle_reversal` 层构建邻接表时排除意图边（不作为 FAS 候选），仅当仅靠真实边无法破环时才降级处理意图边。改动局部、不对 `acyclic::greedy_fas` 通用函数引入意图概念。
 - **路径 B**：改造 `acyclic::greedy_fas` 增加 protected edges 参数。通用性更高但改动面更广。
@@ -500,7 +500,7 @@ pub struct PinSet {
 ### 5.4 调度入口
 
 ```rust
-// crates/drawify-core/src/layout/mod.rs
+// crates/plotgram-core/src/layout/mod.rs
 
 /// 既有入口：保持不变
 pub fn compute_layout(diagram: &Diagram) -> Result<LayoutResult, DiagnosticError> {
@@ -612,7 +612,7 @@ pub trait LayoutStrategy {
 ### 5.6 渲染层透传
 
 ```rust
-// crates/drawify-core/src/render/request.rs
+// crates/plotgram-core/src/render/request.rs
 pub struct RenderRequest<'a> {
     pub diagram: &'a PreparedDiagram,
     pub format: RenderFormat,
@@ -620,20 +620,20 @@ pub struct RenderRequest<'a> {
     pub layout_overlay: Option<&'a LayoutIntentOverlay>,  // ★ 新增
 }
 
-// crates/drawify-core/src/render/scene.rs
+// crates/plotgram-core/src/render/scene.rs
 pub fn export_scene(request: &RenderRequest) -> Result<ExportScene> {
     let layout = layout::compute_layout_with_plan_and_overlay(
         request.diagram.inner(),
         request.diagram.layout_plan(),
         request.layout_overlay,
-    ).map_err(|e| DrawifyError::Render(e.to_string()))?;
+    ).map_err(|e| PlotgramError::Render(e.to_string()))?;
     // ... 其余不变 ...
 }
 ```
 
 `ExportScene` 增加 `refinement_report: Option<RefinementReport>` 字段，供编码器写入响应。
 
-> **注意**：当前 `export_scene` 在 [scene.rs#L193-L194](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/render/scene.rs#L193-L194) 调用的是 `compute_layout(request.diagram)`，这会通过 `Deref` 重新从 `Diagram` resolve `LayoutPlan`，忽略了 `PreparedDiagram` 中已缓存的 plan。本方案改为直接调用 `compute_layout_with_plan_and_overlay(_, request.diagram.layout_plan(), _)`，顺便修复了此效率问题。
+> **注意**：当前 `export_scene` 在 [scene.rs#L193-L194](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/render/scene.rs#L193-L194) 调用的是 `compute_layout(request.diagram)`，这会通过 `Deref` 重新从 `Diagram` resolve `LayoutPlan`，忽略了 `PreparedDiagram` 中已缓存的 plan。本方案改为直接调用 `compute_layout_with_plan_and_overlay(_, request.diagram.layout_plan(), _)`，顺便修复了此效率问题。
 
 ### 5.7 对外 API
 
@@ -682,7 +682,7 @@ pub struct RenderRequestBody {
 成功响应：
 
 - Body：保持裸字节流（SVG/PNG/ASCII/JSON）
-- Header：增加 `X-Drawify-Refinement-Report`（JSON 序列化的 `RefinementReport`，仅当存在时设置）
+- Header：增加 `X-Plotgram-Refinement-Report`（JSON 序列化的 `RefinementReport`，仅当存在时设置）
 
 失败响应：保持现有 JSON 结构不变。
 
@@ -729,7 +729,7 @@ pub struct RenderRequestBody {
 ### Phase 2：API 暴露（1–2 天）
 
 - [ ] WASM：`WasmRenderOptions.layout_intents` + `RenderResult.refinement_report`
-- [ ] Server：`RenderRequestBody.layout_intents` + `X-Drawify-Refinement-Report` 响应头
+- [ ] Server：`RenderRequestBody.layout_intents` + `X-Plotgram-Refinement-Report` 响应头
 - [ ] 集成测试
 
 ### Phase 3：Playground 集成（2–3 天）

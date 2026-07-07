@@ -2,25 +2,25 @@
 
 开发阶段可在 SVG 中嵌入 `data-dfy-*` 属性，把 DOM 元素映射回 DSL 实体，便于 DevTools 调试和脚本分析。
 
-> 实现：`crates/drawify-core/src/render/paint/svg_debug.rs`  
-> 由 Cargo feature **`svg-debug`** 控制（`drawify-core` 默认开启）。
+> 实现：`crates/plotgram-core/src/render/paint/svg_debug.rs`  
+> 由 Cargo feature **`svg-debug`** 控制（`plotgram-core` 默认开启）。
 
 ---
 
 ## 如何开启 / 关闭
 
 ```toml
-# drawify-core/Cargo.toml
+# plotgram-core/Cargo.toml
 [features]
 default = ["raster", "svg-debug"]
 ```
 
 ```bash
 # 关闭 debug 元数据（发布构建）
-cargo build -p drawify-cli --no-default-features --features raster
+cargo build -p plotgram-cli --no-default-features --features raster
 ```
 
-`drawify-wasm` 默认**不**启用 `svg-debug`，以减小产物体积。
+`plotgram-wasm` 默认**不**启用 `svg-debug`，以减小产物体积。
 
 ---
 
@@ -70,9 +70,9 @@ cargo build -p drawify-cli --no-default-features --features raster
 
 ## 浏览器中调试
 
-1. `drawify render diagram.dfy -o out.svg`
+1. `plotgram render diagram.pgm -o out.svg`
 2. 在浏览器打开 SVG（或嵌入页面）
-3. DevTools 检查元素 → 查看 `data-dfy-*` → 对照 `.dfy` 源文件
+3. DevTools 检查元素 → 查看 `data-dfy-*` → 对照 `.pgm` 源文件
 
 ---
 
@@ -88,8 +88,8 @@ Lint **不解析** SVG；将来可在违规报告的 group 上附加 `data-dfy-l
 工作流建议：
 
 ```bash
-drawify lint diagram.dfy --format json > lint.json
-drawify render diagram.dfy -o diagram.svg
+plotgram lint diagram.pgm --format json > lint.json
+plotgram render diagram.pgm -o diagram.svg
 # 根据 lint.json 的 entity_ids / edge_index 在 DevTools 中查找对应 <g>
 ```
 
@@ -100,9 +100,9 @@ drawify render diagram.dfy -o diagram.svg
 ```javascript
 // 在浏览器控制台：列出所有边及其 DSL 映射
 [...document.querySelectorAll('[data-dfy-kind="edge"]')].map(g => ({
-  index: g.dataset.dfyIndex,
-  from: g.dataset.dfyFrom,
-  to: g.dataset.dfyTo,
+  index: g.dataset.pgmIndex,
+  from: g.dataset.pgmFrom,
+  to: g.dataset.pgmTo,
 }));
 ```
 
@@ -111,4 +111,4 @@ drawify render diagram.dfy -o diagram.svg
 ## 相关文档
 
 - [layout-lint.md](layout-lint.md) — 布局质量检查
-- [drawify-cli.md](drawify-cli.md) — `render` 命令
+- [plotgram-cli.md](plotgram-cli.md) — `render` 命令

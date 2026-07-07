@@ -38,7 +38,7 @@
 
 ## 1. 开发者
 
-**画像**：通过 CLI / API / MCP / CI 集成 Drawify；图出现在 GitHub、文档站、内部 Dashboard；关注可脚本化、可版本管理、Patch 变更可感知。
+**画像**：通过 CLI / API / MCP / CI 集成 Plotgram；图出现在 GitHub、文档站、内部 Dashboard；关注可脚本化、可版本管理、Patch 变更可感知。
 
 ### 1.1 推荐格式对照表
 
@@ -170,7 +170,7 @@
 
 | 文档 | 内容 |
 |------|------|
-| [svg-embedding-design-impact.md](./svg-embedding-design-impact.md) | SVG 嵌入方式对 Drawify 设计的底层约束（必读） |
+| [svg-embedding-design-impact.md](./svg-embedding-design-impact.md) | SVG 嵌入方式对 Plotgram 设计的底层约束（必读） |
 | [animation-capability-research.md](./animation-capability-research.md) | 动画能力竞品调研与技术选型 |
 | [animation-implementation-plan.md](./animation-implementation-plan.md) | 分阶段落地计划 |
 | [svg-embed-comparison.html](./svg-embed-comparison.html) | 四种嵌入方式实测对比 |

@@ -1,6 +1,6 @@
 export type PreviewBackground = 'light' | 'dark' | 'snap' | 'transparent';
 
-export const PREVIEW_BG_STORAGE_KEY = 'drawify-playground-preview-bg';
+export const PREVIEW_BG_STORAGE_KEY = 'plotgram-playground-preview-bg';
 
 export const PREVIEW_BACKGROUNDS: PreviewBackground[] = ['light', 'dark', 'snap', 'transparent'];
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 批量评估 showcase 目录下所有 .dfy 文件的布局与路由质量
+# 批量评估 showcase 目录下所有 .pgm 文件的布局与路由质量
 #
 # 用法:
 #   ./eval-showcase.sh                     # 默认：同时对比布局和路由
@@ -13,7 +13,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 EVAL_BIN="$ROOT_DIR/target/debug/eval"
-export DRAWIFY_FONTS_DIR="${DRAWIFY_FONTS_DIR:-$ROOT_DIR/fonts}"
+export PLOTGRAM_FONTS_DIR="${PLOTGRAM_FONTS_DIR:-$ROOT_DIR/fonts}"
 
 COMPARE="auto"
 FORMAT="markdown"
@@ -23,7 +23,7 @@ usage() {
   cat <<'EOF'
 用法: eval-showcase.sh [选项]
 
-批量评估 showcase 目录下所有 .dfy 文件的布局与边路由质量。
+批量评估 showcase 目录下所有 .pgm 文件的布局与边路由质量。
 
 选项:
   -c, --compare <模式>   对比模式: auto(默认) | routing | layout | full
@@ -72,8 +72,8 @@ done
 
 # 构建二进制
 if [[ ! -x "$EVAL_BIN" ]]; then
-  echo "构建 drawify-eval..."
-  (cd "$ROOT_DIR" && cargo build -p drawify-eval --bin eval 2>&1)
+  echo "构建 plotgram-eval..."
+  (cd "$ROOT_DIR" && cargo build -p plotgram-eval --bin eval 2>&1)
 fi
 
 # 运行评估

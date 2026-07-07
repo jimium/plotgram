@@ -1,8 +1,8 @@
-# Drawify 企业规模化架构图战略
+# Plotgram 企业规模化架构图战略
 
 > 版本：0.1.0-draft | 状态：需求设计中
 
-本文档定义 Drawify 面向银行、大型互联网公司的规模化出图战略：产品分层、高价值场景、能力清单、落地路径，以及可直接用于 POC / 客户评审的 K8s Connector 链路设计。
+本文档定义 Plotgram 面向银行、大型互联网公司的规模化出图战略：产品分层、高价值场景、能力清单、落地路径，以及可直接用于 POC / 客户评审的 K8s Connector 链路设计。
 
 ---
 
@@ -12,7 +12,7 @@
 
 | 层级 | 职责 | 说明 |
 |------|------|------|
-| Drawify DSL | 语义表达 | 服务 AI Agent、架构师手写、PR 中小幅修改；保持声明式、低语法空间 |
+| Plotgram DSL | 语义表达 | 服务 AI Agent、架构师手写、PR 中小幅修改；保持声明式、低语法空间 |
 | Connectors | 数据接入 | 从 K8s、Terraform、CMDB、APM 等拉取结构化数据 |
 | Compose | 聚合与视图 | 折叠 Pod、分层级、过滤、命名；批量生成 AST |
 | Core | 渲染引擎 | 校验、布局、渲染；消费已展开的 AST，不理解 K8s |
@@ -54,19 +54,19 @@ flowchart TB
         cicd["CI/CD Pipeline"]
     end
 
-    subgraph connectors ["Drawify Connectors"]
+    subgraph connectors ["Plotgram Connectors"]
         k8s_c["k8s-connector"]
         svc_c["service-catalog-connector"]
         tf_c["iac-connector"]
     end
 
-    subgraph compose ["Drawify Compose"]
+    subgraph compose ["Plotgram Compose"]
         agg["聚合规则引擎"]
         views["多层级 View 生成"]
         builder["AST Builder SDK"]
     end
 
-    subgraph core ["Drawify Core"]
+    subgraph core ["Plotgram Core"]
         ast["AST"]
         validate["Validator"]
         layout["Layout + Render"]
@@ -130,7 +130,7 @@ flowchart TB
 | 输出 | 网络分区图、安全域图、灾备拓扑 |
 | 典型需求 | 核心区 / 互联网区 / DMZ；主备机房；数据流向与跨区访问 |
 
-Drawify 的 `group` + `meta.zone` + `meta.classification` 适配合规留档场景。
+Plotgram 的 `group` + `meta.zone` + `meta.classification` 适配合规留档场景。
 
 ### P1：变更感知架构（Diff）
 
@@ -144,7 +144,7 @@ Drawify 的 `group` + `meta.zone` + `meta.classification` 适配合规留档场�
   → PR / 合规系统收到结构化变更报告
 ```
 
-**差异化**：`drawify diff` / `drawify patch` 是相比 Mermaid、PlantUML 最难被替代的企业能力。
+**差异化**：`plotgram diff` / `plotgram patch` 是相比 Mermaid、PlantUML 最难被替代的企业能力。
 
 ### P2：调用链 / 依赖热力图
 
@@ -172,7 +172,7 @@ Drawify 的 `group` + `meta.zone` + `meta.classification` 适配合规留档场�
 
 ### B. Compose 聚合规则（声明式配置）
 
-用 YAML/JSON 规则文件描述聚合逻辑，**不是** Drawify 语法扩展。
+用 YAML/JSON 规则文件描述聚合逻辑，**不是** Plotgram 语法扩展。
 
 - `aggregate`：按字段分组、折叠子资源
 - `views`：overview / troubleshooting 等多视图
@@ -197,7 +197,7 @@ POST /compose
 
 每个 entity 携带源指纹，支撑 Diff 与审计：
 
-```drawify
+```plotgram
 entity pay_core "pay-core" {
     type: service
     meta.source: "k8s"
@@ -219,7 +219,7 @@ entity pay_core "pay-core" {
 
 ### F. Server API（企业集成阻塞项）
 
-当前 `drawify-server` 为占位实现。企业版至少需要：
+当前 `plotgram-server` 为占位实现。企业版至少需要：
 
 | 端点 | 说明 |
 |------|------|
@@ -241,7 +241,7 @@ entity pay_core "pay-core" {
 | 图的类型 | 安全域架构图、系统全景、数据 lineage | 微服务依赖、部署拓扑、调用链 |
 | 节点规模 | 逻辑系统 50~200（聚合后） | 服务 100~500，Pod 需强聚合 |
 | 采购决策点 | 对接 CMDB、审计报告 | 接 K8s/发布系统、进 PR 门禁 |
-| Drawify 卖点 | AST Diff + 结构化 meta + 可归档输出 | 自动化 + Patch 增量 + API 集成 |
+| Plotgram 卖点 | AST Diff + 结构化 meta + 可归档输出 | 自动化 + Patch 增量 + API 集成 |
 
 **共同刚需**：不是「画得多」，而是**画得对、跟得上变更、能进流程**。
 
@@ -263,8 +263,8 @@ entity pay_core "pay-core" {
 
 ### Phase 1（POC，约 3 个月）
 
-1. 实现 `drawify-server`：`/render`、`/diff`、`/patch`
-2. 发布 `drawify-compose` 库：AST Builder + 聚合规则解析
+1. 实现 `plotgram-server`：`/render`、`/diff`、`/patch`
+2. 发布 `plotgram-compose` 库：AST Builder + 聚合规则解析
 3. 实现 **K8s Connector**（Namespace → Deployment，折叠 Pod）
 4. 演示：**集群变更 → 自动 Diff 报告 → 更新架构文档**
 
@@ -272,7 +272,7 @@ entity pay_core "pay-core" {
 
 5. Terraform Connector（安全域 / 网络分区图）
 6. 服务目录 Connector（依赖图 + owner）
-7. 开发者门户插件（Backstage 类）嵌入 Drawify 预览
+7. 开发者门户插件（Backstage 类）嵌入 Plotgram 预览
 
 ### Phase 3（银行专项）
 
@@ -300,10 +300,10 @@ entity pay_core "pay-core" {
 ```mermaid
 sequenceDiagram
     participant User as 用户 / CI
-    participant API as drawify-server
+    participant API as plotgram-server
     participant K8s as K8s Connector
     participant Compose as Compose 引擎
-    participant Core as drawify-core
+    participant Core as plotgram-core
     participant Store as 图快照存储
 
     User->>API: POST /compose (k8s, view=overview)
@@ -327,11 +327,11 @@ sequenceDiagram
 
 ### 9.3 聚合规则规格（Compose Rules）
 
-规则文件与 Drawify 源码分离，建议路径：`compose-rules/k8s-overview.yaml`。
+规则文件与 Plotgram 源码分离，建议路径：`compose-rules/k8s-overview.yaml`。
 
 ```yaml
 # compose-rules/k8s-overview.yaml
-apiVersion: drawify.compose/v1
+apiVersion: plotgram.compose/v1
 kind: ComposeRule
 metadata:
   name: k8s-overview
@@ -615,11 +615,11 @@ output:
 }
 ```
 
-### 9.5 生成的 Drawify 文本示例（可选导出）
+### 9.5 生成的 Plotgram 文本示例（可选导出）
 
-Compose 产出以 AST 为主；以下为由 AST 序列化的 `.dfy` 示例，供文档归档或人工审阅：
+Compose 产出以 AST 为主；以下为由 AST 序列化的 `.pgm` 示例，供文档归档或人工审阅：
 
-```drawify
+```plotgram
 diagram architecture {
     layout-algo: force-directed
     title: "K8s 部署拓扑 — payment-prod"
@@ -672,7 +672,7 @@ diagram architecture {
 **PR 评论示例（可直接粘贴）：**
 
 ```markdown
-### 🏗️ Drawify 架构变更检测
+### 🏗️ Plotgram 架构变更检测
 
 **命名空间**: `payment-prod` | **基准**: 2026-06-06 18:00 UTC
 
@@ -735,7 +735,7 @@ diagram architecture {
 
 ## 10. 对外定位（一句话）
 
-> **Drawify 是企业架构的「语义层 + 渲染引擎」：从 K8s、IaC、服务目录自动生成可 Diff、可归档、可下钻的架构图；DSL 负责表达与微调，规模化由 Connector 与 Compose 完成。**
+> **Plotgram 是企业架构的「语义层 + 渲染引擎」：从 K8s、IaC、服务目录自动生成可 Diff、可归档、可下钻的架构图；DSL 负责表达与微调，规模化由 Connector 与 Compose 完成。**
 
 ---
 

@@ -10,8 +10,8 @@
 
 代码入口：
 
-- `crates/drawify-core/src/layout/grid_snap.rs`
-- `crates/drawify-core/src/layout/mod.rs` → `compute_layout()`
+- `crates/plotgram-core/src/layout/grid_snap.rs`
+- `crates/plotgram-core/src/layout/mod.rs` → `compute_layout()`
 
 ---
 
@@ -52,7 +52,7 @@
 
 ### 有意未做（可后续独立推进）
 
-- [ ] `drawify-eval` 指标：`layer_alignment_score`、`snap_displacement_avg`
+- [ ] `plotgram-eval` 指标：`layer_alignment_score`、`snap_displacement_avg`
 - [ ] showcase 前后视觉对比 + 交叉数回归报告
 - [x] diagram 属性 `snap: false` 关闭开关（Playground 面板同步）
 - [ ] 从布局算法导出 layer 元数据（替代 y 聚类，复杂 arch 图更准确）

@@ -2,7 +2,7 @@
 
 LayoutLint 在布局计算完成后，对 `LayoutResult` 运行一组**确定性几何规则**，输出可追溯到 DSL 实体（`entity.id`、`edge index`、`group.id`）的违规列表。
 
-> 实现位置：`crates/drawify-core/src/layout/lint/`
+> 实现位置：`crates/plotgram-core/src/layout/lint/`
 
 ---
 
@@ -21,7 +21,7 @@ LayoutLint 在布局计算完成后，对 `LayoutResult` 运行一组**确定性
 数据流：
 
 ```text
-.dfy → parse → prepare → compute_layout → LayoutResult
+.pgm → parse → prepare → compute_layout → LayoutResult
                                               ↓
                                         LayoutLinter::run
                                               ↓
@@ -30,13 +30,13 @@ LayoutLint 在布局计算完成后，对 `LayoutResult` 运行一组**确定性
 
 **不解析 SVG**。几何来自 `LayoutResult` 中的节点 bbox、分组 bbox、边路径折线。
 
-### 与 drawify-eval 的区别
+### 与 plotgram-eval 的区别
 
-| | LayoutLint | drawify-eval |
+| | LayoutLint | plotgram-eval |
 |--|------------|--------------|
 | 输出 | 逐条违规 + 归因 | 聚合分数、算法对比、回归 |
 | 用途 | 开发调试、CI 硬门禁 | 算法 A/B、质量趋势 |
-| 位置 | `drawify-core::layout::lint` | `drawify-eval` crate |
+| 位置 | `plotgram-core::layout::lint` | `plotgram-eval` crate |
 
 两者可配合：lint 发现「哪里错了」，eval 回答「整体好不好」。
 
@@ -81,7 +81,7 @@ LayoutLint 在布局计算完成后，对 `LayoutResult` 运行一组**确定性
 
 | Profile | CLI 别名 | 启用规则 | 典型场景 |
 |---------|----------|----------|----------|
-| `default` | — | 全部 except `edge_on_group_border`；含 `edge_crossing`(warning) | 日常开发、`drawify lint` 默认 |
+| `default` | — | 全部 except `edge_on_group_border`；含 `edge_crossing`(warning) | 日常开发、`plotgram lint` 默认 |
 | `strict` | `ci` | 仅硬约束 6 条（无交叉、无边框） | CI 门禁、`validate --layout-check` |
 | `verbose` | `all` | 全部 8 条 | 调试、排查走廊贴边 |
 
@@ -102,27 +102,27 @@ LayoutLint 在布局计算完成后，对 `LayoutResult` 运行一组**确定性
 
 ## CLI 用法
 
-### `drawify lint`
+### `plotgram lint`
 
 ```bash
 # 默认预设
-drawify lint diagram.dfy
+plotgram lint diagram.pgm
 
 # CI 门禁（仅硬约束）
-drawify lint diagram.dfy --profile strict
-drawify lint diagram.dfy --profile ci
+plotgram lint diagram.pgm --profile strict
+plotgram lint diagram.pgm --profile ci
 
 # 全规则（含贴边框）
-drawify lint diagram.dfy --profile verbose
+plotgram lint diagram.pgm --profile verbose
 
 # 忽略指定规则（逗号分隔）
-drawify lint diagram.dfy --ignore edge_crossing,edge_on_group_border
+plotgram lint diagram.pgm --ignore edge_crossing,edge_on_group_border
 
 # warning 也导致退出码 1
-drawify lint diagram.dfy --fail-on-warning
+plotgram lint diagram.pgm --fail-on-warning
 
 # JSON 输出（便于脚本处理）
-drawify lint diagram.dfy --format json
+plotgram lint diagram.pgm --format json
 ```
 
 退出码：
@@ -130,12 +130,12 @@ drawify lint diagram.dfy --format json
 - `0` — 在当前配置下可接受（`LintReport::is_acceptable`）
 - `1` — 存在 error，或开启了 `--fail-on-warning` 且存在 warning
 
-### `drawify validate --layout-check`
+### `plotgram validate --layout-check`
 
-验证语法语义通过后，额外运行 **`strict` 预设**的 lint（与 `drawify lint --profile strict` 等价）。
+验证语法语义通过后，额外运行 **`strict` 预设**的 lint（与 `plotgram lint --profile strict` 等价）。
 
 ```bash
-drawify validate diagram.dfy --layout-check
+plotgram validate diagram.pgm --layout-check
 ```
 
 ### 文本输出示例
@@ -184,7 +184,7 @@ drawify validate diagram.dfy --layout-check
 ### 快速入口
 
 ```rust
-use drawify_core::layout::{compute_layout_with_plan, lint_layout, LayoutLinter, LintConfig};
+use plotgram_core::layout::{compute_layout_with_plan, lint_layout, LayoutLinter, LintConfig};
 
 let layout = compute_layout_with_plan(diagram, layout_plan)?;
 let report = lint_layout(diagram, &layout);
@@ -199,7 +199,7 @@ if !report.is_clean() {
 ### 自定义配置
 
 ```rust
-use drawify_core::layout::{
+use plotgram_core::layout::{
     LayoutLinter, LintConfig, LintProfile, LintRuleId, LintSeverity, RuleConfig,
 };
 
@@ -294,10 +294,10 @@ pub fn parse_lint_rules_list(s: &str) -> Vec<LintRuleId>;
 ### 与布局管线的衔接
 
 ```rust
-use drawify_core::ast::PreparedDiagram;
-use drawify_core::layout::{compute_layout_with_plan, LayoutLinter, LintConfig};
+use plotgram_core::ast::PreparedDiagram;
+use plotgram_core::layout::{compute_layout_with_plan, LayoutLinter, LintConfig};
 
-fn lint_prepared(prepared: &PreparedDiagram) -> drawify_core::layout::LintReport {
+fn lint_prepared(prepared: &PreparedDiagram) -> plotgram_core::layout::LintReport {
     let diagram = prepared.inner();
     let layout = compute_layout_with_plan(diagram, prepared.layout_plan())
         .expect("layout");
@@ -326,16 +326,16 @@ LayoutLint **不读取 SVG**；两者互补：
 
 | 场景 | 建议 |
 |------|------|
-| 本地改布局算法 | `drawify lint foo.dfy`，默认 preset |
-| CI / pre-commit | `drawify lint showcase/ --profile strict` 或批量脚本 |
-| 验证 .dfy 语法 + 布局 | `drawify validate foo.dfy --layout-check` |
+| 本地改布局算法 | `plotgram lint foo.pgm`，默认 preset |
+| CI / pre-commit | `plotgram lint showcase/ --profile strict` 或批量脚本 |
+| 验证 .pgm 语法 + 布局 | `plotgram validate foo.pgm --layout-check` |
 | 排查走廊贴边 | `--profile verbose` 或 `--ignore` 反向排除 |
-| 算法回归评分 | 继续用 `drawify-eval`；后续可把 lint 计数纳入 eval |
+| 算法回归评分 | 继续用 `plotgram-eval`；后续可把 lint 计数纳入 eval |
 
 ---
 
 ## 相关文档
 
-- [布局模块 readme](../../crates/drawify-core/src/layout/readme.md)
-- [drawify-eval readme](../../crates/drawify-eval/readme.md) — 质量评分与算法对比
+- [布局模块 readme](../../crates/plotgram-core/src/layout/readme.md)
+- [plotgram-eval readme](../../crates/plotgram-eval/readme.md) — 质量评分与算法对比
 - [layout-routing-friendliness-evaluation](../已经实现的方案/layout-routing-friendliness-evaluation.md) — 路由友好性研究（eval 指标来源）

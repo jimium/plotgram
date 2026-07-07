@@ -1,7 +1,7 @@
 /**
  * Layout Intent 类型与辅助函数。
  *
- * 与 Rust 端 `drawify-core::layout::intent` 对齐：
+ * 与 Rust 端 `plotgram-core::layout::intent` 对齐：
  * - `TopologyIntent`：拓扑意图（below / above），影响 Sugiyama 分层 rank 排序。
  * - `GeometricIntent`：几何意图（pin / align_vertical / align_horizontal），布局后修正坐标。
  *

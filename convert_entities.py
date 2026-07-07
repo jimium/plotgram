@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert .dfy entity declarations from old { type: x } syntax to new entity[x] syntax."""
+"""Convert .pgm entity declarations from old { type: x } syntax to new entity[x] syntax."""
 
 import os
 import re
@@ -197,7 +197,7 @@ def main():
         dirnames[:] = [d for d in dirnames if not d.startswith('.')]
 
         for fname in filenames:
-            if fname.endswith('.dfy'):
+            if fname.endswith('.pgm'):
                 fpath = os.path.join(dirpath, fname)
                 if convert_file(fpath):
                     count += 1

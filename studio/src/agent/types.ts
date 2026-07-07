@@ -1,7 +1,7 @@
 /**
  * Agent 类型定义
  *
- * 与 drawify-core 的 diff/types.rs 对齐,
+ * 与 plotgram-core 的 diff/types.rs 对齐,
  * Agent 通过这些类型与 WASM 交互
  */
 

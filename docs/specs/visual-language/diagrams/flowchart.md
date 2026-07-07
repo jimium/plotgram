@@ -21,7 +21,7 @@
 
 ## 语法入口
 
-```drawify
+```plotgram
 diagram flowchart {
     layout: top-to-bottom    // 或 left-to-right
     title: "用户登录流程"
@@ -133,7 +133,7 @@ diagram flowchart {
 
 ### 语法示例
 
-```drawify
+```plotgram
 group backend "后端处理" {
     entity api "API" { type: service }
     entity db "数据库" { type: database }
@@ -176,10 +176,10 @@ api -> db
 
 | 复杂度 | 路径 | 说明 |
 |--------|------|------|
-| 简单 | `showcase/flowchart/s.linear-chain.dfy` | 线性三步 |
-| 简单 | `showcase/flowchart/s.decision-loop.dfy` | 决策与回环 |
-| 正常 | `showcase/flowchart/n.user-auth.dfy` | 用户认证 |
-| 复杂 | `showcase/flowchart/c.software-release.dfy` | 发布流水线 |
+| 简单 | `showcase/flowchart/s.linear-chain.pgm` | 线性三步 |
+| 简单 | `showcase/flowchart/s.decision-loop.pgm` | 决策与回环 |
+| 正常 | `showcase/flowchart/n.user-auth.pgm` | 用户认证 |
+| 复杂 | `showcase/flowchart/c.software-release.pgm` | 发布流水线 |
 
 ---
 

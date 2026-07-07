@@ -14,32 +14,32 @@ export interface ValidationResult {
   warnings: string[];
 }
 
-interface DrawifyNodeWasm {
+interface PlotgramNodeWasm {
   version(): string;
   validate(source: string): string;
   render(source: string): string;
 }
 
-let cached: DrawifyNodeWasm | null | undefined;
+let cached: PlotgramNodeWasm | null | undefined;
 
 function wasmEntryPath(extensionPath: string): string {
-  return path.join(extensionPath, 'media', 'node', 'drawify_wasm.js');
+  return path.join(extensionPath, 'media', 'node', 'plotgram_wasm.js');
 }
 
 export function isNodeWasmAvailable(extensionPath: string): boolean {
   return fs.existsSync(wasmEntryPath(extensionPath));
 }
 
-export function getNodeWasm(extensionPath: string): DrawifyNodeWasm {
+export function getNodeWasm(extensionPath: string): PlotgramNodeWasm {
   if (cached === undefined) {
     const entry = wasmEntryPath(extensionPath);
     if (!fs.existsSync(entry)) {
       throw new Error(
-        '未找到 Drawify WASM 产物，请在 editors/vscode 目录执行: npm run build:wasm',
+        '未找到 Plotgram WASM 产物，请在 editors/vscode 目录执行: npm run build:wasm',
       );
     }
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    cached = require(entry) as DrawifyNodeWasm;
+    cached = require(entry) as PlotgramNodeWasm;
   }
   return cached!;
 }

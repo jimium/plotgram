@@ -1,6 +1,6 @@
-# Drawify 产品文档
+# Plotgram 产品文档
 
-> 此目录存放 Drawify 的产品设计相关文档。
+> 此目录存放 Plotgram 的产品设计相关文档。
 
 ## 文档索引
 

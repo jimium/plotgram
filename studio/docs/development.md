@@ -167,12 +167,12 @@ docs(api): 补充 Change 类型示例
 - API Key 仅存 localStorage,不上传任何服务器
 - 不在代码中硬编码 API Key
 - 生产构建移除 console.log
-- DSL 经 drawify-core 校验,防止注入
+- DSL 经 plotgram-core 校验,防止注入
 - LLM 请求通过 HTTPS
 
-## 8. 与 drawify-core 的协作规范
+## 8. 与 plotgram-core 的协作规范
 
-- Studio **不修改** drawify-core 的管线架构
+- Studio **不修改** plotgram-core 的管线架构
 - 新增能力优先通过 WASM 绑定扩展,不改动 core
 - 如需 core 新增能力(如 ast_to_source),在 core 实现 + WASM 导出 + Studio 消费
 - WASM 绑定的类型签名必须与 core 的 Rust 类型对齐(见 `agent/types.ts`)

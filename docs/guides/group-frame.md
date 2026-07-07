@@ -4,7 +4,7 @@ Group Frame（L1）控制架构图、流程图等含 **group** 图表的**组间
 
 > 设计规格：[group-frame-spec.md](../已经实现的方案/group-frame-spec.md)  
 > DSL 语法：[dsl-writing-manual.md §6.6](../specs/dsl/dsl-writing-manual.md#66-group_frame-统一配置块推荐)  
-> 实现：`crates/drawify-core/src/layout/group_frame/`
+> 实现：`crates/plotgram-core/src/layout/group_frame/`
 
 ---
 
@@ -35,7 +35,7 @@ L3  Node Frame    — 节点：grid_snap（rank/layer 对齐 + 8px 量化）
 
 旧属性 `group_sizing`、`group_arrangement`、`group_gap`、`group_align` 仍可用（语法糖），新图优先写 `group_frame`：
 
-```drawify
+```plotgram
 diagram architecture {
     config {
         group_frame: stack {
@@ -78,7 +78,7 @@ diagram architecture {
 
 四个顶层 group 沿数据流上下（或左右）排列，希望**每层外框等宽**：
 
-```drawify
+```plotgram
 config {
     group_frame: stack {
         axis: horizontal
@@ -90,13 +90,13 @@ config {
 }
 ```
 
-**参考样例**：[`showcase/architecture/c.ai-agent-docops-pipeline.dfy`](../../showcase/architecture/c.ai-agent-docops-pipeline.dfy)、[`n.data-pipeline.dfy`](../../showcase/architecture/n.data-pipeline.dfy)（使用 `group_sizing: uniform` 语法糖）。
+**参考样例**：[`showcase/architecture/c.ai-agent-docops-pipeline.pgm`](../../showcase/architecture/c.ai-agent-docops-pipeline.pgm)、[`n.data-pipeline.pgm`](../../showcase/architecture/n.data-pipeline.pgm)（使用 `group_sizing: uniform` 语法糖）。
 
 拓扑由 **relation** 决定层级；`track: equal` 负责把**同级**顶层 group 拉成相同宽度，组内节点水平居中。
 
 ### 2. 微服务三层（网关 / 服务 / 数据）
 
-```drawify
+```plotgram
 config {
     group_frame: stack {
         axis: horizontal
@@ -121,13 +121,13 @@ config {
 
 `group_frame` 不替代组内 hint。按组声明：
 
-```drawify
+```plotgram
 group agent_runtime "Agent 运行时" {
     layout: fan-out      // 枢纽扇出：orchestrator 居中，其余分布两侧
     ...
 }
 
-group drawify_stack "Drawify 栈" {
+group plotgram_stack "Plotgram 栈" {
     layout: horizontal   // 一行横排
     ...
 }
@@ -146,7 +146,7 @@ group drawify_stack "Drawify 栈" {
 
 需要**显式网格**（如上排 2 个、下排 1 个）时使用：
 
-```drawify
+```plotgram
 config {
     group_frame: matrix {
         cols: 2
@@ -182,7 +182,7 @@ config {
 3. **调组内**：按组加 `layout: horizontal | fan-out | …`，减少单组过宽导致全图被撑大。
 4. **调间距**：`gap` 加大可减轻边路由拥挤；架构图常用 `48`～`60`。
 5. **边框与量化**：`border: shared` + 默认 `snap: true` 让条带更利落。
-6. **预览**：`drawify render your.dfy -o out.svg` 或 showcase 批量脚本。
+6. **预览**：`plotgram render your.pgm -o out.svg` 或 showcase 批量脚本。
 
 ### 常见问题
 
@@ -199,10 +199,10 @@ config {
 
 ```bash
 # 渲染查看
-cargo run -p drawify-cli -- render showcase/architecture/c.ai-agent-docops-pipeline.dfy -o /tmp/out.svg
+cargo run -p plotgram-cli -- render showcase/architecture/c.ai-agent-docops-pipeline.pgm -o /tmp/out.svg
 
 # 布局质量（可选）
-cargo run -p drawify-cli -- lint showcase/architecture/c.ai-agent-docops-pipeline.dfy
+cargo run -p plotgram-cli -- lint showcase/architecture/c.ai-agent-docops-pipeline.pgm
 ```
 
 Layout hints 中可查看 `group_frame` 报告字段（`GroupFrameReport`：是否 equalized、matrix_applied 等），见 [render-pipeline.md](render-pipeline.md)。

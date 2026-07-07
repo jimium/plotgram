@@ -10,7 +10,7 @@
 
 ### 1.1 现状
 
-当前每个内置主题是一份完整的 StyleSheet v0.2 JSON（约 380 行），存放于 `crates/drawify-core/src/theme/themes/`，由引擎 `include_str!` 编译进二进制。
+当前每个内置主题是一份完整的 StyleSheet v0.2 JSON（约 380 行），存放于 `crates/plotgram-core/src/theme/themes/`，由引擎 `include_str!` 编译进二进制。
 
 历史上这些 JSON 由 `scripts/generate_builtin_themes.py` 批量生成。**本方案实施后删除该脚本**，`themes/*.json` 为唯一真源。
 
@@ -681,7 +681,7 @@ render 的 `RenderRequest::resolve_context()` 迁移后构建 `CompiledRenderCon
 
 ### 4.7 用户自定义主题的编译路径
 
-上述 `COMPILED_BUILTIN_CACHE` 仅缓存内置主题（按 `theme_id` 索引）。用户通过 `.dfy` 的 `theme` 块或 API 传入的自定义主题 JSON 走以下路径：
+上述 `COMPILED_BUILTIN_CACHE` 仅缓存内置主题（按 `theme_id` 索引）。用户通过 `.pgm` 的 `theme` 块或 API 传入的自定义主题 JSON 走以下路径：
 
 ```text
 用户 JSON → parse_style_sheet_json → StyleSheet
@@ -724,7 +724,7 @@ render 的 `RenderRequest::resolve_context()` 迁移后构建 `CompiledRenderCon
 
 ## 6. `entity_roles.json`
 
-`crates/drawify-core/src/theme2/entity_roles.json`：撰写基座时 **entity type → 角色名** 的人工对照表。
+`crates/plotgram-core/src/theme2/entity_roles.json`：撰写基座时 **entity type → 角色名** 的人工对照表。
 
 **角色与 compile 的关系**：compile 解析 `{role.X.Y}` 时**直接查 `tokens.palette.X.Y`**，不读 `entity_roles.json`。该文件是**文档 + 测试 oracle**：
 - 文档：主题作者撰写基座 `entity_types` 时，按此表将 entity type 映射到角色名（如 `service` → `blue`），确保命名一致。
@@ -783,7 +783,7 @@ mod theme2;  // 新，并行开发
 - [x] 本方案 v0.6（Context Palette + CompiledTheme + compile 期 `lighten()` 函数表达式）
 - [ ] 更新 `style-sheet-spec.md`（§context_palettes、删 `{branch.*}`）
 - [ ] 提取 `entity_roles.json` 至 `theme2/`
-- [ ] 在 `drawify-core` 添加 `theme2/mod.rs` 空壳 + `lib.rs` 注册（无行为变化）
+- [ ] 在 `plotgram-core` 添加 `theme2/mod.rs` 空壳 + `lib.rs` 注册（无行为变化）
 
 ---
 
@@ -800,7 +800,7 @@ mod theme2;  // 新，并行开发
 - [ ] **门禁（仅 theme2 测试内调用旧 API）**：∀ builtin id, ∀ (diagram, entity_type)：
   `theme2::node_block` == `theme::resolve` + `theme::node_style`（**不含 L2**）
 
-**产出**：`cargo test -p drawify-core theme2` 绿；主管线仍 100% 走 `theme/`。
+**产出**：`cargo test -p plotgram-core theme2` 绿；主管线仍 100% 走 `theme/`。
 
 ---
 
@@ -814,7 +814,7 @@ mod theme2;  // 新，并行开发
 - [ ] 边的 `InstanceContext` 派生：`branch_slot` 按 root 分支取值，`tree_depth` 始终取 `to.depth`（见 §4.2.3）
 - [ ] `theme2::materialize_diagram_styles(diagram, &ThemeContext)` 入口（mirrors `materialize_styles` 职责）
 - [ ] **门禁（双跑）**：`theme2/tests/gate_materialize.rs`（或 `integration_tests`）
-  - 输入：代表性 `.dfy` + 全部 25 内置主题
+  - 输入：代表性 `.pgm` + 全部 25 内置主题
   - 对比：`theme::materialize_styles` vs `theme2::materialize_diagram_styles`
   - 容差：逐 attribute 键完全一致
 - [ ] **门禁（group 专项）**：`gate_group_nest`
@@ -842,7 +842,7 @@ mod theme2;  // 新，并行开发
 
 **说明**：此 Phase 只改 `themes/` 与 `theme2::builtin` 注册；`theme::builtin` 可暂保留旧 JSON 副本于 `themes-bak/` 直至 Phase 5，或门禁仅面向 `theme2`。
 
-> **`themes-bak/` 现状**：仓库中 `crates/drawify-core/src/theme/themes-bak/` **已存在**（25 个主题的完整副本），疑似 Phase 3 预备或手动备份。Phase 3 启动前应先核实其内容与 `themes/` 当前版本是否一致；若一致可直接复用作为旧 JSON 对照副本，若陈旧则删除后重建。
+> **`themes-bak/` 现状**：仓库中 `crates/plotgram-core/src/theme/themes-bak/` **已存在**（25 个主题的完整副本），疑似 Phase 3 预备或手动备份。Phase 3 启动前应先核实其内容与 `themes/` 当前版本是否一致；若一致可直接复用作为旧 JSON 对照副本，若陈旧则删除后重建。
 
 **`group_nest` entries 编写**：浅色基座 `group_nest.entries` 使用 `lighten()` 函数表达式（见 §4.2.6），深色基座使用 `darken()` 函数表达式，**无需预计算 hex**。浅色基座 entry[0] 写 `{colors.group_fill}` / `{colors.group_stroke}`；entry[1+] 写 `{lighten({colors.group_fill}, amount)}` 等，amount 按 §1.4 决策 D 的提亮参数表（0.35/0.55/0.70 for fill，0.30/0.50/0.65 for stroke）。深色基座 entry[1+] 写 `{darken({colors.group_fill}, amount)}` 等，amount 需逐档验证深色背景下的视觉可辨性后确定默认值。子主题仅改 `tokens.colors.group_fill` 时无需覆盖 entries。
 
@@ -859,7 +859,7 @@ mod theme2;  // 新，并行开发
 - [ ] `render/paint/color_queries.rs` → group 相关查询改为从 `attributes.style` 读取；删除 `group_style_by_depth`；**`lighten` 迁入 `theme2/compile.rs`**（保留为 compile 内置颜色函数，见 §4.2.6，不删除）；**`darken` 为 `theme2/compile.rs` 新增函数**；全局属性查询改用 `CompiledTheme`
 - [ ] **`group_nest` 覆盖所有含 group 的 diagram**：基座 `clean-light` 的 `flowchart` 和 `architecture` 均需定义 `context_palettes.group_nest`（entries 引用 `{colors.group_*}` + `lighten()`）；`clean-dark` 同理但使用 `darken()` 表达式，确保 flowchart group 不因删除 `group_style_by_depth` 而丢失 depth 递进样式
 - [ ] `theme/mod.rs` 导出改为 `pub use theme2 as ...` **或** 直接改 use 路径为 `theme2::`
-- [ ] 全库 `cargo test -p drawify-core` 绿
+- [ ] 全库 `cargo test -p plotgram-core` 绿
 
 **翻转检查点**：无代码路径再调用 `ResolvedStyleContext::node_style` / `resolve_contextual_block` / `group_style_by_depth`。`lighten` / `darken` 仅存在于 `theme2/compile.rs`，render 不再直接调用。
 
@@ -867,7 +867,7 @@ mod theme2;  // 新，并行开发
 
 ### Phase 5：删除 `theme/`，收尾
 
-- [ ] 删除 `crates/drawify-core/src/theme/`（cascade、resolve、`{branch.*}` 等）
+- [ ] 删除 `crates/plotgram-core/src/theme/`（cascade、resolve、`{branch.*}` 等）
 - [ ] **`theme2` 重命名为 `theme`**（强制，非可选；推荐删完 `theme/` 后一次性 rename，更新所有 `use` 路径）
 - [ ] 删除 `generate_builtin_themes.py`
 - [ ] 删除 JSON 中 legacy `branch_palettes` 字段（仅 `context_palettes`）
@@ -1014,7 +1014,7 @@ Phase 0 ──► Phase 1（theme2 L1）
 - `mindmap.*` 子主题 extends 此基座，**不** extends common
 - ~100 行
 - **降级行为澄清**：此基座不含 `flowchart` / `architecture` 等 diagram 定义。若用户在 mindmap 主题下渲染其他图类型，将回退到 `defaults`。**这不是回归**——现网 `mindmap.*` 主题（如 `mindmap.vivid-branches`）同样仅含 `diagrams.mindmap`，非 mindmap 图类型已走 `defaults` 回退。迁移保持行为等价。
-- **可见性决议**：`mindmap.base` 注册在 `theme2::builtin`（`include_str!` + 缓存），但**不**加入 `all_theme_ids()` / playground 选择器。对用户可见的主题仍为 25 个；`mindmap.base` 仅作 `extends` 内部基座。用户在 `.dfy` 中显式指定 `theme: mindmap.base` 应被 `ThemeIdResolver` 拒绝（非用户可见 ID）。
+- **可见性决议**：`mindmap.base` 注册在 `theme2::builtin`（`include_str!` + 缓存），但**不**加入 `all_theme_ids()` / playground 选择器。对用户可见的主题仍为 25 个；`mindmap.base` 仅作 `extends` 内部基座。用户在 `.pgm` 中显式指定 `theme: mindmap.base` 应被 `ThemeIdResolver` 拒绝（非用户可见 ID）。
 
 ```
 common.clean-light   ─┬─ 浅色 common 子主题（16）
@@ -1114,7 +1114,7 @@ mindmap.base         ─┴─ mindmap 子主题（3）
 5. **无** render `group_style_by_depth`；`lighten` / `darken` **迁入** `theme2/compile.rs` 作为 compile 内置颜色函数（render无 `lighten` / `darken` 调用）
 6. L1：`node_block` == 旧 `node_style`（无 L2 时）
 7. L2：全主题全 diagram 物化结果 == 迁移前逐键等价。**注**：`mindmap.*` 主题 × 非 mindmap diagram 的组合，旧/新均走 `defaults` 回退（现网 `mindmap.*` 主题仅含 `diagrams.mindmap`），属等价范畴
-8. `cargo test -p drawify-core` 全通过（含 `theme2` 门禁）
+8. `cargo test -p plotgram-core` 全通过（含 `theme2` 门禁）
 9. 单层 extends 违规被拒绝；`index.wrap` / `index.cap` 与 `from` 的组合校验通过（见 §4.4.1）
 10. `generate_builtin_themes.py` 已删除
 11. `theme/` 旧模块已删除；无代码再引用 `ResolvedStyleContext` / `{branch.*}` 路径
@@ -1147,13 +1147,13 @@ mindmap.base         ─┴─ mindmap 子主题（3）
 
 | 资源 | 路径 |
 |------|------|
-| 主题 JSON 真源 | `crates/drawify-core/src/theme/themes/` |
-| 现 cascade（迁移对照） | `crates/drawify-core/src/theme/cascade.rs` |
-| 现 group 硬编码（待删） | `crates/drawify-core/src/render/paint/color_queries.rs` |
-| mindmap 结构下标 | `crates/drawify-core/src/prepare/structure/mindmap.rs` |
-| prepare 物化 | `crates/drawify-core/src/prepare/styles.rs` |
-| render 主题消费 | `crates/drawify-core/src/render/request.rs` |
-| render group 样式 | `crates/drawify-core/src/render/scene.rs` |
+| 主题 JSON 真源 | `crates/plotgram-core/src/theme/themes/` |
+| 现 cascade（迁移对照） | `crates/plotgram-core/src/theme/cascade.rs` |
+| 现 group 硬编码（待删） | `crates/plotgram-core/src/render/paint/color_queries.rs` |
+| mindmap 结构下标 | `crates/plotgram-core/src/prepare/structure/mindmap.rs` |
+| prepare 物化 | `crates/plotgram-core/src/prepare/styles.rs` |
+| render 主题消费 | `crates/plotgram-core/src/render/request.rs` |
+| render group 样式 | `crates/plotgram-core/src/render/scene.rs` |
 | StyleSheet 规范 | `docs/specs/style-system/style-sheet-spec.md` |
 | 旧 mindmap 主题设计（历史） | `docs/architecture/backup/mindmap-unified-theming-design.md` |
 | 待删除脚本 | `scripts/generate_builtin_themes.py` |

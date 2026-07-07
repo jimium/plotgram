@@ -1,10 +1,10 @@
-# Drawify StyleSheet 规范
+# Plotgram StyleSheet 规范
 
 > 版本：0.2.0-draft | 状态：设计中
 >
 > 取代 [style-sheet-spec.md](../style-sheet-spec.md) v0.1 的结构方向。v0.1 保留作历史参考，新实现以本文档为准。
 
-本文档定义 Drawify 样式方案（`StyleSheet`）的 JSON 结构与解析语义。核心原则：
+本文档定义 Plotgram 样式方案（`StyleSheet`）的 JSON 结构与解析语义。核心原则：
 
 - **所有视觉默认值以数据形式存在于 StyleSheet**，不在 Renderer 中硬编码
 - **三层 cascade**：全局兜底 → 图表命名空间 → entity type
@@ -85,7 +85,7 @@ StyleSheet JSON 中**不得**出现 `hand_drawn`、`roughness`、`wobble` 等字
   "id": "builtin.blueprint",
   "name": "Blueprint",
   "meta": {
-    "author": "Drawify",
+    "author": "Plotgram",
     "description": "工程制图风格，适合架构图与技术文档",
     "tags": ["builtin", "blueprint", "technical"]
   },
@@ -643,22 +643,22 @@ pub struct ResolvedStyleSheet {
 
 ## 12. 完整示例
 
-内置主题 JSON 位于 [`crates/drawify-core/src/theme/themes/`](../../../crates/drawify-core/src/theme/themes/)（运行时真源）：
+内置主题 JSON 位于 [`crates/plotgram-core/src/theme/themes/`](../../../crates/plotgram-core/src/theme/themes/)（运行时真源）：
 
 
 | ID                     | 文件                                                                                                   |
 | ---------------------- | ---------------------------------------------------------------------------------------------------- |
-| `builtin.clean-light`  | [themes/builtin.clean-light.json](../../../crates/drawify-core/src/theme/themes/builtin.clean-light.json)   |
-| `builtin.clean-dark`   | [themes/builtin.clean-dark.json](../../../crates/drawify-core/src/theme/themes/builtin.clean-dark.json)     |
-| `builtin.blueprint`    | [themes/builtin.blueprint.json](../../../crates/drawify-core/src/theme/themes/builtin.blueprint.json)       |
-| `builtin.presentation` | [themes/builtin.presentation.json](../../../crates/drawify-core/src/theme/themes/builtin.presentation.json) |
-| `builtin.minimal-gray` | [themes/builtin.minimal-gray.json](../../../crates/drawify-core/src/theme/themes/builtin.minimal-gray.json) |
-| `builtin.brand-vivid`  | [themes/builtin.brand-vivid.json](../../../crates/drawify-core/src/theme/themes/builtin.brand-vivid.json)   |
+| `builtin.clean-light`  | [themes/builtin.clean-light.json](../../../crates/plotgram-core/src/theme/themes/builtin.clean-light.json)   |
+| `builtin.clean-dark`   | [themes/builtin.clean-dark.json](../../../crates/plotgram-core/src/theme/themes/builtin.clean-dark.json)     |
+| `builtin.blueprint`    | [themes/builtin.blueprint.json](../../../crates/plotgram-core/src/theme/themes/builtin.blueprint.json)       |
+| `builtin.presentation` | [themes/builtin.presentation.json](../../../crates/plotgram-core/src/theme/themes/builtin.presentation.json) |
+| `builtin.minimal-gray` | [themes/builtin.minimal-gray.json](../../../crates/plotgram-core/src/theme/themes/builtin.minimal-gray.json) |
+| `builtin.brand-vivid`  | [themes/builtin.brand-vivid.json](../../../crates/plotgram-core/src/theme/themes/builtin.brand-vivid.json)   |
 
 
 每份样式稿均涵盖 `flowchart`、`sequence`、`state`、`architecture`、`er`、`mindmap` 的 `defaults`、`diagrams` 第二层及 `entity_types` 第三层。`builtin.clean-light` 的 per-type 配色与当前 Renderer 硬编码（`common::type_style` 等）对齐，作为迁移基准。
 
-另提供社区高口碑灵感配色（`inspired.*` 前缀，见 [README.md](README.md)），含 Dracula、Nord、Tokyo Night、Catppuccin Mocha/Latte、GitHub Light/Dark、Monokai、Solarized Light、Gruvbox Dark、One Dark、Rosé Pine 等，文件位于 `crates/drawify-core/src/theme/themes/inspired.*.json`。
+另提供社区高口碑灵感配色（`inspired.*` 前缀，见 [README.md](README.md)），含 Dracula、Nord、Tokyo Night、Catppuccin Mocha/Latte、GitHub Light/Dark、Monokai、Solarized Light、Gruvbox Dark、One Dark、Rosé Pine 等，文件位于 `crates/plotgram-core/src/theme/themes/inspired.*.json`。
 
 色盲友好配色（`accessible.*` 前缀）：Okabe-Ito、Paul Tol Bright、Paul Tol High Contrast、IBM Carbon Accessible。设计原则：避免红绿单维度区分、提高笔画对比度、与 `entity.type` 的 shape 语义配合。
 
@@ -728,6 +728,6 @@ StyleSheet v0.2 的核心价值：
 2. **三层 cascade** 语义清晰：defaults → diagrams → entity_types
 3. **与 Expand Pass 单点物化**，布局与渲染一致
 4. **DiagramProfile 只管引用与语义**，不管具体颜色
-5. **完整主题稿可独立校验**（见 `crates/drawify-core/src/theme/themes/builtin.blueprint.json`）
+5. **完整主题稿可独立校验**（见 `crates/plotgram-core/src/theme/themes/builtin.blueprint.json`）
 
 规范稳定后，按 §13 迁移顺序落地实现，不与 layout intent refinement 冲突。

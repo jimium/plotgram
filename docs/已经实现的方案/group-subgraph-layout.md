@@ -41,7 +41,7 @@
 
 ### 2.2 与 two_phase 的关系：复用思路，简化组间排列
 
-> **修正说明**：早期版本曾将本方案与 `architecture_v2/two_phase` 描述为对立方案（"自底向上 vs 自顶向下"）。经核对 [two_phase.rs:1-4](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/architecture_v2/two_phase.rs#L1-L4)，two_phase 实际也是自底向上（组内 Sugiyama → 组间宏观定位 → 全局坐标回填），与本方案思路同源。二者关系应定位为：**复用 two_phase 的组内布局思路，简化组间排列**。
+> **修正说明**：早期版本曾将本方案与 `architecture_v2/two_phase` 描述为对立方案（"自底向上 vs 自顶向下"）。经核对 [two_phase.rs:1-4](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/architecture_v2/two_phase.rs#L1-L4)，two_phase 实际也是自底向上（组内 Sugiyama → 组间宏观定位 → 全局坐标回填），与本方案思路同源。二者关系应定位为：**复用 two_phase 的组内布局思路，简化组间排列**。
 
 #### 2.2.1 思路同源
 
@@ -51,7 +51,7 @@ two_phase 与本方案的核心流程一致：
 组内独立布局（IntraLayout）  →  组间排列  →  全局坐标回填
 ```
 
-本方案的 `SubGraphLayout` 与 two_phase 的 `IntraLayout`（[two_phase.rs:26-33](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/architecture_v2/two_phase.rs#L26-L33)）结构同构，可直接复用。
+本方案的 `SubGraphLayout` 与 two_phase 的 `IntraLayout`（[two_phase.rs:26-33](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/architecture_v2/two_phase.rs#L26-L33)）结构同构，可直接复用。
 
 #### 2.2.2 差异：组间排列的轻重
 
@@ -59,7 +59,7 @@ two_phase 与本方案的核心流程一致：
 |------|---------------------|----------------------|
 | 组间定位策略 | 拓扑排序 + 垂直/水平堆叠 | `assign_super_macro_ranks` + `order_layers_group_aware` |
 | group 级别 Sugiyama | ✗ 不使用 | ✓ 使用（super macro rank） |
-| 嵌套 group 处理 | 复用 `GroupTree` 递归 | `GroupTree` 递归（[two_phase.rs:39-91](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/architecture_v2/two_phase.rs#L39-L91)） |
+| 嵌套 group 处理 | 复用 `GroupTree` 递归 | `GroupTree` 递归（[two_phase.rs:39-91](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/architecture_v2/two_phase.rs#L39-L91)） |
 | 适用场景 | 阶段划分/泳道图（group 间依赖简单） | 架构图（group 间依赖复杂，需全局优化） |
 | group 独立方向 | ✓ 支持（Phase 3） | ✗ 不支持 |
 
@@ -119,8 +119,8 @@ two_phase 与本方案的核心流程一致：
 
 | 组件 | 当前位置 | 抽取后位置 | 说明 |
 |------|---------|-----------|------|
-| `IntraLayout` | [two_phase.rs:26-33](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/architecture_v2/two_phase.rs#L26-L33) | `divide_and_conquer.rs` | 组内布局结果结构 |
-| `GroupTree` | [two_phase.rs:39-91](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/architecture_v2/two_phase.rs#L39-L91) | `divide_and_conquer.rs` | 嵌套 group 递归树 |
+| `IntraLayout` | [two_phase.rs:26-33](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/architecture_v2/two_phase.rs#L26-L33) | `divide_and_conquer.rs` | 组内布局结果结构 |
+| `GroupTree` | [two_phase.rs:39-91](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/architecture_v2/two_phase.rs#L39-L91) | `divide_and_conquer.rs` | 嵌套 group 递归树 |
 | 子图提取逻辑 | two_phase.rs 内联 | `divide_and_conquer.rs` | 提取为独立函数 |
 | 合并 + 坐标回填 | two_phase.rs 内联 | `divide_and_conquer.rs` | 提取为独立函数 |
 | 跨 group 边收集 | two_phase.rs 内联 | `divide_and_conquer.rs` | 提取为独立函数 |
@@ -227,7 +227,7 @@ let result = divide_and_conquer(
 
 #### 2.5.2 约束 2：config block 可配置 group 排列
 
-**背景**：用户在泳道图、阶段划分等场景需要对 group 排列有控制力。当前 [ast.rs:470](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/ast.rs#L470) 的 `Group` 结构已有 `attributes: AttributeMap`，DSL 层面具备扩展基础。
+**背景**：用户在泳道图、阶段划分等场景需要对 group 排列有控制力。当前 [ast.rs:470](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/ast.rs#L470) 的 `Group` 结构已有 `attributes: AttributeMap`，DSL 层面具备扩展基础。
 
 **解法**：扩展 group 的 attributes，支持以下配置维度：
 
@@ -524,8 +524,8 @@ struct SubGraphLayout {
 #### Phase 0 实际实施情况（已完成）
 
 **已完成**：
-- 新增 [divide_and_conquer.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/common/divide_and_conquer.rs)：`IntraLayout`、`GroupTree`、`CrossGroupEdge` 数据结构 + `IntraGroupLayouter`、`GroupArrangement` trait + 3 个单元测试
-- 修改 [two_phase.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/architecture_v2/two_phase.rs)：删除本地 `IntraLayout`、`GroupTree` 定义，改为从通用模块导入
+- 新增 [divide_and_conquer.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/common/divide_and_conquer.rs)：`IntraLayout`、`GroupTree`、`CrossGroupEdge` 数据结构 + `IntraGroupLayouter`、`GroupArrangement` trait + 3 个单元测试
+- 修改 [two_phase.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/architecture_v2/two_phase.rs)：删除本地 `IntraLayout`、`GroupTree` 定义，改为从通用模块导入
 - 全部 666 个测试通过（含 27 个 architecture_v2 测试），行为零退化
 
 **与原方案的差异：推迟 `ArchitectureV2IntraLayouter` + `SuperMacroRankArrangement` 的实现**
@@ -538,7 +538,7 @@ struct SubGraphLayout {
 
 **后续完成情况（Phase 1-3 后补完）**：
 
-- ✅ `ArchitectureV2IntraLayouter` 已实现（[two_phase.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/architecture_v2/two_phase.rs)）：作为 `layout_intra_group_recursive` 的 thin wrapper，持有 6 个上下文引用，实现 `IntraGroupLayouter` trait。当前 `compute_two_phase_layout` 仍直接调用 `layout_intra_group_recursive`，未走 trait 调度——wrapper 仅供文档化关系和未来统一调度使用。
+- ✅ `ArchitectureV2IntraLayouter` 已实现（[two_phase.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/architecture_v2/two_phase.rs)）：作为 `layout_intra_group_recursive` 的 thin wrapper，持有 6 个上下文引用，实现 `IntraGroupLayouter` trait。当前 `compute_two_phase_layout` 仍直接调用 `layout_intra_group_recursive`，未走 trait 调度——wrapper 仅供文档化关系和未来统一调度使用。
 - ❌ `SuperMacroRankArrangement` 不实现：`GroupArrangement` trait 的 `arrange` 签名（`group_ids + intra_layouts + cross_edges → offsets`）无法容纳 architecture_v2 需要的 `macro_ranks` + `pair_edge_counts` + `blocks`（含 `IntraLayout` 但还有 width/height/x/y 等字段）。强行适配会丢失 `adaptive_group_gap` 等优化。architecture_v2 的组间排列保持直接函数调用。
 
 **当前状态**：通用类型基础已就位，architecture_v2 已复用通用类型。`IntraGroupLayouter` trait 已被 `FlowchartIntraGroupLayouter` 和 `ArchitectureV2IntraLayouter` 实现；`GroupArrangement` trait 已被 `StackingArrangement` 实现。
@@ -550,7 +550,7 @@ struct SubGraphLayout {
 **改动**：
 - 新增 `StackingArrangement`：拓扑排序 + 垂直堆叠（实现 `GroupArrangement` trait）
   - 支持 `gap`、`align` 参数（`arrangement` 方向复用 diagram 级 `direction` 属性，Phase 3 实现 horizontal）
-- 修改 [flowchart/mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/flowchart/mod.rs)：`compute` 和 `compute_with_overlay` 检测到有 group 时调用 `divide_flowchart_with_groups()`
+- 修改 [flowchart/mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/flowchart/mod.rs)：`compute` 和 `compute_with_overlay` 检测到有 group 时调用 `divide_flowchart_with_groups()`
 - 扩展 DSL：diagram 级 `config` 块支持 `group_gap`（Number）/ `group_align`（Atom: center|left）
   - **设计决策**：放在 diagram 级而非 group 级，因为组间排列是 diagram 级关注点，避免"哪个 group 的值优先"的歧义（约束 4：整体布局逻辑不过于复杂）
 - group 包围框：分治路径直接用 group 偏移 + IntraLayout 尺寸构造 `GroupLayout`，不调用 `compute_group_bounds`（子图布局已含 preset padding）
@@ -566,9 +566,9 @@ struct SubGraphLayout {
 #### Phase 1 实际实施情况（已完成）
 
 **已完成**：
-- [group_divide.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/flowchart/group_divide.rs)：`FlowchartIntraGroupLayouter` + `StackingArrangement` + `divide_flowchart_with_groups` + 11 个单元测试
-- [flowchart/mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/flowchart/mod.rs)：`compute` 和 `compute_with_overlay` 分治路径分发
-- DSL 扩展：`group_gap`（Number）/ `group_align`（Atom: center|left）注册到 [diagram.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/types/standard_attr_keys/diagram.rs) / [attr_constants.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/types/attr_constants.rs) / [attr_schema.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/types/attr_schema.rs) / [expr.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/dsl/parser/expr.rs) / [common.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/validation/common.rs)
+- [group_divide.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/flowchart/group_divide.rs)：`FlowchartIntraGroupLayouter` + `StackingArrangement` + `divide_flowchart_with_groups` + 11 个单元测试
+- [flowchart/mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/flowchart/mod.rs)：`compute` 和 `compute_with_overlay` 分治路径分发
+- DSL 扩展：`group_gap`（Number）/ `group_align`（Atom: center|left）注册到 [diagram.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/types/standard_attr_keys/diagram.rs) / [attr_constants.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/types/attr_constants.rs) / [attr_schema.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/types/attr_schema.rs) / [expr.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/dsl/parser/expr.rs) / [common.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/validation/common.rs)
 - 3 个有 group 的 showcase 流程图（customer-refund / ci-cd-security / e-commerce-order）全部无重叠
 - 无 group 的流程图不受影响
 - architecture showcase 未退化
@@ -580,7 +580,7 @@ struct SubGraphLayout {
 
 ### Phase 2: 跨 group 边路由验证与适配
 
-> **修正说明**：早期版本将本阶段描述为"实现 group 障碍物"。经核对，正交路由引擎**已支持 group 作为障碍物**：[path.rs:111](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/path.rs#L111) 的 `RoutingContext` 已包含 `groups` 字段，[path.rs:159-160](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/path.rs#L159-L160) 的 `build_channel_detours` 已通过 `channel_outside` / `channel_outside_v` 考虑 group 边框位置做侧通道绕行。因此本阶段工作从"实现"降级为"验证与适配"。
+> **修正说明**：早期版本将本阶段描述为"实现 group 障碍物"。经核对，正交路由引擎**已支持 group 作为障碍物**：[path.rs:111](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/path.rs#L111) 的 `RoutingContext` 已包含 `groups` 字段，[path.rs:159-160](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/path.rs#L159-L160) 的 `build_channel_detours` 已通过 `channel_outside` / `channel_outside_v` 考虑 group 边框位置做侧通道绕行。因此本阶段工作从"实现"降级为"验证与适配"。
 
 **目标**：验证分治布局产出的全局坐标下，跨 group 边能被现有正交路由引擎正确路由；必要时做局部适配。
 
@@ -589,8 +589,8 @@ struct SubGraphLayout {
 - **验证项**：
   - 跨 group 边不穿过 group 矩形（依赖现有 `build_channel_detours` 的 group 障碍物处理）
   - 回环边（如 review → intake）绕行合理
-  - 端口选择（[slot.rs:53](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/slot.rs#L53) `choose_pair_sides`）在分治布局下仍能选出合理边
-  - 磁吸点分配（[mod.rs:209-340](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs#L209-L340)）对跨 group 边的并线策略是否合理
+  - 端口选择（[slot.rs:53](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/slot.rs#L53) `choose_pair_sides`）在分治布局下仍能选出合理边
+  - 磁吸点分配（[mod.rs:209-340](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs#L209-L340)）对跨 group 边的并线策略是否合理
 - **可能的适配**（仅在验证发现问题时做）：
   - 调整 `OrthoConfig.channel_margin` 以适应分治布局下 group 间通道宽度
   - 对跨 group 边的端口选择增加 group 边界感知（如优先选朝向目标 group 的边）
@@ -628,14 +628,14 @@ struct SubGraphLayout {
 **验证**：
 - 泳道图 group 水平排列（`group_arrangement: horizontal`）+ 组内垂直布局（`direction: top-to-bottom`）
 - 阶段划分 group 垂直排列（`group_arrangement: vertical`，默认）+ 组内垂直布局
-- 新增泳道图 showcase：[c.swimlane-order-process.dfy](file:///Users/jimichan/zaprt-projects/flowml/showcase/flowchart/c.swimlane-order-process.dfy)
+- 新增泳道图 showcase：[c.swimlane-order-process.pgm](file:///Users/jimichan/zaprt-projects/flowml/showcase/flowchart/c.swimlane-order-process.pgm)
 
 #### Phase 3 实际实施情况（已完成）
 
 **已完成**：
 - 新增 `ArrangementMode` 枚举（Vertical/Horizontal）和 `group_arrangement` diagram 级属性
 - `StackingArrangement` 支持水平堆叠：group 从左到右排列，垂直方向按 `align` 对齐（Center 垂直居中 / Left 顶部对齐）
-- 新增泳道图 showcase `c.swimlane-order-process.dfy`：4 个 group（客户/销售/仓库/物流）水平排列，组内节点垂直布局
+- 新增泳道图 showcase `c.swimlane-order-process.pgm`：4 个 group（客户/销售/仓库/物流）水平排列，组内节点垂直布局
 - 12 个 group_divide 单元测试通过（含水平排列测试）
 - 678 个全量测试通过
 - 垂直排列 showcase 无退化

@@ -3,7 +3,7 @@
 Update the inline SAMPLE_PATHS manifest inside showcase/index.html.
 
 This keeps the single-file gallery page easy to maintain while still allowing
-new .dfy examples to be discovered from disk automatically.
+new .pgm examples to be discovered from disk automatically.
 """
 
 from __future__ import annotations
@@ -18,10 +18,10 @@ MANIFEST_END = "// manifest:end"
 
 
 def collect_dfy_paths(showcase_dir: Path) -> list[str]:
-    """Return sorted .dfy paths relative to the showcase directory."""
+    """Return sorted .pgm paths relative to the showcase directory."""
     paths = [
         path.relative_to(showcase_dir).as_posix()
-        for path in showcase_dir.rglob("*.dfy")
+        for path in showcase_dir.rglob("*.pgm")
         if path.is_file()
     ]
     return sorted(paths)

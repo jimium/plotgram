@@ -1,8 +1,8 @@
-# Drawify 语言语法与语义规范
+# Plotgram 语言语法与语义规范
 
 > 版本：0.3.0 | 状态：与实现同步
 
-本文档定义 Drawify 语言的完整语法规则和语义约束。所有语法设计决策均以**AI Agent 生成友好度**为首要考量。
+本文档定义 Plotgram 语言的完整语法规则和语义约束。所有语法设计决策均以**AI Agent 生成友好度**为首要考量。
 
 ---
 
@@ -31,13 +31,13 @@
 
 ### 2.1 文件结构
 
-一个 `.dfy` 文件由一个可选的**文档注释块**和一个 `diagram` 声明组成：
+一个 `.pgm` 文件由一个可选的**文档注释块**和一个 `diagram` 声明组成：
 
 ```
 <file> ::= [<doc_comment>] <diagram_declaration>
 ```
 
-```drawify
+```plotgram
 // 文档注释块（可选，连续 // 行）
 // 第二行
 
@@ -187,7 +187,7 @@ diagram flowchart {
 
 **`title` 属性**：作为 body 级属性直接写在图表体中（不放在 `config` 块内）。其他图表属性可放在 `config` 块中或 body 级别。
 
-```drawify
+```plotgram
 diagram flowchart {
     title: "用户登录流程"
 
@@ -299,7 +299,7 @@ diagram flowchart {
 
 **示例：**
 
-```drawify
+```plotgram
 diagram architecture {
     title: "微服务架构"
     config {
@@ -334,7 +334,7 @@ diagram flowchart {
 | `fit` | 每个顶层 group 宽度贴合组内内容（默认） |
 | `uniform` | 所有顶层 group 拉齐到最宽者；组内节点在拉宽后的框内**水平居中**，适合流水线/阶段类架构图 |
 
-```drawify
+```plotgram
 diagram architecture {
     title: "数据仓 ETL 处理架构"
     config {
@@ -358,7 +358,7 @@ diagram architecture {
 | `group_align: center` | 默认 | `vertical` 时各 group 水平居中对齐；`horizontal` 时各 group 垂直居中对齐 |
 | `group_align: left` | | `vertical` 时各 group 左对齐；`horizontal` 时各 group 顶部对齐 |
 
-```drawify
+```plotgram
 // 泳道图示例
 diagram flowchart {
     title: "订单处理泳道"
@@ -500,7 +500,7 @@ diagram flowchart {
 
 不在预定义 Schema 中的属性，必须以 `meta.` 为前缀：
 
-```drawify
+```plotgram
 entity api "API 服务" {
     type: service
     meta.version: "2.1.0"
@@ -519,13 +519,13 @@ entity api "API 服务" {
 
 **最简形式（使用默认 type，无额外属性）：**
 
-```drawify
+```plotgram
 entity login "用户登录"
 ```
 
 **指定 type（语法糖形式，推荐）：**
 
-```drawify
+```plotgram
 entity[gateway] api "API 网关"
 entity[database] db "主数据库"
 entity[start] begin "开始"
@@ -533,7 +533,7 @@ entity[start] begin "开始"
 
 **指定 type 并带其他属性：**
 
-```drawify
+```plotgram
 entity[database] db "主数据库" {
     status: healthy
     owner: "DBA 团队"
@@ -568,7 +568,7 @@ entity[database] db "主数据库" {
 | `-->` | 被动/响应流向 | 返回结果、回调、异步响应      |
 | `<->` | 双向关系    | 双向通信、依赖、数据同步      |
 
-**设计理由：** 对比 Mermaid 的 `-->`, `---`, `-.->`, `==>`, `--text-->` 等 10+ 种变体，Drawify 只有 3 种固定语义。LLM 不需要在样式层面做选择。
+**设计理由：** 对比 Mermaid 的 `-->`, `---`, `-.->`, `==>`, `--text-->` 等 10+ 种变体，Plotgram 只有 3 种固定语义。LLM 不需要在样式层面做选择。
 
 ### 6.3 Relation 属性
 
@@ -580,7 +580,7 @@ entity[database] db "主数据库" {
 
 ### 6.4 Relation 示例
 
-```drawify
+```plotgram
 // 最简形式
 user -> api
 
@@ -612,7 +612,7 @@ user -> post "发表" {
 
 Relation 通过 `line_style: <name>` 引用已声明的 `edge_style` 规则：
 
-```drawify
+```plotgram
 edge_style error {
     stroke: "#C62828"
     dashed: true
@@ -667,7 +667,7 @@ api -> db "查询" { line_style: error }
 | `border_style` | atom   | `solid`, `dashed`, `dotted`        | 边框样式                              |
 | `color`        | string | 任意字符串，如 `"blue"`, `"red"`          | 分组背景色标签                           |
 
-```drawify
+```plotgram
 group process "数据计算层" {
     layout: fan-out
 
@@ -690,7 +690,7 @@ group storage "数据存储层" {
 
 与图级 `group_sizing: uniform` 配合时，各层外框等宽，组内内容水平居中，形成整齐的阶段条带。
 
-```drawify
+```plotgram
 group backend "后端层" {
     border_style: dashed
 
@@ -707,7 +707,7 @@ group backend "后端层" {
 
 **跨组 edge**（必须写在 diagram 顶层）：两端分属不同 group。顶层只保留跨模块的连线，使图的骨架一目了然。
 
-```drawify
+```plotgram
 group frontend "前端" {
     entity web "Web"
     entity mobile "Mobile"
@@ -741,7 +741,7 @@ mobile -> api
 
 ### 8.2 示例
 
-```drawify
+```plotgram
 diagram flowchart {
     title: "用户认证流程"
     config {
@@ -813,7 +813,7 @@ diagram flowchart {
 
 文件开头的连续 `//` 行被捕获为**文档注释**，存入 `Diagram.doc_comment`：
 
-```drawify
+```plotgram
 // 用户认证流程图
 // 作者：平台团队
 
@@ -839,7 +839,7 @@ diagram flowchart {
 - 不支持块注释（`/* */`）—— 减少语法复杂度
 - 行注释在解析时被丢弃，不进入 AST
 
-```drawify
+```plotgram
 // 这是一个注释
 entity api "API 服务"   // 行尾注释也允许
 ```
@@ -850,7 +850,7 @@ entity api "API 服务"   // 行尾注释也允许
 
 ### 10.1 规则
 
-- Drawify 是**空白不敏感**的语言
+- Plotgram 是**空白不敏感**的语言
 - 缩进仅为人类可读，不影响解析
 - 元素之间以换行符分隔
 - 多个空白字符等价于一个空格
@@ -964,7 +964,7 @@ node_style, edge_style, config
 
 ## 14. 完整示例
 
-```drawify
+```plotgram
 // 用户认证流程
 diagram flowchart {
     title: "用户认证流程"
@@ -1012,9 +1012,9 @@ diagram flowchart {
 
 ---
 
-## 附录 A：语法对照（Mermaid → Drawify）
+## 附录 A：语法对照（Mermaid → Plotgram）
 
-| Mermaid             | Drawify                                                      | 说明           |
+| Mermaid             | Plotgram                                                      | 说明           |
 | ------------------- | ------------------------------------------------------------ | ------------ |
 | `graph TD`          | `diagram flowchart { config { direction: top-to-bottom } }` | 图表声明         |
 | `A[节点名]`            | `entity a "节点名"`                                             | 节点声明         |

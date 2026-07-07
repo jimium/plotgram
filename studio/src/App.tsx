@@ -14,7 +14,7 @@ import './styles/app.css';
 const { Header, Content } = Layout;
 
 /**
- * Drawify Studio 应用根组件
+ * Plotgram Studio 应用根组件
  *
  * 布局:顶栏 + 左侧预览区 + 右侧对话区 + 底部 DSL 查看栏
  * 不提供手动 DSL 编辑(那是 Playground 的职责),DSL 由 Agent 生成与迭代
@@ -43,7 +43,7 @@ function App() {
   useEffect(() => {
     if (ready && (!capabilities.diff || !capabilities.applyPatch)) {
       contextHolder.message.warning(
-        '当前 WASM 不支持 diff/apply_patch,增量编辑功能将受限。请重新构建 drawify-wasm。',
+        '当前 WASM 不支持 diff/apply_patch,增量编辑功能将受限。请重新构建 plotgram-wasm。',
       );
     }
   }, [ready, capabilities, contextHolder]);

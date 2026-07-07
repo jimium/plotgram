@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Layout Intent 使用指南 — Drawify</title>
+  <title>Layout Intent 使用指南 — Plotgram</title>
   <style>
     :root {
       --bg: #f6f7f9;
@@ -333,7 +333,7 @@
     <div class="wrap">
       <h1>Layout Intent 使用指南</h1>
       <p>
-        Layout Intent(布局意图)是 Drawify 的布局叠加层,允许在不修改 diagram 源码 <code>relations</code> 的前提下,
+        Layout Intent(布局意图)是 Plotgram 的布局叠加层,允许在不修改 diagram 源码 <code>relations</code> 的前提下,
         向布局算法注入额外的拓扑/几何约束,并返回每条意图的满足度报告。
       </p>
       <div class="tags">
@@ -518,7 +518,7 @@
       <h3>1. Rust 核心 API</h3>
       <h4><code>compute_layout_with_plan_and_overlay</code></h4>
       <p>布局 dispatch 入口,接受 overlay 参数并返回 <code>RefinementReport</code>。</p>
-      <pre><code>use drawify_core::layout::{
+      <pre><code>use plotgram_core::layout::{
     compute_layout_with_plan_and_overlay,
     LayoutIntentOverlay, TopologyIntent,
 };
@@ -548,8 +548,8 @@ if let Some(report) = report {
 
       <h4><code>render_output_with_report</code></h4>
       <p>渲染流水线入口,返回 <code>RenderOutputWithReport { output, report }</code>。</p>
-      <pre><code>use drawify_core::pipeline::render_output_with_report;
-use drawify_core::render::{RenderRequest, RenderFormat};
+      <pre><code>use plotgram_core::pipeline::render_output_with_report;
+use plotgram_core::render::{RenderRequest, RenderFormat};
 
 let mut request = RenderRequest::new(&prepared, RenderFormat::Svg);
 request.layout_overlay = Some(&overlay);
@@ -619,17 +619,17 @@ interface RefinementReport {
     }
   }'</code></pre>
 
-      <h4><code>X-Drawify-Refinement-Report</code> 响应头</h4>
-      <p>成功响应会携带 <code>X-Drawify-Refinement-Report</code> 头(仅当请求体包含 <code>layout_intents</code> 时),值为 JSON 序列化的 <code>RefinementReport</code>:</p>
+      <h4><code>X-Plotgram-Refinement-Report</code> 响应头</h4>
+      <p>成功响应会携带 <code>X-Plotgram-Refinement-Report</code> 头(仅当请求体包含 <code>layout_intents</code> 时),值为 JSON 序列化的 <code>RefinementReport</code>:</p>
       <pre><code>HTTP/1.1 200 OK
 Content-Type: image/svg+xml
-X-Drawify-Format: svg
-X-Drawify-Valid: true
-X-Drawify-Refinement-Report: {"results":[{"index":0,"kind":"below","status":"Conflicted","message":"..."}],"satisfied":0,"partial":0,"conflicted":1,"not_found":0}
+X-Plotgram-Format: svg
+X-Plotgram-Valid: true
+X-Plotgram-Refinement-Report: {"results":[{"index":0,"kind":"below","status":"Conflicted","message":"..."}],"satisfied":0,"partial":0,"conflicted":1,"not_found":0}
 
 &lt;svg&gt;...&lt;/svg&gt;</code></pre>
       <p>解析示例(Node.js):</p>
-      <pre><code>const report = JSON.parse(response.headers['x-drawify-refinement-report']);
+      <pre><code>const report = JSON.parse(response.headers['x-plotgram-refinement-report']);
 console.log(`Satisfied: ${report.satisfied}, Conflicted: ${report.conflicted}`);</code></pre>
     </section>
 
@@ -775,7 +775,7 @@ console.log(`Satisfied: ${report.satisfied}, Conflicted: ${report.conflicted}`);
 
       <h3>FAS 保护(避免意图边被反转)</h3>
       <p>Sugiyama 的 <code>greedy_cycle_reversal</code> 会反转边以破环。意图边被标记为 <code>reversible: false</code>,不参与 FAS 反转:</p>
-      <pre><code>// crates/drawify-core/src/layout/node/sugiyama_v2/graph.rs
+      <pre><code>// crates/plotgram-core/src/layout/node/sugiyama_v2/graph.rs
 pub(super) struct EdgeMeta {
     pub kind: EdgeKind,        // Real | Intent
     pub reversible: bool,      // 意图边 = false
@@ -834,15 +834,15 @@ pub(super) struct EdgeMeta {
         <li><strong>端到端</strong> (pipeline/render.rs):SVG/ASCII 路径、Satisfied/Conflicted/NotFound/空报告</li>
       </ul>
       <p>运行测试:</p>
-      <pre><code>cargo test -p drawify-core --lib layout::intent
-cargo test -p drawify-core --lib pipeline::render</code></pre>
+      <pre><code>cargo test -p plotgram-core --lib layout::intent
+cargo test -p plotgram-core --lib pipeline::render</code></pre>
     </section>
   </main>
 
   <footer>
     <a class="back-bottom" href="../README.md">← 返回架构文档</a>
     <p style="margin-top:0.5rem">
-      © Drawify · Layout Intent 使用指南 ·
+      © Plotgram · Layout Intent 使用指南 ·
       <a href="layout-intent-optimized.md">设计文档</a> ·
       <a href="layout-intent-usage.md">Markdown 版本</a>
     </p>

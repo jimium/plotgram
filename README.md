@@ -1,19 +1,19 @@
-# Drawify
+# Plotgram
 
 **Turn anything into a diagram — a diagram description language and rendering engine built for AI agents.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org)
 
-Drawify is **not** a drop-in replacement for Mermaid. It is a diagram language designed from the ground up for **machine generation**: LLMs write the source, the engine handles layout, and humans read the result.
+Plotgram is **not** a drop-in replacement for Mermaid. It is a diagram language designed from the ground up for **machine generation**: LLMs write the source, the engine handles layout, and humans read the result.
 
 ---
 
-## Why Drawify?
+## Why Plotgram?
 
 Traditional diagram tools (Mermaid, PlantUML, Graphviz) were built for humans typing by hand. AI agents need something different:
 
-| Challenge | Legacy tools | Drawify |
+| Challenge | Legacy tools | Plotgram |
 |-----------|--------------|---------|
 | Syntax variants | Many arrow styles, implicit rules | Fixed grammar — 3 arrow types, explicit structure |
 | Layout | Agent must express coordinates or hints | Semantic-first — engine infers layout automatically |
@@ -35,7 +35,7 @@ Traditional diagram tools (Mermaid, PlantUML, Graphviz) were built for humans ty
 
 ## Quick Example
 
-```drawify
+```plotgram
 diagram flowchart {
     layout: left-to-right
     title: "Linear Flow"
@@ -52,7 +52,7 @@ diagram flowchart {
 Render it:
 
 ```bash
-cargo run -p drawify-cli -- render showcase/flowchart/s.linear-chain.dfy -f svg -o output.svg
+cargo run -p plotgram-cli -- render showcase/flowchart/s.linear-chain.pgm -f svg -o output.svg
 ```
 
 ---
@@ -67,16 +67,16 @@ cargo run -p drawify-cli -- render showcase/flowchart/s.linear-chain.dfy -f svg 
 ### Build
 
 ```bash
-git clone https://github.com/your-org/drawify.git
-cd drawify
+git clone https://github.com/your-org/plotgram.git
+cd plotgram
 cargo build --release
 ```
 
 ### Install CLI
 
 ```bash
-cargo install --path crates/drawify-cli
-drawify --help
+cargo install --path crates/plotgram-cli
+plotgram --help
 ```
 
 ---
@@ -87,25 +87,25 @@ drawify --help
 
 | Command | Description |
 |---------|-------------|
-| `drawify render <file>` | Parse and render a `.dfy` file (`-f svg\|ascii\|png\|webp\|json`) |
-| `drawify validate <file>` | Check syntax and semantics |
-| `drawify export <file>` | Export the AST as JSON |
-| `drawify diff -o old.dfy -n new.dfy` | Semantic diff between two files |
-| `drawify patch <file> <patch.json>` | Apply an AST-level patch |
+| `plotgram render <file>` | Parse and render a `.pgm` file (`-f svg\|ascii\|png\|webp\|json`) |
+| `plotgram validate <file>` | Check syntax and semantics |
+| `plotgram export <file>` | Export the AST as JSON |
+| `plotgram diff -o old.pgm -n new.pgm` | Semantic diff between two files |
+| `plotgram patch <file> <patch.json>` | Apply an AST-level patch |
 
 ```bash
 # Render to stdout (default format: SVG)
-drawify render examples/my-diagram.dfy
+plotgram render examples/my-diagram.pgm
 
 # Validate and print diagnostics
-drawify validate examples/my-diagram.dfy
+plotgram validate examples/my-diagram.pgm
 ```
 
 ### HTTP Server
 
 ```bash
-cargo run -p drawify-server
-# Listens on 0.0.0.0:6080 (override with DRAWIFY_SERVER_ADDR)
+cargo run -p plotgram-server
+# Listens on 0.0.0.0:6080 (override with PLOTGRAM_SERVER_ADDR)
 ```
 
 | Endpoint | Method | Description |
@@ -147,18 +147,18 @@ Browse [showcase/](showcase/) for examples. Files use complexity prefixes: `s.` 
 ## Project Structure
 
 ```
-drawify/
+plotgram/
 ├── crates/
-│   ├── drawify-core/     # Parser, AST, validation, layout, rendering
-│   ├── drawify-cli/      # Command-line tool
-│   ├── drawify-server/   # HTTP API service
-│   ├── drawify-wasm/     # WASM bindings for the browser
-│   └── drawify-eval/     # Evaluation metrics
+│   ├── plotgram-core/     # Parser, AST, validation, layout, rendering
+│   ├── plotgram-cli/      # Command-line tool
+│   ├── plotgram-server/   # HTTP API service
+│   ├── plotgram-wasm/     # WASM bindings for the browser
+│   └── plotgram-eval/     # Evaluation metrics
 ├── docs/
 │   ├── specs/            # Language and style specifications
 │   ├── product/          # Vision, features, and use cases
 │   └── architecture/     # Design philosophy and layout algorithms
-├── showcase/             # Example diagrams by type (.dfy)
+├── showcase/             # Example diagrams by type (.pgm)
 ├── playground/           # React + WASM live editor
 └── Cargo.toml            # Rust workspace
 ```
@@ -181,8 +181,8 @@ drawify/
 
 | Extension | Description |
 |-----------|-------------|
-| `.drawify` | Full extension |
-| `.dfy` | Short extension (recommended) |
+| `.plotgram` | Full extension |
+| `.pgm` | Short extension (recommended) |
 
 ---
 

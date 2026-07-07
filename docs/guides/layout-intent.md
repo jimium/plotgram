@@ -31,12 +31,12 @@ Intent 存在 **overlay** 参数中，不是图结构的一部分。
 ## Rust 最小示例
 
 ```rust
-use drawify_core::layout::intent::{
+use plotgram_core::layout::intent::{
     GeometricIntent, LayoutIntentOverlay, TopologyIntent,
 };
-use drawify_core::layout::compute_layout_with_plan_and_overlay;
-use drawify_core::render::{RenderRequest, RenderFormat};
-use drawify_core::pipeline::render_text;
+use plotgram_core::layout::compute_layout_with_plan_and_overlay;
+use plotgram_core::render::{RenderRequest, RenderFormat};
+use plotgram_core::pipeline::render_text;
 
 let overlay = LayoutIntentOverlay {
     topology: vec![TopologyIntent::Below {

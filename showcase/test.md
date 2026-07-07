@@ -1,6 +1,6 @@
 # xxx
 
-```drawify
+```plotgram
 diagram flowchart {
     layout: top-to-bottom
     title: "生产变更审批流程"

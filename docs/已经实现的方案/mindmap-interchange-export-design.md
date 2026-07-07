@@ -2,14 +2,14 @@
 
 > 版本：0.1.1-draft | 状态：设计中
 >
-> 目标：为 `diagram mindmap` 增加 **Markdown 大纲**、**OPML**、**FreeMind (.mm)** 三种语义型 interchange 的 **导出与导入**，使 Drawify 与文档工具、大纲编辑器、桌面思维导图生态双向互通；并支持 **Markdown 大纲文本直接出图**（不经 Drawify DSL 手写）。
+> 目标：为 `diagram mindmap` 增加 **Markdown 大纲**、**OPML**、**FreeMind (.mm)** 三种语义型 interchange 的 **导出与导入**，使 Plotgram 与文档工具、大纲编辑器、桌面思维导图生态双向互通；并支持 **Markdown 大纲文本直接出图**（不经 Plotgram DSL 手写）。
 
 相关文档：
 
 - [Mindmap 视觉语言规范](../specs/visual-language/diagrams/mindmap.md)
 - [Scene JSON 导出规范](../specs/export-scene-spec.md)
-- [Draw.io 导出实现说明](../../crates/drawify-core/src/render/encode/drawio/README.md)（降级报告模式参考）
-- [Mindmap 结构展开](../../crates/drawify-core/src/prepare/structure/mindmap.rs)（`branch_slot` / `tree_depth`）
+- [Draw.io 导出实现说明](../../crates/plotgram-core/src/render/encode/drawio/README.md)（降级报告模式参考）
+- [Mindmap 结构展开](../../crates/plotgram-core/src/prepare/structure/mindmap.rs)（`branch_slot` / `tree_depth`）
 
 ---
 
@@ -17,7 +17,7 @@
 
 ### 1.1 现状
 
-Drawify mindmap 已支持 **SVG / PNG / WebP / ASCII / Scene JSON / Draw.io** 导出。这些格式面向 **渲染与视觉编辑**，不面向：
+Plotgram mindmap 已支持 **SVG / PNG / WebP / ASCII / Scene JSON / Draw.io** 导出。这些格式面向 **渲染与视觉编辑**，不面向：
 
 - Obsidian、Notion、GitHub 等 **Markdown 文档** 工作流
 - OmniOutliner 等 **大纲工具**
@@ -44,11 +44,11 @@ Drawify mindmap 已支持 **SVG / PNG / WebP / ASCII / Scene JSON / Draw.io** �
 
 ### 1.4 双入口定位
 
-Drawify 主路径仍是 **DSL → 图**。本方案为 mindmap 增加 **第二输入通道**：
+Plotgram 主路径仍是 **DSL → 图**。本方案为 mindmap 增加 **第二输入通道**：
 
 | 入口 | 典型用户 | 表达能力 |
 |------|----------|----------|
-| Drawify DSL | Agent、进阶用户 | 完整：type、theme、layout、显式 id |
+| Plotgram DSL | Agent、进阶用户 | 完整：type、theme、layout、显式 id |
 | Interchange 导入 | 笔记用户、粘贴大纲、Obsidian/Notion 工作流 | **结构-only**：层级 + 文本 label |
 
 两入口在 **`Diagram` AST 层汇合**，之后共用 `prepare → validate → layout → render`。Import **不替代** DSL，见 [§7 Import 通道](#7-import-通道大纲--图)。
@@ -57,9 +57,9 @@ Drawify 主路径仍是 **DSL → 图**。本方案为 mindmap 增加 **第二�
 
 - **XMind 原生 `.xmind`**（格式碎片化；导出侧经 FreeMind 中转；导入侧第一期不做）
 - **完整 CommonMark 解析**（Import 仅支持大纲子集，见 §7.4）
-- **在 `.dfy` 文件中自动猜测输入格式**（必须显式 `--input-format`，见 §7.2）
+- **在 `.pgm` 文件中自动猜测输入格式**（必须显式 `--input-format`，见 §7.2）
 - **flowchart / sequence 等图表的 Markdown 导入**（mindmap-only）
-- **Import 保留 radial 布局或 FreeMind 坐标**（导入后由 Drawify 重新布局）
+- **Import 保留 radial 布局或 FreeMind 坐标**（导入后由 Plotgram 重新布局）
 - **跨分支 relation（非树边）** 的语义保留（导出第一期按树降级；Import 输入本身即为树）
 
 ---
@@ -99,7 +99,7 @@ pub struct MindmapTreeNode {
 
 输入：`PreparedDiagram`（已通过 `prepare/structure/mindmap::expand`）。
 
-1. 用与 [`prepare/structure/mindmap.rs`](../../crates/drawify-core/src/prepare/structure/mindmap.rs) 相同的 `build_children_map` + `find_root_id` 定位 root。
+1. 用与 [`prepare/structure/mindmap.rs`](../../crates/plotgram-core/src/prepare/structure/mindmap.rs) 相同的 `build_children_map` + `find_root_id` 定位 root。
 2. 对每个节点的子 id 列表，按 **该父节点下 relation 首次出现的顺序** 排序（与 `expand` 中 branch_slot 分配一致）。
 3. DFS 递归构建 `MindmapTreeNode`。
 4. 运行 **树合法性检查**（§2.4）。
@@ -107,7 +107,7 @@ pub struct MindmapTreeNode {
 模块建议路径（Export + Import 共用 `MindmapTree`）：
 
 ```text
-crates/drawify-core/src/interchange/mindmap/
+crates/plotgram-core/src/interchange/mindmap/
   tree.rs          # MindmapTree、树合法性检查
   diagram.rs       # build_mindmap_tree() / mindmap_tree_to_diagram()
   export/
@@ -127,7 +127,7 @@ crates/drawify-core/src/interchange/mindmap/
 
 mindmap DSL 中 **title**（图表级）与 **root entity label**（中心主题）可能不同：
 
-```drawify
+```plotgram
 diagram mindmap {
     title: "2025 产品规划"
     entity root "产品规划" { type: root }
@@ -218,7 +218,7 @@ pub trait FormatEncoder {
     /// 从 PreparedDiagram 直接编码（`EncodingPath::Diagram` 的编码器必须实现）。
     /// `EncodingPath::Scene` 的编码器无需覆写，默认返回 unsupported 错误。
     fn encode_from_diagram(&self, _diagram: &PreparedDiagram) -> Result<RenderOutput> {
-        Err(DrawifyError::render_internal_msg(
+        Err(PlotgramError::render_internal_msg(
             "format does not support direct diagram encoding",
         ))
     }
@@ -283,9 +283,9 @@ impl FormatEncoder for MdOutlineEncoder {
 | `RenderFormat::Freemind` | `freemind` | `.mm` | `application/x-freemind` |
 
 ```bash
-drawify render showcase/mindmap/s.brainstorm.dfy -f md-outline -o brainstorm.md
-drawify render showcase/mindmap/n.tech-stack.dfy -f opml -o tech-stack.opml
-drawify render showcase/mindmap/c.product-roadmap.dfy -f freemind -o roadmap.mm
+plotgram render showcase/mindmap/s.brainstorm.pgm -f md-outline -o brainstorm.md
+plotgram render showcase/mindmap/n.tech-stack.pgm -f opml -o tech-stack.opml
+plotgram render showcase/mindmap/c.product-roadmap.pgm -f freemind -o roadmap.mm
 ```
 
 WASM / HTTP Server 第一期仅保证 **文本格式**（三种皆可）；与 draw.io 一样按需渲染即可。
@@ -311,7 +311,7 @@ Obsidian、Notion（粘贴）、GitHub/GitLab README、飞书文档、任意 Mar
 - 有效标题级别：`min_level` ..= `max_level`（默认 1..=6）。
 - 超过 `max_level` 的更深节点：**降级为同级列表**（见模式 B 嵌套列表段落）并 warning L2。
 - 标题文本 = `entity.label`（不转义 `#`，若 label 含换行则替换为空格并 warning）。
-- 标题行尾 **不** 追加 `{#entity-id}`（保持 Markdown 干净）；可选 `include_entity_ids: true` 时在 HTML 注释中保留 `<!-- drawify:entity-id -->`。
+- 标题行尾 **不** 追加 `{#entity-id}`（保持 Markdown 干净）；可选 `include_entity_ids: true` 时在 HTML 注释中保留 `<!-- plotgram:entity-id -->`。
 
 **深度映射**（`root_title_mode: separate` 且存在独立 title 时）：
 
@@ -322,7 +322,7 @@ Obsidian、Notion（粘贴）、GitHub/GitLab README、飞书文档、任意 Mar
 | root 子节点 | `###` |
 | 再下一层 | `####` … |
 
-**示例**（对应 `showcase/mindmap/s.brainstorm.dfy`）：
+**示例**（对应 `showcase/mindmap/s.brainstorm.pgm`）：
 
 ```markdown
 # 头脑风暴
@@ -371,7 +371,7 @@ pub struct MarkdownOutlineOptions {
 
 ### 4.4 字段映射
 
-| Drawify | Markdown |
+| Plotgram | Markdown |
 |---------|----------|
 | `diagram.title` | 可选 `# title` |
 | `entity.label` | 标题文本或列表项 |
@@ -414,10 +414,10 @@ OmniOutliner、MindNode（导入 OPML）、RSS 阅读器类大纲工具、Workfl
     <dateModified>...</dateModified>
   </head>
   <body>
-    <outline text="产品规划" drawifyEntityId="root">
-      <outline text="功能需求" drawifyEntityId="feature"/>
-      <outline text="技术方案" drawifyEntityId="tech"/>
-      <outline text="市场调研" drawifyEntityId="market"/>
+    <outline text="产品规划" plotgramEntityId="root">
+      <outline text="功能需求" plotgramEntityId="feature"/>
+      <outline text="技术方案" plotgramEntityId="tech"/>
+      <outline text="市场调研" plotgramEntityId="market"/>
     </outline>
   </body>
 </opml>
@@ -425,12 +425,12 @@ OmniOutliner、MindNode（导入 OPML）、RSS 阅读器类大纲工具、Workfl
 
 ### 5.3 映射规则
 
-| Drawify | OPML |
+| Plotgram | OPML |
 |---------|------|
 | `diagram.title` | `<head><title>` |
 | `entity.label` | `outline/@text`（XML 转义） |
 | 子 relation | 嵌套 `<outline>` |
-| `entity.id` | 可选 `drawifyEntityId` 属性（`include_metadata: true`，默认 true） |
+| `entity.id` | 可选 `plotgramEntityId` 属性（`include_metadata: true`，默认 true） |
 | `_created` | `dateCreated` = 导出 UTC 时间 |
 | 样式 / layout | **不导出** |
 
@@ -441,7 +441,7 @@ OmniOutliner、MindNode（导入 OPML）、RSS 阅读器类大纲工具、Workfl
 ```rust
 pub struct OpmlExportOptions {
     pub root_title_mode: RootTitleMode,
-    pub include_metadata: bool,   // drawifyEntityId，默认 true
+    pub include_metadata: bool,   // plotgramEntityId，默认 true
     pub strict_tree: bool,
     pub include_date: bool,       // head dateCreated，默认 true
 }
@@ -449,10 +449,10 @@ pub struct OpmlExportOptions {
 
 ### 5.5 孤立节点（宽松模式）
 
-在 `<body>` 末尾追加平级 `<outline>`，并设 `drawifyOrphan="true"`：
+在 `<body>` 末尾追加平级 `<outline>`，并设 `plotgramOrphan="true"`：
 
 ```xml
-<outline text="孤立节点" drawifyEntityId="orphan" drawifyOrphan="true"/>
+<outline text="孤立节点" plotgramEntityId="orphan" plotgramOrphan="true"/>
 ```
 
 Import 侧不在本方案范围内（Import 通道仅支持 Markdown 大纲，见 §7）。
@@ -486,13 +486,13 @@ FreeMind 1.0.1 XML（最广泛兼容的子集）：
 
 #### 6.3.1 结构（L0）
 
-| Drawify | FreeMind |
+| Plotgram | FreeMind |
 |---------|----------|
 | root entity | 顶层 `<node>`（单根） |
 | 子 relation | 嵌套 `<node>` |
 | 兄弟顺序 | relation 插入序 |
 | `entity.label` | `TEXT` 属性（XML 转义） |
-| `entity.id` | 生成唯一 `ID="Freemind_{sanitized}"`；可选 `drawifyEntityId` 自定义属性 |
+| `entity.id` | 生成唯一 `ID="Freemind_{sanitized}"`；可选 `plotgramEntityId` 自定义属性 |
 
 **不导出** layout 坐标（`POSITION`、`VGAP` 等）：交给 FreeMind / XMind 打开后自动布局。
 
@@ -500,13 +500,13 @@ FreeMind 1.0.1 XML（最广泛兼容的子集）：
 
 FreeMind 导出 **不导出颜色/样式**（`COLOR`、`BACKGROUND_COLOR`、`STYLE`、`FONT_*` 等属性均不写入）。理由：
 
-- Drawify 的样式物化依赖 theme cascade，与 layout 管线耦合，语义型导出路径不经过物化。
+- Plotgram 的样式物化依赖 theme cascade，与 layout 管线耦合，语义型导出路径不经过物化。
 - FreeMind / XMind 打开 `.mm` 文件后会自动应用其默认主题样式，视觉效果由目标工具负责。
 - 若未来需要样式导出，可作为独立增强在 `FreemindExportOptions` 中增加 `style_level` 选项，届时需解决物化路径的独立性问题。
 
 #### 6.3.3 边
 
-FreeMind 纯树格式 **无边对象**；父子关系仅由嵌套表达。Drawify 的 bezier 边 **不导出**（implicit L0）。
+FreeMind 纯树格式 **无边对象**；父子关系仅由嵌套表达。Plotgram 的 bezier 边 **不导出**（implicit L0）。
 
 #### 6.3.4 不导出字段
 
@@ -523,7 +523,7 @@ FreeMind 纯树格式 **无边对象**；父子关系仅由嵌套表达。Drawif
 pub struct FreemindExportOptions {
     pub root_title_mode: RootTitleMode,
     pub strict_tree: bool,
-    pub include_entity_ids: bool,         // 自定义属性 drawifyEntityId
+    pub include_entity_ids: bool,         // 自定义属性 plotgramEntityId
     pub id_prefix: &'static str,          // 默认 "Freemind_"
 }
 ```
@@ -541,7 +541,7 @@ pub struct FreemindExportOptions {
 
 ### 6.6 与 XMind 的关系
 
-不在 Drawify 内实现 XMind 原生格式。文档与 CLI help 中说明：
+不在 Plotgram 内实现 XMind 原生格式。文档与 CLI help 中说明：
 
 > 如需在 XMind 中编辑：导出 FreeMind (`.mm`) → XMind「导入」→ 选择 FreeMind 文件。
 
@@ -551,7 +551,7 @@ pub struct FreemindExportOptions {
 
 ### 7.1 定位
 
-允许用户输入 **Markdown 大纲**，**不经手写 Drawify DSL** 直接渲染 mindmap。典型场景：
+允许用户输入 **Markdown 大纲**，**不经手写 Plotgram DSL** 直接渲染 mindmap。典型场景：
 
 - 会议记录 / 培训大纲粘贴到 Playground 一键出图
 - Obsidian、Notion 复制标题结构 → 可视化
@@ -562,7 +562,7 @@ Import 产出 **`Diagram` AST**（`RawDiagram`），**不**经「拼 DSL 字符�
 
 ### 7.2 设计原则
 
-1. **显式输入格式**：调用方必须指定 `InputFormat`，**禁止**对 `.dfy` / 任意文本做启发式格式猜测。
+1. **显式输入格式**：调用方必须指定 `InputFormat`，**禁止**对 `.pgm` / 任意文本做启发式格式猜测。
 2. **mindmap-only**：Import 固定 `diagram_type = Mindmap`；其他图表类型走 DSL。
 3. **结构-only**：Import 只恢复树形结构与 label；theme、layout、graphic_style 使用 profile 默认（与新建 mindmap DSL 一致）。
 4. **直接构造 AST**：`MindmapTree → Diagram`，然后走现有 `prepare()`；不修改 `dsl/parser`。
@@ -656,7 +656,7 @@ pub enum EntityIdStrategy {
     Sequential,
     /// slugify(label)；冲突时追加 _2, _3
     Slugify,
-    /// 解析 Export 写入的 <!-- drawify:entity-id -->
+    /// 解析 Export 写入的 <!-- plotgram:entity-id -->
     FromMetadata,
 }
 ```
@@ -704,9 +704,9 @@ pub struct MarkdownImportOptions {
 ### 市场调研
 ```
 
-等价于 `showcase/mindmap/s.brainstorm.dfy` 的语义（id 为生成值）：
+等价于 `showcase/mindmap/s.brainstorm.pgm` 的语义（id 为生成值）：
 
-```drawify
+```plotgram
 diagram mindmap {
     title: "头脑风暴"
     entity node_1 "产品规划" { type: root }
@@ -746,7 +746,7 @@ pub fn mindmap_tree_to_diagram(
 
 ```rust
 pub enum InputFormat {
-    Drawify,      // 默认：现有 DSL
+    Plotgram,      // 默认：现有 DSL
     MdOutline,    // Markdown 大纲 → mindmap（Import 仅此一种 interchange）
 }
 ```
@@ -782,13 +782,13 @@ pub fn import_prepare_validate(
 
 ```bash
 # 大纲 → SVG（显式 input format）
-drawify render notes.md --input-format md-outline -f svg -o mindmap.svg
+plotgram render notes.md --input-format md-outline -f svg -o mindmap.svg
 
-# 大纲 → 打印等价的 Drawify DSL（调试 / Agent 转码）
-drawify import notes.md --input-format md-outline --emit-dsl
+# 大纲 → 打印等价的 Plotgram DSL（调试 / Agent 转码）
+plotgram import notes.md --input-format md-outline --emit-dsl
 ```
 
-**禁止**：`drawify render foo.dfy` 时根据内容自动切换 parser。
+**禁止**：`plotgram render foo.pgm` 时根据内容自动切换 parser。
 
 #### 7.7.4 WASM / Playground / Studio
 
@@ -798,7 +798,7 @@ drawify import notes.md --input-format md-outline --emit-dsl
 | WASM | 新增 `import_render(source, input_format, output_format, options_json)` |
 | Studio Agent | 检测用户消息是否为大纲子集时，内部 `InputFormat::MdOutline`，对用户可透明 |
 
-可选：`--emit-dsl` 在大纲模式下显示等价的 Drawify 源码，供进阶用户继续 patch。
+可选：`--emit-dsl` 在大纲模式下显示等价的 Plotgram 源码，供进阶用户继续 patch。
 
 ### 7.8 Round-trip 保证
 
@@ -877,9 +877,9 @@ drawify import notes.md --input-format md-outline --emit-dsl
 
 | Fixture | 断言 |
 |---------|------|
-| `showcase/mindmap/s.brainstorm.dfy` | Export 三格式；Import MD 后 entity 数 = 4 |
-| `showcase/mindmap/n.tech-stack.dfy` | 深度 > 3 缩进/层级正确 |
-| `showcase/mindmap/c.product-roadmap.dfy` | FreeMind 节点数 = entity 数 |
+| `showcase/mindmap/s.brainstorm.pgm` | Export 三格式；Import MD 后 entity 数 = 4 |
+| `showcase/mindmap/n.tech-stack.pgm` | 深度 > 3 缩进/层级正确 |
+| `showcase/mindmap/c.product-roadmap.pgm` | FreeMind 节点数 = entity 数 |
 | 手工非树 DSL | Export strict 报错含 `multi_parent` |
 | 含段落/代码块的 .md | Import 跳过 + warning 或 strict 报错 |
 
@@ -894,9 +894,9 @@ drawify import notes.md --input-format md-outline --emit-dsl
 
 ## 10. 示例对照
 
-源文件 `showcase/mindmap/s.brainstorm.dfy`：
+源文件 `showcase/mindmap/s.brainstorm.pgm`：
 
-```drawify
+```plotgram
 diagram mindmap {
     title: "头脑风暴"
     entity root "产品规划" { type: root }
@@ -946,6 +946,6 @@ diagram mindmap {
 ## 12. 参见
 
 - [Mindmap 视觉语言](../specs/visual-language/diagrams/mindmap.md)
-- [Draw.io 导出（降级报告参考）](../../crates/drawify-core/src/render/encode/drawio/README.md)
+- [Draw.io 导出（降级报告参考）](../../crates/plotgram-core/src/render/encode/drawio/README.md)
 - [OPML 2.0 规范](http://opml.org/spec2.opml)
 - [FreeMind XML 格式说明（社区文档）](https://freemind.sourceforge.io/wiki/index.php/File_format)

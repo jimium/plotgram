@@ -1,8 +1,8 @@
-# Drawify DSL 写作手册
+# Plotgram DSL 写作手册
 
 > 实用指南 | 基于语言规范 v0.3.0
 
-本手册是 Drawify DSL 的实践写作指南，帮助你在不同场景下快速写出正确的 `.dfy` 文件。语法规范见 [language-spec.md](./language-spec.md)。
+本手册是 Plotgram DSL 的实践写作指南，帮助你在不同场景下快速写出正确的 `.pgm` 文件。语法规范见 [language-spec.md](./language-spec.md)。
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### 1.1 最小可用图表
 
-```drawify
+```plotgram
 diagram flowchart {
     title: "Hello World"
 
@@ -23,9 +23,9 @@ diagram flowchart {
 
 ### 1.2 文件骨架
 
-一个 `.dfy` 文件的标准结构：
+一个 `.pgm` 文件的标准结构：
 
-```drawify
+```plotgram
 // 文档注释（可选，文件开头连续 // 行）
 
 diagram <类型> {
@@ -91,7 +91,7 @@ diagram <类型> {
 
 ### 3.1 基本形式
 
-```drawify
+```plotgram
 entity <id> "<显示标签>"
 ```
 
@@ -102,7 +102,7 @@ entity <id> "<显示标签>"
 
 `type` 决定渲染形状，是最常用的 entity 属性，使用 `entity[<type>]` 方括号语法在 entity 关键字后直接指定：
 
-```drawify
+```plotgram
 entity[database] db "用户数据库"
 entity[gateway] api "API 网关"
 entity[person] user "用户"
@@ -110,7 +110,7 @@ entity[person] user "用户"
 
 ### 3.3 带状态
 
-```drawify
+```plotgram
 entity[database] db "主数据库" {
     status: healthy
 }
@@ -124,7 +124,7 @@ entity[cache] cache "缓存" {
 
 ### 3.4 带描述和负责人
 
-```drawify
+```plotgram
 entity[service] auth "认证服务" {
     owner: "安全团队"
     description: "处理用户认证和授权"
@@ -133,7 +133,7 @@ entity[service] auth "认证服务" {
 
 ### 3.5 带 semantic 和 icon
 
-```drawify
+```plotgram
 entity[service] api "API 服务" {
     semantic: auth
     icon: shield
@@ -145,7 +145,7 @@ entity[service] api "API 服务" {
 
 ### 3.6 带 meta 自定义属性
 
-```drawify
+```plotgram
 entity[service] api "API 服务" {
     meta.version: "2.1.0"
     meta.port: 8080
@@ -172,7 +172,7 @@ meta 属性不参与渲染，仅供程序化消费。
 
 ### 4.1 三种箭头
 
-```drawify
+```plotgram
 a -> b      // 主动流向：调用、发送、推进
 a --> b     // 被动/响应：返回、回调、异步响应
 a <-> b     // 双向关系：双向通信、数据同步
@@ -180,14 +180,14 @@ a <-> b     // 双向关系：双向通信、数据同步
 
 ### 4.2 带标签
 
-```drawify
+```plotgram
 user -> api "发送请求"
 api --> user "返回响应"
 ```
 
 ### 4.3 带端点标签
 
-```drawify
+```plotgram
 a -> b "中间标签" >"目标端" <"源端"
 a -> b >"仅目标端"
 ```
@@ -198,7 +198,7 @@ a -> b >"仅目标端"
 
 ### 4.4 带属性
 
-```drawify
+```plotgram
 api -> db "查询数据" {
     status: degraded
     line_style: error
@@ -230,7 +230,7 @@ user -> post "发表" {
 
 ### 5.1 基本形式
 
-```drawify
+```plotgram
 group <id> "<标签>" {
     // group 属性（可选）
     layout: <布局>
@@ -252,7 +252,7 @@ group <id> "<标签>" {
 
 推荐将**组内 edge** 就近写在 group 内部，**跨组 edge** 保留在顶层，使模块边界一目了然：
 
-```drawify
+```plotgram
 group frontend "前端层" {
     entity[frontend] web "Web 应用"
     entity[frontend] mobile "移动端"
@@ -304,7 +304,7 @@ api -> cache
 
 ### 6.1 title（body 级属性）
 
-```drawify
+```plotgram
 diagram flowchart {
     title: "用户认证流程"
     ...
@@ -317,7 +317,7 @@ title 直接写在 body 中，不放在 config 块内。
 
 其他图表属性集中在 `config` 块中：
 
-```drawify
+```plotgram
 diagram flowchart {
     title: "用户登录流程"
 
@@ -391,7 +391,7 @@ diagram flowchart {
 **边捆绑（Edge Bundling）：**
 正交路由支持 `bundling` 选项（0.0~1.0，默认 0.0 关闭），启用后相似路径的边会共享主干段，减少视觉"意大利面"效应：
 
-```drawify
+```plotgram
 config {
     edge_routing: orthogonal {
         bundling: 1.0    // 完全启用边捆绑
@@ -418,7 +418,7 @@ config {
 
 **架构图（等宽水平分层）示例：**
 
-```drawify
+```plotgram
 diagram architecture {
     title: "微服务架构"
     config {
@@ -436,7 +436,7 @@ diagram architecture {
 
 **流程图（垂直阶段划分）示例：**
 
-```drawify
+```plotgram
 diagram flowchart {
     title: "CI/CD 流水线"
     config {
@@ -452,7 +452,7 @@ diagram flowchart {
 
 **泳道图（水平排列）示例：**
 
-```drawify
+```plotgram
 diagram flowchart {
     title: "订单处理泳道"
     config {
@@ -482,7 +482,7 @@ diagram flowchart {
 
 按 entity `type` 批量匹配：
 
-```drawify
+```plotgram
 node_style service {
     fill: "#E3F2FD"
     stroke: "#1976D2"
@@ -507,7 +507,7 @@ node_style cache {
 
 声明命名边样式，在 relation 中通过 `line_style` 引用：
 
-```drawify
+```plotgram
 edge_style error {
     stroke: "#C62828"
     stroke_width: 2.5
@@ -529,7 +529,7 @@ db --> api "返回" { line_style: success }
 
 在 entity/relation 的属性块中用 `style.*` 覆盖：
 
-```drawify
+```plotgram
 entity[service] api "API 服务" {
     style.fill: "#C8E6C9"     // 覆盖 node_style service 的 fill
     style.shape: hexagon      // 覆盖 shape
@@ -587,7 +587,7 @@ api -> db "查询" {
 
 ### 8.1 流程图：决策分支
 
-```drawify
+```plotgram
 diagram flowchart {
     title: "用户登录决策"
     config {
@@ -610,7 +610,7 @@ diagram flowchart {
 
 ### 8.2 时序图：请求-响应
 
-```drawify
+```plotgram
 diagram sequence {
     title: "API 调用时序"
 
@@ -627,7 +627,7 @@ diagram sequence {
 
 ### 8.3 架构图：分层服务（使用 group_frame）
 
-```drawify
+```plotgram
 diagram architecture {
     title: "微服务架构"
     config {
@@ -678,7 +678,7 @@ diagram architecture {
 
 ### 8.4 ER 图：表关系
 
-```drawify
+```plotgram
 diagram er {
     title: "博客数据模型"
     config {
@@ -708,7 +708,7 @@ diagram er {
 
 ### 8.5 状态图：状态机
 
-```drawify
+```plotgram
 diagram state {
     title: "订单状态机"
 
@@ -728,7 +728,7 @@ diagram state {
 
 ### 8.6 思维导图
 
-```drawify
+```plotgram
 diagram mindmap {
     title: "产品知识图谱"
     config {
@@ -763,7 +763,7 @@ diagram mindmap {
 
 ### 8.7 泳道流程图（使用 group_frame）
 
-```drawify
+```plotgram
 diagram flowchart {
     title: "订单处理泳道"
     config {
@@ -799,7 +799,7 @@ diagram flowchart {
 
 当图中边很多容易交叉时，启用 `bundling` 让相似边共享主干：
 
-```drawify
+```plotgram
 diagram flowchart {
     title: "微服务调用全景"
     config {
@@ -846,7 +846,7 @@ diagram flowchart {
 
 ### 9.1 ID 命名错误
 
-```drawify
+```plotgram
 // ✗ 错误：ID 含连字符
 entity api-gateway "API 网关"
 
@@ -856,7 +856,7 @@ entity api_gateway "API 网关"
 
 ### 9.2 title 放错位置
 
-```drawify
+```plotgram
 // ✗ 错误：title 在 config 块内
 diagram flowchart {
     config {
@@ -876,7 +876,7 @@ diagram flowchart {
 
 ### 9.3 edge_style 用作属性键
 
-```drawify
+```plotgram
 // ✗ 错误：edge_style 是关键字，不能用作属性键
 edge_style error { stroke: "#C62828" }
 api -> db { edge_style: error }
@@ -888,7 +888,7 @@ api -> db { line_style: error }
 
 ### 9.4 group 内写 relation
 
-```drawify
+```plotgram
 // ✗ 错误：relation 不能在 group 内声明
 group backend "后端" {
     entity api "API"
@@ -906,7 +906,7 @@ api -> db            // 在顶层声明
 
 ### 9.5 group 嵌套过深
 
-```drawify
+```plotgram
 // ✗ 错误：超过 2 层嵌套
 group a "A" {
     group b "B" {
@@ -926,7 +926,7 @@ group a "A" {
 
 ### 9.6 未声明的 entity 引用
 
-```drawify
+```plotgram
 // ✗ 错误：api 未声明
 user -> api "请求"
 
@@ -937,7 +937,7 @@ user -> api "请求"
 
 ### 9.7 type 值不在当前图表类型范围内
 
-```drawify
+```plotgram
 // ✗ 错误：sequence 图不支持 type: service
 diagram sequence {
     entity[service] api "API"
@@ -951,7 +951,7 @@ diagram sequence {
 
 ### 9.8 direction 值不在枚举内或布局不支持
 
-```drawify
+```plotgram
 // ✗ 错误：from_center 不是合法值
 config {
     direction: from_center
@@ -972,7 +972,7 @@ config {
 
 ### 9.9 重复声明 config 块
 
-```drawify
+```plotgram
 // ✗ 错误：config 块只能出现一次
 diagram flowchart {
     config { direction: top-to-bottom }
@@ -990,7 +990,7 @@ diagram flowchart {
 
 ### 9.10 group 作为关系端点
 
-```drawify
+```plotgram
 // ✗ 错误：group 不能作为 relation 端点
 group backend "后端" {
     entity api "API"
@@ -1006,7 +1006,7 @@ api -> db
 
 ### 9.11 主题前缀错误
 
-```drawify
+```plotgram
 // ✗ 错误：旧前缀 builtin. 已弃用
 config {
     theme: builtin.clean-light
@@ -1022,7 +1022,7 @@ config {
 
 ## 10. 编写清单
 
-写 `.dfy` 文件时，按以下清单检查：
+写 `.pgm` 文件时，按以下清单检查：
 
 - [ ] 文件以 `diagram <类型> {` 开头，以 `}` 结尾
 - [ ] `title` 在 body 级（不在 config 块内）

@@ -1,6 +1,6 @@
-# Drawify Studio 文档
+# Plotgram Studio 文档
 
-Drawify Studio 前端应用的文档中心。
+Plotgram Studio 前端应用的文档中心。
 
 ## 目录结构
 
@@ -56,7 +56,7 @@ studio/docs/
 
 | 位置 | 范围 |
 |------|------|
-| `docs/specs/` | Drawify DSL 语言规范、AST 规范、Pipeline 规范（核心，跨项目） |
-| `docs/architecture/` | drawify-core 渲染引擎架构、算法、WASM 模块（后端） |
+| `docs/specs/` | Plotgram DSL 语言规范、AST 规范、Pipeline 规范（核心，跨项目） |
+| `docs/architecture/` | plotgram-core 渲染引擎架构、算法、WASM 模块（后端） |
 | `docs/product/` | 产品愿景、竞品分析、路线图（产品） |
-| `studio/docs/` | Drawify Studio 前端应用专属文档（本目录） |
+| `studio/docs/` | Plotgram Studio 前端应用专属文档（本目录） |

@@ -17,7 +17,7 @@ import {
   type AlgorithmOptionInfo,
   type AlgorithmConfigValues,
   type EffectiveLayoutField,
-  type EffectiveGridSnapField,
+  type EffectiveToggleField,
   type LayoutOptions,
   type LayoutCatalog,
   type DiagramDefaults,
@@ -234,17 +234,20 @@ function EffectiveLayoutSummary({ effective, showEdgeRouting }: EffectiveLayoutS
         <EffectiveLayoutRow label="边路由" field={effective.edgeRouting} />
       )}
       <EffectiveLayoutRow label="布局方向" field={effective.layoutDirection} />
+      {effective.gridAlign.applicable && (
+        <EffectiveToggleRow label="节点对齐" field={effective.gridAlign} />
+      )}
       {effective.gridSnap.applicable && (
-        <EffectiveGridSnapRow field={effective.gridSnap} />
+        <EffectiveToggleRow label="边像素量化" field={effective.gridSnap} />
       )}
     </div>
   );
 }
 
-function EffectiveGridSnapRow({ field }: { field: EffectiveGridSnapField }) {
+function EffectiveToggleRow({ label, field }: { label: string; field: EffectiveToggleField }) {
   return (
     <div className="field-row effective-layout-row">
-      <span className="field-label">网格吸附</span>
+      <span className="field-label">{label}</span>
       <div className="effective-layout-value">
         <code>{field.enabled ? '开启' : '关闭'}</code>
         <span className={`tag tag-origin tag-origin-${field.origin}`}>
@@ -265,7 +268,7 @@ interface InspectorProps {
   layoutCatalog: LayoutCatalog | null;
   diagramDefaults: DiagramDefaults | null;
   layoutSource: 'source' | 'panel';
-  onLayoutChange: (key: 'layoutAlgo' | 'edgeRouting' | 'layoutDirection' | 'gridSnap', value: string | boolean) => void;
+  onLayoutChange: (key: 'layoutAlgo' | 'edgeRouting' | 'layoutDirection' | 'gridSnap' | 'gridAlign', value: string | boolean) => void;
   onLayoutConfigChange: (key: string, value: number | null) => void;
   onEdgeRoutingConfigChange: (key: string, value: number | null) => void;
   onAppearanceChange: <K extends keyof AppearanceOptions>(key: K, value: AppearanceOptions[K]) => void;
@@ -468,14 +471,24 @@ export function Inspector({
               </Field>
 
               {showGridSnap && (
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={layoutOptions.gridSnap}
-                    onChange={(e) => onLayoutChange('gridSnap', e.target.checked)}
-                  />
-                  <span>网格吸附（Grid Snap）</span>
-                </label>
+                <>
+                  <label className="toggle">
+                    <input
+                      type="checkbox"
+                      checked={layoutOptions.gridAlign}
+                      onChange={(e) => onLayoutChange('gridAlign', e.target.checked)}
+                    />
+                    <span>节点对齐（align）</span>
+                  </label>
+                  <label className="toggle">
+                    <input
+                      type="checkbox"
+                      checked={layoutOptions.gridSnap}
+                      onChange={(e) => onLayoutChange('gridSnap', e.target.checked)}
+                    />
+                    <span>边像素量化（snap）</span>
+                  </label>
+                </>
               )}
 
               {layoutOverridden && (
@@ -487,17 +500,27 @@ export function Inspector({
           ) : (
             <>
               {showGridSnap && (
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={effectiveLayout.gridSnap.enabled}
-                    disabled
-                  />
-                  <span>网格吸附（Grid Snap）</span>
-                </label>
+                <>
+                  <label className="toggle">
+                    <input
+                      type="checkbox"
+                      checked={effectiveLayout.gridAlign.enabled}
+                      disabled
+                    />
+                    <span>节点对齐（align）</span>
+                  </label>
+                  <label className="toggle">
+                    <input
+                      type="checkbox"
+                      checked={effectiveLayout.gridSnap.enabled}
+                      disabled
+                    />
+                    <span>边像素量化（snap）</span>
+                  </label>
+                </>
               )}
               <p className="hint">
-                布局参数由源码中的 <code>layout</code> / <code>edge_routing</code> / <code>direction</code> / <code>snap</code> 决定；未写明的项使用图表默认。切换为「面板覆盖」可在不修改源码的情况下试验算法。
+                布局参数由源码中的 <code>layout</code> / <code>edge_routing</code> / <code>direction</code> / <code>snap</code> / <code>align</code> 决定；未写明的项使用图表默认。切换为「面板覆盖」可在不修改源码的情况下试验算法。
               </p>
             </>
           )}
@@ -591,7 +614,7 @@ export function Inspector({
             </Field>
           )}
           <p className="hint">
-            JSON 为 Scene JSON（<code>drawify.export_scene</code>），含布局与样式，供 Agent / CI / 自定义前端消费。
+            JSON 为 Scene JSON（<code>plotgram.export_scene</code>），含布局与样式，供 Agent / CI / 自定义前端消费。
           </p>
           <div className="export-actions">
             <button

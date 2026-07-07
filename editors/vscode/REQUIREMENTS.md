@@ -1,10 +1,10 @@
-# VS Code 插件需求：Drawify DSL 集成
+# VS Code 插件需求：Plotgram DSL 集成
 
 > 版本：0.1.0-draft | 状态：规划中
 
 ## 目标
 
-在 VS Code 中为 Drawify DSL（`.dfy`）提供**语言级编辑体验**和**图形化预览能力**，并支持在 Markdown 文档中**内嵌并渲染** DSL 图表，让「写代码 → 看图形 → 写文档」在同一工作流里完成。
+在 VS Code 中为 Plotgram DSL（`.dfy`）提供**语言级编辑体验**和**图形化预览能力**，并支持在 Markdown 文档中**内嵌并渲染** DSL 图表，让「写代码 → 看图形 → 写文档」在同一工作流里完成。
 
 ---
 
@@ -30,7 +30,7 @@
 **技术方向：**
 
 - TextMate 语法（`syntaxes/`）负责高亮
-- Language Server（`crates/drawify-lsp`，待建）负责诊断，复用 `drawify-core` 的 Parser / Validator
+- Language Server（`crates/plotgram-lsp`，待建）负责诊断，复用 `plotgram-core` 的 Parser / Validator
 - 错误模型见仓库根目录 `docs/specs/error-model.md`（已按 LSP Diagnostic 设计）
 
 ---
@@ -54,18 +54,18 @@
 **技术方向：**
 
 - Webview Panel（`src/preview/`）
-- 渲染链路复用 `drawify-wasm`，产物放入 `media/`（构建时从 `crates/drawify-wasm` 复制）
+- 渲染链路复用 `plotgram-wasm`，产物放入 `media/`（构建时从 `crates/plotgram-wasm` 复制）
 - 可参考 `playground/src/lib/wasm.ts` 的加载与调用方式
 
 ---
 
 ### 3. Markdown 集成：内嵌 DSL 在预览中渲染
 
-**目标：** 在 Markdown 文档里写 Drawify 代码块，预览时显示为图形而非纯文本。
+**目标：** 在 Markdown 文档里写 Plotgram 代码块，预览时显示为图形而非纯文本。
 
 | 能力 | 说明 |
 |------|------|
-| 代码块识别 | 支持 ` ```drawify ` 或 ` ```dfy ` 等 fenced code block |
+| 代码块识别 | 支持 ` ```plotgram ` 或 ` ```pgm ` 等 fenced code block |
 | 预览注入 | 扩展 Markdown 预览渲染器，将 DSL 块替换为 SVG/图片 |
 | 错误降级 | 某段 DSL 无效时，显示错误信息或保留代码块，不影响整篇文档预览 |
 | 可选同步 | 编辑 Markdown 时，内嵌图表随 DSL 内容更新（与 VS Code Markdown Preview 机制一致） |
@@ -75,7 +75,7 @@
 在 `README.md` 或设计文档中写：
 
 ````markdown
-```drawify
+```plotgram
 diagram flowchart {
     a -> b
 }
@@ -86,7 +86,7 @@ diagram flowchart {
 
 **技术方向：**
 
-- 注册 `markdown.markdownItPlugins`，在扩展宿主侧用 Node WASM 渲染 `drawify` 代码块并注入 SVG（避免 Markdown Preview Webview 的 CSP 限制）
+- 注册 `markdown.markdownItPlugins`，在扩展宿主侧用 Node WASM 渲染 `plotgram` 代码块并注入 SVG（避免 Markdown Preview Webview 的 CSP 限制）
 - 样式见 `media/markdown-preview.css`
 
 ---
@@ -108,9 +108,9 @@ diagram flowchart {
 ```
 flowml/
 ├── crates/
-│   ├── drawify-core/     # Parser、Validator、Renderer
-│   ├── drawify-wasm/     # WASM 绑定（预览 & Markdown 渲染）
-│   └── drawify-lsp/      # 待建：LSP 语言服务
+│   ├── plotgram-core/     # Parser、Validator、Renderer
+│   ├── plotgram-wasm/     # WASM 绑定（预览 & Markdown 渲染）
+│   └── plotgram-lsp/      # 待建：LSP 语言服务
 ├── editors/
 │   └── vscode/           # 本扩展
 └── playground/           # 可参考的 WASM + 编辑器联动实现
@@ -125,7 +125,7 @@ flowml/
 | 阶段 | 范围 |
 |------|------|
 | **MVP** | `.dfy` 语法高亮 + 基础语法错误 + 手动触发的图形预览 |
-| **V1** | LSP 语义校验 + 预览实时同步 + Markdown `drawify` 代码块渲染 |
+| **V1** | LSP 语义校验 + 预览实时同步 + Markdown `plotgram` 代码块渲染 |
 | **V2+** | Quick Fix、跳转定义、格式化、导出 PNG/SVG 等 |
 
 ---
@@ -135,10 +135,10 @@ flowml/
 | 项 | 决策 |
 |----|------|
 | 文件扩展名 | 仅 `.dfy` |
-| Markdown 代码块语言标识 | `drawify` |
-| 预览渲染方式 | 本地 WASM（`drawify-wasm`） |
+| Markdown 代码块语言标识 | `plotgram` |
+| 预览渲染方式 | 本地 WASM（`plotgram-wasm`） |
 | 离线能力 | 是，WASM 打包进扩展，不依赖网络 |
-| WASM 产物 | 在 `editors/vscode` 内独立构建，不复用 `playground/drawify-wasm` |
+| WASM 产物 | 在 `editors/vscode` 内独立构建，不复用 `playground/plotgram-wasm` |
 
 WASM 构建命令：`npm run build:wasm`（输出至 `media/wasm/` 与 `media/node/`）。
 
@@ -151,6 +151,6 @@ WASM 构建命令：`npm run build:wasm`（输出至 `media/wasm/` 与 `media/no
 | `.dfy` 语法高亮 | ✅ |
 | 语法/语义诊断（WASM validate） | ✅ |
 | `.dfy` 图形预览（WASM render） | ✅ |
-| Markdown `drawify` 代码块渲染 | ✅ |
-| LSP（`drawify-lsp`） | 待建（V1） |
+| Markdown `plotgram` 代码块渲染 | ✅ |
+| LSP（`plotgram-lsp`） | 待建（V1） |
 | Quick Fix / 格式化 | 待建（V2+） |

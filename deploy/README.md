@@ -1,6 +1,6 @@
 # 部署服务器说明
 
-Drawify Demo 使用两台服务器：海外站承载页面，国内 CDN 承载大体积静态资源。
+Plotgram Demo 使用两台服务器：海外站承载页面，国内 CDN 承载大体积静态资源。
 
 ## 总览
 
@@ -35,8 +35,8 @@ Drawify Demo 使用两台服务器：海外站承载页面，国内 CDN 承载�
 
 ```
 /var/www/plotgram/
-├── playground/          # HTML、favicon、logo（不含 assets/、drawify-wasm/）
-├── showcase/            # 页面、.dfy、manifest（不含 .svg）
+├── playground/          # HTML、favicon、logo（不含 assets/、plotgram-wasm/）
+├── showcase/            # 页面、.pgm、manifest（不含 .svg）
 └── assets/brand/        # 品牌 logo 等
 ```
 
@@ -71,7 +71,7 @@ Drawify Demo 使用两台服务器：海外站承载页面，国内 CDN 承载�
 /var/www/assets.plotgram.cn/
 ├── playground/
 │   ├── assets/         # 打包 js / css（main-*.js、wasm-*.js 等）
-│   └── drawify-wasm/   # drawify_wasm.js、drawify_wasm_bg.wasm
+│   └── plotgram-wasm/   # plotgram_wasm.js、plotgram_wasm_bg.wasm
 └── showcase/
     ├── **/*.svg        # 各类型示例 SVG
     └── .history/       # SVG 历史快照
@@ -82,8 +82,8 @@ Drawify Demo 使用两台服务器：海外站承载页面，国内 CDN 承载�
 | 资源 | URL 示例 |
 |------|----------|
 | Playground JS/CSS | `https://assets.plotgram.cn/playground/assets/main-*.js` |
-| WASM JS | `https://assets.plotgram.cn/playground/drawify-wasm/drawify_wasm.js` |
-| WASM 二进制 | `https://assets.plotgram.cn/playground/drawify-wasm/drawify_wasm_bg.wasm` |
+| WASM JS | `https://assets.plotgram.cn/playground/plotgram-wasm/plotgram_wasm.js` |
+| WASM 二进制 | `https://assets.plotgram.cn/playground/plotgram-wasm/plotgram_wasm_bg.wasm` |
 | Showcase SVG | `https://assets.plotgram.cn/showcase/flowchart/s.linear-chain.svg` |
 
 ### 跨域（CORS）
@@ -121,8 +121,8 @@ Access-Control-Allow-Origin: https://demo.plotgram.dev
 
 | 目标 | 同步内容 | 不同步 |
 |------|----------|--------|
-| Demo 站 | playground 页面、showcase 页面与 .dfy、品牌资源 | `assets/`、wasm、showcase SVG |
-| CDN | wasm、playground 打包 assets、showcase SVG 及历史快照 | 页面与 .dfy |
+| Demo 站 | playground 页面、showcase 页面与 .pgm、品牌资源 | `assets/`、wasm、showcase SVG |
+| CDN | wasm、playground 打包 assets、showcase SVG 及历史快照 | 页面与 .pgm |
 
 ---
 

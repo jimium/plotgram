@@ -21,7 +21,7 @@
 
 ## 语法入口
 
-```drawify
+```plotgram
 diagram mindmap {
     title: "产品规划"
 
@@ -121,10 +121,10 @@ diagram mindmap {
 
 | 复杂度 | 路径 | 说明 |
 |--------|------|------|
-| 简单 | `showcase/mindmap/s.brainstorm.dfy` | 中心 + 三分支 |
-| 简单 | `showcase/mindmap/s.root-branches.dfy` | 基础树形 |
-| 正常 | `showcase/mindmap/n.tech-stack.dfy` | 技术栈 |
-| 复杂 | `showcase/mindmap/c.product-roadmap.dfy` | 产品路线图 |
+| 简单 | `showcase/mindmap/s.brainstorm.pgm` | 中心 + 三分支 |
+| 简单 | `showcase/mindmap/s.root-branches.pgm` | 基础树形 |
+| 正常 | `showcase/mindmap/n.tech-stack.pgm` | 技术栈 |
+| 复杂 | `showcase/mindmap/c.product-roadmap.pgm` | 产品路线图 |
 
 ---
 

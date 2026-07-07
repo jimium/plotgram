@@ -1,8 +1,8 @@
 # 渲染管线使用指南
 
-Drawify 核心把「DSL 文本 → 像素/矢量输出」拆成多个纯函数阶段，由 `drawify_core::pipeline` 编排。
+Plotgram 核心把「DSL 文本 → 像素/矢量输出」拆成多个纯函数阶段，由 `plotgram_core::pipeline` 编排。
 
-> 实现：`crates/drawify-core/src/pipeline/`
+> 实现：`crates/plotgram-core/src/pipeline/`
 
 ---
 
@@ -39,7 +39,7 @@ DSL 源码
 |------|------|----------|
 | `RawDiagram` | 作者意图 | diff2、patch、format |
 | `PreparedDiagram` | 可渲染态 | validate、layout、render |
-| `LayoutResult` | 几何 | LayoutLint、drawify-eval |
+| `LayoutResult` | 几何 | LayoutLint、plotgram-eval |
 | `ExportScene` | 渲染中间层 | 多格式共享 |
 | `RenderOutput` | `Text` / `Binary` | 最终产物 |
 
@@ -50,9 +50,9 @@ DSL 源码
 ### 一站式：`pipeline::run`
 
 ```rust
-use drawify_core::pipeline::{self, PipelineResult};
-use drawify_core::prepare::StyleRequest;
-use drawify_core::render::RenderFormat;
+use plotgram_core::pipeline::{self, PipelineResult};
+use plotgram_core::prepare::StyleRequest;
+use plotgram_core::render::RenderFormat;
 
 match pipeline::run(source, &StyleRequest::default(), RenderFormat::Svg) {
     PipelineResult::Ok(output) => { /* RenderOutput */ }
@@ -65,8 +65,8 @@ match pipeline::run(source, &StyleRequest::default(), RenderFormat::Svg) {
 ### 分步：`parse_prepare_validate`
 
 ```rust
-use drawify_core::pipeline::{parse_prepare_validate, parse_prepare};
-use drawify_core::prepare::StyleRequest;
+use plotgram_core::pipeline::{parse_prepare_validate, parse_prepare};
+use plotgram_core::prepare::StyleRequest;
 
 // 标准：校验 + 渲染
 let output = parse_prepare_validate(source, &StyleRequest::default());
@@ -81,8 +81,8 @@ let output = parse_prepare(source, &StyleRequest::default());
 ### 渲染：`render_*`
 
 ```rust
-use drawify_core::pipeline::{render_text, render_bytes, render_json, render_output};
-use drawify_core::render::{RenderFormat, RenderRequest};
+use plotgram_core::pipeline::{render_text, render_bytes, render_json, render_output};
+use plotgram_core::render::{RenderFormat, RenderRequest};
 
 let request = RenderRequest::new(&prepared, RenderFormat::Svg);
 let svg = render_text(&request)?;
@@ -98,12 +98,12 @@ let svg = render_text(&request)?;
 ### 仅布局
 
 ```rust
-use drawify_core::layout::compute_layout_with_plan;
+use plotgram_core::layout::compute_layout_with_plan;
 
 let layout = compute_layout_with_plan(prepared.inner(), prepared.layout_plan())?;
 ```
 
-用于 LayoutLint、drawify-eval、自定义分析。
+用于 LayoutLint、plotgram-eval、自定义分析。
 
 ---
 
@@ -179,7 +179,7 @@ Quick Start 见 [layout-intent.md](layout-intent.md)。
 
 - **parse / prepare / validate**：`PipelineOutput` 含 `errors`、`warnings`、`truncated`
 - **layout**：`Result<LayoutResult, DiagnosticError>`
-- **render**：`Result<RenderOutput, DrawifyError>`
+- **render**：`Result<RenderOutput, PlotgramError>`
 
 诊断类型为 `DiagnosticError`，含行列号与 fix suggestion，与 [error-model.md](../specs/error-model.md) 一致。
 
@@ -187,7 +187,7 @@ Quick Start 见 [layout-intent.md](layout-intent.md)。
 
 ## 相关文档
 
-- [drawify-cli.md](drawify-cli.md) — 命令行封装
+- [plotgram-cli.md](plotgram-cli.md) — 命令行封装
 - [theme-and-style.md](theme-and-style.md) — 主题与视觉风格
 - [layout-lint.md](layout-lint.md) — 布局质量检查
-- [drawify-eval.md](drawify-eval.md) — 算法评分
+- [plotgram-eval.md](plotgram-eval.md) — 算法评分

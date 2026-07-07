@@ -54,7 +54,7 @@
 
 ## 二、Side 选择参数（Layer 1，P0 新增）
 
-文件位置：[slot.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/slot.rs#L9-L15)
+文件位置：[slot.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/slot.rs#L9-L15)
 
 所有"垂直偏好阈值"的含义：`|dy| >= |dx| * threshold` 时选 Top/Bottom，否则选 Left/Right。
 - **阈值越大** → 越不喜欢垂直端口，越倾向于走 Left/Right（水平侧）
@@ -135,7 +135,7 @@
 
 ### 3.1 `EXTRA_CHANNEL_MARGINS`
 
-文件位置：[path.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/path.rs#L197)
+文件位置：[path.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/path.rs#L197)
 
 | 属性 | 值 |
 |------|-----|
@@ -148,7 +148,7 @@
 
 ### 3.2 `CHANNEL_MARGIN`
 
-文件位置：[mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs#L61)
+文件位置：[mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs#L61)
 
 | 属性 | 值 |
 |------|-----|
@@ -160,7 +160,7 @@
 
 ### 3.3 `MIN_CHANNEL_CLEARANCE`
 
-文件位置：[mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs#L200)
+文件位置：[mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs#L200)
 
 | 属性 | 值 |
 |------|-----|
@@ -173,7 +173,7 @@
 
 ### 3.4 `ORTHO_PARALLEL_GAP`
 
-文件位置：[constants.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/constants.rs#L44)
+文件位置：[constants.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/constants.rs#L44)
 
 | 属性 | 值 |
 |------|-----|
@@ -187,7 +187,7 @@
 
 ## 四、评分函数权重（Layer 2 路径选择）
 
-文件位置：[mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs#L189-L197)、[scoring.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/scoring.rs#L17-L30)
+文件位置：[mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs#L189-L197)、[scoring.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs#L17-L30)
 
 **评分逻辑**：分数越低越好。每条候选路径累加各项惩罚，选分数最低的。
 
@@ -224,7 +224,7 @@
 
 ### 4.4 `GROUP_TRANSIT_PENALTY`
 
-文件位置：[scoring.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/scoring.rs#L26)
+文件位置：[scoring.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs#L26)
 
 | 属性 | 值 |
 |------|-----|
@@ -259,7 +259,7 @@
 
 ### 5.1 `ORTHO_SLOT_PITCH`
 
-文件位置：[constants.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/constants.rs#L41)
+文件位置：[constants.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/constants.rs#L41)
 
 | 属性 | 值 |
 |------|-----|
@@ -272,7 +272,7 @@
 
 ### 5.2 `COMPACT_SLOT_PITCH`
 
-文件位置：[mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs#L58)
+文件位置：[mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs#L58)
 
 | 属性 | 值 |
 |------|-----|
@@ -284,7 +284,7 @@
 
 ### 5.3 `SLOT_MARGIN_RATIO`
 
-文件位置：[mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs#L186)
+文件位置：[mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs#L186)
 
 | 属性 | 值 |
 |------|-----|
@@ -296,7 +296,7 @@
 
 ### 5.4 `PORT_CLEARANCE`
 
-文件位置：[mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs#L183)
+文件位置：[mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs#L183)
 
 | 属性 | 值 |
 |------|-----|
@@ -309,7 +309,7 @@
 
 ### 5.5 Docking Strategy 阈值（代码逻辑）
 
-文件位置：[slot.rs:31-37](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/slot.rs#L31-L37)
+文件位置：[slot.rs:31-37](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/slot.rs#L31-L37)
 
 ```rust
 pub fn choose_docking_strategy(count: usize) -> DockingStrategy {
@@ -333,7 +333,7 @@ pub fn choose_docking_strategy(count: usize) -> DockingStrategy {
 
 ## 六、Group 相关参数
 
-文件位置：[group/constants.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/group/constants.rs)
+文件位置：[group/constants.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/group/constants.rs)
 
 | 参数 | 当前值 | 作用 |
 |------|--------|------|

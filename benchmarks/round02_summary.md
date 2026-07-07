@@ -1,8 +1,8 @@
 # Round 02: sugiyama_v2 + visibility Dijkstra Optimization
 
 ## Changes
-- `crates/drawify-core/src/layout/node/sugiyama_v2/rank.rs`: Pre-computed adjacency tables + Vec<bool> instead of HashSet
-- `crates/drawify-core/src/layout/edge/visibility.rs`: BinaryHeap for Dijkstra
+- `crates/plotgram-core/src/layout/node/sugiyama_v2/rank.rs`: Pre-computed adjacency tables + Vec<bool> instead of HashSet
+- `crates/plotgram-core/src/layout/edge/visibility.rs`: BinaryHeap for Dijkstra
 
 ## Results Summary
 

@@ -1,6 +1,6 @@
 # Phase 2 V2 反馈模式效果评估报告
 
-> 评估二进制：[v2-effectiveness.rs](../crates/drawify-eval/src/bin/v2-effectiveness.rs)
+> 评估二进制：[v2-effectiveness.rs](../crates/plotgram-eval/src/bin/v2-effectiveness.rs)
 > 样本：showcase 74 + friendliness_stress 158 × 各图类型适用布局算法 = 792
 > 注：由于 HashMap 迭代顺序非确定性，各次运行数值可能有 ±2% 波动。
 

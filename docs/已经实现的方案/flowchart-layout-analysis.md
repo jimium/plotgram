@@ -187,9 +187,9 @@ let groups = group_bounds::compute_group_bounds(
 
 **改动文件：**
 
-- [order.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/order.rs)：`order_layers_weighted_median` 与 `compare_nodes_for_layer` 签名增加 `node_group: &HashMap<NodeIndex, Option<String>>` 参数；在 median 差异小于 `GROUP_BIAS_EPSILON = 1.0` 时，按 group_id 字典序作为 tiebreaker，使同顶层组节点聚拢。
-- [engine.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/engine.rs)：新增 `build_node_group_map` 函数，将 layered graph 节点映射到顶层 group_id（Real 节点取 entity 的扁平化顶层组，Dummy 节点为 `None`）。
-- [mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/mod.rs)：调用链更新；新增测试 `group_bias_clusters_same_group_nodes_in_layer` 验证 hub → {a1,a2 (组 A), b1,b2 (组 B)} 场景下同组节点相邻。
+- [order.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/order.rs)：`order_layers_weighted_median` 与 `compare_nodes_for_layer` 签名增加 `node_group: &HashMap<NodeIndex, Option<String>>` 参数；在 median 差异小于 `GROUP_BIAS_EPSILON = 1.0` 时，按 group_id 字典序作为 tiebreaker，使同顶层组节点聚拢。
+- [engine.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/engine.rs)：新增 `build_node_group_map` 函数，将 layered graph 节点映射到顶层 group_id（Real 节点取 entity 的扁平化顶层组，Dummy 节点为 `None`）。
+- [mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/mod.rs)：调用链更新；新增测试 `group_bias_clusters_same_group_nodes_in_layer` 验证 hub → {a1,a2 (组 A), b1,b2 (组 B)} 场景下同组节点相邻。
 
 **设计要点：**
 
@@ -201,9 +201,9 @@ let groups = group_bounds::compute_group_bounds(
 
 **改动文件：**
 
-- [layout/mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/mod.rs)：新增 `GroupLayoutWarning` 结构体与 `GroupLayoutWarningKind` 枚举（`GroupOverlap` / `ForeignNodeInside`）；`LayoutHints` 增加 `group_layout_warnings: Vec<GroupLayoutWarning>` 字段。
-- [group_bounds.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/common/group_bounds.rs)：新增 `detect_group_layout_warnings` 函数，检测非嵌套兄弟组包围框重叠（记录重叠面积）与非组节点落入组框两种问题；新增 `rect_overlap_area` / `rect_overlap_area_node` 辅助函数。
-- [engine.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/engine.rs)：在 `compute_with_preset_and_overlay` 末尾调用 `detect_group_layout_warnings` 填充 hints。
+- [layout/mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/mod.rs)：新增 `GroupLayoutWarning` 结构体与 `GroupLayoutWarningKind` 枚举（`GroupOverlap` / `ForeignNodeInside`）；`LayoutHints` 增加 `group_layout_warnings: Vec<GroupLayoutWarning>` 字段。
+- [group_bounds.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/common/group_bounds.rs)：新增 `detect_group_layout_warnings` 函数，检测非嵌套兄弟组包围框重叠（记录重叠面积）与非组节点落入组框两种问题；新增 `rect_overlap_area` / `rect_overlap_area_node` 辅助函数。
+- [engine.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/engine.rs)：在 `compute_with_preset_and_overlay` 末尾调用 `detect_group_layout_warnings` 填充 hints。
 
 **新增测试（4 个）：** `detects_overlapping_sibling_groups`、`detects_foreign_node_inside_group`、`does_not_warn_for_nested_groups`、`no_warnings_when_groups_disjoint`。
 
@@ -214,7 +214,7 @@ let groups = group_bounds::compute_group_bounds(
 
 ### 优先级 3：BK 坐标分配改为取 4 趟中最优 — ✅ 已实现
 
-**改动文件：** [coordinate.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/coordinate.rs)
+**改动文件：** [coordinate.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/coordinate.rs)
 
 **改动内容：** `assign_layer_centers_brandes_koepf` 从 `(down_left + down_right + up_left + up_right) / 4.0` 改为按"布局宽度最小（最紧凑）"选取最优趟。新增 `pass_width` 函数计算每趟的最左中心到最右中心距离。
 
@@ -222,13 +222,13 @@ let groups = group_bounds::compute_group_bounds(
 
 ### 优先级 5：调高流程图 long_edge_barycenter_weight — ✅ 已实现
 
-**改动文件：** [preset.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/preset.rs)
+**改动文件：** [preset.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/preset.rs)
 
 **改动内容：** `FLOWCHART_PRESET` 从 `BASE`（`long_edge_barycenter_weight = 1.0`）改为 `long_edge_barycenter_weight: 1.8`。流程图常有判断节点跨层跳连，调高后 dummy 链更竖直对齐，减少折弯。
 
 ### 优先级 6：密度感知间距改为逐层评估 — ✅ 已实现
 
-**改动文件：** [engine.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/engine.rs)、[coordinate.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/coordinate.rs)
+**改动文件：** [engine.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/engine.rs)、[coordinate.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/coordinate.rs)
 
 **改动内容：**
 
@@ -266,7 +266,7 @@ let groups = group_bounds::compute_group_bounds(
 
 **现状评估：**
 
-当前 [rank.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/rank.rs) 的 NS-style 实现已是"可行树 + pivot shift"的简化版，与完整 Graphviz dot NS 的差距：
+当前 [rank.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/rank.rs) 的 NS-style 实现已是"可行树 + pivot shift"的简化版，与完整 Graphviz dot NS 的差距：
 
 1. **cut_value 简化**：`cut_value_for_subtree` 只数子树出/入边数（`incoming - outgoing`），未考虑边权重与边类型（长边 vs 短边）。完整 NS 的 cut value 是子树内所有边权重加权和的符号判定。
 2. **entering edge 选取**：`best_entering_edge` 选 slack 最小的边，但完整 NS 应选"使目标函数下降最多"的边，需结合 cut value 与 slack 联合判定。
@@ -304,7 +304,7 @@ let groups = group_bounds::compute_group_bounds(
 
 **现状评估：**
 
-[architecture_v2/two_phase.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/architecture_v2/two_phase.rs) 已有成熟的 two_phase 实现（Phase A 组内递归 Sugiyama → Phase B 组间宏观分层 → Phase C 坐标回填 → Phase C+ 跨组边微调），但与流程图布局完全隔离：
+[architecture_v2/two_phase.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/architecture_v2/two_phase.rs) 已有成熟的 two_phase 实现（Phase A 组内递归 Sugiyama → Phase B 组间宏观分层 → Phase C 坐标回填 → Phase C+ 跨组边微调），但与流程图布局完全隔离：
 
 - 流程图走 `engine::compute_with_preset` 单路径，无 group 感知。
 - architecture_v2 走 `compute_two_phase_layout`，依赖 `GroupMap`、`GraphIndex` 等 architecture 专属抽象。
@@ -326,7 +326,7 @@ let groups = group_bounds::compute_group_bounds(
    - 抽象点：`GraphIndex` → 通用 `DiGraph`；`GroupMap` → 通用 group 元数据。
 
 2. **Phase 2：流程图集成**（1~2 天）
-   - [flowchart/mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/flowchart/mod.rs) 的 `compute` 方法增加分支：
+   - [flowchart/mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/flowchart/mod.rs) 的 `compute` 方法增加分支：
      ```rust
      if diagram.groups.is_empty() {
          engine::compute_with_preset(diagram, &preset::FLOWCHART_PRESET, self.config)
@@ -368,13 +368,13 @@ let groups = group_bounds::compute_group_bounds(
 
 **已修改文件（7 个）：**
 
-1. [preset.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/preset.rs) — P5：`long_edge_barycenter_weight: 1.8`
-2. [coordinate.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/coordinate.rs) — P3：BK 取最优趟；P6：`layer_gaps` 参数
-3. [engine.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/engine.rs) — P6：`compute_per_layer_gaps`；P1s：`build_node_group_map`；P2：调用 `detect_group_layout_warnings`
-4. [order.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/order.rs) — P1s：group 偏置 tiebreaker
-5. [mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/sugiyama_v2/mod.rs) — P1s：调用链更新 + 新测试
-6. [layout/mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/mod.rs) — P2：`GroupLayoutWarning` 结构体
-7. [group_bounds.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/common/group_bounds.rs) — P2：`detect_group_layout_warnings` + 4 测试
+1. [preset.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/preset.rs) — P5：`long_edge_barycenter_weight: 1.8`
+2. [coordinate.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/coordinate.rs) — P3：BK 取最优趟；P6：`layer_gaps` 参数
+3. [engine.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/engine.rs) — P6：`compute_per_layer_gaps`；P1s：`build_node_group_map`；P2：调用 `detect_group_layout_warnings`
+4. [order.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/order.rs) — P1s：group 偏置 tiebreaker
+5. [mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/sugiyama_v2/mod.rs) — P1s：调用链更新 + 新测试
+6. [layout/mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/mod.rs) — P2：`GroupLayoutWarning` 结构体
+7. [group_bounds.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/common/group_bounds.rs) — P2：`detect_group_layout_warnings` + 4 测试
 
 ### 关键设计决策
 

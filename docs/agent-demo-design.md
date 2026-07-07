@@ -9,7 +9,7 @@
 ## 1. 背景与目标
 
 ### 1.1 要做什么
-一个面向评委的演示页面：用户用自然语言对话，AI Agent 通过调用 drawify 的工具（render / validate / diff / apply_patch 等）生成并迭代 Drawify DSL，实时把图表渲染出来。
+一个面向评委的演示页面：用户用自然语言对话，AI Agent 通过调用 plotgram 的工具（render / validate / diff / apply_patch 等）生成并迭代 Plotgram DSL，实时把图表渲染出来。
 
 ### 1.2 核心约束
 1. 调用大模型 API（DeepSeek）产生和调整 DSL。
@@ -46,7 +46,7 @@
 3. 演示页面有独立的视觉/交互诉求（品牌化、一键示例、工具调用可视化），与 studio 的"工程师工作台"定位不同。
 4. `AGENTS.md §1` 明确无向后兼容约束，但新工程并行更清晰，避免演示期间影响 studio 迭代。
 
-> 备选方案：若希望减少重复代码，也可在 `studio/` 中新增一个 `demo` 入口（多页 Vite），共享 agent 模块。但防滥用的后端中转无论如何都要新增。**下文按"新建 `agent-demo/` + 扩展 `drawify-server`"叙述。**
+> 备选方案：若希望减少重复代码，也可在 `studio/` 中新增一个 `demo` 入口（多页 Vite），共享 agent 模块。但防滥用的后端中转无论如何都要新增。**下文按"新建 `agent-demo/` + 扩展 `plotgram-server`"叙述。**
 
 ---
 
@@ -67,13 +67,13 @@
 │                      └────────┬───────────────┬────────────┘ │
 │                               │               │              │
 │               ┌───────────────▼───┐  ┌────────▼─────────┐    │
-│               │  drawify-wasm     │  │  fetch /agent/chat│   │
+│               │  plotgram-wasm     │  │  fetch /agent/chat│   │
 │               │  （本地计算）      │  │  （SSE 流式）      │   │
 │               └───────────────────┘  └────────┬─────────┘    │
 └───────────────────────────────────────────────┼──────────────┘
                                                 │ HTTPS
 ┌───────────────────────────────────────────────▼──────────────┐
-│  drawify-server（axum，Rust）                                  │
+│  plotgram-server（axum，Rust）                                  │
 │                                                                │
 │  POST /agent/chat  ← 新增                                      │
 │   · 校验 Origin/Referer、session token                         │
@@ -104,7 +104,7 @@
 ```
 flowml/
 ├── crates/
-│   └── drawify-server/
+│   └── plotgram-server/
 │       └── src/
 │           ├── main.rs              # 新增 /agent/chat 路由
 │           ├── api.rs               # 已有
@@ -113,7 +113,7 @@ flowml/
 │   ├── package.json
 │   ├── vite.config.ts
 │   ├── index.html
-│   ├── drawify-wasm/                # wasm-pack 产物（gitignore）
+│   ├── plotgram-wasm/                # wasm-pack 产物（gitignore）
 │   └── src/
 │       ├── main.tsx
 │       ├── App.tsx
@@ -146,7 +146,7 @@ flowml/
 
 ## 5. 后端：DeepSeek 中转 API
 
-在 [drawify-server](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-server/src/main.rs)（axum）中新增 `POST /agent/chat`，作为 DeepSeek 的 SSE 流式中转。
+在 [plotgram-server](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-server/src/main.rs)（axum）中新增 `POST /agent/chat`，作为 DeepSeek 的 SSE 流式中转。
 
 ### 5.1 接口设计
 
@@ -224,15 +224,15 @@ DEMO_RATE_LIMIT_PER_MINUTE=10             # 每 IP 每分钟请求数
 DEMO_RATE_LIMIT_BURST=3                   # 突发桶容量
 
 # 来源校验
-DEMO_ALLOWED_ORIGINS=https://demo.drawify.example,https://drawify.example
+DEMO_ALLOWED_ORIGINS=https://demo.plotgram.example,https://plotgram.example
 
 # 日志
-DEMO_LOG_DIR=/var/log/drawify-agent-demo
+DEMO_LOG_DIR=/var/log/plotgram-agent-demo
 ```
 
 ### 5.4 关键实现要点（Rust）
 
-新增 `crates/drawify-server/src/agent_proxy.rs`：
+新增 `crates/plotgram-server/src/agent_proxy.rs`：
 
 - `AgentProxyState`：持有 `reqwest::Client`、令牌桶（`governor` crate 或自实现）、session 配额表（`DashMap<SessionId, AtomicUsize>`）、总额度原子计数器。
 - `agent_chat_handler`：
@@ -255,7 +255,7 @@ DEMO_LOG_DIR=/var/log/drawify-agent-demo
 ### 6.1 技术栈
 - React 19 + Vite + TypeScript（与 studio/playground 一致）
 - UI：**Ant Design 5**（与 studio 一致，降低迁移成本）或轻量自研 CSS（若追求视觉差异化）。建议先 AntD 快速出活，后续视觉再迭代。
-- CodeMirror 6：DSL 只读高亮查看（复用 playground 的 [drawifyLang.ts](file:///Users/jimichan/zaprt-projects/flowml/playground/src/lib/drawifyLang.ts)）
+- CodeMirror 6：DSL 只读高亮查看（复用 playground 的 [plotgramLang.ts](file:///Users/jimichan/zaprt-projects/flowml/playground/src/lib/plotgramLang.ts)）
 - `react-markdown` + `remark-gfm`：Agent 回复渲染
 - `lz-string`：URL 分享（可选）
 
@@ -263,7 +263,7 @@ DEMO_LOG_DIR=/var/log/drawify-agent-demo
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  TopBar：Drawify Agent · 比赛 Logo · 状态指示 · 示例按钮      │
+│  TopBar：Plotgram Agent · 比赛 Logo · 状态指示 · 示例按钮      │
 ├──────────────────────────────┬──────────────────────────────┤
 │                              │                              │
 │   Preview Canvas             │   Chat Panel                 │
@@ -354,7 +354,7 @@ export function createProxyLLMClient(): LLMClient {
 
 直接复用 [tools.ts](file:///Users/jimichan/zaprt-projects/flowml/studio/src/agent/tools.ts) 的 6 个 tool schema 与执行器：
 
-| Tool | WASM 函数（[lib.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-wasm/src/lib.rs)） | 用途 |
+| Tool | WASM 函数（[lib.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-wasm/src/lib.rs)） | 用途 |
 |------|-----------|------|
 | `render` | `render_with_options` | 渲染 SVG/ASCII/JSON |
 | `validate` | `validate` | 校验 DSL，返回结构化诊断 |
@@ -365,7 +365,7 @@ export function createProxyLLMClient(): LLMClient {
 
 WASM 构建命令（README 已有）：
 ```bash
-cd crates/drawify-wasm && wasm-pack build --target web --out-dir ../../agent-demo/drawify-wasm
+cd crates/plotgram-wasm && wasm-pack build --target web --out-dir ../../agent-demo/plotgram-wasm
 ```
 
 ### 6.7 System Prompt
@@ -382,7 +382,7 @@ cd crates/drawify-wasm && wasm-pack build --target web --out-dir ../../agent-dem
 ### 7.1 单轮对话（含一次 tool call）
 
 ```
-浏览器                    drawify-server           DeepSeek
+浏览器                    plotgram-server           DeepSeek
   │                            │                       │
   │ 1. 用户输入"画登录流程"      │                       │
   │ 2. AgentLoop 构造 messages  │                       │
@@ -486,30 +486,30 @@ cd agent-demo
 npm run build          # 产出 dist/
 ```
 - 静态资源部署到 CDN 或服务器静态目录。
-- 构建时通过 `VITE_AGENT_API` 指向中转地址（如 `https://api.drawify.example/agent/chat`）。
+- 构建时通过 `VITE_AGENT_API` 指向中转地址（如 `https://api.plotgram.example/agent/chat`）。
 - 若前端与后端同域，可直接用相对路径 `/agent/chat`，避免 CORS。
 
 ### 9.2 后端
 ```bash
-cd crates/drawify-server
+cd crates/plotgram-server
 cargo build --release
 DEEPSEEK_API_KEY=sk-xxx \
 DEMO_ENABLED=true \
-DEMO_ALLOWED_ORIGINS=https://demo.drawify.example \
+DEMO_ALLOWED_ORIGINS=https://demo.plotgram.example \
 DEMO_TOTAL_TOKEN_BUDGET=2000000 \
-./drawify-server
+./plotgram-server
 ```
-- 监听 `0.0.0.0:6080`（或 `DRAWIFY_SERVER_ADDR` 覆盖）。
+- 监听 `0.0.0.0:6080`（或 `PLOTGRAM_SERVER_ADDR` 覆盖）。
 - 建议前置 Nginx 做 TLS 终止 + 静态资源托管 + 反向代理 `/agent/*` 到 6080。
 
 ### 9.3 Nginx 参考配置
 ```nginx
 server {
   listen 443 ssl http2;
-  server_name demo.drawify.example;
+  server_name demo.plotgram.example;
 
-  ssl_certificate     /etc/ssl/drawify.fullchain.pem;
-  ssl_certificate_key /etc/ssl/drawify.key;
+  ssl_certificate     /etc/ssl/plotgram.fullchain.pem;
+  ssl_certificate_key /etc/ssl/plotgram.key;
 
   root /var/www/agent-demo/dist;
   index index.html;
@@ -530,7 +530,7 @@ server {
 ### 9.4 一键关停
 比赛结束后：
 ```bash
-DEMO_ENABLED=false ./drawify-server   # 重启即可
+DEMO_ENABLED=false ./plotgram-server   # 重启即可
 ```
 或直接 `kill` 进程。前端页面会显示"演示已结束"提示（前端检测到 `demo_disabled` 错误码时展示）。
 
@@ -541,14 +541,14 @@ DEMO_ENABLED=false ./drawify-server   # 重启即可
 ### Phase 1：后端中转（核心防滥用）
 - [ ] T1.1 新增 `agent_proxy.rs`，实现 `AgentProxyState`（reqwest client + 令牌桶 + session 配额表 + 总额度计数器）
 - [ ] T1.2 实现 `agent_chat_handler`：鉴权 → 限流 → 配额 → 透传 SSE → 计量
-- [ ] T1.3 在 [main.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-server/src/main.rs) 注册 `/agent/chat` 路由，注入 state
+- [ ] T1.3 在 [main.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-server/src/main.rs) 注册 `/agent/chat` 路由，注入 state
 - [ ] T1.4 错误码体系（`bad_origin` / `session_invalid` / `rate_limited` / `quota_exceeded` / `demo_disabled` / `upstream_error`）
 - [ ] T1.5 日志记录（IP / session / token / 状态码）
 - [ ] T1.6 本地用 `curl` + 假 DeepSeek mock 验证全链路
 
 ### Phase 2：前端工程脚手架
 - [ ] T2.1 `agent-demo/` 工程初始化（Vite + React + TS + AntD）
-- [ ] T2.2 复用 playground 的 [wasm.ts](file:///Users/jimichan/zaprt-projects/flowml/playground/src/lib/wasm.ts) 与 [drawifyLang.ts](file:///Users/jimichan/zaprt-projects/flowml/playground/src/lib/drawifyLang.ts)
+- [ ] T2.2 复用 playground 的 [wasm.ts](file:///Users/jimichan/zaprt-projects/flowml/playground/src/lib/wasm.ts) 与 [plotgramLang.ts](file:///Users/jimichan/zaprt-projects/flowml/playground/src/lib/plotgramLang.ts)
 - [ ] T2.3 复用 studio 的 `agent/` 模块（types/prompt/tools/AgentLoop/context）
 - [ ] T2.4 实现 `agentProxy.ts`（LLMClient 走 `/agent/chat`）
 - [ ] T2.5 `useWasm` + `useAgent` hook 迁移
@@ -595,7 +595,7 @@ DEMO_ENABLED=false ./drawify-server   # 重启即可
 | 决策点 | 选择 | 理由 |
 |--------|------|------|
 | 新建 vs 改造 studio | **新建 `agent-demo/`** | 定位不同，并行更清晰 |
-| 后端中转位置 | **扩展 drawify-server** | 已有 axum 服务，复用 /validate /render |
+| 后端中转位置 | **扩展 plotgram-server** | 已有 axum 服务，复用 /validate /render |
 | LLM Provider | **DeepSeek（deepseek-chat）** | 用户指定；reasoning_content 已支持 |
 | Agent 循环位置 | **浏览器 JS** | WASM 不发请求；循环每轮调中转 |
 | session 认证 | **前端生成 UUID v4 + 服务器格式校验** | 轻量，演示够用；可升级 JWT |

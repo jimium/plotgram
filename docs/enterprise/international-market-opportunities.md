@@ -1,16 +1,16 @@
-# Drawify 国际市场企业服务机会
+# Plotgram 国际市场企业服务机会
 
 > 版本：0.1.0-draft | 状态：需求设计中
 
-本文档总结 Drawify 在**中国以外国际市场**的企业服务销售机会：目标行业、地区侧重、售卖形态、产品包装与进入优先级。与 [规模化架构图战略](./scale-diagram-strategy.md)（国内银行、互联网）互补，共用同一套技术底座。
+本文档总结 Plotgram 在**中国以外国际市场**的企业服务销售机会：目标行业、地区侧重、售卖形态、产品包装与进入优先级。与 [规模化架构图战略](./scale-diagram-strategy.md)（国内银行、互联网）互补，共用同一套技术底座。
 
 ---
 
 ## 1. 国际市场的三条共性需求
 
-Drawify 的国际化企业服务不宜简单复制「中国银行 / 中国互联网公司」打法，应围绕以下全球共性展开：
+Plotgram 的国际化企业服务不宜简单复制「中国银行 / 中国互联网公司」打法，应围绕以下全球共性展开：
 
-| 需求 | 说明 | Drawify 对应能力 |
+| 需求 | 说明 | Plotgram 对应能力 |
 |------|------|-----------------|
 | **AI Agent 可靠出图** | LangChain、Copilot、企业 Agent 平台需要稳定 diagram 输出 | 低语法空间 DSL、结构化错误、Agent 自我修正闭环 |
 | **架构与真实系统同步** | DevOps、合规、审计要求图不是「幻灯片」 | Connector + Compose、语义 Diff、快照时间线 |
@@ -18,7 +18,7 @@ Drawify 的国际化企业服务不宜简单复制「中国银行 / 中国互联
 
 **国际一句话定位：**
 
-> Drawify is the architecture evidence layer for the AI era — connect live infrastructure to auditable, diffable diagrams in milliseconds, deployable on-prem for regulated industries worldwide.
+> Plotgram is the architecture evidence layer for the AI era — connect live infrastructure to auditable, diffable diagrams in milliseconds, deployable on-prem for regulated industries worldwide.
 
 国内可强调「金融级架构治理」；国际同一产品可讲 **AI-native diagram infrastructure for regulated and platform teams**。
 
@@ -28,7 +28,7 @@ Drawify 的国际化企业服务不宜简单复制「中国银行 / 中国互联
 
 以下行业与银行类似：**监管强、架构复杂、文档是交付物、变更要留痕**。
 
-| 行业 | 典型买家 | Drawify 卖点 | 与国内银行场景相似度 |
+| 行业 | 典型买家 | Plotgram 卖点 | 与国内银行场景相似度 |
 |------|----------|-------------|----------------------|
 | **保险** | 架构办、合规、IT 治理 | 系统全景图、变更 Diff、PNG 归档 | 很高 |
 | **医疗健康** | 医院集团 IT、医疗 SaaS、药企 IT | HIPAA / GxP 架构文档、数据流图、不可篡改快照 | 高 |
@@ -68,7 +68,7 @@ Drawify 的国际化企业服务不宜简单复制「中国银行 / 中国互联
 | **金融（非银行）** | 保险、资管、支付机构基础设施团队 |
 | **制造业数字化** | 德国工业 4.0、供应链架构文档 |
 | **公共部门** | 数字政府、智慧城市招标，常要求可归档交付物（PNG / PDF） |
-| **架构方法论工具链** | 与 Structurizr、C4 Model 社区对接 — Drawify 做「可渲染、可 Diff 的执行层」 |
+| **架构方法论工具链** | 与 Structurizr、C4 Model 社区对接 — Plotgram 做「可渲染、可 Diff 的执行层」 |
 
 **建议入口**：GDPR + 变更 Diff 报告，面向合规意识强的中型企业与北欧市场。
 
@@ -128,7 +128,7 @@ Drawify 的国际化企业服务不宜简单复制「中国银行 / 中国互联
 
 | 平台 | 模式 |
 |------|------|
-| Confluence / Notion 企业版 | 宏 / 嵌入：`.dfy` 块实时渲染 |
+| Confluence / Notion 企业版 | 宏 / 嵌入：`.pgm` 块实时渲染 |
 | Atlassian Marketplace | 全球自助采购，适合 SMB 与中型企业 |
 | Wiki.js、BookStack 等开源文档栈 | OEM 渲染引擎 |
 
@@ -174,10 +174,10 @@ PNG 在此特别重要：许多 Wiki 对 SVG 限制多，PNG 嵌入更顺畅。
 
 | 产品包 | 内容 |
 |--------|------|
-| **Drawify Govern** | Diff、快照、PNG 导出、变更门禁 |
-| **Drawify Compose** | K8s / Terraform / OpenAPI Connectors |
-| **Drawify Embed** | WASM / SDK，供 ISV 嵌入 |
-| **Drawify Agent API** | 面向 LLM 应用的 render + validate + fix 闭环 |
+| **Plotgram Govern** | Diff、快照、PNG 导出、变更门禁 |
+| **Plotgram Compose** | K8s / Terraform / OpenAPI Connectors |
+| **Plotgram Embed** | WASM / SDK，供 ISV 嵌入 |
+| **Plotgram Agent API** | 面向 LLM 应用的 render + validate + fix 闭环 |
 
 ---
 
@@ -220,7 +220,7 @@ PNG 在此特别重要：许多 Wiki 对 SVG 限制多，PNG 嵌入更顺畅。
 
 ```mermaid
 flowchart TB
-    subgraph core ["Drawify Core（共用）"]
+    subgraph core ["Plotgram Core（共用）"]
         ast["AST + Diff + Patch"]
         render["SVG / PNG / WASM"]
     end

@@ -1,10 +1,10 @@
-# Drawify AST 数据结构定义
+# Plotgram AST 数据结构定义
 
 > 版本：0.1.0-draft | 状态：设计中
 
-本文档定义 Drawify 的抽象语法树（AST）数据结构。AST 是 Drawify 的核心数据模型——解析器输出 AST，验证器消费 AST，渲染器消费 AST，Diff/Patch 操作 AST。
+本文档定义 Plotgram 的抽象语法树（AST）数据结构。AST 是 Plotgram 的核心数据模型——解析器输出 AST，验证器消费 AST，渲染器消费 AST，Diff/Patch 操作 AST。
 
-**AST 是 Drawify 的一等公民。** 文本只是 AST 的一种序列化形式。
+**AST 是 Plotgram 的一等公民。** 文本只是 AST 的一种序列化形式。
 
 ### 存储层 vs 管线层
 
@@ -70,7 +70,7 @@ pub struct Diagram {
     ],
     "groups": [],
     "style_decls": [],
-    "source_info": { "file": "diagram.dfy", "line_count": 15 }
+    "source_info": { "file": "diagram.pgm", "line_count": 15 }
 }
 ```
 
@@ -512,9 +512,9 @@ AST 中的每个节点都可以通过 JSON Pointer（RFC 6901）定位。这用�
 
 ### 9.2 寻址示例
 
-给定以下 Drawify：
+给定以下 Plotgram：
 
-```drawify
+```plotgram
 diagram flowchart {
     entity api "API 服务" {
         type: service
@@ -739,11 +739,11 @@ pub enum PatchOp {
 
 ## 12. 与 Rust 代码的映射
 
-本文档中定义的 AST 结构对应 `drawify-core` crate 中的以下模块：
+本文档中定义的 AST 结构对应 `plotgram-core` crate 中的以下模块：
 
 | AST 概念 | Rust 模块 | 文件 |
 |----------|-----------|------|
-| 全部结构 | `ast` | `crates/drawify-core/src/ast.rs` |
+| 全部结构 | `ast` | `crates/plotgram-core/src/ast.rs` |
 | Diagram | `ast::Diagram` | 同上 |
 | Entity | `ast::Entity` | 同上 |
 | Relation | `ast::Relation` | 同上 |
@@ -755,7 +755,7 @@ pub enum PatchOp {
 | RawDiagram | `ast::RawDiagram` | 同上 |
 | PreparedDiagram | `ast::PreparedDiagram` | 同上 |
 | Span / Position | `ast::Span`, `ast::Position` | 同上 |
-| Diff / Patch | `diff` | `crates/drawify-core/src/diff.rs` |
+| Diff / Patch | `diff` | `crates/plotgram-core/src/diff.rs` |
 
 所有结构体都 derive `Debug`, `Clone`, `Serialize`, `Deserialize`，以支持调试、克隆和 JSON 序列化。
 

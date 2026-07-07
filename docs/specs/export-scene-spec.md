@@ -1,8 +1,8 @@
-# Drawify Scene JSON 规范
+# Plotgram Scene JSON 规范
 
 > 版本：0.1.0-draft | 状态：已实现
 
-本文档定义 Drawify `Exporter` 层的对外 JSON 契约。`Scene JSON` 是 `PreparedDiagram` 经过样式解析、布局计算和导出标准化后的结构化结果，面向多渲染器、外部服务和第三方消费方。
+本文档定义 Plotgram `Exporter` 层的对外 JSON 契约。`Scene JSON` 是 `PreparedDiagram` 经过样式解析、布局计算和导出标准化后的结构化结果，面向多渲染器、外部服务和第三方消费方。
 
 核心原则：
 
@@ -71,7 +71,7 @@ Scene JSON / SVG / PNG / WebP / ASCII
 ```json
 {
   "schema_version": "0.1",
-  "format": "drawify.export_scene",
+  "format": "plotgram.export_scene",
   "diagram_type": "flowchart",
   "theme_id": "builtin.clean-light",
   "theme_name": "Clean Light",
@@ -89,7 +89,7 @@ Scene JSON / SVG / PNG / WebP / ASCII
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `schema_version` | `string` | 是 | Scene JSON 协议版本，当前为 `"0.1"` |
-| `format` | `string` | 是 | 固定值 `"drawify.export_scene"` |
+| `format` | `string` | 是 | 固定值 `"plotgram.export_scene"` |
 | `diagram_type` | `string` | 是 | 图表类型，小写枚举值，如 `flowchart` |
 | `theme_id` | `string` | 是 | 实际解析后的 StyleSheet ID |
 | `theme_name` | `string` | 是 | 实际解析后的 StyleSheet 显示名 |
@@ -394,7 +394,7 @@ Scene JSON / SVG / PNG / WebP / ASCII
 
 ```json
 {
-  "file": "diagram.dfy",
+  "file": "diagram.pgm",
   "line_count": 32
 }
 ```
@@ -462,7 +462,7 @@ Scene JSON / SVG / PNG / WebP / ASCII
 ```json
 {
   "schema_version": "0.1",
-  "format": "drawify.export_scene",
+  "format": "plotgram.export_scene",
   "diagram_type": "flowchart",
   "theme_id": "builtin.clean-light",
   "theme_name": "Clean Light",
@@ -545,7 +545,7 @@ Scene JSON / SVG / PNG / WebP / ASCII
   ],
   "groups": [],
   "source_info": {
-    "file": "auth-flow.dfy",
+    "file": "auth-flow.pgm",
     "line_count": 12
   }
 }

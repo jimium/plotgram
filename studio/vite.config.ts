@@ -2,8 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
-// Drawify Studio 开发服务器配置
-// WASM 产物由仓库根目录的 drawify-wasm crate 提供,通过相对路径引用
+// Plotgram Studio 开发服务器配置
+// WASM 产物由仓库根目录的 plotgram-wasm crate 提供,通过相对路径引用
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -14,9 +14,9 @@ export default defineConfig({
       '@hooks': path.resolve(__dirname, 'src/hooks'),
       '@lib': path.resolve(__dirname, 'src/lib'),
       // WASM 产物路径:开发时用占位文件,部署前用 wasm-pack 构建真实产物覆盖
-      '../drawify-wasm/drawify_wasm.js': path.resolve(
+      '../plotgram-wasm/plotgram_wasm.js': path.resolve(
         __dirname,
-        'drawify-wasm/drawify_wasm.js',
+        'plotgram-wasm/plotgram_wasm.js',
       ),
     },
   },
@@ -32,7 +32,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['../crates/drawify-wasm'],
+    exclude: ['../crates/plotgram-wasm'],
   },
   build: {
     outDir: 'dist',

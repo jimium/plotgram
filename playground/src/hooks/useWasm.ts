@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { loadWasm, type DrawifyWasm } from '../lib/wasm';
+import { loadWasm, type PlotgramWasm } from '../lib/wasm';
 
 export interface WasmState {
-  wasm: DrawifyWasm | null;
+  wasm: PlotgramWasm | null;
   ready: boolean;
   error: string | null;
   version: string | null;

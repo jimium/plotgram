@@ -23,7 +23,7 @@
 
 - **结合现状**：所有方案基于现有 `PathGeometry` / `EdgeRoutingStrategy` / `LabelPlacer` 架构，不推翻重写
 - **渐进增强**：先补齐硬缺口（标签压边、bezier 不避障），再做视觉增强（入口合并）
-- **参考而非照搬**：Graphviz 的 concentrate / Spline-o-Matic、Cytoscape 的 fcose 约束模型仅作灵感，实现贴合 Drawify 的 Rust 单体架构
+- **参考而非照搬**：Graphviz 的 concentrate / Spline-o-Matic、Cytoscape 的 fcose 约束模型仅作灵感，实现贴合 Plotgram 的 Rust 单体架构
 
 ---
 
@@ -40,16 +40,16 @@
 | straight | 无 | 两点直线 | — | 否 |
 
 关键代码位置：
-- orthogonal 评分：[scoring.rs](../../crates/drawify-core/src/layout/edge/edge_routing_orthogonal/scoring.rs) `obstacle_penalty` (L44-71)
-- orthogonal 通道绕行：[path.rs](../../crates/drawify-core/src/layout/edge/edge_routing_orthogonal/path.rs) `build_channel_detours` (L98-223)
-- spline 可见性图：[visibility.rs](../../crates/drawify-core/src/layout/edge/visibility.rs) `ObstacleIndex` (L113-150)
-- refine 循环：[refine.rs](../../crates/drawify-core/src/layout/refine.rs) `run_refine` (L166-186)
+- orthogonal 评分：[scoring.rs](../../crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs) `obstacle_penalty` (L44-71)
+- orthogonal 通道绕行：[path.rs](../../crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/path.rs) `build_channel_detours` (L98-223)
+- spline 可见性图：[visibility.rs](../../crates/plotgram-core/src/layout/edge/visibility.rs) `ObstacleIndex` (L113-150)
+- refine 循环：[refine.rs](../../crates/plotgram-core/src/layout/refine.rs) `run_refine` (L166-186)
 
 ### 1.2 标签处理现状
 
 | 能力 | 现状 | 位置 |
 |------|------|------|
-| 标签-标签碰撞 | 检测 + 轴对齐推开 | [label_avoidance.rs](../../crates/drawify-core/src/layout/edge/common/label_avoidance.rs) L37-68 |
+| 标签-标签碰撞 | 检测 + 轴对齐推开 | [label_avoidance.rs](../../crates/plotgram-core/src/layout/edge/common/label_avoidance.rs) L37-68 |
 | 标签-节点碰撞 | 检测 + 轴对齐推开 | 同上 L71-81 |
 | 标签-分组碰撞 | 检测 + 轴对齐推开 | 同上 L84-94 |
 | **标签-边路径碰撞** | **不检测** | — |
@@ -59,7 +59,7 @@
 ### 1.3 入口/出口点现状
 
 - **无任何入口/出口合并逻辑**（全代码库搜索 `merge|concentrate|dock` 在 edge 模块零命中）
-- orthogonal slot 分配是**分散策略**：同侧多边按目标坐标排序后均匀分布在 40px 间距 slot 上（[slot.rs](../../crates/drawify-core/src/layout/edge/edge_routing_orthogonal/slot.rs) `slot_fraction` L71-80）
+- orthogonal slot 分配是**分散策略**：同侧多边按目标坐标排序后均匀分布在 40px 间距 slot 上（[slot.rs](../../crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/slot.rs) `slot_fraction` L71-80）
 - 平行边通过 `parallel_edges.rs` 的法向偏移分开，端点天然不同
 
 ---
@@ -72,8 +72,8 @@
 
 **根因**：
 
-1. 初始放置时法向偏移只有 `DEFAULT_LABEL_PERP_OFFSET = 8.0`（[constants.rs](../../crates/drawify-core/src/layout/constants.rs)），而标签高度 `DEFAULT_LABEL_FONT_SIZE + 2*DEFAULT_LABEL_PADDING = 19.0`，**偏移量不足以让 bbox 脱离边路径**
-2. `resolve_label_overlaps`（[label_avoidance.rs:11-100](../../crates/drawify-core/src/layout/edge/common/label_avoidance.rs)）只检测三类碰撞，**完全不检测标签与边路径的碰撞**
+1. 初始放置时法向偏移只有 `DEFAULT_LABEL_PERP_OFFSET = 8.0`（[constants.rs](../../crates/plotgram-core/src/layout/constants.rs)），而标签高度 `DEFAULT_LABEL_FONT_SIZE + 2*DEFAULT_LABEL_PADDING = 19.0`，**偏移量不足以让 bbox 脱离边路径**
+2. `resolve_label_overlaps`（[label_avoidance.rs:11-100](../../crates/plotgram-core/src/layout/edge/common/label_avoidance.rs)）只检测三类碰撞，**完全不检测标签与边路径的碰撞**
 3. 避让推开后不重新对齐到路径，标签可能漂移到其他边上
 
 **影响范围**：所有带标签的边，尤其是 orthogonal 长折线边和 bezier 弧形边。
@@ -84,9 +84,9 @@
 
 **根因**：
 
-1. `BezierRouting` 没有覆写 `supports_refine`（默认 `false`，[mod.rs:486-488](../../crates/drawify-core/src/layout/edge/mod.rs)），不参与 refine 循环
-2. `compute_bezier_controls`（[edge_geometry.rs:78-149](../../crates/drawify-core/src/layout/edge/common/edge_geometry.rs)）只考虑端口方向和起止点距离，不查询障碍物
-3. refine.rs 的 `analyze_edge_node_crossings`（[refine.rs:74](../../crates/drawify-core/src/layout/refine.rs)）只检测 `PathGeometry::Polyline`，bezier/circular 路径不检测
+1. `BezierRouting` 没有覆写 `supports_refine`（默认 `false`，[mod.rs:486-488](../../crates/plotgram-core/src/layout/edge/mod.rs)），不参与 refine 循环
+2. `compute_bezier_controls`（[edge_geometry.rs:78-149](../../crates/plotgram-core/src/layout/edge/common/edge_geometry.rs)）只考虑端口方向和起止点距离，不查询障碍物
+3. refine.rs 的 `analyze_edge_node_crossings`（[refine.rs:74](../../crates/plotgram-core/src/layout/refine.rs)）只检测 `PathGeometry::Polyline`，bezier/circular 路径不检测
 
 **影响范围**：架构图（默认 force-directed + bezier 路由）、状态图（circular 路由）中节点密集的场景。
 
@@ -96,7 +96,7 @@
 
 **根因**：
 
-1. orthogonal 的 `slot_fraction`（[slot.rs:71-80](../../crates/drawify-core/src/layout/edge/edge_routing_orthogonal/slot.rs)）设计目标是"均匀分布、不重叠"，而非"集中"
+1. orthogonal 的 `slot_fraction`（[slot.rs:71-80](../../crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/slot.rs)）设计目标是"均匀分布、不重叠"，而非"集中"
 2. straight/bezier/spline 通过 `parallel_edges.rs` 的法向偏移分开，端点天然不同
 3. 没有任何"汇流"或"concentrate"逻辑
 
@@ -110,7 +110,7 @@
 
 1. 固定 5 次迭代（`DEFAULT_MAX_LABEL_ITERATIONS`），对密集图不足
 2. 无震荡检测：标签可能在两个障碍间反复弹跳
-3. `push_label_from_obstacle`（[label_avoidance.rs:103-131](../../crates/drawify-core/src/layout/edge/common/label_avoidance.rs)）推开后**不回检**已处理障碍，可能引入新重叠
+3. `push_label_from_obstacle`（[label_avoidance.rs:103-131](../../crates/plotgram-core/src/layout/edge/common/label_avoidance.rs)）推开后**不回检**已处理障碍，可能引入新重叠
 4. 轴对齐推开对斜线/弧形边不友好
 5. 三套标签尺寸估算不一致（label_avoidance.rs / edge_routing_circular.rs:428 / sequence.rs:328）
 
@@ -120,7 +120,7 @@
 
 **根因**：
 
-1. 默认 `max_passes: 1`（[refine.rs:30-39](../../crates/drawify-core/src/layout/refine.rs)）
+1. 默认 `max_passes: 1`（[refine.rs:30-39](../../crates/plotgram-core/src/layout/refine.rs)）
 2. 每轮 refine 后全量重路由（`router.route`），开销大
 3. 无回退机制：推开后穿障反而增加时不会回退
 4. 推开可能引入节点重叠（依赖后续 `OverlapResolver`，但不在路由阶段）
@@ -143,7 +143,7 @@
 
 #### 3.2.1 问题
 
-当前标签 bbox 与边路径线段相交时无任何处理（[label_avoidance.rs:1-4](../../crates/drawify-core/src/layout/edge/common/label_avoidance.rs) 注释明确未包含标签-边）。
+当前标签 bbox 与边路径线段相交时无任何处理（[label_avoidance.rs:1-4](../../crates/plotgram-core/src/layout/edge/common/label_avoidance.rs) 注释明确未包含标签-边）。
 
 #### 3.2.2 方案
 
@@ -268,7 +268,7 @@ pub fn resolve_label_overlaps(edges, relations, nodes, groups) {
 
 #### 3.3.1 问题
 
-bezier 路由（[edge_routing_bezier.rs](../../crates/drawify-core/src/layout/edge/edge_routing_bezier.rs)）的 `compute_bezier_controls` 不查询障碍物，曲线可能穿过中间节点。circular 同理。
+bezier 路由（[edge_routing_bezier.rs](../../crates/plotgram-core/src/layout/edge/edge_routing_bezier.rs)）的 `compute_bezier_controls` 不查询障碍物，曲线可能穿过中间节点。circular 同理。
 
 #### 3.3.2 方案：穿障检测 + 退化到 spline
 
@@ -353,7 +353,7 @@ fn curve_intersects_obstacles(edge: &EdgeLayout, obstacles: &ObstacleIndex) -> b
 
 #### 3.4.2 方案：分级汇流（Tiered Concentration）
 
-**灵感来源**：Graphviz 的 `concentrate=true` 选项合并平行边；Cytoscape 的 compound node 边聚合。但 Drawify 采用**分级策略**而非完全合并。
+**灵感来源**：Graphviz 的 `concentrate=true` 选项合并平行边；Cytoscape 的 compound node 边聚合。但 Plotgram 采用**分级策略**而非完全合并。
 
 **核心思路**：根据同侧边数动态选择分布策略：
 
@@ -454,7 +454,7 @@ for (key, group) in grouped_endpoints {
 
 #### 3.5.1 问题
 
-[label_avoidance.rs](../../crates/drawify-core/src/layout/edge/common/label_avoidance.rs) 的避让算法存在多个鲁棒性问题（§2.4）。
+[label_avoidance.rs](../../crates/plotgram-core/src/layout/edge/common/label_avoidance.rs) 的避让算法存在多个鲁棒性问题（§2.4）。
 
 #### 3.5.2 方案
 
@@ -757,18 +757,18 @@ Phase 3（P2，2 周）
 
 | 模块 | 文件 | 关键函数 |
 |------|------|---------|
-| 标签避让 | [label_avoidance.rs](../../crates/drawify-core/src/layout/edge/common/label_avoidance.rs) | `resolve_label_overlaps` L11 |
-| 标签放置 | [label_placement.rs](../../crates/drawify-core/src/layout/edge/common/label_placement.rs) | `LabelPlacer` trait L36 |
-| orthogonal 路由 | [edge_routing_orthogonal/mod.rs](../../crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs) | slot 分配 L249-284 |
-| orthogonal 评分 | [scoring.rs](../../crates/drawify-core/src/layout/edge/edge_routing_orthogonal/scoring.rs) | `obstacle_penalty` L44 |
-| orthogonal 通道绕行 | [path.rs](../../crates/drawify-core/src/layout/edge/edge_routing_orthogonal/path.rs) | `build_channel_detours` L98 |
-| spline 可见性图 | [visibility.rs](../../crates/drawify-core/src/layout/edge/visibility.rs) | `ObstacleIndex` L113 |
-| bezier 路由 | [edge_routing_bezier.rs](../../crates/drawify-core/src/layout/edge/edge_routing_bezier.rs) | `route_edges_bezier` L97 |
-| circular 路由 | [edge_routing_circular.rs](../../crates/drawify-core/src/layout/edge/edge_routing_circular.rs) | `route_edges_circular` L41 |
-| refine 循环 | [refine.rs](../../crates/drawify-core/src/layout/refine.rs) | `run_refine` L166 |
-| 平行边 | [parallel_edges.rs](../../crates/drawify-core/src/layout/edge/common/parallel_edges.rs) | `group_parallel_edges` L21 |
-| 路由骨架 | [routing_skeleton.rs](../../crates/drawify-core/src/layout/edge/common/routing_skeleton.rs) | `resolve_endpoints` L65 |
-| 常量 | [constants.rs](../../crates/drawify-core/src/layout/constants.rs) | 标签/边常量 |
+| 标签避让 | [label_avoidance.rs](../../crates/plotgram-core/src/layout/edge/common/label_avoidance.rs) | `resolve_label_overlaps` L11 |
+| 标签放置 | [label_placement.rs](../../crates/plotgram-core/src/layout/edge/common/label_placement.rs) | `LabelPlacer` trait L36 |
+| orthogonal 路由 | [edge_routing_orthogonal/mod.rs](../../crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs) | slot 分配 L249-284 |
+| orthogonal 评分 | [scoring.rs](../../crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs) | `obstacle_penalty` L44 |
+| orthogonal 通道绕行 | [path.rs](../../crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/path.rs) | `build_channel_detours` L98 |
+| spline 可见性图 | [visibility.rs](../../crates/plotgram-core/src/layout/edge/visibility.rs) | `ObstacleIndex` L113 |
+| bezier 路由 | [edge_routing_bezier.rs](../../crates/plotgram-core/src/layout/edge/edge_routing_bezier.rs) | `route_edges_bezier` L97 |
+| circular 路由 | [edge_routing_circular.rs](../../crates/plotgram-core/src/layout/edge/edge_routing_circular.rs) | `route_edges_circular` L41 |
+| refine 循环 | [refine.rs](../../crates/plotgram-core/src/layout/refine.rs) | `run_refine` L166 |
+| 平行边 | [parallel_edges.rs](../../crates/plotgram-core/src/layout/edge/common/parallel_edges.rs) | `group_parallel_edges` L21 |
+| 路由骨架 | [routing_skeleton.rs](../../crates/plotgram-core/src/layout/edge/common/routing_skeleton.rs) | `resolve_endpoints` L65 |
+| 常量 | [constants.rs](../../crates/plotgram-core/src/layout/constants.rs) | 标签/边常量 |
 
 ---
 

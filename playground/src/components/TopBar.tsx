@@ -164,7 +164,7 @@ export function TopBar({
     <header className="topbar">
       <div className="topbar-left">
         <div className="brand">
-          <img className="brand-logo" src={withBase(theme === 'dark' ? 'logo-dark.svg' : 'logo.svg')} alt="Drawify" />
+          <img className="brand-logo" src={withBase(theme === 'dark' ? 'logo-dark.svg' : 'logo.svg')} alt="Plotgram" />
         </div>
 
         <div className="file-menu-wrap" ref={fileMenuRef}>
@@ -185,7 +185,7 @@ export function TopBar({
               </button>
               <button type="button" onClick={() => runFileAction(onOpenFile)}>
                 <IconFolderOpen size={14} />
-                <span>打开 .dfy…</span>
+                <span>打开 .pgm…</span>
               </button>
               <button type="button" onClick={() => runFileAction(onSaveFile)}>
                 <IconSave size={14} />

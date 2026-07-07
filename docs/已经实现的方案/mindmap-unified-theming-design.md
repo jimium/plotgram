@@ -85,7 +85,7 @@ flowchart TD
 ### 4.1 模块布局
 
 ```
-crates/drawify-core/src/prepare/
+crates/plotgram-core/src/prepare/
   structure/
     mod.rs          # StructureExpander trait + expand_structure 分派
     mindmap.rs      # 从 relation 树计算 branch_slot / tree_depth
@@ -612,7 +612,7 @@ attributes.style  (全是具体值)
 
 ### Phase 2 — 数据迁移与切换（单次迁移）
 
-4. 更新 `scripts/generate_builtin_themes.py`，重生成 `crates/drawify-core/src/theme/themes/` 下全部主题 JSON（输出 `branch_palettes` + `{branch.*}` 模板）。
+4. 更新 `scripts/generate_builtin_themes.py`，重生成 `crates/plotgram-core/src/theme/themes/` 下全部主题 JSON（输出 `branch_palettes` + `{branch.*}` 模板）。
 5. `materialize_styles` 传入 context，启用 contextual resolve；删除 `materialize_mindmap_branch_styles` 调用。golden 对比验证视觉等价。
 
 ### Phase 3 — 清理
@@ -626,7 +626,7 @@ attributes.style  (全是具体值)
 - [ ] 全部内置 + inspired + accessible 主题 mindmap showcase 视觉回归通过。
 - [ ] `PreparedDiagram` 物化后无 `StyleSource::BranchTheme`。
 - [ ] 换 `theme: inspired.nord` 时分支色带随主题变化。
-- [ ] `cargo test -p drawify-core` 通过；prepare 不变量 I1–I3 仍成立。
+- [ ] `cargo test -p plotgram-core` 通过；prepare 不变量 I1–I3 仍成立。
 
 ---
 
@@ -653,10 +653,10 @@ attributes.style  (全是具体值)
 
 | 文件 | 说明 |
 |------|------|
-| `crates/drawify-core/src/kinds/mindmap/mindmap_theme.rs` | 待删除：结构 + 颜色混合 |
-| `crates/drawify-core/src/prepare/styles.rs` | 待简化：删除 mindmap 分支调用 |
-| `crates/drawify-core/src/theme/cascade.rs` | 待扩展：contextual resolve |
-| `crates/drawify-core/src/theme/themes/builtin.clean-light.json` | 待更新：`branch_palettes` |
+| `crates/plotgram-core/src/kinds/mindmap/mindmap_theme.rs` | 待删除：结构 + 颜色混合 |
+| `crates/plotgram-core/src/prepare/styles.rs` | 待简化：删除 mindmap 分支调用 |
+| `crates/plotgram-core/src/theme/cascade.rs` | 待扩展：contextual resolve |
+| `crates/plotgram-core/src/theme/themes/builtin.clean-light.json` | 待更新：`branch_palettes` |
 
 ---
 

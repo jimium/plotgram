@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Graphic Style 与 Theme 架构 — Drawify</title>
+  <title>Graphic Style 与 Theme 架构 — Plotgram</title>
   <style>
     :root {
       --bg: #f6f7f9;
@@ -165,7 +165,7 @@
 <header>
   <h1>Graphic Style 与 Theme 架构</h1>
   <p>
-    Drawify 将<strong>配色与排版 token</strong>（theme）和<strong>几何笔触皮肤</strong>（graphic style）拆成两条正交维度，
+    Plotgram 将<strong>配色与排版 token</strong>（theme）和<strong>几何笔触皮肤</strong>（graphic style）拆成两条正交维度，
     使同一套色板可以叠加不同画法，而无需为每种组合重写布局或图表逻辑。
   </p>
 </header>
@@ -301,8 +301,8 @@
         </tr>
         <tr>
           <td>核心模块</td>
-          <td><code>crates/drawify-core/src/theme/</code></td>
-          <td><code>crates/drawify-core/src/graphic_style/</code></td>
+          <td><code>crates/plotgram-core/src/theme/</code></td>
+          <td><code>crates/plotgram-core/src/graphic_style/</code></td>
         </tr>
       </tbody>
     </table>
@@ -523,10 +523,10 @@
   <section class="refs">
     <h2>相关文档与代码</h2>
     <ul>
-      <li><a href="../../crates/drawify-core/src/graphic_style/README.md">graphic_style 实现说明</a></li>
+      <li><a href="../../crates/plotgram-core/src/graphic_style/README.md">graphic_style 实现说明</a></li>
       <li><a href="../specs/style-system/style-sheet-spec.md">StyleSheet / theme 规范</a></li>
-      <li><a href="./drawify-server-api.md">Server API（graphic_style 请求字段）</a></li>
-      <li><a href="./overview.md">Drawify 整体架构</a></li>
+      <li><a href="./plotgram-server-api.md">Server API（graphic_style 请求字段）</a></li>
+      <li><a href="./overview.md">Plotgram 整体架构</a></li>
       <li>代码入口：<code>render/request.rs</code>、<code>graphic_style/mod.rs</code>、<code>render/visual.rs</code>、<code>kinds/registry.rs</code></li>
     </ul>
   </section>
@@ -534,7 +534,7 @@
 </main>
 
 <footer>
-  Drawify Architecture · graphic-style-and-theme.html
+  Plotgram Architecture · graphic-style-and-theme.html
 </footer>
 
 </body>

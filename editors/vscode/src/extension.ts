@@ -1,17 +1,17 @@
 import * as vscode from 'vscode';
-import { DrawifyDiagnostics } from './diagnostics';
-import { extendDrawifyMarkdownIt } from './markdown/markdownItPlugin';
+import { PlotgramDiagnostics } from './diagnostics';
+import { extendPlotgramMarkdownIt } from './markdown/markdownItPlugin';
 import { PreviewPanel } from './preview/panel';
 
 export function activate(context: vscode.ExtensionContext) {
-  const diagnostics = new DrawifyDiagnostics(context.extensionPath);
+  const diagnostics = new PlotgramDiagnostics(context.extensionPath);
   diagnostics.activate(context);
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('drawify.openPreview', () => {
+    vscode.commands.registerCommand('plotgram.openPreview', () => {
       const editor = vscode.window.activeTextEditor;
-      if (!editor || editor.document.languageId !== 'drawify') {
-        void vscode.window.showWarningMessage('请在 Drawify (.dfy) 文件中打开预览。');
+      if (!editor || editor.document.languageId !== 'plotgram') {
+        void vscode.window.showWarningMessage('请在 Plotgram (.pgm) 文件中打开预览。');
         return;
       }
       PreviewPanel.show(context.extensionUri, editor.document);
@@ -20,7 +20,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   return {
     extendMarkdownIt(md: unknown) {
-      return extendDrawifyMarkdownIt(md as Parameters<typeof extendDrawifyMarkdownIt>[0], context.extensionPath);
+      return extendPlotgramMarkdownIt(md as Parameters<typeof extendPlotgramMarkdownIt>[0], context.extensionPath);
     },
   };
 }

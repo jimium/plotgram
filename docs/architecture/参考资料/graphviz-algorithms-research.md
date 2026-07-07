@@ -1,8 +1,8 @@
-# Graphviz 核心算法研究：Drawify 可借鉴的技术与 Rust 实现路线
+# Graphviz 核心算法研究：Plotgram 可借鉴的技术与 Rust 实现路线
 
 > 版本：0.1.0-draft | 状态：研究完成
 
-本文档梳理 Graphviz 项目中经过 30+ 年学术打磨的核心算法，分析 Drawify 现有布局引擎的差距，并给出用 Rust 自行实现的优先级排序与技术路线。
+本文档梳理 Graphviz 项目中经过 30+ 年学术打磨的核心算法，分析 Plotgram 现有布局引擎的差距，并给出用 Rust 自行实现的优先级排序与技术路线。
 
 ---
 
@@ -38,9 +38,9 @@ position()    → 最优节点坐标（辅助图 + Network Simplex）
 make-splines() → 样条边路由
 ```
 
-### 2.2 Drawify 现状对比
+### 2.2 Plotgram 现状对比
 
-| 阶段 | Graphviz dot | Drawify sugiyama.rs | 差距 |
+| 阶段 | Graphviz dot | Plotgram sugiyama.rs | 差距 |
 |------|-------------|---------------------|------|
 | Phase 1: 去环 | Greedy FAS（贪心反馈弧集） | DFS 反转回边 | 基本对齐，Graphviz 的贪心 FAS 反转更少边 |
 | Phase 2: 层分配 | **Network Simplex**（最优） | 最长路径法 | **最大差距**：最长路径法不是最优的 |
@@ -156,7 +156,7 @@ Graphviz 原版用辅助图 + Network Simplex 做坐标分配，但 Brandes-Köp
 
 ## 3. 无向图力导向布局（neato / fdp 引擎）— 高优先级
 
-### 3.1 Drawify 现状
+### 3.1 Plotgram 现状
 
 `force-directed.rs` 实际上是**分组感知布局**（分组拓扑排序 + 网格排列），不是真正的力导向。需要重写。
 
@@ -259,7 +259,7 @@ fn stress_majorization(
 - 距离为 k 的节点放在第 k 个同心圆上
 - 同一圆上的节点按父节点角度扇形展开
 
-**Drawify 现状**：`circular.rs` 是圆形布局（所有节点在一个圆上），不是径向布局。
+**Plotgram 现状**：`circular.rs` 是圆形布局（所有节点在一个圆上），不是径向布局。
 
 **适合场景**：思维导图、组织架构图、依赖树
 
@@ -305,7 +305,7 @@ fn radial_layout(
 - 如果分量是外平面图，得到平面布局
 - 边交叉最小化：尽量将边放在圆周上
 
-**Drawify 现状**：`circular.rs` 是简单圆形排列，没有双连通分量分析。
+**Plotgram 现状**：`circular.rs` 是简单圆形排列，没有双连通分量分析。
 
 **适合场景**：状态图、网络拓扑图
 
@@ -331,9 +331,9 @@ fn radial_layout(
 - 输出：不触碰任何屏障的贝塞尔曲线
 - 算法：Proutespline — 基于约束优化的样条拟合
 
-### 6.2 Drawify 现状对比
+### 6.2 Plotgram 现状对比
 
-| 能力 | Graphviz | Drawify |
+| 能力 | Graphviz | Plotgram |
 |------|----------|---------|
 | 正交路由 | 基础（有已知缺陷） | **更好**（磁吸点 + 侧通道绕行 + 标签避让） |
 | 贝塞尔路由 | 障碍避让 + 样条拟合 | **无障碍避让**，边可能穿过节点 |
@@ -384,7 +384,7 @@ fn route_spline(
 
 ## 7. 其他 Graphviz 技术
 
-| 技术 | 说明 | Drawify 适用性 |
+| 技术 | 说明 | Plotgram 适用性 |
 |------|------|---------------|
 | **pack 库** | 多连通分量独立布局后打包排列 | 高：当前不支持多分量 |
 | **overlap removal** | Voronoi / prism 方法消除节点重叠 | 高：力导向后必须有 |
@@ -425,7 +425,7 @@ fn route_spline(
 
 ---
 
-## 9. 与 Drawify 架构的集成方案
+## 9. 与 Plotgram 架构的集成方案
 
 ### 9.1 现有架构
 
@@ -515,7 +515,7 @@ impl NetworkSimplexSolver {
 
 ## 11. 总结
 
-| 维度 | Graphviz | Drawify 现状 | 建议行动 |
+| 维度 | Graphviz | Plotgram 现状 | 建议行动 |
 |------|----------|-------------|---------|
 | 有向图布局 | Network Simplex（最优） | 最长路径法（次优） | **升级到 NS** |
 | 坐标分配 | 辅助图 NS / Brandes-Köpf | 简单迭代 | **实现 BK** |
@@ -525,7 +525,7 @@ impl NetworkSimplexSolver {
 | 圆形布局 | circo（双连通分量） | 简单圆形 | **升级** |
 | 多分量 | pack 库 | 不支持 | **新增** |
 
-**核心结论**：Drawify 最需要从 Graphviz 借鉴的不是"更多布局算法"，而是 **Network Simplex 最优层级分配** 和 **可见性图障碍避让样条路由** 这两项核心技术。前者决定了有向图布局的质量上限，后者决定了边的可读性。这两项用 Rust 自行实现的难度中等（有 `rust-sugiyama` 和 `nalgebra` 等生态支持），但收益极大。
+**核心结论**：Plotgram 最需要从 Graphviz 借鉴的不是"更多布局算法"，而是 **Network Simplex 最优层级分配** 和 **可见性图障碍避让样条路由** 这两项核心技术。前者决定了有向图布局的质量上限，后者决定了边的可读性。这两项用 Rust 自行实现的难度中等（有 `rust-sugiyama` 和 `nalgebra` 等生态支持），但收益极大。
 
 ---
 

@@ -1,7 +1,7 @@
-# c.k8s-tenant-isolation.dfy 优化后基准测试数据
+# c.k8s-tenant-isolation.pgm 优化后基准测试数据
 
 ## 图信息
-- 文件: showcase/architecture/c.k8s-tenant-isolation.dfy
+- 文件: showcase/architecture/c.k8s-tenant-isolation.pgm
 - 节点: 18 | 边: 26 | 分组: 2
 
 ## 优化措施

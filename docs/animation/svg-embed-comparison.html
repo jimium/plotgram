@@ -308,7 +308,7 @@
 </div>
 
 <div class="note">
-  <strong>对 Drawify 的意义：</strong><br>
+  <strong>对 Plotgram 的意义：</strong><br>
   1. <strong>纯 SVG 导出（.svg 文件）</strong>：CSS 写在 <code>&lt;defs&gt;&lt;style&gt;</code> 里，用户用 <code>&lt;img&gt;</code> 嵌入 GitHub README、双击打开、<code>&lt;object&gt;</code> 嵌入网页——动画都能播放。这是最通用的格式。<br>
   2. <strong>HTML Steps 导出（.html 文件）</strong>：SVG 以<strong>内联方式</strong>写在 HTML 里，这样 JS 播放器可以通过 <code>getElementById</code> 直接操作 SVG 元素，切换 class 触发帧间过渡动画。CSS 仍内嵌在 SVG 的 <code>&lt;defs&gt;&lt;style&gt;</code> 中。<br>
   3. <strong>Studio 实时预览</strong>：用内联 SVG 或 <code>&lt;object&gt;</code> + <code>contentDocument</code>，均可实现 JS 控制。<br>

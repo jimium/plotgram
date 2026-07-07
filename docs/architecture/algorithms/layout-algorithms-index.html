@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>布局与路由算法文档索引 — Drawify</title>
+  <title>布局与路由算法文档索引 — Plotgram</title>
   <style>
     :root {
       --bg: #f6f7f9;
@@ -396,13 +396,13 @@
 
   <!-- Top Nav -->
   <nav class="topnav">
-    <span class="crumb">Drawify 算法文档</span>
+    <span class="crumb">Plotgram 算法文档</span>
     <button class="theme-toggle" onclick="toggleTheme()">切换主题</button>
   </nav>
 
   <!-- Hero -->
   <header class="hero">
-    <h1>Drawify 布局与路由算法文档</h1>
+    <h1>Plotgram 布局与路由算法文档</h1>
     <p class="subtitle">
       涵盖节点布局算法与边路由算法的完整索引，帮助你在不同业务场景下快速选型。
       每个算法均提供原理、复杂度、适用规模与实现细节的详细文档。
@@ -778,7 +778,7 @@
   </div>
 
   <footer>
-    Drawify 算法文档 · 布局与路由算法索引
+    Plotgram 算法文档 · 布局与路由算法索引
   </footer>
 
   <script>
@@ -786,11 +786,11 @@
       const current = document.documentElement.getAttribute('data-theme');
       const next = current === 'light' ? 'dark' : 'light';
       document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('drawify-theme', next);
+      localStorage.setItem('plotgram-theme', next);
     }
 
     (function initTheme() {
-      const saved = localStorage.getItem('drawify-theme');
+      const saved = localStorage.getItem('plotgram-theme');
       if (saved) {
         document.documentElement.setAttribute('data-theme', saved);
       }

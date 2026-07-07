@@ -2,7 +2,7 @@
 
 ## 概述
 
-`drawify-wasm` 是 `drawify-core` 的 WebAssembly 绑定，使其能在浏览器或 Node.js 环境中运行，无需后端服务。
+`plotgram-wasm` 是 `plotgram-core` 的 WebAssembly 绑定，使其能在浏览器或 Node.js 环境中运行，无需后端服务。
 
 ## 模块架构
 
@@ -14,19 +14,19 @@
 │  └───────────────────────────────────────────────────────────┘  │
 │                            ↓                                    │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │  drawify-wasm.js (wasm-bindgen 生成的绑定)                 │  │
+│  │  plotgram-wasm.js (wasm-bindgen 生成的绑定)                 │  │
 │  └───────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │                      WebAssembly (WASM) 层                      │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │  drawify-wasm (Rust + wasm-bindgen)                       │  │
+│  │  plotgram-wasm (Rust + wasm-bindgen)                       │  │
 │  └───────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│                        drawify-core                             │
+│                        plotgram-core                             │
 │  [Parser → Validator → Layout → Renderer]                       │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -75,8 +75,8 @@ pub fn version() -> String;
 ### 1. 开发构建
 
 ```bash
-cd crates/drawify-wasm
-wasm-pack build --target web --out-dir ../../playground/drawify-wasm
+cd crates/plotgram-wasm
+wasm-pack build --target web --out-dir ../../playground/plotgram-wasm
 ```
 
 ### 2. 发布构建
@@ -105,7 +105,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    exclude: ['drawify-wasm']  // 不预优化 WASM 包
+    exclude: ['plotgram-wasm']  // 不预优化 WASM 包
   },
   server: {
     port: 3000
@@ -117,7 +117,7 @@ export default defineConfig({
 
 ```javascript
 const loadWasm = async () => {
-  const wasmModule = await import('../drawify-wasm/drawify_wasm.js');
+  const wasmModule = await import('../plotgram-wasm/plotgram_wasm.js');
   await wasmModule.default(); // 初始化 WASM
   // 现在可以使用 wasmModule.render(), wasmModule.validate() 等
 };

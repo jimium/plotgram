@@ -70,7 +70,7 @@ describe('buildMessages', () => {
 
 describe('SYSTEM_PROMPT', () => {
   it('包含核心能力说明', () => {
-    expect(SYSTEM_PROMPT).toContain('生成 Drawify DSL');
+    expect(SYSTEM_PROMPT).toContain('生成 Plotgram DSL');
     expect(SYSTEM_PROMPT).toContain('增量修改');
     expect(SYSTEM_PROMPT).toContain('自动校验');
   });

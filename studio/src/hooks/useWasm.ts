@@ -1,14 +1,14 @@
 /**
  * useWasm Hook
  *
- * 管理 drawify-wasm 模块的加载状态
+ * 管理 plotgram-wasm 模块的加载状态
  */
 
 import { useEffect, useState } from 'react';
-import { loadWasm, checkStudioCapabilities, type DrawifyWasm } from '@lib/wasm';
+import { loadWasm, checkStudioCapabilities, type PlotgramWasm } from '@lib/wasm';
 
 interface UseWasmResult {
-  wasm: DrawifyWasm | null;
+  wasm: PlotgramWasm | null;
   ready: boolean;
   error: string | null;
   version: string;
@@ -19,9 +19,9 @@ interface UseWasmResult {
   };
 }
 
-/** 加载 drawify-wasm 模块 */
+/** 加载 plotgram-wasm 模块 */
 export function useWasm(): UseWasmResult {
-  const [wasm, setWasm] = useState<DrawifyWasm | null>(null);
+  const [wasm, setWasm] = useState<PlotgramWasm | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState('');

@@ -1,6 +1,6 @@
 # Showcase 回归工作流
 
-`showcase/` 是按图表类型与复杂度组织的 `.dfy` 样例集，用于视觉对比、冒烟测试和布局质量回归。
+`showcase/` 是按图表类型与复杂度组织的 `.pgm` 样例集，用于视觉对比、冒烟测试和布局质量回归。
 
 > 样例目录说明：[showcase/README.md](../../showcase/README.md)
 
@@ -58,7 +58,7 @@ python3 -m http.server --directory showcase 4173
 ### 单文件
 
 ```bash
-drawify lint showcase/architecture/c.k8s-platform-stack.dfy --profile strict
+plotgram lint showcase/architecture/c.k8s-platform-stack.pgm --profile strict
 ```
 
 ### 批量（shell 示例）
@@ -66,11 +66,11 @@ drawify lint showcase/architecture/c.k8s-platform-stack.dfy --profile strict
 ```bash
 fail=0
 while IFS= read -r -d '' f; do
-  if ! drawify lint "$f" --profile strict --format json >/dev/null; then
+  if ! plotgram lint "$f" --profile strict --format json >/dev/null; then
     echo "FAIL: $f"
     fail=1
   fi
-done < <(find showcase -name '*.dfy' -print0)
+done < <(find showcase -name '*.pgm' -print0)
 exit $fail
 ```
 
@@ -87,24 +87,24 @@ exit $fail
 ## 冒烟测试（Rust）
 
 ```bash
-cargo test -p drawify-core --test showcase_smoke
+cargo test -p plotgram-core --test showcase_smoke
 ```
 
 覆盖：parse → prepare → validate → render(SVG)，部分含 `validate_group_containment`。
 
 ---
 
-## 算法评估（drawify-eval）
+## 算法评估（plotgram-eval）
 
 对 showcase 做布局/路由算法横向对比：
 
 ```rust
-// 见 drawify-eval.md — EvalReport + presets::layout_comparison()
+// 见 plotgram-eval.md — EvalReport + presets::layout_comparison()
 ```
 
 典型流程：
 
-1. 遍历 `showcase/**/*.dfy`
+1. 遍历 `showcase/**/*.pgm`
 2. `parse` → `EvalEngine::compare`
 3. 输出 `report.md`，保存 `HistoryStore` 基线
 4. 算法改动后 `engine.diff` 检测回归
@@ -115,24 +115,24 @@ cargo test -p drawify-core --test showcase_smoke
 
 | 步骤 | 命令 / 测试 |
 |------|-------------|
-| 语法语义 | `drawify validate` 或 `render-all.sh --validate` |
-| 布局硬约束 | `drawify lint --profile strict` |
+| 语法语义 | `plotgram validate` 或 `render-all.sh --validate` |
+| 布局硬约束 | `plotgram lint --profile strict` |
 | 渲染不崩 | `showcase_smoke` / `render-all.sh` |
-| 算法回归 | drawify-eval + `HistoryStore`（可选） |
+| 算法回归 | plotgram-eval + `HistoryStore`（可选） |
 
 ---
 
 ## 添加新样例
 
 1. 按类型放入对应目录，使用 `s.` / `n.` / `c.` 前缀
-2. `drawify validate` + `drawify lint --profile strict`
-3. `drawify render ... -o` 目视检查
+2. `plotgram validate` + `plotgram lint --profile strict`
+3. `plotgram render ... -o` 目视检查
 4. 更新 `showcase/README.md` 代表样例表（若属重点场景）
 
 ---
 
 ## 相关文档
 
-- [drawify-cli.md](drawify-cli.md)
+- [plotgram-cli.md](plotgram-cli.md)
 - [layout-lint.md](layout-lint.md)
-- [drawify-eval.md](drawify-eval.md)
+- [plotgram-eval.md](plotgram-eval.md)

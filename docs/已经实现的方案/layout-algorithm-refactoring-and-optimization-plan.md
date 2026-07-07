@@ -1,10 +1,10 @@
 # 架构图与流程图布局算法重构与优化方案
 
-> 本文档基于对 `drawify-core` 布局算法的系统性分析，提出当前性能评估、
+> 本文档基于对 `plotgram-core` 布局算法的系统性分析，提出当前性能评估、
 > 算法优化方向、美观度提升方案、优先级排序及实施计划。
 >
-> **范围**：`crates/drawify-core/src/layout/node/architecture_v2/` 与
-> `crates/drawify-core/src/layout/node/flowchart/` 两个模块，及其共享的
+> **范围**：`crates/plotgram-core/src/layout/node/architecture_v2/` 与
+> `crates/plotgram-core/src/layout/node/flowchart/` 两个模块，及其共享的
 > `sugiyama_v2` 引擎与 `common` 工具层。
 >
 > **基准**：本文档对应已落地的重构（FenwickTree 抽取、`empty_diagram_stub`
@@ -466,20 +466,20 @@ fn infrastructure_anchor_x_bidirectional(...) -> Option<f64> {
 
 ## 附录 B：关键文件索引
 
-- 布局入口：`crates/drawify-core/src/layout/mod.rs`
-- 架构图布局：`crates/drawify-core/src/layout/node/architecture_v2/layout.rs`
-- 架构图两阶段：`crates/drawify-core/src/layout/node/architecture_v2/two_phase.rs`
-- 架构图后处理管线：`crates/drawify-core/src/layout/node/architecture_v2/pipeline.rs`
-- 流程图布局：`crates/drawify-core/src/layout/node/flowchart/mod.rs`
-- 流程图分治：`crates/drawify-core/src/layout/node/flowchart/group_divide.rs`
-- Sugiyama 共享引擎：`crates/drawify-core/src/layout/node/sugiyama_v2/engine.rs`
-- 排序算法：`crates/drawify-core/src/layout/node/sugiyama_v2/order.rs`
-- 坐标分配：`crates/drawify-core/src/layout/node/sugiyama_v2/coordinate.rs`
-- 层分配：`crates/drawify-core/src/layout/node/sugiyama_v2/rank.rs`
-- 跨越数共享工具：`crates/drawify-core/src/layout/node/common/crossings.rs`
-- 分组映射：`crates/drawify-core/src/layout/node/common/group_map.rs`
-- 图索引：`crates/drawify-core/src/layout/node/common/graph_index.rs`
-- 分治框架：`crates/drawify-core/src/layout/node/common/divide_and_conquer.rs`
-- 路由友好性：`crates/drawify-core/src/layout/friendliness/mod.rs`
-- 常量定义：`crates/drawify-core/src/layout/constants.rs`
+- 布局入口：`crates/plotgram-core/src/layout/mod.rs`
+- 架构图布局：`crates/plotgram-core/src/layout/node/architecture_v2/layout.rs`
+- 架构图两阶段：`crates/plotgram-core/src/layout/node/architecture_v2/two_phase.rs`
+- 架构图后处理管线：`crates/plotgram-core/src/layout/node/architecture_v2/pipeline.rs`
+- 流程图布局：`crates/plotgram-core/src/layout/node/flowchart/mod.rs`
+- 流程图分治：`crates/plotgram-core/src/layout/node/flowchart/group_divide.rs`
+- Sugiyama 共享引擎：`crates/plotgram-core/src/layout/node/sugiyama_v2/engine.rs`
+- 排序算法：`crates/plotgram-core/src/layout/node/sugiyama_v2/order.rs`
+- 坐标分配：`crates/plotgram-core/src/layout/node/sugiyama_v2/coordinate.rs`
+- 层分配：`crates/plotgram-core/src/layout/node/sugiyama_v2/rank.rs`
+- 跨越数共享工具：`crates/plotgram-core/src/layout/node/common/crossings.rs`
+- 分组映射：`crates/plotgram-core/src/layout/node/common/group_map.rs`
+- 图索引：`crates/plotgram-core/src/layout/node/common/graph_index.rs`
+- 分治框架：`crates/plotgram-core/src/layout/node/common/divide_and_conquer.rs`
+- 路由友好性：`crates/plotgram-core/src/layout/friendliness/mod.rs`
+- 常量定义：`crates/plotgram-core/src/layout/constants.rs`
 - 项目规则：`AGENTS.md`

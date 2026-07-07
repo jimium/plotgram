@@ -1,4 +1,4 @@
-# SVG 嵌入方式对 Drawify 动画设计的影响
+# SVG 嵌入方式对 Plotgram 动画设计的影响
 
 > 版本：1.0.0 | 状态：设计文档 | 日期：2026-06-24
 > 关联：[animation-capability-research.md](./animation-capability-research.md)、[animation-implementation-plan.md](./animation-implementation-plan.md)、[export-format-guide.md](./export-format-guide.md)
@@ -8,7 +8,7 @@
 
 ## 0. 摘要
 
-本文档是对 Drawify 动画能力设计决策的底层依据。我们在实现动画之前，必须回答一个问题：**同一份 SVG 文件，在不同嵌入方式下，用户能看到什么、能做什么？**
+本文档是对 Plotgram 动画能力设计决策的底层依据。我们在实现动画之前，必须回答一个问题：**同一份 SVG 文件，在不同嵌入方式下，用户能看到什么、能做什么？**
 
 经过实测验证，我们得出如下核心结论，这些结论直接约束了后续所有动画功能的设计：
 
@@ -98,7 +98,7 @@
 |-----------|------|------|
 | `<animate attributeName="opacity">` 做淡入淡出 | CSS `@keyframes` 同样能做，且兼容性更好、代码更清晰 | CSS 替代 |
 | `<animate attributeName="d">` 做路径变形 | **点数对齐问题是硬伤**——不同拓扑的路径贝塞尔控制点数量不同，SMIL `d` 插值要求点数一致，否则直接跳变。需要复杂的对齐预处理 | 改用"旧路径淡出 + 新路径淡入"（交叉淡入淡出），CSS 即可 |
-| `<animateMotion>` 沿路径运动 | CSS `offset-path` 可以替代，但考虑到 Drawify 不需要粒子沿路径运动（数据流用 `stroke-dashoffset` 即可），无需引入 | 不用 |
+| `<animateMotion>` 沿路径运动 | CSS `offset-path` 可以替代，但考虑到 Plotgram 不需要粒子沿路径运动（数据流用 `stroke-dashoffset` 即可），无需引入 | 不用 |
 | `<animate begin="btn.click">` SVG 内按钮控制 | **在 `<img>` 下完全失效**——点击事件不穿透 | 不用于核心交互；仅作为"直接打开 .svg 时的附加能力" |
 
 **SMIL 唯一不可替代的优势是 SVG 内声明式按钮交互**，但这种交互在最核心的分发渠道（GitHub `<img>`）下失效，所以没有理由把它作为主力技术。
@@ -122,7 +122,7 @@
         from { opacity: 0; transform: scale(0.5); }
         to   { opacity: 1; transform: scale(1); }
       }
-      .dfy-enter {
+      .pgm-enter {
         transform-origin: center;
         transform-box: fill-box;
         animation: dfy-enter 400ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
@@ -130,7 +130,7 @@
       @keyframes dfy-flow {
         to { stroke-dashoffset: -20; }
       }
-      .dfy-flow {
+      .pgm-flow {
         stroke-dasharray: 6 4;
         animation: dfy-flow 1s linear infinite;
       }
@@ -155,7 +155,7 @@
 
 ## 4. 对导出格式分层的设计影响
 
-基于以上能力边界，Drawify 必须提供两种导出格式，且它们之间有严格的职责划分：
+基于以上能力边界，Plotgram 必须提供两种导出格式，且它们之间有严格的职责划分：
 
 ### 4.1 SVG 导出（自播放型）
 
@@ -306,7 +306,7 @@
 
 ## 6. 对动画能力分层的设计影响
 
-基于"自播放动画是 SVG 唯一通用能力"这一事实，Drawify 的动画能力应分为三层：
+基于"自播放动画是 SVG 唯一通用能力"这一事实，Plotgram 的动画能力应分为三层：
 
 ### Layer 1：自播放动画（纯 SVG 即可，所有嵌入方式生效）
 
@@ -358,7 +358,7 @@ HTML 导出格式中，播放器同时保留"旧帧"和"新帧"两个 SVG 层（
 纯 SVG Patch 导出（单次过渡，不是 Steps）时，被删除的元素仍然保留在 SVG 中，但加上 `dfy-exit` class，CSS 让它播完退出动画后隐藏：
 
 ```css
-.dfy-exit {
+.pgm-exit {
   animation: dfy-exit 400ms ease-in forwards;
 }
 @keyframes dfy-exit {

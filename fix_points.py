@@ -4,18 +4,18 @@ import os
 import subprocess
 
 ROOT = "/Users/jimichan/zaprt-projects/flowml"
-CORE = os.path.join(ROOT, "crates/drawify-core")
+CORE = os.path.join(ROOT, "crates/plotgram-core")
 
 def get_error_files():
     result = subprocess.run(
-        ["cargo", "check", "-p", "drawify-core"],
+        ["cargo", "check", "-p", "plotgram-core"],
         cwd=ROOT,
         capture_output=True,
         text=True
     )
     files = set()
     for line in result.stderr.split("\n"):
-        m = re.search(r"-->\s*(crates/drawify-core/src/[^\s:]+)", line)
+        m = re.search(r"-->\s*(crates/plotgram-core/src/[^\s:]+)", line)
         if m:
             files.add(os.path.join(ROOT, m.group(1)))
     return list(files)

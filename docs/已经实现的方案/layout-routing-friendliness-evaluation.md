@@ -8,7 +8,7 @@
 
 ## 0. 摘要
 
-当前 Drawify 的布局与边路由是**严格的两阶段流水线**：节点布局（Sugiyama / force-directed / circular / architecture-v2 等）产出 `LayoutResult`，再交给边路由（orthogonal / spline / bezier 等）计算路径。节点布局阶段**不感知边路由的需求**，导致布局完成后路由阶段可能产生大量穿障、长绕行、交叉。现有的 [refine.rs](../../crates/drawify-core/src/layout/refine.rs) 反馈循环只在**路由完成后**检测折线穿障并局部推开节点，属于"事后补救"，且只覆盖 `Polyline` 路径。
+当前 Plotgram 的布局与边路由是**严格的两阶段流水线**：节点布局（Sugiyama / force-directed / circular / architecture-v2 等）产出 `LayoutResult`，再交给边路由（orthogonal / spline / bezier 等）计算路径。节点布局阶段**不感知边路由的需求**，导致布局完成后路由阶段可能产生大量穿障、长绕行、交叉。现有的 [refine.rs](../../crates/plotgram-core/src/layout/refine.rs) 反馈循环只在**路由完成后**检测折线穿障并局部推开节点，属于"事后补救"，且只覆盖 `Polyline` 路径。
 
 **提案**：在节点布局完成后、边路由前，插入一个**基于拓扑的快速路由友好性评估**步骤，基于节点 / group 在布局中的位置和图的拓扑结构，快速预测当前布局对边路由是否友好；若不友好，反馈给布局阶段做局部调整（节点位移、group 重排、通道预留），再进入正式路由。
 
@@ -25,7 +25,7 @@
 
 ### 1.1 当前架构
 
-`compute_layout_with_plan` 的核心流水线（[mod.rs L695-L756](../../crates/drawify-core/src/layout/mod.rs)）：
+`compute_layout_with_plan` 的核心流水线（[mod.rs L695-L756](../../crates/plotgram-core/src/layout/mod.rs)）：
 
 ```
 validate_layout_config
@@ -40,8 +40,8 @@ validate_layout_config
 
 1. 节点布局阶段（`LayoutStrategy::compute`）只产出 `nodes` / `groups` / `total_width` / `total_height` / `hints`，**不产出任何"路由友好性"信号**。
 2. 边路由阶段（`EdgeRoutingStrategy::route`）拿到的是"既成事实"的布局，只能在给定布局下做局部最优路径选择。
-3. `LayoutHints`（[mod.rs L531-L537](../../crates/drawify-core/src/layout/mod.rs)）目前只携带 `circular` / `sequence` / `edge_routing_style` 三类算法特定提示，**没有路由友好性反馈通道**。
-4. `refine.rs` 的反馈循环（[refine.rs L179-L227](../../crates/drawify-core/src/layout/refine.rs)）在路由**之后**才检测穿障，且只对 `Polyline` 路径生效——bezier / circular / straight 路径不参与。
+3. `LayoutHints`（[mod.rs L531-L537](../../crates/plotgram-core/src/layout/mod.rs)）目前只携带 `circular` / `sequence` / `edge_routing_style` 三类算法特定提示，**没有路由友好性反馈通道**。
+4. `refine.rs` 的反馈循环（[refine.rs L179-L227](../../crates/plotgram-core/src/layout/refine.rs)）在路由**之后**才检测穿障，且只对 `Polyline` 路径生效——bezier / circular / straight 路径不参与。
 
 ### 1.2 信息量缺失的具体表现
 
@@ -73,27 +73,27 @@ validate_layout_config
 
 | 信号 | 位置 | 现状 | 复用价值 |
 |------|------|------|---------|
-| 边穿障检测 | [refine.rs L67-L110](../../crates/drawify-core/src/layout/refine.rs) `analyze_edge_node_crossings` | 路由后检测 Polyline 穿障 | ★★★ 算法可直接复用为"事后友好度"基准 |
-| orthogonal 障碍惩罚 | [scoring.rs L47-L76](../../crates/drawify-core/src/layout/edge/edge_routing_orthogonal/scoring.rs) `obstacle_penalty` | 路由时对穿障路径加惩罚 | ★★ 惩罚函数可前移为预测信号 |
-| orthogonal 近距擦过 | [scoring.rs L159-L178](../../crates/drawify-core/src/layout/edge/edge_routing_orthogonal/scoring.rs) `segment_near_misses_node` | 检测贴边擦过 | ★★ 可作为"通道狭窄"信号 |
-| 可见性图 | [visibility.rs L103-L156](../../crates/drawify-core/src/layout/edge/visibility.rs) `ObstacleIndex` | spline 路由的障碍索引 | ★★★ 可复用为"通道可用性"评估 |
-| 评估指标 | [drawify-eval/metrics.rs L20-L56](../../crates/drawify-eval/src/metrics.rs) `LayoutMetrics` | 事后计算交叉数 / 穿障 / 边长方差 | ★★★ 度量定义可直接复用 |
-| group 边界 | [mod.rs L82-L109](../../crates/drawify-core/src/layout/mod.rs) `GroupLayout` | group 包围框 + margin | ★★ 可用于 group 通道宽度计算 |
-| LayoutHints | [mod.rs L531-L537](../../crates/drawify-core/src/layout/mod.rs) | 算法特定提示 | ★ 可扩展为友好性反馈通道 |
+| 边穿障检测 | [refine.rs L67-L110](../../crates/plotgram-core/src/layout/refine.rs) `analyze_edge_node_crossings` | 路由后检测 Polyline 穿障 | ★★★ 算法可直接复用为"事后友好度"基准 |
+| orthogonal 障碍惩罚 | [scoring.rs L47-L76](../../crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs) `obstacle_penalty` | 路由时对穿障路径加惩罚 | ★★ 惩罚函数可前移为预测信号 |
+| orthogonal 近距擦过 | [scoring.rs L159-L178](../../crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs) `segment_near_misses_node` | 检测贴边擦过 | ★★ 可作为"通道狭窄"信号 |
+| 可见性图 | [visibility.rs L103-L156](../../crates/plotgram-core/src/layout/edge/visibility.rs) `ObstacleIndex` | spline 路由的障碍索引 | ★★★ 可复用为"通道可用性"评估 |
+| 评估指标 | [plotgram-eval/metrics.rs L20-L56](../../crates/plotgram-eval/src/metrics.rs) `LayoutMetrics` | 事后计算交叉数 / 穿障 / 边长方差 | ★★★ 度量定义可直接复用 |
+| group 边界 | [mod.rs L82-L109](../../crates/plotgram-core/src/layout/mod.rs) `GroupLayout` | group 包围框 + margin | ★★ 可用于 group 通道宽度计算 |
+| LayoutHints | [mod.rs L531-L537](../../crates/plotgram-core/src/layout/mod.rs) | 算法特定提示 | ★ 可扩展为友好性反馈通道 |
 
 ### 2.2 现有反馈循环的局限
 
-[refine.rs](../../crates/drawify-core/src/layout/refine.rs) 的 `run_refine` 是当前唯一的布局 ↔ 路由反馈，但存在以下局限：
+[refine.rs](../../crates/plotgram-core/src/layout/refine.rs) 的 `run_refine` 是当前唯一的布局 ↔ 路由反馈，但存在以下局限：
 
 1. **时机靠后**：在路由完成后才检测，此时布局已"定型"，只能局部推开节点（`push_problem_nodes`），无法做结构性调整（如 group 重排、层间距调整）。
-2. **覆盖不全**：只检测 `PathGeometry::Polyline`（[refine.rs L77-L79](../../crates/drawify-core/src/layout/refine.rs)），bezier / circular / straight 路径不参与。
-3. **无前瞻**：推开一个节点可能引入新的穿障（依赖回退机制兜底，[refine.rs L215-L223](../../crates/drawify-core/src/layout/refine.rs)），但没有"推开前预测"能力。
+2. **覆盖不全**：只检测 `PathGeometry::Polyline`（[refine.rs L77-L79](../../crates/plotgram-core/src/layout/refine.rs)），bezier / circular / straight 路径不参与。
+3. **无前瞻**：推开一个节点可能引入新的穿障（依赖回退机制兜底，[refine.rs L215-L223](../../crates/plotgram-core/src/layout/refine.rs)），但没有"推开前预测"能力。
 4. **无全局视角**：只针对单条边的穿障，不评估"这条边的绕行会不会挤压其他边的通道"。
 5. **无 group 感知**：推开节点时不考虑 group 边界约束，可能把节点推出 group。
 
 ### 2.3 度量体系现状
 
-[drawify-eval/metrics.rs](../../crates/drawify-eval/src/metrics.rs) 的 `LayoutMetrics` 已定义 11 个事后度量，但：
+[plotgram-eval/metrics.rs](../../crates/plotgram-eval/src/metrics.rs) 的 `LayoutMetrics` 已定义 11 个事后度量，但：
 
 - 全部是**事后评估**（post-hoc），在路由完成后计算，无法用于布局阶段预测。
 - 缺少**通道拥堵度**、**group 间距充裕度**、**长边跨层数**等与路由友好性强相关的度量。
@@ -105,7 +105,7 @@ validate_layout_config
 
 ### 3.1 VLSI/EDA 领域：routability-driven placement（最强支持）
 
-VLSI 物理设计与 Drawify 的布局-路由问题**结构同构**：placement ↔ 节点布局，global routing ↔ 边路由。VLSI 领域有 15+ 年的"可布性驱动布局"研究主线，是提案最直接的前置工作。
+VLSI 物理设计与 Plotgram 的布局-路由问题**结构同构**：placement ↔ 节点布局，global routing ↔ 边路由。VLSI 领域有 15+ 年的"可布性驱动布局"研究主线，是提案最直接的前置工作。
 
 #### 3.1.1 SimPLR — lookahead routing（ICCAD 2011）
 
@@ -124,7 +124,7 @@ VLSI 物理设计与 Drawify 的布局-路由问题**结构同构**：placement 
 
 **与提案的对应**：
 
-| SimPLR | Drawify 提案 |
+| SimPLR | Plotgram 提案 |
 |--------|-------------|
 | 快速全局路由器 | 快速友好性评估器（可见性图 / RUDY） |
 | 中间布局多次评估 | 布局后、路由前的评估点 |
@@ -144,7 +144,7 @@ VLSI 物理设计与 Drawify 的布局-路由问题**结构同构**：placement 
 - **可嵌入力导向布局器**：在拥堵区减少路由需求（推开节点），在非拥堵区增加路由供应。
 - **效果**：比 mPL/ROOSTER/APlace 减少 9%/8%/5% 布线线长，速度快 8 倍。
 
-**对 Drawify 的直接价值**：RUDY 密度图是**最轻量、最路由器无关**的友好性估计，可直接迁移到图布局。每条边贡献一个矩形（从 from 节点到 to 节点的包围框），叠加成密度场，密度高的区域即潜在拥堵区。
+**对 Plotgram 的直接价值**：RUDY 密度图是**最轻量、最路由器无关**的友好性估计，可直接迁移到图布局。每条边贡献一个矩形（从 from 节点到 to 节点的包围框），叠加成密度场，密度高的区域即潜在拥堵区。
 
 #### 3.1.3 Congestion-driven placement — cell inflation（DAC 2025）
 
@@ -157,7 +157,7 @@ VLSI 物理设计与 Drawify 的布局-路由问题**结构同构**：placement 
 - **全局路由拥堵**：过多网穿过 G-cell → 不能靠移动 cell 解决，需**可微拥堵函数**。
 - **Momentum-based cell inflation**：考虑历史膨胀比，避免 cell 回流到拥堵区。
 
-**对 Drawify 的启发**：
+**对 Plotgram 的启发**：
 
 - cell inflation ↔ 在拥堵区"膨胀"节点 margin，推开邻居——可直接迁移到力导向 / 约束求解布局。
 - momentum 机制 ↔ 避免节点在多次反馈中回流到不友好位置。
@@ -182,7 +182,7 @@ VLSI 物理设计与 Drawify 的布局-路由问题**结构同构**：placement 
 
 **核心**：训练 **RouteGNN**（定制 GNN）预测 placement 的可布性，融合几何 + 拓扑表示，作为**可微代理**支持端到端梯度优化。
 
-**对 Drawify 的长期价值**：若启发式评估器精度不足，可考虑训练 GNN 代理。但需要先积累 (布局, 路由质量) 数据集——Drawify 的 [drawify-eval](../../crates/drawify-eval/) 框架天然适合生成此类数据。
+**对 Plotgram 的长期价值**：若启发式评估器精度不足，可考虑训练 GNN 代理。但需要先积累 (布局, 路由质量) 数据集——Plotgram 的 [plotgram-eval](../../crates/plotgram-eval/) 框架天然适合生成此类数据。
 
 ### 3.2 图绘制领域：质量度量与隐式耦合
 
@@ -322,7 +322,7 @@ hotspots = regions where density_field > threshold
 
 **与路由器相关性**：高密度区 → orthogonal 通道绕行困难 / spline 可见性图路径长 / bezier 穿障概率高。
 
-**Drawify 复用点**：[GroupLayout](../../crates/drawify-core/src/layout/mod.rs) 的 margin 可作为 group 通道宽度；[NodeLayout](../../crates/drawify-core/src/layout/mod.rs) 的 margin 可作为节点膨胀间距。
+**Plotgram 复用点**：[GroupLayout](../../crates/plotgram-core/src/layout/mod.rs) 的 margin 可作为 group 通道宽度；[NodeLayout](../../crates/plotgram-core/src/layout/mod.rs) 的 margin 可作为节点膨胀间距。
 
 #### 4.2.2 长边跨层度（Long-edge Span）— Sugiyama 专属
 
@@ -341,7 +341,7 @@ hotspots = regions where density_field > threshold
 
 **与路由器相关性**：跨层边在 orthogonal 路由中必然产生折弯，在 spline 路由中可见性图路径长。
 
-**Drawify 复用点**：[sugiyama_v2](../../crates/drawify-core/src/layout/node/sugiyama_v2/) 已有 rank 信息，可扩展 `LayoutHints` 携带 rank map。
+**Plotgram 复用点**：[sugiyama_v2](../../crates/plotgram-core/src/layout/node/sugiyama_v2/) 已有 rank 信息，可扩展 `LayoutHints` 携带 rank map。
 
 #### 4.2.3 group 间距充裕度（Group Gap Adequacy）
 
@@ -362,7 +362,7 @@ hotspots = regions where density_field > threshold
 
 **与路由器相关性**：group 间距不足 → 跨 group 边被迫绕 group 外圈，产生长绕行。
 
-**Drawify 复用点**：[architecture_v2/two_phase.rs](../../crates/drawify-core/src/layout/node/architecture_v2/two_phase.rs) 已有 group 间宏观定位，可在此处评估间距充裕度。
+**Plotgram 复用点**：[architecture_v2/two_phase.rs](../../crates/plotgram-core/src/layout/node/architecture_v2/two_phase.rs) 已有 group 间宏观定位，可在此处评估间距充裕度。
 
 #### 4.2.4 穿障预测度（Obstacle Crossing Prediction）
 
@@ -382,7 +382,7 @@ hotspots = regions where density_field > threshold
 
 **与路由器相关性**：直线穿障数高 → bezier 必穿障（bezier 不避障）、spline 需绕行、orthogonal 需通道绕行。
 
-**Drawify 复用点**：直接复用 [refine.rs L262-L314](../../crates/drawify-core/src/layout/refine.rs) 的 `segment_intersects_aabb`，以及 [visibility.rs](../../crates/drawify-core/src/layout/edge/visibility.rs) 的 `ObstacleIndex`。
+**Plotgram 复用点**：直接复用 [refine.rs L262-L314](../../crates/plotgram-core/src/layout/refine.rs) 的 `segment_intersects_aabb`，以及 [visibility.rs](../../crates/plotgram-core/src/layout/edge/visibility.rs) 的 `ObstacleIndex`。
 
 #### 4.2.5 端口冲突度（Port Conflict）
 
@@ -405,7 +405,7 @@ hotspots = regions where density_field > threshold
 
 **与路由器相关性**：端口冲突 → orthogonal slot 拥挤、箭头分散。
 
-**Drawify 复用点**：[edge_routing_orthogonal/slot.rs](../../crates/drawify-core/src/layout/edge/edge_routing_orthogonal/slot.rs) 的 `slot_fraction`（L93）与 [edge_routing_orthogonal/mod.rs](../../crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs) 的 `SLOT_PITCH`（L50）。
+**Plotgram 复用点**：[edge_routing_orthogonal/slot.rs](../../crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/slot.rs) 的 `slot_fraction`（L93）与 [edge_routing_orthogonal/mod.rs](../../crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs) 的 `SLOT_PITCH`（L50）。
 
 #### 4.2.6 复合友好度分数
 
@@ -476,7 +476,7 @@ let mut result = router.route(diagram, result);
 **价值**：
 
 - 零风险，不改变现有行为。
-- 可在 [drawify-eval](../../crates/drawify-eval/) 中对比 `friendliness_score` 与事后 `LayoutMetrics`（交叉数、穿障数）的相关性，校准权重。
+- 可在 [plotgram-eval](../../crates/plotgram-eval/) 中对比 `friendliness_score` 与事后 `LayoutMetrics`（交叉数、穿障数）的相关性，校准权重。
 - 为 V2 反馈模式积累数据。
 
 #### 4.4.2 V2：反馈模式（局部调整）
@@ -498,14 +498,14 @@ if report.score < FRIENDLINESS_THRESHOLD {
 }
 ```
 
-**调整策略**（借鉴 VLSI cell inflation + Drawify refine）：
+**调整策略**（借鉴 VLSI cell inflation + Plotgram refine）：
 
 | 热点类型 | 调整策略 | 借鉴来源 |
 |---------|---------|---------|
 | 通道拥堵 | 膨胀拥堵区节点 margin，推开邻居 | VLSI cell inflation |
 | group 间距不足 | 增加问题 group 对的间距 | architecture_v2 group gap |
 | 长边跨层 | 在中间层插入虚拟通道节点 | Graphviz dot 虚拟节点链 |
-| 穿障预测 | 沿穿障法线推开中间节点（复用 refine.rs `push_problem_nodes`） | Drawify refine |
+| 穿障预测 | 沿穿障法线推开中间节点（复用 refine.rs `push_problem_nodes`） | Plotgram refine |
 | 端口冲突 | 增加节点侧边长度或分散到多侧 | orthogonal slot |
 
 #### 4.4.3 V3：布局目标集成（长期）
@@ -598,14 +598,14 @@ pub struct LayoutHints {
 | **架构兼容性** | ✅ 高 | V1 诊断模式零侵入；V2 反馈模式复用 refine.rs 的回退机制；不推翻两阶段架构 |
 | **数据可得性** | ✅ 高 | 所需数据（nodes / groups / edges / ranks）布局阶段全部可用 |
 | **性能可行性** | ✅ 高 | RUDY 密度图 O(\|E\|)；穿障预测可用 ObstacleIndex 加速；总体 < 20% 路由时间 |
-| **校准可行性** | ⚠️ 中 | 需积累 (布局, 路由质量) 数据对，但 drawify-eval 框架已具备 |
+| **校准可行性** | ⚠️ 中 | 需积累 (布局, 路由质量) 数据对，但 plotgram-eval 框架已具备 |
 
 ### 5.2 有效性
 
 #### 5.2.1 有利证据
 
 1. **VLSI 领域强证据**：SimPLR 证明 lookahead routing 反馈布局可显著减少线长与拥堵；RUDY 证明密度图估计与真实路由质量强相关。
-2. **度量相关性**：Drawify 现有的 `edge_node_crossings`（[metrics.rs L25](../../crates/drawify-eval/src/metrics.rs)）与提案的"穿障预测度"高度相关——直线穿障是 Polyline 穿障的上界。
+2. **度量相关性**：Plotgram 现有的 `edge_node_crossings`（[metrics.rs L25](../../crates/plotgram-eval/src/metrics.rs)）与提案的"穿障预测度"高度相关——直线穿障是 Polyline 穿障的上界。
 3. **填补已知空白**：[edge-routing-optimization-plan.md](./edge-routing-optimization-plan.md) §2.2 已识别"bezier/circular 不避障"问题，提案的穿障预测可前移该问题的检测时机。
 
 #### 5.2.2 风险与不确定性
@@ -622,7 +622,7 @@ pub struct LayoutHints {
 
 **阶段 1（V1 诊断模式）**：
 
-1. 在 [drawify-eval](../../crates/drawify-eval/) 中新增 `friendliness_score` 指标。
+1. 在 [plotgram-eval](../../crates/plotgram-eval/) 中新增 `friendliness_score` 指标。
 2. 对 benchmarks/ 下的所有样例（[round01_baseline.json](../../benchmarks/round01_baseline.json) 等）计算友好度与事后度量的相关性。
 3. **验收标准**：`friendliness_score` 与 `edge_node_crossings` 的 Pearson 相关系数 > 0.6；与 `edge_crossings` 的 Pearson > 0.5。
 
@@ -637,7 +637,7 @@ pub struct LayoutHints {
 
 ### Phase 0：校准数据积累（前置）
 
-**目标**：在 V1 之前，先用现有 [drawify-eval](../../crates/drawify-eval/) 框架积累 (布局, 路由质量) 数据对。
+**目标**：在 V1 之前，先用现有 [plotgram-eval](../../crates/plotgram-eval/) 框架积累 (布局, 路由质量) 数据对。
 
 **任务**：
 
@@ -653,7 +653,7 @@ pub struct LayoutHints {
 
 **任务**：
 
-1. 新增 [layout/friendliness/](../../crates/drawify-core/src/layout/) 模块：
+1. 新增 [layout/friendliness/](../../crates/plotgram-core/src/layout/) 模块：
    - `mod.rs`：`RoutingFriendlinessEvaluator` + `FriendlinessReport`
    - `congestion.rs`：RUDY 密度图
    - `long_edge.rs`：长边跨层度（需 Sugiyama 导出 rank）
@@ -662,7 +662,7 @@ pub struct LayoutHints {
    - `port_conflict.rs`：端口冲突度
 2. 扩展 `LayoutHints`，新增 `friendliness_report: Option<FriendlinessReport>`。
 3. 在 `compute_layout_with_plan` 中、`router.route` 之前调用评估器。
-4. 在 drawify-eval 中新增 `friendliness_score` 指标，对比与事后度量的相关性。
+4. 在 plotgram-eval 中新增 `friendliness_score` 指标，对比与事后度量的相关性。
 
 **验收**：Pearson > 0.6；评估开销 < 20% 路由时间；现有测试全通过。
 
@@ -673,7 +673,7 @@ pub struct LayoutHints {
 **任务**：
 
 1. 新增 `FriendlinessAdjuster`，实现五类调整策略（见 §4.4.2 表格）。
-2. 复用 [refine.rs](../../crates/drawify-core/src/layout/refine.rs) 的回退机制：调整后重新评估，若分数未改善则回退。
+2. 复用 [refine.rs](../../crates/plotgram-core/src/layout/refine.rs) 的回退机制：调整后重新评估，若分数未改善则回退。
 3. 引入 momentum 机制（借鉴 VLSI DAC 2025）：记录节点历史位移，避免回流到不友好位置。
 4. 与 [Layout Intent](./layout-intent-optimized.md) 集成：pinned 节点不参与位移。
 
@@ -725,7 +725,7 @@ pub struct LayoutHints {
 
 ### 7.3 与现有反馈机制的关系
 
-提案**不替代** [refine.rs](../../crates/drawify-core/src/layout/refine.rs) 的事后反馈，而是**前移**问题检测：
+提案**不替代** [refine.rs](../../crates/plotgram-core/src/layout/refine.rs) 的事后反馈，而是**前移**问题检测：
 
 ```
 布局 → 友好性评估（提案，事前）→ 路由 → refine（现有，事后）
@@ -764,17 +764,17 @@ pub struct LayoutHints {
 
 | 模块 | 文件 | 关键函数 / 结构 | 复用价值 |
 |------|------|----------------|---------|
-| 布局调度 | [mod.rs](../../crates/drawify-core/src/layout/mod.rs) | `compute_layout_with_plan` L695 | 评估器插入点 |
-| 布局结果 | [mod.rs](../../crates/drawify-core/src/layout/mod.rs) | `LayoutResult` L541 / `LayoutHints` L531 | 扩展 friendliness_report |
-| 节点布局 | [mod.rs](../../crates/drawify-core/src/layout/mod.rs) | `NodeLayout` L51 / `GroupLayout` L82 | 评估输入 |
-| refine 反馈 | [refine.rs](../../crates/drawify-core/src/layout/refine.rs) | `run_refine` L179 / `analyze_edge_node_crossings` L67 | 回退机制 + 穿障检测复用 |
-| 穿障检测 | [refine.rs](../../crates/drawify-core/src/layout/refine.rs) | `segment_intersects_aabb` L262 | 穿障预测复用 |
-| 可见性图 | [visibility.rs](../../crates/drawify-core/src/layout/edge/visibility.rs) | `ObstacleIndex` L103 | 通道可用性评估 |
-| orthogonal 评分 | [scoring.rs](../../crates/drawify-core/src/layout/edge/edge_routing_orthogonal/scoring.rs) | `obstacle_penalty` L47 / `segment_near_misses_node` L159 | 惩罚函数前移 |
-| orthogonal slot | [slot.rs](../../crates/drawify-core/src/layout/edge/edge_routing_orthogonal/slot.rs) / [mod.rs](../../crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs) | `slot_fraction` L93 / `SLOT_PITCH` L50 | 端口冲突度复用 |
-| Sugiyama rank | [sugiyama_v2/rank.rs](../../crates/drawify-core/src/layout/node/sugiyama_v2/rank.rs) | rank 分配 | 长边跨层度输入 |
-| 架构图 group | [architecture_v2/two_phase.rs](../../crates/drawify-core/src/layout/node/architecture_v2/two_phase.rs) | group 宏观定位 | group 间距评估 |
-| 评估指标 | [drawify-eval/metrics.rs](../../crates/drawify-eval/src/metrics.rs) | `LayoutMetrics` L20 | 度量定义复用 + 校准 |
+| 布局调度 | [mod.rs](../../crates/plotgram-core/src/layout/mod.rs) | `compute_layout_with_plan` L695 | 评估器插入点 |
+| 布局结果 | [mod.rs](../../crates/plotgram-core/src/layout/mod.rs) | `LayoutResult` L541 / `LayoutHints` L531 | 扩展 friendliness_report |
+| 节点布局 | [mod.rs](../../crates/plotgram-core/src/layout/mod.rs) | `NodeLayout` L51 / `GroupLayout` L82 | 评估输入 |
+| refine 反馈 | [refine.rs](../../crates/plotgram-core/src/layout/refine.rs) | `run_refine` L179 / `analyze_edge_node_crossings` L67 | 回退机制 + 穿障检测复用 |
+| 穿障检测 | [refine.rs](../../crates/plotgram-core/src/layout/refine.rs) | `segment_intersects_aabb` L262 | 穿障预测复用 |
+| 可见性图 | [visibility.rs](../../crates/plotgram-core/src/layout/edge/visibility.rs) | `ObstacleIndex` L103 | 通道可用性评估 |
+| orthogonal 评分 | [scoring.rs](../../crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs) | `obstacle_penalty` L47 / `segment_near_misses_node` L159 | 惩罚函数前移 |
+| orthogonal slot | [slot.rs](../../crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/slot.rs) / [mod.rs](../../crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs) | `slot_fraction` L93 / `SLOT_PITCH` L50 | 端口冲突度复用 |
+| Sugiyama rank | [sugiyama_v2/rank.rs](../../crates/plotgram-core/src/layout/node/sugiyama_v2/rank.rs) | rank 分配 | 长边跨层度输入 |
+| 架构图 group | [architecture_v2/two_phase.rs](../../crates/plotgram-core/src/layout/node/architecture_v2/two_phase.rs) | group 宏观定位 | group 间距评估 |
+| 评估指标 | [plotgram-eval/metrics.rs](../../crates/plotgram-eval/src/metrics.rs) | `LayoutMetrics` L20 | 度量定义复用 + 校准 |
 
 ### 9.2 学术引用
 
@@ -796,7 +796,7 @@ pub struct LayoutHints {
 
 ### 9.3 术语对照
 
-| VLSI 术语 | Drawify 对应 | 说明 |
+| VLSI 术语 | Plotgram 对应 | 说明 |
 |-----------|-------------|------|
 | placement | 节点布局 | 节点 / group 坐标分配 |
 | global routing | 边路由 | orthogonal / spline / bezier 路径计算 |

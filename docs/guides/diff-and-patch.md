@@ -1,8 +1,8 @@
 # 语义 Diff 与 Patch 使用指南
 
-Drawify 在 **RawDiagram**（parse 之后、prepare 之前）层提供结构化 diff 与 patch，用于 PR 审阅和 Agent 增量改图。
+Plotgram 在 **RawDiagram**（parse 之后、prepare 之前）层提供结构化 diff 与 patch，用于 PR 审阅和 Agent 增量改图。
 
-> 实现：`crates/drawify-core/src/diff2/`  
+> 实现：`crates/plotgram-core/src/diff2/`  
 > 详细 API 注释：同目录 `README.md`
 
 ---
@@ -40,8 +40,8 @@ Drawify 在 **RawDiagram**（parse 之后、prepare 之前）层提供结构化 
 ### 生成变更集
 
 ```bash
-drawify diff -o old.dfy -n new.dfy
-drawify diff -o old.dfy -n new.dfy --format json > changes.json
+plotgram diff -o old.pgm -n new.pgm
+plotgram diff -o old.pgm -n new.pgm --format json > changes.json
 ```
 
 文本模式：统计 `+` / `-` / `~` 并列出路径。
@@ -49,7 +49,7 @@ drawify diff -o old.dfy -n new.dfy --format json > changes.json
 ### 应用补丁
 
 ```bash
-drawify patch base.dfy changes.json -o result.json
+plotgram patch base.pgm changes.json -o result.json
 ```
 
 - 接受 `ChangeSet` 或 `Change[]` JSON
@@ -61,9 +61,9 @@ drawify patch base.dfy changes.json -o result.json
 ## Rust API
 
 ```rust
-use drawify_core::diff2::{self, ChangeSet};
-use drawify_core::pipeline::{parse, prepare};
-use drawify_core::prepare::StyleRequest;
+use plotgram_core::diff2::{self, ChangeSet};
+use plotgram_core::pipeline::{parse, prepare};
+use plotgram_core::prepare::StyleRequest;
 
 let old = parse(&old_source)?;
 let new = parse(&new_source)?;
@@ -139,12 +139,12 @@ pub struct PatchResult { diagram, applied, errors }
 
 ## Agent 推荐流程
 
-1. 读取基准图 `base.dfy`，`parse` 得 `RawDiagram`
-2. 用 LLM 生成目标图或手工编辑得 `new.dfy`
+1. 读取基准图 `base.pgm`，`parse` 得 `RawDiagram`
+2. 用 LLM 生成目标图或手工编辑得 `new.pgm`
 3. `diff(base, new)` → `ChangeSet`（可审查、可裁剪）
 4. `patch(base, Δ)` → 更新后的 `RawDiagram`
 5. `prepare` + `validate` + `render` 验证
-6. 可选：`format` 写回 `.dfy` 文本
+6. 可选：`format` 写回 `.pgm` 文本
 
 避免让 Agent 直接输出整文件 DSL，可减少语法错误与无关 diff。
 
@@ -160,6 +160,6 @@ pub struct PatchResult { diagram, applied, errors }
 
 ## 相关文档
 
-- [drawify-cli.md](drawify-cli.md) — `diff` / `patch` 命令
+- [plotgram-cli.md](plotgram-cli.md) — `diff` / `patch` 命令
 - [render-pipeline.md](render-pipeline.md) — parse / prepare 阶段
 - [specs/ast-spec.md](../specs/ast-spec.md) — AST 结构

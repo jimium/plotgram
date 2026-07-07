@@ -11,7 +11,7 @@
 ### 1.1 已有基础机制
 
 当前代码库中**已经实现了基于文字宽度的节点尺寸计算**，核心逻辑在
-[node_sizing.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/common/node_sizing.rs#L45-L51)：
+[node_sizing.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/common/node_sizing.rs#L45-L51)：
 
 ```rust
 pub fn standard_node_size(entity: &Entity) -> (f64, f64) {
@@ -27,15 +27,15 @@ pub fn standard_node_size(entity: &Entity) -> (f64, f64) {
 
 | 参数 | 当前值 | 说明 | 定义位置 |
 |------|--------|------|----------|
-| `LABEL_CHAR_WIDTH` | 11.0px | 每个"显示宽度单位"的像素值 | [node_sizing.rs#L16](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/common/node_sizing.rs#L16-L16) |
-| `LABEL_WIDTH_OFFSET` | 44.0px | 左右 padding + border 总宽度 | [node_sizing.rs#L18](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/common/node_sizing.rs#L18-L18) |
-| `MIN_NODE_WIDTH` | 96.0px | 节点最小宽度 | [node_sizing.rs#L20](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/common/node_sizing.rs#L20-L20) |
-| `MAX_NODE_WIDTH` | 240.0px | 节点最大宽度 | [node_sizing.rs#L22](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/common/node_sizing.rs#L22-L22) |
-| `DEFAULT_NODE_HEIGHT` | 40.0px | 默认节点高度 | [constants.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/constants.rs) |
+| `LABEL_CHAR_WIDTH` | 11.0px | 每个"显示宽度单位"的像素值 | [node_sizing.rs#L16](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/common/node_sizing.rs#L16-L16) |
+| `LABEL_WIDTH_OFFSET` | 44.0px | 左右 padding + border 总宽度 | [node_sizing.rs#L18](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/common/node_sizing.rs#L18-L18) |
+| `MIN_NODE_WIDTH` | 96.0px | 节点最小宽度 | [node_sizing.rs#L20](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/common/node_sizing.rs#L20-L20) |
+| `MAX_NODE_WIDTH` | 240.0px | 节点最大宽度 | [node_sizing.rs#L22](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/common/node_sizing.rs#L22-L22) |
+| `DEFAULT_NODE_HEIGHT` | 40.0px | 默认节点高度 | [constants.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/constants.rs) |
 
 ### 1.3 图标宽度叠加机制
 
-节点图标（semantic icon）的宽度通过 [apply_icon_to_node_size](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/icons/layout.rs#L10-L29) 函数在基础宽度上叠加：
+节点图标（semantic icon）的宽度通过 [apply_icon_to_node_size](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/icons/layout.rs#L10-L29) 函数在基础宽度上叠加：
 
 ```rust
 pub fn apply_icon_to_node_size(entity: &Entity, width: f64, height: f64, options: &ResolveOptions) -> (f64, f64) {
@@ -46,7 +46,7 @@ pub fn apply_icon_to_node_size(entity: &Entity, width: f64, height: f64, options
 }
 ```
 
-该函数在 [styled_node_size](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/mod.rs#L1633-L1633) 末尾被调用，确保图标节点有足够空间。
+该函数在 [styled_node_size](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/mod.rs#L1633-L1633) 末尾被调用，确保图标节点有足够空间。
 
 ### 1.4 使用该机制的布局算法
 
@@ -63,7 +63,7 @@ pub fn apply_icon_to_node_size(entity: &Entity, width: f64, height: f64, options
 
 **问题描述**：使用 `unicode_width::UnicodeWidthStr::width()` 统一乘以 11.0px，没有区分 ASCII 和 CJK 字符的实际宽度差异。
 
-**边标签的对比参照**：边标签宽度估算 [estimate_label_width](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/common/label_avoidance.rs#L393-L403) 已经做了 ASCII/CJK 区分：
+**边标签的对比参照**：边标签宽度估算 [estimate_label_width](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/common/label_avoidance.rs#L393-L403) 已经做了 ASCII/CJK 区分：
 
 ```rust
 pub fn estimate_label_width(text: &str) -> f64 {
@@ -110,7 +110,7 @@ pub fn estimate_label_width(text: &str) -> f64 {
 
 ### 2.4 不支持多行文字 📝
 
-- 所有节点标签都是单行渲染（见 [render_centered_label](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/icons/render.rs#L130-L147)）
+- 所有节点标签都是单行渲染（见 [render_centered_label](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/icons/render.rs#L130-L147)）
 - 长文本没有自动换行机制
 - 节点高度固定为 `DEFAULT_NODE_HEIGHT`
 - 用户无法通过 DSL 控制换行
@@ -147,7 +147,7 @@ pub fn estimate_label_width(text: &str) -> f64 {
 
 #### 4.1.1 核心改动
 
-**文件**：[node_sizing.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/common/node_sizing.rs)
+**文件**：[node_sizing.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/common/node_sizing.rs)
 
 1. 新增 ASCII/CJK 区分的字符宽度计算函数，对齐 `estimate_label_width` 的逻辑
 2. 重新校准 `LABEL_WIDTH_OFFSET`（左右 padding 值）
@@ -184,7 +184,7 @@ pub fn estimate_label_width(text: &str) -> f64 {
 #### 4.2.1 字体大小自适应
 
 **改动点**：
-- 从实体样式 / 主题中读取字体大小（参考 [entity_label_font_size](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/render/color_queries.rs)）
+- 从实体样式 / 主题中读取字体大小（参考 [entity_label_font_size](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/render/color_queries.rs)）
 - 基础字符宽度按字体大小比例缩放
 - 默认字体大小下的行为与阶段 1 一致
 
@@ -218,7 +218,7 @@ pub fn estimate_label_width(text: &str) -> f64 {
    - 最小高度保证（单行时与现状一致）
 
 3. **渲染层支持**：
-   - 修改 [render_centered_label](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/icons/render.rs#L130-L147) 支持多行
+   - 修改 [render_centered_label](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/icons/render.rs#L130-L147) 支持多行
    - 使用多个 `<tspan>` 元素或多个 `<text>` 元素
    - 行高、垂直居中逻辑调整
 
@@ -277,7 +277,7 @@ pub fn estimate_label_width(text: &str) -> f64 {
 
 用户通过 `style: { width: 200 }` 显式设置的宽度应**优先**于自动计算。
 
-这一点当前 [styled_node_size](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/mod.rs#L1611-L1634) 已经正确处理了：
+这一点当前 [styled_node_size](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/mod.rs#L1611-L1634) 已经正确处理了：
 - 先读取 style 中的 width/height，有则使用
 - 没有则使用传入的默认值（自动计算的值）
 
@@ -287,13 +287,13 @@ pub fn estimate_label_width(text: &str) -> f64 {
 
 | 文件 | 作用 |
 |------|------|
-| [node_sizing.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/common/node_sizing.rs) | 节点尺寸计算核心逻辑 |
-| [layout.rs (icons)](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/icons/layout.rs) | 图标尺寸叠加逻辑 |
-| [render.rs (icons)](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/icons/render.rs) | 节点内容渲染（文字+图标） |
-| [label_avoidance.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/common/label_avoidance.rs) | 边标签宽度估算（参考实现） |
-| [constants.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/constants.rs) | 布局常量定义 |
-| [mod.rs (layout)](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/mod.rs) | `styled_node_size` 函数 |
-| [node.rs (paint)](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/render/paint/node.rs) | 节点 SVG 绘制入口 |
+| [node_sizing.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/common/node_sizing.rs) | 节点尺寸计算核心逻辑 |
+| [layout.rs (icons)](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/icons/layout.rs) | 图标尺寸叠加逻辑 |
+| [render.rs (icons)](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/icons/render.rs) | 节点内容渲染（文字+图标） |
+| [label_avoidance.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/common/label_avoidance.rs) | 边标签宽度估算（参考实现） |
+| [constants.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/constants.rs) | 布局常量定义 |
+| [mod.rs (layout)](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/mod.rs) | `styled_node_size` 函数 |
+| [node.rs (paint)](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/render/paint/node.rs) | 节点 SVG 绘制入口 |
 
 ---
 

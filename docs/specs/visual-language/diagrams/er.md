@@ -21,7 +21,7 @@
 
 ## 语法入口
 
-```drawify
+```plotgram
 diagram er {
     layout: top-to-bottom
     title: "用户与文章"
@@ -65,7 +65,7 @@ ER 图**不限制** entity type（`ER_PROFILE.entity_types` 为空）— 所有 
 
 **基数标注** — 在 relation 属性块中声明：
 
-```drawify
+```plotgram
 user -> post "发表" {
     cardinality: "1:N"
 }
@@ -92,7 +92,7 @@ user -> post "发表" {
 
 可用 group 按**模式（schema）或业务域**划分表集合：
 
-```drawify
+```plotgram
 group core "核心业务" {
     entity user "User" { type: database }
     entity order "Order" { type: database }
@@ -125,10 +125,10 @@ group billing "计费" {
 
 | 复杂度 | 路径 | 说明 |
 |--------|------|------|
-| 简单 | `showcase/er/s.user-post.dfy` | 两表一对多 |
-| 简单 | `showcase/er/s.two-tables.dfy` | 基础双表 |
-| 正常 | `showcase/er/n.blog-schema.dfy` | 博客 Schema |
-| 复杂 | `showcase/er/c.ecommerce-schema.dfy` | 电商多表 |
+| 简单 | `showcase/er/s.user-post.pgm` | 两表一对多 |
+| 简单 | `showcase/er/s.two-tables.pgm` | 基础双表 |
+| 正常 | `showcase/er/n.blog-schema.pgm` | 博客 Schema |
+| 复杂 | `showcase/er/c.ecommerce-schema.pgm` | 电商多表 |
 
 ---
 

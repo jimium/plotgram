@@ -1,0 +1,108 @@
+{
+  "version": "0.2",
+  "id": "common.okabe-ito",
+  "name": "Okabe-Ito",
+  "meta": {
+    "author": "Plotgram",
+    "description": "色盲友好：Okabe-Ito 配色（Wong, Nature Methods 2011）。避免红绿对立，蓝/橙/青绿/紫可区分，适合 deuteranopia 与 protanopia",
+    "tags": ["okabe-ito", "wong", "light", "accessible", "colorblind-safe", "a11y"]
+  },
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#FFFFFF",
+      "text": "#000000",
+      "muted_text": "#555555",
+      "border": "#808080",
+      "primary": "#0072B2",
+      "neutral_fill": "#F7F7F7",
+      "neutral_stroke": "#444444",
+      "edge_stroke": "#222222",
+      "group_fill": "#F2F2F2",
+      "group_stroke": "#808080"
+    },
+    "palette": {
+      "blue": { "fill": "#DBEDF6", "stroke": "#0072B2" },
+      "orange": { "fill": "#FDE8D2", "stroke": "#D55E00" },
+      "green": { "fill": "#DFEED9", "stroke": "#009E73" },
+      "purple": { "fill": "#EADFED", "stroke": "#CC79A7" },
+      "yellow": { "fill": "#FFF6D9", "stroke": "#E69F00" },
+      "red": { "fill": "#F8D7DA", "stroke": "#D55E00" },
+      "cyan": { "fill": "#D5F0F3", "stroke": "#56B4E9" },
+      "brown": { "fill": "#EAE2D8", "stroke": "#7A5C2E" },
+      "gray": { "fill": "#F2F2F2", "stroke": "#808080" },
+      "amber": { "fill": "#FFF6D9", "stroke": "#F0E442" },
+      "blue_gray": { "fill": "#E8EAED", "stroke": "#444444" },
+      "start_green": { "fill": "#DFEED9", "stroke": "#009E73" },
+      "end_red": { "fill": "#F8D7DA", "stroke": "#CC79A7" },
+      "arch_blue": { "fill": "#DBEDF6", "stroke": "#0072B2" },
+      "root": { "fill": "#000000", "stroke": "#000000", "text_fill": "#FFFFFF" }
+    },
+    "typography": {
+      "font_family": "'Source Serif Pro', 'Times New Roman', 'Georgia', serif",
+      "title_size": 16,
+      "label_size": 12,
+      "small_size": 10
+    },
+    "strokes": {
+      "thin": 0.9,
+      "normal": 1.3,
+      "thick": 2.0,
+      "dashed": [6, 3],
+      "dotted": [2, 3]
+    },
+    "radius": {
+      "sm": 3,
+      "md": 5,
+      "lg": 8,
+      "pill": 999
+    },
+    "spacing": {
+      "node_padding_x": 12,
+      "node_padding_y": 7
+    }
+  },
+  "defaults": {
+    "node": {
+      "stroke": "{colors.neutral_stroke}",
+      "shape": "rect",
+      "stroke_linecap": "square",
+      "stroke_linejoin": "miter",
+      "fill_opacity": 1.0
+    },
+    "edge": {
+      "stroke": "{colors.edge_stroke}",
+      "stroke_opacity": 1.0,
+      "stroke_linecap": "butt",
+      "stroke_linejoin": "miter",
+      "arrow_style": "normal"
+    }
+  },
+  "diagrams": {
+    "flowchart": { "edge": { "stroke": "{colors.edge_stroke}" } },
+    "sequence": { "edge": { "stroke": "{colors.edge_stroke}" } },
+    "state": { "edge": { "stroke": "{colors.edge_stroke}" } },
+    "architecture": { "edge": { "stroke": "{colors.border}" } },
+    "er": {
+      "node": { "fill": "#FFFFFF", "stroke": "#000000" },
+      "edge": { "stroke": "#000000" }
+    },
+    "mindmap": {
+      "edge": { "stroke_width": "{strokes.normal}" },
+      "node": { "radius": "{radius.md}" },
+      "entity_types": { "leaf": { "fill": "#FFFFFF" } },
+      "context_palettes": {
+        "branch": {
+          "entries": [
+            { "fill": "#DBEDF6", "stroke": "#0072B2", "text_fill": "#004A73", "edge_stroke": "#0072B2" },
+            { "fill": "#FDE8D2", "stroke": "#D55E00", "text_fill": "#8B3A00", "edge_stroke": "#D55E00" },
+            { "fill": "#DFEED9", "stroke": "#009E73", "text_fill": "#006348", "edge_stroke": "#009E73" },
+            { "fill": "#FFF6D9", "stroke": "#E69F00", "text_fill": "#8B5F00", "edge_stroke": "#E69F00" },
+            { "fill": "#EADFED", "stroke": "#CC79A7", "text_fill": "#8B436E", "edge_stroke": "#CC79A7" },
+            { "fill": "#D5F0F3", "stroke": "#56B4E9", "text_fill": "#2A7AB0", "edge_stroke": "#56B4E9" }
+          ]
+        }
+      }
+    }
+  }
+}

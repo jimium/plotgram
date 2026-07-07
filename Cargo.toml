@@ -1,11 +1,11 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/drawify-core",
-    "crates/drawify-cli",
-    "crates/drawify-server",
-    "crates/drawify-wasm",
-    "crates/drawify-eval",
+    "crates/plotgram-core",
+    "crates/plotgram-cli",
+    "crates/plotgram-server",
+    "crates/plotgram-wasm",
+    "crates/plotgram-eval",
 ]
 
 [workspace.package]
@@ -13,11 +13,11 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 rust-version = "1.75"
-repository = "https://github.com/your-org/drawify"
+repository = "https://github.com/your-org/plotgram"
 description = "A chart description language and rendering engine designed for AI Agents — Turn anything into a diagram"
 
 [workspace.dependencies]
-drawify-core = { path = "crates/drawify-core", default-features = false }
+plotgram-core = { path = "crates/plotgram-core", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
@@ -30,5 +30,5 @@ panic = "abort"
 strip = true
 debug = 0
 
-[profile.release.package.drawify-wasm]
+[profile.release.package.plotgram-wasm]
 opt-level = "z"

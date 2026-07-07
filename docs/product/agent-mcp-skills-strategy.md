@@ -2,7 +2,7 @@
 
 > 版本：0.1.0-draft | 状态：产品讨论沉淀
 >
-> 本文档汇总 Drawify 面向 Cursor 及其他 AI Agent 的集成方案讨论，涵盖 MCP 服务设计、本地/云端分层、Skills 分工、商业化、与 draw.io 的关系等。
+> 本文档汇总 Plotgram 面向 Cursor 及其他 AI Agent 的集成方案讨论，涵盖 MCP 服务设计、本地/云端分层、Skills 分工、商业化、与 draw.io 的关系等。
 
 相关文档：
 
@@ -10,8 +10,8 @@
 - [vision.md](vision.md) — 「第一用户是 AI Agent」
 - [competitive-strategy.md](competitive-strategy.md) — 语义微调护城河
 - [../enterprise/international-market-opportunities.md](../enterprise/international-market-opportunities.md) — Govern / Compose / Embed 产品包
-- [../architecture/drawify-server-api.md](../architecture/drawify-server-api.md) — 现有 HTTP API
-- [../../crates/drawify-core/src/render/encode/drawio/README.md](../../crates/drawify-core/src/render/encode/drawio/README.md) — draw.io 导出实现
+- [../architecture/plotgram-server-api.md](../architecture/plotgram-server-api.md) — 现有 HTTP API
+- [../../crates/plotgram-core/src/render/encode/drawio/README.md](../../crates/plotgram-core/src/render/encode/drawio/README.md) — draw.io 导出实现
 
 ---
 
@@ -23,8 +23,8 @@
 | 本地要不要注册？ | **本地 MCP / CLI 不要**；**云端 MCP 要轻量注册**（GitHub OAuth 等）以便计量与图库。 |
 | 服务端要不要 session？ | **第一版无状态**（每次带 `source`）；可选 `diagram_id` + 云端存图；第二版再加 session 缓存。 |
 | 本地免费怎么限制？ | **不限制引擎能力**；角落 **attribution 品牌链接** + MCP 层 **`notices` 提示**；Pro 可关闭署名。 |
-| 和 draw.io 关系？ | **竞争 + 互补**：Agent 迭代用 Drawify；定稿可 **export draw.io** 进熟悉编辑器。 |
-| Govern 是什么？ | 企业级 **架构图治理**产品包（快照、语义 Diff、CI 门禁、合规归档），见 [§12](#12-drawify-govern)。 |
+| 和 draw.io 关系？ | **竞争 + 互补**：Agent 迭代用 Plotgram；定稿可 **export draw.io** 进熟悉编辑器。 |
+| Govern 是什么？ | 企业级 **架构图治理**产品包（快照、语义 Diff、CI 门禁、合规归档），见 [§12](#12-plotgram-govern)。 |
 
 ---
 
@@ -47,13 +47,13 @@ flowchart TB
     subgraph execution ["执行层"]
         LocalMCP["本地 MCP（stdio）"]
         CloudMCP["云端 MCP"]
-        Core["drawify-core"]
-        Server["drawify-server"]
+        Core["plotgram-core"]
+        Server["plotgram-server"]
     end
 
     subgraph products ["产品层"]
-        Studio["Drawify Studio"]
-        Govern["Drawify Govern"]
+        Studio["Plotgram Studio"]
+        Govern["Plotgram Govern"]
     end
 
     clients --> knowledge
@@ -106,7 +106,7 @@ MCP 不自动教会 Agent 语法，需分层供给：
 | 层级 | 机制 | 内容 |
 |------|------|------|
 | 连接时 | MCP `instructions` | 速查规则（~500 字）、可用 tool 列表 |
-| 按需 | MCP `resources` | `writing-manual`、`language-spec`、示例 `.dfy` |
+| 按需 | MCP `resources` | `writing-manual`、`language-spec`、示例 `.pgm` |
 | 按需 | MCP `prompts` | `create-architecture` 等带骨架的模板 |
 | 运行时 | `validate` 返回 | 结构化错误 + `suggestion`（教师角色） |
 | 可选 | 项目 Skill | Cursor 侧触发与工作流强化 |
@@ -134,14 +134,14 @@ MCP 不自动教会 Agent 语法，需分层供给：
 
 ## 5. 本地 MCP 与云端 MCP
 
-### 5.1 本地 MCP（stdio + drawify-core）
+### 5.1 本地 MCP（stdio + plotgram-core）
 
-- **安装**：`npx -y @drawify/mcp`（规划包名），无需 API Key。
-- **状态**：无服务端 session；图状态由 Agent 上下文 + 仓库 `.dfy` 文件承担（与 Studio `AgentContext` 同构）。
+- **安装**：`npx -y @plotgram/mcp`（规划包名），无需 API Key。
+- **状态**：无服务端 session；图状态由 Agent 上下文 + 仓库 `.pgm` 文件承担（与 Studio `AgentContext` 同构）。
 - **隐私**：DSL 与渲染不出机（除用户主动 export）。
 - **成本**：不占云端算力；用 **attribution** 作品牌交换（见 [§8](#8-本地免费档-attribution-与提示)）。
 
-### 5.2 云端 MCP（API Key + drawify-server）
+### 5.2 云端 MCP（API Key + plotgram-server）
 
 - **注册**：GitHub / Google OAuth 或 magic link；同一账号用于 Studio 与 MCP Key。
 - **鉴权**：`Authorization: Bearer dfy_live_xxx`。
@@ -157,7 +157,7 @@ MCP 不自动教会 Agent 语法，需分层供给：
 | **MCP 传输 session** | Cursor 与 MCP 进程的连接；由客户端管理 |
 | **应用 session（一图一会话）** | 当前图的 DSL；需自行设计 |
 
-**第一版推荐无状态**：每次 tool 传完整 `source`（与现有 `drawify-server` 一致）。
+**第一版推荐无状态**：每次 tool 传完整 `source`（与现有 `plotgram-server` 一致）。
 
 **第二版可选**：
 
@@ -167,7 +167,7 @@ apply_patch(diagram_id, patch)  // 服务端存 revision
 export_session(diagram_id) → source
 ```
 
-若做服务端存图，需：TTL、revision 乐观锁、与磁盘 `.dfy` 的「文件为真相」策略、免费档图数量上限。
+若做服务端存图，需：TTL、revision 乐观锁、与磁盘 `.pgm` 的「文件为真相」策略、免费档图数量上限。
 
 ---
 
@@ -195,7 +195,7 @@ User
 
 ## 7. 在 Cursor 中配置 API Key
 
-云端 MCP 通过 **`.cursor/mcp.json`** 注入环境变量，无单独「Drawify 设置页」。
+云端 MCP 通过 **`.cursor/mcp.json`** 注入环境变量，无单独「Plotgram 设置页」。
 
 **项目级**：`<repo>/.cursor/mcp.json`  
 **全局**：`~/.cursor/mcp.json`
@@ -203,28 +203,28 @@ User
 ```json
 {
   "mcpServers": {
-    "drawify": {
+    "plotgram": {
       "command": "npx",
-      "args": ["-y", "@drawify/mcp"],
+      "args": ["-y", "@plotgram/mcp"],
       "env": {
-        "DRAWIFY_API_KEY": "${env:DRAWIFY_API_KEY}"
+        "PLOTGRAM_API_KEY": "${env:PLOTGRAM_API_KEY}"
       }
     }
   }
 }
 ```
 
-用户在 `~/.zshrc` 中：`export DRAWIFY_API_KEY=dfy_live_xxx`，重启 Cursor。
+用户在 `~/.zshrc` 中：`export PLOTGRAM_API_KEY=dfy_live_xxx`，重启 Cursor。
 
 远程 HTTP MCP 示例：
 
 ```json
 {
   "mcpServers": {
-    "drawify": {
-      "url": "https://api.drawify.io/mcp",
+    "plotgram": {
+      "url": "https://api.plotgram.io/mcp",
       "headers": {
-        "Authorization": "Bearer ${env:DRAWIFY_API_KEY}"
+        "Authorization": "Bearer ${env:PLOTGRAM_API_KEY}"
       }
     }
   }
@@ -239,7 +239,7 @@ User
 
 ### 8.1 Attribution（角落品牌链接）
 
-- 实现：`RenderRequest.attribution`（见 [render/request.rs](../../crates/drawify-core/src/render/request.rs)），SVG 底部署名 + 可点击链接。
+- 实现：`RenderRequest.attribution`（见 [render/request.rs](../../crates/plotgram-core/src/render/request.rs)），SVG 底部署名 + 可点击链接。
 - 性质：**轻量 attribution**，非遮挡式水印。
 - 策略：
 
@@ -253,7 +253,7 @@ PNG/WebP 经 SVG 栅格化，署名一并进入位图；JSON/ASCII 不要求。
 
 ### 8.2 MCP 层 `notices`（产品提示）
 
-商业/升级提示放在 **`@drawify/mcp` 包装层**，不塞进 DSL 的 `E/W` 错误码。
+商业/升级提示放在 **`@plotgram/mcp` 包装层**，不塞进 DSL 的 `E/W` 错误码。
 
 ```json
 {
@@ -265,7 +265,7 @@ PNG/WebP 经 SVG 栅格化，署名一并进入位图；JSON/ASCII 不要求。
       "level": "warn",
       "audience": "agent",
       "message": "实体数 128，超过本地推荐值 100…",
-      "action": { "label": "了解 Studio Pro", "url": "https://drawify.io/pricing" }
+      "action": { "label": "了解 Studio Pro", "url": "https://plotgram.io/pricing" }
     }
   ],
   "meta": { "tier": "local" }
@@ -288,7 +288,7 @@ PNG/WebP 经 SVG 栅格化，署名一并进入位图；JSON/ASCII 不要求。
 
 | 永远免费 | 收费 |
 |----------|------|
-| DSL 规范、drawify-core、CLI、WASM、本地 MCP | Govern、Compose Connector |
+| DSL 规范、plotgram-core、CLI、WASM、本地 MCP | Govern、Compose Connector |
 | 基础 validate/render/diff/patch | 托管高可用 API、SLA |
 | 基础 draw.io 导出 | Diff 高亮、高级导出报告 |
 | | Studio 协作、云端图库、去 attribution |
@@ -301,9 +301,9 @@ PNG/WebP 经 SVG 栅格化，署名一并进入位图；JSON/ASCII 不要求。
 |--------|------|
 | **Agent API / 云端 MCP** | validate、render、diff、patch；按调用量或订阅 |
 | **Studio Pro** | 图库、版本、分享、高额度、去署名、Diff 高亮 |
-| **Drawify Govern** | 快照、Compare、CI 门禁、审计（见 §12） |
-| **Drawify Compose** | K8s / Terraform Connector |
-| **Drawify Embed** | WASM/SDK OEM |
+| **Plotgram Govern** | 快照、Compare、CI 门禁、审计（见 §12） |
+| **Plotgram Compose** | K8s / Terraform Connector |
+| **Plotgram Embed** | WASM/SDK OEM |
 
 ### 9.3 档位示意
 
@@ -324,12 +324,12 @@ PNG/WebP 经 SVG 栅格化，署名一并进入位图；JSON/ASCII 不要求。
 
 draw.io 已有官方 MCP（[@drawio/mcp](https://github.com/jgraph/drawio-mcp)、[mcp.draw.io](https://mcp.draw.io/mcp)）。
 
-| 维度 | Drawify | draw.io MCP |
+| 维度 | Plotgram | draw.io MCP |
 |------|---------|-------------|
 | Agent 生成稳定性 | DSL 克制，预期更高 | mxGraph XML 复杂，易空文件/断引用 |
 | 对话式改图 | AST `apply_patch` + 结构化 fix | 改 cell / 坐标，迭代成本高 |
 | Cursor 内预览 | 可设计为 SVG 摘要/路径 | 官方文档：Cursor 不支持 MCP Apps，多跳浏览器 |
-| Git / PR | `.dfy` 可读 diff | `.drawio` XML diff 差 |
+| Git / PR | `.pgm` 可读 diff | `.drawio` XML diff 差 |
 | 人工精修 | 弱（Agent/Studio 向） | 强（完整编辑器） |
 | 生态认知 | 新 | 极强 |
 | 隐私（托管） | 可本地 | 托管 MCP 会上传至 draw.io |
@@ -337,7 +337,7 @@ draw.io 已有官方 MCP（[@drawio/mcp](https://github.com/jgraph/drawio-mcp)�
 **定位**：
 
 - draw.io + MCP：「AI 帮我起稿，我在编辑器里定稿」
-- Drawify + MCP：「图是代码资产，AI 在 IDE 里生成、校验、迭代」
+- Plotgram + MCP：「图是代码资产，AI 在 IDE 里生成、校验、迭代」
 
 ---
 
@@ -346,17 +346,17 @@ draw.io 已有官方 MCP（[@drawio/mcp](https://github.com/jgraph/drawio-mcp)�
 Core **已实现** draw.io 导出（`RenderFormat::Drawio`）：
 
 ```bash
-drawify render input.dfy -f drawio -o output.drawio
+plotgram render input.pgm -f drawio -o output.drawio
 ```
 
-管线：`PreparedDiagram → layout → ExportScene → mxGraphModel XML`。详见 [drawio/README.md](../../crates/drawify-core/src/render/encode/drawio/README.md)。
+管线：`PreparedDiagram → layout → ExportScene → mxGraphModel XML`。详见 [drawio/README.md](../../crates/plotgram-core/src/render/encode/drawio/README.md)。
 
 ### 11.1 战略意义
 
 将 draw.io 从「对手」变为「下游交付渠道」：
 
 ```text
-Cursor + Drawify MCP → .dfy（源码）→ export drawio → draw.io 精修 / Confluence
+Cursor + Plotgram MCP → .pgm（源码）→ export drawio → draw.io 精修 / Confluence
 ```
 
 ### 11.2 MCP 规划
@@ -375,13 +375,13 @@ export_drawio({ source, compressed? })
 | flowchart / architecture / state / mindmap | ✅ |
 | sequence / er | ❌ 默认拒绝 |
 
-存在 L1/L2 降级（贝塞尔近似、多边标签等）。**暂无 draw.io → Drawify 导入**；主路径为 `.dfy` 是 source of truth。
+存在 L1/L2 降级（贝塞尔近似、多边标签等）。**暂无 draw.io → Plotgram 导入**；主路径为 `.pgm` 是 source of truth。
 
 建议 **基础 export draw.io 免费**，促进采用；不与 draw.io 免费编辑器对立。
 
 ---
 
-## 12. Drawify Govern
+## 12. Plotgram Govern
 
 **Govern** 是规划中的**企业架构图治理**产品包（非当前已上线 SKU）。
 
@@ -394,7 +394,7 @@ export_drawio({ source, compressed? })
 
 与 **Compose**（从 K8s/TF 自动出图）搭配：Compose 生成「当前态」，Govern 记录「变了什么」。
 
-依赖：diff2、结构化 validate、drawify-server 多租户、Diff 高亮渲染（企业路线图 P0）。
+依赖：diff2、结构化 validate、plotgram-server 多租户、Diff 高亮渲染（企业路线图 P0）。
 
 ---
 
@@ -402,9 +402,9 @@ export_drawio({ source, compressed? })
 
 | 阶段 | 交付 | 依赖 |
 |------|------|------|
-| **P0** | 本地 `@drawify/mcp`（无状态 tool + instructions + resources） | drawify-core / WASM |
+| **P0** | 本地 `@plotgram/mcp`（无状态 tool + instructions + resources） | plotgram-core / WASM |
 | **P0** | 项目 Skill 模板 + `docs/specs/dsl` 链引用 | — |
-| **P1** | 云端 MCP + API Key + 计量 + 免费档 | drawify-server 鉴权 |
+| **P1** | 云端 MCP + API Key + 计量 + 免费档 | plotgram-server 鉴权 |
 | **P1** | Studio 图库 API + `open_diagram` / `diagram_id` | 存储 |
 | **P1** | `export_drawio` tool | 已有 DrawioRenderer |
 | **P2** | Pro：去 attribution、Diff 高亮、高额度 | — |
@@ -429,4 +429,4 @@ export_drawio({ source, compressed? })
 
 ## 15. 对外一句话
 
-**Drawify 用开源 Core + 免费本地 MCP 占领 Agent 画图格式；用 Skills 教工作流、用 MCP 跑引擎；用云端 + Studio 存图协作；用 Govern 做企业治理；用 export draw.io 对接现有编辑器生态——而不是在 Cursor 里复制一个 draw.io。**
+**Plotgram 用开源 Core + 免费本地 MCP 占领 Agent 画图格式；用 Skills 教工作流、用 MCP 跑引擎；用云端 + Studio 存图协作；用 Govern 做企业治理；用 export draw.io 对接现有编辑器生态——而不是在 Cursor 里复制一个 draw.io。**

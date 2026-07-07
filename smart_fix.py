@@ -12,7 +12,7 @@ ROOT = "/Users/jimichan/zaprt-projects/flowml"
 
 def run_cargo_check():
     result = subprocess.run(
-        ["cargo", "check", "-p", "drawify-core"],
+        ["cargo", "check", "-p", "plotgram-core"],
         cwd=ROOT,
         capture_output=True,
         text=True
@@ -25,7 +25,7 @@ def parse_errors(output):
     
     # 模式: 错误类型，文件，行号
     # error[E0609]: no field `0` on type `...`
-    #   --> crates/drawify-core/src/...:line:col
+    #   --> crates/plotgram-core/src/...:line:col
     
     lines = output.split('\n')
     i = 0
@@ -43,7 +43,7 @@ def parse_errors(output):
             continue
         
         # 文件位置
-        lm = re.match(r'^\s*-->\s*(crates/drawify-core/src/[^:]+):(\d+):(\d+)', line)
+        lm = re.match(r'^\s*-->\s*(crates/plotgram-core/src/[^:]+):(\d+):(\d+)', line)
         if lm and current_error is not None:
             current_error['file'] = os.path.join(ROOT, lm.group(1))
             current_error['line'] = int(lm.group(2))

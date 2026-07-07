@@ -1,6 +1,6 @@
 # Layout Intent 使用指南
 
-Layout Intent(布局意图)是 Drawify 的布局叠加层,允许在不修改 diagram 源码 `relations` 的前提下,向布局算法注入额外的拓扑/几何约束,并返回每条意图的满足度报告。
+Layout Intent(布局意图)是 Plotgram 的布局叠加层,允许在不修改 diagram 源码 `relations` 的前提下,向布局算法注入额外的拓扑/几何约束,并返回每条意图的满足度报告。
 
 > 设计依据:[layout-intent-optimized.md](./layout-intent-optimized.md) v2.1
 
@@ -144,7 +144,7 @@ pub struct IntentResult {
 布局 dispatch 入口,接受 overlay 参数并返回 `RefinementReport`。
 
 ```rust
-use drawify_core::layout::{compute_layout_with_plan_and_overlay, LayoutIntentOverlay, TopologyIntent};
+use plotgram_core::layout::{compute_layout_with_plan_and_overlay, LayoutIntentOverlay, TopologyIntent};
 
 let overlay = LayoutIntentOverlay {
     topology: vec![TopologyIntent::Below {
@@ -173,8 +173,8 @@ if let Some(report) = report {
 渲染流水线入口,返回 `RenderOutputWithReport { output, report }`。
 
 ```rust
-use drawify_core::pipeline::render_output_with_report;
-use drawify_core::render::RenderRequest;
+use plotgram_core::pipeline::render_output_with_report;
+use plotgram_core::render::RenderRequest;
 
 let mut request = RenderRequest::new(&prepared, RenderFormat::Svg);
 request.layout_overlay = Some(&overlay);
@@ -256,16 +256,16 @@ curl -X POST http://localhost:6080/render \
   }'
 ```
 
-#### `X-Drawify-Refinement-Report` 响应头
+#### `X-Plotgram-Refinement-Report` 响应头
 
-成功响应会携带 `X-Drawify-Refinement-Report` 头(仅当请求体包含 `layout_intents` 时),值为 JSON 序列化的 `RefinementReport`:
+成功响应会携带 `X-Plotgram-Refinement-Report` 头(仅当请求体包含 `layout_intents` 时),值为 JSON 序列化的 `RefinementReport`:
 
 ```
 HTTP/1.1 200 OK
 Content-Type: image/svg+xml
-X-Drawify-Format: svg
-X-Drawify-Valid: true
-X-Drawify-Refinement-Report: {"results":[{"index":0,"kind":"below","status":"Conflicted","message":"..."}],"satisfied":0,"partial":0,"conflicted":1,"not_found":0}
+X-Plotgram-Format: svg
+X-Plotgram-Valid: true
+X-Plotgram-Refinement-Report: {"results":[{"index":0,"kind":"below","status":"Conflicted","message":"..."}],"satisfied":0,"partial":0,"conflicted":1,"not_found":0}
 
 <svg>...</svg>
 ```
@@ -273,7 +273,7 @@ X-Drawify-Refinement-Report: {"results":[{"index":0,"kind":"below","status":"Con
 解析示例(Node.js):
 
 ```javascript
-const report = JSON.parse(response.headers['x-drawify-refinement-report']);
+const report = JSON.parse(response.headers['x-plotgram-refinement-report']);
 console.log(`Satisfied: ${report.satisfied}, Conflicted: ${report.conflicted}`);
 ```
 
@@ -405,7 +405,7 @@ console.log(`Satisfied: ${report.satisfied}, Conflicted: ${report.conflicted}`);
 Sugiyama 的 `greedy_cycle_reversal` 会反转边以破环。意图边被标记为 `reversible: false`,不参与 FAS 反转:
 
 ```rust
-// crates/drawify-core/src/layout/node/sugiyama_v2/graph.rs
+// crates/plotgram-core/src/layout/node/sugiyama_v2/graph.rs
 pub(super) struct EdgeMeta {
     pub kind: EdgeKind,        // Real | Intent
     pub reversible: bool,      // 意图边 = false
@@ -470,8 +470,8 @@ pub struct PinSet {
 运行测试:
 
 ```bash
-cargo test -p drawify-core --lib layout::intent
-cargo test -p drawify-core --lib pipeline::render
+cargo test -p plotgram-core --lib layout::intent
+cargo test -p plotgram-core --lib pipeline::render
 ```
 
 ---
@@ -480,4 +480,4 @@ cargo test -p drawify-core --lib pipeline::render
 
 - [设计文档:layout-intent-optimized.md](./layout-intent-optimized.md) — 完整设计与实现路线
 - [WASM 模块设计](./wasm-module.md) — WASM API 总览
-- [Server API 使用说明](./drawify-server-api.md) — HTTP 接口文档
+- [Server API 使用说明](./plotgram-server-api.md) — HTTP 接口文档

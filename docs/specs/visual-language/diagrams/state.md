@@ -21,7 +21,7 @@
 
 ## 语法入口
 
-```drawify
+```plotgram
 diagram state {
     title: "订单状态机"
 
@@ -113,10 +113,10 @@ diagram state {
 
 | 复杂度 | 路径 | 说明 |
 |--------|------|------|
-| 简单 | `showcase/state/s.traffic-light.dfy` | 三状态循环 |
-| 简单 | `showcase/state/s.on-off.dfy` | 开关状态 |
-| 正常 | `showcase/state/n.order-lifecycle.dfy` | 订单生命周期 |
-| 复杂 | `showcase/state/c.payment-flow.dfy` | 支付状态机 |
+| 简单 | `showcase/state/s.traffic-light.pgm` | 三状态循环 |
+| 简单 | `showcase/state/s.on-off.pgm` | 开关状态 |
+| 正常 | `showcase/state/n.order-lifecycle.pgm` | 订单生命周期 |
+| 复杂 | `showcase/state/c.payment-flow.pgm` | 支付状态机 |
 
 ---
 

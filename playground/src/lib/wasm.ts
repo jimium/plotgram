@@ -126,7 +126,7 @@ export interface StyleDeclJson {
   target: string;
 }
 
-export interface DrawifyWasm {
+export interface PlotgramWasm {
   default: (input?: unknown) => Promise<unknown>;
   version: () => string;
   render: (source: string, format: string) => string;
@@ -139,14 +139,14 @@ export interface DrawifyWasm {
   format_source: (source: string) => string;
 }
 
-let modulePromise: Promise<DrawifyWasm> | null = null;
+let modulePromise: Promise<PlotgramWasm> | null = null;
 
 /** 懒加载并初始化 WASM 模块（全局单例）。 */
-export function loadWasm(): Promise<DrawifyWasm> {
+export function loadWasm(): Promise<PlotgramWasm> {
   if (!modulePromise) {
     modulePromise = (async () => {
-      const wasmJs = `${assetBase()}drawify-wasm/drawify_wasm.js`;
-      const mod = (await import(/* @vite-ignore */ wasmJs)) as unknown as DrawifyWasm;
+      const wasmJs = `${assetBase()}plotgram-wasm/plotgram_wasm.js`;
+      const mod = (await import(/* @vite-ignore */ wasmJs)) as unknown as PlotgramWasm;
       await mod.default();
       return mod;
     })();
@@ -178,7 +178,7 @@ function fallbackDiag(message: string, severity: 'error' | 'warning' = 'error'):
 
 /** 按指定格式渲染,返回单格式结果。 */
 export function renderSource(
-  wasm: DrawifyWasm,
+  wasm: PlotgramWasm,
   source: string,
   format: RenderFormat,
   optionsJson?: string,
@@ -197,7 +197,7 @@ export function renderSource(
   });
 }
 
-export function validateSource(wasm: DrawifyWasm, source: string): ValidationResult {
+export function validateSource(wasm: PlotgramWasm, source: string): ValidationResult {
   const json = wasm.validate(source);
   return safeParse<ValidationResult>(json, {
     valid: false,
@@ -206,7 +206,7 @@ export function validateSource(wasm: DrawifyWasm, source: string): ValidationRes
   });
 }
 
-export function parseSource(wasm: DrawifyWasm, source: string): ParseResult {
+export function parseSource(wasm: PlotgramWasm, source: string): ParseResult {
   const json = wasm.parse_to_json(source);
   return safeParse<ParseResult>(json, {
     diagram: null,
@@ -256,7 +256,7 @@ export interface FormatResult {
   errors?: string[];
 }
 
-export function diffSources(wasm: DrawifyWasm, sourceA: string, sourceB: string): DiffResult {
+export function diffSources(wasm: PlotgramWasm, sourceA: string, sourceB: string): DiffResult {
   const json = wasm.diff_sources(sourceA, sourceB);
   return safeParse<DiffResult>(json, {
     success: false,
@@ -264,7 +264,7 @@ export function diffSources(wasm: DrawifyWasm, sourceA: string, sourceB: string)
   });
 }
 
-export function applyPatch(wasm: DrawifyWasm, source: string, patch: ChangeSetJson): PatchApplyResult {
+export function applyPatch(wasm: PlotgramWasm, source: string, patch: ChangeSetJson): PatchApplyResult {
   const json = wasm.apply_patch(source, JSON.stringify(patch));
   return safeParse<PatchApplyResult>(json, {
     success: false,
@@ -273,7 +273,7 @@ export function applyPatch(wasm: DrawifyWasm, source: string, patch: ChangeSetJs
   });
 }
 
-export function formatSource(wasm: DrawifyWasm, source: string): FormatResult {
+export function formatSource(wasm: PlotgramWasm, source: string): FormatResult {
   const json = wasm.format_source(source);
   return safeParse<FormatResult>(json, {
     success: false,

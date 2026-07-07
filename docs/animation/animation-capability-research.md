@@ -1,11 +1,11 @@
-# Drawify SVG 动画能力需求分析与技术实现评估报告
+# Plotgram SVG 动画能力需求分析与技术实现评估报告
 
 > 版本：0.2.0 | 状态：研究评估 | 日期：2026-06-24
-> 关联文档：[competitive-strategy.md](../product/competitive-strategy.md) §4.5 语义动画、[d2-vs-drawify-code-review.md](../product/d2-vs-drawify-code-review.md) §4 Steps Board、[layout-refinement-todo.md](../architecture/layout-refinement-todo.md)、[svg-embedding-design-impact.md](./svg-embedding-design-impact.md)（嵌入方式对设计的约束）
+> 关联文档：[competitive-strategy.md](../product/competitive-strategy.md) §4.5 语义动画、[d2-vs-plotgram-code-review.md](../product/d2-vs-plotgram-code-review.md) §4 Steps Board、[layout-refinement-todo.md](../architecture/layout-refinement-todo.md)、[svg-embedding-design-impact.md](./svg-embedding-design-impact.md)（嵌入方式对设计的约束）
 
 ## 摘要
 
-本报告针对 Drawify 后续引入 SVG 动画能力进行系统性研究，覆盖六大应用场景的方案设计、市场竞品对标、技术可行性、API 规范与性能兼容性。核心结论：
+本报告针对 Plotgram 后续引入 SVG 动画能力进行系统性研究，覆盖六大应用场景的方案设计、市场竞品对标、技术可行性、API 规范与性能兼容性。核心结论：
 
 1. **战略定位**：动画本身不是壁垒，**语义动画**（Diff/Patch/Steps 过渡）是"语义微调"核心壁垒的视觉放大器，应作为 P1 投入；纯装饰动画归入"图形美观"维度，不建议投入。
 2. **技术路线**：推荐 **SVG 内嵌 CSS 动画（`@keyframes` + `transition`）+ JS 控制器（Steps/导出）** 的方案。CSS 通过 `<defs><style>` 内嵌于 SVG 文件，零 JS 依赖即可自包含播放；JS 控制器仅用于 Steps 时序与导出播放控制。全面放弃 SMIL——SMIL 浏览器支持不稳定（Chrome 曾标记弃用）、Safari 无硬件加速、路径 `d` 属性插值存在点数对齐难题，而 CSS 已能覆盖所有需要的动画效果。边路径变形采用"旧路径淡出 + 新路径淡入"的交叉淡入淡出策略。
@@ -155,7 +155,7 @@
 | **PlantUML** | ❌ 无动画能力 | — | ❌ | ❌ | 开源免费 |
 | **Excalidraw** | 原生无，第三方 Excalimate/Smart Presentation 补齐 | JS 插值（Frame 间） | ✅（Frame 模型） | ✅ MP4/GIF/Lottie/SVG | 开源 |
 | **FlowGif** | 将 Mermaid 动画化为 GIF | 自研 + Mermaid | ✅ 步进式 | ✅ GIF/MP4/SVG/HTML | 商业（MCP） |
-| **Drawify（当前）** | ❌ 无 | — | ❌ | ❌ | 开源 |
+| **Plotgram（当前）** | ❌ 无 | — | ❌ | ❌ | 开源 |
 
 ### 2.2 行业领先产品的技术特点
 
@@ -168,7 +168,7 @@ D2 是目前唯一在语言层原生支持动画的文本画图工具，其核�
 - **GIF 导出**：通过 `xgif.Animate` 将多帧 SVG 光栅化为 GIF。
 - **`d2 play`** 命令：交互式播放 Steps。
 
-技术启示：D2 的动画本质是"多帧切换"，帧间无插值过渡，依赖 Board 模型组织内容。Drawify 若做 Steps，应在帧间增加 Patch 动画过渡，体验优于 D2。
+技术启示：D2 的动画本质是"多帧切换"，帧间无插值过渡，依赖 Board 模型组织内容。Plotgram 若做 Steps，应在帧间增加 Patch 动画过渡，体验优于 D2。
 
 #### Mermaid — 轻量 CSS 动画
 
@@ -187,7 +187,7 @@ classDef animated stroke-dasharray: 9,5,stroke-dashoffset: 900,animation: dash 2
 class e1,e2 animated
 ```
 
-技术启示：纯 CSS `stroke-dashoffset` 动画，零 JS 依赖，体积小。Drawify 的边线数据流动画可直接借鉴此方案。
+技术启示：纯 CSS `stroke-dashoffset` 动画，零 JS 依赖，体积小。Plotgram 的边线数据流动画可直接借鉴此方案。
 
 #### draw.io — 连接线 Flow Animation
 
@@ -201,7 +201,7 @@ Excalimate 采用关键帧模型（keyframes + sequences），支持：
 - 渐进式展现（progressive reveal）
 - 导出 MP4/GIF/Lottie/SVG/dotLottie
 
-技术启示：关键帧模型比 D2 的"硬切换"更精细，但实现复杂度高。Drawify 的 Steps 可采用"Patch 动画 + 关键帧"混合：步骤间用 Patch 动画自动插值，无需用户定义关键帧。
+技术启示：关键帧模型比 D2 的"硬切换"更精细，但实现复杂度高。Plotgram 的 Steps 可采用"Patch 动画 + 关键帧"混合：步骤间用 Patch 动画自动插值，无需用户定义关键帧。
 
 ### 2.3 企业付费场景的动画功能定价策略
 
@@ -215,19 +215,19 @@ Excalimate 采用关键帧模型（keyframes + sequences），支持：
 **关键洞察**：
 - D2 将"文本→动画"作为独占定位，是其商业化的核心差异化。
 - 动画能力在企业场景中**不是必需品，但是高价值增值点**，尤其用于架构演示、变更讲解、培训材料。
-- Drawify 的语义动画（Diff/Patch 过渡）比 D2 的"多帧切换"更精准，有差异化空间。
+- Plotgram 的语义动画（Diff/Patch 过渡）比 D2 的"多帧切换"更精准，有差异化空间。
 
 ### 2.4 市场竞争中的动画功能差异化优势与不足
 
-#### Drawify 的潜在优势
+#### Plotgram 的潜在优势
 
 1. **语义动画**：基于 `diff2::ChangeSet` 的语义级 diff，能生成"节点 X 从位置 A 平移到 B"的精准过渡，而非 D2 的整图切换。
 2. **零参数动画**：动画由渲染器自动生成，用户/Agent 无需控制动画参数（D2 需要手动组织 Board）。
 3. **与 Patch/Intent 联动**：动画是"语义微调"工作流的自然延伸，无需额外学习成本。
 
-#### Drawify 的潜在不足
+#### Plotgram 的潜在不足
 
-1. **起步晚**：D2 已有成熟的多 Board + GIF 导出，Drawify 从零开始。
+1. **起步晚**：D2 已有成熟的多 Board + GIF 导出，Plotgram 从零开始。
 2. **生态弱**：Mermaid 的 GitHub/Notion 集成使其静态图无处不在，动画的传播渠道受限。
 3. **交互式探索被排除**：`cytoscape-js-research.md` 明确"产品是静态导出，不是交互式图探索器"，限制了交互动画场景。
 
@@ -237,7 +237,7 @@ Excalimate 采用关键帧模型（keyframes + sequences），支持：
 
 ### 3.1 当前代码架构对 SVG 动画的支持程度
 
-基于对 `crates/drawify-core/src` 的全面调研，当前架构的支持度评估：
+基于对 `crates/plotgram-core/src` 的全面调研，当前架构的支持度评估：
 
 | 维度 | 现状 | 对动画的支持度 | 改造工作量 |
 |------|------|---------------|-----------|
@@ -263,7 +263,7 @@ Excalimate 采用关键帧模型（keyframes + sequences），支持：
 | 边路径变形 | **交叉淡入淡出**（旧路径 `opacity:1→0` + 新路径 `opacity:0→1`） | 零挑战，规避点对齐问题 |
 | 边数据流 | CSS `stroke-dashoffset` keyframes | 零挑战，纯 CSS |
 | 高亮/激活 | CSS class 切换 + `transition` | 需状态管理 |
-| 入场/出场 | CSS `@keyframes` + 初始类（`.dfy-enter`） | 元素需设置初始状态（如 `opacity:0`） |
+| 入场/出场 | CSS `@keyframes` + 初始类（`.pgm-enter`） | 元素需设置初始状态（如 `opacity:0`） |
 | Steps 时序 | JS 控制器（class 切换 + `transition`） | 需前端播放器 |
 | GIF/MP4 导出 | Playwright + ffmpeg | 需 headless 浏览器依赖 |
 
@@ -291,7 +291,7 @@ Excalimate 采用关键帧模型（keyframes + sequences），支持：
 
 **放弃 SMIL 的理由**：
 
-1. **路径变形这一 SMIL 唯一不可替代的优势已被证伪**：`<animate attributeName="d">` 要求新旧路径的命令序列和点数完全一致才能插值，而 Drawify 布局变更后路径点数经常变化（如折线变贝塞尔曲线、边由 3 个点变 5 个点），导致插值失败。交叉淡入淡出（cross-fade）在视觉上完全能表达"路径变了"的语义，且零约束。
+1. **路径变形这一 SMIL 唯一不可替代的优势已被证伪**：`<animate attributeName="d">` 要求新旧路径的命令序列和点数完全一致才能插值，而 Plotgram 布局变更后路径点数经常变化（如折线变贝塞尔曲线、边由 3 个点变 5 个点），导致插值失败。交叉淡入淡出（cross-fade）在视觉上完全能表达"路径变了"的语义，且零约束。
 2. **浏览器风险**：Chrome 2015 年就标记过 SMIL 弃用，虽暂停但社区长期存在疑虑；Safari SMIL 无硬件加速，动画卡顿。
 3. **性能差距**：CSS 的 `transform`/`opacity` 走 GPU 合成层，60fps 稳定；SMIL 在主线程执行，大图动画容易掉帧。
 4. **可维护性**：CSS 将动画逻辑集中在 `<style>` 块中，SMIL 将 `<animate>` 标签散落在每个图形元素内部，调试和维护成本高。
@@ -337,8 +337,8 @@ JS 仅用于 Steps 播放控制与导出 HTML 播放器，核心动画仍由 CSS
 
 ```svg
 <style>
-  .dfy-node:hover { transform: scale(1.05); transform-origin: center; transition: transform 0.2s; }
-  .dfy-node:hover ~ .dfy-edge { stroke: #ff6b35; }
+  .pgm-node:hover { transform: scale(1.05); transform-origin: center; transition: transform 0.2s; }
+  .pgm-node:hover ~ .pgm-edge { stroke: #ff6b35; }
 </style>
 ```
 
@@ -372,7 +372,7 @@ JS 仅用于 Steps 播放控制与导出 HTML 播放器，核心动画仍由 CSS
 
 ```css
 @keyframes dfy-dash { to { stroke-dashoffset: -20; } }
-.dfy-flow { stroke-dasharray: 6 4; animation: dfy-dash 1s linear infinite; }
+.pgm-flow { stroke-dasharray: 6 4; animation: dfy-dash 1s linear infinite; }
 ```
 
 **优点**：零 JS、纯 SVG 自包含、性能优、可被参数关闭。
@@ -418,9 +418,9 @@ pub enum AnimationDirective {
 
 ```svg
 <style>
-  .dfy-highlight { stroke: #ff6b35; stroke-width: 3; }
-  .dfy-active { fill: #4caf50; }
-  .dfy-focus-dim { opacity: 0.3; }
+  .pgm-highlight { stroke: #ff6b35; stroke-width: 3; }
+  .pgm-active { fill: #4caf50; }
+  .pgm-focus-dim { opacity: 0.3; }
 </style>
 <g class="dfy-node dfy-highlight">...</g>
 ```
@@ -468,10 +468,10 @@ pub fn encode_animation_style(out: &mut String, opts: &AnimationOptions) {
     writeln!(out, "<style><![CDATA[");
     writeln!(out, "@keyframes dfy-enter {{ from {{ opacity:0; transform:scale(0); }} to {{ opacity:1; transform:scale(1); }} }}");
     writeln!(out, "@keyframes dfy-exit {{ from {{ opacity:1; }} to {{ opacity:0; transform:scale(0.5); }} }}");
-    writeln!(out, ".dfy-enter {{ animation: dfy-enter {dur}ms cubic-bezier(0.34,1.56,0.64,1) forwards; transform-box:fill-box; transform-origin:center; }}", dur = opts.duration_ms);
-    writeln!(out, ".dfy-enter-edge {{ animation: dfy-enter {dur}ms ease-out forwards; }}", dur = opts.duration_ms);
-    writeln!(out, ".dfy-move {{ transition: transform {dur}ms cubic-bezier(0.25,0.46,0.45,0.94); }}", dur = opts.duration_ms);
-    writeln!(out, ".dfy-edge-fade-in {{ animation: dfy-enter {dur}ms ease-out forwards; }}", dur = opts.duration_ms);
+    writeln!(out, ".pgm-enter {{ animation: dfy-enter {dur}ms cubic-bezier(0.34,1.56,0.64,1) forwards; transform-box:fill-box; transform-origin:center; }}", dur = opts.duration_ms);
+    writeln!(out, ".pgm-enter-edge {{ animation: dfy-enter {dur}ms ease-out forwards; }}", dur = opts.duration_ms);
+    writeln!(out, ".pgm-move {{ transition: transform {dur}ms cubic-bezier(0.25,0.46,0.45,0.94); }}", dur = opts.duration_ms);
+    writeln!(out, ".pgm-edge-fade-in {{ animation: dfy-enter {dur}ms ease-out forwards; }}", dur = opts.duration_ms);
     writeln!(out, "@media (prefers-reduced-motion: reduce) {{ * {{ animation:none!important; transition:none!important; }} }}");
     writeln!(out, "]]></style>");
 }
@@ -525,7 +525,7 @@ function applyPatchAnimation(oldScene, newScene, changeset) {
     const el = svgContainer.querySelector(`#node-${change.path.id}`);
     if (change.op === 'Add') {
       el.classList.add('dfy-enter');
-      // CSS .dfy-enter 动画播放完后移除 class
+      // CSS .pgm-enter 动画播放完后移除 class
       el.addEventListener('animationend', () => el.classList.remove('dfy-enter'), { once: true });
     }
     if (change.op === 'Modify' && change.path.property === 'position') {
@@ -748,7 +748,7 @@ pub fn export_gif(steps: &[RenderOutput], opts: &GifOptions) -> Result<Vec<u8>> 
 #### 5.1.1 Rust Core API
 
 ```rust
-// crates/drawify-core/src/render/animation.rs
+// crates/plotgram-core/src/render/animation.rs
 
 /// 动画配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -818,19 +818,19 @@ pub fn render_with_transition(
 
 ```bash
 # 渲染带 Patch 过渡动画
-drawify render --transition old.dfy new.dfy --changes changes.json -o animated.svg
+plotgram render --transition old.pgm new.pgm --changes changes.json -o animated.svg
 
 # 渲染 Steps 动画
-drawify render --steps steps.dfy -o animation.html
+plotgram render --steps steps.pgm -o animation.html
 
 # 渲染参数化指令
-drawify render input.dfy --animate highlight:nodeA,activate:nodeB -o out.svg
+plotgram render input.pgm --animate highlight:nodeA,activate:nodeB -o out.svg
 
 # 导出 Steps 为 HTML
-drawify export --format html-animation steps.dfy -o out.html
+plotgram export --format html-animation steps.pgm -o out.html
 
 # 导出 Steps 为 GIF（P2）
-drawify export --format gif --fps 15 steps.dfy -o out.gif
+plotgram export --format gif --fps 15 steps.pgm -o out.gif
 ```
 
 #### 5.1.3 Server HTTP API
@@ -870,7 +870,7 @@ Content-Type: application/json
 #### 5.1.4 WASM API
 
 ```typescript
-// studio/drawify-wasm/drawify_wasm.d.ts
+// studio/plotgram-wasm/plotgram_wasm.d.ts
 export function renderWithTransition(
   oldSource: string,
   newSource: string,
@@ -1211,7 +1211,7 @@ pub enum CompatMode {
 | 现有文档 | 关系 |
 |----------|------|
 | [competitive-strategy.md](../product/competitive-strategy.md) §4.5 | 本报告细化语义动画的 P1/P2 优先级与技术方案 |
-| [d2-vs-drawify-code-review.md](../product/d2-vs-drawify-code-review.md) §4 | 本报告细化 Steps Board 的 AST/DSL/渲染设计 |
+| [d2-vs-plotgram-code-review.md](../product/d2-vs-plotgram-code-review.md) §4 | 本报告细化 Steps Board 的 AST/DSL/渲染设计 |
 | [layout-refinement-todo.md](../architecture/layout-refinement-todo.md) | 2026-06-15 决策"移除 Intent 路线动画项，MVP 聚焦 P1a/P1b"，本报告的动画工作应在 Layout Intent MVP 完成后启动 |
 | [cytoscape-js-research.md](../architecture/cytoscape-js-research.md) | "产品是静态导出，非交互式探索器"——本报告的交互动画（场景 a）定位为导出 SVG 自带的轻交互，非交互式探索 |
 | [export-scene-spec.md](../specs/export-scene-spec.md) | ExportScene 是动画渲染器的输入，需扩展 `id` 字段保证元素身份稳定 |

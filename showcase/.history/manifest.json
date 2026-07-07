@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "updated": "2026-07-04T17:08:35+00:00",
+  "updated": "2026-07-07T02:45:00+00:00",
   "charts": {
     "flowchart/s.linear-chain.svg": {
-      "dfy": "flowchart/s.linear-chain.dfy",
+      "dfy": "flowchart/s.linear-chain.pgm",
       "entries": [
         {
           "id": "20260630-165533",
@@ -47,249 +47,264 @@
         }
       ]
     },
-    "architecture/c.drawify-core-mod-deps.svg": {
-      "dfy": "architecture/c.drawify-core-mod-deps.dfy",
+    "architecture/c.plotgram-core-mod-deps.svg": {
+      "dfy": "architecture/c.plotgram-core-mod-deps.pgm",
       "entries": [
         {
+          "id": "20260707-024500",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260707-024500.svg",
+          "savedAt": "2026-07-07T02:45:00+00:00"
+        },
+        {
+          "id": "20260707-022901",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260707-022901.svg",
+          "savedAt": "2026-07-07T02:29:01+00:00"
+        },
+        {
           "id": "20260704-170834",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260704-170834.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260704-170834.svg",
           "savedAt": "2026-07-04T17:08:34+00:00"
         },
         {
           "id": "20260630-165530",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260630-165530.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260630-165530.svg",
           "savedAt": "2026-06-30T16:55:30+00:00"
         },
         {
           "id": "20260630-140917",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260630-140917.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260630-140917.svg",
           "savedAt": "2026-06-30T14:09:17+00:00"
         },
         {
           "id": "20260629-014605",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260629-014605.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260629-014605.svg",
           "savedAt": "2026-06-29T01:46:05+00:00"
         },
         {
           "id": "20260628-153934",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260628-153934.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260628-153934.svg",
           "savedAt": "2026-06-28T15:39:34+00:00"
         },
         {
           "id": "20260628-085611",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260628-085611.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260628-085611.svg",
           "savedAt": "2026-06-28T08:56:11+00:00"
         },
         {
           "id": "20260628-030049",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260628-030049.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260628-030049.svg",
           "savedAt": "2026-06-28T03:00:49+00:00"
         },
         {
           "id": "20260628-021407",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260628-021407.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260628-021407.svg",
           "savedAt": "2026-06-28T02:14:07+00:00"
         },
         {
           "id": "20260628-021010",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260628-021010.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260628-021010.svg",
           "savedAt": "2026-06-28T02:10:10+00:00"
         },
         {
           "id": "20260627-174043",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260627-174043.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260627-174043.svg",
           "savedAt": "2026-06-27T17:40:43+00:00"
         },
         {
           "id": "20260627-174024",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260627-174024.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260627-174024.svg",
           "savedAt": "2026-06-27T17:40:24+00:00"
         },
         {
           "id": "20260627-172451",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260627-172451.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260627-172451.svg",
           "savedAt": "2026-06-27T17:24:51+00:00"
         },
         {
           "id": "20260627-171908",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260627-171908.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260627-171908.svg",
           "savedAt": "2026-06-27T17:19:08+00:00"
         },
         {
           "id": "20260627-153126",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260627-153126.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260627-153126.svg",
           "savedAt": "2026-06-27T15:31:26+00:00"
         },
         {
           "id": "20260627-150506",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260627-150506.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260627-150506.svg",
           "savedAt": "2026-06-27T15:05:06+00:00"
         },
         {
           "id": "20260627-134745",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260627-134745.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260627-134745.svg",
           "savedAt": "2026-06-27T13:47:45+00:00"
         },
         {
           "id": "20260627-113752",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260627-113752.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260627-113752.svg",
           "savedAt": "2026-06-27T11:37:52+00:00"
         },
         {
           "id": "20260627-020806",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260627-020806.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260627-020806.svg",
           "savedAt": "2026-06-27T02:08:06+00:00"
         },
         {
           "id": "20260627-013329",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260627-013329.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260627-013329.svg",
           "savedAt": "2026-06-27T01:33:29+00:00"
         },
         {
           "id": "20260627-013322",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260627-013322.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260627-013322.svg",
           "savedAt": "2026-06-27T01:33:22+00:00"
         },
         {
           "id": "20260627-012941",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260627-012941.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260627-012941.svg",
           "savedAt": "2026-06-27T01:29:41+00:00"
         },
         {
           "id": "20260626-162924",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260626-162924.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260626-162924.svg",
           "savedAt": "2026-06-26T16:29:24+00:00"
         },
         {
           "id": "20260626-162204",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260626-162204.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260626-162204.svg",
           "savedAt": "2026-06-26T16:22:04+00:00"
         },
         {
           "id": "20260626-153744",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260626-153744.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260626-153744.svg",
           "savedAt": "2026-06-26T15:37:44+00:00"
         },
         {
           "id": "20260626-114610",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260626-114610.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260626-114610.svg",
           "savedAt": "2026-06-26T11:46:10+00:00"
         },
         {
           "id": "20260626-111845",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260626-111845.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260626-111845.svg",
           "savedAt": "2026-06-26T11:18:45+00:00"
         },
         {
           "id": "20260626-080206",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260626-080206.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260626-080206.svg",
           "savedAt": "2026-06-26T08:02:06+00:00"
         },
         {
           "id": "20260626-021009",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260626-021009.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260626-021009.svg",
           "savedAt": "2026-06-26T02:10:09+00:00"
         },
         {
           "id": "20260625-132110",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260625-132110.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260625-132110.svg",
           "savedAt": "2026-06-25T13:21:10+00:00"
         },
         {
           "id": "20260625-102154",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260625-102154.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260625-102154.svg",
           "savedAt": "2026-06-25T10:21:54+00:00"
         },
         {
           "id": "20260625-073443",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260625-073443.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260625-073443.svg",
           "savedAt": "2026-06-25T07:34:43+00:00"
         },
         {
           "id": "20260624-170844",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260624-170844.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260624-170844.svg",
           "savedAt": "2026-06-24T17:08:44+00:00"
         },
         {
           "id": "20260624-162243",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260624-162243.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260624-162243.svg",
           "savedAt": "2026-06-24T16:22:43+00:00"
         },
         {
           "id": "20260624-122545",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260624-122545.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260624-122545.svg",
           "savedAt": "2026-06-24T12:25:45+00:00"
         },
         {
           "id": "20260624-074728",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260624-074728.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260624-074728.svg",
           "savedAt": "2026-06-24T07:47:28+00:00"
         },
         {
           "id": "20260624-041410",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260624-041410.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260624-041410.svg",
           "savedAt": "2026-06-24T04:14:10+00:00"
         },
         {
           "id": "20260624-035548",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260624-035548.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260624-035548.svg",
           "savedAt": "2026-06-24T03:55:48+00:00"
         },
         {
           "id": "20260624-032658",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260624-032658.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260624-032658.svg",
           "savedAt": "2026-06-24T03:26:58+00:00"
         },
         {
           "id": "20260624-011534",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260624-011534.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260624-011534.svg",
           "savedAt": "2026-06-24T01:15:34+00:00"
         },
         {
           "id": "20260623-235749",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260623-235749.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260623-235749.svg",
           "savedAt": "2026-06-23T23:57:49+00:00"
         },
         {
           "id": "20260622-013931",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260622-013931.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260622-013931.svg",
           "savedAt": "2026-06-22T01:39:31+00:00"
         },
         {
           "id": "20260620-152745",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260620-152745.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260620-152745.svg",
           "savedAt": "2026-06-20T15:27:45+00:00"
         },
         {
           "id": "20260620-062113",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260620-062113.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260620-062113.svg",
           "savedAt": "2026-06-20T06:21:13+00:00"
         },
         {
           "id": "20260620-030213",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260620-030213.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260620-030213.svg",
           "savedAt": "2026-06-20T03:02:13+00:00"
         },
         {
           "id": "20260620-021309",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260620-021309.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260620-021309.svg",
           "savedAt": "2026-06-20T02:13:09+00:00"
         },
         {
           "id": "20260620-020308",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260620-020308.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260620-020308.svg",
           "savedAt": "2026-06-20T02:03:08+00:00"
         },
         {
           "id": "20260619-164525",
-          "file": ".history/architecture/c.drawify-core-mod-deps/20260619-164525.svg",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260619-164525.svg",
           "savedAt": "2026-06-19T16:45:25+00:00"
         }
       ]
     },
     "architecture/c.hybrid-cloud-dr-topology.svg": {
-      "dfy": "architecture/c.hybrid-cloud-dr-topology.dfy",
+      "dfy": "architecture/c.hybrid-cloud-dr-topology.pgm",
       "entries": [
+        {
+          "id": "20260707-022901",
+          "file": ".history/architecture/c.hybrid-cloud-dr-topology/20260707-022901.svg",
+          "savedAt": "2026-07-07T02:29:01+00:00"
+        },
         {
           "id": "20260630-165530",
           "file": ".history/architecture/c.hybrid-cloud-dr-topology/20260630-165530.svg",
@@ -478,8 +493,13 @@
       ]
     },
     "architecture/c.k8s-blue-green-release-topology.svg": {
-      "dfy": "architecture/c.k8s-blue-green-release-topology.dfy",
+      "dfy": "architecture/c.k8s-blue-green-release-topology.pgm",
       "entries": [
+        {
+          "id": "20260707-022901",
+          "file": ".history/architecture/c.k8s-blue-green-release-topology/20260707-022901.svg",
+          "savedAt": "2026-07-07T02:29:01+00:00"
+        },
         {
           "id": "20260630-165530",
           "file": ".history/architecture/c.k8s-blue-green-release-topology/20260630-165530.svg",
@@ -678,8 +698,13 @@
       ]
     },
     "architecture/c.k8s-multi-namespace-overview.svg": {
-      "dfy": "architecture/c.k8s-multi-namespace-overview.dfy",
+      "dfy": "architecture/c.k8s-multi-namespace-overview.pgm",
       "entries": [
+        {
+          "id": "20260707-022902",
+          "file": ".history/architecture/c.k8s-multi-namespace-overview/20260707-022902.svg",
+          "savedAt": "2026-07-07T02:29:02+00:00"
+        },
         {
           "id": "20260630-165531",
           "file": ".history/architecture/c.k8s-multi-namespace-overview/20260630-165531.svg",
@@ -848,8 +873,13 @@
       ]
     },
     "architecture/c.k8s-tenant-isolation.svg": {
-      "dfy": "architecture/c.k8s-tenant-isolation.dfy",
+      "dfy": "architecture/c.k8s-tenant-isolation.pgm",
       "entries": [
+        {
+          "id": "20260707-022902",
+          "file": ".history/architecture/c.k8s-tenant-isolation/20260707-022902.svg",
+          "savedAt": "2026-07-07T02:29:02+00:00"
+        },
         {
           "id": "20260704-170835",
           "file": ".history/architecture/c.k8s-tenant-isolation/20260704-170835.svg",
@@ -1068,8 +1098,13 @@
       ]
     },
     "architecture/n.d2-cell-tower-network.svg": {
-      "dfy": "architecture/n.d2-cell-tower-network.dfy",
+      "dfy": "architecture/n.d2-cell-tower-network.pgm",
       "entries": [
+        {
+          "id": "20260707-022902",
+          "file": ".history/architecture/n.d2-cell-tower-network/20260707-022902.svg",
+          "savedAt": "2026-07-07T02:29:02+00:00"
+        },
         {
           "id": "20260630-165531",
           "file": ".history/architecture/n.d2-cell-tower-network/20260630-165531.svg",
@@ -1228,7 +1263,7 @@
       ]
     },
     "state/c.document-sync-lifecycle.svg": {
-      "dfy": "state/c.document-sync-lifecycle.dfy",
+      "dfy": "state/c.document-sync-lifecycle.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -1293,7 +1328,7 @@
       ]
     },
     "state/c.k8s-node-pressure-lifecycle.svg": {
-      "dfy": "state/c.k8s-node-pressure-lifecycle.dfy",
+      "dfy": "state/c.k8s-node-pressure-lifecycle.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -1368,7 +1403,7 @@
       ]
     },
     "state/c.k8s-rollout-state-machine.svg": {
-      "dfy": "state/c.k8s-rollout-state-machine.dfy",
+      "dfy": "state/c.k8s-rollout-state-machine.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -1433,7 +1468,7 @@
       ]
     },
     "state/c.payment-flow.svg": {
-      "dfy": "state/c.payment-flow.dfy",
+      "dfy": "state/c.payment-flow.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -1508,7 +1543,7 @@
       ]
     },
     "state/c.service-degradation-lifecycle.svg": {
-      "dfy": "state/c.service-degradation-lifecycle.dfy",
+      "dfy": "state/c.service-degradation-lifecycle.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -1583,7 +1618,7 @@
       ]
     },
     "state/c.settlement-reconciliation-lifecycle.svg": {
-      "dfy": "state/c.settlement-reconciliation-lifecycle.dfy",
+      "dfy": "state/c.settlement-reconciliation-lifecycle.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -1648,7 +1683,7 @@
       ]
     },
     "state/c.tcp-connection.svg": {
-      "dfy": "state/c.tcp-connection.dfy",
+      "dfy": "state/c.tcp-connection.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -1713,7 +1748,7 @@
       ]
     },
     "state/n.order-lifecycle.svg": {
-      "dfy": "state/n.order-lifecycle.dfy",
+      "dfy": "state/n.order-lifecycle.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -1778,7 +1813,7 @@
       ]
     },
     "state/n.ticket-workflow.svg": {
-      "dfy": "state/n.ticket-workflow.dfy",
+      "dfy": "state/n.ticket-workflow.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -1843,8 +1878,18 @@
       ]
     },
     "architecture/c.ai-agent-docops-pipeline.svg": {
-      "dfy": "architecture/c.ai-agent-docops-pipeline.dfy",
+      "dfy": "architecture/c.ai-agent-docops-pipeline.pgm",
       "entries": [
+        {
+          "id": "20260707-024500",
+          "file": ".history/architecture/c.ai-agent-docops-pipeline/20260707-024500.svg",
+          "savedAt": "2026-07-07T02:45:00+00:00"
+        },
+        {
+          "id": "20260707-022901",
+          "file": ".history/architecture/c.ai-agent-docops-pipeline/20260707-022901.svg",
+          "savedAt": "2026-07-07T02:29:01+00:00"
+        },
         {
           "id": "20260704-170834",
           "file": ".history/architecture/c.ai-agent-docops-pipeline/20260704-170834.svg",
@@ -2038,8 +2083,13 @@
       ]
     },
     "architecture/c.data-lineage-platform.svg": {
-      "dfy": "architecture/c.data-lineage-platform.dfy",
+      "dfy": "architecture/c.data-lineage-platform.pgm",
       "entries": [
+        {
+          "id": "20260707-022901",
+          "file": ".history/architecture/c.data-lineage-platform/20260707-022901.svg",
+          "savedAt": "2026-07-07T02:29:01+00:00"
+        },
         {
           "id": "20260630-165530",
           "file": ".history/architecture/c.data-lineage-platform/20260630-165530.svg",
@@ -2203,8 +2253,13 @@
       ]
     },
     "architecture/c.k8s-multi-cluster-federation.svg": {
-      "dfy": "architecture/c.k8s-multi-cluster-federation.dfy",
+      "dfy": "architecture/c.k8s-multi-cluster-federation.pgm",
       "entries": [
+        {
+          "id": "20260707-022901",
+          "file": ".history/architecture/c.k8s-multi-cluster-federation/20260707-022901.svg",
+          "savedAt": "2026-07-07T02:29:01+00:00"
+        },
         {
           "id": "20260630-165530",
           "file": ".history/architecture/c.k8s-multi-cluster-federation/20260630-165530.svg",
@@ -2398,7 +2453,7 @@
       ]
     },
     "er/c.saas-schema.svg": {
-      "dfy": "er/c.saas-schema.dfy",
+      "dfy": "er/c.saas-schema.pgm",
       "entries": [
         {
           "id": "20260630-165532",
@@ -2453,8 +2508,13 @@
       ]
     },
     "flowchart/c.layout-stress-dag.svg": {
-      "dfy": "flowchart/c.layout-stress-dag.dfy",
+      "dfy": "flowchart/c.layout-stress-dag.pgm",
       "entries": [
+        {
+          "id": "20260707-022903",
+          "file": ".history/flowchart/c.layout-stress-dag/20260707-022903.svg",
+          "savedAt": "2026-07-07T02:29:03+00:00"
+        },
         {
           "id": "20260630-165532",
           "file": ".history/flowchart/c.layout-stress-dag/20260630-165532.svg",
@@ -2568,8 +2628,13 @@
       ]
     },
     "architecture/c.layout-stress-nested.svg": {
-      "dfy": "architecture/c.layout-stress-nested.dfy",
+      "dfy": "architecture/c.layout-stress-nested.pgm",
       "entries": [
+        {
+          "id": "20260707-022902",
+          "file": ".history/architecture/c.layout-stress-nested/20260707-022902.svg",
+          "savedAt": "2026-07-07T02:29:02+00:00"
+        },
         {
           "id": "20260630-165531",
           "file": ".history/architecture/c.layout-stress-nested/20260630-165531.svg",
@@ -2733,8 +2798,13 @@
       ]
     },
     "architecture/c.payment-clearing-platform.svg": {
-      "dfy": "architecture/c.payment-clearing-platform.dfy",
+      "dfy": "architecture/c.payment-clearing-platform.pgm",
       "entries": [
+        {
+          "id": "20260707-022902",
+          "file": ".history/architecture/c.payment-clearing-platform/20260707-022902.svg",
+          "savedAt": "2026-07-07T02:29:02+00:00"
+        },
         {
           "id": "20260630-165531",
           "file": ".history/architecture/c.payment-clearing-platform/20260630-165531.svg",
@@ -2893,8 +2963,13 @@
       ]
     },
     "architecture/c.cloud-native.svg": {
-      "dfy": "architecture/c.cloud-native.dfy",
+      "dfy": "architecture/c.cloud-native.pgm",
       "entries": [
+        {
+          "id": "20260707-022901",
+          "file": ".history/architecture/c.cloud-native/20260707-022901.svg",
+          "savedAt": "2026-07-07T02:29:01+00:00"
+        },
         {
           "id": "20260630-165530",
           "file": ".history/architecture/c.cloud-native/20260630-165530.svg",
@@ -3028,8 +3103,13 @@
       ]
     },
     "architecture/c.ecommerce-platform.svg": {
-      "dfy": "architecture/c.ecommerce-platform.dfy",
+      "dfy": "architecture/c.ecommerce-platform.pgm",
       "entries": [
+        {
+          "id": "20260707-022901",
+          "file": ".history/architecture/c.ecommerce-platform/20260707-022901.svg",
+          "savedAt": "2026-07-07T02:29:01+00:00"
+        },
         {
           "id": "20260630-165530",
           "file": ".history/architecture/c.ecommerce-platform/20260630-165530.svg",
@@ -3178,8 +3258,13 @@
       ]
     },
     "architecture/c.k8s-platform-stack.svg": {
-      "dfy": "architecture/c.k8s-platform-stack.dfy",
+      "dfy": "architecture/c.k8s-platform-stack.pgm",
       "entries": [
+        {
+          "id": "20260707-022902",
+          "file": ".history/architecture/c.k8s-platform-stack/20260707-022902.svg",
+          "savedAt": "2026-07-07T02:29:02+00:00"
+        },
         {
           "id": "20260630-165531",
           "file": ".history/architecture/c.k8s-platform-stack/20260630-165531.svg",
@@ -3333,8 +3418,13 @@
       ]
     },
     "architecture/c.supply-chain-control-tower.svg": {
-      "dfy": "architecture/c.supply-chain-control-tower.dfy",
+      "dfy": "architecture/c.supply-chain-control-tower.pgm",
       "entries": [
+        {
+          "id": "20260707-022902",
+          "file": ".history/architecture/c.supply-chain-control-tower/20260707-022902.svg",
+          "savedAt": "2026-07-07T02:29:02+00:00"
+        },
         {
           "id": "20260630-165531",
           "file": ".history/architecture/c.supply-chain-control-tower/20260630-165531.svg",
@@ -3443,8 +3533,13 @@
       ]
     },
     "architecture/n.compiler-pipeline.svg": {
-      "dfy": "architecture/n.compiler-pipeline.dfy",
+      "dfy": "architecture/n.compiler-pipeline.pgm",
       "entries": [
+        {
+          "id": "20260707-022902",
+          "file": ".history/architecture/n.compiler-pipeline/20260707-022902.svg",
+          "savedAt": "2026-07-07T02:29:02+00:00"
+        },
         {
           "id": "20260630-165531",
           "file": ".history/architecture/n.compiler-pipeline/20260630-165531.svg",
@@ -3558,8 +3653,13 @@
       ]
     },
     "architecture/n.data-pipeline.svg": {
-      "dfy": "architecture/n.data-pipeline.dfy",
+      "dfy": "architecture/n.data-pipeline.pgm",
       "entries": [
+        {
+          "id": "20260707-022902",
+          "file": ".history/architecture/n.data-pipeline/20260707-022902.svg",
+          "savedAt": "2026-07-07T02:29:02+00:00"
+        },
         {
           "id": "20260630-165531",
           "file": ".history/architecture/n.data-pipeline/20260630-165531.svg",
@@ -3658,8 +3758,13 @@
       ]
     },
     "architecture/n.event-driven.svg": {
-      "dfy": "architecture/n.event-driven.dfy",
+      "dfy": "architecture/n.event-driven.pgm",
       "entries": [
+        {
+          "id": "20260707-022902",
+          "file": ".history/architecture/n.event-driven/20260707-022902.svg",
+          "savedAt": "2026-07-07T02:29:02+00:00"
+        },
         {
           "id": "20260630-165531",
           "file": ".history/architecture/n.event-driven/20260630-165531.svg",
@@ -3798,8 +3903,13 @@
       ]
     },
     "architecture/n.microservices.svg": {
-      "dfy": "architecture/n.microservices.dfy",
+      "dfy": "architecture/n.microservices.pgm",
       "entries": [
+        {
+          "id": "20260707-022902",
+          "file": ".history/architecture/n.microservices/20260707-022902.svg",
+          "savedAt": "2026-07-07T02:29:02+00:00"
+        },
         {
           "id": "20260630-165531",
           "file": ".history/architecture/n.microservices/20260630-165531.svg",
@@ -3893,7 +4003,7 @@
       ]
     },
     "er/c.ecommerce-schema.svg": {
-      "dfy": "er/c.ecommerce-schema.dfy",
+      "dfy": "er/c.ecommerce-schema.pgm",
       "entries": [
         {
           "id": "20260630-165531",
@@ -3928,7 +4038,7 @@
       ]
     },
     "er/c.layout-stress-dense.svg": {
-      "dfy": "er/c.layout-stress-dense.dfy",
+      "dfy": "er/c.layout-stress-dense.pgm",
       "entries": [
         {
           "id": "20260630-165532",
@@ -3968,7 +4078,7 @@
       ]
     },
     "er/n.blog-schema.svg": {
-      "dfy": "er/n.blog-schema.dfy",
+      "dfy": "er/n.blog-schema.pgm",
       "entries": [
         {
           "id": "20260630-165532",
@@ -4003,7 +4113,7 @@
       ]
     },
     "er/n.school-schema.svg": {
-      "dfy": "er/n.school-schema.dfy",
+      "dfy": "er/n.school-schema.pgm",
       "entries": [
         {
           "id": "20260630-165532",
@@ -4038,7 +4148,7 @@
       ]
     },
     "er/n.social-network.svg": {
-      "dfy": "er/n.social-network.dfy",
+      "dfy": "er/n.social-network.pgm",
       "entries": [
         {
           "id": "20260630-165532",
@@ -4073,7 +4183,7 @@
       ]
     },
     "er/s.two-tables.svg": {
-      "dfy": "er/s.two-tables.dfy",
+      "dfy": "er/s.two-tables.pgm",
       "entries": [
         {
           "id": "20260630-165532",
@@ -4108,7 +4218,7 @@
       ]
     },
     "er/s.user-post.svg": {
-      "dfy": "er/s.user-post.dfy",
+      "dfy": "er/s.user-post.pgm",
       "entries": [
         {
           "id": "20260630-165532",
@@ -4143,8 +4253,13 @@
       ]
     },
     "flowchart/c.aml-case-investigation.svg": {
-      "dfy": "flowchart/c.aml-case-investigation.dfy",
+      "dfy": "flowchart/c.aml-case-investigation.pgm",
       "entries": [
+        {
+          "id": "20260707-022903",
+          "file": ".history/flowchart/c.aml-case-investigation/20260707-022903.svg",
+          "savedAt": "2026-07-07T02:29:03+00:00"
+        },
         {
           "id": "20260630-165532",
           "file": ".history/flowchart/c.aml-case-investigation/20260630-165532.svg",
@@ -4233,7 +4348,7 @@
       ]
     },
     "flowchart/c.caffe-shop.svg": {
-      "dfy": "flowchart/c.caffe-shop.dfy",
+      "dfy": "flowchart/c.caffe-shop.pgm",
       "entries": [
         {
           "id": "20260630-165532",
@@ -4313,8 +4428,13 @@
       ]
     },
     "flowchart/c.change-approval-workflow.svg": {
-      "dfy": "flowchart/c.change-approval-workflow.dfy",
+      "dfy": "flowchart/c.change-approval-workflow.pgm",
       "entries": [
+        {
+          "id": "20260707-022903",
+          "file": ".history/flowchart/c.change-approval-workflow/20260707-022903.svg",
+          "savedAt": "2026-07-07T02:29:03+00:00"
+        },
         {
           "id": "20260630-165532",
           "file": ".history/flowchart/c.change-approval-workflow/20260630-165532.svg",
@@ -4413,8 +4533,13 @@
       ]
     },
     "flowchart/c.k8s-incident-response.svg": {
-      "dfy": "flowchart/c.k8s-incident-response.dfy",
+      "dfy": "flowchart/c.k8s-incident-response.pgm",
       "entries": [
+        {
+          "id": "20260707-022903",
+          "file": ".history/flowchart/c.k8s-incident-response/20260707-022903.svg",
+          "savedAt": "2026-07-07T02:29:03+00:00"
+        },
         {
           "id": "20260630-165532",
           "file": ".history/flowchart/c.k8s-incident-response/20260630-165532.svg",
@@ -4533,8 +4658,13 @@
       ]
     },
     "flowchart/c.pr-architecture-review.svg": {
-      "dfy": "flowchart/c.pr-architecture-review.dfy",
+      "dfy": "flowchart/c.pr-architecture-review.pgm",
       "entries": [
+        {
+          "id": "20260707-022903",
+          "file": ".history/flowchart/c.pr-architecture-review/20260707-022903.svg",
+          "savedAt": "2026-07-07T02:29:03+00:00"
+        },
         {
           "id": "20260630-165532",
           "file": ".history/flowchart/c.pr-architecture-review/20260630-165532.svg",
@@ -4633,8 +4763,13 @@
       ]
     },
     "flowchart/c.software-release.svg": {
-      "dfy": "flowchart/c.software-release.dfy",
+      "dfy": "flowchart/c.software-release.pgm",
       "entries": [
+        {
+          "id": "20260707-022903",
+          "file": ".history/flowchart/c.software-release/20260707-022903.svg",
+          "savedAt": "2026-07-07T02:29:03+00:00"
+        },
         {
           "id": "20260630-165532",
           "file": ".history/flowchart/c.software-release/20260630-165532.svg",
@@ -4718,8 +4853,13 @@
       ]
     },
     "flowchart/n.employee-onboarding.svg": {
-      "dfy": "flowchart/n.employee-onboarding.dfy",
+      "dfy": "flowchart/n.employee-onboarding.pgm",
       "entries": [
+        {
+          "id": "20260707-022904",
+          "file": ".history/flowchart/n.employee-onboarding/20260707-022904.svg",
+          "savedAt": "2026-07-07T02:29:04+00:00"
+        },
         {
           "id": "20260630-165533",
           "file": ".history/flowchart/n.employee-onboarding/20260630-165533.svg",
@@ -4783,7 +4923,7 @@
       ]
     },
     "flowchart/n.order-approval.svg": {
-      "dfy": "flowchart/n.order-approval.dfy",
+      "dfy": "flowchart/n.order-approval.pgm",
       "entries": [
         {
           "id": "20260630-165533",
@@ -4863,8 +5003,13 @@
       ]
     },
     "flowchart/n.user-auth.svg": {
-      "dfy": "flowchart/n.user-auth.dfy",
+      "dfy": "flowchart/n.user-auth.pgm",
       "entries": [
+        {
+          "id": "20260707-022904",
+          "file": ".history/flowchart/n.user-auth/20260707-022904.svg",
+          "savedAt": "2026-07-07T02:29:04+00:00"
+        },
         {
           "id": "20260630-165533",
           "file": ".history/flowchart/n.user-auth/20260630-165533.svg",
@@ -4948,7 +5093,7 @@
       ]
     },
     "flowchart/s.decision-loop.svg": {
-      "dfy": "flowchart/s.decision-loop.dfy",
+      "dfy": "flowchart/s.decision-loop.pgm",
       "entries": [
         {
           "id": "20260630-165533",
@@ -5013,8 +5158,13 @@
       ]
     },
     "flowchart/c.ci-cd-security-pipeline.svg": {
-      "dfy": "flowchart/c.ci-cd-security-pipeline.dfy",
+      "dfy": "flowchart/c.ci-cd-security-pipeline.pgm",
       "entries": [
+        {
+          "id": "20260707-022903",
+          "file": ".history/flowchart/c.ci-cd-security-pipeline/20260707-022903.svg",
+          "savedAt": "2026-07-07T02:29:03+00:00"
+        },
         {
           "id": "20260630-165532",
           "file": ".history/flowchart/c.ci-cd-security-pipeline/20260630-165532.svg",
@@ -5153,7 +5303,7 @@
       ]
     },
     "flowchart/c.customer-refund-process.svg": {
-      "dfy": "flowchart/c.customer-refund-process.dfy",
+      "dfy": "flowchart/c.customer-refund-process.pgm",
       "entries": [
         {
           "id": "20260630-165532",
@@ -5283,7 +5433,7 @@
       ]
     },
     "flowchart/c.e-commerce-order-fulfillment.svg": {
-      "dfy": "flowchart/c.e-commerce-order-fulfillment.dfy",
+      "dfy": "flowchart/c.e-commerce-order-fulfillment.pgm",
       "entries": [
         {
           "id": "20260630-165532",
@@ -5413,7 +5563,7 @@
       ]
     },
     "flowchart/c.swimlane-order-process.svg": {
-      "dfy": "flowchart/c.swimlane-order-process.dfy",
+      "dfy": "flowchart/c.swimlane-order-process.pgm",
       "entries": [
         {
           "id": "20260630-165533",
@@ -5508,7 +5658,7 @@
       ]
     },
     "mindmap/c.knowledge-map.svg": {
-      "dfy": "mindmap/c.knowledge-map.dfy",
+      "dfy": "mindmap/c.knowledge-map.pgm",
       "entries": [
         {
           "id": "20260630-140919",
@@ -5543,7 +5693,7 @@
       ]
     },
     "mindmap/c.product-roadmap.svg": {
-      "dfy": "mindmap/c.product-roadmap.dfy",
+      "dfy": "mindmap/c.product-roadmap.pgm",
       "entries": [
         {
           "id": "20260630-140919",
@@ -5578,7 +5728,7 @@
       ]
     },
     "mindmap/n.programming-learning.svg": {
-      "dfy": "mindmap/n.programming-learning.dfy",
+      "dfy": "mindmap/n.programming-learning.pgm",
       "entries": [
         {
           "id": "20260630-140919",
@@ -5613,7 +5763,7 @@
       ]
     },
     "mindmap/n.project-plan.svg": {
-      "dfy": "mindmap/n.project-plan.dfy",
+      "dfy": "mindmap/n.project-plan.pgm",
       "entries": [
         {
           "id": "20260630-140919",
@@ -5648,7 +5798,7 @@
       ]
     },
     "mindmap/n.tech-stack.svg": {
-      "dfy": "mindmap/n.tech-stack.dfy",
+      "dfy": "mindmap/n.tech-stack.pgm",
       "entries": [
         {
           "id": "20260630-140919",
@@ -5683,7 +5833,7 @@
       ]
     },
     "mindmap/s.brainstorm.svg": {
-      "dfy": "mindmap/s.brainstorm.dfy",
+      "dfy": "mindmap/s.brainstorm.pgm",
       "entries": [
         {
           "id": "20260630-140919",
@@ -5718,7 +5868,7 @@
       ]
     },
     "mindmap/s.root-branches.svg": {
-      "dfy": "mindmap/s.root-branches.dfy",
+      "dfy": "mindmap/s.root-branches.pgm",
       "entries": [
         {
           "id": "20260630-140920",
@@ -5753,7 +5903,7 @@
       ]
     },
     "state/c.layout-stress-transitions.svg": {
-      "dfy": "state/c.layout-stress-transitions.dfy",
+      "dfy": "state/c.layout-stress-transitions.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -5798,8 +5948,13 @@
       ]
     },
     "architecture/c.mcp-server-cluster-architecture.svg": {
-      "dfy": "architecture/c.mcp-server-cluster-architecture.dfy",
+      "dfy": "architecture/c.mcp-server-cluster-architecture.pgm",
       "entries": [
+        {
+          "id": "20260707-022902",
+          "file": ".history/architecture/c.mcp-server-cluster-architecture/20260707-022902.svg",
+          "savedAt": "2026-07-07T02:29:02+00:00"
+        },
         {
           "id": "20260630-165531",
           "file": ".history/architecture/c.mcp-server-cluster-architecture/20260630-165531.svg",
@@ -5903,7 +6058,7 @@
       ]
     },
     "architecture/s.client-api-db.svg": {
-      "dfy": "architecture/s.client-api-db.dfy",
+      "dfy": "architecture/s.client-api-db.pgm",
       "entries": [
         {
           "id": "20260630-165531",
@@ -5928,7 +6083,7 @@
       ]
     },
     "architecture/s.three-tier.svg": {
-      "dfy": "architecture/s.three-tier.dfy",
+      "dfy": "architecture/s.three-tier.pgm",
       "entries": [
         {
           "id": "20260630-165531",
@@ -5953,7 +6108,7 @@
       ]
     },
     "sequence/c.ai-agent-change-loop.svg": {
-      "dfy": "sequence/c.ai-agent-change-loop.dfy",
+      "dfy": "sequence/c.ai-agent-change-loop.pgm",
       "entries": [
         {
           "id": "20260630-165533",
@@ -5983,7 +6138,7 @@
       ]
     },
     "sequence/c.cross-team-incident-escalation.svg": {
-      "dfy": "sequence/c.cross-team-incident-escalation.dfy",
+      "dfy": "sequence/c.cross-team-incident-escalation.pgm",
       "entries": [
         {
           "id": "20260630-165533",
@@ -6013,7 +6168,7 @@
       ]
     },
     "sequence/c.distributed-saga.svg": {
-      "dfy": "sequence/c.distributed-saga.dfy",
+      "dfy": "sequence/c.distributed-saga.pgm",
       "entries": [
         {
           "id": "20260630-165533",
@@ -6043,7 +6198,7 @@
       ]
     },
     "sequence/c.k8s-canary-rollback.svg": {
-      "dfy": "sequence/c.k8s-canary-rollback.dfy",
+      "dfy": "sequence/c.k8s-canary-rollback.pgm",
       "entries": [
         {
           "id": "20260630-165533",
@@ -6073,7 +6228,7 @@
       ]
     },
     "sequence/c.k8s-node-failure-recovery.svg": {
-      "dfy": "sequence/c.k8s-node-failure-recovery.dfy",
+      "dfy": "sequence/c.k8s-node-failure-recovery.pgm",
       "entries": [
         {
           "id": "20260630-165533",
@@ -6103,7 +6258,7 @@
       ]
     },
     "sequence/c.k8s-rolling-update.svg": {
-      "dfy": "sequence/c.k8s-rolling-update.dfy",
+      "dfy": "sequence/c.k8s-rolling-update.pgm",
       "entries": [
         {
           "id": "20260630-165533",
@@ -6133,7 +6288,7 @@
       ]
     },
     "sequence/c.layout-stress-lifelines.svg": {
-      "dfy": "sequence/c.layout-stress-lifelines.dfy",
+      "dfy": "sequence/c.layout-stress-lifelines.pgm",
       "entries": [
         {
           "id": "20260630-165533",
@@ -6163,7 +6318,7 @@
       ]
     },
     "sequence/c.microservice-checkout.svg": {
-      "dfy": "sequence/c.microservice-checkout.dfy",
+      "dfy": "sequence/c.microservice-checkout.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -6198,7 +6353,7 @@
       ]
     },
     "sequence/c.real-time-risk-decisioning.svg": {
-      "dfy": "sequence/c.real-time-risk-decisioning.dfy",
+      "dfy": "sequence/c.real-time-risk-decisioning.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -6228,7 +6383,7 @@
       ]
     },
     "sequence/n.api-call-chain.svg": {
-      "dfy": "sequence/n.api-call-chain.dfy",
+      "dfy": "sequence/n.api-call-chain.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -6258,7 +6413,7 @@
       ]
     },
     "sequence/n.oauth-login.svg": {
-      "dfy": "sequence/n.oauth-login.dfy",
+      "dfy": "sequence/n.oauth-login.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -6288,7 +6443,7 @@
       ]
     },
     "sequence/n.payment-gateway.svg": {
-      "dfy": "sequence/n.payment-gateway.dfy",
+      "dfy": "sequence/n.payment-gateway.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -6318,7 +6473,7 @@
       ]
     },
     "sequence/s.ping-pong.svg": {
-      "dfy": "sequence/s.ping-pong.dfy",
+      "dfy": "sequence/s.ping-pong.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -6348,7 +6503,7 @@
       ]
     },
     "sequence/s.request-response.svg": {
-      "dfy": "sequence/s.request-response.dfy",
+      "dfy": "sequence/s.request-response.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -6378,7 +6533,7 @@
       ]
     },
     "state/s.on-off.svg": {
-      "dfy": "state/s.on-off.dfy",
+      "dfy": "state/s.on-off.pgm",
       "entries": [
         {
           "id": "20260630-165534",
@@ -6408,7 +6563,7 @@
       ]
     },
     "state/s.traffic-light.svg": {
-      "dfy": "state/s.traffic-light.dfy",
+      "dfy": "state/s.traffic-light.pgm",
       "entries": [
         {
           "id": "20260630-165534",

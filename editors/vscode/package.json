@@ -1,9 +1,9 @@
 {
-  "name": "drawify",
-  "displayName": "Drawify",
-  "description": "Drawify DSL language support, diagram preview, and Markdown embedding",
+  "name": "plotgram",
+  "displayName": "Plotgram",
+  "description": "Plotgram DSL language support, diagram preview, and Markdown embedding",
   "version": "0.1.0",
-  "publisher": "drawify",
+  "publisher": "plotgram",
   "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
@@ -13,43 +13,43 @@
     "Visualization"
   ],
   "activationEvents": [
-    "onLanguage:drawify"
+    "onLanguage:plotgram"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "languages": [
       {
-        "id": "drawify",
+        "id": "plotgram",
         "aliases": [
-          "Drawify",
-          "drawify"
+          "Plotgram",
+          "plotgram"
         ],
         "extensions": [
-          ".dfy"
+          ".pgm"
         ],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
       {
-        "language": "drawify",
-        "scopeName": "source.drawify",
-        "path": "./syntaxes/drawify.tmLanguage.json"
+        "language": "plotgram",
+        "scopeName": "source.plotgram",
+        "path": "./syntaxes/plotgram.tmLanguage.json"
       }
     ],
     "commands": [
       {
-        "command": "drawify.openPreview",
-        "title": "Open Drawify Preview",
-        "category": "Drawify",
+        "command": "plotgram.openPreview",
+        "title": "Open Plotgram Preview",
+        "category": "Plotgram",
         "icon": "$(preview)"
       }
     ],
     "menus": {
       "editor/title": [
         {
-          "command": "drawify.openPreview",
-          "when": "resourceLangId == drawify",
+          "command": "plotgram.openPreview",
+          "when": "resourceLangId == plotgram",
           "group": "navigation"
         }
       ]

@@ -1,7 +1,7 @@
 # 布局与边路由实现复盘分析报告
 
 > 日期：2026-06-25  
-> 范围：`crates/drawify-core/src/layout/`（约 98 个 Rust 文件）  
+> 范围：`crates/plotgram-core/src/layout/`（约 98 个 Rust 文件）  
 > 状态：P0 + P1 已落地（见 §八、§九）
 
 ---
@@ -63,7 +63,7 @@ L1 Group Frame  — group_frame（组间 stack/Equal/对齐/量化）
 ### 2.5 工程纪律
 
 - **确定性迭代**：关键路径有显式排序，符合 AGENTS.md §2。
-- **A/B 基础设施**：`backup/sugiyama` + `drawify-eval` + readme 中「改动 >30% 新建文件」原则。
+- **A/B 基础设施**：`backup/sugiyama` + `plotgram-eval` + readme 中「改动 >30% 新建文件」原则。
 - **内嵌测试丰富**：约 60+ 个模块含 `#[cfg(test)]`。
 
 ---
@@ -175,7 +175,7 @@ Week 5–6   P1: refine 空间索引（P2-1 落地）
 Week 7+    P2: Friendliness/Refine 合并、正交分层路由（按需）
 ```
 
-每步配合 `drawify-eval` 跑 showcase 回归（`showcase/architecture/*.dfy`）。
+每步配合 `plotgram-eval` 跑 showcase 回归（`showcase/architecture/*.pgm`）。
 
 ---
 
@@ -254,7 +254,7 @@ Week 7+    P2: Friendliness/Refine 合并、正交分层路由（按需）
 
 ## 相关文档
 
-- [布局算法 readme](../../../crates/drawify-core/src/layout/readme.md)
+- [布局算法 readme](../../../crates/plotgram-core/src/layout/readme.md)
 - [Group Frame 规范](../../../已经实现的方案/group-frame-spec.md)
 - [正交路由投资计划](../../../已经实现的方案/orthogonal-routing-investment-plan.md)
 - [布局算法优化计划](../layout-algorithm-optimization-plan.md)

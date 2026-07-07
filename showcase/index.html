@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Drawify Showcase Gallery</title>
+  <title>Plotgram Showcase Gallery</title>
   <link rel="icon" href="../assets/brand/logo-icon.svg" type="image/svg+xml" />
   <style>
     :root {
@@ -1314,15 +1314,15 @@
 <body>
   <div class="shell">
     <header class="site-brand">
-      <img class="site-brand-logo" src="../assets/brand/logo.svg" alt="Drawify" />
+      <img class="site-brand-logo" src="../assets/brand/logo.svg" alt="Plotgram" />
     </header>
 
     <section class="hero">
-      <div class="eyebrow">Drawify Showcase Gallery</div>
+      <div class="eyebrow">Plotgram Showcase Gallery</div>
       <h1>像画廊一样浏览全部示例</h1>
       <p>
         这个单文件页面用于离线浏览 `showcase/` 下的所有样例。你可以按图类型、复杂度、业务场景筛选，
-        直接预览对应的 SVG，并快速打开 `.dfy` 源文件或独立 SVG。
+        直接预览对应的 SVG，并快速打开 `.pgm` 源文件或独立 SVG。
       </p>
       <div class="hero-meta" id="heroMeta"></div>
     </section>
@@ -1442,7 +1442,7 @@
     </section>
 
     <div class="footer-note">
-      单文件离线页面，默认假定每个 `.dfy` 都存在同名 `.svg` 文件。
+      单文件离线页面，默认假定每个 `.pgm` 都存在同名 `.svg` 文件。
     </div>
   </div>
 
@@ -1514,85 +1514,85 @@
 
     // manifest:start
     const SAMPLE_PATHS = [
-      "architecture/c.ai-agent-docops-pipeline.dfy",
-      "architecture/c.cloud-native.dfy",
-      "architecture/c.data-lineage-platform.dfy",
-      "architecture/c.drawify-core-mod-deps.dfy",
-      "architecture/c.ecommerce-platform.dfy",
-      "architecture/c.hybrid-cloud-dr-topology.dfy",
-      "architecture/c.k8s-blue-green-release-topology.dfy",
-      "architecture/c.k8s-multi-cluster-federation.dfy",
-      "architecture/c.k8s-multi-namespace-overview.dfy",
-      "architecture/c.k8s-platform-stack.dfy",
-      "architecture/c.k8s-tenant-isolation.dfy",
-      "architecture/c.layout-stress-nested.dfy",
-      "architecture/c.mcp-server-cluster-architecture.dfy",
-      "architecture/c.payment-clearing-platform.dfy",
-      "architecture/c.supply-chain-control-tower.dfy",
-      "architecture/n.compiler-pipeline.dfy",
-      "architecture/n.d2-cell-tower-network.dfy",
-      "architecture/n.data-pipeline.dfy",
-      "architecture/n.event-driven.dfy",
-      "architecture/n.microservices.dfy",
-      "architecture/s.client-api-db.dfy",
-      "architecture/s.three-tier.dfy",
-      "er/c.ecommerce-schema.dfy",
-      "er/c.layout-stress-dense.dfy",
-      "er/c.saas-schema.dfy",
-      "er/n.blog-schema.dfy",
-      "er/n.school-schema.dfy",
-      "er/n.social-network.dfy",
-      "er/s.two-tables.dfy",
-      "er/s.user-post.dfy",
-      "flowchart/c.aml-case-investigation.dfy",
-      "flowchart/c.caffe-shop.dfy",
-      "flowchart/c.change-approval-workflow.dfy",
-      "flowchart/c.ci-cd-security-pipeline.dfy",
-      "flowchart/c.customer-refund-process.dfy",
-      "flowchart/c.e-commerce-order-fulfillment.dfy",
-      "flowchart/c.k8s-incident-response.dfy",
-      "flowchart/c.layout-stress-dag.dfy",
-      "flowchart/c.pr-architecture-review.dfy",
-      "flowchart/c.software-release.dfy",
-      "flowchart/c.swimlane-order-process.dfy",
-      "flowchart/n.employee-onboarding.dfy",
-      "flowchart/n.order-approval.dfy",
-      "flowchart/n.user-auth.dfy",
-      "flowchart/s.decision-loop.dfy",
-      "flowchart/s.linear-chain.dfy",
-      "mindmap/c.knowledge-map.dfy",
-      "mindmap/c.product-roadmap.dfy",
-      "mindmap/n.programming-learning.dfy",
-      "mindmap/n.project-plan.dfy",
-      "mindmap/n.tech-stack.dfy",
-      "mindmap/s.brainstorm.dfy",
-      "mindmap/s.root-branches.dfy",
-      "sequence/c.ai-agent-change-loop.dfy",
-      "sequence/c.cross-team-incident-escalation.dfy",
-      "sequence/c.distributed-saga.dfy",
-      "sequence/c.k8s-canary-rollback.dfy",
-      "sequence/c.k8s-node-failure-recovery.dfy",
-      "sequence/c.k8s-rolling-update.dfy",
-      "sequence/c.layout-stress-lifelines.dfy",
-      "sequence/c.microservice-checkout.dfy",
-      "sequence/c.real-time-risk-decisioning.dfy",
-      "sequence/n.api-call-chain.dfy",
-      "sequence/n.oauth-login.dfy",
-      "sequence/n.payment-gateway.dfy",
-      "sequence/s.ping-pong.dfy",
-      "sequence/s.request-response.dfy",
-      "state/c.document-sync-lifecycle.dfy",
-      "state/c.k8s-node-pressure-lifecycle.dfy",
-      "state/c.k8s-rollout-state-machine.dfy",
-      "state/c.layout-stress-transitions.dfy",
-      "state/c.payment-flow.dfy",
-      "state/c.service-degradation-lifecycle.dfy",
-      "state/c.settlement-reconciliation-lifecycle.dfy",
-      "state/c.tcp-connection.dfy",
-      "state/n.order-lifecycle.dfy",
-      "state/n.ticket-workflow.dfy",
-      "state/s.on-off.dfy",
-      "state/s.traffic-light.dfy"
+      "architecture/c.ai-agent-docops-pipeline.pgm",
+      "architecture/c.cloud-native.pgm",
+      "architecture/c.data-lineage-platform.pgm",
+      "architecture/c.ecommerce-platform.pgm",
+      "architecture/c.hybrid-cloud-dr-topology.pgm",
+      "architecture/c.k8s-blue-green-release-topology.pgm",
+      "architecture/c.k8s-multi-cluster-federation.pgm",
+      "architecture/c.k8s-multi-namespace-overview.pgm",
+      "architecture/c.k8s-platform-stack.pgm",
+      "architecture/c.k8s-tenant-isolation.pgm",
+      "architecture/c.layout-stress-nested.pgm",
+      "architecture/c.mcp-server-cluster-architecture.pgm",
+      "architecture/c.payment-clearing-platform.pgm",
+      "architecture/c.plotgram-core-mod-deps.pgm",
+      "architecture/c.supply-chain-control-tower.pgm",
+      "architecture/n.compiler-pipeline.pgm",
+      "architecture/n.d2-cell-tower-network.pgm",
+      "architecture/n.data-pipeline.pgm",
+      "architecture/n.event-driven.pgm",
+      "architecture/n.microservices.pgm",
+      "architecture/s.client-api-db.pgm",
+      "architecture/s.three-tier.pgm",
+      "er/c.ecommerce-schema.pgm",
+      "er/c.layout-stress-dense.pgm",
+      "er/c.saas-schema.pgm",
+      "er/n.blog-schema.pgm",
+      "er/n.school-schema.pgm",
+      "er/n.social-network.pgm",
+      "er/s.two-tables.pgm",
+      "er/s.user-post.pgm",
+      "flowchart/c.aml-case-investigation.pgm",
+      "flowchart/c.caffe-shop.pgm",
+      "flowchart/c.change-approval-workflow.pgm",
+      "flowchart/c.ci-cd-security-pipeline.pgm",
+      "flowchart/c.customer-refund-process.pgm",
+      "flowchart/c.e-commerce-order-fulfillment.pgm",
+      "flowchart/c.k8s-incident-response.pgm",
+      "flowchart/c.layout-stress-dag.pgm",
+      "flowchart/c.pr-architecture-review.pgm",
+      "flowchart/c.software-release.pgm",
+      "flowchart/c.swimlane-order-process.pgm",
+      "flowchart/n.employee-onboarding.pgm",
+      "flowchart/n.order-approval.pgm",
+      "flowchart/n.user-auth.pgm",
+      "flowchart/s.decision-loop.pgm",
+      "flowchart/s.linear-chain.pgm",
+      "mindmap/c.knowledge-map.pgm",
+      "mindmap/c.product-roadmap.pgm",
+      "mindmap/n.programming-learning.pgm",
+      "mindmap/n.project-plan.pgm",
+      "mindmap/n.tech-stack.pgm",
+      "mindmap/s.brainstorm.pgm",
+      "mindmap/s.root-branches.pgm",
+      "sequence/c.ai-agent-change-loop.pgm",
+      "sequence/c.cross-team-incident-escalation.pgm",
+      "sequence/c.distributed-saga.pgm",
+      "sequence/c.k8s-canary-rollback.pgm",
+      "sequence/c.k8s-node-failure-recovery.pgm",
+      "sequence/c.k8s-rolling-update.pgm",
+      "sequence/c.layout-stress-lifelines.pgm",
+      "sequence/c.microservice-checkout.pgm",
+      "sequence/c.real-time-risk-decisioning.pgm",
+      "sequence/n.api-call-chain.pgm",
+      "sequence/n.oauth-login.pgm",
+      "sequence/n.payment-gateway.pgm",
+      "sequence/s.ping-pong.pgm",
+      "sequence/s.request-response.pgm",
+      "state/c.document-sync-lifecycle.pgm",
+      "state/c.k8s-node-pressure-lifecycle.pgm",
+      "state/c.k8s-rollout-state-machine.pgm",
+      "state/c.layout-stress-transitions.pgm",
+      "state/c.payment-flow.pgm",
+      "state/c.service-degradation-lifecycle.pgm",
+      "state/c.settlement-reconciliation-lifecycle.pgm",
+      "state/c.tcp-connection.pgm",
+      "state/n.order-lifecycle.pgm",
+      "state/n.ticket-workflow.pgm",
+      "state/s.on-off.pgm",
+      "state/s.traffic-light.pgm"
     ];
 // manifest:end
 
@@ -1612,44 +1612,44 @@
     };
 
     const FEATURED_FILES = new Set([
-      "architecture/c.k8s-multi-namespace-overview.dfy",
-      "architecture/c.ai-agent-docops-pipeline.dfy",
-      "architecture/c.payment-clearing-platform.dfy",
-      "architecture/c.supply-chain-control-tower.dfy",
-      "sequence/c.k8s-rolling-update.dfy",
-      "sequence/c.real-time-risk-decisioning.dfy",
-      "flowchart/c.k8s-incident-response.dfy",
-      "flowchart/c.aml-case-investigation.dfy",
-      "state/c.k8s-rollout-state-machine.dfy",
-      "state/c.settlement-reconciliation-lifecycle.dfy"
+      "architecture/c.k8s-multi-namespace-overview.pgm",
+      "architecture/c.ai-agent-docops-pipeline.pgm",
+      "architecture/c.payment-clearing-platform.pgm",
+      "architecture/c.supply-chain-control-tower.pgm",
+      "sequence/c.k8s-rolling-update.pgm",
+      "sequence/c.real-time-risk-decisioning.pgm",
+      "flowchart/c.k8s-incident-response.pgm",
+      "flowchart/c.aml-case-investigation.pgm",
+      "state/c.k8s-rollout-state-machine.pgm",
+      "state/c.settlement-reconciliation-lifecycle.pgm"
     ]);
 
     const TITLE_OVERRIDES = {
-      "architecture/c.k8s-multi-namespace-overview.dfy": "K8s 多命名空间生产集群总览",
-      "architecture/c.k8s-multi-cluster-federation.dfy": "K8s 多集群跨地域拓扑",
-      "architecture/c.k8s-platform-stack.dfy": "K8s 平台栈与业务工作负载",
-      "architecture/c.k8s-blue-green-release-topology.dfy": "K8s 蓝绿发布拓扑",
-      "architecture/c.k8s-tenant-isolation.dfy": "K8s 多租户隔离拓扑",
-      "architecture/c.hybrid-cloud-dr-topology.dfy": "混合云灾备拓扑",
-      "architecture/c.data-lineage-platform.dfy": "企业数据血缘平台",
-      "architecture/c.ai-agent-docops-pipeline.dfy": "AI Agent 文档自动化管线",
-      "architecture/c.payment-clearing-platform.dfy": "支付清结算平台",
-      "architecture/c.supply-chain-control-tower.dfy": "供应链控制塔",
-      "sequence/c.k8s-rolling-update.dfy": "K8s 滚动发布链路",
-      "sequence/c.k8s-node-failure-recovery.dfy": "K8s 节点故障恢复链路",
-      "sequence/c.k8s-canary-rollback.dfy": "K8s 金丝雀回滚链路",
-      "sequence/c.cross-team-incident-escalation.dfy": "跨团队故障升级协同",
-      "sequence/c.ai-agent-change-loop.dfy": "AI Agent 变更分析闭环",
-      "sequence/c.real-time-risk-decisioning.dfy": "实时风控决策链路",
-      "flowchart/c.k8s-incident-response.dfy": "K8s 生产集群故障响应流程",
-      "flowchart/c.change-approval-workflow.dfy": "生产变更审批流程",
-      "flowchart/c.pr-architecture-review.dfy": "PR 架构评审流程",
-      "flowchart/c.aml-case-investigation.dfy": "反洗钱案件调查流程",
-      "state/c.k8s-rollout-state-machine.dfy": "K8s 发布状态机",
-      "state/c.k8s-node-pressure-lifecycle.dfy": "K8s 节点压力与恢复状态机",
-      "state/c.service-degradation-lifecycle.dfy": "服务降级生命周期",
-      "state/c.document-sync-lifecycle.dfy": "文档同步生命周期",
-      "state/c.settlement-reconciliation-lifecycle.dfy": "清结算对账生命周期"
+      "architecture/c.k8s-multi-namespace-overview.pgm": "K8s 多命名空间生产集群总览",
+      "architecture/c.k8s-multi-cluster-federation.pgm": "K8s 多集群跨地域拓扑",
+      "architecture/c.k8s-platform-stack.pgm": "K8s 平台栈与业务工作负载",
+      "architecture/c.k8s-blue-green-release-topology.pgm": "K8s 蓝绿发布拓扑",
+      "architecture/c.k8s-tenant-isolation.pgm": "K8s 多租户隔离拓扑",
+      "architecture/c.hybrid-cloud-dr-topology.pgm": "混合云灾备拓扑",
+      "architecture/c.data-lineage-platform.pgm": "企业数据血缘平台",
+      "architecture/c.ai-agent-docops-pipeline.pgm": "AI Agent 文档自动化管线",
+      "architecture/c.payment-clearing-platform.pgm": "支付清结算平台",
+      "architecture/c.supply-chain-control-tower.pgm": "供应链控制塔",
+      "sequence/c.k8s-rolling-update.pgm": "K8s 滚动发布链路",
+      "sequence/c.k8s-node-failure-recovery.pgm": "K8s 节点故障恢复链路",
+      "sequence/c.k8s-canary-rollback.pgm": "K8s 金丝雀回滚链路",
+      "sequence/c.cross-team-incident-escalation.pgm": "跨团队故障升级协同",
+      "sequence/c.ai-agent-change-loop.pgm": "AI Agent 变更分析闭环",
+      "sequence/c.real-time-risk-decisioning.pgm": "实时风控决策链路",
+      "flowchart/c.k8s-incident-response.pgm": "K8s 生产集群故障响应流程",
+      "flowchart/c.change-approval-workflow.pgm": "生产变更审批流程",
+      "flowchart/c.pr-architecture-review.pgm": "PR 架构评审流程",
+      "flowchart/c.aml-case-investigation.pgm": "反洗钱案件调查流程",
+      "state/c.k8s-rollout-state-machine.pgm": "K8s 发布状态机",
+      "state/c.k8s-node-pressure-lifecycle.pgm": "K8s 节点压力与恢复状态机",
+      "state/c.service-degradation-lifecycle.pgm": "服务降级生命周期",
+      "state/c.document-sync-lifecycle.pgm": "文档同步生命周期",
+      "state/c.settlement-reconciliation-lifecycle.pgm": "清结算对账生命周期"
     };
 
     const AUDIENCE_PRESETS = [
@@ -1763,9 +1763,9 @@
 
     const samples = SAMPLE_PATHS.map((path) => {
       const [type, file] = path.split("/");
-      const [complexity, slug] = file.replace(".dfy", "").split(".", 2);
+      const [complexity, slug] = file.replace(".pgm", "").split(".", 2);
       const title = TITLE_OVERRIDES[path] || humanizeSlug(slug);
-      const svgPath = path.replace(/\.dfy$/, ".svg");
+      const svgPath = path.replace(/\.pgm$/, ".svg");
       const tags = deriveTags(path);
       return {
         path,

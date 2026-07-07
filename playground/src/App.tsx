@@ -99,24 +99,24 @@ function App() {
   const layoutCatalog = useLayoutCatalog(wasm, ready);
 
   // ─── 持久化状态 ──────────────────────────────────────────
-  const [code, setCode] = useLocalStorage('drawify.code', DEFAULT_CODE);
+  const [code, setCode] = useLocalStorage('plotgram.code', DEFAULT_CODE);
   const [layoutOptionsStored, setLayoutOptions] = useLocalStorage<LayoutOptions>(
-    'drawify.layout',
+    'plotgram.layout',
     EMPTY_LAYOUT_OPTIONS,
   );
   const [appearanceOptionsStored, setAppearanceOptions] = useLocalStorage<AppearanceOptions>(
-    'drawify.appearance',
+    'plotgram.appearance',
     DEFAULT_APPEARANCE_OPTIONS,
   );
-  const [theme, setTheme] = useLocalStorage<Theme>('drawify.theme', systemTheme());
-  const [editorWidth, setEditorWidth] = useLocalStorage('drawify.editorWidth', 380);
-  const [inspectorWidth, setInspectorWidth] = useLocalStorage('drawify.inspectorWidth', 300);
+  const [theme, setTheme] = useLocalStorage<Theme>('plotgram.theme', systemTheme());
+  const [editorWidth, setEditorWidth] = useLocalStorage('plotgram.editorWidth', 380);
+  const [inspectorWidth, setInspectorWidth] = useLocalStorage('plotgram.inspectorWidth', 300);
   const [rasterExportScale, setRasterExportScale] = useLocalStorage<RasterExportScale>(
-    'drawify.rasterScale',
+    'plotgram.rasterScale',
     2,
   );
   const [intentDraftsStored, setIntentDrafts] = useLocalStorage<IntentDrafts>(
-    'drawify.intents',
+    'plotgram.intents',
     EMPTY_INTENT_DRAFTS,
   );
   const [previewBackgroundStored, setPreviewBackground] = useLocalStorage<PreviewBackground>(
@@ -142,7 +142,7 @@ function App() {
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('problems');
   const [bottomPanelExpanded, setBottomPanelExpanded] = useState(false);
   const [layoutSource, setLayoutSource] = useState<LayoutSource>('panel');
-  const [filename, setFilename] = useState('未命名.dfy');
+  const [filename, setFilename] = useState('未命名.pgm');
   const [dirty, setDirty] = useState(false);
   const [examplesDrawerOpen, setExamplesDrawerOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -514,11 +514,14 @@ function App() {
   }, [code, wasm, ready]);
 
   // ─── 布局/外观变更 ───────────────────────────────────────
-  const handleLayoutChange = (key: 'layoutAlgo' | 'edgeRouting' | 'layoutDirection' | 'gridSnap', value: string | boolean) => {
+  const handleLayoutChange = (key: 'layoutAlgo' | 'edgeRouting' | 'layoutDirection' | 'gridSnap' | 'gridAlign', value: string | boolean) => {
     setLayoutOptions((prev) => {
       const next = normalizeLayoutOptions(prev);
       if (key === 'gridSnap') {
         return { ...next, gridSnap: Boolean(value) };
+      }
+      if (key === 'gridAlign') {
+        return { ...next, gridAlign: Boolean(value) };
       }
       if (key === 'layoutAlgo' && value !== next.layoutAlgo) {
         return { ...next, layoutAlgo: value as string, layoutConfig: {} };
@@ -566,7 +569,7 @@ function App() {
     const exDefaults = getDiagramDefaults(layoutCatalog, detectDiagramType(ex.source));
     setLayoutOptions(exDefaults ? layoutOptionsFromDefaults(exDefaults) : EMPTY_LAYOUT_OPTIONS);
     setAppearanceOptions(DEFAULT_APPEARANCE_OPTIONS);
-    setFilename(`${ex.title}.dfy`);
+    setFilename(`${ex.title}.pgm`);
     setDirty(false);
     setFitSignal((s) => s + 1);
   };
@@ -620,24 +623,24 @@ function App() {
     },
     downloadPng: () => {
       if (!svg) return;
-      downloadPng(svg, `${filename.replace(/\.dfy$/, '') || 'diagram'}.png`, rasterExportScale)
+      downloadPng(svg, `${filename.replace(/\.pgm$/, '') || 'diagram'}.png`, rasterExportScale)
         .then(() => showToast(`PNG 已导出（${rasterExportScale}x）`, 'success'))
         .catch(() => showToast('PNG 导出失败', 'error'));
     },
     downloadWebp: () => {
       if (!svg) return;
-      downloadWebp(svg, `${filename.replace(/\.dfy$/, '') || 'diagram'}.webp`, rasterExportScale)
+      downloadWebp(svg, `${filename.replace(/\.pgm$/, '') || 'diagram'}.webp`, rasterExportScale)
         .then(() => showToast(`WebP 已导出（${rasterExportScale}x）`, 'success'))
         .catch(() => showToast('WebP 导出失败（浏览器可能不支持）', 'error'));
     },
     downloadAscii: () => {
       if (!ascii) return;
-      downloadText(ascii, `${filename.replace(/\.dfy$/, '') || 'diagram'}.txt`);
+      downloadText(ascii, `${filename.replace(/\.pgm$/, '') || 'diagram'}.txt`);
       showToast('ASCII 已导出', 'success');
     },
     downloadJson: () => {
       if (!sceneJson) return;
-      downloadJson(sceneJson, `${filename.replace(/\.dfy$/, '') || 'diagram'}.json`);
+      downloadJson(sceneJson, `${filename.replace(/\.pgm$/, '') || 'diagram'}.json`);
       showToast('Scene JSON 已导出', 'success');
     },
     copySvg: () => {
@@ -667,7 +670,7 @@ function App() {
     downloadDrawio: () => {
       const xml = generateDrawio();
       if (!xml) return;
-      downloadDrawio(xml, `${filename.replace(/\.dfy$/, '') || 'diagram'}.drawio`);
+      downloadDrawio(xml, `${filename.replace(/\.pgm$/, '') || 'diagram'}.drawio`);
       showToast('Drawio 已导出', 'success');
     },
     copyDrawio: () => {
@@ -688,7 +691,7 @@ function App() {
   // ─── 文件操作 ────────────────────────────────────────────
   const handleNewFile = useCallback(() => {
     setCode(DEFAULT_CODE);
-    setFilename('未命名.dfy');
+    setFilename('未命名.pgm');
     setDirty(false);
     fileHandleRef.current = null;
     setActiveExampleId(DEFAULT_EXAMPLE_ID);
@@ -701,8 +704,8 @@ function App() {
       try {
         const [handle] = await (window as unknown as { showOpenFilePicker: (opts?: unknown) => Promise<FileSystemFileHandle[]> }).showOpenFilePicker({
           types: [{
-            description: 'Drawify 文件',
-            accept: { 'text/plain': ['.dfy'] },
+            description: 'Plotgram 文件',
+            accept: { 'text/plain': ['.pgm'] },
           }],
           multiple: false,
         });
@@ -724,7 +727,7 @@ function App() {
     // 回退到 input[type=file]
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.dfy,.txt';
+    input.accept = '.pgm,.txt';
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
@@ -761,8 +764,8 @@ function App() {
         const handle = await (window as unknown as { showSaveFilePicker: (opts?: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker({
           suggestedName: filename,
           types: [{
-            description: 'Drawify 文件',
-            accept: { 'text/plain': ['.dfy'] },
+            description: 'Plotgram 文件',
+            accept: { 'text/plain': ['.pgm'] },
           }],
         });
         const writable = await handle.createWritable();

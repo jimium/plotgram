@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { DrawifyWasm } from '../lib/wasm';
+import type { PlotgramWasm } from '../lib/wasm';
 import { parseLayoutCatalog, type LayoutCatalog } from '../data/layoutOptions';
 
-export function useLayoutCatalog(wasm: DrawifyWasm | null, ready: boolean) {
+export function useLayoutCatalog(wasm: PlotgramWasm | null, ready: boolean) {
   const [catalog, setCatalog] = useState<LayoutCatalog | null>(null);
 
   useEffect(() => {

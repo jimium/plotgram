@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>C4 模型支持方案 — Drawify</title>
+  <title>C4 模型支持方案 — Plotgram</title>
   <style>
     :root {
       --bg: #f6f7f9;
@@ -209,7 +209,7 @@
 <header>
   <h1>C4 模型支持方案</h1>
   <p>
-    在 Drawify 现有 <code>architecture</code> 图表类型与企业 Compose 管线上，以<strong>单一语义模型 + 多视图投影</strong>的方式支持 C4，
+    在 Plotgram 现有 <code>architecture</code> 图表类型与企业 Compose 管线上，以<strong>单一语义模型 + 多视图投影</strong>的方式支持 C4，
     服务 AI Agent 生成、架构师手写与企业 Connector 自动出图。
   </p>
   <p class="meta">版本 0.3.0-draft · 2026-06-25 · 状态：方案设计中 · 路径：<code>docs/specs/visual-language/diagrams/c4/index.html</code></p>
@@ -223,7 +223,7 @@
         <li><a href="#summary">执行摘要</a></li>
         <li><a href="#needs">用户需求与场景</a></li>
         <li><a href="#competitors">竞品能力对照</a></li>
-        <li><a href="#inventory">Drawify 现状盘点</a></li>
+        <li><a href="#inventory">Plotgram 现状盘点</a></li>
         <li><a href="#principles">设计原则</a></li>
         <li><a href="#mapping">C4 概念映射</a></li>
         <li><a href="#design">核心方案：模型 + 视图</a></li>
@@ -287,7 +287,7 @@
       </tbody>
     </table>
 
-    <h3>1.1 C4 四层与 Drawify 覆盖范围</h3>
+    <h3>1.1 C4 四层与 Plotgram 覆盖范围</h3>
     <div class="figure">
       <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg">
         <rect x="20" y="20" width="680" height="52" rx="8" fill="#08427b" opacity="0.12" stroke="#08427b"/>
@@ -315,7 +315,7 @@
         <rect x="360" y="268" width="340" height="24" rx="4" fill="#fef3c7"/>
         <text x="370" y="284" font-size="10" fill="#92400e">+ Dynamic View（运行时序）→ 复用 sequence 或 P2 扩展</text>
       </svg>
-      <figcaption>Drawify C4 分期：优先 Context / Container，与主战场「架构图」一致</figcaption>
+      <figcaption>Plotgram C4 分期：优先 Context / Container，与主战场「架构图」一致</figcaption>
     </div>
   </section>
 
@@ -326,7 +326,7 @@
     <h3>2.1 按角色</h3>
     <table>
       <thead>
-        <tr><th>角色</th><th>典型诉求</th><th>C4 视图</th><th>Drawify 触点</th></tr>
+        <tr><th>角色</th><th>典型诉求</th><th>C4 视图</th><th>Plotgram 触点</th></tr>
       </thead>
       <tbody>
         <tr>
@@ -339,7 +339,7 @@
           <td>架构师</td>
           <td>技术方案、评审材料、招投标</td>
           <td>Context + Container + Component</td>
-          <td>手写 .dfy；C4 配色主题；group 分层</td>
+          <td>手写 .pgm；C4 配色主题；group 分层</td>
         </tr>
         <tr>
           <td>开发者</td>
@@ -423,7 +423,7 @@
     <p>
       调研 Structurizr 官方文档与企业实践：绝大多数团队停留在 <strong>Context + Container</strong>，
       Component 用于核心子系统，Code 层几乎只出现在 IDE 反向工程演示中。
-      Drawify 应将工程资源集中在<strong>视图投影、关系聚合、Diff、Connector</strong>，而非类图渲染。
+      Plotgram 应将工程资源集中在<strong>视图投影、关系聚合、Diff、Connector</strong>，而非类图渲染。
     </p>
   </section>
 
@@ -439,7 +439,7 @@
           <th>Mermaid C4</th>
           <th>PlantUML C4</th>
           <th>D2</th>
-          <th>Drawify（目标）</th>
+          <th>Plotgram（目标）</th>
         </tr>
       </thead>
       <tbody>
@@ -521,12 +521,12 @@
     <h3>3.1 竞品启示</h3>
     <ul>
       <li><strong>向 Structurizr 学</strong>：单一模型、多视图、层级标识符；企业 Landscape 用 workspace 扩展合并。</li>
-      <li><strong>避开 Structurizr 的复杂度</strong>：不引入完整 workspace DSL；用 Drawify 已有 group + Compose 达到 80% 效果。</li>
+      <li><strong>避开 Structurizr 的复杂度</strong>：不引入完整 workspace DSL；用 Plotgram 已有 group + Compose 达到 80% 效果。</li>
       <li><strong>碾压 Mermaid 的点</strong>：一份 DSL 切换视图、全局 entity ID、validate 可修复、Diff 可审查。</li>
       <li><strong>不对标 PlantUML</strong>：不在 Code 层与 UML 类图竞争。</li>
     </ul>
 
-    <h3>3.2 Mermaid vs Drawify 语法对比（Container 视图）</h3>
+    <h3>3.2 Mermaid vs Plotgram 语法对比（Container 视图）</h3>
     <pre><code>// Mermaid — 每种视图是不同 diagram type，实体需重复声明
 C4Context
     Person(customer, "Customer")
@@ -542,7 +542,7 @@ C4Container
     Rel(web, api, "JSON")
     Rel(api, db, "SQL")</code></pre>
 
-    <pre><code>// Drawify — 统一 architecture，view 切换投影
+    <pre><code>// Plotgram — 统一 architecture，view 切换投影
 diagram architecture {
     title: "Internet Banking"
     view: container
@@ -563,8 +563,8 @@ diagram architecture {
 
   <!-- ─── 4. 现状盘点 ─── -->
   <section id="inventory">
-    <h2>4. Drawify 现状盘点</h2>
-    <p class="lead">基于当前代码库（<code>drawify-core</code>）与文档，标注 C4 方案可复用与待建设能力。</p>
+    <h2>4. Plotgram 现状盘点</h2>
+    <p class="lead">基于当前代码库（<code>plotgram-core</code>）与文档，标注 C4 方案可复用与待建设能力。</p>
 
     <table>
       <thead>
@@ -681,11 +681,11 @@ diagram architecture {
 
   <!-- ─── 6. 概念映射 ─── -->
   <section id="mapping">
-    <h2>6. C4 概念 → Drawify 映射</h2>
+    <h2>6. C4 概念 → Plotgram 映射</h2>
 
     <table>
       <thead>
-        <tr><th>C4 元素</th><th>Drawify 表达</th><th>level</th><th>type 建议</th><th>备注</th></tr>
+        <tr><th>C4 元素</th><th>Plotgram 表达</th><th>level</th><th>type 建议</th><th>备注</th></tr>
       </thead>
       <tbody>
         <tr>
@@ -997,7 +997,7 @@ deployment 与 container 正交，仅在 deployment 视图激活</code></pre>
     <h3>10.2 与 GraphicStyle 关系</h3>
     <p>
       C4 主题管<strong>颜色与形状语义</strong>；Excalidraw / Blueprint 等笔触皮肤可叠加。
-      企业客户可在 C4 配色基础上切换笔触，作为 Drawify 相对 Structurizr 的展示层差异化。
+      企业客户可在 C4 配色基础上切换笔触，作为 Plotgram 相对 Structurizr 的展示层差异化。
     </p>
 
     <h3>10.3 图例（Legend）</h3>
@@ -1011,7 +1011,7 @@ deployment 与 container 正交，仅在 deployment 视图激活</code></pre>
     <h3>11.1 K8s → C4 Container 映射</h3>
     <table>
       <thead>
-        <tr><th>K8s 资源</th><th>C4 层级</th><th>Drawify 结构</th></tr>
+        <tr><th>K8s 资源</th><th>C4 层级</th><th>Plotgram 结构</th></tr>
       </thead>
       <tbody>
         <tr><td>Namespace</td><td>（域边界）</td><td><code>group</code> + <code>meta.source_id</code></td></tr>
@@ -1044,7 +1044,7 @@ views:
     <p>
       结合 <code>snapshot-id</code>、<code>meta.source_hash</code> 与 diff2：
       两次发布间「新增 Container」「删除跨区 relation」进入合规报告。
-      这是 Drawify 相对 Mermaid/手绘 C4 的企业护城河。
+      这是 Plotgram 相对 Mermaid/手绘 C4 的企业护城河。
     </p>
   </section>
 
@@ -1125,7 +1125,7 @@ views:
         </tr>
         <tr>
           <td><code>showcase/architecture/</code></td>
-          <td>新增 <code>n.c4-internet-banking.dfy</code> 等示例</td>
+          <td>新增 <code>n.c4-internet-banking.pgm</code> 等示例</td>
         </tr>
         <tr>
           <td rowspan="3"><span class="pill pill-p1">P1</span></td>
@@ -1146,7 +1146,7 @@ views:
           <td>生成 <code>manifest.json</code>；drilldown 映射</td>
         </tr>
         <tr>
-          <td><code>drawify-cli</code></td>
+          <td><code>plotgram-cli</code></td>
           <td><code>--c4-views</code> 多视图批量导出；<code>--c4-bundle zip|html</code></td>
         </tr>
         <tr>
@@ -1160,7 +1160,7 @@ views:
         </tr>
         <tr>
           <td><span class="pill pill-p2">P2</span></td>
-          <td><code>drawify-server</code></td>
+          <td><code>plotgram-server</code></td>
           <td><code>POST /render</code> 的 <code>views[]</code>；<code>GET /c4/manifest</code></td>
         </tr>
       </tbody>
@@ -1229,7 +1229,7 @@ views:
       <svg viewBox="0 0 700 220" xmlns="http://www.w3.org/2000/svg">
         <rect x="20" y="20" width="660" height="70" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
         <text x="40" y="48" font-size="12" font-weight="700" fill="#2563eb">Canonical Model（单一事实来源）</text>
-        <text x="40" y="68" font-size="10" fill="#5c6370">一份 .dfy 或 JSON AST · 含所有 level 的 entity/group/relation · 全局 id 唯一</text>
+        <text x="40" y="68" font-size="10" fill="#5c6370">一份 .pgm 或 JSON AST · 含所有 level 的 entity/group/relation · 全局 id 唯一</text>
         <text x="40" y="82" font-size="10" fill="#5c6370">不直接给人阅读 · diff2 / Connector / Agent Patch 均作用于此层</text>
 
         <text x="340" y="108" font-size="11" fill="#5c6370">view 投影（非复制四份 DSL）</text>
@@ -1256,7 +1256,7 @@ views:
       <tbody>
         <tr>
           <td><span class="pill pill-ok">推荐</span> 单模型 + view 投影</td>
-          <td>一个 <code>.dfy</code>，渲染时指定 <code>view</code> 或 CLI <code>--c4-views</code></td>
+          <td>一个 <code>.pgm</code>，渲染时指定 <code>view</code> 或 CLI <code>--c4-views</code></td>
           <td>Diff、Agent、ID 一致性最好；与 Structurizr 模型/视图分离同构</td>
         </tr>
         <tr>
@@ -1270,8 +1270,8 @@ views:
           <td>评审演示体验最佳；P2 交付</td>
         </tr>
         <tr>
-          <td><span class="pill pill-gap">避免</span> 四个独立 .dfy</td>
-          <td>context.dfy / container.dfy 各写各的</td>
+          <td><span class="pill pill-gap">避免</span> 四个独立 .pgm</td>
+          <td>context.pgm / container.pgm 各写各的</td>
           <td>entity id 漂移、关系不一致、diff 无意义</td>
         </tr>
         <tr>
@@ -1298,7 +1298,7 @@ views:
         <tr><th>概念</th><th>数量</th><th>说明</th></tr>
       </thead>
       <tbody>
-        <tr><td>模型文件</td><td>1</td><td><code>model.dfy</code> 或等效 JSON AST</td></tr>
+        <tr><td>模型文件</td><td>1</td><td><code>model.pgm</code> 或等效 JSON AST</td></tr>
         <tr><td>逻辑视图</td><td>3–5</td><td>context / container / component×N / deployment（可选）</td></tr>
         <tr><td>导出成品</td><td>N 张 SVG/PNG + 1 manifest</td><td>或 1 个 HTML 包内含全部</td></tr>
         <tr><td>Code 层图</td><td>0</td><td>默认不做；类图交给 IDE</td></tr>
@@ -1306,13 +1306,13 @@ views:
     </table>
 
     <h3>17.5 综合架构（端到端）</h3>
-    <pre><code>存储：     1 × canonical model（.dfy / JSON AST）
+    <pre><code>存储：     1 × canonical model（.pgm / JSON AST）
 投影：     N × view（context | container | component[+scope]）
 层内关系： relation 写在最细层 + 粗层由聚合推导（§18）
 层间导航： drilldown 元数据 → HTML / SVG 超链接（§18.3）
 默认导出： SVG×N + manifest.json [+ PNG]
 企业归档： ZIP（dfy + svg + png + manifest + diff 报告 + snapshot-id）
-精修通道： draw.io（单视图导出，.dfy 仍为 source of truth）
+精修通道： draw.io（单视图导出，.pgm 仍为 source of truth）
 动态交互： diagram sequence（另图；entity id 与模型对齐）</code></pre>
   </section>
 
@@ -1324,7 +1324,7 @@ views:
     <h3>18.1 三种链接对照</h3>
     <table>
       <thead>
-        <tr><th>类型</th><th>含义</th><th>Drawify 表达</th><th>示例</th></tr>
+        <tr><th>类型</th><th>含义</th><th>Plotgram 表达</th><th>示例</th></tr>
       </thead>
       <tbody>
         <tr>
@@ -1465,7 +1465,7 @@ banking -> email "SMTP"               // 跨 group 边保留</code></pre>
     </table>
 
     <h3>18.4 隐含关系（Implied Relationships）</h3>
-    <p><span class="pill pill-p2">P2</span> Structurizr 可根据层级自动推导「父到子」的隐含边。Drawify 初期<strong>不实现</strong>，要求作者写显式 relation；待聚合稳定后再评估，避免 Agent 困惑。</p>
+    <p><span class="pill pill-p2">P2</span> Structurizr 可根据层级自动推导「父到子」的隐含边。Plotgram 初期<strong>不实现</strong>，要求作者写显式 relation；待聚合稳定后再评估，避免 Agent 困惑。</p>
 
     <h3>18.5 Dynamic View 与 sequence 的关系</h3>
     <p>
@@ -1519,7 +1519,7 @@ banking -> email "SMTP"               // 跨 group 边保留</code></pre>
           <td><span class="pill pill-p1">T2</span></td>
           <td><strong>draw.io</strong></td>
           <td>架构师精修</td>
-          <td>导出单视图 <code>.drawio</code>；<code>.dfy</code> 仍为 source of truth</td>
+          <td>导出单视图 <code>.drawio</code>；<code>.pgm</code> 仍为 source of truth</td>
         </tr>
         <tr>
           <td><span class="pill pill-p1">T2</span></td>
@@ -1549,12 +1549,12 @@ banking -> email "SMTP"               // 跨 group 边保留</code></pre>
     </table>
 
     <h3>19.2 manifest.json 规范</h3>
-    <p>每次批量导出 C4 视图时，在输出目录生成 <code>manifest.json</code>（schema <code>drawify.c4_manifest/0.1</code>）：</p>
+    <p>每次批量导出 C4 视图时，在输出目录生成 <code>manifest.json</code>（schema <code>plotgram.c4_manifest/0.1</code>）：</p>
     <pre><code>{
   "schema_version": "0.1",
-  "format": "drawify.c4_manifest",
+  "format": "plotgram.c4_manifest",
   "model": {
-    "source": "model.dfy",
+    "source": "model.pgm",
     "title": "Internet Banking System",
     "snapshot_id": "banking-2026-06-25"
   },
@@ -1600,33 +1600,33 @@ banking -> email "SMTP"               // 跨 group 边保留</code></pre>
     {
       "id": "login-flow",
       "title": "Login (Dynamic)",
-      "sequence_source": "sequences/login.dfy"
+      "sequence_source": "sequences/login.pgm"
     }
   ]
 }</code></pre>
 
     <h3>19.3 CLI 多视图导出</h3>
     <pre><code># 从单一模型批量导出默认 C4 视图集
-drawify export model.dfy \
+plotgram export model.pgm \
   --c4-views context,container \
   --format svg \
   --output-dir ./dist/views/
 
 # 同时生成 PNG 与 manifest
-drawify export model.dfy \
+plotgram export model.pgm \
   --c4-views context,container,component:app \
   --format svg,png \
   --c4-manifest ./dist/manifest.json
 
 # 合规 ZIP 包（dfy + 全部视图 + manifest + 可选 diff）
-drawify export model.dfy \
+plotgram export model.pgm \
   --c4-bundle zip \
   --c4-views context,container \
   --snapshot-id banking-2026-06-25 \
   --output ./dist/banking-architecture.zip
 
 # 交互式 HTML 包（P2）
-drawify export model.dfy \
+plotgram export model.pgm \
   --c4-bundle html \
   --c4-views context,container,component:app \
   --output ./dist/banking-c4.html</code></pre>
@@ -1663,7 +1663,7 @@ drawify export model.dfy \
       <tbody>
         <tr>
           <td>AI Agent / CI</td>
-          <td>validate JSON + patch；归档 <code>model.dfy</code> + JSON AST</td>
+          <td>validate JSON + patch；归档 <code>model.pgm</code> + JSON AST</td>
         </tr>
         <tr>
           <td>开发者 PR</td>
@@ -1690,7 +1690,7 @@ drawify export model.dfy \
         <tr><th>路径</th><th>说明</th></tr>
       </thead>
       <tbody>
-        <tr><td><code>model.dfy</code></td><td>Canonical DSL 源文件</td></tr>
+        <tr><td><code>model.pgm</code></td><td>Canonical DSL 源文件</td></tr>
         <tr><td><code>model.ast.json</code></td><td>JSON AST 快照</td></tr>
         <tr><td><code>manifest.json</code></td><td>视图清单与 drilldown</td></tr>
         <tr><td><code>views/*.svg</code></td><td>各投影视图矢量图</td></tr>
@@ -1750,20 +1750,20 @@ drawify export model.dfy \
       <li><a href="https://c4model.com/">C4 Model 官网</a> — Simon Brown</li>
       <li><a href="https://docs.structurizr.com/dsl">Structurizr DSL</a> — 模型 / 视图参考实现</li>
       <li><a href="https://mermaid.js.org/syntax/c4.html">Mermaid C4 语法</a></li>
-      <li><a href="../architecture.md">Drawify architecture 视觉语言</a></li>
+      <li><a href="../architecture.md">Plotgram architecture 视觉语言</a></li>
       <li><a href="../../../../enterprise/scale-diagram-strategy.md">企业规模化架构图战略</a></li>
       <li><a href="../../../../enterprise/capability-roadmap.md">企业能力路线图</a></li>
       <li><a href="../../../../product/competitive-strategy.md">竞争策略 — 语义微调护城河</a></li>
       <li><code>docs/animation/export-format-guide.md</code> — 导出格式选型（SVG/PNG/HTML）</li>
-      <li><code>crates/drawify-core/src/render/encode/drawio/README.md</code> — draw.io 导出</li>
-      <li><code>crates/drawify-core/src/diff2/README.md</code> — 语义 Diff 模块</li>
+      <li><code>crates/plotgram-core/src/render/encode/drawio/README.md</code> — draw.io 导出</li>
+      <li><code>crates/plotgram-core/src/diff2/README.md</code> — 语义 Diff 模块</li>
     </ul>
   </section>
 
 </main>
 
 <footer>
-  Drawify C4 支持方案 · v0.3.0-draft · 2026-06-25
+  Plotgram C4 支持方案 · v0.3.0-draft · 2026-06-25
 </footer>
 
   </div><!-- .doc-main -->

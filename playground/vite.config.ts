@@ -9,7 +9,7 @@ export default defineConfig({
   base: process.env.VITE_BASE_PATH || '/',
   plugins: [react()],
   optimizeDeps: {
-    exclude: ['drawify-wasm', 'public/drawify-wasm'],
+    exclude: ['plotgram-wasm', 'public/plotgram-wasm'],
   },
   server: {
     port: 3000,

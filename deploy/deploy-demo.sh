@@ -84,11 +84,11 @@ PY
 }
 
 build_playground() {
-  log "构建 drawify-wasm…"
+  log "构建 plotgram-wasm…"
   require_cmd wasm-pack
   (
-    cd "$ROOT_DIR/crates/drawify-wasm"
-    wasm-pack build --target web --release --out-dir ../../playground/public/drawify-wasm
+    cd "$ROOT_DIR/crates/plotgram-wasm"
+    wasm-pack build --target web --release --out-dir ../../playground/public/plotgram-wasm
   )
 
   log "构建 playground（base=${PLAYGROUND_BASE}, cdn=${PLAYGROUND_CDN_BASE}）…"
@@ -108,7 +108,7 @@ build_showcase() {
     return
   fi
 
-  log "编译 drawify CLI…"
+  log "编译 plotgram CLI…"
   require_cmd cargo
   (
     cd "$ROOT_DIR"
@@ -116,7 +116,7 @@ build_showcase() {
   )
 
   log "渲染 showcase SVG…"
-  DRAWIFY_PROFILE=release "$ROOT_DIR/showcase/render-all.sh"
+  PLOTGRAM_PROFILE=release "$ROOT_DIR/showcase/render-all.sh"
 }
 
 stage_artifacts() {
@@ -127,12 +127,12 @@ stage_artifacts() {
     "$STAGING_DIR/demo/playground" \
     "$STAGING_DIR/demo/showcase" \
     "$STAGING_DIR/demo/assets" \
-    "$STAGING_DIR/cdn/playground/drawify-wasm" \
+    "$STAGING_DIR/cdn/playground/plotgram-wasm" \
     "$STAGING_DIR/cdn/showcase"
 
   # demo：playground 不含 wasm / 打包 assets（走 CDN）
   rsync -a --delete \
-    --exclude='drawify-wasm/' \
+    --exclude='plotgram-wasm/' \
     --exclude='assets/' \
     "$ROOT_DIR/playground/dist/" \
     "$STAGING_DIR/demo/playground/"
@@ -157,8 +157,8 @@ stage_artifacts() {
 
   # CDN：wasm
   rsync -a --delete \
-    "$ROOT_DIR/playground/public/drawify-wasm/" \
-    "$STAGING_DIR/cdn/playground/drawify-wasm/"
+    "$ROOT_DIR/playground/public/plotgram-wasm/" \
+    "$STAGING_DIR/cdn/playground/plotgram-wasm/"
 
   # CDN：playground 打包 assets（js / css）
   rsync -a --delete \

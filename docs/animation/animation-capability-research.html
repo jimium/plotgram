@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Drawify SVG 动画能力需求分析与技术实现评估报告</title>
+<title>Plotgram SVG 动画能力需求分析与技术实现评估报告</title>
 <style>
   :root {
     --bg: #fafbfc;
@@ -344,7 +344,7 @@
 <!-- Sidebar -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
-    <h2>Drawify SVG 动画能力评估报告</h2>
+    <h2>Plotgram SVG 动画能力评估报告</h2>
     <div class="meta">v0.1.0-draft · 2026-06-20</div>
   </div>
   <nav class="sidebar-nav" id="sidebar-nav">
@@ -363,7 +363,7 @@
 <div class="main">
 
 <div class="header">
-  <h1>Drawify SVG 动画能力需求分析与技术实现评估报告</h1>
+  <h1>Plotgram SVG 动画能力需求分析与技术实现评估报告</h1>
   <div class="meta">
     <span>版本 0.1.0-draft</span>
     <span>状态：研究评估</span>
@@ -376,7 +376,7 @@
   <!-- 摘要 -->
   <section id="summary">
     <h2>摘要</h2>
-    <p>本报告针对 Drawify 后续引入 SVG 动画能力进行系统性研究，覆盖六大应用场景的方案设计、市场竞品对标、技术可行性、API 规范与性能兼容性。核心结论：</p>
+    <p>本报告针对 Plotgram 后续引入 SVG 动画能力进行系统性研究，覆盖六大应用场景的方案设计、市场竞品对标、技术可行性、API 规范与性能兼容性。核心结论：</p>
     <ol>
       <li><strong>战略定位</strong>：动画本身不是壁垒，<strong>语义动画</strong>（Diff/Patch/Steps 过渡）是"语义微调"核心壁垒的视觉放大器，应作为 P1 投入；纯装饰动画归入"图形美观"维度，不建议投入。</li>
       <li><strong>技术路线</strong>：推荐 <strong>CSS 动画为主 + SMIL 为辅 + JS 控制器（Steps/导出）</strong> 的混合方案。CSS 动画用于交互态与循环流，SMIL 用于声明式属性插值（路径变形、淡入淡出），JS 控制器用于 Steps 时序与导出。</li>
@@ -481,7 +481,7 @@
       <tr><td><strong>PlantUML</strong></td><td>❌ 无动画能力</td><td>—</td><td>❌</td><td>❌</td><td>开源免费</td></tr>
       <tr><td><strong>Excalidraw</strong></td><td>原生无，第三方 Excalimate/Smart Presentation 补齐</td><td>JS 插值（Frame 间）</td><td>✅（Frame 模型）</td><td>✅ MP4/GIF/Lottie/SVG</td><td>开源</td></tr>
       <tr><td><strong>FlowGif</strong></td><td>将 Mermaid 动画化为 GIF</td><td>自研 + Mermaid</td><td>✅ 步进式</td><td>✅ GIF/MP4/SVG/HTML</td><td>商业（MCP）</td></tr>
-      <tr><td><strong>Drawify（当前）</strong></td><td>❌ 无</td><td>—</td><td>❌</td><td>❌</td><td>开源</td></tr>
+      <tr><td><strong>Plotgram（当前）</strong></td><td>❌ 无</td><td>—</td><td>❌</td><td>❌</td><td>开源</td></tr>
     </table>
 
     <h3>2.2 行业领先产品的技术特点</h3>
@@ -494,16 +494,16 @@
       <li><strong>GIF 导出</strong>：通过 <code>xgif.Animate</code> 将多帧 SVG 光栅化为 GIF。</li>
       <li><code>d2 play</code> 命令：交互式播放 Steps。</li>
     </ul>
-    <blockquote><p>技术启示：D2 的动画本质是"多帧切换"，帧间无插值过渡。Drawify 若做 Steps，应在帧间增加 Patch 动画过渡，体验优于 D2。</p></blockquote>
+    <blockquote><p>技术启示：D2 的动画本质是"多帧切换"，帧间无插值过渡。Plotgram 若做 Steps，应在帧间增加 Patch 动画过渡，体验优于 D2。</p></blockquote>
 
     <h4>Mermaid — 轻量 CSS 动画</h4>
-    <p>Mermaid 的动画仅限边线，通过 <code>stroke-dashoffset</code> 的 CSS keyframes 实现。纯 CSS，零 JS 依赖，体积小。Drawify 的边线数据流动画可直接借鉴此方案。</p>
+    <p>Mermaid 的动画仅限边线，通过 <code>stroke-dashoffset</code> 的 CSS keyframes 实现。纯 CSS，零 JS 依赖，体积小。Plotgram 的边线数据流动画可直接借鉴此方案。</p>
 
     <h4>draw.io — 连接线 Flow Animation</h4>
     <p>draw.io 在连接线属性面板提供 "Flow Animation" 开关，导出 SVG 时保留 CSS 动画。技术上是 <code>stroke-dashoffset</code> 的循环动画。</p>
 
     <h4>Excalimate / Excalidraw Smart Presentation — 关键帧插值</h4>
-    <p>Excalimate 采用关键帧模型（keyframes + sequences），支持元素属性插值、摄像机动画、渐进式展现、多格式导出。技术启示：关键帧模型比 D2 的"硬切换"更精细，但实现复杂度高。Drawify 的 Steps 可采用"Patch 动画 + 关键帧"混合方案。</p>
+    <p>Excalimate 采用关键帧模型（keyframes + sequences），支持元素属性插值、摄像机动画、渐进式展现、多格式导出。技术启示：关键帧模型比 D2 的"硬切换"更精细，但实现复杂度高。Plotgram 的 Steps 可采用"Patch 动画 + 关键帧"混合方案。</p>
 
     <h3>2.3 企业付费场景的动画功能定价策略</h3>
     <table>
@@ -514,19 +514,19 @@
       <tr><td>Excalimate</td><td>订阅制</td><td>动画为核心，导出多格式</td><td>中，内容创作者</td></tr>
     </table>
     <div class="summary-box">
-      <strong>关键洞察</strong>：D2 将"文本→动画"作为独占定位，是其商业化的核心差异化。动画能力在企业场景中不是必需品，但是高价值增值点。Drawify 的语义动画（Diff/Patch 过渡）比 D2 的"多帧切换"更精准，有差异化空间。
+      <strong>关键洞察</strong>：D2 将"文本→动画"作为独占定位，是其商业化的核心差异化。动画能力在企业场景中不是必需品，但是高价值增值点。Plotgram 的语义动画（Diff/Patch 过渡）比 D2 的"多帧切换"更精准，有差异化空间。
     </div>
 
     <h3>2.4 市场竞争中的动画功能差异化优势与不足</h3>
-    <h4>Drawify 的潜在优势</h4>
+    <h4>Plotgram 的潜在优势</h4>
     <ol>
       <li><strong>语义动画</strong>：基于 <code>diff2::ChangeSet</code> 的语义级 diff，能生成精准过渡，而非 D2 的整图切换。</li>
       <li><strong>零参数动画</strong>：动画由渲染器自动生成，用户/Agent 无需控制动画参数。</li>
       <li><strong>与 Patch/Intent 联动</strong>：动画是"语义微调"工作流的自然延伸。</li>
     </ol>
-    <h4>Drawify 的潜在不足</h4>
+    <h4>Plotgram 的潜在不足</h4>
     <ol>
-      <li><strong>起步晚</strong>：D2 已有成熟的多 Board + GIF 导出，Drawify 从零开始。</li>
+      <li><strong>起步晚</strong>：D2 已有成熟的多 Board + GIF 导出，Plotgram 从零开始。</li>
       <li><strong>生态弱</strong>：Mermaid 的 GitHub/Notion 集成使其静态图无处不在。</li>
       <li><strong>交互式探索被排除</strong>：产品定位是静态导出，不是交互式图探索器。</li>
     </ol>
@@ -746,7 +746,7 @@
     <h3>5.1 动画功能 API 接口与参数规范</h3>
 
     <h4>5.1.1 Rust Core API</h4>
-    <pre><code>// crates/drawify-core/src/render/animation.rs
+    <pre><code>// crates/plotgram-core/src/render/animation.rs
 
 /// 动画配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -795,19 +795,19 @@ pub fn render_with_transition(
 
     <h4>5.1.2 CLI API</h4>
     <pre><code># 渲染带 Patch 过渡动画
-drawify render --transition old.dfy new.dfy --changes changes.json -o animated.svg
+plotgram render --transition old.pgm new.pgm --changes changes.json -o animated.svg
 
 # 渲染 Steps 动画
-drawify render --steps steps.dfy -o animation.html
+plotgram render --steps steps.pgm -o animation.html
 
 # 渲染参数化指令
-drawify render input.dfy --animate highlight:nodeA,activate:nodeB -o out.svg
+plotgram render input.pgm --animate highlight:nodeA,activate:nodeB -o out.svg
 
 # 导出 Steps 为 HTML
-drawify export --format html-animation steps.dfy -o out.html
+plotgram export --format html-animation steps.pgm -o out.html
 
 # 导出 Steps 为 GIF（P2）
-drawify export --format gif --fps 15 steps.dfy -o out.gif</code></pre>
+plotgram export --format gif --fps 15 steps.pgm -o out.gif</code></pre>
 
     <h4>5.1.3 Server HTTP API</h4>
     <pre><code>POST /api/v1/render
@@ -1026,7 +1026,7 @@ pub fn export_animation(
     <table>
       <tr><th>现有文档</th><th>关系</th></tr>
       <tr><td>competitive-strategy.md §4.5</td><td>本报告细化语义动画的 P1/P2 优先级与技术方案</td></tr>
-      <tr><td>d2-vs-drawify-code-review.md §4</td><td>本报告细化 Steps Board 的 AST/DSL/渲染设计</td></tr>
+      <tr><td>d2-vs-plotgram-code-review.md §4</td><td>本报告细化 Steps Board 的 AST/DSL/渲染设计</td></tr>
       <tr><td>layout-refinement-todo.md</td><td>动画工作应在 Layout Intent MVP 完成后启动</td></tr>
       <tr><td>cytoscape-js-research.md</td><td>交互动画定位为导出 SVG 自带的轻交互，非交互式探索</td></tr>
       <tr><td>export-scene-spec.md</td><td>ExportScene 是动画渲染器的输入，需扩展 <code>id</code> 字段</td></tr>

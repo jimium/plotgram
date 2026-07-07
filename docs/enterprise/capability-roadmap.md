@@ -1,8 +1,8 @@
-# Drawify 企业能力路线图（DSL / 解析 / 渲染）
+# Plotgram 企业能力路线图（DSL / 解析 / 渲染）
 
 > 版本：0.1.0-draft | 状态：需求设计中
 
-本文档基于国内外企业需求（银行合规、互联网 K8s 治理、国际 Agent / DevOps / GRC），梳理 Drawify 在 **DSL、解析验证、AST/Diff、渲染布局、输出 API** 各层应做的功能级提升与补充，并给出优先级。
+本文档基于国内外企业需求（银行合规、互联网 K8s 治理、国际 Agent / DevOps / GRC），梳理 Plotgram 在 **DSL、解析验证、AST/Diff、渲染布局、输出 API** 各层应做的功能级提升与补充，并给出优先级。
 
 相关文档：
 
@@ -22,7 +22,7 @@
 | `architecture` | 渲染器有，profile 仍 `implemented: false` | **国内 K8s / 微服务 POC 阻塞** |
 | 结构化错误 + fix | 设计文档有，运行时常为 `Vec<String>` | **Agent / CI 门禁阻塞** |
 | Diff / Patch | 实体增删有；属性 / 关系 / 分组变更待补 | **Architecture Compare 阻塞** |
-| `drawify-server` | 占位 | **企业集成阻塞** |
+| `plotgram-server` | 占位 | **企业集成阻塞** |
 | 大规模图 | 无聚类 / 折叠渲染 | 50+ 节点可读性 |
 | Diff 视觉高亮 | 无 | Compare 产品化 |
 | AST → DSL 反序列化 | 弱 / 无 | 合规审阅、人工改图 |
@@ -98,7 +98,7 @@ flowchart TB
 
 规范并校验 diagram 级 attribute（语法已支持）：
 
-```drawify
+```plotgram
 diagram architecture {
     title: "支付域生产拓扑"
     layout-algo: force-directed
@@ -123,8 +123,8 @@ diagram architecture {
 
 ### 3.4 P1 — 静态 `import`（可选）
 
-```drawify
-import "shared/three-tier.dfy"
+```plotgram
+import "shared/three-tier.pgm"
 ```
 
 编译期展开，无参数、无循环。优先级低于 AST Compose。
@@ -164,7 +164,7 @@ import "shared/three-tier.dfy"
 
 ### 4.4 P1 — AST → DSL 格式化（Round-trip）
 
-Compose 产出 AST 后序列化为可读 `.dfy`，用于：
+Compose 产出 AST 后序列化为可读 `.pgm`，用于：
 
 - 合规人工审阅
 - PR 可读 diff（文本 + 语义双层）
@@ -306,7 +306,7 @@ PNG + Diff 摘要 + 元数据 → 单份 PDF 报告页。
 ### 7.3 P1 — Mermaid 导出
 
 - AST → Mermaid 字符串
-- CLI：`drawify render foo.dfy -f mermaid`
+- CLI：`plotgram render foo.pgm -f mermaid`
 - 国际 GitHub / GitLab；国内生态过渡
 
 ### 7.4 P1 — 渲染产物溯源元数据
@@ -402,7 +402,7 @@ flowchart TB
 | K8s / Terraform 数据拉取 | Connector |
 | 聚合规则 YAML | Compose 引擎 |
 | 批量建节点 | AST Builder SDK |
-| `POST /compose` | drawify-server + Compose |
+| `POST /compose` | plotgram-server + Compose |
 
 Core 团队聚焦：**给定 Diagram AST，校验、Diff、布局、渲染、导出做到极致**。
 

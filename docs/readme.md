@@ -1,4 +1,4 @@
-# Drawify 文档中心
+# Plotgram 文档中心
 
 项目级文档索引。各子目录的详细说明见对应 `README.md`。
 
@@ -21,15 +21,15 @@ docs/
 
 | 我想了解… | 从这里开始 |
 |-----------|------------|
-| 怎么写 `.dfy` 文件 | [specs/dsl/dsl-writing-manual.md](specs/dsl/dsl-writing-manual.md) |
+| 怎么写 `.pgm` 文件 | [specs/dsl/dsl-writing-manual.md](specs/dsl/dsl-writing-manual.md) |
 | 语法与语义完整定义 | [specs/dsl/language-spec.md](specs/dsl/language-spec.md) |
 | 六种图表怎么选、怎么画 | [specs/visual-language/](specs/visual-language/README.md) |
 | 系统整体架构 | [architecture/overview.md](architecture/overview.md) |
 | 产品定位与差异化 | [product/vision.md](product/vision.md) |
 | 企业落地路径 | [enterprise/scale-diagram-strategy.md](enterprise/scale-diagram-strategy.md) |
-| HTTP 服务 API | [architecture/drawify-server-api.md](architecture/drawify-server-api.md) |
+| HTTP 服务 API | [architecture/plotgram-server-api.md](architecture/plotgram-server-api.md) |
 | 布局质量检查 LayoutLint | [guides/layout-lint.md](guides/layout-lint.md) |
-| CLI 与工具链 | [guides/drawify-cli.md](guides/drawify-cli.md) |
+| CLI 与工具链 | [guides/plotgram-cli.md](guides/plotgram-cli.md) |
 | 渲染管线 | [guides/render-pipeline.md](guides/render-pipeline.md) |
 | Studio 前端文档 | [../studio/docs/README.md](../studio/docs/README.md) |
 
@@ -43,10 +43,10 @@ docs/
 
 | 文档 | 内容 |
 |------|------|
-| [drawify-cli.md](guides/drawify-cli.md) | CLI 全命令 |
+| [plotgram-cli.md](guides/plotgram-cli.md) | CLI 全命令 |
 | [render-pipeline.md](guides/render-pipeline.md) | 渲染管线与 Rust API |
 | [diff-and-patch.md](guides/diff-and-patch.md) | 语义 diff / patch |
-| [drawify-eval.md](guides/drawify-eval.md) | 布局算法评估 |
+| [plotgram-eval.md](guides/plotgram-eval.md) | 布局算法评估 |
 | [showcase-workflow.md](guides/showcase-workflow.md) | 样例集回归工作流 |
 
 ### 布局与渲染
@@ -74,7 +74,7 @@ docs/
 | [ast-spec.md](specs/ast-spec.md) | AST 数据结构 — Rust 结构体、JSON 序列化、Diff/Patch |
 | [export-scene-spec.md](specs/export-scene-spec.md) | Exporter Scene JSON — 对外导出契约与 schema |
 | [export-scene-spec.md](specs/export-scene-spec.md) | ExportScene 输入契约 |
-| [draw.io 导出说明](../crates/drawify-core/src/render/encode/drawio/README.md) | draw.io 格式编码、映射与降级策略 |
+| [draw.io 导出说明](../crates/plotgram-core/src/render/encode/drawio/README.md) | draw.io 格式编码、映射与降级策略 |
 | [error-model.md](specs/error-model.md) | 错误模型 — 错误码、Fix Action、LSP 映射与实现参考 |
 
 ### 视觉语言
@@ -118,7 +118,7 @@ docs/
 | [agent-mcp-skills-strategy.md](product/agent-mcp-skills-strategy.md) | Agent 生态：MCP、Skills、商业化与 draw.io |
 | [connector-ast-scenarios.md](product/connector-ast-scenarios.md) | Connector → AST → Web 渲染的高价值场景 |
 | [github-app-workflow-visualizer.md](product/github-app-workflow-visualizer.md) | GitHub App：Actions Workflow 可视化 |
-| [d2-vs-drawify-code-review.md](product/d2-vs-drawify-code-review.md) | D2 源码对比与借鉴报告 |
+| [d2-vs-plotgram-code-review.md](product/d2-vs-plotgram-code-review.md) | D2 源码对比与借鉴报告 |
 
 ---
 
@@ -131,9 +131,9 @@ docs/
 | 文档 | 内容 |
 |------|------|
 | [overview.md](architecture/overview.md) | 整体架构 — 应用层、绑定层、核心引擎分层 |
-| [wasm-module.md](architecture/wasm-module.md) | WASM 模块设计 — drawify-wasm 绑定与浏览器集成 |
-| [drawify-server-api.md](architecture/drawify-server-api.md) | Server API 使用说明 — HTTP 端点与调用示例 |
-| [drawify-core-pipeline.html](architecture/drawify-core-pipeline.html) | Core 渲染管线可视化 |
+| [wasm-module.md](architecture/wasm-module.md) | WASM 模块设计 — plotgram-wasm 绑定与浏览器集成 |
+| [plotgram-server-api.md](architecture/plotgram-server-api.md) | Server API 使用说明 — HTTP 端点与调用示例 |
+| [plotgram-core-pipeline.html](architecture/plotgram-core-pipeline.html) | Core 渲染管线可视化 |
 | [graphic-style-and-theme.html](architecture/graphic-style-and-theme.html) | Graphic Style 与 Theme 架构分离 |
 | [layout-algorithms-classification.html](architecture/layout-algorithms-classification.html) | 布局算法分类可视化 |
 
@@ -171,7 +171,7 @@ docs/
 | 文档 | 内容 |
 |------|------|
 | [graphviz-algorithms-research.md](architecture/参考资料/graphviz-algorithms-research.md) | Graphviz 核心算法研究与 Rust 实现路线 |
-| [cytoscape-js-research.md](architecture/参考资料/cytoscape-js-research.md) | Cytoscape.js 能力研究与 Drawify 取舍 |
+| [cytoscape-js-research.md](architecture/参考资料/cytoscape-js-research.md) | Cytoscape.js 能力研究与 Plotgram 取舍 |
 
 ### 归档（backup/）
 
@@ -212,10 +212,10 @@ docs/
 
 | 位置 | 范围 |
 |------|------|
-| [studio/docs/](../studio/docs/README.md) | Drawify Studio 前端 — Agent、API、部署 |
-| [showcase/README.md](../showcase/README.md) | 示例图集 — 按类型与复杂度组织的 `.dfy` 用例 |
-| [crates/drawify-core/src/layout/readme.md](../crates/drawify-core/src/layout/readme.md) | 布局模块实现说明（代码旁文档） |
-| [crates/drawify-server/README.md](../crates/drawify-server/README.md) | Server crate 快速入门 |
+| [studio/docs/](../studio/docs/README.md) | Plotgram Studio 前端 — Agent、API、部署 |
+| [showcase/README.md](../showcase/README.md) | 示例图集 — 按类型与复杂度组织的 `.pgm` 用例 |
+| [crates/plotgram-core/src/layout/readme.md](../crates/plotgram-core/src/layout/readme.md) | 布局模块实现说明（代码旁文档） |
+| [crates/plotgram-server/README.md](../crates/plotgram-server/README.md) | Server crate 快速入门 |
 | [playground/README.md](../playground/README.md) | Playground 编辑器 |
 
 ## 阅读建议

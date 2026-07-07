@@ -1,12 +1,12 @@
-# K8s 架构可视化：行业现状与 Drawify 定位
+# K8s 架构可视化：行业现状与 Plotgram 定位
 
 > 版本：0.1.0-draft | 状态：需求设计中
 
-本文档说明**在 Drawify 之前**，业界如何解决 Kubernetes 拓扑/架构画图问题，常见方案的边界在哪里，以及 Drawify 要填补的空白。适用于客户沟通、内部评审、销售材料引用。
+本文档说明**在 Plotgram 之前**，业界如何解决 Kubernetes 拓扑/架构画图问题，常见方案的边界在哪里，以及 Plotgram 要填补的空白。适用于客户沟通、内部评审、销售材料引用。
 
 相关文档：
 
-- [规模化架构图战略](./scale-diagram-strategy.md) — Drawify K8s Connector POC 设计
+- [规模化架构图战略](./scale-diagram-strategy.md) — Plotgram K8s Connector POC 设计
 - [企业能力路线图](./capability-roadmap.md) — Core 能力排期
 
 ---
@@ -14,9 +14,9 @@
 ## 1. 核心结论（可直接用于对外表述）
 
 > 以前靠 **Dashboard 看现状 + 手绘 / Mermaid 写文档 + Git diff 看配置变更**，三块工具各干各的，没有统一、可 Diff、可归档的架构图管线。  
-> **Drawify 不是又一个 K8s UI**，而是把**集群真实状态**变成**可治理的架构证据**。
+> **Plotgram 不是又一个 K8s UI**，而是把**集群真实状态**变成**可治理的架构证据**。
 
-在 Drawify 出现之前，行业里**并没有**一种统一的「架构描述语言 + 渲染引擎」，专门把 K8s 状态变成可进审批流、可合规留档的图。大家是用**多种工具拼接**来应付不同片段需求。
+在 Plotgram 出现之前，行业里**并没有**一种统一的「架构描述语言 + 渲染引擎」，专门把 K8s 状态变成可进审批流、可合规留档的图。大家是用**多种工具拼接**来应付不同片段需求。
 
 ---
 
@@ -43,7 +43,7 @@
 
 ---
 
-## 3. 没有 Drawify 时的五种典型做法
+## 3. 没有 Plotgram 时的五种典型做法
 
 ### 3.1 平台团队手工维护（最常见）
 
@@ -127,7 +127,7 @@ on-call 用 Lens 看 Pod 分布
 
 ---
 
-## 4. 碎片化路径 vs Drawify 目标路径
+## 4. 碎片化路径 vs Plotgram 目标路径
 
 ### 4.1 传统碎片化路径
 
@@ -144,12 +144,12 @@ flowchart LR
 
 问题：**五条支路、五种真相**，没有「架构证据」单一来源。
 
-### 4.2 Drawify 目标路径
+### 4.2 Plotgram 目标路径
 
 ```mermaid
 flowchart LR
     k8s["K8s API"]
-    k8s --> conn["Drawify K8s Connector"]
+    k8s --> conn["Plotgram K8s Connector"]
     conn --> compose["聚合规则\nNamespace → Deployment"]
     compose --> ast["Diagram AST"]
     ast --> render["SVG / PNG 渲染"]
@@ -164,39 +164,39 @@ flowchart LR
 
 ## 5. 为什么老方案在银行 / 大企业不够用
 
-| 企业需求 | 老方案缺口 | Drawify 对应能力 |
+| 企业需求 | 老方案缺口 | Plotgram 对应能力 |
 |----------|------------|-----------------|
 | 与生产一致 | 手绘图、过期 Confluence | Connector 拉 API 实况 |
 | 变更可审计 | YAML 行 diff ≠ 架构 diff | 语义 Diff + markdown 报告 |
 | 可读规模 | Dashboard 太细（100 Pod）；手绘太粗 | 聚合规则（Namespace / Deployment） |
 | 合规附件 | 截图不规范、无时间戳 | PNG 企业参数 + meta 溯源 |
 | 数据不出域 | 部分 SaaS 画图 / 云拓扑 | WASM 本地渲染、私有化 Server |
-| AI 自动生成 | Mermaid 幻觉、无结构化修复 | Drawify DSL + 错误码 + Patch |
+| AI 自动生成 | Mermaid 幻觉、无结构化修复 | Plotgram DSL + 错误码 + Patch |
 
 国际场景同理：SOC2 / GDPR 要的是 **evidence**，不是 **slides**。
 
 ---
 
-## 6. Drawify 与现有工具的关系（不是替代谁）
+## 6. Plotgram 与现有工具的关系（不是替代谁）
 
 | 工具 | 关系 |
 |------|------|
-| **Lens / Dashboard** | 互补 — 他们看 Pod 级运维；Drawify 出聚合级架构证据 |
-| **Kiali** | 互补 — Mesh 流量；Drawify 可后续接边数据，但主战场是归档与 Diff |
-| **Argo CD** | 互补 — 配置同步；Drawify 把变更翻译成架构图 + 语义 Diff |
-| **Backstage** | 集成 — Drawify 作渲染引擎 / 架构视图插件 |
-| **Mermaid** | 过渡 — 可导出 Mermaid；Drawify 作更可靠的生成与 AST 源 |
+| **Lens / Dashboard** | 互补 — 他们看 Pod 级运维；Plotgram 出聚合级架构证据 |
+| **Kiali** | 互补 — Mesh 流量；Plotgram 可后续接边数据，但主战场是归档与 Diff |
+| **Argo CD** | 互补 — 配置同步；Plotgram 把变更翻译成架构图 + 语义 Diff |
+| **Backstage** | 集成 — Plotgram 作渲染引擎 / 架构视图插件 |
+| **Mermaid** | 过渡 — 可导出 Mermaid；Plotgram 作更可靠的生成与 AST 源 |
 | **Draw.io / Lucid** | 部分替代手绘维护 — 自动生成 + 人工 DSL 微调 |
 
 **定位句**：
 
-> Drawify 填补的是 **「架构治理与文档自动化」** 层，位于实时控制台与手绘文档之间的空白地带。
+> Plotgram 填补的是 **「架构治理与文档自动化」** 层，位于实时控制台与手绘文档之间的空白地带。
 
 ---
 
 ## 7. 对比总表（评审 / 标书可用）
 
-| 维度 | Dashboard / Lens | 手绘 / Draw.io | 脚本 → Mermaid | GitOps diff | Drawify 目标 |
+| 维度 | Dashboard / Lens | 手绘 / Draw.io | 脚本 → Mermaid | GitOps diff | Plotgram 目标 |
 |------|------------------|----------------|----------------|-------------|-------------|
 | 数据来源 | K8s API 实时 | 人脑 / 旧图 | YAML 清单 | Git 仓库 | K8s API + 聚合规则 |
 | 节点粒度 | Pod 级 | 随意 | 取决于脚本 | 无图 | Deployment 级（可下钻） |
@@ -211,17 +211,17 @@ flowchart LR
 
 ## 8. 常见客户问题与回答
 
-### Q1：我们已经有 Lens / Dashboard，为什么还要 Drawify？
+### Q1：我们已经有 Lens / Dashboard，为什么还要 Plotgram？
 
-**A**：Lens 解决「现在集群里有什么 Pod」；Drawify 解决「这份架构能不能进审批、能不能和上周比 Diff、能不能作为监管附件归档」。用途不同，不冲突。
+**A**：Lens 解决「现在集群里有什么 Pod」；Plotgram 解决「这份架构能不能进审批、能不能和上周比 Diff、能不能作为监管附件归档」。用途不同，不冲突。
 
 ### Q2：我们 Confluence 里全是 Mermaid，要迁移吗？
 
-**A**：不必一次性迁移。短期可 AST → Mermaid 导出；新图用 Drawify 生成；老图逐步替换。价值在 **自动生成 + Diff**，不在推翻现有 Wiki。
+**A**：不必一次性迁移。短期可 AST → Mermaid 导出；新图用 Plotgram 生成；老图逐步替换。价值在 **自动生成 + Diff**，不在推翻现有 Wiki。
 
 ### Q3：和 Backstage 是否重复？
 
-**A**：Backstage 是服务目录与门户；Drawify 是图表语义层与渲染引擎。典型集成：Backstage 展示 Drawify 渲染结果，目录元数据写入 `meta.owner` 等字段。
+**A**：Backstage 是服务目录与门户；Plotgram 是图表语义层与渲染引擎。典型集成：Backstage 展示 Plotgram 渲染结果，目录元数据写入 `meta.owner` 等字段。
 
 ### Q4：能画 100 个 Pod 吗？
 
@@ -233,11 +233,11 @@ flowchart LR
 
 **15 秒版**
 
-> 以前 K8s 架构图靠截图和手绘，和真实集群对不上。Drawify 从 K8s API 自动生成可聚合、可 Diff、可归档的架构图，给审批和合规用，不是替代 Lens。
+> 以前 K8s 架构图靠截图和手绘，和真实集群对不上。Plotgram 从 K8s API 自动生成可聚合、可 Diff、可归档的架构图，给审批和合规用，不是替代 Lens。
 
 **2 分钟版**
 
-> 大多数团队用三套东西：Lens 看现状，Argo 看 YAML 变更，Confluence 里贴手绘或 Mermaid 图。三套各说各话，审批时图经常过期。Drawify 用 Connector 拉集群状态，按 Namespace 和 Deployment 聚合，生成 AST，亚秒级渲染 SVG 和 PNG，并用语义 Diff 对比两次发布之间的架构变化，输出能贴进 PR 和审批流的报告。我们不跟 Dashboard 抢 Pod 级运维，我们做的是架构证据层。
+> 大多数团队用三套东西：Lens 看现状，Argo 看 YAML 变更，Confluence 里贴手绘或 Mermaid 图。三套各说各话，审批时图经常过期。Plotgram 用 Connector 拉集群状态，按 Namespace 和 Deployment 聚合，生成 AST，亚秒级渲染 SVG 和 PNG，并用语义 Diff 对比两次发布之间的架构变化，输出能贴进 PR 和审批流的报告。我们不跟 Dashboard 抢 Pod 级运维，我们做的是架构证据层。
 
 ---
 
@@ -254,4 +254,4 @@ flowchart LR
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
-| 0.1.0-draft | 2026-06-07 | 初稿：K8s 可视化行业现状与 Drawify 定位 |
+| 0.1.0-draft | 2026-06-07 | 初稿：K8s 可视化行业现状与 Plotgram 定位 |

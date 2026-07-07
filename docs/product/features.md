@@ -1,4 +1,4 @@
-# Drawify 功能特性设计
+# Plotgram 功能特性设计
 
 ## 设计原则
 
@@ -14,7 +14,7 @@
 
 ### F1. 多图表类型支持
 
-Drawify 使用统一的语法基础，通过 `diagram` 声明区分图表类型：
+Plotgram 使用统一的语法基础，通过 `diagram` 声明区分图表类型：
 
 | 图表类型 | 关键字 | MVP 阶段 |
 |----------|--------|----------|
@@ -27,7 +27,7 @@ Drawify 使用统一的语法基础，通过 `diagram` 声明区分图表类型�
 
 **语法示例（流程图）：**
 
-```drawify
+```plotgram
 diagram flowchart {
     entity login "用户登录"
     entity auth "身份验证"
@@ -43,7 +43,7 @@ diagram flowchart {
 
 实体（节点）只需要声明**是什么**，不需要声明**怎么画**：
 
-```drawify
+```plotgram
 entity user "用户" {
     type: person
 }
@@ -64,7 +64,7 @@ entity api "API 网关" {
 
 关系只需要表达**谁和谁有什么关系**：
 
-```drawify
+```plotgram
 user -> api "发送请求"
 api -> db "查询数据"
 db --> api "返回结果"    // 虚线 = 响应/回调
@@ -78,13 +78,13 @@ db --> api "返回结果"    // 虚线 = 响应/回调
 | `-->` | 被动/响应 | 返回、回调、异步响应 |
 | `<->` | 双向 | 双向通信、依赖 |
 
-对比 Mermaid 的 `-->`, `---`, `-.->`, `==>`, `--text-->` 等十余种变体，Drawify 只有 3 种。
+对比 Mermaid 的 `-->`, `---`, `-.->`, `==>`, `--text-->` 等十余种变体，Plotgram 只有 3 种。
 
 ### F4. 结构化属性系统
 
 使用 `key: value` 格式声明属性，所有属性都有明确的 schema：
 
-```drawify
+```plotgram
 entity payment "支付服务" {
     type: service
     status: degraded
@@ -102,7 +102,7 @@ entity payment "支付服务" {
 
 使用 `group` 关键字表达逻辑分组（子图），最多支持 2 层嵌套：
 
-```drawify
+```plotgram
 group frontend "前端层" {
     entity web "Web 客户端"
     entity mobile "移动客户端"
@@ -128,7 +128,7 @@ api -> worker
 
 ### F6. 结构化错误
 
-Drawify 的错误不是文本字符串，而是结构化对象：
+Plotgram 的错误不是文本字符串，而是结构化对象：
 
 ```json
 {
@@ -178,7 +178,7 @@ Agent 可以将 fix payload 直接合并到 AST，无需重新生成整段文本
 
 ### F8. AST Diff
 
-Drawify 提供语义级别的图表比较：
+Plotgram 提供语义级别的图表比较：
 
 ```
 + entity cache "Redis 缓存" { type: cache }
@@ -232,7 +232,7 @@ Drawify 提供语义级别的图表比较：
 
 布局可通过 `layout` 属性微调偏好（不指定坐标）：
 
-```drawify
+```plotgram
 diagram flowchart {
     layout: top-to-bottom    // 或 left-to-right
     ...
@@ -243,7 +243,7 @@ diagram flowchart {
 
 支持通过属性控制渲染主题，而非内联样式：
 
-```drawify
+```plotgram
 diagram flowchart {
     theme: "default"         // 预置主题
     ...
@@ -262,16 +262,16 @@ diagram flowchart {
 
 ```bash
 # 解析并渲染
-drawify render diagram.dfy -o output.svg
+plotgram render diagram.pgm -o output.svg
 
 # 验证语法
-drawify validate diagram.dfy
+plotgram validate diagram.pgm
 
 # 生成 JSON（供前端消费）
-drawify export diagram.dfy --format json
+plotgram export diagram.pgm --format json
 
 # 语义 Diff
-drawify diff old.dfy new.dfy
+plotgram diff old.pgm new.pgm
 ```
 
 ### F14. Web API
@@ -297,10 +297,10 @@ Response: { "valid": false, "errors": [...] }
 ### F15. WASM 包
 
 ```javascript
-import { renderSvg, validate } from 'drawify-wasm';
+import { renderSvg, validate } from 'plotgram-wasm';
 
-const svg = renderSvg(drawifySource);
-const errors = validate(drawifySource);
+const svg = renderSvg(plotgramSource);
+const errors = validate(plotgramSource);
 ```
 
 ---

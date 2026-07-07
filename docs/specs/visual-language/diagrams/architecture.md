@@ -21,7 +21,7 @@
 
 ## 语法入口
 
-```drawify
+```plotgram
 diagram architecture {
     title: "三层架构"
 
@@ -133,7 +133,7 @@ diagram architecture {
 
 ### 组内布局 `layout`
 
-```drawify
+```plotgram
 group process "数据计算层" {
     layout: fan-out   // auto | horizontal | vertical | fan-out
     ...
@@ -144,16 +144,16 @@ group process "数据计算层" {
 
 流水线/分层类图可在 diagram 级声明等宽分组：
 
-```drawify
+```plotgram
 diagram architecture {
     group_sizing: uniform   // fit（默认）| uniform
     ...
 }
 ```
 
-`uniform` 时所有顶层 group 拉齐到最宽者，组内节点水平居中，形成整齐的阶段条带。见 `showcase/architecture/n.data-pipeline.dfy`。
+`uniform` 时所有顶层 group 拉齐到最宽者，组内节点水平居中，形成整齐的阶段条带。见 `showcase/architecture/n.data-pipeline.pgm`。
 
-```drawify
+```plotgram
 group backend "后端服务" {
     style: dashed
 
@@ -199,10 +199,10 @@ group data "数据层" {
 
 | 复杂度 | 路径 | 说明 |
 |--------|------|------|
-| 简单 | `showcase/architecture/s.client-api-db.dfy` | 三层单向流 |
-| 简单 | `showcase/architecture/s.three-tier.dfy` | 经典三层 |
-| 正常 | `showcase/architecture/n.microservices.dfy` | 微服务分组 |
-| 复杂 | `showcase/architecture/c.cloud-native.dfy` | 云原生全栈 |
+| 简单 | `showcase/architecture/s.client-api-db.pgm` | 三层单向流 |
+| 简单 | `showcase/architecture/s.three-tier.pgm` | 经典三层 |
+| 正常 | `showcase/architecture/n.microservices.pgm` | 微服务分组 |
+| 复杂 | `showcase/architecture/c.cloud-native.pgm` | 云原生全栈 |
 
 ---
 

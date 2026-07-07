@@ -1,9 +1,9 @@
 /**
- * drawify-wasm 桥接层
+ * plotgram-wasm 桥接层
  *
  * 复用 playground 已有的 WASM 接口,并新增 Studio 所需的 diff/apply_patch 绑定
  *
- * 注意:diff_sources / apply_patch / ast_to_source 需要在 drawify-wasm crate
+ * 注意:diff_sources / apply_patch / ast_to_source 需要在 plotgram-wasm crate
  * 中新增对应导出后才能生效(见 docs/architecture.md 的 WASM 扩展章节)
  */
 
@@ -18,8 +18,8 @@ import type {
   Change,
 } from '@agent/types';
 
-/** drawify-wasm 模块接口 */
-export interface DrawifyWasm {
+/** plotgram-wasm 模块接口 */
+export interface PlotgramWasm {
   default: (input?: unknown) => Promise<unknown>;
   version: () => string;
   render: (source: string, format: string) => string;
@@ -33,18 +33,18 @@ export interface DrawifyWasm {
   ast_to_source?: (astJson: string) => string;
 }
 
-let modulePromise: Promise<DrawifyWasm> | null = null;
+let modulePromise: Promise<PlotgramWasm> | null = null;
 
 /** 懒加载并初始化 WASM 模块(全局单例) */
-export function loadWasm(): Promise<DrawifyWasm> {
+export function loadWasm(): Promise<PlotgramWasm> {
   if (!modulePromise) {
     modulePromise = (async () => {
-      // WASM 产物由仓库根目录的 wasm-pack 生成到 studio/drawify-wasm/
+      // WASM 产物由仓库根目录的 wasm-pack 生成到 studio/plotgram-wasm/
       // 该路径在构建前可能不存在,用动态 import 并忽略类型检查
       const mod = (await import(
         /* @vite-ignore */ /* @ts-expect-error WASM 产物由 wasm-pack 生成,构建前不存在 */
-        '../drawify-wasm/drawify_wasm.js'
-      )) as unknown as DrawifyWasm;
+        '../plotgram-wasm/plotgram_wasm.js'
+      )) as unknown as PlotgramWasm;
       await mod.default();
       return mod;
     })();
@@ -62,7 +62,7 @@ function safeParse<T>(json: string, fallback: T): T {
 
 /** 按指定格式渲染,返回单格式结果 */
 export function renderSource(
-  wasm: DrawifyWasm,
+  wasm: PlotgramWasm,
   source: string,
   format: RenderFormat,
   optionsJson?: string,
@@ -82,7 +82,7 @@ export function renderSource(
 }
 
 /** 校验 DSL 源码 */
-export function validateSource(wasm: DrawifyWasm, source: string): ValidationResult {
+export function validateSource(wasm: PlotgramWasm, source: string): ValidationResult {
   const json = wasm.validate(source);
   return safeParse<ValidationResult>(json, {
     valid: false,
@@ -92,7 +92,7 @@ export function validateSource(wasm: DrawifyWasm, source: string): ValidationRes
 }
 
 /** 解析 DSL 为 AST JSON */
-export function parseSource(wasm: DrawifyWasm, source: string): ParseResult {
+export function parseSource(wasm: PlotgramWasm, source: string): ParseResult {
   const json = wasm.parse_to_json(source);
   return safeParse<ParseResult>(json, {
     diagram: null,
@@ -104,10 +104,10 @@ export function parseSource(wasm: DrawifyWasm, source: string): ParseResult {
 /**
  * 比较两份 DSL 源码的差异
  *
- * 依赖 drawify-wasm 新增的 diff_sources 绑定
+ * 依赖 plotgram-wasm 新增的 diff_sources 绑定
  */
 export function diffSources(
-  wasm: DrawifyWasm,
+  wasm: PlotgramWasm,
   oldSource: string,
   newSource: string,
 ): DiffResult {
@@ -127,10 +127,10 @@ export function diffSources(
 /**
  * 对 DSL 应用增量补丁
  *
- * 依赖 drawify-wasm 新增的 apply_patch 绑定
+ * 依赖 plotgram-wasm 新增的 apply_patch 绑定
  */
 export function applyPatch(
-  wasm: DrawifyWasm,
+  wasm: PlotgramWasm,
   source: string,
   patch: unknown[],
 ): PatchResult {
@@ -140,7 +140,7 @@ export function applyPatch(
       source: null,
       applied: 0,
       skipped: patch.length,
-      errors: ['当前 WASM 版本不支持 apply_patch,请重新构建 drawify-wasm'],
+      errors: ['当前 WASM 版本不支持 apply_patch,请重新构建 plotgram-wasm'],
     };
   }
   const json = wasm.apply_patch(source, JSON.stringify(patch));
@@ -154,7 +154,7 @@ export function applyPatch(
 }
 
 /** 检查 WASM 是否支持 Studio 所需的全部能力 */
-export function checkStudioCapabilities(wasm: DrawifyWasm): {
+export function checkStudioCapabilities(wasm: PlotgramWasm): {
   diff: boolean;
   applyPatch: boolean;
   astToSource: boolean;

@@ -21,7 +21,7 @@
 
 ## 语法入口
 
-```drawify
+```plotgram
 diagram sequence {
     title: "请求-响应"
 
@@ -102,10 +102,10 @@ diagram sequence {
 
 | 复杂度 | 路径 | 说明 |
 |--------|------|------|
-| 简单 | `showcase/sequence/s.request-response.dfy` | 单次请求-响应 |
-| 简单 | `showcase/sequence/s.ping-pong.dfy` | 双向 ping-pong |
-| 正常 | `showcase/sequence/n.oauth-login.dfy` | OAuth 登录 |
-| 复杂 | `showcase/sequence/c.distributed-saga.dfy` | 分布式 Saga |
+| 简单 | `showcase/sequence/s.request-response.pgm` | 单次请求-响应 |
+| 简单 | `showcase/sequence/s.ping-pong.pgm` | 双向 ping-pong |
+| 正常 | `showcase/sequence/n.oauth-login.pgm` | OAuth 登录 |
+| 复杂 | `showcase/sequence/c.distributed-saga.pgm` | 分布式 Saga |
 
 ---
 

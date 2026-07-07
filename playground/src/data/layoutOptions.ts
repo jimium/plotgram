@@ -5,7 +5,7 @@ export interface SelectOption {
   label: string;
 }
 
-/** WASM `layout_catalog()` 返回的结构（与 drawify-core 对齐） */
+/** WASM `layout_catalog()` 返回的结构（与 plotgram-core 对齐） */
 export interface AlgorithmOptionInfo {
   key: string;
   kind: 'non_negative_number' | 'positive_number' | 'number';
@@ -54,8 +54,10 @@ export interface LayoutOptions {
   layoutAlgo: string;
   edgeRouting: string;
   layoutDirection: string;
-  /** 网格吸附；默认 true（flowchart / er / sugiyama-v2 / architecture-v2 生效） */
+  /** 边像素量化（`snap` 属性）；默认 true（flowchart / er / sugiyama-v2 / architecture-v2 生效） */
   gridSnap: boolean;
+  /** 节点结构对齐（`align` 属性）；默认 true（flowchart / er / sugiyama-v2 / architecture-v2 生效） */
+  gridAlign: boolean;
   layoutConfig: AlgorithmConfigValues;
   edgeRoutingConfig: AlgorithmConfigValues;
 }
@@ -74,6 +76,7 @@ export function layoutOptionsFromDefaults(defaults: DiagramDefaults): LayoutOpti
     edgeRouting: defaults.edgeRouting ?? '',
     layoutDirection: LAYOUT_DIRECTION_UNSPECIFIED,
     gridSnap: true,
+    gridAlign: true,
     layoutConfig: {},
     edgeRoutingConfig: {},
   };
@@ -85,6 +88,7 @@ export const EMPTY_LAYOUT_OPTIONS: LayoutOptions = {
   edgeRouting: '',
   layoutDirection: LAYOUT_DIRECTION_UNSPECIFIED,
   gridSnap: true,
+  gridAlign: true,
   layoutConfig: {},
   edgeRoutingConfig: {},
 };
@@ -113,6 +117,7 @@ export function normalizeLayoutOptions(
     edgeRouting,
     layoutDirection,
     gridSnap: raw?.gridSnap ?? true,
+    gridAlign: raw?.gridAlign ?? true,
     layoutConfig: raw?.layoutConfig ?? {},
     edgeRoutingConfig: raw?.edgeRoutingConfig ?? {},
   };
@@ -153,8 +158,10 @@ export interface ParsedSourceLayout {
   layoutAlgo?: string;
   edgeRouting?: string;
   layoutDirection?: string;
-  /** 源码中的 snap；缺省表示 true */
+  /** 源码中的 snap（边像素量化）；缺省表示 true */
   gridSnap?: boolean;
+  /** 源码中的 align（节点结构对齐）；缺省表示 true */
+  gridAlign?: boolean;
 }
 
 export interface EffectiveLayoutField {
@@ -166,16 +173,18 @@ export interface EffectiveLayout {
   layoutAlgo: EffectiveLayoutField;
   edgeRouting: EffectiveLayoutField | null;
   layoutDirection: EffectiveLayoutField;
-  gridSnap: EffectiveGridSnapField;
+  gridSnap: EffectiveToggleField;
+  gridAlign: EffectiveToggleField;
 }
 
-export interface EffectiveGridSnapField {
+/** 通用布尔开关生效字段（snap / align 共用） */
+export interface EffectiveToggleField {
   enabled: boolean;
   applicable: boolean;
   origin: LayoutValueOrigin;
 }
 
-const LAYOUT_ATTR_PATTERN = /^\s*(layout|edge_routing|direction|snap)\s*:/;
+const LAYOUT_ATTR_PATTERN = /^\s*(layout|edge_routing|direction|snap|align)\s*:/;
 
 function countBraceDelta(line: string): number {
   let delta = 0;
@@ -536,6 +545,9 @@ export function parseLayoutFromSource(source: string): ParsedSourceLayout {
       const snapMatch = line.match(/^\s*snap\s*:\s*(true|false)/);
       if (snapMatch) result.gridSnap = snapMatch[1] === 'true';
 
+      const alignMatch = line.match(/^\s*align\s*:\s*(true|false)/);
+      if (alignMatch) result.gridAlign = alignMatch[1] === 'true';
+
       let attrBalance = countBraceDelta(line);
       depth += attrBalance;
       while (attrBalance > 0 && i + 1 < lines.length) {
@@ -587,12 +599,13 @@ function resolveEffectiveDirection(
   return { value: null, origin: 'unspecified' };
 }
 
-function resolveEffectiveGridSnap(
+/** 通用布尔开关 resolve（snap / align 共用）：算法不支持 → 不适用；面板覆盖 → 面板值；源码声明 → 源码值；否则 → 默认开启 */
+function resolveEffectiveToggle(
   panelEnabled: boolean,
-  sourceSnap: boolean | undefined,
+  sourceValue: boolean | undefined,
   layoutSource: 'source' | 'panel',
   layoutAlgo: string | null,
-): EffectiveGridSnapField {
+): EffectiveToggleField {
   const applicable = layoutAlgoSupportsGridSnap(layoutAlgo);
   if (!applicable) {
     return { enabled: false, applicable: false, origin: 'unspecified' };
@@ -600,8 +613,8 @@ function resolveEffectiveGridSnap(
   if (layoutSource === 'panel') {
     return { enabled: panelEnabled, applicable: true, origin: 'panel' };
   }
-  if (sourceSnap !== undefined) {
-    return { enabled: sourceSnap, applicable: true, origin: 'source' };
+  if (sourceValue !== undefined) {
+    return { enabled: sourceValue, applicable: true, origin: 'source' };
   }
   return { enabled: true, applicable: true, origin: 'diagram-default' };
 }
@@ -643,14 +656,21 @@ export function resolveEffectiveLayout(
     layoutSource,
   );
 
-  const gridSnap = resolveEffectiveGridSnap(
+  const gridSnap = resolveEffectiveToggle(
     opts.gridSnap,
     parsed.gridSnap,
     layoutSource,
     layoutAlgo.value,
   );
 
-  return { layoutAlgo, edgeRouting, layoutDirection, gridSnap };
+  const gridAlign = resolveEffectiveToggle(
+    opts.gridAlign,
+    parsed.gridAlign,
+    layoutSource,
+    layoutAlgo.value,
+  );
+
+  return { layoutAlgo, edgeRouting, layoutDirection, gridSnap, gridAlign };
 }
 
 /** 面板选项是否与图表类型默认一致（含参数未改） */
@@ -663,6 +683,7 @@ export function isLayoutAtDefaults(
   if (defaults.edgeRouting !== undefined && opts.edgeRouting !== defaults.edgeRouting) return false;
   if (opts.layoutDirection !== LAYOUT_DIRECTION_UNSPECIFIED) return false;
   if (opts.gridSnap === false) return false;
+  if (opts.gridAlign === false) return false;
   return true;
 }
 
@@ -756,6 +777,13 @@ export function applyLayoutOptions(
     injections.push('    snap: false');
   }
 
+  if (
+    layoutAlgoSupportsGridSnap(layoutAlgoName)
+    && opts.gridAlign === false
+  ) {
+    injections.push('    align: false');
+  }
+
   const stripped = stripLayoutAttributes(source);
   const replaced = stripped.replace(
     /(diagram\s+\w+\s*\{)\s*\n/,
@@ -780,5 +808,6 @@ export function isLayoutOverridden(
       opts.edgeRoutingConfig,
     )
     || opts.gridSnap === false
+    || opts.gridAlign === false
   );
 }

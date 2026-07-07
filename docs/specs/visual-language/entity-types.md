@@ -2,7 +2,7 @@
 
 > 版本：0.3.0 | 状态：与实现同步
 
-本文档定义 Drawify 中 `entity[type]` 的**图表内结构角色**、**全局语义标签**与视觉形状规则。图表级写作规范见 [diagrams/](./diagrams/) 目录；语法约束见 [language-spec.md](../language-spec.md)。
+本文档定义 Plotgram 中 `entity[type]` 的**图表内结构角色**、**全局语义标签**与视觉形状规则。图表级写作规范见 [diagrams/](./diagrams/) 目录；语法约束见 [language-spec.md](../language-spec.md)。
 
 ---
 
@@ -147,7 +147,7 @@ entity icon（可选）             →  显式图标 / icon: none 压制推断
 
 **示例**（架构图）：
 
-```drawify
+```plotgram
 entity[database] db "订单库" {
     semantic: mysql
 }
@@ -239,5 +239,5 @@ entity[cache] cache "会话" {
 - [视觉语言总览](./README.md)
 - [各图表类型详解](./diagrams/)
 - [language-spec.md §5.3](../language-spec.md) — 语法层属性
-- `crates/drawify-core/src/profile/mod.rs` — 各图表 `entity_types` 与默认 type
-- `crates/drawify-core/src/icons/registry.rs` — 全局 `semantic` 词表
+- `crates/plotgram-core/src/profile/mod.rs` — 各图表 `entity_types` 与默认 type
+- `crates/plotgram-core/src/icons/registry.rs` — 全局 `semantic` 词表

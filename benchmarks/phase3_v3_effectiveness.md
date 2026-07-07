@@ -1,6 +1,6 @@
 # Phase 3 V3 布局目标集成效果评估报告
 
-> 评估二进制：[v2-effectiveness.rs](../crates/drawify-eval/src/bin/v2-effectiveness.rs)
+> 评估二进制：[v2-effectiveness.rs](../crates/plotgram-eval/src/bin/v2-effectiveness.rs)
 > 样本：showcase 74 + friendliness_stress 158 × 各图类型适用布局算法 = 792
 > 注：由于 HashMap 迭代顺序非确定性，各次运行数值可能有 ±2% 波动（放射/分组类因 n=74 较小，波动可达 ±10%）。
 
@@ -8,9 +8,9 @@
 
 | 任务 | 文件 | 变更 | 状态 |
 |------|------|------|------|
-| Sugiyama barycenter 长边权重 | [preset.rs](../crates/drawify-core/src/layout/node/sugiyama_v2/preset.rs), [order.rs](../crates/drawify-core/src/layout/node/sugiyama_v2/order.rs), [engine.rs](../crates/drawify-core/src/layout/node/sugiyama_v2/engine.rs) | `weighted_median_stats` 中 dummy 邻居按 `long_edge_barycenter_weight` 加权计算 barycenter | 代码已实现，**w=1.0 禁用**（见 §4 残差分析） |
-| force-directed RUDY 拥堵排斥力 | [force_directed.rs](../crates/drawify-core/src/layout/node/force_directed.rs) | 新增 `CongestionGrid`（RUDY 式边密度网格）+ `apply_congestion_repulsion`（密度梯度排斥力），每轮 FR 迭代重建网格 | ✅ 活跃 |
-| architecture-v2 per-pair 通道间距 | [two_phase.rs](../crates/drawify-core/src/layout/node/architecture_v2/two_phase.rs) | `build_super_graph` 新增返回 `pair_edge_counts`；`position_macro_blocks` / `position_intra_macro_blocks` 改为按相邻 block pair 的跨组边数计算独立间距 | ✅ 活跃 |
+| Sugiyama barycenter 长边权重 | [preset.rs](../crates/plotgram-core/src/layout/node/sugiyama_v2/preset.rs), [order.rs](../crates/plotgram-core/src/layout/node/sugiyama_v2/order.rs), [engine.rs](../crates/plotgram-core/src/layout/node/sugiyama_v2/engine.rs) | `weighted_median_stats` 中 dummy 邻居按 `long_edge_barycenter_weight` 加权计算 barycenter | 代码已实现，**w=1.0 禁用**（见 §4 残差分析） |
+| force-directed RUDY 拥堵排斥力 | [force_directed.rs](../crates/plotgram-core/src/layout/node/force_directed.rs) | 新增 `CongestionGrid`（RUDY 式边密度网格）+ `apply_congestion_repulsion`（密度梯度排斥力），每轮 FR 迭代重建网格 | ✅ 活跃 |
+| architecture-v2 per-pair 通道间距 | [two_phase.rs](../crates/plotgram-core/src/layout/node/architecture_v2/two_phase.rs) | `build_super_graph` 新增返回 `pair_edge_counts`；`position_macro_blocks` / `position_intra_macro_blocks` 改为按相邻 block pair 的跨组边数计算独立间距 | ✅ 活跃 |
 
 ## 1. V3 vs Phase 2 总体对比（V2-on 生产模式）
 

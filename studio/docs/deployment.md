@@ -2,26 +2,26 @@
 
 ## 1. 构建产物
 
-Drawify Studio 是纯前端应用,构建产物为静态文件,可部署到任意静态文件服务器。
+Plotgram Studio 是纯前端应用,构建产物为静态文件,可部署到任意静态文件服务器。
 
 ### 1.1 前置条件
 
 - Node.js 18+
-- 已构建 drawify-wasm 产物(见下文)
+- 已构建 plotgram-wasm 产物(见下文)
 
 ### 1.2 构建 WASM 产物
 
-Studio 依赖 drawify-wasm,需先在仓库根目录构建:
+Studio 依赖 plotgram-wasm,需先在仓库根目录构建:
 
 ```bash
-cd /path/to/flowml/crates/drawify-wasm
-wasm-pack build --target web --release --out-dir ../../studio/drawify-wasm
+cd /path/to/flowml/crates/plotgram-wasm
+wasm-pack build --target web --release --out-dir ../../studio/plotgram-wasm
 ```
 
-构建后 `studio/drawify-wasm/` 目录包含:
-- `drawify_wasm.js`(JS 胶水代码)
-- `drawify_wasm_bg.wasm`(WASM 二进制)
-- `drawify_wasm.d.ts`(类型声明)
+构建后 `studio/plotgram-wasm/` 目录包含:
+- `plotgram_wasm.js`(JS 胶水代码)
+- `plotgram_wasm_bg.wasm`(WASM 二进制)
+- `plotgram_wasm.d.ts`(类型声明)
 
 > 注意:此目录已在 `.gitignore` 中,不入版本控制。
 
@@ -36,7 +36,7 @@ npm run build
 构建产物在 `studio/dist/`,包含:
 - `index.html`
 - `assets/`(JS、CSS、图片)
-- `drawify-wasm/`(WASM 产物,需手动复制或配置构建工具)
+- `plotgram-wasm/`(WASM 产物,需手动复制或配置构建工具)
 
 > 当前配置下 WASM 产物不在 dist 中,需手动复制或调整 vite.config.ts 的 publicDir。
 
@@ -53,8 +53,8 @@ npm run preview
 ```nginx
 server {
     listen 80;
-    server_name studio.drawify.example.com;
-    root /var/www/drawify-studio;
+    server_name studio.plotgram.example.com;
+    root /var/www/plotgram-studio;
     index index.html;
 
     # SPA 回退
@@ -109,8 +109,8 @@ CMD ["nginx", "-g", "daemon off;"]
 构建与运行:
 
 ```bash
-docker build -t drawify-studio .
-docker run -p 8080:80 drawify-studio
+docker build -t plotgram-studio .
+docker run -p 8080:80 plotgram-studio
 ```
 
 ### 2.4 GitHub Pages
@@ -137,8 +137,8 @@ jobs:
       - run: cargo install wasm-pack
       - name: Build WASM
         run: |
-          cd crates/drawify-wasm
-          wasm-pack build --target web --release --out-dir ../../studio/drawify-wasm
+          cd crates/plotgram-wasm
+          wasm-pack build --target web --release --out-dir ../../studio/plotgram-wasm
       - uses: actions/setup-node@v4
         with:
           node-version: 18
@@ -181,7 +181,7 @@ Vite 环境变量在构建时注入,前缀必须为 `VITE_`:
 
 ### 4.1 产物位置
 
-WASM 产物位于 `studio/drawify-wasm/`,由 wasm-pack 生成,不入版本控制。
+WASM 产物位于 `studio/plotgram-wasm/`,由 wasm-pack 生成,不入版本控制。
 
 ### 4.2 CI/CD 构建
 
@@ -192,13 +192,13 @@ WASM 产物位于 `studio/drawify-wasm/`,由 wasm-pack 生成,不入版本控制
 cargo install wasm-pack
 
 # 构建
-cd crates/drawify-wasm
-wasm-pack build --target web --release --out-dir ../../studio/drawify-wasm
+cd crates/plotgram-wasm
+wasm-pack build --target web --release --out-dir ../../studio/plotgram-wasm
 ```
 
 ### 4.3 版本对齐
 
-WASM 产物版本由 drawify-wasm 的 Cargo.toml 决定。Studio 通过 `wasm.version()` 获取版本号并显示在顶栏。
+WASM 产物版本由 plotgram-wasm 的 Cargo.toml 决定。Studio 通过 `wasm.version()` 获取版本号并显示在顶栏。
 
 ## 5. 监控与日志
 
@@ -244,7 +244,7 @@ Sentry.init({ dsn: 'YOUR_DSN' });
 
 ### Q: WASM 加载失败?
 
-A: 检查 `studio/drawify-wasm/` 目录是否存在产物,以及服务器是否正确配置 `.wasm` 的 MIME 类型为 `application/wasm`。
+A: 检查 `studio/plotgram-wasm/` 目录是否存在产物,以及服务器是否正确配置 `.wasm` 的 MIME 类型为 `application/wasm`。
 
 ### Q: LLM 请求跨域?
 
@@ -258,4 +258,4 @@ A: 检查 `VITE_AGENT_MAX_ITERATIONS` 配置,默认 10 次。LLM 可能因 Promp
 
 ### Q: apply_patch 报错"不支持"?
 
-A: 当前 WASM 产物未包含 `apply_patch` 绑定。需在 drawify-wasm crate 新增导出后重新构建(见 [tasks.md](tasks.md) P1 阶段)。
+A: 当前 WASM 产物未包含 `apply_patch` 绑定。需在 plotgram-wasm crate 新增导出后重新构建(见 [tasks.md](tasks.md) P1 阶段)。

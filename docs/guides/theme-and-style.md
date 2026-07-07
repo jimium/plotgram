@@ -1,6 +1,6 @@
 # 主题与视觉风格使用指南
 
-Drawify 的视觉外观由 **Theme（StyleSheet）** 和 **Graphic Style（手绘/蓝图等渲染风格）** 两层控制。本文说明在 DSL、CLI 和 Rust API 中如何指定它们。
+Plotgram 的视觉外观由 **Theme（StyleSheet）** 和 **Graphic Style（手绘/蓝图等渲染风格）** 两层控制。本文说明在 DSL、CLI 和 Rust API 中如何指定它们。
 
 > 规范：[style-sheet-spec.md](../specs/style-sheet-spec.md)
 
@@ -22,7 +22,7 @@ GraphicStyle           → 几何绘制方式（标准 / Excalidraw / Spatial Cl
 
 ### Theme
 
-```drawify
+```plotgram
 diagram flowchart {
     theme: "common.clean-light"
     // ...
@@ -31,7 +31,7 @@ diagram flowchart {
 
 ### Graphic Style（diagram 级）
 
-```drawify
+```plotgram
 diagram architecture {
     graphic_style: excalidraw
     // ...
@@ -48,7 +48,7 @@ diagram architecture {
 
 ## CLI
 
-当前 `drawify render` **未暴露** `--theme` / `--graphic-style` 参数，使用 diagram 内声明 + profile 默认 theme。
+当前 `plotgram render` **未暴露** `--theme` / `--graphic-style` 参数，使用 diagram 内声明 + profile 默认 theme。
 
 自定义 theme JSON 需在 Rust `RenderRequest.explicit_style_json` 中传入（见下文）。
 
@@ -59,7 +59,7 @@ diagram architecture {
 ### prepare：`StyleRequest`
 
 ```rust
-use drawify_core::prepare::StyleRequest;
+use plotgram_core::prepare::StyleRequest;
 
 let req = StyleRequest {
     theme_id: Some("common.clean-light".into()),
@@ -73,8 +73,8 @@ Theme 优先级：`StyleRequest.theme_id` > diagram `theme` 属性 > dark 默认
 ### render：`RenderRequest`
 
 ```rust
-use drawify_core::render::{RenderRequest, RenderFormat};
-use drawify_core::types::GraphicStyleId;
+use plotgram_core::render::{RenderRequest, RenderFormat};
+use plotgram_core::types::GraphicStyleId;
 
 let mut req = RenderRequest::new(&prepared, RenderFormat::Svg);
 req.explicit_theme_id = Some("common.clean-light");
@@ -123,7 +123,7 @@ req.explicit_style_json = Some(r##"{
 
 ```bash
 # 查看物化后的 AST（含 attributes.style）
-drawify export diagram.dfy | jq '.entities[0].attributes'
+plotgram export diagram.pgm | jq '.entities[0].attributes'
 
 # 对比不同 theme 的渲染
 # （需在 Rust 测试或 playground 中切换 RenderRequest）
@@ -135,4 +135,4 @@ drawify export diagram.dfy | jq '.entities[0].attributes'
 
 - [render-pipeline.md](render-pipeline.md) — prepare / render 阶段
 - [graphic-style-and-theme.html](../architecture/graphic-style-and-theme.html) — 架构说明
-- [crates/drawify-core/src/graphic_style/README.md](../../crates/drawify-core/src/graphic_style/README.md) — 各 graphic style 实现
+- [crates/plotgram-core/src/graphic_style/README.md](../../crates/plotgram-core/src/graphic_style/README.md) — 各 graphic style 实现

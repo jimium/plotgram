@@ -5,8 +5,8 @@
 > `applicable_diagram_types` 模式对齐——**算法声明能力，组合不合法则 fail fast**。
 >
 > **状态**：设计定稿，待实施  
-> **范围**：`drawify-core`（profile / layout / ast / validation）、`layout/catalog`、Playground UI  
-> **关联**：`docs/specs/dsl/language-spec.md`、`crates/drawify-core/src/profile/mod.rs`
+> **范围**：`plotgram-core`（profile / layout / ast / validation）、`layout/catalog`、Playground UI  
+> **关联**：`docs/specs/dsl/language-spec.md`、`crates/plotgram-core/src/profile/mod.rs`
 
 ---
 
@@ -447,7 +447,7 @@ DSL parse
 ### 12.2 回归
 
 - 现有 mindmap / flowchart / er 黄金样例在补全或依赖 profile 默认后仍通过
-- `drawify-eval` 若有 direction 相关用例一并更新
+- `plotgram-eval` 若有 direction 相关用例一并更新
 
 ---
 

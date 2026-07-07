@@ -10,7 +10,7 @@
 
 ### 1.1 属性命名空间（3 层）
 
-`AttributeMap`（[ast.rs](../../crates/drawify-core/src/ast.rs)）包含三个命名空间：
+`AttributeMap`（[ast.rs](../../crates/plotgram-core/src/ast.rs)）包含三个命名空间：
 
 | 命名空间 | DSL 写法 | 用途 |
 |---|---|---|
@@ -33,7 +33,7 @@ pub enum AttributeValue {
 
 ### 1.3 各层级合法 standard 属性
 
-**Diagram 级**（[diagram.rs](../../crates/drawify-core/src/types/standard_attr_keys/diagram.rs)）：
+**Diagram 级**（[diagram.rs](../../crates/plotgram-core/src/types/standard_attr_keys/diagram.rs)）：
 
 | key | 值类型 | 说明 |
 |---|---|---|
@@ -46,7 +46,7 @@ pub enum AttributeValue {
 | `group_sizing` | Atom | 分组尺寸策略 |
 | `snap` | Boolean | 网格吸附开关 |
 
-**Entity 级**（[entity.rs](../../crates/drawify-core/src/types/standard_attr_keys/entity.rs)）：
+**Entity 级**（[entity.rs](../../crates/plotgram-core/src/types/standard_attr_keys/entity.rs)）：
 
 | key | 值类型 | 说明 |
 |---|---|---|
@@ -57,7 +57,7 @@ pub enum AttributeValue {
 | `owner` | String | 负责人 |
 | `description` | String | 描述 |
 
-**Group 级**（[group.rs](../../crates/drawify-core/src/types/standard_attr_keys/group.rs)）：
+**Group 级**（[group.rs](../../crates/plotgram-core/src/types/standard_attr_keys/group.rs)）：
 
 | key | 值类型 | 说明 |
 |---|---|---|
@@ -65,7 +65,7 @@ pub enum AttributeValue {
 | `color` | String | 分组颜色 |
 | `layout` | Atom | 分组内布局算法 |
 
-**Relation 级**（[relation.rs](../../crates/drawify-core/src/types/standard_attr_keys/relation.rs)）：
+**Relation 级**（[relation.rs](../../crates/plotgram-core/src/types/standard_attr_keys/relation.rs)）：
 
 | key | 值类型 | 说明 |
 |---|---|---|
@@ -83,7 +83,7 @@ pub enum AttributeValue {
 
 `Enum` 标记为废弃但仍在代码中存在。`as_atom()` 必须同时匹配两者，序列化泄漏历史（`{$atom:...}` vs `{$enum:...}`）。
 
-- 位置：[ast.rs#L119](../../crates/drawify-core/src/ast.rs#L119)
+- 位置：[ast.rs#L119](../../crates/plotgram-core/src/ast.rs#L119)
 - 影响：所有消费者需处理冗余分支
 
 ### 问题 2：String vs Atom 的心智负担
@@ -107,7 +107,7 @@ pub enum AttributeValue {
 
 | 语境 | 含义 | 位置 |
 |---|---|---|
-| `style: solid` | group 边框线型 | [group.rs#L8](../../crates/drawify-core/src/types/standard_attr_keys/group.rs#L8) |
+| `style: solid` | group 边框线型 | [group.rs#L8](../../crates/plotgram-core/src/types/standard_attr_keys/group.rs#L8) |
 | `style.fill: "#xxx"` | 内联视觉样式命名空间 | AttributeMap.style |
 | `node_style service { ... }` | 声明式样式规则 | StyleDecl |
 | `graphic_style: standard` | 图形风格 | diagram 级 |
@@ -122,19 +122,19 @@ pub enum AttributeValue {
 
 ### 问题 5：diagram 属性的顺序约束
 
-[parser/mod.rs#L322-L327](../../crates/drawify-core/src/dsl/parser/mod.rs#L322-L327) 强制 diagram 属性必须在 entity/relation/group 之前，否则报错。这是不必要的限制，用户写大图时很容易违反。
+[parser/mod.rs#L322-L327](../../crates/plotgram-core/src/dsl/parser/mod.rs#L322-L327) 强制 diagram 属性必须在 entity/relation/group 之前，否则报错。这是不必要的限制，用户写大图时很容易违反。
 
 ### 问题 6：`head_label` / `tail_label` 的 hack
 
-[stmt.rs#L351-L358](../../crates/drawify-core/src/dsl/parser/stmt.rs#L351-L358) 中，这两个属性先被解析为 `attributes.standard`，然后又被 `remove` 出来提升为 `Relation` 的顶层字段。既不是纯粹的属性，也不是纯粹的语法结构。
+[stmt.rs#L351-L358](../../crates/plotgram-core/src/dsl/parser/stmt.rs#L351-L358) 中，这两个属性先被解析为 `attributes.standard`，然后又被 `remove` 出来提升为 `Relation` 的顶层字段。既不是纯粹的属性，也不是纯粹的语法结构。
 
 ### 问题 7：key→解析策略的硬编码 match
 
-[expr.rs#L113-L133](../../crates/drawify-core/src/dsl/parser/expr.rs#L113-L133) 用一个巨大的 match 来决定每个 key 的值解析方式。新增属性需要同时改这里、改 validation、改 profile，三处分散。
+[expr.rs#L113-L133](../../crates/plotgram-core/src/dsl/parser/expr.rs#L113-L133) 用一个巨大的 match 来决定每个 key 的值解析方式。新增属性需要同时改这里、改 validation、改 profile，三处分散。
 
 ### 问题 8：未知 key 的 fallback 过于宽松
 
-属性块内未知 key 走 `parse_attribute_value()`（[expr.rs#L132](../../crates/drawify-core/src/dsl/parser/expr.rs#L132)），接受任意值类型，直到 validation 阶段才报错。Parser 阶段应该就能拒绝。
+属性块内未知 key 走 `parse_attribute_value()`（[expr.rs#L132](../../crates/plotgram-core/src/dsl/parser/expr.rs#L132)），接受任意值类型，直到 validation 阶段才报错。Parser 阶段应该就能拒绝。
 
 ---
 
@@ -315,9 +315,9 @@ diagram architecture "AI Agent 文档自动化管线" {
 
 **改动范围**：
 - `types/standard_attr_keys/*.rs`：修改常量值
-- 全局：替换所有引用（含 .dfy 文件）
+- 全局：替换所有引用（含 .pgm 文件）
 
-**风险**：中。需要批量更新所有 .dfy 示例文件和 benchmark。
+**风险**：中。需要批量更新所有 .pgm 示例文件和 benchmark。
 
 ---
 
@@ -337,8 +337,8 @@ diagram architecture {
 }
 ```
 
-diagram body 中 `ident:`（属性）和 `ident ->`（关系）共存，parser 靠 `lookahead_is_attribute()` 逐 token 预判区分（[mod.rs#L460-L466](../../crates/drawify-core/src/dsl/parser/mod.rs#L460-L466)）。由此衍生：
-- 顺序约束：属性必须出现在 entity/group/relation 之前（[mod.rs#L322-L327](../../crates/drawify-core/src/dsl/parser/mod.rs#L322-L327)）
+diagram body 中 `ident:`（属性）和 `ident ->`（关系）共存，parser 靠 `lookahead_is_attribute()` 逐 token 预判区分（[mod.rs#L460-L466](../../crates/plotgram-core/src/dsl/parser/mod.rs#L460-L466)）。由此衍生：
+- 顺序约束：属性必须出现在 entity/group/relation 之前（[mod.rs#L322-L327](../../crates/plotgram-core/src/dsl/parser/mod.rs#L322-L327)）
 - parser 脆弱：未来新增 `ident` 开头的语句类型会加剧歧义
 
 **提议**：两部分改动——
@@ -361,7 +361,7 @@ diagram architecture "AI Agent 文档自动化管线" {
 ```
 
 - title **可选**：无标题时省略字符串
-- AST 变化：`Diagram` 新增 `title: Option<String>` 一等字段，删除 `Diagram::title()` 遍历 attributes 的 hack（[ast.rs#L638-L647](../../crates/drawify-core/src/ast.rs#L638-L647)）
+- AST 变化：`Diagram` 新增 `title: Option<String>` 一等字段，删除 `Diagram::title()` 遍历 attributes 的 hack（[ast.rs#L638-L647](../../crates/plotgram-core/src/ast.rs#L638-L647)）
 - `title` 不再出现在 config block 中
 
 **2. 引入 `config` block 承载剩余 diagram 级属性**
@@ -423,7 +423,7 @@ diagram architecture "AI Agent 文档自动化管线" {
 - `validation/common.rs`：删除 `diagram::TITLE` 的校验分支
 - `types/standard_attr_keys/diagram.rs`：删除 `TITLE` 常量
 
-**风险**：中。需改 lexer + parser + AST，下游需适配 `diagram.title` 字段读取方式。需批量更新 .dfy 文件。
+**风险**：中。需改 lexer + parser + AST，下游需适配 `diagram.title` 字段读取方式。需批量更新 .pgm 文件。
 
 **与原方案 D 的关系**：本方案从结构上消除了顺序约束的根因，原方案 D（仅删除 `seen_non_attr`）不再需要。若不采纳 config block，才回退到原方案 D。
 
@@ -445,7 +445,7 @@ a -> b "中间标签" {
 ```
 
 - `label`（中间标签）是**语法级位置参数**，直接解析为 `Relation.label` 字段
-- `head_label` / `tail_label` 走属性块 → 再被 `remove` 挖出来的 hack 路径（[stmt.rs#L351-L358](../../crates/drawify-core/src/dsl/parser/stmt.rs#L351-L358)）
+- `head_label` / `tail_label` 走属性块 → 再被 `remove` 挖出来的 hack 路径（[stmt.rs#L351-L358](../../crates/plotgram-core/src/dsl/parser/stmt.rs#L351-L358)）
 
 Hack 数据流：
 
@@ -539,9 +539,9 @@ let tail_label = if matches!(self.peek_kind(), TokenKind::Lt) {
 - `parser/stmt.rs`：删除 `attributes.standard.remove()` hack，新增 `>` / `<` 解析
 - `types/standard_attr_keys/relation.rs`：删除 `HEAD_LABEL` / `TAIL_LABEL` 常量
 - `validation/common.rs`：删除 `head_label` / `tail_label` 的属性校验分支
-- 全局：更新所有 .dfy 文件中的 `head_label:` / `tail_label:` 写法
+- 全局：更新所有 .pgm 文件中的 `head_label:` / `tail_label:` 写法
 
-**风险**：中。需改 lexer + parser，但 AST 结构不变。需批量更新 .dfy 文件。
+**风险**：中。需改 lexer + parser，但 AST 结构不变。需批量更新 .pgm 文件。
 
 ---
 
@@ -688,7 +688,7 @@ pub fn get_enum_values(key: &str) -> Option<Vec<String>> {
 | 优先级 | 方案 | 收益 | 改动范围 | 风险 |
 |---|---|---|---|---|
 | P0 | A+B. 合并文本变体为 `String { value, quoted }` | 消除技术债 + 统一解析 | ast.rs + 全局替换 221 处 | 中 |
-| P0 | D. 引入 config block + title 位置参数 | 消除歧义 + 顺序约束 | lexer + parser + .dfy | 中 |
+| P0 | D. 引入 config block + title 位置参数 | 消除歧义 + 顺序约束 | lexer + parser + .pgm | 中 |
 | P1 | C. 重命名消除歧义 | 语义清晰 | 常量定义 + 全局替换 | 中 |
 | P2 | F. 属性 schema 注册表 | 可扩展性 | 跨层重构 | 高 |
 | P2 | E. head/tail_label 正式化 | 消除 hack | parser/stmt.rs | 低~中 |
@@ -725,7 +725,7 @@ pub fn get_enum_values(key: &str) -> Option<Vec<String>> {
   - diagram `graphic_style` → `render_style`
   - relation `edge_style` → `line_style`
 - 示例已结合方案 A+B 和 D 的结构（config block + title 位置参数）
-- 改动范围：常量定义 + 全局替换（含 .dfy 文件）
+- 改动范围：常量定义 + 全局替换（含 .pgm 文件）
 
 ### 方案 D：引入 config block + title 位置参数 — 已确认
 
@@ -739,7 +739,7 @@ pub fn get_enum_values(key: &str) -> Option<Vec<String>> {
 - 效果：
   - 替代原方案 D（仅删除 `seen_non_attr`），从结构上消除顺序约束和 parser 歧义
   - AST 变化：`Diagram` 新增 `title: Option<String>` 一等字段，删除 `title()` hack
-- 待办：实现时需同步更新所有 .dfy 文件
+- 待办：实现时需同步更新所有 .pgm 文件
 
 ### 方案 E：head/tail label 提升为语法级 — 已确认
 
@@ -754,7 +754,7 @@ pub fn get_enum_values(key: &str) -> Option<Vec<String>> {
   - 三个标签位置（mid / head / tail）对称，都是语法级位置参数
   - formatter 友好，统一处理
 - AST 变化：`Relation` 结构体不变，赋值来源从"属性块 remove"改为"语法级直接解析"
-- 改动范围：lexer 新增 `Gt`/`Lt` token、parser 删除 hack 并新增方向符号解析、删除 `HEAD_LABEL`/`TAIL_LABEL` 常量、更新 .dfy 文件
+- 改动范围：lexer 新增 `Gt`/`Lt` token、parser 删除 hack 并新增方向符号解析、删除 `HEAD_LABEL`/`TAIL_LABEL` 常量、更新 .pgm 文件
 
 ### 方案 F：属性 schema 注册表 + 枚举值常量 — 已确认
 

@@ -24,12 +24,12 @@
 
 **严重程度：高（主要根因）**
 
-- `FriendlinessAdjuster::apply`（[adjuster.rs:239-242](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/friendliness/adjuster.rs#L239-L242)）为减少边穿障，沿法线方向推开节点，每轮最多 80px。
-- `refine::run_refine`（[refine.rs:164-167](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/refine.rs#L164-L167)）为消除边-节点重叠，推开问题节点，每轮最多 40px。
+- `FriendlinessAdjuster::apply`（[adjuster.rs:239-242](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/friendliness/adjuster.rs#L239-L242)）为减少边穿障，沿法线方向推开节点，每轮最多 80px。
+- `refine::run_refine`（[refine.rs:164-167](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/refine.rs#L164-L167)）为消除边-节点重叠，推开问题节点，每轮最多 40px。
 - 两者都只修改 `result.nodes`，**不更新 `result.groups`**。
 - 这两步在 grid snap + `refresh_layout_bounds`（重算分组包围框）之后执行，导致 group bounds 反映的是 V2/refine 之前的节点位置。
 
-**管线时序问题**（[mod.rs:837-945](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/mod.rs#L837-L945)）：
+**管线时序问题**（[mod.rs:837-945](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/mod.rs#L837-L945)）：
 
 ```
 snap_layout_to_grid          ← 节点移到格点
@@ -45,7 +45,7 @@ finalize_canvas_bounds       ← 平移所有元素（保持相对位置）
 
 **严重程度：中**
 
-[grid_snap.rs:213-215](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/grid_snap.rs#L213-L215) 中，`align_group_borders` 对齐同侧 group 边框到中位数时：
+[grid_snap.rs:213-215](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/grid_snap.rs#L213-L215) 中，`align_group_borders` 对齐同侧 group 边框到中位数时：
 
 - `g.x = median`（左边缘对齐）但 `width` 不变 → 右边缘跟随平移，group 整体偏移
 - `g.y = median`（上边缘对齐）但 `height` 不变 → 下边缘跟随平移
@@ -57,7 +57,7 @@ finalize_canvas_bounds       ← 平移所有元素（保持相对位置）
 
 **严重程度：中（影响布局质量，非直接溢出）**
 
-[group_layout_hint.rs:170-208](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/architecture_v2/group_layout_hint.rs#L170-L208) 中，`is_simple_chain` 的判定条件为 `in_deg_gt1 <= 1`，允许一个节点有多个入度。
+[group_layout_hint.rs:170-208](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/architecture_v2/group_layout_hint.rs#L170-L208) 中，`is_simple_chain` 的判定条件为 `in_deg_gt1 <= 1`，允许一个节点有多个入度。
 
 对于 fan-in 模式（如 可观测性组：metrics/logs/traces → grafana）：
 - grafana 的 in_degree = 3 → `in_deg_gt1 = 1`
@@ -72,19 +72,19 @@ finalize_canvas_bounds       ← 平移所有元素（保持相对位置）
 
 ### 3.1 修复 `align_group_borders` 宽高补偿
 
-**文件**：[grid_snap.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/grid_snap.rs)
+**文件**：[grid_snap.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/grid_snap.rs)
 
 对齐左边缘时同步调整 `width`（保持右边缘不变），对齐上边缘时同步调整 `height`（保持下边缘不变）。移除了无效的 `_adjust_far` 参数。
 
 ### 3.2 V2/refine 后重算 group bounds
 
-**文件**：[mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/mod.rs)
+**文件**：[mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/mod.rs)
 
 在所有节点位移完成（V2 adjuster + routing + refine）后、`finalize_canvas_bounds` 之前，调用 `refresh_layout_bounds` 从节点位置重算分组包围框。
 
 ### 3.3 修复 `is_simple_chain` 拒绝 fan-in
 
-**文件**：[group_layout_hint.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/node/architecture_v2/group_layout_hint.rs)
+**文件**：[group_layout_hint.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/node/architecture_v2/group_layout_hint.rs)
 
 将判定条件从 `in_deg_gt1 <= 1` 改为 `in_deg_gt1 == 0`。任何节点有多个内部入度时，不再视为链式，回退到 Sugiyama 分层。
 
@@ -104,13 +104,13 @@ finalize_canvas_bounds       ← 平移所有元素（保持相对位置）
 **问题**：当前缺乏自动化布局质量回归检测，节点溢出问题存在已久但未被发现。
 
 **方案**：
-1. 在 CI 中增加布局质量快照测试：对 showcase 中所有 .dfy 渲染后检查节点是否在 group 内
+1. 在 CI 中增加布局质量快照测试：对 showcase 中所有 .pgm 渲染后检查节点是否在 group 内
 2. 在 `LayoutResult` 上增加 `validate_group_containment()` 方法，返回违规列表
-3. 将检查集成到 `drawify validate` 子命令
+3. 将检查集成到 `plotgram validate` 子命令
 
 **实施**：
 - `LayoutResult::validate_group_containment()` 检查所有 group 的直接实体和子组是否在边界内（1px 容差）
-- `drawify validate --layout-check` CLI 子命令
+- `plotgram validate --layout-check` CLI 子命令
 - `showcase_architecture_group_containment` 集成测试覆盖全部 21 个架构图
 
 ### P1：Uniform sizing 策略下的 group bounds 一致性 ✅

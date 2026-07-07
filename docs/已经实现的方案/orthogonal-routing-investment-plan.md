@@ -32,7 +32,7 @@
 
 ## 1. 背景与决策
 
-Drawify 提供六种边路由算法：`straight`、`bezier`、`spline`、`circular`、`orthogonal`、`organic`。其中 **orthogonal 是产品默认路径**：
+Plotgram 提供六种边路由算法：`straight`、`bezier`、`spline`、`circular`、`orthogonal`、`organic`。其中 **orthogonal 是产品默认路径**：
 
 | 图表类型 | 默认边路由 |
 |----------|-----------|
@@ -56,7 +56,7 @@ Drawify 提供六种边路由算法：`straight`、`bezier`、`spline`、`circul
 
 ### 2.1 架构概览
 
-orthogonal 实现位于 `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/`，子模块分工：
+orthogonal 实现位于 `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/`，子模块分工：
 
 | 模块 | 职责 |
 |------|------|
@@ -143,7 +143,7 @@ orthogonal 实现位于 `crates/drawify-core/src/layout/edge/edge_routing_orthog
 **代码证据**：
 
 - `compute_layout_with_plan`（`layout/mod.rs:1030-1089`）硬编码三阶段：V1 评估（总是执行）→ V2 调整（`FriendlinessAdjuster`）→ 路由后择优。
-- V2 调整器 `FriendlinessAdjuster::with_default()`（`adjuster.rs:44-52`）硬编码 `enabled: true`，唯一禁用途径是环境变量 `DRAWIFY_NO_V2_ADJUST=1`（`mod.rs:1044`），**非 DSL 配置**。
+- V2 调整器 `FriendlinessAdjuster::with_default()`（`adjuster.rs:44-52`）硬编码 `enabled: true`，唯一禁用途径是环境变量 `PLOTGRAM_NO_V2_ADJUST=1`（`mod.rs:1044`），**非 DSL 配置**。
 - V2 强制增加 1 次路由开销：V2 改变布局时需额外路由 baseline（`mod.rs:1081`）对比择优。
 - `congestion_score` 与 orthogonal 路由质量相关性弱（`mod.rs:169` `w_congestion: 0.06`，Pearson r<0.06）。
 - `ChannelCongestion` 的 bbox 是**全图宽/高的条带**（`congestion.rs:140-153`），粒度过粗，不适合作为路径评分的查询单元。
@@ -395,7 +395,7 @@ edge_routing: orthogonal {
 4. **Dijkstra 确定性修复**：`visibility.rs:309-313` 的 `HeapNode::Ord` 在等距时用 `node_id` 作为稳定 tiebreak（修复 G7）。
 5. **simplify stub 保护**：`build_channel_detours` 改用 `simplify_path_preserving_stubs`（修复 G7）。
 
-**涉及文件**：`path.rs`、`scoring.rs`、`visibility.rs`、`drawify-eval` bench 工具
+**涉及文件**：`path.rs`、`scoring.rs`、`visibility.rs`、`plotgram-eval` bench 工具
 
 **验收标准**：
 
@@ -471,7 +471,7 @@ bezier、organic、circular、spline 穿障后已退化到 `ObstacleIndex::short
 
 **S1 暂缓理由**：经代码审计发现 `needs_obstacle_index` trait 方法存在但调度层从未调用，每个路由器（bezier/spline/circular/organic）各自内部构建 `ObstacleIndex`，orthogonal 使用自己的 HashMap-based 障碍检测。Full unification 需要显著 trait 变更（调度层预建 + 注入），且当前各路由器独立工作正常，收益有限，风险高于价值。若未来新增路由器或需要统一膨胀间距策略，可重新评估。
 
-**S3 落地内容**（3 个测试，位于 `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs`）：
+**S3 落地内容**（3 个测试，位于 `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs`）：
 - `test_s3_orthogonal_degradation_deterministic`：三节点纵列穿障场景，多轮路由路径完全一致（AGENTS.md §2 确定性要求）。
 - `test_s3_orthogonal_hard_filter_produces_clean_path`：硬过滤后路径不穿障（验证退化候选仍满足硬约束）。
 - `test_s3_multi_edge_degradation_deterministic`：6 节点 4 边多边穿障场景，多轮路由完全一致。
@@ -508,8 +508,8 @@ bezier、organic、circular、spline 穿障后已退化到 `ObstacleIndex::short
 
 每阶段结束前：
 
-1. 跑 `cargo test -p drawify-core` 全量测试；
-2. 跑 `cargo run -p drawify-eval --bin edge_routing_bench`，对比 JSON 指标；
+1. 跑 `cargo test -p plotgram-core` 全量测试；
+2. 跑 `cargo run -p plotgram-eval --bin edge_routing_bench`，对比 JSON 指标；
 3. 对 flowchart / architecture showcase 做视觉抽检；
 4. 同一输入多次渲染，验证确定性（AGENTS.md §2）。
 
@@ -565,23 +565,23 @@ bezier、organic、circular、spline 穿障后已退化到 `ObstacleIndex::short
 
 | 模块 | 路径 | 关键行 |
 |------|------|--------|
-| orthogonal 主流程 | `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs` | `route_edges_orthogonal:165`、`edge_order:344`、`Concentrate:313` |
-| 候选路径与通道绕行 | `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/path.rs` | `select_best_path:30`、`build_channel_detours:98`（混合端口盲区:114）、`RoutedSegment:8` |
-| 路径评分 | `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/scoring.rs` | `obstacle_penalty:46`、`segments_conflict:96`（垂直交叉不检测:130） |
-| 磁吸点与汇流策略 | `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/slot.rs` | `choose_docking_strategy:21` |
-| 折线简化 | `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/simplify.rs` | `preserving_stubs:5` |
-| 路由上下文 | `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/context.rs` | `RoutingContext:19`（待加 friendliness: Option） |
-| 可见性图避障 | `crates/drawify-core/src/layout/edge/visibility.rs` | `ObstacleIndex:102`、`shortest_path:271`（Dijkstra 确定性隐患:309） |
-| refine 循环 | `crates/drawify-core/src/layout/refine.rs` | `run_refine:179`、`reroute_subset:234`（锚点脱节:244）、`push_problem_nodes:152`（无 momentum） |
-| 布局调度主流程 | `crates/drawify-core/src/layout/mod.rs` | `compute_layout_with_plan:926`、`EdgeRoutingStrategy:808`、friendliness 三阶段:1030-1089 |
-| friendliness 评估器 | `crates/drawify-core/src/layout/friendliness/mod.rs` | `FriendlinessReport:33`、`Hotspot:58` |
-| friendliness V2 调整器 | `crates/drawify-core/src/layout/friendliness/adjuster.rs` | `MomentumHistory:58`、`apply:96` |
-| friendliness 拥堵 | `crates/drawify-core/src/layout/friendliness/congestion.rs` | 条带 bbox:140-153 |
-| 标签避让 | `crates/drawify-core/src/layout/edge/common/label_avoidance.rs` | — |
-| 路由 benchmark | `crates/drawify-eval/src/bin/edge_routing_bench.rs` | `RouterResult:38` |
-| 布局质量指标 | `crates/drawify-eval/src/metrics.rs` | `edge_node_crossings:454`、`edge_crossings:499` |
-| 图表默认路由 | `crates/drawify-core/src/profile/mod.rs` | `profile_for:223` |
-| showcase 数据集 | `showcase/{architecture,er,flowchart,mindmap,sequence,state}/` | ~77 个 `.dfy` 文件 |
+| orthogonal 主流程 | `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs` | `route_edges_orthogonal:165`、`edge_order:344`、`Concentrate:313` |
+| 候选路径与通道绕行 | `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/path.rs` | `select_best_path:30`、`build_channel_detours:98`（混合端口盲区:114）、`RoutedSegment:8` |
+| 路径评分 | `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs` | `obstacle_penalty:46`、`segments_conflict:96`（垂直交叉不检测:130） |
+| 磁吸点与汇流策略 | `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/slot.rs` | `choose_docking_strategy:21` |
+| 折线简化 | `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/simplify.rs` | `preserving_stubs:5` |
+| 路由上下文 | `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/context.rs` | `RoutingContext:19`（待加 friendliness: Option） |
+| 可见性图避障 | `crates/plotgram-core/src/layout/edge/visibility.rs` | `ObstacleIndex:102`、`shortest_path:271`（Dijkstra 确定性隐患:309） |
+| refine 循环 | `crates/plotgram-core/src/layout/refine.rs` | `run_refine:179`、`reroute_subset:234`（锚点脱节:244）、`push_problem_nodes:152`（无 momentum） |
+| 布局调度主流程 | `crates/plotgram-core/src/layout/mod.rs` | `compute_layout_with_plan:926`、`EdgeRoutingStrategy:808`、friendliness 三阶段:1030-1089 |
+| friendliness 评估器 | `crates/plotgram-core/src/layout/friendliness/mod.rs` | `FriendlinessReport:33`、`Hotspot:58` |
+| friendliness V2 调整器 | `crates/plotgram-core/src/layout/friendliness/adjuster.rs` | `MomentumHistory:58`、`apply:96` |
+| friendliness 拥堵 | `crates/plotgram-core/src/layout/friendliness/congestion.rs` | 条带 bbox:140-153 |
+| 标签避让 | `crates/plotgram-core/src/layout/edge/common/label_avoidance.rs` | — |
+| 路由 benchmark | `crates/plotgram-eval/src/bin/edge_routing_bench.rs` | `RouterResult:38` |
+| 布局质量指标 | `crates/plotgram-eval/src/metrics.rs` | `edge_node_crossings:454`、`edge_crossings:499` |
+| 图表默认路由 | `crates/plotgram-core/src/profile/mod.rs` | `profile_for:223` |
+| showcase 数据集 | `showcase/{architecture,er,flowchart,mindmap,sequence,state}/` | ~77 个 `.pgm` 文件 |
 
 ---
 
@@ -697,6 +697,6 @@ bezier、organic、circular、spline 穿障后已退化到 `ObstacleIndex::short
 | Q2 | `SLOT_PITCH` 重复定义 | 提取到 `constants::ORTHO_SLOT_PITCH`，orthogonal 和 port_conflict 共享引用 |
 | Q3 | `PARALLEL_GAP` 重复定义 | 提取到 `constants::ORTHO_PARALLEL_GAP`，orthogonal 和 refine 共享引用 |
 | Q4 | `select_best_path` / `select_best_path_with_scorer` 仅测试使用 | 移除两个 dead code 函数，测试直接调用 `select_best_path_with_scorer_stats` |
-| Q5 | refine.rs 公共函数可见性过宽 | `analyze_edge_node_crossings`/`analyze_edge_overlaps`/`analyze_crossings`/`push_problem_nodes`/`segment_intersects_aabb` 降级为 `pub(crate)`；`segment_intersects_node` 保持 `pub`（drawify-eval 跨 crate 引用） |
+| Q5 | refine.rs 公共函数可见性过宽 | `analyze_edge_node_crossings`/`analyze_edge_overlaps`/`analyze_crossings`/`push_problem_nodes`/`segment_intersects_aabb` 降级为 `pub(crate)`；`segment_intersects_node` 保持 `pub`（plotgram-eval 跨 crate 引用） |
 | Q6 | `BBOX_EXPAND` 隐藏在函数体内 | 提升为 scoring.rs 模块级常量 |
 | Q7 | `best_metrics` 未使用赋值 | 移除 refine.rs 中 `best_metrics = new_metrics` 死赋值 |

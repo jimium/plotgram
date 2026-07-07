@@ -1,6 +1,6 @@
 # Phase 0 路由友好性预测度量相关性分析报告
 
-样本数: 179（来自 showcase 全量 .dfy × 各图类型适用布局算法）
+样本数: 179（来自 showcase 全量 .pgm × 各图类型适用布局算法）
 
 ## 1. 描述性统计
 
@@ -80,7 +80,7 @@ V1 评估器（`RoutingFriendlinessEvaluator`）输出的复合分数与事后�
 | c.layout-stress-dense | sugiyama | 18 | 0 | 4.23 | 0 | 0 | 18 | 200 | 0.6542 |
 | c.layout-stress-dense | sugiyama-v2 | 15 | 6 | 10.94 | 10 | 0 | 15 | 200 | 0.9100 |
 | c.layout-stress-dense | er | 14 | 8 | 11.80 | 10 | 0 | 14 | 200 | 0.9100 |
-| c.drawify-core-mod-deps | force-directed | 9 | 23 | 6.40 | 0 | 0 | 22 | 250 | 0.6575 |
+| c.plotgram-core-mod-deps | force-directed | 9 | 23 | 6.40 | 0 | 0 | 22 | 250 | 0.6575 |
 | c.k8s-multi-namespace-overview | architecture | 9 | 49 | 32.35 | 0 | 0 | 15 | 230 | 0.6600 |
 | c.k8s-platform-stack | force-directed | 9 | 48 | 15.70 | 0 | 41 | 8 | 430 | 0.7330 |
 | c.caffe-shop | force-directed | 8 | 32 | 34.86 | 0 | 0 | 27 | 190 | 0.6596 |
@@ -95,5 +95,5 @@ V1 评估器（`RoutingFriendlinessEvaluator`）输出的复合分数与事后�
 | c.payment-flow | state | 4 | 1 | 13.45 | 0 | 0 | 4 | 96 | 0.5274 |
 | c.service-degradation-lifecycle | circular | 4 | 5 | 31.19 | 0 | 0 | 5 | 8 | 0.4392 |
 | c.ai-agent-docops-pipeline | architecture | 3 | 26 | 60.28 | 0 | 0 | 9 | 60 | 0.5640 |
-| c.drawify-core-mod-deps | architecture | 3 | 26 | 57.12 | 0 | 16 | 17 | 640 | 0.6888 |
+| c.plotgram-core-mod-deps | architecture | 3 | 26 | 57.12 | 0 | 16 | 17 | 640 | 0.6888 |
 | c.k8s-incident-response | sugiyama | 3 | 0 | 14.40 | 0 | 0 | 12 | 0 | 0.4200 |

@@ -123,16 +123,16 @@ RoutingGroupRect = f(diagram, nodes, layout_algo, padding_profile) -> HashMap<St
 
 | 样例 | 路径 | 关注点 |
 |------|------|--------|
-| 支付清结算 | `showcase/architecture/c.payment-clearing-platform.dfy` | 贴边段计数（壳层 d&lt;12px）不劣化 |
-| 泳道订单 | `showcase/flowchart/c.swimlane-order-process.dfy` | 组间缝与 `group_gap: 80` 一致 |
-| 退款流程 | `showcase/flowchart/c.customer-refund-process.dfy` | 分治三阶段 group 框与节点不溢出 |
-| CI 流水线 | `showcase/flowchart/c.ci-cd-security-pipeline.dfy` | 垂直堆叠 group 走廊 |
+| 支付清结算 | `showcase/architecture/c.payment-clearing-platform.pgm` | 贴边段计数（壳层 d&lt;12px）不劣化 |
+| 泳道订单 | `showcase/flowchart/c.swimlane-order-process.pgm` | 组间缝与 `group_gap: 80` 一致 |
+| 退款流程 | `showcase/flowchart/c.customer-refund-process.pgm` | 分治三阶段 group 框与节点不溢出 |
+| CI 流水线 | `showcase/flowchart/c.ci-cd-security-pipeline.pgm` | 垂直堆叠 group 走廊 |
 
 ### 4.4 Phase 0 完成标准
 
 - [ ] 代码库中**无**边路由热路径上手写 `GroupLayout`（测试 fixture 除外）。
 - [ ] flowchart 分治与 `compute_group_bounds` 对同一合成图产出相同 rect（给定相同 padding）。
-- [ ] `cargo test -p drawify-core --lib` 全绿，且新增 ≥2 个 rect 不变量测试。
+- [ ] `cargo test -p plotgram-core --lib` 全绿，且新增 ≥2 个 rect 不变量测试。
 
 ---
 
@@ -143,7 +143,7 @@ RoutingGroupRect = f(diagram, nodes, layout_algo, padding_profile) -> HashMap<St
 ### 5.1 目标目录结构
 
 ```text
-crates/drawify-core/src/layout/group/
+crates/plotgram-core/src/layout/group/
   mod.rs              # GroupRoutingHints、对外 re-export、模块文档
   border_shell.rs     # 关系分类、贴边检测、stub 区、violates 判定
   corridor.rs         # GroupCorridor、build_corridors_from_groups、prefer、penalty

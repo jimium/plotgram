@@ -13,7 +13,7 @@
 | Bundling | `edge_bundling/` | **默认关闭** | 用"端到端方向"判兼容(≤60°)，局部重合但整体方向不同的边无法合并 |
 | X-3 Lane Assignment | 无 | **未实现** | 仅作为注释中的计划存在 |
 
-### 当前 SVG 中的重合案例（showcase/architecture/c.layout-stress-nested.dfy）
+### 当前 SVG 中的重合案例（showcase/architecture/c.layout-stress-nested.pgm）
 
 | 重合位置 | 涉及边 | 端到端夹角 | bundling 能否合并 | 原因 |
 |----------|--------|-----------|-------------------|------|
@@ -42,12 +42,12 @@
 ### 改动文件
 
 主要改动：
-- `crates/drawify-core/src/layout/edge/edge_bundling/compatibility.rs` —— 新增段级重叠检测
-- `crates/drawify-core/src/layout/edge/edge_bundling/mod.rs` —— 启用 bundling（测试用例配置）
+- `crates/plotgram-core/src/layout/edge/edge_bundling/compatibility.rs` —— 新增段级重叠检测
+- `crates/plotgram-core/src/layout/edge/edge_bundling/mod.rs` —— 启用 bundling（测试用例配置）
 
 次要改动（视需要）：
-- `crates/drawify-core/src/layout/edge/edge_bundling/trunk.rs` —— trunk 坐标取重叠段而非全路径中位数
-- `crates/drawify-core/src/layout/edge/edge_bundling/path_rewrite.rs` —— partial bundling fork 点处理
+- `crates/plotgram-core/src/layout/edge/edge_bundling/trunk.rs` —— trunk 坐标取重叠段而非全路径中位数
+- `crates/plotgram-core/src/layout/edge/edge_bundling/path_rewrite.rs` —— partial bundling fork 点处理
 
 ### 执行步骤
 
@@ -133,15 +133,15 @@ from_anchor → FromStub → MergeLeg → Trunk → ForkLeg → ToStub → to_an
 
 #### Step 1.5：在测试用例中启用 bundling
 
-修改 `showcase/architecture/c.layout-stress-nested.dfy`，在 orthogonal options 中添加 `bundling: 1.0`。
+修改 `showcase/architecture/c.layout-stress-nested.pgm`，在 orthogonal options 中添加 `bundling: 1.0`。
 
 或者在 pipeline 层面提供一个全局开关用于测试。
 
 ### 验证标准
 
-1. **编译通过**：`cargo build --release -p drawify-core` 无 error
-2. **单元测试通过**：`cargo test --release -p drawify-core` 全部 pass
-3. **SVG 验证**：生成 `c.layout-stress-nested.dfy` 的 SVG，检查：
+1. **编译通过**：`cargo build --release -p plotgram-core` 无 error
+2. **单元测试通过**：`cargo test --release -p plotgram-core` 全部 pass
+3. **SVG 验证**：生成 `c.layout-stress-nested.pgm` 的 SVG，检查：
    - x=518 处 E4/E8 是否合并为共享 trunk（视觉上一条线）
    - x=102 处 E5/E10 是否合并
    - 其他边无回归（不出现新的重合或斜线）
@@ -168,10 +168,10 @@ from_anchor → FromStub → MergeLeg → Trunk → ForkLeg → ToStub → to_an
 ### 改动文件
 
 新增：
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/lane_assignment.rs` —— 新模块
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/lane_assignment.rs` —— 新模块
 
 修改：
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs` —— 在 reroute 之后、grid_snap 之前调用 lane assignment
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs` —— 在 reroute 之后、grid_snap 之前调用 lane assignment
 
 ### 执行步骤
 
@@ -240,8 +240,8 @@ stats.lane_assignment = lane_stats;
 ### 改动文件
 
 修改：
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs::reroute_conflicting_edges`
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/scoring.rs` —— 加入通道负载评分
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs::reroute_conflicting_edges`
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs` —— 加入通道负载评分
 
 ### 执行步骤
 

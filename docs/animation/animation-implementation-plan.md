@@ -1,8 +1,8 @@
-# Drawify 动画能力落地方案
+# Plotgram 动画能力落地方案
 
 > 版本：0.2.0 | 状态：实施方案 | 日期：2026-06-24
-> 依据：[animation-capability-research.md](./animation-capability-research.md)（研究评估）、[svg-embedding-design-impact.md](./svg-embedding-design-impact.md)（嵌入方式设计约束）、[competitive-strategy.md](../product/competitive-strategy.md) §4.5、[language-spec.md](../specs/language-spec.md)、[export-scene-spec.md](../specs/export-scene-spec.md)、[ast-spec.md](../specs/ast-spec.md)、[diff2/README.md](../../crates/drawify-core/src/diff2/README.md)
-> 适用：Drawify Core / CLI / Server / WASM / Studio
+> 依据：[animation-capability-research.md](./animation-capability-research.md)（研究评估）、[svg-embedding-design-impact.md](./svg-embedding-design-impact.md)（嵌入方式设计约束）、[competitive-strategy.md](../product/competitive-strategy.md) §4.5、[language-spec.md](../specs/language-spec.md)、[export-scene-spec.md](../specs/export-scene-spec.md)、[ast-spec.md](../specs/ast-spec.md)、[diff2/README.md](../../crates/plotgram-core/src/diff2/README.md)
+> 适用：Plotgram Core / CLI / Server / WASM / Studio
 
 ---
 
@@ -27,7 +27,7 @@
 | 伪需求 | 来源 | 不做的原因 |
 |--------|------|------------|
 | 节点弹跳/呼吸/发光等装饰动画 | "动画看起来很酷" | 归入"图形美观"维度，Mermaid 追平成本低，不构成壁垒（[competitive-strategy.md](../product/competitive-strategy.md) §2.1） |
-| 交互式图探索（拖拽/缩放/折叠） | "像 Cytoscape 一样" | 与产品定位冲突——Drawify 是静态导出，不是交互探索器（[cytoscape-js-research.md](../architecture/参考资料/cytoscape-js-research.md)） |
+| 交互式图探索（拖拽/缩放/折叠） | "像 Cytoscape 一样" | 与产品定位冲突——Plotgram 是静态导出，不是交互探索器（[cytoscape-js-research.md](../architecture/参考资料/cytoscape-js-research.md)） |
 | DSL 中写 `animate: pulse` 等节点级动画属性 | "用户想精确控制" | 动画是渲染关注点，污染 DSL 后破坏"语义优先"原则，且 Agent 生成成本飙升 |
 | GIF/MP4 光栅化导出（首发） | "PPT 要嵌入" | 依赖 Playwright + ffmpeg 重依赖，且失真；先用 HTML 导出覆盖 90% 场景 |
 
@@ -45,7 +45,7 @@
 
 ### 2.1 战略增值：放大核心壁垒
 
-Drawify 的核心壁垒是**语义微调**（[competitive-strategy.md](../product/competitive-strategy.md) §4）。动画本身不是壁垒，但**语义动画是壁垒的视觉放大器**：
+Plotgram 的核心壁垒是**语义微调**（[competitive-strategy.md](../product/competitive-strategy.md) §4）。动画本身不是壁垒，但**语义动画是壁垒的视觉放大器**：
 
 ```
 没有动画：Patch 生效 → 新图替换旧图 → 用户自己对比哪里变了
@@ -56,14 +56,14 @@ Drawify 的核心壁垒是**语义微调**（[competitive-strategy.md](../produc
 
 ### 2.2 商业增值：企业场景的差异化
 
-| 企业场景 | 当前方案 | Drawify + 动画后 |
+| 企业场景 | 当前方案 | Plotgram + 动画后 |
 |----------|----------|-------------------|
 | 架构变更 PR 评审 | 截图对比 / 文本 diff | 语义 Diff + 过渡动画，一眼看清改了什么 |
 | 变更讲解会议 | 贴多张图手动翻页 | Steps 演示，按节奏播放演变 |
 | 培训材料 | 静态图 + 文字说明 | Steps HTML 导出，可交互回看 |
 | 合规归档 | 截图存档 | 带 ChangeSet 的 SVG，可追溯每次变更 |
 
-D2 已用"唯一能从文本生成动画图的语言"占据开发者心智（[research §2.3](./animation-capability-research.md)）。Drawify 的差异化在于：**帧间有语义插值**（D2 是硬切换），且动画**零参数自动生成**。
+D2 已用"唯一能从文本生成动画图的语言"占据开发者心智（[research §2.3](./animation-capability-research.md)）。Plotgram 的差异化在于：**帧间有语义插值**（D2 是硬切换），且动画**零参数自动生成**。
 
 ### 2.3 技术增值：盘活现有基础设施
 
@@ -85,7 +85,7 @@ D2 已用"唯一能从文本生成动画图的语言"占据开发者心智（[re
 
 ## 3. 代码实现可行性评估
 
-基于对 `crates/drawify-core/src` 的实际代码核查（非文档转述）：
+基于对 `crates/plotgram-core/src` 的实际代码核查（非文档转述）：
 
 ### 3.1 现状核查
 
@@ -115,7 +115,7 @@ D2 已用"唯一能从文本生成动画图的语言"占据开发者心智（[re
 | JS 控制器 | **自研轻量播放器 < 2KB** | 仅用于 Steps 时序（class 切换），核心动画全在 CSS 中，不做 JS 属性插值，避免引入 GSAP/WAAPI 复杂度 |
 | 兼容性降级 | **三级 `CompatMode`**：Modern / Safe / Static | Modern 用 `transform-box:fill-box` 做缩放动画；Safe 仅 opacity+translate；Static 完全无动画 |
 | CSS 样式位置 | **SVG `<defs><style><![CDATA[...]]></style></defs>`** | 单文件自包含，双击 `.svg` 即有动画，`<img>` 嵌入也能播放，CSS 不是 HTML 专属 |
-| Remove 动画策略 | **双方案**：HTML Steps 用双图层叠加；SVG Patch 用保留元素 + `.dfy-exit` class | DOM 中不存在的元素无法播放动画（详见 [svg-embedding-design-impact.md §7](./svg-embedding-design-impact.md)） |
+| Remove 动画策略 | **双方案**：HTML Steps 用双图层叠加；SVG Patch 用保留元素 + `.pgm-exit` class | DOM 中不存在的元素无法播放动画（详见 [svg-embedding-design-impact.md §7](./svg-embedding-design-impact.md)） |
 
 ### 3.3 风险与缓解
 
@@ -126,7 +126,7 @@ D2 已用"唯一能从文本生成动画图的语言"占据开发者心智（[re
 | 大图（>100 节点）动画卡顿 | 中 | 中 | 仅动画 ChangeSet 涉及元素；大图降级为瞬时应用无过渡；CSS transform/opacity 走 GPU 合成层 |
 | DSL `steps` 与现有解析器冲突 | 低 | 中 | `steps` 作为保留关键字，仅在 `diagram_body` 内识别，不影响 entity/relation 解析 |
 | Studio `dangerouslySetInnerHTML` 全量替换导致动画期间重渲染 | 中 | 中 | 动画期间用 `useDeferredValue` 暂停 React 重渲染；JS 切 class 而非全量替换 SVG |
-| Remove 动画需保留旧节点 | 中 | 低 | 纯 SVG 导出时旧节点加 `.dfy-exit` class 淡出后 `visibility:hidden`；HTML/Studio 用 `animationend` 事件移除 DOM |
+| Remove 动画需保留旧节点 | 中 | 低 | 纯 SVG 导出时旧节点加 `.pgm-exit` class 淡出后 `visibility:hidden`；HTML/Studio 用 `animationend` 事件移除 DOM |
 
 ### 3.4 可行性结论
 
@@ -140,7 +140,7 @@ D2 已用"唯一能从文本生成动画图的语言"占据开发者心智（[re
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Drawify 动画产品矩阵                       │
+│                    Plotgram 动画产品矩阵                       │
 ├──────────────────┬──────────────────┬───────────────────────┤
 │  Patch 动画       │  参数化指令       │  Steps 动画系统        │
 │  (diff2 驱动)     │  (渲染参数)       │  (DSL steps: 块)       │
@@ -227,10 +227,10 @@ CSS 方案的优势在于一行全局媒体查询即可禁用所有动画，无�
 
 ```bash
 # Agent 生成初版
-drawify render v1.dfy -o v1.svg
+plotgram render v1.pgm -o v1.svg
 
 # 用户说"把认证服务移到右边"，Agent 生成 v2 + ChangeSet
-drawify render --transition v1.dfy v2.dfy \
+plotgram render --transition v1.pgm v2.pgm \
   --changes changeset.json \
   --duration 400 \
   -o transition.svg
@@ -243,7 +243,7 @@ drawify render --transition v1.dfy v2.dfy \
 Agent 一次性生成带 `steps:` 的 DSL，渲染为 HTML：
 
 ```bash
-drawify render steps.dfy --format html-animation -o demo.html
+plotgram render steps.pgm --format html-animation -o demo.html
 ```
 
 `demo.html` 可直接发给用户，浏览器打开即可播放。
@@ -251,7 +251,7 @@ drawify render steps.dfy --format html-animation -o demo.html
 #### 场景 C：Agent 用参数化指令高亮
 
 ```bash
-drawify render arch.dfy \
+plotgram render arch.pgm \
   --animate highlight:auth_service,flow:edge-3 \
   -o highlighted.svg
 ```
@@ -286,11 +286,11 @@ POST /api/v1/render/steps
 
 ```typescript
 // Studio 中调用 WASM
-const transitionSvg = drawify.renderWithTransition({
+const transitionSvg = plotgram.renderWithTransition({
   oldSource, newSource, changes, opts: { duration_ms: 400 }
 });
 
-const stepsHtml = drawify.renderSteps({
+const stepsHtml = plotgram.renderSteps({
   source, opts: { step_duration_ms: 800, autoplay: false }
 });
 ```
@@ -305,7 +305,7 @@ Studio 端额外提供：
 
 #### 写一个 Steps 演示
 
-```drawify
+```plotgram
 diagram flowchart {
     title: "用户认证流程"
     config { direction: left-to-right }
@@ -340,7 +340,7 @@ diagram flowchart {
 渲染命令：
 
 ```bash
-drawify render auth-flow.dfy --format html-animation -o auth-flow.html
+plotgram render auth-flow.pgm --format html-animation -o auth-flow.html
 ```
 
 打开 `auth-flow.html` 即可看到三步演示，帧间自动计算 diff 并播放过渡。
@@ -551,11 +551,11 @@ pub enum CompatMode {
 | 1.1 | SVG 元素 ID 注入 | `render/paint/scene_svg.rs`、`render/paint/standard.rs`、`render/paint/sequence.rs`、`render/paint/er.rs`、`render/paint/node.rs`、`render/paint/edge.rs` | 每个 `<g>` 节点带 `id="node-{id}"`，每条边带 `id="edge-{index}"` |
 | 1.2 | ExportScene 增加 `anchor_id` 字段 | `render/scene.rs`、[export-scene-spec.md](../specs/export-scene-spec.md) | 字段在 nodes/edges/groups 中出现，schema_version 升级 |
 | 1.3 | 新增动画模块 | `render/paint/animation.rs`（新文件） | 实现 `encode_animation_style()` 输出 `<defs><style>` 包含 `@keyframes` + class 定义；实现 `encode_transition()` 为变更元素注入初始状态 class |
-| 1.4 | ChangeSet → CSS class 映射 | `render/paint/animation.rs` | Add→`.dfy-enter`(opacity:0;scale:0→1)、Remove→`.dfy-exit`(opacity:1→0)、Modify位置→初始`transform:translate()` + `.dfy-move`(transition)、Modify属性→`transition:fill/stroke`、边路径变更→交叉淡入淡出（旧边`.dfy-fade-out`+新边`.dfy-fade-in`） |
+| 1.4 | ChangeSet → CSS class 映射 | `render/paint/animation.rs` | Add→`.pgm-enter`(opacity:0;scale:0→1)、Remove→`.pgm-exit`(opacity:1→0)、Modify位置→初始`transform:translate()` + `.pgm-move`(transition)、Modify属性→`transition:fill/stroke`、边路径变更→交叉淡入淡出（旧边`.pgm-fade-out`+新边`.pgm-fade-in`） |
 | 1.5 | 扩展 RenderRequest | `render/request.rs` | 增加 `animation`、`edge_flow`、`compat_mode` 字段 |
-| 1.6 | CLI 暴露过渡接口 | `drawify-cli` | `drawify render --transition old.dfy new.dfy --changes c.json -o out.svg` |
-| 1.7 | Server 暴露过渡接口 | `drawify-server` | `POST /api/v1/render` 支持 `animation` 字段 |
-| 1.8 | WASM 暴露过渡接口 | `drawify-wasm` | `renderWithTransition(oldSource, newSource, changes, opts)` |
+| 1.6 | CLI 暴露过渡接口 | `plotgram-cli` | `plotgram render --transition old.pgm new.pgm --changes c.json -o out.svg` |
+| 1.7 | Server 暴露过渡接口 | `plotgram-server` | `POST /api/v1/render` 支持 `animation` 字段 |
+| 1.8 | WASM 暴露过渡接口 | `plotgram-wasm` | `renderWithTransition(oldSource, newSource, changes, opts)` |
 | 1.9 | 兼容性降级 | `render/paint/animation.rs` | `CompatMode::Safe` 时不输出 scale 动画（仅 opacity+translate）；`Static` 时无 `<style>` 动画块 |
 | 1.10 | 可访问性 | `render/paint/svg_utils.rs` | SVG `<style>` 内嵌 `@media (prefers-reduced-motion: reduce)` 全局禁用动画 |
 | 1.11 | 确定性保证 | `render/paint/animation.rs` | 动画 class 注入按 ChangeSet 的 changes 顺序（Vec，非 HashMap）；@keyframes 定义顺序固定；不依赖排序不稳定的容器 |
@@ -564,8 +564,8 @@ pub enum CompatMode {
 **验收 Demo**：
 
 ```bash
-# 准备 v1.dfy（A -> B）和 v2.dfy（A -> B -> C），以及 changeset.json
-drawify render --transition v1.dfy v2.dfy --changes changeset.json -o out.svg
+# 准备 v1.pgm（A -> B）和 v2.pgm（A -> B -> C），以及 changeset.json
+plotgram render --transition v1.pgm v2.pgm --changes changeset.json -o out.svg
 # out.svg 双击打开，C 节点通过 CSS @keyframes 弹性缩放+淡入出现，A/B 位置通过 CSS transition 平滑过渡
 ```
 
@@ -579,14 +579,14 @@ drawify render --transition v1.dfy v2.dfy --changes changeset.json -o out.svg
 |---|------|----------|
 | 2.1 | `AnimationDirective` 枚举与 CSS class 注入 | `render/paint/animation.rs` |
 | 2.2 | 边线数据流 CSS keyframes | `render/paint/svg_utils.rs`（`<style>` 内嵌） |
-| 2.3 | CLI 支持 `--animate` flag | `drawify-cli` |
-| 2.4 | Server 支持 `animation.kind: Directives` | `drawify-server` |
+| 2.3 | CLI 支持 `--animate` flag | `plotgram-cli` |
+| 2.4 | Server 支持 `animation.kind: Directives` | `plotgram-server` |
 | 2.5 | Studio 前端增加动画参数 UI | `studio/` |
 
 **验收 Demo**：
 
 ```bash
-drawify render arch.dfy --animate highlight:auth,flow:edge-2 -o out.svg
+plotgram render arch.pgm --animate highlight:auth,flow:edge-2 -o out.svg
 # out.svg 中 auth 节点高亮，edge-2 边线数据流动
 ```
 
@@ -607,15 +607,15 @@ drawify render arch.dfy --animate highlight:auth,flow:edge-2 -o out.svg
 | 3.7 | HTML 自包含导出编码器 | `render/encode/html_animation.rs`（新文件） | 输出自包含 HTML，内嵌 SVG 帧 + CSS 动画样式 + JS 播放器 |
 | 3.8 | 纯 SVG Steps 导出（无 JS） | `render/encode/mod.rs` | 可选导出纯 SVG 版 Steps，用 CSS `:target` 伪类或 SVG 内 `<rect>` 按钮做最简帧切换，可嵌入 GitHub/Notion |
 | 3.9 | 轻量 JS 播放器（< 2KB） | 内嵌于 HTML 导出 | JS 仅做 class 切换触发 CSS 过渡，不做属性插值；支持上一步/下一步/自动播放/跳转 |
-| 3.10 | CLI 支持 `--format html-animation` | `drawify-cli` |
-| 3.11 | Server 支持 `POST /api/v1/render/steps` | `drawify-server` |
-| 3.12 | WASM 支持 `renderSteps` | `drawify-wasm` |
+| 3.10 | CLI 支持 `--format html-animation` | `plotgram-cli` |
+| 3.11 | Server 支持 `POST /api/v1/render/steps` | `plotgram-server` |
+| 3.12 | WASM 支持 `renderSteps` | `plotgram-wasm` |
 | 3.13 | DSL 语法文档更新 | [language-spec.md](../specs/language-spec.md)、[dsl-writing-manual.md](../specs/dsl-writing-manual.md) |
 
 **验收 Demo**：
 
 ```bash
-drawify render auth-flow.dfy --format html-animation -o demo.html
+plotgram render auth-flow.pgm --format html-animation -o demo.html
 # demo.html 双击打开，浏览器中可点击"下一步/上一步/自动播放"
 ```
 
@@ -675,14 +675,14 @@ drawify render auth-flow.dfy --format html-animation -o demo.html
 
 ### 8.1 阶段一交付物（最小可行）
 
-- [ ] `crates/drawify-core/src/render/paint/animation.rs`（新文件）
-- [ ] `crates/drawify-core/src/render/paint/scene_svg.rs` 修改：注入元素 ID
-- [ ] `crates/drawify-core/src/render/paint/{standard,sequence,er}.rs` 修改：paint 函数注入 id
-- [ ] `crates/drawify-core/src/render/scene.rs` 修改：ExportNode/ExportEdge/ExportGroup 增加 `anchor_id`
-- [ ] `crates/drawify-core/src/render/request.rs` 修改：增加 `animation` / `edge_flow` / `compat_mode`
-- [ ] `crates/drawify-cli` 修改：`--transition` / `--animate` flag
-- [ ] `crates/drawify-server` 修改：`/api/v1/render` 支持 `animation` 字段
-- [ ] `crates/drawify-wasm` 修改：`renderWithTransition` 函数
+- [ ] `crates/plotgram-core/src/render/paint/animation.rs`（新文件）
+- [ ] `crates/plotgram-core/src/render/paint/scene_svg.rs` 修改：注入元素 ID
+- [ ] `crates/plotgram-core/src/render/paint/{standard,sequence,er}.rs` 修改：paint 函数注入 id
+- [ ] `crates/plotgram-core/src/render/scene.rs` 修改：ExportNode/ExportEdge/ExportGroup 增加 `anchor_id`
+- [ ] `crates/plotgram-core/src/render/request.rs` 修改：增加 `animation` / `edge_flow` / `compat_mode`
+- [ ] `crates/plotgram-cli` 修改：`--transition` / `--animate` flag
+- [ ] `crates/plotgram-server` 修改：`/api/v1/render` 支持 `animation` 字段
+- [ ] `crates/plotgram-wasm` 修改：`renderWithTransition` 函数
 - [ ] `docs/specs/export-scene-spec.md` 更新：`anchor_id` 字段、schema_version 升级
 - [ ] `benchmarks/` 新增：动画性能基准测试
 - [ ] 单元测试：ChangeSet → CSS class 映射的每个分支（Add/Remove/Modify 对应正确 class）
@@ -690,13 +690,13 @@ drawify render auth-flow.dfy --format html-animation -o demo.html
 
 ### 8.2 阶段三交付物（Steps 系统）
 
-- [ ] `crates/drawify-core/src/ast.rs` 修改：`Diagram.steps` + `Step` 结构
-- [ ] `crates/drawify-core/src/lexer.rs` 修改：`steps` / `as` 关键字
-- [ ] `crates/drawify-core/src/parser.rs` 修改：`steps:` 块解析
-- [ ] `crates/drawify-core/src/validation/` 修改：S17-S21 约束
-- [ ] `crates/drawify-core/src/diff2/diff.rs` 修改：Step 间 diff
-- [ ] `crates/drawify-core/src/render/encode/html_animation.rs`（新文件）
-- [ ] `crates/drawify-core/src/render/encode/mod.rs` 修改：注册 `HtmlAnimation` 格式
+- [ ] `crates/plotgram-core/src/ast.rs` 修改：`Diagram.steps` + `Step` 结构
+- [ ] `crates/plotgram-core/src/lexer.rs` 修改：`steps` / `as` 关键字
+- [ ] `crates/plotgram-core/src/parser.rs` 修改：`steps:` 块解析
+- [ ] `crates/plotgram-core/src/validation/` 修改：S17-S21 约束
+- [ ] `crates/plotgram-core/src/diff2/diff.rs` 修改：Step 间 diff
+- [ ] `crates/plotgram-core/src/render/encode/html_animation.rs`（新文件）
+- [ ] `crates/plotgram-core/src/render/encode/mod.rs` 修改：注册 `HtmlAnimation` 格式
 - [ ] `docs/specs/language-spec.md` 更新：`steps:` 语法、保留字、约束
 - [ ] `docs/specs/ast-spec.md` 更新：`Diagram.steps` + `Step` 结构
 - [ ] `docs/specs/dsl-writing-manual.md` 更新：Steps 用法示例
@@ -717,7 +717,7 @@ drawify render auth-flow.dfy --format html-animation -o demo.html
 | [export-scene-spec.md](../specs/export-scene-spec.md) | 本方案新增 `anchor_id` 字段 |
 | [layout-refinement-todo.md](../architecture/intent/layout-refinement-todo.md) | 动画工作在 Layout Intent MVP 完成后启动 |
 | [cytoscape-js-research.md](../architecture/参考资料/cytoscape-js-research.md) | "静态导出，非交互探索"——本方案的交互动画限定为导出 SVG 自带的轻交互 |
-| [diff2/README.md](../../crates/drawify-core/src/diff2/README.md) | `ChangeSet` 是 Patch 动画的语义源 |
+| [diff2/README.md](../../crates/plotgram-core/src/diff2/README.md) | `ChangeSet` 是 Patch 动画的语义源 |
 | [AGENTS.md](../../AGENTS.md) | 遵守 §1 无向后兼容（直接改 AST/DSL）、§2 确定性迭代（动画编排用 Vec 不用 HashMap） |
 
 ---

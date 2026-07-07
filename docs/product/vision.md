@@ -1,10 +1,10 @@
-# Drawify 项目愿景与定位
+# Plotgram 项目愿景与定位
 
 ## 一句话定位
 
-> **Drawify 是面向 AI Agent 的原生图表描述语言与渲染引擎。**
+> **Plotgram 是面向 AI Agent 的原生图表描述语言与渲染引擎。**
 
-Drawify 不是 Mermaid 的替代品，而是一种为 AI 生成场景从零设计的图表语言。它解决的核心问题是：当 LLM 需要生成图表时，现有工具的语法对机器不友好。
+Plotgram 不是 Mermaid 的替代品，而是一种为 AI 生成场景从零设计的图表语言。它解决的核心问题是：当 LLM 需要生成图表时，现有工具的语法对机器不友好。
 
 ---
 
@@ -36,7 +36,7 @@ AI 时代的需求是**"机器书写，机器渲染，人类阅读"**。
 
 ---
 
-## Drawify 的核心理念
+## Plotgram 的核心理念
 
 ### 1. 第一用户是 AI Agent
 
@@ -49,11 +49,11 @@ AI 时代的需求是**"机器书写，机器渲染，人类阅读"**。
 
 人类和 AI 画图的思维过程都是：**先有关系，后有布局**。
 
-Drawify 只要求 Agent 表达"实体"和"关系"，布局完全由引擎智能推断。Agent 不需要（也不应该）关心节点坐标、连线弯曲方式等视觉细节。
+Plotgram 只要求 Agent 表达"实体"和"关系"，布局完全由引擎智能推断。Agent 不需要（也不应该）关心节点坐标、连线弯曲方式等视觉细节。
 
 ### 3. 结构化可编程
 
-Drawify 的 AST 是一等公民：
+Plotgram 的 AST 是一等公民：
 - 可以序列化为 JSON，供程序消费
 - 支持语义级别的 Diff 和 Patch
 - 可以被另一个 Agent 读取、理解、修改
@@ -66,9 +66,9 @@ Drawify 的 AST 是一等公民：
 
 | 用户 | 使用方式 |
 |------|----------|
-| AI Agent | 生成 Drawify 文本 → 调用渲染 API → 展示给用户 |
-| LLM 应用开发者 | 在 Prompt 中要求输出 Drawify → 嵌入渲染组件 |
-| IDE / 编辑器插件 | 实时预览 .dfy 文件 |
+| AI Agent | 生成 Plotgram 文本 → 调用渲染 API → 展示给用户 |
+| LLM 应用开发者 | 在 Prompt 中要求输出 Plotgram → 嵌入渲染组件 |
+| IDE / 编辑器插件 | 实时预览 .pgm 文件 |
 
 ### 间接用户（图表消费者）
 
@@ -82,7 +82,7 @@ Drawify 的 AST 是一等公民：
 
 ## 产品边界
 
-### Drawify 做什么
+### Plotgram 做什么
 
 - 定义一套简洁、无歧义的图表描述语法
 - 提供可靠的解析器（文本 → AST）
@@ -90,10 +90,10 @@ Drawify 的 AST 是一等公民：
 - 提供结构化错误反馈（供 Agent 自我修正）
 - 提供 AST 的语义 Diff 能力
 
-### Drawify 不做什么
+### Plotgram 不做什么
 
 - 不实现交互式图表编辑器（那是前端的事）
-- 不实现 LLM 本身（Drawify 是 LLM 的输出格式）
+- 不实现 LLM 本身（Plotgram 是 LLM 的输出格式）
 - 不强制绑定特定前端框架（提供 SVG/JSON，任意框架可消费）
 - 不支持手绘风格（那是 Excalidraw 的定位）
 
@@ -103,7 +103,7 @@ Drawify 的 AST 是一等公民：
 
 ### 短期（MVP 验证）
 
-- LLM 生成 Drawify 的正确率 > 95%（对比 Mermaid 的 70-80%）
+- LLM 生成 Plotgram 的正确率 > 95%（对比 Mermaid 的 70-80%）
 - 语法错误时，Agent 可以根据错误反馈在 1 次重试内修复
 
 ### 中期（产品可用）
@@ -115,7 +115,7 @@ Drawify 的 AST 是一等公民：
 ### 长期（生态建设）
 
 - 成为 AI Agent 生成图表的事实标准格式
-- 建立 Drawify 的 schema 注册表（自定义图表类型扩展）
+- 建立 Plotgram 的 schema 注册表（自定义图表类型扩展）
 - 开源社区活跃贡献者 > 50
 
 ---
@@ -123,14 +123,14 @@ Drawify 的 AST 是一等公民：
 ## 技术路线概览
 
 ```
-drawify-core（共享核心）
+plotgram-core（共享核心）
 ├── parser    — 文本 → AST
 ├── validation — AST 语义验证
 └── renderer  — AST → SVG/JSON/PNG
 
-drawify-cli    — 命令行工具（本地文件处理）
-drawify-server — Web API（远程渲染服务）
-drawify-wasm   — WASM 包（浏览器内渲染）
+plotgram-cli    — 命令行工具（本地文件处理）
+plotgram-server — Web API（远程渲染服务）
+plotgram-wasm   — WASM 包（浏览器内渲染）
 ```
 
 详见 [技术栈说明](../specs/README.md)。

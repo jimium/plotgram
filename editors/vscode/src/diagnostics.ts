@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { isNodeWasmAvailable, validateSource } from './wasm/node';
 
-const DIAGNOSTIC_SOURCE = 'drawify';
+const DIAGNOSTIC_SOURCE = 'plotgram';
 const LINE_COL_RE = /\[line (\d+):(\d+)\]/;
 
 function cleanMessage(message: string): string {
@@ -23,7 +23,7 @@ function toDiagnostic(message: string, severity: vscode.DiagnosticSeverity): vsc
   return new vscode.Diagnostic(range, text, severity);
 }
 
-export class DrawifyDiagnostics {
+export class PlotgramDiagnostics {
   private readonly collection = vscode.languages.createDiagnosticCollection(DIAGNOSTIC_SOURCE);
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -47,7 +47,7 @@ export class DrawifyDiagnostics {
   }
 
   private schedule(document: vscode.TextDocument): void {
-    if (document.languageId !== 'drawify') {
+    if (document.languageId !== 'plotgram') {
       return;
     }
 
@@ -76,7 +76,7 @@ export class DrawifyDiagnostics {
       this.collection.set(document.uri, [
         new vscode.Diagnostic(
           new vscode.Range(0, 0, 0, 1),
-          'Drawify WASM 未构建，请执行 npm run build:wasm',
+          'Plotgram WASM 未构建，请执行 npm run build:wasm',
           vscode.DiagnosticSeverity.Warning,
         ),
       ]);

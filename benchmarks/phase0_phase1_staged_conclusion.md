@@ -48,7 +48,7 @@ Phase 0（校准数据积累）、Phase 1（V1 诊断模式）、Phase 1.5（度
 1. **替换 RUDY** → 正交通道占用度（r = 0.01 → r = 0.23），消除度量-路由器脱钩。
 2. **分组校准权重** → 按布局族（层次 / 力导向 / 放射）分别拟合权重 + z-score 校准参数。
 3. **补充 Spearman** → 应对 `edge_node_crossings` 69% 稀疏零值。
-4. **扩样至 792** → 新增 `benchmarks/friendliness_stress/`（158 个合成 .dfy，12+ 拓扑类型）。
+4. **扩样至 792** → 新增 `benchmarks/friendliness_stress/`（158 个合成 .pgm，12+ 拓扑类型）。
 5. **z-score 归一化** → 替代软饱和 `x/(x+threshold)`，保留完整动态范围。
 6. **Bug 修复** → congestion.rs `enumerate()` 解构顺序错误（200+ panic 根因）；metrics.rs/crossing_predict.rs 度量不一致（margin 膨胀差异）。
 
@@ -79,13 +79,13 @@ Phase 0（校准数据积累）、Phase 1（V1 诊断模式）、Phase 1.5（度
 
 ### 2.1 实施内容
 
-1. 扩展 [drawify-eval/src/metrics.rs](../crates/drawify-eval/src/metrics.rs) 的 `LayoutMetrics`，新增 5 个候选预测度量（均带 `#[serde(default)]` 以兼容旧 benchmark JSON）：
+1. 扩展 [plotgram-eval/src/metrics.rs](../crates/plotgram-eval/src/metrics.rs) 的 `LayoutMetrics`，新增 5 个候选预测度量（均带 `#[serde(default)]` 以兼容旧 benchmark JSON）：
    - `channel_congestion`（RUDY 密度图峰值/中位数）
    - `long_edge_count`（Sugiyama rank 跨度 > 1 的边数）
    - `group_gap_deficit`（group 对间距不足累计）
    - `predicted_crossings`（线段-AABB 穿障预测）
    - `port_conflict_score`（端口槽位冲突度）
-2. 新增 [drawify-eval/src/bin/friendliness-correlate.rs](../crates/drawify-eval/src/bin/friendliness-correlate.rs) 校准二进制：扫描 showcase，对每个 .dfy 跑所有适用布局算法，计算 Pearson 相关系数与权重推荐。
+2. 新增 [plotgram-eval/src/bin/friendliness-correlate.rs](../crates/plotgram-eval/src/bin/friendliness-correlate.rs) 校准二进制：扫描 showcase，对每个 .pgm 跑所有适用布局算法，计算 Pearson 相关系数与权重推荐。
 
 ### 2.2 度量相关性（179 样本）
 
@@ -129,7 +129,7 @@ Phase 0（校准数据积累）、Phase 1（V1 诊断模式）、Phase 1.5（度
 
 ### 3.1 实施内容
 
-1. **新增 [layout/friendliness/](../crates/drawify-core/src/layout/friendliness/) 模块**（6 个文件）：
+1. **新增 [layout/friendliness/](../crates/plotgram-core/src/layout/friendliness/) 模块**（6 个文件）：
    - `mod.rs`：`RoutingFriendlinessEvaluator` + `FriendlinessReport` + `Hotspot` + `FriendlinessWeights`
    - `congestion.rs`：RUDY 密度图（GRID_RES=50，score = peak/median）
    - `long_edge.rs`：长边跨层度（消费 `LayoutHints.sugiyama_ranks`）
@@ -137,9 +137,9 @@ Phase 0（校准数据积累）、Phase 1（V1 诊断模式）、Phase 1.5（度
    - `crossing_predict.rs`：穿障预测（复用 `refine::segment_intersects_aabb`）
    - `port_conflict.rs`：端口冲突度（SLOT_PITCH=40.0，按邻居方向预测边分配）
 2. **扩展 `LayoutHints`**：新增 `sugiyama_ranks: Option<HashMap<String, usize>>` 与 `friendliness_report: Option<FriendlinessReport>`。
-3. **导出 Sugiyama ranks**：在 [sugiyama_v2/engine.rs](../crates/drawify-core/src/layout/node/sugiyama_v2/engine.rs) 的 `assign_ranks_network_simplex_style` 后，将 `dag[node]`（entity id）→ rank 映射写入 hints。
-4. **集成评估器**：在 [layout/mod.rs](../crates/drawify-core/src/layout/mod.rs) 的 `compute_layout_with_plan` 中、`router.route` 之前调用评估器，报告写入 `result.hints.friendliness_report`。
-5. **扩展 `EvalResult`**：在 [drawify-eval/src/engine.rs](../crates/drawify-eval/src/engine.rs) 新增 `friendliness_score: f64`，从 `layout.hints.friendliness_report` 读取。
+3. **导出 Sugiyama ranks**：在 [sugiyama_v2/engine.rs](../crates/plotgram-core/src/layout/node/sugiyama_v2/engine.rs) 的 `assign_ranks_network_simplex_style` 后，将 `dag[node]`（entity id）→ rank 映射写入 hints。
+4. **集成评估器**：在 [layout/mod.rs](../crates/plotgram-core/src/layout/mod.rs) 的 `compute_layout_with_plan` 中、`router.route` 之前调用评估器，报告写入 `result.hints.friendliness_report`。
+5. **扩展 `EvalResult`**：在 [plotgram-eval/src/engine.rs](../crates/plotgram-eval/src/engine.rs) 新增 `friendliness_score: f64`，从 `layout.hints.friendliness_report` 读取。
 6. **复合分数归一化**：V1 评估器对每个子分数做 `/threshold.min(1.0)` 归一化后加权求和，避免大尺度度量（如 port_conflict 0-710）淹没小尺度度量。
 
 ### 3.2 V1 评估器相关性
@@ -237,7 +237,7 @@ Phase 1.5 已完成全部 5 项改进（详见 §1 执行摘要），并修复 2
 
 ### 6.4 扩样至 792
 
-新增 [benchmarks/friendliness_stress/](./friendliness_stress/) 目录（158 个合成 .dfy），覆盖 12+ 拓扑类型：chain / grid / star / bipartite / tree / dag / multigroup / hublayer / dense / wide-layer / state-cycle / er-schema / ring / path-shortcuts / dual-hub / sparse-layer。
+新增 [benchmarks/friendliness_stress/](./friendliness_stress/) 目录（158 个合成 .pgm），覆盖 12+ 拓扑类型：chain / grid / star / bipartite / tree / dag / multigroup / hublayer / dense / wide-layer / state-cycle / er-schema / ring / path-shortcuts / dual-hub / sparse-layer。
 
 样本从 179 扩至 **792**（74 showcase + 158 stress × 各图类型适用布局算法），超过 500 目标。
 
@@ -288,7 +288,7 @@ Phase 2 已完成 V2 反馈模式实施，验收通过。
 
 ### 8.1 实施内容
 
-1. **V2 调整器** [layout/friendliness/adjuster.rs](../crates/drawify-core/src/layout/friendliness/adjuster.rs)：
+1. **V2 调整器** [layout/friendliness/adjuster.rs](../crates/plotgram-core/src/layout/friendliness/adjuster.rs)：
    - `FriendlinessAdjuster` 在 V1 评估后、路由前对预测穿障热点做局部节点位移。
    - **法线推送**：沿穿障边段的法线方向推开中间节点（复用 refine.rs 思路）。
    - **多轮迭代**：最多 5 轮，每轮重新评估，若 `predicted_crossings` 未减少则回退。
@@ -302,17 +302,17 @@ Phase 2 已完成 V2 反馈模式实施，验收通过。
    - 否则回退到基线，确保 V2 永远不会让布局变差。
 
 3. **穿障检测对齐**：
-   - 将 `segment_intersects_node`（0.5px 容差，边-边交叉 + 端点包含）提取到 [refine.rs](../crates/drawify-core/src/layout/refine.rs) 作为共享函数。
+   - 将 `segment_intersects_node`（0.5px 容差，边-边交叉 + 端点包含）提取到 [refine.rs](../crates/plotgram-core/src/layout/refine.rs) 作为共享函数。
    - 评估器 `metrics::segment_intersects_rect` 委托到 `refine::segment_intersects_node`。
    - V2 验证 `count_actual_edge_node_crossings` 使用同一函数。
    - 消除了评估器与 V2 验证之间因算法差异（slab method vs 边-边交叉）导致的判定不一致。
 
-4. **管道集成** [layout/mod.rs](../crates/drawify-core/src/layout/mod.rs)：
+4. **管道集成** [layout/mod.rs](../crates/plotgram-core/src/layout/mod.rs)：
    - V2 调整器在 V1 评估后、`router.route` 前执行。
    - 路由后验证在 `refine::run_refine` 后执行。
-   - 环境变量 `DRAWIFY_NO_V2_ADJUST=1` 可禁用 V2（供 A/B 评估对比）。
+   - 环境变量 `PLOTGRAM_NO_V2_ADJUST=1` 可禁用 V2（供 A/B 评估对比）。
 
-5. **V2 效果评估二进制** [v2-effectiveness.rs](../crates/drawify-eval/src/bin/v2-effectiveness.rs)：
+5. **V2 效果评估二进制** [v2-effectiveness.rs](../crates/plotgram-eval/src/bin/v2-effectiveness.rs)：
    - 对比 V2 开启/关闭时的 `edge_node_crossings`、`node_overlap_pairs`、`predicted_crossings`。
    - 输出总体验收、逐样本改善分布、分族统计、改善最大/上升样本详情。
 
@@ -431,19 +431,19 @@ barycenter 启发式对长边权重扰动高度敏感：w=1.3 → enc +11.7%，w
 | Phase 1.5 相关性报告 | [benchmarks/phase1_5_correlation.md](./phase1_5_correlation.md) | ✅ |
 | Phase 2 V2 效果报告 | [benchmarks/phase2_v2_effectiveness.md](./phase2_v2_effectiveness.md) | ✅ |
 | Phase 3 V3 效果报告 | [benchmarks/phase3_v3_effectiveness.md](./phase3_v3_effectiveness.md) | ✅ |
-| Phase 0/1 校准二进制 | [crates/drawify-eval/src/bin/friendliness-correlate.rs](../crates/drawify-eval/src/bin/friendliness-correlate.rs) | ✅ |
-| Phase 2 V2 效果二进制 | [crates/drawify-eval/src/bin/v2-effectiveness.rs](../crates/drawify-eval/src/bin/v2-effectiveness.rs) | ✅ |
-| LayoutMetrics 扩展 | [crates/drawify-eval/src/metrics.rs](../crates/drawify-eval/src/metrics.rs) | ✅ |
-| V1 评估器模块 | [crates/drawify-core/src/layout/friendliness/](../crates/drawify-core/src/layout/friendliness/) | ✅ 7 文件 |
-| V2 调整器 | [crates/drawify-core/src/layout/friendliness/adjuster.rs](../crates/drawify-core/src/layout/friendliness/adjuster.rs) | ✅ |
-| V3 force-directed RUDY 拥堵排斥力 | [crates/drawify-core/src/layout/node/force_directed.rs](../crates/drawify-core/src/layout/node/force_directed.rs) `CongestionGrid` | ✅ |
-| V3 architecture-v2 per-pair 通道间距 | [crates/drawify-core/src/layout/node/architecture_v2/two_phase.rs](../crates/drawify-core/src/layout/node/architecture_v2/two_phase.rs) `pair_edge_counts` | ✅ |
-| V3 Sugiyama barycenter 长边权重 | [crates/drawify-core/src/layout/node/sugiyama_v2/order.rs](../crates/drawify-core/src/layout/node/sugiyama_v2/order.rs) `weighted_median_stats` | ✅ 代码已实现，w=1.0 禁用 |
-| 穿障检测共享函数 | [crates/drawify-core/src/layout/refine.rs](../crates/drawify-core/src/layout/refine.rs) `segment_intersects_node` | ✅ |
-| LayoutHints 扩展 | [crates/drawify-core/src/layout/mod.rs](../crates/drawify-core/src/layout/mod.rs) | ✅ |
-| Sugiyama rank 导出 | [crates/drawify-core/src/layout/node/sugiyama_v2/engine.rs](../crates/drawify-core/src/layout/node/sugiyama_v2/engine.rs) | ✅ |
-| EvalResult 扩展 | [crates/drawify-eval/src/engine.rs](../crates/drawify-eval/src/engine.rs) | ✅ |
-| Phase 1.5 压力样本 | [benchmarks/friendliness_stress/](./friendliness_stress/) | ✅ 158 .dfy |
+| Phase 0/1 校准二进制 | [crates/plotgram-eval/src/bin/friendliness-correlate.rs](../crates/plotgram-eval/src/bin/friendliness-correlate.rs) | ✅ |
+| Phase 2 V2 效果二进制 | [crates/plotgram-eval/src/bin/v2-effectiveness.rs](../crates/plotgram-eval/src/bin/v2-effectiveness.rs) | ✅ |
+| LayoutMetrics 扩展 | [crates/plotgram-eval/src/metrics.rs](../crates/plotgram-eval/src/metrics.rs) | ✅ |
+| V1 评估器模块 | [crates/plotgram-core/src/layout/friendliness/](../crates/plotgram-core/src/layout/friendliness/) | ✅ 7 文件 |
+| V2 调整器 | [crates/plotgram-core/src/layout/friendliness/adjuster.rs](../crates/plotgram-core/src/layout/friendliness/adjuster.rs) | ✅ |
+| V3 force-directed RUDY 拥堵排斥力 | [crates/plotgram-core/src/layout/node/force_directed.rs](../crates/plotgram-core/src/layout/node/force_directed.rs) `CongestionGrid` | ✅ |
+| V3 architecture-v2 per-pair 通道间距 | [crates/plotgram-core/src/layout/node/architecture_v2/two_phase.rs](../crates/plotgram-core/src/layout/node/architecture_v2/two_phase.rs) `pair_edge_counts` | ✅ |
+| V3 Sugiyama barycenter 长边权重 | [crates/plotgram-core/src/layout/node/sugiyama_v2/order.rs](../crates/plotgram-core/src/layout/node/sugiyama_v2/order.rs) `weighted_median_stats` | ✅ 代码已实现，w=1.0 禁用 |
+| 穿障检测共享函数 | [crates/plotgram-core/src/layout/refine.rs](../crates/plotgram-core/src/layout/refine.rs) `segment_intersects_node` | ✅ |
+| LayoutHints 扩展 | [crates/plotgram-core/src/layout/mod.rs](../crates/plotgram-core/src/layout/mod.rs) | ✅ |
+| Sugiyama rank 导出 | [crates/plotgram-core/src/layout/node/sugiyama_v2/engine.rs](../crates/plotgram-core/src/layout/node/sugiyama_v2/engine.rs) | ✅ |
+| EvalResult 扩展 | [crates/plotgram-eval/src/engine.rs](../crates/plotgram-eval/src/engine.rs) | ✅ |
+| Phase 1.5 压力样本 | [benchmarks/friendliness_stress/](./friendliness_stress/) | ✅ 158 .pgm |
 | 本阶段性结论 | [benchmarks/phase0_phase1_staged_conclusion.md](./phase0_phase1_staged_conclusion.md) | ✅ |
 
 ---

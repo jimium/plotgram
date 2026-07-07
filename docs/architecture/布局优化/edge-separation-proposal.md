@@ -1,10 +1,10 @@
 # 正交边路由：边间距（Edge Separation）方案
 
 > 日期：2026-06-28
-> 范围：`crates/drawify-core/src/layout/edge/edge_routing_orthogonal/`
+> 范围：`crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/`
 > 状态：X-0 完成，待执行 X-1（多轮冲突消解重路由）
 > 前置阶段：P0(Group-Aware Side Selection) + P1(Routing Channel Fixes) + A(Slot Replanning) 已完成
-> 验证用例：`showcase/architecture/c.layout-stress-nested.dfy`、`c.k8s-tenant-isolation.dfy`、`c.ai-agent-docops-pipeline.dfy`
+> 验证用例：`showcase/architecture/c.layout-stress-nested.pgm`、`c.k8s-tenant-isolation.pgm`、`c.ai-agent-docops-pipeline.pgm`
 
 ---
 
@@ -121,9 +121,9 @@
 **目标**：在不修改路由逻辑的前提下，增加重合量化统计和硬检测函数。
 
 **涉及文件**：
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/scoring.rs`
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs`
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/context.rs`
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs`
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs`
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/context.rs`
 
 **任务清单**：
 
@@ -166,9 +166,9 @@
 **目标**：路由完成后，迭代检测冲突→按优先级重路由冲突边，将其他已路由边视为硬障碍，直到收敛或达到最大轮次。
 
 **涉及文件**：
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/scoring.rs`
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs`
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/path.rs`
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs`
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs`
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/path.rs`
 
 **前置依赖**：阶段 X-0 完成。
 
@@ -249,7 +249,7 @@
 **目标**：对于X-1多轮重路由后仍无法消除的少量残余重合（拓扑约束导致确实没有足够空间），用几何轻推（nudge）局部推开。
 
 **涉及文件**：
-- 新建 `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/nudge.rs`
+- 新建 `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/nudge.rs`
 - `mod.rs` 增加调用
 
 **前置依赖**：阶段 X-1 完成，确认残余冲突数量。
@@ -314,8 +314,8 @@ X-0 → X-1 → 视觉验证 → （如残留重合）→ X-2 → 视觉验证 �
 ```
 
 每个阶段**独立可测试**，完成一个阶段后必须：
-1. `cargo test --release -p drawify-core --lib` 全部通过（872）
-2. 三个验证用例benchmark：`cargo run --release -p drawify-core --bin bench-phases -- <file> 5`
+1. `cargo test --release -p plotgram-core --lib` 全部通过（872）
+2. 三个验证用例benchmark：`cargo run --release -p plotgram-core --bin bench-phases -- <file> 5`
 3. 确定性验证：同一输入连续5次md5相同
 4. 记录性能数据到本文档的"实施记录"章节
 5. 视觉验证：渲染PNG人工检查重合是否消除/改善
@@ -346,9 +346,9 @@ X-0 → X-1 → 视觉验证 → （如残留重合）→ X-2 → 视觉验证 �
 
 | 用例 | 当前中位数 | X-1目标 | X-2目标 |
 |------|-----------|---------|---------|
-| c.layout-stress-nested.dfy | 2.65ms | ≤4ms | ≤4.5ms |
-| c.k8s-tenant-isolation.dfy | 10.24ms | ≤15ms | ≤16ms |
-| c.ai-agent-docops-pipeline.dfy | 3.66ms | ≤5.5ms | ≤6ms |
+| c.layout-stress-nested.pgm | 2.65ms | ≤4ms | ≤4.5ms |
+| c.k8s-tenant-isolation.pgm | 10.24ms | ≤15ms | ≤16ms |
+| c.ai-agent-docops-pipeline.pgm | 3.66ms | ≤5.5ms | ≤6ms |
 
 如果X-1阶段性能超出预算，优先检查：
 1. reroute轮次是否过多（默认≤3轮）

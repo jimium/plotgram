@@ -1,7 +1,7 @@
 # 全量架构图基准测试对比报告
 
 ## 测试范围
-- 22 个架构图文件（`showcase/architecture/*.dfy`）
+- 22 个架构图文件（`showcase/architecture/*.pgm`）
 - 每文件 5 轮 warm-cache 测试，取中位数
 - release build
 
@@ -16,7 +16,7 @@
 | c.ai-agent-docops-pipeline | 17 | 2.9ms | 3.0ms | 1.0x | 不变 | 不变 | 不变 |
 | c.cloud-native | 14 | 17.8ms | 9.1ms | 2.0x | 不变 | 不变 | 不变 |
 | c.data-lineage-platform | 20 | 5.7ms | 5.7ms | 1.0x | 不变 | 不变 | 不变 |
-| c.drawify-core-mod-deps | 29 | 162.1ms | 40.9ms | **4.0x** | 不变 | 不变 | +2 |
+| c.plotgram-core-mod-deps | 29 | 162.1ms | 40.9ms | **4.0x** | 不变 | 不变 | +2 |
 | c.ecommerce-platform | 19 | 31.4ms | 26.0ms | 1.2x | -0.08 | -4 | +1 |
 | c.hybrid-cloud-dr-topology | 24 | 6.1ms | 6.2ms | 1.0x | 不变 | 不变 | 不变 |
 | c.k8s-blue-green-release-topology | 30 | 64.4ms | 41.5ms | 1.6x | 不变 | 不变 | 不变 |
@@ -53,7 +53,7 @@
 
 ### 退化路由
 - 18 个不变，4 个轻微增加
-  - `c.drawify-core-mod-deps`: 2 → 4 (+2)
+  - `c.plotgram-core-mod-deps`: 2 → 4 (+2)
   - `n.compiler-pipeline`: 0 → 2 (+2)
   - `c.ecommerce-platform`: 0 → 1 (+1)
   - `c.payment-clearing-platform`: 0 → 1 (+1)

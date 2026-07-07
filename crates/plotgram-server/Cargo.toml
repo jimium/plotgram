@@ -1,0 +1,18 @@
+[package]
+name = "plotgram-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Web server for Plotgram rendering API"
+
+[[bin]]
+name = "plotgram-server"
+path = "src/main.rs"
+
+[dependencies]
+plotgram-core = { workspace = true, features = ["raster", "svg-debug"] }
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true

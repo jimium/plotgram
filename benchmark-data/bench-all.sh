@@ -12,11 +12,11 @@ ARCH_DIR="/workspace/showcase/architecture"
 cd /workspace
 
 # 确保 binary 是最新的
-cargo build --release -p drawify-core --bin bench-phases 2>/dev/null
+cargo build --release -p plotgram-core --bin bench-phases 2>/dev/null
 
 echo "file,nodes,edges,groups,parse_ms,median_ms,min_ms,max_ms,friendly,congestion,long_edge,gap,pred_cross,port_conflict,candidates,hard_reject,degraded"
 
-for f in "$ARCH_DIR"/*.dfy; do
+for f in "$ARCH_DIR"/*.pgm; do
     fname=$(basename "$f")
     output=$("$BINARY" "$f" "$RUNS" 2>/dev/null)
     

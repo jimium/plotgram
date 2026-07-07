@@ -1,8 +1,8 @@
-# Drawify 视觉语言标准
+# Plotgram 视觉语言标准
 
 > 版本：0.1.0-draft | 状态：设计中
 
-本文档定义 Drawify **六种内置图表类型**的语义、适用场景、视觉约定与写作规范。它是设计语言层面的**设计标准**，与语法规范、布局实现、样式方案分工如下：
+本文档定义 Plotgram **六种内置图表类型**的语义、适用场景、视觉约定与写作规范。它是设计语言层面的**设计标准**，与语法规范、布局实现、样式方案分工如下：
 
 | 文档 | 职责 |
 |------|------|
@@ -84,7 +84,7 @@
 
 ## 示例与对照
 
-- [Showcase 示例集](../../../showcase/README.md) — 按类型组织、复杂度前缀命名的 `.dfy` 用例
+- [Showcase 示例集](../../../showcase/README.md) — 按类型组织、复杂度前缀命名的 `.pgm` 用例
 - [Agent 编写指南](../../agent-guide.md) — 面向 AI 的语法速查，详细语义以本文档为准
 
 ---
@@ -93,7 +93,7 @@
 
 | 模块 | 路径 |
 |------|------|
-| 图表 Profile（默认布局、允许的 entity type） | `crates/drawify-core/src/diagram/registry.rs` |
-| type 别名归一化 | `crates/drawify-core/src/diagram/profile.rs` |
-| 各类型渲染器 | `crates/drawify-core/src/render/diagram/` |
-| 各类型校验 | `crates/drawify-core/src/validation/` |
+| 图表 Profile（默认布局、允许的 entity type） | `crates/plotgram-core/src/diagram/registry.rs` |
+| type 别名归一化 | `crates/plotgram-core/src/diagram/profile.rs` |
+| 各类型渲染器 | `crates/plotgram-core/src/render/diagram/` |
+| 各类型校验 | `crates/plotgram-core/src/validation/` |

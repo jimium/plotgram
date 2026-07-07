@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { getPreviewHtml } from './webview';
 
 export class PreviewPanel {
-  public static readonly viewType = 'drawify.preview';
+  public static readonly viewType = 'plotgram.preview';
 
   private static readonly panels = new Map<string, PreviewPanel>();
 

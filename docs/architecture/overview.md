@@ -1,6 +1,6 @@
-# Drawify 整体架构
+# Plotgram 整体架构
 
-Drawify 是一个多语言、多平台的图表 DSL 系统，采用模块化设计，核心功能与各种绑定和应用分离。
+Plotgram 是一个多语言、多平台的图表 DSL 系统，采用模块化设计，核心功能与各种绑定和应用分离。
 
 ## 系统架构图
 
@@ -8,11 +8,11 @@ Drawify 是一个多语言、多平台的图表 DSL 系统，采用模块化设�
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            应用层 (Applications)                            │
 ├─────────────────────────┬─────────────────────────┬─────────────────────────┤
-│   Web 编辑器 (React)   │   CLI 工具 (drawify-cli) │   后端服务 (server)    │
+│   Web 编辑器 (React)   │   CLI 工具 (plotgram-cli) │   后端服务 (server)    │
 ├─────────────────────────┴─────────────────────────┴─────────────────────────┤
 │                             绑定层 (Bindings)                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│        WASM 绑定 (drawify-wasm)       │           (Future FFI)            │
+│        WASM 绑定 (plotgram-wasm)       │           (Future FFI)            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                             核心层 (Core)                                   │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
@@ -23,13 +23,13 @@ Drawify 是一个多语言、多平台的图表 DSL 系统，采用模块化设�
 
 ## 核心模块详解
 
-### 1. drawify-core
+### 1. plotgram-core
 核心库，包含所有业务逻辑：
 
 #### 子模块
 
 - **Lexer & Parser** (`lexer.rs`, `parser.rs`)
-  - 将 Drawify 代码解析为 AST
+  - 将 Plotgram 代码解析为 AST
   - 包含诊断信息（错误位置、修复提示）
 
 - **AST** (`ast.rs`)
@@ -37,7 +37,7 @@ Drawify 是一个多语言、多平台的图表 DSL 系统，采用模块化设�
   - 支持多种图表类型
 
 - **Validation** (`validation/`)
-  - 验证 Drawify 代码的语义正确性
+  - 验证 Plotgram 代码的语义正确性
   - 检查未定义实体、循环依赖等
 
 - **Layout Engines** (`layout/`)
@@ -49,22 +49,22 @@ Drawify 是一个多语言、多平台的图表 DSL 系统，采用模块化设�
   - 图表类型特定的渲染器（流程图、序列图、架构图等）
 
 - **Diff & Patch** (`diff.rs`)
-  - 两个 Drawify 代码的差异比较
+  - 两个 Plotgram 代码的差异比较
   - 增量式更新支持
 
-### 2. drawify-cli
+### 2. plotgram-cli
 命令行工具，提供核心功能的 CLI 访问：
 
 ```bash
-drawify-cli render --format svg input.dfy > output.svg
-drawify-cli validate input.dfy
+plotgram-cli render --format svg input.pgm > output.svg
+plotgram-cli validate input.pgm
 ```
 
-### 3. drawify-wasm
+### 3. plotgram-wasm
 WebAssembly 绑定，用于浏览器或 Node.js 环境：
 
 ```javascript
-import init, { render } from './drawify-wasm';
+import init, { render } from './plotgram-wasm';
 
 await init();
 const result = render('diagram flowchart { ... }');
@@ -72,14 +72,14 @@ const result = render('diagram flowchart { ... }');
 
 ### 4. Web 编辑器
 React + Vite 构建的 Web 应用：
-- 实时编辑 Drawify 代码
+- 实时编辑 Plotgram 代码
 - 实时预览渲染结果
 - 导出 SVG 功能
 
 ## 数据流向
 
 ```
-Drawify 代码
+Plotgram 代码
     ↓
 [Lexer] → Token Stream
     ↓

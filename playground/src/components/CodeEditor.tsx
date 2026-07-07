@@ -42,7 +42,7 @@ import {
   type Diagnostic as CmDiagnostic,
 } from '@codemirror/lint';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { drawify } from '../lib/drawifyLang';
+import { plotgram } from '../lib/plotgramLang';
 import { setDiagramContext, type DiagramContext } from '../lib/contextCompletion';
 import type { Diagnostic } from '../lib/errorParse';
 
@@ -161,7 +161,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(
           closeBrackets(),
           autocompletion(),
           lintGutter(),
-          drawify(),
+          plotgram(),
           baseTheme,
           themeCompartment.of(theme === 'dark' ? darkTheme() : lightTheme()),
           keymap.of([

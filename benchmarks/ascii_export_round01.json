@@ -2,7 +2,7 @@
   "benchmark": "ascii_export_round01",
   "generated_at_unix_ms": 1781438977825,
   "environment": {
-    "rust_package": "drawify-eval",
+    "rust_package": "plotgram-eval",
     "target_os": "macos",
     "target_arch": "aarch64"
   },

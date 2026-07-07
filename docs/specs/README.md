@@ -1,6 +1,6 @@
-# Drawify 语言规范
+# Plotgram 语言规范
 
-> 此目录存放 Drawify 语言的设计规范文档。
+> 此目录存放 Plotgram 语言的设计规范文档。
 
 ## 文档索引
 

@@ -1,9 +1,9 @@
 # 正交边路由分层架构设计
 
 > 日期：2026-06-27（架构重构版，P0/P1/A 已实施）
-> 范围：`crates/drawify-core/src/layout/edge/edge_routing_orthogonal/` 及 `edge_bundling/`
+> 范围：`crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/` 及 `edge_bundling/`
 > 状态：P0/P1/A 已实施完成，待验证效果后推进 B/C
-> 验证用例：`showcase/architecture/c.layout-stress-nested.dfy`、`c.k8s-tenant-isolation.dfy`
+> 验证用例：`showcase/architecture/c.layout-stress-nested.pgm`、`c.k8s-tenant-isolation.pgm`
 
 ---
 
@@ -211,7 +211,7 @@ Step 4: 轻量出口校验（AABB射线检测）→ 一出side就撞墙则切换
 
 需要先对两个节点的group关系分类。需要预计算的辅助信息：
 - `node_leaf_group: NodeId → GroupId`：每个节点的直接leaf group（从`node_to_groups`取最深层）
-- `sibling_group_sets`：通过AST的`parent_id`+`child_group_ids`收集sibling group集合（可在GroupRoutingContext构建时一次性计算，参考[collect_sibling_sets](../../../crates/drawify-core/src/layout/group_frame/mod.rs)已有实现）
+- `sibling_group_sets`：通过AST的`parent_id`+`child_group_ids`收集sibling group集合（可在GroupRoutingContext构建时一次性计算，参考[collect_sibling_sets](../../../crates/plotgram-core/src/layout/group_frame/mod.rs)已有实现）
 - `classify_sibling_orientation(Ga, Gb)`：通过比较两个group bbox的ox/oy判定排列方向
 
 **情况A：同组内边（无group或共享同一个leaf group）**
@@ -333,7 +333,7 @@ Step 3选出首选side pair后，做一个轻量校验：
 
 **输出**：
 - 路径points（包含完整折线）
-- 路径角色段（复用[edge_bundling的path decomposition](../../../crates/drawify-core/src/layout/edge/edge_bundling/compatibility.rs)）：
+- 路径角色段（复用[edge_bundling的path decomposition](../../../crates/plotgram-core/src/layout/edge/edge_bundling/compatibility.rs)）：
   - `FromStub`：从锚点沿端口外延方向的初始段
   - `FirstTurn`：第一个转向点
   - `Trunk`：中段主路径（Layer 3不能修改）
@@ -382,7 +382,7 @@ Step 3选出首选side pair后，做一个轻量校验：
 - 两者共享路径分解基础设施（segment角色标记），但操作粒度不同
 - 执行顺序：Layer 3先确定正确端点→Layer 4再做边间合并
 
-**现有代码**：[edge_bundling/](../../../crates/drawify-core/src/layout/edge/edge_bundling/)模块已实现聚类、trunk分配、路径重写，基本框架可用，需适配Layer 3的输出格式。
+**现有代码**：[edge_bundling/](../../../crates/plotgram-core/src/layout/edge/edge_bundling/)模块已实现聚类、trunk分配、路径重写，基本框架可用，需适配Layer 3的输出格式。
 
 ### 4.6 Layer 5: 标签与箭头
 
@@ -396,7 +396,7 @@ Step 3选出首选side pair后，做一个轻量校验：
 - 不修改路径几何
 - 这是纯修饰层，不回流
 
-现有代码：[resolve_label_overlaps](../../../crates/drawify-core/src/layout/edge/common/label_avoidance.rs)和[label_placement](../../../crates/drawify-core/src/layout/edge/edge_bundling/label_placement.rs)已实现，需在Layer 4之后调用。
+现有代码：[resolve_label_overlaps](../../../crates/plotgram-core/src/layout/edge/common/label_avoidance.rs)和[label_placement](../../../crates/plotgram-core/src/layout/edge/edge_bundling/label_placement.rs)已实现，需在Layer 4之后调用。
 
 ---
 
@@ -485,7 +485,7 @@ Step 3选出首选side pair后，做一个轻量校验：
 > - **回滚策略**：出问题怎么撤
 > - **前置依赖**：必须先完成哪个Task
 >
-> Agent 执行规则：严格按顺序执行，完成一个Task并验证通过后再开始下一个。每个Task完成后运行 `cargo test -p drawify-core` 和 `cargo check` 确认无编译错误。
+> Agent 执行规则：严格按顺序执行，完成一个Task并验证通过后再开始下一个。每个Task完成后运行 `cargo test -p plotgram-core` 和 `cargo check` 确认无编译错误。
 
 ---
 
@@ -502,7 +502,7 @@ Step 3选出首选side pair后，做一个轻量校验：
 **前置依赖**：无（可以从当前代码直接开始）
 
 **修改文件**：
-- `crates/drawify-core/src/layout/group/context.rs`：
+- `crates/plotgram-core/src/layout/group/context.rs`：
   - 在 `GroupRoutingContext` 结构体中新增字段
   - 修改 `from_layout` 方法
   - 新增辅助函数
@@ -551,7 +551,7 @@ pub fn is_same_leaf_group(&self, a: &str, b: &str) -> bool { ... }
 6. 更新context.rs中已有的单元测试，覆盖新字段。
 
 **验证方法**：
-- `cargo test -p drawify-core group::context` 所有测试通过
+- `cargo test -p plotgram-core group::context` 所有测试通过
 - 写一个单元测试：创建包含2个水平排列sibling group的diagram，验证sibling_orientation返回Horizontal
 - 写一个单元测试：创建包含2个垂直排列sibling group的diagram，验证sibling_orientation返回Vertical
 
@@ -564,7 +564,7 @@ pub fn is_same_leaf_group(&self, a: &str, b: &str) -> bool { ... }
 **前置依赖**：P0-1
 
 **修改文件**：
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/slot.rs`：重写 `choose_pair_sides` 函数，新增辅助函数
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/slot.rs`：重写 `choose_pair_sides` 函数，新增辅助函数
 
 **实现步骤**：
 
@@ -627,12 +627,12 @@ const EXIT_CHECK_DISTANCE: f64 = 32.0; // PORT_CLEARANCE(16) + stub_clearance(16
 5. 保留旧的 `choose_pair_sides(a, b)` 作为简单包装（调用带group_ctx=None的新函数），确保不破坏现有单元测试。
 
 **验证方法**：
-- `cargo test -p drawify-core orthogonal` 现有测试全通过
+- `cargo test -p plotgram-core orthogonal` 现有测试全通过
 - 新增单元测试：
   - 两节点同组 → 返回结果与旧逻辑一致
   - 两节点在水平排列sibling group中，dy小dx大 → 返回Left/Right
   - lb→biz_svc场景（public_subnet右下方到private_subnet左上方，位置不对齐）→ 返回Left→Right
-- 跑 `showcase/architecture/c.layout-stress-nested.dfy` 导出layout，检查lb→biz_svc是否改走Left→Right
+- 跑 `showcase/architecture/c.layout-stress-nested.pgm` 导出layout，检查lb→biz_svc是否改走Left→Right
 
 **回滚策略**：`choose_pair_sides` 加了`group_ctx: Option<&GroupRoutingContext>`参数，传None就完全是旧行为。如果新逻辑有问题，临时把调用处的group_ctx传None即可。
 
@@ -643,7 +643,7 @@ const EXIT_CHECK_DISTANCE: f64 = 32.0; // PORT_CLEARANCE(16) + stub_clearance(16
 **前置依赖**：P0-2
 
 **修改文件**：
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs`：
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs`：
   - 更新 `choose_pair_sides` 调用处（第306行）传入a_id, b_id, group_ctx
   - 更新 `side_acceptable` 函数（第1210行）以感知group关系
   - 保持 `coordinate_port_sides` 签名不变，但内部的 `side_acceptable` 调用需要传group_ctx
@@ -667,9 +667,9 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
 4. 更新 `coordinate_port_sides` 的调用处（第326行），传入`Some(&group_ctx)`。
 
 **验证方法**：
-- `cargo check -p drawify-core` 无编译错误
-- `cargo test -p drawify-core` 所有测试通过
-- 运行 `c.layout-stress-nested.dfy` 验证：
+- `cargo check -p plotgram-core` 无编译错误
+- `cargo test -p plotgram-core` 所有测试通过
+- 运行 `c.layout-stress-nested.pgm` 验证：
   - lb→biz_svc 选Left→Right
   - 同组边（db_master→db_replica等）side选择与之前一致（仍走Top/Bottom）
   - 无group的简单流程图测试用例行为不变
@@ -691,8 +691,8 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
 #### Task P1-1：修复同组边的group障碍物处理
 
 **修改文件**：
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/scoring.rs`：修改 `obstacle_penalty` 中group障碍物判断
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/path.rs`：如有需要，修改候选生成中的group障碍物过滤
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs`：修改 `obstacle_penalty` 中group障碍物判断
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/path.rs`：如有需要，修改候选生成中的group障碍物过滤
 
 **实现步骤**：
 
@@ -703,7 +703,7 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
 5. 验证：检查`path_avoids_group_interiors`函数是否也有同样问题（只检查直接group不检查祖先）。
 
 **验证方法**：
-- `cargo test -p drawify-core` 通过
+- `cargo test -p plotgram-core` 通过
 - db_master→db_replica（同data_subnet内垂直对齐dx≈0）不再绕cloud外
 - 跨组边（lb→biz_svc）仍正确避开无关group内部
 
@@ -714,7 +714,7 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
 #### Task P1-2：候选通道优先组间间隙
 
 **修改文件**：
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/path.rs`：修改 `build_channel_detours` 函数
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/path.rs`：修改 `build_channel_detours` 函数
 
 **实现步骤**：
 
@@ -727,7 +727,7 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
    - 通道Y/X坐标：优先使用走廊的coord值（走廊中线），而非障碍物边缘+margin
 
 **验证方法**：
-- `cargo test -p drawify-core` 通过
+- `cargo test -p plotgram-core` 通过
 - biz_svc→db_master不再绕到cloud左侧外（应走y=366~462的水平走廊）
 - 其他边路径不退化
 
@@ -738,7 +738,7 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
 #### Task P1-3：评分函数权重调整
 
 **修改文件**：
-- `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/scoring.rs`
+- `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs`
 
 **实现步骤**：
 
@@ -751,7 +751,7 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
 4. 调整后运行测试，对比总路径长度变化。
 
 **验证方法**：
-- `cargo test -p drawify-core` 通过
+- `cargo test -p plotgram-core` 通过
 - 对比P0+P1修复前后，`c.layout-stress-nested`的总路径长度应显著减少
 - 折点数不增加（或减少）
 
@@ -770,11 +770,11 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
 #### Task A-1：实现路径分解辅助函数
 
 **修改文件**：
-- 新增 `crates/drawify-core/src/layout/edge/edge_routing_orthogonal/slot_replan.rs`（或在mod.rs中实现，视代码量决定）
+- 新增 `crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/slot_replan.rs`（或在mod.rs中实现，视代码量决定）
 
 **实现步骤**：
 
-1. 阅读 `crates/drawify-core/src/layout/edge/edge_bundling/compatibility.rs` 中的 `decompose_path` 函数，理解其路径角色段标记逻辑。
+1. 阅读 `crates/plotgram-core/src/layout/edge/edge_bundling/compatibility.rs` 中的 `decompose_path` 函数，理解其路径角色段标记逻辑。
 2. 在slot_replan模块中实现或复用路径分解功能，识别FromStub→FirstTurn→Trunk→LastTurn→ToStub。
 3. 如果edge_bundling的decompose_path可以直接复用（pub且功能足够），则直接引用；否则在本模块内实现轻量版（只需要找到FirstTurn和LastTurn点位置）。
 4. 实现 `extract_exit_direction(path, side, is_from) -> Vec2`：从FirstTurn点提取实际出口切线方向。
@@ -811,7 +811,7 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
 **验证方法**：
 - biz_svc→db_master与auth_svc→redis的水平段交叉消除
 - Concentrate模式下行为不变
-- `cargo test -p drawify-core` 通过
+- `cargo test -p plotgram-core` 通过
 
 **回滚策略**：暂时保留fix_slot_inversions，通过配置开关切换新旧实现。
 
@@ -830,7 +830,7 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
 4. 确保bundling流水线在replan_slots之后执行（顺序不变）。
 
 **验证方法**：
-- `cargo test -p drawify-core` 全部通过
+- `cargo test -p plotgram-core` 全部通过
 - 所有showcase示例渲染无异常
 - 交叉数比P0+P1阶段进一步减少
 
@@ -898,14 +898,14 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
   - 新增 `SiblingOrientation` 枚举（Horizontal/Vertical）
   - 新增字段：`node_leaf_group`、`sibling_sets`、`sibling_orientation`、`group_ancestors`
   - 实现 `build_group_hierarchy` 函数在构建时一次性计算所有关系
-  - 在 [context.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/group/context.rs) 中新增便利方法 `endpoint_group_set`（包含所有祖先 group）
+  - 在 [context.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/group/context.rs) 中新增便利方法 `endpoint_group_set`（包含所有祖先 group）
 - ✅ P0-2：重写 choose_pair_sides 为 4 步决策树
   - 重命名为 `choose_pair_sides_with_group`，签名增加 `a_id`/`b_id`/`group_ctx` 参数
   - 实现 Step 1-4：硬约束排除 → 单候选快速返回 → 4 种 group 关系分类 → 轻量出口校验
   - 新增阈值常量：同组 0.4、水平 siblings 0.8、垂直 siblings 对齐 0.4/不对齐 0.5、跨祖先 0.5
   - 保留旧 `choose_pair_sides` 函数作为 `None` 上下文的兼容包装
 - ✅ P0-3：适配调用方并更新 coordinate_port_sides
-  - 在 [mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/mod.rs) 路由流水线中传入 group_ctx
+  - 在 [mod.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/mod.rs) 路由流水线中传入 group_ctx
   - 更新 `coordinate_port_sides` 函数签名接受 group_ctx 参数
 
 **效果验证**：
@@ -919,7 +919,7 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
 
 **完成内容**：
 - ✅ P1-1：修复同组边的 group 障碍物处理
-  - 在 [path.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/path.rs) 中修改 `endpoint_groups` 构建逻辑
+  - 在 [path.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/path.rs) 中修改 `endpoint_groups` 构建逻辑
   - 使用 `ctx.group_ctx.endpoint_group_set(from_id, to_id)` 替代直接从 `node_to_groups` 取值，确保包含所有祖先 group
   - 修复同组边错误避开自身 group 边界导致外道绕行的问题
 - ✅ P1-2：候选通道优先组间间隙
@@ -931,8 +931,8 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
   - 现有评分权重在通道修复后已能正确选择更短路径
 
 **修改文件**：
-- [path.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/path.rs)
-- [scoring.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/scoring.rs)（测试辅助更新）
+- [path.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/path.rs)
+- [scoring.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/scoring.rs)（测试辅助更新）
 
 ---
 
@@ -950,7 +950,7 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
 - ✅ A-3：集成到路由流水线
   - 在 `route_edges_orthogonal_inner` 第 585 行用 `replan_slots` 替换 `fix_slot_inversions`
   - 保留旧 `fix_slot_inversions` 和 `swap_endpoint_anchors` 函数暂不删除（可回退参考）
-  - 在 [context.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_routing_orthogonal/context.rs) 中已有 `remove_by_edges` 批量移除方法支持
+  - 在 [context.rs](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_routing_orthogonal/context.rs) 中已有 `remove_by_edges` 批量移除方法支持
 
 **关键实现决策**：
 - replan_slots 不改变子组锚点坐标集合，只重新分配顺序，保证不破坏多子组分布
@@ -965,10 +965,10 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
 
 | 测试用例 | 规模（节点/边/分组） | P0+P1+A 中位数耗时 | 候选总数 | 退化数 | 预测交叉 |
 |----------|---------------------|-------------------|---------|--------|---------|
-| c.k8s-tenant-isolation.dfy | 19/26/5 | **7.91ms** | 897 | 2 | 8 |
-| c.k8s-multi-namespace-overview.dfy | 35/46/9 | 11.20ms | 3247 | 2 | 17 |
-| c.cloud-native.dfy | 10/12/4 | 1.85ms | 510 | 0 | 6 |
-| c.ecommerce-platform.dfy | 14/13/4 | 3.87ms | 177 | 1 | 2 |
+| c.k8s-tenant-isolation.pgm | 19/26/5 | **7.91ms** | 897 | 2 | 8 |
+| c.k8s-multi-namespace-overview.pgm | 35/46/9 | 11.20ms | 3247 | 2 | 17 |
+| c.cloud-native.pgm | 10/12/4 | 1.85ms | 510 | 0 | 6 |
+| c.ecommerce-platform.pgm | 14/13/4 | 3.87ms | 177 | 1 | 2 |
 
 **累计改进对比（基线 vs P0+P1+A）**：
 
@@ -991,7 +991,7 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
 1. **视觉效果验证**：
    - 渲染多个 showcase/architecture 示例，肉眼对比 P0/P1/A 前后的路径质量
    - 重点检查：跨组边是否走侧边、同组边是否不再外道绕行、节点附近是否还有 slot 顺序导致的交叉
-   - 特别验证 `c.layout-stress-nested.dfy` 中§2.2列出的6个问题边是否全部修复
+   - 特别验证 `c.layout-stress-nested.pgm` 中§2.2列出的6个问题边是否全部修复
 
 2. **参数微调**：
    - 验证水平 sibling 阈值 0.8 是否在所有场景下都合适（部分垂直位移较大的跨水平组边，走 Top/Bottom 可能反而更好）
@@ -1017,7 +1017,7 @@ let (side_a, side_b) = choose_pair_sides(a_nl, b_nl, can_from, can_to, Some(&gro
 **这是最推荐的下一步**——P0+P1+A 已搭建好分层架构，Layer 4 Edge Bundling 的框架代码已存在，需要适配新的路由输出。
 
 1. **C-1：Bundling 适配 Layer 3 输出**
-   - 检查现有 [edge_bundling/](file:///Users/jimichan/zaprt-projects/flowml/crates/drawify-core/src/layout/edge/edge_bundling/) 模块
+   - 检查现有 [edge_bundling/](file:///Users/jimichan/zaprt-projects/flowml/crates/plotgram-core/src/layout/edge/edge_bundling/) 模块
    - 确保 bundling 在 replan_slots 之后执行，使用最终确定的锚点位置
    - 验证 bundling 重写路径后不会破坏 Layer 3 修复的 slot 顺序
    - 启用 bundling 时跳过路由内 label 避障（当前代码已有此逻辑，需验证）

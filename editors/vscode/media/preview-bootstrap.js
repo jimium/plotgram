@@ -1,10 +1,10 @@
 function readConfig() {
-  const config = document.getElementById('drawify-config');
+  const config = document.getElementById('plotgram-config');
   const wasmJs = config?.dataset.wasmJs;
   const wasmBin = config?.dataset.wasmBin;
 
   if (!wasmJs || !wasmBin) {
-    throw new Error('Drawify 配置缺失：未找到 WASM 资源 URI');
+    throw new Error('Plotgram 配置缺失：未找到 WASM 资源 URI');
   }
 
   return { wasmJs, wasmBin };
@@ -22,14 +22,14 @@ function showBootstrapError(error) {
   }
 
   const err = document.createElement('pre');
-  err.className = 'error drawify-preview-error';
+  err.className = 'error plotgram-preview-error';
   err.textContent = error instanceof Error ? error.message : String(error);
   diagram.appendChild(err);
 }
 
 const { wasmJs, wasmBin } = readConfig();
 
-globalThis.__drawifyRuntimePromise = (async () => {
+globalThis.__plotgramRuntimePromise = (async () => {
   const { default: init, render } = await import(/* webpackIgnore: true */ wasmJs);
   await init(wasmBin);
   return {
@@ -37,7 +37,7 @@ globalThis.__drawifyRuntimePromise = (async () => {
   };
 })();
 
-globalThis.__drawifyRuntimePromise
+globalThis.__plotgramRuntimePromise
   .then(() => {
     const status = document.getElementById('status');
     if (status) {
