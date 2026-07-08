@@ -16,6 +16,7 @@ FORMATS=("svg")
 VALIDATE=false
 SERVE=false
 SERVE_PORT=4173
+TRANSPARENT_BG=true
 
 usage() {
   cat <<'EOF'
@@ -29,6 +30,7 @@ usage() {
   -a, --all             同时渲染 svg 和 png（便于与 Mermaid 截图对比）
       --validate        渲染前先执行语法验证
   -s, --serve [PORT]    渲染完成后启动 HTTP 服务（默认 4173），便于在浏览器中查看 index.html
+      --opaque          保留画布背景色（默认输出透明背景，便于嵌入 showcase 预览）
   -h, --help            显示此帮助
 
 示例:
@@ -55,6 +57,10 @@ while [[ $# -gt 0 ]]; do
       VALIDATE=true
       shift
       ;;
+    --opaque)
+      TRANSPARENT_BG=false
+      shift
+      ;;
     -s|--serve)
       SERVE=true
       if [[ "${2:-}" =~ ^[0-9]+$ ]]; then
@@ -77,6 +83,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 build_plotgram() {
+  export CARGO_TARGET_DIR="$ROOT_DIR/target"
   echo "构建 plotgram-cli ($PLOTGRAM_PROFILE)..."
   if [[ "$PLOTGRAM_PROFILE" == "release" ]]; then
     (cd "$ROOT_DIR" && cargo build --release -p plotgram-cli)
@@ -101,6 +108,10 @@ format_duration_ms() {
 # 仅统计 plotgram render 墙钟耗时（毫秒精度）；不含 svg-history 归档/写盘。
 # 子进程 stdout/stderr 重定向到 /dev/null，避免 [perf] 等日志污染输出。
 run_timed_render() {
+  local render_args=(render "$1" -f "$2" -o "$3")
+  if $TRANSPARENT_BG; then
+    render_args+=(--transparent-background)
+  fi
   perl -MTime::HiRes=time -e '
     use strict;
     my $start = time();
@@ -115,7 +126,7 @@ run_timed_render() {
     my $rc = $? >> 8;
     print int((time() - $start) * 1000 + 0.5), "\n";
     exit($rc);
-  ' -- "$PLOTGRAM_BIN" render "$1" -f "$2" -o "$3"
+  ' -- "$PLOTGRAM_BIN" "${render_args[@]}"
 }
 
 output_ext() {

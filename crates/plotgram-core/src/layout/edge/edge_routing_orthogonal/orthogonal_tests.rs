@@ -1236,11 +1236,7 @@
         );
     }
 
-    /// A2 验证：stress-nested 的 `unrelated_edge_trunk_merge` 违规数不超过基线（4）。
-    ///
-    /// 注意：这些违规源于路由通道选择（corridor routing）使无关边共享平行段，
-    /// 属于 G1（穿组硬约束）的范畴，非 A2（slot 分组语义对齐）能消除。
-    /// A2 的职责是确保 slot 分组键与 merge policy 语义一致，此测试锁定基线防回退。
+    /// A7：stress-nested 的 `unrelated_edge_trunk_merge` 应 ≤ 1。
     #[test]
     fn stress_nested_unrelated_trunk_merge_baseline() {
         let source = include_str!(
@@ -1267,11 +1263,10 @@
                 )
             })
             .count();
-        // 基线 = 4（corridor 边之间的 trunk 共享，非 G1 能消除——G1 已确保
-        // 非 corridor 边不再被强制走 corridor，但 corridor 边之间的共享需 lane 层面解决）
+        // A7：corridor lane 按 merge policy 分离 + 路径全程使用 lane_coord
         assert!(
-            unrelated <= 4,
-            "stress-nested unrelated_edge_trunk_merge 应 ≤ 4（基线），实际 {unrelated}"
+            unrelated <= 1,
+            "stress-nested unrelated_edge_trunk_merge 应 ≤ 1，实际 {unrelated}"
         );
     }
 

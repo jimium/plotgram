@@ -407,6 +407,298 @@ pub fn assign_lanes(
     stats
 }
 
+/// Architecture A7：对通用路由回退的走廊边，按 plan 的 cross-axis offset 平移干线 interior 段。
+pub fn apply_corridor_planned_offsets(
+    edges: &mut [EdgeLayout],
+    grid: &mut SegmentGrid,
+    nodes: &HashMap<String, NodeLayout>,
+    sorted_node_ids: &[String],
+    relations: &[Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+    corridor_plan: &super::corridor_route::CorridorRoutePlan,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+) -> usize {
+    use crate::layout::group::CorridorAxis;
+
+    let mut shifted = 0usize;
+    let mut shifted_edges = Vec::new();
+    let n = edges.len();
+
+    for ei in 0..n {
+        let Some((axis, offset)) =
+            super::corridor_route::planned_cross_axis_offset_for_edge(ei, corridor_plan, group_ctx)
+        else {
+            continue;
+        };
+        if edges[ei].path_is_empty() {
+            continue;
+        }
+        let original: Vec<Point> = edges[ei].path_points().into_owned();
+        if original.len() < 4 {
+            continue;
+        }
+
+        let n_segs = original.len() - 1;
+        let mut best_si = None;
+        let mut best_len = 0.0f64;
+        for si in 1..n_segs.saturating_sub(1) {
+            let p1 = original[si];
+            let p2 = original[si + 1];
+            let dx = (p2.x - p1.x).abs();
+            let dy = (p2.y - p1.y).abs();
+            let len = dx.max(dy);
+            let is_target = match axis {
+                CorridorAxis::Horizontal => dx < EPS && dy >= MIN_SHARED_TRUNK_LEN,
+                CorridorAxis::Vertical => dy < EPS && dx >= MIN_SHARED_TRUNK_LEN,
+            };
+            if is_target && len > best_len {
+                best_len = len;
+                best_si = Some(si);
+            }
+        }
+        let Some(si) = best_si else { continue };
+
+        let mut new_points = original.clone();
+        match axis {
+            CorridorAxis::Horizontal => {
+                new_points[si].x += offset;
+                new_points[si + 1].x += offset;
+            }
+            CorridorAxis::Vertical => {
+                new_points[si].y += offset;
+                new_points[si + 1].y += offset;
+            }
+        }
+
+        if validate_shift(&original, &new_points, si, nodes, sorted_node_ids) {
+            commit_shifted_path(edges, ei, &new_points, relations, from_side, to_side);
+            shifted_edges.push(ei);
+            shifted += 1;
+        }
+    }
+
+    if !shifted_edges.is_empty() {
+        shifted_edges.sort_unstable();
+        shifted_edges.dedup();
+        grid.remove_by_edges(&shifted_edges);
+        for &ei in &shifted_edges {
+            grid.insert_path(&edges[ei].path_points(), ei);
+        }
+    }
+
+    shifted
+}
+
+/// Architecture：对 `edges_may_share_trunk == false` 的边对，强制分离仍重合的干线 interior 段。
+pub fn separate_unrelated_trunk_overlaps(
+    edges: &mut [EdgeLayout],
+    grid: Option<&mut SegmentGrid>,
+    relations: &[Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+    nodes: &HashMap<String, NodeLayout>,
+    sorted_node_ids: &[String],
+    min_gap: f64,
+) -> usize {
+    use crate::layout::edge::edge_merge_policy::{edge_merge_context, edges_may_share_trunk};
+    use crate::types::DiagramType;
+
+    let n = edges.len();
+    if n < 2 {
+        return 0;
+    }
+
+    let mut separated = 0usize;
+    let mut shifted_edges = Vec::new();
+
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let Some(rel_i) = relations.get(i) else { continue };
+            let Some(rel_j) = relations.get(j) else { continue };
+            let ctx_i = edge_merge_context(rel_i.from.as_str(), rel_i.to.as_str(), i);
+            let ctx_j = edge_merge_context(rel_j.from.as_str(), rel_j.to.as_str(), j);
+            if edges_may_share_trunk(&ctx_i, &ctx_j, DiagramType::Architecture) {
+                continue;
+            }
+            if edges[i].path_is_empty() || edges[j].path_is_empty() {
+                continue;
+            }
+            let path_i: Vec<Point> = edges[i].path_points().into_owned();
+            let path_j: Vec<Point> = edges[j].path_points().into_owned();
+            if path_i.len() < 4 || path_j.len() < 4 {
+                continue;
+            }
+
+            let sep = try_separate_edge_pair(
+                &path_i,
+                edges,
+                j,
+                min_gap,
+                nodes,
+                sorted_node_ids,
+                relations,
+                from_side,
+                to_side,
+            ) || try_separate_edge_pair(
+                &path_j,
+                edges,
+                i,
+                min_gap,
+                nodes,
+                sorted_node_ids,
+                relations,
+                from_side,
+                to_side,
+            );
+            if sep {
+                shifted_edges.push(j);
+                shifted_edges.push(i);
+                separated += 1;
+            }
+        }
+    }
+
+    if !shifted_edges.is_empty() {
+        shifted_edges.sort_unstable();
+        shifted_edges.dedup();
+        if let Some(grid) = grid {
+            grid.remove_by_edges(&shifted_edges);
+            for &ei in &shifted_edges {
+                grid.insert_path(&edges[ei].path_points(), ei);
+            }
+        }
+    }
+
+    separated
+}
+
+fn try_separate_edge_pair(
+    reference_path: &[Point],
+    edges: &mut [EdgeLayout],
+    target_ei: usize,
+    min_gap: f64,
+    nodes: &HashMap<String, NodeLayout>,
+    sorted_node_ids: &[String],
+    relations: &[Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+) -> bool {
+    let original: Vec<Point> = edges[target_ei].path_points().into_owned();
+    if original.len() < 4 {
+        return false;
+    }
+
+    let n_segs = original.len() - 1;
+    for si in 1..n_segs.saturating_sub(1) {
+        let t1 = original[si];
+        let t2 = original[si + 1];
+        let tdx = (t2.x - t1.x).abs();
+        let tdy = (t2.y - t1.y).abs();
+        let is_vertical = tdx < EPS && tdy >= MIN_SHARED_TRUNK_LEN;
+        let is_horizontal = tdy < EPS && tdx >= MIN_SHARED_TRUNK_LEN;
+        if !is_vertical && !is_horizontal {
+            continue;
+        }
+
+        for ri in 0..reference_path.len().saturating_sub(1) {
+            let r1 = reference_path[ri];
+            let r2 = reference_path[ri + 1];
+            let rdx = (r2.x - r1.x).abs();
+            let rdy = (r2.y - r1.y).abs();
+            let shares = if is_vertical {
+                rdx < EPS
+                    && tdx < EPS
+                    && (t1.x - r1.x).abs() < EPS
+                    && t1.y.max(t2.y).min(r1.y.max(r2.y)) - t1.y.min(t2.y).max(r1.y.min(r2.y))
+                        >= MIN_SHARED_TRUNK_LEN - EPS
+            } else {
+                rdy < EPS
+                    && tdy < EPS
+                    && (t1.y - r1.y).abs() < EPS
+                    && t1.x.max(t2.x).min(r1.x.max(r2.x)) - t1.x.min(t2.x).max(r1.x.min(r2.x))
+                        >= MIN_SHARED_TRUNK_LEN - EPS
+            };
+            if !shares {
+                continue;
+            }
+
+            for magnitude in [min_gap, 18.0, 24.0, 36.0] {
+                for sign in [1.0, -1.0] {
+                    let mut new_points = original.clone();
+                    let offset = magnitude * sign;
+                    if is_vertical {
+                        new_points[si].x += offset;
+                        new_points[si + 1].x += offset;
+                    } else {
+                        new_points[si].y += offset;
+                        new_points[si + 1].y += offset;
+                    }
+                    if validate_shift(&original, &new_points, si, nodes, sorted_node_ids) {
+                        commit_shifted_path(
+                            edges,
+                            target_ei,
+                            &new_points,
+                            relations,
+                            from_side,
+                            to_side,
+                        );
+                        return true;
+                    }
+                }
+            }
+
+            let shared_coord = if is_vertical { t1.x } else { t1.y };
+            for magnitude in [min_gap, 18.0, 24.0] {
+                for sign in [1.0, -1.0] {
+                    let mut new_points = original.clone();
+                    let target = shared_coord + magnitude * sign;
+                    if force_shift_trunk_coord(&mut new_points, is_vertical, shared_coord, target) {
+                        commit_shifted_path(
+                            edges,
+                            target_ei,
+                            &new_points,
+                            relations,
+                            from_side,
+                            to_side,
+                        );
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    false
+}
+
+/// 将路径上所有位于 `from_coord` 的干线点强制移至 `to_coord`（保持正交折线）。
+fn force_shift_trunk_coord(
+    path: &mut [Point],
+    is_vertical: bool,
+    from_coord: f64,
+    to_coord: f64,
+) -> bool {
+    if (from_coord - to_coord).abs() < EPS || path.len() < 2 {
+        return false;
+    }
+    let mut moved = false;
+    for p in path.iter_mut() {
+        if is_vertical {
+            if (p.x - from_coord).abs() < EPS {
+                p.x = to_coord;
+                moved = true;
+            }
+        } else if (p.y - from_coord).abs() < EPS {
+            p.y = to_coord;
+            moved = true;
+        }
+    }
+    moved
+}
+
+const MIN_SHARED_TRUNK_LEN: f64 = 12.0;
+
 // ═══════════════════════════════════════════════════════════
 //  单元测试
 // ═══════════════════════════════════════════════════════════

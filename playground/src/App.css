@@ -1279,30 +1279,30 @@
   to { transform: translateX(0); }
 }
 
-.example-drawer-head {
+.example-drawer-search {
   flex-shrink: 0;
+  padding: 10px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.example-drawer-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
 }
 
-.example-drawer-head h3 {
+.example-drawer-title-row h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text);
 }
 
-.example-drawer-search {
-  flex-shrink: 0;
-  padding: 10px 14px;
-}
-
 .example-drawer-search .search-input {
-  height: 34px;
-  font-size: 13px;
+  height: 30px;
+  font-size: 12.5px;
 }
 
 .example-drawer-filters {

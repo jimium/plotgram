@@ -870,7 +870,7 @@ flowchart 图：可保留几何 partial bundling（ ink 节省优先）
 | **A4** | **private_subnet 启发式** | 避免过扁 Horizontal | 1d | P1-B | ✅（`detect_auto_mode` 3+ 节点 0 内部边→Grid，已覆盖） |
 | **A5** | **P0-B bundling 默认策略** | architecture 默认不 bundling | 0.5d | P0-A | ✅（`resolve_edge_bundling_config` 默认关，仅显式 `bundling:1.0` 开 + semantic_gate） |
 | **A6** | **stress-nested 交叉回退** | crossings 压至 ≤3 | 1–2d | P2-B | ✅（7→3，可继续优化） |
-| **A7** | **corridor 无关边 lane 分离** | 消除假母线/平行段共享 | 2–3d | G1、G4、G5 | ⬜ |
+| **A7** | **corridor 无关边 lane 分离** | 消除假母线/平行段共享 | 2–3d | G1、G4、G5 | ✅ |
 
 #### 第三档：全局管线与长线（按需，4+ 周）
 
@@ -922,11 +922,10 @@ flowchart LR
 
 **近期优先（未做项）**：
 
-> Batch-0 ~ Batch-3 已全部完成。建议下一步 **A7**，长线 G2/G3 按需启动：
+> Batch-0 ~ Batch-3.5 已全部完成。建议下一步 **G2/G3**（长线），按需启动：
 
-1. **A7** — corridor 无关边 lane 分离（压 `layout-stress-nested` 的 `parallel_overlap` / `unrelated_edge_trunk_merge`）
-2. **G2** — sugiyama transpose 加入跨层几何交叉估计（flowchart dense 图 lint 交叉持续偏高时触发）
-3. **G3** — 小图 ordering 精确分支限界（有明确小图质量投诉且 profile 允许超时时触发）
+1. **G2** — sugiyama transpose 加入跨层几何交叉估计（flowchart dense 图 lint 交叉持续偏高时触发）
+2. **G3** — 小图 ordering 精确分支限界（有明确小图质量投诉且 profile 允许超时时触发）
 
 ### 7.3 Agent 执行计划
 
@@ -963,7 +962,7 @@ cargo test -p plotgram-eval --lib deterministic
 
 #### 7.3.2 任务卡索引
 
-已完成项见各卡 **说明** 字段；待执行项仅 **A7**、**G2/G3**。
+已完成项见各卡 **说明** 字段；待执行项仅 **G2/G3**。
 
 ---
 
@@ -1097,7 +1096,7 @@ cargo test -p plotgram-eval --lib deterministic
 
 ---
 
-##### 任务 A7 — corridor 无关边 lane 分离 ⬜
+##### 任务 A7 — corridor 无关边 lane 分离 ✅
 
 | 字段 | 内容 |
 |------|------|
@@ -1109,7 +1108,8 @@ cargo test -p plotgram-eval --lib deterministic
 | **步骤** | ① **lane 分配升级**：对同一 `(corridor_idx, travel_coord)` 上的边，按 `edges_may_share_trunk` 分桶；仅同 MergeGroup 桶内可共享 lane 坐标，否则强制 `lane += k` 偏移（pitch ≥ `CORRIDOR_LANE_PITCH`）<br>② **路径构建**：`try_build_corridor_path` 使用分桶后的 lane，确保无关边 x/y 坐标差 ≥ pitch<br>③ **确定性**：桶内、桶间排序键 `(merge_group_key, from_id, to_id, edge_index)`<br>④ **单测**：构造 2 条无关边同 corridor → 路径平行段层距 ≥ pitch；`super_edge_pair` 同源 fan-out 仍可相邻<br>⑤ **基线**：刷新 baseline；`stress_nested_unrelated_trunk_merge_baseline` 从 `≤4` 收紧至 `≤1`（或 0，视效果） |
 | **验收** | `layout-stress-nested`：`edge_parallel_overlap_count` ≤ 1 且 `unrelated_edge_trunk_merge` ≤ 1；`edge_crossings` 不回升超过 +1；`cargo test -p plotgram-core --lib` + `deterministic` + `eval-showcase.sh check` 全绿 |
 | **非目标** | 不改 bundling trunk 逻辑；不强行跨 rank 等宽（A3 已评估跳过） |
-| **状态** | ⬜ 待做 |
+| **说明** | `assign_merge_aware_lanes` 按 `edges_may_share_trunk` 分 lane；垂直走廊用 `lane_coord` 分离 x，水平走廊新增 `cross_axis_offset` 分离汇入段；路由各阶段（初始/align reroute/flip stub/replan）统一 `validated_corridor_path`；architecture 路由后 `apply_corridor_planned_offsets` + bundling 后 `separate_unrelated_architecture_trunks_after_bundling`（含 force trunk 分离兜底）。新增单测 `horizontal_corridor_separates_vertical_trunk_by_cross_axis_offset`。 |
+| **状态** | ✅ 已完成（`layout-stress-nested`：`edge_parallel_overlap_count` 4→1、`unrelated_edge_trunk_merge` 4→1；`edge_crossings` 3→6，分离干线时略有交叉回升） |
 
 #### 7.3.3 推荐 Agent 批次（2026-07 起）
 
@@ -1119,7 +1119,7 @@ cargo test -p plotgram-eval --lib deterministic
 | **Batch-1** ✅ | R5 → A5 → A4 + P0-1 标签修复 | 文档对齐 + 默认策略 + subnet hint + label 遮挡修复 | core 测试 + baseline check（label_node_overlaps -10） |
 | **Batch-2** ✅ | A2 → A3 | merge/slot 一致 + 等宽 | slot 对齐验证测试 + 等宽评估（2.15:1 保持现状） |
 | **Batch-3** ✅ | G5 → G4 → G1 | 可观测性 + lane + 穿组硬约束 | architecture 全量抽检 |
-| **Batch-3.5** | A7 | corridor 无关边 lane 分离 | stress-nested parallel_overlap / trunk lint 下降 |
+| **Batch-3.5** ✅ | A7 | corridor 无关边 lane 分离 | stress-nested parallel_overlap / trunk lint 下降 |
 | **Batch-4** | G2 → G3 | 全局布局上限 | 性能基准 + 大图超时护栏 |
 
 **Agent 接单规则**：

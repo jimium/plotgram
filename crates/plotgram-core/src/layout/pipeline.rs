@@ -398,6 +398,24 @@ impl<'a> LayoutPipeline<'a> {
             &result.groups,
         );
 
+        if matches!(
+            self.diagram.diagram_type,
+            crate::types::DiagramType::Architecture
+        ) && self.plan.edge_bundling.enabled
+        {
+            let sorted_node_ids: Vec<String> = {
+                let mut ids: Vec<String> = result.nodes.keys().cloned().collect();
+                ids.sort();
+                ids
+            };
+            crate::layout::edge::edge_routing_orthogonal::separate_unrelated_architecture_trunks_after_bundling(
+                &self.diagram.relations,
+                &mut result.edges,
+                &result.nodes,
+                &sorted_node_ids,
+            );
+        }
+
         Ok(result)
     }
 }

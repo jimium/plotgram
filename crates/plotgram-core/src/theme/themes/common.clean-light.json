@@ -23,7 +23,7 @@
       "primary": "#5E6AD2",
       "neutral_fill": "#FFFFFF",
       "neutral_stroke": "#E4E4E7",
-      "edge_stroke": "#71717A",
+      "edge_stroke": "#52525B",
       "group_fill": "transparent",
       "group_stroke": "#737373"
     },
@@ -105,12 +105,12 @@
     },
     "edge": {
       "stroke": "{colors.edge_stroke}",
-      "stroke_width": "{strokes.normal}",
+      "stroke_width": 1.25,
       "text_fill": "{colors.muted_text}",
       "font_size": "{typography.small_size}",
       "stroke_linecap": "round",
       "stroke_linejoin": "round",
-      "stroke_opacity": 0.72,
+      "stroke_opacity": 0.88,
       "arrow_style": "normal",
       "label_bg": "{colors.neutral_fill}",
       "label_border": "none",
@@ -235,7 +235,7 @@
     "sequence": {
       "edge": {
         "stroke": "{colors.edge_stroke}",
-        "stroke_opacity": 0.8
+        "stroke_opacity": 0.9
       },
       "entity_types": {
         "participant": {
@@ -311,7 +311,7 @@
     "architecture": {
       "edge": {
         "stroke": "{colors.edge_stroke}",
-        "stroke_opacity": 0.7
+        "stroke_opacity": 0.85
       },
       "group": {
         "stroke": "{colors.border_strong}",
@@ -418,7 +418,7 @@
     "mindmap": {
       "edge": {
         "stroke_width": "{strokes.thin}",
-        "stroke_opacity": 0.6,
+        "stroke_opacity": 0.75,
         "stroke": "{colors.edge_stroke}"
       },
       "node": {

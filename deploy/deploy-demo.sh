@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一键构建并同步 playground + showcase 到 demo.plotgram.dev，大资源走 assets.plotgram.cn
+# 一键构建并同步 website(landing) + playground + showcase 到 demo.plotgram.dev，大资源走 assets.plotgram.cn
 #
 # 用法:
 #   ./deploy/deploy-demo.sh
@@ -33,7 +33,7 @@ usage() {
   cat <<'EOF'
 用法: deploy/deploy-demo.sh [选项]
 
-构建 playground（含 WASM）与 showcase，同步到 demo 站与 assets CDN。
+构建 website（landing page）+ playground（含 WASM）与 showcase，同步到 demo 站与 assets CDN。
 
 选项:
   --skip-showcase-render  跳过 showcase SVG 渲染（使用已有产物）
@@ -97,6 +97,16 @@ patch_build_hash() {
   sed -i '' "s/{{BUILD_HASH}}/${build_hash}/g" "$index_html"
 }
 
+build_website() {
+  log "构建 website (Landing Page)…"
+  require_cmd npm
+  (
+    cd "$ROOT_DIR/website"
+    npm ci --silent
+    npm run build
+  )
+}
+
 build_playground() {
   log "构建 plotgram-wasm…"
   require_cmd wasm-pack
@@ -148,11 +158,21 @@ stage_artifacts() {
   log "打包到临时目录: $STAGING_DIR"
 
   mkdir -p \
+    "$STAGING_DIR/demo/root" \
     "$STAGING_DIR/demo/playground" \
     "$STAGING_DIR/demo/showcase" \
     "$STAGING_DIR/demo/assets" \
     "$STAGING_DIR/cdn/playground/plotgram-wasm" \
     "$STAGING_DIR/cdn/showcase"
+
+  # demo 根目录：website (Landing Page)
+  rsync -a --delete \
+    "$ROOT_DIR/website/dist/" \
+    "$STAGING_DIR/demo/root/"
+
+  # demo：brand 资源
+  mkdir -p "$STAGING_DIR/demo/root/assets/brand"
+  rsync -a "$ROOT_DIR/assets/brand/" "$STAGING_DIR/demo/root/assets/brand/"
 
   # demo：playground 不含 wasm / 打包 assets（走 CDN）
   rsync -a --delete \
@@ -176,8 +196,6 @@ stage_artifacts() {
     "$STAGING_DIR/demo/showcase/"
 
   patch_showcase_cdn "$STAGING_DIR/demo/showcase/index.html"
-
-  rsync -a "$ROOT_DIR/assets/brand/" "$STAGING_DIR/demo/assets/brand/"
 
   # CDN：wasm
   rsync -a --delete \
@@ -203,12 +221,17 @@ upload() {
 
   log "同步 demo → ${DEPLOY_HOST}:${REMOTE_DIR} …"
   ssh "$DEPLOY_HOST" "mkdir -p '$REMOTE_DIR'"
+
+  # 根目录（landing page + assets），不删除已有的 playground/ 和 showcase/
+  rsync -avz --delete \
+    --exclude='playground/' \
+    --exclude='showcase/' \
+    "$STAGING_DIR/demo/root/" "$DEPLOY_HOST:$REMOTE_DIR/"
+
   rsync -avz --delete \
     "$STAGING_DIR/demo/playground/" "$DEPLOY_HOST:$REMOTE_DIR/playground/"
   rsync -avz --delete \
     "$STAGING_DIR/demo/showcase/" "$DEPLOY_HOST:$REMOTE_DIR/showcase/"
-  rsync -avz --delete \
-    "$STAGING_DIR/demo/assets/" "$DEPLOY_HOST:$REMOTE_DIR/assets/"
 
   log "同步 CDN → ${ASSET_HOST}:${ASSET_REMOTE_DIR} …"
   ssh "$ASSET_HOST" "mkdir -p '$ASSET_REMOTE_DIR'"
@@ -218,7 +241,7 @@ upload() {
     "$STAGING_DIR/cdn/showcase/" "$ASSET_HOST:$ASSET_REMOTE_DIR/showcase/"
 
   log "同步 nginx 配置 …"
-  scp "$ROOT_DIR/deploy/nginx/demo.plotgram.dev.conf" "$DEPLOY_HOST:/etc/nginx/sites-available/demo.plotgram.dev.conf"
+  scp "$ROOT_DIR/deploy/nginx/demo.plotgram.dev.conf" "$DEPLOY_HOST:/etc/nginx/conf.d/demo.plotgram.dev.conf"
   ssh "$DEPLOY_HOST" 'nginx -t && systemctl reload nginx'
   scp "$ROOT_DIR/deploy/nginx/assets.plotgram.cn.conf" "$ASSET_HOST:/etc/nginx/conf.d/assets.plotgram.cn.conf"
   ssh "$ASSET_HOST" 'nginx -t && systemctl reload nginx'
@@ -227,6 +250,7 @@ upload() {
 main() {
   log "开始同步 → https://${DOMAIN}（CDN: ${CDN_BASE}）"
   build_showcase
+  build_website
   build_playground
   stage_artifacts
   patch_build_hash "$STAGING_DIR/demo/showcase/index.html"
@@ -234,6 +258,7 @@ main() {
 
   echo ""
   echo "✅ 同步完成"
+  echo "   Website:    https://${DOMAIN}/"
   echo "   Playground: https://${DOMAIN}/playground/"
   echo "   Showcase:   https://${DOMAIN}/showcase/"
   echo "   CDN:        ${CDN_BASE}"

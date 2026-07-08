@@ -44,7 +44,9 @@ pub(super) mod slot;
 // Re-exports for cross-submodule access via `use super::*;`
 pub(super) use channel_load::{channel_load_penalty, ChannelLoadMap};
 pub(super) use context::{EndpointPair, PreparedObstacles, RoutingContext, SegmentGrid};
-pub(super) use lane_assignment::assign_lanes;
+pub(super) use lane_assignment::{
+    apply_corridor_planned_offsets, assign_lanes, separate_unrelated_trunk_overlaps,
+};
 pub(super) use path::{select_best_path_with_scorer_stats, PathSelectStats, RoutedSegment};
 #[allow(unused_imports)] // SpacingViolationKind/segments_violate_spacing/path_edge_spacing_violations used in X-1
 pub(super) use scoring::{CandidateScorer, DefaultScorer, GROUP_OBSTACLE_PAD, NODE_OBSTACLE_PAD, path_avoids_group_interiors, path_is_clean, path_is_clean_from_edges, path_length, SpacingViolationKind, segments_violate_spacing, path_edge_spacing_violations, count_all_edge_spacing_violations};
@@ -232,6 +234,30 @@ pub fn route_edges_orthogonal(
     route_edges_orthogonal_inner(diagram, result, cfg, None)
 }
 
+/// Architecture A7：bundling 后分离无关边共享 trunk（bundling 路径重写可能再次共线）。
+pub fn separate_unrelated_architecture_trunks_after_bundling(
+    relations: &[crate::ast::Relation],
+    edges: &mut [EdgeLayout],
+    nodes: &HashMap<String, NodeLayout>,
+    sorted_node_ids: &[String],
+) -> usize {
+    if edges.is_empty() {
+        return 0;
+    }
+    let from_side: Vec<Port> = edges.iter().map(|e| e.from_port).collect();
+    let to_side: Vec<Port> = edges.iter().map(|e| e.to_port).collect();
+    separate_unrelated_trunk_overlaps(
+        edges,
+        None,
+        relations,
+        &from_side,
+        &to_side,
+        nodes,
+        sorted_node_ids,
+        EDGE_PARALLEL_GAP,
+    )
+}
+
 /// 节点位移后的增量重路由：仅重算端点落在 `moved_node_ids` 上的边。
 ///
 /// 若需重路由的边占比过高（≥ 85%），回退为全图重路由以保持质量与简单性。
@@ -313,7 +339,8 @@ fn route_edges_orthogonal_inner(
         horizontal,
     );
 
-    let corridor_plan = corridor_route::plan_corridor_routes(relations, &group_ctx);
+    let corridor_plan =
+        corridor_route::plan_corridor_routes(relations, &group_ctx, diagram.diagram_type.clone());
 
     // ── 1. 按无向节点对分组，并确定每条边的端口（连接边） ──
     let t1 = crate::layout::perf::Instant::now();
@@ -667,7 +694,8 @@ fn route_edges_orthogonal_inner(
             to: to_ep.clone(),
         };
 
-        let corridor_candidate = corridor_route::try_build_corridor_path(
+        let mut path_stats = PathSelectStats::default();
+        let path = validated_corridor_path(
             i,
             from_ep.anchor,
             to_ep.anchor,
@@ -675,42 +703,11 @@ fn route_edges_orthogonal_inner(
             to_id,
             &corridor_plan,
             &group_ctx,
+            &result.nodes,
+            &obstacles,
             cfg.channel_margin,
-        );
-        let corridor_ok = corridor_candidate.as_ref().is_some_and(|candidate| {
-            candidate.len() >= 2
-                && path_is_clean(
-                    candidate,
-                    from_id,
-                    to_id,
-                    &result.nodes,
-                    &group_ctx,
-                    &obstacles.sorted_node_ids,
-                )
-                && path_avoids_group_interiors(
-                    candidate,
-                    from_id,
-                    to_id,
-                    &group_ctx,
-                    &obstacles.sorted_group_ids,
-                )
-        });
-        let mut path_stats = PathSelectStats::default();
-        let path = if let Some(candidate) = corridor_candidate {
-            if corridor_ok {
-                path_stats.candidate_count = 1;
-                candidate
-            } else {
-                let selected = select_best_path_with_scorer_stats(
-                    &ctx,
-                    &pair,
-                    &DefaultScorer,
-                    Some(&mut path_stats),
-                    false,
-                );
-                selected
-            }
-        } else {
+        )
+        .unwrap_or_else(|| {
             select_best_path_with_scorer_stats(
                 &ctx,
                 &pair,
@@ -718,7 +715,7 @@ fn route_edges_orthogonal_inner(
                 Some(&mut path_stats),
                 false,
             )
-        };
+        });
         ortho_stats.total_candidates += path_stats.candidate_count;
         ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
         if path_stats.degraded {
@@ -806,17 +803,45 @@ fn route_edges_orthogonal_inner(
         for &ei in &align_reroute {
             let Some(from_ep) = endpoint_map.get(&(ei, true)) else { continue };
             let Some(to_ep) = endpoint_map.get(&(ei, false)) else { continue };
-            let pair = EndpointPair { from: from_ep.clone(), to: to_ep.clone() };
-            let ctx = RoutingContext::new(&result.nodes, &group_ctx, &grid, &cfg, &obstacles, None)
-                .with_strict_group_transit(corridor_plan.chains.contains_key(&ei));
+            let (from_id, to_id) = relations
+                .get(ei)
+                .map(|rel| (rel.from.as_str(), rel.to.as_str()))
+                .unwrap_or(("", ""));
             let mut path_stats = PathSelectStats::default();
-            let candidate = select_best_path_with_scorer_stats(
-                &ctx,
-                &pair,
-                &DefaultScorer,
-                Some(&mut path_stats),
-                false,
-            );
+            let candidate = validated_corridor_path(
+                ei,
+                from_ep.anchor,
+                to_ep.anchor,
+                from_id,
+                to_id,
+                &corridor_plan,
+                &group_ctx,
+                &result.nodes,
+                &obstacles,
+                cfg.channel_margin,
+            )
+            .unwrap_or_else(|| {
+                let pair = EndpointPair {
+                    from: from_ep.clone(),
+                    to: to_ep.clone(),
+                };
+                let ctx = RoutingContext::new(
+                    &result.nodes,
+                    &group_ctx,
+                    &grid,
+                    &cfg,
+                    &obstacles,
+                    None,
+                )
+                .with_strict_group_transit(corridor_plan.chains.contains_key(&ei));
+                select_best_path_with_scorer_stats(
+                    &ctx,
+                    &pair,
+                    &DefaultScorer,
+                    Some(&mut path_stats),
+                    false,
+                )
+            });
             if candidate.len() >= 2 {
                 grid.insert_path(&candidate, ei);
                 let labels = match relations.get(ei) {
@@ -877,6 +902,7 @@ fn route_edges_orthogonal_inner(
         &cfg,
         &group_ctx,
         &obstacles,
+        &corridor_plan,
         &mut ortho_stats,
     );
     crate::perf_log!("[perf]     x2_flip_stub: {:.2}ms (flipped {} edges)", t_flip.elapsed().as_secs_f64() * 1000.0, ortho_stats.flipped_stub_edges);
@@ -898,6 +924,30 @@ fn route_edges_orthogonal_inner(
     ortho_stats.lane_groups = lane_stats.lane_groups;
     ortho_stats.lane_segments_shifted = lane_stats.segments_shifted;
     ortho_stats.lane_shifts_failed = lane_stats.shifts_failed;
+    if diagram.diagram_type == DiagramType::Architecture {
+        let corridor_shifted = apply_corridor_planned_offsets(
+            &mut edges,
+            &mut grid,
+            &result.nodes,
+            &obstacles.sorted_node_ids,
+            relations,
+            &from_side,
+            &to_side,
+            &corridor_plan,
+            &group_ctx,
+        );
+        ortho_stats.lane_segments_shifted += corridor_shifted;
+        ortho_stats.lane_segments_shifted += separate_unrelated_trunk_overlaps(
+            &mut edges,
+            Some(&mut grid),
+            relations,
+            &from_side,
+            &to_side,
+            &result.nodes,
+            &obstacles.sorted_node_ids,
+            EDGE_PARALLEL_GAP,
+        );
+    }
     crate::perf_log!(
         "[perf]     x3_lane_assignment: {:.2}ms ({} groups, {} shifted, {} failed)",
         t_lane.elapsed().as_secs_f64() * 1000.0,
@@ -924,6 +974,55 @@ fn route_edges_orthogonal_inner(
     // P2-1: 导出 orthogonal 路由 debug 统计
     result.hints.orthogonal_debug = Some(ortho_stats);
     result
+}
+
+/// 走廊边路径重建：有计划且通过穿障/穿组校验时返回路径。
+fn validated_corridor_path(
+    edge_index: usize,
+    from_anchor: Point,
+    to_anchor: Point,
+    from_id: &str,
+    to_id: &str,
+    corridor_plan: &corridor_route::CorridorRoutePlan,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    nodes: &HashMap<String, NodeLayout>,
+    obstacles: &PreparedObstacles,
+    stub_len: f64,
+) -> Option<Vec<Point>> {
+    if !corridor_plan.chains.contains_key(&edge_index) {
+        return None;
+    }
+    let candidate = corridor_route::try_build_corridor_path(
+        edge_index,
+        from_anchor,
+        to_anchor,
+        from_id,
+        to_id,
+        corridor_plan,
+        group_ctx,
+        stub_len,
+    )?;
+    if candidate.len() >= 2
+        && path_is_clean(
+            &candidate,
+            from_id,
+            to_id,
+            nodes,
+            group_ctx,
+            &obstacles.sorted_node_ids,
+        )
+        && path_avoids_group_interiors(
+            &candidate,
+            from_id,
+            to_id,
+            group_ctx,
+            &obstacles.sorted_group_ids,
+        )
+    {
+        Some(candidate)
+    } else {
+        None
+    }
 }
 
 /// 全局 Slot 重规划（Layer 3）：路由完成后根据实际出口方向全局重排 slot，
@@ -1117,14 +1216,33 @@ fn replan_slots(
             to: to_ep.clone(),
         };
 
+        let (from_id, to_id) = relations
+            .get(ei)
+            .map(|rel| (rel.from.as_str(), rel.to.as_str()))
+            .unwrap_or(("", ""));
+
         let mut path_stats = PathSelectStats::default();
-        let path = select_best_path_with_scorer_stats(
-            &ctx,
-            &pair,
-            &DefaultScorer,
-            Some(&mut path_stats),
-            true,
-        );
+        let path = validated_corridor_path(
+            ei,
+            from_ep.anchor,
+            to_ep.anchor,
+            from_id,
+            to_id,
+            corridor_plan,
+            group_ctx,
+            nodes,
+            obstacles,
+            cfg.channel_margin,
+        )
+        .unwrap_or_else(|| {
+            select_best_path_with_scorer_stats(
+                &ctx,
+                &pair,
+                &DefaultScorer,
+                Some(&mut path_stats),
+                true,
+            )
+        });
         ortho_stats.total_candidates += path_stats.candidate_count;
         ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
         if path_stats.degraded {
@@ -1242,6 +1360,37 @@ fn reroute_conflicting_edges(
             let Some(to_ep) = endpoint_map.get(&(ei, false)) else {
                 continue;
             };
+
+            let (from_id, to_id) = relations
+                .get(ei)
+                .map(|rel| (rel.from.as_str(), rel.to.as_str()))
+                .unwrap_or(("", ""));
+
+            if let Some(corridor_path) = validated_corridor_path(
+                ei,
+                from_ep.anchor,
+                to_ep.anchor,
+                from_id,
+                to_id,
+                corridor_plan,
+                group_ctx,
+                nodes,
+                obstacles,
+                cfg.channel_margin,
+            ) {
+                if path_edge_spacing_violations(&corridor_path, grid, EDGE_PARALLEL_GAP).is_empty() {
+                    grid.insert_path(&corridor_path, ei);
+                    let mut edge = EdgeLayout {
+                        geometry: PathGeometry::Polyline { points: Vec::new() },
+                        labels: edges[ei].labels.clone(),
+                        from_port: from_side[ei],
+                        to_port: to_side[ei],
+                    };
+                    edge.set_polyline_points(corridor_path);
+                    edges[ei] = edge;
+                    continue;
+                }
+            }
 
             // 先移除当前边
             grid.remove_by_edges(&[ei]);
@@ -2185,6 +2334,7 @@ fn fix_reverse_stub_ports(
     cfg: &OrthoConfig,
     group_ctx: &crate::layout::group::GroupRoutingContext,
     obstacles: &PreparedObstacles,
+    corridor_plan: &corridor_route::CorridorRoutePlan,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
 ) {
     let n = edges.len();
@@ -2325,16 +2475,35 @@ fn fix_reverse_stub_ports(
             };
 
             let pair = EndpointPair { from: nf_ep.clone(), to: nt_ep.clone() };
-            let ctx = RoutingContext::new(nodes, group_ctx, grid, &r_cfg, obstacles, None);
+            let (from_id, to_id) = relations
+                .get(ei)
+                .map(|rel| (rel.from.as_str(), rel.to.as_str()))
+                .unwrap_or(("", ""));
 
             let mut path_stats = PathSelectStats::default();
-            let candidate = select_best_path_with_scorer_stats(
-                &ctx,
-                &pair,
-                &DefaultScorer,
-                Some(&mut path_stats),
-                false,
-            );
+            let candidate = validated_corridor_path(
+                ei,
+                nf_anchor,
+                nt_anchor,
+                from_id,
+                to_id,
+                corridor_plan,
+                group_ctx,
+                nodes,
+                obstacles,
+                r_cfg.channel_margin,
+            )
+            .unwrap_or_else(|| {
+                let ctx = RoutingContext::new(nodes, group_ctx, grid, &r_cfg, obstacles, None)
+                    .with_strict_group_transit(corridor_plan.chains.contains_key(&ei));
+                select_best_path_with_scorer_stats(
+                    &ctx,
+                    &pair,
+                    &DefaultScorer,
+                    Some(&mut path_stats),
+                    false,
+                )
+            });
             ortho_stats.total_candidates += path_stats.candidate_count;
             ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
             if path_stats.degraded {

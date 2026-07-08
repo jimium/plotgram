@@ -24,6 +24,13 @@ Thumbs.db
 /crates/plotgram-wasm/dist/
 /playground/plotgram-wasm/
 
+# Website build artifacts
+/website/node_modules/
+/website/dist/
+
+# Playground dependencies
+/playground/node_modules/
+
 # VS Code extension
 /editors/vscode/node_modules/
 /editors/vscode/out/

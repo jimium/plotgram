@@ -45,6 +45,9 @@ enum Commands {
         /// 输入格式 (dfy/md-outline)，默认根据文件扩展名推断
         #[arg(long = "input-format")]
         input_format: Option<String>,
+        /// 省略画布背景（SVG/PNG/WebP 等输出为透明底）
+        #[arg(long = "transparent-background")]
+        transparent_background: bool,
     },
     /// 验证 Plotgram 文件的语法和语义
     Validate {
@@ -113,7 +116,15 @@ fn main() {
             output,
             fonts_dir,
             input_format,
-        }) => cmd_render(&input, &format, output.as_deref(), fonts_dir.as_deref(), input_format.as_deref()),
+            transparent_background,
+        }) => cmd_render(
+            &input,
+            &format,
+            output.as_deref(),
+            fonts_dir.as_deref(),
+            input_format.as_deref(),
+            transparent_background,
+        ),
         Some(Commands::Validate { input, format, layout_check }) => cmd_validate(&input, &format, layout_check),
         Some(Commands::Lint {
             input,
@@ -267,7 +278,14 @@ fn print_diagnostics_json(output: &PipelineOutput) {
     }));
 }
 
-fn cmd_render(input: &str, format_str: &str, output: Option<&str>, fonts_dir: Option<&str>, input_format: Option<&str>) {
+fn cmd_render(
+    input: &str,
+    format_str: &str,
+    output: Option<&str>,
+    fonts_dir: Option<&str>,
+    input_format: Option<&str>,
+    transparent_background: bool,
+) {
     configure_fonts_dir(fonts_dir);
 
     let format = RenderFormat::from_str(format_str).unwrap_or_else(|| {
@@ -317,7 +335,8 @@ fn cmd_render(input: &str, format_str: &str, output: Option<&str>, fonts_dir: Op
     let prepared = pipeline_output.diagram.unwrap();
 
     // Render
-    let request = plotgram_core::render::RenderRequest::new(&prepared, format);
+    let mut request = plotgram_core::render::RenderRequest::new(&prepared, format);
+    request.transparent_background = transparent_background;
     match output {
         Some(path) => {
             match format {

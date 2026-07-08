@@ -73,14 +73,13 @@ export function ExampleDrawer({ open, activeId, onSelect, onClose }: ExampleDraw
       <div className="example-drawer-backdrop" onClick={onClose} />
       {/* 抽屉 */}
       <div className="example-drawer">
-        <div className="example-drawer-head">
-          <h3>示例库</h3>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭">
-            <IconClose />
-          </button>
-        </div>
-
         <div className="example-drawer-search">
+          <div className="example-drawer-title-row">
+            <h3>示例库</h3>
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭">
+              <IconClose />
+            </button>
+          </div>
           <input
             className="search-input"
             type="search"

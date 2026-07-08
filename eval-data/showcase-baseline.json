@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "1783494465",
+  "generated_at": "1783500129",
   "entries": [
     {
       "path": "architecture/c.ai-agent-docops-pipeline.pgm",
@@ -10,15 +10,15 @@
         "edge_node_crossings": 1,
         "edge_through_groups": 1,
         "label_node_overlaps": 0,
-        "label_label_overlaps": 2,
-        "bend_count": 32,
-        "edge_parallel_overlap_count": 3,
-        "edge_crossings": 17,
+        "label_label_overlaps": 1,
+        "bend_count": 40,
+        "edge_parallel_overlap_count": 1,
+        "edge_crossings": 20,
         "total_area": 1608931.0,
-        "total_edge_length": 7499.876031999999,
+        "total_edge_length": 7711.379135999999,
         "total_node_area": 159750.0,
-        "edge_length_stddev": 269.6940571379112,
-        "edge_length_cv": 0.6113166340059968,
+        "edge_length_stddev": 275.0276340287992,
+        "edge_length_cv": 0.6063078595970601,
         "aspect_ratio": 1.3284870513403,
         "aspect_ratio_deviation": 0.2715129486597001,
         "area_utilization": 0.09928952826441904,
@@ -33,11 +33,11 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 1,
-          "edge_crossing": 17,
+          "edge_crossing": 20,
           "edge_crosses_group_interior": 1,
           "label_node_overlap": 0,
-          "label_label_overlap": 2,
-          "unrelated_edge_trunk_merge": 3,
+          "label_label_overlap": 1,
+          "unrelated_edge_trunk_merge": 1,
           "total_violations": 24,
           "error_count": 2,
           "warning_count": 22
@@ -47,17 +47,17 @@
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 1,
-        "edge_crossing": 17,
+        "edge_crossing": 20,
         "edge_crosses_group_interior": 1,
         "label_node_overlap": 0,
-        "label_label_overlap": 2,
-        "unrelated_edge_trunk_merge": 3,
+        "label_label_overlap": 1,
+        "unrelated_edge_trunk_merge": 1,
         "total_violations": 24,
         "error_count": 2,
         "warning_count": 22
       },
-      "score": 62.33,
-      "elapsed_us": 409262
+      "score": 62.79,
+      "elapsed_us": 582069
     },
     {
       "path": "architecture/c.cloud-native.pgm",
@@ -68,14 +68,14 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 23,
-        "edge_parallel_overlap_count": 0,
-        "edge_crossings": 7,
+        "bend_count": 46,
+        "edge_parallel_overlap_count": 1,
+        "edge_crossings": 6,
         "total_area": 1250832.0,
-        "total_edge_length": 6772.0,
+        "total_edge_length": 7193.5,
         "total_node_area": 89500.0,
-        "edge_length_stddev": 422.4432005051818,
-        "edge_length_cv": 0.8733320742871449,
+        "edge_length_stddev": 417.92733079631273,
+        "edge_length_cv": 0.8133707696042787,
         "aspect_ratio": 1.2213438735177864,
         "aspect_ratio_deviation": 0.3786561264822137,
         "area_utilization": 0.07155237473937347,
@@ -90,11 +90,11 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 0,
-          "edge_crossing": 7,
+          "edge_crossing": 6,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 0,
+          "unrelated_edge_trunk_merge": 1,
           "total_violations": 7,
           "error_count": 0,
           "warning_count": 7
@@ -104,17 +104,17 @@
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 0,
-        "edge_crossing": 7,
+        "edge_crossing": 6,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 0,
+        "unrelated_edge_trunk_merge": 1,
         "total_violations": 7,
         "error_count": 0,
         "warning_count": 7
       },
-      "score": 61.4,
-      "elapsed_us": 46860
+      "score": 63.17,
+      "elapsed_us": 51849
     },
     {
       "path": "architecture/c.data-lineage-platform.pgm",
@@ -125,14 +125,14 @@
         "edge_through_groups": 1,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 36,
-        "edge_parallel_overlap_count": 0,
+        "bend_count": 48,
+        "edge_parallel_overlap_count": 1,
         "edge_crossings": 15,
         "total_area": 1556580.0170108122,
-        "total_edge_length": 8718.028988219547,
+        "total_edge_length": 9072.919857853403,
         "total_node_area": 138950.0,
-        "edge_length_stddev": 358.4945708721597,
-        "edge_length_cv": 0.8224211489927011,
+        "edge_length_stddev": 364.6951589652569,
+        "edge_length_cv": 0.8039201595053911,
         "aspect_ratio": 1.7026969195516728,
         "aspect_ratio_deviation": 0.1026969195516727,
         "area_utilization": 0.08926621084782617,
@@ -151,10 +151,10 @@
           "edge_crosses_group_interior": 1,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 0,
-          "total_violations": 16,
+          "unrelated_edge_trunk_merge": 1,
+          "total_violations": 17,
           "error_count": 1,
-          "warning_count": 15
+          "warning_count": 16
         }
       },
       "lint": {
@@ -165,13 +165,13 @@
         "edge_crosses_group_interior": 1,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 0,
-        "total_violations": 16,
+        "unrelated_edge_trunk_merge": 1,
+        "total_violations": 17,
         "error_count": 1,
-        "warning_count": 15
+        "warning_count": 16
       },
-      "score": 60.61,
-      "elapsed_us": 215293
+      "score": 60.98,
+      "elapsed_us": 246116
     },
     {
       "path": "architecture/c.ecommerce-platform.pgm",
@@ -182,14 +182,14 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 40,
+        "bend_count": 63,
         "edge_parallel_overlap_count": 0,
-        "edge_crossings": 10,
+        "edge_crossings": 13,
         "total_area": 2022272.0,
-        "total_edge_length": 10316.829436997048,
+        "total_edge_length": 10583.074657650437,
         "total_node_area": 122350.0,
-        "edge_length_stddev": 311.6948174034773,
-        "edge_length_cv": 0.5740330948409924,
+        "edge_length_stddev": 314.4740154773952,
+        "edge_length_cv": 0.5645813232311666,
         "aspect_ratio": 1.4425675675675675,
         "aspect_ratio_deviation": 0.15743243243243255,
         "area_utilization": 0.06050125799101209,
@@ -204,31 +204,31 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 0,
-          "edge_crossing": 10,
+          "edge_crossing": 13,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
           "unrelated_edge_trunk_merge": 0,
-          "total_violations": 10,
+          "total_violations": 13,
           "error_count": 0,
-          "warning_count": 10
+          "warning_count": 13
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 0,
-        "edge_crossing": 10,
+        "edge_crossing": 13,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 0,
-        "total_violations": 10,
+        "total_violations": 13,
         "error_count": 0,
-        "warning_count": 10
+        "warning_count": 13
       },
-      "score": 66.73,
-      "elapsed_us": 77032
+      "score": 65.65,
+      "elapsed_us": 75589
     },
     {
       "path": "architecture/c.hybrid-cloud-dr-topology.pgm",
@@ -239,14 +239,14 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 47,
-        "edge_parallel_overlap_count": 2,
-        "edge_crossings": 20,
+        "bend_count": 55,
+        "edge_parallel_overlap_count": 0,
+        "edge_crossings": 24,
         "total_area": 2662080.0,
-        "total_edge_length": 14332.220000000001,
+        "total_edge_length": 14603.720000000001,
         "total_node_area": 163300.0,
-        "edge_length_stddev": 618.1310637849972,
-        "edge_length_cv": 1.0350905533713501,
+        "edge_length_stddev": 629.0062339759087,
+        "edge_length_cv": 1.0337194643160652,
         "aspect_ratio": 1.911864406779661,
         "aspect_ratio_deviation": 0.311864406779661,
         "area_utilization": 0.06134300997716072,
@@ -261,31 +261,31 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 0,
-          "edge_crossing": 20,
+          "edge_crossing": 24,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 2,
-          "total_violations": 22,
+          "unrelated_edge_trunk_merge": 0,
+          "total_violations": 24,
           "error_count": 0,
-          "warning_count": 22
+          "warning_count": 24
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 0,
-        "edge_crossing": 20,
+        "edge_crossing": 24,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 2,
-        "total_violations": 22,
+        "unrelated_edge_trunk_merge": 0,
+        "total_violations": 24,
         "error_count": 0,
-        "warning_count": 22
+        "warning_count": 24
       },
-      "score": 54.23,
-      "elapsed_us": 89063
+      "score": 52.89,
+      "elapsed_us": 97470
     },
     {
       "path": "architecture/c.k8s-blue-green-release-topology.pgm",
@@ -296,17 +296,17 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 73,
-        "edge_parallel_overlap_count": 7,
-        "edge_crossings": 29,
-        "total_area": 3193596.0,
-        "total_edge_length": 24375.964999999997,
+        "bend_count": 74,
+        "edge_parallel_overlap_count": 1,
+        "edge_crossings": 33,
+        "total_area": 3127356.0,
+        "total_edge_length": 24444.464999999997,
         "total_node_area": 165300.0,
-        "edge_length_stddev": 687.9034099320478,
-        "edge_length_cv": 0.8466168333422467,
-        "aspect_ratio": 1.1645531400966183,
-        "aspect_ratio_deviation": 0.43544685990338183,
-        "area_utilization": 0.051759834368530024,
+        "edge_length_stddev": 687.3469787697599,
+        "edge_length_cv": 0.8435614918589054,
+        "aspect_ratio": 1.1403985507246377,
+        "aspect_ratio_deviation": 0.4596014492753624,
+        "area_utilization": 0.052856150690871136,
         "channel_congestion": 31.0,
         "long_edge_count": 15,
         "group_gap_deficit": 0.0,
@@ -318,31 +318,31 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 0,
-          "edge_crossing": 29,
+          "edge_crossing": 33,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 7,
-          "total_violations": 36,
+          "unrelated_edge_trunk_merge": 1,
+          "total_violations": 34,
           "error_count": 0,
-          "warning_count": 36
+          "warning_count": 34
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 0,
-        "edge_crossing": 29,
+        "edge_crossing": 33,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 7,
-        "total_violations": 36,
+        "unrelated_edge_trunk_merge": 1,
+        "total_violations": 34,
         "error_count": 0,
-        "warning_count": 36
+        "warning_count": 34
       },
-      "score": 57.4,
-      "elapsed_us": 149659
+      "score": 57.24,
+      "elapsed_us": 168357
     },
     {
       "path": "architecture/c.k8s-multi-cluster-federation.pgm",
@@ -353,14 +353,14 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 88,
-        "edge_parallel_overlap_count": 6,
-        "edge_crossings": 47,
+        "bend_count": 114,
+        "edge_parallel_overlap_count": 4,
+        "edge_crossings": 54,
         "total_area": 2679280.0,
-        "total_edge_length": 23204.880191730474,
+        "total_edge_length": 24601.50497546685,
         "total_node_area": 210800.0,
-        "edge_length_stddev": 485.4830827514907,
-        "edge_length_cv": 0.7322557908468574,
+        "edge_length_stddev": 491.74626369931946,
+        "edge_length_cv": 0.6995961932670167,
         "aspect_ratio": 1.70926517571885,
         "aspect_ratio_deviation": 0.10926517571884986,
         "area_utilization": 0.0786778537517542,
@@ -375,31 +375,31 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 2,
-          "edge_crossing": 47,
+          "edge_crossing": 54,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 6,
-          "total_violations": 55,
+          "unrelated_edge_trunk_merge": 4,
+          "total_violations": 60,
           "error_count": 2,
-          "warning_count": 53
+          "warning_count": 58
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 2,
-        "edge_crossing": 47,
+        "edge_crossing": 54,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 6,
-        "total_violations": 55,
+        "unrelated_edge_trunk_merge": 4,
+        "total_violations": 60,
         "error_count": 2,
-        "warning_count": 53
+        "warning_count": 58
       },
-      "score": 59.27,
-      "elapsed_us": 816920
+      "score": 59.92,
+      "elapsed_us": 847947
     },
     {
       "path": "architecture/c.k8s-multi-namespace-overview.pgm",
@@ -410,14 +410,14 @@
         "edge_through_groups": 1,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 151,
-        "edge_parallel_overlap_count": 20,
-        "edge_crossings": 62,
+        "bend_count": 159,
+        "edge_parallel_overlap_count": 8,
+        "edge_crossings": 75,
         "total_area": 2602032.0,
-        "total_edge_length": 23226.071094472652,
+        "total_edge_length": 23385.025260422677,
         "total_node_area": 233450.0,
-        "edge_length_stddev": 528.1299583899199,
-        "edge_length_cv": 0.8413307778549496,
+        "edge_length_stddev": 523.3445127600395,
+        "edge_length_cv": 0.8280404556540328,
         "aspect_ratio": 1.2618384401114207,
         "aspect_ratio_deviation": 0.33816155988857943,
         "area_utilization": 0.08971834320254324,
@@ -432,88 +432,88 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 11,
-          "edge_crossing": 62,
+          "edge_crossing": 75,
           "edge_crosses_group_interior": 1,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 20,
-          "total_violations": 94,
+          "unrelated_edge_trunk_merge": 8,
+          "total_violations": 95,
           "error_count": 12,
-          "warning_count": 82
+          "warning_count": 83
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 11,
-        "edge_crossing": 62,
+        "edge_crossing": 75,
         "edge_crosses_group_interior": 1,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 20,
-        "total_violations": 94,
+        "unrelated_edge_trunk_merge": 8,
+        "total_violations": 95,
         "error_count": 12,
-        "warning_count": 82
+        "warning_count": 83
       },
-      "score": 55.19,
-      "elapsed_us": 912847
+      "score": 55.46,
+      "elapsed_us": 994354
     },
     {
       "path": "architecture/c.k8s-platform-stack.pgm",
       "diagram_type": "architecture",
       "metrics": {
         "node_overlap_pairs": 0,
-        "edge_node_crossings": 8,
-        "edge_through_groups": 5,
+        "edge_node_crossings": 5,
+        "edge_through_groups": 4,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 66,
-        "edge_parallel_overlap_count": 3,
-        "edge_crossings": 40,
-        "total_area": 2656704.0,
-        "total_edge_length": 23237.164464682985,
+        "bend_count": 81,
+        "edge_parallel_overlap_count": 1,
+        "edge_crossings": 38,
+        "total_area": 2586560.0,
+        "total_edge_length": 23911.366984676268,
         "total_node_area": 189950.0,
-        "edge_length_stddev": 690.0456162383641,
-        "edge_length_cv": 0.8908732611766771,
-        "aspect_ratio": 1.8085808580858085,
-        "aspect_ratio_deviation": 0.2085808580858084,
-        "area_utilization": 0.07149836790248368,
-        "channel_congestion": 30.0,
+        "edge_length_stddev": 676.2344361446482,
+        "edge_length_cv": 0.8484263194714255,
+        "aspect_ratio": 1.8576271186440676,
+        "aspect_ratio_deviation": 0.2576271186440675,
+        "area_utilization": 0.0734373066930595,
+        "channel_congestion": 31.0,
         "long_edge_count": 15,
         "group_gap_deficit": 0.0,
         "predicted_crossings": 24,
-        "port_conflict_score": 90.0,
+        "port_conflict_score": 60.0,
         "node_count": 23,
         "edge_count": 30,
         "lint": {
           "node_overlap": 0,
           "group_overlap": 0,
-          "edge_through_node": 8,
-          "edge_crossing": 40,
-          "edge_crosses_group_interior": 5,
+          "edge_through_node": 5,
+          "edge_crossing": 38,
+          "edge_crosses_group_interior": 4,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 3,
-          "total_violations": 56,
-          "error_count": 13,
-          "warning_count": 43
+          "unrelated_edge_trunk_merge": 1,
+          "total_violations": 48,
+          "error_count": 9,
+          "warning_count": 39
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
-        "edge_through_node": 8,
-        "edge_crossing": 40,
-        "edge_crosses_group_interior": 5,
+        "edge_through_node": 5,
+        "edge_crossing": 38,
+        "edge_crosses_group_interior": 4,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 3,
-        "total_violations": 56,
-        "error_count": 13,
-        "warning_count": 43
+        "unrelated_edge_trunk_merge": 1,
+        "total_violations": 48,
+        "error_count": 9,
+        "warning_count": 39
       },
-      "score": 52.8,
-      "elapsed_us": 1337816
+      "score": 54.68,
+      "elapsed_us": 1395734
     },
     {
       "path": "architecture/c.k8s-tenant-isolation.pgm",
@@ -524,14 +524,14 @@
         "edge_through_groups": 1,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 62,
-        "edge_parallel_overlap_count": 3,
+        "bend_count": 87,
+        "edge_parallel_overlap_count": 2,
         "edge_crossings": 40,
         "total_area": 2368174.0,
-        "total_edge_length": 17950.36,
+        "total_edge_length": 18856.42239186819,
         "total_node_area": 197050.0,
-        "edge_length_stddev": 538.6772310497996,
-        "edge_length_cv": 0.780241065209544,
+        "edge_length_stddev": 543.3318362319925,
+        "edge_length_cv": 0.7491679730362796,
         "aspect_ratio": 1.4110382091856426,
         "aspect_ratio_deviation": 0.1889617908143575,
         "area_utilization": 0.08320756836279766,
@@ -550,10 +550,10 @@
           "edge_crosses_group_interior": 1,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 3,
-          "total_violations": 44,
+          "unrelated_edge_trunk_merge": 2,
+          "total_violations": 43,
           "error_count": 1,
-          "warning_count": 43
+          "warning_count": 42
         }
       },
       "lint": {
@@ -564,13 +564,13 @@
         "edge_crosses_group_interior": 1,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 3,
-        "total_violations": 44,
+        "unrelated_edge_trunk_merge": 2,
+        "total_violations": 43,
         "error_count": 1,
-        "warning_count": 43
+        "warning_count": 42
       },
-      "score": 59.72,
-      "elapsed_us": 568304
+      "score": 60.34,
+      "elapsed_us": 596110
     },
     {
       "path": "architecture/c.layout-stress-nested.pgm",
@@ -581,17 +581,17 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 22,
-        "edge_parallel_overlap_count": 4,
-        "edge_crossings": 3,
-        "total_area": 1049926.921875,
-        "total_edge_length": 5171.0,
+        "bend_count": 30,
+        "edge_parallel_overlap_count": 1,
+        "edge_crossings": 6,
+        "total_area": 1045654.5,
+        "total_edge_length": 4758.16,
         "total_node_area": 85800.0,
-        "edge_length_stddev": 255.00954849276764,
-        "edge_length_cv": 0.6410992323353276,
-        "aspect_ratio": 2.1909534127843986,
-        "aspect_ratio_deviation": 0.5909534127843985,
-        "area_utilization": 0.08171997327849738,
+        "edge_length_stddev": 208.928803410814,
+        "edge_length_cv": 0.5708245297216954,
+        "aspect_ratio": 2.1431639226914814,
+        "aspect_ratio_deviation": 0.5431639226914813,
+        "area_utilization": 0.08205387152257271,
         "channel_congestion": 12.0,
         "long_edge_count": 7,
         "group_gap_deficit": 0.0,
@@ -603,11 +603,11 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 0,
-          "edge_crossing": 3,
+          "edge_crossing": 6,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 4,
+          "unrelated_edge_trunk_merge": 1,
           "total_violations": 7,
           "error_count": 0,
           "warning_count": 7
@@ -617,17 +617,17 @@
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 0,
-        "edge_crossing": 3,
+        "edge_crossing": 6,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 4,
+        "unrelated_edge_trunk_merge": 1,
         "total_violations": 7,
         "error_count": 0,
         "warning_count": 7
       },
-      "score": 65.65,
-      "elapsed_us": 37761
+      "score": 65.46,
+      "elapsed_us": 36903
     },
     {
       "path": "architecture/c.mcp-server-cluster-architecture.pgm",
@@ -638,14 +638,14 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 19,
+        "bend_count": 30,
         "edge_parallel_overlap_count": 0,
-        "edge_crossings": 3,
+        "edge_crossings": 2,
         "total_area": 1090800.0,
-        "total_edge_length": 4114.243735875357,
+        "total_edge_length": 4184.77625601547,
         "total_node_area": 88100.0,
-        "edge_length_stddev": 151.3962351856888,
-        "edge_length_cv": 0.40477878656555843,
+        "edge_length_stddev": 162.73759270463964,
+        "edge_length_cv": 0.4277680359082066,
         "aspect_ratio": 1.3466666666666667,
         "aspect_ratio_deviation": 0.2533333333333334,
         "area_utilization": 0.08076640997433077,
@@ -656,6 +656,291 @@
         "port_conflict_score": 30.0,
         "node_count": 9,
         "edge_count": 11,
+        "lint": {
+          "node_overlap": 0,
+          "group_overlap": 0,
+          "edge_through_node": 0,
+          "edge_crossing": 2,
+          "edge_crosses_group_interior": 0,
+          "label_node_overlap": 0,
+          "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
+          "total_violations": 2,
+          "error_count": 0,
+          "warning_count": 2
+        }
+      },
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 2,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "total_violations": 2,
+        "error_count": 0,
+        "warning_count": 2
+      },
+      "score": 73.22,
+      "elapsed_us": 18954
+    },
+    {
+      "path": "architecture/c.payment-clearing-platform.pgm",
+      "diagram_type": "architecture",
+      "metrics": {
+        "node_overlap_pairs": 0,
+        "edge_node_crossings": 0,
+        "edge_through_groups": 0,
+        "label_node_overlaps": 0,
+        "label_label_overlaps": 0,
+        "bend_count": 36,
+        "edge_parallel_overlap_count": 0,
+        "edge_crossings": 5,
+        "total_area": 1718596.0,
+        "total_edge_length": 8621.842074752305,
+        "total_node_area": 152700.0,
+        "edge_length_stddev": 497.5925695252706,
+        "edge_length_cv": 0.9811213901378053,
+        "aspect_ratio": 1.3603202846975087,
+        "aspect_ratio_deviation": 0.23967971530249144,
+        "area_utilization": 0.08885159746676939,
+        "channel_congestion": 14.0,
+        "long_edge_count": 9,
+        "group_gap_deficit": 0.0,
+        "predicted_crossings": 3,
+        "port_conflict_score": 30.0,
+        "node_count": 16,
+        "edge_count": 17,
+        "lint": {
+          "node_overlap": 0,
+          "group_overlap": 0,
+          "edge_through_node": 0,
+          "edge_crossing": 5,
+          "edge_crosses_group_interior": 0,
+          "label_node_overlap": 0,
+          "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
+          "total_violations": 5,
+          "error_count": 0,
+          "warning_count": 5
+        }
+      },
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 5,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "total_violations": 5,
+        "error_count": 0,
+        "warning_count": 5
+      },
+      "score": 61.58,
+      "elapsed_us": 110199
+    },
+    {
+      "path": "architecture/c.plotgram-core-mod-deps.pgm",
+      "diagram_type": "architecture",
+      "metrics": {
+        "node_overlap_pairs": 1,
+        "edge_node_crossings": 6,
+        "edge_through_groups": 3,
+        "label_node_overlaps": 0,
+        "label_label_overlaps": 0,
+        "bend_count": 60,
+        "edge_parallel_overlap_count": 0,
+        "edge_crossings": 40,
+        "total_area": 2173919.9,
+        "total_edge_length": 19389.4,
+        "total_node_area": 219250.0,
+        "edge_length_stddev": 553.4344754536797,
+        "edge_length_cv": 0.8277512346001791,
+        "aspect_ratio": 1.1908815039597365,
+        "aspect_ratio_deviation": 0.4091184960402636,
+        "area_utilization": 0.10085468190433328,
+        "channel_congestion": 28.0,
+        "long_edge_count": 18,
+        "group_gap_deficit": 0.0,
+        "predicted_crossings": 30,
+        "port_conflict_score": 184.0,
+        "node_count": 20,
+        "edge_count": 29,
+        "lint": {
+          "node_overlap": 1,
+          "group_overlap": 0,
+          "edge_through_node": 6,
+          "edge_crossing": 40,
+          "edge_crosses_group_interior": 3,
+          "label_node_overlap": 0,
+          "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
+          "total_violations": 50,
+          "error_count": 10,
+          "warning_count": 40
+        }
+      },
+      "lint": {
+        "node_overlap": 1,
+        "group_overlap": 0,
+        "edge_through_node": 6,
+        "edge_crossing": 40,
+        "edge_crosses_group_interior": 3,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "total_violations": 50,
+        "error_count": 10,
+        "warning_count": 40
+      },
+      "score": 56.92,
+      "elapsed_us": 956928
+    },
+    {
+      "path": "architecture/c.supply-chain-control-tower.pgm",
+      "diagram_type": "architecture",
+      "metrics": {
+        "node_overlap_pairs": 0,
+        "edge_node_crossings": 0,
+        "edge_through_groups": 0,
+        "label_node_overlaps": 0,
+        "label_label_overlaps": 1,
+        "bend_count": 22,
+        "edge_parallel_overlap_count": 0,
+        "edge_crossings": 1,
+        "total_area": 1925160.6357355288,
+        "total_edge_length": 4925.422712758327,
+        "total_node_area": 173500.0,
+        "edge_length_stddev": 354.1786432436691,
+        "edge_length_cv": 1.2943489219457889,
+        "aspect_ratio": 1.890992331977077,
+        "aspect_ratio_deviation": 0.29099233197707686,
+        "area_utilization": 0.09012234967795943,
+        "channel_congestion": 14.0,
+        "long_edge_count": 3,
+        "group_gap_deficit": 0.0,
+        "predicted_crossings": 9,
+        "port_conflict_score": 130.0,
+        "node_count": 16,
+        "edge_count": 18,
+        "lint": {
+          "node_overlap": 0,
+          "group_overlap": 0,
+          "edge_through_node": 0,
+          "edge_crossing": 1,
+          "edge_crosses_group_interior": 0,
+          "label_node_overlap": 0,
+          "label_label_overlap": 1,
+          "unrelated_edge_trunk_merge": 0,
+          "total_violations": 2,
+          "error_count": 0,
+          "warning_count": 2
+        }
+      },
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 1,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 1,
+        "unrelated_edge_trunk_merge": 0,
+        "total_violations": 2,
+        "error_count": 0,
+        "warning_count": 2
+      },
+      "score": 61.37,
+      "elapsed_us": 52429
+    },
+    {
+      "path": "architecture/n.compiler-pipeline.pgm",
+      "diagram_type": "architecture",
+      "metrics": {
+        "node_overlap_pairs": 0,
+        "edge_node_crossings": 0,
+        "edge_through_groups": 0,
+        "label_node_overlaps": 0,
+        "label_label_overlaps": 0,
+        "bend_count": 20,
+        "edge_parallel_overlap_count": 0,
+        "edge_crossings": 2,
+        "total_area": 1350804.0,
+        "total_edge_length": 5543.685769788119,
+        "total_node_area": 78500.0,
+        "edge_length_stddev": 334.6507748404735,
+        "edge_length_cv": 0.6640272692414714,
+        "aspect_ratio": 1.1327838827838828,
+        "aspect_ratio_deviation": 0.46721611721611733,
+        "area_utilization": 0.05811353830755609,
+        "channel_congestion": 13.0,
+        "long_edge_count": 3,
+        "group_gap_deficit": 40.0,
+        "predicted_crossings": 4,
+        "port_conflict_score": 0.0,
+        "node_count": 10,
+        "edge_count": 11,
+        "lint": {
+          "node_overlap": 0,
+          "group_overlap": 0,
+          "edge_through_node": 0,
+          "edge_crossing": 2,
+          "edge_crosses_group_interior": 0,
+          "label_node_overlap": 0,
+          "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
+          "total_violations": 2,
+          "error_count": 0,
+          "warning_count": 2
+        }
+      },
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 2,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "total_violations": 2,
+        "error_count": 0,
+        "warning_count": 2
+      },
+      "score": 67.59,
+      "elapsed_us": 32385
+    },
+    {
+      "path": "architecture/n.d2-cell-tower-network.pgm",
+      "diagram_type": "architecture",
+      "metrics": {
+        "node_overlap_pairs": 0,
+        "edge_node_crossings": 0,
+        "edge_through_groups": 0,
+        "label_node_overlaps": 0,
+        "label_label_overlaps": 0,
+        "bend_count": 15,
+        "edge_parallel_overlap_count": 0,
+        "edge_crossings": 3,
+        "total_area": 791116.25,
+        "total_edge_length": 4130.764035174503,
+        "total_node_area": 46550.0,
+        "edge_length_stddev": 314.7259252351173,
+        "edge_length_cv": 0.5333351065047589,
+        "aspect_ratio": 1.2716323296354992,
+        "aspect_ratio_deviation": 0.3283676703645009,
+        "area_utilization": 0.05884090991684218,
+        "channel_congestion": 9.0,
+        "long_edge_count": 5,
+        "group_gap_deficit": 0.0,
+        "predicted_crossings": 5,
+        "port_conflict_score": 0.0,
+        "node_count": 7,
+        "edge_count": 7,
         "lint": {
           "node_overlap": 0,
           "group_overlap": 0,
@@ -683,293 +968,8 @@
         "error_count": 0,
         "warning_count": 3
       },
-      "score": 72.95,
-      "elapsed_us": 24314
-    },
-    {
-      "path": "architecture/c.payment-clearing-platform.pgm",
-      "diagram_type": "architecture",
-      "metrics": {
-        "node_overlap_pairs": 0,
-        "edge_node_crossings": 0,
-        "edge_through_groups": 0,
-        "label_node_overlaps": 0,
-        "label_label_overlaps": 0,
-        "bend_count": 26,
-        "edge_parallel_overlap_count": 1,
-        "edge_crossings": 5,
-        "total_area": 1706364.0,
-        "total_edge_length": 8432.381077129532,
-        "total_node_area": 152700.0,
-        "edge_length_stddev": 492.55240332227345,
-        "edge_length_cv": 0.9930043222535474,
-        "aspect_ratio": 1.3700716845878136,
-        "aspect_ratio_deviation": 0.2299283154121865,
-        "area_utilization": 0.0894885264808681,
-        "channel_congestion": 14.0,
-        "long_edge_count": 9,
-        "group_gap_deficit": 0.0,
-        "predicted_crossings": 3,
-        "port_conflict_score": 30.0,
-        "node_count": 16,
-        "edge_count": 17,
-        "lint": {
-          "node_overlap": 0,
-          "group_overlap": 0,
-          "edge_through_node": 0,
-          "edge_crossing": 5,
-          "edge_crosses_group_interior": 0,
-          "label_node_overlap": 0,
-          "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 1,
-          "total_violations": 6,
-          "error_count": 0,
-          "warning_count": 6
-        }
-      },
-      "lint": {
-        "node_overlap": 0,
-        "group_overlap": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 5,
-        "edge_crosses_group_interior": 0,
-        "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 1,
-        "total_violations": 6,
-        "error_count": 0,
-        "warning_count": 6
-      },
-      "score": 61.37,
-      "elapsed_us": 106766
-    },
-    {
-      "path": "architecture/c.plotgram-core-mod-deps.pgm",
-      "diagram_type": "architecture",
-      "metrics": {
-        "node_overlap_pairs": 1,
-        "edge_node_crossings": 5,
-        "edge_through_groups": 2,
-        "label_node_overlaps": 0,
-        "label_label_overlaps": 0,
-        "bend_count": 61,
-        "edge_parallel_overlap_count": 4,
-        "edge_crossings": 35,
-        "total_area": 2212068.0,
-        "total_edge_length": 19631.4,
-        "total_node_area": 219250.0,
-        "edge_length_stddev": 603.7002165303268,
-        "edge_length_cv": 0.8918012102743296,
-        "aspect_ratio": 1.2173590504451037,
-        "aspect_ratio_deviation": 0.38264094955489636,
-        "area_utilization": 0.09911539789916042,
-        "channel_congestion": 28.0,
-        "long_edge_count": 18,
-        "group_gap_deficit": 0.0,
-        "predicted_crossings": 28,
-        "port_conflict_score": 184.0,
-        "node_count": 20,
-        "edge_count": 29,
-        "lint": {
-          "node_overlap": 1,
-          "group_overlap": 0,
-          "edge_through_node": 5,
-          "edge_crossing": 35,
-          "edge_crosses_group_interior": 2,
-          "label_node_overlap": 0,
-          "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 4,
-          "total_violations": 47,
-          "error_count": 8,
-          "warning_count": 39
-        }
-      },
-      "lint": {
-        "node_overlap": 1,
-        "group_overlap": 0,
-        "edge_through_node": 5,
-        "edge_crossing": 35,
-        "edge_crosses_group_interior": 2,
-        "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 4,
-        "total_violations": 47,
-        "error_count": 8,
-        "warning_count": 39
-      },
-      "score": 55.99,
-      "elapsed_us": 1076381
-    },
-    {
-      "path": "architecture/c.supply-chain-control-tower.pgm",
-      "diagram_type": "architecture",
-      "metrics": {
-        "node_overlap_pairs": 0,
-        "edge_node_crossings": 0,
-        "edge_through_groups": 0,
-        "label_node_overlaps": 0,
-        "label_label_overlaps": 0,
-        "bend_count": 22,
-        "edge_parallel_overlap_count": 0,
-        "edge_crossings": 1,
-        "total_area": 1925160.6357355288,
-        "total_edge_length": 4925.422712758327,
-        "total_node_area": 173500.0,
-        "edge_length_stddev": 354.1786432436691,
-        "edge_length_cv": 1.2943489219457889,
-        "aspect_ratio": 1.890992331977077,
-        "aspect_ratio_deviation": 0.29099233197707686,
-        "area_utilization": 0.09012234967795943,
-        "channel_congestion": 14.0,
-        "long_edge_count": 3,
-        "group_gap_deficit": 0.0,
-        "predicted_crossings": 9,
-        "port_conflict_score": 130.0,
-        "node_count": 16,
-        "edge_count": 18,
-        "lint": {
-          "node_overlap": 0,
-          "group_overlap": 0,
-          "edge_through_node": 0,
-          "edge_crossing": 1,
-          "edge_crosses_group_interior": 0,
-          "label_node_overlap": 0,
-          "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 0,
-          "total_violations": 1,
-          "error_count": 0,
-          "warning_count": 1
-        }
-      },
-      "lint": {
-        "node_overlap": 0,
-        "group_overlap": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 1,
-        "edge_crosses_group_interior": 0,
-        "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 0,
-        "total_violations": 1,
-        "error_count": 0,
-        "warning_count": 1
-      },
-      "score": 61.71,
-      "elapsed_us": 49014
-    },
-    {
-      "path": "architecture/n.compiler-pipeline.pgm",
-      "diagram_type": "architecture",
-      "metrics": {
-        "node_overlap_pairs": 0,
-        "edge_node_crossings": 0,
-        "edge_through_groups": 0,
-        "label_node_overlaps": 0,
-        "label_label_overlaps": 0,
-        "bend_count": 15,
-        "edge_parallel_overlap_count": 1,
-        "edge_crossings": 3,
-        "total_area": 1311240.0,
-        "total_edge_length": 5077.663794107513,
-        "total_node_area": 78500.0,
-        "edge_length_stddev": 285.35389957777926,
-        "edge_length_cv": 0.6181765911713512,
-        "aspect_ratio": 1.0547085201793722,
-        "aspect_ratio_deviation": 0.5452914798206279,
-        "area_utilization": 0.05986699612580458,
-        "channel_congestion": 13.0,
-        "long_edge_count": 3,
-        "group_gap_deficit": 40.0,
-        "predicted_crossings": 4,
-        "port_conflict_score": 0.0,
-        "node_count": 10,
-        "edge_count": 11,
-        "lint": {
-          "node_overlap": 0,
-          "group_overlap": 0,
-          "edge_through_node": 0,
-          "edge_crossing": 3,
-          "edge_crosses_group_interior": 0,
-          "label_node_overlap": 0,
-          "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 1,
-          "total_violations": 4,
-          "error_count": 0,
-          "warning_count": 4
-        }
-      },
-      "lint": {
-        "node_overlap": 0,
-        "group_overlap": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 3,
-        "edge_crosses_group_interior": 0,
-        "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 1,
-        "total_violations": 4,
-        "error_count": 0,
-        "warning_count": 4
-      },
-      "score": 67.85,
-      "elapsed_us": 31662
-    },
-    {
-      "path": "architecture/n.d2-cell-tower-network.pgm",
-      "diagram_type": "architecture",
-      "metrics": {
-        "node_overlap_pairs": 0,
-        "edge_node_crossings": 0,
-        "edge_through_groups": 0,
-        "label_node_overlaps": 0,
-        "label_label_overlaps": 0,
-        "bend_count": 15,
-        "edge_parallel_overlap_count": 3,
-        "edge_crossings": 1,
-        "total_area": 711377.75,
-        "total_edge_length": 4146.764035174503,
-        "total_node_area": 46550.0,
-        "edge_length_stddev": 318.0994435583463,
-        "edge_length_cv": 0.5369719824954353,
-        "aspect_ratio": 1.4141698977793444,
-        "aspect_ratio_deviation": 0.18583010222065566,
-        "area_utilization": 0.06543640140558234,
-        "channel_congestion": 9.0,
-        "long_edge_count": 5,
-        "group_gap_deficit": 0.0,
-        "predicted_crossings": 5,
-        "port_conflict_score": 0.0,
-        "node_count": 7,
-        "edge_count": 7,
-        "lint": {
-          "node_overlap": 0,
-          "group_overlap": 0,
-          "edge_through_node": 0,
-          "edge_crossing": 1,
-          "edge_crosses_group_interior": 0,
-          "label_node_overlap": 0,
-          "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 3,
-          "total_violations": 4,
-          "error_count": 0,
-          "warning_count": 4
-        }
-      },
-      "lint": {
-        "node_overlap": 0,
-        "group_overlap": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 1,
-        "edge_crosses_group_interior": 0,
-        "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 3,
-        "total_violations": 4,
-        "error_count": 0,
-        "warning_count": 4
-      },
-      "score": 70.74,
-      "elapsed_us": 22551
+      "score": 68.26,
+      "elapsed_us": 22683
     },
     {
       "path": "architecture/n.data-pipeline.pgm",
@@ -1026,7 +1026,7 @@
         "warning_count": 0
       },
       "score": 70.66,
-      "elapsed_us": 13815
+      "elapsed_us": 14054
     },
     {
       "path": "architecture/n.event-driven.pgm",
@@ -1037,14 +1037,14 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 14,
-        "edge_parallel_overlap_count": 1,
+        "bend_count": 24,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 2,
         "total_area": 548432.0,
-        "total_edge_length": 2370.0,
+        "total_edge_length": 2540.5,
         "total_node_area": 37950.0,
-        "edge_length_stddev": 215.04952917874525,
-        "edge_length_cv": 0.4536909898285765,
+        "edge_length_stddev": 202.4567608157357,
+        "edge_length_cv": 0.3984584940282143,
         "aspect_ratio": 1.5033112582781456,
         "aspect_ratio_deviation": 0.09668874172185449,
         "area_utilization": 0.06919727514076494,
@@ -1063,10 +1063,10 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 1,
-          "total_violations": 3,
+          "unrelated_edge_trunk_merge": 0,
+          "total_violations": 2,
           "error_count": 0,
-          "warning_count": 3
+          "warning_count": 2
         }
       },
       "lint": {
@@ -1077,13 +1077,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 1,
-        "total_violations": 3,
+        "unrelated_edge_trunk_merge": 0,
+        "total_violations": 2,
         "error_count": 0,
-        "warning_count": 3
+        "warning_count": 2
       },
-      "score": 70.49,
-      "elapsed_us": 7951
+      "score": 71.6,
+      "elapsed_us": 8599
     },
     {
       "path": "architecture/n.microservices.pgm",
@@ -1094,14 +1094,14 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 9,
+        "bend_count": 10,
         "edge_parallel_overlap_count": 1,
         "edge_crossings": 0,
         "total_area": 445704.0,
-        "total_edge_length": 1330.675,
+        "total_edge_length": 1358.685,
         "total_node_area": 51750.0,
-        "edge_length_stddev": 62.24039793853246,
-        "edge_length_cv": 0.3741884258051438,
+        "edge_length_stddev": 67.6795716819106,
+        "edge_length_cv": 0.39850044230655735,
         "aspect_ratio": 1.2891156462585034,
         "aspect_ratio_deviation": 0.3108843537414967,
         "area_utilization": 0.11610844865650746,
@@ -1139,8 +1139,8 @@
         "error_count": 0,
         "warning_count": 1
       },
-      "score": 77.16,
-      "elapsed_us": 12065
+      "score": 76.67,
+      "elapsed_us": 12096
     },
     {
       "path": "architecture/s.client-api-db.pgm",
@@ -1197,7 +1197,7 @@
         "warning_count": 0
       },
       "score": 85.27,
-      "elapsed_us": 759
+      "elapsed_us": 1895
     },
     {
       "path": "architecture/s.three-tier.pgm",
@@ -1254,7 +1254,7 @@
         "warning_count": 0
       },
       "score": 84.96,
-      "elapsed_us": 1865
+      "elapsed_us": 1795
     },
     {
       "path": "er/c.ecommerce-schema.pgm",
@@ -1311,7 +1311,7 @@
         "warning_count": 0
       },
       "score": 75.28,
-      "elapsed_us": 15893
+      "elapsed_us": 16005
     },
     {
       "path": "er/c.layout-stress-dense.pgm",
@@ -1368,7 +1368,7 @@
         "warning_count": 20
       },
       "score": 65.09,
-      "elapsed_us": 57007
+      "elapsed_us": 61074
     },
     {
       "path": "er/c.saas-schema.pgm",
@@ -1425,7 +1425,7 @@
         "warning_count": 5
       },
       "score": 57.19,
-      "elapsed_us": 92335
+      "elapsed_us": 94427
     },
     {
       "path": "er/n.blog-schema.pgm",
@@ -1482,7 +1482,7 @@
         "warning_count": 0
       },
       "score": 74.83,
-      "elapsed_us": 4616
+      "elapsed_us": 4432
     },
     {
       "path": "er/n.school-schema.pgm",
@@ -1539,7 +1539,7 @@
         "warning_count": 0
       },
       "score": 82.37,
-      "elapsed_us": 2086
+      "elapsed_us": 3250
     },
     {
       "path": "er/n.social-network.pgm",
@@ -1596,7 +1596,7 @@
         "warning_count": 1
       },
       "score": 73.42,
-      "elapsed_us": 5896
+      "elapsed_us": 7189
     },
     {
       "path": "er/s.two-tables.pgm",
@@ -1653,7 +1653,7 @@
         "warning_count": 0
       },
       "score": 87.93,
-      "elapsed_us": 430
+      "elapsed_us": 505
     },
     {
       "path": "er/s.user-post.pgm",
@@ -1710,7 +1710,7 @@
         "warning_count": 0
       },
       "score": 87.93,
-      "elapsed_us": 379
+      "elapsed_us": 381
     },
     {
       "path": "flowchart/c.aml-case-investigation.pgm",
@@ -1767,7 +1767,7 @@
         "warning_count": 0
       },
       "score": 59.3,
-      "elapsed_us": 32375
+      "elapsed_us": 35572
     },
     {
       "path": "flowchart/c.caffe-shop.pgm",
@@ -1824,7 +1824,7 @@
         "warning_count": 3
       },
       "score": 54.93,
-      "elapsed_us": 99210
+      "elapsed_us": 102533
     },
     {
       "path": "flowchart/c.change-approval-workflow.pgm",
@@ -1881,7 +1881,7 @@
         "warning_count": 1
       },
       "score": 59.05,
-      "elapsed_us": 50007
+      "elapsed_us": 48324
     },
     {
       "path": "flowchart/c.ci-cd-security-pipeline.pgm",
@@ -1892,14 +1892,14 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 1,
-        "bend_count": 39,
+        "bend_count": 40,
         "edge_parallel_overlap_count": 0,
-        "edge_crossings": 1,
+        "edge_crossings": 3,
         "total_area": 2660380.47294701,
-        "total_edge_length": 10402.0951577003,
+        "total_edge_length": 10477.0951577003,
         "total_node_area": 184000.0,
-        "edge_length_stddev": 510.7779566005879,
-        "edge_length_cv": 1.423997811676606,
+        "edge_length_stddev": 515.1027305488973,
+        "edge_length_cv": 1.4257748890386976,
         "aspect_ratio": 3.7677152204084954,
         "aspect_ratio_deviation": 2.1677152204084953,
         "area_utilization": 0.06916303959943589,
@@ -1914,31 +1914,31 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 0,
-          "edge_crossing": 1,
+          "edge_crossing": 3,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 1,
           "unrelated_edge_trunk_merge": 0,
-          "total_violations": 2,
+          "total_violations": 4,
           "error_count": 0,
-          "warning_count": 2
+          "warning_count": 4
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 0,
-        "edge_crossing": 1,
+        "edge_crossing": 3,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 1,
         "unrelated_edge_trunk_merge": 0,
-        "total_violations": 2,
+        "total_violations": 4,
         "error_count": 0,
-        "warning_count": 2
+        "warning_count": 4
       },
-      "score": 51.45,
-      "elapsed_us": 97215
+      "score": 50.89,
+      "elapsed_us": 100620
     },
     {
       "path": "flowchart/c.customer-refund-process.pgm",
@@ -1995,7 +1995,7 @@
         "warning_count": 4
       },
       "score": 53.55,
-      "elapsed_us": 98464
+      "elapsed_us": 104699
     },
     {
       "path": "flowchart/c.e-commerce-order-fulfillment.pgm",
@@ -2052,7 +2052,7 @@
         "warning_count": 1
       },
       "score": 51.82,
-      "elapsed_us": 70083
+      "elapsed_us": 73774
     },
     {
       "path": "flowchart/c.k8s-incident-response.pgm",
@@ -2109,7 +2109,7 @@
         "warning_count": 0
       },
       "score": 61.78,
-      "elapsed_us": 101367
+      "elapsed_us": 105613
     },
     {
       "path": "flowchart/c.layout-stress-dag.pgm",
@@ -2166,7 +2166,7 @@
         "warning_count": 9
       },
       "score": 61.47,
-      "elapsed_us": 74660
+      "elapsed_us": 82980
     },
     {
       "path": "flowchart/c.pr-architecture-review.pgm",
@@ -2223,7 +2223,7 @@
         "warning_count": 2
       },
       "score": 62.42,
-      "elapsed_us": 52704
+      "elapsed_us": 55704
     },
     {
       "path": "flowchart/c.software-release.pgm",
@@ -2280,7 +2280,7 @@
         "warning_count": 4
       },
       "score": 56.09,
-      "elapsed_us": 75036
+      "elapsed_us": 77442
     },
     {
       "path": "flowchart/c.swimlane-order-process.pgm",
@@ -2291,7 +2291,7 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 14,
+        "bend_count": 12,
         "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 651792.0,
@@ -2337,7 +2337,7 @@
         "warning_count": 0
       },
       "score": 56.91,
-      "elapsed_us": 10161
+      "elapsed_us": 9903
     },
     {
       "path": "flowchart/n.employee-onboarding.pgm",
@@ -2394,7 +2394,7 @@
         "warning_count": 0
       },
       "score": 76.1,
-      "elapsed_us": 7350
+      "elapsed_us": 7463
     },
     {
       "path": "flowchart/n.order-approval.pgm",
@@ -2451,7 +2451,7 @@
         "warning_count": 0
       },
       "score": 67.0,
-      "elapsed_us": 10409
+      "elapsed_us": 11875
     },
     {
       "path": "flowchart/n.user-auth.pgm",
@@ -2508,7 +2508,7 @@
         "warning_count": 1
       },
       "score": 73.74,
-      "elapsed_us": 7176
+      "elapsed_us": 7639
     },
     {
       "path": "flowchart/s.decision-loop.pgm",
@@ -2565,7 +2565,7 @@
         "warning_count": 0
       },
       "score": 70.62,
-      "elapsed_us": 2448
+      "elapsed_us": 2745
     },
     {
       "path": "flowchart/s.linear-chain.pgm",
@@ -2622,7 +2622,7 @@
         "warning_count": 0
       },
       "score": 86.93,
-      "elapsed_us": 595
+      "elapsed_us": 601
     },
     {
       "path": "mindmap/c.knowledge-map.pgm",
@@ -2679,7 +2679,7 @@
         "warning_count": 1
       },
       "score": 71.98,
-      "elapsed_us": 59793
+      "elapsed_us": 65606
     },
     {
       "path": "mindmap/c.product-roadmap.pgm",
@@ -2736,7 +2736,7 @@
         "warning_count": 0
       },
       "score": 79.31,
-      "elapsed_us": 38035
+      "elapsed_us": 40653
     },
     {
       "path": "mindmap/n.programming-learning.pgm",
@@ -2793,7 +2793,7 @@
         "warning_count": 0
       },
       "score": 78.21,
-      "elapsed_us": 28142
+      "elapsed_us": 29612
     },
     {
       "path": "mindmap/n.project-plan.pgm",
@@ -2850,7 +2850,7 @@
         "warning_count": 0
       },
       "score": 79.28,
-      "elapsed_us": 11595
+      "elapsed_us": 12684
     },
     {
       "path": "mindmap/n.tech-stack.pgm",
@@ -2907,7 +2907,7 @@
         "warning_count": 0
       },
       "score": 79.99,
-      "elapsed_us": 11037
+      "elapsed_us": 12463
     },
     {
       "path": "mindmap/s.brainstorm.pgm",
@@ -2964,7 +2964,7 @@
         "warning_count": 0
       },
       "score": 81.82,
-      "elapsed_us": 1066
+      "elapsed_us": 1106
     },
     {
       "path": "mindmap/s.root-branches.pgm",
@@ -3021,7 +3021,7 @@
         "warning_count": 0
       },
       "score": 81.7,
-      "elapsed_us": 1030
+      "elapsed_us": 1206
     },
     {
       "path": "sequence/c.ai-agent-change-loop.pgm",
@@ -3078,7 +3078,7 @@
         "warning_count": 0
       },
       "score": 58.7,
-      "elapsed_us": 1180
+      "elapsed_us": 1199
     },
     {
       "path": "sequence/c.cross-team-incident-escalation.pgm",
@@ -3135,7 +3135,7 @@
         "warning_count": 0
       },
       "score": 65.5,
-      "elapsed_us": 2258
+      "elapsed_us": 2135
     },
     {
       "path": "sequence/c.distributed-saga.pgm",
@@ -3192,7 +3192,7 @@
         "warning_count": 0
       },
       "score": 73.4,
-      "elapsed_us": 990
+      "elapsed_us": 1412
     },
     {
       "path": "sequence/c.k8s-canary-rollback.pgm",
@@ -3249,7 +3249,7 @@
         "warning_count": 0
       },
       "score": 59.48,
-      "elapsed_us": 1846
+      "elapsed_us": 1703
     },
     {
       "path": "sequence/c.k8s-node-failure-recovery.pgm",
@@ -3306,7 +3306,7 @@
         "warning_count": 0
       },
       "score": 62.28,
-      "elapsed_us": 1910
+      "elapsed_us": 2021
     },
     {
       "path": "sequence/c.k8s-rolling-update.pgm",
@@ -3363,7 +3363,7 @@
         "warning_count": 0
       },
       "score": 61.26,
-      "elapsed_us": 2439
+      "elapsed_us": 2921
     },
     {
       "path": "sequence/c.layout-stress-lifelines.pgm",
@@ -3420,7 +3420,7 @@
         "warning_count": 0
       },
       "score": 71.22,
-      "elapsed_us": 2213
+      "elapsed_us": 2371
     },
     {
       "path": "sequence/c.microservice-checkout.pgm",
@@ -3477,7 +3477,7 @@
         "warning_count": 0
       },
       "score": 60.44,
-      "elapsed_us": 1492
+      "elapsed_us": 2441
     },
     {
       "path": "sequence/c.real-time-risk-decisioning.pgm",
@@ -3534,7 +3534,7 @@
         "warning_count": 0
       },
       "score": 64.52,
-      "elapsed_us": 1137
+      "elapsed_us": 1193
     },
     {
       "path": "sequence/n.api-call-chain.pgm",
@@ -3591,7 +3591,7 @@
         "warning_count": 0
       },
       "score": 79.82,
-      "elapsed_us": 422
+      "elapsed_us": 426
     },
     {
       "path": "sequence/n.oauth-login.pgm",
@@ -3648,7 +3648,7 @@
         "warning_count": 0
       },
       "score": 74.04,
-      "elapsed_us": 694
+      "elapsed_us": 651
     },
     {
       "path": "sequence/n.payment-gateway.pgm",
@@ -3705,7 +3705,7 @@
         "warning_count": 0
       },
       "score": 69.42,
-      "elapsed_us": 1097
+      "elapsed_us": 1213
     },
     {
       "path": "sequence/s.ping-pong.pgm",
@@ -3762,7 +3762,7 @@
         "warning_count": 0
       },
       "score": 82.39,
-      "elapsed_us": 104
+      "elapsed_us": 108
     },
     {
       "path": "sequence/s.request-response.pgm",
@@ -3819,7 +3819,7 @@
         "warning_count": 0
       },
       "score": 82.39,
-      "elapsed_us": 114
+      "elapsed_us": 107
     },
     {
       "path": "state/c.document-sync-lifecycle.pgm",
@@ -3876,7 +3876,7 @@
         "warning_count": 0
       },
       "score": 61.83,
-      "elapsed_us": 11178
+      "elapsed_us": 12190
     },
     {
       "path": "state/c.k8s-node-pressure-lifecycle.pgm",
@@ -3933,7 +3933,7 @@
         "warning_count": 8
       },
       "score": 59.71,
-      "elapsed_us": 62276
+      "elapsed_us": 68836
     },
     {
       "path": "state/c.k8s-rollout-state-machine.pgm",
@@ -3990,7 +3990,7 @@
         "warning_count": 2
       },
       "score": 62.27,
-      "elapsed_us": 24109
+      "elapsed_us": 26337
     },
     {
       "path": "state/c.layout-stress-transitions.pgm",
@@ -4047,7 +4047,7 @@
         "warning_count": 0
       },
       "score": 67.25,
-      "elapsed_us": 30459
+      "elapsed_us": 29889
     },
     {
       "path": "state/c.payment-flow.pgm",
@@ -4104,7 +4104,7 @@
         "warning_count": 1
       },
       "score": 63.75,
-      "elapsed_us": 31210
+      "elapsed_us": 32138
     },
     {
       "path": "state/c.service-degradation-lifecycle.pgm",
@@ -4161,7 +4161,7 @@
         "warning_count": 2
       },
       "score": 61.78,
-      "elapsed_us": 29939
+      "elapsed_us": 29641
     },
     {
       "path": "state/c.settlement-reconciliation-lifecycle.pgm",
@@ -4218,7 +4218,7 @@
         "warning_count": 2
       },
       "score": 63.66,
-      "elapsed_us": 16340
+      "elapsed_us": 17604
     },
     {
       "path": "state/c.tcp-connection.pgm",
@@ -4275,7 +4275,7 @@
         "warning_count": 1
       },
       "score": 62.31,
-      "elapsed_us": 38295
+      "elapsed_us": 42487
     },
     {
       "path": "state/n.order-lifecycle.pgm",
@@ -4332,7 +4332,7 @@
         "warning_count": 2
       },
       "score": 63.44,
-      "elapsed_us": 11801
+      "elapsed_us": 12469
     },
     {
       "path": "state/n.ticket-workflow.pgm",
@@ -4389,7 +4389,7 @@
         "warning_count": 4
       },
       "score": 63.59,
-      "elapsed_us": 13062
+      "elapsed_us": 14907
     },
     {
       "path": "state/s.on-off.pgm",
@@ -4446,7 +4446,7 @@
         "warning_count": 0
       },
       "score": 79.71,
-      "elapsed_us": 444
+      "elapsed_us": 491
     },
     {
       "path": "state/s.traffic-light.pgm",
@@ -4503,7 +4503,7 @@
         "warning_count": 0
       },
       "score": 81.05,
-      "elapsed_us": 607
+      "elapsed_us": 459
     }
   ]
 }

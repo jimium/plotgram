@@ -162,6 +162,27 @@ mod tests {
     }
 
     #[test]
+    fn clean_light_edge_tokens() {
+        let compiled = compiled_builtin_theme("common.clean-light").unwrap();
+        let edge = compiled.edge_block("flowchart", None);
+        assert_eq!(
+            edge.get("stroke").and_then(|v| v.as_str()),
+            Some("#52525B"),
+            "flowchart edge stroke"
+        );
+        assert_eq!(
+            edge.get("stroke_width").and_then(|v| v.as_number()),
+            Some(1.25),
+            "flowchart edge stroke_width"
+        );
+        assert_eq!(
+            edge.get("stroke_opacity").and_then(|v| v.as_number()),
+            Some(0.88),
+            "flowchart edge stroke_opacity"
+        );
+    }
+
+    #[test]
     fn compiled_cache_is_idempotent() {
         for id in ["common.clean-light", "common.github-dark", "mindmap.vivid-branches"] {
             let first = compiled_builtin_theme(id).unwrap();
