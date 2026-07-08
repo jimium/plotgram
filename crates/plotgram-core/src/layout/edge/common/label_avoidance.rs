@@ -1,7 +1,6 @@
 //! 标签自动避让
 //!
-//! 在初始标签定位后，通过迭代式碰撞检测 + 最小位移策略
-//! 自动消除标签-标签、标签-节点、标签-分组边框、标签-边路径的重叠。
+//! 流程：候选位打分选优 → 迭代式碰撞检测推开（兜底）→ leader line 归属引导。
 //!
 //! 核心语义：`EdgeLabelLayout.center` 为标签包围框的几何中心
 //! （不再有"基线"与"中心"的歧义），所有 bbox 计算基于中心语义。
@@ -18,6 +17,7 @@ use crate::layout::geometry::{Point, Rect};
 use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
 use crate::layout::constants::*;
 use crate::layout::edge::common::edge_geometry::closest_point_on_path;
+use crate::layout::edge::common::label_candidate::place_all_labels_by_candidates;
 use std::collections::{HashMap, HashSet};
 
 const EPS: f64 = 1e-6;
@@ -50,6 +50,9 @@ pub fn resolve_label_overlaps(
     if label_keys.is_empty() {
         return;
     }
+
+    // Phase 1: 候选位打分（优先消除标签-节点硬冲突）
+    place_all_labels_by_candidates(edges, nodes, groups);
 
     let initial_positions: HashMap<LabelKey, Point> = label_keys
         .iter()
@@ -379,7 +382,7 @@ pub fn aabb_overlap(
     }
 }
 
-fn segment_vs_aabb_intersect(
+pub(crate) fn segment_vs_aabb_intersect(
     p1: Point,
     p2: Point,
     bbox: (f64, f64, f64, f64),

@@ -64,6 +64,11 @@ pub fn compute_with_preset_and_overlay(
     let reversed_edges = graph::greedy_cycle_reversal(&g);
     let dag = graph::build_dag(&g, &reversed_edges);
     let mut ranks = rank::assign_ranks_network_simplex_style(&dag);
+    if preset.node_sizing == crate::layout::node::common::node_sizing::NodeSizing::State {
+        apply_state_semantic_rank_constraints(&dag, &mut ranks, diagram);
+    } else if preset.node_sizing == crate::layout::node::common::node_sizing::NodeSizing::Standard {
+        apply_sink_rank_constraints(&dag, &mut ranks, diagram);
+    }
     // group 感知的 rank 重分配：为每个 group 分配不重叠的 rank 窗口，
     // 消除 group 包围框在分层方向上的重叠。
     apply_group_rank_constraints(&dag, &mut ranks, diagram);
@@ -306,6 +311,62 @@ fn apply_group_rank_constraints(
 
         // +1 为 group 间留空（dummy 链填充）
         current_rank += window_size + 1;
+    }
+}
+
+/// 状态图语义 rank 约束：initial → rank 0，final → max rank。
+fn apply_state_semantic_rank_constraints(
+    dag: &petgraph::graph::DiGraph<String, ()>,
+    ranks: &mut HashMap<petgraph::graph::NodeIndex, usize>,
+    diagram: &Diagram,
+) {
+    use crate::types::attr_constants::entity_type;
+
+    let entity_type_of = |entity_id: &str| -> &str {
+        diagram
+            .entities
+            .iter()
+            .find(|e| e.id.as_str() == entity_id)
+            .and_then(|e| e.attributes.standard.get("type").and_then(|v| v.as_str()))
+            .unwrap_or(entity_type::STATE)
+    };
+
+    for node in dag.node_indices() {
+        if entity_type_of(&dag[node]) == entity_type::INITIAL {
+            ranks.insert(node, 0);
+        }
+    }
+
+    let max_rank = ranks.values().copied().max().unwrap_or(0);
+    for node in dag.node_indices() {
+        if entity_type_of(&dag[node]) == entity_type::FINAL {
+            ranks.insert(node, max_rank);
+        }
+    }
+}
+
+/// 流程图终止节点（type=end）强制落到最大 rank。
+fn apply_sink_rank_constraints(
+    dag: &petgraph::graph::DiGraph<String, ()>,
+    ranks: &mut HashMap<petgraph::graph::NodeIndex, usize>,
+    diagram: &Diagram,
+) {
+    use crate::types::attr_constants::entity_type;
+
+    let entity_type_of = |entity_id: &str| -> &str {
+        diagram
+            .entities
+            .iter()
+            .find(|e| e.id.as_str() == entity_id)
+            .and_then(|e| e.attributes.standard.get("type").and_then(|v| v.as_str()))
+            .unwrap_or("")
+    };
+
+    let max_rank = ranks.values().copied().max().unwrap_or(0);
+    for node in dag.node_indices() {
+        if entity_type_of(&dag[node]) == entity_type::END {
+            ranks.insert(node, max_rank);
+        }
     }
 }
 

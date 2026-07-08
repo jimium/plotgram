@@ -37,6 +37,11 @@ pub mod path_rewrite;
 pub mod trunk;
 pub mod types;
 
+pub use crate::layout::edge::edge_merge_policy::{
+    edge_merge_context, edges_may_share_trunk, merge_groups_for_edge, EdgeMergeContext,
+    MergeGroup, MergeGroupKind,
+};
+
 pub use compatibility::{compute_compatibility, decompose_path, CompatibilityBucket, EdgeFeatures};
 pub use clustering::{cluster_edges, BundleCandidate};
 pub use path_rewrite::{apply_bundling, rewrite_bundle_paths};

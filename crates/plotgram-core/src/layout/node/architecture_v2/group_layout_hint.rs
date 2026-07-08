@@ -4,6 +4,7 @@ use super::layout::acyclic::is_effective_edge;
 use super::layout::rank::assign_intra_ranks;
 use super::layout::types::GraphIndex;
 use crate::ast::Group;
+use crate::types::DiagramType;
 use std::collections::{HashMap, HashSet};
 
 /// DSL 可写的 group layout hint
@@ -63,6 +64,32 @@ pub fn parse_group_layout_hint(group: &Group) -> GroupLayoutHint {
         .and_then(|v| v.as_str())
         .map(parse_layout_atom)
         .unwrap_or(GroupLayoutHint::Auto)
+}
+
+/// 解析组内布局 hint：DSL 显式 `layout:` 优先，其次架构图子网启发式。
+pub fn resolve_group_layout_hint(group: &Group, diagram_type: DiagramType) -> GroupLayoutHint {
+    let parsed = parse_group_layout_hint(group);
+    if parsed != GroupLayoutHint::Auto {
+        return parsed;
+    }
+    if diagram_type == DiagramType::Architecture {
+        if let Some(hint) = architecture_subnet_layout_hint(group) {
+            return hint;
+        }
+    }
+    GroupLayoutHint::Auto
+}
+
+/// 架构图常见子网命名：公有/数据子网默认竖排（gateway→lb、db 栈等）。
+fn architecture_subnet_layout_hint(group: &Group) -> Option<GroupLayoutHint> {
+    let id = group.id.as_str().to_ascii_lowercase();
+    if id.contains("public_subnet") || id.contains("public-subnet") {
+        return Some(GroupLayoutHint::Vertical);
+    }
+    if id.contains("data_subnet") || id.contains("data-subnet") {
+        return Some(GroupLayoutHint::Grid);
+    }
+    None
 }
 
 fn parse_layout_atom(raw: &str) -> GroupLayoutHint {
@@ -142,8 +169,8 @@ fn detect_auto_mode(
     }
 
     if internal_edges == 0 {
-        // 无内部边：节点数较多时用 Grid，否则水平排列
-        if members.len() >= 4 {
+        // 无内部边：3+ 节点用 Grid，避免单行过扁
+        if members.len() >= 3 {
             return GroupLayoutMode::Grid;
         }
         return GroupLayoutMode::Horizontal;
@@ -518,7 +545,59 @@ mod tests {
     }
 
     #[test]
+    fn architecture_subnet_hint_vertical_for_public_and_data() {
+        use crate::ast::{AttributeMap, Identifier, Span};
+        let mk = |id: &str| Group {
+            id: Identifier::new_unchecked(id),
+            label: id.to_string(),
+            attributes: AttributeMap::default(),
+            parent_id: None,
+            depth: 1,
+            entity_ids: vec![],
+            child_group_ids: vec![],
+            span: Span::dummy(),
+        };
+        assert_eq!(
+            resolve_group_layout_hint(&mk("public_subnet"), DiagramType::Architecture),
+            GroupLayoutHint::Vertical
+        );
+        assert_eq!(
+            resolve_group_layout_hint(&mk("data_subnet"), DiagramType::Architecture),
+            GroupLayoutHint::Grid
+        );
+        assert_eq!(
+            resolve_group_layout_hint(&mk("private_subnet"), DiagramType::Architecture),
+            GroupLayoutHint::Auto
+        );
+    }
+
+    #[test]
+    fn explicit_layout_overrides_subnet_hint() {
+        use crate::ast::{AttributeMap, AttributeValue, Identifier, Span, TextValue};
+        let mut attrs = AttributeMap::default();
+        attrs.standard.insert(
+            "layout".to_string(),
+            AttributeValue::String(TextValue::unquoted("grid".to_string())),
+        );
+        let group = Group {
+            id: Identifier::new_unchecked("data_subnet"),
+            label: "data".to_string(),
+            attributes: attrs,
+            parent_id: None,
+            depth: 1,
+            entity_ids: vec![],
+            child_group_ids: vec![],
+            span: Span::dummy(),
+        };
+        assert_eq!(
+            resolve_group_layout_hint(&group, DiagramType::Architecture),
+            GroupLayoutHint::Grid
+        );
+    }
+
+    #[test]
     fn parse_group_layout_values() {
+        use crate::ast::{AttributeMap, AttributeValue, Identifier, Span, TextValue};
         let mut attrs = AttributeMap::default();
         attrs
             .standard

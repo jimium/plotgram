@@ -83,7 +83,98 @@ pub fn build_corridors_from_groups(groups: &HashMap<String, GroupLayout>) -> Vec
     corridors
 }
 
-/// 流程图堆叠排列：按拓扑序在相邻 group 之间导出走廊。
+/// 同父 sibling 组：按堆叠主轴排序后，仅在相邻对之间导出走廊（嵌套架构图）。
+pub fn build_sibling_corridors(
+    diagram: &crate::ast::Diagram,
+    groups: &HashMap<String, GroupLayout>,
+) -> Vec<GroupCorridor> {
+    use std::collections::HashMap as StdHashMap;
+
+    let mut children_of: StdHashMap<String, Vec<String>> = StdHashMap::new();
+    for group in &diagram.groups {
+        if let Some(pid) = &group.parent_id {
+            children_of
+                .entry(pid.as_str().to_string())
+                .or_default()
+                .push(group.id.as_str().to_string());
+        }
+    }
+
+    let mut corridors = Vec::new();
+    let mut parent_ids: Vec<String> = children_of.keys().cloned().collect();
+    parent_ids.sort();
+    for parent_id in parent_ids {
+        let Some(children) = children_of.get_mut(&parent_id) else {
+            continue;
+        };
+        if children.len() < 2 {
+            continue;
+        }
+        children.sort();
+        sort_siblings_along_stack_axis(children, groups);
+        for w in children.windows(2) {
+            let id_a = w[0].as_str();
+            let id_b = w[1].as_str();
+            if pair_covered(&corridors, id_a, id_b) {
+                continue;
+            }
+            let (Some(ga), Some(gb)) = (groups.get(id_a), groups.get(id_b)) else {
+                continue;
+            };
+            push_corridor_between(ga, gb, id_a, id_b, &mut corridors);
+        }
+    }
+    corridors.sort_by(|a, b| {
+        a.axis
+            .cmp(&b.axis)
+            .then_with(|| a.group_a.cmp(&b.group_a))
+            .then_with(|| a.group_b.cmp(&b.group_b))
+    });
+    corridors
+}
+
+fn sort_siblings_along_stack_axis(children: &mut [String], groups: &HashMap<String, GroupLayout>) {
+    let vertical_stack = children
+        .iter()
+        .filter_map(|id| groups.get(id))
+        .collect::<Vec<_>>();
+    if vertical_stack.len() < 2 {
+        return;
+    }
+    let mut dy_sum = 0.0;
+    let mut dx_sum = 0.0;
+    for i in 0..vertical_stack.len() {
+        for j in (i + 1)..vertical_stack.len() {
+            let ga = vertical_stack[i];
+            let gb = vertical_stack[j];
+            dy_sum += (ga.y - gb.y).abs();
+            dx_sum += (ga.x - gb.x).abs();
+        }
+    }
+    if dy_sum >= dx_sum {
+        children.sort_by(|a, b| {
+            let ga = groups.get(a).unwrap();
+            let gb = groups.get(b).unwrap();
+            ga.y
+                .partial_cmp(&gb.y)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| ga.x.partial_cmp(&gb.x).unwrap_or(std::cmp::Ordering::Equal))
+                .then_with(|| a.cmp(b))
+        });
+    } else {
+        children.sort_by(|a, b| {
+            let ga = groups.get(a).unwrap();
+            let gb = groups.get(b).unwrap();
+            ga.x
+                .partial_cmp(&gb.x)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| ga.y.partial_cmp(&gb.y).unwrap_or(std::cmp::Ordering::Equal))
+                .then_with(|| a.cmp(b))
+        });
+    }
+}
+
+/// 流程图堆叠排列：按拓扑序在 adjacent group 之间导出走廊。
 pub fn build_stacking_corridors(
     order: &[String],
     groups: &HashMap<String, GroupLayout>,
@@ -282,6 +373,91 @@ pub fn corridor_misalignment_penalty(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn build_sibling_corridors_vertical_stack() {
+        use crate::ast::{AttributeMap, Diagram, Group, Identifier, Span};
+        use crate::types::DiagramType;
+
+        let mut groups = HashMap::new();
+        groups.insert(
+            "cloud".to_string(),
+            GroupLayout {
+                x: 0.0,
+                y: 0.0,
+                width: 400.0,
+                height: 400.0,
+            },
+        );
+        groups.insert(
+            "private_subnet".to_string(),
+            GroupLayout {
+                x: 10.0,
+                y: 20.0,
+                width: 180.0,
+                height: 120.0,
+            },
+        );
+        groups.insert(
+            "data_subnet".to_string(),
+            GroupLayout {
+                x: 10.0,
+                y: 180.0,
+                width: 180.0,
+                height: 100.0,
+            },
+        );
+        let diagram = Diagram {
+            diagram_type: DiagramType::Architecture,
+            attributes: vec![],
+            entities: vec![],
+            relations: vec![],
+            groups: vec![
+                Group {
+                    id: Identifier::new_unchecked("cloud"),
+                    label: "cloud".to_string(),
+                    attributes: AttributeMap::default(),
+                    parent_id: None,
+                    depth: 0,
+                    entity_ids: vec![],
+                    child_group_ids: vec![
+                        Identifier::new_unchecked("private_subnet"),
+                        Identifier::new_unchecked("data_subnet"),
+                    ],
+                    span: Span::dummy(),
+                },
+                Group {
+                    id: Identifier::new_unchecked("private_subnet"),
+                    label: "private".to_string(),
+                    attributes: AttributeMap::default(),
+                    parent_id: Some(Identifier::new_unchecked("cloud")),
+                    depth: 1,
+                    entity_ids: vec![],
+                    child_group_ids: vec![],
+                    span: Span::dummy(),
+                },
+                Group {
+                    id: Identifier::new_unchecked("data_subnet"),
+                    label: "data".to_string(),
+                    attributes: AttributeMap::default(),
+                    parent_id: Some(Identifier::new_unchecked("cloud")),
+                    depth: 1,
+                    entity_ids: vec![],
+                    child_group_ids: vec![],
+                    span: Span::dummy(),
+                },
+            ],
+            style_decls: vec![],
+            source_info: Default::default(),
+            ..Default::default()
+        };
+        let corridors = build_sibling_corridors(&diagram, &groups);
+        assert_eq!(corridors.len(), 1);
+        assert_eq!(corridors[0].axis, CorridorAxis::Horizontal);
+        let (ka, kb) = corridor_pair_key("private_subnet", "data_subnet");
+        let (ca, cb) = corridor_pair_key(&corridors[0].group_a, &corridors[0].group_b);
+        assert_eq!((ca, cb), (ka, kb));
+    }
 
     #[test]
     fn build_corridors_vertical_gap() {

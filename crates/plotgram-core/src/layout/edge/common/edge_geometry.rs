@@ -416,6 +416,19 @@ pub fn parse_label_t(rel: &crate::ast::Relation) -> f64 {
     }
 }
 
+/// 按图类型解析标签路径参数 t（ER 默认 1/3，避开中点交叉区）。
+pub fn label_t_for_diagram(diagram: &crate::ast::Diagram, rel: &crate::ast::Relation) -> f64 {
+    if diagram.diagram_type == crate::types::DiagramType::Er
+        && !rel.attributes.style.contains_key("label_position")
+    {
+        return ER_DEFAULT_LABEL_T;
+    }
+    parse_label_t(rel)
+}
+
+/// ER 关系标签默认位置（路径 1/3 处）
+pub const ER_DEFAULT_LABEL_T: f64 = 1.0 / 3.0;
+
 /// 解析 label_position 字符串为 t 值
 fn parse_label_position_str(s: &str) -> f64 {
     let s = s.trim();

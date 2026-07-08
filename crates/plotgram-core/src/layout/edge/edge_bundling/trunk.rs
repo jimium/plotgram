@@ -130,6 +130,18 @@ fn find_collision_free_coord(
 ) -> Option<f64> {
     const MAX_ATTEMPTS: usize = 12; // 每侧最多尝试 6 次（±6 × 8px = ±48px）
 
+    // bundle 内各边的端点节点：主干贴近这些节点属正常接入，用收缩检测；
+    // 其余无关节点则要求正向安全间距，避免主干贴边或穿过。
+    let endpoint_ids: std::collections::HashSet<&str> = edges
+        .iter()
+        .flat_map(|&i| {
+            [
+                features[i].from_id.as_str(),
+                features[i].to_id.as_str(),
+            ]
+        })
+        .collect();
+
     for step in 0..=MAX_ATTEMPTS {
         // 交替尝试正负偏移：0, +1, -1, +2, -2, ...
         let offsets: Vec<f64> = match step {
@@ -142,7 +154,7 @@ fn find_collision_free_coord(
             // 与端点节点产生误碰撞（端口本身在节点边界上，不算穿障）
             let (core_start, core_end) =
                 compute_trunk_range_with_margin(edges, features, axis, coord, 0.0);
-            if !trunk_segment_collides(core_start, core_end, nodes) {
+            if !trunk_segment_collides(core_start, core_end, nodes, &endpoint_ids) {
                 return Some(coord);
             }
         }
@@ -150,15 +162,26 @@ fn find_collision_free_coord(
     None
 }
 
+/// 主干与无关节点的最小安全间距（像素）
+const TRUNK_NODE_CLEARANCE: f64 = 6.0;
+
 /// 检查主干段是否穿过任何节点。
-/// 使用 -2px pad 收缩节点矩形，避免端口位置（在节点边界上）触发误碰撞。
+///
+/// - 端点节点：-2px pad 收缩，避免端口位置（在节点边界上）触发误碰撞；
+/// - 无关节点：+TRUNK_NODE_CLEARANCE 外扩，保证主干不贴边。
 fn trunk_segment_collides(
     trunk_start: Point,
     trunk_end: Point,
     nodes: &std::collections::HashMap<String, NodeLayout>,
+    endpoint_ids: &std::collections::HashSet<&str>,
 ) -> bool {
-    for (_id, nl) in nodes {
-        if Rect::from(nl).intersects_segment(trunk_start, trunk_end, -2.0) {
+    for (id, nl) in nodes {
+        let pad = if endpoint_ids.contains(id.as_str()) {
+            -2.0
+        } else {
+            TRUNK_NODE_CLEARANCE
+        };
+        if Rect::from(nl).intersects_segment(trunk_start, trunk_end, pad) {
             return true;
         }
     }
@@ -418,21 +441,34 @@ fn compute_fork_points(
         axis_max,
     );
 
-    // 转换为 Point 坐标
-    let entry_points: Vec<Point> = entry_axis_coords
+    // 转换为 Point 坐标，并**还原为 bundle.edges 的 slot 顺序**。
+    // entry_data/exit_data 已按垂直坐标排序，但消费方（rewrite_single_edge）
+    // 用 slot（边在 bundle.edges 中的位置）索引 entry_points/exit_points，
+    // 若直接按排序后顺序返回，边会拿到别的边的分叉点，导致 fork leg 交叉。
+    let slot_of: std::collections::HashMap<usize, usize> = edges
         .iter()
-        .map(|&coord| match axis {
-            Axis::Horizontal => Point::new(coord, trunk_coord),
-            Axis::Vertical => Point::new(trunk_coord, coord),
-        })
+        .enumerate()
+        .map(|(slot, &edge_idx)| (edge_idx, slot))
         .collect();
-    let exit_points: Vec<Point> = exit_axis_coords
-        .iter()
-        .map(|&coord| match axis {
-            Axis::Horizontal => Point::new(coord, trunk_coord),
-            Axis::Vertical => Point::new(trunk_coord, coord),
-        })
-        .collect();
+
+    let to_point = |coord: f64| match axis {
+        Axis::Horizontal => Point::new(coord, trunk_coord),
+        Axis::Vertical => Point::new(trunk_coord, coord),
+    };
+
+    let fallback = to_point(axis_min);
+    let mut entry_points: Vec<Point> = vec![fallback; edges.len()];
+    for (i, &(edge_idx, _, _)) in entry_data.iter().enumerate() {
+        if let Some(&slot) = slot_of.get(&edge_idx) {
+            entry_points[slot] = to_point(entry_axis_coords[i]);
+        }
+    }
+    let mut exit_points: Vec<Point> = vec![fallback; edges.len()];
+    for (i, &(edge_idx, _, _)) in exit_data.iter().enumerate() {
+        if let Some(&slot) = slot_of.get(&edge_idx) {
+            exit_points[slot] = to_point(exit_axis_coords[i]);
+        }
+    }
 
     (entry_points, exit_points)
 }

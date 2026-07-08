@@ -18,6 +18,7 @@ use crate::layout::edge::common::edge_geometry::{
     node_center, undirected_pair_key, select_port, compute_bezier_controls, cubic_bezier_point,
     DEFAULT_BEZIER_TENSION, build_edge_labels,
 };
+use crate::layout::edge::common::self_loop::{self_loop_indices, route_self_loop, SelfLoopStyle};
 use crate::layout::edge::common::label_placement::{LabelContext, LabelPlacer, RadialPlacer};
 use crate::layout::edge::visibility;
 use std::collections::HashMap;
@@ -78,6 +79,7 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
         .collect();
     let obstacle_index = visibility::ObstacleIndex::build(&node_list);
 
+    let self_loop_idx = self_loop_indices(&diagram.relations);
     let mut edges = Vec::with_capacity(diagram.relations.len());
 
     for (i, rel) in diagram.relations.iter().enumerate() {
@@ -85,12 +87,13 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
         let to_id = rel.to.as_str();
 
         let mut edge = if from_id == to_id {
-            route_self_loop(
-                result.nodes.get(from_id),
-                &node_placement,
-                from_id,
-                rel,
-            )
+            match result.nodes.get(from_id) {
+                Some(nl) => {
+                    let loop_idx = self_loop_idx.get(&i).copied().unwrap_or(0);
+                    route_self_loop(rel, nl, loop_idx, SelfLoopStyle::Curved)
+                }
+                None => EdgeLayout::empty(),
+            }
         } else {
             let (from_nl, to_nl) = match (
                 result.nodes.get(from_id),
@@ -338,58 +341,6 @@ fn route_inter_circle_edge(
         labels,
         from_port,
         to_port,
-    }
-}
-
-fn route_self_loop(
-    node: Option<&NodeLayout>,
-    node_placement: &HashMap<String, NodeCirclePos>,
-    node_id: &str,
-    rel: &crate::ast::Relation,
-) -> EdgeLayout {
-    let nl = match node {
-        Some(n) => n,
-        None => return EdgeLayout::empty(),
-    };
-
-    let pos = node_placement.get(node_id);
-    let n = pos.map(|_| 8).unwrap_or(8);
-    let idx = pos.map(|p| p.pos_idx).unwrap_or(0);
-    let angle = -std::f64::consts::PI / 2.0
-        + (2.0 * std::f64::consts::PI * idx as f64) / n.max(1) as f64;
-
-    let node_center_pt = node_center(nl);
-    let ncx = node_center_pt.x;
-    let ncy = node_center_pt.y;
-    let outward = Point::new(
-        angle.cos(),
-        angle.sin(),
-    );
-    let out_len = outward.length().max(0.01);
-    let ox = outward.x / out_len;
-    let oy = outward.y / out_len;
-
-    let loop_r = 22.0;
-    let sx = ncx + ox * nl.width.min(nl.height) * 0.35;
-    let sy = ncy + oy * nl.width.min(nl.height) * 0.35;
-    let apex = Point::new(sx + ox * loop_r * 1.6, sy + oy * loop_r * 1.6);
-    let ex = ncx + ox * nl.width.min(nl.height) * 0.2 - oy * loop_r * 0.4;
-    let ey = ncy + oy * nl.width.min(nl.height) * 0.2 + ox * loop_r * 0.4;
-
-    let cp1 = Point::new(sx + ox * loop_r, sy + oy * loop_r);
-    let cp2 = Point::new(apex.x - oy * loop_r * 0.3, apex.y + ox * loop_r * 0.3);
-
-    let labels = build_edge_labels(rel, 0.5, Point::zero(), |_| apex);
-
-    EdgeLayout {
-        geometry: PathGeometry::Bezier {
-            start: Point::new(sx, sy),
-            end: Point::new(ex, ey),
-            controls: [cp1, cp2],
-        },
-        labels,
-        from_port: Port::Top,
-        to_port: Port::Top,
     }
 }
 

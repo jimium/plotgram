@@ -17,6 +17,7 @@ use crate::layout::edge::common::edge_geometry::{
 use crate::layout::edge::common::routing_skeleton::{
     finalize_edges, resolve_endpoints, RoutingContext,
 };
+use crate::layout::edge::common::self_loop::{self_loop_indices, route_self_loop, SelfLoopStyle};
 use crate::layout::edge::visibility;
 use std::collections::HashMap;
 
@@ -139,9 +140,20 @@ pub fn route_edges_bezier(
         .collect();
     let obstacle_index = visibility::ObstacleIndex::build(&node_list);
 
+    let self_loop_idx = self_loop_indices(relations);
     let mut edges: Vec<EdgeLayout> = Vec::with_capacity(relations.len());
 
     for (i, rel) in relations.iter().enumerate() {
+        if rel.from.as_str() == rel.to.as_str() {
+            if let Some(nl) = ctx.nodes.get(rel.from.as_str()) {
+                let loop_idx = self_loop_idx.get(&i).copied().unwrap_or(0);
+                edges.push(route_self_loop(rel, nl, loop_idx, SelfLoopStyle::Curved));
+            } else {
+                edges.push(EdgeLayout::empty());
+            }
+            continue;
+        }
+
         let Some((ep, label_off)) = resolve_endpoints(&ctx, rel, i) else {
             edges.push(EdgeLayout::empty());
             continue;

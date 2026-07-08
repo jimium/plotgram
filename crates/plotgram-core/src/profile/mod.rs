@@ -186,7 +186,7 @@ static STATE_PROFILE: DiagramProfile = DiagramProfile {
     entity_types: STATE_ENTITY_TYPES,
     default_entity_type: Some(entity_type::STATE),
     default_layout_options: &[],
-    default_direction: None,
+    default_direction: Some(crate::types::attr_constants::direction::TOP_TO_BOTTOM),
     implemented: true,
 };
 
@@ -194,7 +194,7 @@ static ER_PROFILE: DiagramProfile = DiagramProfile {
     kind: DiagramType::Er,
     name: "er",
     default_layout: "er",
-    default_edge_routing: "straight",
+    default_edge_routing: "spline",
     default_theme_id: "common.clean-light",
     dark_theme_id: Some(DEFAULT_DARK_THEME_ID),
     default_graphic_style: DEFAULT_GRAPHIC_STYLE,
@@ -342,7 +342,7 @@ mod tests {
         let profile = profile_for(&DiagramType::Er);
         assert!(profile.implemented);
         assert_eq!(profile.default_layout, "er");
-        assert_eq!(profile.default_edge_routing, "straight");
+        assert_eq!(profile.default_edge_routing, "spline");
     }
 
     #[test]
@@ -378,7 +378,7 @@ mod tests {
         assert_eq!(mindmap.default_direction, Some(direction::RADIAL));
 
         let state = profile_for(&DiagramType::State);
-        assert_eq!(state.default_direction, None);
+        assert_eq!(state.default_direction, Some(direction::TOP_TO_BOTTOM));
 
         let sequence = profile_for(&DiagramType::Sequence);
         assert_eq!(sequence.default_direction, None);

@@ -37,6 +37,8 @@ fn main() {
         "batch" => cmd_batch(&args[2..]),
         "algo" => cmd_algo(&args[2..]),
         "diff" => cmd_diff(&args[2..]),
+        "baseline" => cmd_baseline(&args[2..]),
+        "baseline-check" => cmd_baseline_check(&args[2..]),
         "-h" | "--help" => print_usage(),
         "-V" | "--version" => {
             println!("plotgram-eval {}", env!("CARGO_PKG_VERSION"));
@@ -58,6 +60,8 @@ fn print_usage() {
   plotgram-eval batch <目录> [选项]            批量评估目录下所有 .pgm 文件
   plotgram-eval algo <算法名> <目录> [选项]    算法维度评估
   plotgram-eval diff <baseline.json> <current.json>  对比两次评估结果
+  plotgram-eval baseline <目录> [-o eval-data/showcase-baseline.json]  生成 showcase 质量基线
+  plotgram-eval baseline-check <目录> [--baseline <文件>]  与基线对比检测回归
 
 选项:
   -c, --compare <模式>     对比模式: auto(默认) | routing | layout | full | combinations
@@ -699,6 +703,133 @@ fn cmd_diff(args: &[String]) {
     let fmt = cli.format.as_deref().unwrap_or("markdown");
     let content = format_report(&diff_report, fmt);
     output_content(&content, cli.output.as_deref());
+}
+
+// ═══════════════════════════════════════════════════════════
+//  baseline 命令 — showcase 质量基线
+// ═══════════════════════════════════════════════════════════
+
+fn cmd_baseline(args: &[String]) {
+    if args.is_empty() {
+        eprintln!("用法: plotgram-eval baseline <showcase目录> [-o eval-data/showcase-baseline.json]");
+        std::process::exit(1);
+    }
+
+    let showcase_dir = Path::new(&args[0]);
+    let mut output = PathBuf::from("eval-data/showcase-baseline.json");
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-o" | "--output" => {
+                if i + 1 >= args.len() {
+                    eprintln!("错误: -o 需要参数");
+                    std::process::exit(1);
+                }
+                output = PathBuf::from(&args[i + 1]);
+                i += 2;
+            }
+            other => {
+                eprintln!("未知选项: {other}");
+                std::process::exit(1);
+            }
+        }
+    }
+
+    eprintln!("生成 showcase 质量基线: {}", showcase_dir.display());
+    let baseline = plotgram_eval::generate_baseline(showcase_dir).unwrap_or_else(|e| {
+        eprintln!("生成失败: {e}");
+        std::process::exit(1);
+    });
+
+    baseline.save(&output).unwrap_or_else(|e| {
+        eprintln!("保存失败: {e}");
+        std::process::exit(1);
+    });
+
+    eprintln!(
+        "✓ 已写入 {} ({} 个文件)",
+        output.display(),
+        baseline.entries.len()
+    );
+}
+
+fn cmd_baseline_check(args: &[String]) {
+    if args.is_empty() {
+        eprintln!(
+            "用法: plotgram-eval baseline-check <showcase目录> [--baseline eval-data/showcase-baseline.json] [-f text|json] [-o 文件]"
+        );
+        std::process::exit(1);
+    }
+
+    let showcase_dir = Path::new(&args[0]);
+    let mut baseline_path = PathBuf::from("eval-data/showcase-baseline.json");
+    let mut format = "text".to_string();
+    let mut output: Option<String> = None;
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--baseline" | "-b" => {
+                if i + 1 >= args.len() {
+                    eprintln!("错误: --baseline 需要参数");
+                    std::process::exit(1);
+                }
+                baseline_path = PathBuf::from(&args[i + 1]);
+                i += 2;
+            }
+            "-f" | "--format" => {
+                if i + 1 >= args.len() {
+                    eprintln!("错误: -f 需要参数");
+                    std::process::exit(1);
+                }
+                format = args[i + 1].clone();
+                i += 2;
+            }
+            "-o" | "--output" => {
+                if i + 1 >= args.len() {
+                    eprintln!("错误: -o 需要参数");
+                    std::process::exit(1);
+                }
+                output = Some(args[i + 1].clone());
+                i += 2;
+            }
+            other => {
+                eprintln!("未知选项: {other}");
+                std::process::exit(1);
+            }
+        }
+    }
+
+    eprintln!("对比 showcase 与基线");
+    eprintln!("  showcase: {}", showcase_dir.display());
+    eprintln!("  baseline: {}", baseline_path.display());
+
+    let baseline = plotgram_eval::ShowcaseBaseline::load(&baseline_path).unwrap_or_else(|e| {
+        eprintln!("加载基线失败: {e}");
+        eprintln!("提示: 先运行 `plotgram-eval baseline showcase/` 生成基线");
+        std::process::exit(1);
+    });
+
+    let mut report =
+        plotgram_eval::compare_with_baseline(showcase_dir, &baseline).unwrap_or_else(|e| {
+            eprintln!("对比失败: {e}");
+            std::process::exit(1);
+        });
+    report.baseline_path = baseline_path.to_string_lossy().to_string();
+
+    let content = if format == "json" {
+        serde_json::to_string_pretty(&report).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}"))
+    } else {
+        report.to_markdown()
+    };
+
+    output_content(&content, output.as_deref());
+
+    if report.has_regressions() {
+        eprintln!("\n✗ 检测到 {} 项指标回归", report.regressions.len());
+        std::process::exit(1);
+    } else {
+        eprintln!("\n✓ 未检测到指标回归");
+    }
 }
 
 // ═══════════════════════════════════════════════════════════

@@ -79,8 +79,9 @@ pub use catalog::{
 };
 pub use plan::{validate_layout_plan_warnings, FriendlinessMode, LayoutPlan, ResolvedAlgoOptions};
 pub use lint::{
-    lint_layout, parse_lint_profile, parse_lint_rule, parse_lint_rules_list, LayoutLinter,
-    LayoutViolation, LintConfig, LintProfile, LintReport, LintRuleId, LintSeverity, RuleConfig,
+    compute_lint_metrics, lint_layout, parse_lint_profile, parse_lint_rule, parse_lint_rules_list,
+    LayoutLinter, LayoutViolation, LintConfig, LintMetricsSummary, LintProfile, LintReport,
+    LintRuleId, LintSeverity, RuleConfig,
 };
 pub use registry::{EDGE_ROUTING_NAMES, LAYOUT_ALGORITHM_NAMES};
 pub use grid_snap::{DiagramAlignOverride, EdgeSnapConfig, LayerAxisAlign, NodeAlignConfig};
@@ -495,6 +496,8 @@ pub enum EdgeRoutingStyle {
     Straight,
     /// 平滑曲线（circular 环边、mindmap 等弧形布局）
     Curved,
+    /// 障碍避让样条（ER 等关系图）
+    Spline,
     /// 自环 + 折线（sequence 自调用消息）
     SelfLoop,
 }
@@ -561,6 +564,8 @@ pub struct RefineDebugStats {
     pub momentum_reversals: usize,
     /// refine 实际执行的轮次
     pub passes_executed: usize,
+    /// spline 可见性图兜底重路由的边数
+    pub spline_fallback_count: usize,
 }
 
 /// orthogonal 路由调试统计（P2-1 可观测性）
@@ -1785,9 +1790,9 @@ mod tests {
     }
 
     #[test]
-    fn effective_direction_state_is_none() {
+    fn effective_direction_state_default() {
         let diagram = sample_diagram(DiagramType::State);
-        assert_eq!(resolve_effective_direction(&diagram), None);
+        assert_eq!(resolve_effective_direction(&diagram), Some("top-to-bottom"));
     }
 
     #[test]

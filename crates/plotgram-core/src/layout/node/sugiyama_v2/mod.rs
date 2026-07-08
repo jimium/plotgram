@@ -276,6 +276,7 @@ mod tests {
             &layers,
             &proper.sizes,
             &preset::FLOWCHART_PRESET,
+            &std::collections::HashSet::new(),
         );
 
         let mut chain = proper

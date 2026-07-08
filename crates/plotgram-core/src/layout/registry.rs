@@ -27,7 +27,7 @@ pub(super) fn build_layout_strategy(
 ) -> Option<Box<dyn LayoutStrategy>> {
     use super::node::{
         architecture_v2, backup, circular, er, flowchart, force_directed, mindmap, sequence,
-        sugiyama_v2,
+        state, sugiyama_v2,
     };
 
     let strategy: Box<dyn LayoutStrategy> = match algo {
@@ -39,7 +39,7 @@ pub(super) fn build_layout_strategy(
         )),
         "flowchart" => Box::new(flowchart::FlowchartLayout::from_options(&plan.layout_options)),
         "er" => Box::new(er::ErLayout::from_options(&plan.layout_options)),
-        "state" => Box::new(circular::StateLayout::from_options(&plan.layout_options)),
+        "state" => Box::new(state::StateLayout::from_options(&plan.layout_options)),
         "sugiyama-v2" => Box::new(sugiyama_v2::SugiyamaV2Layout::new(
             SugiyamaLayoutConfig::from_options(&plan.layout_options),
         )),

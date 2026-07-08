@@ -8,9 +8,6 @@
 //! `state` 为图类型门面算法，共享本模块引擎；`circular` 保留为通用圆形布局（高级选项）。
 
 pub mod common;
-pub mod facade;
-
-pub use facade::StateLayout;
 
 pub use common::{
     calculate_circle_radius, order_entities_on_circle, CircleGroup, CircularLayoutHints,

@@ -174,9 +174,9 @@ use crate::types::DiagramType;
     }
 
     #[test]
-    fn refine_config_default_max_passes_is_1() {
+    fn refine_config_default_max_passes_is_3() {
         let config = RefineConfig::default();
-        assert_eq!(config.max_passes, 1, "default max_passes should be 1 for performance");
+        assert_eq!(config.max_passes, 3, "default max_passes should be 3 (P2-2)");
     }
 
     #[test]

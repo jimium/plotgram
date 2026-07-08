@@ -198,13 +198,14 @@ impl<'a> LayoutPipeline<'a> {
         } = feedback.apply_pre_route(result);
         crate::perf_log!("[perf]   pre-route: {:.2}ms", t0.elapsed().as_secs_f64() * 1000.0);
 
-        let edge_routing_style = self.plan.edge_routing.as_str();
-        let router = registry::build_edge_routing_strategy(edge_routing_style, self.plan).ok_or_else(
+        let edge_routing_style =
+            LayoutPlan::resolve_effective_edge_routing(self.diagram, self.plan, &result_v2.hints);
+        let router = registry::build_edge_routing_strategy(edge_routing_style.as_str(), self.plan).ok_or_else(
             || {
                 super::layout_config_error(
                     self.diagram,
                     crate::types::standard_attr_keys::diagram::EDGE_ROUTING,
-                    edge_routing_style,
+                    edge_routing_style.as_str(),
                     &super::known_edge_routing_names(),
                 )
             },

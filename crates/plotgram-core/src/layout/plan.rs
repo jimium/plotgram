@@ -167,6 +167,26 @@ impl LayoutPlan {
         }
     }
 
+    /// 解析有效边路由算法：用户显式配置优先，否则采用布局 hints 推荐。
+    pub fn resolve_effective_edge_routing(
+        diagram: &Diagram,
+        plan: &LayoutPlan,
+        hints: &super::LayoutHints,
+    ) -> String {
+        if diagram_algorithm_name(diagram, diagram::EDGE_ROUTING).is_some() {
+            return plan.edge_routing.clone();
+        }
+        match hints.edge_routing_style {
+            super::EdgeRoutingStyle::Orthogonal => "orthogonal".to_string(),
+            super::EdgeRoutingStyle::Curved => "circular".to_string(),
+            super::EdgeRoutingStyle::Straight => "straight".to_string(),
+            super::EdgeRoutingStyle::Spline => "spline".to_string(),
+            super::EdgeRoutingStyle::SelfLoop | super::EdgeRoutingStyle::Unspecified => {
+                plan.edge_routing.clone()
+            }
+        }
+    }
+
     /// catalog 查询用的空 plan（layout option 使用 spec 默认值）。
     pub fn default_for_catalog() -> Self {
         Self {
@@ -225,7 +245,7 @@ fn resolve_friendliness_mode(diagram: &Diagram) -> FriendlinessMode {
 /// 仅对 `orthogonal` 路由有效；其他路由算法忽略 bundling 配置。
 /// 当前仅支持 `bundling: true/false` 开关，其余参数使用 `BundlingConfig::default()`。
 fn resolve_edge_bundling_config(
-    _diagram: &Diagram,
+    diagram: &Diagram,
     edge_routing: &str,
     edge_options: &ResolvedAlgoOptions,
 ) -> BundlingConfig {
@@ -239,8 +259,11 @@ fn resolve_edge_bundling_config(
         return BundlingConfig::default();
     }
 
+    let semantic_gate = matches!(diagram.diagram_type, crate::types::DiagramType::Architecture);
+
     BundlingConfig {
         enabled: true,
+        semantic_gate,
         ..BundlingConfig::default()
     }
 }
@@ -302,7 +325,8 @@ fn resolve_algo_name(diagram: &Diagram, key: &str, profile_default: &str) -> Str
         .to_string()
 }
 
-fn diagram_algorithm_name<'a>(diagram: &'a Diagram, key: &str) -> Option<&'a str> {
+/// 读取 diagram 属性块中的算法名（未配置时返回 `None`）。
+pub fn diagram_algorithm_name<'a>(diagram: &'a Diagram, key: &str) -> Option<&'a str> {
     diagram
         .attributes
         .iter()

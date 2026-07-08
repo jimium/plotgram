@@ -18,11 +18,13 @@
 //! - 尺度兼容、位置兼容、lane 兼容
 
 use crate::ast::Relation;
-use crate::layout::geometry::Point;
+use crate::layout::edge::common::edge_geometry::canonical_pair;
 use crate::layout::edge::common::edge_geometry::{
     arrow_type_tag, edge_line_style_signature, edge_stroke_color_signature,
     edge_stroke_width_signature, node_center,
 };
+use crate::layout::edge::edge_merge_policy::{edge_merge_context, edges_may_share_trunk};
+use crate::layout::geometry::Point;
 use crate::layout::NodeLayout;
 
 use super::types::{Axis, BundlingConfig, LabelBundlePolicy, PathSegment, SegmentDirection};
@@ -314,6 +316,13 @@ pub fn find_parallel_segment_overlap(
     best
 }
 
+/// 语义合并资格：同源出边、同宿入边、或无向节点对平行边。
+fn semantically_merge_eligible(e1: &EdgeFeatures, e2: &EdgeFeatures) -> bool {
+    let c1 = edge_merge_context(&e1.from_id, &e1.to_id, e1.edge_index);
+    let c2 = edge_merge_context(&e2.from_id, &e2.to_id, e2.edge_index);
+    edges_may_share_trunk(&c1, &c2, crate::types::DiagramType::Architecture)
+}
+
 /// 计算两条边的兼容性分数（Step 2）。
 ///
 /// 返回值 ∈ [0.0, 1.0]。0.0 表示不兼容（硬条件不满足），≥ threshold 表示可捆绑。
@@ -336,6 +345,11 @@ pub fn compute_compatibility(e1: &EdgeFeatures, e2: &EdgeFeatures, config: &Bund
     }
     // 出入边合并：一条边的 to 是另一条边的 from（语义流向相反）
     if e1.to_id == e2.from_id || e1.from_id == e2.to_id {
+        return 0.0;
+    }
+
+    // ── 硬条件 2b: 架构图语义门控（禁止无关边仅因段重叠而合并）──
+    if config.semantic_gate && !semantically_merge_eligible(e1, e2) {
         return 0.0;
     }
 
@@ -834,6 +848,54 @@ mod tests {
         };
         let score = compute_compatibility(&e1, &e2, &config);
         assert!(score > 0.0, "SegmentAware 下不同 label 应兼容（P0 占位）");
+    }
+
+    #[test]
+    fn semantic_gate_blocks_unrelated_parallel_segments() {
+        // 模拟 architecture 场景：不同源/宿但路径共享垂直段
+        let nodes = make_nodes(
+            &["auth", "biz", "redis", "db"],
+            &[(300.0, 500.0), (500.0, 500.0), (300.0, 150.0), (100.0, 150.0)],
+        );
+        let rel1 = make_relation("auth", "redis", ArrowType::Active);
+        let rel2 = make_relation("biz", "db", ArrowType::Active);
+        let shared_bus = vec![
+            pt(294.0, 500.0),
+            pt(294.0, 400.0),
+            pt(294.0, 200.0),
+            pt(294.0, 150.0),
+        ];
+        let e1 = make_features(0, &rel1, &nodes, &shared_bus);
+        let e2 = make_features(1, &rel2, &nodes, &shared_bus);
+        let config = BundlingConfig {
+            semantic_gate: true,
+            ..Default::default()
+        };
+        let score = compute_compatibility(&e1, &e2, &config);
+        assert_eq!(
+            score, 0.0,
+            "semantic_gate 应禁止不同源/宿边仅因段重叠而合并"
+        );
+    }
+
+    #[test]
+    fn semantic_gate_allows_same_source_fan_out() {
+        let nodes = make_nodes(
+            &["lb", "auth", "biz"],
+            &[(400.0, 300.0), (200.0, 500.0), (600.0, 500.0)],
+        );
+        let rel1 = make_relation("lb", "auth", ArrowType::Active);
+        let rel2 = make_relation("lb", "biz", ArrowType::Active);
+        let path1 = vec![pt(400.0, 320.0), pt(400.0, 500.0), pt(200.0, 500.0)];
+        let path2 = vec![pt(400.0, 320.0), pt(400.0, 500.0), pt(600.0, 500.0)];
+        let e1 = make_features(0, &rel1, &nodes, &path1);
+        let e2 = make_features(1, &rel2, &nodes, &path2);
+        let config = BundlingConfig {
+            semantic_gate: true,
+            ..Default::default()
+        };
+        let score = compute_compatibility(&e1, &e2, &config);
+        assert!(score > 0.0, "同源 fan-out 在 semantic_gate 下仍应可合并");
     }
 
     #[test]

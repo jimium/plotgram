@@ -10,10 +10,13 @@
 //! client 对齐等特化优化）保留在本模块。未来 flowchart 分治布局将实现
 //! `IntraGroupLayouter` trait，共用同一套类型基础。
 
-use super::group_sizing::{apply_group_sizing_policy, parse_group_sizing, GroupSizingPolicy};
+use super::group_sizing::{
+    apply_equal_sibling_dimensions_per_rank, apply_group_sizing_policy, parse_group_sizing,
+    GroupSizeBlock, GroupSizingPolicy,
+};
 use super::group_layout_hint::{
     align_nodes_in_column, assign_ranks_for_mode, parse_group_layout_hint,
-    resolve_group_layout_mode, GroupLayoutHint, GroupLayoutMode,
+    resolve_group_layout_hint, resolve_group_layout_mode, GroupLayoutHint, GroupLayoutMode,
 };
 use super::layout::acyclic::is_effective_edge;
 use super::layout::constants::{
@@ -74,6 +77,30 @@ impl super::group_sizing::GroupWidthBlock for MacroBlock {
     }
 }
 
+impl GroupSizeBlock for MacroBlock {
+    fn block_height(&self) -> f64 {
+        self.height
+    }
+
+    fn set_block_height(&mut self, height: f64) {
+        self.height = height;
+    }
+
+    fn shift_intra_nodes_y(&mut self, delta: f64) {
+        for nl in self.intra.nodes.values_mut() {
+            nl.y += delta;
+        }
+        self.intra.content_height += delta;
+    }
+}
+
+/// 宏观行内块的水平对齐策略（架构图默认左对齐，避免窄行居中偏移）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RowAlign {
+    Start,
+    Center,
+}
+
 pub(super) fn compute_two_phase_layout(
     diagram: &Diagram,
     graph: &GraphIndex,
@@ -104,9 +131,10 @@ pub(super) fn compute_two_phase_layout(
     }
 
     // ── Phase B: 宏观超级节点分层 ──
-    let (super_members, super_edges, pair_edge_counts) =
+    let (super_members, super_edges, pair_edge_counts, edge_weights) =
         build_super_graph(graph, group_map, reversed_edges);
-    let macro_ranks = assign_super_macro_ranks(&super_members, &super_edges);
+    let macro_ranks =
+        assign_super_macro_ranks(&super_members, &super_edges, &edge_weights, &graph.node_ids);
 
     let mut blocks = build_macro_blocks(
         diagram,
@@ -128,6 +156,7 @@ pub(super) fn compute_two_phase_layout(
         &super_edges,
         &pair_edge_counts,
         canvas_padding,
+        RowAlign::Start,
     );
 
     // ── Phase C: 回填全局坐标 ──
@@ -156,6 +185,14 @@ pub(super) fn compute_two_phase_layout(
 
     let (total_width, total_height) = compute_total_size(&nodes, &groups);
 
+    let sibling_corridors =
+        crate::layout::group::build_sibling_corridors(diagram, &groups);
+    let corridors = crate::layout::group::merge_corridors(&sibling_corridors, &groups);
+    let group_routing = crate::layout::group::GroupRoutingHints {
+        corridors,
+        border_shell_pad: crate::layout::group::GROUP_BORDER_SHELL_PAD,
+    };
+
     // 从全局层导出 sugiyama_ranks（entity_id → rank），供拓扑意图满足度评估使用。
     let sugiyama_ranks: HashMap<String, usize> = layers
         .iter()
@@ -172,6 +209,7 @@ pub(super) fn compute_two_phase_layout(
         hints: crate::layout::LayoutHints {
             edge_routing_style: crate::layout::EdgeRoutingStyle::Orthogonal,
             sugiyama_ranks: Some(sugiyama_ranks),
+            group_routing: Some(group_routing),
             ..Default::default()
         },
     }
@@ -224,12 +262,12 @@ fn layout_intra_group(
 
     let hint = diagram
         .find_group(group_id)
-        .map(parse_group_layout_hint)
+        .map(|g| resolve_group_layout_hint(g, diagram.diagram_type.clone()))
         .unwrap_or(GroupLayoutHint::Auto);
     let mode = resolve_group_layout_mode(hint, members, graph, reversed);
     let ranks = assign_ranks_for_mode(&mode, members, graph, reversed);
     let layers = build_layers(&ranks);
-    let ordered_layers = order_layers_group_aware(
+    let mut ordered_layers = order_layers_group_aware(
         graph,
         &intra_map,
         &layers,
@@ -251,7 +289,25 @@ fn layout_intra_group(
     }
 
     normalize_to_origin(&mut nodes);
-    let (content_width, content_height) = content_bbox(&nodes);
+    let (mut content_width, mut content_height) = content_bbox(&nodes);
+
+    // 过扁组（宽 >> 高）回退 Grid，改善 private_subnet 类单行布局
+    const MIN_GROUP_ASPECT: f64 = 0.25;
+    if mode == GroupLayoutMode::Horizontal
+        && members.len() >= 3
+        && content_width > f64::EPSILON
+        && content_height < content_width * MIN_GROUP_ASPECT
+    {
+        let grid_mode = GroupLayoutMode::Grid;
+        let ranks = assign_ranks_for_mode(&grid_mode, members, graph, reversed);
+        let layers = build_layers(&ranks);
+        ordered_layers = order_layers_group_aware(graph, &intra_map, &layers, reversed);
+        nodes = assign_coordinates_intra(graph, &ordered_layers, sizes, &member_set);
+        center_group_hub_nodes(graph, &intra_map, &ordered_layers, sizes, &mut nodes);
+        align_client_nodes_to_hubs(graph, &intra_map, &ordered_layers, sizes, &mut nodes);
+        normalize_to_origin(&mut nodes);
+        (content_width, content_height) = content_bbox(&nodes);
+    }
 
     IntraLayout {
         nodes,
@@ -347,17 +403,25 @@ fn layout_intra_group_recursive(
     }
 
     // 4. 构建超级节点图（基于跨子组边）
-    let (super_members, super_edges, pair_edge_counts) =
+    let (super_members, super_edges, pair_edge_counts, edge_weights) =
         build_super_graph_for_group(group_id, group_tree, graph, reversed);
-    let macro_ranks = assign_super_macro_ranks(&super_members, &super_edges);
+    let macro_ranks =
+        assign_super_macro_ranks(&super_members, &super_edges, &edge_weights, &graph.node_ids);
 
-    // 4.5 应用 uniform sizing：同 rank 的子组块拉齐宽度（嵌套层级也生效）
+    // 4.5 嵌套 sibling 等宽等高 + uniform 策略
     let sizing = parse_group_sizing(diagram);
     let child_group_ids: Vec<String> = children.to_vec();
+    apply_equal_sibling_dimensions_per_rank(&macro_ranks, &mut blocks);
     apply_group_sizing_policy(sizing, &child_group_ids, &mut blocks);
 
-    // 5. 宏观定位（复用 position_macro_blocks 逻辑，padding=0 因为容器组内部无画布 padding）
-    position_intra_macro_blocks(&mut blocks, &macro_ranks, &super_edges, &pair_edge_counts);
+    // 5. 宏观定位（架构图左对齐，不居中窄行）
+    position_intra_macro_blocks(
+        &mut blocks,
+        &macro_ranks,
+        &super_edges,
+        &pair_edge_counts,
+        RowAlign::Start,
+    );
 
     // 6. 合并为单个 IntraLayout
     compose_intra_layout_recursive(group_id, &blocks, padding, &child_intras, &direct_intra)
@@ -396,6 +460,23 @@ impl super::group_sizing::GroupWidthBlock for IntraMacroBlock {
             nl.x += delta;
         }
         self.intra.content_width += delta;
+    }
+}
+
+impl GroupSizeBlock for IntraMacroBlock {
+    fn block_height(&self) -> f64 {
+        self.height
+    }
+
+    fn set_block_height(&mut self, height: f64) {
+        self.height = height;
+    }
+
+    fn shift_intra_nodes_y(&mut self, delta: f64) {
+        for nl in self.intra.nodes.values_mut() {
+            nl.y += delta;
+        }
+        self.intra.content_height += delta;
     }
 }
 
@@ -468,6 +549,7 @@ fn build_super_graph_for_group(
     HashMap<String, Vec<String>>,
     HashSet<(String, String)>,
     HashMap<(String, String), usize>,
+    HashMap<(String, String), usize>,
 ) {
     let children = group_tree.children_of(group_id);
     let direct_entities = group_tree.entities_of(group_id);
@@ -496,6 +578,8 @@ fn build_super_graph_for_group(
     let mut super_edges: HashSet<(String, String)> = HashSet::new();
     // Phase 3：per-pair 边数（归一化为无向 pair）
     let mut pair_edge_counts: HashMap<(String, String), usize> = HashMap::new();
+    // 有向边权（跨组实际边数），供加权 FAS 裁决双向对
+    let mut edge_weights: HashMap<(String, String), usize> = HashMap::new();
     for (super_id, members) in &super_members {
         for node in members {
             if let Some(succs) = graph.out_edges.get(node) {
@@ -510,6 +594,9 @@ fn build_super_graph_for_group(
                     };
                     if from_super != to_super {
                         super_edges.insert((from_super.clone(), to_super.clone()));
+                        *edge_weights
+                            .entry((from_super.clone(), to_super.clone()))
+                            .or_insert(0) += 1;
                         let pair = if from_super <= to_super {
                             (from_super, to_super)
                         } else {
@@ -522,7 +609,7 @@ fn build_super_graph_for_group(
         }
     }
 
-    (super_members, super_edges, pair_edge_counts)
+    (super_members, super_edges, pair_edge_counts, edge_weights)
 }
 
 /// 容器组内宏观块定位（复用顶层 position_macro_blocks 逻辑，但 padding=0）
@@ -531,6 +618,7 @@ fn position_intra_macro_blocks(
     macro_ranks: &HashMap<String, usize>,
     super_edges: &HashSet<(String, String)>,
     pair_edge_counts: &HashMap<(String, String), usize>,
+    row_align: RowAlign,
 ) {
     if blocks.is_empty() {
         return;
@@ -582,14 +670,68 @@ fn position_intra_macro_blocks(
             }
         }
 
-        let extra_layer_gap = cross_edge_counts
-            .get(&rank)
-            .map(|&c| (c as f64 * CROSS_EDGE_LAYER_GAP_SCALE).min(MAX_EXTRA_LAYER_GAP))
-            .unwrap_or(0.0);
+        let extra_layer_gap = adaptive_vertical_rank_gap(
+            rank,
+            blocks,
+            macro_ranks,
+            &cross_edge_counts,
+            pair_edge_counts,
+        );
         let effective_layer_gap = LAYER_GAP + extra_layer_gap;
 
         y_cursor += max_height + effective_layer_gap;
     }
+
+    if row_align == RowAlign::Center {
+        center_rank_rows(macro_ranks, blocks.len(), |i| {
+            (blocks[i].id.clone(), blocks[i].x, blocks[i].width)
+        })
+        .into_iter()
+        .for_each(|(i, shift)| blocks[i].x += shift);
+    }
+}
+
+/// 计算每个宏观块的行居中偏移量。
+///
+/// 按 rank 分行，行宽 = 行内块的最大右边界 - origin；
+/// 最宽行保持不动，窄行整体右移 `(max_row_width - row_width) / 2`。
+/// 返回 `(block_index, shift_x)` 列表（shift 为 0 的块不返回）。
+fn center_rank_rows(
+    macro_ranks: &HashMap<String, usize>,
+    block_count: usize,
+    block_info: impl Fn(usize) -> (String, f64, f64),
+) -> Vec<(usize, f64)> {
+    // rank → (行右边界, 行内块索引)
+    let mut rows: HashMap<usize, (f64, Vec<usize>)> = HashMap::new();
+    for i in 0..block_count {
+        let (id, x, width) = block_info(i);
+        let rank = macro_ranks.get(&id).copied().unwrap_or(0);
+        let entry = rows.entry(rank).or_insert((f64::NEG_INFINITY, Vec::new()));
+        entry.0 = entry.0.max(x + width);
+        entry.1.push(i);
+    }
+
+    let max_extent = rows
+        .values()
+        .map(|(extent, _)| *extent)
+        .fold(f64::NEG_INFINITY, f64::max);
+    if !max_extent.is_finite() {
+        return Vec::new();
+    }
+
+    let mut shifts = Vec::new();
+    let mut ranks: Vec<usize> = rows.keys().copied().collect();
+    ranks.sort_unstable();
+    for rank in ranks {
+        let (extent, indices) = &rows[&rank];
+        let shift = (max_extent - extent) / 2.0;
+        if shift > f64::EPSILON {
+            for &i in indices {
+                shifts.push((i, shift));
+            }
+        }
+    }
+    shifts
 }
 
 /// 合并容器组内的宏观块为单个 IntraLayout
@@ -636,9 +778,11 @@ fn compose_intra_layout_recursive(
     let mut layers: Vec<Vec<String>> = Vec::new();
     let mut sorted_blocks: Vec<&IntraMacroBlock> = blocks.iter().collect();
     sorted_blocks.sort_by(|a, b| {
-        a.y.partial_cmp(&b.y)
+        a.y
+            .partial_cmp(&b.y)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then(a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal))
+            .then(a.id.cmp(&b.id))
     });
 
     for block in &sorted_blocks {
@@ -847,6 +991,7 @@ fn build_super_graph(
     HashMap<String, Vec<String>>,
     HashSet<(String, String)>,
     HashMap<(String, String), usize>,
+    HashMap<(String, String), usize>,
 ) {
     let mut super_members: HashMap<String, Vec<String>> = HashMap::new();
 
@@ -867,6 +1012,8 @@ fn build_super_graph(
     let mut super_edges: HashSet<(String, String)> = HashSet::new();
     // Phase 3：per-pair 边数（归一化为无向 pair），用于按 pair 计算通道间距
     let mut pair_edge_counts: HashMap<(String, String), usize> = HashMap::new();
+    // 有向边权（跨组实际边数），供加权 FAS 裁决双向对
+    let mut edge_weights: HashMap<(String, String), usize> = HashMap::new();
     for node in &graph.node_ids {
         if let Some(succs) = graph.out_edges.get(node) {
             for succ in succs {
@@ -877,6 +1024,9 @@ fn build_super_graph(
                 let to_super = super_node_id(succ, group_map);
                 if from_super != to_super {
                     super_edges.insert((from_super.clone(), to_super.clone()));
+                    *edge_weights
+                        .entry((from_super.clone(), to_super.clone()))
+                        .or_insert(0) += 1;
                     // 归一化为无向 pair (min, max)
                     let pair = if from_super <= to_super {
                         (from_super, to_super)
@@ -889,7 +1039,7 @@ fn build_super_graph(
         }
     }
 
-    (super_members, super_edges, pair_edge_counts)
+    (super_members, super_edges, pair_edge_counts, edge_weights)
 }
 
 fn super_node_id(node: &str, group_map: &GroupMap) -> String {
@@ -959,9 +1109,13 @@ fn build_macro_blocks(
 }
 
 /// 每条跨组边为层间距额外增加的像素
-const CROSS_EDGE_LAYER_GAP_SCALE: f64 = 8.0;
+const CROSS_EDGE_LAYER_GAP_SCALE: f64 = 12.0;
 /// 层间距额外增加的上限
-const MAX_EXTRA_LAYER_GAP: f64 = 60.0;
+const MAX_EXTRA_LAYER_GAP: f64 = 80.0;
+/// 相邻 rank 组对跨组边为垂直间隙额外增加的像素
+const CROSS_EDGE_PAIR_VERTICAL_GAP_SCALE: f64 = 10.0;
+/// 组对垂直间隙额外增加的上限
+const MAX_EXTRA_PAIR_VERTICAL_GAP: f64 = 56.0;
 /// 每条同 rank 跨组边为组间距额外增加的像素
 const CROSS_EDGE_GROUP_GAP_SCALE: f64 = 6.0;
 /// 组间距额外增加的上限
@@ -981,6 +1135,53 @@ fn adaptive_group_gap(pair_edge_count: usize) -> f64 {
             .min(MAX_EXTRA_GROUP_GAP);
         GROUP_GAP_X + extra
     }
+}
+
+/// 相邻 macro rank 之间：取 rank 总跨组边密度与「上下行组对」最大边数的较大值，放大垂直通道。
+fn adaptive_vertical_rank_gap<B: super::group_sizing::GroupWidthBlock>(
+    rank: usize,
+    blocks: &[B],
+    macro_ranks: &HashMap<String, usize>,
+    cross_edge_counts: &HashMap<usize, usize>,
+    pair_edge_counts: &HashMap<(String, String), usize>,
+) -> f64 {
+    let from_rank = cross_edge_counts
+        .get(&rank)
+        .map(|&c| (c as f64 * CROSS_EDGE_LAYER_GAP_SCALE).min(MAX_EXTRA_LAYER_GAP))
+        .unwrap_or(0.0);
+
+    let mut ids_a: Vec<String> = blocks
+        .iter()
+        .filter(|b| {
+            b.is_group_block() && macro_ranks.get(b.block_id()).copied() == Some(rank)
+        })
+        .map(|b| b.block_id().to_string())
+        .collect();
+    let mut ids_b: Vec<String> = blocks
+        .iter()
+        .filter(|b| {
+            b.is_group_block() && macro_ranks.get(b.block_id()).copied() == Some(rank + 1)
+        })
+        .map(|b| b.block_id().to_string())
+        .collect();
+    ids_a.sort();
+    ids_b.sort();
+
+    let mut pair_max = 0usize;
+    for a in &ids_a {
+        for b in &ids_b {
+            let pair = if a <= b {
+                (a.clone(), b.clone())
+            } else {
+                (b.clone(), a.clone())
+            };
+            pair_max = pair_max.max(pair_edge_counts.get(&pair).copied().unwrap_or(0));
+        }
+    }
+    let from_pair = (pair_max as f64 * CROSS_EDGE_PAIR_VERTICAL_GAP_SCALE)
+        .min(MAX_EXTRA_PAIR_VERTICAL_GAP);
+
+    from_rank.max(from_pair)
 }
 
 /// 统计每对相邻 macro rank 之间的跨组边数
@@ -1010,6 +1211,7 @@ fn position_macro_blocks(
     super_edges: &HashSet<(String, String)>,
     pair_edge_counts: &HashMap<(String, String), usize>,
     canvas_padding: f64,
+    row_align: RowAlign,
 ) {
     if blocks.is_empty() {
         return;
@@ -1063,14 +1265,24 @@ fn position_macro_blocks(
             }
         }
 
-        // 跨 rank 跨组边密度 → 放大层间距
-        let extra_layer_gap = cross_edge_counts
-            .get(&rank)
-            .map(|&c| (c as f64 * CROSS_EDGE_LAYER_GAP_SCALE).min(MAX_EXTRA_LAYER_GAP))
-            .unwrap_or(0.0);
+        let extra_layer_gap = adaptive_vertical_rank_gap(
+            rank,
+            blocks,
+            macro_ranks,
+            &cross_edge_counts,
+            pair_edge_counts,
+        );
         let effective_layer_gap = LAYER_GAP + extra_layer_gap;
 
         y_cursor += max_height + effective_layer_gap;
+    }
+
+    if row_align == RowAlign::Center {
+        center_rank_rows(macro_ranks, blocks.len(), |i| {
+            (blocks[i].id.clone(), blocks[i].x, blocks[i].width)
+        })
+        .into_iter()
+        .for_each(|(i, shift)| blocks[i].x += shift);
     }
 }
 
@@ -1264,8 +1476,13 @@ fn nudge_intra_nodes_toward_cross_group_edges(
             .push((node_id.clone(), current_cx, avg_target));
     }
 
-    // 对每组：计算动态微调
-    for (gid, entries) in group_node_targets {
+    // 对每组：计算动态微调（按 gid 排序保证确定性）
+    let mut group_ids: Vec<String> = group_node_targets.keys().cloned().collect();
+    group_ids.sort();
+    for gid in group_ids {
+        let Some(entries) = group_node_targets.get(&gid) else {
+            continue;
+        };
         let Some(gl) = groups.get(&gid) else {
             continue;
         };

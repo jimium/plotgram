@@ -41,10 +41,16 @@ pub enum LintRuleId {
     BundleForkOverlap,
     /// bundle 主干穿过节点
     BundleTrunkThroughNode,
+    /// 不同源/宿边共享非语义 trunk 段（架构图假并线）
+    UnrelatedEdgeTrunkMerge,
+    /// 标签与节点 AABB 重叠
+    LabelNodeOverlap,
+    /// 两个标签 AABB 重叠
+    LabelLabelOverlap,
 }
 
 impl LintRuleId {
-    pub const COUNT: usize = 13;
+    pub const COUNT: usize = 16;
 
     pub const ALL: [LintRuleId; Self::COUNT] = [
         LintRuleId::NodeOverlap,
@@ -60,6 +66,9 @@ impl LintRuleId {
         LintRuleId::BundleMergeDensity,
         LintRuleId::BundleForkOverlap,
         LintRuleId::BundleTrunkThroughNode,
+        LintRuleId::UnrelatedEdgeTrunkMerge,
+        LintRuleId::LabelNodeOverlap,
+        LintRuleId::LabelLabelOverlap,
     ];
 
     pub fn index(self) -> usize {
@@ -77,6 +86,9 @@ impl LintRuleId {
             LintRuleId::BundleMergeDensity => 10,
             LintRuleId::BundleForkOverlap => 11,
             LintRuleId::BundleTrunkThroughNode => 12,
+            LintRuleId::UnrelatedEdgeTrunkMerge => 13,
+            LintRuleId::LabelNodeOverlap => 14,
+            LintRuleId::LabelLabelOverlap => 15,
         }
     }
 
@@ -87,8 +99,11 @@ impl LintRuleId {
             | LintRuleId::BundledArrowConvergence
             | LintRuleId::BundledOppositeFlow
             | LintRuleId::BundleMergeDensity
-            | LintRuleId::BundleForkOverlap
-            | LintRuleId::BundleTrunkThroughNode => LintSeverity::Warning,
+            |             LintRuleId::BundleForkOverlap
+            | LintRuleId::BundleTrunkThroughNode
+            | LintRuleId::UnrelatedEdgeTrunkMerge
+            | LintRuleId::LabelLabelOverlap => LintSeverity::Warning,
+            LintRuleId::LabelNodeOverlap => LintSeverity::Error,
             _ => LintSeverity::Error,
         }
     }
@@ -108,6 +123,9 @@ impl LintRuleId {
             LintRuleId::BundleMergeDensity => "bundle_merge_density",
             LintRuleId::BundleForkOverlap => "bundle_fork_overlap",
             LintRuleId::BundleTrunkThroughNode => "bundle_trunk_through_node",
+            LintRuleId::UnrelatedEdgeTrunkMerge => "unrelated_edge_trunk_merge",
+            LintRuleId::LabelNodeOverlap => "label_node_overlap",
+            LintRuleId::LabelLabelOverlap => "label_label_overlap",
         }
     }
 }

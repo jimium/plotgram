@@ -26,6 +26,29 @@ pub struct RoutingContext<'a> {
     pub obstacles: &'a PreparedObstacles,
     /// Phase 3: 通道负载图（reroute 时传入 Some，初始路由为 None）
     pub channel_load: Option<&'a ChannelLoadMap>,
+    /// P0-2: 有组间走廊时，穿无关组内部为硬约束（不接受 nodes-only 候选）
+    pub strict_group_transit: bool,
+}
+
+impl<'a> RoutingContext<'a> {
+    pub fn new(
+        nodes: &'a HashMap<String, NodeLayout>,
+        group_ctx: &'a GroupRoutingContext,
+        grid: &'a SegmentGrid,
+        cfg: &'a OrthoConfig,
+        obstacles: &'a PreparedObstacles,
+        channel_load: Option<&'a ChannelLoadMap>,
+    ) -> Self {
+        Self {
+            nodes,
+            group_ctx,
+            grid,
+            cfg,
+            obstacles,
+            channel_load,
+            strict_group_transit: !group_ctx.corridors.is_empty(),
+        }
+    }
 }
 
 /// 路由前预排序的障碍物索引，避免每次调用重复 `nodes.keys().collect() + sort()`。
@@ -180,6 +203,7 @@ impl SegmentGrid {
                 }
             }
         }
+        result.sort_by_key(|s| (s.edge_index, s.x1.to_bits(), s.y1.to_bits(), s.x2.to_bits(), s.y2.to_bits()));
         result
     }
 

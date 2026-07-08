@@ -145,7 +145,10 @@ fn order_layer_by_median(
                 layer.len() as f64 / 2.0
             } else {
                 let mut sorted = positions;
-                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                sorted.sort_by(|a, b| {
+                    a.partial_cmp(b)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
                 sorted[sorted.len() / 2]
             };
 
@@ -153,7 +156,11 @@ fn order_layer_by_median(
         })
         .collect();
 
-    nodes_with_median.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+    nodes_with_median.sort_by(|a, b| {
+        a.1.partial_cmp(&b.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.0.cmp(&b.0))
+    });
     nodes_with_median.into_iter().map(|(node, _)| node).collect()
 }
 
@@ -177,14 +184,13 @@ fn group_aware_reorder(ordered: &[String], group_map: &GroupMap) -> Vec<String> 
         .into_iter()
         .filter(|(_, positions)| positions.len() > 1)
         .collect();
-    // 先按 gid 排序保证确定性底序，再按中位数位置排序（稳定排序），
-    // 避免 median 相同时保持 HashMap 迭代顺序（非确定）→ 处理顺序不同 → result 不同
-    multi_groups.sort_by(|a, b| a.0.cmp(&b.0));
-    // 按中位数位置从后往前排序，这样从后往前处理时不会影响前面的索引
+    // 按中位数位置从后往前排序；median 相同时按 gid 保证确定性
     multi_groups.sort_by(|a, b| {
         let a_med = a.1[a.1.len() / 2];
         let b_med = b.1[b.1.len() / 2];
-        b_med.cmp(&a_med)
+        b_med
+            .cmp(&a_med)
+            .then(a.0.cmp(&b.0))
     });
 
     let mut result = ordered.to_vec();

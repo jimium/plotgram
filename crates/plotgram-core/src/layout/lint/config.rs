@@ -87,6 +87,7 @@ impl LintConfig {
         rules[LintRuleId::ChildGroupOutsideParent.index()] = RuleConfig::on();
         rules[LintRuleId::EdgeThroughNode.index()] = RuleConfig::on();
         rules[LintRuleId::EdgeCrossesGroupInterior.index()] = RuleConfig::on();
+        rules[LintRuleId::LabelNodeOverlap.index()] = RuleConfig::on();
         Self {
             rules,
             fail_on_warning: false,

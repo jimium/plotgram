@@ -101,14 +101,12 @@ pub(in super::super) fn resolve_group_overlaps(
     }
 
     let mut ordered: Vec<String> = groups.keys().cloned().collect();
-    // 先按 id 排序保证确定性底序，再按 y 排序（稳定排序），
-    // 避免 y 相同时保持 HashMap 迭代顺序（非确定）→ cursor_bottom 累积顺序不同
-    ordered.sort();
     ordered.sort_by(|a, b| {
         groups[a]
             .y
             .partial_cmp(&groups[b].y)
             .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.cmp(b))
     });
 
     let mut cursor_bottom = f64::NEG_INFINITY;

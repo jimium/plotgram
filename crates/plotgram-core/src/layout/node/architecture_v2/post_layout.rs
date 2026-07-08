@@ -23,6 +23,10 @@ pub(crate) fn center_single_group_rows(diagram: &Diagram, layout: &mut LayoutRes
     if top_ids.is_empty() {
         return;
     }
+    // 多个顶层 group 时保持左对齐（与 RowAlign::Start / SharedLines 一致），不居中窄行
+    if top_ids.len() > 1 {
+        return;
+    }
 
     let mut rows: Vec<(f64, Vec<String>)> = Vec::new();
     for id in &top_ids {
@@ -132,5 +136,32 @@ pub(crate) fn center_single_group_rows(diagram: &Diagram, layout: &mut LayoutRes
                 g.x += shift;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::layout::compute_layout_with_plan;
+    use crate::pipeline::parse_prepare_validate;
+    use crate::prepare::StyleRequest;
+
+    #[test]
+    fn multi_top_level_groups_share_left_edge() {
+        let source = include_str!(
+            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
+        );
+        let output = parse_prepare_validate(source, &StyleRequest::default());
+        let prepared = output.diagram.expect("valid diagram");
+        let layout = compute_layout_with_plan(prepared.inner(), prepared.layout_plan())
+            .expect("layout");
+
+        let external = layout.groups.get("external").expect("external");
+        let cloud = layout.groups.get("cloud").expect("cloud");
+        assert!(
+            (external.x - cloud.x).abs() < 1.0,
+            "external.x={} cloud.x={} (expected shared left edge)",
+            external.x,
+            cloud.x
+        );
     }
 }

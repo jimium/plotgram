@@ -13,6 +13,9 @@ use crate::layout::node::common::crossings::count_crossings_from_edges;
 /// 相邻位置，让 group 偏置在"位置接近"时生效，而非仅完全相等时。
 const GROUP_BIAS_EPSILON: f64 = 1.0;
 
+const ORDERING_SWEEP_MAX: usize = 16;
+const ORDERING_NO_IMPROVE_STOP: usize = 2;
+
 pub(super) fn order_layers_weighted_median(
     dag: &DiGraph<LayerNode, ()>,
     mut layers: Vec<Vec<NodeIndex>>,
@@ -20,7 +23,11 @@ pub(super) fn order_layers_weighted_median(
     long_edge_barycenter_weight: f64,
     node_group: &HashMap<NodeIndex, Option<String>>,
 ) -> Vec<Vec<NodeIndex>> {
-    for _ in 0..ordering_sweeps {
+    let max_sweeps = ordering_sweeps.clamp(1, ORDERING_SWEEP_MAX);
+    let mut no_improve = 0usize;
+    let mut prev_crossings = count_layer_crossings(dag, &layers);
+
+    for _ in 0..max_sweeps {
         for layer_index in 1..layers.len() {
             let upper_pos = index_map(&layers[layer_index - 1]);
             let layer_snapshot = layers[layer_index].clone();
@@ -56,9 +63,28 @@ pub(super) fn order_layers_weighted_median(
             });
             transpose_adjacent(layer_index, &mut layers, dag, long_edge_barycenter_weight);
         }
+
+        let crossings = count_layer_crossings(dag, &layers);
+        if crossings < prev_crossings {
+            no_improve = 0;
+        } else {
+            no_improve += 1;
+            if no_improve >= ORDERING_NO_IMPROVE_STOP {
+                break;
+            }
+        }
+        prev_crossings = crossings;
     }
 
     layers
+}
+
+fn count_layer_crossings(dag: &DiGraph<LayerNode, ()>, layers: &[Vec<NodeIndex>]) -> usize {
+    let mut total = 0usize;
+    for layer_index in 0..layers.len().saturating_sub(1) {
+        total += count_crossings(&layers[layer_index], &layers[layer_index + 1], dag);
+    }
+    total
 }
 
 pub(super) fn index_map(layer: &[NodeIndex]) -> HashMap<NodeIndex, usize> {
@@ -244,11 +270,16 @@ pub(super) fn transpose_adjacent(
         for index in 0..layers[layer_index].len().saturating_sub(1) {
             let before_cross = crossing_score_around(layer_index, layers, dag);
             let before_penalty = alignment_penalty_around(layer_index, layers, dag, long_edge_barycenter_weight);
+            let before_long = long_edge_crossing_score(layers, dag);
             layers[layer_index].swap(index, index + 1);
             let after_cross = crossing_score_around(layer_index, layers, dag);
             let after_penalty = alignment_penalty_around(layer_index, layers, dag, long_edge_barycenter_weight);
+            let after_long = long_edge_crossing_score(layers, dag);
             if after_cross < before_cross
                 || (after_cross == before_cross && after_penalty < before_penalty)
+                || (after_cross == before_cross
+                    && after_penalty == before_penalty
+                    && after_long < before_long)
             {
                 improved = true;
             } else {
@@ -341,4 +372,84 @@ fn layers_iter_from_pos(pos: &HashMap<NodeIndex, usize>) -> Vec<NodeIndex> {
     let mut nodes = pos.iter().map(|(node, idx)| (*idx, *node)).collect::<Vec<_>>();
     nodes.sort_by_key(|(idx, _)| *idx);
     nodes.into_iter().map(|(_, node)| node).collect()
+}
+
+/// 跨层长边（rank 差 ≥ 2）在层坐标系下的几何交叉估计。
+fn long_edge_crossing_score(
+    layers: &[Vec<NodeIndex>],
+    dag: &DiGraph<LayerNode, ()>,
+) -> usize {
+    let mut layer_pos: HashMap<NodeIndex, (usize, usize)> = HashMap::new();
+    for (layer_idx, layer) in layers.iter().enumerate() {
+        for (pos, node) in layer.iter().enumerate() {
+            layer_pos.insert(*node, (layer_idx, pos));
+        }
+    }
+
+    let mut long_edges: Vec<((usize, usize), (usize, usize))> = Vec::new();
+    for node in dag.node_indices() {
+        let Some(&(from_layer, from_pos)) = layer_pos.get(&node) else {
+            continue;
+        };
+        for succ in dag.neighbors_directed(node, Direction::Outgoing) {
+            let Some(&(to_layer, to_pos)) = layer_pos.get(&succ) else {
+                continue;
+            };
+            if from_layer.abs_diff(to_layer) < 2 {
+                continue;
+            }
+            long_edges.push(((from_layer, from_pos), (to_layer, to_pos)));
+        }
+    }
+
+    long_edges.sort();
+    let mut crossings = 0usize;
+    for left in 0..long_edges.len() {
+        for right in (left + 1)..long_edges.len() {
+            let (a0, a1) = long_edges[left];
+            let (b0, b1) = long_edges[right];
+            if long_segments_cross(a0, a1, b0, b1) {
+                crossings += 1;
+            }
+        }
+    }
+    crossings
+}
+
+fn long_segments_cross(
+    a0: (usize, usize),
+    a1: (usize, usize),
+    b0: (usize, usize),
+    b1: (usize, usize),
+) -> bool {
+    let (a_layer0, a_pos0) = (a0.0 as f64, a0.1 as f64);
+    let (a_layer1, a_pos1) = (a1.0 as f64, a1.1 as f64);
+    let (b_layer0, b_pos0) = (b0.0 as f64, b0.1 as f64);
+    let (b_layer1, b_pos1) = (b1.0 as f64, b1.1 as f64);
+
+    fn orient(ax: f64, ay: f64, bx: f64, by: f64, cx: f64, cy: f64) -> f64 {
+        (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+    }
+
+    let o1 = orient(a_layer0, a_pos0, a_layer1, a_pos1, b_layer0, b_pos0);
+    let o2 = orient(a_layer0, a_pos0, a_layer1, a_pos1, b_layer1, b_pos1);
+    let o3 = orient(b_layer0, b_pos0, b_layer1, b_pos1, a_layer0, a_pos0);
+    let o4 = orient(b_layer0, b_pos0, b_layer1, b_pos1, a_layer1, a_pos1);
+
+    if o1 == 0.0 && o2 == 0.0 && o3 == 0.0 && o4 == 0.0 {
+        let a_min_layer = a_layer0.min(a_layer1);
+        let a_max_layer = a_layer0.max(a_layer1);
+        let b_min_layer = b_layer0.min(b_layer1);
+        let b_max_layer = b_layer0.max(b_layer1);
+        let a_min_pos = a_pos0.min(a_pos1);
+        let a_max_pos = a_pos0.max(a_pos1);
+        let b_min_pos = b_pos0.min(b_pos1);
+        let b_max_pos = b_pos0.max(b_pos1);
+        return a_min_layer <= b_max_layer
+            && b_min_layer <= a_max_layer
+            && a_min_pos <= b_max_pos
+            && b_min_pos <= a_max_pos;
+    }
+
+    (o1 > 0.0) != (o2 > 0.0) && (o3 > 0.0) != (o4 > 0.0)
 }

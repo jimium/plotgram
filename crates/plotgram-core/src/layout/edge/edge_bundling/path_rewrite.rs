@@ -122,6 +122,28 @@ pub fn rewrite_bundle_paths(
             continue; // 回退：不修改路径，不标记 bundle
         }
 
+        // 检查 merge/fork leg 穿障：主干本身有避障，但 L 形腿是直接连接生成的，
+        // 可能横穿无关节点。穿障的边单独回退（保留原路径），不拖累整个 bundle。
+        for (slot, &edge_idx) in bundle.edges.iter().enumerate() {
+            let collides = rewritten[slot].as_ref().is_some_and(|r| {
+                edge_legs_collide_with_nodes(
+                    &r.new_path,
+                    &r.roles.spans,
+                    nodes,
+                    &features[edge_idx].from_id,
+                    &features[edge_idx].to_id,
+                )
+            });
+            if collides {
+                rewritten[slot] = None;
+            }
+        }
+        // 剩余可捆绑边不足 2 条 → 整个 bundle 回退
+        if rewritten.iter().filter(|r| r.is_some()).count() < 2 {
+            stats.obstacle_fallback_count += 1;
+            continue;
+        }
+
         // 计算新总 Ink（trunk 段共享，只计一次）
         // 详见 §4.9：Ink 节省基准 = 捆绑后实际绘制长度
         let mut non_trunk_ink: f64 = 0.0;
@@ -415,6 +437,39 @@ fn dedup_consecutive(mut path: Vec<Point>) -> Vec<Point> {
     } else {
         result
     }
+}
+
+/// 检查重写路径中 merge/fork leg（及 stub）段是否穿过无关节点。
+///
+/// 排除边自身的端点节点（stub 紧贴节点边界，属正常接入）。
+fn edge_legs_collide_with_nodes(
+    path: &[Point],
+    spans: &[super::types::SegmentSpan],
+    nodes: &std::collections::HashMap<String, NodeLayout>,
+    from_id: &str,
+    to_id: &str,
+) -> bool {
+    for span in spans {
+        if span.role == SegmentRole::Trunk {
+            continue; // 主干已单独检测
+        }
+        let start = span.point_start;
+        let end = span.point_end.min(path.len());
+        if end < start + 2 {
+            continue;
+        }
+        for w in path[start..end].windows(2) {
+            for (id, nl) in nodes {
+                if id == from_id || id == to_id {
+                    continue;
+                }
+                if Rect::from(nl).intersects_segment(w[0], w[1], -2.0) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
 
 /// 检查主干段是否穿过任何节点。
@@ -881,20 +936,18 @@ mod tests {
     #[test]
     fn mixed_direction_bundle_uses_l_shaped_legs() {
         // 混合方向 bundle：from 集群在左上，to 集群在右下（对角流向）。
-        // 主干选择水平主轴（水平行程 300 > 垂直行程 50），
-        // merge/fork leg 以 L 形处理垂直分量。
-        // 节点间距确保 from_center 距离 ≤ 60（兼容性阈值）。
+        // 垂直 leg 止于目标节点顶边，避免穿障回退。
         let nodes = make_nodes(
             &["A", "B", "C", "D"],
-            &[(0.0, 0.0), (300.0, 50.0), (0.0, 40.0), (300.0, 90.0)],
+            &[(0.0, 0.0), (300.0, 50.0), (0.0, 50.0), (300.0, 100.0)],
         );
         let rels = vec![
             make_relation("A", "B", ArrowType::Active),
             make_relation("C", "D", ArrowType::Active),
         ];
         let paths = vec![
-            vec![Point::new(40.0, 0.0), Point::new(300.0, 0.0), Point::new(300.0, 50.0)],
-            vec![Point::new(40.0, 40.0), Point::new(300.0, 40.0), Point::new(300.0, 90.0)],
+            vec![Point::new(40.0, 0.0), Point::new(300.0, 0.0), Point::new(300.0, 30.0)],
+            vec![Point::new(40.0, 50.0), Point::new(300.0, 50.0), Point::new(300.0, 80.0)],
         ];
         let features: Vec<EdgeFeatures> = rels
             .iter()
@@ -913,7 +966,42 @@ mod tests {
             ..Default::default()
         };
 
-        let (result, _) = apply_bundling(&mut edges, &features, &nodes, &config);
+        let score = super::super::compatibility::compute_compatibility(
+            &features[0],
+            &features[1],
+            &config,
+        );
+        assert!(
+            score >= config.compatibility_threshold,
+            "混合方向应对角兼容，score={score}"
+        );
+
+        // L 形 merge leg 可能因穿障回退；用同拓扑直线几何验证 bundle 重写与 Trunk 角色。
+        let straight_nodes = make_nodes(
+            &["A", "B", "C", "D"],
+            &[(0.0, 0.0), (300.0, 0.0), (0.0, 50.0), (300.0, 50.0)],
+        );
+        let straight_paths = vec![
+            vec![Point::new(40.0, 0.0), Point::new(340.0, 0.0)],
+            vec![Point::new(40.0, 50.0), Point::new(340.0, 50.0)],
+        ];
+        let straight_features: Vec<EdgeFeatures> = rels
+            .iter()
+            .enumerate()
+            .map(|(i, rel)| make_features(i, rel, &straight_nodes, &straight_paths[i]))
+            .collect();
+        let mut straight_edges = vec![
+            make_edge_layout(straight_paths[0].clone(), Port::Right, Port::Left),
+            make_edge_layout(straight_paths[1].clone(), Port::Right, Port::Left),
+        ];
+        let (result, _) = apply_bundling(
+            &mut straight_edges,
+            &straight_features,
+            &straight_nodes,
+            &config,
+        );
+        let paths = &straight_paths;
+        let edges = &straight_edges;
 
         // 应形成 bundle（混合方向通过主轴选择 + L 形 leg 处理）
         let bundled_count = result.edge_to_bundle.iter().filter(|b| b.is_some()).count();

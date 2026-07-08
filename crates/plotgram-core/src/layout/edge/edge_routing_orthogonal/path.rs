@@ -56,6 +56,7 @@ impl EdgeCorridor {
 /// 优先使用 GroupCorridors 中预定义的走廊坐标。
 fn group_gap_midpoints_on_axis(
     groups: &HashMap<String, GroupLayout>,
+    sorted_group_ids: &[String],
     corridors: &[GroupCorridor],
     axis: Axis,
     corridor: EdgeCorridor,
@@ -81,24 +82,30 @@ fn group_gap_midpoints_on_axis(
         mids.push(c.coord);
     }
 
-    let mut ranges: Vec<(f64, f64, f64, f64)> = groups
-        .values()
-        .filter_map(|g| {
+    let mut ranges: Vec<(f64, f64, f64, f64, &str)> = sorted_group_ids
+        .iter()
+        .filter_map(|gid| {
+            let g = groups.get(gid)?;
             let r = Rect::from(g);
             if !corridor.overlaps_travel_band(&r, axis, GROUP_OBSTACLE_PAD) {
                 return None;
             }
             let (cross_lo, cross_hi) = r.cross_range_on_axis(axis);
             let (m_lo, m_hi) = r.range_on_axis(axis);
-            Some((cross_lo, cross_hi, m_lo, m_hi))
+            Some((cross_lo, cross_hi, m_lo, m_hi, gid.as_str()))
         })
         .collect();
-    ranges.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    ranges.sort_by(|a, b| {
+        a.0
+            .partial_cmp(&b.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.4.cmp(b.4))
+    });
 
     for i in 0..ranges.len() {
         for j in i + 1..ranges.len() {
-            let (_ac_lo, ac_hi, am_lo, am_hi) = ranges[i];
-            let (bc_lo, _bc_hi, bm_lo, bm_hi) = ranges[j];
+            let (_ac_lo, ac_hi, am_lo, am_hi, _) = ranges[i];
+            let (bc_lo, _bc_hi, bm_lo, bm_hi, _) = ranges[j];
             if am_hi <= bm_lo || bm_hi <= am_lo {
                 continue;
             }
@@ -113,7 +120,19 @@ fn group_gap_midpoints_on_axis(
             }
         }
     }
-    mids.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    mids.sort_by(|a, b| {
+        a.partial_cmp(b)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    // 相等坐标按首次出现序稳定化（先排序再 dedup 保留左侧）
+    let mut indexed: Vec<(usize, f64)> = mids.into_iter().enumerate().collect();
+    indexed.sort_by(|a, b| {
+        a.1
+            .partial_cmp(&b.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.0.cmp(&b.0))
+    });
+    let mut mids: Vec<f64> = indexed.into_iter().map(|(_, m)| m).collect();
     mids.dedup_by(|a, b| (*a - *b).abs() < 1.0);
     mids
 }
@@ -205,6 +224,35 @@ struct PathEvalState {
     candidate_count: usize,
 }
 
+fn lex_path_cmp(a: &[Point], b: &[Point]) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let n = a.len().min(b.len());
+    for i in 0..n {
+        let c = a[i]
+            .x
+            .partial_cmp(&b[i].x)
+            .unwrap_or(Ordering::Equal)
+            .then_with(|| a[i].y.partial_cmp(&b[i].y).unwrap_or(Ordering::Equal));
+        if c != Ordering::Equal {
+            return c;
+        }
+    }
+    a.len().cmp(&b.len())
+}
+
+/// 同分时按路径点字典序选取，保证候选选择确定性。
+fn candidate_better(score: f64, path: &[Point], best: &Option<(f64, Vec<Point>)>) -> bool {
+    use std::cmp::Ordering;
+    match best {
+        None => true,
+        Some((best_score, best_path)) => match score.partial_cmp(best_score) {
+            Some(Ordering::Less) => true,
+            Some(Ordering::Greater) => false,
+            _ => lex_path_cmp(path, best_path) == Ordering::Less,
+        },
+    }
+}
+
 fn evaluate_path_batch(
     paths: Vec<Vec<Point>>,
     ctx: &RoutingContext,
@@ -236,7 +284,7 @@ fn evaluate_path_batch(
                 state.strict_count += 1;
                 if state.best_strict.as_ref().is_none_or(|(bs, _)| lower_bound < *bs) {
                     let score = scorer.score(&path, ctx, pair);
-                    if state.best_strict.as_ref().is_none_or(|(bs, _)| score < *bs) {
+                    if candidate_better(score, &path, &state.best_strict) {
                         state.best_strict = Some((score, path));
                     }
                 }
@@ -244,14 +292,14 @@ fn evaluate_path_batch(
                 state.nodes_only_count += 1;
                 if state.best_nodes_only.as_ref().is_none_or(|(bs, _)| lower_bound < *bs) {
                     let score = scorer.score(&path, ctx, pair);
-                    if state.best_nodes_only.as_ref().is_none_or(|(bs, _)| score < *bs) {
+                    if candidate_better(score, &path, &state.best_nodes_only) {
                         state.best_nodes_only = Some((score, path));
                     }
                 }
             }
         } else {
             let score = path_length(&path) + path.len().saturating_sub(2) as f64 * BEND_PENALTY;
-            if state.best_dirty.as_ref().is_none_or(|(bs, _)| score < *bs) {
+            if candidate_better(score, &path, &state.best_dirty) {
                 state.best_dirty = Some((score, path));
             }
         }
@@ -372,7 +420,13 @@ pub fn select_best_path_with_scorer_stats(
 
     state
         .best_strict
-        .or(state.best_nodes_only)
+        .or_else(|| {
+            if ctx.strict_group_transit {
+                None
+            } else {
+                state.best_nodes_only
+            }
+        })
         .or(state.best_dirty)
         .map(|(_, p)| p)
         .unwrap_or_else(|| vec![start, end])
@@ -478,9 +532,22 @@ fn generate_axis_folds(
         &ctx.obstacles.sorted_node_ids, &ctx.obstacles.sorted_group_ids,
         corridor,
     );
-    folds.extend(group_gap_midpoints_on_axis(groups, &ctx.group_ctx.corridors, axis, corridor));
+    folds.extend(group_gap_midpoints_on_axis(
+        groups,
+        &ctx.obstacles.sorted_group_ids,
+        &ctx.group_ctx.corridors,
+        axis,
+        corridor,
+    ));
 
-    folds.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let mut indexed: Vec<(usize, f64)> = folds.into_iter().enumerate().collect();
+    indexed.sort_by(|a, b| {
+        a.1
+            .partial_cmp(&b.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.0.cmp(&b.0))
+    });
+    let mut folds: Vec<f64> = indexed.into_iter().map(|(_, v)| v).collect();
     folds.dedup_by(|a, b| (*a - *b).abs() < 1.0);
 
     let s_main = axis.main_coord(s1);
@@ -607,8 +674,20 @@ fn build_staircase_candidates(
         corridor,
     );
 
-    fold_coords.extend(group_gap_midpoints_on_axis(groups, &ctx.group_ctx.corridors, axis.other(), corridor));
-    channel_coords.extend(group_gap_midpoints_on_axis(groups, &ctx.group_ctx.corridors, axis, corridor));
+    fold_coords.extend(group_gap_midpoints_on_axis(
+        groups,
+        &ctx.obstacles.sorted_group_ids,
+        &ctx.group_ctx.corridors,
+        axis.other(),
+        corridor,
+    ));
+    channel_coords.extend(group_gap_midpoints_on_axis(
+        groups,
+        &ctx.obstacles.sorted_group_ids,
+        &ctx.group_ctx.corridors,
+        axis,
+        corridor,
+    ));
 
     prepare_coords(&mut fold_coords);
     prepare_coords(&mut channel_coords);
@@ -749,16 +828,35 @@ fn build_channel_detours_on_axis(
 
     for &margin in margins {
         channel_coords.push(channel_coord_on_axis(
-            max_cross, true, groups, &ctx.group_ctx.corridors,
-            axis, margin, band_lo, band_hi,
+            max_cross,
+            true,
+            groups,
+            &ctx.obstacles.sorted_group_ids,
+            &ctx.group_ctx.corridors,
+            axis,
+            margin,
+            band_lo,
+            band_hi,
         ));
         channel_coords.push(channel_coord_on_axis(
-            min_cross, false, groups, &ctx.group_ctx.corridors,
-            axis, margin, band_lo, band_hi,
+            min_cross,
+            false,
+            groups,
+            &ctx.obstacles.sorted_group_ids,
+            &ctx.group_ctx.corridors,
+            axis,
+            margin,
+            band_lo,
+            band_hi,
         ));
     }
 
-    all_bounds.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    all_bounds.sort_by(|a, b| {
+        a.0
+            .partial_cmp(&b.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+    });
     for &(lo, hi) in &all_bounds {
         for &margin in margins {
             channel_coords.push(lo - margin);
@@ -849,6 +947,7 @@ fn channel_coord_on_axis(
     edge_main: f64,
     outward_positive: bool,
     groups: &HashMap<String, GroupLayout>,
+    sorted_group_ids: &[String],
     corridors: &[GroupCorridor],
     axis: Axis,
     margin: f64,
@@ -862,7 +961,8 @@ fn channel_coord_on_axis(
 
     let ch = if outward_positive {
         let mut ch = edge_main + margin;
-        for g in groups.values() {
+        for gid in sorted_group_ids {
+            let Some(g) = groups.get(gid) else { continue };
             let r = Rect::from(g);
             let (_, wall) = r.cross_range_on_axis(axis);
             if wall > edge_main + EPS && wall < edge_main + 3.0 * margin {
@@ -873,7 +973,8 @@ fn channel_coord_on_axis(
         ch.max(edge_main + MIN_CHANNEL_CLEARANCE)
     } else {
         let mut ch = edge_main - margin;
-        for g in groups.values() {
+        for gid in sorted_group_ids {
+            let Some(g) = groups.get(gid) else { continue };
             let r = Rect::from(g);
             let (wall, _) = r.cross_range_on_axis(axis);
             if wall < edge_main - EPS && wall > edge_main - 3.0 * margin {

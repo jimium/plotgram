@@ -12,10 +12,13 @@
 
 use plotgram_core::types::DiagramType;
 use plotgram_core::ast::{Diagram};
-use plotgram_core::layout::{EdgeLayout, LayoutResult, NodeLayout};
+use plotgram_core::layout::{compute_lint_metrics, EdgeLayout, LayoutResult, LintMetricsSummary, NodeLayout};
 use plotgram_core::layout::refine::segment_intersects_node;
 use plotgram_core::layout::geometry::Point;
 use std::collections::HashMap;
+
+/// 理想宽高比（用于偏离度计算）
+pub const IDEAL_ASPECT_RATIO: f64 = 1.6;
 
 /// 布局质量评估结果
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -25,6 +28,18 @@ pub struct LayoutMetrics {
     pub node_overlap_pairs: usize,
     /// 边穿过节点数（仅统计非起终节点的穿越）
     pub edge_node_crossings: usize,
+    /// 边穿分组内部数（端点均不属于该分组）
+    #[serde(default)]
+    pub edge_through_groups: usize,
+    /// 标签遮挡节点数
+    #[serde(default)]
+    pub label_node_overlaps: usize,
+    /// 标签互相重叠数
+    #[serde(default)]
+    pub label_label_overlaps: usize,
+    /// 路径拐点总数（折线方向变化次数）
+    #[serde(default)]
+    pub bend_count: usize,
 
     // ── 可读性指标 ──
     /// 边交叉数（两两边在非共享端点处的交叉）
@@ -47,6 +62,9 @@ pub struct LayoutMetrics {
     // ── 美观性指标 ──
     /// 画布宽高比（≥ 1.0）
     pub aspect_ratio: f64,
+    /// 宽高比偏离理想值的程度（|ratio - 1.6|）
+    #[serde(default)]
+    pub aspect_ratio_deviation: f64,
     /// 面积利用率（节点面积 / 画布面积）
     pub area_utilization: f64,
 
@@ -75,6 +93,10 @@ pub struct LayoutMetrics {
     pub node_count: usize,
     /// 边数量
     pub edge_count: usize,
+
+    /// LayoutLint 指标摘要
+    #[serde(default)]
+    pub lint: LintMetricsSummary,
 }
 
 impl LayoutMetrics {
@@ -83,6 +105,8 @@ impl LayoutMetrics {
         let node_overlap_pairs = count_node_overlaps(&result.nodes);
         let edge_node_crossings = count_edge_node_crossings(diagram, result);
         let edge_crossings = count_edge_crossings(result);
+        let lint = compute_lint_metrics(diagram, result);
+        let bend_count = count_bends(result);
 
         let total_area = result.total_width * result.total_height;
         let total_edge_length = compute_total_edge_length(result);
@@ -103,6 +127,7 @@ impl LayoutMetrics {
         } else {
             aspect_ratio
         };
+        let aspect_ratio_deviation = (aspect_ratio - IDEAL_ASPECT_RATIO).abs();
 
         let area_utilization = if total_area > 0.0 {
             total_node_area / total_area
@@ -120,6 +145,10 @@ impl LayoutMetrics {
         Self {
             node_overlap_pairs,
             edge_node_crossings,
+            edge_through_groups: lint.edge_crosses_group_interior,
+            label_node_overlaps: lint.label_node_overlap,
+            label_label_overlaps: lint.label_label_overlap,
+            bend_count,
             edge_crossings,
             total_area,
             total_edge_length,
@@ -127,6 +156,7 @@ impl LayoutMetrics {
             edge_length_stddev,
             edge_length_cv,
             aspect_ratio,
+            aspect_ratio_deviation,
             area_utilization,
             channel_congestion,
             long_edge_count,
@@ -135,6 +165,7 @@ impl LayoutMetrics {
             port_conflict_score,
             node_count: result.nodes.len(),
             edge_count: result.edges.len(),
+            lint,
         }
     }
 
@@ -143,6 +174,10 @@ impl LayoutMetrics {
         Self {
             node_overlap_pairs: 0,
             edge_node_crossings: 0,
+            edge_through_groups: 0,
+            label_node_overlaps: 0,
+            label_label_overlaps: 0,
+            bend_count: 0,
             edge_crossings: 0,
             total_area: 0.0,
             total_edge_length: 0.0,
@@ -150,6 +185,7 @@ impl LayoutMetrics {
             edge_length_stddev: 0.0,
             edge_length_cv: 1.0,
             aspect_ratio: 1.0,
+            aspect_ratio_deviation: 0.0,
             area_utilization: 0.0,
             channel_congestion: 0.0,
             long_edge_count: 0,
@@ -158,29 +194,21 @@ impl LayoutMetrics {
             port_conflict_score: 0.0,
             node_count: diagram.entities.len(),
             edge_count: diagram.relations.len(),
+            lint: LintMetricsSummary::default(),
         }
     }
 
     /// 综合质量评分（0~100，越高越好）
     ///
     /// 评分维度及权重：
-    /// - 正确性（40%）：节点重叠 + 边穿节点 + 边交叉
+    /// - 正确性（40%）：节点重叠 + 边穿节点 + 边交叉 + 标签遮挡
     /// - 紧凑性（20%）：面积利用率
     /// - 均匀性（20%）：边长 CV
     /// - 美观性（20%）：宽高比偏离度
     pub fn quality_score(&self) -> f64 {
-        // ── 正确性（40%）──
-        // 每个错误项扣分，归一化到边数
         let edge_count = self.edge_count.max(1) as f64;
         let node_count = self.node_count.max(1) as f64;
-        let overlap_penalty = (self.node_overlap_pairs as f64
-            / (node_count * (node_count - 1.0) / 2.0).max(1.0))
-        .min(1.0);
-        let edge_node_penalty = (self.edge_node_crossings as f64 / edge_count).min(1.0);
-        let edge_cross_penalty = (self.edge_crossings as f64 / edge_count).min(1.0);
-        let correctness = (1.0 - overlap_penalty) * 0.4
-            + (1.0 - edge_node_penalty) * 0.35
-            + (1.0 - edge_cross_penalty) * 0.25;
+        let correctness = self.correctness_subscore(edge_count, node_count);
 
         // ── 紧凑性（20%）──
         // 面积利用率越高越好，上限 50% 视为满分
@@ -208,12 +236,15 @@ impl LayoutMetrics {
     /// 生成单行摘要（适合终端输出）
     pub fn one_line_summary(&self) -> String {
         format!(
-            "nodes={} edges={} overlaps={} edge_x_node={} edge_x_edge={} area={:.0} edge_len={:.1}±{:.1} cv={:.2} ratio={:.2} util={:.1}% score={:.1}",
+            "nodes={} edges={} overlaps={} edge_x_node={} edge_x_edge={} label_x_node={} label_x_label={} bends={} area={:.0} edge_len={:.1}±{:.1} cv={:.2} ratio={:.2} util={:.1}% score={:.1}",
             self.node_count,
             self.edge_count,
             self.node_overlap_pairs,
             self.edge_node_crossings,
             self.edge_crossings,
+            self.label_node_overlaps,
+            self.label_label_overlaps,
+            self.bend_count,
             self.total_area,
             self.total_edge_length,
             self.edge_length_stddev,
@@ -228,14 +259,7 @@ impl LayoutMetrics {
     pub fn quality_score_with_weights(&self, weights: &MetricWeights) -> f64 {
         let edge_count = self.edge_count.max(1) as f64;
         let node_count = self.node_count.max(1) as f64;
-        let overlap_penalty = (self.node_overlap_pairs as f64
-            / (node_count * (node_count - 1.0) / 2.0).max(1.0))
-        .min(1.0);
-        let edge_node_penalty = (self.edge_node_crossings as f64 / edge_count).min(1.0);
-        let edge_cross_penalty = (self.edge_crossings as f64 / edge_count).min(1.0);
-        let correctness = (1.0 - overlap_penalty) * 0.4
-            + (1.0 - edge_node_penalty) * 0.35
-            + (1.0 - edge_cross_penalty) * 0.25;
+        let correctness = self.correctness_subscore(edge_count, node_count);
 
         let compactness = (self.area_utilization / 0.5).min(1.0);
         let uniformity = (1.0 - self.edge_length_cv).max(0.0);
@@ -269,14 +293,7 @@ impl LayoutMetrics {
     pub fn dimension_scores(&self) -> DimensionScores {
         let edge_count = self.edge_count.max(1) as f64;
         let node_count = self.node_count.max(1) as f64;
-        let overlap_penalty = (self.node_overlap_pairs as f64
-            / (node_count * (node_count - 1.0) / 2.0).max(1.0))
-        .min(1.0);
-        let edge_node_penalty = (self.edge_node_crossings as f64 / edge_count).min(1.0);
-        let edge_cross_penalty = (self.edge_crossings as f64 / edge_count).min(1.0);
-        let correctness = (1.0 - overlap_penalty) * 0.4
-            + (1.0 - edge_node_penalty) * 0.35
-            + (1.0 - edge_cross_penalty) * 0.25;
+        let correctness = self.correctness_subscore(edge_count, node_count);
         let compactness = (self.area_utilization / 0.5).min(1.0);
         let uniformity = (1.0 - self.edge_length_cv).max(0.0);
         let ideal_ratio = 1.6;
@@ -293,6 +310,21 @@ impl LayoutMetrics {
             uniformity: (uniformity * 100.0).round() / 100.0,
             aesthetics: (aesthetics * 100.0).round() / 100.0,
         }
+    }
+
+    fn correctness_subscore(&self, edge_count: f64, node_count: f64) -> f64 {
+        let overlap_penalty = (self.node_overlap_pairs as f64
+            / (node_count * (node_count - 1.0) / 2.0).max(1.0))
+            .min(1.0);
+        let edge_node_penalty = (self.edge_node_crossings as f64 / edge_count).min(1.0);
+        let edge_cross_penalty = (self.edge_crossings as f64 / edge_count).min(1.0);
+        let label_penalty = ((self.label_node_overlaps + self.label_label_overlaps) as f64
+            / edge_count)
+            .min(1.0);
+        (1.0 - overlap_penalty) * 0.35
+            + (1.0 - edge_node_penalty) * 0.30
+            + (1.0 - edge_cross_penalty) * 0.20
+            + (1.0 - label_penalty) * 0.15
     }
 }
 
@@ -422,6 +454,28 @@ impl std::fmt::Display for QualityGrade {
             QualityGrade::Poor => write!(f, "较差"),
         }
     }
+}
+
+/// 计算路径拐点总数（相邻线段不共线则计为一个拐点）
+fn count_bends(result: &LayoutResult) -> usize {
+    let mut total = 0usize;
+    for edge in &result.edges {
+        let path = edge.path_points();
+        if path.len() < 3 {
+            continue;
+        }
+        for i in 1..path.len() - 1 {
+            let dx1 = path[i].x - path[i - 1].x;
+            let dy1 = path[i].y - path[i - 1].y;
+            let dx2 = path[i + 1].x - path[i].x;
+            let dy2 = path[i + 1].y - path[i].y;
+            let cross = dx1 * dy2 - dy1 * dx2;
+            if cross.abs() > 0.5 {
+                total += 1;
+            }
+        }
+    }
+    total
 }
 
 /// 计算节点重叠对数

@@ -17,6 +17,7 @@ use crate::layout::edge::common::edge_geometry::{
     arrow_type_tag, build_edge_labels, canonical_pair, edge_line_style_signature, node_center,
     parse_label_t, point_at_path_t, undirected_pair_key,
 };
+use crate::layout::edge::common::self_loop;
 use crate::layout::edge::common::label_avoidance::resolve_label_overlaps;
 use crate::types::DiagramType;
 use crate::ast::{Diagram};
@@ -31,6 +32,8 @@ const APPLICABLE_TYPES: &[DiagramType] = &[
 
 pub(super) mod channel_load;
 pub(super) mod context;
+pub(super) mod corridor_route;
+pub(super) mod feedback_side;
 pub(super) mod lane_assignment;
 pub(super) mod layer_order;
 pub(super) mod path;
@@ -287,6 +290,7 @@ fn route_edges_orthogonal_inner(
 ) -> LayoutResult {
     let relations = &diagram.relations;
     let n = relations.len();
+    let self_loop_idx = self_loop::self_loop_indices(relations);
 
     let routing_algo = crate::layout::group::routing_algo_for_diagram(diagram);
     let group_ctx = crate::layout::group::GroupRoutingContext::from_layout(
@@ -298,6 +302,18 @@ fn route_edges_orthogonal_inner(
 
     // 预排序节点/分组 ID，避免路由循环内重复排序（方案 2）
     let obstacles = PreparedObstacles::build(&result.nodes, &group_ctx);
+
+    let horizontal =
+        crate::layout::resolve_effective_direction(diagram) == Some("left-to-right");
+    let feedback_assignment = feedback_side::assign_feedback_sides(
+        diagram,
+        relations,
+        &result.nodes,
+        result.hints.sugiyama_ranks.as_ref(),
+        horizontal,
+    );
+
+    let corridor_plan = corridor_route::plan_corridor_routes(relations, &group_ctx);
 
     // ── 1. 按无向节点对分组，并确定每条边的端口（连接边） ──
     let t1 = crate::layout::perf::Instant::now();
@@ -311,7 +327,10 @@ fn route_edges_orthogonal_inner(
     let mut to_side = vec![Port::Top; n];
     let mut lane = vec![0usize; n];
 
-    for indices in pair_groups.values() {
+    let mut pair_keys: Vec<String> = pair_groups.keys().cloned().collect();
+    pair_keys.sort();
+    for key in &pair_keys {
+        let indices = &pair_groups[key];
         let rel0 = &relations[indices[0]];
         let (can_from, can_to) = canonical_pair(rel0.from.as_str(), rel0.to.as_str());
 
@@ -325,6 +344,12 @@ fn route_edges_orthogonal_inner(
 
         for (l, &i) in indices.iter().enumerate() {
             let rel = &relations[i];
+            if let Some(hint) = feedback_assignment.hints.get(&i) {
+                from_side[i] = hint.from_side;
+                to_side[i] = hint.to_side;
+                lane[i] = hint.lane;
+                continue;
+            }
             if rel.from.as_str() == can_from {
                 from_side[i] = side_a;
                 to_side[i] = side_b;
@@ -342,6 +367,13 @@ fn route_edges_orthogonal_inner(
     // 导致节点附近不必要的交叉。此阶段对每个节点的多条边做"同侧偏好"协调：
     // 统计各侧边数，让少数派边在几何可接受时切换到多数派侧。
     coordinate_port_sides(relations, &result.nodes, &mut from_side, &mut to_side, Some(&group_ctx));
+    apply_feedback_side_overrides(
+        relations,
+        &feedback_assignment,
+        &mut from_side,
+        &mut to_side,
+        &mut lane,
+    );
     crate::perf_log!("[perf]     step1_ports: {:.2}ms", t1.elapsed().as_secs_f64() * 1000.0);
 
     // ── 2. 为每个连接点分配磁吸 slot 坐标 ──
@@ -416,7 +448,12 @@ fn route_edges_orthogonal_inner(
 
     // endpoint_map: (edge_index, is_from) -> Endpoint (with anchor filled in)
     let mut endpoint_map: HashMap<(usize, bool), Endpoint> = HashMap::new();
-    for ((node_id, side), mut sub_groups) in side_groups {
+    let mut side_group_keys: Vec<(String, Port)> = side_groups.keys().cloned().collect();
+    side_group_keys.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+    for (node_id, side) in side_group_keys {
+        let Some(mut sub_groups) = side_groups.remove(&(node_id.clone(), side)) else {
+            continue;
+        };
         let Some(nl) = result.nodes.get(&node_id) else {
             continue;
         };
@@ -439,7 +476,14 @@ fn route_edges_orthogonal_inner(
         // 排序会导致两端排名不一致 → base_frac 不同 → 路径非直线。min_edge_index
         // 作为稳定 tiebreaker，保证同一 edge 在两端子组中获得相同排名。
         sub_groups.sort_by(|a, b| {
-            sub_group_sort_key(a, relations).cmp(&sub_group_sort_key(b, relations))
+            sub_group_sort_key(a, relations)
+                .cmp(&sub_group_sort_key(b, relations))
+                .then_with(|| {
+                    a.iter()
+                        .map(|e| e.edge_index)
+                        .min()
+                        .cmp(&b.iter().map(|e| e.edge_index).min())
+                })
         });
 
         let k = sub_groups.len();
@@ -479,6 +523,55 @@ fn route_edges_orthogonal_inner(
                     },
                 );
             }
+        }
+    }
+
+    // 平行边切线偏移：仅 A↔B 正反向对对称错开；同向多边由 slot 分布处理。
+    let parallel = super::common::parallel_edges::group_parallel_edges(
+        relations,
+        crate::layout::constants::DEFAULT_EDGE_OFFSET,
+    );
+    let mut reverse_pairs: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut pair_groups: std::collections::BTreeMap<String, Vec<usize>> =
+        std::collections::BTreeMap::new();
+    for (i, rel) in relations.iter().enumerate() {
+        let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
+        pair_groups.entry(key).or_default().push(i);
+    }
+    for (key, indices) in &pair_groups {
+        if indices.len() < 2 {
+            continue;
+        }
+        let rel0 = &relations[indices[0]];
+        let (can_from, can_to) = canonical_pair(rel0.from.as_str(), rel0.to.as_str());
+        let mut has_forward = false;
+        let mut has_backward = false;
+        for &i in indices {
+            let rel = &relations[i];
+            if rel.from.as_str() == can_from && rel.to.as_str() == can_to {
+                has_forward = true;
+            } else {
+                has_backward = true;
+            }
+        }
+        if has_forward && has_backward {
+            reverse_pairs.insert(key.clone());
+        }
+    }
+    for ((edge_index, _), ep) in endpoint_map.iter_mut() {
+        let rel = &relations[*edge_index];
+        let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
+        if !reverse_pairs.contains(&key) {
+            continue;
+        }
+        let offset = parallel.offsets[*edge_index];
+        if offset.abs() < EPS {
+            continue;
+        }
+        if is_vertical_port(ep.side) {
+            ep.anchor.x += offset;
+        } else {
+            ep.anchor.y += offset;
         }
     }
 
@@ -526,6 +619,19 @@ fn route_edges_orthogonal_inner(
         let from_id = rel.from.as_str();
         let to_id = rel.to.as_str();
 
+        if from_id == to_id {
+            if let Some(nl) = result.nodes.get(from_id) {
+                let loop_idx = self_loop_idx.get(&i).copied().unwrap_or(0);
+                edges[i] = self_loop::route_self_loop(
+                    rel,
+                    nl,
+                    loop_idx,
+                    self_loop::SelfLoopStyle::Orthogonal,
+                );
+            }
+            continue;
+        }
+
         if let Some(ref preserve) = preserve_edges {
             if preserve.contains(&i) && edges[i].path_len() >= 2 {
                 let path: Vec<Point> = edges[i].path_points().into_owned();
@@ -547,28 +653,71 @@ fn route_edges_orthogonal_inner(
             continue;
         };
 
-        let ctx = RoutingContext {
-            nodes: &result.nodes,
-            group_ctx: &group_ctx,
-            grid: &grid,
-            cfg: &cfg,
-            obstacles: &obstacles,
-            channel_load: None,
-        };
+        let ctx = RoutingContext::new(
+            &result.nodes,
+            &group_ctx,
+            &grid,
+            &cfg,
+            &obstacles,
+            None,
+        );
         let pair = EndpointPair {
             from: from_ep.clone(),
             to: to_ep.clone(),
         };
 
-        // P2-1: 收集路径选择统计
-        let mut path_stats = PathSelectStats::default();
-        let path = select_best_path_with_scorer_stats(
-            &ctx,
-            &pair,
-            &DefaultScorer,
-            Some(&mut path_stats),
-            false,
+        let corridor_candidate = corridor_route::try_build_corridor_path(
+            i,
+            from_ep.anchor,
+            to_ep.anchor,
+            from_id,
+            to_id,
+            &corridor_plan,
+            &group_ctx,
+            cfg.channel_margin,
         );
+        let corridor_ok = corridor_candidate.as_ref().is_some_and(|candidate| {
+            candidate.len() >= 2
+                && path_is_clean(
+                    candidate,
+                    from_id,
+                    to_id,
+                    &result.nodes,
+                    &group_ctx,
+                    &obstacles.sorted_node_ids,
+                )
+                && path_avoids_group_interiors(
+                    candidate,
+                    from_id,
+                    to_id,
+                    &group_ctx,
+                    &obstacles.sorted_group_ids,
+                )
+        });
+        let mut path_stats = PathSelectStats::default();
+        let path = if let Some(candidate) = corridor_candidate {
+            if corridor_ok {
+                path_stats.candidate_count = 1;
+                candidate
+            } else {
+                let selected = select_best_path_with_scorer_stats(
+                    &ctx,
+                    &pair,
+                    &DefaultScorer,
+                    Some(&mut path_stats),
+                    false,
+                );
+                selected
+            }
+        } else {
+            select_best_path_with_scorer_stats(
+                &ctx,
+                &pair,
+                &DefaultScorer,
+                Some(&mut path_stats),
+                false,
+            )
+        };
         ortho_stats.total_candidates += path_stats.candidate_count;
         ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
         if path_stats.degraded {
@@ -650,12 +799,13 @@ fn route_edges_orthogonal_inner(
         }
     }
     if !align_reroute.is_empty() {
+        align_reroute.sort_unstable();
         grid.remove_by_edges(&align_reroute);
         for &ei in &align_reroute {
             let Some(from_ep) = endpoint_map.get(&(ei, true)) else { continue };
             let Some(to_ep) = endpoint_map.get(&(ei, false)) else { continue };
             let pair = EndpointPair { from: from_ep.clone(), to: to_ep.clone() };
-            let ctx = RoutingContext { nodes: &result.nodes, group_ctx: &group_ctx, grid: &grid, cfg: &cfg, obstacles: &obstacles, channel_load: None };
+            let ctx = RoutingContext::new(&result.nodes, &group_ctx, &grid, &cfg, &obstacles, None);
             let mut path_stats = PathSelectStats::default();
             let candidate = select_best_path_with_scorer_stats(
                 &ctx,
@@ -872,33 +1022,55 @@ fn replan_slots(
             });
         }
 
-        // 块内按 sort_key 排序端点
+        // 块内按 sort_key 排序端点（同 key 时按 edge_index）
         for block in &mut blocks {
-            block
-                .members
-                .sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal));
+            block.members.sort_by(|a, b| {
+                a.2
+                    .partial_cmp(&b.2)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then(a.0.cmp(&b.0))
+            });
         }
 
-        // 块间排序：先按中心 tangent 建立初始几何顺序，再用稳定排序按 dir_key 重排
-        blocks.sort_by(|a, b| {
-            a._center_tangent
-                .partial_cmp(&b._center_tangent)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        // 块间排序：dir_key → center_tangent → min(edge_index)，单次全序保证确定性
         blocks.sort_by(|a, b| {
             a.dir_key
                 .partial_cmp(&b.dir_key)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then(
+                    a._center_tangent
+                        .partial_cmp(&b._center_tangent)
+                        .unwrap_or(std::cmp::Ordering::Equal),
+                )
+                .then_with(|| {
+                    a.members
+                        .iter()
+                        .map(|m| m.0)
+                        .min()
+                        .cmp(&b.members.iter().map(|m| m.0).min())
+                })
         });
 
-        // 收集所有 tangent 值排序，按新顺序分配
-        let mut all_tangents: Vec<f64> = ep_info.iter().map(|m| m.3).collect();
-        all_tangents.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        // 收集 tangent 池并按 (量化 tangent, 原始值, edge_index, is_from) 排序后分配
+        let mut tangent_pool: Vec<(f64, usize, bool)> = Vec::new();
+        for block in &blocks {
+            for m in &block.members {
+                tangent_pool.push((m.3, m.0, m.1));
+            }
+        }
+        tangent_pool.sort_by(|a, b| {
+            let ka = (a.0 * 1000.0).round() as i64;
+            let kb = (b.0 * 1000.0).round() as i64;
+            ka.cmp(&kb)
+                .then(a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
+                .then(a.1.cmp(&b.1))
+                .then(a.2.cmp(&b.2))
+        });
 
         let mut idx = 0;
         for block in &blocks {
             for m in &block.members {
-                let new_tangent = all_tangents[idx];
+                let new_tangent = tangent_pool[idx].0;
                 idx += 1;
                 let (ei, ef, _, _) = m;
                 if let Some(ep) = endpoint_map.get_mut(&(*ei, *ef)) {
@@ -920,7 +1092,8 @@ fn replan_slots(
         return;
     }
 
-    let edge_vec: Vec<usize> = edges_to_reroute.into_iter().collect();
+    let mut edge_vec: Vec<usize> = edges_to_reroute.into_iter().collect();
+    edge_vec.sort_unstable();
     grid.remove_by_edges(&edge_vec);
 
     for &ei in &edge_vec {
@@ -931,14 +1104,8 @@ fn replan_slots(
             continue;
         };
 
-        let ctx = RoutingContext {
-            nodes,
-            group_ctx,
-            grid,
-            cfg,
-            obstacles,
-            channel_load: None,
-        };
+
+        let ctx = RoutingContext::new(nodes, group_ctx, grid, cfg, obstacles, None);
         let pair = EndpointPair {
             from: from_ep.clone(),
             to: to_ep.clone(),
@@ -1080,14 +1247,14 @@ fn reroute_conflicting_edges(
                     channel_margin: margin,
                     ..*cfg
                 };
-                let ctx = RoutingContext {
+                let ctx = RoutingContext::new(
                     nodes,
                     group_ctx,
                     grid,
-                    cfg: &r_cfg,
+                    &r_cfg,
                     obstacles,
-                    channel_load: Some(&load_map),
-                };
+                    Some(&load_map),
+                );
                 let pair = EndpointPair {
                     from: from_ep.clone(),
                     to: to_ep.clone(),
@@ -1277,6 +1444,27 @@ fn sub_group_sort_key(
         edge_line_style_signature(rel),
         min_edge,
     )
+}
+
+// ═══════════════════════════════════════════════════════════
+//  P1-3: 回环边侧向通道覆盖（在端口协调后强制执行）
+// ═══════════════════════════════════════════════════════════
+
+fn apply_feedback_side_overrides(
+    relations: &[crate::ast::Relation],
+    assignment: &feedback_side::FeedbackSideAssignment,
+    from_side: &mut [Port],
+    to_side: &mut [Port],
+    lane: &mut [usize],
+) {
+    for (&edge_index, hint) in &assignment.hints {
+        if edge_index >= relations.len() {
+            continue;
+        }
+        from_side[edge_index] = hint.from_side;
+        to_side[edge_index] = hint.to_side;
+        lane[edge_index] = hint.lane;
+    }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2129,7 +2317,7 @@ fn fix_reverse_stub_ports(
             };
 
             let pair = EndpointPair { from: nf_ep.clone(), to: nt_ep.clone() };
-            let ctx = RoutingContext { nodes, group_ctx, grid, cfg: &r_cfg, obstacles, channel_load: None };
+            let ctx = RoutingContext::new(nodes, group_ctx, grid, &r_cfg, obstacles, None);
 
             let mut path_stats = PathSelectStats::default();
             let candidate = select_best_path_with_scorer_stats(

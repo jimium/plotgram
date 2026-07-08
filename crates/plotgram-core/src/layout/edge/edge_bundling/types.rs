@@ -138,6 +138,9 @@ pub struct BundlingConfig {
     pub min_exclusive_segment_for_label: f64,
     /// label 与 bundling 的协同策略（默认 SegmentAware）
     pub label_bundle_policy: LabelBundlePolicy,
+    /// 架构图等场景：仅允许同源 fan-out / 同宿 fan-in / 平行边合并；
+    /// 禁止仅因段级平行重叠而合并无关边。
+    pub semantic_gate: bool,
 }
 
 impl Default for BundlingConfig {
@@ -155,6 +158,7 @@ impl Default for BundlingConfig {
             label_t_spacing: 0.08,
             min_exclusive_segment_for_label: 40.0,
             label_bundle_policy: LabelBundlePolicy::default(),
+            semantic_gate: false,
         }
     }
 }

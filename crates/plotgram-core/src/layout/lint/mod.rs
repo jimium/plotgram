@@ -14,7 +14,10 @@ pub use violation::{
     LayoutViolation, LintReport, LintRuleId, LintSeverity,
 };
 
+use crate::layout::edge::common::label_avoidance::aabb_overlap;
+
 use crate::ast::Diagram;
+use crate::layout::edge::edge_merge_policy::{edge_merge_context, edges_may_share_trunk};
 use crate::layout::edge::edge_bundling::types::BundlingResult;
 use crate::layout::geometry::Point;
 use crate::layout::refine::segment_intersects_node;
@@ -70,11 +73,20 @@ impl LayoutLinter {
         if cfg.is_enabled(LintRuleId::EdgeCrossing) {
             check_edge_crossings(result, &mut violations);
         }
+        if cfg.is_enabled(LintRuleId::UnrelatedEdgeTrunkMerge) {
+            check_unrelated_edge_trunk_merge(diagram, result, &mut violations);
+        }
         if cfg.is_enabled(LintRuleId::EdgeOnGroupBorder) {
             check_edge_on_group_borders(diagram, result, &mut violations);
         }
         if cfg.is_enabled(LintRuleId::EdgeCrossesGroupInterior) {
             check_edge_crosses_group_interior(diagram, result, &mut violations);
+        }
+        if cfg.is_enabled(LintRuleId::LabelNodeOverlap) {
+            check_label_node_overlaps(diagram, result, &mut violations);
+        }
+        if cfg.is_enabled(LintRuleId::LabelLabelOverlap) {
+            check_label_label_overlaps(result, &mut violations);
         }
 
         // ── Edge Bundling 专项检查 ──
@@ -565,6 +577,117 @@ fn endpoint_related_groups(
         .unwrap_or_else(|| HashSet::from([direct.clone()]))
 }
 
+// ─── 架构图假并线检测 ─────────────────────────────────────────────
+
+const TRUNK_ALIGN_EPS: f64 = 1.0;
+const MIN_SHARED_TRUNK_LEN: f64 = 24.0;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TrunkAxis {
+    Vertical,
+    Horizontal,
+}
+
+#[derive(Clone, Copy)]
+struct TrunkRun {
+    axis: TrunkAxis,
+    coord: f64,
+    span_min: f64,
+    span_max: f64,
+}
+
+fn axis_aligned_runs(path: &[Point]) -> Vec<TrunkRun> {
+    let mut runs = Vec::new();
+    for w in path.windows(2) {
+        let a = w[0];
+        let b = w[1];
+        if (a.x - b.x).abs() < TRUNK_ALIGN_EPS && (a.y - b.y).abs() >= MIN_SHARED_TRUNK_LEN {
+            runs.push(TrunkRun {
+                axis: TrunkAxis::Vertical,
+                coord: (a.x + b.x) * 0.5,
+                span_min: a.y.min(b.y),
+                span_max: a.y.max(b.y),
+            });
+        } else if (a.y - b.y).abs() < TRUNK_ALIGN_EPS && (a.x - b.x).abs() >= MIN_SHARED_TRUNK_LEN {
+            runs.push(TrunkRun {
+                axis: TrunkAxis::Horizontal,
+                coord: (a.y + b.y) * 0.5,
+                span_min: a.x.min(b.x),
+                span_max: a.x.max(b.x),
+            });
+        }
+    }
+    runs
+}
+
+fn runs_share_trunk(a: &TrunkRun, b: &TrunkRun) -> bool {
+    if a.axis != b.axis || (a.coord - b.coord).abs() > TRUNK_ALIGN_EPS {
+        return false;
+    }
+    let overlap = a.span_max.min(b.span_max) - a.span_min.max(b.span_min);
+    overlap >= MIN_SHARED_TRUNK_LEN - TRUNK_ALIGN_EPS
+}
+
+/// 检测不同源/宿边是否共享长 trunk 段（架构图语义门控未允许的假并线）。
+fn check_unrelated_edge_trunk_merge(
+    diagram: &Diagram,
+    result: &LayoutResult,
+    out: &mut Vec<LayoutViolation>,
+) {
+    use crate::types::DiagramType;
+
+    if diagram.diagram_type != DiagramType::Architecture {
+        return;
+    }
+
+    let n = result.edges.len().min(diagram.relations.len());
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let Some(rel_i) = diagram.relations.get(i) else {
+                continue;
+            };
+            let Some(rel_j) = diagram.relations.get(j) else {
+                continue;
+            };
+            let ctx_i = edge_merge_context(rel_i.from.as_str(), rel_i.to.as_str(), i);
+            let ctx_j = edge_merge_context(rel_j.from.as_str(), rel_j.to.as_str(), j);
+            if edges_may_share_trunk(&ctx_i, &ctx_j, diagram.diagram_type.clone()) {
+                continue;
+            }
+            let runs_i = axis_aligned_runs(&result.edges[i].path_points());
+            let runs_j = axis_aligned_runs(&result.edges[j].path_points());
+            let mut shared = false;
+            for ri in &runs_i {
+                for rj in &runs_j {
+                    if runs_share_trunk(ri, rj) {
+                        shared = true;
+                        break;
+                    }
+                }
+                if shared {
+                    break;
+                }
+            }
+            if !shared {
+                continue;
+            }
+            out.push(
+                LayoutViolation::new(
+                    LintRuleId::UnrelatedEdgeTrunkMerge,
+                    format!(
+                        "边 {i} ({}→{}) 与边 {j} ({}→{}) 共享非语义 trunk 段",
+                        rel_i.from.as_str(),
+                        rel_i.to.as_str(),
+                        rel_j.from.as_str(),
+                        rel_j.to.as_str(),
+                    ),
+                )
+                .with_entities([i.to_string(), j.to_string()]),
+            );
+        }
+    }
+}
+
 // ─── Edge Bundling Lint 检查 ───────────────────────────────────────
 
 /// 检查同 bundle 内多条边指向同一节点（箭头冗余）。
@@ -808,6 +931,123 @@ fn check_bundle_trunk_through_node(
                         ),
                     )
                     .with_entities([node_id.as_str()]),
+                );
+            }
+        }
+    }
+}
+
+/// Lint 指标摘要（供 eval 框架与基线对比消费）。
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct LintMetricsSummary {
+    pub node_overlap: usize,
+    pub group_overlap: usize,
+    pub edge_through_node: usize,
+    pub edge_crossing: usize,
+    pub edge_crosses_group_interior: usize,
+    pub label_node_overlap: usize,
+    pub label_label_overlap: usize,
+    pub total_violations: usize,
+    pub error_count: usize,
+    pub warning_count: usize,
+}
+
+impl LintMetricsSummary {
+    /// 从 lint 报告聚合指标。
+    pub fn from_report(report: &LintReport) -> Self {
+        let mut summary = Self {
+            total_violations: report.violations.len(),
+            error_count: report.error_count(),
+            warning_count: report.warning_count(),
+            ..Default::default()
+        };
+        for v in &report.violations {
+            match v.rule {
+                LintRuleId::NodeOverlap => summary.node_overlap += 1,
+                LintRuleId::GroupOverlap => summary.group_overlap += 1,
+                LintRuleId::EdgeThroughNode => summary.edge_through_node += 1,
+                LintRuleId::EdgeCrossing => summary.edge_crossing += 1,
+                LintRuleId::EdgeCrossesGroupInterior => summary.edge_crosses_group_interior += 1,
+                LintRuleId::LabelNodeOverlap => summary.label_node_overlap += 1,
+                LintRuleId::LabelLabelOverlap => summary.label_label_overlap += 1,
+                _ => {}
+            }
+        }
+        summary
+    }
+}
+
+/// 计算布局质量 lint 指标（verbose 配置，含全部规则）。
+pub fn compute_lint_metrics(diagram: &Diagram, result: &LayoutResult) -> LintMetricsSummary {
+    let report = LayoutLinter::with_config(LintConfig::verbose()).run(diagram, result);
+    LintMetricsSummary::from_report(&report)
+}
+
+fn check_label_node_overlaps(
+    diagram: &Diagram,
+    result: &LayoutResult,
+    out: &mut Vec<LayoutViolation>,
+) {
+    let mut node_ids: Vec<&String> = result.nodes.keys().collect();
+    node_ids.sort();
+
+    for (edge_idx, edge) in result.edges.iter().enumerate() {
+        if edge.labels.is_empty() {
+            continue;
+        }
+        let rel = diagram.relations.get(edge_idx);
+        for (label_idx, label) in edge.labels.iter().enumerate() {
+            let bbox = label.bbox();
+            for node_id in &node_ids {
+                let nl = &result.nodes[*node_id];
+                let node_bbox = (nl.x, nl.y, nl.x + nl.width, nl.y + nl.height);
+                if aabb_overlap(&bbox, &node_bbox).is_some() {
+                    let text_preview = if label.text.chars().count() > 12 {
+                        format!("{}…", label.text.chars().take(12).collect::<String>())
+                    } else {
+                        label.text.clone()
+                    };
+                    let mut violation = LayoutViolation::new(
+                        LintRuleId::LabelNodeOverlap,
+                        format!("标签 '{text_preview}' 与节点 '{node_id}' 重叠"),
+                    )
+                    .with_edge_index(edge_idx)
+                    .with_entities([node_id.as_str()]);
+                    if let Some(rel) = rel {
+                        violation = violation.with_entities([
+                            rel.from.as_str(),
+                            rel.to.as_str(),
+                            node_id.as_str(),
+                        ]);
+                    }
+                    let _ = label_idx;
+                    out.push(violation);
+                }
+            }
+        }
+    }
+}
+
+fn check_label_label_overlaps(result: &LayoutResult, out: &mut Vec<LayoutViolation>) {
+    let mut entries: Vec<(usize, usize, (f64, f64, f64, f64))> = Vec::new();
+    for (edge_idx, edge) in result.edges.iter().enumerate() {
+        for (label_idx, label) in edge.labels.iter().enumerate() {
+            entries.push((edge_idx, label_idx, label.bbox()));
+        }
+    }
+
+    for i in 0..entries.len() {
+        for j in (i + 1)..entries.len() {
+            let (ei, li, bi) = entries[i];
+            let (ej, lj, bj) = entries[j];
+            if let Some((ox, oy)) = aabb_overlap(&bi, &bj) {
+                out.push(
+                    LayoutViolation::new(
+                        LintRuleId::LabelLabelOverlap,
+                        format!("边 {ei} 标签 {li} 与边 {ej} 标签 {lj} 重叠"),
+                    )
+                    .with_metric(ox * oy)
+                    .with_edge_index(ei),
                 );
             }
         }

@@ -43,7 +43,7 @@ const BASE: SugiyamaPreset = SugiyamaPreset {
     padding: 40.0,
     layer_gap: 84.0,
     node_gap: 56.0,
-    ordering_sweeps: 8,
+    ordering_sweeps: 16,
     dummy_node_width: 12.0,
     dummy_node_height: 8.0,
     node_sizing: NodeSizing::Standard,
@@ -67,6 +67,15 @@ pub const ER_PRESET: SugiyamaPreset = SugiyamaPreset {
     node_gap: 64.0,
     node_sizing: NodeSizing::Er,
     finish_layout: Some(finish_er_layout),
+    ..BASE
+};
+
+/// 状态图专用 preset（`layout_algo: state` 自动 Sugiyama 路径）：紧凑间距 + 状态节点尺寸。
+pub const STATE_PRESET: SugiyamaPreset = SugiyamaPreset {
+    layer_gap: 72.0,
+    node_gap: 48.0,
+    node_sizing: NodeSizing::State,
+    long_edge_barycenter_weight: 1.5,
     ..BASE
 };
 

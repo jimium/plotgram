@@ -96,6 +96,12 @@ impl LabelPlacer for RadialPlacer {
     fn place(&self, edges: &mut [EdgeLayout], ctx: &LabelContext) {
         resolve_label_collisions_radial(edges, self.max_iterations, self.label_push_factor);
         push_labels_away_from_nodes_radial(edges, ctx.nodes, self.node_push_margin);
+        // 候选打分 + 轴对齐推开：节点碰撞硬否决、标签-标签分离
+        crate::layout::edge::common::label_avoidance::resolve_label_overlaps(
+            edges,
+            ctx.nodes,
+            ctx.groups,
+        );
     }
 }
 

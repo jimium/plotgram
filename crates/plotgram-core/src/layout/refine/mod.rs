@@ -12,6 +12,7 @@ mod geometry;
 mod overlap;
 mod push;
 mod reroute;
+mod spline_fallback;
 
 pub use crossing::analyze_edge_node_crossings;
 pub use geometry::segment_intersects_node;
@@ -32,7 +33,7 @@ impl Default for RefineConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            max_passes: 1,
+            max_passes: 3,
             push_distance: 40.0,
             node_shrink: 2.0,
         }
@@ -133,7 +134,18 @@ pub fn run_refine(
         push_count: total_push_count,
         momentum_reversals: momentum.reversal_count,
         passes_executed,
+        spline_fallback_count: 0,
     });
+
+    // P2-2：多轮 refine 后仍有穿障的边，降级为 spline 可见性图绕障
+    let final_metrics = crossing::analyze_crossings(&result, diagram, config);
+    if final_metrics.edge_node_crossings > 0 {
+        let mut fallback_edges: HashSet<usize> = HashSet::new();
+        for info in final_metrics.problem_nodes.values() {
+            fallback_edges.extend(info.edge_indices.iter().copied());
+        }
+        spline_fallback::reroute_edges_with_spline(&mut result, diagram, &fallback_edges);
+    }
 
     result
 }

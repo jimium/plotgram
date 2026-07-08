@@ -10,6 +10,7 @@ use super::constants::{
     NEIGHBOR_ALIGN_MAX_PASSES, NEIGHBOR_PULL_FACTOR, NODE_GAP, PADDING,
 };
 use super::types::{GraphIndex, GroupMap};
+use crate::layout::node::sugiyama_v2::coordinate::assign_layer_centers_for_string_graph;
 
 pub(in super::super) fn assign_coordinates(
     _diagram: &Diagram,
@@ -37,17 +38,26 @@ pub(in super::super) fn assign_coordinates(
         layer_y_offsets.push(layer_y_offsets[i - 1] + layer_heights[i - 1] + LAYER_GAP);
     }
 
-    // 对每层分配 x 坐标（Brandes-Köpf 风格简化版）
+    // 完整 BK 四趟：一次性为全图层分配 x 中心
+    let bk_centers = assign_layer_centers_for_string_graph(
+        layers,
+        sizes,
+        &graph.out_edges,
+        NODE_GAP,
+        PADDING,
+    );
+
+    // 对每层分配 x 坐标（Brandes-Köpf 完整版 + 组/基础设施后处理）
     for (layer_idx, layer) in layers.iter().enumerate() {
         let y_center = layer_y_offsets[layer_idx] + layer_heights[layer_idx] / 2.0;
 
-        // 计算每个节点的理想 x 位置
-        let ideal_positions = compute_ideal_x_positions(
-            layer, layers, layer_idx, graph, sizes, group_map, &nodes,
-        );
-
-        // 解决重叠：确保节点不重叠
-        let mut adjusted_positions = resolve_x_overlaps(layer, &ideal_positions, sizes);
+        let mut adjusted_positions: Vec<f64> = layer
+            .iter()
+            .map(|node| bk_centers.get(node).copied().unwrap_or_else(|| {
+                uniform_initial_positions(std::slice::from_ref(node), sizes)[0]
+            }))
+            .collect();
+        adjusted_positions = resolve_x_overlaps(layer, &adjusted_positions, sizes);
 
         // 无组基础设施层：以连入该层的上游节点为锚点水平居中
         if is_infrastructure_layer(layer, group_map) {
@@ -300,7 +310,12 @@ pub(in super::super) fn align_client_nodes_to_hubs(
             }
         }
 
-        for (_hub_key, mut indices) in by_hub {
+        let mut hub_keys: Vec<i64> = by_hub.keys().copied().collect();
+        hub_keys.sort_unstable();
+        for hub_key in hub_keys {
+            let Some(mut indices) = by_hub.remove(&hub_key) else {
+                continue;
+            };
             if indices.is_empty() {
                 continue;
             }
@@ -308,6 +323,7 @@ pub(in super::super) fn align_client_nodes_to_hubs(
                 centers[a]
                     .partial_cmp(&centers[b])
                     .unwrap_or(std::cmp::Ordering::Equal)
+                    .then(a.cmp(&b))
             });
 
             let hub_cx = hub_targets[indices[0]].unwrap();
@@ -438,7 +454,12 @@ fn pull_toward_group_center(
         group_indices.entry(gid).or_default().push(i);
     }
 
-    for (_, indices) in &group_indices {
+    let mut group_ids: Vec<String> = group_indices.keys().cloned().collect();
+    group_ids.sort();
+    for gid in group_ids {
+        let Some(indices) = group_indices.get(&gid) else {
+            continue;
+        };
         if indices.len() <= 1 {
             continue;
         }

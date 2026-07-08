@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use super::graph::{LayerNode, LayerNodeKind};
 use super::order;
 use super::postprocess;
-use super::preset::SugiyamaPreset;
+use super::preset::{self, SugiyamaPreset};
 
 pub(super) fn assign_coordinates_brandes_koepf(
     dag: &DiGraph<String, ()>,
@@ -16,7 +16,17 @@ pub(super) fn assign_coordinates_brandes_koepf(
     preset: &SugiyamaPreset,
     layer_gaps: &[f64],
 ) -> HashMap<String, crate::layout::NodeLayout> {
-    let centers = assign_layer_centers_brandes_koepf(layered_graph, layers, sizes, preset);
+    let spine = compute_spine_nodes(dag);
+    let mut centers =
+        assign_layer_centers_brandes_koepf(layered_graph, layers, sizes, preset, &spine);
+    compact_layer_centers(
+        &mut centers,
+        layered_graph,
+        layers,
+        sizes,
+        preset,
+        2,
+    );
 
     let mut nodes = HashMap::new();
     let (default_w, default_h) = preset.default_node_size();
@@ -161,11 +171,12 @@ pub(super) fn assign_layer_centers_brandes_koepf(
     layers: &[Vec<NodeIndex>],
     sizes: &HashMap<NodeIndex, (f64, f64)>,
     preset: &SugiyamaPreset,
+    spine: &HashSet<NodeIndex>,
 ) -> HashMap<NodeIndex, f64> {
-    let down_left = run_coordinate_pass_bk(dag, layers, sizes, true, true, preset);
-    let down_right = run_coordinate_pass_bk(dag, layers, sizes, true, false, preset);
-    let up_left = run_coordinate_pass_bk(dag, layers, sizes, false, true, preset);
-    let up_right = run_coordinate_pass_bk(dag, layers, sizes, false, false, preset);
+    let down_left = run_coordinate_pass_bk(dag, layers, sizes, true, true, preset, spine);
+    let down_right = run_coordinate_pass_bk(dag, layers, sizes, true, false, preset, spine);
+    let up_left = run_coordinate_pass_bk(dag, layers, sizes, false, true, preset, spine);
+    let up_right = run_coordinate_pass_bk(dag, layers, sizes, false, false, preset, spine);
 
     // 标准 Brandes-Kopf：4 趟使用相同层序，Sugiyama 交叉数相同；
     // 按"布局宽度最小（最紧凑）"选取最优趟，而非取平均。
@@ -208,10 +219,11 @@ fn run_coordinate_pass_bk(
     downward: bool,
     left_to_right: bool,
     preset: &SugiyamaPreset,
+    spine: &HashSet<NodeIndex>,
 ) -> HashMap<NodeIndex, f64> {
     let oriented_layers = orient_layers(layers, left_to_right);
     let conflicts = detect_alignment_conflicts(dag, &oriented_layers);
-    let blocks = vertical_alignment_blocks(dag, &oriented_layers, &conflicts, downward);
+    let blocks = vertical_alignment_blocks(dag, &oriented_layers, &conflicts, downward, spine);
     let mut coords = horizontal_compaction(&oriented_layers, sizes, &blocks, preset);
     if !left_to_right {
         coords = mirror_coordinates(&coords);
@@ -290,6 +302,7 @@ pub(super) fn vertical_alignment_blocks(
     layers: &[Vec<NodeIndex>],
     conflicts: &HashSet<(NodeIndex, NodeIndex)>,
     downward: bool,
+    spine: &HashSet<NodeIndex>,
 ) -> HashMap<NodeIndex, NodeIndex> {
     let mut parent = dag
         .node_indices()
@@ -321,7 +334,7 @@ pub(super) fn vertical_alignment_blocks(
             }
 
             neighbors.sort_by_key(|neighbor| neighbor_pos[neighbor]);
-            let candidates = median_candidates(&neighbors);
+            let candidates = median_candidates_with_spine(&neighbors, dag, spine);
             for neighbor in candidates {
                 let edge = if downward {
                     (neighbor, *node)
@@ -362,6 +375,113 @@ fn median_candidates(neighbors: &[NodeIndex]) -> Vec<NodeIndex> {
     let left = neighbors[neighbors.len() / 2 - 1];
     let right = neighbors[neighbors.len() / 2];
     vec![left, right]
+}
+
+fn median_candidates_with_spine(
+    neighbors: &[NodeIndex],
+    layered_graph: &DiGraph<LayerNode, ()>,
+    spine: &HashSet<NodeIndex>,
+) -> Vec<NodeIndex> {
+    let mut candidates = median_candidates(neighbors);
+    candidates.sort_by_key(|node| {
+        let on_spine = match &layered_graph[*node].kind {
+            LayerNodeKind::Real(original) => spine.contains(original),
+            LayerNodeKind::Dummy { .. } => false,
+        };
+        (!on_spine, node.index())
+    });
+    candidates
+}
+
+/// 从 source 沿最大出度贪心路径识别主干（spine）节点。
+fn compute_spine_nodes(dag: &DiGraph<String, ()>) -> HashSet<NodeIndex> {
+    let mut starts: Vec<NodeIndex> = dag
+        .node_indices()
+        .filter(|n| dag.neighbors_directed(*n, Direction::Incoming).count() == 0)
+        .collect();
+    starts.sort_by_key(|n| dag[*n].as_str());
+
+    let Some(mut current) = starts.first().copied() else {
+        return HashSet::new();
+    };
+    let mut spine = HashSet::from([current]);
+    loop {
+        let mut succs: Vec<NodeIndex> = dag.neighbors_directed(current, Direction::Outgoing).collect();
+        succs.sort_by_key(|n| {
+            let out = dag.neighbors_directed(*n, Direction::Outgoing).count();
+            (std::cmp::Reverse(out), dag[*n].as_str())
+        });
+        let Some(&next) = succs.first() else {
+            break;
+        };
+        if !spine.insert(next) {
+            break;
+        }
+        current = next;
+    }
+    spine
+}
+
+/// BK 四趟后的受限紧凑化：向邻居重心靠拢，保持层内最小间距。
+fn compact_layer_centers(
+    centers: &mut HashMap<NodeIndex, f64>,
+    layered_graph: &DiGraph<LayerNode, ()>,
+    layers: &[Vec<NodeIndex>],
+    sizes: &HashMap<NodeIndex, (f64, f64)>,
+    preset: &SugiyamaPreset,
+    passes: usize,
+) {
+    const DAMPING: f64 = 0.35;
+    let (default_w, _) = preset.default_node_size();
+
+    for _ in 0..passes {
+        for layer in layers {
+            let mut nodes: Vec<NodeIndex> = layer
+                .iter()
+                .filter(|node| matches!(layered_graph[**node].kind, LayerNodeKind::Real(_)))
+                .copied()
+                .collect();
+            nodes.sort_by(|a, b| {
+                centers[a]
+                    .partial_cmp(&centers[b])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.index().cmp(&b.index()))
+            });
+
+            for node in &nodes {
+                let neighbors: Vec<NodeIndex> = layered_graph
+                    .neighbors_directed(*node, Direction::Incoming)
+                    .chain(layered_graph.neighbors_directed(*node, Direction::Outgoing))
+                    .filter(|n| matches!(layered_graph[*n].kind, LayerNodeKind::Real(_)))
+                    .collect();
+                if neighbors.is_empty() {
+                    continue;
+                }
+                let target =
+                    neighbors.iter().map(|n| centers[n]).sum::<f64>() / neighbors.len() as f64;
+                let current = centers[node];
+                centers.insert(*node, current + (target - current) * DAMPING);
+            }
+
+            nodes.sort_by(|a, b| {
+                centers[a]
+                    .partial_cmp(&centers[b])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.index().cmp(&b.index()))
+            });
+            for index in 1..nodes.len() {
+                let left = nodes[index - 1];
+                let right = nodes[index];
+                let min_center = centers[&left]
+                    + sizes.get(&left).map(|(w, _)| w / 2.0).unwrap_or(default_w / 2.0)
+                    + sizes.get(&right).map(|(w, _)| w / 2.0).unwrap_or(default_w / 2.0)
+                    + preset.node_gap;
+                if centers[&right] < min_center {
+                    centers.insert(right, min_center);
+                }
+            }
+        }
+    }
 }
 
 fn find_block_root(parent: &HashMap<NodeIndex, NodeIndex>, node: NodeIndex) -> NodeIndex {
@@ -557,4 +677,83 @@ fn initial_x_positions(
         }
     }
     coords
+}
+
+/// 为 architecture 无 group 路径复用完整 BK 四趟坐标分配（字符串图层）。
+pub(crate) fn assign_layer_centers_for_string_graph(
+    layers: &[Vec<String>],
+    sizes: &HashMap<String, (f64, f64)>,
+    out_edges: &HashMap<String, Vec<String>>,
+    node_gap: f64,
+    padding: f64,
+) -> HashMap<String, f64> {
+    let mut layered = DiGraph::<LayerNode, ()>::new();
+    let mut node_idx: HashMap<String, NodeIndex> = HashMap::new();
+    let mut layer_nodes: Vec<Vec<NodeIndex>> = Vec::with_capacity(layers.len());
+
+    for (rank, layer) in layers.iter().enumerate() {
+        let mut indices = Vec::with_capacity(layer.len());
+        for id in layer {
+            let idx = layered.add_node(LayerNode {
+                kind: LayerNodeKind::Real(NodeIndex::new(0)),
+                rank,
+            });
+            node_idx.insert(id.clone(), idx);
+            indices.push(idx);
+        }
+        layer_nodes.push(indices);
+    }
+
+    for (idx, node) in layered.node_indices().enumerate() {
+        layered[node].kind = LayerNodeKind::Real(NodeIndex::new(idx));
+    }
+
+    let id_to_layer: HashMap<String, usize> = layers
+        .iter()
+        .enumerate()
+        .flat_map(|(li, layer)| layer.iter().map(move |id| (id.clone(), li)))
+        .collect();
+
+    let mut edge_keys: Vec<(String, String)> = Vec::new();
+    for (from_id, succs) in out_edges {
+        let Some(&from_layer) = id_to_layer.get(from_id) else {
+            continue;
+        };
+        for to_id in succs {
+            if id_to_layer.get(to_id.as_str()) == Some(&(from_layer + 1)) {
+                edge_keys.push((from_id.clone(), to_id.clone()));
+            }
+        }
+    }
+    edge_keys.sort();
+
+    for (from_id, to_id) in edge_keys {
+        if let (Some(&from_idx), Some(&to_idx)) = (node_idx.get(&from_id), node_idx.get(&to_id)) {
+            layered.add_edge(from_idx, to_idx, ());
+        }
+    }
+
+    let mut sizes_idx: HashMap<NodeIndex, (f64, f64)> = HashMap::new();
+    for (id, idx) in &node_idx {
+        sizes_idx.insert(
+            *idx,
+            sizes
+                .get(id)
+                .copied()
+                .unwrap_or((preset::FLOWCHART_PRESET.default_node_width, preset::FLOWCHART_PRESET.default_node_height)),
+        );
+    }
+
+    let preset = SugiyamaPreset {
+        node_gap,
+        padding,
+        ..preset::FLOWCHART_PRESET
+    };
+    let spine = HashSet::new();
+    let centers = assign_layer_centers_brandes_koepf(&layered, &layer_nodes, &sizes_idx, &preset, &spine);
+
+    node_idx
+        .into_iter()
+        .filter_map(|(id, idx)| centers.get(&idx).map(|cx| (id, *cx)))
+        .collect()
 }

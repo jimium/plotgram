@@ -292,7 +292,10 @@ fn has_clear_exit(
         .map(|v| v.iter().map(|s| s.as_str()).collect())
         .unwrap_or_default();
 
-    for (gid, gl) in ctx.groups.iter() {
+    let mut group_ids: Vec<&String> = ctx.groups.keys().collect();
+    group_ids.sort();
+    for gid in group_ids {
+        let gl = &ctx.groups[gid];
         if node_groups.contains(gid.as_str()) {
             continue;
         }

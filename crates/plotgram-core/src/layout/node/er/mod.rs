@@ -9,7 +9,7 @@ use crate::layout::algorithm_config::SugiyamaLayoutConfig;
 use crate::layout::intent::topology::ValidTopologyIntent;
 use crate::layout::node::sugiyama_v2::{engine, preset};
 use crate::layout::plan::ResolvedAlgoOptions;
-use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeAlignConfig};
+use crate::layout::{AlgorithmOptionSpec, EdgeRoutingStyle, LayoutResult, LayoutStrategy, NodeAlignConfig};
 use crate::types::DiagramType;
 
 /// ER 图布局（`layout_algo: er`）。
@@ -55,7 +55,10 @@ impl LayoutStrategy for ErLayout {
     }
 
     fn compute(&self, diagram: &Diagram) -> LayoutResult {
-        engine::compute_with_preset(diagram, &preset::ER_PRESET, self.config)
+        let mut result =
+            engine::compute_with_preset(diagram, &preset::ER_PRESET, self.config);
+        result.hints.edge_routing_style = recommended_er_edge_routing(diagram);
+        result
     }
 
     fn compute_with_overlay(
@@ -63,15 +66,23 @@ impl LayoutStrategy for ErLayout {
         diagram: &Diagram,
         valid_topology: Option<&[ValidTopologyIntent]>,
     ) -> LayoutResult {
-        engine::compute_with_preset_and_overlay(
+        let mut result = engine::compute_with_preset_and_overlay(
             diagram,
             &preset::ER_PRESET,
             self.config,
             valid_topology,
-        )
+        );
+        result.hints.edge_routing_style = recommended_er_edge_routing(diagram);
+        result
     }
 
     fn node_align_config(&self) -> NodeAlignConfig {
         NodeAlignConfig::default_er()
     }
+}
+
+/// 稠密 ER（边数 > 节点数 × 1.5）与默认路径均推荐 spline 路由。
+fn recommended_er_edge_routing(diagram: &Diagram) -> EdgeRoutingStyle {
+    let _ = diagram;
+    EdgeRoutingStyle::Spline
 }

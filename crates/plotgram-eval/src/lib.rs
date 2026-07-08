@@ -36,6 +36,7 @@
 //! }
 //! ```
 
+pub mod baseline;
 pub mod engine;
 pub mod history;
 pub mod metrics;
@@ -43,6 +44,10 @@ pub mod profile;
 pub mod report;
 
 // 向后兼容的重导出
+pub use baseline::{
+    compare_with_baseline, generate_baseline, BaselineCompareReport, MetricRegression,
+    ShowcaseBaseline, ShowcaseBaselineEntry,
+};
 pub use engine::{AlgorithmConfig, AlgorithmResult, ComparisonReport, EvalEngine, EvalResult};
 pub use metrics::LayoutMetrics;
 pub use report::EvalReport;

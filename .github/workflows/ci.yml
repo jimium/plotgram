@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  PLOTGRAM_FONTS_DIR: ${{ github.workspace }}/fonts
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Unit tests (core + eval)
+        run: |
+          cargo test -p plotgram-core --lib
+          cargo test -p plotgram-eval --lib deterministic
+
+      - name: Build eval CLI
+        run: cargo build -p plotgram-eval --bin eval
+
+      - name: Showcase baseline regression
+        run: ./showcase/eval-showcase.sh check

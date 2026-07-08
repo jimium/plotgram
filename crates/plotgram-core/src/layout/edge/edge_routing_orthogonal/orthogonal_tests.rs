@@ -606,14 +606,14 @@
         let grid = SegmentGrid::new();
         let group_ctx = test_group_ctx(HashMap::new(), HashMap::new());
         let obstacles = PreparedObstacles::build(&nodes, &group_ctx);
-        let ctx = RoutingContext {
-            nodes: &nodes,
-            group_ctx: &group_ctx,
-            grid: &grid,
-            cfg: &cfg,
-            obstacles: &obstacles,
-            channel_load: None,
-        };
+        let ctx = RoutingContext::new(
+            &nodes,
+            &group_ctx,
+            &grid,
+            &cfg,
+            &obstacles,
+            None,
+        );
 
         // A bottom anchor: (180, 150)，B left anchor: (400, 325)
         let from_ep = Endpoint {

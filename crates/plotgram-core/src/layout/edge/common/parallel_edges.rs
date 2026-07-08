@@ -30,7 +30,10 @@ pub fn group_parallel_edges(
     }
 
     let mut offsets = vec![0.0; n];
-    for indices in pair_groups.values() {
+    let mut pair_keys: Vec<String> = pair_groups.keys().cloned().collect();
+    pair_keys.sort();
+    for key in &pair_keys {
+        let indices = &pair_groups[key];
         if indices.len() == 1 {
             continue;
         }

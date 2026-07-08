@@ -3,11 +3,8 @@ use petgraph::visit::EdgeRef;
 use petgraph::Direction;
 use std::collections::{HashMap, HashSet, VecDeque};
 
-/// NS 紧边压缩的最大迭代轮次。
-///
-/// 旧版为 32，大图上可能在收敛前提前停止。提升到 64 让收敛判定
-/// （状态指纹重复 / 无候选 / 连续无改进）主导退出，而非硬上限。
-const NS_MAX_ITERATIONS: usize = 64;
+/// NS 紧边压缩的最大迭代轮次（收敛判定主导退出，上限仅作安全阀）。
+const NS_MAX_ITERATIONS: usize = 256;
 
 /// 连续无改进的早停阈值。
 ///
@@ -122,20 +119,17 @@ fn assign_component_ranks_network_simplex(
             tree_edges_member[e.index()] = true;
         }
 
-        // P2.3: 增量更新 cut value 表
-        // 仅在首轮或树结构变化后全量重算，否则跳过（cut_values 已在 pivot 后局部更新）
-        if cut_values.is_empty() {
-            compute_all_cut_values(
-                &out_edges,
-                &in_edges,
-                dag,
-                &component_member,
-                &tree,
-                &tree_edges,
-                max_node_idx,
-                &mut cut_values,
-            );
-        }
+        cut_values.clear();
+        compute_all_cut_values(
+            &out_edges,
+            &in_edges,
+            dag,
+            &component_member,
+            &tree,
+            &tree_edges,
+            max_node_idx,
+            &mut cut_values,
+        );
 
         let Some(candidate) = best_pivot_candidate_incremental(
             &out_edges,
@@ -167,17 +161,8 @@ fn assign_component_ranks_network_simplex(
         tree_edges.remove(&leaving_edge);
         tree_edges.insert(entering_edge);
 
-        // P2.3: pivot 后局部更新 cut value 表
-        // 移除离开边的 cut value，标记需要重算（树结构已变）
-        cut_values.remove(&leaving_edge);
-        // 树结构变化，清空 cut value 表以触发下轮全量重算
-        // 更精细的增量更新需要追踪受影响子树，但树边交换后影响范围
-        // 难以精确确定，全量重算仍比原实现快（原实现每条树边都重新收集子树）
-        cut_values.clear();
-
         if !tree_is_connected(component_set, dag, &tree_edges, root) {
             tree_edges = build_feasible_tight_tree(dag, component_set, &mut ranks, root);
-            cut_values.clear();
         }
 
         if improved {

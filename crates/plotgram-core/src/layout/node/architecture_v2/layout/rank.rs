@@ -61,8 +61,9 @@ fn assign_macro_group_ranks(
         members.sort();
     }
 
-    // 2. 超级节点间边（去重）
+    // 2. 超级节点间边（去重）+ 有向边权（跨组实际边数）
     let mut super_edges: HashSet<(String, String)> = HashSet::new();
+    let mut edge_weights: HashMap<(String, String), usize> = HashMap::new();
     for node in &graph.node_ids {
         if let Some(succs) = graph.out_edges.get(node) {
             for succ in succs {
@@ -72,6 +73,9 @@ fn assign_macro_group_ranks(
                 let from_super = super_node_id(node, group_map);
                 let to_super = super_node_id(succ, group_map);
                 if from_super != to_super {
+                    *edge_weights
+                        .entry((from_super.clone(), to_super.clone()))
+                        .or_insert(0) += 1;
                     super_edges.insert((from_super, to_super));
                 }
             }
@@ -79,7 +83,8 @@ fn assign_macro_group_ranks(
     }
 
     // 3. 宏观 rank
-    let macro_ranks = assign_super_macro_ranks(&super_members, &super_edges);
+    let macro_ranks =
+        assign_super_macro_ranks(&super_members, &super_edges, &edge_weights, &graph.node_ids);
 
     // 4. 微观 rank + 各超级节点层带宽度
     let mut intra_ranks: HashMap<String, usize> = HashMap::new();
@@ -134,15 +139,37 @@ fn assign_macro_group_ranks(
 /// `argo -> pay_gateway` 产生 `platform_ns -> payment_ns`，形成 group 级环）。
 /// 因此在 rank 分配前，对超级图额外运行 `greedy_fas` 去环，确保拓扑排序和最长路径
 /// rank 分配在 DAG 上进行，避免 sink 节点因环中前驱未排序而被错误地分配到 rank 0。
+///
+/// **加权双向对裁决**：超级边是去重的（每对组只记一条），但组间实际边数差异
+/// 是决定主流向的关键信号。例如 `private_subnet → data_subnet` 有 4 条实际边、
+/// `data_subnet → private_subnet` 只有 1 条回流边（mq→worker），主流向应保留
+/// 4 边方向。因此在 FAS 之前先按 `edge_weights`（有向跨组实际边数）裁决所有
+/// 双向对：多数方向保留、少数方向直接标记反转；权重平局时，成员声明序更早的
+/// 组视为上游（用户通常先声明流程源头）。
 pub(in super::super) fn assign_super_macro_ranks(
     super_members: &HashMap<String, Vec<String>>,
     super_edges: &HashSet<(String, String)>,
+    edge_weights: &HashMap<(String, String), usize>,
+    node_decl_order: &[String],
 ) -> HashMap<String, usize> {
     let all_supers: HashSet<String> = super_members.keys().cloned().collect();
+
+    // ── 加权裁决双向对（2-环）──
+    let pre_reversed = resolve_bidirectional_pairs_by_weight(
+        super_members,
+        super_edges,
+        edge_weights,
+        node_decl_order,
+    );
+
+    // 构建去除"已裁决反转边"后的邻接表，供 FAS 处理剩余的长环
     let mut super_in: HashMap<String, Vec<String>> = HashMap::new();
     let mut super_out: HashMap<String, Vec<String>> = HashMap::new();
 
     for (from, to) in super_edges {
+        if pre_reversed.contains(&(from.clone(), to.clone())) {
+            continue;
+        }
         super_out.entry(from.clone()).or_default().push(to.clone());
         super_in.entry(to.clone()).or_default().push(from.clone());
     }
@@ -160,17 +187,7 @@ pub(in super::super) fn assign_super_macro_ranks(
     let mut sorted_supers: Vec<String> = all_supers.iter().cloned().collect();
     sorted_supers.sort();
     let mut super_reversed = crate::layout::node::common::acyclic::greedy_fas(&sorted_supers, &super_out, &super_in);
-
-    // ── FAS 一致性修正 ──
-    // greedy_fas 在打破双向边对（A↔B）形成的 2-环时，可能对同一节点的不
-    // 同双向对选择相反的反转方向。例如 platform_ns 与 payment/order 之间
-    // 反转了 platform_ns→*（正确），但与 user_ns 之间反转了 user_ns→
-    // platform_ns（错误），导致 user_ns 被推到 platform_ns 下方。
-    //
-    // 修正策略：对每个双向对，统计两端节点的出向反转次数，若 FAS 反转了
-    // "少数方向"，则翻转为"多数方向"。这确保同一节点的所有双向对选择
-    // 一致的反转方向。
-    normalize_bidirectional_reversals(&super_edges, &mut super_reversed);
+    super_reversed.extend(pre_reversed);
 
     // 构建去环后的邻接表（移除后向边）
     let mut acyclic_in: HashMap<String, Vec<String>> = HashMap::new();
@@ -211,25 +228,20 @@ pub(in super::super) fn assign_super_macro_ranks(
     macro_ranks
 }
 
-/// 修正 FAS 在双向边对（2-环）上的不一致反转。
+/// 按有向边权裁决超级图中的双向对（2-环）。
 ///
-/// 当超级图中存在多个双向对（A↔B）且共享同一节点时，greedy_fas 可能对
-/// 不同双向对选择相反的反转方向。例如：
-/// - platform_ns ↔ payment_ns：反转 platform_ns→payment_ns ✓
-/// - platform_ns ↔ user_ns：反转 user_ns→platform_ns ✗（应反转 platform_ns→user_ns）
+/// 对每个双向对 (A↔B)：
+/// 1. 比较 `weight(A→B)` 与 `weight(B→A)`（跨组实际边数），反转权重小的方向；
+/// 2. 权重平局时，成员在 DSL 中声明序更早的组视为上游，反转"下游→上游"方向。
 ///
-/// 修正策略：
-/// 1. 找出所有双向对（A,B），其中 A→B 和 B→A 都存在于原始边集
-/// 2. 统计每个节点作为"被反转出边源"的次数
-/// 3. 对每个双向对，若 FAS 反转了少数方向，翻转为多数方向
-///
-/// 这确保同一节点的所有双向对选择一致的反转方向，避免类似 user_ns
-/// 被错误推到 platform_ns 下方的问题。
-fn normalize_bidirectional_reversals(
+/// 返回需要标记反转的边集合（这些边不参与后续 FAS / 拓扑排序）。
+fn resolve_bidirectional_pairs_by_weight(
+    super_members: &HashMap<String, Vec<String>>,
     super_edges: &HashSet<(String, String)>,
-    super_reversed: &mut HashSet<(String, String)>,
-) {
-    // 1. 找出所有双向对，归一化为 (min, max) 去重
+    edge_weights: &HashMap<(String, String), usize>,
+    node_decl_order: &[String],
+) -> HashSet<(String, String)> {
+    // 找出所有双向对，归一化为 (min, max) 去重
     let mut bidir_pairs: Vec<(String, String)> = Vec::new();
     let mut seen: HashSet<(String, String)> = HashSet::new();
     for (from, to) in super_edges {
@@ -247,47 +259,52 @@ fn normalize_bidirectional_reversals(
             }
         }
     }
+    let mut reversed = HashSet::new();
     if bidir_pairs.is_empty() {
-        return;
+        return reversed;
     }
+    bidir_pairs.sort();
 
-    // 2. 统计每个节点作为"被反转出边源"的次数
-    let mut out_reversed_count: HashMap<String, usize> = HashMap::new();
+    // 节点声明序索引（用于权重平局时的上游判定）
+    let decl_index: HashMap<&str, usize> = node_decl_order
+        .iter()
+        .enumerate()
+        .map(|(i, id)| (id.as_str(), i))
+        .collect();
+    // 超级节点的"最早成员声明序"
+    let super_decl_rank = |super_id: &str| -> usize {
+        super_members
+            .get(super_id)
+            .map(|members| {
+                members
+                    .iter()
+                    .filter_map(|m| decl_index.get(m.as_str()).copied())
+                    .min()
+                    .unwrap_or(usize::MAX)
+            })
+            .unwrap_or(usize::MAX)
+    };
+
     for (a, b) in &bidir_pairs {
-        if super_reversed.contains(&(a.clone(), b.clone())) {
-            *out_reversed_count.entry(a.clone()).or_insert(0) += 1;
-        }
-        if super_reversed.contains(&(b.clone(), a.clone())) {
-            *out_reversed_count.entry(b.clone()).or_insert(0) += 1;
+        let w_ab = edge_weights.get(&(a.clone(), b.clone())).copied().unwrap_or(1);
+        let w_ba = edge_weights.get(&(b.clone(), a.clone())).copied().unwrap_or(1);
+
+        let reverse_a_to_b = if w_ab != w_ba {
+            // 反转权重小的方向
+            w_ab < w_ba
+        } else {
+            // 平局：声明序更早的组视为上游 → 反转"晚→早"方向
+            super_decl_rank(a) > super_decl_rank(b)
+        };
+
+        if reverse_a_to_b {
+            reversed.insert((a.clone(), b.clone()));
+        } else {
+            reversed.insert((b.clone(), a.clone()));
         }
     }
 
-    // 3. 对每个双向对，若 FAS 反转了少数方向，翻转为多数方向
-    for (a, b) in &bidir_pairs {
-        let a_to_b = (a.clone(), b.clone());
-        let b_to_a = (b.clone(), a.clone());
-        let a_reversed = super_reversed.contains(&a_to_b);
-        let b_reversed = super_reversed.contains(&b_to_a);
-
-        if a_reversed && !b_reversed {
-            // FAS 反转了 A→B。若 B 的出向反转次数 > A，则翻转为 B→A
-            let a_count = *out_reversed_count.get(a).unwrap_or(&0);
-            let b_count = *out_reversed_count.get(b).unwrap_or(&0);
-            if b_count > a_count {
-                super_reversed.remove(&a_to_b);
-                super_reversed.insert(b_to_a);
-            }
-        } else if b_reversed && !a_reversed {
-            // FAS 反转了 B→A。若 A 的出向反转次数 > B，则翻转为 A→B
-            let a_count = *out_reversed_count.get(a).unwrap_or(&0);
-            let b_count = *out_reversed_count.get(b).unwrap_or(&0);
-            if a_count > b_count {
-                super_reversed.remove(&b_to_a);
-                super_reversed.insert(a_to_b);
-            }
-        }
-        // 两者都反转或都未反转的情况：不处理（FAS 应保证恰好反转一条）
-    }
+    reversed
 }
 
 /// 超级节点图拓扑排序
