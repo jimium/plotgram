@@ -48,6 +48,9 @@ enum Commands {
         /// 省略画布背景（SVG/PNG/WebP 等输出为透明底）
         #[arg(long = "transparent-background")]
         transparent_background: bool,
+        /// 在画布顶部绘制 DSL title（默认不绘制）
+        #[arg(long)]
+        title: bool,
     },
     /// 验证 Plotgram 文件的语法和语义
     Validate {
@@ -117,6 +120,7 @@ fn main() {
             fonts_dir,
             input_format,
             transparent_background,
+            title,
         }) => cmd_render(
             &input,
             &format,
@@ -124,6 +128,7 @@ fn main() {
             fonts_dir.as_deref(),
             input_format.as_deref(),
             transparent_background,
+            title,
         ),
         Some(Commands::Validate { input, format, layout_check }) => cmd_validate(&input, &format, layout_check),
         Some(Commands::Lint {
@@ -285,6 +290,7 @@ fn cmd_render(
     fonts_dir: Option<&str>,
     input_format: Option<&str>,
     transparent_background: bool,
+    show_title: bool,
 ) {
     configure_fonts_dir(fonts_dir);
 
@@ -337,6 +343,7 @@ fn cmd_render(
     // Render
     let mut request = plotgram_core::render::RenderRequest::new(&prepared, format);
     request.transparent_background = transparent_background;
+    request.show_title = show_title;
     match output {
         Some(path) => {
             match format {

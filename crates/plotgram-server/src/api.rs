@@ -48,6 +48,8 @@ pub struct RenderRequestBody {
     pub theme_id: Option<String>,
     pub graphic_style: Option<String>,
     pub dark_mode: Option<bool>,
+    /// 是否在画布顶部绘制 DSL title（默认 false）
+    pub show_title: Option<bool>,
     /// 布局意图叠加层（可选）。
     ///
     /// 透传至 `RenderRequest::layout_overlay`，由布局算法与几何微调阶段消费。
@@ -243,6 +245,7 @@ pub async fn render_handler(Json(body): Json<RenderRequestBody>) -> Response {
     }
 
     request.dark_mode = body.dark_mode.unwrap_or(false);
+    request.show_title = body.show_title.unwrap_or(false);
 
     // 透传布局意图叠加层
     if let Some(intents) = &body.layout_intents {

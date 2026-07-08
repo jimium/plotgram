@@ -52,8 +52,14 @@ impl FormatEncoder for AsciiRenderer {
     }
 
     fn encode_scene(&self, scene: &ExportScene<'_>) -> Result<RenderOutput> {
-        let result = generate_ascii(scene.diagram(), &scene.layout, &AsciiExportOptions::default())
-            .map_err(|err| crate::error::PlotgramError::render_internal_msg(err.to_string()))?;
+        let show_title = scene.canvas.title.is_some();
+        let result = generate_ascii(
+            scene.diagram(),
+            &scene.layout,
+            &AsciiExportOptions::default(),
+            show_title,
+        )
+        .map_err(|err| crate::error::PlotgramError::render_internal_msg(err.to_string()))?;
         Ok(RenderOutput::Text(result.text))
     }
 
@@ -67,16 +73,23 @@ impl FormatEncoder for AsciiRenderer {
 
     fn encode_from_diagram(
         &self,
-        diagram: &crate::ast::PreparedDiagram,
-        layout_overlay: Option<&crate::layout::LayoutIntentOverlay>,
+        request: &RenderRequest<'_>,
     ) -> crate::error::Result<DiagramEncodeOutput> {
-        let (layout, report) = crate::layout::compute_layout_with_plan_and_overlay(
+        let diagram = request.diagram;
+        let (mut layout, report) = crate::layout::compute_layout_with_plan_and_overlay(
             diagram.inner(),
             diagram.layout_plan(),
-            layout_overlay,
+            request.layout_overlay,
         ).map_err(|e| crate::error::PlotgramError::layout_failed_msg(e.to_string()))?;
 
-        let text = encode_direct(diagram.inner(), &layout, &AsciiExportOptions::default())?;
+        crate::render::scene::apply_title_band_layout_adjustment(&mut layout, request.show_title);
+
+        let text = encode_direct(
+            diagram.inner(),
+            &layout,
+            &request.ascii_options,
+            request.show_title,
+        )?;
         Ok(DiagramEncodeOutput {
             output: RenderOutput::Text(text),
             report,
@@ -89,8 +102,14 @@ impl FormatEncoder for AsciiRenderer {
 /// 注意:ASCII 不需要视觉物化,此函数内部只做布局 + ASCII 编码;
 /// `pipeline::render::render_output` 在 ASCII 格式时直接调用 [`encode_direct`] 跳过物化。
 pub fn encode_with_report(request: &RenderRequest<'_>) -> Result<AsciiExportResult> {
-    let layout = crate::render::scene::compute_layout(request.diagram)?;
-    encode_direct_with_report(request.diagram.inner(), &layout, &request.ascii_options)
+    let mut layout = crate::render::scene::compute_layout(request.diagram)?;
+    crate::render::scene::apply_title_band_layout_adjustment(&mut layout, request.show_title);
+    encode_direct_with_report(
+        request.diagram.inner(),
+        &layout,
+        &request.ascii_options,
+        request.show_title,
+    )
 }
 
 pub fn encode(request: &RenderRequest<'_>) -> Result<String> {
@@ -104,8 +123,9 @@ pub fn encode_direct(
     diagram: &Diagram,
     layout: &LayoutResult,
     options: &AsciiExportOptions,
+    show_title: bool,
 ) -> Result<String> {
-    encode_direct_with_report(diagram, layout, options).map(|r| r.text)
+    encode_direct_with_report(diagram, layout, options, show_title).map(|r| r.text)
 }
 
 /// 独立路径(含 metadata):直接从 diagram + layout 生成 ASCII,返回完整结果。
@@ -115,8 +135,9 @@ pub fn encode_direct_with_report(
     diagram: &Diagram,
     layout: &LayoutResult,
     options: &AsciiExportOptions,
+    show_title: bool,
 ) -> Result<AsciiExportResult> {
-    generate_ascii(diagram, layout, options)
+    generate_ascii(diagram, layout, options, show_title)
         .map_err(|err| crate::error::PlotgramError::render_internal_msg(err.to_string()))
 }
 

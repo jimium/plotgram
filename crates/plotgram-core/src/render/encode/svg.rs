@@ -110,9 +110,20 @@ mod tests {
     }
 
     #[test]
+    fn test_svg_renderer_render_without_title_by_default() {
+        let diagram = create_simple_diagram();
+        let svg = encode(&RenderRequest::new(&diagram, RenderFormat::Svg)).unwrap();
+        assert!(
+            !svg.contains("Test Diagram"),
+            "title should not be drawn unless show_title is enabled"
+        );
+    }
+
+    #[test]
     fn test_svg_renderer_render() {
         let diagram = create_simple_diagram();
-        let request = RenderRequest::new(&diagram, RenderFormat::Svg);
+        let mut request = RenderRequest::new(&diagram, RenderFormat::Svg);
+        request.show_title = true;
         let svg = encode(&request).unwrap();
 
         assert!(svg.starts_with("<svg"));
@@ -174,6 +185,7 @@ mod tests {
             scene_graphic_style: None,
             dark_mode: false,
             attribution: true,
+            show_title: false,
             transparent_background: false,
             semantic_inference: true,
             ascii_options: crate::render::encode::ascii::AsciiExportOptions::default(),
@@ -199,6 +211,7 @@ mod tests {
             scene_graphic_style: None,
             dark_mode: false,
             attribution: true,
+            show_title: false,
             transparent_background: false,
             semantic_inference: true,
             ascii_options: crate::render::encode::ascii::AsciiExportOptions::default(),
@@ -224,6 +237,7 @@ mod tests {
             scene_graphic_style: None,
             dark_mode: false,
             attribution: true,
+            show_title: false,
             transparent_background: false,
             semantic_inference: true,
             ascii_options: crate::render::encode::ascii::AsciiExportOptions::default(),
@@ -286,6 +300,7 @@ mod tests {
             scene_graphic_style: None,
             dark_mode: false,
             attribution: true,
+            show_title: false,
             transparent_background: false,
             semantic_inference: true,
             ascii_options: crate::render::encode::ascii::AsciiExportOptions::default(),
@@ -327,6 +342,7 @@ mod tests {
             scene_graphic_style: None,
             dark_mode: false,
             attribution: true,
+            show_title: false,
             transparent_background: true,
             semantic_inference: true,
             ascii_options: crate::render::encode::ascii::AsciiExportOptions::default(),

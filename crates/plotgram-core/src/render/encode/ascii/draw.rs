@@ -14,8 +14,9 @@ pub(super) fn generate_ascii(
     diagram: &Diagram,
     layout: &LayoutResult,
     options: &AsciiExportOptions,
+    show_title: bool,
 ) -> Result<AsciiExportResult, super::AsciiExportError> {
-    let has_title = diagram.title().is_some();
+    let has_title = show_title && diagram.title().is_some();
     let mapper = GridMapper::new(has_title);
     let (width, height) = calculate_canvas_size(layout, has_title);
     let mut canvas = DisplayCanvas::new(width, height);

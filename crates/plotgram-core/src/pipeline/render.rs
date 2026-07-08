@@ -70,7 +70,7 @@ pub fn render_output_with_report(request: &RenderRequest<'_>) -> Result<RenderOu
     let encoder = encoder_for(request.format)?;
     match encoder.encoding_path() {
         crate::render::encode::EncodingPath::Diagram => {
-            let result = encoder.encode_from_diagram(request.diagram, request.layout_overlay)?;
+            let result = encoder.encode_from_diagram(request)?;
             Ok(RenderOutputWithReport {
                 output: result.output,
                 report: result.report,

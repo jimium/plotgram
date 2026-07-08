@@ -14,7 +14,7 @@ use crate::render::visual::{EdgeStyle, NodeStyle};
 use crate::error::{PlotgramError, Result};
 use crate::layout::{self, EdgeLayout, GroupLayout, LayoutResult, NodeLayout, RefinementReport};
 use crate::render::paint::color_queries;
-use crate::render::{RenderRequest, CompiledRenderContext};
+use crate::render::{RenderRequest, CompiledRenderContext, CANVAS_TITLE_BAND_HEIGHT};
 use serde::Serialize;
 
 /// 画布级导出信息。
@@ -237,7 +237,11 @@ pub fn build_scene<'a>(
     let canvas = ExportCanvas {
         width: layout.total_width,
         height: layout.total_height,
-        title: diagram.title().map(str::to_owned),
+        title: if request.show_title {
+            diagram.title().map(str::to_owned)
+        } else {
+            None
+        },
         background,
         title_color: color_queries::title_color(diagram, &context),
         attribution: request.attribution,
@@ -263,16 +267,25 @@ pub fn build_scene<'a>(
 pub fn export_scene<'a>(request: &'a RenderRequest<'a>) -> Result<ExportScene<'a>> {
     // 直接使用 PreparedDiagram 中已缓存的 LayoutPlan（避免重复 resolve），
     // 并透传 layout_overlay 至布局阶段。
-    let (layout, refinement_report) = layout::compute_layout_with_plan_and_overlay(
+    let (mut layout, refinement_report) = layout::compute_layout_with_plan_and_overlay(
         request.diagram.inner(),
         request.diagram.layout_plan(),
         request.layout_overlay,
     )
     .map_err(|e| PlotgramError::layout_failed_msg(e.to_string()))?;
 
+    apply_title_band_layout_adjustment(&mut layout, request.show_title);
+
     let mut scene = build_scene(request, layout)?;
     scene.refinement_report = refinement_report;
     Ok(scene)
+}
+
+/// 按 `show_title` 调整布局画布：不绘制标题时收回顶部标题带留白。
+pub(crate) fn apply_title_band_layout_adjustment(layout: &mut LayoutResult, show_title: bool) {
+    if !show_title {
+        layout::postprocess::trim_title_band_from_canvas(layout, CANVAS_TITLE_BAND_HEIGHT);
+    }
 }
 
 #[cfg(test)]
@@ -384,9 +397,35 @@ mod tests {
     }
 
     #[test]
-    fn export_scene_materializes_layout_and_styles() {
+    fn export_without_title_trims_top_canvas_band() {
+        let diagram = sample_prepared();
+        let mut with_title_request = RenderRequest::new(&diagram, RenderFormat::Svg);
+        with_title_request.show_title = true;
+        let with_title = export_scene(&with_title_request).expect("with title");
+
+        let without_title_request = RenderRequest::new(&diagram, RenderFormat::Svg);
+        let without_title = export_scene(&without_title_request).expect("without title");
+        assert!(
+            without_title.canvas.height + 1.0 < with_title.canvas.height,
+            "hiding title should reclaim top band: {} vs {}",
+            without_title.canvas.height,
+            with_title.canvas.height
+        );
+    }
+
+    #[test]
+    fn export_scene_hides_title_by_default() {
         let diagram = sample_prepared();
         let request = RenderRequest::new(&diagram, RenderFormat::Svg);
+        let scene = export_scene(&request).expect("export scene");
+        assert!(scene.canvas.title.is_none());
+    }
+
+    #[test]
+    fn export_scene_materializes_layout_and_styles() {
+        let diagram = sample_prepared();
+        let mut request = RenderRequest::new(&diagram, RenderFormat::Svg);
+        request.show_title = true;
         let scene = export_scene(&request).expect("export scene");
 
         assert_eq!(scene.diagram().diagram_type, DiagramType::Flowchart);
@@ -422,8 +461,9 @@ mod tests {
         let diagram = sample_prepared();
         let request = RenderRequest::new(&diagram, RenderFormat::Svg);
 
-        // 显式分两步:布局 → 物化
-        let layout = compute_layout(&diagram).expect("compute layout");
+        // 显式分两步:布局 → 物化（与 export_scene 一致，含标题带调整）
+        let mut layout = compute_layout(&diagram).expect("compute layout");
+        apply_title_band_layout_adjustment(&mut layout, request.show_title);
         assert!(layout.total_width > 0.0);
         assert!(layout.total_height > 0.0);
         assert_eq!(layout.nodes.len(), 2);
@@ -441,7 +481,8 @@ mod tests {
         let request = RenderRequest::new(&diagram, RenderFormat::Svg);
 
         let one_shot = export_scene(&request).expect("one-shot");
-        let layout = compute_layout(&diagram).expect("layout");
+        let mut layout = compute_layout(&diagram).expect("layout");
+        apply_title_band_layout_adjustment(&mut layout, request.show_title);
         let split = build_scene(&request, layout).expect("split");
 
         assert_eq!(one_shot.canvas.width, split.canvas.width);

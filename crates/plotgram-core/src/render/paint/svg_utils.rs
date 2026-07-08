@@ -42,7 +42,11 @@ pub fn write_svg_preamble(
     let context = &scene.context;
     let w = scene.canvas.width;
     let h = scene.canvas.height;
-    let title_offset = if scene.canvas.title.is_some() { 30.0 } else { 0.0 };
+    let title_offset = if scene.canvas.title.is_some() {
+        crate::render::CANVAS_TITLE_BAND_HEIGHT
+    } else {
+        0.0
+    };
     let total_h = h + title_offset;
     let canvas_background = &scene.canvas.background;
     let canvas_transparent = super::color_queries::is_transparent_canvas(canvas_background);

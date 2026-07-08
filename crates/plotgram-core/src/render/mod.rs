@@ -33,6 +33,9 @@ pub use encode::{
 pub use output::RenderOutput;
 pub use paint::{color_queries, style_mapping, svg_utils};
 pub use request::RenderRequest;
+
+/// 画布顶部标题带高度（与 SVG `title_offset` 一致；不绘制标题时可从布局收回）。
+pub const CANVAS_TITLE_BAND_HEIGHT: f64 = 30.0;
 pub use crate::theme::CompiledRenderContext;
 pub use scene::{
     build_scene, compute_layout, export_scene, ExportCanvas, ExportEdge, ExportGroup, ExportNode,

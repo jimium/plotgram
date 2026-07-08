@@ -19,6 +19,8 @@ pub struct RenderRequest<'a> {
     pub dark_mode: bool,
     /// 是否在 SVG 右下角输出 "powered by plotgram" 署名（默认开启）。
     pub attribution: bool,
+    /// 是否在画布顶部绘制 DSL `title`（默认关闭；单独导出时可设为 true）。
+    pub show_title: bool,
     /// 强制省略画布背景 rect（不受 theme canvas.background 影响）。
     pub transparent_background: bool,
     /// 是否启用 semantic → icon 推断（默认开启）。
@@ -43,6 +45,7 @@ impl<'a> RenderRequest<'a> {
             scene_graphic_style: None,
             dark_mode: false,
             attribution: true,
+            show_title: false,
             transparent_background: false,
             semantic_inference: true,
             ascii_options: AsciiExportOptions::default(),
@@ -131,6 +134,13 @@ mod tests {
     }
 
     #[test]
+    fn show_title_defaults_to_false() {
+        let prepared = sample_prepared(DiagramType::Flowchart);
+        let request = RenderRequest::new(&prepared, RenderFormat::Svg);
+        assert!(!request.show_title);
+    }
+
+    #[test]
     fn explicit_theme_id_has_highest_priority() {
         let prepared = sample_prepared(DiagramType::Architecture);
         let request = RenderRequest {
@@ -143,6 +153,7 @@ mod tests {
             scene_graphic_style: None,
             dark_mode: true,
             attribution: true,
+            show_title: false,
             transparent_background: false,
             semantic_inference: true,
             ascii_options: AsciiExportOptions::default(),
@@ -165,6 +176,7 @@ mod tests {
             scene_graphic_style: None,
             dark_mode: true,
             attribution: true,
+            show_title: false,
             transparent_background: false,
             semantic_inference: true,
             ascii_options: AsciiExportOptions::default(),
@@ -202,6 +214,7 @@ mod tests {
             scene_graphic_style: None,
             dark_mode: false,
             attribution: true,
+            show_title: false,
             transparent_background: false,
             semantic_inference: true,
             ascii_options: AsciiExportOptions::default(),
@@ -239,6 +252,7 @@ mod tests {
             scene_graphic_style: None,
             dark_mode: false,
             attribution: true,
+            show_title: false,
             transparent_background: false,
             semantic_inference: true,
             ascii_options: AsciiExportOptions::default(),

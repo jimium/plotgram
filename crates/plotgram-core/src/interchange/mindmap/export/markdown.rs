@@ -2,11 +2,9 @@
 
 use std::fmt::Write;
 
-use crate::ast::PreparedDiagram;
 use crate::error::Result;
-use crate::layout::LayoutIntentOverlay;
 use crate::render::encode::{DiagramEncodeOutput, EncodingPath, FormatEncoder};
-use crate::render::{RenderFormat, RenderOutput};
+use crate::render::{RenderFormat, RenderOutput, RenderRequest};
 
 use crate::interchange::mindmap::{build_mindmap_tree, BuildTreeOptions, MindmapTree, MindmapTreeNode, RootTitleMode};
 
@@ -71,9 +69,9 @@ impl FormatEncoder for MdOutlineEncoder {
 
     fn encode_from_diagram(
         &self,
-        diagram: &PreparedDiagram,
-        _layout_overlay: Option<&LayoutIntentOverlay>,
+        request: &RenderRequest<'_>,
     ) -> Result<DiagramEncodeOutput> {
+        let diagram = request.diagram;
         let inner = diagram.inner();
 
         // 仅支持 mindmap

@@ -17,6 +17,7 @@ VALIDATE=false
 SERVE=false
 SERVE_PORT=4173
 TRANSPARENT_BG=true
+SHOW_TITLE=false
 
 usage() {
   cat <<'EOF'
@@ -31,6 +32,7 @@ usage() {
       --validate        渲染前先执行语法验证
   -s, --serve [PORT]    渲染完成后启动 HTTP 服务（默认 4173），便于在浏览器中查看 index.html
       --opaque          保留画布背景色（默认输出透明背景，便于嵌入 showcase 预览）
+      --title           在画布顶部绘制 DSL title（默认不绘制）
   -h, --help            显示此帮助
 
 示例:
@@ -59,6 +61,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --opaque)
       TRANSPARENT_BG=false
+      shift
+      ;;
+    --title)
+      SHOW_TITLE=true
       shift
       ;;
     -s|--serve)
@@ -111,6 +117,9 @@ run_timed_render() {
   local render_args=(render "$1" -f "$2" -o "$3")
   if $TRANSPARENT_BG; then
     render_args+=(--transparent-background)
+  fi
+  if $SHOW_TITLE; then
+    render_args+=(--title)
   fi
   perl -MTime::HiRes=time -e '
     use strict;

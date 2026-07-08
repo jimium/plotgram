@@ -63,6 +63,7 @@ export interface WasmRenderOptions {
   theme_id?: string;
   graphic_style?: string;
   dark_mode: boolean;
+  show_title?: boolean;
   transparent_background?: boolean;
   ascii?: {
     output_encoding?: 'ascii' | 'utf8';

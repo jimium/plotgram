@@ -1,8 +1,6 @@
 //! FreeMind (.mm) 导出编码器（L0 only：结构 + TEXT，不导出样式）。
 
-use crate::ast::PreparedDiagram;
 use crate::error::Result;
-use crate::layout::LayoutIntentOverlay;
 use crate::render::encode::{DiagramEncodeOutput, EncodingPath, FormatEncoder};
 use crate::render::{RenderFormat, RenderOutput};
 
@@ -57,9 +55,9 @@ impl FormatEncoder for FreemindEncoder {
 
     fn encode_from_diagram(
         &self,
-        diagram: &PreparedDiagram,
-        _layout_overlay: Option<&LayoutIntentOverlay>,
+        request: &crate::render::RenderRequest<'_>,
     ) -> Result<DiagramEncodeOutput> {
+        let diagram = request.diagram;
         let inner = diagram.inner();
 
         if inner.diagram_type != crate::types::DiagramType::Mindmap {

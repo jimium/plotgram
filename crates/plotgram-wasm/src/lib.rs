@@ -45,6 +45,8 @@ pub struct WasmRenderOptions {
     pub graphic_style: Option<String>,
     pub dark_mode: Option<bool>,
     pub transparent_background: Option<bool>,
+    /// 是否在画布顶部绘制 DSL title（默认 false）
+    pub show_title: Option<bool>,
     pub ascii: Option<plotgram_core::render::encode::ascii::AsciiExportOptions>,
     /// 布局意图叠加层（可选）。
     ///
@@ -100,6 +102,7 @@ fn apply_options_to_request<'a>(
     }
     request.dark_mode = options.dark_mode.unwrap_or(false);
     request.transparent_background = options.transparent_background.unwrap_or(false);
+    request.show_title = options.show_title.unwrap_or(false);
     if let Some(ascii) = &options.ascii {
         request.ascii_options = ascii.clone();
     }

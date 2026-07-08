@@ -98,8 +98,7 @@ pub trait FormatEncoder {
     /// `EncodingPath::Scene` 的编码器无需覆写，默认返回 unsupported 错误。
     fn encode_from_diagram(
         &self,
-        _diagram: &PreparedDiagram,
-        _layout_overlay: Option<&crate::layout::LayoutIntentOverlay>,
+        _request: &RenderRequest<'_>,
     ) -> crate::error::Result<DiagramEncodeOutput> {
         Err(crate::error::PlotgramError::render_internal_msg(
             "format does not support direct diagram encoding",

@@ -47,6 +47,22 @@ pub fn finalize_canvas_bounds(result: &mut LayoutResult, padding: f64) {
     result.total_height = canvas_height;
 }
 
+/// 不绘制画布标题时，上移内容并缩短画布高度，收回顶部标题带留白。
+///
+/// 与渲染层 `CANVAS_TITLE_BAND_HEIGHT` / SVG `title_offset` 对齐；仅影响导出坐标，
+/// 不改变布局算法本身。应在 `finalize_canvas_bounds` 之后、物化/编码之前调用。
+pub fn trim_title_band_from_canvas(result: &mut LayoutResult, band: f64) {
+    if band <= 1e-9 {
+        return;
+    }
+    if result.nodes.is_empty() && result.edges.is_empty() {
+        result.total_height = (result.total_height - band).max(0.0);
+        return;
+    }
+    translate_all(result, 0.0, -band);
+    result.total_height = (result.total_height - band).max(band);
+}
+
 /// 计算全局包围框，涵盖节点、分组、边路径采样点、边标签包围框与引线终点。
 ///
 /// 返回 `(min_x, min_y, max_x, max_y)`。若没有任何视觉元素则返回 `None`。
@@ -166,6 +182,27 @@ mod tests {
             total_height: 0.0,
             hints: LayoutHints::default(),
         }
+    }
+
+    #[test]
+    fn trim_title_band_shifts_content_up_and_shortens_canvas() {
+        let mut result = empty_result();
+        result.nodes.insert(
+            "a".to_string(),
+            NodeLayout {
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 50.0,
+                ..Default::default()
+            },
+        );
+        finalize_canvas_bounds(&mut result, 70.0);
+        let before_h = result.total_height;
+        let before_y = result.nodes["a"].y;
+        trim_title_band_from_canvas(&mut result, 30.0);
+        assert!((result.nodes["a"].y - (before_y - 30.0)).abs() < 1e-9);
+        assert!((result.total_height - (before_h - 30.0)).abs() < 1e-9);
     }
 
     #[test]
