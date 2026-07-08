@@ -69,7 +69,7 @@ impl OrthoRoutingProfile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layout::constants::ORTHO_PARALLEL_GAP;
+    use crate::layout::constants::{ORTHO_PARALLEL_GAP, ORTHO_PARALLEL_GAP_ARCHITECTURE};
 
     #[test]
     fn flowchart_profile_defaults() {
@@ -86,7 +86,8 @@ mod tests {
     fn architecture_profile_defaults() {
         let p = OrthoRoutingProfile::for_diagram_type(DiagramType::Architecture);
         assert_eq!(p.diagram_type, DiagramType::Architecture);
-        assert!(p.parallel_gap >= ORTHO_PARALLEL_GAP);
+        assert!((p.parallel_gap - ORTHO_PARALLEL_GAP_ARCHITECTURE).abs() < f64::EPSILON);
+        assert!(p.parallel_gap > ORTHO_PARALLEL_GAP);
         assert!(p.semantic_merge);
         assert!(p.corridor_lane_offsets);
         assert!(p.separate_unrelated_trunks);

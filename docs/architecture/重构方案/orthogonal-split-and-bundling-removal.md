@@ -2,7 +2,7 @@
 
 > 版本：1.0  
 > 日期：2026-07-09  
-> 状态：**提案 / 待实施**  
+> 状态：**Phase 1–4 已实施**（持续优化见 Phase 4 后续子项）  
 > 范围：`edge_routing_orthogonal/`、`edge_bundling/`、`pipeline.rs`、`edge_merge_policy.rs`、标签流水线  
 > 验证用例：`showcase/architecture/c.layout-stress-nested.pgm`、showcase flowchart 多 fan-out 样例、`plotgram-eval` showcase baseline
 
@@ -415,9 +415,10 @@ Phase 3  物理删除
   [x] 更新流水线文档
 
 Phase 4  专项优化（可选）
-  [ ] architecture parallel_gap ↑
-  [ ] 长标签 whitespace
-  [ ] flowchart fan-out showcase
+  [x] architecture parallel_gap ↑ (12px)
+  [x] 长标签 whitespace + 端点 group 壳层豁免
+  [x] flowchart trunk+fork 测试 + s.fan-out-four showcase
+  [x] profile 级 parallel_gap 常量
 ```
 
 ---

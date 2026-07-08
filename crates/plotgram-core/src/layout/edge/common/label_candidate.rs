@@ -10,6 +10,7 @@ use crate::layout::edge::common::label_avoidance::{
 use crate::layout::geometry::Point;
 use crate::layout::group::constants::GROUP_BORDER_SHELL_PAD;
 use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
+use crate::types::DiagramType;
 use std::collections::HashMap;
 
 const REJECT_SCORE: f64 = f64::INFINITY;
@@ -18,6 +19,10 @@ const FOREIGN_EDGE_PENALTY: f64 = 100.0;
 const GROUP_OVERLAP_PENALTY: f64 = 50.0;
 const PATH_DISTANCE_WEIGHT: f64 = 0.5;
 const MIDPOINT_DISTANCE_WEIGHT: f64 = 0.1;
+/// 长标签放在足够长的直线段上时的 whitespace 奖励（architecture Phase 4）。
+const LONG_SEGMENT_WHITESPACE_BONUS: f64 = 25.0;
+const LONG_LABEL_MIN_WIDTH: f64 = 48.0;
+const LONG_SEGMENT_MIN_RATIO: f64 = 1.25;
 /// 节点重叠：高有限惩罚（>LABEL_OVERLAP_PENALTY），按重叠面积加权。
 /// 不用 INFINITY 以保证「所有候选都碰节点」时仍能选出重叠最小的候选，
 /// 避免回退到原始冲突位置（label_avoidance Phase 2 不处理 label-node）。
@@ -26,11 +31,47 @@ const NODE_OVERLAP_AREA_WEIGHT: f64 = 100.0;
 
 type LabelKey = (usize, usize);
 
+/// 图种相关的标签候选打分策略（Phase 4 architecture 专项）。
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct LabelPlacementConfig {
+    /// 偏好将较长标签放在有足够 whitespace 的直线段旁
+    pub prefer_long_segment_whitespace: bool,
+    /// 路径端点附近的标签与 group 边框壳层重叠时减轻惩罚
+    pub soften_endpoint_group_shell: bool,
+}
+
+impl LabelPlacementConfig {
+    pub fn for_diagram_type(diagram_type: DiagramType) -> Self {
+        match diagram_type {
+            DiagramType::Architecture => Self {
+                prefer_long_segment_whitespace: true,
+                soften_endpoint_group_shell: true,
+            },
+            _ => Self::default(),
+        }
+    }
+}
+
 /// 沿边路径为所有标签做候选位放置（按边序贪心占位）。
 pub fn place_all_labels_by_candidates(
     edges: &mut [EdgeLayout],
     nodes: &HashMap<String, NodeLayout>,
     groups: &HashMap<String, GroupLayout>,
+) {
+    place_all_labels_by_candidates_with_config(
+        edges,
+        nodes,
+        groups,
+        LabelPlacementConfig::default(),
+    );
+}
+
+/// 带图种策略的候选位放置。
+pub fn place_all_labels_by_candidates_with_config(
+    edges: &mut [EdgeLayout],
+    nodes: &HashMap<String, NodeLayout>,
+    groups: &HashMap<String, GroupLayout>,
+    config: LabelPlacementConfig,
 ) {
     let label_keys = collect_label_keys(edges);
     if label_keys.is_empty() {
@@ -77,10 +118,12 @@ pub fn place_all_labels_by_candidates(
                 edge_idx,
                 &path,
                 preferred_t,
+                size,
                 &placed_bboxes,
                 &node_obstacles,
                 groups,
                 &edge_segments,
+                config,
             );
             let best = candidates
                 .into_iter()
@@ -92,10 +135,12 @@ pub fn place_all_labels_by_candidates(
                         edge_idx,
                         &path,
                         preferred_t,
+                        size,
                         &placed_bboxes,
                         &node_obstacles,
                         groups,
                         &edge_segments,
+                        config,
                     );
                     (score, center)
                 })
@@ -291,10 +336,12 @@ fn score_candidate(
     edge_idx: usize,
     path: &[Point],
     preferred_t: f64,
+    label_size: (f64, f64),
     placed_bboxes: &[(f64, f64, f64, f64)],
     node_obstacles: &[(f64, f64, f64, f64)],
     groups: &HashMap<String, GroupLayout>,
     edge_segments: &[Vec<(Point, Point)>],
+    config: LabelPlacementConfig,
 ) -> f64 {
     // 节点重叠：高有限惩罚（非 INFINITY），按重叠面积加权。
     // 保证「全部候选都碰节点」时仍能选出最小重叠候选，而非回退原始冲突位置。
@@ -317,7 +364,14 @@ fn score_candidate(
         ids
     } {
         if label_bbox_overlaps_group_shell(&bbox, &groups[id], GROUP_BORDER_SHELL_PAD) {
-            score += GROUP_OVERLAP_PENALTY;
+            let near_endpoint = config.soften_endpoint_group_shell
+                && path_t_for_center(path, center).is_some_and(|t| t <= 0.25 || t >= 0.75);
+            let penalty = if near_endpoint {
+                GROUP_OVERLAP_PENALTY * 0.2
+            } else {
+                GROUP_OVERLAP_PENALTY
+            };
+            score += penalty;
         }
     }
 
@@ -345,13 +399,72 @@ fn score_candidate(
         ((center.x - preferred_point.x).powi(2) + (center.y - preferred_point.y).powi(2)).sqrt();
     score += pref_dist * 0.05;
 
+    if config.prefer_long_segment_whitespace && label_size.0 >= LONG_LABEL_MIN_WIDTH {
+        let seg_len = segment_length_at_center(path, center);
+        if seg_len >= label_size.0 * LONG_SEGMENT_MIN_RATIO {
+            let bonus = (seg_len / label_size.0).min(3.0) * LONG_SEGMENT_WHITESPACE_BONUS;
+            score -= bonus;
+        }
+    }
+
     score
+}
+
+fn path_t_for_center(path: &[Point], center: Point) -> Option<f64> {
+    let total_len: f64 = path
+        .windows(2)
+        .map(|w| segment_length(w[0], w[1]))
+        .sum();
+    if total_len <= 1e-6 {
+        return None;
+    }
+    let (closest, _) = closest_point_on_path(path, center);
+    let mut accum = 0.0;
+    for w in path.windows(2) {
+        let seg_len = segment_length(w[0], w[1]);
+        let seg_dist = segment_length(w[0], closest);
+        if seg_dist <= seg_len + 1.0 {
+            let local_t = if seg_len > 1e-6 {
+                seg_dist / seg_len
+            } else {
+                0.0
+            };
+            return Some(((accum + seg_len * local_t) / total_len).clamp(0.0, 1.0));
+        }
+        accum += seg_len;
+    }
+    None
+}
+
+fn segment_length(p0: Point, p1: Point) -> f64 {
+    let dx = p1.x - p0.x;
+    let dy = p1.y - p0.y;
+    (dx * dx + dy * dy).sqrt()
+}
+
+/// 标签中心最近路径段的长度（用于 whitespace 奖励）。
+fn segment_length_at_center(path: &[Point], center: Point) -> f64 {
+    if path.len() < 2 {
+        return 0.0;
+    }
+    let (closest, _) = closest_point_on_path(path, center);
+    let mut best: f64 = 0.0;
+    for w in path.windows(2) {
+        let seg_len = segment_length(w[0], w[1]);
+        let d0 = segment_length(w[0], closest);
+        let d1 = segment_length(w[1], closest);
+        if d0 + d1 <= seg_len + 2.0 {
+            best = best.max(seg_len);
+        }
+    }
+    best
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::layout::{EdgeLabelLayout, PathGeometry, Port};
+    use crate::types::DiagramType;
 
     fn labeled_edge(center: Point) -> EdgeLayout {
         EdgeLayout {
@@ -363,6 +476,16 @@ mod tests {
             from_port: Port::Bottom,
             to_port: Port::Top,
         }
+    }
+
+    #[test]
+    fn architecture_config_prefers_long_segment_whitespace() {
+        let cfg = LabelPlacementConfig::for_diagram_type(DiagramType::Architecture);
+        assert!(cfg.prefer_long_segment_whitespace);
+        assert!(cfg.soften_endpoint_group_shell);
+
+        let flow = LabelPlacementConfig::for_diagram_type(DiagramType::Flowchart);
+        assert!(!flow.prefer_long_segment_whitespace);
     }
 
     #[test]

@@ -40,8 +40,11 @@ pub const DEFAULT_MIN_SEPARATION: f64 = 2.0;
 /// orthogonal 路由 slot 磁吸点间距（orthogonal 路由与 friendliness/port_conflict 共享）
 pub const ORTHO_SLOT_PITCH: f64 = 40.0;
 
-/// orthogonal 路由平行边重叠判定阈值（orthogonal scoring 与 refine/segments_conflict_xy 共享）
+/// orthogonal 路由平行边重叠判定阈值（flowchart 默认；refine/segments_conflict 等共享）
 pub const ORTHO_PARALLEL_GAP: f64 = 8.0;
+
+/// architecture profile 平行边最小间距（Phase 4：高于 flowchart 以减少无关边贴靠）
+pub const ORTHO_PARALLEL_GAP_ARCHITECTURE: f64 = 12.0;
 
 // ─── 标签 ──────────────────────────────────────────────
 

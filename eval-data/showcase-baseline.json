@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "1783529572",
+  "generated_at": "1783529965",
   "entries": [
     {
       "path": "architecture/c.ai-agent-docops-pipeline.pgm",
@@ -10,15 +10,15 @@
         "edge_node_crossings": 1,
         "edge_through_groups": 1,
         "label_node_overlaps": 0,
-        "label_label_overlaps": 1,
+        "label_label_overlaps": 0,
         "bend_count": 40,
         "edge_parallel_overlap_count": 1,
-        "edge_crossings": 20,
+        "edge_crossings": 21,
         "total_area": 1610990.0,
-        "total_edge_length": 7711.379135999999,
+        "total_edge_length": 7719.379135999999,
         "total_node_area": 159750.0,
-        "edge_length_stddev": 275.0276340287992,
-        "edge_length_cv": 0.6063078595970601,
+        "edge_length_stddev": 275.60946720428143,
+        "edge_length_cv": 0.6069608526704168,
         "aspect_ratio": 1.25165271044513,
         "aspect_ratio_deviation": 0.34834728955487004,
         "area_utilization": 0.0991626267078008,
@@ -33,10 +33,10 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 1,
-          "edge_crossing": 20,
+          "edge_crossing": 21,
           "edge_crosses_group_interior": 1,
           "label_node_overlap": 0,
-          "label_label_overlap": 1,
+          "label_label_overlap": 0,
           "unrelated_edge_trunk_merge": 1,
           "total_violations": 24,
           "error_count": 2,
@@ -47,17 +47,17 @@
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 1,
-        "edge_crossing": 20,
+        "edge_crossing": 21,
         "edge_crosses_group_interior": 1,
         "label_node_overlap": 0,
-        "label_label_overlap": 1,
+        "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 1,
         "total_violations": 24,
         "error_count": 2,
         "warning_count": 22
       },
-      "score": 62.78,
-      "elapsed_us": 421925
+      "score": 63.12,
+      "elapsed_us": 425462
     },
     {
       "path": "architecture/c.cloud-native.pgm",
@@ -72,10 +72,10 @@
         "edge_parallel_overlap_count": 1,
         "edge_crossings": 6,
         "total_area": 1250832.0,
-        "total_edge_length": 7193.5,
+        "total_edge_length": 7209.5,
         "total_node_area": 89500.0,
-        "edge_length_stddev": 417.92733079631273,
-        "edge_length_cv": 0.8133707696042787,
+        "edge_length_stddev": 418.57794820617323,
+        "edge_length_cv": 0.8128290831384182,
         "aspect_ratio": 1.2213438735177864,
         "aspect_ratio_deviation": 0.3786561264822137,
         "area_utilization": 0.07155237473937347,
@@ -113,8 +113,8 @@
         "error_count": 0,
         "warning_count": 7
       },
-      "score": 63.17,
-      "elapsed_us": 45924
+      "score": 63.18,
+      "elapsed_us": 47287
     },
     {
       "path": "architecture/c.data-lineage-platform.pgm",
@@ -171,7 +171,7 @@
         "warning_count": 16
       },
       "score": 60.38,
-      "elapsed_us": 220310
+      "elapsed_us": 227906
     },
     {
       "path": "architecture/c.ecommerce-platform.pgm",
@@ -228,7 +228,7 @@
         "warning_count": 13
       },
       "score": 65.65,
-      "elapsed_us": 70098
+      "elapsed_us": 70132
     },
     {
       "path": "architecture/c.hybrid-cloud-dr-topology.pgm",
@@ -239,14 +239,14 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 55,
-        "edge_parallel_overlap_count": 0,
-        "edge_crossings": 24,
+        "bend_count": 58,
+        "edge_parallel_overlap_count": 1,
+        "edge_crossings": 23,
         "total_area": 2662080.0,
-        "total_edge_length": 14603.720000000001,
+        "total_edge_length": 14725.720000000001,
         "total_node_area": 163300.0,
-        "edge_length_stddev": 629.0062339759087,
-        "edge_length_cv": 1.0337194643160652,
+        "edge_length_stddev": 631.4257972086314,
+        "edge_length_cv": 1.0290986880782163,
         "aspect_ratio": 1.911864406779661,
         "aspect_ratio_deviation": 0.311864406779661,
         "area_utilization": 0.06134300997716072,
@@ -261,11 +261,11 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 0,
-          "edge_crossing": 24,
+          "edge_crossing": 23,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 0,
+          "unrelated_edge_trunk_merge": 1,
           "total_violations": 24,
           "error_count": 0,
           "warning_count": 24
@@ -275,17 +275,17 @@
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 0,
-        "edge_crossing": 24,
+        "edge_crossing": 23,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 0,
+        "unrelated_edge_trunk_merge": 1,
         "total_violations": 24,
         "error_count": 0,
         "warning_count": 24
       },
-      "score": 52.89,
-      "elapsed_us": 89662
+      "score": 53.23,
+      "elapsed_us": 91015
     },
     {
       "path": "architecture/c.k8s-blue-green-release-topology.pgm",
@@ -299,14 +299,14 @@
         "bend_count": 74,
         "edge_parallel_overlap_count": 1,
         "edge_crossings": 33,
-        "total_area": 3127356.0,
-        "total_edge_length": 24444.464999999997,
+        "total_area": 3150018.0,
+        "total_edge_length": 24496.464999999997,
         "total_node_area": 165300.0,
-        "edge_length_stddev": 687.3469787697599,
-        "edge_length_cv": 0.8435614918589054,
-        "aspect_ratio": 1.1403985507246377,
-        "aspect_ratio_deviation": 0.4596014492753624,
-        "area_utilization": 0.052856150690871136,
+        "edge_length_stddev": 690.4078971010341,
+        "edge_length_cv": 0.8455194213953331,
+        "aspect_ratio": 1.1321942446043165,
+        "aspect_ratio_deviation": 0.4678057553956836,
+        "area_utilization": 0.052475890613958395,
         "channel_congestion": 31.0,
         "long_edge_count": 15,
         "group_gap_deficit": 0.0,
@@ -341,8 +341,8 @@
         "error_count": 0,
         "warning_count": 34
       },
-      "score": 57.24,
-      "elapsed_us": 156579
+      "score": 57.19,
+      "elapsed_us": 162268
     },
     {
       "path": "architecture/c.k8s-multi-cluster-federation.pgm",
@@ -353,17 +353,17 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 114,
-        "edge_parallel_overlap_count": 4,
+        "bend_count": 117,
+        "edge_parallel_overlap_count": 5,
         "edge_crossings": 54,
-        "total_area": 2679280.0,
-        "total_edge_length": 24601.50497546685,
+        "total_area": 2645040.0,
+        "total_edge_length": 24608.01018323517,
         "total_node_area": 210800.0,
-        "edge_length_stddev": 491.74626369931946,
-        "edge_length_cv": 0.6995961932670167,
-        "aspect_ratio": 1.70926517571885,
-        "aspect_ratio_deviation": 0.10926517571884986,
-        "area_utilization": 0.0786778537517542,
+        "edge_length_stddev": 487.1543733044921,
+        "edge_length_cv": 0.6928802019625806,
+        "aspect_ratio": 1.7313915857605178,
+        "aspect_ratio_deviation": 0.13139158576051768,
+        "area_utilization": 0.07969633729546623,
         "channel_congestion": 31.0,
         "long_edge_count": 18,
         "group_gap_deficit": 0.0,
@@ -379,10 +379,10 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 4,
-          "total_violations": 60,
+          "unrelated_edge_trunk_merge": 5,
+          "total_violations": 61,
           "error_count": 2,
-          "warning_count": 58
+          "warning_count": 59
         }
       },
       "lint": {
@@ -393,13 +393,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 4,
-        "total_violations": 60,
+        "unrelated_edge_trunk_merge": 5,
+        "total_violations": 61,
         "error_count": 2,
-        "warning_count": 58
+        "warning_count": 59
       },
-      "score": 59.92,
-      "elapsed_us": 742351
+      "score": 59.99,
+      "elapsed_us": 811574
     },
     {
       "path": "architecture/c.k8s-multi-namespace-overview.pgm",
@@ -410,14 +410,14 @@
         "edge_through_groups": 1,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 159,
-        "edge_parallel_overlap_count": 8,
+        "bend_count": 158,
+        "edge_parallel_overlap_count": 7,
         "edge_crossings": 75,
         "total_area": 2602032.0,
-        "total_edge_length": 23385.025260422677,
+        "total_edge_length": 23445.025260422677,
         "total_node_area": 233450.0,
-        "edge_length_stddev": 523.3445127600395,
-        "edge_length_cv": 0.8280404556540328,
+        "edge_length_stddev": 526.6490215906236,
+        "edge_length_cv": 0.8311363959904633,
         "aspect_ratio": 1.2618384401114207,
         "aspect_ratio_deviation": 0.33816155988857943,
         "area_utilization": 0.08971834320254324,
@@ -436,10 +436,10 @@
           "edge_crosses_group_interior": 1,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "unrelated_edge_trunk_merge": 8,
-          "total_violations": 95,
+          "unrelated_edge_trunk_merge": 7,
+          "total_violations": 94,
           "error_count": 12,
-          "warning_count": 83
+          "warning_count": 82
         }
       },
       "lint": {
@@ -450,13 +450,13 @@
         "edge_crosses_group_interior": 1,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 8,
-        "total_violations": 95,
+        "unrelated_edge_trunk_merge": 7,
+        "total_violations": 94,
         "error_count": 12,
-        "warning_count": 83
+        "warning_count": 82
       },
-      "score": 55.46,
-      "elapsed_us": 906351
+      "score": 55.4,
+      "elapsed_us": 939433
     },
     {
       "path": "architecture/c.k8s-platform-stack.pgm",
@@ -467,17 +467,17 @@
         "edge_through_groups": 4,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 81,
+        "bend_count": 85,
         "edge_parallel_overlap_count": 1,
-        "edge_crossings": 38,
-        "total_area": 2586560.0,
-        "total_edge_length": 23911.366984676268,
+        "edge_crossings": 39,
+        "total_area": 2604096.0,
+        "total_edge_length": 23990.123733537683,
         "total_node_area": 189950.0,
-        "edge_length_stddev": 676.2344361446482,
-        "edge_length_cv": 0.8484263194714255,
-        "aspect_ratio": 1.8576271186440676,
-        "aspect_ratio_deviation": 0.2576271186440675,
-        "area_utilization": 0.0734373066930595,
+        "edge_length_stddev": 675.1342592958844,
+        "edge_length_cv": 0.8442652486432086,
+        "aspect_ratio": 1.8451178451178452,
+        "aspect_ratio_deviation": 0.24511784511784507,
+        "area_utilization": 0.07294277937526113,
         "channel_congestion": 31.0,
         "long_edge_count": 15,
         "group_gap_deficit": 0.0,
@@ -489,31 +489,31 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 5,
-          "edge_crossing": 38,
+          "edge_crossing": 39,
           "edge_crosses_group_interior": 4,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
           "unrelated_edge_trunk_merge": 1,
-          "total_violations": 48,
+          "total_violations": 49,
           "error_count": 9,
-          "warning_count": 39
+          "warning_count": 40
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 5,
-        "edge_crossing": 38,
+        "edge_crossing": 39,
         "edge_crosses_group_interior": 4,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 1,
-        "total_violations": 48,
+        "total_violations": 49,
         "error_count": 9,
-        "warning_count": 39
+        "warning_count": 40
       },
-      "score": 54.68,
-      "elapsed_us": 1296272
+      "score": 54.81,
+      "elapsed_us": 1348342
     },
     {
       "path": "architecture/c.k8s-tenant-isolation.pgm",
@@ -526,12 +526,12 @@
         "label_label_overlaps": 0,
         "bend_count": 87,
         "edge_parallel_overlap_count": 2,
-        "edge_crossings": 40,
+        "edge_crossings": 41,
         "total_area": 2368174.0,
-        "total_edge_length": 18856.42239186819,
+        "total_edge_length": 18986.42239186819,
         "total_node_area": 197050.0,
-        "edge_length_stddev": 543.3318362319925,
-        "edge_length_cv": 0.7491679730362796,
+        "edge_length_stddev": 544.427729431601,
+        "edge_length_cv": 0.7455391370247936,
         "aspect_ratio": 1.4110382091856426,
         "aspect_ratio_deviation": 0.1889617908143575,
         "area_utilization": 0.08320756836279766,
@@ -546,31 +546,31 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 0,
-          "edge_crossing": 40,
+          "edge_crossing": 41,
           "edge_crosses_group_interior": 1,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
           "unrelated_edge_trunk_merge": 2,
-          "total_violations": 43,
+          "total_violations": 44,
           "error_count": 1,
-          "warning_count": 42
+          "warning_count": 43
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 0,
-        "edge_crossing": 40,
+        "edge_crossing": 41,
         "edge_crosses_group_interior": 1,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 2,
-        "total_violations": 43,
+        "total_violations": 44,
         "error_count": 1,
-        "warning_count": 42
+        "warning_count": 43
       },
-      "score": 60.34,
-      "elapsed_us": 558259
+      "score": 60.42,
+      "elapsed_us": 556032
     },
     {
       "path": "architecture/c.layout-stress-nested.pgm",
@@ -583,15 +583,15 @@
         "label_label_overlaps": 0,
         "bend_count": 30,
         "edge_parallel_overlap_count": 1,
-        "edge_crossings": 5,
-        "total_area": 1135782.0,
-        "total_edge_length": 4806.16,
+        "edge_crossings": 6,
+        "total_area": 1036152.0,
+        "total_edge_length": 4778.16,
         "total_node_area": 85800.0,
-        "edge_length_stddev": 212.05365273967033,
-        "edge_length_cv": 0.5735758871148099,
-        "aspect_ratio": 1.9181286549707601,
-        "aspect_ratio_deviation": 0.31812865497076004,
-        "area_utilization": 0.0755426657580416,
+        "edge_length_stddev": 211.58939229124297,
+        "edge_length_cv": 0.5756739204602104,
+        "aspect_ratio": 2.1025641025641026,
+        "aspect_ratio_deviation": 0.5025641025641026,
+        "area_utilization": 0.08280638361939174,
         "channel_congestion": 12.0,
         "long_edge_count": 7,
         "group_gap_deficit": 0.0,
@@ -603,31 +603,31 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 0,
-          "edge_crossing": 5,
+          "edge_crossing": 6,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
           "unrelated_edge_trunk_merge": 1,
-          "total_violations": 6,
+          "total_violations": 7,
           "error_count": 0,
-          "warning_count": 6
+          "warning_count": 7
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 0,
-        "edge_crossing": 5,
+        "edge_crossing": 6,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 1,
-        "total_violations": 6,
+        "total_violations": 7,
         "error_count": 0,
-        "warning_count": 6
+        "warning_count": 7
       },
-      "score": 66.88,
-      "elapsed_us": 35560
+      "score": 65.59,
+      "elapsed_us": 36749
     },
     {
       "path": "architecture/c.mcp-server-cluster-architecture.pgm",
@@ -684,7 +684,7 @@
         "warning_count": 2
       },
       "score": 73.22,
-      "elapsed_us": 17693
+      "elapsed_us": 18501
     },
     {
       "path": "architecture/c.payment-clearing-platform.pgm",
@@ -698,14 +698,14 @@
         "bend_count": 36,
         "edge_parallel_overlap_count": 0,
         "edge_crossings": 5,
-        "total_area": 1719517.5679546357,
-        "total_edge_length": 8621.842074752305,
+        "total_area": 1725549.5679546357,
+        "total_edge_length": 8629.842074752305,
         "total_node_area": 152700.0,
-        "edge_length_stddev": 497.5925695252706,
-        "edge_length_cv": 0.9811213901378053,
-        "aspect_ratio": 1.3225011726428573,
-        "aspect_ratio_deviation": 0.2774988273571428,
-        "area_utilization": 0.08880397783992197,
+        "edge_length_stddev": 498.6231604592236,
+        "edge_length_cv": 0.9822420450318724,
+        "aspect_ratio": 1.317878108071703,
+        "aspect_ratio_deviation": 0.28212189192829706,
+        "area_utilization": 0.08849354596112909,
         "channel_congestion": 14.0,
         "long_edge_count": 9,
         "group_gap_deficit": 0.0,
@@ -740,65 +740,65 @@
         "error_count": 2,
         "warning_count": 5
       },
-      "score": 60.87,
-      "elapsed_us": 107553
+      "score": 60.84,
+      "elapsed_us": 110204
     },
     {
       "path": "architecture/c.plotgram-core-mod-deps.pgm",
       "diagram_type": "architecture",
       "metrics": {
-        "node_overlap_pairs": 1,
-        "edge_node_crossings": 6,
+        "node_overlap_pairs": 0,
+        "edge_node_crossings": 7,
         "edge_through_groups": 3,
-        "label_node_overlaps": 3,
+        "label_node_overlaps": 2,
         "label_label_overlaps": 0,
-        "bend_count": 60,
+        "bend_count": 62,
         "edge_parallel_overlap_count": 0,
-        "edge_crossings": 40,
-        "total_area": 2145546.8,
-        "total_edge_length": 19389.4,
+        "edge_crossings": 41,
+        "total_area": 2200968.0,
+        "total_edge_length": 19587.8,
         "total_node_area": 219250.0,
-        "edge_length_stddev": 553.4344754536797,
-        "edge_length_cv": 0.8277512346001791,
-        "aspect_ratio": 1.1753386129820147,
-        "aspect_ratio_deviation": 0.4246613870179854,
-        "area_utilization": 0.10218840250886162,
-        "channel_congestion": 28.0,
+        "edge_length_stddev": 575.4269009072765,
+        "edge_length_cv": 0.851927226452742,
+        "aspect_ratio": 1.1457431457431457,
+        "aspect_ratio_deviation": 0.45425685425685436,
+        "area_utilization": 0.09961526019460529,
+        "channel_congestion": 29.0,
         "long_edge_count": 18,
         "group_gap_deficit": 0.0,
-        "predicted_crossings": 30,
-        "port_conflict_score": 184.0,
+        "predicted_crossings": 24,
+        "port_conflict_score": 214.0,
         "node_count": 20,
         "edge_count": 29,
         "lint": {
-          "node_overlap": 1,
+          "node_overlap": 0,
           "group_overlap": 0,
-          "edge_through_node": 6,
-          "edge_crossing": 40,
+          "edge_through_node": 7,
+          "edge_crossing": 41,
           "edge_crosses_group_interior": 3,
-          "label_node_overlap": 3,
+          "label_node_overlap": 2,
           "label_label_overlap": 0,
           "unrelated_edge_trunk_merge": 0,
           "total_violations": 53,
-          "error_count": 13,
-          "warning_count": 40
+          "error_count": 12,
+          "warning_count": 41
         }
       },
       "lint": {
-        "node_overlap": 1,
+        "node_overlap": 0,
         "group_overlap": 0,
-        "edge_through_node": 6,
-        "edge_crossing": 40,
+        "edge_through_node": 7,
+        "edge_crossing": 41,
         "edge_crosses_group_interior": 3,
-        "label_node_overlap": 3,
+        "label_node_overlap": 2,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 0,
         "total_violations": 53,
-        "error_count": 13,
-        "warning_count": 40
+        "error_count": 12,
+        "warning_count": 41
       },
-      "score": 56.36,
-      "elapsed_us": 869849
+      "score": 55.64,
+      "elapsed_us": 1111166
     },
     {
       "path": "architecture/c.supply-chain-control-tower.pgm",
@@ -855,7 +855,7 @@
         "warning_count": 1
       },
       "score": 61.71,
-      "elapsed_us": 47544
+      "elapsed_us": 48969
     },
     {
       "path": "architecture/n.compiler-pipeline.pgm",
@@ -912,7 +912,7 @@
         "warning_count": 2
       },
       "score": 67.58,
-      "elapsed_us": 30636
+      "elapsed_us": 31399
     },
     {
       "path": "architecture/n.d2-cell-tower-network.pgm",
@@ -926,14 +926,14 @@
         "bend_count": 15,
         "edge_parallel_overlap_count": 0,
         "edge_crossings": 3,
-        "total_area": 730117.0,
-        "total_edge_length": 4130.764035174503,
+        "total_area": 722261.0,
+        "total_edge_length": 4122.764035174503,
         "total_node_area": 46550.0,
-        "edge_length_stddev": 314.7259252351173,
-        "edge_length_cv": 0.5333351065047589,
-        "aspect_ratio": 1.320780094149294,
-        "aspect_ratio_deviation": 0.2792199058507061,
-        "area_utilization": 0.06375690471527166,
+        "edge_length_stddev": 313.0630834682809,
+        "edge_length_cv": 0.5315466918749353,
+        "aspect_ratio": 1.3351461590754587,
+        "aspect_ratio_deviation": 0.26485384092454134,
+        "area_utilization": 0.0644503856639082,
         "channel_congestion": 9.0,
         "long_edge_count": 5,
         "group_gap_deficit": 0.0,
@@ -968,8 +968,8 @@
         "error_count": 0,
         "warning_count": 3
       },
-      "score": 68.46,
-      "elapsed_us": 22793
+      "score": 68.52,
+      "elapsed_us": 23584
     },
     {
       "path": "architecture/n.data-pipeline.pgm",
@@ -1026,7 +1026,7 @@
         "warning_count": 0
       },
       "score": 69.91,
-      "elapsed_us": 13784
+      "elapsed_us": 14358
     },
     {
       "path": "architecture/n.event-driven.pgm",
@@ -1041,10 +1041,10 @@
         "edge_parallel_overlap_count": 0,
         "edge_crossings": 2,
         "total_area": 548432.0,
-        "total_edge_length": 2540.5,
+        "total_edge_length": 2532.5,
         "total_node_area": 37950.0,
-        "edge_length_stddev": 202.4567608157357,
-        "edge_length_cv": 0.3984584940282143,
+        "edge_length_stddev": 202.19421356705539,
+        "edge_length_cv": 0.39919884218569673,
         "aspect_ratio": 1.5033112582781456,
         "aspect_ratio_deviation": 0.09668874172185449,
         "area_utilization": 0.06919727514076494,
@@ -1082,8 +1082,8 @@
         "error_count": 0,
         "warning_count": 2
       },
-      "score": 71.6,
-      "elapsed_us": 8075
+      "score": 71.58,
+      "elapsed_us": 8549
     },
     {
       "path": "architecture/n.microservices.pgm",
@@ -1140,7 +1140,7 @@
         "warning_count": 1
       },
       "score": 76.67,
-      "elapsed_us": 11390
+      "elapsed_us": 11827
     },
     {
       "path": "architecture/s.client-api-db.pgm",
@@ -1197,7 +1197,7 @@
         "warning_count": 0
       },
       "score": 85.27,
-      "elapsed_us": 788
+      "elapsed_us": 709
     },
     {
       "path": "architecture/s.three-tier.pgm",
@@ -1254,7 +1254,7 @@
         "warning_count": 0
       },
       "score": 84.96,
-      "elapsed_us": 1839
+      "elapsed_us": 2078
     },
     {
       "path": "er/c.ecommerce-schema.pgm",
@@ -1311,7 +1311,7 @@
         "warning_count": 0
       },
       "score": 75.28,
-      "elapsed_us": 13649
+      "elapsed_us": 14549
     },
     {
       "path": "er/c.layout-stress-dense.pgm",
@@ -1368,7 +1368,7 @@
         "warning_count": 20
       },
       "score": 65.09,
-      "elapsed_us": 55271
+      "elapsed_us": 56121
     },
     {
       "path": "er/c.saas-schema.pgm",
@@ -1425,7 +1425,7 @@
         "warning_count": 5
       },
       "score": 57.01,
-      "elapsed_us": 85778
+      "elapsed_us": 88750
     },
     {
       "path": "er/n.blog-schema.pgm",
@@ -1482,7 +1482,7 @@
         "warning_count": 0
       },
       "score": 74.83,
-      "elapsed_us": 4582
+      "elapsed_us": 4445
     },
     {
       "path": "er/n.school-schema.pgm",
@@ -1539,7 +1539,7 @@
         "warning_count": 0
       },
       "score": 82.37,
-      "elapsed_us": 1887
+      "elapsed_us": 2129
     },
     {
       "path": "er/n.social-network.pgm",
@@ -1596,7 +1596,7 @@
         "warning_count": 1
       },
       "score": 73.42,
-      "elapsed_us": 5881
+      "elapsed_us": 5748
     },
     {
       "path": "er/s.two-tables.pgm",
@@ -1653,7 +1653,7 @@
         "warning_count": 0
       },
       "score": 87.93,
-      "elapsed_us": 514
+      "elapsed_us": 504
     },
     {
       "path": "er/s.user-post.pgm",
@@ -1710,7 +1710,7 @@
         "warning_count": 0
       },
       "score": 87.93,
-      "elapsed_us": 415
+      "elapsed_us": 360
     },
     {
       "path": "flowchart/c.aml-case-investigation.pgm",
@@ -1767,7 +1767,7 @@
         "warning_count": 0
       },
       "score": 59.3,
-      "elapsed_us": 52463
+      "elapsed_us": 50636
     },
     {
       "path": "flowchart/c.caffe-shop.pgm",
@@ -1824,7 +1824,7 @@
         "warning_count": 3
       },
       "score": 54.93,
-      "elapsed_us": 147194
+      "elapsed_us": 149045
     },
     {
       "path": "flowchart/c.change-approval-workflow.pgm",
@@ -1881,7 +1881,7 @@
         "warning_count": 1
       },
       "score": 59.05,
-      "elapsed_us": 73521
+      "elapsed_us": 74723
     },
     {
       "path": "flowchart/c.ci-cd-security-pipeline.pgm",
@@ -1938,7 +1938,7 @@
         "warning_count": 4
       },
       "score": 51.26,
-      "elapsed_us": 158368
+      "elapsed_us": 160509
     },
     {
       "path": "flowchart/c.customer-refund-process.pgm",
@@ -1995,7 +1995,7 @@
         "warning_count": 4
       },
       "score": 53.8,
-      "elapsed_us": 165196
+      "elapsed_us": 168850
     },
     {
       "path": "flowchart/c.e-commerce-order-fulfillment.pgm",
@@ -2052,7 +2052,7 @@
         "warning_count": 1
       },
       "score": 51.67,
-      "elapsed_us": 114115
+      "elapsed_us": 117030
     },
     {
       "path": "flowchart/c.k8s-incident-response.pgm",
@@ -2109,7 +2109,7 @@
         "warning_count": 1
       },
       "score": 61.95,
-      "elapsed_us": 200671
+      "elapsed_us": 156301
     },
     {
       "path": "flowchart/c.layout-stress-dag.pgm",
@@ -2166,7 +2166,7 @@
         "warning_count": 8
       },
       "score": 62.03,
-      "elapsed_us": 99807
+      "elapsed_us": 101990
     },
     {
       "path": "flowchart/c.pr-architecture-review.pgm",
@@ -2223,7 +2223,7 @@
         "warning_count": 2
       },
       "score": 62.42,
-      "elapsed_us": 69248
+      "elapsed_us": 69426
     },
     {
       "path": "flowchart/c.software-release.pgm",
@@ -2280,7 +2280,7 @@
         "warning_count": 4
       },
       "score": 56.44,
-      "elapsed_us": 89933
+      "elapsed_us": 91864
     },
     {
       "path": "flowchart/c.swimlane-order-process.pgm",
@@ -2337,7 +2337,7 @@
         "warning_count": 0
       },
       "score": 56.91,
-      "elapsed_us": 13851
+      "elapsed_us": 14133
     },
     {
       "path": "flowchart/n.employee-onboarding.pgm",
@@ -2394,7 +2394,7 @@
         "warning_count": 0
       },
       "score": 76.35,
-      "elapsed_us": 12261
+      "elapsed_us": 12940
     },
     {
       "path": "flowchart/n.order-approval.pgm",
@@ -2451,7 +2451,7 @@
         "warning_count": 0
       },
       "score": 66.29,
-      "elapsed_us": 17431
+      "elapsed_us": 17711
     },
     {
       "path": "flowchart/n.user-auth.pgm",
@@ -2508,7 +2508,7 @@
         "warning_count": 1
       },
       "score": 73.74,
-      "elapsed_us": 10800
+      "elapsed_us": 10803
     },
     {
       "path": "flowchart/s.decision-loop.pgm",
@@ -2565,7 +2565,64 @@
         "warning_count": 0
       },
       "score": 70.49,
-      "elapsed_us": 3260
+      "elapsed_us": 3290
+    },
+    {
+      "path": "flowchart/s.fan-out-four.pgm",
+      "diagram_type": "flowchart",
+      "metrics": {
+        "node_overlap_pairs": 0,
+        "edge_node_crossings": 0,
+        "edge_through_groups": 0,
+        "label_node_overlaps": 0,
+        "label_label_overlaps": 0,
+        "bend_count": 10,
+        "edge_parallel_overlap_count": 0,
+        "edge_crossings": 1,
+        "total_area": 330672.00000000006,
+        "total_edge_length": 1265.2000000000003,
+        "total_node_area": 40000.0,
+        "edge_length_stddev": 189.50783862415832,
+        "edge_length_cv": 0.5991395467093211,
+        "aspect_ratio": 3.0,
+        "aspect_ratio_deviation": 1.4,
+        "area_utilization": 0.12096579087434071,
+        "channel_congestion": 7.0,
+        "long_edge_count": 0,
+        "group_gap_deficit": 0.0,
+        "predicted_crossings": 0,
+        "port_conflict_score": 70.0,
+        "node_count": 5,
+        "edge_count": 4,
+        "lint": {
+          "node_overlap": 0,
+          "group_overlap": 0,
+          "edge_through_node": 0,
+          "edge_crossing": 1,
+          "edge_crosses_group_interior": 0,
+          "label_node_overlap": 0,
+          "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
+          "total_violations": 1,
+          "error_count": 0,
+          "warning_count": 1
+        }
+      },
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 1,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "total_violations": 1,
+        "error_count": 0,
+        "warning_count": 1
+      },
+      "score": 63.86,
+      "elapsed_us": 10591
     },
     {
       "path": "flowchart/s.linear-chain.pgm",
@@ -2622,7 +2679,7 @@
         "warning_count": 0
       },
       "score": 86.93,
-      "elapsed_us": 682
+      "elapsed_us": 641
     },
     {
       "path": "mindmap/c.knowledge-map.pgm",
@@ -2679,7 +2736,7 @@
         "warning_count": 1
       },
       "score": 71.98,
-      "elapsed_us": 57923
+      "elapsed_us": 59083
     },
     {
       "path": "mindmap/c.product-roadmap.pgm",
@@ -2736,7 +2793,7 @@
         "warning_count": 0
       },
       "score": 79.31,
-      "elapsed_us": 37583
+      "elapsed_us": 37666
     },
     {
       "path": "mindmap/n.programming-learning.pgm",
@@ -2793,7 +2850,7 @@
         "warning_count": 0
       },
       "score": 78.21,
-      "elapsed_us": 27032
+      "elapsed_us": 28223
     },
     {
       "path": "mindmap/n.project-plan.pgm",
@@ -2850,7 +2907,7 @@
         "warning_count": 0
       },
       "score": 79.28,
-      "elapsed_us": 11648
+      "elapsed_us": 11529
     },
     {
       "path": "mindmap/n.tech-stack.pgm",
@@ -2907,7 +2964,7 @@
         "warning_count": 0
       },
       "score": 79.99,
-      "elapsed_us": 10957
+      "elapsed_us": 11193
     },
     {
       "path": "mindmap/s.brainstorm.pgm",
@@ -2964,7 +3021,7 @@
         "warning_count": 0
       },
       "score": 81.82,
-      "elapsed_us": 1057
+      "elapsed_us": 1133
     },
     {
       "path": "mindmap/s.root-branches.pgm",
@@ -3021,7 +3078,7 @@
         "warning_count": 0
       },
       "score": 81.7,
-      "elapsed_us": 1006
+      "elapsed_us": 1076
     },
     {
       "path": "sequence/c.ai-agent-change-loop.pgm",
@@ -3078,7 +3135,7 @@
         "warning_count": 0
       },
       "score": 58.7,
-      "elapsed_us": 1150
+      "elapsed_us": 1214
     },
     {
       "path": "sequence/c.cross-team-incident-escalation.pgm",
@@ -3135,7 +3192,7 @@
         "warning_count": 0
       },
       "score": 65.5,
-      "elapsed_us": 2269
+      "elapsed_us": 2325
     },
     {
       "path": "sequence/c.distributed-saga.pgm",
@@ -3192,7 +3249,7 @@
         "warning_count": 0
       },
       "score": 73.4,
-      "elapsed_us": 1039
+      "elapsed_us": 1060
     },
     {
       "path": "sequence/c.k8s-canary-rollback.pgm",
@@ -3249,7 +3306,7 @@
         "warning_count": 0
       },
       "score": 59.48,
-      "elapsed_us": 1811
+      "elapsed_us": 1815
     },
     {
       "path": "sequence/c.k8s-node-failure-recovery.pgm",
@@ -3306,7 +3363,7 @@
         "warning_count": 0
       },
       "score": 62.28,
-      "elapsed_us": 1964
+      "elapsed_us": 2109
     },
     {
       "path": "sequence/c.k8s-rolling-update.pgm",
@@ -3363,7 +3420,7 @@
         "warning_count": 0
       },
       "score": 61.26,
-      "elapsed_us": 2362
+      "elapsed_us": 2437
     },
     {
       "path": "sequence/c.layout-stress-lifelines.pgm",
@@ -3420,7 +3477,7 @@
         "warning_count": 0
       },
       "score": 71.22,
-      "elapsed_us": 2293
+      "elapsed_us": 2414
     },
     {
       "path": "sequence/c.microservice-checkout.pgm",
@@ -3477,7 +3534,7 @@
         "warning_count": 0
       },
       "score": 60.44,
-      "elapsed_us": 1460
+      "elapsed_us": 1515
     },
     {
       "path": "sequence/c.real-time-risk-decisioning.pgm",
@@ -3534,7 +3591,7 @@
         "warning_count": 0
       },
       "score": 64.52,
-      "elapsed_us": 1211
+      "elapsed_us": 1291
     },
     {
       "path": "sequence/n.api-call-chain.pgm",
@@ -3591,7 +3648,7 @@
         "warning_count": 0
       },
       "score": 79.82,
-      "elapsed_us": 443
+      "elapsed_us": 439
     },
     {
       "path": "sequence/n.oauth-login.pgm",
@@ -3648,7 +3705,7 @@
         "warning_count": 0
       },
       "score": 74.04,
-      "elapsed_us": 710
+      "elapsed_us": 758
     },
     {
       "path": "sequence/n.payment-gateway.pgm",
@@ -3705,7 +3762,7 @@
         "warning_count": 0
       },
       "score": 69.42,
-      "elapsed_us": 1127
+      "elapsed_us": 1137
     },
     {
       "path": "sequence/s.ping-pong.pgm",
@@ -3762,7 +3819,7 @@
         "warning_count": 0
       },
       "score": 82.39,
-      "elapsed_us": 105
+      "elapsed_us": 135
     },
     {
       "path": "sequence/s.request-response.pgm",
@@ -3819,7 +3876,7 @@
         "warning_count": 0
       },
       "score": 82.39,
-      "elapsed_us": 101
+      "elapsed_us": 104
     },
     {
       "path": "state/c.document-sync-lifecycle.pgm",
@@ -3876,7 +3933,7 @@
         "warning_count": 0
       },
       "score": 61.83,
-      "elapsed_us": 14568
+      "elapsed_us": 15326
     },
     {
       "path": "state/c.k8s-node-pressure-lifecycle.pgm",
@@ -3933,7 +3990,7 @@
         "warning_count": 7
       },
       "score": 60.25,
-      "elapsed_us": 74998
+      "elapsed_us": 78186
     },
     {
       "path": "state/c.k8s-rollout-state-machine.pgm",
@@ -3990,7 +4047,7 @@
         "warning_count": 1
       },
       "score": 62.65,
-      "elapsed_us": 39556
+      "elapsed_us": 40296
     },
     {
       "path": "state/c.layout-stress-transitions.pgm",
@@ -4047,7 +4104,7 @@
         "warning_count": 0
       },
       "score": 67.23,
-      "elapsed_us": 44343
+      "elapsed_us": 45197
     },
     {
       "path": "state/c.payment-flow.pgm",
@@ -4104,7 +4161,7 @@
         "warning_count": 1
       },
       "score": 63.58,
-      "elapsed_us": 45763
+      "elapsed_us": 46578
     },
     {
       "path": "state/c.service-degradation-lifecycle.pgm",
@@ -4161,7 +4218,7 @@
         "warning_count": 2
       },
       "score": 61.78,
-      "elapsed_us": 38497
+      "elapsed_us": 38721
     },
     {
       "path": "state/c.settlement-reconciliation-lifecycle.pgm",
@@ -4218,7 +4275,7 @@
         "warning_count": 2
       },
       "score": 63.66,
-      "elapsed_us": 22595
+      "elapsed_us": 24133
     },
     {
       "path": "state/c.tcp-connection.pgm",
@@ -4275,7 +4332,7 @@
         "warning_count": 1
       },
       "score": 62.31,
-      "elapsed_us": 59778
+      "elapsed_us": 62115
     },
     {
       "path": "state/n.order-lifecycle.pgm",
@@ -4332,7 +4389,7 @@
         "warning_count": 2
       },
       "score": 63.51,
-      "elapsed_us": 18928
+      "elapsed_us": 19581
     },
     {
       "path": "state/n.ticket-workflow.pgm",
@@ -4389,7 +4446,7 @@
         "warning_count": 4
       },
       "score": 63.59,
-      "elapsed_us": 20182
+      "elapsed_us": 20811
     },
     {
       "path": "state/s.on-off.pgm",
@@ -4446,7 +4503,7 @@
         "warning_count": 0
       },
       "score": 79.71,
-      "elapsed_us": 547
+      "elapsed_us": 447
     },
     {
       "path": "state/s.traffic-light.pgm",
@@ -4503,7 +4560,7 @@
         "warning_count": 0
       },
       "score": 81.05,
-      "elapsed_us": 492
+      "elapsed_us": 590
     }
   ]
 }

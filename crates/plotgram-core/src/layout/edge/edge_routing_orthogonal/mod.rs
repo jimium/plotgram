@@ -18,7 +18,8 @@ use crate::layout::edge::common::edge_geometry::{
     parse_label_t, point_at_path_t, undirected_pair_key,
 };
 use crate::layout::edge::common::self_loop;
-use crate::layout::edge::common::label_avoidance::resolve_label_overlaps;
+use crate::layout::edge::common::label_avoidance::resolve_label_overlaps_with_config;
+use crate::layout::edge::common::label_candidate::LabelPlacementConfig;
 use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use std::collections::HashMap;
@@ -906,17 +907,23 @@ fn route_edges_orthogonal_inner(
         );
         ortho_stats.lane_segments_shifted += corridor_shifted;
         if profile.separate_unrelated_trunks {
-            ortho_stats.lane_segments_shifted += separate_unrelated_trunk_overlaps(
-                &mut edges,
-                Some(&mut grid),
-                relations,
-                &from_side,
-                &to_side,
-                &result.nodes,
-                &obstacles.sorted_node_ids,
-                parallel_gap,
-                &profile,
-            );
+            for _ in 0..2 {
+                let shifted = separate_unrelated_trunk_overlaps(
+                    &mut edges,
+                    Some(&mut grid),
+                    relations,
+                    &from_side,
+                    &to_side,
+                    &result.nodes,
+                    &obstacles.sorted_node_ids,
+                    parallel_gap,
+                    &profile,
+                );
+                ortho_stats.lane_segments_shifted += shifted;
+                if shifted == 0 {
+                    break;
+                }
+            }
         }
     }
     crate::perf_log!(
@@ -934,7 +941,8 @@ fn route_edges_orthogonal_inner(
     ortho_stats.edge_tight_spacing_pairs = tight_spacing_pairs;
 
     // ── 5. 标签自动避让 ──
-    resolve_label_overlaps(&mut edges, &result.nodes, &result.groups);
+    let label_config = LabelPlacementConfig::for_diagram_type(diagram.diagram_type.clone());
+    resolve_label_overlaps_with_config(&mut edges, &result.nodes, &result.groups, label_config);
     crate::perf_log!("[perf]     fix_inversions+labels: {:.2}ms", t_fix.elapsed().as_secs_f64() * 1000.0);
 
     result.edges = edges;

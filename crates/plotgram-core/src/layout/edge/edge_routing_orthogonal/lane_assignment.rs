@@ -623,7 +623,14 @@ fn try_separate_edge_pair(
                 continue;
             }
 
-            for magnitude in [min_gap, 18.0, 24.0, 36.0] {
+            for magnitude in [
+                min_gap,
+                min_gap + 6.0,
+                18.0,
+                24.0,
+                36.0,
+                48.0,
+            ] {
                 for sign in [1.0, -1.0] {
                     let mut new_points = original.clone();
                     let offset = magnitude * sign;
@@ -649,7 +656,7 @@ fn try_separate_edge_pair(
             }
 
             let shared_coord = if is_vertical { t1.x } else { t1.y };
-            for magnitude in [min_gap, 18.0, 24.0] {
+            for magnitude in [min_gap, min_gap + 6.0, 18.0, 24.0, 36.0, 48.0] {
                 for sign in [1.0, -1.0] {
                     let mut new_points = original.clone();
                     let target = shared_coord + magnitude * sign;

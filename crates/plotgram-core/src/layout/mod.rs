@@ -2028,6 +2028,35 @@ mod tests {
     }
 
     #[test]
+    fn parallel_edges_no_exact_overlap_and_shared_from_anchor() {
+        let diagram = make_parallel_edges_test_diagram();
+        let profile = profile_for(&diagram.diagram_type);
+        let plan = LayoutPlan::resolve(&diagram, profile);
+        let result = compute_layout_with_plan(&diagram, &plan).expect("layout should succeed");
+
+        assert_eq!(result.edges.len(), 4);
+
+        let starts: Vec<Point> = result
+            .edges
+            .iter()
+            .map(|e| e.path_points().into_owned()[0])
+            .collect();
+        let anchor = starts[0];
+        assert!(
+            starts
+                .iter()
+                .all(|s| (s.x - anchor.x).abs() < 2.0 && (s.y - anchor.y).abs() < 2.0),
+            "flowchart fan-out should share from anchor (trunk+fork entry), got {starts:?}"
+        );
+
+        let unrelated = count_unrelated_parallel_overlaps(&diagram, &result);
+        assert_eq!(
+            unrelated, 0,
+            "four parallel edges must not have unrelated exact overlaps"
+        );
+    }
+
+    #[test]
     fn parallel_edges_layout_without_bundling() {
         let diagram = make_parallel_edges_test_diagram();
         let profile = profile_for(&diagram.diagram_type);

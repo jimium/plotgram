@@ -18,7 +18,10 @@ use crate::layout::group::constants::GROUP_BORDER_SHELL_PAD;
 use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
 use crate::layout::constants::*;
 use crate::layout::edge::common::edge_geometry::closest_point_on_path;
-use crate::layout::edge::common::label_candidate::place_all_labels_by_candidates;
+use crate::layout::edge::common::label_candidate::{
+    place_all_labels_by_candidates, place_all_labels_by_candidates_with_config,
+    LabelPlacementConfig,
+};
 use std::collections::{HashMap, HashSet};
 
 const EPS: f64 = 1e-6;
@@ -35,6 +38,20 @@ pub fn resolve_label_overlaps(
     edges: &mut [EdgeLayout],
     nodes: &HashMap<String, NodeLayout>,
     groups: &HashMap<String, GroupLayout>,
+) {
+    resolve_label_overlaps_with_config(
+        edges,
+        nodes,
+        groups,
+        LabelPlacementConfig::default(),
+    );
+}
+
+pub fn resolve_label_overlaps_with_config(
+    edges: &mut [EdgeLayout],
+    nodes: &HashMap<String, NodeLayout>,
+    groups: &HashMap<String, GroupLayout>,
+    label_config: LabelPlacementConfig,
 ) {
     let label_keys: Vec<LabelKey> = edges
         .iter()
@@ -53,7 +70,7 @@ pub fn resolve_label_overlaps(
     }
 
     // Phase 1: 候选位打分（优先消除标签-节点硬冲突）
-    place_all_labels_by_candidates(edges, nodes, groups);
+    place_all_labels_by_candidates_with_config(edges, nodes, groups, label_config);
 
     let initial_positions: HashMap<LabelKey, Point> = label_keys
         .iter()

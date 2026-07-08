@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-07-08T16:47:41+00:00",
+  "updated": "2026-07-08T17:01:10+00:00",
   "charts": {
     "flowchart/s.linear-chain.svg": {
       "dfy": "flowchart/s.linear-chain.pgm",
@@ -85,6 +85,11 @@
     "architecture/c.plotgram-core-mod-deps.svg": {
       "dfy": "architecture/c.plotgram-core-mod-deps.pgm",
       "entries": [
+        {
+          "id": "20260708-170110",
+          "file": ".history/architecture/c.plotgram-core-mod-deps/20260708-170110.svg",
+          "savedAt": "2026-07-08T17:01:10+00:00"
+        },
         {
           "id": "20260708-154620",
           "file": ".history/architecture/c.plotgram-core-mod-deps/20260708-154620.svg",
@@ -421,6 +426,11 @@
       "dfy": "architecture/c.hybrid-cloud-dr-topology.pgm",
       "entries": [
         {
+          "id": "20260708-170109",
+          "file": ".history/architecture/c.hybrid-cloud-dr-topology/20260708-170109.svg",
+          "savedAt": "2026-07-08T17:01:09+00:00"
+        },
+        {
           "id": "20260708-154619",
           "file": ".history/architecture/c.hybrid-cloud-dr-topology/20260708-154619.svg",
           "savedAt": "2026-07-08T15:46:19+00:00"
@@ -695,6 +705,11 @@
     "architecture/c.k8s-blue-green-release-topology.svg": {
       "dfy": "architecture/c.k8s-blue-green-release-topology.pgm",
       "entries": [
+        {
+          "id": "20260708-170109",
+          "file": ".history/architecture/c.k8s-blue-green-release-topology/20260708-170109.svg",
+          "savedAt": "2026-07-08T17:01:09+00:00"
+        },
         {
           "id": "20260708-154619",
           "file": ".history/architecture/c.k8s-blue-green-release-topology/20260708-154619.svg",
@@ -971,6 +986,11 @@
       "dfy": "architecture/c.k8s-multi-namespace-overview.pgm",
       "entries": [
         {
+          "id": "20260708-170109",
+          "file": ".history/architecture/c.k8s-multi-namespace-overview/20260708-170109.svg",
+          "savedAt": "2026-07-08T17:01:09+00:00"
+        },
+        {
           "id": "20260708-154620",
           "file": ".history/architecture/c.k8s-multi-namespace-overview/20260708-154620.svg",
           "savedAt": "2026-07-08T15:46:20+00:00"
@@ -1215,6 +1235,11 @@
     "architecture/c.k8s-tenant-isolation.svg": {
       "dfy": "architecture/c.k8s-tenant-isolation.pgm",
       "entries": [
+        {
+          "id": "20260708-170109",
+          "file": ".history/architecture/c.k8s-tenant-isolation/20260708-170109.svg",
+          "savedAt": "2026-07-08T17:01:09+00:00"
+        },
         {
           "id": "20260708-154620",
           "file": ".history/architecture/c.k8s-tenant-isolation/20260708-154620.svg",
@@ -1520,6 +1545,11 @@
     "architecture/n.d2-cell-tower-network.svg": {
       "dfy": "architecture/n.d2-cell-tower-network.pgm",
       "entries": [
+        {
+          "id": "20260708-170110",
+          "file": ".history/architecture/n.d2-cell-tower-network/20260708-170110.svg",
+          "savedAt": "2026-07-08T17:01:10+00:00"
+        },
         {
           "id": "20260708-154620",
           "file": ".history/architecture/n.d2-cell-tower-network/20260708-154620.svg",
@@ -2881,6 +2911,11 @@
       "dfy": "architecture/c.ai-agent-docops-pipeline.pgm",
       "entries": [
         {
+          "id": "20260708-170108",
+          "file": ".history/architecture/c.ai-agent-docops-pipeline/20260708-170108.svg",
+          "savedAt": "2026-07-08T17:01:08+00:00"
+        },
+        {
           "id": "20260708-154619",
           "file": ".history/architecture/c.ai-agent-docops-pipeline/20260708-154619.svg",
           "savedAt": "2026-07-08T15:46:19+00:00"
@@ -3161,6 +3196,11 @@
       "dfy": "architecture/c.data-lineage-platform.pgm",
       "entries": [
         {
+          "id": "20260708-170109",
+          "file": ".history/architecture/c.data-lineage-platform/20260708-170109.svg",
+          "savedAt": "2026-07-08T17:01:09+00:00"
+        },
+        {
           "id": "20260708-154619",
           "file": ".history/architecture/c.data-lineage-platform/20260708-154619.svg",
           "savedAt": "2026-07-08T15:46:19+00:00"
@@ -3400,6 +3440,11 @@
     "architecture/c.k8s-multi-cluster-federation.svg": {
       "dfy": "architecture/c.k8s-multi-cluster-federation.pgm",
       "entries": [
+        {
+          "id": "20260708-170109",
+          "file": ".history/architecture/c.k8s-multi-cluster-federation/20260708-170109.svg",
+          "savedAt": "2026-07-08T17:01:09+00:00"
+        },
         {
           "id": "20260708-154619",
           "file": ".history/architecture/c.k8s-multi-cluster-federation/20260708-154619.svg",
@@ -3966,6 +4011,11 @@
       "dfy": "architecture/c.layout-stress-nested.pgm",
       "entries": [
         {
+          "id": "20260708-170109",
+          "file": ".history/architecture/c.layout-stress-nested/20260708-170109.svg",
+          "savedAt": "2026-07-08T17:01:09+00:00"
+        },
+        {
           "id": "20260708-164737",
           "file": ".history/architecture/c.layout-stress-nested/20260708-164737.svg",
           "savedAt": "2026-07-08T16:47:37+00:00"
@@ -4221,6 +4271,11 @@
       "dfy": "architecture/c.payment-clearing-platform.pgm",
       "entries": [
         {
+          "id": "20260708-170109",
+          "file": ".history/architecture/c.payment-clearing-platform/20260708-170109.svg",
+          "savedAt": "2026-07-08T17:01:09+00:00"
+        },
+        {
           "id": "20260708-154620",
           "file": ".history/architecture/c.payment-clearing-platform/20260708-154620.svg",
           "savedAt": "2026-07-08T15:46:20+00:00"
@@ -4456,6 +4511,11 @@
       "dfy": "architecture/c.cloud-native.pgm",
       "entries": [
         {
+          "id": "20260708-170108",
+          "file": ".history/architecture/c.cloud-native/20260708-170108.svg",
+          "savedAt": "2026-07-08T17:01:08+00:00"
+        },
+        {
           "id": "20260708-120814",
           "file": ".history/architecture/c.cloud-native/20260708-120814.svg",
           "savedAt": "2026-07-08T12:08:14+00:00"
@@ -4650,6 +4710,11 @@
     "architecture/c.ecommerce-platform.svg": {
       "dfy": "architecture/c.ecommerce-platform.pgm",
       "entries": [
+        {
+          "id": "20260708-170109",
+          "file": ".history/architecture/c.ecommerce-platform/20260708-170109.svg",
+          "savedAt": "2026-07-08T17:01:09+00:00"
+        },
         {
           "id": "20260708-154619",
           "file": ".history/architecture/c.ecommerce-platform/20260708-154619.svg",
@@ -4875,6 +4940,11 @@
     "architecture/c.k8s-platform-stack.svg": {
       "dfy": "architecture/c.k8s-platform-stack.pgm",
       "entries": [
+        {
+          "id": "20260708-170109",
+          "file": ".history/architecture/c.k8s-platform-stack/20260708-170109.svg",
+          "savedAt": "2026-07-08T17:01:09+00:00"
+        },
         {
           "id": "20260708-154620",
           "file": ".history/architecture/c.k8s-platform-stack/20260708-154620.svg",
@@ -5105,6 +5175,11 @@
     "architecture/c.supply-chain-control-tower.svg": {
       "dfy": "architecture/c.supply-chain-control-tower.pgm",
       "entries": [
+        {
+          "id": "20260708-170110",
+          "file": ".history/architecture/c.supply-chain-control-tower/20260708-170110.svg",
+          "savedAt": "2026-07-08T17:01:10+00:00"
+        },
         {
           "id": "20260708-154620",
           "file": ".history/architecture/c.supply-chain-control-tower/20260708-154620.svg",
@@ -5650,6 +5725,11 @@
     "architecture/n.event-driven.svg": {
       "dfy": "architecture/n.event-driven.pgm",
       "entries": [
+        {
+          "id": "20260708-170110",
+          "file": ".history/architecture/n.event-driven/20260708-170110.svg",
+          "savedAt": "2026-07-08T17:01:10+00:00"
+        },
         {
           "id": "20260708-120815",
           "file": ".history/architecture/n.event-driven/20260708-120815.svg",
@@ -9270,6 +9350,11 @@
     "architecture/c.mcp-server-cluster-architecture.svg": {
       "dfy": "architecture/c.mcp-server-cluster-architecture.pgm",
       "entries": [
+        {
+          "id": "20260708-170109",
+          "file": ".history/architecture/c.mcp-server-cluster-architecture/20260708-170109.svg",
+          "savedAt": "2026-07-08T17:01:09+00:00"
+        },
         {
           "id": "20260708-120815",
           "file": ".history/architecture/c.mcp-server-cluster-architecture/20260708-120815.svg",
