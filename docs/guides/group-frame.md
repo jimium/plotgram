@@ -105,7 +105,7 @@ config {
         gap: 50
         border: shared
     }
-    edge_routing: orthogonal { bundling: 1.0 }
+    edge_routing: orthogonal
 }
 ```
 

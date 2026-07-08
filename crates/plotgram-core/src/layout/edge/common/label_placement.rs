@@ -245,8 +245,9 @@ fn separation_vector(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layout::edge::common::label_avoidance::{aabb_overlap, label_bbox};
+    use crate::layout::edge::common::label_avoidance::{label_bbox, label_bbox_overlaps_group_shell};
     use crate::layout::geometry::Point;
+    use crate::layout::group::constants::GROUP_BORDER_SHELL_PAD;
     use crate::layout::{EdgeLabelLayout, EdgeLayout, GroupLayout, NodeLayout, PathGeometry, Port};
 
     fn labeled_edge(label_center: Point) -> EdgeLayout {
@@ -369,12 +370,16 @@ mod tests {
         AxisAlignedPlacer::default().place(&mut edges, &ctx);
 
         let bbox = label_bbox(&edges[0], "");
-        let group_bbox = (12.0, 174.0, 380.0, 430.0);
+        let gl = GroupLayout {
+            x: 12.0,
+            y: 174.0,
+            width: 368.0,
+            height: 256.0,
+            ..Default::default()
+        };
         assert!(
-            aabb_overlap(&bbox, &group_bbox).is_none(),
-            "axis-aligned placer should avoid group border: bbox={:?} group={:?}",
-            bbox,
-            group_bbox
+            !label_bbox_overlaps_group_shell(&bbox, &gl, GROUP_BORDER_SHELL_PAD),
+            "axis-aligned placer should avoid group border shell: bbox={bbox:?}",
         );
     }
 }

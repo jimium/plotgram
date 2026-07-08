@@ -1,10 +1,8 @@
 //! 标准图 SVG 绘制（消费 ExportScene）。
 
 use crate::kinds::standard::StandardStyleConfig;
-use crate::layout::edge::edge_bundling::EdgePathRoles;
 use crate::render::paint::edge::{paint_arrowed_edge, paint_plain_edge, uses_arrows};
 use crate::render::paint::node::paint_labeled_node;
-use crate::render::paint::svg_utils::BundleRenderInfo;
 use crate::render::{ExportEdge, ExportNode, ExportScene};
 
 pub fn paint_export_node(
@@ -33,7 +31,6 @@ pub fn paint_export_edge(
     if edge.layout.path_len() < 2 {
         return;
     }
-    let bundle = extract_bundle_info(scene, edge.index);
     if uses_arrows(&config.edge_config.arrow_style) {
         paint_arrowed_edge(
             &config.diagram_type,
@@ -42,34 +39,11 @@ pub fn paint_export_edge(
             &edge.style,
             false, // 标签由 paint_export_edge_label 单独渲染（三图层）
             &scene.context,
-            bundle.as_ref(),
             svg,
         );
     } else {
-        paint_plain_edge(&edge.layout, &edge.style, &scene.context, bundle.as_ref(), svg);
+        paint_plain_edge(&edge.layout, &edge.style, &scene.context, svg);
     }
-}
-
-/// P6 §6: 从 `scene.layout.hints.edge_bundling` 提取当前边的 bundle 渲染信息。
-///
-/// 返回 `Some` 当且仅当：
-/// 1. bundling 已启用且 hints 已填充
-/// 2. 该边属于某个 bundle（`edge_to_bundle[edge_index]` 为 `Some`）
-/// 3. 该边有非空的路径区段分解（`edge_roles[edge_index].spans` 非空）
-fn extract_bundle_info<'a>(scene: &'a ExportScene<'a>, edge_index: usize) -> Option<BundleRenderInfo<'a>> {
-    let hints = scene.layout.hints.edge_bundling.as_ref()?;
-    let result = &hints.result;
-    let bundle_id = result.edge_to_bundle.get(edge_index).copied().flatten()?;
-    let bundle = result.bundles.iter().find(|b| b.id == bundle_id)?;
-    let roles: &EdgePathRoles = result.edge_roles.get(edge_index)?;
-    if roles.spans.is_empty() {
-        return None;
-    }
-    Some(BundleRenderInfo {
-        bundle_size: bundle.edges.len(),
-        roles,
-        arrow_suppressed: result.arrow_suppressed.contains(&edge_index),
-    })
 }
 
 /// 渲染边标签（三图层顶层）。

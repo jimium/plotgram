@@ -324,7 +324,7 @@ diagram flowchart {
     config {
         direction: left-to-right
         layout: sugiyama-v2 { friendliness: adjust }
-        edge_routing: orthogonal { bundling: 1.0 }
+        edge_routing: orthogonal
         theme: common.clean-light
         render_style: excalidraw
         group_frame: stack {
@@ -344,7 +344,7 @@ diagram flowchart {
 | --- | --- | --- | --- |
 | `direction` | atom | 由图表类型 profile 决定 | `top-to-bottom` / `left-to-right` / `radial`；仅 flowchart/er/sugiyama 支持 tb+lr，mindmap 支持 radial+tb+lr；其他布局不支持 direction |
 | `layout` | atom/config | 由图表类型决定 | 布局算法，可带配置块；支持 `friendliness: off/diagnose/adjust`（默认 `adjust`） |
-| `edge_routing` | atom/config | 由图表类型决定 | 边路由算法，可带配置块；`orthogonal` 支持 `bundling` 启用边捆绑 |
+| `edge_routing` | atom/config | 由图表类型决定 | 边路由算法，可带配置块 |
 | `theme` | atom | 由 profile 决定 | 主题 ID，如 `common.clean-light`、`common.blueprint`、`mindmap.vivid-branches` |
 | `render_style` | atom | `standard` | `standard` / `excalidraw` / `cross-hatch` / `blueprint` / `spatial-clarity` / `neon-glow` / `stipple` |
 | `group_frame` | atom/config | 由算法默认决定 | **[推荐]** Group Frame 统一配置块，统一控制组间排列/尺寸/对齐/间距/量化 |
@@ -382,23 +382,14 @@ diagram flowchart {
 
 | 值 | 说明 | 常用 option |
 | --- | --- | --- |
-| `orthogonal` | 正交折线路由（flowchart/architecture 默认） | `slot_pitch`, `channel_margin`, `bundling` |
+| `orthogonal` | 正交折线路由（flowchart/architecture 默认） | `slot_pitch`, `channel_margin` |
 | `straight` | 直线连接（ER 图默认） | — |
 | `bezier` | 贝塞尔曲线路由 | `tension` |
 | `spline` | 障碍避让多段样条 | — |
 | `circular` | 弧形边路由（state 图默认） | — |
 | `organic` | **有机自然曲线**（mindmap 默认） | — |
 
-**边捆绑（Edge Bundling）：**
-正交路由支持 `bundling` 选项（0.0~1.0，默认 0.0 关闭），启用后相似路径的边会共享主干段，减少视觉"意大利面"效应：
-
-```plotgram
-config {
-    edge_routing: orthogonal {
-        bundling: 1.0    // 完全启用边捆绑
-    }
-}
-```
+**边捆绑（Edge Bundling）已移除。** 平行边分离改由 orthogonal 路由内的 lane assignment 与 flowchart profile 的 trunk+fork 候选处理。
 
 > **时序图**（`diagram sequence`）不支持 `edge_routing`；消息路径由布局阶段生成。
 
@@ -678,7 +669,7 @@ diagram architecture {
             cross: start
             border: shared
         }
-        edge_routing: orthogonal { bundling: 1.0 }
+        edge_routing: orthogonal
     }
 
     group gateway "网关层" {
@@ -834,9 +825,9 @@ diagram flowchart {
 }
 ```
 
-### 8.8 带边捆绑的密集流程图
+### 8.8 密集流程图（平行边 lane 分离）
 
-当图中边很多容易交叉时，启用 `bundling` 让相似边共享主干：
+边较多的流程图可增大 `slot_pitch` 改善端口间距；同源 fan-out 由 orthogonal 路由自动处理：
 
 ```plotgram
 diagram flowchart {
@@ -844,7 +835,6 @@ diagram flowchart {
     config {
         direction: left-to-right
         edge_routing: orthogonal {
-            bundling: 1.0
             slot_pitch: 30
         }
     }
@@ -1079,4 +1069,4 @@ config {
 - [ ] `node_style` 的 selector 是当前图表类型支持的 entity type
 - [ ] 主题 ID 使用 `common.` 前缀（如 `common.clean-light`）
 - [ ] 组间排列优先使用 `group_frame` 配置块（而非旧的 `group_sizing`/`group_arrangement` 等）
-- [ ] 边密集的图考虑启用 `edge_routing: orthogonal { bundling: 1.0 }` 减少交叉
+- [ ] 边密集的图可增大 `slot_pitch` 或依赖 orthogonal 的 lane 分离

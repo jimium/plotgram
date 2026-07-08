@@ -2,7 +2,6 @@
 
 use crate::ast::*;
 use crate::types::DiagramType;
-use crate::layout::edge::edge_bundling::{EdgePathRoles, SegmentRole};
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLabelLayout, EdgeLayout, PathGeometry};
 use crate::render::CompiledRenderContext;
@@ -320,92 +319,6 @@ pub fn render_edge_path(
                 .unwrap();
             }
         }
-    }
-}
-
-/// P6 §6: Bundle 渲染信息——由 `paint_export_edge` 从 `scene.layout.hints.edge_bundling`
-/// 提取，传入渲染层用于透明度叠加和线宽累加。
-pub struct BundleRenderInfo<'a> {
-    /// bundle 内边数（用于线宽累加 √n）
-    pub bundle_size: usize,
-    /// 路径区段分解（含 FromStub/MergeLeg/Trunk/ForkLeg/ToStub 角色）
-    pub roles: &'a EdgePathRoles,
-    /// 该边箭头是否应抑制（同 bundle 内多条边指向同一节点时）
-    pub arrow_suppressed: bool,
-}
-
-/// P6 §6: bundled 边的低 stroke-opacity（透明度叠加）。
-///
-/// 多条边的主干段几何重合，低 alpha 叠加后高密度束颜色更深。
-const BUNDLE_STROKE_ALPHA: f64 = 0.35;
-
-/// P6 §6: 渲染 bundled 边——按区段角色分拆为多个 `<path>`：
-/// - **Trunk 段**：`stroke-width = base × √(n_edges)`（线宽累加），`stroke-opacity = 0.35`
-/// - **非 Trunk 段**（stub/leg）：`stroke-width = base`，`stroke-opacity = 0.35`
-/// - `marker-end` 仅最后一段，`marker-start` 仅第一段
-///
-/// 非 Polyline 几何或空 spans 时回退到 `render_edge_path`。
-pub fn render_bundled_edge_path(
-    el: &EdgeLayout,
-    context: &CompiledRenderContext,
-    style: &EdgeStyle,
-    stroke: &str,
-    dash_pattern: Option<&str>,
-    marker_end: &str,
-    marker_start: &str,
-    bundle: &BundleRenderInfo<'_>,
-    svg: &mut String,
-) {
-    let points = match &el.geometry {
-        PathGeometry::Polyline { points } => points.as_slice(),
-        _ => {
-            render_edge_path(el, context, style, stroke, dash_pattern, marker_end, marker_start, svg);
-            return;
-        }
-    };
-
-    let spans = &bundle.roles.spans;
-    if spans.is_empty() {
-        render_edge_path(el, context, style, stroke, dash_pattern, marker_end, marker_start, svg);
-        return;
-    }
-
-    let paint_attrs = super::style_mapping::edge_paint_attrs_no_stroke_opacity(style, dash_pattern);
-    let base_width = style.stroke_width;
-    let trunk_width = base_width * (bundle.bundle_size as f64).sqrt();
-    let base_alpha = style.stroke_opacity.unwrap_or(1.0);
-    let alpha = base_alpha * BUNDLE_STROKE_ALPHA;
-    let n = spans.len();
-
-    for (i, span) in spans.iter().enumerate() {
-        let start_idx = span.point_start;
-        let end_idx = span.point_end; // 不含
-        if start_idx >= end_idx || end_idx > points.len() {
-            continue;
-        }
-        let seg_points = &points[start_idx..end_idx];
-        if seg_points.len() < 2 {
-            continue;
-        }
-
-        let d = rounded_polyline_path(seg_points, CORNER_RADIUS);
-        let width = if span.role == SegmentRole::Trunk {
-            trunk_width
-        } else {
-            base_width
-        };
-        let m_end = if i == n - 1 && !bundle.arrow_suppressed {
-            marker_end
-        } else {
-            ""
-        };
-        let m_start = if i == 0 { marker_start } else { "" };
-
-        writeln!(
-            svg,
-            r##"<path d="{d}" fill="none" stroke="{stroke}" stroke-width="{width}" stroke-opacity="{alpha:.2}" {paint_attrs} marker-end="{m_end}" marker-start="{m_start}"/>"##,
-        )
-        .unwrap();
     }
 }
 

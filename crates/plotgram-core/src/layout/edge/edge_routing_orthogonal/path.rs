@@ -351,6 +351,28 @@ pub fn select_best_path_with_scorer_stats(
         &mut state,
     );
 
+    // P1-1 trunk+fork：flowchart profile 额外评估 fork 候选（单侧 stub_len=0）
+    if ctx.profile.prefer_trunk_fork {
+        evaluate_path_batch(
+            build_candidate_paths(sx, sy, from_side, ex, ey, to_side, 0.0, PORT_CLEARANCE),
+            ctx,
+            pair,
+            scorer,
+            from_id,
+            to_id,
+            &mut state,
+        );
+        evaluate_path_batch(
+            build_candidate_paths(sx, sy, from_side, ex, ey, to_side, PORT_CLEARANCE, 0.0),
+            ctx,
+            pair,
+            scorer,
+            from_id,
+            to_id,
+            &mut state,
+        );
+    }
+
     // Level 1 + P1-B: channel detour——先 base margin，无 strict 再加档
     if state.best_strict.is_none() {
         let base_margin = ctx.cfg.channel_margin;

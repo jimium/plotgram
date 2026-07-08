@@ -9,7 +9,7 @@ use crate::layout::group::GroupRoutingContext;
 use crate::layout::NodeLayout;
 use std::collections::HashMap;
 
-use super::{ChannelLoadMap, OrthoConfig, RoutedSegment};
+use super::{ChannelLoadMap, OrthoConfig, OrthoRoutingProfile, RoutedSegment};
 use super::slot::Endpoint;
 
 /// Shared, read-only routing context for a single `route_edges_orthogonal` call.
@@ -23,6 +23,7 @@ pub struct RoutingContext<'a> {
     pub group_ctx: &'a GroupRoutingContext,
     pub grid: &'a SegmentGrid,
     pub cfg: &'a OrthoConfig,
+    pub profile: &'a OrthoRoutingProfile,
     pub obstacles: &'a PreparedObstacles,
     /// Phase 3: 通道负载图（reroute 时传入 Some，初始路由为 None）
     pub channel_load: Option<&'a ChannelLoadMap>,
@@ -39,6 +40,7 @@ impl<'a> RoutingContext<'a> {
         group_ctx: &'a GroupRoutingContext,
         grid: &'a SegmentGrid,
         cfg: &'a OrthoConfig,
+        profile: &'a OrthoRoutingProfile,
         obstacles: &'a PreparedObstacles,
         channel_load: Option<&'a ChannelLoadMap>,
     ) -> Self {
@@ -47,6 +49,7 @@ impl<'a> RoutingContext<'a> {
             group_ctx,
             grid,
             cfg,
+            profile,
             obstacles,
             channel_load,
             // G1: 默认 false，由调用方按边 corridor 可达性覆盖

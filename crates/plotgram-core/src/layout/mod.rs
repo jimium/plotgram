@@ -547,12 +547,6 @@ pub struct LayoutHints {
     pub orthogonal_debug: Option<OrthoDebugStats>,
     /// 分组路由提示：组间走廊 + 边框壳层厚度（architecture 等含 group 的图）。
     pub group_routing: Option<group::GroupRoutingHints>,
-    /// Edge Bundling 结果与调试统计（§7.2）。
-    ///
-    /// 由 `EdgeBundler::apply` 在执行后填充；未启用 bundling 时为 `None`。
-    /// 包含 bundle 分组、路径区段分解（edge_roles）、主干禁放区（trunk_keepouts），
-    /// 供后置 label 流水线与渲染层查询。
-    pub edge_bundling: Option<edge::edge_bundling::EdgeBundlingHints>,
 }
 
 /// refine 调试统计（P2-1 可观测性）
@@ -1956,32 +1950,16 @@ mod tests {
         );
     }
 
-    // ── Edge Bundling 端到端集成测试（§7.3 / §9 P4e）──
+    // ── 平行边布局集成测试 ──
 
-    /// 构造一个含多条平行边的 flowchart，用于 bundling 端到端测试。
-    ///
-    /// 拓扑：a 与 b 之间有 4 条同向 Active 边（无 label）。
-    /// orthogonal 路由会用 lane 机制将它们并排排列（间距 ~16px），
-    /// 4 条边共享 trunk 的 Ink 节省率 > 10%（min_ink_saving 阈值）。
-    fn make_bundling_test_diagram() -> Diagram {
+    /// 构造含多条平行边的 flowchart。
+    fn make_parallel_edges_test_diagram() -> Diagram {
         use crate::ast::{AttributeMap, Entity, Identifier, Relation, ArrowType};
 
         let span = Span::new(Position::new(1, 1), Position::new(1, 1));
         let mut diagram = sample_diagram(DiagramType::Flowchart);
         diagram.attributes.push(atom_attr("direction", "left-to-right"));
-        // edge_routing: orthogonal { bundling: 1.0 }
-        diagram.attributes.push(DiagramAttribute {
-            key: "edge_routing".into(),
-            value: AttributeValue::Config {
-                algo: "orthogonal".into(),
-                options: {
-                    let mut m = std::collections::HashMap::new();
-                    m.insert("bundling".to_string(), AttributeValue::Number(1.0));
-                    m
-                },
-            },
-            span,
-        });
+        diagram.attributes.push(atom_attr("edge_routing", "orthogonal"));
 
         for id in ["a", "b"] {
             diagram.entities.push(Entity {
@@ -2009,180 +1987,66 @@ mod tests {
     }
 
     #[test]
-    fn bundling_config_resolves_from_dsl() {
-        let diagram = make_bundling_test_diagram();
-        let profile = profile_for(&diagram.diagram_type);
-        let plan = LayoutPlan::resolve(&diagram, profile);
+    fn unknown_bundling_option_emits_warning() {
+        use crate::ast::{AttributeMap, AttributeValue, DiagramAttribute};
+        use crate::layout::algorithm_config::validate_algorithm_config_warnings;
 
-        assert_eq!(plan.edge_routing, "orthogonal");
-        assert!(
-            plan.edge_bundling.enabled,
-            "bundling should be enabled when edge_routing option bundling=1.0"
-        );
-    }
-
-    #[test]
-    fn bundling_disabled_by_default() {
-        use crate::ast::{AttributeMap, Entity, Identifier, Relation, ArrowType};
-
+        let mut diagram = make_parallel_edges_test_diagram();
+        diagram.attributes.retain(|a| a.key != "edge_routing");
         let span = Span::new(Position::new(1, 1), Position::new(1, 1));
-        let mut diagram = sample_diagram(DiagramType::Flowchart);
-        for id in ["a", "b"] {
-            diagram.entities.push(Entity {
-                id: Identifier::new_unchecked(id),
-                label: id.to_string(),
-                attributes: AttributeMap::default(),
-                group_id: None,
-                span,
-            });
-        }
-        diagram.relations.push(Relation {
-            from: Identifier::new_unchecked("a"),
-            to: Identifier::new_unchecked("b"),
-            arrow: ArrowType::Active,
-            label: None,
-            head_label: None,
-            tail_label: None,
-            attributes: AttributeMap::default(),
+        diagram.attributes.push(DiagramAttribute {
+            key: "edge_routing".into(),
+            value: AttributeValue::Config {
+                algo: "orthogonal".into(),
+                options: std::collections::HashMap::from([(
+                    "bundling".to_string(),
+                    AttributeValue::Number(1.0),
+                )]),
+            },
             span,
         });
 
-        let profile = profile_for(&diagram.diagram_type);
-        let plan = LayoutPlan::resolve(&diagram, profile);
-        assert!(!plan.edge_bundling.enabled, "bundling should be off by default");
-
-        let result = compute_layout_with_plan(&diagram, &plan).expect("layout should succeed");
+        let mut validation = crate::error::ValidationResult::new();
+        validate_algorithm_config_warnings(&diagram, &mut validation);
         assert!(
-            result.hints.edge_bundling.is_none(),
-            "edge_bundling hints should be absent when bundling is disabled"
+            validation
+                .warnings
+                .iter()
+                .any(|w| w.message.contains("未知选项 'bundling'")),
+            "removed bundling option should be reported as unknown"
         );
     }
 
     #[test]
-    fn bundling_pipeline_runs_and_preserves_edge_endpoints() {
-        let diagram = make_bundling_test_diagram();
+    fn parallel_edges_layout_succeeds() {
+        let diagram = make_parallel_edges_test_diagram();
+        let profile = profile_for(&diagram.diagram_type);
+        let plan = LayoutPlan::resolve(&diagram, profile);
+
+        let result = compute_layout_with_plan(&diagram, &plan).expect("layout should succeed");
+        assert_eq!(result.edges.len(), 4);
+    }
+
+    #[test]
+    fn parallel_edges_layout_without_bundling() {
+        let diagram = make_parallel_edges_test_diagram();
         let profile = profile_for(&diagram.diagram_type);
         let plan = LayoutPlan::resolve(&diagram, profile);
 
         let result = compute_layout_with_plan(&diagram, &plan).expect("layout should succeed");
 
-        // §7.3: bundling 启用后 hints.edge_bundling 必须被填充
-        let bundling_hints = result
-            .hints
-            .edge_bundling
-            .as_ref()
-            .expect("edge_bundling hints should be populated when bundling is enabled");
-
-        // 每条边都有对应的 edge_to_bundle 条目
-        assert_eq!(
-            bundling_hints.result.edge_to_bundle.len(),
-            result.edges.len(),
-            "edge_to_bundle length must match edge count"
-        );
-        assert_eq!(
-            bundling_hints.result.edge_roles.len(),
-            result.edges.len(),
-            "edge_roles length must match edge count"
-        );
-
-        // 所有边的路径仍然有效：≥ 2 个点，首尾点与节点边界对齐
         for (i, edge) in result.edges.iter().enumerate() {
             let path: Vec<Point> = edge.path_points().into_owned();
             assert!(
                 path.len() >= 2,
-                "edge {} path must have at least 2 points after bundling, got {}",
+                "edge {} path must have at least 2 points, got {}",
                 i,
                 path.len()
             );
-            // 首尾点不应为 NaN
             for p in &path {
                 assert!(p.x.is_finite(), "edge {} has NaN/inf x in path", i);
                 assert!(p.y.is_finite(), "edge {} has NaN/inf y in path", i);
             }
-        }
-    }
-
-    #[test]
-    fn bundling_produces_at_least_one_bundle() {
-        let diagram = make_bundling_test_diagram();
-        let profile = profile_for(&diagram.diagram_type);
-        let plan = LayoutPlan::resolve(&diagram, profile);
-
-        let result = compute_layout_with_plan(&diagram, &plan).expect("layout should succeed");
-        let bundling_hints = result
-            .hints
-            .edge_bundling
-            .as_ref()
-            .expect("edge_bundling hints should be populated");
-
-        // 四条同向平行边 → 至少应形成一个 bundle
-        let bundle_count = bundling_hints.result.bundles.len();
-        let bundled_edge_count = bundling_hints
-            .result
-            .edge_to_bundle
-            .iter()
-            .filter(|b| b.is_some())
-            .count();
-
-        assert!(
-            bundle_count >= 1,
-            "expected at least 1 bundle for 4 parallel edges, got {}",
-            bundle_count
-        );
-        assert!(
-            bundled_edge_count >= 2,
-            "expected at least 2 bundled edges, got {}",
-            bundled_edge_count
-        );
-
-        // 捆绑后的边路径应包含共享主干
-        for bundle in &bundling_hints.result.bundles {
-            assert!(
-                bundle.edges.len() >= 2,
-                "bundle {} should contain at least 2 edges, got {}",
-                bundle.id,
-                bundle.edges.len()
-            );
-            assert!(
-                bundle.entry_points.len() == bundle.edges.len(),
-                "bundle {} entry_points count mismatch",
-                bundle.id
-            );
-            assert!(
-                bundle.exit_points.len() == bundle.edges.len(),
-                "bundle {} exit_points count mismatch",
-                bundle.id
-            );
-        }
-    }
-
-    #[test]
-    fn bundling_ink_saved_is_non_negative() {
-        let diagram = make_bundling_test_diagram();
-        let profile = profile_for(&diagram.diagram_type);
-        let plan = LayoutPlan::resolve(&diagram, profile);
-
-        let result = compute_layout_with_plan(&diagram, &plan).expect("layout should succeed");
-        let bundling_hints = result
-            .hints
-            .edge_bundling
-            .as_ref()
-            .expect("edge_bundling hints should be populated");
-
-        // Ink 节省量必须非负（bundling 只会减少或保持 ink，不会增加）
-        assert!(
-            bundling_hints.result.total_ink_saved >= 0.0,
-            "total_ink_saved should be non-negative, got {}",
-            bundling_hints.result.total_ink_saved
-        );
-
-        // 如果有 bundle，ink 节省应 > 0（min_ink_saving 默认 0.1，低于此值的 bundle 会被回退）
-        if !bundling_hints.result.bundles.is_empty() {
-            assert!(
-                bundling_hints.result.total_ink_saved > 0.0,
-                "total_ink_saved should be positive when bundles exist, got {}",
-                bundling_hints.result.total_ink_saved
-            );
         }
     }
 }

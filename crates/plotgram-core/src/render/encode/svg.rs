@@ -362,13 +362,11 @@ mod tests {
         );
     }
 
-    // ─── P6: Edge Bundling 渲染增强 ──────────────────────────────
+    // ─── 平行边渲染 ───────────────────────────────────────────────
 
-    /// 创建 4 条平行边 a→b 并启用 orthogonal bundling 的测试图。
-    fn create_bundled_diagram() -> PreparedDiagram {
+    /// 创建 4 条平行边 a→b。
+    fn create_parallel_edges_diagram() -> PreparedDiagram {
         let span = Span::dummy();
-        let mut options = std::collections::HashMap::new();
-        options.insert("bundling".to_string(), AttributeValue::Number(1.0));
         PreparedDiagram::new(Diagram {
             diagram_type: DiagramType::Flowchart,
             attributes: vec![
@@ -379,10 +377,7 @@ mod tests {
                 },
                 DiagramAttribute {
                     key: "edge_routing".to_string(),
-                    value: AttributeValue::Config {
-                        algo: "orthogonal".to_string(),
-                        options,
-                    },
+                    value: AttributeValue::String(TextValue::quoted("orthogonal".to_string())),
                     span,
                 },
             ],
@@ -423,35 +418,20 @@ mod tests {
     }
 
     #[test]
-    fn svg_bundling_produces_stroke_opacity_for_bundled_edges() {
-        let diagram = create_bundled_diagram();
+    fn svg_parallel_edges_render_paths() {
+        let diagram = create_parallel_edges_diagram();
         let request = RenderRequest::new(&diagram, RenderFormat::Svg);
-        let svg = encode(&request).expect("encode bundled diagram");
+        let svg = encode(&request).expect("encode parallel-edge diagram");
 
-        // P6: bundled 边应输出 stroke-opacity 实现透明度叠加
+        assert!(svg.contains("<path"), "parallel edges should render path elements");
         assert!(
-            svg.contains("stroke-opacity=\"0.35\""),
-            "bundled edges should have stroke-opacity=\"0.35\" for alpha overlay"
+            !svg.contains("stroke-opacity=\"0.35\""),
+            "edges should not use legacy bundle stroke-opacity"
         );
     }
 
     #[test]
-    fn svg_bundling_trunk_segment_has_wider_stroke() {
-        let diagram = create_bundled_diagram();
-        let request = RenderRequest::new(&diagram, RenderFormat::Svg);
-        let svg = encode(&request).expect("encode bundled diagram");
-
-        // P6: trunk 段 stroke-width = base × √4 = base × 2.0
-        // 默认 base stroke_width = 1.5 → trunk width = 3.0
-        assert!(
-            svg.contains("stroke-width=\"3"),
-            "trunk segment should have wider stroke-width (base × √n = 1.5 × 2.0 = 3.0)"
-        );
-    }
-
-    #[test]
-    fn svg_no_bundling_has_no_stroke_opacity() {
-        // 未启用 bundling 时，边不应有 stroke-opacity
+    fn svg_simple_edges_have_no_bundle_stroke_opacity() {
         let diagram = create_simple_diagram();
         let request = RenderRequest::new(&diagram, RenderFormat::Svg);
         let svg = encode(&request).expect("encode simple diagram");

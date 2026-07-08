@@ -1,8 +1,6 @@
 //! 语义边合并策略：统一「两条边是否允许共享 trunk / corridor lane」的判定。
 //!
-//! 供 post-route bundling（`edge_bundling`）与架构图路由门控共用。
-//! architecture 图：仅当两条边属于同一 `MergeGroup` 时才允许路径级合并；
-//! flowchart 等图：几何 bundling 优先，不做语义拦截。
+//! architecture 图启用语义门控；flowchart 等图几何优先，不做语义拦截。
 
 use crate::layout::edge::common::edge_geometry::canonical_pair;
 use crate::types::DiagramType;

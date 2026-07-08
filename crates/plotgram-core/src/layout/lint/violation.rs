@@ -30,17 +30,6 @@ pub enum LintRuleId {
     EdgeOnGroupBorder,
     /// 边穿过某分组内部，但端点均不属于该分组
     EdgeCrossesGroupInterior,
-    // ── Edge Bundling 专项规则（仅 Warning，供算法优化参考）──
-    /// 同 bundle 内多条边指向同一节点（箭头冗余）
-    BundledArrowConvergence,
-    /// 同 bundle 内存在语义反向的边（出入方向不一致）
-    BundledOppositeFlow,
-    /// bundle 的 merge leg 分叉点过密
-    BundleMergeDensity,
-    /// bundle 的 fork leg 交叉
-    BundleForkOverlap,
-    /// bundle 主干穿过节点
-    BundleTrunkThroughNode,
     /// 不同源/宿边共享非语义 trunk 段（架构图假并线）
     UnrelatedEdgeTrunkMerge,
     /// 标签与节点 AABB 重叠
@@ -50,7 +39,7 @@ pub enum LintRuleId {
 }
 
 impl LintRuleId {
-    pub const COUNT: usize = 16;
+    pub const COUNT: usize = 11;
 
     pub const ALL: [LintRuleId; Self::COUNT] = [
         LintRuleId::NodeOverlap,
@@ -61,11 +50,6 @@ impl LintRuleId {
         LintRuleId::EdgeCrossing,
         LintRuleId::EdgeOnGroupBorder,
         LintRuleId::EdgeCrossesGroupInterior,
-        LintRuleId::BundledArrowConvergence,
-        LintRuleId::BundledOppositeFlow,
-        LintRuleId::BundleMergeDensity,
-        LintRuleId::BundleForkOverlap,
-        LintRuleId::BundleTrunkThroughNode,
         LintRuleId::UnrelatedEdgeTrunkMerge,
         LintRuleId::LabelNodeOverlap,
         LintRuleId::LabelLabelOverlap,
@@ -81,14 +65,9 @@ impl LintRuleId {
             LintRuleId::EdgeCrossing => 5,
             LintRuleId::EdgeOnGroupBorder => 6,
             LintRuleId::EdgeCrossesGroupInterior => 7,
-            LintRuleId::BundledArrowConvergence => 8,
-            LintRuleId::BundledOppositeFlow => 9,
-            LintRuleId::BundleMergeDensity => 10,
-            LintRuleId::BundleForkOverlap => 11,
-            LintRuleId::BundleTrunkThroughNode => 12,
-            LintRuleId::UnrelatedEdgeTrunkMerge => 13,
-            LintRuleId::LabelNodeOverlap => 14,
-            LintRuleId::LabelLabelOverlap => 15,
+            LintRuleId::UnrelatedEdgeTrunkMerge => 8,
+            LintRuleId::LabelNodeOverlap => 9,
+            LintRuleId::LabelLabelOverlap => 10,
         }
     }
 
@@ -96,11 +75,6 @@ impl LintRuleId {
         match self {
             LintRuleId::EdgeCrossing
             | LintRuleId::EdgeOnGroupBorder
-            | LintRuleId::BundledArrowConvergence
-            | LintRuleId::BundledOppositeFlow
-            | LintRuleId::BundleMergeDensity
-            |             LintRuleId::BundleForkOverlap
-            | LintRuleId::BundleTrunkThroughNode
             | LintRuleId::UnrelatedEdgeTrunkMerge
             | LintRuleId::LabelLabelOverlap => LintSeverity::Warning,
             LintRuleId::LabelNodeOverlap => LintSeverity::Error,
@@ -118,11 +92,6 @@ impl LintRuleId {
             LintRuleId::EdgeCrossing => "edge_crossing",
             LintRuleId::EdgeOnGroupBorder => "edge_on_group_border",
             LintRuleId::EdgeCrossesGroupInterior => "edge_crosses_group_interior",
-            LintRuleId::BundledArrowConvergence => "bundled_arrow_convergence",
-            LintRuleId::BundledOppositeFlow => "bundled_opposite_flow",
-            LintRuleId::BundleMergeDensity => "bundle_merge_density",
-            LintRuleId::BundleForkOverlap => "bundle_fork_overlap",
-            LintRuleId::BundleTrunkThroughNode => "bundle_trunk_through_node",
             LintRuleId::UnrelatedEdgeTrunkMerge => "unrelated_edge_trunk_merge",
             LintRuleId::LabelNodeOverlap => "label_node_overlap",
             LintRuleId::LabelLabelOverlap => "label_label_overlap",

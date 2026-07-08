@@ -4,7 +4,6 @@ use crate::ast::Diagram;
 use crate::error::DiagnosticError;
 use crate::layout::constants;
 use crate::layout::edge_postprocess;
-use crate::layout::geometry::Point;
 use crate::layout::grid_snap;
 use crate::layout::group_frame::GroupFramePass;
 use crate::layout::intent::{self, IntentStatus, LayoutIntentOverlay, RefinementReport};
@@ -216,8 +215,6 @@ impl<'a> LayoutPipeline<'a> {
         }
         // P5: 按节点密度自适应网格步长（小图精细、大图粗放，减少密集区视觉碎片）
         edge_snap_config.grid_step = grid_snap::adaptive_grid_step(result_v2.nodes.len());
-        let is_orthogonal = router.name() == "orthogonal";
-
         let gf_pass = GroupFramePass::resolve(self.diagram, self.plan, algo);
         if !self.diagram.groups.is_empty() {
             gf_pass.refresh_before_route(self.diagram, &mut result_v2, pinned, algo);
@@ -248,11 +245,7 @@ impl<'a> LayoutPipeline<'a> {
 
         result = self.run_post_route_group_frame(algo, result, pinned, &gf_pass, &*router, &edge_snap_config)?;
 
-        if is_orthogonal && self.plan.edge_bundling.enabled {
-            result = self.apply_edge_bundling(result)?;
-        }
-
-        // P1: 像素量化在管道最末尾执行（bundling 之后），仅运行一次
+        // P1: 像素量化在管道最末尾执行，仅运行一次
         edge_postprocess::snap_and_repulse_edges(
             &mut result.edges,
             &result.groups,
@@ -339,83 +332,6 @@ impl<'a> LayoutPipeline<'a> {
         }
 
         grid_snap::update_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
-        Ok(result)
-    }
-
-    fn apply_edge_bundling(&self, mut result: LayoutResult) -> Result<LayoutResult, DiagnosticError> {
-        let ranks = result.hints.sugiyama_ranks.as_ref();
-        let features: Vec<crate::layout::edge::edge_bundling::EdgeFeatures> =
-            (0..result.edges.len())
-                .map(|i| {
-                    let rel = &self.diagram.relations[i];
-                    let pts = result.edges[i].path_points();
-                    crate::layout::edge::edge_bundling::EdgeFeatures::extract(
-                        i,
-                        rel,
-                        &result.nodes,
-                        ranks,
-                        &pts,
-                    )
-                    .unwrap_or_else(|| crate::layout::edge::edge_bundling::EdgeFeatures {
-                        edge_index: i,
-                        from_id: format!("_skip_{}", i),
-                        to_id: format!("_skip_{}", i),
-                        from_center: Point::new(0.0, 0.0),
-                        to_center: Point::new(0.0, 0.0),
-                        from_rank: None,
-                        to_rank: None,
-                        arrow_tag: "active",
-                        line_style: String::new(),
-                        stroke_color: String::new(),
-                        stroke_width: String::new(),
-                        path_length: 0.0,
-                        path_points: Vec::new(),
-                        direction: (1.0, 0.0),
-                        has_label: false,
-                        label_text: None,
-                    })
-                })
-                .collect();
-
-        let (bundling_result, bundling_debug) = crate::layout::edge::edge_bundling::apply_bundling(
-            &mut result.edges,
-            &features,
-            &result.nodes,
-            &self.plan.edge_bundling,
-        );
-
-        result.hints.edge_bundling = Some(crate::layout::edge::edge_bundling::EdgeBundlingHints {
-            result: bundling_result,
-            debug: bundling_debug,
-        });
-
-        crate::layout::edge::edge_bundling::label_placement::relayout_edge_labels_after_bundling(
-            self.diagram,
-            &mut result.edges,
-            &result.hints.edge_bundling.as_ref().unwrap().result,
-            &self.plan.edge_bundling,
-            &result.nodes,
-            &result.groups,
-        );
-
-        if matches!(
-            self.diagram.diagram_type,
-            crate::types::DiagramType::Architecture
-        ) && self.plan.edge_bundling.enabled
-        {
-            let sorted_node_ids: Vec<String> = {
-                let mut ids: Vec<String> = result.nodes.keys().cloned().collect();
-                ids.sort();
-                ids
-            };
-            crate::layout::edge::edge_routing_orthogonal::separate_unrelated_architecture_trunks_after_bundling(
-                &self.diagram.relations,
-                &mut result.edges,
-                &result.nodes,
-                &sorted_node_ids,
-            );
-        }
-
         Ok(result)
     }
 }

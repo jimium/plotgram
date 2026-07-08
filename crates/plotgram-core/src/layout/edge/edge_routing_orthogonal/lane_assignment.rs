@@ -500,9 +500,9 @@ pub fn separate_unrelated_trunk_overlaps(
     nodes: &HashMap<String, NodeLayout>,
     sorted_node_ids: &[String],
     min_gap: f64,
+    profile: &super::OrthoRoutingProfile,
 ) -> usize {
     use crate::layout::edge::edge_merge_policy::{edge_merge_context, edges_may_share_trunk};
-    use crate::types::DiagramType;
 
     let n = edges.len();
     if n < 2 {
@@ -518,7 +518,7 @@ pub fn separate_unrelated_trunk_overlaps(
             let Some(rel_j) = relations.get(j) else { continue };
             let ctx_i = edge_merge_context(rel_i.from.as_str(), rel_i.to.as_str(), i);
             let ctx_j = edge_merge_context(rel_j.from.as_str(), rel_j.to.as_str(), j);
-            if edges_may_share_trunk(&ctx_i, &ctx_j, DiagramType::Architecture) {
+            if edges_may_share_trunk(&ctx_i, &ctx_j, profile.merge_policy_diagram_type()) {
                 continue;
             }
             if edges[i].path_is_empty() || edges[j].path_is_empty() {

@@ -30,6 +30,7 @@ const APPLICABLE_TYPES: &[DiagramType] = &[
     DiagramType::Er,
 ];
 
+pub(super) mod profile;
 pub(super) mod channel_load;
 pub(super) mod context;
 pub(super) mod corridor_route;
@@ -42,6 +43,7 @@ pub(super) mod simplify;
 pub(super) mod slot;
 
 // Re-exports for cross-submodule access via `use super::*;`
+pub(super) use profile::OrthoRoutingProfile;
 pub(super) use channel_load::{channel_load_penalty, ChannelLoadMap};
 pub(super) use context::{EndpointPair, PreparedObstacles, RoutingContext, SegmentGrid};
 pub(super) use lane_assignment::{
@@ -84,16 +86,6 @@ pub(crate) const ORTHOGONAL_OPTIONS: &[AlgorithmOptionSpec] = &[
         default: CHANNEL_MARGIN,
         description: "侧通道距障碍节点的留白",
     },
-    AlgorithmOptionSpec {
-        key: "bundling",
-        kind: OptionKind::Number {
-            min: 0.0,
-            max: 1.0,
-            exclude_min: false,
-        },
-        default: 0.0,
-        description: "是否启用 Edge Bundling（边捆绑，默认关闭）。启用后将在路由后处理阶段将相似边捆绑共享主干",
-    },
 ];
 
 /// 可调美学参数（由 LayoutPlan 解析后注入路由实例）
@@ -103,11 +95,6 @@ pub struct OrthoConfig {
     pub slot_pitch: f64,
     /// 侧通道距障碍节点的留白
     pub channel_margin: f64,
-    /// Edge Bundling §7.3: 是否启用边捆绑（默认 false）。
-    ///
-    /// 启用后在路由后处理阶段（repulse 之后、finalize 之前）执行 bundling。
-    /// 仅对 orthogonal 路由有效。
-    pub bundling: bool,
 }
 
 impl OrthoConfig {
@@ -115,7 +102,6 @@ impl OrthoConfig {
         Self {
             slot_pitch: ORTHOGONAL_OPTIONS[0].default,
             channel_margin: ORTHOGONAL_OPTIONS[1].default,
-            bundling: ORTHOGONAL_OPTIONS[2].default > 0.5,
         }
     }
 }
@@ -139,7 +125,6 @@ impl OrthogonalRouting {
             config: OrthoConfig {
                 slot_pitch: options.get_or_default(&ORTHOGONAL_OPTIONS[0]),
                 channel_margin: options.get_or_default(&ORTHOGONAL_OPTIONS[1]),
-                bundling: options.get_or_default(&ORTHOGONAL_OPTIONS[2]) > 0.5,
             },
         }
     }
@@ -234,30 +219,6 @@ pub fn route_edges_orthogonal(
     route_edges_orthogonal_inner(diagram, result, cfg, None)
 }
 
-/// Architecture A7：bundling 后分离无关边共享 trunk（bundling 路径重写可能再次共线）。
-pub fn separate_unrelated_architecture_trunks_after_bundling(
-    relations: &[crate::ast::Relation],
-    edges: &mut [EdgeLayout],
-    nodes: &HashMap<String, NodeLayout>,
-    sorted_node_ids: &[String],
-) -> usize {
-    if edges.is_empty() {
-        return 0;
-    }
-    let from_side: Vec<Port> = edges.iter().map(|e| e.from_port).collect();
-    let to_side: Vec<Port> = edges.iter().map(|e| e.to_port).collect();
-    separate_unrelated_trunk_overlaps(
-        edges,
-        None,
-        relations,
-        &from_side,
-        &to_side,
-        nodes,
-        sorted_node_ids,
-        EDGE_PARALLEL_GAP,
-    )
-}
-
 /// 节点位移后的增量重路由：仅重算端点落在 `moved_node_ids` 上的边。
 ///
 /// 若需重路由的边占比过高（≥ 85%），回退为全图重路由以保持质量与简单性。
@@ -317,6 +278,8 @@ fn route_edges_orthogonal_inner(
     let relations = &diagram.relations;
     let n = relations.len();
     let self_loop_idx = self_loop::self_loop_indices(relations);
+    let profile = OrthoRoutingProfile::for_diagram_type(diagram.diagram_type.clone());
+    let parallel_gap = profile.parallel_gap;
 
     let routing_algo = crate::layout::group::routing_algo_for_diagram(diagram);
     let group_ctx = crate::layout::group::GroupRoutingContext::from_layout(
@@ -340,7 +303,7 @@ fn route_edges_orthogonal_inner(
     );
 
     let corridor_plan =
-        corridor_route::plan_corridor_routes(relations, &group_ctx, diagram.diagram_type.clone());
+        corridor_route::plan_corridor_routes(relations, &group_ctx, &profile);
 
     // ── 1. 按无向节点对分组，并确定每条边的端口（连接边） ──
     let t1 = crate::layout::perf::Instant::now();
@@ -685,6 +648,7 @@ fn route_edges_orthogonal_inner(
             &group_ctx,
             &grid,
             &cfg,
+            &profile,
             &obstacles,
             None,
         )
@@ -774,6 +738,7 @@ fn route_edges_orthogonal_inner(
         &obstacles,
         &corridor_plan,
         &mut ortho_stats,
+        &profile,
     );
 
     // ── 4c. 直连偏好对齐：正对端口边的 slot 锚点对齐修正 ──
@@ -830,6 +795,7 @@ fn route_edges_orthogonal_inner(
                     &group_ctx,
                     &grid,
                     &cfg,
+                    &profile,
                     &obstacles,
                     None,
                 )
@@ -879,6 +845,7 @@ fn route_edges_orthogonal_inner(
         &obstacles,
         &corridor_plan,
         &mut ortho_stats,
+        &profile,
     );
     crate::perf_log!("[perf]     x1_reroute: {:.2}ms", t_x1.elapsed().as_secs_f64() * 1000.0);
 
@@ -904,6 +871,7 @@ fn route_edges_orthogonal_inner(
         &obstacles,
         &corridor_plan,
         &mut ortho_stats,
+        &profile,
     );
     crate::perf_log!("[perf]     x2_flip_stub: {:.2}ms (flipped {} edges)", t_flip.elapsed().as_secs_f64() * 1000.0, ortho_stats.flipped_stub_edges);
 
@@ -919,12 +887,12 @@ fn route_edges_orthogonal_inner(
         relations,
         &from_side,
         &to_side,
-        EDGE_PARALLEL_GAP,
+        parallel_gap,
     );
     ortho_stats.lane_groups = lane_stats.lane_groups;
     ortho_stats.lane_segments_shifted = lane_stats.segments_shifted;
     ortho_stats.lane_shifts_failed = lane_stats.shifts_failed;
-    if diagram.diagram_type == DiagramType::Architecture {
+    if profile.corridor_lane_offsets {
         let corridor_shifted = apply_corridor_planned_offsets(
             &mut edges,
             &mut grid,
@@ -937,16 +905,19 @@ fn route_edges_orthogonal_inner(
             &group_ctx,
         );
         ortho_stats.lane_segments_shifted += corridor_shifted;
-        ortho_stats.lane_segments_shifted += separate_unrelated_trunk_overlaps(
-            &mut edges,
-            Some(&mut grid),
-            relations,
-            &from_side,
-            &to_side,
-            &result.nodes,
-            &obstacles.sorted_node_ids,
-            EDGE_PARALLEL_GAP,
-        );
+        if profile.separate_unrelated_trunks {
+            ortho_stats.lane_segments_shifted += separate_unrelated_trunk_overlaps(
+                &mut edges,
+                Some(&mut grid),
+                relations,
+                &from_side,
+                &to_side,
+                &result.nodes,
+                &obstacles.sorted_node_ids,
+                parallel_gap,
+                &profile,
+            );
+        }
     }
     crate::perf_log!(
         "[perf]     x3_lane_assignment: {:.2}ms ({} groups, {} shifted, {} failed)",
@@ -958,16 +929,12 @@ fn route_edges_orthogonal_inner(
 
     // ── 4c. X-0: 统计边间距违规（排除 stub 段） ──
     let (exact_overlap_pairs, tight_spacing_pairs) =
-        count_all_edge_spacing_violations(&edges, &grid, EDGE_PARALLEL_GAP);
+        count_all_edge_spacing_violations(&edges, &grid, parallel_gap);
     ortho_stats.edge_exact_overlap_pairs = exact_overlap_pairs;
     ortho_stats.edge_tight_spacing_pairs = tight_spacing_pairs;
 
     // ── 5. 标签自动避让 ──
-    // §4.10.1: 启用 bundling 时跳过路由内 label 避障，
-    // 由后置 label 流水线（relayout_edge_labels_after_bundling）统一处理。
-    if !cfg.bundling {
-        resolve_label_overlaps(&mut edges, &result.nodes, &result.groups);
-    }
+    resolve_label_overlaps(&mut edges, &result.nodes, &result.groups);
     crate::perf_log!("[perf]     fix_inversions+labels: {:.2}ms", t_fix.elapsed().as_secs_f64() * 1000.0);
 
     result.edges = edges;
@@ -1045,6 +1012,7 @@ fn replan_slots(
     obstacles: &PreparedObstacles,
     corridor_plan: &corridor_route::CorridorRoutePlan,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
+    profile: &OrthoRoutingProfile,
 ) {
     use std::collections::{BTreeMap, HashSet};
 
@@ -1209,7 +1177,7 @@ fn replan_slots(
         };
 
 
-        let ctx = RoutingContext::new(nodes, group_ctx, grid, cfg, obstacles, None)
+        let ctx = RoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
             .with_strict_group_transit(corridor_plan.chains.contains_key(&ei));
         let pair = EndpointPair {
             from: from_ep.clone(),
@@ -1297,6 +1265,7 @@ fn reroute_conflicting_edges(
     obstacles: &PreparedObstacles,
     corridor_plan: &corridor_route::CorridorRoutePlan,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
+    profile: &OrthoRoutingProfile,
 ) {
     use std::collections::HashSet;
 
@@ -1304,6 +1273,8 @@ fn reroute_conflicting_edges(
     if n < 2 {
         return;
     }
+
+    let parallel_gap = profile.parallel_gap;
 
     // 重路由时使用的 margin 档位：逐步增大以生成更多绕行候选
     let reroute_margins: [f64; 3] = [
@@ -1325,7 +1296,7 @@ fn reroute_conflicting_edges(
                 continue;
             }
             let points: Vec<Point> = edges[ei].path_points().into_owned();
-            let viols = path_edge_spacing_violations(&points, grid, EDGE_PARALLEL_GAP);
+            let viols = path_edge_spacing_violations(&points, grid, parallel_gap);
             if !viols.is_empty() {
                 conflicts.push((ei, viols.len()));
             }
@@ -1350,7 +1321,7 @@ fn reroute_conflicting_edges(
             }
             // 重新检查冲突——上一次重路由可能已解决了这条边的冲突
             let current_points: Vec<Point> = edges[ei].path_points().into_owned();
-            if path_edge_spacing_violations(&current_points, grid, EDGE_PARALLEL_GAP).is_empty() {
+            if path_edge_spacing_violations(&current_points, grid, parallel_gap).is_empty() {
                 continue;
             }
 
@@ -1378,7 +1349,7 @@ fn reroute_conflicting_edges(
                 obstacles,
                 cfg.channel_margin,
             ) {
-                if path_edge_spacing_violations(&corridor_path, grid, EDGE_PARALLEL_GAP).is_empty() {
+                if path_edge_spacing_violations(&corridor_path, grid, parallel_gap).is_empty() {
                     grid.insert_path(&corridor_path, ei);
                     let mut edge = EdgeLayout {
                         geometry: PathGeometry::Polyline { points: Vec::new() },
@@ -1408,6 +1379,7 @@ fn reroute_conflicting_edges(
                     group_ctx,
                     grid,
                     &r_cfg,
+                    profile,
                     obstacles,
                     Some(&load_map),
                 )
@@ -1447,7 +1419,7 @@ fn reroute_conflicting_edges(
                         group_ctx,
                         &obstacles.sorted_group_ids,
                     )
-                    && path_is_clean_from_edges(&candidate, grid, EDGE_PARALLEL_GAP, STUB_GUARD_LENGTH)
+                    && path_is_clean_from_edges(&candidate, grid, parallel_gap, STUB_GUARD_LENGTH)
                 {
                     clean_path = Some(candidate);
                     break;
@@ -2336,6 +2308,7 @@ fn fix_reverse_stub_ports(
     obstacles: &PreparedObstacles,
     corridor_plan: &corridor_route::CorridorRoutePlan,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
+    profile: &OrthoRoutingProfile,
 ) {
     let n = edges.len();
     if n == 0 {
@@ -2494,7 +2467,7 @@ fn fix_reverse_stub_ports(
                 r_cfg.channel_margin,
             )
             .unwrap_or_else(|| {
-                let ctx = RoutingContext::new(nodes, group_ctx, grid, &r_cfg, obstacles, None)
+                let ctx = RoutingContext::new(nodes, group_ctx, grid, &r_cfg, profile, obstacles, None)
                     .with_strict_group_transit(corridor_plan.chains.contains_key(&ei));
                 select_best_path_with_scorer_stats(
                     &ctx,

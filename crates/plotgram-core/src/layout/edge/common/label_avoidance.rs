@@ -14,6 +14,7 @@
 //! 避障以 `(edge_idx, label_idx)` 为最小单元独立处理每个标签。
 
 use crate::layout::geometry::{Point, Rect};
+use crate::layout::group::constants::GROUP_BORDER_SHELL_PAD;
 use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
 use crate::layout::constants::*;
 use crate::layout::edge::common::edge_geometry::closest_point_on_path;
@@ -74,10 +75,7 @@ pub fn resolve_label_overlaps(
         .values()
         .map(|nl| (nl.x, nl.y, nl.x + nl.width, nl.y + nl.height))
         .collect();
-    let group_obstacles: Vec<(f64, f64, f64, f64)> = groups
-        .values()
-        .map(|gl| (gl.x, gl.y, gl.x + gl.width, gl.y + gl.height))
-        .collect();
+    let group_obstacles = sorted_group_shell_obstacles(groups);
 
     let mut last_delta: HashMap<LabelKey, Point> = HashMap::new();
     let mut oscillating: HashSet<LabelKey> = HashSet::new();
@@ -391,6 +389,53 @@ pub fn label_bbox(el: &EdgeLayout, _text: &str) -> (f64, f64, f64, f64) {
     el.label_bbox()
 }
 
+/// 分组边框壳层四边带（与边路由 `border_shell` 语义对齐，非实心矩形）。
+fn group_shell_bands(gl: &GroupLayout, pad: f64) -> [(f64, f64, f64, f64); 4] {
+    let left = gl.x;
+    let right = gl.x + gl.width;
+    let top = gl.y;
+    let bottom = gl.y + gl.height;
+    [
+        (left, top - pad, right, top + pad),
+        (left, bottom - pad, right, bottom + pad),
+        (left - pad, top, left + pad, bottom),
+        (right - pad, top, right + pad, bottom),
+    ]
+}
+
+/// 标签 bbox 是否与分组边框壳层重叠（组内部区域不算障碍）。
+pub(crate) fn label_bbox_overlaps_group_shell(
+    bbox: &(f64, f64, f64, f64),
+    gl: &GroupLayout,
+    pad: f64,
+) -> bool {
+    if gl.width <= 0.0 || gl.height <= 0.0 {
+        return false;
+    }
+    group_shell_bands(gl, pad)
+        .iter()
+        .any(|band| aabb_overlap(bbox, band).is_some())
+}
+
+/// 按 group id 排序的边框壳层障碍带（每条边各 4 个矩形带）。
+pub(crate) fn sorted_group_shell_obstacles(
+    groups: &HashMap<String, GroupLayout>,
+) -> Vec<(f64, f64, f64, f64)> {
+    let pad = GROUP_BORDER_SHELL_PAD;
+    let mut ids: Vec<&String> = groups.keys().collect();
+    ids.sort();
+    ids.into_iter()
+        .flat_map(|id| {
+            let gl = &groups[id];
+            if gl.width <= 0.0 || gl.height <= 0.0 {
+                Vec::new()
+            } else {
+                group_shell_bands(gl, pad).to_vec()
+            }
+        })
+        .collect()
+}
+
 pub fn aabb_overlap(
     a: &(f64, f64, f64, f64),
     b: &(f64, f64, f64, f64),
@@ -481,12 +526,43 @@ mod tests {
         resolve_label_overlaps(&mut edges, &nodes, &groups);
 
         let bbox = edges[0].label_bbox();
-        let group_bbox = (12.0, 174.0, 380.0, 430.0);
+        let gl = GroupLayout {
+            x: 12.0,
+            y: 174.0,
+            width: 368.0,
+            height: 256.0,
+            ..Default::default()
+        };
         assert!(
-            aabb_overlap(&bbox, &group_bbox).is_none(),
-            "label bbox {:?} should not overlap group {:?}",
+            !label_bbox_overlaps_group_shell(&bbox, &gl, GROUP_BORDER_SHELL_PAD),
+            "label bbox {:?} should not overlap group border shell",
             bbox,
-            group_bbox
+        );
+    }
+
+    #[test]
+    fn label_inside_group_not_pushed_out() {
+        let mut edges = vec![labeled_edge(Point::new(200.0, 300.0))];
+        let nodes = HashMap::new();
+        let mut groups = HashMap::new();
+        groups.insert(
+            "backend".to_string(),
+            GroupLayout {
+                x: 12.0,
+                y: 174.0,
+                width: 368.0,
+                height: 256.0,
+                ..Default::default()
+            },
+        );
+
+        resolve_label_overlaps(&mut edges, &nodes, &groups);
+
+        let pos = edges[0].label_pos();
+        assert!(
+            (pos.x - 200.0).abs() < 1.0 && (pos.y - 300.0).abs() < 1.0,
+            "label inside group interior should stay put, got {:?}",
+            pos,
         );
     }
 

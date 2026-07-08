@@ -39,7 +39,7 @@ Step 1: 端口选择
   └── 回环边端口覆盖 (apply_feedback_side_overrides)
 
 Step 2: Slot 分配
-  ├── 按 bundling_key 分组端点 (node_id|side|is_from|arrow|style)
+  ├── 按 slot 分组键分组端点 (node_id|side|is_from|arrow|style)
   ├── 子组内按目标节点切线方向排序
   ├── 子组间按 (arrow, style, min_edge_index) 排序
   ├── 选择 DockingStrategy (Single/Compact/Concentrate)
@@ -86,7 +86,7 @@ Step 4f: X-3 Lane Assignment (assign_lanes)
   └── Architecture 专用: corridor_planned_offsets + unrelated trunk 分离
 
 Step 5: 标签避让
-  └── resolve_label_overlaps (bundling 关闭时)
+  └── resolve_label_overlaps
 ```
 
 ## 2. 与同类产品算法对比
@@ -95,8 +95,8 @@ Step 5: 标签避让
 |---|---|---|---|---|---|
 | **路径搜索** | 候选枚举+打分 | 网格 A* + channel | channel-based + pathfinding | 简化路径搜索 | waypoint + 曼哈顿 |
 | **端口选择** | 几何规则+分组树 | side constraint | port constraint solver | 几何启发式 | 固定/浮动 port |
-| **平行段分离** | Lane assignment(平移) | 多层 nudging | 高级 nudging | 无 | 简单偏移 |
-| **边捆绑** | 可选 bundling | 无原生 | bus routing | 无 | 无 |
+| **平行段分离** | Lane assignment(平移) + flowchart trunk+fork | 多层 nudging | 高级 nudging | 无 | 简单偏移 |
+| **同源 fan-out** | slot 汇流 + trunk+fork 候选 | 无原生 | bus routing | 无 | 无 |
 | **分组路由** | corridor 三段式 | 透传+nudging | group-aware | 绕行 | 绕行 |
 | **增量路由** | 支持 preserve | 部分支持 | 支持 | 不支持 | 支持 |
 | **确定性保证** | BTreeMap+显式排序 | 有 | 有 | 有 | 弱 |
@@ -178,10 +178,10 @@ Step 5: 标签避让
 每层重路由都调用 `select_best_path_with_scorer_stats`，最坏情况复杂度可能较高。A* 一次搜索到位的方案在大图上可能更快。不过当前有 `SegmentGrid` 空间索引和 `PreparedObstacles` 缓解，实际性能需测试。
 
 ### 4.6 缺少 hyperedge / bus routing
-当前 bundling 是可选的简单 trunk 共享，不是真正的 hyperedge routing。
+flowchart profile 的 trunk+fork 候选提供轻量同源 fan-out 视觉束，但不是真正的 hyperedge routing。
 - yWorks 支持真正的 bus routing（多边共享总线）
 - ELK 有 hyperedge 支持
-- 当前 bundling 安全 fallback 多，效果有限
+- 当前 trunk+fork 仅覆盖同源 fan-out，跨语义边仍依赖 lane assignment 分离
 
 ### 4.7 自环边处理简单
 `self_loop::route_self_loop` 独立处理，与主路由流程割裂。ELK/yWorks 的自环边与主路由统一处理，能更好利用通道。

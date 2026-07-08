@@ -4,8 +4,11 @@
 
 use crate::layout::constants::DEFAULT_LABEL_PERP_OFFSET;
 use crate::layout::edge::common::edge_geometry::{closest_point_on_path, point_at_path_t};
-use crate::layout::edge::common::label_avoidance::{aabb_overlap, segment_vs_aabb_intersect};
+use crate::layout::edge::common::label_avoidance::{
+    aabb_overlap, label_bbox_overlaps_group_shell, segment_vs_aabb_intersect,
+};
 use crate::layout::geometry::Point;
+use crate::layout::group::constants::GROUP_BORDER_SHELL_PAD;
 use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
 use std::collections::HashMap;
 
@@ -35,7 +38,6 @@ pub fn place_all_labels_by_candidates(
     }
 
     let node_obstacles: Vec<(f64, f64, f64, f64)> = sorted_node_obstacles(nodes);
-    let group_obstacles: Vec<(f64, f64, f64, f64)> = sorted_group_obstacles(groups);
     let edge_segments = build_edge_segments(edges);
 
     let mut placed_bboxes: Vec<(f64, f64, f64, f64)> = Vec::new();
@@ -77,7 +79,7 @@ pub fn place_all_labels_by_candidates(
                 preferred_t,
                 &placed_bboxes,
                 &node_obstacles,
-                &group_obstacles,
+                groups,
                 &edge_segments,
             );
             let best = candidates
@@ -92,7 +94,7 @@ pub fn place_all_labels_by_candidates(
                         preferred_t,
                         &placed_bboxes,
                         &node_obstacles,
-                        &group_obstacles,
+                        groups,
                         &edge_segments,
                     );
                     (score, center)
@@ -176,17 +178,6 @@ fn sorted_node_obstacles(nodes: &HashMap<String, NodeLayout>) -> Vec<(f64, f64, 
         .map(|id| {
             let nl = &nodes[id];
             (nl.x, nl.y, nl.x + nl.width, nl.y + nl.height)
-        })
-        .collect()
-}
-
-fn sorted_group_obstacles(groups: &HashMap<String, GroupLayout>) -> Vec<(f64, f64, f64, f64)> {
-    let mut ids: Vec<&String> = groups.keys().collect();
-    ids.sort();
-    ids.into_iter()
-        .map(|id| {
-            let gl = &groups[id];
-            (gl.x, gl.y, gl.x + gl.width, gl.y + gl.height)
         })
         .collect()
 }
@@ -302,7 +293,7 @@ fn score_candidate(
     preferred_t: f64,
     placed_bboxes: &[(f64, f64, f64, f64)],
     node_obstacles: &[(f64, f64, f64, f64)],
-    group_obstacles: &[(f64, f64, f64, f64)],
+    groups: &HashMap<String, GroupLayout>,
     edge_segments: &[Vec<(Point, Point)>],
 ) -> f64 {
     // 节点重叠：高有限惩罚（非 INFINITY），按重叠面积加权。
@@ -320,8 +311,12 @@ fn score_candidate(
         }
     }
 
-    for group_bbox in group_obstacles {
-        if aabb_overlap(&bbox, group_bbox).is_some() {
+    for id in {
+        let mut ids: Vec<&String> = groups.keys().collect();
+        ids.sort();
+        ids
+    } {
+        if label_bbox_overlaps_group_shell(&bbox, &groups[id], GROUP_BORDER_SHELL_PAD) {
             score += GROUP_OVERLAP_PENALTY;
         }
     }

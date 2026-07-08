@@ -8,7 +8,6 @@ use crate::profile::DiagramProfile;
 use crate::types::standard_attr_keys::diagram;
 
 use super::algorithm_config::{diagram_algorithm_config, AlgorithmOptionSpec, OptionsReader};
-use super::edge::edge_bundling::BundlingConfig;
 use super::registry::LAYOUT_ALGORITHM_NAMES;
 use super::{edge_routing_option_specs, layout_option_specs};
 
@@ -121,10 +120,6 @@ pub struct LayoutPlan {
     pub edge_options: ResolvedAlgoOptions,
     /// §6: friendliness 模式（off | diagnose | adjust），默认 adjust。
     pub friendliness: FriendlinessMode,
-    /// §7.3: Edge Bundling 配置（默认 disabled）。
-    ///
-    /// 通过 `edge_routing: orthogonal { bundling: true }` 启用。
-    pub edge_bundling: BundlingConfig,
 }
 
 impl LayoutPlan {
@@ -154,16 +149,12 @@ impl LayoutPlan {
         // §6: 从 layout 配置块解析 friendliness 模式
         let friendliness = resolve_friendliness_mode(diagram);
 
-        // §7.3: 从 edge_routing 配置块解析 bundling 配置
-        let edge_bundling = resolve_edge_bundling_config(diagram, &edge_routing, &edge_options);
-
         Self {
             layout_algo,
             layout_options,
             edge_routing,
             edge_options,
             friendliness,
-            edge_bundling,
         }
     }
 
@@ -195,7 +186,6 @@ impl LayoutPlan {
             edge_routing: String::new(),
             edge_options: ResolvedAlgoOptions::default(),
             friendliness: FriendlinessMode::default(),
-            edge_bundling: BundlingConfig::default(),
         }
     }
 
@@ -207,7 +197,6 @@ impl LayoutPlan {
             edge_routing: algo.to_string(),
             edge_options: ResolvedAlgoOptions::default(),
             friendliness: FriendlinessMode::default(),
-            edge_bundling: BundlingConfig::default(),
         }
     }
 }
@@ -231,41 +220,6 @@ fn resolve_friendliness_mode(diagram: &Diagram) -> FriendlinessMode {
         }
     }
     FriendlinessMode::default()
-}
-
-/// §7.3: 从 edge_routing 配置块解析 Edge Bundling 配置。
-///
-/// DSL 语法：
-/// ```dfy
-/// edge_routing: orthogonal {
-///     bundling: true    // true | false（1 | 0）
-/// }
-/// ```
-///
-/// 仅对 `orthogonal` 路由有效；其他路由算法忽略 bundling 配置。
-/// 当前仅支持 `bundling: true/false` 开关，其余参数使用 `BundlingConfig::default()`。
-fn resolve_edge_bundling_config(
-    diagram: &Diagram,
-    edge_routing: &str,
-    edge_options: &ResolvedAlgoOptions,
-) -> BundlingConfig {
-    if edge_routing != "orthogonal" {
-        return BundlingConfig::default();
-    }
-
-    // 检查 `bundling` option（Number 0.0/1.0）
-    let enabled = edge_options.get("bundling").map_or(false, |v| v > 0.5);
-    if !enabled {
-        return BundlingConfig::default();
-    }
-
-    let semantic_gate = matches!(diagram.diagram_type, crate::types::DiagramType::Architecture);
-
-    BundlingConfig {
-        enabled: true,
-        semantic_gate,
-        ..BundlingConfig::default()
-    }
 }
 
 /// 校验配置块中显式 option 值的类型/范围（非法值发警告，layout 阶段会回退默认值）。

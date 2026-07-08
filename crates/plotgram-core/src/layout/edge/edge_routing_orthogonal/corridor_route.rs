@@ -7,13 +7,13 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::ast::Relation;
 use crate::layout::edge::edge_merge_policy::{
-    edge_merge_context_with_groups, edges_may_share_trunk, requires_semantic_merge,
+    edge_merge_context_with_groups, edges_may_share_trunk,
 };
 use crate::layout::geometry::Point;
 use crate::layout::group::{CorridorAxis, GroupCorridor, GroupRoutingContext};
 use crate::layout::{GroupLayout, Port};
-use crate::types::DiagramType;
 
+use super::profile::OrthoRoutingProfile;
 use super::path::port_outward;
 use super::simplify::simplify_path_preserving_stubs;
 use super::EPS;
@@ -38,7 +38,7 @@ pub struct CorridorRoutePlan {
 pub fn plan_corridor_routes(
     relations: &[Relation],
     group_ctx: &GroupRoutingContext,
-    diagram_type: DiagramType,
+    profile: &OrthoRoutingProfile,
 ) -> CorridorRoutePlan {
     if group_ctx.corridors.is_empty() {
         return CorridorRoutePlan::default();
@@ -83,7 +83,7 @@ pub fn plan_corridor_routes(
         });
         edges.dedup();
         let (lane_map, lane_count) =
-            assign_merge_aware_lanes(&edges, relations, group_ctx, &diagram_type);
+            assign_merge_aware_lanes(&edges, relations, group_ctx, profile);
         plan.corridor_load.insert(c_idx, lane_count);
         for (edge_index, lane) in lane_map {
             plan.lanes.insert((edge_index, c_idx), lane);
@@ -98,9 +98,9 @@ fn assign_merge_aware_lanes(
     edges: &[usize],
     relations: &[Relation],
     group_ctx: &GroupRoutingContext,
-    diagram_type: &DiagramType,
+    profile: &OrthoRoutingProfile,
 ) -> (HashMap<usize, usize>, usize) {
-    if !requires_semantic_merge(diagram_type.clone()) {
+    if !profile.semantic_merge {
         let mut lanes = HashMap::new();
         for (lane, &edge_index) in edges.iter().enumerate() {
             lanes.insert(edge_index, lane);
@@ -133,7 +133,7 @@ fn assign_merge_aware_lanes(
                         group_ctx.node_leaf_group(other_rel.from.as_str()),
                         group_ctx.node_leaf_group(other_rel.to.as_str()),
                     );
-                    edges_may_share_trunk(&ctx, &other_ctx, diagram_type.clone())
+                    edges_may_share_trunk(&ctx, &other_ctx, profile.merge_policy_diagram_type())
                 })
             });
             if can_use {
@@ -463,6 +463,7 @@ fn infer_port_at_point(from: Point, to: Point) -> Port {
 mod tests {
     use super::*;
     use crate::layout::GroupLayout;
+    use crate::types::DiagramType;
 
     fn sample_corridor() -> GroupCorridor {
         GroupCorridor {
@@ -529,7 +530,11 @@ mod tests {
             attributes: crate::ast::AttributeMap::default(),
             span: crate::ast::Span::dummy(),
         }];
-        let plan = plan_corridor_routes(&relations, &ctx, crate::types::DiagramType::Flowchart);
+        let plan = plan_corridor_routes(
+            &relations,
+            &ctx,
+            &OrthoRoutingProfile::for_diagram_type(crate::types::DiagramType::Flowchart),
+        );
         assert_eq!(plan.chains.get(&0).map(|c| c.as_slice()), Some(&[0][..]));
         assert_eq!(plan.lanes.get(&(0, 0)), Some(&0));
     }
@@ -596,7 +601,11 @@ mod tests {
             make_relation("a3", "b3"),
             make_relation("a4", "b4"),
         ];
-        let plan = plan_corridor_routes(&relations, &ctx, crate::types::DiagramType::Flowchart);
+        let plan = plan_corridor_routes(
+            &relations,
+            &ctx,
+            &OrthoRoutingProfile::for_diagram_type(crate::types::DiagramType::Flowchart),
+        );
         // 所有边应分配到 corridor 0 的 lane 0..3
         for edge_idx in 0..4 {
             assert!(
@@ -640,7 +649,11 @@ mod tests {
             make_relation("a3", "b3"),  // 不同 SuperEdgePair 子组，但同 leaf group pair
             make_relation("a2", "b2"),
         ];
-        let plan = plan_corridor_routes(&relations, &ctx, crate::types::DiagramType::Flowchart);
+        let plan = plan_corridor_routes(
+            &relations,
+            &ctx,
+            &OrthoRoutingProfile::for_diagram_type(crate::types::DiagramType::Flowchart),
+        );
         // 排序后应为 a1→b1, a2→b2, a3→b3（按 from_id 然后 to_id）
         // lane: a1→b1=0, a2→b2=1, a3→b3=2
         assert_eq!(plan.lanes.get(&(0, 0)), Some(&0), "edge 0 (a1→b1) 应为 lane 0");
@@ -661,7 +674,11 @@ mod tests {
             make_relation("auth", "redis"),
             make_relation("biz", "db"),
         ];
-        let plan = plan_corridor_routes(&relations, &ctx, DiagramType::Architecture);
+        let plan = plan_corridor_routes(
+            &relations,
+            &ctx,
+            &OrthoRoutingProfile::for_diagram_type(DiagramType::Architecture),
+        );
         let l0 = plan.lanes.get(&(0, 0)).copied().unwrap();
         let l1 = plan.lanes.get(&(1, 0)).copied().unwrap();
         assert_ne!(l0, l1, "无关边应分到不同 lane");
@@ -679,7 +696,11 @@ mod tests {
             make_relation("a1", "b1"),
             make_relation("a2", "b2"),
         ];
-        let plan = plan_corridor_routes(&relations, &ctx, DiagramType::Architecture);
+        let plan = plan_corridor_routes(
+            &relations,
+            &ctx,
+            &OrthoRoutingProfile::for_diagram_type(DiagramType::Architecture),
+        );
         let lane0 = plan.lanes.get(&(0, 0)).copied().unwrap_or(0);
         let lane1 = plan.lanes.get(&(1, 0)).copied().unwrap_or(1);
         let coord0 = corridor_lane_coord(&sample_corridor(), lane0, 2);
@@ -736,7 +757,11 @@ mod tests {
             make_relation("lb", "auth"),
             make_relation("lb", "biz"),
         ];
-        let plan = plan_corridor_routes(&relations, &ctx, DiagramType::Architecture);
+        let plan = plan_corridor_routes(
+            &relations,
+            &ctx,
+            &OrthoRoutingProfile::for_diagram_type(DiagramType::Architecture),
+        );
         let l0 = plan.lanes.get(&(0, 0)).copied().unwrap();
         let l1 = plan.lanes.get(&(1, 0)).copied().unwrap();
         assert_eq!(l0, l1, "同源 fan-out 可共用 lane");
@@ -783,7 +808,11 @@ mod tests {
             make_relation("a1", "b1"),
             make_relation("a2", "b2"),
         ];
-        let plan = plan_corridor_routes(&relations, &ctx, DiagramType::Architecture);
+        let plan = plan_corridor_routes(
+            &relations,
+            &ctx,
+            &OrthoRoutingProfile::for_diagram_type(DiagramType::Architecture),
+        );
         let path0 = try_build_corridor_path(
             0,
             Point::new(40.0, 30.0),

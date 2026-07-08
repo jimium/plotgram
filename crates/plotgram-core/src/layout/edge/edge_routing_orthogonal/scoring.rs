@@ -44,8 +44,9 @@ pub struct DefaultScorer;
 
 impl CandidateScorer for DefaultScorer {
     fn score(&self, path: &[Point], ctx: &RoutingContext, pair: &EndpointPair) -> f64 {
-        let mut score = path_length(path);
-        score += path.len().saturating_sub(2) as f64 * BEND_PENALTY;
+        let w = ctx.profile.scoring;
+        let mut score = path_length(path) * w.path_length;
+        score += path.len().saturating_sub(2) as f64 * BEND_PENALTY * w.bend;
         score += obstacle_penalty(
             path,
             pair.from_id(),
@@ -53,21 +54,21 @@ impl CandidateScorer for DefaultScorer {
             ctx.nodes,
             ctx.group_ctx,
             &ctx.obstacles,
-        );
+        ) * w.obstacle;
         score += edge_overlap_penalty(
             path,
             ctx.grid,
         );
         // Phase 3: 通道负载感知——reroute 时偏好低负载通道，从源头减少拥堵
         if let Some(load_map) = ctx.channel_load {
-            score += channel_load_penalty(path, load_map);
+            score += channel_load_penalty(path, load_map) * w.channel_load;
         }
         if !ctx.group_ctx.corridors.is_empty() {
             score += corridor_misalignment_penalty(
                 path,
                 &ctx.group_ctx.corridors,
                 ctx.group_ctx.corridor_misalignment_penalty,
-            );
+            ) * w.corridor_misalignment;
         }
         score
     }

@@ -32,7 +32,7 @@ pub fn repulse_edges_only(
 
 /// 对边路径执行 grid snap 与分组边框排斥（L3 waypoint snap + Border Shell repulse）。
 ///
-/// 在管道最末尾执行（bundling 之后），仅运行一次。
+/// 在管道最末尾执行，仅运行一次。
 /// 当 snap 未启用时无操作。
 pub fn snap_and_repulse_edges(
     edges: &mut [EdgeLayout],

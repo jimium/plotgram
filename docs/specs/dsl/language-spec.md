@@ -212,7 +212,7 @@ diagram flowchart {
 | `title`        | string           | 任意字符串                                                     | 无                     | 图表标题（body 级属性，不进 config 块）       |
 | `direction`    | atom             | `top-to-bottom`, `left-to-right`, `radial`                | 由图表类型 profile 决定 | 布局方向偏好；仅支持 direction 的布局生效（见 §4.5）                          |
 | `layout`       | atom 或配置块        | 见布局算法表                                                     | 由图表类型决定 | 布局算法及可选参数；支持 `friendliness` 选项：`off` \| `diagnose` \| `adjust`（默认 `adjust`） |
-| `edge_routing` | atom 或配置块        | 见边路由算法表 | 由图表类型决定 | 边路由算法及可选参数；`orthogonal` 支持 `bundling: true` 启用边捆绑 |
+| `edge_routing` | atom 或配置块        | 见边路由算法表 | 由图表类型决定 | 边路由算法及可选参数 |
 | `theme`        | atom             | 内置主题 ID（见主题系统规范），如 `common.clean-light`、`common.blueprint`、`mindmap.vivid-branches` | 由图表类型 profile 决定      | 颜色/字体主题（对应 StyleSheet 的 `id` 字段） |
 | `render_style`| atom             | `standard`, `excalidraw`, `cross-hatch`, `blueprint`, `spatial-clarity`, `neon-glow`, `stipple` | `standard` | 笔触皮肤（与 theme 分工：theme 管颜色，render_style 管绘制风格） |
 | `group_frame`  | atom 或配置块        | `stack { ... }` \| `matrix { ... }` | 由算法默认决定 | **[新增]** Group Frame 统一配置块，统一控制组间排列/尺寸/对齐/间距/量化；旧属性 `group_sizing`/`group_arrangement`/`group_gap`/`group_align`/`snap` 保留为语法糖（见 §4.6） |
@@ -246,7 +246,7 @@ diagram flowchart {
 
 | 值                   | 说明              |
 | ------------------- | --------------- |
-| `orthogonal`        | 正交折线路由（flowchart/architecture 默认；options: `slot_pitch`, `channel_margin`, `bundling`） |
+| `orthogonal`        | 正交折线路由（flowchart/architecture 默认；options: `slot_pitch`, `channel_margin`） |
 | `straight`          | 直线连接（ER 图默认） |
 | `bezier`            | 贝塞尔曲线路由；options: `tension` |
 | `spline`            | 障碍避让多段样条 |

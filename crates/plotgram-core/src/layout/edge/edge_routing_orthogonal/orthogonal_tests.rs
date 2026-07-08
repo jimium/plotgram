@@ -603,6 +603,7 @@
         );
 
         let cfg = OrthoConfig::from_spec_defaults();
+        let profile = OrthoRoutingProfile::for_diagram_type(DiagramType::Flowchart);
         let grid = SegmentGrid::new();
         let group_ctx = test_group_ctx(HashMap::new(), HashMap::new());
         let obstacles = PreparedObstacles::build(&nodes, &group_ctx);
@@ -611,6 +612,7 @@
             &group_ctx,
             &grid,
             &cfg,
+            &profile,
             &obstacles,
             None,
         );
@@ -1278,12 +1280,21 @@
     fn g1_strict_group_transit_defaults_false_and_overridable() {
         let nodes: HashMap<String, NodeLayout> = HashMap::new();
         let cfg = OrthoConfig::from_spec_defaults();
+        let profile = OrthoRoutingProfile::for_diagram_type(DiagramType::Flowchart);
         let grid = SegmentGrid::new();
 
         // 无 corridor 的图 → strict_group_transit = false（G1 前 = false）
         let group_ctx_no_corridor = test_group_ctx(HashMap::new(), HashMap::new());
         let obstacles = PreparedObstacles::build(&nodes, &group_ctx_no_corridor);
-        let ctx = RoutingContext::new(&nodes, &group_ctx_no_corridor, &grid, &cfg, &obstacles, None);
+        let ctx = RoutingContext::new(
+            &nodes,
+            &group_ctx_no_corridor,
+            &grid,
+            &cfg,
+            &profile,
+            &obstacles,
+            None,
+        );
         assert!(
             !ctx.strict_group_transit,
             "G1: 无 corridor 时 strict_group_transit 应为 false"
@@ -1320,7 +1331,15 @@
             group_ancestors: HashMap::new(),
         };
         let obstacles = PreparedObstacles::build(&nodes, &group_ctx_with_corridor);
-        let ctx = RoutingContext::new(&nodes, &group_ctx_with_corridor, &grid, &cfg, &obstacles, None);
+        let ctx = RoutingContext::new(
+            &nodes,
+            &group_ctx_with_corridor,
+            &grid,
+            &cfg,
+            &profile,
+            &obstacles,
+            None,
+        );
         assert!(
             !ctx.strict_group_transit,
             "G1: 有 corridor 时 strict_group_transit 默认也应为 false（按边判定，不再全局 true）"

@@ -303,10 +303,9 @@ mod tests {
             .iter()
             .find(|r| r.name == "orthogonal")
             .expect("orthogonal");
-        assert_eq!(orthogonal.options.len(), 3);
+        assert_eq!(orthogonal.options.len(), 2);
         let keys: Vec<&str> = orthogonal.options.iter().map(|o| o.key.as_str()).collect();
         assert!(keys.contains(&"slot_pitch"));
         assert!(keys.contains(&"channel_margin"));
-        assert!(keys.contains(&"bundling"));
     }
 }

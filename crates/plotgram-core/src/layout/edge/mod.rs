@@ -1,7 +1,6 @@
 //! 边路由算法
 
 pub mod common;
-pub mod edge_bundling;
 pub mod edge_merge_policy;
 pub mod edge_routing;
 pub mod edge_routing_bezier;
