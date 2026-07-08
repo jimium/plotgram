@@ -12,7 +12,10 @@
 
 use plotgram_core::types::DiagramType;
 use plotgram_core::ast::{Diagram};
-use plotgram_core::layout::{compute_lint_metrics, EdgeLayout, LayoutResult, LintMetricsSummary, NodeLayout};
+use plotgram_core::layout::{
+    compute_lint_metrics, count_unrelated_parallel_overlaps, EdgeLayout, LayoutResult,
+    LintMetricsSummary, NodeLayout,
+};
 use plotgram_core::layout::refine::segment_intersects_node;
 use plotgram_core::layout::geometry::Point;
 use std::collections::HashMap;
@@ -40,6 +43,9 @@ pub struct LayoutMetrics {
     /// 路径拐点总数（折线方向变化次数）
     #[serde(default)]
     pub bend_count: usize,
+    /// 非语义平行段重叠对数（非 intentional bundle 的平行段重叠）
+    #[serde(default)]
+    pub edge_parallel_overlap_count: usize,
 
     // ── 可读性指标 ──
     /// 边交叉数（两两边在非共享端点处的交叉）
@@ -107,6 +113,7 @@ impl LayoutMetrics {
         let edge_crossings = count_edge_crossings(result);
         let lint = compute_lint_metrics(diagram, result);
         let bend_count = count_bends(result);
+        let edge_parallel_overlap_count = count_unrelated_parallel_overlaps(diagram, result);
 
         let total_area = result.total_width * result.total_height;
         let total_edge_length = compute_total_edge_length(result);
@@ -149,6 +156,7 @@ impl LayoutMetrics {
             label_node_overlaps: lint.label_node_overlap,
             label_label_overlaps: lint.label_label_overlap,
             bend_count,
+            edge_parallel_overlap_count,
             edge_crossings,
             total_area,
             total_edge_length,
@@ -178,6 +186,7 @@ impl LayoutMetrics {
             label_node_overlaps: 0,
             label_label_overlaps: 0,
             bend_count: 0,
+            edge_parallel_overlap_count: 0,
             edge_crossings: 0,
             total_area: 0.0,
             total_edge_length: 0.0,
@@ -236,7 +245,7 @@ impl LayoutMetrics {
     /// 生成单行摘要（适合终端输出）
     pub fn one_line_summary(&self) -> String {
         format!(
-            "nodes={} edges={} overlaps={} edge_x_node={} edge_x_edge={} label_x_node={} label_x_label={} bends={} area={:.0} edge_len={:.1}±{:.1} cv={:.2} ratio={:.2} util={:.1}% score={:.1}",
+            "nodes={} edges={} overlaps={} edge_x_node={} edge_x_edge={} label_x_node={} label_x_label={} bends={} parallel_overlap={} area={:.0} edge_len={:.1}±{:.1} cv={:.2} ratio={:.2} util={:.1}% score={:.1}",
             self.node_count,
             self.edge_count,
             self.node_overlap_pairs,
@@ -245,6 +254,7 @@ impl LayoutMetrics {
             self.label_node_overlaps,
             self.label_label_overlaps,
             self.bend_count,
+            self.edge_parallel_overlap_count,
             self.total_area,
             self.total_edge_length,
             self.edge_length_stddev,

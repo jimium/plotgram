@@ -660,7 +660,8 @@ fn route_edges_orthogonal_inner(
             &cfg,
             &obstacles,
             None,
-        );
+        )
+        .with_strict_group_transit(corridor_plan.chains.contains_key(&i));
         let pair = EndpointPair {
             from: from_ep.clone(),
             to: to_ep.clone(),
@@ -774,6 +775,7 @@ fn route_edges_orthogonal_inner(
         &cfg,
         &group_ctx,
         &obstacles,
+        &corridor_plan,
         &mut ortho_stats,
     );
 
@@ -805,7 +807,8 @@ fn route_edges_orthogonal_inner(
             let Some(from_ep) = endpoint_map.get(&(ei, true)) else { continue };
             let Some(to_ep) = endpoint_map.get(&(ei, false)) else { continue };
             let pair = EndpointPair { from: from_ep.clone(), to: to_ep.clone() };
-            let ctx = RoutingContext::new(&result.nodes, &group_ctx, &grid, &cfg, &obstacles, None);
+            let ctx = RoutingContext::new(&result.nodes, &group_ctx, &grid, &cfg, &obstacles, None)
+                .with_strict_group_transit(corridor_plan.chains.contains_key(&ei));
             let mut path_stats = PathSelectStats::default();
             let candidate = select_best_path_with_scorer_stats(
                 &ctx,
@@ -849,6 +852,7 @@ fn route_edges_orthogonal_inner(
         &cfg,
         &group_ctx,
         &obstacles,
+        &corridor_plan,
         &mut ortho_stats,
     );
     crate::perf_log!("[perf]     x1_reroute: {:.2}ms", t_x1.elapsed().as_secs_f64() * 1000.0);
@@ -940,6 +944,7 @@ fn replan_slots(
     cfg: &OrthoConfig,
     group_ctx: &crate::layout::group::GroupRoutingContext,
     obstacles: &PreparedObstacles,
+    corridor_plan: &corridor_route::CorridorRoutePlan,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
 ) {
     use std::collections::{BTreeMap, HashSet};
@@ -1105,7 +1110,8 @@ fn replan_slots(
         };
 
 
-        let ctx = RoutingContext::new(nodes, group_ctx, grid, cfg, obstacles, None);
+        let ctx = RoutingContext::new(nodes, group_ctx, grid, cfg, obstacles, None)
+            .with_strict_group_transit(corridor_plan.chains.contains_key(&ei));
         let pair = EndpointPair {
             from: from_ep.clone(),
             to: to_ep.clone(),
@@ -1171,6 +1177,7 @@ fn reroute_conflicting_edges(
     cfg: &OrthoConfig,
     group_ctx: &crate::layout::group::GroupRoutingContext,
     obstacles: &PreparedObstacles,
+    corridor_plan: &corridor_route::CorridorRoutePlan,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
 ) {
     use std::collections::HashSet;
@@ -1254,7 +1261,8 @@ fn reroute_conflicting_edges(
                     &r_cfg,
                     obstacles,
                     Some(&load_map),
-                );
+                )
+                .with_strict_group_transit(corridor_plan.chains.contains_key(&ei));
                 let pair = EndpointPair {
                     from: from_ep.clone(),
                     to: to_ep.clone(),

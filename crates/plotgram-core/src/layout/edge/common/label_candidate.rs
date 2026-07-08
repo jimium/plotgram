@@ -15,6 +15,11 @@ const FOREIGN_EDGE_PENALTY: f64 = 100.0;
 const GROUP_OVERLAP_PENALTY: f64 = 50.0;
 const PATH_DISTANCE_WEIGHT: f64 = 0.5;
 const MIDPOINT_DISTANCE_WEIGHT: f64 = 0.1;
+/// 节点重叠：高有限惩罚（>LABEL_OVERLAP_PENALTY），按重叠面积加权。
+/// 不用 INFINITY 以保证「所有候选都碰节点」时仍能选出重叠最小的候选，
+/// 避免回退到原始冲突位置（label_avoidance Phase 2 不处理 label-node）。
+const NODE_OVERLAP_PENALTY: f64 = 10000.0;
+const NODE_OVERLAP_AREA_WEIGHT: f64 = 100.0;
 
 type LabelKey = (usize, usize);
 
@@ -63,6 +68,18 @@ pub fn place_all_labels_by_candidates(
 
         if has_conflict {
             let candidates = generate_candidates(&path, preferred_t, size);
+            // 同时为当前位置打分，确保候选比当前位置更好才移动（避免劣化）
+            let current_score = score_candidate(
+                current,
+                current_bbox,
+                edge_idx,
+                &path,
+                preferred_t,
+                &placed_bboxes,
+                &node_obstacles,
+                &group_obstacles,
+                &edge_segments,
+            );
             let best = candidates
                 .into_iter()
                 .map(|center| {
@@ -83,7 +100,9 @@ pub fn place_all_labels_by_candidates(
                 .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
             if let Some((score, center)) = best {
-                if score < REJECT_SCORE {
+                // 候选优于当前位置才移动；节点重叠现为有限惩罚，
+                // 保证「全候选碰节点」时仍选出最小重叠候选（优于原始冲突位置）。
+                if score < current_score {
                     edges[edge_idx].set_label_pos_at(label_idx, center);
                     placed_bboxes.push(bbox_from_center(center, size));
                     continue;
@@ -232,7 +251,8 @@ fn preferred_t_for_label(label_idx: usize, path: &[Point], current: Point) -> f6
 
 fn generate_candidates(path: &[Point], preferred_t: f64, size: (f64, f64)) -> Vec<Point> {
     let _ = size;
-    let mut ts = vec![0.3, 0.5, 0.7, preferred_t];
+    // 覆盖短边场景：端点附近 (0.15/0.85) 增加候选，中段保持 0.3/0.5/0.7
+    let mut ts = vec![0.15, 0.3, 0.5, 0.7, 0.85, preferred_t];
     ts.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     ts.dedup_by(|a, b| (*a - *b).abs() < 0.05);
 
@@ -240,7 +260,7 @@ fn generate_candidates(path: &[Point], preferred_t: f64, size: (f64, f64)) -> Ve
     for t in ts {
         let (normal, anchor) = normal_at_path_t(path, t);
         for sign in [1.0, -1.0] {
-            for mult in [1.0, 2.0] {
+            for mult in [1.0, 2.0, 3.0] {
                 let offset = DEFAULT_LABEL_PERP_OFFSET * mult * sign;
                 candidates.push(Point::new(
                     anchor.x + normal.x * offset,
@@ -285,13 +305,14 @@ fn score_candidate(
     group_obstacles: &[(f64, f64, f64, f64)],
     edge_segments: &[Vec<(Point, Point)>],
 ) -> f64 {
+    // 节点重叠：高有限惩罚（非 INFINITY），按重叠面积加权。
+    // 保证「全部候选都碰节点」时仍能选出最小重叠候选，而非回退原始冲突位置。
+    let mut score = 0.0;
     for node_bbox in node_obstacles {
-        if aabb_overlap(&bbox, node_bbox).is_some() {
-            return REJECT_SCORE;
+        if let Some((ox, oy)) = aabb_overlap(&bbox, node_bbox) {
+            score += NODE_OVERLAP_PENALTY + ox * oy * NODE_OVERLAP_AREA_WEIGHT;
         }
     }
-
-    let mut score = 0.0;
 
     for placed in placed_bboxes {
         if let Some((ox, oy)) = aabb_overlap(&bbox, placed) {

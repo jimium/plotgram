@@ -79,9 +79,9 @@ pub use catalog::{
 };
 pub use plan::{validate_layout_plan_warnings, FriendlinessMode, LayoutPlan, ResolvedAlgoOptions};
 pub use lint::{
-    compute_lint_metrics, lint_layout, parse_lint_profile, parse_lint_rule, parse_lint_rules_list,
-    LayoutLinter, LayoutViolation, LintConfig, LintMetricsSummary, LintProfile, LintReport,
-    LintRuleId, LintSeverity, RuleConfig,
+    compute_lint_metrics, count_unrelated_parallel_overlaps, lint_layout, parse_lint_profile,
+    parse_lint_rule, parse_lint_rules_list, LayoutLinter, LayoutViolation, LintConfig,
+    LintMetricsSummary, LintProfile, LintReport, LintRuleId, LintSeverity, RuleConfig,
 };
 pub use registry::{EDGE_ROUTING_NAMES, LAYOUT_ALGORITHM_NAMES};
 pub use grid_snap::{DiagramAlignOverride, EdgeSnapConfig, LayerAxisAlign, NodeAlignConfig};

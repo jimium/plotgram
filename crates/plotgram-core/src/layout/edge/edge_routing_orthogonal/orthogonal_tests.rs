@@ -1176,3 +1176,165 @@
             assert_eq!((n1.x, n1.y), (n2.x, n2.y), "节点 {} 位置应一致", nid);
         }
     }
+
+    /// A2 验证：slot 分组键 (`endpoint_bundling_key`) 与 `edge_merge_policy` 语义对齐。
+    ///
+    /// 同源 fan-out（同 from_id）→ 相同 bundling_key（from 端）→ 同子组 ↔ `SameSourceFanOut`
+    /// 同宿 fan-in（同 to_id）→ 相同 bundling_key（to 端）→ 同子组 ↔ `SameTargetFanIn`
+    /// 无向对相同 → 相同 pair_key → 同 pair_group ↔ `ParallelPair`
+    /// 无关边（不同源、不同宿、不同无向对）→ 不同 key → 不同组 ↔ `edges_may_share_trunk == false`
+    #[test]
+    fn slot_bundling_key_aligns_with_merge_policy() {
+        use crate::layout::edge::edge_merge_policy::{edges_may_share_trunk, edge_merge_context};
+        use crate::types::DiagramType as DT;
+        use crate::ast::{ArrowType, AttributeMap, Identifier, Relation, Span};
+
+        let span = Span::dummy();
+        let mk_rel = |from: &str, to: &str| Relation {
+            from: Identifier::new_unchecked(from),
+            to: Identifier::new_unchecked(to),
+            arrow: ArrowType::Active,
+            label: None,
+            head_label: None,
+            tail_label: None,
+            attributes: AttributeMap::default(),
+            span,
+        };
+
+        // 同源 fan-out: lb->auth_svc, lb->biz_svc
+        let rel_a = mk_rel("lb", "auth_svc");
+        let rel_b = mk_rel("lb", "biz_svc");
+        let k_a_from = endpoint_bundling_key("lb", Port::Bottom, true, &rel_a);
+        let k_b_from = endpoint_bundling_key("lb", Port::Bottom, true, &rel_b);
+        assert_eq!(k_a_from, k_b_from, "同源边 from 端应有相同 bundling_key");
+
+        let ctx_a = edge_merge_context("lb", "auth_svc", 0);
+        let ctx_b = edge_merge_context("lb", "biz_svc", 1);
+        assert!(
+            edges_may_share_trunk(&ctx_a, &ctx_b, DT::Architecture),
+            "同源 fan-out 应允许共享 trunk"
+        );
+
+        // 无关边: auth_svc->redis, biz_svc->db_master
+        let rel_c = mk_rel("auth_svc", "redis");
+        let rel_d = mk_rel("biz_svc", "db_master");
+        let k_c_from = endpoint_bundling_key("auth_svc", Port::Bottom, true, &rel_c);
+        let k_d_from = endpoint_bundling_key("biz_svc", Port::Bottom, true, &rel_d);
+        assert_ne!(k_c_from, k_d_from, "不同源边 from 端应有不同 bundling_key");
+
+        let ctx_c = edge_merge_context("auth_svc", "redis", 2);
+        let ctx_d = edge_merge_context("biz_svc", "db_master", 3);
+        assert!(
+            !edges_may_share_trunk(&ctx_c, &ctx_d, DT::Architecture),
+            "无关边不应允许共享 trunk（architecture 语义门控）"
+        );
+
+        // flowchart 不做语义门控
+        assert!(
+            edges_may_share_trunk(&ctx_c, &ctx_d, DT::Flowchart),
+            "flowchart 几何 bundling 优先，不做语义拦截"
+        );
+    }
+
+    /// A2 验证：stress-nested 的 `unrelated_edge_trunk_merge` 违规数不超过基线（4）。
+    ///
+    /// 注意：这些违规源于路由通道选择（corridor routing）使无关边共享平行段，
+    /// 属于 G1（穿组硬约束）的范畴，非 A2（slot 分组语义对齐）能消除。
+    /// A2 的职责是确保 slot 分组键与 merge policy 语义一致，此测试锁定基线防回退。
+    #[test]
+    fn stress_nested_unrelated_trunk_merge_baseline() {
+        let source = include_str!(
+            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
+        );
+        let output = crate::pipeline::parse_prepare_validate(
+            source,
+            &crate::prepare::StyleRequest::default(),
+        );
+        let prepared = output.diagram.expect("valid diagram");
+        let layout = crate::layout::compute_layout_with_plan(
+            prepared.inner(),
+            prepared.layout_plan(),
+        )
+        .expect("layout");
+        let lint_result = crate::layout::lint::lint_layout(prepared.inner(), &layout);
+        let unrelated = lint_result
+            .violations
+            .iter()
+            .filter(|v| {
+                matches!(
+                    v.rule,
+                    crate::layout::lint::LintRuleId::UnrelatedEdgeTrunkMerge
+                )
+            })
+            .count();
+        // 基线 = 4（corridor 边之间的 trunk 共享，非 G1 能消除——G1 已确保
+        // 非 corridor 边不再被强制走 corridor，但 corridor 边之间的共享需 lane 层面解决）
+        assert!(
+            unrelated <= 4,
+            "stress-nested unrelated_edge_trunk_merge 应 ≤ 4（基线），实际 {unrelated}"
+        );
+    }
+
+    /// G1: `strict_group_transit` 默认 false，由调用方按边 corridor 可达性覆盖。
+    ///
+    /// 验证：无 corridor 的图 → 默认 false；有 corridor 的图 → 仍默认 false（按边判定）；
+    /// `with_strict_group_transit(true)` 可覆盖为 true。
+    #[test]
+    fn g1_strict_group_transit_defaults_false_and_overridable() {
+        let nodes: HashMap<String, NodeLayout> = HashMap::new();
+        let cfg = OrthoConfig::from_spec_defaults();
+        let grid = SegmentGrid::new();
+
+        // 无 corridor 的图 → strict_group_transit = false（G1 前 = false）
+        let group_ctx_no_corridor = test_group_ctx(HashMap::new(), HashMap::new());
+        let obstacles = PreparedObstacles::build(&nodes, &group_ctx_no_corridor);
+        let ctx = RoutingContext::new(&nodes, &group_ctx_no_corridor, &grid, &cfg, &obstacles, None);
+        assert!(
+            !ctx.strict_group_transit,
+            "G1: 无 corridor 时 strict_group_transit 应为 false"
+        );
+
+        // 有 corridor 的图 → 仍默认 false（G1 改为按边判定，不再全局 true）
+        let mut groups: HashMap<String, crate::layout::GroupLayout> = HashMap::new();
+        groups.insert(
+            "left".into(),
+            crate::layout::GroupLayout { x: 0.0, y: 0.0, width: 100.0, height: 80.0 },
+        );
+        groups.insert(
+            "right".into(),
+            crate::layout::GroupLayout { x: 140.0, y: 0.0, width: 100.0, height: 80.0 },
+        );
+        let group_ctx_with_corridor = GroupRoutingContext {
+            groups,
+            node_to_groups: HashMap::new(),
+            border_shell_pad: 12.0,
+            stub_clearance: 24.0,
+            corridor_misalignment_penalty: 80.0,
+            repulse_max_rounds: 2,
+            corridors: vec![crate::layout::group::GroupCorridor {
+                axis: crate::layout::group::CorridorAxis::Vertical,
+                coord: 120.0,
+                span_min: 10.0,
+                span_max: 200.0,
+                group_a: "left".into(),
+                group_b: "right".into(),
+            }],
+            node_leaf_group: HashMap::new(),
+            sibling_sets: vec![],
+            sibling_orientation: HashMap::new(),
+            group_ancestors: HashMap::new(),
+        };
+        let obstacles = PreparedObstacles::build(&nodes, &group_ctx_with_corridor);
+        let ctx = RoutingContext::new(&nodes, &group_ctx_with_corridor, &grid, &cfg, &obstacles, None);
+        assert!(
+            !ctx.strict_group_transit,
+            "G1: 有 corridor 时 strict_group_transit 默认也应为 false（按边判定，不再全局 true）"
+        );
+
+        // with_strict_group_transit(true) 可覆盖为 true（corridor 可达的边）
+        let ctx_strict = ctx.with_strict_group_transit(true);
+        assert!(
+            ctx_strict.strict_group_transit,
+            "G1: with_strict_group_transit(true) 应将 strict_group_transit 设为 true"
+        );
+    }

@@ -137,9 +137,22 @@ pub fn resolve_label_overlaps(
                             new_b.y -= shift;
                         }
                     }
-                    edges[ka.0].set_label_pos_at(ka.1, new_a);
-                    edges[kb.0].set_label_pos_at(kb.1, new_b);
-                    moved = true;
+                    // 节点安全检查：不把标签推入节点（避免 label-label ↔ label-node 振荡）
+                    let (w_a, h_a) = (bbox_a.2 - bbox_a.0, bbox_a.3 - bbox_a.1);
+                    let (w_b, h_b) = (bbox_b.2 - bbox_b.0, bbox_b.3 - bbox_b.1);
+                    let new_bbox_a = (new_a.x - w_a / 2.0, new_a.y - h_a / 2.0, new_a.x + w_a / 2.0, new_a.y + h_a / 2.0);
+                    let new_bbox_b = (new_b.x - w_b / 2.0, new_b.y - h_b / 2.0, new_b.x + w_b / 2.0, new_b.y + h_b / 2.0);
+                    let a_safe = node_obstacles.iter().all(|n| aabb_overlap(&new_bbox_a, n).is_none());
+                    let b_safe = node_obstacles.iter().all(|n| aabb_overlap(&new_bbox_b, n).is_none());
+                    if a_safe {
+                        edges[ka.0].set_label_pos_at(ka.1, new_a);
+                    }
+                    if b_safe {
+                        edges[kb.0].set_label_pos_at(kb.1, new_b);
+                    }
+                    if a_safe || b_safe {
+                        moved = true;
+                    }
                 }
             }
         }
@@ -302,19 +315,28 @@ fn push_label_from_obstacle(
 ) -> bool {
     if let Some((dx, dy)) = aabb_overlap(bbox, &obstacle) {
         if dx < dy {
-            let shift = dx + DEFAULT_MIN_SEPARATION;
+            // X 轴推开：位移量基于实际清空距离（标签边到障碍边的距离），
+            // 而非重叠深度。当标签完全嵌入障碍 X 范围时，dx=标签宽度≠清空距离。
             let cx = (obstacle.0 + obstacle.2) / 2.0;
             if label_pos.x < cx {
+                // 向左推：标签右边需清空障碍左边
+                let shift = (bbox.2 - obstacle.0) + DEFAULT_MIN_SEPARATION;
                 label_pos.x -= shift;
             } else {
+                // 向右推：标签左边需清空障碍右边
+                let shift = (obstacle.2 - bbox.0) + DEFAULT_MIN_SEPARATION;
                 label_pos.x += shift;
             }
         } else {
-            let shift = dy + DEFAULT_MIN_SEPARATION;
+            // Y 轴推开：同理用实际清空距离
             let cy = (obstacle.1 + obstacle.3) / 2.0;
             if label_pos.y < cy {
+                // 向上推：标签底边需清空障碍顶边
+                let shift = (bbox.3 - obstacle.1) + DEFAULT_MIN_SEPARATION;
                 label_pos.y -= shift;
             } else {
+                // 向下推：标签顶边需清空障碍底边
+                let shift = (obstacle.3 - bbox.1) + DEFAULT_MIN_SEPARATION;
                 label_pos.y += shift;
             }
         }

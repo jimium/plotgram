@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "1783480751",
+  "generated_at": "1783494465",
   "entries": [
     {
       "path": "architecture/c.ai-agent-docops-pipeline.pgm",
@@ -10,17 +10,18 @@
         "edge_node_crossings": 1,
         "edge_through_groups": 1,
         "label_node_overlaps": 0,
-        "label_label_overlaps": 0,
+        "label_label_overlaps": 2,
         "bend_count": 32,
+        "edge_parallel_overlap_count": 3,
         "edge_crossings": 17,
-        "total_area": 1622350.0,
+        "total_area": 1608931.0,
         "total_edge_length": 7499.876031999999,
         "total_node_area": 159750.0,
         "edge_length_stddev": 269.6940571379112,
         "edge_length_cv": 0.6113166340059968,
-        "aspect_ratio": 1.2428884026258205,
-        "aspect_ratio_deviation": 0.35711159737417963,
-        "area_utilization": 0.09846827133479212,
+        "aspect_ratio": 1.3284870513403,
+        "aspect_ratio_deviation": 0.2715129486597001,
+        "area_utilization": 0.09928952826441904,
         "channel_congestion": 18.0,
         "long_edge_count": 9,
         "group_gap_deficit": 0.0,
@@ -35,10 +36,11 @@
           "edge_crossing": 17,
           "edge_crosses_group_interior": 1,
           "label_node_overlap": 0,
-          "label_label_overlap": 0,
-          "total_violations": 22,
+          "label_label_overlap": 2,
+          "unrelated_edge_trunk_merge": 3,
+          "total_violations": 24,
           "error_count": 2,
-          "warning_count": 20
+          "warning_count": 22
         }
       },
       "lint": {
@@ -48,13 +50,14 @@
         "edge_crossing": 17,
         "edge_crosses_group_interior": 1,
         "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "total_violations": 22,
+        "label_label_overlap": 2,
+        "unrelated_edge_trunk_merge": 3,
+        "total_violations": 24,
         "error_count": 2,
-        "warning_count": 20
+        "warning_count": 22
       },
-      "score": 63.01,
-      "elapsed_us": 391413
+      "score": 62.33,
+      "elapsed_us": 409262
     },
     {
       "path": "architecture/c.cloud-native.pgm",
@@ -66,6 +69,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 23,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 7,
         "total_area": 1250832.0,
         "total_edge_length": 6772.0,
@@ -90,6 +94,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 7,
           "error_count": 0,
           "warning_count": 7
@@ -103,12 +108,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 7,
         "error_count": 0,
         "warning_count": 7
       },
       "score": 61.4,
-      "elapsed_us": 46180
+      "elapsed_us": 46860
     },
     {
       "path": "architecture/c.data-lineage-platform.pgm",
@@ -117,18 +123,19 @@
         "node_overlap_pairs": 0,
         "edge_node_crossings": 0,
         "edge_through_groups": 1,
-        "label_node_overlaps": 2,
+        "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 36,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 15,
-        "total_area": 1569604.0170108122,
+        "total_area": 1556580.0170108122,
         "total_edge_length": 8718.028988219547,
         "total_node_area": 138950.0,
         "edge_length_stddev": 358.4945708721597,
         "edge_length_cv": 0.8224211489927011,
-        "aspect_ratio": 1.6885685633293988,
-        "aspect_ratio_deviation": 0.08856856332939866,
-        "area_utilization": 0.08852551248219878,
+        "aspect_ratio": 1.7026969195516728,
+        "aspect_ratio_deviation": 0.1026969195516727,
+        "area_utilization": 0.08926621084782617,
         "channel_congestion": 18.0,
         "long_edge_count": 9,
         "group_gap_deficit": 0.0,
@@ -142,10 +149,11 @@
           "edge_through_node": 0,
           "edge_crossing": 15,
           "edge_crosses_group_interior": 1,
-          "label_node_overlap": 2,
+          "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "total_violations": 18,
-          "error_count": 3,
+          "unrelated_edge_trunk_merge": 0,
+          "total_violations": 16,
+          "error_count": 1,
           "warning_count": 15
         }
       },
@@ -155,14 +163,15 @@
         "edge_through_node": 0,
         "edge_crossing": 15,
         "edge_crosses_group_interior": 1,
-        "label_node_overlap": 2,
+        "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "total_violations": 18,
-        "error_count": 3,
+        "unrelated_edge_trunk_merge": 0,
+        "total_violations": 16,
+        "error_count": 1,
         "warning_count": 15
       },
-      "score": 60.05,
-      "elapsed_us": 216200
+      "score": 60.61,
+      "elapsed_us": 215293
     },
     {
       "path": "architecture/c.ecommerce-platform.pgm",
@@ -174,6 +183,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 40,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 10,
         "total_area": 2022272.0,
         "total_edge_length": 10316.829436997048,
@@ -198,6 +208,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 10,
           "error_count": 0,
           "warning_count": 10
@@ -211,12 +222,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 10,
         "error_count": 0,
         "warning_count": 10
       },
       "score": 66.73,
-      "elapsed_us": 77345
+      "elapsed_us": 77032
     },
     {
       "path": "architecture/c.hybrid-cloud-dr-topology.pgm",
@@ -227,13 +239,14 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 46,
+        "bend_count": 47,
+        "edge_parallel_overlap_count": 2,
         "edge_crossings": 20,
         "total_area": 2662080.0,
-        "total_edge_length": 14280.220000000001,
+        "total_edge_length": 14332.220000000001,
         "total_node_area": 163300.0,
-        "edge_length_stddev": 615.581564741266,
-        "edge_length_cv": 1.0345749262819748,
+        "edge_length_stddev": 618.1310637849972,
+        "edge_length_cv": 1.0350905533713501,
         "aspect_ratio": 1.911864406779661,
         "aspect_ratio_deviation": 0.311864406779661,
         "area_utilization": 0.06134300997716072,
@@ -252,6 +265,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 2,
           "total_violations": 22,
           "error_count": 0,
           "warning_count": 22
@@ -265,12 +279,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 2,
         "total_violations": 22,
         "error_count": 0,
         "warning_count": 22
       },
       "score": 54.23,
-      "elapsed_us": 93702
+      "elapsed_us": 89063
     },
     {
       "path": "architecture/c.k8s-blue-green-release-topology.pgm",
@@ -282,6 +297,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 73,
+        "edge_parallel_overlap_count": 7,
         "edge_crossings": 29,
         "total_area": 3193596.0,
         "total_edge_length": 24375.964999999997,
@@ -306,6 +322,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 7,
           "total_violations": 36,
           "error_count": 0,
           "warning_count": 36
@@ -319,12 +336,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 7,
         "total_violations": 36,
         "error_count": 0,
         "warning_count": 36
       },
       "score": 57.4,
-      "elapsed_us": 148824
+      "elapsed_us": 149659
     },
     {
       "path": "architecture/c.k8s-multi-cluster-federation.pgm",
@@ -336,6 +354,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 88,
+        "edge_parallel_overlap_count": 6,
         "edge_crossings": 47,
         "total_area": 2679280.0,
         "total_edge_length": 23204.880191730474,
@@ -360,6 +379,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 6,
           "total_violations": 55,
           "error_count": 2,
           "warning_count": 53
@@ -373,12 +393,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 6,
         "total_violations": 55,
         "error_count": 2,
         "warning_count": 53
       },
       "score": 59.27,
-      "elapsed_us": 777393
+      "elapsed_us": 816920
     },
     {
       "path": "architecture/c.k8s-multi-namespace-overview.pgm",
@@ -390,12 +411,13 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 151,
-        "edge_crossings": 61,
+        "edge_parallel_overlap_count": 20,
+        "edge_crossings": 62,
         "total_area": 2602032.0,
         "total_edge_length": 23226.071094472652,
         "total_node_area": 233450.0,
-        "edge_length_stddev": 527.6772312806347,
-        "edge_length_cv": 0.8406095666360819,
+        "edge_length_stddev": 528.1299583899199,
+        "edge_length_cv": 0.8413307778549496,
         "aspect_ratio": 1.2618384401114207,
         "aspect_ratio_deviation": 0.33816155988857943,
         "area_utilization": 0.08971834320254324,
@@ -410,29 +432,31 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 11,
-          "edge_crossing": 61,
+          "edge_crossing": 62,
           "edge_crosses_group_interior": 1,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "total_violations": 95,
+          "unrelated_edge_trunk_merge": 20,
+          "total_violations": 94,
           "error_count": 12,
-          "warning_count": 83
+          "warning_count": 82
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 11,
-        "edge_crossing": 61,
+        "edge_crossing": 62,
         "edge_crosses_group_interior": 1,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "total_violations": 95,
+        "unrelated_edge_trunk_merge": 20,
+        "total_violations": 94,
         "error_count": 12,
-        "warning_count": 83
+        "warning_count": 82
       },
-      "score": 55.21,
-      "elapsed_us": 877477
+      "score": 55.19,
+      "elapsed_us": 912847
     },
     {
       "path": "architecture/c.k8s-platform-stack.pgm",
@@ -444,6 +468,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 66,
+        "edge_parallel_overlap_count": 3,
         "edge_crossings": 40,
         "total_area": 2656704.0,
         "total_edge_length": 23237.164464682985,
@@ -468,6 +493,7 @@
           "edge_crosses_group_interior": 5,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 3,
           "total_violations": 56,
           "error_count": 13,
           "warning_count": 43
@@ -481,12 +507,13 @@
         "edge_crosses_group_interior": 5,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 3,
         "total_violations": 56,
         "error_count": 13,
         "warning_count": 43
       },
       "score": 52.8,
-      "elapsed_us": 1344713
+      "elapsed_us": 1337816
     },
     {
       "path": "architecture/c.k8s-tenant-isolation.pgm",
@@ -498,15 +525,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 62,
+        "edge_parallel_overlap_count": 3,
         "edge_crossings": 40,
-        "total_area": 2359948.0,
+        "total_area": 2368174.0,
         "total_edge_length": 17950.36,
         "total_node_area": 197050.0,
         "edge_length_stddev": 538.6772310497996,
         "edge_length_cv": 0.780241065209544,
-        "aspect_ratio": 1.4159566227730442,
-        "aspect_ratio_deviation": 0.18404337722695585,
-        "area_utilization": 0.08349760248954638,
+        "aspect_ratio": 1.4110382091856426,
+        "aspect_ratio_deviation": 0.1889617908143575,
+        "area_utilization": 0.08320756836279766,
         "channel_congestion": 27.0,
         "long_edge_count": 14,
         "group_gap_deficit": 0.0,
@@ -522,6 +550,7 @@
           "edge_crosses_group_interior": 1,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 3,
           "total_violations": 44,
           "error_count": 1,
           "warning_count": 43
@@ -535,12 +564,13 @@
         "edge_crosses_group_interior": 1,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 3,
         "total_violations": 44,
         "error_count": 1,
         "warning_count": 43
       },
-      "score": 59.74,
-      "elapsed_us": 547951
+      "score": 59.72,
+      "elapsed_us": 568304
     },
     {
       "path": "architecture/c.layout-stress-nested.pgm",
@@ -549,18 +579,19 @@
         "node_overlap_pairs": 0,
         "edge_node_crossings": 0,
         "edge_through_groups": 0,
-        "label_node_overlaps": 2,
+        "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 22,
+        "edge_parallel_overlap_count": 4,
         "edge_crossings": 3,
-        "total_area": 1030986.0,
+        "total_area": 1049926.921875,
         "total_edge_length": 5171.0,
         "total_node_area": 85800.0,
         "edge_length_stddev": 255.00954849276764,
         "edge_length_cv": 0.6410992323353276,
-        "aspect_ratio": 2.1130994989262706,
-        "aspect_ratio_deviation": 0.5130994989262705,
-        "area_utilization": 0.08322130465399143,
+        "aspect_ratio": 2.1909534127843986,
+        "aspect_ratio_deviation": 0.5909534127843985,
+        "area_utilization": 0.08171997327849738,
         "channel_congestion": 12.0,
         "long_edge_count": 7,
         "group_gap_deficit": 0.0,
@@ -574,10 +605,11 @@
           "edge_through_node": 0,
           "edge_crossing": 3,
           "edge_crosses_group_interior": 0,
-          "label_node_overlap": 2,
+          "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "total_violations": 9,
-          "error_count": 2,
+          "unrelated_edge_trunk_merge": 4,
+          "total_violations": 7,
+          "error_count": 0,
           "warning_count": 7
         }
       },
@@ -587,14 +619,15 @@
         "edge_through_node": 0,
         "edge_crossing": 3,
         "edge_crosses_group_interior": 0,
-        "label_node_overlap": 2,
+        "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "total_violations": 9,
-        "error_count": 2,
+        "unrelated_edge_trunk_merge": 4,
+        "total_violations": 7,
+        "error_count": 0,
         "warning_count": 7
       },
-      "score": 65.17,
-      "elapsed_us": 34828
+      "score": 65.65,
+      "elapsed_us": 37761
     },
     {
       "path": "architecture/c.mcp-server-cluster-architecture.pgm",
@@ -606,6 +639,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 19,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 3,
         "total_area": 1090800.0,
         "total_edge_length": 4114.243735875357,
@@ -630,6 +664,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 3,
           "error_count": 0,
           "warning_count": 3
@@ -643,12 +678,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 3,
         "error_count": 0,
         "warning_count": 3
       },
       "score": 72.95,
-      "elapsed_us": 24342
+      "elapsed_us": 24314
     },
     {
       "path": "architecture/c.payment-clearing-platform.pgm",
@@ -657,18 +693,19 @@
         "node_overlap_pairs": 0,
         "edge_node_crossings": 0,
         "edge_through_groups": 0,
-        "label_node_overlaps": 1,
+        "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 26,
+        "edge_parallel_overlap_count": 1,
         "edge_crossings": 5,
-        "total_area": 1884068.0731702843,
+        "total_area": 1706364.0,
         "total_edge_length": 8432.381077129532,
         "total_node_area": 152700.0,
-        "edge_length_stddev": 492.5524033222734,
-        "edge_length_cv": 0.9930043222535473,
-        "aspect_ratio": 1.2069967281879987,
-        "aspect_ratio_deviation": 0.39300327181200134,
-        "area_utilization": 0.08104802696595496,
+        "edge_length_stddev": 492.55240332227345,
+        "edge_length_cv": 0.9930043222535474,
+        "aspect_ratio": 1.3700716845878136,
+        "aspect_ratio_deviation": 0.2299283154121865,
+        "area_utilization": 0.0894885264808681,
         "channel_congestion": 14.0,
         "long_edge_count": 9,
         "group_gap_deficit": 0.0,
@@ -682,10 +719,11 @@
           "edge_through_node": 0,
           "edge_crossing": 5,
           "edge_crosses_group_interior": 0,
-          "label_node_overlap": 1,
+          "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "total_violations": 7,
-          "error_count": 1,
+          "unrelated_edge_trunk_merge": 1,
+          "total_violations": 6,
+          "error_count": 0,
           "warning_count": 6
         }
       },
@@ -695,14 +733,15 @@
         "edge_through_node": 0,
         "edge_crossing": 5,
         "edge_crosses_group_interior": 0,
-        "label_node_overlap": 1,
+        "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "total_violations": 7,
-        "error_count": 1,
+        "unrelated_edge_trunk_merge": 1,
+        "total_violations": 6,
+        "error_count": 0,
         "warning_count": 6
       },
-      "score": 60.68,
-      "elapsed_us": 101620
+      "score": 61.37,
+      "elapsed_us": 106766
     },
     {
       "path": "architecture/c.plotgram-core-mod-deps.pgm",
@@ -711,18 +750,19 @@
         "node_overlap_pairs": 1,
         "edge_node_crossings": 5,
         "edge_through_groups": 2,
-        "label_node_overlaps": 1,
+        "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 61,
+        "edge_parallel_overlap_count": 4,
         "edge_crossings": 35,
-        "total_area": 2183760.0,
+        "total_area": 2212068.0,
         "total_edge_length": 19631.4,
         "total_node_area": 219250.0,
         "edge_length_stddev": 603.7002165303268,
         "edge_length_cv": 0.8918012102743296,
-        "aspect_ratio": 1.201780415430267,
-        "aspect_ratio_deviation": 0.39821958456973316,
-        "area_utilization": 0.10040022713118658,
+        "aspect_ratio": 1.2173590504451037,
+        "aspect_ratio_deviation": 0.38264094955489636,
+        "area_utilization": 0.09911539789916042,
         "channel_congestion": 28.0,
         "long_edge_count": 18,
         "group_gap_deficit": 0.0,
@@ -736,10 +776,11 @@
           "edge_through_node": 5,
           "edge_crossing": 35,
           "edge_crosses_group_interior": 2,
-          "label_node_overlap": 1,
+          "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "total_violations": 48,
-          "error_count": 9,
+          "unrelated_edge_trunk_merge": 4,
+          "total_violations": 47,
+          "error_count": 8,
           "warning_count": 39
         }
       },
@@ -749,14 +790,15 @@
         "edge_through_node": 5,
         "edge_crossing": 35,
         "edge_crosses_group_interior": 2,
-        "label_node_overlap": 1,
+        "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "total_violations": 48,
-        "error_count": 9,
+        "unrelated_edge_trunk_merge": 4,
+        "total_violations": 47,
+        "error_count": 8,
         "warning_count": 39
       },
-      "score": 55.83,
-      "elapsed_us": 1079345
+      "score": 55.99,
+      "elapsed_us": 1076381
     },
     {
       "path": "architecture/c.supply-chain-control-tower.pgm",
@@ -768,15 +810,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 22,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 1,
-        "total_area": 1940424.6357355288,
+        "total_area": 1925160.6357355288,
         "total_edge_length": 4925.422712758327,
         "total_node_area": 173500.0,
         "edge_length_stddev": 354.1786432436691,
         "edge_length_cv": 1.2943489219457889,
-        "aspect_ratio": 1.8761171822682314,
-        "aspect_ratio_deviation": 0.27611718226823134,
-        "area_utilization": 0.08941341848828561,
+        "aspect_ratio": 1.890992331977077,
+        "aspect_ratio_deviation": 0.29099233197707686,
+        "area_utilization": 0.09012234967795943,
         "channel_congestion": 14.0,
         "long_edge_count": 3,
         "group_gap_deficit": 0.0,
@@ -792,6 +835,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 1,
           "error_count": 0,
           "warning_count": 1
@@ -805,12 +849,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 1,
         "error_count": 0,
         "warning_count": 1
       },
-      "score": 61.75,
-      "elapsed_us": 47096
+      "score": 61.71,
+      "elapsed_us": 49014
     },
     {
       "path": "architecture/n.compiler-pipeline.pgm",
@@ -822,15 +867,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 15,
+        "edge_parallel_overlap_count": 1,
         "edge_crossings": 3,
-        "total_area": 1359540.0,
+        "total_area": 1311240.0,
         "total_edge_length": 5077.663794107513,
         "total_node_area": 78500.0,
         "edge_length_stddev": 285.35389957777926,
         "edge_length_cv": 0.6181765911713512,
-        "aspect_ratio": 1.14010989010989,
-        "aspect_ratio_deviation": 0.45989010989011003,
-        "area_utilization": 0.057740117981081834,
+        "aspect_ratio": 1.0547085201793722,
+        "aspect_ratio_deviation": 0.5452914798206279,
+        "area_utilization": 0.05986699612580458,
         "channel_congestion": 13.0,
         "long_edge_count": 3,
         "group_gap_deficit": 40.0,
@@ -846,6 +892,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 1,
           "total_violations": 4,
           "error_count": 0,
           "warning_count": 4
@@ -859,12 +906,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 1,
         "total_violations": 4,
         "error_count": 0,
         "warning_count": 4
       },
-      "score": 67.76,
-      "elapsed_us": 28965
+      "score": 67.85,
+      "elapsed_us": 31662
     },
     {
       "path": "architecture/n.d2-cell-tower-network.pgm",
@@ -876,15 +924,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 15,
+        "edge_parallel_overlap_count": 3,
         "edge_crossings": 1,
-        "total_area": 758840.5,
+        "total_area": 711377.75,
         "total_edge_length": 4146.764035174503,
         "total_node_area": 46550.0,
         "edge_length_stddev": 318.0994435583463,
         "edge_length_cv": 0.5369719824954353,
-        "aspect_ratio": 1.270786153348431,
-        "aspect_ratio_deviation": 0.32921384665156905,
-        "area_utilization": 0.06134358933135488,
+        "aspect_ratio": 1.4141698977793444,
+        "aspect_ratio_deviation": 0.18583010222065566,
+        "area_utilization": 0.06543640140558234,
         "channel_congestion": 9.0,
         "long_edge_count": 5,
         "group_gap_deficit": 0.0,
@@ -900,6 +949,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 3,
           "total_violations": 4,
           "error_count": 0,
           "warning_count": 4
@@ -913,12 +963,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 3,
         "total_violations": 4,
         "error_count": 0,
         "warning_count": 4
       },
-      "score": 70.57,
-      "elapsed_us": 21612
+      "score": 70.74,
+      "elapsed_us": 22551
     },
     {
       "path": "architecture/n.data-pipeline.pgm",
@@ -927,9 +978,10 @@
         "node_overlap_pairs": 0,
         "edge_node_crossings": 0,
         "edge_through_groups": 0,
-        "label_node_overlaps": 1,
+        "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 13,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 711480.0,
         "total_edge_length": 1422.18,
@@ -952,10 +1004,11 @@
           "edge_through_node": 0,
           "edge_crossing": 0,
           "edge_crosses_group_interior": 0,
-          "label_node_overlap": 1,
+          "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "total_violations": 1,
-          "error_count": 1,
+          "unrelated_edge_trunk_merge": 0,
+          "total_violations": 0,
+          "error_count": 0,
           "warning_count": 0
         }
       },
@@ -965,14 +1018,15 @@
         "edge_through_node": 0,
         "edge_crossing": 0,
         "edge_crosses_group_interior": 0,
-        "label_node_overlap": 1,
+        "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "total_violations": 1,
-        "error_count": 1,
+        "unrelated_edge_trunk_merge": 0,
+        "total_violations": 0,
+        "error_count": 0,
         "warning_count": 0
       },
-      "score": 69.91,
-      "elapsed_us": 13326
+      "score": 70.66,
+      "elapsed_us": 13815
     },
     {
       "path": "architecture/n.event-driven.pgm",
@@ -984,6 +1038,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 14,
+        "edge_parallel_overlap_count": 1,
         "edge_crossings": 2,
         "total_area": 548432.0,
         "total_edge_length": 2370.0,
@@ -1008,6 +1063,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 1,
           "total_violations": 3,
           "error_count": 0,
           "warning_count": 3
@@ -1021,12 +1077,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 1,
         "total_violations": 3,
         "error_count": 0,
         "warning_count": 3
       },
       "score": 70.49,
-      "elapsed_us": 7832
+      "elapsed_us": 7951
     },
     {
       "path": "architecture/n.microservices.pgm",
@@ -1038,6 +1095,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 9,
+        "edge_parallel_overlap_count": 1,
         "edge_crossings": 0,
         "total_area": 445704.0,
         "total_edge_length": 1330.675,
@@ -1062,6 +1120,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 1,
           "total_violations": 1,
           "error_count": 0,
           "warning_count": 1
@@ -1075,12 +1134,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 1,
         "total_violations": 1,
         "error_count": 0,
         "warning_count": 1
       },
       "score": 77.16,
-      "elapsed_us": 11781
+      "elapsed_us": 12065
     },
     {
       "path": "architecture/s.client-api-db.pgm",
@@ -1092,6 +1152,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 122400.0,
         "total_edge_length": 160.0,
@@ -1116,6 +1177,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -1129,12 +1191,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 85.27,
-      "elapsed_us": 714
+      "elapsed_us": 759
     },
     {
       "path": "architecture/s.three-tier.pgm",
@@ -1146,15 +1209,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
-        "total_area": 137250.0,
+        "total_area": 148050.0,
         "total_edge_length": 320.0,
         "total_node_area": 18350.0,
         "edge_length_stddev": 0.0,
         "edge_length_cv": 0.0,
-        "aspect_ratio": 1.4754098360655736,
-        "aspect_ratio_deviation": 0.12459016393442646,
-        "area_utilization": 0.1336976320582878,
+        "aspect_ratio": 1.3677811550151975,
+        "aspect_ratio_deviation": 0.2322188449848026,
+        "area_utilization": 0.12394461330631544,
         "channel_congestion": 2.0,
         "long_edge_count": 0,
         "group_gap_deficit": 0.0,
@@ -1170,6 +1234,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -1183,12 +1248,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
-      "score": 85.35,
-      "elapsed_us": 1611
+      "score": 84.96,
+      "elapsed_us": 1865
     },
     {
       "path": "er/c.ecommerce-schema.pgm",
@@ -1200,6 +1266,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 21,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 714604.5120000001,
         "total_edge_length": 1984.299758969145,
@@ -1224,6 +1291,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -1237,12 +1305,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 75.28,
-      "elapsed_us": 12910
+      "elapsed_us": 15893
     },
     {
       "path": "er/c.layout-stress-dense.pgm",
@@ -1254,6 +1323,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 19,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 20,
         "total_area": 841081.1377274495,
         "total_edge_length": 7500.433299651314,
@@ -1278,6 +1348,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 20,
           "error_count": 0,
           "warning_count": 20
@@ -1291,12 +1362,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 20,
         "error_count": 0,
         "warning_count": 20
       },
       "score": 65.09,
-      "elapsed_us": 55831
+      "elapsed_us": 57007
     },
     {
       "path": "er/c.saas-schema.pgm",
@@ -1308,15 +1380,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 262,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 5,
-        "total_area": 1280208.0,
+        "total_area": 1325811.222638835,
         "total_edge_length": 8576.902450689073,
         "total_node_area": 93043.2,
         "edge_length_stddev": 509.368860495967,
         "edge_length_cv": 0.5938844045673436,
-        "aspect_ratio": 3.604026845637584,
-        "aspect_ratio_deviation": 2.004026845637584,
-        "area_utilization": 0.07267818979415845,
+        "aspect_ratio": 3.5484395664084465,
+        "aspect_ratio_deviation": 1.9484395664084464,
+        "area_utilization": 0.07017831680049517,
         "channel_congestion": 11.0,
         "long_edge_count": 7,
         "group_gap_deficit": 0.0,
@@ -1332,6 +1405,7 @@
           "edge_crosses_group_interior": 4,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 9,
           "error_count": 4,
           "warning_count": 5
@@ -1345,12 +1419,13 @@
         "edge_crosses_group_interior": 4,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 9,
         "error_count": 4,
         "warning_count": 5
       },
-      "score": 57.01,
-      "elapsed_us": 79103
+      "score": 57.19,
+      "elapsed_us": 92335
     },
     {
       "path": "er/n.blog-schema.pgm",
@@ -1362,6 +1437,7 @@
         "label_node_overlaps": 1,
         "label_label_overlaps": 0,
         "bend_count": 33,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 290416.23600000003,
         "total_edge_length": 813.5513962139119,
@@ -1386,6 +1462,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 1,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 1,
           "error_count": 1,
           "warning_count": 0
@@ -1399,12 +1476,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 1,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 1,
         "error_count": 1,
         "warning_count": 0
       },
       "score": 74.83,
-      "elapsed_us": 3659
+      "elapsed_us": 4616
     },
     {
       "path": "er/n.school-schema.pgm",
@@ -1416,6 +1494,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 302255.04,
         "total_edge_length": 521.1692537190437,
@@ -1440,6 +1519,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -1453,12 +1533,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 82.37,
-      "elapsed_us": 1972
+      "elapsed_us": 2086
     },
     {
       "path": "er/n.social-network.pgm",
@@ -1470,6 +1551,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 1,
         "total_area": 466799.53271523176,
         "total_edge_length": 1893.6992437836839,
@@ -1494,6 +1576,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 1,
           "error_count": 0,
           "warning_count": 1
@@ -1507,12 +1590,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 1,
         "error_count": 0,
         "warning_count": 1
       },
       "score": 73.42,
-      "elapsed_us": 5545
+      "elapsed_us": 5896
     },
     {
       "path": "er/s.two-tables.pgm",
@@ -1524,6 +1608,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 109720.0,
         "total_edge_length": 98.0,
@@ -1548,6 +1633,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -1561,12 +1647,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 87.93,
-      "elapsed_us": 425
+      "elapsed_us": 430
     },
     {
       "path": "er/s.user-post.pgm",
@@ -1578,6 +1665,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 109720.0,
         "total_edge_length": 98.0,
@@ -1602,6 +1690,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -1615,12 +1704,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 87.93,
-      "elapsed_us": 356
+      "elapsed_us": 379
     },
     {
       "path": "flowchart/c.aml-case-investigation.pgm",
@@ -1632,6 +1722,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 15,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 1210731.4047881528,
         "total_edge_length": 3446.7192695421463,
@@ -1656,6 +1747,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -1669,12 +1761,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 59.3,
-      "elapsed_us": 30858
+      "elapsed_us": 32375
     },
     {
       "path": "flowchart/c.caffe-shop.pgm",
@@ -1683,18 +1776,19 @@
         "node_overlap_pairs": 0,
         "edge_node_crossings": 0,
         "edge_through_groups": 0,
-        "label_node_overlaps": 1,
+        "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 36,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 3,
-        "total_area": 2506787.107343703,
+        "total_area": 2485171.107343703,
         "total_edge_length": 8703.730459645363,
         "total_node_area": 160000.0,
         "edge_length_stddev": 589.0211827174904,
         "edge_length_cv": 1.691864153676613,
-        "aspect_ratio": 2.9124148511104475,
-        "aspect_ratio_deviation": 1.3124148511104474,
-        "area_utilization": 0.06382672047868586,
+        "aspect_ratio": 2.9377470140490765,
+        "aspect_ratio_deviation": 1.3377470140490764,
+        "area_utilization": 0.06438188482362384,
         "channel_congestion": 15.0,
         "long_edge_count": 7,
         "group_gap_deficit": 0.0,
@@ -1708,10 +1802,11 @@
           "edge_through_node": 0,
           "edge_crossing": 3,
           "edge_crosses_group_interior": 0,
-          "label_node_overlap": 1,
+          "label_node_overlap": 0,
           "label_label_overlap": 0,
-          "total_violations": 4,
-          "error_count": 1,
+          "unrelated_edge_trunk_merge": 0,
+          "total_violations": 3,
+          "error_count": 0,
           "warning_count": 3
         }
       },
@@ -1721,14 +1816,15 @@
         "edge_through_node": 0,
         "edge_crossing": 3,
         "edge_crosses_group_interior": 0,
-        "label_node_overlap": 1,
+        "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "total_violations": 4,
-        "error_count": 1,
+        "unrelated_edge_trunk_merge": 0,
+        "total_violations": 3,
+        "error_count": 0,
         "warning_count": 3
       },
-      "score": 54.79,
-      "elapsed_us": 93501
+      "score": 54.93,
+      "elapsed_us": 99210
     },
     {
       "path": "flowchart/c.change-approval-workflow.pgm",
@@ -1740,6 +1836,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 23,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 1,
         "total_area": 1414804.5841818608,
         "total_edge_length": 3757.530492619613,
@@ -1764,6 +1861,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 1,
           "error_count": 0,
           "warning_count": 1
@@ -1777,12 +1875,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 1,
         "error_count": 0,
         "warning_count": 1
       },
       "score": 59.05,
-      "elapsed_us": 44653
+      "elapsed_us": 50007
     },
     {
       "path": "flowchart/c.ci-cd-security-pipeline.pgm",
@@ -1792,17 +1891,18 @@
         "edge_node_crossings": 0,
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
-        "label_label_overlaps": 0,
+        "label_label_overlaps": 1,
         "bend_count": 39,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 1,
-        "total_area": 2650079.9966792352,
+        "total_area": 2660380.47294701,
         "total_edge_length": 10402.0951577003,
         "total_node_area": 184000.0,
         "edge_length_stddev": 510.7779566005879,
         "edge_length_cv": 1.423997811676606,
-        "aspect_ratio": 3.68267222583065,
-        "aspect_ratio_deviation": 2.08267222583065,
-        "area_utilization": 0.06943186629481635,
+        "aspect_ratio": 3.7677152204084954,
+        "aspect_ratio_deviation": 2.1677152204084953,
+        "area_utilization": 0.06916303959943589,
         "channel_congestion": 17.0,
         "long_edge_count": 0,
         "group_gap_deficit": 0.0,
@@ -1817,10 +1917,11 @@
           "edge_crossing": 1,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
-          "label_label_overlap": 0,
-          "total_violations": 1,
+          "label_label_overlap": 1,
+          "unrelated_edge_trunk_merge": 0,
+          "total_violations": 2,
           "error_count": 0,
-          "warning_count": 1
+          "warning_count": 2
         }
       },
       "lint": {
@@ -1830,13 +1931,14 @@
         "edge_crossing": 1,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "total_violations": 1,
+        "label_label_overlap": 1,
+        "unrelated_edge_trunk_merge": 0,
+        "total_violations": 2,
         "error_count": 0,
-        "warning_count": 1
+        "warning_count": 2
       },
-      "score": 52.09,
-      "elapsed_us": 92058
+      "score": 51.45,
+      "elapsed_us": 97215
     },
     {
       "path": "flowchart/c.customer-refund-process.pgm",
@@ -1848,15 +1950,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 33,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 4,
-        "total_area": 2571927.716212201,
+        "total_area": 2590759.8229208677,
         "total_edge_length": 7480.09543618049,
         "total_node_area": 184000.0,
         "edge_length_stddev": 373.54157107260176,
         "edge_length_cv": 1.348328040064446,
-        "aspect_ratio": 3.1981552001445706,
-        "aspect_ratio_deviation": 1.5981552001445705,
-        "area_utilization": 0.0715416684692,
+        "aspect_ratio": 3.2215726545389347,
+        "aspect_ratio_deviation": 1.6215726545389346,
+        "area_utilization": 0.07102163557274684,
         "channel_congestion": 14.0,
         "long_edge_count": 0,
         "group_gap_deficit": 0.0,
@@ -1872,6 +1975,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 4,
           "error_count": 0,
           "warning_count": 4
@@ -1885,12 +1989,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 4,
         "error_count": 0,
         "warning_count": 4
       },
-      "score": 53.69,
-      "elapsed_us": 95459
+      "score": 53.55,
+      "elapsed_us": 98464
     },
     {
       "path": "flowchart/c.e-commerce-order-fulfillment.pgm",
@@ -1902,15 +2007,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 26,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 1,
-        "total_area": 1942836.0,
+        "total_area": 2000821.7196828604,
         "total_edge_length": 4323.500542371914,
         "total_node_area": 168000.0,
         "edge_length_stddev": 170.4767926979795,
         "edge_length_cv": 0.94632647426636,
-        "aspect_ratio": 4.116448326055313,
-        "aspect_ratio_deviation": 2.5164483260553125,
-        "area_utilization": 0.08647152924899477,
+        "aspect_ratio": 4.056733751014334,
+        "aspect_ratio_deviation": 2.4567337510143337,
+        "area_utilization": 0.08396550194718437,
         "channel_congestion": 11.0,
         "long_edge_count": 0,
         "group_gap_deficit": 0.0,
@@ -1926,6 +2032,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 1,
           "error_count": 0,
           "warning_count": 1
@@ -1939,12 +2046,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 1,
         "error_count": 0,
         "warning_count": 1
       },
-      "score": 51.62,
-      "elapsed_us": 68185
+      "score": 51.82,
+      "elapsed_us": 70083
     },
     {
       "path": "flowchart/c.k8s-incident-response.pgm",
@@ -1956,6 +2064,7 @@
         "label_node_overlaps": 1,
         "label_label_overlaps": 0,
         "bend_count": 27,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 2004460.435185185,
         "total_edge_length": 7613.3522885131015,
@@ -1980,6 +2089,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 1,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 2,
           "error_count": 2,
           "warning_count": 0
@@ -1993,12 +2103,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 1,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 2,
         "error_count": 2,
         "warning_count": 0
       },
       "score": 61.78,
-      "elapsed_us": 97176
+      "elapsed_us": 101367
     },
     {
       "path": "flowchart/c.layout-stress-dag.pgm",
@@ -2010,15 +2121,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 28,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 9,
-        "total_area": 990299.9943457737,
+        "total_area": 990764.4877765175,
         "total_edge_length": 6528.204953972548,
         "total_node_area": 88000.0,
         "edge_length_stddev": 327.9919962653791,
         "edge_length_cv": 0.9043613021347018,
-        "aspect_ratio": 1.1474866267677966,
-        "aspect_ratio_deviation": 0.45251337323220353,
-        "area_utilization": 0.08886196152927965,
+        "aspect_ratio": 1.1480248475120591,
+        "aspect_ratio_deviation": 0.45197515248794096,
+        "area_utilization": 0.08882030097535125,
         "channel_congestion": 16.0,
         "long_edge_count": 7,
         "group_gap_deficit": 0.0,
@@ -2034,6 +2146,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 9,
           "error_count": 0,
           "warning_count": 9
@@ -2047,12 +2160,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 9,
         "error_count": 0,
         "warning_count": 9
       },
       "score": 61.47,
-      "elapsed_us": 71675
+      "elapsed_us": 74660
     },
     {
       "path": "flowchart/c.pr-architecture-review.pgm",
@@ -2064,6 +2178,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 20,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 2,
         "total_area": 1021163.6866666666,
         "total_edge_length": 4988.837363185763,
@@ -2088,6 +2203,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 2,
           "error_count": 0,
           "warning_count": 2
@@ -2101,12 +2217,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 2,
         "error_count": 0,
         "warning_count": 2
       },
       "score": 62.42,
-      "elapsed_us": 49719
+      "elapsed_us": 52704
     },
     {
       "path": "flowchart/c.software-release.pgm",
@@ -2115,18 +2232,19 @@
         "node_overlap_pairs": 0,
         "edge_node_crossings": 0,
         "edge_through_groups": 0,
-        "label_node_overlaps": 3,
+        "label_node_overlaps": 2,
         "label_label_overlaps": 0,
         "bend_count": 22,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 4,
-        "total_area": 1207543.9863344363,
+        "total_area": 1173301.9863344363,
         "total_edge_length": 7269.836511024611,
         "total_node_area": 112000.0,
         "edge_length_stddev": 546.2289218563266,
         "edge_length_cv": 1.27731781278377,
-        "aspect_ratio": 2.5535599819930677,
-        "aspect_ratio_deviation": 0.9535599819930676,
-        "area_utilization": 0.09275024451902736,
+        "aspect_ratio": 2.6280838487569675,
+        "aspect_ratio_deviation": 1.0280838487569675,
+        "area_utilization": 0.09545709570466514,
         "channel_congestion": 13.0,
         "long_edge_count": 5,
         "group_gap_deficit": 0.0,
@@ -2140,10 +2258,11 @@
           "edge_through_node": 0,
           "edge_crossing": 4,
           "edge_crosses_group_interior": 0,
-          "label_node_overlap": 3,
+          "label_node_overlap": 2,
           "label_label_overlap": 0,
-          "total_violations": 7,
-          "error_count": 3,
+          "unrelated_edge_trunk_merge": 0,
+          "total_violations": 6,
+          "error_count": 2,
           "warning_count": 4
         }
       },
@@ -2153,14 +2272,15 @@
         "edge_through_node": 0,
         "edge_crossing": 4,
         "edge_crosses_group_interior": 0,
-        "label_node_overlap": 3,
+        "label_node_overlap": 2,
         "label_label_overlap": 0,
-        "total_violations": 7,
-        "error_count": 3,
+        "unrelated_edge_trunk_merge": 0,
+        "total_violations": 6,
+        "error_count": 2,
         "warning_count": 4
       },
-      "score": 56.0,
-      "elapsed_us": 72692
+      "score": 56.09,
+      "elapsed_us": 75036
     },
     {
       "path": "flowchart/c.swimlane-order-process.pgm",
@@ -2172,6 +2292,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 14,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 651792.0,
         "total_edge_length": 2424.0,
@@ -2196,6 +2317,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -2209,12 +2331,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 56.91,
-      "elapsed_us": 10346
+      "elapsed_us": 10161
     },
     {
       "path": "flowchart/n.employee-onboarding.pgm",
@@ -2226,6 +2349,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 4,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 539544.4266666666,
         "total_edge_length": 969.4853880682017,
@@ -2250,6 +2374,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -2263,12 +2388,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 76.1,
-      "elapsed_us": 7046
+      "elapsed_us": 7350
     },
     {
       "path": "flowchart/n.order-approval.pgm",
@@ -2280,15 +2406,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 11,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
-        "total_area": 534469.1455501224,
+        "total_area": 532701.1455501224,
         "total_edge_length": 1744.2231498975898,
         "total_node_area": 56000.0,
         "edge_length_stddev": 187.53090542725124,
         "edge_length_cv": 0.8601234558239268,
-        "aspect_ratio": 1.4621162072801361,
-        "aspect_ratio_deviation": 0.13788379271986395,
-        "area_utilization": 0.1047768621748219,
+        "aspect_ratio": 1.4669688746266683,
+        "aspect_ratio_deviation": 0.13303112537333184,
+        "area_utilization": 0.10512460967616016,
         "channel_congestion": 8.0,
         "long_edge_count": 2,
         "group_gap_deficit": 0.0,
@@ -2304,6 +2431,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -2317,12 +2445,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
-      "score": 66.99,
-      "elapsed_us": 10234
+      "score": 67.0,
+      "elapsed_us": 10409
     },
     {
       "path": "flowchart/n.user-auth.pgm",
@@ -2334,15 +2463,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 7,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 1,
-        "total_area": 353629.0133333333,
+        "total_area": 340480.0,
         "total_edge_length": 1073.1266666666668,
         "total_node_area": 40000.0,
         "edge_length_stddev": 66.79405965249538,
         "edge_length_cv": 0.4979397994830958,
-        "aspect_ratio": 1.045344092430425,
-        "aspect_ratio_deviation": 0.5546559075695752,
-        "area_utilization": 0.11311289088798748,
+        "aspect_ratio": 1.0857142857142856,
+        "aspect_ratio_deviation": 0.5142857142857145,
+        "area_utilization": 0.1174812030075188,
         "channel_congestion": 8.0,
         "long_edge_count": 0,
         "group_gap_deficit": 0.0,
@@ -2358,6 +2488,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 1,
           "error_count": 0,
           "warning_count": 1
@@ -2371,12 +2502,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 1,
         "error_count": 0,
         "warning_count": 1
       },
-      "score": 73.57,
-      "elapsed_us": 6487
+      "score": 73.74,
+      "elapsed_us": 7176
     },
     {
       "path": "flowchart/s.decision-loop.pgm",
@@ -2388,15 +2520,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 2,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
-        "total_area": 222138.0,
+        "total_area": 217322.0,
         "total_edge_length": 614.0,
         "total_node_area": 32000.0,
         "edge_length_stddev": 114.60693696282088,
         "edge_length_cv": 0.7466249965004618,
-        "aspect_ratio": 1.6314363143631436,
-        "aspect_ratio_deviation": 0.031436314363143536,
-        "area_utilization": 0.14405459669214632,
+        "aspect_ratio": 1.667590027700831,
+        "aspect_ratio_deviation": 0.067590027700831,
+        "area_utilization": 0.14724694232521326,
         "channel_congestion": 2.0,
         "long_edge_count": 1,
         "group_gap_deficit": 0.0,
@@ -2412,6 +2545,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -2425,12 +2559,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
-      "score": 70.67,
-      "elapsed_us": 2361
+      "score": 70.62,
+      "elapsed_us": 2448
     },
     {
       "path": "flowchart/s.linear-chain.pgm",
@@ -2442,6 +2577,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 138600.0,
         "total_edge_length": 172.0,
@@ -2466,6 +2602,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -2479,12 +2616,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 86.93,
-      "elapsed_us": 490
+      "elapsed_us": 595
     },
     {
       "path": "mindmap/c.knowledge-map.pgm",
@@ -2496,6 +2634,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 1,
         "total_area": 3346335.1819932605,
         "total_edge_length": 6273.415543036998,
@@ -2520,6 +2659,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 1,
           "error_count": 0,
           "warning_count": 1
@@ -2533,12 +2673,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 1,
         "error_count": 0,
         "warning_count": 1
       },
       "score": 71.98,
-      "elapsed_us": 58173
+      "elapsed_us": 59793
     },
     {
       "path": "mindmap/c.product-roadmap.pgm",
@@ -2550,6 +2691,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 1529375.4979413685,
         "total_edge_length": 3982.639891117596,
@@ -2574,6 +2716,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -2587,12 +2730,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 79.31,
-      "elapsed_us": 37570
+      "elapsed_us": 38035
     },
     {
       "path": "mindmap/n.programming-learning.pgm",
@@ -2604,6 +2748,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 1651093.4470159083,
         "total_edge_length": 3586.2751164549554,
@@ -2628,6 +2773,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -2641,12 +2787,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 78.21,
-      "elapsed_us": 27947
+      "elapsed_us": 28142
     },
     {
       "path": "mindmap/n.project-plan.pgm",
@@ -2658,6 +2805,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 1441684.902579241,
         "total_edge_length": 2299.110150993966,
@@ -2682,6 +2830,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -2695,12 +2844,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 79.28,
-      "elapsed_us": 11838
+      "elapsed_us": 11595
     },
     {
       "path": "mindmap/n.tech-stack.pgm",
@@ -2712,6 +2862,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 1399626.3488773315,
         "total_edge_length": 2271.965714224528,
@@ -2736,6 +2887,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -2749,12 +2901,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 79.99,
-      "elapsed_us": 10910
+      "elapsed_us": 11037
     },
     {
       "path": "mindmap/s.brainstorm.pgm",
@@ -2766,6 +2919,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 428850.5946212584,
         "total_edge_length": 354.71872087355683,
@@ -2790,6 +2944,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -2803,12 +2958,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 81.82,
-      "elapsed_us": 1118
+      "elapsed_us": 1066
     },
     {
       "path": "mindmap/s.root-branches.pgm",
@@ -2820,6 +2976,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 409366.02044543455,
         "total_edge_length": 337.1231202876195,
@@ -2844,6 +3001,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -2857,12 +3015,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 81.7,
-      "elapsed_us": 1063
+      "elapsed_us": 1030
     },
     {
       "path": "sequence/c.ai-agent-change-loop.pgm",
@@ -2874,6 +3033,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 1425600.0,
         "total_edge_length": 5192.0,
@@ -2898,6 +3058,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -2911,12 +3072,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 58.7,
-      "elapsed_us": 640
+      "elapsed_us": 1180
     },
     {
       "path": "sequence/c.cross-team-incident-escalation.pgm",
@@ -2928,6 +3090,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 1920600.0,
         "total_edge_length": 7312.0,
@@ -2952,6 +3115,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -2965,12 +3129,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 65.5,
-      "elapsed_us": 1098
+      "elapsed_us": 2258
     },
     {
       "path": "sequence/c.distributed-saga.pgm",
@@ -2982,6 +3147,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 683400.0,
         "total_edge_length": 4240.0,
@@ -3006,6 +3172,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -3019,12 +3186,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 73.4,
-      "elapsed_us": 489
+      "elapsed_us": 990
     },
     {
       "path": "sequence/c.k8s-canary-rollback.pgm",
@@ -3036,6 +3204,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 1931400.0,
         "total_edge_length": 7568.0,
@@ -3060,6 +3229,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -3073,12 +3243,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 59.48,
-      "elapsed_us": 798
+      "elapsed_us": 1846
     },
     {
       "path": "sequence/c.k8s-node-failure-recovery.pgm",
@@ -3090,15 +3261,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
-        "total_area": 2106780.0,
+        "total_area": 2042400.0,
         "total_edge_length": 11160.0,
         "total_node_area": 72000.0,
         "edge_length_stddev": 560.2285248003711,
         "edge_length_cv": 0.7529953290327569,
-        "aspect_ratio": 2.339304531085353,
-        "aspect_ratio_deviation": 0.7393045310853528,
-        "area_utilization": 0.034175376641130066,
+        "aspect_ratio": 2.4130434782608696,
+        "aspect_ratio_deviation": 0.8130434782608695,
+        "area_utilization": 0.03525264394829612,
         "channel_congestion": 8.0,
         "long_edge_count": 0,
         "group_gap_deficit": 0.0,
@@ -3114,6 +3286,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -3127,12 +3300,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
-      "score": 62.61,
-      "elapsed_us": 1048
+      "score": 62.28,
+      "elapsed_us": 1910
     },
     {
       "path": "sequence/c.k8s-rolling-update.pgm",
@@ -3144,6 +3318,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 2754000.0,
         "total_edge_length": 8984.0,
@@ -3168,6 +3343,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -3181,12 +3357,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 61.26,
-      "elapsed_us": 1255
+      "elapsed_us": 2439
     },
     {
       "path": "sequence/c.layout-stress-lifelines.pgm",
@@ -3198,6 +3375,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 6,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 1132047.0,
         "total_edge_length": 3530.0,
@@ -3222,6 +3400,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -3235,12 +3414,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 71.22,
-      "elapsed_us": 1188
+      "elapsed_us": 2213
     },
     {
       "path": "sequence/c.microservice-checkout.pgm",
@@ -3252,6 +3432,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 1635900.0,
         "total_edge_length": 5431.0,
@@ -3276,6 +3457,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -3289,12 +3471,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 60.44,
-      "elapsed_us": 812
+      "elapsed_us": 1492
     },
     {
       "path": "sequence/c.real-time-risk-decisioning.pgm",
@@ -3306,15 +3489,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
-        "total_area": 1483020.0,
+        "total_area": 1425600.0,
         "total_edge_length": 4712.0,
         "total_node_area": 64000.0,
         "edge_length_stddev": 246.8445490687584,
         "edge_length_cv": 0.5762500084372543,
-        "aspect_ratio": 2.643524699599466,
-        "aspect_ratio_deviation": 1.043524699599466,
-        "area_utilization": 0.04315518334209923,
+        "aspect_ratio": 2.75,
+        "aspect_ratio_deviation": 1.15,
+        "area_utilization": 0.04489337822671156,
         "channel_congestion": 6.0,
         "long_edge_count": 0,
         "group_gap_deficit": 0.0,
@@ -3330,6 +3514,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -3343,12 +3528,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
-      "score": 64.98,
-      "elapsed_us": 666
+      "score": 64.52,
+      "elapsed_us": 1137
     },
     {
       "path": "sequence/n.api-call-chain.pgm",
@@ -3360,6 +3546,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 479400.0,
         "total_edge_length": 1392.0,
@@ -3384,6 +3571,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -3397,12 +3585,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 79.82,
-      "elapsed_us": 268
+      "elapsed_us": 422
     },
     {
       "path": "sequence/n.oauth-login.pgm",
@@ -3414,6 +3603,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 581400.0,
         "total_edge_length": 2576.0,
@@ -3438,6 +3628,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -3451,12 +3642,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 74.04,
-      "elapsed_us": 380
+      "elapsed_us": 694
     },
     {
       "path": "sequence/n.payment-gateway.pgm",
@@ -3468,6 +3660,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 907200.0,
         "total_edge_length": 3512.0,
@@ -3492,6 +3685,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -3505,12 +3699,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 69.42,
-      "elapsed_us": 611
+      "elapsed_us": 1097
     },
     {
       "path": "sequence/s.ping-pong.pgm",
@@ -3522,6 +3717,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 145800.0,
         "total_edge_length": 464.0,
@@ -3546,6 +3742,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -3559,12 +3756,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 82.39,
-      "elapsed_us": 66
+      "elapsed_us": 104
     },
     {
       "path": "sequence/s.request-response.pgm",
@@ -3576,6 +3774,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 145800.0,
         "total_edge_length": 464.0,
@@ -3600,6 +3799,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -3613,12 +3813,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 82.39,
-      "elapsed_us": 89
+      "elapsed_us": 114
     },
     {
       "path": "state/c.document-sync-lifecycle.pgm",
@@ -3630,15 +3831,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 5,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
-        "total_area": 785826.4922666667,
+        "total_area": 642312.6522666666,
         "total_edge_length": 1963.5833333333335,
         "total_node_area": 49793.68,
         "edge_length_stddev": 217.15038518782836,
         "edge_length_cv": 1.1058883088969742,
-        "aspect_ratio": 1.5156865559017285,
-        "aspect_ratio_deviation": 0.08431344409827157,
-        "area_utilization": 0.06336472553422484,
+        "aspect_ratio": 1.8543409434592755,
+        "aspect_ratio_deviation": 0.2543409434592754,
+        "area_utilization": 0.07752249597494669,
         "channel_congestion": 8.0,
         "long_edge_count": 2,
         "group_gap_deficit": 0.0,
@@ -3654,6 +3856,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -3667,12 +3870,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
-      "score": 62.53,
-      "elapsed_us": 11591
+      "score": 61.83,
+      "elapsed_us": 11178
     },
     {
       "path": "state/c.k8s-node-pressure-lifecycle.pgm",
@@ -3684,15 +3888,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 22,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 8,
-        "total_area": 1245744.4000000001,
+        "total_area": 1236525.2000000002,
         "total_edge_length": 7658.334735210488,
         "total_node_area": 63288.0,
         "edge_length_stddev": 485.9560937513153,
         "edge_length_cv": 0.888363534338438,
-        "aspect_ratio": 1.066049953746531,
-        "aspect_ratio_deviation": 0.533950046253469,
-        "area_utilization": 0.05080335901971544,
+        "aspect_ratio": 1.0739981360671016,
+        "aspect_ratio_deviation": 0.5260018639328985,
+        "area_utilization": 0.05118213522862291,
         "channel_congestion": 15.0,
         "long_edge_count": 6,
         "group_gap_deficit": 0.0,
@@ -3708,6 +3913,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 8,
           "error_count": 0,
           "warning_count": 8
@@ -3721,12 +3927,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 8,
         "error_count": 0,
         "warning_count": 8
       },
-      "score": 59.69,
-      "elapsed_us": 62404
+      "score": 59.71,
+      "elapsed_us": 62276
     },
     {
       "path": "state/c.k8s-rollout-state-machine.pgm",
@@ -3738,15 +3945,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 17,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 2,
-        "total_area": 797722.5960000001,
+        "total_area": 794673.3569213485,
         "total_edge_length": 2343.1152537848875,
         "total_node_area": 61792.0,
         "edge_length_stddev": 177.0353074992828,
         "edge_length_cv": 0.9066663223500268,
-        "aspect_ratio": 1.8670351917673393,
-        "aspect_ratio_deviation": 0.26703519176733925,
-        "area_utilization": 0.07746051109726869,
+        "aspect_ratio": 1.8741991876637294,
+        "aspect_ratio_deviation": 0.2741991876637293,
+        "area_utilization": 0.07775773462368106,
         "channel_congestion": 8.0,
         "long_edge_count": 3,
         "group_gap_deficit": 0.0,
@@ -3762,6 +3970,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 2,
           "error_count": 0,
           "warning_count": 2
@@ -3775,12 +3984,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 2,
         "error_count": 0,
         "warning_count": 2
       },
-      "score": 62.3,
-      "elapsed_us": 23366
+      "score": 62.27,
+      "elapsed_us": 24109
     },
     {
       "path": "state/c.layout-stress-transitions.pgm",
@@ -3792,15 +4002,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 25,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
-        "total_area": 487349.9469333334,
+        "total_area": 524685.6969333334,
         "total_edge_length": 2839.9726804583333,
         "total_node_area": 32512.0,
-        "edge_length_stddev": 154.4533345709366,
-        "edge_length_cv": 0.7613970017641644,
-        "aspect_ratio": 1.1327568690091947,
-        "aspect_ratio_deviation": 0.4672431309908054,
-        "area_utilization": 0.06671181602580015,
+        "edge_length_stddev": 154.45333457093662,
+        "edge_length_cv": 0.7613970017641646,
+        "aspect_ratio": 1.0521517991182125,
+        "aspect_ratio_deviation": 0.5478482008817875,
+        "area_utilization": 0.06196471561932243,
         "channel_congestion": 12.0,
         "long_edge_count": 2,
         "group_gap_deficit": 0.0,
@@ -3816,6 +4027,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -3829,12 +4041,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
-      "score": 67.44,
-      "elapsed_us": 78220
+      "score": 67.25,
+      "elapsed_us": 30459
     },
     {
       "path": "state/c.payment-flow.pgm",
@@ -3843,18 +4056,19 @@
         "node_overlap_pairs": 0,
         "edge_node_crossings": 2,
         "edge_through_groups": 0,
-        "label_node_overlaps": 3,
+        "label_node_overlaps": 2,
         "label_label_overlaps": 0,
         "bend_count": 19,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 1,
-        "total_area": 522301.55586666666,
+        "total_area": 526760.2109000001,
         "total_edge_length": 2730.705922244935,
         "total_node_area": 33137.68,
         "edge_length_stddev": 171.85346320826258,
         "edge_length_cv": 0.7552045578030482,
-        "aspect_ratio": 1.3877305963550124,
-        "aspect_ratio_deviation": 0.2122694036449877,
-        "area_utilization": 0.0634454935616914,
+        "aspect_ratio": 1.4134085380669363,
+        "aspect_ratio_deviation": 0.18659146193306375,
+        "area_utilization": 0.0629084720415431,
         "channel_congestion": 12.0,
         "long_edge_count": 3,
         "group_gap_deficit": 0.0,
@@ -3868,10 +4082,11 @@
           "edge_through_node": 2,
           "edge_crossing": 1,
           "edge_crosses_group_interior": 0,
-          "label_node_overlap": 3,
+          "label_node_overlap": 2,
           "label_label_overlap": 0,
-          "total_violations": 6,
-          "error_count": 5,
+          "unrelated_edge_trunk_merge": 0,
+          "total_violations": 5,
+          "error_count": 4,
           "warning_count": 1
         }
       },
@@ -3881,14 +4096,15 @@
         "edge_through_node": 2,
         "edge_crossing": 1,
         "edge_crosses_group_interior": 0,
-        "label_node_overlap": 3,
+        "label_node_overlap": 2,
         "label_label_overlap": 0,
-        "total_violations": 6,
-        "error_count": 5,
+        "unrelated_edge_trunk_merge": 0,
+        "total_violations": 5,
+        "error_count": 4,
         "warning_count": 1
       },
-      "score": 63.27,
-      "elapsed_us": 51354
+      "score": 63.75,
+      "elapsed_us": 31210
     },
     {
       "path": "state/c.service-degradation-lifecycle.pgm",
@@ -3900,15 +4116,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 13,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 2,
-        "total_area": 771707.7365722249,
+        "total_area": 656341.6565377249,
         "total_edge_length": 4243.3756568745275,
         "total_node_area": 51025.68,
         "edge_length_stddev": 377.50936400915634,
         "edge_length_cv": 1.067572785070494,
-        "aspect_ratio": 1.2786759064811422,
-        "aspect_ratio_deviation": 0.32132409351885793,
-        "area_utilization": 0.06612047227444694,
+        "aspect_ratio": 1.5034305376947887,
+        "aspect_ratio_deviation": 0.09656946230521135,
+        "area_utilization": 0.07774255906468916,
         "channel_congestion": 10.0,
         "long_edge_count": 4,
         "group_gap_deficit": 0.0,
@@ -3924,6 +4141,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 2,
           "error_count": 0,
           "warning_count": 2
@@ -3937,12 +4155,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 2,
         "error_count": 0,
         "warning_count": 2
       },
-      "score": 61.31,
-      "elapsed_us": 33391
+      "score": 61.78,
+      "elapsed_us": 29939
     },
     {
       "path": "state/c.settlement-reconciliation-lifecycle.pgm",
@@ -3954,6 +4173,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 8,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 2,
         "total_area": 710919.1332822902,
         "total_edge_length": 2288.1490456372135,
@@ -3978,6 +4198,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 2,
           "error_count": 0,
           "warning_count": 2
@@ -3991,12 +4212,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 2,
         "error_count": 0,
         "warning_count": 2
       },
       "score": 63.66,
-      "elapsed_us": 15763
+      "elapsed_us": 16340
     },
     {
       "path": "state/c.tcp-connection.pgm",
@@ -4008,6 +4230,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 24,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 1,
         "total_area": 842191.175,
         "total_edge_length": 3601.5081933083443,
@@ -4032,6 +4255,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 1,
           "error_count": 0,
           "warning_count": 1
@@ -4045,12 +4269,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 1,
         "error_count": 0,
         "warning_count": 1
       },
       "score": 62.31,
-      "elapsed_us": 37129
+      "elapsed_us": 38295
     },
     {
       "path": "state/n.order-lifecycle.pgm",
@@ -4062,6 +4287,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 8,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 2,
         "total_area": 426799.148767216,
         "total_edge_length": 1634.0368671580168,
@@ -4086,6 +4312,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 2,
           "error_count": 0,
           "warning_count": 2
@@ -4099,12 +4326,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 2,
         "error_count": 0,
         "warning_count": 2
       },
       "score": 63.44,
-      "elapsed_us": 11371
+      "elapsed_us": 11801
     },
     {
       "path": "state/n.ticket-workflow.pgm",
@@ -4116,15 +4344,16 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 16,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 4,
-        "total_area": 383988.11250000005,
+        "total_area": 377524.11250000005,
         "total_edge_length": 1686.452055621432,
         "total_node_area": 24256.0,
         "edge_length_stddev": 138.4809312615754,
         "edge_length_cv": 0.7390239035849291,
-        "aspect_ratio": 1.700219300408681,
-        "aspect_ratio_deviation": 0.10021930040868088,
-        "area_utilization": 0.06316862217967749,
+        "aspect_ratio": 1.7293306000421362,
+        "aspect_ratio_deviation": 0.12933060004213615,
+        "area_utilization": 0.06425020070737865,
         "channel_congestion": 9.0,
         "long_edge_count": 1,
         "group_gap_deficit": 0.0,
@@ -4140,6 +4369,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 4,
           "error_count": 0,
           "warning_count": 4
@@ -4153,12 +4383,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 4,
         "error_count": 0,
         "warning_count": 4
       },
-      "score": 63.69,
-      "elapsed_us": 13105
+      "score": 63.59,
+      "elapsed_us": 13062
     },
     {
       "path": "state/s.on-off.pgm",
@@ -4170,6 +4401,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 150164.22273292195,
         "total_edge_length": 416.4883186364813,
@@ -4194,6 +4426,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -4207,12 +4440,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 79.71,
-      "elapsed_us": 475
+      "elapsed_us": 444
     },
     {
       "path": "state/s.traffic-light.pgm",
@@ -4224,6 +4458,7 @@
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
         "bend_count": 0,
+        "edge_parallel_overlap_count": 0,
         "edge_crossings": 0,
         "total_area": 153109.4117926076,
         "total_edge_length": 434.2942220643446,
@@ -4248,6 +4483,7 @@
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
+          "unrelated_edge_trunk_merge": 0,
           "total_violations": 0,
           "error_count": 0,
           "warning_count": 0
@@ -4261,12 +4497,13 @@
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
         "total_violations": 0,
         "error_count": 0,
         "warning_count": 0
       },
       "score": 81.05,
-      "elapsed_us": 574
+      "elapsed_us": 607
     }
   ]
 }

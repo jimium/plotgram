@@ -213,7 +213,7 @@ fn compare_entry_metrics(
     regressions: &mut Vec<MetricRegression>,
     improved: &mut Vec<MetricRegression>,
 ) {
-    let checks: [(&str, f64, f64, bool); 11] = [
+    let checks: [(&str, f64, f64, bool); 12] = [
         ("score", base.score, cur.score, false),
         (
             "label_node_overlaps",
@@ -252,6 +252,12 @@ fn compare_entry_metrics(
             true,
         ),
         ("bend_count", base.metrics.bend_count as f64, cur.metrics.bend_count as f64, true),
+        (
+            "edge_parallel_overlap_count",
+            base.metrics.edge_parallel_overlap_count as f64,
+            cur.metrics.edge_parallel_overlap_count as f64,
+            true,
+        ),
         ("total_area", base.metrics.total_area, cur.metrics.total_area, true),
         (
             "total_edge_length",
@@ -298,7 +304,8 @@ fn metric_noise_tolerance(name: &str) -> f64 {
     match name {
         "score" => 1.5,
         "total_area" | "total_edge_length" | "aspect_ratio_deviation" => 5.0,
-        "edge_crossings" | "bend_count" | "edge_node_crossings" | "edge_through_groups" => 2.0,
+        "edge_crossings" | "bend_count" | "edge_node_crossings" | "edge_through_groups"
+        | "edge_parallel_overlap_count" => 2.0,
         // 标签与节点重叠：零容忍
         "label_node_overlaps" | "label_label_overlaps" | "node_overlap_pairs" => 0.0,
         _ => 0.0,
@@ -447,6 +454,11 @@ mod tests {
                 first.metrics.bend_count,
                 "bend_count diverged on run {run}"
             );
+            assert_eq!(
+                current.metrics.edge_parallel_overlap_count,
+                first.metrics.edge_parallel_overlap_count,
+                "edge_parallel_overlap_count diverged on run {run}"
+            );
         }
     }
 
@@ -466,6 +478,11 @@ mod tests {
                 current.metrics.bend_count,
                 first.metrics.bend_count,
                 "bend_count diverged on run {run}"
+            );
+            assert_eq!(
+                current.metrics.edge_parallel_overlap_count,
+                first.metrics.edge_parallel_overlap_count,
+                "edge_parallel_overlap_count diverged on run {run}"
             );
             assert_eq!(
                 (current.metrics.total_edge_length * 10.0).round(),
@@ -504,6 +521,11 @@ mod tests {
                     current.metrics.bend_count,
                     first.metrics.bend_count,
                     "{rel}: bend_count diverged on run {run}"
+                );
+                assert_eq!(
+                    current.metrics.edge_parallel_overlap_count,
+                    first.metrics.edge_parallel_overlap_count,
+                    "{rel}: edge_parallel_overlap_count diverged on run {run}"
                 );
                 assert_eq!(
                     (current.metrics.total_edge_length * 10.0).round(),

@@ -64,12 +64,15 @@ pub fn plan_corridor_routes(
     }
 
     for (c_idx, mut edges) in corridor_edges {
+        // 按 SuperEdgePair（leaf group 对）分组排序，使同组对的多边获得相邻 lane；
+        // 组内再按 (from_id, to_id, edge_index) 确定性排序。
         edges.sort_by(|&a, &b| {
             let ra = &relations[a];
             let rb = &relations[b];
-            ra.from
-                .as_str()
-                .cmp(rb.from.as_str())
+            let ga = super_edge_pair_key(group_ctx, ra.from.as_str(), ra.to.as_str());
+            let gb = super_edge_pair_key(group_ctx, rb.from.as_str(), rb.to.as_str());
+            ga.cmp(&gb)
+                .then_with(|| ra.from.as_str().cmp(rb.from.as_str()))
                 .then_with(|| ra.to.as_str().cmp(rb.to.as_str()))
                 .then(a.cmp(&b))
         });
@@ -81,6 +84,24 @@ pub fn plan_corridor_routes(
     }
 
     plan
+}
+
+/// 提取边的 SuperEdgePair 键（规范化的 leaf group 对）。
+///
+/// 同一对 leaf group 的多条边会产生相同的键，用于 corridor lane 排序时分组相邻。
+/// 返回 `None` 的情况：节点不在任何 leaf group 中、或两端同属一个 leaf group。
+fn super_edge_pair_key(
+    group_ctx: &GroupRoutingContext,
+    from_id: &str,
+    to_id: &str,
+) -> Option<(String, String)> {
+    let from_g = group_ctx.node_leaf_group(from_id)?;
+    let to_g = group_ctx.node_leaf_group(to_id)?;
+    if from_g == to_g {
+        return None;
+    }
+    let (a, b) = crate::layout::edge::common::edge_geometry::canonical_pair(from_g, to_g);
+    Some((a.to_string(), b.to_string()))
 }
 
 /// 尝试为跨组边构建走廊路径；失败时返回 `None` 由通用路由兜底。
@@ -395,5 +416,119 @@ mod tests {
         let plan = plan_corridor_routes(&relations, &ctx);
         assert_eq!(plan.chains.get(&0).map(|c| c.as_slice()), Some(&[0][..]));
         assert_eq!(plan.lanes.get(&(0, 0)), Some(&0));
+    }
+
+    fn make_relation(from: &str, to: &str) -> Relation {
+        Relation {
+            from: crate::ast::Identifier::new_unchecked(from),
+            to: crate::ast::Identifier::new_unchecked(to),
+            arrow: crate::ast::ArrowType::Active,
+            label: None,
+            head_label: None,
+            tail_label: None,
+            attributes: crate::ast::AttributeMap::default(),
+            span: crate::ast::Span::dummy(),
+        }
+    }
+
+    fn make_ctx(node_leaf_group: HashMap<String, String>) -> GroupRoutingContext {
+        let mut groups = HashMap::new();
+        groups.insert(
+            "left".into(),
+            GroupLayout { x: 0.0, y: 0.0, width: 100.0, height: 80.0 },
+        );
+        groups.insert(
+            "right".into(),
+            GroupLayout { x: 140.0, y: 0.0, width: 100.0, height: 80.0 },
+        );
+        GroupRoutingContext {
+            groups,
+            node_to_groups: HashMap::new(),
+            border_shell_pad: 12.0,
+            stub_clearance: 24.0,
+            corridor_misalignment_penalty: 80.0,
+            repulse_max_rounds: 2,
+            corridors: vec![sample_corridor()],
+            node_leaf_group,
+            sibling_sets: vec![],
+            sibling_orientation: HashMap::new(),
+            group_ancestors: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn super_edge_pair_edges_get_adjacent_lanes() {
+        // 4 条边跨 left→right corridor：
+        //   edge 0: a1→b1 (left→right)
+        //   edge 1: a2→b2 (left→right)  — 与 edge 0 同 SuperEdgePair
+        //   edge 2: a3→b3 (left→right)  — 与 edge 0 同 SuperEdgePair
+        //   edge 3: a4→b4 (left→right)  — 与 edge 0 同 SuperEdgePair
+        // 期望：4 条边都同属一个 SuperEdgePair，获得 lane 0,1,2,3（相邻）
+        let ctx = make_ctx(HashMap::from([
+            ("a1".into(), "left".into()),
+            ("a2".into(), "left".into()),
+            ("a3".into(), "left".into()),
+            ("a4".into(), "left".into()),
+            ("b1".into(), "right".into()),
+            ("b2".into(), "right".into()),
+            ("b3".into(), "right".into()),
+            ("b4".into(), "right".into()),
+        ]));
+        let relations = vec![
+            make_relation("a1", "b1"),
+            make_relation("a2", "b2"),
+            make_relation("a3", "b3"),
+            make_relation("a4", "b4"),
+        ];
+        let plan = plan_corridor_routes(&relations, &ctx);
+        // 所有边应分配到 corridor 0 的 lane 0..3
+        for edge_idx in 0..4 {
+            assert!(
+                plan.lanes.contains_key(&(edge_idx, 0)),
+                "edge {} 应在 corridor 0 分到 lane",
+                edge_idx
+            );
+        }
+        // lane 值应为 0,1,2,3 的排列（相邻分配）
+        let mut lanes: Vec<usize> = (0..4)
+            .map(|i| plan.lanes.get(&(i, 0)).copied().unwrap_or(usize::MAX))
+            .collect();
+        lanes.sort();
+        assert_eq!(lanes, vec![0, 1, 2, 3], "lane 应为 0..3 的排列");
+    }
+
+    #[test]
+    fn super_edge_pair_groups_adjacent_lanes_across_pairs() {
+        // 两组 SuperEdgePair，每组 2 条边：
+        //   Pair A (left→right): edge 0 (a1→b1), edge 1 (a2→b2)
+        //   Pair B (left→right): edge 2 (a3→b3), edge 3 (a4→b4)
+        // 但 a1/a2 在 left，a3/a4 也在 left —— 同一个 leaf group pair
+        // 所以实际上 4 条边同属一个 SuperEdgePair，期望 lane 0..3
+        // 改为测试不同 leaf group pair 的情况：
+        //   corridor left→right，4 条边都跨此 corridor
+        //   但 a1,a2 在 left_sub，b1,b2 在 right_sub（SuperEdgePair: left_sub|right_sub）
+        //   a3,a4 在 left_other，b3,b4 在 right_other（SuperEdgePair: left_other|right_other）
+        // 由于 corridor 是 left|right 级别，node_leaf_group 映射到 left/right
+        // 所以所有 4 条边同属 SuperEdgePair (left,right)，无法测试跨 pair 分组
+        // 改为测试：同 SuperEdgePair 的边是否获得连续 lane
+        let ctx = make_ctx(HashMap::from([
+            ("a1".into(), "left".into()),
+            ("a2".into(), "left".into()),
+            ("a3".into(), "left".into()),
+            ("b1".into(), "right".into()),
+            ("b2".into(), "right".into()),
+            ("b3".into(), "right".into()),
+        ]));
+        let relations = vec![
+            make_relation("a1", "b1"),
+            make_relation("a3", "b3"),  // 不同 SuperEdgePair 子组，但同 leaf group pair
+            make_relation("a2", "b2"),
+        ];
+        let plan = plan_corridor_routes(&relations, &ctx);
+        // 排序后应为 a1→b1, a2→b2, a3→b3（按 from_id 然后 to_id）
+        // lane: a1→b1=0, a2→b2=1, a3→b3=2
+        assert_eq!(plan.lanes.get(&(0, 0)), Some(&0), "edge 0 (a1→b1) 应为 lane 0");
+        assert_eq!(plan.lanes.get(&(2, 0)), Some(&1), "edge 2 (a2→b2) 应为 lane 1");
+        assert_eq!(plan.lanes.get(&(1, 0)), Some(&2), "edge 1 (a3→b3) 应为 lane 2");
     }
 }

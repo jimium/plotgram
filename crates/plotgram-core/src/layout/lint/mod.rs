@@ -628,18 +628,15 @@ fn runs_share_trunk(a: &TrunkRun, b: &TrunkRun) -> bool {
     overlap >= MIN_SHARED_TRUNK_LEN - TRUNK_ALIGN_EPS
 }
 
-/// 检测不同源/宿边是否共享长 trunk 段（架构图语义门控未允许的假并线）。
-fn check_unrelated_edge_trunk_merge(
+/// 返回所有非语义平行段重叠的边对 (i, j)（所有图类型）。
+///
+/// 对每对边：若不属于同一 `MergeGroup`（语义门控）且存在共享 trunk 段，
+/// 则计入结果。非 architecture 图 `edges_may_share_trunk` 恒为 true，返回空。
+fn find_unrelated_parallel_overlaps(
     diagram: &Diagram,
     result: &LayoutResult,
-    out: &mut Vec<LayoutViolation>,
-) {
-    use crate::types::DiagramType;
-
-    if diagram.diagram_type != DiagramType::Architecture {
-        return;
-    }
-
+) -> Vec<(usize, usize)> {
+    let mut pairs = Vec::new();
     let n = result.edges.len().min(diagram.relations.len());
     for i in 0..n {
         for j in (i + 1)..n {
@@ -668,23 +665,50 @@ fn check_unrelated_edge_trunk_merge(
                     break;
                 }
             }
-            if !shared {
-                continue;
+            if shared {
+                pairs.push((i, j));
             }
-            out.push(
-                LayoutViolation::new(
-                    LintRuleId::UnrelatedEdgeTrunkMerge,
-                    format!(
-                        "边 {i} ({}→{}) 与边 {j} ({}→{}) 共享非语义 trunk 段",
-                        rel_i.from.as_str(),
-                        rel_i.to.as_str(),
-                        rel_j.from.as_str(),
-                        rel_j.to.as_str(),
-                    ),
-                )
-                .with_entities([i.to_string(), j.to_string()]),
-            );
         }
+    }
+    pairs
+}
+
+/// 计算非语义平行段重叠对数（所有图类型，供 eval 框架消费）。
+///
+/// 语义门控：architecture 图要求边对至少共享一个 `MergeGroup` 才允许共享 trunk；
+/// 其他图类型 `edges_may_share_trunk` 恒为 true，本函数返回 0。
+pub fn count_unrelated_parallel_overlaps(diagram: &Diagram, result: &LayoutResult) -> usize {
+    find_unrelated_parallel_overlaps(diagram, result).len()
+}
+
+/// 检测不同源/宿边是否共享长 trunk 段（架构图语义门控未允许的假并线）。
+fn check_unrelated_edge_trunk_merge(
+    diagram: &Diagram,
+    result: &LayoutResult,
+    out: &mut Vec<LayoutViolation>,
+) {
+    use crate::types::DiagramType;
+
+    if diagram.diagram_type != DiagramType::Architecture {
+        return;
+    }
+
+    for (i, j) in find_unrelated_parallel_overlaps(diagram, result) {
+        let rel_i = &diagram.relations[i];
+        let rel_j = &diagram.relations[j];
+        out.push(
+            LayoutViolation::new(
+                LintRuleId::UnrelatedEdgeTrunkMerge,
+                format!(
+                    "边 {i} ({}→{}) 与边 {j} ({}→{}) 共享非语义 trunk 段",
+                    rel_i.from.as_str(),
+                    rel_i.to.as_str(),
+                    rel_j.from.as_str(),
+                    rel_j.to.as_str(),
+                ),
+            )
+            .with_entities([i.to_string(), j.to_string()]),
+        );
     }
 }
 
@@ -947,6 +971,8 @@ pub struct LintMetricsSummary {
     pub edge_crosses_group_interior: usize,
     pub label_node_overlap: usize,
     pub label_label_overlap: usize,
+    /// 不同源/宿边共享非语义 trunk 段（架构图假并线）
+    pub unrelated_edge_trunk_merge: usize,
     pub total_violations: usize,
     pub error_count: usize,
     pub warning_count: usize,
@@ -970,6 +996,7 @@ impl LintMetricsSummary {
                 LintRuleId::EdgeCrossesGroupInterior => summary.edge_crosses_group_interior += 1,
                 LintRuleId::LabelNodeOverlap => summary.label_node_overlap += 1,
                 LintRuleId::LabelLabelOverlap => summary.label_label_overlap += 1,
+                LintRuleId::UnrelatedEdgeTrunkMerge => summary.unrelated_edge_trunk_merge += 1,
                 _ => {}
             }
         }

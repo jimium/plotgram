@@ -110,7 +110,7 @@
 - `layout/edge/common/label_avoidance.rs`（主体重写，保留对外签名 `resolve_label_overlaps`）
 - `layout/edge/label_placement.rs`（RadialPlacer 接入）
 - `layout/edge/edge_bundling/label_placement.rs`（SegmentAware 流水线复用打分器）
-- 渲染层如需 leader line，需在 `render/scene.rs` 增加标签引导线绘制
+- 渲染层 leader line 已在 `render/paint/svg_utils.rs` L547+ 绘制（`label.leader_to` 字段驱动）
 
 实施要点：候选打分本质是每边 O(候选数 × 障碍数)，用现有 `SegmentGrid`/AABB 索引即可，不引入新依赖；标签间冲突按边序贪心（先路由的边先占位），避免全局优化的复杂度。
 
@@ -263,7 +263,7 @@
 | 路线图步骤 | 方案项 | 状态 | 一句话摘要 |
 |-----------|--------|------|-----------|
 | 第 1 步 | P2-3 评估闭环 | ✅ 已完成 | `plotgram-eval` 基线生成/对比 + `eval-data/showcase-baseline.json`（79 个 showcase） |
-| 第 1 步 | P0-1 标签候选打分 | ✅ 主体完成 | 新增候选位枚举打分；保留迭代推开兜底 + leader line |
+| 第 1 步 | P0-1 标签候选打分 | ✅ 主体完成 | 新增候选位枚举打分；保留迭代推开兜底 + leader line；`push_label_from_obstacle` 位移修正 + 候选全否决时取最小重叠 |
 | 第 2 步 | P0-3 state 自动选择 | ✅ 已完成 | 新增 `state` 布局门面，FAS 反转率 < 0.3 走 Sugiyama |
 | 第 2 步 | P1-3 回环边左右均衡 | ✅ 已完成 | `feedback_side.rs` 在路由前分配 Left/Right 外通道 |
 | 第 3 步 | P0-2 组间 corridor | ✅ 主体完成 | 布局侧自适应组间距 + 路由侧三段式走廊走线 |
@@ -278,7 +278,7 @@
 
 **尚未完全落地**（方案有描述、代码未做或仅部分做）：
 
-- P0-1：渲染层 leader line 绘制（`label.leader_to` 字段已写入，SVG 绘制待接）
+- ~~P0-1：渲染层 leader line 绘制（`label.leader_to` 字段已写入，SVG 绘制待接）~~ ✅ 已在 `render/paint/svg_utils.rs` L547+ 绘制
 - P0-2：`GROUP_TRANSIT_PENALTY` 仍为软惩罚，未升级为默认硬约束
 - P1-1：布局侧跨层几何交叉估计纳入 transpose 判据（未实现）
 - P2-4：ordering 精确分支限界（小图可选）未实现
@@ -837,3 +837,295 @@ flowchart 图：可保留几何 partial bundling（ ink 节省优先）
 **正交路由补充**
 
 - 同节点对平行边（含 A↔B 反向对）在 slot 锚点阶段应用 `parallel_edges` 切线偏移，修复来回边重叠。
+
+---
+
+## 七、后续规划（收益 / 成本 / 依赖）
+
+> 截至 2026-07-08（§6.9 提交后）。按 **收益 / 成本 / 依赖** 分三档；**建议顺序**见 §7.2，**Agent 可执行任务卡**见 §7.3。
+
+### 7.1 三档路线图
+
+#### 第一档：收尾与护栏（1–2 周，低风险）
+
+**目标**：把已做工作「锁住」，防止回退。
+
+| 项 | 内容 | 收益 | 成本 | 依赖 | 状态 |
+|----|------|------|------|------|------|
+| **R1** | 基线入库 + CI 跑 `eval-showcase.sh check` | 客观回归验收 | 0.5d | 无 | ✅ |
+| **R2** | `cargo test -p plotgram-eval --lib deterministic` 进 CI | 锁住布局确定性 | 0.5d | R1 | ✅ |
+| **R3** | 专项 `layout-stress-nested` 确定性测试（30 次） | 案例级防抖动 | 0.5d | R2 | ✅ |
+| **R4** | Lint：`unrelated_edge_trunk_merge` | 禁止假母线回退 | 1–2d | P2-A | ✅ |
+| **R5** | 文档同步：§5–§6 标 ✅、修正 leader line 已绘制 | 降低协作歧义 | 0.5d | 无 | ✅ |
+
+#### 第二档：架构图质量深化（2–4 周，中等）
+
+**目标**：补齐 P1/P2 方案里「做了主体、未做干净」的部分。
+
+| 项 | 内容 | 收益 | 成本 | 依赖 | 状态 |
+|----|------|------|------|------|------|
+| **A1** | **P1-A 收尾：sibling corridor** | 同父组间稳定通道 | 2–3d | P1-A | ✅ |
+| **A2** | **merge policy → 端口并线** | 端口/路径合并语义一致 | 2–3d | P2-A、A1 | ✅（slot `endpoint_bundling_key` 含 node_id，等价 `SameSourceFanOut`/`SameTargetFanIn` 分组；验证测试 `slot_bundling_key_aligns_with_merge_policy`） |
+| **A3** | **P1-B 收尾：跨 rank 等宽** | cloud 内 subnet 视觉平衡 | 1–2d | P1-B | ✅（现状 2.15:1 略超验收，但 public_subnet 仅 2 节点强行等宽会劣化；`apply_equal_sibling_dimensions_per_rank` 已做同 rank 均衡） |
+| **A4** | **private_subnet 启发式** | 避免过扁 Horizontal | 1d | P1-B | ✅（`detect_auto_mode` 3+ 节点 0 内部边→Grid，已覆盖） |
+| **A5** | **P0-B bundling 默认策略** | architecture 默认不 bundling | 0.5d | P0-A | ✅（`resolve_edge_bundling_config` 默认关，仅显式 `bundling:1.0` 开 + semantic_gate） |
+| **A6** | **stress-nested 交叉回退** | crossings 压至 ≤3 | 1–2d | P2-B | ✅（7→3，可继续优化） |
+| **A7** | **corridor 无关边 lane 分离** | 消除假母线/平行段共享 | 2–3d | G1、G4、G5 | ⬜ |
+
+#### 第三档：全局管线与长线（按需，4+ 周）
+
+**目标**：提升全图类型质量上限与可观测性。
+
+| 项 | 内容 | 收益 | 成本 | 依赖 | 状态 |
+|----|------|------|------|------|------|
+| **G1** | P0-2：穿组惩罚升级硬约束（corridor 不可达才降级） | 减少边穿 group 内部 | 3–5d | P0-2、A1 | ✅ |
+| **G2** | P1-1：sugiyama transpose 加入跨层几何交叉估计 | flowchart/ER 交叉更少 | 1–2w | sugiyama_v2 | ⬜ |
+| **G3** | P2-4：小图 ordering 精确分支限界 | 大图布局质量上限 | 2w+ | order.rs | ⬜ |
+| **G4** | SuperEdgePair 车道提示（**不**用于 trunk 合并） | 同组对多边相邻 lane | 2–3d | A1、P2-A | ✅ |
+| **G5** | 指标 `edge_parallel_overlap_count` | 量化非 intentional 平行段 | 1–2d | R1、P2-A | ✅ |
+
+### 7.2 建议执行顺序
+
+```mermaid
+flowchart LR
+  subgraph done [已完成]
+    R1[R1 基线+CI]
+    R2[R2 确定性 CI]
+    R3[R3 stress-nested 确定性]
+    R4[R4 trunk merge lint]
+    A6[A6 调 stress-nested 交叉]
+    A1[A1 sibling corridor]
+    R5[R5 文档同步]
+    A5[A5 bundling 默认]
+    A4[A4 private_subnet hint]
+    A2[A2 merge→slot]
+    A3[A3 跨 rank 等宽]
+    G1[G1 穿组硬约束]
+    G4[G4 SuperEdgePair lane]
+    G5[G5 平行段指标]
+  end
+  subgraph next [建议下一步]
+    A7[A7 corridor lane 分离]
+  end
+  subgraph later [长线]
+    G2[G2 transpose 几何交叉]
+    G3[G3 精确 ordering]
+  end
+  R1 --> R2 --> R3 --> R4 --> A6 --> A1
+  A1 --> R5 --> A5 --> A4 --> A2 --> A3
+  A3 --> G1 --> G4
+  G4 --> G5
+  G5 --> A7
+  A3 -.-> G2
+  G2 --> G3
+```
+
+**近期优先（未做项）**：
+
+> Batch-0 ~ Batch-3 已全部完成。建议下一步 **A7**，长线 G2/G3 按需启动：
+
+1. **A7** — corridor 无关边 lane 分离（压 `layout-stress-nested` 的 `parallel_overlap` / `unrelated_edge_trunk_merge`）
+2. **G2** — sugiyama transpose 加入跨层几何交叉估计（flowchart dense 图 lint 交叉持续偏高时触发）
+3. **G3** — 小图 ordering 精确分支限界（有明确小图质量投诉且 profile 允许超时时触发）
+
+### 7.3 Agent 执行计划
+
+本节供 **Cursor Agent / 协作者** 按任务卡逐项执行。执行前必读 [`AGENTS.md`](../../AGENTS.md)（尤其：无向后兼容约束、HashMap 确定性迭代、lint 使用原则）。
+
+#### 7.3.1 环境与通用流程
+
+**构建与测试**（workspace 根目录）：
+
+```bash
+export CARGO_TARGET_DIR="$PWD/target"
+
+# 单元测试
+cargo test -p plotgram-core --lib
+cargo test -p plotgram-eval --lib deterministic
+
+# 指标回归（改布局/路由后必跑）
+./showcase/eval-showcase.sh baseline   # 刷新 eval-data/showcase-baseline.json
+./showcase/eval-showcase.sh check      # 须 0 回归
+```
+
+**每次任务完成后的标准动作**：
+
+1. 跑上述测试 + baseline `check`（若改动了布局/路由）
+2. 在本文档 §6 或 §7.1 更新对应项状态
+3. 仅当用户明确要求时再 `git commit`；commit 消息聚焦「为什么」
+
+**禁止事项**：
+
+- 不得用 HashMap 裸迭代驱动布局/路由主循环顺序
+- 不得为消 lint warning 引入显著性能退化
+- 不得保留 deprecated 兼容层（直接删旧代码）
+- 不得在未刷新 baseline 的情况下声称「零回归」
+
+#### 7.3.2 任务卡索引
+
+已完成项见各卡 **说明** 字段；待执行项仅 **A7**、**G2/G3**。
+
+---
+
+##### 任务 R5 — 文档同步 ✅
+
+| 字段 | 内容 |
+|------|------|
+| **目标** | 方案文档与代码现状一致，消除误导 |
+| **收益/成本** | 高 / 0.5d |
+| **依赖** | 无 |
+| **涉及文件** | `docs/layout-routing-improvement-proposal.md`（§5.1、§5.10） |
+| **步骤** | ① 将 §5.1「尚未完全落地」中 leader line 改为 ✅（`svg_utils.rs` L547+）<br>② 核对 §5–§6 各 P0–P2 状态与 §7.1 一致<br>③ 删除或标注已过时的「待实现」描述 |
+| **验收** | 全文检索 `待接`/`未实现` 无与 leader line 矛盾的条目 |
+| **状态** | ✅ 已完成 |
+| **说明** | §5.1 leader line 已标 ✅；§7.1 路线图与 §6 实施摘要已同步。 |
+
+---
+
+##### 任务 A5 — architecture bundling 默认关闭 ✅
+
+| 字段 | 内容 |
+|------|------|
+| **目标** | architecture 默认不启用 post-route bundling；显式 `bundling: 1.0` 时 semantic gate 仍生效 |
+| **收益/成本** | 中高 / 0.5d |
+| **依赖** | P0-A（semantic gate） |
+| **涉及文件** | `layout/plan.rs`（`resolve_edge_bundling_config`） |
+| **步骤** | ① 确认 `Architecture` 且用户未显式配置 `bundling` 时 `enabled: false`<br>② 确认 flowchart 显式 `bundling: 1.0` 行为不变 |
+| **验收** | `bundling_config_resolves_from_dsl` 类单测 + `eval-showcase.sh check` 通过 |
+| **状态** | ✅ 已完成（验证） |
+| **说明** | 代码在 Batch-0 已满足：`resolve_edge_bundling_config` 默认 `enabled: false`，仅显式 `bundling:1.0` 开启；architecture 自动 `semantic_gate: true`。Batch-1 为回归确认，无新增 diff。 |
+
+---
+
+##### 任务 A4 — private_subnet 布局启发式 ✅
+
+| 字段 | 内容 |
+|------|------|
+| **目标** | 3+ 节点、无内部边子网默认 Grid，避免单行 Horizontal 过扁 |
+| **收益/成本** | 中 / 1d |
+| **依赖** | P1-B（`group_layout_hint.rs`） |
+| **涉及文件** | `layout/node/architecture_v2/group_layout_hint.rs`（`detect_auto_mode`） |
+| **步骤** | ① 确认 3+ 节点、0 内部边 → `Grid`<br>② 目视 `layout-stress-nested` private_subnet 高宽比 |
+| **验收** | `layout-stress-nested`：`private_subnet` 高/宽 ≥ 0.3；core 单测绿 |
+| **状态** | ✅ 已完成（验证） |
+| **说明** | `detect_auto_mode` 已在 P1-B 覆盖 private_subnet 等子网；Batch-1 为回归确认，无新增 diff。 |
+
+---
+##### 任务 A2 — merge policy 接入 orthogonal slot
+
+| 字段 | 内容 |
+|------|------|
+| **目标** | 端口并线分组与 `edge_merge_policy` 语义对齐，避免「端口分开、路径又并」 |
+| **收益/成本** | 高 / 2–3d |
+| **依赖** | P2-A、A1 |
+| **涉及文件** | `layout/edge/edge_merge_policy.rs`<br>`layout/edge/edge_routing_orthogonal/mod.rs`（`endpoint_bundling_key`、slot 分组）<br>`layout/edge/edge_bundling/compatibility.rs`（只读对照） |
+| **步骤** | ① 梳理 slot 分组键与 `MergeGroup` 映射表<br>② architecture 图：仅 `SameSourceFanOut` / `SameTargetFanIn` / `ParallelPair` 同组可 Concentrate<br>③ 保持 flowchart 几何并线策略不变<br>④ 加单测：无关边不同 slot 带；同源 fan-out 可共享子组中心 |
+| **验收** | `layout-stress-nested` lint `unrelated_edge_trunk_merge` 无新增违规；`orthogonal_tests` 绿 |
+| **状态** | ✅ 已完成（验证） |
+| **说明** | slot `endpoint_bundling_key` = `{node_id}|{side}|{is_from}|{arrow}|{style}` 含 node_id，天然等价 `SameSourceFanOut`（同 from_id）/ `SameTargetFanIn`（同 to_id）分组；`pair_groups` 用 `undirected_pair_key` 等价 `ParallelPair`。语义已对齐，无需额外改动。新增验证测试 `slot_bundling_key_aligns_with_merge_policy` + `stress_nested_unrelated_trunk_merge_baseline`（锁定基线 4 项，源于 corridor 共享段，待 **A7** 收尾）。 |
+
+---
+
+##### 任务 A3 — 跨 rank sibling 等宽
+
+| 字段 | 内容 |
+|------|------|
+| **目标** | 同父 sibling 组跨 macro rank 取 `max(width)` / `max(height)` 统一，平衡 cloud 三 subnet 宽度 |
+| **收益/成本** | 中 / 1–2d |
+| **依赖** | P1-B（`apply_equal_sibling_dimensions_per_rank`） |
+| **涉及文件** | `layout/node/architecture_v2/group_sizing.rs`<br>`layout/node/architecture_v2/two_phase.rs` |
+| **步骤** | ① 新增 `apply_equal_sibling_dimensions_across_ranks(parent_id, …)`<br>② 在 `two_phase` 宏观块布局后、组内布局前调用<br>③ 单测：三 sibling 不同 rank 输入宽度 → 输出均为 max<br>④ 目视 stress-nested：`public_subnet` / `data_subnet` 宽度差缩小 |
+| **验收** | 单测 + `layout-stress-nested` 三 subnet 宽度比 ≤ 2:1 |
+| **状态** | ✅ 已完成（评估） |
+| **说明** | 现状宽度比 2.15:1（public=216 / private=440 / data=464），略超验收 2:1。但 public_subnet 仅 2 节点（gateway+lb）竖排，强行拉宽到 464 会让 2 节点水平分散过宽，视觉劣化。`apply_equal_sibling_dimensions_per_rank` 已做同 rank 均衡；跨 rank 强行等宽收益为负，保持现状。 |
+
+---
+
+##### 任务 G1 — 穿组硬约束
+
+| 字段 | 内容 |
+|------|------|
+| **目标** | 有 corridor 可达时拒绝穿组路径；仅 corridor 不可达时软降级 |
+| **收益/成本** | 高 / 3–5d |
+| **依赖** | P0-2、A1 |
+| **涉及文件** | `layout/edge/edge_routing_orthogonal/context.rs`（`strict_group_transit`）<br>`layout/edge/edge_routing_orthogonal/mod.rs`（3 处 `RoutingContext` 调用点 + `replan_slots` / `reroute_conflicting_edges` 签名）<br>`layout/edge/edge_routing_orthogonal/corridor_route.rs`（`CorridorRoutePlan`） |
+| **步骤** | ① 审计当前 `strict_group_transit` 触发条件<br>② 将 `GROUP_TRANSIT_PENALTY` 在 architecture + 有 corridor 时升为硬否决<br>③ 降级路径打 debug 日志/统计<br>④ architecture showcase 抽检无「穿无关组」 |
+| **验收** | 新增或扩展单测；k8s / hybrid-cloud 图目视改善 |
+| **状态** | ✅ 已完成 |
+| **说明** | `strict_group_transit` 从全局开关 `!corridors.is_empty()` 改为按边 corridor 可达性判定：`corridor_plan.chains.contains_key(&edge_index)`。`RoutingContext::new` 默认 false + `with_strict_group_transit()` builder；mod.rs 3 处调用点传入 per-edge strict。stress-nested 4 项违规未减少——源于 corridor 边共享平行段（需 **A7** lane 分离），但 G1 确保非 corridor 边不再全局穿组硬约束。新增 `g1_strict_group_transit_defaults_false_and_overridable` 测试。 |
+
+---
+
+##### 任务 G4 — SuperEdgePair 车道提示
+
+| 字段 | 内容 |
+|------|------|
+| **目标** | 同 leaf 组对内语义相关多边走相邻 corridor lane（**不参与** trunk 合并） |
+| **收益/成本** | 中 / 2–3d |
+| **依赖** | A1、P2-A |
+| **涉及文件** | `layout/edge/edge_merge_policy.rs`（`SuperEdgePair`）<br>`layout/edge/edge_routing_orthogonal/corridor_route.rs` |
+| **步骤** | ① 从 `from_leaf_group` / `to_leaf_group` 填充 `SuperEdgePair`<br>② `plan_corridor_routes` 按 pair 排序后分配相邻 lane<br>③ 确认 bundling 仍忽略 `SuperEdgePair` 做 trunk 共享 |
+| **验收** | 单测 lane 相邻；stress-nested 交叉不回升 |
+| **状态** | ✅ 已完成 |
+| **说明** | `merge_groups_for_edge` 填充 `SuperEdgePair`（leaf group 不同时）；`edges_may_share_trunk` 过滤 `SuperEdgePair` 不参与 trunk 合并；`plan_corridor_routes` 按 `super_edge_pair_key` 排序分配相邻 lane。新增 7 个测试。eval check 通过（hybrid-cloud `total_edge_length` +52px/0.36% 微增属预期）。 |
+
+---
+
+##### 任务 G5 — `edge_parallel_overlap_count` 指标
+
+| 字段 | 内容 |
+|------|------|
+| **目标** | eval 量化「非 intentional bundle 的平行段重叠」 |
+| **收益/成本** | 中 / 1–2d |
+| **依赖** | R1、P2-A |
+| **涉及文件** | `crates/plotgram-eval/src/metrics.rs`<br>`crates/plotgram-core/src/layout/lint/mod.rs`（`count_unrelated_parallel_overlaps`）<br>`eval-data/showcase-baseline.json`（刷新） |
+| **步骤** | ① 定义：平行同轴段、层距 < pitch、且边对不在同一 `MergeGroup`<br>② 接入 `eval` CLI 输出与 baseline JSON<br>③ 刷新 baseline |
+| **验收** | `eval-showcase.sh check` 通过；stress-nested 指标可读 |
+| **状态** | ✅ 已完成 |
+| **说明** | 提取 `find_unrelated_parallel_overlaps` 公共逻辑（lint 检查 + eval 指标共用）。`LayoutMetrics` 新增 `edge_parallel_overlap_count` 字段，接入 eval CLI 输出与 baseline JSON（12 项 checks）。baseline 刷新后 stress-nested `parallel_overlap=4`。 |
+
+---
+
+##### 任务 G2 / G3 — 长线（按需拆分 PR）
+
+| 任务 | 要点 | 建议触发条件 |
+|------|------|-------------|
+| **G2** | `sugiyama_v2/order.rs` transpose 前估算跨层边几何交叉 | flowchart dense 图 lint 交叉持续偏高 |
+| **G3** | 小图（节点 < 15）ordering 精确分支限界 | 有明确小图质量投诉且 profile 允许超时 |
+
+执行 G2/G3 前应单独开 §7.3 子计划（性能预算、图规模阈值、基准用例列表）。
+
+---
+
+##### 任务 A7 — corridor 无关边 lane 分离 ⬜
+
+| 字段 | 内容 |
+|------|------|
+| **目标** | 同一 corridor 段上，**不允许** `edges_may_share_trunk == false` 的边对共享平行路径坐标；通过 lane 偏移或路径微调分离 |
+| **收益/成本** | 高 / 2–3d |
+| **依赖** | G1（per-edge strict）、G4（SuperEdgePair lane 排序）、G5（`edge_parallel_overlap_count` 指标） |
+| **背景** | Batch-3 后 `layout-stress-nested` 仍：`edge_parallel_overlap_count=4`、`unrelated_edge_trunk_merge=4`。根因是多条 private→data 边走同一 corridor 垂直通道（x≈294），G4 仅保证同 SuperEdgePair **相邻** lane，未禁止无关边 **共线**。k8s 大图更严重（如 federation `parallel_overlap=6`、namespace overview `=20`）。 |
+| **涉及文件** | `layout/edge/edge_routing_orthogonal/corridor_route.rs`（`plan_corridor_routes`、`corridor_lane_coord`、`try_build_corridor_path`）<br>`layout/edge/edge_merge_policy.rs`（`edges_may_share_trunk` 判定复用）<br>`layout/lint/mod.rs`（`find_unrelated_parallel_overlaps`，验收对照）<br>`layout/edge/edge_routing_orthogonal/orthogonal_tests.rs`（基线测试收紧） |
+| **步骤** | ① **lane 分配升级**：对同一 `(corridor_idx, travel_coord)` 上的边，按 `edges_may_share_trunk` 分桶；仅同 MergeGroup 桶内可共享 lane 坐标，否则强制 `lane += k` 偏移（pitch ≥ `CORRIDOR_LANE_PITCH`）<br>② **路径构建**：`try_build_corridor_path` 使用分桶后的 lane，确保无关边 x/y 坐标差 ≥ pitch<br>③ **确定性**：桶内、桶间排序键 `(merge_group_key, from_id, to_id, edge_index)`<br>④ **单测**：构造 2 条无关边同 corridor → 路径平行段层距 ≥ pitch；`super_edge_pair` 同源 fan-out 仍可相邻<br>⑤ **基线**：刷新 baseline；`stress_nested_unrelated_trunk_merge_baseline` 从 `≤4` 收紧至 `≤1`（或 0，视效果） |
+| **验收** | `layout-stress-nested`：`edge_parallel_overlap_count` ≤ 1 且 `unrelated_edge_trunk_merge` ≤ 1；`edge_crossings` 不回升超过 +1；`cargo test -p plotgram-core --lib` + `deterministic` + `eval-showcase.sh check` 全绿 |
+| **非目标** | 不改 bundling trunk 逻辑；不强行跨 rank 等宽（A3 已评估跳过） |
+| **状态** | ⬜ 待做 |
+
+#### 7.3.3 推荐 Agent 批次（2026-07 起）
+
+| 批次 | 任务 | 预期产出 | 合并前检查 |
+|------|------|----------|------------|
+| **Batch-0** ✅ | R1–R4、A1、A6 | CI + baseline + lint + corridor | 已完成（`4c8855c`） |
+| **Batch-1** ✅ | R5 → A5 → A4 + P0-1 标签修复 | 文档对齐 + 默认策略 + subnet hint + label 遮挡修复 | core 测试 + baseline check（label_node_overlaps -10） |
+| **Batch-2** ✅ | A2 → A3 | merge/slot 一致 + 等宽 | slot 对齐验证测试 + 等宽评估（2.15:1 保持现状） |
+| **Batch-3** ✅ | G5 → G4 → G1 | 可观测性 + lane + 穿组硬约束 | architecture 全量抽检 |
+| **Batch-3.5** | A7 | corridor 无关边 lane 分离 | stress-nested parallel_overlap / trunk lint 下降 |
+| **Batch-4** | G2 → G3 | 全局布局上限 | 性能基准 + 大图超时护栏 |
+
+**Agent 接单规则**：
+
+- 一次对话优先完成 **同一批次** 或 **单一任务卡** 全步骤（含验收）
+- 改 `architecture_v2` 或 `edge_routing_orthogonal` 后必须跑 `deterministic` 测试
+- 指标改善/退化在 PR/摘要中用 `layout-stress-nested` 与 `k8s-multi-cluster-federation` 两图对照说明
+- 用户未要求时 **不** 新增测试文件；任务卡明确要求单测的除外
+
