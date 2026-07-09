@@ -169,7 +169,13 @@ impl LayoutPlan {
         }
         match hints.edge_routing_style {
             super::EdgeRoutingStyle::Orthogonal => "orthogonal".to_string(),
-            super::EdgeRoutingStyle::Curved => "circular".to_string(),
+            super::EdgeRoutingStyle::Curved => {
+                if diagram.diagram_type == crate::types::DiagramType::Mindmap {
+                    "organic".to_string()
+                } else {
+                    "circular".to_string()
+                }
+            }
             super::EdgeRoutingStyle::Straight => "straight".to_string(),
             super::EdgeRoutingStyle::Spline => "spline".to_string(),
             super::EdgeRoutingStyle::SelfLoop | super::EdgeRoutingStyle::Unspecified => {

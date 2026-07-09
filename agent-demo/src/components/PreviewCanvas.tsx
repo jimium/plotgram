@@ -1,29 +1,37 @@
 /**
  * PreviewCanvas 预览画布
  *
- * 显示 Agent 渲染的 SVG 结果，支持缩放/平移。
- * 与 studio 版本一致，仅文案微调以适应演示场景。
+ * 三栏布局左侧：SVG 预览 + DSL 源码切换 + 主题/导出工具栏。
+ * 工具栏支持：主题切换、暗色模式、导出 SVG/PNG、在 draw.io 打开。
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Space, Tooltip, Spin, Empty, Segmented } from 'antd';
+import { Button, Space, Tooltip, Spin, Empty, Segmented, Select, Dropdown, message } from 'antd';
+import type { MenuProps } from 'antd';
 import {
   ZoomInOutlined,
   ZoomOutOutlined,
   CompressOutlined,
+  DownloadOutlined,
+  BgColorsOutlined,
+  MoonOutlined,
 } from '@ant-design/icons';
-import type { DiffResult } from '@agent/types';
-import { DiffSummary } from './DiffSummary';
-import { ToolCallTrace } from './ToolCallTrace';
-import type { ToolCallTraceItem } from '@hooks/useAgent';
+import { DslViewer } from './DslViewer';
+import {
+  THEME_GROUPS,
+  DEFAULT_APPEARANCE,
+  buildRenderOptions,
+  type AppearanceOptions,
+} from '@lib/themes';
+import { downloadSvg, downloadPng, downloadDrawio, openInDrawio, copyText } from '@lib/exportImage';
 
 interface PreviewCanvasProps {
   svg: string;
   source: string;
   ready: boolean;
   isAgentRunning: boolean;
-  lastDiff: DiffResult | null;
-  toolCallTrace: ToolCallTraceItem[];
+  onRerenderTheme: (optionsJson: string) => void;
+  onRenderDrawio: (optionsJson: string) => string | null;
 }
 
 const MIN_SCALE = 0.1;
@@ -38,20 +46,32 @@ export function PreviewCanvas({
   source,
   ready,
   isAgentRunning,
-  lastDiff,
-  toolCallTrace,
+  onRerenderTheme,
+  onRenderDrawio,
 }: PreviewCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
   const [view, setView] = useState<'preview' | 'source'>('preview');
+  const [appearance, setAppearance] = useState<AppearanceOptions>(DEFAULT_APPEARANCE);
+  const [isDragging, setIsDragging] = useState(false);
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
   const txRef = useRef(tx);
   txRef.current = tx;
   const tyRef = useRef(ty);
   tyRef.current = ty;
+  const dragStateRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number } | null>(null);
+
+  // 主题变化时重新渲染
+  const applyAppearance = useCallback(
+    (opts: AppearanceOptions) => {
+      setAppearance(opts);
+      onRerenderTheme(JSON.stringify(buildRenderOptions(opts)));
+    },
+    [onRerenderTheme],
+  );
 
   const fitToView = useCallback(() => {
     const container = containerRef.current;
@@ -87,10 +107,10 @@ export function PreviewCanvas({
   }, [svg]);
 
   useEffect(() => {
-    if (svg) {
+    if (svg && view === 'preview') {
       requestAnimationFrame(fitToView);
     }
-  }, [svg, fitToView]);
+  }, [svg, fitToView, view]);
 
   const zoomAt = useCallback((centerX: number, centerY: number, factor: number) => {
     setScale((prevScale) => {
@@ -102,18 +122,65 @@ export function PreviewCanvas({
     });
   }, []);
 
+  // 滚轮 / 双指缩放：用 clientX - rect.left 计算稳定中心点
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const listener = (e: WheelEvent) => {
-      if (!svg) return;
+      if (!svg || view !== 'preview') return;
       e.preventDefault();
-      const factor = e.deltaY < 0 ? 1.05 : 1 / 1.05;
-      zoomAt(e.offsetX, e.offsetY, factor);
+      const rect = container.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      // macOS trackpad pinch zoom 会触发 ctrlKey=true 的 wheel 事件，
+      // deltaY 代表缩放级别变化（负值=放大），用 exp 让缩放跟随手势
+      let factor: number;
+      if (e.ctrlKey) {
+        factor = Math.exp(-e.deltaY * 0.01);
+      } else {
+        factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
+      }
+      zoomAt(cx, cy, factor);
     };
     container.addEventListener('wheel', listener, { passive: false });
     return () => container.removeEventListener('wheel', listener);
-  }, [svg, zoomAt]);
+  }, [svg, zoomAt, view]);
+
+  // 拖拽平移：mousedown 记录起点，window mousemove/up 实时更新
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (!svg || view !== 'preview') return;
+      if (e.button !== 0) return; // 只响应左键
+      dragStateRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startTx: txRef.current,
+        startTy: tyRef.current,
+      };
+      setIsDragging(true);
+    },
+    [svg, view],
+  );
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: MouseEvent) => {
+      const s = dragStateRef.current;
+      if (!s) return;
+      setTx(s.startTx + (e.clientX - s.startX));
+      setTy(s.startTy + (e.clientY - s.startY));
+    };
+    const onUp = () => {
+      dragStateRef.current = null;
+      setIsDragging(false);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [isDragging]);
 
   const zoomByButton = useCallback(
     (factor: number) => {
@@ -124,9 +191,68 @@ export function PreviewCanvas({
     [zoomAt],
   );
 
+  // 导出操作
+  const handleExportSvg = () => {
+    if (svg) {
+      downloadSvg(svg);
+      message.success('SVG 已导出');
+    }
+  };
+
+  const handleExportPng = () => {
+    if (svg) {
+      downloadPng(svg, 'diagram.png', 2)
+        .then(() => message.success('PNG 已导出 (2x)'))
+        .catch(() => message.error('PNG 导出失败'));
+    }
+  };
+
+  const handleDrawioDownload = () => {
+    const xml = onRenderDrawio(JSON.stringify(buildRenderOptions(appearance)));
+    if (xml) {
+      downloadDrawio(xml);
+      message.success('Drawio 文件已下载');
+    } else {
+      message.error('Drawio 生成失败');
+    }
+  };
+
+  const handleDrawioOpen = () => {
+    const xml = onRenderDrawio(JSON.stringify(buildRenderOptions(appearance)));
+    if (xml) {
+      openInDrawio(xml);
+    } else {
+      message.error('Drawio 生成失败');
+    }
+  };
+
+  const handleCopyDsl = () => {
+    if (source) {
+      copyText(source)
+        .then(() => message.success('DSL 已复制'))
+        .catch(() => message.error('复制失败'));
+    }
+  };
+
+  const exportMenuItems: MenuProps['items'] = [
+    { key: 'svg', label: '导出 SVG', onClick: handleExportSvg },
+    { key: 'png', label: '导出 PNG (2x)', onClick: handleExportPng },
+    { type: 'divider' },
+    { key: 'drawio_dl', label: '下载 .drawio', onClick: handleDrawioDownload },
+    { key: 'drawio_open', label: '在 draw.io 中打开', onClick: handleDrawioOpen },
+    { type: 'divider' },
+    { key: 'copy_dsl', label: '复制 DSL 源码', onClick: handleCopyDsl },
+  ];
+
+  // 主题选项
+  const themeOptions = THEME_GROUPS.flatMap((g) => [
+    { label: g.label, options: g.options.map((o) => ({ label: o.label, value: o.value })) },
+  ]);
+
   return (
     <div className="preview-pane">
-      <div className="preview-tabs">
+      {/* 工具栏 */}
+      <div className="preview-toolbar-top">
         <Segmented
           size="small"
           value={view}
@@ -136,10 +262,49 @@ export function PreviewCanvas({
             { label: 'DSL 源码', value: 'source' },
           ]}
         />
+        <Space size={6}>
+          {view === 'preview' && svg && (
+            <>
+              <Select
+                size="small"
+                style={{ width: 140 }}
+                value={appearance.themeId}
+                onChange={(v) => applyAppearance({ ...appearance, themeId: v })}
+                options={themeOptions}
+                suffixIcon={<BgColorsOutlined />}
+              />
+              <Tooltip title={appearance.darkMode ? '切换亮色' : '切换暗色'}>
+                <Button
+                  size="small"
+                  type={appearance.darkMode ? 'primary' : 'text'}
+                  icon={<MoonOutlined />}
+                  onClick={() => applyAppearance({ ...appearance, darkMode: !appearance.darkMode })}
+                />
+              </Tooltip>
+            </>
+          )}
+          <Dropdown menu={{ items: exportMenuItems }} disabled={!svg && !source}>
+            <Button size="small" icon={<DownloadOutlined />}>
+              导出
+            </Button>
+          </Dropdown>
+        </Space>
       </div>
 
+      {/* 内容区 */}
       {view === 'preview' ? (
-        <div ref={containerRef} className="preview-canvas">
+        <div
+          ref={containerRef}
+          className="preview-canvas"
+          onMouseDown={handleMouseDown}
+          style={{
+            cursor: isDragging
+              ? 'grabbing'
+              : svg
+                ? 'grab'
+                : 'default',
+          }}
+        >
           {isAgentRunning && !svg && (
             <div className="preview-loading">
               <Spin tip="Agent 正在生成图表...">
@@ -180,31 +345,16 @@ export function PreviewCanvas({
             <div className="preview-toolbar">
               <Space size={4}>
                 <Tooltip title="缩小">
-                  <Button
-                    size="small"
-                    type="text"
-                    icon={<ZoomOutOutlined />}
-                    onClick={() => zoomByButton(1 / 1.1)}
-                  />
+                  <Button size="small" type="text" icon={<ZoomOutOutlined />} onClick={() => zoomByButton(1 / 1.1)} />
                 </Tooltip>
                 <span style={{ fontSize: 12, minWidth: 48, textAlign: 'center' }}>
                   {Math.round(scale * 100)}%
                 </span>
                 <Tooltip title="放大">
-                  <Button
-                    size="small"
-                    type="text"
-                    icon={<ZoomInOutlined />}
-                    onClick={() => zoomByButton(1.1)}
-                  />
+                  <Button size="small" type="text" icon={<ZoomInOutlined />} onClick={() => zoomByButton(1.1)} />
                 </Tooltip>
                 <Tooltip title="适应窗口">
-                  <Button
-                    size="small"
-                    type="text"
-                    icon={<CompressOutlined />}
-                    onClick={fitToView}
-                  />
+                  <Button size="small" type="text" icon={<CompressOutlined />} onClick={fitToView} />
                 </Tooltip>
               </Space>
             </div>
@@ -212,31 +362,7 @@ export function PreviewCanvas({
         </div>
       ) : (
         <div className="preview-source">
-          {source ? (
-            <pre className="preview-source-code">
-              <code>{source}</code>
-            </pre>
-          ) : (
-            <div className="preview-empty">
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="还没有 DSL 源码，先让 Agent 生成图表"
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tool Call 轨迹（运行中或最近一次有 trace 时显示） */}
-      {toolCallTrace.length > 0 && (
-        <div className="preview-trace">
-          <ToolCallTrace items={toolCallTrace} running={isAgentRunning} />
-        </div>
-      )}
-
-      {lastDiff && lastDiff.changes.length > 0 && (
-        <div className="preview-diff">
-          <DiffSummary diff={lastDiff} />
+          <DslViewer source={source} />
         </div>
       )}
     </div>

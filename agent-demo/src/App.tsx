@@ -1,8 +1,7 @@
 /**
  * Plotgram Agent Demo 应用根组件
  *
- * 布局：顶栏 + 左侧预览区（含 ToolCallTrace + DiffSummary）+ 右侧对话区
- * 演示版移除了 DSL Viewer 和 LLM 配置弹窗，开箱即用。
+ * 三栏布局：左侧预览（SVG + DSL）| 中间对话 | 右侧执行轨迹
  */
 
 import { useCallback } from 'react';
@@ -10,6 +9,7 @@ import { Layout, App as AntdApp } from 'antd';
 import { TopBar } from '@components/TopBar';
 import { PreviewCanvas } from '@components/PreviewCanvas';
 import { ChatPanel } from '@components/ChatPanel';
+import { ToolCallTrace } from '@components/ToolCallTrace';
 import { useAgent } from '@hooks/useAgent';
 import { useWasm } from '@hooks/useWasm';
 import { downloadSvg } from '@lib/exportImage';
@@ -43,17 +43,19 @@ function App() {
       </Header>
 
       <Content className="studio-main">
+        {/* 左栏：预览画布 */}
         <div className="studio-preview-pane">
           <PreviewCanvas
             svg={agent.currentSvg}
             source={agent.currentSource}
             ready={ready}
             isAgentRunning={agent.isRunning}
-            lastDiff={agent.lastDiff}
-            toolCallTrace={agent.toolCallTrace}
+            onRerenderTheme={agent.rerenderWithTheme}
+            onRenderDrawio={agent.renderDrawio}
           />
         </div>
 
+        {/* 中栏：对话 */}
         <div className="studio-chat-pane">
           <ChatPanel
             messages={agent.messages}
@@ -64,6 +66,15 @@ function App() {
             onAbort={agent.abort}
             onClearError={agent.clearError}
             onReset={agent.resetConversation}
+          />
+        </div>
+
+        {/* 右栏：执行轨迹 */}
+        <div className="studio-trace-pane">
+          <ToolCallTrace
+            items={agent.toolCallTrace}
+            running={agent.isRunning}
+            lastDiff={agent.lastDiff}
           />
         </div>
       </Content>

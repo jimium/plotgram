@@ -258,7 +258,184 @@ Relation样式: style.stroke, style.stroke_width, style.dashed, style.label_colo
 - 演示场景下，用户可能描述模糊需求，若无法确定图表类型，优先询问而非臆测`;
 
 /**
+ * 按图表类型增量注入的知识模块。
+ *
+ * 设计考量（DeepSeek prefix cache）：
+ * - SYSTEM_PROMPT 是稳定前缀，每次对话完全一致 → prefix cache 命中，成本降低 10x+
+ * - 本模块作为第二 条 system 消息注入，按 diagramType 选择内容
+ * - 只有 diagramType 变化时才会切换模块，同一图表类型的多次对话仍然缓存友好
+ */
+const KNOWLEDGE_MODULES: Record<string, string> = {
+  flowchart: `## Flowchart 专项知识
+- 默认布局: flowchart (共享 sugiyama-v2 引擎)，默认方向 top-to-bottom
+- 默认边路由: orthogonal
+- 常用 type: start(圆形起点) / end(双圆终点) / process(矩形) / decision(菱形) / service / database / cache / gateway / client / person
+- 流程图最佳实践:
+  - 用 start/end 标记流程首尾
+  - decision 节点用于分支(可自环)
+  - -> 表示主流程，--> 表示返回/响应
+  - 带泳道时用 group + group_arrangement: horizontal
+- 示例:
+diagram flowchart {
+    title: "用户登录"
+    config { direction: top-to-bottom }
+    entity[start] begin "开始"
+    entity[process] input "输入凭据"
+    entity[decision] check "验证"
+    entity[end] ok "成功"
+    entity[end] fail "失败"
+    begin -> input
+    input -> check
+    check -> ok "通过"
+    check -> fail "拒绝"
+}`,
+
+  architecture: `## Architecture 专项知识
+- 默认布局: architecture (分组分层)，默认方向 left-to-right
+- 默认边路由: orthogonal
+- 常用 type: service / database / cache / gateway / queue / storage / frontend / backend / external
+- 组内布局通过 group 的 layout 属性控制: auto / horizontal / vertical / fan-out
+- group_frame: stack { axis: horizontal, gap: 50 } 控制组间排列
+- group_sizing: uniform 让所有组等宽(适合阶段条带)
+- 架构图最佳实践:
+  - 用 group 划分层级(前端层/后端层/数据层)
+  - 组内 edge 就近声明，跨组 edge 写在顶层
+  - semantic 属性匹配图标(redis/postgres/kafka/nginx 等)
+  - border_style: dashed 表示外部边界
+- 示例:
+diagram architecture {
+    title: "微服务架构"
+    config {
+        direction: left-to-right
+        group_frame: stack { axis: horizontal gap: 50 }
+    }
+    group frontend "前端层" {
+        layout: horizontal
+        entity[frontend] web "Web 应用"
+        entity[frontend] mobile "移动端"
+    }
+    group backend "后端层" {
+        layout: vertical
+        entity[gateway] gw "API 网关"
+        entity[service] auth "认证服务" { semantic: auth }
+        entity[service] order "订单服务"
+    }
+    group data "数据层" {
+        layout: vertical
+        entity[database] db "主库" { semantic: postgres }
+        entity[cache] cache "缓存" { semantic: redis }
+    }
+    web -> gw
+    mobile -> gw
+    gw -> auth
+    gw -> order
+    auth -> db
+    order -> db
+    order -> cache
+}`,
+
+  sequence: `## Sequence 专项知识
+- 默认布局: sequence，不支持 edge_routing(消息路径由布局直接生成)
+- 常用 type: participant(矩形参与者) / actor(人形) / boundary / control / lifeline
+- 箭头语义: -> 请求/调用, --> 返回/响应, <-> 双向
+- 时序图没有 group 概念，所有 entity 平铺为 lifeline
+- 标签即消息文本: a -> b "查询用户"
+- 示例:
+diagram sequence {
+    title: "API 调用时序"
+    entity[actor] user "用户"
+    entity[participant] client "客户端"
+    entity[participant] server "服务端"
+    entity[participant] db "数据库"
+    user -> client "操作"
+    client -> server "HTTPS 请求"
+    server -> db "查询"
+    db --> server "返回数据"
+    server --> client "响应"
+    client --> user "展示结果"
+}`,
+
+  state: `## State 专项知识
+- 默认布局: state (共享 circular 引擎)，默认边路由: circular
+- 常用 type: initial(圆形初始) / state(圆角矩形中间) / final(双圆终止) / choice(菱形选择)
+- 状态转换: a -> b "事件/条件"
+- choice 节点用于分支决策
+- 示例:
+diagram state {
+    title: "订单状态"
+    entity[initial] init "开始"
+    entity[state] pending "待支付"
+    entity[state] paid "已支付"
+    entity[state] shipped "已发货"
+    entity[final] done "完成"
+    entity[choice] check "支付检查"
+    init -> pending
+    pending -> check "提交"
+    check -> paid "成功"
+    check -> pending "失败重试"
+    paid -> shipped
+    shipped -> done
+}`,
+
+  er: `## ER 图专项知识
+- 默认布局: er (共享 sugiyama-v2 引擎)，默认边路由: straight
+- type 值开放(接受任意 atom)，通常用实体名作 type
+- 关系基数通过 cardinality 属性标注: "1:N" / "0..1" / "M:N"
+- 箭头: -> 表示一对多方向，<-> 表示多对多
+- 示例:
+diagram er {
+    title: "博客 ER 图"
+    entity user "用户" { type: entity }
+    entity post "文章" { type: entity }
+    entity comment "评论" { type: entity }
+    entity tag "标签" { type: entity }
+    user -> post "发表" { cardinality: "1:N" }
+    user -> comment "撰写" { cardinality: "1:N" }
+    post -> comment "包含" { cardinality: "1:N" }
+    post <-> tag "标记" { cardinality: "M:N" }
+}`,
+
+  mindmap: `## Mindmap 专项知识
+- 默认布局: mindmap，默认边路由: organic(有机曲线)
+- 常用 type: root(圆形根节点) / main(矩形主分支) / branch(矩形分支) / leaf(矩形叶节点)
+- 支持方向: radial(放射状) / top-to-bottom / left-to-right
+- 层级通过 entity 的 type 和关系结构自然形成
+- 主题推荐: mindmap.vivid-branches / mindmap.ink-dark
+- 示例:
+diagram mindmap {
+    title: "技术栈"
+    config { direction: radial theme: mindmap.vivid-branches }
+    entity[root] tech "技术栈"
+    entity[main] frontend "前端"
+    entity[main] backend "后端"
+    entity[main] devops "运维"
+    entity[branch] react "React"
+    entity[branch] vue "Vue"
+    entity[branch] node "Node.js"
+    entity[branch] rust "Rust"
+    entity[branch] docker "Docker"
+    entity[branch] k8s "K8s"
+    tech -> frontend
+    tech -> backend
+    tech -> devops
+    frontend -> react
+    frontend -> vue
+    backend -> node
+    backend -> rust
+    devops -> docker
+    devops -> k8s
+}`,
+};
+
+/**
  * 构建发送给 LLM 的消息列表
+ *
+ * 消息顺序设计（兼顾 prefix cache 与增量知识）:
+ * 1. [system] SYSTEM_PROMPT — 稳定前缀，每次完全一致（cache 命中）
+ * 2. [system] 增量知识模块 — 按 diagramType 选择，同类型内稳定
+ * 3. [system] 当前 DSL 源码 — 随图表迭代变化
+ * 4. [user/assistant] 对话历史
+ * 5. [user] 当前输入
  */
 export function buildMessages(
   userMessage: string,
@@ -267,6 +444,14 @@ export function buildMessages(
   const messages: LLMMessage[] = [
     { role: 'system', content: SYSTEM_PROMPT },
   ];
+
+  // 按图表类型注入增量知识（第二条 system 消息）
+  const knowledgeModule = context.diagramType
+    ? KNOWLEDGE_MODULES[context.diagramType]
+    : null;
+  if (knowledgeModule) {
+    messages.push({ role: 'system', content: knowledgeModule });
+  }
 
   // 注入当前 DSL 状态（让 Agent 知道当前图表内容）
   if (context.source) {

@@ -27,7 +27,7 @@ import {
   type ToolCall,
 } from '@agent/index';
 import { createProxyLLMClient } from '@lib/agentProxy';
-import type { PlotgramWasm } from '@lib/wasm';
+import { renderSource, type PlotgramWasm, type RenderFormat } from '@lib/wasm';
 
 /** LLM 请求超时时间(毫秒) — DeepSeek 流式可能较慢，给足 90s */
 const LLM_TIMEOUT_MS = 90_000;
@@ -65,6 +65,10 @@ interface UseAgentResult {
   clearError: () => void;
   /** 清空当前对话与图表（session_id 不变，配额仍累加） */
   resetConversation: () => void;
+  /** 用新外观选项重新渲染当前 DSL（不触发 Agent 循环） */
+  rerenderWithTheme: (optionsJson: string) => void;
+  /** 渲染 drawio XML（用于导出/在 draw.io 打开） */
+  renderDrawio: (optionsJson: string) => string | null;
 }
 
 export function useAgent(options: UseAgentOptions): UseAgentResult {
@@ -264,6 +268,28 @@ export function useAgent(options: UseAgentOptions): UseAgentResult {
     setError(null);
   }, [isRunning]);
 
+  /** 用新外观选项重新渲染当前 DSL（不触发 Agent 循环，仅更新 SVG） */
+  const rerenderWithTheme = useCallback(
+    (optionsJson: string) => {
+      if (!wasm || !contextRef.current.source) return;
+      const result = renderSource(wasm, contextRef.current.source, 'svg', optionsJson);
+      if (result.success && result.text) {
+        setCurrentSvg(result.text);
+      }
+    },
+    [wasm],
+  );
+
+  /** 渲染 drawio XML（用于导出/在 draw.io 打开） */
+  const renderDrawio = useCallback(
+    (optionsJson: string): string | null => {
+      if (!wasm || !contextRef.current.source) return null;
+      const result = renderSource(wasm, contextRef.current.source, 'drawio' as RenderFormat, optionsJson);
+      return result.success && result.text ? result.text : null;
+    },
+    [wasm],
+  );
+
   return {
     messages,
     currentSource,
@@ -276,6 +302,8 @@ export function useAgent(options: UseAgentOptions): UseAgentResult {
     abort,
     clearError,
     resetConversation,
+    rerenderWithTheme,
+    renderDrawio,
   };
 }
 
