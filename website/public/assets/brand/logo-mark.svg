@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="Plotgram" shape-rendering="geometricPrecision">
+  <!-- Bare mark: lines + node only, transparent bg. For docs / CLI / inline. -->
+  <path d="M10 14.4h28.8" stroke="#121212" stroke-width="3" stroke-linecap="round"/>
+  <path d="M10 26.4h13.5" stroke="#121212" stroke-width="3" stroke-linecap="round"/>
+  <path d="M10 38.4h11" stroke="#121212" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="31.9" cy="33" r="6.9" fill="#121212"/>
+</svg>

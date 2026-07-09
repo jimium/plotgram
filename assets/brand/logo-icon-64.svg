@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="Plotgram" shape-rendering="geometricPrecision">
   <!--
-    Mark: S2a22 - text wraps a node.
-    Line lengths in golden ratio phi~1.618: 28.8 -> 17.8 -> 11.0
-    Flat: solid fills only, no gradient / glow / filter.
+    64px-optimized mark (display at 64x64).
+    Full three-line S2a22 at standard geometry (same as logo-icon.svg).
+    Scheme 1: circle right = top line end (38.8); bottom-aligned with bottom line.
   -->
   <rect width="48" height="48" rx="12" fill="#121212"/>
   <path d="M10 14.4h28.8" stroke="#FAF8F4" stroke-width="3" stroke-linecap="round"/>

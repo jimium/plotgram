@@ -2,16 +2,14 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 
 function BrandIcon({ size = 28 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 50 50" fill="none">
-      <defs>
-        <linearGradient id="nav-bi" x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0%" stopColor="#7C3AED" />
-          <stop offset="100%" stopColor="#06B6D4" />
-        </linearGradient>
-      </defs>
-      <rect x="7" y="9" width="36" height="36" rx="8" fill="none" stroke="url(#nav-bi)" strokeWidth="2.5" />
-      <path fill="url(#nav-bi)" d="M17.125 18H25A9 9 0 0 1 34 27v0a9 9 0 0 1-9 9h-7.875A1.125 1.125 0 0 1 16 34.875V19.125A1.125 1.125 0 0 1 17.125 18Z" />
-    </svg>
+    <img
+      className="nav-brand-icon"
+      src="/assets/brand/logo-icon-32.svg"
+      width={size}
+      height={size}
+      alt=""
+      aria-hidden="true"
+    />
   );
 }
 

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="Plotgram" shape-rendering="geometricPrecision">
+  <!--
+    32px-optimized mark (display at 32x32).
+    Full three-line S2a22; slightly thicker stroke / node than 64 for optical weight.
+    Scheme 1: circle right = top line end (38.8); bottom-aligned with bottom line.
+  -->
+  <rect width="48" height="48" rx="12" fill="#121212"/>
+  <path d="M10 14.4h28.8" stroke="#FAF8F4" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M10 26.4h11.2" stroke="#FAF8F4" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M10 38.4h9.5" stroke="#FAF8F4" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="31.6" cy="32.8" r="7.2" fill="#2DD4A8"/>
+</svg>

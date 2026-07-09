@@ -797,9 +797,9 @@
 <section class="option">
   <div class="option-head">
     <div>
-      <div class="code">S2a22 · 美学精修</div>
+      <div class="code">S2a22 · 黄金比精修</div>
       <div class="name">文本环绕 · 节点</div>
-      <p class="why">等距三行 + 等差缩短（48→32→16），右下青绿圆与底行底对齐；中行与圆左缘留固定气口，形成「文本环绕节点」的负形三角。</p>
+      <p class="why">等距三行 + 黄金比缩短（28.8→17.8→11.0，φ≈1.618）；中线更短、环绕气口更清晰；底行与圆底对齐。字标 plot/gram 间距收紧。</p>
     </div>
     <span class="badge">精修</span>
   </div>
@@ -808,18 +808,11 @@
       <div class="label">ICON 96</div>
       <svg width="96" height="96" viewBox="0 0 96 96" fill="none">
         <rect x="8" y="8" width="80" height="80" rx="22" fill="#121212"/>
-        <!--
-          美学网格（内容区 20–76，左右边距对称）
-          行距等距 20：y = 30 / 50 / 70
-          线长等差 −16：48 / 32 / 16 → 右端 68 / 52 / 36（阶梯对角线）
-          圆 r=11.5，cx=67 → 左缘 55.5，与中行气口 ≈3.5（光学上因圆角帽更近）
-          底对齐：线底 72.5 → cy = 72.5 − 11.5 = 61
-          圆右缘 78.5，右边距 ≈9.5，与左边距 12 接近
-        -->
+        <!-- φ 线长：48 / 29.67 / 18.33；底对齐圆 -->
         <path d="M20 30h48" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
-        <path d="M20 50h32" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
-        <path d="M20 70h16" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
-        <circle cx="67" cy="61" r="11.5" fill="#2DD4A8"/>
+        <path d="M20 50h29.7" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+        <path d="M20 70h18.3" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+        <circle cx="68.4" cy="61" r="11.5" fill="#2DD4A8"/>
       </svg>
     </div>
     <div class="stage dark">
@@ -829,9 +822,9 @@
           <svg width="48" height="48" viewBox="0 0 96 96" fill="none">
             <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
             <path d="M20 30h48" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
-            <path d="M20 50h32" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
-            <path d="M20 70h16" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
-            <circle cx="67" cy="61" r="11.5" fill="#0F9F8A"/>
+            <path d="M20 50h29.7" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
+            <path d="M20 70h18.3" stroke="#121212" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="68.4" cy="61" r="11.5" fill="#0F9F8A"/>
           </svg>
           <span>48</span>
         </div>
@@ -839,9 +832,9 @@
           <svg width="32" height="32" viewBox="0 0 96 96" fill="none">
             <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
             <path d="M18 28h50" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
-            <path d="M18 50h33" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
-            <path d="M18 70h16" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
-            <circle cx="68" cy="60.5" r="12.5" fill="#0F9F8A"/>
+            <path d="M18 50h31" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
+            <path d="M18 70h19" stroke="#121212" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="69" cy="60.5" r="12.5" fill="#0F9F8A"/>
           </svg>
           <span>32</span>
         </div>
@@ -849,8 +842,8 @@
           <svg width="16" height="16" viewBox="0 0 96 96" fill="none">
             <rect x="8" y="8" width="80" height="80" rx="22" fill="#FAF8F4"/>
             <path d="M16 26h52" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
-            <path d="M16 50h34" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
-            <path d="M16 70h16" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+            <path d="M16 50h32" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
+            <path d="M16 70h20" stroke="#121212" stroke-width="8" stroke-linecap="round"/>
             <circle cx="70" cy="60" r="14" fill="#0F9F8A"/>
           </svg>
           <span>16</span>
@@ -863,31 +856,37 @@
         <rect x="4" y="4" width="88" height="88" rx="24" fill="#0B1F1C"/>
         <rect x="14" y="14" width="68" height="68" rx="18" fill="#121212"/>
         <path d="M24 30h40" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
-        <path d="M24 48h26" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
-        <path d="M24 66h13" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
-        <circle cx="63" cy="57.25" r="10.5" fill="#2DD4A8"/>
+        <path d="M24 48h24.7" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <path d="M24 66h15.3" stroke="#FAF8F4" stroke-width="4.5" stroke-linecap="round"/>
+        <circle cx="64" cy="57.25" r="10.5" fill="#2DD4A8"/>
       </svg>
     </div>
   </div>
   <div class="wm-bar">
     <div class="wm">
-      <svg viewBox="0 0 340 48" fill="none">
-        <rect x="2" y="6" width="36" height="36" rx="10" fill="#121212"/>
-        <path d="M8 13h18" stroke="#FAF8F4" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M8 21h12" stroke="#FAF8F4" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M8 32h6" stroke="#FAF8F4" stroke-width="2.4" stroke-linecap="round"/>
-        <circle cx="28.5" cy="27.8" r="5.2" fill="#2DD4A8"/>
-        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">plotgram</text>
+      <svg viewBox="0 0 280 48" fill="none">
+        <rect x="0" y="0" width="36" height="36" rx="9" transform="translate(2,6)" fill="#121212"/>
+        <g transform="translate(2,6)">
+          <path d="M7.5 10.8h21.6" stroke="#FAF8F4" stroke-width="2.25" stroke-linecap="round"/>
+          <path d="M7.5 19.8h13.35" stroke="#FAF8F4" stroke-width="2.25" stroke-linecap="round"/>
+          <path d="M7.5 28.8h8.25" stroke="#FAF8F4" stroke-width="2.25" stroke-linecap="round"/>
+          <circle cx="27.15" cy="24.75" r="5.175" fill="#2DD4A8"/>
+        </g>
+        <text x="48" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#121212">plot</text>
+        <text x="104" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#0F9F8A">gram</text>
       </svg>
     </div>
     <div class="wm dark">
-      <svg viewBox="0 0 340 48" fill="none">
-        <rect x="2" y="6" width="36" height="36" rx="10" fill="#FAF8F4"/>
-        <path d="M8 13h18" stroke="#121212" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M8 21h12" stroke="#121212" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M8 32h6" stroke="#121212" stroke-width="2.4" stroke-linecap="round"/>
-        <circle cx="28.5" cy="27.8" r="5.2" fill="#0F9F8A"/>
-        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">plotgram</text>
+      <svg viewBox="0 0 280 48" fill="none">
+        <rect x="0" y="0" width="36" height="36" rx="9" transform="translate(2,6)" fill="#FAF8F4"/>
+        <g transform="translate(2,6)">
+          <path d="M7.5 10.8h21.6" stroke="#121212" stroke-width="2.25" stroke-linecap="round"/>
+          <path d="M7.5 19.8h13.35" stroke="#121212" stroke-width="2.25" stroke-linecap="round"/>
+          <path d="M7.5 28.8h8.25" stroke="#121212" stroke-width="2.25" stroke-linecap="round"/>
+          <circle cx="27.15" cy="24.75" r="5.175" fill="#0F9F8A"/>
+        </g>
+        <text x="48" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#FAF8F4">plot</text>
+        <text x="104" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.045em" fill="#2DD4A8">gram</text>
       </svg>
     </div>
   </div>
