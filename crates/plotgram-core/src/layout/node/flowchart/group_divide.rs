@@ -527,6 +527,7 @@ pub fn divide_flowchart_with_groups(
     let group_routing = crate::layout::group::GroupRoutingHints {
         corridors: crate::layout::group::merge_corridors(&stacking_corridors, &groups),
         border_shell_pad: crate::layout::group::GROUP_BORDER_SHELL_PAD,
+        side_gutters: std::collections::BTreeMap::new(),
     };
 
     // 8. 计算总尺寸

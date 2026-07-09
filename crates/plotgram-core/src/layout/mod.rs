@@ -547,6 +547,18 @@ pub struct LayoutHints {
     pub orthogonal_debug: Option<OrthoDebugStats>,
     /// 分组路由提示：组间走廊 + 边框壳层厚度（architecture 等含 group 的图）。
     pub group_routing: Option<group::GroupRoutingHints>,
+    /// EGB / PRS 调试统计（architecture 可选观测）。
+    pub gutter_budget_debug: Option<GutterBudgetDebug>,
+}
+
+/// EGB + PRS 性能与效果观测（不影响布局结果）。
+#[derive(Debug, Clone, Default)]
+pub struct GutterBudgetDebug {
+    pub egb_ms: f64,
+    pub prs_ms: f64,
+    pub prs_grew: bool,
+    pub max_side_gutter: f64,
+    pub canvas_area_delta_pct: f64,
 }
 
 /// refine 调试统计（P2-1 可观测性）

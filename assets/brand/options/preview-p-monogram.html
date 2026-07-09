@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plotgram — Text-to-Diagram</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #fff; color: #111; font-family: -apple-system, 'Inter', system-ui, sans-serif; padding: 56px 48px; -webkit-font-smoothing: antialiased; }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; }
+  .sub { color: #999; font-size: 13px; margin: 6px 0 12px; max-width: 640px; line-height: 1.6; }
+  .concept { color: #666; font-size: 12px; margin-bottom: 40px; padding: 12px 16px; background: #fafafa; border-left: 2px solid #6366F1; max-width: 720px; line-height: 1.6; }
+  .concept b { color: #111; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; max-width: 1240px; }
+  .card { border: 1px solid #eee; border-radius: 12px; transition: border-color 0.15s; }
+  .card:hover { border-color: #bbb; }
+  .stage { height: 200px; display: flex; align-items: center; justify-content: center; background: #fafafa; border-bottom: 1px solid #f0f0f0; position: relative; }
+  .stage .icon { width: 96px; height: 96px; }
+  .stage .fav { width: 22px; height: 22px; position: absolute; top: 12px; right: 12px; }
+  .info { padding: 14px 18px 16px; }
+  .info .n { font-size: 10px; font-weight: 600; color: #bbb; letter-spacing: 0.1em; margin-bottom: 4px; }
+  .info .nm { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .info .desc { font-size: 12px; color: #888; line-height: 1.5; }
+  .sep { grid-column: 1 / -1; font-size: 10px; font-weight: 600; color: #ccc; letter-spacing: 0.12em; padding: 24px 0 4px; }
+  .wm-section { grid-column: 1 / -1; margin-top: 48px; padding-top: 48px; border-top: 1px solid #eee; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .wm-card { border: 1px solid #eee; border-radius: 10px; padding: 28px 20px; display: flex; align-items: center; justify-content: center; min-height: 80px; background: #fafafa; }
+  .wm-card svg { height: 32px; width: auto; }
+</style>
+</head>
+<body>
+
+<h1>Plotgram — Text → Diagram</h1>
+<p class="sub">12 个方向。产品定位：<b>文本画图</b>（用户写文本，自动生成图表/流程图）。logo 必须传达「文字 → 图形」的转化关系。</p>
+<div class="concept">
+  <b>核心隐喻候选：</b> ① 文本行 → 节点/箭头（最直接）② 光标 + 节点（编辑器感）③ 「/」斜杠作为分隔符（命令感）④ 代码括号 []（文本外壳）⑤ 文字变图形的视觉转译
+</div>
+
+<div class="grid">
+
+  <div class="sep">方向 A · 文本 → 节点（直接转译）</div>
+
+  <!-- A1: 横线转节点 -->
+  <div class="card">
+    <div class="stage">
+      <svg class="icon" viewBox="0 0 96 48" fill="none">
+        <line x1="8" y1="14" x2="20" y2="14" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <rect x="22" y="9" width="10" height="10" rx="2" fill="#111"/>
+        <line x1="34" y1="14" x2="44" y2="14" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <rect x="46" y="9" width="10" height="10" rx="2" fill="#6366F1"/>
+        <line x1="58" y1="14" x2="68" y2="14" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="74" cy="14" r="5" fill="#6366F1"/>
+        <line x1="8" y1="34" x2="18" y2="34" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <polygon points="22,29 32,29 32,34 36,34 27,42 18,34 22,34" fill="#111"/>
+        <line x1="40" y1="34" x2="50" y2="34" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <path d="M56,29 L66,29 L66,34 L62,34 L62,37 L56,37 Z" fill="#6366F1"/>
+      </svg>
+      <svg class="fav" viewBox="0 0 48 48" fill="none">
+        <line x1="4" y1="14" x2="12" y2="14" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+        <rect x="14" y="9" width="10" height="10" rx="2" fill="#111"/>
+        <line x1="26" y1="14" x2="34" y2="14" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+        <rect x="36" y="9" width="10" height="10" rx="2" fill="#6366F1"/>
+      </svg>
+    </div>
+    <div class="info">
+      <div class="n">A1</div>
+      <div class="nm">文字行 → 节点链</div>
+      <div class="desc">上方：横线（文本）+ 节点 = 文字被转译成图。下方：箭头 + 矩形 = 流程图。最直白的「文本→图」</div>
+    </div>
+  </div>
+
+  <!-- A2: 三行文本 → 树状图 -->
+  <div class="card">
+    <div class="stage">
+      <svg class="icon" viewBox="0 0 96 48" fill="none">
+        <line x1="8" y1="10" x2="32" y2="10" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <line x1="8" y1="22" x2="22" y2="22" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <line x1="8" y1="34" x2="26" y2="34" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="40" cy="22" r="3" fill="#111"/>
+        <line x1="43" y1="22" x2="55" y2="10" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="43" y1="22" x2="50" y2="22" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="43" y1="22" x2="55" y2="34" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="58" cy="10" r="3" fill="#6366F1"/>
+        <circle cx="53" cy="22" r="3" fill="#6366F1"/>
+        <circle cx="58" cy="34" r="3" fill="#6366F1"/>
+      </svg>
+      <svg class="fav" viewBox="0 0 48 48" fill="none">
+        <line x1="4" y1="10" x2="20" y2="10" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="4" y1="22" x2="14" y2="22" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="4" y1="34" x2="18" y2="34" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="26" cy="22" r="3" fill="#111"/>
+        <line x1="29" y1="22" x2="38" y2="10" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <line x1="29" y1="22" x2="38" y2="34" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="41" cy="10" r="3" fill="#6366F1"/>
+        <circle cx="41" cy="34" r="3" fill="#6366F1"/>
+      </svg>
+    </div>
+    <div class="info">
+      <div class="n">A2</div>
+      <div class="nm">三行文本 → 树</div>
+      <div class="desc">左侧 3 行文字 → 右侧 3 节点树状结构。最贴近产品：「写列表就生成树图」</div>
+    </div>
+  </div>
+
+  <!-- A3: 句子 → 图 -->
+  <div class="card">
+    <div class="stage">
+      <svg class="icon" viewBox="0 0 96 48" fill="none">
+        <text x="8" y="16" font-family="ui-monospace, monospace" font-size="8" font-weight="600" fill="#111">A → B</text>
+        <path d="M20,24 L76,24" stroke="#111" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="2,3"/>
+        <polygon points="76,21 80,24 76,27" fill="#111"/>
+        <circle cx="14" cy="36" r="3" fill="#111"/>
+        <circle cx="30" cy="36" r="3" fill="#111"/>
+        <line x1="17" y1="36" x2="27" y2="36" stroke="#111" stroke-width="1.5"/>
+        <text x="40" y="40" font-family="ui-monospace, monospace" font-size="6" fill="#888">render</text>
+        <circle cx="58" cy="36" r="3" fill="#6366F1"/>
+        <text x="66" y="40" font-family="ui-monospace, monospace" font-size="6" fill="#888">view</text>
+      </svg>
+      <svg class="fav" viewBox="0 0 48 48" fill="none">
+        <text x="6" y="18" font-family="ui-monospace, monospace" font-size="7" font-weight="700" fill="#111">A→B</text>
+        <line x1="6" y1="32" x2="22" y2="32" stroke="#111" stroke-width="2"/>
+        <polygon points="22,29 26,32 22,35" fill="#111"/>
+        <circle cx="34" cy="32" r="4" fill="#6366F1"/>
+      </svg>
+    </div>
+    <div class="info">
+      <div class="n">A3</div>
+      <div class="nm">代码语法 → 图</div>
+      <div class="desc">`A→B` 这类文本语法 → 渲染成节点连线。表达 Mermaid/Plotgram 类产品的核心</div>
+    </div>
+  </div>
+
+  <div class="sep">方向 B · 光标 + 图形（编辑器）</div>
+
+  <!-- B1: 文本块 + 节点 -->
+  <div class="card">
+    <div class="stage">
+      <svg class="icon" viewBox="0 0 96 48" fill="none">
+        <rect x="6" y="8" width="32" height="32" rx="3" fill="none" stroke="#111" stroke-width="2"/>
+        <line x1="12" y1="16" x2="32" y2="16" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="12" y1="22" x2="28" y2="22" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="12" y1="28" x2="30" y2="28" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="12" y1="34" x2="22" y2="34" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <rect x="32" y="30" width="2" height="6" fill="#6366F1"/>
+        <path d="M44,20 L58,20 L58,30 L72,30" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <polygon points="72,27 76,30 72,33" fill="#6366F1"/>
+        <rect x="42" y="14" width="14" height="10" rx="2" fill="#6366F1"/>
+        <rect x="60" y="32" width="14" height="10" rx="2" fill="#6366F1"/>
+      </svg>
+      <svg class="fav" viewBox="0 0 48 48" fill="none">
+        <rect x="4" y="8" width="20" height="32" rx="3" fill="none" stroke="#111" stroke-width="2"/>
+        <line x1="8" y1="16" x2="20" y2="16" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="8" y1="22" x2="18" y2="22" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="8" y1="28" x2="20" y2="28" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="8" y1="34" x2="16" y2="34" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <rect x="20" y="30" width="1.5" height="6" fill="#6366F1"/>
+        <path d="M28,18 L36,18 L36,24 L42,24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <polygon points="42,21 45,24 42,27" fill="#6366F1"/>
+        <rect x="28" y="13" width="8" height="6" rx="1.5" fill="#6366F1"/>
+        <rect x="38" y="26" width="8" height="6" rx="1.5" fill="#6366F1"/>
+      </svg>
+    </div>
+    <div class="info">
+      <div class="n">B1</div>
+      <div class="nm">编辑器 + 生成图</div>
+      <div class="desc">左侧文本编辑器（带光标）→ 右侧自动生成的图。Notion AI / Cursor 范式，最贴近产品 UI</div>
+    </div>
+  </div>
+
+  <!-- B2: 光标 + 节点 -->
+  <div class="card">
+    <div class="stage">
+      <svg class="icon" viewBox="0 0 96 48" fill="none">
+        <line x1="14" y1="8" x2="14" y2="40" stroke="#111" stroke-width="3" stroke-linecap="round"/>
+        <rect x="22" y="14" width="14" height="10" rx="2" fill="#111"/>
+        <circle cx="14" cy="22" r="2" fill="#6366F1"/>
+        <line x1="36" y1="19" x2="48" y2="19" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <polygon points="48,16 52,19 48,22" fill="#111"/>
+        <circle cx="60" cy="19" r="5" fill="#6366F1"/>
+        <line x1="22" y1="34" x2="22" y2="38" stroke="#111" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <svg class="fav" viewBox="0 0 48 48" fill="none">
+        <line x1="10" y1="8" x2="10" y2="40" stroke="#111" stroke-width="3" stroke-linecap="round"/>
+        <rect x="16" y="14" width="12" height="8" rx="2" fill="#111"/>
+        <line x1="28" y1="18" x2="36" y2="18" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <polygon points="36,15 40,18 36,21" fill="#111"/>
+        <circle cx="42" cy="18" r="4" fill="#6366F1"/>
+        <line x1="10" y1="34" x2="10" y2="40" stroke="#111" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="info">
+      <div class="n">B2</div>
+      <div class="nm">光标 + 节点（V5 演化）</div>
+      <div class="desc">V5 基础 + 文字行上下文。底部光标 = 文本编辑器隐喻</div>
+    </div>
+  </div>
+
+  <div class="sep">方向 C · 斜杠 / 命令符</div>
+
+  <!-- C1: 斜杠 + 节点 -->
+  <div class="card">
+    <div class="stage">
+      <svg class="icon" viewBox="0 0 96 48" fill="none">
+        <line x1="22" y1="38" x2="42" y2="6" stroke="#111" stroke-width="3.5" stroke-linecap="round"/>
+        <circle cx="46" cy="6" r="3" fill="#6366F1"/>
+        <line x1="56" y1="14" x2="68" y2="14" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <polygon points="68,11 72,14 68,17" fill="#111"/>
+        <rect x="74" y="9" width="12" height="10" rx="2" fill="#6366F1"/>
+        <line x1="56" y1="30" x2="68" y2="30" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <polygon points="68,27 72,30 68,33" fill="#111"/>
+        <circle cx="80" cy="30" r="6" fill="none" stroke="#6366F1" stroke-width="2"/>
+      </svg>
+      <svg class="fav" viewBox="0 0 48 48" fill="none">
+        <line x1="14" y1="40" x2="28" y2="8" stroke="#111" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="32" cy="8" r="3.5" fill="#6366F1"/>
+        <line x1="36" y1="20" x2="42" y2="20" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <polygon points="42,17 45,20 42,23" fill="#111"/>
+        <rect x="44" y="16" width="4" height="8" fill="#6366F1"/>
+      </svg>
+    </div>
+    <div class="info">
+      <div class="n">C1</div>
+      <div class="nm">斜杠 / 命令</div>
+      <div class="desc">`/` 命令符 = 输入触发。Notion/Linear 命令面板感。斜杠发出节点/箭头</div>
+    </div>
+  </div>
+
+  <!-- C2: 括号包裹节点 -->
+  <div class="card">
+    <div class="stage">
+      <svg class="icon" viewBox="0 0 96 48" fill="none">
+        <path d="M16,6 L8,6 L8,42 L16,42" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M80,6 L88,6 L88,42 L80,42" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="30" y1="20" x2="42" y2="20" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <polygon points="42,17 46,20 42,23" fill="#111"/>
+        <rect x="48" y="14" width="14" height="12" rx="2" fill="#6366F1"/>
+        <line x1="30" y1="32" x2="42" y2="32" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <polygon points="42,29 46,32 42,35" fill="#111"/>
+        <circle cx="54" cy="32" r="6" fill="none" stroke="#6366F1" stroke-width="2"/>
+        <text x="62" y="36" font-family="ui-monospace, monospace" font-size="9" font-weight="700" fill="#111">P</text>
+      </svg>
+      <svg class="fav" viewBox="0 0 48 48" fill="none">
+        <path d="M10,6 L4,6 L4,42 L10,42" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M38,6 L44,6 L44,42 L38,42" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="16" y="16" width="6" height="6" rx="1" fill="#111"/>
+        <rect x="26" y="22" width="6" height="6" rx="1" fill="#6366F1"/>
+        <line x1="22" y1="19" x2="26" y2="25" stroke="#111" stroke-width="1.2"/>
+        <line x1="22" y1="25" x2="26" y2="19" stroke="#111" stroke-width="1.2"/>
+        <circle cx="24" cy="32" r="4" fill="#6366F1"/>
+      </svg>
+    </div>
+    <div class="info">
+      <div class="n">C2</div>
+      <div class="nm">方括号 [...]</div>
+      <div class="desc">`[ ... ]` 文本容器包裹节点。Mermaid/代码块语法。开发者/技术感</div>
+    </div>
+  </div>
+
+  <!-- C3: 引号 + 节点 -->
+  <div class="card">
+    <div class="stage">
+      <svg class="icon" viewBox="0 0 96 48" fill="none">
+        <text x="8" y="26" font-family="Georgia, serif" font-size="22" font-weight="700" fill="#111">"</text>
+        <text x="74" y="40" font-family="Georgia, serif" font-size="22" font-weight="700" fill="#111">"</text>
+        <line x1="22" y1="20" x2="34" y2="20" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <polygon points="34,17 38,20 34,23" fill="#111"/>
+        <rect x="40" y="14" width="12" height="12" rx="2" fill="#6366F1"/>
+        <circle cx="60" cy="20" r="6" fill="none" stroke="#6366F1" stroke-width="2"/>
+      </svg>
+      <svg class="fav" viewBox="0 0 48 48" fill="none">
+        <text x="2" y="28" font-family="Georgia, serif" font-size="20" font-weight="700" fill="#111">"</text>
+        <text x="38" y="40" font-family="Georgia, serif" font-size="20" font-weight="700" fill="#111">"</text>
+        <rect x="16" y="16" width="6" height="6" rx="1" fill="#111"/>
+        <line x1="24" y1="19" x2="28" y2="19" stroke="#111" stroke-width="1.5"/>
+        <polygon points="28,17 31,19 28,21" fill="#111"/>
+        <rect x="32" y="16" width="6" height="6" rx="1" fill="#6366F1"/>
+      </svg>
+    </div>
+    <div class="info">
+      <div class="n">C3</div>
+      <div class="nm">引号包裹</div>
+      <div class="desc">「"…"」引号 = 文本，包裹节点图。自然语言提示词的视觉化</div>
+    </div>
+  </div>
+
+  <div class="sep">方向 D · P 字母 + 节点（融合 V5）</div>
+
+  <!-- D1: P 弧变成节点 -->
+  <div class="card">
+    <div class="stage">
+      <svg class="icon" viewBox="0 0 96 48" fill="none">
+        <line x1="14" y1="8" x2="14" y2="40" stroke="#111" stroke-width="4" stroke-linecap="round"/>
+        <path d="M14,8 L26,8 C36,8 36,22 26,22 L18,22" fill="none" stroke="#111" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="26" cy="22" r="2.5" fill="#fff" stroke="#111" stroke-width="2"/>
+        <line x1="40" y1="22" x2="52" y2="22" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <polygon points="52,19 56,22 52,25" fill="#111"/>
+        <rect x="58" y="17" width="12" height="10" rx="2" fill="#6366F1"/>
+        <line x1="74" y1="22" x2="82" y2="22" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <polygon points="82,19 86,22 82,25" fill="#111"/>
+        <circle cx="88" cy="22" r="3" fill="#6366F1"/>
+      </svg>
+      <svg class="fav" viewBox="0 0 48 48" fill="none">
+        <line x1="8" y1="8" x2="8" y2="40" stroke="#111" stroke-width="4" stroke-linecap="round"/>
+        <path d="M8,8 L18,8 C26,8 26,20 18,20 L12,20" fill="none" stroke="#111" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="18" cy="20" r="2.5" fill="#fff" stroke="#111" stroke-width="2"/>
+        <line x1="26" y1="20" x2="32" y2="20" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <polygon points="32,17 35,20 32,23" fill="#111"/>
+        <rect x="36" y="16" width="8" height="8" rx="1.5" fill="#6366F1"/>
+      </svg>
+    </div>
+    <div class="info">
+      <div class="n">D1</div>
+      <div class="nm">P 弧 → 节点链</div>
+      <div class="desc">V5 演化：P 的弧线尽头变成节点，节点继续延伸出箭头 + 矩形。「P 不只是字母，是图」</div>
+    </div>
+  </div>
+
+  <!-- D2: P + 提示符 -->
+  <div class="card">
+    <div class="stage">
+      <svg class="icon" viewBox="0 0 96 48" fill="none">
+        <text x="6" y="32" font-family="ui-monospace, monospace" font-size="14" font-weight="700" fill="#6366F1">&gt;</text>
+        <path d="M22,8 L22,40" stroke="#111" stroke-width="4" stroke-linecap="round"/>
+        <path d="M22,8 L34,8 C44,8 44,22 34,22 L24,22" fill="none" stroke="#111" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="58" y="16" width="2" height="14" fill="#6366F1"/>
+        <line x1="66" y1="22" x2="76" y2="22" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <polygon points="76,19 80,22 76,25" fill="#111"/>
+        <circle cx="86" cy="22" r="4" fill="#6366F1"/>
+      </svg>
+      <svg class="fav" viewBox="0 0 48 48" fill="none">
+        <text x="2" y="32" font-family="ui-monospace, monospace" font-size="13" font-weight="700" fill="#6366F1">&gt;</text>
+        <path d="M14,8 L14,40" stroke="#111" stroke-width="4" stroke-linecap="round"/>
+        <path d="M14,8 L24,8 C32,8 32,20 24,20 L18,20" fill="none" stroke="#111" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="info">
+      <div class="n">D2</div>
+      <div class="nm">P + 终端提示符</div>
+      <div class="desc">`&gt;` 提示符 + P + 节点。终端/REPL 感，开发者友好。命令行式 plotgram</div>
+    </div>
+  </div>
+
+  <!-- D3: P 嵌在文本块里 -->
+  <div class="card">
+    <div class="stage">
+      <svg class="icon" viewBox="0 0 96 48" fill="none">
+        <rect x="6" y="8" width="84" height="32" rx="3" fill="none" stroke="#111" stroke-width="2"/>
+        <text x="14" y="22" font-family="ui-monospace, monospace" font-size="9" font-weight="700" fill="#111">A</text>
+        <text x="22" y="22" font-family="ui-monospace, monospace" font-size="9" fill="#888">→</text>
+        <rect x="34" y="14" width="10" height="10" rx="1.5" fill="#111"/>
+        <text x="48" y="22" font-family="ui-monospace, monospace" font-size="9" fill="#888">→</text>
+        <rect x="58" y="14" width="10" height="10" rx="1.5" fill="#6366F1"/>
+        <text x="72" y="22" font-family="ui-monospace, monospace" font-size="9" fill="#888">→</text>
+        <circle cx="82" cy="19" r="4" fill="#6366F1"/>
+        <path d="M14,32 L82,32" stroke="#111" stroke-width="0.5" opacity="0.3"/>
+        <rect x="14" y="34" width="1.5" height="4" fill="#6366F1"/>
+        <text x="20" y="38" font-family="ui-monospace, monospace" font-size="7" font-weight="700" fill="#6366F1">P</text>
+      </svg>
+      <svg class="fav" viewBox="0 0 48 48" fill="none">
+        <rect x="4" y="6" width="40" height="36" rx="3" fill="none" stroke="#111" stroke-width="2"/>
+        <rect x="9" y="14" width="6" height="6" rx="1" fill="#111"/>
+        <text x="17" y="20" font-family="ui-monospace, monospace" font-size="7" fill="#888">→</text>
+        <rect x="24" y="14" width="6" height="6" rx="1" fill="#6366F1"/>
+        <text x="32" y="20" font-family="ui-monospace, monospace" font-size="7" fill="#888">→</text>
+        <circle cx="40" cy="17" r="3" fill="#6366F1"/>
+        <rect x="9" y="30" width="1.5" height="6" fill="#6366F1"/>
+        <text x="14" y="36" font-family="ui-monospace, monospace" font-size="7" font-weight="700" fill="#6366F1">P</text>
+      </svg>
+    </div>
+    <div class="info">
+      <div class="n">D3</div>
+      <div class="nm">代码块里的 P</div>
+      <div class="desc">把 `A → [□] → [□] → ●` 这类 Plotgram 语法画在代码块里，底部光标。开发者最熟悉的形态</div>
+    </div>
+  </div>
+
+  <div class="sep">方向 E · 单字标（P+dot 极致版）</div>
+
+  <!-- E1: P 内部 = 文本线 -->
+  <div class="card">
+    <div class="stage">
+      <svg class="icon" viewBox="0 0 96 48" fill="none">
+        <rect x="20" y="6" width="56" height="36" rx="4" fill="none" stroke="#111" stroke-width="3"/>
+        <line x1="14" y1="6" x2="14" y2="42" stroke="#111" stroke-width="3" stroke-linecap="round"/>
+        <path d="M14,6 L26,6 C36,6 36,20 26,20 L18,20" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="32" y1="16" x2="48" y2="16" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="32" y1="24" x2="44" y2="24" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="32" y1="32" x2="50" y2="32" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="62" cy="16" r="2" fill="#6366F1"/>
+        <circle cx="68" cy="24" r="2" fill="#6366F1"/>
+        <circle cx="58" cy="32" r="2" fill="#6366F1"/>
+      </svg>
+      <svg class="fav" viewBox="0 0 48 48" fill="none">
+        <line x1="10" y1="8" x2="10" y2="40" stroke="#111" stroke-width="3.5" stroke-linecap="round"/>
+        <path d="M10,8 L20,8 C28,8 28,20 20,20 L14,20" fill="none" stroke="#111" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <line x1="32" y1="14" x2="42" y2="14" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="32" y1="22" x2="38" y2="22" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="32" y1="30" x2="42" y2="30" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="44" cy="14" r="2" fill="#6366F1"/>
+        <circle cx="40" cy="22" r="2" fill="#6366F1"/>
+        <circle cx="44" cy="30" r="2" fill="#6366F1"/>
+      </svg>
+    </div>
+    <div class="info">
+      <div class="n">E1</div>
+      <div class="nm">P + 文本行节点</div>
+      <div class="desc">P 旁边是文本行 + 数据点列。P = Plot 缩写，文本+点是 plot 的本质</div>
+    </div>
+  </div>
+
+  <!-- E2: P 内嵌文字 -->
+  <div class="card">
+    <div class="stage">
+      <svg class="icon" viewBox="0 0 96 48" fill="none">
+        <rect x="20" y="8" width="4" height="32" rx="2" fill="#111"/>
+        <path d="M24,8 L34,8 C42,8 42,20 34,20 L26,20 Z" fill="#111"/>
+        <text x="30" y="18" font-family="ui-monospace, monospace" font-size="6" font-weight="700" fill="#fff">A</text>
+        <line x1="50" y1="14" x2="62" y2="14" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <polygon points="62,11 65,14 62,17" fill="#111"/>
+        <rect x="66" y="10" width="10" height="8" rx="1.5" fill="#6366F1"/>
+        <line x1="50" y1="32" x2="62" y2="32" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <polygon points="62,29 65,32 62,35" fill="#111"/>
+        <circle cx="70" cy="32" r="5" fill="none" stroke="#6366F1" stroke-width="2"/>
+      </svg>
+      <svg class="fav" viewBox="0 0 48 48" fill="none">
+        <rect x="6" y="8" width="4" height="32" rx="2" fill="#111"/>
+        <path d="M10,8 L18,8 C24,8 24,20 18,20 L12,20 Z" fill="#111"/>
+        <line x1="28" y1="16" x2="36" y2="16" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <polygon points="36,13 40,16 36,19" fill="#111"/>
+        <rect x="40" y="13" width="6" height="6" rx="1" fill="#6366F1"/>
+        <line x1="28" y1="32" x2="36" y2="32" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <polygon points="36,29 40,32 36,35" fill="#111"/>
+        <circle cx="42" cy="32" r="3" fill="none" stroke="#6366F1" stroke-width="1.5"/>
+      </svg>
+    </div>
+    <div class="info">
+      <div class="n">E2</div>
+      <div class="nm">P 内含 A → 节点</div>
+      <div class="desc">P 的弧内嵌一个字母 A。P = Plot，A = 节点起点。表达「文字 → 图」的最短路径</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Wordmark -->
+<div class="wm-section">
+  <div class="wm-card">
+    <svg viewBox="0 0 280 48" fill="none">
+      <g transform="translate(6,16)">
+        <line x1="14" y1="8" x2="14" y2="40" stroke="#111" stroke-width="4" stroke-linecap="round"/>
+        <path d="M14,8 L26,8 C36,8 36,22 26,22 L18,22" fill="none" stroke="#111" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="26" cy="22" r="2.5" fill="#fff" stroke="#111" stroke-width="2"/>
+        <line x1="40" y1="22" x2="52" y2="22" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        <polygon points="52,19 56,22 52,25" fill="#111"/>
+        <rect x="58" y="17" width="12" height="10" rx="2" fill="#6366F1"/>
+      </g>
+      <text x="86" y="36" font-family="Inter, sans-serif" font-size="26" font-weight="700" letter-spacing="-0.02em" fill="#111">Plotgram</text>
+    </svg>
+  </div>
+  <div class="wm-card">
+    <svg viewBox="0 0 280 48" fill="none">
+      <g transform="translate(6,16)">
+        <rect x="6" y="8" width="32" height="32" rx="3" fill="none" stroke="#111" stroke-width="2"/>
+        <line x1="12" y1="16" x2="32" y2="16" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="12" y1="22" x2="28" y2="22" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="12" y1="28" x2="30" y2="28" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <rect x="32" y="30" width="2" height="6" fill="#6366F1"/>
+        <path d="M44,20 L58,20 L58,30 L72,30" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <polygon points="72,27 76,30 72,33" fill="#6366F1"/>
+      </g>
+      <text x="86" y="36" font-family="Inter, sans-serif" font-size="26" font-weight="700" letter-spacing="-0.02em" fill="#111">Plotgram</text>
+    </svg>
+  </div>
+  <div class="wm-card">
+    <svg viewBox="0 0 280 48" fill="none">
+      <g transform="translate(6,16)">
+        <line x1="22" y1="38" x2="42" y2="6" stroke="#111" stroke-width="3.5" stroke-linecap="round"/>
+        <circle cx="46" cy="6" r="3" fill="#6366F1"/>
+        <line x1="56" y1="14" x2="68" y2="14" stroke="#111" stroke-width="1.5" stroke-linecap="round"/>
+        <polygon points="68,11 72,14 68,17" fill="#111"/>
+        <rect x="74" y="9" width="12" height="10" rx="2" fill="#6366F1"/>
+      </g>
+      <text x="92" y="36" font-family="Inter, sans-serif" font-size="26" font-weight="700" letter-spacing="-0.02em" fill="#111">Plotgram</text>
+    </svg>
+  </div>
+  <div class="wm-card">
+    <svg viewBox="0 0 280 48" fill="none">
+      <g transform="translate(6,16)">
+        <line x1="14" y1="8" x2="14" y2="40" stroke="#111" stroke-width="4" stroke-linecap="round"/>
+        <path d="M14,8 L26,8 C36,8 36,22 26,22 L18,22" fill="none" stroke="#111" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="58" y="16" width="2" height="14" fill="#6366F1"/>
+      </g>
+      <text x="76" y="36" font-family="Inter, sans-serif" font-size="26" font-weight="700" letter-spacing="-0.02em" fill="#111">Plotgram</text>
+    </svg>
+  </div>
+  <div class="wm-card">
+    <svg viewBox="0 0 280 48" fill="none">
+      <g transform="translate(6,16)">
+        <text x="6" y="32" font-family="ui-monospace, monospace" font-size="14" font-weight="700" fill="#6366F1">&gt;</text>
+        <path d="M22,8 L22,40" stroke="#111" stroke-width="4" stroke-linecap="round"/>
+        <path d="M22,8 L34,8 C44,8 44,22 34,22 L24,22" fill="none" stroke="#111" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="58" y="16" width="2" height="14" fill="#6366F1"/>
+      </g>
+      <text x="80" y="36" font-family="Inter, sans-serif" font-size="26" font-weight="700" letter-spacing="-0.02em" fill="#111">Plotgram</text>
+    </svg>
+  </div>
+  <div class="wm-card">
+    <svg viewBox="0 0 280 48" fill="none">
+      <g transform="translate(6,16)">
+        <rect x="6" y="8" width="64" height="32" rx="3" fill="none" stroke="#111" stroke-width="2"/>
+        <rect x="14" y="14" width="10" height="10" rx="1.5" fill="#111"/>
+        <text x="28" y="22" font-family="ui-monospace, monospace" font-size="9" fill="#888">→</text>
+        <rect x="38" y="14" width="10" height="10" rx="1.5" fill="#6366F1"/>
+        <text x="52" y="22" font-family="ui-monospace, monospace" font-size="9" fill="#888">→</text>
+        <circle cx="64" cy="19" r="4" fill="#6366F1"/>
+        <rect x="14" y="32" width="1.5" height="4" fill="#6366F1"/>
+      </g>
+      <text x="86" y="36" font-family="Inter, sans-serif" font-size="26" font-weight="700" letter-spacing="-0.02em" fill="#111">Plotgram</text>
+    </svg>
+  </div>
+</div>
+
+</body>
+</html>

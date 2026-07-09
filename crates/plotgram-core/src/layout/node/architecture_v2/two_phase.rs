@@ -32,14 +32,19 @@ use super::layout::postprocess::{clamp_to_canvas, compute_total_size};
 use super::layout::rank::{assign_intra_ranks, assign_super_macro_ranks};
 use super::layout::types::{GraphIndex, GroupMap};
 use crate::layout::algorithm_config::ArchitectureV2LayoutConfig;
-use crate::ast::Diagram;
+use crate::ast::{Diagram, Group};
 use crate::layout::constants;
 use crate::layout::node::common::divide_and_conquer::{
     GroupTree, IntraGroupLayouter, IntraLayout,
 };
-use crate::layout::node::common::group_bounds::GroupPadding;
+use crate::layout::node::common::edge_gutter::estimate_side_gutters_with_hierarchy;
+use crate::layout::node::common::group_bounds::{
+    compute_group_bounds, compute_group_bounds_with_side_gutters, container_padding_for_leaf,
+    GroupPadding, SideGutter,
+};
+use crate::layout::group::constants::EPS;
 use crate::layout::{GroupLayout, LayoutResult, NodeLayout};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// 宏观布局块：顶层 group 或无组节点簇
 struct MacroBlock {
@@ -160,7 +165,7 @@ pub(super) fn compute_two_phase_layout(
     );
 
     // ── Phase C: 回填全局坐标 ──
-    let (mut nodes, groups) = compose_global_layout(&blocks, &padding);
+    let (mut nodes, mut groups) = compose_global_layout(&blocks, &padding);
 
     // ── Phase C+: 两阶段 spacing 微调 ──
     // 组框已定，对涉及跨组边的组内节点朝跨组边方向做小幅 x 微调，
@@ -183,6 +188,63 @@ pub(super) fn compute_two_phase_layout(
     rebalance_infrastructure_layers(graph, group_map, &layers, sizes, &mut nodes);
     clamp_to_canvas(&mut nodes, sizes);
 
+    // EGB：节点落定后估计逐组侧 gutter，重算 group bounds 并持久化至 hints。
+    let bounds_padding = padding;
+    let base_groups = compute_group_bounds(diagram, &nodes, bounds_padding);
+    let t_egb = std::time::Instant::now();
+    let side_gutters = estimate_side_gutters_with_hierarchy(diagram, &nodes, &base_groups);
+    let egb_ms = t_egb.elapsed().as_secs_f64() * 1000.0;
+    let computed_groups = compute_group_bounds_with_side_gutters(
+        diagram,
+        &nodes,
+        bounds_padding,
+        container_padding_for_leaf(bounds_padding),
+        Some(&side_gutters),
+    );
+    merge_egb_groups(diagram, &mut groups, computed_groups, &side_gutters);
+    let gf_spec = crate::layout::group_frame::resolve_group_frame_spec(diagram, "architecture");
+    let mut layout_scratch = LayoutResult {
+        nodes: std::mem::take(&mut nodes),
+        groups: std::mem::take(&mut groups),
+        edges: vec![],
+        total_width: 0.0,
+        total_height: 0.0,
+        hints: Default::default(),
+    };
+    crate::layout::group_frame::resolve_all_sibling_overlaps(
+        &gf_spec,
+        diagram,
+        &mut layout_scratch,
+        &crate::layout::intent::PinSet::default(),
+    );
+    crate::layout::group_frame::expand_groups_to_contain_contents(
+        diagram,
+        &mut layout_scratch.groups,
+        &layout_scratch.nodes,
+        bounds_padding,
+        container_padding_for_leaf(bounds_padding),
+    );
+    nodes = layout_scratch.nodes;
+    groups = layout_scratch.groups;
+    let max_side_gutter = side_gutters
+        .values()
+        .flat_map(|g| [g.left, g.right, g.top, g.bottom])
+        .fold(0.0_f64, f64::max);
+    let pre_egb_area: f64 = base_groups.values().map(|g| g.width * g.height).sum();
+    let post_egb_area: f64 = groups.values().map(|g| g.width * g.height).sum();
+    let canvas_area_delta_pct = if pre_egb_area > EPS {
+        (post_egb_area - pre_egb_area) / pre_egb_area * 100.0
+    } else {
+        0.0
+    };
+    let gutter_budget_debug = crate::layout::GutterBudgetDebug {
+        egb_ms,
+        prs_ms: 0.0,
+        prs_grew: false,
+        max_side_gutter,
+        canvas_area_delta_pct,
+    };
+
     let (total_width, total_height) = compute_total_size(&nodes, &groups);
 
     let sibling_corridors =
@@ -191,6 +253,7 @@ pub(super) fn compute_two_phase_layout(
     let group_routing = crate::layout::group::GroupRoutingHints {
         corridors,
         border_shell_pad: crate::layout::group::GROUP_BORDER_SHELL_PAD,
+        side_gutters,
     };
 
     // 从全局层导出 sugiyama_ranks（entity_id → rank），供拓扑意图满足度评估使用。
@@ -210,6 +273,7 @@ pub(super) fn compute_two_phase_layout(
             edge_routing_style: crate::layout::EdgeRoutingStyle::Orthogonal,
             sugiyama_ranks: Some(sugiyama_ranks),
             group_routing: Some(group_routing),
+            gutter_budget_debug: Some(gutter_budget_debug),
             ..Default::default()
         },
     }
@@ -383,8 +447,8 @@ fn layout_intra_group_recursive(
         blocks.push(IntraMacroBlock {
             id: child_id.clone(),
             is_group: true,
-            width: intra.content_width + padding.x_delta,
-            height: intra.content_height + padding.y_delta,
+            width: intra.content_width + padding.horizontal_extent(),
+            height: intra.content_height + padding.vertical_extent(),
             x: 0.0,
             y: 0.0,
             intra,
@@ -751,7 +815,7 @@ fn compose_intra_layout_recursive(
 
     for block in blocks {
         let (offset_x, offset_y) = if block.is_group {
-            (block.x + padding.x, block.y + padding.y_top)
+            (block.x + padding.left, block.y + padding.top)
         } else {
             (block.x, block.y)
         };
@@ -1075,8 +1139,8 @@ fn build_macro_blocks(
         blocks.push(MacroBlock {
             id: gid.clone(),
             is_group: true,
-            width: intra.content_width + padding.x_delta,
-            height: intra.content_height + padding.y_delta,
+            width: intra.content_width + padding.horizontal_extent(),
+            height: intra.content_height + padding.vertical_extent(),
             x: 0.0,
             y: 0.0,
             intra,
@@ -1311,8 +1375,8 @@ fn compose_global_layout(
                 nodes.insert(
                     nid.clone(),
                     NodeLayout {
-                        x: block.x + padding.x + local.x,
-                        y: block.y + padding.y_top + local.y,
+                        x: block.x + padding.left + local.x,
+                        y: block.y + padding.top + local.y,
                         width: local.width,
                         height: local.height,
                         ..Default::default()
@@ -1336,6 +1400,53 @@ fn compose_global_layout(
     }
 
     (nodes, groups)
+}
+
+/// 将 EGB 结果合并进 compose 产出的组框：顶层叶子组保留 macro 定位，容器/嵌套组采用重算结果。
+fn merge_egb_groups(
+    diagram: &Diagram,
+    compose_groups: &mut HashMap<String, GroupLayout>,
+    computed_groups: HashMap<String, GroupLayout>,
+    side_gutters: &BTreeMap<String, SideGutter>,
+) {
+    let top_level: HashSet<String> = diagram
+        .groups
+        .iter()
+        .filter(|g| g.parent_id.is_none())
+        .map(|g| g.id.as_str().to_string())
+        .collect();
+
+    for (gid, cgl) in computed_groups {
+        let Some(ast_group) = diagram.groups.iter().find(|g| g.id.as_str() == gid) else {
+            compose_groups.insert(gid, cgl);
+            continue;
+        };
+        let is_top_leaf = top_level.contains(&gid) && !is_container_group_ast(ast_group);
+        if is_top_leaf {
+            if let Some(budget) = side_gutters.get(&gid) {
+                if let Some(gl) = compose_groups.get_mut(&gid) {
+                    let mut b = *budget;
+                    let h = b.left.max(b.right);
+                    b.left = h;
+                    b.right = h;
+                    expand_gutter_in_place(gl, b);
+                }
+            }
+        } else {
+            compose_groups.insert(gid, cgl);
+        }
+    }
+}
+
+fn is_container_group_ast(group: &Group) -> bool {
+    !group.child_group_ids.is_empty()
+}
+
+fn expand_gutter_in_place(gl: &mut GroupLayout, budget: SideGutter) {
+    gl.x -= budget.left;
+    gl.width += budget.left + budget.right;
+    gl.y -= budget.top;
+    gl.height += budget.top + budget.bottom;
 }
 
 /// 跨组边端口微调的基础位移（像素），作为动态计算的下限

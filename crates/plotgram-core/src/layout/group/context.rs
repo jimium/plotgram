@@ -1,29 +1,27 @@
 //! 边路由阶段的分组障碍上下文（构建一次，scorer / path / 后处理共用）。
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::ast::Diagram;
 use crate::layout::geometry::Point;
+use crate::layout::node::common::group_bounds::SideGutter;
 use crate::layout::{GroupLayout, LayoutResult};
 
 use super::border_shell::group_segment_violates_border_shell;
 use super::config::GroupRoutingProfile;
 use super::constants::{GROUP_BORDER_SHELL_PAD, EPS};
 use super::corridor::{merge_corridors, CorridorAxis, GroupCorridor};
+use super::hierarchy::build_group_hierarchy;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SiblingOrientation {
-    Horizontal,
-    Vertical,
-}
-
-const GROUP_GAP_THRESHOLD: f64 = 48.0;
+pub use super::hierarchy::SiblingOrientation;
 
 /// 布局阶段产出的分组路由提示。
 #[derive(Debug, Clone)]
 pub struct GroupRoutingHints {
     pub corridors: Vec<GroupCorridor>,
     pub border_shell_pad: f64,
+    /// EGB 产出；architecture 布局写入，GroupFrame 重算时读取。
+    pub side_gutters: BTreeMap<String, SideGutter>,
 }
 
 impl Default for GroupRoutingHints {
@@ -31,6 +29,7 @@ impl Default for GroupRoutingHints {
         Self {
             corridors: Vec::new(),
             border_shell_pad: GROUP_BORDER_SHELL_PAD,
+            side_gutters: BTreeMap::new(),
         }
     }
 }
@@ -40,6 +39,7 @@ impl GroupRoutingHints {
         Self {
             corridors: super::corridor::build_corridors_from_groups(groups),
             border_shell_pad: GROUP_BORDER_SHELL_PAD,
+            side_gutters: BTreeMap::new(),
         }
     }
 
@@ -47,6 +47,7 @@ impl GroupRoutingHints {
         Self {
             corridors,
             border_shell_pad: GROUP_BORDER_SHELL_PAD,
+            side_gutters: BTreeMap::new(),
         }
     }
 }
@@ -61,6 +62,7 @@ pub struct GroupRoutingContext {
     pub corridor_misalignment_penalty: f64,
     pub repulse_max_rounds: usize,
     pub corridors: Vec<GroupCorridor>,
+    pub side_gutters: BTreeMap<String, SideGutter>,
     pub node_leaf_group: HashMap<String, String>,
     pub sibling_sets: Vec<Vec<String>>,
     pub sibling_orientation: HashMap<(String, String), SiblingOrientation>,
@@ -76,8 +78,13 @@ impl GroupRoutingContext {
         } else {
             super::corridor::build_corridors_from_groups(&result.groups)
         };
-        let (node_leaf_group, sibling_sets, sibling_orientation, group_ancestors) =
-            build_group_hierarchy(diagram, &result.groups);
+        let hierarchy = build_group_hierarchy(diagram, &result.groups);
+        let side_gutters = result
+            .hints
+            .group_routing
+            .as_ref()
+            .map(|h| h.side_gutters.clone())
+            .unwrap_or_default();
         Self {
             groups: result.groups.clone(),
             node_to_groups,
@@ -86,10 +93,11 @@ impl GroupRoutingContext {
             corridor_misalignment_penalty: profile.corridor_misalignment_penalty,
             repulse_max_rounds: profile.repulse_max_rounds,
             corridors,
-            node_leaf_group,
-            sibling_sets,
-            sibling_orientation,
-            group_ancestors,
+            side_gutters,
+            node_leaf_group: hierarchy.node_leaf_group,
+            sibling_sets: hierarchy.sibling_sets,
+            sibling_orientation: hierarchy.sibling_orientation,
+            group_ancestors: hierarchy.group_ancestors,
         }
     }
 
@@ -97,6 +105,7 @@ impl GroupRoutingContext {
         GroupRoutingHints {
             corridors: self.corridors.clone(),
             border_shell_pad: self.border_shell_pad,
+            side_gutters: self.side_gutters.clone(),
         }
     }
 
@@ -196,112 +205,6 @@ pub fn build_node_to_groups(diagram: &Diagram) -> HashMap<String, Vec<String>> {
         groups_list.sort();
     }
     node_to_groups
-}
-
-fn build_group_hierarchy(
-    diagram: &Diagram,
-    groups: &HashMap<String, GroupLayout>,
-) -> (
-    HashMap<String, String>,
-    Vec<Vec<String>>,
-    HashMap<(String, String), SiblingOrientation>,
-    HashMap<String, Vec<String>>,
-) {
-    let mut parent_of: HashMap<String, String> = HashMap::new();
-    let mut children_of: HashMap<String, Vec<String>> = HashMap::new();
-    let mut group_depth: HashMap<String, u8> = HashMap::new();
-
-    for group in &diagram.groups {
-        let gid = group.id.as_str().to_string();
-        group_depth.insert(gid.clone(), group.depth);
-        if let Some(pid) = &group.parent_id {
-            let pid_str = pid.as_str().to_string();
-            parent_of.insert(gid.clone(), pid_str.clone());
-            children_of.entry(pid_str).or_default().push(gid);
-        }
-    }
-
-    for children in children_of.values_mut() {
-        children.sort();
-    }
-
-    let mut sibling_sets: Vec<Vec<String>> = Vec::new();
-    for children in children_of.values() {
-        if children.len() >= 2 {
-            sibling_sets.push(children.clone());
-        }
-    }
-    sibling_sets.sort();
-
-    let mut sibling_orientation: HashMap<(String, String), SiblingOrientation> = HashMap::new();
-    for siblings in &sibling_sets {
-        for i in 0..siblings.len() {
-            for j in (i + 1)..siblings.len() {
-                let ga = &siblings[i];
-                let gb = &siblings[j];
-                if let (Some(gla), Some(glb)) = (groups.get(ga), groups.get(gb)) {
-                    let ox = range_overlap(gla.x, gla.x + gla.width, glb.x, glb.x + glb.width);
-                    let oy = range_overlap(gla.y, gla.y + gla.height, glb.y, glb.y + glb.height);
-                    let min_h = gla.height.min(glb.height);
-                    let min_w = gla.width.min(glb.width);
-
-                    let orient = if oy >= 0.5 * min_h - EPS && ox <= GROUP_GAP_THRESHOLD {
-                        SiblingOrientation::Horizontal
-                    } else if ox >= 0.5 * min_w - EPS && oy <= GROUP_GAP_THRESHOLD {
-                        SiblingOrientation::Vertical
-                    } else {
-                        let dx = (gla.x + gla.width / 2.0) - (glb.x + glb.width / 2.0);
-                        let dy = (gla.y + gla.height / 2.0) - (glb.y + glb.height / 2.0);
-                        if dy.abs() >= dx.abs() {
-                            SiblingOrientation::Vertical
-                        } else {
-                            SiblingOrientation::Horizontal
-                        }
-                    };
-                    let key = if ga <= gb {
-                        (ga.clone(), gb.clone())
-                    } else {
-                        (gb.clone(), ga.clone())
-                    };
-                    sibling_orientation.insert(key, orient);
-                }
-            }
-        }
-    }
-
-    let mut group_ancestors: HashMap<String, Vec<String>> = HashMap::new();
-    for group in &diagram.groups {
-        let gid = group.id.as_str().to_string();
-        let mut ancestors = Vec::new();
-        let mut current = parent_of.get(&gid).cloned();
-        while let Some(p) = current {
-            ancestors.push(p.clone());
-            current = parent_of.get(&p).cloned();
-        }
-        group_ancestors.insert(gid, ancestors);
-    }
-
-    let mut node_leaf_group: HashMap<String, String> = HashMap::new();
-    for group in &diagram.groups {
-        let gid = group.id.as_str().to_string();
-        for eid in &group.entity_ids {
-            let eid_str = eid.as_str().to_string();
-            let existing_depth = node_leaf_group
-                .get(&eid_str)
-                .and_then(|g| group_depth.get(g))
-                .copied()
-                .unwrap_or(0);
-            if group.depth >= existing_depth {
-                node_leaf_group.insert(eid_str, gid.clone());
-            }
-        }
-    }
-
-    (node_leaf_group, sibling_sets, sibling_orientation, group_ancestors)
-}
-
-fn range_overlap(a_min: f64, a_max: f64, b_min: f64, b_max: f64) -> f64 {
-    (a_max.min(b_max) - a_min.max(b_min)).max(0.0)
 }
 
 #[cfg(test)]

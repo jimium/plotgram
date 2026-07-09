@@ -1,45 +1,111 @@
 //! 分组包围框计算
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::ast::Diagram;
 use crate::layout::{
     GroupLayout, GroupLayoutWarning, GroupLayoutWarningKind, NodeLayout,
 };
 
-/// 分组包围框的 padding 配置
-#[derive(Debug, Clone, Copy)]
+/// 分组包围框的四侧内边距（各侧独立，支持非对称 gutter）。
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct GroupPadding {
-    /// 水平内边距
-    pub x: f64,
-    /// 垂直内边距（上方，含标题区额外偏移）
-    pub y_top: f64,
-    /// 水平总增量（width += x_delta）
-    pub x_delta: f64,
-    /// 垂直总增量（height += y_delta）
-    pub y_delta: f64,
+    pub left: f64,
+    pub right: f64,
+    pub top: f64,
+    pub bottom: f64,
 }
 
 impl GroupPadding {
-    /// 统一 padding（x/y 相同），含标题区偏移
+    /// 统一 padding（四侧相同；`top` 额外含标题区 `header_height`）。
     pub fn uniform(padding: f64, header_height: f64) -> Self {
         Self {
-            x: padding,
-            y_top: padding + header_height,
-            x_delta: padding * 2.0,
-            y_delta: padding * 2.0 + header_height,
+            left: padding,
+            right: padding,
+            top: padding + header_height,
+            bottom: padding,
+        }
+    }
+
+    /// architecture_v2 默认非对称 padding（等价于旧 x=28, y_top=48, x_delta=56, y_delta=76）。
+    pub fn architecture_v2() -> Self {
+        Self {
+            left: 28.0,
+            right: 28.0,
+            top: 48.0,
+            bottom: 28.0,
         }
     }
 
     /// force-directed 布局的分组内边距
     pub fn force_directed() -> Self {
         Self {
-            x: 20.0,
-            y_top: 36.0,
-            x_delta: 40.0,
-            y_delta: 56.0,
+            left: 20.0,
+            right: 20.0,
+            top: 36.0,
+            bottom: 20.0,
         }
     }
+
+    pub fn horizontal_extent(&self) -> f64 {
+        self.left + self.right
+    }
+
+    pub fn vertical_extent(&self) -> f64 {
+        self.top + self.bottom
+    }
+
+    /// 逐侧取与 `SideGutter` 的较大值（base 与 EGB budget 合成）。
+    pub fn max_per_side(self, budget: SideGutter) -> Self {
+        Self {
+            left: self.left.max(budget.left),
+            right: self.right.max(budget.right),
+            top: self.top.max(budget.top),
+            bottom: self.bottom.max(budget.bottom),
+        }
+    }
+}
+
+/// 单个 group 的四侧 gutter 预算（EGB 产出）。
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct SideGutter {
+    pub left: f64,
+    pub right: f64,
+    pub top: f64,
+    pub bottom: f64,
+}
+
+impl SideGutter {
+    pub fn set_side(&mut self, side: GutterSide, value: f64) {
+        let v = self.get_side_mut(side);
+        *v = (*v).max(value);
+    }
+
+    pub fn get_side(self, side: GutterSide) -> f64 {
+        match side {
+            GutterSide::Left => self.left,
+            GutterSide::Right => self.right,
+            GutterSide::Top => self.top,
+            GutterSide::Bottom => self.bottom,
+        }
+    }
+
+    fn get_side_mut(&mut self, side: GutterSide) -> &mut f64 {
+        match side {
+            GutterSide::Left => &mut self.left,
+            GutterSide::Right => &mut self.right,
+            GutterSide::Top => &mut self.top,
+            GutterSide::Bottom => &mut self.bottom,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum GutterSide {
+    Left,
+    Right,
+    Top,
+    Bottom,
 }
 
 /// 分组的有效成员实体 id（优先 `group.entity_ids`，否则从 `entity.group_id` 推导）。
@@ -58,39 +124,80 @@ fn effective_entity_ids(group: &crate::ast::Group, diagram: &Diagram) -> Vec<Str
     ids
 }
 
+fn is_container_group(group: &crate::ast::Group, diagram: &Diagram) -> bool {
+    effective_entity_ids(group, diagram).is_empty()
+}
+
+fn resolve_padding(
+    leaf_padding: GroupPadding,
+    container_padding: GroupPadding,
+    group: &crate::ast::Group,
+    diagram: &Diagram,
+    side_gutters: Option<&BTreeMap<String, SideGutter>>,
+) -> GroupPadding {
+    let base = if is_container_group(group, diagram) {
+        container_padding
+    } else {
+        leaf_padding
+    };
+    let budget = side_gutters
+        .and_then(|m| m.get(group.id.as_str()))
+        .copied()
+        .unwrap_or_default();
+    let mut merged = base.max_per_side(budget);
+    // 顶层叶子组：水平 gutter 对称化，避免破坏 L1 左共线；容器组保留四侧独立预算。
+    if group.parent_id.is_none() && !is_container_group(group, diagram) {
+        let h = merged.left.max(merged.right);
+        merged.left = h;
+        merged.right = h;
+    }
+    merged
+}
+
 /// 计算分组的包围框
-///
-/// 支持嵌套分组：父组包围框 = 直接实体包围框 ∪ 所有子组包围框。
-/// 按 `depth` 降序排序（叶子组先算，容器组后算），确保父组计算时
-/// 子组结果已就绪。纯容器父组（无直接实体）也能从子组推导出包围框。
-///
-/// 容器组（无直接实体、仅有子组）使用 `container_padding`，避免与子组
-/// padding 叠加导致内层空间紧张。有直接实体的组使用 `leaf_padding`。
 pub fn compute_group_bounds(
     diagram: &Diagram,
     nodes: &HashMap<String, NodeLayout>,
     leaf_padding: GroupPadding,
 ) -> HashMap<String, GroupLayout> {
-    compute_group_bounds_with_container_padding(
+    compute_group_bounds_with_side_gutters(
         diagram,
         nodes,
         leaf_padding,
         container_padding(leaf_padding),
+        None,
     )
+}
+
+/// 与 [`compute_group_bounds`] 相同，但叠加 EGB 产出的逐组 `side_gutters`。
+pub fn compute_group_bounds_with_side_gutters(
+    diagram: &Diagram,
+    nodes: &HashMap<String, NodeLayout>,
+    leaf_padding: GroupPadding,
+    container_pad: GroupPadding,
+    side_gutters: Option<&BTreeMap<String, SideGutter>>,
+) -> HashMap<String, GroupLayout> {
+    compute_group_bounds_inner(
+        diagram,
+        nodes,
+        leaf_padding,
+        container_pad,
+        side_gutters,
+    )
+}
+
+/// 容器组 padding（由叶子 padding 推导，供 GroupFrame 重算）。
+pub fn container_padding_for_leaf(leaf: GroupPadding) -> GroupPadding {
+    container_padding(leaf)
 }
 
 /// 容器组（无直接实体）的 padding：水平减半，垂直保留标题区但 padding 减半。
 fn container_padding(leaf: GroupPadding) -> GroupPadding {
-    // 底部 padding = y_delta - y_top（leaf 的底部纯 padding，不含 header）
-    let leaf_bottom = leaf.y_delta - leaf.y_top;
-    let container_x = leaf.x * 0.5;
-    let container_y_top = leaf.y_top * 0.6;
-    let container_bottom = leaf_bottom * 0.5;
     GroupPadding {
-        x: container_x,
-        y_top: container_y_top,
-        x_delta: container_x * 2.0,
-        y_delta: container_y_top + container_bottom,
+        left: leaf.left * 0.5,
+        right: leaf.right * 0.5,
+        top: leaf.top * 0.6,
+        bottom: leaf.bottom * 0.5,
     }
 }
 
@@ -101,8 +208,22 @@ pub fn compute_group_bounds_with_container_padding(
     leaf_padding: GroupPadding,
     container_padding: GroupPadding,
 ) -> HashMap<String, GroupLayout> {
-    // 按 depth 升序排序：叶子组（depth 大）先算，容器组（depth 小）后算。
-    // 稳定排序保证同 depth 时按 diagram.groups 原始顺序，确定性输出。
+    compute_group_bounds_inner(
+        diagram,
+        nodes,
+        leaf_padding,
+        container_padding,
+        None,
+    )
+}
+
+fn compute_group_bounds_inner(
+    diagram: &Diagram,
+    nodes: &HashMap<String, NodeLayout>,
+    leaf_padding: GroupPadding,
+    container_padding: GroupPadding,
+    side_gutters: Option<&BTreeMap<String, SideGutter>>,
+) -> HashMap<String, GroupLayout> {
     let mut sorted_groups: Vec<&crate::ast::Group> = diagram.groups.iter().collect();
     sorted_groups.sort_by(|a, b| a.depth.cmp(&b.depth).reverse());
 
@@ -113,7 +234,6 @@ pub fn compute_group_bounds_with_container_padding(
         let mut max_x = f64::MIN;
         let mut max_y = f64::MIN;
 
-        // 1. 直接实体
         for eid in effective_entity_ids(group, diagram) {
             if let Some(nl) = nodes.get(eid.as_str()) {
                 min_x = min_x.min(nl.x);
@@ -123,7 +243,6 @@ pub fn compute_group_bounds_with_container_padding(
             }
         }
 
-        // 2. 递归子组：父组包围框必须包含所有子组包围框
         for child_gid in &group.child_group_ids {
             if let Some(child_gl) = groups.get(child_gid.as_str()) {
                 min_x = min_x.min(child_gl.x);
@@ -134,20 +253,20 @@ pub fn compute_group_bounds_with_container_padding(
         }
 
         if min_x < f64::MAX {
-            // 容器组（无直接实体）使用更小的 padding，避免与子组 padding 叠加
-            let has_direct_entities = !effective_entity_ids(group, diagram).is_empty();
-            let padding = if has_direct_entities {
-                leaf_padding
-            } else {
-                container_padding
-            };
+            let padding = resolve_padding(
+                leaf_padding,
+                container_padding,
+                group,
+                diagram,
+                side_gutters,
+            );
             groups.insert(
                 group.id.as_str().to_string(),
                 GroupLayout {
-                    x: min_x - padding.x,
-                    y: min_y - padding.y_top,
-                    width: max_x - min_x + padding.x_delta,
-                    height: max_y - min_y + padding.y_delta,
+                    x: min_x - padding.left,
+                    y: min_y - padding.top,
+                    width: max_x - min_x + padding.horizontal_extent(),
+                    height: max_y - min_y + padding.vertical_extent(),
                     ..Default::default()
                 },
             );
@@ -157,11 +276,6 @@ pub fn compute_group_bounds_with_container_padding(
 }
 
 /// 检测分组布局问题：非嵌套分组包围框重叠、非组成员节点落入分组框内。
-///
-/// 返回警告列表（按 group_id → other_id 字典序排序，保证确定性）。
-/// 嵌套分组（父子关系）的包围框自然包含，不报重叠警告。
-///
-/// 容差 `EPSILON`：重叠面积小于此值视为边界相切，不报。
 pub fn detect_group_layout_warnings(
     diagram: &Diagram,
     nodes: &HashMap<String, NodeLayout>,
@@ -170,7 +284,6 @@ pub fn detect_group_layout_warnings(
     const EPSILON: f64 = 1.0;
     let mut warnings = Vec::new();
 
-    // 构建 group_id → 所有后代实体 id 集合（含递归子组的实体）
     let mut group_descendants: HashMap<String, HashSet<String>> = HashMap::new();
     for group in &diagram.groups {
         let mut desc: HashSet<String> = group
@@ -178,7 +291,6 @@ pub fn detect_group_layout_warnings(
             .iter()
             .map(|e| e.as_str().to_string())
             .collect();
-        // 递归收集子组实体
         let mut stack: Vec<String> = group
             .child_group_ids
             .iter()
@@ -198,7 +310,6 @@ pub fn detect_group_layout_warnings(
         group_descendants.insert(group.id.as_str().to_string(), desc);
     }
 
-    // 构建 group 祖先链：group_id → 所有祖先 group id 集合（含自身）
     let mut group_ancestors: HashMap<String, HashSet<String>> = HashMap::new();
     for group in &diagram.groups {
         let mut ancestors = HashSet::new();
@@ -216,7 +327,6 @@ pub fn detect_group_layout_warnings(
         group_ancestors.insert(group.id.as_str().to_string(), ancestors);
     }
 
-    // 1. 检测非嵌套分组包围框重叠
     let mut sorted_groups: Vec<&crate::ast::Group> = diagram.groups.iter().collect();
     sorted_groups.sort_by(|a, b| a.id.as_str().cmp(b.id.as_str()));
     for i in 0..sorted_groups.len() {
@@ -227,7 +337,6 @@ pub fn detect_group_layout_warnings(
             else {
                 continue;
             };
-            // 跳过嵌套关系（父子）
             let a_ancestors = group_ancestors.get(ga.id.as_str());
             let b_ancestors = group_ancestors.get(gb.id.as_str());
             let nested = a_ancestors
@@ -251,7 +360,6 @@ pub fn detect_group_layout_warnings(
         }
     }
 
-    // 2. 检测非组成员节点落入分组框内
     for group in &diagram.groups {
         let Some(gl) = groups.get(group.id.as_str()) else {
             continue;
@@ -278,7 +386,6 @@ pub fn detect_group_layout_warnings(
         }
     }
 
-    // 确定性排序：按 (group_id, other_id) 字典序
     warnings.sort_by(|a, b| {
         a.group_id
             .cmp(&b.group_id)
@@ -288,7 +395,6 @@ pub fn detect_group_layout_warnings(
     warnings
 }
 
-/// 计算两个 GroupLayout 矩形的重叠面积
 fn rect_overlap_area(a: &GroupLayout, b: &GroupLayout) -> f64 {
     let x_overlap = (a.x + a.width).min(b.x + b.width) - a.x.max(b.x);
     let y_overlap = (a.y + a.height).min(b.y + b.height) - a.y.max(b.y);
@@ -299,7 +405,6 @@ fn rect_overlap_area(a: &GroupLayout, b: &GroupLayout) -> f64 {
     }
 }
 
-/// 计算 GroupLayout 矩形与 NodeLayout 矩形的重叠面积
 fn rect_overlap_area_node(g: &GroupLayout, n: &NodeLayout) -> f64 {
     let x_overlap = (g.x + g.width).min(n.x + n.width) - g.x.max(n.x);
     let y_overlap = (g.y + g.height).min(n.y + n.height) - g.y.max(n.y);
@@ -314,7 +419,7 @@ fn rect_overlap_area_node(g: &GroupLayout, n: &NodeLayout) -> f64 {
 mod tests {
     use super::*;
     use crate::ast::{AttributeMap, Entity, Group, Identifier, Span};
-    use crate::layout::{NodeLayout};
+    use crate::layout::NodeLayout;
     use crate::types::DiagramType;
 
     fn span() -> Span {
@@ -368,6 +473,29 @@ mod tests {
     }
 
     #[test]
+    fn uniform_padding_matches_legacy_extents() {
+        let p = GroupPadding::uniform(20.0, 16.0);
+        assert_eq!(p.left, 20.0);
+        assert_eq!(p.right, 20.0);
+        assert_eq!(p.top, 36.0);
+        assert_eq!(p.bottom, 20.0);
+        assert_eq!(p.horizontal_extent(), 40.0);
+        assert_eq!(p.vertical_extent(), 56.0);
+    }
+
+    #[test]
+    fn side_gutter_overrides_container_half_padding() {
+        let leaf = GroupPadding::architecture_v2();
+        let container = container_padding(leaf);
+        assert!(container.left < leaf.left);
+        let merged = container.max_per_side(SideGutter {
+            left: 60.0,
+            ..Default::default()
+        });
+        assert_eq!(merged.left, 60.0);
+    }
+
+    #[test]
     fn detects_overlapping_sibling_groups() {
         let diagram = Diagram {
             diagram_type: DiagramType::Flowchart,
@@ -383,7 +511,6 @@ mod tests {
             ("a1".to_string(), node_layout(0.0, 0.0, 100.0, 50.0)),
             ("b1".to_string(), node_layout(50.0, 0.0, 100.0, 50.0)),
         ]);
-        // A 和 B 包围框明显重叠
         let groups = HashMap::from([
             ("A".to_string(), group_layout(-10.0, -10.0, 120.0, 70.0)),
             ("B".to_string(), group_layout(40.0, -10.0, 120.0, 70.0)),
@@ -420,7 +547,6 @@ mod tests {
         let nodes = HashMap::from([
             ("a1".to_string(), node_layout(0.0, 0.0, 100.0, 50.0)),
             ("a2".to_string(), node_layout(0.0, 200.0, 100.0, 50.0)),
-            // foreign 节点落在 A 的包围框内（x 重叠，y 在 a1/a2 之间）
             ("foreign".to_string(), node_layout(10.0, 100.0, 80.0, 40.0)),
         ]);
         let groups = HashMap::from([(
@@ -465,7 +591,6 @@ mod tests {
             ..Default::default()
         };
         let nodes = HashMap::from([("a1".to_string(), node_layout(0.0, 0.0, 100.0, 50.0))]);
-        // outer 包含 inner（嵌套），不应报重叠
         let groups = HashMap::from([
             ("outer".to_string(), group_layout(-20.0, -20.0, 140.0, 90.0)),
             ("inner".to_string(), group_layout(-10.0, -10.0, 120.0, 70.0)),

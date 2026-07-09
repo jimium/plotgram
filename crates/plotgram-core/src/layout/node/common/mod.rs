@@ -4,6 +4,7 @@ pub mod acyclic;
 pub mod barnes_hut;
 pub mod crossings;
 pub mod divide_and_conquer;
+pub mod edge_gutter;
 pub mod group_bounds;
 pub mod group_map;
 pub mod graph_index;

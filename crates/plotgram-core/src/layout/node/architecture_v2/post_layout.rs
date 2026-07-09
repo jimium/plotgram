@@ -146,7 +146,7 @@ mod tests {
     use crate::prepare::StyleRequest;
 
     #[test]
-    fn multi_top_level_groups_share_left_edge() {
+    fn stress_nested_cloud_gets_left_gutter_budget() {
         let source = include_str!(
             "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
         );
@@ -155,13 +155,151 @@ mod tests {
         let layout = compute_layout_with_plan(prepared.inner(), prepared.layout_plan())
             .expect("layout");
 
-        let external = layout.groups.get("external").expect("external");
-        let cloud = layout.groups.get("cloud").expect("cloud");
+        let cloud_left = layout
+            .hints
+            .group_routing
+            .as_ref()
+            .and_then(|h| h.side_gutters.get("cloud"))
+            .map(|g| g.left)
+            .unwrap_or(0.0);
         assert!(
-            (external.x - cloud.x).abs() < 1.0,
-            "external.x={} cloud.x={} (expected shared left edge)",
-            external.x,
-            cloud.x
+            cloud_left > 0.0,
+            "cloud should have positive EGB left gutter, got {cloud_left}"
         );
+    }
+
+    #[test]
+    fn stress_nested_has_no_sibling_group_overlap() {
+        use crate::layout::lint::{lint_layout, LintMetricsSummary};
+
+        let source = include_str!(
+            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
+        );
+        let output = parse_prepare_validate(source, &StyleRequest::default());
+        let prepared = output.diagram.expect("valid diagram");
+        let diagram = prepared.inner();
+        let layout = compute_layout_with_plan(diagram, prepared.layout_plan())
+            .expect("layout");
+        let summary = LintMetricsSummary::from_report(&lint_layout(diagram, &layout));
+        assert_eq!(
+            summary.group_overlap, 0,
+            "unexpected group overlaps in stress-nested layout"
+        );
+    }
+
+    #[test]
+    fn stress_nested_nodes_stay_inside_leaf_groups() {
+        let source = include_str!(
+            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
+        );
+        let output = parse_prepare_validate(source, &StyleRequest::default());
+        let prepared = output.diagram.expect("valid diagram");
+        let diagram = prepared.inner();
+        let layout = compute_layout_with_plan(diagram, prepared.layout_plan())
+            .expect("layout");
+
+        let ds = layout.groups.get("data_subnet").expect("data_subnet");
+        let ds_bottom = ds.y + ds.height;
+        for id in ["db_master", "db_replica", "mq", "redis"] {
+            let n = layout.nodes.get(id).expect(id);
+            assert!(
+                n.y + n.height <= ds_bottom + 1.0,
+                "{id} bottom {:.1} exceeds data_subnet bottom {:.1}",
+                n.y + n.height,
+                ds_bottom
+            );
+        }
+
+        let cloud = layout.groups.get("cloud").expect("cloud");
+        let cloud_bottom = cloud.y + cloud.height;
+        assert!(
+            ds_bottom <= cloud_bottom + 1.0,
+            "data_subnet bottom {:.1} exceeds cloud bottom {:.1}",
+            ds_bottom,
+            cloud_bottom
+        );
+        // 父组底边不应与子组完全贴死（至少保留容器 bottom padding 的一半量级）
+        assert!(
+            cloud_bottom - ds_bottom >= 8.0,
+            "cloud should keep bottom padding below data_subnet, gap={:.1}",
+            cloud_bottom - ds_bottom
+        );
+    }
+
+    #[test]
+    fn stress_nested_child_groups_stay_inside_parents() {
+        use crate::layout::lint::{lint_layout, LintRuleId, LintMetricsSummary};
+
+        let source = include_str!(
+            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
+        );
+        let output = parse_prepare_validate(source, &StyleRequest::default());
+        let prepared = output.diagram.expect("valid diagram");
+        let diagram = prepared.inner();
+        let layout = compute_layout_with_plan(diagram, prepared.layout_plan())
+            .expect("layout");
+        let report = lint_layout(diagram, &layout);
+        let outside: Vec<_> = report
+            .violations
+            .iter()
+            .filter(|v| v.rule == LintRuleId::ChildGroupOutsideParent)
+            .collect();
+        assert!(
+            outside.is_empty(),
+            "child groups outside parent: {:?}",
+            outside
+                .iter()
+                .map(|v| v.message.as_str())
+                .collect::<Vec<_>>()
+        );
+        let summary = LintMetricsSummary::from_report(&report);
+        assert_eq!(summary.group_overlap, 0);
+    }
+
+    #[test]
+    fn stress_nested_edges_attach_to_node_ports() {
+        use crate::layout::group::PORT_STUB_CLEARANCE;
+
+        let source = include_str!(
+            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
+        );
+        let output = parse_prepare_validate(source, &StyleRequest::default());
+        let prepared = output.diagram.expect("valid diagram");
+        let diagram = prepared.inner();
+        let layout = compute_layout_with_plan(diagram, prepared.layout_plan())
+            .expect("layout");
+
+        let max_stub = PORT_STUB_CLEARANCE + 4.0;
+        for (i, edge) in layout.edges.iter().enumerate() {
+            let rel = &diagram.relations[i];
+            let from = layout.nodes.get(rel.from.as_str()).expect("from node");
+            let to = layout.nodes.get(rel.to.as_str()).expect("to node");
+            let start = edge.path_start().expect("path start");
+            let end = edge.path_end().expect("path end");
+            let ds = dist_point_to_rect(start.x, start.y, from.x, from.y, from.width, from.height);
+            let de = dist_point_to_rect(end.x, end.y, to.x, to.y, to.width, to.height);
+            assert!(
+                ds <= max_stub,
+                "edge {} start detached from {} by {:.1}px (max {:.1})",
+                i,
+                rel.from.as_str(),
+                ds,
+                max_stub
+            );
+            assert!(
+                de <= max_stub,
+                "edge {} end detached from {} by {:.1}px (max {:.1})",
+                i,
+                rel.to.as_str(),
+                de,
+                max_stub
+            );
+        }
+    }
+
+    fn dist_point_to_rect(px: f64, py: f64, x: f64, y: f64, w: f64, h: f64) -> f64 {
+        let dx = (x - px).max(0.0).max(px - (x + w));
+        let dy = (y - py).max(0.0).max(py - (y + h));
+        (dx * dx + dy * dy).sqrt()
     }
 }

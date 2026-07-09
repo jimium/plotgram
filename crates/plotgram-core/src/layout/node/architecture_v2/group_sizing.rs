@@ -148,41 +148,7 @@ pub fn apply_equal_sibling_dimensions_per_rank<B: GroupSizeBlock>(
 }
 
 /// 与 [`crate::layout::node::common::group_bounds::GroupPadding`] 对齐的 padding 参数
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
-pub struct GroupPaddingLike {
-    pub x: f64,
-    pub y_top: f64,
-    pub x_delta: f64,
-    pub y_delta: f64,
-}
-
-#[allow(dead_code)]
-impl GroupPaddingLike {
-    pub fn architecture_v2() -> Self {
-        Self {
-            x: 28.0,
-            y_top: 48.0,
-            x_delta: 56.0,
-            y_delta: 76.0,
-        }
-    }
-
-    pub fn from_group_padding(padding: f64, header_height: f64) -> Self {
-        let p = crate::layout::node::common::group_bounds::GroupPadding::uniform(padding, header_height);
-        Self {
-            x: p.x,
-            y_top: p.y_top,
-            x_delta: p.x_delta,
-            y_delta: p.y_delta,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn default_sugiyama(group_padding: f64) -> Self {
-        Self::from_group_padding(group_padding, 16.0)
-    }
-}
+pub type GroupPaddingLike = crate::layout::node::common::group_bounds::GroupPadding;
 
 #[cfg(test)]
 mod tests {

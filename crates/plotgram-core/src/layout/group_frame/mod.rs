@@ -22,7 +22,10 @@
 use crate::ast::{AttributeValue, Diagram};
 use crate::layout::grid_snap::{diagram_snap_attribute, snap_floor, snap_ceil};
 use crate::layout::intent::PinSet;
-use crate::layout::node::common::group_bounds::{compute_group_bounds, GroupPadding as BoundsGroupPadding};
+use crate::layout::node::common::group_bounds::{
+    compute_group_bounds, compute_group_bounds_with_side_gutters,
+    container_padding_for_leaf, GroupPadding,
+};
 use crate::layout::{GroupLayout, LayoutResult, NodeLayout};
 use crate::types::standard_attr_keys::diagram as dsl;
 use std::collections::{HashMap, HashSet};
@@ -134,45 +137,6 @@ impl Default for QuantizeSpec {
             enabled: true,
             step: 8.0,
             quantize_groups: true,
-        }
-    }
-}
-
-/// 组内 padding（与 `node::common::group_bounds::GroupPadding` 对齐）。
-///
-/// 非对称：architecture 用 (x=28, y_top=48, x_delta=56, y_delta=76)；
-/// flowchart/sugiyama 用 `uniform(group_padding, header_height)`。
-/// Frame 不直接施加 padding，而是消费 `compute_group_bounds` 的结果。
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct GroupPadding {
-    pub x: f64,
-    pub y_top: f64,
-    pub x_delta: f64,
-    pub y_delta: f64,
-}
-
-impl GroupPadding {
-    /// architecture_v2 默认 padding（与 `GroupPaddingLike::architecture_v2` 一致）
-    pub fn architecture_v2() -> Self {
-        Self {
-            x: 28.0,
-            y_top: 48.0,
-            x_delta: 56.0,
-            y_delta: 76.0,
-        }
-    }
-
-    /// 从对称 padding + header 高度构造（sugiyama / flowchart 路径）
-    pub fn uniform(padding: f64, header_height: f64) -> Self {
-        let p = crate::layout::node::common::group_bounds::GroupPadding::uniform(
-            padding,
-            header_height,
-        );
-        Self {
-            x: p.x,
-            y_top: p.y_top,
-            x_delta: p.x_delta,
-            y_delta: p.y_delta,
         }
     }
 }
@@ -604,6 +568,154 @@ pub fn apply_group_frame(
     }
 
     report
+}
+
+/// 仅消除各层 sibling group 之间的几何重叠（不重算 bounds、不做排列）。
+///
+/// 用于 EGB/PRS 等扩壳后恢复 `group_gap` 约束。
+pub fn resolve_all_sibling_overlaps(
+    spec: &GroupFrameSpec,
+    diagram: &Diagram,
+    layout: &mut LayoutResult,
+    pinned: &PinSet,
+) {
+    let sibling_sets = collect_sibling_sets(diagram);
+    for target_ids in sibling_sets {
+        if target_ids.len() < 2 {
+            continue;
+        }
+        let node_to_target = build_node_to_ancestor_in_set(diagram, &target_ids);
+        let group_to_target = build_group_to_ancestor_in_set(diagram, &target_ids);
+        resolve_sibling_overlaps(
+            &target_ids,
+            &mut layout.groups,
+            &mut layout.nodes,
+            &node_to_target,
+            &group_to_target,
+            &spec.arrangement,
+            spec.gap,
+            pinned,
+        );
+    }
+}
+
+/// 重叠消解 / PRS 后的安全网：向外扩展 group 矩形以包住内容（不动节点）。
+///
+/// - leaf group：包住直接成员节点，保留 `leaf_padding`
+/// - 容器组：包住直接子组，保留 `container_padding`
+///
+/// 与 [`recompute_group_bounds`] 不同：不整体重算原点，只向外扩，尽量保留
+/// L1 左缘对齐等整形结果。
+pub fn expand_groups_to_contain_contents(
+    diagram: &Diagram,
+    groups: &mut HashMap<String, GroupLayout>,
+    nodes: &HashMap<String, NodeLayout>,
+    leaf_padding: GroupPadding,
+    container_padding: GroupPadding,
+) {
+    let mut group_ids: Vec<String> = diagram
+        .groups
+        .iter()
+        .map(|g| g.id.as_str().to_string())
+        .collect();
+    // 深组优先：先扩 leaf，再扩祖先容器。
+    group_ids.sort_by(|a, b| {
+        let da = group_depth(diagram, a);
+        let db = group_depth(diagram, b);
+        db.cmp(&da).then_with(|| a.cmp(b))
+    });
+
+    for gid in group_ids {
+        let Some(gdef) = diagram.find_group(&gid) else {
+            continue;
+        };
+        let Some(gl) = groups.get(&gid).cloned() else {
+            continue;
+        };
+
+        let mut min_x = f64::MAX;
+        let mut min_y = f64::MAX;
+        let mut max_x = f64::MIN;
+        let mut max_y = f64::MIN;
+        let mut has_content = false;
+
+        for eid in &gdef.entity_ids {
+            let Some(nl) = nodes.get(eid.as_str()) else {
+                continue;
+            };
+            has_content = true;
+            min_x = min_x.min(nl.x);
+            min_y = min_y.min(nl.y);
+            max_x = max_x.max(nl.x + nl.width);
+            max_y = max_y.max(nl.y + nl.height);
+        }
+        for child_id in &gdef.child_group_ids {
+            let Some(child) = groups.get(child_id.as_str()) else {
+                continue;
+            };
+            has_content = true;
+            min_x = min_x.min(child.x);
+            min_y = min_y.min(child.y);
+            max_x = max_x.max(child.x + child.width);
+            max_y = max_y.max(child.y + child.height);
+        }
+        if !has_content {
+            continue;
+        }
+
+        let pad = if gdef.entity_ids.is_empty() {
+            container_padding
+        } else {
+            leaf_padding
+        };
+        let need_left = min_x - pad.left;
+        let need_top = min_y - pad.top;
+        let need_right = max_x + pad.right;
+        let need_bottom = max_y + pad.bottom;
+
+        if let Some(gl) = groups.get_mut(&gid) {
+            let left = gl.x.min(need_left);
+            let top = gl.y.min(need_top);
+            let right = (gl.x + gl.width).max(need_right);
+            let bottom = (gl.y + gl.height).max(need_bottom);
+            gl.x = left;
+            gl.y = top;
+            gl.width = right - left;
+            gl.height = bottom - top;
+        }
+    }
+}
+
+/// 兼容旧调用：仅扩容器组包住子组（无额外 padding）。
+pub fn expand_container_groups_to_fit_children(
+    diagram: &Diagram,
+    groups: &mut HashMap<String, GroupLayout>,
+) {
+    expand_groups_to_contain_contents(
+        diagram,
+        groups,
+        &HashMap::new(),
+        GroupPadding::default(),
+        GroupPadding::default(),
+    );
+}
+
+fn group_depth(diagram: &Diagram, group_id: &str) -> usize {
+    let mut depth = 0usize;
+    let mut cur = group_id.to_string();
+    loop {
+        let Some(g) = diagram.find_group(&cur) else {
+            break;
+        };
+        match &g.parent_id {
+            Some(p) => {
+                depth += 1;
+                cur = p.as_str().to_string();
+            }
+            None => break,
+        }
+    }
+    depth
 }
 
 /// 收集 sibling sets（同级 group 集合），自顶向下 BFS 顺序。
@@ -1493,13 +1605,23 @@ pub fn recompute_group_bounds(
     layout: &mut LayoutResult,
     padding: GroupPadding,
 ) {
-    let bounds_padding = BoundsGroupPadding {
-        x: padding.x,
-        y_top: padding.y_top,
-        x_delta: padding.x_delta,
-        y_delta: padding.y_delta,
+    let side_gutters = layout
+        .hints
+        .group_routing
+        .as_ref()
+        .filter(|h| !h.side_gutters.is_empty())
+        .map(|h| &h.side_gutters);
+    layout.groups = if let Some(gutters) = side_gutters {
+        compute_group_bounds_with_side_gutters(
+            diagram,
+            &layout.nodes,
+            padding,
+            container_padding_for_leaf(padding),
+            Some(gutters),
+        )
+    } else {
+        compute_group_bounds(diagram, &layout.nodes, padding)
     };
-    layout.groups = compute_group_bounds(diagram, &layout.nodes, bounds_padding);
 }
 
 /// 按算法返回 Group Frame 使用的 padding（与 `grid_snap::refresh_layout_bounds` 对齐）。

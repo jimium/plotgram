@@ -288,7 +288,13 @@ fn route_edges_orthogonal_inner(
         &result,
         routing_algo,
     );
-    result.hints.group_routing = Some(group_ctx.routing_hints());
+    let mut group_routing = group_ctx.routing_hints();
+    if let Some(existing) = &result.hints.group_routing {
+        if !existing.side_gutters.is_empty() {
+            group_routing.side_gutters = existing.side_gutters.clone();
+        }
+    }
+    result.hints.group_routing = Some(group_routing);
 
     // 预排序节点/分组 ID，避免路由循环内重复排序（方案 2）
     let obstacles = PreparedObstacles::build(&result.nodes, &group_ctx);

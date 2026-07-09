@@ -9,12 +9,7 @@ use crate::layout::{GroupLayout, NodeLayout};
 /// 按布局算法选择 `GroupPadding` 配置。
 pub fn routing_group_padding(algo: &str, group_padding: f64) -> GroupPadding {
     match algo {
-        "architecture" => GroupPadding {
-            x: 28.0,
-            y_top: 48.0,
-            x_delta: 56.0,
-            y_delta: 76.0,
-        },
+        "architecture" => GroupPadding::architecture_v2(),
         "force-directed" => GroupPadding::force_directed(),
         _ => GroupPadding::uniform(group_padding, 16.0),
     }

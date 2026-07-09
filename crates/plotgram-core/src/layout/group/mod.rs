@@ -11,7 +11,9 @@ pub mod config;
 pub mod constants;
 pub mod context;
 pub mod corridor;
+pub mod hierarchy;
 pub mod post_route;
+pub mod post_route_shell;
 pub mod rect;
 
 pub use border_shell::{
@@ -31,6 +33,7 @@ pub use post_route::{
     project_path_off_group_borders, project_path_off_group_borders_with_stub,
     repulse_edges_from_group_borders,
 };
+pub use post_route_shell::post_route_shell_expand;
 pub use rect::{finalize_routing_groups, routing_group_padding};
 #[cfg(debug_assertions)]
 pub use rect::debug_assert_routing_groups_contain_members;

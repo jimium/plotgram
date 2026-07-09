@@ -512,6 +512,7 @@ mod tests {
             corridor_misalignment_penalty: 80.0,
             repulse_max_rounds: 2,
             corridors: vec![sample_corridor()],
+            side_gutters: std::collections::BTreeMap::new(),
             node_leaf_group: HashMap::from([
                 ("a".into(), "left".into()),
                 ("b".into(), "right".into()),
@@ -570,6 +571,7 @@ mod tests {
             corridor_misalignment_penalty: 80.0,
             repulse_max_rounds: 2,
             corridors: vec![sample_corridor()],
+            side_gutters: std::collections::BTreeMap::new(),
             node_leaf_group,
             sibling_sets: vec![],
             sibling_orientation: HashMap::new(),
@@ -794,6 +796,7 @@ mod tests {
             corridor_misalignment_penalty: 80.0,
             repulse_max_rounds: 2,
             corridors: vec![corridor],
+            side_gutters: std::collections::BTreeMap::new(),
             node_leaf_group: HashMap::from([
                 ("a1".into(), "top".into()),
                 ("a2".into(), "top".into()),
