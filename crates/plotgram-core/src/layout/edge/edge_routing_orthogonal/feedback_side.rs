@@ -75,6 +75,8 @@ pub fn assign_feedback_sides(
     right_bucket.sort_by_key(|(idx, span)| (*span, *idx));
 
     balance_buckets(&mut left_bucket, &mut right_bucket);
+    // 已知代价修复：仅 2 条回环且挤在同侧时，强制分左右，避免长通道重叠增交叉。
+    split_paired_feedback_sides(&mut left_bucket, &mut right_bucket);
 
     let mut hints = HashMap::new();
     assign_bucket_hints(&mut hints, &left_bucket, detour_side(horizontal, true), horizontal);
@@ -168,6 +170,22 @@ fn balance_buckets(left: &mut Vec<(usize, usize)>, right: &mut Vec<(usize, usize
         let moved: Vec<_> = right.drain(right.len() - overflow..).collect();
         left.extend(moved);
         left.sort_by_key(|(idx, span)| (*span, *idx));
+    }
+}
+
+/// 恰好 2 条回环挤在同一侧时，把 span 更大的一条挪到对侧。
+fn split_paired_feedback_sides(
+    left: &mut Vec<(usize, usize)>,
+    right: &mut Vec<(usize, usize)>,
+) {
+    if left.is_empty() && right.len() == 2 {
+        let moved = right.remove(1);
+        left.push(moved);
+        left.sort_by_key(|(idx, span)| (*span, *idx));
+    } else if right.is_empty() && left.len() == 2 {
+        let moved = left.remove(1);
+        right.push(moved);
+        right.sort_by_key(|(idx, span)| (*span, *idx));
     }
 }
 

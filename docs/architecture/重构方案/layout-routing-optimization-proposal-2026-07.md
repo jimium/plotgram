@@ -319,7 +319,7 @@ showcase eval 跟踪这些指标，避免「为修边又弄歪框」。
 - `c.ecommerce-platform`：error 持平 3；穿节点 2→1；crossing 21→12；score 62→65
 - `c.hybrid-cloud-dr-topology`：error 2→1；穿节点 2→0；crossing 29→17；score 54→57（穿组 0→1）
 - `c.cloud-native` / `c.layout-stress-nested`：I1 成果保持（穿组 error 仍为 0）
-- **已知代价**：`c.k8s-multi-namespace-overview` error 上升（通道预算 + strict dirty 过滤在稠密多 namespace 上仍会退化）；留给后续 corridor 覆盖率 / 局部放宽
+- **已知代价**：`c.k8s-multi-namespace-overview` error 上升（通道预算 + strict dirty 过滤在稠密多 namespace 上仍会退化）；留给后续 corridor 专项（见 §6.1）
 
 ### Iteration 3（约 2–4 天）— 流程图 + 性能闸门 ✅ 已落地（2026-07-09）
 
@@ -335,8 +335,18 @@ showcase eval 跟踪这些指标，避免「为修边又弄歪框」。
 4. 全 showcase eval 已更新 baseline  
 
 **实测摘要**：
-- `c.layout-stress-dag`：`end` 在最底层；n4/n9 自环路径长约 251px（非退化）；error 仍为 0；crossing 8→11（可接受代价）
+- `c.layout-stress-dag`：`end` 在最底层；n4/n9 自环路径长约 251px（非退化）；error 仍为 0；crossing 8→11（I3 当时代价）
 - showcase check：绿；`sibling_width_ratio` 全库 1 条 warning（跟踪用）
+
+### 6.1 已知代价小迭代（2026-07-09）✅ 部分落地
+
+| 问题 | 处理 | 结果 |
+|------|------|------|
+| stress-dag crossing 8→11；n8 偏上层 | FAS 自环不计入剥离度；`layer_order` 全局延后 feedback；恰好 2 条回环同侧时强制分左右。**不加** compaction 权重 | crossing **11→5**；n8 回到环尾层（反转 `n8→n5` 而非 `n7→n8`） |
+| multi-namespace error 上升 | 试过：走廊几何刷新 / 非相邻遮挡过滤 / 校验失败放宽 strict | 均拖累 multi-namespace 或 cloud-native；**已回退**。仍留给 corridor 专项 |
+| architecture 总 error ≥50% | 以 federation / ecommerce / hybrid 为主验收 | 本轮 trio 持平 14；全库 84 持平。全库下降仍靠 corridor 专项 |
+
+原则：本轮只修 feedback / FAS / layer_order 对齐；corridor 覆盖与 strict dirty 局部放宽另开专项，避免与主回归图互相打架。
 
 ---
 
@@ -347,8 +357,8 @@ showcase eval 跟踪这些指标，避免「为修边又弄歪框」。
 | 对称 | 同 band sibling 宽比 | ≤ 1.08（8px 量化容差内视为 1.0） | ✅ I1 实测达标；lint `SiblingWidthRatio` 跟踪 |
 | 对称 | 同 band 高比 | ≤ 1.12 | ✅ I1 |
 | 画布 | 相对当前 Fit 面积 | 中位增长 ≤ 30%，P95 ≤ 40% | ✅ I1/I2 代表图可控 |
-| 正确性 | `edge_crosses_group_interior` / `edge_through_node` | showcase architecture error 数下降 ≥ 50% | ⚠ 主回归图改善；全库未达 50%（multi-namespace 代价） |
-| 流程图 | stress-dag：end 在 max rank；自环非退化 | 必须 | ✅ I3 |
+| 正确性 | `edge_crosses_group_interior` / `edge_through_node` | showcase architecture error 数下降 ≥ 50% | ⚠ 主回归 trio 改善；全库未达 50%（multi-namespace 留给 corridor 专项） |
+| 流程图 | stress-dag：end 在 max rank；自环非退化 | 必须 | ✅ I3；§6.1 后 crossing 11→5、n8 层序对齐 |
 | 性能 | bench-phases 代表图 | route 时间不增超过 15% | ✅ 见下 |
 | 确定性 | 同输入两次渲染 | 坐标完全一致 | ✅ 见下 |
 

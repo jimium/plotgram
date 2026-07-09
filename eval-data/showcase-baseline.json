@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "1783583467",
+  "generated_at": "1783588900",
   "entries": [
     {
       "path": "architecture/c.ai-agent-docops-pipeline.pgm",
@@ -59,7 +59,7 @@
         "warning_count": 29
       },
       "score": 59.56,
-      "elapsed_us": 127705
+      "elapsed_us": 119996
     },
     {
       "path": "architecture/c.cloud-native.pgm",
@@ -118,7 +118,7 @@
         "warning_count": 7
       },
       "score": 60.21,
-      "elapsed_us": 146830
+      "elapsed_us": 151409
     },
     {
       "path": "architecture/c.data-lineage-platform.pgm",
@@ -177,7 +177,7 @@
         "warning_count": 5
       },
       "score": 62.1,
-      "elapsed_us": 272440
+      "elapsed_us": 278267
     },
     {
       "path": "architecture/c.ecommerce-platform.pgm",
@@ -236,7 +236,7 @@
         "warning_count": 14
       },
       "score": 64.35,
-      "elapsed_us": 245535
+      "elapsed_us": 253055
     },
     {
       "path": "architecture/c.hybrid-cloud-dr-topology.pgm",
@@ -295,7 +295,7 @@
         "warning_count": 19
       },
       "score": 56.38,
-      "elapsed_us": 94754
+      "elapsed_us": 97693
     },
     {
       "path": "architecture/c.k8s-blue-green-release-topology.pgm",
@@ -354,7 +354,7 @@
         "warning_count": 36
       },
       "score": 56.23,
-      "elapsed_us": 422240
+      "elapsed_us": 425550
     },
     {
       "path": "architecture/c.k8s-multi-cluster-federation.pgm",
@@ -413,7 +413,7 @@
         "warning_count": 44
       },
       "score": 58.64,
-      "elapsed_us": 452266
+      "elapsed_us": 469956
     },
     {
       "path": "architecture/c.k8s-multi-namespace-overview.pgm",
@@ -472,7 +472,7 @@
         "warning_count": 104
       },
       "score": 48.7,
-      "elapsed_us": 497971
+      "elapsed_us": 501733
     },
     {
       "path": "architecture/c.k8s-platform-stack.pgm",
@@ -531,7 +531,7 @@
         "warning_count": 42
       },
       "score": 54.29,
-      "elapsed_us": 479078
+      "elapsed_us": 503063
     },
     {
       "path": "architecture/c.k8s-tenant-isolation.pgm",
@@ -590,7 +590,7 @@
         "warning_count": 19
       },
       "score": 56.34,
-      "elapsed_us": 126583
+      "elapsed_us": 131475
     },
     {
       "path": "architecture/c.layout-stress-nested.pgm",
@@ -649,7 +649,7 @@
         "warning_count": 4
       },
       "score": 62.78,
-      "elapsed_us": 67101
+      "elapsed_us": 69287
     },
     {
       "path": "architecture/c.mcp-server-cluster-architecture.pgm",
@@ -708,7 +708,7 @@
         "warning_count": 4
       },
       "score": 71.93,
-      "elapsed_us": 20389
+      "elapsed_us": 21482
     },
     {
       "path": "architecture/c.payment-clearing-platform.pgm",
@@ -767,7 +767,7 @@
         "warning_count": 12
       },
       "score": 54.48,
-      "elapsed_us": 54261
+      "elapsed_us": 57019
     },
     {
       "path": "architecture/c.plotgram-core-mod-deps.pgm",
@@ -826,7 +826,7 @@
         "warning_count": 46
       },
       "score": 55.37,
-      "elapsed_us": 442404
+      "elapsed_us": 466746
     },
     {
       "path": "architecture/c.supply-chain-control-tower.pgm",
@@ -885,7 +885,7 @@
         "warning_count": 3
       },
       "score": 58.99,
-      "elapsed_us": 117092
+      "elapsed_us": 78104
     },
     {
       "path": "architecture/n.compiler-pipeline.pgm",
@@ -944,7 +944,7 @@
         "warning_count": 5
       },
       "score": 64.26,
-      "elapsed_us": 46235
+      "elapsed_us": 30377
     },
     {
       "path": "architecture/n.d2-cell-tower-network.pgm",
@@ -1003,7 +1003,7 @@
         "warning_count": 4
       },
       "score": 66.12,
-      "elapsed_us": 63574
+      "elapsed_us": 55566
     },
     {
       "path": "architecture/n.data-pipeline.pgm",
@@ -1062,7 +1062,7 @@
         "warning_count": 0
       },
       "score": 67.46,
-      "elapsed_us": 24773
+      "elapsed_us": 24580
     },
     {
       "path": "architecture/n.event-driven.pgm",
@@ -1121,7 +1121,7 @@
         "warning_count": 2
       },
       "score": 69.68,
-      "elapsed_us": 19210
+      "elapsed_us": 19800
     },
     {
       "path": "architecture/n.microservices.pgm",
@@ -1180,7 +1180,7 @@
         "warning_count": 1
       },
       "score": 74.54,
-      "elapsed_us": 20538
+      "elapsed_us": 22453
     },
     {
       "path": "architecture/s.client-api-db.pgm",
@@ -1239,7 +1239,7 @@
         "warning_count": 0
       },
       "score": 85.27,
-      "elapsed_us": 644
+      "elapsed_us": 773
     },
     {
       "path": "architecture/s.three-tier.pgm",
@@ -1298,7 +1298,7 @@
         "warning_count": 0
       },
       "score": 84.96,
-      "elapsed_us": 1626
+      "elapsed_us": 1859
     },
     {
       "path": "er/c.ecommerce-schema.pgm",
@@ -1357,7 +1357,7 @@
         "warning_count": 0
       },
       "score": 75.71,
-      "elapsed_us": 13754
+      "elapsed_us": 14588
     },
     {
       "path": "er/c.layout-stress-dense.pgm",
@@ -1416,7 +1416,7 @@
         "warning_count": 18
       },
       "score": 63.85,
-      "elapsed_us": 71706
+      "elapsed_us": 73122
     },
     {
       "path": "er/c.saas-schema.pgm",
@@ -1475,7 +1475,7 @@
         "warning_count": 5
       },
       "score": 58.87,
-      "elapsed_us": 77964
+      "elapsed_us": 80287
     },
     {
       "path": "er/n.blog-schema.pgm",
@@ -1534,7 +1534,7 @@
         "warning_count": 0
       },
       "score": 75.09,
-      "elapsed_us": 4128
+      "elapsed_us": 4742
     },
     {
       "path": "er/n.school-schema.pgm",
@@ -1593,7 +1593,7 @@
         "warning_count": 0
       },
       "score": 81.8,
-      "elapsed_us": 2024
+      "elapsed_us": 2289
     },
     {
       "path": "er/n.social-network.pgm",
@@ -1652,7 +1652,7 @@
         "warning_count": 1
       },
       "score": 73.39,
-      "elapsed_us": 5613
+      "elapsed_us": 5800
     },
     {
       "path": "er/s.two-tables.pgm",
@@ -1711,7 +1711,7 @@
         "warning_count": 0
       },
       "score": 87.93,
-      "elapsed_us": 344
+      "elapsed_us": 523
     },
     {
       "path": "er/s.user-post.pgm",
@@ -1770,7 +1770,7 @@
         "warning_count": 0
       },
       "score": 87.93,
-      "elapsed_us": 343
+      "elapsed_us": 407
     },
     {
       "path": "flowchart/c.aml-case-investigation.pgm",
@@ -1829,7 +1829,7 @@
         "warning_count": 0
       },
       "score": 59.5,
-      "elapsed_us": 51761
+      "elapsed_us": 52530
     },
     {
       "path": "flowchart/c.caffe-shop.pgm",
@@ -1888,7 +1888,7 @@
         "warning_count": 3
       },
       "score": 54.93,
-      "elapsed_us": 145764
+      "elapsed_us": 148852
     },
     {
       "path": "flowchart/c.change-approval-workflow.pgm",
@@ -1947,7 +1947,7 @@
         "warning_count": 0
       },
       "score": 57.12,
-      "elapsed_us": 92476
+      "elapsed_us": 74346
     },
     {
       "path": "flowchart/c.ci-cd-security-pipeline.pgm",
@@ -2006,7 +2006,7 @@
         "warning_count": 4
       },
       "score": 48.95,
-      "elapsed_us": 163265
+      "elapsed_us": 165548
     },
     {
       "path": "flowchart/c.customer-refund-process.pgm",
@@ -2065,7 +2065,7 @@
         "warning_count": 4
       },
       "score": 49.62,
-      "elapsed_us": 120671
+      "elapsed_us": 121018
     },
     {
       "path": "flowchart/c.e-commerce-order-fulfillment.pgm",
@@ -2124,7 +2124,7 @@
         "warning_count": 1
       },
       "score": 52.16,
-      "elapsed_us": 125016
+      "elapsed_us": 126973
     },
     {
       "path": "flowchart/c.k8s-incident-response.pgm",
@@ -2183,7 +2183,7 @@
         "warning_count": 4
       },
       "score": 61.68,
-      "elapsed_us": 281969
+      "elapsed_us": 286993
     },
     {
       "path": "flowchart/c.layout-stress-dag.pgm",
@@ -2194,55 +2194,55 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 30,
+        "bend_count": 26,
         "edge_parallel_overlap_count": 0,
-        "edge_crossings": 11,
-        "total_area": 1103374.1518060733,
-        "total_edge_length": 6965.7015142422015,
+        "edge_crossings": 5,
+        "total_area": 1111320.146781895,
+        "total_edge_length": 4543.499064193,
         "total_node_area": 88000.0,
-        "edge_length_stddev": 320.033557925937,
-        "edge_length_cv": 0.8269955338868065,
-        "aspect_ratio": 1.0308581618829793,
-        "aspect_ratio_deviation": 0.5691418381170208,
-        "area_utilization": 0.07975535756022196,
-        "channel_congestion": 16.0,
-        "long_edge_count": 7,
+        "edge_length_stddev": 277.08813818687213,
+        "edge_length_cv": 1.0977412819715362,
+        "aspect_ratio": 1.9023465075495578,
+        "aspect_ratio_deviation": 0.3023465075495577,
+        "area_utilization": 0.07918510274003937,
+        "channel_congestion": 13.0,
+        "long_edge_count": 5,
         "group_gap_deficit": 0.0,
-        "predicted_crossings": 0,
-        "port_conflict_score": 60.0,
+        "predicted_crossings": 7,
+        "port_conflict_score": 30.0,
         "node_count": 11,
         "edge_count": 18,
         "lint": {
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 0,
-          "edge_crossing": 11,
+          "edge_crossing": 5,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
           "unrelated_edge_trunk_merge": 0,
           "sibling_width_ratio": 0,
-          "total_violations": 11,
+          "total_violations": 5,
           "error_count": 0,
-          "warning_count": 11
+          "warning_count": 5
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 0,
-        "edge_crossing": 11,
+        "edge_crossing": 5,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
-        "total_violations": 11,
+        "total_violations": 5,
         "error_count": 0,
-        "warning_count": 11
+        "warning_count": 5
       },
-      "score": 61.76,
-      "elapsed_us": 100934
+      "score": 59.43,
+      "elapsed_us": 75828
     },
     {
       "path": "flowchart/c.pr-architecture-review.pgm",
@@ -2301,7 +2301,7 @@
         "warning_count": 2
       },
       "score": 62.56,
-      "elapsed_us": 75508
+      "elapsed_us": 76668
     },
     {
       "path": "flowchart/c.software-release.pgm",
@@ -2360,7 +2360,7 @@
         "warning_count": 5
       },
       "score": 56.46,
-      "elapsed_us": 87009
+      "elapsed_us": 82416
     },
     {
       "path": "flowchart/c.swimlane-order-process.pgm",
@@ -2419,7 +2419,7 @@
         "warning_count": 1
       },
       "score": 56.91,
-      "elapsed_us": 11251
+      "elapsed_us": 10939
     },
     {
       "path": "flowchart/n.employee-onboarding.pgm",
@@ -2478,7 +2478,7 @@
         "warning_count": 0
       },
       "score": 77.16,
-      "elapsed_us": 14235
+      "elapsed_us": 14082
     },
     {
       "path": "flowchart/n.order-approval.pgm",
@@ -2537,7 +2537,7 @@
         "warning_count": 0
       },
       "score": 64.47,
-      "elapsed_us": 14978
+      "elapsed_us": 14828
     },
     {
       "path": "flowchart/n.user-auth.pgm",
@@ -2596,7 +2596,7 @@
         "warning_count": 2
       },
       "score": 73.59,
-      "elapsed_us": 10544
+      "elapsed_us": 10464
     },
     {
       "path": "flowchart/s.decision-loop.pgm",
@@ -2655,7 +2655,7 @@
         "warning_count": 0
       },
       "score": 70.49,
-      "elapsed_us": 3037
+      "elapsed_us": 3109
     },
     {
       "path": "flowchart/s.fan-out-four.pgm",
@@ -2714,7 +2714,7 @@
         "warning_count": 2
       },
       "score": 62.49,
-      "elapsed_us": 9226
+      "elapsed_us": 9397
     },
     {
       "path": "flowchart/s.linear-chain.pgm",
@@ -2773,7 +2773,7 @@
         "warning_count": 0
       },
       "score": 86.93,
-      "elapsed_us": 519
+      "elapsed_us": 572
     },
     {
       "path": "mindmap/c.knowledge-map.pgm",
@@ -2832,7 +2832,7 @@
         "warning_count": 1
       },
       "score": 71.98,
-      "elapsed_us": 58536
+      "elapsed_us": 58498
     },
     {
       "path": "mindmap/c.product-roadmap.pgm",
@@ -2891,7 +2891,7 @@
         "warning_count": 0
       },
       "score": 79.31,
-      "elapsed_us": 37898
+      "elapsed_us": 38195
     },
     {
       "path": "mindmap/n.programming-learning.pgm",
@@ -2950,7 +2950,7 @@
         "warning_count": 0
       },
       "score": 78.21,
-      "elapsed_us": 28190
+      "elapsed_us": 27970
     },
     {
       "path": "mindmap/n.project-plan.pgm",
@@ -3009,7 +3009,7 @@
         "warning_count": 0
       },
       "score": 79.28,
-      "elapsed_us": 11913
+      "elapsed_us": 12201
     },
     {
       "path": "mindmap/n.tech-stack.pgm",
@@ -3068,7 +3068,7 @@
         "warning_count": 0
       },
       "score": 79.99,
-      "elapsed_us": 11314
+      "elapsed_us": 11338
     },
     {
       "path": "mindmap/s.brainstorm.pgm",
@@ -3127,7 +3127,7 @@
         "warning_count": 0
       },
       "score": 81.82,
-      "elapsed_us": 1067
+      "elapsed_us": 1016
     },
     {
       "path": "mindmap/s.root-branches.pgm",
@@ -3186,7 +3186,7 @@
         "warning_count": 0
       },
       "score": 81.7,
-      "elapsed_us": 1042
+      "elapsed_us": 1019
     },
     {
       "path": "sequence/c.ai-agent-change-loop.pgm",
@@ -3245,7 +3245,7 @@
         "warning_count": 0
       },
       "score": 58.7,
-      "elapsed_us": 1222
+      "elapsed_us": 1242
     },
     {
       "path": "sequence/c.cross-team-incident-escalation.pgm",
@@ -3304,7 +3304,7 @@
         "warning_count": 0
       },
       "score": 65.5,
-      "elapsed_us": 2149
+      "elapsed_us": 2251
     },
     {
       "path": "sequence/c.distributed-saga.pgm",
@@ -3363,7 +3363,7 @@
         "warning_count": 0
       },
       "score": 73.4,
-      "elapsed_us": 980
+      "elapsed_us": 954
     },
     {
       "path": "sequence/c.k8s-canary-rollback.pgm",
@@ -3422,7 +3422,7 @@
         "warning_count": 0
       },
       "score": 59.48,
-      "elapsed_us": 1781
+      "elapsed_us": 1795
     },
     {
       "path": "sequence/c.k8s-node-failure-recovery.pgm",
@@ -3481,7 +3481,7 @@
         "warning_count": 0
       },
       "score": 62.28,
-      "elapsed_us": 2019
+      "elapsed_us": 2052
     },
     {
       "path": "sequence/c.k8s-rolling-update.pgm",
@@ -3540,7 +3540,7 @@
         "warning_count": 0
       },
       "score": 61.26,
-      "elapsed_us": 2490
+      "elapsed_us": 2438
     },
     {
       "path": "sequence/c.layout-stress-lifelines.pgm",
@@ -3599,7 +3599,7 @@
         "warning_count": 0
       },
       "score": 71.22,
-      "elapsed_us": 2315
+      "elapsed_us": 2423
     },
     {
       "path": "sequence/c.microservice-checkout.pgm",
@@ -3658,7 +3658,7 @@
         "warning_count": 0
       },
       "score": 60.44,
-      "elapsed_us": 1548
+      "elapsed_us": 1492
     },
     {
       "path": "sequence/c.real-time-risk-decisioning.pgm",
@@ -3717,7 +3717,7 @@
         "warning_count": 0
       },
       "score": 64.52,
-      "elapsed_us": 1200
+      "elapsed_us": 1138
     },
     {
       "path": "sequence/n.api-call-chain.pgm",
@@ -3776,7 +3776,7 @@
         "warning_count": 0
       },
       "score": 79.82,
-      "elapsed_us": 425
+      "elapsed_us": 414
     },
     {
       "path": "sequence/n.oauth-login.pgm",
@@ -3835,7 +3835,7 @@
         "warning_count": 0
       },
       "score": 74.04,
-      "elapsed_us": 665
+      "elapsed_us": 698
     },
     {
       "path": "sequence/n.payment-gateway.pgm",
@@ -3894,7 +3894,7 @@
         "warning_count": 0
       },
       "score": 69.42,
-      "elapsed_us": 1143
+      "elapsed_us": 1208
     },
     {
       "path": "sequence/s.ping-pong.pgm",
@@ -3953,7 +3953,7 @@
         "warning_count": 0
       },
       "score": 82.39,
-      "elapsed_us": 96
+      "elapsed_us": 104
     },
     {
       "path": "sequence/s.request-response.pgm",
@@ -4012,7 +4012,7 @@
         "warning_count": 0
       },
       "score": 82.39,
-      "elapsed_us": 98
+      "elapsed_us": 99
     },
     {
       "path": "state/c.document-sync-lifecycle.pgm",
@@ -4071,7 +4071,7 @@
         "warning_count": 0
       },
       "score": 61.88,
-      "elapsed_us": 15582
+      "elapsed_us": 16030
     },
     {
       "path": "state/c.k8s-node-pressure-lifecycle.pgm",
@@ -4082,14 +4082,14 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 28,
+        "bend_count": 29,
         "edge_parallel_overlap_count": 0,
-        "edge_crossings": 4,
+        "edge_crossings": 3,
         "total_area": 1286956.2000000002,
-        "total_edge_length": 7833.606727183001,
+        "total_edge_length": 8049.520148917112,
         "total_node_area": 63288.0,
-        "edge_length_stddev": 539.1627863394308,
-        "edge_length_cv": 0.9635764561117335,
+        "edge_length_stddev": 555.5583983459717,
+        "edge_length_cv": 0.9662461156631726,
         "aspect_ratio": 1.1178005591798696,
         "aspect_ratio_deviation": 0.48219944082013044,
         "area_utilization": 0.04917649878061117,
@@ -4104,33 +4104,33 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 0,
-          "edge_crossing": 4,
+          "edge_crossing": 3,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
           "unrelated_edge_trunk_merge": 0,
           "sibling_width_ratio": 0,
-          "total_violations": 4,
+          "total_violations": 3,
           "error_count": 0,
-          "warning_count": 4
+          "warning_count": 3
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 0,
-        "edge_crossing": 4,
+        "edge_crossing": 3,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
-        "total_violations": 4,
+        "total_violations": 3,
         "error_count": 0,
-        "warning_count": 4
+        "warning_count": 3
       },
-      "score": 60.41,
-      "elapsed_us": 84599
+      "score": 60.93,
+      "elapsed_us": 86765
     },
     {
       "path": "state/c.k8s-rollout-state-machine.pgm",
@@ -4189,7 +4189,7 @@
         "warning_count": 2
       },
       "score": 60.55,
-      "elapsed_us": 39298
+      "elapsed_us": 39822
     },
     {
       "path": "state/c.layout-stress-transitions.pgm",
@@ -4200,55 +4200,55 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 23,
+        "bend_count": 14,
         "edge_parallel_overlap_count": 0,
-        "edge_crossings": 0,
-        "total_area": 449143.5,
-        "total_edge_length": 2838.9849898903994,
+        "edge_crossings": 1,
+        "total_area": 476337.7432010758,
+        "total_edge_length": 1927.9146399507213,
         "total_node_area": 32512.0,
-        "edge_length_stddev": 156.5320170071074,
-        "edge_length_cv": 0.7719125835124989,
-        "aspect_ratio": 1.2291149710504548,
-        "aspect_ratio_deviation": 0.37088502894954534,
-        "area_utilization": 0.07238666484096953,
-        "channel_congestion": 12.0,
+        "edge_length_stddev": 112.7427616736801,
+        "edge_length_cv": 0.8187077533017055,
+        "aspect_ratio": 1.9026499850914038,
+        "aspect_ratio_deviation": 0.30264998509140373,
+        "area_utilization": 0.0682540916903067,
+        "channel_congestion": 8.0,
         "long_edge_count": 2,
         "group_gap_deficit": 0.0,
-        "predicted_crossings": 4,
-        "port_conflict_score": 236.0,
+        "predicted_crossings": 1,
+        "port_conflict_score": 160.0,
         "node_count": 9,
         "edge_count": 14,
         "lint": {
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 0,
-          "edge_crossing": 0,
+          "edge_crossing": 1,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
           "unrelated_edge_trunk_merge": 0,
           "sibling_width_ratio": 0,
-          "total_violations": 0,
+          "total_violations": 1,
           "error_count": 0,
-          "warning_count": 0
+          "warning_count": 1
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 0,
-        "edge_crossing": 0,
+        "edge_crossing": 1,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
-        "total_violations": 0,
+        "total_violations": 1,
         "error_count": 0,
-        "warning_count": 0
+        "warning_count": 1
       },
-      "score": 67.46,
-      "elapsed_us": 45709
+      "score": 64.27,
+      "elapsed_us": 38000
     },
     {
       "path": "state/c.payment-flow.pgm",
@@ -4307,7 +4307,7 @@
         "warning_count": 4
       },
       "score": 58.59,
-      "elapsed_us": 45670
+      "elapsed_us": 46677
     },
     {
       "path": "state/c.service-degradation-lifecycle.pgm",
@@ -4318,14 +4318,14 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 18,
+        "bend_count": 19,
         "edge_parallel_overlap_count": 0,
-        "edge_crossings": 6,
+        "edge_crossings": 7,
         "total_area": 698242.3315455506,
-        "total_edge_length": 4322.798615476736,
+        "total_edge_length": 4375.115648411704,
         "total_node_area": 51025.68,
-        "edge_length_stddev": 319.9204199553699,
-        "edge_length_cv": 0.8880925023246897,
+        "edge_length_stddev": 325.0014492193709,
+        "edge_length_cv": 0.8914089829941462,
         "aspect_ratio": 1.4132114955216337,
         "aspect_ratio_deviation": 0.18678850447836637,
         "area_utilization": 0.0730773224348276,
@@ -4340,33 +4340,33 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 0,
-          "edge_crossing": 6,
+          "edge_crossing": 7,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
           "unrelated_edge_trunk_merge": 0,
           "sibling_width_ratio": 0,
-          "total_violations": 6,
+          "total_violations": 7,
           "error_count": 0,
-          "warning_count": 6
+          "warning_count": 7
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 0,
-        "edge_crossing": 6,
+        "edge_crossing": 7,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
-        "total_violations": 6,
+        "total_violations": 7,
         "error_count": 0,
-        "warning_count": 6
+        "warning_count": 7
       },
-      "score": 61.16,
-      "elapsed_us": 46582
+      "score": 60.43,
+      "elapsed_us": 48840
     },
     {
       "path": "state/c.settlement-reconciliation-lifecycle.pgm",
@@ -4425,7 +4425,7 @@
         "warning_count": 2
       },
       "score": 63.66,
-      "elapsed_us": 23105
+      "elapsed_us": 23390
     },
     {
       "path": "state/c.tcp-connection.pgm",
@@ -4484,7 +4484,7 @@
         "warning_count": 1
       },
       "score": 62.41,
-      "elapsed_us": 54309
+      "elapsed_us": 54587
     },
     {
       "path": "state/n.order-lifecycle.pgm",
@@ -4543,7 +4543,7 @@
         "warning_count": 2
       },
       "score": 63.51,
-      "elapsed_us": 15408
+      "elapsed_us": 15885
     },
     {
       "path": "state/n.ticket-workflow.pgm",
@@ -4554,17 +4554,17 @@
         "edge_through_groups": 0,
         "label_node_overlaps": 0,
         "label_label_overlaps": 0,
-        "bend_count": 11,
+        "bend_count": 15,
         "edge_parallel_overlap_count": 0,
-        "edge_crossings": 1,
-        "total_area": 397795.107356875,
-        "total_edge_length": 1744.085219765625,
+        "edge_crossings": 0,
+        "total_area": 417980.2551311719,
+        "total_edge_length": 1948.085219765625,
         "total_node_area": 24256.0,
-        "edge_length_stddev": 146.33014144213058,
-        "edge_length_cv": 0.7551071805746703,
-        "aspect_ratio": 1.64120671151014,
-        "aspect_ratio_deviation": 0.04120671151013999,
-        "area_utilization": 0.060976114465478196,
+        "edge_length_stddev": 208.11372083290996,
+        "edge_length_cv": 0.9614689688583203,
+        "aspect_ratio": 1.724485764940729,
+        "aspect_ratio_deviation": 0.12448576494072894,
+        "area_utilization": 0.05803144933817007,
         "channel_congestion": 9.0,
         "long_edge_count": 1,
         "group_gap_deficit": 0.0,
@@ -4576,33 +4576,33 @@
           "node_overlap": 0,
           "group_overlap": 0,
           "edge_through_node": 0,
-          "edge_crossing": 1,
+          "edge_crossing": 0,
           "edge_crosses_group_interior": 0,
           "label_node_overlap": 0,
           "label_label_overlap": 0,
           "unrelated_edge_trunk_merge": 0,
           "sibling_width_ratio": 0,
-          "total_violations": 1,
+          "total_violations": 0,
           "error_count": 0,
-          "warning_count": 1
+          "warning_count": 0
         }
       },
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "edge_through_node": 0,
-        "edge_crossing": 1,
+        "edge_crossing": 0,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
-        "total_violations": 1,
+        "total_violations": 0,
         "error_count": 0,
-        "warning_count": 1
+        "warning_count": 0
       },
-      "score": 66.24,
-      "elapsed_us": 18288
+      "score": 62.47,
+      "elapsed_us": 19511
     },
     {
       "path": "state/s.on-off.pgm",
@@ -4661,7 +4661,7 @@
         "warning_count": 0
       },
       "score": 79.71,
-      "elapsed_us": 435
+      "elapsed_us": 544
     },
     {
       "path": "state/s.traffic-light.pgm",
@@ -4720,7 +4720,7 @@
         "warning_count": 0
       },
       "score": 81.05,
-      "elapsed_us": 437
+      "elapsed_us": 520
     }
   ]
 }

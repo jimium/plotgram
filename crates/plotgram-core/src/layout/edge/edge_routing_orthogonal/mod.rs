@@ -589,13 +589,16 @@ fn route_edges_orthogonal_inner(
     let t_align = crate::layout::perf::Instant::now();
     crate::perf_log!("[perf]     step2b_straighten: {:.2}ms (moved to 4c)", t_align.elapsed().as_secs_f64() * 1000.0);
 
-    // ── 3. 分层批量边序（有 rank 时低层先占通道，层内按连接度） ──
+    // ── 3. 分层批量边序（有 rank 时低层先占通道；feedback 全局延后） ──
     let t2 = crate::layout::perf::Instant::now();
     let node_degree = layer_order::compute_node_degrees(relations);
-    let edge_order = layer_order::compute_edge_order(
+    let feedback_edge_set: std::collections::HashSet<usize> =
+        feedback_assignment.hints.keys().copied().collect();
+    let edge_order = layer_order::compute_edge_order_with_feedback(
         relations,
         result.hints.sugiyama_ranks.as_ref(),
         &node_degree,
+        Some(&feedback_edge_set),
     );
     crate::perf_log!("[perf]     step2_slots+step3_order: {:.2}ms", t2.elapsed().as_secs_f64() * 1000.0);
 

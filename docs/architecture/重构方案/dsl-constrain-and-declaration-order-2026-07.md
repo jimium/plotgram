@@ -1,7 +1,8 @@
-# 删除 Layout Intent，改用 DSL 隐形约束边
+# DSL 布局信号：删除 Intent、隐形约束边、声明序软偏置
 
 > 日期：2026-07-09  
 > 状态：已决定，待实施  
+> 原文件名：`remove-intent-add-constrain-edge-2026-07.md`（已重命名并扩充）  
 > 相关文档：  
 > - [layout-routing-pipeline-full-analysis.md](./layout-routing-pipeline-full-analysis.md)（§14 intent 现状）  
 > - [layout-routing-optimization-proposal-2026-07.md](./layout-routing-optimization-proposal-2026-07.md)（布局/路由主优化，与本决策正交）  
@@ -11,14 +12,18 @@
 
 ## 0. 一句话结论
 
-**删除整套 Layout Intent（overlay / Pin / Align / RefinementReport）**；  
-需要「影响分层、但不画边」时，改用 DSL 声明：
+三件事一起定：
 
-```plotgram
-constrain A -> B
+1. **删除**整套 Layout Intent（overlay / Pin / Align / RefinementReport）  
+2. **新增** DSL 隐形约束边：`constrain A -> B`（硬信号，影响 rank，不画边）  
+3. **启用** entity / group **声明序软偏置 A+B**（软信号，定同层/同级阅读序，不改分层主轴）
+
+```text
+边 / constrain  → 决定层次（上下游，硬）
+声明序         → 同层、同级默认左右（阅读序，软）
 ```
 
-约束跟图源码走，可复现；不再在渲染期另传 overlay。
+约束与阅读序都跟图源码走，可复现；不再在渲染期另传 overlay。
 
 ---
 
@@ -47,6 +52,17 @@ Intent 设计目标是：不修改 DSL、不增加 `relations` 的前提下，�
 - **不保留**渲染期 overlay / 约束边 API  
 - **改为** DSL 隐形边（`constrain`）  
 - 约束持久化在源码中，showcase / 调试 / LLM 生成均可直接使用  
+
+### 1.4 声明序：被浪费的作者信号
+
+DSL 里 `entity` / `group` 的书写顺序，作者通常隐含「阅读/并列顺序」，但 flowchart / architecture 的 **rank 主轴几乎只看边**。声明序目前多用于确定性平局（sequence 除外），尚未当成稳定的布局软信号。
+
+边与声明序互补：
+
+| 信号 | 擅长 |
+|------|------|
+| 边 / `constrain` | 谁在谁上游（rank） |
+| 声明序 | 同层谁左谁右、同级 group 条带顺序、无边时的并列阅读序 |
 
 ---
 
@@ -102,9 +118,45 @@ diagram flowchart {
 - 渲染期 `layout_intents` overlay——与本决策冲突  
 - 隐形边带 label / 端点标签——无视觉载体，禁止  
 
+### 2.3 声明序软偏置（先做 A+B，不做 C）
+
+**定位：软偏置（soft bias），不是第二套拓扑。**
+
+优先级（高 → 低）：
+
+```text
+1. 真实边 / constrain              （硬）
+2. 语义约束（type=end、sink…）     （硬/半硬）
+3. 声明序                          （软：平局、同层、同级排列）
+4. id 字典序                       （最后确定性兜底）
+```
+
+| 档 | 内容 | 决策 |
+|----|------|------|
+| **A. 强化平局** | 同层节点排序、同 rank sibling 水平序、architecture 双向对权重平局等，**明确优先声明序**（现有雏形统一并写清） | **做** |
+| **B. 同级阅读序** | 同一 parent 下 group / 节点的默认交叉轴顺序（TB 下左→右）= **局部声明序**；Equal 条带仍按内容拉齐尺寸 | **做** |
+| **C. 无边时加弱阅读边** | 相邻声明节点注入极低权边助 rank | **不做**（易与真实拓扑拧巴，且「换两行 entity」导致整图跳变） |
+
+作用域：
+
+- 序是 **同一 parent 下的局部声明序**，不是全局 `entities` 大数组序  
+- 嵌套 group：每个 sibling set 各自按该层声明序  
+- 文档需写明：同级默认按声明序排列，便于作者与 LLM 预期一致  
+
+与 `constrain` 分工：
+
+| 机制 | 角色 |
+|------|------|
+| `A -> B` | 业务流，画出来 |
+| `constrain A -> B` | 显式硬约束：必须上下游，不画 |
+| 声明序 A+B | 隐式软偏好：没说死时的默认阅读/并列顺序 |
+
+需要硬上下游 → 写边或 `constrain`；  
+只需「左边 ingress、右边 data」→ 调整 group 声明顺序即可，不必新语法。
+
 ---
 
-## 3. 语义规范
+## 3. `constrain` 语义规范
 
 | 项 | 约定 |
 |----|------|
@@ -139,7 +191,11 @@ Diagram {
 
 `Constraint` 最小字段：`from`、`to`、`span`（错误定位）。
 
+声明序：继续以 `diagram.entities` / `diagram.groups`（及 `child_group_ids`）的 **AST 出现顺序** 为权威；布局 tiebreak 统一「局部声明序 > id」。
+
 ### 4.2 消费点
+
+**constrain：**
 
 1. **Parse**：识别 `constrain A -> B`，写入 `constraints`  
 2. **Validate / Prepare**：节点存在性、自环、成环  
@@ -147,6 +203,14 @@ Diagram {
 4. **Route / Render / Export scene**：只遍历 `relations`，忽略 `constraints`  
 
 删除 intent 后，现有 `inject_intent_edges` / `build_graph_with_overlay` 应改为消费 `diagram.constraints`（或等价内部结构），不再接收 overlay 参数。
+
+**声明序 A+B（落点示例）：**
+
+- Sugiyama / architecture 同层排序与坐标平局  
+- architecture 超级图双向对权重平局（已有雏形，统一语义）  
+- flowchart `group_divide` 就绪队列 / 同级排列  
+- L1 `group_frame` 同级 sibling 的默认交叉轴顺序  
+- 凡今日仅用 id 字典序做「同层左右」的路径，改为声明序优先、id 兜底  
 
 ---
 
@@ -156,10 +220,13 @@ Diagram {
    主路径恢复为无 overlay；确认 showcase / 默认渲染无行为回归。  
 2. **再加 `constrain`**  
    语法 → AST → 校验 → 布局注入 → 文档与 1～2 个 showcase 样例。  
-3. **不并行两套**  
+3. **并行或紧随：声明序 A+B**  
+   统一 tiebreak 与同级阅读序；不引入弱阅读边（C）。  
+4. **不并行两套约束系统**  
    实施期间不要保留「半套 intent + 半套 constrain」。
 
-与 [layout-routing-optimization-proposal-2026-07.md](./layout-routing-optimization-proposal-2026-07.md) 的 RankBand / 通道预算等工作**正交**，可并行，但勿把 constrain 做成那些优化的依赖。
+与 [layout-routing-optimization-proposal-2026-07.md](./layout-routing-optimization-proposal-2026-07.md) 的 RankBand / 通道预算等工作**正交**，可并行。  
+优先级上：RankBand / 通道预算仍是观感主杠杆；本文件三项不阻塞那些优化，也勿把它们做成互相依赖。
 
 ---
 
@@ -170,6 +237,8 @@ Diagram {
 3. 不保留渲染期 `layout_overlay` / `layout_intents`  
 4. 不做 SameRank / Near / 通用约束求解  
 5. 不为「消掉 intent 相关 warning」堆兼容层  
+6. **不做声明序档 C**（无边时注入弱阅读边助 rank）  
+7. 不把声明序做成硬约束（不得覆盖真实边 / `constrain`）  
 
 ---
 
@@ -179,11 +248,14 @@ Diagram {
 |----|------|
 | Intent 清除 | 无 overlay API；pipeline 无 PinSet / RefinementReport 主路径分支 |
 | 语法 | `constrain A -> B` 可解析；带 label / 错误箭头 被拒绝 |
-| 布局 | 约束影响 rank；FAS 不反转约束边 |
+| 布局（constrain） | 约束影响 rank；FAS 不反转约束边 |
 | 视觉 | SVG/场景中无约束边几何 |
 | 索引 | `relations.len()` 与可见 `edges.len()` 仍一一对应 |
 | 错误 | 自环、成环、未知节点 → 明确诊断（含 span） |
-| 回归 | 无 constrain 的既有 showcase 与删 intent 前一致（容差内） |
+| 声明序 A | 同层/平局场景下，声明更早者稳定优先于仅 id 排序 |
+| 声明序 B | 同 parent 多 sibling 时，默认交叉轴顺序与局部声明序一致（无边强制时） |
+| 声明序不越权 | 真实边 / constrain 与声明序冲突时，以前者为准 |
+| 回归 | 无 constrain、且未依赖声明序审美的既有 showcase，与删 intent 前一致（容差内） |
 
 ---
 
@@ -194,6 +266,12 @@ Diagram {
 | 渲染期 Intent overlay | 删除 |
 | `Above` / `Below` / Pin / Align + Report | 删除 |
 | 「不改 DSL 的临时微调」 | 当前不做；需要时改 DSL |
-| 隐形拓扑约束 | `constrain A -> B`（DSL 一等声明） |
+| 隐形拓扑约束 | `constrain A -> B`（DSL 一等声明，硬） |
+| 声明序仅作确定性兜底 | A+B：同层/同级阅读序软偏置 |
 
-**原则：** 约束是图的一部分，不是渲染旁路；引擎只吃不可反转、不渲染的有向边；语法保持显式、单一、与现有三箭头体系兼容。
+**原则：**
+
+- 硬约束是图的一部分（边 + `constrain`），不是渲染旁路  
+- 软阅读序用作者已写在 DSL 里的声明顺序，不新发明语法  
+- 引擎分层仍边驱动；声明序只填「边说不清的左右」  
+- 语法保持显式、单一，与现有三箭头体系兼容  

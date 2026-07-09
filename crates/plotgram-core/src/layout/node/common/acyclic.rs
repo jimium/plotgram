@@ -38,8 +38,16 @@ where
     let mut in_deg: HashMap<N, usize> = HashMap::new();
 
     for node in nodes {
-        let outs = out_neighbors.get(node).map(|v| v.len()).unwrap_or(0);
-        let ins = in_neighbors.get(node).map(|v| v.len()).unwrap_or(0);
+        // 自环不计入剥离用的出/入度，否则带自环节点永远成不了 sink/source，
+        // 会污染环上启发式选点（stress-dag：n9 自环导致 n8 被过早推到拓扑序前端）。
+        let outs = out_neighbors
+            .get(node)
+            .map(|v| v.iter().filter(|&t| t != node).count())
+            .unwrap_or(0);
+        let ins = in_neighbors
+            .get(node)
+            .map(|v| v.iter().filter(|&t| t != node).count())
+            .unwrap_or(0);
         out_deg.insert(node.clone(), outs);
         in_deg.insert(node.clone(), ins);
     }
@@ -139,6 +147,9 @@ fn remove_node<N>(
     }
     if let Some(neighbors) = out_neighbors.get(node) {
         for n in neighbors {
+            if n == node {
+                continue; // 自环
+            }
             if remaining.contains(n) {
                 if let Some(d) = in_deg.get_mut(n) {
                     *d = d.saturating_sub(1);
@@ -148,6 +159,9 @@ fn remove_node<N>(
     }
     if let Some(neighbors) = in_neighbors.get(node) {
         for n in neighbors {
+            if n == node {
+                continue;
+            }
             if remaining.contains(n) {
                 if let Some(d) = out_deg.get_mut(n) {
                     *d = d.saturating_sub(1);
@@ -211,11 +225,53 @@ mod tests {
     }
 
     #[test]
+    fn test_self_loop_does_not_block_sink_peeling() {
+        // end 是真正 sink；n9 仅自环 + 到 end。剥离时应先拿掉 end，再把 n9 当 sink，
+        // 不应因自环把 n9 留在环集合里干扰上游。
+        let (nodes, out_n, in_n) = build_adjacency(&[
+            ("a", "n9"),
+            ("n9", "end"),
+            ("n9", "n9"),
+        ]);
+        let reversed = greedy_fas(&nodes, &out_n, &in_n);
+        assert!(
+            reversed.contains(&("n9".into(), "n9".into())),
+            "self-loop must still be marked reversed"
+        );
+        assert!(
+            !reversed.iter().any(|(a, b)| a != b),
+            "chain a→n9→end should need no non-loop reversal, got {reversed:?}"
+        );
+    }
+
+    #[test]
+    fn test_feedback_prefers_back_edge_not_forward_chain() {
+        // n5→n6→n7→n8→n5 环 + n8→n9→end；应反转 n8→n5，而不是 n7→n8
+        let (nodes, out_n, in_n) = build_adjacency(&[
+            ("n5", "n6"),
+            ("n6", "n7"),
+            ("n7", "n8"),
+            ("n8", "n5"),
+            ("n8", "n9"),
+            ("n9", "end"),
+            ("n9", "n9"),
+        ]);
+        let reversed = greedy_fas(&nodes, &out_n, &in_n);
+        assert!(
+            reversed.contains(&("n8".into(), "n5".into())),
+            "should reverse feedback n8→n5, got {reversed:?}"
+        );
+        assert!(
+            !reversed.contains(&("n7".into(), "n8".into())),
+            "must not reverse forward n7→n8, got {reversed:?}"
+        );
+    }
+
+    #[test]
     fn test_complex_cycle() {
         // A -> B -> C -> A + A -> C
         let (nodes, out_n, in_n) = build_adjacency(&[("a", "b"), ("b", "c"), ("c", "a"), ("a", "c")]);
         let reversed = greedy_fas(&nodes, &out_n, &in_n);
-        // 反转后应为 DAG
         assert!(!reversed.is_empty(), "cycle should require at least 1 reversal");
     }
 }
