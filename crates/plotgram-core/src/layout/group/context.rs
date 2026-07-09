@@ -295,7 +295,8 @@ mod tests {
         };
         let ctx = GroupRoutingContext::from_layout(&diagram, &result, "flowchart");
         assert_eq!(ctx.corridors.len(), 1);
-        assert!((ctx.corridors[0].coord - 130.0).abs() < 0.01);
+        // 最终几何中线优先（a 右缘 100、b 左缘 140 → 120），注入 130 被刷新。
+        assert!((ctx.corridors[0].coord - 120.0).abs() < 0.01);
         assert_eq!(ctx.corridor_misalignment_penalty, 80.0);
     }
 }

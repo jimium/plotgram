@@ -42,15 +42,19 @@ fn pair_covered(corridors: &[GroupCorridor], group_a: &str, group_b: &str) -> bo
     })
 }
 
-/// 合并布局注入走廊与几何 fallback（注入优先，补全未覆盖邻接对）。
+/// 合并布局注入走廊与最终几何走廊。
+///
+/// **最终几何优先**：`group_frame` 会移动/拉齐组框，布局阶段注入的 `coord/span`
+/// 会过期；若仍以注入为准，走廊路径易脏并触发退化。
+/// 几何能覆盖的邻接对一律用当前包围框重建；注入仅补全几何未覆盖的对。
 pub fn merge_corridors(
     injected: &[GroupCorridor],
     groups: &HashMap<String, GroupLayout>,
 ) -> Vec<GroupCorridor> {
-    let mut merged = injected.to_vec();
-    for c in build_corridors_from_groups(groups) {
+    let mut merged = build_corridors_from_groups(groups);
+    for c in injected {
         if !pair_covered(&merged, &c.group_a, &c.group_b) {
-            merged.push(c);
+            merged.push(c.clone());
         }
     }
     merged.sort_by(|a, b| {
@@ -487,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    fn merge_corridors_injected_takes_precedence() {
+    fn merge_corridors_prefers_final_geometry_over_stale_injected() {
         let mut groups = HashMap::new();
         groups.insert(
             "a".to_string(),
@@ -507,9 +511,10 @@ mod tests {
                 height: 80.0,
             },
         );
+        // 注入坐标故意偏离几何中线（模拟 group_frame 前的过期值）
         let injected = vec![GroupCorridor {
             axis: CorridorAxis::Vertical,
-            coord: 121.0,
+            coord: 999.0,
             span_min: 0.0,
             span_max: 100.0,
             group_a: "a".into(),
@@ -517,6 +522,10 @@ mod tests {
         }];
         let merged = merge_corridors(&injected, &groups);
         assert_eq!(merged.len(), 1);
-        assert!((merged[0].coord - 121.0).abs() < EPS);
+        assert!(
+            (merged[0].coord - 120.0).abs() < EPS,
+            "geometry mid-gap should win, got {}",
+            merged[0].coord
+        );
     }
 }

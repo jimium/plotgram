@@ -470,7 +470,143 @@ pub fn select_best_path_with_scorer_stats(
     };
     chosen
         .map(|(_, p)| p)
-        .unwrap_or_else(|| vec![start, end])
+        // A2：禁止斜线逃生；候选全失败时仍输出正交路径（优先绕外框，永不对角线）。
+        .unwrap_or_else(|| {
+            orthogonal_degraded_fallback(ctx, start, end, from_side, to_side, from_id, to_id)
+        })
+}
+
+/// 路由硬失败时的正交兜底：同轴可直线；否则在 L/Z 与外框绕行中选穿组更少者。
+fn orthogonal_degraded_fallback(
+    ctx: &RoutingContext<'_>,
+    start: Point,
+    end: Point,
+    from_side: Port,
+    to_side: Port,
+    from_id: &str,
+    to_id: &str,
+) -> Vec<Point> {
+    let sx = start.x;
+    let sy = start.y;
+    let ex = end.x;
+    let ey = end.y;
+    if (sx - ex).abs() < EPS || (sy - ey).abs() < EPS {
+        return vec![start, end];
+    }
+
+    let mut candidates = compute_orthogonal_path_variants(sx, sy, from_side, ex, ey, to_side);
+    candidates.push(simplify_path(vec![
+        Point::new(sx, sy),
+        Point::new(ex, sy),
+        Point::new(ex, ey),
+    ]));
+    candidates.push(simplify_path(vec![
+        Point::new(sx, sy),
+        Point::new(sx, ey),
+        Point::new(ex, ey),
+    ]));
+
+    // 绕所有组外框的通道（嵌套架构图上短 L 常穿父组，外框绕行更干净）
+    const OUTER_PAD: f64 = 28.0;
+    if let Some((x_lo, y_lo, x_hi, y_hi)) = groups_outer_bounds(ctx) {
+        let left = x_lo - OUTER_PAD;
+        let right = x_hi + OUTER_PAD;
+        let top = y_lo - OUTER_PAD;
+        let bottom = y_hi + OUTER_PAD;
+        for x in [left, right] {
+            candidates.push(simplify_path(vec![
+                Point::new(sx, sy),
+                Point::new(x, sy),
+                Point::new(x, ey),
+                Point::new(ex, ey),
+            ]));
+        }
+        for y in [top, bottom] {
+            candidates.push(simplify_path(vec![
+                Point::new(sx, sy),
+                Point::new(sx, y),
+                Point::new(ex, y),
+                Point::new(ex, ey),
+            ]));
+        }
+    }
+
+    let mut best: Option<(u32, u32, f64, Vec<Point>)> = None;
+    for path in candidates {
+        if path.len() < 2 || !path_is_orthogonal(&path) {
+            continue;
+        }
+        let group_hits = count_unrelated_group_hits_binary(
+            &path,
+            from_id,
+            to_id,
+            ctx.group_ctx,
+            &ctx.obstacles.sorted_group_ids,
+        );
+        let node_dirty = if path_is_clean(
+            &path,
+            from_id,
+            to_id,
+            ctx.nodes,
+            ctx.group_ctx,
+            &ctx.obstacles.sorted_node_ids,
+        ) {
+            0u32
+        } else {
+            1u32
+        };
+        let len = path_length(&path);
+        let key = (group_hits, node_dirty, len);
+        if best
+            .as_ref()
+            .is_none_or(|(g, n, l, _)| key < (*g, *n, *l))
+        {
+            best = Some((group_hits, node_dirty, len, path));
+        }
+    }
+    best.map(|(_, _, _, p)| p).unwrap_or_else(|| {
+        simplify_path(vec![
+            Point::new(sx, sy),
+            Point::new(ex, sy),
+            Point::new(ex, ey),
+        ])
+    })
+}
+
+fn groups_outer_bounds(ctx: &RoutingContext<'_>) -> Option<(f64, f64, f64, f64)> {
+    let mut iter = ctx.group_ctx.groups.values();
+    let first = iter.next()?;
+    let mut x_lo = first.x;
+    let mut y_lo = first.y;
+    let mut x_hi = first.x + first.width;
+    let mut y_hi = first.y + first.height;
+    for g in iter {
+        x_lo = x_lo.min(g.x);
+        y_lo = y_lo.min(g.y);
+        x_hi = x_hi.max(g.x + g.width);
+        y_hi = y_hi.max(g.y + g.height);
+    }
+    Some((x_lo, y_lo, x_hi, y_hi))
+}
+
+fn path_is_orthogonal(path: &[Point]) -> bool {
+    path.windows(2).all(|w| {
+        (w[0].x - w[1].x).abs() < EPS || (w[0].y - w[1].y).abs() < EPS
+    })
+}
+
+fn count_unrelated_group_hits_binary(
+    path: &[Point],
+    from_id: &str,
+    to_id: &str,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    sorted_group_ids: &[String],
+) -> u32 {
+    if path_avoids_group_interiors(path, from_id, to_id, group_ctx, sorted_group_ids) {
+        0
+    } else {
+        1
+    }
 }
 
 fn build_candidate_paths(

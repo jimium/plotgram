@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一键构建并同步 website(landing) + playground + showcase 到 demo.plotgram.dev，大资源走 assets.plotgram.cn
+# 一键构建并同步 website(landing) + playground + showcase 到 demo.plotgram.dev，大资源走 assets.pg.agcli.cn
 #
 # 用法:
 #   ./deploy/deploy-demo.sh
@@ -9,8 +9,8 @@
 #   DEPLOY_HOST       demo 站 SSH 目标（默认 plotgram.dev）
 #   ASSET_HOST        资源 CDN SSH 目标（默认 shanxun）
 #   REMOTE_DIR        demo 站部署目录（默认 /var/www/plotgram）
-#   ASSET_REMOTE_DIR  CDN 部署目录（默认 /var/www/assets.plotgram.cn）
-#   CDN_BASE          CDN 根 URL（默认 https://assets.plotgram.cn/）
+#   ASSET_REMOTE_DIR  CDN 部署目录（默认 /var/www/assets.pg.agcli.cn）
+#   CDN_BASE          CDN 根 URL（默认 https://assets.pg.agcli.cn/）
 
 set -euo pipefail
 
@@ -20,8 +20,8 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEPLOY_HOST="${DEPLOY_HOST:-plotgram.dev}"
 ASSET_HOST="${ASSET_HOST:-shanxun}"
 REMOTE_DIR="${REMOTE_DIR:-/var/www/plotgram}"
-ASSET_REMOTE_DIR="${ASSET_REMOTE_DIR:-/var/www/assets.plotgram.cn}"
-CDN_BASE="${CDN_BASE:-https://assets.plotgram.cn/}"
+ASSET_REMOTE_DIR="${ASSET_REMOTE_DIR:-/var/www/assets.pg.agcli.cn}"
+CDN_BASE="${CDN_BASE:-https://assets.pg.agcli.cn/}"
 DOMAIN="demo.plotgram.dev"
 PLAYGROUND_BASE="/playground/"
 PLAYGROUND_CDN_BASE="${CDN_BASE}playground/"
@@ -243,7 +243,7 @@ upload() {
   log "同步 nginx 配置 …"
   scp "$ROOT_DIR/deploy/nginx/demo.plotgram.dev.conf" "$DEPLOY_HOST:/etc/nginx/conf.d/demo.plotgram.dev.conf"
   ssh "$DEPLOY_HOST" 'nginx -t && systemctl reload nginx'
-  scp "$ROOT_DIR/deploy/nginx/assets.plotgram.cn.conf" "$ASSET_HOST:/etc/nginx/conf.d/assets.plotgram.cn.conf"
+  scp "$ROOT_DIR/deploy/nginx/assets.pg.agcli.cn.conf" "$ASSET_HOST:/etc/nginx/conf.d/assets.pg.agcli.cn.conf"
   ssh "$ASSET_HOST" 'nginx -t && systemctl reload nginx'
 }
 

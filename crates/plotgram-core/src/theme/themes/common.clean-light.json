@@ -4,28 +4,29 @@
   "name": "Clean Light",
   "meta": {
     "author": "Plotgram",
-    "description": "默认亮色基础样式：借鉴 Linear/Figma 近白底与发丝级灰框，保留 Plotgram 语义色块分层",
+    "description": "默认亮色基础样式：Desk & Cards 面色阶梯（画布作桌面、group 作卡片、节点纯白浮起），保留 Plotgram 语义色块分层",
     "tags": [
       "light",
       "clean",
       "cool",
       "modern",
-      "minimal"
+      "minimal",
+      "desk-cards"
     ]
   },
   "tokens": {
     "colors": {
-      "canvas": "#F7F8F8",
+      "canvas": "#EBEEF2",
       "text": "#18181B",
       "muted_text": "#71717A",
-      "border": "#E4E4E7",
-      "border_strong": "#737373",
+      "border": "#CBD5E1",
+      "border_strong": "#64748B",
       "primary": "#5E6AD2",
       "neutral_fill": "#FFFFFF",
-      "neutral_stroke": "#E4E4E7",
+      "neutral_stroke": "#D0D5DD",
       "edge_stroke": "#52525B",
       "group_fill": "transparent",
-      "group_stroke": "#737373"
+      "group_stroke": "#64748B"
     },
     "palette": {
       "blue": { "fill": "#EEF2FF", "stroke": "#93C5FD", "text_fill": "#1E3A8A" },
@@ -220,10 +221,10 @@
       "context_palettes": {
         "group_nest": {
           "entries": [
-            { "fill": "transparent", "stroke": "{colors.group_stroke}", "stroke_width": 1.0, "border_radius": 10.0, "stroke_dasharray": "5,4" },
-            { "fill": "{colors.neutral_fill}", "stroke": "{colors.border}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" },
-            { "fill": "{darken({colors.neutral_fill}, 0.03)}", "stroke": "{colors.border}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" },
-            { "fill": "{darken({colors.neutral_fill}, 0.06)}", "stroke": "{colors.border_strong}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" }
+            { "fill": "transparent", "stroke": "{colors.group_stroke}", "stroke_width": 1.15, "border_radius": 10.0, "stroke_dasharray": "5,4" },
+            { "fill": "#F8FAFC", "stroke": "{colors.border}", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#F1F5F9", "stroke": "{colors.border}", "stroke_width": 0.85, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#E2E8F0", "stroke": "#94A3B8", "stroke_width": 0.85, "border_radius": 8.0, "stroke_dasharray": "none" }
           ],
           "index": { "from": "group_depth", "cap": 3 },
           "bindings": [
@@ -315,9 +316,9 @@
       },
       "group": {
         "stroke": "{colors.border_strong}",
-        "stroke_width": "{strokes.normal}",
+        "stroke_width": 1.15,
         "stroke_dasharray": "none",
-        "fill": "{colors.neutral_fill}"
+        "fill": "#F8FAFC"
       },
       "entity_types": {
         "frontend": {
@@ -392,10 +393,10 @@
       "context_palettes": {
         "group_nest": {
           "entries": [
-            { "fill": "{colors.neutral_fill}", "stroke": "{colors.border_strong}", "stroke_width": 1.0, "border_radius": 10.0, "stroke_dasharray": "none" },
-            { "fill": "{darken({colors.neutral_fill}, 0.02)}", "stroke": "{colors.border}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" },
-            { "fill": "{darken({colors.neutral_fill}, 0.04)}", "stroke": "{colors.border}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" },
-            { "fill": "{darken({colors.neutral_fill}, 0.06)}", "stroke": "{colors.border_strong}", "stroke_width": 0.75, "border_radius": 8.0, "stroke_dasharray": "none" }
+            { "fill": "#F8FAFC", "stroke": "{colors.border_strong}", "stroke_width": 1.15, "border_radius": 10.0, "stroke_dasharray": "none" },
+            { "fill": "#F1F5F9", "stroke": "{colors.border}", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#E8EEF5", "stroke": "{colors.border}", "stroke_width": 0.85, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#DDE5EF", "stroke": "#94A3B8", "stroke_width": 0.85, "border_radius": 8.0, "stroke_dasharray": "none" }
           ],
           "index": { "from": "group_depth", "cap": 3 },
           "bindings": [

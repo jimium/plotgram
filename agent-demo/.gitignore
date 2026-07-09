@@ -1,0 +1,7 @@
+node_modules
+dist
+plotgram-wasm
+*.local
+.env
+.env.*
+!.env.example

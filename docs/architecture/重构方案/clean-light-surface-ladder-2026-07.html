@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clean Light · 面色阶梯方案对比</title>
+  <style>
+    :root {
+      --page: #f3f4f6;
+      --ink: #18181b;
+      --muted: #71717a;
+      --line: #d4d4d8;
+      --card: #ffffff;
+      --accent: #2563eb;
+      --ok: #15803d;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Noto Sans SC", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #e8eef8 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #ece7e0 0%, transparent 50%),
+        var(--page);
+      line-height: 1.45;
+    }
+
+    header {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 36px 24px 12px;
+    }
+    header h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: -0.03em;
+      font-weight: 650;
+    }
+    header p {
+      margin: 0;
+      max-width: 72ch;
+      color: var(--muted);
+      font-size: 14.5px;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .pill {
+      font-size: 12px;
+      color: #3f3f46;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 10px;
+    }
+
+    .toolbar {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 16px 24px 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(10px);
+      background: color-mix(in srgb, var(--page) 82%, transparent);
+      border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+    }
+    .toolbar label {
+      font-size: 13px;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .toolbar select, .toolbar button {
+      font: inherit;
+      font-size: 13px;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 6px 10px;
+      color: var(--ink);
+    }
+    .toolbar button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 560;
+    }
+    .choice-banner {
+      margin-left: auto;
+      font-size: 13px;
+      color: var(--ok);
+      font-weight: 560;
+      min-height: 1.2em;
+    }
+
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 12px 24px 64px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 18px;
+    }
+
+    .scheme {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .scheme.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
+    }
+    .scheme-head {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid #eee;
+      display: grid;
+      gap: 6px;
+    }
+    .scheme-head .row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .scheme-head h2 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+      color: #52525b;
+      background: #f4f4f5;
+      border-radius: 6px;
+      padding: 2px 7px;
+      white-space: nowrap;
+    }
+    .badge.current { background: #fef3c7; color: #92400e; }
+    .badge.rec { background: #dbeafe; color: #1e40af; }
+    .scheme-head p {
+      margin: 0;
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+
+    .preview {
+      padding: 14px;
+    }
+    .canvas {
+      border-radius: 10px;
+      padding: 18px;
+      min-height: 250px;
+      position: relative;
+      border: 1px dashed color-mix(in srgb, #000 8%, transparent);
+    }
+    .canvas-label {
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      font-size: 10px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: #64748b;
+      opacity: .85;
+      font-weight: 600;
+    }
+
+    .group {
+      border-radius: var(--r, 10px);
+      border: var(--sw, 1px) var(--sd, solid) var(--ss, #737373);
+      background: var(--gf, transparent);
+      padding: 14px 12px 12px;
+      position: relative;
+    }
+    .group + .group { margin-top: 10px; }
+    .group-tag {
+      position: absolute;
+      top: -8px;
+      left: 10px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #71717a;
+      background: var(--tag-bg, #fff);
+      padding: 0 5px;
+      border-radius: 3px;
+    }
+    .inner { display: flex; flex-direction: column; gap: 10px; }
+    .nodes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding-top: 4px;
+    }
+    .node {
+      background: var(--nf, #fff);
+      border: 1px solid var(--ns, #e4e4e7);
+      color: #18181b;
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 560;
+      box-shadow: 0 1px 0 color-mix(in srgb, #000 3%, transparent);
+    }
+    .node.role {
+      background: #eef2ff;
+      border-color: #93c5fd;
+      color: #1e3a8a;
+    }
+    .edge-demo {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-top: 2px;
+    }
+    .edge-demo .wire {
+      height: 0;
+      flex: 1;
+      border-top: 1.5px solid var(--es, #52525b);
+      opacity: .88;
+      position: relative;
+    }
+    .edge-demo .wire::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      top: -4px;
+      border: 4px solid transparent;
+      border-left: 6px solid var(--es, #52525b);
+    }
+
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+      padding: 0 14px 12px;
+    }
+    .swatch {
+      display: grid;
+      gap: 4px;
+      justify-items: center;
+    }
+    .chip {
+      width: 100%;
+      aspect-ratio: 1.35;
+      border-radius: 7px;
+      border: 1px solid color-mix(in srgb, #000 12%, transparent);
+      position: relative;
+    }
+    .chip.checker {
+      background-image:
+        linear-gradient(45deg, #ddd 25%, transparent 25%),
+        linear-gradient(-45deg, #ddd 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #ddd 75%),
+        linear-gradient(-45deg, transparent 75%, #ddd 75%);
+      background-size: 8px 8px;
+      background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+    }
+    .chip .overlay {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+    }
+    .swatch span {
+      font-size: 9.5px;
+      color: #52525b;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+      line-height: 1.2;
+    }
+    .swatch strong {
+      display: block;
+      font-size: 10px;
+      color: #27272a;
+      font-weight: 650;
+    }
+
+    .actions {
+      margin-top: auto;
+      padding: 0 14px 14px;
+      display: flex;
+      gap: 8px;
+    }
+    .actions button {
+      flex: 1;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 560;
+      border-radius: 9px;
+      padding: 8px 10px;
+      cursor: pointer;
+      border: 1px solid var(--line);
+      background: #fafafa;
+      color: var(--ink);
+    }
+    .actions button.pick {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: #1d4ed8;
+    }
+    .scheme.selected .actions button.pick {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .notes {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 24px 48px;
+    }
+    .notes details {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 16px;
+    }
+    .notes summary {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .notes ul {
+      margin: 10px 0 4px;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .notes code {
+      font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+      font-size: 12px;
+      background: #f4f4f5;
+      padding: 1px 5px;
+      border-radius: 4px;
+      color: #3f3f46;
+    }
+
+    @media (max-width: 720px) {
+      main { grid-template-columns: 1fr; }
+      .swatches { grid-template-columns: repeat(3, 1fr); }
+      .choice-banner { margin-left: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Clean Light · 面色阶梯方案</h1>
+    <p>
+      对比画布底色与 group 嵌套层级的面色关系。每张卡片是同一套迷你图结构：
+      Canvas → Group L0 → L1 → L2（内含节点）。目标是让层级一眼可读，同时保持 Clean Light 的干净气质。
+      边色暂不改动，统一用当前 <code style="font-family:ui-monospace;font-size:12px">#52525B</code>。
+    </p>
+    <div class="meta">
+      <span class="pill">flowchart 语义：L0 常为虚线外框</span>
+      <span class="pill">节点保持近白，靠与 group 的对比浮起</span>
+      <span class="pill">点「选这个」做决策记录</span>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <label>
+      预览模式
+      <select id="mode">
+        <option value="flowchart" selected>Flowchart（L0 透明虚线）</option>
+        <option value="architecture">Architecture（L0 实心容器）</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="showRoles" checked /> 显示语义色节点</label>
+    <button type="button" id="clearPick">清除选择</button>
+    <button type="button" class="primary" id="copyPick">复制所选方案 ID</button>
+    <div class="choice-banner" id="choiceBanner">尚未选择</div>
+  </div>
+
+  <main id="grid"></main>
+
+  <section class="notes">
+    <details open>
+      <summary>怎么看这些方案</summary>
+      <ul>
+        <li><strong>Current</strong>：现状对照。L1 与 Node 同为纯白，层级主要靠发丝描边，清晰度不足。</li>
+        <li><strong>Desk &amp; Cards</strong>：画布略沉，group 作卡片层递进，节点最亮——最接近「桌面 + 卡片」阅读习惯。</li>
+        <li><strong>Nested Wells</strong>：外深内浅，像凹槽；越往里越亮，终点落在白节点。</li>
+        <li><strong>Clear Steps</strong>：加大 ΔL，牺牲一点「极简干净」，换更强可读性。</li>
+        <li><strong>Cool Mist</strong>：冷灰蓝微色相，层级仍靠亮度，但整体更「产品工具」一点。</li>
+        <li><strong>Ink Frame</strong>：面色仍克制，主要靠描边权重/灰度拉开；适合想少改 fill 的路线。</li>
+      </ul>
+    </details>
+  </section>
+
+  <script>
+    const SCHEMES = [
+      {
+        id: "current",
+        name: "Current",
+        badge: "现状",
+        badgeClass: "current",
+        blurb: "近白画布 + 微 darken。L1 与 Node 同白，层级几乎靠描边。",
+        canvas: "#F7F8F8",
+        edge: "#52525B",
+        node: { fill: "#FFFFFF", stroke: "#E4E4E7" },
+        flowchart: [
+          { fill: "transparent", stroke: "#737373", width: 1, dash: "5 4", radius: 10 },
+          { fill: "#FFFFFF", stroke: "#E4E4E7", width: 0.75, dash: "none", radius: 8 },
+          { fill: "#F7F7F7", stroke: "#E4E4E7", width: 0.75, dash: "none", radius: 8 },
+          { fill: "#F0F0F0", stroke: "#737373", width: 0.75, dash: "none", radius: 8 },
+        ],
+        architecture: [
+          { fill: "#FFFFFF", stroke: "#737373", width: 1, dash: "none", radius: 10 },
+          { fill: "#FAFAFA", stroke: "#E4E4E7", width: 0.75, dash: "none", radius: 8 },
+          { fill: "#F5F5F5", stroke: "#E4E4E7", width: 0.75, dash: "none", radius: 8 },
+          { fill: "#F0F0F0", stroke: "#737373", width: 0.75, dash: "none", radius: 8 },
+        ],
+      },
+      {
+        id: "desk-cards",
+        name: "Desk & Cards",
+        badge: "推荐试看",
+        badgeClass: "rec",
+        blurb: "画布作桌面（沉一点），group 作卡片递进，节点纯白浮起。干净且层级清楚。",
+        canvas: "#EBEEF2",
+        edge: "#52525B",
+        node: { fill: "#FFFFFF", stroke: "#D0D5DD" },
+        flowchart: [
+          { fill: "transparent", stroke: "#64748B", width: 1.15, dash: "5 4", radius: 10 },
+          { fill: "#F8FAFC", stroke: "#CBD5E1", width: 1, dash: "none", radius: 8 },
+          { fill: "#F1F5F9", stroke: "#CBD5E1", width: 0.85, dash: "none", radius: 8 },
+          { fill: "#E2E8F0", stroke: "#94A3B8", width: 0.85, dash: "none", radius: 8 },
+        ],
+        architecture: [
+          { fill: "#F8FAFC", stroke: "#64748B", width: 1.15, dash: "none", radius: 10 },
+          { fill: "#F1F5F9", stroke: "#CBD5E1", width: 1, dash: "none", radius: 8 },
+          { fill: "#E8EEF5", stroke: "#CBD5E1", width: 0.85, dash: "none", radius: 8 },
+          { fill: "#DDE5EF", stroke: "#94A3B8", width: 0.85, dash: "none", radius: 8 },
+        ],
+      },
+      {
+        id: "nested-wells",
+        name: "Nested Wells",
+        badge: "外深内浅",
+        badgeClass: "",
+        blurb: "外层更深、内层更浅，像一层层凹槽；阅读方向是「往里走越亮」。",
+        canvas: "#F3F4F6",
+        edge: "#52525B",
+        node: { fill: "#FFFFFF", stroke: "#D4D4D8" },
+        flowchart: [
+          { fill: "transparent", stroke: "#52525B", width: 1.2, dash: "5 4", radius: 10 },
+          { fill: "#E7E9ED", stroke: "#A1A1AA", width: 1, dash: "none", radius: 8 },
+          { fill: "#F0F1F4", stroke: "#D4D4D8", width: 0.85, dash: "none", radius: 8 },
+          { fill: "#F7F8FA", stroke: "#D4D4D8", width: 0.75, dash: "none", radius: 8 },
+        ],
+        architecture: [
+          { fill: "#E4E7EC", stroke: "#52525B", width: 1.15, dash: "none", radius: 10 },
+          { fill: "#ECEEF2", stroke: "#A1A1AA", width: 1, dash: "none", radius: 8 },
+          { fill: "#F4F5F7", stroke: "#D4D4D8", width: 0.85, dash: "none", radius: 8 },
+          { fill: "#FAFAFB", stroke: "#D4D4D8", width: 0.75, dash: "none", radius: 8 },
+        ],
+      },
+      {
+        id: "clear-steps",
+        name: "Clear Steps",
+        badge: "高对比",
+        badgeClass: "",
+        blurb: "刻意加大每层亮度差。清晰度最高，但「极简干净」感会弱一点。",
+        canvas: "#E5E7EB",
+        edge: "#3F3F46",
+        node: { fill: "#FFFFFF", stroke: "#C4C4C8" },
+        flowchart: [
+          { fill: "transparent", stroke: "#52525B", width: 1.25, dash: "5 4", radius: 10 },
+          { fill: "#F9FAFB", stroke: "#9CA3AF", width: 1, dash: "none", radius: 8 },
+          { fill: "#EEF0F3", stroke: "#9CA3AF", width: 0.9, dash: "none", radius: 8 },
+          { fill: "#E5E7EB", stroke: "#6B7280", width: 0.9, dash: "none", radius: 8 },
+        ],
+        architecture: [
+          { fill: "#F9FAFB", stroke: "#4B5563", width: 1.2, dash: "none", radius: 10 },
+          { fill: "#F3F4F6", stroke: "#9CA3AF", width: 1, dash: "none", radius: 8 },
+          { fill: "#E5E7EB", stroke: "#9CA3AF", width: 0.9, dash: "none", radius: 8 },
+          { fill: "#D1D5DB", stroke: "#6B7280", width: 0.9, dash: "none", radius: 8 },
+        ],
+      },
+      {
+        id: "cool-mist",
+        name: "Cool Mist",
+        badge: "冷灰蓝",
+        badgeClass: "",
+        blurb: "带一点冷灰蓝色相，仍用亮度做层级。比纯灰更有产品工具气质。",
+        canvas: "#E8EEF5",
+        edge: "#475569",
+        node: { fill: "#FFFFFF", stroke: "#C5D0DE" },
+        flowchart: [
+          { fill: "transparent", stroke: "#64748B", width: 1.15, dash: "5 4", radius: 10 },
+          { fill: "#F5F8FC", stroke: "#B6C3D4", width: 1, dash: "none", radius: 8 },
+          { fill: "#EAF0F8", stroke: "#B6C3D4", width: 0.85, dash: "none", radius: 8 },
+          { fill: "#DDE6F1", stroke: "#8B9BB0", width: 0.85, dash: "none", radius: 8 },
+        ],
+        architecture: [
+          { fill: "#F5F8FC", stroke: "#64748B", width: 1.15, dash: "none", radius: 10 },
+          { fill: "#EAF0F8", stroke: "#B6C3D4", width: 1, dash: "none", radius: 8 },
+          { fill: "#DFE7F2", stroke: "#B6C3D4", width: 0.85, dash: "none", radius: 8 },
+          { fill: "#D2DCE9", stroke: "#8B9BB0", width: 0.85, dash: "none", radius: 8 },
+        ],
+      },
+      {
+        id: "ink-frame",
+        name: "Ink Frame",
+        badge: "描边主导",
+        badgeClass: "",
+        blurb: "面色仍克制，主要靠描边灰度与线宽拉开层级。改动最小、风险最低。",
+        canvas: "#F1F2F4",
+        edge: "#52525B",
+        node: { fill: "#FFFFFF", stroke: "#D4D4D8" },
+        flowchart: [
+          { fill: "transparent", stroke: "#3F3F46", width: 1.35, dash: "5 4", radius: 10 },
+          { fill: "#FAFAFA", stroke: "#A1A1AA", width: 1.1, dash: "none", radius: 8 },
+          { fill: "#F4F4F5", stroke: "#A1A1AA", width: 0.9, dash: "none", radius: 8 },
+          { fill: "#E4E4E7", stroke: "#71717A", width: 0.9, dash: "none", radius: 8 },
+        ],
+        architecture: [
+          { fill: "#FAFAFA", stroke: "#3F3F46", width: 1.25, dash: "none", radius: 10 },
+          { fill: "#F4F4F5", stroke: "#A1A1AA", width: 1.05, dash: "none", radius: 8 },
+          { fill: "#EBEBED", stroke: "#A1A1AA", width: 0.9, dash: "none", radius: 8 },
+          { fill: "#E4E4E7", stroke: "#71717A", width: 0.9, dash: "none", radius: 8 },
+        ],
+      },
+    ];
+
+    const grid = document.getElementById("grid");
+    const modeEl = document.getElementById("mode");
+    const rolesEl = document.getElementById("showRoles");
+    const banner = document.getElementById("choiceBanner");
+    let selected = localStorage.getItem("clean-light-ladder-choice") || "";
+
+    function swatchCell(label, fill, stroke) {
+      const transparent = !fill || fill === "transparent";
+      return `
+        <div class="swatch">
+          <div class="chip ${transparent ? "checker" : ""}" title="${label}">
+            <div class="overlay" style="background:${transparent ? "transparent" : fill}; box-shadow: inset 0 0 0 2px ${stroke}"></div>
+          </div>
+          <span><strong>${label}</strong>${transparent ? "transparent" : fill}<br/>${stroke}</span>
+        </div>`;
+    }
+
+    function renderGroup(level, style, innerHtml, tagBg) {
+      const dash = style.dash === "none" ? "solid" : "dashed";
+      const dasharray = style.dash === "none" ? "none" : style.dash;
+      return `
+        <div class="group" style="
+          --gf:${style.fill};
+          --ss:${style.stroke};
+          --sw:${style.width}px;
+          --sd:${dash};
+          --r:${style.radius}px;
+          border-style:${dash};
+          ${dasharray !== "none" ? `stroke-dasharray:${dasharray};` : ""}
+        ">
+          <span class="group-tag" style="--tag-bg:${tagBg}; background:${tagBg}">L${level}</span>
+          ${innerHtml}
+        </div>`;
+    }
+
+    function renderScheme(scheme) {
+      const mode = modeEl.value;
+      const levels = scheme[mode];
+      const showRoles = rolesEl.checked;
+      const tagBg = scheme.canvas;
+
+      const nodes = `
+        <div class="nodes">
+          <div class="node" style="--nf:${scheme.node.fill}; --ns:${scheme.node.stroke}">Process</div>
+          ${showRoles ? `<div class="node role">Service</div>` : ""}
+          <div class="edge-demo" style="width:56px">
+            <div class="node" style="--nf:${scheme.node.fill}; --ns:${scheme.node.stroke}; padding:7px 8px">A</div>
+            <div class="wire" style="--es:${scheme.edge}"></div>
+            <div class="node" style="--nf:${scheme.node.fill}; --ns:${scheme.node.stroke}; padding:7px 8px">B</div>
+          </div>
+        </div>`;
+
+      const l2 = renderGroup(2, levels[2], nodes, levels[1].fill === "transparent" ? scheme.canvas : levels[1].fill);
+      const l1 = renderGroup(1, levels[1], `<div class="inner">${l2}</div>`, levels[0].fill === "transparent" ? scheme.canvas : levels[0].fill);
+      const l0 = renderGroup(0, levels[0], `<div class="inner">${l1}</div>`, scheme.canvas);
+
+      const card = document.createElement("article");
+      card.className = "scheme" + (selected === scheme.id ? " selected" : "");
+      card.dataset.id = scheme.id;
+      card.innerHTML = `
+        <div class="scheme-head">
+          <div class="row">
+            <h2>${scheme.name}</h2>
+            <span class="badge ${scheme.badgeClass}">${scheme.badge}</span>
+          </div>
+          <p>${scheme.blurb}</p>
+        </div>
+        <div class="preview">
+          <div class="canvas" style="background:${scheme.canvas}">
+            <div class="canvas-label">canvas ${scheme.canvas}</div>
+            ${l0}
+          </div>
+        </div>
+        <div class="swatches">
+          ${swatchCell("Canvas", scheme.canvas, "transparent")}
+          ${swatchCell("L0", levels[0].fill, levels[0].stroke)}
+          ${swatchCell("L1", levels[1].fill, levels[1].stroke)}
+          ${swatchCell("L2", levels[2].fill, levels[2].stroke)}
+          ${swatchCell("L3", levels[3].fill, levels[3].stroke)}
+          ${swatchCell("Node", scheme.node.fill, scheme.node.stroke)}
+        </div>
+        <div class="actions">
+          <button type="button" class="pick" data-pick="${scheme.id}">
+            ${selected === scheme.id ? "已选择 ✓" : "选这个"}
+          </button>
+        </div>`;
+      return card;
+    }
+
+    function paint() {
+      grid.innerHTML = "";
+      SCHEMES.forEach((s) => grid.appendChild(renderScheme(s)));
+      banner.textContent = selected
+        ? `已选：${SCHEMES.find((s) => s.id === selected)?.name || selected} (${selected})`
+        : "尚未选择";
+    }
+
+    grid.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-pick]");
+      if (!btn) return;
+      selected = btn.getAttribute("data-pick");
+      localStorage.setItem("clean-light-ladder-choice", selected);
+      paint();
+    });
+
+    modeEl.addEventListener("change", paint);
+    rolesEl.addEventListener("change", paint);
+    document.getElementById("clearPick").addEventListener("click", () => {
+      selected = "";
+      localStorage.removeItem("clean-light-ladder-choice");
+      paint();
+    });
+    document.getElementById("copyPick").addEventListener("click", async () => {
+      if (!selected) {
+        banner.textContent = "请先选择一个方案";
+        return;
+      }
+      const scheme = SCHEMES.find((s) => s.id === selected);
+      const mode = modeEl.value;
+      const payload = {
+        id: scheme.id,
+        name: scheme.name,
+        mode,
+        canvas: scheme.canvas,
+        edge: scheme.edge,
+        node: scheme.node,
+        group_nest: scheme[mode],
+      };
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      banner.textContent = `已复制：${scheme.name} (${scheme.id})`;
+    });
+
+    paint();
+  </script>
+</body>
+</html>

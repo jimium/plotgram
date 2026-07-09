@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="Plotgram" shape-rendering="geometricPrecision">
+  <!--
+    Mark: S2a22 - text wraps a node.
+    Line lengths in golden ratio phi~1.618: 28.8 -> 17.8 -> 11.0
+    Flat: solid fills only, no gradient / glow / filter.
+  -->
+  <rect width="48" height="48" rx="12" fill="#121212"/>
+  <path d="M10 14.4h28.8" stroke="#FAF8F4" stroke-width="3" stroke-linecap="round"/>
+  <path d="M10 26.4h13.5" stroke="#FAF8F4" stroke-width="3" stroke-linecap="round"/>
+  <path d="M10 38.4h11" stroke="#FAF8F4" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="31.9" cy="33" r="6.9" fill="#2DD4A8"/>
+</svg>
