@@ -342,15 +342,32 @@ showcase eval 跟踪这些指标，避免「为修边又弄歪框」。
 
 ## 7. 验收标准（量化）
 
-| 维度 | 指标 | 目标 |
-|------|------|------|
-| 对称 | 同 band sibling 宽比 | ≤ 1.08（8px 量化容差内视为 1.0） |
-| 对称 | 同 band 高比 | ≤ 1.12 |
-| 画布 | 相对当前 Fit 面积 | 中位增长 ≤ 30%，P95 ≤ 40% |
-| 正确性 | `edge_crosses_group_interior` / `edge_through_node` | showcase architecture error 数下降 ≥ 50% |
-| 流程图 | stress-dag：end 在 max rank；自环非退化 | 必须 |
-| 性能 | bench-phases 代表图 | route 时间不增超过 15% |
-| 确定性 | 同输入两次渲染 | 坐标完全一致 |
+| 维度 | 指标 | 目标 | 状态（2026-07-09） |
+|------|------|------|-------------------|
+| 对称 | 同 band sibling 宽比 | ≤ 1.08（8px 量化容差内视为 1.0） | ✅ I1 实测达标；lint `SiblingWidthRatio` 跟踪 |
+| 对称 | 同 band 高比 | ≤ 1.12 | ✅ I1 |
+| 画布 | 相对当前 Fit 面积 | 中位增长 ≤ 30%，P95 ≤ 40% | ✅ I1/I2 代表图可控 |
+| 正确性 | `edge_crosses_group_interior` / `edge_through_node` | showcase architecture error 数下降 ≥ 50% | ⚠ 主回归图改善；全库未达 50%（multi-namespace 代价） |
+| 流程图 | stress-dag：end 在 max rank；自环非退化 | 必须 | ✅ I3 |
+| 性能 | bench-phases 代表图 | route 时间不增超过 15% | ✅ 见下 |
+| 确定性 | 同输入两次渲染 | 坐标完全一致 | ✅ 见下 |
+
+### 7.1 性能 / 确定性补验收（相对 I1 前 `b064531`）
+
+`bench-phases` 中位数（7 轮，布局+路由总耗时）：
+
+| 样例 | 前 (ms) | 后 (ms) | Δ |
+|------|--------:|--------:|---|
+| `c.k8s-tenant-isolation` | 60.66 | 11.93 | −80.3% |
+| `c.k8s-multi-cluster-federation` | 86.81 | 37.91 | −56.3% |
+| `c.cloud-native` | 17.47 | 13.74 | −21.4% |
+| `c.layout-stress-nested` | 7.21 | 6.40 | −11.2% |
+| `n.microservices` | 2.22 | 2.03 | −8.6% |
+| `c.layout-stress-dag` | 8.85 | 9.31 | **+5.2%** |
+
+结论：6/6 均 ≤ +15%；中位 Δ −16.3%；最大增幅 +5.2%（stress-dag）。
+
+确定性：对 stress-nested / stress-dag / k8s-federation / cloud-native / tenant-isolation 各渲染两次，节点/组/边几何与整文件 hash 完全一致。
 
 ---
 
