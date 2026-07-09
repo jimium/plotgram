@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plotgram Logo — Direction Board v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,500&family=IBM+Plex+Mono:wght@500;600&family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F5F0;
+    --ink: #141414;
+    --muted: #6B6560;
+    --line: #E6E1D8;
+    --card: #FFFCFA;
+    --soft: #F0EBE3;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "DM Sans", system-ui, sans-serif;
+    padding: 56px 40px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .hero { max-width: 1080px; margin-bottom: 48px; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 42px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    margin-bottom: 14px;
+  }
+  .lede {
+    font-size: 16px;
+    line-height: 1.65;
+    color: var(--muted);
+    max-width: 720px;
+  }
+  .lede b { color: var(--ink); font-weight: 600; }
+  .brief {
+    margin-top: 22px;
+    padding: 16px 18px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    max-width: 820px;
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+  .brief b { color: var(--ink); }
+  .family {
+    margin-top: 56px;
+    max-width: 1240px;
+  }
+  .family-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 8px;
+  }
+  .family-id {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .family-title {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 22px;
+    font-weight: 650;
+    letter-spacing: -0.03em;
+  }
+  .family-desc {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 18px;
+    max-width: 720px;
+    line-height: 1.55;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 14px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .stage {
+    height: 188px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border-bottom: 1px solid var(--line);
+  }
+  .stage.light { background: #FAF8F4; }
+  .stage.dark { background: #121212; }
+  .stage.ink { background: #0E1A1F; }
+  .stage.paper { background: #F3EFE7; }
+  .stage.mint { background: #E8F3EF; }
+  .stage.sand { background: #F4EDE3; }
+  .stage.navy { background: #0F1724; }
+  .icon { width: 88px; height: 88px; }
+  .fav {
+    width: 24px;
+    height: 24px;
+    position: absolute;
+    top: 14px;
+    right: 14px;
+  }
+  .info { padding: 16px 18px 18px; }
+  .code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: #A39B90;
+    margin-bottom: 6px;
+  }
+  .name {
+    font-size: 15px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+  .desc {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .wm-row {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .wm {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #FFFCFA;
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px 20px;
+  }
+  .wm.dark { background: #121212; border-color: #2A2A2A; }
+  .wm svg { height: 34px; width: auto; max-width: 100%; }
+  .pick {
+    margin-top: 72px;
+    max-width: 820px;
+    padding: 22px 24px;
+    border-radius: 16px;
+    background: var(--ink);
+    color: #F7F5F0;
+  }
+  .pick h2 {
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 20px;
+    letter-spacing: -0.03em;
+    margin-bottom: 10px;
+  }
+  .pick p {
+    font-size: 14px;
+    line-height: 1.65;
+    color: #C9C2B8;
+  }
+  .pick code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: #F7F5F0;
+    background: #2A2A2A;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="eyebrow">Brand exploration · Plotgram</div>
+  <h1>Logo direction board</h1>
+  <p class="lede">
+    产品名已定为 <b>Plotgram</b>（plot + gram）：文本/DSL → 结构化图表。
+    下面是 <b>8 个风格家族 × 18 个具体方案</b>。每个卡片含大图标、16px favicon、以及字标组合。
+    请先选方向编号（如 <b>C2 / F1</b>），再进入精修。
+  </p>
+  <div class="brief">
+    <b>命名可读性：</b>Plot（绘制/图）+ gram（书写单位 / diagram / program）。
+    <b>应传达：</b>结构化、可路由的图、从文本到图形的转化。
+    <b>刻意避开：</b>旧 Drawquill 紫青渐变、通用 AI 紫、过度拟物羽毛笔。
+  </div>
+</div>
+
+<!-- ========== A ========== -->
+<section class="family">
+  <div class="family-head">
+    <span class="family-id">A</span>
+    <h2 class="family-title">P 字标 · 图即字母</h2>
+  </div>
+  <p class="family-desc">把 P 做成可识别的品牌核：字母本身就是一张小图。适合 app icon / favicon。</p>
+  <div class="grid">
+
+    <div class="card">
+      <div class="stage light">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <rect x="18" y="18" width="60" height="60" rx="16" fill="#141414"/>
+          <path d="M38 30v36" stroke="#FAF8F4" stroke-width="7" stroke-linecap="round"/>
+          <path d="M38 30h16c11 0 18 7 18 16s-7 16-18 16H38" stroke="#FAF8F4" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <circle cx="62" cy="46" r="4.5" fill="#2DD4A8"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <rect x="6" y="6" width="36" height="36" rx="10" fill="#141414"/>
+          <path d="M17 14v20" stroke="#FAF8F4" stroke-width="4" stroke-linecap="round"/>
+          <path d="M17 14h9c6.5 0 10.5 4 10.5 9.2S32.5 32.4 26 32.4H17" stroke="#FAF8F4" stroke-width="4" stroke-linecap="round" fill="none"/>
+          <circle cx="32" cy="23" r="2.6" fill="#2DD4A8"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">A1</div>
+        <div class="name">P · 节点落点</div>
+        <div class="desc">实心圆角底 + 镂空 P，弧线终点落一枚青绿节点。像「字母完成了一次连线」。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stage paper">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <path d="M30 22v52" stroke="#141414" stroke-width="8" stroke-linecap="round"/>
+          <path d="M30 22h20c14 0 23 9 23 21s-9 21-23 21H30" fill="none" stroke="#141414" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="58" y="54" width="14" height="14" rx="3" fill="#E4572E"/>
+          <path d="M53 43H66" stroke="#E4572E" stroke-width="3" stroke-linecap="round"/>
+          <path d="M62 39l5 4-5 4" fill="none" stroke="#E4572E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <path d="M14 10v28" stroke="#141414" stroke-width="5" stroke-linecap="round"/>
+          <path d="M14 10h11c8 0 13 5 13 12s-5 12-13 12H14" fill="none" stroke="#141414" stroke-width="5" stroke-linecap="round"/>
+          <rect x="30" y="28" width="8" height="8" rx="1.5" fill="#E4572E"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">A2</div>
+        <div class="name">P · 流出箭头</div>
+        <div class="desc">线型 P，从碗口伸出箭头接到矩形节点。更「流程图」，暖橙强调动作。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stage mint">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <circle cx="48" cy="48" r="34" fill="#0F3D34"/>
+          <path d="M36 28v40" stroke="#E8F3EF" stroke-width="7" stroke-linecap="round"/>
+          <path d="M36 28h15c12 0 19 7.5 19 17.5S63 63 51 63H36" fill="none" stroke="#E8F3EF" stroke-width="7" stroke-linecap="round"/>
+          <circle cx="36" cy="68" r="3.5" fill="#7CFFB2"/>
+          <circle cx="55" cy="45.5" r="3.5" fill="#7CFFB2"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="18" fill="#0F3D34"/>
+          <path d="M17 13v22" stroke="#E8F3EF" stroke-width="4" stroke-linecap="round"/>
+          <path d="M17 13h8c6.5 0 10.5 4 10.5 9.5S31.5 32 25 32h-8" fill="none" stroke="#E8F3EF" stroke-width="4" stroke-linecap="round"/>
+          <circle cx="17" cy="35" r="2" fill="#7CFFB2"/>
+          <circle cx="28" cy="22.5" r="2" fill="#7CFFB2"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">A3</div>
+        <div class="name">P · 双锚点</div>
+        <div class="desc">深绿圆章 + 亮绿锚点。偏「工具/基础设施」气质，适合 CLI / SDK。</div>
+      </div>
+    </div>
+
+  </div>
+  <div class="wm-row">
+    <div class="wm">
+      <svg viewBox="0 0 320 48" fill="none">
+        <rect x="2" y="6" width="36" height="36" rx="10" fill="#141414"/>
+        <path d="M14 14v20" stroke="#FAF8F4" stroke-width="4" stroke-linecap="round"/>
+        <path d="M14 14h9c6.2 0 10.2 4 10.2 9.2S29.2 32.4 23 32.4H14" stroke="#FAF8F4" stroke-width="4" stroke-linecap="round" fill="none"/>
+        <circle cx="29" cy="23" r="2.4" fill="#2DD4A8"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.04em" fill="#141414">plotgram</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ========== B ========== -->
+<section class="family">
+  <div class="family-head">
+    <span class="family-id">B</span>
+    <h2 class="family-title">文本 → 图 · 转化隐喻</h2>
+  </div>
+  <p class="family-desc">最直白的产品叙事：左边是书写，右边是结构图。适合落地页与文档头图。</p>
+  <div class="grid">
+
+    <div class="card">
+      <div class="stage light">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <rect x="14" y="22" width="28" height="52" rx="4" stroke="#141414" stroke-width="3"/>
+          <path d="M20 34h16M20 42h12M20 50h14M20 58h8" stroke="#141414" stroke-width="2.5" stroke-linecap="round"/>
+          <rect x="36" y="62" width="2.5" height="8" fill="#0EA5A0"/>
+          <path d="M50 40h10" stroke="#141414" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M57 35l7 5-7 5" fill="none" stroke="#141414" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="66" y="28" width="16" height="12" rx="3" fill="#141414"/>
+          <circle cx="74" cy="56" r="8" fill="none" stroke="#0EA5A0" stroke-width="3"/>
+          <path d="M74 40v8" stroke="#0EA5A0" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <rect x="5" y="8" width="14" height="32" rx="2" stroke="#141414" stroke-width="2.5"/>
+          <path d="M8 15h8M8 21h6M8 27h7" stroke="#141414" stroke-width="2" stroke-linecap="round"/>
+          <rect x="16" y="32" width="1.8" height="5" fill="#0EA5A0"/>
+          <rect x="28" y="14" width="10" height="8" rx="2" fill="#141414"/>
+          <circle cx="33" cy="32" r="5" fill="none" stroke="#0EA5A0" stroke-width="2.5"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">B1</div>
+        <div class="name">编辑器 → 节点</div>
+        <div class="desc">文档块 + 光标，输出矩形与圆节点。产品 UI 感最强。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stage sand">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <text x="16" y="38" font-family="IBM Plex Mono, monospace" font-size="14" font-weight="600" fill="#141414">A→B</text>
+          <path d="M18 48h60" stroke="#C4B8A8" stroke-width="1.5" stroke-dasharray="3 4"/>
+          <circle cx="28" cy="68" r="7" fill="#141414"/>
+          <path d="M35 68h18" stroke="#141414" stroke-width="3" stroke-linecap="round"/>
+          <path d="M49 63l8 5-8 5" fill="none" stroke="#141414" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="60" y="61" width="16" height="14" rx="3" fill="#C45C26"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <text x="6" y="18" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="600" fill="#141414">A→B</text>
+          <circle cx="12" cy="34" r="5" fill="#141414"/>
+          <path d="M17 34h10" stroke="#141414" stroke-width="2.5"/>
+          <path d="M25 30l5 4-5 4" fill="none" stroke="#141414" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="32" y="29" width="10" height="10" rx="2" fill="#C45C26"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">B2</div>
+        <div class="name">语法 → 渲染</div>
+        <div class="desc">上方 DSL 文本，下方已渲染的边与节点。对开发者一眼可读。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stage dark">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <path d="M22 28h18M22 40h12M22 52h16" stroke="#8A857C" stroke-width="3" stroke-linecap="round"/>
+          <path d="M48 40h8" stroke="#F5F1EA" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M54 35l6 5-6 5" fill="none" stroke="#F5F1EA" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="70" cy="28" r="5" fill="#5EEAD4"/>
+          <circle cx="70" cy="40" r="5" fill="#5EEAD4"/>
+          <circle cx="70" cy="52" r="5" fill="#5EEAD4"/>
+          <path d="M70 33v2M70 45v2" stroke="#5EEAD4" stroke-width="2"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <path d="M8 14h12M8 24h8M8 34h10" stroke="#8A857C" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="34" cy="14" r="3.5" fill="#5EEAD4"/>
+          <circle cx="34" cy="24" r="3.5" fill="#5EEAD4"/>
+          <circle cx="34" cy="34" r="3.5" fill="#5EEAD4"/>
+          <path d="M34 17.5v3M34 27.5v3" stroke="#5EEAD4" stroke-width="1.8"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">B3</div>
+        <div class="name">三行 → 三节点</div>
+        <div class="desc">列表文本变成纵向节点链。极简、暗色友好，适合 IDE 插件图标。</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ========== C ========== -->
+<section class="family">
+  <div class="family-head">
+    <span class="family-id">C</span>
+    <h2 class="family-title">正交路由 · 布局 DNA</h2>
+  </div>
+  <p class="family-desc">呼应 Plotgram 的正交边路由与结构化布局——logo 本身就是一张迷你架构图。</p>
+  <div class="grid">
+
+    <div class="card">
+      <div class="stage ink">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <rect x="18" y="20" width="18" height="14" rx="3" fill="#7DD3C0"/>
+          <rect x="60" y="20" width="18" height="14" rx="3" fill="#7DD3C0"/>
+          <rect x="39" y="62" width="18" height="14" rx="3" fill="#F0B429"/>
+          <path d="M27 34v12h42V34" fill="none" stroke="#D7E8E3" stroke-width="3" stroke-linejoin="round"/>
+          <path d="M48 46v16" stroke="#D7E8E3" stroke-width="3"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <rect x="6" y="8" width="12" height="10" rx="2" fill="#7DD3C0"/>
+          <rect x="30" y="8" width="12" height="10" rx="2" fill="#7DD3C0"/>
+          <rect x="18" y="30" width="12" height="10" rx="2" fill="#F0B429"/>
+          <path d="M12 18v8h24V18" fill="none" stroke="#D7E8E3" stroke-width="2.5"/>
+          <path d="M24 26v4" stroke="#D7E8E3" stroke-width="2.5"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">C1</div>
+        <div class="name">正交三节点</div>
+        <div class="desc">经典「两上一下」正交折线。一眼是架构图，不是通用 AI 标。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stage navy">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <rect x="20" y="20" width="56" height="56" rx="14" fill="none" stroke="#2A3A52" stroke-width="3"/>
+          <path d="M34 34h12v12H34z" fill="#93C5FD"/>
+          <path d="M46 40h16v0" stroke="#F8FAFC" stroke-width="3"/>
+          <path d="M62 40v16H50" fill="none" stroke="#F8FAFC" stroke-width="3" stroke-linejoin="round"/>
+          <circle cx="50" cy="56" r="6" fill="#FBBF24"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <rect x="8" y="8" width="32" height="32" rx="8" fill="none" stroke="#2A3A52" stroke-width="2.5"/>
+          <rect x="14" y="14" width="8" height="8" rx="1.5" fill="#93C5FD"/>
+          <path d="M22 18h10v10H26" fill="none" stroke="#F8FAFC" stroke-width="2.5" stroke-linejoin="round"/>
+          <circle cx="26" cy="28" r="3.5" fill="#FBBF24"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">C2</div>
+        <div class="name">框内折线</div>
+        <div class="desc">圆角画布内完成一次正交路由。像「一张图被装进容器」。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stage light">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <path d="M24 28h20v16H24z" fill="#141414"/>
+          <path d="M52 28h20v16H52z" fill="none" stroke="#141414" stroke-width="3"/>
+          <path d="M24 56h20v16H24z" fill="none" stroke="#141414" stroke-width="3"/>
+          <path d="M52 56h20v16H52z" fill="#0EA5A0"/>
+          <path d="M44 36h8M34 44v12M62 44v12M44 64h8" stroke="#141414" stroke-width="3"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <rect x="8" y="8" width="12" height="12" fill="#141414"/>
+          <rect x="28" y="8" width="12" height="12" fill="none" stroke="#141414" stroke-width="2.5"/>
+          <rect x="8" y="28" width="12" height="12" fill="none" stroke="#141414" stroke-width="2.5"/>
+          <rect x="28" y="28" width="12" height="12" fill="#0EA5A0"/>
+          <path d="M20 14h8M14 20v8M34 20v8M20 34h8" stroke="#141414" stroke-width="2.5"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">C3</div>
+        <div class="name">四宫格网格</div>
+        <div class="desc">2×2 节点网格，强调布局系统。偏「引擎/库」而非消费级 App。</div>
+      </div>
+    </div>
+
+  </div>
+  <div class="wm-row">
+    <div class="wm dark">
+      <svg viewBox="0 0 340 48" fill="none">
+        <rect x="4" y="10" width="12" height="10" rx="2" fill="#7DD3C0"/>
+        <rect x="24" y="10" width="12" height="10" rx="2" fill="#7DD3C0"/>
+        <rect x="14" y="28" width="12" height="10" rx="2" fill="#F0B429"/>
+        <path d="M10 20v4h20V20" fill="none" stroke="#D7E8E3" stroke-width="2"/>
+        <path d="M20 24v4" stroke="#D7E8E3" stroke-width="2"/>
+        <text x="52" y="33" font-family="Space Grotesk, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.04em" fill="#F5F1EA">plotgram</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- ========== D ========== -->
+<section class="family">
+  <div class="family-head">
+    <span class="family-id">D</span>
+    <h2 class="family-title">Plot 标记 · 点线面</h2>
+  </div>
+  <p class="family-desc">从「plot」字面出发：数据点、轨迹、坐标系。更抽象、更品牌化。</p>
+  <div class="grid">
+
+    <div class="card">
+      <div class="stage paper">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <path d="M22 70 L38 48 L52 56 L74 28" fill="none" stroke="#141414" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="22" cy="70" r="5" fill="#141414"/>
+          <circle cx="38" cy="48" r="5" fill="#141414"/>
+          <circle cx="52" cy="56" r="5" fill="#141414"/>
+          <circle cx="74" cy="28" r="6" fill="#E4572E"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <path d="M8 38 L18 24 L28 30 L40 12" fill="none" stroke="#141414" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="8" cy="38" r="3" fill="#141414"/>
+          <circle cx="18" cy="24" r="3" fill="#141414"/>
+          <circle cx="28" cy="30" r="3" fill="#141414"/>
+          <circle cx="40" cy="12" r="3.5" fill="#E4572E"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">D1</div>
+        <div class="name">折线轨迹</div>
+        <div class="desc">经典 plot 折线，终点高亮。偏数据可视化，需确认是否过「图表」而非「流程图」。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stage light">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <path d="M26 70V28M26 70h44" stroke="#C9C2B8" stroke-width="3" stroke-linecap="round"/>
+          <rect x="38" y="42" width="12" height="28" rx="2" fill="#141414"/>
+          <rect x="54" y="30" width="12" height="40" rx="2" fill="#0EA5A0"/>
+          <circle cx="70" cy="24" r="5" fill="#E4572E"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <path d="M10 38V12M10 38h28" stroke="#C9C2B8" stroke-width="2.5" stroke-linecap="round"/>
+          <rect x="16" y="22" width="8" height="16" rx="1.5" fill="#141414"/>
+          <rect x="26" y="14" width="8" height="24" rx="1.5" fill="#0EA5A0"/>
+          <circle cx="38" cy="10" r="3" fill="#E4572E"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">D2</div>
+        <div class="name">坐标 + 柱</div>
+        <div class="desc">轻量坐标系。更「分析工具」；若产品主打流程图，可作次要方向。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stage mint">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <circle cx="32" cy="48" r="10" fill="#0F3D34"/>
+          <circle cx="48" cy="32" r="7" fill="#1F6B5A"/>
+          <circle cx="64" cy="48" r="10" fill="#0F3D34"/>
+          <circle cx="48" cy="64" r="7" fill="#2DD4A8"/>
+          <path d="M40 42l6-6M54 42l-6-6M54 54l-6 6M40 54l6 6" stroke="#0F3D34" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <circle cx="14" cy="24" r="6" fill="#0F3D34"/>
+          <circle cx="24" cy="14" r="4.5" fill="#1F6B5A"/>
+          <circle cx="34" cy="24" r="6" fill="#0F3D34"/>
+          <circle cx="24" cy="34" r="4.5" fill="#2DD4A8"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">D3</div>
+        <div class="name">星形图元</div>
+        <div class="desc">四节点交叉连接，像一张极简 graph。抽象度高，记忆点强。</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ========== E ========== -->
+<section class="family">
+  <div class="family-head">
+    <span class="family-id">E</span>
+    <h2 class="family-title">Gram · 书写与语法</h2>
+  </div>
+  <p class="family-desc">强调「gram」：书写单位、语法、可组合的符号系统。偏语言/DSL 气质。</p>
+  <div class="grid">
+
+    <div class="card">
+      <div class="stage light">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <path d="M28 24v48M68 24v48" stroke="#141414" stroke-width="5" stroke-linecap="round"/>
+          <path d="M28 24h8M28 72h8M68 24h-8M68 72h-8" stroke="#141414" stroke-width="5" stroke-linecap="round"/>
+          <rect x="40" y="36" width="16" height="12" rx="2" fill="#141414"/>
+          <circle cx="48" cy="60" r="7" fill="#6366F1"/>
+          <path d="M48 48v5" stroke="#6366F1" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <path d="M12 10v28M36 10v28" stroke="#141414" stroke-width="3.5" stroke-linecap="round"/>
+          <path d="M12 10h5M12 38h5M36 10h-5M36 38h-5" stroke="#141414" stroke-width="3.5" stroke-linecap="round"/>
+          <rect x="18" y="16" width="12" height="8" rx="1.5" fill="#141414"/>
+          <circle cx="24" cy="32" r="4.5" fill="#6366F1"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">E1</div>
+        <div class="name">方括号语法</div>
+        <div class="desc">`[ □ ● ]` 像代码块里的图。开发者友好，和 Mermaid 类产品同语境。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stage sand">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <text x="22" y="58" font-family="Instrument Serif, Georgia, serif" font-size="54" font-weight="400" fill="#141414">"</text>
+          <rect x="40" y="34" width="14" height="14" rx="3" fill="#C45C26"/>
+          <path d="M54 41h10" stroke="#141414" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="72" cy="41" r="7" fill="#141414"/>
+          <text x="74" y="72" font-family="Instrument Serif, Georgia, serif" font-size="54" fill="#141414">"</text>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <text x="4" y="30" font-family="Instrument Serif, Georgia, serif" font-size="28" fill="#141414">"</text>
+          <rect x="16" y="16" width="8" height="8" rx="1.5" fill="#C45C26"/>
+          <circle cx="32" cy="20" r="4" fill="#141414"/>
+          <text x="34" y="40" font-family="Instrument Serif, Georgia, serif" font-size="28" fill="#141414">"</text>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">E2</div>
+        <div class="name">引号包裹</div>
+        <div class="desc">自然语言提示词被「说成」一张图。偏 Studio / LLM 创作场景。</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ========== F ========== -->
+<section class="family">
+  <div class="family-head">
+    <span class="family-id">F</span>
+    <h2 class="family-title">字标优先 · Wordmark</h2>
+  </div>
+  <p class="family-desc">不依赖复杂图标，用字母本身做识别。适合文档、CLI、GitHub README。</p>
+  <div class="grid">
+
+    <div class="card">
+      <div class="stage light">
+        <svg class="icon" viewBox="0 0 160 96" fill="none" style="width:140px;height:84px">
+          <text x="8" y="58" font-family="Space Grotesk, sans-serif" font-size="36" font-weight="700" letter-spacing="-0.05em" fill="#141414">plot</text>
+          <text x="86" y="58" font-family="Space Grotesk, sans-serif" font-size="36" font-weight="700" letter-spacing="-0.05em" fill="#0EA5A0">gram</text>
+          <circle cx="150" cy="48" r="4" fill="#0EA5A0"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <text x="8" y="32" font-family="Space Grotesk, sans-serif" font-size="22" font-weight="700" fill="#141414">pg</text>
+          <circle cx="38" cy="28" r="3" fill="#0EA5A0"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">F1</div>
+        <div class="name">plot / gram 双色</div>
+        <div class="desc">拆词着色：plot 墨色，gram 青绿。结尾圆点像句号/节点。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stage dark">
+        <svg class="icon" viewBox="0 0 160 96" fill="none" style="width:140px;height:84px">
+          <text x="10" y="58" font-family="IBM Plex Mono, monospace" font-size="30" font-weight="600" letter-spacing="-0.02em" fill="#F5F1EA">plotgram</text>
+          <rect x="10" y="66" width="2.5" height="10" fill="#5EEAD4"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <text x="6" y="30" font-family="IBM Plex Mono, monospace" font-size="14" font-weight="600" fill="#F5F1EA">&gt;_</text>
+          <circle cx="36" cy="26" r="4" fill="#5EEAD4"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">F2</div>
+        <div class="name">等宽终端</div>
+        <div class="desc">Mono + 光标。极客、CLI-first。favicon 用 `>_` + 节点。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stage paper">
+        <svg class="icon" viewBox="0 0 160 96" fill="none" style="width:140px;height:84px">
+          <text x="8" y="56" font-family="Instrument Serif, Georgia, serif" font-size="40" fill="#141414">Plotgram</text>
+          <path d="M8 68h118" stroke="#E4572E" stroke-width="2"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <text x="10" y="32" font-family="Instrument Serif, Georgia, serif" font-size="26" fill="#141414">P</text>
+          <path d="M10 36h20" stroke="#E4572E" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">F3</div>
+        <div class="name">衬线编辑感</div>
+        <div class="desc">Instrument Serif + 底线。偏出版/写作工具，和「画图引擎」反差大，可作大胆选项。</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ========== G ========== -->
+<section class="family">
+  <div class="family-head">
+    <span class="family-id">G</span>
+    <h2 class="family-title">印章 / 徽章 · 应用图标</h2>
+  </div>
+  <p class="family-desc">为 app icon、社交媒体头像设计的满版徽章。强调小尺寸可读性。</p>
+  <div class="grid">
+
+    <div class="card">
+      <div class="stage light">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <rect x="12" y="12" width="72" height="72" rx="20" fill="#141414"/>
+          <path d="M34 34h12v0" stroke="#FAF8F4" stroke-width="4" stroke-linecap="round"/>
+          <rect x="30" y="42" width="16" height="12" rx="3" fill="#FAF8F4"/>
+          <path d="M46 48h10v12" fill="none" stroke="#2DD4A8" stroke-width="4" stroke-linejoin="round"/>
+          <circle cx="56" cy="66" r="6" fill="#2DD4A8"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <rect x="4" y="4" width="40" height="40" rx="12" fill="#141414"/>
+          <rect x="12" y="18" width="10" height="8" rx="2" fill="#FAF8F4"/>
+          <path d="M22 22h7v8" fill="none" stroke="#2DD4A8" stroke-width="3" stroke-linejoin="round"/>
+          <circle cx="29" cy="34" r="3.5" fill="#2DD4A8"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">G1</div>
+        <div class="name">黑底路由章</div>
+        <div class="desc">满版黑底 + 白节点 + 青绿折线。小尺寸仍清晰，适合默认 app icon。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stage mint">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <rect x="12" y="12" width="72" height="72" rx="20" fill="#0F3D34"/>
+          <text x="28" y="62" font-family="Space Grotesk, sans-serif" font-size="42" font-weight="700" fill="#E8F3EF">P</text>
+          <circle cx="64" cy="34" r="6" fill="#7CFFB2"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <rect x="4" y="4" width="40" height="40" rx="12" fill="#0F3D34"/>
+          <text x="12" y="33" font-family="Space Grotesk, sans-serif" font-size="24" font-weight="700" fill="#E8F3EF">P</text>
+          <circle cx="34" cy="16" r="3.5" fill="#7CFFB2"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">G2</div>
+        <div class="name">P 单字母章</div>
+        <div class="desc">最简：深绿底 + P + 一枚亮点。记忆成本最低。</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ========== H ========== -->
+<section class="family">
+  <div class="family-head">
+    <span class="family-id">H</span>
+    <h2 class="family-title">混合实验 · 大胆选项</h2>
+  </div>
+  <p class="family-desc">更有个性的实验方向，可能不适合作为唯一主标，但能拉开品牌差异。</p>
+  <div class="grid">
+
+    <div class="card">
+      <div class="stage navy">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <path d="M28 24c0 0 0 48 0 48" stroke="#93C5FD" stroke-width="6" stroke-linecap="round"/>
+          <path d="M28 24h18c14 0 22 10 22 22 0 8-4 15-11 19" fill="none" stroke="#93C5FD" stroke-width="6" stroke-linecap="round"/>
+          <path d="M57 65h10v0" stroke="#FBBF24" stroke-width="4" stroke-linecap="round"/>
+          <path d="M64 60l7 5-7 5" fill="none" stroke="#FBBF24" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="72" y="58" width="4" height="14" fill="#FBBF24"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <path d="M12 10v28" stroke="#93C5FD" stroke-width="4" stroke-linecap="round"/>
+          <path d="M12 10h10c8 0 12 5.5 12 12 0 4.5-2 8.5-6 10.5" fill="none" stroke="#93C5FD" stroke-width="4" stroke-linecap="round"/>
+          <path d="M30 34h6" stroke="#FBBF24" stroke-width="3" stroke-linecap="round"/>
+          <path d="M34 30l5 4-5 4" fill="none" stroke="#FBBF24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">H1</div>
+        <div class="name">P 未完成 → 继续画</div>
+        <div class="desc">P 的弧线故意断开，接上金色箭头。隐喻「语言还在生成图」。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stage paper">
+        <svg class="icon" viewBox="0 0 96 96" fill="none">
+          <path d="M30 22 L30 74 L66 74" fill="none" stroke="#141414" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="66" cy="42" r="8" fill="none" stroke="#E4572E" stroke-width="5"/>
+          <path d="M66 34v16M58 42h16" stroke="#E4572E" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        <svg class="fav" viewBox="0 0 48 48" fill="none">
+          <path d="M14 10v28h20" fill="none" stroke="#141414" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="34" cy="20" r="5" fill="none" stroke="#E4572E" stroke-width="3.5"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="code">H2</div>
+        <div class="name">角尺 + 准星</div>
+        <div class="desc">像绘图仪/工程尺。强调精确布局，和「随便画」的 AI 图工具拉开距离。</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<div class="pick">
+  <h2>怎么选</h2>
+  <p>
+    回复你喜欢的编号即可，例如 <code>A1 + C2</code> 或 <code>G1 做 icon，F1 做字标</code>。
+    也可以说偏好：更技术 / 更产品 / 更抽象 / 要避开图表感。
+    选定后我会输出精修 SVG（logo / logo-dark / logo-icon）并替换 <code>assets/brand/</code>。
+  </p>
+</div>
+
+</body>
+</html>
