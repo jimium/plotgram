@@ -157,38 +157,44 @@ fn orthogonal_loop_geometry(
     let cy = node.y + node.height / 2.0;
     let hw = node.width / 2.0;
     let hh = node.height / 2.0;
+    // Iteration 3：最小段长，避免小节点上 p4→end 退化成近零长度
+    const MIN_SEG: f64 = 8.0;
+    let inset_start = hh.max(MIN_SEG) * 0.15;
+    let inset_near = (hw * 0.15).max(MIN_SEG * 0.5).min(hw.max(MIN_SEG));
+    let inset_far = (hw * 0.35).max(MIN_SEG).min(hw.max(MIN_SEG));
+    let loop_out = loop_r.max(MIN_SEG);
 
     let (start, p2, p3, p4, end, apex) = if corner.dx > 0.0 && corner.dy < 0.0 {
-        let start = Point::new(node.x + node.width, cy - hh * 0.15);
-        let p2 = Point::new(start.x + loop_r, start.y);
-        let p3 = Point::new(p2.x, node.y - loop_r);
-        let p4 = Point::new(cx + hw * 0.15, p3.y);
-        let end = Point::new(cx + hw * 0.35, node.y);
-        let apex = Point::new(p3.x, p3.y - loop_r * 0.35);
+        let start = Point::new(node.x + node.width, cy - inset_start);
+        let p2 = Point::new(start.x + loop_out, start.y);
+        let p3 = Point::new(p2.x, node.y - loop_out);
+        let p4 = Point::new(cx + inset_near, p3.y);
+        let end = Point::new(cx + inset_far, node.y);
+        let apex = Point::new(p3.x, p3.y - loop_out * 0.35);
         (start, p2, p3, p4, end, apex)
     } else if corner.dx < 0.0 && corner.dy < 0.0 {
-        let start = Point::new(node.x, cy - hh * 0.15);
-        let p2 = Point::new(start.x - loop_r, start.y);
-        let p3 = Point::new(p2.x, node.y - loop_r);
-        let p4 = Point::new(cx - hw * 0.15, p3.y);
-        let end = Point::new(cx - hw * 0.35, node.y);
-        let apex = Point::new(p3.x, p3.y - loop_r * 0.35);
+        let start = Point::new(node.x, cy - inset_start);
+        let p2 = Point::new(start.x - loop_out, start.y);
+        let p3 = Point::new(p2.x, node.y - loop_out);
+        let p4 = Point::new(cx - inset_near, p3.y);
+        let end = Point::new(cx - inset_far, node.y);
+        let apex = Point::new(p3.x, p3.y - loop_out * 0.35);
         (start, p2, p3, p4, end, apex)
     } else if corner.dx > 0.0 && corner.dy > 0.0 {
-        let start = Point::new(node.x + node.width, cy + hh * 0.15);
-        let p2 = Point::new(start.x + loop_r, start.y);
-        let p3 = Point::new(p2.x, node.y + node.height + loop_r);
-        let p4 = Point::new(cx + hw * 0.15, p3.y);
-        let end = Point::new(cx + hw * 0.35, node.y + node.height);
-        let apex = Point::new(p3.x, p3.y + loop_r * 0.35);
+        let start = Point::new(node.x + node.width, cy + inset_start);
+        let p2 = Point::new(start.x + loop_out, start.y);
+        let p3 = Point::new(p2.x, node.y + node.height + loop_out);
+        let p4 = Point::new(cx + inset_near, p3.y);
+        let end = Point::new(cx + inset_far, node.y + node.height);
+        let apex = Point::new(p3.x, p3.y + loop_out * 0.35);
         (start, p2, p3, p4, end, apex)
     } else {
-        let start = Point::new(node.x, cy + hh * 0.15);
-        let p2 = Point::new(start.x - loop_r, start.y);
-        let p3 = Point::new(p2.x, node.y + node.height + loop_r);
-        let p4 = Point::new(cx - hw * 0.15, p3.y);
-        let end = Point::new(cx - hw * 0.35, node.y + node.height);
-        let apex = Point::new(p3.x, p3.y + loop_r * 0.35);
+        let start = Point::new(node.x, cy + inset_start);
+        let p2 = Point::new(start.x - loop_out, start.y);
+        let p3 = Point::new(p2.x, node.y + node.height + loop_out);
+        let p4 = Point::new(cx - inset_near, p3.y);
+        let end = Point::new(cx - inset_far, node.y + node.height);
+        let apex = Point::new(p3.x, p3.y + loop_out * 0.35);
         (start, p2, p3, p4, end, apex)
     };
 

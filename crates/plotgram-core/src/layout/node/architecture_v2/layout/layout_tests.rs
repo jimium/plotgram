@@ -193,9 +193,10 @@ use crate::ast::{
             order.y
         );
 
-        // P1: 宏观分层后后端组应紧凑（不再被 mq 回边拉散）
+        // P1: 宏观分层后后端组应紧凑（不再被 mq 回边拉散）。
+        // Iteration 1/2：Equal sizing + lane_budget/side gutter 会略增高组框，阈值放宽到 360。
         assert!(
-            be.height < 300.0,
+            be.height < 360.0,
             "backend group should be compact, got height {:.1}",
             be.height
         );

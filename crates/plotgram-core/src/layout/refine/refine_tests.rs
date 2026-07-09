@@ -174,9 +174,10 @@ use crate::types::DiagramType;
     }
 
     #[test]
-    fn refine_config_default_max_passes_is_3() {
+    fn refine_config_default_max_passes_is_2() {
         let config = RefineConfig::default();
-        assert_eq!(config.max_passes, 3, "default max_passes should be 3 (P2-2)");
+        // Iteration 3：有穿障时最多 2 轮（无穿障早退不变）
+        assert_eq!(config.max_passes, 2, "default max_passes should be 2 (I3)");
     }
 
     #[test]

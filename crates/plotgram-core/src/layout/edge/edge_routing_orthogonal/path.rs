@@ -214,6 +214,8 @@ pub struct PathSelectStats {
 
 /// 额外 channel_margin 档位（P1-B：base 档无 strict 干净候选时再逐档尝试）。
 const EXTRA_CHANNEL_MARGINS: [f64; 2] = [28.0, 40.0];
+/// Iteration 3：每边候选评估上限（超出则截断，优先保留已生成的前缀）。
+const MAX_CANDIDATES: usize = 48;
 
 struct PathEvalState {
     best_strict: Option<(f64, Vec<Point>)>,
@@ -254,7 +256,7 @@ fn candidate_better(score: f64, path: &[Point], best: &Option<(f64, Vec<Point>)>
 }
 
 fn evaluate_path_batch(
-    paths: Vec<Vec<Point>>,
+    mut paths: Vec<Vec<Point>>,
     ctx: &RoutingContext,
     pair: &EndpointPair,
     scorer: &dyn CandidateScorer,
@@ -262,6 +264,13 @@ fn evaluate_path_batch(
     to_id: &str,
     state: &mut PathEvalState,
 ) {
+    let remaining = MAX_CANDIDATES.saturating_sub(state.candidate_count);
+    if remaining == 0 {
+        return;
+    }
+    if paths.len() > remaining {
+        paths.truncate(remaining);
+    }
     state.candidate_count += paths.len();
     for path in paths {
         if path_is_clean(
@@ -440,16 +449,26 @@ pub fn select_best_path_with_scorer_stats(
         s.degraded = state.best_strict.is_none() && state.best_nodes_only.is_none();
     }
 
-    state
-        .best_strict
-        .or_else(|| {
-            if ctx.strict_group_transit {
-                None
-            } else {
-                state.best_nodes_only
-            }
+    // Iteration 2：有 corridor 时拒绝 nodes-only（穿组）；dirty 仅在不穿无关组时可用。
+    let chosen = if ctx.strict_group_transit {
+        state.best_strict.or_else(|| {
+            state.best_dirty.filter(|(_, path)| {
+                path_avoids_group_interiors(
+                    path,
+                    from_id,
+                    to_id,
+                    ctx.group_ctx,
+                    &ctx.obstacles.sorted_group_ids,
+                )
+            })
         })
-        .or(state.best_dirty)
+    } else {
+        state
+            .best_strict
+            .or(state.best_nodes_only)
+            .or(state.best_dirty)
+    };
+    chosen
         .map(|(_, p)| p)
         .unwrap_or_else(|| vec![start, end])
 }

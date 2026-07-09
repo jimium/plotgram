@@ -158,7 +158,7 @@ const ARCH_GROUP_GAP: f64 = 50.0;
 ///
 /// | 算法 | arrangement | track_sizing | cross_align | gap | border_align |
 /// |------|-------------|--------------|-------------|-----|--------------|
-/// | `architecture` | `Stack(H)` | `Fit`（`uniform` 时 `Equal`） | `Start` | 50.0 | `SharedLines` |
+/// | `architecture` | `Stack(H)` | `Equal`（`fit` 时退回 `Fit`） | `Center` | 50.0 | `SharedLines` |
 /// | `flowchart` | `Stack(V)`（可由 `group_arrangement` 覆盖） | `Fit` | `Center`（可由 `group_align` 覆盖） | 60.0（可由 `group_gap` 覆盖） | `None` |
 /// | 其他含 group 算法 | `Stack(V)` | `Fit` | `Center` | 60.0 | `None` |
 ///
@@ -309,13 +309,16 @@ fn read_num_option(options: &HashMap<String, AttributeValue>, key: &str) -> Opti
     }
 }
 
-/// architecture 默认：`Stack(H) + Fit + Start + gap=50 + SharedLines`；
-/// `group_sizing: uniform` 时 `track_sizing = Equal`。
+/// architecture 默认（RankBand）：`Stack(H) + Equal + Center + gap=50 + SharedLines`。
+///
+/// - 默认等宽条带，避免 sibling group 大小不一。
+/// - `group_sizing: fit` / `group_frame { track: fit }` 可退回内容贴合。
+/// - `group_sizing: uniform` 与默认等价（保留 sugar）。
 fn resolve_architecture(diagram: &Diagram) -> GroupFrameSpec {
-    let track_sizing = if diagram_group_sizing_is_uniform(diagram) {
-        TrackSizing::Equal
-    } else {
+    let track_sizing = if diagram_group_sizing_is_fit(diagram) {
         TrackSizing::Fit
+    } else {
+        TrackSizing::Equal
     };
 
     GroupFrameSpec {
@@ -323,8 +326,7 @@ fn resolve_architecture(diagram: &Diagram) -> GroupFrameSpec {
             axis: Axis::Horizontal,
         },
         track_sizing,
-        // architecture 当前 `align_top_groups_horizontally` 无条件左缘对齐
-        cross_align: CrossAlign::Start,
+        cross_align: CrossAlign::Center,
         gap: ARCH_GROUP_GAP,
         padding: GroupPadding::architecture_v2(),
         border_align: BorderAlign::SharedLines,
@@ -405,19 +407,18 @@ fn resolve_quantize(diagram: &Diagram) -> QuantizeSpec {
     }
 }
 
-/// 读取 diagram 属性 `group_sizing` 是否为 `uniform`（与 `parse_group_sizing` 对齐）。
-///
-/// P1 将吸收 `parse_group_sizing`，届时此函数替换为直接调用。
-fn diagram_group_sizing_is_uniform(diagram: &Diagram) -> bool {
+/// 读取 diagram 属性 `group_sizing` 是否显式为 `fit`（退出 RankBand 等宽默认）。
+fn diagram_group_sizing_is_fit(diagram: &Diagram) -> bool {
     for attr in &diagram.attributes {
         if attr.key == dsl::GROUP_SIZING {
             if let Some(v) = attr.value.as_str() {
-                return v.trim().to_ascii_lowercase() == "uniform";
+                return v.trim().to_ascii_lowercase() == "fit";
             }
         }
     }
     false
 }
+
 
 // ─── L1 整形 Pass（P1）─────────────────────────────────────
 
@@ -507,18 +508,7 @@ pub fn apply_group_frame(
                 }
             }
             GroupArrangement::Stack { .. } => {
-                if matches!(spec.cross_align, CrossAlign::Start) {
-                    if apply_cross_align_start(
-                        target_ids,
-                        &mut layout.groups,
-                        &mut layout.nodes,
-                        &node_to_target,
-                        &group_to_target,
-                        pinned,
-                    ) {
-                        report.cross_aligned = true;
-                    }
-                }
+                // 先等宽/等高，再做交叉轴对齐（Center 依赖等宽后的行宽）
                 if matches!(spec.track_sizing, TrackSizing::Equal) {
                     if apply_equal_sizing(
                         target_ids,
@@ -526,10 +516,42 @@ pub fn apply_group_frame(
                         &mut layout.nodes,
                         &node_to_target,
                         &group_to_target,
+                        spec.gap,
                         pinned,
                     ) {
                         report.equalized = true;
                     }
+                }
+                match spec.cross_align {
+                    CrossAlign::Start => {
+                        if apply_cross_align_start(
+                            target_ids,
+                            &mut layout.groups,
+                            &mut layout.nodes,
+                            &node_to_target,
+                            &group_to_target,
+                            pinned,
+                        ) {
+                            report.cross_aligned = true;
+                        }
+                    }
+                    // Center 仅在 Equal 后有意义：同宽条带再按行居中。
+                    // Fit+Center 不做激进平移，避免破坏 SharedLines 近对齐。
+                    CrossAlign::Center
+                        if matches!(spec.track_sizing, TrackSizing::Equal) =>
+                    {
+                        if apply_cross_align_center(
+                            target_ids,
+                            &mut layout.groups,
+                            &mut layout.nodes,
+                            &node_to_target,
+                            &group_to_target,
+                            pinned,
+                        ) {
+                            report.cross_aligned = true;
+                        }
+                    }
+                    CrossAlign::Center | CrossAlign::End | CrossAlign::Stretch => {}
                 }
             }
         }
@@ -1202,10 +1224,11 @@ fn shift_target_vertically(
     }
 }
 
-/// track_sizing Equal：所有顶层 group 拉齐到 `max(width)`，组内节点水平居中。
+/// track_sizing Equal：同级 sibling 拉齐宽度；同 RankBand（同 y 行）再拉齐高度并按固定 gap 重排。
 ///
-/// **节点联动分级**（spec §2.1/§3.1）：track_sizing 属于「必须同步平移节点」级别，
-/// 因此嵌套 group 框也必须同步平移，否则嵌套 group 不再包含其成员节点。
+/// - **全 sibling set 等宽**：垂直条带（不同 rank）也同宽，对应 `group_sizing: uniform` 观感。
+/// - **同 band 等高 + 固定 gap**：水平并排时消除右缘锯齿与不等间距。
+/// - 组内内容相对新框居中（平移节点与嵌套 group）。
 ///
 /// 返回 `true` 表示执行了拉齐。
 fn apply_equal_sizing(
@@ -1214,6 +1237,7 @@ fn apply_equal_sizing(
     nodes: &mut HashMap<String, NodeLayout>,
     node_to_top: &HashMap<String, String>,
     group_to_top: &HashMap<String, String>,
+    gap: f64,
     pinned: &PinSet,
 ) -> bool {
     if top_ids.is_empty() {
@@ -1228,49 +1252,243 @@ fn apply_equal_sizing(
         return false;
     }
 
-    let mut equalized = false;
+    // 垂直条带（每行仅 1 个 group）共用左缘，保证等宽后左缘共线
+    let align_left = top_ids
+        .iter()
+        .filter_map(|id| groups.get(id).map(|g| g.x))
+        .fold(f64::INFINITY, f64::min);
+
+    let mut rows: Vec<(f64, Vec<String>)> = Vec::new();
     for top_id in top_ids {
-        let Some(group) = groups.get(top_id) else {
-            continue;
-        };
-        let extra_w = max_width - group.width;
-        if extra_w <= f64::EPSILON {
+        if let Some(g) = groups.get(top_id) {
+            let row_idx = rows
+                .iter()
+                .position(|(row_y, _)| (row_y - g.y).abs() < 0.5);
+            match row_idx {
+                Some(idx) => rows[idx].1.push(top_id.clone()),
+                None => rows.push((g.y, vec![top_id.clone()])),
+            }
+        }
+    }
+    rows.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    let gap = gap.max(0.0);
+    let mut equalized = false;
+
+    for (_, row_ids) in &rows {
+        if row_ids.is_empty() {
             continue;
         }
 
-        // 设置顶层 group 宽度
-        if let Some(g) = groups.get_mut(top_id) {
-            g.width = max_width;
+        let max_height = row_ids
+            .iter()
+            .filter_map(|id| groups.get(id).map(|g| g.height))
+            .fold(0.0_f64, f64::max);
+
+        let mut ordered = row_ids.clone();
+        ordered.sort_by(|a, b| {
+            let xa = groups.get(a).map(|g| g.x).unwrap_or(0.0);
+            let xb = groups.get(b).map(|g| g.x).unwrap_or(0.0);
+            xa.partial_cmp(&xb)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.cmp(b))
+        });
+
+        let origin_x = ordered
+            .iter()
+            .filter_map(|id| groups.get(id).map(|g| g.x))
+            .fold(f64::INFINITY, f64::min);
+        if !origin_x.is_finite() {
+            continue;
         }
 
-        // 组内节点水平居中（跳过 PinSet 保护的节点）
-        let half = extra_w / 2.0;
-        for (node_id, nl) in nodes.iter_mut() {
-            if node_to_top.get(node_id) == Some(top_id) && !pinned.is_x_pinned(node_id) {
-                nl.x += half;
+        // Iteration 2：保留 two_phase lane_budget 已写入的间距（取 max(spec.gap, 现有相邻 gap)）
+        let mut effective_gap = gap;
+        if ordered.len() >= 2 {
+            for w in ordered.windows(2) {
+                if let (Some(a), Some(b)) = (groups.get(&w[0]), groups.get(&w[1])) {
+                    let existing = b.x - (a.x + a.width);
+                    if existing.is_finite() && existing > effective_gap {
+                        effective_gap = existing;
+                    }
+                }
             }
         }
 
-        // 嵌套 group 框同步平移 half（保持与组内节点相对位置一致）
-        // 确定性：按 group id 字典序
-        let mut nested_ids: Vec<String> = groups
-            .keys()
-            .filter(|gid| {
-                gid.as_str() != top_id.as_str()
-                    && group_to_top.get(*gid).map(String::as_str) == Some(top_id.as_str())
-            })
-            .cloned()
-            .collect();
-        nested_ids.sort();
-        for gid in nested_ids {
-            if let Some(g) = groups.get_mut(&gid) {
-                g.x += half;
+        let mut x_cursor = origin_x;
+        for (pos, top_id) in ordered.iter().enumerate() {
+            let Some(old) = groups.get(top_id).cloned() else {
+                continue;
+            };
+            let target_x = if ordered.len() == 1 {
+                // 单列条带：对齐到 sibling set 左缘，再拉宽（内容居中）
+                if align_left.is_finite() {
+                    align_left
+                } else {
+                    old.x
+                }
+            } else {
+                x_cursor
+            };
+            let target_y = old.y - (max_height - old.height).max(0.0) / 2.0;
+            let dx = target_x - old.x;
+            let dy = target_y - old.y;
+            let extra_w = max_width - old.width;
+            let extra_h = max_height - old.height;
+
+            if dx.abs() > 0.5
+                || dy.abs() > 0.5
+                || extra_w > f64::EPSILON
+                || extra_h > f64::EPSILON
+            {
+                equalized = true;
+            }
+
+            if let Some(g) = groups.get_mut(top_id) {
+                g.x = target_x;
+                g.y = target_y;
+                g.width = max_width;
+                if max_height > f64::EPSILON {
+                    g.height = max_height;
+                }
+            }
+
+            let content_dx = dx + extra_w / 2.0;
+            let content_dy = dy + extra_h.max(0.0) / 2.0;
+            if content_dx.abs() > f64::EPSILON || content_dy.abs() > f64::EPSILON {
+                for (node_id, nl) in nodes.iter_mut() {
+                    if node_to_top.get(node_id) != Some(top_id) {
+                        continue;
+                    }
+                    if content_dx.abs() > f64::EPSILON && !pinned.is_x_pinned(node_id) {
+                        nl.x += content_dx;
+                    }
+                    if content_dy.abs() > f64::EPSILON && !pinned.is_y_pinned(node_id) {
+                        nl.y += content_dy;
+                    }
+                }
+                let mut nested_ids: Vec<String> = groups
+                    .keys()
+                    .filter(|gid| {
+                        gid.as_str() != top_id.as_str()
+                            && group_to_top.get(*gid).map(String::as_str) == Some(top_id.as_str())
+                    })
+                    .cloned()
+                    .collect();
+                nested_ids.sort();
+                for gid in nested_ids {
+                    if let Some(g) = groups.get_mut(&gid) {
+                        g.x += content_dx;
+                        g.y += content_dy;
+                    }
+                }
+            }
+
+            if ordered.len() > 1 {
+                x_cursor += max_width;
+                if pos + 1 < ordered.len() {
+                    x_cursor += effective_gap;
+                }
             }
         }
-        equalized = true;
     }
 
     equalized
+}
+
+/// cross_align Center：各 RankBand（同 y 行）相对 sibling set 的包围盒水平居中。
+///
+/// 多行时以全部 sibling 的 `[min_x, max_right]` 为参考宽度；每行整体平移使行中心对齐。
+fn apply_cross_align_center(
+    top_ids: &[String],
+    groups: &mut HashMap<String, GroupLayout>,
+    nodes: &mut HashMap<String, NodeLayout>,
+    node_to_top: &HashMap<String, String>,
+    group_to_top: &HashMap<String, String>,
+    pinned: &PinSet,
+) -> bool {
+    if top_ids.len() < 2 {
+        return false;
+    }
+
+    let full_left = top_ids
+        .iter()
+        .filter_map(|id| groups.get(id).map(|g| g.x))
+        .fold(f64::INFINITY, f64::min);
+    let full_right = top_ids
+        .iter()
+        .filter_map(|id| groups.get(id).map(|g| g.x + g.width))
+        .fold(f64::NEG_INFINITY, f64::max);
+    if !full_left.is_finite() || !full_right.is_finite() {
+        return false;
+    }
+    let full_width = full_right - full_left;
+    if full_width <= f64::EPSILON {
+        return false;
+    }
+    let full_center = full_left + full_width / 2.0;
+
+    let mut rows: Vec<(f64, Vec<String>)> = Vec::new();
+    for top_id in top_ids {
+        if let Some(g) = groups.get(top_id) {
+            let row_idx = rows
+                .iter()
+                .position(|(row_y, _)| (row_y - g.y).abs() < 0.5);
+            match row_idx {
+                Some(idx) => rows[idx].1.push(top_id.clone()),
+                None => rows.push((g.y, vec![top_id.clone()])),
+            }
+        }
+    }
+    rows.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut shifted = false;
+    for (_, row_ids) in &rows {
+        let row_left = row_ids
+            .iter()
+            .filter_map(|id| groups.get(id).map(|g| g.x))
+            .fold(f64::INFINITY, f64::min);
+        let row_right = row_ids
+            .iter()
+            .filter_map(|id| groups.get(id).map(|g| g.x + g.width))
+            .fold(f64::NEG_INFINITY, f64::max);
+        if !row_left.is_finite() || !row_right.is_finite() {
+            continue;
+        }
+        let row_center = (row_left + row_right) / 2.0;
+        let shift = full_center - row_center;
+        if shift.abs() < 0.5 {
+            continue;
+        }
+
+        for top_id in row_ids {
+            if let Some(g) = groups.get_mut(top_id) {
+                g.x += shift;
+            }
+            for (node_id, nl) in nodes.iter_mut() {
+                if node_to_top.get(node_id) == Some(top_id) && !pinned.is_x_pinned(node_id) {
+                    nl.x += shift;
+                }
+            }
+            let mut nested_ids: Vec<String> = groups
+                .keys()
+                .filter(|gid| {
+                    gid.as_str() != top_id.as_str()
+                        && group_to_top.get(*gid).map(String::as_str) == Some(top_id.as_str())
+                })
+                .cloned()
+                .collect();
+            nested_ids.sort();
+            for gid in nested_ids {
+                if let Some(g) = groups.get_mut(&gid) {
+                    g.x += shift;
+                }
+            }
+        }
+        shifted = true;
+    }
+
+    shifted
 }
 
 /// Matrix 二维排列：将顶层 group 放入行优先网格，按 `track_sizing` 决定列宽/行高，

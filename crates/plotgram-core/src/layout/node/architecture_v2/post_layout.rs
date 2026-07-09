@@ -5,8 +5,9 @@ use crate::layout::LayoutResult;
 use std::collections::HashMap;
 
 /// 架构图单 group 行居中：当某 macro rank 只有一个 group 时，
-/// `apply_cross_align_start` 会将其左对齐到全局 min(x)，留下大片右侧空白。
-/// 本函数在 `apply_group_frame` 之后将单 group 行水平居中到画布宽度。
+/// 将其水平居中到 sibling 包围盒（或画布）宽度，避免窄行贴左留下大片空白。
+///
+/// 多个顶层 group 时同样对「单 group 行」居中（RankBand Center 语义）。
 ///
 /// 确定性：按 group id 字典序处理，不依赖 HashMap 迭代序。
 pub(crate) fn center_single_group_rows(diagram: &Diagram, layout: &mut LayoutResult) {
@@ -21,10 +22,6 @@ pub(crate) fn center_single_group_rows(diagram: &Diagram, layout: &mut LayoutRes
         .map(|g| g.id.as_str().to_string())
         .collect();
     if top_ids.is_empty() {
-        return;
-    }
-    // 多个顶层 group 时保持左对齐（与 RowAlign::Start / SharedLines 一致），不居中窄行
-    if top_ids.len() > 1 {
         return;
     }
 

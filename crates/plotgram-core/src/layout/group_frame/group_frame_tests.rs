@@ -29,8 +29,8 @@
         let spec = resolve_group_frame_spec(&diagram, "architecture");
 
         assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Horizontal });
-        assert_eq!(spec.track_sizing, TrackSizing::Fit);
-        assert_eq!(spec.cross_align, CrossAlign::Start);
+        assert_eq!(spec.track_sizing, TrackSizing::Equal);
+        assert_eq!(spec.cross_align, CrossAlign::Center);
         assert!((spec.gap - 50.0).abs() < f64::EPSILON);
         assert_eq!(spec.border_align, BorderAlign::SharedLines);
         assert_eq!(spec.padding, GroupPadding::architecture_v2());
@@ -47,6 +47,7 @@
         };
         let spec = resolve_group_frame_spec(&diagram, "architecture");
         assert_eq!(spec.track_sizing, TrackSizing::Equal);
+        assert_eq!(spec.cross_align, CrossAlign::Center);
     }
 
     #[test]

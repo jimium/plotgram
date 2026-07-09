@@ -210,7 +210,8 @@ impl LayoutPlan {
 /// }
 /// ```
 ///
-/// 缺省时返回 `Adjust`（与 v2.0 前行为一致）。
+/// 缺省时：小图 `Adjust`；大图（|V|>40 或 |E|>60）自动降为 `Diagnose`，避免 V2 adjust 破坏对称。
+/// 显式 DSL `friendliness:` 始终优先。
 fn resolve_friendliness_mode(diagram: &Diagram) -> FriendlinessMode {
     if let Some((_, options)) = diagram_algorithm_config(diagram, diagram::LAYOUT) {
         if let Some(AttributeValue::String(tv)) = options.get("friendliness") {
@@ -218,6 +219,14 @@ fn resolve_friendliness_mode(diagram: &Diagram) -> FriendlinessMode {
                 return mode;
             }
         }
+    }
+    // Iteration 3：大图性能/对称闸门
+    const LARGE_NODE_THRESHOLD: usize = 40;
+    const LARGE_EDGE_THRESHOLD: usize = 60;
+    if diagram.entities.len() > LARGE_NODE_THRESHOLD
+        || diagram.relations.len() > LARGE_EDGE_THRESHOLD
+    {
+        return FriendlinessMode::Diagnose;
     }
     FriendlinessMode::default()
 }

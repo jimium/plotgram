@@ -87,6 +87,9 @@ impl LayoutLinter {
         if cfg.is_enabled(LintRuleId::LabelLabelOverlap) {
             check_label_label_overlaps(result, &mut violations);
         }
+        if cfg.is_enabled(LintRuleId::SiblingWidthRatio) {
+            check_sibling_width_ratios(result, &mut violations);
+        }
 
         let mut violations = finalize_violations(cfg, violations);
         sort_violations(&mut violations);
@@ -169,6 +172,73 @@ fn check_group_overlaps(diagram: &Diagram, result: &LayoutResult, out: &mut Vec<
                     .with_groups([id_a, id_b]),
                 );
             }
+        }
+    }
+}
+
+/// Iteration 3：同 y 行（RankBand）的 sibling group 宽比软指标。
+///
+/// 阈值 1.08（与方案验收一致）；仅 warning，不进 CI strict。
+fn check_sibling_width_ratios(result: &LayoutResult, out: &mut Vec<LayoutViolation>) {
+    const Y_BAND_EPS: f64 = 8.0;
+    const MAX_RATIO: f64 = 1.08;
+
+    let mut ids: Vec<&String> = result.groups.keys().collect();
+    ids.sort();
+    if ids.len() < 2 {
+        return;
+    }
+
+    let mut visited = vec![false; ids.len()];
+    for i in 0..ids.len() {
+        if visited[i] {
+            continue;
+        }
+        let yi = result.groups[ids[i]].y;
+        let mut band: Vec<usize> = vec![i];
+        visited[i] = true;
+        for j in (i + 1)..ids.len() {
+            if visited[j] {
+                continue;
+            }
+            if (result.groups[ids[j]].y - yi).abs() <= Y_BAND_EPS {
+                visited[j] = true;
+                band.push(j);
+            }
+        }
+        if band.len() < 2 {
+            continue;
+        }
+        let mut min_w = f64::MAX;
+        let mut max_w = 0.0f64;
+        let mut min_id = ids[band[0]].as_str();
+        let mut max_id = ids[band[0]].as_str();
+        for &idx in &band {
+            let w = result.groups[ids[idx]].width;
+            if w < min_w {
+                min_w = w;
+                min_id = ids[idx].as_str();
+            }
+            if w > max_w {
+                max_w = w;
+                max_id = ids[idx].as_str();
+            }
+        }
+        if min_w <= 1.0 {
+            continue;
+        }
+        let ratio = max_w / min_w;
+        if ratio > MAX_RATIO {
+            out.push(
+                LayoutViolation::new(
+                    LintRuleId::SiblingWidthRatio,
+                    format!(
+                        "同级条带宽比过大：'{max_id}'/{max_w:.0} vs '{min_id}'/{min_w:.0} = {ratio:.3}"
+                    ),
+                )
+                .with_metric(ratio)
+                .with_groups([max_id, min_id]),
+            );
         }
     }
 }
@@ -691,6 +761,7 @@ fn check_unrelated_edge_trunk_merge(
 
 /// Lint 指标摘要（供 eval 框架与基线对比消费）。
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq)]
+#[serde(default)]
 pub struct LintMetricsSummary {
     pub node_overlap: usize,
     pub group_overlap: usize,
@@ -701,6 +772,8 @@ pub struct LintMetricsSummary {
     pub label_label_overlap: usize,
     /// 不同源/宿边共享非语义 trunk 段（架构图假并线）
     pub unrelated_edge_trunk_merge: usize,
+    /// 同级 sibling 同 RankBand 宽比过大（对称性软指标）
+    pub sibling_width_ratio: usize,
     pub total_violations: usize,
     pub error_count: usize,
     pub warning_count: usize,
@@ -725,6 +798,7 @@ impl LintMetricsSummary {
                 LintRuleId::LabelNodeOverlap => summary.label_node_overlap += 1,
                 LintRuleId::LabelLabelOverlap => summary.label_label_overlap += 1,
                 LintRuleId::UnrelatedEdgeTrunkMerge => summary.unrelated_edge_trunk_merge += 1,
+                LintRuleId::SiblingWidthRatio => summary.sibling_width_ratio += 1,
                 _ => {}
             }
         }

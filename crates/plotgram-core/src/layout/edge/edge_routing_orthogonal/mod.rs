@@ -197,8 +197,12 @@ use crate::layout::constants::ORTHO_PARALLEL_GAP as EDGE_PARALLEL_GAP;
 /// X-1: stub 段保护长度——从端点出发的第一段（stub）在此长度内不做硬间距检查，
 /// 因为同节点相邻 slot 的 stub 天然平行近距（slot_pitch 可能小于 EDGE_PARALLEL_GAP）。
 pub(super) const STUB_GUARD_LENGTH: f64 = 24.0;
-/// X-1: 多轮重路由最大迭代次数
+/// X-1: 多轮重路由默认上限（违规边多时可升到此值）
 const MAX_REROUTE_ROUNDS: usize = 3;
+/// X-1: 默认轮次；仅当冲突边数超过阈值时升到 MAX
+const DEFAULT_REROUTE_ROUNDS: usize = 2;
+/// X-1: 冲突边数超过此值时启用第 3 轮
+const REROUTE_ESCALATE_CONFLICT_THRESHOLD: usize = 8;
 /// X-1: 重路由时额外增大 channel_margin 以生成更多绕行候选
 const REROUTE_EXTRA_CHANNEL_MARGIN: f64 = 40.0;
 
@@ -659,7 +663,13 @@ fn route_edges_orthogonal_inner(
             &obstacles,
             None,
         )
-        .with_strict_group_transit(corridor_plan.chains.contains_key(&i));
+        .with_strict_group_transit(should_strict_group_transit(
+            &profile,
+            &group_ctx,
+            from_id,
+            to_id,
+            corridor_plan.chains.contains_key(&i),
+        ));
         let pair = EndpointPair {
             from: from_ep.clone(),
             to: to_ep.clone(),
@@ -806,7 +816,13 @@ fn route_edges_orthogonal_inner(
                     &obstacles,
                     None,
                 )
-                .with_strict_group_transit(corridor_plan.chains.contains_key(&ei));
+                .with_strict_group_transit(should_strict_group_transit(
+                    &profile,
+                    &group_ctx,
+                    from_id,
+                    to_id,
+                    corridor_plan.chains.contains_key(&ei),
+                ));
                 select_best_path_with_scorer_stats(
                     &ctx,
                     &pair,
@@ -958,6 +974,21 @@ fn route_edges_orthogonal_inner(
 }
 
 /// 走廊边路径重建：有计划且通过穿障/穿组校验时返回路径。
+/// Iteration 2：是否对该边启用穿组硬约束（拒绝 `best_nodes_only` 穿无关组）。
+///
+/// - 已有 corridor chain → 强制 strict（应走走廊，禁止穿组软降级）
+/// - 其余边保持 false：仍可用高 `GROUP_TRANSIT_PENALTY` 软惩罚；无走廊时硬否决
+///   会导致直线/脏路径退化（见 k8s-multi-namespace 回归）
+fn should_strict_group_transit(
+    _profile: &OrthoRoutingProfile,
+    _group_ctx: &crate::layout::group::GroupRoutingContext,
+    _from_id: &str,
+    _to_id: &str,
+    has_corridor_chain: bool,
+) -> bool {
+    has_corridor_chain
+}
+
 fn validated_corridor_path(
     edge_index: usize,
     from_anchor: Point,
@@ -1191,17 +1222,22 @@ fn replan_slots(
         };
 
 
-        let ctx = RoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
-            .with_strict_group_transit(corridor_plan.chains.contains_key(&ei));
-        let pair = EndpointPair {
-            from: from_ep.clone(),
-            to: to_ep.clone(),
-        };
-
         let (from_id, to_id) = relations
             .get(ei)
             .map(|rel| (rel.from.as_str(), rel.to.as_str()))
             .unwrap_or(("", ""));
+        let ctx = RoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
+            .with_strict_group_transit(should_strict_group_transit(
+                profile,
+                group_ctx,
+                from_id,
+                to_id,
+                corridor_plan.chains.contains_key(&ei),
+            ));
+        let pair = EndpointPair {
+            from: from_ep.clone(),
+            to: to_ep.clone(),
+        };
 
         let mut path_stats = PathSelectStats::default();
         let path = validated_corridor_path(
@@ -1301,8 +1337,13 @@ fn reroute_conflicting_edges(
     let mut rounds_done = 0usize;
     let mut failed_edges: HashSet<usize> = HashSet::new();
     let mut max_channel_load = 0usize;
+    // Iteration 3：默认 2 轮；冲突边多时升到 3
+    let mut max_rounds = DEFAULT_REROUTE_ROUNDS;
 
     for round in 0..MAX_REROUTE_ROUNDS {
+        if round >= max_rounds {
+            break;
+        }
         // 检测所有冲突边（path_edge_spacing_violations 内部已豁免 stub 段）
         let mut conflicts: Vec<(usize, usize)> = Vec::new(); // (ei, violation_count)
         for ei in 0..n {
@@ -1318,6 +1359,9 @@ fn reroute_conflicting_edges(
 
         if conflicts.is_empty() {
             break;
+        }
+        if conflicts.len() > REROUTE_ESCALATE_CONFLICT_THRESHOLD {
+            max_rounds = MAX_REROUTE_ROUNDS;
         }
 
         // 按违规数降序排列（稳定排序保证确定性）
@@ -1397,7 +1441,13 @@ fn reroute_conflicting_edges(
                     obstacles,
                     Some(&load_map),
                 )
-                .with_strict_group_transit(corridor_plan.chains.contains_key(&ei));
+                .with_strict_group_transit(should_strict_group_transit(
+                    profile,
+                    group_ctx,
+                    from_id,
+                    to_id,
+                    corridor_plan.chains.contains_key(&ei),
+                ));
                 let pair = EndpointPair {
                     from: from_ep.clone(),
                     to: to_ep.clone(),
@@ -2482,7 +2532,13 @@ fn fix_reverse_stub_ports(
             )
             .unwrap_or_else(|| {
                 let ctx = RoutingContext::new(nodes, group_ctx, grid, &r_cfg, profile, obstacles, None)
-                    .with_strict_group_transit(corridor_plan.chains.contains_key(&ei));
+                    .with_strict_group_transit(should_strict_group_transit(
+                        profile,
+                        group_ctx,
+                        from_id,
+                        to_id,
+                        corridor_plan.chains.contains_key(&ei),
+                    ));
                 select_best_path_with_scorer_stats(
                     &ctx,
                     &pair,

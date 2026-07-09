@@ -72,6 +72,7 @@ impl LintConfig {
     pub fn default_preset() -> Self {
         let mut rules = Self::all_enabled_rules();
         rules[LintRuleId::EdgeOnGroupBorder.index()] = RuleConfig::off();
+        // Iteration 3：对称性软指标默认开启（warning），不进 fail_on_warning
         Self {
             rules,
             fail_on_warning: false,

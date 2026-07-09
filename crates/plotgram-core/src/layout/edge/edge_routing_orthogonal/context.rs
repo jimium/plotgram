@@ -27,10 +27,10 @@ pub struct RoutingContext<'a> {
     pub obstacles: &'a PreparedObstacles,
     /// Phase 3: 通道负载图（reroute 时传入 Some，初始路由为 None）
     pub channel_load: Option<&'a ChannelLoadMap>,
-    /// G1: 该边是否强制走 corridor（拒绝穿无关组内部）。
+    /// 该边是否强制拒绝穿无关组内部（`path_avoids_group_interiors` 硬过滤）。
     ///
-    /// 按边判定：仅当该边 corridor 可达（两端点在不同 leaf group 且存在 corridor chain）时为 true。
-    /// corridor 不可达的边允许软降级到 nodes-only 候选（避免路径生成失败）。
+    /// 由 `should_strict_group_transit` 按边判定：存在 corridor chain 时为 true。
+    /// 无走廊时保持 false，允许 nodes-only 软降级，避免大图无通道时路径塌缩。
     pub strict_group_transit: bool,
 }
 
@@ -52,12 +52,12 @@ impl<'a> RoutingContext<'a> {
             profile,
             obstacles,
             channel_load,
-            // G1: 默认 false，由调用方按边 corridor 可达性覆盖
+            // 默认 false，由调用方按边调用 should_strict_group_transit 覆盖
             strict_group_transit: false,
         }
     }
 
-    /// G1: 设置该边是否强制走 corridor（按边 corridor 可达性判定）。
+    /// 设置该边是否强制拒绝穿无关组（见 `should_strict_group_transit`）。
     pub fn with_strict_group_transit(mut self, strict: bool) -> Self {
         self.strict_group_transit = strict;
         self

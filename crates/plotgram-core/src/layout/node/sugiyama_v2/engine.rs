@@ -72,6 +72,10 @@ pub fn compute_with_preset_and_overlay(
     // group 感知的 rank 重分配：为每个 group 分配不重叠的 rank 窗口，
     // 消除 group 包围框在分层方向上的重叠。
     apply_group_rank_constraints(&dag, &mut ranks, diagram);
+    // Iteration 3：group 窗口重分配后再 clamp sink，避免 type=end / 出度 0 被抬离底层。
+    if preset.node_sizing == crate::layout::node::common::node_sizing::NodeSizing::Standard {
+        apply_sink_rank_constraints(&dag, &mut ranks, diagram);
+    }
 
     // 导出 rank 映射（entity_id → rank），供路由友好性评估的"长边跨层度"使用。
     // dag 节点权重即 entity id 字符串（见 graph::build_graph / build_dag）。
@@ -345,13 +349,16 @@ fn apply_state_semantic_rank_constraints(
     }
 }
 
-/// 流程图终止节点（type=end）强制落到最大 rank。
+/// 流程图终止节点强制落到最大 rank。
+///
+/// Iteration 3：`type=end`，或出度 0（非自环 sink）均 clamp 到底层。
 fn apply_sink_rank_constraints(
     dag: &petgraph::graph::DiGraph<String, ()>,
     ranks: &mut HashMap<petgraph::graph::NodeIndex, usize>,
     diagram: &Diagram,
 ) {
     use crate::types::attr_constants::entity_type;
+    use petgraph::Direction;
 
     let entity_type_of = |entity_id: &str| -> &str {
         diagram
@@ -364,7 +371,10 @@ fn apply_sink_rank_constraints(
 
     let max_rank = ranks.values().copied().max().unwrap_or(0);
     for node in dag.node_indices() {
-        if entity_type_of(&dag[node]) == entity_type::END {
+        let is_end = entity_type_of(&dag[node]) == entity_type::END;
+        let out_degree = dag.neighbors_directed(node, Direction::Outgoing).count();
+        // 出度 0：真正的 sink（自环边在 DAG 中仍占出度，不会误伤自环节点）
+        if is_end || out_degree == 0 {
             ranks.insert(node, max_rank);
         }
     }

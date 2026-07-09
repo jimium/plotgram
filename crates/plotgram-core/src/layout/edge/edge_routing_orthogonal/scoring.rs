@@ -21,9 +21,10 @@ const GROUP_NEAR_MISS_PENALTY: f64 = 2_000.0;
 /// 分组边框近距擦过检测额外余量
 const GROUP_NEAR_MISS_EXTRA: f64 = 8.0;
 /// 分组穿越（Transit/Interior/Crossing）软惩罚。
-/// 低于 NODE_CROSSING_PENALTY（穿节点更严重），高于 GROUP_NEAR_MISS_PENALTY（穿越比擦过更严重）。
-/// 用于 scorer 软约束，不作为硬过滤——当分组铺满画布时允许穿越以避免穿节点。
-const GROUP_TRANSIT_PENALTY: f64 = 3_000.0;
+///
+/// Iteration 2：提高到接近穿节点量级，使 scorer 强烈偏好绕行而非穿无关组。
+/// 硬过滤仍由 `path_avoids_group_interiors` + `strict_group_transit` 负责。
+const GROUP_TRANSIT_PENALTY: f64 = 8_000.0;
 
 /// P2-1: edge-overlap bbox 预筛选扩张量（含 EDGE_PARALLEL_GAP + 余量）。
 /// 用于 `edge_overlap_penalty` 中快速跳过 bbox 不相交的已路由段。

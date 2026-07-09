@@ -36,10 +36,12 @@ pub enum LintRuleId {
     LabelNodeOverlap,
     /// 两个标签 AABB 重叠
     LabelLabelOverlap,
+    /// 同级 sibling 同 RankBand 宽比过大（对称性软指标）
+    SiblingWidthRatio,
 }
 
 impl LintRuleId {
-    pub const COUNT: usize = 11;
+    pub const COUNT: usize = 12;
 
     pub const ALL: [LintRuleId; Self::COUNT] = [
         LintRuleId::NodeOverlap,
@@ -53,6 +55,7 @@ impl LintRuleId {
         LintRuleId::UnrelatedEdgeTrunkMerge,
         LintRuleId::LabelNodeOverlap,
         LintRuleId::LabelLabelOverlap,
+        LintRuleId::SiblingWidthRatio,
     ];
 
     pub fn index(self) -> usize {
@@ -68,6 +71,7 @@ impl LintRuleId {
             LintRuleId::UnrelatedEdgeTrunkMerge => 8,
             LintRuleId::LabelNodeOverlap => 9,
             LintRuleId::LabelLabelOverlap => 10,
+            LintRuleId::SiblingWidthRatio => 11,
         }
     }
 
@@ -76,7 +80,8 @@ impl LintRuleId {
             LintRuleId::EdgeCrossing
             | LintRuleId::EdgeOnGroupBorder
             | LintRuleId::UnrelatedEdgeTrunkMerge
-            | LintRuleId::LabelLabelOverlap => LintSeverity::Warning,
+            | LintRuleId::LabelLabelOverlap
+            | LintRuleId::SiblingWidthRatio => LintSeverity::Warning,
             LintRuleId::LabelNodeOverlap => LintSeverity::Error,
             _ => LintSeverity::Error,
         }
@@ -95,6 +100,7 @@ impl LintRuleId {
             LintRuleId::UnrelatedEdgeTrunkMerge => "unrelated_edge_trunk_merge",
             LintRuleId::LabelNodeOverlap => "label_node_overlap",
             LintRuleId::LabelLabelOverlap => "label_label_overlap",
+            LintRuleId::SiblingWidthRatio => "sibling_width_ratio",
         }
     }
 }

@@ -19,13 +19,15 @@ pub(super) fn assign_coordinates_brandes_koepf(
     let spine = compute_spine_nodes(dag);
     let mut centers =
         assign_layer_centers_brandes_koepf(layered_graph, layers, sizes, preset, &spine);
+    // Iteration 3：compaction 保持 3 轮；spine 邻居轻微加权（1.5，避免过度拉扯增交叉）
     compact_layer_centers(
         &mut centers,
         layered_graph,
         layers,
         sizes,
         preset,
-        2,
+        &spine,
+        3,
     );
 
     let mut nodes = HashMap::new();
@@ -423,15 +425,19 @@ fn compute_spine_nodes(dag: &DiGraph<String, ()>) -> HashSet<NodeIndex> {
 }
 
 /// BK 四趟后的受限紧凑化：向邻居重心靠拢，保持层内最小间距。
+///
+/// Iteration 3：spine 邻居在重心中权重 ×2，使主干更直。
 fn compact_layer_centers(
     centers: &mut HashMap<NodeIndex, f64>,
     layered_graph: &DiGraph<LayerNode, ()>,
     layers: &[Vec<NodeIndex>],
     sizes: &HashMap<NodeIndex, (f64, f64)>,
     preset: &SugiyamaPreset,
+    spine: &HashSet<NodeIndex>,
     passes: usize,
 ) {
     const DAMPING: f64 = 0.35;
+    const SPINE_NEIGHBOR_WEIGHT: f64 = 1.5;
     let (default_w, _) = preset.default_node_size();
 
     for _ in 0..passes {
@@ -457,8 +463,22 @@ fn compact_layer_centers(
                 if neighbors.is_empty() {
                     continue;
                 }
-                let target =
-                    neighbors.iter().map(|n| centers[n]).sum::<f64>() / neighbors.len() as f64;
+                let mut weight_sum = 0.0;
+                let mut weighted = 0.0;
+                for n in &neighbors {
+                    let on_spine = match &layered_graph[*n].kind {
+                        LayerNodeKind::Real(original) => spine.contains(original),
+                        LayerNodeKind::Dummy { .. } => false,
+                    };
+                    let w = if on_spine {
+                        SPINE_NEIGHBOR_WEIGHT
+                    } else {
+                        1.0
+                    };
+                    weighted += centers[n] * w;
+                    weight_sum += w;
+                }
+                let target = weighted / weight_sum;
                 let current = centers[node];
                 centers.insert(*node, current + (target - current) * DAMPING);
             }

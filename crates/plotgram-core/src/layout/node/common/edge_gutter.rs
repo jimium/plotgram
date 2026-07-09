@@ -172,6 +172,15 @@ fn demand_to_side_gutters(
             .min(GUTTER_MAX);
         out.entry(gid).or_default().set_side(side, gutter);
     }
+    // Iteration 2：左右 / 上下对称优先，避免「一侧挤、一侧空」
+    for gutter in out.values_mut() {
+        let lr = gutter.left.max(gutter.right);
+        gutter.left = lr;
+        gutter.right = lr;
+        let tb = gutter.top.max(gutter.bottom);
+        gutter.top = tb;
+        gutter.bottom = tb;
+    }
     out
 }
 

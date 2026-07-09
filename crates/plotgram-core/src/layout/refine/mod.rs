@@ -33,7 +33,8 @@ impl Default for RefineConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            max_passes: 3,
+            // Iteration 3：有穿障时最多 2 轮（无穿障早退不变）
+            max_passes: 2,
             push_distance: 40.0,
             node_shrink: 2.0,
         }

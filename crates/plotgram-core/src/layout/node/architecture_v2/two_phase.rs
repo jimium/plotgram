@@ -153,6 +153,7 @@ pub(super) fn compute_two_phase_layout(
     );
 
     let sizing = parse_group_sizing(diagram);
+    // 与 L1 RankBand 对齐：默认 Uniform；显式 fit 时跳过预拉齐
     apply_group_sizing_policy(sizing, &group_map.top_groups, &mut blocks);
 
     position_macro_blocks(
@@ -161,6 +162,7 @@ pub(super) fn compute_two_phase_layout(
         &super_edges,
         &pair_edge_counts,
         canvas_padding,
+        // 初值左对齐；L1 Center 在 pipeline 中对单行做居中
         RowAlign::Start,
     );
 
@@ -472,13 +474,15 @@ fn layout_intra_group_recursive(
     let macro_ranks =
         assign_super_macro_ranks(&super_members, &super_edges, &edge_weights, &graph.node_ids);
 
-    // 4.5 嵌套 sibling 等宽等高 + uniform 策略
+    // 4.5 与 L1 RankBand 对齐：嵌套 sibling 等宽等高；显式 fit 时跳过
     let sizing = parse_group_sizing(diagram);
     let child_group_ids: Vec<String> = children.to_vec();
-    apply_equal_sibling_dimensions_per_rank(&macro_ranks, &mut blocks);
+    if sizing != GroupSizingPolicy::Fit {
+        apply_equal_sibling_dimensions_per_rank(&macro_ranks, &mut blocks);
+    }
     apply_group_sizing_policy(sizing, &child_group_ids, &mut blocks);
 
-    // 5. 宏观定位（架构图左对齐，不居中窄行）
+    // 5. 宏观定位（初值左对齐；L1 完成 Center）
     position_intra_macro_blocks(
         &mut blocks,
         &macro_ranks,
@@ -715,21 +719,19 @@ fn position_intra_macro_blocks(
             blocks[i].x = 0.0;
             blocks[i].y = y_cursor;
         } else {
-            // Phase 3：per-pair 通道间距（同 position_macro_blocks，含无边靠拢）
+            // Iteration 2：band 内统一 lane_budget gap
+            let ordered_ids: Vec<String> = rank_indices
+                .iter()
+                .map(|&i| blocks[i].id.clone())
+                .collect();
+            let gap = band_uniform_gap(&ordered_ids, pair_edge_counts);
             let mut x_cursor = 0.0;
             for (pos, &i) in rank_indices.iter().enumerate() {
                 blocks[i].x = x_cursor;
                 blocks[i].y = y_cursor;
                 x_cursor += blocks[i].width;
                 if pos + 1 < rank_indices.len() {
-                    let next_i = rank_indices[pos + 1];
-                    let pair = if blocks[i].id <= blocks[next_i].id {
-                        (blocks[i].id.clone(), blocks[next_i].id.clone())
-                    } else {
-                        (blocks[next_i].id.clone(), blocks[i].id.clone())
-                    };
-                    let pair_count = pair_edge_counts.get(&pair).copied().unwrap_or(0);
-                    x_cursor += adaptive_group_gap(pair_count);
+                    x_cursor += gap;
                 }
             }
         }
@@ -1180,25 +1182,38 @@ const MAX_EXTRA_LAYER_GAP: f64 = 80.0;
 const CROSS_EDGE_PAIR_VERTICAL_GAP_SCALE: f64 = 10.0;
 /// 组对垂直间隙额外增加的上限
 const MAX_EXTRA_PAIR_VERTICAL_GAP: f64 = 56.0;
-/// 每条同 rank 跨组边为组间距额外增加的像素
+/// 每条同 rank 跨组边为组间距额外增加的像素（lane_budget）
 const CROSS_EDGE_GROUP_GAP_SCALE: f64 = 6.0;
 /// 组间距额外增加的上限
 const MAX_EXTRA_GROUP_GAP: f64 = 40.0;
-/// 无跨组边的相邻组间距缩减比例（相对 GROUP_GAP_X）
-const NO_EDGE_GROUP_GAP_RATIO: f64 = 0.5;
 
-/// 计算相邻组块间的自适应间距
+/// 计算相邻组块间的间距（Iteration 2：lane_budget）。
 ///
-/// - 有跨组边：`GROUP_GAP_X + min(edge_count * scale, max_extra)`（边多则间距大）
-/// - 无跨组边：`GROUP_GAP_X * NO_EDGE_GROUP_GAP_RATIO`（自动靠拢，节省空间）
+/// `gap = GROUP_GAP_X + min(edge_count × scale, max_extra)`。
 fn adaptive_group_gap(pair_edge_count: usize) -> f64 {
-    if pair_edge_count == 0 {
-        GROUP_GAP_X * NO_EDGE_GROUP_GAP_RATIO
-    } else {
-        let extra = (pair_edge_count as f64 * CROSS_EDGE_GROUP_GAP_SCALE)
-            .min(MAX_EXTRA_GROUP_GAP);
-        GROUP_GAP_X + extra
+    let extra = (pair_edge_count as f64 * CROSS_EDGE_GROUP_GAP_SCALE).min(MAX_EXTRA_GROUP_GAP);
+    GROUP_GAP_X + extra
+}
+
+/// 同一 RankBand 内统一水平间距：取该行所有相邻 pair 的 lane_budget 最大值。
+fn band_uniform_gap(
+    ordered_ids: &[String],
+    pair_edge_counts: &HashMap<(String, String), usize>,
+) -> f64 {
+    if ordered_ids.len() < 2 {
+        return GROUP_GAP_X;
     }
+    let mut max_gap = GROUP_GAP_X;
+    for w in ordered_ids.windows(2) {
+        let pair = if w[0] <= w[1] {
+            (w[0].clone(), w[1].clone())
+        } else {
+            (w[1].clone(), w[0].clone())
+        };
+        let count = pair_edge_counts.get(&pair).copied().unwrap_or(0);
+        max_gap = max_gap.max(adaptive_group_gap(count));
+    }
+    max_gap
 }
 
 /// 相邻 macro rank 之间：取 rank 总跨组边密度与「上下行组对」最大边数的较大值，放大垂直通道。
@@ -1308,23 +1323,19 @@ fn position_macro_blocks(
             blocks[i].x = canvas_padding;
             blocks[i].y = y_cursor;
         } else {
-            // Phase 3：per-pair 通道间距 — 相邻 block 对按其跨组边数计算独立间距，
-            // 边数多的 pair 获得更宽通道，无边的 pair 自动靠拢。
+            // Iteration 2：band 内统一 lane_budget gap（取相邻 pair 最大值）
+            let ordered_ids: Vec<String> = rank_indices
+                .iter()
+                .map(|&i| blocks[i].id.clone())
+                .collect();
+            let gap = band_uniform_gap(&ordered_ids, pair_edge_counts);
             let mut x_cursor = canvas_padding;
             for (pos, &i) in rank_indices.iter().enumerate() {
                 blocks[i].x = x_cursor;
                 blocks[i].y = y_cursor;
                 x_cursor += blocks[i].width;
-                // 计算与下一个 block 的 pair 间距
                 if pos + 1 < rank_indices.len() {
-                    let next_i = rank_indices[pos + 1];
-                    let pair = if blocks[i].id <= blocks[next_i].id {
-                        (blocks[i].id.clone(), blocks[next_i].id.clone())
-                    } else {
-                        (blocks[next_i].id.clone(), blocks[i].id.clone())
-                    };
-                    let pair_count = pair_edge_counts.get(&pair).copied().unwrap_or(0);
-                    x_cursor += adaptive_group_gap(pair_count);
+                    x_cursor += gap;
                 }
             }
         }
@@ -1952,17 +1963,17 @@ mod tests {
         assert!(source.y < process.y, "source above process");
         assert!(process.y < storage.y, "process above storage");
 
-        // 顶层分组左对齐
-        assert!((source.x - process.x).abs() < 1.0);
-        assert!((process.x - storage.x).abs() < 1.0);
-
-        // 计算层最宽（Spark/Flink 分叉），存储层较窄（竖排）
+        // RankBand 默认 Equal：三层同宽；内容居中
         assert!(
-            process.width > storage.width,
-            "process ({:.0}) should be wider than storage ({:.0})",
-            process.width,
-            storage.width
+            (source.width - process.width).abs() < 8.0,
+            "default RankBand: source/process should equalize"
         );
+        assert!(
+            (process.width - storage.width).abs() < 8.0,
+            "default RankBand: process/storage should equalize"
+        );
+        assert!((source.x - process.x).abs() < 8.0);
+        assert!((process.x - storage.x).abs() < 8.0);
 
         // Kafka 在 Spark/Flink 上方
         let kafka = result.nodes.get("kafka").unwrap();
@@ -2049,9 +2060,22 @@ mod tests {
             (process.width - storage.width).abs() < 1.0,
             "after grid snap: process/storage width"
         );
-        assert!(
-            (source.x - process.x).abs() < 1.0 && (process.x - storage.x).abs() < 1.0,
-            "top groups should stay left-aligned"
-        );
+        // RankBand Center：单 group 行相对画布居中，不再强制左对齐
+        let canvas_left = [source, process, storage]
+            .iter()
+            .map(|g| g.x)
+            .fold(f64::INFINITY, f64::min);
+        let canvas_right = [source, process, storage]
+            .iter()
+            .map(|g| g.x + g.width)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let canvas_cx = (canvas_left + canvas_right) / 2.0;
+        for (name, g) in [("source", source), ("process", process), ("storage", storage)] {
+            let g_cx = g.x + g.width / 2.0;
+            assert!(
+                (g_cx - canvas_cx).abs() < 8.0,
+                "{name} should be centered in RankBand, cx={g_cx:.1} canvas_cx={canvas_cx:.1}"
+            );
+        }
     }
 }
