@@ -7,7 +7,6 @@
 
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::{CircularLayoutConfig, SugiyamaLayoutConfig};
-use crate::layout::intent::topology::ValidTopologyIntent;
 use crate::layout::node::circular::CircularLayout;
 use crate::layout::node::common::acyclic::greedy_fas;
 use crate::layout::node::sugiyama_v2::{engine, preset};
@@ -76,25 +75,16 @@ impl LayoutStrategy for StateLayout {
     }
 
     fn compute(&self, diagram: &Diagram) -> LayoutResult {
-        self.compute_with_overlay(diagram, None)
-    }
-
-    fn compute_with_overlay(
-        &self,
-        diagram: &Diagram,
-        valid_topology: Option<&[ValidTopologyIntent]>,
-    ) -> LayoutResult {
         if user_requested_circular(diagram) || !should_use_sugiyama(diagram) {
             let mut result = CircularLayout::new(self.circular_config).compute(diagram);
             result.hints.edge_routing_style = EdgeRoutingStyle::Curved;
             return result;
         }
 
-        let mut result = engine::compute_with_preset_and_overlay(
+        let mut result = engine::compute_with_preset(
             diagram,
             &preset::STATE_PRESET,
             self.sugiyama_config,
-            valid_topology,
         );
         result.hints.edge_routing_style = EdgeRoutingStyle::Orthogonal;
         result
@@ -191,6 +181,7 @@ mod tests {
                 })
                 .collect(),
             groups: vec![],
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo {
                 file: None,

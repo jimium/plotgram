@@ -353,6 +353,7 @@ mod tests {
             ],
             relations: relations.clone(),
             groups: vec![],
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo {
                 file: None,

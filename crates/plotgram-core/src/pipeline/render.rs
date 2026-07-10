@@ -17,36 +17,23 @@
 
 use crate::ast::PreparedDiagram;
 use crate::error::{PlotgramError, Result};
-use crate::layout::RefinementReport;
 use crate::render::encode::encoder_for;
 use crate::render::encode::drawio::ExportReport;
 use crate::render::scene::export_scene;
 use crate::render::{RenderFormat, RenderOutput, RenderRequest};
 
-/// 渲染产物 + 意图修正报告 + 导出报告。
-///
-/// `report` 为 `None` 表示 `RenderRequest.layout_overlay` 为 `None`（无意图叠加）；
-/// 为 `Some(RefinementReport::default())` 表示有 overlay 但无意图被消费（空报告）。
+/// 渲染产物 + 导出报告。
 ///
 /// `export_report` 为 `Some` 时携带编码器级别的导出降级报告（目前仅 drawio）。
 pub struct RenderOutputWithReport {
     pub output: RenderOutput,
-    pub report: Option<RefinementReport>,
     pub export_report: Option<ExportReport>,
-}
-
-impl RenderOutputWithReport {
-    /// 拆分为 `(output, report)` 元组，便于解构。
-    pub fn into_parts(self) -> (RenderOutput, Option<RefinementReport>) {
-        (self.output, self.report)
-    }
 }
 
 impl From<RenderOutput> for RenderOutputWithReport {
     fn from(output: RenderOutput) -> Self {
         Self {
             output,
-            report: None,
             export_report: None,
         }
     }
@@ -57,15 +44,11 @@ impl From<RenderOutput> for RenderOutputWithReport {
 /// `EncodingPath::Diagram` 的编码器跳过视觉物化,直接从 PreparedDiagram 编码;
 /// `EncodingPath::Scene` 的编码器走完整流水线。
 ///
-/// 返回 `RenderOutput`，丢弃意图修正报告。需要报告时使用 [`render_output_with_report`]。
 pub fn render_output(request: &RenderRequest<'_>) -> Result<RenderOutput> {
     render_output_with_report(request).map(|r| r.output)
 }
 
-/// 与 [`render_output`] 相同，但额外返回意图修正报告。
-///
-/// `report` 为 `None` 表示 `request.layout_overlay` 为 `None`；
-/// 为 `Some(report)` 表示已消费 overlay（可能为空报告）。
+/// 与 [`render_output`] 相同，但额外返回导出报告。
 pub fn render_output_with_report(request: &RenderRequest<'_>) -> Result<RenderOutputWithReport> {
     let encoder = encoder_for(request.format)?;
     match encoder.encoding_path() {
@@ -73,7 +56,6 @@ pub fn render_output_with_report(request: &RenderRequest<'_>) -> Result<RenderOu
             let result = encoder.encode_from_diagram(request)?;
             Ok(RenderOutputWithReport {
                 output: result.output,
-                report: result.report,
                 export_report: None,
             })
         }
@@ -82,7 +64,6 @@ pub fn render_output_with_report(request: &RenderRequest<'_>) -> Result<RenderOu
             let (output, export_report) = encoder.encode_scene_with_report(&scene)?;
             Ok(RenderOutputWithReport {
                 output,
-                report: scene.refinement_report,
                 export_report,
             })
         }
@@ -142,7 +123,7 @@ mod tests {
                 line_count: 1,
             },
         ))
-    }
+        }
 
     #[test]
     fn render_request_supports_style_json_bridge() {
@@ -227,148 +208,5 @@ mod tests {
 
         let request = RenderRequest::new(&prepared, RenderFormat::Svg);
         assert!(render_bytes(&request).is_err());
-    }
-
-    // ── Phase 2: render_output_with_report 集成测试 ──────────
-
-    use crate::layout::intent::{LayoutIntentOverlay, TopologyIntent};
-    use crate::pipeline::prepare::parse_prepare_validate;
-    use crate::prepare::StyleRequest;
-
-    fn sample_prepared_with_entities() -> PreparedDiagram {
-        let source = r#"diagram flowchart {
-            entity a "A"
-            entity b "B"
-            entity c "C"
-        }"#;
-        let output = parse_prepare_validate(source, &StyleRequest::default());
-        assert!(output.is_valid(), "{:?}", output.errors);
-        output.diagram.unwrap()
-    }
-
-    #[test]
-    fn render_output_with_report_returns_none_when_no_overlay() {
-        let prepared = sample_prepared_with_entities();
-        let request = RenderRequest::new(&prepared, RenderFormat::Svg);
-
-        let result = render_output_with_report(&request).unwrap();
-        assert!(result.report.is_none(), "no overlay → no report");
-        assert!(matches!(result.output, RenderOutput::Text(_)));
-    }
-
-    #[test]
-    fn render_output_with_report_returns_report_when_overlay_present() {
-        let prepared = sample_prepared_with_entities();
-        let overlay = LayoutIntentOverlay {
-            topology: vec![TopologyIntent::Below {
-                from: "a".into(),
-                to: "b".into(),
-            }],
-            geometric: vec![],
-        };
-        let mut request = RenderRequest::new(&prepared, RenderFormat::Svg);
-        request.layout_overlay = Some(&overlay);
-
-        let result = render_output_with_report(&request).unwrap();
-        let report = result.report.expect("overlay present → report should be Some");
-        assert_eq!(report.results.len(), 1);
-        assert_eq!(report.satisfied, 1, "Below(a,b) with no real edges → Satisfied");
-    }
-
-    #[test]
-    fn render_output_with_report_ascii_path_returns_report() {
-        let prepared = sample_prepared_with_entities();
-        let overlay = LayoutIntentOverlay {
-            topology: vec![TopologyIntent::Below {
-                from: "a".into(),
-                to: "b".into(),
-            }],
-            geometric: vec![],
-        };
-        let mut request = RenderRequest::new(&prepared, RenderFormat::Ascii);
-        request.layout_overlay = Some(&overlay);
-
-        let result = render_output_with_report(&request).unwrap();
-        // ASCII 路径也应返回报告
-        let report = result.report.expect("ASCII path should still return report");
-        assert_eq!(report.satisfied, 1);
-        assert!(matches!(result.output, RenderOutput::Text(_)));
-    }
-
-    #[test]
-    fn render_output_with_report_reports_conflicted_intent() {
-        // Real edge a→b; Below(a,b) → edge b→a → cycle → Conflicted
-        let source = r#"diagram flowchart {
-            entity a "A"
-            entity b "B"
-            a -> b
-        }"#;
-        let output = parse_prepare_validate(source, &StyleRequest::default());
-        let prepared = output.diagram.unwrap();
-
-        let overlay = LayoutIntentOverlay {
-            topology: vec![TopologyIntent::Below {
-                from: "a".into(),
-                to: "b".into(),
-            }],
-            geometric: vec![],
-        };
-        let mut request = RenderRequest::new(&prepared, RenderFormat::Svg);
-        request.layout_overlay = Some(&overlay);
-
-        let result = render_output_with_report(&request).unwrap();
-        let report = result.report.expect("overlay present → report");
-        assert_eq!(report.conflicted, 1);
-        assert_eq!(report.satisfied, 0);
-    }
-
-    #[test]
-    fn render_output_with_report_reports_not_found_intent() {
-        let prepared = sample_prepared_with_entities();
-        let overlay = LayoutIntentOverlay {
-            topology: vec![TopologyIntent::Below {
-                from: "a".into(),
-                to: "ghost".into(),
-            }],
-            geometric: vec![],
-        };
-        let mut request = RenderRequest::new(&prepared, RenderFormat::Svg);
-        request.layout_overlay = Some(&overlay);
-
-        let result = render_output_with_report(&request).unwrap();
-        let report = result.report.expect("overlay present → report");
-        assert_eq!(report.not_found, 1);
-    }
-
-    #[test]
-    fn render_output_with_report_geometric_intent_satisfied() {
-        let prepared = sample_prepared_with_entities();
-        let overlay = LayoutIntentOverlay {
-            topology: vec![],
-            geometric: vec![crate::layout::intent::GeometricIntent::Pin {
-                node: "a".into(),
-                axis: crate::layout::intent::PinAxis::Both,
-            }],
-        };
-        let mut request = RenderRequest::new(&prepared, RenderFormat::Svg);
-        request.layout_overlay = Some(&overlay);
-
-        let result = render_output_with_report(&request).unwrap();
-        let report = result.report.expect("overlay present → report");
-        assert_eq!(report.satisfied, 1);
-        assert_eq!(report.results[0].kind, "pin");
-    }
-
-    #[test]
-    fn render_output_with_report_empty_overlay_returns_empty_report() {
-        let prepared = sample_prepared_with_entities();
-        let overlay = LayoutIntentOverlay::default();
-        let mut request = RenderRequest::new(&prepared, RenderFormat::Svg);
-        request.layout_overlay = Some(&overlay);
-
-        let result = render_output_with_report(&request).unwrap();
-        let report = result.report.expect("overlay present → report");
-        assert!(report.is_empty());
-        assert_eq!(report.satisfied + report.partial + report.conflicted + report.not_found, 0);
     }
 }

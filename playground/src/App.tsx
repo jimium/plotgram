@@ -52,23 +52,12 @@ import {
   PREVIEW_BG_STORAGE_KEY,
   type PreviewBackground,
 } from './data/previewBackground';
-import {
-  buildIntentOverlay,
-  normalizeIntentDrafts,
-  EMPTY_INTENT_DRAFTS,
-  STATUS_LABELS,
-  STATUS_COLORS,
-  describeTopologyIntent,
-  describeGeometricIntent,
-  type IntentDrafts,
-  type RefinementReport,
-} from './data/intentOptions';
 import { EXAMPLES, DEFAULT_EXAMPLE_ID, getExample, type DiagramKind } from './data/examples';
 
 type Theme = 'light' | 'dark';
 type MobilePane = 'editor' | 'preview' | 'inspector';
 type PreviewTab = 'graph' | 'ast' | 'ascii' | 'scene';
-type BottomTab = 'problems' | 'output' | 'stats' | 'intent';
+type BottomTab = 'problems' | 'output' | 'stats';
 type LayoutSource = 'source' | 'panel';
 
 const DEFAULT_CODE = getExample(DEFAULT_EXAMPLE_ID)?.source ?? EXAMPLES[0].source;
@@ -111,10 +100,6 @@ function App() {
     'plotgram.rasterScale',
     2,
   );
-  const [intentDraftsStored, setIntentDrafts] = useLocalStorage<IntentDrafts>(
-    'plotgram.intents',
-    EMPTY_INTENT_DRAFTS,
-  );
   const [previewBackgroundStored, setPreviewBackground] = useLocalStorage<PreviewBackground>(
     PREVIEW_BG_STORAGE_KEY,
     DEFAULT_PREVIEW_BACKGROUND,
@@ -146,7 +131,6 @@ function App() {
   const [entityCount, setEntityCount] = useState<number | null>(null);
   const [edgeCount, setEdgeCount] = useState<number | null>(null);
   const [astData, setAstData] = useState<DiagramJson | null>(null);
-  const [refinementReport, setRefinementReport] = useState<RefinementReport | null>(null);
 
   // ─── 原有状态 ────────────────────────────────────────────
   const [helpOpen, setHelpOpen] = useState(false);
@@ -332,19 +316,6 @@ function App() {
     () => normalizePreviewBackground(previewBackgroundStored),
     [previewBackgroundStored],
   );
-  const intentDrafts = useMemo(
-    () => normalizeIntentDrafts(intentDraftsStored),
-    [intentDraftsStored],
-  );
-  const intentOverlay = useMemo(
-    () => buildIntentOverlay(intentDrafts),
-    [intentDrafts],
-  );
-  const entityIds = useMemo(
-    () => (astData?.entities?.map((e) => e.id) ?? []),
-    [astData],
-  );
-
   // 从 AST 提取上下文信息，供编辑器自动补全使用
   const diagramContext = useMemo<DiagramContext>(() => {
     if (!astData) return { entities: [], groups: [] };
@@ -415,7 +386,7 @@ function App() {
           ? code
           : applyLayoutOptions(code, layoutOptions, layoutCatalog, diagramDefaults);
       const optionsJson = JSON.stringify(
-        buildRenderOptions(appearanceOptions, intentOverlay, previewBackground),
+        buildRenderOptions(appearanceOptions, previewBackground),
       );
 
       const t0 = performance.now();
@@ -458,7 +429,6 @@ function App() {
       setDiagnostics(diags);
       setSuccess(result.success);
       setRenderMs(elapsed);
-      setRefinementReport(result.refinement_report ?? null);
 
       setEntityCount(countEntities(code));
       setEdgeCount(countEdges(code));
@@ -500,7 +470,7 @@ function App() {
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
-  }, [code, layoutOptions, appearanceOptions, intentOverlay, previewBackground, layoutSource, layoutCatalog, diagramDefaults, wasm, ready, activePreviewTab]);
+  }, [code, layoutOptions, appearanceOptions, previewBackground, layoutSource, layoutCatalog, diagramDefaults, wasm, ready, activePreviewTab]);
 
   // ─── AST 解析 ────────────────────────────────────────────
   useEffect(() => {
@@ -603,7 +573,7 @@ function App() {
       layoutSource === 'source'
         ? code
         : applyLayoutOptions(code, layoutOptions, layoutCatalog, diagramDefaults);
-    const optionsJson = JSON.stringify(buildRenderOptions(appearanceOptions, intentOverlay));
+    const optionsJson = JSON.stringify(buildRenderOptions(appearanceOptions));
     const result = renderSource(wasm, effectiveSource, 'drawio', optionsJson);
     if (result.success && result.text) {
       setDrawio(result.text);
@@ -614,7 +584,7 @@ function App() {
     setDrawioExportReport(null);
     showToast('drawio 渲染失败', 'error');
     return null;
-  }, [wasm, ready, code, layoutOptions, appearanceOptions, intentOverlay, previewBackground, layoutSource, layoutCatalog, diagramDefaults, showToast]);
+  }, [wasm, ready, code, layoutOptions, appearanceOptions, previewBackground, layoutSource, layoutCatalog, diagramDefaults, showToast]);
 
   // ─── 导出 ────────────────────────────────────────────────
   const exportActions = useMemo<ExportActions>(() => ({
@@ -1048,9 +1018,6 @@ function App() {
             onResetLayout={handleResetLayout}
             onReset={handleReset}
             onLayoutSourceChange={setLayoutSource}
-            intentDrafts={intentDrafts}
-            onIntentChange={setIntentDrafts}
-            entityIds={entityIds}
             onExportSvg={exportActions.downloadSvg}
             onExportPng={exportActions.downloadPng}
             onExportWebp={exportActions.downloadWebp}
@@ -1074,7 +1041,7 @@ function App() {
       <div className={`bottom-panel ${bottomPanelExpanded ? 'expanded' : ''}`}>
         <div className="bottom-panel-bar">
           <div className="bottom-tabs">
-            {(['problems', 'output', 'stats', 'intent'] as BottomTab[]).map((tab) => (
+            {(['problems', 'output', 'stats'] as BottomTab[]).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -1088,7 +1055,7 @@ function App() {
                   }
                 }}
               >
-                {tab === 'problems' ? '问题' : tab === 'output' ? '输出' : tab === 'stats' ? '统计' : '意图报告'}
+                {tab === 'problems' ? '问题' : tab === 'output' ? '输出' : '统计'}
                 {tab === 'stats' && renderMs != null && (
                   <span className="tab-render-time">{renderMs.toFixed(1)} ms</span>
                 )}
@@ -1100,11 +1067,6 @@ function App() {
                 {tab === 'problems' && diagnostics.filter(d => d.severity === 'warning').length > 0 && (
                   <span className="tab-badge tab-badge-warn">
                     {diagnostics.filter(d => d.severity === 'warning').length}
-                  </span>
-                )}
-                {tab === 'intent' && refinementReport && (refinementReport.conflicted + refinementReport.not_found + refinementReport.partial) > 0 && (
-                  <span className="tab-badge tab-badge-warn">
-                    {refinementReport.conflicted + refinementReport.not_found + refinementReport.partial}
                   </span>
                 )}
               </button>
@@ -1203,58 +1165,6 @@ function App() {
                   <span className="stat-label">文件名</span>
                   <span className="stat-value">{filename}</span>
                 </div>
-              </div>
-            )}
-            {activeBottomTab === 'intent' && (
-              <div className="intent-report-pane">
-                {refinementReport ? (
-                  <>
-                    <div className="intent-report-summary">
-                      <span className={`intent-stat intent-stat--success`}>
-                        满足 {refinementReport.satisfied}
-                      </span>
-                      <span className={`intent-stat intent-stat--warning`}>
-                        部分 {refinementReport.partial}
-                      </span>
-                      <span className={`intent-stat intent-stat--error`}>
-                        冲突 {refinementReport.conflicted}
-                      </span>
-                      <span className={`intent-stat intent-stat--muted`}>
-                        未找到 {refinementReport.not_found}
-                      </span>
-                    </div>
-                    {refinementReport.results.length === 0 ? (
-                      <div className="empty-hint">无意图结果</div>
-                    ) : (
-                      <div className="intent-result-list">
-                        {refinementReport.results.map((r, i) => {
-                          const isTopology = r.kind === 'below' || r.kind === 'above';
-                          let desc: string;
-                          if (isTopology) {
-                            const draft = intentDrafts.topology[r.index];
-                            desc = draft ? describeTopologyIntent(draft) : `${r.kind}[${r.index}]`;
-                          } else {
-                            const draft = intentDrafts.geometric[r.index];
-                            desc = draft ? describeGeometricIntent(draft) : `${r.kind}[${r.index}]`;
-                          }
-                          return (
-                            <div key={i} className={`intent-result intent-result--${STATUS_COLORS[r.status]}`}>
-                              <span className={`intent-status-tag intent-status--${STATUS_COLORS[r.status]}`}>
-                                {STATUS_LABELS[r.status]}
-                              </span>
-                              <span className="intent-result-desc">{desc}</span>
-                              {r.message && <span className="intent-result-msg">{r.message}</span>}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="empty-hint">
-                    未启用布局意图。在右侧「属性 → 布局意图」中勾选启用并添加意图后，此处将显示每条意图的满足状态报告。
-                  </div>
-                )}
               </div>
             )}
           </div>

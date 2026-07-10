@@ -1,7 +1,7 @@
 //! 布局阶段图标尺寸调整。
 
 use crate::ast::Entity;
-use crate::layout::constants::DEFAULT_LABEL_FONT_SIZE;
+use crate::layout::node::common::node_sizing::NODE_LABEL_FONT_SIZE;
 
 use super::render::extra_node_width;
 use super::resolve::{node_shape_from_entity, resolve, ResolveOptions};
@@ -18,7 +18,7 @@ pub fn apply_icon_to_node_size(
         return (width, height);
     };
 
-    let extra = extra_node_width(def, DEFAULT_LABEL_FONT_SIZE);
+    let extra = extra_node_width(def, NODE_LABEL_FONT_SIZE);
     if extra <= 0.0 {
         return (width, height);
     }

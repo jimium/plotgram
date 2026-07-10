@@ -76,11 +76,10 @@ impl FormatEncoder for AsciiRenderer {
         request: &RenderRequest<'_>,
     ) -> crate::error::Result<DiagramEncodeOutput> {
         let diagram = request.diagram;
-        let (mut layout, report) = crate::layout::compute_layout_with_plan_and_overlay(
+        let mut layout = crate::layout::compute_layout_with_plan(
             diagram.inner(),
             diagram.layout_plan(),
-            request.layout_overlay,
-        ).map_err(|e| crate::error::PlotgramError::layout_failed_msg(e.to_string()))?;
+        ).map_err(|e| crate::error::PlotgramError::Render(vec![e]))?;
 
         crate::render::scene::apply_title_band_layout_adjustment(&mut layout, request.show_title);
 
@@ -92,7 +91,6 @@ impl FormatEncoder for AsciiRenderer {
         )?;
         Ok(DiagramEncodeOutput {
             output: RenderOutput::Text(text),
-            report,
         })
     }
 }
@@ -230,6 +228,7 @@ mod tests {
                 },
             ],
             groups: vec![],
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo {
                 file: None,

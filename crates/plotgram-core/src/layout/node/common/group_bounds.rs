@@ -27,13 +27,16 @@ impl GroupPadding {
         }
     }
 
-    /// architecture_v2 默认非对称 padding（等价于旧 x=28, y_top=48, x_delta=56, y_delta=76）。
+    /// architecture_v2 默认非对称 padding。
+    ///
+    /// Phase D：收紧组壳（原 28/48/28 → 20/36/20），标题区仍由 `top` 覆盖
+    ///（`GROUP_LABEL_HEIGHT=20`，内容顶隙 ≥16）。
     pub fn architecture_v2() -> Self {
         Self {
-            left: 28.0,
-            right: 28.0,
-            top: 48.0,
-            bottom: 28.0,
+            left: 20.0,
+            right: 20.0,
+            top: 36.0,
+            bottom: 20.0,
         }
     }
 
@@ -145,11 +148,17 @@ fn resolve_padding(
         .copied()
         .unwrap_or_default();
     let mut merged = base.max_per_side(budget);
-    // 顶层叶子组：水平 gutter 对称化，避免破坏 L1 左共线；容器组保留四侧独立预算。
+    // 顶层叶子：仅当左右 EGB 都达到完整出口量级才水平对称；
+    // 单侧有边不把空侧拉齐（避免「假设很多边」预留）。
     if group.parent_id.is_none() && !is_container_group(group, diagram) {
-        let h = merged.left.max(merged.right);
-        merged.left = h;
-        merged.right = h;
+        let both_horizontal = budget.left >= base.left && budget.right >= base.right
+            && budget.left > f64::EPSILON
+            && budget.right > f64::EPSILON;
+        if both_horizontal {
+            let h = merged.left.max(merged.right);
+            merged.left = h;
+            merged.right = h;
+        }
     }
     merged
 }
@@ -503,6 +512,7 @@ mod tests {
             entities: vec![entity("a1", Some("A")), entity("b1", Some("B"))],
             relations: vec![],
             groups: vec![group("A", vec!["a1"], None), group("B", vec!["b1"], None)],
+            constraints: vec![],
             style_decls: vec![],
             source_info: crate::ast::SourceInfo { file: None, line_count: 0 },
             ..Default::default()
@@ -540,6 +550,7 @@ mod tests {
             ],
             relations: vec![],
             groups: vec![group("A", vec!["a1", "a2"], None)],
+            constraints: vec![],
             style_decls: vec![],
             source_info: crate::ast::SourceInfo { file: None, line_count: 0 },
             ..Default::default()
@@ -573,6 +584,7 @@ mod tests {
             attributes: vec![],
             entities: vec![entity("a1", Some("inner"))],
             relations: vec![],
+            constraints: vec![],
             groups: vec![
                 group("outer", vec![], None),
                 Group {
@@ -614,6 +626,7 @@ mod tests {
             entities: vec![entity("a1", Some("A")), entity("b1", Some("B"))],
             relations: vec![],
             groups: vec![group("A", vec!["a1"], None), group("B", vec!["b1"], None)],
+            constraints: vec![],
             style_decls: vec![],
             source_info: crate::ast::SourceInfo { file: None, line_count: 0 },
             ..Default::default()

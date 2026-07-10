@@ -431,6 +431,7 @@ mod tests {
                 span: dummy_span(),
             }],
             groups: vec![],
+            constraints: vec![],
             style_decls: vec![],
             doc_comment: None,
             source_info: crate::ast::SourceInfo {
@@ -533,6 +534,7 @@ mod tests {
             entities: vec![],
             relations: vec![],
             groups: vec![],
+            constraints: vec![],
             style_decls: vec![],
             doc_comment: None,
             source_info: crate::ast::SourceInfo {

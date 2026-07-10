@@ -90,6 +90,7 @@ mod tests {
                 span,
             }],
             groups: vec![],
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo {
                 file: None,
@@ -189,7 +190,6 @@ mod tests {
             transparent_background: false,
             semantic_inference: true,
             ascii_options: crate::render::encode::ascii::AsciiExportOptions::default(),
-            layout_overlay: None,
         };
 
         let svg = encode(&request).unwrap();
@@ -215,7 +215,6 @@ mod tests {
             transparent_background: false,
             semantic_inference: true,
             ascii_options: crate::render::encode::ascii::AsciiExportOptions::default(),
-            layout_overlay: None,
         };
 
         let svg = encode(&request).unwrap();
@@ -241,7 +240,6 @@ mod tests {
             transparent_background: false,
             semantic_inference: true,
             ascii_options: crate::render::encode::ascii::AsciiExportOptions::default(),
-            layout_overlay: None,
         };
 
         let svg = encode(&request).unwrap();
@@ -304,7 +302,6 @@ mod tests {
             transparent_background: false,
             semantic_inference: true,
             ascii_options: crate::render::encode::ascii::AsciiExportOptions::default(),
-            layout_overlay: None,
         };
 
         let svg = encode(&request).unwrap();
@@ -346,7 +343,6 @@ mod tests {
             transparent_background: true,
             semantic_inference: true,
             ascii_options: crate::render::encode::ascii::AsciiExportOptions::default(),
-            layout_overlay: None,
         };
 
         let scene = crate::render::scene::export_scene(&request).expect("export scene");
@@ -424,6 +420,7 @@ mod tests {
                 span,
             }).collect(),
             groups: vec![],
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo {
                 file: None,

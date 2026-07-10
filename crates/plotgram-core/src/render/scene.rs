@@ -12,7 +12,7 @@ use crate::ast::{Diagram, Entity, Group, PreparedDiagram, Relation};
 use crate::kinds;
 use crate::render::visual::{EdgeStyle, NodeStyle};
 use crate::error::{PlotgramError, Result};
-use crate::layout::{self, EdgeLayout, GroupLayout, LayoutResult, NodeLayout, RefinementReport};
+use crate::layout::{self, EdgeLayout, GroupLayout, LayoutResult, NodeLayout};
 use crate::render::paint::color_queries;
 use crate::render::{RenderRequest, CompiledRenderContext, CANVAS_TITLE_BAND_HEIGHT};
 use serde::Serialize;
@@ -76,17 +76,12 @@ pub struct ExportScene<'a> {
     pub nodes: Vec<ExportNode<'a>>,
     pub edges: Vec<ExportEdge<'a>>,
     pub groups: Vec<ExportGroup<'a>>,
-    /// 布局意图修正报告。
-    ///
-    /// 由 `export_scene` 在调用 `compute_layout_with_plan_and_overlay` 后填充。
-    /// `overlay` 为 `None` 时为 `None`；`build_scene` 独立调用时为 `None`。
-    pub refinement_report: Option<RefinementReport>,
 }
 
 impl<'a> ExportScene<'a> {
     pub fn diagram(&self) -> &Diagram {
         self.prepared.inner()
-    }
+        }
 }
 
 /// 布局计算(独立步骤,不依赖渲染格式)。
@@ -96,7 +91,7 @@ impl<'a> ExportScene<'a> {
 /// 做布局后处理(refine 优化)或缓存。
 pub fn compute_layout(diagram: &PreparedDiagram) -> Result<LayoutResult> {
     layout::compute_layout_with_plan(diagram.inner(), diagram.layout_plan())
-        .map_err(|e| PlotgramError::layout_failed_msg(e.to_string()))
+        .map_err(|e| PlotgramError::Render(vec![e]))
 }
 
 /// 极简主题不绘制 group 卡片阴影（与 `tokens.effects.shadow: false` 一致）。
@@ -255,30 +250,24 @@ pub fn build_scene<'a>(
         nodes,
         edges,
         groups,
-        refinement_report: None,
     })
 }
 
 /// 将 `RenderRequest` 导出为标准化场景(向后兼容:布局 + 物化一步到位)。
 ///
-/// 等价于 `compute_layout_with_plan_and_overlay` 后再 `build_scene(request, layout)`，
-/// 并将意图修正报告写入 `ExportScene.refinement_report`。
+/// 等价于 `compute_layout_with_plan` 后再 `build_scene(request, layout)`。
 /// 新调用方推荐显式分两步调用,便于复用布局结果。
 pub fn export_scene<'a>(request: &'a RenderRequest<'a>) -> Result<ExportScene<'a>> {
-    // 直接使用 PreparedDiagram 中已缓存的 LayoutPlan（避免重复 resolve），
-    // 并透传 layout_overlay 至布局阶段。
-    let (mut layout, refinement_report) = layout::compute_layout_with_plan_and_overlay(
+    // 直接使用 PreparedDiagram 中已缓存的 LayoutPlan（避免重复 resolve）。
+    let mut layout = layout::compute_layout_with_plan(
         request.diagram.inner(),
         request.diagram.layout_plan(),
-        request.layout_overlay,
     )
-    .map_err(|e| PlotgramError::layout_failed_msg(e.to_string()))?;
+    .map_err(|e| PlotgramError::Render(vec![e]))?;
 
     apply_title_band_layout_adjustment(&mut layout, request.show_title);
 
-    let mut scene = build_scene(request, layout)?;
-    scene.refinement_report = refinement_report;
-    Ok(scene)
+    build_scene(request, layout)
 }
 
 /// 按 `show_title` 调整布局画布：不绘制标题时收回顶部标题带留白。
@@ -334,6 +323,7 @@ mod tests {
                 span,
             }],
             groups: vec![],
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo {
                 file: None,
@@ -394,7 +384,7 @@ mod tests {
             },
             ..Default::default()
         })
-    }
+        }
 
     #[test]
     fn export_without_title_trims_top_canvas_band() {

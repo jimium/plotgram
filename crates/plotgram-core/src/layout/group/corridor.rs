@@ -416,6 +416,7 @@ mod tests {
             attributes: vec![],
             entities: vec![],
             relations: vec![],
+            constraints: vec![],
             groups: vec![
                 Group {
                     id: Identifier::new_unchecked("cloud"),

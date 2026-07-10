@@ -8,7 +8,10 @@ use super::constants::{
 };
 use super::types::{GraphIndex, GroupMap};
 
-pub(in super::super) fn build_layers(ranks: &HashMap<String, usize>) -> Vec<Vec<String>> {
+pub(in super::super) fn build_layers(
+    ranks: &HashMap<String, usize>,
+    decl_index: &HashMap<String, usize>,
+) -> Vec<Vec<String>> {
     if ranks.is_empty() {
         return vec![];
     }
@@ -20,9 +23,9 @@ pub(in super::super) fn build_layers(ranks: &HashMap<String, usize>) -> Vec<Vec<
         layers[rank].push(node.clone());
     }
 
-    // 每层内按 node_order 排序（确定性初始顺序）
+    // 每层内：声明序 soft bias，再 id 字典序 fallback（确定性初始顺序）
     for layer in &mut layers {
-        layer.sort();
+        layer.sort_by(|a, b| crate::layout::decl_order::cmp_by_decl_then_id(decl_index, a, b));
     }
 
     layers
@@ -39,6 +42,7 @@ pub(in super::super) fn order_layers_group_aware(
     group_map: &GroupMap,
     layers: &[Vec<String>],
     reversed: &HashSet<(String, String)>,
+    decl_index: &HashMap<String, usize>,
 ) -> Vec<Vec<String>> {
     if layers.len() <= 1 {
         return layers.to_vec();
@@ -59,7 +63,8 @@ pub(in super::super) fn order_layers_group_aware(
             for layer_idx in 1..current_layers.len() {
                 let upper_pos = index_map(&current_layers[layer_idx - 1]);
                 let layer = &current_layers[layer_idx];
-                let ordered = order_layer_by_median(layer, &upper_pos, graph, reversed, downward);
+                let ordered =
+                    order_layer_by_median(layer, &upper_pos, graph, reversed, downward, decl_index);
                 let grouped = group_aware_reorder(&ordered, group_map);
                 let optimized = transpose_adjacent_group_aware(
                     &grouped, layer_idx, &current_layers, graph, reversed, group_map,
@@ -71,7 +76,8 @@ pub(in super::super) fn order_layers_group_aware(
             for layer_idx in (0..current_layers.len().saturating_sub(1)).rev() {
                 let lower_pos = index_map(&current_layers[layer_idx + 1]);
                 let layer = &current_layers[layer_idx];
-                let ordered = order_layer_by_median(layer, &lower_pos, graph, reversed, downward);
+                let ordered =
+                    order_layer_by_median(layer, &lower_pos, graph, reversed, downward, decl_index);
                 let grouped = group_aware_reorder(&ordered, group_map);
                 let optimized = transpose_adjacent_group_aware(
                     &grouped, layer_idx, &current_layers, graph, reversed, group_map,
@@ -117,6 +123,7 @@ fn order_layer_by_median(
     graph: &GraphIndex,
     reversed: &HashSet<(String, String)>,
     downward: bool,
+    decl_index: &HashMap<String, usize>,
 ) -> Vec<String> {
     let mut nodes_with_median: Vec<(String, f64)> = layer
         .iter()
@@ -159,7 +166,7 @@ fn order_layer_by_median(
     nodes_with_median.sort_by(|a, b| {
         a.1.partial_cmp(&b.1)
             .unwrap_or(std::cmp::Ordering::Equal)
-            .then(a.0.cmp(&b.0))
+            .then_with(|| crate::layout::decl_order::cmp_by_decl_then_id(decl_index, &a.0, &b.0))
     });
     nodes_with_median.into_iter().map(|(node, _)| node).collect()
 }

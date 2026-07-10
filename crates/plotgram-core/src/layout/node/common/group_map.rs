@@ -1,7 +1,7 @@
 //! 节点 → 顶层组的映射工具。
 //!
 //! 抽取自 `architecture_v2::layout::build_group_map` 与
-//! `intent::geometric::build_node_to_top_group`，消除两处重复实现。
+//! 组内节点到顶层 group 的映射。
 
 use crate::ast::Diagram;
 use std::collections::HashMap;

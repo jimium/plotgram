@@ -6,8 +6,7 @@ use crate::ast::Diagram;
 use crate::layout::edge::common::label_avoidance::estimate_label_width;
 use crate::layout::group::constants::{GROUP_BORDER_SHELL_PAD, PORT_STUB_CLEARANCE};
 use crate::layout::group::hierarchy::{
-    ancestor_set_excluding_self, build_group_hierarchy, lowest_common_ancestor,
-    path_from_leaf_up_to_including, GroupHierarchy,
+    ancestor_set_excluding_self, build_group_hierarchy, lowest_common_ancestor, GroupHierarchy,
 };
 use crate::layout::group::constants::EPS;
 use crate::layout::node::common::group_bounds::{GutterSide, SideGutter};
@@ -16,9 +15,10 @@ use std::collections::HashMap;
 
 /// 与走廊车道间距对齐（见 `corridor_route::CORRIDOR_LANE_PITCH`）。
 const LANE_PITCH: f64 = 18.0;
-const GUTTER_MAX: f64 = 56.0;
-const SOFT_PRIMARY: f64 = 0.7;
-const SOFT_SECONDARY: f64 = 0.3;
+/// Phase C：侧 gutter 上限 56 → 40，减轻跨组边把窄组撑成空壳。
+const GUTTER_MAX: f64 = 40.0;
+/// 单侧至少累计到该权重才开 gutter（≈一条主出口边）。
+const MIN_LANE_OPEN: f64 = 0.5;
 
 #[derive(Debug, Clone, Copy, Default)]
 struct LaneDemand {
@@ -70,39 +70,37 @@ pub fn estimate_side_gutters(
             let gu = gu.unwrap();
             let gv = gv.unwrap();
             if let Some(lca) = lowest_common_ancestor(gu, gv, &hierarchy.parent_of) {
-                for g in path_from_leaf_up_to_including(gu, &lca, &hierarchy.parent_of) {
-                    accrue_on_group(
-                        &mut demand,
-                        &g,
-                        cu,
-                        cv,
-                        base_groups,
-                        label_w,
-                        1.0,
-                    );
-                }
-                for g in path_from_leaf_up_to_including(gv, &lca, &hierarchy.parent_of) {
-                    accrue_on_group(
-                        &mut demand,
-                        &g,
-                        cv,
-                        cu,
-                        base_groups,
-                        label_w,
-                        1.0,
-                    );
-                }
+                // Phase E：LCA 路径只在共享容器上记 demand，避免 leaf→LCA 逐层 sum 叠乘。
+                accrue_on_group(
+                    &mut demand,
+                    &lca,
+                    cu,
+                    cv,
+                    base_groups,
+                    label_w,
+                    1.0,
+                );
+                accrue_on_group(
+                    &mut demand,
+                    &lca,
+                    cv,
+                    cu,
+                    base_groups,
+                    label_w,
+                    1.0,
+                );
             }
         }
 
         if let (Some(gu), Some(gv)) = (gu, gv) {
             let exit_u = exit_groups(gu, gv, hierarchy);
             let exit_v = exit_groups(gv, gu, hierarchy);
-            for g in exit_u {
-                accrue_on_group(&mut demand, &g, cu, cv, base_groups, label_w, 1.0);
+            // Phase E：exit 路径仍逐级记账（父需要绕行带）；与 LCA 分支不再在 leaf 上重复累加。
+            for g in &exit_u {
+                accrue_on_group(&mut demand, g, cu, cv, base_groups, label_w, 1.0);
             }
-            for g in exit_v {
-                accrue_on_group(&mut demand, &g, cv, cu, base_groups, label_w, 1.0);
+            for g in &exit_v {
+                accrue_on_group(&mut demand, g, cv, cu, base_groups, label_w, 1.0);
             }
         }
     }
@@ -124,6 +122,7 @@ fn exit_groups(from_leaf: &str, to_leaf: &str, hierarchy: &GroupHierarchy) -> Ve
     let mut to_set = ancestor_set_excluding_self(to_leaf, &hierarchy.group_ancestors);
     to_set.insert(to_leaf.to_string());
 
+    // leaf → root 顺序（末元素为最外层穿出组）；不再按 id 排序以免打乱外层判定。
     let mut out = Vec::new();
     let mut cur = Some(from_leaf.to_string());
     while let Some(g) = cur {
@@ -132,7 +131,6 @@ fn exit_groups(from_leaf: &str, to_leaf: &str, hierarchy: &GroupHierarchy) -> Ve
         }
         cur = hierarchy.parent_of.get(&g).cloned();
     }
-    out.sort();
     out
 }
 
@@ -148,7 +146,7 @@ fn accrue_on_group(
     let Some(gl) = base_groups.get(group_id) else {
         return;
     };
-    for (side, frac) in soft_dominant_side(from_center, gl, to_center) {
+    for (side, frac) in exit_side_weights(from_center, gl, to_center) {
         let entry = demand
             .entry((group_id.to_string(), side))
             .or_default();
@@ -163,23 +161,51 @@ fn demand_to_side_gutters(
     demand: BTreeMap<(String, GutterSide), LaneDemand>,
 ) -> BTreeMap<String, SideGutter> {
     let mut out: BTreeMap<String, SideGutter> = BTreeMap::new();
+    let mut lane_load: BTreeMap<(String, GutterSide), f64> = BTreeMap::new();
     for ((gid, side), d) in demand {
-        let lanes_ceil = d.lanes.ceil().max(1.0) as u32;
+        // 不足半条出口边的碎量不开侧；有标签宽度时仍保留，避免边注被夹。
+        if d.lanes < MIN_LANE_OPEN && d.label_w <= f64::EPSILON {
+            continue;
+        }
+        // 按完整出口边数叠层：1.4 → 1 档（不升到 2）；2.0 → 2 档。
+        // 避免少数边被 ceil 成「很多车道」去预留。
+        let lane_slots = d.lanes.floor().max(1.0) as u32;
         let gutter = (GROUP_BORDER_SHELL_PAD
             + PORT_STUB_CLEARANCE
-            + lanes_ceil.saturating_sub(1) as f64 * LANE_PITCH
+            + lane_slots.saturating_sub(1) as f64 * LANE_PITCH
             + d.label_w)
             .min(GUTTER_MAX);
-        out.entry(gid).or_default().set_side(side, gutter);
+        out.entry(gid.clone()).or_default().set_side(side, gutter);
+        lane_load.insert((gid, side), d.lanes);
     }
-    // Iteration 2：左右 / 上下对称优先，避免「一侧挤、一侧空」
-    for gutter in out.values_mut() {
-        let lr = gutter.left.max(gutter.right);
-        gutter.left = lr;
-        gutter.right = lr;
-        let tb = gutter.top.max(gutter.bottom);
-        gutter.top = tb;
-        gutter.bottom = tb;
+    // 仅当左右/上下都至少有一条完整出口边时才对称；单侧有边不把空侧拉齐。
+    for (gid, gutter) in out.iter_mut() {
+        let left_n = lane_load
+            .get(&(gid.clone(), GutterSide::Left))
+            .copied()
+            .unwrap_or(0.0);
+        let right_n = lane_load
+            .get(&(gid.clone(), GutterSide::Right))
+            .copied()
+            .unwrap_or(0.0);
+        let top_n = lane_load
+            .get(&(gid.clone(), GutterSide::Top))
+            .copied()
+            .unwrap_or(0.0);
+        let bottom_n = lane_load
+            .get(&(gid.clone(), GutterSide::Bottom))
+            .copied()
+            .unwrap_or(0.0);
+        if left_n >= 1.0 - f64::EPSILON && right_n >= 1.0 - f64::EPSILON {
+            let lr = gutter.left.max(gutter.right);
+            gutter.left = lr;
+            gutter.right = lr;
+        }
+        if top_n >= 1.0 - f64::EPSILON && bottom_n >= 1.0 - f64::EPSILON {
+            let tb = gutter.top.max(gutter.bottom);
+            gutter.top = tb;
+            gutter.bottom = tb;
+        }
     }
     out
 }
@@ -188,25 +214,24 @@ fn node_center(nodes: &HashMap<String, NodeLayout>, id: &str) -> Option<(f64, f6
     nodes.get(id).map(|n| (n.x + n.width / 2.0, n.y + n.height / 2.0))
 }
 
-fn soft_dominant_side(
+/// 主出口侧权重 1.0；仅当次轴足够大（明显斜向）时才给正交侧少量权重。
+/// 轴对齐边不再给空侧记 demand，避免对称拉齐造成「假设有边」预留。
+fn exit_side_weights(
     from_center: (f64, f64),
     group: &GroupLayout,
     to_center: (f64, f64),
-) -> [(GutterSide, f64); 2] {
+) -> Vec<(GutterSide, f64)> {
     let cx = group.x + group.width / 2.0;
     let cy = group.y + group.height / 2.0;
     let dx = to_center.0 - cx;
     let dy = to_center.1 - cy;
     let ax = dx.abs();
     let ay = dy.abs();
-    let total = ax + ay;
-    if total < EPS {
-        return [
-            (GutterSide::Left, 0.5),
-            (GutterSide::Right, 0.5),
-        ];
+    if ax + ay < EPS {
+        return vec![(GutterSide::Right, 1.0)];
     }
-    if ax >= ay {
+
+    let (primary, secondary, primary_span, secondary_span) = if ax >= ay {
         let primary = if dx < 0.0 {
             GutterSide::Left
         } else {
@@ -217,7 +242,7 @@ fn soft_dominant_side(
         } else {
             GutterSide::Bottom
         };
-        [(primary, SOFT_PRIMARY), (secondary, SOFT_SECONDARY)]
+        (primary, secondary, ax, ay)
     } else {
         let primary = if dy < 0.0 {
             GutterSide::Top
@@ -229,7 +254,14 @@ fn soft_dominant_side(
         } else {
             GutterSide::Right
         };
-        [(primary, SOFT_PRIMARY), (secondary, SOFT_SECONDARY)]
+        (primary, secondary, ay, ax)
+    };
+
+    // 次轴至少占主轴一半才视为需要拐角预留；否则只开主侧。
+    if secondary_span >= primary_span * 0.5 {
+        vec![(primary, 1.0), (secondary, 0.35)]
+    } else {
+        vec![(primary, 1.0)]
     }
 }
 
@@ -346,7 +378,10 @@ mod tests {
         let gutters = estimate_side_gutters_with_hierarchy(&diagram, &nodes, &base_groups);
         let cloud = gutters.get("cloud").copied().unwrap_or_default();
         assert!(
-            cloud.left > pad.left || cloud.right > pad.right || cloud.top > pad.top,
+            cloud.left > f64::EPSILON
+                || cloud.right > f64::EPSILON
+                || cloud.top > f64::EPSILON
+                || cloud.bottom > f64::EPSILON,
             "cloud should have non-zero gutter budget, got {:?}",
             cloud
         );

@@ -101,6 +101,7 @@ mod tests {
             entities: vec![entity("a", "g1"), entity("b", "g1")],
             relations: vec![],
             groups: vec![group("g1", vec!["a", "b"])],
+            constraints: vec![],
             style_decls: vec![],
             source_info: crate::ast::SourceInfo {
                 file: None,

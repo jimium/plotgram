@@ -1,5 +1,4 @@
 use crate::ast::Diagram;
-use crate::layout::intent::topology::ValidTopologyIntent;
 use crate::layout::node::common::acyclic;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
@@ -12,7 +11,7 @@ use super::preset::SugiyamaPreset;
 /// 供 `greedy_cycle_reversal` 判断是否可反转。
 #[derive(Clone, Debug)]
 pub(super) struct EdgeMeta {
-    /// 是否允许 FAS 反转。真实边为 `true`，意图边为 `false`。
+    /// 是否允许 FAS 反转。真实边为 `true`，DSL `constrain` 边为 `false`。
     pub reversible: bool,
 }
 
@@ -38,18 +37,12 @@ pub(super) struct ProperLayerGraph {
     pub sizes: HashMap<NodeIndex, (f64, f64)>,
 }
 
-/// 构建 diagram 的有向图，可选注入拓扑意图约束边。
+/// 构建 diagram 的有向图。
 ///
 /// - 真实边：`EdgeMeta { reversible: true }`
-/// - 意图边：`EdgeMeta { reversible: false }`
-///   - `Below { from: A, to: B }` 注入 `B → A`（使 `rank(A) > rank(B)`，A 在 B 下方）
-///   - `Above { from: A, to: B }` 注入 `A → B`（使 `rank(A) < rank(B)`，A 在 B 上方）
-///
-/// 意图边引用的节点不存在时静默跳过（由 `validate_topology_intents` 预先标记 `NotFound`）。
-pub(super) fn build_graph_with_overlay(
-    diagram: &Diagram,
-    valid_topology: Option<&[ValidTopologyIntent]>,
-) -> DiGraph<String, EdgeMeta> {
+/// - DSL `constrain` 边（若有）：`EdgeMeta { reversible: false }`，由调用方经
+///   [`inject_irreversible_edges`] 注入，FAS 不会反转它们。
+pub(super) fn build_graph(diagram: &Diagram) -> DiGraph<String, EdgeMeta> {
     let mut graph = DiGraph::<String, EdgeMeta>::new();
     let mut index = HashMap::new();
 
@@ -64,27 +57,39 @@ pub(super) fn build_graph_with_overlay(
         }
     }
 
-    if let Some(intents) = valid_topology {
-        for v in intents {
-            // ValidTopologyIntent.edge() 返回注入边方向：
-            // Below(A,B) → B→A, Above(A,B) → A→B
-            let (from, to) = v.edge();
-            if let (Some(from_idx), Some(to_idx)) = (index.get(from), index.get(to)) {
-                graph.add_edge(*from_idx, *to_idx, EdgeMeta { reversible: false });
-            }
+    // Phase 2: inject diagram.constraints as irreversible edges.
+    for c in &diagram.constraints {
+        if let (Some(from), Some(to)) = (index.get(c.from.as_str()), index.get(c.to.as_str())) {
+            graph.add_edge(*from, *to, EdgeMeta { reversible: false });
         }
     }
 
     graph
 }
 
+/// 向已建图注入不可逆约束边（`from → to`，`reversible: false`）。
+#[allow(dead_code)] // kept for explicit constraint injection API
+pub(super) fn inject_irreversible_edges(
+    graph: &mut DiGraph<String, EdgeMeta>,
+    edges: &[(&str, &str)],
+) {
+    let index: HashMap<String, NodeIndex> = graph
+        .node_indices()
+        .map(|n| (graph[n].clone(), n))
+        .collect();
+    for &(from, to) in edges {
+        if let (Some(&from_idx), Some(&to_idx)) = (index.get(from), index.get(to)) {
+            graph.add_edge(from_idx, to_idx, EdgeMeta { reversible: false });
+        }
+    }
+}
+
 /// 贪心 FAS 去环，返回需要反转的边集合。
 ///
-/// **意图边保护（路径 A）**：构建 FAS 邻接表时排除意图边（`reversible: false`），
-/// 仅将真实边作为反转候选。意图边不参与 FAS 计算，因此永远不会被反转。
+/// **不可逆边保护**：构建 FAS 邻接表时排除 `reversible: false` 的边（DSL constrain），
+/// 仅将真实边作为反转候选。不可逆边不参与 FAS 计算，因此永远不会被反转。
 ///
-/// 前置条件：`validate_topology_intents` 已确保意图边不与真实边构成环。
-/// 若真实边自身含环，FAS 仅反转真实边破环，意图边方向保持不变。
+/// 若真实边自身含环，FAS 仅反转真实边破环，constrain 方向保持不变。
 pub(super) fn greedy_cycle_reversal(graph: &DiGraph<String, EdgeMeta>) -> HashSet<(NodeIndex, NodeIndex)> {
     let nodes = graph.node_indices().collect::<Vec<_>>();
     let mut out_neighbors: HashMap<NodeIndex, Vec<NodeIndex>> = HashMap::new();

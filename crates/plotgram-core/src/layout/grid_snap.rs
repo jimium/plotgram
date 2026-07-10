@@ -17,7 +17,6 @@ use crate::layout::constants::{
 use crate::types::attr_constants;
 use crate::layout::geometry::Point;
 use crate::layout::group::constants::{GROUP_BORDER_SHELL_PAD, PORT_STUB_CLEARANCE};
-use crate::layout::intent::PinSet;
 use crate::layout::{EdgeLayout, GroupLayout, LayoutResult, NodeLayout};
 use std::collections::{HashMap, HashSet};
 
@@ -281,12 +280,10 @@ pub struct SnapReport {
 /// 对布局结果执行节点结构对齐（rank 轴中心线 + layer 轴重叠消除）。
 ///
 /// 属于结构对齐阶段，在边路由之前执行。
-/// `pinned` 中的节点在对应轴上跳过对齐（由 `Pin` / `Align*` 意图保护）。
 pub fn align_nodes(
     layout: &mut LayoutResult,
     config: &NodeAlignConfig,
     horizontal: bool,
-    pinned: &PinSet,
 ) -> SnapReport {
     if !config.enabled || layout.nodes.is_empty() {
         return SnapReport::default();
@@ -300,13 +297,13 @@ pub fn align_nodes(
 
     if config.rank_axis {
         for layer in &layers {
-            snap_rank_axis_centers(layout, layer, horizontal, config, &mut report, pinned);
+            snap_rank_axis_centers(layout, layer, horizontal, config, &mut report);
         }
     }
 
     if config.layer_axis != LayerAxisAlign::Off {
         for layer in &layers {
-            apply_layer_axis_align(layout, layer, horizontal, config, &mut report, pinned);
+            apply_layer_axis_align(layout, layer, horizontal, config, &mut report);
         }
     }
 
@@ -704,7 +701,6 @@ fn snap_rank_axis_centers(
     horizontal: bool,
     config: &NodeAlignConfig,
     report: &mut SnapReport,
-    pinned: &PinSet,
 ) {
     if layer.is_empty() {
         return;
@@ -724,9 +720,6 @@ fn snap_rank_axis_centers(
     let target = sorted[sorted.len() / 2];
 
     for id in layer {
-        if pinned.is_rank_pinned(id, horizontal) {
-            continue;
-        }
         let Some(node) = layout.nodes.get_mut(id) else {
             continue;
         };
@@ -776,7 +769,6 @@ fn apply_layer_axis_align(
     horizontal: bool,
     config: &NodeAlignConfig,
     report: &mut SnapReport,
-    pinned: &PinSet,
 ) {
     if layer.len() <= 1 || config.layer_axis == LayerAxisAlign::Off {
         return;
@@ -849,9 +841,6 @@ fn apply_layer_axis_align(
     }
 
     for (i, id) in ordered.iter().enumerate() {
-        if pinned.is_layer_pinned(id, horizontal) {
-            continue;
-        }
         let Some(node) = layout.nodes.get_mut(id) else {
             continue;
         };
@@ -916,7 +905,7 @@ mod tests {
             node_gap: 48.0,
             ..NodeAlignConfig::default_sugiyama()
         };
-        align_nodes(&mut layout, &config, false, &PinSet::default());
+        align_nodes(&mut layout, &config, false);
 
         let top = rank_centers(&layout, &["a", "b"], false);
         assert!((top[0] - top[1]).abs() < f64::EPSILON, "same layer y must match");
@@ -930,7 +919,7 @@ mod tests {
 
         let mut layout = sample_layout(nodes);
         let config = NodeAlignConfig::default_sugiyama();
-        align_nodes(&mut layout, &config, true, &PinSet::default());
+        align_nodes(&mut layout, &config, true);
 
         let xs = rank_centers(&layout, &["a", "b"], true);
         assert!((xs[0] - xs[1]).abs() < f64::EPSILON, "same layer x must match for LR");
@@ -948,7 +937,7 @@ mod tests {
             layer_axis: LayerAxisAlign::OverlapOnly,
             ..NodeAlignConfig::default_sugiyama()
         };
-        align_nodes(&mut layout, &config, false, &PinSet::default());
+        align_nodes(&mut layout, &config, false);
 
         let a = &layout.nodes["a"];
         let b = &layout.nodes["b"];
@@ -964,7 +953,7 @@ mod tests {
 
         let mut layout = sample_layout(nodes.clone());
         let config = NodeAlignConfig::default_flowchart();
-        align_nodes(&mut layout, &config, false, &PinSet::default());
+        align_nodes(&mut layout, &config, false);
 
         assert!((layout.nodes["left"].x - nodes["left"].x).abs() < 0.1);
         assert!((layout.nodes["right"].x - nodes["right"].x).abs() < 0.1);
@@ -978,7 +967,7 @@ mod tests {
 
         let mut layout = sample_layout(nodes.clone());
         let config = NodeAlignConfig::default_er();
-        align_nodes(&mut layout, &config, false, &PinSet::default());
+        align_nodes(&mut layout, &config, false);
 
         assert!((layout.nodes["b"].x - nodes["b"].x).abs() < 0.1);
     }
@@ -999,7 +988,7 @@ mod tests {
             layer_axis: LayerAxisAlign::OverlapOnly,
             ..NodeAlignConfig::default_sugiyama()
         };
-        align_nodes(&mut layout, &config, false, &PinSet::default());
+        align_nodes(&mut layout, &config, false);
 
         let a_cx = layout.nodes["a"].x + layout.nodes["a"].width / 2.0;
         let b_cx = layout.nodes["b"].x + layout.nodes["b"].width / 2.0;
@@ -1020,8 +1009,8 @@ mod tests {
         let mut layout1 = sample_layout(nodes.clone());
         let mut layout2 = sample_layout(nodes);
         let config = NodeAlignConfig::default_sugiyama();
-        align_nodes(&mut layout1, &config, false, &PinSet::default());
-        align_nodes(&mut layout2, &config, false, &PinSet::default());
+        align_nodes(&mut layout1, &config, false);
+        align_nodes(&mut layout2, &config, false);
 
         for id in ["a", "b", "c"] {
             let n1 = &layout1.nodes[id];
@@ -1043,7 +1032,7 @@ mod tests {
             max_snap_distance: 48.0,
             ..NodeAlignConfig::default_sugiyama()
         };
-        align_nodes(&mut layout, &config, false, &PinSet::default());
+        align_nodes(&mut layout, &config, false);
 
         let ids: Vec<_> = layout.nodes.keys().cloned().collect();
         for i in 0..ids.len() {
@@ -1068,7 +1057,7 @@ mod tests {
             max_snap_distance: 10.0,
             ..NodeAlignConfig::default_sugiyama()
         };
-        let report = align_nodes(&mut layout, &config, false, &PinSet::default());
+        let report = align_nodes(&mut layout, &config, false);
 
         assert!(report.skipped_nodes >= 1);
         assert!((layout.nodes["far"].y - 140.0).abs() < 0.1);
@@ -1083,7 +1072,7 @@ mod tests {
         let original_positions: Vec<(f64, f64)> = nodes.values().map(|n| (n.x, n.y)).collect();
         let mut layout = sample_layout(nodes);
         let config = NodeAlignConfig::disabled();
-        align_nodes(&mut layout, &config, false, &PinSet::default());
+        align_nodes(&mut layout, &config, false);
 
         for (i, (_, n)) in layout.nodes.iter().enumerate() {
             assert!((n.x - original_positions[i].0).abs() < 0.01);

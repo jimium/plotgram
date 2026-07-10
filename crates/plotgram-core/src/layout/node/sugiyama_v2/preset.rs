@@ -38,11 +38,14 @@ impl SugiyamaPreset {
 }
 
 const BASE: SugiyamaPreset = SugiyamaPreset {
-    default_node_width: 160.0,
+    // 回退宽；Standard 路径实际用 estimate_standard_node_width。
+    default_node_width: 136.0,
     default_node_height: 50.0,
-    padding: 40.0,
-    layer_gap: 84.0,
-    node_gap: 56.0,
+    // 与 DEFAULT_PADDING 对齐，避免布局 40 → finalize 70 的双重抬升。
+    padding: 50.0,
+    // Phase A：层/同层间距再收一档（字号与节点盒不变）。
+    layer_gap: 56.0,
+    node_gap: 36.0,
     ordering_sweeps: 16,
     dummy_node_width: 12.0,
     dummy_node_height: 8.0,
@@ -70,10 +73,8 @@ pub const ER_PRESET: SugiyamaPreset = SugiyamaPreset {
     ..BASE
 };
 
-/// 状态图专用 preset（`layout_algo: state` 自动 Sugiyama 路径）：紧凑间距 + 状态节点尺寸。
+/// 状态图专用 preset（`layout_algo: state` 自动 Sugiyama 路径）：状态节点尺寸 + 长边加权。
 pub const STATE_PRESET: SugiyamaPreset = SugiyamaPreset {
-    layer_gap: 72.0,
-    node_gap: 48.0,
     node_sizing: NodeSizing::State,
     long_edge_barycenter_weight: 1.5,
     ..BASE

@@ -936,6 +936,7 @@ mod tests {
             entities,
             relations,
             groups: Vec::new(),
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo {
                 file: None,

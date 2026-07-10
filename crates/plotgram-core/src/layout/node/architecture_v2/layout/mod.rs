@@ -5,7 +5,6 @@
 
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::{ArchitectureV2LayoutConfig, ARCHITECTURE_V2_LAYOUT_OPTIONS};
-use crate::layout::intent::topology::ValidTopologyIntent;
 use crate::layout::node::common::node_sizing;
 use crate::layout::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeAlignConfig};
@@ -61,14 +60,6 @@ impl LayoutStrategy for ArchitectureV2Layout {
     }
 
     fn compute(&self, diagram: &Diagram) -> LayoutResult {
-        self.compute_with_overlay(diagram, None)
-    }
-
-    fn compute_with_overlay(
-        &self,
-        diagram: &Diagram,
-        valid_topology: Option<&[ValidTopologyIntent]>,
-    ) -> LayoutResult {
         let config = self.config;
         if diagram.entities.is_empty() {
             return LayoutResult {
@@ -87,14 +78,16 @@ impl LayoutStrategy for ArchitectureV2Layout {
 
         let reversed_edges = acyclic::find_edges_to_reverse(&graph);
 
-        let skipped_intents = if let Some(intents) = valid_topology {
-            acyclic::inject_intent_edges(&mut graph, intents, &group_map)
-        } else {
-            Vec::new()
-        };
+        // FAS 之后注入全部 constrain（同组影响组内 rank；跨组进入超级图边）。
+        let constraint_edges: Vec<(&str, &str)> = diagram
+            .constraints
+            .iter()
+            .map(|c| (c.from.as_str(), c.to.as_str()))
+            .collect();
+        acyclic::inject_irreversible_edges(&mut graph, &constraint_edges);
 
         if !group_map.top_groups.is_empty() {
-            let mut result = super::two_phase::compute_two_phase_layout(
+            return super::two_phase::compute_two_phase_layout(
                 diagram,
                 &graph,
                 &group_map,
@@ -102,14 +95,18 @@ impl LayoutStrategy for ArchitectureV2Layout {
                 &reversed_edges,
                 config,
             );
-            result.hints.skipped_topology_intents = skipped_intents;
-            return result;
         }
 
         let ranks = rank::assign_ranks_group_aware(diagram, &graph, &group_map, &reversed_edges);
-        let layers = order::build_layers(&ranks);
-        let ordered_layers =
-            order::order_layers_group_aware(&graph, &group_map, &layers, &reversed_edges);
+        let decl_index = crate::layout::decl_order::entity_sibling_decl_index(diagram);
+        let layers = order::build_layers(&ranks, &decl_index);
+        let ordered_layers = order::order_layers_group_aware(
+            &graph,
+            &group_map,
+            &layers,
+            &reversed_edges,
+            &decl_index,
+        );
         let nodes = coordinate::assign_coordinates(diagram, &graph, &group_map, &ordered_layers, &sizes);
 
         let mut ctx = super::pipeline::LayoutContext {
@@ -135,7 +132,6 @@ impl LayoutStrategy for ArchitectureV2Layout {
             hints: crate::layout::LayoutHints {
                 edge_routing_style: crate::layout::EdgeRoutingStyle::Orthogonal,
                 sugiyama_ranks: Some(ranks),
-                skipped_topology_intents: skipped_intents,
                 ..Default::default()
             },
         }

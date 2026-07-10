@@ -1,5 +1,4 @@
 use crate::ast::{AttributeValue, Diagram, PreparedDiagram};
-use crate::layout::LayoutIntentOverlay;
 use crate::render::encode::ascii::AsciiExportOptions;
 use crate::error::{PlotgramError, Result};
 use crate::graphic_style::parse_graphic_style_id;
@@ -26,11 +25,6 @@ pub struct RenderRequest<'a> {
     /// 是否启用 semantic → icon 推断（默认开启）。
     pub semantic_inference: bool,
     pub ascii_options: AsciiExportOptions,
-    /// 布局意图叠加层（可选）。
-    ///
-    /// 透传至 `compute_layout_with_plan_and_overlay`，由布局算法与几何微调阶段消费。
-    /// 为 `None` 时布局行为与无意图完全一致。
-    pub layout_overlay: Option<&'a LayoutIntentOverlay>,
 }
 
 impl<'a> RenderRequest<'a> {
@@ -49,7 +43,6 @@ impl<'a> RenderRequest<'a> {
             transparent_background: false,
             semantic_inference: true,
             ascii_options: AsciiExportOptions::default(),
-            layout_overlay: None,
         }
     }
 
@@ -131,7 +124,7 @@ mod tests {
                 line_count: 1,
             },
         ))
-    }
+        }
 
     #[test]
     fn show_title_defaults_to_false() {
@@ -157,7 +150,6 @@ mod tests {
             transparent_background: false,
             semantic_inference: true,
             ascii_options: AsciiExportOptions::default(),
-            layout_overlay: None,
         };
 
         assert_eq!(request.resolve_theme_id(), "common.presentation");
@@ -180,7 +172,6 @@ mod tests {
             transparent_background: false,
             semantic_inference: true,
             ascii_options: AsciiExportOptions::default(),
-            layout_overlay: None,
         };
 
         assert_eq!(request.resolve_theme_id(), "common.clean-dark");
@@ -218,7 +209,6 @@ mod tests {
             transparent_background: false,
             semantic_inference: true,
             ascii_options: AsciiExportOptions::default(),
-            layout_overlay: None,
         };
 
         let context = request.resolve_context().unwrap();
@@ -256,7 +246,6 @@ mod tests {
             transparent_background: false,
             semantic_inference: true,
             ascii_options: AsciiExportOptions::default(),
-            layout_overlay: None,
         };
 
         assert_eq!(

@@ -29,9 +29,10 @@
         let spec = resolve_group_frame_spec(&diagram, "architecture");
 
         assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Horizontal });
-        assert_eq!(spec.track_sizing, TrackSizing::Equal);
+        // Phase C：architecture 默认 Fit；显式 uniform 才 Equal
+        assert_eq!(spec.track_sizing, TrackSizing::Fit);
         assert_eq!(spec.cross_align, CrossAlign::Center);
-        assert!((spec.gap - 50.0).abs() < f64::EPSILON);
+        assert!((spec.gap - 40.0).abs() < f64::EPSILON);
         assert_eq!(spec.border_align, BorderAlign::SharedLines);
         assert_eq!(spec.padding, GroupPadding::architecture_v2());
         // architecture 在 snap 白名单内，snap 未声明 → 默认 true
@@ -81,7 +82,7 @@
         assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Vertical });
         assert_eq!(spec.track_sizing, TrackSizing::Fit);
         assert_eq!(spec.cross_align, CrossAlign::Center);
-        assert!((spec.gap - 60.0).abs() < f64::EPSILON);
+        assert!((spec.gap - 48.0).abs() < f64::EPSILON);
         assert_eq!(spec.border_align, BorderAlign::None);
         assert!(spec.quantize.enabled);
     }
@@ -123,7 +124,7 @@
             ..Default::default()
         };
         let spec = resolve_group_frame_spec(&diagram, "flowchart");
-        assert!((spec.gap - 60.0).abs() < f64::EPSILON);
+        assert!((spec.gap - 48.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -462,9 +463,8 @@
             total_height: 200.0,
             hints: Default::default(),
         };
-        let pinned = PinSet::default();
 
-        let report = apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        let report = apply_group_frame(&spec, &diagram, &mut layout);
 
         assert!(report.equalized);
         // 两 group 等宽 = max(100, 80) = 100
@@ -508,9 +508,8 @@
             total_height: 200.0,
             hints: Default::default(),
         };
-        let pinned = PinSet::default();
 
-        let report = apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        let report = apply_group_frame(&spec, &diagram, &mut layout);
 
         assert!(report.cross_aligned);
         // 跨 rank 左缘对齐到 min(0, 200) = 0
@@ -554,9 +553,8 @@
             total_height: 100.0,
             hints: Default::default(),
         };
-        let pinned = PinSet::default();
 
-        let _report = apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        let _report = apply_group_frame(&spec, &diagram, &mut layout);
 
         // 同行 group 保持相对 x 位置，不折叠到同一 x
         assert!(
@@ -606,9 +604,8 @@
             total_height: 200.0,
             hints: Default::default(),
         };
-        let pinned = PinSet::default();
 
-        let report = apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        let report = apply_group_frame(&spec, &diagram, &mut layout);
 
         assert!(report.borders_aligned > 0);
         // 左缘共线（中位数 = 0 或 3，取排序后中位数）
@@ -653,9 +650,8 @@
             total_height: 100.0,
             hints: Default::default(),
         };
-        let pinned = PinSet::default();
 
-        let report = apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        let report = apply_group_frame(&spec, &diagram, &mut layout);
 
         assert!(report.groups_quantized > 0);
         // g1: x=5→floor(5/8)*8=0, y=3→0, right=102→ceil=104, bottom=58→ceil=64
@@ -695,13 +691,12 @@
             total_height: 100.0,
             hints: Default::default(),
         };
-        let pinned = PinSet::default();
 
         let mut layout = make_layout();
-        apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        apply_group_frame(&spec, &diagram, &mut layout);
         let snapshot = layout.clone();
         // 第二次执行
-        apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        apply_group_frame(&spec, &diagram, &mut layout);
 
         // 幂等：第二次结果与第一次一致
         for (id, g) in &snapshot.groups {
@@ -715,47 +710,6 @@
         }
     }
 
-    #[test]
-    fn pinset_protects_nodes_from_shift() {
-        let diagram = two_group_diagram();
-        let spec = GroupFrameSpec {
-            arrangement: GroupArrangement::Stack { axis: Axis::Horizontal },
-            track_sizing: TrackSizing::Fit,
-            cross_align: CrossAlign::Start,
-            gap: 50.0,
-            padding: GroupPadding::architecture_v2(),
-            border_align: BorderAlign::None,
-            quantize: QuantizeSpec {
-                enabled: false,
-                step: 8.0,
-                quantize_groups: false,
-            },
-        };
-        let mut layout = LayoutResult {
-            nodes: HashMap::from([
-                ("a1".to_string(), node_layout(10.0, 0.0, 80.0, 40.0)),
-                ("a2".to_string(), node_layout(210.0, 100.0, 60.0, 40.0)),
-            ]),
-            groups: HashMap::from([
-                ("g1".to_string(), group_layout(0.0, 0.0, 100.0, 60.0)),
-                ("g2".to_string(), group_layout(200.0, 100.0, 80.0, 60.0)),
-            ]),
-            edges: vec![],
-            total_width: 300.0,
-            total_height: 200.0,
-            hints: Default::default(),
-        };
-        // a2 被 Pin 保护
-        let mut pinned = PinSet::default();
-        pinned.full.insert("a2".to_string());
-
-        apply_group_frame(&spec, &diagram, &mut layout, &pinned);
-
-        // a2 不动（PinSet 保护，跨 rank 平移被跳过）
-        assert!((layout.nodes["a2"].x - 210.0).abs() < f64::EPSILON);
-        // group 框仍跨 rank 左缘对齐
-        assert!((layout.groups["g2"].x - 0.0).abs() < f64::EPSILON);
-    }
 
     #[test]
     fn no_groups_is_noop() {
@@ -777,8 +731,7 @@
             total_height: 100.0,
             hints: Default::default(),
         };
-        let pinned = PinSet::default();
-        let report = apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        let report = apply_group_frame(&spec, &diagram, &mut layout);
         assert_eq!(report.top_group_count, 0);
         assert!(!report.equalized);
         assert!(!report.cross_aligned);
@@ -854,9 +807,8 @@
         // 自动推断 2x2
         let spec = matrix_spec(None, None, TrackSizing::Fit, CrossAlign::Start, 20.0);
         let mut layout = matrix_layout_initial();
-        let pinned = PinSet::default();
 
-        let report = apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        let report = apply_group_frame(&spec, &diagram, &mut layout);
 
         assert!(report.matrix_applied);
         // col_widths = [max(100,90), max(80,70)] = [100, 80]
@@ -881,9 +833,8 @@
         let diagram = four_group_diagram();
         let spec = matrix_spec(None, None, TrackSizing::Equal, CrossAlign::Start, 20.0);
         let mut layout = matrix_layout_initial();
-        let pinned = PinSet::default();
 
-        apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        apply_group_frame(&spec, &diagram, &mut layout);
 
         // Equal: col_widths 全 = max(100,80,90,70)=100; row_heights 全 = max(60,60,70,50)=70
         // col_x = [0, 120]; row_y = [0, 90]
@@ -899,9 +850,8 @@
         let diagram = four_group_diagram();
         let spec = matrix_spec(None, None, TrackSizing::Fit, CrossAlign::Center, 20.0);
         let mut layout = matrix_layout_initial();
-        let pinned = PinSet::default();
 
-        apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        apply_group_frame(&spec, &diagram, &mut layout);
 
         // Fit: col_widths=[100,80], row_heights=[60,70]; col_x=[0,120], row_y=[0,80]
         // Center:
@@ -922,9 +872,8 @@
         // 1 行 4 列
         let spec = matrix_spec(Some(1), Some(4), TrackSizing::Fit, CrossAlign::Start, 10.0);
         let mut layout = matrix_layout_initial();
-        let pinned = PinSet::default();
 
-        apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        apply_group_frame(&spec, &diagram, &mut layout);
 
         // 排序后 ordered = [g1,g2,g3,g4]（按 y,x）
         // col_widths = [100,80,90,70]; row_heights=[max(60,60,70,50)]=70
@@ -945,9 +894,8 @@
         let diagram = four_group_diagram();
         let spec = matrix_spec(None, None, TrackSizing::Equal, CrossAlign::Start, 20.0);
         let mut layout = matrix_layout_initial();
-        let pinned = PinSet::default();
 
-        apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        apply_group_frame(&spec, &diagram, &mut layout);
         // 快照
         let snap_groups: Vec<(String, f64, f64, f64, f64)> = layout
             .groups
@@ -961,7 +909,7 @@
             .collect();
 
         // 第二次执行
-        let report = apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        let report = apply_group_frame(&spec, &diagram, &mut layout);
         // 第二次应近似 no-op（dx/dy < 0.5 跳过）
         assert!(!report.matrix_applied);
 
@@ -979,26 +927,6 @@
         }
     }
 
-    #[test]
-    fn matrix_pinset_protection() {
-        let diagram = four_group_diagram();
-        let spec = matrix_spec(None, None, TrackSizing::Fit, CrossAlign::Start, 20.0);
-        let mut layout = matrix_layout_initial();
-        // a3 被 Pin 保护
-        let mut pinned = PinSet::default();
-        pinned.full.insert("a3".to_string());
-
-        apply_group_frame(&spec, &diagram, &mut layout, &pinned);
-
-        // a3 不动（PinSet 保护），但 g3 框仍移动到 (0, 80)
-        assert!((layout.nodes["a3"].x - 10.0).abs() < 0.5);
-        assert!((layout.nodes["a3"].y - 210.0).abs() < 0.5);
-        assert!((layout.groups["g3"].x - 0.0).abs() < 0.5);
-        assert!((layout.groups["g3"].y - 80.0).abs() < 0.5);
-        // 其他节点正常平移
-        assert!((layout.nodes["a4"].x - 130.0).abs() < 0.5);
-        assert!((layout.nodes["a4"].y - 90.0).abs() < 0.5);
-    }
 
     #[test]
     fn infer_matrix_dims_auto_square() {
@@ -1120,9 +1048,8 @@
         // Stack(V) + Equal + Start：顶层 [g1] 单元素 no-op；嵌套 [g1a, g1b] 拉齐宽度
         let spec = nested_stack_spec(TrackSizing::Equal, CrossAlign::Start);
         let mut layout = nested_layout_initial();
-        let pinned = PinSet::default();
 
-        let report = apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        let report = apply_group_frame(&spec, &diagram, &mut layout);
 
         // 嵌套 sibling set 数 = 1（[g1a, g1b]）
         assert_eq!(report.top_group_count, 1);
@@ -1167,9 +1094,8 @@
             total_height: 250.0,
             hints: Default::default(),
         };
-        let pinned = PinSet::default();
 
-        let report = apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        let report = apply_group_frame(&spec, &diagram, &mut layout);
 
         // 3 个 sibling set：[g1,g2] + [g1a,g1b] + [g2a,g2b]
         // top_group_count = 2（顶层 set 长度）
@@ -1183,9 +1109,8 @@
         let diagram = nested_diagram_single_parent();
         let spec = nested_stack_spec(TrackSizing::Equal, CrossAlign::Start);
         let mut layout = nested_layout_initial();
-        let pinned = PinSet::default();
 
-        apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        apply_group_frame(&spec, &diagram, &mut layout);
 
         // 快照第一次结果
         let snap_groups: Vec<(String, f64, f64, f64, f64)> = ["g1", "g1a", "g1b"]
@@ -1204,7 +1129,7 @@
             .collect();
 
         // 第二次执行
-        apply_group_frame(&spec, &diagram, &mut layout, &pinned);
+        apply_group_frame(&spec, &diagram, &mut layout);
 
         for (k, x, y, w, h) in &snap_groups {
             let g = &layout.groups[k];
@@ -1220,21 +1145,3 @@
         }
     }
 
-    #[test]
-    fn nested_subframe_pinset_protection() {
-        let diagram = nested_diagram_single_parent();
-        let spec = nested_stack_spec(TrackSizing::Equal, CrossAlign::Start);
-        let mut layout = nested_layout_initial();
-        // a2 被 Pin 保护
-        let mut pinned = PinSet::default();
-        pinned.full.insert("a2".to_string());
-
-        apply_group_frame(&spec, &diagram, &mut layout, &pinned);
-
-        // g1b 框仍拉齐到 80
-        assert!((layout.groups["g1b"].width - 80.0).abs() < 0.5);
-        // a2 不动（PinSet 保护）
-        assert!((layout.nodes["a2"].x - 20.0).abs() < 0.5);
-        // a1 不受影响
-        assert!((layout.nodes["a1"].x - 20.0).abs() < 0.5);
-    }

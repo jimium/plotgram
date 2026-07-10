@@ -739,6 +739,7 @@
             diagram_type: DiagramType::Flowchart,
             attributes: Vec::new(), entities, relations,
             groups: Vec::new(), style_decls: vec![],
+            constraints: vec![],
             source_info: SourceInfo { file: None, line_count: 1 },
             ..Default::default()
         };

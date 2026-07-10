@@ -82,7 +82,6 @@ impl FormatEncoder for FreemindEncoder {
 
         Ok(DiagramEncodeOutput {
             output: RenderOutput::Text(text),
-            report: None,
         })
     }
 

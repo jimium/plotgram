@@ -5,8 +5,8 @@
 
 // ─── 节点尺寸 ──────────────────────────────────────────
 
-/// 默认节点宽度
-pub const DEFAULT_NODE_WIDTH: f64 = 160.0;
+/// 默认节点宽度（无标签估宽时的回退值；flowchart 主路径已按标签估宽）
+pub const DEFAULT_NODE_WIDTH: f64 = 136.0;
 
 /// 默认节点高度
 pub const DEFAULT_NODE_HEIGHT: f64 = 50.0;
@@ -14,7 +14,10 @@ pub const DEFAULT_NODE_HEIGHT: f64 = 50.0;
 // ─── 间距 ──────────────────────────────────────────────
 
 /// 默认画布内边距（所有布局统一使用）
-pub const DEFAULT_PADDING: f64 = 70.0;
+///
+/// Phase A：70 → 50，去掉「布局内 40、管线再抬到 70」的双重抬升，
+/// 与 Sugiyama preset.padding 对齐。
+pub const DEFAULT_PADDING: f64 = 50.0;
 
 /// 默认分组内边距（force_directed / sequence / circular；sugiyama 系列使用 28.0）
 pub const DEFAULT_GROUP_PADDING: f64 = 20.0;
@@ -75,11 +78,11 @@ pub const DEFAULT_LEADER_LINE_THRESHOLD: f64 = 4.0;
 pub const SUGIYAMA_GROUP_PADDING: f64 = 28.0;
 
 /// 圆形布局：画布内边距、多分量间距
-pub const CIRCULAR_PADDING: f64 = 70.0;
+pub const CIRCULAR_PADDING: f64 = DEFAULT_PADDING;
 pub const CIRCULAR_COMPONENT_GAP: f64 = 40.0;
 
 /// 径向/力导向布局画布内边距
-pub const WIDE_PADDING: f64 = 70.0;
+pub const WIDE_PADDING: f64 = DEFAULT_PADDING;
 
 /// Force-directed-fr 默认节点宽度（比标准值略窄，适配散布布局）
 pub const FR_NODE_WIDTH: f64 = 156.0;
@@ -101,7 +104,8 @@ pub const FORCE_DIRECTED_GROUP_PADDING: f64 = 20.0;
 
 /// architecture 画布与分组内边距
 pub const ARCH_V2_PADDING: f64 = DEFAULT_PADDING;
-pub const ARCH_V2_GROUP_PADDING: f64 = SUGIYAMA_GROUP_PADDING;
+/// 与 [`GroupPadding::architecture_v2`] 水平边距对齐（Phase D：28 → 20）
+pub const ARCH_V2_GROUP_PADDING: f64 = 20.0;
 
 // ─── 网格吸附（Grid Snap）────────────────────────────────
 
@@ -114,8 +118,8 @@ pub const GRID_SNAP_LAYER_TOLERANCE: f64 = 4.0;
 /// 单节点 snap 最大允许位移，超过则跳过
 pub const GRID_SNAP_MAX_DISTANCE: f64 = 24.0;
 
-/// architecture 槽位间距
-pub const GRID_SNAP_NODE_GAP_ARCH: f64 = 48.0;
+/// architecture 槽位间距（与 architecture_v2 NODE_GAP 对齐）
+pub const GRID_SNAP_NODE_GAP_ARCH: f64 = 32.0;
 
-/// sugiyama-v2 槽位间距
-pub const GRID_SNAP_NODE_GAP_SUGIYAMA: f64 = 56.0;
+/// sugiyama-v2 槽位间距（与 FLOWCHART_PRESET.node_gap 对齐）
+pub const GRID_SNAP_NODE_GAP_SUGIYAMA: f64 = 36.0;

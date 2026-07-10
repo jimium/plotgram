@@ -97,7 +97,6 @@ impl FormatEncoder for MdOutlineEncoder {
 
         Ok(DiagramEncodeOutput {
             output: RenderOutput::Text(text),
-            report: None,
         })
     }
 

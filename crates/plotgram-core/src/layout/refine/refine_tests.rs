@@ -139,6 +139,7 @@ use crate::types::DiagramType;
             entities,
             relations: rels,
             groups: Vec::new(),
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo { file: None, line_count: 1 },
             ..Default::default()
@@ -296,6 +297,7 @@ use crate::types::DiagramType;
             entities,
             relations: rels,
             groups: Vec::new(),
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo { file: None, line_count: 1 },
             ..Default::default()

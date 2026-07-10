@@ -1,4 +1,4 @@
-//! 布局管线编排器：将 `compute_layout_with_plan_and_overlay` 的多阶段逻辑结构化。
+//! 布局管线编排器：将 `compute_layout_with_plan` 的多阶段逻辑结构化。
 
 use crate::ast::Diagram;
 use crate::error::DiagnosticError;
@@ -6,37 +6,27 @@ use crate::layout::constants;
 use crate::layout::edge_postprocess;
 use crate::layout::grid_snap;
 use crate::layout::group_frame::GroupFramePass;
-use crate::layout::intent::{self, IntentStatus, LayoutIntentOverlay, RefinementReport};
 use crate::layout::plan::LayoutPlan;
 use crate::layout::postprocess;
 use crate::layout::refine;
 use crate::layout::registry;
 use crate::layout::route_feedback::{LayoutRouteFeedback, PreRouteFeedback};
 use crate::layout::{resolve_effective_direction, EdgeRoutingStrategy, LayoutResult};
-use std::collections::{HashMap, HashSet};
 use crate::layout::perf::Instant;
+use std::collections::{HashMap, HashSet};
 
-/// 带意图叠加层的布局管线。
+/// 布局管线。
 pub(crate) struct LayoutPipeline<'a> {
     diagram: &'a Diagram,
     plan: &'a LayoutPlan,
-    overlay: Option<&'a LayoutIntentOverlay>,
 }
 
 impl<'a> LayoutPipeline<'a> {
-    pub fn new(
-        diagram: &'a Diagram,
-        plan: &'a LayoutPlan,
-        overlay: Option<&'a LayoutIntentOverlay>,
-    ) -> Self {
-        Self {
-            diagram,
-            plan,
-            overlay,
-        }
+    pub fn new(diagram: &'a Diagram, plan: &'a LayoutPlan) -> Self {
+        Self { diagram, plan }
     }
 
-    pub fn run(self) -> Result<(LayoutResult, Option<RefinementReport>), DiagnosticError> {
+    pub fn run(self) -> Result<LayoutResult, DiagnosticError> {
         let algo = self.plan.layout_algo.as_str();
 
         let strategy = registry::build_layout_strategy(algo, self.plan).ok_or_else(|| {
@@ -53,116 +43,31 @@ impl<'a> LayoutPipeline<'a> {
             node_align_config.apply_diagram_override(override_mode);
         }
 
-        let mut report = RefinementReport::default();
-        let valid_topology = self.validate_topology_intents(&mut report);
-
         let t_layout = Instant::now();
-        let mut result = strategy.compute_with_overlay(self.diagram, Some(&valid_topology));
+        let mut result = strategy.compute(self.diagram);
         let layout_elapsed = t_layout.elapsed();
         crate::perf_log!("[perf] layout: {:.2}ms", layout_elapsed.as_secs_f64() * 1000.0);
 
-        self.evaluate_topology_satisfaction(&valid_topology, &mut result, &mut report);
-
-        let mut pinned = intent::PinSet::default();
-        if let Some(ov) = self.overlay {
-            let geo_report =
-                intent::geometric::apply_geometric_refinement(&mut result, ov, &mut pinned, self.diagram);
-            report.merge(geo_report);
-        }
-
-        self.apply_node_frame(&node_align_config, &mut result, &pinned)?;
+        self.apply_node_frame(&node_align_config, &mut result)?;
 
         if produces_edges {
             postprocess::finalize_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
-            let report_opt = if self.overlay.is_some() {
-                Some(report)
-            } else {
-                None
-            };
-            return Ok((result, report_opt));
+            return Ok(result);
         }
 
         let t_routing = Instant::now();
-        let mut result = self.run_routing_pipeline(algo, result, &pinned, &mut report)?;
+        let mut result = self.run_routing_pipeline(algo, result)?;
         let routing_elapsed = t_routing.elapsed();
         crate::perf_log!("[perf] routing: {:.2}ms", routing_elapsed.as_secs_f64() * 1000.0);
 
         postprocess::finalize_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
-
-        let report_opt = if self.overlay.is_some() {
-            Some(report)
-        } else {
-            None
-        };
-        Ok((result, report_opt))
-    }
-
-    fn validate_topology_intents(&self, report: &mut RefinementReport) -> Vec<intent::topology::ValidTopologyIntent> {
-        if let Some(ov) = self.overlay {
-            let (valid, validation_results) =
-                intent::topology::validate_topology_intents(self.diagram, ov);
-            for r in validation_results {
-                report.push(r.index, r.kind, r.status, r.message);
-            }
-            valid
-        } else {
-            Vec::new()
-        }
-    }
-
-    fn evaluate_topology_satisfaction(
-        &self,
-        valid_topology: &[intent::topology::ValidTopologyIntent],
-        result: &LayoutResult,
-        report: &mut RefinementReport,
-    ) {
-        if valid_topology.is_empty() {
-            return;
-        }
-
-        let skipped: HashSet<usize> = result.hints.skipped_topology_intents.iter().copied().collect();
-
-        if let Some(ranks) = &result.hints.sugiyama_ranks {
-            let satisfaction =
-                intent::topology::evaluate_topology_satisfaction(valid_topology, ranks);
-            for r in satisfaction {
-                if skipped.contains(&r.index) {
-                    report.push(
-                        r.index,
-                        r.kind,
-                        IntentStatus::Partial,
-                        Some("cross-group topology intent not supported in first phase".into()),
-                    );
-                } else {
-                    report.push(r.index, r.kind, r.status, r.message);
-                }
-            }
-        } else {
-            for v in valid_topology {
-                if skipped.contains(&v.index) {
-                    report.push(
-                        v.index,
-                        v.kind,
-                        IntentStatus::Partial,
-                        Some("cross-group topology intent not supported in first phase".into()),
-                    );
-                } else {
-                    report.push(
-                        v.index,
-                        v.kind,
-                        IntentStatus::Partial,
-                        Some("layout algorithm does not expose rank information".into()),
-                    );
-                }
-            }
-        }
+        Ok(result)
     }
 
     fn apply_node_frame(
         &self,
         node_align_config: &grid_snap::NodeAlignConfig,
         result: &mut LayoutResult,
-        pinned: &intent::PinSet,
     ) -> Result<(), DiagnosticError> {
         if !node_align_config.enabled {
             return Ok(());
@@ -175,10 +80,10 @@ impl<'a> LayoutPipeline<'a> {
 
         let horizontal = effective_dir == Some("left-to-right");
 
-        grid_snap::align_nodes(result, node_align_config, horizontal, pinned);
+        grid_snap::align_nodes(result, node_align_config, horizontal);
         let algo = self.plan.layout_algo.as_str();
         let gf_pass = GroupFramePass::resolve(self.diagram, self.plan, algo);
-        gf_pass.apply_after_node_snap(self.diagram, result, pinned, algo);
+        gf_pass.apply_after_node_snap(self.diagram, result, algo);
         grid_snap::update_canvas_bounds(result, constants::DEFAULT_PADDING);
         Ok(())
     }
@@ -187,8 +92,6 @@ impl<'a> LayoutPipeline<'a> {
         &self,
         algo: &str,
         result: LayoutResult,
-        pinned: &intent::PinSet,
-        report: &mut RefinementReport,
     ) -> Result<LayoutResult, DiagnosticError> {
         let t0 = Instant::now();
         let feedback = LayoutRouteFeedback::new(self.diagram, self.plan, algo);
@@ -199,16 +102,15 @@ impl<'a> LayoutPipeline<'a> {
 
         let edge_routing_style =
             LayoutPlan::resolve_effective_edge_routing(self.diagram, self.plan, &result_v2.hints);
-        let router = registry::build_edge_routing_strategy(edge_routing_style.as_str(), self.plan).ok_or_else(
-            || {
+        let router = registry::build_edge_routing_strategy(edge_routing_style.as_str(), self.plan)
+            .ok_or_else(|| {
                 super::layout_config_error(
                     self.diagram,
                     crate::types::standard_attr_keys::diagram::EDGE_ROUTING,
                     edge_routing_style.as_str(),
                     &super::known_edge_routing_names(),
                 )
-            },
-        )?;
+            })?;
         let mut edge_snap_config = router.edge_snap_config();
         if let Some(false) = grid_snap::diagram_snap_attribute(self.diagram) {
             edge_snap_config.enabled = false;
@@ -217,16 +119,12 @@ impl<'a> LayoutPipeline<'a> {
         edge_snap_config.grid_step = grid_snap::adaptive_grid_step(result_v2.nodes.len());
         let gf_pass = GroupFramePass::resolve(self.diagram, self.plan, algo);
         if !self.diagram.groups.is_empty() {
-            gf_pass.refresh_before_route(self.diagram, &mut result_v2, pinned, algo);
+            gf_pass.refresh_before_route(self.diagram, &mut result_v2, algo);
         }
 
         let refine_config = refine::RefineConfig::default();
         let t_route = Instant::now();
-        let mut result = feedback.complete_routing(
-            router.as_ref(),
-            result_v2,
-            &refine_config,
-        );
+        let mut result = feedback.complete_routing(router.as_ref(), result_v2, &refine_config);
         crate::perf_log!("[perf]   route: {:.2}ms", t_route.elapsed().as_secs_f64() * 1000.0);
 
         let t_post = Instant::now();
@@ -237,13 +135,7 @@ impl<'a> LayoutPipeline<'a> {
             &edge_snap_config,
         );
 
-        if let Some(ov) = self.overlay {
-            if !pinned.aligned_vertical.is_empty() || !pinned.aligned_horizontal.is_empty() {
-                intent::geometric::check_alignment_after_refine(&result, pinned, ov, report);
-            }
-        }
-
-        result = self.run_post_route_group_frame(algo, result, pinned, &gf_pass, &*router, &edge_snap_config)?;
+        result = self.run_post_route_group_frame(algo, result, &gf_pass, &*router, &edge_snap_config)?;
 
         if algo == "architecture" {
             let t_prs = Instant::now();
@@ -262,7 +154,6 @@ impl<'a> LayoutPipeline<'a> {
                     &gf_pass.spec,
                     self.diagram,
                     &mut result,
-                    pinned,
                 );
                 let moved_nodes: HashSet<String> = result
                     .nodes
@@ -330,7 +221,6 @@ impl<'a> LayoutPipeline<'a> {
         &self,
         algo: &str,
         mut result: LayoutResult,
-        pinned: &intent::PinSet,
         gf_pass: &GroupFramePass,
         router: &dyn EdgeRoutingStrategy,
         edge_snap_config: &grid_snap::EdgeSnapConfig,
@@ -350,7 +240,7 @@ impl<'a> LayoutPipeline<'a> {
             .map(|(id, n)| (id.clone(), (n.x, n.y)))
             .collect();
 
-        gf_pass.restore_after_node_moves(self.diagram, &mut result, pinned, algo, &pre_recompute_y);
+        gf_pass.restore_after_node_moves(self.diagram, &mut result, algo, &pre_recompute_y);
 
         let max_node_disp = result
             .nodes

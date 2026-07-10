@@ -7,7 +7,6 @@ use plotgram_core::{
     ast::{Diagram, RawDiagram},
     diff2::{self, ChangeSet},
     error::DiagnosticError,
-    layout::LayoutIntentOverlay,
     parser,
     pipeline::{parse_prepare_validate, render_output_with_report, RenderOutputWithReport},
     prepare::StyleRequest,
@@ -24,9 +23,6 @@ pub struct RenderResult {
     pub text: Option<String>,
     pub errors: Vec<DiagnosticError>,
     pub warnings: Vec<DiagnosticError>,
-    /// 布局意图修正报告（仅当 `WasmRenderOptions.layout_intents` 为 `Some` 时存在）。
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub refinement_report: Option<plotgram_core::layout::RefinementReport>,
     /// drawio 导出降级报告（仅 drawio 格式时存在）。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub export_report: Option<plotgram_core::render::encode::ExportReport>,
@@ -48,11 +44,6 @@ pub struct WasmRenderOptions {
     /// 是否在画布顶部绘制 DSL title（默认 false）
     pub show_title: Option<bool>,
     pub ascii: Option<plotgram_core::render::encode::ascii::AsciiExportOptions>,
-    /// 布局意图叠加层（可选）。
-    ///
-    /// 透传至 `RenderRequest::layout_overlay`，由布局算法与几何微调阶段消费。
-    /// 为 `None` 时布局行为与无意图完全一致。
-    pub layout_intents: Option<LayoutIntentOverlay>,
 }
 
 #[wasm_bindgen(start)]
@@ -84,7 +75,7 @@ fn normalize_option(value: Option<&str>) -> Option<&str> {
         .filter(|value| !value.is_empty() && *value != "auto")
 }
 
-/// 将可选 options 应用到 RenderRequest(theme / graphic_style / dark_mode / transparent / ascii / layout_intents)。
+/// 将可选 options 应用到 RenderRequest(theme / graphic_style / dark_mode / transparent / ascii)。
 /// 返回 Err 时携带错误消息(如未知 graphic_style)。
 fn apply_options_to_request<'a>(
     request: &mut RenderRequest<'a>,
@@ -105,9 +96,6 @@ fn apply_options_to_request<'a>(
     request.show_title = options.show_title.unwrap_or(false);
     if let Some(ascii) = &options.ascii {
         request.ascii_options = ascii.clone();
-    }
-    if let Some(intents) = &options.layout_intents {
-        request.layout_overlay = Some(intents);
     }
     Ok(())
 }
@@ -135,7 +123,6 @@ pub fn render_with_options(source: &str, format: &str, options_json: &str) -> St
                     format!("invalid render options json: {err}"),
                 )],
                 warnings: vec![],
-                refinement_report: None,
                 export_report: None,
             };
             serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
@@ -158,7 +145,6 @@ fn render_impl(source: &str, format_str: &str, options: Option<WasmRenderOptions
                     ),
                 )],
                 warnings: vec![],
-                refinement_report: None,
                 export_report: None,
             };
             return serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string());
@@ -180,14 +166,13 @@ fn render_impl(source: &str, format_str: &str, options: Option<WasmRenderOptions
                 ));
             } else {
                 match render_output_with_report(&request) {
-                    Ok(RenderOutputWithReport { output: RenderOutput::Text(text), report, export_report }) => {
+                    Ok(RenderOutputWithReport { output: RenderOutput::Text(text), export_report, .. }) => {
                         let result = RenderResult {
                             success: true,
                             format: format_str.to_string(),
                             text: Some(text),
                             errors,
                             warnings,
-                            refinement_report: report,
                             export_report,
                         };
                         return serde_json::to_string(&result)
@@ -213,7 +198,6 @@ fn render_impl(source: &str, format_str: &str, options: Option<WasmRenderOptions
         text: None,
         errors,
         warnings,
-        refinement_report: None,
         export_report: None,
     };
     serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())

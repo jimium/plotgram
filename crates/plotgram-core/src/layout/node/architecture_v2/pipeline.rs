@@ -151,11 +151,15 @@ struct GroupBoundsPhase;
 
 impl Phase for GroupBoundsPhase {
     fn apply(&self, ctx: &mut LayoutContext) {
-        ctx.groups = group_bounds::compute_group_bounds(
-            ctx.diagram,
-            &ctx.nodes,
-            GroupPadding::uniform(ctx.config.group_padding, GROUP_LABEL_HEIGHT),
-        );
+        let padding = if (ctx.config.group_padding - crate::layout::constants::ARCH_V2_GROUP_PADDING)
+            .abs()
+            < f64::EPSILON
+        {
+            GroupPadding::architecture_v2()
+        } else {
+            GroupPadding::uniform(ctx.config.group_padding, GROUP_LABEL_HEIGHT)
+        };
+        ctx.groups = group_bounds::compute_group_bounds(ctx.diagram, &ctx.nodes, padding);
         clamp_groups_to_canvas(&mut ctx.nodes, &mut ctx.groups);
     }
 }

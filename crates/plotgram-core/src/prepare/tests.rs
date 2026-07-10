@@ -39,6 +39,7 @@ fn state_diagram_gets_default_type_state() {
         ],
         relations: vec![],
         groups: vec![],
+            constraints: vec![],
         style_decls: vec![],
         source_info: SourceInfo {
             file: None,
@@ -72,6 +73,7 @@ fn existing_type_not_overridden() {
         entities: vec![make_entity("init", "初始化", attrs)],
         relations: vec![],
         groups: vec![],
+            constraints: vec![],
         style_decls: vec![],
         source_info: SourceInfo {
             file: None,
@@ -96,6 +98,7 @@ fn er_diagram_no_default_type() {
         entities: vec![make_entity("user", "User", AttributeMap::default())],
         relations: vec![],
         groups: vec![],
+            constraints: vec![],
         style_decls: vec![],
         source_info: SourceInfo {
             file: None,
@@ -117,6 +120,7 @@ fn flowchart_gets_default_type_process() {
         entities: vec![make_entity("step1", "步骤1", AttributeMap::default())],
         relations: vec![],
         groups: vec![],
+            constraints: vec![],
         style_decls: vec![],
         source_info: SourceInfo {
             file: None,
@@ -141,6 +145,7 @@ fn sequence_gets_default_type_participant() {
         entities: vec![make_entity("api", "API", AttributeMap::default())],
         relations: vec![],
         groups: vec![],
+            constraints: vec![],
         style_decls: vec![],
         source_info: SourceInfo {
             file: None,
@@ -165,6 +170,7 @@ fn architecture_gets_default_type_service() {
         entities: vec![make_entity("svc", "服务", AttributeMap::default())],
         relations: vec![],
         groups: vec![],
+            constraints: vec![],
         style_decls: vec![],
         source_info: SourceInfo {
             file: None,
@@ -189,6 +195,7 @@ fn idempotent() {
         entities: vec![make_entity("s1", "状态1", AttributeMap::default())],
         relations: vec![],
         groups: vec![],
+            constraints: vec![],
         style_decls: vec![],
         source_info: SourceInfo {
             file: None,
@@ -307,6 +314,7 @@ fn expand_structure_derives_branch_slot_for_mindmap() {
             span: Span::dummy(),
         }],
         groups: vec![],
+            constraints: vec![],
         style_decls: vec![],
         source_info: SourceInfo { file: None, line_count: 5 },
         ..Default::default()

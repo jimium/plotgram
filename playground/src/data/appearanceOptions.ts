@@ -1,5 +1,4 @@
 import type { SelectOption } from './layoutOptions';
-import type { LayoutIntentOverlay } from './intentOptions';
 import {
   DEFAULT_PREVIEW_BACKGROUND,
   previewBackgroundForcesTransparent,
@@ -69,8 +68,6 @@ export interface WasmRenderOptions {
     output_encoding?: 'ascii' | 'utf8';
     non_ascii_policy?: 'escape' | 'replace' | 'drop' | 'approximate';
   };
-  /** 布局意图叠加层（可选）。透传至 Rust 端 `RenderRequest::layout_overlay`。 */
-  layout_intents?: LayoutIntentOverlay | null;
 }
 
 /** 兼容 localStorage / 分享链接中的 legacy `styleId` 字段。 */
@@ -102,10 +99,9 @@ export function normalizeAppearanceOptions(raw: unknown): AppearanceOptions {
 
 export function buildRenderOptions(
   opts: AppearanceOptions,
-  layoutIntents?: LayoutIntentOverlay | null,
   previewBackground: PreviewBackground = DEFAULT_PREVIEW_BACKGROUND,
 ): WasmRenderOptions {
-  const options: WasmRenderOptions = {
+  return {
     theme_id: opts.themeId === 'auto' ? undefined : opts.themeId,
     graphic_style: opts.graphicStyle === 'auto' ? undefined : opts.graphicStyle,
     dark_mode: Boolean(opts.darkMode),
@@ -115,10 +111,6 @@ export function buildRenderOptions(
       non_ascii_policy: 'approximate',
     },
   };
-  if (layoutIntents) {
-    options.layout_intents = layoutIntents;
-  }
-  return options;
 }
 
 export function isAppearanceOverridden(opts: AppearanceOptions): boolean {

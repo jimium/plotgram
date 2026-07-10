@@ -879,6 +879,7 @@ mod tests {
                 span: Span::dummy(),
             }],
             groups: vec![],
+            constraints: vec![],
             style_decls: vec![],
             doc_comment: None,
             source_info: SourceInfo {

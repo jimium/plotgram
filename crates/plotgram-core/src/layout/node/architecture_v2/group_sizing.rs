@@ -21,20 +21,21 @@ pub fn is_valid_group_sizing_atom(raw: &str) -> bool {
 
 /// 从 diagram 属性 `group_sizing` 读取策略。
 ///
-/// 默认 `Uniform`（与 L1 RankBand `track: equal` 对齐）；显式 `fit` 退回内容贴合。
+/// Phase C：默认 `Fit`（内容贴合），避免窄组被最宽组横向拉空；
+/// 显式 `uniform` 才拉齐等宽条带。
 pub fn parse_group_sizing(diagram: &Diagram) -> GroupSizingPolicy {
     for attr in &diagram.attributes {
         if attr.key == "group_sizing" {
             if let Some(v) = attr.value.as_str() {
                 return match v.trim().to_ascii_lowercase().as_str() {
-                    "fit" => GroupSizingPolicy::Fit,
                     "uniform" => GroupSizingPolicy::Uniform,
-                    _ => GroupSizingPolicy::Uniform,
+                    "fit" => GroupSizingPolicy::Fit,
+                    _ => GroupSizingPolicy::Fit,
                 };
             }
         }
     }
-    GroupSizingPolicy::Uniform
+    GroupSizingPolicy::Fit
 }
 
 /// 组块 trait：供 uniform 策略调整宽度（与 two_phase::MacroBlock 对齐）

@@ -195,7 +195,7 @@ fn prepare_diagram(source: &str) -> PreparedDiagram {
     plotgram_core::pipeline::prepare(RawDiagram(raw.into_inner()), &StyleRequest::default())
         .expect("prepare diagram")
         .diagram
-}
+        }
 
 fn scenario_from_samples(
     name: &'static str,

@@ -391,6 +391,7 @@ mod tests {
             entities,
             relations,
             groups: vec![],
+            constraints: vec![],
             style_decls: vec![],
             doc_comment: None,
             source_info: SourceInfo {

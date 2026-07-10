@@ -1,0 +1,21 @@
+// architecture 跨组 constrain：强制 storage 在 ingress 下游
+diagram architecture {
+    title: "constrain cross-group"
+
+    group ingress "入口" {
+        entity[service] api "API"
+        entity[service] gw "Gateway"
+        api -> gw
+    }
+
+    group storage "存储" {
+        entity[database] db "DB"
+        entity[cache] cache "Cache"
+        cache -> db
+    }
+
+    gw -> cache
+
+    // 隐形硬约束：即使业务边稀疏，也强制 storage 侧在下游
+    constrain gw -> db
+}

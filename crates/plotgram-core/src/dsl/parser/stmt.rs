@@ -341,10 +341,15 @@ impl Parser {
                         local_relations.push(rel);
                     }
                 }
+                TokenKind::Constrain => {
+                    if let Some(c) = self.parse_constraint() {
+                        self.pending_constraints.push(c);
+                    }
+                }
                 _ => {
                     self.errors.push(DiagnosticError::syntax_error(
                         self.current().span,
-                        "group 内只允许 entity、嵌套 group、属性声明和 edge 连线",
+                        "group 内只允许 entity、嵌套 group、属性声明、edge 连线和 constrain",
                     ));
                     self.advance();
                 }
@@ -474,6 +479,66 @@ impl Parser {
             head_label,
             tail_label,
             attributes,
+            span: Span::new(start.start, self.last_end()),
+        })
+    }
+
+    // ── Constraint ───────────────────────────────────────
+
+    /// 解析 `constrain A -> B`。仅允许 `->`，不允许标签或属性块。
+    pub(super) fn parse_constraint(&mut self) -> Option<Constraint> {
+        let start = self.current().span;
+        self.advance(); // consume 'constrain'
+
+        let (from_str, _) = self.expect_ident()?;
+        let from = Identifier::new_unchecked(&from_str);
+
+        match self.peek_kind() {
+            TokenKind::Arrow => {
+                self.advance();
+            }
+            TokenKind::DashArrow | TokenKind::BiArrow => {
+                self.errors.push(DiagnosticError::syntax_error(
+                    self.current().span,
+                    "constrain 只允许使用 '->'，不支持 '-->' 或 '<->'",
+                ));
+                self.skip_to_next_statement();
+                return None;
+            }
+            _ => {
+                self.errors.push(DiagnosticError::unexpected_token(
+                    self.current().span,
+                    self.peek_kind().display_name(),
+                    &["'->'"],
+                ));
+                self.skip_to_next_statement();
+                return None;
+            }
+        }
+
+        let (to_str, _) = self.expect_ident()?;
+        let to = Identifier::new_unchecked(&to_str);
+
+        if matches!(self.peek_kind(), TokenKind::StringLit(_)) {
+            self.errors.push(DiagnosticError::syntax_error(
+                self.current().span,
+                "constrain 不支持标签",
+            ));
+            self.skip_to_next_statement();
+            return None;
+        }
+        if matches!(self.peek_kind(), TokenKind::LBrace) {
+            self.errors.push(DiagnosticError::syntax_error(
+                self.current().span,
+                "constrain 不支持属性块",
+            ));
+            self.skip_to_next_statement();
+            return None;
+        }
+
+        Some(Constraint {
+            from,
+            to,
             span: Span::new(start.start, self.last_end()),
         })
     }

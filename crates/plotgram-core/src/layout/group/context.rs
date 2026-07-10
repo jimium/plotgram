@@ -241,6 +241,7 @@ mod tests {
                 span: span(),
             }],
             relations: vec![],
+            constraints: vec![],
             style_decls: vec![],
             source_info: crate::ast::SourceInfo {
                 file: None,

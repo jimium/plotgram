@@ -933,6 +933,7 @@ mod tests {
             ],
             relations: vec![],
             groups: vec![],
+            constraints: vec![],
             ..Default::default()
         };
         let result = LayoutResult {
@@ -959,6 +960,7 @@ mod tests {
             diagram_type: crate::types::DiagramType::Architecture,
             entities: vec![],
             relations: vec![],
+            constraints: vec![],
             groups: vec![
                 Group {
                     id: Identifier::new_unchecked("g1"),
@@ -1006,6 +1008,7 @@ mod tests {
             diagram_type: crate::types::DiagramType::Architecture,
             entities: vec![],
             relations: vec![],
+            constraints: vec![],
             groups: vec![
                 Group {
                     id: Identifier::new_unchecked("parent"),
@@ -1059,6 +1062,7 @@ mod tests {
                 span,
             }],
             relations: vec![],
+            constraints: vec![],
             groups: vec![Group {
                 id: Identifier::new_unchecked("g1"),
                 label: "G".into(),
@@ -1194,6 +1198,7 @@ mod tests {
             ],
             relations: vec![],
             groups: vec![],
+            constraints: vec![],
             ..Default::default()
         };
         let result = LayoutResult {
@@ -1246,6 +1251,7 @@ mod tests {
                 span,
             }],
             groups: vec![],
+            constraints: vec![],
             source_info: SourceInfo::default(),
             ..Default::default()
         };

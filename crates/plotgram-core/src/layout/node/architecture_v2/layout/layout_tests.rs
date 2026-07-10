@@ -176,9 +176,10 @@ use crate::ast::{
         let result = ArchitectureV2Layout::default().compute(&d);
         let fe = result.groups.get("frontend").unwrap();
         let be = result.groups.get("backend").unwrap();
+        // 两层组框不得重叠；紧凑间距下允许贴齐（不再强制 MIN_GROUP_GAP 空隙）。
         assert!(
-            fe.y + fe.height + 8.0 <= be.y,
-            "frontend bottom {:.1} should be at least 8px above backend top {:.1}",
+            fe.y + fe.height <= be.y + 0.5,
+            "frontend should not overlap backend: fe.bottom={:.1} be.top={:.1}",
             fe.y + fe.height,
             be.y
         );
@@ -253,24 +254,25 @@ use crate::ast::{
             gw_cx
         );
 
-        // 所有组成员节点应落在分组包围框内（含 padding）
+        // 所有组成员节点应落在分组包围框内（architecture_v2 非对称 padding）
+        let pad = crate::layout::node::common::group_bounds::GroupPadding::architecture_v2();
         for eid in ["web", "mobile"] {
             let n = result.nodes.get(eid).unwrap();
             assert!(
-                n.x >= fe.x + constants::ARCH_V2_GROUP_PADDING - 0.5
-                    && n.x + n.width <= fe.x + fe.width - constants::ARCH_V2_GROUP_PADDING + 0.5
-                    && n.y >= fe.y + GROUP_LABEL_HEIGHT + constants::ARCH_V2_GROUP_PADDING - 0.5
-                    && n.y + n.height <= fe.y + fe.height - constants::ARCH_V2_GROUP_PADDING + 0.5,
+                n.x >= fe.x + pad.left - 0.5
+                    && n.x + n.width <= fe.x + fe.width - pad.right + 0.5
+                    && n.y >= fe.y + pad.top - 0.5
+                    && n.y + n.height <= fe.y + fe.height - pad.bottom + 0.5,
                 "{eid} should stay inside frontend group"
             );
         }
         for eid in ["gateway", "user_svc", "order_svc"] {
             let n = result.nodes.get(eid).unwrap();
             assert!(
-                n.x >= be.x + constants::ARCH_V2_GROUP_PADDING - 0.5
-                    && n.x + n.width <= be.x + be.width - constants::ARCH_V2_GROUP_PADDING + 0.5
-                    && n.y >= be.y + GROUP_LABEL_HEIGHT + constants::ARCH_V2_GROUP_PADDING - 0.5
-                    && n.y + n.height <= be.y + be.height - constants::ARCH_V2_GROUP_PADDING + 0.5,
+                n.x >= be.x + pad.left - 0.5
+                    && n.x + n.width <= be.x + be.width - pad.right + 0.5
+                    && n.y >= be.y + pad.top - 0.5
+                    && n.y + n.height <= be.y + be.height - pad.bottom + 0.5,
                 "{eid} should stay inside backend group"
             );
         }

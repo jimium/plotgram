@@ -1,7 +1,7 @@
 # DSL 布局信号：删除 Intent、隐形约束边、声明序软偏置
 
 > 日期：2026-07-09  
-> 状态：已决定，待实施  
+> 状态：已实施（2026-07-10）  
 > 原文件名：`remove-intent-add-constrain-edge-2026-07.md`（已重命名并扩充）  
 > 相关文档：  
 > - [layout-routing-pipeline-full-analysis.md](./layout-routing-pipeline-full-analysis.md)（§14 intent 现状）  

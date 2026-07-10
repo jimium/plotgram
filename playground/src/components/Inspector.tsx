@@ -1,6 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { IconChevron, IconDownload, IconCopy, IconSettings, IconReset } from './Icons';
-import { IntentPanel } from './IntentPanel';
 import {
   buildLayoutAlgoOptions,
   buildEdgeRoutingOptions,
@@ -32,7 +31,6 @@ import {
   resolveEffectiveThemeId,
   type AppearanceOptions,
 } from '../data/appearanceOptions';
-import type { IntentDrafts } from '../data/intentOptions';
 import type { DiagramKind } from '../data/examples';
 import { KIND_LABELS } from '../data/examples';
 import type { ExportReport } from '../lib/wasm';
@@ -294,11 +292,6 @@ interface InspectorProps {
   onResetLayout: () => void;
   onReset: () => void;
   onLayoutSourceChange: (source: 'source' | 'panel') => void;
-  /** 布局意图草稿 */
-  intentDrafts: IntentDrafts;
-  onIntentChange: (drafts: IntentDrafts) => void;
-  /** 当前 diagram 的实体 ID 列表，供意图面板选择节点 */
-  entityIds: string[];
   /** 导出回调 */
   onExportSvg?: () => void;
   onExportPng?: () => void;
@@ -335,9 +328,6 @@ export function Inspector({
   onResetLayout,
   onReset,
   onLayoutSourceChange,
-  intentDrafts,
-  onIntentChange,
-  entityIds,
   onExportSvg,
   onExportPng,
   onExportWebp,
@@ -553,15 +543,6 @@ export function Inspector({
               </p>
             </>
           )}
-        </Section>
-
-        {/* ── 布局意图 ──────────────────────────────────── */}
-        <Section
-          title="布局意图"
-          badge={intentDrafts.enabled ? <span className="tag tag-override">已启用</span> : null}
-          defaultOpen={false}
-        >
-          <IntentPanel drafts={intentDrafts} onChange={onIntentChange} entityIds={entityIds} />
         </Section>
 
         {/* ── 第三层：外观 ──────────────────────────────── */}

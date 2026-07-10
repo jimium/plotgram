@@ -330,7 +330,7 @@ mod tests {
                 line_count: 1,
             },
         )
-    }
+        }
 
     fn config_attr(key: &str, algo: &str, options: &[(&str, AttributeValue)]) -> DiagramAttribute {
         DiagramAttribute {

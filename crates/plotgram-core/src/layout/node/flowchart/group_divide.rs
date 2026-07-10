@@ -75,10 +75,10 @@ impl AlignMode {
 /// 从 diagram 属性读取组间排列配置
 ///
 /// - `group_arrangement`：Atom，排列方向 vertical/horizontal（默认 vertical）
-/// - `group_gap`：Number，group 间距（默认 60.0）
+/// - `group_gap`：Number，group 间距（默认 48.0）
 /// - `group_align`：Atom，对齐方式（默认 center）
 fn read_arrangement_config(diagram: &Diagram) -> (f64, AlignMode, ArrangementMode) {
-    let mut gap = 60.0;
+    let mut gap = 48.0;
     let mut align = AlignMode::DEFAULT;
     let mut mode = ArrangementMode::DEFAULT;
 
@@ -156,6 +156,17 @@ impl<'a> FlowchartIntraGroupLayouter<'a> {
             .cloned()
             .collect();
 
+        // 组内 constrain 一并传入子图布局
+        let constraints: Vec<crate::ast::Constraint> = self
+            .diagram
+            .constraints
+            .iter()
+            .filter(|c| {
+                member_set.contains(c.from.as_str()) && member_set.contains(c.to.as_str())
+            })
+            .cloned()
+            .collect();
+
         // 继承外层方向等关键属性
         let attributes: Vec<DiagramAttribute> = self.diagram.attributes.clone();
 
@@ -165,6 +176,7 @@ impl<'a> FlowchartIntraGroupLayouter<'a> {
             entities,
             relations,
             groups: vec![],
+            constraints,
             style_decls: vec![],
             doc_comment: None,
             source_info: Default::default(),
@@ -206,7 +218,11 @@ impl<'a> IntraGroupLayouter for FlowchartIntraGroupLayouter<'a> {
         // content_width/height 必须与 `compute_group_bounds` 的 GroupPadding 一致，
         // 否则 `refresh_layout_bounds` 重算 group bounds 后，group 间的 gap 会有偏差
         // （偏差 = 2*preset_padding - y_top - group_padding）。
-        let layers = rebuild_layers_from_ranks(&result.hints.sugiyama_ranks, members);
+        let layers = rebuild_layers_from_ranks(
+            &result.hints.sugiyama_ranks,
+            members,
+            self.diagram,
+        );
 
         // 节点包围框（含 preset padding）
         let min_x = result.nodes.values().map(|n| n.x).fold(f64::INFINITY, f64::min);
@@ -238,6 +254,7 @@ impl<'a> IntraGroupLayouter for FlowchartIntraGroupLayouter<'a> {
 fn rebuild_layers_from_ranks(
     ranks: &Option<HashMap<String, usize>>,
     members: &[String],
+    diagram: &Diagram,
 ) -> Vec<Vec<String>> {
     let Some(ranks) = ranks else {
         return vec![];
@@ -258,9 +275,10 @@ fn rebuild_layers_from_ranks(
             }
         }
     }
-    // 确定性排序
+    // 声明序 soft bias，再 id 字典序 fallback
+    let decl_index = crate::layout::decl_order::entity_sibling_decl_index(diagram);
     for layer in &mut layers {
-        layer.sort();
+        layer.sort_by(|a, b| crate::layout::decl_order::cmp_by_decl_then_id(&decl_index, a, b));
     }
     layers
 }
@@ -580,18 +598,15 @@ fn build_entity_to_top_group(
     mapping
 }
 
-/// 收集跨 group 边
+/// 收集跨 group 边（真实边 + 跨组 constrain）
 fn collect_cross_edges(
     diagram: &Diagram,
     entity_to_group: &HashMap<String, String>,
 ) -> Vec<CrossGroupEdge> {
     let mut edges = Vec::new();
-    for r in &diagram.relations {
-        let from = r.from.as_str().to_string();
-        let to = r.to.as_str().to_string();
+    let mut push_if_cross = |from: String, to: String| {
         let from_group = entity_to_group.get(&from).cloned();
         let to_group = entity_to_group.get(&to).cloned();
-
         // 跨 group 边：from_group != to_group（含一方无 group 的情况）
         if from_group != to_group {
             edges.push(CrossGroupEdge {
@@ -601,6 +616,12 @@ fn collect_cross_edges(
                 to_group,
             });
         }
+    };
+    for r in &diagram.relations {
+        push_if_cross(r.from.as_str().to_string(), r.to.as_str().to_string());
+    }
+    for c in &diagram.constraints {
+        push_if_cross(c.from.as_str().to_string(), c.to.as_str().to_string());
     }
     edges
 }
@@ -789,12 +810,14 @@ mod tests {
     fn should_divide_detects_groups() {
         let diagram_with_group = Diagram {
             groups: vec![group("g1")],
+            constraints: vec![],
             ..Default::default()
         };
         assert!(should_divide(&diagram_with_group));
 
         let diagram_no_group = Diagram {
             groups: vec![],
+            constraints: vec![],
             ..Default::default()
         };
         assert!(!should_divide(&diagram_no_group));
@@ -808,6 +831,7 @@ mod tests {
                 relation("a", "b"), // 跨 group
             ],
             groups: vec![group("g1"), group("g2")],
+            constraints: vec![],
             ..Default::default()
         };
 
@@ -838,6 +862,7 @@ mod tests {
                 relation("c", "d"),
             ],
             groups: vec![group("g1"), group("g2")],
+            constraints: vec![],
             ..Default::default()
         };
 
@@ -882,6 +907,7 @@ mod tests {
             ],
             relations: vec![relation("a", "b"), relation("b", "c")],
             groups: vec![group("g1")],
+            constraints: vec![],
             ..Default::default()
         };
 
@@ -902,7 +928,7 @@ mod tests {
             ..Default::default()
         };
         let (gap, align, mode) = read_arrangement_config(&diagram);
-        assert_eq!(gap, 60.0);
+        assert_eq!(gap, 48.0);
         assert_eq!(align, AlignMode::Center);
         assert_eq!(mode, ArrangementMode::Vertical);
     }
@@ -963,7 +989,7 @@ mod tests {
             ..Default::default()
         };
         let (gap, align, mode) = read_arrangement_config(&diagram);
-        assert_eq!(gap, 60.0); // 默认值
+        assert_eq!(gap, 48.0); // 默认值
         assert_eq!(align, AlignMode::Center); // 默认值
         assert_eq!(mode, ArrangementMode::Vertical); // 默认值
     }

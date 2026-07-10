@@ -45,6 +45,7 @@ mod tests {
             entities,
             relations,
             groups: vec![],
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo {
                 file: None,

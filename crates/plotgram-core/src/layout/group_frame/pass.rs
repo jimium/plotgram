@@ -5,7 +5,6 @@ use crate::layout::algorithm_config::{ArchitectureV2LayoutConfig, SugiyamaLayout
 use crate::layout::constants;
 #[allow(unused_imports)]
 use crate::layout::group;
-use crate::layout::intent::PinSet;
 use crate::layout::node::architecture_v2::post_layout;
 use crate::layout::plan::LayoutPlan;
 use crate::layout::LayoutResult;
@@ -38,11 +37,26 @@ impl GroupFramePass {
         &self,
         diagram: &Diagram,
         layout: &mut LayoutResult,
-        pinned: &PinSet,
         algo: &str,
     ) {
         recompute_group_bounds(diagram, layout, self.padding);
-        apply_group_frame(&self.spec, diagram, layout, pinned);
+        apply_group_frame(&self.spec, diagram, layout);
+        // Fit：整形/量化可能留下高于 base∪egb 的空壳，再收回一次。
+        if algo == "architecture" && matches!(self.spec.track_sizing, super::TrackSizing::Fit) {
+            let side_gutters = layout
+                .hints
+                .group_routing
+                .as_ref()
+                .map(|h| &h.side_gutters);
+            crate::layout::group_frame::shrink_groups_to_required_padding(
+                diagram,
+                &mut layout.groups,
+                &layout.nodes,
+                self.padding,
+                crate::layout::node::common::group_bounds::container_padding_for_leaf(self.padding),
+                side_gutters,
+            );
+        }
         if algo == "architecture" {
             post_layout::center_single_group_rows(diagram, layout);
         }
@@ -53,13 +67,12 @@ impl GroupFramePass {
         &self,
         diagram: &Diagram,
         layout: &mut LayoutResult,
-        pinned: &PinSet,
         algo: &str,
     ) {
         if diagram.groups.is_empty() {
             return;
         }
-        self.apply_after_node_snap(diagram, layout, pinned, algo);
+        self.apply_after_node_snap(diagram, layout, algo);
         #[cfg(debug_assertions)]
         group::debug_assert_routing_groups_contain_members(diagram, &layout.nodes, &layout.groups);
     }
@@ -69,13 +82,12 @@ impl GroupFramePass {
         &self,
         diagram: &Diagram,
         layout: &mut LayoutResult,
-        pinned: &PinSet,
         algo: &str,
         pre_recompute_y: &HashMap<String, f64>,
     ) {
         recompute_group_bounds(diagram, layout, self.padding);
         realign_group_rows(&mut layout.groups, pre_recompute_y);
-        apply_group_frame(&self.spec, diagram, layout, pinned);
+        apply_group_frame(&self.spec, diagram, layout);
         if algo == "architecture" {
             post_layout::center_single_group_rows(diagram, layout);
         }

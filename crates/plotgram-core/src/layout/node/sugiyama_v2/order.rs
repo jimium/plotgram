@@ -22,6 +22,7 @@ pub(super) fn order_layers_weighted_median(
     ordering_sweeps: usize,
     long_edge_barycenter_weight: f64,
     node_group: &HashMap<NodeIndex, Option<String>>,
+    group_decl: &HashMap<String, usize>,
 ) -> Vec<Vec<NodeIndex>> {
     let max_sweeps = ordering_sweeps.clamp(1, ORDERING_SWEEP_MAX);
     let mut no_improve = 0usize;
@@ -41,6 +42,7 @@ pub(super) fn order_layers_weighted_median(
                     Direction::Incoming,
                     long_edge_barycenter_weight,
                     node_group,
+                    group_decl,
                 )
             });
             transpose_adjacent(layer_index, &mut layers, dag, long_edge_barycenter_weight);
@@ -59,6 +61,7 @@ pub(super) fn order_layers_weighted_median(
                     Direction::Outgoing,
                     long_edge_barycenter_weight,
                     node_group,
+                    group_decl,
                 )
             });
             transpose_adjacent(layer_index, &mut layers, dag, long_edge_barycenter_weight);
@@ -108,13 +111,14 @@ fn compare_nodes_for_layer(
     direction: Direction,
     long_edge_barycenter_weight: f64,
     node_group: &HashMap<NodeIndex, Option<String>>,
+    group_decl: &HashMap<String, usize>,
 ) -> Ordering {
     let left_stats = weighted_median_stats(dag, left, neighbor_pos, direction, long_edge_barycenter_weight);
     let right_stats = weighted_median_stats(dag, right, neighbor_pos, direction, long_edge_barycenter_weight);
 
     // Group 偏置：当 median 接近时（差 < epsilon），优先把同 group 节点排在一起。
     // 仅在 median 接近时生效，避免破坏基于 median 的交叉最小化。
-    // 两节点都有 group 且不同时按 group id 排序（聚拢同 group 节点）；
+    // 两节点都有 group 且不同时按 group sibling 声明序（再 id）排序；
     // 任一节点无 group 时返回 Equal（不影响后续 tiebreaker）。
     let median_diff = (left_stats.median - right_stats.median).abs();
     let median_cmp = left_stats
@@ -126,7 +130,9 @@ fn compare_nodes_for_layer(
             node_group.get(&left).and_then(|g| g.as_deref()),
             node_group.get(&right).and_then(|g| g.as_deref()),
         ) {
-            (Some(lg), Some(rg)) => lg.cmp(rg),
+            (Some(lg), Some(rg)) => {
+                crate::layout::decl_order::cmp_by_decl_then_id(group_decl, lg, rg)
+            }
             _ => Ordering::Equal,
         }
     } else {

@@ -75,6 +75,7 @@ pub fn make_diagram_with_layout(
             })
             .collect(),
         groups: Vec::new(),
+            constraints: vec![],
         style_decls: vec![],
         source_info: SourceInfo {
             file: None,
@@ -157,6 +158,7 @@ pub fn make_diagram_grid(rows: usize, cols: usize) -> (Diagram, LayoutResult) {
             })
             .collect(),
         groups: Vec::new(),
+            constraints: vec![],
         style_decls: vec![],
         source_info: SourceInfo {
             file: None,

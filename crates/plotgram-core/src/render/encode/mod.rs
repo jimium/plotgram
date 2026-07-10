@@ -5,7 +5,6 @@
 
 use crate::ast::PreparedDiagram;
 use crate::error::Result;
-use crate::layout::RefinementReport;
 
 use super::scene::ExportScene;
 use super::{RenderFormat, RenderOutput, RenderRequest};
@@ -49,7 +48,6 @@ pub enum EncodingPath {
 /// `EncodingPath::Diagram` 编码器的输出。
 pub struct DiagramEncodeOutput {
     pub output: RenderOutput,
-    pub report: Option<RefinementReport>,
 }
 
 /// 格式编码器 trait:将 [`ExportScene`] 编码为 [`RenderOutput`]。

@@ -19,6 +19,7 @@ pub fn validate(diagram: &PreparedDiagram) -> ValidationResult {
     crate::icons::validate_entity_semantic_icon(diagram.inner(), &mut result);
     attrs::validate_relation_attributes(diagram, &mut result);
     common::validate_relations(diagram, &mut result);
+    common::validate_constraints(diagram, &mut result);
     common::validate_groups(diagram, &mut result);
     common::check_orphan_entities(diagram, &mut result);
     validate_diagram_specific(diagram, &mut result);
@@ -73,6 +74,7 @@ mod tests {
             entities,
             relations,
             groups: vec![],
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo {
                 file: None,
@@ -84,7 +86,7 @@ mod tests {
 
     fn make_prepared(diagram: Diagram) -> PreparedDiagram {
         PreparedDiagram::new(diagram)
-    }
+        }
 
     #[test]
     fn legacy_validator_path_still_works() {
@@ -330,5 +332,133 @@ mod tests {
 
         let result = validate(&make_prepared(diagram));
         assert!(result.errors.is_empty(), "{:?}", result.errors);
+    }
+
+    fn make_constraint(from: &str, to: &str) -> crate::ast::Constraint {
+        crate::ast::Constraint {
+            from: Identifier::new(from).unwrap(),
+            to: Identifier::new(to).unwrap(),
+            span: span(),
+        }
+    }
+
+    fn make_relation(from: &str, to: &str) -> Relation {
+        Relation {
+            from: Identifier::new(from).unwrap(),
+            to: Identifier::new(to).unwrap(),
+            arrow: crate::ast::ArrowType::Active,
+            label: None,
+            head_label: None,
+            tail_label: None,
+            attributes: AttributeMap::default(),
+            span: span(),
+        }
+    }
+
+    #[test]
+    fn constrain_self_loop_is_error() {
+        let mut diagram = make_diagram(
+            DiagramType::Flowchart,
+            vec![make_entity("a", "process")],
+            vec![],
+        );
+        diagram.constraints.push(make_constraint("a", "a"));
+        let result = validate(&make_prepared(diagram));
+        assert!(
+            result.errors.iter().any(|e| e.message.contains("自环")),
+            "{:?}",
+            result.errors
+        );
+    }
+
+    #[test]
+    fn constrain_unsatisfiable_with_relation_is_error() {
+        // relation a->b + constrain b->a：FAS 保留 a->b，加约束后成环
+        let mut diagram = make_diagram(
+            DiagramType::Flowchart,
+            vec![make_entity("a", "process"), make_entity("b", "process")],
+            vec![make_relation("a", "b")],
+        );
+        diagram.constraints.push(make_constraint("b", "a"));
+        let result = validate(&make_prepared(diagram));
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.message.contains("不可满足") || e.message.contains("环")),
+            "{:?}",
+            result.errors
+        );
+    }
+
+    #[test]
+    fn constrain_satisfiable_with_cyclic_relations() {
+        // a->b, b->a 关系环可由 FAS 打破；constrain a->c 可满足
+        let mut diagram = make_diagram(
+            DiagramType::Flowchart,
+            vec![
+                make_entity("a", "process"),
+                make_entity("b", "process"),
+                make_entity("c", "process"),
+            ],
+            vec![make_relation("a", "b"), make_relation("b", "a")],
+        );
+        diagram.constraints.push(make_constraint("a", "c"));
+        let result = validate(&make_prepared(diagram));
+        assert!(
+            !result
+                .errors
+                .iter()
+                .any(|e| e.message.contains("不可满足") || e.message.contains("自环")),
+            "{:?}",
+            result.errors
+        );
+    }
+
+    #[test]
+    fn constrain_with_flowchart_groups_is_allowed() {
+        use crate::ast::Group;
+
+        let mut diagram = make_diagram(
+            DiagramType::Flowchart,
+            vec![
+                Entity {
+                    id: Identifier::new("a").unwrap(),
+                    label: "A".into(),
+                    attributes: {
+                        let mut m = AttributeMap::default();
+                        m.standard.insert(
+                            "type".into(),
+                            AttributeValue::String(TextValue::unquoted("process")),
+                        );
+                        m
+                    },
+                    group_id: Some(Identifier::new("g").unwrap()),
+                    span: span(),
+                },
+                make_entity("b", "process"),
+            ],
+            vec![],
+        );
+        diagram.groups.push(Group {
+            id: Identifier::new("g").unwrap(),
+            label: "G".into(),
+            attributes: AttributeMap::default(),
+            parent_id: None,
+            depth: 0,
+            entity_ids: vec![Identifier::new("a").unwrap()],
+            child_group_ids: vec![],
+            span: span(),
+        });
+        diagram.constraints.push(make_constraint("a", "b"));
+        let result = validate(&make_prepared(diagram));
+        assert!(
+            !result
+                .errors
+                .iter()
+                .any(|e| e.message.contains("group divide") || e.message.contains("cross-group")),
+            "{:?}",
+            result.errors
+        );
     }
 }

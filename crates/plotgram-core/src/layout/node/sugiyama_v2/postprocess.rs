@@ -116,6 +116,10 @@ pub(super) fn sized_node_for(
     entity: &Entity,
     preset: &SugiyamaPreset,
 ) -> (f64, f64) {
+    use crate::layout::node::common::node_sizing::{
+        estimate_standard_node_width, DEFAULT_NODE_HEIGHT,
+    };
+
     let (default_w, default_h) = match preset.node_sizing {
         NodeSizing::Er => entity_node_size(entity),
         NodeSizing::State => state_fallback_node_size(diagram, entity),
@@ -125,10 +129,17 @@ pub(super) fn sized_node_for(
             } else if diagram.diagram_type == DiagramType::State {
                 state_fallback_node_size(diagram, entity)
             } else {
-                preset.default_node_size()
+                (
+                    estimate_standard_node_width(entity.label.as_str()),
+                    DEFAULT_NODE_HEIGHT,
+                )
             }
         }
-        NodeSizing::Standard => preset.default_node_size(),
+        // Phase B：flowchart 按标签估宽，不再固定 160。
+        NodeSizing::Standard => (
+            estimate_standard_node_width(entity.label.as_str()),
+            DEFAULT_NODE_HEIGHT,
+        ),
     };
 
     let (width, height) = crate::layout::styled_node_size(entity, default_w, default_h);

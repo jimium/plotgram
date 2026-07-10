@@ -14,7 +14,6 @@ pub mod group_divide;
 
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
-use crate::layout::intent::topology::ValidTopologyIntent;
 use crate::layout::node::sugiyama_v2::{engine, preset};
 use crate::layout::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeAlignConfig};
@@ -73,22 +72,6 @@ impl LayoutStrategy for FlowchartLayout {
         engine::compute_with_preset(diagram, &preset::FLOWCHART_PRESET, self.config)
     }
 
-    fn compute_with_overlay(
-        &self,
-        diagram: &Diagram,
-        valid_topology: Option<&[ValidTopologyIntent]>,
-    ) -> LayoutResult {
-        if group_divide::should_divide(diagram) {
-            // 分治布局暂不支持拓扑意图叠加，有 group 时走分治路径
-            return group_divide::divide_flowchart_with_groups(diagram, self.config);
-        }
-        engine::compute_with_preset_and_overlay(
-            diagram,
-            &preset::FLOWCHART_PRESET,
-            self.config,
-            valid_topology,
-        )
-    }
 
     fn node_align_config(&self) -> NodeAlignConfig {
         NodeAlignConfig::default_flowchart()

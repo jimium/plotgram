@@ -9,7 +9,6 @@ use axum::{
 use plotgram_core::{
     ast::{PreparedDiagram, Span},
     error::DiagnosticError,
-    layout::LayoutIntentOverlay,
     pipeline::{render_output_with_report, RenderOutputWithReport},
     prepare::StyleRequest,
     render::{parse_graphic_style_id, RenderFormat, RenderOutput, RenderRequest},
@@ -19,8 +18,6 @@ use serde::{Deserialize, Serialize};
 static HEADER_FORMAT: HeaderName = HeaderName::from_static("x-plotgram-format");
 static HEADER_VALID: HeaderName = HeaderName::from_static("x-plotgram-valid");
 static HEADER_WARNINGS: HeaderName = HeaderName::from_static("x-plotgram-warnings");
-static HEADER_REFINEMENT_REPORT: HeaderName =
-    HeaderName::from_static("x-plotgram-refinement-report");
 
 #[derive(Debug, Serialize)]
 pub struct CheckResult {
@@ -50,11 +47,6 @@ pub struct RenderRequestBody {
     pub dark_mode: Option<bool>,
     /// 是否在画布顶部绘制 DSL title（默认 false）
     pub show_title: Option<bool>,
-    /// 布局意图叠加层（可选）。
-    ///
-    /// 透传至 `RenderRequest::layout_overlay`，由布局算法与几何微调阶段消费。
-    /// 为 `None` 时布局行为与无意图完全一致。
-    pub layout_intents: Option<LayoutIntentOverlay>,
 }
 
 fn default_format() -> String {
@@ -116,7 +108,6 @@ fn render_success(
     format: RenderFormat,
     output: RenderOutput,
     check: &CheckResult,
-    refinement_report: Option<&plotgram_core::layout::RefinementReport>,
 ) -> Response {
     let mut headers = HeaderMap::new();
     headers.insert(
@@ -124,15 +115,6 @@ fn render_success(
         HeaderValue::from_str(&content_type_for(format)).expect("content-type"),
     );
     attach_render_meta(&mut headers, format, check);
-
-    // 仅当存在报告时设置 X-Plotgram-Refinement-Report 头
-    if let Some(report) = refinement_report {
-        if let Ok(json) = serde_json::to_string(report) {
-            if let Ok(value) = HeaderValue::from_str(&json) {
-                headers.insert(HEADER_REFINEMENT_REPORT.clone(), value);
-            }
-        }
-    }
 
     let body = match output {
         RenderOutput::Text(text) => Body::from(text),
@@ -247,14 +229,9 @@ pub async fn render_handler(Json(body): Json<RenderRequestBody>) -> Response {
     request.dark_mode = body.dark_mode.unwrap_or(false);
     request.show_title = body.show_title.unwrap_or(false);
 
-    // 透传布局意图叠加层
-    if let Some(intents) = &body.layout_intents {
-        request.layout_overlay = Some(intents);
-    }
-
     match render_output_with_report(&request) {
-        Ok(RenderOutputWithReport { output, report, .. }) => {
-            render_success(format, output, &check, report.as_ref())
+        Ok(RenderOutputWithReport { output, .. }) => {
+            render_success(format, output, &check)
         }
         Err(err) => {
             let check = CheckResult {

@@ -39,11 +39,14 @@ pub struct Diagram {
     /// 所有实体（扁平化存储，包括 group 内的）
     pub entities: Vec<Entity>,
 
-    /// 所有关系
+    /// 所有关系（可渲染边；`relations[i] ↔ edges[i]`）
     pub relations: Vec<Relation>,
 
     /// 所有分组
     pub groups: Vec<Group>,
+
+    /// DSL 隐形布局约束：`constrain A -> B`（仅布局用，不渲染）
+    pub constraints: Vec<Constraint>,
 
     /// 声明式样式规则（node_style / edge_style）
     pub style_decls: Vec<StyleDecl>,
@@ -69,6 +72,7 @@ pub struct Diagram {
         { "from": "api", "to": "db", "arrow": "active", "label": "查询", "attributes": { "standard": {}, "style": {}, "meta": {} }, "span": { "start": { "line": 10, "column": 5 }, "end": { "line": 10, "column": 25 } } }
     ],
     "groups": [],
+    "constraints": [],
     "style_decls": [],
     "source_info": { "file": "diagram.pgm", "line_count": 15 }
 }
@@ -221,6 +225,26 @@ true
     }
 }
 ```
+
+---
+
+## 4.5 Constraint（隐形布局约束）
+
+DSL：`constrain A -> B`。语义为 `rank(A) < rank(B)`；不进入 `relations`，不参与路由/渲染；布局建图时作为不可逆边注入（FAS 不反转）。
+
+```rust
+pub struct Constraint {
+    pub from: Identifier,
+    pub to: Identifier,
+    pub span: Span,
+}
+```
+
+约定：
+
+- 仅允许 `->`；禁止 label / 属性块 / `-->` / `<->`
+- 自环、未知节点、不可满足环（关系边可 FAS 反转后仍无法消环）→ 校验报错
+- 声明序是同层/同级阅读序的软偏置，不得覆盖真实边或 `constrain`
 
 ---
 

@@ -21,6 +21,8 @@
 //!     <顶层 entities (group_id=None), 按 id 排序>
 //!
 //!     <relations, 按 (from, to, label) 排序>
+//!
+//!     <constraints, 按 (from, to) 排序>
 //! }
 //! ```
 
@@ -132,6 +134,23 @@ pub fn format(diagram: &RawDiagram) -> String {
         });
         for relation in relations {
             format_relation(relation, &mut s, 1);
+        }
+        if !s.is_empty() {
+            sections.push(s);
+        }
+    }
+
+    // constraints（按 (from, to) 排序）
+    {
+        let mut s = String::new();
+        let mut constraints: Vec<&Constraint> = d.constraints.iter().collect();
+        constraints.sort_by(|a, b| {
+            let ka = (a.from.as_str(), a.to.as_str());
+            let kb = (b.from.as_str(), b.to.as_str());
+            ka.cmp(&kb)
+        });
+        for c in constraints {
+            format_constraint(c, &mut s, 1);
         }
         if !s.is_empty() {
             sections.push(s);
@@ -303,6 +322,15 @@ fn format_relation(relation: &Relation, out: &mut String, indent_level: usize) {
     } else {
         out.push('\n');
     }
+}
+
+fn format_constraint(c: &Constraint, out: &mut String, indent_level: usize) {
+    push_indent(out, indent_level);
+    out.push_str("constrain ");
+    out.push_str(c.from.as_str());
+    out.push_str(" -> ");
+    out.push_str(c.to.as_str());
+    out.push('\n');
 }
 
 fn format_group(group: &Group, diagram: &Diagram, out: &mut String, indent_level: usize) {

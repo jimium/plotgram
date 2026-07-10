@@ -13,7 +13,6 @@
 use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
-use crate::layout::intent::topology::ValidTopologyIntent;
 use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeAlignConfig};
 
 pub mod engine;
@@ -70,18 +69,6 @@ impl LayoutStrategy for SugiyamaV2Layout {
         engine::compute_with_preset(diagram, &preset::GENERIC_PRESET, self.config)
     }
 
-    fn compute_with_overlay(
-        &self,
-        diagram: &Diagram,
-        valid_topology: Option<&[ValidTopologyIntent]>,
-    ) -> LayoutResult {
-        engine::compute_with_preset_and_overlay(
-            diagram,
-            &preset::GENERIC_PRESET,
-            self.config,
-            valid_topology,
-        )
-    }
 
     fn node_align_config(&self) -> NodeAlignConfig {
         NodeAlignConfig::default_sugiyama()
@@ -135,6 +122,7 @@ mod tests {
                 })
                 .collect(),
             groups: vec![],
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo {
                 file: None,
@@ -176,7 +164,7 @@ mod tests {
             vec![("a", "b"), ("b", "c"), ("d", "c")],
         );
 
-        let g = graph::build_graph_with_overlay(&diagram, None);
+        let g = graph::build_graph(&diagram);
         let reversed = graph::greedy_cycle_reversal(&g);
         let dag = graph::build_dag(&g, &reversed);
         let component = rank::weak_components(&dag).remove(0);
@@ -199,7 +187,7 @@ mod tests {
             vec!["a", "b", "c", "d", "e"],
             vec![("a", "c"), ("b", "c"), ("c", "d"), ("c", "e")],
         );
-        let g = graph::build_graph_with_overlay(&diagram, None);
+        let g = graph::build_graph(&diagram);
         let reversed = graph::greedy_cycle_reversal(&g);
         let dag = graph::build_dag(&g, &reversed);
         let ranks = rank::assign_ranks_network_simplex_style(&dag);
@@ -215,7 +203,7 @@ mod tests {
             vec!["a", "b", "c", "d"],
             vec![("a", "b"), ("b", "c"), ("c", "d"), ("a", "d")],
         );
-        let g = graph::build_graph_with_overlay(&diagram, None);
+        let g = graph::build_graph(&diagram);
         let reversed = graph::greedy_cycle_reversal(&g);
         let dag = graph::build_dag(&g, &reversed);
         let ranks = rank::assign_ranks_network_simplex_style(&dag);
@@ -254,7 +242,7 @@ mod tests {
             vec!["a", "b", "c", "d"],
             vec![("a", "b"), ("b", "c"), ("c", "d"), ("a", "d")],
         );
-        let g = graph::build_graph_with_overlay(&diagram, None);
+        let g = graph::build_graph(&diagram);
         let reversed = graph::greedy_cycle_reversal(&g);
         let dag = graph::build_dag(&g, &reversed);
         let ranks = rank::assign_ranks_network_simplex_style(&dag);
@@ -269,6 +257,7 @@ mod tests {
             proper.layers.clone(),
             preset::FLOWCHART_PRESET.ordering_sweeps,
             preset::FLOWCHART_PRESET.long_edge_barycenter_weight,
+            &std::collections::HashMap::new(),
             &std::collections::HashMap::new(),
         );
         let centers = coordinate::assign_layer_centers_brandes_koepf(

@@ -98,8 +98,8 @@ impl std::fmt::Display for Identifier {
 }
 
 pub const RESERVED_WORDS: &[&str] = &[
-    "diagram", "entity", "group", "relation", "flowchart", "sequence", "architecture", "state",
-    "er", "mindmap", "true", "false", "meta",
+    "diagram", "entity", "group", "relation", "constrain", "flowchart", "sequence", "architecture",
+    "state", "er", "mindmap", "true", "false", "meta",
 ];
 
 use crate::types::DiagramType;
@@ -461,6 +461,18 @@ pub struct Relation {
     pub span: Span,
 }
 
+// ─── Constraint ────────────────────────────────────────────────────
+
+/// DSL 隐形布局约束边：`constrain A -> B` ⇒ `rank(A) < rank(B)`。
+///
+/// 不进入 `relations`，不参与路由/渲染；仅布局建图时作为不可逆边注入。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Constraint {
+    pub from: Identifier,
+    pub to: Identifier,
+    pub span: Span,
+}
+
 // ─── Group ─────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -623,6 +635,9 @@ pub struct Diagram {
     pub entities: Vec<Entity>,
     pub relations: Vec<Relation>,
     pub groups: Vec<Group>,
+    /// DSL 隐形布局约束：`constrain A -> B`（仅布局用，不渲染）。
+    #[serde(default)]
+    pub constraints: Vec<Constraint>,
     /// DSL 声明式样式列表：`node_style service { ... }` / `edge_style error { ... }`。
     #[serde(default)]
     pub style_decls: Vec<StyleDecl>,
@@ -640,6 +655,7 @@ impl Default for Diagram {
             entities: Vec::new(),
             relations: Vec::new(),
             groups: Vec::new(),
+            constraints: Vec::new(),
             style_decls: Vec::new(),
             doc_comment: None,
             source_info: SourceInfo::default(),
@@ -655,6 +671,7 @@ impl Diagram {
             entities: Vec::new(),
             relations: Vec::new(),
             groups: Vec::new(),
+            constraints: Vec::new(),
             style_decls: Vec::new(),
             doc_comment: None,
             source_info,

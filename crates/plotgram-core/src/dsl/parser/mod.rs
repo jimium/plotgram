@@ -65,6 +65,8 @@ struct Parser {
     pending_groups: Vec<Group>,
     /// 从 group 解析中收集的 relation，需要添加到 diagram.relations
     pending_relations: Vec<Relation>,
+    /// 从 group 解析中收集的 constrain，需要添加到 diagram.constraints
+    pending_constraints: Vec<Constraint>,
     /// 文件开头文档注释，由 Lexer 提前提取。
     doc_comment: Option<String>,
 }
@@ -87,6 +89,7 @@ impl Parser {
             pending_entities: Vec::new(),
             pending_groups: Vec::new(),
             pending_relations: Vec::new(),
+            pending_constraints: Vec::new(),
             doc_comment,
         }
     }
@@ -289,7 +292,7 @@ impl Parser {
                     self.advance(); // consume '{'
                     return;
                 }
-                TokenKind::Entity | TokenKind::Group | TokenKind::NodeStyle | TokenKind::EdgeStyle => {
+                TokenKind::Entity | TokenKind::Group | TokenKind::Constrain | TokenKind::NodeStyle | TokenKind::EdgeStyle => {
                     return;
                 }
                 TokenKind::Ident(_) => {
@@ -356,7 +359,14 @@ impl Parser {
                         diagram.groups.extend(groups);
                         let relations = std::mem::take(&mut self.pending_relations);
                         diagram.relations.extend(relations);
+                        let constraints = std::mem::take(&mut self.pending_constraints);
+                        diagram.constraints.extend(constraints);
                         diagram.groups.push(group);
+                    }
+                }
+                TokenKind::Constrain => {
+                    if let Some(c) = self.parse_constraint() {
+                        diagram.constraints.push(c);
                     }
                 }
                 TokenKind::NodeStyle | TokenKind::EdgeStyle => {
@@ -750,5 +760,110 @@ diagram architecture {
         let diagram = parse(source).expect("parse");
         assert_eq!(diagram.relations.len(), 1);
         assert_eq!(diagram.relations[0].arrow, ArrowType::Passive);
+    }
+}
+
+#[cfg(test)]
+mod constrain_parse_tests {
+    use super::parse;
+    use crate::error::PlotgramError;
+
+    #[test]
+    fn parse_constrain_ok() {
+        let source = r#"
+diagram flowchart {
+    entity a "A"
+    entity b "B"
+    a -> b
+    constrain a -> b
+}
+"#;
+        let diagram = parse(source).expect("parse");
+        assert_eq!(diagram.constraints.len(), 1);
+        assert_eq!(diagram.constraints[0].from.as_str(), "a");
+        assert_eq!(diagram.constraints[0].to.as_str(), "b");
+    }
+
+    #[test]
+    fn parse_constrain_inside_group() {
+        let source = r#"
+diagram architecture {
+    group g1 "G" {
+        entity a "A" { type: service }
+        entity b "B" { type: service }
+        constrain a -> b
+    }
+}
+"#;
+        let diagram = parse(source).expect("parse");
+        assert_eq!(diagram.constraints.len(), 1);
+        assert_eq!(diagram.constraints[0].from.as_str(), "a");
+        assert_eq!(diagram.constraints[0].to.as_str(), "b");
+    }
+
+    #[test]
+    fn reject_constrain_with_label() {
+        let source = r#"
+diagram flowchart {
+    entity a "A"
+    entity b "B"
+    constrain a -> b "nope"
+}
+"#;
+        let err = parse(source).expect_err("should reject label");
+        match err {
+            PlotgramError::Parse(errors) => {
+                assert!(
+                    errors.iter().any(|e| e.message.contains("标签")),
+                    "expected label error, got {:?}",
+                    errors
+                );
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn reject_constrain_dash_arrow() {
+        let source = r#"
+diagram flowchart {
+    entity a "A"
+    entity b "B"
+    constrain a --> b
+}
+"#;
+        let err = parse(source).expect_err("should reject -->");
+        match err {
+            PlotgramError::Parse(errors) => {
+                assert!(
+                    errors.iter().any(|e| e.message.contains("->")),
+                    "expected arrow error, got {:?}",
+                    errors
+                );
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn reject_constrain_with_attrs() {
+        let source = r##"
+diagram flowchart {
+    entity a "A"
+    entity b "B"
+    constrain a -> b { style.stroke: "#f00" }
+}
+"##;
+        let err = parse(source).expect_err("should reject attrs");
+        match err {
+            PlotgramError::Parse(errors) => {
+                assert!(
+                    errors.iter().any(|e| e.message.contains("属性")),
+                    "expected attr error, got {:?}",
+                    errors
+                );
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
 }

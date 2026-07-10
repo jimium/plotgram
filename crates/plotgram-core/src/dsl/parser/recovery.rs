@@ -28,7 +28,7 @@ impl Parser {
         while !self.at_eof() {
             match self.peek_kind() {
                 // 遇到新的语句起始点，停止跳过
-                TokenKind::Entity | TokenKind::Group | TokenKind::NodeStyle | TokenKind::EdgeStyle => {
+                TokenKind::Entity | TokenKind::Group | TokenKind::Constrain | TokenKind::NodeStyle | TokenKind::EdgeStyle => {
                     if brace_depth == 0 {
                         return;
                     }

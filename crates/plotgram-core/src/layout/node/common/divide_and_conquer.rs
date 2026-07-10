@@ -14,7 +14,7 @@
 
 use crate::ast::Diagram;
 use crate::layout::NodeLayout;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 // ─── 组内布局结果 ─────────────────────────────────────────
 
@@ -79,63 +79,89 @@ impl Default for IntraLayout {
 /// 能对容器组递归布局子组。
 #[derive(Debug, Clone)]
 pub struct GroupTree {
-    /// 组 → 直接子组 ID 列表（已确定性排序）
+    /// 组 → 直接子组 ID 列表（AST `child_group_ids` 声明序）
     group_children: HashMap<String, Vec<String>>,
-    /// 组 → 直接实体 ID 列表（已确定性排序）
+    /// 组 → 直接实体 ID 列表（AST `entity_ids` 声明序）
     group_entities: HashMap<String, Vec<String>>,
+    /// 顶层组 ID（`diagram.groups` 中 `parent_id.is_none()` 的声明序）
+    top_group_ids: Vec<String>,
 }
 
 impl GroupTree {
     /// 从 Diagram 构建分组树
     ///
-    /// 所有子组列表和实体列表均按 ID 排序，保证确定性
-    /// （遵循 AGENTS.md 第 2 条：不依赖 HashMap 迭代顺序）。
+    /// 子组 / 实体顺序取自 AST 声明序（`child_group_ids` / `entity_ids`），
+    /// 顶层组取自 `diagram.groups` 中无 parent 的声明序。确定性来自 AST
+    /// 顺序，不依赖 HashMap 迭代，也不按 id 字典序重排
+    /// （遵循 AGENTS.md 第 2 条）。
+    ///
+    /// 若某组的 `entity_ids` / `child_group_ids` 为空（常见于手工构造的测试
+    /// Diagram），则回退到按 `entity.group_id` / `group.parent_id` 从
+    /// `diagram.entities` / `diagram.groups` 声明序收集。
     pub fn build(diagram: &Diagram) -> Self {
         let mut group_children: HashMap<String, Vec<String>> = HashMap::new();
         let mut group_entities: HashMap<String, Vec<String>> = HashMap::new();
+        let mut top_group_ids: Vec<String> = Vec::new();
 
-        // 收集子组关系
         for group in &diagram.groups {
-            if let Some(ref parent) = group.parent_id {
-                group_children
-                    .entry(parent.as_str().to_string())
-                    .or_default()
-                    .push(group.id.as_str().to_string());
+            let gid = group.id.as_str().to_string();
+            if group.parent_id.is_none() {
+                top_group_ids.push(gid.clone());
             }
-            // 确保每个组都有 entry（即使无子组）
-            group_children
-                .entry(group.id.as_str().to_string())
-                .or_default();
-            group_entities
-                .entry(group.id.as_str().to_string())
-                .or_default();
-        }
 
-        // 收集直接实体
-        for entity in &diagram.entities {
-            if let Some(ref gid) = entity.group_id {
-                group_entities
-                    .entry(gid.as_str().to_string())
-                    .or_default()
-                    .push(entity.id.as_str().to_string());
-            }
-        }
+            let children: Vec<String> = if !group.child_group_ids.is_empty() {
+                group
+                    .child_group_ids
+                    .iter()
+                    .map(|c| c.as_str().to_string())
+                    .collect()
+            } else {
+                // Fallback: parent_id links in diagram.groups declaration order
+                diagram
+                    .groups
+                    .iter()
+                    .filter(|g| {
+                        g.parent_id
+                            .as_ref()
+                            .map(|p| p.as_str() == group.id.as_str())
+                            .unwrap_or(false)
+                    })
+                    .map(|g| g.id.as_str().to_string())
+                    .collect()
+            };
+            group_children.insert(gid.clone(), children);
 
-        // 确定性排序
-        for children in group_children.values_mut() {
-            children.sort();
-        }
-        for entities in group_entities.values_mut() {
-            entities.sort();
+            let entities: Vec<String> = if !group.entity_ids.is_empty() {
+                group
+                    .entity_ids
+                    .iter()
+                    .map(|e| e.as_str().to_string())
+                    .collect()
+            } else {
+                // Fallback: entities with this group_id in diagram.entities order
+                diagram
+                    .entities
+                    .iter()
+                    .filter(|e| {
+                        e.group_id
+                            .as_ref()
+                            .map(|g| g.as_str() == group.id.as_str())
+                            .unwrap_or(false)
+                    })
+                    .map(|e| e.id.as_str().to_string())
+                    .collect()
+            };
+            group_entities.insert(gid, entities);
         }
 
         Self {
             group_children,
             group_entities,
+            top_group_ids,
         }
     }
 
-    /// 组的直接子组（空切片若无）
+    /// 组的直接子组（空切片若无；AST `child_group_ids` 序）
     pub fn children_of(&self, gid: &str) -> &[String] {
         self.group_children
             .get(gid)
@@ -143,7 +169,7 @@ impl GroupTree {
             .unwrap_or(&[])
     }
 
-    /// 组的直接实体（空切片若无）
+    /// 组的直接实体（空切片若无；AST `entity_ids` 序）
     pub fn entities_of(&self, gid: &str) -> &[String] {
         self.group_entities
             .get(gid)
@@ -160,23 +186,9 @@ impl GroupTree {
         out
     }
 
-    /// 所有顶层组（parent_id 为 None 的组），按 ID 排序保证确定性
+    /// 所有顶层组（`parent_id` 为 None），按 `diagram.groups` 声明序
     pub fn top_groups(&self) -> Vec<String> {
-        // 顶层组 = 在 group_children 中有 entry 但不是任何组的 child
-        let mut all_children: HashSet<&str> = HashSet::new();
-        for children in self.group_children.values() {
-            for c in children {
-                all_children.insert(c.as_str());
-            }
-        }
-        let mut tops: Vec<String> = self
-            .group_children
-            .keys()
-            .filter(|g| !all_children.contains(g.as_str()))
-            .cloned()
-            .collect();
-        tops.sort();
-        tops
+        self.top_group_ids.clone()
     }
 }
 
@@ -280,15 +292,26 @@ mod tests {
         }
     }
 
-    fn group(id: &str, parent: Option<&str>) -> Group {
+    fn group(
+        id: &str,
+        parent: Option<&str>,
+        entities: &[&str],
+        children: &[&str],
+    ) -> Group {
         Group {
             id: Identifier::new_unchecked(id),
             label: id.to_string(),
             attributes: crate::ast::AttributeMap::default(),
             parent_id: parent.map(|p| Identifier::new_unchecked(p)),
             depth: 0,
-            entity_ids: vec![],
-            child_group_ids: vec![],
+            entity_ids: entities
+                .iter()
+                .map(|e| Identifier::new_unchecked(e))
+                .collect(),
+            child_group_ids: children
+                .iter()
+                .map(|c| Identifier::new_unchecked(c))
+                .collect(),
             span: Span::dummy(),
         }
     }
@@ -303,24 +326,24 @@ mod tests {
                 entity("d", None),
             ],
             groups: vec![
-                group("g1", None),
-                group("g2", None),
-                group("g3", Some("g1")), // 嵌套
+                group("g1", None, &["a"], &["g3"]),
+                group("g2", None, &["b", "c"], &[]),
+                group("g3", Some("g1"), &[], &[]), // 嵌套
             ],
             ..Default::default()
         };
 
         let tree = GroupTree::build(&diagram);
 
-        // 顶层组（确定性排序）
+        // 顶层组（diagram.groups 声明序）
         let tops = tree.top_groups();
         assert_eq!(tops, vec!["g1".to_string(), "g2".to_string()]);
 
-        // 直接子组
+        // 直接子组（child_group_ids 序）
         assert_eq!(tree.children_of("g1"), &["g3".to_string()]);
         assert_eq!(tree.children_of("g2"), &[] as &[String]);
 
-        // 直接实体（g1 有直接实体 a，g2 有 b/c）
+        // 直接实体（entity_ids 序）
         assert_eq!(tree.entities_of("g1"), &["a".to_string()]);
         assert_eq!(tree.entities_of("g2"), &["b".to_string(), "c".to_string()]);
 
@@ -330,6 +353,27 @@ mod tests {
             tree.descendant_entities("g2"),
             &["b".to_string(), "c".to_string()]
         );
+    }
+
+    #[test]
+    fn group_tree_preserves_child_group_ids_over_id_lex() {
+        // Declared z then a under parent — must not sort to a, z by id.
+        let diagram = Diagram {
+            entities: vec![],
+            groups: vec![
+                group("parent", None, &[], &["z", "a"]),
+                group("z", Some("parent"), &[], &[]),
+                group("a", Some("parent"), &[], &[]),
+            ],
+            ..Default::default()
+        };
+
+        let tree = GroupTree::build(&diagram);
+        assert_eq!(
+            tree.children_of("parent"),
+            &["z".to_string(), "a".to_string()]
+        );
+        assert_eq!(tree.top_groups(), vec!["parent".to_string()]);
     }
 
     #[test]

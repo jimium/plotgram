@@ -833,6 +833,7 @@ mod tests {
                 })
                 .collect(),
             groups: Vec::new(),
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo {
                 file: None,
@@ -881,6 +882,7 @@ mod tests {
                 })
                 .collect(),
             groups: Vec::new(),
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo {
                 file: None,
@@ -1121,6 +1123,7 @@ mod tests {
                 span,
             }],
             groups: vec![],
+            constraints: vec![],
             style_decls: vec![],
             source_info: SourceInfo {
                 file: None,

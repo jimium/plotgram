@@ -6,7 +6,6 @@
 
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
-use crate::layout::intent::topology::ValidTopologyIntent;
 use crate::layout::node::sugiyama_v2::{engine, preset};
 use crate::layout::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, EdgeRoutingStyle, LayoutResult, LayoutStrategy, NodeAlignConfig};
@@ -61,20 +60,6 @@ impl LayoutStrategy for ErLayout {
         result
     }
 
-    fn compute_with_overlay(
-        &self,
-        diagram: &Diagram,
-        valid_topology: Option<&[ValidTopologyIntent]>,
-    ) -> LayoutResult {
-        let mut result = engine::compute_with_preset_and_overlay(
-            diagram,
-            &preset::ER_PRESET,
-            self.config,
-            valid_topology,
-        );
-        result.hints.edge_routing_style = recommended_er_edge_routing(diagram);
-        result
-    }
 
     fn node_align_config(&self) -> NodeAlignConfig {
         NodeAlignConfig::default_er()

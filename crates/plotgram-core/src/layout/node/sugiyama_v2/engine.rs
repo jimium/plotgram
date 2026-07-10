@@ -2,7 +2,6 @@
 
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
-use crate::layout::intent::topology::ValidTopologyIntent;
 use crate::layout::node::common::group_bounds::{self, GroupPadding};
 use crate::layout::{LayoutResult, EdgeRoutingStyle};
 use std::collections::HashMap;
@@ -15,37 +14,19 @@ use super::{coordinate, rank};
 
 /// 密度感知间距：每条跨层边为 layer_gap 额外增加的像素
 const DENSITY_LAYER_GAP_SCALE: f64 = 2.0;
-/// 密度感知间距：layer_gap 额外增加的上限
-const DENSITY_MAX_EXTRA_LAYER_GAP: f64 = 40.0;
+/// 密度感知间距：layer_gap 额外增加的上限（Phase C：40 → 20）
+const DENSITY_MAX_EXTRA_LAYER_GAP: f64 = 20.0;
 /// 密度感知间距：层内平均度数每超 1.0 为 node_gap 额外增加的像素
 const DENSITY_NODE_GAP_SCALE: f64 = 8.0;
-/// 密度感知间距：node_gap 额外增加的上限
-const DENSITY_MAX_EXTRA_NODE_GAP: f64 = 32.0;
+/// 密度感知间距：node_gap 额外增加的上限（Phase C：32 → 20）
+const DENSITY_MAX_EXTRA_NODE_GAP: f64 = 20.0;
 /// 触发密度感知的层内平均度数阈值
 const DENSITY_DEGREE_THRESHOLD: f64 = 2.0;
 
-/// 无意图入口（等价于 `overlay = None`）。
 pub fn compute_with_preset(
     diagram: &Diagram,
     preset: &SugiyamaPreset,
     layout_config: SugiyamaLayoutConfig,
-) -> LayoutResult {
-    compute_with_preset_and_overlay(diagram, preset, layout_config, None)
-}
-
-/// 带意图叠加层的入口。
-///
-/// `valid_topology` 为 `None` 时与 [`compute_with_preset`] 行为完全一致。
-/// `valid_topology` 为 `Some` 时，拓扑意图边被注入到 `build_graph_with_overlay`，
-/// 并在 `greedy_cycle_reversal` 中被保护不被反转。
-///
-/// 调用方应预先通过 [`crate::layout::intent::topology::validate_topology_intents`]
-/// 过滤掉冲突意图，仅传入有效意图。
-pub fn compute_with_preset_and_overlay(
-    diagram: &Diagram,
-    preset: &SugiyamaPreset,
-    layout_config: SugiyamaLayoutConfig,
-    valid_topology: Option<&[ValidTopologyIntent]>,
 ) -> LayoutResult {
     if diagram.entities.is_empty() {
         return LayoutResult {
@@ -60,7 +41,7 @@ pub fn compute_with_preset_and_overlay(
 
     let horizontal = crate::layout::resolve_effective_direction(diagram) == Some("left-to-right");
 
-    let g = graph::build_graph_with_overlay(diagram, valid_topology);
+    let g = graph::build_graph(diagram);
     let reversed_edges = graph::greedy_cycle_reversal(&g);
     let dag = graph::build_dag(&g, &reversed_edges);
     let mut ranks = rank::assign_ranks_network_simplex_style(&dag);
@@ -93,6 +74,7 @@ pub fn compute_with_preset_and_overlay(
     // 构建 layered graph 节点 → group_id 映射，供排序阶段 group 偏置使用。
     // Real 节点取其 entity 的 group_id；Dummy 节点无 group（None）。
     let node_group = build_node_group_map(diagram, &dag, &proper.graph);
+    let group_decl = crate::layout::decl_order::group_sibling_decl_index(diagram);
     let mut layers = proper.layers;
     layers = order::order_layers_weighted_median(
         &proper.graph,
@@ -100,6 +82,7 @@ pub fn compute_with_preset_and_overlay(
         adjusted_preset.ordering_sweeps,
         adjusted_preset.long_edge_barycenter_weight,
         &node_group,
+        &group_decl,
     );
     let nodes = coordinate::assign_coordinates_brandes_koepf(
         &dag,

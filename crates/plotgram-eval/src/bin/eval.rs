@@ -975,7 +975,7 @@ fn parse_diagram(source: &str) -> plotgram_core::ast::Diagram {
         eprintln!("错误: 解析 .pgm 文件失败");
         std::process::exit(1);
     })
-}
+        }
 
 fn try_parse_diagram(source: &str) -> Option<plotgram_core::ast::Diagram> {
     let raw = plotgram_core::pipeline::parse(source).ok()?;

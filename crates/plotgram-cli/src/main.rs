@@ -4,7 +4,7 @@
 
 use clap::{Parser, Subcommand};
 use plotgram_core::diff2::{self, ChangeSet, ChangeOp};
-use plotgram_core::error::DiagnosticError;
+use plotgram_core::error::{DiagnosticError, PlotgramError};
 use plotgram_core::interchange::mindmap::{
     import_interchange, InputFormat, MarkdownImportOptions,
 };
@@ -267,6 +267,17 @@ fn print_source_snippet(source: &str, err: &DiagnosticError) {
     eprintln!("  │ {}{}", " ".repeat(prefix_len), marker);
 }
 
+/// 打印渲染阶段 `PlotgramError` 中的完整诊断信息（含 valid_values 等上下文）。
+fn print_render_error(e: PlotgramError, source: Option<&str>) {
+    let diags = e.into_diagnostics();
+    for d in &diags {
+        eprintln!("{}", d);
+        if let Some(src) = source {
+            print_source_snippet(src, d);
+        }
+    }
+}
+
 /// 将诊断输出为 JSON（spec §4.2 结构）。
 fn print_diagnostics_json(output: &PipelineOutput) {
     let json = serde_json::json!({
@@ -351,7 +362,7 @@ fn cmd_render(
                 | RenderFormat::Webp => {
                     let output_bytes =
                         render_bytes(&request).unwrap_or_else(|e| {
-                            eprintln!("错误: 渲染失败: {}", e);
+                            print_render_error(e, Some(&source));
                             std::process::exit(1);
                         });
                     fs::write(path, output_bytes).unwrap_or_else(|e| {
@@ -362,7 +373,7 @@ fn cmd_render(
                 _ => {
                     let output_content = render_text(&request)
                         .unwrap_or_else(|e| {
-                            eprintln!("错误: 渲染失败: {}", e);
+                            print_render_error(e, Some(&source));
                             std::process::exit(1);
                         });
                     fs::write(path, &output_content).unwrap_or_else(|e| {
@@ -384,7 +395,7 @@ fn cmd_render(
                 RenderFormat::Drawio => {
                     let output_content = render_text(&request)
                         .unwrap_or_else(|e| {
-                            eprintln!("错误: 渲染失败: {}", e);
+                            print_render_error(e, Some(&source));
                             std::process::exit(1);
                         });
                     println!("{}", output_content);
@@ -392,7 +403,7 @@ fn cmd_render(
                 _ => {
                     let output_content = render_text(&request)
                         .unwrap_or_else(|e| {
-                            eprintln!("错误: 渲染失败: {}", e);
+                            print_render_error(e, Some(&source));
                             std::process::exit(1);
                         });
                     println!("{}", output_content);

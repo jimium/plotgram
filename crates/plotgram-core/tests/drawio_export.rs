@@ -100,7 +100,7 @@ fn create_flowchart_prepared() -> PreparedDiagram {
         },
     ];
     PreparedDiagram::new(diagram)
-}
+        }
 
 fn encode_flowchart(prepared: &PreparedDiagram) -> (String, ExportReport) {
     let request = RenderRequest::new(prepared, RenderFormat::Drawio);

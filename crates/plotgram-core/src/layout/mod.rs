@@ -12,8 +12,6 @@
 //! │ 拓扑主布局（Sugiyama / two_phase / group_divide）              │
 //! │   L2 Intra Frame：组内节点排列（group_layout_hint）            │
 //! ├──────────────────────────────────────────────────────────────┤
-//! │ apply_geometric_refinement（Intent Pin / Align*）→ PinSet     │
-//! ├──────────────────────────────────────────────────────────────┤
 //! │ L3 Node Frame（grid_snap::align_nodes）：rank/layer 轴独立对齐       │
 //! │   rank 轴：同层中心线对齐；layer 轴：重叠消除（保持层重心）          │
 //! │   仅节点坐标调整；由 `align` 属性控制（rank/layer 分级）        │
@@ -46,6 +44,7 @@ use std::collections::HashMap;
 pub mod algorithm_config;
 pub mod catalog;
 pub mod constants;
+pub mod decl_order;
 pub mod edge;
 pub mod edge_postprocess;
 pub mod friendliness;
@@ -53,7 +52,6 @@ pub mod geometry;
 pub mod grid_snap;
 pub mod group;
 pub mod group_frame;
-pub mod intent;
 pub mod lint;
 pub mod node;
 pub mod plan;
@@ -63,11 +61,6 @@ pub mod postprocess;
 pub mod refine;
 pub mod registry;
 pub mod route_feedback;
-
-pub use intent::{
-    GeometricIntent, IntentResult, IntentStatus, LayoutIntentOverlay, PinAxis,
-    RefinementReport, TopologyIntent,
-};
 
 pub use algorithm_config::{
     AlgorithmOptionSpec, ArchitectureV2LayoutConfig, CircularLayoutConfig, ForceDirectedLayoutConfig,
@@ -520,10 +513,6 @@ pub struct LayoutHints {
     /// 供 organic 边路由根据层级动态调整曲线弧度，深层级更平缓。
     /// 非 MindMap 布局为 `None`。
     pub mindmap_depths: Option<HashMap<String, usize>>,
-    /// 被布局策略跳过的拓扑意图索引列表（如 Architecture V2 跳过跨组意图）。
-    ///
-    /// 调度层据此将这些意图标记为 `Partial`，而非依赖 rank 比对给出误导性消息。
-    pub skipped_topology_intents: Vec<usize>,
     /// 路由友好性评估报告（V1 诊断模式输出）。
     ///
     /// 在 `compute_layout_with_plan` 中、`router.route` 之前由
@@ -813,24 +802,6 @@ pub trait LayoutStrategy {
     /// 根据 Diagram 计算布局（节点 + 分组）
     fn compute(&self, diagram: &Diagram) -> LayoutResult;
 
-    /// 支持意图叠加层的布局入口。
-    ///
-    /// 默认实现：忽略 `valid_topology`，直接委托 [`compute`](Self::compute)。
-    /// 需要原生消费拓扑意图的算法（SugiyamaV2 / Flowchart / Er / ArchitectureV2）
-    /// 覆写此方法，在 `build_graph` 阶段注入约束边并保护意图边不被 FAS 反转。
-    ///
-    /// `valid_topology` 为 `None` 时必须与 `compute` 行为完全一致（既有测试不变）。
-    /// `valid_topology` 为 `Some` 时，其中的意图已通过 `validate_topology_intents`
-    /// 校验（节点存在、无环、无矛盾），可直接注入。
-    fn compute_with_overlay(
-        &self,
-        diagram: &Diagram,
-        valid_topology: Option<&[intent::topology::ValidTopologyIntent]>,
-    ) -> LayoutResult {
-        let _ = valid_topology;
-        self.compute(diagram)
-    }
-
     /// 该布局算法是否在 `compute` 阶段自行产出边几何信息。
     ///
     /// 返回 `true` 时，`compute_layout` 将跳过通用边路由后处理，
@@ -1029,33 +1000,12 @@ pub fn compute_layout(
 }
 
 /// 使用已解析的 [`LayoutPlan`] 计算布局（`PreparedDiagram` 在 prepare 阶段已解析 plan 时走此路径）。
-///
-/// 等价于 `compute_layout_with_plan_and_overlay(diagram, plan, None)` 的布局部分（丢弃空报告）。
 pub fn compute_layout_with_plan(
     diagram: &Diagram,
     plan: &LayoutPlan,
 ) -> std::result::Result<LayoutResult, DiagnosticError> {
-    compute_layout_with_plan_and_overlay(diagram, plan, None).map(|(r, _)| r)
-}
-
-/// 带意图叠加层的布局入口。
-///
-/// 与 [`compute_layout_with_plan`] 的差异：
-/// - `overlay` 为 `None` 时行为与 [`compute_layout_with_plan`] 完全一致（既有测试不变）。
-/// - `overlay` 为 `Some` 时：
-///   - 拓扑意图由 `strategy.compute_with_overlay` 在布局内部消费（P1）。
-///   - 几何意图由 `apply_geometric_refinement` 在 grid snap 前消费（P1.5）。
-/// - 返回值额外携带 [`RefinementReport`]，汇总每条意图的满足状态。
-///   `overlay` 为 `None` 时报告为 `None`。
-///
-/// `diagram` 不会被变异，`relations[i] ↔ edges[i]` 索引契约保持不变。
-pub fn compute_layout_with_plan_and_overlay(
-    diagram: &Diagram,
-    plan: &LayoutPlan,
-    overlay: Option<&LayoutIntentOverlay>,
-) -> std::result::Result<(LayoutResult, Option<RefinementReport>), DiagnosticError> {
     validate_layout_config(diagram)?;
-    pipeline::LayoutPipeline::new(diagram, plan, overlay).run()
+    pipeline::LayoutPipeline::new(diagram, plan).run()
 }
 
 fn layout_strategy_for(algo: &str) -> Option<Box<dyn LayoutStrategy>> {
@@ -1445,7 +1395,7 @@ mod tests {
                 line_count: 1,
             },
         )
-    }
+        }
 
     fn atom_attr(key: &str, value: &str) -> DiagramAttribute {
         DiagramAttribute {
@@ -1907,7 +1857,7 @@ mod tests {
             span,
         });
 
-        let (result, _) = compute_layout_with_plan_and_overlay(&diagram, &LayoutPlan::resolve(&diagram, profile_for(&diagram.diagram_type)), None).unwrap();
+        let result = compute_layout_with_plan(&diagram, &LayoutPlan::resolve(&diagram, profile_for(&diagram.diagram_type))).unwrap();
 
         // friendliness: off → V1 被跳过 → friendliness_report 应为 None
         assert!(
@@ -1953,7 +1903,7 @@ mod tests {
             span,
         });
 
-        let (result, _) = compute_layout_with_plan_and_overlay(&diagram, &LayoutPlan::resolve(&diagram, profile_for(&diagram.diagram_type)), None).unwrap();
+        let result = compute_layout_with_plan(&diagram, &LayoutPlan::resolve(&diagram, profile_for(&diagram.diagram_type))).unwrap();
 
         // 默认 adjust → V1 执行 → friendliness_report 应有值
         assert!(
@@ -1996,7 +1946,7 @@ mod tests {
             });
         }
         diagram
-    }
+        }
 
     #[test]
     fn unknown_bundling_option_emits_warning() {

@@ -21,8 +21,8 @@ pub(in super::super) fn assign_ranks_group_aware(
     group_map: &GroupMap,
     reversed: &HashSet<(String, String)>,
 ) -> HashMap<String, usize> {
-    let _ = diagram;
-    let mut ranks = assign_macro_group_ranks(graph, group_map, reversed);
+    let group_decl = crate::layout::decl_order::group_sibling_decl_index(diagram);
+    let mut ranks = assign_macro_group_ranks(graph, group_map, reversed, &group_decl);
 
     // 归一化
     let min_rank = ranks.values().copied().min().unwrap_or(0);
@@ -48,6 +48,7 @@ fn assign_macro_group_ranks(
     graph: &GraphIndex,
     group_map: &GroupMap,
     reversed: &HashSet<(String, String)>,
+    group_decl: &HashMap<String, usize>,
 ) -> HashMap<String, usize> {
     // 1. 超级节点成员
     let mut super_members: HashMap<String, Vec<String>> = HashMap::new();
@@ -83,8 +84,13 @@ fn assign_macro_group_ranks(
     }
 
     // 3. 宏观 rank
-    let macro_ranks =
-        assign_super_macro_ranks(&super_members, &super_edges, &edge_weights, &graph.node_ids);
+    let macro_ranks = assign_super_macro_ranks(
+        &super_members,
+        &super_edges,
+        &edge_weights,
+        &graph.node_ids,
+        group_decl,
+    );
 
     // 4. 微观 rank + 各超级节点层带宽度
     let mut intra_ranks: HashMap<String, usize> = HashMap::new();
@@ -144,13 +150,14 @@ fn assign_macro_group_ranks(
 /// 是决定主流向的关键信号。例如 `private_subnet → data_subnet` 有 4 条实际边、
 /// `data_subnet → private_subnet` 只有 1 条回流边（mq→worker），主流向应保留
 /// 4 边方向。因此在 FAS 之前先按 `edge_weights`（有向跨组实际边数）裁决所有
-/// 双向对：多数方向保留、少数方向直接标记反转；权重平局时，成员声明序更早的
-/// 组视为上游（用户通常先声明流程源头）。
+/// 双向对：多数方向保留、少数方向直接标记反转；权重平局时，组声明序更早的
+/// 组视为上游（优先 group sibling decl，回退到成员全局声明序）。
 pub(in super::super) fn assign_super_macro_ranks(
     super_members: &HashMap<String, Vec<String>>,
     super_edges: &HashSet<(String, String)>,
     edge_weights: &HashMap<(String, String), usize>,
     node_decl_order: &[String],
+    group_decl: &HashMap<String, usize>,
 ) -> HashMap<String, usize> {
     let all_supers: HashSet<String> = super_members.keys().cloned().collect();
 
@@ -160,6 +167,7 @@ pub(in super::super) fn assign_super_macro_ranks(
         super_edges,
         edge_weights,
         node_decl_order,
+        group_decl,
     );
 
     // 构建去除"已裁决反转边"后的邻接表，供 FAS 处理剩余的长环
@@ -232,7 +240,8 @@ pub(in super::super) fn assign_super_macro_ranks(
 ///
 /// 对每个双向对 (A↔B)：
 /// 1. 比较 `weight(A→B)` 与 `weight(B→A)`（跨组实际边数），反转权重小的方向；
-/// 2. 权重平局时，成员在 DSL 中声明序更早的组视为上游，反转"下游→上游"方向。
+/// 2. 权重平局时，组声明序更早的组视为上游（优先 `group_decl`，否则成员全局声明序），
+///    反转"下游→上游"方向。
 ///
 /// 返回需要标记反转的边集合（这些边不参与后续 FAS / 拓扑排序）。
 fn resolve_bidirectional_pairs_by_weight(
@@ -240,6 +249,7 @@ fn resolve_bidirectional_pairs_by_weight(
     super_edges: &HashSet<(String, String)>,
     edge_weights: &HashMap<(String, String), usize>,
     node_decl_order: &[String],
+    group_decl: &HashMap<String, usize>,
 ) -> HashSet<(String, String)> {
     // 找出所有双向对，归一化为 (min, max) 去重
     let mut bidir_pairs: Vec<(String, String)> = Vec::new();
@@ -265,14 +275,17 @@ fn resolve_bidirectional_pairs_by_weight(
     }
     bidir_pairs.sort();
 
-    // 节点声明序索引（用于权重平局时的上游判定）
+    // 节点声明序索引（用于权重平局时的上游判定回退）
     let decl_index: HashMap<&str, usize> = node_decl_order
         .iter()
         .enumerate()
         .map(|(i, id)| (id.as_str(), i))
         .collect();
-    // 超级节点的"最早成员声明序"
+    // 优先组 sibling 声明序；无组映射时回退到最早成员全局声明序
     let super_decl_rank = |super_id: &str| -> usize {
+        if let Some(&idx) = group_decl.get(super_id) {
+            return idx;
+        }
         super_members
             .get(super_id)
             .map(|members| {
