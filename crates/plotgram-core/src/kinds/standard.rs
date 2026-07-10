@@ -25,6 +25,13 @@ impl StandardEdgeConfig {
         dashed_for_passive: false,
         render_labels: true,
     };
+
+    /// 思维导图：无箭头、不渲染边标签（DSL 可写，静默忽略）。
+    pub const MINDMAP: Self = Self {
+        arrow_style: ArrowStyle::None,
+        dashed_for_passive: false,
+        render_labels: false,
+    };
 }
 
 /// 标准图在 scene 物化阶段使用的样式参数。
@@ -86,7 +93,7 @@ pub static ARCHITECTURE: StandardStyleConfig = StandardStyleConfig {
 pub static MINDMAP: StandardStyleConfig = StandardStyleConfig {
     diagram_type: DiagramType::Mindmap,
     label_weight: "500",
-    edge_config: StandardEdgeConfig::NO_ARROW,
+    edge_config: StandardEdgeConfig::MINDMAP,
     // shape 由 theme cascade 按 entity_types[root/main/branch/leaf] 物化（root=circle，其余=rounded_rect）
     force_shape: None,
 };

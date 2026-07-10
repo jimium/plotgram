@@ -36,7 +36,7 @@ diagram mindmap {
 }
 ```
 
-> 省略 `layout` 时默认 **中心辐射**（`radial`）。大纲式单向树可写 `layout: top-to-bottom` 或 `left-to-right`。
+> 省略 `layout` 时默认 **自左而右**（`left-to-right`）。中心辐射可写 `direction: radial`；大纲式自上而下可写 `direction: top-to-bottom`。
 
 > **书写提示**：`start` / `process` / `service` / `database` / `end` 会归一化为 `root` / `branch` / `leaf` 等。推荐直接使用规范 type。
 
@@ -78,18 +78,18 @@ diagram mindmap {
 
 | 属性 | 默认值 | 说明 |
 |------|--------|------|
-| `layout-algo` | `mindmap` | 思维导图专属布局（中心辐射 / 单向树） |
+| `layout-algo` | `mindmap` | 思维导图专属布局（单向树 / 中心辐射） |
 | `edge-routing` | `bezier` | 平滑曲线辐射 |
-| `layout` | `radial`（省略时） | 中心主题居中、一级分支左右交替；亦可 `top-to-bottom` / `left-to-right` |
+| `direction` | `left-to-right`（省略时） | 中心主题在左、树向右展开；亦可 `radial` / `top-to-bottom` |
 | 样式方案 | `builtin.clean-light` | 紫色主题节点 |
 
 ### 布局方向
 
-| `layout` 值 | 效果 | 适用场景 |
+| `direction` 值 | 效果 | 适用场景 |
 |-------------|------|----------|
-| `radial`（**默认**） | `root` 居中，子树向左右交替辐射 | 头脑风暴、知识图谱 |
-| `top-to-bottom` | `root` 在上方，树形向下展开 | 培训大纲、目录结构 |
-| `left-to-right` | `root` 在左侧，树形向右展开 | 横向路线图 |
+| `left-to-right`（**默认**） | `root` 在左侧，树形向右展开 | 路线图、项目计划、培训大纲 |
+| `radial` | `root` 居中，子树向左右交替辐射 | 头脑风暴、知识发散 |
+| `top-to-bottom` | `root` 在上方，树形向下展开 | 目录结构、由总到分 |
 
 ---
 

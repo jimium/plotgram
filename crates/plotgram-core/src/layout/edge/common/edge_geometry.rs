@@ -9,7 +9,7 @@ use crate::layout::{EdgeLabelLayout, NodeLayout, Port};
 pub use crate::layout::geometry::node_center;
 
 /// 默认贝塞尔张力（0.0 = 直线，1.0 = 最大弧度）
-pub const DEFAULT_BEZIER_TENSION: f64 = 0.55;
+pub const DEFAULT_BEZIER_TENSION: f64 = 0.62;
 
 /// 最小控制点延伸距离（避免曲线太"平"）
 const MIN_CONTROL_EXTENSION: f64 = 20.0;
@@ -220,20 +220,20 @@ pub fn compute_bezier_controls(
 }
 
 /// 默认肩长比例（沿端口方向伸出的长度占连线距离的比例）
-pub const DEFAULT_SHOULDER_RATIO: f64 = 0.35;
+pub const DEFAULT_SHOULDER_RATIO: f64 = 0.42;
 
-/// 计算有机贝塞尔控制点（适合 MindMap 等树形结构）
+/// 计算有机贝塞尔控制点（Plotgram「绽放曲线」）
 ///
-/// 采用「肘形 S 曲线」设计，类似 XMind / MindManager 等主流产品风格：
-/// - 控制点沿端口方向伸出一段「肩」，再平滑过渡到目标方向
-/// - 两端控制点向相反方向偏移，形成自然的 S 形弧线
-/// - 曲线从节点侧面水平/垂直伸出，连接处更自然
+/// 设计目标：比 XMind / MindManager 更干净的切线连续性，形成可辨识的特色：
+/// 1. **纯切线肩**：控制点严格沿出/入端口法向，保证端点处水平（或垂直）切线，无折感
+/// 2. **非对称肩**：父侧更长（主干抽出）、子侧更短（叶尖接入），有生长感
+/// 3. **跨度自适应**：垂直落差大时自动加长肩，弧线更从容，不硬拐
 ///
 /// 起点和终点应已位于节点边界上（如通过 `edge_point` 计算）。
 ///
 /// # 参数
 /// - `tension`: 整体弧度大小（0.0 = 近直线，1.0 = 最大弧度）
-/// - `shoulder_ratio`: 肩长占连线距离的比例，控制水平伸出段的长度
+/// - `shoulder_ratio`: 肩长占连线距离的比例
 pub fn compute_bezier_controls_organic(
     sx: f64,
     sy: f64,
@@ -244,45 +244,75 @@ pub fn compute_bezier_controls_organic(
     tension: f64,
     shoulder_ratio: f64,
 ) -> [Point; 2] {
+    let from_dir = port_direction(from_port);
+    let to_dir = port_direction(to_port);
+    compute_bezier_controls_organic_tangents(
+        sx, sy, ex, ey, from_dir, to_dir, tension, shoulder_ratio,
+    )
+}
+
+/// 与 [`compute_bezier_controls_organic`] 相同，但允许自定义出/入切线方向。
+///
+/// 用于圆形 root：出边切线取径向（从圆心指向边界点），实现「从中心绽放」；
+/// 子节点仍用水平端口切线接入。
+pub fn compute_bezier_controls_organic_tangents(
+    sx: f64,
+    sy: f64,
+    ex: f64,
+    ey: f64,
+    from_dir: Point,
+    to_dir: Point,
+    tension: f64,
+    shoulder_ratio: f64,
+) -> [Point; 2] {
     let dx = ex - sx;
     let dy = ey - sy;
     let dist = (dx * dx + dy * dy).sqrt().max(1.0);
 
-    let dir = Point::new(dx / dist, dy / dist);
+    // 垂直跨度越大，肩越长，避免「硬肘」
+    let horiz = dx.abs().max(1.0);
+    let aspect = (dy.abs() / horiz).min(3.0);
+    let tension = tension.clamp(0.05, 2.0);
+    let base = dist * shoulder_ratio * tension;
+    let desired = base * (0.80 + 0.40 * aspect);
+    let max_shoulder = (dist * 0.50).max(4.0);
+    let shoulder = desired.clamp(4.0, max_shoulder);
 
-    let from_dir = port_direction(from_port);
-    let to_dir = port_direction(to_port);
+    // 非对称：父侧抽出更长，子侧接入更短
+    let mut shoulder_from = (shoulder * 1.18).min(dist * 0.55);
+    let mut shoulder_to = (shoulder * 0.82).min(dist * 0.45);
 
-    let shoulder_len = (dist * shoulder_ratio * tension).max(MIN_CONTROL_EXTENSION * 0.5);
+    // 按水平跨度限制肩的水平分量，避免 cp1/cp2 在 x 上交叉（径向绽放时尤甚）
+    let span_x = dx.abs().max(1.0);
+    let x_budget = span_x * 0.38;
+    if from_dir.x.abs() > 0.05 {
+        shoulder_from = shoulder_from.min(x_budget / from_dir.x.abs());
+    }
+    if to_dir.x.abs() > 0.05 {
+        shoulder_to = shoulder_to.min(x_budget / to_dir.x.abs());
+    }
 
-    let axial_extension = (dist * tension * 0.2).max(MIN_CONTROL_EXTENSION * 0.3);
-
-    let cp1_x = sx + from_dir.x * shoulder_len + dir.x * axial_extension;
-    let cp1_y = sy + from_dir.y * shoulder_len + dir.y * axial_extension;
-
-    let cp2_x = ex + to_dir.x * shoulder_len - dir.x * axial_extension;
-    let cp2_y = ey + to_dir.y * shoulder_len - dir.y * axial_extension;
-
-    let perp_x = dir.y;
-    let perp_y = -dir.x;
-    let s_offset = dist * 0.06 * tension;
-
-    let s_sign = if from_dir.x.abs() > from_dir.y.abs() {
-        from_dir.x.signum()
-    } else {
-        from_dir.y.signum()
-    };
-
+    // 纯切线控制点 —— 端点处切线 = 端口法向，无弦方向污染
     let cp1 = Point::new(
-        cp1_x + perp_x * s_offset * s_sign,
-        cp1_y + perp_y * s_offset * s_sign,
+        sx + from_dir.x * shoulder_from,
+        sy + from_dir.y * shoulder_from,
     );
     let cp2 = Point::new(
-        cp2_x - perp_x * s_offset * s_sign,
-        cp2_y - perp_y * s_offset * s_sign,
+        ex + to_dir.x * shoulder_to,
+        ey + to_dir.y * shoulder_to,
     );
 
     [cp1, cp2]
+}
+
+/// 从圆形/方形节点中心指向边界点的单位径向（向外）。
+pub fn radial_outward_tangent(nl: &NodeLayout, border: Point) -> Point {
+    let cx = nl.x + nl.width / 2.0;
+    let cy = nl.y + nl.height / 2.0;
+    let dx = border.x - cx;
+    let dy = border.y - cy;
+    let len = (dx * dx + dy * dy).sqrt().max(1e-6);
+    Point::new(dx / len, dy / len)
 }
 
 fn port_direction(port: Port) -> Point {
@@ -1047,22 +1077,53 @@ mod organic_tests {
             0.1, DEFAULT_SHOULDER_RATIO,
         );
         let cp1_ext = ((cp1.x - 0.0).powi(2) + (cp1.y - 0.0).powi(2)).sqrt();
-        assert!(cp1_ext >= 5.0, "short edge should still have min control extension");
+        assert!(cp1_ext > 0.0, "short edge should still extend control point");
+        assert!(cp1_ext <= 5.0, "short edge shoulder should not overshoot distance");
     }
 
     #[test]
-    fn organic_s_shape_controls_offset_opposite() {
+    fn organic_preserves_horizontal_tangents() {
+        // 绽放曲线：水平端口的控制点必须保持端点 y，保证切线水平无折感
         let [cp1, cp2] = compute_bezier_controls_organic(
-            0.0, 0.0, 100.0, 0.0,
+            0.0, 10.0, 200.0, 80.0,
             Port::Right, Port::Left,
             0.8, DEFAULT_SHOULDER_RATIO,
         );
-        let dy1 = cp1.y - 0.0;
-        let dy2 = cp2.y - 0.0;
         assert!(
-            dy1 * dy2 <= 0.0 || (dy1 - dy2).abs() > 0.1,
-            "organic curve should have S-shape characteristic, dy1={}, dy2={}", dy1, dy2
+            (cp1.y - 10.0).abs() < 1e-9,
+            "cp1 should stay on start tangent (y=10), got {}",
+            cp1.y
         );
+        assert!(
+            (cp2.y - 80.0).abs() < 1e-9,
+            "cp2 should stay on end tangent (y=80), got {}",
+            cp2.y
+        );
+        assert!(cp1.x > 0.0, "cp1 should extend right of start");
+        assert!(cp2.x < 200.0, "cp2 should extend left of end");
+        // 非对称：父侧肩更长
+        assert!(
+            (cp1.x - 0.0) > (200.0 - cp2.x),
+            "parent shoulder should be longer than child shoulder"
+        );
+    }
+
+    #[test]
+    fn organic_radial_tangent_blooms_from_circle() {
+        let from_dir = Point::new(0.6, 0.8); // 归一化前先用，函数内部不要求单位但我们传入单位
+        let len = (0.6_f64.powi(2) + 0.8_f64.powi(2)).sqrt();
+        let from_dir = Point::new(0.6 / len, 0.8 / len);
+        let to_dir = Point::new(-1.0, 0.0);
+        let [cp1, cp2] = compute_bezier_controls_organic_tangents(
+            50.0, 50.0, 200.0, 120.0,
+            from_dir, to_dir, 0.7, DEFAULT_SHOULDER_RATIO,
+        );
+        // cp1 应沿径向延伸
+        let vx = cp1.x - 50.0;
+        let vy = cp1.y - 50.0;
+        let cross = (vx * from_dir.y - vy * from_dir.x).abs();
+        assert!(cross < 1e-6, "cp1 should lie on radial tangent, cross={}", cross);
+        assert!((cp2.y - 120.0).abs() < 1e-9, "cp2 should keep horizontal entry");
     }
 
     #[test]

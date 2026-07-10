@@ -1,9 +1,9 @@
 //! Mindmap（思维导图）专属布局算法
 //!
 //! 支持三种展开方向：
-//! - `radial` / `from_center`（默认）：中心主题居中，一级分支左右交替辐射
+//! - `left-to-right`（默认）：中心主题在左侧，树形向右展开
+//! - `radial`：中心主题居中，一级分支左右交替辐射
 //! - `top-to-bottom`：中心主题在上方，树形向下展开
-//! - `left-to-right`：中心主题在左侧，树形向右展开
 
 use crate::ast::Diagram;
 use crate::types::DiagramType;
@@ -51,7 +51,7 @@ impl MindmapNodeKind {
     /// 节点尺寸参数：(min_w, max_w, height, label_padding, char_width)
     const fn size_params(self) -> (f64, f64, f64, f64, f64) {
         match self {
-            MindmapNodeKind::Root => (160.0, 180.0, 140.0, 48.0, 16.0),
+            MindmapNodeKind::Root => (64.0, 100.0, 64.0, 24.0, 13.5),
             MindmapNodeKind::Main => (132.0, 200.0, 54.0, 36.0, 13.5),
             MindmapNodeKind::Leaf => (108.0, 176.0, 46.0, 30.0, 12.0),
             MindmapNodeKind::Branch => (120.0, 188.0, 50.0, 32.0, 12.5),
@@ -66,10 +66,8 @@ impl MindmapNodeKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MindmapMode {
-    /// 水平双向布局（左右交替，旧版 radial）
+    /// 水平双向布局（左右交替）
     Radial,
-    /// 真正的极坐标径向布局（root 居中，分支按角度辐射）
-    TrueRadial,
     TopToBottom,
     LeftToRight,
 }
@@ -126,18 +124,6 @@ impl LayoutStrategy for MindmapLayout {
         let children = build_children_map(diagram);
         let root_id = find_root_id(diagram, &children);
         let mode = layout_mode(diagram);
-        // 径向模式下，root 子节点数 >= 3 时启用真正的极坐标径向布局
-        let mode = match mode {
-            MindmapMode::Radial => {
-                let root_branch_count = children.get(&root_id).map(|v| v.len()).unwrap_or(0);
-                if root_branch_count >= 3 {
-                    MindmapMode::TrueRadial
-                } else {
-                    MindmapMode::Radial
-                }
-            }
-            other => other,
-        };
         let mut centers: HashMap<String, (f64, f64)> = HashMap::new();
         let mut sizes: HashMap<String, (f64, f64)> = HashMap::new();
 
@@ -148,9 +134,6 @@ impl LayoutStrategy for MindmapLayout {
         match mode {
             MindmapMode::Radial => {
                 layout_radial(diagram, &root_id, &children, &sizes, &mut centers, config)
-            }
-            MindmapMode::TrueRadial => {
-                layout_true_radial(&root_id, &children, &sizes, &mut centers, config)
             }
             MindmapMode::TopToBottom => layout_directional_tree(
                 diagram, &root_id, &children, &sizes, &mut centers, false, config,
@@ -165,10 +148,8 @@ impl LayoutStrategy for MindmapLayout {
         // 重叠检测与消除（安全网，所有模式通用）
         detect_and_fix_overlaps(&mut centers, &sizes, config.node_gap);
 
-        // TrueRadial 模式：最终重新居中，确保 root 在画布几何中心
-        if mode == MindmapMode::TrueRadial {
-            recenter_root(&root_id, &mut centers, &sizes, config);
-        }
+        // 推开后可能越出画布，再次归一化到 padding
+        normalize_to_padding(&mut centers, &sizes, config);
 
         let nodes = centers
             .iter()
@@ -190,20 +171,7 @@ impl LayoutStrategy for MindmapLayout {
         // 计算节点深度，供边路由层级感知使用
         let node_depths = compute_node_depths(&root_id, &children);
 
-        // TrueRadial 模式：对称画布尺寸（root 在中心）；其他模式用实际边界
-        let (total_width, total_height) = if mode == MindmapMode::TrueRadial {
-            let (root_cx, root_cy) = centers[&root_id];
-            let mut max_dx: f64 = 0.0;
-            let mut max_dy: f64 = 0.0;
-            for (id, (cx, cy)) in centers.iter() {
-                let (w, h) = sizes.get(id).copied().unwrap_or((150.0, 48.0));
-                max_dx = max_dx.max((cx - root_cx).abs() + w / 2.0);
-                max_dy = max_dy.max((cy - root_cy).abs() + h / 2.0);
-            }
-            (2.0 * (max_dx + config.padding), 2.0 * (max_dy + config.padding))
-        } else {
-            bounds_from_nodes(&nodes, config)
-        };
+        let (total_width, total_height) = bounds_from_nodes(&nodes, config);
         LayoutResult {
             nodes,
             groups: HashMap::new(),
@@ -238,7 +206,7 @@ fn layout_mode(diagram: &Diagram) -> MindmapMode {
     match crate::layout::resolve_effective_direction(diagram) {
         Some("left-to-right") => MindmapMode::LeftToRight,
         Some("top-to-bottom") => MindmapMode::TopToBottom,
-        // radial / None（不应发生，mindmap profile 有默认值）/ 未知值均回退 radial
+        // radial / 未知值均回退 radial
         _ => MindmapMode::Radial,
     }
 }
@@ -336,139 +304,6 @@ fn compute_node_depths(
     depths
 }
 
-/// 真正的极坐标径向布局：root 居中，一级分支按角度均匀辐射，子树沿父方向扇形展开。
-///
-/// 角度分配按子树叶子数加权（Reingold-Tilford 思想），避免大子树与小子树角度相同导致重叠。
-/// 半径随深度递增，确保层级清晰。
-fn layout_true_radial(
-    root_id: &str,
-    children: &HashMap<String, Vec<String>>,
-    sizes: &HashMap<String, (f64, f64)>,
-    centers: &mut HashMap<String, (f64, f64)>,
-    config: MindmapLayoutConfig,
-) {
-    // root 在原点
-    centers.insert(root_id.to_string(), (0.0, 0.0));
-
-    let root_children = children.get(root_id).cloned().unwrap_or_default();
-    if root_children.is_empty() {
-        normalize_to_padding(centers, sizes, config);
-        return;
-    }
-
-    // 按子树叶子数加权分配角度扇区
-    let weights: Vec<f64> = root_children
-        .iter()
-        .map(|cid| subtree_leaf_count(cid, children) as f64)
-        .collect();
-    let total_weight: f64 = weights.iter().sum();
-
-    // 从正上方（-90°）开始顺时针分配
-    let start_angle = -std::f64::consts::PI / 2.0;
-    let mut angle_cursor = start_angle;
-
-    let (root_w, root_h) = sizes.get(root_id).copied().unwrap_or((120.0, 120.0));
-    let root_extent = root_w.max(root_h) / 2.0;
-    let base_radius = root_extent + config.center_gap;
-
-    for (i, child_id) in root_children.iter().enumerate() {
-        let sector = 2.0 * std::f64::consts::PI * weights[i] / total_weight;
-        let child_angle = angle_cursor + sector / 2.0;
-
-        // 一级分支的半径
-        let (child_w, child_h) = sizes.get(child_id).copied().unwrap_or((132.0, 54.0));
-        let child_extent = child_w.max(child_h) / 2.0;
-        let radius = base_radius + child_extent;
-        let cx = radius * child_angle.cos();
-        let cy = radius * child_angle.sin();
-        centers.insert(child_id.to_string(), (cx, cy));
-
-        // 递归布局子树到扇区内
-        layout_radial_subtree(
-            child_id,
-            child_angle,
-            sector,
-            radius,
-            children,
-            sizes,
-            centers,
-            config,
-        );
-
-        angle_cursor += sector;
-    }
-
-    normalize_to_padding(centers, sizes, config);
-}
-
-/// 递归将子树布局到父节点的角度扇区内。
-#[allow(clippy::too_many_arguments)]
-fn layout_radial_subtree(
-    node_id: &str,
-    node_angle: f64,
-    sector: f64,
-    node_radius: f64,
-    children: &HashMap<String, Vec<String>>,
-    sizes: &HashMap<String, (f64, f64)>,
-    centers: &mut HashMap<String, (f64, f64)>,
-    config: MindmapLayoutConfig,
-) {
-    let kids = match children.get(node_id) {
-        Some(k) if !k.is_empty() => k,
-        _ => return,
-    };
-
-    // 子节点的半径 = 当前半径 + 当前节点 extent + level_gap
-    let (node_w, node_h) = sizes.get(node_id).copied().unwrap_or((132.0, 54.0));
-    let node_extent = node_w.max(node_h) / 2.0;
-    let child_radius = node_radius + node_extent + config.level_gap;
-
-    // 按叶子数分配子扇区
-    let weights: Vec<f64> = kids
-        .iter()
-        .map(|kid| subtree_leaf_count(kid, children) as f64)
-        .collect();
-    let total_weight: f64 = weights.iter().sum();
-
-    let mut angle_cursor = node_angle - sector / 2.0;
-
-    for (i, kid) in kids.iter().enumerate() {
-        let child_sector = if total_weight > 0.0 {
-            sector * weights[i] / total_weight
-        } else {
-            sector / kids.len() as f64
-        };
-        let child_angle = angle_cursor + child_sector / 2.0;
-
-        let cx = child_radius * child_angle.cos();
-        let cy = child_radius * child_angle.sin();
-        centers.insert(kid.to_string(), (cx, cy));
-
-        layout_radial_subtree(
-            kid,
-            child_angle,
-            child_sector,
-            child_radius,
-            children,
-            sizes,
-            centers,
-            config,
-        );
-
-        angle_cursor += child_sector;
-    }
-}
-
-/// 计算子树的叶子节点数（用于角度加权分配）。
-fn subtree_leaf_count(node_id: &str, children: &HashMap<String, Vec<String>>) -> usize {
-    match children.get(node_id) {
-        Some(kids) if !kids.is_empty() => {
-            kids.iter().map(|kid| subtree_leaf_count(kid, children)).sum()
-        }
-        _ => 1,
-    }
-}
-
 /// 节点重叠检测与消除：迭代式推开重叠节点。
 ///
 /// 作为布局安全网，检测所有节点对的包围盒重叠，沿重叠较小的轴推开。
@@ -559,24 +394,151 @@ fn layout_radial(
     }
 
     let root_w = sizes.get(root_id).map(|(w, _)| *w).unwrap_or(120.0);
+    // 按各层最大节点宽累加 x，避免 level_gap < 半宽之和时父子水平重叠
+    let depth_xs = compute_radial_depth_xs(root_id, children, sizes, root_w, config);
 
-    let mut y_cursor = 0.0;
-    for (i, child_id) in root_children.iter().enumerate() {
-        let direction = if i % 2 == 0 { 1.0 } else { -1.0 };
-        layout_horizontal_subtree(
-            child_id, 1, direction, &mut y_cursor, children, sizes, centers, config,
-            root_w,
-        );
-        y_cursor += config.node_gap;
-    }
-    if y_cursor > 0.0 {
-        y_cursor -= config.node_gap;
+    // 按子树权重贪心分配左右，两侧独立纵向堆叠后再对齐到 root
+    let directions = assign_radial_sides(&root_children, children);
+    let mut right_ids = Vec::new();
+    let mut left_ids = Vec::new();
+    for (child_id, dir) in root_children.iter().zip(directions.iter()) {
+        if *dir > 0.0 {
+            right_ids.push(child_id.clone());
+        } else {
+            left_ids.push(child_id.clone());
+        }
     }
 
-    let root_cy = y_cursor / 2.0;
-    centers.insert(root_id.to_string(), (0.0, root_cy));
+    let right_span = layout_radial_side(
+        &right_ids, 1.0, children, sizes, centers, config, &depth_xs,
+    );
+    let left_span = layout_radial_side(
+        &left_ids, -1.0, children, sizes, centers, config, &depth_xs,
+    );
+
+    // 两侧各自居中到 y=0，root 落在原点
+    recenter_side_vertical(&right_ids, children, centers, right_span);
+    recenter_side_vertical(&left_ids, children, centers, left_span);
+    centers.insert(root_id.to_string(), (0.0, 0.0));
 
     normalize_to_padding(centers, sizes, config);
+}
+
+/// 计算径向布局各深度的 |x| 中心坐标（从 root 向外累加）。
+///
+/// depth 0 = 0；depth d 的中心 = 上一层右缘 + level_gap + 本层半宽。
+fn compute_radial_depth_xs(
+    root_id: &str,
+    children: &HashMap<String, Vec<String>>,
+    sizes: &HashMap<String, (f64, f64)>,
+    root_w: f64,
+    config: MindmapLayoutConfig,
+) -> Vec<f64> {
+    let level_widths = compute_level_max_sizes(root_id, children, sizes, true);
+    if level_widths.is_empty() {
+        return vec![0.0];
+    }
+
+    let mut xs = vec![0.0]; // depth 0 = root
+    // depth 1：root 半宽 + center_gap + 本层半宽
+    if level_widths.len() > 1 {
+        xs.push(root_w / 2.0 + config.center_gap + level_widths[1] / 2.0);
+    }
+    for depth in 2..level_widths.len() {
+        let prev = xs[depth - 1];
+        let prev_half = level_widths[depth - 1] / 2.0;
+        let cur_half = level_widths[depth] / 2.0;
+        xs.push(prev + prev_half + config.level_gap + cur_half);
+    }
+    xs
+}
+
+/// 按子树叶子数贪心分配左右侧，保持声明顺序在同侧内的相对次序。
+///
+/// 每次把下一个分支放到当前累计权重更轻的一侧；平局时优先右侧（与经典
+/// 思维导图「先右后左」阅读习惯一致）。
+fn assign_radial_sides(
+    root_children: &[String],
+    children: &HashMap<String, Vec<String>>,
+) -> Vec<f64> {
+    let mut directions = Vec::with_capacity(root_children.len());
+    let mut right_weight = 0.0_f64;
+    let mut left_weight = 0.0_f64;
+
+    for child_id in root_children {
+        let w = subtree_leaf_count(child_id, children) as f64;
+        if right_weight <= left_weight {
+            directions.push(1.0);
+            right_weight += w;
+        } else {
+            directions.push(-1.0);
+            left_weight += w;
+        }
+    }
+    directions
+}
+
+fn subtree_leaf_count(node_id: &str, children: &HashMap<String, Vec<String>>) -> usize {
+    match children.get(node_id) {
+        Some(kids) if !kids.is_empty() => {
+            kids.iter().map(|kid| subtree_leaf_count(kid, children)).sum()
+        }
+        _ => 1,
+    }
+}
+
+/// 在单侧独立堆叠一级分支及其子树，返回该侧总高度跨度。
+fn layout_radial_side(
+    branch_ids: &[String],
+    direction: f64,
+    children: &HashMap<String, Vec<String>>,
+    sizes: &HashMap<String, (f64, f64)>,
+    centers: &mut HashMap<String, (f64, f64)>,
+    config: MindmapLayoutConfig,
+    depth_xs: &[f64],
+) -> f64 {
+    if branch_ids.is_empty() {
+        return 0.0;
+    }
+
+    let mut y_cursor = 0.0;
+    let cluster_gap = config.node_gap * 1.6;
+    for (i, child_id) in branch_ids.iter().enumerate() {
+        layout_horizontal_subtree(
+            child_id, 1, direction, &mut y_cursor, children, sizes, centers, config,
+            depth_xs,
+        );
+        if i + 1 < branch_ids.len() {
+            y_cursor += cluster_gap;
+        }
+    }
+    y_cursor
+}
+
+/// 将一侧已放置的节点整体平移，使该侧包围盒垂直居中于 y=0。
+fn recenter_side_vertical(
+    branch_ids: &[String],
+    children: &HashMap<String, Vec<String>>,
+    centers: &mut HashMap<String, (f64, f64)>,
+    side_span: f64,
+) {
+    if branch_ids.is_empty() || side_span <= 0.0 {
+        return;
+    }
+    let shift_y = -side_span / 2.0;
+    let mut stack: Vec<String> = branch_ids.to_vec();
+    let mut visited = std::collections::HashSet::new();
+    while let Some(id) = stack.pop() {
+        if !visited.insert(id.clone()) {
+            continue;
+        }
+        if let Some((_, cy)) = centers.get_mut(&id) {
+            *cy += shift_y;
+        }
+        if let Some(kids) = children.get(&id) {
+            stack.extend(kids.iter().cloned());
+        }
+    }
 }
 
 fn normalize_to_padding(
@@ -593,32 +555,6 @@ fn normalize_to_padding(
     }
 }
 
-/// 以 root 为中心重新平移所有节点，确保 root 位于画布几何中心。
-///
-/// 用于 TrueRadial 模式的最终居中：计算所有节点相对 root 的最大偏移（含节点尺寸），
-/// 取对称半径，平移使 root 落在 (padding + radius, padding + radius) 即画布中心。
-fn recenter_root(
-    root_id: &str,
-    centers: &mut HashMap<String, (f64, f64)>,
-    sizes: &HashMap<String, (f64, f64)>,
-    config: MindmapLayoutConfig,
-) {
-    let (root_cx, root_cy) = centers.get(root_id).copied().unwrap_or((0.0, 0.0));
-    let mut max_dx: f64 = 0.0;
-    let mut max_dy: f64 = 0.0;
-    for (id, (cx, cy)) in centers.iter() {
-        let (w, h) = sizes.get(id).copied().unwrap_or((150.0, 48.0));
-        max_dx = max_dx.max((cx - root_cx).abs() + w / 2.0);
-        max_dy = max_dy.max((cy - root_cy).abs() + h / 2.0);
-    }
-    let shift_x = config.padding + max_dx - root_cx;
-    let shift_y = config.padding + max_dy - root_cy;
-    for (_, (cx, cy)) in centers.iter_mut() {
-        *cx += shift_x;
-        *cy += shift_y;
-    }
-}
-
 fn layout_horizontal_subtree(
     node_id: &str,
     depth: usize,
@@ -628,42 +564,36 @@ fn layout_horizontal_subtree(
     sizes: &HashMap<String, (f64, f64)>,
     centers: &mut HashMap<String, (f64, f64)>,
     config: MindmapLayoutConfig,
-    root_w: f64,
+    depth_xs: &[f64],
 ) -> f64 {
     let (_, h) = sizes.get(node_id).copied().unwrap_or((150.0, 48.0));
     let kids = children.get(node_id).map(|v| v.as_slice()).unwrap_or(&[]);
+    let cx = direction * depth_xs.get(depth).copied().unwrap_or(0.0);
 
     if kids.is_empty() {
         let cy = *y_cursor + h / 2.0;
-        let cx = direction * horizontal_depth_x(depth, root_w, config);
         centers.insert(node_id.to_string(), (cx, cy));
-        *y_cursor += h + config.node_gap;
+        *y_cursor += h;
         return h;
     }
 
     let start_y = *y_cursor;
     let mut subtree_height = 0.0;
-    for kid in kids {
+    for (i, kid) in kids.iter().enumerate() {
         let kid_h = layout_horizontal_subtree(
             kid, depth + 1, direction, y_cursor, children, sizes, centers, config,
-            root_w,
+            depth_xs,
         );
-        subtree_height += kid_h + config.node_gap;
+        subtree_height += kid_h;
+        if i + 1 < kids.len() {
+            *y_cursor += config.node_gap;
+            subtree_height += config.node_gap;
+        }
     }
-    subtree_height -= config.node_gap;
 
     let cy = start_y + subtree_height / 2.0;
-    let cx = direction * horizontal_depth_x(depth, root_w, config);
     centers.insert(node_id.to_string(), (cx, cy));
     subtree_height
-}
-
-/// 计算水平径向布局中指定深度的 x 坐标偏移
-fn horizontal_depth_x(depth: usize, root_w: f64, config: MindmapLayoutConfig) -> f64 {
-    config.center_gap
-        + root_w / 2.0
-        + (depth as f64 - 1.0) * config.level_gap
-        + config.level_gap / 2.0
 }
 
 fn layout_directional_tree(
@@ -761,13 +691,13 @@ fn layout_tree_subtree(
         };
         centers.insert(node_id.to_string(), (cx, cy));
         let span = if horizontal { h } else { w };
-        *cursor += span + config.branch_gap;
+        *cursor += span;
         return span;
     }
 
     let start = *cursor;
     let mut subtree_span = 0.0;
-    for kid in kids {
+    for (i, kid) in kids.iter().enumerate() {
         let kid_span = layout_tree_subtree(
             kid,
             depth + 1,
@@ -779,9 +709,18 @@ fn layout_tree_subtree(
             level_centers,
             config,
         );
-        subtree_span += kid_span + config.branch_gap;
+        subtree_span += kid_span;
+        if i + 1 < kids.len() {
+            // 根下一级分支之间略加大间距，形成视觉分组
+            let gap = if depth == 0 {
+                config.branch_gap * 1.75
+            } else {
+                config.branch_gap
+            };
+            *cursor += gap;
+            subtree_span += gap;
+        }
     }
-    subtree_span -= config.branch_gap;
 
     let (cx, cy) = if horizontal {
         (primary_center, start + subtree_span / 2.0)
@@ -948,7 +887,6 @@ mod tests {
 
     #[test]
     fn radial_places_root_between_left_and_right_branches() {
-        // 2 个分支：使用旧 Radial 水平双向布局（左一个右一个）
         let diagram = mindmap_diagram(
             vec![
                 entity("root", "root"),
@@ -959,7 +897,7 @@ mod tests {
                 relation("root", "a"),
                 relation("root", "b"),
             ],
-            None,
+            Some("radial"),
         );
 
         let result = MindmapLayout::default().compute(&diagram);
@@ -982,8 +920,7 @@ mod tests {
     }
 
     #[test]
-    fn true_radial_centers_root_with_three_branches() {
-        // 3 个分支：启用 TrueRadial 极坐标径向布局，root 在画布中心
+    fn radial_alternates_three_branches_horizontally() {
         let diagram = mindmap_diagram(
             vec![
                 entity("root", "root"),
@@ -996,31 +933,59 @@ mod tests {
                 relation("root", "b"),
                 relation("root", "c"),
             ],
+            Some("radial"),
+        );
+
+        let result = MindmapLayout::default().compute(&diagram);
+        let root = result.nodes.get("root").unwrap();
+        let a = result.nodes.get("a").unwrap();
+        let b = result.nodes.get("b").unwrap();
+        let c = result.nodes.get("c").unwrap();
+
+        let root_cx = root.x + root.width / 2.0;
+        let a_cx = a.x + a.width / 2.0;
+        let b_cx = b.x + b.width / 2.0;
+        let c_cx = c.x + c.width / 2.0;
+
+        assert!(a_cx > root_cx, "first branch should be on the right");
+        assert!(b_cx < root_cx, "second branch should be on the left");
+        assert!(c_cx > root_cx, "third branch should be on the right");
+        assert_eq!(result.nodes.len(), 4);
+    }
+
+    #[test]
+    fn default_direction_is_left_to_right() {
+        let diagram = mindmap_diagram(
+            vec![
+                entity("root", "root"),
+                entity("a", "main"),
+                entity("b", "main"),
+            ],
+            vec![relation("root", "a"), relation("root", "b")],
             None,
         );
 
         let result = MindmapLayout::default().compute(&diagram);
         let root = result.nodes.get("root").unwrap();
-        let root_cx = root.x + root.width / 2.0;
-        let root_cy = root.y + root.height / 2.0;
+        let a = result.nodes.get("a").unwrap();
 
-        // root 应在画布几何中心（允许 padding 级别的误差）
-        let canvas_cx = result.total_width / 2.0;
-        let canvas_cy = result.total_height / 2.0;
-        assert!(
-            (root_cx - canvas_cx).abs() < 5.0,
-            "root cx {root_cx} should be near canvas center {canvas_cx}"
-        );
-        assert!(
-            (root_cy - canvas_cy).abs() < 5.0,
-            "root cy {root_cy} should be near canvas center {canvas_cy}"
-        );
-        assert_eq!(result.nodes.len(), 4);
+        assert!(root.x + root.width <= a.x + 1.0);
+    }
 
-        for nl in result.nodes.values() {
-            assert!(nl.x >= constants::MINDMAP_PADDING - 0.1, "node x should stay inside canvas");
-            assert!(nl.y >= constants::MINDMAP_PADDING - 0.1, "node y should stay inside canvas");
-        }
+    #[test]
+    fn root_node_is_compact_circle() {
+        let diagram = mindmap_diagram(
+            vec![entity("root", "root")],
+            vec![],
+            None,
+        );
+
+        let result = MindmapLayout::default().compute(&diagram);
+        let root = result.nodes.get("root").unwrap();
+
+        assert!(root.width <= 100.0, "root width should stay compact");
+        assert!(root.height <= 100.0, "root height should stay compact");
+        assert!((root.width - root.height).abs() < 0.1, "root should be square");
     }
 
     #[test]
@@ -1189,5 +1154,99 @@ mod tests {
                 depth2_ys
             );
         }
+    }
+
+    #[test]
+    fn radial_balances_left_and_right_independently() {
+        // 4 个等权分支：应左右各 2，且两侧都跨越 root 的上下（独立堆叠后居中）
+        let diagram = mindmap_diagram(
+            vec![
+                entity("root", "root"),
+                entity("a", "main"),
+                entity("b", "main"),
+                entity("c", "main"),
+                entity("d", "main"),
+                entity("a1", "leaf"),
+                entity("b1", "leaf"),
+                entity("c1", "leaf"),
+                entity("d1", "leaf"),
+            ],
+            vec![
+                relation("root", "a"),
+                relation("root", "b"),
+                relation("root", "c"),
+                relation("root", "d"),
+                relation("a", "a1"),
+                relation("b", "b1"),
+                relation("c", "c1"),
+                relation("d", "d1"),
+            ],
+            Some("radial"),
+        );
+
+        let result = MindmapLayout::default().compute(&diagram);
+        let root = result.nodes.get("root").unwrap();
+        let root_cx = root.x + root.width / 2.0;
+        let root_cy = root.y + root.height / 2.0;
+
+        let mut left = 0;
+        let mut right = 0;
+        for id in ["a", "b", "c", "d"] {
+            let n = result.nodes.get(id).unwrap();
+            let cx = n.x + n.width / 2.0;
+            if cx < root_cx {
+                left += 1;
+            } else {
+                right += 1;
+            }
+        }
+        assert_eq!(left, 2, "should place two branches on the left");
+        assert_eq!(right, 2, "should place two branches on the right");
+
+        let main_cys: Vec<f64> = ["a", "b", "c", "d"]
+            .iter()
+            .map(|id| {
+                let n = result.nodes.get(*id).unwrap();
+                n.y + n.height / 2.0
+            })
+            .collect();
+        let above = main_cys.iter().filter(|&&y| y < root_cy - 1.0).count();
+        let below = main_cys.iter().filter(|&&y| y > root_cy + 1.0).count();
+        assert!(above >= 1, "expected at least one branch above root, got {:?}", main_cys);
+        assert!(below >= 1, "expected at least one branch below root, got {:?}", main_cys);
+    }
+
+    #[test]
+    fn radial_parent_child_do_not_horizontally_overlap() {
+        let diagram = mindmap_diagram(
+            vec![
+                entity("root", "root"),
+                entity("main", "main"),
+                entity("leaf1", "leaf"),
+                entity("leaf2", "leaf"),
+            ],
+            vec![
+                relation("root", "main"),
+                relation("main", "leaf1"),
+                relation("main", "leaf2"),
+            ],
+            Some("radial"),
+        );
+
+        let result = MindmapLayout::default().compute(&diagram);
+        let main = result.nodes.get("main").unwrap();
+        let leaf1 = result.nodes.get("leaf1").unwrap();
+
+        let main_right = main.x + main.width;
+        let main_left = main.x;
+        let leaf_right = leaf1.x + leaf1.width;
+        let leaf_left = leaf1.x;
+
+        let overlap = main_left < leaf_right && main_right > leaf_left;
+        assert!(
+            !overlap,
+            "main [{:.1},{:.1}] should not overlap leaf [{:.1},{:.1}]",
+            main_left, main_right, leaf_left, leaf_right
+        );
     }
 }

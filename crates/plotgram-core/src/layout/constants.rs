@@ -87,12 +87,14 @@ pub const WIDE_PADDING: f64 = DEFAULT_PADDING;
 /// Force-directed-fr 默认节点宽度（比标准值略窄，适配散布布局）
 pub const FR_NODE_WIDTH: f64 = 156.0;
 
-/// 思维导图布局默认间距
+/// 思维导图布局默认间距（对齐 XMind / ProcessOn 的紧凑密度）
 pub const MINDMAP_PADDING: f64 = WIDE_PADDING;
-pub const MINDMAP_LEVEL_GAP: f64 = 200.0;
-pub const MINDMAP_BRANCH_GAP: f64 = 70.0;
-pub const MINDMAP_NODE_GAP: f64 = 22.0;
-pub const MINDMAP_CENTER_GAP: f64 = 100.0;
+/// 层级中心距：约等于「半个节点宽 + 间隙」，保证同侧父子不重叠
+pub const MINDMAP_LEVEL_GAP: f64 = 120.0;
+pub const MINDMAP_BRANCH_GAP: f64 = 22.0;
+pub const MINDMAP_NODE_GAP: f64 = 16.0;
+/// 根到一级分支中心的额外间距（不含 root 半宽）；需 ≥ 半个 main 宽 + node_gap
+pub const MINDMAP_CENTER_GAP: f64 = 96.0;
 
 /// 时序图布局默认间距
 pub const SEQUENCE_NODE_SPACING: f64 = 80.0;

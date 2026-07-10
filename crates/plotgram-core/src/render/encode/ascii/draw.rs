@@ -1,5 +1,6 @@
 use crate::ast::{ArrowType, Diagram};
 use crate::layout::{self, LayoutResult, Port};
+use crate::types::DiagramType;
 use std::collections::HashMap;
 
 use super::config::{AsciiDetectedEncoding, AsciiExportMetadata, AsciiExportOptions, AsciiExportResult};
@@ -82,12 +83,14 @@ pub(super) fn generate_ascii(
     // Post-process: render proper Unicode junction characters at route turning points
     render_junctions(&mut canvas, &routes, &node_rects);
 
-    for (idx, relation) in diagram.relations.iter().enumerate() {
-        if let Some(label) = &relation.label {
-            if let Some(route) = routes.get(idx).and_then(Option::as_ref) {
-                if route.points.len() >= 2 {
-                    let label = clean_label(label);
-                    place_edge_label(&mut canvas, route, &label);
+    if !matches!(diagram.diagram_type, DiagramType::Mindmap) {
+        for (idx, relation) in diagram.relations.iter().enumerate() {
+            if let Some(label) = &relation.label {
+                if let Some(route) = routes.get(idx).and_then(Option::as_ref) {
+                    if route.points.len() >= 2 {
+                        let label = clean_label(label);
+                        place_edge_label(&mut canvas, route, &label);
+                    }
                 }
             }
         }

@@ -1352,8 +1352,20 @@ pub fn styled_node_size(entity: &Entity, default_width: f64, default_height: f64
 
 // ─── 几何工具函数 ────────────────────────────────────────
 
-/// 计算从矩形中心到目标点的射线与矩形边界的交点
+/// 计算从节点中心到目标点的射线与节点边界的交点。
+///
+/// 近似正方形的节点（思维导图 root 等圆形）按椭圆/圆求交，
+/// 避免矩形包围盒在斜角方向把连接点推到圆外。
 pub fn edge_point(nl: &NodeLayout, tx: f64, ty: f64) -> (f64, f64) {
+    let aspect = nl.width / nl.height.max(1e-6);
+    if (aspect - 1.0).abs() < 0.08 {
+        return ellipse_edge_point(nl, tx, ty);
+    }
+    rect_edge_point(nl, tx, ty)
+}
+
+/// 矩形包围盒边界交点
+fn rect_edge_point(nl: &NodeLayout, tx: f64, ty: f64) -> (f64, f64) {
     let cx = nl.x + nl.width / 2.0;
     let cy = nl.y + nl.height / 2.0;
     let dx = tx - cx;
@@ -1379,6 +1391,25 @@ pub fn edge_point(nl: &NodeLayout, tx: f64, ty: f64) -> (f64, f64) {
     let scale = scale_x.min(scale_y);
 
     (cx + dx * scale, cy + dy * scale)
+}
+
+/// 椭圆（含圆）边界交点：射线从中心指向目标，落在椭圆周上。
+pub fn ellipse_edge_point(nl: &NodeLayout, tx: f64, ty: f64) -> (f64, f64) {
+    let cx = nl.x + nl.width / 2.0;
+    let cy = nl.y + nl.height / 2.0;
+    let dx = tx - cx;
+    let dy = ty - cy;
+
+    if dx.abs() < 0.01 && dy.abs() < 0.01 {
+        return (cx + nl.width / 2.0, cy);
+    }
+
+    let a = nl.width / 2.0;
+    let b = nl.height / 2.0;
+    // 椭圆参数方程：点 = (a cos θ, b sin θ)，θ 由方向决定
+    // 规范化方向后求与椭圆的交：t = 1 / sqrt((dx/a)² + (dy/b)²)
+    let t = 1.0 / ((dx / a).powi(2) + (dy / b).powi(2)).sqrt();
+    (cx + dx * t, cy + dy * t)
 }
 
 #[cfg(test)]
@@ -1736,7 +1767,7 @@ mod tests {
     #[test]
     fn effective_direction_mindmap_default() {
         let diagram = sample_diagram(DiagramType::Mindmap);
-        assert_eq!(resolve_effective_direction(&diagram), Some("radial"));
+        assert_eq!(resolve_effective_direction(&diagram), Some("left-to-right"));
     }
 
     #[test]
