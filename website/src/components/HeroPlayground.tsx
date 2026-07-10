@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { EditorState } from '@codemirror/state';
+import { EditorView, keymap } from '@codemirror/view';
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { bracketMatching, HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { tags as t } from '@lezer/highlight';
 import { useWasm } from '../hooks/useWasm';
 import { renderSvg, type DiagnosticErrorJson } from '../lib/wasm';
+import { plotgram } from '../lib/plotgramLang';
 
 const DEFAULT_SOURCE = `// 经典三层架构：Client → API → DB
 // Mermaid 对照: graph LR 三层结构
@@ -96,6 +102,57 @@ function formatErrors(errors: DiagnosticErrorJson[]): string {
   return `${locStr}${first.message}`;
 }
 
+const plotgramHighlightStyle = HighlightStyle.define([
+  { tag: t.keyword, color: '#7C3AED', fontWeight: '600' },
+  { tag: t.typeName, color: '#0891B2' },
+  { tag: t.string, color: '#059669' },
+  { tag: t.number, color: '#D97706' },
+  { tag: t.lineComment, color: '#94A3B8', fontStyle: 'italic' },
+  { tag: t.operator, color: '#6366F1', fontWeight: '600' },
+  { tag: t.propertyName, color: '#B45309' },
+  { tag: t.atom, color: '#DC2626' },
+  { tag: t.bracket, color: '#64748B' },
+  { tag: t.punctuation, color: '#94A3B8' },
+  { tag: t.variableName, color: '#1E293B' },
+]);
+
+const editorTheme = EditorView.theme({
+  '&': {
+    height: '100%',
+    fontSize: '13.5px',
+    backgroundColor: 'transparent',
+  },
+  '.cm-scroller': {
+    fontFamily: "'JetBrains Mono', 'SF Mono', 'Monaco', 'Menlo', monospace",
+    lineHeight: '1.65',
+    overflow: 'auto',
+  },
+  '.cm-content': {
+    padding: '18px 20px',
+    caretColor: '#7C3AED',
+  },
+  '.cm-line': {
+    padding: '0 2px',
+  },
+  '&.cm-focused': {
+    outline: 'none',
+  },
+  '.cm-cursor': {
+    borderLeftColor: '#7C3AED',
+    borderLeftWidth: '2px',
+  },
+  '.cm-selectionBackground, ::selection': {
+    background: 'rgba(124, 58, 237, 0.15)',
+  },
+  '.cm-matchingBracket': {
+    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    borderRadius: '3px',
+  },
+  '.cm-gutters': {
+    display: 'none',
+  },
+});
+
 export default function HeroPlayground() {
   const { wasm, ready, error: wasmError } = useWasm();
   const [source, setSource] = useState(DEFAULT_SOURCE);
@@ -103,12 +160,50 @@ export default function HeroPlayground() {
   const [renderError, setRenderError] = useState<string>('');
   const [activePreset, setActivePreset] = useState(0);
 
-  // 防抖渲染
+  const editorHostRef = useRef<HTMLDivElement>(null);
+  const editorViewRef = useRef<EditorView | null>(null);
+  const sourceRef = useRef(source);
+  sourceRef.current = source;
+
+  useEffect(() => {
+    if (!editorHostRef.current) return;
+    const state = EditorState.create({
+      doc: sourceRef.current,
+      extensions: [
+        history(),
+        bracketMatching(),
+        plotgram(),
+        syntaxHighlighting(plotgramHighlightStyle),
+        editorTheme,
+        EditorView.lineWrapping,
+        EditorView.updateListener.of((u) => {
+          if (u.docChanged) setSource(u.state.doc.toString());
+        }),
+        keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+      ],
+    });
+    const view = new EditorView({ state, parent: editorHostRef.current });
+    editorViewRef.current = view;
+    return () => {
+      view.destroy();
+      editorViewRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const view = editorViewRef.current;
+    if (!view) return;
+    const current = view.state.doc.toString();
+    if (current !== source) {
+      view.dispatch({ changes: { from: 0, to: current.length, insert: source } });
+    }
+  }, [source]);
+
   useEffect(() => {
     if (!wasm) return;
 
     const timer = setTimeout(() => {
-      const result = renderSvg(wasm, source);
+      const result = renderSvg(wasm, source, { transparent_background: true });
       if (result.success && result.text) {
         setSvg(result.text);
         setRenderError('');
@@ -124,16 +219,18 @@ export default function HeroPlayground() {
     if (wasmError) return { kind: 'error' as const, text: `WASM 加载失败：${wasmError}` };
     if (!ready) return { kind: 'loading' as const, text: '正在加载渲染引擎…' };
     if (renderError) return { kind: 'dsl-error' as const, text: renderError };
-    return { kind: 'ok' as const, text: '实时渲染中 · 修改左侧代码自动更新' };
+    return { kind: 'ok' as const, text: '实时渲染中 · 修改代码即时预览' };
   }, [wasmError, ready, renderError]);
 
   return (
     <div className="hero-visual">
       <div className="hero-visual-header">
-        <span className="hero-visual-dot red" />
-        <span className="hero-visual-dot yellow" />
-        <span className="hero-visual-dot green" />
-        <span className="hero-playground-title">live-demo.pgm</span>
+        <div className="hero-window-dots">
+          <span className="hero-visual-dot red" />
+          <span className="hero-visual-dot yellow" />
+          <span className="hero-visual-dot green" />
+        </div>
+        <span className="hero-playground-title">plotgram demo</span>
         <div className="hero-playground-presets">
           {PRESETS.map((p, i) => (
             <button
@@ -151,13 +248,7 @@ export default function HeroPlayground() {
       </div>
       <div className="hero-visual-body">
         <div className="hero-editor-wrap">
-          <div className="hero-editor-label">DSL</div>
-          <textarea
-            className="hero-editor"
-            value={source}
-            spellCheck={false}
-            onChange={(e) => setSource(e.target.value)}
-          />
+          <div className="hero-editor" ref={editorHostRef} />
         </div>
         <div className="hero-preview">
           <div className="hero-preview-label">

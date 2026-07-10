@@ -69,10 +69,15 @@ export default function Home() {
       {/* HERO */}
       <section className="hero">
         <div className="container">
-          <div className="hero-badge">
+          <a
+            className="hero-badge"
+            href="https://www.trae.cn/ai-creativity?utm_source=community"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             <span className="hero-badge-dot" />
             TRAE AI 编程大赛参赛作品
-          </div>
+          </a>
           <h1>
             为 <span className="gradient-text">AI Agent</span><br />
             而生的图表语言

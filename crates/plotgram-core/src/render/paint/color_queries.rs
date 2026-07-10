@@ -4,14 +4,18 @@ use crate::ast::*;
 use crate::types::DiagramType;
 use crate::render::CompiledRenderContext;
 
-/// SVG 署名区域的配色（pill 底 + 文字）。
+/// SVG 署名区域的配色（可选底衬 + 前缀/品牌双色字 + 图标色）。
 pub struct AttributionStyle {
-    pub pill_fill: String,
-    pub pill_fill_opacity: f64,
-    pub pill_stroke: String,
-    pub pill_stroke_opacity: f64,
-    pub text_fill: String,
-    pub text_fill_opacity: f64,
+    pub backdrop: bool,
+    pub backdrop_fill: String,
+    pub backdrop_opacity: f64,
+    pub prefix_fill: String,
+    pub prefix_opacity: f64,
+    pub brand_fill: String,
+    pub brand_opacity: f64,
+    pub icon_tile: String,
+    pub icon_line: String,
+    pub icon_accent: String,
 }
 
 /// 判断 canvas 背景是否为透明（不绘制全画布 rect）。
@@ -76,37 +80,49 @@ pub fn relative_luminance(hex: &str) -> Option<f64> {
     Some(0.2126 * r + 0.7152 * g + 0.0722 * b)
 }
 
-/// 根据 canvas 背景选择署名样式：不透明走主题自适应，透明走通用高对比 pill。
-pub fn attribution_style(canvas_background: &str, muted_fallback: &str) -> AttributionStyle {
+/// 根据 canvas 背景选择署名样式：实底走双色字，透明底走轻磨砂底衬。
+pub fn attribution_style(canvas_background: &str, _muted_fallback: &str) -> AttributionStyle {
     if is_transparent_canvas(canvas_background) {
         return AttributionStyle {
-            pill_fill: "#000000".to_string(),
-            pill_fill_opacity: 0.45,
-            pill_stroke: "#000000".to_string(),
-            pill_stroke_opacity: 0.0,
-            text_fill: "#ffffff".to_string(),
-            text_fill_opacity: 0.88,
+            backdrop: true,
+            backdrop_fill: "#000000".to_string(),
+            backdrop_opacity: 0.36,
+            prefix_fill: "#ffffff".to_string(),
+            prefix_opacity: 0.62,
+            brand_fill: "#ffffff".to_string(),
+            brand_opacity: 0.92,
+            icon_tile: "#121212".to_string(),
+            icon_line: "#FAF8F4".to_string(),
+            icon_accent: "#FAF8F4".to_string(),
         };
     }
 
     let light_canvas = relative_luminance(canvas_background).unwrap_or(0.9) > 0.5;
     if light_canvas {
         AttributionStyle {
-            pill_fill: canvas_background.to_string(),
-            pill_fill_opacity: 0.82,
-            pill_stroke: muted_fallback.to_string(),
-            pill_stroke_opacity: 0.25,
-            text_fill: "#6b7280".to_string(),
-            text_fill_opacity: 0.55,
+            backdrop: false,
+            backdrop_fill: String::new(),
+            backdrop_opacity: 0.0,
+            prefix_fill: "#94A3B8".to_string(),
+            prefix_opacity: 0.88,
+            brand_fill: "#475569".to_string(),
+            brand_opacity: 0.92,
+            icon_tile: "#121212".to_string(),
+            icon_line: "#FAF8F4".to_string(),
+            icon_accent: "#FAF8F4".to_string(),
         }
     } else {
         AttributionStyle {
-            pill_fill: canvas_background.to_string(),
-            pill_fill_opacity: 0.82,
-            pill_stroke: muted_fallback.to_string(),
-            pill_stroke_opacity: 0.25,
-            text_fill: "#9ca3af".to_string(),
-            text_fill_opacity: 0.60,
+            backdrop: false,
+            backdrop_fill: String::new(),
+            backdrop_opacity: 0.0,
+            prefix_fill: "#64748B".to_string(),
+            prefix_opacity: 0.85,
+            brand_fill: "#E2E8F0".to_string(),
+            brand_opacity: 0.95,
+            icon_tile: "#E2E8F0".to_string(),
+            icon_line: "#121212".to_string(),
+            icon_accent: "#121212".to_string(),
         }
     }
 }
@@ -324,7 +340,8 @@ mod tests {
     #[test]
     fn attribution_style_uses_universal_colors_for_transparent_canvas() {
         let style = attribution_style("transparent", "#999");
-        assert_eq!(style.text_fill, "#ffffff");
-        assert_eq!(style.pill_fill, "#000000");
+        assert!(style.backdrop);
+        assert_eq!(style.brand_fill, "#ffffff");
+        assert_eq!(style.backdrop_fill, "#000000");
     }
 }

@@ -255,8 +255,9 @@ mod tests {
         let svg = encode(&RenderRequest::new(&diagram, RenderFormat::Svg)).unwrap();
 
         assert!(svg.contains("class=\"plotgram-attribution\""));
-        assert!(svg.contains("powered by plotgram"));
-        assert!(svg.contains("href=\"https://plotgram.studio\""));
+        assert!(svg.contains("by "));
+        assert!(svg.contains("Plotgram"));
+        assert!(svg.contains("href=\"https://demo.plotgram.dev/\""));
     }
 
     #[test]
@@ -267,7 +268,8 @@ mod tests {
 
         let svg = encode(&request).unwrap();
         assert!(!svg.contains("plotgram-attribution"));
-        assert!(!svg.contains("powered by plotgram"));
+        assert!(!svg.contains("by "));
+        assert!(!svg.contains("Plotgram"));
     }
 
     #[test]

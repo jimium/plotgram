@@ -13,16 +13,21 @@ pub const ARROW_SIZE: f64 = 8.0;
 pub const FONT_SIZE: f64 = 13.0;
 pub const NODE_RX: f64 = 8.0;
 
-pub const ATTRIBUTION_URL: &str = "https://plotgram.studio";
-const ATTRIBUTION_TEXT: &str = "powered by plotgram";
-const ATTRIBUTION_PILL_WIDTH: f64 = 108.0;
-const ATTRIBUTION_PILL_HEIGHT: f64 = 16.0;
-const ATTRIBUTION_FONT_SIZE: f64 = 10.0;
+pub const ATTRIBUTION_URL: &str = "https://demo.plotgram.dev/";
+const ATTRIBUTION_PREFIX: &str = "by ";
+const ATTRIBUTION_BRAND: &str = "Plotgram";
+const ATTRIBUTION_ICON_SIZE: f64 = 11.0;
+const ATTRIBUTION_BLOCK_HEIGHT: f64 = 14.0;
+const ATTRIBUTION_FONT_SIZE: f64 = 9.5;
+const ATTRIBUTION_ICON_GAP: f64 = 5.0;
+/// 9.5px 下前缀/品牌名的估宽（右对齐布局，无需 font metrics）。
+const ATTRIBUTION_PREFIX_WIDTH: f64 = 16.0;
+const ATTRIBUTION_BRAND_WIDTH: f64 = 46.0;
+const ATTRIBUTION_BACKDROP_PAD_X: f64 = 8.0;
+const ATTRIBUTION_BACKDROP_PAD_Y: f64 = 5.0;
 /// 署名锚点距画布右/底边的留白（复用 layout 已预留的 padding，不额外扩展画布）。
 const ATTRIBUTION_MARGIN_RIGHT: f64 = 20.0;
 const ATTRIBUTION_MARGIN_BOTTOM: f64 = 18.0;
-/// 10px sans-serif 在 pill 垂直中心处的基线偏移（相对中心向下为正）。
-const ATTRIBUTION_TEXT_BASELINE_OFFSET: f64 = 2.4;
 
 pub fn escape_xml(s: &str) -> String {
     s.replace('&', "&amp;")
@@ -140,31 +145,41 @@ fn write_attribution(
     let context = &scene.context;
     let canvas_background = &scene.canvas.background;
     let muted = super::color_queries::muted_text_color(&diagram.diagram_type, context, "#999");
-    let style = super::color_queries::attribution_style(&canvas_background, &muted);
+    let style = super::color_queries::attribution_style(canvas_background, &muted);
+
+    let content_width =
+        ATTRIBUTION_ICON_SIZE + ATTRIBUTION_ICON_GAP + ATTRIBUTION_PREFIX_WIDTH + ATTRIBUTION_BRAND_WIDTH;
+    let block_height = if style.backdrop {
+        ATTRIBUTION_BLOCK_HEIGHT + ATTRIBUTION_BACKDROP_PAD_Y * 2.0
+    } else {
+        ATTRIBUTION_BLOCK_HEIGHT
+    };
 
     let canvas_bottom = layout.total_height + title_offset;
     let x = layout.total_width - ATTRIBUTION_MARGIN_RIGHT;
-    let pill_half_h = ATTRIBUTION_PILL_HEIGHT / 2.0;
-    // 锚点为 pill 垂直中心，距画布底边 ATTRIBUTION_MARGIN_BOTTOM + pill 半高
-    let y = canvas_bottom - ATTRIBUTION_MARGIN_BOTTOM - pill_half_h;
+    let y = canvas_bottom - ATTRIBUTION_MARGIN_BOTTOM - block_height / 2.0;
 
     writeln!(
         svg,
         r##"<g class="plotgram-attribution" transform="translate({x:.1},{y:.1})">"##
     )
     .unwrap();
-    writeln!(
-        svg,
-        r##"<rect x="-{pw:.0}" y="-{pill_half_h:.1}" width="{pw:.0}" height="{ph:.0}" rx="3" fill="{pill_fill}" fill-opacity="{pill_fill_opacity:.2}" stroke="{pill_stroke}" stroke-opacity="{pill_stroke_opacity:.2}" stroke-width="0.5"/>"##,
-        pw = ATTRIBUTION_PILL_WIDTH,
-        pill_half_h = pill_half_h,
-        ph = ATTRIBUTION_PILL_HEIGHT,
-        pill_fill = style.pill_fill,
-        pill_fill_opacity = style.pill_fill_opacity,
-        pill_stroke = style.pill_stroke,
-        pill_stroke_opacity = style.pill_stroke_opacity,
-    )
-    .unwrap();
+
+    if style.backdrop {
+        let bw = content_width + ATTRIBUTION_BACKDROP_PAD_X * 2.0;
+        let bh = block_height;
+        writeln!(
+            svg,
+            r##"<rect x="-{bw:.1}" y="-{bh_half:.1}" width="{bw:.1}" height="{bh:.1}" rx="7" fill="{fill}" fill-opacity="{opacity:.2}"/>"##,
+            bw = bw,
+            bh = bh,
+            bh_half = bh / 2.0,
+            fill = style.backdrop_fill,
+            opacity = style.backdrop_opacity,
+        )
+        .unwrap();
+    }
+
     writeln!(
         svg,
         r##"<a href="{ATTRIBUTION_URL}" target="_blank" rel="noopener noreferrer">"##
@@ -172,14 +187,63 @@ fn write_attribution(
     .unwrap();
     writeln!(
         svg,
-        r##"<text x="-6" y="{text_y:.1}" text-anchor="end" font-size="{font_size:.0}" fill="{text_fill}" fill-opacity="{text_fill_opacity:.2}">{ATTRIBUTION_TEXT}</text>"##,
-        text_y = ATTRIBUTION_TEXT_BASELINE_OFFSET,
-        font_size = ATTRIBUTION_FONT_SIZE,
-        text_fill = style.text_fill,
-        text_fill_opacity = style.text_fill_opacity,
+        r##"<g transform="translate(-{content_width:.1},-{block_inner_half:.1})">"##,
+        content_width = content_width,
+        block_inner_half = ATTRIBUTION_BLOCK_HEIGHT / 2.0,
     )
     .unwrap();
+
+    write_attribution_icon(svg, &style);
+
+    let text_x = ATTRIBUTION_ICON_SIZE + ATTRIBUTION_ICON_GAP;
+    let text_y = ATTRIBUTION_BLOCK_HEIGHT / 2.0;
+    writeln!(
+        svg,
+        r##"<text x="{text_x:.1}" y="{text_y:.1}" dominant-baseline="middle" font-size="{font_size:.1}" font-family="'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif">"##,
+        font_size = ATTRIBUTION_FONT_SIZE,
+    )
+    .unwrap();
+    writeln!(
+        svg,
+        r##"<tspan fill="{prefix_fill}" fill-opacity="{prefix_opacity:.2}" letter-spacing="0.04em">{prefix}</tspan>"##,
+        prefix_fill = style.prefix_fill,
+        prefix_opacity = style.prefix_opacity,
+        prefix = ATTRIBUTION_PREFIX,
+    )
+    .unwrap();
+    writeln!(
+        svg,
+        r##"<tspan fill="{brand_fill}" fill-opacity="{brand_opacity:.2}" font-weight="600">{brand}</tspan>"##,
+        brand_fill = style.brand_fill,
+        brand_opacity = style.brand_opacity,
+        brand = ATTRIBUTION_BRAND,
+    )
+    .unwrap();
+    writeln!(svg, "</text>").unwrap();
+    writeln!(svg, "</g>").unwrap();
     writeln!(svg, "</a>").unwrap();
+    writeln!(svg, "</g>").unwrap();
+}
+
+/// 品牌 mark（S2a22），配色随画布背景自适应。
+fn write_attribution_icon(svg: &mut String, style: &super::color_queries::AttributionStyle) {
+    let icon_scale = ATTRIBUTION_ICON_SIZE / 48.0;
+    let icon_y = (ATTRIBUTION_BLOCK_HEIGHT - ATTRIBUTION_ICON_SIZE) / 2.0;
+    writeln!(
+        svg,
+        r##"<g transform="translate(0,{icon_y:.2}) scale({icon_scale:.4})">"##,
+        icon_y = icon_y,
+        icon_scale = icon_scale,
+    )
+    .unwrap();
+    writeln!(
+        svg,
+        r##"<rect width="48" height="48" rx="12" fill="{tile}"/><path d="M10 14.4h28.8" stroke="{line}" stroke-width="3" stroke-linecap="round"/><path d="M10 26.4h13.5" stroke="{line}" stroke-width="3" stroke-linecap="round"/><path d="M10 38.4h11" stroke="{line}" stroke-width="3" stroke-linecap="round"/><circle cx="31.9" cy="33" r="6.9" fill="{accent}"/>"##,
+        tile = style.icon_tile,
+        line = style.icon_line,
+        accent = style.icon_accent,
+    )
+    .unwrap();
     writeln!(svg, "</g>").unwrap();
 }
 
