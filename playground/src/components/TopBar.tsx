@@ -223,6 +223,10 @@ export function TopBar({
       </div>
 
       <div className="topbar-right">
+        <a href="/" className="btn btn-ghost" title="返回 Plotgram 主站">
+          <span>主站</span>
+        </a>
+
         <div className="export-wrap" ref={exportRef}>
           <button
             type="button"

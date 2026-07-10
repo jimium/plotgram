@@ -16,6 +16,7 @@ import {
   ThunderboltFilled,
   BookOutlined,
   GithubOutlined,
+  HomeOutlined,
 } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -99,6 +100,15 @@ export function TopBar({
       </div>
 
       <Space className="topbar-actions">
+        <Tooltip title="返回 Plotgram 主站">
+          <Button
+            type="text"
+            icon={<HomeOutlined />}
+            href="/"
+          >
+            主站
+          </Button>
+        </Tooltip>
         <Tooltip title="查看使用文档">
           <Button
             type="text"

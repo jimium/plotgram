@@ -13,7 +13,7 @@ const FEATURES = [
   {
     icon: '🤖',
     title: 'AI 原生语法设计',
-    desc: '箭头仅 3 种、语义用 type 表达、没有隐式规则——LLM 生成正确率从 Mermaid 的 70% 提升到 95%+。',
+    desc: '箭头仅 3 种、语义用 type 表达、没有隐式规则——LLM 一次写对，不用调参猜语法。',
   },
   {
     icon: '⚠️',
@@ -51,10 +51,10 @@ const COMPARISON = [
 ];
 
 const STATS = [
-  { number: '6', label: '图表类型' },
-  { number: '7', label: '布局算法' },
-  { number: '4', label: '边路由策略' },
-  { number: '959', label: '测试用例' },
+  { number: '70+', label: '真实场景示例' },
+  { number: '6', label: '图表类型 · 一套语法' },
+  { number: '3', label: '端同源交付 CLI / API / WASM' },
+  { number: '0', label: '手写坐标 · 全自动布局' },
 ];
 
 function Mark({ type }: { type: 'check' | 'cross' | 'partial' }) {
@@ -79,19 +79,25 @@ export default function Home() {
             TRAE AI 编程大赛参赛作品
           </a>
           <h1>
-            为 <span className="gradient-text">AI Agent</span><br />
-            而生的图表语言
+            让 <span className="gradient-text">Agent</span> 会画图<br />
+            一图胜千言，被 AI 放大
           </h1>
           <p className="hero-subtitle">
-            Plotgram 不是 Mermaid 的替代品——它从语法设计、错误模型到操作范式，
-            整套为「AI 生成、人类阅读」场景从零构建的智能图表渲染引擎。
+            Plotgram 是为 AI 生成而设计的图表 DSL——Agent 理解语义、操作 AST，
+            按你的需求生成和修改图表，改一行不用重画整张。70+ 真实示例，对话即可出图。
           </p>
           <div className="hero-actions">
-            <a href="/playground/" className="btn btn-primary">
-              打开 Playground
+            <a href="/agent/" className="btn btn-primary" target="_blank" rel="noopener noreferrer">
+              去 Agent Demo 对话
               <span className="hero-cta-arrow">→</span>
             </a>
-            <a href="/docs/getting-started/" className="btn btn-secondary">
+            <a href="/showcase/" className="btn btn-secondary" target="_blank" rel="noopener noreferrer">
+              浏览 70+ 示例
+            </a>
+            <a href="/playground/" className="btn btn-agent" target="_blank" rel="noopener noreferrer">
+              打开 Playground
+            </a>
+            <a href="/docs/getting-started/" className="btn btn-ghost">
               5 分钟快速上手
             </a>
           </div>
@@ -105,8 +111,8 @@ export default function Home() {
         <div className="container">
           <div className="section-header">
             <div className="section-label">Core Features</div>
-            <h2>为什么选择 Plotgram</h2>
-            <p>从语法到布局引擎，每一处设计都为 AI 场景优化</p>
+            <h2>Agent 画图，为什么需要专门的 DSL</h2>
+            <p>每一处设计，都为了让 AI 一次生成对的图、增量改对已有的图</p>
           </div>
           <div className="features-grid">
             {FEATURES.map((f) => (
@@ -130,7 +136,7 @@ export default function Home() {
           </div>
           <div className="types-grid">
             {DIAGRAM_TYPES.map((t) => (
-              <a href="/showcase/" className="type-card" key={t.name}>
+              <a href="/showcase/" className="type-card" key={t.name} target="_blank" rel="noopener noreferrer">
                 <div className="type-icon">{t.icon}</div>
                 <h3>{t.name}</h3>
                 <p>{t.desc}</p>
@@ -147,9 +153,9 @@ export default function Home() {
       <section className="comparison" id="comparison">
         <div className="container">
           <div className="section-header">
-            <div className="section-label">Why Not Mermaid?</div>
-            <h2>不是替代品，是新物种</h2>
-            <p>Mermaid 和 PlantUML 为人类手写设计，Plotgram 为 AI 生成设计</p>
+            <div className="section-label">Why Plotgram</div>
+            <h2>为 AI 生成而设计，从一开始</h2>
+            <p>传统工具为人类手写优化，Plotgram 为 Agent 生成优化——语境不同，设计不同</p>
           </div>
           <div className="comparison-table">
             <div className="comparison-row header">
@@ -191,7 +197,7 @@ export default function Home() {
           <div className="stats-grid">
             {STATS.map((s) => (
               <div key={s.label}>
-                <div className="stat-number">{s.number}+</div>
+                <div className="stat-number">{s.number}</div>
                 <div className="stat-label">{s.label}</div>
               </div>
             ))}
@@ -199,21 +205,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="cta-section">
-        <div className="container">
-          <h2>立即开始体验</h2>
-          <p>在浏览器中实时编写 Plotgram 代码，无需安装任何东西</p>
-          <div className="cta-actions">
-            <a href="/playground/" className="btn btn-primary" style={{ fontSize: 16, padding: '14px 32px' }}>
-              🚀 打开 Playground
-            </a>
-            <a href="/showcase/" className="btn btn-secondary" style={{ fontSize: 16, padding: '14px 32px' }}>
-              📂 浏览 70+ 示例
-            </a>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

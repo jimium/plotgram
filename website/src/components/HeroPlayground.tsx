@@ -8,9 +8,7 @@ import { useWasm } from '../hooks/useWasm';
 import { renderSvg, type DiagnosticErrorJson } from '../lib/wasm';
 import { plotgram } from '../lib/plotgramLang';
 
-const DEFAULT_SOURCE = `// 经典三层架构：Client → API → DB
-// Mermaid 对照: graph LR 三层结构
-diagram architecture {
+const DEFAULT_SOURCE = `diagram architecture {
     title: "三层架构"
 
     entity[frontend] client "客户端" {
@@ -37,19 +35,29 @@ const PRESETS: Preset[] = [
   {
     label: '流程图',
     source: `diagram flowchart {
-  title: "订单处理流程"
-  config { direction: top-to-bottom }
+    title: "用户认证流程"
+    config {
+        direction: top-to-bottom
+    }
 
-  entity[start] start "开始"
-  entity[process] order "用户下单"
-  entity[process] pay "支付"
-  entity[process] ship "发货"
-  entity[end] done "完成"
+    entity[client] client "移动客户端"
+    entity[gateway] gateway "API 网关" {
+        status: healthy
+    }
+    entity[service] auth "认证服务" {
+        owner: "安全团队"
+    }
+    entity[database] db "用户数据库"
+    entity[cache] cache "Token 缓存"
 
-  start -> order
-  order -> pay
-  pay -> ship
-  ship -> done
+    client -> gateway "HTTPS 请求"
+    gateway -> auth "转发认证请求"
+    auth -> db "查询用户信息"
+    db --> auth "返回用户记录"
+    auth -> cache "存储 Token"
+    cache --> auth "返回缓存结果"
+    auth --> gateway "认证结果"
+    gateway --> client "响应"
 }`,
   },
   {

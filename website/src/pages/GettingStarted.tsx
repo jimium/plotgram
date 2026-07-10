@@ -93,7 +93,7 @@ export default function GettingStarted() {
       <h2>三种使用方式</h2>
       <p>Plotgram 提供多种接入方式，根据你的场景选择最合适的一种开始体验。</p>
       <div className="quick-links">
-        <a href="/playground/" className="quick-link-card">
+        <a href="/playground/" className="quick-link-card" target="_blank" rel="noopener noreferrer">
           <div className="ql-icon">🌐</div>
           <h4>浏览器 Playground</h4>
           <p>零安装，打开即用，实时预览</p>
@@ -105,7 +105,7 @@ export default function GettingStarted() {
           <p>本地渲染 SVG/PNG，支持批量处理和 CI 集成</p>
           <span className="ql-arrow">→</span>
         </a>
-        <a href="/playground/" className="quick-link-card">
+        <a href="/playground/" className="quick-link-card" target="_blank" rel="noopener noreferrer">
           <div className="ql-icon">🧩</div>
           <h4>WASM / HTTP API</h4>
           <p>嵌入前端或后端服务，Agent 集成首选</p>
@@ -115,7 +115,7 @@ export default function GettingStarted() {
 
       <h2>第一步：Hello World 流程图</h2>
       <p>
-        打开 <a href="/playground/">Playground</a>，在左侧编辑器中输入以下代码，右侧会实时渲染出你的第一张 Plotgram 图：
+        打开 <a href="/playground/" target="_blank" rel="noopener noreferrer">Playground</a>，在左侧编辑器中输入以下代码，右侧会实时渲染出你的第一张 Plotgram 图：
       </p>
       <CodeBlock code={helloFlowchart} title="hello.pgm" />
 
@@ -268,13 +268,13 @@ export default function GettingStarted() {
       <h2>下一步</h2>
       <p>恭喜你完成了快速上手！接下来你可以：</p>
       <div className="quick-links">
-        <a href="/playground/" className="quick-link-card">
+        <a href="/playground/" className="quick-link-card" target="_blank" rel="noopener noreferrer">
           <div className="ql-icon">🚀</div>
           <h4>打开 Playground 动手尝试</h4>
           <p>在浏览器中实时编写 Plotgram 代码</p>
           <span className="ql-arrow">→</span>
         </a>
-        <a href="/showcase/" className="quick-link-card">
+        <a href="/showcase/" className="quick-link-card" target="_blank" rel="noopener noreferrer">
           <div className="ql-icon">📂</div>
           <h4>浏览示例画廊</h4>
           <p>70+ 真实场景示例，涵盖所有 6 种图表类型</p>

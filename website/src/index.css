@@ -103,6 +103,58 @@ a {
   color: var(--text-primary);
 }
 
+/* 导航栏右侧三个突出入口 */
+.nav-cta-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-cta {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  transition: all 0.15s;
+  text-decoration: none;
+}
+
+.nav-cta:hover {
+  transform: translateY(-1px);
+  border-color: var(--brand-purple);
+  color: var(--brand-purple);
+}
+
+.nav-cta-primary {
+  background: linear-gradient(135deg, var(--brand-purple), var(--brand-cyan));
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 3px 10px rgba(124,58,237,0.30);
+}
+
+.nav-cta-primary:hover {
+  color: white;
+  box-shadow: 0 5px 16px rgba(124,58,237,0.42);
+}
+
+.nav-cta-accent {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 3px 10px rgba(37,99,235,0.30);
+}
+
+.nav-cta-accent:hover {
+  color: white;
+  box-shadow: 0 5px 16px rgba(37,99,235,0.42);
+}
+
 /* ===== BUTTONS ===== */
 .btn {
   display: inline-flex;
@@ -138,6 +190,22 @@ a {
 .btn-secondary:hover {
   border-color: var(--brand-purple);
   color: var(--brand-purple);
+}
+
+.btn-agent {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: white;
+  box-shadow: 0 4px 14px rgba(37,99,235,0.35);
+}
+
+.btn-agent:hover {
+  transform: translateY(-1px);
+  color: white;
+  box-shadow: 0 6px 20px rgba(37,99,235,0.45);
+}
+
+.btn-agent:hover .hero-cta-arrow {
+  transform: translateX(3px);
 }
 
 .btn-ghost {
