@@ -4,6 +4,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url));
+const cdnBase = process.env.VITE_CDN_BASE || '';
 
 export default defineConfig({
   base: '/',
@@ -18,6 +19,14 @@ export default defineConfig({
       input: {
         main: resolve(rootDir, 'index.html'),
       },
+    },
+  },
+  experimental: {
+    renderBuiltUrl(filename, { type }) {
+      if (!cdnBase || type !== 'asset') {
+        return { relative: true };
+      }
+      return `${cdnBase}${filename}`;
     },
   },
 });

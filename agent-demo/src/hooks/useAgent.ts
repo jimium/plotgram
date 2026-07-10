@@ -185,6 +185,22 @@ export function useAgent(options: UseAgentOptions): UseAgentResult {
               ),
             );
           }
+
+          // render_update: 增量推送，立即更新预览 / DSL / diff，不必等 Agent 文字回复完成
+          if (step.type === 'render_update' && step.renderUpdate) {
+            const { source: newSource, svg: newSvg, diff: newDiff } = step.renderUpdate;
+            if (newSource && newSource !== contextRef.current.source) {
+              contextRef.current = { ...contextRef.current, source: newSource };
+              currentSourceRef.current = newSource;
+              setCurrentSource(newSource);
+            }
+            if (newSvg) {
+              setCurrentSvg(newSvg);
+            }
+            if (newDiff) {
+              setLastDiff(newDiff);
+            }
+          }
         },
       };
 

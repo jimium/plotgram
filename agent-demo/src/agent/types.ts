@@ -120,10 +120,16 @@ export interface LLMResponse {
 
 /** Agent 执行步骤 */
 export interface AgentStep {
-  type: 'thinking' | 'tool_call' | 'tool_result' | 'response' | 'error';
+  type: 'thinking' | 'tool_call' | 'tool_result' | 'response' | 'error' | 'render_update';
   content: string;
   toolCall?: ToolCall;
   toolResult?: unknown;
+  /** render_update 事件携带的最新渲染产物 */
+  renderUpdate?: {
+    source?: string;
+    svg?: string;
+    diff?: DiffResult;
+  };
   timestamp: number;
 }
 

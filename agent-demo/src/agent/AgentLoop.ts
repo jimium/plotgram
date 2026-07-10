@@ -156,6 +156,21 @@ export async function runAgentLoop(
         renderFailed = true;
       }
 
+      // 5.5 增量推送：每完成一次 render / apply_patch / diff 立即把最新产物
+      // 推给 UI，避免等 LLM 后续文字响应结束才更新预览
+      if (stateUpdate.svg || stateUpdate.source || stateUpdate.diff) {
+        config.onStep({
+          type: 'render_update',
+          content: 'render_update',
+          renderUpdate: {
+            source: stateUpdate.source,
+            svg: stateUpdate.svg,
+            diff: stateUpdate.diff,
+          },
+          timestamp: Date.now(),
+        });
+      }
+
       // 6. 将 Tool 结果加入对话(截断后发给 LLM)
       messages.push({
         role: 'tool',

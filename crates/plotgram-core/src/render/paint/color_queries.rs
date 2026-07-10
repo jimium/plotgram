@@ -212,6 +212,32 @@ pub fn edge_stroke(diagram: &Diagram, context: &CompiledRenderContext, fallback:
         .to_string()
 }
 
+/// 箭头填充色：优先 `arrow_fill`，未设时回退到边 `stroke`。
+pub fn edge_arrow_fill(diagram: &Diagram, context: &CompiledRenderContext, fallback: &str) -> String {
+    let edge = context
+        .compiled
+        .edge_block(diagram.diagram_type.style_key(), None);
+    edge.get("arrow_fill")
+        .and_then(|v| v.as_str())
+        .or_else(|| edge.get("stroke").and_then(|v| v.as_str()))
+        .unwrap_or(fallback)
+        .to_string()
+}
+
+/// 箭头填充色（按 DiagramType 查询）。
+pub fn edge_arrow_fill_color(
+    diagram_type: &DiagramType,
+    context: &CompiledRenderContext,
+    fallback: &str,
+) -> String {
+    let edge = context.compiled.edge_block(diagram_type.style_key(), None);
+    edge.get("arrow_fill")
+        .and_then(|v| v.as_str())
+        .or_else(|| edge.get("stroke").and_then(|v| v.as_str()))
+        .unwrap_or(fallback)
+        .to_string()
+}
+
 /// 边描边颜色（从 theme cascade 读取，带回退值）。
 pub fn edge_stroke_color(
     diagram_type: &DiagramType,

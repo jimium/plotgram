@@ -51,7 +51,7 @@ pub fn write_svg_preamble(
     let canvas_background = &scene.canvas.background;
     let canvas_transparent = super::color_queries::is_transparent_canvas(canvas_background);
     let title_color = &scene.canvas.title_color;
-    let marker_stroke = super::color_queries::edge_stroke(diagram, context, "#555");
+    let marker_stroke = super::color_queries::edge_arrow_fill(diagram, context, "#555");
     let muted_marker_stroke = super::color_queries::muted_text_color(&diagram.diagram_type, context, "#999");
 
     writeln!(

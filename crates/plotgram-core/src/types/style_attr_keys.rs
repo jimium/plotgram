@@ -47,6 +47,8 @@ pub const STROKE_LINEJOIN: &str = "stroke_linejoin";
 pub const DASHED: &str = "dashed";
 /// 箭头样式（normal | hollow | none）
 pub const ARROW_STYLE: &str = "arrow_style";
+/// 箭头填充色（可与边线 stroke 独立；未设时回退到 stroke）
+pub const ARROW_FILL: &str = "arrow_fill";
 /// 标签颜色
 pub const LABEL_COLOR: &str = "label_color";
 

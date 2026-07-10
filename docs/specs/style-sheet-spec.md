@@ -468,11 +468,12 @@ token 引用之外，`context_palettes.entries` 的值还支持 **compile 期颜
 | `stroke_width`     | `number`  | 线宽     |
 | `stroke_dasharray` | `string`  | 虚线     |
 | `dashed`           | `boolean` | 简写虚线开关 |
+| `arrow_fill`       | `string`  | 箭头填充色（可与 `stroke` 独立；未设时回退到 `stroke`） |
 | `text_fill`        | `string`  | 边标签颜色  |
 | `font_size`        | `number`  | 边标签字号  |
 
 
-> 箭头形态（`ArrowType` → `ArrowStyle`）属于**渲染语义**，由 Renderer 根据 relation.arrow 决定，不写入 StyleSheet。
+> 箭头**形态**（`ArrowType` → `ArrowStyle`）属于渲染语义，由 Renderer 根据 relation.arrow 决定。箭头**颜色**可通过 `arrow_fill` 与边线 `stroke` 解耦。
 
 ### 6.3 shape 枚举
 

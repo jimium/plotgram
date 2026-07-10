@@ -33,6 +33,7 @@ pub const VALID_RELATION_STYLE_ATTRS: &[&str] = &[
     style_attr_keys::STROKE_DASHARRAY,
     style_attr_keys::DASHED,
     style_attr_keys::ARROW_STYLE,
+    style_attr_keys::ARROW_FILL,
     style_attr_keys::STROKE_OPACITY,
     style_attr_keys::STROKE_LINECAP,
     style_attr_keys::STROKE_LINEJOIN,
@@ -98,7 +99,7 @@ pub fn validate_style_property(
     let expected: Option<&'static str> = match key {
         "fill" | "stroke" | "stroke_dasharray" | "text_fill" | "transform"
         | "label_color" | "label_bg" | "label_border" | "stroke_linecap"
-        | "stroke_linejoin" | "arrow_style" => {
+        | "stroke_linejoin" | "arrow_style" | "arrow_fill" => {
             if !is_string_like(value) {
                 Some("String")
             } else {

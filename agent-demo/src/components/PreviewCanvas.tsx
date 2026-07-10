@@ -15,6 +15,7 @@ import {
   DownloadOutlined,
   BgColorsOutlined,
   MoonOutlined,
+  SunOutlined,
 } from '@ant-design/icons';
 import { DslViewer } from './DslViewer';
 import {
@@ -262,29 +263,32 @@ export function PreviewCanvas({
             { label: 'DSL 源码', value: 'source' },
           ]}
         />
-        <Space size={6}>
+        <Space size={8} className="preview-toolbar-right">
           {view === 'preview' && svg && (
-            <>
+            <div className="preview-toolbar-group">
+              <span className="preview-toolbar-label">
+                <BgColorsOutlined />
+                主题
+              </span>
               <Select
                 size="small"
-                style={{ width: 140 }}
+                style={{ width: 130 }}
                 value={appearance.themeId}
                 onChange={(v) => applyAppearance({ ...appearance, themeId: v })}
                 options={themeOptions}
-                suffixIcon={<BgColorsOutlined />}
               />
               <Tooltip title={appearance.darkMode ? '切换亮色' : '切换暗色'}>
                 <Button
                   size="small"
                   type={appearance.darkMode ? 'primary' : 'text'}
-                  icon={<MoonOutlined />}
+                  icon={appearance.darkMode ? <SunOutlined /> : <MoonOutlined />}
                   onClick={() => applyAppearance({ ...appearance, darkMode: !appearance.darkMode })}
                 />
               </Tooltip>
-            </>
+            </div>
           )}
           <Dropdown menu={{ items: exportMenuItems }} disabled={!svg && !source}>
-            <Button size="small" icon={<DownloadOutlined />}>
+            <Button size="small" icon={<DownloadOutlined />} className="preview-export-btn">
               导出
             </Button>
           </Dropdown>

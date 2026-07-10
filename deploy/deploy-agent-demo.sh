@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# 一键构建并同步 Plotgram Agent Demo 到 demo.plotgram.dev/agent/，WASM 走 assets.pg.agcli.cn
+# 一键构建并同步 Plotgram Agent Demo 到 demo.plotgram.dev/agent/
+#
+# WASM 产物走 CDN common 路径 assets.pg.agcli.cn/plotgram-wasm/（与 website / playground 三端共用）
 #
 # 用法:
 #   ./deploy/deploy-agent-demo.sh
@@ -39,7 +41,7 @@ usage() {
   cat <<'EOF'
 用法: deploy/deploy-agent-demo.sh [选项]
 
-构建 Agent Demo（wasm-pack + vite build），同步到 demo 站 /agent/ 与 CDN /agent/。
+构建 Agent Demo（wasm-pack + vite build），同步到 demo 站 /agent/ 与 CDN。
 
 选项:
   --skip-build   跳过 wasm-pack 与 vite build，直接用已有 dist 同步
@@ -64,7 +66,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-log() { echo "▸ $*"; }
+log() { echo "▸ $*" >&2; }
 die() { echo "✗ $*" >&2; exit 1; }
 
 require_cmd() {
@@ -81,14 +83,9 @@ build_wasm() {
 
   local wasm_bin="$AGENT_DIR/plotgram-wasm/plotgram_wasm_bg.wasm"
   [[ -f "$wasm_bin" ]] || die "WASM 产物未生成: $wasm_bin"
-  local wasm_md5
-  wasm_md5=$(md5 -q "$wasm_bin" 2>/dev/null || md5sum "$wasm_bin" | awk '{print $1}')
-  log "plotgram-wasm md5=${wasm_md5}"
-  echo "$wasm_md5"
 }
 
 build_vite() {
-  local wasm_md5="$1"
   log "构建 agent-demo（base=${AGENT_BASE}, cdn=${AGENT_CDN_BASE}）"
   require_cmd npm
   (
@@ -97,7 +94,6 @@ build_vite() {
     VITE_BASE_PATH="$AGENT_BASE" \
       VITE_CDN_BASE="$AGENT_CDN_BASE" \
       VITE_AGENT_API="https://api.pg.agcli.cn/agent/chat" \
-      VITE_WASM_BUILD_STAMP="$wasm_md5" \
       npm run build
   )
 }
@@ -109,7 +105,7 @@ stage_artifacts() {
 
   mkdir -p \
     "$STAGING_DIR/demo/agent" \
-    "$STAGING_DIR/cdn/agent/plotgram-wasm" \
+    "$STAGING_DIR/cdn/plotgram-wasm" \
     "$STAGING_DIR/cdn/agent/assets"
 
   # demo 站：agent 页面（不含 wasm / 打包 assets，走 CDN）
@@ -119,10 +115,10 @@ stage_artifacts() {
     "$AGENT_DIR/dist/" \
     "$STAGING_DIR/demo/agent/"
 
-  # CDN：wasm
+  # CDN：wasm common 路径（三端共用，靠 ETag 控制缓存）
   rsync -a --delete \
     "$AGENT_DIR/plotgram-wasm/" \
-    "$STAGING_DIR/cdn/agent/plotgram-wasm/"
+    "$STAGING_DIR/cdn/plotgram-wasm/"
 
   # CDN：vite 打包 assets（js / css）
   rsync -a --delete \
@@ -139,8 +135,10 @@ upload() {
   rsync -avz --delete \
     "$STAGING_DIR/demo/agent/" "$DEPLOY_HOST:$AGENT_REMOTE_DIR/"
 
-  log "同步 CDN → ${ASSET_HOST}:${ASSET_REMOTE_DIR}/agent/ …"
-  ssh "$ASSET_HOST" "mkdir -p '$ASSET_REMOTE_DIR/agent'"
+  log "同步 CDN → ${ASSET_HOST}:${ASSET_REMOTE_DIR} …"
+  ssh "$ASSET_HOST" "mkdir -p '$ASSET_REMOTE_DIR'"
+  rsync -avz --delete \
+    "$STAGING_DIR/cdn/plotgram-wasm/" "$ASSET_HOST:$ASSET_REMOTE_DIR/plotgram-wasm/"
   rsync -avz --delete \
     "$STAGING_DIR/cdn/agent/" "$ASSET_HOST:$ASSET_REMOTE_DIR/agent/"
 }
@@ -168,11 +166,11 @@ verify() {
     echo "⚠ Agent 页面返回 HTTP $code"
   fi
 
-  code=$(curl -s -o /dev/null -w '%{http_code}' "https://assets.pg.agcli.cn/agent/plotgram-wasm/plotgram_wasm.js" 2>/dev/null || echo "000")
+  code=$(curl -s -o /dev/null -w '%{http_code}' "https://assets.pg.agcli.cn/plotgram-wasm/plotgram_wasm.js" 2>/dev/null || echo "000")
   if [[ "$code" == "200" ]]; then
-    log "✅ CDN WASM JS: https://assets.pg.agcli.cn/agent/plotgram-wasm/plotgram_wasm.js"
+    log "✅ CDN WASM (common): https://assets.pg.agcli.cn/plotgram-wasm/plotgram_wasm.js"
   else
-    echo "⚠ CDN WASM JS 返回 HTTP $code"
+    echo "⚠ CDN WASM 返回 HTTP $code"
   fi
 
   code=$(curl -s -o /dev/null -w '%{http_code}' "https://api.pg.agcli.cn/health" 2>/dev/null || echo "000")
@@ -188,16 +186,15 @@ main() {
   log "=== 发布 Plotgram Agent Demo ==="
   log "  部署服务器: $DEPLOY_HOST"
   log "  访问路径:   https://demo.plotgram.dev/agent/"
-  log "  CDN:        ${CDN_BASE}agent/"
+  log "  CDN wasm:   ${CDN_BASE}plotgram-wasm/（common）"
 
   if [[ "$SETUP_NGINX" == true ]]; then
     setup_nginx
   fi
 
-  local wasm_md5="0"
   if [[ "$SKIP_BUILD" == false ]]; then
-    wasm_md5=$(build_wasm)
-    build_vite "$wasm_md5"
+    build_wasm
+    build_vite
   else
     log "跳过构建（使用已有 agent-demo/dist）"
   fi
@@ -208,7 +205,7 @@ main() {
   echo ""
   echo "✅ 发布完成"
   echo "   Agent Demo: https://demo.plotgram.dev/agent/"
-  echo "   CDN WASM:   ${CDN_BASE}agent/plotgram-wasm/"
+  echo "   CDN WASM:   ${CDN_BASE}plotgram-wasm/（common，三端共用）"
   echo "   CDN assets: ${CDN_BASE}agent/assets/"
   echo "   Agent API:  https://api.pg.agcli.cn/agent/chat"
   echo ""

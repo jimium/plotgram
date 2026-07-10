@@ -97,51 +97,44 @@ export interface PlotgramWasm {
 
 let modulePromise: Promise<PlotgramWasm> | null = null;
 
-/** 开发调试：强制下次 loadWasm 重新拉取 WASM（配合 build stamp）。 */
+/** 开发调试：强制下次 loadWasm 重新拉取 WASM。 */
 export function resetWasmModule(): void {
   modulePromise = null;
 }
 
-function wasmBuildStamp(): string {
-  return import.meta.env.VITE_WASM_BUILD_STAMP ?? '0';
+/** 生产环境 CDN common 路径（三端共用同一份 wasm 产物，靠 ETag 控制缓存）。 */
+function wasmCdnBase(): string {
+  return 'https://assets.pg.agcli.cn/plotgram-wasm/';
 }
 
-/** 资源根：生产走 CDN，开发走 vite base。 */
-function wasmAssetBase(): string {
-  const cdn = import.meta.env.VITE_CDN_BASE || '';
-  const base = cdn || import.meta.env.BASE_URL;
-  return base.endsWith('/') ? base : `${base}/`;
-}
-
-/** plotgram_wasm.js 加载地址（开发走 Vite 别名目录，生产走 CDN）。 */
-function plotgramWasmJsUrl(stamp: string): string {
+/** plotgram_wasm.js 加载地址（开发走本地 vite 中间件，生产走 CDN common 路径）。 */
+function plotgramWasmJsUrl(): string {
   if (import.meta.env.DEV) {
-    return `../plotgram-wasm/plotgram_wasm.js?v=${stamp}`;
+    return `../plotgram-wasm/plotgram_wasm.js`;
   }
-  return `${wasmAssetBase()}plotgram-wasm/plotgram_wasm.js?v=${stamp}`;
+  return `${wasmCdnBase()}plotgram_wasm.js`;
 }
 
-/** wasm 二进制加载地址（显式带 ?v=，避免相对路径无版本号被 CDN 长缓存）。 */
-function plotgramWasmBinaryUrl(stamp: string): string {
+/** wasm 二进制加载地址。 */
+function plotgramWasmBinaryUrl(): string {
   if (import.meta.env.DEV) {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${origin}/plotgram-wasm/plotgram_wasm_bg.wasm?v=${stamp}`;
+    return `${origin}/plotgram-wasm/plotgram_wasm_bg.wasm`;
   }
-  return `${wasmAssetBase()}plotgram-wasm/plotgram_wasm_bg.wasm?v=${stamp}`;
+  return `${wasmCdnBase()}plotgram_wasm_bg.wasm`;
 }
 
 /** 懒加载并初始化 WASM 模块（全局单例）。 */
 export function loadWasm(): Promise<PlotgramWasm> {
   if (!modulePromise) {
-    const stamp = wasmBuildStamp();
     modulePromise = (async () => {
       // WASM 产物由 wasm-pack 生成到 agent-demo/plotgram-wasm/
       const mod = (await import(
         /* @vite-ignore */ // @ts-ignore WASM 产物由 wasm-pack 生成，首次构建前不存在
         /* webpackIgnore: true */
-        plotgramWasmJsUrl(stamp)
+        plotgramWasmJsUrl()
       )) as unknown as PlotgramWasm;
-      await mod.default({ module_or_path: plotgramWasmBinaryUrl(stamp) });
+      await mod.default({ module_or_path: plotgramWasmBinaryUrl() });
       return mod;
     })();
   }

@@ -1,3 +1,5 @@
+import HeroPlayground from '../components/HeroPlayground';
+
 const DIAGRAM_TYPES = [
   { icon: '🔀', name: '流程图 Flowchart', desc: '业务流程、审批流、CI/CD', status: 'stable' },
   { icon: '📊', name: '时序图 Sequence', desc: 'API 调用、微服务交互', status: 'stable' },
@@ -89,62 +91,7 @@ export default function Home() {
             </a>
           </div>
 
-          <div className="hero-visual">
-            <div className="hero-visual-header">
-              <span className="hero-visual-dot red" />
-              <span className="hero-visual-dot yellow" />
-              <span className="hero-visual-dot green" />
-              <span style={{ marginLeft: 8, fontSize: 13, color: '#94A3B8' }}>microservices.pgm</span>
-            </div>
-            <div className="hero-visual-body">
-              <pre className="hero-code">
-                <code>
-                  <span className="comment">{'// AI 只需表达语义，无需关心坐标'}</span>{'\n'}
-                  <span className="keyword">diagram</span> <span className="entity-name">architecture</span> {'{'}{'\n'}
-                  {'    '}<span className="attr-key">layout</span>: <span className="attr-val">"left-to-right"</span>{'\n'}
-                  {'    '}<span className="attr-key">title</span>: <span className="attr-val">"微服务架构"</span>{'\n\n'}
-                  {'    '}<span className="keyword">entity</span> <span className="entity-name">client</span> <span className="entity-label">"客户端"</span> {'{'}<span className="attr-key"> type</span>: <span className="attr-val">browser</span> {'}'}{'\n'}
-                  {'    '}<span className="keyword">entity</span> <span className="entity-name">gw</span> <span className="entity-label">"API 网关"</span> {'{'}<span className="attr-key"> type</span>: <span className="attr-val">gateway</span> {'}'}{'\n'}
-                  {'    '}<span className="keyword">entity</span> <span className="entity-name">svc</span> <span className="entity-label">"订单服务"</span> {'{'}<span className="attr-key"> type</span>: <span className="attr-val">service</span> {'}'}{'\n'}
-                  {'    '}<span className="keyword">entity</span> <span className="entity-name">db</span> <span className="entity-label">"订单库"</span> {'{'}<span className="attr-key"> type</span>: <span className="attr-val">database</span> {'}'}{'\n\n'}
-                  {'    '}client <span className="arrow">{'->'}</span> gw{'\n'}
-                  {'    '}gw <span className="arrow">{'->'}</span> svc{'\n'}
-                  {'    '}svc <span className="arrow">{'->'}</span> db{'\n'}
-                  {'}'}
-                </code>
-              </pre>
-              <div className="hero-preview">
-                <svg width="380" height="280" viewBox="0 0 380 280" fill="none">
-                  <defs>
-                    <linearGradient id="hg1" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="#7C3AED" />
-                      <stop offset="100%" stopColor="#06B6D4" />
-                    </linearGradient>
-                    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748B" />
-                    </marker>
-                  </defs>
-                  <rect x="20" y="110" width="80" height="60" rx="10" fill="#F8FAFC" stroke="#CBD5E1" strokeWidth="1.5" />
-                  <text x="60" y="135" textAnchor="middle" fontSize="24">🌐</text>
-                  <text x="60" y="155" textAnchor="middle" fontSize="12" fontWeight="600" fill="#334155">客户端</text>
-                  <rect x="150" y="110" width="80" height="60" rx="10" fill="url(#hg1)" opacity="0.1" />
-                  <rect x="150" y="110" width="80" height="60" rx="10" stroke="url(#hg1)" strokeWidth="2" />
-                  <text x="190" y="135" textAnchor="middle" fontSize="24">🚪</text>
-                  <text x="190" y="155" textAnchor="middle" fontSize="12" fontWeight="600" fill="#334155">API 网关</text>
-                  <rect x="280" y="30" width="80" height="60" rx="10" fill="#F8FAFC" stroke="#CBD5E1" strokeWidth="1.5" />
-                  <text x="320" y="55" textAnchor="middle" fontSize="24">⚙️</text>
-                  <text x="320" y="75" textAnchor="middle" fontSize="12" fontWeight="600" fill="#334155">订单服务</text>
-                  <ellipse cx="320" cy="170" rx="36" ry="14" fill="#F8FAFC" stroke="#CBD5E1" strokeWidth="1.5" />
-                  <path d="M 284 170 v 40 a 36 14 0 0 0 72 0 v -40" fill="#F8FAFC" stroke="#CBD5E1" strokeWidth="1.5" />
-                  <ellipse cx="320" cy="170" rx="36" ry="14" fill="none" stroke="#CBD5E1" strokeWidth="1.5" />
-                  <text x="320" y="228" textAnchor="middle" fontSize="12" fontWeight="600" fill="#334155">订单库</text>
-                  <line x1="100" y1="140" x2="150" y2="140" stroke="#64748B" strokeWidth="1.5" markerEnd="url(#arrow)" />
-                  <path d="M 230 130 Q 255 80 280 70" stroke="#64748B" strokeWidth="1.5" fill="none" markerEnd="url(#arrow)" />
-                  <path d="M 320 90 L 320 155" stroke="#64748B" strokeWidth="1.5" fill="none" markerEnd="url(#arrow)" />
-                </svg>
-              </div>
-            </div>
-          </div>
+          <HeroPlayground />
         </div>
       </section>
 

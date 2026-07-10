@@ -87,6 +87,8 @@ pub struct EdgeStyle {
     pub stroke_linejoin: Option<String>,
     pub hand_drawn: bool,
     pub arrow: ArrowStyle,
+    /// 箭头填充色；`None` 表示与 `stroke` 同色。
+    pub arrow_fill: Option<String>,
     pub stroke_opacity: Option<f64>,
     /// 边标签样式（独立于边的描边样式）
     pub label_style: EdgeLabelStyle,
@@ -103,6 +105,7 @@ impl Default for EdgeStyle {
             stroke_linejoin: None,
             hand_drawn: false,
             arrow: ArrowStyle::Normal,
+            arrow_fill: None,
             stroke_opacity: None,
             label_style: EdgeLabelStyle::default(),
         }

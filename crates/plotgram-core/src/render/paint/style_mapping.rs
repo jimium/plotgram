@@ -83,6 +83,9 @@ pub fn edge_style_from_attributes(relation: &Relation) -> EdgeStyle {
     if let Some(AttributeValue::String(v)) = s.get(style_attr_keys::ARROW_STYLE) {
         style.arrow = parse_arrow_style(v);
     }
+    if let Some(AttributeValue::String(v)) = s.get(style_attr_keys::ARROW_FILL) {
+        style.arrow_fill = Some(v.to_string());
+    }
     if let Some(n) = style_number_from(s, style_attr_keys::STROKE_OPACITY) {
         style.stroke_opacity = Some(n.clamp(0.0, 1.0));
     }

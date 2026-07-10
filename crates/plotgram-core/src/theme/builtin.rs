@@ -167,8 +167,13 @@ mod tests {
         let edge = compiled.edge_block("flowchart", None);
         assert_eq!(
             edge.get("stroke").and_then(|v| v.as_str()),
-            Some("#52525B"),
+            Some("#BDBDBD"),
             "flowchart edge stroke"
+        );
+        assert_eq!(
+            edge.get("arrow_fill").and_then(|v| v.as_str()),
+            Some("#0F766E"),
+            "flowchart arrow_fill independent of stroke"
         );
         assert_eq!(
             edge.get("stroke_width").and_then(|v| v.as_number()),
@@ -177,8 +182,22 @@ mod tests {
         );
         assert_eq!(
             edge.get("stroke_opacity").and_then(|v| v.as_number()),
-            Some(0.88),
+            Some(1.0),
             "flowchart edge stroke_opacity"
+        );
+        assert_eq!(
+            compiled
+                .canvas
+                .get("background")
+                .and_then(|v| v.as_str()),
+            Some("#F5F5F5"),
+            "canvas background"
+        );
+        let node = compiled.node_block("flowchart", Some("process"));
+        assert_eq!(
+            node.get("fill").and_then(|v| v.as_str()),
+            Some("#E4E4E4"),
+            "process node fill"
         );
     }
 

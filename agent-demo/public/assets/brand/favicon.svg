@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="Plotgram" shape-rendering="geometricPrecision">
+  <!--
+    16px-optimized mark (display at 16x16).
+    Simplified: drop middle line; thicker strokes; larger node.
+    Scheme 1: circle right = top line end; bottom-aligned with bottom line.
+    Bottom line shortened so round-cap end clears circle left (~1.5px at 16).
+  -->
+  <rect width="48" height="48" rx="12" fill="#121212"/>
+  <path d="M9 16h28" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+  <path d="M9 36h5" stroke="#FAF8F4" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="29" cy="30.5" r="8" fill="#2DD4A8"/>
+</svg>

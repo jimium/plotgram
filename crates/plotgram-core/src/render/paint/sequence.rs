@@ -8,7 +8,7 @@ use crate::layout::{EdgeLayout, NodeLayout};
 use crate::render::paint::node::paint_rect_header;
 use crate::render::paint::style_mapping::{edge_paint_attrs, node_style_from_attributes, edge_style_from_attributes};
 use crate::render::paint::svg_utils::{self, marker_filter_attr, marker_head_path};
-use crate::render::color_queries::{edge_label_color, edge_stroke_color};
+use crate::render::color_queries::{edge_arrow_fill_color, edge_label_color, edge_stroke_color};
 use crate::render::visual::{ArrowStyle, EdgeStyle, NodeStyle};
 use crate::render::{ExportEdge, ExportNode, ExportScene, CompiledRenderContext};
 use crate::types::DiagramType;
@@ -33,7 +33,7 @@ pub fn materialize_edge_style(relation: &Relation, context: &CompiledRenderConte
 }
 
 pub fn paint_svg_defs(context: &CompiledRenderContext) -> Option<String> {
-    let active = edge_stroke_color(&DiagramType::Sequence, context, "#555");
+    let active = edge_arrow_fill_color(&DiagramType::Sequence, context, "#555");
     let passive = edge_label_color(&DiagramType::Sequence, context, "#999");
     let path = marker_head_path(context);
     let filter = marker_filter_attr(context);

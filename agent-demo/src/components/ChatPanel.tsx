@@ -1,24 +1,26 @@
 /**
  * ChatPanel 对话面板
  *
- * 演示版在 studio 基础上：
- *   - 顶部嵌入 ExamplePicker 一键示例（无消息时显示）
- *   - 底部增加 resetConversation 按钮
+ * 设计：
+ *   - 空状态：大渐变 hero 图标 + 主副标题 + 引导文案
+ *   - 输入区：玻璃态背景 + 渐变发送按钮
+ *   - 顶部状态条：session 信息 + 新对话
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Input, Button, Alert, Empty, Typography, Space, Tooltip } from 'antd';
+import { Input, Button, Alert, Space, Tooltip } from 'antd';
 import {
   SendOutlined,
   StopOutlined,
   ReloadOutlined,
+  ThunderboltFilled,
+  CommentOutlined,
 } from '@ant-design/icons';
 import type { ChatMessage as ChatMessageType } from '@agent/types';
 import { ChatMessage } from './ChatMessage';
 import { ExamplePicker } from './ExamplePicker';
 
 const { TextArea } = Input;
-const { Text } = Typography;
 
 interface ChatPanelProps {
   messages: ChatMessageType[];
@@ -30,6 +32,13 @@ interface ChatPanelProps {
   onClearError: () => void;
   onReset: () => void;
 }
+
+const SUGGESTIONS = [
+  { icon: '🛒', text: '画一个电商下单流程图' },
+  { icon: '🏗️', text: '画一个微服务架构图' },
+  { icon: '⏱️', text: '画一个 OAuth2 时序图' },
+  { icon: '🔄', text: '画一个订单状态机' },
+];
 
 export function ChatPanel({
   messages,
@@ -89,45 +98,73 @@ export function ChatPanel({
     [isRunning, onSend],
   );
 
+  const handleSuggestion = useCallback(
+    (text: string) => {
+      if (isRunning) return;
+      setInput(text);
+    },
+    [isRunning],
+  );
+
   const isEmpty = messages.length === 0 && !isRunning;
 
   return (
     <div className="chat-panel">
       <div className="chat-panel-header">
-        <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-          <Text strong style={{ fontSize: 14 }}>
-            对话区
-          </Text>
-          {(hasChart || messages.length > 0) && (
-            <Tooltip title="清空对话与图表（session 配额仍累加）">
-              <Button
-                size="small"
-                type="text"
-                icon={<ReloadOutlined />}
-                onClick={onReset}
-                disabled={isRunning}
-              >
-                新对话
-              </Button>
-            </Tooltip>
+        <Space size={8} align="center">
+          <span className="chat-panel-header-icon">
+            <CommentOutlined />
+          </span>
+          <span className="chat-panel-header-title">对话区</span>
+          {messages.length > 0 && (
+            <span className="chat-panel-header-badge">{messages.length}</span>
           )}
         </Space>
+        {(hasChart || messages.length > 0) && (
+          <Tooltip title="清空对话与图表（session 配额仍累加）">
+            <Button
+              size="small"
+              type="text"
+              icon={<ReloadOutlined />}
+              onClick={onReset}
+              disabled={isRunning}
+              className="chat-panel-reset-btn"
+            >
+              新对话
+            </Button>
+          </Tooltip>
+        )}
       </div>
 
       <div ref={scrollContainerRef} className="chat-messages">
         {isEmpty && (
           <div className="chat-empty-state">
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={
-                <span style={{ fontSize: 13 }}>
-                  用自然语言描述你想要的图表
-                  <br />
-                  或点击下方示例开始
-                </span>
-              }
-              style={{ marginTop: 24 }}
-            />
+            <div className="chat-empty-hero">
+              <div className="chat-empty-hero-icon">
+                <ThunderboltFilled />
+              </div>
+              <h2 className="chat-empty-hero-title">开始一段对话</h2>
+              <p className="chat-empty-hero-subtitle">
+                用自然语言描述你想要的图表<br />
+                Plotgram Agent 会自动生成、修改、迭代
+              </p>
+            </div>
+
+            <div className="chat-suggestions">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s.text}
+                  type="button"
+                  className="chat-suggestion-btn"
+                  onClick={() => handleSuggestion(s.text)}
+                  disabled={isRunning}
+                >
+                  <span className="chat-suggestion-icon">{s.icon}</span>
+                  <span className="chat-suggestion-text">{s.text}</span>
+                </button>
+              ))}
+            </div>
+
             <ExamplePicker onPick={handlePickExample} disabled={isRunning} hasChart={hasChart} />
           </div>
         )}
@@ -144,7 +181,7 @@ export function ChatPanel({
             showIcon
             closable
             onClose={onClearError}
-            style={{ margin: '8px 0' }}
+            className="chat-error-alert"
           />
         )}
 
@@ -152,40 +189,48 @@ export function ChatPanel({
       </div>
 
       <div className="chat-input-area">
-        <div className="chat-input-wrapper">
+        <div className={`chat-input-wrapper ${isRunning ? 'is-running' : ''}`}>
           <TextArea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
               isRunning
-                ? 'Agent 执行中，请等待或点击中止...'
+                ? 'Agent 执行中，请等待或点击中止…'
                 : '描述你想要的图表，如：画一个用户认证流程图'
             }
             disabled={isRunning}
-            autoSize={{ minRows: 1, maxRows: 4 }}
-            style={{ resize: 'none' }}
+            autoSize={{ minRows: 1, maxRows: 5 }}
+            className="chat-input"
+            variant="borderless"
           />
           {isRunning ? (
-            <Button danger icon={<StopOutlined />} onClick={onAbort} className="chat-send-btn">
+            <Button
+              danger
+              icon={<StopOutlined />}
+              onClick={onAbort}
+              className="chat-send-btn"
+            >
               中止
             </Button>
           ) : (
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={handleSend}
-              disabled={!input.trim()}
-              className="chat-send-btn"
-            >
-              发送
-            </Button>
+            <Tooltip title="发送 (Enter)">
+              <Button
+                type="primary"
+                icon={<SendOutlined />}
+                onClick={handleSend}
+                disabled={!input.trim()}
+                className="chat-send-btn"
+              />
+            </Tooltip>
           )}
         </div>
         <div className="chat-input-hint">
-          <Text type="secondary" style={{ fontSize: 11 }}>
-            Enter 发送 · Shift+Enter 换行 · Powered by DeepSeek
-          </Text>
+          <span>Enter 发送</span>
+          <span className="chat-input-hint-dot">·</span>
+          <span>Shift+Enter 换行</span>
+          <span className="chat-input-hint-dot">·</span>
+          <span>Powered by DeepSeek V4</span>
         </div>
       </div>
     </div>

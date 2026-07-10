@@ -4,29 +4,30 @@
   "name": "Clean Light",
   "meta": {
     "author": "Plotgram",
-    "description": "默认亮色基础样式：Desk & Cards 面色阶梯（画布作桌面、group 作卡片、节点纯白浮起），保留 Plotgram 语义色块分层",
+    "description": "默认亮色基础样式：浅灰纸面 + 更深灰节点块，边线浅灰、箭头青绿强调，保留 Plotgram 语义色块分层",
     "tags": [
       "light",
       "clean",
       "cool",
       "modern",
       "minimal",
-      "desk-cards"
+      "paper-gray"
     ]
   },
   "tokens": {
     "colors": {
-      "canvas": "#EBEEF2",
+      "canvas": "#F5F5F5",
       "text": "#18181B",
       "muted_text": "#71717A",
-      "border": "#CBD5E1",
-      "border_strong": "#64748B",
+      "border": "#C9C9C9",
+      "border_strong": "#9CA3AF",
       "primary": "#5E6AD2",
-      "neutral_fill": "#FFFFFF",
-      "neutral_stroke": "#D0D5DD",
-      "edge_stroke": "#52525B",
+      "neutral_fill": "#E4E4E4",
+      "neutral_stroke": "#C9C9C9",
+      "edge_stroke": "#BDBDBD",
+      "arrow_fill": "#0F766E",
       "group_fill": "transparent",
-      "group_stroke": "#64748B"
+      "group_stroke": "#9CA3AF"
     },
     "palette": {
       "blue": { "fill": "#EEF2FF", "stroke": "#93C5FD", "text_fill": "#1E3A8A" },
@@ -111,11 +112,12 @@
       "font_size": "{typography.small_size}",
       "stroke_linecap": "round",
       "stroke_linejoin": "round",
-      "stroke_opacity": 0.88,
+      "stroke_opacity": 1.0,
       "arrow_style": "normal",
-      "label_bg": "{colors.neutral_fill}",
+      "arrow_fill": "{colors.arrow_fill}",
+      "label_bg": "none",
       "label_border": "none",
-      "label_bg_opacity": 0.9,
+      "label_bg_opacity": 0,
       "label_border_width": 0,
       "label_border_radius": 4,
       "label_padding": 3
@@ -221,10 +223,10 @@
       "context_palettes": {
         "group_nest": {
           "entries": [
-            { "fill": "transparent", "stroke": "{colors.group_stroke}", "stroke_width": 1.15, "border_radius": 10.0, "stroke_dasharray": "5,4" },
-            { "fill": "#F8FAFC", "stroke": "{colors.border}", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
-            { "fill": "#F1F5F9", "stroke": "{colors.border}", "stroke_width": 0.85, "border_radius": 8.0, "stroke_dasharray": "none" },
-            { "fill": "#E2E8F0", "stroke": "#94A3B8", "stroke_width": 0.85, "border_radius": 8.0, "stroke_dasharray": "none" }
+            { "fill": "transparent", "stroke": "{colors.group_stroke}", "stroke_width": 1.2, "border_radius": 10.0, "stroke_dasharray": "5,4" },
+            { "fill": "#FFFFFF", "stroke": "#D4D4D4", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#F3F3F3", "stroke": "#D4D4D4", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#EBEBEB", "stroke": "{colors.border_strong}", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" }
           ],
           "index": { "from": "group_depth", "cap": 3 },
           "bindings": [
@@ -316,9 +318,9 @@
       },
       "group": {
         "stroke": "{colors.border_strong}",
-        "stroke_width": 1.15,
+        "stroke_width": 1.2,
         "stroke_dasharray": "none",
-        "fill": "#F8FAFC"
+        "fill": "#FFFFFF"
       },
       "entity_types": {
         "frontend": {
@@ -393,10 +395,10 @@
       "context_palettes": {
         "group_nest": {
           "entries": [
-            { "fill": "#F8FAFC", "stroke": "{colors.border_strong}", "stroke_width": 1.15, "border_radius": 10.0, "stroke_dasharray": "none" },
-            { "fill": "#F1F5F9", "stroke": "{colors.border}", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
-            { "fill": "#E8EEF5", "stroke": "{colors.border}", "stroke_width": 0.85, "border_radius": 8.0, "stroke_dasharray": "none" },
-            { "fill": "#DDE5EF", "stroke": "#94A3B8", "stroke_width": 0.85, "border_radius": 8.0, "stroke_dasharray": "none" }
+            { "fill": "#FFFFFF", "stroke": "{colors.border_strong}", "stroke_width": 1.2, "border_radius": 10.0, "stroke_dasharray": "none" },
+            { "fill": "#F3F3F3", "stroke": "#D4D4D4", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#EBEBEB", "stroke": "#D4D4D4", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#E6E6E6", "stroke": "{colors.border_strong}", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" }
           ],
           "index": { "from": "group_depth", "cap": 3 },
           "bindings": [

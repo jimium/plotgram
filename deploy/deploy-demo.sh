@@ -25,6 +25,7 @@ CDN_BASE="${CDN_BASE:-https://assets.pg.agcli.cn/}"
 DOMAIN="demo.plotgram.dev"
 PLAYGROUND_BASE="/playground/"
 PLAYGROUND_CDN_BASE="${CDN_BASE}playground/"
+WEBSITE_CDN_BASE="${CDN_BASE}website/"
 STAGING_DIR=""
 
 SKIP_SHOWCASE_RENDER=false
@@ -56,7 +57,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-log() { echo "▸ $*"; }
+log() { echo "▸ $*" >&2; }
 die() { echo "✗ $*" >&2; exit 1; }
 
 require_cmd() {
@@ -98,16 +99,17 @@ patch_build_hash() {
 }
 
 build_website() {
-  log "构建 website (Landing Page)…"
+  log "构建 website (Landing Page, cdn=${WEBSITE_CDN_BASE})…"
   require_cmd npm
   (
     cd "$ROOT_DIR/website"
     npm ci --silent
-    npm run build
+    VITE_CDN_BASE="$WEBSITE_CDN_BASE" \
+      npm run build
   )
 }
 
-build_playground() {
+build_wasm() {
   log "构建 plotgram-wasm…"
   require_cmd wasm-pack
   local wasm_out="$ROOT_DIR/playground/plotgram-wasm"
@@ -115,15 +117,14 @@ build_playground() {
 
   local wasm_bin="$wasm_out/plotgram_wasm_bg.wasm"
   [[ -f "$wasm_bin" ]] || die "WASM 产物未生成: $wasm_bin"
-  local wasm_md5
-  wasm_md5=$(md5 -q "$wasm_bin" 2>/dev/null || md5sum "$wasm_bin" | awk '{print $1}')
-  log "plotgram-wasm md5=${wasm_md5}"
 
   if [[ -d "$ROOT_DIR/playground/public/plotgram-wasm" ]]; then
     log "删除过期的 public/plotgram-wasm（避免 vite build 写入 dist 旧副本）"
     rm -rf "$ROOT_DIR/playground/public/plotgram-wasm"
   fi
+}
 
+build_playground() {
   log "构建 playground（base=${PLAYGROUND_BASE}, cdn=${PLAYGROUND_CDN_BASE}）…"
   require_cmd npm
   (
@@ -131,7 +132,6 @@ build_playground() {
     npm ci --silent
     VITE_BASE_PATH="$PLAYGROUND_BASE" \
       VITE_CDN_BASE="$PLAYGROUND_CDN_BASE" \
-      VITE_WASM_BUILD_STAMP="$wasm_md5" \
       npm run build
   )
 }
@@ -162,11 +162,14 @@ stage_artifacts() {
     "$STAGING_DIR/demo/playground" \
     "$STAGING_DIR/demo/showcase" \
     "$STAGING_DIR/demo/assets" \
-    "$STAGING_DIR/cdn/playground/plotgram-wasm" \
-    "$STAGING_DIR/cdn/showcase"
+    "$STAGING_DIR/cdn/plotgram-wasm" \
+    "$STAGING_DIR/cdn/playground/assets" \
+    "$STAGING_DIR/cdn/showcase" \
+    "$STAGING_DIR/cdn/website/assets"
 
-  # demo 根目录：website (Landing Page)
+  # demo 根目录：website (Landing Page)，不含打包 assets（走 CDN）
   rsync -a --delete \
+    --exclude='assets/' \
     "$ROOT_DIR/website/dist/" \
     "$STAGING_DIR/demo/root/"
 
@@ -197,15 +200,20 @@ stage_artifacts() {
 
   patch_showcase_cdn "$STAGING_DIR/demo/showcase/index.html"
 
-  # CDN：wasm
+  # CDN：wasm common 路径（website / playground / agent 三端共用，靠 ETag 控制缓存）
   rsync -a --delete \
     "$ROOT_DIR/playground/plotgram-wasm/" \
-    "$STAGING_DIR/cdn/playground/plotgram-wasm/"
+    "$STAGING_DIR/cdn/plotgram-wasm/"
 
   # CDN：playground 打包 assets（js / css）
   rsync -a --delete \
     "$ROOT_DIR/playground/dist/assets/" \
     "$STAGING_DIR/cdn/playground/assets/"
+
+  # CDN：website 打包 assets（js / css）
+  rsync -a --delete \
+    "$ROOT_DIR/website/dist/assets/" \
+    "$STAGING_DIR/cdn/website/assets/"
 
   # CDN：showcase svg + 历史快照
   rsync -a \
@@ -236,9 +244,13 @@ upload() {
   log "同步 CDN → ${ASSET_HOST}:${ASSET_REMOTE_DIR} …"
   ssh "$ASSET_HOST" "mkdir -p '$ASSET_REMOTE_DIR'"
   rsync -avz --delete \
+    "$STAGING_DIR/cdn/plotgram-wasm/" "$ASSET_HOST:$ASSET_REMOTE_DIR/plotgram-wasm/"
+  rsync -avz --delete \
     "$STAGING_DIR/cdn/playground/" "$ASSET_HOST:$ASSET_REMOTE_DIR/playground/"
   rsync -avz --delete \
     "$STAGING_DIR/cdn/showcase/" "$ASSET_HOST:$ASSET_REMOTE_DIR/showcase/"
+  rsync -avz --delete \
+    "$STAGING_DIR/cdn/website/" "$ASSET_HOST:$ASSET_REMOTE_DIR/website/"
 
   log "同步 nginx 配置 …"
   scp "$ROOT_DIR/deploy/nginx/demo.plotgram.dev.conf" "$DEPLOY_HOST:/etc/nginx/conf.d/demo.plotgram.dev.conf"
@@ -250,6 +262,7 @@ upload() {
 main() {
   log "开始同步 → https://${DOMAIN}（CDN: ${CDN_BASE}）"
   build_showcase
+  build_wasm
   build_website
   build_playground
   stage_artifacts

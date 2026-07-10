@@ -187,7 +187,7 @@ fn validate_colors_in_element_defaults(defaults: &ElementDefaults, path_prefix: 
 /// 仅检查非 token 引用的字符串值（token 引用在 resolve 阶段验证）。
 fn validate_colors_in_block(block: &super::schema::StyleBlock, path_prefix: &str) -> Result<()> {
     for (key, value) in block.iter() {
-        if key == "fill" || key == "stroke" || key == "text_fill" {
+        if key == "fill" || key == "stroke" || key == "text_fill" || key == "arrow_fill" {
             if let StyleValue::String(s) = value {
                 // 跳过 token 引用（在 resolve 阶段验证）
                 if !StyleTokens::is_token_ref(s) && !is_valid_color(s) {
