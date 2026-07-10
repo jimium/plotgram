@@ -323,7 +323,7 @@ diagram flowchart {
 
     config {
         direction: left-to-right
-        layout: sugiyama-v2 { friendliness: adjust }
+        layout: sugiyama-v2
         edge_routing: orthogonal
         theme: common.clean-light
         render_style: excalidraw
@@ -343,7 +343,7 @@ diagram flowchart {
 | 属性 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `direction` | atom | 由图表类型 profile 决定 | `top-to-bottom` / `left-to-right` / `radial`；仅 flowchart/er/sugiyama 支持 tb+lr，mindmap 支持 radial+tb+lr；其他布局不支持 direction |
-| `layout` | atom/config | 由图表类型决定 | 布局算法，可带配置块；支持 `friendliness: off/diagnose/adjust`（默认 `adjust`） |
+| `layout` | atom/config | 由图表类型决定 | 布局算法，可带配置块 |
 | `edge_routing` | atom/config | 由图表类型决定 | 边路由算法，可带配置块 |
 | `theme` | atom | 由 profile 决定 | 主题 ID，如 `common.clean-light`、`common.blueprint`、`mindmap.vivid-branches` |
 | `render_style` | atom | `standard` | `standard` / `excalidraw` / `cross-hatch` / `blueprint` / `spatial-clarity` / `neon-glow` / `stipple` |
@@ -361,20 +361,15 @@ diagram flowchart {
 
 | 值 | 说明 | 常用 option |
 | --- | --- | --- |
-| `flowchart` | **流程图专属分层布局（默认）**；共享 sugiyama-v2 引擎 | `group_padding`, `friendliness` |
-| `er` | **ER 图专属分层布局**；共享 sugiyama-v2 引擎 | `group_padding`, `friendliness` |
+| `flowchart` | **流程图专属分层布局（默认）**；共享 sugiyama-v2 引擎 | `group_padding` |
+| `er` | **ER 图专属分层布局**；共享 sugiyama-v2 引擎 | `group_padding` |
 | `state` | **状态图专属布局**；共享 circular 引擎 | `group_padding`, `padding`, `component_gap` |
 | `architecture` | **架构图分组分层布局（默认）** | `group_padding`, `padding` |
 | `mindmap` | 思维导图布局（默认） | `padding`, `level_gap`, `branch_gap`, `node_gap`, `center_gap` |
 | `sequence` | 时序图布局（不支持 edge_routing） | `group_padding`, `node_spacing`, `message_spacing` |
-| `sugiyama-v2` | 通用 Sugiyama 分层布局（高级选项） | `group_padding`, `friendliness` |
+| `sugiyama-v2` | 通用 Sugiyama 分层布局（高级选项） | `group_padding` |
 | `force-directed` | 分组感知力导向布局 | `group_padding`, `padding`, `component_gap` |
 | `circular` | 自适应圆形布局 | `group_padding`, `padding`, `component_gap` |
-
-**friendliness 模式：**
-- `off`：关闭路由友好度评估
-- `diagnose`：仅诊断并报告问题，不调整
-- `adjust`（默认）：诊断并自动调整路由
 
 ### 6.5 边路由算法选项
 
@@ -622,7 +617,7 @@ diagram flowchart {
     title: "用户登录决策"
     config {
         direction: top-to-bottom
-        layout: flowchart { friendliness: adjust }
+        layout: flowchart
     }
 
     entity[start] start "开始"

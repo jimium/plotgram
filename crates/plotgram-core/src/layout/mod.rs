@@ -21,7 +21,7 @@
 //! │ L1 Group Frame（group_frame）：组间排列/尺寸/对齐/间距/量化    │
 //! │   apply_group_frame：Equal / border_align / quantize groups   │
 //! ├──────────────────────────────────────────────────────────────┤
-//! │ friendliness + route + refine（LayoutRouteFeedback）        │
+//! │ route + refine（LayoutRouteFeedback）                       │
 //! ├──────────────────────────────────────────────────────────────┤
 //! │ L1 Group Frame（幂等恢复）                                    │
 //! ├──────────────────────────────────────────────────────────────┤
@@ -47,7 +47,6 @@ pub mod constants;
 pub mod decl_order;
 pub mod edge;
 pub mod edge_postprocess;
-pub mod friendliness;
 pub mod geometry;
 pub mod grid_snap;
 pub mod group;
@@ -70,7 +69,7 @@ pub use catalog::{
     layout_catalog, AlgorithmOptionInfo, DiagramTypeCatalog, EdgeRoutingAlgoInfo, LayoutAlgoInfo,
     LayoutCatalog,
 };
-pub use plan::{validate_layout_plan_warnings, FriendlinessMode, LayoutPlan, ResolvedAlgoOptions};
+pub use plan::{validate_layout_plan_warnings, LayoutPlan, ResolvedAlgoOptions};
 pub use lint::{
     compute_lint_metrics, count_unrelated_parallel_overlaps, lint_layout, parse_lint_profile,
     parse_lint_rule, parse_lint_rules_list, LayoutLinter, LayoutViolation, LintConfig,
@@ -504,7 +503,7 @@ pub struct LayoutHints {
     pub edge_routing_style: EdgeRoutingStyle,
     /// Sugiyama 系列布局产出的节点 rank 映射（entity_id → rank）。
     ///
-    /// 供路由友好性评估的"长边跨层度"度量使用（见 `friendliness::long_edge`）。
+    /// 供正交路由层序、flowchart group 重建等使用。
     /// 非 Sugiyama 布局为 `None`。
     pub sugiyama_ranks: Option<HashMap<String, usize>>,
     /// MindMap 布局产出的节点深度映射（entity_id → depth）。
@@ -513,11 +512,6 @@ pub struct LayoutHints {
     /// 供 organic 边路由根据层级动态调整曲线弧度，深层级更平缓。
     /// 非 MindMap 布局为 `None`。
     pub mindmap_depths: Option<HashMap<String, usize>>,
-    /// 路由友好性评估报告（V1 诊断模式输出）。
-    ///
-    /// 在 `compute_layout_with_plan` 中、`router.route` 之前由
-    /// `friendliness::RoutingFriendlinessEvaluator` 填充。
-    pub friendliness_report: Option<friendliness::FriendlinessReport>,
     /// 分组布局警告：group 包围框互相重叠或框内含非组节点。
     ///
     /// 由 Sugiyama 系列布局在 `compute_group_bounds` 后检测填充。
@@ -1830,117 +1824,6 @@ mod tests {
         diagram.attributes.push(atom_attr("direction", "from_center"));
         let result = compute_layout(&diagram);
         assert!(result.is_err(), "from_center should be rejected");
-    }
-
-    // ── §6: friendliness 解耦集成测试 ──
-
-    /// §6: `friendliness: off` 时，LayoutResult.hints.friendliness_report 应为 None
-    /// （V1 评估被跳过）。
-    #[test]
-    fn friendliness_off_skips_v1_evaluation() {
-        use crate::ast::{AttributeMap, Entity, Identifier, Relation, ArrowType};
-
-        let span = Span::new(Position::new(1, 1), Position::new(1, 1));
-        let mut diagram = sample_diagram(DiagramType::Flowchart);
-        // 设置 friendliness: off
-        diagram.attributes.push(DiagramAttribute {
-            key: "layout".to_string(),
-            value: AttributeValue::Config {
-                algo: "flowchart".to_string(),
-                options: {
-                    let mut m = std::collections::HashMap::new();
-                    m.insert(
-                        "friendliness".to_string(),
-                        AttributeValue::String(TextValue::unquoted("off".to_string())),
-                    );
-                    m
-                },
-            },
-            span,
-        });
-        for id in ["a", "b", "c"] {
-            diagram.entities.push(Entity {
-                id: Identifier::new_unchecked(id),
-                label: id.to_string(),
-                attributes: AttributeMap::default(),
-                group_id: None,
-                span,
-            });
-        }
-        diagram.relations.push(Relation {
-            from: Identifier::new_unchecked("a"),
-            to: Identifier::new_unchecked("b"),
-            arrow: ArrowType::Active,
-            label: None,
-            head_label: None,
-            tail_label: None,
-            attributes: AttributeMap::default(),
-            span,
-        });
-        diagram.relations.push(Relation {
-            from: Identifier::new_unchecked("b"),
-            to: Identifier::new_unchecked("c"),
-            arrow: ArrowType::Active,
-            label: None,
-            head_label: None,
-            tail_label: None,
-            attributes: AttributeMap::default(),
-            span,
-        });
-
-        let result = compute_layout_with_plan(&diagram, &LayoutPlan::resolve(&diagram, profile_for(&diagram.diagram_type))).unwrap();
-
-        // friendliness: off → V1 被跳过 → friendliness_report 应为 None
-        assert!(
-            result.hints.friendliness_report.is_none(),
-            "friendliness: off should skip V1 evaluation (friendliness_report should be None)"
-        );
-    }
-
-    /// §6: 默认（adjust）时，friendliness_report 应有值（V1 评估执行）。
-    #[test]
-    fn friendliness_default_adjust_runs_v1_evaluation() {
-        use crate::ast::{AttributeMap, Entity, Identifier, Relation, ArrowType};
-
-        let span = Span::new(Position::new(1, 1), Position::new(1, 1));
-        let mut diagram = sample_diagram(DiagramType::Flowchart);
-        for id in ["a", "b", "c"] {
-            diagram.entities.push(Entity {
-                id: Identifier::new_unchecked(id),
-                label: id.to_string(),
-                attributes: AttributeMap::default(),
-                group_id: None,
-                span,
-            });
-        }
-        diagram.relations.push(Relation {
-            from: Identifier::new_unchecked("a"),
-            to: Identifier::new_unchecked("b"),
-            arrow: ArrowType::Active,
-            label: None,
-            head_label: None,
-            tail_label: None,
-            attributes: AttributeMap::default(),
-            span,
-        });
-        diagram.relations.push(Relation {
-            from: Identifier::new_unchecked("b"),
-            to: Identifier::new_unchecked("c"),
-            arrow: ArrowType::Active,
-            label: None,
-            head_label: None,
-            tail_label: None,
-            attributes: AttributeMap::default(),
-            span,
-        });
-
-        let result = compute_layout_with_plan(&diagram, &LayoutPlan::resolve(&diagram, profile_for(&diagram.diagram_type))).unwrap();
-
-        // 默认 adjust → V1 执行 → friendliness_report 应有值
-        assert!(
-            result.hints.friendliness_report.is_some(),
-            "default friendliness (adjust) should run V1 evaluation (friendliness_report should be Some)"
-        );
     }
 
     // ── 平行边布局集成测试 ──

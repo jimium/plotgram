@@ -65,7 +65,7 @@ pub(super) use slot::{
 use path::port_outward;
 
 /// 相邻磁吸点之间的理想间距（像素）；边长不足时自动压缩。
-/// 引用共享常量（与 friendliness/port_conflict 共用）。
+/// 引用共享常量（与 port 容量估算共用）。
 use crate::layout::constants::ORTHO_SLOT_PITCH as SLOT_PITCH;
 
 /// 紧凑分布模式（2-3 条边）的磁吸点间距

@@ -211,7 +211,7 @@ diagram flowchart {
 | -------------- | ---------------- | --------------------------------------------------------- | --------------------- | ------------------------------- |
 | `title`        | string           | 任意字符串                                                     | 无                     | 图表标题（body 级属性，不进 config 块）       |
 | `direction`    | atom             | `top-to-bottom`, `left-to-right`, `radial`                | 由图表类型 profile 决定 | 布局方向偏好；仅支持 direction 的布局生效（见 §4.5）                          |
-| `layout`       | atom 或配置块        | 见布局算法表                                                     | 由图表类型决定 | 布局算法及可选参数；支持 `friendliness` 选项：`off` \| `diagnose` \| `adjust`（默认 `adjust`） |
+| `layout`       | atom 或配置块        | 见布局算法表                                                     | 由图表类型决定 | 布局算法及可选参数 |
 | `edge_routing` | atom 或配置块        | 见边路由算法表 | 由图表类型决定 | 边路由算法及可选参数 |
 | `theme`        | atom             | 内置主题 ID（见主题系统规范），如 `common.clean-light`、`common.blueprint`、`mindmap.vivid-branches` | 由图表类型 profile 决定      | 颜色/字体主题（对应 StyleSheet 的 `id` 字段） |
 | `render_style`| atom             | `standard`, `excalidraw`, `cross-hatch`, `blueprint`, `spatial-clarity`, `neon-glow`, `stipple` | `standard` | 笔触皮肤（与 theme 分工：theme 管颜色，render_style 管绘制风格） |
@@ -229,13 +229,13 @@ diagram flowchart {
 
 | 值                   | 说明                         |
 | ------------------- | -------------------------- |
-| `flowchart`         | **流程图专属分层布局（默认）**；共享 sugiyama-v2 引擎；option: `group_padding`, `friendliness` |
-| `er`                | **ER 图专属分层布局**；共享 sugiyama-v2 引擎；option: `group_padding`, `friendliness` |
+| `flowchart`         | **流程图专属分层布局（默认）**；共享 sugiyama-v2 引擎；option: `group_padding` |
+| `er`                | **ER 图专属分层布局**；共享 sugiyama-v2 引擎；option: `group_padding` |
 | `state`             | **状态图专属布局**；共享 circular 引擎；option: `group_padding`, `padding`, `component_gap` |
 | `architecture`      | **架构图分组分层布局（默认）**（原 `architecture-v2`）；option: `group_padding`, `padding` |
 | `mindmap`           | 思维导图布局（默认）；option: `padding`, `level_gap`, `branch_gap`, `node_gap`, `center_gap` |
 | `sequence`          | 时序图布局（布局阶段直接产出边几何，不支持 edge_routing）；option: `group_padding`, `node_spacing`, `message_spacing` |
-| `sugiyama-v2`       | 通用 Sugiyama 分层布局（高级选项）；option: `group_padding`, `friendliness` |
+| `sugiyama-v2`       | 通用 Sugiyama 分层布局（高级选项）；option: `group_padding` |
 | `sugiyama`          | Sugiyama 分层算法（旧版兼容）；option: `group_padding` |
 | `force-directed`    | 分组感知力导向布局（FR + 分组引力）；option: `group_padding`, `padding`, `component_gap` |
 | `circular`          | 自适应圆形布局（单圆 / 多连通分量）；option: `group_padding`, `padding`, `component_gap` |

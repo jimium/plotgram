@@ -102,13 +102,13 @@ diagram, entity, group, relation, flowchart, sequence, architecture, state, er, 
 - sequence/state/force-directed/circular: 不支持 direction，声明会报错
 
 ## 布局算法(layout 可选值)
-- flowchart: 流程图专属分层(默认)，共享sugiyama-v2引擎；options: group_padding, friendliness
-- er: ER图专属分层，共享sugiyama-v2引擎；options: group_padding, friendliness
+- flowchart: 流程图专属分层(默认)，共享sugiyama-v2引擎；options: group_padding
+- er: ER图专属分层，共享sugiyama-v2引擎；options: group_padding
 - state: 状态图专属，共享circular引擎；options: group_padding, padding, component_gap
 - architecture: 架构图分组分层(默认)；options: group_padding, padding
 - mindmap: 思维导图(默认)；options: padding, level_gap, branch_gap, node_gap, center_gap
 - sequence: 时序图(不支持edge_routing)；options: group_padding, node_spacing, message_spacing
-- sugiyama-v2: 通用Sugiyama分层(高级)；options: group_padding, friendliness
+- sugiyama-v2: 通用Sugiyama分层(高级)；options: group_padding
 - force-directed: 分组感知力导向；options: group_padding, padding, component_gap
 - circular: 自适应圆形布局；options: group_padding, padding, component_gap
 

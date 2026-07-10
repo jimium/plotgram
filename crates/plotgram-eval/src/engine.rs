@@ -59,9 +59,6 @@ pub struct EvalResult {
     pub timed_out: bool,
     /// 超时时的样本 DSL（仅当 timed_out=true 时有值）
     pub timeout_dsl: Option<String>,
-    /// 路由友好性评估分数（V1 诊断模式，来自 LayoutHints.friendliness_report）
-    #[serde(default)]
-    pub friendliness_score: f64,
 }
 
 /// 多算法对比报告
@@ -315,12 +312,6 @@ impl EvalEngine {
                 let metrics = LayoutMetrics::compute(&diag, &layout);
                 let score = self.compute_score(&metrics);
                 let quality_grade = QualityGrade::from_score(score);
-                let friendliness_score = layout
-                    .hints
-                    .friendliness_report
-                    .as_ref()
-                    .map(|r| r.score)
-                    .unwrap_or(0.0);
 
                 EvalResult {
                     algorithm: config.name.to_string(),
@@ -336,7 +327,6 @@ impl EvalEngine {
                     score,
                     timed_out: false,
                     timeout_dsl: None,
-                    friendliness_score,
                 }
             }
             Ok(Err(layout_error)) => {
@@ -360,7 +350,6 @@ impl EvalEngine {
                     score: 0.0,
                     timed_out: true,
                     timeout_dsl: dsl_source.map(|s| s.to_string()),
-                    friendliness_score: 0.0,
                 }
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
@@ -386,7 +375,6 @@ impl EvalEngine {
                     score: 0.0,
                     timed_out: true,
                     timeout_dsl: dsl_source.map(|s| s.to_string()),
-                    friendliness_score: 0.0,
                 }
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {
@@ -411,7 +399,6 @@ impl EvalEngine {
                     score: 0.0,
                     timed_out: true,
                     timeout_dsl: dsl_source.map(|s| s.to_string()),
-                    friendliness_score: 0.0,
                 }
             }
         }
@@ -469,12 +456,6 @@ impl EvalEngine {
         let metrics = LayoutMetrics::compute(diagram, result);
         let score = self.compute_score(&metrics);
         let quality_grade = QualityGrade::from_score(score);
-        let friendliness_score = result
-            .hints
-            .friendliness_report
-            .as_ref()
-            .map(|r| r.score)
-            .unwrap_or(0.0);
 
         EvalResult {
             algorithm: algorithm.to_string(),
@@ -487,7 +468,6 @@ impl EvalEngine {
             score,
             timed_out: false,
             timeout_dsl: None,
-            friendliness_score,
         }
     }
 

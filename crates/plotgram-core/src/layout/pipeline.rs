@@ -94,7 +94,7 @@ impl<'a> LayoutPipeline<'a> {
         result: LayoutResult,
     ) -> Result<LayoutResult, DiagnosticError> {
         let t0 = Instant::now();
-        let feedback = LayoutRouteFeedback::new(self.diagram, self.plan, algo);
+        let feedback = LayoutRouteFeedback::new(self.diagram);
         let PreRouteFeedback {
             result: mut result_v2,
         } = feedback.apply_pre_route(result);
