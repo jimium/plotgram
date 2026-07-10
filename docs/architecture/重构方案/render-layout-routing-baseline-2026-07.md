@@ -16,12 +16,9 @@
 
 FlowML（Plotgram）是 **纯 Rust 多阶段管线**：DSL → parse → prepare → validate → **layout（含边路由）** → build_scene → encode。前端只消费 SVG/文本，不做布局。
 
-架构图默认路径是 **`architecture`（两阶段 Sugiyama）+ `orthogonal`（Architecture Profile）**。管线骨架正确，**不需要推倒重写**；后续升级应围绕：
+架构图默认路径是 **`architecture`（两阶段 Sugiyama）+ `orthogonal`（Architecture Profile）**。管线骨架正确，**不需要推倒重写**。  
 
-1. **双套 Sugiyama 收敛**（`architecture_v2/layout/*` vs `sugiyama_v2/*`）
-2. **布局↔路由空间预算统一**（EGB / PRS / corridor / group_sizing）
-3. **正交路由编排拆分**（`edge_routing_orthogonal/mod.rs` 过重）
-4. **组框审美默认策略**（Fit vs 同级条带化）
+**2026-07-10 分阶段落地后**：默认组框为 Equal+Center；组内复杂拓扑委托 sugiyama_v2；orthogonal 后处理已模块化；PRS 经 `post_route_hook` 接入。详见 §10。
 
 ---
 
@@ -259,9 +256,12 @@ PreparedObstacles（确定性排序）
 | `plotgram-eval` `LayoutMetrics` | 穿障、交叉、弯折、面积、拥堵预测 |
 | layout lint | CLI `lint`、穿组/穿节点等 |
 | `[perf] layout/routing/...` | 分段耗时 |
-| `benchmark-data/baseline.md` | 基线（例：k8s-tenant routing ~12ms） |
+| `benchmark-data/baseline.md` | 历史单图基线（tenant-isolation） |
+| **`benchmark-data/phase0-latest.md`** | **Phase 0 固定样例集快照**（lint / bench / 确定性）；复跑 `./benchmark-data/snapshot-phase0.sh` |
 
 架构图已知短板（来自 2026-07-09 优化方案实测）：穿组、同级 group 宽高不齐、Fit 默认与条带审美冲突。日常流程图质量已可用；压力图（回环/长边/自环）仍是 flowchart 侧重点。
+
+> **Phase 0（2026-07-10）**：样例集见 `benchmark-data/phase0-regression-set.txt`；快照见 `phase0-latest.md`。当时默认仍为 Fit；I1–I3 / A1+A2 已落地。
 
 ---
 
@@ -342,3 +342,30 @@ crates/plotgram-eval/src/metrics.rs
 - 本文件是 **基线认知**，不是实施任务单；具体改造写独立方案文档并回链此处。  
 - 代码与文档冲突时以 **代码** 为准，并在本节或相关专项文档标注「文档过时」。  
 - 重大管线变更后更新 §0 结论、§7 债表与必验清单。  
+
+---
+
+## 10. 分阶段执行结论（2026-07-10）
+
+计划见 Cursor plan「布局路由分阶段计划」。落地摘要：
+
+| 阶段 | 状态 | 要点 |
+|------|------|------|
+| Phase 0 | 完成 | `benchmark-data/phase0-regression-set.txt` + `snapshot-phase0.sh` + `phase0-latest.md` |
+| Phase 1 | 完成 | architecture 默认 `TrackSizing::Equal`；two_phase 只出 content-fit；Fit 逃生舱 |
+| Phase 2 | 完成 | 顶层 sibling 走廊；lane_budget 抬高；PRS 扣减已预留 gutter + `PRS_MAX=24` |
+| Phase 3 | 完成 | 组内 Sugiyama → `sugiyama_v2::ARCHITECTURE_PRESET`（`intra_sugiyama.rs`）；内置 rank/order 冻结 |
+| Phase 4 | 完成 | orthogonal 后处理拆至 `slot_replan` / `conflict_reroute` / `straighten` / `stub_fix` |
+| Phase 5 | 完成 | `post_route_hook`；`MIN_PRESERVE_RATIO=0.10`；旧 `sugiyama` 别名 v2 且移出 catalog 名表 |
+
+### §7.2 债表更新
+
+| 优先级 | 债 | 状态 |
+|--------|-----|------|
+| P0 | 双套 Sugiyama | **部分关闭**：组内已委托 v2；无顶层 group 全局路径仍用 architecture 内置（冻结） |
+| P0 | 布局↔路由预算被动 | **改善**：lane_budget↑ + 顶层走廊 + PRS 降触发 |
+| P1 | orthogonal / two_phase 过大 | **部分关闭**：orthogonal 后处理已拆；two_phase 未拆子模块 |
+| P1 | Group 默认 Fit+Start | **关闭**：默认 Equal+Center |
+| P2 | Pipeline architecture 硬编码 | **关闭**：`post_route_hook` |
+| P2 | 旧 sugiyama 注册 | **关闭**：catalog 名表移除；工厂别名 → v2 |
+| P2 | 文档超前 | 仍开放（overlay/intent 等） |

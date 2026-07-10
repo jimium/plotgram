@@ -56,6 +56,7 @@ pub mod node;
 pub mod plan;
 pub mod perf;
 pub mod pipeline;
+pub mod post_route_hook;
 pub mod postprocess;
 pub mod refine;
 pub mod registry;
@@ -958,7 +959,8 @@ pub trait EdgeRoutingStrategy {
 /// - "sugiyama-v2": 通用 Sugiyama 分层布局（高级选项）
 /// - "circular": 通用自适应圆形布局（高级选项）
 /// - "force-directed": 通用力导向布局（高级选项）
-/// - "sugiyama": Sugiyama 分层算法（旧版）
+/// - "sugiyama-v2": 增强分层布局（推荐）
+/// - "sugiyama": 已别名到 sugiyama-v2（catalog 不再列出）
 ///
 /// 可通过 diagram 属性 `layout_algo: 算法名` 切换。
 ///

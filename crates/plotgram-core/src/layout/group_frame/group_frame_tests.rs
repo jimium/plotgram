@@ -29,8 +29,8 @@
         let spec = resolve_group_frame_spec(&diagram, "architecture");
 
         assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Horizontal });
-        // Phase C：architecture 默认 Fit；显式 uniform 才 Equal
-        assert_eq!(spec.track_sizing, TrackSizing::Fit);
+        // Phase 1：architecture 默认 Equal（同级条带）；显式 fit 才 Fit
+        assert_eq!(spec.track_sizing, TrackSizing::Equal);
         assert_eq!(spec.cross_align, CrossAlign::Center);
         assert!((spec.gap - 40.0).abs() < f64::EPSILON);
         assert_eq!(spec.border_align, BorderAlign::SharedLines);

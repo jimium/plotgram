@@ -15,7 +15,6 @@ pub const LAYOUT_ALGORITHM_NAMES: &[&str] = &[
     "state",
     "sugiyama-v2",
     "architecture",
-    "sugiyama",
 ];
 
 /// 已注册的边路由算法名（与 `build_edge_routing_strategy` 保持一致）。
@@ -26,8 +25,8 @@ pub(super) fn build_layout_strategy(
     plan: &LayoutPlan,
 ) -> Option<Box<dyn LayoutStrategy>> {
     use super::node::{
-        architecture_v2, backup, circular, er, flowchart, force_directed, mindmap, sequence,
-        state, sugiyama_v2,
+        architecture_v2, circular, er, flowchart, force_directed, mindmap, sequence, state,
+        sugiyama_v2,
     };
 
     let strategy: Box<dyn LayoutStrategy> = match algo {
@@ -46,9 +45,10 @@ pub(super) fn build_layout_strategy(
         "architecture" => Box::new(architecture_v2::ArchitectureV2Layout::from_options(
             &plan.layout_options,
         )),
-        "sugiyama" => Box::new(backup::sugiyama::SugiyamaLayout::new(SugiyamaLayoutConfig::from_options(
-            &plan.layout_options,
-        ))),
+        // Phase 5：旧 `sugiyama` 别名到 sugiyama-v2（不再暴露于 catalog）
+        "sugiyama" => Box::new(sugiyama_v2::SugiyamaV2Layout::new(
+            SugiyamaLayoutConfig::from_options(&plan.layout_options),
+        )),
         _ => return None,
     };
     Some(strategy)

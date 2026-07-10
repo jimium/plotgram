@@ -311,15 +311,14 @@ fn read_num_option(options: &HashMap<String, AttributeValue>, key: &str) -> Opti
     }
 }
 
-/// architecture 默认：`Stack(H) + Fit + Center + SharedLines`。
+/// architecture 默认：`Stack(H) + Equal + Center + SharedLines`（同级 sibling 条带）。
 ///
-/// Phase C：默认内容贴合（Fit），避免窄组被最宽 sibling 横向拉空。
-/// `group_sizing: uniform` / `group_frame { track: equal }` 可恢复等宽条带。
+/// 默认等宽条带；显式 `group_sizing: fit` / `group_frame { track: fit }` 可退回内容贴合。
 fn resolve_architecture(diagram: &Diagram) -> GroupFrameSpec {
-    let track_sizing = if diagram_group_sizing_is_uniform(diagram) {
-        TrackSizing::Equal
-    } else {
+    let track_sizing = if diagram_group_sizing_is_fit(diagram) {
         TrackSizing::Fit
+    } else {
+        TrackSizing::Equal
     };
 
     GroupFrameSpec {
@@ -408,12 +407,14 @@ fn resolve_quantize(diagram: &Diagram) -> QuantizeSpec {
     }
 }
 
-/// 读取 diagram 属性 `group_sizing` 是否显式为 `uniform`（启用等宽条带）。
-fn diagram_group_sizing_is_uniform(diagram: &Diagram) -> bool {
+/// 读取 diagram 属性 `group_sizing` 是否显式为 `fit`（退回内容贴合）。
+///
+/// architecture 默认 Equal；仅显式 `fit` 时关闭条带等宽。
+fn diagram_group_sizing_is_fit(diagram: &Diagram) -> bool {
     for attr in &diagram.attributes {
         if attr.key == dsl::GROUP_SIZING {
             if let Some(v) = attr.value.as_str() {
-                return v.trim().to_ascii_lowercase() == "uniform";
+                return v.trim().to_ascii_lowercase() == "fit";
             }
         }
     }

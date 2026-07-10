@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::mem;
 
 /// 保留占比低于此阈值时回退全量重路由（与 orthogonal `reroute_edges_touching_nodes` 对称）。
-const MIN_PRESERVE_RATIO: f64 = 0.15;
+const MIN_PRESERVE_RATIO: f64 = crate::layout::post_route_hook::MIN_PRESERVE_RATIO;
 
 pub(crate) fn reroute_subset(
     result: &mut LayoutResult,

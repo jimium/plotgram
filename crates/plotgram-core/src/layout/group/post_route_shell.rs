@@ -10,10 +10,13 @@ use crate::layout::group::hierarchy::build_group_hierarchy;
 use crate::layout::node::common::group_bounds::GutterSide;
 use crate::layout::{GroupLayout, LayoutResult};
 
-/// 单侧最大补扩（EGB 已预留主预算，PRS 只做小步安全网）。
-const PRS_MAX_PER_SIDE: f64 = 48.0;
+/// 单侧最大补扩（EGB/lane_budget 已预留主预算，PRS 只做小步安全网）。
+/// Phase 2：从 48 降到 24，降低事后扩壳对条带对称的破坏。
+const PRS_MAX_PER_SIDE: f64 = 24.0;
 
 /// 路由与标签完成后，若几何越出 group border shell，向外扩壳一次（不重路由）。
+///
+/// 若布局期 `side_gutters` 已为该侧预留足够预算，则跳过该侧扩壳（降 PRS 触发）。
 pub fn post_route_shell_expand(diagram: &Diagram, layout: &mut LayoutResult) -> bool {
     let shell_pad = layout
         .hints
@@ -21,6 +24,13 @@ pub fn post_route_shell_expand(diagram: &Diagram, layout: &mut LayoutResult) -> 
         .as_ref()
         .map(|h| h.border_shell_pad)
         .unwrap_or(GROUP_BORDER_SHELL_PAD);
+
+    let side_gutters = layout
+        .hints
+        .group_routing
+        .as_ref()
+        .map(|h| h.side_gutters.clone())
+        .unwrap_or_default();
 
     let hierarchy = build_group_hierarchy(diagram, &layout.groups);
     let node_to_groups = build_node_to_groups(diagram);
@@ -36,20 +46,36 @@ pub fn post_route_shell_expand(diagram: &Diagram, layout: &mut LayoutResult) -> 
         return false;
     }
 
+    let mut grew = false;
     let keys: Vec<(String, GutterSide)> = overflow.keys().cloned().collect();
     for (gid, side) in keys {
-        let Some(delta) = overflow.get(&(gid.clone(), side)).copied() else {
+        let Some(raw_delta) = overflow.get(&(gid.clone(), side)).copied() else {
             continue;
         };
+        if raw_delta <= EPS {
+            continue;
+        }
+        // 已预留 gutter 的一侧：只补超出预留的部分
+        let reserved = side_gutters
+            .get(&gid)
+            .map(|g| match side {
+                GutterSide::Left => g.left,
+                GutterSide::Right => g.right,
+                GutterSide::Top => g.top,
+                GutterSide::Bottom => g.bottom,
+            })
+            .unwrap_or(0.0);
+        let delta = (raw_delta - reserved * 0.5).max(0.0).min(PRS_MAX_PER_SIDE);
         if delta <= EPS {
             continue;
         }
         if let Some(gl) = layout.groups.get_mut(&gid) {
             grow_border_outward(gl, side, delta);
+            grew = true;
         }
     }
 
-    true
+    grew
 }
 
 fn scan_shell_overflow(

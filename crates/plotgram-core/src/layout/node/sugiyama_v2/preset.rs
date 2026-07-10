@@ -80,6 +80,18 @@ pub const STATE_PRESET: SugiyamaPreset = SugiyamaPreset {
     ..BASE
 };
 
+/// 架构图组内 Sugiyama preset（Phase 3：委托 sugiyama_v2）。
+///
+/// 间距对齐 `architecture_v2` 常量（LAYER_GAP=72 / NODE_GAP=32），padding 取小值，
+/// 由 two_phase 外层 GroupPadding 负责组框留白。
+pub const ARCHITECTURE_PRESET: SugiyamaPreset = SugiyamaPreset {
+    padding: 8.0,
+    layer_gap: 72.0,
+    node_gap: 32.0,
+    long_edge_barycenter_weight: 1.8,
+    ..BASE
+};
+
 /// 通用 `sugiyama-v2` preset：参数中性，尺寸按 diagram 类型推断。
 pub const GENERIC_PRESET: SugiyamaPreset = SugiyamaPreset {
     node_sizing: NodeSizing::InferFromDiagram,

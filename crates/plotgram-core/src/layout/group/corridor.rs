@@ -88,6 +88,8 @@ pub fn build_corridors_from_groups(groups: &HashMap<String, GroupLayout>) -> Vec
 }
 
 /// 同父 sibling 组：按堆叠主轴排序后，仅在相邻对之间导出走廊（嵌套架构图）。
+///
+/// 同时覆盖**顶层** sibling（`parent_id == None`），补齐跨顶层 group 走廊。
 pub fn build_sibling_corridors(
     diagram: &crate::ast::Diagram,
     groups: &HashMap<String, GroupLayout>,
@@ -95,12 +97,15 @@ pub fn build_sibling_corridors(
     use std::collections::HashMap as StdHashMap;
 
     let mut children_of: StdHashMap<String, Vec<String>> = StdHashMap::new();
+    let mut top_level: Vec<String> = Vec::new();
     for group in &diagram.groups {
         if let Some(pid) = &group.parent_id {
             children_of
                 .entry(pid.as_str().to_string())
                 .or_default()
                 .push(group.id.as_str().to_string());
+        } else {
+            top_level.push(group.id.as_str().to_string());
         }
     }
 
@@ -111,23 +116,11 @@ pub fn build_sibling_corridors(
         let Some(children) = children_of.get_mut(&parent_id) else {
             continue;
         };
-        if children.len() < 2 {
-            continue;
-        }
-        children.sort();
-        sort_siblings_along_stack_axis(children, groups);
-        for w in children.windows(2) {
-            let id_a = w[0].as_str();
-            let id_b = w[1].as_str();
-            if pair_covered(&corridors, id_a, id_b) {
-                continue;
-            }
-            let (Some(ga), Some(gb)) = (groups.get(id_a), groups.get(id_b)) else {
-                continue;
-            };
-            push_corridor_between(ga, gb, id_a, id_b, &mut corridors);
-        }
+        append_adjacent_sibling_corridors(children, groups, &mut corridors);
     }
+    // Phase 2：顶层 sibling 走廊（无 parent）
+    append_adjacent_sibling_corridors(&mut top_level, groups, &mut corridors);
+
     corridors.sort_by(|a, b| {
         a.axis
             .cmp(&b.axis)
@@ -135,6 +128,29 @@ pub fn build_sibling_corridors(
             .then_with(|| a.group_b.cmp(&b.group_b))
     });
     corridors
+}
+
+fn append_adjacent_sibling_corridors(
+    children: &mut [String],
+    groups: &HashMap<String, GroupLayout>,
+    corridors: &mut Vec<GroupCorridor>,
+) {
+    if children.len() < 2 {
+        return;
+    }
+    children.sort();
+    sort_siblings_along_stack_axis(children, groups);
+    for w in children.windows(2) {
+        let id_a = w[0].as_str();
+        let id_b = w[1].as_str();
+        if pair_covered(corridors, id_a, id_b) {
+            continue;
+        }
+        let (Some(ga), Some(gb)) = (groups.get(id_a), groups.get(id_b)) else {
+            continue;
+        };
+        push_corridor_between(ga, gb, id_a, id_b, corridors);
+    }
 }
 
 fn sort_siblings_along_stack_axis(children: &mut [String], groups: &HashMap<String, GroupLayout>) {

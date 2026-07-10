@@ -137,73 +137,15 @@ impl<'a> LayoutPipeline<'a> {
 
         result = self.run_post_route_group_frame(algo, result, &gf_pass, &*router, &edge_snap_config)?;
 
-        if algo == "architecture" {
-            let t_prs = Instant::now();
-            let prs_grew = crate::layout::group::post_route_shell::post_route_shell_expand(
-                self.diagram,
-                &mut result,
-            );
-            let prs_ms = t_prs.elapsed().as_secs_f64() * 1000.0;
-            if prs_grew {
-                let pre_positions: HashMap<String, (f64, f64)> = result
-                    .nodes
-                    .iter()
-                    .map(|(id, n)| (id.clone(), (n.x, n.y)))
-                    .collect();
-                crate::layout::group_frame::resolve_all_sibling_overlaps(
-                    &gf_pass.spec,
-                    self.diagram,
-                    &mut result,
-                );
-                let moved_nodes: HashSet<String> = result
-                    .nodes
-                    .iter()
-                    .filter_map(|(id, n)| {
-                        pre_positions.get(id).and_then(|(px, py)| {
-                            let dx = n.x - px;
-                            let dy = n.y - py;
-                            if (dx * dx + dy * dy).sqrt() >= 1.0 {
-                                Some(id.clone())
-                            } else {
-                                None
-                            }
-                        })
-                    })
-                    .collect();
-                if !moved_nodes.is_empty() {
-                    result = router.route_after_node_moves(self.diagram, result, &moved_nodes);
-                }
-            }
-            // 无论 PRS 是否扩壳，都做一次内容包络安全网（leaf + 容器 + padding）。
-            let leaf_pad = gf_pass.padding;
-            let container_pad =
-                crate::layout::node::common::group_bounds::container_padding_for_leaf(leaf_pad);
-            crate::layout::group_frame::expand_groups_to_contain_contents(
-                self.diagram,
-                &mut result.groups,
-                &result.nodes,
-                leaf_pad,
-                container_pad,
-            );
-            grid_snap::update_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
-            if prs_grew {
-                edge_postprocess::repulse_edges_only(
-                    &mut result.edges,
-                    &result.groups,
-                    &edge_snap_config,
-                );
-            }
-            if let Some(debug) = result.hints.gutter_budget_debug.as_mut() {
-                debug.prs_ms = prs_ms;
-                debug.prs_grew = prs_grew;
-            } else {
-                result.hints.gutter_budget_debug = Some(crate::layout::GutterBudgetDebug {
-                    prs_ms,
-                    prs_grew,
-                    ..Default::default()
-                });
-            }
-        }
+        let hook = super::post_route_hook::post_route_hook_for(algo);
+        result = hook.after_route(
+            self.diagram,
+            result,
+            &*router,
+            &gf_pass.spec,
+            &edge_snap_config,
+            gf_pass.padding,
+        );
 
         // P1: 像素量化在管道最末尾执行，仅运行一次
         edge_postprocess::snap_and_repulse_edges(
@@ -257,7 +199,7 @@ impl<'a> LayoutPipeline<'a> {
             })
             .fold(0.0f64, f64::max);
 
-        if max_node_disp >= 1.0 {
+        if max_node_disp >= super::post_route_hook::NODE_MOVE_REROUTE_EPS {
             let moved_nodes: HashSet<String> = result
                 .nodes
                 .iter()
@@ -265,7 +207,9 @@ impl<'a> LayoutPipeline<'a> {
                     pre_gf_positions.get(id).and_then(|(px, py)| {
                         let dx = n.x - px;
                         let dy = n.y - py;
-                        if (dx * dx + dy * dy).sqrt() >= 1.0 {
+                        if (dx * dx + dy * dy).sqrt()
+                            >= super::post_route_hook::NODE_MOVE_REROUTE_EPS
+                        {
                             Some(id.clone())
                         } else {
                             None

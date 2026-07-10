@@ -21,8 +21,8 @@ pub fn is_valid_group_sizing_atom(raw: &str) -> bool {
 
 /// 从 diagram 属性 `group_sizing` 读取策略。
 ///
-/// Phase C：默认 `Fit`（内容贴合），避免窄组被最宽组横向拉空；
-/// 显式 `uniform` 才拉齐等宽条带。
+/// Phase 1：默认 `Uniform`（同级条带，由 L1 GroupFramePass 拉齐）；
+/// 显式 `fit` 才退回内容贴合。two_phase 本身不再执行 Equal。
 pub fn parse_group_sizing(diagram: &Diagram) -> GroupSizingPolicy {
     for attr in &diagram.attributes {
         if attr.key == "group_sizing" {
@@ -30,12 +30,12 @@ pub fn parse_group_sizing(diagram: &Diagram) -> GroupSizingPolicy {
                 return match v.trim().to_ascii_lowercase().as_str() {
                     "uniform" => GroupSizingPolicy::Uniform,
                     "fit" => GroupSizingPolicy::Fit,
-                    _ => GroupSizingPolicy::Fit,
+                    _ => GroupSizingPolicy::Uniform,
                 };
             }
         }
     }
-    GroupSizingPolicy::Fit
+    GroupSizingPolicy::Uniform
 }
 
 /// 组块 trait：供 uniform 策略调整宽度（与 two_phase::MacroBlock 对齐）
@@ -85,6 +85,8 @@ pub fn apply_uniform_group_width<B: GroupWidthBlock>(
     }
 }
 
+/// Phase 1：Equal 已迁至 L1 GroupFramePass；本函数保留供显式/测试调用。
+#[allow(dead_code)]
 pub fn apply_group_sizing_policy<B: GroupWidthBlock>(
     policy: GroupSizingPolicy,
     top_group_ids: &[String],
