@@ -14,9 +14,9 @@ use crate::layout::algorithm_config::{AlgorithmOptionSpec, OptionKind};
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, EdgeRoutingStrategy, EdgeSnapConfig, LayoutResult, NodeLayout, PathGeometry, Port};
 use crate::layout::edge::common::edge_geometry::{
-    arrow_type_tag, build_edge_labels, canonical_pair, edge_line_style_signature, node_center,
-    parse_label_t, point_at_path_t, undirected_pair_key,
+    arrow_type_tag, canonical_pair, edge_line_style_signature, node_center, undirected_pair_key,
 };
+use crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels;
 use crate::layout::edge::common::self_loop;
 use crate::layout::edge::common::label_avoidance::resolve_label_overlaps_with_config;
 use crate::layout::edge::common::label_candidate::LabelPlacementConfig;
@@ -746,13 +746,16 @@ fn route_edges_orthogonal_inner(
             }
         }
 
-        // 标签位置：根据 label_position 锚点沿路径取点
+        // 标签位置：平行/反向边错开 t + 法向偏移，避免双向边标签重叠
         let labels = if path.len() >= 2 {
             match relations.get(i) {
-                Some(rel) => {
-                    let middle_t = parse_label_t(rel);
-                    build_edge_labels(rel, middle_t, Point::new(0.0, 0.0), |t| point_at_path_t(&path, t))
-                }
+                Some(rel) => build_parallel_aware_edge_labels(
+                    rel,
+                    i,
+                    relations,
+                    &parallel.offsets,
+                    &path,
+                ),
                 None => Vec::new(),
             }
         } else {
@@ -806,7 +809,23 @@ fn route_edges_orthogonal_inner(
     // 修改anchor后需要重路由受影响的边，因此放在 X-1 reroute 之前。
     let t_align2 = crate::layout::perf::Instant::now();
     let old_endpoints: HashMap<(usize, bool), Endpoint> = endpoint_map.clone();
-    straighten_preferred_alignments(&result.nodes, n, &from_side, &to_side, &mut endpoint_map);
+    // 仅 reverse_pairs 边携带非零 parallel offset；straighten 对齐到 center±offset
+    let mut straighten_offsets = vec![0.0; n];
+    for ((edge_index, _), _) in endpoint_map.iter() {
+        let rel = &relations[*edge_index];
+        let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
+        if reverse_pairs.contains(&key) {
+            straighten_offsets[*edge_index] = parallel.offsets[*edge_index];
+        }
+    }
+    straighten_preferred_alignments(
+        &result.nodes,
+        n,
+        &from_side,
+        &to_side,
+        &mut endpoint_map,
+        &straighten_offsets,
+    );
 
     // 找出anchor被修改的边，需要重路由
     let mut align_reroute: Vec<usize> = Vec::new();
@@ -884,10 +903,13 @@ fn route_edges_orthogonal_inner(
             if candidate.len() >= 2 {
                 grid.insert_path(&candidate, ei);
                 let labels = match relations.get(ei) {
-                    Some(rel) => {
-                        let middle_t = parse_label_t(rel);
-                        build_edge_labels(rel, middle_t, Point::new(0.0, 0.0), |t| point_at_path_t(&candidate, t))
-                    }
+                    Some(rel) => build_parallel_aware_edge_labels(
+                        rel,
+                        ei,
+                        relations,
+                        &parallel.offsets,
+                        &candidate,
+                    ),
                     None => Vec::new(),
                 };
                 let mut edge = EdgeLayout {

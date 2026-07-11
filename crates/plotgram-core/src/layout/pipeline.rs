@@ -222,6 +222,20 @@ impl<'a> LayoutPipeline<'a> {
                 &from_side,
                 &to_side,
             );
+
+            // 标签避让必须是几何冻结后的**最终**步骤：sanitize 会按平行边规则
+            // 重建所有标签（丢弃路由内部 step-5 的避让结果），snap/repulse 又移动了
+            // 路径。因此在此对量化后的最终几何再跑一次标签避让，保证输出不含重叠。
+            let label_config =
+                crate::layout::edge::common::label_candidate::LabelPlacementConfig::for_diagram_type(
+                    self.diagram.diagram_type.clone(),
+                );
+            crate::layout::edge::common::label_avoidance::resolve_label_overlaps_with_config(
+                &mut result.edges,
+                &result.nodes,
+                &result.groups,
+                label_config,
+            );
         }
 
         crate::perf_log!("[perf]   post-process: {:.2}ms", t_post.elapsed().as_secs_f64() * 1000.0);

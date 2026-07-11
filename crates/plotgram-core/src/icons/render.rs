@@ -96,6 +96,8 @@ pub fn extra_node_width(def: &IconDef, font_size: f64) -> f64 {
 }
 
 /// 渲染节点内侧内容：有图标时 icon+label 横排居中，否则标签居中。
+///
+/// `text_color` 用于标签文字，`icon_color` 用于图标 glyph（通常由节点边框色加深得到）。
 pub fn render_entity_content(
     entity: &Entity,
     node_x: f64,
@@ -104,6 +106,7 @@ pub fn render_entity_content(
     node_height: f64,
     shape: NodeShape,
     text_color: &str,
+    icon_color: &str,
     font_size: f64,
     font_weight: &str,
     options: &ResolveOptions,
@@ -123,6 +126,7 @@ pub fn render_entity_content(
                 def,
                 &layout,
                 &entity.label,
+                icon_color,
                 text_color,
                 font_size,
                 font_weight,
@@ -166,7 +170,7 @@ pub fn render_icon(def: &IconDef, x: f64, y: f64, size: f64, color: &str) -> Str
     let scale = size / GLYPH_VIEWBOX;
     let inner = svg_inner(def.asset);
     format!(
-        r#"<g transform="translate({x:.2},{y:.2}) scale({scale:.4})" color="{color}">{inner}</g>"#,
+        r#"<g transform="translate({x:.2},{y:.2}) scale({scale:.4})" color="{color}" fill="none">{inner}</g>"#,
         x = x,
         y = y,
         scale = scale,
@@ -176,11 +180,14 @@ pub fn render_icon(def: &IconDef, x: f64, y: f64, size: f64, color: &str) -> Str
 }
 
 /// 渲染内侧图标 + 标签（整组已由 [`layout_inside`] 定位）。
+///
+/// `icon_color` 用于图标 glyph，`label_color` 用于标签文字。
 pub fn render_inside(
     def: &IconDef,
     layout: &IconLayout,
     label: &str,
-    color: &str,
+    icon_color: &str,
+    label_color: &str,
     font_size: f64,
     font_weight: &str,
 ) -> String {
@@ -188,17 +195,17 @@ pub fn render_inside(
     writeln!(
         &mut svg,
         "{}",
-        render_icon(def, layout.icon_x, layout.icon_y, layout.icon_size, color)
+        render_icon(def, layout.icon_x, layout.icon_y, layout.icon_size, icon_color)
     )
     .unwrap();
     writeln!(
         &mut svg,
-        r#"<text x="{:.2}" y="{:.2}" text-anchor="start" dominant-baseline="central" font-size="{font_size}" font-weight="{font_weight}" fill="{color}">{label}</text>"#,
+        r#"<text x="{:.2}" y="{:.2}" text-anchor="start" dominant-baseline="central" font-size="{font_size}" font-weight="{font_weight}" fill="{label_color}">{label}</text>"#,
         layout.label_x,
         layout.label_y,
         font_size = font_size,
         font_weight = font_weight,
-        color = escape_xml(color),
+        label_color = escape_xml(label_color),
         label = escape_xml(label),
     )
     .unwrap();

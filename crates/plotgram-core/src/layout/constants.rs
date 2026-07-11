@@ -69,8 +69,9 @@ pub const DEFAULT_ASCII_CHAR_WIDTH: f64 = 6.5;
 /// 默认标签位置迭代次数上限
 pub const DEFAULT_MAX_LABEL_ITERATIONS: usize = 5;
 
-/// 引线触发阈值：标签中心到边路径距离超过此值时绘制引线
-pub const DEFAULT_LEADER_LINE_THRESHOLD: f64 = 4.0;
+/// 引线最小可见长度：标签包围框边缘到路径锚点的距离。
+/// 短于此值的引线几乎看不出归属，省略不画。
+pub const DEFAULT_LEADER_LINE_MIN_LENGTH: f64 = 12.0;
 
 // ─── 算法专用常量 ──────────────────────────────────────
 

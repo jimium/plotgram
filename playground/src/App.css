@@ -1584,6 +1584,37 @@
   font-size: 12px;
 }
 
+/* ─── 示例库引导 ─────────────────────────────────────────── */
+.examples-btn {
+  position: relative;
+}
+
+.examples-btn.guide-pulse {
+  animation: guide-pulse 2s ease-in-out infinite;
+}
+
+@keyframes guide-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(124, 58, 237, 0); }
+}
+
+.guide-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid var(--panel);
+  animation: guide-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes guide-blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.8); }
+}
+
 .link-btn {
   background: none;
   border: none;

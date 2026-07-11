@@ -105,7 +105,10 @@ stage_artifacts() {
   mkdir -p "$STAGING_DIR/demo-showcase" "$STAGING_DIR/cdn-showcase"
 
   # demo 站：showcase 不含 svg / 历史快照（走 CDN）
+  # 例外：assets/brand/ 下的品牌 logo SVG 需跟随 demo 站（相对路径引用）
   rsync -a \
+    --include='assets/brand/' \
+    --include='assets/brand/*.svg' \
     --exclude='*.svg' \
     --include='.history/' \
     --include='.history/manifest.json' \

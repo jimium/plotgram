@@ -43,9 +43,9 @@ pub struct LabelPlacementConfig {
 impl LabelPlacementConfig {
     pub fn for_diagram_type(diagram_type: DiagramType) -> Self {
         match diagram_type {
-            DiagramType::Architecture => Self {
+            DiagramType::Architecture | DiagramType::Flowchart => Self {
                 prefer_long_segment_whitespace: true,
-                soften_endpoint_group_shell: true,
+                soften_endpoint_group_shell: matches!(diagram_type, DiagramType::Architecture),
             },
             _ => Self::default(),
         }
@@ -219,10 +219,12 @@ fn collect_label_keys(edges: &[EdgeLayout]) -> Vec<LabelKey> {
 fn sorted_node_obstacles(nodes: &HashMap<String, NodeLayout>) -> Vec<(f64, f64, f64, f64)> {
     let mut ids: Vec<&String> = nodes.keys().collect();
     ids.sort();
+    let m = DEFAULT_LABEL_PERP_OFFSET;
     ids.into_iter()
         .map(|id| {
             let nl = &nodes[id];
-            (nl.x, nl.y, nl.x + nl.width, nl.y + nl.height)
+            // 外扩法向偏置量：贴边也视为冲突，触发 Phase 1 候选偏置
+            (nl.x - m, nl.y - m, nl.x + nl.width + m, nl.y + nl.height + m)
         })
         .collect()
 }
@@ -286,18 +288,26 @@ fn preferred_t_for_label(label_idx: usize, path: &[Point], current: Point) -> f6
 }
 
 fn generate_candidates(path: &[Point], preferred_t: f64, size: (f64, f64)) -> Vec<Point> {
-    let _ = size;
     // 覆盖短边场景：端点附近 (0.15/0.85) 增加候选，中段保持 0.3/0.5/0.7
     let mut ts = vec![0.15, 0.3, 0.5, 0.7, 0.85, preferred_t];
     ts.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     ts.dedup_by(|a, b| (*a - *b).abs() < 0.05);
 
+    // 外偏需能覆盖半标签宽，否则 fan 组看得见冲突却移不动
+    let half_w = (size.0 * 0.5 + 6.0).max(DEFAULT_LABEL_PERP_OFFSET * 3.0);
+    let distances = [
+        DEFAULT_LABEL_PERP_OFFSET,
+        DEFAULT_LABEL_PERP_OFFSET * 2.0,
+        DEFAULT_LABEL_PERP_OFFSET * 3.0,
+        half_w,
+    ];
+
     let mut candidates = Vec::new();
     for t in ts {
         let (normal, anchor) = normal_at_path_t(path, t);
         for sign in [1.0, -1.0] {
-            for mult in [1.0, 2.0, 3.0] {
-                let offset = DEFAULT_LABEL_PERP_OFFSET * mult * sign;
+            for &dist in &distances {
+                let offset = dist * sign;
                 candidates.push(Point::new(
                     anchor.x + normal.x * offset,
                     anchor.y + normal.y * offset,
@@ -485,7 +495,8 @@ mod tests {
         assert!(cfg.soften_endpoint_group_shell);
 
         let flow = LabelPlacementConfig::for_diagram_type(DiagramType::Flowchart);
-        assert!(!flow.prefer_long_segment_whitespace);
+        assert!(flow.prefer_long_segment_whitespace);
+        assert!(!flow.soften_endpoint_group_shell);
     }
 
     #[test]

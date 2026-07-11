@@ -472,28 +472,56 @@ a {
 
 .hero-preview-canvas {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  overflow: auto;
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
 }
 
 .hero-svg-host {
-  max-width: 100%;
-  max-height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
 }
 
 .hero-svg-host svg {
-  max-width: 100%;
-  max-height: 100%;
-  height: auto;
-  width: auto;
+  display: block;
+}
+
+.hero-preview-toolbar {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  user-select: none;
+  z-index: 5;
+}
+
+.hero-preview-toolbar button {
+  border: 0;
+  background: transparent;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  min-width: 28px;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.hero-preview-toolbar button:hover {
+  background: rgba(124, 58, 237, 0.1);
+  color: #7c3aed;
 }
 
 

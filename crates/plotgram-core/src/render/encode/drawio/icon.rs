@@ -4,6 +4,7 @@ use crate::icons::{render_entity_content, resolve};
 use crate::render::paint::color_queries::{entity_label_font_size, entity_text_fill};
 use crate::render::paint::svg_utils::{label_weight, FONT_SIZE};
 use crate::render::scene::{ExportNode, ExportScene};
+use crate::theme::compile::darken;
 
 use super::report::{DegradeTier, DrawioExportOptions, ExportReport, ExportWarning};
 
@@ -88,6 +89,7 @@ fn build_icon_image_style(node: &ExportNode<'_>, scene: &ExportScene<'_>) -> Opt
 
     let diagram_type = &scene.diagram().diagram_type;
     let text_color = entity_text_fill(node.entity, diagram_type, &scene.context, "#333333");
+    let icon_color = darken(&node.style.stroke, 0.15);
     let font_size = entity_label_font_size(node.entity, diagram_type, &scene.context, FONT_SIZE);
     let font_weight = label_weight(&node.style, "500");
 
@@ -99,6 +101,7 @@ fn build_icon_image_style(node: &ExportNode<'_>, scene: &ExportScene<'_>) -> Opt
         h,
         node.style.shape.clone(),
         &text_color,
+        &icon_color,
         font_size,
         font_weight,
         &scene.context.icon_resolve,

@@ -72,11 +72,6 @@ pub fn resolve_label_overlaps_with_config(
     // Phase 1: 候选位打分（优先消除标签-节点硬冲突）
     place_all_labels_by_candidates_with_config(edges, nodes, groups, label_config);
 
-    let initial_positions: HashMap<LabelKey, Point> = label_keys
-        .iter()
-        .filter_map(|&k| edges[k.0].label_pos_at(k.1).map(|p| (k, p)))
-        .collect();
-
     let edge_segments: Vec<Vec<(Point, Point)>> = edges
         .iter()
         .map(|e| {
@@ -90,7 +85,15 @@ pub fn resolve_label_overlaps_with_config(
 
     let node_obstacles: Vec<(f64, f64, f64, f64)> = nodes
         .values()
-        .map(|nl| (nl.x, nl.y, nl.x + nl.width, nl.y + nl.height))
+        .map(|nl| {
+            let m = DEFAULT_LABEL_PERP_OFFSET;
+            (
+                nl.x - m,
+                nl.y - m,
+                nl.x + nl.width + m,
+                nl.y + nl.height + m,
+            )
+        })
         .collect();
     let group_obstacles = sorted_group_shell_obstacles(groups);
 
@@ -132,33 +135,53 @@ pub fn resolve_label_overlaps_with_config(
                         Some(p) => p,
                         None => continue,
                     };
-                    let (mut new_a, mut new_b) = (pos_a, pos_b);
-                    if dx < dy {
-                        let shift = (dx + DEFAULT_MIN_SEPARATION) / 2.0;
-                        if pos_a.x < pos_b.x {
-                            new_a.x -= shift;
-                            new_b.x += shift;
-                        } else {
-                            new_a.x += shift;
-                            new_b.x -= shift;
-                        }
-                    } else {
-                        let shift = (dy + DEFAULT_MIN_SEPARATION) / 2.0;
-                        if pos_a.y < pos_b.y {
-                            new_a.y -= shift;
-                            new_b.y += shift;
-                        } else {
-                            new_a.y += shift;
-                            new_b.y -= shift;
-                        }
-                    }
-                    // 节点安全检查：不把标签推入节点（避免 label-label ↔ label-node 振荡）
                     let (w_a, h_a) = (bbox_a.2 - bbox_a.0, bbox_a.3 - bbox_a.1);
                     let (w_b, h_b) = (bbox_b.2 - bbox_b.0, bbox_b.3 - bbox_b.1);
-                    let new_bbox_a = (new_a.x - w_a / 2.0, new_a.y - h_a / 2.0, new_a.x + w_a / 2.0, new_a.y + h_a / 2.0);
-                    let new_bbox_b = (new_b.x - w_b / 2.0, new_b.y - h_b / 2.0, new_b.x + w_b / 2.0, new_b.y + h_b / 2.0);
-                    let a_safe = node_obstacles.iter().all(|n| aabb_overlap(&new_bbox_a, n).is_none());
-                    let b_safe = node_obstacles.iter().all(|n| aabb_overlap(&new_bbox_b, n).is_none());
+
+                    // 沿指定轴对称分离两标签，返回 (new_a, new_b, a_safe, b_safe)。
+                    // 节点安全检查：不把标签推入节点（避免 label-label ↔ label-node 振荡）。
+                    let split_on_axis = |use_x: bool| {
+                        let (mut na, mut nb) = (pos_a, pos_b);
+                        if use_x {
+                            let shift = (dx + DEFAULT_MIN_SEPARATION) / 2.0;
+                            if pos_a.x <= pos_b.x {
+                                na.x -= shift;
+                                nb.x += shift;
+                            } else {
+                                na.x += shift;
+                                nb.x -= shift;
+                            }
+                        } else {
+                            let shift = (dy + DEFAULT_MIN_SEPARATION) / 2.0;
+                            if pos_a.y <= pos_b.y {
+                                na.y -= shift;
+                                nb.y += shift;
+                            } else {
+                                na.y += shift;
+                                nb.y -= shift;
+                            }
+                        }
+                        let bba = (na.x - w_a / 2.0, na.y - h_a / 2.0, na.x + w_a / 2.0, na.y + h_a / 2.0);
+                        let bbb = (nb.x - w_b / 2.0, nb.y - h_b / 2.0, nb.x + w_b / 2.0, nb.y + h_b / 2.0);
+                        let sa = node_obstacles.iter().all(|n| aabb_overlap(&bba, n).is_none());
+                        let sb = node_obstacles.iter().all(|n| aabb_overlap(&bbb, n).is_none());
+                        (na, nb, sa, sb)
+                    };
+
+                    // 优先沿最小穿透轴分离；若该轴对两个标签都不安全（被节点挡住），
+                    // 退回到正交轴再试一次——密集 fan-in/fan-out 走廊上标签常被节点
+                    // 夹住，单轴推挤会卡死并残留重叠。
+                    let prefer_x = dx < dy;
+                    let (mut new_a, mut new_b, mut a_safe, mut b_safe) = split_on_axis(prefer_x);
+                    if !a_safe && !b_safe {
+                        let alt = split_on_axis(!prefer_x);
+                        if alt.2 || alt.3 {
+                            new_a = alt.0;
+                            new_b = alt.1;
+                            a_safe = alt.2;
+                            b_safe = alt.3;
+                        }
+                    }
                     if a_safe {
                         edges[ka.0].set_label_pos_at(ka.1, new_a);
                     }
@@ -285,42 +308,54 @@ pub fn resolve_label_overlaps_with_config(
         }
     }
 
-    assign_leader_lines(edges, &initial_positions);
+    assign_leader_lines(edges);
 }
 
-fn assign_leader_lines(
-    edges: &mut [EdgeLayout],
-    initial_positions: &HashMap<LabelKey, Point>,
-) {
-    for (edge_idx, edge) in edges.iter_mut().enumerate() {
+/// 按**可见引线长度**（包围框边缘 → 路径锚点）决定是否画引线。
+///
+/// 侧向偏置只留出很小空隙时，短线没有信息量，省略；只有标签被推得较远时才挂
+/// `leader_to`。
+fn assign_leader_lines(edges: &mut [EdgeLayout]) {
+    for edge in edges.iter_mut() {
         if edge.path_len() < 2 {
             continue;
         }
         let path = edge.path_points().into_owned();
-        for (label_idx, label) in edge.labels.iter_mut().enumerate() {
-            let key = (edge_idx, label_idx);
-            let initial = initial_positions.get(&key);
-            let was_moved = match initial {
-                Some(&init) => {
-                    let dx = label.center.x - init.x;
-                    let dy = label.center.y - init.y;
-                    (dx * dx + dy * dy).sqrt() > DEFAULT_LEADER_LINE_THRESHOLD
-                }
-                None => false,
-            };
-            if !was_moved {
-                label.leader_to = None;
-                continue;
-            }
-
-            let (closest, dist) = closest_point_on_path(&path, label.center);
-            if dist > DEFAULT_LEADER_LINE_THRESHOLD {
+        for label in edge.labels.iter_mut() {
+            let (closest, _) = closest_point_on_path(&path, label.center);
+            if leader_visible_length(label.center, label.size, closest)
+                >= DEFAULT_LEADER_LINE_MIN_LENGTH
+            {
                 label.leader_to = Some(closest);
             } else {
                 label.leader_to = None;
             }
         }
     }
+}
+
+/// 标签包围框边缘到引线锚点的可见长度。
+pub fn leader_visible_length(center: Point, size: (f64, f64), target: Point) -> f64 {
+    let dx = target.x - center.x;
+    let dy = target.y - center.y;
+    let dist = (dx * dx + dy * dy).sqrt();
+    if dist < 1e-9 {
+        return 0.0;
+    }
+    let hw = size.0 / 2.0;
+    let hh = size.1 / 2.0;
+    // 与渲染侧 bbox_exit_point 一致：沿中心→锚点方向到矩形边界的参数 t
+    let mut t_edge = f64::INFINITY;
+    if dx.abs() > 1e-9 {
+        t_edge = t_edge.min(hw / dx.abs());
+    }
+    if dy.abs() > 1e-9 {
+        t_edge = t_edge.min(hh / dy.abs());
+    }
+    if !t_edge.is_finite() {
+        return 0.0;
+    }
+    (dist * (1.0 - t_edge)).max(0.0)
 }
 
 fn push_label_from_obstacle(
@@ -371,8 +406,16 @@ fn push_label_from_obstacle_safe(
     let original_pos = *label_pos;
     let original_bbox = *bbox;
     if push_label_from_obstacle(label_pos, bbox, obstacle) {
-        for other in all_obstacles {
-            if aabb_overlap(bbox, other).is_some() {
+        // 只拒绝「推入其他障碍」；与当前障碍的残余重叠由下一轮继续推开
+        for &other in all_obstacles {
+            if (other.0 - obstacle.0).abs() < EPS
+                && (other.1 - obstacle.1).abs() < EPS
+                && (other.2 - obstacle.2).abs() < EPS
+                && (other.3 - obstacle.3).abs() < EPS
+            {
+                continue;
+            }
+            if aabb_overlap(bbox, &other).is_some() {
                 *label_pos = original_pos;
                 *bbox = original_bbox;
                 return false;
@@ -785,45 +828,80 @@ mod tests {
     }
 
     #[test]
-    fn leader_line_set_when_label_pushed_from_edge() {
+    fn leader_line_set_when_label_pushed_far_from_edge() {
+        // 标签压在边上，避让后若可见引线够长则挂 leader；短推开则省略
         let mut edges = vec![labeled_edge(Point::new(50.0, 0.0))];
         let nodes = HashMap::new();
         let groups = HashMap::new();
 
-        assert!(edges[0].labels[0].leader_to.is_none());
+        resolve_label_overlaps(&mut edges, &nodes, &groups);
+
+        let label = &edges[0].labels[0];
+        let (closest, _) = closest_point_on_path(
+            &[Point::new(0.0, 0.0), Point::new(100.0, 0.0)],
+            label.center,
+        );
+        let visible = leader_visible_length(label.center, label.size, closest);
+        if visible >= DEFAULT_LEADER_LINE_MIN_LENGTH {
+            assert!(
+                label.leader_to.is_some(),
+                "visible leader {visible:.1}px should set leader_to"
+            );
+            let leader = label.leader_to.unwrap();
+            assert!(
+                leader.y.abs() < 1.0,
+                "leader_to should be on edge path (y≈0), got y={}",
+                leader.y
+            );
+        } else {
+            assert!(
+                label.leader_to.is_none(),
+                "short visible leader {visible:.1}px should be omitted"
+            );
+        }
+    }
+
+    #[test]
+    fn leader_line_none_when_label_near_path() {
+        // 标签紧贴路径（仅微小偏移），可见引线过短，不应画
+        let mut edges = vec![labeled_edge(Point::new(50.0, 2.0))];
+        let nodes = HashMap::new();
+        let groups = HashMap::new();
 
         resolve_label_overlaps(&mut edges, &nodes, &groups);
 
         let label = &edges[0].labels[0];
-        assert!(
-            label.leader_to.is_some(),
-            "leader_to should be set after label is pushed from edge"
+        let (closest, _) = closest_point_on_path(
+            &[Point::new(0.0, 0.0), Point::new(100.0, 0.0)],
+            label.center,
         );
-        let leader = label.leader_to.unwrap();
-        assert!(
-            leader.y.abs() < 1.0,
-            "leader_to should be on edge path (y≈0), got y={}",
-            leader.y
-        );
+        if leader_visible_length(label.center, label.size, closest) < DEFAULT_LEADER_LINE_MIN_LENGTH
+        {
+            assert!(
+                label.leader_to.is_none(),
+                "short visible leader should be omitted"
+            );
+        }
     }
 
     #[test]
-    fn leader_line_none_when_label_not_displaced() {
-        let mut edges = vec![labeled_edge(Point::new(50.0, 100.0))];
+    fn leader_line_set_when_label_far_from_path() {
+        // 标签离路径足够远，可见引线超过最小长度
+        let mut edges = vec![labeled_edge(Point::new(50.0, 40.0))];
         let nodes = HashMap::new();
         let groups = HashMap::new();
 
         resolve_label_overlaps(&mut edges, &nodes, &groups);
 
         assert!(
-            edges[0].labels[0].leader_to.is_none(),
-            "leader_to should be None when label is not displaced"
+            edges[0].labels[0].leader_to.is_some(),
+            "far label should get a leader line"
         );
     }
 
     #[test]
     fn leader_line_points_to_closest_edge_point() {
-        let mut edges = vec![labeled_edge(Point::new(50.0, 20.0))];
+        let mut edges = vec![labeled_edge(Point::new(50.0, 40.0))];
         let nodes = HashMap::new();
         let groups = HashMap::new();
 
@@ -875,7 +953,11 @@ mod tests {
 
     #[test]
     fn multi_label_independent_displacement() {
-        let mut edges = vec![multi_label_edge(&[Point::new(50.0, 0.0), Point::new(50.0, 100.0)])];
+        // 初始即离开路径足够远，使可见引线长度 ≥ DEFAULT_LEADER_LINE_MIN_LENGTH
+        let mut edges = vec![multi_label_edge(&[
+            Point::new(50.0, 40.0),
+            Point::new(50.0, 100.0),
+        ])];
         let nodes = HashMap::new();
         let groups = HashMap::new();
 
@@ -883,11 +965,11 @@ mod tests {
 
         assert!(
             edges[0].labels[0].leader_to.is_some(),
-            "displaced label should have leader_to"
+            "label far from path should have leader_to"
         );
         assert!(
-            edges[0].labels[1].leader_to.is_none(),
-            "non-displaced label should not have leader_to"
+            edges[0].labels[1].leader_to.is_some(),
+            "label farther from the path should also have leader_to"
         );
     }
 

@@ -51,6 +51,7 @@ interface TopBarProps {
   exportActions: ExportActions;
   rasterScale: number;
   onRasterScaleChange: (scale: number) => void;
+  examplesGuideSeen: boolean;
 }
 
 function useClickOutside(ref: React.RefObject<HTMLElement | null>, open: boolean, onClose: () => void) {
@@ -141,6 +142,7 @@ export function TopBar({
   exportActions,
   rasterScale,
   onRasterScaleChange,
+  examplesGuideSeen,
 }: TopBarProps) {
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -202,9 +204,14 @@ export function TopBar({
 
         <span className="topbar-divider" />
 
-        <button type="button" className="btn btn-ghost" onClick={onOpenExamples}>
+        <button
+          type="button"
+          className={`btn btn-soft examples-btn${!examplesGuideSeen ? ' guide-pulse' : ''}`}
+          onClick={onOpenExamples}
+        >
           <IconGallery />
           <span>示例库</span>
+          {!examplesGuideSeen && <span className="guide-badge" />}
         </button>
 
         <button type="button" className="btn btn-ghost" onClick={onOpenDocs}>

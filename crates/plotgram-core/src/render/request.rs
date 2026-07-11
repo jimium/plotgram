@@ -38,7 +38,7 @@ impl<'a> RenderRequest<'a> {
             explicit_graphic_style: None,
             scene_graphic_style: None,
             dark_mode: false,
-            attribution: true,
+            attribution: false, // TODO: 恢复署名时改回 true
             show_title: false,
             transparent_background: false,
             semantic_inference: true,

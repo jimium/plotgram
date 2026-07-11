@@ -23,12 +23,16 @@ fn is_opposite_port_pair(from: Port, to: Port) -> bool {
 /// 2. 遍历所有边，检测正对端口对且节点在切线方向有投影重叠的边。
 /// 3. 若一端是 Single（该侧该方向只有这一条边），调整其锚点切线坐标与另一端对齐。
 /// 4. 若两端都是 Single，取两端节点中心连线的位置作为对齐坐标。
+///
+/// `parallel_offsets`：reverse pair 边的切线偏移；对齐到中线时写入 `center±offset`，
+/// 避免抹平 step2 已施加的正反向分离。
 pub fn straighten_preferred_alignments(
     nodes: &HashMap<String, NodeLayout>,
     n: usize,
     from_side: &[Port],
     to_side: &[Port],
     endpoint_map: &mut HashMap<(usize, bool), Endpoint>,
+    parallel_offsets: &[f64],
 ) {
     use std::collections::HashMap;
 
@@ -118,16 +122,17 @@ pub fn straighten_preferred_alignments(
         match (from_single, to_single) {
             (true, true) => {
                 // 两端都是 Single：取两端节点中心连线位置作为对齐坐标，最自然
-                let target = if vertical {
+                let base = if vertical {
                     let fc = from_nl.x + from_nl.width / 2.0;
                     let tc = to_nl.x + to_nl.width / 2.0;
-                    // 取中点更自然，但若两端中心距离大则偏向中间位置
                     (fc + tc) / 2.0
                 } else {
                     let fc = from_nl.y + from_nl.height / 2.0;
                     let tc = to_nl.y + to_nl.height / 2.0;
                     (fc + tc) / 2.0
                 };
+                let offset = parallel_offsets.get(i).copied().unwrap_or(0.0);
+                let target = base + offset;
                 // 限制目标在节点边的有效范围内
                 let target_clamped = if vertical {
                     let margin = from_nl.width * SLOT_MARGIN_RATIO;
@@ -185,7 +190,7 @@ pub fn straighten_preferred_alignments(
                 };
 
                 if center_aligned {
-                    let target = if vertical {
+                    let base = if vertical {
                         let fc = from_nl.x + from_nl.width / 2.0;
                         let tc = to_nl.x + to_nl.width / 2.0;
                         (fc + tc) / 2.0
@@ -194,6 +199,8 @@ pub fn straighten_preferred_alignments(
                         let tc = to_nl.y + to_nl.height / 2.0;
                         (fc + tc) / 2.0
                     };
+                    let offset = parallel_offsets.get(i).copied().unwrap_or(0.0);
+                    let target = base + offset;
                     let target_clamped_from = if vertical {
                         let margin = from_nl.width * SLOT_MARGIN_RATIO;
                         target.clamp(from_nl.x + margin, from_nl.x + from_nl.width - margin)

@@ -24,6 +24,50 @@ fn opposite_port(p: Port) -> Port {
     }
 }
 
+/// 路径长度 ≤ PORT_CLEARANCE 且终点不在目标节点端口边上 → 非法退化 stub。
+fn is_degenerate_stub_path(points: &[Point], to_nl: &NodeLayout, to_side: Port) -> bool {
+    if points.len() < 2 {
+        return true;
+    }
+    let mut len = 0.0;
+    for w in points.windows(2) {
+        let dx = w[1].x - w[0].x;
+        let dy = w[1].y - w[0].y;
+        len += (dx * dx + dy * dy).sqrt();
+    }
+    if len > PORT_CLEARANCE + 1.0 {
+        return false;
+    }
+    let end = points[points.len() - 1];
+    !point_near_node_port_edge(end, to_nl, to_side)
+}
+
+fn point_near_node_port_edge(p: Point, nl: &NodeLayout, side: Port) -> bool {
+    const TOL: f64 = 2.0;
+    match side {
+        Port::Top => {
+            (p.y - nl.y).abs() <= TOL
+                && p.x >= nl.x - TOL
+                && p.x <= nl.x + nl.width + TOL
+        }
+        Port::Bottom => {
+            (p.y - (nl.y + nl.height)).abs() <= TOL
+                && p.x >= nl.x - TOL
+                && p.x <= nl.x + nl.width + TOL
+        }
+        Port::Left => {
+            (p.x - nl.x).abs() <= TOL
+                && p.y >= nl.y - TOL
+                && p.y <= nl.y + nl.height + TOL
+        }
+        Port::Right => {
+            (p.x - (nl.x + nl.width)).abs() <= TOL
+                && p.y >= nl.y - TOL
+                && p.y <= nl.y + nl.height + TOL
+        }
+    }
+}
+
 /// 检测单个端点是否存在反向stub。
 ///
 /// 反向stub的两种情况：
@@ -257,21 +301,39 @@ pub fn fix_reverse_stub_ports(
             continue;
         }
         let points: Vec<Point> = edges[ei].path_points().into_owned();
+        let Some(to_ep) = endpoint_map.get(&(ei, false)) else {
+            continue;
+        };
+        let Some(to_nl) = nodes.get(&to_ep.node_id) else {
+            continue;
+        };
+
+        // 退化 stub：路径极短且终点不在目标节点端口边 → 强制翻正对端口
+        let degenerate = is_degenerate_stub_path(&points, to_nl, to_side[ei]);
+
         let from_rev = has_reverse_stub(&points, 0, from_side[ei]);
         let to_rev = has_reverse_stub(&points, points.len() - 1, to_side[ei]);
-        let from_side_approach = if from_rev { None } else { detect_side_approach(&points, 0, from_side[ei]) };
-        let to_side_approach = if to_rev { None } else { detect_side_approach(&points, points.len() - 1, to_side[ei]) };
+        let from_side_approach = if from_rev || degenerate {
+            None
+        } else {
+            detect_side_approach(&points, 0, from_side[ei])
+        };
+        let to_side_approach = if to_rev || degenerate {
+            None
+        } else {
+            detect_side_approach(&points, points.len() - 1, to_side[ei])
+        };
         let orig_from_side = from_side_approach.is_some();
         let orig_to_side = to_side_approach.is_some();
 
-        let from_fix = if from_rev {
+        let from_fix = if from_rev || degenerate {
             PortFix::Flip
         } else if let Some(suggested) = from_side_approach {
             PortFix::Rotate(suggested)
         } else {
             PortFix::None
         };
-        let to_fix = if to_rev {
+        let to_fix = if to_rev || degenerate {
             PortFix::Flip
         } else if let Some(suggested) = to_side_approach {
             PortFix::Rotate(suggested)
@@ -447,8 +509,10 @@ pub fn fix_reverse_stub_ports(
                 };
                 let no_reverse = !new_from_rev && !new_to_rev;
                 let new_len = path_length(&candidate);
+                let still_degenerate = is_degenerate_stub_path(&candidate, to_nl, new_to);
                 // 允许最长比原路径长20%，但优先选择更短的路径
-                let len_ok = new_len <= old_path_len * 1.2 + 60.0;
+                let len_ok = new_len <= old_path_len * 1.2 + 60.0
+                    || is_degenerate_stub_path(&old_points, to_nl, old_to);
 
                 // 接受条件：
                 // 1. 路径干净（不穿过节点/组内部）
@@ -458,6 +522,7 @@ pub fn fix_reverse_stub_ports(
                 //    a) 总side_approach问题数减少
                 //    b) 总side_approach问题数不变且路径更短
                 //    c) 路径明显更短（<0.9倍原长）
+                //    d) 原路径为退化 stub，新路径非退化
                 let new_from_has_side = new_from_side.is_some();
                 let new_to_has_side = new_to_side.is_some();
                 let new_side_problems = (new_from_has_side as i32) + (new_to_has_side as i32);
@@ -465,8 +530,12 @@ pub fn fix_reverse_stub_ports(
                 let side_problems_same_or_better = new_side_problems <= orig_side_problems;
                 let shorter = new_len < old_path_len;
                 let significantly_shorter = new_len < old_path_len * 0.9;
+                let fixes_degenerate =
+                    is_degenerate_stub_path(&old_points, to_nl, old_to) && !still_degenerate;
 
-                let accept = if side_problems_improved {
+                let accept = if fixes_degenerate {
+                    true
+                } else if side_problems_improved {
                     true
                 } else if side_problems_same_or_better && shorter {
                     true
@@ -476,7 +545,7 @@ pub fn fix_reverse_stub_ports(
                     false
                 };
 
-                if clean && no_reverse && len_ok && accept {
+                if clean && no_reverse && !still_degenerate && len_ok && accept {
                     let better = match &best {
                         None => true,
                         Some((_, _, _, _, _, best_len)) => new_len < *best_len,
@@ -497,10 +566,9 @@ pub fn fix_reverse_stub_ports(
 
                 let labels = match relations.get(ei) {
                     Some(rel) => {
-                        let middle_t = parse_label_t(rel);
-                        build_edge_labels(rel, middle_t, Point::new(0.0, 0.0), |t| {
-                            point_at_path_t(&candidate, t)
-                        })
+                        crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto(
+                            rel, ei, relations, &candidate,
+                        )
                     }
                     None => Vec::new(),
                 };

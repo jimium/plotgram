@@ -493,17 +493,21 @@ fn orthogonal_degraded_fallback(
     let ey = end.y;
 
     let mut candidates: Vec<Vec<Point>> = Vec::new();
-    // 同轴直线仅在不穿无关节点时作为候选（禁止静默穿障变直）
+    // 同轴直线仅在不穿无关节点、且真正跨到对端时作为候选（禁止 16px stub 退化）
     if (sx - ex).abs() < EPS || (sy - ey).abs() < EPS {
         let straight = ensure_port_stubs(vec![start, end], from_side, to_side);
-        if path_is_clean(
-            &straight,
-            from_id,
-            to_id,
-            ctx.nodes,
-            ctx.group_ctx,
-            &ctx.obstacles.sorted_node_ids,
-        ) {
+        let plen = path_length(&straight);
+        let spans = plen > PORT_CLEARANCE + 1.0;
+        if spans
+            && path_is_clean(
+                &straight,
+                from_id,
+                to_id,
+                ctx.nodes,
+                ctx.group_ctx,
+                &ctx.obstacles.sorted_node_ids,
+            )
+        {
             return straight;
         }
     } else {

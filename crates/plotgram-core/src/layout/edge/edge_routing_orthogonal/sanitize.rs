@@ -12,9 +12,7 @@ use super::path::port_outward;
 use super::simplify::simplify_path;
 use super::{EPS, PORT_CLEARANCE};
 use crate::ast::Relation;
-use crate::layout::edge::common::edge_geometry::{
-    build_edge_labels, parse_label_t, point_at_path_t,
-};
+use crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, PathGeometry, Port};
 
@@ -45,12 +43,7 @@ pub fn sanitize_orthogonal_edges(
         }
 
         let labels = match relations.get(ei) {
-            Some(rel) => {
-                let middle_t = parse_label_t(rel);
-                build_edge_labels(rel, middle_t, Point::new(0.0, 0.0), |t| {
-                    point_at_path_t(&points, t)
-                })
-            }
+            Some(rel) => build_parallel_aware_edge_labels_auto(rel, ei, relations, &points),
             None => Vec::new(),
         };
 

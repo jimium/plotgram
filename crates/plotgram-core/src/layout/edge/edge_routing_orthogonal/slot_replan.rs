@@ -241,8 +241,9 @@ pub fn replan_slots(
         let labels = if path.len() >= 2 {
             match relations.get(ei) {
                 Some(rel) => {
-                    let middle_t = parse_label_t(rel);
-                    build_edge_labels(rel, middle_t, Point::new(0.0, 0.0), |t| point_at_path_t(&path, t))
+                    crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto(
+                        rel, ei, relations, &path,
+                    )
                 }
                 None => Vec::new(),
             }

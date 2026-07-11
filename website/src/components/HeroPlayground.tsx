@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EditorState } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
@@ -102,6 +102,13 @@ const PRESETS: Preset[] = [
   },
 ];
 
+const MIN_SCALE = 0.1;
+const MAX_SCALE = 8;
+
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v));
+}
+
 function formatErrors(errors: DiagnosticErrorJson[]): string {
   if (errors.length === 0) return '';
   const first = errors[0];
@@ -175,6 +182,20 @@ export default function HeroPlayground() {
   const sourceRef = useRef(source);
   sourceRef.current = source;
 
+  // 预览缩放/平移
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [tx, setTx] = useState(0);
+  const [ty, setTy] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+  const txRef = useRef(tx);
+  txRef.current = tx;
+  const tyRef = useRef(ty);
+  tyRef.current = ty;
+  const dragStateRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number } | null>(null);
+
   useEffect(() => {
     if (!editorHostRef.current) return;
     const state = EditorState.create({
@@ -229,6 +250,157 @@ export default function HeroPlayground() {
     return () => clearTimeout(timer);
   }, [source, wasm]);
 
+  // 缩放/平移逻辑（与 AGENT 预览区行为一致）
+  const zoomAt = useCallback((centerX: number, centerY: number, factor: number) => {
+    setScale((prevScale) => {
+      const nextScale = clamp(prevScale * factor, MIN_SCALE, MAX_SCALE);
+      if (nextScale === prevScale) return prevScale;
+      setTx(centerX - (centerX - txRef.current) * (nextScale / prevScale));
+      setTy(centerY - (centerY - tyRef.current) * (nextScale / prevScale));
+      return nextScale;
+    });
+  }, []);
+
+  const fitToView = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || !svg) return;
+    const svgEl = container.querySelector('svg');
+    if (!svgEl) return;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const viewBox = svgEl.viewBox.baseVal;
+    let naturalW: number;
+    let naturalH: number;
+    if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+      naturalW = viewBox.width;
+      naturalH = viewBox.height;
+    } else {
+      const bbox = svgEl.getBoundingClientRect();
+      const curScale = scaleRef.current || 1;
+      naturalW = bbox.width / curScale;
+      naturalH = bbox.height / curScale;
+    }
+    if (naturalW === 0 || naturalH === 0) return;
+    const padding = 32;
+    const nextScale = clamp(
+      Math.min((cw - padding) / naturalW, (ch - padding) / naturalH),
+      MIN_SCALE,
+      MAX_SCALE,
+    );
+    setScale(nextScale);
+    setTx((cw - naturalW * nextScale) / 2);
+    setTy((ch - naturalH * nextScale) / 2);
+  }, [svg]);
+
+  const resetTo100 = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || !svg) return;
+    const svgEl = container.querySelector('svg');
+    if (!svgEl) return;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const viewBox = svgEl.viewBox.baseVal;
+    let naturalW: number;
+    let naturalH: number;
+    if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+      naturalW = viewBox.width;
+      naturalH = viewBox.height;
+    } else {
+      const bbox = svgEl.getBoundingClientRect();
+      naturalW = bbox.width / (scaleRef.current || 1);
+      naturalH = bbox.height / (scaleRef.current || 1);
+    }
+    if (naturalW === 0 || naturalH === 0) return;
+    setScale(1);
+    setTx((cw - naturalW) / 2);
+    setTy((ch - naturalH) / 2);
+  }, [svg]);
+
+  const zoomByButton = useCallback(
+    (factor: number) => {
+      const container = containerRef.current;
+      if (!container) return;
+      zoomAt(container.clientWidth / 2, container.clientHeight / 2, factor);
+    },
+    [zoomAt],
+  );
+
+  // SVG 变化时自适应
+  useEffect(() => {
+    if (svg) {
+      requestAnimationFrame(fitToView);
+    }
+  }, [svg, fitToView]);
+
+  // 滚轮：ctrlKey=缩放，普通滚动=平移
+  // 始终阻止预览区内的 pinch zoom 冒泡到浏览器，避免整页缩放
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const listener = (e: WheelEvent) => {
+      // ctrlKey(pinch zoom) 始终阻止默认行为,避免浏览器缩放整页
+      if (e.ctrlKey) e.preventDefault();
+      if (!svg) return;
+      if (!e.ctrlKey) e.preventDefault();
+      if (e.ctrlKey) {
+        const rect = container.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const factor = Math.exp(-e.deltaY * 0.01);
+        zoomAt(cx, cy, factor);
+      } else {
+        setTx((prev) => prev - e.deltaX);
+        setTy((prev) => prev - e.deltaY);
+      }
+    };
+    // Safari 的 pinch 通过 gesturestart/gesturechange 触发
+    const gestureHandler = (e: Event) => e.preventDefault();
+    container.addEventListener('wheel', listener, { passive: false });
+    container.addEventListener('gesturestart', gestureHandler, { passive: false });
+    container.addEventListener('gesturechange', gestureHandler, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', listener);
+      container.removeEventListener('gesturestart', gestureHandler);
+      container.removeEventListener('gesturechange', gestureHandler);
+    };
+  }, [svg, zoomAt]);
+
+  // 拖拽平移
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (!svg) return;
+      if (e.button !== 0) return;
+      dragStateRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startTx: txRef.current,
+        startTy: tyRef.current,
+      };
+      setIsDragging(true);
+    },
+    [svg],
+  );
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: MouseEvent) => {
+      const s = dragStateRef.current;
+      if (!s) return;
+      setTx(s.startTx + (e.clientX - s.startX));
+      setTy(s.startTy + (e.clientY - s.startY));
+    };
+    const onUp = () => {
+      dragStateRef.current = null;
+      setIsDragging(false);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [isDragging]);
+
   const status = useMemo(() => {
     if (wasmError) return { kind: 'error' as const, text: `WASM 加载失败：${wasmError}` };
     if (!ready) return { kind: 'loading' as const, text: '正在加载渲染引擎…' };
@@ -265,9 +437,20 @@ export default function HeroPlayground() {
           <div className="hero-editor" ref={editorHostRef} />
         </div>
         <div className="hero-preview">
-          <div className="hero-preview-canvas">
+          <div
+            ref={containerRef}
+            className="hero-preview-canvas"
+            onMouseDown={handleMouseDown}
+            style={{
+              cursor: isDragging ? 'grabbing' : svg ? 'grab' : 'default',
+            }}
+          >
             {svg ? (
-              <div className="hero-svg-host" dangerouslySetInnerHTML={{ __html: svg }} />
+              <div
+                className="hero-svg-host"
+                style={{ transform: `translate(${tx}px, ${ty}px) scale(${scale})` }}
+                dangerouslySetInnerHTML={{ __html: svg }}
+              />
             ) : (
               <div className="hero-preview-placeholder">
                 {status.kind === 'loading' ? (
@@ -277,6 +460,16 @@ export default function HeroPlayground() {
                 ) : (
                   <span>等待渲染…</span>
                 )}
+              </div>
+            )}
+            {svg && (
+              <div className="hero-preview-toolbar">
+                <button onClick={() => zoomByButton(1 / 1.1)} aria-label="缩小">−</button>
+                <button onClick={resetTo100} aria-label="重置为 100%">
+                  {Math.round(scale * 100)}%
+                </button>
+                <button onClick={() => zoomByButton(1.1)} aria-label="放大">+</button>
+                <button onClick={fitToView} aria-label="适应窗口">适应</button>
               </div>
             )}
           </div>

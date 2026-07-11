@@ -3,6 +3,6 @@
   <path stroke="currentColor" stroke-width="1.65" stroke-linecap="round" d="M4.5 9h15" />
   <circle cx="7" cy="7" r="0.65" fill="currentColor" />
   <circle cx="9.25" cy="7" r="0.65" fill="currentColor" />
-  <path stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" d="M10 14h4M12 12v4" />
+  <circle cx="11.5" cy="7" r="0.65" fill="currentColor" />
 </g>
 </svg>

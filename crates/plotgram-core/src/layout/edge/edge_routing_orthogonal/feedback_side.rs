@@ -57,13 +57,19 @@ pub fn assign_feedback_sides(
             continue;
         };
 
+        let rank_span = rank_span_for_edge(rel, ranks, from_nl, to_nl, horizontal);
+        // 相邻层且投影重叠：走几何正对端口，不进侧通道桶。
+        // 避免共列节点上 Left→Left 退化成 PORT_CLEARANCE stub。
+        if prefers_opposite_ports_over_side_channel(from_nl, to_nl, rank_span, horizontal) {
+            continue;
+        }
+
         let centroid = if horizontal {
             (from_nl.y + from_nl.height / 2.0 + to_nl.y + to_nl.height / 2.0) / 2.0
         } else {
             (from_nl.x + from_nl.width / 2.0 + to_nl.x + to_nl.width / 2.0) / 2.0
         };
 
-        let rank_span = rank_span_for_edge(rel, ranks, from_nl, to_nl, horizontal);
         if centroid < graph_center {
             left_bucket.push((edge_index, rank_span));
         } else {
@@ -205,6 +211,52 @@ fn detour_side(horizontal: bool, low_side: bool) -> Port {
 
 fn same_side_ports(side: Port) -> (Port, Port) {
     (side, side)
+}
+
+/// 相邻层 + 切线方向投影重叠（或间隙 < 16px）时，反馈边应走正对端口而非侧通道。
+const OPPOSITE_PORT_GAP_THRESHOLD: f64 = 16.0;
+
+fn prefers_opposite_ports_over_side_channel(
+    from_nl: &NodeLayout,
+    to_nl: &NodeLayout,
+    rank_span: usize,
+    horizontal: bool,
+) -> bool {
+    if rank_span > 1 {
+        return false;
+    }
+    let (overlap, gap) = if horizontal {
+        // LR：切线为 y
+        let a0 = from_nl.y;
+        let a1 = from_nl.y + from_nl.height;
+        let b0 = to_nl.y;
+        let b1 = to_nl.y + to_nl.height;
+        let overlap = (a1.min(b1) - a0.max(b0)).max(0.0);
+        let gap = if a1 < b0 {
+            b0 - a1
+        } else if b1 < a0 {
+            a0 - b1
+        } else {
+            0.0
+        };
+        (overlap, gap)
+    } else {
+        // TB：切线为 x
+        let a0 = from_nl.x;
+        let a1 = from_nl.x + from_nl.width;
+        let b0 = to_nl.x;
+        let b1 = to_nl.x + to_nl.width;
+        let overlap = (a1.min(b1) - a0.max(b0)).max(0.0);
+        let gap = if a1 < b0 {
+            b0 - a1
+        } else if b1 < a0 {
+            a0 - b1
+        } else {
+            0.0
+        };
+        (overlap, gap)
+    };
+    overlap > 0.0 || gap < OPPOSITE_PORT_GAP_THRESHOLD
 }
 
 fn assign_bucket_hints(
