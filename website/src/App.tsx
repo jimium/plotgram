@@ -6,6 +6,7 @@ import AgentGuide from './pages/AgentGuide';
 import HowItWorks from './pages/HowItWorks';
 import TraeStory from './pages/TraeStory';
 import Faq from './pages/Faq';
+import Roadmap from './pages/Roadmap';
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="docs/agent-guide" element={<AgentGuide />} />
           <Route path="docs/how-it-works" element={<HowItWorks />} />
           <Route path="docs/trae-story" element={<TraeStory />} />
+          <Route path="docs/roadmap" element={<Roadmap />} />
           <Route path="docs/faq" element={<Faq />} />
         </Route>
       </Routes>

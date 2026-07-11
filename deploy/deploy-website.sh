@@ -75,6 +75,10 @@ stage_artifacts() {
   mkdir -p "$STAGING_DIR/demo-root/assets/brand"
   rsync -a "$ROOT_DIR/assets/brand/" "$STAGING_DIR/demo-root/assets/brand/"
 
+  # 根目录：其他静态资源（svg 等，不走 CDN）
+  rsync -a --include='*.svg' --exclude='*' \
+    "$WEBSITE_DIR/dist/assets/" "$STAGING_DIR/demo-root/assets/"
+
   # CDN：website 打包 assets（js / css），保留 assets/ 子目录层级
   mkdir -p "$STAGING_DIR/cdn-website/assets"
   rsync -a --delete \

@@ -1321,6 +1321,122 @@ a {
   color: var(--text-secondary);
 }
 
+/* ===== ROADMAP ===== */
+.roadmap-item {
+  padding: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin: 20px 0;
+}
+
+.roadmap-item-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.roadmap-item-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.roadmap-item-header h2 {
+  margin: 0;
+  font-size: 18px;
+  flex: 1;
+}
+
+.roadmap-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.roadmap-status-planning {
+  background: rgba(124, 58, 237, 0.1);
+  color: var(--brand-purple);
+}
+
+.roadmap-status-planned {
+  background: rgba(6, 182, 212, 0.1);
+  color: var(--brand-cyan);
+}
+
+.roadmap-status-exploring {
+  background: rgba(148, 163, 184, 0.15);
+  color: #64748B;
+}
+
+.roadmap-item p {
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.roadmap-item ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.roadmap-item li {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 4px 0;
+}
+
+.roadmap-demo {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.roadmap-demo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+.roadmap-demo-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.roadmap-demo-replay {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.roadmap-demo-replay:hover {
+  border-color: var(--brand-purple);
+  color: var(--brand-purple);
+  background: rgba(124, 58, 237, 0.06);
+}
+
+.roadmap-demo-iframe {
+  display: block;
+  width: 100%;
+  height: 210px;
+  border: none;
+}
+
 /* ===== TECH ALGO CARDS ===== */
 .algo-card {
   padding: 28px;

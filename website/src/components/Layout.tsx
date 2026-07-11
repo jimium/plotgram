@@ -72,6 +72,8 @@ export default function Layout() {
             <a href="/docs/getting-started/">快速上手</a>
             <a href="/docs/agent-guide/">Agent 集成</a>
             <a href="/docs/how-it-works/">技术揭秘</a>
+            <a href="/docs/trae-story/">TRAE 开发实践</a>
+            <a href="/docs/roadmap/">路线图</a>
             <a href="/docs/faq/">FAQ</a>
           </div>
         </div>

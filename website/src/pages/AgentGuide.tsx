@@ -121,10 +121,10 @@ export default function AgentGuide() {
       </div>
 
       <h2>为什么 AI 需要专门的图表语言</h2>
-      <p>传统图表语言（如 Mermaid）面向人类手写设计，语法体系庞大、隐式规则繁多，LLM 生成时失败率居高不下。我们在实测中发现，使用通用模型生成 Mermaid 图表的首次成功率仅约 70%，且错误难以自修复。</p>
+      <p>传统图表语言（如 Mermaid）面向人类手写设计，语法体系庞大、隐式规则繁多，LLM 生成时容易出错，且错误难以自修复。</p>
       <p>具体来说，AI 生成图表面临三大核心痛点：</p>
       <ul>
-        <li><strong>语法变体过多</strong>：仅箭头就有 10+ 种写法，LLM 容易混淆导致约 30% 的生成直接失败</li>
+        <li><strong>语法变体过多</strong>：仅箭头就有 10+ 种写法，LLM 容易混淆导致生成失败</li>
         <li><strong>错误反馈模糊</strong>：文本错误信息或静默失败，Agent 无法定位问题，自我修复极其困难</li>
         <li><strong>增量修改代价高</strong>：纯文本输出没有结构语义，微小修改也需要完整重新生成，容易引入新错误</li>
       </ul>
@@ -162,11 +162,6 @@ export default function AgentGuide() {
             <td>增量修改</td>
             <td>不支持</td>
             <td>AST Patch</td>
-          </tr>
-          <tr>
-            <td>正确率（实测）</td>
-            <td>~70%</td>
-            <td>95%+</td>
           </tr>
         </tbody>
       </table>

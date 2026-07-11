@@ -196,7 +196,7 @@ export default function GettingStarted() {
       </table>
 
       <h2>三种箭头，固定语义</h2>
-      <p>Plotgram 刻意只保留 3 种箭头，让 AI 和人类都能准确表达数据流含义，没有歧义。这是 LLM 生成正确率高的关键设计之一。</p>
+      <p>Plotgram 刻意只保留 3 种箭头，让 AI 和人类都能准确表达数据流含义，没有歧义。这是 LLM 一次写对的关键设计之一。</p>
       <div className="doc-feature-grid">
         <div className="doc-feature-card">
           <div className="icon">→</div>
