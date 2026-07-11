@@ -233,7 +233,7 @@ export default function HeroPlayground() {
     if (wasmError) return { kind: 'error' as const, text: `WASM 加载失败：${wasmError}` };
     if (!ready) return { kind: 'loading' as const, text: '正在加载渲染引擎…' };
     if (renderError) return { kind: 'dsl-error' as const, text: renderError };
-    return { kind: 'ok' as const, text: '实时渲染中 · 修改代码即时预览' };
+    return { kind: 'ok' as const, text: '实时渲染 · 修改代码即时预览' };
   }, [wasmError, ready, renderError]);
 
   return (

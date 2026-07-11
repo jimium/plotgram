@@ -169,7 +169,7 @@ group backend "后端" {
 1. **fan-out**：某节点组内出度 ≥ 2  
 2. **fan-in**：某节点组内入度 ≥ 2，且没有明显 fan-out  
 3. **grid**：无内部边，且成员 ≥ 3（避免一行排太扁）  
-4. **vertical**：简单链（A→B→C）  
+4. **简单链**：成员 ≤ 2 → **vertical**（gateway→lb 等短栈）；成员 ≥ 3 → **horizontal**（避免与 architecture 组间上→下叠加成过高图）  
 5. **Sugiyama**：其余有边的复杂拓扑（分层布局，非 DSL 字面量）
 
 架构图还有**命名启发式**（仅当仍为 `auto` 时）：
@@ -177,7 +177,7 @@ group backend "后端" {
 - id 含 `public_subnet` → 倾向 `vertical`  
 - id 含 `data_subnet` → 倾向 `grid`
 
-**用途**：草稿阶段省事；拓扑清晰时结果通常够用。若推断与意图不符，再改成显式值。
+**用途**：草稿阶段省事；拓扑清晰时结果通常够用。长链若仍要竖排，显式写 `layout: vertical`。
 
 #### `horizontal` / `h`
 

@@ -177,6 +177,12 @@ fn detect_auto_mode(
     }
 
     if is_simple_chain(members, graph, reversed, &member_set) {
+        // 短链（≤2）竖排：保留 gateway→lb 等习惯。
+        // 长链（≥3）横排：architecture 组间已按 macro rank 上→下时，
+        // 组内再竖排会叠成过高图（如供应链每组 4 节点链）。
+        if members.len() >= 3 {
+            return GroupLayoutMode::Horizontal;
+        }
         return GroupLayoutMode::Vertical;
     }
 
@@ -321,7 +327,7 @@ fn is_simple_chain(
 
     // 链式：无分叉点（入度>1），且总边数约为 n-1。
     // 注意：fan-in 模式（多源 → 单汇）的 in_deg_gt1 ≥ 1，不应视为链式，
-    // 否则会被误判为 Vertical 产生过高的单列布局。
+    // 否则会被误判为单列布局。长链的横/竖选择见 detect_auto_mode。
     in_deg_gt1 == 0 && out_deg >= members.len().saturating_sub(1)
 }
 
@@ -661,6 +667,34 @@ mod tests {
             GroupLayoutMode::FanIn { sink } => assert_eq!(sink, "grafana"),
             other => panic!("expected FanIn, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn auto_short_chain_prefers_vertical() {
+        let (graph, members) = member_graph(&[("gw", "lb")]);
+        let reversed = HashSet::new();
+        let mode = detect_auto_mode(&members, &graph, &reversed);
+        assert_eq!(mode, GroupLayoutMode::Vertical);
+    }
+
+    #[test]
+    fn auto_long_chain_prefers_horizontal() {
+        let (graph, members) = member_graph(&[
+            ("a", "b"),
+            ("b", "c"),
+            ("c", "d"),
+        ]);
+        let reversed = HashSet::new();
+        let mode = detect_auto_mode(&members, &graph, &reversed);
+        assert_eq!(mode, GroupLayoutMode::Horizontal);
+    }
+
+    #[test]
+    fn auto_three_node_chain_prefers_horizontal() {
+        let (graph, members) = member_graph(&[("a", "b"), ("b", "c")]);
+        let reversed = HashSet::new();
+        let mode = detect_auto_mode(&members, &graph, &reversed);
+        assert_eq!(mode, GroupLayoutMode::Horizontal);
     }
 
     #[test]
