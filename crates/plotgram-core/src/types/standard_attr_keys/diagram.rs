@@ -13,7 +13,10 @@ pub const LAYOUT: &str = "layout";
 pub const EDGE_ROUTING: &str = "edge_routing";
 /// Group Frame 统一配置块（组间宏观几何的唯一 DSL 入口）
 ///
-/// 语法：`group_frame: stack { axis: horizontal, gap: 48, track: equal, cross: start, snap: 8 }`
+/// 语法：
+/// - 完整：`group_frame: stack { axis: horizontal, gap: 48, track: equal, … }`
+/// - 场景短名：`group_frame: strips` / `lanes` / `fit` / `stages` / `tiles`
+/// - 短名可覆盖：`group_frame: strips { gap: 60 }`
 pub const GROUP_FRAME: &str = "group_frame";
 
 // 解析策略：`parse_atom_attribute_value`

@@ -82,18 +82,28 @@ diagram architecture {
 | `direction` | **不支持** | 默认布局不消费 `direction`；写了会校验报错 |
 | 样式方案 | 主题决定 | 常用蓝图/技术图纸感主题 |
 
-含 `group` 时，用 `group_frame` 控制组间条带（默认同级等宽）。**不要**用 `direction: left-to-right` 表达「层从左到右」——应写：
+含 `group` 时，用 `group_frame` 控制等宽/对齐等（默认接近 `strips`）。**层与层谁上谁下**由拓扑 **macro rank** 决定（上→下），不是 `direction`，也不是把所有 group 横排。
 
 ```plotgram
 config {
-    group_frame: stack {
-        axis: horizontal   // 顶层 group 从左到右排
-        track: equal
-    }
+    group_frame: strips   // 等宽条带；链状图仍是竖列，见下
 }
 ```
 
-详见 [group-layout-and-frame.md](../../../guides/group-layout-and-frame.md)。
+```text
+链状（每层 1 group）          同行多 group
+┌──────────┐                 ┌────┐ ┌────┐
+│ 上游      │                 │ A  │ │ B  │  ← 同 rank，左右
+└────┬─────┘                 └──┬─┘ └─┬──┘
+┌────▼─────┐                    └──┬──┘
+│ 运营      │                 ┌────▼────┐
+└────┬─────┘                 │    C     │
+┌────▼─────┐                 └─────────┘
+│ 下游      │
+└──────────┘
+```
+
+详见 [group-layout-and-frame.md §1](../../../guides/group-layout-and-frame.md#1-architecture-macro-rank必读)（rank 与 `axis: horizontal` 的含义）。
 
 ---
 

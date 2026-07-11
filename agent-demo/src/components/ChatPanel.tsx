@@ -33,13 +33,6 @@ interface ChatPanelProps {
   onReset: () => void;
 }
 
-const SUGGESTIONS = [
-  { icon: '🛒', text: '画一个电商下单流程图' },
-  { icon: '🏗️', text: '画一个微服务架构图' },
-  { icon: '⏱️', text: '画一个 OAuth2 时序图' },
-  { icon: '🔄', text: '画一个订单状态机' },
-];
-
 export function ChatPanel({
   messages,
   isRunning,
@@ -98,14 +91,6 @@ export function ChatPanel({
     [isRunning, onSend],
   );
 
-  const handleSuggestion = useCallback(
-    (text: string) => {
-      if (isRunning) return;
-      setInput(text);
-    },
-    [isRunning],
-  );
-
   const isEmpty = messages.length === 0 && !isRunning;
 
   return (
@@ -148,21 +133,6 @@ export function ChatPanel({
                 用自然语言描述你想要的图表<br />
                 Plotgram Agent 会自动生成、修改、迭代
               </p>
-            </div>
-
-            <div className="chat-suggestions">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s.text}
-                  type="button"
-                  className="chat-suggestion-btn"
-                  onClick={() => handleSuggestion(s.text)}
-                  disabled={isRunning}
-                >
-                  <span className="chat-suggestion-icon">{s.icon}</span>
-                  <span className="chat-suggestion-text">{s.text}</span>
-                </button>
-              ))}
             </div>
 
             <ExamplePicker onPick={handlePickExample} disabled={isRunning} hasChart={hasChart} />

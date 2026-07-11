@@ -215,7 +215,7 @@ diagram flowchart {
 | `edge_routing` | atom 或配置块        | 见边路由算法表 | 由图表类型决定 | 边路由算法及可选参数 |
 | `theme`        | atom             | 内置主题 ID（见主题系统规范），如 `common.clean-light`、`common.blueprint`、`mindmap.vivid-branches` | 由图表类型 profile 决定      | 颜色/字体主题（对应 StyleSheet 的 `id` 字段） |
 | `render_style`| atom             | `standard`, `excalidraw`, `cross-hatch`, `blueprint`, `spatial-clarity`, `neon-glow`, `stipple` | `standard` | 笔触皮肤（与 theme 分工：theme 管颜色，render_style 管绘制风格） |
-| `group_frame`  | atom 或配置块        | `stack { ... }` \| `matrix { ... }` | 由算法默认决定 | Group Frame：**组间几何唯一入口**（见 §4.6） |
+| `group_frame`  | atom 或配置块        | 场景短名 `strips`/`fit`/`lanes`/`stages`/`tiles`，或 `stack { … }` / `matrix { … }` | 由算法默认决定 | Group Frame：**组间几何唯一入口**（见 §4.6） |
 | `snap`         | boolean          | `true`, `false` | `true` | 边路由后像素量化开关（`group_frame` sugar，建议直接使用 `group_frame` 的 `snap` 选项） |
 | `align`        | boolean / atom   | `true`, `false`, `rank`, `layer`, `full`, `off` | `true` | 节点结构对齐（L3 Node Frame）：rank/layer 轴独立控制，路由前执行（见 §4.8） |
 
@@ -261,20 +261,35 @@ diagram flowchart {
 | `mindmap` | `radial`, `top-to-bottom`, `left-to-right` | 默认多为 `left-to-right` |
 | `architecture` / `sequence` / `state` / `force-directed` / `circular` | — | **不支持** `direction`；显式声明将报错 |
 
-> **架构图注意**：默认布局 `architecture` 不读 `direction`。层间/组间左右排列请用 `group_frame: stack { axis: horizontal }`（与 flowchart 的 `direction: left-to-right` 不是同一概念）。详见 [group-layout-and-frame.md](../../guides/group-layout-and-frame.md)。
+> **架构图注意**：默认布局 `architecture` **不读** `direction`。层间上下由拓扑 **macro rank**（上→下）决定；`group_frame: strips` / `axis: horizontal` 管的是**同行**处理与等宽条带，**不会**把链状分层改成整图左右流。详见 [group-layout-and-frame.md §1](../../guides/group-layout-and-frame.md#1-architecture-macro-rank必读)。
 
 ### 4.6 `group_frame` 统一配置块（新增）
 
 `group_frame` 是组间宏观几何的**唯一** DSL 入口。旧属性 `group_sizing` / `group_arrangement` / `group_gap` / `group_align` **已移除**。
 
-> 选项能力与用途详解：[group-layout-and-frame.md](../../guides/group-layout-and-frame.md)
+> 选项能力与场景短名：[group-layout-and-frame.md](../../guides/group-layout-and-frame.md)
 
 **语法：**
 
 ```
-<group_frame_config> ::= <group_frame_arrangement>
-<group_frame_arrangement> ::= "stack" "{" <stack_option>* "}" | "matrix" "{" <matrix_option>* "}"
+<group_frame_config> ::= <group_frame_arrangement> | <group_frame_preset>
+<group_frame_arrangement> ::= "stack" "{" <stack_option>* "}"
+                            | "matrix" "{" <matrix_option>* "}"
+<group_frame_preset> ::= <preset_name> [ "{" <stack_or_matrix_option>* "}" ]
+<preset_name> ::= "strips" | "fit" | "lanes" | "stages" | "tiles"
 ```
+
+**场景短名（推荐日常使用）：**
+
+| 短名 | 场景 | 展开为 |
+| --- | --- | --- |
+| `strips` | 分层条带（等宽；architecture 层间仍上→下） | `stack { axis: horizontal, track: equal, cross: center, border: shared }` |
+| `fit` | 内容贴合 | `stack { axis: horizontal, track: fit }` |
+| `lanes` | 水平泳道 | `stack { axis: horizontal, cross: start, gap: 80 }` |
+| `stages` | 纵向阶段 | `stack { axis: vertical, track: fit, cross: center }` |
+| `tiles` | 固定网格 | `matrix { cols: 2, rows: 2, track: equal, gap: 48 }` |
+
+短名可带选项块覆盖单项，例如 `group_frame: strips { gap: 60 }`、`group_frame: tiles { cols: 3 }`。
 
 **`stack` 选项（一维堆叠排列）：**
 
@@ -287,14 +302,14 @@ diagram flowchart {
 | `border` | atom | `none`, `shared`/`shared_lines` | `none` (flowchart) / `shared` (architecture) | 边框共线策略 |
 | `snap` | boolean/number | `true`, `false`, 步长数值 | `true` (步长 8px) | 像素量化开关/步长 |
 
-**`matrix` 选项（二期，二维网格排列）：**
+**`matrix` 选项（二维网格排列）：**
 
 | 选项 | 类型 | 可选值 | 默认值 | 说明 |
 | --- | --- | --- | --- | --- |
-| `rows` | number | 正整数 | 自动推断 | 网格行数 |
-| `cols` | number | 正整数 | 自动推断（接近正方形） | 网格列数 |
-| `gap` | number | 正数 | 60 | 组间间距 |
-| `track` | atom/number | `fit`, `equal`/`uniform` | `fit` | 单元格尺寸策略 |
+| `rows` | number | 正整数 | 自动推断；`tiles` 默认 2 | 网格行数 |
+| `cols` | number | 正整数 | 自动推断；`tiles` 默认 2 | 网格列数 |
+| `gap` | number | 正数 | 60；`tiles` 默认 48 | 组间间距 |
+| `track` | atom/number | `fit`, `equal`/`uniform` | `fit`；`tiles` 默认 `equal` | 单元格尺寸策略 |
 | `cross` | atom | `start`, `center`, `end` | `center` | 单元格内对齐 |
 | `snap` | boolean/number |  | `true` | 像素量化 |
 
@@ -304,13 +319,7 @@ diagram flowchart {
 diagram architecture {
     title: "微服务架构"
     config {
-        group_frame: stack {
-            axis: horizontal
-            gap: 50
-            track: equal
-            cross: start
-            border: shared
-        }
+        group_frame: strips { gap: 50 }   // 场景短名 + 覆盖间距
     }
     // ...
 }
@@ -318,11 +327,7 @@ diagram architecture {
 diagram flowchart {
     title: "CI/CD 流水线"
     config {
-        group_frame: stack {
-            axis: vertical
-            gap: 80
-            cross: center
-        }
+        group_frame: stages
     }
     // ...
 }

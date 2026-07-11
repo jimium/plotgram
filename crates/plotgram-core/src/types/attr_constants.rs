@@ -96,6 +96,24 @@ pub mod group_frame_track {
     pub const ALL: &[&str] = &[FIT, EQUAL, UNIFORM];
 }
 
+/// `group_frame` 场景短名（展开为 stack/matrix 默认组合；仍可用 `{ … }` 覆盖单项）。
+///
+/// 与 arrangement 关键字 `stack` / `matrix` 并列；详见 guides/group-layout-and-frame.md。
+pub mod group_frame_preset {
+    /// 分层条带：水平等宽 + 居中 + 共线边框
+    pub const STRIPS: &str = "strips";
+    /// 内容贴合：水平堆叠、不拉等宽
+    pub const FIT: &str = "fit";
+    /// 水平泳道：水平堆叠、顶对齐、较大间距
+    pub const LANES: &str = "lanes";
+    /// 纵向阶段：垂直堆叠、内容贴合
+    pub const STAGES: &str = "stages";
+    /// 固定网格：默认 2×2 matrix + 等宽单元格
+    pub const TILES: &str = "tiles";
+
+    pub const ALL: &[&str] = &[STRIPS, FIT, LANES, STAGES, TILES];
+}
+
 /// 节点对齐模式枚举值（diagram 级 `align` 属性）。
 ///
 /// 除下列 atom 外，也接受 boolean：`true`（算法默认）、`false`（关闭）。

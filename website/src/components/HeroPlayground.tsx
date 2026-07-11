@@ -111,17 +111,17 @@ function formatErrors(errors: DiagnosticErrorJson[]): string {
 }
 
 const plotgramHighlightStyle = HighlightStyle.define([
-  { tag: t.keyword, color: '#7C3AED', fontWeight: '600' },
-  { tag: t.typeName, color: '#0891B2' },
-  { tag: t.string, color: '#059669' },
-  { tag: t.number, color: '#D97706' },
-  { tag: t.lineComment, color: '#94A3B8', fontStyle: 'italic' },
-  { tag: t.operator, color: '#6366F1', fontWeight: '600' },
-  { tag: t.propertyName, color: '#B45309' },
-  { tag: t.atom, color: '#DC2626' },
-  { tag: t.bracket, color: '#64748B' },
-  { tag: t.punctuation, color: '#94A3B8' },
-  { tag: t.variableName, color: '#1E293B' },
+  { tag: t.keyword, color: '#c678dd', fontWeight: '600' },
+  { tag: t.typeName, color: '#56b6c2' },
+  { tag: t.string, color: '#98c379' },
+  { tag: t.number, color: '#d19a66' },
+  { tag: t.lineComment, color: '#5c6370', fontStyle: 'italic' },
+  { tag: t.operator, color: '#56b6c2', fontWeight: '600' },
+  { tag: t.propertyName, color: '#d19a66' },
+  { tag: t.atom, color: '#e06c75' },
+  { tag: t.bracket, color: '#abb2bf' },
+  { tag: t.punctuation, color: '#abb2bf' },
+  { tag: t.variableName, color: '#61afef' },
 ]);
 
 const editorTheme = EditorView.theme({
@@ -129,6 +129,7 @@ const editorTheme = EditorView.theme({
     height: '100%',
     fontSize: '13.5px',
     backgroundColor: 'transparent',
+    color: '#abb2bf',
   },
   '.cm-scroller': {
     fontFamily: "'JetBrains Mono', 'SF Mono', 'Monaco', 'Menlo', monospace",
@@ -137,7 +138,7 @@ const editorTheme = EditorView.theme({
   },
   '.cm-content': {
     padding: '18px 20px',
-    caretColor: '#7C3AED',
+    caretColor: '#c678dd',
   },
   '.cm-line': {
     padding: '0 2px',
@@ -146,14 +147,14 @@ const editorTheme = EditorView.theme({
     outline: 'none',
   },
   '.cm-cursor': {
-    borderLeftColor: '#7C3AED',
+    borderLeftColor: '#c678dd',
     borderLeftWidth: '2px',
   },
   '.cm-selectionBackground, ::selection': {
-    background: 'rgba(124, 58, 237, 0.15)',
+    background: 'rgba(124, 58, 237, 0.25)',
   },
   '.cm-matchingBracket': {
-    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    backgroundColor: 'rgba(124, 58, 237, 0.2)',
     borderRadius: '3px',
   },
   '.cm-gutters': {
@@ -166,6 +167,7 @@ export default function HeroPlayground() {
   const [source, setSource] = useState(DEFAULT_SOURCE);
   const [svg, setSvg] = useState<string>('');
   const [renderError, setRenderError] = useState<string>('');
+  const [renderMs, setRenderMs] = useState<number | null>(null);
   const [activePreset, setActivePreset] = useState(0);
 
   const editorHostRef = useRef<HTMLDivElement>(null);
@@ -211,12 +213,16 @@ export default function HeroPlayground() {
     if (!wasm) return;
 
     const timer = setTimeout(() => {
+      const t0 = performance.now();
       const result = renderSvg(wasm, source, { transparent_background: true });
+      const elapsed = performance.now() - t0;
       if (result.success && result.text) {
         setSvg(result.text);
         setRenderError('');
+        setRenderMs(elapsed);
       } else {
         setRenderError(formatErrors(result.errors));
+        setRenderMs(elapsed);
       }
     }, 150);
 
@@ -259,13 +265,6 @@ export default function HeroPlayground() {
           <div className="hero-editor" ref={editorHostRef} />
         </div>
         <div className="hero-preview">
-          <div className="hero-preview-label">
-            {status.kind === 'ok' && <span className="hero-status-dot ok" />}
-            {status.kind === 'loading' && <span className="hero-status-dot loading" />}
-            {status.kind === 'error' && <span className="hero-status-dot error" />}
-            {status.kind === 'dsl-error' && <span className="hero-status-dot error" />}
-            <span className={`hero-status-text ${status.kind}`}>{status.text}</span>
-          </div>
           <div className="hero-preview-canvas">
             {svg ? (
               <div className="hero-svg-host" dangerouslySetInnerHTML={{ __html: svg }} />
@@ -282,6 +281,20 @@ export default function HeroPlayground() {
             )}
           </div>
         </div>
+      </div>
+      <div className="hero-visual-footer">
+        <div className="hero-footer-status">
+          {status.kind === 'ok' && <span className="hero-status-dot ok" />}
+          {status.kind === 'loading' && <span className="hero-status-dot loading" />}
+          {status.kind === 'error' && <span className="hero-status-dot error" />}
+          {status.kind === 'dsl-error' && <span className="hero-status-dot error" />}
+          <span className={`hero-status-text ${status.kind}`}>{status.text}</span>
+        </div>
+        {renderMs !== null && status.kind !== 'loading' && (
+          <span className="hero-footer-render-time">
+            渲染 {renderMs.toFixed(1)} ms
+          </span>
+        )}
       </div>
     </div>
   );

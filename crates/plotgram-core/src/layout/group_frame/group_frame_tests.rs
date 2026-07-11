@@ -286,6 +286,111 @@
         assert_eq!(spec.track_sizing, TrackSizing::Fit);
     }
 
+    // ─── 场景短名 ────────────────────────────────────────
+
+    #[test]
+    fn preset_strips_expands() {
+        let diagram = Diagram {
+            attributes: vec![DiagramAttribute {
+                key: "group_frame".to_string(),
+                value: AttributeValue::String(TextValue::unquoted("strips")),
+                span: Span::dummy(),
+            }],
+            ..Default::default()
+        };
+        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Horizontal });
+        assert_eq!(spec.track_sizing, TrackSizing::Equal);
+        assert_eq!(spec.cross_align, CrossAlign::Center);
+        assert_eq!(spec.border_align, BorderAlign::SharedLines);
+    }
+
+    #[test]
+    fn preset_fit_expands() {
+        let diagram = Diagram {
+            attributes: vec![config_attr("fit", &[])],
+            ..Default::default()
+        };
+        let spec = resolve_group_frame_spec(&diagram, "architecture");
+        assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Horizontal });
+        assert_eq!(spec.track_sizing, TrackSizing::Fit);
+    }
+
+    #[test]
+    fn preset_lanes_expands() {
+        let diagram = Diagram {
+            attributes: vec![config_attr("lanes", &[])],
+            ..Default::default()
+        };
+        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Horizontal });
+        assert_eq!(spec.cross_align, CrossAlign::Start);
+        assert!((spec.gap - 80.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn preset_stages_expands() {
+        let diagram = Diagram {
+            attributes: vec![config_attr("stages", &[])],
+            ..Default::default()
+        };
+        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Vertical });
+        assert_eq!(spec.track_sizing, TrackSizing::Fit);
+        assert_eq!(spec.cross_align, CrossAlign::Center);
+    }
+
+    #[test]
+    fn preset_tiles_expands_default_2x2() {
+        let diagram = Diagram {
+            attributes: vec![config_attr("tiles", &[])],
+            ..Default::default()
+        };
+        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        assert_eq!(
+            spec.arrangement,
+            GroupArrangement::Matrix {
+                rows: Some(2),
+                cols: Some(2)
+            }
+        );
+        assert_eq!(spec.track_sizing, TrackSizing::Equal);
+        assert!((spec.gap - 48.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn preset_allows_option_overrides() {
+        let diagram = Diagram {
+            attributes: vec![config_attr(
+                "strips",
+                &[("gap", num_val(60.0)), ("cross", str_val("start"))],
+            )],
+            ..Default::default()
+        };
+        let spec = resolve_group_frame_spec(&diagram, "architecture");
+        assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Horizontal });
+        assert_eq!(spec.track_sizing, TrackSizing::Equal);
+        assert_eq!(spec.border_align, BorderAlign::SharedLines);
+        assert_eq!(spec.cross_align, CrossAlign::Start);
+        assert!((spec.gap - 60.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn preset_tiles_allows_cols_override() {
+        let diagram = Diagram {
+            attributes: vec![config_attr("tiles", &[("cols", num_val(3.0))])],
+            ..Default::default()
+        };
+        let spec = resolve_group_frame_spec(&diagram, "flowchart");
+        assert_eq!(
+            spec.arrangement,
+            GroupArrangement::Matrix {
+                rows: Some(2),
+                cols: Some(3)
+            }
+        );
+    }
+
     // ─── snap 默认启用（与算法无关，仅受 `snap` 属性控制） ──────
 
     #[test]

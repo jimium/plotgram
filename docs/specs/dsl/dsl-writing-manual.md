@@ -342,11 +342,7 @@ diagram flowchart {
         edge_routing: orthogonal
         theme: common.clean-light
         render_style: excalidraw
-        group_frame: stack {
-            axis: horizontal
-            gap: 40
-            track: equal
-        }
+        group_frame: strips { gap: 40 }
     }
 
     ...
@@ -362,7 +358,7 @@ diagram flowchart {
 | `edge_routing` | atom/config | 由图表类型决定 | 边路由算法，可带配置块 |
 | `theme` | atom | 由 profile 决定 | 主题 ID，如 `common.clean-light`、`common.blueprint`、`mindmap.vivid-branches` |
 | `render_style` | atom | `standard` | `standard` / `excalidraw` / `cross-hatch` / `blueprint` / `spatial-clarity` / `neon-glow` / `stipple` |
-| `group_frame` | atom/config | 由算法默认决定 | Group Frame：**组间几何唯一入口**（排列/尺寸/对齐/间距/量化） |
+| `group_frame` | atom/config | 由算法默认决定 | Group Frame：**组间几何唯一入口**；优先场景短名 `strips`/`fit`/`lanes`/`stages`/`tiles` |
 | `snap` | boolean | `true` | 边路由后像素量化（也可写在 `group_frame { snap: … }`） |
 | `align` | boolean / atom | `true` | 节点结构对齐（L3）：`false`/`off`、`rank`、`layer`、`full`；见 §6.7 |
 
@@ -403,9 +399,21 @@ diagram flowchart {
 
 `group_frame` 是组间宏观几何的**唯一** DSL 入口。旧属性 `group_sizing` / `group_arrangement` / `group_gap` / `group_align` **已移除**，声明会报错。
 
-> **完整能力说明**（含 group `layout` 与每个选项用途）：[group-layout-and-frame.md](../../guides/group-layout-and-frame.md)
+> **按场景选用 + rank 说明**：[group-layout-and-frame.md](../../guides/group-layout-and-frame.md)（§1 解释 architecture 为何常是「上→下」）
 
-**`stack` 一维堆叠排列（最常用）：**
+**场景短名（优先使用）：**
+
+| 短名 | 场景 | 展开要点 |
+| --- | --- | --- |
+| `strips` | 分层条带 | 等宽 + 居中 + 共线；architecture 层间仍上→下（见 group-layout §1） |
+| `fit` | 内容贴合 | 不拉等宽 |
+| `lanes` | 水平泳道 | 水平并排 + 顶对齐 + `gap: 80` |
+| `stages` | 纵向阶段 | 垂直堆叠 + 内容贴合 |
+| `tiles` | 固定网格 | 默认 2×2 matrix + 等宽 |
+
+短名可覆盖单项：`group_frame: strips { gap: 60 }`、`group_frame: tiles { cols: 3 }`。
+
+**`stack` 一维堆叠排列（完整写法）：**
 
 | 选项 | 类型 | 可选值 | 默认值 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -422,13 +430,7 @@ diagram flowchart {
 diagram architecture {
     title: "微服务架构"
     config {
-        group_frame: stack {
-            axis: horizontal
-            gap: 50
-            track: equal
-            cross: start
-            border: shared
-        }
+        group_frame: strips { gap: 50 }
     }
     // ...
 }
@@ -440,11 +442,7 @@ diagram architecture {
 diagram flowchart {
     title: "CI/CD 流水线"
     config {
-        group_frame: stack {
-            axis: vertical
-            gap: 80
-            cross: center
-        }
+        group_frame: stages
     }
     // ...
 }
@@ -456,11 +454,7 @@ diagram flowchart {
 diagram flowchart {
     title: "订单处理泳道"
     config {
-        group_frame: stack {
-            axis: horizontal
-            gap: 40
-            cross: center
-        }
+        group_frame: lanes
     }
     // ...
 }
@@ -670,12 +664,9 @@ diagram architecture {
     title: "微服务架构"
     config {
         render_style: blueprint
-        group_frame: stack {
-            axis: horizontal
-            track: equal
+        group_frame: strips {
             gap: 50
             cross: start
-            border: shared
         }
         edge_routing: orthogonal
     }
@@ -805,11 +796,7 @@ diagram mindmap {
 diagram flowchart {
     title: "订单处理泳道"
     config {
-        group_frame: stack {
-            axis: horizontal
-            gap: 40
-            cross: center
-        }
+        group_frame: lanes
     }
 
     group customer "客户" {
@@ -1011,7 +998,7 @@ diagram flowchart {
 // ✓ 正确：架构图用 group_frame 控制组间左右排（不是 direction）
 diagram architecture {
     config {
-        group_frame: stack { axis: horizontal, track: equal }
+        group_frame: strips
     }
 }
 ```
@@ -1085,5 +1072,5 @@ config {
 - [ ] 引用边样式用 `line_style: <name>`（不是 `edge_style: <name>`）
 - [ ] `node_style` 的 selector 是当前图表类型支持的 entity type
 - [ ] 主题 ID 使用 `common.` 前缀（如 `common.clean-light`）
-- [ ] 组间排列只使用 `group_frame` 配置块（勿再写已移除的 `group_sizing` / `group_arrangement` 等）
+- [ ] 组间排列只使用 `group_frame`（优先场景短名 `strips`/`fit`/`lanes`/`stages`/`tiles`；勿再写已移除的 `group_sizing` 等）
 - [ ] 边密集的图可增大 `slot_pitch` 或依赖 orthogonal 的 lane 分离

@@ -16,6 +16,8 @@ L3  Node Frame    — 节点：align（路由前）+ snap（路由后）
 
 调节「group 框是否对齐」用 **L1**；调节「group 里节点怎么排」用 **L2**。
 
+**上手建议**：先读 [§1 Architecture macro rank](#1-architecture-macro-rank必读)（避免把上下分层误当成左右排），再看 [§5 按场景选用](#5-按场景选用)。
+
 > 设计规格：[group-frame-spec.md](../已经实现的方案/group-frame-spec.md)  
 > DSL：[dsl-writing-manual §5.3 / §6.6](../specs/dsl/dsl-writing-manual.md) · [language-spec §4.6 / §7.3](../specs/dsl/language-spec.md)  
 > 权威枚举：`attr_constants`（`group_layout` / `group_frame_track`）  
@@ -25,7 +27,93 @@ Group Frame 在**主布局算法之后**执行（路由前、路由后各会幂�
 
 ---
 
-## 1. 何时使用
+## 1. Architecture macro rank（必读）
+
+架构图里「group 从上到下」和「`group_frame` 默认 Stack(水平)」**同时成立**，管的不是同一件事。
+
+### 1.1 谁决定上下？——主布局的 macro rank
+
+`layout: architecture`（两阶段）先根据 **group 之间的边** 给每个顶层 group 算 **macro rank**（宏观层号）：
+
+- 数据/依赖大致从上游指向下游 → rank 增大  
+- **rank 沿 Y 轴往下排**（上 = 小 rank，下 = 大 rank）  
+- **同一 rank** 里若有多个 group，才在该行内沿 **X 轴左右排**
+
+```text
+示例 A：供应链链状（每层 1 个 group）——你看到的是「整列从上到下」
+
+  rank 0   ┌──────────────┐
+           │ 上游与计划    │
+           └──────┬───────┘
+  rank 1   ┌──────▼───────┐
+           │ 运营与履约    │
+           └──────┬───────┘
+  rank 2   ┌──────▼───────┐
+           │ 物流协同      │
+           └──────┬───────┘
+  rank 3   ┌──────▼───────┐
+           │ 控制塔能力    │
+           └──────────────┘
+
+参考：showcase/architecture/c.supply-chain-control-tower.pgm
+（未写 group_frame 时也是这样：上下由拓扑决定，不是 axis 写反了）
+```
+
+```text
+示例 B：同一 rank 有多个 group ——「行内」才会左右并排
+
+  rank 0   ┌────────┐  ┌────────┐
+           │ 网关层  │  │ 边缘层  │     ← 同行，左右排
+           └────┬───┘  └───┬────┘
+  rank 1        └────┬─────┘
+               ┌─────▼─────┐
+               │  服务层    │           ← 下一行
+               └─────┬─────┘
+  rank 2       ┌─────▼─────┐
+               │  数据层    │
+               └───────────┘
+```
+
+**要点**：`group_frame` **不会**把示例 A 的四层竖链「掰成」一横排。上下顺序由 relation 拓扑决定。
+
+### 1.2 那 `axis: horizontal` / 短名 `strips` 管什么？
+
+在 architecture 默认里，`Stack(水平)` 的含义是：
+
+| 说法 | 实际意思 |
+|------|----------|
+| ❌ 「所有 group 从左排到右」 | 误解 |
+| ✅ 「**同一行（同 rank）** 内的兄弟按水平关系处理」 | 正确：等宽、水平间距、同行消重叠 |
+| ✅ 「不同行之间仍保持主布局的上下关系」 | 正确：行间只做必要的竖直间距/消重叠 |
+
+`track: equal`（`strips` 含此项）会把**同一 parent 下的兄弟 group** 拉成相同宽度——即使它们在不同 rank（不同行），也会形成「等宽竖条带」观感，而不是改成横排。
+
+```text
+strips / 默认 architecture 常见观感（链状分层）：
+
+  ┌─────────────────────┐  ← 等宽
+  │      上游与计划       │
+  └─────────────────────┘
+  ┌─────────────────────┐  ← 与上行同宽
+  │      运营与履约       │
+  └─────────────────────┘
+           ⋮
+```
+
+### 1.3 和 flowchart / `direction` 的对比
+
+| | architecture | flowchart |
+|--|--------------|-----------|
+| 层间主方向 | 主布局固定：**上→下**（macro rank） | 由 `direction` 决定（tb / lr） |
+| `direction` | **不支持**（写了报错） | 支持 |
+| `group_frame` `axis: horizontal` | 管**同行**兄弟；默认接近 `strips` | 常用于泳道左右并排（`lanes`） |
+| `group_frame` `axis: vertical` | 少用；会按竖直 stack 语义整形 | 阶段上下堆（`stages`） |
+
+> 详细选项仍见下文；场景短名见 [§5](#5-按场景选用)。
+
+---
+
+## 2. 何时使用
 
 - 架构图顶层 group 宽度参差不齐，希望形成**等宽阶段条带**
 - 泳道 / 分层图需要**左缘对齐**、**边框共线**
@@ -34,7 +122,7 @@ Group Frame 在**主布局算法之后**执行（路由前、路由后各会幂�
 
 ---
 
-## 2. Group 级属性（含 L2 `layout`）
+## 3. Group 级属性（含 L2 `layout`）
 
 Group 标准属性只有三项：
 
@@ -46,7 +134,7 @@ Group 标准属性只有三项：
 
 `layout` **仅 architecture 两阶段布局读取**；flowchart 分治路径目前不消费组内 `layout`。
 
-### 2.1 写法
+### 3.1 写法
 
 ```plotgram
 group backend "后端" {
@@ -59,7 +147,7 @@ group backend "后端" {
 
 未写时等价于 `layout: auto`。
 
-### 2.2 取值总表
+### 3.2 取值总表
 
 | 值 | 别名 | 能力 | 典型用途 |
 |----|------|------|----------|
@@ -72,7 +160,7 @@ group backend "后端" {
 
 解析入口：`parse_group_layout_hint` → `resolve_group_layout_mode`。
 
-### 2.3 各选项详解
+### 3.3 各选项详解
 
 #### `auto`（默认）
 
@@ -121,7 +209,7 @@ group backend "后端" {
 - **用途**：多数据库实例、多缓存分片、一排对等微服务且组内无依赖边。  
 - **注意**：组内边很多时仍强制 grid 会忽略分层语义，边可能交叉；有边时更宜 `auto` / Sugiyama / `fan-*`。
 
-### 2.4 选用建议
+### 3.4 选用建议
 
 ```text
 组内有明显「一拖多」？     → fan-out
@@ -136,11 +224,11 @@ group backend "后端" {
 
 ---
 
-## 3. Diagram 级：`group_frame`（L1）
+## 4. Diagram 级：`group_frame`（L1）
 
 组间几何**只写** `group_frame`（旧 `group_sizing` 等已移除）。
 
-### 3.1 推荐写法
+### 4.1 推荐写法
 
 ```plotgram
 diagram architecture {
@@ -159,21 +247,24 @@ diagram architecture {
 
 | 写法 | 能力 | 用途 |
 |------|------|------|
-| `group_frame: stack { … }` | 兄弟 group **一维堆叠**（沿 axis） | 分层架构、阶段流水线、泳道（改 axis） |
+| `group_frame: stack { … }` | 对兄弟 group 做 L1 整形（等宽/对齐/间距；axis 语义见 §1 / §4.2） | 分层架构、泳道、阶段 |
 | `group_frame: matrix { … }` | 顶层 group 填入 **二维网格** | 固定版式（如 2×2） |
+| 场景短名 `strips` 等 | 展开为上表组合 | 日常优先；见 §5 |
 
-未写 `group_frame` 时，按图表类型用算法默认（见 §3.4）。
+未写 `group_frame` 时，按图表类型用算法默认（见 §4.4）。
 
-### 3.2 `stack` 选项详解
+### 4.2 `stack` 选项详解
 
-#### `axis` — 堆叠主轴
+#### `axis` — 堆叠主轴（L1 整形语义）
 
 | 值 | 能力 | 用途 |
 |----|------|------|
-| `horizontal` / `h` | 兄弟组沿**水平**排开（左→右） | 架构图默认语义：阶段/层从左到右 |
-| `vertical` / `v` | 兄弟组沿**垂直**排开（上→下） | 流程图阶段划分、纵向泳道内容 |
+| `horizontal` / `h` | 把兄弟组当作**水平关系**处理：同行内左右间距/消重叠；`track: equal` 时拉齐宽度 | architecture 默认；`strips` / `lanes` |
+| `vertical` / `v` | 把兄弟组当作**竖直关系**处理：上下堆叠与竖直间距 | flowchart 默认；`stages` |
 
-只影响 **group 框之间**的相对位置，不改组内 `layout`。
+**architecture 注意**：主布局已按 macro rank **上→下**排好层；此处的 `horizontal` **不会**把不同 rank 的 group 改成一横排，只影响**同行内**与等宽/对齐。详见 [§1](#1-architecture-macro-rank必读)。
+
+只影响 **group 框**的 L1 整形，不改组内 `layout`。
 
 #### `track` — 同级「轨道」尺寸（主轴方向上的框宽/高）
 
@@ -223,7 +314,7 @@ diagram architecture {
 
 也可继续用 diagram 级 `snap:`（边折线量化）；`group_frame { snap: … }` 可覆盖组框量化。
 
-### 3.3 `matrix` 选项
+### 4.3 `matrix` 选项
 
 ```plotgram
 config {
@@ -245,16 +336,16 @@ config {
 - 顶层 group 按布局后的 `(y, x)` **行优先**填入网格  
 - **限制**：暂无 colspan；下排仅 1 个 group 时占左格  
 
-### 3.4 算法默认（未写 `group_frame` 时）
+### 4.4 算法默认（未写 `group_frame` 时）
 
-| 图表 | arrangement | track | cross | gap | border |
-|------|-------------|-------|-------|-----|--------|
-| **architecture** | `Stack(水平)` | **`equal`**（`track: fit` 可退回） | `center` | ~40 | `shared` |
-| **flowchart**（等） | `Stack(垂直)` | `fit` | `center` | ~48 | `none` |
+| 图表 | arrangement | track | cross | gap | border | 你实际看到的 |
+|------|-------------|-------|-------|-----|--------|--------------|
+| **architecture** | `Stack(水平)` | **`equal`** | `center` | ~40 | `shared` | 层间仍 **上→下**（macro rank）；默认≈`strips` 的等宽竖条带 |
+| **flowchart**（等） | `Stack(垂直)` | `fit` | `center` | ~48 | `none` | 组框倾向 **上→下** 堆；≈`stages` |
 
-架构图默认就是「同级等宽条带」；要内容贴合请写 `group_frame: stack { track: fit }`。
+架构图默认「同级等宽 + 边框共线」，**不是**「所有 group 横排」。链状拓扑（如供应链控制塔）会呈现一列从上到下的等宽框。要内容贴合请写 `group_frame: fit` 或 `track: fit`。
 
-### 3.5 架构图内置行为（无需 DSL）
+### 4.5 架构图内置行为（无需 DSL）
 
 | 行为 | 说明 |
 |------|------|
@@ -263,7 +354,7 @@ config {
 | 嵌套 group | 每个 parent 下的子 group 集合单独跑一遍 L1（同一 `GroupFrameSpec`） |
 | Pin 保护 | `layout intent` 中 Pin 的节点在 Equal 拉宽时不会被平移 |
 
-### 3.6 已移除的旧属性
+### 4.6 已移除的旧属性
 
 以下 diagram 属性**已删除**，声明会校验报错，请一律改写为 `group_frame`：
 
@@ -281,85 +372,162 @@ config {
 
 | 名字 | 层级 | 对象 |
 |------|------|------|
+| **macro rank**（主布局） | architecture 两阶段 | 按拓扑决定 group **在哪一行（上/下）** |
 | group `layout` | L2 | 组内节点 |
-| `group_frame` 的 `axis` / `cross` | L1 | group 框怎么排、怎么对齐 |
+| `group_frame` 的 `axis` / `cross` | L1 | 同行内怎么处理、是否等宽/对齐（**不改写 rank 上下序**） |
 | diagram `direction` | 主布局流向轴 | **仅** flowchart / er / sugiyama(-v2) / mindmap；**architecture 不支持** |
-| diagram `align` | L3 | 节点 rank/layer 结构对齐（与 group 无关） |
+| diagram `align` | L3 | 节点 rank/layer 结构对齐（与 group 框无关） |
 
-> **`axis` ≠ `direction`**：`group_frame { axis: horizontal }` 控制**组框**从左到右堆叠；flowchart 的 `direction: left-to-right` 控制**节点分层流向**。架构图要「层从左到右」请写 `group_frame`，不要写 `direction`（写了会报错）。
+> **`axis` ≠「整图左右流」**：architecture 下 `axis: horizontal` / `strips` 管的是同行与等宽条带，不是 `direction: left-to-right`。flowchart 的 `direction` 才改节点分层流向。详见 [§1](#1-architecture-macro-rank必读)。
 
 ---
 
-## 4. 典型配方
+## 5. 按场景选用
 
-### 4.1 流水线 / 分层（等宽条带）
+不必先背全套选项。先选下面 **5 个场景**之一；短名会展开成固定参数组合。需要微调时再写 `group_frame: <短名> { gap: 60 }` 覆盖单项，或改写成完整 `stack` / `matrix`。
 
-```plotgram
-config {
-    group_frame: stack {
-        axis: horizontal
-        track: equal
-        cross: center
-        gap: 50
-        border: shared
-    }
-}
-```
-
-参考：[`c.ai-agent-docops-pipeline.pgm`](../../showcase/architecture/c.ai-agent-docops-pipeline.pgm)、[`n.data-pipeline.pgm`](../../showcase/architecture/n.data-pipeline.pgm)。
-
-拓扑由 **relation** 决定层级；`track: equal` 把**同级**顶层 group 拉成相同宽度。
-
-### 4.2 微服务三层 + 正交路由
+| 场景 | 短名 | 一句话 | 展开后的关键参数 |
+|------|------|--------|------------------|
+| 分层条带 | `strips` | 等宽整齐的层/阶段框（architecture 层间仍上→下） | `axis: horizontal` · `track: equal` · `cross: center` · `border: shared` |
+| 内容贴合 | `fit` | 不拉等宽；同行仍按水平关系处理 | `axis: horizontal` · `track: fit` |
+| 水平泳道 | `lanes` | 多泳道并排，顶对齐、间距偏大 | `axis: horizontal` · `cross: start` · `gap: 80` |
+| 纵向阶段 | `stages` | 阶段从上往下堆（flowchart） | `axis: vertical` · `track: fit` · `cross: center` |
+| 固定网格 | `tiles` | 默认 2×2 格子版式 | `matrix` · `cols/rows: 2` · `track: equal` · `gap: 48` |
 
 ```plotgram
 config {
-    group_frame: stack {
-        axis: horizontal
-        track: equal
-        cross: center
-        gap: 50
-        border: shared
-    }
-    edge_routing: orthogonal
+    group_frame: strips          // 推荐：短名
+    // group_frame: strips { gap: 60 }   // 短名 + 覆盖
 }
 ```
 
-见 [dsl-writing-manual §8.3](../specs/dsl/dsl-writing-manual.md#83-架构图分层服务使用-group_frame)。
+> 架构图**未写** `group_frame` 时，默认效果接近 `strips`（等宽竖条带；**层序仍上→下**）。flowchart 默认接近垂直 `stages`，泳道请显式写 `lanes`。见 [§1](#1-architecture-macro-rank必读)。
 
-### 4.3 泳道（水平堆叠 group）
+### 5.1 `strips` — 分层条带
+
+**何时用**：微服务分层、流水线阶段，希望同级 group **一样宽**、边框像尺子画的。
+
+**architecture 下长什么样**：链状拓扑 → **一列等宽框从上到下**（不是横排）。同一 rank 有多个 group 时，该行内才会左右并排。
+
+```plotgram
+group_frame: strips
+// 等价于：
+group_frame: stack {
+    axis: horizontal   // 同行按水平关系处理（≠ 整图改成左右流）
+    track: equal       // 兄弟拉成一样宽 → 竖条带也同宽
+    cross: center      // 交叉轴居中
+    border: shared     // 同侧边框尽量共线
+}
+```
+
+| 参数 | 作用 |
+|------|------|
+| `axis: horizontal` | 同行内水平间距/消重叠；配合 equal 做条带 |
+| `track: equal` | 同级等宽（跨行也会同宽，形成竖条带） |
+| `cross: center` | 交叉轴居中 |
+| `border: shared` | 边框共线，更「图纸感」 |
+
+常与 `edge_routing: orthogonal` 一起用。参考：[`c.supply-chain-control-tower.pgm`](../../showcase/architecture/c.supply-chain-control-tower.pgm)（竖向链）、[`c.ai-agent-docops-pipeline.pgm`](../../showcase/architecture/c.ai-agent-docops-pipeline.pgm)、[`n.data-pipeline.pgm`](../../showcase/architecture/n.data-pipeline.pgm)、[dsl-writing-manual §8.3](../specs/dsl/dsl-writing-manual.md#83-架构图分层服务使用-group_frame)。
+
+### 5.2 `fit` — 内容贴合
+
+**何时用**：各组节点数差很大，硬拉等宽会留大片空白。
+
+```plotgram
+group_frame: fit
+// 等价于：
+group_frame: stack {
+    axis: horizontal   // 同行按水平关系；层间上下仍由主布局决定
+    track: fit         // 框宽贴合内容，不拉齐
+}
+```
+
+| 参数 | 作用 |
+|------|------|
+| `axis: horizontal` | 同行水平关系（同 `strips`） |
+| `track: fit` | 每个框跟自己的内容走 |
+
+### 5.3 `lanes` — 水平泳道
+
+**何时用**：流程图多条泳道并排；要**顶对齐**、框之间疏一点。
 
 ```plotgram
 diagram flowchart {
     config {
         direction: top-to-bottom   // 仅 flowchart 等支持；architecture 勿写
-        group_frame: stack {
-            axis: horizontal       // 组框左右排（≠ direction）
-            cross: start
-            gap: 80
-        }
+        group_frame: lanes
+        // 等价于：
+        // group_frame: stack {
+        //     axis: horizontal
+        //     cross: start
+        //     gap: 80
+        // }
     }
 }
 ```
 
-参考：[`c.swimlane-order-process.pgm`](../../showcase/flowchart/c.swimlane-order-process.pgm)。架构图同类版式只保留 `group_frame`，不要加 `direction`。
+| 参数 | 作用 |
+|------|------|
+| `axis: horizontal` | 泳道左右并排（≠ `direction`） |
+| `cross: start` | 顶对齐（水平堆叠时） |
+| `gap: 80` | 泳道间距偏大，边更好走 |
 
-### 4.4 仅贴合内容
+参考：[`c.swimlane-order-process.pgm`](../../showcase/flowchart/c.swimlane-order-process.pgm)。
 
-`group_frame: stack { track: fit }`（或 flowchart 默认）：每个 group 宽度随内容，适合组内节点数差异大的草图。
+### 5.4 `stages` — 纵向阶段
 
-### 4.5 L1 + L2 一起写
+**何时用**：流程图阶段从上往下划分（CI/CD、审批阶段）。
+
+```plotgram
+group_frame: stages
+// 等价于：
+group_frame: stack {
+    axis: vertical
+    track: fit
+    cross: center
+}
+```
+
+| 参数 | 作用 |
+|------|------|
+| `axis: vertical` | 组框上下堆 |
+| `track: fit` | 高度/宽度随内容 |
+| `cross: center` | 水平方向居中 |
+
+### 5.5 `tiles` — 固定网格
+
+**何时用**：就要 2×2 / 上二下一这类固定格子；默认 **2×2 等宽**。
+
+```plotgram
+group_frame: tiles
+// 等价于：
+group_frame: matrix {
+    cols: 2
+    rows: 2
+    track: equal
+    gap: 48
+}
+
+// 改成 3 列：
+group_frame: tiles { cols: 3 }
+```
+
+| 参数 | 作用 |
+|------|------|
+| `cols` / `rows` | 网格列/行；短名默认都是 2 |
+| `track: equal` | 单元格等宽 |
+| `gap: 48` | 格间距 |
+
+限制：暂无 colspan；下排仅 1 个 group 时占左格。
+
+### 5.6 L1 + L2 一起写
+
+短名只管**组间**；组内仍用 `group { layout: … }`。
 
 ```plotgram
 diagram architecture {
     config {
-        group_frame: stack {
-            axis: horizontal
-            track: equal
-            cross: center
-            gap: 48
-            border: shared
-        }
+        group_frame: strips
         edge_routing: orthogonal
     }
 
@@ -387,21 +555,23 @@ diagram architecture {
 
 ---
 
-## 5. 调节步骤与排错
+## 6. 调节步骤与排错
 
-1. **先定拓扑**：用 relation 表达分层与数据流；框无法单靠 DSL 覆盖错误拓扑。  
-2. **开等宽**：架构图默认已是 `track: equal`；要贴内容用 `track: fit`。  
-3. **调组内**：按组加 `layout: horizontal | fan-out | fan-in | grid | …`。  
-4. **调间距**：`gap` 加大可减轻边路由拥挤；架构图常用 `48`～`60`。  
-5. **边框与量化**：`border: shared` + 默认 `snap: true`。  
+1. **先选场景短名**（`strips` / `fit` / `lanes` / `stages` / `tiles`），预览效果。  
+2. **先定拓扑**：用 relation 表达分层与数据流；框无法单靠 DSL 覆盖错误拓扑。  
+3. **微调一项**：常见只改 `gap`；要贴内容用 `fit` 或 `track: fit`。  
+4. **调组内**：按组加 `layout: horizontal | fan-out | fan-in | grid | …`。  
+5. **边框与量化**：`strips` 已含 `border: shared`；默认 `snap: true`。  
 6. **预览**：`plotgram render your.pgm -o out.svg` 或 showcase 批量脚本。
 
 | 现象 | 可能原因 | 调节 |
 |------|----------|------|
+| 架构图 group 全是上下排，不是左右 | **正常**：macro rank 上→下；每层 1 个 group 时就是竖列 | 见 [§1](#1-architecture-macro-rank必读)；左右并排需同 rank 多个 group |
+| 写了 `strips` 仍是竖的 | `strips` 管等宽/同行，不改 rank 方向 | 改拓扑或接受竖条带 |
 | 等宽后某层特别高 | 该组节点多或 `fan-out` 展开 | 拆组、改 `layout`、或减少组内 entity |
 | 两层宽度仍不齐 | 两层不在同一 sibling 集合 | Equal 仅拉齐**同一 parent 下**的兄弟 |
 | 拉宽后节点偏一侧 | 正常：Equal 会居中组内内容 | 检查 `cross`；Pin 节点不会被移动 |
-| 矩阵顺序不对 | 格子顺序由布局后坐标决定 | 先调拓扑让大致顺序正确，再开 matrix |
+| 矩阵顺序不对 | 格子顺序由布局后坐标决定 | 先调拓扑让大致顺序正确，再开 `tiles` / matrix |
 
 ### CLI 验证
 
@@ -414,7 +584,7 @@ Layout hints 中可查看 `GroupFrameReport`（是否 equalized、matrix_applied
 
 ---
 
-## 6. 相关文档
+## 7. 相关文档
 
 - [DSL 写作手册 §5 Group / §6.6 group_frame](../specs/dsl/dsl-writing-manual.md)  
 - [语言规范 §4.6 / §7.3](../specs/dsl/language-spec.md)  
