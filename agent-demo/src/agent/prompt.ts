@@ -88,18 +88,14 @@ diagram, entity, group, relation, flowchart, sequence, architecture, state, er, 
 | edge_routing | atom/config | 见路由算法表 | 由图表类型决定 | 边路由算法 |
 | theme | atom | 主题ID如common.clean-light | 由profile决定 | 颜色/字体主题 |
 | render_style | atom | standard/excalidraw/cross-hatch/blueprint/spatial-clarity/neon-glow/stipple | standard | 笔触皮肤 |
-| group_frame | config | stack{...} / matrix{...} | 由算法决定 | 组间几何统一配置 |
-| group_sizing | atom | fit / uniform | fit | 顶层分组宽度策略 |
+| group_frame | config | stack{...} / matrix{...} | 由算法决定 | 组间几何唯一入口(axis/track/gap/cross/border/snap) |
 | snap | boolean | true/false | true | 边路由后像素量化开关 |
 | align | boolean/atom | true/false/off/rank/layer/full | true | 节点结构对齐(L3，路由前执行) |
-| group_arrangement | atom | vertical / horizontal | vertical | group间排列(仅flowchart含group生效) |
-| group_gap | number | 正数 | 60 | group间距像素 |
-| group_align | atom | center / left | center | group间对齐(仅flowchart含group生效) |
 
 ## direction 布局支持矩阵
-- flowchart/er/sugiyama/sugiyama-v2/architecture: 支持 top-to-bottom, left-to-right (不支持 radial)
+- flowchart/er/sugiyama/sugiyama-v2: 支持 top-to-bottom, left-to-right (不支持 radial)
 - mindmap: 支持 radial, top-to-bottom, left-to-right
-- sequence/state/force-directed/circular: 不支持 direction，声明会报错
+- architecture/sequence/state/force-directed/circular: **不支持 direction**，声明会报错；架构图组间左右排用 group_frame: stack { axis: horizontal }
 
 ## 布局算法(layout 可选值)
 - flowchart: 流程图专属分层(默认)，共享sugiyama-v2引擎；options: group_padding
@@ -274,7 +270,7 @@ const KNOWLEDGE_MODULES: Record<string, string> = {
   - 用 start/end 标记流程首尾
   - decision 节点用于分支(可自环)
   - -> 表示主流程，--> 表示返回/响应
-  - 带泳道时用 group + group_arrangement: horizontal
+  - 带泳道时用 group + group_frame: stack { axis: horizontal }
 - 示例:
 diagram flowchart {
     title: "用户登录"
@@ -291,12 +287,13 @@ diagram flowchart {
 }`,
 
   architecture: `## Architecture 专项知识
-- 默认布局: architecture (分组分层)，默认方向 left-to-right
+- 默认布局: architecture (分组分层)
+- **不支持 direction 属性**（写了会报错）；组间左右排列用 group_frame: stack { axis: horizontal }
 - 默认边路由: orthogonal
 - 常用 type: service / database / cache / gateway / queue / storage / frontend / backend / external
-- 组内布局通过 group 的 layout 属性控制: auto / horizontal / vertical / fan-out
+- 组内布局通过 group 的 layout 属性控制: auto / horizontal / vertical / fan-out / fan-in / grid
 - group_frame: stack { axis: horizontal, gap: 50 } 控制组间排列
-- group_sizing: uniform 让所有组等宽(适合阶段条带)
+- group_frame: stack { track: equal } 让同级组等宽(适合阶段条带；architecture 默认已是 equal)
 - 架构图最佳实践:
   - 用 group 划分层级(前端层/后端层/数据层)
   - 组内 edge 就近声明，跨组 edge 写在顶层
@@ -306,8 +303,7 @@ diagram flowchart {
 diagram architecture {
     title: "微服务架构"
     config {
-        direction: left-to-right
-        group_frame: stack { axis: horizontal gap: 50 }
+        group_frame: stack { axis: horizontal, gap: 50, track: equal }
     }
     group frontend "前端层" {
         layout: horizontal

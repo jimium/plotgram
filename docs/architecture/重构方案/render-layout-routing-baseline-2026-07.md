@@ -142,7 +142,7 @@ strategy.compute()                    # 节点/分组
 | Group Frame | 兄弟重叠消解、内容包络 |
 
 组内 hint：`group { layout: horizontal | vertical | fan-out | fan-in | grid | auto }`  
-组宽：`group_sizing: fit`（默认）| `uniform`（同级条带）
+组宽：`group_frame { track: equal }`（architecture 默认）| `track: fit`（内容贴合）
 
 ### 2.3 与 sugiyama_v2 的关系（重要技术债）
 

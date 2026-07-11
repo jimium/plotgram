@@ -20,7 +20,6 @@ use crate::layout::node::common::divide_and_conquer::{
 };
 use crate::layout::node::sugiyama_v2::{engine, preset};
 use crate::layout::{EdgeRoutingStyle, LayoutHints, LayoutResult, NodeLayout};
-use crate::types::standard_attr_keys::diagram;
 use std::collections::{HashMap, HashSet};
 
 /// 无 group 节点的虚拟 group ID
@@ -72,43 +71,24 @@ impl AlignMode {
     }
 }
 
-/// 从 diagram 属性读取组间排列配置
-///
-/// - `group_arrangement`：Atom，排列方向 vertical/horizontal（默认 vertical）
-/// - `group_gap`：Number，group 间距（默认 48.0）
-/// - `group_align`：Atom，对齐方式（默认 center）
+/// 从 `group_frame` 读取组间排列配置（与 L1 同一真源）。
 fn read_arrangement_config(diagram: &Diagram) -> (f64, AlignMode, ArrangementMode) {
-    let mut gap = 48.0;
-    let mut align = AlignMode::DEFAULT;
-    let mut mode = ArrangementMode::DEFAULT;
-
-    for attr in &diagram.attributes {
-        match attr.key.as_str() {
-            diagram::GROUP_ARRANGEMENT => {
-                if let Some(s) = attr.value.as_str() {
-                    if let Some(m) = ArrangementMode::from_str(s) {
-                        mode = m;
-                    }
-                }
-            }
-            diagram::GROUP_GAP => {
-                if let crate::ast::AttributeValue::Number(n) = &attr.value {
-                    if *n > 0.0 {
-                        gap = *n;
-                    }
-                }
-            }
-            diagram::GROUP_ALIGN => {
-                if let Some(s) = attr.value.as_str() {
-                    if let Some(a) = AlignMode::from_str(s) {
-                        align = a;
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
+    let spec = crate::layout::group_frame::resolve_group_frame_spec(diagram, "flowchart");
+    let gap = if spec.gap > 0.0 {
+        spec.gap
+    } else {
+        48.0
+    };
+    let align = match spec.cross_align {
+        crate::layout::group_frame::CrossAlign::Start => AlignMode::Left,
+        _ => AlignMode::Center,
+    };
+    let mode = match spec.arrangement {
+        crate::layout::group_frame::GroupArrangement::Stack {
+            axis: crate::layout::group_frame::Axis::Horizontal,
+        } => ArrangementMode::Horizontal,
+        _ => ArrangementMode::Vertical,
+    };
     (gap, align, mode)
 }
 
@@ -936,25 +916,28 @@ mod tests {
     #[test]
     fn read_arrangement_config_custom() {
         use crate::ast::{AttributeValue, DiagramAttribute, TextValue};
+        use std::collections::HashMap;
+
+        let mut options = HashMap::new();
+        options.insert(
+            "axis".to_string(),
+            AttributeValue::String(TextValue::unquoted("horizontal")),
+        );
+        options.insert("gap".to_string(), AttributeValue::Number(120.0));
+        options.insert(
+            "cross".to_string(),
+            AttributeValue::String(TextValue::unquoted("left")),
+        );
 
         let diagram = Diagram {
-            attributes: vec![
-                DiagramAttribute {
-                    key: "group_gap".to_string(),
-                    value: AttributeValue::Number(120.0),
-                    span: Span::dummy(),
+            attributes: vec![DiagramAttribute {
+                key: "group_frame".to_string(),
+                value: AttributeValue::Config {
+                    algo: "stack".to_string(),
+                    options,
                 },
-                DiagramAttribute {
-                    key: "group_align".to_string(),
-                    value: AttributeValue::String(TextValue::unquoted("left")),
-                    span: Span::dummy(),
-                },
-                DiagramAttribute {
-                    key: "group_arrangement".to_string(),
-                    value: AttributeValue::String(TextValue::unquoted("horizontal")),
-                    span: Span::dummy(),
-                },
-            ],
+                span: Span::dummy(),
+            }],
             ..Default::default()
         };
         let (gap, align, mode) = read_arrangement_config(&diagram);
@@ -964,33 +947,27 @@ mod tests {
     }
 
     #[test]
-    fn read_arrangement_config_ignores_invalid() {
-        use crate::ast::{AttributeValue, DiagramAttribute, TextValue};
+    fn read_arrangement_config_ignores_non_positive_gap() {
+        use crate::ast::{AttributeValue, DiagramAttribute};
+        use std::collections::HashMap;
 
-        // gap <= 0 应被忽略，align/arrangement 非法值应被忽略
+        let mut options = HashMap::new();
+        options.insert("gap".to_string(), AttributeValue::Number(-10.0));
+
         let diagram = Diagram {
-            attributes: vec![
-                DiagramAttribute {
-                    key: "group_gap".to_string(),
-                    value: AttributeValue::Number(-10.0),
-                    span: Span::dummy(),
+            attributes: vec![DiagramAttribute {
+                key: "group_frame".to_string(),
+                value: AttributeValue::Config {
+                    algo: "stack".to_string(),
+                    options,
                 },
-                DiagramAttribute {
-                    key: "group_align".to_string(),
-                    value: AttributeValue::String(TextValue::unquoted("invalid")),
-                    span: Span::dummy(),
-                },
-                DiagramAttribute {
-                    key: "group_arrangement".to_string(),
-                    value: AttributeValue::String(TextValue::unquoted("diagonal")),
-                    span: Span::dummy(),
-                },
-            ],
+                span: Span::dummy(),
+            }],
             ..Default::default()
         };
         let (gap, align, mode) = read_arrangement_config(&diagram);
-        assert_eq!(gap, 48.0); // 默认值
-        assert_eq!(align, AlignMode::Center); // 默认值
-        assert_eq!(mode, ArrangementMode::Vertical); // 默认值
+        assert_eq!(gap, 48.0);
+        assert_eq!(align, AlignMode::Center);
+        assert_eq!(mode, ArrangementMode::Vertical);
     }
 }

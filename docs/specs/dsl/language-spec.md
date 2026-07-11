@@ -215,13 +215,9 @@ diagram flowchart {
 | `edge_routing` | atom 或配置块        | 见边路由算法表 | 由图表类型决定 | 边路由算法及可选参数 |
 | `theme`        | atom             | 内置主题 ID（见主题系统规范），如 `common.clean-light`、`common.blueprint`、`mindmap.vivid-branches` | 由图表类型 profile 决定      | 颜色/字体主题（对应 StyleSheet 的 `id` 字段） |
 | `render_style`| atom             | `standard`, `excalidraw`, `cross-hatch`, `blueprint`, `spatial-clarity`, `neon-glow`, `stipple` | `standard` | 笔触皮肤（与 theme 分工：theme 管颜色，render_style 管绘制风格） |
-| `group_frame`  | atom 或配置块        | `stack { ... }` \| `matrix { ... }` | 由算法默认决定 | **[新增]** Group Frame 统一配置块，统一控制组间排列/尺寸/对齐/间距/量化；旧属性 `group_sizing`/`group_arrangement`/`group_gap`/`group_align`/`snap` 保留为语法糖（见 §4.6） |
-| `group_sizing` | atom             | `fit`, `uniform` | `fit` | 顶层分组宽度策略（`group_frame` sugar，建议直接使用 `group_frame`）；适用于含 group 的布局 |
+| `group_frame`  | atom 或配置块        | `stack { ... }` \| `matrix { ... }` | 由算法默认决定 | Group Frame：**组间几何唯一入口**（见 §4.6） |
 | `snap`         | boolean          | `true`, `false` | `true` | 边路由后像素量化开关（`group_frame` sugar，建议直接使用 `group_frame` 的 `snap` 选项） |
 | `align`        | boolean / atom   | `true`, `false`, `rank`, `layer`, `full`, `off` | `true` | 节点结构对齐（L3 Node Frame）：rank/layer 轴独立控制，路由前执行（见 §4.8） |
-| `group_arrangement` | atom         | `vertical`, `horizontal` | `vertical` | group 间排列方向（`group_frame` sugar，建议直接使用 `group_frame: stack { axis: ... }`） |
-| `group_gap`    | number           | 正数            | `60`                  | group 间距（像素）（`group_frame` sugar，建议直接使用 `group_frame` 的 `gap` 选项） |
-| `group_align`  | atom             | `center`, `left` \| `start` | `center`             | group 间对齐方式（`group_frame` sugar，建议直接使用 `group_frame` 的 `cross` 选项） |
 
 ### 4.4 布局算法
 
@@ -255,19 +251,23 @@ diagram flowchart {
 
 > **时序图**（`diagram sequence`）不支持 `edge_routing`；消息路径由 `layout: sequence` 在布局阶段生成。显式声明 `edge_routing` 将报错。
 
-> **注意：** `direction`、`theme`、`render_style`、`group_sizing` 使用 atom 字面量（无引号）。`layout`、`edge_routing` 可为 atom 或 `algo { options }` 配置块；配置块内的 option key 由各算法自行定义。多词算法/路由名用连字符分段，如 `sugiyama-v2`；主题 ID 含点号，如 `common.clean-light`、`mindmap.vivid-branches`。
+> **注意：** `direction`、`theme`、`render_style` 使用 atom 字面量（无引号）。`layout`、`edge_routing` 可为 atom 或 `algo { options }` 配置块；配置块内的 option key 由各算法自行定义。多词算法/路由名用连字符分段，如 `sugiyama-v2`；主题 ID 含点号，如 `common.clean-light`、`mindmap.vivid-branches`。
 
 **`direction` 布局支持矩阵：**
 
-| 布局 / 图表类型 | 支持的 direction 值 | 不支持 direction |
+| 布局算法 | 支持的 direction 值 | 说明 |
 | --- | --- | --- |
-| `flowchart` / `er` / `sugiyama` / `sugiyama-v2` / `architecture` | `top-to-bottom`, `left-to-right` | `radial` |
-| `mindmap` | `radial`, `top-to-bottom`, `left-to-right` | — |
-| `sequence` / `state` / `force-directed` / `circular` | — | 不支持 `direction`，声明将报错 |
+| `flowchart` / `er` / `sugiyama` / `sugiyama-v2` | `top-to-bottom`, `left-to-right` | 消费 diagram 级 `direction`（流向轴） |
+| `mindmap` | `radial`, `top-to-bottom`, `left-to-right` | 默认多为 `left-to-right` |
+| `architecture` / `sequence` / `state` / `force-directed` / `circular` | — | **不支持** `direction`；显式声明将报错 |
+
+> **架构图注意**：默认布局 `architecture` 不读 `direction`。层间/组间左右排列请用 `group_frame: stack { axis: horizontal }`（与 flowchart 的 `direction: left-to-right` 不是同一概念）。详见 [group-layout-and-frame.md](../../guides/group-layout-and-frame.md)。
 
 ### 4.6 `group_frame` 统一配置块（新增）
 
-`group_frame` 是组间宏观几何的统一配置入口，将原分散的 `group_sizing`、`group_arrangement`、`group_gap`、`group_align`、`snap` 整合为一个配置块。旧属性仍可使用（语法糖），新代码推荐直接使用 `group_frame`。
+`group_frame` 是组间宏观几何的**唯一** DSL 入口。旧属性 `group_sizing` / `group_arrangement` / `group_gap` / `group_align` **已移除**。
+
+> 选项能力与用途详解：[group-layout-and-frame.md](../../guides/group-layout-and-frame.md)
 
 **语法：**
 
@@ -281,9 +281,9 @@ diagram flowchart {
 | 选项 | 类型 | 可选值 | 默认值 | 说明 |
 | --- | --- | --- | --- | --- |
 | `axis` | atom | `horizontal` / `h`, `vertical` / `v` | 由算法决定 | 堆叠轴方向 |
-| `gap` | number | 正数 | 60 (flowchart) / 50 (architecture) | 组间净间距（像素） |
-| `track` | atom/number | `fit`, `equal`/`uniform`, 固定数值 | `fit` | 主轴 track 尺寸策略；`equal` 同级等宽/等高 |
-| `cross` | atom | `start`/`left`, `center`, `end`/`right`, `stretch` | `center` (flowchart) / `start` (architecture) | 交叉轴对齐方式 |
+| `gap` | number | 正数 | ~48 (flowchart) / ~40 (architecture) | 组间净间距（像素） |
+| `track` | atom/number | `fit`, `equal`/`uniform`, 固定数值 | architecture 默认 `equal`；flowchart 默认 `fit` | 主轴 track 尺寸策略；`equal` 同级等宽/等高 |
+| `cross` | atom | `start`/`left`, `center`, `end`/`right`, `stretch` | `center` | 交叉轴对齐方式 |
 | `border` | atom | `none`, `shared`/`shared_lines` | `none` (flowchart) / `shared` (architecture) | 边框共线策略 |
 | `snap` | boolean/number | `true`, `false`, 步长数值 | `true` (步长 8px) | 像素量化开关/步长 |
 
@@ -328,67 +328,21 @@ diagram flowchart {
 }
 ```
 
-### 4.7 `group_sizing` 说明（兼容保留）
+### 4.7 已移除的组间糖属性
 
-| 值 | 行为 |
-| --- | --- |
-| `fit` | 每个顶层 group 宽度贴合组内内容（默认） |
-| `uniform` | 所有顶层 group 拉齐到最宽者；组内节点在拉宽后的框内**水平居中**，适合流水线/阶段类架构图 |
+`group_sizing` / `group_arrangement` / `group_gap` / `group_align` **已删除**。请使用 §4.6 `group_frame`。
 
-```plotgram
-diagram architecture {
-    title: "数据仓 ETL 处理架构"
-    config {
-        group_sizing: uniform
-    }
-    ...
-}
-```
+flowchart 含 group 时的分治排列同样只读 `group_frame`（与 L1 同一真源）。
 
-### 4.7 `group_arrangement` / `group_gap` / `group_align` 说明
+> **嵌套 group 限制**：flowchart 分治路径当前不支持嵌套 group。若 flowchart 声明了嵌套 group，子 group 的边界和标签会丢失。如需嵌套 group，请使用 `diagram architecture`。
 
-这三个属性控制 **flowchart 含 group 时的分治布局**（每个 group 独立布局后，再按指定方向堆叠合并）。仅对 `diagram flowchart` 且存在 group 时生效；无 group 或其他图表类型声明这些属性不会报错但也不生效。
-
-> **嵌套 group 限制**：flowchart 分治路径当前不支持嵌套 group。若 flowchart 声明了嵌套 group，子 group 的边界和标签会丢失，其内部节点会被当作顶层 group 的直接成员一起布局。如需嵌套 group 支持，请使用 `diagram architecture`（`architecture-v2` 布局已递归处理嵌套）。
-
-| 属性 | 值 | 行为 |
-| --- | --- | --- |
-| `group_arrangement: vertical` | 默认 | group 自上而下排列（阶段划分图） |
-| `group_arrangement: horizontal` | | group 从左到右排列（泳道图） |
-| `group_gap` | 正数（默认 `60`） | 相邻 group 边界之间的像素间距 |
-| `group_align: center` | 默认 | `vertical` 时各 group 水平居中对齐；`horizontal` 时各 group 垂直居中对齐 |
-| `group_align: left` | | `vertical` 时各 group 左对齐；`horizontal` 时各 group 顶部对齐 |
-
-```plotgram
-// 泳道图示例
-diagram flowchart {
-    title: "订单处理泳道"
-    config {
-        group_arrangement: horizontal
-        group_gap: 40
-        group_align: center
-    }
-
-    group customer "客户" {
-        entity[start] order "下单"
-        entity[process] pay "支付"
-    }
-    group warehouse "仓库" {
-        entity[process] pick "拣货"
-        entity[process] pack "打包"
-    }
-
-    order -> pay
-    pay -> pick
-    pick -> pack
-}
-```
+**与 `group_frame.cross` 的区别**：`cross` 调节 **group 框**之间的对齐（L1）；`align` 调节**节点**在 rank/layer 轴上的结构对齐。
 
 ### 4.8 `align` 节点结构对齐（L3 Node Frame）
 
 `align` 控制**路由前**的节点坐标修正（L3 Node Frame），与 `snap`（路由后的边/组框像素量化）相互独立。
 
-**与 `group_align` 的区别**：`group_align` 调节的是 **group 框**之间的对齐（L1 Group Frame）；`align` 调节的是**节点**在 rank/layer 轴上的结构对齐。
+**与 `group_frame.cross` 的区别**：`cross` 调节的是 **group 框**之间的对齐（L1 Group Frame）；`align` 调节的是**节点**在 rank/layer 轴上的结构对齐。
 
 #### 取值
 
@@ -483,7 +437,7 @@ diagram flowchart {
 
 | 类别     | 语法       | 示例属性                                                                                                  |
 | ------ | -------- | ----------------------------------------------------------------------------------------------------- |
-| Atom   | 无引号 atom | `type`, `status`, `semantic`, `icon`, `direction`, `layout`, `edge_routing`, `render_style`, `theme`, `group_sizing`, `border_style`, group `layout` |
+| Atom   | 无引号 atom | `type`, `status`, `semantic`, `icon`, `direction`, `layout`, `edge_routing`, `render_style`, `theme`, `border_style`, group `layout` |
 | String | 引号字符串    | `title`, `owner`, `description`, `cardinality`, group `color`                                                               |
 | Number | 数值       | `style.stroke_width`, `style.width`, `style.height` 等                                                  |
 | Boolean | 布尔      | `snap`, `style.dashed` 等                                                                               |
@@ -714,9 +668,22 @@ api -> db "查询" { line_style: error }
 
 | 属性名           | 类型     | 可选值                                | 说明                                |
 | -------------- | ------ | ---------------------------------- | --------------------------------- |
-| `layout`       | atom   | `auto`, `horizontal`, `vertical`, `fan-out` | 组内节点布局；简写 `h` / `v`；别名 `fan_out`、`fanout`。**仅 `architecture-v2` 两阶段布局读取** |
+| `layout`       | atom   | `auto`, `horizontal`, `vertical`, `fan-out`, `fan-in`, `grid` | 组内布局 hint（L2）。简写 `h` / `v`；别名 `fan_out`/`fanout`、`fan_in`/`fanin`。**仅 architecture 两阶段布局读取** |
 | `border_style` | atom   | `solid`, `dashed`, `dotted`        | 边框样式                              |
 | `color`        | string | 任意字符串，如 `"blue"`, `"red"`          | 分组背景色标签                           |
+
+`layout` 语义速查：
+
+| 值 | 行为 |
+| --- | --- |
+| `auto` | 默认；按组内边推断 fan-out / fan-in / grid / 竖链 / Sugiyama |
+| `horizontal` | 单层横排 |
+| `vertical` | 单列竖排 |
+| `fan-out` | hub 在上（或居中），子节点展开 |
+| `fan-in` | 多源在上，sink 在下 |
+| `grid` | 规则网格（适合无内部边的同质节点） |
+
+组间排列/等宽等属 **diagram** 级 `group_frame`（唯一入口），见 §4.6。详解：[group-layout-and-frame.md](../../guides/group-layout-and-frame.md)。
 
 ```plotgram
 group process "数据计算层" {
@@ -739,7 +706,7 @@ group storage "数据存储层" {
 }
 ```
 
-与图级 `group_sizing: uniform` 配合时，各层外框等宽，组内内容水平居中，形成整齐的阶段条带。
+与图级 `group_frame: stack { track: equal }` 配合时，各层外框等宽，组内内容水平居中，形成整齐的阶段条带。
 
 ```plotgram
 group backend "后端层" {
@@ -1090,12 +1057,8 @@ diagram flowchart {
 | `edge_routing` | atom / config | body / config | 边路由算法 |
 | `theme` | atom | body / config | 主题 ID |
 | `render_style` | atom | body / config | 笔触皮肤 |
-| `group_sizing` | atom (enum) | body / config | `fit` \| `uniform` |
 | `snap` | boolean | body / config | 边路由后像素量化开关 |
 | `align` | boolean / atom | body / config | 节点结构对齐（L3）：`false`/`off`、`rank`、`layer`、`full`；见 language-spec §4.8 |
-| `group_arrangement` | atom (enum) | body / config | `vertical` \| `horizontal`（仅 flowchart 含 group 时生效） |
-| `group_gap` | number | body / config | group 间距像素（默认 `60`） |
-| `group_align` | atom (enum) | body / config | `center` \| `left`（仅 flowchart 含 group 时生效） |
 
 ### Entity 属性
 
@@ -1112,7 +1075,7 @@ diagram flowchart {
 
 | 属性 | 值类型 | 说明 |
 | --- | --- | --- |
-| `layout` | atom (enum) | `auto` \| `horizontal` \| `vertical` \| `fan-out` |
+| `layout` | atom (enum) | `auto` \| `horizontal` \| `vertical` \| `fan-out` \| `fan-in` \| `grid`（别名见 §7.3） |
 | `border_style` | atom (enum) | `solid` \| `dashed` \| `dotted` |
 | `color` | string | 背景色标签 |
 

@@ -5,10 +5,7 @@ use crate::types::attr_constants;
 use crate::types::attr_schema;
 use crate::ast::{is_valid_atom, AttributeValue, Diagram};
 use crate::error::{DiagnosticError, ValidationResult};
-use crate::layout::node::architecture_v2::{
-    is_valid_group_layout_atom, is_valid_group_sizing_atom, VALID_GROUP_LAYOUTS,
-    VALID_GROUP_SIZING,
-};
+use crate::layout::node::architecture_v2::{is_valid_group_layout_atom, VALID_GROUP_LAYOUTS};
 
 use crate::types::style_attrs::{is_atom_like, is_boolean_like, is_number_like, is_string_like};
 
@@ -37,43 +34,23 @@ pub fn validate_diagram_attributes(diagram: &Diagram, result: &mut ValidationRes
             | diagram::EDGE_ROUTING
             | diagram::GROUP_FRAME
             | diagram::THEME
-            | diagram::RENDER_STYLE
-            | diagram::GROUP_SIZING
-            | diagram::GROUP_ALIGN
-            | diagram::GROUP_ARRANGEMENT => match &attr.value {
+            | diagram::RENDER_STYLE => match &attr.value {
                 AttributeValue::String(_) => {
-                    if attr.key == diagram::GROUP_SIZING {
-                        if let Some(v) = attr.value.as_str() {
-                            if !is_valid_group_sizing_atom(v) {
-                                result.add_error(DiagnosticError::invalid_enum_value(
-                                    attr.span,
-                                    diagram::GROUP_SIZING,
-                                    v,
-                                    VALID_GROUP_SIZING,
-                                ));
-                            }
-                        }
-                    } else if !is_atom_like(&attr.value) {
+                    if !is_atom_like(&attr.value) {
                         result.add_error(DiagnosticError::structure_violation(
                             attr.span,
                             format!("属性 '{}' 的值必须是 atom", attr.key),
                         ));
                     }
-                    // 枚举值闭集校验（direction 等）：从 schema 查询 enum_values。
-                    // group_sizing 已由上方 is_valid_group_sizing_atom 校验，跳过避免重复报错。
-                    if attr.key != diagram::GROUP_SIZING {
-                        if let Some(v) = attr.value.as_str() {
-                            if let Some(valid_values) =
-                                attr_schema::enum_values_for_key(&attr.key)
-                            {
-                                if !valid_values.contains(&v) {
-                                    result.add_error(DiagnosticError::invalid_enum_value(
-                                        attr.span,
-                                        &attr.key,
-                                        v,
-                                        valid_values,
-                                    ));
-                                }
+                    if let Some(v) = attr.value.as_str() {
+                        if let Some(valid_values) = attr_schema::enum_values_for_key(&attr.key) {
+                            if !valid_values.contains(&v) {
+                                result.add_error(DiagnosticError::invalid_enum_value(
+                                    attr.span,
+                                    &attr.key,
+                                    v,
+                                    valid_values,
+                                ));
                             }
                         }
                     }
@@ -135,14 +112,6 @@ pub fn validate_diagram_attributes(diagram: &Diagram, result: &mut ValidationRes
                     ));
                 }
             }
-            diagram::GROUP_GAP => {
-                if !matches!(attr.value, AttributeValue::Number(_)) {
-                    result.add_error(DiagnosticError::structure_violation(
-                        attr.span,
-                        format!("属性 '{}' 的值必须是数字", diagram::GROUP_GAP),
-                    ));
-                }
-            }
             diagram::TITLE => {
                 if !is_string_like(&attr.value) {
                     result.add_error(DiagnosticError::structure_violation(
@@ -150,6 +119,14 @@ pub fn validate_diagram_attributes(diagram: &Diagram, result: &mut ValidationRes
                         format!("属性 '{}' 的值必须是 string", diagram::TITLE),
                     ));
                 }
+            }
+            key if diagram::removed::ALL.contains(&key) => {
+                result.add_error(DiagnosticError::structure_violation(
+                    attr.span,
+                    format!(
+                        "属性 '{key}' 已移除，请改用 group_frame: stack {{ ... }}（例如 track/axis/gap/cross）"
+                    ),
+                ));
             }
             _ => {
                 result.add_error(DiagnosticError::structure_violation(

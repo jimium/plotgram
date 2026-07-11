@@ -120,7 +120,7 @@ diagram flowchart {
 |---|--------|--------|
 | group 的角色 | **语义舞台** — 先定组，再在框内摆节点 | **阅读辅助** — 主轴仍是控制流/数据流 |
 | 布局驱动 | `architecture-v2` 两阶段：组内 → 组间 | `sugiyama-v2` 全局分层，group 为后验包围框 |
-| group 属性 | 支持 `layout`、`group_sizing: uniform` 等 | 语法支持 group，暂无组内/组间专用布局 hint |
+| group 属性 | 支持 group `layout`、diagram `group_frame` | 语法支持 group；组间用 `group_frame` |
 | 推荐使用强度 | **强烈推荐** | **按需使用** |
 
 架构图 group 是系统分层/域边界的本体；流程图 group **不参与连线**，仅作视觉与逻辑归类，帮助读者分段阅读。详见 [architecture.md §分组](./architecture.md#分组-group)。

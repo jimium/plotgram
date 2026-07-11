@@ -87,28 +87,13 @@ pub mod group_layout {
     pub const ALL: &[&str] = &[AUTO, HORIZONTAL, VERTICAL, FAN_OUT, FAN_IN, GRID];
 }
 
-/// 分组尺寸策略枚举值（diagram 级 `group_sizing` 属性）。
-pub mod group_sizing {
+/// `group_frame` 的 `track` 选项常用 atom（另接受 `equal` 与数字固定宽）。
+pub mod group_frame_track {
     pub const FIT: &str = "fit";
-    pub const UNIFORM: &str = "uniform";
+    pub const EQUAL: &str = "equal";
+    pub const UNIFORM: &str = "uniform"; // equal 别名
 
-    pub const ALL: &[&str] = &[FIT, UNIFORM];
-}
-
-/// 分组对齐方式枚举值（diagram 级 `group_align` 属性）。
-pub mod group_align {
-    pub const CENTER: &str = "center";
-    pub const LEFT: &str = "left";
-
-    pub const ALL: &[&str] = &[CENTER, LEFT];
-}
-
-/// 分组排列方向枚举值（diagram 级 `group_arrangement` 属性）。
-pub mod group_arrangement {
-    pub const VERTICAL: &str = "vertical";
-    pub const HORIZONTAL: &str = "horizontal";
-
-    pub const ALL: &[&str] = &[VERTICAL, HORIZONTAL];
+    pub const ALL: &[&str] = &[FIT, EQUAL, UNIFORM];
 }
 
 /// 节点对齐模式枚举值（diagram 级 `align` 属性）。

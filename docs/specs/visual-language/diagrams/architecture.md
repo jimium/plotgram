@@ -77,11 +77,23 @@ diagram architecture {
 
 | 属性 | 默认值 | 说明 |
 |------|--------|------|
-| `layout-algo` | `architecture-v2` | 默认分组分层；`force-directed` 适合关系复杂、需自然散开的拓扑 |
-| `edge-routing` | `orthogonal` | 正交折线表达依赖与绕行 |
-| 样式方案 | `builtin.blueprint` | 蓝图风格，偏技术图纸感 |
+| `layout` | `architecture` | 默认分组分层；`force-directed` 适合关系复杂、需自然散开的拓扑 |
+| `edge_routing` | `orthogonal` | 正交折线表达依赖与绕行 |
+| `direction` | **不支持** | 默认布局不消费 `direction`；写了会校验报错 |
+| 样式方案 | 主题决定 | 常用蓝图/技术图纸感主题 |
 
-含 `group` 时，分组包围框在力导向结果之上叠加绘制。
+含 `group` 时，用 `group_frame` 控制组间条带（默认同级等宽）。**不要**用 `direction: left-to-right` 表达「层从左到右」——应写：
+
+```plotgram
+config {
+    group_frame: stack {
+        axis: horizontal   // 顶层 group 从左到右排
+        track: equal
+    }
+}
+```
+
+详见 [group-layout-and-frame.md](../../../guides/group-layout-and-frame.md)。
 
 ---
 
@@ -120,7 +132,7 @@ diagram architecture {
 |---|--------|--------|
 | group 的角色 | **语义舞台** — 先定组，再在框内摆节点 | **阅读辅助** — 主轴仍是控制流/数据流 |
 | 布局驱动 | `architecture-v2` 两阶段：组内 → 组间 | `sugiyama-v2` 全局分层，group 为后验包围框 |
-| group 属性 | 支持 `layout`、`group_sizing: uniform` 等 | 语法支持 group，暂无组内/组间专用布局 hint |
+| group 属性 | 支持 group `layout`、diagram `group_frame` 等 | 语法支持 group，暂无组内/组间专用布局 hint |
 | 推荐使用强度 | **强烈推荐** | **按需使用** |
 
 架构图 group 是系统分层/域边界的本体；流程图 group **不参与连线**，仅作视觉与逻辑归类。详见 [flowchart.md §分组](./flowchart.md#分组-group)。
@@ -131,27 +143,42 @@ diagram architecture {
 - 表达的是**步骤顺序**而非**组件拓扑** → 改用 `flowchart`
 - 需要严格泳道（按角色/部门约束位置）→ group 可表达域边界，但不等价于泳道布局
 
-### 组内布局 `layout`
+### 组内布局 hint `layout`
+
+Group 级属性：`layout` | `border_style` | `color`。其中 `layout` 控制组内节点排列（L2）：
+
+| 值 | 说明 |
+| --- | --- |
+| `auto` | 默认，按组内拓扑推断 |
+| `horizontal` / `h` | 横排 |
+| `vertical` / `v` | 竖排 |
+| `fan-out`（`fan_out` / `fanout`） | 单枢纽扇出 |
+| `fan-in`（`fan_in` / `fanin`） | 多源汇入 |
+| `grid` | 无内部边的网格 |
 
 ```plotgram
 group process "数据计算层" {
-    layout: fan-out   // auto | horizontal | vertical | fan-out
+    layout: fan-out
     ...
 }
 ```
 
-### 等宽阶段条带 `group_sizing`
+详解见 [group-layout-and-frame.md](../../../guides/group-layout-and-frame.md)。
 
-流水线/分层类图可在 diagram 级声明等宽分组：
+### 等宽阶段条带 `group_frame`
+
+流水线/分层类图用 `track: equal`（架构图默认即为 equal）：
 
 ```plotgram
 diagram architecture {
-    group_sizing: uniform   // fit（默认）| uniform
+    config {
+        group_frame: stack { track: equal }
+    }
     ...
 }
 ```
 
-`uniform` 时所有顶层 group 拉齐到最宽者，组内节点水平居中，形成整齐的阶段条带。见 `showcase/architecture/n.data-pipeline.pgm`。
+同级顶层 group 拉齐到最宽者，组内节点水平居中。见 `showcase/architecture/n.data-pipeline.pgm`。
 
 ```plotgram
 group backend "后端服务" {
@@ -178,7 +205,7 @@ group data "数据层" {
 
 - **解析与渲染**：架构图完整支持 group 声明、嵌套与包围框绘制
 - **布局**：含顶层 group 时，`architecture-v2` 走两阶段布局（组内 Sugiyama/按 `layout` hint 排版 → 组间宏观定位 → 全局坐标回填）；无 group 时退化为分组感知的单层布局
-- **组内 hint**：`layout: auto | horizontal | vertical | fan-out` 控制组内排版；diagram 级 `group_sizing: uniform` 拉齐顶层 group 宽度
+- **组内 hint**：`layout: auto | horizontal | vertical | fan-out | fan-in | grid` 控制组内排版；diagram 级 `group_frame: stack { track: equal }` 拉齐顶层 group 宽度
 - **力导向**：`force-directed` 模式下节点先力导布局，group 包围框后验叠加
 - **路由友好性**：跨 group 边通道评估见布局友好性体系中的 `group_gap`
 
@@ -191,7 +218,7 @@ group data "数据层" {
 3. **外部系统标 `external`** — 虚线边框与普通组件区分。
 4. **网关、队列、缓存用专属 type** — 形状自带语义，减少标签负担。
 5. **复杂系统用 group 分区** — 按业务域或技术层分组；简单三层拓扑可省略。
-6. **分层图配合 `group_sizing: uniform`** — 流水线/阶段类架构形成等宽条带，便于横向对比各层。
+6. **分层图配合 `group_frame { track: equal }`** — 流水线/阶段类架构形成等宽条带，便于横向对比各层。
 
 ---
 

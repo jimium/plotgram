@@ -41,20 +41,17 @@
     }
 
     #[test]
-    fn architecture_uniform_maps_to_equal() {
-        let diagram = Diagram {
-            attributes: vec![str_attr("group_sizing", "uniform")],
-            ..Default::default()
-        };
+    fn architecture_default_equal_track() {
+        let diagram = Diagram::default();
         let spec = resolve_group_frame_spec(&diagram, "architecture");
         assert_eq!(spec.track_sizing, TrackSizing::Equal);
         assert_eq!(spec.cross_align, CrossAlign::Center);
     }
 
     #[test]
-    fn architecture_fit_explicit() {
+    fn architecture_fit_via_group_frame() {
         let diagram = Diagram {
-            attributes: vec![str_attr("group_sizing", "fit")],
+            attributes: vec![config_attr("stack", &[("track", str_val("fit"))])],
             ..Default::default()
         };
         let spec = resolve_group_frame_spec(&diagram, "architecture");
@@ -88,9 +85,9 @@
     }
 
     #[test]
-    fn flowchart_group_arrangement_horizontal() {
+    fn flowchart_axis_horizontal_via_group_frame() {
         let diagram = Diagram {
-            attributes: vec![str_attr("group_arrangement", "horizontal")],
+            attributes: vec![config_attr("stack", &[("axis", str_val("horizontal"))])],
             ..Default::default()
         };
         let spec = resolve_group_frame_spec(&diagram, "flowchart");
@@ -98,9 +95,9 @@
     }
 
     #[test]
-    fn flowchart_group_arrangement_vertical() {
+    fn flowchart_axis_vertical_via_group_frame() {
         let diagram = Diagram {
-            attributes: vec![str_attr("group_arrangement", "vertical")],
+            attributes: vec![config_attr("stack", &[("axis", str_val("vertical"))])],
             ..Default::default()
         };
         let spec = resolve_group_frame_spec(&diagram, "flowchart");
@@ -108,9 +105,9 @@
     }
 
     #[test]
-    fn flowchart_group_gap_custom() {
+    fn flowchart_gap_via_group_frame() {
         let diagram = Diagram {
-            attributes: vec![num_attr("group_gap", 120.0)],
+            attributes: vec![config_attr("stack", &[("gap", num_val(120.0))])],
             ..Default::default()
         };
         let spec = resolve_group_frame_spec(&diagram, "flowchart");
@@ -118,9 +115,9 @@
     }
 
     #[test]
-    fn flowchart_group_gap_negative_ignored() {
+    fn flowchart_gap_non_positive_keeps_default() {
         let diagram = Diagram {
-            attributes: vec![num_attr("group_gap", -10.0)],
+            attributes: vec![config_attr("stack", &[("gap", num_val(-10.0))])],
             ..Default::default()
         };
         let spec = resolve_group_frame_spec(&diagram, "flowchart");
@@ -128,9 +125,9 @@
     }
 
     #[test]
-    fn flowchart_group_align_left() {
+    fn flowchart_cross_start_via_group_frame() {
         let diagram = Diagram {
-            attributes: vec![str_attr("group_align", "left")],
+            attributes: vec![config_attr("stack", &[("cross", str_val("start"))])],
             ..Default::default()
         };
         let spec = resolve_group_frame_spec(&diagram, "flowchart");
@@ -138,59 +135,34 @@
     }
 
     #[test]
-    fn flowchart_group_align_center() {
+    fn flowchart_combined_group_frame() {
         let diagram = Diagram {
-            attributes: vec![str_attr("group_align", "center")],
-            ..Default::default()
-        };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
-        assert_eq!(spec.cross_align, CrossAlign::Center);
-    }
-
-    #[test]
-    fn flowchart_group_align_invalid_ignored() {
-        let diagram = Diagram {
-            attributes: vec![str_attr("group_align", "invalid")],
-            ..Default::default()
-        };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
-        assert_eq!(spec.cross_align, CrossAlign::Center);
-    }
-
-    #[test]
-    fn flowchart_combined_attrs() {
-        let diagram = Diagram {
-            attributes: vec![
-                num_attr("group_gap", 100.0),
-                str_attr("group_align", "left"),
-                str_attr("group_arrangement", "horizontal"),
-            ],
+            attributes: vec![config_attr(
+                "stack",
+                &[
+                    ("axis", str_val("horizontal")),
+                    ("gap", num_val(100.0)),
+                    ("cross", str_val("left")),
+                    ("track", str_val("equal")),
+                ],
+            )],
             ..Default::default()
         };
         let spec = resolve_group_frame_spec(&diagram, "flowchart");
         assert_eq!(spec.arrangement, GroupArrangement::Stack { axis: Axis::Horizontal });
         assert_eq!(spec.cross_align, CrossAlign::Start);
+        assert_eq!(spec.track_sizing, TrackSizing::Equal);
         assert!((spec.gap - 100.0).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn flowchart_group_sizing_uniform_maps_to_equal() {
-        let diagram = Diagram {
-            attributes: vec![str_attr("group_sizing", "uniform")],
-            ..Default::default()
-        };
-        let spec = resolve_group_frame_spec(&diagram, "flowchart");
-        assert_eq!(spec.track_sizing, TrackSizing::Equal);
-    }
-
-    #[test]
-    fn flowchart_group_sizing_fit_default() {
+    fn flowchart_track_fit_default() {
         let diagram = Diagram::default();
         let spec = resolve_group_frame_spec(&diagram, "flowchart");
         assert_eq!(spec.track_sizing, TrackSizing::Fit);
     }
 
-    // ─── group_frame 配置块（P2 sugar）────────────────────
+    // ─── group_frame 配置块 ────────────────────
 
     use std::collections::HashMap as StdHashMap;
 
@@ -344,10 +316,10 @@
     #[test]
     fn resolve_is_deterministic_across_calls() {
         let diagram = Diagram {
-            attributes: vec![
-                num_attr("group_gap", 80.0),
-                str_attr("group_align", "left"),
-            ],
+            attributes: vec![config_attr(
+                "stack",
+                &[("gap", num_val(80.0)), ("cross", str_val("left"))],
+            )],
             ..Default::default()
         };
         let s1 = resolve_group_frame_spec(&diagram, "flowchart");
