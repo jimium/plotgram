@@ -6,8 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Space, Tooltip, Spin, Empty, Segmented, Select, Dropdown, message } from 'antd';
-import type { MenuProps } from 'antd';
+import { Button, Space, Tooltip, Spin, Empty, Segmented, Select, message } from 'antd';
 import {
   ZoomInOutlined,
   ZoomOutOutlined,
@@ -16,6 +15,7 @@ import {
   BgColorsOutlined,
   MoonOutlined,
   SunOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import { DslViewer } from './DslViewer';
 import {
@@ -24,7 +24,7 @@ import {
   buildRenderOptions,
   type AppearanceOptions,
 } from '@lib/themes';
-import { downloadSvg, downloadPng, downloadDrawio, openInDrawio, copyText } from '@lib/exportImage';
+import { downloadSvg, downloadPng, openInDrawio, copyText } from '@lib/exportImage';
 
 interface PreviewCanvasProps {
   svg: string;
@@ -123,25 +123,27 @@ export function PreviewCanvas({
     });
   }, []);
 
-  // 滚轮 / 双指缩放：用 clientX - rect.left 计算稳定中心点
+  // 滚轮 / 双指手势：
+  //   - ctrlKey=true（pinch zoom 捏合）→ 缩放
+  //   - 普通滚动（双指上下/鼠标滚轮）→ 平移画面
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const listener = (e: WheelEvent) => {
       if (!svg || view !== 'preview') return;
       e.preventDefault();
-      const rect = container.getBoundingClientRect();
-      const cx = e.clientX - rect.left;
-      const cy = e.clientY - rect.top;
-      // macOS trackpad pinch zoom 会触发 ctrlKey=true 的 wheel 事件，
-      // deltaY 代表缩放级别变化（负值=放大），用 exp 让缩放跟随手势
-      let factor: number;
       if (e.ctrlKey) {
-        factor = Math.exp(-e.deltaY * 0.01);
+        // pinch zoom：以光标为中心缩放
+        const rect = container.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const factor = Math.exp(-e.deltaY * 0.01);
+        zoomAt(cx, cy, factor);
       } else {
-        factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
+        // 普通滚动：平移画面
+        setTx((prev) => prev - e.deltaX);
+        setTy((prev) => prev - e.deltaY);
       }
-      zoomAt(cx, cy, factor);
     };
     container.addEventListener('wheel', listener, { passive: false });
     return () => container.removeEventListener('wheel', listener);
@@ -192,6 +194,30 @@ export function PreviewCanvas({
     [zoomAt],
   );
 
+  const resetTo100 = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || !svg) return;
+    const svgEl = container.querySelector('svg');
+    if (!svgEl) return;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const viewBox = svgEl.viewBox.baseVal;
+    let naturalW: number;
+    let naturalH: number;
+    if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+      naturalW = viewBox.width;
+      naturalH = viewBox.height;
+    } else {
+      const bbox = svgEl.getBoundingClientRect();
+      naturalW = bbox.width / (scaleRef.current || 1);
+      naturalH = bbox.height / (scaleRef.current || 1);
+    }
+    if (naturalW === 0 || naturalH === 0) return;
+    setScale(1);
+    setTx((cw - naturalW) / 2);
+    setTy((ch - naturalH) / 2);
+  }, [svg]);
+
   // 导出操作
   const handleExportSvg = () => {
     if (svg) {
@@ -205,16 +231,6 @@ export function PreviewCanvas({
       downloadPng(svg, 'diagram.png', 2)
         .then(() => message.success('PNG 已导出 (2x)'))
         .catch(() => message.error('PNG 导出失败'));
-    }
-  };
-
-  const handleDrawioDownload = () => {
-    const xml = onRenderDrawio(JSON.stringify(buildRenderOptions(appearance)));
-    if (xml) {
-      downloadDrawio(xml);
-      message.success('Drawio 文件已下载');
-    } else {
-      message.error('Drawio 生成失败');
     }
   };
 
@@ -234,16 +250,6 @@ export function PreviewCanvas({
         .catch(() => message.error('复制失败'));
     }
   };
-
-  const exportMenuItems: MenuProps['items'] = [
-    { key: 'svg', label: '导出 SVG', onClick: handleExportSvg },
-    { key: 'png', label: '导出 PNG (2x)', onClick: handleExportPng },
-    { type: 'divider' },
-    { key: 'drawio_dl', label: '下载 .drawio', onClick: handleDrawioDownload },
-    { key: 'drawio_open', label: '在 draw.io 中打开', onClick: handleDrawioOpen },
-    { type: 'divider' },
-    { key: 'copy_dsl', label: '复制 DSL 源码', onClick: handleCopyDsl },
-  ];
 
   // 主题选项
   const themeOptions = THEME_GROUPS.flatMap((g) => [
@@ -287,11 +293,27 @@ export function PreviewCanvas({
               </Tooltip>
             </div>
           )}
-          <Dropdown menu={{ items: exportMenuItems }} disabled={!svg && !source}>
-            <Button size="small" icon={<DownloadOutlined />} className="preview-export-btn">
-              导出
-            </Button>
-          </Dropdown>
+          <Space size={4} className="preview-export-group">
+            <Tooltip title="导出 SVG 文件">
+              <Button size="small" icon={<DownloadOutlined />} onClick={handleExportSvg} disabled={!svg}>
+                SVG
+              </Button>
+            </Tooltip>
+            <Tooltip title="导出 PNG 图片 (2x)">
+              <Button size="small" onClick={handleExportPng} disabled={!svg}>
+                PNG
+              </Button>
+            </Tooltip>
+            <Tooltip title="在 draw.io 中打开">
+              <Button size="small" onClick={handleDrawioOpen} disabled={!svg}>
+                draw.io
+              </Button>
+            </Tooltip>
+            <Tooltip title="复制 DSL 源码">
+              <Button size="small" icon={<CopyOutlined />} onClick={handleCopyDsl} disabled={!source}>
+              </Button>
+            </Tooltip>
+          </Space>
         </Space>
       </div>
 
@@ -351,9 +373,16 @@ export function PreviewCanvas({
                 <Tooltip title="缩小">
                   <Button size="small" type="text" icon={<ZoomOutOutlined />} onClick={() => zoomByButton(1 / 1.1)} />
                 </Tooltip>
-                <span style={{ fontSize: 12, minWidth: 48, textAlign: 'center' }}>
-                  {Math.round(scale * 100)}%
-                </span>
+                <Tooltip title="重置为 100%">
+                  <Button
+                    size="small"
+                    type="text"
+                    onClick={resetTo100}
+                    style={{ fontSize: 12, minWidth: 48, textAlign: 'center', padding: '0 4px' }}
+                  >
+                    {Math.round(scale * 100)}%
+                  </Button>
+                </Tooltip>
                 <Tooltip title="放大">
                   <Button size="small" type="text" icon={<ZoomInOutlined />} onClick={() => zoomByButton(1.1)} />
                 </Tooltip>

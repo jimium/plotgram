@@ -10,6 +10,13 @@ use std::fmt::Write;
 
 const GLYPH_VIEWBOX: f64 = 24.0;
 
+/// 图标相对标签字号的默认倍率：略大于文字，作节点识别标记。
+/// catalog `scale` 仍可在此基础上做单图标微调。
+const ICON_TO_FONT_RATIO: f64 = 1.45;
+
+/// 相对 catalog `gap` 的额外间距，避免放大后图标与文字贴挤。
+const ICON_GAP_EXTRA: f64 = 1.0;
+
 /// 内侧图标 + 标签的排版结果。
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IconLayout {
@@ -23,6 +30,14 @@ pub struct IconLayout {
     pub icon_y: f64,
     pub label_x: f64,
     pub label_y: f64,
+}
+
+fn resolved_icon_size(font_size: f64, def: &IconDef) -> f64 {
+    font_size * ICON_TO_FONT_RATIO * def.scale
+}
+
+fn resolved_icon_gap(def: &IconDef) -> f64 {
+    def.gap + ICON_GAP_EXTRA
 }
 
 /// 节点是否满足图标最小尺寸要求。
@@ -46,8 +61,8 @@ pub fn layout_inside(
         return None;
     }
 
-    let icon_size = font_size * def.scale;
-    let gap = def.gap;
+    let icon_size = resolved_icon_size(font_size, def);
+    let gap = resolved_icon_gap(def);
     let group_width = icon_size + gap + label_width;
     let group_height = icon_size.max(font_size);
     let group_x = node_x + (node_width - group_width) / 2.0;
@@ -77,7 +92,7 @@ pub fn extra_node_width(def: &IconDef, font_size: f64) -> f64 {
     if def.placement != IconPlacement::Inside {
         return 0.0;
     }
-    font_size * def.scale + def.gap
+    resolved_icon_size(font_size, def) + resolved_icon_gap(def)
 }
 
 /// 渲染节点内侧内容：有图标时 icon+label 横排居中，否则标签居中。

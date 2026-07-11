@@ -4,15 +4,13 @@
  * 三栏布局：左侧预览（SVG + DSL）| 中间对话 | 右侧执行轨迹
  */
 
-import { useCallback } from 'react';
-import { Layout, App as AntdApp } from 'antd';
+import { Layout } from 'antd';
 import { TopBar } from '@components/TopBar';
 import { PreviewCanvas } from '@components/PreviewCanvas';
 import { ChatPanel } from '@components/ChatPanel';
 import { ToolCallTrace } from '@components/ToolCallTrace';
 import { useAgent } from '@hooks/useAgent';
 import { useWasm } from '@hooks/useWasm';
-import { downloadSvg } from '@lib/exportImage';
 import './styles/app.css';
 
 const { Header, Content } = Layout;
@@ -20,14 +18,6 @@ const { Header, Content } = Layout;
 function App() {
   const { wasm, ready, error: wasmError, version } = useWasm();
   const agent = useAgent({ wasm, ready });
-  const { message } = AntdApp.useApp();
-
-  const handleExport = useCallback(() => {
-    if (agent.currentSvg) {
-      downloadSvg(agent.currentSvg);
-      message.success('已导出 SVG');
-    }
-  }, [agent.currentSvg, message]);
 
   return (
     <Layout className="studio-shell">
@@ -37,8 +27,6 @@ function App() {
           wasmReady={ready}
           wasmError={wasmError}
           isAgentRunning={agent.isRunning}
-          canExport={Boolean(agent.currentSvg)}
-          onExport={handleExport}
         />
       </Header>
 

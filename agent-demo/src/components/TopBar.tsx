@@ -9,7 +9,6 @@
 
 import { Button, Tooltip, Space, Typography } from 'antd';
 import {
-  DownloadOutlined,
   CheckCircleFilled,
   ExclamationCircleFilled,
   LoadingOutlined,
@@ -26,8 +25,6 @@ interface TopBarProps {
   wasmReady: boolean;
   wasmError: string | null;
   isAgentRunning: boolean;
-  canExport: boolean;
-  onExport: () => void;
   onOpenDocs?: () => void;
 }
 
@@ -46,8 +43,6 @@ export function TopBar({
   wasmReady,
   wasmError,
   isAgentRunning,
-  canExport,
-  onExport,
   onOpenDocs,
 }: TopBarProps) {
   return (
@@ -125,15 +120,6 @@ export function TopBar({
             onClick={() => window.open('https://github.com/plotgram/plotgram', '_blank', 'noopener')}
           />
         </Tooltip>
-        <Button
-          type="primary"
-          icon={<DownloadOutlined />}
-          onClick={onExport}
-          disabled={!canExport}
-          className="topbar-export-btn"
-        >
-          导出 SVG
-        </Button>
       </Space>
     </div>
   );
