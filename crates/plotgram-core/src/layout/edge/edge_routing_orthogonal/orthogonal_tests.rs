@@ -1274,6 +1274,63 @@
         );
     }
 
+    /// 锯齿消毒 2.0：无反向 stub、无斜段、关键边无同轴 U 折。
+    #[test]
+    fn stress_nested_no_reverse_exit_stubs() {
+        use super::sanitize::{first_segment_is_reverse, has_non_orthogonal_segment};
+        use crate::layout::geometry::Point;
+
+        let source = include_str!(
+            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
+        );
+        let output = crate::pipeline::parse_prepare_validate(
+            source,
+            &crate::prepare::StyleRequest::default(),
+        );
+        let prepared = output.diagram.expect("valid diagram");
+        let layout = crate::layout::compute_layout_with_plan(
+            prepared.inner(),
+            prepared.layout_plan(),
+        )
+        .expect("layout");
+
+        let mut problems = Vec::new();
+        for (i, edge) in layout.edges.iter().enumerate() {
+            let pts: Vec<Point> = edge.path_points().into_owned();
+            if pts.len() < 2 {
+                continue;
+            }
+            let rel = &prepared.inner().relations[i];
+            let label = rel.label.as_deref().unwrap_or("");
+            if first_segment_is_reverse(&pts, edge.from_port) {
+                problems.push(format!("REV {label} {}->{}", rel.from, rel.to));
+            }
+            if has_non_orthogonal_segment(&pts) {
+                problems.push(format!("NON_ORTHO {label} {}->{}", rel.from, rel.to));
+            }
+            // 同轴 U：离开通道后又折回
+            if pts.len() >= 5 {
+                for w in pts.windows(5) {
+                    let (a, b, c, d, e) = (w[0], w[1], w[2], w[3], w[4]);
+                    let vert_u = (a.x - b.x).abs() < 0.5
+                        && (b.y - c.y).abs() < 0.5
+                        && (c.x - d.x).abs() < 0.5
+                        && (d.y - e.y).abs() < 0.5
+                        && (e.x - a.x).abs() < 0.5
+                        && (c.x - a.x).abs() > 0.5;
+                    if vert_u {
+                        problems.push(format!("U_TURN {label} {}->{}", rel.from, rel.to));
+                    }
+                }
+            }
+        }
+        assert!(
+            problems.is_empty(),
+            "sanitize 2.0 defects remain:\n{}",
+            problems.join("\n")
+        );
+    }
+
     /// G1: `strict_group_transit` 默认 false，由调用方按边 corridor 可达性覆盖。
     ///
     /// 验证：无 corridor 的图 → 默认 false；有 corridor 的图 → 仍默认 false（按边判定）；

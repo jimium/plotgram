@@ -24,7 +24,7 @@ use super::layout::constants::{
 use super::layout::coordinate::{
     align_client_nodes_to_hubs, center_group_hub_nodes, layer_centers_from_placed,
     pull_toward_neighbors, rebalance_infrastructure_layers, resolve_x_overlaps,
-    uniform_initial_positions,
+    resolve_x_overlaps_with_gaps, uniform_initial_positions,
 };
 use super::layout::order::{build_layers, order_layers_group_aware};
 use super::layout::postprocess::{clamp_to_canvas, compute_total_size};
@@ -280,6 +280,17 @@ pub(super) fn compute_two_phase_layout(
         canvas_area_delta_pct,
     };
 
+    // 空间契约：边感知间距写入 hints，并做一次水平缝 enforce
+    let space_budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
+    crate::layout::space_budget::enforce_horizontal_gaps(&mut nodes, &space_budget);
+    crate::layout::group_frame::expand_groups_to_contain_contents(
+        diagram,
+        &mut groups,
+        &nodes,
+        bounds_padding,
+        container_padding_for_leaf(bounds_padding),
+    );
+
     let (total_width, total_height) = compute_total_size(&nodes, &groups);
 
     let sibling_corridors =
@@ -309,6 +320,7 @@ pub(super) fn compute_two_phase_layout(
             sugiyama_ranks: Some(sugiyama_ranks),
             group_routing: Some(group_routing),
             gutter_budget_debug: Some(gutter_budget_debug),
+            space_budget: Some(space_budget),
             ..Default::default()
         },
     }
@@ -385,11 +397,14 @@ fn layout_intra_group(
         &decl_index,
     );
 
+    let member_set: HashSet<String> = members.iter().cloned().collect();
+    let space_budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
     let mut nodes = assign_coordinates_intra(
         graph,
         &ordered_layers,
         sizes,
         &member_set,
+        Some(&space_budget),
     );
 
     center_group_hub_nodes(graph, &intra_map, &ordered_layers, sizes, &mut nodes);
@@ -413,7 +428,13 @@ fn layout_intra_group(
         let ranks = assign_ranks_for_mode(&grid_mode, members, graph, reversed);
         let layers = build_layers(&ranks, &decl_index);
         ordered_layers = order_layers_group_aware(graph, &intra_map, &layers, reversed, &decl_index);
-        nodes = assign_coordinates_intra(graph, &ordered_layers, sizes, &member_set);
+        nodes = assign_coordinates_intra(
+            graph,
+            &ordered_layers,
+            sizes,
+            &member_set,
+            Some(&space_budget),
+        );
         center_group_hub_nodes(graph, &intra_map, &ordered_layers, sizes, &mut nodes);
         align_client_nodes_to_hubs(graph, &intra_map, &ordered_layers, sizes, &mut nodes);
         normalize_to_origin(&mut nodes);
@@ -949,7 +970,13 @@ fn layout_ungrouped_cluster(
     let layers = build_layers(&ranks, &decl_index);
     let member_set: HashSet<String> = members.iter().cloned().collect();
 
-    let mut nodes = assign_coordinates_intra(graph, &layers, sizes, &member_set);
+    let mut nodes = assign_coordinates_intra(
+        graph,
+        &layers,
+        sizes,
+        &member_set,
+        Some(&crate::layout::space_budget::SpaceBudget::from_diagram(diagram)),
+    );
     normalize_to_origin(&mut nodes);
     let (content_width, content_height) = content_bbox(&nodes);
 
@@ -981,6 +1008,7 @@ fn assign_coordinates_intra(
     layers: &[Vec<String>],
     sizes: &HashMap<String, (f64, f64)>,
     member_set: &HashSet<String>,
+    budget: Option<&crate::layout::space_budget::SpaceBudget>,
 ) -> HashMap<String, NodeLayout> {
     let mut nodes = HashMap::new();
 
@@ -1027,7 +1055,6 @@ fn assign_coordinates_intra(
             None
         };
 
-        // 组内坐标分配使用 6 轮迭代（比全局 8 轮少，组内图较小收敛更快）
         for _ in 0..6 {
             if let Some(ref upper) = upper_x {
                 pull_toward_neighbors(
@@ -1053,7 +1080,11 @@ fn assign_coordinates_intra(
             }
         }
 
-        let adjusted = resolve_x_overlaps(layer, &positions, sizes);
+        let adjusted = if let Some(b) = budget {
+            resolve_x_overlaps_with_gaps(layer, &positions, sizes, |a, c| b.min_gap(a, c))
+        } else {
+            resolve_x_overlaps(layer, &positions, sizes)
+        };
 
         for (i, node) in layer.iter().enumerate() {
             let (width, height) = sizes

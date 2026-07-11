@@ -477,6 +477,7 @@ pub fn select_best_path_with_scorer_stats(
 }
 
 /// 路由硬失败时的正交兜底：同轴可直线；否则在 L/Z 与外框绕行中选穿组更少者。
+/// 所有候选在出口/入口强制外向 stub，避免退化路径首段反向伸入节点。
 fn orthogonal_degraded_fallback(
     ctx: &RoutingContext<'_>,
     start: Point,
@@ -490,29 +491,45 @@ fn orthogonal_degraded_fallback(
     let sy = start.y;
     let ex = end.x;
     let ey = end.y;
+
+    let mut candidates: Vec<Vec<Point>> = Vec::new();
+    // 同轴直线仅在不穿无关节点时作为候选（禁止静默穿障变直）
     if (sx - ex).abs() < EPS || (sy - ey).abs() < EPS {
-        return vec![start, end];
+        let straight = ensure_port_stubs(vec![start, end], from_side, to_side);
+        if path_is_clean(
+            &straight,
+            from_id,
+            to_id,
+            ctx.nodes,
+            ctx.group_ctx,
+            &ctx.obstacles.sorted_node_ids,
+        ) {
+            return straight;
+        }
+    } else {
+        candidates.extend(compute_orthogonal_path_variants(
+            sx, sy, from_side, ex, ey, to_side,
+        ));
+        candidates.push(simplify_path(vec![
+            Point::new(sx, sy),
+            Point::new(ex, sy),
+            Point::new(ex, ey),
+        ]));
+        candidates.push(simplify_path(vec![
+            Point::new(sx, sy),
+            Point::new(sx, ey),
+            Point::new(ex, ey),
+        ]));
     }
 
-    let mut candidates = compute_orthogonal_path_variants(sx, sy, from_side, ex, ey, to_side);
-    candidates.push(simplify_path(vec![
-        Point::new(sx, sy),
-        Point::new(ex, sy),
-        Point::new(ex, ey),
-    ]));
-    candidates.push(simplify_path(vec![
-        Point::new(sx, sy),
-        Point::new(sx, ey),
-        Point::new(ex, ey),
-    ]));
-
     // 绕所有组外框的通道（嵌套架构图上短 L 常穿父组，外框绕行更干净）
-    const OUTER_PAD: f64 = 28.0;
+    // S2：corridor_boost 时加大垫，优先走已升档的外框通道
+    let outer_pad = if ctx.corridor_boost { 56.0 } else { 28.0 };
     if let Some((x_lo, y_lo, x_hi, y_hi)) = groups_outer_bounds(ctx) {
-        let left = x_lo - OUTER_PAD;
-        let right = x_hi + OUTER_PAD;
-        let top = y_lo - OUTER_PAD;
-        let bottom = y_hi + OUTER_PAD;
+        let left = x_lo - outer_pad;
+        let right = x_hi + outer_pad;
+        let top = y_lo - outer_pad;
+        let bottom = y_hi + outer_pad;
         for x in [left, right] {
             candidates.push(simplify_path(vec![
                 Point::new(sx, sy),
@@ -533,6 +550,7 @@ fn orthogonal_degraded_fallback(
 
     let mut best: Option<(u32, u32, f64, Vec<Point>)> = None;
     for path in candidates {
+        let path = ensure_port_stubs(path, from_side, to_side);
         if path.len() < 2 || !path_is_orthogonal(&path) {
             continue;
         }
@@ -565,12 +583,65 @@ fn orthogonal_degraded_fallback(
         }
     }
     best.map(|(_, _, _, p)| p).unwrap_or_else(|| {
-        simplify_path(vec![
-            Point::new(sx, sy),
-            Point::new(ex, sy),
-            Point::new(ex, ey),
-        ])
+        ensure_port_stubs(
+            simplify_path(vec![
+                Point::new(sx, sy),
+                Point::new(ex, sy),
+                Point::new(ex, ey),
+            ]),
+            from_side,
+            to_side,
+        )
     })
+}
+
+/// 保证路径首/末段沿端口外向离开/进入（退化兜底专用）。
+fn ensure_port_stubs(mut path: Vec<Point>, from_side: Port, to_side: Port) -> Vec<Point> {
+    if path.len() < 2 {
+        return path;
+    }
+    let (fox, foy) = port_outward(from_side);
+    let (tox, toy) = port_outward(to_side);
+    let start = path[0];
+    let end = *path.last().unwrap();
+    let from_stub = Point::new(start.x + fox * PORT_CLEARANCE, start.y + foy * PORT_CLEARANCE);
+    let to_stub = Point::new(end.x + tox * PORT_CLEARANCE, end.y + toy * PORT_CLEARANCE);
+
+    // 去掉旧首段若已反向或过短，再插入标准 stub
+    let mut mid: Vec<Point> = path.drain(1..path.len().saturating_sub(1)).collect();
+    // 若 mid 首点在 from 背后，丢掉
+    while let Some(&p) = mid.first() {
+        let fp = (p.x - start.x) * fox + (p.y - start.y) * foy;
+        if fp >= PORT_CLEARANCE * 0.5 {
+            break;
+        }
+        mid.remove(0);
+    }
+    while let Some(&p) = mid.last() {
+        let fp = (p.x - end.x) * tox + (p.y - end.y) * toy;
+        if fp >= PORT_CLEARANCE * 0.5 {
+            break;
+        }
+        mid.pop();
+    }
+
+    let mut out = vec![start, from_stub];
+    if let Some(&first_mid) = mid.first() {
+        if (from_stub.x - first_mid.x).abs() > EPS && (from_stub.y - first_mid.y).abs() > EPS {
+            out.push(Point::new(first_mid.x, from_stub.y));
+        }
+        out.extend(mid);
+    }
+    if let Some(&last) = out.last() {
+        if (last.x - to_stub.x).abs() > EPS && (last.y - to_stub.y).abs() > EPS {
+            out.push(Point::new(to_stub.x, last.y));
+        }
+    }
+    if out.last().is_none_or(|p| (p.x - to_stub.x).abs() > EPS || (p.y - to_stub.y).abs() > EPS) {
+        out.push(to_stub);
+    }
+    out.push(end);
+    simplify_path(out)
 }
 
 fn groups_outer_bounds(ctx: &RoutingContext<'_>) -> Option<(f64, f64, f64, f64)> {

@@ -300,10 +300,10 @@ PreparedObstacles（确定性排序）
 ```text
 1. 基线固化：showcase 关键样例 + lint/eval 指标快照（本笔记 + baseline）
 2. 组框审美：默认偏向同级条带（uniform / equal+center），保留 Fit 逃生舱
-3. 空间预算：把 EGB 与 group_sizing / corridor 预算前移到布局阶段协商
+3. 空间预算：把 EGB 与 group_sizing / corridor 预算前移到布局阶段协商 → 见 [space-contract-2026-07.md](./space-contract-2026-07.md)
 4. Sugiyama 收敛：组内布局委托 sugiyama_v2 或统一接口（小步、可 A/B）
 5. 正交编排拆分：path/scoring/slot/corridor 已模块化，继续拆 mod.rs 后处理
-6. 反馈环收紧：减少 PRS/refine 后「推节点→全图重路由」的次数与范围
+6. 反馈环收紧：减少 PRS/refine 后「推节点→全图重路由」的次数与范围 → 见 [space-contract-2026-07.md](./space-contract-2026-07.md)
 ```
 
 ### 7.5 改动时必验清单
@@ -357,13 +357,14 @@ crates/plotgram-eval/src/metrics.rs
 | Phase 3 | 完成 | 组内 Sugiyama → `sugiyama_v2::ARCHITECTURE_PRESET`（`intra_sugiyama.rs`）；内置 rank/order 冻结 |
 | Phase 4 | 完成 | orthogonal 后处理拆至 `slot_replan` / `conflict_reroute` / `straighten` / `stub_fix` |
 | Phase 5 | 完成 | `post_route_hook`；`MIN_PRESERVE_RATIO=0.10`；旧 `sugiyama` 别名 v2 且移出 catalog 名表 |
+| Space Contract | 进行中→落地 | `SpaceBudget` + 边感知 gap enforce；sanitize 不变量-only；退化升档；末端消重叠仅契约失败兜底。见 [space-contract-2026-07.md](./space-contract-2026-07.md) |
 
 ### §7.2 债表更新
 
 | 优先级 | 债 | 状态 |
 |--------|-----|------|
 | P0 | 双套 Sugiyama | **部分关闭**：组内已委托 v2；无顶层 group 全局路径仍用 architecture 内置（冻结） |
-| P0 | 布局↔路由预算被动 | **改善**：lane_budget↑ + 顶层走廊 + PRS 降触发 |
+| P0 | 布局↔路由预算被动 | **改善**：lane_budget↑ + 顶层走廊 + PRS 降触发；**空间契约**见 [space-contract-2026-07.md](./space-contract-2026-07.md) |
 | P1 | orthogonal / two_phase 过大 | **部分关闭**：orthogonal 后处理已拆；two_phase 未拆子模块 |
 | P1 | Group 默认 Fit+Start | **关闭**：默认 Equal+Center |
 | P2 | Pipeline architecture 硬编码 | **关闭**：`post_route_hook` |

@@ -61,6 +61,7 @@ pub mod postprocess;
 pub mod refine;
 pub mod registry;
 pub mod route_feedback;
+pub mod space_budget;
 
 pub use algorithm_config::{
     AlgorithmOptionSpec, ArchitectureV2LayoutConfig, CircularLayoutConfig, ForceDirectedLayoutConfig,
@@ -533,6 +534,8 @@ pub struct LayoutHints {
     pub group_routing: Option<group::GroupRoutingHints>,
     /// EGB / PRS 调试统计（architecture 可选观测）。
     pub gutter_budget_debug: Option<GutterBudgetDebug>,
+    /// 空间契约：同层间距 / 标签缝 / 端口 clearance（布局预留，路由与后处理守约）。
+    pub space_budget: Option<space_budget::SpaceBudget>,
 }
 
 /// EGB + PRS 性能与效果观测（不影响布局结果）。

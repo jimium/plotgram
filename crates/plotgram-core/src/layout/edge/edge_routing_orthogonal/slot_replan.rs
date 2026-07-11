@@ -202,7 +202,9 @@ pub fn replan_slots(
                 from_id,
                 to_id,
                 corridor_plan.chains.contains_key(&ei),
-            ));
+            ))
+            // slot 重排后的重路由：允许升档外框绕行
+            .with_corridor_boost(true);
         let pair = EndpointPair {
             from: from_ep.clone(),
             to: to_ep.clone(),

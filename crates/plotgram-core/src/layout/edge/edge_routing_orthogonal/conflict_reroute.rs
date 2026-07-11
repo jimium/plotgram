@@ -153,6 +153,7 @@ pub fn reroute_conflicting_edges(
                     channel_margin: margin,
                     ..*cfg
                 };
+                let boost = margin > cfg.channel_margin + 0.5;
                 let ctx = RoutingContext::new(
                     nodes,
                     group_ctx,
@@ -168,7 +169,8 @@ pub fn reroute_conflicting_edges(
                     from_id,
                     to_id,
                     corridor_plan.chains.contains_key(&ei),
-                ));
+                ))
+                .with_corridor_boost(boost);
                 let pair = EndpointPair {
                     from: from_ep.clone(),
                     to: to_ep.clone(),

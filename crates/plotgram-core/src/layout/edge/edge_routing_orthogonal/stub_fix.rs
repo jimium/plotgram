@@ -38,6 +38,26 @@ fn has_reverse_stub(points: &[Point], anchor_idx: usize, side: Port) -> bool {
     }
     let anchor = points[anchor_idx];
     let (out_dx, out_dy) = port_outward(side);
+    let is_start = anchor_idx == 0;
+
+    // 情况0：首段（从锚点出发的第一段）直接反向——即使后续有正向行程也算反向 stub。
+    // 修复 c.layout-stress-nested 写/读/批量：Bottom 端口却先向上伸入节点。
+    {
+        let neighbor = if is_start {
+            points.get(1).copied()
+        } else {
+            points.get(points.len().saturating_sub(2)).copied()
+        };
+        if let Some(n) = neighbor {
+            let dx = n.x - anchor.x;
+            let dy = n.y - anchor.y;
+            let proj = dx * out_dx + dy * out_dy;
+            // 从锚点看邻居：start 应沿 outward；end 的 prev 也应在 outward 一侧（路径从外进入）
+            if proj < -1.0 {
+                return true;
+            }
+        }
+    }
 
     // 情况1：直接反向（stub段本身方向反了）
     let mut max_forward = 0.0f64;
@@ -61,7 +81,6 @@ fn has_reverse_stub(points: &[Point], anchor_idx: usize, side: Port) -> bool {
     // 沿路径从anchor出发向主体方向遍历，跟踪走出stub后的方向变化。
     // 如果走出stub（fp>=16）后，在垂直于outward方向移动不超过 CHANNEL_SPACING*2
     // 的距离内，fp降到 -REVERSE_STUB_THRESHOLD 以下，说明是U型折返。
-    let is_start = anchor_idx == 0;
     let traversal: Vec<Point> = if is_start {
         points.to_vec()
     } else {
@@ -381,7 +400,9 @@ pub fn fix_reverse_stub_ports(
                         from_id,
                         to_id,
                         corridor_plan.chains.contains_key(&ei),
-                    ));
+                    ))
+                    // 换端口重试：升档外框通道
+                    .with_corridor_boost(true);
                 select_best_path_with_scorer_stats(
                     &ctx,
                     &pair,

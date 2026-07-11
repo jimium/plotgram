@@ -7,14 +7,15 @@ use crate::layout::node::common::overlap::{
 use crate::layout::{GroupLayout, NodeLayout};
 use std::collections::HashMap;
 
-use super::constants::{MIN_GROUP_GAP, PADDING};
+use super::constants::{MIN_GROUP_GAP, NODE_GAP, PADDING};
 
 pub(in super::super) fn remove_node_overlaps(
     nodes: &mut HashMap<String, NodeLayout>,
     _sizes: &HashMap<String, (f64, f64)>,
 ) {
     let config = OverlapConfig {
-        margin: 8.0,
+        // 与 NODE_GAP 对齐；8px 只够「不重叠」，放不下同层边标签
+        margin: NODE_GAP,
         max_iterations: 30,
         step_factor: 0.5,
     };

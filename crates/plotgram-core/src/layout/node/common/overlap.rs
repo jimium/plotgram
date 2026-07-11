@@ -186,6 +186,16 @@ impl OverlapResolver for BruteForceResolver {
     }
 }
 
+/// 管道末段：无位置弹簧约束地消除残留节点重叠。
+///
+/// refine / PRS 推节点后可能重新引入重叠。
+///
+/// **空间契约**：主路径应走 `space_budget::resolve_residual_with_budget`；
+/// 本函数仅作无 budget 时的兼容入口，margin 对齐 DEFAULT_NODE_GAP。
+pub fn resolve_residual_node_overlaps(nodes: &mut HashMap<String, NodeLayout>) {
+    crate::layout::space_budget::resolve_residual_with_budget(nodes, None);
+}
+
 /// 串联多个 resolver，按顺序执行
 pub struct ChainedResolver {
     pub resolvers: Vec<Box<dyn OverlapResolver>>,

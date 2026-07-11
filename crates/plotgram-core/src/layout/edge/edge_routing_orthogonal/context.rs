@@ -32,6 +32,8 @@ pub struct RoutingContext<'a> {
     /// 由 `should_strict_group_transit` 按边判定：存在 corridor chain 时为 true。
     /// 无走廊时保持 false，允许 nodes-only 软降级，避免大图无通道时路径塌缩。
     pub strict_group_transit: bool,
+    /// 空间契约：0 候选升档后加大外框绕行垫（S2）。
+    pub corridor_boost: bool,
 }
 
 impl<'a> RoutingContext<'a> {
@@ -54,12 +56,18 @@ impl<'a> RoutingContext<'a> {
             channel_load,
             // 默认 false，由调用方按边调用 should_strict_group_transit 覆盖
             strict_group_transit: false,
+            corridor_boost: false,
         }
     }
 
     /// 设置该边是否强制拒绝穿无关组（见 `should_strict_group_transit`）。
     pub fn with_strict_group_transit(mut self, strict: bool) -> Self {
         self.strict_group_transit = strict;
+        self
+    }
+
+    pub fn with_corridor_boost(mut self, boost: bool) -> Self {
+        self.corridor_boost = boost;
         self
     }
 }

@@ -44,6 +44,7 @@ pub(super) mod simplify;
 pub(super) mod slot;
 pub(super) mod slot_replan;
 pub(super) mod conflict_reroute;
+pub(super) mod sanitize;
 pub(super) mod straighten;
 pub(super) mod stub_fix;
 
@@ -67,6 +68,7 @@ pub(super) use slot::{
 };
 pub(super) use slot_replan::replan_slots;
 pub(super) use conflict_reroute::reroute_conflicting_edges;
+pub use sanitize::sanitize_orthogonal_edges;
 pub(super) use straighten::straighten_preferred_alignments;
 pub(super) use stub_fix::fix_reverse_stub_ports;
 
@@ -654,29 +656,26 @@ fn route_edges_orthogonal_inner(
             continue;
         };
 
-        let ctx = RoutingContext::new(
-            &result.nodes,
-            &group_ctx,
-            &grid,
-            &cfg,
-            &profile,
-            &obstacles,
-            None,
-        )
-        .with_strict_group_transit(should_strict_group_transit(
+        let mut corridor_boost = result
+            .hints
+            .space_budget
+            .as_ref()
+            .map(|b| b.corridor_boost_requested)
+            .unwrap_or(false);
+        let pair = EndpointPair {
+            from: from_ep.clone(),
+            to: to_ep.clone(),
+        };
+        let strict = should_strict_group_transit(
             &profile,
             &group_ctx,
             from_id,
             to_id,
             corridor_plan.chains.contains_key(&i),
-        ));
-        let pair = EndpointPair {
-            from: from_ep.clone(),
-            to: to_ep.clone(),
-        };
+        );
 
         let mut path_stats = PathSelectStats::default();
-        let path = validated_corridor_path(
+        let mut path = validated_corridor_path(
             i,
             from_ep.anchor,
             to_ep.anchor,
@@ -689,6 +688,17 @@ fn route_edges_orthogonal_inner(
             cfg.channel_margin,
         )
         .unwrap_or_else(|| {
+            let ctx = RoutingContext::new(
+                &result.nodes,
+                &group_ctx,
+                &grid,
+                &cfg,
+                &profile,
+                &obstacles,
+                None,
+            )
+            .with_strict_group_transit(strict)
+            .with_corridor_boost(corridor_boost);
             select_best_path_with_scorer_stats(
                 &ctx,
                 &pair,
@@ -697,10 +707,43 @@ fn route_edges_orthogonal_inner(
                 false,
             )
         });
+        // S2：0 候选/退化 → 升走廊预算再路由一次（加大外框垫），禁止静默脏折线
+        if path_stats.degraded && !corridor_boost {
+            corridor_boost = true;
+            if let Some(budget) = result.hints.space_budget.as_mut() {
+                budget.request_corridor_boost();
+            }
+            let mut boost_stats = PathSelectStats::default();
+            let ctx = RoutingContext::new(
+                &result.nodes,
+                &group_ctx,
+                &grid,
+                &cfg,
+                &profile,
+                &obstacles,
+                None,
+            )
+            .with_strict_group_transit(strict)
+            .with_corridor_boost(true);
+            let boosted = select_best_path_with_scorer_stats(
+                &ctx,
+                &pair,
+                &DefaultScorer,
+                Some(&mut boost_stats),
+                false,
+            );
+            if !boost_stats.degraded || boost_stats.candidate_count > path_stats.candidate_count {
+                path = boosted;
+                path_stats = boost_stats;
+            }
+        }
         ortho_stats.total_candidates += path_stats.candidate_count;
         ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
         if path_stats.degraded {
             ortho_stats.degraded_count += 1;
+            if let Some(budget) = result.hints.space_budget.as_mut() {
+                budget.request_corridor_boost();
+            }
         }
 
         // 标签位置：根据 label_position 锚点沿路径取点
@@ -807,6 +850,12 @@ fn route_edges_orthogonal_inner(
                     from: from_ep.clone(),
                     to: to_ep.clone(),
                 };
+                let boost = result
+                    .hints
+                    .space_budget
+                    .as_ref()
+                    .map(|b| b.corridor_boost_requested)
+                    .unwrap_or(false);
                 let ctx = RoutingContext::new(
                     &result.nodes,
                     &group_ctx,
@@ -822,7 +871,8 @@ fn route_edges_orthogonal_inner(
                     from_id,
                     to_id,
                     corridor_plan.chains.contains_key(&ei),
-                ));
+                ))
+                .with_corridor_boost(boost);
                 select_best_path_with_scorer_stats(
                     &ctx,
                     &pair,
@@ -955,6 +1005,9 @@ fn route_edges_orthogonal_inner(
         lane_stats.segments_shifted,
         lane_stats.shifts_failed
     );
+
+    // ── 4g. 锯齿消毒：端点反向 stub + 微折折叠（lane/corridor 之后）──
+    sanitize_orthogonal_edges(&mut edges, relations, &from_side, &to_side);
 
     // ── 4c. X-0: 统计边间距违规（排除 stub 段） ──
     let (exact_overlap_pairs, tight_spacing_pairs) =

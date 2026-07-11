@@ -147,12 +147,82 @@ impl<'a> LayoutPipeline<'a> {
             gf_pass.padding,
         );
 
+        // S3：PRS 后仅在契约失败时兜底；margin 来自 SpaceBudget
+        let budget = result
+            .hints
+            .space_budget
+            .clone()
+            .unwrap_or_else(|| {
+                crate::layout::space_budget::SpaceBudget::from_diagram(self.diagram)
+            });
+        let pre_overlap: HashMap<String, (f64, f64)> = result
+            .nodes
+            .iter()
+            .map(|(id, n)| (id.clone(), (n.x, n.y)))
+            .collect();
+        let mut moved_for_overlap: HashSet<String> = HashSet::new();
+        if !crate::layout::space_budget::horizontal_gap_violations(&result.nodes, &budget)
+            .is_empty()
+        {
+            crate::layout::space_budget::resolve_residual_with_budget(
+                &mut result.nodes,
+                Some(&budget),
+            );
+            result.hints.space_budget = Some(budget);
+            moved_for_overlap = result
+                .nodes
+                .iter()
+                .filter_map(|(id, n)| {
+                    pre_overlap.get(id).and_then(|(px, py)| {
+                        let dx = n.x - px;
+                        let dy = n.y - py;
+                        if (dx * dx + dy * dy).sqrt()
+                            >= super::post_route_hook::NODE_MOVE_REROUTE_EPS
+                        {
+                            Some(id.clone())
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect();
+        } else if result.hints.space_budget.is_none() {
+            result.hints.space_budget = Some(budget);
+        }
+        if !result.groups.is_empty() {
+            crate::layout::group_frame::recompute_group_bounds(
+                self.diagram,
+                &mut result,
+                gf_pass.padding,
+            );
+        }
+        if !moved_for_overlap.is_empty() {
+            result = router.route_after_node_moves(self.diagram, result, &moved_for_overlap);
+            edge_postprocess::repulse_edges_only(
+                &mut result.edges,
+                &result.groups,
+                &edge_snap_config,
+            );
+        }
+
         // P1: 像素量化在管道最末尾执行，仅运行一次
         edge_postprocess::snap_and_repulse_edges(
             &mut result.edges,
             &result.groups,
             &edge_snap_config,
         );
+
+        // 消毒 2.0：snap/repulse 可能抖回微台阶与斜段，正交路由在量化后再消一次
+        if edge_routing_style == "orthogonal" {
+            let from_side: Vec<_> = result.edges.iter().map(|e| e.from_port).collect();
+            let to_side: Vec<_> = result.edges.iter().map(|e| e.to_port).collect();
+            crate::layout::edge::edge_routing_orthogonal::sanitize_orthogonal_edges(
+                &mut result.edges,
+                &self.diagram.relations,
+                &from_side,
+                &to_side,
+            );
+        }
 
         crate::perf_log!("[perf]   post-process: {:.2}ms", t_post.elapsed().as_secs_f64() * 1000.0);
 
