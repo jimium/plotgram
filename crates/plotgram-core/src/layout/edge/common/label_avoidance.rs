@@ -17,7 +17,9 @@ use crate::layout::geometry::{Point, Rect};
 use crate::layout::group::constants::GROUP_BORDER_SHELL_PAD;
 use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
 use crate::layout::constants::*;
-use crate::layout::edge::common::edge_geometry::closest_point_on_path;
+use crate::layout::edge::common::edge_geometry::{
+    closest_point_on_path, leader_anchor_on_path,
+};
 use crate::layout::edge::common::label_candidate::{
     place_all_labels_by_candidates, place_all_labels_by_candidates_with_config,
     LabelPlacementConfig,
@@ -316,23 +318,24 @@ pub fn resolve_label_overlaps_with_config(
 
 /// 按**可见引线长度**（包围框边缘 → 路径锚点）决定是否画引线。
 ///
+/// 锚点取标签到路径的最近点，但避开两端（尤其箭头端），避免「指到箭头」。
 /// 侧向偏置只留出很小空隙时，短线没有信息量，省略；只有标签被推得较远时才挂
 /// `leader_to`。
 fn assign_leader_lines(edges: &mut [EdgeLayout]) {
-    // Pass 1：按可见引线长度决定默认是否挂 leader，并记录每个标签到路径的最近锚点。
-    let mut closest_of: HashMap<LabelKey, Point> = HashMap::new();
+    // Pass 1：按可见引线长度决定默认是否挂 leader，并记录每个标签的路径锚点。
+    let mut anchor_of: HashMap<LabelKey, Point> = HashMap::new();
     for (ei, edge) in edges.iter_mut().enumerate() {
         if edge.path_len() < 2 {
             continue;
         }
         let path = edge.path_points().into_owned();
         for (li, label) in edge.labels.iter_mut().enumerate() {
-            let (closest, _) = closest_point_on_path(&path, label.center);
-            closest_of.insert((ei, li), closest);
-            if leader_visible_length(label.center, label.size, closest)
+            let anchor = leader_anchor_on_path(&path, label.center);
+            anchor_of.insert((ei, li), anchor);
+            if leader_visible_length(label.center, label.size, anchor)
                 >= DEFAULT_LEADER_LINE_MIN_LENGTH
             {
-                label.leader_to = Some(closest);
+                label.leader_to = Some(anchor);
             } else {
                 label.leader_to = None;
             }
@@ -342,7 +345,7 @@ fn assign_leader_lines(edges: &mut [EdgeLayout]) {
     // Pass 2：两个**不同边**的标签彼此过近时，即使引线较短也强制保留，
     // 以消除「谁属于哪条边」的歧义（引线锚回各自路径即可区分归属）。
     // 仅当标签确实偏离路径（可见引线 > 0）时才挂，避免在贴线标签上画零长引线。
-    let keys: Vec<LabelKey> = closest_of.keys().copied().collect();
+    let keys: Vec<LabelKey> = anchor_of.keys().copied().collect();
     let mut force: HashSet<LabelKey> = HashSet::new();
     for a in 0..keys.len() {
         for b in (a + 1)..keys.len() {
@@ -362,13 +365,13 @@ fn assign_leader_lines(edges: &mut [EdgeLayout]) {
         }
     }
     for k in force {
-        if let (Some(closest), Some(label)) =
-            (closest_of.get(&k).copied(), edges[k.0].labels.get_mut(k.1))
+        if let (Some(anchor), Some(label)) =
+            (anchor_of.get(&k).copied(), edges[k.0].labels.get_mut(k.1))
         {
             if label.leader_to.is_none()
-                && leader_visible_length(label.center, label.size, closest) > 1.0
+                && leader_visible_length(label.center, label.size, anchor) > 1.0
             {
-                label.leader_to = Some(closest);
+                label.leader_to = Some(anchor);
             }
         }
     }

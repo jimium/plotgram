@@ -281,8 +281,9 @@
       "entity_types": {
         "initial": {
           "shape": "circle",
-          "fill": "{colors.text}",
-          "stroke": "{colors.text}",
+          "fill": "{role.start_green.fill}",
+          "stroke": "{role.start_green.stroke}",
+          "text_fill": "{role.start_green.text_fill}",
           "radius": 12
         },
         "state": {

@@ -967,6 +967,7 @@ fn route_edges_orthogonal_inner(
         &corridor_plan,
         &mut ortho_stats,
         &profile,
+        &feedback_edge_set,
     );
     crate::perf_log!("[perf]     x2_flip_stub: {:.2}ms (flipped {} edges)", t_flip.elapsed().as_secs_f64() * 1000.0, ortho_stats.flipped_stub_edges);
 

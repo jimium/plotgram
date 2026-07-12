@@ -9,7 +9,7 @@ use crate::layout::constants::{
 use crate::layout::geometry::Point;
 use crate::layout::EdgeLabelLayout;
 use super::edge_geometry::{
-    build_edge_labels, canonical_pair, closest_point_on_path, parse_label_t, point_at_path_t,
+    build_edge_labels, canonical_pair, leader_anchor_on_path, parse_label_t, point_at_path_t,
     undirected_pair_key,
 };
 use super::label_avoidance::{label_metrics, leader_visible_length};
@@ -423,11 +423,10 @@ fn attach_leaders_if_offset(labels: &mut [EdgeLabelLayout], path: &[Point]) {
         return;
     }
     for label in labels.iter_mut() {
-        let (closest, _) = closest_point_on_path(path, label.center);
-        if leader_visible_length(label.center, label.size, closest)
-            >= DEFAULT_LEADER_LINE_MIN_LENGTH
+        let anchor = leader_anchor_on_path(path, label.center);
+        if leader_visible_length(label.center, label.size, anchor) >= DEFAULT_LEADER_LINE_MIN_LENGTH
         {
-            label.leader_to = Some(closest);
+            label.leader_to = Some(anchor);
         }
     }
 }

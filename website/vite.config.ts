@@ -1,17 +1,73 @@
-import { resolve } from 'node:path';
+import { createReadStream, existsSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url));
+const wasmDir = resolve(rootDir, 'plotgram-wasm');
 const cdnBase = process.env.VITE_CDN_BASE || '';
+
+/**
+ * 开发/预览时从 `website/plotgram-wasm/` 提供 `/plotgram-wasm/*`，
+ * 让浏览器加载本地最新构建产物，避免每次改 Rust 都要发布到 CDN。
+ */
+function servePlotgramWasm(): Plugin {
+  return {
+    name: 'serve-plotgram-wasm',
+    configureServer(server) {
+      return () => {
+        server.middlewares.use((req, res, next) => {
+          const urlPath = req.url?.split('?')[0] ?? '';
+          if (!urlPath.startsWith('/plotgram-wasm/')) {
+            next();
+            return;
+          }
+
+          const rel = decodeURIComponent(urlPath.slice('/plotgram-wasm/'.length));
+          if (!rel || rel.includes('..')) {
+            next();
+            return;
+          }
+
+          const file = join(wasmDir, rel);
+          if (!file.startsWith(wasmDir) || !existsSync(file) || !statSync(file).isFile()) {
+            next();
+            return;
+          }
+
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          if (file.endsWith('.wasm')) {
+            res.setHeader('Content-Type', 'application/wasm');
+          } else if (file.endsWith('.js')) {
+            res.setHeader('Content-Type', 'text/javascript');
+          }
+
+          createReadStream(file).pipe(res);
+        });
+      };
+    },
+  };
+}
 
 export default defineConfig({
   base: '/',
-  plugins: [react()],
+  plugins: [react(), servePlotgramWasm()],
+  resolve: {
+    alias: {
+      '../../plotgram-wasm/plotgram_wasm.js': resolve(rootDir, 'plotgram-wasm/plotgram_wasm.js'),
+    },
+  },
+  optimizeDeps: {
+    exclude: ['plotgram-wasm'],
+  },
   server: {
     port: 3001,
     strictPort: true,
+    fs: {
+      allow: ['..'],
+    },
   },
   build: {
     outDir: 'dist',

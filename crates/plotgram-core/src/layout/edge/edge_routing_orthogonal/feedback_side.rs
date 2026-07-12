@@ -25,10 +25,13 @@ pub struct FeedbackSideAssignment {
     pub hints: HashMap<usize, FeedbackSideHint>,
 }
 
-/// 为 Greedy FAS 反转边分配侧向通道。
+/// 为 Greedy FAS 反转边、以及跨多层的长前向边分配侧向通道。
 ///
 /// TB 布局走 Left/Right 外通道；LR 布局走 Top/Bottom 外通道。
 /// 自环边跳过（由自环路由单独处理）。
+///
+/// 长前向边（rank_span ≥ [`LONG_SPAN_SIDE_THRESHOLD`]）若仍走 Bottom↔Top，
+/// 会穿过中间层节点列（如 warning→healthy）；强制侧通道与回环边一致绕行。
 pub fn assign_feedback_sides(
     diagram: &Diagram,
     relations: &[Relation],
@@ -37,15 +40,39 @@ pub fn assign_feedback_sides(
     horizontal: bool,
 ) -> FeedbackSideAssignment {
     let reversed = reversed_edge_indices(diagram, relations);
-    if reversed.is_empty() {
-        return FeedbackSideAssignment::default();
+    let mut reversed_set: HashMap<usize, ()> = HashMap::new();
+    for &i in &reversed {
+        reversed_set.insert(i, ());
     }
 
     let graph_center = graph_center(nodes, horizontal);
     let mut left_bucket: Vec<(usize, usize)> = Vec::new();
     let mut right_bucket: Vec<(usize, usize)> = Vec::new();
 
-    for &edge_index in &reversed {
+    // 候选：FAS 反转边 + 长跨度前向边
+    let mut candidates: Vec<usize> = reversed;
+    for (i, rel) in relations.iter().enumerate() {
+        if reversed_set.contains_key(&i) {
+            continue;
+        }
+        if rel.from.as_str() == rel.to.as_str() {
+            continue;
+        }
+        let Some(from_nl) = nodes.get(rel.from.as_str()) else {
+            continue;
+        };
+        let Some(to_nl) = nodes.get(rel.to.as_str()) else {
+            continue;
+        };
+        let span = rank_span_for_edge(rel, ranks, from_nl, to_nl, horizontal);
+        if span >= LONG_SPAN_SIDE_THRESHOLD {
+            candidates.push(i);
+        }
+    }
+    candidates.sort();
+    candidates.dedup();
+
+    for &edge_index in &candidates {
         let rel = &relations[edge_index];
         if rel.from.as_str() == rel.to.as_str() {
             continue;
@@ -59,8 +86,10 @@ pub fn assign_feedback_sides(
 
         let rank_span = rank_span_for_edge(rel, ranks, from_nl, to_nl, horizontal);
         // 相邻层且投影重叠：走几何正对端口，不进侧通道桶。
-        // 避免共列节点上 Left→Left 退化成 PORT_CLEARANCE stub。
-        if prefers_opposite_ports_over_side_channel(from_nl, to_nl, rank_span, horizontal) {
+        // 长跨度边（span≥阈值）即使投影重叠也强制侧通道，避免穿中间节点列。
+        if rank_span < LONG_SPAN_SIDE_THRESHOLD
+            && prefers_opposite_ports_over_side_channel(from_nl, to_nl, rank_span, horizontal)
+        {
             continue;
         }
 
@@ -90,6 +119,9 @@ pub fn assign_feedback_sides(
 
     FeedbackSideAssignment { hints }
 }
+
+/// 跨此层数及以上的边优先走侧通道（与回环边同策略）。
+pub const LONG_SPAN_SIDE_THRESHOLD: usize = 2;
 
 fn reversed_edge_indices(diagram: &Diagram, relations: &[Relation]) -> Vec<usize> {
     let mut nodes: Vec<String> = diagram

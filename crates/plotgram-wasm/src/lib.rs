@@ -7,8 +7,14 @@ use plotgram_core::{
     ast::{Diagram, RawDiagram},
     diff2::{self, ChangeSet},
     error::DiagnosticError,
+    interchange::mindmap::{
+        import_interchange, InputFormat, MarkdownImportOptions,
+    },
     parser,
-    pipeline::{parse_prepare_validate, render_output_with_report, RenderOutputWithReport},
+    pipeline::{
+        import_prepare_validate, parse_prepare_validate, render_output_with_report,
+        RenderOutputWithReport,
+    },
     prepare::StyleRequest,
     render::{parse_graphic_style_id, RenderFormat, RenderOutput, RenderRequest},
     types::attr_schema,
@@ -146,6 +152,75 @@ pub fn render_with_options(source: &str, format: &str, options_json: &str) -> St
     }
 }
 
+/// 从 Markdown 大纲渲染。`source` 为 ATX 标题模式的 Markdown 大纲文本，
+/// 内部走 `import_interchange(MdOutline)` → `import_prepare_validate` → render 管线。
+#[wasm_bindgen]
+pub fn render_from_md_outline(source: &str, format: &str, options_json: &str) -> String {
+    let options = if options_json.trim().is_empty() {
+        None
+    } else {
+        match serde_json::from_str::<WasmRenderOptions>(options_json) {
+            Ok(opts) => Some(opts),
+            Err(err) => {
+                let result = RenderResult {
+                    success: false,
+                    format: format.to_string(),
+                    text: None,
+                    errors: vec![DiagnosticError::render_internal(
+                        plotgram_core::ast::Span::dummy(),
+                        format!("invalid render options json: {err}"),
+                    )],
+                    warnings: vec![],
+                    export_report: None,
+                };
+                return serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string());
+            }
+        }
+    };
+
+    let format_parsed = match RenderFormat::from_str(format) {
+        Some(f) => f,
+        None => {
+            let result = RenderResult {
+                success: false,
+                format: format.to_string(),
+                text: None,
+                errors: vec![DiagnosticError::render_internal(
+                    plotgram_core::ast::Span::dummy(),
+                    format!(
+                        "unsupported format '{format}'; supported: svg, ascii, png, webp, json, drawio, md-outline, opml, freemind"
+                    ),
+                )],
+                warnings: vec![],
+                export_report: None,
+            };
+            return serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string());
+        }
+    };
+
+    let style_request = style_request_from_options(options.as_ref());
+    let import_options = MarkdownImportOptions::default();
+    let pipeline_output = match import_interchange(source, InputFormat::MdOutline, &import_options) {
+        Ok(diagram) => import_prepare_validate(diagram, &style_request),
+        Err(err) => {
+            let result = RenderResult {
+                success: false,
+                format: format.to_string(),
+                text: None,
+                errors: vec![DiagnosticError::render_internal(
+                    plotgram_core::ast::Span::dummy(),
+                    format!("md-outline import failed: {err:?}"),
+                )],
+                warnings: vec![],
+                export_report: None,
+            };
+            return serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string());
+        }
+    };
+
+    render_from_pipeline(pipeline_output, format_parsed, format, options)
+}
+
 fn render_impl(source: &str, format_str: &str, options: Option<WasmRenderOptions>) -> String {
     let format = match RenderFormat::from_str(format_str) {
         Some(f) => f,
@@ -169,6 +244,16 @@ fn render_impl(source: &str, format_str: &str, options: Option<WasmRenderOptions
 
     let style_request = style_request_from_options(options.as_ref());
     let output = parse_prepare_validate(source, &style_request);
+    render_from_pipeline(output, format, format_str, options)
+}
+
+/// 从 PipelineOutput 走 render 管线，构造 RenderResult JSON。
+fn render_from_pipeline(
+    output: plotgram_core::pipeline::PipelineOutput,
+    format: RenderFormat,
+    format_str: &str,
+    options: Option<WasmRenderOptions>,
+) -> String {
     let mut errors = output.errors;
     let warnings = output.warnings;
 

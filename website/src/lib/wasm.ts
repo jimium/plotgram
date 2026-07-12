@@ -29,6 +29,7 @@ export interface PlotgramWasm {
   version: () => string;
   render: (source: string, format: string) => string;
   render_with_options: (source: string, format: string, optionsJson: string) => string;
+  render_from_md_outline: (source: string, format: string, optionsJson: string) => string;
 }
 
 let modulePromise: Promise<PlotgramWasm> | null = null;
@@ -40,11 +41,20 @@ function wasmCdnBase(): string {
   return 'https://assets.pg.agcli.cn/plotgram-wasm/';
 }
 
+/** plotgram_wasm.js 加载地址（开发走本地 vite 中间件，生产走 CDN common 路径）。 */
 function plotgramWasmJsUrl(): string {
+  if (import.meta.env.DEV) {
+    return `../../plotgram-wasm/plotgram_wasm.js`;
+  }
   return `${wasmCdnBase()}plotgram_wasm.js`;
 }
 
+/** wasm 二进制加载地址。 */
 function plotgramWasmBinaryUrl(): string {
+  if (import.meta.env.DEV) {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${origin}/plotgram-wasm/plotgram_wasm_bg.wasm`;
+  }
   return `${wasmCdnBase()}plotgram_wasm_bg.wasm`;
 }
 
@@ -94,6 +104,19 @@ export function renderSvg(wasm: PlotgramWasm, source: string, options?: WasmRend
   const json = options
     ? wasm.render_with_options(source, 'svg', JSON.stringify(options))
     : wasm.render(source, 'svg');
+  return safeParse<RenderResult>(json, {
+    success: false,
+    format: 'svg',
+    text: null,
+    errors: [fallbackDiag('无法解析渲染结果')],
+    warnings: [],
+  });
+}
+
+/** 从 Markdown 大纲渲染 SVG（ATX 标题模式，仅 mindmap）。 */
+export function renderMdOutlineSvg(wasm: PlotgramWasm, source: string, options?: WasmRenderOptions): RenderResult {
+  const optionsJson = options ? JSON.stringify(options) : '';
+  const json = wasm.render_from_md_outline(source, 'svg', optionsJson);
   return safeParse<RenderResult>(json, {
     success: false,
     format: 'svg',

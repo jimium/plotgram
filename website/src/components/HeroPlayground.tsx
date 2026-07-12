@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { EditorState } from '@codemirror/state';
+import { Compartment, EditorState } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { bracketMatching, HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
 import { useWasm } from '../hooks/useWasm';
-import { renderSvg, type DiagnosticErrorJson } from '../lib/wasm';
+import { renderSvg, renderMdOutlineSvg, type DiagnosticErrorJson } from '../lib/wasm';
 import { plotgram } from '../lib/plotgramLang';
+import { markdownOutline } from '../lib/markdownOutlineLang';
 
 const DEFAULT_SOURCE = `diagram architecture {
     title: "三层架构"
@@ -28,7 +29,26 @@ const DEFAULT_SOURCE = `diagram architecture {
 interface Preset {
   label: string;
   source: string;
+  /** 输入语法：plotgram DSL 或 markdown 大纲（仅 mindmap 支持）。 */
+  inputMode?: 'dfy' | 'md-outline';
 }
+
+const MINDMAP_OUTLINE_SOURCE = `# AI 学习路线
+
+## 基础
+
+### 数学
+### Python
+
+## 机器学习
+
+### 监督学习
+### 无监督学习
+
+## 深度学习
+
+### Transformer
+### CNN`;
 
 const PRESETS: Preset[] = [
   { label: '架构图', source: DEFAULT_SOURCE },
@@ -84,6 +104,11 @@ const PRESETS: Preset[] = [
 }`,
   },
   {
+    label: '思维导图(大纲)',
+    inputMode: 'md-outline',
+    source: MINDMAP_OUTLINE_SOURCE,
+  },
+  {
     label: '时序图',
     source: `diagram sequence {
   title: "登录流程"
@@ -131,6 +156,21 @@ const plotgramHighlightStyle = HighlightStyle.define([
   { tag: t.variableName, color: '#61afef' },
 ]);
 
+const markdownOutlineHighlightStyle = HighlightStyle.define([
+  { tag: t.heading1, color: '#c678dd', fontWeight: '700' },
+  { tag: t.heading2, color: '#c678dd', fontWeight: '700' },
+  { tag: t.heading3, color: '#d19a66', fontWeight: '600' },
+  { tag: t.heading4, color: '#d19a66', fontWeight: '600' },
+  { tag: t.heading5, color: '#61afef', fontWeight: '600' },
+  { tag: t.heading6, color: '#61afef', fontWeight: '600' },
+  { tag: t.comment, color: '#5c6370', fontStyle: 'italic' },
+  { tag: t.list, color: '#56b6c2', fontWeight: '600' },
+  { tag: t.string, color: '#98c379' },
+  { tag: t.strong, color: '#e06c75', fontWeight: '700' },
+  { tag: t.emphasis, color: '#e06c75', fontStyle: 'italic' },
+  { tag: t.url, color: '#61afef' },
+]);
+
 const editorTheme = EditorView.theme({
   '&': {
     height: '100%',
@@ -176,11 +216,16 @@ export default function HeroPlayground() {
   const [renderError, setRenderError] = useState<string>('');
   const [renderMs, setRenderMs] = useState<number | null>(null);
   const [activePreset, setActivePreset] = useState(0);
+  const [inputMode, setInputMode] = useState<'dfy' | 'md-outline'>('dfy');
 
   const editorHostRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
+  const languageCompartmentRef = useRef(new Compartment());
+  const highlightCompartmentRef = useRef(new Compartment());
   const sourceRef = useRef(source);
   sourceRef.current = source;
+  const inputModeRef = useRef(inputMode);
+  inputModeRef.current = inputMode;
 
   // 预览缩放/平移
   const containerRef = useRef<HTMLDivElement>(null);
@@ -198,13 +243,20 @@ export default function HeroPlayground() {
 
   useEffect(() => {
     if (!editorHostRef.current) return;
+    const initialMode = inputModeRef.current;
     const state = EditorState.create({
       doc: sourceRef.current,
       extensions: [
         history(),
         bracketMatching(),
-        plotgram(),
-        syntaxHighlighting(plotgramHighlightStyle),
+        languageCompartmentRef.current.of(
+          initialMode === 'md-outline' ? markdownOutline() : plotgram(),
+        ),
+        highlightCompartmentRef.current.of(
+          syntaxHighlighting(
+            initialMode === 'md-outline' ? markdownOutlineHighlightStyle : plotgramHighlightStyle,
+          ),
+        ),
         editorTheme,
         EditorView.lineWrapping,
         EditorView.updateListener.of((u) => {
@@ -221,6 +273,24 @@ export default function HeroPlayground() {
     };
   }, []);
 
+  // 切换 inputMode 时，热替换编辑器语言扩展
+  useEffect(() => {
+    const view = editorViewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: [
+        languageCompartmentRef.current.reconfigure(
+          inputMode === 'md-outline' ? markdownOutline() : plotgram(),
+        ),
+        highlightCompartmentRef.current.reconfigure(
+          syntaxHighlighting(
+            inputMode === 'md-outline' ? markdownOutlineHighlightStyle : plotgramHighlightStyle,
+          ),
+        ),
+      ],
+    });
+  }, [inputMode]);
+
   useEffect(() => {
     const view = editorViewRef.current;
     if (!view) return;
@@ -235,7 +305,10 @@ export default function HeroPlayground() {
 
     const timer = setTimeout(() => {
       const t0 = performance.now();
-      const result = renderSvg(wasm, source, { transparent_background: true });
+      const result =
+        inputMode === 'md-outline'
+          ? renderMdOutlineSvg(wasm, source, { transparent_background: true })
+          : renderSvg(wasm, source, { transparent_background: true });
       const elapsed = performance.now() - t0;
       if (result.success && result.text) {
         setSvg(result.text);
@@ -248,7 +321,7 @@ export default function HeroPlayground() {
     }, 150);
 
     return () => clearTimeout(timer);
-  }, [source, wasm]);
+  }, [source, wasm, inputMode]);
 
   // 缩放/平移逻辑（与 AGENT 预览区行为一致）
   const zoomAt = useCallback((centerX: number, centerY: number, factor: number) => {
@@ -425,6 +498,7 @@ export default function HeroPlayground() {
               onClick={() => {
                 setActivePreset(i);
                 setSource(p.source);
+                setInputMode(p.inputMode ?? 'dfy');
               }}
             >
               {p.label}

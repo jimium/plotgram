@@ -80,10 +80,14 @@ pub(super) fn assign_coordinates_brandes_koepf(
     nodes
 }
 
-/// 单节点层对齐前驱：拉直主轴，避免 fan-out 把上游单节点层拉向后继重心。
+/// 单节点层对齐邻层前驱：拉直主轴，避免 fan-out / 回边假前驱把链拉歪。
 ///
-/// 对恰好 1 个 Real 节点的层：优先对齐到前驱中心 median；无前驱时回退到后继 median。
+/// 对恰好 1 个 Real 节点的层：只对齐**紧邻上一层**的前驱中心（median）；
+/// 无邻层前驱时回退到邻层后继；再没有才用全部前驱/后继。
 /// 多节点层不动，以免破坏 fan-out 间距。
+///
+/// 关键：FAS 反转长回边后，远端节点会变成「假前驱」，若参与 median
+/// 会把 `last_ack` 一类主链节点拉成阶梯右偏。
 fn align_singleton_layers_to_predecessors(
     dag: &DiGraph<String, ()>,
     layered_graph: &DiGraph<LayerNode, ()>,
@@ -91,7 +95,17 @@ fn align_singleton_layers_to_predecessors(
     nodes: &mut HashMap<String, crate::layout::NodeLayout>,
     horizontal: bool,
 ) {
-    for layer in layers {
+    // Real 节点 → 层下标（确定性：同 id 不跨层）
+    let mut real_layer: HashMap<String, usize> = HashMap::new();
+    for (layer_index, layer) in layers.iter().enumerate() {
+        for node in layer {
+            if let LayerNodeKind::Real(original) = &layered_graph[*node].kind {
+                real_layer.insert(dag[*original].clone(), layer_index);
+            }
+        }
+    }
+
+    for (layer_index, layer) in layers.iter().enumerate() {
         let real_ids: Vec<String> = layer
             .iter()
             .filter_map(|node| match &layered_graph[*node].kind {
@@ -107,24 +121,50 @@ fn align_singleton_layers_to_predecessors(
             continue;
         };
 
-        let mut pred_centers: Vec<f64> = dag
-            .neighbors_directed(original, Direction::Incoming)
-            .filter_map(|pred| nodes.get(&dag[pred]).map(|nl| axis_center(nl, horizontal)))
-            .collect();
-        pred_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let mut adj_pred_centers: Vec<f64> = Vec::new();
+        let mut all_pred_centers: Vec<f64> = Vec::new();
+        for pred in dag.neighbors_directed(original, Direction::Incoming) {
+            let pred_id = &dag[pred];
+            let Some(nl) = nodes.get(pred_id) else {
+                continue;
+            };
+            let c = axis_center(nl, horizontal);
+            all_pred_centers.push(c);
+            if real_layer.get(pred_id).copied() == layer_index.checked_sub(1) {
+                adj_pred_centers.push(c);
+            }
+        }
+        adj_pred_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        all_pred_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-        let target = if !pred_centers.is_empty() {
-            median_f64(&pred_centers)
+        let target = if !adj_pred_centers.is_empty() {
+            median_f64(&adj_pred_centers)
         } else {
-            let mut succ_centers: Vec<f64> = dag
-                .neighbors_directed(original, Direction::Outgoing)
-                .filter_map(|succ| nodes.get(&dag[succ]).map(|nl| axis_center(nl, horizontal)))
-                .collect();
-            if succ_centers.is_empty() {
+            let mut adj_succ_centers: Vec<f64> = Vec::new();
+            let mut all_succ_centers: Vec<f64> = Vec::new();
+            for succ in dag.neighbors_directed(original, Direction::Outgoing) {
+                let succ_id = &dag[succ];
+                let Some(nl) = nodes.get(succ_id) else {
+                    continue;
+                };
+                let c = axis_center(nl, horizontal);
+                all_succ_centers.push(c);
+                if real_layer.get(succ_id).copied() == Some(layer_index + 1) {
+                    adj_succ_centers.push(c);
+                }
+            }
+            adj_succ_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            all_succ_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            if !adj_succ_centers.is_empty() {
+                median_f64(&adj_succ_centers)
+            } else if !all_succ_centers.is_empty() {
+                median_f64(&all_succ_centers)
+            } else if !all_pred_centers.is_empty() {
+                // 无邻层邻居时回退全部前驱（保持旧行为兜底）
+                median_f64(&all_pred_centers)
+            } else {
                 continue;
             }
-            succ_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            median_f64(&succ_centers)
         };
 
         let Some(nl) = nodes.get_mut(id) else {

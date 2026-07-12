@@ -62,7 +62,7 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
     }
 
     let node_placement = build_node_placement(diagram, &circles);
-    let lane_offsets = compute_lane_offsets(diagram, &node_placement);
+    let (lane_offsets, arc_sides) = compute_lane_offsets(diagram, &node_placement);
 
     // 构建障碍索引（用于穿障检测与退化绕行）
     let node_list: Vec<(usize, &NodeLayout)> = result
@@ -118,6 +118,7 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
                         from_pos.pos_idx,
                         to_pos.pos_idx,
                         lane_offsets[i],
+                        arc_sides[i],
                         rel,
                     )
                 } else {
@@ -191,10 +192,13 @@ fn build_node_placement(diagram: &Diagram, circles: &[CircleGroup]) -> HashMap<S
     map
 }
 
+/// 计算平行边 lane 偏移，以及对向边的弧侧符号（+1 / -1 = 弦两侧）。
+///
+/// 对 A↔B 正反边强制分到弦的两侧（一个上弧一个下弧），避免两条短弧贴在一起。
 fn compute_lane_offsets(
     diagram: &Diagram,
     node_placement: &HashMap<String, NodeCirclePos>,
-) -> Vec<f64> {
+) -> (Vec<f64>, Vec<f64>) {
     let mut pair_groups: HashMap<String, Vec<usize>> = HashMap::new();
     let mut from_groups: HashMap<String, Vec<usize>> = HashMap::new();
 
@@ -208,14 +212,59 @@ fn compute_lane_offsets(
     }
 
     let mut lane_offsets = vec![0.0; diagram.relations.len()];
+    let mut arc_sides = vec![1.0; diagram.relations.len()];
 
-    for indices in pair_groups.values() {
+    // 稳定迭代：按无向键排序，避免 HashMap 顺序影响正反弧分配。
+    let mut pair_keys: Vec<String> = pair_groups.keys().cloned().collect();
+    pair_keys.sort();
+    for key in &pair_keys {
+        let indices = &pair_groups[key];
         if indices.len() <= 1 {
             continue;
         }
-        let spread = (indices.len() as f64 - 1.0) / 2.0;
-        for (lane, &i) in indices.iter().enumerate() {
-            lane_offsets[i] = (lane as f64 - spread) * PARALLEL_SPACING;
+        let mut sorted = indices.clone();
+        sorted.sort();
+
+        // 拆正反方向：forward / backward 各走弦的一侧。
+        let rel0 = &diagram.relations[sorted[0]];
+        let (can_from, can_to) = {
+            let a = rel0.from.as_str();
+            let b = rel0.to.as_str();
+            if a <= b {
+                (a, b)
+            } else {
+                (b, a)
+            }
+        };
+        let mut forward: Vec<usize> = Vec::new();
+        let mut backward: Vec<usize> = Vec::new();
+        for &i in &sorted {
+            let rel = &diagram.relations[i];
+            if rel.from.as_str() == can_from && rel.to.as_str() == can_to {
+                forward.push(i);
+            } else if rel.from.as_str() == can_to && rel.to.as_str() == can_from {
+                backward.push(i);
+            } else {
+                forward.push(i);
+            }
+        }
+
+        if !forward.is_empty() && !backward.is_empty() {
+            let f_spread = (forward.len() as f64 - 1.0) / 2.0;
+            for (lane, &i) in forward.iter().enumerate() {
+                lane_offsets[i] = (lane as f64 - f_spread) * PARALLEL_SPACING;
+                arc_sides[i] = 1.0;
+            }
+            let b_spread = (backward.len() as f64 - 1.0) / 2.0;
+            for (lane, &i) in backward.iter().enumerate() {
+                lane_offsets[i] = (lane as f64 - b_spread) * PARALLEL_SPACING;
+                arc_sides[i] = -1.0;
+            }
+        } else {
+            let spread = (sorted.len() as f64 - 1.0) / 2.0;
+            for (lane, &i) in sorted.iter().enumerate() {
+                lane_offsets[i] = (lane as f64 - spread) * PARALLEL_SPACING;
+            }
         }
     }
 
@@ -250,7 +299,7 @@ fn compute_lane_offsets(
         }
     }
 
-    lane_offsets
+    (lane_offsets, arc_sides)
 }
 
 fn route_intra_circle_edge(
@@ -260,6 +309,7 @@ fn route_intra_circle_edge(
     from_idx: usize,
     to_idx: usize,
     lane: f64,
+    arc_side: f64,
     rel: &crate::ast::Relation,
 ) -> EdgeLayout {
     let n = circle.entity_indices.len().max(1);
@@ -277,8 +327,16 @@ fn route_intra_circle_edge(
     let backward = n - forward;
     let steps = forward.min(backward);
 
-    let bulge_factor = bulge_for_steps(steps, n) + lane;
-    let bulge_pt = bulge_point_on_arc(center_pt, radius, Point::new(sx, sy), Point::new(ex, ey), bulge_factor);
+    let bulge_mag = bulge_for_steps(steps, n) + lane.abs();
+    // arc_side: +1 / -1 决定弦的哪一侧鼓起（正反边一上一下）。
+    let bulge_pt = bulge_point_on_chord(
+        Point::new(sx, sy),
+        Point::new(ex, ey),
+        center_pt,
+        radius,
+        bulge_mag,
+        arc_side.signum(),
+    );
 
     let cp1 = Point::new(
         sx + (bulge_pt.x - sx) * 0.55,
@@ -292,7 +350,8 @@ fn route_intra_circle_edge(
     let label_t = (0.42 + lane * 0.35).clamp(0.25, 0.75);
     let (off_x, off_y) = {
         let base = cubic_bezier_point(Point::new(sx, sy), cp1, cp2, Point::new(ex, ey), label_t);
-        let off = offset_label(base, center_pt, lane);
+        // 标签也跟着弧侧推开，避免正反边 label 叠在同一侧。
+        let off = offset_label_by_side(base, Point::new(sx, sy), Point::new(ex, ey), lane, arc_side);
         (off.x - base.x, off.y - base.y)
     };
     let labels = build_edge_labels(rel, label_t, Point::new(off_x, off_y), |t| {
@@ -358,32 +417,54 @@ fn bulge_for_steps(steps: usize, n: usize) -> f64 {
     }
 }
 
-fn bulge_point_on_arc(
-    center: Point,
-    radius: f64,
+/// 在弦中点沿弦法向鼓起；`arc_side` 符号决定上下（或左右）哪一侧。
+///
+/// 法向选取：优先与「圆心 → 弦中点」同向的一侧作为 +1，这样默认弧仍朝圆外凸，
+/// 对向边取 -1 则朝弦另一侧（常见效果：一上一下）。
+fn bulge_point_on_chord(
     start: Point,
     end: Point,
-    bulge_factor: f64,
+    center: Point,
+    radius: f64,
+    bulge_mag: f64,
+    arc_side: f64,
 ) -> Point {
     let mid = Point::new((start.x + end.x) / 2.0, (start.y + end.y) / 2.0);
-    let d = mid.sub(center);
-    let dist = d.length().max(1.0);
-    let target_r = radius * bulge_factor;
-    Point::new(
-        center.x + d.x / dist * target_r,
-        center.y + d.y / dist * target_r,
-    )
+    let dx = end.x - start.x;
+    let dy = end.y - start.y;
+    let chord_len = (dx * dx + dy * dy).sqrt().max(1.0);
+    let mut nx = -dy / chord_len;
+    let mut ny = dx / chord_len;
+
+    // 让 +side 与圆心→弦中点方向一致（圆外凸）。
+    let to_mid = mid.sub(center);
+    if to_mid.x * nx + to_mid.y * ny < 0.0 {
+        nx = -nx;
+        ny = -ny;
+    }
+
+    let side = if arc_side >= 0.0 { 1.0 } else { -1.0 };
+    // 鼓起幅度：相对半径，保证短弦也有明显弧度分离。
+    let lift = (radius * (bulge_mag - 1.0).max(0.08) + chord_len * 0.18).max(18.0);
+    Point::new(mid.x + nx * lift * side, mid.y + ny * lift * side)
 }
 
-fn offset_label(pos: Point, center: Point, lane: f64) -> Point {
-    let d = pos.sub(center);
-    let len = d.length().max(1.0);
-    let radial_push = 10.0 + lane.abs() * 18.0;
-    let lane_push = lane * 14.0;
-    Point::new(
-        pos.x + d.x / len * radial_push - d.y / len * lane_push,
-        pos.y + d.y / len * radial_push + d.x / len * lane_push,
-    )
+fn offset_label_by_side(pos: Point, start: Point, end: Point, lane: f64, arc_side: f64) -> Point {
+    let dx = end.x - start.x;
+    let dy = end.y - start.y;
+    let len = (dx * dx + dy * dy).sqrt().max(1.0);
+    let mut nx = -dy / len;
+    let mut ny = dx / len;
+    let side = if arc_side >= 0.0 { 1.0 } else { -1.0 };
+    // 保证法向与弧侧一致（与 bulge 同一半球）。
+    let mid = Point::new((start.x + end.x) / 2.0, (start.y + end.y) / 2.0);
+    let to_pos = Point::new(pos.x - mid.x, pos.y - mid.y);
+    if (to_pos.x * nx + to_pos.y * ny) * side < 0.0 {
+        nx = -nx;
+        ny = -ny;
+    }
+    let push = 12.0 + lane.abs() * 16.0;
+    Point::new(pos.x + nx * push * side, pos.y + ny * push * side)
 }
 
 

@@ -330,6 +330,9 @@ pub fn fix_reverse_stub_ports(
     corridor_plan: &corridor_route::CorridorRoutePlan,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
     profile: &OrthoRoutingProfile,
+    // 侧通道边（回环 / 长跨度）：禁止 stub_fix 把 Left/Right 改成 Top/Bottom，
+    // 否则会重新走穿节点列的「捷径」。
+    side_channel_edges: &std::collections::HashSet<usize>,
 ) {
     let n = edges.len();
     if n == 0 {
@@ -349,6 +352,10 @@ pub fn fix_reverse_stub_ports(
     let mut edges_to_check: Vec<(usize, PortFix, PortFix, bool, bool)> = Vec::new();
     for ei in 0..n {
         if edges[ei].path_is_empty() {
+            continue;
+        }
+        // 侧通道边保持 Left/Right（或 LR 下的 Top/Bottom），不参与 stub 翻转/旋转。
+        if side_channel_edges.contains(&ei) {
             continue;
         }
         let points: Vec<Point> = edges[ei].path_points().into_owned();

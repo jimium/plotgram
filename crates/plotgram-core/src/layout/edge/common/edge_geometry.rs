@@ -388,25 +388,128 @@ pub fn point_at_path_t(path: &[Point], t: f64) -> Point {
 /// 逐段计算点到线段的最近点，返回全局最近点及其距离。
 /// 空路径返回 ((0,0), +∞)；单点路径返回 (该点, 到该点距离)。
 pub fn closest_point_on_path(path: &[Point], p: Point) -> (Point, f64) {
+    let (pt, dist, _) = closest_point_on_path_with_t(path, p);
+    (pt, dist)
+}
+
+/// 同 [`closest_point_on_path`]，额外返回最近点的弧长参数 t∈[0,1]。
+pub fn closest_point_on_path_with_t(path: &[Point], p: Point) -> (Point, f64, f64) {
     if path.is_empty() {
-        return (Point::new(0.0, 0.0), f64::INFINITY);
+        return (Point::new(0.0, 0.0), f64::INFINITY, 0.0);
     }
     if path.len() == 1 {
         let dx = p.x - path[0].x;
         let dy = p.y - path[0].y;
-        return (path[0], (dx * dx + dy * dy).sqrt());
+        return (path[0], (dx * dx + dy * dy).sqrt(), 0.0);
+    }
+
+    let seg_lengths: Vec<f64> = path
+        .windows(2)
+        .map(|w| {
+            let dx = w[1].x - w[0].x;
+            let dy = w[1].y - w[0].y;
+            (dx * dx + dy * dy).sqrt()
+        })
+        .collect();
+    let total_len: f64 = seg_lengths.iter().sum();
+    if total_len < 1e-9 {
+        let dx = p.x - path[0].x;
+        let dy = p.y - path[0].y;
+        return (path[0], (dx * dx + dy * dy).sqrt(), 0.0);
     }
 
     let mut best_pt = path[0];
     let mut best_dist_sq = f64::INFINITY;
-    for w in path.windows(2) {
+    let mut best_t = 0.0;
+    let mut accum = 0.0;
+    for (i, w) in path.windows(2).enumerate() {
         let (cp, dist_sq) = closest_point_on_segment(w[0], w[1], p);
+        if dist_sq < best_dist_sq {
+            best_dist_sq = dist_sq;
+            best_pt = cp;
+            let seg_len = seg_lengths[i];
+            let local_t = if seg_len > 1e-9 {
+                let dx = cp.x - w[0].x;
+                let dy = cp.y - w[0].y;
+                ((dx * dx + dy * dy).sqrt() / seg_len).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            best_t = (accum + seg_len * local_t) / total_len;
+        }
+        accum += seg_lengths[i];
+    }
+    (best_pt, best_dist_sq.sqrt(), best_t.clamp(0.0, 1.0))
+}
+
+/// 引线锚点：在路径**主体**上取离标签最近的点，避开两端（尤其箭头端）。
+///
+/// 图 2 一类问题：标签偏在侧方时，全局最近点会落到终点/短 stub（箭头附近）。
+/// 正确做法是在去掉端点保护区后的弧长区间内找最近点——**不是**先找全局最近点再
+/// clamp（那样仍会停在短 stub 上），也**不是**一律挂中点（会破坏架构图等场景）。
+const LEADER_END_GUARD_PX: f64 = 28.0;
+const LEADER_END_GUARD_T_MIN: f64 = 0.08;
+const LEADER_END_GUARD_T_MAX: f64 = 0.22;
+
+pub fn leader_anchor_on_path(path: &[Point], label_center: Point) -> Point {
+    if path.len() < 2 {
+        return path.first().copied().unwrap_or_else(|| Point::new(0.0, 0.0));
+    }
+    let seg_lengths: Vec<f64> = path
+        .windows(2)
+        .map(|w| {
+            let dx = w[1].x - w[0].x;
+            let dy = w[1].y - w[0].y;
+            (dx * dx + dy * dy).sqrt()
+        })
+        .collect();
+    let total_len: f64 = seg_lengths.iter().sum();
+    if total_len < 1e-9 {
+        return path[0];
+    }
+
+    let guard_t =
+        (LEADER_END_GUARD_PX / total_len).clamp(LEADER_END_GUARD_T_MIN, LEADER_END_GUARD_T_MAX);
+    if guard_t * 2.0 >= 1.0 {
+        return point_at_path_t(path, 0.5);
+    }
+    let t_lo = guard_t;
+    let t_hi = 1.0 - guard_t;
+    let dist_lo = total_len * t_lo;
+    let dist_hi = total_len * t_hi;
+
+    // 在 [dist_lo, dist_hi] 弧长窗口内找最近点（裁剪落在窗外的段）。
+    let mut best_pt = point_at_path_t(path, 0.5);
+    let mut best_dist_sq = f64::INFINITY;
+    let mut accum = 0.0;
+    for (i, w) in path.windows(2).enumerate() {
+        let seg_len = seg_lengths[i];
+        let seg_start = accum;
+        let seg_end = accum + seg_len;
+        accum = seg_end;
+        if seg_end <= dist_lo || seg_start >= dist_hi || seg_len < 1e-9 {
+            continue;
+        }
+        let local_lo = ((dist_lo - seg_start) / seg_len).clamp(0.0, 1.0);
+        let local_hi = ((dist_hi - seg_start) / seg_len).clamp(0.0, 1.0);
+        if local_hi <= local_lo {
+            continue;
+        }
+        let a = Point::new(
+            w[0].x + (w[1].x - w[0].x) * local_lo,
+            w[0].y + (w[1].y - w[0].y) * local_lo,
+        );
+        let b = Point::new(
+            w[0].x + (w[1].x - w[0].x) * local_hi,
+            w[0].y + (w[1].y - w[0].y) * local_hi,
+        );
+        let (cp, dist_sq) = closest_point_on_segment(a, b, label_center);
         if dist_sq < best_dist_sq {
             best_dist_sq = dist_sq;
             best_pt = cp;
         }
     }
-    (best_pt, best_dist_sq.sqrt())
+    best_pt
 }
 
 /// 点到线段的最近点（含距离平方）。
@@ -851,6 +954,51 @@ mod tests {
         assert!((pt.x - 10.0).abs() < 1e-9);
         assert!((pt.y - 5.0).abs() < 1e-9);
         assert!((dist - 2.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn leader_anchor_keeps_interior_closest_point() {
+        // 标签正对路径中段：锚点应保持最近点，不强制中点
+        let path = [
+            Point::new(0.0, 0.0),
+            Point::new(0.0, 100.0),
+            Point::new(40.0, 100.0),
+        ];
+        let label = Point::new(-20.0, 40.0);
+        let anchor = leader_anchor_on_path(&path, label);
+        assert!(
+            (anchor.x).abs() < 1e-6 && (anchor.y - 40.0).abs() < 1e-6,
+            "interior closest should be kept, got {anchor:?}"
+        );
+    }
+
+    #[test]
+    fn leader_anchor_avoids_arrow_endpoint() {
+        // 模拟图 2：标签在侧方，全局最近点落在终点（箭头）；
+        // 应在安全弧长区间内落到竖段中部，而不是短 stub 上。
+        let path = [
+            Point::new(358.0, 178.0),
+            Point::new(358.0, 272.0),
+            Point::new(326.0, 272.0),
+        ];
+        let label = Point::new(273.0, 216.0);
+        let (closest, _, _) = closest_point_on_path_with_t(&path, label);
+        let anchor = leader_anchor_on_path(&path, label);
+        let end = path[path.len() - 1];
+        let dist_closest_to_end =
+            ((closest.x - end.x).powi(2) + (closest.y - end.y).powi(2)).sqrt();
+        assert!(
+            dist_closest_to_end < 5.0 || (closest.y - 272.0).abs() < 1e-6,
+            "precondition: global closest near arrow stub, got {closest:?}"
+        );
+        assert!(
+            (anchor.x - 358.0).abs() < 1e-6,
+            "anchor should be on vertical trunk, got {anchor:?}"
+        );
+        assert!(
+            (anchor.y - 216.0).abs() < 1.0,
+            "anchor should be near label's y on trunk, got {anchor:?}"
+        );
     }
 
     fn relation_with_labels(
