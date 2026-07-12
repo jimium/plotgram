@@ -74,8 +74,9 @@ pub use catalog::{
 pub use plan::{validate_layout_plan_warnings, LayoutPlan, ResolvedAlgoOptions};
 pub use lint::{
     compute_lint_metrics, count_unrelated_parallel_overlaps, lint_layout, parse_lint_profile,
-    parse_lint_rule, parse_lint_rules_list, LayoutLinter, LayoutViolation, LintConfig,
-    LintMetricsSummary, LintProfile, LintReport, LintRuleId, LintSeverity, RuleConfig,
+    parse_lint_rule, parse_lint_rules_list, AdviceConfidence, LayoutKnob, LintAdvice,
+    LayoutLinter, LayoutViolation, LintConfig, LintMetricsSummary, LintProfile, LintReport,
+    LintRuleId, LintSeverity, RuleConfig,
 };
 pub use registry::{EDGE_ROUTING_NAMES, LAYOUT_ALGORITHM_NAMES};
 pub use grid_snap::{DiagramAlignOverride, EdgeSnapConfig, LayerAxisAlign, NodeAlignConfig};
@@ -520,6 +521,8 @@ pub struct LayoutHints {
     /// 流程图布局 group 不参与布局（仅事后画框），此类警告用于诊断
     /// "group 框拉得很长/互相压住"的视觉问题。
     pub group_layout_warnings: Vec<GroupLayoutWarning>,
+    /// Group Frame pass 的执行报告，供 lint advice 与调试消费。
+    pub group_frame_report: Option<group_frame::GroupFrameReport>,
     /// refine 调试统计（P2-1 可观测性）。
     ///
     /// 由 `refine::run_refine` 在执行后填充；未启用 refine 时为 `None`。

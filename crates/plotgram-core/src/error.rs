@@ -9,7 +9,7 @@
 //! - `E1xx`：Render Error（渲染阶段错误）
 
 use crate::ast::Span;
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use std::fmt;
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -202,7 +202,7 @@ pub enum Category {
 // ═══════════════════════════════════════════════════════════════════════
 
 /// 修复建议
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Suggestion {
     pub text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -210,7 +210,7 @@ pub struct Suggestion {
 }
 
 /// 修复动作
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FixAction {
     pub action: String,
     pub payload: serde_json::Value,

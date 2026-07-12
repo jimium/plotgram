@@ -40,7 +40,8 @@ impl GroupFramePass {
         algo: &str,
     ) {
         recompute_group_bounds(diagram, layout, self.padding);
-        apply_group_frame(&self.spec, diagram, layout);
+        let report = apply_group_frame(&self.spec, diagram, layout);
+        layout.hints.group_frame_report = Some(report);
         // Fit：整形/量化可能留下高于 base∪egb 的空壳，再收回一次。
         if algo == "architecture" && matches!(self.spec.track_sizing, super::TrackSizing::Fit) {
             let side_gutters = layout
@@ -87,7 +88,8 @@ impl GroupFramePass {
     ) {
         recompute_group_bounds(diagram, layout, self.padding);
         realign_group_rows(&mut layout.groups, pre_recompute_y);
-        apply_group_frame(&self.spec, diagram, layout);
+        let report = apply_group_frame(&self.spec, diagram, layout);
+        layout.hints.group_frame_report = Some(report);
         if algo == "architecture" {
             post_layout::center_single_group_rows(diagram, layout);
         }

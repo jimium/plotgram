@@ -94,8 +94,10 @@ plotgram validate diagram.pgm --layout-check
 ```bash
 plotgram lint diagram.pgm
 plotgram lint diagram.pgm --profile strict
+plotgram lint diagram.pgm --advice
 plotgram lint diagram.pgm --ignore edge_crossing
 plotgram lint diagram.pgm --format json --fail-on-warning
+plotgram lint diagram.pgm --advice --format json
 ```
 
 完整说明见 [layout-lint.md](layout-lint.md)。

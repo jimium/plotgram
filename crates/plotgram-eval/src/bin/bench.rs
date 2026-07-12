@@ -34,7 +34,7 @@ fn load_showcase(dir: &Path) -> Vec<(String, plotgram_core::ast::Diagram)> {
     let mut dfy_files: Vec<_> = Vec::new();
     for entry in walkdir(dir) {
         let path = entry.path();
-        if path.extension().map(|e| e == "dfy").unwrap_or(false) {
+        if path.extension().map(|e| e == "pgm").unwrap_or(false) {
             dfy_files.push(path.to_path_buf());
         }
     }

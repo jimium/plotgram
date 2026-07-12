@@ -40,6 +40,45 @@ export interface ValidationResult {
   warnings: DiagnosticErrorJson[];
 }
 
+export interface LintViolation {
+  rule: string;
+  severity: 'error' | 'warning';
+  message: string;
+  metric?: number | null;
+  entity_ids?: string[];
+  group_ids?: string[];
+  edge_index?: number | null;
+  related_edge_indices?: number[];
+}
+
+export interface LintAdvice {
+  violation_index: number;
+  text: string;
+  priority: number;
+  confidence: 'high' | 'medium' | 'low';
+  knobs?: Array<Record<string, unknown>>;
+  fix?: { action: string; payload: Record<string, unknown> } | null;
+}
+
+export interface LintReport {
+  violations: LintViolation[];
+  advices?: LintAdvice[];
+}
+
+export interface LintResult {
+  success: boolean;
+  acceptable: boolean;
+  report: LintReport;
+  errors: DiagnosticErrorJson[];
+  warnings: DiagnosticErrorJson[];
+}
+
+export interface LintOptions {
+  profile?: 'default' | 'strict' | 'ci' | 'verbose' | 'all';
+  fail_on_warning?: boolean;
+  advice?: boolean;
+}
+
 export interface ParseResult {
   diagram: unknown | null;
   errors: DiagnosticErrorJson[];
@@ -88,6 +127,8 @@ export interface PlotgramWasm {
   render: (source: string, format: string) => string;
   render_with_options: (source: string, format: string, optionsJson: string) => string;
   validate: (source: string) => string;
+  lint: (source: string) => string;
+  lint_with_options: (source: string, optionsJson: string) => string;
   parse_to_json: (source: string) => string;
   layout_catalog: () => string;
   diff_sources: (sourceA: string, sourceB: string) => string;
@@ -185,6 +226,20 @@ export function validateSource(wasm: PlotgramWasm, source: string): ValidationRe
   return safeParse<ValidationResult>(json, {
     valid: false,
     errors: [fallbackDiag('无法解析校验结果')],
+    warnings: [],
+  });
+}
+
+export function lintSource(wasm: PlotgramWasm, source: string, options?: LintOptions): LintResult {
+  const json =
+    options && typeof wasm.lint_with_options === 'function'
+      ? wasm.lint_with_options(source, JSON.stringify(options))
+      : wasm.lint(source);
+  return safeParse<LintResult>(json, {
+    success: false,
+    acceptable: false,
+    report: { violations: [], advices: [] },
+    errors: [fallbackDiag('无法解析 lint 结果')],
     warnings: [],
   });
 }

@@ -657,7 +657,9 @@ fn try_separate_edge_pair(
                 for sign in [1.0, -1.0] {
                     let mut new_points = original.clone();
                     let target = shared_coord + magnitude * sign;
-                    if force_shift_trunk_coord(&mut new_points, is_vertical, shared_coord, target) {
+                    if force_shift_trunk_coord(&mut new_points, is_vertical, shared_coord, target)
+                        && validate_shift(&original, &new_points, si, nodes, sorted_node_ids)
+                    {
                         commit_shifted_path(
                             edges,
                             target_ei,
@@ -1000,6 +1002,69 @@ mod tests {
         assert_eq!(pa.len(), pb.len());
         for (a, b) in pa.iter().zip(pb.iter()) {
             assert!((a.x - b.x).abs() < EPS && (a.y - b.y).abs() < EPS, "路径不一致");
+        }
+    }
+
+    #[test]
+    fn test_force_shift_fallback_respects_node_penetration() {
+        // 回归 P06：fallback 分支（force_shift_trunk_coord）必须经 validate_shift 校验，
+        // 不得在穿节点时提交。
+        // 构造：两条反向 V 段同 x=200，第一策略因 H 段过短（4px）会失败或退化，
+        // fallback 会把整个 x=200 干线移到 x=208/x=192 等。
+        // 在 x=208, y=150..250 放一个节点 → fallback 移到 +8 时会穿节点，应被拒绝。
+        let p0 = vec![pt(196.0, 100.0), pt(200.0, 100.0), pt(200.0, 300.0), pt(304.0, 300.0)];
+        let p1 = vec![pt(304.0, 300.0), pt(200.0, 300.0), pt(200.0, 100.0), pt(196.0, 100.0)];
+        let mut edges = vec![mk_edge(&p0), mk_edge(&p1)];
+        let mut grid = SegmentGrid::new();
+        grid.insert_path(&p0, 0);
+        grid.insert_path(&p1, 1);
+
+        // 障碍节点：fallback +8 x-shift 会穿它
+        let mut nodes = HashMap::new();
+        nodes.insert(
+            "obstacle".to_string(),
+            NodeLayout {
+                x: 204.0,
+                y: 150.0,
+                width: 20.0,
+                height: 100.0,
+            },
+        );
+        let sorted_node_ids: Vec<String> = vec!["obstacle".to_string()];
+        let (from_side, to_side) = empty_sides(2);
+
+        let stats = assign_lanes(
+            &mut edges, &mut grid, &nodes, &sorted_node_ids, &empty_relations(),
+            &from_side, &to_side, 8.0,
+        );
+
+        // 修复前 fallback 会无条件提交穿节点的路径；修复后应被 validate_shift 拒绝
+        // 验证：至少有 1 次失败，且若发生偏移，结果路径不穿 obstacle 节点
+        assert!(stats.shifts_failed >= 1, "fallback 穿节点应被拒绝");
+
+        // 检查所有边的路径点不穿 obstacle 节点（x∈[204,224], y∈[150,250]）
+        let obstacle_rect = (204.0..=224.0_f64, 150.0..=250.0_f64);
+        for (i, edge) in edges.iter().enumerate() {
+            let pts: Vec<Point> = edge.path_points().into_owned();
+            for w in pts.windows(2) {
+                let x1 = w[0].x.min(w[1].x);
+                let x2 = w[0].x.max(w[1].x);
+                let y1 = w[0].y.min(w[1].y);
+                let y2 = w[0].y.max(w[1].y);
+                // 线段 AABB 与 obstacle AABB 相交，且非纯水平/垂直避让
+                if x2 >= *obstacle_rect.0.start() && x1 <= *obstacle_rect.0.end()
+                    && y2 >= *obstacle_rect.1.start() && y1 <= *obstacle_rect.1.end()
+                {
+                    // 进一步检查是否真的穿过内部（排除仅擦边）
+                    let cx = (x1 + x2) * 0.5;
+                    let cy = (y1 + y2) * 0.5;
+                    assert!(
+                        !(obstacle_rect.0.contains(&cx) && obstacle_rect.1.contains(&cy)),
+                        "edge {} 路径穿过 obstacle 节点内部 (seg x={}..{}, y={}..{})",
+                        i, x1, x2, y1, y2
+                    );
+                }
+            }
         }
     }
 }

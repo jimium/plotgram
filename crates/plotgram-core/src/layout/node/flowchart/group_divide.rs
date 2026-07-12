@@ -387,7 +387,6 @@ fn topological_sort_groups(
         let to = edge.to_group.as_deref().unwrap_or(UNGROUPED_ID);
         if from != to && id_set.contains(from) && id_set.contains(to) {
             out_edges.get_mut(from).unwrap().push(to.to_string());
-            *in_degree.get_mut(to).unwrap() += 1;
         }
     }
 
@@ -395,6 +394,14 @@ fn topological_sort_groups(
     for edges in out_edges.values_mut() {
         edges.sort();
         edges.dedup();
+    }
+
+    // 从去重后的 out_edges 派生 in_degree，保证两者一致
+    // （加法可交换，HashMap 迭代顺序不影响结果）
+    for edges in out_edges.values() {
+        for to in edges {
+            *in_degree.get_mut(to).unwrap() += 1;
+        }
     }
 
     // BinaryHeap 维护就绪队列：按声明顺序（order_index）排序
@@ -543,6 +550,21 @@ pub fn divide_flowchart_with_groups(
         .max(groups.values().map(|g| g.y + g.height).fold(0.0_f64, f64::max))
         + padding;
 
+    // 9. 从 intra_layouts 的 layers 重建全局 sugiyama_ranks（修复 P09）
+    // 按堆叠顺序累加每组 layers.len() 作为 rank offset，保证 rank 单调对应 y 位置
+    let mut sugiyama_ranks: HashMap<String, usize> = HashMap::new();
+    let mut rank_offset = 0usize;
+    for gid in &order {
+        if let Some(intra) = intra_layouts.get(gid) {
+            for (local_rank, layer) in intra.layers.iter().enumerate() {
+                for id in layer {
+                    sugiyama_ranks.insert(id.clone(), rank_offset + local_rank);
+                }
+            }
+            rank_offset += intra.layers.len();
+        }
+    }
+
     LayoutResult {
         nodes,
         groups,
@@ -552,6 +574,11 @@ pub fn divide_flowchart_with_groups(
         hints: LayoutHints {
             edge_routing_style: EdgeRoutingStyle::Orthogonal,
             group_routing: Some(group_routing),
+            sugiyama_ranks: if sugiyama_ranks.is_empty() {
+                None
+            } else {
+                Some(sugiyama_ranks)
+            },
             ..Default::default()
         },
     }
@@ -710,6 +737,36 @@ mod tests {
         let order = topological_sort_groups(&group_ids, &cross_edges);
         // 声明顺序：g2 先，g1 后
         assert_eq!(order, vec!["g2", "g1"]);
+    }
+
+    #[test]
+    fn topological_sort_duplicate_edges() {
+        // 多条 g1→g2 跨组边（不同实体 id，同组）不应让 in_degree 多算
+        // 回归 P04：修复前 in_degree[g2]=2 但 out_edges[g1] 去重后只减 1 → g2 落入循环恢复
+        let group_ids = vec!["g1".to_string(), "g2".to_string(), "g3".to_string()];
+        let cross_edges = vec![
+            CrossGroupEdge {
+                from: "a1".to_string(),
+                to: "b1".to_string(),
+                from_group: Some("g1".to_string()),
+                to_group: Some("g2".to_string()),
+            },
+            CrossGroupEdge {
+                from: "a2".to_string(),
+                to: "b2".to_string(),
+                from_group: Some("g1".to_string()),
+                to_group: Some("g2".to_string()),
+            },
+            CrossGroupEdge {
+                from: "a3".to_string(),
+                to: "b3".to_string(),
+                from_group: Some("g1".to_string()),
+                to_group: Some("g2".to_string()),
+            },
+        ];
+        let order = topological_sort_groups(&group_ids, &cross_edges);
+        // g1→g2 依赖应只算一次，g1 先出，g2 后出，g3 独立
+        assert_eq!(order, vec!["g1", "g2", "g3"]);
     }
 
     #[test]
@@ -969,5 +1026,48 @@ mod tests {
         assert_eq!(gap, 48.0);
         assert_eq!(align, AlignMode::Center);
         assert_eq!(mode, ArrangementMode::Vertical);
+    }
+
+    #[test]
+    fn divide_flowchart_backfills_sugiyama_ranks() {
+        // 回归 P09：分治结果必须向 LayoutHints 回填 sugiyama_ranks，
+        // 否则正交路由的 layer_order 退化为按连接度排序。
+        // g1: a → b, g2: c → d, 跨 group 边: b → c
+        let diagram = Diagram {
+            diagram_type: crate::types::DiagramType::Flowchart,
+            entities: vec![
+                entity("a", Some("g1")),
+                entity("b", Some("g1")),
+                entity("c", Some("g2")),
+                entity("d", Some("g2")),
+            ],
+            relations: vec![
+                relation("a", "b"),
+                relation("b", "c"), // 跨 group
+                relation("c", "d"),
+            ],
+            groups: vec![group("g1"), group("g2")],
+            constraints: vec![],
+            ..Default::default()
+        };
+
+        let result = divide_flowchart_with_groups(&diagram, SugiyamaLayoutConfig::default());
+
+        // sugiyama_ranks 应为 Some 且包含全部 4 个节点
+        let ranks = result.hints.sugiyama_ranks.as_ref().expect("sugiyama_ranks should be backfilled");
+        assert_eq!(ranks.len(), 4, "all 4 nodes should have ranks");
+        assert!(ranks.contains_key("a"));
+        assert!(ranks.contains_key("b"));
+        assert!(ranks.contains_key("c"));
+        assert!(ranks.contains_key("d"));
+
+        // g1 的节点 rank 应小于 g2 的节点 rank（g1 在上，rank 更小）
+        let rank_a = ranks["a"];
+        let rank_b = ranks["b"];
+        let rank_c = ranks["c"];
+        let rank_d = ranks["d"];
+        assert!(rank_a < rank_c, "g1 nodes should have smaller ranks than g2 nodes (a={}, c={})", rank_a, rank_c);
+        assert!(rank_b < rank_c, "g1 nodes should have smaller ranks than g2 nodes (b={}, c={})", rank_b, rank_c);
+        assert!(rank_c < rank_d, "within g2, c should have smaller rank than d (c={}, d={})", rank_c, rank_d);
     }
 }

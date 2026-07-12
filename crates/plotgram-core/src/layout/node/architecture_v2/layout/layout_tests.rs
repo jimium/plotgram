@@ -731,3 +731,45 @@ use crate::ast::{
             }
         }
     }
+
+    #[test]
+    fn constraint_creating_cycle_does_not_collapse_ranks() {
+        // 回归 P03：约束边在 FAS 之前注入，FAS 不会反转约束边。
+        // relation: A→B（A rank < B rank），constraint: B→A（与 relation 反向，造环）
+        // 修复前：约束在 FAS 后注入，约束造的环无人打破 → B 可能坍缩到 rank 0
+        // 修复后：约束在 FAS 前注入，FAS 会反转 relation A→B 来打破环（约束 B→A 不被反转），
+        //         最终 rank(B) < rank(A)，约束方向被尊重
+        use crate::ast::Constraint;
+        let d = Diagram {
+            diagram_type: DiagramType::Architecture,
+            attributes: vec![],
+            entities: vec![entity("a", "A"), entity("b", "B")],
+            relations: vec![relation("a", "b")],
+            groups: vec![],
+            constraints: vec![Constraint {
+                from: Identifier::new_unchecked("b"),
+                to: Identifier::new_unchecked("a"),
+                span: Span::dummy(),
+            }],
+            style_decls: vec![],
+            source_info: SourceInfo { file: None, line_count: 1 },
+            ..Default::default()
+        };
+        let result = ArchitectureV2Layout::default().compute(&d);
+        assert_eq!(result.nodes.len(), 2, "both nodes should be laid out");
+
+        // 约束 B→A 要求 rank(B) < rank(A)，即 B 在 A 上方
+        let a_y = result.nodes["a"].y;
+        let b_y = result.nodes["b"].y;
+        assert!(
+            b_y < a_y,
+            "constraint B→A should place B above A (b_y={}, a_y={})",
+            b_y, a_y
+        );
+        // 两个节点不应坍缩到同一 y（rank 不应相同）
+        assert!(
+            (a_y - b_y).abs() > 1.0,
+            "nodes should not collapse to same rank (a_y={}, b_y={})",
+            a_y, b_y
+        );
+    }

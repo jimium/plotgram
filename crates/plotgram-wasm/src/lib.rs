@@ -35,6 +35,15 @@ pub struct ValidationResult {
     pub warnings: Vec<DiagnosticError>,
 }
 
+#[derive(serde::Serialize)]
+pub struct LintResult {
+    pub success: bool,
+    pub acceptable: bool,
+    pub report: plotgram_core::layout::LintReport,
+    pub errors: Vec<DiagnosticError>,
+    pub warnings: Vec<DiagnosticError>,
+}
+
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct WasmRenderOptions {
     pub theme_id: Option<String>,
@@ -44,6 +53,13 @@ pub struct WasmRenderOptions {
     /// 是否在画布顶部绘制 DSL title（默认 false）
     pub show_title: Option<bool>,
     pub ascii: Option<plotgram_core::render::encode::ascii::AsciiExportOptions>,
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+pub struct WasmLintOptions {
+    pub profile: Option<String>,
+    pub fail_on_warning: Option<bool>,
+    pub advice: Option<bool>,
 }
 
 #[wasm_bindgen(start)]
@@ -232,6 +248,107 @@ pub fn validate(source: &str) -> String {
         warnings: output.warnings,
     };
     serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
+}
+
+#[wasm_bindgen]
+pub fn lint(source: &str) -> String {
+    lint_impl(source, None)
+}
+
+#[wasm_bindgen]
+pub fn lint_with_options(source: &str, options_json: &str) -> String {
+    if options_json.trim().is_empty() {
+        return lint_impl(source, None);
+    }
+
+    match serde_json::from_str::<WasmLintOptions>(options_json) {
+        Ok(options) => lint_impl(source, Some(options)),
+        Err(err) => {
+            let result = LintResult {
+                success: false,
+                acceptable: false,
+                report: plotgram_core::layout::LintReport::default(),
+                errors: vec![DiagnosticError::render_internal(
+                    plotgram_core::ast::Span::dummy(),
+                    format!("invalid lint options json: {err}"),
+                )],
+                warnings: vec![],
+            };
+            serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
+        }
+    }
+}
+
+fn lint_impl(source: &str, options: Option<WasmLintOptions>) -> String {
+    let output = parse_prepare_validate(source, &StyleRequest::default());
+    let mut errors = output.errors;
+    let warnings = output.warnings;
+    let config = match lint_config_from_options(options.as_ref()) {
+        Ok(config) => config,
+        Err(message) => {
+            let result = LintResult {
+                success: false,
+                acceptable: false,
+                report: plotgram_core::layout::LintReport::default(),
+                errors: vec![DiagnosticError::render_internal(
+                    plotgram_core::ast::Span::dummy(),
+                    message,
+                )],
+                warnings,
+            };
+            return serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string());
+        }
+    };
+
+    let mut report = plotgram_core::layout::LintReport::default();
+    let mut success = false;
+    let mut acceptable = false;
+    if let Some(prepared) = output.diagram {
+        if errors.is_empty() {
+            let diagram = prepared.inner();
+            match plotgram_core::layout::compute_layout_with_plan(diagram, prepared.layout_plan()) {
+                Ok(layout) => {
+                    report = plotgram_core::layout::LayoutLinter::with_config(config.clone())
+                        .run(diagram, &layout);
+                    success = true;
+                    acceptable = report.is_acceptable(&config);
+                }
+                Err(err) => errors.push(err),
+            }
+        }
+    }
+
+    let result = LintResult {
+        success,
+        acceptable,
+        report,
+        errors,
+        warnings,
+    };
+    serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
+}
+
+fn lint_config_from_options(
+    options: Option<&WasmLintOptions>,
+) -> Result<plotgram_core::layout::LintConfig, String> {
+    let profile = options
+        .and_then(|opts| opts.profile.as_deref())
+        .map(str::trim)
+        .filter(|profile| !profile.is_empty())
+        .map(|profile| {
+            plotgram_core::layout::parse_lint_profile(profile)
+                .ok_or_else(|| format!("unknown lint profile '{profile}'"))
+        })
+        .transpose()?
+        .unwrap_or(plotgram_core::layout::LintProfile::Default);
+
+    let fail_on_warning = options
+        .and_then(|opts| opts.fail_on_warning)
+        .unwrap_or(false);
+    let advice = options.and_then(|opts| opts.advice).unwrap_or(true);
+    Ok(plotgram_core::layout::LintConfig::profile(profile)
+        .with_fail_on_warning(fail_on_warning)
+        .with_advice(advice))
 }
 
 /// 获取指定 scope 下的属性 schema 列表，供 playground 前端编辑器做自动补全。

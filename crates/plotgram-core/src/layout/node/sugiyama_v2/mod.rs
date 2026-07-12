@@ -621,4 +621,81 @@ mod tests {
             && a.y < b.y + b.height
             && a.y + a.height > b.y
     }
+
+    #[test]
+    fn test_normalize_padding_syncs_groups_and_total_size() {
+        // 回归 P15：normalize_layout_result_to_padding 必须同步移动 nodes + groups + total_size
+        use crate::layout::LayoutResult;
+        use crate::layout::LayoutHints;
+        const EPS: f64 = 1e-9;
+
+        // 场景 1：节点 min < padding，需要平移
+        let mut result = LayoutResult {
+            nodes: {
+                let mut m = HashMap::new();
+                m.insert(
+                    "n1".to_string(),
+                    NodeLayout { x: 2.0, y: 2.0, width: 40.0, height: 20.0 },
+                );
+                m
+            },
+            groups: {
+                let mut m = HashMap::new();
+                m.insert(
+                    "g1".to_string(),
+                    GroupLayout { x: 2.0, y: 2.0, width: 60.0, height: 40.0 },
+                );
+                m
+            },
+            edges: vec![],
+            total_width: 42.0,
+            total_height: 22.0,
+            hints: LayoutHints::default(),
+        };
+        let padding = 10.0;
+        postprocess::normalize_layout_result_to_padding(&mut result, padding);
+
+        // 节点应移动 dx=8, dy=8
+        let n1 = result.nodes.get("n1").unwrap();
+        assert!((n1.x - 10.0).abs() < EPS, "node x should be 10, got {}", n1.x);
+        assert!((n1.y - 10.0).abs() < EPS, "node y should be 10, got {}", n1.y);
+        // group 应同步移动
+        let g1 = result.groups.get("g1").unwrap();
+        assert!((g1.x - 10.0).abs() < EPS, "group x should be 10, got {}", g1.x);
+        assert!((g1.y - 10.0).abs() < EPS, "group y should be 10, got {}", g1.y);
+        // total_width/height 应各 +8
+        assert!((result.total_width - 50.0).abs() < EPS, "total_width should be 50, got {}", result.total_width);
+        assert!((result.total_height - 30.0).abs() < EPS, "total_height should be 30, got {}", result.total_height);
+
+        // 场景 2：节点已 >= padding，不应移动
+        let mut result2 = LayoutResult {
+            nodes: {
+                let mut m = HashMap::new();
+                m.insert(
+                    "n1".to_string(),
+                    NodeLayout { x: 20.0, y: 20.0, width: 40.0, height: 20.0 },
+                );
+                m
+            },
+            groups: {
+                let mut m = HashMap::new();
+                m.insert(
+                    "g1".to_string(),
+                    GroupLayout { x: 20.0, y: 20.0, width: 60.0, height: 40.0 },
+                );
+                m
+            },
+            edges: vec![],
+            total_width: 60.0,
+            total_height: 40.0,
+            hints: LayoutHints::default(),
+        };
+        postprocess::normalize_layout_result_to_padding(&mut result2, padding);
+        let n1 = result2.nodes.get("n1").unwrap();
+        assert!((n1.x - 20.0).abs() < EPS, "node should not move, x={}", n1.x);
+        assert!((n1.y - 20.0).abs() < EPS, "node should not move, y={}", n1.y);
+        let g1 = result2.groups.get("g1").unwrap();
+        assert!((g1.x - 20.0).abs() < EPS, "group should not move, x={}", g1.x);
+        assert!((result2.total_width - 60.0).abs() < EPS, "total_width should not change");
+    }
 }

@@ -10,6 +10,7 @@ import type { ToolSchema, ToolExecutor, RenderFormat, RenderOptions, DiffResult,
 import {
   renderSource,
   validateSource,
+  lintSource,
   parseSource,
   diffSources,
   applyPatch,
@@ -48,6 +49,30 @@ export const AGENT_TOOL_SCHEMAS: ToolSchema[] = [
           },
         },
         required: ['source', 'format'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'lint',
+      description:
+        '运行布局静态质量检查，返回违规列表与可执行 advice。validate 通过后、render 之前优先调用，用于修复 group overlap / containment / sibling 宽比等布局问题。',
+      parameters: {
+        type: 'object',
+        properties: {
+          source: { type: 'string', description: 'Plotgram DSL 源码' },
+          profile: {
+            type: 'string',
+            enum: ['default', 'strict', 'ci', 'verbose', 'all'],
+            description: 'lint 预设，默认 default',
+          },
+          advice: {
+            type: 'boolean',
+            description: '是否返回面向 Agent 的布局建议，默认 true',
+          },
+        },
+        required: ['source'],
       },
     },
   },
@@ -195,6 +220,14 @@ export function createToolExecutors(
       const wasm = await getWasm();
       const source = String(args.source ?? '');
       return validateSource(wasm, source);
+    },
+
+    lint: async (args) => {
+      const wasm = await getWasm();
+      const source = String(args.source ?? '');
+      const profile = typeof args.profile === 'string' ? args.profile : undefined;
+      const advice = typeof args.advice === 'boolean' ? args.advice : true;
+      return lintSource(wasm, source, { profile, advice });
     },
 
     parse: async (args) => {

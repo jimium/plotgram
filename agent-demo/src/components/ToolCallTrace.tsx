@@ -27,6 +27,7 @@ interface ToolCallTraceProps {
 const TOOL_LABELS: Record<string, string> = {
   render: '渲染图表',
   validate: '校验语法',
+  lint: '布局体检',
   parse: '解析 DSL',
   diff: '对比差异',
   apply_patch: '增量修改',
@@ -43,6 +44,11 @@ const TOOL_THEMES: Record<string, { color: string; bg: string; icon: React.React
     color: '#10b981',
     bg: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
     icon: <CheckCircleFilled />,
+  },
+  lint: {
+    color: '#2563eb',
+    bg: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+    icon: <ToolOutlined />,
   },
   apply_patch: {
     color: '#f59e0b',

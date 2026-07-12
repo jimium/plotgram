@@ -145,12 +145,20 @@ pub(super) fn compute_two_phase_layout(
     let (super_members, super_edges, pair_edge_counts, edge_weights) =
         build_super_graph(graph, group_map, reversed_edges);
     let group_decl = crate::layout::decl_order::group_sibling_decl_index(diagram);
+    let constraint_super_edges: HashSet<(String, String)> = diagram.constraints.iter()
+        .filter_map(|c| {
+            let from_super = super_node_id(c.from.as_str(), group_map);
+            let to_super = super_node_id(c.to.as_str(), group_map);
+            if from_super != to_super { Some((from_super, to_super)) } else { None }
+        })
+        .collect();
     let macro_ranks = assign_super_macro_ranks(
         &super_members,
         &super_edges,
         &edge_weights,
         &graph.node_ids,
         &group_decl,
+        &constraint_super_edges,
     );
 
     let mut blocks = build_macro_blocks(
@@ -538,12 +546,24 @@ fn layout_intra_group_recursive(
     let (super_members, super_edges, pair_edge_counts, edge_weights) =
         build_super_graph_for_group(group_id, group_tree, graph, reversed);
     let group_decl = crate::layout::decl_order::group_sibling_decl_index(diagram);
+    // 约束边映射到组内超级节点级别
+    let node_to_super: HashMap<&str, &str> = super_members.iter()
+        .flat_map(|(super_id, members)| members.iter().map(move |m| (m.as_str(), super_id.as_str())))
+        .collect();
+    let constraint_super_edges: HashSet<(String, String)> = diagram.constraints.iter()
+        .filter_map(|c| {
+            let from_super = node_to_super.get(c.from.as_str())?;
+            let to_super = node_to_super.get(c.to.as_str())?;
+            if from_super != to_super { Some((from_super.to_string(), to_super.to_string())) } else { None }
+        })
+        .collect();
     let macro_ranks = assign_super_macro_ranks(
         &super_members,
         &super_edges,
         &edge_weights,
         &graph.node_ids,
         &group_decl,
+        &constraint_super_edges,
     );
 
     // 4.5 嵌套 sibling：Phase 1 起 Equal 仅由 L1 执行；此处只保留 content-fit 初值。

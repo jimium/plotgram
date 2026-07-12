@@ -15,14 +15,19 @@ fn super_node_id(node: &str, group_map: &GroupMap) -> String {
 }
 
 /// 分组感知的层分配算法
+///
+/// `constraints` 为 DSL `constrain` 边集合 `(from, to)`，语义为 `rank(from) < rank(to)`。
+/// 约束边永不被反转：在 macro 级 `resolve_bidirectional_pairs_by_weight` 和 super-node FAS
+/// 中均被排除出反转候选。
 pub(in super::super) fn assign_ranks_group_aware(
     diagram: &Diagram,
     graph: &GraphIndex,
     group_map: &GroupMap,
     reversed: &HashSet<(String, String)>,
+    constraints: &HashSet<(String, String)>,
 ) -> HashMap<String, usize> {
     let group_decl = crate::layout::decl_order::group_sibling_decl_index(diagram);
-    let mut ranks = assign_macro_group_ranks(graph, group_map, reversed, &group_decl);
+    let mut ranks = assign_macro_group_ranks(graph, group_map, reversed, &group_decl, constraints);
 
     // 归一化
     let min_rank = ranks.values().copied().min().unwrap_or(0);
@@ -49,6 +54,7 @@ fn assign_macro_group_ranks(
     group_map: &GroupMap,
     reversed: &HashSet<(String, String)>,
     group_decl: &HashMap<String, usize>,
+    constraints: &HashSet<(String, String)>,
 ) -> HashMap<String, usize> {
     // 1. 超级节点成员
     let mut super_members: HashMap<String, Vec<String>> = HashMap::new();
@@ -83,6 +89,12 @@ fn assign_macro_group_ranks(
         }
     }
 
+    // 2b. 约束边映射到超级节点级别，供 macro 级排除反转
+    let constraint_super_edges: HashSet<(String, String)> = constraints
+        .iter()
+        .map(|(from, to)| (super_node_id(from, group_map), super_node_id(to, group_map)))
+        .collect();
+
     // 3. 宏观 rank
     let macro_ranks = assign_super_macro_ranks(
         &super_members,
@@ -90,6 +102,7 @@ fn assign_macro_group_ranks(
         &edge_weights,
         &graph.node_ids,
         group_decl,
+        &constraint_super_edges,
     );
 
     // 4. 微观 rank + 各超级节点层带宽度
@@ -158,16 +171,18 @@ pub(in super::super) fn assign_super_macro_ranks(
     edge_weights: &HashMap<(String, String), usize>,
     node_decl_order: &[String],
     group_decl: &HashMap<String, usize>,
+    constraint_super_edges: &HashSet<(String, String)>,
 ) -> HashMap<String, usize> {
     let all_supers: HashSet<String> = super_members.keys().cloned().collect();
 
-    // ── 加权裁决双向对（2-环）──
+    // ── 加权裁决双向对（2-环），约束边永不被反转 ──
     let pre_reversed = resolve_bidirectional_pairs_by_weight(
         super_members,
         super_edges,
         edge_weights,
         node_decl_order,
         group_decl,
+        constraint_super_edges,
     );
 
     // 构建去除"已裁决反转边"后的邻接表，供 FAS 处理剩余的长环
@@ -195,6 +210,8 @@ pub(in super::super) fn assign_super_macro_ranks(
     let mut sorted_supers: Vec<String> = all_supers.iter().cloned().collect();
     sorted_supers.sort();
     let mut super_reversed = crate::layout::node::common::acyclic::greedy_fas(&sorted_supers, &super_out, &super_in);
+    // 约束边永不被反转：从 FAS 结果中剔除约束 super-edge
+    super_reversed.retain(|e| !constraint_super_edges.contains(e));
     super_reversed.extend(pre_reversed);
 
     // 构建去环后的邻接表（移除后向边）
@@ -239,8 +256,10 @@ pub(in super::super) fn assign_super_macro_ranks(
 /// 按有向边权裁决超级图中的双向对（2-环）。
 ///
 /// 对每个双向对 (A↔B)：
-/// 1. 比较 `weight(A→B)` 与 `weight(B→A)`（跨组实际边数），反转权重小的方向；
-/// 2. 权重平局时，组声明序更早的组视为上游（优先 `group_decl`，否则成员全局声明序），
+/// 1. 若其中一侧是约束边（`constraint_super_edges`），**永不被反转**——
+///    反转另一侧（非约束方向）。若两侧都是约束边，不反转（矛盾约束由下游兜底）。
+/// 2. 否则比较 `weight(A→B)` 与 `weight(B→A)`（跨组实际边数），反转权重小的方向；
+/// 3. 权重平局时，组声明序更早的组视为上游（优先 `group_decl`，否则成员全局声明序），
 ///    反转"下游→上游"方向。
 ///
 /// 返回需要标记反转的边集合（这些边不参与后续 FAS / 拓扑排序）。
@@ -250,6 +269,7 @@ fn resolve_bidirectional_pairs_by_weight(
     edge_weights: &HashMap<(String, String), usize>,
     node_decl_order: &[String],
     group_decl: &HashMap<String, usize>,
+    constraint_super_edges: &HashSet<(String, String)>,
 ) -> HashSet<(String, String)> {
     // 找出所有双向对，归一化为 (min, max) 去重
     let mut bidir_pairs: Vec<(String, String)> = Vec::new();
@@ -299,6 +319,23 @@ fn resolve_bidirectional_pairs_by_weight(
     };
 
     for (a, b) in &bidir_pairs {
+        let ab_is_constraint = constraint_super_edges.contains(&(a.clone(), b.clone()));
+        let ba_is_constraint = constraint_super_edges.contains(&(b.clone(), a.clone()));
+
+        // 约束边永不被反转：反转非约束方向
+        if ab_is_constraint && !ba_is_constraint {
+            reversed.insert((b.clone(), a.clone()));
+            continue;
+        }
+        if ba_is_constraint && !ab_is_constraint {
+            reversed.insert((a.clone(), b.clone()));
+            continue;
+        }
+        if ab_is_constraint && ba_is_constraint {
+            // 两侧都是约束边（矛盾约束），不反转，由下游拓扑排序兜底
+            continue;
+        }
+
         let w_ab = edge_weights.get(&(a.clone(), b.clone())).copied().unwrap_or(1);
         let w_ba = edge_weights.get(&(b.clone(), a.clone())).copied().unwrap_or(1);
 

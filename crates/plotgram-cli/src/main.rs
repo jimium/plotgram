@@ -59,7 +59,7 @@ enum Commands {
         /// 诊断输出格式 (text/json)
         #[arg(short, long, default_value = "text")]
         format: String,
-        /// 额外执行布局质量检查（LayoutLint 全量规则）
+        /// 额外执行布局质量检查（LayoutLint strict 预设）
         #[arg(long = "layout-check")]
         layout_check: bool,
     },
@@ -79,6 +79,9 @@ enum Commands {
         /// warning 也视为失败
         #[arg(long = "fail-on-warning")]
         fail_on_warning: bool,
+        /// 生成面向 Agent 的布局建议
+        #[arg(long = "advice")]
+        advice: bool,
     },
     /// 将 Plotgram AST 导出为 JSON
     Export {
@@ -137,7 +140,8 @@ fn main() {
             profile,
             ignore,
             fail_on_warning,
-        }) => cmd_lint(&input, &format, &profile, ignore.as_deref(), fail_on_warning),
+            advice,
+        }) => cmd_lint(&input, &format, &profile, ignore.as_deref(), fail_on_warning, advice),
         Some(Commands::Export { input }) => cmd_export(&input),
         Some(Commands::Diff {
             old_file,
@@ -459,7 +463,12 @@ fn cmd_validate(input: &str, format_str: &str, layout_check: bool) {
     }
 }
 
-fn build_lint_config(profile: &str, ignore: Option<&str>, fail_on_warning: bool) -> plotgram_core::layout::LintConfig {
+fn build_lint_config(
+    profile: &str,
+    ignore: Option<&str>,
+    fail_on_warning: bool,
+    advice: bool,
+) -> plotgram_core::layout::LintConfig {
     let profile = plotgram_core::layout::parse_lint_profile(profile).unwrap_or_else(|| {
         eprintln!("未知 lint profile '{profile}'，使用 default（可选：default / strict / ci / verbose / all）");
         plotgram_core::layout::LintProfile::Default
@@ -472,7 +481,9 @@ fn build_lint_config(profile: &str, ignore: Option<&str>, fail_on_warning: bool)
         }
         config = config.without(&rules);
     }
-    config.with_fail_on_warning(fail_on_warning)
+    config
+        .with_fail_on_warning(fail_on_warning)
+        .with_advice(advice)
 }
 
 fn run_layout_lint(
@@ -501,7 +512,7 @@ fn print_lint_report_text(
         errors, warnings
     );
 
-    for v in &report.violations {
+    for (idx, v) in report.violations.iter().enumerate() {
         let level = match v.severity {
             plotgram_core::layout::LintSeverity::Error => "error",
             plotgram_core::layout::LintSeverity::Warning => "warning",
@@ -520,6 +531,25 @@ fn print_lint_report_text(
         if let Some(idx) = v.edge_index {
             eprintln!("  edge_index: {idx}");
         }
+        if !v.related_edge_indices.is_empty() {
+            let related = v
+                .related_edge_indices
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>();
+            eprintln!("  edge_indices: {}", related.join(", "));
+        }
+        for advice in report.advices_for_violation(idx) {
+            eprintln!(
+                "  advice(p{} {:?}): {}",
+                advice.priority,
+                advice.confidence,
+                advice.text
+            );
+            if let Some(fix) = &advice.fix {
+                eprintln!("    fix: {}", fix.action);
+            }
+        }
     }
 
     if exit_on_failure && !report.is_acceptable(config) {
@@ -527,8 +557,15 @@ fn print_lint_report_text(
     }
 }
 
-fn cmd_lint(input: &str, format_str: &str, profile: &str, ignore: Option<&str>, fail_on_warning: bool) {
-    let config = build_lint_config(profile, ignore, fail_on_warning);
+fn cmd_lint(
+    input: &str,
+    format_str: &str,
+    profile: &str,
+    ignore: Option<&str>,
+    fail_on_warning: bool,
+    advice: bool,
+) {
+    let config = build_lint_config(profile, ignore, fail_on_warning, advice);
     let source = read_source(input);
     let output = parse_prepare_validate(&source, &StyleRequest::default());
 

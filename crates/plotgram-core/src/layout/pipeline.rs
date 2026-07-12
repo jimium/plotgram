@@ -254,7 +254,7 @@ impl<'a> LayoutPipeline<'a> {
         router: &dyn EdgeRoutingStrategy,
         edge_snap_config: &grid_snap::EdgeSnapConfig,
     ) -> Result<LayoutResult, DiagnosticError> {
-        if !edge_snap_config.enabled || result.groups.is_empty() {
+        if result.groups.is_empty() {
             return Ok(result);
         }
 

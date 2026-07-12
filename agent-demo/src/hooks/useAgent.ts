@@ -327,6 +327,11 @@ export function useAgent(options: UseAgentOptions): UseAgentResult {
 
 function summarizeArgs(tc: ToolCall): string {
   const args = tc.arguments || {};
+  if (tc.name === 'lint') {
+    const profile = typeof args.profile === 'string' ? args.profile : 'default';
+    const advice = typeof args.advice === 'boolean' ? args.advice : true;
+    return `lint profile=${profile} advice=${String(advice)}`;
+  }
   // render/validate 的 source 太长，只保留前 80 字符 + 长度
   if (typeof args.source === 'string') {
     const s = args.source as string;
@@ -348,6 +353,12 @@ function summarizeResult(result: unknown): string {
   if (!result || typeof result !== 'object') return String(result);
   const r = result as Record<string, unknown>;
   if (r.success === true) {
+    if (r.report && typeof r.report === 'object') {
+      const report = r.report as { violations?: unknown[]; advices?: unknown[] };
+      const violationCount = Array.isArray(report.violations) ? report.violations.length : 0;
+      const adviceCount = Array.isArray(report.advices) ? report.advices.length : 0;
+      return `lint 完成 (${violationCount} violations, ${adviceCount} advices)`;
+    }
     if (typeof r.text === 'string') {
       return `渲染成功 (${(r.text as string).length} chars)`;
     }

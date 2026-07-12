@@ -1,5 +1,6 @@
 //! LayoutLint 违规类型与报告。
 
+use crate::error::FixAction;
 use serde::{Deserialize, Serialize};
 
 /// 规则严重级别。
@@ -105,6 +106,63 @@ impl LintRuleId {
     }
 }
 
+/// 建议置信度。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AdviceConfidence {
+    High,
+    Medium,
+    Low,
+}
+
+/// 可被 Agent 消费的布局调节旋钮。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum LayoutKnob {
+    GroupFrame {
+        field: String,
+        suggested: String,
+        rationale: String,
+    },
+    GroupLayout {
+        group_id: String,
+        suggested: String,
+        rationale: String,
+    },
+    LayoutOption {
+        key: String,
+        suggested: String,
+        rationale: String,
+    },
+    Topology {
+        action: String,
+        targets: Vec<String>,
+        rationale: String,
+    },
+    Label {
+        edge_or_entity: String,
+        action: String,
+        rationale: String,
+    },
+    IgnoreRule {
+        rule: String,
+        rationale: String,
+    },
+}
+
+/// 布局违规的可执行建议。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LintAdvice {
+    pub violation_index: usize,
+    pub text: String,
+    pub priority: u8,
+    pub confidence: AdviceConfidence,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub knobs: Vec<LayoutKnob>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fix: Option<FixAction>,
+}
+
 /// 单条布局违规。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LayoutViolation {
@@ -120,6 +178,8 @@ pub struct LayoutViolation {
     pub group_ids: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub edge_index: Option<usize>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub related_edge_indices: Vec<usize>,
 }
 
 impl LayoutViolation {
@@ -132,6 +192,7 @@ impl LayoutViolation {
             entity_ids: Vec::new(),
             group_ids: Vec::new(),
             edge_index: None,
+            related_edge_indices: Vec::new(),
         }
     }
 
@@ -154,12 +215,30 @@ impl LayoutViolation {
         self.edge_index = Some(index);
         self
     }
+
+    pub fn with_related_edges(mut self, indices: impl IntoIterator<Item = usize>) -> Self {
+        let mut collected: Vec<usize> = indices.into_iter().collect();
+        collected.sort_unstable();
+        collected.dedup();
+        if self.edge_index.is_none() {
+            self.edge_index = collected.first().copied();
+        }
+        self.related_edge_indices = collected;
+        self
+    }
+
+    pub fn primary_edge_index(&self) -> Option<usize> {
+        self.edge_index
+            .or_else(|| self.related_edge_indices.first().copied())
+    }
 }
 
 /// 完整 lint 报告。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct LintReport {
     pub violations: Vec<LayoutViolation>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub advices: Vec<LintAdvice>,
 }
 
 impl LintReport {
@@ -193,5 +272,11 @@ impl LintReport {
 
     pub fn by_rule(&self, rule: LintRuleId) -> impl Iterator<Item = &LayoutViolation> {
         self.violations.iter().filter(move |v| v.rule == rule)
+    }
+
+    pub fn advices_for_violation(&self, index: usize) -> impl Iterator<Item = &LintAdvice> {
+        self.advices
+            .iter()
+            .filter(move |advice| advice.violation_index == index)
     }
 }

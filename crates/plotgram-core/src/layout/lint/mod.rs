@@ -3,15 +3,18 @@
 //! 在 `LayoutResult` 上运行一组确定性几何规则，输出可追溯到 DSL 实体的违规列表。
 //! 供 CLI、测试、eval 框架消费；不依赖 SVG 渲染。
 
+mod advice;
 mod config;
 mod geometry;
 mod violation;
 
+use advice::generate_lint_advices;
 pub use config::{
     parse_lint_profile, parse_lint_rule, parse_lint_rules_list, LintConfig, LintProfile, RuleConfig,
 };
 pub use violation::{
-    LayoutViolation, LintReport, LintRuleId, LintSeverity,
+    AdviceConfidence, LayoutKnob, LintAdvice, LayoutViolation, LintReport, LintRuleId,
+    LintSeverity,
 };
 
 use crate::layout::edge::common::label_avoidance::aabb_overlap;
@@ -93,7 +96,15 @@ impl LayoutLinter {
 
         let mut violations = finalize_violations(cfg, violations);
         sort_violations(&mut violations);
-        LintReport { violations }
+        let advices = if cfg.advice_enabled {
+            generate_lint_advices(diagram, result, &violations)
+        } else {
+            Vec::new()
+        };
+        LintReport {
+            violations,
+            advices,
+        }
     }
 }
 
@@ -114,11 +125,19 @@ fn finalize_violations(config: &LintConfig, violations: Vec<LayoutViolation>) ->
 
 fn sort_violations(violations: &mut Vec<LayoutViolation>) {
     violations.sort_by(|a, b| {
+        let severity_rank = |severity: LintSeverity| match severity {
+            LintSeverity::Error => 0,
+            LintSeverity::Warning => 1,
+        };
         a.rule
             .as_str()
             .cmp(b.rule.as_str())
+            .then_with(|| severity_rank(a.severity).cmp(&severity_rank(b.severity)))
             .then_with(|| a.message.cmp(&b.message))
+            .then_with(|| a.group_ids.cmp(&b.group_ids))
+            .then_with(|| a.entity_ids.cmp(&b.entity_ids))
             .then_with(|| a.edge_index.cmp(&b.edge_index))
+            .then_with(|| a.related_edge_indices.cmp(&b.related_edge_indices))
     });
 }
 
@@ -315,6 +334,9 @@ fn containment_direction_label(kind: ContainmentViolationKind) -> &'static str {
 }
 
 fn check_edge_through_nodes(diagram: &Diagram, result: &LayoutResult, out: &mut Vec<LayoutViolation>) {
+    let mut node_ids: Vec<&String> = result.nodes.keys().collect();
+    node_ids.sort();
+
     for (index, edge) in result.edges.iter().enumerate() {
         if edge.path_len() < 2 {
             continue;
@@ -332,9 +354,8 @@ fn check_edge_through_nodes(diagram: &Diagram, result: &LayoutResult, out: &mut 
             }
             let a = window[0];
             let b = window[1];
-            let mut node_ids: Vec<&String> = result.nodes.keys().collect();
-            node_ids.sort();
-            for node_id in node_ids {
+            for node_id in &node_ids {
+                let node_id = node_id.as_str();
                 if node_id == from_id || node_id == to_id {
                     continue;
                 }
@@ -351,7 +372,7 @@ fn check_edge_through_nodes(diagram: &Diagram, result: &LayoutResult, out: &mut 
                             ),
                         )
                         .with_edge_index(index)
-                        .with_entities([from_id, to_id, node_id.as_str()]),
+                        .with_entities([from_id, to_id, node_id]),
                     );
                 }
             }
@@ -379,7 +400,7 @@ fn check_edge_crossings(result: &LayoutResult, out: &mut Vec<LayoutViolation>) {
                         format!("边 index={i} 与边 index={j} 交叉"),
                     )
                     .with_edge_index(i)
-                    .with_entities([] as [&str; 0]),
+                    .with_related_edges([i, j]),
                 );
             }
         }
@@ -413,6 +434,9 @@ fn polylines_cross(a: &[Point], b: &[Point]) -> bool {
 }
 
 fn check_edge_on_group_borders(diagram: &Diagram, result: &LayoutResult, out: &mut Vec<LayoutViolation>) {
+    let mut group_ids: Vec<&String> = result.groups.keys().collect();
+    group_ids.sort();
+
     for (index, edge) in result.edges.iter().enumerate() {
         if edge.path_len() < 2 {
             continue;
@@ -423,10 +447,8 @@ fn check_edge_on_group_borders(diagram: &Diagram, result: &LayoutResult, out: &m
         for window in path.windows(2) {
             let a = window[0];
             let b = window[1];
-            let mut group_ids: Vec<&String> = result.groups.keys().collect();
-            group_ids.sort();
-            for gid in group_ids {
-                let gl = &result.groups[gid];
+            for gid in &group_ids {
+                let gl = &result.groups[*gid];
                 if gl.width <= 0.0 || gl.height <= 0.0 {
                     continue;
                 }
@@ -453,6 +475,8 @@ fn check_edge_on_group_borders(diagram: &Diagram, result: &LayoutResult, out: &m
 fn check_edge_crosses_group_interior(diagram: &Diagram, result: &LayoutResult, out: &mut Vec<LayoutViolation>) {
     let entity_group = entity_to_group_map(diagram);
     let ancestor_sets = build_group_ancestor_sets(diagram);
+    let mut group_ids: Vec<&String> = result.groups.keys().collect();
+    group_ids.sort();
 
     for (index, edge) in result.edges.iter().enumerate() {
         if edge.path_len() < 2 {
@@ -463,14 +487,11 @@ fn check_edge_crosses_group_interior(diagram: &Diagram, result: &LayoutResult, o
         let to_related = endpoint_related_groups(rel.to.as_str(), &entity_group, &ancestor_sets);
         let path = edge.path_points();
 
-        let mut group_ids: Vec<&String> = result.groups.keys().collect();
-        group_ids.sort();
-
-        for gid in group_ids {
+        for gid in &group_ids {
             if from_related.contains(gid.as_str()) || to_related.contains(gid.as_str()) {
                 continue;
             }
-            let gl = &result.groups[gid];
+            let gl = &result.groups[*gid];
             if gl.width <= 0.0 || gl.height <= 0.0 {
                 continue;
             }
@@ -754,7 +775,14 @@ fn check_unrelated_edge_trunk_merge(
                     rel_j.to.as_str(),
                 ),
             )
-            .with_entities([i.to_string(), j.to_string()]),
+            .with_edge_index(i)
+            .with_related_edges([i, j])
+            .with_entities([
+                rel_i.from.as_str(),
+                rel_i.to.as_str(),
+                rel_j.from.as_str(),
+                rel_j.to.as_str(),
+            ]),
         );
     }
 }
@@ -765,8 +793,11 @@ fn check_unrelated_edge_trunk_merge(
 pub struct LintMetricsSummary {
     pub node_overlap: usize,
     pub group_overlap: usize,
+    pub node_outside_group: usize,
+    pub child_group_outside_parent: usize,
     pub edge_through_node: usize,
     pub edge_crossing: usize,
+    pub edge_on_group_border: usize,
     pub edge_crosses_group_interior: usize,
     pub label_node_overlap: usize,
     pub label_label_overlap: usize,
@@ -792,14 +823,16 @@ impl LintMetricsSummary {
             match v.rule {
                 LintRuleId::NodeOverlap => summary.node_overlap += 1,
                 LintRuleId::GroupOverlap => summary.group_overlap += 1,
+                LintRuleId::NodeOutsideGroup => summary.node_outside_group += 1,
+                LintRuleId::ChildGroupOutsideParent => summary.child_group_outside_parent += 1,
                 LintRuleId::EdgeThroughNode => summary.edge_through_node += 1,
                 LintRuleId::EdgeCrossing => summary.edge_crossing += 1,
+                LintRuleId::EdgeOnGroupBorder => summary.edge_on_group_border += 1,
                 LintRuleId::EdgeCrossesGroupInterior => summary.edge_crosses_group_interior += 1,
                 LintRuleId::LabelNodeOverlap => summary.label_node_overlap += 1,
                 LintRuleId::LabelLabelOverlap => summary.label_label_overlap += 1,
                 LintRuleId::UnrelatedEdgeTrunkMerge => summary.unrelated_edge_trunk_merge += 1,
                 LintRuleId::SiblingWidthRatio => summary.sibling_width_ratio += 1,
-                _ => {}
             }
         }
         summary

@@ -116,6 +116,11 @@ pub fn reroute_conflicting_edges(
                 .map(|rel| (rel.from.as_str(), rel.to.as_str()))
                 .unwrap_or(("", ""));
 
+            // 先移除当前边的旧段，避免 corridor 校验时与自身旧路径假冲突，
+            // 也避免快速路径 insert 时旧段残留为幽灵段（P05 回归）
+            grid.remove_by_edges(&[ei]);
+            let old_points: Vec<Point> = edges[ei].path_points().into_owned();
+
             if let Some(corridor_path) = validated_corridor_path(
                 ei,
                 from_ep.anchor,
@@ -141,10 +146,6 @@ pub fn reroute_conflicting_edges(
                     continue;
                 }
             }
-
-            // 先移除当前边
-            grid.remove_by_edges(&[ei]);
-            let old_points: Vec<Point> = edges[ei].path_points().into_owned();
 
             let mut clean_path: Option<Vec<Point>> = None;
 

@@ -11,7 +11,7 @@ use crate::layout::node::common::node_sizing;
 use crate::layout::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeAlignConfig};
 use crate::types::DiagramType;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub(in super::super) mod acyclic;
 pub(in super::super) mod constants;
@@ -78,15 +78,21 @@ impl LayoutStrategy for ArchitectureV2Layout {
         let mut graph = types::GraphIndex::build(diagram);
         let group_map = types::build_group_map(diagram);
 
-        let reversed_edges = acyclic::find_edges_to_reverse(&graph);
-
-        // FAS 之后注入全部 constrain（同组影响组内 rank；跨组进入超级图边）。
+        // 先注入约束（与 sugiyama_v2::graph::build_graph 一致），使 FAS 能看到完整拓扑。
+        // 约束边参与图拓扑但不作为 FAS 反转候选（见 find_edges_to_reverse 的 non_reversible 参数）。
         let constraint_edges: Vec<(&str, &str)> = diagram
             .constraints
             .iter()
             .map(|c| (c.from.as_str(), c.to.as_str()))
             .collect();
         acyclic::inject_irreversible_edges(&mut graph, &constraint_edges);
+
+        // FAS：约束边永不被反转
+        let constraint_set: HashSet<(String, String)> = constraint_edges
+            .iter()
+            .map(|(f, t)| (f.to_string(), t.to_string()))
+            .collect();
+        let reversed_edges = acyclic::find_edges_to_reverse(&graph, &constraint_set);
 
         if !group_map.top_groups.is_empty() {
             return super::two_phase::compute_two_phase_layout(
@@ -99,7 +105,7 @@ impl LayoutStrategy for ArchitectureV2Layout {
             );
         }
 
-        let ranks = rank::assign_ranks_group_aware(diagram, &graph, &group_map, &reversed_edges);
+        let ranks = rank::assign_ranks_group_aware(diagram, &graph, &group_map, &reversed_edges, &constraint_set);
         let decl_index = crate::layout::decl_order::entity_sibling_decl_index(diagram);
         let layers = order::build_layers(&ranks, &decl_index);
         let ordered_layers = order::order_layers_group_aware(

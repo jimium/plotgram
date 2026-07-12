@@ -43,24 +43,22 @@ pub(super) fn normalize_layout_to_padding(
 }
 
 pub(super) fn normalize_layout_result_to_padding(result: &mut LayoutResult, padding: f64) {
-    normalize_layout_to_padding(&mut result.nodes, padding);
-    let min_x = result.nodes.values().map(|node| node.x).fold(f64::INFINITY, f64::min);
-    let min_y = result.nodes.values().map(|node| node.y).fold(f64::INFINITY, f64::min);
+    // 从原始节点 min 一次性算 dx/dy，统一应用到 nodes + groups + total_size。
+    // 修复 P15：旧实现先调 normalize_layout_to_padding 移动节点，再用移动后的 min 重算
+    // dx/dy → 恒 ≤ 0 → early return → groups 和 total_size 永不调整。
+    let min_x = result.nodes.values().map(|n| n.x).fold(f64::INFINITY, f64::min);
+    let min_y = result.nodes.values().map(|n| n.y).fold(f64::INFINITY, f64::min);
     if !min_x.is_finite() || !min_y.is_finite() {
         return;
     }
-    let dx = if min_x < padding {
-        padding - min_x
-    } else {
-        0.0
-    };
-    let dy = if min_y < padding {
-        padding - min_y
-    } else {
-        0.0
-    };
-    if dx <= 0.0 && dy <= 0.0 {
+    let dx = if min_x < padding { padding - min_x } else { 0.0 };
+    let dy = if min_y < padding { padding - min_y } else { 0.0 };
+    if dx == 0.0 && dy == 0.0 {
         return;
+    }
+    for node in result.nodes.values_mut() {
+        node.x += dx;
+        node.y += dy;
     }
     for group in result.groups.values_mut() {
         group.x += dx;

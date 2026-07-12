@@ -51,6 +51,8 @@ pub struct LintConfig {
     pub(crate) rules: [RuleConfig; LintRuleId::COUNT],
     /// 为 true 时 warning 也视为失败（`LintReport::is_acceptable`）
     pub fail_on_warning: bool,
+    /// 为 true 时生成面向 Agent 的建议层。
+    pub advice_enabled: bool,
 }
 
 impl Default for LintConfig {
@@ -76,6 +78,7 @@ impl LintConfig {
         Self {
             rules,
             fail_on_warning: false,
+            advice_enabled: false,
         }
     }
 
@@ -92,6 +95,7 @@ impl LintConfig {
         Self {
             rules,
             fail_on_warning: false,
+            advice_enabled: false,
         }
     }
 
@@ -100,6 +104,7 @@ impl LintConfig {
         Self {
             rules: Self::all_enabled_rules(),
             fail_on_warning: false,
+            advice_enabled: false,
         }
     }
 
@@ -140,6 +145,11 @@ impl LintConfig {
 
     pub fn with_fail_on_warning(mut self, fail: bool) -> Self {
         self.fail_on_warning = fail;
+        self
+    }
+
+    pub fn with_advice(mut self, enabled: bool) -> Self {
+        self.advice_enabled = enabled;
         self
     }
 }

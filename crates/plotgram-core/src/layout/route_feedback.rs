@@ -78,7 +78,9 @@ impl<'a> LayoutRouteFeedback<'a> {
                     pre.get(id).and_then(|(px, py)| {
                         let dx = n.x - px;
                         let dy = n.y - py;
-                        if (dx * dx + dy * dy).sqrt() >= 1.0 {
+                        if (dx * dx + dy * dy).sqrt()
+                            >= super::post_route_hook::NODE_MOVE_REROUTE_EPS
+                        {
                             Some(id.clone())
                         } else {
                             None

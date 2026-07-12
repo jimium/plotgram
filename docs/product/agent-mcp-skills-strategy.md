@@ -95,8 +95,8 @@ Skills 路径因产品而异（示例）：
 
 发布时提供 **一份 Skill 源码** + **一个 MCP server** + 安装说明：
 
-- **Skill**（约 50–80 行）：触发词、工作流（validate 闭环、优先 `apply_patch`）、指向 MCP resources。
-- **MCP**：`validate` / `render` / `diff` / `apply_patch` / `layout_catalog` / `export_drawio` 等。
+- **Skill**（约 50–80 行）：触发词、工作流（`validate -> lint(advice) -> render` 闭环、优先 `apply_patch`）、指向 MCP resources。
+- **MCP**：`validate` / `lint` / `render` / `diff` / `apply_patch` / `layout_catalog` / `export_drawio` 等。
 - **完整语法**：放在 MCP `resources` 或 `docs/specs/dsl/`，Skill 只链过去，避免双份维护。
 
 ### 3.3 DSL 知识如何传给 MCP 调用方
@@ -108,7 +108,7 @@ MCP 不自动教会 Agent 语法，需分层供给：
 | 连接时 | MCP `instructions` | 速查规则（~500 字）、可用 tool 列表 |
 | 按需 | MCP `resources` | `writing-manual`、`language-spec`、示例 `.pgm` |
 | 按需 | MCP `prompts` | `create-architecture` 等带骨架的模板 |
-| 运行时 | `validate` 返回 | 结构化错误 + `suggestion`（教师角色） |
+| 运行时 | `validate` / `lint` 返回 | 结构化错误 + `suggestion` / 布局 `advices`（教师角色） |
 | 可选 | 项目 Skill | Cursor 侧触发与工作流强化 |
 
 ---
@@ -120,6 +120,7 @@ MCP 不自动教会 Agent 语法，需分层供给：
 | Tool | 说明 | 本地 | 云端 |
 |------|------|------|------|
 | `validate` | 语法/语义校验 + 结构化诊断 | ✅ | ✅ |
+| `lint` | 布局几何检查 + Agent advice（group_frame / group layout / group_padding） | ✅ | ✅ |
 | `render` | SVG / ASCII / JSON / PNG 等 | ✅ | ✅ |
 | `parse` | DSL → AST JSON | ✅ | ✅ |
 | `diff` | 两份 DSL 语义差异 | ✅ | ✅ |

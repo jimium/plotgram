@@ -63,6 +63,10 @@ LayoutLint 在布局计算完成后，对 `LayoutResult` 运行一组**确定性
 | `edge_crosses_group_interior` | error | 边穿过某分组内部，且该分组不在端点祖先链上 |
 | `edge_crossing` | warning | 两两边在非共享端点处交叉 |
 | `edge_on_group_border` | warning | 边路径与分组边框重合（正交走廊路由常触发，**default 预设默认关闭**） |
+| `unrelated_edge_trunk_merge` | warning | 无关边共享非语义 trunk 段（架构图假并线） |
+| `label_node_overlap` | error | 标签与节点 AABB 重叠 |
+| `label_label_overlap` | warning | 标签与标签 AABB 重叠 |
+| `sibling_width_ratio` | warning | 同级 sibling 宽比过大（架构图对称性信号） |
 
 ### 关于「合法穿越」
 
@@ -82,8 +86,8 @@ LayoutLint 在布局计算完成后，对 `LayoutResult` 运行一组**确定性
 | Profile | CLI 别名 | 启用规则 | 典型场景 |
 |---------|----------|----------|----------|
 | `default` | — | 全部 except `edge_on_group_border`；含 `edge_crossing`(warning) | 日常开发、`plotgram lint` 默认 |
-| `strict` | `ci` | 仅硬约束 6 条（无交叉、无边框） | CI 门禁、`validate --layout-check` |
-| `verbose` | `all` | 全部 8 条 | 调试、排查走廊贴边 |
+| `strict` | `ci` | 仅硬约束 7 条（无交叉、无边框、无软指标） | CI 门禁、`validate --layout-check` |
+| `verbose` | `all` | 全部 12 条 | 调试、排查走廊贴边 |
 
 ### 各预设规则开关一览
 
@@ -97,6 +101,10 @@ LayoutLint 在布局计算完成后，对 `LayoutResult` 运行一组**确定性
 | `edge_crosses_group_interior` | on | on | on |
 | `edge_crossing` | on (warning) | off | on (warning) |
 | `edge_on_group_border` | **off** | off | on (warning) |
+| `unrelated_edge_trunk_merge` | on (warning) | off | on (warning) |
+| `label_node_overlap` | on | on | on |
+| `label_label_overlap` | on (warning) | off | on (warning) |
+| `sibling_width_ratio` | on (warning) | off | on (warning) |
 
 ---
 
@@ -121,8 +129,11 @@ plotgram lint diagram.pgm --ignore edge_crossing,edge_on_group_border
 # warning 也导致退出码 1
 plotgram lint diagram.pgm --fail-on-warning
 
+# 输出面向 Agent 的 advice
+plotgram lint diagram.pgm --advice
+
 # JSON 输出（便于脚本处理）
-plotgram lint diagram.pgm --format json
+plotgram lint diagram.pgm --advice --format json
 ```
 
 退出码：
@@ -147,6 +158,11 @@ plotgram validate diagram.pgm --layout-check
   edge_index: 3
 [warning] edge_crossing: 边 index=0 与边 index=1 交叉
   edge_index: 0
+  edge_indices: 0, 1
+[warning] sibling_width_ratio: 同级条带宽比过大：'data_ns'/512 vs 'platform_ns'/296 = 1.730
+  groups: data_ns, platform_ns
+  advice(p1 High): 同级条带宽比 1.730 偏大，architecture 图优先改 diagram 级 `group_frame: strips`，或显式设 `group_frame { track: equal, gap: 40 }`。
+    fix: set_group_frame_preset
 ```
 
 ### JSON 输出结构
@@ -161,7 +177,24 @@ plotgram validate diagram.pgm --layout-check
       "metric": 2400.0,
       "entity_ids": ["a", "b"],
       "group_ids": [],
-      "edge_index": null
+      "edge_index": null,
+      "related_edge_indices": []
+    }
+  ],
+  "advices": [
+    {
+      "violation_index": 0,
+      "text": "优先增大 `layout { group_padding: ... }` 或 diagram 级 `group_frame.gap`。",
+      "priority": 1,
+      "confidence": "high",
+      "knobs": [
+        {
+          "kind": "layout_option",
+          "key": "group_padding",
+          "suggested": "40",
+          "rationale": "containment / overlap 通常先用 padding 吃掉边界压力。"
+        }
+      ]
     }
   ]
 }
@@ -176,6 +209,18 @@ plotgram validate diagram.pgm --layout-check
 | `entity_ids` | 相关实体 id |
 | `group_ids` | 相关分组 id |
 | `edge_index` | 边在 `diagram.relations` 中的下标 |
+| `related_edge_indices` | 相关边下标集合（适用于 crossing / trunk merge） |
+| `advices` | 仅 `--advice` 开启时输出；包含 `priority` / `confidence` / `knobs` / 可选 `fix` |
+
+### `--advice` 的语义
+
+- 默认关闭，避免 CI / eval JSON 噪音。
+- 开启后，在 `LintReport.violations` 之外额外输出 `advices`。
+- `advices[].fix` 只覆盖高置信、白名单内的安全建议（如 `group_frame` preset、`gap`、`group_padding`）。
+- architecture 图建议优先落在：
+  - `layout.group_padding`
+  - diagram `group_frame`
+  - `group { layout: ... }`
 
 ---
 
