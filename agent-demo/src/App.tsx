@@ -36,6 +36,7 @@ function App() {
           <PreviewCanvas
             svg={agent.currentSvg}
             source={agent.currentSource}
+            wasm={wasm}
             ready={ready}
             isAgentRunning={agent.isRunning}
             onRerenderTheme={agent.rerenderWithTheme}

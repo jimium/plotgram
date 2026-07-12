@@ -18,6 +18,7 @@ import {
   CopyOutlined,
 } from '@ant-design/icons';
 import { DslViewer } from './DslViewer';
+import { RenderStructureViewer } from './RenderStructureViewer';
 import {
   THEME_GROUPS,
   DEFAULT_APPEARANCE,
@@ -25,10 +26,12 @@ import {
   type AppearanceOptions,
 } from '@lib/themes';
 import { downloadSvg, downloadPng, openInDrawio, copyText } from '@lib/exportImage';
+import type { PlotgramWasm } from '@lib/wasm';
 
 interface PreviewCanvasProps {
   svg: string;
   source: string;
+  wasm: PlotgramWasm | null;
   ready: boolean;
   isAgentRunning: boolean;
   onRerenderTheme: (optionsJson: string) => void;
@@ -45,6 +48,7 @@ function clamp(v: number, min: number, max: number) {
 export function PreviewCanvas({
   svg,
   source,
+  wasm,
   ready,
   isAgentRunning,
   onRerenderTheme,
@@ -54,7 +58,7 @@ export function PreviewCanvas({
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
-  const [view, setView] = useState<'preview' | 'source'>('preview');
+  const [view, setView] = useState<'preview' | 'source' | 'structure'>('preview');
   const [appearance, setAppearance] = useState<AppearanceOptions>(DEFAULT_APPEARANCE);
   const [isDragging, setIsDragging] = useState(false);
   const scaleRef = useRef(scale);
@@ -263,10 +267,11 @@ export function PreviewCanvas({
         <Segmented
           size="small"
           value={view}
-          onChange={(v) => setView(v as 'preview' | 'source')}
+          onChange={(v) => setView(v as 'preview' | 'source' | 'structure')}
           options={[
             { label: '预览', value: 'preview' },
             { label: 'DSL 源码', value: 'source' },
+            { label: '渲染结构', value: 'structure' },
           ]}
         />
         <Space size={8} className="preview-toolbar-right">
@@ -393,9 +398,13 @@ export function PreviewCanvas({
             </div>
           )}
         </div>
-      ) : (
+      ) : view === 'source' ? (
         <div className="preview-source">
           <DslViewer source={source} />
+        </div>
+      ) : (
+        <div className="preview-structure">
+          <RenderStructureViewer source={source} wasm={wasm} ready={ready} />
         </div>
       )}
     </div>
