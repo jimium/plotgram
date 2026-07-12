@@ -68,7 +68,7 @@ pub(super) use slot::{
 };
 pub(super) use slot_replan::replan_slots;
 pub(super) use conflict_reroute::reroute_conflicting_edges;
-pub use sanitize::sanitize_orthogonal_edges;
+pub use sanitize::{sanitize_orthogonal_edges, sanitize_orthogonal_edges_ext};
 pub(super) use straighten::straighten_preferred_alignments;
 pub(super) use stub_fix::fix_reverse_stub_ports;
 

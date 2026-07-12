@@ -20,11 +20,26 @@ use crate::layout::{EdgeLayout, PathGeometry, Port};
 const MICRO_JOG_LEN: f64 = 24.0;
 
 /// 路由后处理：消除反向 stub / 斜段 / 微折，并重建标签。
+///
+/// 路由内部（step 4g）调用保持**保守**（`merge_overshoot=false`），避免改动被
+/// 后续 node/space-budget 反馈用于重定位节点而扰动全局布局；管线末尾几何冻结后
+/// 调用启用 `merge_overshoot=true`，清理「冲过端口再折回」的 overshoot Z 折。
 pub fn sanitize_orthogonal_edges(
     edges: &mut [EdgeLayout],
     relations: &[Relation],
     from_side: &[Port],
     to_side: &[Port],
+) {
+    sanitize_orthogonal_edges_ext(edges, relations, from_side, to_side, false);
+}
+
+/// 见 [`sanitize_orthogonal_edges`]；`merge_overshoot` 控制是否合并 overshoot Z 折。
+pub fn sanitize_orthogonal_edges_ext(
+    edges: &mut [EdgeLayout],
+    relations: &[Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+    merge_overshoot: bool,
 ) {
     for (ei, edge) in edges.iter_mut().enumerate() {
         if edge.path_is_empty() {
@@ -37,7 +52,7 @@ pub fn sanitize_orthogonal_edges(
         let fs = from_side.get(ei).copied().unwrap_or(edge.from_port);
         let ts = to_side.get(ei).copied().unwrap_or(edge.to_port);
 
-        sanitize_polyline(&mut points, fs, ts);
+        sanitize_polyline_ext(&mut points, fs, ts, merge_overshoot);
         if points.len() < 2 {
             continue;
         }
@@ -60,13 +75,23 @@ pub fn sanitize_orthogonal_edges(
 
 /// 对单条正交折线做不变量消毒（供测试与管道复用）。
 pub fn sanitize_polyline(points: &mut Vec<Point>, from_side: Port, to_side: Port) {
+    sanitize_polyline_ext(points, from_side, to_side, false);
+}
+
+/// 见 [`sanitize_polyline`]；`merge_overshoot` 控制是否合并 overshoot Z 折。
+pub fn sanitize_polyline_ext(
+    points: &mut Vec<Point>,
+    from_side: Port,
+    to_side: Port,
+    merge_overshoot: bool,
+) {
     if points.len() < 2 {
         return;
     }
     fix_endpoint_reverse_stub(points, true, from_side);
     fix_endpoint_reverse_stub(points, false, to_side);
     force_orthogonal(points);
-    collapse_micro_jogs(points);
+    collapse_micro_jogs(points, merge_overshoot);
     *points = simplify_path(std::mem::take(points));
     ensure_outward_stub(points, true, from_side);
     ensure_outward_stub(points, false, to_side);
@@ -259,7 +284,10 @@ fn force_orthogonal(points: &mut Vec<Point>) {
 }
 
 /// 折叠短正交微折与单臂短台阶。
-fn collapse_micro_jogs(points: &mut Vec<Point>) {
+///
+/// `merge_overshoot=true` 时，用「相邻段共线合并分数」选择对齐角，可消除
+/// 「冲过端口再折回」的 overshoot Z 折；false 时沿用最近距离启发式（保守）。
+fn collapse_micro_jogs(points: &mut Vec<Point>, merge_overshoot: bool) {
     if points.len() < 4 {
         return;
     }
@@ -290,13 +318,35 @@ fn collapse_micro_jogs(points: &mut Vec<Point>) {
                 continue;
             }
 
-            // 两段都短，或一段极短：用对齐角替换 curr
+            // 两段都短，或一段极短：用对齐角替换 curr。
+            //
+            // 两个候选角 cand_a/cand_b 端点相同、都合法；关键是选能与相邻段**共线合并**
+            // 的那个，从而让后续 simplify 删点、消除「冲过端口再折回」的 overshoot Z 折。
+            // 仅按「离 curr 最近」选会在 cand==curr 时死锁（overshoot 永不消除），
+            // 且可能把本可合并的直段翻成镜像 L。改为优先合并分数，平局再退回最近距离。
             if d1 < MICRO_JOG_LEN || d2 < MICRO_JOG_LEN {
                 let cand_a = Point::new(next.x, prev.y);
                 let cand_b = Point::new(prev.x, next.y);
+                let before = if i >= 2 { Some(points[i - 2]) } else { None };
+                let after = if i + 2 < points.len() { Some(points[i + 2]) } else { None };
+                // cand_a：prev→cand_a 沿 y=prev.y（水平），cand_a→next 沿 x=next.x（竖直）
+                let mut score_a = 0i32;
+                if before.is_some_and(|b| (b.y - prev.y).abs() < EPS) { score_a += 1; }
+                if after.is_some_and(|a| (a.x - next.x).abs() < EPS) { score_a += 1; }
+                // cand_b：prev→cand_b 沿 x=prev.x（竖直），cand_b→next 沿 y=next.y（水平）
+                let mut score_b = 0i32;
+                if before.is_some_and(|b| (b.x - prev.x).abs() < EPS) { score_b += 1; }
+                if after.is_some_and(|a| (a.y - next.y).abs() < EPS) { score_b += 1; }
+
                 let da = (cand_a.x - curr.x).abs() + (cand_a.y - curr.y).abs();
                 let db = (cand_b.x - curr.x).abs() + (cand_b.y - curr.y).abs();
-                let new_c = if da <= db { cand_a } else { cand_b };
+                let new_c = if merge_overshoot && score_a != score_b {
+                    if score_a > score_b { cand_a } else { cand_b }
+                } else if da <= db {
+                    cand_a
+                } else {
+                    cand_b
+                };
                 if (new_c.x - curr.x).abs() > EPS || (new_c.y - curr.y).abs() > EPS {
                     points[i] = new_c;
                     changed = true;
@@ -437,7 +487,7 @@ mod tests {
             Point::new(0.0, 58.0),
             Point::new(0.0, 100.0),
         ];
-        collapse_micro_jogs(&mut pts);
+        collapse_micro_jogs(&mut pts, false);
         assert!(
             pts.len() <= 3,
             "collinear micro jog should collapse, got {} points: {:?}",
@@ -456,7 +506,7 @@ mod tests {
             Point::new(8.0, 100.0),
         ];
         let before = pts.len();
-        collapse_micro_jogs(&mut pts);
+        collapse_micro_jogs(&mut pts, true);
         assert!(pts.len() <= before);
     }
 }

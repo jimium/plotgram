@@ -26,6 +26,9 @@ use std::collections::{HashMap, HashSet};
 
 const EPS: f64 = 1e-6;
 
+/// 两标签间隙小于该值（且另一轴投影重叠）时视为「易混淆」，强制保留引线以区分归属。
+const LABEL_LEADER_PROXIMITY: f64 = 16.0;
+
 type LabelKey = (usize, usize);
 
 pub fn label_metrics(text: &str) -> (f64, f64) {
@@ -316,13 +319,16 @@ pub fn resolve_label_overlaps_with_config(
 /// 侧向偏置只留出很小空隙时，短线没有信息量，省略；只有标签被推得较远时才挂
 /// `leader_to`。
 fn assign_leader_lines(edges: &mut [EdgeLayout]) {
-    for edge in edges.iter_mut() {
+    // Pass 1：按可见引线长度决定默认是否挂 leader，并记录每个标签到路径的最近锚点。
+    let mut closest_of: HashMap<LabelKey, Point> = HashMap::new();
+    for (ei, edge) in edges.iter_mut().enumerate() {
         if edge.path_len() < 2 {
             continue;
         }
         let path = edge.path_points().into_owned();
-        for label in edge.labels.iter_mut() {
+        for (li, label) in edge.labels.iter_mut().enumerate() {
             let (closest, _) = closest_point_on_path(&path, label.center);
+            closest_of.insert((ei, li), closest);
             if leader_visible_length(label.center, label.size, closest)
                 >= DEFAULT_LEADER_LINE_MIN_LENGTH
             {
@@ -332,6 +338,58 @@ fn assign_leader_lines(edges: &mut [EdgeLayout]) {
             }
         }
     }
+
+    // Pass 2：两个**不同边**的标签彼此过近时，即使引线较短也强制保留，
+    // 以消除「谁属于哪条边」的歧义（引线锚回各自路径即可区分归属）。
+    // 仅当标签确实偏离路径（可见引线 > 0）时才挂，避免在贴线标签上画零长引线。
+    let keys: Vec<LabelKey> = closest_of.keys().copied().collect();
+    let mut force: HashSet<LabelKey> = HashSet::new();
+    for a in 0..keys.len() {
+        for b in (a + 1)..keys.len() {
+            let (ka, kb) = (keys[a], keys[b]);
+            if ka.0 == kb.0 {
+                continue; // 同一条边的多标签不算歧义来源
+            }
+            let (Some(bba), Some(bbb)) =
+                (edges[ka.0].label_bbox_at(ka.1), edges[kb.0].label_bbox_at(kb.1))
+            else {
+                continue;
+            };
+            if labels_confusingly_close(&bba, &bbb) {
+                force.insert(ka);
+                force.insert(kb);
+            }
+        }
+    }
+    for k in force {
+        if let (Some(closest), Some(label)) =
+            (closest_of.get(&k).copied(), edges[k.0].labels.get_mut(k.1))
+        {
+            if label.leader_to.is_none()
+                && leader_visible_length(label.center, label.size, closest) > 1.0
+            {
+                label.leader_to = Some(closest);
+            }
+        }
+    }
+}
+
+/// 两个标签包围框是否「近到易混淆」：任一轴间隙小于阈值且另一轴有投影重叠。
+fn labels_confusingly_close(a: &(f64, f64, f64, f64), b: &(f64, f64, f64, f64)) -> bool {
+    let gap_x = (a.0.max(b.0)) - (a.2.min(b.2)); // >0 表示 x 方向分离间隙
+    let gap_y = (a.1.max(b.1)) - (a.3.min(b.3));
+    let overlap_x = gap_x < 0.0;
+    let overlap_y = gap_y < 0.0;
+    // 竖直堆叠且很近：x 有重叠，y 间隙小
+    if overlap_x && gap_y >= 0.0 && gap_y < LABEL_LEADER_PROXIMITY {
+        return true;
+    }
+    // 水平并排且很近：y 有重叠，x 间隙小
+    if overlap_y && gap_x >= 0.0 && gap_x < LABEL_LEADER_PROXIMITY {
+        return true;
+    }
+    // 已经重叠（两轴都负）：必然易混淆
+    overlap_x && overlap_y
 }
 
 /// 标签包围框边缘到引线锚点的可见长度。

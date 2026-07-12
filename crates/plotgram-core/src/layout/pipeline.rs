@@ -216,11 +216,14 @@ impl<'a> LayoutPipeline<'a> {
         if edge_routing_style == "orthogonal" {
             let from_side: Vec<_> = result.edges.iter().map(|e| e.from_port).collect();
             let to_side: Vec<_> = result.edges.iter().map(|e| e.to_port).collect();
-            crate::layout::edge::edge_routing_orthogonal::sanitize_orthogonal_edges(
+            // 几何已冻结：启用 overshoot Z 折合并，清理「冲过端口再折回」的多余折点。
+            // 保守版（router step 4g）不合并，避免改动反馈进节点重定位扰动全局布局。
+            crate::layout::edge::edge_routing_orthogonal::sanitize_orthogonal_edges_ext(
                 &mut result.edges,
                 &self.diagram.relations,
                 &from_side,
                 &to_side,
+                true,
             );
 
             // 标签避让必须是几何冻结后的**最终**步骤：sanitize 会按平行边规则

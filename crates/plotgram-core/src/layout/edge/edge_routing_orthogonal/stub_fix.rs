@@ -14,6 +14,57 @@ use std::collections::HashMap;
 /// 该值需大于 PORT_CLEARANCE(16px)，避免将正常stub段误判。
 const REVERSE_STUB_THRESHOLD: f64 = 24.0;
 
+/// 端口翻转后，若目标 (node, side) 上已有**其它边**锚定在 frac=0.5 附近，
+/// 沿该侧切线方向错开，避免入边/出边共用同一端口锚点造成重合。
+///
+/// `base` 为默认锚点（通常 slot_anchor(nl, side, 0.5)）；返回去冲突后的锚点。
+fn deconflict_flip_anchor(
+    base: Point,
+    node_id: &str,
+    side: Port,
+    nl: &NodeLayout,
+    ei: usize,
+    endpoint_map: &HashMap<(usize, bool), Endpoint>,
+) -> Point {
+    const SEP: f64 = 14.0;
+    // Top/Bottom 端口沿 x 错开；Left/Right 端口沿 y 错开。
+    let vertical = is_vertical_port(side);
+    let occupied: Vec<f64> = endpoint_map
+        .values()
+        .filter(|e| e.node_id == node_id && e.side == side && e.edge_index != ei)
+        .map(|e| if vertical { e.anchor.x } else { e.anchor.y })
+        .collect();
+    if occupied.is_empty() {
+        return base;
+    }
+    let cur = if vertical { base.x } else { base.y };
+    if occupied.iter().all(|&o| (o - cur).abs() >= SEP) {
+        return base;
+    }
+    let (lo, hi) = if vertical {
+        (
+            nl.x + nl.width * SLOT_MARGIN_RATIO,
+            nl.x + nl.width * (1.0 - SLOT_MARGIN_RATIO),
+        )
+    } else {
+        (
+            nl.y + nl.height * SLOT_MARGIN_RATIO,
+            nl.y + nl.height * (1.0 - SLOT_MARGIN_RATIO),
+        )
+    };
+    for mult in [1.0_f64, -1.0, 2.0, -2.0] {
+        let cand = (cur + mult * SEP).clamp(lo, hi);
+        if occupied.iter().all(|&o| (o - cand).abs() >= SEP - 1.0) {
+            return if vertical {
+                Point::new(cand, base.y)
+            } else {
+                Point::new(base.x, cand)
+            };
+        }
+    }
+    base
+}
+
 /// 返回端口的对面端口
 fn opposite_port(p: Port) -> Port {
     match p {
@@ -411,8 +462,30 @@ pub fn fix_reverse_stub_ports(
             let new_from = attempt.from.unwrap_or(old_from);
             let new_to = attempt.to.unwrap_or(old_to);
 
-            let nf_anchor = if attempt.from.is_some() { slot_anchor(from_nl, new_from, 0.5) } else { old_from_ep.anchor };
-            let nt_anchor = if attempt.to.is_some() { slot_anchor(to_nl, new_to, 0.5) } else { old_to_ep.anchor };
+            let nf_anchor = if attempt.from.is_some() {
+                deconflict_flip_anchor(
+                    slot_anchor(from_nl, new_from, 0.5),
+                    &old_from_ep.node_id,
+                    new_from,
+                    from_nl,
+                    ei,
+                    endpoint_map,
+                )
+            } else {
+                old_from_ep.anchor
+            };
+            let nt_anchor = if attempt.to.is_some() {
+                deconflict_flip_anchor(
+                    slot_anchor(to_nl, new_to, 0.5),
+                    &old_to_ep.node_id,
+                    new_to,
+                    to_nl,
+                    ei,
+                    endpoint_map,
+                )
+            } else {
+                old_to_ep.anchor
+            };
 
             let nf_ep = Endpoint {
                 edge_index: ei,
