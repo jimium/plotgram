@@ -481,6 +481,19 @@ pub(in super::super) fn resolve_x_overlaps(
     positions: &[f64],
     sizes: &HashMap<String, (f64, f64)>,
 ) -> Vec<f64> {
+    resolve_x_overlaps_with_gaps(layer, positions, sizes, |_, _| NODE_GAP)
+}
+
+/// 同层 X 重叠消除，间距由 `gap_between(left_id, right_id)` 提供（空间契约）。
+pub(in super::super) fn resolve_x_overlaps_with_gaps<F>(
+    layer: &[String],
+    positions: &[f64],
+    sizes: &HashMap<String, (f64, f64)>,
+    gap_between: F,
+) -> Vec<f64>
+where
+    F: Fn(&str, &str) -> f64,
+{
     let n = layer.len();
     if n <= 1 {
         return positions.to_vec();
@@ -488,27 +501,26 @@ pub(in super::super) fn resolve_x_overlaps(
 
     let mut adjusted = positions.to_vec();
 
-    // 前向扫描：确保不重叠
     for i in 1..n {
         let prev_width = sizes.get(&layer[i - 1]).map(|(w, _)| *w).unwrap_or(constants::DEFAULT_NODE_WIDTH);
         let curr_width = sizes.get(&layer[i]).map(|(w, _)| *w).unwrap_or(constants::DEFAULT_NODE_WIDTH);
-        let min_center = adjusted[i - 1] + prev_width / 2.0 + NODE_GAP + curr_width / 2.0;
+        let gap = gap_between(&layer[i - 1], &layer[i]);
+        let min_center = adjusted[i - 1] + prev_width / 2.0 + gap + curr_width / 2.0;
         if adjusted[i] < min_center {
             adjusted[i] = min_center;
         }
     }
 
-    // 后向扫描：尽量保持原始位置
     for i in (0..n.saturating_sub(1)).rev() {
         let next_width = sizes.get(&layer[i + 1]).map(|(w, _)| *w).unwrap_or(constants::DEFAULT_NODE_WIDTH);
         let curr_width = sizes.get(&layer[i]).map(|(w, _)| *w).unwrap_or(constants::DEFAULT_NODE_WIDTH);
-        let max_center = adjusted[i + 1] - next_width / 2.0 - NODE_GAP - curr_width / 2.0;
+        let gap = gap_between(&layer[i], &layer[i + 1]);
+        let max_center = adjusted[i + 1] - next_width / 2.0 - gap - curr_width / 2.0;
         if adjusted[i] > max_center {
             adjusted[i] = max_center;
         }
     }
 
-    // 确保不超出左边界
     for i in 0..n {
         let width = sizes.get(&layer[i]).map(|(w, _)| *w).unwrap_or(constants::DEFAULT_NODE_WIDTH);
         let min_x = PADDING + width / 2.0;

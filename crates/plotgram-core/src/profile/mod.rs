@@ -216,7 +216,7 @@ static MINDMAP_PROFILE: DiagramProfile = DiagramProfile {
     entity_types: MINDMAP_ENTITY_TYPES,
     default_entity_type: Some(entity_type::BRANCH),
     default_layout_options: &[],
-    default_direction: Some(crate::types::attr_constants::direction::RADIAL),
+    default_direction: Some(crate::types::attr_constants::direction::LEFT_TO_RIGHT),
     implemented: true,
 };
 
@@ -375,7 +375,7 @@ mod tests {
         assert_eq!(er.default_direction, Some(direction::TOP_TO_BOTTOM));
 
         let mindmap = profile_for(&DiagramType::Mindmap);
-        assert_eq!(mindmap.default_direction, Some(direction::RADIAL));
+        assert_eq!(mindmap.default_direction, Some(direction::LEFT_TO_RIGHT));
 
         let state = profile_for(&DiagramType::State);
         assert_eq!(state.default_direction, Some(direction::TOP_TO_BOTTOM));

@@ -94,7 +94,7 @@ impl<'a> LayoutPipeline<'a> {
         result: LayoutResult,
     ) -> Result<LayoutResult, DiagnosticError> {
         let t0 = Instant::now();
-        let feedback = LayoutRouteFeedback::new(self.diagram, self.plan, algo);
+        let feedback = LayoutRouteFeedback::new(self.diagram);
         let PreRouteFeedback {
             result: mut result_v2,
         } = feedback.apply_pre_route(result);
@@ -137,72 +137,72 @@ impl<'a> LayoutPipeline<'a> {
 
         result = self.run_post_route_group_frame(algo, result, &gf_pass, &*router, &edge_snap_config)?;
 
-        if algo == "architecture" {
-            let t_prs = Instant::now();
-            let prs_grew = crate::layout::group::post_route_shell::post_route_shell_expand(
+        let hook = super::post_route_hook::post_route_hook_for(algo);
+        result = hook.after_route(
+            self.diagram,
+            result,
+            &*router,
+            &gf_pass.spec,
+            &edge_snap_config,
+            gf_pass.padding,
+        );
+
+        // S3：PRS 后仅在契约失败时兜底；margin 来自 SpaceBudget
+        let budget = result
+            .hints
+            .space_budget
+            .clone()
+            .unwrap_or_else(|| {
+                crate::layout::space_budget::SpaceBudget::from_diagram(self.diagram)
+            });
+        let pre_overlap: HashMap<String, (f64, f64)> = result
+            .nodes
+            .iter()
+            .map(|(id, n)| (id.clone(), (n.x, n.y)))
+            .collect();
+        let mut moved_for_overlap: HashSet<String> = HashSet::new();
+        if !crate::layout::space_budget::horizontal_gap_violations(&result.nodes, &budget)
+            .is_empty()
+        {
+            crate::layout::space_budget::resolve_residual_with_budget(
+                &mut result.nodes,
+                Some(&budget),
+            );
+            result.hints.space_budget = Some(budget);
+            moved_for_overlap = result
+                .nodes
+                .iter()
+                .filter_map(|(id, n)| {
+                    pre_overlap.get(id).and_then(|(px, py)| {
+                        let dx = n.x - px;
+                        let dy = n.y - py;
+                        if (dx * dx + dy * dy).sqrt()
+                            >= super::post_route_hook::NODE_MOVE_REROUTE_EPS
+                        {
+                            Some(id.clone())
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect();
+        } else if result.hints.space_budget.is_none() {
+            result.hints.space_budget = Some(budget);
+        }
+        if !result.groups.is_empty() {
+            crate::layout::group_frame::recompute_group_bounds(
                 self.diagram,
                 &mut result,
+                gf_pass.padding,
             );
-            let prs_ms = t_prs.elapsed().as_secs_f64() * 1000.0;
-            if prs_grew {
-                let pre_positions: HashMap<String, (f64, f64)> = result
-                    .nodes
-                    .iter()
-                    .map(|(id, n)| (id.clone(), (n.x, n.y)))
-                    .collect();
-                crate::layout::group_frame::resolve_all_sibling_overlaps(
-                    &gf_pass.spec,
-                    self.diagram,
-                    &mut result,
-                );
-                let moved_nodes: HashSet<String> = result
-                    .nodes
-                    .iter()
-                    .filter_map(|(id, n)| {
-                        pre_positions.get(id).and_then(|(px, py)| {
-                            let dx = n.x - px;
-                            let dy = n.y - py;
-                            if (dx * dx + dy * dy).sqrt() >= 1.0 {
-                                Some(id.clone())
-                            } else {
-                                None
-                            }
-                        })
-                    })
-                    .collect();
-                if !moved_nodes.is_empty() {
-                    result = router.route_after_node_moves(self.diagram, result, &moved_nodes);
-                }
-            }
-            // 无论 PRS 是否扩壳，都做一次内容包络安全网（leaf + 容器 + padding）。
-            let leaf_pad = gf_pass.padding;
-            let container_pad =
-                crate::layout::node::common::group_bounds::container_padding_for_leaf(leaf_pad);
-            crate::layout::group_frame::expand_groups_to_contain_contents(
-                self.diagram,
-                &mut result.groups,
-                &result.nodes,
-                leaf_pad,
-                container_pad,
+        }
+        if !moved_for_overlap.is_empty() {
+            result = router.route_after_node_moves(self.diagram, result, &moved_for_overlap);
+            edge_postprocess::repulse_edges_only(
+                &mut result.edges,
+                &result.groups,
+                &edge_snap_config,
             );
-            grid_snap::update_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
-            if prs_grew {
-                edge_postprocess::repulse_edges_only(
-                    &mut result.edges,
-                    &result.groups,
-                    &edge_snap_config,
-                );
-            }
-            if let Some(debug) = result.hints.gutter_budget_debug.as_mut() {
-                debug.prs_ms = prs_ms;
-                debug.prs_grew = prs_grew;
-            } else {
-                result.hints.gutter_budget_debug = Some(crate::layout::GutterBudgetDebug {
-                    prs_ms,
-                    prs_grew,
-                    ..Default::default()
-                });
-            }
         }
 
         // P1: 像素量化在管道最末尾执行，仅运行一次
@@ -211,6 +211,35 @@ impl<'a> LayoutPipeline<'a> {
             &result.groups,
             &edge_snap_config,
         );
+
+        // 消毒 2.0：snap/repulse 可能抖回微台阶与斜段，正交路由在量化后再消一次
+        if edge_routing_style == "orthogonal" {
+            let from_side: Vec<_> = result.edges.iter().map(|e| e.from_port).collect();
+            let to_side: Vec<_> = result.edges.iter().map(|e| e.to_port).collect();
+            // 几何已冻结：启用 overshoot Z 折合并，清理「冲过端口再折回」的多余折点。
+            // 保守版（router step 4g）不合并，避免改动反馈进节点重定位扰动全局布局。
+            crate::layout::edge::edge_routing_orthogonal::sanitize_orthogonal_edges_ext(
+                &mut result.edges,
+                &self.diagram.relations,
+                &from_side,
+                &to_side,
+                true,
+            );
+
+            // 标签避让必须是几何冻结后的**最终**步骤：sanitize 会按平行边规则
+            // 重建所有标签（丢弃路由内部 step-5 的避让结果），snap/repulse 又移动了
+            // 路径。因此在此对量化后的最终几何再跑一次标签避让，保证输出不含重叠。
+            let label_config =
+                crate::layout::edge::common::label_candidate::LabelPlacementConfig::for_diagram_type(
+                    self.diagram.diagram_type.clone(),
+                );
+            crate::layout::edge::common::label_avoidance::resolve_label_overlaps_with_config(
+                &mut result.edges,
+                &result.nodes,
+                &result.groups,
+                label_config,
+            );
+        }
 
         crate::perf_log!("[perf]   post-process: {:.2}ms", t_post.elapsed().as_secs_f64() * 1000.0);
 
@@ -257,7 +286,7 @@ impl<'a> LayoutPipeline<'a> {
             })
             .fold(0.0f64, f64::max);
 
-        if max_node_disp >= 1.0 {
+        if max_node_disp >= super::post_route_hook::NODE_MOVE_REROUTE_EPS {
             let moved_nodes: HashSet<String> = result
                 .nodes
                 .iter()
@@ -265,7 +294,9 @@ impl<'a> LayoutPipeline<'a> {
                     pre_gf_positions.get(id).and_then(|(px, py)| {
                         let dx = n.x - px;
                         let dy = n.y - py;
-                        if (dx * dx + dy * dy).sqrt() >= 1.0 {
+                        if (dx * dx + dy * dy).sqrt()
+                            >= super::post_route_hook::NODE_MOVE_REROUTE_EPS
+                        {
                             Some(id.clone())
                         } else {
                             None

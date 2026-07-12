@@ -10,6 +10,13 @@ use std::fmt::Write;
 
 const GLYPH_VIEWBOX: f64 = 24.0;
 
+/// 图标相对标签字号的默认倍率：略大于文字，作节点识别标记。
+/// catalog `scale` 仍可在此基础上做单图标微调。
+const ICON_TO_FONT_RATIO: f64 = 1.45;
+
+/// 相对 catalog `gap` 的额外间距，避免放大后图标与文字贴挤。
+const ICON_GAP_EXTRA: f64 = 1.0;
+
 /// 内侧图标 + 标签的排版结果。
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IconLayout {
@@ -23,6 +30,14 @@ pub struct IconLayout {
     pub icon_y: f64,
     pub label_x: f64,
     pub label_y: f64,
+}
+
+fn resolved_icon_size(font_size: f64, def: &IconDef) -> f64 {
+    font_size * ICON_TO_FONT_RATIO * def.scale
+}
+
+fn resolved_icon_gap(def: &IconDef) -> f64 {
+    def.gap + ICON_GAP_EXTRA
 }
 
 /// 节点是否满足图标最小尺寸要求。
@@ -46,8 +61,8 @@ pub fn layout_inside(
         return None;
     }
 
-    let icon_size = font_size * def.scale;
-    let gap = def.gap;
+    let icon_size = resolved_icon_size(font_size, def);
+    let gap = resolved_icon_gap(def);
     let group_width = icon_size + gap + label_width;
     let group_height = icon_size.max(font_size);
     let group_x = node_x + (node_width - group_width) / 2.0;
@@ -77,10 +92,12 @@ pub fn extra_node_width(def: &IconDef, font_size: f64) -> f64 {
     if def.placement != IconPlacement::Inside {
         return 0.0;
     }
-    font_size * def.scale + def.gap
+    resolved_icon_size(font_size, def) + resolved_icon_gap(def)
 }
 
 /// 渲染节点内侧内容：有图标时 icon+label 横排居中，否则标签居中。
+///
+/// `text_color` 用于标签文字，`icon_color` 用于图标 glyph（通常由节点边框色加深得到）。
 pub fn render_entity_content(
     entity: &Entity,
     node_x: f64,
@@ -89,6 +106,7 @@ pub fn render_entity_content(
     node_height: f64,
     shape: NodeShape,
     text_color: &str,
+    icon_color: &str,
     font_size: f64,
     font_weight: &str,
     options: &ResolveOptions,
@@ -108,6 +126,7 @@ pub fn render_entity_content(
                 def,
                 &layout,
                 &entity.label,
+                icon_color,
                 text_color,
                 font_size,
                 font_weight,
@@ -151,7 +170,7 @@ pub fn render_icon(def: &IconDef, x: f64, y: f64, size: f64, color: &str) -> Str
     let scale = size / GLYPH_VIEWBOX;
     let inner = svg_inner(def.asset);
     format!(
-        r#"<g transform="translate({x:.2},{y:.2}) scale({scale:.4})" color="{color}">{inner}</g>"#,
+        r#"<g transform="translate({x:.2},{y:.2}) scale({scale:.4})" color="{color}" fill="none">{inner}</g>"#,
         x = x,
         y = y,
         scale = scale,
@@ -161,11 +180,14 @@ pub fn render_icon(def: &IconDef, x: f64, y: f64, size: f64, color: &str) -> Str
 }
 
 /// 渲染内侧图标 + 标签（整组已由 [`layout_inside`] 定位）。
+///
+/// `icon_color` 用于图标 glyph，`label_color` 用于标签文字。
 pub fn render_inside(
     def: &IconDef,
     layout: &IconLayout,
     label: &str,
-    color: &str,
+    icon_color: &str,
+    label_color: &str,
     font_size: f64,
     font_weight: &str,
 ) -> String {
@@ -173,17 +195,17 @@ pub fn render_inside(
     writeln!(
         &mut svg,
         "{}",
-        render_icon(def, layout.icon_x, layout.icon_y, layout.icon_size, color)
+        render_icon(def, layout.icon_x, layout.icon_y, layout.icon_size, icon_color)
     )
     .unwrap();
     writeln!(
         &mut svg,
-        r#"<text x="{:.2}" y="{:.2}" text-anchor="start" dominant-baseline="central" font-size="{font_size}" font-weight="{font_weight}" fill="{color}">{label}</text>"#,
+        r#"<text x="{:.2}" y="{:.2}" text-anchor="start" dominant-baseline="central" font-size="{font_size}" font-weight="{font_weight}" fill="{label_color}">{label}</text>"#,
         layout.label_x,
         layout.label_y,
         font_size = font_size,
         font_weight = font_weight,
-        color = escape_xml(color),
+        label_color = escape_xml(label_color),
         label = escape_xml(label),
     )
     .unwrap();

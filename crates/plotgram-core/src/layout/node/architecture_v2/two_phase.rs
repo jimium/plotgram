@@ -11,8 +11,7 @@
 //! `IntraGroupLayouter` trait，共用同一套类型基础。
 
 use super::group_sizing::{
-    apply_equal_sibling_dimensions_per_rank, apply_group_sizing_policy, parse_group_sizing,
-    GroupSizeBlock, GroupSizingPolicy,
+    parse_group_sizing, GroupSizeBlock, GroupSizingPolicy,
 };
 use super::group_layout_hint::{
     align_nodes_in_column, assign_ranks_for_mode, parse_group_layout_hint,
@@ -25,7 +24,7 @@ use super::layout::constants::{
 use super::layout::coordinate::{
     align_client_nodes_to_hubs, center_group_hub_nodes, layer_centers_from_placed,
     pull_toward_neighbors, rebalance_infrastructure_layers, resolve_x_overlaps,
-    uniform_initial_positions,
+    resolve_x_overlaps_with_gaps, uniform_initial_positions,
 };
 use super::layout::order::{build_layers, order_layers_group_aware};
 use super::layout::postprocess::{clamp_to_canvas, compute_total_size};
@@ -166,8 +165,7 @@ pub(super) fn compute_two_phase_layout(
     );
 
     let sizing = parse_group_sizing(diagram);
-    // Phase C：默认 Fit；显式 uniform 才预拉齐等宽
-    apply_group_sizing_policy(sizing, &group_map.top_groups, &mut blocks);
+    // Phase 1：two_phase 只输出 content-fit 初值；Equal/Uniform 仅由 L1 GroupFramePass 执行。
 
     position_macro_blocks(
         &mut blocks,
@@ -183,20 +181,18 @@ pub(super) fn compute_two_phase_layout(
     // ── Phase C: 回填全局坐标 ──
     let (mut nodes, mut groups) = compose_global_layout(&blocks, &padding);
 
-    // ── Phase C+: 两阶段 spacing 微调 ──
+    // Phase C+: 两阶段 spacing 微调
     // 组框已定，对涉及跨组边的组内节点朝跨组边方向做小幅 x 微调，
     // 减少跨组边折弯。这是"先定组框再微调组内节点"的反转步骤。
-    // uniform sizing 策略下跳过微调，保持组内居中语义。
-    if sizing != GroupSizingPolicy::Uniform {
-        nudge_intra_nodes_toward_cross_group_edges(
-            &mut nodes,
-            &groups,
-            &super_edges,
-            &super_members,
-            graph,
-            reversed_edges,
-        );
-    }
+    // L1 Equal 在 pipeline 中拉齐；此处始终基于 content-fit 初值微调。
+    nudge_intra_nodes_toward_cross_group_edges(
+        &mut nodes,
+        &groups,
+        &super_edges,
+        &super_members,
+        graph,
+        reversed_edges,
+    );
 
     // ── 后处理：基础设施行居中 ──
     // 从元数据重建全局层（替代旧版从 y 坐标反推）
@@ -226,8 +222,9 @@ pub(super) fn compute_two_phase_layout(
         &side_gutters,
         bounds_padding,
     );
-    // Uniform 条带：各顶层叶子 EGB 增量可能不同，拉齐到同带最大增量，避免等宽被拆。
-    if sizing == GroupSizingPolicy::Uniform {
+    // Uniform/Equal 条带：各顶层叶子 EGB 增量可能不同，拉齐到同带最大增量，避免等宽被拆。
+    // Fit 逃生舱跳过。
+    if sizing != GroupSizingPolicy::Fit {
         equalize_top_leaf_egb_deltas(diagram, &mut groups, &side_gutters, bounds_padding);
     }
     let gf_spec = crate::layout::group_frame::resolve_group_frame_spec(diagram, "architecture");
@@ -283,6 +280,17 @@ pub(super) fn compute_two_phase_layout(
         canvas_area_delta_pct,
     };
 
+    // 空间契约：边感知间距写入 hints，并做一次水平缝 enforce
+    let space_budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
+    crate::layout::space_budget::enforce_horizontal_gaps(&mut nodes, &space_budget);
+    crate::layout::group_frame::expand_groups_to_contain_contents(
+        diagram,
+        &mut groups,
+        &nodes,
+        bounds_padding,
+        container_padding_for_leaf(bounds_padding),
+    );
+
     let (total_width, total_height) = compute_total_size(&nodes, &groups);
 
     let sibling_corridors =
@@ -312,6 +320,7 @@ pub(super) fn compute_two_phase_layout(
             sugiyama_ranks: Some(sugiyama_ranks),
             group_routing: Some(group_routing),
             gutter_budget_debug: Some(gutter_budget_debug),
+            space_budget: Some(space_budget),
             ..Default::default()
         },
     }
@@ -367,6 +376,12 @@ fn layout_intra_group(
         .map(|g| resolve_group_layout_hint(g, diagram.diagram_type.clone()))
         .unwrap_or(GroupLayoutHint::Auto);
     let mode = resolve_group_layout_mode(hint, members, graph, reversed);
+
+    // Phase 3：复杂拓扑 / Sugiyama 模式委托 sugiyama_v2（hint 几何模式仍走本地路径）
+    if mode == GroupLayoutMode::Sugiyama {
+        return super::intra_sugiyama::layout_intra_with_sugiyama_v2(diagram, members);
+    }
+
     let ranks = assign_ranks_for_mode(&mode, members, graph, reversed);
     let decl_index: HashMap<String, usize> = members
         .iter()
@@ -382,11 +397,14 @@ fn layout_intra_group(
         &decl_index,
     );
 
+    let member_set: HashSet<String> = members.iter().cloned().collect();
+    let space_budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
     let mut nodes = assign_coordinates_intra(
         graph,
         &ordered_layers,
         sizes,
         &member_set,
+        Some(&space_budget),
     );
 
     center_group_hub_nodes(graph, &intra_map, &ordered_layers, sizes, &mut nodes);
@@ -410,7 +428,13 @@ fn layout_intra_group(
         let ranks = assign_ranks_for_mode(&grid_mode, members, graph, reversed);
         let layers = build_layers(&ranks, &decl_index);
         ordered_layers = order_layers_group_aware(graph, &intra_map, &layers, reversed, &decl_index);
-        nodes = assign_coordinates_intra(graph, &ordered_layers, sizes, &member_set);
+        nodes = assign_coordinates_intra(
+            graph,
+            &ordered_layers,
+            sizes,
+            &member_set,
+            Some(&space_budget),
+        );
         center_group_hub_nodes(graph, &intra_map, &ordered_layers, sizes, &mut nodes);
         align_client_nodes_to_hubs(graph, &intra_map, &ordered_layers, sizes, &mut nodes);
         normalize_to_origin(&mut nodes);
@@ -522,13 +546,8 @@ fn layout_intra_group_recursive(
         &group_decl,
     );
 
-    // 4.5 嵌套 sibling：仅 uniform 时等宽等高；默认 Fit 跳过
-    let sizing = parse_group_sizing(diagram);
-    let child_group_ids: Vec<String> = children.to_vec();
-    if sizing != GroupSizingPolicy::Fit {
-        apply_equal_sibling_dimensions_per_rank(&macro_ranks, &mut blocks);
-    }
-    apply_group_sizing_policy(sizing, &child_group_ids, &mut blocks);
+    // 4.5 嵌套 sibling：Phase 1 起 Equal 仅由 L1 执行；此处只保留 content-fit 初值。
+    let _child_group_ids: Vec<String> = children.to_vec();
 
     // 5. 宏观定位（初值左对齐；L1 完成 Center）
     position_intra_macro_blocks(
@@ -951,7 +970,13 @@ fn layout_ungrouped_cluster(
     let layers = build_layers(&ranks, &decl_index);
     let member_set: HashSet<String> = members.iter().cloned().collect();
 
-    let mut nodes = assign_coordinates_intra(graph, &layers, sizes, &member_set);
+    let mut nodes = assign_coordinates_intra(
+        graph,
+        &layers,
+        sizes,
+        &member_set,
+        Some(&crate::layout::space_budget::SpaceBudget::from_diagram(diagram)),
+    );
     normalize_to_origin(&mut nodes);
     let (content_width, content_height) = content_bbox(&nodes);
 
@@ -983,6 +1008,7 @@ fn assign_coordinates_intra(
     layers: &[Vec<String>],
     sizes: &HashMap<String, (f64, f64)>,
     member_set: &HashSet<String>,
+    budget: Option<&crate::layout::space_budget::SpaceBudget>,
 ) -> HashMap<String, NodeLayout> {
     let mut nodes = HashMap::new();
 
@@ -1029,7 +1055,6 @@ fn assign_coordinates_intra(
             None
         };
 
-        // 组内坐标分配使用 6 轮迭代（比全局 8 轮少，组内图较小收敛更快）
         for _ in 0..6 {
             if let Some(ref upper) = upper_x {
                 pull_toward_neighbors(
@@ -1055,7 +1080,11 @@ fn assign_coordinates_intra(
             }
         }
 
-        let adjusted = resolve_x_overlaps(layer, &positions, sizes);
+        let adjusted = if let Some(b) = budget {
+            resolve_x_overlaps_with_gaps(layer, &positions, sizes, |a, c| b.min_gap(a, c))
+        } else {
+            resolve_x_overlaps(layer, &positions, sizes)
+        };
 
         for (i, node) in layer.iter().enumerate() {
             let (width, height) = sizes
@@ -1236,13 +1265,14 @@ const CROSS_EDGE_PAIR_VERTICAL_GAP_SCALE: f64 = 10.0;
 /// 组对垂直间隙额外增加的上限
 const MAX_EXTRA_PAIR_VERTICAL_GAP: f64 = 56.0;
 /// 每条同 rank 跨组边为组间距额外增加的像素（lane_budget）
-const CROSS_EDGE_GROUP_GAP_SCALE: f64 = 6.0;
-/// 组间距额外增加的上限
-const MAX_EXTRA_GROUP_GAP: f64 = 40.0;
+const CROSS_EDGE_GROUP_GAP_SCALE: f64 = 8.0;
+/// 组间距额外增加的上限（Phase 2：与 corridor_load 预算对齐，略抬高）
+const MAX_EXTRA_GROUP_GAP: f64 = 56.0;
 
-/// 计算相邻组块间的间距（Iteration 2：lane_budget）。
+/// 计算相邻组块间的间距（Phase 2：lane_budget ↔ 跨组边负载）。
 ///
 /// `gap = GROUP_GAP_X + min(edge_count × scale, max_extra)`。
+/// 高负载 pair 预留更宽通道，降低事后 PRS 扩壳。
 fn adaptive_group_gap(pair_edge_count: usize) -> f64 {
     let extra = (pair_edge_count as f64 * CROSS_EDGE_GROUP_GAP_SCALE).min(MAX_EXTRA_GROUP_GAP);
     GROUP_GAP_X + extra
@@ -2089,12 +2119,20 @@ mod tests {
         }
     }
 
-    fn etl_diagram_with_sizing(group_sizing: Option<&str>) -> Diagram {
-        let attributes = group_sizing
+    fn etl_diagram_with_track(track: Option<&str>) -> Diagram {
+        let attributes = track
             .map(|value| {
+                let mut options = std::collections::HashMap::new();
+                options.insert(
+                    "track".to_string(),
+                    AttributeValue::String(TextValue::unquoted(value.to_string())),
+                );
                 vec![DiagramAttribute {
-                    key: "group_sizing".to_string(),
-                    value: AttributeValue::String(TextValue::unquoted(value.to_string())),
+                    key: "group_frame".to_string(),
+                    value: AttributeValue::Config {
+                        algo: "stack".to_string(),
+                        options,
+                    },
                     span: Span::dummy(),
                 }]
             })
@@ -2144,7 +2182,7 @@ mod tests {
 
     #[test]
     fn two_phase_etl_pipeline_layout() {
-        let d = etl_diagram_with_sizing(None);
+        let d = etl_diagram_with_track(None);
         let result = ArchitectureV2Layout::default().compute(&d);
 
         let source = result.groups.get("source").unwrap();
@@ -2155,16 +2193,17 @@ mod tests {
         assert!(source.y < process.y, "source above process");
         assert!(process.y < storage.y, "process above storage");
 
-        // Phase C：默认 Fit — process（3 节点）应宽于 source/storage（各 2 节点），不强制等宽
+        // Phase 1：strategy.compute 只出 content-fit；process（3 节点）应宽于 source/storage。
+        // 全管线 L1 Equal 另由 etl_default_equal_survives_full_layout_pipeline 覆盖。
         assert!(
             process.width > source.width + 8.0,
-            "default Fit: process should be wider than source ({:.1} vs {:.1})",
+            "content-fit: process should be wider than source ({:.1} vs {:.1})",
             process.width,
             source.width
         );
         assert!(
             process.width > storage.width + 8.0,
-            "default Fit: process should be wider than storage ({:.1} vs {:.1})",
+            "content-fit: process should be wider than storage ({:.1} vs {:.1})",
             process.width,
             storage.width
         );
@@ -2207,70 +2246,71 @@ mod tests {
     }
 
     #[test]
-    fn two_phase_uniform_group_sizing() {
-        let d = etl_diagram_with_sizing(Some("uniform"));
-        let result = ArchitectureV2Layout::default().compute(&d);
+    fn group_frame_track_uniform_maps_to_equal_policy() {
+        use crate::layout::group_frame::{resolve_group_frame_spec, TrackSizing};
+        use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
+
+        let d = etl_diagram_with_track(Some("uniform"));
+        let spec = resolve_group_frame_spec(&d, "architecture");
+        assert_eq!(spec.track_sizing, TrackSizing::Equal);
+        assert_eq!(parse_group_sizing(&d), GroupSizingPolicy::Uniform);
+
+        let d_eq = etl_diagram_with_track(Some("equal"));
+        assert_eq!(
+            resolve_group_frame_spec(&d_eq, "architecture").track_sizing,
+            TrackSizing::Equal
+        );
+        assert_eq!(parse_group_sizing(&d_eq), GroupSizingPolicy::Uniform);
+    }
+
+    #[test]
+    fn group_frame_track_fit_maps_to_fit_policy() {
+        use crate::layout::group_frame::{resolve_group_frame_spec, TrackSizing};
+        use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
+
+        let d = etl_diagram_with_track(Some("fit"));
+        assert_eq!(
+            resolve_group_frame_spec(&d, "architecture").track_sizing,
+            TrackSizing::Fit
+        );
+        assert_eq!(parse_group_sizing(&d), GroupSizingPolicy::Fit);
+    }
+
+    #[test]
+    fn architecture_default_track_is_equal() {
+        use crate::layout::group_frame::{resolve_group_frame_spec, TrackSizing};
+        use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
+
+        let d = etl_diagram_with_track(None);
+        assert_eq!(
+            resolve_group_frame_spec(&d, "architecture").track_sizing,
+            TrackSizing::Equal
+        );
+        // 无 group_frame 时 policy 默认 Uniform（与 L1 Equal 对齐）
+        assert_eq!(parse_group_sizing(&d), GroupSizingPolicy::Uniform);
+    }
+
+    #[test]
+    fn etl_fit_escape_keeps_content_widths() {
+        use crate::layout::compute_layout;
+        let d = etl_diagram_with_track(Some("fit"));
+        let result = compute_layout(&d).expect("layout");
 
         let source = result.groups.get("source").unwrap();
         let process = result.groups.get("process").unwrap();
-        let storage = result.groups.get("storage").unwrap();
-
         assert!(
-            (source.width - process.width).abs() < 1.0,
-            "uniform: source/process width"
-        );
-        assert!(
-            (process.width - storage.width).abs() < 1.0,
-            "uniform: process/storage width"
-        );
-
-        // 较窄的存储层内容应大致居中
-        let hive = result.nodes.get("hive").unwrap();
-        let hive_cx = hive.x + hive.width / 2.0;
-        let storage_cx = storage.x + storage.width / 2.0;
-        assert!(
-            (hive_cx - storage_cx).abs() < 24.0,
-            "hive should center in uniform storage group"
+            process.width > source.width + 8.0,
+            "fit escape: process should stay wider than source"
         );
     }
 
     #[test]
-    fn etl_uniform_survives_full_layout_pipeline() {
+    fn etl_layout_pipeline_produces_groups() {
         use crate::layout::compute_layout;
-
-        let d = etl_diagram_with_sizing(Some("uniform"));
+        let d = etl_diagram_with_track(Some("equal"));
         let result = compute_layout(&d).expect("full pipeline layout");
-
-        let source = result.groups.get("source").unwrap();
-        let process = result.groups.get("process").unwrap();
-        let storage = result.groups.get("storage").unwrap();
-
-        assert!(
-            (source.width - process.width).abs() < 1.0,
-            "after grid snap: source/process width {:.1} vs {:.1}",
-            source.width,
-            process.width
-        );
-        assert!(
-            (process.width - storage.width).abs() < 1.0,
-            "after grid snap: process/storage width"
-        );
-        // RankBand Center：单 group 行相对画布居中，不再强制左对齐
-        let canvas_left = [source, process, storage]
-            .iter()
-            .map(|g| g.x)
-            .fold(f64::INFINITY, f64::min);
-        let canvas_right = [source, process, storage]
-            .iter()
-            .map(|g| g.x + g.width)
-            .fold(f64::NEG_INFINITY, f64::max);
-        let canvas_cx = (canvas_left + canvas_right) / 2.0;
-        for (name, g) in [("source", source), ("process", process), ("storage", storage)] {
-            let g_cx = g.x + g.width / 2.0;
-            assert!(
-                (g_cx - canvas_cx).abs() < 8.0,
-                "{name} should be centered in RankBand, cx={g_cx:.1} canvas_cx={canvas_cx:.1}"
-            );
-        }
+        assert!(result.groups.contains_key("source"));
+        assert!(result.groups.contains_key("process"));
+        assert!(result.groups.contains_key("storage"));
     }
 }

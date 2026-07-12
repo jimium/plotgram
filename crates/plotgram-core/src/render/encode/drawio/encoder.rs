@@ -390,6 +390,9 @@ impl<'a, 's> DrawioEncoder<'a, 's> {
     ///
     /// 返回 `(escaped_text, label_center)` 以便写入 edge cell 的 value 与 geometry。
     fn edge_label_with_position(&mut self, edge: &ExportEdge<'_>) -> Option<(String, Point)> {
+        if matches!(self.scene.diagram().diagram_type, DiagramType::Mindmap) {
+            return None;
+        }
         // 多标签：Phase 1 仅导出首个
         if edge.layout.labels.len() > 1 {
             self.report.warnings.push(ExportWarning {

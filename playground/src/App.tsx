@@ -62,6 +62,20 @@ type LayoutSource = 'source' | 'panel';
 
 const DEFAULT_CODE = getExample(DEFAULT_EXAMPLE_ID)?.source ?? EXAMPLES[0].source;
 
+// 新建文件时的空白模板
+const BLANK_CODE = `diagram flowchart {
+    title: "未命名图表"
+
+    // 添加节点：entity[类型] id "标签"
+    // 类型可选：start / end / client / service / database / cache ...
+    entity[start] start "开始"
+    entity[end] end "结束"
+
+    // 添加边：source -> target "标签"
+    // 使用 --> 表示虚线/响应箭头
+    start -> end
+}`;
+
 /** PNG / WebP 浏览器栅格化导出倍率选项 */
 export const RASTER_EXPORT_SCALES = [1, 2, 3] as const;
 export type RasterExportScale = (typeof RASTER_EXPORT_SCALES)[number];
@@ -107,6 +121,8 @@ function App() {
 
   // ─── 会话状态 ────────────────────────────────────────────
   const [activeExampleId, setActiveExampleId] = useState(DEFAULT_EXAMPLE_ID);
+  // 示例库首次引导：用户打开过示例库抽屉后不再显示脉冲提示
+  const [examplesGuideSeen, setExamplesGuideSeen] = useLocalStorage('plotgram.examplesGuideSeen', false);
   const [svg, setSvg] = useState('');
   const [ascii, setAscii] = useState('');
   const [sceneJson, setSceneJson] = useState('');
@@ -123,7 +139,19 @@ function App() {
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('problems');
   const [bottomPanelExpanded, setBottomPanelExpanded] = useState(false);
   const [layoutSource, setLayoutSource] = useState<LayoutSource>('panel');
-  const [filename, setFilename] = useState('未命名.pgm');
+  // 首次访问(localStorage 无 plotgram.code)时,文件名与默认示例标题保持一致
+  const [filename, setFilename] = useState(() => {
+    try {
+      const raw = window.localStorage.getItem('plotgram.code');
+      if (raw === null) {
+        const ex = getExample(DEFAULT_EXAMPLE_ID);
+        return `${ex?.title ?? '未命名'}.pgm`;
+      }
+    } catch {
+      // ignore
+    }
+    return '未命名.pgm';
+  });
   const [dirty, setDirty] = useState(false);
   const [examplesDrawerOpen, setExamplesDrawerOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -660,11 +688,12 @@ function App() {
 
   // ─── 文件操作 ────────────────────────────────────────────
   const handleNewFile = useCallback(() => {
-    setCode(DEFAULT_CODE);
+    setCode(BLANK_CODE);
     setFilename('未命名.pgm');
     setDirty(false);
     fileHandleRef.current = null;
-    setActiveExampleId(DEFAULT_EXAMPLE_ID);
+    setActiveExampleId('');
+    setFitSignal((s) => s + 1);
     showToast('已新建文件', 'info');
   }, [setCode, showToast]);
 
@@ -844,7 +873,10 @@ function App() {
         errorCount={diagnostics.filter(d => d.severity === 'error').length}
         warningCount={diagnostics.filter(d => d.severity === 'warning').length}
         renderMs={renderMs}
-        onOpenExamples={() => setExamplesDrawerOpen(true)}
+        onOpenExamples={() => {
+          setExamplesDrawerOpen(true);
+          setExamplesGuideSeen(true);
+        }}
         onOpenDocs={() => setHelpOpen(true)}
         onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
         onShare={handleShare}
@@ -856,6 +888,7 @@ function App() {
         exportActions={exportActions}
         rasterScale={rasterExportScale}
         onRasterScaleChange={handleRasterScaleChange}
+        examplesGuideSeen={examplesGuideSeen}
       />
 
       {/* ─── 移动端标签 ──────────────────────────────────── */}

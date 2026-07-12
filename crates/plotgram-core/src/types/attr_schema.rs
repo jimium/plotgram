@@ -103,28 +103,10 @@ pub const DIAGRAM_ATTRS: &[AttrSchema] = &[
         None,
     ),
     AttrSchema::new(
-        diagram::GROUP_SIZING,
+        diagram::GROUP_FRAME,
         AttrScope::Diagram,
-        AttrValueType::Atom,
-        Some(attr_constants::group_sizing::ALL),
-    ),
-    AttrSchema::new(
-        diagram::GROUP_GAP,
-        AttrScope::Diagram,
-        AttrValueType::Number,
+        AttrValueType::AlgorithmConfig,
         None,
-    ),
-    AttrSchema::new(
-        diagram::GROUP_ALIGN,
-        AttrScope::Diagram,
-        AttrValueType::Atom,
-        Some(attr_constants::group_align::ALL),
-    ),
-    AttrSchema::new(
-        diagram::GROUP_ARRANGEMENT,
-        AttrScope::Diagram,
-        AttrValueType::Atom,
-        Some(attr_constants::group_arrangement::ALL),
     ),
     AttrSchema::new(
         diagram::SNAP,

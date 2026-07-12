@@ -117,6 +117,14 @@ pub fn run_refine(
         total_push_count += push_count;
 
         push::push_problem_nodes(&mut result, &metrics, config, &mut momentum);
+        // 空间契约：推开后不得压穿同层标签缝
+        if let Some(budget) = result.hints.space_budget.clone() {
+            crate::layout::space_budget::enforce_horizontal_gaps(&mut result.nodes, &budget);
+        } else {
+            let budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
+            crate::layout::space_budget::enforce_horizontal_gaps(&mut result.nodes, &budget);
+            result.hints.space_budget = Some(budget);
+        }
         reroute::reroute_subset(&mut result, diagram, router, &edges_to_reroute);
         passes_executed += 1;
 

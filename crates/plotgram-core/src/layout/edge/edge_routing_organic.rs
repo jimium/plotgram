@@ -1,8 +1,8 @@
 //! 有机贝塞尔边路由模块
 //!
 //! 专为 MindMap 树形结构设计的边路由算法。
-//! 采用「肘形 S 曲线」设计：控制点沿端口方向伸出一段「肩」，再平滑过渡到目标方向，
-//! 效果类似 XMind / MindManager 等主流思维导图产品的曲线风格。
+//! 采用 Plotgram「绽放曲线」：纯切线肩 + 非对称生长感 + 圆形 root 径向绽放，
+//! 端点处水平/径向切线连续，观感优于常见的弦向污染 S 曲线。
 //!
 //! 可通过 `edge_routing: organic { … }` 调节。
 //!
@@ -10,7 +10,8 @@
 //! - 曲线风格预设：organic / round / soft 三种预设风格
 //! - 层级感知：根据节点深度自动调整曲线弧度，根→一级最明显，深层级更平缓
 //! - 连接点均匀分布：同一父节点的子节点连接点在垂直方向均匀排布，避免拥挤
-//! - 障碍避让：路由完成后采样曲线检测穿障，穿障的边退化到 spline 绕行折线
+//! - 圆形 root 径向出边：从圆心沿半径「长出」，再水平接入子节点
+//! - 障碍避让：路由完成后采样曲线检测穿障；mindmap 保持贝塞尔拉弓，不退化折线
 
 use crate::types::DiagramType;
 use crate::ast::Diagram;
@@ -19,7 +20,8 @@ use crate::layout::algorithm_config::{AlgorithmOptionSpec, OptionKind};
 use crate::layout::{EdgeLayout, EdgeRoutingStrategy, LayoutResult, PathGeometry};
 use crate::layout::edge::common::edge_geometry::{
     build_edge_labels, compute_bezier_controls_organic,
-    cubic_bezier_point, parse_label_t, DEFAULT_BEZIER_TENSION, DEFAULT_SHOULDER_RATIO,
+    compute_bezier_controls_organic_tangents, cubic_bezier_point, parse_label_t,
+    radial_outward_tangent, DEFAULT_BEZIER_TENSION, DEFAULT_SHOULDER_RATIO,
 };
 use crate::layout::edge::common::routing_skeleton::{
     finalize_edges, resolve_endpoints, EdgeEndpoints, LabelOffset, RoutingContext,
@@ -36,10 +38,10 @@ const APPLICABLE_TYPES: &[DiagramType] = &[
 ];
 
 /// 默认深度衰减系数（每深入一层，曲线参数乘以该比例）
-const DEFAULT_DEPTH_DECAY: f64 = 0.7;
+const DEFAULT_DEPTH_DECAY: f64 = 0.72;
 
 /// 曲线风格预设
-/// 0 = organic（肘形 S 曲线，默认）
+/// 0 = organic（绽放曲线，默认）
 /// 1 = round（大圆弧，更圆润）
 /// 2 = soft（柔和曲线，更平缓）
 const DEFAULT_CURVE_STYLE: f64 = 0.0;
@@ -229,6 +231,15 @@ pub fn route_edges_organic(
         .collect();
     let obstacle_index = visibility::ObstacleIndex::build(&node_list);
 
+    // 父子映射：穿障检测时跳过同父兄弟，避免扇出曲线误判为穿障
+    let mut children_of: HashMap<&str, Vec<&str>> = HashMap::new();
+    for rel in relations {
+        children_of
+            .entry(rel.from.as_str())
+            .or_default()
+            .push(rel.to.as_str());
+    }
+
     // ── 第一轮：解析所有边的端点 ──
     // 先得到真实的连接点坐标，再基于真实坐标做均匀分布
     let mut endpoints: Vec<Option<(EdgeEndpoints, LabelOffset)>> =
@@ -247,6 +258,7 @@ pub fn route_edges_organic(
     };
 
     let mut edges: Vec<EdgeLayout> = Vec::with_capacity(relations.len());
+    let is_mindmap = matches!(diagram.diagram_type, DiagramType::Mindmap);
 
     for (i, rel) in relations.iter().enumerate() {
         let Some((ep, label_off)) = endpoints[i].clone() else {
@@ -261,30 +273,81 @@ pub fn route_edges_organic(
         let (effective_tension, effective_shoulder) = if let Some(depths) = node_depths {
             let from_depth = depths.get(ep.from_id.as_str()).copied().unwrap_or(0);
             let decay = depth_decay.powi(from_depth as i32);
-            (base_tension * decay, base_shoulder_ratio * decay)
+            // 深层保留最低张力，避免叶子边退化成「假直线」
+            let t = (base_tension * decay).max(base_tension * 0.48);
+            let s = (base_shoulder_ratio * decay).max(base_shoulder_ratio * 0.55);
+            (t, s)
         } else {
             (base_tension, base_shoulder_ratio)
         };
 
         // ── 应用连接点均匀分布 ──
-        let start_pt = if let Some((sx, sy)) = distributed_starts.get(&i) {
-            Point::new(*sx, *sy)
+        let (start_pt, from_port) = if let Some((sx, sy)) = distributed_starts.get(&i) {
+            // 分布后的点已吸附到左/右边界，端口与水平侧对齐
+            let nl = result.nodes.get(ep.from_id.as_str());
+            let port = if let Some(nl) = nl {
+                let cx = nl.x + nl.width / 2.0;
+                if *sx >= cx {
+                    crate::layout::Port::Right
+                } else {
+                    crate::layout::Port::Left
+                }
+            } else {
+                ep.from_port
+            };
+            (Point::new(*sx, *sy), port)
+        } else if is_mindmap {
+            coerce_mindmap_start_to_horizontal_port(&result, &ep)
         } else {
-            ep.start
+            (ep.start, ep.from_port)
         };
+
+        // 子节点接入：思维导图强制接到朝向父节点的侧边中部（杜绝角点）
+        let (end_pt, to_port) = if is_mindmap {
+            snap_mindmap_end(&result, &ep, &start_pt)
+        } else {
+            (ep.end, ep.to_port)
+        };
+
         let start_x = start_pt.x;
         let start_y = start_pt.y;
+        let end_x = end_pt.x;
+        let end_y = end_pt.y;
 
-        let control_points = compute_bezier_controls_organic(
-            start_x, start_y, ep.end.x, ep.end.y,
-            ep.from_port, ep.to_port, effective_tension, effective_shoulder,
-        );
+        // 大跨度边加长水平肩
+        let dx = (end_x - start_x).abs();
+        let dy = (end_y - start_y).abs();
+        let aspect = if dx > 1.0 { (dy / dx).min(2.5) } else { 0.0 };
+        let adaptive_shoulder = effective_shoulder * (1.0 + 0.28 * aspect);
+
+        // 圆形 parent：径向绽放出边；矩形 parent：端口法向出边
+        let control_points = if let Some(from_nl) = result.nodes.get(ep.from_id.as_str()) {
+            let aspect_n = from_nl.width / from_nl.height.max(1e-6);
+            if (aspect_n - 1.0).abs() < 0.08 {
+                let from_dir = radial_outward_tangent(from_nl, start_pt);
+                let to_dir = port_dir(to_port);
+                compute_bezier_controls_organic_tangents(
+                    start_x, start_y, end_x, end_y,
+                    from_dir, to_dir, effective_tension, adaptive_shoulder,
+                )
+            } else {
+                compute_bezier_controls_organic(
+                    start_x, start_y, end_x, end_y,
+                    from_port, to_port, effective_tension, adaptive_shoulder,
+                )
+            }
+        } else {
+            compute_bezier_controls_organic(
+                start_x, start_y, end_x, end_y,
+                from_port, to_port, effective_tension, adaptive_shoulder,
+            )
+        };
 
         // 标签位于曲线 t 处（由 label_position 锚点决定）
         let cp0 = control_points[0];
         let cp1 = control_points[1];
         let bez_start = start_pt;
-        let bez_end = ep.end;
+        let bez_end = end_pt;
         let middle_t = parse_label_t(rel);
         let labels = build_edge_labels(rel, middle_t, Point::new(label_off.ox, label_off.oy), |t| {
             cubic_bezier_point(bez_start, cp0, cp1, bez_end, t)
@@ -292,26 +355,46 @@ pub fn route_edges_organic(
 
         let geometry = PathGeometry::Bezier {
             start: start_pt,
-            end: ep.end,
+            end: end_pt,
             controls: control_points,
         };
 
         let mut edge = EdgeLayout {
             geometry,
             labels,
-            from_port: ep.from_port,
-            to_port: ep.to_port,
+            from_port,
+            to_port,
         };
 
         // ── 穿障检测：采样曲线，若穿过非端点节点则退化到 spline 绕行 ──
         let from_idx = node_id_to_idx.get(ep.from_id.as_str()).copied().unwrap_or(usize::MAX);
         let to_idx = node_id_to_idx.get(ep.to_id.as_str()).copied().unwrap_or(usize::MAX);
-        let skip = [from_idx, to_idx];
+        let mut skip = vec![from_idx, to_idx];
+        // 同父兄弟扇出时曲线常擦过中间兄弟，属预期而非穿障
+        if let Some(siblings) = children_of.get(ep.from_id.as_str()) {
+            for sib in siblings {
+                if *sib != ep.to_id.as_str() {
+                    if let Some(&idx) = node_id_to_idx.get(sib) {
+                        skip.push(idx);
+                    }
+                }
+            }
+        }
 
         if curve_intersects_obstacles(&edge, &obstacle_index, &skip) {
-            let detour = obstacle_index.shortest_path(ep.start, ep.end, &skip);
-            if !detour.is_empty() {
-                edge.geometry = PathGeometry::Polyline { points: detour };
+            if is_mindmap {
+                // 思维导图保持平滑贝塞尔：用绕行中点拉弓，避免折线观感
+                if let Some(bowed) = bow_bezier_around_obstacles(
+                    &edge, &obstacle_index, &skip, from_port, to_port,
+                    effective_tension, adaptive_shoulder,
+                ) {
+                    edge.geometry = bowed;
+                }
+            } else {
+                let detour = obstacle_index.shortest_path(start_pt, end_pt, &skip);
+                if !detour.is_empty() {
+                    edge.geometry = PathGeometry::Polyline { points: detour };
+                }
             }
         }
 
@@ -327,6 +410,9 @@ pub fn route_edges_organic(
 /// 然后通过椭圆方程重新计算边界 x，确保与节点形状完美贴合。
 /// 圆形节点完全精确，圆角矩形也有很好的椭圆近似效果。
 ///
+/// **按端口侧（Left / Right）分别分布**，避免径向思维导图左右分支
+/// 抢同一组 y 槽位，导致一侧连接点落到圆外或分布失衡。
+///
 /// 返回 HashMap<edge_index, (start_x, start_y)>
 fn compute_distributed_port_points(
     result: &LayoutResult,
@@ -336,26 +422,43 @@ fn compute_distributed_port_points(
 ) -> HashMap<usize, (f64, f64)> {
     use std::collections::BTreeMap;
 
-    // 按 from_id 分组：from_id -> Vec<(edge_index, start_y, port)>
-    let mut from_to_edges: BTreeMap<String, Vec<(usize, f64, crate::layout::Port)>> = BTreeMap::new();
+    // 按 (from_id, port_side) 分组，左右独立分布
+    let mut from_to_edges: BTreeMap<(String, bool), Vec<(usize, f64, crate::layout::Port)>> =
+        BTreeMap::new();
 
     for (i, ep_opt) in endpoints.iter().enumerate() {
         let Some((ep, _)) = ep_opt else { continue };
-        // 只处理水平端口（左/右）
-        match ep.from_port {
-            crate::layout::Port::Left | crate::layout::Port::Right => {
-                from_to_edges
-                    .entry(ep.from_id.clone())
-                    .or_default()
-                    .push((i, ep.start.y, ep.from_port));
+        let Some(nl) = result.nodes.get(&ep.from_id) else { continue };
+        let aspect = nl.width / nl.height.max(1e-6);
+        let is_circular = (aspect - 1.0).abs() < 0.08;
+
+        let (is_right, port) = match ep.from_port {
+            crate::layout::Port::Right => (true, crate::layout::Port::Right),
+            crate::layout::Port::Left => (false, crate::layout::Port::Left),
+            // 仅圆形节点把 Top/Bottom 归入左/右侧（矩形节点保持原端口，不参与水平分布）
+            _ if is_circular => {
+                let cx = nl.x + nl.width / 2.0;
+                let right = ep.end.x >= cx;
+                (
+                    right,
+                    if right {
+                        crate::layout::Port::Right
+                    } else {
+                        crate::layout::Port::Left
+                    },
+                )
             }
-            _ => {}
-        }
+            _ => continue,
+        };
+        from_to_edges
+            .entry((ep.from_id.clone(), is_right))
+            .or_default()
+            .push((i, ep.start.y, port));
     }
 
     let mut result_map: HashMap<usize, (f64, f64)> = HashMap::new();
 
-    for (from_id, edges) in from_to_edges.iter() {
+    for ((from_id, _), edges) in from_to_edges.iter() {
         let from_nl = match result.nodes.get(from_id) {
             Some(nl) => nl,
             None => continue,
@@ -363,50 +466,146 @@ fn compute_distributed_port_points(
 
         let n = edges.len();
         if n <= 1 {
-            continue; // 只有一个子节点时不需要均匀分布
+            // 单边：仅圆形节点需要吸附（斜角矩形交点可能在圆外）
+            if n == 1 {
+                let aspect = from_nl.width / from_nl.height.max(1e-6);
+                if (aspect - 1.0).abs() < 0.08 {
+                    let (edge_idx, original_y, port) = edges[0];
+                    let (x, y) = snap_to_side(from_nl, original_y, port);
+                    result_map.insert(edge_idx, (x, y));
+                }
+            }
+            continue;
         }
 
         // 按原始连接点 y 坐标排序
         let mut sorted = edges.clone();
         sorted.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        // 计算均匀分布的目标 y 坐标
-        // 在 from 节点的高度范围内均匀分布，带 15% 的边距
-        let margin_ratio = 0.15;
+        // 在 from 节点高度范围内均匀分布；加大边距，避开圆角/椭圆极点
+        let margin_ratio = 0.28;
         let top = from_nl.y + from_nl.height * margin_ratio;
         let bottom = from_nl.y + from_nl.height * (1.0 - margin_ratio);
-        let range = bottom - top;
-
-        // 椭圆参数（用于重新计算边界 x）
-        let cx = from_nl.x + from_nl.width / 2.0;
-        let cy = from_nl.y + from_nl.height / 2.0;
-        let a = from_nl.width / 2.0;
-        let b = from_nl.height / 2.0;
+        let range = (bottom - top).max(1.0);
 
         for (i, (edge_idx, original_y, port)) in sorted.iter().enumerate() {
-            // 均匀分布的目标 y
             let target_y = top + range * (i as f64) / ((n - 1) as f64);
-
-            // 根据分布强度在原始位置和均匀分布位置之间插值
             let final_y = original_y + (target_y - original_y) * distribution_strength;
-
-            // 用椭圆方程计算对应 y 的边界 x
-            // 椭圆方程：(x-cx)²/a² + (y-cy)²/b² = 1
-            // 已知 y，求 x：x = cx ± a * √(1 - ((y-cy)/b)²)
-            let dy = (final_y - cy).abs().min(b * 0.999); // 夹紧，防止越界
-            let dx = a * (1.0 - (dy / b).powi(2)).sqrt();
-
-            let final_x = match port {
-                crate::layout::Port::Right => cx + dx,
-                crate::layout::Port::Left => cx - dx,
-                _ => continue,
-            };
-
-            result_map.insert(*edge_idx, (final_x, final_y));
+            let (final_x, snapped_y) = snap_to_side(from_nl, final_y, *port);
+            result_map.insert(*edge_idx, (final_x, snapped_y));
         }
     }
 
     result_map
+}
+
+/// 将给定 y 吸附到节点左/右边界。
+///
+/// - 近似圆形：椭圆边界（与渲染圆一致）
+/// - 圆角矩形：落在左右竖直边（flat side），避免角点接入
+fn snap_to_side(
+    nl: &crate::layout::NodeLayout,
+    y: f64,
+    port: crate::layout::Port,
+) -> (f64, f64) {
+    let cy = nl.y + nl.height / 2.0;
+    let half_h = nl.height / 2.0;
+    // 再夹紧一点，远离上下圆角
+    let pad = (nl.height * 0.12).min(10.0);
+    let clamped_y = y.clamp(nl.y + pad, nl.y + nl.height - pad);
+
+    let aspect = nl.width / nl.height.max(1e-6);
+    if (aspect - 1.0).abs() < 0.08 {
+        // 圆形：椭圆方程
+        let cx = nl.x + nl.width / 2.0;
+        let a = nl.width / 2.0;
+        let b = half_h;
+        let dy = (clamped_y - cy).abs().min(b * 0.999);
+        let dx = a * (1.0 - (dy / b).powi(2)).sqrt();
+        let final_x = match port {
+            crate::layout::Port::Right => cx + dx,
+            _ => cx - dx,
+        };
+        (final_x, clamped_y)
+    } else {
+        // 矩形/圆角矩形：落在左右平直边
+        let final_x = match port {
+            crate::layout::Port::Right => nl.x + nl.width,
+            _ => nl.x,
+        };
+        (final_x, clamped_y)
+    }
+}
+
+/// 兼容旧名
+fn snap_to_ellipse_side(
+    nl: &crate::layout::NodeLayout,
+    y: f64,
+    port: crate::layout::Port,
+) -> (f64, f64) {
+    snap_to_side(nl, y, port)
+}
+
+/// 思维导图：若起点落在 Top/Bottom（斜角矩形交点），按子节点水平侧改吸附。
+fn coerce_mindmap_start_to_horizontal_port(
+    result: &LayoutResult,
+    ep: &EdgeEndpoints,
+) -> (Point, crate::layout::Port) {
+    match ep.from_port {
+        crate::layout::Port::Left | crate::layout::Port::Right => {
+            // 即便已是水平端口，也吸附到侧边，避免斜向矩形交点贴在角上
+            if let Some(nl) = result.nodes.get(&ep.from_id) {
+                let (x, y) = snap_to_side(nl, ep.start.y, ep.from_port);
+                (Point::new(x, y), ep.from_port)
+            } else {
+                (ep.start, ep.from_port)
+            }
+        }
+        _ => {
+            let Some(nl) = result.nodes.get(&ep.from_id) else {
+                return (ep.start, ep.from_port);
+            };
+            let cx = nl.x + nl.width / 2.0;
+            let port = if ep.end.x >= cx {
+                crate::layout::Port::Right
+            } else {
+                crate::layout::Port::Left
+            };
+            let (x, y) = snap_to_side(nl, ep.start.y, port);
+            (Point::new(x, y), port)
+        }
+    }
+}
+
+/// 思维导图终点：强制接到子节点朝向父节点的那一侧中部，杜绝角点接入。
+fn snap_mindmap_end(
+    result: &LayoutResult,
+    ep: &EdgeEndpoints,
+    start: &Point,
+) -> (Point, crate::layout::Port) {
+    let Some(to_nl) = result.nodes.get(&ep.to_id) else {
+        return (ep.end, ep.to_port);
+    };
+    let tcx = to_nl.x + to_nl.width / 2.0;
+    // 父在左侧 → 接到子节点左边；父在右侧 → 接到子节点右边
+    let port = if start.x < tcx {
+        crate::layout::Port::Left
+    } else {
+        crate::layout::Port::Right
+    };
+    // 单边接入：落在侧边垂直中心，最干净
+    let mid_y = to_nl.y + to_nl.height / 2.0;
+    let (x, y) = snap_to_side(to_nl, mid_y, port);
+    (Point::new(x, y), port)
+}
+
+fn port_dir(port: crate::layout::Port) -> Point {
+    match port {
+        crate::layout::Port::Top => Point::new(0.0, -1.0),
+        crate::layout::Port::Bottom => Point::new(0.0, 1.0),
+        crate::layout::Port::Left => Point::new(-1.0, 0.0),
+        crate::layout::Port::Right => Point::new(1.0, 0.0),
+    }
 }
 
 /// 检测有机贝塞尔曲线采样后是否穿过任何非 skip 障碍物
@@ -422,6 +621,84 @@ fn curve_intersects_obstacles(
         }
     }
     false
+}
+
+/// 思维导图穿障时保持贝塞尔：沿绕行折线中点拉弓，生成平滑曲线。
+///
+/// 若绕行失败或拉弓后仍穿障，返回 `None`（调用方保留原曲线，不退化折线）。
+fn bow_bezier_around_obstacles(
+    edge: &EdgeLayout,
+    obstacles: &visibility::ObstacleIndex,
+    skip: &[usize],
+    from_port: crate::layout::Port,
+    to_port: crate::layout::Port,
+    tension: f64,
+    shoulder_ratio: f64,
+) -> Option<PathGeometry> {
+    let (start, end) = match &edge.geometry {
+        PathGeometry::Bezier { start, end, .. } => (*start, *end),
+        PathGeometry::Straight { start, end } => (*start, *end),
+        PathGeometry::Polyline { points } if points.len() >= 2 => {
+            (points[0], points[points.len() - 1])
+        }
+        _ => return None,
+    };
+
+    let detour = obstacles.shortest_path(start, end, skip);
+    if detour.len() < 3 {
+        return None;
+    }
+
+    let mid = detour[detour.len() / 2];
+    let dx = end.x - start.x;
+    let dy = end.y - start.y;
+    let dist = (dx * dx + dy * dy).sqrt().max(1.0);
+
+    // 控制点：有机肩部 + 向绕行中点拉弓
+    let base = compute_bezier_controls_organic(
+        start.x, start.y, end.x, end.y, from_port, to_port, tension, shoulder_ratio,
+    );
+    let pull = 0.55;
+    let cp0 = Point::new(
+        base[0].x * (1.0 - pull) + mid.x * pull,
+        base[0].y * (1.0 - pull) + mid.y * pull,
+    );
+    let cp1 = Point::new(
+        base[1].x * (1.0 - pull) + mid.x * pull,
+        base[1].y * (1.0 - pull) + mid.y * pull,
+    );
+
+    // 若中点几乎在直线上，略微沿法线外推，避免退化成直线仍穿障
+    let perp_x = -dy / dist;
+    let perp_y = dx / dist;
+    let mid_off = ((mid.x - start.x) * perp_x + (mid.y - start.y) * perp_y).abs();
+    let (cp0, cp1) = if mid_off < 8.0 {
+        let bump = dist * 0.12;
+        (
+            Point::new(cp0.x + perp_x * bump, cp0.y + perp_y * bump),
+            Point::new(cp1.x + perp_x * bump, cp1.y + perp_y * bump),
+        )
+    } else {
+        (cp0, cp1)
+    };
+
+    let bowed = PathGeometry::Bezier {
+        start,
+        end,
+        controls: [cp0, cp1],
+    };
+    let candidate = EdgeLayout {
+        geometry: bowed.clone(),
+        labels: vec![],
+        from_port,
+        to_port,
+    };
+    if curve_intersects_obstacles(&candidate, obstacles, skip) {
+        // 仍穿障则保留原曲线（比折线观感更好）
+        None
+    } else {
+        Some(bowed)
+    }
 }
 
 #[cfg(test)]

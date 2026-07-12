@@ -4,7 +4,9 @@
 diagram architecture {
     title: "数据仓ETL处理架构"
     config {
-        group_sizing: uniform
+        group_frame: stack {
+            track: equal
+        }
     }
 
     group source "数据源层" {

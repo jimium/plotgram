@@ -160,17 +160,18 @@ const FLOWCHART_GROUP_GAP: f64 = 48.0;
 ///
 /// | 算法 | arrangement | track_sizing | cross_align | gap | border_align |
 /// |------|-------------|--------------|-------------|-----|--------------|
-/// | `architecture` | `Stack(H)` | `Fit`（`uniform` 时升为 `Equal`） | `Center` | 40.0 | `SharedLines` |
-/// | `flowchart` | `Stack(V)`（可由 `group_arrangement` 覆盖） | `Fit` | `Center`（可由 `group_align` 覆盖） | 48.0（可由 `group_gap` 覆盖） | `None` |
+/// | `architecture` | `Stack(H)` | `Equal`（`group_frame { track: fit }` 可退回） | `Center` | 40.0 | `SharedLines` |
+/// | `flowchart` | `Stack(V)` | `Fit` | `Center` | 48.0 | `None` |
 /// | 其他含 group 算法 | `Stack(V)` | `Fit` | `Center` | 48.0 | `None` |
 ///
 /// `quantize.enabled` 由 `snap` 属性 + 节点 snap 是否启用决定。
 ///
-/// # `group_frame:` 配置块（spec §6.2 sugar）
+/// # `group_frame:` 配置块
 ///
-/// 若 diagram 声明了 `group_frame: stack { axis: horizontal, gap: 48, ... }` 配置块，
-/// 则以配置块覆盖算法默认值；未声明的字段保留算法默认。旧属性（`group_sizing` 等）
-/// 保留为 sugar，在无 `group_frame` 配置块时生效。
+/// 若 diagram 声明了 `group_frame: stack { … }`、`group_frame: matrix { … }`，
+/// 或以场景短名 `strips` / `fit` / `lanes` / `stages` / `tiles`（可带 `{ … }` 覆盖），
+/// 则以配置覆盖算法默认值；未声明的字段保留算法默认。
+/// 组间几何的唯一 DSL 入口；旧 `group_sizing` / `group_arrangement` 等已移除。
 pub fn resolve_group_frame_spec(diagram: &Diagram, algo: &str) -> GroupFrameSpec {
     // 优先消费 `group_frame:` 配置块（覆盖算法默认值）
     if let Some(spec) = resolve_from_group_frame_config(diagram, algo) {
@@ -184,7 +185,7 @@ pub fn resolve_group_frame_spec(diagram: &Diagram, algo: &str) -> GroupFrameSpec
     }
 }
 
-/// 从 `group_frame: stack { ... }` 配置块解析 Spec，覆盖算法默认值。
+/// 从 `group_frame: stack { ... }` / 场景短名解析 Spec，覆盖算法默认值。
 ///
 /// 配置块选项：
 /// - `axis`: `"horizontal"` | `"vertical"`（stack 排列轴）
@@ -193,8 +194,10 @@ pub fn resolve_group_frame_spec(diagram: &Diagram, algo: &str) -> GroupFrameSpec
 /// - `cross`: `"start"` | `"center"` | `"end"` | `"stretch"`（交叉轴对齐）
 /// - `border`: `"none"` | `"shared"` | `"shared_lines"`（边框共线策略）
 /// - `snap`: number（量化步长）或 boolean（开关）
+/// - `rows` / `cols`: matrix / `tiles` 网格尺寸
 ///
-/// 返回 `None` 表示未声明 `group_frame` 配置块。
+/// 场景短名（`strips` / `fit` / `lanes` / `stages` / `tiles`）先展开默认组合，
+/// 再用 `{ … }` 覆盖单项。返回 `None` 表示未声明 `group_frame`。
 fn resolve_from_group_frame_config(diagram: &Diagram, algo: &str) -> Option<GroupFrameSpec> {
     let attr = diagram
         .attributes
@@ -202,7 +205,7 @@ fn resolve_from_group_frame_config(diagram: &Diagram, algo: &str) -> Option<Grou
         .find(|a| a.key == dsl::GROUP_FRAME)?;
     let (arrangement_algo, options) = match &attr.value {
         AttributeValue::Config { algo, options } => (algo.as_str(), options),
-        // `group_frame: stack`（无选项块）→ 仅指定 arrangement，其余用算法默认
+        // `group_frame: stack` / `group_frame: strips`（无选项块）
         AttributeValue::String(s) => (s.as_str(), &HashMap::new()),
         _ => return None,
     };
@@ -214,22 +217,40 @@ fn resolve_from_group_frame_config(diagram: &Diagram, algo: &str) -> Option<Grou
         resolve_stack(diagram)
     };
 
+    let name = arrangement_algo.to_ascii_lowercase();
+    let preset_applied = apply_group_frame_preset(&name, &mut spec);
+
     // arrangement（algo 字段）
-    match arrangement_algo {
+    match name.as_str() {
         "stack" => {
-            // axis 可由 options 覆盖
             if let Some(axis) = read_str_option(options, "axis") {
-                let axis = match axis.to_ascii_lowercase().as_str() {
-                    "horizontal" | "h" => Axis::Horizontal,
-                    _ => Axis::Vertical,
+                spec.arrangement = GroupArrangement::Stack {
+                    axis: parse_stack_axis(axis),
                 };
-                spec.arrangement = GroupArrangement::Stack { axis };
             }
         }
         "matrix" => {
             let rows = read_num_option(options, "rows").map(|n| n as u32);
             let cols = read_num_option(options, "cols").map(|n| n as u32);
             spec.arrangement = GroupArrangement::Matrix { rows, cols };
+        }
+        _ if preset_applied => {
+            // 短名展开后仍允许覆盖 axis / rows / cols
+            match &mut spec.arrangement {
+                GroupArrangement::Stack { axis } => {
+                    if let Some(a) = read_str_option(options, "axis") {
+                        *axis = parse_stack_axis(a);
+                    }
+                }
+                GroupArrangement::Matrix { rows, cols } => {
+                    if let Some(r) = read_num_option(options, "rows") {
+                        *rows = Some(r as u32);
+                    }
+                    if let Some(c) = read_num_option(options, "cols") {
+                        *cols = Some(c as u32);
+                    }
+                }
+            }
         }
         _ => {}
     }
@@ -295,6 +316,67 @@ fn resolve_from_group_frame_config(diagram: &Diagram, algo: &str) -> Option<Grou
     Some(spec)
 }
 
+fn parse_stack_axis(axis: &str) -> Axis {
+    match axis.to_ascii_lowercase().as_str() {
+        "horizontal" | "h" => Axis::Horizontal,
+        _ => Axis::Vertical,
+    }
+}
+
+/// 将场景短名展开到 `spec`；未知名称返回 `false`。
+fn apply_group_frame_preset(name: &str, spec: &mut GroupFrameSpec) -> bool {
+    use crate::types::attr_constants::group_frame_preset as preset;
+    match name {
+        n if n == preset::STRIPS => {
+            // 分层条带：水平等宽 + 居中 + 共线边框
+            spec.arrangement = GroupArrangement::Stack {
+                axis: Axis::Horizontal,
+            };
+            spec.track_sizing = TrackSizing::Equal;
+            spec.cross_align = CrossAlign::Center;
+            spec.border_align = BorderAlign::SharedLines;
+            true
+        }
+        n if n == preset::FIT => {
+            // 内容贴合：水平堆叠、不拉等宽
+            spec.arrangement = GroupArrangement::Stack {
+                axis: Axis::Horizontal,
+            };
+            spec.track_sizing = TrackSizing::Fit;
+            true
+        }
+        n if n == preset::LANES => {
+            // 水平泳道：顶对齐 + 较大间距
+            spec.arrangement = GroupArrangement::Stack {
+                axis: Axis::Horizontal,
+            };
+            spec.cross_align = CrossAlign::Start;
+            spec.gap = 80.0;
+            true
+        }
+        n if n == preset::STAGES => {
+            // 纵向阶段：垂直堆叠、内容贴合
+            spec.arrangement = GroupArrangement::Stack {
+                axis: Axis::Vertical,
+            };
+            spec.track_sizing = TrackSizing::Fit;
+            spec.cross_align = CrossAlign::Center;
+            true
+        }
+        n if n == preset::TILES => {
+            // 固定网格：默认 2×2 等宽单元格
+            spec.arrangement = GroupArrangement::Matrix {
+                rows: Some(2),
+                cols: Some(2),
+            };
+            spec.track_sizing = TrackSizing::Equal;
+            spec.gap = 48.0;
+            true
+        }
+        _ => false,
+    }
+}
+
 /// 从 Config options 读取字符串值（小写归一化）。
 fn read_str_option<'a>(
     options: &'a HashMap<String, AttributeValue>,
@@ -311,22 +393,15 @@ fn read_num_option(options: &HashMap<String, AttributeValue>, key: &str) -> Opti
     }
 }
 
-/// architecture 默认：`Stack(H) + Fit + Center + SharedLines`。
+/// architecture 默认：`Stack(H) + Equal + Center + SharedLines`（同级 sibling 条带）。
 ///
-/// Phase C：默认内容贴合（Fit），避免窄组被最宽 sibling 横向拉空。
-/// `group_sizing: uniform` / `group_frame { track: equal }` 可恢复等宽条带。
+/// 默认等宽条带；显式 `group_frame { track: fit }` 经配置块覆盖退回内容贴合。
 fn resolve_architecture(diagram: &Diagram) -> GroupFrameSpec {
-    let track_sizing = if diagram_group_sizing_is_uniform(diagram) {
-        TrackSizing::Equal
-    } else {
-        TrackSizing::Fit
-    };
-
     GroupFrameSpec {
         arrangement: GroupArrangement::Stack {
             axis: Axis::Horizontal,
         },
-        track_sizing,
+        track_sizing: TrackSizing::Equal,
         cross_align: CrossAlign::Center,
         gap: ARCH_GROUP_GAP,
         padding: GroupPadding::architecture_v2(),
@@ -335,58 +410,15 @@ fn resolve_architecture(diagram: &Diagram) -> GroupFrameSpec {
     }
 }
 
-/// flowchart / 通用 stack：从 `group_arrangement` / `group_gap` / `group_align` / `group_sizing` 解析。
-///
-/// `group_sizing: uniform` → `TrackSizing::Equal`（与 architecture 对齐，补齐 spec §4.1 缺口）。
+/// flowchart / 通用 stack 算法默认（仅由 `group_frame` 覆盖，无旧糖属性）。
 fn resolve_stack(diagram: &Diagram) -> GroupFrameSpec {
-    let mut gap = FLOWCHART_GROUP_GAP;
-    let mut cross_align = CrossAlign::Center;
-    let mut axis = Axis::Vertical;
-    let mut track_sizing = TrackSizing::Fit;
-
-    for attr in &diagram.attributes {
-        match attr.key.as_str() {
-            dsl::GROUP_ARRANGEMENT => {
-                if let Some(s) = attr.value.as_str() {
-                    axis = match s.trim().to_ascii_lowercase().as_str() {
-                        "horizontal" => Axis::Horizontal,
-                        // vertical 或其他：保持默认 Vertical
-                        _ => Axis::Vertical,
-                    };
-                }
-            }
-            dsl::GROUP_GAP => {
-                if let AttributeValue::Number(n) = &attr.value {
-                    if *n > 0.0 {
-                        gap = *n;
-                    }
-                }
-            }
-            dsl::GROUP_ALIGN => {
-                if let Some(s) = attr.value.as_str() {
-                    cross_align = match s.trim().to_ascii_lowercase().as_str() {
-                        "left" => CrossAlign::Start,
-                        "center" => CrossAlign::Center,
-                        _ => cross_align,
-                    };
-                }
-            }
-            dsl::GROUP_SIZING => {
-                if let Some(v) = attr.value.as_str() {
-                    if v.trim().to_ascii_lowercase() == "uniform" {
-                        track_sizing = TrackSizing::Equal;
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
     GroupFrameSpec {
-        arrangement: GroupArrangement::Stack { axis },
-        track_sizing,
-        cross_align,
-        gap,
+        arrangement: GroupArrangement::Stack {
+            axis: Axis::Vertical,
+        },
+        track_sizing: TrackSizing::Fit,
+        cross_align: CrossAlign::Center,
+        gap: FLOWCHART_GROUP_GAP,
         padding: GroupPadding::uniform(
             crate::layout::constants::SUGIYAMA_GROUP_PADDING,
             GROUP_LABEL_HEIGHT,
@@ -406,18 +438,6 @@ fn resolve_quantize(diagram: &Diagram) -> QuantizeSpec {
         step: DEFAULT_QUANTIZE_STEP,
         quantize_groups: enabled,
     }
-}
-
-/// 读取 diagram 属性 `group_sizing` 是否显式为 `uniform`（启用等宽条带）。
-fn diagram_group_sizing_is_uniform(diagram: &Diagram) -> bool {
-    for attr in &diagram.attributes {
-        if attr.key == dsl::GROUP_SIZING {
-            if let Some(v) = attr.value.as_str() {
-                return v.trim().to_ascii_lowercase() == "uniform";
-            }
-        }
-    }
-    false
 }
 
 

@@ -9,13 +9,13 @@
 
 import { Button, Tooltip, Space, Typography } from 'antd';
 import {
-  DownloadOutlined,
   CheckCircleFilled,
   ExclamationCircleFilled,
   LoadingOutlined,
   ThunderboltFilled,
   BookOutlined,
   GithubOutlined,
+  HomeOutlined,
 } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -25,8 +25,6 @@ interface TopBarProps {
   wasmReady: boolean;
   wasmError: string | null;
   isAgentRunning: boolean;
-  canExport: boolean;
-  onExport: () => void;
   onOpenDocs?: () => void;
 }
 
@@ -45,8 +43,6 @@ export function TopBar({
   wasmReady,
   wasmError,
   isAgentRunning,
-  canExport,
-  onExport,
   onOpenDocs,
 }: TopBarProps) {
   return (
@@ -99,6 +95,15 @@ export function TopBar({
       </div>
 
       <Space className="topbar-actions">
+        <Tooltip title="返回 Plotgram 主站">
+          <Button
+            type="text"
+            icon={<HomeOutlined />}
+            href="/"
+          >
+            主站
+          </Button>
+        </Tooltip>
         <Tooltip title="查看使用文档">
           <Button
             type="text"
@@ -115,15 +120,6 @@ export function TopBar({
             onClick={() => window.open('https://github.com/plotgram/plotgram', '_blank', 'noopener')}
           />
         </Tooltip>
-        <Button
-          type="primary"
-          icon={<DownloadOutlined />}
-          onClick={onExport}
-          disabled={!canExport}
-          className="topbar-export-btn"
-        >
-          导出 SVG
-        </Button>
       </Space>
     </div>
   );

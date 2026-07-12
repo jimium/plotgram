@@ -1,7 +1,9 @@
 //! 架构图专用布局 v2
 //!
-//! **有顶层分组时**：走 `two_phase` 模块（组内 Sugiyama → 组间宏观定位 → 坐标回填）。
-//! **无分组时**：走全局 Sugiyama 管线（`rank` → `order` → `coordinate` → `postprocess`）。
+//! **有顶层分组时**：走 `two_phase`（组内 hint 或 sugiyama_v2 → 组间宏观定位 → 坐标回填）。
+//! **无分组时**：走本目录全局 Sugiyama（`rank` → `order` → `coordinate`）；
+//! Phase 3 起组内复杂拓扑已委托 `sugiyama_v2::ARCHITECTURE_PRESET`，本目录 rank/order/coordinate
+//! **冻结扩展**（仅服务无顶层 group 路径与 hint 几何模式）。
 
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::{ArchitectureV2LayoutConfig, ARCHITECTURE_V2_LAYOUT_OPTIONS};

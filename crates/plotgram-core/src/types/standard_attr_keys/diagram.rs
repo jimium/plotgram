@@ -11,11 +11,12 @@ pub const TITLE: &str = "title";
 pub const LAYOUT: &str = "layout";
 /// 边路由算法选择
 pub const EDGE_ROUTING: &str = "edge_routing";
-/// Group Frame 统一配置块（spec §6.2 sugar）
+/// Group Frame 统一配置块（组间宏观几何的唯一 DSL 入口）
 ///
-/// 语法：`group_frame: stack { axis: horizontal, gap: 48, track: equal, cross: start, snap: 8 }`
-/// 旧属性（`group_sizing` / `group_arrangement` / `group_gap` / `group_align` / `snap`）保留为 sugar，
-/// 解析为同一 `GroupFrameSpec`。
+/// 语法：
+/// - 完整：`group_frame: stack { axis: horizontal, gap: 48, track: equal, … }`
+/// - 场景短名：`group_frame: strips` / `lanes` / `fit` / `stages` / `tiles`
+/// - 短名可覆盖：`group_frame: strips { gap: 60 }`
 pub const GROUP_FRAME: &str = "group_frame";
 
 // 解析策略：`parse_atom_attribute_value`
@@ -26,21 +27,6 @@ pub const DIRECTION: &str = "direction";
 pub const RENDER_STYLE: &str = "render_style";
 /// 主题
 pub const THEME: &str = "theme";
-/// 分组尺寸策略
-pub const GROUP_SIZING: &str = "group_sizing";
-
-// 值类型：Number
-
-/// 分治布局下 group 之间的间距（垂直堆叠时的垂直间距）
-pub const GROUP_GAP: &str = "group_gap";
-
-// 值类型：Atom
-
-/// 分治布局下 group 之间的对齐方式（center / left）
-pub const GROUP_ALIGN: &str = "group_align";
-
-/// 分治布局下 group 之间的排列方向（vertical / horizontal）
-pub const GROUP_ARRANGEMENT: &str = "group_arrangement";
 
 // 值类型：Boolean
 
@@ -49,3 +35,13 @@ pub const SNAP: &str = "snap";
 
 /// 节点结构对齐开关（rank/layer 轴独立控制，见 `align: rank | layer | full | false`）
 pub const ALIGN: &str = "align";
+
+/// 已移除的旧语法糖键（仅用于校验报错提示，请改用 [`GROUP_FRAME`]）。
+pub mod removed {
+    pub const GROUP_SIZING: &str = "group_sizing";
+    pub const GROUP_GAP: &str = "group_gap";
+    pub const GROUP_ALIGN: &str = "group_align";
+    pub const GROUP_ARRANGEMENT: &str = "group_arrangement";
+
+    pub const ALL: &[&str] = &[GROUP_SIZING, GROUP_GAP, GROUP_ALIGN, GROUP_ARRANGEMENT];
+}

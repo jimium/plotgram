@@ -313,8 +313,7 @@
 .preview-toolbar {
   position: absolute;
   bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 16px;
   padding: 4px 10px;
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid var(--color-border);

@@ -18,12 +18,13 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
-DEPLOY_HOST="${DEPLOY_HOST:-shanxun}"
+# Agent API 部署在 shanxun（与 CDN 同机），直接覆盖 common.sh 的默认值。
+# 注意：不能用 ${VAR:-default}，因为 common.sh 已经把这些变量设为 demo 站的默认值。
+DEPLOY_HOST="shanxun"
 REMOTE_SRC="${REMOTE_SRC:-/opt/plotgram}"
-REMOTE_DIR="${REMOTE_DIR:-/opt/plotgram-agent-api}"
+REMOTE_DIR="/opt/plotgram-agent-api"
 
 SKIP_SYNC=false
 SKIP_BUILD=false
@@ -52,16 +53,11 @@ while [[ $# -gt 0 ]]; do
     --setup-nginx)  SETUP_NGINX=true; shift ;;
     --dry-run)      DRY_RUN=true; shift ;;
     -h|--help)      usage; exit 0 ;;
-    *) echo "未知选项: $1" >&2; usage >&2; exit 1 ;;
+    *)              echo "未知选项: $1" >&2; usage >&2; exit 1 ;;
   esac
 done
 
-log()  { echo "▸ $*"; }
-die()  { echo "✗ $*" >&2; exit 1; }
-
-require_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "未找到命令: $1"
-}
+trap 'close_ssh_multiplexing "$DEPLOY_HOST"' EXIT
 
 # ─── 同步源码 ───────────────────────────────────────────
 sync_source() {
@@ -112,9 +108,9 @@ deploy_binary() {
 
   log "同步 start.sh / stop.sh / .env.example..."
   rsync -az \
-    "$SCRIPT_DIR/agent-api/start.sh" \
-    "$SCRIPT_DIR/agent-api/stop.sh" \
-    "$SCRIPT_DIR/agent-api/.env.example" \
+    "$DEPLOY_DIR/agent-api/start.sh" \
+    "$DEPLOY_DIR/agent-api/stop.sh" \
+    "$DEPLOY_DIR/agent-api/.env.example" \
     "$DEPLOY_HOST:$REMOTE_DIR/"
 
   # 首次部署：创建 .env（如不存在）
@@ -144,21 +140,18 @@ restart_service() {
   fi
 }
 
-# ─── 同步 nginx 配置 ───────────────────────────────────
-setup_nginx() {
-  log "同步 nginx 配置到 $DEPLOY_HOST ..."
-  scp "$SCRIPT_DIR/nginx/assets.pg.agcli.cn.conf" \
-      "$SCRIPT_DIR/nginx/api.pg.agcli.cn.conf" \
-      "$DEPLOY_HOST:/etc/nginx/conf.d/"
-  ssh "$DEPLOY_HOST" 'nginx -t && systemctl reload nginx && echo "✅ nginx 已重载"'
-}
-
 # ─── 主流程 ─────────────────────────────────────────────
 main() {
   log "=== 发布 Plotgram Agent API ==="
   log "  部署服务器: $DEPLOY_HOST"
   log "  源码目录:   $REMOTE_SRC"
   log "  部署目录:   $REMOTE_DIR"
+
+  setup_ssh_multiplexing "$DEPLOY_HOST"
+
+  if [[ "$SETUP_NGINX" == true ]]; then
+    sync_nginx "$DEPLOY_HOST" nginx/assets.pg.agcli.cn.conf nginx/api.pg.agcli.cn.conf
+  fi
 
   if [[ "$SKIP_SYNC" == false ]]; then
     sync_source
@@ -175,10 +168,6 @@ main() {
     build_remote
   else
     log "跳过编译"
-  fi
-
-  if [[ "$SETUP_NGINX" == true ]]; then
-    setup_nginx
   fi
 
   deploy_binary

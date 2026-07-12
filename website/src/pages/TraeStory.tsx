@@ -171,7 +171,7 @@ export default function TraeStory() {
           <h4>返回首页</h4>
           <span className="ql-arrow">→</span>
         </a>
-        <a href="/playground/" className="quick-link-card">
+        <a href="/playground/" className="quick-link-card" target="_blank" rel="noopener noreferrer">
           <div className="ql-icon">🎮</div>
           <h4>体验 Playground</h4>
           <span className="ql-arrow">→</span>

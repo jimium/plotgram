@@ -81,9 +81,19 @@ function fallbackDiag(message: string): DiagnosticErrorJson {
   };
 }
 
+export interface WasmRenderOptions {
+  theme_id?: string;
+  graphic_style?: string;
+  dark_mode?: boolean;
+  transparent_background?: boolean;
+  show_title?: boolean;
+}
+
 /** 渲染 SVG，返回单格式结果。 */
-export function renderSvg(wasm: PlotgramWasm, source: string): RenderResult {
-  const json = wasm.render(source, 'svg');
+export function renderSvg(wasm: PlotgramWasm, source: string, options?: WasmRenderOptions): RenderResult {
+  const json = options
+    ? wasm.render_with_options(source, 'svg', JSON.stringify(options))
+    : wasm.render(source, 'svg');
   return safeParse<RenderResult>(json, {
     success: false,
     format: 'svg',

@@ -1,41 +1,54 @@
 //! 顶层分组宽度策略：fit（内容贴合）与 uniform（等宽阶段条带）
+//!
+//! DSL 唯一入口：`group_frame: stack { track: fit | equal | uniform }`。
 
-use crate::ast::Diagram;
+use crate::ast::{AttributeValue, Diagram};
+use crate::types::standard_attr_keys::diagram;
 use std::collections::HashMap;
 
 /// 图级分组宽度策略
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GroupSizingPolicy {
-    /// 组宽 = 组内内容 + padding（默认）
+    /// 组宽 = 组内内容 + padding
     Fit,
-    /// 所有顶层 group 拉齐到最宽者，组内内容水平居中
+    /// 所有顶层 group 拉齐到最宽者，组内内容水平居中（默认）
     Uniform,
 }
 
-pub const VALID_GROUP_SIZING: &[&str] = crate::types::attr_constants::group_sizing::ALL;
-
-pub fn is_valid_group_sizing_atom(raw: &str) -> bool {
-    let normalized = raw.trim().to_ascii_lowercase();
-    crate::types::attr_constants::group_sizing::ALL.contains(&normalized.as_str())
+/// 从 `group_frame` 的 `track` 选项读取策略。
+///
+/// 默认 `Uniform`（同级条带，由 L1 GroupFramePass 拉齐）；
+/// 显式 `track: fit` 才退回内容贴合。two_phase 本身不再执行 Equal。
+pub fn parse_group_sizing(diagram: &Diagram) -> GroupSizingPolicy {
+    match diagram_group_frame_track(diagram) {
+        Some(t) => match t.trim().to_ascii_lowercase().as_str() {
+            "fit" => GroupSizingPolicy::Fit,
+            "equal" | "uniform" => GroupSizingPolicy::Uniform,
+            _ => GroupSizingPolicy::Uniform,
+        },
+        None => GroupSizingPolicy::Uniform,
+    }
 }
 
-/// 从 diagram 属性 `group_sizing` 读取策略。
-///
-/// Phase C：默认 `Fit`（内容贴合），避免窄组被最宽组横向拉空；
-/// 显式 `uniform` 才拉齐等宽条带。
-pub fn parse_group_sizing(diagram: &Diagram) -> GroupSizingPolicy {
+/// 读取 `group_frame { track: ... }` 的原始字符串（若有）。
+pub(crate) fn diagram_group_frame_track(diagram: &Diagram) -> Option<&str> {
     for attr in &diagram.attributes {
-        if attr.key == "group_sizing" {
-            if let Some(v) = attr.value.as_str() {
-                return match v.trim().to_ascii_lowercase().as_str() {
-                    "uniform" => GroupSizingPolicy::Uniform,
-                    "fit" => GroupSizingPolicy::Fit,
-                    _ => GroupSizingPolicy::Fit,
-                };
-            }
+        if attr.key != diagram::GROUP_FRAME {
+            continue;
+        }
+        if let AttributeValue::Config { options, .. } = &attr.value {
+            return options.get("track").and_then(|v| v.as_str());
         }
     }
-    GroupSizingPolicy::Fit
+    None
+}
+
+/// `group_frame { track: fit }` 是否显式要求内容贴合。
+pub(crate) fn diagram_group_frame_track_is_fit(diagram: &Diagram) -> bool {
+    matches!(
+        diagram_group_frame_track(diagram).map(|t| t.trim().to_ascii_lowercase()),
+        Some(t) if t == "fit"
+    )
 }
 
 /// 组块 trait：供 uniform 策略调整宽度（与 two_phase::MacroBlock 对齐）
@@ -85,6 +98,8 @@ pub fn apply_uniform_group_width<B: GroupWidthBlock>(
     }
 }
 
+/// Phase 1：Equal 已迁至 L1 GroupFramePass；本函数保留供显式/测试调用。
+#[allow(dead_code)]
 pub fn apply_group_sizing_policy<B: GroupWidthBlock>(
     policy: GroupSizingPolicy,
     top_group_ids: &[String],

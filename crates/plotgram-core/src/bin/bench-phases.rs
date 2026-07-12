@@ -91,16 +91,6 @@ fn main() {
             println!("  Nudge失败:    {}", ortho.nudge_failed);
         }
     }
-    if let Some(ref friendliness) = result.hints.friendliness_report {
-        println!();
-        println!("路由友好性: {:.2}", friendliness.score);
-        println!("  拥堵分数:     {}", friendliness.congestion_score);
-        println!("  长边分数:     {}", friendliness.long_edge_score);
-        println!("  间隙充足度:   {}", friendliness.gap_adequacy_score);
-        println!("  预测交叉:     {}", friendliness.predicted_crossings);
-        println!("  端口冲突:     {}", friendliness.port_conflict_score);
-    }
-
     println!();
     println!("═══════════════════════════════════════════");
     println!("基准测试完成");

@@ -16,7 +16,7 @@ pub struct RenderRequest<'a> {
     pub explicit_graphic_style: Option<GraphicStyleId>,
     pub scene_graphic_style: Option<GraphicStyleId>,
     pub dark_mode: bool,
-    /// 是否在 SVG 右下角输出 "powered by plotgram" 署名（默认开启）。
+    /// 是否在 SVG 右下角输出 "by Plotgram" 署名（默认开启）。
     pub attribution: bool,
     /// 是否在画布顶部绘制 DSL `title`（默认关闭；单独导出时可设为 true）。
     pub show_title: bool,
@@ -38,7 +38,7 @@ impl<'a> RenderRequest<'a> {
             explicit_graphic_style: None,
             scene_graphic_style: None,
             dark_mode: false,
-            attribution: true,
+            attribution: false, // TODO: 恢复署名时改回 true
             show_title: false,
             transparent_background: false,
             semantic_inference: true,

@@ -87,28 +87,31 @@ pub mod group_layout {
     pub const ALL: &[&str] = &[AUTO, HORIZONTAL, VERTICAL, FAN_OUT, FAN_IN, GRID];
 }
 
-/// 分组尺寸策略枚举值（diagram 级 `group_sizing` 属性）。
-pub mod group_sizing {
+/// `group_frame` 的 `track` 选项常用 atom（另接受 `equal` 与数字固定宽）。
+pub mod group_frame_track {
     pub const FIT: &str = "fit";
-    pub const UNIFORM: &str = "uniform";
+    pub const EQUAL: &str = "equal";
+    pub const UNIFORM: &str = "uniform"; // equal 别名
 
-    pub const ALL: &[&str] = &[FIT, UNIFORM];
+    pub const ALL: &[&str] = &[FIT, EQUAL, UNIFORM];
 }
 
-/// 分组对齐方式枚举值（diagram 级 `group_align` 属性）。
-pub mod group_align {
-    pub const CENTER: &str = "center";
-    pub const LEFT: &str = "left";
+/// `group_frame` 场景短名（展开为 stack/matrix 默认组合；仍可用 `{ … }` 覆盖单项）。
+///
+/// 与 arrangement 关键字 `stack` / `matrix` 并列；详见 guides/group-layout-and-frame.md。
+pub mod group_frame_preset {
+    /// 分层条带：水平等宽 + 居中 + 共线边框
+    pub const STRIPS: &str = "strips";
+    /// 内容贴合：水平堆叠、不拉等宽
+    pub const FIT: &str = "fit";
+    /// 水平泳道：水平堆叠、顶对齐、较大间距
+    pub const LANES: &str = "lanes";
+    /// 纵向阶段：垂直堆叠、内容贴合
+    pub const STAGES: &str = "stages";
+    /// 固定网格：默认 2×2 matrix + 等宽单元格
+    pub const TILES: &str = "tiles";
 
-    pub const ALL: &[&str] = &[CENTER, LEFT];
-}
-
-/// 分组排列方向枚举值（diagram 级 `group_arrangement` 属性）。
-pub mod group_arrangement {
-    pub const VERTICAL: &str = "vertical";
-    pub const HORIZONTAL: &str = "horizontal";
-
-    pub const ALL: &[&str] = &[VERTICAL, HORIZONTAL];
+    pub const ALL: &[&str] = &[STRIPS, FIT, LANES, STAGES, TILES];
 }
 
 /// 节点对齐模式枚举值（diagram 级 `align` 属性）。

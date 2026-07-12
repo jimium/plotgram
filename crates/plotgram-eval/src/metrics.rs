@@ -17,7 +17,7 @@ use plotgram_core::layout::{
     LintMetricsSummary, NodeLayout,
 };
 use plotgram_core::layout::refine::segment_intersects_node;
-use plotgram_core::layout::geometry::Point;
+use plotgram_core::layout::geometry::{Point, Rect};
 use std::collections::HashMap;
 
 /// 理想宽高比（用于偏离度计算）
@@ -858,12 +858,29 @@ fn aabb_gap(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)) -> f64 {
 
 /// 穿障预测数：对每条边用直线（center→center）检测穿过非端点节点的次数。
 ///
-/// 这是 bezier / straight 路由穿障的上界估计。
-///
-/// Phase 1.5：委托给 V1 评估器的 `crossing_predict::evaluate`，确保与评估器内部
-/// 度量一致（含 margin 膨胀 + slab 相交算法），避免校准基线错配。
+/// 这是 bezier / straight 路由穿障的上界估计（节点 AABB，无 margin 膨胀）。
 fn compute_predicted_crossings(diagram: &Diagram, result: &LayoutResult) -> usize {
-    plotgram_core::layout::friendliness::crossing_predict::evaluate(diagram, result).count
+    let mut count = 0;
+    for rel in &diagram.relations {
+        let (Some(from), Some(to)) = (
+            result.nodes.get(rel.from.as_str()),
+            result.nodes.get(rel.to.as_str()),
+        ) else {
+            continue;
+        };
+        let p1 = Point::new(from.x + from.width / 2.0, from.y + from.height / 2.0);
+        let p2 = Point::new(to.x + to.width / 2.0, to.y + to.height / 2.0);
+
+        for (node_id, nl) in &result.nodes {
+            if node_id == rel.from.as_str() || node_id == rel.to.as_str() {
+                continue;
+            }
+            if Rect::from(nl).intersects_segment(p1, p2, 0.0) {
+                count += 1;
+            }
+        }
+    }
+    count
 }
 
 /// 端口冲突度：对每个节点，按邻居方向预测边在哪一侧汇入，检查每侧 slot 容量。

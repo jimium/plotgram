@@ -166,6 +166,41 @@ mod tests {
     }
 
     #[test]
+    fn stress_nested_no_node_overlap() {
+        use crate::layout::lint::{lint_layout, LintMetricsSummary};
+
+        let source = include_str!(
+            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
+        );
+        let output = parse_prepare_validate(source, &StyleRequest::default());
+        let prepared = output.diagram.expect("valid diagram");
+        let diagram = prepared.inner();
+        let layout = compute_layout_with_plan(diagram, prepared.layout_plan())
+            .expect("layout");
+        let summary = LintMetricsSummary::from_report(&lint_layout(diagram, &layout));
+        assert_eq!(
+            summary.node_overlap, 0,
+            "unexpected node overlaps in stress-nested layout"
+        );
+        let a = layout.nodes.get("db_master").expect("db_master");
+        let b = layout.nodes.get("db_replica").expect("db_replica");
+        let gap = if a.x <= b.x {
+            b.x - (a.x + a.width)
+        } else {
+            a.x - (b.x + b.width)
+        };
+        // 「主从同步」标签约 52px 宽，间距必须能放下边+label
+        assert!(
+            gap >= 52.0,
+            "db_master/db_replica gap too tight for edge label: gap={gap:.1} a=({:.1},w={:.1}) b=({:.1},w={:.1})",
+            a.x,
+            a.width,
+            b.x,
+            b.width
+        );
+    }
+
+    #[test]
     fn stress_nested_has_no_sibling_group_overlap() {
         use crate::layout::lint::{lint_layout, LintMetricsSummary};
 

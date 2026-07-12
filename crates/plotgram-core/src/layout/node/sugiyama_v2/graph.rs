@@ -1,4 +1,4 @@
-use crate::ast::Diagram;
+use crate::ast::{ArrowType, Diagram};
 use crate::layout::node::common::acyclic;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
@@ -39,7 +39,8 @@ pub(super) struct ProperLayerGraph {
 
 /// 构建 diagram 的有向图。
 ///
-/// - 真实边：`EdgeMeta { reversible: true }`
+/// - 主动边（非 `Passive`）：`EdgeMeta { reversible: true }`
+/// - `Passive`（`-->`）：不参与分层/去环/排序，仅由路由绘制（与 architecture 一致）
 /// - DSL `constrain` 边（若有）：`EdgeMeta { reversible: false }`，由调用方经
 ///   [`inject_irreversible_edges`] 注入，FAS 不会反转它们。
 pub(super) fn build_graph(diagram: &Diagram) -> DiGraph<String, EdgeMeta> {
@@ -52,6 +53,9 @@ pub(super) fn build_graph(diagram: &Diagram) -> DiGraph<String, EdgeMeta> {
     }
 
     for relation in &diagram.relations {
+        if relation.arrow == ArrowType::Passive {
+            continue;
+        }
         if let (Some(from), Some(to)) = (index.get(relation.from.as_str()), index.get(relation.to.as_str())) {
             graph.add_edge(*from, *to, EdgeMeta { reversible: true });
         }

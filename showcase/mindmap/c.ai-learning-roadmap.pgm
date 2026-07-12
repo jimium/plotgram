@@ -3,6 +3,9 @@
 // Mermaid 对照: 复杂 mindmap 多层级知识树
 diagram mindmap {
     title: "AI 学习路线"
+    config {
+        direction: radial
+    }
 
     entity[root] ai_roadmap "AI 学习路线"
 
@@ -34,33 +37,33 @@ diagram mindmap {
     entity[branch] deploy "模型部署"
     entity[branch] projects "项目实战"
 
-    ai_roadmap -> math "基础"
-    ai_roadmap -> ml "核心"
-    ai_roadmap -> dl "进阶"
-    ai_roadmap -> practice "落地"
+    ai_roadmap -> math
+    ai_roadmap -> ml
+    ai_roadmap -> dl
+    ai_roadmap -> practice
 
-    math -> linear_algebra "矩阵运算"
-    math -> calculus "求导与梯度"
-    math -> probability "贝叶斯"
-    math -> optimization "凸优化"
+    math -> linear_algebra
+    math -> calculus
+    math -> probability
+    math -> optimization
 
-    ml -> supervised "回归/分类"
-    ml -> unsupervised "聚类/降维"
-    ml -> feature_eng "数据预处理"
-    ml -> model_eval "交叉验证"
+    ml -> supervised
+    ml -> unsupervised
+    ml -> feature_eng
+    ml -> model_eval
 
-    feature_eng -> fe_encoding "独热/Label编码"
-    feature_eng -> fe_selection "过滤/包裹/嵌入"
-    feature_eng -> fe_scale "MinMax/标准分数"
-    feature_eng -> fe_extraction "PCA/LDA"
+    feature_eng -> fe_encoding
+    feature_eng -> fe_selection
+    feature_eng -> fe_scale
+    feature_eng -> fe_extraction
 
-    dl -> cnn "图像处理"
-    dl -> rnn "序列建模"
-    dl -> transformer "注意力机制"
-    dl -> gan "数据生成"
+    dl -> cnn
+    dl -> rnn
+    dl -> transformer
+    dl -> gan
 
-    practice -> frameworks "PyTorch/TF"
-    practice -> mlops "实验管理"
-    practice -> deploy "ONNX/TensorRT"
-    practice -> projects "Kaggle/竞赛"
+    practice -> frameworks
+    practice -> mlops
+    practice -> deploy
+    practice -> projects
 }

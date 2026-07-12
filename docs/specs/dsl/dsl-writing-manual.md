@@ -285,9 +285,24 @@ api -> cache
 
 | 属性 | 可选值 | 说明 |
 | --- | --- | --- |
-| `layout` | `auto`, `horizontal`, `vertical`, `fan-out` | 组内布局（简写 `h`/`v`，别名 `fan_out`/`fanout`） |
+| `layout` | `auto`, `horizontal`, `vertical`, `fan-out`, `fan-in`, `grid` | 组内布局 hint（L2）；见下表 |
 | `border_style` | `solid`, `dashed`, `dotted` | 边框线型 |
 | `color` | 任意字符串 | 背景色标签 |
+
+`layout` 取值（与 `attr_constants::group_layout` 一致；**仅 architecture 两阶段布局读取**）：
+
+| 值 | 别名 | 适用 |
+| --- | --- | --- |
+| `auto` | （默认） | 按组内拓扑推断：fan-out / fan-in / grid / 竖链 / Sugiyama |
+| `horizontal` | `h` | 同级组件横排（约 3～5 个） |
+| `vertical` | `v` | 短链、存储栈竖排 |
+| `fan-out` | `fan_out`, `fanout` | 单枢纽 → 多下游（网关 / Agent） |
+| `fan-in` | `fan_in`, `fanin` | 多源 → 单汇 |
+| `grid` | — | 无内部边的同质节点矩阵（如多库并排） |
+
+组间宏观几何（等宽条带、间距等）用 diagram 级 **`group_frame` 唯一入口**，不是 group 属性。见 [§6.6](#66-group_frame-统一配置块推荐) 与 [group-layout-and-frame 详解](../../guides/group-layout-and-frame.md)。
+
+> 各 `layout` / `group_frame` 选项的能力与用途见 **[group-layout-and-frame.md](../../guides/group-layout-and-frame.md)**。
 
 ### 5.4 Group 约束
 
@@ -323,15 +338,11 @@ diagram flowchart {
 
     config {
         direction: left-to-right
-        layout: sugiyama-v2 { friendliness: adjust }
+        layout: sugiyama-v2
         edge_routing: orthogonal
         theme: common.clean-light
         render_style: excalidraw
-        group_frame: stack {
-            axis: horizontal
-            gap: 40
-            track: equal
-        }
+        group_frame: strips { gap: 40 }
     }
 
     ...
@@ -342,18 +353,14 @@ diagram flowchart {
 
 | 属性 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `direction` | atom | 由图表类型 profile 决定 | `top-to-bottom` / `left-to-right` / `radial`；仅 flowchart/er/sugiyama 支持 tb+lr，mindmap 支持 radial+tb+lr；其他布局不支持 direction |
-| `layout` | atom/config | 由图表类型决定 | 布局算法，可带配置块；支持 `friendliness: off/diagnose/adjust`（默认 `adjust`） |
+| `direction` | atom | 由图表类型 profile 决定 | `top-to-bottom` / `left-to-right` / `radial`；**仅** flowchart / er / sugiyama(-v2) 支持 tb+lr，mindmap 支持 radial+tb+lr；**architecture / sequence / state / circular / force-directed 不支持**，声明会报错 |
+| `layout` | atom/config | 由图表类型决定 | 布局算法，可带配置块 |
 | `edge_routing` | atom/config | 由图表类型决定 | 边路由算法，可带配置块 |
 | `theme` | atom | 由 profile 决定 | 主题 ID，如 `common.clean-light`、`common.blueprint`、`mindmap.vivid-branches` |
 | `render_style` | atom | `standard` | `standard` / `excalidraw` / `cross-hatch` / `blueprint` / `spatial-clarity` / `neon-glow` / `stipple` |
-| `group_frame` | atom/config | 由算法默认决定 | **[推荐]** Group Frame 统一配置块，统一控制组间排列/尺寸/对齐/间距/量化 |
-| `group_sizing` | atom | `fit` | 顶层分组宽度策略（`group_frame` sugar，建议用 `group_frame`） |
-| `snap` | boolean | `true` | 边路由后像素量化（`group_frame` sugar，建议用 `group_frame` 的 `snap` 选项） |
+| `group_frame` | atom/config | 由算法默认决定 | Group Frame：**组间几何唯一入口**；优先场景短名 `strips`/`fit`/`lanes`/`stages`/`tiles` |
+| `snap` | boolean | `true` | 边路由后像素量化（也可写在 `group_frame { snap: … }`） |
 | `align` | boolean / atom | `true` | 节点结构对齐（L3）：`false`/`off`、`rank`、`layer`、`full`；见 §6.7 |
-| `group_arrangement` | atom | `vertical` | group 间排列方向（`group_frame` sugar，建议用 `group_frame: stack { axis: ... }`） |
-| `group_gap` | number | `60` | group 间距像素（`group_frame` sugar，建议用 `group_frame` 的 `gap` 选项） |
-| `group_align` | atom | `center` | group 间对齐方式（`group_frame` sugar，建议用 `group_frame` 的 `cross` 选项） |
 
 ### 6.4 布局算法选项
 
@@ -361,20 +368,15 @@ diagram flowchart {
 
 | 值 | 说明 | 常用 option |
 | --- | --- | --- |
-| `flowchart` | **流程图专属分层布局（默认）**；共享 sugiyama-v2 引擎 | `group_padding`, `friendliness` |
-| `er` | **ER 图专属分层布局**；共享 sugiyama-v2 引擎 | `group_padding`, `friendliness` |
+| `flowchart` | **流程图专属分层布局（默认）**；共享 sugiyama-v2 引擎 | `group_padding` |
+| `er` | **ER 图专属分层布局**；共享 sugiyama-v2 引擎 | `group_padding` |
 | `state` | **状态图专属布局**；共享 circular 引擎 | `group_padding`, `padding`, `component_gap` |
 | `architecture` | **架构图分组分层布局（默认）** | `group_padding`, `padding` |
 | `mindmap` | 思维导图布局（默认） | `padding`, `level_gap`, `branch_gap`, `node_gap`, `center_gap` |
 | `sequence` | 时序图布局（不支持 edge_routing） | `group_padding`, `node_spacing`, `message_spacing` |
-| `sugiyama-v2` | 通用 Sugiyama 分层布局（高级选项） | `group_padding`, `friendliness` |
+| `sugiyama-v2` | 通用 Sugiyama 分层布局（高级选项） | `group_padding` |
 | `force-directed` | 分组感知力导向布局 | `group_padding`, `padding`, `component_gap` |
 | `circular` | 自适应圆形布局 | `group_padding`, `padding`, `component_gap` |
-
-**friendliness 模式：**
-- `off`：关闭路由友好度评估
-- `diagnose`：仅诊断并报告问题，不调整
-- `adjust`（默认）：诊断并自动调整路由
 
 ### 6.5 边路由算法选项
 
@@ -393,18 +395,32 @@ diagram flowchart {
 
 > **时序图**（`diagram sequence`）不支持 `edge_routing`；消息路径由布局阶段生成。
 
-### 6.6 `group_frame` 统一配置块（推荐）
+### 6.6 `group_frame` 统一配置块
 
-`group_frame` 是组间宏观几何的统一配置入口，将原分散的 `group_sizing`、`group_arrangement`、`group_gap`、`group_align`、`snap` 整合为一个配置块。旧属性仍可使用（语法糖），新代码推荐直接使用 `group_frame`。
+`group_frame` 是组间宏观几何的**唯一** DSL 入口。旧属性 `group_sizing` / `group_arrangement` / `group_gap` / `group_align` **已移除**，声明会报错。
 
-**`stack` 一维堆叠排列（最常用）：**
+> **按场景选用 + rank 说明**：[group-layout-and-frame.md](../../guides/group-layout-and-frame.md)（§1 解释 architecture 为何常是「上→下」）
+
+**场景短名（优先使用）：**
+
+| 短名 | 场景 | 展开要点 |
+| --- | --- | --- |
+| `strips` | 分层条带 | 等宽 + 居中 + 共线；architecture 层间仍上→下（见 group-layout §1） |
+| `fit` | 内容贴合 | 不拉等宽 |
+| `lanes` | 水平泳道 | 水平并排 + 顶对齐 + `gap: 80` |
+| `stages` | 纵向阶段 | 垂直堆叠 + 内容贴合 |
+| `tiles` | 固定网格 | 默认 2×2 matrix + 等宽 |
+
+短名可覆盖单项：`group_frame: strips { gap: 60 }`、`group_frame: tiles { cols: 3 }`。
+
+**`stack` 一维堆叠排列（完整写法）：**
 
 | 选项 | 类型 | 可选值 | 默认值 | 说明 |
 | --- | --- | --- | --- | --- |
 | `axis` | atom | `horizontal` / `h`, `vertical` / `v` | 由算法决定 | 堆叠轴方向 |
-| `gap` | number | 正数 | 60 (flowchart) / 50 (architecture) | 组间净间距（像素） |
-| `track` | atom/number | `fit`, `equal`/`uniform`, 固定数值 | `fit` | 主轴尺寸策略；`equal` 同级等宽/等高 |
-| `cross` | atom | `start`/`left`, `center`, `end`/`right`, `stretch` | `center` (flowchart) / `start` (architecture) | 交叉轴对齐方式 |
+| `gap` | number | 正数 | ~48 (flowchart) / ~40 (architecture) | 组间净间距（像素） |
+| `track` | atom/number | `fit`, `equal`/`uniform`, 固定数值 | architecture 默认 `equal`；flowchart 默认 `fit` | 主轴尺寸策略；`equal` 同级等宽/等高 |
+| `cross` | atom | `start`/`left`, `center`, `end`/`right`, `stretch` | `center` | 交叉轴对齐方式 |
 | `border` | atom | `none`, `shared`/`shared_lines` | `none` (flowchart) / `shared` (architecture) | 边框共线策略 |
 | `snap` | boolean/number | `true`, `false`, 步长数值 | `true` (步长 8px) | 像素量化开关/步长 |
 
@@ -414,13 +430,7 @@ diagram flowchart {
 diagram architecture {
     title: "微服务架构"
     config {
-        group_frame: stack {
-            axis: horizontal
-            gap: 50
-            track: equal
-            cross: start
-            border: shared
-        }
+        group_frame: strips { gap: 50 }
     }
     // ...
 }
@@ -432,11 +442,7 @@ diagram architecture {
 diagram flowchart {
     title: "CI/CD 流水线"
     config {
-        group_frame: stack {
-            axis: vertical
-            gap: 80
-            cross: center
-        }
+        group_frame: stages
     }
     // ...
 }
@@ -448,11 +454,7 @@ diagram flowchart {
 diagram flowchart {
     title: "订单处理泳道"
     config {
-        group_frame: stack {
-            axis: horizontal
-            gap: 40
-            cross: center
-        }
+        group_frame: lanes
     }
     // ...
 }
@@ -467,7 +469,7 @@ diagram flowchart {
 | `align` | 路由**前** | 节点坐标 | rank/layer 轴结构修正 |
 | `snap` | 路由**后** | 边折线、组框 | 像素量化，不改拓扑 |
 
-**不要与 `group_align` 混淆**：`group_align` 是 group 框之间的对齐（L1）；`align` 是节点对齐（L3）。
+**不要与 `group_frame` 的 `cross` 混淆**：`cross` 是 group 框之间的对齐（L1）；`align` 是节点对齐（L3）。
 
 #### 取值速查
 
@@ -622,7 +624,7 @@ diagram flowchart {
     title: "用户登录决策"
     config {
         direction: top-to-bottom
-        layout: flowchart { friendliness: adjust }
+        layout: flowchart
     }
 
     entity[start] start "开始"
@@ -662,12 +664,9 @@ diagram architecture {
     title: "微服务架构"
     config {
         render_style: blueprint
-        group_frame: stack {
-            axis: horizontal
-            track: equal
+        group_frame: strips {
             gap: 50
             cross: start
-            border: shared
         }
         edge_routing: orthogonal
     }
@@ -797,11 +796,7 @@ diagram mindmap {
 diagram flowchart {
     title: "订单处理泳道"
     config {
-        group_frame: stack {
-            axis: horizontal
-            gap: 40
-            cross: center
-        }
+        group_frame: lanes
     }
 
     group customer "客户" {
@@ -986,16 +981,25 @@ config {
     direction: from_center
 }
 
-// ✗ 错误：sequence 不支持 direction
-diagram sequence {
+// ✗ 错误：sequence / architecture 等不支持 direction
+diagram architecture {
     config {
         direction: left-to-right
     }
 }
 
 // ✓ 正确：flowchart 支持 direction
-config {
-    direction: top-to-bottom
+diagram flowchart {
+    config {
+        direction: top-to-bottom
+    }
+}
+
+// ✓ 正确：架构图用 group_frame 控制组间左右排（不是 direction）
+diagram architecture {
+    config {
+        group_frame: strips
+    }
 }
 ```
 
@@ -1059,7 +1063,7 @@ config {
 - [ ] 所有 entity ID 小写 + 下划线，不含连字符
 - [ ] 所有 entity 在 relation 引用前已声明
 - [ ] `type` 值在当前图表类型的允许范围内
-- [ ] `direction` 值为 `top-to-bottom` / `left-to-right` / `radial`，且当前布局支持 direction
+- [ ] 若写了 `direction`：值为 `top-to-bottom` / `left-to-right` / `radial`，且当前布局支持（architecture / sequence / state 等**不要**写 `direction`；架构图组间左右排用 `group_frame`）
 - [ ] `status` 值为 `healthy` / `degraded` / `down` / `unknown`
 - [ ] `border_style` 值为 `solid` / `dashed` / `dotted`
 - [ ] group 嵌套不超过 2 层
@@ -1068,5 +1072,5 @@ config {
 - [ ] 引用边样式用 `line_style: <name>`（不是 `edge_style: <name>`）
 - [ ] `node_style` 的 selector 是当前图表类型支持的 entity type
 - [ ] 主题 ID 使用 `common.` 前缀（如 `common.clean-light`）
-- [ ] 组间排列优先使用 `group_frame` 配置块（而非旧的 `group_sizing`/`group_arrangement` 等）
+- [ ] 组间排列只使用 `group_frame`（优先场景短名 `strips`/`fit`/`lanes`/`stages`/`tiles`；勿再写已移除的 `group_sizing` 等）
 - [ ] 边密集的图可增大 `slot_pitch` 或依赖 orthogonal 的 lane 分离

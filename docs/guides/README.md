@@ -31,7 +31,7 @@
 |------|------|
 | [layout-lint.md](layout-lint.md) | LayoutLint — 布局静态质量检查 |
 | [layout-intent.md](layout-intent.md) | Layout Intent 快速入门 |
-| [group-frame.md](group-frame.md) | Group Frame — 组间等宽、对齐与矩阵排列 |
+| [group-layout-and-frame.md](group-layout-and-frame.md) | Group `layout` + Group Frame；含 architecture macro rank 与场景短名 |
 | [theme-and-style.md](theme-and-style.md) | Theme 与 Graphic Style |
 | [svg-debug.md](svg-debug.md) | SVG `data-dfy-*` 调试元数据 |
 
@@ -48,7 +48,7 @@
 **布局 / 路由开发**
 
 1. [layout-lint.md](layout-lint.md)
-2. [group-frame.md](group-frame.md)
+2. [group-layout-and-frame.md](group-layout-and-frame.md)
 3. [plotgram-eval.md](plotgram-eval.md)
 4. [layout-intent.md](layout-intent.md) → [完整 Intent 文档](../architecture/intent/layout-intent-usage.md)
 

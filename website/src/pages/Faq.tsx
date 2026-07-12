@@ -19,7 +19,7 @@ export default function Faq() {
       <div className="faq-list">
         <div className="faq-item">
           <h3><span className="q">Q</span>Plotgram 和 Mermaid 有什么区别？为什么不直接在 Mermaid 基础上改进？</h3>
-          <p>核心区别是设计目标不同。Mermaid 为人类手写设计，语法有大量变体和隐式规则，这导致 LLM 生成正确率约 70%；Plotgram 从零为 AI 生成设计，语法极简（只有3种箭头）、无隐式规则、结构化错误反馈、AST 一等公民支持，AI 生成正确率达 95%+。Mermaid 的语法包袱太重，在其基础上修修补补无法解决根本问题。</p>
+          <p>核心区别是设计目标不同。Mermaid 为人类手写设计，语法有大量变体和隐式规则，LLM 容易写错且出错后难以自修复；Plotgram 从零为 AI 生成设计——语法极简（只有 3 种箭头）、无隐式规则、结构化错误反馈（JSON 含行列位置和修复建议）、AST 一等公民支持增量修改。Mermaid 的语法包袱太重，在其基础上修修补补无法解决根本问题。</p>
         </div>
         <div className="faq-item">
           <h3><span className="q">Q</span>Plotgram 支持哪些图表类型？</h3>

@@ -4,9 +4,11 @@ diagram flowchart {
     title: "跨部门订单处理（泳道图）"
     config {
         direction: top-to-bottom
-        group_arrangement: horizontal
-        group_align: left
-        group_gap: 80
+        group_frame: stack {
+            axis: horizontal
+            cross: start
+            gap: 80
+        }
     }
 
     group customer "客户" {

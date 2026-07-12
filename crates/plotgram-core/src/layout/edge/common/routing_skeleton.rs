@@ -11,6 +11,7 @@
 
 use crate::ast::{Diagram, Relation};
 use crate::layout::geometry::Point;
+use crate::types::DiagramType;
 use crate::layout::{
     edge_point, EdgeLayout, GroupLayout, LayoutResult, NodeLayout, Port,
 };
@@ -130,8 +131,13 @@ pub fn resolve_endpoints(
 pub fn finalize_edges(
     mut result: LayoutResult,
     mut edges: Vec<EdgeLayout>,
-    _diagram: &Diagram,
+    diagram: &Diagram,
 ) -> LayoutResult {
+    if matches!(diagram.diagram_type, DiagramType::Mindmap) {
+        for edge in &mut edges {
+            edge.labels.clear();
+        }
+    }
     resolve_label_overlaps(&mut edges, &result.nodes, &result.groups);
     result.edges = edges;
     result
@@ -326,5 +332,59 @@ mod tests {
         }];
         result = finalize_edges(result, edges, &diagram);
         assert_eq!(result.edges.len(), 1);
+    }
+
+    #[test]
+    fn finalize_edges_strips_labels_for_mindmap() {
+        use crate::layout::{EdgeLayout, PathGeometry};
+        let span = Span::dummy();
+        let diagram = Diagram {
+            diagram_type: DiagramType::Mindmap,
+            attributes: Vec::new(),
+            entities: vec![Entity {
+                id: Identifier::new_unchecked("a"),
+                label: "a".to_string(),
+                attributes: AttributeMap::default(),
+                group_id: None,
+                span,
+            }],
+            relations: vec![Relation {
+                from: Identifier::new_unchecked("a"),
+                to: Identifier::new_unchecked("b"),
+                arrow: ArrowType::Active,
+                label: Some("ignored".to_string()),
+                head_label: Some("head".to_string()),
+                tail_label: Some("tail".to_string()),
+                attributes: AttributeMap::default(),
+                span,
+            }],
+            groups: Vec::new(),
+            constraints: vec![],
+            style_decls: vec![],
+            source_info: SourceInfo {
+                file: None,
+                line_count: 1,
+            },
+            ..Default::default()
+        };
+        let mut result = LayoutResult {
+            nodes: HashMap::new(),
+            groups: HashMap::new(),
+            edges: vec![],
+            total_width: 100.0,
+            total_height: 100.0,
+            hints: Default::default(),
+        };
+        let edges = vec![EdgeLayout {
+            geometry: PathGeometry::Straight {
+                start: Point::new(0.0, 0.0),
+                end: Point::new(100.0, 0.0),
+            },
+            labels: vec![crate::layout::EdgeLabelLayout::new("mid", Point::new(50.0, 0.0))],
+            from_port: Port::Right,
+            to_port: Port::Left,
+        }];
+        let result = finalize_edges(result, edges, &diagram);
+        assert!(result.edges[0].labels.is_empty());
     }
 }

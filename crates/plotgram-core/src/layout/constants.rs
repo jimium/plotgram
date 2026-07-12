@@ -40,7 +40,7 @@ pub const DEFAULT_OBSTACLE_PADDING: f64 = 8.0;
 /// 默认最小分离距离
 pub const DEFAULT_MIN_SEPARATION: f64 = 2.0;
 
-/// orthogonal 路由 slot 磁吸点间距（orthogonal 路由与 friendliness/port_conflict 共享）
+/// orthogonal 路由 slot 磁吸点间距（orthogonal 路由与 port 容量估算共享）
 pub const ORTHO_SLOT_PITCH: f64 = 40.0;
 
 /// orthogonal 路由平行边重叠判定阈值（flowchart 默认；refine/segments_conflict 等共享）
@@ -69,8 +69,9 @@ pub const DEFAULT_ASCII_CHAR_WIDTH: f64 = 6.5;
 /// 默认标签位置迭代次数上限
 pub const DEFAULT_MAX_LABEL_ITERATIONS: usize = 5;
 
-/// 引线触发阈值：标签中心到边路径距离超过此值时绘制引线
-pub const DEFAULT_LEADER_LINE_THRESHOLD: f64 = 4.0;
+/// 引线最小可见长度：标签包围框边缘到路径锚点的距离。
+/// 短于此值的引线几乎看不出归属，省略不画。
+pub const DEFAULT_LEADER_LINE_MIN_LENGTH: f64 = 12.0;
 
 // ─── 算法专用常量 ──────────────────────────────────────
 
@@ -87,12 +88,14 @@ pub const WIDE_PADDING: f64 = DEFAULT_PADDING;
 /// Force-directed-fr 默认节点宽度（比标准值略窄，适配散布布局）
 pub const FR_NODE_WIDTH: f64 = 156.0;
 
-/// 思维导图布局默认间距
+/// 思维导图布局默认间距（对齐 XMind / ProcessOn 的紧凑密度）
 pub const MINDMAP_PADDING: f64 = WIDE_PADDING;
-pub const MINDMAP_LEVEL_GAP: f64 = 200.0;
-pub const MINDMAP_BRANCH_GAP: f64 = 70.0;
-pub const MINDMAP_NODE_GAP: f64 = 22.0;
-pub const MINDMAP_CENTER_GAP: f64 = 100.0;
+/// 层级中心距：约等于「半个节点宽 + 间隙」，保证同侧父子不重叠
+pub const MINDMAP_LEVEL_GAP: f64 = 120.0;
+pub const MINDMAP_BRANCH_GAP: f64 = 22.0;
+pub const MINDMAP_NODE_GAP: f64 = 16.0;
+/// 根到一级分支中心的额外间距（不含 root 半宽）；需 ≥ 半个 main 宽 + node_gap
+pub const MINDMAP_CENTER_GAP: f64 = 96.0;
 
 /// 时序图布局默认间距
 pub const SEQUENCE_NODE_SPACING: f64 = 80.0;

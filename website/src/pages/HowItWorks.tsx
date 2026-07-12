@@ -183,7 +183,7 @@ export default function HowItWorks() {
           <p>了解 Plotgram 的开发历程和经验</p>
           <span className="ql-arrow">→</span>
         </a>
-        <a href="/playground/" className="quick-link-card">
+        <a href="/playground/" className="quick-link-card" target="_blank" rel="noopener noreferrer">
           <div className="ql-icon">🎮</div>
           <h4>立即试用 Playground</h4>
           <p>在线体验 Plotgram 图表渲染</p>

@@ -9,7 +9,11 @@ use crate::render::paint::svg_utils::{label_weight, FONT_SIZE};
 use crate::render::color_queries::{entity_label_font_size, entity_text_fill};
 use crate::render::visual::{NodeShape, NodeStyle};
 use crate::render::CompiledRenderContext;
+use crate::theme::compile::darken;
 use crate::types::DiagramType;
+
+/// 图标颜色加深比例：取节点边框色后向黑色混合 15%。
+const ICON_DARKEN_AMOUNT: f64 = 0.15;
 
 /// 绘制带标签/图标的节点（使用 scene 已物化的样式）。
 pub fn paint_labeled_node(
@@ -22,6 +26,7 @@ pub fn paint_labeled_node(
     svg: &mut String,
 ) {
     let text_color = entity_text_fill(entity, diagram_type, context, "#333");
+    let icon_color = darken(&style.stroke, ICON_DARKEN_AMOUNT);
     let font_size = entity_label_font_size(entity, diagram_type, context, FONT_SIZE);
 
     let shape_svg = style.shape.render_with_context(
@@ -42,6 +47,7 @@ pub fn paint_labeled_node(
         layout.height,
         style.shape.clone(),
         &text_color,
+        &icon_color,
         font_size,
         label_weight(style, label_weight_default),
         &context.icon_resolve,
@@ -70,6 +76,7 @@ pub fn paint_rect_header(
     writeln!(svg, "{shape_svg}").unwrap();
 
     let text_color = entity_text_fill(entity, diagram_type, context, "#333");
+    let icon_color = darken(&style.stroke, ICON_DARKEN_AMOUNT);
     let font_size = entity_label_font_size(entity, diagram_type, context, 12.0);
     let content = render_entity_content(
         entity,
@@ -79,6 +86,7 @@ pub fn paint_rect_header(
         node_layout.height,
         shape,
         &text_color,
+        &icon_color,
         font_size,
         label_weight(style, "500"),
         &context.icon_resolve,

@@ -891,9 +891,8 @@
     .lightbox-toolbar {
       position: absolute;
       bottom: 24px;
-      left: 50%;
+      right: 24px;
       z-index: 2;
-      transform: translateX(-50%);
       display: flex;
       gap: 8px;
       user-select: none;
@@ -918,6 +917,7 @@
 
     .lightbox-toolbar .zoom-pct {
       padding: 6px 12px;
+      border: 0;
       border-radius: 999px;
       background: rgba(255, 255, 255, 0.16);
       color: rgba(255, 255, 255, 0.75);
@@ -928,6 +928,12 @@
       align-items: center;
       min-width: 48px;
       justify-content: center;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .lightbox-toolbar .zoom-pct:hover {
+      background: rgba(255, 255, 255, 0.28);
     }
 
     /* 详情视图：全宽开关 */
@@ -1126,7 +1132,9 @@
     <section class="workspace">
       <aside class="sidebar">
         <div class="sidebar-header">
-          <img class="brand-logo" src="assets/brand/logo-icon-32.svg" width="26" height="26" alt="Plotgram" />
+          <a href="/" title="返回 Plotgram 主站" style="display:flex;align-items:center;gap:10px;">
+            <img class="brand-logo" src="assets/brand/logo-icon-32.svg" width="26" height="26" alt="Plotgram" />
+          </a>
           <div class="brand-text">
             <strong>Plotgram Showcase</strong>
             <span id="topbarStats">加载中...</span>
@@ -1174,6 +1182,7 @@
           <div class="sidebar-foot">
             <button class="sidebar-btn primary" id="scrollFeatured" type="button">精选示例</button>
             <button class="sidebar-btn" id="resetFilters" type="button">重置筛选</button>
+            <a class="sidebar-btn" href="/" title="返回 Plotgram 主站" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">主站</a>
           </div>
         </div>
       </aside>
@@ -1254,7 +1263,7 @@
     <img id="lightboxImg" alt="" />
     <div class="lightbox-toolbar">
       <button id="lbZoomOut" aria-label="缩小">−</button>
-      <span class="zoom-pct" id="lbZoomPct">100%</span>
+      <button class="zoom-pct" id="lbZoomPct" aria-label="重置为 100%">100%</button>
       <button id="lbZoomIn" aria-label="放大">+</button>
       <button id="lbZoomFit" aria-label="适应屏幕">适应</button>
       <button id="lbZoom1" aria-label="原始大小">1:1</button>
@@ -1271,7 +1280,8 @@
       const isSvg = path.endsWith(".svg");
       const cacheBust = BUILD_HASH && !BUILD_HASH.includes("{{") ? BUILD_HASH : "";
       const suffix = cacheBust && isSvg ? `?v=${cacheBust}` : "";
-      if (!CDN_BASE) return path + suffix;
+      // 只有 SVG 走 CDN,其他资源(.pgm / .json 等)走 demo 站相对路径
+      if (!CDN_BASE || !isSvg) return path + suffix;
       const normalized = path.startsWith("/") ? path.slice(1) : path;
       return `${CDN_BASE}showcase/${normalized}${suffix}`;
     }
@@ -2035,8 +2045,16 @@
 
     lightbox.addEventListener("wheel", (e) => {
       e.preventDefault();
-      const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
-      lbZoom(e.clientX, e.clientY, factor);
+      if (e.ctrlKey) {
+        // pinch zoom：以光标为中心缩放
+        const factor = Math.exp(-e.deltaY * 0.01);
+        lbZoom(e.clientX, e.clientY, factor);
+      } else {
+        // 普通滚动：平移画面
+        lbPanX -= e.deltaX;
+        lbPanY -= e.deltaY;
+        lbApplyTransform();
+      }
     }, { passive: false });
 
     lightbox.addEventListener("pointerdown", (e) => {
@@ -2089,6 +2107,15 @@
       lbFitToScreen();
     });
     lbZoom1.addEventListener("click", (e) => {
+      e.stopPropagation();
+      lbScale = 1;
+      lbPanX = (window.innerWidth - lbImgNaturalW) / 2;
+      lbPanY = (window.innerHeight - lbImgNaturalH) / 2;
+      lbApplyTransform();
+    });
+
+    // 点击百分比文字重置为 100% 并居中
+    lbZoomPct.addEventListener("click", (e) => {
       e.stopPropagation();
       lbScale = 1;
       lbPanX = (window.innerWidth - lbImgNaturalW) / 2;

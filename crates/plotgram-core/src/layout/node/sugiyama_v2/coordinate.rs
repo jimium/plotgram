@@ -75,8 +75,78 @@ pub(super) fn assign_coordinates_brandes_koepf(
     }
 
     resolve_real_node_overlaps(dag, layered_graph, layers, &mut nodes, horizontal, preset);
+    align_singleton_layers_to_predecessors(dag, layered_graph, layers, &mut nodes, horizontal);
     postprocess::normalize_layout_to_padding(&mut nodes, preset.padding);
     nodes
+}
+
+/// 单节点层对齐前驱：拉直主轴，避免 fan-out 把上游单节点层拉向后继重心。
+///
+/// 对恰好 1 个 Real 节点的层：优先对齐到前驱中心 median；无前驱时回退到后继 median。
+/// 多节点层不动，以免破坏 fan-out 间距。
+fn align_singleton_layers_to_predecessors(
+    dag: &DiGraph<String, ()>,
+    layered_graph: &DiGraph<LayerNode, ()>,
+    layers: &[Vec<NodeIndex>],
+    nodes: &mut HashMap<String, crate::layout::NodeLayout>,
+    horizontal: bool,
+) {
+    for layer in layers {
+        let real_ids: Vec<String> = layer
+            .iter()
+            .filter_map(|node| match &layered_graph[*node].kind {
+                LayerNodeKind::Real(original) => Some(dag[*original].clone()),
+                LayerNodeKind::Dummy { .. } => None,
+            })
+            .collect();
+        if real_ids.len() != 1 {
+            continue;
+        }
+        let id = &real_ids[0];
+        let Some(original) = dag.node_indices().find(|&n| dag[n] == *id) else {
+            continue;
+        };
+
+        let mut pred_centers: Vec<f64> = dag
+            .neighbors_directed(original, Direction::Incoming)
+            .filter_map(|pred| nodes.get(&dag[pred]).map(|nl| axis_center(nl, horizontal)))
+            .collect();
+        pred_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        let target = if !pred_centers.is_empty() {
+            median_f64(&pred_centers)
+        } else {
+            let mut succ_centers: Vec<f64> = dag
+                .neighbors_directed(original, Direction::Outgoing)
+                .filter_map(|succ| nodes.get(&dag[succ]).map(|nl| axis_center(nl, horizontal)))
+                .collect();
+            if succ_centers.is_empty() {
+                continue;
+            }
+            succ_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            median_f64(&succ_centers)
+        };
+
+        let Some(nl) = nodes.get_mut(id) else {
+            continue;
+        };
+        let size = axis_size(nl, horizontal);
+        let old = axis_center(nl, horizontal);
+        if (old - target).abs() <= 0.5 {
+            continue;
+        }
+        set_axis_center(nl, horizontal, target, size);
+    }
+}
+
+fn median_f64(xs: &[f64]) -> f64 {
+    let n = xs.len();
+    debug_assert!(n > 0);
+    if n % 2 == 1 {
+        xs[n / 2]
+    } else {
+        (xs[n / 2 - 1] + xs[n / 2]) * 0.5
+    }
 }
 
 fn resolve_real_node_overlaps(

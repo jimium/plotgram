@@ -80,6 +80,47 @@
     }
 
     #[test]
+    fn test_bidirectional_edge_labels_do_not_overlap() {
+        // 三层架构典型场景：竖直双向边的水平标签不得 AABB 重叠
+        let (diagram, result) = make_diagram_with_layout(
+            vec![
+                ("client", 40.0, 40.0),
+                ("api", 40.0, 180.0),
+                ("db", 40.0, 320.0),
+            ],
+            vec![
+                ("client", "api", Some("HTTP 请求")),
+                ("api", "db", Some("SQL 查询")),
+                ("db", "api", Some("查询结果")),
+                ("api", "client", Some("JSON 响应")),
+            ],
+        );
+
+        let routed = route_edges_orthogonal(&diagram, result, OrthoConfig::from_spec_defaults());
+        assert_eq!(routed.edges.len(), 4);
+
+        let mut bboxes = Vec::new();
+        for edge in &routed.edges {
+            assert!(!edge.labels.is_empty(), "每条边都应有标签");
+            for (li, label) in edge.labels.iter().enumerate() {
+                let bbox = edge.label_bbox_at(li).expect("label bbox");
+                bboxes.push((label.text.clone(), bbox));
+            }
+        }
+
+        for i in 0..bboxes.len() {
+            for j in (i + 1)..bboxes.len() {
+                let (ref ta, ba) = bboxes[i];
+                let (ref tb, bb) = bboxes[j];
+                assert!(
+                    crate::layout::edge::common::label_avoidance::aabb_overlap(&ba, &bb).is_none(),
+                    "labels '{ta}' and '{tb}' overlap: {ba:?} vs {bb:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_slot_fraction_symmetric() {
         // 两个连接点应对称分布在 0.5 两侧
         let f0 = slot_fraction(0, 2, 160.0, SLOT_PITCH);
@@ -1274,6 +1315,63 @@
         );
     }
 
+    /// 锯齿消毒 2.0：无反向 stub、无斜段、关键边无同轴 U 折。
+    #[test]
+    fn stress_nested_no_reverse_exit_stubs() {
+        use super::sanitize::{first_segment_is_reverse, has_non_orthogonal_segment};
+        use crate::layout::geometry::Point;
+
+        let source = include_str!(
+            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
+        );
+        let output = crate::pipeline::parse_prepare_validate(
+            source,
+            &crate::prepare::StyleRequest::default(),
+        );
+        let prepared = output.diagram.expect("valid diagram");
+        let layout = crate::layout::compute_layout_with_plan(
+            prepared.inner(),
+            prepared.layout_plan(),
+        )
+        .expect("layout");
+
+        let mut problems = Vec::new();
+        for (i, edge) in layout.edges.iter().enumerate() {
+            let pts: Vec<Point> = edge.path_points().into_owned();
+            if pts.len() < 2 {
+                continue;
+            }
+            let rel = &prepared.inner().relations[i];
+            let label = rel.label.as_deref().unwrap_or("");
+            if first_segment_is_reverse(&pts, edge.from_port) {
+                problems.push(format!("REV {label} {}->{}", rel.from, rel.to));
+            }
+            if has_non_orthogonal_segment(&pts) {
+                problems.push(format!("NON_ORTHO {label} {}->{}", rel.from, rel.to));
+            }
+            // 同轴 U：离开通道后又折回
+            if pts.len() >= 5 {
+                for w in pts.windows(5) {
+                    let (a, b, c, d, e) = (w[0], w[1], w[2], w[3], w[4]);
+                    let vert_u = (a.x - b.x).abs() < 0.5
+                        && (b.y - c.y).abs() < 0.5
+                        && (c.x - d.x).abs() < 0.5
+                        && (d.y - e.y).abs() < 0.5
+                        && (e.x - a.x).abs() < 0.5
+                        && (c.x - a.x).abs() > 0.5;
+                    if vert_u {
+                        problems.push(format!("U_TURN {label} {}->{}", rel.from, rel.to));
+                    }
+                }
+            }
+        }
+        assert!(
+            problems.is_empty(),
+            "sanitize 2.0 defects remain:\n{}",
+            problems.join("\n")
+        );
+    }
+
     /// G1: `strict_group_transit` 默认 false，由调用方按边 corridor 可达性覆盖。
     ///
     /// 验证：无 corridor 的图 → 默认 false；有 corridor 的图 → 仍默认 false（按边判定）；
@@ -1353,5 +1451,138 @@
         assert!(
             ctx_strict.strict_group_transit,
             "G1: with_strict_group_transit(true) 应将 strict_group_transit 设为 true"
+        );
+    }
+
+    /// 完整 n.user-auth 几何验收：禁止两节点替身。
+    #[test]
+    fn user_auth_flowchart_geometry_invariants() {
+        let source = include_str!("../../../../../../showcase/flowchart/n.user-auth.pgm");
+        let output = crate::pipeline::parse_prepare_validate(
+            source,
+            &crate::prepare::StyleRequest::default(),
+        );
+        let prepared = output.diagram.expect("valid diagram");
+        let layout = crate::layout::compute_layout_with_plan(
+            prepared.inner(),
+            prepared.layout_plan(),
+        )
+        .expect("layout");
+
+        let relations = &prepared.inner().relations;
+        let nodes = &layout.nodes;
+
+        let find_edge = |from: &str, to: &str| -> usize {
+            relations
+                .iter()
+                .position(|r| r.from.as_str() == from && r.to.as_str() == to)
+                .unwrap_or_else(|| panic!("missing edge {from}->{to}"))
+        };
+
+        let path_len = |ei: usize| -> f64 {
+            let pts: Vec<Point> = layout.edges[ei].path_points().into_owned();
+            path_length(&pts)
+        };
+
+        let point_in_node = |p: Point, id: &str| -> bool {
+            let n = nodes.get(id).unwrap();
+            p.x >= n.x - 1.0
+                && p.x <= n.x + n.width + 1.0
+                && p.y >= n.y - 1.0
+                && p.y <= n.y + n.height + 1.0
+        };
+
+        let on_node_boundary = |p: Point, id: &str| -> bool {
+            let n = nodes.get(id).unwrap();
+            let on_v = (p.x - n.x).abs() < 2.0 || (p.x - (n.x + n.width)).abs() < 2.0;
+            let on_h = (p.y - n.y).abs() < 2.0 || (p.y - (n.y + n.height)).abs() < 2.0;
+            let in_x = p.x >= n.x - 2.0 && p.x <= n.x + n.width + 2.0;
+            let in_y = p.y >= n.y - 2.0 && p.y <= n.y + n.height + 2.0;
+            (on_v && in_y) || (on_h && in_x)
+        };
+
+        // 1) gateway→client「响应」：终点在 client，路径长 ≫ PORT_CLEARANCE
+        let resp_i = find_edge("gateway", "client");
+        let resp = &layout.edges[resp_i];
+        let resp_end = resp.path_end().expect("response end");
+        let resp_len = path_len(resp_i);
+        assert!(
+            point_in_node(resp_end, "client"),
+            "响应终点应在 client 盒内，got {:?} client={:?}",
+            resp_end,
+            nodes.get("client")
+        );
+        assert!(
+            resp_len > PORT_CLEARANCE * 2.0,
+            "响应路径长应 ≫ PORT_CLEARANCE，got {resp_len}"
+        );
+        let resp_start = resp.path_start().unwrap();
+        assert!(
+            on_node_boundary(resp_start, "gateway"),
+            "响应起点应在 gateway 边界，got {:?}",
+            resp_start
+        );
+
+        // 2) 双向边可见分离
+        for (a, b) in [("client", "gateway"), ("gateway", "auth"), ("auth", "db")] {
+            let i = find_edge(a, b);
+            let j = find_edge(b, a);
+            let pi: Vec<Point> = layout.edges[i].path_points().into_owned();
+            let pj: Vec<Point> = layout.edges[j].path_points().into_owned();
+            let mid_i = pi[pi.len() / 2];
+            let mid_j = pj[pj.len() / 2];
+            let gap = ((mid_i.x - mid_j.x).powi(2) + (mid_i.y - mid_j.y).powi(2)).sqrt();
+            assert!(
+                gap > 8.0,
+                "{a}↔{b} 双向边应可见分离，mid gap={gap} ({mid_i:?} vs {mid_j:?})"
+            );
+        }
+
+        // 3) 扇出标签不重叠；「返回用户记录」不进入 auth 盒
+        let query_i = find_edge("auth", "db");
+        let store_i = find_edge("auth", "cache");
+        let query_bb = layout.edges[query_i]
+            .label_bbox_at(0)
+            .expect("查询用户信息 bbox");
+        let store_bb = layout.edges[store_i]
+            .label_bbox_at(0)
+            .expect("存储 Token bbox");
+        assert!(
+            crate::layout::edge::common::label_avoidance::aabb_overlap(&query_bb, &store_bb)
+                .is_none(),
+            "「查询用户信息」与「存储 Token」AABB 重叠: {query_bb:?} vs {store_bb:?}"
+        );
+
+        let ret_i = find_edge("db", "auth");
+        let ret_bb = layout.edges[ret_i]
+            .label_bbox_at(0)
+            .expect("返回用户记录 bbox");
+        let auth = nodes.get("auth").unwrap();
+        let auth_box = (auth.x, auth.y, auth.x + auth.width, auth.y + auth.height);
+        assert!(
+            crate::layout::edge::common::label_avoidance::aabb_overlap(&ret_bb, &auth_box)
+                .is_none(),
+            "「返回用户记录」不应进入 auth 盒: label={ret_bb:?} auth={auth_box:?}"
+        );
+
+        // 4) auth→cache 锚点落在两端边界
+        let ac_i = find_edge("auth", "cache");
+        let ac = &layout.edges[ac_i];
+        let ac_s = ac.path_start().unwrap();
+        let ac_e = ac.path_end().unwrap();
+        assert!(
+            on_node_boundary(ac_s, "auth"),
+            "auth→cache 起点应在 auth 边界，got {:?}",
+            ac_s
+        );
+        assert!(
+            on_node_boundary(ac_e, "cache"),
+            "auth→cache 终点应在 cache 边界，got {:?}",
+            ac_e
+        );
+        assert!(
+            path_len(ac_i) > PORT_CLEARANCE * 2.0,
+            "auth→cache 不应半条边退化，len={}",
+            path_len(ac_i)
         );
     }

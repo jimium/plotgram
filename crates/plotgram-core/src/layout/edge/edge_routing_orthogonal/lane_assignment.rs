@@ -14,7 +14,7 @@
 
 use super::*;
 use crate::ast::Relation;
-use crate::layout::edge::common::edge_geometry::{build_edge_labels, parse_label_t, point_at_path_t};
+use crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto;
 use crate::layout::geometry::{Point, Rect};
 use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
 use std::collections::{BTreeMap, HashMap};
@@ -202,10 +202,7 @@ fn commit_shifted_path(
     let labels = if new_points.len() >= 2 {
         match relations.get(ei) {
             Some(rel) => {
-                let middle_t = parse_label_t(rel);
-                build_edge_labels(rel, middle_t, Point::new(0.0, 0.0), |t| {
-                    point_at_path_t(new_points, t)
-                })
+                build_parallel_aware_edge_labels_auto(rel, ei, relations, new_points)
             }
             None => Vec::new(),
         }

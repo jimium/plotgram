@@ -1,54 +1,40 @@
-//! 布局 ↔ 路由反馈闭环：友好性诊断/调整、路由与 refine。
+//! 布局 ↔ 路由反馈：路由与 refine。
 
 use crate::ast::Diagram;
-use crate::layout::friendliness;
-use crate::layout::plan::LayoutPlan;
 use crate::layout::refine::{run_refine, RefineConfig};
+use crate::layout::space_budget::{
+    enforce_horizontal_gaps, horizontal_gap_violations, resolve_residual_with_budget, SpaceBudget,
+};
 use crate::layout::{EdgeRoutingStrategy, LayoutResult};
+use std::collections::{HashMap, HashSet};
 
 /// 预路由反馈：待路由布局。
 pub struct PreRouteFeedback {
     pub result: LayoutResult,
 }
 
-/// 统一 Friendliness V1/V2 与路由后 refine。
+/// 路由后 refine。
 pub struct LayoutRouteFeedback<'a> {
     diagram: &'a Diagram,
-    plan: &'a LayoutPlan,
-    algo: &'a str,
 }
 
 impl<'a> LayoutRouteFeedback<'a> {
-    pub fn new(diagram: &'a Diagram, plan: &'a LayoutPlan, algo: &'a str) -> Self {
-        Self {
-            diagram,
-            plan,
-            algo,
-        }
+    pub fn new(diagram: &'a Diagram) -> Self {
+        Self { diagram }
     }
 
-    /// V1 诊断 + 可选 V2 节点微调；返回待路由布局。
+    /// 预路由：确保 SpaceBudget 存在并 enforce 同层缝。
     pub fn apply_pre_route(&self, mut result: LayoutResult) -> PreRouteFeedback {
-        let v1_enabled = self.plan.friendliness.v1_enabled();
-        let v2_env_disabled = std::env::var("PLOTGRAM_NO_V2_ADJUST").as_deref() == Ok("1");
-        let v2_enabled = self.plan.friendliness.v2_enabled() && !v2_env_disabled;
-
-        if v1_enabled {
-            let evaluator = friendliness::RoutingFriendlinessEvaluator::for_layout(self.algo);
-            result.hints.friendliness_report = Some(evaluator.evaluate(self.diagram, &result));
+        if result.hints.space_budget.is_none() {
+            result.hints.space_budget = Some(SpaceBudget::from_diagram(self.diagram));
         }
-
-        if v2_enabled {
-            let adjuster = friendliness::adjuster::FriendlinessAdjuster::with_default();
-            result = adjuster.apply(self.diagram, result);
-            let evaluator = friendliness::RoutingFriendlinessEvaluator::for_layout(self.algo);
-            result.hints.friendliness_report = Some(evaluator.evaluate(self.diagram, &result));
+        if let Some(budget) = result.hints.space_budget.clone() {
+            enforce_horizontal_gaps(&mut result.nodes, &budget);
         }
-
         PreRouteFeedback { result }
     }
 
-    /// 路由 → refine。
+    /// 路由 → refine → 仅在契约失败时兜底消重叠并增量重路由。
     pub fn complete_routing(
         &self,
         router: &dyn EdgeRoutingStrategy,
@@ -57,12 +43,54 @@ impl<'a> LayoutRouteFeedback<'a> {
     ) -> LayoutResult {
         let t_route = crate::layout::perf::Instant::now();
         let mut routed = router.route(self.diagram, layout);
-        crate::perf_log!("[perf]       router.route: {:.2}ms", t_route.elapsed().as_secs_f64() * 1000.0);
+        crate::perf_log!(
+            "[perf]       router.route: {:.2}ms",
+            t_route.elapsed().as_secs_f64() * 1000.0
+        );
 
         if router.supports_refine() {
             let t_refine = crate::layout::perf::Instant::now();
             routed = run_refine(self.diagram, routed, router, refine_config);
-            crate::perf_log!("[perf]       run_refine: {:.2}ms", t_refine.elapsed().as_secs_f64() * 1000.0);
+            crate::perf_log!(
+                "[perf]       run_refine: {:.2}ms",
+                t_refine.elapsed().as_secs_f64() * 1000.0
+            );
+        }
+
+        // S3：仅当水平缝仍违反契约时才兜底推开
+        let budget = routed
+            .hints
+            .space_budget
+            .clone()
+            .unwrap_or_else(|| SpaceBudget::from_diagram(self.diagram));
+        if !horizontal_gap_violations(&routed.nodes, &budget).is_empty() {
+            let pre: HashMap<String, (f64, f64)> = routed
+                .nodes
+                .iter()
+                .map(|(id, n)| (id.clone(), (n.x, n.y)))
+                .collect();
+            resolve_residual_with_budget(&mut routed.nodes, Some(&budget));
+            routed.hints.space_budget = Some(budget);
+            let moved: HashSet<String> = routed
+                .nodes
+                .iter()
+                .filter_map(|(id, n)| {
+                    pre.get(id).and_then(|(px, py)| {
+                        let dx = n.x - px;
+                        let dy = n.y - py;
+                        if (dx * dx + dy * dy).sqrt() >= 1.0 {
+                            Some(id.clone())
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect();
+            if !moved.is_empty() {
+                routed = router.route_after_node_moves(self.diagram, routed, &moved);
+            }
+        } else if routed.hints.space_budget.is_none() {
+            routed.hints.space_budget = Some(budget);
         }
 
         routed

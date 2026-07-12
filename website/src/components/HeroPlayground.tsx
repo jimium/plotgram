@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { EditorState } from '@codemirror/state';
+import { EditorView, keymap } from '@codemirror/view';
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { bracketMatching, HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { tags as t } from '@lezer/highlight';
 import { useWasm } from '../hooks/useWasm';
 import { renderSvg, type DiagnosticErrorJson } from '../lib/wasm';
+import { plotgram } from '../lib/plotgramLang';
 
-const DEFAULT_SOURCE = `// 经典三层架构：Client → API → DB
-// Mermaid 对照: graph LR 三层结构
-diagram architecture {
+const DEFAULT_SOURCE = `diagram architecture {
     title: "三层架构"
 
     entity[frontend] client "客户端" {
@@ -31,19 +35,29 @@ const PRESETS: Preset[] = [
   {
     label: '流程图',
     source: `diagram flowchart {
-  title: "订单处理流程"
-  config { direction: top-to-bottom }
+    title: "用户认证流程"
+    config {
+        direction: top-to-bottom
+    }
 
-  entity[start] start "开始"
-  entity[process] order "用户下单"
-  entity[process] pay "支付"
-  entity[process] ship "发货"
-  entity[end] done "完成"
+    entity[client] client "移动客户端"
+    entity[gateway] gateway "API 网关" {
+        status: healthy
+    }
+    entity[service] auth "认证服务" {
+        owner: "安全团队"
+    }
+    entity[database] db "用户数据库"
+    entity[cache] cache "Token 缓存"
 
-  start -> order
-  order -> pay
-  pay -> ship
-  ship -> done
+    client -> gateway "HTTPS 请求"
+    gateway -> auth "转发认证请求"
+    auth -> db "查询用户信息"
+    db --> auth "返回用户记录"
+    auth -> cache "存储 Token"
+    cache --> auth "返回缓存结果"
+    auth --> gateway "认证结果"
+    gateway --> client "响应"
 }`,
   },
   {
@@ -88,6 +102,13 @@ const PRESETS: Preset[] = [
   },
 ];
 
+const MIN_SCALE = 0.1;
+const MAX_SCALE = 8;
+
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v));
+}
+
 function formatErrors(errors: DiagnosticErrorJson[]): string {
   if (errors.length === 0) return '';
   const first = errors[0];
@@ -96,44 +117,306 @@ function formatErrors(errors: DiagnosticErrorJson[]): string {
   return `${locStr}${first.message}`;
 }
 
+const plotgramHighlightStyle = HighlightStyle.define([
+  { tag: t.keyword, color: '#c678dd', fontWeight: '600' },
+  { tag: t.typeName, color: '#56b6c2' },
+  { tag: t.string, color: '#98c379' },
+  { tag: t.number, color: '#d19a66' },
+  { tag: t.lineComment, color: '#5c6370', fontStyle: 'italic' },
+  { tag: t.operator, color: '#56b6c2', fontWeight: '600' },
+  { tag: t.propertyName, color: '#d19a66' },
+  { tag: t.atom, color: '#e06c75' },
+  { tag: t.bracket, color: '#abb2bf' },
+  { tag: t.punctuation, color: '#abb2bf' },
+  { tag: t.variableName, color: '#61afef' },
+]);
+
+const editorTheme = EditorView.theme({
+  '&': {
+    height: '100%',
+    fontSize: '13.5px',
+    backgroundColor: 'transparent',
+    color: '#abb2bf',
+  },
+  '.cm-scroller': {
+    fontFamily: "'JetBrains Mono', 'SF Mono', 'Monaco', 'Menlo', monospace",
+    lineHeight: '1.65',
+    overflow: 'auto',
+  },
+  '.cm-content': {
+    padding: '18px 20px',
+    caretColor: '#c678dd',
+  },
+  '.cm-line': {
+    padding: '0 2px',
+  },
+  '&.cm-focused': {
+    outline: 'none',
+  },
+  '.cm-cursor': {
+    borderLeftColor: '#c678dd',
+    borderLeftWidth: '2px',
+  },
+  '.cm-selectionBackground, ::selection': {
+    background: 'rgba(124, 58, 237, 0.25)',
+  },
+  '.cm-matchingBracket': {
+    backgroundColor: 'rgba(124, 58, 237, 0.2)',
+    borderRadius: '3px',
+  },
+  '.cm-gutters': {
+    display: 'none',
+  },
+});
+
 export default function HeroPlayground() {
   const { wasm, ready, error: wasmError } = useWasm();
   const [source, setSource] = useState(DEFAULT_SOURCE);
   const [svg, setSvg] = useState<string>('');
   const [renderError, setRenderError] = useState<string>('');
+  const [renderMs, setRenderMs] = useState<number | null>(null);
   const [activePreset, setActivePreset] = useState(0);
 
-  // 防抖渲染
+  const editorHostRef = useRef<HTMLDivElement>(null);
+  const editorViewRef = useRef<EditorView | null>(null);
+  const sourceRef = useRef(source);
+  sourceRef.current = source;
+
+  // 预览缩放/平移
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [tx, setTx] = useState(0);
+  const [ty, setTy] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+  const txRef = useRef(tx);
+  txRef.current = tx;
+  const tyRef = useRef(ty);
+  tyRef.current = ty;
+  const dragStateRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number } | null>(null);
+
+  useEffect(() => {
+    if (!editorHostRef.current) return;
+    const state = EditorState.create({
+      doc: sourceRef.current,
+      extensions: [
+        history(),
+        bracketMatching(),
+        plotgram(),
+        syntaxHighlighting(plotgramHighlightStyle),
+        editorTheme,
+        EditorView.lineWrapping,
+        EditorView.updateListener.of((u) => {
+          if (u.docChanged) setSource(u.state.doc.toString());
+        }),
+        keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+      ],
+    });
+    const view = new EditorView({ state, parent: editorHostRef.current });
+    editorViewRef.current = view;
+    return () => {
+      view.destroy();
+      editorViewRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const view = editorViewRef.current;
+    if (!view) return;
+    const current = view.state.doc.toString();
+    if (current !== source) {
+      view.dispatch({ changes: { from: 0, to: current.length, insert: source } });
+    }
+  }, [source]);
+
   useEffect(() => {
     if (!wasm) return;
 
     const timer = setTimeout(() => {
-      const result = renderSvg(wasm, source);
+      const t0 = performance.now();
+      const result = renderSvg(wasm, source, { transparent_background: true });
+      const elapsed = performance.now() - t0;
       if (result.success && result.text) {
         setSvg(result.text);
         setRenderError('');
+        setRenderMs(elapsed);
       } else {
         setRenderError(formatErrors(result.errors));
+        setRenderMs(elapsed);
       }
     }, 150);
 
     return () => clearTimeout(timer);
   }, [source, wasm]);
 
+  // 缩放/平移逻辑（与 AGENT 预览区行为一致）
+  const zoomAt = useCallback((centerX: number, centerY: number, factor: number) => {
+    setScale((prevScale) => {
+      const nextScale = clamp(prevScale * factor, MIN_SCALE, MAX_SCALE);
+      if (nextScale === prevScale) return prevScale;
+      setTx(centerX - (centerX - txRef.current) * (nextScale / prevScale));
+      setTy(centerY - (centerY - tyRef.current) * (nextScale / prevScale));
+      return nextScale;
+    });
+  }, []);
+
+  const fitToView = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || !svg) return;
+    const svgEl = container.querySelector('svg');
+    if (!svgEl) return;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const viewBox = svgEl.viewBox.baseVal;
+    let naturalW: number;
+    let naturalH: number;
+    if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+      naturalW = viewBox.width;
+      naturalH = viewBox.height;
+    } else {
+      const bbox = svgEl.getBoundingClientRect();
+      const curScale = scaleRef.current || 1;
+      naturalW = bbox.width / curScale;
+      naturalH = bbox.height / curScale;
+    }
+    if (naturalW === 0 || naturalH === 0) return;
+    const padding = 32;
+    const nextScale = clamp(
+      Math.min((cw - padding) / naturalW, (ch - padding) / naturalH),
+      MIN_SCALE,
+      MAX_SCALE,
+    );
+    setScale(nextScale);
+    setTx((cw - naturalW * nextScale) / 2);
+    setTy((ch - naturalH * nextScale) / 2);
+  }, [svg]);
+
+  const resetTo100 = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || !svg) return;
+    const svgEl = container.querySelector('svg');
+    if (!svgEl) return;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const viewBox = svgEl.viewBox.baseVal;
+    let naturalW: number;
+    let naturalH: number;
+    if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+      naturalW = viewBox.width;
+      naturalH = viewBox.height;
+    } else {
+      const bbox = svgEl.getBoundingClientRect();
+      naturalW = bbox.width / (scaleRef.current || 1);
+      naturalH = bbox.height / (scaleRef.current || 1);
+    }
+    if (naturalW === 0 || naturalH === 0) return;
+    setScale(1);
+    setTx((cw - naturalW) / 2);
+    setTy((ch - naturalH) / 2);
+  }, [svg]);
+
+  const zoomByButton = useCallback(
+    (factor: number) => {
+      const container = containerRef.current;
+      if (!container) return;
+      zoomAt(container.clientWidth / 2, container.clientHeight / 2, factor);
+    },
+    [zoomAt],
+  );
+
+  // SVG 变化时自适应
+  useEffect(() => {
+    if (svg) {
+      requestAnimationFrame(fitToView);
+    }
+  }, [svg, fitToView]);
+
+  // 滚轮：ctrlKey=缩放，普通滚动=平移
+  // 始终阻止预览区内的 pinch zoom 冒泡到浏览器，避免整页缩放
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const listener = (e: WheelEvent) => {
+      // ctrlKey(pinch zoom) 始终阻止默认行为,避免浏览器缩放整页
+      if (e.ctrlKey) e.preventDefault();
+      if (!svg) return;
+      if (!e.ctrlKey) e.preventDefault();
+      if (e.ctrlKey) {
+        const rect = container.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const factor = Math.exp(-e.deltaY * 0.01);
+        zoomAt(cx, cy, factor);
+      } else {
+        setTx((prev) => prev - e.deltaX);
+        setTy((prev) => prev - e.deltaY);
+      }
+    };
+    // Safari 的 pinch 通过 gesturestart/gesturechange 触发
+    const gestureHandler = (e: Event) => e.preventDefault();
+    container.addEventListener('wheel', listener, { passive: false });
+    container.addEventListener('gesturestart', gestureHandler, { passive: false });
+    container.addEventListener('gesturechange', gestureHandler, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', listener);
+      container.removeEventListener('gesturestart', gestureHandler);
+      container.removeEventListener('gesturechange', gestureHandler);
+    };
+  }, [svg, zoomAt]);
+
+  // 拖拽平移
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (!svg) return;
+      if (e.button !== 0) return;
+      dragStateRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startTx: txRef.current,
+        startTy: tyRef.current,
+      };
+      setIsDragging(true);
+    },
+    [svg],
+  );
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: MouseEvent) => {
+      const s = dragStateRef.current;
+      if (!s) return;
+      setTx(s.startTx + (e.clientX - s.startX));
+      setTy(s.startTy + (e.clientY - s.startY));
+    };
+    const onUp = () => {
+      dragStateRef.current = null;
+      setIsDragging(false);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [isDragging]);
+
   const status = useMemo(() => {
     if (wasmError) return { kind: 'error' as const, text: `WASM 加载失败：${wasmError}` };
     if (!ready) return { kind: 'loading' as const, text: '正在加载渲染引擎…' };
     if (renderError) return { kind: 'dsl-error' as const, text: renderError };
-    return { kind: 'ok' as const, text: '实时渲染中 · 修改左侧代码自动更新' };
+    return { kind: 'ok' as const, text: '实时渲染 · 修改代码即时预览' };
   }, [wasmError, ready, renderError]);
 
   return (
     <div className="hero-visual">
       <div className="hero-visual-header">
-        <span className="hero-visual-dot red" />
-        <span className="hero-visual-dot yellow" />
-        <span className="hero-visual-dot green" />
-        <span className="hero-playground-title">live-demo.pgm</span>
+        <div className="hero-window-dots">
+          <span className="hero-visual-dot red" />
+          <span className="hero-visual-dot yellow" />
+          <span className="hero-visual-dot green" />
+        </div>
+        <span className="hero-playground-title">plotgram demo</span>
         <div className="hero-playground-presets">
           {PRESETS.map((p, i) => (
             <button
@@ -151,25 +434,23 @@ export default function HeroPlayground() {
       </div>
       <div className="hero-visual-body">
         <div className="hero-editor-wrap">
-          <div className="hero-editor-label">DSL</div>
-          <textarea
-            className="hero-editor"
-            value={source}
-            spellCheck={false}
-            onChange={(e) => setSource(e.target.value)}
-          />
+          <div className="hero-editor" ref={editorHostRef} />
         </div>
         <div className="hero-preview">
-          <div className="hero-preview-label">
-            {status.kind === 'ok' && <span className="hero-status-dot ok" />}
-            {status.kind === 'loading' && <span className="hero-status-dot loading" />}
-            {status.kind === 'error' && <span className="hero-status-dot error" />}
-            {status.kind === 'dsl-error' && <span className="hero-status-dot error" />}
-            <span className={`hero-status-text ${status.kind}`}>{status.text}</span>
-          </div>
-          <div className="hero-preview-canvas">
+          <div
+            ref={containerRef}
+            className="hero-preview-canvas"
+            onMouseDown={handleMouseDown}
+            style={{
+              cursor: isDragging ? 'grabbing' : svg ? 'grab' : 'default',
+            }}
+          >
             {svg ? (
-              <div className="hero-svg-host" dangerouslySetInnerHTML={{ __html: svg }} />
+              <div
+                className="hero-svg-host"
+                style={{ transform: `translate(${tx}px, ${ty}px) scale(${scale})` }}
+                dangerouslySetInnerHTML={{ __html: svg }}
+              />
             ) : (
               <div className="hero-preview-placeholder">
                 {status.kind === 'loading' ? (
@@ -181,8 +462,32 @@ export default function HeroPlayground() {
                 )}
               </div>
             )}
+            {svg && (
+              <div className="hero-preview-toolbar">
+                <button onClick={() => zoomByButton(1 / 1.1)} aria-label="缩小">−</button>
+                <button onClick={resetTo100} aria-label="重置为 100%">
+                  {Math.round(scale * 100)}%
+                </button>
+                <button onClick={() => zoomByButton(1.1)} aria-label="放大">+</button>
+                <button onClick={fitToView} aria-label="适应窗口">适应</button>
+              </div>
+            )}
           </div>
         </div>
+      </div>
+      <div className="hero-visual-footer">
+        <div className="hero-footer-status">
+          {status.kind === 'ok' && <span className="hero-status-dot ok" />}
+          {status.kind === 'loading' && <span className="hero-status-dot loading" />}
+          {status.kind === 'error' && <span className="hero-status-dot error" />}
+          {status.kind === 'dsl-error' && <span className="hero-status-dot error" />}
+          <span className={`hero-status-text ${status.kind}`}>{status.text}</span>
+        </div>
+        {renderMs !== null && status.kind !== 'loading' && (
+          <span className="hero-footer-render-time">
+            渲染 {renderMs.toFixed(1)} ms
+          </span>
+        )}
       </div>
     </div>
   );
