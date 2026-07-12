@@ -76,6 +76,50 @@ export interface ParseResult {
   warnings: DiagnosticErrorJson[];
 }
 
+// ─── LayoutLint 类型（对应 Rust 端 LintResult / LintReport 序列化）─────
+
+export interface LintViolation {
+  rule: string;
+  severity: 'error' | 'warning';
+  message: string;
+  metric?: number | null;
+  entity_ids?: string[];
+  group_ids?: string[];
+  edge_index?: number | null;
+  related_edge_indices?: number[];
+}
+
+export interface LintAdvice {
+  /** 对应 violations 数组的下标 */
+  violation_index: number;
+  text: string;
+  /** 1=最高优先级 */
+  priority: number;
+  confidence: 'high' | 'medium' | 'low';
+  knobs?: Array<Record<string, unknown>>;
+  fix?: FixActionJson | null;
+}
+
+export interface LintReport {
+  violations: LintViolation[];
+  advices?: LintAdvice[];
+}
+
+export interface LintResult {
+  success: boolean;
+  /** true=无 error 级违规（warning 仍可接受） */
+  acceptable: boolean;
+  report: LintReport;
+  errors: DiagnosticErrorJson[];
+  warnings: DiagnosticErrorJson[];
+}
+
+export interface LintOptions {
+  profile?: 'default' | 'strict' | 'ci' | 'verbose' | 'all';
+  fail_on_warning?: boolean;
+  advice?: boolean;
+}
+
 export interface DiagramJson {
   diagram_type: string;
   attributes: DiagramAttributeJson[];
@@ -132,6 +176,8 @@ export interface PlotgramWasm {
   diff_sources: (sourceA: string, sourceB: string) => string;
   apply_patch: (source: string, patchJson: string) => string;
   format_source: (source: string) => string;
+  lint: (source: string) => string;
+  lint_with_options: (source: string, optionsJson: string) => string;
 }
 
 let modulePromise: Promise<PlotgramWasm> | null = null;
@@ -236,6 +282,25 @@ export function parseSource(wasm: PlotgramWasm, source: string): ParseResult {
   return safeParse<ParseResult>(json, {
     diagram: null,
     errors: [fallbackDiag('无法解析 AST')],
+    warnings: [],
+  });
+}
+
+/** 运行布局 lint，返回违规列表与可选的 advice。 */
+export function lintSource(
+  wasm: PlotgramWasm,
+  source: string,
+  options?: LintOptions,
+): LintResult {
+  const json =
+    options && typeof wasm.lint_with_options === 'function'
+      ? wasm.lint_with_options(source, JSON.stringify(options))
+      : wasm.lint(source);
+  return safeParse<LintResult>(json, {
+    success: false,
+    acceptable: false,
+    report: { violations: [], advices: [] },
+    errors: [fallbackDiag('无法解析 lint 结果')],
     warnings: [],
   });
 }

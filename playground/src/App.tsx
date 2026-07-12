@@ -10,12 +10,13 @@ import { ResizeHandle } from './components/ResizeHandle';
 import { Toast, type ToastMessage } from './components/Toast';
 import { AstViewer } from './components/AstViewer';
 import { SceneJsonViewer } from './components/SceneJsonViewer';
+import { LintViewer } from './components/LintViewer';
 import { CommandPalette, type Command } from './components/CommandPalette';
 import { IconChevron, IconError, IconWarning } from './components/Icons';
 import { useWasm } from './hooks/useWasm';
 import { useLayoutCatalog } from './hooks/useLayoutCatalog';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import { renderSource, validateSource, parseSource, type DiagramJson, type RenderFormat, type ExportReport } from './lib/wasm';
+import { renderSource, validateSource, parseSource, lintSource, type DiagramJson, type RenderFormat, type ExportReport, type LintResult } from './lib/wasm';
 import { parseDiagnostics, formatContextLines, type Diagnostic } from './lib/errorParse';
 import { type DiagramContext, type EntityInfo, type GroupInfo } from './lib/contextCompletion';
 import {
@@ -56,7 +57,7 @@ import { EXAMPLES, DEFAULT_EXAMPLE_ID, getExample, type DiagramKind } from './da
 
 type Theme = 'light' | 'dark';
 type MobilePane = 'editor' | 'preview' | 'inspector';
-type PreviewTab = 'graph' | 'ast' | 'ascii' | 'scene';
+type PreviewTab = 'graph' | 'ast' | 'ascii' | 'scene' | 'lint';
 type BottomTab = 'problems' | 'output' | 'stats';
 type LayoutSource = 'source' | 'panel';
 
@@ -159,6 +160,7 @@ function App() {
   const [entityCount, setEntityCount] = useState<number | null>(null);
   const [edgeCount, setEdgeCount] = useState<number | null>(null);
   const [astData, setAstData] = useState<DiagramJson | null>(null);
+  const [lintData, setLintData] = useState<LintResult | null>(null);
 
   // ─── 原有状态 ────────────────────────────────────────────
   const [helpOpen, setHelpOpen] = useState(false);
@@ -434,6 +436,36 @@ function App() {
           : `[${new Date().toLocaleTimeString()}] 校验失败 ${elapsed.toFixed(1)}ms — ${diags.filter(d => d.severity === 'error').length} 个错误`;
         setRenderLog(prev => [...prev.slice(-99), logEntry]);
         const hasErrors = diags.some(d => d.severity === 'error');
+        if (hasErrors) {
+          autoExpandedRef.current = true;
+          setActiveBottomTab('problems');
+          setBottomPanelExpanded(true);
+        } else if (autoExpandedRef.current) {
+          autoExpandedRef.current = false;
+          setBottomPanelExpanded(false);
+        }
+        return;
+      }
+
+      // Lint 页签：跑布局 lint 并展示违规 + advice
+      if (activePreviewTab === 'lint') {
+        const lint = lintSource(wasm, effectiveSource, { advice: true });
+        const elapsed = performance.now() - t0;
+        const diags = parseDiagnostics(lint.errors, lint.warnings);
+        setDiagnostics(diags);
+        setLintData(lint);
+        setSuccess(lint.success);
+        setRenderMs(elapsed);
+        setEntityCount(countEntities(code));
+        setEdgeCount(countEdges(code));
+        const violationCount = lint.report.violations.length;
+        const adviceCount = lint.report.advices?.length ?? 0;
+        const logEntry = lint.success
+          ? `[${new Date().toLocaleTimeString()}] Lint ${elapsed.toFixed(1)}ms — ${violationCount} 违规 / ${adviceCount} 建议`
+          : `[${new Date().toLocaleTimeString()}] Lint 失败 ${elapsed.toFixed(1)}ms`;
+        setRenderLog(prev => [...prev.slice(-99), logEntry]);
+        const hasErrors = diags.some(d => d.severity === 'error')
+          || lint.report.violations.some(v => v.severity === 'error');
         if (hasErrors) {
           autoExpandedRef.current = true;
           setActiveBottomTab('problems');
@@ -952,7 +984,7 @@ function App() {
         <section className="preview-col">
           {/* 预览标签栏 */}
           <div className="preview-tabs">
-            {(['graph', 'ast', 'ascii', 'scene'] as PreviewTab[]).map((tab) => (
+            {(['graph', 'ast', 'ascii', 'scene', 'lint'] as PreviewTab[]).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -965,7 +997,9 @@ function App() {
                     ? 'AST'
                     : tab === 'ascii'
                       ? 'ASCII'
-                      : 'Scene JSON'}
+                      : tab === 'scene'
+                        ? 'Scene JSON'
+                        : 'Lint'}
               </button>
             ))}
           </div>
@@ -1001,6 +1035,11 @@ function App() {
               ) : (
                 <pre className="scene-json-preview">{ready ? '无 Scene JSON 数据' : 'WASM 加载中…'}</pre>
               )}
+            </div>
+          )}
+          {activePreviewTab === 'lint' && (
+            <div className="preview-alt-pane">
+              <LintViewer result={lintData} ready={ready} />
             </div>
           )}
         </section>

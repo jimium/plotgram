@@ -213,7 +213,7 @@ pub(super) fn compute_two_phase_layout(
     // EGB：节点落定后估计逐组侧 gutter，重算 group bounds 并持久化至 hints。
     let bounds_padding = padding;
     let base_groups = compute_group_bounds(diagram, &nodes, bounds_padding);
-    let t_egb = std::time::Instant::now();
+    let t_egb = crate::layout::perf::Instant::now();
     let side_gutters = estimate_side_gutters_with_hierarchy(diagram, &nodes, &base_groups);
     let egb_ms = t_egb.elapsed().as_secs_f64() * 1000.0;
     let computed_groups = compute_group_bounds_with_side_gutters(

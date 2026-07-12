@@ -225,7 +225,7 @@ export function createToolExecutors(
     lint: async (args) => {
       const wasm = await getWasm();
       const source = String(args.source ?? '');
-      const profile = typeof args.profile === 'string' ? args.profile : undefined;
+      const profile = typeof args.profile === 'string' ? (args.profile as 'default' | 'strict' | 'ci' | 'verbose' | 'all') : undefined;
       const advice = typeof args.advice === 'boolean' ? args.advice : true;
       return lintSource(wasm, source, { profile, advice });
     },

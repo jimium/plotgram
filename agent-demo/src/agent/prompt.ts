@@ -302,7 +302,7 @@ diagram flowchart {
   - 先调 layout.group_padding
   - 再调 diagram 级 group_frame.gap / group_frame: strips
   - 最后再改 group 的 layout
-- 若 lint 提示 sibling_width_ratio: 优先 `group_frame: strips` 或 `group_frame { track: equal }`
+- 若 lint 提示 sibling_width_ratio: 优先 \`group_frame: strips\` 或 \`group_frame { track: equal }\`
 - 若 lint 提示 edge_on_group_border: 通常可忽略，不要先盲目增大 gap
 - 架构图最佳实践:
   - 用 group 划分层级(前端层/后端层/数据层)
