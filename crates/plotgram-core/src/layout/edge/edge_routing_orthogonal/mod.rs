@@ -51,14 +51,14 @@ pub(super) mod stub_fix;
 // Re-exports for cross-submodule access via `use super::*;`
 pub(super) use profile::OrthoRoutingProfile;
 pub(super) use channel_load::{channel_load_penalty, ChannelLoadMap};
-pub(super) use context::{EndpointPair, PreparedObstacles, RoutingContext, SegmentGrid};
+pub(super) use context::{EndpointPair, PreparedObstacles, OrthoRoutingContext, SegmentGrid};
 pub(super) use lane_assignment::{
     apply_corridor_planned_offsets, assign_lanes, separate_unrelated_trunk_overlaps,
 };
 pub(super) use path::{select_best_path_with_scorer_stats, PathSelectStats, RoutedSegment};
 #[allow(unused_imports)] // SpacingViolationKind/segments_violate_spacing/path_edge_spacing_violations used in X-1
 pub(super) use scoring::{CandidateScorer, DefaultScorer, GROUP_OBSTACLE_PAD, NODE_OBSTACLE_PAD, path_avoids_group_interiors, path_is_clean, path_is_clean_from_edges, path_length, SpacingViolationKind, segments_violate_spacing, path_edge_spacing_violations, count_all_edge_spacing_violations};
-pub(super) use simplify::{simplify_path, simplify_path_preserving_stubs};
+pub(super) use simplify::simplify_path;
 #[allow(unused_imports)] // used by tests via `use super::*;`
 pub(super) use simplify::is_collinear;
 #[allow(unused_imports)] // choose_pair_sides is used by tests
@@ -247,7 +247,7 @@ pub fn reroute_edges_touching_nodes(
             preserve.insert(i);
         }
     }
-    if preserve.is_empty() || (preserve.len() as f64 / n as f64) < crate::layout::post_route_hook::MIN_PRESERVE_RATIO {
+    if preserve.is_empty() || (preserve.len() as f64 / n as f64) < crate::layout::post_route::MIN_PRESERVE_RATIO {
         return route_edges_orthogonal(diagram, result, cfg);
     }
     route_edges_orthogonal_inner(diagram, result, cfg, Some(preserve))
@@ -266,7 +266,7 @@ pub fn reroute_edges_preserve(
     if n == 0 || preserve_edges.is_empty() {
         return route_edges_orthogonal(diagram, result, cfg);
     }
-    if (preserve_edges.len() as f64 / n as f64) < crate::layout::post_route_hook::MIN_PRESERVE_RATIO {
+    if (preserve_edges.len() as f64 / n as f64) < crate::layout::post_route::MIN_PRESERVE_RATIO {
         return route_edges_orthogonal(diagram, result, cfg);
     }
     route_edges_orthogonal_inner(diagram, result, cfg, Some(preserve_edges.clone()))
@@ -315,6 +315,194 @@ fn route_edges_orthogonal_inner(
     let corridor_plan =
         corridor_route::plan_corridor_routes(relations, &group_ctx, &profile);
 
+    // ── 1+2. 端口选择 + slot 分配 + 平行边偏移 ──
+    let (mut from_side, mut to_side, _lane, mut endpoint_map, parallel, reverse_pairs) = phase_port_slot(
+        relations,
+        &result.nodes,
+        &group_ctx,
+        &feedback_assignment,
+        &cfg,
+        n,
+    );
+
+    // ── 3. 分层批量边序（有 rank 时低层先占通道；feedback 全局延后） ──
+    let (edge_order, feedback_edge_set) = phase_layer_order(
+        relations,
+        result.hints.sugiyama_ranks.as_ref(),
+        &feedback_assignment,
+    );
+
+    // ── 4. 逐边构建路径 ──
+    let incremental = preserve_edges.is_some();
+    let mut edges: Vec<EdgeLayout> = if incremental {
+        result.edges.clone()
+    } else {
+        (0..n).map(|_| EdgeLayout::empty()).collect()
+    };
+    let mut grid = SegmentGrid::new();
+
+    // P2-1: 路由 debug 统计
+    let mut ortho_stats = crate::layout::OrthoDebugStats {
+        edge_count: n,
+        ..Default::default()
+    };
+
+    phase_route_edges(
+        &edge_order,
+        relations,
+        &result.nodes,
+        &from_side,
+        &to_side,
+        &endpoint_map,
+        &mut edges,
+        &mut grid,
+        &mut ortho_stats,
+        &cfg,
+        &profile,
+        &group_ctx,
+        &obstacles,
+        &corridor_plan,
+        &parallel,
+        &preserve_edges,
+        &self_loop_idx,
+        &mut result.hints.space_budget,
+    );
+
+    // ── 4b. 后置交叉检测：修正 slot 排序与实际路由方向不一致的锚点 ──
+    let t_fix = crate::layout::perf::Instant::now();
+    //
+    // slot 排序（步骤 2）按对端节点中心坐标排列，但当边的实际路由方向与对端位置
+    // 方向不一致时（如需要绕过中间节点），排序结果会导致出边交叉。
+    // 典型场景：节点 A 底部两条出边，左边 slot 的边实际向右绕行，右边 slot 的边
+    // 直下，两者在节点下方交叉。交换 slot 后即可消除交叉。
+    replan_slots(
+        &result.nodes,
+        &relations,
+        &from_side,
+        &to_side,
+        &mut endpoint_map,
+        &mut edges,
+        &mut grid,
+        &cfg,
+        &group_ctx,
+        &obstacles,
+        &corridor_plan,
+        &mut ortho_stats,
+        &profile,
+    );
+
+    // ── 4c. 直连偏好对齐：正对端口边的 slot 锚点对齐修正 ──
+    phase_straighten_align(
+        &result.nodes,
+        n,
+        &from_side,
+        &to_side,
+        &mut endpoint_map,
+        &mut edges,
+        &mut grid,
+        relations,
+        &reverse_pairs,
+        &parallel,
+        &corridor_plan,
+        &group_ctx,
+        &obstacles,
+        &cfg,
+        &profile,
+        &result.hints.space_budget,
+    );
+
+    // ── 4d. X-1: 多轮冲突消解重路由 ──
+    phase_reroute(
+        &result.nodes,
+        relations,
+        &from_side,
+        &to_side,
+        &endpoint_map,
+        &mut edges,
+        &mut grid,
+        &cfg,
+        &group_ctx,
+        &obstacles,
+        &corridor_plan,
+        &mut ortho_stats,
+        &profile,
+    );
+
+    // ── 4e. X-2: 反向 stub 检测与端口翻转 ──
+    phase_stub_fix(
+        &result.nodes,
+        relations,
+        &mut from_side,
+        &mut to_side,
+        &mut endpoint_map,
+        &mut edges,
+        &mut grid,
+        &cfg,
+        &group_ctx,
+        &obstacles,
+        &corridor_plan,
+        &mut ortho_stats,
+        &profile,
+        &feedback_edge_set,
+    );
+
+    // ── 4f. X-3: Lane Assignment 车道分配 ──
+    phase_lane(
+        &mut edges,
+        &mut grid,
+        &result.nodes,
+        &obstacles.sorted_node_ids,
+        relations,
+        &from_side,
+        &to_side,
+        parallel_gap,
+        &corridor_plan,
+        &group_ctx,
+        &profile,
+        &mut ortho_stats,
+    );
+
+    // ── 4g. 锯齿消毒 + X-0 间距统计 ──
+    phase_sanitize(
+        &mut edges,
+        relations,
+        &from_side,
+        &to_side,
+        &grid,
+        parallel_gap,
+        &mut ortho_stats,
+    );
+
+    // ── 5. 标签自动避让 ──
+    phase_labels(
+        &mut edges,
+        &result.nodes,
+        &result.groups,
+        diagram.diagram_type.clone(),
+    );
+    crate::perf_log!("[perf]     fix_inversions+labels: {:.2}ms", t_fix.elapsed().as_secs_f64() * 1000.0);
+
+    result.edges = edges;
+    // P2-1: 导出 orthogonal 路由 debug 统计
+    result.hints.orthogonal_debug = Some(ortho_stats);
+    result
+}
+
+fn phase_port_slot(
+    relations: &[crate::ast::Relation],
+    nodes: &HashMap<String, NodeLayout>,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    feedback_assignment: &feedback_side::FeedbackSideAssignment,
+    cfg: &OrthoConfig,
+    n: usize,
+) -> (
+    Vec<Port>,
+    Vec<Port>,
+    Vec<usize>,
+    HashMap<(usize, bool), Endpoint>,
+    crate::layout::edge::common::parallel_edges::ParallelGroups,
+    std::collections::BTreeSet<String>,
+) {
     // ── 1. 按无向节点对分组，并确定每条边的端口（连接边） ──
     let t1 = crate::layout::perf::Instant::now();
     let mut pair_groups: HashMap<String, Vec<usize>> = HashMap::new();
@@ -335,12 +523,12 @@ fn route_edges_orthogonal_inner(
         let (can_from, can_to) = canonical_pair(rel0.from.as_str(), rel0.to.as_str());
 
         let (Some(a_nl), Some(b_nl)) =
-            (result.nodes.get(can_from), result.nodes.get(can_to))
+            (nodes.get(can_from), nodes.get(can_to))
         else {
             continue;
         };
 
-        let (side_a, side_b) = choose_pair_sides_with_group(a_nl, b_nl, can_from, can_to, Some(&group_ctx));
+        let (side_a, side_b) = choose_pair_sides_with_group(a_nl, b_nl, can_from, can_to, Some(group_ctx));
 
         for (l, &i) in indices.iter().enumerate() {
             let rel = &relations[i];
@@ -366,10 +554,10 @@ fn route_edges_orthogonal_inner(
     // choose_pair_sides 逐对独立选端口，同一节点的多条边可能分散在不同侧出发，
     // 导致节点附近不必要的交叉。此阶段对每个节点的多条边做"同侧偏好"协调：
     // 统计各侧边数，让少数派边在几何可接受时切换到多数派侧。
-    coordinate_port_sides(relations, &result.nodes, &mut from_side, &mut to_side, Some(&group_ctx));
+    coordinate_port_sides(relations, nodes, &mut from_side, &mut to_side, Some(group_ctx));
     apply_feedback_side_overrides(
         relations,
-        &feedback_assignment,
+        feedback_assignment,
         &mut from_side,
         &mut to_side,
         &mut lane,
@@ -396,7 +584,7 @@ fn route_edges_orthogonal_inner(
         let from_id = rel.from.as_str();
         let to_id = rel.to.as_str();
         let (Some(from_nl), Some(to_nl)) =
-            (result.nodes.get(from_id), result.nodes.get(to_id))
+            (nodes.get(from_id), nodes.get(to_id))
         else {
             continue;
         };
@@ -454,7 +642,7 @@ fn route_edges_orthogonal_inner(
         let Some(mut sub_groups) = side_groups.remove(&(node_id.clone(), side)) else {
             continue;
         };
-        let Some(nl) = result.nodes.get(&node_id) else {
+        let Some(nl) = nodes.get(&node_id) else {
             continue;
         };
         let vertical_side = is_vertical_port(side);
@@ -588,42 +776,38 @@ fn route_edges_orthogonal_inner(
     let t_align = crate::layout::perf::Instant::now();
     crate::perf_log!("[perf]     step2b_straighten: {:.2}ms (moved to 4c)", t_align.elapsed().as_secs_f64() * 1000.0);
 
-    // ── 3. 分层批量边序（有 rank 时低层先占通道；feedback 全局延后） ──
-    let t2 = crate::layout::perf::Instant::now();
-    let node_degree = layer_order::compute_node_degrees(relations);
-    let feedback_edge_set: std::collections::HashSet<usize> =
-        feedback_assignment.hints.keys().copied().collect();
-    let edge_order = layer_order::compute_edge_order_with_feedback(
-        relations,
-        result.hints.sugiyama_ranks.as_ref(),
-        &node_degree,
-        Some(&feedback_edge_set),
-    );
-    crate::perf_log!("[perf]     step2_slots+step3_order: {:.2}ms", t2.elapsed().as_secs_f64() * 1000.0);
+    (from_side, to_side, lane, endpoint_map, parallel, reverse_pairs)
+}
 
-    // ── 4. 逐边构建路径 ──
-    let incremental = preserve_edges.is_some();
-    let mut edges: Vec<EdgeLayout> = if incremental {
-        result.edges.clone()
-    } else {
-        (0..n).map(|_| EdgeLayout::empty()).collect()
-    };
-    let mut grid = SegmentGrid::new();
-
-    // P2-1: 路由 debug 统计
-    let mut ortho_stats = crate::layout::OrthoDebugStats {
-        edge_count: n,
-        ..Default::default()
-    };
-
-    for &i in &edge_order {
+#[allow(clippy::too_many_arguments)]
+fn phase_route_edges(
+    edge_order: &[usize],
+    relations: &[crate::ast::Relation],
+    nodes: &HashMap<String, NodeLayout>,
+    from_side: &[Port],
+    to_side: &[Port],
+    endpoint_map: &HashMap<(usize, bool), Endpoint>,
+    edges: &mut [EdgeLayout],
+    grid: &mut SegmentGrid,
+    ortho_stats: &mut crate::layout::OrthoDebugStats,
+    cfg: &OrthoConfig,
+    profile: &OrthoRoutingProfile,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    obstacles: &PreparedObstacles,
+    corridor_plan: &corridor_route::CorridorRoutePlan,
+    parallel: &crate::layout::edge::common::parallel_edges::ParallelGroups,
+    preserve_edges: &Option<std::collections::HashSet<usize>>,
+    self_loop_idx: &HashMap<usize, usize>,
+    space_budget: &mut Option<crate::layout::space_budget::SpaceBudget>,
+) {
+    for &i in edge_order {
         let t_edge = crate::layout::perf::Instant::now();
         let rel = &relations[i];
         let from_id = rel.from.as_str();
         let to_id = rel.to.as_str();
 
         if from_id == to_id {
-            if let Some(nl) = result.nodes.get(from_id) {
+            if let Some(nl) = nodes.get(from_id) {
                 let loop_idx = self_loop_idx.get(&i).copied().unwrap_or(0);
                 edges[i] = self_loop::route_self_loop(
                     rel,
@@ -644,7 +828,7 @@ fn route_edges_orthogonal_inner(
         }
 
         let (Some(_from_nl), Some(_to_nl)) =
-            (result.nodes.get(from_id), result.nodes.get(to_id))
+            (nodes.get(from_id), nodes.get(to_id))
         else {
             continue;
         };
@@ -656,9 +840,7 @@ fn route_edges_orthogonal_inner(
             continue;
         };
 
-        let mut corridor_boost = result
-            .hints
-            .space_budget
+        let mut corridor_boost = space_budget
             .as_ref()
             .map(|b| b.corridor_boost_requested)
             .unwrap_or(false);
@@ -667,8 +849,8 @@ fn route_edges_orthogonal_inner(
             to: to_ep.clone(),
         };
         let strict = should_strict_group_transit(
-            &profile,
-            &group_ctx,
+            profile,
+            group_ctx,
             from_id,
             to_id,
             corridor_plan.chains.contains_key(&i),
@@ -681,20 +863,20 @@ fn route_edges_orthogonal_inner(
             to_ep.anchor,
             from_id,
             to_id,
-            &corridor_plan,
-            &group_ctx,
-            &result.nodes,
-            &obstacles,
+            corridor_plan,
+            group_ctx,
+            nodes,
+            obstacles,
             cfg.channel_margin,
         )
         .unwrap_or_else(|| {
-            let ctx = RoutingContext::new(
-                &result.nodes,
-                &group_ctx,
-                &grid,
-                &cfg,
-                &profile,
-                &obstacles,
+            let ctx = OrthoRoutingContext::new(
+                nodes,
+                group_ctx,
+                grid,
+                cfg,
+                profile,
+                obstacles,
                 None,
             )
             .with_strict_group_transit(strict)
@@ -710,17 +892,17 @@ fn route_edges_orthogonal_inner(
         // S2：0 候选/退化 → 升走廊预算再路由一次（加大外框垫），禁止静默脏折线
         if path_stats.degraded && !corridor_boost {
             corridor_boost = true;
-            if let Some(budget) = result.hints.space_budget.as_mut() {
+            if let Some(budget) = space_budget.as_mut() {
                 budget.request_corridor_boost();
             }
             let mut boost_stats = PathSelectStats::default();
-            let ctx = RoutingContext::new(
-                &result.nodes,
-                &group_ctx,
-                &grid,
-                &cfg,
-                &profile,
-                &obstacles,
+            let ctx = OrthoRoutingContext::new(
+                nodes,
+                group_ctx,
+                grid,
+                cfg,
+                profile,
+                obstacles,
                 None,
             )
             .with_strict_group_transit(strict)
@@ -741,7 +923,7 @@ fn route_edges_orthogonal_inner(
         ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
         if path_stats.degraded {
             ortho_stats.degraded_count += 1;
-            if let Some(budget) = result.hints.space_budget.as_mut() {
+            if let Some(budget) = space_budget.as_mut() {
                 budget.request_corridor_boost();
             }
         }
@@ -780,30 +962,27 @@ fn route_edges_orthogonal_inner(
             t_edge.elapsed().as_secs_f64() * 1000.0
         );
     }
+}
 
-    // ── 4b. 后置交叉检测：修正 slot 排序与实际路由方向不一致的锚点 ──
-    let t_fix = crate::layout::perf::Instant::now();
-    //
-    // slot 排序（步骤 2）按对端节点中心坐标排列，但当边的实际路由方向与对端位置
-    // 方向不一致时（如需要绕过中间节点），排序结果会导致出边交叉。
-    // 典型场景：节点 A 底部两条出边，左边 slot 的边实际向右绕行，右边 slot 的边
-    // 直下，两者在节点下方交叉。交换 slot 后即可消除交叉。
-    replan_slots(
-        &result.nodes,
-        &relations,
-        &from_side,
-        &to_side,
-        &mut endpoint_map,
-        &mut edges,
-        &mut grid,
-        &cfg,
-        &group_ctx,
-        &obstacles,
-        &corridor_plan,
-        &mut ortho_stats,
-        &profile,
-    );
-
+#[allow(clippy::too_many_arguments)]
+fn phase_straighten_align(
+    nodes: &HashMap<String, NodeLayout>,
+    n: usize,
+    from_side: &[Port],
+    to_side: &[Port],
+    endpoint_map: &mut HashMap<(usize, bool), Endpoint>,
+    edges: &mut [EdgeLayout],
+    grid: &mut SegmentGrid,
+    relations: &[crate::ast::Relation],
+    reverse_pairs: &std::collections::BTreeSet<String>,
+    parallel: &crate::layout::edge::common::parallel_edges::ParallelGroups,
+    corridor_plan: &corridor_route::CorridorRoutePlan,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    obstacles: &PreparedObstacles,
+    cfg: &OrthoConfig,
+    profile: &OrthoRoutingProfile,
+    space_budget: &Option<crate::layout::space_budget::SpaceBudget>,
+) {
     // ── 4c. 直连偏好对齐：正对端口边的 slot 锚点对齐修正 ──
     // 在 replan_slots 之后执行，确保anchor位置是最终的slot排序结果。
     // 修改anchor后需要重路由受影响的边，因此放在 X-1 reroute 之前。
@@ -819,11 +998,11 @@ fn route_edges_orthogonal_inner(
         }
     }
     straighten_preferred_alignments(
-        &result.nodes,
+        nodes,
         n,
         &from_side,
         &to_side,
-        &mut endpoint_map,
+        endpoint_map,
         &straighten_offsets,
     );
 
@@ -858,10 +1037,10 @@ fn route_edges_orthogonal_inner(
                 to_ep.anchor,
                 from_id,
                 to_id,
-                &corridor_plan,
-                &group_ctx,
-                &result.nodes,
-                &obstacles,
+                corridor_plan,
+                group_ctx,
+                nodes,
+                obstacles,
                 cfg.channel_margin,
             )
             .unwrap_or_else(|| {
@@ -869,24 +1048,22 @@ fn route_edges_orthogonal_inner(
                     from: from_ep.clone(),
                     to: to_ep.clone(),
                 };
-                let boost = result
-                    .hints
-                    .space_budget
+                let boost = space_budget
                     .as_ref()
                     .map(|b| b.corridor_boost_requested)
                     .unwrap_or(false);
-                let ctx = RoutingContext::new(
-                    &result.nodes,
-                    &group_ctx,
+                let ctx = OrthoRoutingContext::new(
+                    nodes,
+                    group_ctx,
                     &grid,
-                    &cfg,
-                    &profile,
-                    &obstacles,
+                    cfg,
+                    profile,
+                    obstacles,
                     None,
                 )
                 .with_strict_group_transit(should_strict_group_transit(
-                    &profile,
-                    &group_ctx,
+                    profile,
+                    group_ctx,
                     from_id,
                     to_id,
                     corridor_plan.chains.contains_key(&ei),
@@ -924,65 +1101,137 @@ fn route_edges_orthogonal_inner(
         }
     }
     crate::perf_log!("[perf]     4c_straighten_align: {:.2}ms (aligned {} edges)", t_align2.elapsed().as_secs_f64() * 1000.0, align_reroute.len());
+}
 
-    // ── 4d. X-1: 多轮冲突消解重路由 ──
+/// Phase 3：分层批量边序（有 rank 时低层先占通道；feedback 全局延后）
+fn phase_layer_order(
+    relations: &[crate::ast::Relation],
+    sugiyama_ranks: Option<&HashMap<String, usize>>,
+    feedback_assignment: &feedback_side::FeedbackSideAssignment,
+) -> (Vec<usize>, std::collections::HashSet<usize>) {
+    let t2 = crate::layout::perf::Instant::now();
+    let node_degree = layer_order::compute_node_degrees(relations);
+    let feedback_edge_set: std::collections::HashSet<usize> =
+        feedback_assignment.hints.keys().copied().collect();
+    let edge_order = layer_order::compute_edge_order_with_feedback(
+        relations,
+        sugiyama_ranks,
+        &node_degree,
+        Some(&feedback_edge_set),
+    );
+    crate::perf_log!("[perf]     step2_slots+step3_order: {:.2}ms", t2.elapsed().as_secs_f64() * 1000.0);
+    (edge_order, feedback_edge_set)
+}
+
+/// Phase 4d (X-1)：多轮冲突消解重路由
+#[allow(clippy::too_many_arguments)]
+fn phase_reroute(
+    nodes: &HashMap<String, NodeLayout>,
+    relations: &[crate::ast::Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+    endpoint_map: &HashMap<(usize, bool), Endpoint>,
+    edges: &mut Vec<EdgeLayout>,
+    grid: &mut SegmentGrid,
+    cfg: &OrthoConfig,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    obstacles: &PreparedObstacles,
+    corridor_plan: &corridor_route::CorridorRoutePlan,
+    ortho_stats: &mut crate::layout::OrthoDebugStats,
+    profile: &OrthoRoutingProfile,
+) {
     let t_x1 = crate::layout::perf::Instant::now();
     reroute_conflicting_edges(
-        &result.nodes,
-        &relations,
-        &from_side,
-        &to_side,
-        &endpoint_map,
-        &mut edges,
-        &mut grid,
-        &cfg,
-        &group_ctx,
-        &obstacles,
-        &corridor_plan,
-        &mut ortho_stats,
-        &profile,
+        nodes,
+        relations,
+        from_side,
+        to_side,
+        endpoint_map,
+        edges,
+        grid,
+        cfg,
+        group_ctx,
+        obstacles,
+        corridor_plan,
+        ortho_stats,
+        profile,
     );
     crate::perf_log!("[perf]     x1_reroute: {:.2}ms", t_x1.elapsed().as_secs_f64() * 1000.0);
+}
 
-    // ── 4e. X-2: 反向 stub 检测与端口翻转 ──
-    //
-    // 问题场景：由于分组障碍物/走廊限制，choose_pair_sides 基于几何中心选择的端口
-    // 在实际路由时被证明是"反向"的——路径从端口出发后不得不沿反方向折返穿过节点
-    // 投影平面才能到达目标，导致箭头方向与主路径方向冲突（视觉上"搞笑箭头"）。
-    //
-    // 修正策略：路由完成后检测路径上的反向stub端点，将其端口翻转到对面（Bottom↔Top,
-    // Left↔Right），重新计算anchor并重路由。若新路径无反向stub且质量可接受，则接受。
+/// Phase 4e (X-2)：反向 stub 检测与端口翻转
+///
+/// 问题场景：由于分组障碍物/走廊限制，choose_pair_sides 基于几何中心选择的端口
+/// 在实际路由时被证明是"反向"的——路径从端口出发后不得不沿反方向折返穿过节点
+/// 投影平面才能到达目标，导致箭头方向与主路径方向冲突（视觉上"搞笑箭头"）。
+///
+/// 修正策略：路由完成后检测路径上的反向stub端点，将其端口翻转到对面（Bottom↔Top,
+/// Left↔Right），重新计算anchor并重路由。若新路径无反向stub且质量可接受，则接受。
+#[allow(clippy::too_many_arguments)]
+fn phase_stub_fix(
+    nodes: &HashMap<String, NodeLayout>,
+    relations: &[crate::ast::Relation],
+    from_side: &mut [Port],
+    to_side: &mut [Port],
+    endpoint_map: &mut HashMap<(usize, bool), Endpoint>,
+    edges: &mut Vec<EdgeLayout>,
+    grid: &mut SegmentGrid,
+    cfg: &OrthoConfig,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    obstacles: &PreparedObstacles,
+    corridor_plan: &corridor_route::CorridorRoutePlan,
+    ortho_stats: &mut crate::layout::OrthoDebugStats,
+    profile: &OrthoRoutingProfile,
+    feedback_edge_set: &std::collections::HashSet<usize>,
+) {
     let t_flip = crate::layout::perf::Instant::now();
     fix_reverse_stub_ports(
-        &result.nodes,
-        &relations,
-        &mut from_side,
-        &mut to_side,
-        &mut endpoint_map,
-        &mut edges,
-        &mut grid,
-        &cfg,
-        &group_ctx,
-        &obstacles,
-        &corridor_plan,
-        &mut ortho_stats,
-        &profile,
-        &feedback_edge_set,
+        nodes,
+        relations,
+        from_side,
+        to_side,
+        endpoint_map,
+        edges,
+        grid,
+        cfg,
+        group_ctx,
+        obstacles,
+        corridor_plan,
+        ortho_stats,
+        profile,
+        feedback_edge_set,
     );
     crate::perf_log!("[perf]     x2_flip_stub: {:.2}ms (flipped {} edges)", t_flip.elapsed().as_secs_f64() * 1000.0, ortho_stats.flipped_stub_edges);
+}
 
-    // ── 4f. X-3: Lane Assignment 车道分配 ──
-    // 对 bundling 无法合并的残余平行段，通过平移 cross-axis 坐标分离重合段。
-    // 不插入 Z 字弯，保持正交性。
+/// Phase 4f (X-3)：Lane Assignment 车道分配
+///
+/// 对 bundling 无法合并的残余平行段，通过平移 cross-axis 坐标分离重合段。
+/// 不插入 Z 字弯，保持正交性。
+#[allow(clippy::too_many_arguments)]
+fn phase_lane(
+    edges: &mut [EdgeLayout],
+    grid: &mut SegmentGrid,
+    nodes: &HashMap<String, NodeLayout>,
+    sorted_node_ids: &[String],
+    relations: &[crate::ast::Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+    parallel_gap: f64,
+    corridor_plan: &corridor_route::CorridorRoutePlan,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    profile: &OrthoRoutingProfile,
+    ortho_stats: &mut crate::layout::OrthoDebugStats,
+) {
     let t_lane = crate::layout::perf::Instant::now();
     let lane_stats = assign_lanes(
-        &mut edges,
-        &mut grid,
-        &result.nodes,
-        &obstacles.sorted_node_ids,
+        edges,
+        grid,
+        nodes,
+        sorted_node_ids,
         relations,
-        &from_side,
-        &to_side,
+        from_side,
+        to_side,
         parallel_gap,
     );
     ortho_stats.lane_groups = lane_stats.lane_groups;
@@ -990,29 +1239,29 @@ fn route_edges_orthogonal_inner(
     ortho_stats.lane_shifts_failed = lane_stats.shifts_failed;
     if profile.corridor_lane_offsets {
         let corridor_shifted = apply_corridor_planned_offsets(
-            &mut edges,
-            &mut grid,
-            &result.nodes,
-            &obstacles.sorted_node_ids,
+            edges,
+            grid,
+            nodes,
+            sorted_node_ids,
             relations,
-            &from_side,
-            &to_side,
-            &corridor_plan,
-            &group_ctx,
+            from_side,
+            to_side,
+            corridor_plan,
+            group_ctx,
         );
         ortho_stats.lane_segments_shifted += corridor_shifted;
         if profile.separate_unrelated_trunks {
             for _ in 0..2 {
                 let shifted = separate_unrelated_trunk_overlaps(
-                    &mut edges,
-                    Some(&mut grid),
+                    edges,
+                    Some(grid),
                     relations,
-                    &from_side,
-                    &to_side,
-                    &result.nodes,
-                    &obstacles.sorted_node_ids,
+                    from_side,
+                    to_side,
+                    nodes,
+                    sorted_node_ids,
                     parallel_gap,
-                    &profile,
+                    profile,
                 );
                 ortho_stats.lane_segments_shifted += shifted;
                 if shifted == 0 {
@@ -1028,25 +1277,36 @@ fn route_edges_orthogonal_inner(
         lane_stats.segments_shifted,
         lane_stats.shifts_failed
     );
+}
 
-    // ── 4g. 锯齿消毒：端点反向 stub + 微折折叠（lane/corridor 之后）──
-    sanitize_orthogonal_edges(&mut edges, relations, &from_side, &to_side);
+/// Phase 4g + X-0：锯齿消毒（端点反向 stub + 微折折叠）+ 边间距违规统计
+fn phase_sanitize(
+    edges: &mut [EdgeLayout],
+    relations: &[crate::ast::Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+    grid: &SegmentGrid,
+    parallel_gap: f64,
+    ortho_stats: &mut crate::layout::OrthoDebugStats,
+) {
+    sanitize_orthogonal_edges(edges, relations, from_side, to_side);
 
-    // ── 4c. X-0: 统计边间距违规（排除 stub 段） ──
+    // ── X-0: 统计边间距违规（排除 stub 段） ──
     let (exact_overlap_pairs, tight_spacing_pairs) =
-        count_all_edge_spacing_violations(&edges, &grid, parallel_gap);
+        count_all_edge_spacing_violations(edges, grid, parallel_gap);
     ortho_stats.edge_exact_overlap_pairs = exact_overlap_pairs;
     ortho_stats.edge_tight_spacing_pairs = tight_spacing_pairs;
+}
 
-    // ── 5. 标签自动避让 ──
-    let label_config = LabelPlacementConfig::for_diagram_type(diagram.diagram_type.clone());
-    resolve_label_overlaps_with_config(&mut edges, &result.nodes, &result.groups, label_config);
-    crate::perf_log!("[perf]     fix_inversions+labels: {:.2}ms", t_fix.elapsed().as_secs_f64() * 1000.0);
-
-    result.edges = edges;
-    // P2-1: 导出 orthogonal 路由 debug 统计
-    result.hints.orthogonal_debug = Some(ortho_stats);
-    result
+/// Phase 5：标签自动避让
+fn phase_labels(
+    edges: &mut [EdgeLayout],
+    nodes: &HashMap<String, NodeLayout>,
+    groups: &HashMap<String, crate::layout::GroupLayout>,
+    diagram_type: crate::types::DiagramType,
+) {
+    let label_config = LabelPlacementConfig::for_diagram_type(diagram_type);
+    resolve_label_overlaps_with_config(edges, nodes, groups, label_config);
 }
 
 /// 走廊边路径重建：有计划且通过穿障/穿组校验时返回路径。

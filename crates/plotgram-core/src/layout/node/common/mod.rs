@@ -2,6 +2,7 @@
 
 pub mod acyclic;
 pub mod barnes_hut;
+pub mod canvas_bounds;
 pub mod crossings;
 pub mod divide_and_conquer;
 pub mod edge_gutter;
@@ -11,7 +12,7 @@ pub mod graph_index;
 pub mod node_sizing;
 pub mod overlap;
 pub mod pack;
-pub mod preset;
+pub mod stats;
 
 // Re-export: label_placement 已下沉到 edge::common，此处保留兼容入口
 pub use crate::layout::edge::common::label_placement;

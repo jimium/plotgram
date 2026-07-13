@@ -12,9 +12,14 @@ use crate::metrics::{LayoutMetrics, MetricWeights, QualityGrade};
 use crate::profile::GraphProfile;
 use plotgram_core::types::DiagramType;
 use plotgram_core::ast::{Diagram};
-use plotgram_core::layout::{compute_layout, LayoutResult};
+use plotgram_core::layout::{compute_layout_with_plan, LayoutResult};
+// 与 core 对齐:使用 WASM-safe 的 perf::Instant(eval 本身为 native-only 工具,
+// 不会编译到 wasm32,但统一引用路径便于跨 crate 维护)
+use plotgram_core::layout::perf::Instant;
+use plotgram_core::layout::plan::LayoutPlan;
+use plotgram_core::profile::profile_for;
 use std::sync::mpsc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 // ═══════════════════════════════════════════════════════════
 //  算法配置
@@ -289,26 +294,60 @@ impl EvalEngine {
         let profile = GraphProfile::analyze(&diag);
         let timeout = self.timeout;
 
-        // 在独立线程中执行布局计算，通过 channel 传递结果
-        let (tx, rx) = mpsc::channel();
-        let diag_for_layout = diag.clone();
+        // 统一结果枚举:native 路径(thread+timeout)与 wasm 路径(sync)都产出 Outcome,
+        // 由下方单一 match 构建 EvalResult,避免逻辑重复。
+        enum Outcome {
+            Success(LayoutResult, Duration),
+            LayoutError(String),
+            Timeout,
+            Disconnected,
+        }
 
-        std::thread::spawn(move || {
-            let start = Instant::now();
-            let layout = match compute_layout(&diag_for_layout) {
-                Ok(layout) => layout,
-                Err(err) => {
-                    let _ = tx.send(Err(err.to_string()));
-                    return;
+        // native:独立线程 + channel + recv_timeout(依赖 std::thread / std::time::Instant)
+        #[cfg(not(target_arch = "wasm32"))]
+        let outcome: Outcome = {
+            let (tx, rx) = mpsc::channel();
+            let diag_for_layout = diag.clone();
+            std::thread::spawn(move || {
+                let start = Instant::now();
+                // 与 baseline.rs 对齐:显式解析 plan + compute_layout_with_plan。
+                // 调用方已通过 parse+prepare 完成样式物化,此处仅需重新解析 plan
+                // (diagram 经 clone/mutate 后 PreparedDiagram 的 plan 无法复用)。
+                let profile = profile_for(&diag_for_layout.diagram_type);
+                let plan = LayoutPlan::resolve(&diag_for_layout, profile);
+                match compute_layout_with_plan(&diag_for_layout, &plan) {
+                    Ok(layout) => {
+                        let elapsed = start.elapsed();
+                        let _ = tx.send(Ok((layout, elapsed)));
+                    }
+                    Err(err) => {
+                        let _ = tx.send(Err(err.to_string()));
+                    }
                 }
-            };
-            let elapsed = start.elapsed();
-            let _ = tx.send(Ok((layout, elapsed)));
-        });
+            });
+            match rx.recv_timeout(timeout) {
+                Ok(Ok((layout, elapsed))) => Outcome::Success(layout, elapsed),
+                Ok(Err(err)) => Outcome::LayoutError(err),
+                Err(mpsc::RecvTimeoutError::Timeout) => Outcome::Timeout,
+                Err(mpsc::RecvTimeoutError::Disconnected) => Outcome::Disconnected,
+            }
+        };
+        // wasm32 fallback:同步执行(eval 实际不会编译到 wasm32,此分支为防御性占位)
+        #[cfg(target_arch = "wasm32")]
+        let outcome: Outcome = {
+            let start = Instant::now();
+            let profile = profile_for(&diag.diagram_type);
+            let plan = LayoutPlan::resolve(&diag, profile);
+            match compute_layout_with_plan(&diag, &plan) {
+                Ok(layout) => Outcome::Success(layout, start.elapsed()),
+                Err(err) => Outcome::LayoutError(err.to_string()),
+            }
+        };
 
-        // 等待结果或超时
-        match rx.recv_timeout(timeout) {
-            Ok(Ok((layout, elapsed))) => {
+        let _ = timeout; // wasm 分支不使用 timeout,避免 unused 警告
+
+        match outcome {
+            Outcome::Success(layout, elapsed) => {
                 let metrics = LayoutMetrics::compute(&diag, &layout);
                 let score = self.compute_score(&metrics);
                 let quality_grade = QualityGrade::from_score(score);
@@ -329,7 +368,7 @@ impl EvalEngine {
                     timeout_dsl: None,
                 }
             }
-            Ok(Err(layout_error)) => {
+            Outcome::LayoutError(layout_error) => {
                 eprintln!(
                     "  ⚠ 布局配置错误！算法 '{}': {}",
                     config.name, layout_error
@@ -352,7 +391,7 @@ impl EvalEngine {
                     timeout_dsl: dsl_source.map(|s| s.to_string()),
                 }
             }
-            Err(mpsc::RecvTimeoutError::Timeout) => {
+            Outcome::Timeout => {
                 eprintln!(
                     "  ⚠ 超时！算法 '{}' 超过 {}s 未完成",
                     config.name,
@@ -377,7 +416,7 @@ impl EvalEngine {
                     timeout_dsl: dsl_source.map(|s| s.to_string()),
                 }
             }
-            Err(mpsc::RecvTimeoutError::Disconnected) => {
+            Outcome::Disconnected => {
                 // 计算线程 panic，视为超时
                 eprintln!(
                     "  ⚠ 计算线程异常退出！算法 '{}'",

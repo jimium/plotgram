@@ -7,6 +7,8 @@ use super::order;
 use super::postprocess;
 use super::preset::{self, SugiyamaPreset};
 
+use crate::layout::node::common::stats::median_f64;
+
 pub(super) fn assign_coordinates_brandes_koepf(
     dag: &DiGraph<String, ()>,
     layered_graph: &DiGraph<LayerNode, ()>,
@@ -176,16 +178,6 @@ fn align_singleton_layers_to_predecessors(
             continue;
         }
         set_axis_center(nl, horizontal, target, size);
-    }
-}
-
-fn median_f64(xs: &[f64]) -> f64 {
-    let n = xs.len();
-    debug_assert!(n > 0);
-    if n % 2 == 1 {
-        xs[n / 2]
-    } else {
-        (xs[n / 2 - 1] + xs[n / 2]) * 0.5
     }
 }
 

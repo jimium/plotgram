@@ -15,7 +15,7 @@ use crate::layout::{GroupLayout, Port};
 
 use super::profile::OrthoRoutingProfile;
 use super::path::port_outward;
-use super::simplify::simplify_path_preserving_stubs;
+use super::simplify::simplify_path;
 use super::EPS;
 
 /// 走廊内相邻车道间距（像素）
@@ -271,7 +271,7 @@ pub fn try_build_corridor_path(
     append_stub_leg(&mut waypoints, &mut current, to_anchor, final_side, stub);
     waypoints.push(to_anchor);
 
-    let path = simplify_path_preserving_stubs(waypoints);
+    let path = simplify_path(waypoints, true);
     (path.len() >= 2).then_some(path)
 }
 

@@ -13,6 +13,8 @@ use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
 use crate::types::DiagramType;
 use std::collections::HashMap;
 
+use super::label_common::{build_edge_segments, collect_label_keys, sorted_node_obstacles};
+
 const REJECT_SCORE: f64 = f64::INFINITY;
 const LABEL_OVERLAP_PENALTY: f64 = 1000.0;
 const FOREIGN_EDGE_PENALTY: f64 = 100.0;
@@ -28,8 +30,6 @@ const LONG_SEGMENT_MIN_RATIO: f64 = 1.25;
 /// 避免回退到原始冲突位置（label_avoidance Phase 2 不处理 label-node）。
 const NODE_OVERLAP_PENALTY: f64 = 10000.0;
 const NODE_OVERLAP_AREA_WEIGHT: f64 = 100.0;
-
-type LabelKey = (usize, usize);
 
 /// 图种相关的标签候选打分策略（Phase 4 architecture 专项）。
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -111,37 +111,24 @@ pub fn place_all_labels_by_candidates_with_config(
 
         if has_conflict {
             let candidates = generate_candidates(&path, preferred_t, size);
-            // 同时为当前位置打分，确保候选比当前位置更好才移动（避免劣化）
-            let current_score = score_candidate(
-                current,
-                current_bbox,
+            let ctx = CandidateScoringContext {
                 edge_idx,
-                &path,
+                path: &path,
                 preferred_t,
-                size,
-                &placed_bboxes,
-                &node_obstacles,
+                label_size: size,
+                placed_bboxes: &placed_bboxes,
+                node_obstacles: &node_obstacles,
                 groups,
-                &edge_segments,
+                edge_segments: &edge_segments,
                 config,
-            );
+            };
+            // 同时为当前位置打分，确保候选比当前位置更好才移动（避免劣化）
+            let current_score = score_candidate(current, current_bbox, &ctx);
             let best = candidates
                 .into_iter()
                 .map(|center| {
                     let bbox = bbox_from_center(center, size);
-                    let score = score_candidate(
-                        center,
-                        bbox,
-                        edge_idx,
-                        &path,
-                        preferred_t,
-                        size,
-                        &placed_bboxes,
-                        &node_obstacles,
-                        groups,
-                        &edge_segments,
-                        config,
-                    );
+                    let score = score_candidate(center, bbox, &ctx);
                     (score, center)
                 })
                 .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
@@ -200,46 +187,6 @@ fn placement_has_conflict(
     }
     let _ = path;
     false
-}
-
-fn collect_label_keys(edges: &[EdgeLayout]) -> Vec<LabelKey> {
-    edges
-        .iter()
-        .enumerate()
-        .flat_map(|(i, e)| {
-            if e.path_len() < 2 {
-                Vec::new()
-            } else {
-                (0..e.labels.len()).map(move |li| (i, li)).collect()
-            }
-        })
-        .collect()
-}
-
-fn sorted_node_obstacles(nodes: &HashMap<String, NodeLayout>) -> Vec<(f64, f64, f64, f64)> {
-    let mut ids: Vec<&String> = nodes.keys().collect();
-    ids.sort();
-    let m = DEFAULT_LABEL_PERP_OFFSET;
-    ids.into_iter()
-        .map(|id| {
-            let nl = &nodes[id];
-            // 外扩法向偏置量：贴边也视为冲突，触发 Phase 1 候选偏置
-            (nl.x - m, nl.y - m, nl.x + nl.width + m, nl.y + nl.height + m)
-        })
-        .collect()
-}
-
-fn build_edge_segments(edges: &[EdgeLayout]) -> Vec<Vec<(Point, Point)>> {
-    edges
-        .iter()
-        .map(|e| {
-            if e.path_len() < 2 {
-                return Vec::new();
-            }
-            let path = e.path_points().into_owned();
-            path.windows(2).map(|w| (w[0], w[1])).collect()
-        })
-        .collect()
 }
 
 fn preferred_t_for_label(label_idx: usize, path: &[Point], current: Point) -> f64 {
@@ -340,42 +287,48 @@ fn bbox_from_center(center: Point, size: (f64, f64)) -> (f64, f64, f64, f64) {
     )
 }
 
+/// Shared scoring context for label candidate evaluation.
+/// Constructed once per edge, reused across all candidates.
+struct CandidateScoringContext<'a> {
+    edge_idx: usize,
+    path: &'a [Point],
+    preferred_t: f64,
+    label_size: (f64, f64),
+    placed_bboxes: &'a [(f64, f64, f64, f64)],
+    node_obstacles: &'a [(f64, f64, f64, f64)],
+    groups: &'a HashMap<String, GroupLayout>,
+    edge_segments: &'a [Vec<(Point, Point)>],
+    config: LabelPlacementConfig,
+}
+
 fn score_candidate(
     center: Point,
     bbox: (f64, f64, f64, f64),
-    edge_idx: usize,
-    path: &[Point],
-    preferred_t: f64,
-    label_size: (f64, f64),
-    placed_bboxes: &[(f64, f64, f64, f64)],
-    node_obstacles: &[(f64, f64, f64, f64)],
-    groups: &HashMap<String, GroupLayout>,
-    edge_segments: &[Vec<(Point, Point)>],
-    config: LabelPlacementConfig,
+    ctx: &CandidateScoringContext,
 ) -> f64 {
     // 节点重叠：高有限惩罚（非 INFINITY），按重叠面积加权。
     // 保证「全部候选都碰节点」时仍能选出最小重叠候选，而非回退原始冲突位置。
     let mut score = 0.0;
-    for node_bbox in node_obstacles {
+    for node_bbox in ctx.node_obstacles {
         if let Some((ox, oy)) = aabb_overlap(&bbox, node_bbox) {
             score += NODE_OVERLAP_PENALTY + ox * oy * NODE_OVERLAP_AREA_WEIGHT;
         }
     }
 
-    for placed in placed_bboxes {
+    for placed in ctx.placed_bboxes {
         if let Some((ox, oy)) = aabb_overlap(&bbox, placed) {
             score += LABEL_OVERLAP_PENALTY + ox * oy;
         }
     }
 
     for id in {
-        let mut ids: Vec<&String> = groups.keys().collect();
+        let mut ids: Vec<&String> = ctx.groups.keys().collect();
         ids.sort();
         ids
     } {
-        if label_bbox_overlaps_group_shell(&bbox, &groups[id], GROUP_BORDER_SHELL_PAD) {
-            let near_endpoint = config.soften_endpoint_group_shell
-                && path_t_for_center(path, center).is_some_and(|t| t <= 0.25 || t >= 0.75);
+        if label_bbox_overlaps_group_shell(&bbox, &ctx.groups[id], GROUP_BORDER_SHELL_PAD) {
+            let near_endpoint = ctx.config.soften_endpoint_group_shell
+                && path_t_for_center(ctx.path, center).is_some_and(|t| t <= 0.25 || t >= 0.75);
             let penalty = if near_endpoint {
                 GROUP_OVERLAP_PENALTY * 0.2
             } else {
@@ -385,8 +338,8 @@ fn score_candidate(
         }
     }
 
-    for (seg_edge_idx, segs) in edge_segments.iter().enumerate() {
-        if seg_edge_idx == edge_idx {
+    for (seg_edge_idx, segs) in ctx.edge_segments.iter().enumerate() {
+        if seg_edge_idx == ctx.edge_idx {
             continue;
         }
         for &(p1, p2) in segs {
@@ -397,22 +350,22 @@ fn score_candidate(
         }
     }
 
-    let (_, path_dist) = closest_point_on_path(path, center);
+    let (_, path_dist) = closest_point_on_path(ctx.path, center);
     score += path_dist * PATH_DISTANCE_WEIGHT;
 
-    let midpoint = point_at_path_t(path, 0.5);
+    let midpoint = point_at_path_t(ctx.path, 0.5);
     let mid_dist = ((center.x - midpoint.x).powi(2) + (center.y - midpoint.y).powi(2)).sqrt();
     score += mid_dist * MIDPOINT_DISTANCE_WEIGHT;
 
-    let preferred_point = point_at_path_t(path, preferred_t);
+    let preferred_point = point_at_path_t(ctx.path, ctx.preferred_t);
     let pref_dist =
         ((center.x - preferred_point.x).powi(2) + (center.y - preferred_point.y).powi(2)).sqrt();
     score += pref_dist * 0.05;
 
-    if config.prefer_long_segment_whitespace && label_size.0 >= LONG_LABEL_MIN_WIDTH {
-        let seg_len = segment_length_at_center(path, center);
-        if seg_len >= label_size.0 * LONG_SEGMENT_MIN_RATIO {
-            let bonus = (seg_len / label_size.0).min(3.0) * LONG_SEGMENT_WHITESPACE_BONUS;
+    if ctx.config.prefer_long_segment_whitespace && ctx.label_size.0 >= LONG_LABEL_MIN_WIDTH {
+        let seg_len = segment_length_at_center(ctx.path, center);
+        if seg_len >= ctx.label_size.0 * LONG_SEGMENT_MIN_RATIO {
+            let bonus = (seg_len / ctx.label_size.0).min(3.0) * LONG_SEGMENT_WHITESPACE_BONUS;
             score -= bonus;
         }
     }

@@ -257,7 +257,7 @@ fn candidate_better(score: f64, path: &[Point], best: &Option<(f64, Vec<Point>)>
 
 fn evaluate_path_batch(
     mut paths: Vec<Vec<Point>>,
-    ctx: &RoutingContext,
+    ctx: &OrthoRoutingContext,
     pair: &EndpointPair,
     scorer: &dyn CandidateScorer,
     from_id: &str,
@@ -321,7 +321,7 @@ fn evaluate_path_batch(
 ///
 /// P1-A 渐进式候选：L 形 → channel（单档 margin）→ channel（加档 margin）→ z-fold → 阶梯。
 pub fn select_best_path_with_scorer_stats(
-    ctx: &RoutingContext,
+    ctx: &OrthoRoutingContext,
     pair: &EndpointPair,
     scorer: &dyn CandidateScorer,
     mut stats: Option<&mut PathSelectStats>,
@@ -479,7 +479,7 @@ pub fn select_best_path_with_scorer_stats(
 /// 路由硬失败时的正交兜底：同轴可直线；否则在 L/Z 与外框绕行中选穿组更少者。
 /// 所有候选在出口/入口强制外向 stub，避免退化路径首段反向伸入节点。
 fn orthogonal_degraded_fallback(
-    ctx: &RoutingContext<'_>,
+    ctx: &OrthoRoutingContext<'_>,
     start: Point,
     end: Point,
     from_side: Port,
@@ -518,12 +518,12 @@ fn orthogonal_degraded_fallback(
             Point::new(sx, sy),
             Point::new(ex, sy),
             Point::new(ex, ey),
-        ]));
+        ], false));
         candidates.push(simplify_path(vec![
             Point::new(sx, sy),
             Point::new(sx, ey),
             Point::new(ex, ey),
-        ]));
+        ], false));
     }
 
     // 绕所有组外框的通道（嵌套架构图上短 L 常穿父组，外框绕行更干净）
@@ -540,7 +540,7 @@ fn orthogonal_degraded_fallback(
                 Point::new(x, sy),
                 Point::new(x, ey),
                 Point::new(ex, ey),
-            ]));
+            ], false));
         }
         for y in [top, bottom] {
             candidates.push(simplify_path(vec![
@@ -548,7 +548,7 @@ fn orthogonal_degraded_fallback(
                 Point::new(sx, y),
                 Point::new(ex, y),
                 Point::new(ex, ey),
-            ]));
+            ], false));
         }
     }
 
@@ -592,7 +592,7 @@ fn orthogonal_degraded_fallback(
                 Point::new(sx, sy),
                 Point::new(ex, sy),
                 Point::new(ex, ey),
-            ]),
+            ], false),
             from_side,
             to_side,
         )
@@ -645,10 +645,10 @@ fn ensure_port_stubs(mut path: Vec<Point>, from_side: Port, to_side: Port) -> Ve
         out.push(to_stub);
     }
     out.push(end);
-    simplify_path(out)
+    simplify_path(out, false)
 }
 
-fn groups_outer_bounds(ctx: &RoutingContext<'_>) -> Option<(f64, f64, f64, f64)> {
+fn groups_outer_bounds(ctx: &OrthoRoutingContext<'_>) -> Option<(f64, f64, f64, f64)> {
     let mut iter = ctx.group_ctx.groups.values();
     let first = iter.next()?;
     let mut x_lo = first.x;
@@ -720,7 +720,7 @@ fn build_candidate_paths(
             path.push(start_stub);
             path.extend(middle.into_iter().skip(1));
             path.push(Point::new(ex, ey));
-            simplify_path_preserving_stubs(path)
+            simplify_path(path, true)
         })
         .collect();
 
@@ -752,7 +752,7 @@ fn build_candidate_paths(
                 path.extend(middle.into_iter().skip(1));
                 path.push(ext_end);
                 path.push(Point::new(ex, ey));
-                candidates.push(simplify_path_preserving_stubs(path));
+                candidates.push(simplify_path(path, true));
             }
         }
     }
@@ -768,7 +768,7 @@ fn generate_axis_folds(
     e1: Point,
     sx: f64, sy: f64, ex: f64, ey: f64,
     pair: &EndpointPair,
-    ctx: &RoutingContext,
+    ctx: &OrthoRoutingContext,
     endpoint_groups: &HashSet<&str>,
     margin: f64,
     corridor: EdgeCorridor,
@@ -808,9 +808,9 @@ fn generate_axis_folds(
     folds.into_iter().map(|fold| {
         let p1 = axis.point(s_main, fold);
         let p2 = axis.point(e_main, fold);
-        simplify_path_preserving_stubs(vec![
+        simplify_path(vec![
             Point::new(sx, sy), s1, p1, p2, e1, Point::new(ex, ey),
-        ])
+        ], true)
     }).collect()
 }
 
@@ -830,7 +830,7 @@ fn build_obstacle_aware_z_folds(
     ey: f64,
     to_side: Port,
     pair: &EndpointPair,
-    ctx: &RoutingContext,
+    ctx: &OrthoRoutingContext,
     corridor: EdgeCorridor,
 ) -> Vec<Vec<Point>> {
     let from_vertical = is_vertical_port(from_side);
@@ -891,7 +891,7 @@ fn build_staircase_candidates(
     ey: f64,
     to_side: Port,
     pair: &EndpointPair,
-    ctx: &RoutingContext,
+    ctx: &OrthoRoutingContext,
     fold_order: FoldOrder,
     corridor: EdgeCorridor,
 ) -> Vec<Vec<Point>> {
@@ -958,9 +958,9 @@ fn build_staircase_candidates(
                     let p1 = axis.point(fold, s_cross);
                     let p2 = axis.point(fold, channel);
                     let p3 = axis.point(e_main, channel);
-                    candidates.push(simplify_path_preserving_stubs(vec![
+                    candidates.push(simplify_path(vec![
                         Point::new(sx, sy), s1, p1, p2, p3, e1, Point::new(ex, ey),
-                    ]));
+                    ], true));
                 }
             }
         }
@@ -970,9 +970,9 @@ fn build_staircase_candidates(
                     let p1 = axis.point(s_main, channel);
                     let p2 = axis.point(fold, channel);
                     let p3 = axis.point(fold, e_cross);
-                    candidates.push(simplify_path_preserving_stubs(vec![
+                    candidates.push(simplify_path(vec![
                         Point::new(sx, sy), s1, p1, p2, p3, e1, Point::new(ex, ey),
-                    ]));
+                    ], true));
                 }
             }
         }
@@ -991,7 +991,7 @@ fn build_channel_detours_on_axis(
     ey: f64,
     to_side: Port,
     pair: &EndpointPair,
-    ctx: &RoutingContext,
+    ctx: &OrthoRoutingContext,
     endpoint_groups: &HashSet<&str>,
     margins: &[f64],
     base_margin: f64,
@@ -1140,14 +1140,14 @@ fn build_channel_detours_on_axis(
     for &channel in &channel_coords {
         let p_mid1 = axis.point(axis.main_coord(s1), channel);
         let p_mid2 = axis.point(axis.main_coord(e1), channel);
-        candidates.push(simplify_path_preserving_stubs(vec![
+        candidates.push(simplify_path(vec![
             Point::new(sx, sy),
             s1,
             p_mid1,
             p_mid2,
             e1,
             Point::new(ex, ey),
-        ]));
+        ], true));
     }
     candidates
 }
@@ -1161,7 +1161,7 @@ fn build_channel_detours(
     ey: f64,
     to_side: Port,
     pair: &EndpointPair,
-    ctx: &RoutingContext,
+    ctx: &OrthoRoutingContext,
     corridor: EdgeCorridor,
     margins: &[f64],
 ) -> Vec<Vec<Point>> {
@@ -1267,12 +1267,12 @@ fn compute_orthogonal_path_variants(
         } else {
             vec![Point::new(sx, sy), Point::new(ex, sy), Point::new(ex, ey)]
         };
-        let mut variants = vec![simplify_path(l1)];
+        let mut variants = vec![simplify_path(l1, false)];
         if !from_vertical && (ey - sy).abs() > EPS {
-            variants.push(simplify_path(vec![Point::new(sx, sy), Point::new(sx, ey), Point::new(ex, ey)]));
+            variants.push(simplify_path(vec![Point::new(sx, sy), Point::new(sx, ey), Point::new(ex, ey)], false));
         }
         if from_vertical && (ex - sx).abs() > EPS {
-            variants.push(simplify_path(vec![Point::new(sx, sy), Point::new(ex, sy), Point::new(ex, ey)]));
+            variants.push(simplify_path(vec![Point::new(sx, sy), Point::new(ex, sy), Point::new(ex, ey)], false));
         }
         return variants;
     }
@@ -1284,7 +1284,7 @@ fn compute_orthogonal_path_variants(
                 .iter()
                 .map(|r| {
                     let yj = sy + (ey - sy) * r;
-                    simplify_path(vec![Point::new(sx, sy), Point::new(sx, yj), Point::new(ex, yj), Point::new(ex, ey)])
+                    simplify_path(vec![Point::new(sx, sy), Point::new(sx, yj), Point::new(ex, yj), Point::new(ex, ey)], false)
                 })
                 .collect()
         } else {
@@ -1292,12 +1292,12 @@ fn compute_orthogonal_path_variants(
                 .iter()
                 .map(|r| {
                     let xj = sx + (ex - sx) * r;
-                    simplify_path(vec![Point::new(sx, sy), Point::new(xj, sy), Point::new(xj, ey), Point::new(ex, ey)])
+                    simplify_path(vec![Point::new(sx, sy), Point::new(xj, sy), Point::new(xj, ey), Point::new(ex, ey)], false)
                 })
                 .collect()
         }
     } else {
-        vec![simplify_path(same_side_path(sx, sy, from_side, ex, ey))]
+        vec![simplify_path(same_side_path(sx, sy, from_side, ex, ey), false)]
     }
 }
 

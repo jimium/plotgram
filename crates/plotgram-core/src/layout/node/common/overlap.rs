@@ -103,11 +103,26 @@ impl OverlapResolver for ForceDirectedResolver {
 pub struct BruteForceResolver {
     /// 最大迭代轮数
     pub max_rounds: usize,
+    /// 每次推开时在计算位移之外额外加的 epsilon,
+    /// 用于保证 overlap 接近 0 时仍有进展。
+    /// 默认 1.0;mindmap 历史实现使用 0.5,通过 [`with_push_epsilon`] 传入。
+    pub push_epsilon: f64,
 }
 
 impl BruteForceResolver {
     pub fn new(max_rounds: usize) -> Self {
-        Self { max_rounds }
+        Self {
+            max_rounds,
+            push_epsilon: 1.0,
+        }
+    }
+
+    /// 指定自定义 `push_epsilon`(用于对齐历史实现的常量,保证零行为变更)。
+    pub fn with_push_epsilon(max_rounds: usize, push_epsilon: f64) -> Self {
+        Self {
+            max_rounds,
+            push_epsilon,
+        }
     }
 }
 
@@ -159,7 +174,7 @@ impl OverlapResolver for BruteForceResolver {
                         (a_y + a_h + margin - b_y).min(b_y + b_h + margin - a_y);
 
                     if overlap_x_amount < overlap_y_amount {
-                        let shift = overlap_x_amount / 2.0 + 1.0;
+                        let shift = overlap_x_amount / 2.0 + self.push_epsilon;
                         let dir = if a_cx <= b_cx { -1.0 } else { 1.0 };
                         if let Some(nl) = nodes.get_mut(&ids[i]) {
                             nl.x += dir * shift;
@@ -168,7 +183,7 @@ impl OverlapResolver for BruteForceResolver {
                             nl.x -= dir * shift;
                         }
                     } else {
-                        let shift = overlap_y_amount / 2.0 + 1.0;
+                        let shift = overlap_y_amount / 2.0 + self.push_epsilon;
                         let dir = if a_cy <= b_cy { -1.0 } else { 1.0 };
                         if let Some(nl) = nodes.get_mut(&ids[i]) {
                             nl.y += dir * shift;

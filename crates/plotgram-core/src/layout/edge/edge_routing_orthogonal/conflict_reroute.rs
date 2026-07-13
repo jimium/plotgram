@@ -66,17 +66,7 @@ pub fn reroute_conflicting_edges(
             break;
         }
         // 检测所有冲突边（path_edge_spacing_violations 内部已豁免 stub 段）
-        let mut conflicts: Vec<(usize, usize)> = Vec::new(); // (ei, violation_count)
-        for ei in 0..n {
-            if edges[ei].path_is_empty() || failed_edges.contains(&ei) {
-                continue;
-            }
-            let points: Vec<Point> = edges[ei].path_points().into_owned();
-            let viols = path_edge_spacing_violations(&points, grid, parallel_gap);
-            if !viols.is_empty() {
-                conflicts.push((ei, viols.len()));
-            }
-        }
+        let conflicts = collect_spacing_conflicts(edges, grid, parallel_gap, &failed_edges);
 
         if conflicts.is_empty() {
             break;
@@ -86,6 +76,7 @@ pub fn reroute_conflicting_edges(
         }
 
         // 按违规数降序排列（稳定排序保证确定性）
+        let mut conflicts = conflicts;
         conflicts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
 
         rounds_done = round + 1;
@@ -121,102 +112,30 @@ pub fn reroute_conflicting_edges(
             grid.remove_by_edges(&[ei]);
             let old_points: Vec<Point> = edges[ei].path_points().into_owned();
 
-            if let Some(corridor_path) = validated_corridor_path(
+            let clean_path = find_clean_reroute_path(
                 ei,
-                from_ep.anchor,
-                to_ep.anchor,
+                from_ep,
+                to_ep,
                 from_id,
                 to_id,
-                corridor_plan,
-                group_ctx,
+                cfg,
+                &reroute_margins,
                 nodes,
+                group_ctx,
+                grid,
+                profile,
                 obstacles,
-                cfg.channel_margin,
-            ) {
-                if path_edge_spacing_violations(&corridor_path, grid, parallel_gap).is_empty() {
-                    grid.insert_path(&corridor_path, ei);
-                    let mut edge = EdgeLayout {
-                        geometry: PathGeometry::Polyline { points: Vec::new() },
-                        labels: edges[ei].labels.clone(),
-                        from_port: from_side[ei],
-                        to_port: to_side[ei],
-                    };
-                    edge.set_polyline_points(corridor_path);
-                    edges[ei] = edge;
-                    continue;
-                }
-            }
-
-            let mut clean_path: Option<Vec<Point>> = None;
-
-            for &margin in &reroute_margins {
-                let r_cfg = OrthoConfig {
-                    channel_margin: margin,
-                    ..*cfg
-                };
-                let boost = margin > cfg.channel_margin + 0.5;
-                let ctx = RoutingContext::new(
-                    nodes,
-                    group_ctx,
-                    grid,
-                    &r_cfg,
-                    profile,
-                    obstacles,
-                    Some(&load_map),
-                )
-                .with_strict_group_transit(should_strict_group_transit(
-                    profile,
-                    group_ctx,
-                    from_id,
-                    to_id,
-                    corridor_plan.chains.contains_key(&ei),
-                ))
-                .with_corridor_boost(boost);
-                let pair = EndpointPair {
-                    from: from_ep.clone(),
-                    to: to_ep.clone(),
-                };
-                let mut path_stats = PathSelectStats::default();
-                // 使用全候选（phase1_only=false），包含 staircases，增加找到干净路径的概率
-                let candidate = select_best_path_with_scorer_stats(
-                    &ctx,
-                    &pair,
-                    &DefaultScorer,
-                    Some(&mut path_stats),
-                    false,
-                );
-                ortho_stats.total_candidates += path_stats.candidate_count;
-                ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
-                if path_stats.degraded {
-                    ortho_stats.degraded_count += 1;
-                }
-
-                if candidate.len() >= 2
-                    && path_is_clean(
-                        &candidate,
-                        pair.from_id(),
-                        pair.to_id(),
-                        nodes,
-                        group_ctx,
-                        &obstacles.sorted_node_ids,
-                    )
-                    && path_avoids_group_interiors(
-                        &candidate,
-                        pair.from_id(),
-                        pair.to_id(),
-                        group_ctx,
-                        &obstacles.sorted_group_ids,
-                    )
-                    && path_is_clean_from_edges(&candidate, grid, parallel_gap, STUB_GUARD_LENGTH)
-                {
-                    clean_path = Some(candidate);
-                    break;
-                }
-            }
+                &load_map,
+                ortho_stats,
+                parallel_gap,
+                corridor_plan,
+            );
 
             match clean_path {
-                Some(path) => {
-                    let labels = if path.len() >= 2 {
+                Some((path, preserve_old_labels)) => {
+                    let labels = if preserve_old_labels {
+                        edges[ei].labels.clone()
+                    } else if path.len() >= 2 {
                         match relations.get(ei) {
                             Some(rel) => {
                                 crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto(
@@ -237,7 +156,10 @@ pub fn reroute_conflicting_edges(
                     };
                     edge.set_polyline_points(path);
                     edges[ei] = edge;
-                    total_rerouted += 1;
+                    // corridor 快速通道不计入 rerouted 统计（对齐原 continue 分支）
+                    if !preserve_old_labels {
+                        total_rerouted += 1;
+                    }
                 }
                 None => {
                     // 找不到干净路径，恢复原路径并标记为失败，后续轮次跳过
@@ -251,4 +173,139 @@ pub fn reroute_conflicting_edges(
     ortho_stats.reroute_iterations = rounds_done;
     ortho_stats.rerouted_edges = total_rerouted;
     ortho_stats.max_channel_load = max_channel_load;
+}
+
+/// 收集所有存在间距违规的边索引及其违规数。
+///
+/// 跳过空路径边和已标记失败的边。stub 段在 `path_edge_spacing_violations`
+/// 内部已豁免。
+fn collect_spacing_conflicts(
+    edges: &[EdgeLayout],
+    grid: &SegmentGrid,
+    parallel_gap: f64,
+    failed_edges: &std::collections::HashSet<usize>,
+) -> Vec<(usize, usize)> {
+    let mut conflicts: Vec<(usize, usize)> = Vec::new();
+    for ei in 0..edges.len() {
+        if edges[ei].path_is_empty() || failed_edges.contains(&ei) {
+            continue;
+        }
+        let points: Vec<Point> = edges[ei].path_points().into_owned();
+        let viols = path_edge_spacing_violations(&points, grid, parallel_gap);
+        if !viols.is_empty() {
+            conflicts.push((ei, viols.len()));
+        }
+    }
+    conflicts
+}
+
+/// 为一条冲突边寻找干净的重路由路径。
+///
+/// 依次尝试：corridor 快速通道 → 递增 channel_margin 的全候选搜索。
+/// 返回第一条通过节点/分组/边间距硬检查的路径；若全部失败返回 `None`。
+///
+/// 返回值的 `bool` 表示是否保留原标签（corridor 快速通道保留，全候选搜索重建）。
+#[allow(clippy::too_many_arguments)]
+fn find_clean_reroute_path(
+    ei: usize,
+    from_ep: &Endpoint,
+    to_ep: &Endpoint,
+    from_id: &str,
+    to_id: &str,
+    cfg: &OrthoConfig,
+    reroute_margins: &[f64],
+    nodes: &HashMap<String, NodeLayout>,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    grid: &SegmentGrid,
+    profile: &OrthoRoutingProfile,
+    obstacles: &PreparedObstacles,
+    load_map: &ChannelLoadMap,
+    ortho_stats: &mut crate::layout::OrthoDebugStats,
+    parallel_gap: f64,
+    corridor_plan: &corridor_route::CorridorRoutePlan,
+) -> Option<(Vec<Point>, bool)> {
+    // 先试 corridor 快速通道（保留原标签）
+    if let Some(corridor_path) = validated_corridor_path(
+        ei,
+        from_ep.anchor,
+        to_ep.anchor,
+        from_id,
+        to_id,
+        corridor_plan,
+        group_ctx,
+        nodes,
+        obstacles,
+        cfg.channel_margin,
+    ) {
+        if path_edge_spacing_violations(&corridor_path, grid, parallel_gap).is_empty() {
+            return Some((corridor_path, true));
+        }
+    }
+
+    // 递增 margin 尝试全候选搜索（重建标签）
+    for &margin in reroute_margins {
+        let r_cfg = OrthoConfig {
+            channel_margin: margin,
+            ..*cfg
+        };
+        let boost = margin > cfg.channel_margin + 0.5;
+        let ctx = OrthoRoutingContext::new(
+            nodes,
+            group_ctx,
+            grid,
+            &r_cfg,
+            profile,
+            obstacles,
+            Some(load_map),
+        )
+        .with_strict_group_transit(should_strict_group_transit(
+            profile,
+            group_ctx,
+            from_id,
+            to_id,
+            corridor_plan.chains.contains_key(&ei),
+        ))
+        .with_corridor_boost(boost);
+        let pair = EndpointPair {
+            from: from_ep.clone(),
+            to: to_ep.clone(),
+        };
+        let mut path_stats = PathSelectStats::default();
+        // 使用全候选（phase1_only=false），包含 staircases，增加找到干净路径的概率
+        let candidate = select_best_path_with_scorer_stats(
+            &ctx,
+            &pair,
+            &DefaultScorer,
+            Some(&mut path_stats),
+            false,
+        );
+        ortho_stats.total_candidates += path_stats.candidate_count;
+        ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
+        if path_stats.degraded {
+            ortho_stats.degraded_count += 1;
+        }
+
+        if candidate.len() >= 2
+            && path_is_clean(
+                &candidate,
+                pair.from_id(),
+                pair.to_id(),
+                nodes,
+                group_ctx,
+                &obstacles.sorted_node_ids,
+            )
+            && path_avoids_group_interiors(
+                &candidate,
+                pair.from_id(),
+                pair.to_id(),
+                group_ctx,
+                &obstacles.sorted_group_ids,
+            )
+            && path_is_clean_from_edges(&candidate, grid, parallel_gap, STUB_GUARD_LENGTH)
+        {
+            return Some((candidate, false));
+        }
+    }
+
+    None
 }

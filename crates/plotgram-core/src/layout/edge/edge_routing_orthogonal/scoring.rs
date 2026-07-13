@@ -36,7 +36,7 @@ const BBOX_EXPAND: f64 = 10.0;
 /// (A* / multi-objective / learned weights) swap the scorer without touching
 /// `select_best_path`'s structure.
 pub trait CandidateScorer {
-    fn score(&self, path: &[Point], ctx: &RoutingContext, pair: &EndpointPair) -> f64;
+    fn score(&self, path: &[Point], ctx: &OrthoRoutingContext, pair: &EndpointPair) -> f64;
 }
 
 /// Default scorer: the original 4-term weighted sum
@@ -44,7 +44,7 @@ pub trait CandidateScorer {
 pub struct DefaultScorer;
 
 impl CandidateScorer for DefaultScorer {
-    fn score(&self, path: &[Point], ctx: &RoutingContext, pair: &EndpointPair) -> f64 {
+    fn score(&self, path: &[Point], ctx: &OrthoRoutingContext, pair: &EndpointPair) -> f64 {
         let w = ctx.profile.scoring;
         let mut score = path_length(path) * w.path_length;
         score += path.len().saturating_sub(2) as f64 * BEND_PENALTY * w.bend;
@@ -305,36 +305,15 @@ fn segments_conflict(a: &RoutedSegment, b: &RoutedSegment) -> bool {
         return false;
     }
 
+    if let Some(info) = classify_parallel_pair(a, b) {
+        return info.gap <= EDGE_PARALLEL_GAP && info.projection_overlaps;
+    }
+
+    // P0-2: 检测垂直交叉（水平段与垂直段相交，修复 G2 检测缺失）
     let a_horiz = (a.y1 - a.y2).abs() < EPS;
     let b_horiz = (b.y1 - b.y2).abs() < EPS;
     let a_vert = (a.x1 - a.x2).abs() < EPS;
     let b_vert = (b.x1 - b.x2).abs() < EPS;
-
-    if a_horiz && b_horiz {
-        let gap = (a.y1 - b.y1).abs();
-        if gap > EDGE_PARALLEL_GAP {
-            return false;
-        }
-        let a_min = a.x1.min(a.x2);
-        let a_max = a.x1.max(a.x2);
-        let b_min = b.x1.min(b.x2);
-        let b_max = b.x1.max(b.x2);
-        return a_max > b_min + EPS && b_max > a_min + EPS;
-    }
-
-    if a_vert && b_vert {
-        let gap = (a.x1 - b.x1).abs();
-        if gap > EDGE_PARALLEL_GAP {
-            return false;
-        }
-        let a_min = a.y1.min(a.y2);
-        let a_max = a.y1.max(a.y2);
-        let b_min = b.y1.min(b.y2);
-        let b_max = b.y1.max(b.y2);
-        return a_max > b_min + EPS && b_max > a_min + EPS;
-    }
-
-    // P0-2: 检测垂直交叉（水平段与垂直段相交，修复 G2 检测缺失）
     if a_horiz && b_vert {
         return segments_cross_perpendicular(a, b);
     }
@@ -343,6 +322,49 @@ fn segments_conflict(a: &RoutedSegment, b: &RoutedSegment) -> bool {
     }
 
     false
+}
+
+/// 平行段对信息：间隙与投影重叠判定结果。
+struct ParallelPairInfo {
+    gap: f64,
+    projection_overlaps: bool,
+}
+
+/// 判定两条段是否为平行对（同水平或同垂直）。
+///
+/// 不检查 `edge_index`；调用方需自行跳过同边。
+/// 返回间隙和投影重叠信息；非平行（含非轴向）返回 `None`。
+fn classify_parallel_pair(a: &RoutedSegment, b: &RoutedSegment) -> Option<ParallelPairInfo> {
+    let a_horiz = (a.y1 - a.y2).abs() < EPS;
+    let b_horiz = (b.y1 - b.y2).abs() < EPS;
+    let a_vert = (a.x1 - a.x2).abs() < EPS;
+    let b_vert = (b.x1 - b.x2).abs() < EPS;
+
+    if a_horiz && b_horiz {
+        let gap = (a.y1 - b.y1).abs();
+        let a_min = a.x1.min(a.x2);
+        let a_max = a.x1.max(a.x2);
+        let b_min = b.x1.min(b.x2);
+        let b_max = b.x1.max(b.x2);
+        return Some(ParallelPairInfo {
+            gap,
+            projection_overlaps: a_max > b_min + EPS && b_max > a_min + EPS,
+        });
+    }
+
+    if a_vert && b_vert {
+        let gap = (a.x1 - b.x1).abs();
+        let a_min = a.y1.min(a.y2);
+        let a_max = a.y1.max(a.y2);
+        let b_min = b.y1.min(b.y2);
+        let b_max = b.y1.max(b.y2);
+        return Some(ParallelPairInfo {
+            gap,
+            projection_overlaps: a_max > b_min + EPS && b_max > a_min + EPS,
+        });
+    }
+
+    None
 }
 
 /// 检测水平段 `h` 与垂直段 `v` 是否严格内部相交（不含端点接触）。
@@ -385,47 +407,19 @@ pub fn segments_violate_spacing(
         return None;
     }
 
-    let a_horiz = (a.y1 - a.y2).abs() < EPS;
-    let b_horiz = (b.y1 - b.y2).abs() < EPS;
-    let a_vert = (a.x1 - a.x2).abs() < EPS;
-    let b_vert = (b.x1 - b.x2).abs() < EPS;
+    // 复用 classify_parallel_pair：非平行段（含正交交叉）返回 None；
+    // 平行段返回 gap + projection_overlaps。
+    let info = classify_parallel_pair(a, b)?;
 
-    if a_horiz && b_horiz {
-        let gap = (a.y1 - b.y1).abs();
-        let a_min = a.x1.min(a.x2);
-        let a_max = a.x1.max(a.x2);
-        let b_min = b.x1.min(b.x2);
-        let b_max = b.x1.max(b.x2);
-        if a_max <= b_min + EPS || b_max <= a_min + EPS {
-            return None;
-        }
-        if gap < EPS {
-            return Some((SpacingViolationKind::ExactOverlap, 0.0));
-        }
-        if gap < min_gap {
-            return Some((SpacingViolationKind::TightSpacing, gap));
-        }
+    if !info.projection_overlaps {
         return None;
     }
-
-    if a_vert && b_vert {
-        let gap = (a.x1 - b.x1).abs();
-        let a_min = a.y1.min(a.y2);
-        let a_max = a.y1.max(a.y2);
-        let b_min = b.y1.min(b.y2);
-        let b_max = b.y1.max(b.y2);
-        if a_max <= b_min + EPS || b_max <= a_min + EPS {
-            return None;
-        }
-        if gap < EPS {
-            return Some((SpacingViolationKind::ExactOverlap, 0.0));
-        }
-        if gap < min_gap {
-            return Some((SpacingViolationKind::TightSpacing, gap));
-        }
-        return None;
+    if info.gap < EPS {
+        return Some((SpacingViolationKind::ExactOverlap, 0.0));
     }
-
+    if info.gap < min_gap {
+        return Some((SpacingViolationKind::TightSpacing, info.gap));
+    }
     None
 }
 
@@ -441,7 +435,7 @@ pub fn path_edge_spacing_violations(
     grid: &SegmentGrid,
     min_gap: f64,
 ) -> Vec<(usize, SpacingViolationKind, f64)> {
-    let stub_guard = 24.0;
+    let stub_guard = super::STUB_GUARD_LENGTH;
     let mut violations = Vec::new();
     if path.len() < 2 {
         return violations;
@@ -479,7 +473,7 @@ pub fn count_all_edge_spacing_violations(
     grid: &SegmentGrid,
     min_gap: f64,
 ) -> (usize, usize) {
-    let stub_guard = 24.0;
+    let stub_guard = super::STUB_GUARD_LENGTH;
     let mut exact_overlap = 0usize;
     let mut tight_spacing = 0usize;
 

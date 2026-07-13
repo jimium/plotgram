@@ -125,7 +125,11 @@ impl LayoutStrategy for ForceDirectedLayout {
             &nodes,
             GroupPadding::uniform(config.group_padding, 16.0),
         );
-        let (total_width, total_height) = bounds_from_layout(&nodes, &groups, config.padding);
+        let (total_width, total_height) = crate::layout::node::common::canvas_bounds::canvas_size(
+            &nodes,
+            &groups,
+            config.padding,
+        );
 
         LayoutResult {
             nodes,
@@ -836,21 +840,6 @@ fn pack_components_v2(
 }
 
 // ─── 工具函数 ────────────────────────────────────────────
-
-fn bounds_from_layout(
-    nodes: &HashMap<String, NodeLayout>,
-    groups: &HashMap<String, GroupLayout>,
-    padding: f64,
-) -> (f64, f64) {
-    let node_max_x = nodes.values().map(|node| node.x + node.width).fold(0.0_f64, f64::max);
-    let node_max_y = nodes.values().map(|node| node.y + node.height).fold(0.0_f64, f64::max);
-    let group_max_x = groups.values().map(|group| group.x + group.width).fold(0.0_f64, f64::max);
-    let group_max_y = groups.values().map(|group| group.y + group.height).fold(0.0_f64, f64::max);
-    (
-        node_max_x.max(group_max_x) + padding,
-        node_max_y.max(group_max_y) + padding,
-    )
-}
 
 fn add_vec(displacements: &mut HashMap<String, (f64, f64)>, id: &str, dx: f64, dy: f64) {
     let entry = displacements.entry(id.to_string()).or_insert((0.0, 0.0));

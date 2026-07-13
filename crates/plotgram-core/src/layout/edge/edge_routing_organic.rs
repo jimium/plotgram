@@ -21,7 +21,7 @@ use crate::layout::{EdgeLayout, EdgeRoutingStrategy, LayoutResult, PathGeometry}
 use crate::layout::edge::common::edge_geometry::{
     build_edge_labels, compute_bezier_controls_organic,
     compute_bezier_controls_organic_tangents, cubic_bezier_point, parse_label_t,
-    radial_outward_tangent, DEFAULT_BEZIER_TENSION, DEFAULT_SHOULDER_RATIO,
+    port_direction, radial_outward_tangent, DEFAULT_BEZIER_TENSION, DEFAULT_SHOULDER_RATIO,
 };
 use crate::layout::edge::common::routing_skeleton::{
     finalize_edges, resolve_endpoints, EdgeEndpoints, LabelOffset, RoutingContext,
@@ -101,9 +101,6 @@ pub(crate) const ORGANIC_OPTIONS: &[AlgorithmOptionSpec] = &[
         description: "连接点均匀分布强度（0.0=关闭，1.0=完全均匀分布，同一父节点的子节点连接点垂直均匀排布）",
     },
 ];
-
-/// 穿障检测的曲线采样点数
-const OBSTACLE_CHECK_SAMPLES: usize = 16;
 
 /// 有机曲线路由可调参数
 #[derive(Clone, Copy)]
@@ -217,19 +214,8 @@ pub fn route_edges_organic(
         config.shoulder_ratio
     };
 
-    let node_list: Vec<(usize, &crate::layout::NodeLayout)> = result
-        .nodes
-        .iter()
-        .enumerate()
-        .map(|(i, (_, nl))| (i, nl))
-        .collect();
-    let node_id_to_idx: HashMap<&str, usize> = result
-        .nodes
-        .keys()
-        .enumerate()
-        .map(|(i, id)| (id.as_str(), i))
-        .collect();
-    let obstacle_index = visibility::ObstacleIndex::build(&node_list);
+    let (node_id_to_idx, obstacle_index) =
+        crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
 
     // 父子映射：穿障检测时跳过同父兄弟，避免扇出曲线误判为穿障
     let mut children_of: HashMap<&str, Vec<&str>> = HashMap::new();
@@ -325,7 +311,7 @@ pub fn route_edges_organic(
             let aspect_n = from_nl.width / from_nl.height.max(1e-6);
             if (aspect_n - 1.0).abs() < 0.08 {
                 let from_dir = radial_outward_tangent(from_nl, start_pt);
-                let to_dir = port_dir(to_port);
+                let to_dir = port_direction(to_port);
                 compute_bezier_controls_organic_tangents(
                     start_x, start_y, end_x, end_y,
                     from_dir, to_dir, effective_tension, adaptive_shoulder,
@@ -381,7 +367,7 @@ pub fn route_edges_organic(
             }
         }
 
-        if curve_intersects_obstacles(&edge, &obstacle_index, &skip) {
+        if crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(&edge, &obstacle_index, &skip) {
             if is_mindmap {
                 // 思维导图保持平滑贝塞尔：用绕行中点拉弓，避免折线观感
                 if let Some(bowed) = bow_bezier_around_obstacles(
@@ -537,15 +523,6 @@ fn snap_to_side(
     }
 }
 
-/// 兼容旧名
-fn snap_to_ellipse_side(
-    nl: &crate::layout::NodeLayout,
-    y: f64,
-    port: crate::layout::Port,
-) -> (f64, f64) {
-    snap_to_side(nl, y, port)
-}
-
 /// 思维导图：若起点落在 Top/Bottom（斜角矩形交点），按子节点水平侧改吸附。
 fn coerce_mindmap_start_to_horizontal_port(
     result: &LayoutResult,
@@ -597,30 +574,6 @@ fn snap_mindmap_end(
     let mid_y = to_nl.y + to_nl.height / 2.0;
     let (x, y) = snap_to_side(to_nl, mid_y, port);
     (Point::new(x, y), port)
-}
-
-fn port_dir(port: crate::layout::Port) -> Point {
-    match port {
-        crate::layout::Port::Top => Point::new(0.0, -1.0),
-        crate::layout::Port::Bottom => Point::new(0.0, 1.0),
-        crate::layout::Port::Left => Point::new(-1.0, 0.0),
-        crate::layout::Port::Right => Point::new(1.0, 0.0),
-    }
-}
-
-/// 检测有机贝塞尔曲线采样后是否穿过任何非 skip 障碍物
-fn curve_intersects_obstacles(
-    edge: &EdgeLayout,
-    obstacles: &visibility::ObstacleIndex,
-    skip: &[usize],
-) -> bool {
-    let sampled = edge.sampled_path(OBSTACLE_CHECK_SAMPLES);
-    for window in sampled.windows(2) {
-        if obstacles.segment_hits_any(window[0], window[1], skip) {
-            return true;
-        }
-    }
-    false
 }
 
 /// 思维导图穿障时保持贝塞尔：沿绕行折线中点拉弓，生成平滑曲线。
@@ -693,7 +646,7 @@ fn bow_bezier_around_obstacles(
         from_port,
         to_port,
     };
-    if curve_intersects_obstacles(&candidate, obstacles, skip) {
+    if crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(&candidate, obstacles, skip) {
         // 仍穿障则保留原曲线（比折线观感更好）
         None
     } else {

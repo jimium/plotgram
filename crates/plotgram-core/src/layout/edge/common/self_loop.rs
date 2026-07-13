@@ -3,7 +3,7 @@
 use crate::ast::Relation;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
-use crate::layout::edge::common::edge_geometry::{build_edge_labels, node_center, parse_label_t};
+use crate::layout::edge::common::edge_geometry::{build_edge_labels, node_center, parse_label_t, point_at_path_t};
 
 /// 自环绘制风格
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -233,36 +233,6 @@ fn label_outward_offset(corner: Corner, loop_r: f64) -> Point {
         corner.dx * (loop_r * 0.25),
         corner.dy * (loop_r * 0.25),
     )
-}
-
-fn point_at_path_t(path: &[Point], t: f64) -> Point {
-    if path.is_empty() {
-        return Point::zero();
-    }
-    if path.len() == 1 {
-        return path[0];
-    }
-    let total: f64 = path
-        .windows(2)
-        .map(|w| ((w[1].x - w[0].x).powi(2) + (w[1].y - w[0].y).powi(2)).sqrt())
-        .sum();
-    if total <= f64::EPSILON {
-        return path[0];
-    }
-    let target = t.clamp(0.0, 1.0) * total;
-    let mut acc = 0.0;
-    for w in path.windows(2) {
-        let seg = ((w[1].x - w[0].x).powi(2) + (w[1].y - w[0].y).powi(2)).sqrt();
-        if acc + seg >= target {
-            let local = (target - acc) / seg.max(f64::EPSILON);
-            return Point::new(
-                w[0].x + (w[1].x - w[0].x) * local,
-                w[0].y + (w[1].y - w[0].y) * local,
-            );
-        }
-        acc += seg;
-    }
-    *path.last().unwrap()
 }
 
 #[cfg(test)]

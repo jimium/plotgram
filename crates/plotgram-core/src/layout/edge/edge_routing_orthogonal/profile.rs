@@ -1,10 +1,5 @@
 //! 图种相关的正交路由策略预设。
 
-#[path = "profile_flowchart.rs"]
-mod profile_flowchart;
-#[path = "profile_architecture.rs"]
-mod profile_architecture;
-
 use crate::types::DiagramType;
 
 /// 路径打分权重倍率（相对 DefaultScorer 基准项）。
@@ -51,8 +46,8 @@ impl OrthoRoutingProfile {
     /// 按图种选择预设；State / Er / Custom 继承 flowchart 默认。
     pub fn for_diagram_type(diagram_type: DiagramType) -> Self {
         match diagram_type {
-            DiagramType::Architecture => profile_architecture::default_profile(),
-            _ => profile_flowchart::default_profile(),
+            DiagramType::Architecture => architecture_default_profile(),
+            _ => flowchart_default_profile(),
         }
     }
 
@@ -63,6 +58,37 @@ impl OrthoRoutingProfile {
         } else {
             DiagramType::Flowchart
         }
+    }
+}
+
+fn flowchart_default_profile() -> OrthoRoutingProfile {
+    OrthoRoutingProfile {
+        diagram_type: DiagramType::Flowchart,
+        parallel_gap: crate::layout::constants::ORTHO_PARALLEL_GAP,
+        corridor_lane_offsets: false,
+        separate_unrelated_trunks: false,
+        semantic_merge: false,
+        scoring: ScoringWeights::default(),
+        prefer_trunk_fork: true,
+    }
+}
+
+fn architecture_default_profile() -> OrthoRoutingProfile {
+    OrthoRoutingProfile {
+        diagram_type: DiagramType::Architecture,
+        parallel_gap: crate::layout::constants::ORTHO_PARALLEL_GAP_ARCHITECTURE,
+        corridor_lane_offsets: true,
+        separate_unrelated_trunks: true,
+        semantic_merge: true,
+        // Iteration 2：提高障碍权重，强化穿组/擦边代价
+        scoring: ScoringWeights {
+            path_length: 1.0,
+            bend: 1.0,
+            obstacle: 1.5,
+            corridor_misalignment: 1.2,
+            channel_load: 1.0,
+        },
+        prefer_trunk_fork: false,
     }
 }
 

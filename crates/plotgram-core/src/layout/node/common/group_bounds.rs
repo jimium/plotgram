@@ -293,6 +293,20 @@ pub fn detect_group_layout_warnings(
     const EPSILON: f64 = 1.0;
     let mut warnings = Vec::new();
 
+    // 预构建索引,避免在嵌套循环中反复 `diagram.groups.iter().find(...)`(O(n) → O(1))
+    // - group_by_id: 由 group id 查 Group 引用(用于 descendants 的 BFS 展开)
+    // - parent_of: 由 group id 查直接父 group id(用于 ancestors 的链式上溯)
+    let group_by_id: HashMap<&str, &crate::ast::Group> = diagram
+        .groups
+        .iter()
+        .map(|g| (g.id.as_str(), g))
+        .collect();
+    let parent_of: HashMap<&str, Option<&str>> = diagram
+        .groups
+        .iter()
+        .map(|g| (g.id.as_str(), g.parent_id.as_ref().map(|p| p.as_str())))
+        .collect();
+
     let mut group_descendants: HashMap<String, HashSet<String>> = HashMap::new();
     for group in &diagram.groups {
         let mut desc: HashSet<String> = group
@@ -306,7 +320,7 @@ pub fn detect_group_layout_warnings(
             .map(|g| g.as_str().to_string())
             .collect();
         while let Some(child) = stack.pop() {
-            if let Some(child_group) = diagram.groups.iter().find(|g| g.id.as_str() == child) {
+            if let Some(child_group) = group_by_id.get(child.as_str()) {
                 desc.extend(child_group.entity_ids.iter().map(|e| e.as_str().to_string()));
                 stack.extend(
                     child_group
@@ -326,12 +340,11 @@ pub fn detect_group_layout_warnings(
         let mut current = group.parent_id.as_ref().map(|p| p.as_str().to_string());
         while let Some(p) = current {
             ancestors.insert(p.clone());
-            current = diagram
-                .groups
-                .iter()
-                .find(|g| g.id.as_str() == p)
-                .and_then(|g| g.parent_id.as_ref())
-                .map(|p| p.as_str().to_string());
+            current = parent_of
+                .get(p.as_str())
+                .copied()
+                .flatten()
+                .map(|p| p.to_string());
         }
         group_ancestors.insert(group.id.as_str().to_string(), ancestors);
     }

@@ -352,7 +352,7 @@ fn evaluate_pgm_file(path: &Path) -> Result<EvaluatedEntry, String> {
     };
 
     let diagram = prepared.inner();
-    let start = std::time::Instant::now();
+    let start = plotgram_core::layout::perf::Instant::now();
     let layout = compute_layout_with_plan(diagram, prepared.layout_plan())
         .map_err(|e| e.to_string())?;
     let elapsed_us = start.elapsed().as_micros() as u64;

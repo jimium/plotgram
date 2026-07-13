@@ -299,14 +299,14 @@ fn has_clear_exit(
         if node_groups.contains(gid.as_str()) {
             continue;
         }
-        if segment_intersects_aabb(start, end, gl) {
+        if segment_bbox_overlaps_group(start, end, gl) {
             return false;
         }
     }
     true
 }
 
-fn segment_intersects_aabb(a: Point, b: Point, gl: &crate::layout::GroupLayout) -> bool {
+fn segment_bbox_overlaps_group(a: Point, b: Point, gl: &crate::layout::GroupLayout) -> bool {
     let min_x = a.x.min(b.x) - EPS;
     let max_x = a.x.max(b.x) + EPS;
     let min_y = a.y.min(b.y) - EPS;

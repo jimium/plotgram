@@ -129,7 +129,11 @@ impl LayoutStrategy for ArchitectureV2Layout {
         };
         super::pipeline::run_pipeline(&mut ctx);
 
-        let (total_width, total_height) = postprocess::compute_total_size(&ctx.nodes, &ctx.groups);
+        let (total_width, total_height) = crate::layout::node::common::canvas_bounds::canvas_size(
+            &ctx.nodes,
+            &ctx.groups,
+            constants::PADDING,
+        );
 
         LayoutResult {
             nodes: ctx.nodes,

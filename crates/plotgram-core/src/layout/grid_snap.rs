@@ -360,7 +360,8 @@ pub fn snap_edge_waypoints(
 
 /// 根据 nodes / groups 更新画布 total 尺寸
 pub fn update_canvas_bounds(layout: &mut LayoutResult, padding: f64) {
-    let (total_width, total_height) = bounds_from_layout(&layout.nodes, &layout.groups, padding);
+    let (total_width, total_height) =
+        crate::layout::node::common::canvas_bounds::canvas_size(&layout.nodes, &layout.groups, padding);
     layout.total_width = total_width;
     layout.total_height = total_height;
 }
@@ -579,21 +580,6 @@ fn is_on_grid(value: f64, step: f64) -> bool {
     }
     let ratio = value / step;
     (ratio - ratio.round()).abs() < 1e-6
-}
-
-fn bounds_from_layout(
-    nodes: &HashMap<String, NodeLayout>,
-    groups: &HashMap<String, GroupLayout>,
-    padding: f64,
-) -> (f64, f64) {
-    let node_max_x = nodes.values().map(|n| n.x + n.width).fold(0.0_f64, f64::max);
-    let node_max_y = nodes.values().map(|n| n.y + n.height).fold(0.0_f64, f64::max);
-    let group_max_x = groups.values().map(|g| g.x + g.width).fold(0.0_f64, f64::max);
-    let group_max_y = groups.values().map(|g| g.y + g.height).fold(0.0_f64, f64::max);
-    (
-        node_max_x.max(group_max_x) + padding,
-        node_max_y.max(group_max_y) + padding,
-    )
 }
 
 fn rank_center(layout: &NodeLayout, horizontal: bool) -> f64 {

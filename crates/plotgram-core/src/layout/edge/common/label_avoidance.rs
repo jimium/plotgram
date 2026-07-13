@@ -200,56 +200,12 @@ pub fn resolve_label_overlaps_with_config(
             }
         }
 
-        for &k in &label_keys {
-            if oscillating.contains(&k) {
-                continue;
-            }
-            let mut pos = match edges[k.0].label_pos_at(k.1) {
-                Some(p) => p,
-                None => continue,
-            };
-            let mut bbox = match edges[k.0].label_bbox_at(k.1) {
-                Some(b) => b,
-                None => continue,
-            };
-
-            for &obstacle in &node_obstacles {
-                if push_label_from_obstacle_safe(
-                    &mut pos,
-                    &mut bbox,
-                    obstacle,
-                    &node_obstacles,
-                ) {
-                    edges[k.0].set_label_pos_at(k.1, pos);
-                    moved = true;
-                }
-            }
+        if push_labels_from_obstacles(edges, &label_keys, &oscillating, &node_obstacles) {
+            moved = true;
         }
 
-        for &k in &label_keys {
-            if oscillating.contains(&k) {
-                continue;
-            }
-            let mut pos = match edges[k.0].label_pos_at(k.1) {
-                Some(p) => p,
-                None => continue,
-            };
-            let mut bbox = match edges[k.0].label_bbox_at(k.1) {
-                Some(b) => b,
-                None => continue,
-            };
-
-            for &obstacle in &group_obstacles {
-                if push_label_from_obstacle_safe(
-                    &mut pos,
-                    &mut bbox,
-                    obstacle,
-                    &group_obstacles,
-                ) {
-                    edges[k.0].set_label_pos_at(k.1, pos);
-                    moved = true;
-                }
-            }
+        if push_labels_from_obstacles(edges, &label_keys, &oscillating, &group_obstacles) {
+            moved = true;
         }
 
         for &k in &label_keys {
@@ -456,6 +412,41 @@ fn push_label_from_obstacle(
     } else {
         false
     }
+}
+
+/// 对所有非震荡标签执行障碍物推开（节点/分组障碍共用）。
+///
+/// `obstacles` 既是推开用的障碍列表，也作为 `push_label_from_obstacle_safe`
+/// 的"所有障碍"列表用于回检，避免推入新冲突。
+/// 返回是否有标签被移动。
+fn push_labels_from_obstacles(
+    edges: &mut [EdgeLayout],
+    label_keys: &[LabelKey],
+    oscillating: &HashSet<LabelKey>,
+    obstacles: &[(f64, f64, f64, f64)],
+) -> bool {
+    let mut moved = false;
+    for &k in label_keys {
+        if oscillating.contains(&k) {
+            continue;
+        }
+        let mut pos = match edges[k.0].label_pos_at(k.1) {
+            Some(p) => p,
+            None => continue,
+        };
+        let mut bbox = match edges[k.0].label_bbox_at(k.1) {
+            Some(b) => b,
+            None => continue,
+        };
+
+        for &obstacle in obstacles {
+            if push_label_from_obstacle_safe(&mut pos, &mut bbox, obstacle, obstacles) {
+                edges[k.0].set_label_pos_at(k.1, pos);
+                moved = true;
+            }
+        }
+    }
+    moved
 }
 
 fn push_label_from_obstacle_safe(

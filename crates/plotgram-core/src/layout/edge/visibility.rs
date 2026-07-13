@@ -12,17 +12,14 @@
 
 use crate::layout::geometry::{Point, Rect};
 use crate::layout::{constants, NodeLayout};
-use std::collections::HashMap;
+
+use crate::layout::edge::common::spatial_grid::SpatialGrid;
 
 /// 坐标比较容差
 const EPS: f64 = 0.1;
 
 /// 障碍物均匀网格 cell 边长（像素）。
 const OBSTACLE_GRID_CELL: f64 = 64.0;
-
-fn obstacle_cell_coord(v: f64) -> i32 {
-    (v / OBSTACLE_GRID_CELL).floor() as i32
-}
 
 /// 障碍物 bbox 均匀网格空间索引。
 ///
@@ -34,29 +31,27 @@ fn obstacle_cell_coord(v: f64) -> i32 {
 /// 段-障碍物相交的交点必然同时落在段 bbox 与障碍物 bbox 内，故 bbox 预筛选
 /// 不会漏检（安全）。
 struct ObstacleGrid {
-    cells: HashMap<(i32, i32), Vec<usize>>,
+    grid: SpatialGrid<usize>,
 }
 
 impl ObstacleGrid {
     fn build(obstacles: &[Obstacle]) -> Self {
-        let mut cells: HashMap<(i32, i32), Vec<usize>> = HashMap::new();
+        let mut grid = SpatialGrid::new(OBSTACLE_GRID_CELL);
         for (oi, obs) in obstacles.iter().enumerate() {
-            let cx0 = obstacle_cell_coord(obs.rect.left());
-            let cx1 = obstacle_cell_coord(obs.rect.right());
-            let cy0 = obstacle_cell_coord(obs.rect.top());
-            let cy1 = obstacle_cell_coord(obs.rect.bottom());
-            for cx in cx0..=cx1 {
-                for cy in cy0..=cy1 {
-                    cells.entry((cx, cy)).or_default().push(oi);
-                }
-            }
+            let (cx0, cx1, cy0, cy1) = grid.cell_range(
+                obs.rect.left(),
+                obs.rect.right(),
+                obs.rect.top(),
+                obs.rect.bottom(),
+            );
+            grid.insert_range(cx0, cx1, cy0, cy1, oi);
         }
         // 每个 cell 内按障碍物索引排序去重，保证查询返回顺序确定（AGENTS.md §2）
-        for list in cells.values_mut() {
+        for list in grid.cells_mut().values_mut() {
             list.sort_unstable();
             list.dedup();
         }
-        Self { cells }
+        Self { grid }
     }
 
     /// 返回 bbox 与查询段 bbox（含 EPS 余量）相交的障碍物索引，按索引升序去重。
@@ -65,15 +60,12 @@ impl ObstacleGrid {
         let xmax = a.x.max(b.x) + EPS;
         let ymin = a.y.min(b.y) - EPS;
         let ymax = a.y.max(b.y) + EPS;
-        let cx0 = obstacle_cell_coord(xmin);
-        let cx1 = obstacle_cell_coord(xmax);
-        let cy0 = obstacle_cell_coord(ymin);
-        let cy1 = obstacle_cell_coord(ymax);
+        let (cx0, cx1, cy0, cy1) = self.grid.cell_range(xmin, xmax, ymin, ymax);
         // 命中数通常很小（< 邻近障碍物数），用 Vec 线性去重比 HashSet 快
         let mut seen: Vec<usize> = Vec::new();
         for cx in cx0..=cx1 {
             for cy in cy0..=cy1 {
-                if let Some(list) = self.cells.get(&(cx, cy)) {
+                if let Some(list) = self.grid.cells().get(&(cx, cy)) {
                     for &oi in list {
                         if !seen.contains(&oi) {
                             seen.push(oi);

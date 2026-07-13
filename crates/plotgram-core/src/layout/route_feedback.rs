@@ -2,11 +2,8 @@
 
 use crate::ast::Diagram;
 use crate::layout::refine::{run_refine, RefineConfig};
-use crate::layout::space_budget::{
-    enforce_horizontal_gaps, horizontal_gap_violations, resolve_residual_with_budget, SpaceBudget,
-};
+use crate::layout::space_budget::{enforce_horizontal_gaps, SpaceBudget};
 use crate::layout::{EdgeRoutingStrategy, LayoutResult};
-use std::collections::{HashMap, HashSet};
 
 /// 预路由反馈：待路由布局。
 pub struct PreRouteFeedback {
@@ -57,44 +54,13 @@ impl<'a> LayoutRouteFeedback<'a> {
             );
         }
 
-        // S3：仅当水平缝仍违反契约时才兜底推开
-        let budget = routed
-            .hints
-            .space_budget
-            .clone()
-            .unwrap_or_else(|| SpaceBudget::from_diagram(self.diagram));
-        if !horizontal_gap_violations(&routed.nodes, &budget).is_empty() {
-            let pre: HashMap<String, (f64, f64)> = routed
-                .nodes
-                .iter()
-                .map(|(id, n)| (id.clone(), (n.x, n.y)))
-                .collect();
-            resolve_residual_with_budget(&mut routed.nodes, Some(&budget));
-            routed.hints.space_budget = Some(budget);
-            let moved: HashSet<String> = routed
-                .nodes
-                .iter()
-                .filter_map(|(id, n)| {
-                    pre.get(id).and_then(|(px, py)| {
-                        let dx = n.x - px;
-                        let dy = n.y - py;
-                        if (dx * dx + dy * dy).sqrt()
-                            >= super::post_route_hook::NODE_MOVE_REROUTE_EPS
-                        {
-                            Some(id.clone())
-                        } else {
-                            None
-                        }
-                    })
-                })
-                .collect();
-            if !moved.is_empty() {
-                routed = router.route_after_node_moves(self.diagram, routed, &moved);
-            }
-        } else if routed.hints.space_budget.is_none() {
-            routed.hints.space_budget = Some(budget);
-        }
-
-        routed
+        // S3：仅当水平缝仍违反契约时才兜底推开 + 增量重路由 + repulse
+        // (R-4:与 pipeline.rs S3 兜底保持一致,含 repulse_edges_only)
+        let (routed, moved) = crate::layout::space_budget_guard::resolve_budget_violations(
+            self.diagram, routed,
+        );
+        crate::layout::space_budget_guard::reroute_and_repulse(
+            self.diagram, routed, router, &moved, &router.edge_snap_config(),
+        )
     }
 }

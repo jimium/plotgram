@@ -761,6 +761,13 @@ pub(in super::super) fn align_nodes_to_neighbors(
     }
 }
 
+/// 计算 architecture 布局专用的中位数。
+///
+/// **注意**:此实现与 `crate::layout::node::common::stats::median_f64` 有意不同:
+/// - 此处对输入内部排序(调用方传入无序的 in/out 邻居 center_x 混合切片)
+/// - 此处对偶数长度返回 `sorted[len/2]`(上中位元素),而非算术平均
+///
+/// 保持此差异是为了零行为变更;如需统一,必须先验证偶数长度输入下的渲染结果。
 fn median_f64(xs: &[f64]) -> f64 {
     let mut sorted = xs.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));

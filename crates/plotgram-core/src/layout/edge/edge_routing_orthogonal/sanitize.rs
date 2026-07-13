@@ -92,10 +92,10 @@ pub fn sanitize_polyline_ext(
     fix_endpoint_reverse_stub(points, false, to_side);
     force_orthogonal(points);
     collapse_micro_jogs(points, merge_overshoot);
-    *points = simplify_path(std::mem::take(points));
+    *points = simplify_path(std::mem::take(points), false);
     ensure_outward_stub(points, true, from_side);
     ensure_outward_stub(points, false, to_side);
-    *points = simplify_path(std::mem::take(points));
+    *points = simplify_path(std::mem::take(points), false);
 }
 
 /// 若端点第一段（或末端最后一段）沿端口外向为负，则切除「背向」折点并补正确 stub。
@@ -355,7 +355,7 @@ fn collapse_micro_jogs(points: &mut Vec<Point>, merge_overshoot: bool) {
             }
             i += 1;
         }
-        *points = simplify_path(std::mem::take(points));
+        *points = simplify_path(std::mem::take(points), false);
     }
 }
 

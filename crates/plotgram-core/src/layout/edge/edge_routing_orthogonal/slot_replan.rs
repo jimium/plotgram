@@ -195,7 +195,7 @@ pub fn replan_slots(
             .get(ei)
             .map(|rel| (rel.from.as_str(), rel.to.as_str()))
             .unwrap_or(("", ""));
-        let ctx = RoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
+        let ctx = OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
             .with_strict_group_transit(should_strict_group_transit(
                 profile,
                 group_ctx,

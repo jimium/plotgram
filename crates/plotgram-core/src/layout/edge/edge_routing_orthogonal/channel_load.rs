@@ -7,7 +7,7 @@
 //! - `ChannelLoadMap`：key = (轴, 量化层坐标)，value = 段数
 //! - 在 reroute 每轮开始时从当前所有边路径构建
 //! - `channel_load_penalty`：负载 > 阈值时按多余边数惩罚
-//! - 通过 `RoutingContext.channel_load` 传入 scorer
+//! - 通过 `OrthoRoutingContext.channel_load` 传入 scorer
 //!
 //! 确定性（AGENTS.md §2）：使用 HashMap 但 key 为 (Axis, i64)，
 //! 查询时量化 layer 后查表，不依赖迭代顺序。

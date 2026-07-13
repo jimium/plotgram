@@ -98,19 +98,6 @@ pub fn apply_uniform_group_width<B: GroupWidthBlock>(
     }
 }
 
-/// Phase 1：Equal 已迁至 L1 GroupFramePass；本函数保留供显式/测试调用。
-#[allow(dead_code)]
-pub fn apply_group_sizing_policy<B: GroupWidthBlock>(
-    policy: GroupSizingPolicy,
-    top_group_ids: &[String],
-    blocks: &mut [B],
-) {
-    match policy {
-        GroupSizingPolicy::Fit => {}
-        GroupSizingPolicy::Uniform => apply_uniform_group_width(top_group_ids, blocks),
-    }
-}
-
 /// 架构图嵌套 sibling：同一 macro rank 内的 group 块拉齐到最宽/最高，内容居中。
 ///
 /// 确定性：rank 升序、块 id 升序迭代。

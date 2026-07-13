@@ -71,23 +71,6 @@ pub(super) fn build_graph(diagram: &Diagram) -> DiGraph<String, EdgeMeta> {
     graph
 }
 
-/// 向已建图注入不可逆约束边（`from → to`，`reversible: false`）。
-#[allow(dead_code)] // kept for explicit constraint injection API
-pub(super) fn inject_irreversible_edges(
-    graph: &mut DiGraph<String, EdgeMeta>,
-    edges: &[(&str, &str)],
-) {
-    let index: HashMap<String, NodeIndex> = graph
-        .node_indices()
-        .map(|n| (graph[n].clone(), n))
-        .collect();
-    for &(from, to) in edges {
-        if let (Some(&from_idx), Some(&to_idx)) = (index.get(from), index.get(to)) {
-            graph.add_edge(from_idx, to_idx, EdgeMeta { reversible: false });
-        }
-    }
-}
-
 /// 贪心 FAS 去环，返回需要反转的边集合。
 ///
 /// **不可逆边保护**：构建 FAS 邻接表时排除 `reversible: false` 的边（DSL constrain），

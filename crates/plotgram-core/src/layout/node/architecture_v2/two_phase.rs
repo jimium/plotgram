@@ -27,7 +27,8 @@ use super::layout::coordinate::{
     resolve_x_overlaps_with_gaps, uniform_initial_positions,
 };
 use super::layout::order::{build_layers, order_layers_group_aware};
-use super::layout::postprocess::{clamp_to_canvas, compute_total_size};
+use super::layout::postprocess::clamp_to_canvas;
+use super::layout::constants::PADDING;
 use super::layout::rank::{assign_intra_ranks, assign_super_macro_ranks};
 use super::layout::types::{GraphIndex, GroupMap};
 use crate::layout::algorithm_config::ArchitectureV2LayoutConfig;
@@ -125,21 +126,15 @@ pub(super) fn compute_two_phase_layout(
 
     // ── Phase A: 组内布局（递归，支持嵌套分组）──
     let group_tree = GroupTree::build(diagram);
-    let mut intra_by_group: HashMap<String, IntraLayout> = HashMap::new();
-    for gid in &group_map.top_groups {
-        intra_by_group.insert(
-            gid.clone(),
-            layout_intra_group_recursive(
-                diagram,
-                gid,
-                &group_tree,
-                graph,
-                sizes,
-                reversed_edges,
-                &padding,
-            ),
-        );
-    }
+    let intra_by_group = phase_a_intra_layout(
+        diagram,
+        &group_tree,
+        &group_map.top_groups,
+        graph,
+        sizes,
+        reversed_edges,
+        &padding,
+    );
 
     // ── Phase B: 宏观超级节点分层 ──
     let (super_members, super_edges, pair_edge_counts, edge_weights) =
@@ -202,30 +197,94 @@ pub(super) fn compute_two_phase_layout(
         reversed_edges,
     );
 
+    // ── Phase D: 后处理（基础设施行居中 + EGB + group_frame + space_budget + canvas）──
+    phase_d_postprocess(
+        diagram,
+        &mut nodes,
+        &mut groups,
+        &blocks,
+        &macro_ranks,
+        graph,
+        group_map,
+        sizes,
+        padding,
+        sizing,
+    )
+}
+
+// ─── Phase A: 组内布局 ───────────────────────────────────
+
+/// Phase A：递归构建每个顶层 group 的组内 IntraLayout。
+fn phase_a_intra_layout(
+    diagram: &Diagram,
+    group_tree: &GroupTree,
+    top_groups: &[String],
+    graph: &GraphIndex,
+    sizes: &HashMap<String, (f64, f64)>,
+    reversed_edges: &HashSet<(String, String)>,
+    padding: &GroupPadding,
+) -> HashMap<String, IntraLayout> {
+    let mut intra_by_group: HashMap<String, IntraLayout> = HashMap::new();
+    for gid in top_groups {
+        intra_by_group.insert(
+            gid.clone(),
+            layout_intra_group_recursive(
+                diagram,
+                gid,
+                group_tree,
+                graph,
+                sizes,
+                reversed_edges,
+                padding,
+            ),
+        );
+    }
+    intra_by_group
+}
+
+// ─── Phase D: 后处理 ─────────────────────────────────────
+
+/// Phase D：从 Phase C 产出的 nodes/groups 出发，依次完成：
+/// (1) 重建全局层 + 基础设施行居中 + canvas clamp + 同 leaf-group y 微对齐；
+/// (2) EGB（逐组侧 gutter 估计 + group bounds 重算 + Uniform/Equal 条带拉齐）；
+/// (3) group_frame 三段（sibling overlap resolve / expand / Fit 收回）；
+/// (4) space_budget enforce + expand 兜底；
+/// (5) 计算 canvas_size + sibling_corridors + sugiyama_ranks，组装 LayoutResult。
+fn phase_d_postprocess(
+    diagram: &Diagram,
+    nodes: &mut HashMap<String, NodeLayout>,
+    groups: &mut HashMap<String, GroupLayout>,
+    blocks: &[MacroBlock],
+    macro_ranks: &HashMap<String, usize>,
+    graph: &GraphIndex,
+    group_map: &GroupMap,
+    sizes: &HashMap<String, (f64, f64)>,
+    bounds_padding: GroupPadding,
+    sizing: GroupSizingPolicy,
+) -> LayoutResult {
     // ── 后处理：基础设施行居中 ──
     // 从元数据重建全局层（替代旧版从 y 坐标反推）
-    let layers = rebuild_layers_from_metadata(&blocks, &macro_ranks);
-    rebalance_infrastructure_layers(graph, group_map, &layers, sizes, &mut nodes);
-    clamp_to_canvas(&mut nodes, sizes);
+    let layers = rebuild_layers_from_metadata(blocks, macro_ranks);
+    rebalance_infrastructure_layers(graph, group_map, &layers, sizes, nodes);
+    clamp_to_canvas(nodes, sizes);
     // Phase F：同 leaf-group 内近邻 y 带节点微对齐（修小幅错位，不改层拓扑）
-    align_intra_group_same_rank_y(diagram, &mut nodes);
+    align_intra_group_same_rank_y(diagram, nodes);
 
     // EGB：节点落定后估计逐组侧 gutter，重算 group bounds 并持久化至 hints。
-    let bounds_padding = padding;
-    let base_groups = compute_group_bounds(diagram, &nodes, bounds_padding);
+    let base_groups = compute_group_bounds(diagram, nodes, bounds_padding);
     let t_egb = crate::layout::perf::Instant::now();
-    let side_gutters = estimate_side_gutters_with_hierarchy(diagram, &nodes, &base_groups);
+    let side_gutters = estimate_side_gutters_with_hierarchy(diagram, nodes, &base_groups);
     let egb_ms = t_egb.elapsed().as_secs_f64() * 1000.0;
     let computed_groups = compute_group_bounds_with_side_gutters(
         diagram,
-        &nodes,
+        nodes,
         bounds_padding,
         container_padding_for_leaf(bounds_padding),
         Some(&side_gutters),
     );
     merge_egb_groups(
         diagram,
-        &mut groups,
+        groups,
         computed_groups,
         &side_gutters,
         bounds_padding,
@@ -233,12 +292,12 @@ pub(super) fn compute_two_phase_layout(
     // Uniform/Equal 条带：各顶层叶子 EGB 增量可能不同，拉齐到同带最大增量，避免等宽被拆。
     // Fit 逃生舱跳过。
     if sizing != GroupSizingPolicy::Fit {
-        equalize_top_leaf_egb_deltas(diagram, &mut groups, &side_gutters, bounds_padding);
+        equalize_top_leaf_egb_deltas(diagram, groups, &side_gutters, bounds_padding);
     }
     let gf_spec = crate::layout::group_frame::resolve_group_frame_spec(diagram, "architecture");
     let mut layout_scratch = LayoutResult {
-        nodes: std::mem::take(&mut nodes),
-        groups: std::mem::take(&mut groups),
+        nodes: std::mem::take(nodes),
+        groups: std::mem::take(groups),
         edges: vec![],
         total_width: 0.0,
         total_height: 0.0,
@@ -267,8 +326,8 @@ pub(super) fn compute_two_phase_layout(
             Some(&side_gutters),
         );
     }
-    nodes = layout_scratch.nodes;
-    groups = layout_scratch.groups;
+    *nodes = layout_scratch.nodes;
+    *groups = layout_scratch.groups;
     let max_side_gutter = side_gutters
         .values()
         .flat_map(|g| [g.left, g.right, g.top, g.bottom])
@@ -290,20 +349,24 @@ pub(super) fn compute_two_phase_layout(
 
     // 空间契约：边感知间距写入 hints，并做一次水平缝 enforce
     let space_budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
-    crate::layout::space_budget::enforce_horizontal_gaps(&mut nodes, &space_budget);
+    crate::layout::space_budget::enforce_horizontal_gaps(nodes, &space_budget);
     crate::layout::group_frame::expand_groups_to_contain_contents(
         diagram,
-        &mut groups,
-        &nodes,
+        groups,
+        nodes,
         bounds_padding,
         container_padding_for_leaf(bounds_padding),
     );
 
-    let (total_width, total_height) = compute_total_size(&nodes, &groups);
+    let (total_width, total_height) = crate::layout::node::common::canvas_bounds::canvas_size(
+        nodes,
+        groups,
+        PADDING,
+    );
 
     let sibling_corridors =
-        crate::layout::group::build_sibling_corridors(diagram, &groups);
-    let corridors = crate::layout::group::merge_corridors(&sibling_corridors, &groups);
+        crate::layout::group::build_sibling_corridors(diagram, groups);
+    let corridors = crate::layout::group::merge_corridors(&sibling_corridors, groups);
     let group_routing = crate::layout::group::GroupRoutingHints {
         corridors,
         border_shell_pad: crate::layout::group::GROUP_BORDER_SHELL_PAD,
@@ -318,8 +381,8 @@ pub(super) fn compute_two_phase_layout(
         .collect();
 
     LayoutResult {
-        nodes,
-        groups,
+        nodes: std::mem::take(nodes),
+        groups: std::mem::take(groups),
         edges: vec![],
         total_width,
         total_height,
@@ -635,59 +698,30 @@ impl GroupSizeBlock for IntraMacroBlock {
     }
 }
 
-/// architecture_v2 的组内布局策略（实现 [`IntraGroupLayouter`]）
+/// Accumulate a single super-edge into the shared aggregation structures.
 ///
-/// 这是 `layout_intra_group_recursive` 的 thin wrapper，将其包装为 trait 实现。
-/// 当前 `compute_two_phase_layout` 仍直接调用 `layout_intra_group_recursive`，
-/// 未走 trait 调度——此 struct 仅供文档化关系和未来统一调度使用。
-///
-/// # 为什么不改变实际调度
-///
-/// `compute_two_phase_layout` 的 Phase A 需要对每个顶层 group 调用一次组内布局，
-/// 并在 Phase B 中复用 `group_tree` / `graph` / `sizes` / `reversed` 等上下文。
-/// 强行改为 trait 调度会增加间接层而无功能收益。
-#[allow(dead_code)]
-pub struct ArchitectureV2IntraLayouter<'a> {
-    diagram: &'a Diagram,
-    group_tree: &'a GroupTree,
-    graph: &'a GraphIndex,
-    sizes: &'a HashMap<String, (f64, f64)>,
-    reversed: &'a HashSet<(String, String)>,
-    padding: &'a GroupPadding,
-}
-
-#[allow(dead_code)]
-impl<'a> ArchitectureV2IntraLayouter<'a> {
-    pub fn new(
-        diagram: &'a Diagram,
-        group_tree: &'a GroupTree,
-        graph: &'a GraphIndex,
-        sizes: &'a HashMap<String, (f64, f64)>,
-        reversed: &'a HashSet<(String, String)>,
-        padding: &'a GroupPadding,
-    ) -> Self {
-        Self {
-            diagram,
-            group_tree,
-            graph,
-            sizes,
-            reversed,
-            padding,
-        }
-    }
-}
-
-impl<'a> IntraGroupLayouter for ArchitectureV2IntraLayouter<'a> {
-    fn layout_intra(&self, group_id: &str, _members: &[String]) -> IntraLayout {
-        layout_intra_group_recursive(
-            self.diagram,
-            group_id,
-            self.group_tree,
-            self.graph,
-            self.sizes,
-            self.reversed,
-            self.padding,
-        )
+/// If `from_super != to_super`, inserts the directed edge into `super_edges`,
+/// increments its weight in `edge_weights`, and increments the normalized
+/// undirected pair count in `pair_edge_counts`. No-op when both endpoints
+/// resolve to the same super-node.
+fn accumulate_super_edge(
+    from_super: String,
+    to_super: String,
+    super_edges: &mut HashSet<(String, String)>,
+    edge_weights: &mut HashMap<(String, String), usize>,
+    pair_edge_counts: &mut HashMap<(String, String), usize>,
+) {
+    if from_super != to_super {
+        super_edges.insert((from_super.clone(), to_super.clone()));
+        *edge_weights
+            .entry((from_super.clone(), to_super.clone()))
+            .or_insert(0) += 1;
+        let pair = if from_super <= to_super {
+            (from_super, to_super)
+        } else {
+            (to_super, from_super)
+        };
+        *pair_edge_counts.entry(pair).or_insert(0) += 1;
     }
 }
 
@@ -747,18 +781,13 @@ fn build_super_graph_for_group(
                         Some(s) => s.clone(),
                         None => continue,
                     };
-                    if from_super != to_super {
-                        super_edges.insert((from_super.clone(), to_super.clone()));
-                        *edge_weights
-                            .entry((from_super.clone(), to_super.clone()))
-                            .or_insert(0) += 1;
-                        let pair = if from_super <= to_super {
-                            (from_super, to_super)
-                        } else {
-                            (to_super, from_super)
-                        };
-                        *pair_edge_counts.entry(pair).or_insert(0) += 1;
-                    }
+                    accumulate_super_edge(
+                        from_super,
+                        to_super,
+                        &mut super_edges,
+                        &mut edge_weights,
+                        &mut pair_edge_counts,
+                    );
                 }
             }
         }
@@ -1190,19 +1219,13 @@ fn build_super_graph(
                 }
                 let from_super = super_node_id(node, group_map);
                 let to_super = super_node_id(succ, group_map);
-                if from_super != to_super {
-                    super_edges.insert((from_super.clone(), to_super.clone()));
-                    *edge_weights
-                        .entry((from_super.clone(), to_super.clone()))
-                        .or_insert(0) += 1;
-                    // 归一化为无向 pair (min, max)
-                    let pair = if from_super <= to_super {
-                        (from_super, to_super)
-                    } else {
-                        (to_super, from_super)
-                    };
-                    *pair_edge_counts.entry(pair).or_insert(0) += 1;
-                }
+                accumulate_super_edge(
+                    from_super,
+                    to_super,
+                    &mut super_edges,
+                    &mut edge_weights,
+                    &mut pair_edge_counts,
+                );
             }
         }
     }
@@ -1681,14 +1704,25 @@ fn nudge_intra_nodes_toward_cross_group_edges(
     nudge_cross_group_y_alignment(nodes, super_edges, super_members, graph, reversed);
 
     // ── x 微调阶段（原有逻辑） ──
+    let node_targets = collect_cross_group_node_targets(super_edges, super_members, graph, reversed, nodes);
+    let group_node_targets = compute_group_node_targets(&node_targets, super_members, graph, reversed, nodes);
+    apply_nudge_per_group(&group_node_targets, groups, nodes);
+}
 
-    // 收集每个节点的跨组边目标信息：(node_id → Vec<target_cx>)
-    // target_cx 为跨组边对端节点的中心 x
+/// 收集每个节点的跨组边目标信息：(node_id → Vec<target_cx>)。
+/// target_cx 为跨组边对端节点的中心 x。
+///
+/// 排序保证迭代顺序确定（HashSet 迭代顺序随机），
+/// 否则 node_targets 中每个 Vec<f64> 顺序随机，
+/// f64 求和非结合性会导致 avg_target 1 ULP 差异 → desired_x 排序 tie → 最终位置抖动
+fn collect_cross_group_node_targets(
+    super_edges: &HashSet<(String, String)>,
+    super_members: &HashMap<String, Vec<String>>,
+    graph: &GraphIndex,
+    reversed: &HashSet<(String, String)>,
+    nodes: &HashMap<String, NodeLayout>,
+) -> HashMap<String, Vec<f64>> {
     let mut node_targets: HashMap<String, Vec<f64>> = HashMap::new();
-
-    // 排序保证迭代顺序确定（HashSet 迭代顺序随机），
-    // 否则 node_targets 中每个 Vec<f64> 顺序随机，
-    // f64 求和非结合性会导致 avg_target 1 ULP 差异 → desired_x 排序 tie → 最终位置抖动
     let mut super_edges_sorted: Vec<&(String, String)> = super_edges.iter().collect();
     super_edges_sorted.sort();
 
@@ -1731,18 +1765,27 @@ fn nudge_intra_nodes_toward_cross_group_edges(
             }
         }
     }
+    node_targets
+}
 
-    // 按组收集同组节点，用于同向多边排序分布
-    let mut group_node_targets: HashMap<String, Vec<(String, f64, f64)>> = HashMap::new();
+/// 按组收集同组节点，用于同向多边排序分布。
+/// 跳过组内 hub（有组内后继的节点，如 gateway → services），
+/// 它们需要保持居中于组内子节点，不应被跨组边拉开。
+fn compute_group_node_targets(
+    node_targets: &HashMap<String, Vec<f64>>,
+    super_members: &HashMap<String, Vec<String>>,
+    graph: &GraphIndex,
+    reversed: &HashSet<(String, String)>,
+    nodes: &HashMap<String, NodeLayout>,
+) -> HashMap<String, Vec<(String, f64, f64)>> {
     // (node_id, current_cx, avg_target_cx)
+    let mut group_node_targets: HashMap<String, Vec<(String, f64, f64)>> = HashMap::new();
 
-    for (node_id, targets) in &node_targets {
+    for (node_id, targets) in node_targets {
         let Some(nl) = nodes.get(node_id) else {
             continue;
         };
 
-        // 跳过组内 hub：有组内后继的节点（如 gateway → services），
-        // 它们需要保持居中于组内子节点，不应被跨组边拉开
         let group_id = super_members
             .iter()
             .find(|(_, members)| members.contains(node_id))
@@ -1774,8 +1817,18 @@ fn nudge_intra_nodes_toward_cross_group_edges(
             .or_default()
             .push((node_id.clone(), current_cx, avg_target));
     }
+    group_node_targets
+}
 
-    // 对每组：计算动态微调（按 gid 排序保证确定性）
+/// 对每组：计算动态微调（按 gid 排序保证确定性）。
+/// 动态位移上限基于组宽和固定上限取小；
+/// 按 desired_x 排序后强制保持最小间距，避免重叠；
+/// 最后 clamp 到组框（先排序边界再 clamp，避免 release 下 f64::clamp panic）。
+fn apply_nudge_per_group(
+    group_node_targets: &HashMap<String, Vec<(String, f64, f64)>>,
+    groups: &HashMap<String, GroupLayout>,
+    nodes: &mut HashMap<String, NodeLayout>,
+) {
     let mut group_ids: Vec<String> = group_node_targets.keys().cloned().collect();
     group_ids.sort();
     for gid in group_ids {

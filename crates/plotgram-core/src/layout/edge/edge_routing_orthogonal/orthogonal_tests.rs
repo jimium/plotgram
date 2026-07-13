@@ -135,7 +135,7 @@
     #[test]
     fn test_simplify_path() {
         let path = vec![Point::new(0.0, 0.0), Point::new(50.0, 0.0), Point::new(100.0, 0.0)];
-        let simplified = simplify_path(path);
+        let simplified = simplify_path(path, false);
         assert_eq!(simplified.len(), 2);
     }
 
@@ -649,7 +649,7 @@
         let grid = SegmentGrid::new();
         let group_ctx = test_group_ctx(HashMap::new(), HashMap::new());
         let obstacles = PreparedObstacles::build(&nodes, &group_ctx);
-        let ctx = RoutingContext::new(
+        let ctx = OrthoRoutingContext::new(
             &nodes,
             &group_ctx,
             &grid,
@@ -722,8 +722,8 @@
 
     /// P2-1: channel detour 路径必须保留 stub 折点（修复 G7）。
     ///
-    /// 当 stub 方向与 channel 方向共线时，`simplify_path` 会合并 stub 折点，
-    /// 导致边一出节点就折回。`simplify_path_preserving_stubs` 保护 index 1 和
+    /// 当 stub 方向与 channel 方向共线时，`simplify_path(path, false)` 会合并 stub 折点，
+    /// 导致边一出节点就折回。`simplify_path(path, true)` 保护 index 1 和
     /// len-2 的折点，确保 PORT_CLEARANCE stub 不被消除。
     #[test]
     fn test_p2_1_channel_detour_preserves_stubs() {
@@ -1386,7 +1386,7 @@
         // 无 corridor 的图 → strict_group_transit = false（G1 前 = false）
         let group_ctx_no_corridor = test_group_ctx(HashMap::new(), HashMap::new());
         let obstacles = PreparedObstacles::build(&nodes, &group_ctx_no_corridor);
-        let ctx = RoutingContext::new(
+        let ctx = OrthoRoutingContext::new(
             &nodes,
             &group_ctx_no_corridor,
             &grid,
@@ -1432,7 +1432,7 @@
             group_ancestors: HashMap::new(),
         };
         let obstacles = PreparedObstacles::build(&nodes, &group_ctx_with_corridor);
-        let ctx = RoutingContext::new(
+        let ctx = OrthoRoutingContext::new(
             &nodes,
             &group_ctx_with_corridor,
             &grid,

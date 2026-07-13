@@ -20,17 +20,9 @@ use crate::layout::edge::common::edge_geometry::{
 };
 use crate::layout::edge::common::self_loop::{self_loop_indices, route_self_loop, SelfLoopStyle};
 use crate::layout::edge::common::label_placement::{LabelContext, LabelPlacer, RadialPlacer};
-use crate::layout::edge::visibility;
 use std::collections::HashMap;
 
 const PARALLEL_SPACING: f64 = 0.10;
-
-/// 障碍物膨胀间距：取自 [`constants::DEFAULT_NODE_MARGIN`]。
-#[allow(dead_code)]
-const OBSTACLE_PADDING: f64 = 8.0;
-
-/// 穿障检测的曲线采样点数
-const OBSTACLE_CHECK_SAMPLES: usize = 16;
 
 /// 弧形边路由策略
 pub struct CircularRouting;
@@ -65,19 +57,8 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
     let (lane_offsets, arc_sides) = compute_lane_offsets(diagram, &node_placement);
 
     // 构建障碍索引（用于穿障检测与退化绕行）
-    let node_list: Vec<(usize, &NodeLayout)> = result
-        .nodes
-        .iter()
-        .enumerate()
-        .map(|(i, (_, nl))| (i, nl))
-        .collect();
-    let node_id_to_idx: HashMap<&str, usize> = result
-        .nodes
-        .keys()
-        .enumerate()
-        .map(|(i, id)| (id.as_str(), i))
-        .collect();
-    let obstacle_index = visibility::ObstacleIndex::build(&node_list);
+    let (node_id_to_idx, obstacle_index) =
+        crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
 
     let self_loop_idx = self_loop_indices(&diagram.relations);
     let mut edges = Vec::with_capacity(diagram.relations.len());
@@ -134,7 +115,7 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
         let to_idx = node_id_to_idx.get(to_id).copied().unwrap_or(usize::MAX);
         let skip = [from_idx, to_idx];
 
-        if curve_intersects_obstacles(&edge, &obstacle_index, &skip) {
+        if crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(&edge, &obstacle_index, &skip) {
             if let (Some(start), Some(end)) = (edge.path_start(), edge.path_end()) {
                 let detour = obstacle_index.shortest_path(start, end, &skip);
                 if !detour.is_empty() {
@@ -155,21 +136,6 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
         .place(&mut edges, &label_ctx);
     result.edges = edges;
     result
-}
-
-/// 检测弧形曲线采样后是否穿过任何非 skip 障碍物
-fn curve_intersects_obstacles(
-    edge: &EdgeLayout,
-    obstacles: &visibility::ObstacleIndex,
-    skip: &[usize],
-) -> bool {
-    let sampled = edge.sampled_path(OBSTACLE_CHECK_SAMPLES);
-    for window in sampled.windows(2) {
-        if obstacles.segment_hits_any(window[0], window[1], skip) {
-            return true;
-        }
-    }
-    false
 }
 
 struct NodeCirclePos {

@@ -305,6 +305,30 @@ fn detect_side_approach(points: &[Point], anchor_idx: usize, side: Port) -> Opti
     None
 }
 
+// ─── PortFix / Attempt: 端口修正候选的类型定义（模块级） ───
+
+#[derive(Copy, Clone, Debug)]
+enum PortFix {
+    None,
+    Flip,        // 翻转到对面端口（反向stub）
+    Rotate(Port), // 旋转到指定相邻端口（侧向接入）
+}
+
+#[derive(Copy, Clone, Debug)]
+struct Attempt {
+    from: Option<Port>,
+    to: Option<Port>,
+}
+
+/// 待修正边的信息：边索引 + from/to 修正方式 + 原 side_approach 标记。
+struct EdgeToCheck {
+    ei: usize,
+    from_fix: PortFix,
+    to_fix: PortFix,
+    orig_from_has_side: bool,
+    orig_to_has_side: bool,
+}
+
 /// 反向 stub 与侧向接入检测、端口修正。
 ///
 /// 问题场景：
@@ -341,16 +365,128 @@ pub fn fix_reverse_stub_ports(
 
     let mut flipped_count = 0usize;
 
-    #[derive(Copy, Clone, Debug)]
-    enum PortFix {
-        None,
-        Flip,        // 翻转到对面端口（反向stub）
-        Rotate(Port), // 旋转到指定相邻端口（侧向接入）
+    // Phase 1: 收集所有需要修正的边及建议修正方式，避免边遍历边修改
+    let edges_to_check = collect_edges_to_check(
+        edges,
+        from_side,
+        to_side,
+        endpoint_map,
+        nodes,
+        side_channel_edges,
+    );
+
+    // Phase 2: 逐边生成候选端口组合，评估选最优
+    let r_cfg = OrthoConfig {
+        channel_margin: cfg.channel_margin + 10.0,
+        ..*cfg
+    };
+
+    for etc in edges_to_check {
+        let ei = etc.ei;
+        let orig_side_problems = (etc.orig_from_has_side as i32) + (etc.orig_to_has_side as i32);
+        let old_from = from_side[ei];
+        let old_to = to_side[ei];
+
+        let Some(old_from_ep) = endpoint_map.get(&(ei, true)) else { continue };
+        let Some(old_to_ep) = endpoint_map.get(&(ei, false)) else { continue };
+        let Some(from_nl) = nodes.get(&old_from_ep.node_id) else { continue };
+        let Some(to_nl) = nodes.get(&old_to_ep.node_id) else { continue };
+
+        let old_points: Vec<Point> = edges[ei].path_points().into_owned();
+        let old_path_len = path_length(&old_points);
+
+        let attempts = generate_attempts(etc.from_fix, etc.to_fix, old_from, old_to);
+
+        grid.remove_by_edges(&[ei]);
+
+        let mut best: Option<(Port, Port, Endpoint, Endpoint, Vec<Point>, f64)> = None;
+
+        for attempt in &attempts {
+            if let Some(result) = evaluate_attempt(
+                ei,
+                attempt,
+                old_from,
+                old_to,
+                old_from_ep,
+                old_to_ep,
+                from_nl,
+                to_nl,
+                etc.from_fix,
+                etc.to_fix,
+                orig_side_problems,
+                old_path_len,
+                &old_points,
+                relations,
+                nodes,
+                grid,
+                &r_cfg,
+                profile,
+                group_ctx,
+                obstacles,
+                corridor_plan,
+                ortho_stats,
+                endpoint_map,
+            ) {
+                let new_len = result.5;
+                let better = match &best {
+                    None => true,
+                    Some((_, _, _, _, _, best_len)) => new_len < *best_len,
+                };
+                if better {
+                    best = Some(result);
+                }
+            }
+        }
+
+        match best {
+            Some((new_from, new_to, nf_ep, nt_ep, candidate, _)) => {
+                from_side[ei] = new_from;
+                to_side[ei] = new_to;
+                endpoint_map.insert((ei, true), nf_ep);
+                endpoint_map.insert((ei, false), nt_ep);
+
+                let labels = match relations.get(ei) {
+                    Some(rel) => {
+                        crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto(
+                            rel, ei, relations, &candidate,
+                        )
+                    }
+                    None => Vec::new(),
+                };
+                grid.insert_path(&candidate, ei);
+                let mut edge = EdgeLayout {
+                    geometry: PathGeometry::Polyline { points: Vec::new() },
+                    labels,
+                    from_port: new_from,
+                    to_port: new_to,
+                };
+                edge.set_polyline_points(candidate);
+                edges[ei] = edge;
+                flipped_count += 1;
+            }
+            None => {
+                grid.insert_path(&old_points, ei);
+            }
+        }
     }
 
-    // 先收集所有需要修正的边及建议修正方式，避免边遍历边修改
-    let mut edges_to_check: Vec<(usize, PortFix, PortFix, bool, bool)> = Vec::new();
-    for ei in 0..n {
+    ortho_stats.flipped_stub_edges = flipped_count;
+}
+
+/// 收集所有需要修正的边及建议修正方式。
+///
+/// 跳过空路径边和侧通道边。对每条边检测 from/to 端点的反向 stub、
+/// 侧向接入、退化 stub，生成对应的 `PortFix` 建议。
+fn collect_edges_to_check(
+    edges: &[EdgeLayout],
+    from_side: &[Port],
+    to_side: &[Port],
+    endpoint_map: &HashMap<(usize, bool), Endpoint>,
+    nodes: &HashMap<String, NodeLayout>,
+    side_channel_edges: &std::collections::HashSet<usize>,
+) -> Vec<EdgeToCheck> {
+    let mut edges_to_check: Vec<EdgeToCheck> = Vec::new();
+    for ei in 0..edges.len() {
         if edges[ei].path_is_empty() {
             continue;
         }
@@ -400,274 +536,272 @@ pub fn fix_reverse_stub_ports(
         };
 
         if !matches!(from_fix, PortFix::None) || !matches!(to_fix, PortFix::None) {
-            edges_to_check.push((ei, from_fix, to_fix, orig_from_side, orig_to_side));
+            edges_to_check.push(EdgeToCheck {
+                ei,
+                from_fix,
+                to_fix,
+                orig_from_has_side: orig_from_side,
+                orig_to_has_side: orig_to_side,
+            });
+        }
+    }
+    edges_to_check
+}
+
+/// 基于 from_fix / to_fix 生成候选端口组合。
+///
+/// - Flip类型：尝试翻转到对面端口
+/// - Rotate类型：尝试旋转到建议的相邻端口
+/// - 同时尝试两端都修正的组合
+/// - 单端 Flip 时额外尝试双端翻转（翻转一端可能导致另一端也反向）
+fn generate_attempts(
+    from_fix: PortFix,
+    to_fix: PortFix,
+    old_from: Port,
+    old_to: Port,
+) -> Vec<Attempt> {
+    let mut attempts: Vec<Attempt> = Vec::new();
+
+    // 基于from_fix和to_fix生成候选端口列表（包含原端口作为选项）
+    let from_candidates: Vec<Port> = match from_fix {
+        PortFix::None => vec![old_from],
+        PortFix::Flip => vec![old_from, opposite_port(old_from)],
+        PortFix::Rotate(p) => vec![old_from, p],
+    };
+    let to_candidates: Vec<Port> = match to_fix {
+        PortFix::None => vec![old_to],
+        PortFix::Flip => vec![old_to, opposite_port(old_to)],
+        PortFix::Rotate(p) => vec![old_to, p],
+    };
+
+    // 笛卡尔积生成所有组合
+    for &fc in &from_candidates {
+        for &tc in &to_candidates {
+            if fc == old_from && tc == old_to {
+                continue; // 跳过不修改的组合（保持原路径）
+            }
+            attempts.push(Attempt {
+                from: if fc == old_from { None } else { Some(fc) },
+                to: if tc == old_to { None } else { Some(tc) },
+            });
         }
     }
 
-    for (ei, from_fix, to_fix, orig_from_has_side, orig_to_has_side) in edges_to_check {
-        let orig_side_problems = (orig_from_has_side as i32) + (orig_to_has_side as i32);
-        let old_from = from_side[ei];
-        let old_to = to_side[ei];
+    // 如果是反向stub单端问题，额外尝试双端翻转（翻转一端可能导致另一端也反向）
+    if matches!(from_fix, PortFix::Flip) && matches!(to_fix, PortFix::None) {
+        attempts.push(Attempt {
+            from: Some(opposite_port(old_from)),
+            to: Some(opposite_port(old_to)),
+        });
+    }
+    if matches!(to_fix, PortFix::Flip) && matches!(from_fix, PortFix::None) {
+        attempts.push(Attempt {
+            from: Some(opposite_port(old_from)),
+            to: Some(opposite_port(old_to)),
+        });
+    }
 
-        let Some(old_from_ep) = endpoint_map.get(&(ei, true)) else { continue };
-        let Some(old_to_ep) = endpoint_map.get(&(ei, false)) else { continue };
-        let Some(from_nl) = nodes.get(&old_from_ep.node_id) else { continue };
-        let Some(to_nl) = nodes.get(&old_to_ep.node_id) else { continue };
+    attempts
+}
 
-        let old_points: Vec<Point> = edges[ei].path_points().into_owned();
-        let old_path_len = path_length(&old_points);
+/// 评估单个端口组合候选：重新路由 + 检查接受条件。
+///
+/// 返回 `(new_from, new_to, nf_ep, nt_ep, candidate_path, path_len)` 若可接受；
+/// 否则返回 `None`。调用方负责比较 `path_len` 选最优。
+#[allow(clippy::too_many_arguments)]
+fn evaluate_attempt(
+    ei: usize,
+    attempt: &Attempt,
+    old_from: Port,
+    old_to: Port,
+    old_from_ep: &Endpoint,
+    old_to_ep: &Endpoint,
+    from_nl: &NodeLayout,
+    to_nl: &NodeLayout,
+    from_fix: PortFix,
+    to_fix: PortFix,
+    orig_side_problems: i32,
+    old_path_len: f64,
+    old_points: &[Point],
+    relations: &[crate::ast::Relation],
+    nodes: &HashMap<String, NodeLayout>,
+    grid: &SegmentGrid,
+    r_cfg: &OrthoConfig,
+    profile: &OrthoRoutingProfile,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    obstacles: &PreparedObstacles,
+    corridor_plan: &corridor_route::CorridorRoutePlan,
+    ortho_stats: &mut crate::layout::OrthoDebugStats,
+    endpoint_map: &HashMap<(usize, bool), Endpoint>,
+) -> Option<(Port, Port, Endpoint, Endpoint, Vec<Point>, f64)> {
+    let new_from = attempt.from.unwrap_or(old_from);
+    let new_to = attempt.to.unwrap_or(old_to);
 
-        // 生成需要尝试的端口组合：
-        // - Flip类型：尝试翻转到对面端口
-        // - Rotate类型：尝试旋转到建议的相邻端口
-        // - 同时尝试两端都修正的组合
-        #[derive(Copy, Clone, Debug)]
-        struct Attempt { from: Option<Port>, to: Option<Port> }
+    let nf_anchor = if attempt.from.is_some() {
+        deconflict_flip_anchor(
+            slot_anchor(from_nl, new_from, 0.5),
+            &old_from_ep.node_id,
+            new_from,
+            from_nl,
+            ei,
+            endpoint_map,
+        )
+    } else {
+        old_from_ep.anchor
+    };
+    let nt_anchor = if attempt.to.is_some() {
+        deconflict_flip_anchor(
+            slot_anchor(to_nl, new_to, 0.5),
+            &old_to_ep.node_id,
+            new_to,
+            to_nl,
+            ei,
+            endpoint_map,
+        )
+    } else {
+        old_to_ep.anchor
+    };
 
-        let mut attempts: Vec<Attempt> = Vec::new();
+    let nf_ep = Endpoint {
+        edge_index: ei,
+        is_from: true,
+        target_x: old_from_ep.target_x,
+        target_y: old_from_ep.target_y,
+        lane: old_from_ep.lane,
+        node_id: old_from_ep.node_id.clone(),
+        side: new_from,
+        anchor: nf_anchor,
+    };
+    let nt_ep = Endpoint {
+        edge_index: ei,
+        is_from: false,
+        target_x: old_to_ep.target_x,
+        target_y: old_to_ep.target_y,
+        lane: old_to_ep.lane,
+        node_id: old_to_ep.node_id.clone(),
+        side: new_to,
+        anchor: nt_anchor,
+    };
 
-        // 基于from_fix和to_fix生成候选端口列表（包含原端口作为选项）
-        let from_candidates: Vec<Port> = match from_fix {
-            PortFix::None => vec![old_from],
-            PortFix::Flip => vec![old_from, opposite_port(old_from)],
-            PortFix::Rotate(p) => vec![old_from, p],
-        };
-        let to_candidates: Vec<Port> = match to_fix {
-            PortFix::None => vec![old_to],
-            PortFix::Flip => vec![old_to, opposite_port(old_to)],
-            PortFix::Rotate(p) => vec![old_to, p],
-        };
+    let pair = EndpointPair {
+        from: nf_ep.clone(),
+        to: nt_ep.clone(),
+    };
+    let (from_id, to_id) = relations
+        .get(ei)
+        .map(|rel| (rel.from.as_str(), rel.to.as_str()))
+        .unwrap_or(("", ""));
 
-        // 笛卡尔积生成所有组合
-        for &fc in &from_candidates {
-            for &tc in &to_candidates {
-                if fc == old_from && tc == old_to {
-                    continue; // 跳过不修改的组合（保持原路径）
-                }
-                attempts.push(Attempt { from: if fc == old_from { None } else { Some(fc) }, to: if tc == old_to { None } else { Some(tc) } });
-            }
-        }
-
-        // 如果是反向stub单端问题，额外尝试双端翻转（翻转一端可能导致另一端也反向）
-        if matches!(from_fix, PortFix::Flip) && matches!(to_fix, PortFix::None) {
-            attempts.push(Attempt { from: Some(opposite_port(old_from)), to: Some(opposite_port(old_to)) });
-        }
-        if matches!(to_fix, PortFix::Flip) && matches!(from_fix, PortFix::None) {
-            attempts.push(Attempt { from: Some(opposite_port(old_from)), to: Some(opposite_port(old_to)) });
-        }
-
-        let mut best: Option<(Port, Port, Endpoint, Endpoint, Vec<Point>, f64)> = None;
-
-        let r_cfg = OrthoConfig {
-            channel_margin: cfg.channel_margin + 10.0,
-            ..*cfg
-        };
-
-        grid.remove_by_edges(&[ei]);
-
-        for attempt in &attempts {
-            let new_from = attempt.from.unwrap_or(old_from);
-            let new_to = attempt.to.unwrap_or(old_to);
-
-            let nf_anchor = if attempt.from.is_some() {
-                deconflict_flip_anchor(
-                    slot_anchor(from_nl, new_from, 0.5),
-                    &old_from_ep.node_id,
-                    new_from,
-                    from_nl,
-                    ei,
-                    endpoint_map,
-                )
-            } else {
-                old_from_ep.anchor
-            };
-            let nt_anchor = if attempt.to.is_some() {
-                deconflict_flip_anchor(
-                    slot_anchor(to_nl, new_to, 0.5),
-                    &old_to_ep.node_id,
-                    new_to,
-                    to_nl,
-                    ei,
-                    endpoint_map,
-                )
-            } else {
-                old_to_ep.anchor
-            };
-
-            let nf_ep = Endpoint {
-                edge_index: ei,
-                is_from: true,
-                target_x: old_from_ep.target_x,
-                target_y: old_from_ep.target_y,
-                lane: old_from_ep.lane,
-                node_id: old_from_ep.node_id.clone(),
-                side: new_from,
-                anchor: nf_anchor,
-            };
-            let nt_ep = Endpoint {
-                edge_index: ei,
-                is_from: false,
-                target_x: old_to_ep.target_x,
-                target_y: old_to_ep.target_y,
-                lane: old_to_ep.lane,
-                node_id: old_to_ep.node_id.clone(),
-                side: new_to,
-                anchor: nt_anchor,
-            };
-
-            let pair = EndpointPair { from: nf_ep.clone(), to: nt_ep.clone() };
-            let (from_id, to_id) = relations
-                .get(ei)
-                .map(|rel| (rel.from.as_str(), rel.to.as_str()))
-                .unwrap_or(("", ""));
-
-            let mut path_stats = PathSelectStats::default();
-            let candidate = validated_corridor_path(
-                ei,
-                nf_anchor,
-                nt_anchor,
+    let mut path_stats = PathSelectStats::default();
+    let candidate = validated_corridor_path(
+        ei,
+        nf_anchor,
+        nt_anchor,
+        from_id,
+        to_id,
+        corridor_plan,
+        group_ctx,
+        nodes,
+        obstacles,
+        r_cfg.channel_margin,
+    )
+    .unwrap_or_else(|| {
+        let ctx = OrthoRoutingContext::new(nodes, group_ctx, grid, r_cfg, profile, obstacles, None)
+            .with_strict_group_transit(should_strict_group_transit(
+                profile,
+                group_ctx,
                 from_id,
                 to_id,
-                corridor_plan,
-                group_ctx,
-                nodes,
-                obstacles,
-                r_cfg.channel_margin,
-            )
-            .unwrap_or_else(|| {
-                let ctx = RoutingContext::new(nodes, group_ctx, grid, &r_cfg, profile, obstacles, None)
-                    .with_strict_group_transit(should_strict_group_transit(
-                        profile,
-                        group_ctx,
-                        from_id,
-                        to_id,
-                        corridor_plan.chains.contains_key(&ei),
-                    ))
-                    // 换端口重试：升档外框通道
-                    .with_corridor_boost(true);
-                select_best_path_with_scorer_stats(
-                    &ctx,
-                    &pair,
-                    &DefaultScorer,
-                    Some(&mut path_stats),
-                    false,
-                )
-            });
-            ortho_stats.total_candidates += path_stats.candidate_count;
-            ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
-            if path_stats.degraded {
-                ortho_stats.degraded_count += 1;
-            }
-
-            if candidate.len() >= 2 {
-                let candidate = simplify_path_preserving_stubs(candidate);
-                let clean = path_is_clean(
-                    &candidate,
-                    pair.from_id(),
-                    pair.to_id(),
-                    nodes,
-                    group_ctx,
-                    &obstacles.sorted_node_ids,
-                ) && path_avoids_group_interiors(
-                    &candidate,
-                    pair.from_id(),
-                    pair.to_id(),
-                    group_ctx,
-                    &obstacles.sorted_group_ids,
-                );
-                let new_from_rev = has_reverse_stub(&candidate, 0, new_from);
-                let new_to_rev = has_reverse_stub(&candidate, candidate.len() - 1, new_to);
-                let new_from_side = if matches!(from_fix, PortFix::Rotate(_) | PortFix::Flip) {
-                    detect_side_approach(&candidate, 0, new_from)
-                } else {
-                    None
-                };
-                let new_to_side = if matches!(to_fix, PortFix::Rotate(_) | PortFix::Flip) {
-                    detect_side_approach(&candidate, candidate.len() - 1, new_to)
-                } else {
-                    None
-                };
-                let no_reverse = !new_from_rev && !new_to_rev;
-                let new_len = path_length(&candidate);
-                let still_degenerate = is_degenerate_stub_path(&candidate, to_nl, new_to);
-                // 允许最长比原路径长20%，但优先选择更短的路径
-                let len_ok = new_len <= old_path_len * 1.2 + 60.0
-                    || is_degenerate_stub_path(&old_points, to_nl, old_to);
-
-                // 接受条件：
-                // 1. 路径干净（不穿过节点/组内部）
-                // 2. 无反向stub
-                // 3. 长度可接受
-                // 4. 问题修复检查（满足任一）：
-                //    a) 总side_approach问题数减少
-                //    b) 总side_approach问题数不变且路径更短
-                //    c) 路径明显更短（<0.9倍原长）
-                //    d) 原路径为退化 stub，新路径非退化
-                let new_from_has_side = new_from_side.is_some();
-                let new_to_has_side = new_to_side.is_some();
-                let new_side_problems = (new_from_has_side as i32) + (new_to_has_side as i32);
-                let side_problems_improved = new_side_problems < orig_side_problems;
-                let side_problems_same_or_better = new_side_problems <= orig_side_problems;
-                let shorter = new_len < old_path_len;
-                let significantly_shorter = new_len < old_path_len * 0.9;
-                let fixes_degenerate =
-                    is_degenerate_stub_path(&old_points, to_nl, old_to) && !still_degenerate;
-
-                let accept = if fixes_degenerate {
-                    true
-                } else if side_problems_improved {
-                    true
-                } else if side_problems_same_or_better && shorter {
-                    true
-                } else if significantly_shorter {
-                    true
-                } else {
-                    false
-                };
-
-                if clean && no_reverse && !still_degenerate && len_ok && accept {
-                    let better = match &best {
-                        None => true,
-                        Some((_, _, _, _, _, best_len)) => new_len < *best_len,
-                    };
-                    if better {
-                        best = Some((new_from, new_to, nf_ep, nt_ep, candidate, new_len));
-                    }
-                }
-            }
-        }
-
-        match best {
-            Some((new_from, new_to, nf_ep, nt_ep, candidate, _)) => {
-                from_side[ei] = new_from;
-                to_side[ei] = new_to;
-                endpoint_map.insert((ei, true), nf_ep);
-                endpoint_map.insert((ei, false), nt_ep);
-
-                let labels = match relations.get(ei) {
-                    Some(rel) => {
-                        crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto(
-                            rel, ei, relations, &candidate,
-                        )
-                    }
-                    None => Vec::new(),
-                };
-                grid.insert_path(&candidate, ei);
-                let mut edge = EdgeLayout {
-                    geometry: PathGeometry::Polyline { points: Vec::new() },
-                    labels,
-                    from_port: new_from,
-                    to_port: new_to,
-                };
-                edge.set_polyline_points(candidate);
-                edges[ei] = edge;
-                flipped_count += 1;
-            }
-            None => {
-                grid.insert_path(&old_points, ei);
-            }
-        }
+                corridor_plan.chains.contains_key(&ei),
+            ))
+            // 换端口重试：升档外框通道
+            .with_corridor_boost(true);
+        select_best_path_with_scorer_stats(
+            &ctx,
+            &pair,
+            &DefaultScorer,
+            Some(&mut path_stats),
+            false,
+        )
+    });
+    ortho_stats.total_candidates += path_stats.candidate_count;
+    ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
+    if path_stats.degraded {
+        ortho_stats.degraded_count += 1;
     }
 
-    ortho_stats.flipped_stub_edges = flipped_count;
+    if candidate.len() < 2 {
+        return None;
+    }
+
+    let candidate = simplify_path(candidate, true);
+    let clean = path_is_clean(
+        &candidate,
+        pair.from_id(),
+        pair.to_id(),
+        nodes,
+        group_ctx,
+        &obstacles.sorted_node_ids,
+    ) && path_avoids_group_interiors(
+        &candidate,
+        pair.from_id(),
+        pair.to_id(),
+        group_ctx,
+        &obstacles.sorted_group_ids,
+    );
+    let new_from_rev = has_reverse_stub(&candidate, 0, new_from);
+    let new_to_rev = has_reverse_stub(&candidate, candidate.len() - 1, new_to);
+    let new_from_side = if matches!(from_fix, PortFix::Rotate(_) | PortFix::Flip) {
+        detect_side_approach(&candidate, 0, new_from)
+    } else {
+        None
+    };
+    let new_to_side = if matches!(to_fix, PortFix::Rotate(_) | PortFix::Flip) {
+        detect_side_approach(&candidate, candidate.len() - 1, new_to)
+    } else {
+        None
+    };
+    let no_reverse = !new_from_rev && !new_to_rev;
+    let new_len = path_length(&candidate);
+    let still_degenerate = is_degenerate_stub_path(&candidate, to_nl, new_to);
+    // 允许最长比原路径长20%，但优先选择更短的路径
+    let len_ok = new_len <= old_path_len * 1.2 + 60.0
+        || is_degenerate_stub_path(old_points, to_nl, old_to);
+
+    // 接受条件：
+    // 1. 路径干净（不穿过节点/组内部）
+    // 2. 无反向stub
+    // 3. 长度可接受
+    // 4. 问题修复检查（满足任一）：
+    //    a) 总side_approach问题数减少
+    //    b) 总side_approach问题数不变且路径更短
+    //    c) 路径明显更短（<0.9倍原长）
+    //    d) 原路径为退化 stub，新路径非退化
+    let new_from_has_side = new_from_side.is_some();
+    let new_to_has_side = new_to_side.is_some();
+    let new_side_problems = (new_from_has_side as i32) + (new_to_has_side as i32);
+    let side_problems_improved = new_side_problems < orig_side_problems;
+    let side_problems_same_or_better = new_side_problems <= orig_side_problems;
+    let shorter = new_len < old_path_len;
+    let significantly_shorter = new_len < old_path_len * 0.9;
+    let fixes_degenerate =
+        is_degenerate_stub_path(old_points, to_nl, old_to) && !still_degenerate;
+
+    let accept = if fixes_degenerate {
+        true
+    } else if side_problems_improved {
+        true
+    } else if side_problems_same_or_better && shorter {
+        true
+    } else if significantly_shorter {
+        true
+    } else {
+        false
+    };
+
+    if clean && no_reverse && !still_degenerate && len_ok && accept {
+        Some((new_from, new_to, nf_ep, nt_ep, candidate, new_len))
+    } else {
+        None
+    }
 }

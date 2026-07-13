@@ -3,12 +3,15 @@
 use super::*;
 use crate::layout::geometry::Point;
 
-pub fn simplify_path_preserving_stubs(mut path: Vec<Point>) -> Vec<Point> {
+pub fn simplify_path(mut path: Vec<Point>, preserve_stubs: bool) -> Vec<Point> {
     if path.len() <= 2 {
         return path;
     }
     path.dedup_by(|a, b| (a.x - b.x).abs() < EPS && (a.y - b.y).abs() < EPS);
-    if path.len() <= 4 {
+    // preserve_stubs needs at least 5 points (start, stub, mid..., stub, end) to be meaningful;
+    // non-preserve mode needs at least 3 points to simplify.
+    let min_len = if preserve_stubs { 5 } else { 3 };
+    if path.len() < min_len {
         return path;
     }
 
@@ -20,34 +23,12 @@ pub fn simplify_path_preserving_stubs(mut path: Vec<Point>) -> Vec<Point> {
         let prev = *simplified.last().unwrap();
         let curr = path[i];
         let next = path[i + 1];
-        let preserves_node_exit = i == first_stub_index || i == last_stub_index;
+        let preserves_node_exit = preserve_stubs && (i == first_stub_index || i == last_stub_index);
         if preserves_node_exit || !is_collinear(prev, curr, next) {
             simplified.push(curr);
         }
     }
 
-    simplified.push(*path.last().unwrap());
-    simplified
-}
-
-pub fn simplify_path(mut path: Vec<Point>) -> Vec<Point> {
-    if path.len() <= 2 {
-        return path;
-    }
-    path.dedup_by(|a, b| (a.x - b.x).abs() < EPS && (a.y - b.y).abs() < EPS);
-    if path.len() <= 2 {
-        return path;
-    }
-
-    let mut simplified = vec![path[0]];
-    for i in 1..path.len() - 1 {
-        let prev = *simplified.last().unwrap();
-        let curr = path[i];
-        let next = path[i + 1];
-        if !is_collinear(prev, curr, next) {
-            simplified.push(curr);
-        }
-    }
     simplified.push(*path.last().unwrap());
     simplified
 }

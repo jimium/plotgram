@@ -20,6 +20,7 @@ use crate::layout::edge::common::edge_geometry::{
 };
 use crate::layout::edge::common::label_avoidance::resolve_label_overlaps;
 use crate::layout::edge::common::parallel_edges::group_parallel_edges;
+use crate::layout::edge::visibility;
 use crate::layout::constants;
 use std::collections::HashMap;
 
@@ -40,6 +41,29 @@ impl<'a> RoutingContext<'a> {
             parallel_offsets: pg.offsets,
         }
     }
+}
+
+/// 构建穿障检测上下文:节点 id → 索引映射 + 障碍物索引。
+///
+/// 统一 bezier / circular / organic / spline 四处逐字符相同的前置设置序列。
+/// 返回的 `HashMap<&str, usize>` 借用 `result.nodes` 的 key。
+pub fn build_obstacle_context<'a>(
+    result: &'a LayoutResult,
+) -> (HashMap<&'a str, usize>, visibility::ObstacleIndex) {
+    let node_list: Vec<(usize, &NodeLayout)> = result
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, (_, nl))| (i, nl))
+        .collect();
+    let node_id_to_idx: HashMap<&str, usize> = result
+        .nodes
+        .keys()
+        .enumerate()
+        .map(|(i, id)| (id.as_str(), i))
+        .collect();
+    let obstacle_index = visibility::ObstacleIndex::build(&node_list);
+    (node_id_to_idx, obstacle_index)
 }
 
 /// 一条边的端点解析结果

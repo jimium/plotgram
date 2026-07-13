@@ -14,7 +14,7 @@ use crate::layout::algorithm_config::AlgorithmOptionSpec;
 use crate::layout::edge::edge_routing_bezier::{BezierConfig, BEZIER_OPTIONS};
 use crate::layout::geometry::Point;
 use crate::layout::{
-    visibility, EdgeLayout, EdgeRoutingStrategy, LayoutResult, PathGeometry,
+    EdgeLayout, EdgeRoutingStrategy, LayoutResult, PathGeometry,
 };
 use crate::layout::edge::common::edge_geometry::{
     build_edge_labels, compute_bezier_controls, cubic_bezier_point, label_t_for_diagram,
@@ -24,7 +24,6 @@ use crate::layout::edge::common::routing_skeleton::{
     finalize_edges, resolve_endpoints, RoutingContext,
 };
 use crate::layout::edge::common::self_loop::{self_loop_indices, route_self_loop, SelfLoopStyle};
-use std::collections::HashMap;
 
 const APPLICABLE_TYPES: &[DiagramType] = &[
     DiagramType::Flowchart,
@@ -89,13 +88,6 @@ impl EdgeRoutingStrategy for SplineRouting {
     }
 }
 
-/// 障碍物膨胀间距
-///
-/// 保留供参考：实际膨胀间距取自 [`constants::DEFAULT_NODE_MARGIN`]。
-/// `ObstacleIndex::build` 不再接受固定 padding 参数。
-#[allow(dead_code)]
-const OBSTACLE_PADDING: f64 = 8.0;
-
 /// 贝塞尔路径每段的采样点数
 const BEZIER_SAMPLES_PER_SEGMENT: usize = 12;
 
@@ -109,20 +101,8 @@ pub fn route_edges_spline(
     let tension = config.tension;
     let ctx = RoutingContext::new(diagram, &result);
 
-    let node_list: Vec<(usize, &crate::layout::NodeLayout)> = result
-        .nodes
-        .iter()
-        .enumerate()
-        .map(|(i, (_, nl))| (i, nl))
-        .collect();
-    let node_id_to_idx: HashMap<&str, usize> = result
-        .nodes
-        .keys()
-        .enumerate()
-        .map(|(i, id)| (id.as_str(), i))
-        .collect();
-
-    let obstacle_index = visibility::ObstacleIndex::build(&node_list);
+    let (node_id_to_idx, obstacle_index) =
+        crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
 
     let self_loop_idx = self_loop_indices(relations);
     let mut edges: Vec<EdgeLayout> = Vec::with_capacity(relations.len());

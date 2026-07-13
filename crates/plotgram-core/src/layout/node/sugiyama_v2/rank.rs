@@ -70,11 +70,7 @@ fn assign_component_ranks_network_simplex(
 
     let root = component[0];
     let mut tree_edges = build_feasible_tight_tree(dag, component_set, &mut ranks, root);
-    let node_order = {
-        let mut nodes = component.to_vec();
-        nodes.sort_by_key(|node| node.index());
-        nodes
-    };
+    let node_order = sorted_component_nodes(component_set);
 
     let max_node_idx = component
         .iter()
@@ -790,7 +786,26 @@ fn tree_is_connected(
     if component_set.len() <= 1 {
         return true;
     }
-    root_tree(component_set, dag, tree_edges, root).order.len() == component_set.len()
+    // 轻量 BFS:仅统计从 root 经 tree_edges 可达的节点数,
+    // 不构建完整的 RootedTree(省去 parent_edge / children 的 HashMap 分配与排序)。
+    let mut adjacency: HashMap<NodeIndex, Vec<NodeIndex>> = HashMap::new();
+    for edge in tree_edges {
+        let (from, to) = dag.edge_endpoints(*edge).unwrap();
+        adjacency.entry(from).or_default().push(to);
+        adjacency.entry(to).or_default().push(from);
+    }
+    let mut visited = HashSet::from([root]);
+    let mut queue = VecDeque::from([root]);
+    while let Some(node) = queue.pop_front() {
+        if let Some(neighbors) = adjacency.get(&node) {
+            for neighbor in neighbors {
+                if visited.insert(*neighbor) {
+                    queue.push_back(*neighbor);
+                }
+            }
+        }
+    }
+    visited.len() == component_set.len()
 }
 
 fn simplex_state_key(

@@ -101,8 +101,11 @@ pub fn compute_with_preset(
     // 检测 group 包围框重叠与非组节点落入框内，填充警告。
     // 流程图布局 group 不参与布局（仅事后画框），此检测诊断视觉问题。
     let group_warnings = group_bounds::detect_group_layout_warnings(diagram, &nodes, &groups);
-    let (total_width, total_height) =
-        postprocess::bounds_from_layout(&nodes, &groups, adjusted_preset.padding);
+    let (total_width, total_height) = crate::layout::node::common::canvas_bounds::canvas_size(
+        &nodes,
+        &groups,
+        adjusted_preset.padding,
+    );
 
     let mut result = LayoutResult {
         nodes,

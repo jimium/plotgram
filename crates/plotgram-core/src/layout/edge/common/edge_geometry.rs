@@ -315,7 +315,7 @@ pub fn radial_outward_tangent(nl: &NodeLayout, border: Point) -> Point {
     Point::new(dx / len, dy / len)
 }
 
-fn port_direction(port: Port) -> Point {
+pub fn port_direction(port: Port) -> Point {
     match port {
         Port::Top => Point::new(0.0, -1.0),
         Port::Bottom => Point::new(0.0, 1.0),

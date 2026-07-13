@@ -31,288 +31,129 @@ pub struct AlgorithmOptionSpec {
     pub description: &'static str,
 }
 
-/// Sugiyama 系布局算法共用的 option 列表。
-pub const SUGIYAMA_LAYOUT_OPTIONS: &[AlgorithmOptionSpec] = &[AlgorithmOptionSpec {
-    key: "group_padding",
-    kind: OptionKind::NonNegativeNumber,
-    default: constants::SUGIYAMA_GROUP_PADDING,
-    description: "分组包围框内边距",
-}];
+/// 生成布局算法 Config struct + OPTIONS 常量表 + Default + from_options。
+///
+/// 用法：
+/// ```ignore
+/// define_layout_config! {
+///     /// 文档注释
+///     pub struct FooConfig {
+///         options = FOO_LAYOUT_OPTIONS;
+///         padding: "padding" ; OptionKind::NonNegativeNumber ; constants::FOO_PADDING ; "画布内边距",
+///         gap: "gap" ; OptionKind::PositiveNumber ; constants::FOO_GAP ; "间距",
+///     }
+/// }
+/// ```
+macro_rules! define_layout_config {
+    (
+        $(#[$meta:meta])*
+        pub struct $name:ident {
+            options = $options_const:ident;
+            $(
+                $(#[$field_meta:meta])*
+                $field:ident: $opt_key:literal ; $opt_kind:expr ; $opt_default:expr ; $opt_desc:literal
+            ),+ $(,)?
+        }
+    ) => {
+        pub const $options_const: &[AlgorithmOptionSpec] = &[
+            $( AlgorithmOptionSpec {
+                key: $opt_key,
+                kind: $opt_kind,
+                default: $opt_default,
+                description: $opt_desc,
+            } ),+
+        ];
 
-/// Sugiyama 系布局已解析的运行时配置。
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct SugiyamaLayoutConfig {
-    pub group_padding: f64,
+        $(#[$meta])*
+        #[derive(Debug, Clone, Copy, PartialEq)]
+        pub struct $name {
+            $( $(#[$field_meta])* pub $field: f64, )+
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                let opts: &[AlgorithmOptionSpec] = $options_const;
+                let mut iter = opts.iter();
+                $(
+                    let $field = iter.next().unwrap().default;
+                )+
+                Self {
+                    $( $field, )+
+                }
+            }
+        }
+
+        impl $name {
+            pub fn from_options(options: &super::plan::ResolvedAlgoOptions) -> Self {
+                let opts: &[AlgorithmOptionSpec] = $options_const;
+                let mut iter = opts.iter();
+                $(
+                    let $field = options.get_or_default(iter.next().unwrap());
+                )+
+                Self {
+                    $( $field, )+
+                }
+            }
+        }
+    };
 }
 
-impl Default for SugiyamaLayoutConfig {
-    fn default() -> Self {
-        Self {
-            group_padding: SUGIYAMA_LAYOUT_OPTIONS[0].default,
-        }
+define_layout_config! {
+    /// Sugiyama 系布局已解析的运行时配置。
+    pub struct SugiyamaLayoutConfig {
+        options = SUGIYAMA_LAYOUT_OPTIONS;
+        group_padding: "group_padding" ; OptionKind::NonNegativeNumber ; constants::SUGIYAMA_GROUP_PADDING ; "分组包围框内边距",
     }
 }
 
-impl SugiyamaLayoutConfig {
-    pub fn from_options(options: &super::plan::ResolvedAlgoOptions) -> Self {
-        Self {
-            group_padding: options.get_or_default(&SUGIYAMA_LAYOUT_OPTIONS[0]),
-        }
+define_layout_config! {
+    /// 圆形布局已解析的运行时配置。
+    pub struct CircularLayoutConfig {
+        options = CIRCULAR_LAYOUT_OPTIONS;
+        group_padding: "group_padding" ; OptionKind::NonNegativeNumber ; constants::DEFAULT_GROUP_PADDING ; "分组包围框内边距",
+        padding: "padding" ; OptionKind::NonNegativeNumber ; constants::CIRCULAR_PADDING ; "画布内边距",
+        component_gap: "component_gap" ; OptionKind::NonNegativeNumber ; constants::CIRCULAR_COMPONENT_GAP ; "多连通分量圆环之间的水平间距",
     }
 }
 
-/// 圆形布局算法 option 列表。
-pub const CIRCULAR_LAYOUT_OPTIONS: &[AlgorithmOptionSpec] = &[
-    AlgorithmOptionSpec {
-        key: "group_padding",
-        kind: OptionKind::NonNegativeNumber,
-        default: constants::DEFAULT_GROUP_PADDING,
-        description: "分组包围框内边距",
-    },
-    AlgorithmOptionSpec {
-        key: "padding",
-        kind: OptionKind::NonNegativeNumber,
-        default: constants::CIRCULAR_PADDING,
-        description: "画布内边距",
-    },
-    AlgorithmOptionSpec {
-        key: "component_gap",
-        kind: OptionKind::NonNegativeNumber,
-        default: constants::CIRCULAR_COMPONENT_GAP,
-        description: "多连通分量圆环之间的水平间距",
-    },
-];
-
-/// 圆形布局已解析的运行时配置。
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct CircularLayoutConfig {
-    pub group_padding: f64,
-    pub padding: f64,
-    pub component_gap: f64,
-}
-
-impl Default for CircularLayoutConfig {
-    fn default() -> Self {
-        Self {
-            group_padding: CIRCULAR_LAYOUT_OPTIONS[0].default,
-            padding: CIRCULAR_LAYOUT_OPTIONS[1].default,
-            component_gap: CIRCULAR_LAYOUT_OPTIONS[2].default,
-        }
+define_layout_config! {
+    /// 思维导图布局已解析的运行时配置。
+    pub struct MindmapLayoutConfig {
+        options = MINDMAP_LAYOUT_OPTIONS;
+        padding: "padding" ; OptionKind::NonNegativeNumber ; constants::MINDMAP_PADDING ; "画布内边距",
+        level_gap: "level_gap" ; OptionKind::PositiveNumber ; constants::MINDMAP_LEVEL_GAP ; "层级之间的主轴间距",
+        branch_gap: "branch_gap" ; OptionKind::NonNegativeNumber ; constants::MINDMAP_BRANCH_GAP ; "同层兄弟节点间距",
+        node_gap: "node_gap" ; OptionKind::NonNegativeNumber ; constants::MINDMAP_NODE_GAP ; "径向模式下子树垂直间距",
+        center_gap: "center_gap" ; OptionKind::NonNegativeNumber ; constants::MINDMAP_CENTER_GAP ; "根节点到一级分支的水平间距",
     }
 }
 
-impl CircularLayoutConfig {
-    pub fn from_options(options: &super::plan::ResolvedAlgoOptions) -> Self {
-        Self {
-            group_padding: options.get_or_default(&CIRCULAR_LAYOUT_OPTIONS[0]),
-            padding: options.get_or_default(&CIRCULAR_LAYOUT_OPTIONS[1]),
-            component_gap: options.get_or_default(&CIRCULAR_LAYOUT_OPTIONS[2]),
-        }
+define_layout_config! {
+    /// 时序图布局已解析的运行时配置。
+    pub struct SequenceLayoutConfig {
+        options = SEQUENCE_LAYOUT_OPTIONS;
+        group_padding: "group_padding" ; OptionKind::NonNegativeNumber ; constants::DEFAULT_GROUP_PADDING ; "分组包围框内边距",
+        node_spacing: "node_spacing" ; OptionKind::NonNegativeNumber ; constants::SEQUENCE_NODE_SPACING ; "参与者节点水平间距",
+        message_spacing: "message_spacing" ; OptionKind::PositiveNumber ; constants::SEQUENCE_MESSAGE_SPACING ; "相邻消息行垂直间距",
     }
 }
 
-/// 思维导图布局 option 列表。
-pub const MINDMAP_LAYOUT_OPTIONS: &[AlgorithmOptionSpec] = &[
-    AlgorithmOptionSpec {
-        key: "padding",
-        kind: OptionKind::NonNegativeNumber,
-        default: constants::MINDMAP_PADDING,
-        description: "画布内边距",
-    },
-    AlgorithmOptionSpec {
-        key: "level_gap",
-        kind: OptionKind::PositiveNumber,
-        default: constants::MINDMAP_LEVEL_GAP,
-        description: "层级之间的主轴间距",
-    },
-    AlgorithmOptionSpec {
-        key: "branch_gap",
-        kind: OptionKind::NonNegativeNumber,
-        default: constants::MINDMAP_BRANCH_GAP,
-        description: "同层兄弟节点间距",
-    },
-    AlgorithmOptionSpec {
-        key: "node_gap",
-        kind: OptionKind::NonNegativeNumber,
-        default: constants::MINDMAP_NODE_GAP,
-        description: "径向模式下子树垂直间距",
-    },
-    AlgorithmOptionSpec {
-        key: "center_gap",
-        kind: OptionKind::NonNegativeNumber,
-        default: constants::MINDMAP_CENTER_GAP,
-        description: "根节点到一级分支的水平间距",
-    },
-];
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct MindmapLayoutConfig {
-    pub padding: f64,
-    pub level_gap: f64,
-    pub branch_gap: f64,
-    pub node_gap: f64,
-    pub center_gap: f64,
-}
-
-impl Default for MindmapLayoutConfig {
-    fn default() -> Self {
-        Self {
-            padding: MINDMAP_LAYOUT_OPTIONS[0].default,
-            level_gap: MINDMAP_LAYOUT_OPTIONS[1].default,
-            branch_gap: MINDMAP_LAYOUT_OPTIONS[2].default,
-            node_gap: MINDMAP_LAYOUT_OPTIONS[3].default,
-            center_gap: MINDMAP_LAYOUT_OPTIONS[4].default,
-        }
+define_layout_config! {
+    /// 力导向布局已解析的运行时配置。
+    pub struct ForceDirectedLayoutConfig {
+        options = FORCE_DIRECTED_LAYOUT_OPTIONS;
+        group_padding: "group_padding" ; OptionKind::NonNegativeNumber ; constants::FORCE_DIRECTED_GROUP_PADDING ; "分组包围框内边距",
+        padding: "padding" ; OptionKind::NonNegativeNumber ; constants::WIDE_PADDING ; "画布内边距",
+        component_gap: "component_gap" ; OptionKind::NonNegativeNumber ; constants::FORCE_DIRECTED_COMPONENT_GAP ; "连通分量之间的水平间距",
     }
 }
 
-impl MindmapLayoutConfig {
-    pub fn from_options(options: &super::plan::ResolvedAlgoOptions) -> Self {
-        Self {
-            padding: options.get_or_default(&MINDMAP_LAYOUT_OPTIONS[0]),
-            level_gap: options.get_or_default(&MINDMAP_LAYOUT_OPTIONS[1]),
-            branch_gap: options.get_or_default(&MINDMAP_LAYOUT_OPTIONS[2]),
-            node_gap: options.get_or_default(&MINDMAP_LAYOUT_OPTIONS[3]),
-            center_gap: options.get_or_default(&MINDMAP_LAYOUT_OPTIONS[4]),
-        }
-    }
-}
-
-/// 时序图布局 option 列表。
-pub const SEQUENCE_LAYOUT_OPTIONS: &[AlgorithmOptionSpec] = &[
-    AlgorithmOptionSpec {
-        key: "group_padding",
-        kind: OptionKind::NonNegativeNumber,
-        default: constants::DEFAULT_GROUP_PADDING,
-        description: "分组包围框内边距",
-    },
-    AlgorithmOptionSpec {
-        key: "node_spacing",
-        kind: OptionKind::NonNegativeNumber,
-        default: constants::SEQUENCE_NODE_SPACING,
-        description: "参与者节点水平间距",
-    },
-    AlgorithmOptionSpec {
-        key: "message_spacing",
-        kind: OptionKind::PositiveNumber,
-        default: constants::SEQUENCE_MESSAGE_SPACING,
-        description: "相邻消息行垂直间距",
-    },
-];
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct SequenceLayoutConfig {
-    pub group_padding: f64,
-    pub node_spacing: f64,
-    pub message_spacing: f64,
-}
-
-impl Default for SequenceLayoutConfig {
-    fn default() -> Self {
-        Self {
-            group_padding: SEQUENCE_LAYOUT_OPTIONS[0].default,
-            node_spacing: SEQUENCE_LAYOUT_OPTIONS[1].default,
-            message_spacing: SEQUENCE_LAYOUT_OPTIONS[2].default,
-        }
-    }
-}
-
-impl SequenceLayoutConfig {
-    pub fn from_options(options: &super::plan::ResolvedAlgoOptions) -> Self {
-        Self {
-            group_padding: options.get_or_default(&SEQUENCE_LAYOUT_OPTIONS[0]),
-            node_spacing: options.get_or_default(&SEQUENCE_LAYOUT_OPTIONS[1]),
-            message_spacing: options.get_or_default(&SEQUENCE_LAYOUT_OPTIONS[2]),
-        }
-    }
-}
-
-/// 力导向布局 option 列表。
-pub const FORCE_DIRECTED_LAYOUT_OPTIONS: &[AlgorithmOptionSpec] = &[
-    AlgorithmOptionSpec {
-        key: "group_padding",
-        kind: OptionKind::NonNegativeNumber,
-        default: constants::FORCE_DIRECTED_GROUP_PADDING,
-        description: "分组包围框内边距",
-    },
-    AlgorithmOptionSpec {
-        key: "padding",
-        kind: OptionKind::NonNegativeNumber,
-        default: constants::WIDE_PADDING,
-        description: "画布内边距",
-    },
-    AlgorithmOptionSpec {
-        key: "component_gap",
-        kind: OptionKind::NonNegativeNumber,
-        default: constants::FORCE_DIRECTED_COMPONENT_GAP,
-        description: "连通分量之间的水平间距",
-    },
-];
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ForceDirectedLayoutConfig {
-    pub group_padding: f64,
-    pub padding: f64,
-    pub component_gap: f64,
-}
-
-impl Default for ForceDirectedLayoutConfig {
-    fn default() -> Self {
-        Self {
-            group_padding: FORCE_DIRECTED_LAYOUT_OPTIONS[0].default,
-            padding: FORCE_DIRECTED_LAYOUT_OPTIONS[1].default,
-            component_gap: FORCE_DIRECTED_LAYOUT_OPTIONS[2].default,
-        }
-    }
-}
-
-impl ForceDirectedLayoutConfig {
-    pub fn from_options(options: &super::plan::ResolvedAlgoOptions) -> Self {
-        Self {
-            group_padding: options.get_or_default(&FORCE_DIRECTED_LAYOUT_OPTIONS[0]),
-            padding: options.get_or_default(&FORCE_DIRECTED_LAYOUT_OPTIONS[1]),
-            component_gap: options.get_or_default(&FORCE_DIRECTED_LAYOUT_OPTIONS[2]),
-        }
-    }
-}
-
-/// architecture 布局 option 列表。
-pub const ARCHITECTURE_V2_LAYOUT_OPTIONS: &[AlgorithmOptionSpec] = &[
-    AlgorithmOptionSpec {
-        key: "group_padding",
-        kind: OptionKind::NonNegativeNumber,
-        default: constants::ARCH_V2_GROUP_PADDING,
-        description: "分组包围框内边距",
-    },
-    AlgorithmOptionSpec {
-        key: "padding",
-        kind: OptionKind::NonNegativeNumber,
-        default: constants::ARCH_V2_PADDING,
-        description: "画布内边距",
-    },
-];
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ArchitectureV2LayoutConfig {
-    pub group_padding: f64,
-    pub padding: f64,
-}
-
-impl Default for ArchitectureV2LayoutConfig {
-    fn default() -> Self {
-        Self {
-            group_padding: ARCHITECTURE_V2_LAYOUT_OPTIONS[0].default,
-            padding: ARCHITECTURE_V2_LAYOUT_OPTIONS[1].default,
-        }
-    }
-}
-
-impl ArchitectureV2LayoutConfig {
-    pub fn from_options(options: &super::plan::ResolvedAlgoOptions) -> Self {
-        Self {
-            group_padding: options.get_or_default(&ARCHITECTURE_V2_LAYOUT_OPTIONS[0]),
-            padding: options.get_or_default(&ARCHITECTURE_V2_LAYOUT_OPTIONS[1]),
-        }
+define_layout_config! {
+    /// architecture 布局已解析的运行时配置。
+    pub struct ArchitectureV2LayoutConfig {
+        options = ARCHITECTURE_V2_LAYOUT_OPTIONS;
+        group_padding: "group_padding" ; OptionKind::NonNegativeNumber ; constants::ARCH_V2_GROUP_PADDING ; "分组包围框内边距",
+        padding: "padding" ; OptionKind::NonNegativeNumber ; constants::ARCH_V2_PADDING ; "画布内边距",
     }
 }
 

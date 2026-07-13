@@ -141,23 +141,6 @@ pub(in super::super) fn resolve_group_overlaps(
     }
 }
 
-// ─── Phase 7: 总尺寸计算 ─────────────────────────────────
-
-pub(in super::super) fn compute_total_size(
-    nodes: &HashMap<String, NodeLayout>,
-    groups: &HashMap<String, GroupLayout>,
-) -> (f64, f64) {
-    let node_max_x = nodes.values().map(|n| n.x + n.width).fold(0.0_f64, f64::max);
-    let node_max_y = nodes.values().map(|n| n.y + n.height).fold(0.0_f64, f64::max);
-    let group_max_x = groups.values().map(|g| g.x + g.width).fold(0.0_f64, f64::max);
-    let group_max_y = groups.values().map(|g| g.y + g.height).fold(0.0_f64, f64::max);
-
-    (
-        node_max_x.max(group_max_x) + PADDING,
-        node_max_y.max(group_max_y) + PADDING,
-    )
-}
-
 // ═══════════════════════════════════════════════════════════
 //  单元测试
 // ═══════════════════════════════════════════════════════════

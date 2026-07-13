@@ -9,6 +9,7 @@ use crate::layout::group::GroupRoutingContext;
 use crate::layout::NodeLayout;
 use std::collections::HashMap;
 
+use crate::layout::edge::common::spatial_grid::SpatialGrid;
 use super::{ChannelLoadMap, OrthoConfig, OrthoRoutingProfile, RoutedSegment};
 use super::slot::Endpoint;
 
@@ -16,9 +17,9 @@ use super::slot::Endpoint;
 ///
 /// Holds references to the diagram-level node/group maps, the already-routed
 /// segments (for overlap detection), and the resolved config. All per-edge
-/// path-building functions receive `&RoutingContext` instead of repeating
+/// path-building functions receive `&OrthoRoutingContext` instead of repeating
 /// these parameters.
-pub struct RoutingContext<'a> {
+pub struct OrthoRoutingContext<'a> {
     pub nodes: &'a HashMap<String, NodeLayout>,
     pub group_ctx: &'a GroupRoutingContext,
     pub grid: &'a SegmentGrid,
@@ -36,7 +37,7 @@ pub struct RoutingContext<'a> {
     pub corridor_boost: bool,
 }
 
-impl<'a> RoutingContext<'a> {
+impl<'a> OrthoRoutingContext<'a> {
     pub fn new(
         nodes: &'a HashMap<String, NodeLayout>,
         group_ctx: &'a GroupRoutingContext,
@@ -106,9 +107,8 @@ impl PreparedObstacles {
 /// 所有段均为轴对齐（水平/垂直），cell 大小 64px 是 BBOX_EXPAND(10) 的
 /// 合理倍数，保证绝大多数段仅覆盖 1-2 个 cell。
 pub struct SegmentGrid {
-    cell_size: f64,
+    grid: SpatialGrid<usize>,
     segments: Vec<RoutedSegment>,
-    cells: HashMap<(i32, i32), Vec<usize>>,
 }
 
 impl Default for SegmentGrid {
@@ -122,9 +122,8 @@ impl SegmentGrid {
 
     pub fn new() -> Self {
         Self {
-            cell_size: Self::CELL_SIZE,
+            grid: SpatialGrid::new(Self::CELL_SIZE),
             segments: Vec::new(),
-            cells: HashMap::new(),
         }
     }
 
@@ -155,7 +154,7 @@ impl SegmentGrid {
     }
 
     fn rebuild(&mut self) {
-        self.cells.clear();
+        self.grid.clear();
         // 先收集 (idx, bbox cell 范围)，避免在迭代 segments 时可变借用 self
         let entries: Vec<(usize, i32, i32, i32, i32)> = self
             .segments
@@ -166,19 +165,12 @@ impl SegmentGrid {
                 let xmax = seg.x1.max(seg.x2);
                 let ymin = seg.y1.min(seg.y2);
                 let ymax = seg.y1.max(seg.y2);
-                let cx0 = (xmin / self.cell_size).floor() as i32;
-                let cx1 = (xmax / self.cell_size).floor() as i32;
-                let cy0 = (ymin / self.cell_size).floor() as i32;
-                let cy1 = (ymax / self.cell_size).floor() as i32;
+                let (cx0, cx1, cy0, cy1) = self.grid.cell_range(xmin, xmax, ymin, ymax);
                 (idx, cx0, cx1, cy0, cy1)
             })
             .collect();
         for (idx, cx0, cx1, cy0, cy1) in entries {
-            for cx in cx0..=cx1 {
-                for cy in cy0..=cy1 {
-                    self.cells.entry((cx, cy)).or_default().push(idx);
-                }
-            }
+            self.grid.insert_range(cx0, cx1, cy0, cy1, idx);
         }
     }
 
@@ -187,15 +179,8 @@ impl SegmentGrid {
         let xmax = seg.x1.max(seg.x2);
         let ymin = seg.y1.min(seg.y2);
         let ymax = seg.y1.max(seg.y2);
-        let cx0 = (xmin / self.cell_size).floor() as i32;
-        let cx1 = (xmax / self.cell_size).floor() as i32;
-        let cy0 = (ymin / self.cell_size).floor() as i32;
-        let cy1 = (ymax / self.cell_size).floor() as i32;
-        for cx in cx0..=cx1 {
-            for cy in cy0..=cy1 {
-                self.cells.entry((cx, cy)).or_default().push(idx);
-            }
-        }
+        let (cx0, cx1, cy0, cy1) = self.grid.cell_range(xmin, xmax, ymin, ymax);
+        self.grid.insert_range(cx0, cx1, cy0, cy1, idx);
     }
 
     /// 查询与给定段 bbox（扩张 `expand`）重叠的所有已路由段（去重）。
@@ -204,17 +189,14 @@ impl SegmentGrid {
         let xmax = seg.x1.max(seg.x2) + expand;
         let ymin = seg.y1.min(seg.y2) - expand;
         let ymax = seg.y1.max(seg.y2) + expand;
-        let cx0 = (xmin / self.cell_size).floor() as i32;
-        let cx1 = (xmax / self.cell_size).floor() as i32;
-        let cy0 = (ymin / self.cell_size).floor() as i32;
-        let cy1 = (ymax / self.cell_size).floor() as i32;
+        let (cx0, cx1, cy0, cy1) = self.grid.cell_range(xmin, xmax, ymin, ymax);
 
         // 结果集通常很小（< 20），用 Vec 线性查找比 HashSet 更快
         let mut seen: Vec<usize> = Vec::new();
         let mut result = Vec::new();
         for cx in cx0..=cx1 {
             for cy in cy0..=cy1 {
-                if let Some(indices) = self.cells.get(&(cx, cy)) {
+                if let Some(indices) = self.grid.cells().get(&(cx, cy)) {
                     for &idx in indices {
                         if !seen.contains(&idx) {
                             seen.push(idx);

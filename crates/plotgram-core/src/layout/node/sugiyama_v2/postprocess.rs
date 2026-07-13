@@ -68,21 +68,6 @@ pub(super) fn normalize_layout_result_to_padding(result: &mut LayoutResult, padd
     result.total_height += dy;
 }
 
-pub(super) fn bounds_from_layout(
-    nodes: &HashMap<String, NodeLayout>,
-    groups: &HashMap<String, GroupLayout>,
-    padding: f64,
-) -> (f64, f64) {
-    let node_max_x = nodes.values().map(|node| node.x + node.width).fold(0.0_f64, f64::max);
-    let node_max_y = nodes.values().map(|node| node.y + node.height).fold(0.0_f64, f64::max);
-    let group_max_x = groups.values().map(|group| group.x + group.width).fold(0.0_f64, f64::max);
-    let group_max_y = groups.values().map(|group| group.y + group.height).fold(0.0_f64, f64::max);
-    (
-        node_max_x.max(group_max_x) + padding,
-        node_max_y.max(group_max_y) + padding,
-    )
-}
-
 fn state_entity_type(_diagram: &Diagram, entity: &Entity) -> String {
     entity
         .attributes

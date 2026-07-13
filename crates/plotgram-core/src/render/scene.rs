@@ -273,7 +273,7 @@ pub fn export_scene<'a>(request: &'a RenderRequest<'a>) -> Result<ExportScene<'a
 /// 按 `show_title` 调整布局画布：不绘制标题时收回顶部标题带留白。
 pub(crate) fn apply_title_band_layout_adjustment(layout: &mut LayoutResult, show_title: bool) {
     if !show_title {
-        layout::postprocess::trim_title_band_from_canvas(layout, CANVAS_TITLE_BAND_HEIGHT);
+        layout::canvas_finalize::trim_title_band_from_canvas(layout, CANVAS_TITLE_BAND_HEIGHT);
     }
 }
 

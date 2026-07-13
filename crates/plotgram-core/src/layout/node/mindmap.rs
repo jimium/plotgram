@@ -308,69 +308,51 @@ fn compute_node_depths(
 ///
 /// 作为布局安全网，检测所有节点对的包围盒重叠，沿重叠较小的轴推开。
 /// 适用于所有布局模式（radial / directional）。
+///
+/// 实现委托给 `common::overlap::BruteForceResolver`,
+/// `push_epsilon = 0.5` 对齐历史实现常量,`max_rounds = 30` 对齐历史迭代上限。
 fn detect_and_fix_overlaps(
     centers: &mut HashMap<String, (f64, f64)>,
     sizes: &HashMap<String, (f64, f64)>,
     min_gap: f64,
 ) {
-    let max_iterations = 30;
-    let ids: Vec<String> = centers.keys().cloned().collect();
-    let n = ids.len();
-    if n < 2 {
+    if centers.len() < 2 {
         return;
     }
 
-    for _ in 0..max_iterations {
-        let mut moved = false;
+    use crate::layout::node::common::overlap::{
+        BruteForceResolver, OverlapConfig, OverlapResolver,
+    };
 
-        for i in 0..n {
-            for j in (i + 1)..n {
-                let id_a = &ids[i];
-                let id_b = &ids[j];
-                let (ax, ay) = centers[id_a];
-                let (bx, by) = centers[id_b];
-                let (aw, ah) = sizes.get(id_a).copied().unwrap_or((150.0, 48.0));
-                let (bw, bh) = sizes.get(id_b).copied().unwrap_or((150.0, 48.0));
+    // centers (cx, cy) + sizes → NodeLayout(x, y, w, h)
+    let mut nodes: HashMap<String, NodeLayout> = centers
+        .iter()
+        .map(|(id, (cx, cy))| {
+            let (w, h) = sizes.get(id).copied().unwrap_or((150.0, 48.0));
+            (
+                id.clone(),
+                NodeLayout {
+                    x: cx - w / 2.0,
+                    y: cy - h / 2.0,
+                    width: w,
+                    height: h,
+                    ..Default::default()
+                },
+            )
+        })
+        .collect();
 
-                // 包围盒重叠检测（含最小间距）
-                let min_dx = (aw + bw) / 2.0 + min_gap;
-                let min_dy = (ah + bh) / 2.0 + min_gap;
-                let dx = bx - ax;
-                let dy = by - ay;
-                let abs_dx = dx.abs();
-                let abs_dy = dy.abs();
+    let config = OverlapConfig {
+        margin: min_gap,
+        max_iterations: 30,
+        step_factor: 0.5,
+    };
+    BruteForceResolver::with_push_epsilon(30, 0.5).resolve(&mut nodes, &HashMap::new(), &config);
 
-                if abs_dx < min_dx && abs_dy < min_dy {
-                    let overlap_x = min_dx - abs_dx;
-                    let overlap_y = min_dy - abs_dy;
-
-                    // 沿重叠较小的轴推开（减少总位移）
-                    if overlap_x < overlap_y {
-                        let push = overlap_x / 2.0 + 0.5;
-                        let sign = if dx >= 0.0 { 1.0 } else { -1.0 };
-                        if let Some((x, _)) = centers.get_mut(id_a) {
-                            *x -= sign * push;
-                        }
-                        if let Some((x, _)) = centers.get_mut(id_b) {
-                            *x += sign * push;
-                        }
-                    } else {
-                        let push = overlap_y / 2.0 + 0.5;
-                        let sign = if dy >= 0.0 { 1.0 } else { -1.0 };
-                        if let Some((_, y)) = centers.get_mut(id_a) {
-                            *y -= sign * push;
-                        }
-                        if let Some((_, y)) = centers.get_mut(id_b) {
-                            *y += sign * push;
-                        }
-                    }
-                    moved = true;
-                }
-            }
-        }
-
-        if !moved {
-            break;
+    // NodeLayout → centers
+    for (id, nl) in &nodes {
+        if let Some(c) = centers.get_mut(id) {
+            *c = (nl.x + nl.width / 2.0, nl.y + nl.height / 2.0);
         }
     }
 }
