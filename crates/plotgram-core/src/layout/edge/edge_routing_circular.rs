@@ -12,7 +12,7 @@ use crate::layout::edge::common::circular_support::{
     APPLICABLE_TYPES as CIRCULAR_APPLICABLE_TYPES, CircleGroup, resolve_circle_groups,
 };
 use crate::layout::{
-    edge_point, EdgeLayout, EdgeRoutingStrategy, LayoutResult, NodeLayout, PathGeometry, Port,
+    edge_point, EdgeLayout, EdgeRoutingStrategy, LayoutResult, NodeLayout, PathGeometry,
 };
 use crate::layout::edge::common::edge_geometry::{
     node_center, undirected_pair_key, select_port, compute_bezier_controls, cubic_bezier_point,
@@ -103,10 +103,10 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
                         rel,
                     )
                 } else {
-                    route_inter_circle_edge(from_nl, to_nl, lane_offsets[i], rel)
+                    route_inter_circle_edge(from_nl, to_nl, lane_offsets[i], arc_sides[i], rel)
                 }
             } else {
-                route_inter_circle_edge(from_nl, to_nl, lane_offsets[i], rel)
+                route_inter_circle_edge(from_nl, to_nl, lane_offsets[i], arc_sides[i], rel)
             }
         };
 
@@ -120,6 +120,40 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
                 let detour = obstacle_index.shortest_path(start, end, &skip);
                 if !detour.is_empty() {
                     edge.geometry = PathGeometry::Polyline { points: detour };
+                    // 几何已换：按折线重建标签
+                    let middle_t = crate::layout::edge::common::edge_geometry::parse_label_t(rel);
+                    let sampled = edge.path_points().into_owned();
+                    edge.labels = build_edge_labels(rel, middle_t, Point::new(0.0, -6.0), |t| {
+                        crate::layout::edge::common::edge_geometry::point_at_path_t(&sampled, t)
+                    });
+                } else {
+                    // R5：空 detour 时走 outer 折线兜底，避免静默保留穿障 Bezier
+                    let outer = outer_polyline_detour(start, end, &result.nodes, from_id, to_id);
+                    let probe = EdgeLayout {
+                        geometry: PathGeometry::Polyline {
+                            points: outer.clone(),
+                        },
+                        labels: Vec::new(),
+                        from_port: edge.from_port,
+                        to_port: edge.to_port,
+                    };
+                    if !crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(
+                        &probe,
+                        &obstacle_index,
+                        &skip,
+                    ) || outer.len() >= 3
+                    {
+                        edge.geometry = PathGeometry::Polyline { points: outer };
+                        let middle_t =
+                            crate::layout::edge::common::edge_geometry::parse_label_t(rel);
+                        let sampled = edge.path_points().into_owned();
+                        edge.labels =
+                            build_edge_labels(rel, middle_t, Point::new(0.0, -6.0), |t| {
+                                crate::layout::edge::common::edge_geometry::point_at_path_t(
+                                    &sampled, t,
+                                )
+                            });
+                    }
                 }
             }
         }
@@ -234,7 +268,12 @@ fn compute_lane_offsets(
         }
     }
 
-    for indices in from_groups.values() {
+    for key in {
+        let mut keys: Vec<String> = from_groups.keys().cloned().collect();
+        keys.sort();
+        keys
+    } {
+        let indices = &from_groups[&key];
         if indices.len() <= 1 {
             continue;
         }
@@ -340,6 +379,7 @@ fn route_inter_circle_edge(
     from_nl: &NodeLayout,
     to_nl: &NodeLayout,
     lane: f64,
+    arc_side: f64,
     rel: &crate::ast::Relation,
 ) -> EdgeLayout {
     let from_center = node_center(from_nl);
@@ -350,10 +390,20 @@ fn route_inter_circle_edge(
     let (ex, ey) = edge_point(to_nl, fcx, fcy);
     let from_port = select_port(sx, sy, from_nl);
     let to_port = select_port(ex, ey, to_nl);
-    let cp = compute_bezier_controls(
+    let mut cp = compute_bezier_controls(
         sx, sy, ex, ey, from_port, to_port, DEFAULT_BEZIER_TENSION,
     );
-    let labels = build_edge_labels(rel, 0.5, Point::new(0.0, lane * 12.0), |t| {
+    // R8：跨圆双向边沿弦法向按 arc_side 鼓起，与同圆正反弧分离一致。
+    let side = if arc_side >= 0.0 { 1.0 } else { -1.0 };
+    let dx = ex - sx;
+    let dy = ey - sy;
+    let len = (dx * dx + dy * dy).sqrt().max(1.0);
+    let nx = -dy / len;
+    let ny = dx / len;
+    let lift = (12.0 + lane.abs() * 16.0) * side;
+    cp[0] = Point::new(cp[0].x + nx * lift, cp[0].y + ny * lift);
+    cp[1] = Point::new(cp[1].x + nx * lift, cp[1].y + ny * lift);
+    let labels = build_edge_labels(rel, 0.5, Point::new(nx * lift * 0.5, ny * lift * 0.5), |t| {
         cubic_bezier_point(Point::new(sx, sy), cp[0], cp[1], Point::new(ex, ey), t)
     });
 
@@ -367,6 +417,71 @@ fn route_inter_circle_edge(
         from_port,
         to_port,
     }
+}
+
+/// R5：shortest_path 为空时，绕节点外框走 start→mid→end 折线。
+fn outer_polyline_detour(
+    start: Point,
+    end: Point,
+    nodes: &HashMap<String, NodeLayout>,
+    from_id: &str,
+    to_id: &str,
+) -> Vec<Point> {
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    let mut ids: Vec<&String> = nodes.keys().collect();
+    ids.sort();
+    for id in ids {
+        if id.as_str() == from_id || id.as_str() == to_id {
+            continue;
+        }
+        let nl = &nodes[id];
+        min_x = min_x.min(nl.x);
+        min_y = min_y.min(nl.y);
+        max_x = max_x.max(nl.x + nl.width);
+        max_y = max_y.max(nl.y + nl.height);
+    }
+    let pad = 28.0;
+    if !min_x.is_finite() {
+        // 无第三方障碍：简单水平-垂直折线
+        return vec![start, Point::new(end.x, start.y), end];
+    }
+    let top = min_y - pad;
+    let bottom = max_y + pad;
+    let left = min_x - pad;
+    let right = max_x + pad;
+    // 选绕上/下/左/右中较短的一条
+    let candidates = [
+        vec![start, Point::new(start.x, top), Point::new(end.x, top), end],
+        vec![
+            start,
+            Point::new(start.x, bottom),
+            Point::new(end.x, bottom),
+            end,
+        ],
+        vec![
+            start,
+            Point::new(left, start.y),
+            Point::new(left, end.y),
+            end,
+        ],
+        vec![
+            start,
+            Point::new(right, start.y),
+            Point::new(right, end.y),
+            end,
+        ],
+    ];
+    candidates
+        .into_iter()
+        .min_by(|a, b| {
+            let la: f64 = a.windows(2).map(|w| w[0].distance_to(w[1])).sum();
+            let lb: f64 = b.windows(2).map(|w| w[0].distance_to(w[1])).sum();
+            la.partial_cmp(&lb).unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .unwrap_or_else(|| vec![start, Point::new(end.x, start.y), end])
 }
 
 fn bulge_for_steps(steps: usize, n: usize) -> f64 {

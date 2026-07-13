@@ -115,7 +115,14 @@ impl LayoutStrategy for ArchitectureV2Layout {
             &reversed_edges,
             &decl_index,
         );
-        let nodes = coordinate::assign_coordinates(diagram, &graph, &group_map, &ordered_layers, &sizes);
+        let nodes = coordinate::assign_coordinates(
+            diagram,
+            &graph,
+            &group_map,
+            &ordered_layers,
+            &sizes,
+            &reversed_edges,
+        );
 
         let mut ctx = super::pipeline::LayoutContext {
             diagram,
@@ -124,6 +131,7 @@ impl LayoutStrategy for ArchitectureV2Layout {
             sizes: &sizes,
             config,
             ordered_layers: &ordered_layers,
+            reversed: &reversed_edges,
             nodes,
             groups: HashMap::new(),
         };

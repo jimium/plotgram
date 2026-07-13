@@ -426,6 +426,7 @@ pub fn fix_reverse_stub_ports(
                 corridor_plan,
                 ortho_stats,
                 endpoint_map,
+                side_channel_edges.contains(&ei),
             ) {
                 let new_len = result.5;
                 let better = match &best {
@@ -633,6 +634,7 @@ fn evaluate_attempt(
     corridor_plan: &corridor_route::CorridorRoutePlan,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
     endpoint_map: &HashMap<(usize, bool), Endpoint>,
+    force_strict_feedback_or_long_span: bool,
 ) -> Option<(Port, Port, Endpoint, Endpoint, Vec<Point>, f64)> {
     let new_from = attempt.from.unwrap_or(old_from);
     let new_to = attempt.to.unwrap_or(old_to);
@@ -713,6 +715,7 @@ fn evaluate_attempt(
                 from_id,
                 to_id,
                 corridor_plan.chains.contains_key(&ei),
+                force_strict_feedback_or_long_span,
             ))
             // 换端口重试：升档外框通道
             .with_corridor_boost(true);

@@ -36,7 +36,8 @@ impl Default for RefineConfig {
             // Iteration 3：有穿障时最多 2 轮（无穿障早退不变）
             max_passes: 2,
             push_distance: 40.0,
-            node_shrink: 2.0,
+            // C11：略减小 shrink，降低贴边穿过漏检
+            node_shrink: 1.0,
         }
     }
 }
@@ -153,7 +154,12 @@ pub fn run_refine(
         for info in final_metrics.problem_nodes.values() {
             fallback_edges.extend(info.edge_indices.iter().copied());
         }
-        spline_fallback::reroute_edges_with_spline(&mut result, diagram, &fallback_edges);
+        spline_fallback::reroute_edges_with_spline(
+            &mut result,
+            diagram,
+            &fallback_edges,
+            config,
+        );
     }
 
     result

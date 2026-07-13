@@ -173,56 +173,64 @@ fn order_layer_by_median(
 
 /// 分组感知的重排序：同组节点保持相邻
 ///
-/// 策略：按中位数排序后，将同组节点"吸附"到组内中位数最低的节点位置
+/// 策略：仅对真实 top-group 多成员组，在原始 median 位置一次性聚块输出（稳定置换），
+/// 禁止对可变容器边 remove/insert 边用陈旧下标。无 top-group 节点不参与吸附。
 fn group_aware_reorder(ordered: &[String], group_map: &GroupMap) -> Vec<String> {
     if ordered.len() <= 1 {
         return ordered.to_vec();
     }
 
-    // 找出每个组在当前层中的成员
+    // 只收集真实 top group；无 group 的节点不进表（避免空 gid 并组）
     let mut group_positions: HashMap<String, Vec<usize>> = HashMap::new();
     for (idx, node) in ordered.iter().enumerate() {
-        let gid = group_map.node_to_top_group.get(node).cloned().unwrap_or_default();
-        group_positions.entry(gid).or_default().push(idx);
+        if let Some(gid) = group_map.node_to_top_group.get(node) {
+            group_positions.entry(gid.clone()).or_default().push(idx);
+        }
     }
 
-    // 只处理有多个成员的组，按组中位数位置排序（从后往前处理避免索引偏移）
-    let mut multi_groups: Vec<(String, Vec<usize>)> = group_positions
+    let multi_groups: HashMap<String, Vec<usize>> = group_positions
         .into_iter()
         .filter(|(_, positions)| positions.len() > 1)
+        .map(|(gid, mut positions)| {
+            positions.sort_unstable();
+            (gid, positions)
+        })
         .collect();
-    // 按中位数位置从后往前排序；median 相同时按 gid 保证确定性
-    multi_groups.sort_by(|a, b| {
-        let a_med = a.1[a.1.len() / 2];
-        let b_med = b.1[b.1.len() / 2];
-        b_med
-            .cmp(&a_med)
-            .then(a.0.cmp(&b.0))
-    });
 
-    let mut result = ordered.to_vec();
-    for (_, mut positions) in multi_groups {
-        positions.sort();
-        let group_nodes: Vec<String> = positions.iter().map(|&idx| result[idx].clone()).collect();
+    if multi_groups.is_empty() {
+        return ordered.to_vec();
+    }
 
-        // 从 result 中移除这些节点（从后往前移除避免索引偏移）
-        for &idx in positions.iter().rev() {
-            result.remove(idx);
-        }
-
-        // 计算插入位置：找到组内第一个非组节点在 result 中的位置
-        // 使用组内中位数节点在原始序列中的相对位置
-        let original_median_idx = positions[positions.len() / 2];
-        // 计算在移除组内节点后，中位数之前有多少个非组节点
-        let non_group_before_median = positions.iter().filter(|&&idx| idx < original_median_idx).count();
-        let insert_pos = original_median_idx - non_group_before_median;
-        let insert_pos = insert_pos.min(result.len());
-
-        for (i, node) in group_nodes.into_iter().enumerate() {
-            result.insert(insert_pos + i, node);
+    let mut node_to_multi: HashMap<&str, &str> = HashMap::new();
+    for (gid, positions) in &multi_groups {
+        for &idx in positions {
+            node_to_multi.insert(ordered[idx].as_str(), gid.as_str());
         }
     }
 
+    // 一次性稳定置换：遍历原序；多成员组仅在 median 下标处整块输出
+    let mut result = Vec::with_capacity(ordered.len());
+    let mut emitted: HashSet<&str> = HashSet::new();
+    for (i, node) in ordered.iter().enumerate() {
+        if let Some(&gid) = node_to_multi.get(node.as_str()) {
+            if emitted.contains(gid) {
+                continue;
+            }
+            let positions = multi_groups.get(gid).expect("multi group positions");
+            let median_idx = positions[positions.len() / 2];
+            if i != median_idx {
+                continue;
+            }
+            for &p in positions {
+                result.push(ordered[p].clone());
+            }
+            emitted.insert(gid);
+        } else {
+            result.push(node.clone());
+        }
+    }
+
+    debug_assert_eq!(result.len(), ordered.len());
     result
 }
 

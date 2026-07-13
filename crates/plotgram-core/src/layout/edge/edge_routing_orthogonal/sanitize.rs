@@ -8,7 +8,7 @@
 //!
 //! 应在 lane/corridor 之后调用；snap 后再跑一次同一套不变量。
 
-use super::path::port_outward;
+use super::path::{port_aware_elbow, port_outward};
 use super::simplify::simplify_path;
 use super::{EPS, PORT_CLEARANCE};
 use crate::ast::Relation;
@@ -88,17 +88,50 @@ pub fn sanitize_polyline_ext(
     if points.len() < 2 {
         return;
     }
+    let original = points.clone();
+    let orig_end = *original.last().unwrap();
+    let orig_start = original[0];
+    let orig_len = polyline_length(&original);
+
     fix_endpoint_reverse_stub(points, true, from_side);
     fix_endpoint_reverse_stub(points, false, to_side);
     force_orthogonal(points);
     collapse_micro_jogs(points, merge_overshoot);
-    *points = simplify_path(std::mem::take(points), false);
+    // 保护端点 stub，避免把连接裁成仅 PORT_CLEARANCE 残段
+    *points = simplify_path(std::mem::take(points), true);
     ensure_outward_stub(points, true, from_side);
     ensure_outward_stub(points, false, to_side);
-    *points = simplify_path(std::mem::take(points), false);
+    // 出 stub 后禁止沿端口内向折回（穿节点 / 短 stub 倒钩）
+    repair_post_stub_inward(points, true, from_side);
+    repair_post_stub_inward(points, false, to_side);
+    *points = simplify_path(std::mem::take(points), true);
+
+    // 安全网：消毒不得丢掉起终点连通性（曾出现裁成 [anchor,stub] 导致「边起点丢失」）
+    if points.len() < 2
+        || !same_point(points[0], orig_start)
+        || !same_point(*points.last().unwrap(), orig_end)
+        || (orig_len > PORT_CLEARANCE * 4.0 && polyline_length(points) <= PORT_CLEARANCE + 1.0)
+    {
+        *points = original;
+        force_orthogonal(points);
+    }
+}
+
+fn same_point(a: Point, b: Point) -> bool {
+    (a.x - b.x).abs() < 1.0 && (a.y - b.y).abs() < 1.0
+}
+
+fn polyline_length(points: &[Point]) -> f64 {
+    points.windows(2).fold(0.0, |acc, w| {
+        let dx = w[1].x - w[0].x;
+        let dy = w[1].y - w[0].y;
+        acc + (dx * dx + dy * dy).sqrt()
+    })
 }
 
 /// 若端点第一段（或末端最后一段）沿端口外向为负，则切除「背向」折点并补正确 stub。
+///
+/// **不得**在找不到外向保留点时把路径裁成仅 stub——那会丢掉对端节点连接。
 fn fix_endpoint_reverse_stub(points: &mut Vec<Point>, at_start: bool, side: Port) {
     if points.len() < 3 {
         return;
@@ -121,12 +154,24 @@ fn fix_endpoint_reverse_stub(points: &mut Vec<Point>, at_start: bool, side: Port
             }
             keep_from += 1;
         }
+        // 全部点都在背向半平面：放弃裁剪，留给 stub_fix 翻端口重路由
+        if keep_from >= points.len() {
+            return;
+        }
         let stub = Point::new(anchor.x + ox * PORT_CLEARANCE, anchor.y + oy * PORT_CLEARANCE);
         let mut new_pts = vec![anchor, stub];
-        if keep_from < points.len() {
-            ortho_append(&mut new_pts, points[keep_from]);
-            new_pts.extend_from_slice(&points[keep_from + 1..]);
+        let keep_pt = points[keep_from];
+        if (stub.x - keep_pt.x).abs() > EPS && (stub.y - keep_pt.y).abs() > EPS {
+            let elbow = port_aware_elbow(stub, keep_pt, side);
+            if (elbow.x - stub.x).abs() > EPS
+                || (elbow.y - stub.y).abs() > EPS
+            {
+                if (elbow.x - keep_pt.x).abs() > EPS || (elbow.y - keep_pt.y).abs() > EPS {
+                    new_pts.push(elbow);
+                }
+            }
         }
+        new_pts.extend_from_slice(&points[keep_from..]);
         *points = new_pts;
     } else {
         let last = points.len() - 1;
@@ -147,13 +192,23 @@ fn fix_endpoint_reverse_stub(points: &mut Vec<Point>, at_start: bool, side: Port
             }
             keep_to -= 1;
         }
+        // keep_to==0 意味着起点也会被丢掉：放弃
+        if keep_to == 0 {
+            return;
+        }
         let stub = Point::new(anchor.x + ox * PORT_CLEARANCE, anchor.y + oy * PORT_CLEARANCE);
         let mut new_pts: Vec<Point> = points[..keep_to].to_vec();
-        if new_pts.is_empty() {
-            new_pts.push(stub);
-        } else {
-            ortho_append(&mut new_pts, stub);
+        let keep_pt = points[keep_to - 1];
+        if (keep_pt.x - stub.x).abs() > EPS && (keep_pt.y - stub.y).abs() > EPS {
+            let elbow = port_aware_elbow(stub, keep_pt, side);
+            if new_pts
+                .last()
+                .is_none_or(|p| (p.x - elbow.x).abs() > EPS || (p.y - elbow.y).abs() > EPS)
+            {
+                new_pts.push(elbow);
+            }
         }
+        new_pts.push(stub);
         new_pts.push(anchor);
         *points = new_pts;
     }
@@ -167,6 +222,7 @@ fn ensure_outward_stub(points: &mut Vec<Point>, at_start: bool, side: Port) {
     let (ox, oy) = port_outward(side);
     if at_start {
         let anchor = points[0];
+        let far_end = *points.last().unwrap();
         let nxt = points[1];
         let proj = (nxt.x - anchor.x) * ox + (nxt.y - anchor.y) * oy;
         if proj >= PORT_CLEARANCE * 0.5 {
@@ -182,15 +238,37 @@ fn ensure_outward_stub(points: &mut Vec<Point>, at_start: bool, side: Port) {
             }
             rest.remove(0);
         }
+        // 若中间全被清掉，至少保留到原终点，禁止退化成 [anchor, stub]
+        if rest.is_empty() {
+            if same_point(anchor, far_end) {
+                return;
+            }
+            let mut out = vec![anchor, stub];
+            if (stub.x - far_end.x).abs() > EPS && (stub.y - far_end.y).abs() > EPS {
+                let elbow = port_aware_elbow(stub, far_end, side);
+                if (elbow.x - stub.x).abs() > EPS || (elbow.y - stub.y).abs() > EPS {
+                    out.push(elbow);
+                }
+            }
+            out.push(far_end);
+            *points = out;
+            return;
+        }
         let mut out = vec![anchor, stub];
         if let Some(&p) = rest.first() {
-            ortho_append(&mut out, p);
-            out.extend_from_slice(&rest[1..]);
+            if (stub.x - p.x).abs() > EPS && (stub.y - p.y).abs() > EPS {
+                let elbow = port_aware_elbow(stub, p, side);
+                if (elbow.x - stub.x).abs() > EPS || (elbow.y - stub.y).abs() > EPS {
+                    out.push(elbow);
+                }
+            }
+            out.extend_from_slice(&rest);
         }
         *points = out;
     } else {
         let last = points.len() - 1;
         let anchor = points[last];
+        let far_start = points[0];
         let prev = points[last - 1];
         let proj = (prev.x - anchor.x) * ox + (prev.y - anchor.y) * oy;
         if proj >= PORT_CLEARANCE * 0.5 {
@@ -206,45 +284,138 @@ fn ensure_outward_stub(points: &mut Vec<Point>, at_start: bool, side: Port) {
             head.pop();
         }
         if head.is_empty() {
-            *points = vec![stub, anchor];
+            // 禁止退化成 [stub, anchor] 丢掉起点
+            if same_point(far_start, anchor) {
+                return;
+            }
+            let mut out = vec![far_start];
+            if (far_start.x - stub.x).abs() > EPS && (far_start.y - stub.y).abs() > EPS {
+                let elbow = port_aware_elbow(stub, far_start, side);
+                if (elbow.x - far_start.x).abs() > EPS || (elbow.y - far_start.y).abs() > EPS {
+                    out.push(elbow);
+                }
+            }
+            out.push(stub);
+            out.push(anchor);
+            *points = out;
             return;
         }
-        ortho_append(&mut head, stub);
+        let Some(&last_h) = head.last() else {
+            return;
+        };
+        if (last_h.x - stub.x).abs() > EPS && (last_h.y - stub.y).abs() > EPS {
+            let elbow = port_aware_elbow(stub, last_h, side);
+            if (elbow.x - last_h.x).abs() > EPS || (elbow.y - last_h.y).abs() > EPS {
+                head.push(elbow);
+            }
+        }
+        head.push(stub);
         head.push(anchor);
         *points = head;
     }
 }
 
-fn ortho_append(points: &mut Vec<Point>, target: Point) {
-    let Some(&curr) = points.last() else {
-        points.push(target);
-        return;
-    };
-    if (curr.x - target.x).abs() < EPS && (curr.y - target.y).abs() < EPS {
+/// 出/入 stub 之后若下一段沿端口内向折回，跳过无法无穿模到达的点，并在 stub 外向坐标上转弯。
+fn repair_post_stub_inward(points: &mut Vec<Point>, at_start: bool, side: Port) {
+    if points.len() < 4 {
         return;
     }
-    if (curr.x - target.x).abs() > EPS && (curr.y - target.y).abs() > EPS {
-        // 优先延续上一段方向
-        let elbow = if points.len() >= 2 {
-            let prev = points[points.len() - 2];
-            let came_vert = (curr.x - prev.x).abs() < EPS;
-            if came_vert {
-                Point::new(curr.x, target.y)
-            } else {
-                Point::new(target.x, curr.y)
-            }
-        } else {
-            Point::new(target.x, curr.y)
-        };
-        if (elbow.x - curr.x).abs() > EPS || (elbow.y - curr.y).abs() > EPS {
-            points.push(elbow);
+    let (ox, oy) = port_outward(side);
+    if at_start {
+        let stub = points[1];
+        // stub 须大致在外向 PORT_CLEARANCE 处
+        let stub_proj = (stub.x - points[0].x) * ox + (stub.y - points[0].y) * oy;
+        if stub_proj < PORT_CLEARANCE * 0.5 {
+            return;
         }
-    }
-    let Some(&curr2) = points.last() else {
-        return;
-    };
-    if (curr2.x - target.x).abs() > EPS || (curr2.y - target.y).abs() > EPS {
-        points.push(target);
+        let nxt = points[2];
+        let inward = (nxt.x - stub.x) * ox + (nxt.y - stub.y) * oy;
+        if inward >= -1.0 {
+            return;
+        }
+        // 跳过只能靠内向滑移到达的折点，直到能用合法肘点连接
+        let mut idx = 2usize;
+        while idx < points.len() {
+            let t = points[idx];
+            let direct_dx = t.x - stub.x;
+            let direct_dy = t.y - stub.y;
+            let dproj = direct_dx * ox + direct_dy * oy;
+            let axis = direct_dx.abs() < EPS || direct_dy.abs() < EPS;
+            if axis && dproj >= -1.0 {
+                break;
+            }
+            let elbow = port_aware_elbow(stub, t, side);
+            let edx = elbow.x - stub.x;
+            let edy = elbow.y - stub.y;
+            let eproj = edx * ox + edy * oy;
+            if (edx.abs() > EPS || edy.abs() > EPS) && eproj >= -1.0 {
+                break;
+            }
+            idx += 1;
+        }
+        if idx >= points.len() {
+            return;
+        }
+        let t = points[idx];
+        let mut out = vec![points[0], stub];
+        if (t.x - stub.x).abs() > EPS && (t.y - stub.y).abs() > EPS {
+            let elbow = port_aware_elbow(stub, t, side);
+            if (elbow.x - stub.x).abs() > EPS || (elbow.y - stub.y).abs() > EPS {
+                out.push(elbow);
+            }
+        }
+        out.extend_from_slice(&points[idx..]);
+        *points = out;
+    } else {
+        let last = points.len() - 1;
+        let stub_i = last - 1;
+        let stub = points[stub_i];
+        let stub_proj = (stub.x - points[last].x) * ox + (stub.y - points[last].y) * oy;
+        if stub_proj < PORT_CLEARANCE * 0.5 {
+            return;
+        }
+        let prev = points[stub_i - 1];
+        let inward = (prev.x - stub.x) * ox + (prev.y - stub.y) * oy;
+        if inward >= -1.0 {
+            return;
+        }
+        let mut idx = stub_i - 1;
+        loop {
+            let t = points[idx];
+            let direct_dx = t.x - stub.x;
+            let direct_dy = t.y - stub.y;
+            let dproj = direct_dx * ox + direct_dy * oy;
+            let axis = direct_dx.abs() < EPS || direct_dy.abs() < EPS;
+            if axis && dproj >= -1.0 {
+                break;
+            }
+            let elbow = port_aware_elbow(stub, t, side);
+            let edx = elbow.x - stub.x;
+            let edy = elbow.y - stub.y;
+            let eproj = edx * ox + edy * oy;
+            if (edx.abs() > EPS || edy.abs() > EPS) && eproj >= -1.0 {
+                break;
+            }
+            if idx == 0 {
+                return;
+            }
+            idx -= 1;
+        }
+        let t = points[idx];
+        let mut head = points[..=idx].to_vec();
+        if (t.x - stub.x).abs() > EPS && (t.y - stub.y).abs() > EPS {
+            let elbow = port_aware_elbow(stub, t, side);
+            if (elbow.x - t.x).abs() > EPS || (elbow.y - t.y).abs() > EPS {
+                // 避免与 head 末点重复
+                if head.last().is_none_or(|p| (p.x - elbow.x).abs() > EPS || (p.y - elbow.y).abs() > EPS)
+                {
+                    head.push(elbow);
+                }
+            }
+        }
+        head.push(stub);
+        head.push(points[last]);
+        *points = head;
     }
 }
 

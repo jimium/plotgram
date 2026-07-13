@@ -48,7 +48,12 @@ impl<'a> LayoutPipeline<'a> {
         let layout_elapsed = t_layout.elapsed();
         crate::perf_log!("[perf] layout: {:.2}ms", layout_elapsed.as_secs_f64() * 1000.0);
 
-        self.apply_node_frame(&node_align_config, &mut result)?;
+        // C13：sequence 等自产边布局若再跑 node align，边端点不会随节点更新。
+        // 完整修复需 align 后按节点重锚定消息端点（改动面大）；此处对 produces_edges
+        // 跳过 node align，避免端点漂移。默认 sequence align 本已关闭。
+        if !produces_edges {
+            self.apply_node_frame(&node_align_config, &mut result)?;
+        }
 
         if produces_edges {
             canvas_finalize::finalize_canvas_bounds(&mut result, constants::DEFAULT_PADDING);

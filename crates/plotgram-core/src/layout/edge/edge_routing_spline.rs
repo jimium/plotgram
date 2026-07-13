@@ -133,10 +133,14 @@ pub fn route_edges_spline(
         );
 
         let (geometry, sampled_for_label) = if detour_path.is_empty() {
-            let cp = compute_bezier_controls(
+            let mut cp = compute_bezier_controls(
                 ep.start.x, ep.start.y, ep.end.x, ep.end.y,
                 ep.from_port, ep.to_port, tension,
             );
+            cp[0].x += ep.mid_ox;
+            cp[0].y += ep.mid_oy;
+            cp[1].x += ep.mid_ox;
+            cp[1].y += ep.mid_oy;
             let sampled = sample_bezier(ep.start, cp[0], cp[1], ep.end, BEZIER_SAMPLES_PER_SEGMENT);
             let geometry = PathGeometry::Bezier {
                 start: ep.start,
@@ -145,7 +149,17 @@ pub fn route_edges_spline(
             };
             (geometry, sampled)
         } else {
-            let full_path = build_full_path(ep.start, &detour_path, ep.end);
+            let mut full_path = build_full_path(ep.start, &detour_path, ep.end);
+            // 平行中段偏移：端点不动，中间点平移
+            if ep.mid_ox.abs() > 0.1 || ep.mid_oy.abs() > 0.1 {
+                let n = full_path.len();
+                if n > 2 {
+                    for p in &mut full_path[1..n - 1] {
+                        p.x += ep.mid_ox;
+                        p.y += ep.mid_oy;
+                    }
+                }
+            }
             let sampled = fit_multi_segment_spline(&full_path, BEZIER_SAMPLES_PER_SEGMENT);
             let geometry = PathGeometry::Polyline { points: sampled.clone() };
             (geometry, sampled)

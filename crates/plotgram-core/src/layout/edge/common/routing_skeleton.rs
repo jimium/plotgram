@@ -50,17 +50,18 @@ impl<'a> RoutingContext<'a> {
 pub fn build_obstacle_context<'a>(
     result: &'a LayoutResult,
 ) -> (HashMap<&'a str, usize>, visibility::ObstacleIndex) {
-    let node_list: Vec<(usize, &NodeLayout)> = result
-        .nodes
+    // R7：按 node id 排序再建索引，保证障碍索引确定性。
+    let mut sorted_ids: Vec<&'a str> = result.nodes.keys().map(|s| s.as_str()).collect();
+    sorted_ids.sort_unstable();
+    let node_list: Vec<(usize, &NodeLayout)> = sorted_ids
         .iter()
         .enumerate()
-        .map(|(i, (_, nl))| (i, nl))
+        .filter_map(|(i, id)| result.nodes.get(*id).map(|nl| (i, nl)))
         .collect();
-    let node_id_to_idx: HashMap<&str, usize> = result
-        .nodes
-        .keys()
+    let node_id_to_idx: HashMap<&str, usize> = sorted_ids
+        .iter()
         .enumerate()
-        .map(|(i, id)| (id.as_str(), i))
+        .map(|(i, id)| (*id, i))
         .collect();
     let obstacle_index = visibility::ObstacleIndex::build(&node_list);
     (node_id_to_idx, obstacle_index)
@@ -75,6 +76,9 @@ pub struct EdgeEndpoints {
     pub to_port: Port,
     pub from_id: String,
     pub to_id: String,
+    /// 平行边法向偏移，只作用于中段/控制点，端点保持在节点边界上。
+    pub mid_ox: f64,
+    pub mid_oy: f64,
 }
 
 /// 标签沿法线方向的偏移量（调用方需将其加到路径中点上）
@@ -89,7 +93,8 @@ pub struct LabelOffset {
 /// 返回 `None` 表示起止节点缺失，调用方应推入 `EdgeLayout::empty()`。
 ///
 /// 统一了 straight / bezier / spline 三处重复的 10 步前置逻辑：
-/// 节点查找 → 中心 → 法线 → 偏移 → 边界交点 → 端口 → 标签偏移。
+/// 节点查找 → 中心 → 法线 → 边界交点 → 端口 → 中段偏移 → 标签偏移。
+/// 端点始终落在 `edge_point` 边界上；平行分离通过 `mid_ox/mid_oy` 偏移中段。
 pub fn resolve_endpoints(
     ctx: &RoutingContext,
     rel: &Relation,
@@ -108,15 +113,12 @@ pub fn resolve_endpoints(
 
     let perp = canonical_perpendicular(from_id, to_id, c1.x, c1.y, c2.x, c2.y);
     let offset_scalar = ctx.parallel_offsets[edge_index];
-    let ox = perp.x * offset_scalar;
-    let oy = perp.y * offset_scalar;
+    let mid_ox = perp.x * offset_scalar;
+    let mid_oy = perp.y * offset_scalar;
 
-    // 先计算无偏移的边界交点，再直接平移
-    // （避免 edge_point 射线截断导致偏移量被压缩）
+    // 端点保持在节点边界；平行偏移留给中段/控制点
     let (sx, sy) = edge_point(from_nl, c2.x, c2.y);
     let (ex, ey) = edge_point(to_nl, c1.x, c1.y);
-    let (sx, sy) = (sx + ox, sy + oy);
-    let (ex, ey) = (ex + ox, ey + oy);
 
     let from_port = select_port(sx, sy, from_nl);
     let to_port = select_port(ex, ey, to_nl);
@@ -140,6 +142,8 @@ pub fn resolve_endpoints(
             to_port,
             from_id: from_id.to_string(),
             to_id: to_id.to_string(),
+            mid_ox,
+            mid_oy,
         },
         LabelOffset {
             ox: label_ox,
@@ -308,10 +312,10 @@ mod tests {
         let ctx = RoutingContext::new(&diagram, &result);
         let (ep1, _) = resolve_endpoints(&ctx, &diagram.relations[0], 0).unwrap();
         let (ep2, _) = resolve_endpoints(&ctx, &diagram.relations[1], 1).unwrap();
-        // 两条边应有不同的偏移（避免重叠）
+        // 端点贴边；平行分离体现在中段偏移方向相反
         assert!(
-            (ep1.start.x - ep2.start.x).abs() > 0.1 || (ep1.start.y - ep2.start.y).abs() > 0.1,
-            "双向边应有不同偏移"
+            (ep1.mid_ox - ep2.mid_ox).abs() > 0.1 || (ep1.mid_oy - ep2.mid_oy).abs() > 0.1,
+            "双向边中段应有不同偏移"
         );
     }
 

@@ -18,7 +18,7 @@
 use crate::ast::Diagram;
 use crate::layout::node::common::group_bounds::{self, GroupPadding};
 use crate::layout::{GroupLayout, NodeLayout};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::layout::coordinate::{
     align_client_nodes_to_hubs, align_nodes_to_neighbors, center_group_hub_nodes,
@@ -39,6 +39,7 @@ pub(super) struct LayoutContext<'a> {
     pub sizes: &'a HashMap<String, (f64, f64)>,
     pub config: ArchitectureV2LayoutConfig,
     pub ordered_layers: &'a [Vec<String>],
+    pub reversed: &'a HashSet<(String, String)>,
     pub nodes: HashMap<String, NodeLayout>,
     pub groups: HashMap<String, GroupLayout>,
 }
@@ -84,6 +85,7 @@ impl Phase for OverlapRemovalPhase {
             ctx.ordered_layers,
             ctx.sizes,
             &mut ctx.nodes,
+            ctx.reversed,
         );
     }
 }
@@ -111,6 +113,7 @@ impl Phase for NeighborAlignmentPhase {
             ctx.ordered_layers,
             ctx.sizes,
             &mut ctx.nodes,
+            ctx.reversed,
         );
     }
 }
@@ -127,6 +130,7 @@ impl Phase for HubCenteringPhase {
             ctx.ordered_layers,
             ctx.sizes,
             &mut ctx.nodes,
+            ctx.reversed,
         );
         align_client_nodes_to_hubs(
             ctx.graph,
@@ -134,6 +138,7 @@ impl Phase for HubCenteringPhase {
             ctx.ordered_layers,
             ctx.sizes,
             &mut ctx.nodes,
+            ctx.reversed,
         );
         rebalance_infrastructure_layers(
             ctx.graph,
@@ -141,6 +146,7 @@ impl Phase for HubCenteringPhase {
             ctx.ordered_layers,
             ctx.sizes,
             &mut ctx.nodes,
+            ctx.reversed,
         );
     }
 }
@@ -189,6 +195,7 @@ impl Phase for GroupAlignmentPhase {
             ctx.ordered_layers,
             ctx.sizes,
             &mut ctx.nodes,
+            ctx.reversed,
         );
     }
 }

@@ -24,6 +24,7 @@ use crate::layout::edge::common::label_candidate::{
     place_all_labels_by_candidates, place_all_labels_by_candidates_with_config,
     LabelPlacementConfig,
 };
+use crate::layout::edge::common::label_common::sorted_node_obstacles;
 use std::collections::{HashMap, HashSet};
 
 const EPS: f64 = 1e-6;
@@ -88,18 +89,8 @@ pub fn resolve_label_overlaps_with_config(
         })
         .collect();
 
-    let node_obstacles: Vec<(f64, f64, f64, f64)> = nodes
-        .values()
-        .map(|nl| {
-            let m = DEFAULT_LABEL_PERP_OFFSET;
-            (
-                nl.x - m,
-                nl.y - m,
-                nl.x + nl.width + m,
-                nl.y + nl.height + m,
-            )
-        })
-        .collect();
+    // R13：Phase-2 节点障碍按 id 排序，与 label_candidate 一致。
+    let node_obstacles: Vec<(f64, f64, f64, f64)> = sorted_node_obstacles(nodes);
     let group_obstacles = sorted_group_shell_obstacles(groups);
 
     let mut last_delta: HashMap<LabelKey, Point> = HashMap::new();

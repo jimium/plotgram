@@ -20,7 +20,7 @@ use crate::layout::algorithm_config::{AlgorithmOptionSpec, OptionKind};
 use crate::layout::{EdgeLayout, EdgeRoutingStrategy, LayoutResult, PathGeometry};
 use crate::layout::edge::common::edge_geometry::{
     build_edge_labels, compute_bezier_controls_organic,
-    compute_bezier_controls_organic_tangents, cubic_bezier_point, parse_label_t,
+    compute_bezier_controls_organic_tangents, cubic_bezier_point, parse_label_t, point_at_path_t,
     port_direction, radial_outward_tangent, DEFAULT_BEZIER_TENSION, DEFAULT_SHOULDER_RATIO,
 };
 use crate::layout::edge::common::routing_skeleton::{
@@ -328,6 +328,10 @@ pub fn route_edges_organic(
                 from_port, to_port, effective_tension, adaptive_shoulder,
             )
         };
+        let control_points = [
+            Point::new(control_points[0].x + ep.mid_ox, control_points[0].y + ep.mid_oy),
+            Point::new(control_points[1].x + ep.mid_ox, control_points[1].y + ep.mid_oy),
+        ];
 
         // 标签位于曲线 t 处（由 label_position 锚点决定）
         let cp0 = control_points[0];
@@ -375,11 +379,19 @@ pub fn route_edges_organic(
                     effective_tension, adaptive_shoulder,
                 ) {
                     edge.geometry = bowed;
+                    let sampled = edge.sampled_path(24);
+                    edge.labels = build_edge_labels(rel, middle_t, Point::new(label_off.ox, label_off.oy), |t| {
+                        point_at_path_t(&sampled, t)
+                    });
                 }
             } else {
                 let detour = obstacle_index.shortest_path(start_pt, end_pt, &skip);
                 if !detour.is_empty() {
                     edge.geometry = PathGeometry::Polyline { points: detour };
+                    let sampled = edge.path_points().into_owned();
+                    edge.labels = build_edge_labels(rel, middle_t, Point::new(label_off.ox, label_off.oy), |t| {
+                        point_at_path_t(&sampled, t)
+                    });
                 }
             }
         }

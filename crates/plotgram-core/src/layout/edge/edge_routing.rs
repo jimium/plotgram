@@ -49,18 +49,34 @@ pub fn route_edges(diagram: &Diagram, result: LayoutResult) -> LayoutResult {
             continue;
         };
 
-        // 标签位置：根据 label_position 锚点沿路径取点
-        let path_pts = [ep.start, ep.end];
+        // 有平行中段偏移时用折线分离；否则保持直线
+        let geometry = if ep.mid_ox.abs() > 0.1 || ep.mid_oy.abs() > 0.1 {
+            let mid = Point::new(
+                (ep.start.x + ep.end.x) * 0.5 + ep.mid_ox,
+                (ep.start.y + ep.end.y) * 0.5 + ep.mid_oy,
+            );
+            PathGeometry::Polyline {
+                points: vec![ep.start, mid, ep.end],
+            }
+        } else {
+            PathGeometry::Straight {
+                start: ep.start,
+                end: ep.end,
+            }
+        };
+
+        let path_pts: Vec<Point> = match &geometry {
+            PathGeometry::Polyline { points } => points.clone(),
+            PathGeometry::Straight { start, end } => vec![*start, *end],
+            _ => vec![ep.start, ep.end],
+        };
         let middle_t = parse_label_t(rel);
         let labels = build_edge_labels(rel, middle_t, Point::new(label_off.ox, label_off.oy), |t| {
             point_at_path_t(&path_pts, t)
         });
 
         edges.push(EdgeLayout {
-            geometry: PathGeometry::Straight {
-                start: ep.start,
-                end: ep.end,
-            },
+            geometry,
             labels,
             from_port: ep.from_port,
             to_port: ep.to_port,

@@ -451,9 +451,17 @@ const LEADER_END_GUARD_PX: f64 = 28.0;
 const LEADER_END_GUARD_T_MIN: f64 = 0.08;
 const LEADER_END_GUARD_T_MAX: f64 = 0.22;
 
-pub fn leader_anchor_on_path(path: &[Point], label_center: Point) -> Point {
+/// 在端点保护区外的弧长窗口内找最近点，并返回对应归一化 t。
+///
+/// 供引线锚点与标签候选 `preferred_t` 共用，避免标签被箭头端 stub 吸引。
+pub fn closest_point_in_arc_window(
+    path: &[Point],
+    query: Point,
+    guard_px: f64,
+) -> (Point, f64, f64) {
     if path.len() < 2 {
-        return path.first().copied().unwrap_or_else(|| Point::new(0.0, 0.0));
+        let pt = path.first().copied().unwrap_or_else(|| Point::new(0.0, 0.0));
+        return (pt, 0.0, 0.5);
     }
     let seg_lengths: Vec<f64> = path
         .windows(2)
@@ -465,22 +473,24 @@ pub fn leader_anchor_on_path(path: &[Point], label_center: Point) -> Point {
         .collect();
     let total_len: f64 = seg_lengths.iter().sum();
     if total_len < 1e-9 {
-        return path[0];
+        return (path[0], 0.0, 0.5);
     }
 
-    let guard_t =
-        (LEADER_END_GUARD_PX / total_len).clamp(LEADER_END_GUARD_T_MIN, LEADER_END_GUARD_T_MAX);
+    let guard_t = (guard_px / total_len).clamp(LEADER_END_GUARD_T_MIN, LEADER_END_GUARD_T_MAX);
     if guard_t * 2.0 >= 1.0 {
-        return point_at_path_t(path, 0.5);
+        let mid = point_at_path_t(path, 0.5);
+        let dx = mid.x - query.x;
+        let dy = mid.y - query.y;
+        return (mid, (dx * dx + dy * dy).sqrt(), 0.5);
     }
     let t_lo = guard_t;
     let t_hi = 1.0 - guard_t;
     let dist_lo = total_len * t_lo;
     let dist_hi = total_len * t_hi;
 
-    // 在 [dist_lo, dist_hi] 弧长窗口内找最近点（裁剪落在窗外的段）。
     let mut best_pt = point_at_path_t(path, 0.5);
     let mut best_dist_sq = f64::INFINITY;
+    let mut best_t = 0.5;
     let mut accum = 0.0;
     for (i, w) in path.windows(2).enumerate() {
         let seg_len = seg_lengths[i];
@@ -503,13 +513,32 @@ pub fn leader_anchor_on_path(path: &[Point], label_center: Point) -> Point {
             w[0].x + (w[1].x - w[0].x) * local_hi,
             w[0].y + (w[1].y - w[0].y) * local_hi,
         );
-        let (cp, dist_sq) = closest_point_on_segment(a, b, label_center);
+        let (cp, dist_sq) = closest_point_on_segment(a, b, query);
         if dist_sq < best_dist_sq {
             best_dist_sq = dist_sq;
             best_pt = cp;
+            let local_t = if (b.x - a.x).abs() > 1e-9 || (b.y - a.y).abs() > 1e-9 {
+                let dx = cp.x - a.x;
+                let dy = cp.y - a.y;
+                let len = ((b.x - a.x).powi(2) + (b.y - a.y).powi(2)).sqrt();
+                if len > 1e-9 {
+                    ((dx * (b.x - a.x) + dy * (b.y - a.y)) / (len * len)).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
+            let arc = seg_start + seg_len * local_lo + seg_len * (local_hi - local_lo) * local_t;
+            best_t = (arc / total_len).clamp(t_lo, t_hi);
         }
     }
-    best_pt
+    (best_pt, best_dist_sq.sqrt(), best_t)
+}
+
+pub fn leader_anchor_on_path(path: &[Point], label_center: Point) -> Point {
+    let (pt, _, _) = closest_point_in_arc_window(path, label_center, LEADER_END_GUARD_PX);
+    pt
 }
 
 /// 点到线段的最近点（含距离平方）。

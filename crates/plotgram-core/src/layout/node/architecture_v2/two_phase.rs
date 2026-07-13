@@ -209,6 +209,7 @@ pub(super) fn compute_two_phase_layout(
         sizes,
         padding,
         sizing,
+        reversed_edges,
     )
 }
 
@@ -261,11 +262,12 @@ fn phase_d_postprocess(
     sizes: &HashMap<String, (f64, f64)>,
     bounds_padding: GroupPadding,
     sizing: GroupSizingPolicy,
+    reversed_edges: &HashSet<(String, String)>,
 ) -> LayoutResult {
     // ── 后处理：基础设施行居中 ──
     // 从元数据重建全局层（替代旧版从 y 坐标反推）
     let layers = rebuild_layers_from_metadata(blocks, macro_ranks);
-    rebalance_infrastructure_layers(graph, group_map, &layers, sizes, nodes);
+    rebalance_infrastructure_layers(graph, group_map, &layers, sizes, nodes, reversed_edges);
     clamp_to_canvas(nodes, sizes);
     // Phase F：同 leaf-group 内近邻 y 带节点微对齐（修小幅错位，不改层拓扑）
     align_intra_group_same_rank_y(diagram, nodes);
@@ -476,10 +478,11 @@ fn layout_intra_group(
         sizes,
         &member_set,
         Some(&space_budget),
+        reversed,
     );
 
-    center_group_hub_nodes(graph, &intra_map, &ordered_layers, sizes, &mut nodes);
-    align_client_nodes_to_hubs(graph, &intra_map, &ordered_layers, sizes, &mut nodes);
+    center_group_hub_nodes(graph, &intra_map, &ordered_layers, sizes, &mut nodes, reversed);
+    align_client_nodes_to_hubs(graph, &intra_map, &ordered_layers, sizes, &mut nodes, reversed);
 
     if mode == GroupLayoutMode::Vertical {
         align_nodes_in_column(&mut nodes);
@@ -505,9 +508,10 @@ fn layout_intra_group(
             sizes,
             &member_set,
             Some(&space_budget),
+            reversed,
         );
-        center_group_hub_nodes(graph, &intra_map, &ordered_layers, sizes, &mut nodes);
-        align_client_nodes_to_hubs(graph, &intra_map, &ordered_layers, sizes, &mut nodes);
+        center_group_hub_nodes(graph, &intra_map, &ordered_layers, sizes, &mut nodes, reversed);
+        align_client_nodes_to_hubs(graph, &intra_map, &ordered_layers, sizes, &mut nodes, reversed);
         normalize_to_origin(&mut nodes);
         (content_width, content_height) = content_bbox(&nodes);
     }
@@ -1025,6 +1029,7 @@ fn layout_ungrouped_cluster(
         sizes,
         &member_set,
         Some(&crate::layout::space_budget::SpaceBudget::from_diagram(diagram)),
+        reversed,
     );
     normalize_to_origin(&mut nodes);
     let (content_width, content_height) = content_bbox(&nodes);
@@ -1058,6 +1063,7 @@ fn assign_coordinates_intra(
     sizes: &HashMap<String, (f64, f64)>,
     member_set: &HashSet<String>,
     budget: Option<&crate::layout::space_budget::SpaceBudget>,
+    reversed: &HashSet<(String, String)>,
 ) -> HashMap<String, NodeLayout> {
     let mut nodes = HashMap::new();
 
@@ -1111,6 +1117,7 @@ fn assign_coordinates_intra(
                     &mut positions,
                     upper,
                     graph,
+                    reversed,
                     Some(member_set),
                     true,
                     NEIGHBOR_PULL_FACTOR,
@@ -1122,6 +1129,7 @@ fn assign_coordinates_intra(
                     &mut positions,
                     lower,
                     graph,
+                    reversed,
                     Some(member_set),
                     false,
                     NEIGHBOR_PULL_FACTOR,
@@ -1916,8 +1924,11 @@ fn align_intra_group_same_rank_y(diagram: &Diagram, nodes: &mut HashMap<String, 
         .iter()
         .filter(|g| g.child_group_ids.is_empty())
         .map(|g| {
-            let mut ids: Vec<String> = g.entity_ids.iter().map(|id| id.as_str().to_string()).collect();
+            // C4：复用 effective_entity_ids，覆盖仅靠 group_id 挂靠的成员。
+            let mut ids =
+                crate::layout::node::common::group_bounds::effective_entity_ids(g, diagram);
             ids.sort();
+            ids.dedup();
             (g.id.as_str().to_string(), ids)
         })
         .collect();

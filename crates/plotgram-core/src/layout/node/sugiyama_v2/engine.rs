@@ -302,9 +302,44 @@ fn apply_group_rank_constraints(
         // +1 为 group 间留空（dummy 链填充）
         current_rank += window_size + 1;
     }
+
+    // L6：ungrouped 节点 rank 夹取到与邻居一致的合法区间，避免跨 group 窗口倒挂。
+    let grouped: std::collections::HashSet<petgraph::graph::NodeIndex> = group_nodes
+        .values()
+        .flat_map(|v| v.iter().copied())
+        .collect();
+    let mut ungrouped: Vec<_> = dag
+        .node_indices()
+        .filter(|n| !grouped.contains(n))
+        .collect();
+    ungrouped.sort_by_key(|n| n.index());
+    for node in ungrouped {
+        use petgraph::Direction;
+        let mut lo = 0usize;
+        let mut hi = usize::MAX;
+        let mut preds: Vec<_> = dag.neighbors_directed(node, Direction::Incoming).collect();
+        preds.sort_by_key(|n| n.index());
+        for p in preds {
+            lo = lo.max(ranks[&p].saturating_add(1));
+        }
+        let mut succs: Vec<_> = dag.neighbors_directed(node, Direction::Outgoing).collect();
+        succs.sort_by_key(|n| n.index());
+        for s in succs {
+            hi = hi.min(ranks[&s].saturating_sub(1));
+        }
+        let cur = ranks[&node];
+        if lo <= hi {
+            ranks.insert(node, cur.clamp(lo, hi));
+        } else {
+            // 上下界冲突：优先满足前驱（lower），下游靠后续 layering/dummy 处理
+            ranks.insert(node, lo);
+        }
+    }
 }
 
 /// 状态图语义 rank 约束：initial → rank 0，final → max rank。
+///
+/// L5：硬覆盖后传播修复违反 `rank(u) < rank(v)` 的边。
 fn apply_state_semantic_rank_constraints(
     dag: &petgraph::graph::DiGraph<String, ()>,
     ranks: &mut HashMap<petgraph::graph::NodeIndex, usize>,
@@ -331,6 +366,51 @@ fn apply_state_semantic_rank_constraints(
     for node in dag.node_indices() {
         if entity_type_of(&dag[node]) == entity_type::FINAL {
             ranks.insert(node, max_rank);
+        }
+    }
+
+    // L5：硬覆盖后传播调整，修复 rank(u) >= rank(v) 的前向边。
+    repair_rank_monotonicity(dag, ranks);
+}
+
+/// 传播修复：对每条边若 rank(u) >= rank(v)，将 v（及可达下游）整体后移。
+fn repair_rank_monotonicity(
+    dag: &petgraph::graph::DiGraph<String, ()>,
+    ranks: &mut HashMap<petgraph::graph::NodeIndex, usize>,
+) {
+    use petgraph::Direction;
+    // 按拓扑近似：多轮松弛直到无违反或达到上限。
+    for _ in 0..dag.node_count().saturating_add(1) {
+        let mut changed = false;
+        let mut edges: Vec<(petgraph::graph::NodeIndex, petgraph::graph::NodeIndex)> = dag
+            .edge_indices()
+            .filter_map(|e| dag.edge_endpoints(e))
+            .collect();
+        // 确定性：按 (u.index, v.index) 排序
+        edges.sort_by_key(|(u, v)| (u.index(), v.index()));
+        for (u, v) in edges {
+            let ru = ranks[&u];
+            let rv = ranks[&v];
+            if ru >= rv {
+                ranks.insert(v, ru + 1);
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+        // 顺带把下游也推开：再扫一遍出边
+        let mut nodes: Vec<_> = dag.node_indices().collect();
+        nodes.sort_by_key(|n| n.index());
+        for u in nodes {
+            let ru = ranks[&u];
+            let mut outs: Vec<_> = dag.neighbors_directed(u, Direction::Outgoing).collect();
+            outs.sort_by_key(|n| n.index());
+            for v in outs {
+                if ranks[&v] <= ru {
+                    ranks.insert(v, ru + 1);
+                }
+            }
         }
     }
 }

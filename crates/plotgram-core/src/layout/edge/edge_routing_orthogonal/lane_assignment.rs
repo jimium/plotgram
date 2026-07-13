@@ -263,7 +263,12 @@ pub fn assign_lanes(
             if length < EPS {
                 continue;
             }
+            // C10：斜段跳过，勿按 dy≈0 二分当竖段做 offset。
             let is_horizontal = dy.abs() < EPS;
+            let is_vertical = dx.abs() < EPS;
+            if !is_horizontal && !is_vertical {
+                continue;
+            }
             let (layer, is_positive) = if is_horizontal {
                 (p1.y, dx > 0.0)
             } else {

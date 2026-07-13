@@ -12,7 +12,7 @@ use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, EdgeRoutingStrategy, LayoutResult, PathGeometry};
 use crate::layout::edge::common::edge_geometry::{
     build_edge_labels, compute_bezier_controls,
-    cubic_bezier_point, parse_label_t, DEFAULT_BEZIER_TENSION,
+    cubic_bezier_point, parse_label_t, point_at_path_t, DEFAULT_BEZIER_TENSION,
 };
 use crate::layout::edge::common::routing_skeleton::{
     finalize_edges, resolve_endpoints, RoutingContext,
@@ -139,28 +139,15 @@ pub fn route_edges_bezier(
             ep.start.x, ep.start.y, ep.end.x, ep.end.y,
             ep.from_port, ep.to_port, tension,
         );
+        let control_points = [
+            Point::new(control_points[0].x + ep.mid_ox, control_points[0].y + ep.mid_oy),
+            Point::new(control_points[1].x + ep.mid_ox, control_points[1].y + ep.mid_oy),
+        ];
 
-        // 标签位于曲线 t 处（由 label_position 锚点决定）
-        let cp0 = control_points[0];
-        let cp1 = control_points[1];
-        let bez_start = ep.start;
-        let bez_end = ep.end;
-        let middle_t = parse_label_t(rel);
-        let labels = build_edge_labels(rel, middle_t, Point::new(label_off.ox, label_off.oy), |t| {
-            cubic_bezier_point(bez_start, cp0, cp1, bez_end, t)
-        });
-
-        let geometry = PathGeometry::Bezier {
+        let mut geometry = PathGeometry::Bezier {
             start: ep.start,
             end: ep.end,
             controls: control_points,
-        };
-
-        let mut edge = EdgeLayout {
-            geometry,
-            labels,
-            from_port: ep.from_port,
-            to_port: ep.to_port,
         };
 
         // ── 穿障检测：采样曲线，若穿过非端点节点则退化到 spline 绕行 ──
@@ -168,16 +155,46 @@ pub fn route_edges_bezier(
         let to_idx = node_id_to_idx.get(ep.to_id.as_str()).copied().unwrap_or(usize::MAX);
         let skip = [from_idx, to_idx];
 
-        if crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(&edge, &obstacle_index, &skip) {
-            // 退化到 spline 绕行
+        let probe = EdgeLayout {
+            geometry: geometry.clone(),
+            labels: Vec::new(),
+            from_port: ep.from_port,
+            to_port: ep.to_port,
+        };
+        if crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(&probe, &obstacle_index, &skip) {
             let detour = obstacle_index.shortest_path(ep.start, ep.end, &skip);
             if !detour.is_empty() {
-                // 用绕行折线替换几何（保留标签位置与端口）
-                edge.geometry = PathGeometry::Polyline { points: detour };
+                geometry = PathGeometry::Polyline { points: detour };
             }
         }
 
-        edges.push(edge);
+        // 先定最终几何，再采样建标签（避免穿障改折线后标签仍挂旧曲线）
+        let middle_t = parse_label_t(rel);
+        let label_off_pt = Point::new(label_off.ox, label_off.oy);
+        let labels = match &geometry {
+            PathGeometry::Polyline { points } => {
+                build_edge_labels(rel, middle_t, label_off_pt, |t| point_at_path_t(points, t))
+            }
+            PathGeometry::Bezier { start, end, controls } => {
+                let cp0 = controls[0];
+                let cp1 = controls[1];
+                let s = *start;
+                let e = *end;
+                build_edge_labels(rel, middle_t, label_off_pt, |t| {
+                    cubic_bezier_point(s, cp0, cp1, e, t)
+                })
+            }
+            _ => build_edge_labels(rel, middle_t, label_off_pt, |_| {
+                Point::new((ep.start.x + ep.end.x) * 0.5, (ep.start.y + ep.end.y) * 0.5)
+            }),
+        };
+
+        edges.push(EdgeLayout {
+            geometry,
+            labels,
+            from_port: ep.from_port,
+            to_port: ep.to_port,
+        });
     }
 
     finalize_edges(result, edges, diagram)

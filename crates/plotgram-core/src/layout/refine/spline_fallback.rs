@@ -5,6 +5,7 @@ use crate::layout::edge::common::edge_geometry::{
     build_edge_labels, compute_bezier_controls, label_t_for_diagram,
     point_at_path_t,
 };
+use crate::layout::edge::common::obstacle_check::curve_intersects_obstacles;
 use crate::layout::edge::common::routing_skeleton::{resolve_endpoints, RoutingContext};
 use crate::layout::edge::common::self_loop::{route_self_loop, self_loop_indices, SelfLoopStyle};
 use crate::layout::edge::edge_routing_spline::{
@@ -16,13 +17,19 @@ use crate::layout::{EdgeLayout, LayoutResult, PathGeometry};
 use crate::layout::edge::edge_routing_bezier::BezierConfig;
 use std::collections::HashSet;
 
+use super::crossing::analyze_edge_node_crossings;
+use super::RefineConfig;
+
 const SPLINE_SAMPLES_PER_SEGMENT: usize = 12;
 
 /// 对指定边索引用 spline 可见性图重路由（混合路由兜底）。
+///
+/// C9：仅当替换后 crossing 不劣于原边时才采纳；空 detour 退 Bezier 后须复检穿障。
 pub(crate) fn reroute_edges_with_spline(
     result: &mut LayoutResult,
     diagram: &Diagram,
     edge_indices: &HashSet<usize>,
+    config: &RefineConfig,
 ) {
     if edge_indices.is_empty() {
         return;
@@ -87,8 +94,9 @@ pub(crate) fn reroute_edges_with_spline(
             .get(ep.to_id.as_str())
             .copied()
             .unwrap_or(usize::MAX);
+        let skip = [from_idx, to_idx];
 
-        let detour_path = obstacle_index.shortest_path(ep.start, ep.end, &[from_idx, to_idx]);
+        let detour_path = obstacle_index.shortest_path(ep.start, ep.end, &skip);
 
         let (geometry, sampled_for_label) = if detour_path.is_empty() {
             let cp = compute_bezier_controls(
@@ -101,14 +109,21 @@ pub(crate) fn reroute_edges_with_spline(
                 tension,
             );
             let sampled = sample_bezier(ep.start, cp[0], cp[1], ep.end, SPLINE_SAMPLES_PER_SEGMENT);
-            (
-                PathGeometry::Bezier {
+            let candidate = EdgeLayout {
+                geometry: PathGeometry::Bezier {
                     start: ep.start,
                     end: ep.end,
                     controls: cp,
                 },
-                sampled,
-            )
+                labels: Vec::new(),
+                from_port: ep.from_port,
+                to_port: ep.to_port,
+            };
+            // C9：空 detour 退 Bezier 后必须复检；仍穿障则保留原边。
+            if curve_intersects_obstacles(&candidate, &obstacle_index, &skip) {
+                continue;
+            }
+            (candidate.geometry, sampled)
         } else {
             let full_path = build_full_path(ep.start, &detour_path, ep.end);
             let sampled = fit_multi_segment_spline(&full_path, SPLINE_SAMPLES_PER_SEGMENT);
@@ -120,15 +135,35 @@ pub(crate) fn reroute_edges_with_spline(
             point_at_path_t(&sampled_for_label, t)
         });
 
-        updates.push((
-            i,
-            EdgeLayout {
-                geometry,
-                labels,
-                from_port: ep.from_port,
-                to_port: ep.to_port,
-            },
-        ));
+        let candidate = EdgeLayout {
+            geometry,
+            labels,
+            from_port: ep.from_port,
+            to_port: ep.to_port,
+        };
+
+        // C9：仅 when after ≤ before 才替换（crossing 不增）。
+        if let Some(original) = routing_snapshot.edges.get(i) {
+            let before = count_single_edge_crossings(
+                original,
+                &routing_snapshot,
+                diagram,
+                i,
+                config,
+            );
+            let after = count_single_edge_crossings(
+                &candidate,
+                &routing_snapshot,
+                diagram,
+                i,
+                config,
+            );
+            if after > before {
+                continue;
+            }
+        }
+
+        updates.push((i, candidate));
         spline_count += 1;
     }
 
@@ -143,6 +178,29 @@ pub(crate) fn reroute_edges_with_spline(
             stats.spline_fallback_count = spline_count;
         }
     }
+}
+
+/// 统计单条边相对当前布局的穿障次数（用于 C9 质量门控）。
+fn count_single_edge_crossings(
+    edge: &EdgeLayout,
+    result: &LayoutResult,
+    diagram: &Diagram,
+    edge_idx: usize,
+    config: &RefineConfig,
+) -> usize {
+    let mut probe = result.clone();
+    if edge_idx < probe.edges.len() {
+        probe.edges[edge_idx] = edge.clone();
+    }
+    let metrics = analyze_edge_node_crossings(&probe, diagram, config);
+    // 只计本边相关的穿障：problem_nodes 中含本 edge_idx 的 crossing 累加不精确，
+    // 直接用全量 metrics 中属于本边的 edge_indices 计数。
+    metrics
+        .problem_nodes
+        .values()
+        .flat_map(|info| info.edge_indices.iter())
+        .filter(|&&ei| ei == edge_idx)
+        .count()
 }
 
 #[cfg(test)]
@@ -240,7 +298,7 @@ mod tests {
 
         let mut set = HashSet::new();
         set.insert(0);
-        reroute_edges_with_spline(&mut result, &diagram, &set);
+        reroute_edges_with_spline(&mut result, &diagram, &set, &RefineConfig::default());
         assert!(result.edges[0].path_len() >= 2);
     }
 }

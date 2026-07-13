@@ -124,47 +124,37 @@ fn align_singleton_layers_to_predecessors(
         };
 
         let mut adj_pred_centers: Vec<f64> = Vec::new();
-        let mut all_pred_centers: Vec<f64> = Vec::new();
         for pred in dag.neighbors_directed(original, Direction::Incoming) {
             let pred_id = &dag[pred];
             let Some(nl) = nodes.get(pred_id) else {
                 continue;
             };
             let c = axis_center(nl, horizontal);
-            all_pred_centers.push(c);
             if real_layer.get(pred_id).copied() == layer_index.checked_sub(1) {
                 adj_pred_centers.push(c);
             }
         }
         adj_pred_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        all_pred_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let target = if !adj_pred_centers.is_empty() {
             median_f64(&adj_pred_centers)
         } else {
             let mut adj_succ_centers: Vec<f64> = Vec::new();
-            let mut all_succ_centers: Vec<f64> = Vec::new();
             for succ in dag.neighbors_directed(original, Direction::Outgoing) {
                 let succ_id = &dag[succ];
                 let Some(nl) = nodes.get(succ_id) else {
                     continue;
                 };
                 let c = axis_center(nl, horizontal);
-                all_succ_centers.push(c);
                 if real_layer.get(succ_id).copied() == Some(layer_index + 1) {
                     adj_succ_centers.push(c);
                 }
             }
             adj_succ_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            all_succ_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             if !adj_succ_centers.is_empty() {
                 median_f64(&adj_succ_centers)
-            } else if !all_succ_centers.is_empty() {
-                median_f64(&all_succ_centers)
-            } else if !all_pred_centers.is_empty() {
-                // 无邻层邻居时回退全部前驱（保持旧行为兜底）
-                median_f64(&all_pred_centers)
             } else {
+                // 无邻层邻居则跳过，禁止全图假邻居 fallback
                 continue;
             }
         };
@@ -697,7 +687,10 @@ pub(super) fn horizontal_compaction(
             .fold(f64::INFINITY, f64::min);
         let anchor = initial[root];
         let candidate = anchor.max(lower_bound);
-        if candidate.is_finite() && upper_bound.is_finite() {
+        // C5：lower > upper 时不要静默违反下界；保持 lower（层内分离优先）。
+        if lower_bound.is_finite() && upper_bound.is_finite() && lower_bound > upper_bound {
+            block_pos.insert(*root, lower_bound);
+        } else if candidate.is_finite() && upper_bound.is_finite() {
             block_pos.insert(*root, candidate.min(upper_bound));
         } else if candidate.is_finite() {
             block_pos.insert(*root, candidate);
@@ -802,10 +795,13 @@ fn initial_x_positions(
 }
 
 /// 为 architecture 无 group 路径复用完整 BK 四趟坐标分配（字符串图层）。
+///
+/// `reversed`：FAS 反转边集；建边走 effective DAG，跨层边插 dummy 链（对齐 proper layer graph）。
 pub(crate) fn assign_layer_centers_for_string_graph(
     layers: &[Vec<String>],
     sizes: &HashMap<String, (f64, f64)>,
     out_edges: &HashMap<String, Vec<String>>,
+    reversed: &HashSet<(String, String)>,
     node_gap: f64,
     padding: f64,
 ) -> HashMap<String, f64> {
@@ -836,25 +832,29 @@ pub(crate) fn assign_layer_centers_for_string_graph(
         .flat_map(|(li, layer)| layer.iter().map(move |id| (id.clone(), li)))
         .collect();
 
-    let mut edge_keys: Vec<(String, String)> = Vec::new();
-    for (from_id, succs) in out_edges {
-        let Some(&from_layer) = id_to_layer.get(from_id) else {
+    // Effective DAG 边：反转边取反向；按 (src,dst) 去重
+    let mut edge_set: HashSet<(String, String)> = HashSet::new();
+    let mut from_ids: Vec<String> = out_edges.keys().cloned().collect();
+    from_ids.sort();
+    for from_id in &from_ids {
+        let Some(succs) = out_edges.get(from_id) else {
             continue;
         };
-        for to_id in succs {
-            if id_to_layer.get(to_id.as_str()) == Some(&(from_layer + 1)) {
-                edge_keys.push((from_id.clone(), to_id.clone()));
-            }
+        let mut succ_sorted = succs.clone();
+        succ_sorted.sort();
+        for to_id in succ_sorted {
+            let (src, dst) = if reversed.contains(&(from_id.clone(), to_id.clone())) {
+                (to_id, from_id.clone())
+            } else {
+                (from_id.clone(), to_id)
+            };
+            edge_set.insert((src, dst));
         }
     }
+    let mut edge_keys: Vec<(String, String)> = edge_set.into_iter().collect();
     edge_keys.sort();
 
-    for (from_id, to_id) in edge_keys {
-        if let (Some(&from_idx), Some(&to_idx)) = (node_idx.get(&from_id), node_idx.get(&to_id)) {
-            layered.add_edge(from_idx, to_idx, ());
-        }
-    }
-
+    let (dummy_w, dummy_h) = preset::FLOWCHART_PRESET.dummy_node_size();
     let mut sizes_idx: HashMap<NodeIndex, (f64, f64)> = HashMap::new();
     for (id, idx) in &node_idx {
         sizes_idx.insert(
@@ -862,8 +862,54 @@ pub(crate) fn assign_layer_centers_for_string_graph(
             sizes
                 .get(id)
                 .copied()
-                .unwrap_or((preset::FLOWCHART_PRESET.default_node_width, preset::FLOWCHART_PRESET.default_node_height)),
+                .unwrap_or((
+                    preset::FLOWCHART_PRESET.default_node_width,
+                    preset::FLOWCHART_PRESET.default_node_height,
+                )),
         );
+    }
+
+    for (from_id, to_id) in edge_keys {
+        let Some(&from_layer) = id_to_layer.get(&from_id) else {
+            continue;
+        };
+        let Some(&to_layer) = id_to_layer.get(&to_id) else {
+            continue;
+        };
+        if to_layer <= from_layer {
+            continue;
+        }
+        let Some(&from_idx) = node_idx.get(&from_id) else {
+            continue;
+        };
+        let Some(&to_idx) = node_idx.get(&to_id) else {
+            continue;
+        };
+
+        if to_layer == from_layer + 1 {
+            layered.add_edge(from_idx, to_idx, ());
+            continue;
+        }
+
+        // 跨层：插 dummy 链
+        let mut prev = from_idx;
+        for rank in (from_layer + 1)..to_layer {
+            let dummy = layered.add_node(LayerNode {
+                kind: LayerNodeKind::Dummy {
+                    source: NodeIndex::new(from_idx.index()),
+                    target: NodeIndex::new(to_idx.index()),
+                    segment: rank - from_layer,
+                },
+                rank,
+            });
+            if rank < layer_nodes.len() {
+                layer_nodes[rank].push(dummy);
+            }
+            sizes_idx.insert(dummy, (dummy_w, dummy_h));
+            layered.add_edge(prev, dummy, ());
+            prev = dummy;
+        }
+        layered.add_edge(prev, to_idx, ());
     }
 
     let preset = SugiyamaPreset {

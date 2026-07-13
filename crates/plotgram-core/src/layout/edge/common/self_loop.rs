@@ -1,6 +1,7 @@
 //! 自环边统一几何：矩形折线（orthogonal）与小贝塞尔环（curved）。
 
 use crate::ast::Relation;
+use crate::layout::edge_point;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
 use crate::layout::edge::common::edge_geometry::{build_edge_labels, node_center, parse_label_t, point_at_path_t};
@@ -214,16 +215,33 @@ fn curved_loop_endpoints(
     let center = node_center(node);
     let ncx = center.x;
     let ncy = center.y;
-    let scale = node.width.min(node.height) * 0.35;
 
-    let sx = ncx + corner.dx * scale;
-    let sy = ncy + corner.dy * scale * 0.5;
+    // 端点落在节点边界（与正交自环契约一致），外凸由控制点负责
+    let start_toward = match corner.from_port {
+        Port::Right => (node.x + node.width + 10.0, ncy + corner.dy * node.height * 0.15),
+        Port::Left => (node.x - 10.0, ncy + corner.dy * node.height * 0.15),
+        Port::Top => (ncx + corner.dx * node.width * 0.15, node.y - 10.0),
+        Port::Bottom => (ncx + corner.dx * node.width * 0.15, node.y + node.height + 10.0),
+    };
+    let end_toward = match corner.to_port {
+        Port::Top => (
+            ncx + corner.dx * node.width * 0.15 - corner.perp_x * loop_r * 0.2,
+            node.y - 10.0,
+        ),
+        Port::Bottom => (
+            ncx + corner.dx * node.width * 0.15 - corner.perp_x * loop_r * 0.2,
+            node.y + node.height + 10.0,
+        ),
+        Port::Right => (node.x + node.width + 10.0, ncy + corner.dy * node.height * 0.15),
+        Port::Left => (node.x - 10.0, ncy + corner.dy * node.height * 0.15),
+    };
+    let (sx, sy) = edge_point(node, start_toward.0, start_toward.1);
+    let (ex, ey) = edge_point(node, end_toward.0, end_toward.1);
+
     let apex = Point::new(
         sx + corner.dx * loop_r * 1.5,
         sy + corner.dy * loop_r * 1.5,
     );
-    let ex = ncx + corner.dx * scale * 0.55 - corner.perp_x * loop_r * 0.4;
-    let ey = ncy + corner.dy * scale * 0.55 - corner.perp_y * loop_r * 0.4;
 
     (sx, sy, ex, ey, apex, corner.from_port, corner.to_port)
 }

@@ -87,8 +87,17 @@ pub fn assign_feedback_sides(
         let rank_span = rank_span_for_edge(rel, ranks, from_nl, to_nl, horizontal);
         // 相邻层且投影重叠：走几何正对端口，不进侧通道桶。
         // 长跨度边（span≥阈值）即使投影重叠也强制侧通道，避免穿中间节点列。
+        // R1：rank_span==1 时正对候选须 path_is_clean；不干净则仍进侧通道。
         if rank_span < LONG_SPAN_SIDE_THRESHOLD
             && prefers_opposite_ports_over_side_channel(from_nl, to_nl, rank_span, horizontal)
+            && opposite_channel_path_is_clean(
+                from_nl,
+                to_nl,
+                rel.from.as_str(),
+                rel.to.as_str(),
+                nodes,
+                horizontal,
+            )
         {
             continue;
         }
@@ -289,6 +298,68 @@ fn prefers_opposite_ports_over_side_channel(
         (overlap, gap)
     };
     overlap > 0.0 || gap < OPPOSITE_PORT_GAP_THRESHOLD
+}
+
+/// R1：构造正对端口的简易正交路径，检查是否穿第三方节点。
+fn opposite_channel_path_is_clean(
+    from_nl: &NodeLayout,
+    to_nl: &NodeLayout,
+    from_id: &str,
+    to_id: &str,
+    nodes: &HashMap<String, NodeLayout>,
+    horizontal: bool,
+) -> bool {
+    use crate::layout::geometry::{Point, Rect};
+
+    let (sx, sy, ex, ey) = if horizontal {
+        // LR：Right → Left
+        (
+            from_nl.x + from_nl.width,
+            from_nl.y + from_nl.height / 2.0,
+            to_nl.x,
+            to_nl.y + to_nl.height / 2.0,
+        )
+    } else {
+        // TB：Bottom → Top
+        (
+            from_nl.x + from_nl.width / 2.0,
+            from_nl.y + from_nl.height,
+            to_nl.x + to_nl.width / 2.0,
+            to_nl.y,
+        )
+    };
+    let start = Point::new(sx, sy);
+    let end = Point::new(ex, ey);
+    let path = if (sx - ex).abs() < 1e-6 || (sy - ey).abs() < 1e-6 {
+        vec![start, end]
+    } else if horizontal {
+        vec![start, Point::new(ex, sy), end]
+    } else {
+        vec![start, Point::new(sx, ey), end]
+    };
+    const PAD: f64 = 18.0; // 对齐 NODE_OBSTACLE_PAD
+    let mut sorted_ids: Vec<&String> = nodes.keys().collect();
+    sorted_ids.sort();
+    for window in path.windows(2) {
+        let a = window[0];
+        let b = window[1];
+        for id in &sorted_ids {
+            if id.as_str() == from_id || id.as_str() == to_id {
+                continue;
+            }
+            let nl = &nodes[*id];
+            let rect = Rect::new(
+                nl.x - PAD,
+                nl.y - PAD,
+                nl.width + 2.0 * PAD,
+                nl.height + 2.0 * PAD,
+            );
+            if rect.intersects_segment(a, b, 0.0) {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 fn assign_bucket_hints(

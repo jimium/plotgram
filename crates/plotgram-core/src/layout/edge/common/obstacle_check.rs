@@ -7,8 +7,8 @@
 use crate::layout::edge::visibility;
 use crate::layout::EdgeLayout;
 
-/// 穿障检测的曲线采样点数
-pub const OBSTACLE_CHECK_SAMPLES: usize = 16;
+/// 穿障检测的曲线采样点数（C12：16→32，降低窄障碍漏检）
+pub const OBSTACLE_CHECK_SAMPLES: usize = 32;
 
 /// 检测曲线采样后是否穿过任何非 skip 障碍物。
 ///

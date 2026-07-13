@@ -366,6 +366,7 @@ fn route_edges_orthogonal_inner(
         &preserve_edges,
         &self_loop_idx,
         &mut result.hints.space_budget,
+        &feedback_edge_set,
     );
 
     // ── 4b. 后置交叉检测：修正 slot 排序与实际路由方向不一致的锚点 ──
@@ -799,6 +800,7 @@ fn phase_route_edges(
     preserve_edges: &Option<std::collections::HashSet<usize>>,
     self_loop_idx: &HashMap<usize, usize>,
     space_budget: &mut Option<crate::layout::space_budget::SpaceBudget>,
+    feedback_edge_set: &std::collections::HashSet<usize>,
 ) {
     for &i in edge_order {
         let t_edge = crate::layout::perf::Instant::now();
@@ -854,6 +856,7 @@ fn phase_route_edges(
             from_id,
             to_id,
             corridor_plan.chains.contains_key(&i),
+            feedback_edge_set.contains(&i),
         );
 
         let mut path_stats = PathSelectStats::default();
@@ -1067,6 +1070,7 @@ fn phase_straighten_align(
                     from_id,
                     to_id,
                     corridor_plan.chains.contains_key(&ei),
+                    false,
                 ))
                 .with_corridor_boost(boost);
                 select_best_path_with_scorer_stats(
@@ -1313,6 +1317,7 @@ fn phase_labels(
 /// Iteration 2：是否对该边启用穿组硬约束（拒绝 `best_nodes_only` 穿无关组）。
 ///
 /// - 已有 corridor chain → 强制 strict（应走走廊，禁止穿组软降级）
+/// - R3：feedback / 长跨度边 → 强制 strict（`path_avoids_group_interiors`）
 /// - 其余边保持 false：仍可用高 `GROUP_TRANSIT_PENALTY` 软惩罚；无走廊时硬否决
 ///   会导致直线/脏路径退化（见 k8s-multi-namespace 回归）
 fn should_strict_group_transit(
@@ -1321,8 +1326,9 @@ fn should_strict_group_transit(
     _from_id: &str,
     _to_id: &str,
     has_corridor_chain: bool,
+    force_strict_feedback_or_long_span: bool,
 ) -> bool {
-    has_corridor_chain
+    has_corridor_chain || force_strict_feedback_or_long_span
 }
 
 fn validated_corridor_path(

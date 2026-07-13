@@ -127,7 +127,7 @@ impl LayoutStrategy for SequenceLayout {
                     ..Default::default()
                 },
             );
-            current_x += constants::DEFAULT_NODE_WIDTH + config.node_spacing;
+            current_x += w + config.node_spacing;
         }
         let total_width = if node_count == 0 {
             constants::DEFAULT_PADDING * 2.0

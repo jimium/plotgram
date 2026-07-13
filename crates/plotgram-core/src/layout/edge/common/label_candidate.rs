@@ -3,7 +3,9 @@
 //! 在迭代推开之前，沿边路径生成有限候选框并打分，优先消除标签-节点硬冲突。
 
 use crate::layout::constants::DEFAULT_LABEL_PERP_OFFSET;
-use crate::layout::edge::common::edge_geometry::{closest_point_on_path, point_at_path_t};
+use crate::layout::edge::common::edge_geometry::{
+    closest_point_in_arc_window, closest_point_on_path, point_at_path_t,
+};
 use crate::layout::edge::common::label_avoidance::{
     aabb_overlap, label_bbox_overlaps_group_shell, segment_vs_aabb_intersect,
 };
@@ -195,41 +197,10 @@ fn preferred_t_for_label(label_idx: usize, path: &[Point], current: Point) -> f6
         1 => 0.15,
         _ => 0.85,
     };
-    let (closest, dist) = closest_point_on_path(path, current);
+    // 与引线共用端点保护区，避免标签被箭头 stub 吸引
+    let (_, dist, closest_t) = closest_point_in_arc_window(path, current, 28.0);
     if dist.is_finite() && dist < 80.0 {
-        let total_len: f64 = path
-            .windows(2)
-            .map(|w| {
-                let dx = w[1].x - w[0].x;
-                let dy = w[1].y - w[0].y;
-                (dx * dx + dy * dy).sqrt()
-            })
-            .sum();
-        if total_len > 1e-6 {
-            let mut accum = 0.0;
-            for w in path.windows(2) {
-                let seg_len = {
-                    let dx = w[1].x - w[0].x;
-                    let dy = w[1].y - w[0].y;
-                    (dx * dx + dy * dy).sqrt()
-                };
-                let seg_dist = {
-                    let dx = closest.x - w[0].x;
-                    let dy = closest.y - w[0].y;
-                    (dx * dx + dy * dy).sqrt()
-                };
-                if seg_dist <= seg_len + 1.0 {
-                    let local_t = if seg_len > 1e-6 {
-                        seg_dist / seg_len
-                    } else {
-                        0.0
-                    };
-                    let t = (accum + seg_len * local_t) / total_len;
-                    return t.clamp(0.05, 0.95).mul_add(0.35, anchor_t * 0.65);
-                }
-                accum += seg_len;
-            }
-        }
+        return closest_t.mul_add(0.35, anchor_t * 0.65);
     }
     anchor_t
 }
@@ -381,22 +352,8 @@ fn path_t_for_center(path: &[Point], center: Point) -> Option<f64> {
     if total_len <= 1e-6 {
         return None;
     }
-    let (closest, _) = closest_point_on_path(path, center);
-    let mut accum = 0.0;
-    for w in path.windows(2) {
-        let seg_len = segment_length(w[0], w[1]);
-        let seg_dist = segment_length(w[0], closest);
-        if seg_dist <= seg_len + 1.0 {
-            let local_t = if seg_len > 1e-6 {
-                seg_dist / seg_len
-            } else {
-                0.0
-            };
-            return Some(((accum + seg_len * local_t) / total_len).clamp(0.0, 1.0));
-        }
-        accum += seg_len;
-    }
-    None
+    let (_, _, t) = closest_point_in_arc_window(path, center, 28.0);
+    Some(t)
 }
 
 fn segment_length(p0: Point, p1: Point) -> f64 {

@@ -78,21 +78,25 @@ pub(super) fn build_graph(diagram: &Diagram) -> DiGraph<String, EdgeMeta> {
 ///
 /// 若真实边自身含环，FAS 仅反转真实边破环，constrain 方向保持不变。
 pub(super) fn greedy_cycle_reversal(graph: &DiGraph<String, EdgeMeta>) -> HashSet<(NodeIndex, NodeIndex)> {
-    let nodes = graph.node_indices().collect::<Vec<_>>();
+    // L10：按节点 id 排序，避免 petgraph 插入序影响 FAS 结果。
+    let mut nodes = graph.node_indices().collect::<Vec<_>>();
+    nodes.sort_by(|a, b| graph[*a].cmp(&graph[*b]));
     let mut out_neighbors: HashMap<NodeIndex, Vec<NodeIndex>> = HashMap::new();
     let mut in_neighbors: HashMap<NodeIndex, Vec<NodeIndex>> = HashMap::new();
 
     for node in &nodes {
-        let outs = graph
+        let mut outs = graph
             .edges_directed(*node, Direction::Outgoing)
             .filter(|e| e.weight().reversible)
             .map(|e| e.target())
             .collect::<Vec<_>>();
-        let ins = graph
+        outs.sort_by(|a, b| graph[*a].cmp(&graph[*b]));
+        let mut ins = graph
             .edges_directed(*node, Direction::Incoming)
             .filter(|e| e.weight().reversible)
             .map(|e| e.source())
             .collect::<Vec<_>>();
+        ins.sort_by(|a, b| graph[*a].cmp(&graph[*b]));
         out_neighbors.insert(*node, outs);
         in_neighbors.insert(*node, ins);
     }

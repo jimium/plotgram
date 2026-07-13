@@ -264,6 +264,7 @@ fn find_clean_reroute_path(
             from_id,
             to_id,
             corridor_plan.chains.contains_key(&ei),
+            false,
         ))
         .with_corridor_boost(boost);
         let pair = EndpointPair {

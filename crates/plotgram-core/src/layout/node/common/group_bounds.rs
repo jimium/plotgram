@@ -112,7 +112,7 @@ pub enum GutterSide {
 }
 
 /// 分组的有效成员实体 id（优先 `group.entity_ids`，否则从 `entity.group_id` 推导）。
-fn effective_entity_ids(group: &crate::ast::Group, diagram: &Diagram) -> Vec<String> {
+pub(crate) fn effective_entity_ids(group: &crate::ast::Group, diagram: &Diagram) -> Vec<String> {
     if !group.entity_ids.is_empty() {
         return group.entity_ids.iter().map(|id| id.to_string()).collect();
     }

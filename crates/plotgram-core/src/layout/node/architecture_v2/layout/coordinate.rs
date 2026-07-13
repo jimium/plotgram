@@ -5,10 +5,8 @@ use crate::layout::constants;
 use crate::layout::{NodeLayout};
 use std::collections::{HashMap, HashSet};
 
-use super::constants::{
-    COORDINATE_REFINE_EPSILON, COORDINATE_REFINE_ITERATIONS, GROUP_CENTER_PULL_FACTOR, LAYER_GAP,
-    NEIGHBOR_ALIGN_MAX_PASSES, NEIGHBOR_PULL_FACTOR, NODE_GAP, PADDING,
-};
+use super::acyclic::is_effective_edge;
+use super::constants::{LAYER_GAP, NEIGHBOR_ALIGN_MAX_PASSES, NODE_GAP, PADDING};
 use super::types::{GraphIndex, GroupMap};
 use crate::layout::node::sugiyama_v2::coordinate::assign_layer_centers_for_string_graph;
 
@@ -18,6 +16,7 @@ pub(in super::super) fn assign_coordinates(
     group_map: &GroupMap,
     layers: &[Vec<String>],
     sizes: &HashMap<String, (f64, f64)>,
+    reversed: &HashSet<(String, String)>,
 ) -> HashMap<String, NodeLayout> {
     let mut nodes = HashMap::new();
 
@@ -38,11 +37,12 @@ pub(in super::super) fn assign_coordinates(
         layer_y_offsets.push(layer_y_offsets[i - 1] + layer_heights[i - 1] + LAYER_GAP);
     }
 
-    // 完整 BK 四趟：一次性为全图层分配 x 中心
+    // 完整 BK 四趟：effective DAG + 跨层 dummy
     let bk_centers = assign_layer_centers_for_string_graph(
         layers,
         sizes,
         &graph.out_edges,
+        reversed,
         NODE_GAP,
         PADDING,
     );
@@ -61,7 +61,7 @@ pub(in super::super) fn assign_coordinates(
 
         // 无组基础设施层：以连入该层的上游节点为锚点水平居中
         if is_infrastructure_layer(layer, group_map) {
-            if let Some(anchor_x) = infrastructure_anchor_x(layer, graph, &nodes) {
+            if let Some(anchor_x) = infrastructure_anchor_x(layer, graph, &nodes, reversed) {
                 center_layer_on_anchor(layer, &mut adjusted_positions, sizes, anchor_x);
                 adjusted_positions = resolve_x_overlaps(layer, &adjusted_positions, sizes);
             }
@@ -87,73 +87,6 @@ pub(in super::super) fn assign_coordinates(
     }
 
     nodes
-}
-
-/// 计算层内节点的理想 x 位置（Brandes-Köpf 简化版）
-///
-/// 四遍扫描：左对齐 → 右对齐 → 取平均
-fn compute_ideal_x_positions(
-    layer: &[String],
-    layers: &[Vec<String>],
-    layer_idx: usize,
-    graph: &GraphIndex,
-    sizes: &HashMap<String, (f64, f64)>,
-    group_map: &GroupMap,
-    placed: &HashMap<String, NodeLayout>,
-) -> Vec<f64> {
-    let n = layer.len();
-    if n == 0 {
-        return vec![];
-    }
-
-    // 初始位置：均匀分布（保证非负且不重叠）
-    let mut positions = uniform_initial_positions(layer, sizes);
-
-    // 已放置的邻层使用真实中心；未放置的邻层退化为均匀分布估计
-    let upper_x: Option<HashMap<String, f64>> = if layer_idx > 0 {
-        Some(layer_centers_from_placed(
-            &layers[layer_idx - 1],
-            placed,
-            sizes,
-        ))
-    } else {
-        None
-    };
-    let lower_x: Option<HashMap<String, f64>> = if layer_idx + 1 < layers.len() {
-        Some(layer_centers_from_placed(
-            &layers[layer_idx + 1],
-            placed,
-            sizes,
-        ))
-    } else {
-        None
-    };
-
-    // 多轮迭代优化位置（P0.2: 检测收敛提前退出）
-    for _ in 0..COORDINATE_REFINE_ITERATIONS {
-        let prev_positions = positions.clone();
-
-        if let Some(ref upper) = upper_x {
-            pull_toward_neighbors(layer, &mut positions, upper, graph, None, true, NEIGHBOR_PULL_FACTOR);
-        }
-        if let Some(ref lower) = lower_x {
-            pull_toward_neighbors(layer, &mut positions, lower, graph, None, false, NEIGHBOR_PULL_FACTOR);
-        }
-
-        // 分组引力：同组节点向质心靠拢
-        pull_toward_group_center(layer, &mut positions, group_map, sizes);
-
-        // 收敛检测：所有节点位置变化均小于 ε 时提前退出
-        let converged = positions
-            .iter()
-            .zip(prev_positions.iter())
-            .all(|(new, old)| (*new - *old).abs() < COORDINATE_REFINE_EPSILON);
-        if converged {
-            break;
-        }
-    }
-
-    positions
 }
 
 /// 从已放置节点读取层内中心；缺失节点用均匀分布补齐
@@ -212,6 +145,7 @@ pub(in super::super) fn center_group_hub_nodes(
     layers: &[Vec<String>],
     sizes: &HashMap<String, (f64, f64)>,
     nodes: &mut HashMap<String, NodeLayout>,
+    reversed: &HashSet<(String, String)>,
 ) {
     for (layer_idx, layer) in layers.iter().enumerate() {
         if layer_idx + 1 >= layers.len() || is_infrastructure_layer(layer, group_map) {
@@ -234,7 +168,8 @@ pub(in super::super) fn center_group_hub_nodes(
                     succs
                         .iter()
                         .filter(|s| {
-                            lower_set.contains(*s)
+                            is_effective_edge(hub, s, reversed)
+                                && lower_set.contains(*s)
                                 && group_map.node_to_top_group.get(*s) == Some(gid)
                         })
                         .map(|s| node_center_x(s, nodes))
@@ -264,6 +199,7 @@ pub(in super::super) fn align_client_nodes_to_hubs(
     layers: &[Vec<String>],
     sizes: &HashMap<String, (f64, f64)>,
     nodes: &mut HashMap<String, NodeLayout>,
+    reversed: &HashSet<(String, String)>,
 ) {
     for (layer_idx, layer) in layers.iter().enumerate() {
         if layer_idx + 1 >= layers.len() || is_infrastructure_layer(layer, group_map) {
@@ -280,7 +216,8 @@ pub(in super::super) fn align_client_nodes_to_hubs(
                     succs
                         .iter()
                         .filter(|s| {
-                            lower_set.contains(*s)
+                            is_effective_edge(node, s, reversed)
+                                && lower_set.contains(*s)
                                 && should_align_neighbors(
                                     node,
                                     s,
@@ -402,11 +339,13 @@ pub(in super::super) fn uniform_initial_positions(
 /// 为 `None` 时考虑所有邻居（全局布局场景）。
 ///
 /// `pull_factor` 控制单次拉力强度（0.0=不动，1.0=直接跳到中位数）。
+/// 邻居必须是 effective DAG 边（过滤 FAS 反转边）。
 pub(in super::super) fn pull_toward_neighbors(
     layer: &[String],
     positions: &mut [f64],
     neighbor_x: &HashMap<String, f64>,
     graph: &GraphIndex,
+    reversed: &HashSet<(String, String)>,
     filter: Option<&HashSet<String>>,
     from_upper: bool,
     pull_factor: f64,
@@ -421,6 +360,13 @@ pub(in super::super) fn pull_toward_neighbors(
         let positions_set: Vec<f64> = neighbors
             .iter()
             .filter(|n| filter.map_or(true, |f| f.contains(*n)))
+            .filter(|n| {
+                if from_upper {
+                    is_effective_edge(n, node, reversed)
+                } else {
+                    is_effective_edge(node, n, reversed)
+                }
+            })
             .filter_map(|n| neighbor_x.get(n).copied())
             .collect();
 
@@ -438,41 +384,6 @@ pub(in super::super) fn pull_toward_neighbors(
         let current = positions[i];
         let pull = (median - current) * pull_factor;
         positions[i] = current + pull;
-    }
-}
-
-fn pull_toward_group_center(
-    layer: &[String],
-    positions: &mut [f64],
-    group_map: &GroupMap,
-    _sizes: &HashMap<String, (f64, f64)>,
-) {
-    // 找出层内同组节点
-    let mut group_indices: HashMap<String, Vec<usize>> = HashMap::new();
-    for (i, node) in layer.iter().enumerate() {
-        let gid = group_map.node_to_top_group.get(node).cloned().unwrap_or_default();
-        group_indices.entry(gid).or_default().push(i);
-    }
-
-    let mut group_ids: Vec<String> = group_indices.keys().cloned().collect();
-    group_ids.sort();
-    for gid in group_ids {
-        let Some(indices) = group_indices.get(&gid) else {
-            continue;
-        };
-        if indices.len() <= 1 {
-            continue;
-        }
-
-        // 计算组内质心
-        let centroid: f64 = indices.iter().map(|&i| positions[i]).sum::<f64>() / indices.len() as f64;
-
-        // 朝质心方向微调（增强分组引力）
-        for &i in indices {
-            let current = positions[i];
-            let pull = (centroid - current) * GROUP_CENTER_PULL_FACTOR;
-            positions[i] = current + pull;
-        }
     }
 }
 
@@ -549,20 +460,27 @@ pub(in super::super) fn infrastructure_anchor_x(
     layer: &[String],
     graph: &GraphIndex,
     placed: &HashMap<String, NodeLayout>,
+    reversed: &HashSet<(String, String)>,
 ) -> Option<f64> {
     let mut xs = Vec::new();
     for node in layer {
-        // 上游：in_edges 中已放置的节点
+        // 上游：in_edges 中已放置且 effective 的节点
         if let Some(preds) = graph.in_edges.get(node) {
             for pred in preds {
+                if !is_effective_edge(pred, node, reversed) {
+                    continue;
+                }
                 if let Some(nl) = placed.get(pred) {
                     xs.push(nl.x + nl.width / 2.0);
                 }
             }
         }
-        // 下游：out_edges 中已放置的节点（P1.2: 双向锚点）
+        // 下游：out_edges 中已放置且 effective 的节点
         if let Some(succs) = graph.out_edges.get(node) {
             for succ in succs {
+                if !is_effective_edge(node, succ, reversed) {
+                    continue;
+                }
                 if let Some(nl) = placed.get(succ) {
                     xs.push(nl.x + nl.width / 2.0);
                 }
@@ -623,12 +541,13 @@ pub(in super::super) fn rebalance_infrastructure_layers(
     layers: &[Vec<String>],
     sizes: &HashMap<String, (f64, f64)>,
     nodes: &mut HashMap<String, NodeLayout>,
+    reversed: &HashSet<(String, String)>,
 ) {
     for layer in layers {
         if !is_infrastructure_layer(layer, group_map) {
             continue;
         }
-        let Some(anchor_x) = infrastructure_anchor_x(layer, graph, nodes) else {
+        let Some(anchor_x) = infrastructure_anchor_x(layer, graph, nodes, reversed) else {
             continue;
         };
 
@@ -669,7 +588,15 @@ pub(in super::super) fn align_nodes_to_neighbors(
     layers: &[Vec<String>],
     sizes: &HashMap<String, (f64, f64)>,
     nodes: &mut HashMap<String, NodeLayout>,
+    reversed: &HashSet<(String, String)>,
 ) {
+    let mut layer_of: HashMap<&str, usize> = HashMap::new();
+    for (li, layer) in layers.iter().enumerate() {
+        for node in layer {
+            layer_of.insert(node.as_str(), li);
+        }
+    }
+
     for _pass in 0..NEIGHBOR_ALIGN_MAX_PASSES {
         let mut any_moved = false;
 
@@ -679,12 +606,25 @@ pub(in super::super) fn align_nodes_to_neighbors(
                 continue;
             }
 
-            // 收集本层各节点的邻接目标 center_x
+            // 收集本层各节点的邻接目标 center_x（仅 effective + 邻层）
             let mut targets: Vec<Option<f64>> = Vec::with_capacity(layer.len());
             for node in layer {
+                let Some(&node_layer) = layer_of.get(node.as_str()) else {
+                    targets.push(None);
+                    continue;
+                };
                 let mut xs: Vec<f64> = Vec::new();
                 if let Some(preds) = graph.in_edges.get(node) {
                     for pred in preds {
+                        if !is_effective_edge(pred, node, reversed) {
+                            continue;
+                        }
+                        let Some(&pred_layer) = layer_of.get(pred.as_str()) else {
+                            continue;
+                        };
+                        if pred_layer + 1 != node_layer {
+                            continue;
+                        }
                         if let Some(nl) = nodes.get(pred) {
                             xs.push(nl.x + nl.width / 2.0);
                         }
@@ -692,6 +632,15 @@ pub(in super::super) fn align_nodes_to_neighbors(
                 }
                 if let Some(succs) = graph.out_edges.get(node) {
                     for succ in succs {
+                        if !is_effective_edge(node, succ, reversed) {
+                            continue;
+                        }
+                        let Some(&succ_layer) = layer_of.get(succ.as_str()) else {
+                            continue;
+                        };
+                        if succ_layer != node_layer + 1 {
+                            continue;
+                        }
                         if let Some(nl) = nodes.get(succ) {
                             xs.push(nl.x + nl.width / 2.0);
                         }

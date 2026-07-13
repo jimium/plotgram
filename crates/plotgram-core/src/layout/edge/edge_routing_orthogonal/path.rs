@@ -214,6 +214,8 @@ pub struct PathSelectStats {
 
 /// 额外 channel_margin 档位（P1-B：base 档无 strict 干净候选时再逐档尝试）。
 const EXTRA_CHANNEL_MARGINS: [f64; 2] = [28.0, 40.0];
+/// R2：主路径仍无 clean 时再升档的 channel margin。
+const FORCE_UPGRADE_MARGINS: [f64; 3] = [56.0, 72.0, 96.0];
 /// Iteration 3：每边候选评估上限（超出则截断，优先保留已生成的前缀）。
 const MAX_CANDIDATES: usize = 48;
 
@@ -441,6 +443,26 @@ pub fn select_best_path_with_scorer_stats(
         evaluate_path_batch(phase2, ctx, pair, scorer, from_id, to_id, &mut state);
     }
 
+    // R2：dirty 前强制升档——无 clean（strict / nodes_only）时再试更大 channel margin。
+    if state.best_strict.is_none() && state.best_nodes_only.is_none() {
+        for &extra in &FORCE_UPGRADE_MARGINS {
+            if state.best_strict.is_some() || state.best_nodes_only.is_some() {
+                break;
+            }
+            evaluate_path_batch(
+                build_channel_detours(
+                    sx, sy, from_side, ex, ey, to_side, pair, ctx, corridor, &[extra],
+                ),
+                ctx,
+                pair,
+                scorer,
+                from_id,
+                to_id,
+                &mut state,
+            );
+        }
+    }
+
     if let Some(s) = stats.as_mut() {
         s.candidate_count = state.candidate_count;
         s.hard_filter_reject_count = state
@@ -450,6 +472,7 @@ pub fn select_best_path_with_scorer_stats(
     }
 
     // Iteration 2：有 corridor 时拒绝 nodes-only（穿组）；dirty 仅在不穿无关组时可用。
+    // R2：主选择路径禁止 node_dirty 胜出；无 clean 时走 orthogonal_degraded_fallback。
     let chosen = if ctx.strict_group_transit {
         state.best_strict.or_else(|| {
             state.best_dirty.filter(|(_, path)| {
@@ -459,14 +482,19 @@ pub fn select_best_path_with_scorer_stats(
                     to_id,
                     ctx.group_ctx,
                     &ctx.obstacles.sorted_group_ids,
+                ) && path_is_clean(
+                    path,
+                    from_id,
+                    to_id,
+                    ctx.nodes,
+                    ctx.group_ctx,
+                    &ctx.obstacles.sorted_node_ids,
                 )
             })
         })
     } else {
-        state
-            .best_strict
-            .or(state.best_nodes_only)
-            .or(state.best_dirty)
+        state.best_strict.or(state.best_nodes_only)
+        // 不再 .or(best_dirty)：node 穿模只能由 degraded fallback 显式接受
     };
     chosen
         .map(|(_, p)| p)
@@ -632,20 +660,29 @@ fn ensure_port_stubs(mut path: Vec<Point>, from_side: Port, to_side: Port) -> Ve
     let mut out = vec![start, from_stub];
     if let Some(&first_mid) = mid.first() {
         if (from_stub.x - first_mid.x).abs() > EPS && (from_stub.y - first_mid.y).abs() > EPS {
-            out.push(Point::new(first_mid.x, from_stub.y));
+            // 禁止 (target.x, stub.y) 这类沿端口内向折回的肘点（会穿源节点）
+            let elbow = port_aware_elbow(from_stub, first_mid, from_side);
+            if (elbow.x - from_stub.x).abs() > EPS || (elbow.y - from_stub.y).abs() > EPS {
+                out.push(elbow);
+            }
         }
         out.extend(mid);
     }
     if let Some(&last) = out.last() {
         if (last.x - to_stub.x).abs() > EPS && (last.y - to_stub.y).abs() > EPS {
-            out.push(Point::new(to_stub.x, last.y));
+            let elbow = port_aware_elbow(to_stub, last, to_side);
+            // 从 mid 走向 to_stub：肘点在 stub 侧，路径为 last → elbow → to_stub
+            if (elbow.x - last.x).abs() > EPS || (elbow.y - last.y).abs() > EPS {
+                // port_aware_elbow 以 stub 为原点；转换为 last→elbow→stub
+                out.push(elbow);
+            }
         }
     }
     if out.last().is_none_or(|p| (p.x - to_stub.x).abs() > EPS || (p.y - to_stub.y).abs() > EPS) {
         out.push(to_stub);
     }
     out.push(end);
-    simplify_path(out, false)
+    simplify_path(out, true)
 }
 
 fn groups_outer_bounds(ctx: &OrthoRoutingContext<'_>) -> Option<(f64, f64, f64, f64)> {
@@ -1307,6 +1344,37 @@ pub(super) fn port_outward(side: Port) -> (f64, f64) {
         Port::Bottom => (0.0, 1.0),
         Port::Left => (-1.0, 0.0),
         Port::Right => (1.0, 0.0),
+    }
+}
+
+/// 从端口 stub 拐向 `target` 时选择肘点，使 **stub→肘点** 不沿端口内向折回。
+///
+/// 错误肘点 `(target.x, stub.y)`（Left/Right）会在出 stub 后立刻反向穿源节点；
+/// 应优先在 stub 外向坐标上转弯：Left/Right 用 `(stub.x, target.y)`，Top/Bottom 用 `(target.x, stub.y)`。
+pub(super) fn port_aware_elbow(stub: Point, target: Point, side: Port) -> Point {
+    let (ox, oy) = port_outward(side);
+    let cand_h = Point::new(target.x, stub.y);
+    let cand_v = Point::new(stub.x, target.y);
+    let score = |elbow: Point| -> f64 {
+        let dx = elbow.x - stub.x;
+        let dy = elbow.y - stub.y;
+        if dx.abs() < EPS && dy.abs() < EPS {
+            return f64::NEG_INFINITY;
+        }
+        dx * ox + dy * oy
+    };
+    let sh = score(cand_h);
+    let sv = score(cand_v);
+    if sh > sv + EPS {
+        cand_h
+    } else if sv > sh + EPS {
+        cand_v
+    } else {
+        // 平局（常见：两肘外向投影均为 0）：Left/Right 保 stub.x，Top/Bottom 保 stub.y
+        match side {
+            Port::Left | Port::Right => cand_v,
+            Port::Top | Port::Bottom => cand_h,
+        }
     }
 }
 
