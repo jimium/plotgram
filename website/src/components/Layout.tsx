@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { to: '/docs/getting-started', label: '快速上手' },
   { to: '/docs/agent-guide', label: 'Agent 集成' },
   { to: '/docs/trae-story', label: 'TRAE 开发实践' },
+  { to: '/docs/roadmap', label: '路线图' },
 ];
 
 export default function Layout() {

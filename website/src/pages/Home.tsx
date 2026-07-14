@@ -106,6 +106,88 @@ export default function Home() {
         </div>
       </section>
 
+      {/* FOR JUDGES */}
+      <section className="judges">
+        <div className="container">
+          <div className="judges-card">
+            <div className="judges-header">
+              <span className="judges-badge">项目概览</span>
+              <h2>为什么 Plotgram 值得关注</h2>
+              <p>30 秒理解项目核心价值与差异化优势</p>
+            </div>
+            <div className="judges-grid">
+              {/* Column 1: Core Innovation */}
+              <div className="judges-col">
+                <div className="judges-col-icon">💡</div>
+                <h3>核心创新</h3>
+                <p className="judges-col-desc">
+                  <strong>AI 原生的图表 DSL</strong>——语法为 LLM 理解语义、操作 AST 而设计。
+                  不是"让 AI 写 Mermaid"，而是"创造一种 AI 天生就能写对的图表语言"。
+                </p>
+                <ul className="judges-tags">
+                  <li>结构化 AST，可序列化为 JSON</li>
+                  <li>语义 Diff &amp; Patch，增量修改不重生成</li>
+                  <li>结构化错误含修复建议，AI 一次自修正</li>
+                  <li>计划通过 Skill + MCP 深度集成 Trae 等 Agent</li>
+                </ul>
+              </div>
+
+              {/* Column 2: Quantitative Data */}
+              <div className="judges-col">
+                <div className="judges-col-icon">📊</div>
+                <h3>量化数据</h3>
+                <div className="judges-stats">
+                  <div className="judges-stat">
+                    <span className="judges-stat-num">50K+</span>
+                    <span className="judges-stat-label">行 Rust 源码</span>
+                  </div>
+                  <div className="judges-stat">
+                    <span className="judges-stat-num">952</span>
+                    <span className="judges-stat-label">个测试用例</span>
+                  </div>
+                  <div className="judges-stat">
+                    <span className="judges-stat-num">83</span>
+                    <span className="judges-stat-label">个真实场景示例</span>
+                  </div>
+                  <div className="judges-stat">
+                    <span className="judges-stat-num">6</span>
+                    <span className="judges-stat-label">种图表类型</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Column 3: Comparison */}
+              <div className="judges-col">
+                <div className="judges-col-icon">⚡</div>
+                <h3>对比传统方案</h3>
+                <div className="judges-compare">
+                  <div className="judges-compare-row">
+                    <span className="judges-compare-label">语法设计</span>
+                    <span className="judges-compare-bad">Mermaid 多种箭头变体、隐式规则</span>
+                    <span className="judges-compare-good">Plotgram 3 种箭头、显式声明</span>
+                  </div>
+                  <div className="judges-compare-row">
+                    <span className="judges-compare-label">错误反馈</span>
+                    <span className="judges-compare-bad">PlantUML 静默失败或模糊文本</span>
+                    <span className="judges-compare-good">结构化 JSON 含行列+修复建议</span>
+                  </div>
+                  <div className="judges-compare-row">
+                    <span className="judges-compare-label">可编程性</span>
+                    <span className="judges-compare-bad">文本是唯一产物</span>
+                    <span className="judges-compare-good">AST 导出、Diff &amp; Patch</span>
+                  </div>
+                  <div className="judges-compare-row">
+                    <span className="judges-compare-label">多端交付</span>
+                    <span className="judges-compare-bad">通常只有 CLI/Web</span>
+                    <span className="judges-compare-good">CLI / API / WASM 同源</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FEATURES */}
       <section className="features" id="features">
         <div className="container">

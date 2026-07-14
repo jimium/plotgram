@@ -129,6 +129,7 @@ const PRESETS: Preset[] = [
 
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 8;
+const PAN_MARGIN = 0.3; // 至少保留 30% 的图在可视区域内
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
@@ -240,6 +241,43 @@ export default function HeroPlayground() {
   const tyRef = useRef(ty);
   tyRef.current = ty;
   const dragStateRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number } | null>(null);
+  const svgNaturalSizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
+
+  // 读取 SVG 自然尺寸
+  const updateSvgNaturalSize = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const svgEl = container.querySelector('svg');
+    if (!svgEl) return;
+    const viewBox = svgEl.viewBox.baseVal;
+    if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+      svgNaturalSizeRef.current = { w: viewBox.width, h: viewBox.height };
+    } else {
+      const bbox = svgEl.getBBox();
+      svgNaturalSizeRef.current = { w: bbox.width, h: bbox.height };
+    }
+  }, []);
+
+  // 限制 tx/ty，确保至少 PAN_MARGIN 比例的图在可视区域内
+  const clampPan = useCallback((newTx: number, newTy: number, s: number) => {
+    const container = containerRef.current;
+    if (!container) return { tx: newTx, ty: newTy };
+    const { w: nw, h: nh } = svgNaturalSizeRef.current;
+    if (nw === 0 || nh === 0) return { tx: newTx, ty: newTy };
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const sw = nw * s;
+    const sh = nh * s;
+    const margin = PAN_MARGIN;
+    const minTx = -(sw - cw * margin);
+    const maxTx = cw * margin;
+    const minTy = -(sh - ch * margin);
+    const maxTy = ch * margin;
+    return {
+      tx: clamp(newTx, Math.min(minTx, maxTx), Math.max(minTx, maxTx)),
+      ty: clamp(newTy, Math.min(minTy, maxTy), Math.max(minTy, maxTy)),
+    };
+  }, []);
 
   useEffect(() => {
     if (!editorHostRef.current) return;
@@ -398,12 +436,15 @@ export default function HeroPlayground() {
     [zoomAt],
   );
 
-  // SVG 变化时自适应
+  // SVG 变化时自适应并更新自然尺寸
   useEffect(() => {
     if (svg) {
-      requestAnimationFrame(fitToView);
+      requestAnimationFrame(() => {
+        updateSvgNaturalSize();
+        fitToView();
+      });
     }
-  }, [svg, fitToView]);
+  }, [svg, fitToView, updateSvgNaturalSize]);
 
   // 滚轮：ctrlKey=缩放，普通滚动=平移
   // 始终阻止预览区内的 pinch zoom 冒泡到浏览器，避免整页缩放
@@ -422,8 +463,14 @@ export default function HeroPlayground() {
         const factor = Math.exp(-e.deltaY * 0.01);
         zoomAt(cx, cy, factor);
       } else {
-        setTx((prev) => prev - e.deltaX);
-        setTy((prev) => prev - e.deltaY);
+        setTx((prev) => {
+          const next = prev - e.deltaX;
+          return clampPan(next, tyRef.current, scaleRef.current).tx;
+        });
+        setTy((prev) => {
+          const next = prev - e.deltaY;
+          return clampPan(txRef.current, next, scaleRef.current).ty;
+        });
       }
     };
     // Safari 的 pinch 通过 gesturestart/gesturechange 触发
@@ -459,8 +506,11 @@ export default function HeroPlayground() {
     const onMove = (e: MouseEvent) => {
       const s = dragStateRef.current;
       if (!s) return;
-      setTx(s.startTx + (e.clientX - s.startX));
-      setTy(s.startTy + (e.clientY - s.startY));
+      const nextTx = s.startTx + (e.clientX - s.startX);
+      const nextTy = s.startTy + (e.clientY - s.startY);
+      const clamped = clampPan(nextTx, nextTy, scaleRef.current);
+      setTx(clamped.tx);
+      setTy(clamped.ty);
     };
     const onUp = () => {
       dragStateRef.current = null;
