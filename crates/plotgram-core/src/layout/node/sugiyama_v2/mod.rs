@@ -698,4 +698,53 @@ mod tests {
         assert!((g1.x - 20.0).abs() < EPS, "group should not move, x={}", g1.x);
         assert!((result2.total_width - 60.0).abs() < EPS, "total_width should not change");
     }
+
+    /// V3b：n.user-auth 同层 db+cache 挂到 auth → 组质心对齐；auth/gateway/client 冻结。
+    #[test]
+    fn v3b_user_auth_pendants_pack_under_auth() {
+        let source = include_str!("../../../../../../showcase/flowchart/n.user-auth.pgm");
+        let output = crate::pipeline::parse_prepare_validate(
+            source,
+            &StyleRequest::default(),
+        );
+        let prepared = output.diagram.expect("valid diagram");
+        let layout = crate::layout::compute_layout_with_plan(
+            prepared.inner(),
+            prepared.layout_plan(),
+        )
+        .expect("layout");
+
+        let cx = |id: &str| {
+            let n = layout.nodes.get(id).unwrap();
+            n.x + n.width / 2.0
+        };
+        let auth = cx("auth");
+        let db = cx("db");
+        let cache = cx("cache");
+        let centroid = (db + cache) / 2.0;
+        assert!(
+            (centroid - auth).abs() <= 2.0,
+            "db+cache 组质心应对齐 auth，auth={auth} db={db} cache={cache} centroid={centroid}"
+        );
+        // 同层间距 ≥ flowchart base node_gap（密度可能更大，这里只查无重叠）
+        let db_n = layout.nodes.get("db").unwrap();
+        let cache_n = layout.nodes.get("cache").unwrap();
+        let edge_gap = if cache_n.x >= db_n.x + db_n.width {
+            cache_n.x - (db_n.x + db_n.width)
+        } else if db_n.x >= cache_n.x + cache_n.width {
+            db_n.x - (cache_n.x + cache_n.width)
+        } else {
+            -1.0
+        };
+        assert!(
+            edge_gap + 1e-6 >= preset::FLOWCHART_PRESET.node_gap,
+            "db/cache 边距应 ≥ node_gap，got {edge_gap}"
+        );
+
+        // 主干相对稳定：auth 与 gateway 同心（既有链），且非 pendant
+        assert!(
+            (cx("gateway") - auth).abs() <= 2.0,
+            "gateway 应仍与 auth 对齐"
+        );
+    }
 }

@@ -78,7 +78,9 @@ pub(super) fn assign_coordinates_brandes_koepf(
 
     resolve_real_node_overlaps(dag, layered_graph, layers, &mut nodes, horizontal, preset);
     align_singleton_layers_to_predecessors(dag, layered_graph, layers, &mut nodes, horizontal);
+    // 先 normalize，再对齐悬挂叶：避免 pack 探出左缘后二次 normalize 把锚点（auth）整体平移。
     postprocess::normalize_layout_to_padding(&mut nodes, preset.padding);
+    align_pendants_under_anchors(dag, layered_graph, layers, &mut nodes, horizontal, preset);
     nodes
 }
 
@@ -178,6 +180,335 @@ fn align_singleton_layers_to_predecessors(
         }
         set_axis_center(nl, horizontal, target, size);
     }
+}
+
+/// V3b：邻层悬挂叶（P-Pendant）对齐到枢纽锚点。
+///
+/// - 单 pendant：主轴中心与锚点重合（无同层冲突时）。
+/// - 同锚同层多 pendant：整层皆为该组时 S-PackUnderAnchor（组质心 = 锚点）；否则逐个 SkipIfConflict。
+/// - 锚点永不移动；一轮内每个节点至多写入一次；pack 失败整组回滚。
+///
+/// 须在 `normalize_layout_to_padding` **之后**调用，以免 pack 后再次 normalize 拖动锚点。
+fn align_pendants_under_anchors(
+    dag: &DiGraph<String, ()>,
+    layered_graph: &DiGraph<LayerNode, ()>,
+    layers: &[Vec<NodeIndex>],
+    nodes: &mut HashMap<String, crate::layout::NodeLayout>,
+    horizontal: bool,
+    preset: &SugiyamaPreset,
+) {
+    const EPS: f64 = 1.0;
+
+    let mut real_layer: HashMap<String, usize> = HashMap::new();
+    let mut layer_reals: Vec<Vec<String>> = vec![Vec::new(); layers.len()];
+    for (layer_index, layer) in layers.iter().enumerate() {
+        for node in layer {
+            if let LayerNodeKind::Real(original) = &layered_graph[*node].kind {
+                let id = dag[*original].clone();
+                real_layer.insert(id.clone(), layer_index);
+                layer_reals[layer_index].push(id);
+            }
+        }
+        layer_reals[layer_index].sort();
+    }
+
+    // id → 无向邻层 Real 邻居（稳定：按 id 排序）
+    let mut adj_layer_nbrs: HashMap<String, Vec<String>> = HashMap::new();
+    for id in real_layer.keys() {
+        let Some(original) = dag.node_indices().find(|&n| dag[n] == *id) else {
+            continue;
+        };
+        let Some(&my_layer) = real_layer.get(id) else {
+            continue;
+        };
+        let mut nbrs: Vec<String> = Vec::new();
+        for nbr in dag
+            .neighbors_directed(original, Direction::Incoming)
+            .chain(dag.neighbors_directed(original, Direction::Outgoing))
+        {
+            let nbr_id = dag[nbr].clone();
+            let Some(&nbr_layer) = real_layer.get(&nbr_id) else {
+                continue;
+            };
+            let adjacent = my_layer.abs_diff(nbr_layer) == 1;
+            if adjacent && !nbrs.contains(&nbr_id) {
+                nbrs.push(nbr_id);
+            }
+        }
+        nbrs.sort();
+        adj_layer_nbrs.insert(id.clone(), nbrs);
+    }
+
+    // 候选 (movable, anchor)：movable 邻层邻居唯一且为锚点；锚点邻层邻居数 > 1（枢纽）
+    let mut candidates: Vec<(String, String)> = Vec::new();
+    let mut movable_ids: Vec<String> = real_layer.keys().cloned().collect();
+    movable_ids.sort();
+    for movable in &movable_ids {
+        let Some(nbrs) = adj_layer_nbrs.get(movable) else {
+            continue;
+        };
+        if nbrs.len() != 1 {
+            continue;
+        }
+        let anchor = &nbrs[0];
+        let Some(anchor_nbrs) = adj_layer_nbrs.get(anchor) else {
+            continue;
+        };
+        if anchor_nbrs.len() <= 1 {
+            // 两端皆叶 → P-Mutual，本切片不做
+            continue;
+        }
+        candidates.push((movable.clone(), anchor.clone()));
+    }
+
+    // 按 (movable_layer, anchor) 分组
+    let mut groups: HashMap<(usize, String), Vec<String>> = HashMap::new();
+    for (movable, anchor) in candidates {
+        let Some(&layer) = real_layer.get(&movable) else {
+            continue;
+        };
+        groups
+            .entry((layer, anchor))
+            .or_default()
+            .push(movable);
+    }
+    let mut group_keys: Vec<(usize, String)> = groups.keys().cloned().collect();
+    group_keys.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+
+    let mut moved: HashSet<String> = HashSet::new();
+
+    for key in group_keys {
+        let Some(mut pendants) = groups.remove(&key) else {
+            continue;
+        };
+        pendants.retain(|id| !moved.contains(id));
+        if pendants.is_empty() {
+            continue;
+        }
+        let (layer, anchor) = key;
+        let Some(anchor_layout) = nodes.get(&anchor).cloned() else {
+            continue;
+        };
+        let anchor_cx = axis_center(&anchor_layout, horizontal);
+
+        // 同层非组成员
+        let layer_ids = &layer_reals[layer];
+        let non_group: Vec<&String> = layer_ids
+            .iter()
+            .filter(|id| !pendants.contains(id))
+            .collect();
+
+        if pendants.len() == 1 {
+            let movable = &pendants[0];
+            let Some(layout) = nodes.get(movable).cloned() else {
+                continue;
+            };
+            let size = axis_size(&layout, horizontal);
+            let old = axis_center(&layout, horizontal);
+            if (old - anchor_cx).abs() <= EPS {
+                moved.insert(movable.clone());
+                continue;
+            }
+            if same_layer_conflicts(
+                nodes,
+                horizontal,
+                movable,
+                anchor_cx,
+                size,
+                layer_ids,
+                preset.node_gap,
+            ) {
+                continue;
+            }
+            if let Some(nl) = nodes.get_mut(movable) {
+                set_axis_center(nl, horizontal, anchor_cx, size);
+            }
+            moved.insert(movable.clone());
+            continue;
+        }
+
+        // 多 pendant：E1/E2 — 整层 Real 全是本组时才 pack，否则 SkipIfConflict 逐个试
+        let entire_layer_is_group = non_group.is_empty() && layer_ids.len() == pendants.len();
+        if entire_layer_is_group {
+            if try_pack_under_anchor(
+                nodes,
+                horizontal,
+                &pendants,
+                anchor_cx,
+                preset.node_gap,
+                EPS,
+            ) {
+                for id in &pendants {
+                    moved.insert(id.clone());
+                }
+            }
+        } else {
+            // 按 (center, id) 稳定序逐个尝试对齐
+            pendants.sort_by(|a, b| {
+                let ca = nodes
+                    .get(a)
+                    .map(|n| axis_center(n, horizontal))
+                    .unwrap_or(0.0);
+                let cb = nodes
+                    .get(b)
+                    .map(|n| axis_center(n, horizontal))
+                    .unwrap_or(0.0);
+                ca.partial_cmp(&cb)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.cmp(b))
+            });
+            for movable in &pendants {
+                if moved.contains(movable) {
+                    continue;
+                }
+                let Some(layout) = nodes.get(movable).cloned() else {
+                    continue;
+                };
+                let size = axis_size(&layout, horizontal);
+                let old = axis_center(&layout, horizontal);
+                if (old - anchor_cx).abs() <= EPS {
+                    moved.insert(movable.clone());
+                    continue;
+                }
+                if same_layer_conflicts(
+                    nodes,
+                    horizontal,
+                    movable,
+                    anchor_cx,
+                    size,
+                    layer_ids,
+                    preset.node_gap,
+                ) {
+                    continue;
+                }
+                if let Some(nl) = nodes.get_mut(movable) {
+                    set_axis_center(nl, horizontal, anchor_cx, size);
+                }
+                moved.insert(movable.clone());
+            }
+        }
+    }
+}
+
+fn same_layer_conflicts(
+    nodes: &HashMap<String, crate::layout::NodeLayout>,
+    horizontal: bool,
+    movable: &str,
+    trial_center: f64,
+    movable_size: f64,
+    layer_ids: &[String],
+    node_gap: f64,
+) -> bool {
+    for other in layer_ids {
+        if other == movable {
+            continue;
+        }
+        let Some(ol) = nodes.get(other) else {
+            continue;
+        };
+        let oc = axis_center(ol, horizontal);
+        let os = axis_size(ol, horizontal);
+        let min_sep = movable_size / 2.0 + os / 2.0 + node_gap;
+        if (trial_center - oc).abs() + 1e-6 < min_sep {
+            return true;
+        }
+    }
+    false
+}
+
+/// S-PackUnderAnchor：组内质心对齐锚点；失败回滚。返回是否成功写入。
+fn try_pack_under_anchor(
+    nodes: &mut HashMap<String, crate::layout::NodeLayout>,
+    horizontal: bool,
+    pendants: &[String],
+    anchor_cx: f64,
+    node_gap: f64,
+    eps: f64,
+) -> bool {
+    let mut items: Vec<(String, f64, f64)> = Vec::new(); // id, old_center, size
+    for id in pendants {
+        let Some(layout) = nodes.get(id) else {
+            return false;
+        };
+        items.push((
+            id.clone(),
+            axis_center(layout, horizontal),
+            axis_size(layout, horizontal),
+        ));
+    }
+    // 稳定序：(center, id)
+    items.sort_by(|a, b| {
+        a.1.partial_cmp(&b.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.0.cmp(&b.0))
+    });
+
+    let mut trial: Vec<f64> = Vec::with_capacity(items.len());
+    trial.push(0.0); // 相对坐标，稍后整体平移
+    for i in 1..items.len() {
+        let prev = trial[i - 1];
+        let sep = items[i - 1].2 / 2.0 + items[i].2 / 2.0 + node_gap;
+        trial.push(prev + sep);
+    }
+    let mean = trial.iter().sum::<f64>() / trial.len() as f64;
+    let shift = anchor_cx - mean;
+    for c in &mut trial {
+        *c += shift;
+    }
+
+    // 组内间距已由构造保证；检查相对「应不变」——本组无非成员时跳过外部校验
+    // 保存快照以便回滚
+    let snapshot: Vec<(String, crate::layout::NodeLayout)> = pendants
+        .iter()
+        .filter_map(|id| nodes.get(id).map(|n| (id.clone(), n.clone())))
+        .collect();
+
+    for (i, (id, _, size)) in items.iter().enumerate() {
+        let Some(nl) = nodes.get_mut(id) else {
+            // 回滚
+            for (sid, layout) in &snapshot {
+                if let Some(n) = nodes.get_mut(sid) {
+                    *n = layout.clone();
+                }
+            }
+            return false;
+        };
+        set_axis_center(nl, horizontal, trial[i], *size);
+    }
+
+    // 组质心校验
+    let centroid: f64 = items
+        .iter()
+        .filter_map(|(id, _, _)| nodes.get(id).map(|n| axis_center(n, horizontal)))
+        .sum::<f64>()
+        / items.len() as f64;
+    if (centroid - anchor_cx).abs() > eps + 1e-6 {
+        for (sid, layout) in &snapshot {
+            if let Some(n) = nodes.get_mut(sid) {
+                *n = layout.clone();
+            }
+        }
+        return false;
+    }
+
+    // 组内两两 node_gap
+    for i in 0..items.len() {
+        for j in (i + 1)..items.len() {
+            let ci = axis_center(&nodes[&items[i].0], horizontal);
+            let cj = axis_center(&nodes[&items[j].0], horizontal);
+            let min_sep = items[i].2 / 2.0 + items[j].2 / 2.0 + node_gap;
+            if (ci - cj).abs() + 1e-6 < min_sep {
+                for (sid, layout) in &snapshot {
+                    if let Some(n) = nodes.get_mut(sid) {
+                        *n = layout.clone();
+                    }
+                }
+                return false;
+            }
+        }
+    }
+
+    true
 }
 
 fn resolve_real_node_overlaps(
