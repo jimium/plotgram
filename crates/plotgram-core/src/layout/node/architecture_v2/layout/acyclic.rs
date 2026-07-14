@@ -51,15 +51,3 @@ pub(in super::super) fn inject_irreversible_edges(
             .push(edge_from.to_string());
     }
 }
-
-/// 供调用方判断两端是否同属一个顶层 group（无 group 时视为同组）。
-pub(in super::super) fn same_top_group(
-    group_map: &GroupMap,
-    from: &str,
-    to: &str,
-) -> bool {
-    if group_map.top_groups.is_empty() {
-        return true;
-    }
-    group_map.node_to_top_group.get(from) == group_map.node_to_top_group.get(to)
-}

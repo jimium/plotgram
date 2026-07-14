@@ -264,23 +264,7 @@ pub(in super::super) fn align_client_nodes_to_hubs(
             });
 
             let hub_cx = hub_targets[indices[0]].unwrap();
-            if indices.len() == 2 {
-                let left_idx = indices[0];
-                let right_idx = indices[1];
-                let w_left = sizes
-                    .get(&layer[left_idx])
-                    .map(|(w, _)| *w)
-                    .unwrap_or(constants::DEFAULT_NODE_WIDTH);
-                let w_right = sizes
-                    .get(&layer[right_idx])
-                    .map(|(w, _)| *w)
-                    .unwrap_or(constants::DEFAULT_NODE_WIDTH);
-                // 左侧客户端与 hub 同列（垂直连线），右侧客户端外移
-                centers[left_idx] = hub_cx;
-                centers[right_idx] = hub_cx + w_left / 2.0 + NODE_GAP + w_right / 2.0;
-                continue;
-            }
-
+            // V3b-A：任意数量客户端绕 hub 对称放置，组质心对齐 hub（含 2 叶，不再左贴右甩）
             let mut total_width = 0.0;
             for (pos, &idx) in indices.iter().enumerate() {
                 let width = sizes
@@ -294,10 +278,8 @@ pub(in super::super) fn align_client_nodes_to_hubs(
             }
 
             let mut cursor = hub_cx - total_width / 2.0;
-            let min_cursor = PADDING;
-            if cursor < min_cursor {
-                cursor = min_cursor;
-            }
+            // 不因 padding 右推整组：否则组质心会偏离 hub（曾出现稳定的 8px 偏差）。
+            // 画布左侧留白由后续 normalize / finalize 统一处理。
 
             for &idx in &indices {
                 let width = sizes

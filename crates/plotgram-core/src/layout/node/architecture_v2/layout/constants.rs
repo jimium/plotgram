@@ -12,10 +12,7 @@ pub(in super::super) const INTRA_LAYER_GAP: f64 = 40.0;
 pub(in super::super) const CROSSING_SWEEPS_MAX: usize = 16;
 pub(in super::super) const CROSSING_SWEEPS_MIN: usize = 4;
 
-pub(in super::super) const COORDINATE_REFINE_ITERATIONS: usize = 8;
-pub(in super::super) const COORDINATE_REFINE_EPSILON: f64 = 0.5;
 pub(in super::super) const NEIGHBOR_PULL_FACTOR: f64 = 0.4;
-pub(in super::super) const GROUP_CENTER_PULL_FACTOR: f64 = 0.25;
 pub(in super::super) const TRANSPOSE_MAX_ROUNDS: usize = 10;
 pub(in super::super) const NEIGHBOR_ALIGN_MAX_PASSES: usize = 4;
 pub(in super::super) const LONG_EDGE_BARYCENTER_WEIGHT: f64 = 1.8;

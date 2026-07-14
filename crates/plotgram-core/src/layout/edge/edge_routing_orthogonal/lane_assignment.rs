@@ -273,8 +273,10 @@ pub fn enforce_reverse_pair_min_gap(
             continue;
         }
 
-        // 取路径上最长竖直/水平段的坐标作为 trunk
-        let trunk = |pts: &[Point]| -> Option<(bool, f64)> {
+        // 取路径上可用的竖/横 trunk。正反向对常一侧最长是 jog 水平段、一侧是竖干，
+        // 若只比「全局最长段」会对不齐朝向而漏分离（auth↔db：gap=0 漏网）。
+        // 策略：两侧都有竖段且 x 间距不足 → 优先竖分；否则横分；再否则同朝向最长 trunk。
+        let best_axes = |pts: &[Point]| -> (Option<(f64, f64)>, Option<(f64, f64)>) {
             let mut best_v: Option<(f64, f64)> = None; // (len, x)
             let mut best_h: Option<(f64, f64)> = None; // (len, y)
             for w in pts.windows(2) {
@@ -291,23 +293,42 @@ pub fn enforce_reverse_pair_min_gap(
                     }
                 }
             }
-            match (best_v, best_h) {
-                (Some((lv, x)), Some((lh, _))) if lv >= lh => Some((true, x)),
-                (Some((lv, x)), None) => Some((true, x)),
-                (Some((lv, _)), Some((lh, y))) if lh > lv => Some((false, y)),
-                (None, Some((_, y))) => Some((false, y)),
+            (best_v, best_h)
+        };
+        let (av, ah) = best_axes(&pa);
+        let (bv, bh) = best_axes(&pb);
+        let pick = |prefer_vert: bool| -> Option<(bool, f64, f64)> {
+            if prefer_vert {
+                match (av, bv) {
+                    (Some((_, xa)), Some((_, xb))) => Some((true, xa, xb)),
+                    _ => None,
+                }
+            } else {
+                match (ah, bh) {
+                    (Some((_, ya)), Some((_, yb))) => Some((false, ya, yb)),
+                    _ => None,
+                }
+            }
+        };
+        let chosen = {
+            let v_pair = pick(true);
+            let h_pair = pick(false);
+            match (v_pair, h_pair) {
+                (Some((_, xa, xb)), _) if (xa - xb).abs() + 0.5 < min_gap => {
+                    Some((true, xa, xb))
+                }
+                (_, Some((_, ya, yb))) if (ya - yb).abs() + 0.5 < min_gap => {
+                    Some((false, ya, yb))
+                }
+                (Some((vert, a, b)), None) | (None, Some((vert, a, b))) => Some((vert, a, b)),
+                (Some((true, xa, xb)), Some((false, _, _))) => Some((true, xa, xb)),
+                (Some((false, ya, yb)), Some((true, _, _))) => Some((false, ya, yb)),
                 _ => None,
             }
         };
-        let Some((a_vert, a_coord)) = trunk(&pa) else {
+        let Some((a_vert, a_coord, b_coord)) = chosen else {
             continue;
         };
-        let Some((b_vert, b_coord)) = trunk(&pb) else {
-            continue;
-        };
-        if a_vert != b_vert {
-            continue;
-        }
         if (a_coord - b_coord).abs() + 0.5 >= min_gap {
             continue;
         }
@@ -1197,4 +1218,52 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn o1_enforce_auth_db_shared_trunk() {
+        use crate::ast::{ArrowType, AttributeMap, Identifier, Relation, Span};
+
+        let rel = |from: &str, to: &str| Relation {
+            from: Identifier::new_unchecked(from),
+            to: Identifier::new_unchecked(to),
+            arrow: ArrowType::Active,
+            label: None,
+            head_label: None,
+            tail_label: None,
+            attributes: AttributeMap::default(),
+            span: Span::dummy(),
+        };
+        let relations = vec![rel("auth", "db"), rel("db", "auth")];
+        let p0 = vec![
+            pt(168.0, 316.0),
+            pt(168.0, 332.0),
+            pt(148.56, 332.0),
+            pt(148.56, 360.0),
+            pt(148.56, 376.0),
+        ];
+        let p1 = vec![
+            pt(148.56, 376.0),
+            pt(148.56, 345.92),
+            pt(184.0, 345.92),
+            pt(184.0, 316.0),
+        ];
+        let mut edges = vec![mk_edge(&p0), mk_edge(&p1)];
+        let n = enforce_reverse_pair_min_gap(&mut edges, &relations, 8.0);
+        let pa: Vec<Point> = edges[0].path_points().into_owned();
+        let pb: Vec<Point> = edges[1].path_points().into_owned();
+        eprintln!("shifted={n} pa={pa:?} pb={pb:?}");
+        let lx = |pts: &[Point]| {
+            pts.windows(2)
+                .filter(|w| (w[1].x - w[0].x).abs() < 1.0 && (w[1].y - w[0].y).abs() > 1.0)
+                .map(|w| ((w[1].y - w[0].y).abs(), w[0].x))
+                .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap())
+                .map(|(_, x)| x)
+                .unwrap()
+        };
+        let gap = (lx(&pa) - lx(&pb)).abs();
+        eprintln!("gap={gap}");
+        assert!(n > 0, "should shift");
+        assert!(gap + 1e-6 >= 8.0, "gap {gap}");
+    }
+
 }

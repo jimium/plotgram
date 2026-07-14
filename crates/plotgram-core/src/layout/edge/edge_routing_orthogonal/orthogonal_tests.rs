@@ -1586,3 +1586,52 @@
             path_len(ac_i)
         );
     }
+
+
+    /// O1 dump: auth↔db / auth↔cache 最长竖干间距
+    #[test]
+    fn o1_user_auth_reverse_trunk_gap_dump() {
+        let source = include_str!("../../../../../../showcase/flowchart/n.user-auth.pgm");
+        let output = crate::pipeline::parse_prepare_validate(
+            source,
+            &crate::prepare::StyleRequest::default(),
+        );
+        let prepared = output.diagram.expect("valid");
+        let layout = crate::layout::compute_layout_with_plan(
+            prepared.inner(),
+            prepared.layout_plan(),
+        )
+        .expect("layout");
+        let relations = &prepared.inner().relations;
+
+        let longest_v_x = |pts: &[Point]| -> Option<(f64, f64)> {
+            let mut best: Option<(f64, f64)> = None;
+            for w in pts.windows(2) {
+                let dx = (w[1].x - w[0].x).abs();
+                let dy = (w[1].y - w[0].y).abs();
+                if dx < 1.0 && dy > 1.0 {
+                    let len = dy;
+                    if best.map(|(l, _)| len > l).unwrap_or(true) {
+                        best = Some((len, w[0].x));
+                    }
+                }
+            }
+            best
+        };
+
+        for (a, b) in [("auth", "db"), ("auth", "cache"), ("client", "gateway")] {
+            let i = relations.iter().position(|r| r.from.as_str() == a && r.to.as_str() == b).unwrap();
+            let j = relations.iter().position(|r| r.from.as_str() == b && r.to.as_str() == a).unwrap();
+            let pi: Vec<Point> = layout.edges[i].path_points().into_owned();
+            let pj: Vec<Point> = layout.edges[j].path_points().into_owned();
+            let vi = longest_v_x(&pi).unwrap();
+            let vj = longest_v_x(&pj).unwrap();
+            let gap = (vi.1 - vj.1).abs();
+            eprintln!("{a}<->{b}: trunk_x=({:.3},{:.3}) gap={:.3} pts_i={:?} pts_j={:?}", vi.1, vj.1, gap, pi, pj);
+            assert!(
+                gap + 1e-3 >= crate::layout::constants::ORTHO_PARALLEL_GAP,
+                "{a}<->{b} trunk gap {gap} < ORTHO_PARALLEL_GAP"
+            );
+        }
+    }
+

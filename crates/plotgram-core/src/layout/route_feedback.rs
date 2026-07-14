@@ -32,11 +32,15 @@ impl<'a> LayoutRouteFeedback<'a> {
     }
 
     /// 路由 → refine → 仅在契约失败时兜底消重叠并增量重路由。
+    ///
+    /// `edge_snap_config` 须与 pipeline 使用同一份（含 `snap:false` / 自适应 grid_step），
+    /// 避免 S3 `reroute_and_repulse` 与后续 post_route 排斥配置不一致。
     pub fn complete_routing(
         &self,
         router: &dyn EdgeRoutingStrategy,
         layout: LayoutResult,
         refine_config: &RefineConfig,
+        edge_snap_config: &crate::layout::EdgeSnapConfig,
     ) -> LayoutResult {
         let t_route = crate::layout::perf::Instant::now();
         let mut routed = router.route(self.diagram, layout);
@@ -55,12 +59,12 @@ impl<'a> LayoutRouteFeedback<'a> {
         }
 
         // S3：仅当水平缝仍违反契约时才兜底推开 + 增量重路由 + repulse
-        // (R-4:与 pipeline.rs S3 兜底保持一致,含 repulse_edges_only)
+        // (R-4:与 pipeline.rs S3 兜底保持一致,含 repulse_edges_only；snap 配置与 pipeline 对齐)
         let (routed, moved) = crate::layout::space_budget_guard::resolve_budget_violations(
             self.diagram, routed,
         );
         crate::layout::space_budget_guard::reroute_and_repulse(
-            self.diagram, routed, router, &moved, &router.edge_snap_config(),
+            self.diagram, routed, router, &moved, edge_snap_config,
         )
     }
 }

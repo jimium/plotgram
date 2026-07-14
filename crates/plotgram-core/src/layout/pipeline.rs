@@ -129,7 +129,12 @@ impl<'a> LayoutPipeline<'a> {
 
         let refine_config = refine::RefineConfig::default();
         let t_route = Instant::now();
-        let mut result = feedback.complete_routing(router.as_ref(), result_v2, &refine_config);
+        let mut result = feedback.complete_routing(
+            router.as_ref(),
+            result_v2,
+            &refine_config,
+            &edge_snap_config,
+        );
         crate::perf_log!("[perf]   route: {:.2}ms", t_route.elapsed().as_secs_f64() * 1000.0);
 
         let t_post = Instant::now();

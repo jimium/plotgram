@@ -1,6 +1,5 @@
 //! Sugiyama v2
 //!
-//! This version keeps the original `backup/sugiyama.rs` untouched and introduces:
 //! - greedy cycle removal
 //! - network-simplex-style rank compaction
 //! - weighted median + transpose ordering

@@ -2166,23 +2166,6 @@ mod tests {
         }
     }
 
-    #[allow(dead_code)]
-    fn make_group(id: &str, label: &str, entity_ids: Vec<&str>) -> Group {
-        Group {
-            id: Identifier::new_unchecked(id),
-            label: label.to_string(),
-            attributes: AttributeMap::default(),
-            parent_id: None,
-            depth: 0,
-            entity_ids: entity_ids
-                .into_iter()
-                .map(|e| Identifier::new_unchecked(e))
-                .collect(),
-            child_group_ids: vec![],
-            span: Span::dummy(),
-        }
-    }
-
     fn make_group_with_layout(id: &str, label: &str, layout: &str, entity_ids: Vec<&str>) -> Group {
         let mut attrs = AttributeMap::default();
         attrs

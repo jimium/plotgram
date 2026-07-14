@@ -43,14 +43,6 @@ pub(crate) fn diagram_group_frame_track(diagram: &Diagram) -> Option<&str> {
     None
 }
 
-/// `group_frame { track: fit }` 是否显式要求内容贴合。
-pub(crate) fn diagram_group_frame_track_is_fit(diagram: &Diagram) -> bool {
-    matches!(
-        diagram_group_frame_track(diagram).map(|t| t.trim().to_ascii_lowercase()),
-        Some(t) if t == "fit"
-    )
-}
-
 /// 组块 trait：供 uniform 策略调整宽度（与 two_phase::MacroBlock 对齐）
 pub trait GroupWidthBlock {
     fn block_id(&self) -> &str;
@@ -152,9 +144,6 @@ pub fn apply_equal_sibling_dimensions_per_rank<B: GroupSizeBlock>(
         }
     }
 }
-
-/// 与 [`crate::layout::node::common::group_bounds::GroupPadding`] 对齐的 padding 参数
-pub type GroupPaddingLike = crate::layout::node::common::group_bounds::GroupPadding;
 
 #[cfg(test)]
 mod tests {
