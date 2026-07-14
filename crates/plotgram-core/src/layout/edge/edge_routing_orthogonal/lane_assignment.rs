@@ -219,6 +219,131 @@ fn commit_shifted_path(
     edges[ei] = edge;
 }
 
+/// V3a：正反向平行对若共线且间距 &lt; `min_gap`，绕中点对称拉开（含 2 点直线）。
+///
+/// `assign_lanes` 只处理 ≥4 折点的 interior 段，auth↔db 一类直连会被跳过；
+/// straighten 的 offset 又可能被后续步骤抹掉。本函数在 lane 之后做硬间距守卫。
+pub fn enforce_reverse_pair_min_gap(
+    edges: &mut [EdgeLayout],
+    relations: &[Relation],
+    min_gap: f64,
+) -> usize {
+    use crate::layout::edge::common::edge_geometry::{canonical_pair, undirected_pair_key};
+
+    let n = edges.len().min(relations.len());
+    if n < 2 || min_gap <= EPS {
+        return 0;
+    }
+
+    let mut pair_groups: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+    for (i, rel) in relations.iter().enumerate().take(n) {
+        let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
+        pair_groups.entry(key).or_default().push(i);
+    }
+
+    let mut shifted = 0usize;
+    for indices in pair_groups.values() {
+        if indices.len() < 2 {
+            continue;
+        }
+        let rel0 = &relations[indices[0]];
+        let (can_from, can_to) = canonical_pair(rel0.from.as_str(), rel0.to.as_str());
+        let mut forward: Vec<usize> = Vec::new();
+        let mut backward: Vec<usize> = Vec::new();
+        for &i in indices {
+            let rel = &relations[i];
+            if rel.from.as_str() == can_from && rel.to.as_str() == can_to {
+                forward.push(i);
+            } else {
+                backward.push(i);
+            }
+        }
+        if forward.is_empty() || backward.is_empty() {
+            continue;
+        }
+        // 每侧取第一条边（典型正反向各一条）
+        let fi = forward[0];
+        let bi = backward[0];
+        if edges[fi].path_is_empty() || edges[bi].path_is_empty() {
+            continue;
+        }
+        let mut pa: Vec<Point> = edges[fi].path_points().into_owned();
+        let mut pb: Vec<Point> = edges[bi].path_points().into_owned();
+        if pa.len() < 2 || pb.len() < 2 {
+            continue;
+        }
+
+        // 取路径上最长竖直/水平段的坐标作为 trunk
+        let trunk = |pts: &[Point]| -> Option<(bool, f64)> {
+            let mut best_v: Option<(f64, f64)> = None; // (len, x)
+            let mut best_h: Option<(f64, f64)> = None; // (len, y)
+            for w in pts.windows(2) {
+                let dx = (w[1].x - w[0].x).abs();
+                let dy = (w[1].y - w[0].y).abs();
+                let len = (dx * dx + dy * dy).sqrt();
+                if dx < 1.0 && dy > 1.0 {
+                    if best_v.is_none_or(|(l, _)| len > l) {
+                        best_v = Some((len, w[0].x));
+                    }
+                } else if dy < 1.0 && dx > 1.0 {
+                    if best_h.is_none_or(|(l, _)| len > l) {
+                        best_h = Some((len, w[0].y));
+                    }
+                }
+            }
+            match (best_v, best_h) {
+                (Some((lv, x)), Some((lh, _))) if lv >= lh => Some((true, x)),
+                (Some((lv, x)), None) => Some((true, x)),
+                (Some((lv, _)), Some((lh, y))) if lh > lv => Some((false, y)),
+                (None, Some((_, y))) => Some((false, y)),
+                _ => None,
+            }
+        };
+        let Some((a_vert, a_coord)) = trunk(&pa) else {
+            continue;
+        };
+        let Some((b_vert, b_coord)) = trunk(&pb) else {
+            continue;
+        };
+        if a_vert != b_vert {
+            continue;
+        }
+        if (a_coord - b_coord).abs() + 0.5 >= min_gap {
+            continue;
+        }
+        let mid = (a_coord + b_coord) * 0.5;
+        let a2 = mid - min_gap * 0.5;
+        let b2 = mid + min_gap * 0.5;
+        if a_vert {
+            for p in &mut pa {
+                if (p.x - a_coord).abs() < 1.0 {
+                    p.x = a2;
+                }
+            }
+            for p in &mut pb {
+                if (p.x - b_coord).abs() < 1.0 {
+                    p.x = b2;
+                }
+            }
+        } else {
+            for p in &mut pa {
+                if (p.y - a_coord).abs() < 1.0 {
+                    p.y = a2;
+                }
+            }
+            for p in &mut pb {
+                if (p.y - b_coord).abs() < 1.0 {
+                    p.y = b2;
+                }
+            }
+        }
+        edges[fi].set_polyline_points(pa);
+        edges[bi].set_polyline_points(pb);
+        shifted += 2;
+    }
+    shifted
+}
+
 /// X-3: 主入口——车道分配，分离残余平行重合段。
 ///
 /// 算法步骤：

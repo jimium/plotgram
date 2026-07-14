@@ -190,6 +190,12 @@ impl<'a> LayoutPipeline<'a> {
                 &to_side,
                 true,
             );
+            // V3a：snap/sanitize 之后再次保证正反向平行 gap
+            let _ = crate::layout::edge::edge_routing_orthogonal::enforce_reverse_pair_min_gap(
+                &mut result.edges,
+                &self.diagram.relations,
+                crate::layout::constants::ORTHO_PARALLEL_GAP,
+            );
 
             // 标签避让必须是几何冻结后的**最终**步骤：sanitize 会按平行边规则
             // 重建所有标签（丢弃路由内部 step-5 的避让结果），snap/repulse 又移动了

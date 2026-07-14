@@ -506,6 +506,8 @@ pub fn select_best_path_with_scorer_stats(
 
 /// 路由硬失败时的正交兜底：同轴可直线；否则在 L/Z 与外框绕行中选穿组更少者。
 /// 所有候选在出口/入口强制外向 stub，避免退化路径首段反向伸入节点。
+///
+/// R2：先升档外框垫寻找 **clean** 路径；仅当各档均无 clean 时才允许 dirty（显式 degraded）。
 fn orthogonal_degraded_fallback(
     ctx: &OrthoRoutingContext<'_>,
     start: Point,
@@ -520,111 +522,132 @@ fn orthogonal_degraded_fallback(
     let ex = end.x;
     let ey = end.y;
 
-    let mut candidates: Vec<Vec<Point>> = Vec::new();
-    // 同轴直线仅在不穿无关节点、且真正跨到对端时作为候选（禁止 16px stub 退化）
-    if (sx - ex).abs() < EPS || (sy - ey).abs() < EPS {
-        let straight = ensure_port_stubs(vec![start, end], from_side, to_side);
-        let plen = path_length(&straight);
-        let spans = plen > PORT_CLEARANCE + 1.0;
-        if spans
-            && path_is_clean(
-                &straight,
+    // 升档垫：先小后大；corridor_boost 时从更大垫起步
+    let pad_tiers: &[f64] = if ctx.corridor_boost {
+        &[56.0, 84.0, 120.0]
+    } else {
+        &[28.0, 56.0, 84.0]
+    };
+
+    let mut best_clean: Option<(u32, f64, Vec<Point>)> = None;
+    let mut best_dirty: Option<(u32, f64, Vec<Point>)> = None;
+
+    for &outer_pad in pad_tiers {
+        let mut candidates: Vec<Vec<Point>> = Vec::new();
+        if (sx - ex).abs() < EPS || (sy - ey).abs() < EPS {
+            let straight = ensure_port_stubs(vec![start, end], from_side, to_side);
+            let plen = path_length(&straight);
+            let spans = plen > PORT_CLEARANCE + 1.0;
+            if spans
+                && path_is_clean(
+                    &straight,
+                    from_id,
+                    to_id,
+                    ctx.nodes,
+                    ctx.group_ctx,
+                    &ctx.obstacles.sorted_node_ids,
+                )
+            {
+                return straight;
+            }
+        } else {
+            candidates.extend(compute_orthogonal_path_variants(
+                sx, sy, from_side, ex, ey, to_side,
+            ));
+            candidates.push(simplify_path(vec![
+                Point::new(sx, sy),
+                Point::new(ex, sy),
+                Point::new(ex, ey),
+            ], false));
+            candidates.push(simplify_path(vec![
+                Point::new(sx, sy),
+                Point::new(sx, ey),
+                Point::new(ex, ey),
+            ], false));
+        }
+
+        if let Some((x_lo, y_lo, x_hi, y_hi)) = groups_outer_bounds(ctx) {
+            let left = x_lo - outer_pad;
+            let right = x_hi + outer_pad;
+            let top = y_lo - outer_pad;
+            let bottom = y_hi + outer_pad;
+            for x in [left, right] {
+                candidates.push(simplify_path(vec![
+                    Point::new(sx, sy),
+                    Point::new(x, sy),
+                    Point::new(x, ey),
+                    Point::new(ex, ey),
+                ], false));
+            }
+            for y in [top, bottom] {
+                candidates.push(simplify_path(vec![
+                    Point::new(sx, sy),
+                    Point::new(sx, y),
+                    Point::new(ex, y),
+                    Point::new(ex, ey),
+                ], false));
+            }
+        }
+
+        for path in candidates {
+            let path = ensure_port_stubs(path, from_side, to_side);
+            if path.len() < 2 || !path_is_orthogonal(&path) {
+                continue;
+            }
+            let group_hits = count_unrelated_group_hits_binary(
+                &path,
+                from_id,
+                to_id,
+                ctx.group_ctx,
+                &ctx.obstacles.sorted_group_ids,
+            );
+            let clean = path_is_clean(
+                &path,
                 from_id,
                 to_id,
                 ctx.nodes,
                 ctx.group_ctx,
                 &ctx.obstacles.sorted_node_ids,
+            );
+            let len = path_length(&path);
+            if clean {
+                let key = (group_hits, len);
+                if best_clean
+                    .as_ref()
+                    .is_none_or(|(g, l, _)| key < (*g, *l))
+                {
+                    best_clean = Some((group_hits, len, path));
+                }
+            } else {
+                let key = (group_hits, len);
+                if best_dirty
+                    .as_ref()
+                    .is_none_or(|(g, l, _)| key < (*g, *l))
+                {
+                    best_dirty = Some((group_hits, len, path));
+                }
+            }
+        }
+        // 本档已有 clean → 不再升档（控制性能）
+        if best_clean.is_some() {
+            break;
+        }
+    }
+
+    best_clean
+        .map(|(_, _, p)| p)
+        .or_else(|| best_dirty.map(|(_, _, p)| p))
+        .unwrap_or_else(|| {
+            ensure_port_stubs(
+                simplify_path(vec![
+                    Point::new(sx, sy),
+                    Point::new(ex, sy),
+                    Point::new(ex, ey),
+                ], false),
+                from_side,
+                to_side,
             )
-        {
-            return straight;
-        }
-    } else {
-        candidates.extend(compute_orthogonal_path_variants(
-            sx, sy, from_side, ex, ey, to_side,
-        ));
-        candidates.push(simplify_path(vec![
-            Point::new(sx, sy),
-            Point::new(ex, sy),
-            Point::new(ex, ey),
-        ], false));
-        candidates.push(simplify_path(vec![
-            Point::new(sx, sy),
-            Point::new(sx, ey),
-            Point::new(ex, ey),
-        ], false));
-    }
-
-    // 绕所有组外框的通道（嵌套架构图上短 L 常穿父组，外框绕行更干净）
-    // S2：corridor_boost 时加大垫，优先走已升档的外框通道
-    let outer_pad = if ctx.corridor_boost { 56.0 } else { 28.0 };
-    if let Some((x_lo, y_lo, x_hi, y_hi)) = groups_outer_bounds(ctx) {
-        let left = x_lo - outer_pad;
-        let right = x_hi + outer_pad;
-        let top = y_lo - outer_pad;
-        let bottom = y_hi + outer_pad;
-        for x in [left, right] {
-            candidates.push(simplify_path(vec![
-                Point::new(sx, sy),
-                Point::new(x, sy),
-                Point::new(x, ey),
-                Point::new(ex, ey),
-            ], false));
-        }
-        for y in [top, bottom] {
-            candidates.push(simplify_path(vec![
-                Point::new(sx, sy),
-                Point::new(sx, y),
-                Point::new(ex, y),
-                Point::new(ex, ey),
-            ], false));
-        }
-    }
-
-    let mut best: Option<(u32, u32, f64, Vec<Point>)> = None;
-    for path in candidates {
-        let path = ensure_port_stubs(path, from_side, to_side);
-        if path.len() < 2 || !path_is_orthogonal(&path) {
-            continue;
-        }
-        let group_hits = count_unrelated_group_hits_binary(
-            &path,
-            from_id,
-            to_id,
-            ctx.group_ctx,
-            &ctx.obstacles.sorted_group_ids,
-        );
-        let node_dirty = if path_is_clean(
-            &path,
-            from_id,
-            to_id,
-            ctx.nodes,
-            ctx.group_ctx,
-            &ctx.obstacles.sorted_node_ids,
-        ) {
-            0u32
-        } else {
-            1u32
-        };
-        let len = path_length(&path);
-        let key = (group_hits, node_dirty, len);
-        if best
-            .as_ref()
-            .is_none_or(|(g, n, l, _)| key < (*g, *n, *l))
-        {
-            best = Some((group_hits, node_dirty, len, path));
-        }
-    }
-    best.map(|(_, _, _, p)| p).unwrap_or_else(|| {
-        ensure_port_stubs(
-            simplify_path(vec![
-                Point::new(sx, sy),
-                Point::new(ex, sy),
-                Point::new(ex, ey),
-            ], false),
-            from_side,
-            to_side,
-        )
-    })
+        })
 }
 
 /// 保证路径首/末段沿端口外向离开/进入（退化兜底专用）。

@@ -139,6 +139,8 @@ fn align_singleton_layers_to_predecessors(
         let target = if !adj_pred_centers.is_empty() {
             median_f64(&adj_pred_centers)
         } else {
+            // FAS 反转后，DAG 后继可能落在上一层（layer-1）而非 layer+1。
+            // 凡紧邻层的出边邻居均可作为对齐目标（仍禁止全图假邻居）。
             let mut adj_succ_centers: Vec<f64> = Vec::new();
             for succ in dag.neighbors_directed(original, Direction::Outgoing) {
                 let succ_id = &dag[succ];
@@ -146,7 +148,14 @@ fn align_singleton_layers_to_predecessors(
                     continue;
                 };
                 let c = axis_center(nl, horizontal);
-                if real_layer.get(succ_id).copied() == Some(layer_index + 1) {
+                let Some(&succ_layer) = real_layer.get(succ_id) else {
+                    continue;
+                };
+                let adjacent = succ_layer
+                    .checked_add(1)
+                    .is_some_and(|s| s == layer_index)
+                    || succ_layer == layer_index + 1;
+                if adjacent {
                     adj_succ_centers.push(c);
                 }
             }

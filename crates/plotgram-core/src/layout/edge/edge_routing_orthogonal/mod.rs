@@ -69,6 +69,7 @@ pub(super) use slot::{
 pub(super) use slot_replan::replan_slots;
 pub(super) use conflict_reroute::reroute_conflicting_edges;
 pub use sanitize::{sanitize_orthogonal_edges, sanitize_orthogonal_edges_ext};
+pub use lane_assignment::enforce_reverse_pair_min_gap;
 pub(super) use straighten::straighten_preferred_alignments;
 pub(super) use stub_fix::fix_reverse_stub_ports;
 
@@ -679,17 +680,23 @@ fn phase_port_slot(
         for (group_rank, endpoints) in sub_groups.iter().enumerate() {
             let count = endpoints.len();
             let strategy = choose_docking_strategy(count);
-            // 子组锚点带中心：单子组时居中(0.5)；多子组时按 slot_fraction 分布以避免重叠
             let base_frac = if k <= 1 {
                 0.5
             } else {
                 slot_fraction(group_rank, k, edge_len, cfg.slot_pitch)
             };
 
+            // V2：同侧入出混合时禁用 Concentrate 共心（多边汇流会抹掉子组带分离）
+            let mixed_inout = k >= 2
+                && sub_groups.iter().any(|g| g.iter().any(|e| e.is_from))
+                && sub_groups.iter().any(|g| g.iter().any(|e| !e.is_from));
+            let strategy = if mixed_inout && matches!(strategy, DockingStrategy::Concentrate) {
+                DockingStrategy::Compact
+            } else {
+                strategy
+            };
+
             for (rank, ep) in endpoints.iter().enumerate() {
-                // 根据汇流策略选择 slot 分数：
-                // - Single/Concentrate：所有边共享子组中心（base_frac），实现入口合并
-                // - Compact：围绕子组中心紧凑分布（pitch 上限 16px），接近汇流但仍可区分
                 let frac = match strategy {
                     DockingStrategy::Single | DockingStrategy::Concentrate => base_frac,
                     DockingStrategy::Compact => {
@@ -1274,11 +1281,14 @@ fn phase_lane(
             }
         }
     }
+    // V3a：2 点直连正反向对不会进 assign_lanes（需 ≥4 折点）；在此强制 trunk 间距
+    let gap_fixed = enforce_reverse_pair_min_gap(edges, relations, parallel_gap);
+    ortho_stats.lane_segments_shifted += gap_fixed;
     crate::perf_log!(
         "[perf]     x3_lane_assignment: {:.2}ms ({} groups, {} shifted, {} failed)",
         t_lane.elapsed().as_secs_f64() * 1000.0,
         lane_stats.lane_groups,
-        lane_stats.segments_shifted,
+        lane_stats.segments_shifted + gap_fixed,
         lane_stats.shifts_failed
     );
 }
@@ -1294,6 +1304,8 @@ fn phase_sanitize(
     ortho_stats: &mut crate::layout::OrthoDebugStats,
 ) {
     sanitize_orthogonal_edges(edges, relations, from_side, to_side);
+    // sanitize 可能微移坐标；再次守卫正反向 gap
+    let _ = enforce_reverse_pair_min_gap(edges, relations, parallel_gap);
 
     // ── X-0: 统计边间距违规（排除 stub 段） ──
     let (exact_overlap_pairs, tight_spacing_pairs) =
@@ -1318,7 +1330,9 @@ fn phase_labels(
 ///
 /// - 已有 corridor chain → 强制 strict（应走走廊，禁止穿组软降级）
 /// - R3：feedback / 长跨度边 → 强制 strict（`path_avoids_group_interiors`）
-/// - 其余边保持 false：仍可用高 `GROUP_TRANSIT_PENALTY` 软惩罚；无走廊时硬否决
+///   - 长跨度边在 `assign_feedback_sides` 中**必然**进 hint（不会因正对通道跳过），
+///     故 `feedback_edge_set` 已覆盖「长跨度 ∪ 回环」；此处只需传入该集合。
+/// - 其余短边保持 false：仍可用高 `GROUP_TRANSIT_PENALTY` 软惩罚；全图硬否决
 ///   会导致直线/脏路径退化（见 k8s-multi-namespace 回归）
 fn should_strict_group_transit(
     _profile: &OrthoRoutingProfile,

@@ -113,9 +113,12 @@ pub fn straighten_preferred_alignments(
         let to_tangent = if vertical { to_ep.anchor.x } else { to_ep.anchor.y };
 
         let tangent_diff = (from_tangent - to_tangent).abs();
+        let offset = parallel_offsets.get(i).copied().unwrap_or(0.0);
 
-        // 已经对齐（差值 < 1px），无需调整
-        if tangent_diff < 1.0 {
+        // 已对齐且无平行偏移 → 跳过。
+        // reverse-pair 的非零 offset 即使锚点已共线也必须写入 center±offset，
+        // 否则正反向边会共线贴合（V3a：gap 被抹平）。
+        if tangent_diff < 1.0 && offset.abs() < EPS {
             continue;
         }
 
@@ -131,8 +134,14 @@ pub fn straighten_preferred_alignments(
                     let tc = to_nl.y + to_nl.height / 2.0;
                     (fc + tc) / 2.0
                 };
-                let offset = parallel_offsets.get(i).copied().unwrap_or(0.0);
-                let target = base + offset;
+                // 保证正反向分离至少 ORTHO_PARALLEL_GAP（半侧）
+                let min_half = crate::layout::constants::ORTHO_PARALLEL_GAP * 0.5;
+                let adj_offset = if offset.abs() > EPS && offset.abs() < min_half {
+                    offset.signum() * min_half
+                } else {
+                    offset
+                };
+                let target = base + adj_offset;
                 // 限制目标在节点边的有效范围内
                 let target_clamped = if vertical {
                     let margin = from_nl.width * SLOT_MARGIN_RATIO;

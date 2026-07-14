@@ -189,7 +189,8 @@ pub fn path_is_clean(
         return true;
     }
 
-    for window in path.windows(2) {
+    let last_segment = path.len().saturating_sub(2);
+    for (segment_index, window) in path.windows(2).enumerate() {
         let a = window[0];
         let b = window[1];
         // 段 bbox 预筛选——跳过明显不相交的节点
@@ -199,7 +200,11 @@ pub fn path_is_clean(
         let seg_ymax = a.y.max(b.y) + NODE_OBSTACLE_PAD;
         for node_id in sorted_node_ids {
             let nid = node_id.as_str();
-            if nid == from_id || nid == to_id {
+            // R11：与 obstacle_penalty 对齐——仅豁免源首段 / 宿末段（合法 stub）；
+            // 中间段仍检测穿 from/to，避免「出 stub 后穿回源/宿」漏网。
+            let stub_exempt = (nid == from_id && segment_index == 0)
+                || (nid == to_id && segment_index == last_segment);
+            if stub_exempt {
                 continue;
             }
             if let Some(nl) = nodes.get(nid) {
@@ -208,7 +213,14 @@ pub fn path_is_clean(
                     || nl.y + nl.height < seg_ymin || nl.y > seg_ymax {
                     continue;
                 }
-                if segment_intersects_node(a, b, nl, NODE_OBSTACLE_PAD) {
+                // 端点节点中间段：只禁穿严格内部（pad=0），允许贴边外绕；
+                // 第三方节点仍用 NODE_OBSTACLE_PAD。
+                let pad = if nid == from_id || nid == to_id {
+                    0.0
+                } else {
+                    NODE_OBSTACLE_PAD
+                };
+                if segment_intersects_node(a, b, nl, pad) {
                     return false;
                 }
             }
@@ -633,6 +645,69 @@ mod tests {
 
     fn pt(x: f64, y: f64) -> Point {
         Point::new(x, y)
+    }
+
+    #[test]
+    fn test_r11_path_is_clean_rejects_through_source_on_middle_segment() {
+        // R11：源节点仅豁免首段 stub；中间段穿回源节点内部须判脏。
+        let mut nodes: HashMap<String, NodeLayout> = HashMap::new();
+        nodes.insert(
+            "src".to_string(),
+            NodeLayout {
+                x: 100.0,
+                y: 100.0,
+                width: 80.0,
+                height: 40.0,
+            },
+        );
+        nodes.insert(
+            "dst".to_string(),
+            NodeLayout {
+                x: 100.0,
+                y: 400.0,
+                width: 80.0,
+                height: 40.0,
+            },
+        );
+        let group_ctx = test_group_ctx(HashMap::new(), HashMap::new());
+        let obstacles = PreparedObstacles::build(&nodes, &group_ctx);
+        // 右出 stub 后水平穿回源节点中心，再下行
+        let through = vec![
+            pt(180.0, 120.0),
+            pt(196.0, 120.0),
+            pt(120.0, 120.0), // 穿 src 内部
+            pt(120.0, 420.0),
+            pt(100.0, 420.0),
+        ];
+        assert!(
+            !path_is_clean(
+                &through,
+                "src",
+                "dst",
+                &nodes,
+                &group_ctx,
+                &obstacles.sorted_node_ids
+            ),
+            "中间段穿源节点应不 clean"
+        );
+        // 仅首段离开源右缘，不穿内部
+        let clean = vec![
+            pt(180.0, 120.0),
+            pt(196.0, 120.0),
+            pt(196.0, 420.0),
+            pt(180.0, 420.0),
+        ];
+        assert!(
+            path_is_clean(
+                &clean,
+                "src",
+                "dst",
+                &nodes,
+                &group_ctx,
+                &obstacles.sorted_node_ids
+            ),
+            "外绕路径应 clean"
+        );
     }
 
     #[test]
