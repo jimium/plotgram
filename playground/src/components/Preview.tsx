@@ -24,6 +24,7 @@ interface PreviewProps {
 
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 8;
+const PAN_MARGIN = 0.3;
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
@@ -57,8 +58,45 @@ export function Preview({
   const [ty, setTy] = useState(0);
   const [glowKey, setGlowKey] = useState(0);
   const panState = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
+  const svgNaturalSizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
 
   const viewBoxLabel = svg ? readViewBox(svg) : null;
+
+  // 读取 SVG 自然尺寸
+  const updateSvgNaturalSize = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const svgEl = container.querySelector('svg');
+    if (!svgEl) return;
+    const viewBox = svgEl.viewBox.baseVal;
+    if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+      svgNaturalSizeRef.current = { w: viewBox.width, h: viewBox.height };
+    } else {
+      const bbox = svgEl.getBBox();
+      svgNaturalSizeRef.current = { w: bbox.width, h: bbox.height };
+    }
+  }, []);
+
+  // 限制 tx/ty，确保至少 PAN_MARGIN 比例的图在可视区域内
+  const clampPan = useCallback((newTx: number, newTy: number, s: number) => {
+    const container = containerRef.current;
+    if (!container) return { tx: newTx, ty: newTy };
+    const { w: nw, h: nh } = svgNaturalSizeRef.current;
+    if (nw === 0 || nh === 0) return { tx: newTx, ty: newTy };
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const sw = nw * s;
+    const sh = nh * s;
+    const margin = PAN_MARGIN;
+    const minTx = -(sw - cw * margin);
+    const maxTx = cw * margin;
+    const minTy = -(sh - ch * margin);
+    const maxTy = ch * margin;
+    return {
+      tx: clamp(newTx, Math.min(minTx, maxTx), Math.max(minTx, maxTx)),
+      ty: clamp(newTy, Math.min(minTy, maxTy), Math.max(minTy, maxTy)),
+    };
+  }, []);
 
   // 用 ref 保持最新的 fitToView，避免将其放入 effect 依赖引发"缩放→fitToView 覆盖"的循环
   const fitToViewRef = useRef<() => void>(() => {});
@@ -112,12 +150,15 @@ export function Preview({
   useEffect(() => {
     const hasSvg = Boolean(svg);
     if (hasSvg && !prevHasSvg.current) {
-      requestAnimationFrame(() => fitToViewRef.current());
+      requestAnimationFrame(() => {
+        updateSvgNaturalSize();
+        fitToViewRef.current();
+      });
       // 触发成功发光动画
       setGlowKey((k) => k + 1);
     }
     prevHasSvg.current = hasSvg;
-  }, [svg]);
+  }, [svg, updateSvgNaturalSize]);
 
   useEffect(() => {
     if (!svg) return;
@@ -135,12 +176,15 @@ export function Preview({
       setScale((prev) => {
         const next = clamp(prev * factor, MIN_SCALE, MAX_SCALE);
         const ratio = next / prev;
-        setTx((prevTx) => px - (px - prevTx) * ratio);
-        setTy((prevTy) => py - (py - prevTy) * ratio);
+        const nextTx = px - (px - tx) * ratio;
+        const nextTy = py - (py - ty) * ratio;
+        const clamped = clampPan(nextTx, nextTy, next);
+        setTx(clamped.tx);
+        setTy(clamped.ty);
         return next;
       });
     },
-    [],
+    [tx, ty, clampPan],
   );
 
   // 原生 wheel 事件，避免被动监听
@@ -170,8 +214,11 @@ export function Preview({
   const handlePointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const pan = panState.current;
     if (!pan) return;
-    setTx(pan.tx + (e.clientX - pan.x));
-    setTy(pan.ty + (e.clientY - pan.y));
+    const nextTx = pan.tx + (e.clientX - pan.x);
+    const nextTy = pan.ty + (e.clientY - pan.y);
+    const clamped = clampPan(nextTx, nextTy, scale);
+    setTx(clamped.tx);
+    setTy(clamped.ty);
   };
 
   const endPan = (e: ReactPointerEvent<HTMLDivElement>) => {

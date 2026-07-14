@@ -40,6 +40,7 @@ interface PreviewCanvasProps {
 
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 8;
+const PAN_MARGIN = 0.3;
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
@@ -68,6 +69,43 @@ export function PreviewCanvas({
   const tyRef = useRef(ty);
   tyRef.current = ty;
   const dragStateRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number } | null>(null);
+  const svgNaturalSizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
+
+  // 读取 SVG 自然尺寸
+  const updateSvgNaturalSize = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const svgEl = container.querySelector('svg');
+    if (!svgEl) return;
+    const viewBox = svgEl.viewBox.baseVal;
+    if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+      svgNaturalSizeRef.current = { w: viewBox.width, h: viewBox.height };
+    } else {
+      const bbox = svgEl.getBBox();
+      svgNaturalSizeRef.current = { w: bbox.width, h: bbox.height };
+    }
+  }, []);
+
+  // 限制 tx/ty，确保至少 PAN_MARGIN 比例的图在可视区域内
+  const clampPan = useCallback((newTx: number, newTy: number, s: number) => {
+    const container = containerRef.current;
+    if (!container) return { tx: newTx, ty: newTy };
+    const { w: nw, h: nh } = svgNaturalSizeRef.current;
+    if (nw === 0 || nh === 0) return { tx: newTx, ty: newTy };
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const sw = nw * s;
+    const sh = nh * s;
+    const margin = PAN_MARGIN;
+    const minTx = -(sw - cw * margin);
+    const maxTx = cw * margin;
+    const minTy = -(sh - ch * margin);
+    const maxTy = ch * margin;
+    return {
+      tx: clamp(newTx, Math.min(minTx, maxTx), Math.max(minTx, maxTx)),
+      ty: clamp(newTy, Math.min(minTy, maxTy), Math.max(minTy, maxTy)),
+    };
+  }, []);
 
   // 主题变化时重新渲染
   const applyAppearance = useCallback(
@@ -113,19 +151,25 @@ export function PreviewCanvas({
 
   useEffect(() => {
     if (svg && view === 'preview') {
-      requestAnimationFrame(fitToView);
+      requestAnimationFrame(() => {
+        updateSvgNaturalSize();
+        fitToView();
+      });
     }
-  }, [svg, fitToView, view]);
+  }, [svg, fitToView, view, updateSvgNaturalSize]);
 
   const zoomAt = useCallback((centerX: number, centerY: number, factor: number) => {
     setScale((prevScale) => {
       const nextScale = clamp(prevScale * factor, MIN_SCALE, MAX_SCALE);
       if (nextScale === prevScale) return prevScale;
-      setTx(centerX - (centerX - txRef.current) * (nextScale / prevScale));
-      setTy(centerY - (centerY - tyRef.current) * (nextScale / prevScale));
+      const nextTx = centerX - (centerX - txRef.current) * (nextScale / prevScale);
+      const nextTy = centerY - (centerY - tyRef.current) * (nextScale / prevScale);
+      const clamped = clampPan(nextTx, nextTy, nextScale);
+      setTx(clamped.tx);
+      setTy(clamped.ty);
       return nextScale;
     });
-  }, []);
+  }, [clampPan]);
 
   // 滚轮 / 双指手势：
   //   - ctrlKey=true（pinch zoom 捏合）→ 缩放
@@ -145,13 +189,19 @@ export function PreviewCanvas({
         zoomAt(cx, cy, factor);
       } else {
         // 普通滚动：平移画面
-        setTx((prev) => prev - e.deltaX);
-        setTy((prev) => prev - e.deltaY);
+        setTx((prev) => {
+          const next = prev - e.deltaX;
+          return clampPan(next, tyRef.current, scaleRef.current).tx;
+        });
+        setTy((prev) => {
+          const next = prev - e.deltaY;
+          return clampPan(txRef.current, next, scaleRef.current).ty;
+        });
       }
     };
     container.addEventListener('wheel', listener, { passive: false });
     return () => container.removeEventListener('wheel', listener);
-  }, [svg, zoomAt, view]);
+  }, [svg, zoomAt, view, clampPan]);
 
   // 拖拽平移：mousedown 记录起点，window mousemove/up 实时更新
   const handleMouseDown = useCallback(
@@ -174,8 +224,11 @@ export function PreviewCanvas({
     const onMove = (e: MouseEvent) => {
       const s = dragStateRef.current;
       if (!s) return;
-      setTx(s.startTx + (e.clientX - s.startX));
-      setTy(s.startTy + (e.clientY - s.startY));
+      const nextTx = s.startTx + (e.clientX - s.startX);
+      const nextTy = s.startTy + (e.clientY - s.startY);
+      const clamped = clampPan(nextTx, nextTy, scaleRef.current);
+      setTx(clamped.tx);
+      setTy(clamped.ty);
     };
     const onUp = () => {
       dragStateRef.current = null;
@@ -187,7 +240,7 @@ export function PreviewCanvas({
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
-  }, [isDragging]);
+  }, [isDragging, clampPan]);
 
   const zoomByButton = useCallback(
     (factor: number) => {

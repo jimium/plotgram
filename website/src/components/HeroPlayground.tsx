@@ -366,11 +366,14 @@ export default function HeroPlayground() {
     setScale((prevScale) => {
       const nextScale = clamp(prevScale * factor, MIN_SCALE, MAX_SCALE);
       if (nextScale === prevScale) return prevScale;
-      setTx(centerX - (centerX - txRef.current) * (nextScale / prevScale));
-      setTy(centerY - (centerY - tyRef.current) * (nextScale / prevScale));
+      const nextTx = centerX - (centerX - txRef.current) * (nextScale / prevScale);
+      const nextTy = centerY - (centerY - tyRef.current) * (nextScale / prevScale);
+      const clamped = clampPan(nextTx, nextTy, nextScale);
+      setTx(clamped.tx);
+      setTy(clamped.ty);
       return nextScale;
     });
-  }, []);
+  }, [clampPan]);
 
   const fitToView = useCallback(() => {
     const container = containerRef.current;
@@ -483,7 +486,7 @@ export default function HeroPlayground() {
       container.removeEventListener('gesturestart', gestureHandler);
       container.removeEventListener('gesturechange', gestureHandler);
     };
-  }, [svg, zoomAt]);
+  }, [svg, zoomAt, clampPan]);
 
   // 拖拽平移
   const handleMouseDown = useCallback(
@@ -522,7 +525,7 @@ export default function HeroPlayground() {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
-  }, [isDragging]);
+  }, [isDragging, clampPan]);
 
   const status = useMemo(() => {
     if (wasmError) return { kind: 'error' as const, text: `WASM 加载失败：${wasmError}` };
