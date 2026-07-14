@@ -150,8 +150,8 @@ export default function Home() {
                     <span className="judges-stat-label">个真实场景示例</span>
                   </div>
                   <div className="judges-stat">
-                    <span className="judges-stat-num">6</span>
-                    <span className="judges-stat-label">种图表类型</span>
+                    <span className="judges-stat-num">45 天</span>
+                    <span className="judges-stat-label">从 0 到 50K 行 Rust</span>
                   </div>
                 </div>
               </div>

@@ -1,0 +1,32 @@
+// ES 索引分片分布：展示一个索引的主分片和副本分片如何分布在集群节点上
+diagram architecture {
+    title: "ES 索引分片分布"
+
+    group cluster "ES 集群" {
+        entity[service] master "Master Node"
+
+        group data_nodes "Data Nodes" {
+            entity[service] node1 "Node-1"
+            entity[service] node2 "Node-2"
+            entity[service] node3 "Node-3"
+        }
+    }
+
+    entity[service] app "Application"
+
+    // 主分片分布
+    app -> master "PUT /orders"
+    master -> node1 "P0 (primary)"
+    master -> node2 "P1 (primary)"
+    master -> node3 "P2 (primary)"
+
+    // 副本分片分布 (跨节点，不能和主分片同节点)
+    node1 -> node2 "R0 (replica)"
+    node1 -> node3 "R1 (replica)"
+    node2 -> node3 "R2 (replica)"
+
+    // 读取路径
+    app -> node1 "GET /orders/_search"
+    app -> node2 "GET /orders/_search"
+    app -> node3 "GET /orders/_search"
+}

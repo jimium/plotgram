@@ -1,0 +1,29 @@
+diagram architecture {
+    title: "ES 集群状态图"
+
+    group es_cluster "Elasticsearch 集群" {
+        entity[service] es_master "Master Node"
+        entity[service] es_data1 "Data Node 1"
+        entity[service] es_data2 "Data Node 2"
+        entity[service] es_data3 "Data Node 3"
+        entity[service] es_client "Client Node"
+    }
+
+    entity[service] app "Application"
+    entity[service] kibana "Kibana"
+    entity[service] prometheus "Prometheus"
+
+    app -> es_client "REST API"
+    kibana -> es_client "查询"
+    es_client -> es_master "协调"
+    es_client -> es_data1 "读写"
+    es_client -> es_data2 "读写"
+    es_client -> es_data3 "读写"
+    es_master -> es_data1 "管理"
+    es_master -> es_data2 "管理"
+    es_master -> es_data3 "管理"
+    prometheus -> es_master "metrics"
+    prometheus -> es_data1 "metrics"
+    prometheus -> es_data2 "metrics"
+    prometheus -> es_data3 "metrics"
+}

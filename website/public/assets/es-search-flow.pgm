@@ -1,0 +1,31 @@
+// ES 搜索查询完整流程：从客户端请求到结果合并返回
+diagram sequence {
+    title: "ES 搜索查询流程"
+
+    entity[actor] client "客户端"
+    entity[control] coord "Coordinating Node"
+    entity[participant] node1 "Data Node 1"
+    entity[participant] node2 "Data Node 2"
+    entity[participant] node3 "Data Node 3"
+
+    client -> coord "POST /orders/_search"
+    coord -> node1 "query phase: 分发查询"
+    coord -> node2 "query phase: 分发查询"
+    coord -> node3 "query phase: 分发查询"
+
+    node1 --> coord "返回 doc_id + score"
+    node2 --> coord "返回 doc_id + score"
+    node3 --> coord "返回 doc_id + score"
+
+    coord -> coord "合并排序 Top-K"
+
+    coord -> node1 "fetch phase: 获取完整文档"
+    coord -> node2 "fetch phase: 获取完整文档"
+    coord -> node3 "fetch phase: 获取完整文档"
+
+    node1 --> coord "返回完整文档"
+    node2 --> coord "返回完整文档"
+    node3 --> coord "返回完整文档"
+
+    coord --> client "返回最终结果"
+}

@@ -52,6 +52,7 @@ AGENT_BASE="/agent/"
 AGENT_CDN_BASE="${CDN_BASE}agent/"
 AGENT_API="https://api.pg.agcli.cn/agent/chat"
 AGENT_REMOTE="$DEPLOY_HOST:$REMOTE_DIR/agent/"
+AGENT_MIRROR_REMOTE="$SITE_MIRROR_HOST:$SITE_MIRROR_DIR/agent/"
 CDN_AGENT_REMOTE="$ASSET_HOST:$ASSET_REMOTE_DIR/agent/"
 
 # ─── 构建 ───────────────────────────────────────────────
@@ -76,13 +77,20 @@ build() {
 # ─── 打包暂存 ───────────────────────────────────────────
 stage_artifacts() {
   STAGING_DIR="$(new_staging_dir)"
-  mkdir -p "$STAGING_DIR/demo-agent" "$STAGING_DIR/cdn-agent"
+  mkdir -p "$STAGING_DIR/demo-agent" "$STAGING_DIR/demo-agent-cn" "$STAGING_DIR/cdn-agent"
 
   # demo 站：agent 页面（不含 wasm / 打包 assets，走 CDN）
   rsync -a --delete \
     --exclude='plotgram-wasm/' \
     --exclude='assets/' \
     "$AGENT_DIR/dist/" "$STAGING_DIR/demo-agent/"
+
+  # 镜像站副本：复制后注入 ICP 备案号（仅 plotgram.cn）
+  rsync -a "$STAGING_DIR/demo-agent/" "$STAGING_DIR/demo-agent-cn/"
+  if [[ "$MIRROR_ENABLED" == "true" ]]; then
+    log "注入 ICP 备案号 → plotgram.cn agent/index.html"
+    inject_icp_badge "$STAGING_DIR/demo-agent-cn/index.html"
+  fi
 
   # CDN：agent 打包 assets（js / css），保留 assets/ 子目录层级
   mkdir -p "$STAGING_DIR/cdn-agent/assets"
@@ -93,10 +101,21 @@ stage_artifacts() {
 # ─── 上传 ───────────────────────────────────────────────
 upload() {
   require_cmd rsync
-  log "同步 demo → $AGENT_REMOTE"
+  # 主站（plotgram.dev）
+  log "同步 demo → 主站 (plotgram.dev)"
   ssh "$DEPLOY_HOST" "mkdir -p '$REMOTE_DIR/agent'"
   rsync -avz --delete \
     "$STAGING_DIR/demo-agent/" "$AGENT_REMOTE"
+
+  # 镜像站（plotgram.cn，含 ICP badge）
+  if [[ "$MIRROR_ENABLED" == "true" ]]; then
+    log "同步 demo → 镜像站 (plotgram.cn，含 ICP badge)"
+    ssh "$SITE_MIRROR_HOST" "mkdir -p '$SITE_MIRROR_DIR/agent'"
+    rsync -avz --delete \
+      "$STAGING_DIR/demo-agent-cn/" "$AGENT_MIRROR_REMOTE"
+  else
+    log "跳过镜像同步（MIRROR_ENABLED=false）"
+  fi
 
   log "同步 CDN → $CDN_AGENT_REMOTE"
   ssh "$ASSET_HOST" "mkdir -p '$ASSET_REMOTE_DIR/agent'"
@@ -111,9 +130,16 @@ verify() {
 
   code=$(curl -s -o /dev/null -w '%{http_code}' "https://demo.plotgram.dev/agent/" 2>/dev/null || echo "000")
   if [[ "$code" == "200" ]]; then
-    log "✅ Agent 页面: https://demo.plotgram.dev/agent/"
+    log "✅ Agent 页面 (plotgram.dev): https://demo.plotgram.dev/agent/"
   else
-    echo "⚠ Agent 页面返回 HTTP $code"
+    echo "⚠ Agent 页面 (plotgram.dev) 返回 HTTP $code"
+  fi
+
+  code=$(curl -s -o /dev/null -w '%{http_code}' "https://www.plotgram.cn/agent/" 2>/dev/null || echo "000")
+  if [[ "$code" == "200" ]]; then
+    log "✅ Agent 页面 (plotgram.cn): https://www.plotgram.cn/agent/"
+  else
+    echo "⚠ Agent 页面 (plotgram.cn) 返回 HTTP $code"
   fi
 
   code=$(curl -s -o /dev/null -w '%{http_code}' "https://api.pg.agcli.cn/health" 2>/dev/null || echo "000")
@@ -134,7 +160,7 @@ main() {
 
   if [[ "$SETUP_NGINX" == true ]]; then
     sync_nginx "$DEPLOY_HOST" nginx/demo.plotgram.dev.conf
-    sync_nginx "$ASSET_HOST" nginx/assets.pg.agcli.cn.conf
+    sync_nginx "$ASSET_HOST" nginx/assets.pg.agcli.cn.conf nginx/plotgram.cn.conf
   fi
 
   if [[ "$SKIP_BUILD" == false ]]; then
@@ -149,10 +175,11 @@ main() {
 
   echo ""
   echo "✅ 发布完成"
-  echo "   Agent Demo: https://demo.plotgram.dev/agent/"
-  echo "   CDN assets: ${CDN_BASE}agent/assets/"
-  echo "   Agent API:  $AGENT_API"
-  echo "   CDN WASM:   ${CDN_BASE}plotgram-wasm/（由 deploy-wasm.sh 维护）"
+  echo "   Agent Demo (plotgram.dev): https://demo.plotgram.dev/agent/"
+  echo "   Agent Demo (plotgram.cn):  https://www.plotgram.cn/agent/"
+  echo "   CDN assets:                ${CDN_BASE}agent/assets/"
+  echo "   Agent API:                 $AGENT_API"
+  echo "   CDN WASM:                  ${CDN_BASE}plotgram-wasm/（由 deploy-wasm.sh 维护）"
   echo ""
 
   verify

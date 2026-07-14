@@ -150,7 +150,13 @@ main() {
   setup_ssh_multiplexing "$DEPLOY_HOST"
 
   if [[ "$SETUP_NGINX" == true ]]; then
-    sync_nginx "$DEPLOY_HOST" nginx/assets.pg.agcli.cn.conf nginx/api.pg.agcli.cn.conf
+    # 同步 shanxun 上全部 nginx 配置：
+    # - assets.pg.agcli.cn.conf / api.pg.agcli.cn.conf：已添加 plotgram.cn 别名
+    # - plotgram.cn.conf：plotgram.cn 主站（www.plotgram.cn + plotgram.cn）
+    sync_nginx "$DEPLOY_HOST" \
+      nginx/assets.pg.agcli.cn.conf \
+      nginx/api.pg.agcli.cn.conf \
+      nginx/plotgram.cn.conf
   fi
 
   if [[ "$SKIP_SYNC" == false ]]; then
@@ -175,9 +181,12 @@ main() {
 
   echo ""
   echo "✅ 发布完成"
-  echo "   健康检查: https://api.pg.agcli.cn/health"
-  echo "   API:      https://api.pg.agcli.cn/agent/chat"
-  echo "   静态资源: https://assets.pg.agcli.cn/"
+  echo "   健康检查 (agcli.cn):  https://api.pg.agcli.cn/health"
+  echo "   健康检查 (plotgram.cn): https://api.plotgram.cn/health"
+  echo "   API (agcli.cn):       https://api.pg.agcli.cn/agent/chat"
+  echo "   API (plotgram.cn):    https://api.plotgram.cn/agent/chat"
+  echo "   静态资源 CDN:         https://assets.pg.agcli.cn/"
+  echo "                        https://assets.plotgram.cn/"
   echo "   远程目录: $DEPLOY_HOST:$REMOTE_DIR"
   echo "   查看日志: ssh $DEPLOY_HOST 'tail -f $REMOTE_DIR/server.log'"
   echo "   重启服务: ssh $DEPLOY_HOST 'cd $REMOTE_DIR && ./stop.sh && ./start.sh'"

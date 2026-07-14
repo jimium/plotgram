@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 657.5 610" width="657.5" height="610" font-family="'Noto Sans CJK SC', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" data-dfy-debug="1">
+<defs>
+  <marker id="arrow-active" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#0F766E"/>
+  </marker>
+  <marker id="arrow-passive" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#71717A"/>
+  </marker>
+  <marker id="arrow-bidi" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#0F766E"/>
+  </marker>
+</defs>
+<rect width="657.5" height="610" fill="#F5F5F5"/>
+<g data-dfy-kind="group" data-dfy-id="cluster" data-dfy-source-line="5">
+<rect x="169.5" y="150" width="438" height="410" rx="10" fill="#FFFFFF" stroke="#9CA3AF" stroke-width="1.2"/>
+<text x="177.5" y="164" font-size="11" fill="#71717A" font-weight="600">ES 集群</text>
+</g>
+<g data-dfy-kind="group" data-dfy-id="data_nodes" data-dfy-source-line="8">
+<rect x="209.5" y="320" width="358" height="200" rx="8" fill="#F3F3F3" stroke="#D4D4D4" stroke-width="1"/>
+<text x="217.5" y="334" font-size="11" fill="#71717A" font-weight="600">Data Nodes</text>
+</g>
+<g data-dfy-kind="node" data-dfy-id="master" data-dfy-source-line="6">
+<rect x="233.5" y="190" width="116.5" height="50" rx="10" fill="#ECFDF5" stroke="#86EFAC" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="291.8" y="219.3" text-anchor="middle" font-size="13" fill="#166534" font-weight="500">Master Node</text>
+</g>
+<g data-dfy-kind="node" data-dfy-id="node1" data-dfy-source-line="9">
+<rect x="356.5" y="360" width="112" height="50" rx="10" fill="#ECFDF5" stroke="#86EFAC" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="412.5" y="389.3" text-anchor="middle" font-size="13" fill="#166534" font-weight="500">Node-1</text>
+</g>
+<g data-dfy-kind="node" data-dfy-id="node2" data-dfy-source-line="10">
+<rect x="229.5" y="450" width="112" height="50" rx="10" fill="#ECFDF5" stroke="#86EFAC" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="285.5" y="479.3" text-anchor="middle" font-size="13" fill="#166534" font-weight="500">Node-2</text>
+</g>
+<g data-dfy-kind="node" data-dfy-id="node3" data-dfy-source-line="11">
+<rect x="435.5" y="450" width="112" height="50" rx="10" fill="#ECFDF5" stroke="#86EFAC" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="491.5" y="479.3" text-anchor="middle" font-size="13" fill="#166534" font-weight="500">Node-3</text>
+</g>
+<g data-dfy-kind="node" data-dfy-id="app" data-dfy-source-line="15">
+<rect x="321.375" y="20" width="116.5" height="50" rx="10" fill="#ECFDF5" stroke="#86EFAC" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="379.6" y="49.3" text-anchor="middle" font-size="13" fill="#166534" font-weight="500">Application</text>
+</g>
+<g data-dfy-kind="edge" data-dfy-index="0" data-dfy-from="app" data-dfy-to="master" data-dfy-arrow="active" data-dfy-source-line="18">
+<line x1="335.7" y1="70.0" x2="335.7" y2="190.0" stroke="#BDBDBD" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.85" marker-end="url(#arrow-active)" marker-start=""/>
+</g>
+<g data-dfy-kind="edge" data-dfy-index="1" data-dfy-from="master" data-dfy-to="node1" data-dfy-arrow="active" data-dfy-source-line="19">
+<path d="M 336.0 240.0 L 336.0 271.8 L 361.9 271.8 Q 369.9 271.8 369.9 279.8 L 369.9 360.0" fill="none" stroke="#BDBDBD" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.85" marker-end="url(#arrow-active)" marker-start=""/>
+</g>
+<g data-dfy-kind="edge" data-dfy-index="2" data-dfy-from="master" data-dfy-to="node2" data-dfy-arrow="active" data-dfy-source-line="20">
+<path d="M 233.5 215.0 L 191.5 215.0 L 191.5 459.0 Q 191.5 467.0 199.5 467.0 L 229.5 467.0" fill="none" stroke="#BDBDBD" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.85" marker-end="url(#arrow-active)" marker-start=""/>
+</g>
+<g data-dfy-kind="edge" data-dfy-index="3" data-dfy-from="master" data-dfy-to="node3" data-dfy-arrow="active" data-dfy-source-line="21">
+<path d="M 350.0 215.0 L 583.5 215.0 L 583.5 459.0 Q 583.5 467.0 575.5 467.0 L 547.5 467.0" fill="none" stroke="#BDBDBD" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.85" marker-end="url(#arrow-active)" marker-start=""/>
+</g>
+<g data-dfy-kind="edge" data-dfy-index="4" data-dfy-from="node1" data-dfy-to="node2" data-dfy-arrow="active" data-dfy-source-line="24">
+<path d="M 356.5 385.0 L 328.1 385.0 L 328.1 450.0" fill="none" stroke="#BDBDBD" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.85" marker-end="url(#arrow-active)" marker-start=""/>
+</g>
+<g data-dfy-kind="edge" data-dfy-index="5" data-dfy-from="node1" data-dfy-to="node3" data-dfy-arrow="active" data-dfy-source-line="25">
+<path d="M 420.5 410.0 L 420.5 426.0 L 444.9 426.0 Q 448.9 426.0 448.9 430.0 L 448.9 434.0 L 448.9 450.0" fill="none" stroke="#BDBDBD" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.85" marker-end="url(#arrow-active)" marker-start=""/>
+</g>
+<g data-dfy-kind="edge" data-dfy-index="6" data-dfy-from="node2" data-dfy-to="node3" data-dfy-arrow="active" data-dfy-source-line="26">
+<line x1="341.5" y1="475.0" x2="435.5" y2="475.0" stroke="#BDBDBD" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.85" marker-end="url(#arrow-active)" marker-start=""/>
+</g>
+<g data-dfy-kind="edge" data-dfy-index="7" data-dfy-from="app" data-dfy-to="node1" data-dfy-arrow="active" data-dfy-source-line="29">
+<path d="M 437.9 53.0 L 508.5 53.0 L 508.5 377.0 Q 508.5 385.0 500.5 385.0 L 468.5 385.0" fill="none" stroke="#BDBDBD" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.85" marker-end="url(#arrow-active)" marker-start=""/>
+</g>
+<g data-dfy-kind="edge" data-dfy-index="8" data-dfy-from="app" data-dfy-to="node2" data-dfy-arrow="active" data-dfy-source-line="30">
+<path d="M 321.4 45.0 L 191.5 45.0 L 191.5 475.0 Q 191.5 483.0 199.5 483.0 L 229.5 483.0" fill="none" stroke="#BDBDBD" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.85" marker-end="url(#arrow-active)" marker-start=""/>
+</g>
+<g data-dfy-kind="edge" data-dfy-index="9" data-dfy-from="app" data-dfy-to="node3" data-dfy-arrow="active" data-dfy-source-line="31">
+<path d="M 437.9 37.0 L 583.5 37.0 L 583.5 475.0 Q 583.5 483.0 575.5 483.0 L 547.5 483.0" fill="none" stroke="#BDBDBD" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.85" marker-end="url(#arrow-active)" marker-start=""/>
+</g>
+<g data-dfy-kind="edge-label" data-dfy-index="0" data-dfy-from="app" data-dfy-to="master">
+<line x1="341.7" y1="98.4" x2="335.7" y2="98.4" stroke="#666" stroke-width="0.8" stroke-opacity="0.6" />
+<text x="381.4" y="98.4" text-anchor="middle" dominant-baseline="central" font-size="11.0" fill="#71717A">PUT /orders</text>
+</g>
+<g data-dfy-kind="edge-label" data-dfy-index="1" data-dfy-from="master" data-dfy-to="node1">
+<line x1="412.3" y1="291.3" x2="369.9" y2="291.3" stroke="#666" stroke-width="0.8" stroke-opacity="0.6" />
+<text x="455.3" y="291.3" text-anchor="middle" dominant-baseline="central" font-size="11.0" fill="#71717A">P0 (primary)</text>
+</g>
+<g data-dfy-kind="edge-label" data-dfy-index="2" data-dfy-from="master" data-dfy-to="node2">
+<text x="240.5" y="290.7" text-anchor="middle" dominant-baseline="central" font-size="11.0" fill="#71717A">P1 (primary)</text>
+</g>
+<g data-dfy-kind="edge-label" data-dfy-index="3" data-dfy-from="master" data-dfy-to="node3">
+<line x1="428.2" y1="225.0" x2="428.2" y2="215.0" stroke="#666" stroke-width="0.8" stroke-opacity="0.6" />
+<text x="428.2" y="234.5" text-anchor="middle" dominant-baseline="central" font-size="11.0" fill="#71717A">P2 (primary)</text>
+</g>
+<g data-dfy-kind="edge-label" data-dfy-index="4" data-dfy-from="node1" data-dfy-to="node2">
+<text x="346.4" y="430.6" text-anchor="middle" dominant-baseline="central" font-size="11.0" fill="#71717A">R0 (replica)</text>
+</g>
+<g data-dfy-kind="edge-label" data-dfy-index="5" data-dfy-from="node1" data-dfy-to="node3">
+<text x="477.9" y="442.0" text-anchor="middle" dominant-baseline="central" font-size="11.0" fill="#71717A">R1 (replica)</text>
+</g>
+<g data-dfy-kind="edge-label" data-dfy-index="6" data-dfy-from="node2" data-dfy-to="node3">
+<line x1="420.1" y1="514.5" x2="414.8" y2="475.0" stroke="#666" stroke-width="0.8" stroke-opacity="0.6" />
+<text x="421.4" y="524.0" text-anchor="middle" dominant-baseline="central" font-size="11.0" fill="#71717A">R2 (replica)</text>
+</g>
+<g data-dfy-kind="edge-label" data-dfy-index="7" data-dfy-from="app" data-dfy-to="node1">
+<line x1="498.5" y1="203.7" x2="508.5" y2="203.7" stroke="#666" stroke-width="0.8" stroke-opacity="0.6" />
+<text x="432.8" y="203.7" text-anchor="middle" dominant-baseline="central" font-size="11.0" fill="#71717A">GET /orders/_search</text>
+</g>
+<g data-dfy-kind="edge-label" data-dfy-index="8" data-dfy-from="app" data-dfy-to="node2">
+<text x="115.8" y="96.9" text-anchor="middle" dominant-baseline="central" font-size="11.0" fill="#71717A">GET /orders/_search</text>
+</g>
+<g data-dfy-kind="edge-label" data-dfy-index="9" data-dfy-from="app" data-dfy-to="node3">
+<line x1="445.5" y1="109.9" x2="488.1" y2="37.0" stroke="#666" stroke-width="0.8" stroke-opacity="0.6" />
+<text x="440.0" y="119.4" text-anchor="middle" dominant-baseline="central" font-size="11.0" fill="#71717A">GET /orders/_search</text>
+</g>
+</svg>

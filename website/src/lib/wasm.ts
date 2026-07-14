@@ -38,7 +38,7 @@ let modulePromise: Promise<PlotgramWasm> | null = null;
 function wasmCdnBase(): string {
   const fromEnv = import.meta.env.VITE_WASM_CDN_BASE as string | undefined;
   if (fromEnv) return fromEnv.endsWith('/') ? fromEnv : `${fromEnv}/`;
-  return 'https://assets.pg.agcli.cn/plotgram-wasm/';
+  return 'https://assets.plotgram.cn/plotgram-wasm/';
 }
 
 /** plotgram_wasm.js 加载地址（开发走本地 vite 中间件，生产走 CDN common 路径）。 */

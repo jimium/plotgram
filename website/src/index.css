@@ -1472,6 +1472,42 @@ a {
   border: none;
 }
 
+.roadmap-demo-tabs {
+  display: flex;
+  gap: 0;
+}
+
+.roadmap-demo-tab {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.roadmap-demo-tab:hover {
+  color: var(--text-secondary);
+  border-bottom-color: var(--border);
+}
+
+.roadmap-demo-tab.active {
+  color: var(--brand-purple);
+  border-bottom-color: var(--brand-purple);
+}
+
+.roadmap-demo-svg {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  padding: 16px;
+  background: var(--bg-canvas);
+}
+
 /* ===== TECH ALGO CARDS ===== */
 .algo-card {
   padding: 28px;

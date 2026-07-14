@@ -145,7 +145,7 @@ export function resetWasmModule(): void {
 
 /** 生产环境 CDN common 路径（三端共用同一份 wasm 产物，靠 ETag 控制缓存）。 */
 function wasmCdnBase(): string {
-  return 'https://assets.pg.agcli.cn/plotgram-wasm/';
+  return 'https://assets.plotgram.cn/plotgram-wasm/';
 }
 
 /** plotgram_wasm.js 加载地址（开发走本地 vite 中间件，生产走 CDN common 路径）。 */

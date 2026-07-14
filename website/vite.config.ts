@@ -79,10 +79,15 @@ export default defineConfig({
   },
   experimental: {
     renderBuiltUrl(filename, { type }) {
-      if (!cdnBase || type !== 'asset') {
+      if (!cdnBase) {
         return { relative: true };
       }
-      return `${cdnBase}${filename}`;
+      // type 可能是 'asset' | 'publicScript' | 'publicCss' 等
+      // 当配置了 CDN 前缀时，所有打包产物（JS/CSS/资源）都走 CDN
+      if (type === 'asset' || type === 'publicScript' || type === 'publicCss' || type === 'asset-proxy') {
+        return `${cdnBase}${filename}`;
+      }
+      return { relative: true };
     },
   },
 });

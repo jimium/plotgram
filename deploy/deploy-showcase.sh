@@ -46,6 +46,7 @@ trap 'close_ssh_multiplexing "$DEPLOY_HOST" "$ASSET_HOST"' EXIT
 
 SHOWCASE_DIR="$ROOT_DIR/showcase"
 SHOWCASE_REMOTE="$DEPLOY_HOST:$REMOTE_DIR/showcase/"
+SHOWCASE_MIRROR_REMOTE="$SITE_MIRROR_HOST:$SITE_MIRROR_DIR/showcase/"
 CDN_SHOWCASE_REMOTE="$ASSET_HOST:$ASSET_REMOTE_DIR/showcase/"
 
 # ─── 渲染 SVG ──────────────────────────────────────────
@@ -102,7 +103,7 @@ patch_build_hash() {
 # ─── 打包暂存 ───────────────────────────────────────────
 stage_artifacts() {
   STAGING_DIR="$(new_staging_dir)"
-  mkdir -p "$STAGING_DIR/demo-showcase" "$STAGING_DIR/cdn-showcase"
+  mkdir -p "$STAGING_DIR/demo-showcase" "$STAGING_DIR/demo-showcase-cn" "$STAGING_DIR/cdn-showcase"
 
   # demo 站：showcase 不含 svg / 历史快照（走 CDN）
   # 例外：assets/brand/ 下的品牌 logo SVG 需跟随 demo 站（相对路径引用）
@@ -122,6 +123,9 @@ stage_artifacts() {
 
   patch_showcase_cdn "$STAGING_DIR/demo-showcase/index.html"
 
+  # 镜像站副本：复制后注入 ICP 备案号（仅 plotgram.cn）
+  rsync -a "$STAGING_DIR/demo-showcase/" "$STAGING_DIR/demo-showcase-cn/"
+
   # CDN：showcase svg + 历史快照
   rsync -a \
     --include='*/' \
@@ -136,11 +140,28 @@ upload() {
 
   # BUILD_HASH 依赖 SVG 内容，必须在 stage 后计算（demo 端 index.html 已 patch）
   patch_build_hash "$STAGING_DIR/demo-showcase/index.html"
+  # 镜像站副本同步 BUILD_HASH 后再注入 ICP
+  cp "$STAGING_DIR/demo-showcase/index.html" "$STAGING_DIR/demo-showcase-cn/index.html"
+  if [[ "$MIRROR_ENABLED" == "true" ]]; then
+    log "注入 ICP 备案号 → plotgram.cn showcase/index.html"
+    inject_icp_badge "$STAGING_DIR/demo-showcase-cn/index.html"
+  fi
 
-  log "同步 demo → $SHOWCASE_REMOTE"
+  # 主站（plotgram.dev）
+  log "同步 demo → 主站 (plotgram.dev)"
   ssh "$DEPLOY_HOST" "mkdir -p '$REMOTE_DIR/showcase'"
   rsync -avz --delete \
     "$STAGING_DIR/demo-showcase/" "$SHOWCASE_REMOTE"
+
+  # 镜像站（plotgram.cn，含 ICP badge）
+  if [[ "$MIRROR_ENABLED" == "true" ]]; then
+    log "同步 demo → 镜像站 (plotgram.cn，含 ICP badge)"
+    ssh "$SITE_MIRROR_HOST" "mkdir -p '$SITE_MIRROR_DIR/showcase'"
+    rsync -avz --delete \
+      "$STAGING_DIR/demo-showcase-cn/" "$SHOWCASE_MIRROR_REMOTE"
+  else
+    log "跳过镜像同步（MIRROR_ENABLED=false）"
+  fi
 
   log "同步 CDN → $CDN_SHOWCASE_REMOTE"
   ssh "$ASSET_HOST" "mkdir -p '$ASSET_REMOTE_DIR/showcase'"
@@ -157,7 +178,7 @@ main() {
 
   if [[ "$SETUP_NGINX" == true ]]; then
     sync_nginx "$DEPLOY_HOST" nginx/demo.plotgram.dev.conf
-    sync_nginx "$ASSET_HOST" nginx/assets.pg.agcli.cn.conf
+    sync_nginx "$ASSET_HOST" nginx/assets.pg.agcli.cn.conf nginx/plotgram.cn.conf
   fi
 
   if [[ "$SKIP_RENDER" == false ]]; then
@@ -171,8 +192,9 @@ main() {
 
   echo ""
   echo "✅ 发布完成"
-  echo "   Showcase: https://demo.plotgram.dev/showcase/"
-  echo "   CDN SVG:  ${CDN_BASE}showcase/"
+  echo "   Showcase (plotgram.dev): https://demo.plotgram.dev/showcase/"
+  echo "   Showcase (plotgram.cn):  https://www.plotgram.cn/showcase/"
+  echo "   CDN SVG:                 ${CDN_BASE}showcase/"
   echo ""
 }
 

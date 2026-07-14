@@ -1,0 +1,29 @@
+// ES 节点健康状态机：节点从启动到故障的完整生命周期
+diagram state {
+    title: "ES 节点健康状态机"
+
+    entity[initial] start "节点启动"
+    entity[state] init "Initializing"
+    entity[state] green "Green (健康)"
+    entity[state] yellow "Yellow (警告)"
+    entity[state] red "Red (异常)"
+    entity[state] recovery "Recovering"
+    entity[final] removed "Decommissioned"
+
+    start -> init "加入集群"
+    init -> green "分片分配完成"
+    init -> yellow "副本未分配"
+
+    green -> yellow "副本分配失败"
+    yellow -> green "副本恢复"
+    yellow -> red "主分片丢失"
+    green -> red "硬件故障 / OOM"
+
+    red -> recovery "节点重启"
+    recovery -> yellow "数据恢复中"
+    recovery -> green "完全恢复"
+
+    green -> removed "主动下线"
+    yellow -> removed "主动下线"
+    red -> removed "强制摘除"
+}

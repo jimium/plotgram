@@ -16,7 +16,8 @@ interface RoadmapItem {
   status: string;
   desc: string;
   bullets: string[];
-  demo?: string;
+  demo?: string | { src: string; label: string }[];
+  demoType?: 'svg' | 'animation';
 }
 
 const ROADMAP_ITEMS: RoadmapItem[] = [
@@ -33,6 +34,7 @@ const ROADMAP_ITEMS: RoadmapItem[] = [
       '渲染引擎内置动画属性 vs 前端独立动画层的取舍',
     ],
     demo: '/assets/animation-demo.svg',
+    demoType: 'animation',
   },
   {
     phase: '近期',
@@ -58,6 +60,26 @@ const ROADMAP_ITEMS: RoadmapItem[] = [
       'AI 编程工具是 Plotgram 的天然分发渠道',
       '与现有 Agent Demo 形成互补：Demo 面向终端用户，MCP 面向开发者工具链',
     ],
+  },
+  {
+    phase: '中期',
+    icon: '📡',
+    title: '实时数据源集成',
+    status: 'planned',
+    desc: '读取 Kubernetes、Elasticsearch 等 API 的实时状态，自动绘制集群拓扑图、服务健康状态图、索引分布图。让基础设施可视化从"手工画图"变成"实时观测"。',
+    bullets: [
+      'K8s API 集成：自动绘制集群拓扑、Pod 分布、Service 依赖图',
+      'Elasticsearch API 集成：索引分片图、节点状态图',
+      'Prometheus / Grafana 数据源：指标驱动的动态图表',
+      '声明式数据源配置，Agent 自动发现与绘制',
+    ],
+    demo: [
+      { src: '/assets/es-cluster.svg', label: '集群拓扑' },
+      { src: '/assets/es-index-shards.svg', label: '索引分片' },
+      { src: '/assets/es-search-flow.svg', label: '搜索流程' },
+      { src: '/assets/es-node-health.svg', label: '节点健康' },
+    ],
+    demoType: 'svg',
   },
   {
     phase: '中期',
@@ -105,8 +127,86 @@ const STATUS_LABEL: Record<string, string> = {
   exploring: '探索中',
 };
 
+function RoadmapItemCard({ item, activeIndex, onTabChange, demoKey, onReplay }: {
+  item: RoadmapItem;
+  activeIndex: number;
+  onTabChange: (index: number) => void;
+  demoKey: number;
+  onReplay: () => void;
+}) {
+  return (
+    <div className="roadmap-item">
+      <div className="roadmap-item-header">
+        <span className="roadmap-item-icon">{item.icon}</span>
+        <h2>{item.title}</h2>
+        <span className={`roadmap-status roadmap-status-${item.status}`}>
+          {item.phase} · {STATUS_LABEL[item.status]}
+        </span>
+      </div>
+      <p>{item.desc}</p>
+      <ul>
+        {item.bullets.map((b) => (
+          <li key={b}>{b}</li>
+        ))}
+      </ul>
+      {item.demo && (
+        <div className="roadmap-demo">
+          <div className="roadmap-demo-header">
+            {Array.isArray(item.demo) ? (
+              <div className="roadmap-demo-tabs">
+                {item.demo.map((demo, index) => (
+                  <button
+                    key={demo.label}
+                    className={`roadmap-demo-tab ${index === activeIndex ? 'active' : ''}`}
+                    onClick={() => onTabChange(index)}
+                  >
+                    {demo.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className="roadmap-demo-label">示例预览</span>
+            )}
+            {!Array.isArray(item.demo) && item.demoType === 'animation' && (
+              <button
+                className="roadmap-demo-replay"
+                onClick={onReplay}
+              >
+                ↻ 重播
+              </button>
+            )}
+          </div>
+          {Array.isArray(item.demo) ? (
+            <img
+              src={item.demo[activeIndex].src}
+              className="roadmap-demo-svg"
+              alt={item.demo[activeIndex].label}
+            />
+          ) : item.demoType === 'animation' ? (
+            <iframe
+              key={demoKey}
+              src={item.demo}
+              className="roadmap-demo-iframe"
+              title="动画效果演示"
+            />
+          ) : (
+            <img
+              src={item.demo}
+              className="roadmap-demo-svg"
+              alt="示例图"
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Roadmap() {
   const [demoKey, setDemoKey] = useState(0);
+  const [activeDemoIndex, setActiveDemoIndex] = useState<Record<string, number>>({});
+
+  const getActiveIndex = (title: string) => activeDemoIndex[title] || 0;
 
   return (
     <DocPage
@@ -122,40 +222,14 @@ export default function Roadmap() {
       </div>
 
       {ROADMAP_ITEMS.map((item) => (
-        <div key={item.title} className="roadmap-item">
-          <div className="roadmap-item-header">
-            <span className="roadmap-item-icon">{item.icon}</span>
-            <h2>{item.title}</h2>
-            <span className={`roadmap-status roadmap-status-${item.status}`}>
-              {item.phase} · {STATUS_LABEL[item.status]}
-            </span>
-          </div>
-          <p>{item.desc}</p>
-          <ul>
-            {item.bullets.map((b) => (
-              <li key={b}>{b}</li>
-            ))}
-          </ul>
-          {item.demo && (
-            <div className="roadmap-demo">
-              <div className="roadmap-demo-header">
-                <span className="roadmap-demo-label">动画原型预览</span>
-                <button
-                  className="roadmap-demo-replay"
-                  onClick={() => setDemoKey((k) => k + 1)}
-                >
-                  ↻ 重播
-                </button>
-              </div>
-              <iframe
-                key={demoKey}
-                src={item.demo}
-                className="roadmap-demo-iframe"
-                title="动画效果演示"
-              />
-            </div>
-          )}
-        </div>
+        <RoadmapItemCard
+          key={item.title}
+          item={item}
+          activeIndex={getActiveIndex(item.title)}
+          onTabChange={(idx) => setActiveDemoIndex(prev => ({ ...prev, [item.title]: idx }))}
+          demoKey={demoKey}
+          onReplay={() => setDemoKey((k) => k + 1)}
+        />
       ))}
 
       <div className="callout tip">
