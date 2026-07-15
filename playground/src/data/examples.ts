@@ -6,11 +6,16 @@ import paymentGateway from '../../../showcase/sequence/n.payment-gateway.pgm?raw
 import microservices from '../../../showcase/architecture/n.microservices.pgm?raw';
 import dataPipeline from '../../../showcase/architecture/n.data-pipeline.pgm?raw';
 import ecommercePlatform from '../../../showcase/architecture/c.ecommerce-platform.pgm?raw';
+import threeTier from '../../../showcase/architecture/s.three-tier.pgm?raw';
+import aiAgentDocops from '../../../showcase/architecture/c.ai-agent-docops-pipeline.pgm?raw';
 import orderLifecycle from '../../../showcase/state/n.order-lifecycle.pgm?raw';
+import k8sRolloutState from '../../../showcase/state/c.k8s-rollout-state-machine.pgm?raw';
+import onOffState from '../../../showcase/state/s.on-off.pgm?raw';
 import blogSchema from '../../../showcase/er/n.blog-schema.pgm?raw';
 import socialNetwork from '../../../showcase/er/n.social-network.pgm?raw';
 import techStack from '../../../showcase/mindmap/n.tech-stack.pgm?raw';
 import programmingLearning from '../../../showcase/mindmap/n.programming-learning.pgm?raw';
+import aiLearningRoadmap from '../../../showcase/mindmap/c.ai-learning-roadmap.pgm?raw';
 
 import stressDag from '../../../showcase/flowchart/c.layout-stress-dag.pgm?raw';
 import stressNested from '../../../showcase/architecture/c.layout-stress-nested.pgm?raw';
@@ -35,9 +40,84 @@ export interface Example {
   category: ExampleCategory;
   description: string;
   source: string;
+  featured?: boolean;
 }
 
 export const EXAMPLES: Example[] = [
+  // ── 精选示例 ─────────────────────────────────────────────
+  {
+    id: 'state-k8s-rollout',
+    title: 'K8s 发布状态机',
+    kind: 'state',
+    category: 'scenario',
+    description: '云原生 · 灰度/回滚/暂停全流程',
+    source: k8sRolloutState,
+    featured: true,
+  },
+  {
+    id: 'architecture-ai-agent-docops',
+    title: 'AI Agent 文档自动化管线',
+    kind: 'architecture',
+    category: 'scenario',
+    description: 'AI 工程 · 文档生成与审核流水线',
+    source: aiAgentDocops,
+    featured: true,
+  },
+  {
+    id: 'architecture-microservices',
+    title: '微服务架构',
+    kind: 'architecture',
+    category: 'basic',
+    description: '服务、网关与数据库的拓扑',
+    source: microservices,
+    featured: true,
+  },
+  {
+    id: 'architecture-three-tier',
+    title: '三层架构',
+    kind: 'architecture',
+    category: 'basic',
+    description: '经典前端-后端-数据库分层',
+    source: threeTier,
+    featured: true,
+  },
+  {
+    id: 'architecture-data-pipeline',
+    title: '数据仓 ETL 处理',
+    kind: 'architecture',
+    category: 'scenario',
+    description: '数据可视化 · 数仓 ETL 拓扑',
+    source: dataPipeline,
+    featured: true,
+  },
+  {
+    id: 'mindmap-ai-learning',
+    title: 'AI 学习路线',
+    kind: 'mindmap',
+    category: 'scenario',
+    description: '教育学习 · AI 领域知识体系',
+    source: aiLearningRoadmap,
+    featured: true,
+  },
+  {
+    id: 'state-on-off',
+    title: '开关状态',
+    kind: 'state',
+    category: 'basic',
+    description: '最简单二态状态机示例',
+    source: onOffState,
+    featured: true,
+  },
+  {
+    id: 'sequence-payment-gateway',
+    title: '支付网关交互',
+    kind: 'sequence',
+    category: 'scenario',
+    description: '电商交易 · 支付回调链路',
+    source: paymentGateway,
+    featured: true,
+  },
+
   // ── 基础示例 ─────────────────────────────────────────────
   {
     id: 'flowchart-user-auth',
@@ -62,14 +142,6 @@ export const EXAMPLES: Example[] = [
     category: 'basic',
     description: '第三方授权的时序交互',
     source: oauthLogin,
-  },
-  {
-    id: 'architecture-microservices',
-    title: '微服务架构',
-    kind: 'architecture',
-    category: 'basic',
-    description: '服务、网关与数据库的拓扑',
-    source: microservices,
   },
   {
     id: 'state-order-lifecycle',
@@ -104,22 +176,6 @@ export const EXAMPLES: Example[] = [
     category: 'scenario',
     description: '办公协作 · 跨部门入职编排',
     source: employeeOnboarding,
-  },
-  {
-    id: 'sequence-payment-gateway',
-    title: '支付网关交互',
-    kind: 'sequence',
-    category: 'scenario',
-    description: '电商交易 · 支付回调链路',
-    source: paymentGateway,
-  },
-  {
-    id: 'architecture-data-pipeline',
-    title: '数据仓 ETL 处理',
-    kind: 'architecture',
-    category: 'scenario',
-    description: '数据可视化 · 数仓 ETL 拓扑',
-    source: dataPipeline,
   },
   {
     id: 'architecture-ecommerce',
@@ -189,7 +245,7 @@ export const EXAMPLES: Example[] = [
   },
 ];
 
-export const DEFAULT_EXAMPLE_ID = 'flowchart-employee-onboarding';
+export const DEFAULT_EXAMPLE_ID = 'architecture-microservices';
 
 export const CATEGORY_LABELS: Record<ExampleCategory, string> = {
   basic: '基础',

@@ -277,7 +277,7 @@ export default function GettingStarted() {
         <a href="/showcase/" className="quick-link-card" target="_blank" rel="noopener noreferrer">
           <div className="ql-icon">📂</div>
           <h4>浏览示例画廊</h4>
-          <p>70+ 真实场景示例，涵盖所有 6 种图表类型</p>
+          <p>80+ 真实场景示例，涵盖所有 6 种图表类型</p>
           <span className="ql-arrow">→</span>
         </a>
         <a href="/docs/agent-guide/" className="quick-link-card">

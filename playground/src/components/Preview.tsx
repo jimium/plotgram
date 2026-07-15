@@ -187,20 +187,34 @@ export function Preview({
     [tx, ty, clampPan],
   );
 
-  // 原生 wheel 事件，避免被动监听
+  // 滚轮 / 双指手势：
+  //   - ctrlKey=true（pinch zoom 捏合）→ 缩放
+  //   - 普通滚动（双指上下/鼠标滚轮）→ 平移画面
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const listener = (e: WheelEvent) => {
       if (!svg) return;
       e.preventDefault();
-      const rect = container.getBoundingClientRect();
-      const factor = e.deltaY < 0 ? 1.05 : 1 / 1.05;
-      zoomBy(factor, e.clientX - rect.left, e.clientY - rect.top);
+      if (e.ctrlKey) {
+        // pinch zoom：以光标为中心缩放
+        const rect = container.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const factor = Math.exp(-e.deltaY * 0.01);
+        zoomBy(factor, cx, cy);
+      } else {
+        // 普通滚动：平移画面
+        const nextTx = tx - e.deltaX;
+        const nextTy = ty - e.deltaY;
+        const clamped = clampPan(nextTx, nextTy, scale);
+        setTx(clamped.tx);
+        setTy(clamped.ty);
+      }
     };
     container.addEventListener('wheel', listener, { passive: false });
     return () => container.removeEventListener('wheel', listener);
-  }, [svg, zoomBy]);
+  }, [svg, zoomBy, tx, ty, scale, clampPan]);
 
   /** 阻止浮动工具栏的指针事件冒泡到画布，防止触发平移 */
   const stopProp = (e: ReactPointerEvent | React.MouseEvent) => e.stopPropagation();

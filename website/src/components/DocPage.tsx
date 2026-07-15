@@ -60,7 +60,6 @@ export const DOCS_SIDEBAR = [
     items: [
       { to: '/docs/how-it-works/', label: '技术揭秘', active: false },
       { to: '/docs/trae-story/', label: 'TRAE 开发实践', active: false },
-      { to: '/docs/roadmap/', label: '路线图', active: false },
     ],
   },
 ];

@@ -1309,6 +1309,7 @@
       "architecture/n.data-pipeline.pgm",
       "architecture/n.event-driven.pgm",
       "architecture/n.microservices.pgm",
+      "architecture/n.typical-microservice-architecture.pgm",
       "architecture/s.client-api-db.pgm",
       "architecture/s.three-tier.pgm",
       "er/c.ecommerce-schema.pgm",
@@ -1414,16 +1415,14 @@
     };
 
     const FEATURED_FILES = new Set([
-      "architecture/c.k8s-multi-namespace-overview.pgm",
-      "architecture/c.ai-agent-docops-pipeline.pgm",
-      "architecture/c.payment-clearing-platform.pgm",
-      "architecture/c.supply-chain-control-tower.pgm",
-      "sequence/c.k8s-rolling-update.pgm",
-      "sequence/c.real-time-risk-decisioning.pgm",
-      "flowchart/c.k8s-incident-response.pgm",
-      "flowchart/c.aml-case-investigation.pgm",
       "state/c.k8s-rollout-state-machine.pgm",
-      "state/c.settlement-reconciliation-lifecycle.pgm"
+      "architecture/c.ai-agent-docops-pipeline.pgm",
+      "architecture/n.microservices.pgm",
+      "architecture/s.three-tier.pgm",
+      "architecture/n.data-pipeline.pgm",
+      "mindmap/c.ai-learning-roadmap.pgm",
+      "state/s.on-off.pgm",
+      "sequence/n.payment-gateway.pgm"
     ]);
 
     const TITLE_OVERRIDES = {
@@ -1437,6 +1436,7 @@
       "architecture/c.ai-agent-docops-pipeline.pgm": "AI Agent 文档自动化管线",
       "architecture/c.payment-clearing-platform.pgm": "支付清结算平台",
       "architecture/c.supply-chain-control-tower.pgm": "供应链控制塔",
+      "architecture/n.typical-microservice-architecture.pgm": "典型微服务架构图",
       "sequence/c.k8s-rolling-update.pgm": "K8s 滚动发布链路",
       "sequence/c.k8s-node-failure-recovery.pgm": "K8s 节点故障恢复链路",
       "sequence/c.k8s-canary-rollback.pgm": "K8s 金丝雀回滚链路",
@@ -1476,6 +1476,7 @@
       if (lower.includes("mindmap")) tags.add("知识组织");
       if (lower.includes("layout-stress")) tags.add("布局压力");
       if (lower.includes("ecommerce")) tags.add("电商");
+      if (lower.includes("microservice")) tags.add("微服务");
       if (lower.includes("compiler")) tags.add("工程系统");
       if (lower.includes("oauth") || lower.includes("auth")) tags.add("认证");
       if (lower.includes("social-network") || lower.includes("blog") || lower.includes("school")) tags.add("业务建模");

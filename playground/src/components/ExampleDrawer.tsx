@@ -59,10 +59,12 @@ export function ExampleDrawer({ open, activeId, onSelect, onClose }: ExampleDraw
       const matchesKind = kindFilter === 'all' || e.kind === kindFilter;
       return matchesQuery && matchesKind;
     });
-    return CATEGORY_ORDER.map((cat) => ({
+    const featured = filtered.filter((e) => e.featured);
+    const rest = CATEGORY_ORDER.map((cat) => ({
       category: cat,
-      items: filtered.filter((e) => e.category === cat),
+      items: filtered.filter((e) => e.category === cat && !e.featured),
     })).filter((g) => g.items.length > 0);
+    return { featured, rest };
   }, [query, kindFilter]);
 
   if (!open) return null;
@@ -104,8 +106,34 @@ export function ExampleDrawer({ open, activeId, onSelect, onClose }: ExampleDraw
         </div>
 
         <div className="example-drawer-body">
-          {grouped.length === 0 && <div className="empty-hint">没有匹配的示例</div>}
-          {grouped.map(({ category, items }) => (
+          {grouped.featured.length === 0 && grouped.rest.length === 0 && <div className="empty-hint">没有匹配的示例</div>}
+          {grouped.featured.length > 0 && (
+            <section className="example-drawer-group example-drawer-group-featured">
+              <h4 className="example-drawer-group-title">精选</h4>
+              {grouped.featured.map((ex) => (
+                <button
+                  key={ex.id}
+                  type="button"
+                  className={`example-drawer-card ${ex.id === activeId ? 'active' : ''}`}
+                  onClick={() => {
+                    onSelect(ex.id);
+                    onClose();
+                  }}
+                >
+                  <div className="example-drawer-thumb">
+                    <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>
+                      {KIND_LABELS[ex.kind].slice(0, 2)}
+                    </span>
+                  </div>
+                  <div className="example-drawer-info">
+                    <div className="example-drawer-info-title">{ex.title}</div>
+                    <div className="example-drawer-info-desc">{ex.description}</div>
+                  </div>
+                </button>
+              ))}
+            </section>
+          )}
+          {grouped.rest.map(({ category, items }) => (
             <section key={category} className="example-drawer-group">
               <h4 className="example-drawer-group-title">{CATEGORY_LABELS[category]}</h4>
               {items.map((ex) => (
