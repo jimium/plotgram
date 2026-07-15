@@ -227,6 +227,8 @@ export default function HeroPlayground() {
   sourceRef.current = source;
   const inputModeRef = useRef(inputMode);
   inputModeRef.current = inputMode;
+  const autoplayStoppedRef = useRef(false);
+  const isAutoplaySwitchRef = useRef(false);
 
   // 预览缩放/平移
   const containerRef = useRef<HTMLDivElement>(null);
@@ -298,7 +300,12 @@ export default function HeroPlayground() {
         editorTheme,
         EditorView.lineWrapping,
         EditorView.updateListener.of((u) => {
-          if (u.docChanged) setSource(u.state.doc.toString());
+          if (u.docChanged) {
+            if (!isAutoplaySwitchRef.current) {
+              autoplayStoppedRef.current = true;
+            }
+            setSource(u.state.doc.toString());
+          }
         }),
         keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
       ],
@@ -534,8 +541,44 @@ export default function HeroPlayground() {
     return { kind: 'ok' as const, text: '实时渲染 · 修改代码即时预览' };
   }, [wasmError, ready, renderError]);
 
+  const stopAutoplay = useCallback(() => {
+    autoplayStoppedRef.current = true;
+  }, []);
+
+  const switchPreset = useCallback((i: number) => {
+    const p = PRESETS[i];
+    isAutoplaySwitchRef.current = true;
+    setActivePreset(i);
+    setSource(p.source);
+    setInputMode(p.inputMode ?? 'dfy');
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (autoplayStoppedRef.current) {
+        clearInterval(interval);
+        return;
+      }
+      setActivePreset((prev) => {
+        const next = (prev + 1) % PRESETS.length;
+        const p = PRESETS[next];
+        isAutoplaySwitchRef.current = true;
+        setSource(p.source);
+        setInputMode(p.inputMode ?? 'dfy');
+        return next;
+      });
+    }, 3500);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (isAutoplaySwitchRef.current) {
+      isAutoplaySwitchRef.current = false;
+    }
+  }, [source]);
+
   return (
-    <div className="hero-visual">
+    <div className="hero-visual" onClick={stopAutoplay}>
       <div className="hero-visual-header">
         <div className="hero-window-dots">
           <span className="hero-visual-dot red" />
@@ -549,9 +592,8 @@ export default function HeroPlayground() {
               key={p.label}
               className={`hero-preset-btn ${i === activePreset ? 'active' : ''}`}
               onClick={() => {
-                setActivePreset(i);
-                setSource(p.source);
-                setInputMode(p.inputMode ?? 'dfy');
+                stopAutoplay();
+                switchPreset(i);
               }}
             >
               {p.label}

@@ -41,3 +41,8 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Root node_modules (temp tooling)
+/node_modules/
+/package.json
+/package-lock.json

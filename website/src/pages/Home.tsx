@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import HeroPlayground from '../components/HeroPlayground';
+import ScrollNav from '../components/ScrollNav';
 
 interface RoadmapItem {
   phase: string;
@@ -19,6 +20,15 @@ const DIAGRAM_TYPES = [
   { icon: '🔄', name: '状态机 State', desc: '订单生命周期、状态流转', status: 'beta' },
   { icon: '🗃️', name: 'ER 图 ER Diagram', desc: '数据库设计、数据建模', status: 'beta' },
   { icon: '🧠', name: '思维导图 Mindmap', desc: '知识梳理、产品路线图', status: 'beta' },
+];
+
+const EXPORT_FORMATS = [
+  { icon: '📄', name: 'SVG', desc: '矢量图，无损缩放' },
+  { icon: '🖼️', name: 'PNG', desc: '透明底位图' },
+  { icon: '🌐', name: 'WebP', desc: '高效压缩位图' },
+  { icon: '📐', name: 'Draw.io', desc: '可继续编辑' },
+  { icon: '🔤', name: 'ASCII', desc: '终端文本图' },
+  { icon: '📋', name: 'JSON', desc: 'AST 可编程' },
 ];
 
 const FEATURES = [
@@ -52,6 +62,21 @@ const FEATURES = [
     title: '语义图标 + 多套主题',
     desc: '50+ 内置语义图标（数据库、服务、K8s 资源等），7 套精美主题一键切换，技术图也能颜值在线。',
   },
+];
+
+const LAYOUT_ALGOS = [
+  { name: 'Sugiyama-v2', desc: '增强分层布局', tag: '流程图/ER图', color: 'purple' },
+  { name: 'Architecture', desc: '双层分组布局', tag: '架构图', color: 'cyan' },
+  { name: 'Mindmap', desc: '中心辐射布局', tag: '思维导图', color: 'purple' },
+  { name: 'Force-Directed', desc: '力导向布局', tag: '拓扑图', color: 'cyan' },
+  { name: 'Circular', desc: '自适应环形布局', tag: '状态机', color: 'purple' },
+  { name: 'Sequence', desc: '生命线专用布局', tag: '时序图', color: 'cyan' },
+];
+
+const ROUTING_PIPELINE = [
+  { step: '01', title: '通道规划', desc: '基于节点 rank 与分组边界，自动规划正交通道与走廊，边沿分组边缘绕行' },
+  { step: '02', title: '边聚合 & 锚点共享', desc: '同方向边共享槽位锚点、合并主干，减少视觉杂乱（Edge Bundling）' },
+  { step: '03', title: '冲突重路由 + 车道分配', desc: '3 轮渐进式避让重路由，交叉轴偏移分配车道，保证边不重叠、不穿节点' },
 ];
 
 const COMPARISON = [
@@ -219,7 +244,7 @@ function RoadmapItemCard({ item, activeIndex, onTabChange, demoKey, onReplay }: 
     <div className="roadmap-item">
       <div className="roadmap-item-header">
         <span className="roadmap-item-icon">{item.icon}</span>
-        <h2>{item.title}</h2>
+        <h3>{item.title}</h3>
         <span className={`roadmap-status roadmap-status-${item.status}`}>
           {item.phase} · {STATUS_LABEL[item.status]}
         </span>
@@ -296,8 +321,9 @@ export default function Home() {
 
   return (
     <div>
+      <ScrollNav />
       {/* HERO */}
-      <section className="hero">
+      <section className="hero" id="hero">
         <div className="container">
           <a
             className="hero-badge"
@@ -338,7 +364,7 @@ export default function Home() {
       </section>
 
       {/* FOR JUDGES */}
-      <section className="judges">
+      <section className="judges" id="overview">
         <div className="container">
           <div className="judges-card">
             <div className="judges-header">
@@ -439,6 +465,67 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ALGORITHMS */}
+      <section className="algorithms" id="algorithms">
+        <div className="container">
+          <div className="section-header">
+            <div className="section-label">Core Engine</div>
+            <h2>自研布局与路由引擎</h2>
+            <p>50K+ 行 Rust 实现的核心算法——不是包装开源库，而是从几何底层自研</p>
+          </div>
+          <div className="algo-grid">
+            <div className="algo-card">
+              <div className="algo-card-header">
+                <div className="algo-card-icon purple">📐</div>
+                <div>
+                  <h3>7 种节点布局算法</h3>
+                  <p>根据图表类型自动切换，引擎选择最优策略</p>
+                </div>
+              </div>
+              <div className="algo-list">
+                {LAYOUT_ALGOS.map((a) => (
+                  <div className="algo-item" key={a.name}>
+                    <span className={`algo-dot ${a.color}`} />
+                    <div className="algo-item-body">
+                      <div className="algo-item-name">{a.name}</div>
+                      <div className="algo-item-desc">{a.desc}</div>
+                    </div>
+                    <span className="algo-item-tag">{a.tag}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="algo-card">
+              <div className="algo-card-header">
+                <div className="algo-card-icon cyan">✏️</div>
+                <div>
+                  <h3>正交边路由三层管线</h3>
+                  <p>复杂架构图也能清晰不交叉、不穿节点</p>
+                </div>
+              </div>
+              <div className="routing-pipeline">
+                {ROUTING_PIPELINE.map((p, i) => (
+                  <div className="pipeline-item" key={p.step}>
+                    <div className="pipeline-step">
+                      <div className="pipeline-step-num">{p.step}</div>
+                      <div className="pipeline-step-body">
+                        <div className="pipeline-step-title">{p.title}</div>
+                        <div className="pipeline-step-desc">{p.desc}</div>
+                      </div>
+                    </div>
+                    {i < ROUTING_PIPELINE.length - 1 && <div className="pipeline-arrow">↓</div>}
+                  </div>
+                ))}
+              </div>
+              <div className="algo-highlight">
+                <strong>+</strong> 还支持 Bezier 曲线、Spline 样条、Organic 自然肘形 S 曲线、Circular 弧形等路由风格
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* DIAGRAM TYPES */}
       <section className="diagram-types" id="diagram-types">
         <div className="container">
@@ -455,6 +542,23 @@ export default function Home() {
                 <p>{t.desc}</p>
               </a>
             ))}
+          </div>
+
+          <div className="export-section">
+            <div className="section-header">
+              <div className="section-label">Export</div>
+              <h2>多格式导出，无缝融入工作流</h2>
+              <p>CLI / API / WASM 统一输出，满足文档、演示、二次编辑、程序化处理需求</p>
+            </div>
+            <div className="export-grid">
+              {EXPORT_FORMATS.map((f) => (
+                <div className="export-card" key={f.name}>
+                  <div className="export-icon">{f.icon}</div>
+                  <div className="export-name">{f.name}</div>
+                  <div className="export-desc">{f.desc}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
