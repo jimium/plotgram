@@ -39,10 +39,31 @@ pub fn snap_and_repulse_edges(
     groups: &HashMap<String, GroupLayout>,
     config: &EdgeSnapConfig,
 ) {
+    snap_and_repulse_edges_with_guard(edges, groups, config, None, None, None, None);
+}
+
+/// 见 [`snap_and_repulse_edges`]；可选 Annotation / 节点守卫。
+pub fn snap_and_repulse_edges_with_guard(
+    edges: &mut [EdgeLayout],
+    groups: &HashMap<String, GroupLayout>,
+    config: &EdgeSnapConfig,
+    annotations: Option<&crate::layout::edge::RouteAnnotationSet>,
+    nodes: Option<&std::collections::HashMap<String, crate::layout::NodeLayout>>,
+    relations: Option<&[crate::ast::Relation]>,
+    sorted_node_ids: Option<&[String]>,
+) {
     if !config.enabled {
         return;
     }
-    grid_snap::snap_edge_waypoints(edges, groups, config);
+    grid_snap::snap_edge_waypoints_with_guard(
+        edges,
+        groups,
+        config,
+        annotations,
+        nodes,
+        relations,
+        sorted_node_ids,
+    );
     group::repulse_edges_from_group_borders(
         edges,
         groups,

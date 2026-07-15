@@ -41,15 +41,4 @@
 
 ## 6. WASM 平台禁用 `std::time::{Instant, SystemTime}`
 
-`std::time::Instant` 和 `std::time::SystemTime` 在 `wasm32-unknown-unknown` 目标上**不可用**，直接调用会在运行时 panic：`RuntimeError: unreachable` + 控制台 `time not implemented on this platform`。playground / agent-demo 通过 `wasm-pack` 编译到浏览器，任何在 render / lint / parse 路径上的裸 `Instant::now()` 都会让前端白屏或 tab 崩溃。
-
-- **必须使用 WASM-safe 的 `crate::layout::perf::Instant`**：该模块在非 wasm32 目标上 re-export `std::time::Instant`，在 wasm32 上提供一个 no-op 替身（`now()` 返回 `Instant`，`elapsed()` 返回 `Duration::ZERO`）。
-  - 非 wasm32：真实计时，保留性能日志语义。
-  - wasm32：返回零，不 panic。
-- **新增计时点时的检查清单**：
-  1. 用 `crate::layout::perf::Instant::now()`，不要用 `std::time::Instant::now()`。
-  2. 如果同文件里已 `use crate::layout::perf::Instant;`，直接写 `Instant::now()` 即可；否则写全路径。
-  3. PR 前在 `crates/plotgram-core/src` 全局 grep `std::time::Instant|std::time::SystemTime`，确认没有漏网（`src/bin/` 下的 bench 工具除外，它们不进 WASM）。
-- **反例**：`two_phase.rs:216` 曾用 `std::time::Instant::now()` 做 EGB 阶段计时，结果在 playground 渲染 architecture 类型图时 `render_with_options` 整个崩溃。修复就是把 `std::time::Instant` 改成 `crate::layout::perf::Instant`。
-- **WASM 产物同步**：改完 Rust 代码后必须 `wasm-pack build crates/plotgram-wasm --target web --release`，然后把 `crates/plotgram-wasm/pkg` 同步到 `playground/plotgram-wasm/` 和 `agent-demo/plotgram-wasm/`，否则浏览器加载的是陈旧 WASM，bug 不会消失。
-- **其他 WASM 不可用的 std 功能**（同样需要平台抽象或规避）：`std::thread`、`std::fs`、`std::net`、`std::process`、`std::env::args`、`std::time::{Instant, SystemTime}`。引入新依赖前先确认其在 `wasm32-unknown-unknown` 下可编译。
+`plotgram-core` 会编译到 WASM（playground / agent-demo），在 `crates/plotgram-core/src` 内禁止裸用 `std::time::{Instant, SystemTime}`，否则会运行时 panic。计时与性能日志统一走 [`crates/plotgram-core/src/layout/perf.rs`](crates/plotgram-core/src/layout/perf.rs) 的 `crate::layout::perf::Instant` 与 `perf_log!` 宏。

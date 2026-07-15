@@ -35,6 +35,10 @@ pub struct OrthoRoutingContext<'a> {
     pub strict_group_transit: bool,
     /// 空间契约：0 候选升档后加大外框绕行垫（S2）。
     pub corridor_boost: bool,
+    /// S4：优先评估外环绕行候选（feedback / 监控枢纽边）。
+    pub prefer_outer_ring: bool,
+    /// S4：受保护的垂直业务干线 `(x, y_lo, y_hi)`；穿越加重惩罚。
+    pub protected_trunks: &'a [(f64, f64, f64)],
 }
 
 impl<'a> OrthoRoutingContext<'a> {
@@ -58,6 +62,8 @@ impl<'a> OrthoRoutingContext<'a> {
             // 默认 false，由调用方按边调用 should_strict_group_transit 覆盖
             strict_group_transit: false,
             corridor_boost: false,
+            prefer_outer_ring: false,
+            protected_trunks: &[],
         }
     }
 
@@ -69,6 +75,16 @@ impl<'a> OrthoRoutingContext<'a> {
 
     pub fn with_corridor_boost(mut self, boost: bool) -> Self {
         self.corridor_boost = boost;
+        self
+    }
+
+    pub fn with_prefer_outer_ring(mut self, prefer: bool) -> Self {
+        self.prefer_outer_ring = prefer;
+        self
+    }
+
+    pub fn with_protected_trunks(mut self, trunks: &'a [(f64, f64, f64)]) -> Self {
+        self.protected_trunks = trunks;
         self
     }
 }

@@ -20,7 +20,9 @@ pub use violation::{
 use crate::layout::edge::common::label_avoidance::aabb_overlap;
 
 use crate::ast::Diagram;
-use crate::layout::edge::edge_merge_policy::{edge_merge_context, edges_may_share_trunk};
+use crate::layout::edge::segment_pair::{
+    find_needs_separation_edge_pairs, SeparationReason,
+};
 use crate::layout::geometry::Point;
 use crate::layout::refine::segment_intersects_node;
 use crate::layout::{ContainmentViolationKind, LayoutResult};
@@ -645,106 +647,28 @@ fn endpoint_related_groups(
         .unwrap_or_else(|| HashSet::from([direct.clone()]))
 }
 
-// ─── 架构图假并线检测 ─────────────────────────────────────────────
+// ─── 架构图假并线检测（P1：走 segment_pair::Classify）────────────────
 
-const TRUNK_ALIGN_EPS: f64 = 1.0;
-const MIN_SHARED_TRUNK_LEN: f64 = 24.0;
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum TrunkAxis {
-    Vertical,
-    Horizontal,
-}
-
-#[derive(Clone, Copy)]
-struct TrunkRun {
-    axis: TrunkAxis,
-    coord: f64,
-    span_min: f64,
-    span_max: f64,
-}
-
-fn axis_aligned_runs(path: &[Point]) -> Vec<TrunkRun> {
-    let mut runs = Vec::new();
-    for w in path.windows(2) {
-        let a = w[0];
-        let b = w[1];
-        if (a.x - b.x).abs() < TRUNK_ALIGN_EPS && (a.y - b.y).abs() >= MIN_SHARED_TRUNK_LEN {
-            runs.push(TrunkRun {
-                axis: TrunkAxis::Vertical,
-                coord: (a.x + b.x) * 0.5,
-                span_min: a.y.min(b.y),
-                span_max: a.y.max(b.y),
-            });
-        } else if (a.y - b.y).abs() < TRUNK_ALIGN_EPS && (a.x - b.x).abs() >= MIN_SHARED_TRUNK_LEN {
-            runs.push(TrunkRun {
-                axis: TrunkAxis::Horizontal,
-                coord: (a.y + b.y) * 0.5,
-                span_min: a.x.min(b.x),
-                span_max: a.x.max(b.x),
-            });
-        }
-    }
-    runs
-}
-
-fn runs_share_trunk(a: &TrunkRun, b: &TrunkRun) -> bool {
-    if a.axis != b.axis || (a.coord - b.coord).abs() > TRUNK_ALIGN_EPS {
-        return false;
-    }
-    let overlap = a.span_max.min(b.span_max) - a.span_min.max(b.span_min);
-    overlap >= MIN_SHARED_TRUNK_LEN - TRUNK_ALIGN_EPS
-}
-
-/// 返回所有非语义平行段重叠的边对 (i, j)（所有图类型）。
+/// 返回所有非语义平行段重叠的边对 (i, j)。
 ///
-/// 对每对边：若不属于同一 `MergeGroup`（语义门控）且存在共享 trunk 段，
-/// 则计入结果。非 architecture 图 `edges_may_share_trunk` 恒为 true，返回空。
+/// 裁决统一走 [`find_needs_separation_edge_pairs`]；仅保留
+/// exact 的 `NonSemanticTrunk`（与历史 UnrelatedEdgeTrunkMerge 对齐：
+/// 长 trunk 共线重合，不含紧间距）。
 fn find_unrelated_parallel_overlaps(
     diagram: &Diagram,
     result: &LayoutResult,
 ) -> Vec<(usize, usize)> {
-    let mut pairs = Vec::new();
-    let n = result.edges.len().min(diagram.relations.len());
-    for i in 0..n {
-        for j in (i + 1)..n {
-            let Some(rel_i) = diagram.relations.get(i) else {
-                continue;
-            };
-            let Some(rel_j) = diagram.relations.get(j) else {
-                continue;
-            };
-            let ctx_i = edge_merge_context(rel_i.from.as_str(), rel_i.to.as_str(), i);
-            let ctx_j = edge_merge_context(rel_j.from.as_str(), rel_j.to.as_str(), j);
-            if edges_may_share_trunk(&ctx_i, &ctx_j, diagram.diagram_type.clone()) {
-                continue;
-            }
-            let runs_i = axis_aligned_runs(&result.edges[i].path_points());
-            let runs_j = axis_aligned_runs(&result.edges[j].path_points());
-            let mut shared = false;
-            for ri in &runs_i {
-                for rj in &runs_j {
-                    if runs_share_trunk(ri, rj) {
-                        shared = true;
-                        break;
-                    }
-                }
-                if shared {
-                    break;
-                }
-            }
-            if shared {
-                pairs.push((i, j));
-            }
-        }
-    }
-    pairs
+    find_needs_separation_edge_pairs(diagram, result)
+        .into_iter()
+        .filter(|(_, _, reason, _)| matches!(reason, SeparationReason::NonSemanticTrunk))
+        .map(|(i, j, _, _)| (i, j))
+        .collect()
 }
 
 /// 计算非语义平行段重叠对数（所有图类型，供 eval 框架消费）。
 ///
 /// 语义门控：architecture 图要求边对至少共享一个 `MergeGroup` 才允许共享 trunk；
-/// 其他图类型 `edges_may_share_trunk` 恒为 true，本函数返回 0。
+/// 其他图类型不产生 `NonSemanticTrunk`，本函数返回 0。
 pub fn count_unrelated_parallel_overlaps(diagram: &Diagram, result: &LayoutResult) -> usize {
     find_unrelated_parallel_overlaps(diagram, result).len()
 }

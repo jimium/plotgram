@@ -48,7 +48,8 @@ impl CandidateScorer for DefaultScorer {
         let w = ctx.profile.scoring;
         let mut score = path_length(path) * w.path_length;
         score += path.len().saturating_sub(2) as f64 * BEND_PENALTY * w.bend;
-        score += obstacle_penalty(
+        // S4 / S4.x：feedback / 监控边对交叉加重（×3）；obstacle 穿模再 ×2
+        let obst = obstacle_penalty(
             path,
             pair.from_id(),
             pair.to_id(),
@@ -56,10 +57,25 @@ impl CandidateScorer for DefaultScorer {
             ctx.group_ctx,
             &ctx.obstacles,
         ) * w.obstacle;
-        score += edge_overlap_penalty(
-            path,
-            ctx.grid,
-        );
+        score += if ctx.prefer_outer_ring {
+            obst * 2.0
+        } else {
+            obst
+        };
+        let overlap = edge_overlap_penalty(path, ctx.grid);
+        score += if ctx.prefer_outer_ring {
+            overlap * 3.0
+        } else {
+            overlap
+        };
+        // S4.x：穿越受保护业务 FanIn 干线加重惩罚
+        if !ctx.protected_trunks.is_empty() {
+            score += protected_trunk_crossing_penalty(path, ctx.protected_trunks);
+        }
+        // S4.x：外环路径（折点落在节点 bbox 外）给更强奖励
+        if ctx.prefer_outer_ring {
+            score += outer_ring_path_bonus(path, ctx.nodes);
+        }
         // Phase 3: 通道负载感知——reroute 时偏好低负载通道，从源头减少拥堵
         if let Some(load_map) = ctx.channel_load {
             score += channel_load_penalty(path, load_map) * w.channel_load;
@@ -312,6 +328,68 @@ pub fn edge_overlap_penalty(
     penalty
 }
 
+/// S4.x：水平段穿越受保护垂直干线（业务 FanIn 主缝）的加重惩罚。
+const PROTECTED_TRUNK_CROSS_PENALTY: f64 = 28_000.0;
+
+pub(super) fn protected_trunk_crossing_penalty(path: &[Point], trunks: &[(f64, f64, f64)]) -> f64 {
+    if trunks.is_empty() || path.len() < 2 {
+        return 0.0;
+    }
+    let mut penalty = 0.0;
+    for window in path.windows(2) {
+        let a = window[0];
+        let b = window[1];
+        // 仅水平段可与垂直干线正交交叉
+        if (a.y - b.y).abs() >= EPS {
+            continue;
+        }
+        let y = a.y;
+        let x_lo = a.x.min(b.x);
+        let x_hi = a.x.max(b.x);
+        for &(tx, y0, y1) in trunks {
+            let ty_lo = y0.min(y1);
+            let ty_hi = y0.max(y1);
+            if tx > x_lo + EPS
+                && tx < x_hi - EPS
+                && y > ty_lo + EPS
+                && y < ty_hi - EPS
+            {
+                penalty += PROTECTED_TRUNK_CROSS_PENALTY;
+            }
+        }
+    }
+    penalty
+}
+
+/// 折点落在节点包围盒外（外环）时给负分奖励。
+const OUTER_RING_PATH_BONUS: f64 = -9_000.0;
+
+fn outer_ring_path_bonus(path: &[Point], nodes: &HashMap<String, NodeLayout>) -> f64 {
+    if path.len() < 3 || nodes.is_empty() {
+        return 0.0;
+    }
+    let mut x_lo = f64::INFINITY;
+    let mut y_lo = f64::INFINITY;
+    let mut x_hi = f64::NEG_INFINITY;
+    let mut y_hi = f64::NEG_INFINITY;
+    for n in nodes.values() {
+        x_lo = x_lo.min(n.x);
+        y_lo = y_lo.min(n.y);
+        x_hi = x_hi.max(n.x + n.width);
+        y_hi = y_hi.max(n.y + n.height);
+    }
+    // 中间折点（非端点）是否有落在 bbox 外 ≥ 24px
+    const OUT: f64 = 24.0;
+    let outside = path[1..path.len() - 1].iter().any(|p| {
+        p.x < x_lo - OUT || p.x > x_hi + OUT || p.y < y_lo - OUT || p.y > y_hi + OUT
+    });
+    if outside {
+        OUTER_RING_PATH_BONUS
+    } else {
+        0.0
+    }
+}
+
 fn segments_conflict(a: &RoutedSegment, b: &RoutedSegment) -> bool {
     if a.edge_index == b.edge_index {
         return false;
@@ -347,36 +425,27 @@ struct ParallelPairInfo {
 /// 不检查 `edge_index`；调用方需自行跳过同边。
 /// 返回间隙和投影重叠信息；非平行（含非轴向）返回 `None`。
 fn classify_parallel_pair(a: &RoutedSegment, b: &RoutedSegment) -> Option<ParallelPairInfo> {
-    let a_horiz = (a.y1 - a.y2).abs() < EPS;
-    let b_horiz = (b.y1 - b.y2).abs() < EPS;
-    let a_vert = (a.x1 - a.x2).abs() < EPS;
-    let b_vert = (b.x1 - b.x2).abs() < EPS;
-
-    if a_horiz && b_horiz {
-        let gap = (a.y1 - b.y1).abs();
-        let a_min = a.x1.min(a.x2);
-        let a_max = a.x1.max(a.x2);
-        let b_min = b.x1.min(b.x2);
-        let b_max = b.x1.max(b.x2);
-        return Some(ParallelPairInfo {
-            gap,
-            projection_overlaps: a_max > b_min + EPS && b_max > a_min + EPS,
-        });
-    }
-
-    if a_vert && b_vert {
-        let gap = (a.x1 - b.x1).abs();
-        let a_min = a.y1.min(a.y2);
-        let a_max = a.y1.max(a.y2);
-        let b_min = b.y1.min(b.y2);
-        let b_max = b.y1.max(b.y2);
-        return Some(ParallelPairInfo {
-            gap,
-            projection_overlaps: a_max > b_min + EPS && b_max > a_min + EPS,
-        });
-    }
-
-    None
+    use crate::layout::edge::segment_pair::{measure_segment_pair, OrthoSegment};
+    let oa = OrthoSegment {
+        x1: a.x1,
+        y1: a.y1,
+        x2: a.x2,
+        y2: a.y2,
+        edge_index: a.edge_index,
+    };
+    let ob = OrthoSegment {
+        x1: b.x1,
+        y1: b.y1,
+        x2: b.x2,
+        y2: b.y2,
+        edge_index: b.edge_index,
+    };
+    let m = measure_segment_pair(&oa, &ob)?;
+    Some(ParallelPairInfo {
+        gap: m.gap,
+        // 与历史行为一致：端点接触也算 projection_overlaps（违规检测另有逻辑）
+        projection_overlaps: m.projection_overlaps,
+    })
 }
 
 /// 检测水平段 `h` 与垂直段 `v` 是否严格内部相交（不含端点接触）。
@@ -394,6 +463,32 @@ fn segments_cross_perpendicular(h: &RoutedSegment, v: &RoutedSegment) -> bool {
         && v_x < h_x_max - EPS
         && h_y > v_y_min + EPS
         && h_y < v_y_max - EPS
+}
+
+/// S4：候选路径是否与已路由边发生垂直交叉（平行贴近不算）。
+pub(super) fn path_has_perpendicular_edge_crossing(path: &[Point], grid: &SegmentGrid) -> bool {
+    for window in path.windows(2) {
+        let seg = RoutedSegment {
+            x1: window[0].x,
+            y1: window[0].y,
+            x2: window[1].x,
+            y2: window[1].y,
+            edge_index: usize::MAX,
+        };
+        for existing in grid.query_overlapping(&seg, BBOX_EXPAND) {
+            let a_horiz = (seg.y1 - seg.y2).abs() < EPS;
+            let b_horiz = (existing.y1 - existing.y2).abs() < EPS;
+            let a_vert = (seg.x1 - seg.x2).abs() < EPS;
+            let b_vert = (existing.x1 - existing.x2).abs() < EPS;
+            if a_horiz && b_vert && segments_cross_perpendicular(&seg, existing) {
+                return true;
+            }
+            if a_vert && b_horiz && segments_cross_perpendicular(existing, &seg) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// 边间距违规类型
@@ -574,7 +669,7 @@ pub fn path_is_clean_from_edges(
     true
 }
 
-fn segment_intersects_node(a: Point, b: Point, nl: &NodeLayout, pad: f64) -> bool {
+pub(super) fn segment_intersects_node(a: Point, b: Point, nl: &NodeLayout, pad: f64) -> bool {
     Rect::from(nl).expanded(pad).segment_crosses_interior(a, b, EPS)
 }
 

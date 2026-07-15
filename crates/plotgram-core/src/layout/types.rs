@@ -466,6 +466,9 @@ pub struct LayoutHints {
     /// 空间契约：同层间距 / 标签缝 / 端口 clearance（布局预留，路由与后处理守约）。
     // WRITE: layout(space_budget)  READ: render(routing + post-process)
     pub space_budget: Option<space_budget::SpaceBudget>,
+    /// 正交路由 C 末旁路注解（stub / 受保护 trunk）；不改 `EdgeLayout`。
+    // WRITE: render(route_edges_orthogonal @ C end)  READ: sanitize / grid_snap validate
+    pub route_annotations: Option<crate::layout::edge::RouteAnnotationSet>,
 }
 
 /// EGB + PRS 性能与效果观测（不影响布局结果）。
@@ -526,6 +529,20 @@ pub struct OrthoDebugStats {
     pub lane_shifts_failed: usize,
     /// Phase 3: reroute 时构建的通道负载图的最大负载值
     pub max_channel_load: usize,
+    /// S1：同侧 stub 冲突对数（去冲突前，含跨对）
+    pub stub_occupancy_conflicts: usize,
+    /// S1：跨无向对的 stub 冲突对数
+    pub stub_cross_pair_conflicts: usize,
+    /// S1：成功平移的 stub 端数
+    pub stub_occupancy_shifted: usize,
+    /// S1：未能分离而 degraded 的次数
+    pub stub_occupancy_degraded: usize,
+    /// S3：成功合流的语义组数（FanIn/FanOut）
+    pub semantic_trunk_groups_merged: usize,
+    /// S3：合流失败 degraded 的组数
+    pub semantic_trunk_degraded: usize,
+    /// S4：S3 后为避 FanIn 干线而重路由的 feedback 边数
+    pub feedback_rerouted_after_trunk: usize,
 }
 
 impl OrthoDebugStats {

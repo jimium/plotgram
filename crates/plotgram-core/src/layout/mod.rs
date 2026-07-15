@@ -37,6 +37,7 @@ pub mod canvas_finalize;
 pub mod constants;
 pub mod decl_order;
 pub mod edge;
+pub mod edge_band_demand;
 pub mod entry;
 pub mod geometry;
 pub mod geometry_helpers;
@@ -44,6 +45,7 @@ pub mod grid_snap;
 pub mod group;
 pub mod group_frame;
 pub mod lint;
+pub mod metrics;
 pub mod node;
 pub mod plan;
 pub mod perf;
@@ -72,8 +74,22 @@ pub use lint::{
     LayoutLinter, LayoutViolation, LintConfig, LintMetricsSummary, LintProfile, LintReport,
     LintRuleId, LintSeverity, RuleConfig,
 };
+pub use edge_band_demand::{
+    demand_extra_over_base, edge_band_demand, layer_gaps_from_demand, EdgeBandDemandBreakdown,
+    EdgeBandDemandProfile,
+};
+pub use metrics::{
+    compute_collinear_sample_metrics, compute_congestion_sample_metrics, node_fingerprint,
+    CollinearBaselineSnapshot, CollinearOrthoStats, CollinearSampleMetrics,
+    CongestionBaselineSnapshot, CongestionSampleMetrics,
+};
 pub use registry::{EDGE_ROUTING_NAMES, LAYOUT_ALGORITHM_NAMES};
 pub use grid_snap::{DiagramAlignOverride, EdgeSnapConfig, LayerAxisAlign, NodeAlignConfig};
+pub use edge::segment_pair::{
+    classify_segment_pair, find_needs_separation_edge_pairs, measure_segment_pair,
+    ClassifyPairContext, ClassifyResult, ConflictDisposition, OrthoSegment, SegmentPairMeasure,
+    SeparationReason, SpacingClass,
+};
 
 // 向后兼容：保持 `crate::layout::sugiyama` 等路径可用
 pub use edge::{

@@ -1,0 +1,16 @@
+# 共线方案回归样例集（质量 + 性能门禁）
+# 含 phase0 集 + 共干/性能热点。路径相对仓库根目录。
+
+# --- phase0 ---
+showcase/architecture/c.layout-stress-nested.pgm
+showcase/architecture/c.cloud-native.pgm
+showcase/architecture/c.k8s-multi-cluster-federation.pgm
+showcase/architecture/c.k8s-multi-namespace-overview.pgm
+showcase/architecture/c.ecommerce-platform.pgm
+showcase/architecture/c.hybrid-cloud-dr-topology.pgm
+showcase/flowchart/c.layout-stress-dag.pgm
+showcase/flowchart/c.aml-case-investigation.pgm
+
+# --- 热点（perf / 共干）---
+showcase/architecture/c.k8s-tenant-isolation.pgm
+showcase/architecture/c.k8s-platform-stack.pgm

@@ -1,10 +1,13 @@
 //! 回环边（Greedy FAS 反转边）侧向通道分配。
 //!
 //! 路由前对反转边做左右（或上下）均衡分配，避免多条回环边挤在同一外通道。
+//!
+//! S4：另将「监控枢纽」入边（同目标被动入边 ≥ [`MONITOR_HUB_MIN_PASSIVE_IN`]）
+//! 强制纳入侧通道，避免与业务 FanIn 主缝抢道。
 
 use std::collections::HashMap;
 
-use crate::ast::{Diagram, Relation};
+use crate::ast::{ArrowType, Diagram, Relation};
 use crate::layout::node::common::acyclic::greedy_fas;
 use crate::layout::{NodeLayout, Port};
 
@@ -50,6 +53,8 @@ pub fn assign_feedback_sides(
     let mut right_bucket: Vec<(usize, usize)> = Vec::new();
 
     // 候选：FAS 反转边 + 长跨度前向边
+    // S4：监控枢纽边不在此强制改端口（顶置 hub 强行 L/R 会增交叉）；
+    // 仅由 run 侧并入 feedback_edge_set 延后路由 + 外环/干线评分。
     let mut candidates: Vec<usize> = reversed;
     for (i, rel) in relations.iter().enumerate() {
         if reversed_set.contains_key(&i) {
@@ -131,6 +136,121 @@ pub fn assign_feedback_sides(
 
 /// 跨此层数及以上的边优先走侧通道（与回环边同策略）。
 pub const LONG_SPAN_SIDE_THRESHOLD: usize = 2;
+
+/// 同目标被动（`-->`）入边达到此数时视为监控枢纽，强制侧通道。
+pub const MONITOR_HUB_MIN_PASSIVE_IN: usize = 3;
+
+/// 汇聚到监控枢纽的被动入边下标（确定性：按 hub id、边下标排序）。
+pub fn monitor_hub_edge_indices(relations: &[Relation]) -> Vec<usize> {
+    let mut inbound: HashMap<&str, Vec<usize>> = HashMap::new();
+    for (i, rel) in relations.iter().enumerate() {
+        if rel.arrow != ArrowType::Passive {
+            continue;
+        }
+        if rel.from.as_str() == rel.to.as_str() {
+            continue;
+        }
+        inbound.entry(rel.to.as_str()).or_default().push(i);
+    }
+    let mut hubs: Vec<&str> = inbound
+        .iter()
+        .filter(|(_, edges)| edges.len() >= MONITOR_HUB_MIN_PASSIVE_IN)
+        .map(|(id, _)| *id)
+        .collect();
+    hubs.sort_unstable();
+    let mut out = Vec::new();
+    for hub in hubs {
+        if let Some(edges) = inbound.get(hub) {
+            out.extend(edges.iter().copied());
+        }
+    }
+    out.sort_unstable();
+    out.dedup();
+    out
+}
+
+/// S4.x：同排被堵死时，监控边改走朝向枢纽的正对端口（TB：Top↔Bottom）。
+///
+/// 中排节点（如 postgres）左右都有同排邻居时，L/R 侧廊必须在 NODE_GAP(32) 内
+/// 竖向离排，但 `NODE_OBSTACLE_PAD`(18)×2 已超过缝宽 → 必然穿模。此时改 Top/Bottom
+/// 先进入层间，再由外环候选绕开中轴。
+pub fn apply_monitor_hub_escape_ports(
+    relations: &[Relation],
+    nodes: &HashMap<String, NodeLayout>,
+    from_side: &mut [Port],
+    to_side: &mut [Port],
+    horizontal: bool,
+) {
+    if horizontal {
+        return;
+    }
+    const MIN_SIDE_ESCAPE_GAP: f64 = 36.0; // ≥ 2 * NODE_OBSTACLE_PAD
+    for ei in monitor_hub_edge_indices(relations) {
+        if ei >= relations.len() || ei >= from_side.len() {
+            continue;
+        }
+        let rel = &relations[ei];
+        let Some(from_nl) = nodes.get(rel.from.as_str()) else {
+            continue;
+        };
+        let Some(to_nl) = nodes.get(rel.to.as_str()) else {
+            continue;
+        };
+        let sy = from_nl.y + from_nl.height * 0.5;
+        let gap_left = same_row_clearance_toward(from_nl, rel.from.as_str(), sy, nodes, true);
+        let gap_right = same_row_clearance_toward(from_nl, rel.from.as_str(), sy, nodes, false);
+        let blocked_left = gap_left < MIN_SIDE_ESCAPE_GAP;
+        let blocked_right = gap_right < MIN_SIDE_ESCAPE_GAP;
+        let blocked = match from_side[ei] {
+            Port::Left => blocked_left,
+            Port::Right => blocked_right,
+            _ => blocked_left && blocked_right,
+        };
+        if !blocked {
+            continue;
+        }
+        let from_cy = from_nl.y + from_nl.height * 0.5;
+        let to_cy = to_nl.y + to_nl.height * 0.5;
+        if to_cy < from_cy - 1.0 {
+            from_side[ei] = Port::Top;
+            to_side[ei] = Port::Bottom;
+        } else if to_cy > from_cy + 1.0 {
+            from_side[ei] = Port::Bottom;
+            to_side[ei] = Port::Top;
+        }
+    }
+}
+
+/// 同排朝向 `left`/`right` 最近邻的外缘间隙；无邻居则视为足够宽。
+fn same_row_clearance_toward(
+    from_nl: &NodeLayout,
+    from_id: &str,
+    sy: f64,
+    nodes: &HashMap<String, NodeLayout>,
+    toward_left: bool,
+) -> f64 {
+    let mut best = f64::INFINITY;
+    for (id, n) in nodes {
+        if id == from_id {
+            continue;
+        }
+        if n.y - 1.0 > sy || n.y + n.height + 1.0 < sy {
+            continue;
+        }
+        if toward_left {
+            if n.x + n.width <= from_nl.x + 1.0 {
+                best = best.min(from_nl.x - (n.x + n.width));
+            }
+        } else if n.x >= from_nl.x + from_nl.width - 1.0 {
+            best = best.min(n.x - (from_nl.x + from_nl.width));
+        }
+    }
+    if best.is_finite() {
+        best
+    } else {
+        f64::INFINITY
+    }
+}
 
 fn reversed_edge_indices(diagram: &Diagram, relations: &[Relation]) -> Vec<usize> {
     let mut nodes: Vec<String> = diagram
@@ -541,5 +661,54 @@ mod tests {
             .count();
         assert!(left_count <= MAX_SAME_SIDE_FEEDBACK);
         assert!(right_count <= MAX_SAME_SIDE_FEEDBACK);
+    }
+
+    #[test]
+    fn monitor_hub_detects_passive_inbound_cluster() {
+        let span = Span::dummy();
+        let relations = vec![
+            Relation {
+                from: Identifier::new_unchecked("a"),
+                to: Identifier::new_unchecked("hub"),
+                arrow: ArrowType::Passive,
+                label: None,
+                head_label: None,
+                tail_label: None,
+                attributes: AttributeMap::default(),
+                span,
+            },
+            Relation {
+                from: Identifier::new_unchecked("b"),
+                to: Identifier::new_unchecked("hub"),
+                arrow: ArrowType::Passive,
+                label: None,
+                head_label: None,
+                tail_label: None,
+                attributes: AttributeMap::default(),
+                span,
+            },
+            Relation {
+                from: Identifier::new_unchecked("c"),
+                to: Identifier::new_unchecked("hub"),
+                arrow: ArrowType::Passive,
+                label: None,
+                head_label: None,
+                tail_label: None,
+                attributes: AttributeMap::default(),
+                span,
+            },
+            Relation {
+                from: Identifier::new_unchecked("d"),
+                to: Identifier::new_unchecked("other"),
+                arrow: ArrowType::Passive,
+                label: None,
+                head_label: None,
+                tail_label: None,
+                attributes: AttributeMap::default(),
+                span,
+            },
+        ];
+        let hub = monitor_hub_edge_indices(&relations);
+        assert_eq!(hub, vec![0, 1, 2]);
     }
 }

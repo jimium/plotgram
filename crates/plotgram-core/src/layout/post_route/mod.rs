@@ -9,4 +9,4 @@ pub(super) mod border_repulse;
 pub use hook::{NODE_MOVE_REROUTE_EPS, MIN_PRESERVE_RATIO};
 pub(crate) use hook::{AlgoProfile, NoopPostRouteHook, ArchitecturePostRouteHook, PostRouteHook};
 pub use shell_expand::post_route_shell_expand;
-pub use border_repulse::{repulse_edges_only, snap_and_repulse_edges};
+pub use border_repulse::{repulse_edges_only, snap_and_repulse_edges, snap_and_repulse_edges_with_guard};

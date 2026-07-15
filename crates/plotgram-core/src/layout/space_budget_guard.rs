@@ -8,7 +8,8 @@ use crate::layout::post_route;
 use crate::layout::grid_snap::EdgeSnapConfig;
 use crate::layout::post_route::NODE_MOVE_REROUTE_EPS;
 use crate::layout::space_budget::{
-    horizontal_gap_violations, resolve_residual_with_budget, SpaceBudget,
+    has_node_aabb_overlaps, horizontal_gap_violations, resolve_residual_with_budget_and_ranks,
+    SpaceBudget,
 };
 use crate::layout::{EdgeRoutingStrategy, LayoutResult, NodeLayout};
 use std::collections::{HashMap, HashSet};
@@ -36,7 +37,7 @@ pub fn diff_moved_nodes(
         .collect()
 }
 
-/// 检测水平缝违反 → 推开 → 返回移动的节点集合。
+/// 检测水平缝违反或 AABB 节点重叠 → 推开 → 返回移动的节点集合。
 ///
 /// 若无违反且 space_budget 未设置,则设置 budget hint。
 /// 返回 (处理后的 result, 移动的节点集合)。
@@ -49,13 +50,28 @@ pub fn resolve_budget_violations(
         .space_budget
         .clone()
         .unwrap_or_else(|| SpaceBudget::from_diagram(diagram));
-    if !horizontal_gap_violations(&result.nodes, &budget).is_empty() {
+    let gap_violations = horizontal_gap_violations(&result.nodes, &budget);
+    // 斜向 AABB 碰撞兜底仅对无分组图启用：有组大图的 rank 回排易牵动壳内节点抬高穿模。
+    let aabb_overlaps =
+        result.groups.is_empty() && has_node_aabb_overlaps(&result.nodes);
+    let needs_resolve = !gap_violations.is_empty() || aabb_overlaps;
+    if needs_resolve {
         let pre: HashMap<String, (f64, f64)> = result
             .nodes
             .iter()
             .map(|(id, n)| (id.clone(), (n.x, n.y)))
             .collect();
-        resolve_residual_with_budget(&mut result.nodes, Some(&budget));
+        // 仅 AABB 碰撞时带 rank 回排；纯水平缝违反走原 BruteForce
+        let ranks = if aabb_overlaps {
+            result.hints.sugiyama_ranks.clone()
+        } else {
+            None
+        };
+        resolve_residual_with_budget_and_ranks(
+            &mut result.nodes,
+            Some(&budget),
+            ranks.as_ref(),
+        );
         result.hints.space_budget = Some(budget);
         let moved = diff_moved_nodes(&pre, &result.nodes);
         crate::perf_log!("[fallback] budget residual: {} moved nodes", moved.len());

@@ -1,0 +1,4 @@
+# 拥堵修正代表集（S0+）：机制验证，禁止图名特判逻辑
+# T1 跨对 stub / T2 层缝+FanIn+监控外环
+showcase/flowchart/n.user-auth.pgm
+showcase/architecture/n.typical-microservice-architecture.pgm

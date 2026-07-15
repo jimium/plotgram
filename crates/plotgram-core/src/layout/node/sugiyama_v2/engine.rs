@@ -68,6 +68,8 @@ pub fn compute_with_preset(
     // 密度感知间距：根据图密度动态放大 layer_gap / node_gap
     let adjusted_preset = apply_density_aware_spacing(&dag, &ranks, *preset);
     // 逐层密度感知：为每个层间边界单独计算 gap，稀疏层不被无谓拉大。
+    // S2 边带需求主要挂在 architecture 无组路径（assign_coordinates）；此处保持密度公式，
+    // 避免 flowchart / 大图组内 Sugiyama 画布膨胀。
     let per_layer_gaps = compute_per_layer_gaps(&dag, &ranks, adjusted_preset.layer_gap);
 
     let proper = graph::build_proper_layer_graph(diagram, &dag, &ranks, &adjusted_preset);

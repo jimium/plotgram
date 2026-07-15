@@ -318,39 +318,104 @@ pub fn align_nodes(
 /// - stub `path[1]` / `path[last-1]`（len ≥ 4）：端口 clearance，不修改
 /// - 仅对通道段量化：竖线段对齐 x、横线段对齐 y；邻接 protected 的段只 snap 可动端的主轴坐标
 /// - Phase B：量化后将贴边通道段投影到分组边框壳层外的合法格点
+/// - P2：量化后 simplify 挂 `validate_route_edit`；失败则保留量化结果（跳过 simplify）
 pub fn snap_edge_waypoints(
     edges: &mut [EdgeLayout],
     groups: &HashMap<String, GroupLayout>,
     config: &EdgeSnapConfig,
+) -> usize {
+    snap_edge_waypoints_with_guard(edges, groups, config, None, None, None, None)
+}
+
+/// 见 [`snap_edge_waypoints`]；可选 Annotation / 节点守卫。
+pub fn snap_edge_waypoints_with_guard(
+    edges: &mut [EdgeLayout],
+    groups: &HashMap<String, GroupLayout>,
+    config: &EdgeSnapConfig,
+    annotations: Option<&crate::layout::edge::RouteAnnotationSet>,
+    nodes: Option<&HashMap<String, NodeLayout>>,
+    relations: Option<&[crate::ast::Relation]>,
+    sorted_node_ids: Option<&[String]>,
 ) -> usize {
     if !config.enabled {
         return 0;
     }
 
     let mut snapped = 0usize;
-    for edge in edges.iter_mut() {
+    for (ei, edge) in edges.iter_mut().enumerate() {
         if edge.is_bezier() || edge.path_len() <= 2 {
             continue;
         }
 
-        let Some(points) = edge.polyline_points_mut() else {
-            continue;
+        let before: Vec<Point> = match edge.polyline_points() {
+            Some(pts) if pts.len() > 2 => pts.to_vec(),
+            _ => continue,
         };
-        let before_len = points.len().saturating_sub(2);
+        let before_len = before.len().saturating_sub(2);
         if before_len == 0 {
             continue;
         }
 
-        snapped += snap_edge_path_channels(points, config.grid_step);
+        let fs = edge.from_port;
+        let ts = edge.to_port;
+        let mut points = before.clone();
+        snapped += snap_edge_path_channels(&mut points, config.grid_step);
         crate::layout::group::project_path_off_group_borders_with_stub(
-            points,
+            &mut points,
             groups,
             config.shell_pad,
             config.grid_step,
             config.stub_clearance,
         );
-        let simplified = simplify_polyline_path_preserving_stubs(points);
-        edge.set_polyline_points(simplified);
+        let after_snap = points.clone();
+        let simplified = simplify_polyline_path_preserving_stubs(&after_snap);
+
+        let ann = crate::layout::edge::annotate_edge_from_path(&before, fs, ts, ei).map(
+            |mut a| {
+                if let Some(frozen) = annotations.and_then(|set| set.get(ei)) {
+                    a.merge_intervals = frozen.merge_intervals.clone();
+                    a.degraded = frozen.degraded.clone();
+                }
+                a
+            },
+        );
+        let obstacle = None::<crate::layout::edge::RouteEditObstacleCtx<'_>>;
+        // 量化钩子：不做穿障硬回退（与 D sanitize 同因）；仍校验端点/stub/正交。
+        let _ = (nodes, sorted_node_ids, relations); // 保留签名供后续打开
+
+        let final_pts = if let Some(ref ann) = ann {
+            let opts = crate::layout::edge::RouteEditValidateOpts {
+                coord_tol: config.grid_step.max(POST_QUANTIZE_SIMPLIFY_EPS),
+                edit_kind: crate::layout::edge::RouteEditKind::ShapeChanging,
+            };
+            // 先试 simplify；失败则保留 snap 后未简化路径（仍须通过验证，否则整边回退）
+            if crate::layout::edge::validate_route_edit(
+                &before,
+                &simplified,
+                ann,
+                obstacle,
+                opts,
+            )
+            .is_ok()
+            {
+                simplified
+            } else if crate::layout::edge::validate_route_edit(
+                &before,
+                &after_snap,
+                ann,
+                obstacle,
+                opts,
+            )
+            .is_ok()
+            {
+                after_snap
+            } else {
+                before
+            }
+        } else {
+            simplified
+        };
+        edge.set_polyline_points(final_pts);
     }
 
     snapped
@@ -531,46 +596,13 @@ fn snap_edge_path_channels(path: &mut [Point], step: f64) -> usize {
     count
 }
 
-fn is_collinear_eps(a: Point, b: Point, c: Point, eps: f64) -> bool {
-    let cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-    cross.abs() < eps
-}
-
 fn simplify_polyline_path_preserving_stubs(path: &[Point]) -> Vec<Point> {
-    // P4: 量化后使用放大容差（POST_QUANTIZE_SIMPLIFY_EPS）消除量化产生的微小折点
-    simplify_polyline_path_with_eps(path, POST_QUANTIZE_SIMPLIFY_EPS)
-}
-
-fn simplify_polyline_path_with_eps(path: &[Point], eps: f64) -> Vec<Point> {
-    if path.len() <= 2 {
-        return path.to_vec();
-    }
-
-    let mut deduped = path.to_vec();
-    deduped.dedup_by(|a, b| (a.x - b.x).abs() < eps && (a.y - b.y).abs() < eps);
-    if deduped.len() <= 2 {
-        return deduped;
-    }
-    if deduped.len() <= 4 {
-        return deduped;
-    }
-
-    let first_stub_index = 1;
-    let last_stub_index = deduped.len() - 2;
-    let mut simplified = vec![deduped[0]];
-
-    for i in 1..deduped.len() - 1 {
-        let prev = *simplified.last().unwrap();
-        let curr = deduped[i];
-        let next = deduped[i + 1];
-        let preserves_stub = i == first_stub_index || i == last_stub_index;
-        if preserves_stub || !is_collinear_eps(prev, curr, next, eps) {
-            simplified.push(curr);
-        }
-    }
-
-    simplified.push(*deduped.last().unwrap());
-    simplified
+    // 量化后使用放大容差消除量化产生的微小折点；仍走公共严格共线模块（非改形状路由）。
+    crate::layout::edge::common::collinear_simplify::simplify_collinear_polyline(
+        path.to_vec(),
+        true,
+        POST_QUANTIZE_SIMPLIFY_EPS,
+    )
 }
 
 #[cfg(test)]

@@ -11,7 +11,7 @@ use super::types::{GraphIndex, GroupMap};
 use crate::layout::node::sugiyama_v2::coordinate::assign_layer_centers_for_string_graph;
 
 pub(in super::super) fn assign_coordinates(
-    _diagram: &Diagram,
+    diagram: &Diagram,
     graph: &GraphIndex,
     group_map: &GroupMap,
     layers: &[Vec<String>],
@@ -31,10 +31,38 @@ pub(in super::super) fn assign_coordinates(
         })
         .collect();
 
+    // S2：邻层边带需求抬高 layer gap（路由前写权）
+    let parallel_gap =
+        crate::layout::edge::segment_pair::parallel_gap_for_diagram(diagram.diagram_type.clone());
+    let profile =
+        crate::layout::edge_band_demand::EdgeBandDemandProfile::for_diagram_type(
+            diagram.diagram_type.clone(),
+        );
+    let per_layer_gaps = crate::layout::edge_band_demand::layer_gaps_from_demand(
+        layers,
+        &diagram.relations,
+        LAYER_GAP,
+        parallel_gap,
+        profile,
+    );
+
+    // S4：无分组时侧通道水平 gutter（L/R 外廊）；竖向仍用 PADDING，避免层缝诊断虚高
+    let side_gutter = if diagram.groups.is_empty() {
+        crate::layout::edge_band_demand::side_channel_gutter(
+            &diagram.relations,
+            parallel_gap,
+            profile,
+        )
+    } else {
+        0.0
+    };
+    let h_pad = PADDING + side_gutter;
+
     // 计算每层的 y 偏移
     let mut layer_y_offsets = vec![PADDING];
     for i in 1..layers.len() {
-        layer_y_offsets.push(layer_y_offsets[i - 1] + layer_heights[i - 1] + LAYER_GAP);
+        let gap = per_layer_gaps.get(i - 1).copied().unwrap_or(LAYER_GAP);
+        layer_y_offsets.push(layer_y_offsets[i - 1] + layer_heights[i - 1] + gap);
     }
 
     // 完整 BK 四趟：effective DAG + 跨层 dummy
@@ -44,7 +72,7 @@ pub(in super::super) fn assign_coordinates(
         &graph.out_edges,
         reversed,
         NODE_GAP,
-        PADDING,
+        h_pad,
     );
 
     // 对每层分配 x 坐标（Brandes-Köpf 完整版 + 组/基础设施后处理）
@@ -543,6 +571,9 @@ pub(in super::super) fn rebalance_infrastructure_layers(
             );
         }
         center_layer_on_anchor(layer, &mut centers, sizes, anchor_x);
+        // 与 assign_coordinates 一致：居中后再消重叠。此前缺这一步时，
+        // redis/postgres 等同层宽节点会被压到 NODE_GAP 以下甚至相交。
+        centers = resolve_x_overlaps(layer, &centers, sizes);
 
         for (node, cx) in layer.iter().zip(centers.iter()) {
             if let Some(nl) = nodes.get_mut(node) {

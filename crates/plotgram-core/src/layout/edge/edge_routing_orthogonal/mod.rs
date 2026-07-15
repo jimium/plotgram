@@ -42,6 +42,8 @@ pub(super) mod conflict_reroute;
 pub(super) mod sanitize;
 pub(super) mod straighten;
 pub(super) mod stub_fix;
+pub(super) mod stub_occupancy;
+pub(super) mod semantic_trunk_merge;
 pub(super) mod run;
 
 // Re-exports for cross-submodule access via `use super::*;`
@@ -64,8 +66,15 @@ pub(super) use slot::{
 };
 pub(super) use slot_replan::replan_slots;
 pub(super) use conflict_reroute::reroute_conflicting_edges;
-pub use sanitize::{sanitize_orthogonal_edges, sanitize_orthogonal_edges_ext};
+pub use sanitize::{
+    sanitize_orthogonal_edges, sanitize_orthogonal_edges_ext, sanitize_orthogonal_edges_with_guard,
+};
 pub use lane_assignment::enforce_reverse_pair_min_gap;
+pub use stub_occupancy::{
+    collect_stub_occupancy, estimate_layer_band_demands, find_stub_occupancy_conflicts,
+    resolve_stub_occupancy_conflicts, LayerBandDemand, StubOccupancyConflict,
+    StubOccupancyRecord, StubOccupancyStats,
+};
 pub(super) use straighten::straighten_preferred_alignments;
 pub(super) use stub_fix::fix_reverse_stub_ports;
 
@@ -244,16 +253,60 @@ pub fn reroute_edges_touching_nodes(
     }
     let mut preserve = std::collections::HashSet::new();
     for (i, rel) in diagram.relations.iter().enumerate() {
-        if !moved_node_ids.contains(rel.from.as_str())
-            && !moved_node_ids.contains(rel.to.as_str())
-        {
-            preserve.insert(i);
+        let incident = moved_node_ids.contains(rel.from.as_str())
+            || moved_node_ids.contains(rel.to.as_str());
+        if incident {
+            continue;
         }
+        // S4.x：节点被 residual/refine 推开后，非关联边也可能新穿入该节点；
+        // 仅重路由端点关联边会漏掉 postgres→prometheus 穿 order_svc 这类。
+        if edge_pierces_moved_nodes(&result, i, rel.from.as_str(), rel.to.as_str(), moved_node_ids)
+        {
+            continue;
+        }
+        preserve.insert(i);
     }
     if preserve.is_empty() || (preserve.len() as f64 / n as f64) < crate::layout::post_route::MIN_PRESERVE_RATIO {
         return route_edges_orthogonal(diagram, result, cfg);
     }
     run::route_edges_orthogonal_inner(diagram, result, cfg, Some(preserve))
+}
+
+fn edge_pierces_moved_nodes(
+    result: &LayoutResult,
+    edge_index: usize,
+    from_id: &str,
+    to_id: &str,
+    moved_node_ids: &std::collections::HashSet<String>,
+) -> bool {
+    let Some(edge) = result.edges.get(edge_index) else {
+        return false;
+    };
+    if edge.path_is_empty() {
+        return false;
+    }
+    let pts: Vec<Point> = edge.path_points().into_owned();
+    if pts.len() < 2 {
+        return false;
+    }
+    let mut moved: Vec<&str> = moved_node_ids.iter().map(|s| s.as_str()).collect();
+    moved.sort_unstable();
+    for window in pts.windows(2) {
+        let a = window[0];
+        let b = window[1];
+        for &nid in &moved {
+            if nid == from_id || nid == to_id {
+                continue;
+            }
+            let Some(nl) = result.nodes.get(nid) else {
+                continue;
+            };
+            if scoring::segment_intersects_node(a, b, nl, scoring::NODE_OBSTACLE_PAD) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// refine / 局部更新：保留 `preserve_edges` 中的边，仅重算其余边。

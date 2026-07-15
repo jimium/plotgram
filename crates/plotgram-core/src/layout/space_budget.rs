@@ -203,16 +203,60 @@ pub fn horizontal_gap_violations(
     out
 }
 
+/// 任意一对节点 AABB 真实相交（含斜向部分重叠）。
+///
+/// `horizontal_gap_violations` 要求 Y 重叠 ≥50% 才视为同排；refine 对角推开后
+/// 常留下「斜向相交」而被漏检，故兜底须用本谓词。
+pub fn has_node_aabb_overlaps(nodes: &HashMap<String, NodeLayout>) -> bool {
+    const EPS: f64 = 0.5;
+    let mut ids: Vec<String> = nodes.keys().cloned().collect();
+    ids.sort();
+    for i in 0..ids.len() {
+        for j in (i + 1)..ids.len() {
+            let a = &nodes[&ids[i]];
+            let b = &nodes[&ids[j]];
+            let ox = (a.x + a.width).min(b.x + b.width) - a.x.max(b.x);
+            let oy = (a.y + a.height).min(b.y + b.height) - a.y.max(b.y);
+            if ox > EPS && oy > EPS {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// 契约失败时的兜底消重叠：margin 取自 SpaceBudget（无则 default_node_gap）。
+///
+/// 若提供 `sugiyama_ranks`，先按 rank 恢复同排（统一 Y + 水平缝），再跑 BruteForce，
+/// 避免 refine 对角推开后把同层拆成上下两排或误推穿模。
 pub fn resolve_residual_with_budget(
     nodes: &mut HashMap<String, NodeLayout>,
     budget: Option<&SpaceBudget>,
 ) {
+    resolve_residual_with_budget_and_ranks(nodes, budget, None);
+}
+
+/// 同上，可带 Sugiyama rank 做同排恢复。
+pub fn resolve_residual_with_budget_and_ranks(
+    nodes: &mut HashMap<String, NodeLayout>,
+    budget: Option<&SpaceBudget>,
+    ranks: Option<&HashMap<String, usize>>,
+) {
     let margin = budget
         .map(|b| b.default_node_gap)
         .unwrap_or(DEFAULT_NODE_GAP);
+    let ran_rank_realign = if let (Some(b), Some(r)) = (budget, ranks) {
+        realign_shared_rank_rows(nodes, r, b);
+        true
+    } else {
+        false
+    };
     if let Some(b) = budget {
         enforce_horizontal_gaps(nodes, b);
+    }
+    // 同排回排已清掉 AABB：不必再 BruteForce（会把同排拆成斜向）
+    if ran_rank_realign && !has_node_aabb_overlaps(nodes) {
+        return;
     }
     use crate::layout::node::common::overlap::{
         BruteForceResolver, OverlapConfig, OverlapResolver,
@@ -226,6 +270,84 @@ pub fn resolve_residual_with_budget(
     BruteForceResolver::new(20).resolve(nodes, &empty, &config);
     if let Some(b) = budget {
         enforce_horizontal_gaps(nodes, b);
+    }
+}
+
+/// 同 Sugiyama rank 的节点：Y 对齐到中位数中心，再按当前 X 序水平缝推开。
+///
+/// 仅处理「含有 AABB 重叠对」的 rank，避免有组大图无重叠行被整排重排。
+pub fn realign_shared_rank_rows(
+    nodes: &mut HashMap<String, NodeLayout>,
+    ranks: &HashMap<String, usize>,
+    budget: &SpaceBudget,
+) {
+    const EPS: f64 = 0.5;
+    let mut by_rank: BTreeMap<usize, Vec<String>> = BTreeMap::new();
+    for (id, &rank) in ranks {
+        if nodes.contains_key(id) {
+            by_rank.entry(rank).or_default().push(id.clone());
+        }
+    }
+    for (_rank, mut ids) in by_rank {
+        if ids.len() < 2 {
+            continue;
+        }
+        let mut has_overlap = false;
+        'pairs: for i in 0..ids.len() {
+            for j in (i + 1)..ids.len() {
+                let a = &nodes[&ids[i]];
+                let b = &nodes[&ids[j]];
+                let ox = (a.x + a.width).min(b.x + b.width) - a.x.max(b.x);
+                let oy = (a.y + a.height).min(b.y + b.height) - a.y.max(b.y);
+                if ox > EPS && oy > EPS {
+                    has_overlap = true;
+                    break 'pairs;
+                }
+            }
+        }
+        if !has_overlap {
+            continue;
+        }
+
+        ids.sort_by(|a, b| {
+            let ca = nodes[a].x + nodes[a].width * 0.5;
+            let cb = nodes[b].x + nodes[b].width * 0.5;
+            ca.partial_cmp(&cb)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.cmp(b))
+        });
+
+        let mut cys: Vec<f64> = ids
+            .iter()
+            .map(|id| nodes[id].y + nodes[id].height * 0.5)
+            .collect();
+        cys.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let med_cy = cys[cys.len() / 2];
+        for id in &ids {
+            if let Some(nl) = nodes.get_mut(id) {
+                nl.y = med_cy - nl.height * 0.5;
+            }
+        }
+
+        for i in 1..ids.len() {
+            let gap = budget.min_gap(&ids[i - 1], &ids[i]);
+            let min_left = nodes[&ids[i - 1]].x + nodes[&ids[i - 1]].width + gap;
+            if let Some(nl) = nodes.get_mut(&ids[i]) {
+                if nl.x < min_left {
+                    nl.x = min_left;
+                }
+            }
+        }
+        for i in (0..ids.len().saturating_sub(1)).rev() {
+            let gap = budget.min_gap(&ids[i], &ids[i + 1]);
+            let max_right = nodes[&ids[i + 1]].x - gap;
+            if let Some(nl) = nodes.get_mut(&ids[i]) {
+                let right = nl.x + nl.width;
+                if right > max_right {
+                    nl.x = max_right - nl.width;
+                }
+            }
+        }
     }
 }
 

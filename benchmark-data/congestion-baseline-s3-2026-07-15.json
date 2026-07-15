@@ -1,0 +1,32 @@
+{
+  "date": "2026-07-15",
+  "note": "S3: FanIn semantic trunk merge (ungrouped architecture); S2 layer demand; S1 flowchart stub",
+  "samples": [
+    {
+      "file": "showcase/flowchart/n.user-auth.pgm",
+      "diagram_type": "Flowchart",
+      "node_fp": "1fea184dc3bd548c",
+      "stub_records": 16,
+      "stub_conflict_pairs": 2,
+      "stub_cross_pair_conflicts": 0,
+      "stub_exact_cross_pairs": 0,
+      "max_layer_deficit": 0.0,
+      "layer_bands_with_deficit": 0,
+      "ortho_stub_shifted": 1,
+      "ortho_stub_conflicts": 3
+    },
+    {
+      "file": "showcase/architecture/n.typical-microservice-architecture.pgm",
+      "diagram_type": "Architecture",
+      "node_fp": "4919c798f09dd892",
+      "stub_records": 32,
+      "stub_conflict_pairs": 5,
+      "stub_cross_pair_conflicts": 5,
+      "stub_exact_cross_pairs": 0,
+      "max_layer_deficit": 0.0,
+      "layer_bands_with_deficit": 0,
+      "ortho_stub_shifted": 0,
+      "ortho_stub_conflicts": 5
+    }
+  ]
+}

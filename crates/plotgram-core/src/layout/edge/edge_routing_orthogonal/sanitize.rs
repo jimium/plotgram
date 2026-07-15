@@ -7,14 +7,22 @@
 //! - 真微折（< MICRO_JOG_LEN）
 //!
 //! 应在 lane/corridor 之后调用；snap 后再跑一次同一套不变量。
+//!
+//! P2：`collapse_micro_jogs`（含 overshoot 换角）经 `validate_route_edit` 守护；
+//! 失败回退该步之前的折线。严格共线 `simplify_path` 不跑全量验证。
 
 use super::path::{port_aware_elbow, port_outward};
 use super::simplify::simplify_path;
 use super::{EPS, PORT_CLEARANCE};
 use crate::ast::Relation;
 use crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto;
+use crate::layout::edge::route_annotation::{
+    annotate_edge_from_path, validate_route_edit, RouteAnnotationSet, RouteEditObstacleCtx,
+    RouteEditValidateOpts,
+};
 use crate::layout::geometry::Point;
-use crate::layout::{EdgeLayout, PathGeometry, Port};
+use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
+use std::collections::HashMap;
 
 /// 短于该长度的折段视为「微折」，可折叠。
 const MICRO_JOG_LEN: f64 = 24.0;
@@ -41,6 +49,30 @@ pub fn sanitize_orthogonal_edges_ext(
     to_side: &[Port],
     merge_overshoot: bool,
 ) {
+    sanitize_orthogonal_edges_with_guard(
+        edges,
+        relations,
+        from_side,
+        to_side,
+        merge_overshoot,
+        None,
+        None,
+        None,
+    );
+}
+
+/// 消毒 + 可选形状验证上下文（节点 / 冻结 Annotation）。
+#[allow(clippy::too_many_arguments)]
+pub fn sanitize_orthogonal_edges_with_guard(
+    edges: &mut [EdgeLayout],
+    relations: &[Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+    merge_overshoot: bool,
+    annotations: Option<&RouteAnnotationSet>,
+    nodes: Option<&HashMap<String, NodeLayout>>,
+    sorted_node_ids: Option<&[String]>,
+) {
     for (ei, edge) in edges.iter_mut().enumerate() {
         if edge.path_is_empty() {
             continue;
@@ -52,7 +84,20 @@ pub fn sanitize_orthogonal_edges_ext(
         let fs = from_side.get(ei).copied().unwrap_or(edge.from_port);
         let ts = to_side.get(ei).copied().unwrap_or(edge.to_port);
 
-        sanitize_polyline_ext(&mut points, fs, ts, merge_overshoot);
+        let frozen = annotations.and_then(|set| set.get(ei)).cloned();
+        let _ = (nodes, sorted_node_ids, relations.get(ei));
+
+        sanitize_polyline_ext_guarded(
+            &mut points,
+            fs,
+            ts,
+            merge_overshoot,
+            frozen.as_ref(),
+            ei,
+            // 穿障检查保留在 validate API / 单测；挂到 D sanitize 时会回退
+            // 有益 overshoot 合并并抬高 trunk 严重度（门禁回归）。P3 再按证据打开。
+            None,
+        );
         if points.len() < 2 {
             continue;
         }
@@ -85,6 +130,20 @@ pub fn sanitize_polyline_ext(
     to_side: Port,
     merge_overshoot: bool,
 ) {
+    sanitize_polyline_ext_guarded(points, from_side, to_side, merge_overshoot, None, 0, None);
+}
+
+/// 消毒单边；仅在 `merge_overshoot`（管线末激进清理）时挂形状验证。
+/// router 内保守消毒不验证，避免回退改变边几何后经 space-budget 反馈扰动节点（node_fp）。
+fn sanitize_polyline_ext_guarded(
+    points: &mut Vec<Point>,
+    from_side: Port,
+    to_side: Port,
+    merge_overshoot: bool,
+    frozen: Option<&crate::layout::edge::EdgeRouteAnnotation>,
+    edge_index: usize,
+    obstacle: Option<RouteEditObstacleCtx<'_>>,
+) {
     if points.len() < 2 {
         return;
     }
@@ -96,15 +155,43 @@ pub fn sanitize_polyline_ext(
     fix_endpoint_reverse_stub(points, true, from_side);
     fix_endpoint_reverse_stub(points, false, to_side);
     force_orthogonal(points);
+
+    let before_shape = points.clone();
+    // 校验注解必须来自**当前**几何：C 冻结的 start/end 在 space-budget / snap 后会过期，
+    // 直接拿来 validate 会恒失败并回退，等效于关掉 overshoot 合并。
+    let ann = if merge_overshoot {
+        annotate_edge_from_path(&before_shape, from_side, to_side, edge_index).map(|mut a| {
+            if let Some(frozen) = frozen {
+                a.merge_intervals = frozen.merge_intervals.clone();
+                a.degraded = frozen.degraded.clone();
+            }
+            a
+        })
+    } else {
+        None
+    };
+
     collapse_micro_jogs(points, merge_overshoot);
-    // 保护端点 stub，避免把连接裁成仅 PORT_CLEARANCE 残段
     *points = simplify_path(std::mem::take(points), true);
     ensure_outward_stub(points, true, from_side);
     ensure_outward_stub(points, false, to_side);
-    // 出 stub 后禁止沿端口内向折回（穿节点 / 短 stub 倒钩）
     repair_post_stub_inward(points, true, from_side);
     repair_post_stub_inward(points, false, to_side);
     *points = simplify_path(std::mem::take(points), true);
+
+    if let Some(ref ann) = ann {
+        if validate_route_edit(
+            &before_shape,
+            points,
+            ann,
+            obstacle,
+            RouteEditValidateOpts::default(),
+        )
+        .is_err()
+        {
+            *points = before_shape;
+        }
+    }
 
     // 安全网：消毒不得丢掉起终点连通性（曾出现裁成 [anchor,stub] 导致「边起点丢失」）
     if points.len() < 2

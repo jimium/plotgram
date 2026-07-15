@@ -176,10 +176,20 @@ impl<'a> LayoutPipeline<'a> {
         );
 
         // P1: 像素量化在管道最末尾执行，仅运行一次
-        post_route::snap_and_repulse_edges(
+        let sorted_node_ids: Vec<String> = {
+            let mut ids: Vec<String> = result.nodes.keys().cloned().collect();
+            ids.sort();
+            ids
+        };
+        let annotations = result.hints.route_annotations.clone();
+        post_route::snap_and_repulse_edges_with_guard(
             &mut result.edges,
             &result.groups,
             &edge_snap_config,
+            annotations.as_ref(),
+            Some(&result.nodes),
+            Some(&self.diagram.relations),
+            Some(&sorted_node_ids),
         );
 
         // 消毒 2.0：snap/repulse 可能抖回微台阶与斜段，正交路由在量化后再消一次
@@ -188,23 +198,26 @@ impl<'a> LayoutPipeline<'a> {
             let to_side: Vec<_> = result.edges.iter().map(|e| e.to_port).collect();
             // 几何已冻结：启用 overshoot Z 折合并，清理「冲过端口再折回」的多余折点。
             // 保守版（router step 4g）不合并，避免改动反馈进节点重定位扰动全局布局。
-            crate::layout::edge::edge_routing_orthogonal::sanitize_orthogonal_edges_ext(
+            crate::layout::edge::edge_routing_orthogonal::sanitize_orthogonal_edges_with_guard(
                 &mut result.edges,
                 &self.diagram.relations,
                 &from_side,
                 &to_side,
                 true,
+                annotations.as_ref(),
+                Some(&result.nodes),
+                Some(&sorted_node_ids),
             );
-            // V3a：snap/sanitize 之后再次保证正反向平行 gap
+            // V3a / P3.1：D 一次正反向 gap 审计（C 预修在 phase_lane 末）。
+            // 使用图类型对应 gap，避免 architecture 误用 flowchart 的 8px。
             let _ = crate::layout::edge::edge_routing_orthogonal::enforce_reverse_pair_min_gap(
                 &mut result.edges,
                 &self.diagram.relations,
-                crate::layout::constants::ORTHO_PARALLEL_GAP,
+                crate::layout::edge::parallel_gap_for_diagram(self.diagram.diagram_type.clone()),
             );
 
             // 标签避让必须是几何冻结后的**最终**步骤：sanitize 会按平行边规则
-            // 重建所有标签（丢弃路由内部 step-5 的避让结果），snap/repulse 又移动了
-            // 路径。因此在此对量化后的最终几何再跑一次标签避让，保证输出不含重叠。
+            // 重建所有标签；snap/repulse 又移动了路径。router 内不再提前 resolve（P3.3）。
             let label_config =
                 crate::layout::edge::common::label_candidate::LabelPlacementConfig::for_diagram_type(
                     self.diagram.diagram_type.clone(),

@@ -275,6 +275,8 @@ fn evaluate_path_batch(
     }
     state.candidate_count += paths.len();
     for path in paths {
+        // S4.x：不再把「外环但仍边交叉」硬降为 dirty（否则与穿模脏路径同池，短穿模胜出）。
+        // 边交叉改由 DefaultScorer 在 prefer_outer 下 overlap×3 软惩罚。
         if path_is_clean(
             &path,
             from_id,
@@ -350,6 +352,20 @@ pub fn select_best_path_with_scorer_stats(
         nodes_only_count: 0,
         candidate_count: 0,
     };
+
+    // S4：feedback / 监控枢纽 —— 先评估外环（软偏好；不挂 corridor_boost，避免有组大图行为漂移）
+    if ctx.prefer_outer_ring {
+        let pad = if ctx.corridor_boost { 56.0 } else { 40.0 };
+        evaluate_path_batch(
+            build_outer_ring_candidates(sx, sy, ex, ey, from_side, to_side, ctx, pad),
+            ctx,
+            pair,
+            scorer,
+            from_id,
+            to_id,
+            &mut state,
+        );
+    }
 
     // Level 0: 基础 L 形 + 混合端口扩展
     evaluate_path_batch(
@@ -522,8 +538,14 @@ fn orthogonal_degraded_fallback(
     let ex = end.x;
     let ey = end.y;
 
-    // 升档垫：先小后大；corridor_boost 时从更大垫起步
-    let pad_tiers: &[f64] = if ctx.corridor_boost {
+    // 升档垫：先小后大；corridor_boost / prefer_outer 时用更大外环垫，降低 degraded 穿模
+    let pad_tiers: &[f64] = if ctx.prefer_outer_ring {
+        if ctx.corridor_boost {
+            &[84.0, 120.0, 160.0, 200.0]
+        } else {
+            &[56.0, 84.0, 120.0, 160.0]
+        }
+    } else if ctx.corridor_boost {
         &[56.0, 84.0, 120.0]
     } else {
         &[28.0, 56.0, 84.0]
@@ -566,7 +588,7 @@ fn orthogonal_degraded_fallback(
             ], false));
         }
 
-        if let Some((x_lo, y_lo, x_hi, y_hi)) = groups_outer_bounds(ctx) {
+        if let Some((x_lo, y_lo, x_hi, y_hi)) = routing_outer_bounds(ctx, false) {
             let left = x_lo - outer_pad;
             let right = x_hi + outer_pad;
             let top = y_lo - outer_pad;
@@ -586,6 +608,29 @@ fn orthogonal_degraded_fallback(
                     Point::new(ex, y),
                     Point::new(ex, ey),
                 ], false));
+            }
+            // S4.x：与 build_outer_ring_candidates 一致的离排再绕行
+            if ctx.prefer_outer_ring {
+                let (fx, fy) = port_outward(from_side);
+                let stub = Point::new(sx + fx * PORT_CLEARANCE, sy + fy * PORT_CLEARANCE);
+                for &jog_y in &same_row_clearance_ys(sy, ctx) {
+                    if (jog_y - sy).abs() < 8.0 {
+                        continue;
+                    }
+                    for x in [left, right] {
+                        candidates.push(simplify_path(
+                            vec![
+                                Point::new(sx, sy),
+                                stub,
+                                Point::new(stub.x, jog_y),
+                                Point::new(x, jog_y),
+                                Point::new(x, ey),
+                                Point::new(ex, ey),
+                            ],
+                            false,
+                        ));
+                    }
+                }
             }
         }
 
@@ -722,6 +767,325 @@ fn groups_outer_bounds(ctx: &OrthoRoutingContext<'_>) -> Option<(f64, f64, f64, 
         y_hi = y_hi.max(g.y + g.height);
     }
     Some((x_lo, y_lo, x_hi, y_hi))
+}
+
+fn nodes_outer_bounds(nodes: &HashMap<String, crate::layout::NodeLayout>) -> Option<(f64, f64, f64, f64)> {
+    if nodes.is_empty() {
+        return None;
+    }
+    let mut iter = nodes.values();
+    let first = iter.next()?;
+    let mut x_lo = first.x;
+    let mut y_lo = first.y;
+    let mut x_hi = first.x + first.width;
+    let mut y_hi = first.y + first.height;
+    for n in iter {
+        x_lo = x_lo.min(n.x);
+        y_lo = y_lo.min(n.y);
+        x_hi = x_hi.max(n.x + n.width);
+        y_hi = y_hi.max(n.y + n.height);
+    }
+    Some((x_lo, y_lo, x_hi, y_hi))
+}
+
+/// S4：有组用组外框；`prefer_nodes` 时（无组监控外环）回退节点 bbox。
+fn routing_outer_bounds(
+    ctx: &OrthoRoutingContext<'_>,
+    prefer_nodes: bool,
+) -> Option<(f64, f64, f64, f64)> {
+    groups_outer_bounds(ctx).or_else(|| {
+        if prefer_nodes {
+            nodes_outer_bounds(ctx.nodes)
+        } else {
+            None
+        }
+    })
+}
+
+/// S4.x：以目标端口外向 stub 收束。
+///
+/// 若路径以「沿端口边横走」结束（Bottom 时 y=ey），`ensure_outward_stub` 会弹出
+/// 端口平面折点并用 stub.x 肘点回接，随后 simplify 与上游横段共线，吞掉外环 U 形。
+/// 横移须在 `PORT_CLEARANCE + NODE_OBSTACLE_PAD` 之外，否则 path_is_clean 会因擦边判脏。
+fn push_target_approach(pts: &mut Vec<Point>, ex: f64, ey: f64, to_side: Port) {
+    let (tx, ty) = port_outward(to_side);
+    let deep_dist = PORT_CLEARANCE + NODE_OBSTACLE_PAD + 8.0;
+    let deep = Point::new(ex + tx * deep_dist, ey + ty * deep_dist);
+    let stub = Point::new(ex + tx * PORT_CLEARANCE, ey + ty * PORT_CLEARANCE);
+    let end = Point::new(ex, ey);
+    let Some(&last) = pts.last() else {
+        pts.push(deep);
+        pts.push(stub);
+        pts.push(end);
+        return;
+    };
+    if matches!(to_side, Port::Top | Port::Bottom) {
+        if (last.y - deep.y).abs() > EPS {
+            pts.push(Point::new(last.x, deep.y));
+        }
+        if pts
+            .last()
+            .is_none_or(|p| (p.x - deep.x).abs() > EPS || (p.y - deep.y).abs() > EPS)
+        {
+            pts.push(deep);
+        }
+    } else {
+        if (last.x - deep.x).abs() > EPS {
+            pts.push(Point::new(deep.x, last.y));
+        }
+        if pts
+            .last()
+            .is_none_or(|p| (p.x - deep.x).abs() > EPS || (p.y - deep.y).abs() > EPS)
+        {
+            pts.push(deep);
+        }
+    }
+    if pts
+        .last()
+        .is_none_or(|p| (p.x - stub.x).abs() > EPS || (p.y - stub.y).abs() > EPS)
+    {
+        pts.push(stub);
+    }
+    pts.push(end);
+}
+
+/// S4.x：为仍穿模的监控边强制生成「离排 → 左右外廊」路径；若干净则返回 Some。
+pub(super) fn force_outer_escape_path(
+    start: Point,
+    end: Point,
+    from_side: Port,
+    to_side: Port,
+    from_id: &str,
+    to_id: &str,
+    nodes: &HashMap<String, crate::layout::NodeLayout>,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    obstacles: &PreparedObstacles,
+) -> Option<Vec<Point>> {
+    let (x_lo, _y_lo, x_hi, _y_hi) = nodes_outer_bounds(nodes)?;
+    let outer_pad = 56.0;
+    let left = x_lo - outer_pad;
+    let right = x_hi + outer_pad;
+    let sx = start.x;
+    let sy = start.y;
+    let ex = end.x;
+    let ey = end.y;
+    let (fx, fy) = port_outward(from_side);
+    let jog_ys = same_row_clearance_ys_nodes(sy, nodes);
+    let mut best: Option<(f64, Vec<Point>)> = None;
+    for &jog_y in &jog_ys {
+        if (jog_y - sy).abs() < 8.0 {
+            continue;
+        }
+        let toward_target =
+            (jog_y - sy).signum() == (ey - sy).signum() || (ey - sy).abs() < 1.0;
+        if !toward_target {
+            continue;
+        }
+        for x in [left, right] {
+            let mut pts = vec![Point::new(sx, sy)];
+            if matches!(from_side, Port::Left | Port::Right) {
+                pts.push(Point::new(sx + fx * PORT_CLEARANCE, sy + fy * PORT_CLEARANCE));
+                pts.push(Point::new(sx + fx * PORT_CLEARANCE, jog_y));
+            } else {
+                pts.push(Point::new(sx, jog_y));
+            }
+            pts.push(Point::new(x, jog_y));
+            push_target_approach(&mut pts, ex, ey, to_side);
+            let path = simplify_path(pts, false);
+            if path.len() < 2 || !path_is_orthogonal(&path) {
+                continue;
+            }
+            if !path_is_clean(
+                &path,
+                from_id,
+                to_id,
+                nodes,
+                group_ctx,
+                &obstacles.sorted_node_ids,
+            ) {
+                continue;
+            }
+            let len = path_length(&path);
+            if best.as_ref().is_none_or(|(bl, _)| len < *bl) {
+                best = Some((len, path));
+            }
+        }
+    }
+    best.map(|(_, p)| p)
+}
+
+/// 外环绕行候选（左右竖廊 / 上下横廊 / U 形外框），供 feedback 主选与 degraded 共用。
+///
+/// 按端口朝向过滤：L/R 侧通道优先左右竖廊；T/B 侧通道用 U 形（先出侧廊再绕顶/底），
+/// 避免「沿源 x 竖穿全图再横顶」横切业务层。
+fn build_outer_ring_candidates(
+    sx: f64,
+    sy: f64,
+    ex: f64,
+    ey: f64,
+    from_side: Port,
+    to_side: Port,
+    ctx: &OrthoRoutingContext<'_>,
+    outer_pad: f64,
+) -> Vec<Vec<Point>> {
+    let Some((x_lo, y_lo, x_hi, y_hi)) = routing_outer_bounds(ctx, true) else {
+        return Vec::new();
+    };
+    let left = x_lo - outer_pad;
+    let right = x_hi + outer_pad;
+    let top = y_lo - outer_pad;
+    let bottom = y_hi + outer_pad;
+    let prefer_vertical_ring = matches!(from_side, Port::Left | Port::Right)
+        || matches!(to_side, Port::Left | Port::Right);
+    let prefer_horizontal_ring = matches!(from_side, Port::Top | Port::Bottom)
+        || matches!(to_side, Port::Top | Port::Bottom);
+    let mut candidates = Vec::with_capacity(16);
+
+    let push = |cands: &mut Vec<Vec<Point>>, pts: Vec<Point>| {
+        cands.push(ensure_port_stubs(
+            simplify_path(pts, false),
+            from_side,
+            to_side,
+        ));
+    };
+    // S4.x 离排候选不加二次 stub（路径已含 PORT_CLEARANCE stub），避免 simplify 折坏
+    let push_raw = |cands: &mut Vec<Vec<Point>>, pts: Vec<Point>| {
+        cands.push(simplify_path(pts, false));
+    };
+
+    // S4.x：优先评估「离排再绕廊」候选（放在列表前部，避免 MAX_CANDIDATES 截断）
+    // 首段必须是单段出端口→jog（可合并共线点），以便 path_is_clean 允许源节点仅在 segment0。
+    if ctx.prefer_outer_ring {
+        let (fx, fy) = port_outward(from_side);
+        for &jog_y in &same_row_clearance_ys(sy, ctx) {
+            if (jog_y - sy).abs() < 8.0 {
+                continue;
+            }
+            let toward_target =
+                (jog_y - sy).signum() == (ey - sy).signum() || (ey - sy).abs() < 1.0;
+            if !toward_target {
+                continue;
+            }
+            // 沿端口外向先走出清除距，再折向 jog（L/R 时 stub.x≠sx；T/B 时直达 jog_y）
+            let mid = if matches!(from_side, Port::Left | Port::Right) {
+                let stub = Point::new(sx + fx * PORT_CLEARANCE, sy + fy * PORT_CLEARANCE);
+                Point::new(stub.x, jog_y)
+            } else {
+                Point::new(sx, jog_y)
+            };
+            for x in [left, right] {
+                let mut pts = vec![Point::new(sx, sy)];
+                if matches!(from_side, Port::Left | Port::Right) {
+                    pts.push(Point::new(sx + fx * PORT_CLEARANCE, sy + fy * PORT_CLEARANCE));
+                }
+                pts.push(mid);
+                pts.push(Point::new(x, mid.y));
+                push_target_approach(&mut pts, ex, ey, to_side);
+                push_raw(&mut candidates, pts);
+            }
+        }
+    }
+
+    if prefer_vertical_ring || !prefer_horizontal_ring {
+        for x in [left, right] {
+            if ctx.prefer_outer_ring {
+                let mut pts = vec![Point::new(sx, sy), Point::new(x, sy)];
+                push_target_approach(&mut pts, ex, ey, to_side);
+                push(&mut candidates, pts);
+            } else {
+                push(
+                    &mut candidates,
+                    vec![
+                        Point::new(sx, sy),
+                        Point::new(x, sy),
+                        Point::new(x, ey),
+                        Point::new(ex, ey),
+                    ],
+                );
+            }
+        }
+    }
+    if prefer_horizontal_ring {
+        // U 形：侧廊 → 顶/底横廊 → 回落（不沿 sx 竖穿）
+        for x in [left, right] {
+            for y in [top, bottom] {
+                if ctx.prefer_outer_ring {
+                    let mut pts = vec![
+                        Point::new(sx, sy),
+                        Point::new(x, sy),
+                        Point::new(x, y),
+                        Point::new(ex, y),
+                    ];
+                    push_target_approach(&mut pts, ex, ey, to_side);
+                    push(&mut candidates, pts);
+                } else {
+                    push(
+                        &mut candidates,
+                        vec![
+                            Point::new(sx, sy),
+                            Point::new(x, sy),
+                            Point::new(x, y),
+                            Point::new(ex, y),
+                            Point::new(ex, ey),
+                        ],
+                    );
+                }
+            }
+        }
+    } else if !prefer_vertical_ring {
+        for y in [top, bottom] {
+            if ctx.prefer_outer_ring {
+                let mut pts = vec![
+                    Point::new(sx, sy),
+                    Point::new(sx, y),
+                    Point::new(ex, y),
+                ];
+                push_target_approach(&mut pts, ex, ey, to_side);
+                push(&mut candidates, pts);
+            } else {
+                push(
+                    &mut candidates,
+                    vec![
+                        Point::new(sx, sy),
+                        Point::new(sx, y),
+                        Point::new(ex, y),
+                        Point::new(ex, ey),
+                    ],
+                );
+            }
+        }
+    }
+    candidates
+}
+
+/// S4.x：与 `sy` 相交的同排节点包络之外的清除 y（上/下各一），供外环先离排再绕行。
+fn same_row_clearance_ys(sy: f64, ctx: &OrthoRoutingContext<'_>) -> Vec<f64> {
+    same_row_clearance_ys_nodes(sy, ctx.nodes)
+}
+
+fn same_row_clearance_ys_nodes(
+    sy: f64,
+    nodes: &HashMap<String, crate::layout::NodeLayout>,
+) -> Vec<f64> {
+    const CLEAR: f64 = 40.0;
+    let mut row_top = f64::INFINITY;
+    let mut row_bot = f64::NEG_INFINITY;
+    let mut found = false;
+    for n in nodes.values() {
+        if n.y - 1.0 > sy || n.y + n.height + 1.0 < sy {
+            continue;
+        }
+        found = true;
+        row_top = row_top.min(n.y);
+        row_bot = row_bot.max(n.y + n.height);
+    }
+    if !found {
+        return vec![sy - CLEAR, sy + CLEAR];
+    }
+    let mut ys = vec![row_top - CLEAR, row_bot + CLEAR];
+    ys.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    ys.dedup_by(|a, b| (*a - *b).abs() < 1.0);
+    ys
 }
 
 fn path_is_orthogonal(path: &[Point]) -> bool {

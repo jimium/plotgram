@@ -1,6 +1,7 @@
 //! 边路由共享工具
 
 pub mod circular_support;
+pub mod collinear_simplify;
 pub mod edge_geometry;
 pub mod label_avoidance;
 pub mod label_candidate;
