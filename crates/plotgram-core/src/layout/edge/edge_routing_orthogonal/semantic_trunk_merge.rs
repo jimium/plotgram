@@ -235,7 +235,7 @@ fn try_merge_fan_in(
 
     let mut end_xs: Vec<f64> = ends.iter().map(|(_, _, e)| e.x).collect();
     end_xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let trunk_x = end_xs[end_xs.len() / 2];
+    let median_trunk_x = end_xs[end_xs.len() / 2];
 
     let (_, toy) = port_outward(to_port);
     let end_y = ends[0].2.y;
@@ -258,6 +258,18 @@ fn try_merge_fan_in(
             let y0 = ys[0];
             ys.iter().all(|y| (y - y0).abs() <= 1.0).then_some(y0)
         }
+    };
+    // 双源、同排、同出侧 pendant 使用目标边界中心，消除 slot 的 half-pitch 偏移；
+    // 密集/多源 FanIn 保留 allocator 中位 dock，避免把不同 trunk 强拉到同一轴。
+    let trunk_x = if relations.len() <= 16 && members.len() == 2 && aligned_source_join.is_some() {
+        match key {
+            SemanticMergeKey::FanIn { to_id, .. } => nodes
+                .get(to_id)
+                .map(|node| node.x + node.width / 2.0)
+                .unwrap_or(median_trunk_x),
+        }
+    } else {
+        median_trunk_x
     };
     let join_y =
         aligned_source_join.unwrap_or_else(|| fork_y + toy * MIN_SHARED_TRUNK_LEN.max(32.0));

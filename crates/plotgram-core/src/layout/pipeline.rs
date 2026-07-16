@@ -167,14 +167,45 @@ impl<'a> LayoutPipeline<'a> {
         );
 
         // S3：PRS 后仅在契约失败时兜底；margin 来自 SpaceBudget
-        let (mut result, moved_for_overlap) =
+        let (mut result, mut moved_for_overlap) =
             crate::layout::space_budget_guard::resolve_budget_violations(self.diagram, result);
         if !result.groups.is_empty() {
-            crate::layout::group_frame::recompute_group_bounds(
-                self.diagram,
-                &mut result,
-                gf_pass.padding,
-            );
+            let explicit_equal = crate::layout::group_frame::has_explicit_equal_track(self.diagram);
+            // budget guard 之后由 GroupFramePass 恢复完整 L1 契约；不能只做
+            // content-fit recompute，否则 `track: equal` 会在管线末尾被冲掉。
+            let pre_recompute_y: HashMap<String, f64> = result
+                .groups
+                .iter()
+                .map(|(id, group)| (id.clone(), group.y))
+                .collect();
+            let pre_frame_nodes: HashMap<String, (f64, f64)> = result
+                .nodes
+                .iter()
+                .map(|(id, node)| (id.clone(), (node.x, node.y)))
+                .collect();
+            if explicit_equal {
+                gf_pass.restore_after_node_moves(self.diagram, &mut result, algo, &pre_recompute_y);
+            } else {
+                crate::layout::group_frame::recompute_group_bounds(
+                    self.diagram,
+                    &mut result,
+                    gf_pass.padding,
+                );
+            }
+            if algo == "architecture" && explicit_equal {
+                moved_for_overlap.extend(
+                    crate::layout::node::architecture_v2::post_layout::
+                        align_cross_scope_pendant_chains(self.diagram, &mut result),
+                );
+            }
+            for (id, node) in &result.nodes {
+                if pre_frame_nodes.get(id).is_some_and(|(x, y)| {
+                    (node.x - x).abs() > super::post_route::NODE_MOVE_REROUTE_EPS
+                        || (node.y - y).abs() > super::post_route::NODE_MOVE_REROUTE_EPS
+                }) {
+                    moved_for_overlap.insert(id.clone());
+                }
+            }
         }
         result = crate::layout::space_budget_guard::reroute_and_repulse(
             self.diagram,

@@ -41,6 +41,13 @@ impl ProtectedRun {
         let b1 = other_t0.max(other_t1);
         (a1.min(b1) - a0.max(b0)).max(0.0)
     }
+
+    fn translate(&mut self, dx: f64, dy: f64) {
+        let (cross, along) = if self.horizontal { (dy, dx) } else { (dx, dy) };
+        self.coord += cross;
+        self.t0 += along;
+        self.t1 += along;
+    }
 }
 
 /// 声明的 merge 共享区间（P2 可空；后续由 Classify / merge 组填充）。
@@ -52,6 +59,15 @@ pub struct MergeInterval {
     pub t1: f64,
     /// 可选组键，便于调试
     pub group_key: Option<String>,
+}
+
+impl MergeInterval {
+    fn translate(&mut self, dx: f64, dy: f64) {
+        let (cross, along) = if self.horizontal { (dy, dx) } else { (dx, dy) };
+        self.coord += cross;
+        self.t0 += along;
+        self.t1 += along;
+    }
 }
 
 /// 单边旁路注解（C 末冻结）。
@@ -93,6 +109,43 @@ impl RouteAnnotationSet {
 
     pub fn is_empty(&self) -> bool {
         self.edges.is_empty()
+    }
+
+    /// 与路径几何执行同一次全局平移，保持 annotation 的绝对坐标契约。
+    pub fn translate(&mut self, dx: f64, dy: f64) {
+        for ann in &mut self.edges {
+            ann.start.x += dx;
+            ann.start.y += dy;
+            ann.end.x += dx;
+            ann.end.y += dy;
+            if let Some(point) = ann.stub_start.as_mut() {
+                point.x += dx;
+                point.y += dy;
+            }
+            if let Some(point) = ann.stub_end.as_mut() {
+                point.x += dx;
+                point.y += dy;
+            }
+            for run in &mut ann.protected_runs {
+                run.translate(dx, dy);
+            }
+            for merge in &mut ann.merge_intervals {
+                merge.translate(dx, dy);
+            }
+            if let Some(coord) = ann.stub_occupancy_from.as_mut() {
+                *coord += port_cross_axis_delta(ann.from_port, dx, dy);
+            }
+            if let Some(coord) = ann.stub_occupancy_to.as_mut() {
+                *coord += port_cross_axis_delta(ann.to_port, dx, dy);
+            }
+        }
+    }
+}
+
+fn port_cross_axis_delta(port: Port, dx: f64, dy: f64) -> f64 {
+    match port {
+        Port::Top | Port::Bottom => dx,
+        Port::Left | Port::Right => dy,
     }
 }
 
@@ -376,11 +429,7 @@ pub fn freeze_route_annotations_with_merges(
     out
 }
 
-fn protected_runs_preserved(
-    after: &[Point],
-    runs: &[ProtectedRun],
-    coord_tol: f64,
-) -> bool {
+fn protected_runs_preserved(after: &[Point], runs: &[ProtectedRun], coord_tol: f64) -> bool {
     if runs.is_empty() {
         return true;
     }
@@ -425,8 +474,7 @@ pub fn validate_route_edit(
     if after.len() < 2 {
         return Err(RouteEditViolation::DegeneratePath);
     }
-    if !same_point(after[0], ann.start, EPS) || !same_point(*after.last().unwrap(), ann.end, EPS)
-    {
+    if !same_point(after[0], ann.start, EPS) || !same_point(*after.last().unwrap(), ann.end, EPS) {
         return Err(RouteEditViolation::EndpointsChanged);
     }
     // 编辑不得丢掉连通性：端点相对 before 也需稳定
@@ -569,13 +617,7 @@ mod tests {
         let mut after = pts.clone();
         after[2] = Point::new(16.0, 0.0);
         after[3] = Point::new(80.0, 0.0);
-        let err = validate_route_edit(
-            &pts,
-            &after,
-            &ann,
-            None,
-            RouteEditValidateOpts::default(),
-        );
+        let err = validate_route_edit(&pts, &after, &ann, None, RouteEditValidateOpts::default());
         assert_eq!(err, Err(RouteEditViolation::CrossProtectedRun));
     }
 
@@ -584,10 +626,16 @@ mod tests {
         let mut pts = horiz_stair();
         let before = pts.clone();
         let ann = annotate_edge_from_path(&pts, Port::Right, Port::Left, 0).unwrap();
-        let ok = try_shape_edit(&mut pts, &ann, None, RouteEditValidateOpts::default(), |p| {
-            // 毁掉起点 stub 外向
-            p[1] = Point::new(-16.0, 0.0);
-        });
+        let ok = try_shape_edit(
+            &mut pts,
+            &ann,
+            None,
+            RouteEditValidateOpts::default(),
+            |p| {
+                // 毁掉起点 stub 外向
+                p[1] = Point::new(-16.0, 0.0);
+            },
+        );
         assert!(!ok);
         assert_eq!(pts, before);
     }
@@ -674,7 +722,13 @@ mod tests {
             to_id: "b",
         };
         assert_eq!(
-            validate_route_edit(&before, &after, &ann2, Some(obs), RouteEditValidateOpts::default()),
+            validate_route_edit(
+                &before,
+                &after,
+                &ann2,
+                Some(obs),
+                RouteEditValidateOpts::default()
+            ),
             Err(RouteEditViolation::NodePenetration)
         );
         let _ = ann;

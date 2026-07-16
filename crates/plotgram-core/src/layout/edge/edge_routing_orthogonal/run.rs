@@ -558,6 +558,7 @@ fn phase_port_slot(
             horizontal,
         );
     }
+    align_fanin_target_sides(relations, nodes, &mut to_side);
     crate::perf_log!(
         "[perf]     step1_ports: {:.2}ms",
         t1.elapsed().as_secs_f64() * 1000.0
@@ -1378,6 +1379,117 @@ fn phase_lane(
             grid.insert_path(&pts, ei);
         }
     }
+}
+
+/// 同宿 FanIn 若全部源节点位于目标同一侧，统一使用目标正对端口。
+///
+/// 逐边最近侧选择会把较远成员旋到 Left/Right，导致语义合流组在 S3 前被拆散。
+/// 这里只处理明确的全上/全下关系；混合方向仍保留逐边端口选择。
+fn align_fanin_target_sides(
+    relations: &[crate::ast::Relation],
+    nodes: &HashMap<String, NodeLayout>,
+    to_side: &mut [Port],
+) {
+    let mut by_target: std::collections::BTreeMap<&str, Vec<usize>> =
+        std::collections::BTreeMap::new();
+    for (edge_index, relation) in relations.iter().enumerate() {
+        by_target
+            .entry(relation.to.as_str())
+            .or_default()
+            .push(edge_index);
+    }
+    for (target_id, members) in by_target {
+        if let Some(common) = aligned_fanin_target_port(target_id, &members, relations, nodes) {
+            for edge_index in members {
+                if let Some(side) = to_side.get_mut(edge_index) {
+                    *side = common;
+                }
+            }
+        }
+    }
+}
+
+pub(super) fn aligned_fanin_target_port(
+    target_id: &str,
+    members: &[usize],
+    relations: &[crate::ast::Relation],
+    nodes: &HashMap<String, NodeLayout>,
+) -> Option<Port> {
+    if members.len() != 2 {
+        return None;
+    }
+    let target = nodes.get(target_id)?;
+    let sources: Vec<(&str, &NodeLayout)> = members
+        .iter()
+        .filter_map(|&edge_index| {
+            let relation = relations.get(edge_index)?;
+            nodes
+                .get(relation.from.as_str())
+                .map(|node| (relation.from.as_str(), node))
+        })
+        .collect();
+    if sources.len() != members.len() {
+        return None;
+    }
+    let first_center_y = sources[0].1.y + sources[0].1.height / 2.0;
+    if !sources
+        .iter()
+        .all(|(_, source)| (source.y + source.height / 2.0 - first_center_y).abs() <= 1.0)
+    {
+        return None;
+    }
+    let port = if sources
+        .iter()
+        .all(|(_, source)| source.y + source.height <= target.y + 0.5)
+    {
+        Port::Top
+    } else if sources
+        .iter()
+        .all(|(_, source)| source.y >= target.y + target.height - 0.5)
+    {
+        Port::Bottom
+    } else {
+        return None;
+    };
+
+    let trunk_x = target.x + target.width / 2.0;
+    let target_anchor = match port {
+        Port::Top => Point::new(trunk_x, target.y),
+        Port::Bottom => Point::new(trunk_x, target.y + target.height),
+        _ => unreachable!(),
+    };
+    for (source_id, source) in &sources {
+        let source_anchor = match port {
+            Port::Top => Point::new(source.x + source.width / 2.0, source.y + source.height),
+            Port::Bottom => Point::new(source.x + source.width / 2.0, source.y),
+            _ => unreachable!(),
+        };
+        let join_y = source_anchor.y
+            + if matches!(port, Port::Top) {
+                PORT_CLEARANCE
+            } else {
+                -PORT_CLEARANCE
+            };
+        let path = [
+            source_anchor,
+            Point::new(source_anchor.x, join_y),
+            Point::new(trunk_x, join_y),
+            target_anchor,
+        ];
+        let blocked = path.windows(2).any(|segment| {
+            nodes.iter().any(|(node_id, node)| {
+                node_id.as_str() != *source_id
+                    && node_id.as_str() != target_id
+                    && crate::layout::geometry::Rect::from(node)
+                        .expanded(NODE_OBSTACLE_PAD)
+                        .segment_crosses_interior(segment[0], segment[1], 0.5)
+            })
+        });
+        if blocked {
+            return None;
+        }
+    }
+    Some(port)
 }
 
 /// 从 S3 merge_intervals 提取垂直受保护干线 `(x, y_lo, y_hi)`（去重、排序）。

@@ -2,7 +2,10 @@
 
 use crate::ast::Diagram;
 use crate::layout::LayoutResult;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap, HashSet};
+
+const PENDANT_ALIGN_EPS: f64 = 2.0;
+const GROUP_INNER_GUARD: f64 = 8.0;
 
 /// 架构图单 group 行居中：当某 macro rank 只有一个 group 时，
 /// 将其水平居中到 sibling 包围盒（或画布）宽度，避免窄行贴左留下大片空白。
@@ -28,9 +31,7 @@ pub(crate) fn center_single_group_rows(diagram: &Diagram, layout: &mut LayoutRes
     let mut rows: Vec<(f64, Vec<String>)> = Vec::new();
     for id in &top_ids {
         if let Some(g) = layout.groups.get(id) {
-            let row_idx = rows
-                .iter()
-                .position(|(row_y, _)| (row_y - g.y).abs() < 0.5);
+            let row_idx = rows.iter().position(|(row_y, _)| (row_y - g.y).abs() < 0.5);
             match row_idx {
                 Some(idx) => rows[idx].1.push(id.clone()),
                 None => rows.push((g.y, vec![id.clone()])),
@@ -136,6 +137,145 @@ pub(crate) fn center_single_group_rows(diagram: &Diagram, layout: &mut LayoutRes
     }
 }
 
+/// V3b-A：最终 group frame 落定后，对跨作用域的唯一入边链重申主轴对齐。
+///
+/// 目标在 leaf group 内时原子平移该组全部直接成员，保持组内纵链；目标无组时只移动
+/// 目标节点。若目标块还接受其它作用域的输入、越出组框或与其它节点碰撞，则整组放弃。
+/// 返回实际移动的节点，供调用方在路由前做增量重路由。
+pub(crate) fn align_cross_scope_pendant_chains(
+    diagram: &Diagram,
+    layout: &mut LayoutResult,
+) -> HashSet<String> {
+    let node_scope: HashMap<String, Option<String>> = diagram
+        .entities
+        .iter()
+        .map(|entity| {
+            (
+                entity.id.as_str().to_string(),
+                entity.group_id.as_ref().map(|id| id.as_str().to_string()),
+            )
+        })
+        .collect();
+    let mut incoming_count: HashMap<String, usize> = HashMap::new();
+    for relation in &diagram.relations {
+        *incoming_count
+            .entry(relation.to.as_str().to_string())
+            .or_default() += 1;
+    }
+
+    let ranks = layout.hints.sugiyama_ranks.as_ref();
+    let mut moved = HashSet::new();
+    let mut moved_blocks: HashSet<String> = HashSet::new();
+
+    for relation in &diagram.relations {
+        let from_id = relation.from.as_str();
+        let to_id = relation.to.as_str();
+        if incoming_count.get(to_id).copied().unwrap_or(0) != 1 {
+            continue;
+        }
+        let from_scope = node_scope.get(from_id).cloned().flatten();
+        let to_scope = node_scope.get(to_id).cloned().flatten();
+        let block_key = to_scope
+            .as_ref()
+            .map(|group| format!("group:{group}"))
+            .unwrap_or_else(|| format!("node:{to_id}"));
+        if from_scope == to_scope || moved_blocks.contains(&block_key) {
+            continue;
+        }
+        if let Some(ranks) = ranks {
+            let (Some(&from_rank), Some(&to_rank)) = (ranks.get(from_id), ranks.get(to_id)) else {
+                continue;
+            };
+            if to_rank != from_rank + 1 {
+                continue;
+            }
+        }
+
+        let mut block: Vec<String> = match to_scope.as_ref() {
+            Some(group_id) => diagram
+                .entities
+                .iter()
+                .filter(|entity| {
+                    entity.group_id.as_ref().map(|id| id.as_str()) == Some(group_id.as_str())
+                })
+                .map(|entity| entity.id.as_str().to_string())
+                .collect(),
+            None => vec![to_id.to_string()],
+        };
+        block.sort();
+        if block.is_empty() {
+            continue;
+        }
+        let block_set: HashSet<&str> = block.iter().map(String::as_str).collect();
+
+        let external_scopes: BTreeSet<Option<String>> = diagram
+            .relations
+            .iter()
+            .filter(|edge| {
+                block_set.contains(edge.to.as_str()) && !block_set.contains(edge.from.as_str())
+            })
+            .map(|edge| node_scope.get(edge.from.as_str()).cloned().flatten())
+            .collect();
+        if external_scopes.len() != 1 || !external_scopes.contains(&from_scope) {
+            continue;
+        }
+
+        let (Some(from), Some(to)) = (layout.nodes.get(from_id), layout.nodes.get(to_id)) else {
+            continue;
+        };
+        let delta = (from.x + from.width / 2.0) - (to.x + to.width / 2.0);
+        if delta.abs() <= PENDANT_ALIGN_EPS {
+            moved_blocks.insert(block_key);
+            continue;
+        }
+
+        if let Some(group_id) = to_scope.as_ref() {
+            let Some(group) = layout.groups.get(group_id) else {
+                continue;
+            };
+            let inside = block.iter().all(|id| {
+                layout.nodes.get(id).is_some_and(|node| {
+                    node.x + delta >= group.x + GROUP_INNER_GUARD
+                        && node.x + delta + node.width <= group.x + group.width - GROUP_INNER_GUARD
+                })
+            });
+            if !inside {
+                continue;
+            }
+        }
+
+        let collides = block.iter().any(|id| {
+            let Some(node) = layout.nodes.get(id) else {
+                return true;
+            };
+            let left = node.x + delta;
+            let right = left + node.width;
+            let top = node.y;
+            let bottom = node.y + node.height;
+            layout.nodes.iter().any(|(other_id, other)| {
+                !block_set.contains(other_id.as_str())
+                    && left < other.x + other.width - 0.5
+                    && right > other.x + 0.5
+                    && top < other.y + other.height - 0.5
+                    && bottom > other.y + 0.5
+            })
+        });
+        if collides {
+            continue;
+        }
+
+        for id in &block {
+            if let Some(node) = layout.nodes.get_mut(id) {
+                node.x += delta;
+                moved.insert(id.clone());
+            }
+        }
+        moved_blocks.insert(block_key);
+    }
+
+    moved
+}
+
 #[cfg(test)]
 mod tests {
     use crate::layout::compute_layout_with_plan;
@@ -144,13 +284,12 @@ mod tests {
 
     #[test]
     fn stress_nested_cloud_gets_left_gutter_budget() {
-        let source = include_str!(
-            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
-        );
+        let source =
+            include_str!("../../../../../../showcase/architecture/c.layout-stress-nested.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
         let prepared = output.diagram.expect("valid diagram");
-        let layout = compute_layout_with_plan(prepared.inner(), prepared.layout_plan())
-            .expect("layout");
+        let layout =
+            compute_layout_with_plan(prepared.inner(), prepared.layout_plan()).expect("layout");
 
         let cloud_left = layout
             .hints
@@ -169,14 +308,12 @@ mod tests {
     fn stress_nested_no_node_overlap() {
         use crate::layout::lint::{lint_layout, LintMetricsSummary};
 
-        let source = include_str!(
-            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
-        );
+        let source =
+            include_str!("../../../../../../showcase/architecture/c.layout-stress-nested.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
         let prepared = output.diagram.expect("valid diagram");
         let diagram = prepared.inner();
-        let layout = compute_layout_with_plan(diagram, prepared.layout_plan())
-            .expect("layout");
+        let layout = compute_layout_with_plan(diagram, prepared.layout_plan()).expect("layout");
         let summary = LintMetricsSummary::from_report(&lint_layout(diagram, &layout));
         assert_eq!(
             summary.node_overlap, 0,
@@ -204,14 +341,12 @@ mod tests {
     fn stress_nested_has_no_sibling_group_overlap() {
         use crate::layout::lint::{lint_layout, LintMetricsSummary};
 
-        let source = include_str!(
-            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
-        );
+        let source =
+            include_str!("../../../../../../showcase/architecture/c.layout-stress-nested.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
         let prepared = output.diagram.expect("valid diagram");
         let diagram = prepared.inner();
-        let layout = compute_layout_with_plan(diagram, prepared.layout_plan())
-            .expect("layout");
+        let layout = compute_layout_with_plan(diagram, prepared.layout_plan()).expect("layout");
         let summary = LintMetricsSummary::from_report(&lint_layout(diagram, &layout));
         assert_eq!(
             summary.group_overlap, 0,
@@ -221,14 +356,12 @@ mod tests {
 
     #[test]
     fn stress_nested_nodes_stay_inside_leaf_groups() {
-        let source = include_str!(
-            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
-        );
+        let source =
+            include_str!("../../../../../../showcase/architecture/c.layout-stress-nested.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
         let prepared = output.diagram.expect("valid diagram");
         let diagram = prepared.inner();
-        let layout = compute_layout_with_plan(diagram, prepared.layout_plan())
-            .expect("layout");
+        let layout = compute_layout_with_plan(diagram, prepared.layout_plan()).expect("layout");
 
         let ds = layout.groups.get("data_subnet").expect("data_subnet");
         let ds_bottom = ds.y + ds.height;
@@ -260,16 +393,14 @@ mod tests {
 
     #[test]
     fn stress_nested_child_groups_stay_inside_parents() {
-        use crate::layout::lint::{lint_layout, LintRuleId, LintMetricsSummary};
+        use crate::layout::lint::{lint_layout, LintMetricsSummary, LintRuleId};
 
-        let source = include_str!(
-            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
-        );
+        let source =
+            include_str!("../../../../../../showcase/architecture/c.layout-stress-nested.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
         let prepared = output.diagram.expect("valid diagram");
         let diagram = prepared.inner();
-        let layout = compute_layout_with_plan(diagram, prepared.layout_plan())
-            .expect("layout");
+        let layout = compute_layout_with_plan(diagram, prepared.layout_plan()).expect("layout");
         let report = lint_layout(diagram, &layout);
         let outside: Vec<_> = report
             .violations
@@ -292,14 +423,12 @@ mod tests {
     fn stress_nested_edges_attach_to_node_ports() {
         use crate::layout::group::PORT_STUB_CLEARANCE;
 
-        let source = include_str!(
-            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
-        );
+        let source =
+            include_str!("../../../../../../showcase/architecture/c.layout-stress-nested.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
         let prepared = output.diagram.expect("valid diagram");
         let diagram = prepared.inner();
-        let layout = compute_layout_with_plan(diagram, prepared.layout_plan())
-            .expect("layout");
+        let layout = compute_layout_with_plan(diagram, prepared.layout_plan()).expect("layout");
 
         let max_stub = PORT_STUB_CLEARANCE + 4.0;
         for (i, edge) in layout.edges.iter().enumerate() {
@@ -334,5 +463,4 @@ mod tests {
         let dy = (y - py).max(0.0).max(py - (y + h));
         (dx * dx + dy * dy).sqrt()
     }
-
 }

@@ -1,7 +1,7 @@
 //! Reverse-stub / side-approach detection and port correction.
 
-use super::*;
 use super::path::port_outward;
+use super::*;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
 use std::collections::HashMap;
@@ -96,20 +96,14 @@ fn is_degenerate_stub_path(points: &[Point], to_nl: &NodeLayout, to_side: Port) 
 fn point_near_node_port_edge(p: Point, nl: &NodeLayout, side: Port) -> bool {
     const TOL: f64 = 2.0;
     match side {
-        Port::Top => {
-            (p.y - nl.y).abs() <= TOL
-                && p.x >= nl.x - TOL
-                && p.x <= nl.x + nl.width + TOL
-        }
+        Port::Top => (p.y - nl.y).abs() <= TOL && p.x >= nl.x - TOL && p.x <= nl.x + nl.width + TOL,
         Port::Bottom => {
             (p.y - (nl.y + nl.height)).abs() <= TOL
                 && p.x >= nl.x - TOL
                 && p.x <= nl.x + nl.width + TOL
         }
         Port::Left => {
-            (p.x - nl.x).abs() <= TOL
-                && p.y >= nl.y - TOL
-                && p.y <= nl.y + nl.height + TOL
+            (p.x - nl.x).abs() <= TOL && p.y >= nl.y - TOL && p.y <= nl.y + nl.height + TOL
         }
         Port::Right => {
             (p.x - (nl.x + nl.width)).abs() <= TOL
@@ -293,10 +287,18 @@ fn detect_side_approach(points: &[Point], anchor_idx: usize, side: Port) -> Opti
     if seg_perp.abs() > seg_fwd.abs() && seg_perp.abs() > SIDE_JOG_THRESHOLD {
         let suggested = match side {
             Port::Top | Port::Bottom => {
-                if far.x > corner.x { Port::Right } else { Port::Left }
+                if far.x > corner.x {
+                    Port::Right
+                } else {
+                    Port::Left
+                }
             }
             Port::Left | Port::Right => {
-                if far.y > corner.y { Port::Bottom } else { Port::Top }
+                if far.y > corner.y {
+                    Port::Bottom
+                } else {
+                    Port::Top
+                }
             }
         };
         return Some(suggested);
@@ -310,7 +312,7 @@ fn detect_side_approach(points: &[Point], anchor_idx: usize, side: Port) -> Opti
 #[derive(Copy, Clone, Debug)]
 enum PortFix {
     None,
-    Flip,        // 翻转到对面端口（反向stub）
+    Flip,         // 翻转到对面端口（反向stub）
     Rotate(Port), // 旋转到指定相邻端口（侧向接入）
 }
 
@@ -368,6 +370,7 @@ pub fn fix_reverse_stub_ports(
     // Phase 1: 收集所有需要修正的边及建议修正方式，避免边遍历边修改
     let edges_to_check = collect_edges_to_check(
         edges,
+        relations,
         from_side,
         to_side,
         endpoint_map,
@@ -387,10 +390,18 @@ pub fn fix_reverse_stub_ports(
         let old_from = from_side[ei];
         let old_to = to_side[ei];
 
-        let Some(old_from_ep) = endpoint_map.get(&(ei, true)) else { continue };
-        let Some(old_to_ep) = endpoint_map.get(&(ei, false)) else { continue };
-        let Some(from_nl) = nodes.get(&old_from_ep.node_id) else { continue };
-        let Some(to_nl) = nodes.get(&old_to_ep.node_id) else { continue };
+        let Some(old_from_ep) = endpoint_map.get(&(ei, true)) else {
+            continue;
+        };
+        let Some(old_to_ep) = endpoint_map.get(&(ei, false)) else {
+            continue;
+        };
+        let Some(from_nl) = nodes.get(&old_from_ep.node_id) else {
+            continue;
+        };
+        let Some(to_nl) = nodes.get(&old_to_ep.node_id) else {
+            continue;
+        };
 
         let old_points: Vec<Point> = edges[ei].path_points().into_owned();
         let old_path_len = path_length(&old_points);
@@ -480,6 +491,7 @@ pub fn fix_reverse_stub_ports(
 /// 侧向接入、退化 stub，生成对应的 `PortFix` 建议。
 fn collect_edges_to_check(
     edges: &[EdgeLayout],
+    relations: &[crate::ast::Relation],
     from_side: &[Port],
     to_side: &[Port],
     endpoint_map: &HashMap<(usize, bool), Endpoint>,
@@ -520,6 +532,16 @@ fn collect_edges_to_check(
         };
         let orig_from_side = from_side_approach.is_some();
         let orig_to_side = to_side_approach.is_some();
+        let semantic_fanin = relations.get(ei).is_some_and(|relation| {
+            let members: Vec<usize> = relations
+                .iter()
+                .enumerate()
+                .filter(|(_, other)| other.to == relation.to)
+                .map(|(edge_index, _)| edge_index)
+                .collect();
+            super::run::aligned_fanin_target_port(relation.to.as_str(), &members, relations, nodes)
+                == Some(to_side[ei])
+        });
 
         let from_fix = if from_rev || degenerate {
             PortFix::Flip
@@ -528,7 +550,11 @@ fn collect_edges_to_check(
         } else {
             PortFix::None
         };
-        let to_fix = if to_rev || degenerate {
+        let to_fix = if semantic_fanin {
+            // 同宿 FanIn 的目标正对侧由端口协调阶段统一；这里若按单边侧向
+            // approach 旋转，会在 S3 前拆散合流组。
+            PortFix::None
+        } else if to_rev || degenerate {
             PortFix::Flip
         } else if let Some(suggested) = to_side_approach {
             PortFix::Rotate(suggested)
@@ -768,8 +794,8 @@ fn evaluate_attempt(
     let new_len = path_length(&candidate);
     let still_degenerate = is_degenerate_stub_path(&candidate, to_nl, new_to);
     // 允许最长比原路径长20%，但优先选择更短的路径
-    let len_ok = new_len <= old_path_len * 1.2 + 60.0
-        || is_degenerate_stub_path(old_points, to_nl, old_to);
+    let len_ok =
+        new_len <= old_path_len * 1.2 + 60.0 || is_degenerate_stub_path(old_points, to_nl, old_to);
 
     // 接受条件：
     // 1. 路径干净（不穿过节点/组内部）
@@ -787,8 +813,7 @@ fn evaluate_attempt(
     let side_problems_same_or_better = new_side_problems <= orig_side_problems;
     let shorter = new_len < old_path_len;
     let significantly_shorter = new_len < old_path_len * 0.9;
-    let fixes_degenerate =
-        is_degenerate_stub_path(old_points, to_nl, old_to) && !still_degenerate;
+    let fixes_degenerate = is_degenerate_stub_path(old_points, to_nl, old_to) && !still_degenerate;
 
     let accept = if fixes_degenerate {
         true

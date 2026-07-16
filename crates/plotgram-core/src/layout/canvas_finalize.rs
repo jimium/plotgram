@@ -73,10 +73,18 @@ fn compute_global_bbox(result: &LayoutResult) -> Option<(f64, f64, f64, f64)> {
     let mut max_y = f64::NEG_INFINITY;
 
     let mut extend = |x: f64, y: f64| {
-        if x < min_x { min_x = x; }
-        if y < min_y { min_y = y; }
-        if x > max_x { max_x = x; }
-        if y > max_y { max_y = y; }
+        if x < min_x {
+            min_x = x;
+        }
+        if y < min_y {
+            min_y = y;
+        }
+        if x > max_x {
+            max_x = x;
+        }
+        if y > max_y {
+            max_y = y;
+        }
     };
 
     let mut has_any = false;
@@ -142,6 +150,12 @@ fn translate_all(result: &mut LayoutResult, dx: f64, dy: f64) {
         edge.translate(dx, dy);
     }
 
+    // 路由注解使用绝对坐标；必须与路径同步平移，否则 merge/protected run
+    // 会在渲染与末尾形状校验时失配。
+    if let Some(annotations) = result.hints.route_annotations.as_mut() {
+        annotations.translate(dx, dy);
+    }
+
     // Circular hints: 圆环中心
     if let Some(circular) = result.hints.circular.as_mut() {
         for circle in &mut circular.circles {
@@ -167,10 +181,8 @@ fn translate_all(result: &mut LayoutResult, dx: f64, dy: f64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layout::{
-        EdgeLabelLayout, EdgeLayout, LayoutHints, NodeLayout, PathGeometry, Port,
-    };
     use crate::layout::geometry::Point;
+    use crate::layout::{EdgeLabelLayout, EdgeLayout, LayoutHints, NodeLayout, PathGeometry, Port};
     use std::collections::HashMap;
 
     fn empty_result() -> LayoutResult {

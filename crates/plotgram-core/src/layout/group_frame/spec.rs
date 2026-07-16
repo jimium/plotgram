@@ -3,9 +3,9 @@
 //! 本文件从 `mod.rs` 拆分而来，仅做代码搬家，无行为变更。
 
 use crate::ast::{AttributeValue, Diagram};
+use crate::layout::constants::SUGIYAMA_GROUP_PADDING;
 use crate::layout::grid_snap::diagram_snap_attribute;
 use crate::layout::node::common::group_bounds::GroupPadding;
-use crate::layout::constants::SUGIYAMA_GROUP_PADDING;
 use crate::types::standard_attr_keys::diagram as dsl;
 use std::collections::HashMap;
 
@@ -58,7 +58,10 @@ pub enum GroupArrangement {
     ///
     /// 命名用 `Matrix` 而非 `Grid`，避免与 L2 `GroupLayoutHint::Grid`（组内矩阵）
     /// 及 L3 `grid_snap`（节点 8px snap）三层「grid」歧义（见 spec §1.3）。
-    Matrix { rows: Option<u32>, cols: Option<u32> },
+    Matrix {
+        rows: Option<u32>,
+        cols: Option<u32>,
+    },
 }
 
 /// 主方向 track 的尺寸策略。
@@ -290,6 +293,37 @@ fn resolve_from_group_frame_config(diagram: &Diagram, algo: &str) -> Option<Grou
     Some(spec)
 }
 
+/// 是否由 DSL 显式声明了 Equal track 契约。
+///
+/// 与算法默认值分开：末尾重申 L1 尺寸只应作用于用户声明的契约，不能把默认
+/// architecture Equal 扩散为所有图的最终坐标重写。
+pub(crate) fn has_explicit_equal_track(diagram: &Diagram) -> bool {
+    let Some(attr) = diagram
+        .attributes
+        .iter()
+        .find(|attribute| attribute.key == dsl::GROUP_FRAME)
+    else {
+        return false;
+    };
+    if attr.span == crate::ast::Span::dummy() {
+        return false;
+    }
+    match &attr.value {
+        AttributeValue::Config { algo, options } => {
+            let preset_equal =
+                algo.eq_ignore_ascii_case(crate::types::attr_constants::group_frame_preset::STRIPS);
+            let option_equal = read_str_option(options, "track").is_some_and(|track| {
+                track.eq_ignore_ascii_case("equal") || track.eq_ignore_ascii_case("uniform")
+            });
+            preset_equal || option_equal
+        }
+        AttributeValue::String(value) => {
+            value.eq_ignore_ascii_case(crate::types::attr_constants::group_frame_preset::STRIPS)
+        }
+        _ => false,
+    }
+}
+
 fn parse_stack_axis(axis: &str) -> Axis {
     match axis.to_ascii_lowercase().as_str() {
         "horizontal" | "h" => Axis::Horizontal,
@@ -352,10 +386,7 @@ fn apply_group_frame_preset(name: &str, spec: &mut GroupFrameSpec) -> bool {
 }
 
 /// 从 Config options 读取字符串值（小写归一化）。
-fn read_str_option<'a>(
-    options: &'a HashMap<String, AttributeValue>,
-    key: &str,
-) -> Option<&'a str> {
+fn read_str_option<'a>(options: &'a HashMap<String, AttributeValue>, key: &str) -> Option<&'a str> {
     options.get(key).and_then(|v| v.as_str())
 }
 
@@ -393,10 +424,7 @@ fn resolve_stack(diagram: &Diagram) -> GroupFrameSpec {
         track_sizing: TrackSizing::Fit,
         cross_align: CrossAlign::Center,
         gap: FLOWCHART_GROUP_GAP,
-        padding: GroupPadding::uniform(
-            SUGIYAMA_GROUP_PADDING,
-            GROUP_LABEL_HEIGHT,
-        ),
+        padding: GroupPadding::uniform(SUGIYAMA_GROUP_PADDING, GROUP_LABEL_HEIGHT),
         border_align: BorderAlign::None,
         quantize: resolve_quantize(diagram),
     }
