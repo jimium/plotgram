@@ -181,13 +181,24 @@ pub fn run_refine(
         spline_fallback_count: 0,
     });
 
-    // P2-2：多轮 refine 后仍有穿障的边，降级为 spline 可见性图绕障
+    // P2-2：多轮 refine 后仍穿节点/穿组的边，走正交 dogleg/外廊降级（architecture
+    // 禁止密采样 spline）。穿组内若不纳入候选，仅穿组不穿节点的边永远得不到纠正。
     let final_metrics = crossing::analyze_crossings(&result, diagram, config);
-    if final_metrics.edge_node_crossings > 0 {
-        let mut fallback_edges: HashSet<usize> = HashSet::new();
-        for info in final_metrics.problem_nodes.values() {
-            fallback_edges.extend(info.edge_indices.iter().copied());
+    let mut fallback_edges: HashSet<usize> = HashSet::new();
+    for info in final_metrics.problem_nodes.values() {
+        fallback_edges.extend(info.edge_indices.iter().copied());
+    }
+    if !result.groups.is_empty() {
+        let maps = crate::layout::lint::GroupInteriorMaps::new(diagram);
+        for edge_index in 0..result.edges.len() {
+            if crate::layout::lint::edge_crosses_group_interior_with_maps(
+                diagram, &result, edge_index, &maps,
+            ) {
+                fallback_edges.insert(edge_index);
+            }
         }
+    }
+    if !fallback_edges.is_empty() {
         spline_fallback::reroute_edges_with_spline(&mut result, diagram, &fallback_edges, config);
     }
 
