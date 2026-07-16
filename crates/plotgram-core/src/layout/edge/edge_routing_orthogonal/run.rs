@@ -28,11 +28,8 @@ pub(super) fn route_edges_orthogonal_inner(
     let s4_monitor_corridor = profile.semantic_merge && diagram.groups.is_empty();
 
     let routing_algo = crate::layout::group::routing_algo_for_diagram(diagram);
-    let group_ctx = crate::layout::group::GroupRoutingContext::from_layout(
-        diagram,
-        &result,
-        routing_algo,
-    );
+    let group_ctx =
+        crate::layout::group::GroupRoutingContext::from_layout(diagram, &result, routing_algo);
     let mut group_routing = group_ctx.routing_hints();
     if let Some(existing) = &result.hints.group_routing {
         if !existing.side_gutters.is_empty() {
@@ -44,8 +41,7 @@ pub(super) fn route_edges_orthogonal_inner(
     // 预排序节点/分组 ID，避免路由循环内重复排序（方案 2）
     let obstacles = PreparedObstacles::build(&result.nodes, &group_ctx);
 
-    let horizontal =
-        crate::layout::resolve_effective_direction(diagram) == Some("left-to-right");
+    let horizontal = crate::layout::resolve_effective_direction(diagram) == Some("left-to-right");
     let feedback_assignment = feedback_side::assign_feedback_sides(
         diagram,
         relations,
@@ -54,20 +50,20 @@ pub(super) fn route_edges_orthogonal_inner(
         horizontal,
     );
 
-    let corridor_plan =
-        corridor_route::plan_corridor_routes(relations, &group_ctx, &profile);
+    let corridor_plan = corridor_route::plan_corridor_routes(relations, &group_ctx, &profile);
 
     // ── 1+2. 端口选择 + slot 分配 + 平行边偏移 ──
-    let (mut from_side, mut to_side, _lane, mut endpoint_map, parallel, reverse_pairs) = phase_port_slot(
-        relations,
-        &result.nodes,
-        &group_ctx,
-        &feedback_assignment,
-        &cfg,
-        n,
-        s4_monitor_corridor,
-        horizontal,
-    );
+    let (mut from_side, mut to_side, _lane, mut endpoint_map, parallel, reverse_pairs) =
+        phase_port_slot(
+            relations,
+            &result.nodes,
+            &group_ctx,
+            &feedback_assignment,
+            &cfg,
+            n,
+            s4_monitor_corridor,
+            horizontal,
+        );
 
     // ── 3. 分层批量边序（有 rank 时低层先占通道；feedback 全局延后） ──
     let (edge_order, feedback_edge_set) = phase_layer_order(
@@ -210,7 +206,7 @@ pub(super) fn route_edges_orthogonal_inner(
     );
 
     // S3：语义 FanIn/FanOut 合流（仅 architecture）；写路径 + merge_intervals
-    let merge_result = if profile.semantic_merge {
+    let mut merge_result = if profile.semantic_merge {
         let mr = semantic_trunk_merge::apply_semantic_trunk_merge(
             &mut edges,
             relations,
@@ -371,13 +367,8 @@ pub(super) fn route_edges_orthogonal_inner(
             };
             grid.remove_by_edges(std::slice::from_ref(&ei));
             grid.insert_path(&path, ei);
-            let labels = build_parallel_aware_edge_labels(
-                rel,
-                ei,
-                relations,
-                &parallel.offsets,
-                &path,
-            );
+            let labels =
+                build_parallel_aware_edge_labels(rel, ei, relations, &parallel.offsets, &path);
             let mut edge = EdgeLayout {
                 geometry: PathGeometry::Polyline { points: Vec::new() },
                 labels,
@@ -407,9 +398,68 @@ pub(super) fn route_edges_orthogonal_inner(
         }
     }
 
+    // B.2：监控外环已稳定后，仅在目标附近按端口侧做局部 trunk。
+    // 复用原路径前缀，避免把监控边重新拉回业务走廊；失败保持 S4 外环。
+    if s4_monitor_corridor && profile.semantic_merge {
+        let monitor_set: std::collections::HashSet<usize> =
+            feedback_side::monitor_hub_edge_indices(relations)
+                .into_iter()
+                .collect();
+        let local = semantic_trunk_merge::apply_monitor_local_trunk_merge(
+            &mut edges,
+            relations,
+            &from_side,
+            &to_side,
+            &result.nodes,
+            diagram.diagram_type.clone(),
+            &monitor_set,
+        );
+        if local.stats.edges_rewritten > 0 {
+            grid.remove_by_edges(&monitor_set.iter().copied().collect::<Vec<_>>());
+            for &ei in &monitor_set {
+                if ei < edges.len() && !edges[ei].path_is_empty() {
+                    grid.insert_path(edges[ei].path_points().as_ref(), ei);
+                }
+            }
+        }
+        if let Some(base) = merge_result.as_mut() {
+            base.stats.groups_considered += local.stats.groups_considered;
+            base.stats.groups_merged += local.stats.groups_merged;
+            base.stats.edges_rewritten += local.stats.edges_rewritten;
+            base.stats.degraded_groups += local.stats.degraded_groups;
+            base.merge_intervals.extend(local.merge_intervals);
+            base.degraded.extend(local.degraded);
+        } else {
+            merge_result = Some(local);
+        }
+        // 几何与 merge 声明均可能变化，刷新最终 Annotation。
+        result.hints.route_annotations =
+            Some(crate::layout::edge::freeze_route_annotations_with_merges(
+                &edges,
+                &from_side,
+                &to_side,
+                merge_result.as_ref().map(|m| &m.merge_intervals),
+                merge_result.as_ref().map(|m| &m.degraded),
+            ));
+    }
+
+    // 轨道 A：sanitize / S4 escape 之后再次收口正反向同侧共锚
+    let dock_gap = parallel_gap.max(COMPACT_SLOT_PITCH);
+    let _dock_fixed = enforce_reverse_pair_dock_separation(
+        &mut edges,
+        relations,
+        &result.nodes,
+        &from_side,
+        &to_side,
+        dock_gap,
+    );
+
     // P3.3：标签避让只在 pipeline 几何冻结后做一次。
     // sanitize 会重建平行边标签；此处再 resolve 会被 D 段 snap/sanitize 丢掉。
-    crate::perf_log!("[perf]     fix_inversions+labels: {:.2}ms", t_fix.elapsed().as_secs_f64() * 1000.0);
+    crate::perf_log!(
+        "[perf]     fix_inversions+labels: {:.2}ms",
+        t_fix.elapsed().as_secs_f64() * 1000.0
+    );
 
     result.edges = edges;
     // P2-1: 导出 orthogonal 路由 debug 统计
@@ -453,13 +503,12 @@ fn phase_port_slot(
         let rel0 = &relations[indices[0]];
         let (can_from, can_to) = canonical_pair(rel0.from.as_str(), rel0.to.as_str());
 
-        let (Some(a_nl), Some(b_nl)) =
-            (nodes.get(can_from), nodes.get(can_to))
-        else {
+        let (Some(a_nl), Some(b_nl)) = (nodes.get(can_from), nodes.get(can_to)) else {
             continue;
         };
 
-        let (side_a, side_b) = choose_pair_sides_with_group(a_nl, b_nl, can_from, can_to, Some(group_ctx));
+        let (side_a, side_b) =
+            choose_pair_sides_with_group(a_nl, b_nl, can_from, can_to, Some(group_ctx));
 
         for (l, &i) in indices.iter().enumerate() {
             let rel = &relations[i];
@@ -485,7 +534,13 @@ fn phase_port_slot(
     // choose_pair_sides 逐对独立选端口，同一节点的多条边可能分散在不同侧出发，
     // 导致节点附近不必要的交叉。此阶段对每个节点的多条边做"同侧偏好"协调：
     // 统计各侧边数，让少数派边在几何可接受时切换到多数派侧。
-    coordinate_port_sides(relations, nodes, &mut from_side, &mut to_side, Some(group_ctx));
+    coordinate_port_sides(
+        relations,
+        nodes,
+        &mut from_side,
+        &mut to_side,
+        Some(group_ctx),
+    );
     apply_feedback_side_overrides(
         relations,
         feedback_assignment,
@@ -503,7 +558,10 @@ fn phase_port_slot(
             horizontal,
         );
     }
-    crate::perf_log!("[perf]     step1_ports: {:.2}ms", t1.elapsed().as_secs_f64() * 1000.0);
+    crate::perf_log!(
+        "[perf]     step1_ports: {:.2}ms",
+        t1.elapsed().as_secs_f64() * 1000.0
+    );
 
     // ── 2. 为每个连接点分配磁吸 slot 坐标 ──
     //
@@ -524,9 +582,7 @@ fn phase_port_slot(
         let rel = &relations[i];
         let from_id = rel.from.as_str();
         let to_id = rel.to.as_str();
-        let (Some(from_nl), Some(to_nl)) =
-            (nodes.get(from_id), nodes.get(to_id))
-        else {
+        let (Some(from_nl), Some(to_nl)) = (nodes.get(from_id), nodes.get(to_id)) else {
             continue;
         };
         let from_center = node_center(from_nl);
@@ -572,7 +628,10 @@ fn phase_port_slot(
         }
         let node_id = endpoints[0].node_id.clone();
         let side = endpoints[0].side;
-        side_groups.entry((node_id, side)).or_default().push(endpoints);
+        side_groups
+            .entry((node_id, side))
+            .or_default()
+            .push(endpoints);
     }
 
     // endpoint_map: (edge_index, is_from) -> Endpoint (with anchor filled in)
@@ -592,8 +651,16 @@ fn phase_port_slot(
         // 子组内沿切线方向排序：上/下边按目标 x，左/右边按目标 y；同位置再按 lane
         for endpoints in sub_groups.iter_mut() {
             endpoints.sort_by(|p, q| {
-                let pk = if vertical_side { p.target_x } else { p.target_y };
-                let qk = if vertical_side { q.target_x } else { q.target_y };
+                let pk = if vertical_side {
+                    p.target_x
+                } else {
+                    p.target_y
+                };
+                let qk = if vertical_side {
+                    q.target_x
+                } else {
+                    q.target_y
+                };
                 pk.partial_cmp(&qk)
                     .unwrap_or(std::cmp::Ordering::Equal)
                     .then(p.lane.cmp(&q.lane))
@@ -722,9 +789,19 @@ fn phase_port_slot(
     // 将「自由度较高」端（该侧同方向仅1条边的Single端点）的锚点切线坐标调整为与另一端对齐，
     // 形成直线路径。两端都有多个边时若节点中心线高度对齐（<16px），也强制对齐。
     let t_align = crate::layout::perf::Instant::now();
-    crate::perf_log!("[perf]     step2b_straighten: {:.2}ms (moved to 4c)", t_align.elapsed().as_secs_f64() * 1000.0);
+    crate::perf_log!(
+        "[perf]     step2b_straighten: {:.2}ms (moved to 4c)",
+        t_align.elapsed().as_secs_f64() * 1000.0
+    );
 
-    (from_side, to_side, lane, endpoint_map, parallel, reverse_pairs)
+    (
+        from_side,
+        to_side,
+        lane,
+        endpoint_map,
+        parallel,
+        reverse_pairs,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -777,9 +854,7 @@ fn phase_route_edges(
             }
         }
 
-        let (Some(_from_nl), Some(_to_nl)) =
-            (nodes.get(from_id), nodes.get(to_id))
-        else {
+        let (Some(_from_nl), Some(_to_nl)) = (nodes.get(from_id), nodes.get(to_id)) else {
             continue;
         };
 
@@ -823,18 +898,11 @@ fn phase_route_edges(
             cfg.channel_margin,
         )
         .unwrap_or_else(|| {
-            let ctx = OrthoRoutingContext::new(
-                nodes,
-                group_ctx,
-                grid,
-                cfg,
-                profile,
-                obstacles,
-                None,
-            )
-            .with_strict_group_transit(strict)
-            .with_corridor_boost(corridor_boost)
-            .with_prefer_outer_ring(prefer_outer);
+            let ctx =
+                OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
+                    .with_strict_group_transit(strict)
+                    .with_corridor_boost(corridor_boost)
+                    .with_prefer_outer_ring(prefer_outer);
             select_best_path_with_scorer_stats(
                 &ctx,
                 &pair,
@@ -850,18 +918,11 @@ fn phase_route_edges(
                 budget.request_corridor_boost();
             }
             let mut boost_stats = PathSelectStats::default();
-            let ctx = OrthoRoutingContext::new(
-                nodes,
-                group_ctx,
-                grid,
-                cfg,
-                profile,
-                obstacles,
-                None,
-            )
-            .with_strict_group_transit(strict)
-            .with_corridor_boost(true)
-            .with_prefer_outer_ring(prefer_outer);
+            let ctx =
+                OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
+                    .with_strict_group_transit(strict)
+                    .with_corridor_boost(true)
+                    .with_prefer_outer_ring(prefer_outer);
             let boosted = select_best_path_with_scorer_stats(
                 &ctx,
                 &pair,
@@ -886,13 +947,9 @@ fn phase_route_edges(
         // 标签位置：平行/反向边错开 t + 法向偏移，避免双向边标签重叠
         let labels = if path.len() >= 2 {
             match relations.get(i) {
-                Some(rel) => build_parallel_aware_edge_labels(
-                    rel,
-                    i,
-                    relations,
-                    &parallel.offsets,
-                    &path,
-                ),
+                Some(rel) => {
+                    build_parallel_aware_edge_labels(rel, i, relations, &parallel.offsets, &path)
+                }
                 None => Vec::new(),
             }
         } else {
@@ -913,7 +970,10 @@ fn phase_route_edges(
         edges[i] = edge;
         crate::perf_log!(
             "[perf]     edge[{}] {}->{}: {} candidates, {:.2}ms",
-            i, from_id, to_id, path_stats.candidate_count,
+            i,
+            from_id,
+            to_id,
+            path_stats.candidate_count,
             t_edge.elapsed().as_secs_f64() * 1000.0
         );
     }
@@ -968,7 +1028,8 @@ fn phase_straighten_align(
             let old_ep = old_endpoints.get(&(i, is_from));
             let new_ep = endpoint_map.get(&(i, is_from));
             if let (Some(o), Some(ne)) = (old_ep, new_ep) {
-                if (o.anchor.x - ne.anchor.x).abs() > EPS || (o.anchor.y - ne.anchor.y).abs() > EPS {
+                if (o.anchor.x - ne.anchor.x).abs() > EPS || (o.anchor.y - ne.anchor.y).abs() > EPS
+                {
                     align_reroute.push(i);
                     break;
                 }
@@ -979,8 +1040,12 @@ fn phase_straighten_align(
         align_reroute.sort_unstable();
         grid.remove_by_edges(&align_reroute);
         for &ei in &align_reroute {
-            let Some(from_ep) = endpoint_map.get(&(ei, true)) else { continue };
-            let Some(to_ep) = endpoint_map.get(&(ei, false)) else { continue };
+            let Some(from_ep) = endpoint_map.get(&(ei, true)) else {
+                continue;
+            };
+            let Some(to_ep) = endpoint_map.get(&(ei, false)) else {
+                continue;
+            };
             let (from_id, to_id) = relations
                 .get(ei)
                 .map(|rel| (rel.from.as_str(), rel.to.as_str()))
@@ -1008,13 +1073,7 @@ fn phase_straighten_align(
                     .map(|b| b.corridor_boost_requested)
                     .unwrap_or(false);
                 let ctx = OrthoRoutingContext::new(
-                    nodes,
-                    group_ctx,
-                    &grid,
-                    cfg,
-                    profile,
-                    obstacles,
-                    None,
+                    nodes, group_ctx, &grid, cfg, profile, obstacles, None,
                 )
                 .with_strict_group_transit(should_strict_group_transit(
                     profile,
@@ -1056,7 +1115,11 @@ fn phase_straighten_align(
             }
         }
     }
-    crate::perf_log!("[perf]     4c_straighten_align: {:.2}ms (aligned {} edges)", t_align2.elapsed().as_secs_f64() * 1000.0, align_reroute.len());
+    crate::perf_log!(
+        "[perf]     4c_straighten_align: {:.2}ms (aligned {} edges)",
+        t_align2.elapsed().as_secs_f64() * 1000.0,
+        align_reroute.len()
+    );
 }
 
 /// Phase 3：分层批量边序（有 rank 时低层先占通道；feedback / 监控枢纽全局延后）
@@ -1082,7 +1145,10 @@ fn phase_layer_order(
         &node_degree,
         Some(&feedback_edge_set),
     );
-    crate::perf_log!("[perf]     step2_slots+step3_order: {:.2}ms", t2.elapsed().as_secs_f64() * 1000.0);
+    crate::perf_log!(
+        "[perf]     step2_slots+step3_order: {:.2}ms",
+        t2.elapsed().as_secs_f64() * 1000.0
+    );
     (edge_order, feedback_edge_set)
 }
 
@@ -1119,7 +1185,10 @@ fn phase_reroute(
         ortho_stats,
         profile,
     );
-    crate::perf_log!("[perf]     x1_reroute: {:.2}ms", t_x1.elapsed().as_secs_f64() * 1000.0);
+    crate::perf_log!(
+        "[perf]     x1_reroute: {:.2}ms",
+        t_x1.elapsed().as_secs_f64() * 1000.0
+    );
 }
 
 /// Phase 4e (X-2)：反向 stub 检测与端口翻转
@@ -1164,7 +1233,11 @@ fn phase_stub_fix(
         profile,
         feedback_edge_set,
     );
-    crate::perf_log!("[perf]     x2_flip_stub: {:.2}ms (flipped {} edges)", t_flip.elapsed().as_secs_f64() * 1000.0, ortho_stats.flipped_stub_edges);
+    crate::perf_log!(
+        "[perf]     x2_flip_stub: {:.2}ms (flipped {} edges)",
+        t_flip.elapsed().as_secs_f64() * 1000.0,
+        ortho_stats.flipped_stub_edges
+    );
 }
 
 /// Phase 4f (X-3)：Lane Assignment 车道分配
@@ -1242,8 +1315,7 @@ fn phase_lane(
     let records = collect_stub_occupancy(edges, relations, from_side, to_side);
     let conflicts = find_stub_occupancy_conflicts(&records, relations, parallel_gap);
     ortho_stats.stub_occupancy_conflicts = conflicts.len();
-    ortho_stats.stub_cross_pair_conflicts =
-        conflicts.iter().filter(|c| !c.reverse_pair).count();
+    ortho_stats.stub_cross_pair_conflicts = conflicts.iter().filter(|c| !c.reverse_pair).count();
     if !profile.semantic_merge {
         let stub_stats = resolve_stub_occupancy_conflicts(
             edges,
@@ -1288,6 +1360,23 @@ fn phase_lane(
             lane_stats.shifts_failed,
             conflicts.len()
         );
+    }
+
+    // 轨道 A：正反向同侧 dock 共锚分离（落点最终写者；在 stub_occ 之后）
+    let dock_gap = parallel_gap.max(COMPACT_SLOT_PITCH);
+    let dock_fixed =
+        enforce_reverse_pair_dock_separation(edges, relations, nodes, from_side, to_side, dock_gap);
+    if dock_fixed > 0 {
+        ortho_stats.lane_segments_shifted += dock_fixed;
+        let touched: Vec<usize> = (0..edges.len()).collect();
+        grid.remove_by_edges(&touched);
+        for ei in 0..edges.len() {
+            if edges[ei].path_is_empty() {
+                continue;
+            }
+            let pts: Vec<Point> = edges[ei].path_points().into_owned();
+            grid.insert_path(&pts, ei);
+        }
     }
 }
 
@@ -1389,18 +1478,11 @@ fn phase_reroute_feedback_after_trunk(
             cfg.channel_margin,
         )
         .unwrap_or_else(|| {
-            let ctx = OrthoRoutingContext::new(
-                nodes,
-                group_ctx,
-                grid,
-                cfg,
-                profile,
-                obstacles,
-                None,
-            )
-            .with_strict_group_transit(strict)
-            .with_prefer_outer_ring(true)
-            .with_protected_trunks(protected_trunks);
+            let ctx =
+                OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
+                    .with_strict_group_transit(strict)
+                    .with_prefer_outer_ring(true)
+                    .with_protected_trunks(protected_trunks);
             let mut first = select_best_path_with_scorer_stats(
                 &ctx,
                 &pair,
@@ -1410,19 +1492,12 @@ fn phase_reroute_feedback_after_trunk(
             );
             if path_stats.degraded {
                 let mut boost_stats = PathSelectStats::default();
-                let ctx2 = OrthoRoutingContext::new(
-                    nodes,
-                    group_ctx,
-                    grid,
-                    cfg,
-                    profile,
-                    obstacles,
-                    None,
-                )
-                .with_strict_group_transit(strict)
-                .with_corridor_boost(true)
-                .with_prefer_outer_ring(true)
-                .with_protected_trunks(protected_trunks);
+                let ctx2 =
+                    OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
+                        .with_strict_group_transit(strict)
+                        .with_corridor_boost(true)
+                        .with_prefer_outer_ring(true)
+                        .with_protected_trunks(protected_trunks);
                 let boosted = select_best_path_with_scorer_stats(
                     &ctx2,
                     &pair,
@@ -1430,8 +1505,7 @@ fn phase_reroute_feedback_after_trunk(
                     Some(&mut boost_stats),
                     false,
                 );
-                if !boost_stats.degraded
-                    || boost_stats.candidate_count > path_stats.candidate_count
+                if !boost_stats.degraded || boost_stats.candidate_count > path_stats.candidate_count
                 {
                     path_stats = boost_stats;
                     first = boosted;
@@ -1447,13 +1521,9 @@ fn phase_reroute_feedback_after_trunk(
         }
         grid.insert_path(&path, ei);
         let labels = match relations.get(ei) {
-            Some(rel) => build_parallel_aware_edge_labels(
-                rel,
-                ei,
-                relations,
-                &parallel.offsets,
-                &path,
-            ),
+            Some(rel) => {
+                build_parallel_aware_edge_labels(rel, ei, relations, &parallel.offsets, &path)
+            }
             None => Vec::new(),
         };
         let mut edge = EdgeLayout {
@@ -1680,10 +1750,12 @@ fn coordinate_port_sides(
     let mut node_ports: BTreeMap<String, Vec<(String, usize, bool, Port)>> = BTreeMap::new();
     for (i, rel) in relations.iter().enumerate() {
         let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
-        node_ports
-            .entry(rel.from.to_string())
-            .or_default()
-            .push((key.clone(), i, true, from_side[i]));
+        node_ports.entry(rel.from.to_string()).or_default().push((
+            key.clone(),
+            i,
+            true,
+            from_side[i],
+        ));
         node_ports
             .entry(rel.to.to_string())
             .or_default()

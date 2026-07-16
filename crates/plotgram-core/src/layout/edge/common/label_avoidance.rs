@@ -13,26 +13,70 @@
 //! 多标签支持（P2-1）：每条边可携带多个标签（中段/头部/尾部），
 //! 避障以 `(edge_idx, label_idx)` 为最小单元独立处理每个标签。
 
-use crate::layout::geometry::{Point, Rect};
-use crate::layout::group::constants::GROUP_BORDER_SHELL_PAD;
-use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
 use crate::layout::constants::*;
-use crate::layout::edge::common::edge_geometry::{
-    closest_point_on_path, leader_anchor_on_path,
-};
+use crate::layout::edge::common::edge_geometry::{closest_point_on_path, leader_anchor_on_path};
 use crate::layout::edge::common::label_candidate::{
     place_all_labels_by_candidates, place_all_labels_by_candidates_with_config,
     LabelPlacementConfig,
 };
 use crate::layout::edge::common::label_common::sorted_node_obstacles;
-use std::collections::{HashMap, HashSet};
+use crate::layout::geometry::{Point, Rect};
+use crate::layout::group::constants::GROUP_BORDER_SHELL_PAD;
+use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 const EPS: f64 = 1e-6;
 
 /// 两标签间隙小于该值（且另一轴投影重叠）时视为「易混淆」，强制保留引线以区分归属。
 const LABEL_LEADER_PROXIMITY: f64 = 16.0;
+/// 到己边路径的原始距离超过该值 → 强制引线（轨道 C）。
+const OWNERSHIP_FORCE_RAW_DIST: f64 = 20.0;
+/// 邻边路径距离 ≤ 己边×该系数 + slack 时视为归属歧义。
+const OWNERSHIP_AMBIGUITY_RATIO: f64 = 1.35;
+const OWNERSHIP_AMBIGUITY_SLACK: f64 = 12.0;
 
 type LabelKey = (usize, usize);
+
+/// 显式共享 trunk 上的同文案标签只保留一份。
+///
+/// 每条 relation 在 sanitize 后都会重建标签；若多条边已声明同一 `MergeInterval`，
+/// 重复文案会堆在共享干附近，反而破坏归属。按 `(group_key, text)` 选择最小 edge
+/// index 作为确定性代表，其余重复布局删除；不同文案仍各自保留。
+pub fn dedupe_labels_on_declared_merges(
+    edges: &mut [EdgeLayout],
+    annotations: &crate::layout::edge::RouteAnnotationSet,
+) {
+    let mut groups: BTreeMap<(String, String), Vec<usize>> = BTreeMap::new();
+    for ann in &annotations.edges {
+        let Some(edge) = edges.get(ann.edge_index) else {
+            continue;
+        };
+        for merge in &ann.merge_intervals {
+            let Some(group_key) = merge.group_key.as_ref() else {
+                continue;
+            };
+            for label in &edge.labels {
+                groups
+                    .entry((group_key.clone(), label.text.clone()))
+                    .or_default()
+                    .push(ann.edge_index);
+            }
+        }
+    }
+
+    for ((_, text), mut members) in groups {
+        members.sort_unstable();
+        members.dedup();
+        if members.len() < 2 {
+            continue;
+        }
+        for &ei in members.iter().skip(1) {
+            if let Some(edge) = edges.get_mut(ei) {
+                edge.labels.retain(|label| label.text != text);
+            }
+        }
+    }
+}
 
 pub fn label_metrics(text: &str) -> (f64, f64) {
     let width = estimate_label_width(text) + DEFAULT_LABEL_PADDING * 2.0;
@@ -45,12 +89,7 @@ pub fn resolve_label_overlaps(
     nodes: &HashMap<String, NodeLayout>,
     groups: &HashMap<String, GroupLayout>,
 ) {
-    resolve_label_overlaps_with_config(
-        edges,
-        nodes,
-        groups,
-        LabelPlacementConfig::default(),
-    );
+    resolve_label_overlaps_with_config(edges, nodes, groups, LabelPlacementConfig::default());
 }
 
 pub fn resolve_label_overlaps_with_config(
@@ -157,10 +196,24 @@ pub fn resolve_label_overlaps_with_config(
                                 nb.y -= shift;
                             }
                         }
-                        let bba = (na.x - w_a / 2.0, na.y - h_a / 2.0, na.x + w_a / 2.0, na.y + h_a / 2.0);
-                        let bbb = (nb.x - w_b / 2.0, nb.y - h_b / 2.0, nb.x + w_b / 2.0, nb.y + h_b / 2.0);
-                        let sa = node_obstacles.iter().all(|n| aabb_overlap(&bba, n).is_none());
-                        let sb = node_obstacles.iter().all(|n| aabb_overlap(&bbb, n).is_none());
+                        let bba = (
+                            na.x - w_a / 2.0,
+                            na.y - h_a / 2.0,
+                            na.x + w_a / 2.0,
+                            na.y + h_a / 2.0,
+                        );
+                        let bbb = (
+                            nb.x - w_b / 2.0,
+                            nb.y - h_b / 2.0,
+                            nb.x + w_b / 2.0,
+                            nb.y + h_b / 2.0,
+                        );
+                        let sa = node_obstacles
+                            .iter()
+                            .all(|n| aabb_overlap(&bba, n).is_none());
+                        let sb = node_obstacles
+                            .iter()
+                            .all(|n| aabb_overlap(&bbb, n).is_none());
                         (na, nb, sa, sb)
                     };
 
@@ -270,6 +323,7 @@ pub fn resolve_label_overlaps_with_config(
 /// `leader_to`。
 fn assign_leader_lines(edges: &mut [EdgeLayout]) {
     // Pass 1：按可见引线长度决定默认是否挂 leader，并记录每个标签的路径锚点。
+    // 竖直旋转标签的 size 常按「字串宽×高」存储，可见长度须按轴对齐后的半宽计算。
     let mut anchor_of: HashMap<LabelKey, Point> = HashMap::new();
     for (ei, edge) in edges.iter_mut().enumerate() {
         if edge.path_len() < 2 {
@@ -279,7 +333,8 @@ fn assign_leader_lines(edges: &mut [EdgeLayout]) {
         for (li, label) in edge.labels.iter_mut().enumerate() {
             let anchor = leader_anchor_on_path(&path, label.center);
             anchor_of.insert((ei, li), anchor);
-            if leader_visible_length(label.center, label.size, anchor)
+            let eff_size = label_axis_aligned_size(label.size, label.rotation);
+            if leader_visible_length(label.center, eff_size, anchor)
                 >= DEFAULT_LEADER_LINE_MIN_LENGTH
             {
                 label.leader_to = Some(anchor);
@@ -300,9 +355,10 @@ fn assign_leader_lines(edges: &mut [EdgeLayout]) {
             if ka.0 == kb.0 {
                 continue; // 同一条边的多标签不算歧义来源
             }
-            let (Some(bba), Some(bbb)) =
-                (edges[ka.0].label_bbox_at(ka.1), edges[kb.0].label_bbox_at(kb.1))
-            else {
+            let (Some(bba), Some(bbb)) = (
+                edges[ka.0].label_bbox_at(ka.1),
+                edges[kb.0].label_bbox_at(kb.1),
+            ) else {
                 continue;
             };
             if labels_confusingly_close(&bba, &bbb) {
@@ -311,12 +367,42 @@ fn assign_leader_lines(edges: &mut [EdgeLayout]) {
             }
         }
     }
+
+    // Pass 3（轨道 C）：到己边路径的净空大，或与邻边路径几乎等距 → 强制引线标明归属
+    for &k in &keys {
+        if !anchor_of.contains_key(&k) {
+            continue;
+        }
+        let label = &edges[k.0].labels[k.1];
+        let own_path = edges[k.0].path_points();
+        let own_raw = {
+            let (_, dist) = closest_point_on_path(&own_path, label.center);
+            dist
+        };
+        let mut foreign_min = f64::INFINITY;
+        for (ej, edge) in edges.iter().enumerate() {
+            if ej == k.0 || edge.path_len() < 2 {
+                continue;
+            }
+            let path = edge.path_points();
+            let (_, dist) = closest_point_on_path(&path, label.center);
+            foreign_min = foreign_min.min(dist);
+        }
+        let ambiguous = foreign_min.is_finite()
+            && foreign_min <= own_raw * OWNERSHIP_AMBIGUITY_RATIO + OWNERSHIP_AMBIGUITY_SLACK;
+        let far_from_own = own_raw >= OWNERSHIP_FORCE_RAW_DIST;
+        if ambiguous || far_from_own {
+            force.insert(k);
+        }
+    }
+
     for k in force {
         if let (Some(anchor), Some(label)) =
             (anchor_of.get(&k).copied(), edges[k.0].labels.get_mut(k.1))
         {
+            let eff_size = label_axis_aligned_size(label.size, label.rotation);
             if label.leader_to.is_none()
-                && leader_visible_length(label.center, label.size, anchor) > 1.0
+                && leader_visible_length(label.center, eff_size, anchor) > 1.0
             {
                 label.leader_to = Some(anchor);
             }
@@ -324,7 +410,17 @@ fn assign_leader_lines(edges: &mut [EdgeLayout]) {
     }
 }
 
-/// 两个标签包围框是否「近到易混淆」：任一轴间隙小于阈值且另一轴有投影重叠。
+/// ±90° 旋转时字串宽高对调，得到轴对齐包围盒尺寸（供引线可见长度）。
+fn label_axis_aligned_size(size: (f64, f64), rotation_deg: f64) -> (f64, f64) {
+    let r = rotation_deg.rem_euclid(180.0);
+    if (r - 90.0).abs() < 15.0 {
+        (size.1, size.0)
+    } else {
+        size
+    }
+}
+
+/// 两标签包围框是否「近到易混淆」：任一轴间隙小于阈值且另一轴有投影重叠。
 fn labels_confusingly_close(a: &(f64, f64, f64, f64), b: &(f64, f64, f64, f64)) -> bool {
     let gap_x = (a.0.max(b.0)) - (a.2.min(b.2)); // >0 表示 x 方向分离间隙
     let gap_y = (a.1.max(b.1)) - (a.3.min(b.3));
@@ -473,7 +569,12 @@ fn push_label_from_obstacle_safe(
 fn label_bbox_from_pos(center: Point, prev: &(f64, f64, f64, f64)) -> (f64, f64, f64, f64) {
     let w = prev.2 - prev.0;
     let h = prev.3 - prev.1;
-    (center.x - w / 2.0, center.y - h / 2.0, center.x + w / 2.0, center.y + h / 2.0)
+    (
+        center.x - w / 2.0,
+        center.y - h / 2.0,
+        center.x + w / 2.0,
+        center.y + h / 2.0,
+    )
 }
 
 pub fn estimate_label_width(text: &str) -> f64 {
@@ -539,10 +640,7 @@ pub(crate) fn sorted_group_shell_obstacles(
         .collect()
 }
 
-pub fn aabb_overlap(
-    a: &(f64, f64, f64, f64),
-    b: &(f64, f64, f64, f64),
-) -> Option<(f64, f64)> {
+pub fn aabb_overlap(a: &(f64, f64, f64, f64), b: &(f64, f64, f64, f64)) -> Option<(f64, f64)> {
     let overlap_x = (a.2.min(b.2) - a.0.max(b.0)).max(0.0);
     let overlap_y = (a.3.min(b.3) - a.1.max(b.1)).max(0.0);
     if overlap_x > 0.0 && overlap_y > 0.0 {
@@ -552,11 +650,7 @@ pub fn aabb_overlap(
     }
 }
 
-pub(crate) fn segment_vs_aabb_intersect(
-    p1: Point,
-    p2: Point,
-    bbox: (f64, f64, f64, f64),
-) -> bool {
+pub(crate) fn segment_vs_aabb_intersect(p1: Point, p2: Point, bbox: (f64, f64, f64, f64)) -> bool {
     Rect::new(bbox.0, bbox.1, bbox.2 - bbox.0, bbox.3 - bbox.1).intersects_segment(p1, p2, 0.0)
 }
 
@@ -672,12 +766,36 @@ mod tests {
     #[test]
     fn segment_vs_aabb_basic_intersect() {
         let bbox = (0.0, 0.0, 100.0, 20.0);
-        assert!(segment_vs_aabb_intersect(Point::new(-10.0, 10.0), Point::new(110.0, 10.0), bbox));
-        assert!(segment_vs_aabb_intersect(Point::new(50.0, -10.0), Point::new(50.0, 30.0), bbox));
-        assert!(!segment_vs_aabb_intersect(Point::new(0.0, -10.0), Point::new(100.0, -10.0), bbox));
-        assert!(!segment_vs_aabb_intersect(Point::new(110.0, 0.0), Point::new(120.0, 20.0), bbox));
-        assert!(segment_vs_aabb_intersect(Point::new(-10.0, -10.0), Point::new(110.0, 30.0), bbox));
-        assert!(segment_vs_aabb_intersect(Point::new(50.0, 10.0), Point::new(200.0, 10.0), bbox));
+        assert!(segment_vs_aabb_intersect(
+            Point::new(-10.0, 10.0),
+            Point::new(110.0, 10.0),
+            bbox
+        ));
+        assert!(segment_vs_aabb_intersect(
+            Point::new(50.0, -10.0),
+            Point::new(50.0, 30.0),
+            bbox
+        ));
+        assert!(!segment_vs_aabb_intersect(
+            Point::new(0.0, -10.0),
+            Point::new(100.0, -10.0),
+            bbox
+        ));
+        assert!(!segment_vs_aabb_intersect(
+            Point::new(110.0, 0.0),
+            Point::new(120.0, 20.0),
+            bbox
+        ));
+        assert!(segment_vs_aabb_intersect(
+            Point::new(-10.0, -10.0),
+            Point::new(110.0, 30.0),
+            bbox
+        ));
+        assert!(segment_vs_aabb_intersect(
+            Point::new(50.0, 10.0),
+            Point::new(200.0, 10.0),
+            bbox
+        ));
     }
 
     #[test]
@@ -775,12 +893,8 @@ mod tests {
         let all_obstacles = vec![obstacle_a, obstacle_b];
 
         let original_pos = label_pos;
-        let result = push_label_from_obstacle_safe(
-            &mut label_pos,
-            &mut bbox,
-            obstacle_a,
-            &all_obstacles,
-        );
+        let result =
+            push_label_from_obstacle_safe(&mut label_pos, &mut bbox, obstacle_a, &all_obstacles);
 
         assert!(!result, "push should be rejected (would enter obstacle B)");
         assert_eq!(
@@ -798,12 +912,8 @@ mod tests {
         let all_obstacles = vec![obstacle_a, obstacle_b];
 
         let original_pos = label_pos;
-        let result = push_label_from_obstacle_safe(
-            &mut label_pos,
-            &mut bbox,
-            obstacle_a,
-            &all_obstacles,
-        );
+        let result =
+            push_label_from_obstacle_safe(&mut label_pos, &mut bbox, obstacle_a, &all_obstacles);
 
         assert!(result, "push should be accepted when no new overlap");
         assert_ne!(label_pos, original_pos, "label should move");
@@ -978,7 +1088,10 @@ mod tests {
 
     #[test]
     fn multi_label_same_edge_labels_avoid_each_other() {
-        let mut edges = vec![multi_label_edge(&[Point::new(50.0, 0.0), Point::new(50.0, 0.0)])];
+        let mut edges = vec![multi_label_edge(&[
+            Point::new(50.0, 0.0),
+            Point::new(50.0, 0.0),
+        ])];
         let nodes = HashMap::new();
         let groups = HashMap::new();
 

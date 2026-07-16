@@ -245,14 +245,15 @@ fn fix_endpoint_reverse_stub(points: &mut Vec<Point>, at_start: bool, side: Port
         if keep_from >= points.len() {
             return;
         }
-        let stub = Point::new(anchor.x + ox * PORT_CLEARANCE, anchor.y + oy * PORT_CLEARANCE);
+        let stub = Point::new(
+            anchor.x + ox * PORT_CLEARANCE,
+            anchor.y + oy * PORT_CLEARANCE,
+        );
         let mut new_pts = vec![anchor, stub];
         let keep_pt = points[keep_from];
         if (stub.x - keep_pt.x).abs() > EPS && (stub.y - keep_pt.y).abs() > EPS {
             let elbow = port_aware_elbow(stub, keep_pt, side);
-            if (elbow.x - stub.x).abs() > EPS
-                || (elbow.y - stub.y).abs() > EPS
-            {
+            if (elbow.x - stub.x).abs() > EPS || (elbow.y - stub.y).abs() > EPS {
                 if (elbow.x - keep_pt.x).abs() > EPS || (elbow.y - keep_pt.y).abs() > EPS {
                     new_pts.push(elbow);
                 }
@@ -283,7 +284,10 @@ fn fix_endpoint_reverse_stub(points: &mut Vec<Point>, at_start: bool, side: Port
         if keep_to == 0 {
             return;
         }
-        let stub = Point::new(anchor.x + ox * PORT_CLEARANCE, anchor.y + oy * PORT_CLEARANCE);
+        let stub = Point::new(
+            anchor.x + ox * PORT_CLEARANCE,
+            anchor.y + oy * PORT_CLEARANCE,
+        );
         let mut new_pts: Vec<Point> = points[..keep_to].to_vec();
         let keep_pt = points[keep_to - 1];
         if (keep_pt.x - stub.x).abs() > EPS && (keep_pt.y - stub.y).abs() > EPS {
@@ -315,7 +319,10 @@ fn ensure_outward_stub(points: &mut Vec<Point>, at_start: bool, side: Port) {
         if proj >= PORT_CLEARANCE * 0.5 {
             return;
         }
-        let stub = Point::new(anchor.x + ox * PORT_CLEARANCE, anchor.y + oy * PORT_CLEARANCE);
+        let stub = Point::new(
+            anchor.x + ox * PORT_CLEARANCE,
+            anchor.y + oy * PORT_CLEARANCE,
+        );
         let mut rest = points[1..].to_vec();
         // 丢掉仍在 stub 内侧的点
         while let Some(&p) = rest.first() {
@@ -361,7 +368,10 @@ fn ensure_outward_stub(points: &mut Vec<Point>, at_start: bool, side: Port) {
         if proj >= PORT_CLEARANCE * 0.5 {
             return;
         }
-        let stub = Point::new(anchor.x + ox * PORT_CLEARANCE, anchor.y + oy * PORT_CLEARANCE);
+        let stub = Point::new(
+            anchor.x + ox * PORT_CLEARANCE,
+            anchor.y + oy * PORT_CLEARANCE,
+        );
         let mut head = points[..last].to_vec();
         while let Some(&p) = head.last() {
             let fp = (p.x - anchor.x) * ox + (p.y - anchor.y) * oy;
@@ -494,7 +504,9 @@ fn repair_post_stub_inward(points: &mut Vec<Point>, at_start: bool, side: Port) 
             let elbow = port_aware_elbow(stub, t, side);
             if (elbow.x - t.x).abs() > EPS || (elbow.y - t.y).abs() > EPS {
                 // 避免与 head 末点重复
-                if head.last().is_none_or(|p| (p.x - elbow.x).abs() > EPS || (p.y - elbow.y).abs() > EPS)
+                if head
+                    .last()
+                    .is_none_or(|p| (p.x - elbow.x).abs() > EPS || (p.y - elbow.y).abs() > EPS)
                 {
                     head.push(elbow);
                 }
@@ -586,20 +598,36 @@ fn collapse_micro_jogs(points: &mut Vec<Point>, merge_overshoot: bool) {
                 let cand_a = Point::new(next.x, prev.y);
                 let cand_b = Point::new(prev.x, next.y);
                 let before = if i >= 2 { Some(points[i - 2]) } else { None };
-                let after = if i + 2 < points.len() { Some(points[i + 2]) } else { None };
+                let after = if i + 2 < points.len() {
+                    Some(points[i + 2])
+                } else {
+                    None
+                };
                 // cand_a：prev→cand_a 沿 y=prev.y（水平），cand_a→next 沿 x=next.x（竖直）
                 let mut score_a = 0i32;
-                if before.is_some_and(|b| (b.y - prev.y).abs() < EPS) { score_a += 1; }
-                if after.is_some_and(|a| (a.x - next.x).abs() < EPS) { score_a += 1; }
+                if before.is_some_and(|b| (b.y - prev.y).abs() < EPS) {
+                    score_a += 1;
+                }
+                if after.is_some_and(|a| (a.x - next.x).abs() < EPS) {
+                    score_a += 1;
+                }
                 // cand_b：prev→cand_b 沿 x=prev.x（竖直），cand_b→next 沿 y=next.y（水平）
                 let mut score_b = 0i32;
-                if before.is_some_and(|b| (b.x - prev.x).abs() < EPS) { score_b += 1; }
-                if after.is_some_and(|a| (a.y - next.y).abs() < EPS) { score_b += 1; }
+                if before.is_some_and(|b| (b.x - prev.x).abs() < EPS) {
+                    score_b += 1;
+                }
+                if after.is_some_and(|a| (a.y - next.y).abs() < EPS) {
+                    score_b += 1;
+                }
 
                 let da = (cand_a.x - curr.x).abs() + (cand_a.y - curr.y).abs();
                 let db = (cand_b.x - curr.x).abs() + (cand_b.y - curr.y).abs();
                 let new_c = if merge_overshoot && score_a != score_b {
-                    if score_a > score_b { cand_a } else { cand_b }
+                    if score_a > score_b {
+                        cand_a
+                    } else {
+                        cand_b
+                    }
                 } else if da <= db {
                     cand_a
                 } else {

@@ -1,12 +1,13 @@
 //! SVG 文档结构工具（头部、尾部、分组、边路径渲染）。
 
 use crate::ast::*;
-use crate::types::DiagramType;
+use crate::layout::edge::route_annotation::{EdgeRouteAnnotation, MergeInterval};
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLabelLayout, EdgeLayout, PathGeometry};
-use crate::render::CompiledRenderContext;
 use crate::render::scene::ExportScene;
 use crate::render::visual::{ArrowStyle, EdgeLabelStyle, EdgeStyle, LabelRotation, NodeStyle};
+use crate::render::CompiledRenderContext;
+use crate::types::DiagramType;
 use std::fmt::Write;
 
 pub const ARROW_SIZE: f64 = 8.0;
@@ -57,7 +58,8 @@ pub fn write_svg_preamble(
     let canvas_transparent = super::color_queries::is_transparent_canvas(canvas_background);
     let title_color = &scene.canvas.title_color;
     let marker_stroke = super::color_queries::edge_arrow_fill(diagram, context, "#555");
-    let muted_marker_stroke = super::color_queries::muted_text_color(&diagram.diagram_type, context, "#999");
+    let muted_marker_stroke =
+        super::color_queries::muted_text_color(&diagram.diagram_type, context, "#999");
 
     writeln!(
         svg,
@@ -70,7 +72,12 @@ pub fn write_svg_preamble(
     if let Some(defs) = context.graphic_painter().shared_svg_defs() {
         writeln!(svg, "{defs}").unwrap();
     }
-    writeln!(svg, "{}", standard_markers(context, &marker_stroke, &muted_marker_stroke)).unwrap();
+    writeln!(
+        svg,
+        "{}",
+        standard_markers(context, &marker_stroke, &muted_marker_stroke)
+    )
+    .unwrap();
     if let Some(defs) = extra_defs {
         write!(svg, "{defs}").unwrap();
     }
@@ -125,21 +132,13 @@ pub fn write_svg_postamble(
             skipped_nodes, skipped_edges
         )
         .unwrap();
-        writeln!(
-            svg,
-            "<!-- 这通常是因为节点或关系引用了不存在的实体 -->"
-        )
-        .unwrap();
+        writeln!(svg, "<!-- 这通常是因为节点或关系引用了不存在的实体 -->").unwrap();
     }
 
     writeln!(svg, "</svg>").unwrap();
 }
 
-fn write_attribution(
-    svg: &mut String,
-    scene: &ExportScene<'_>,
-    title_offset: f64,
-) {
+fn write_attribution(svg: &mut String, scene: &ExportScene<'_>, title_offset: f64) {
     let diagram = scene.diagram();
     let layout = &scene.layout;
     let context = &scene.context;
@@ -147,8 +146,10 @@ fn write_attribution(
     let muted = super::color_queries::muted_text_color(&diagram.diagram_type, context, "#999");
     let style = super::color_queries::attribution_style(canvas_background, &muted);
 
-    let content_width =
-        ATTRIBUTION_ICON_SIZE + ATTRIBUTION_ICON_GAP + ATTRIBUTION_PREFIX_WIDTH + ATTRIBUTION_BRAND_WIDTH;
+    let content_width = ATTRIBUTION_ICON_SIZE
+        + ATTRIBUTION_ICON_GAP
+        + ATTRIBUTION_PREFIX_WIDTH
+        + ATTRIBUTION_BRAND_WIDTH;
     let block_height = if style.backdrop {
         ATTRIBUTION_BLOCK_HEIGHT + ATTRIBUTION_BACKDROP_PAD_Y * 2.0
     } else {
@@ -247,10 +248,7 @@ fn write_attribution_icon(svg: &mut String, style: &super::color_queries::Attrib
     writeln!(svg, "</g>").unwrap();
 }
 
-pub fn render_groups(
-    scene: &ExportScene<'_>,
-    svg: &mut String,
-) {
+pub fn render_groups(scene: &ExportScene<'_>, svg: &mut String) {
     // P2.2: 检查是否有需要阴影的分组，若有则添加 SVG filter 定义
     let has_any_shadow = scene.groups.iter().any(|g| g.has_shadow);
     if has_any_shadow {
@@ -314,6 +312,32 @@ pub fn render_edge_path(
     marker_start: &str,
     svg: &mut String,
 ) {
+    render_edge_path_with_annotation(
+        el,
+        None,
+        context,
+        style,
+        stroke,
+        dash_pattern,
+        marker_end,
+        marker_start,
+        svg,
+    );
+}
+
+/// 同 [`render_edge_path`]，但使用路由语义注解决定哪些合流/分叉角保持直角。
+#[allow(clippy::too_many_arguments)]
+pub fn render_edge_path_with_annotation(
+    el: &EdgeLayout,
+    annotation: Option<&EdgeRouteAnnotation>,
+    context: &CompiledRenderContext,
+    style: &EdgeStyle,
+    stroke: &str,
+    dash_pattern: Option<&str>,
+    marker_end: &str,
+    marker_start: &str,
+    svg: &mut String,
+) {
     if el.path_len() < 2 {
         return;
     }
@@ -321,7 +345,11 @@ pub fn render_edge_path(
     let paint_attrs = super::style_mapping::edge_paint_attrs(style, dash_pattern);
 
     match &el.geometry {
-        PathGeometry::Bezier { start, end, controls } => {
+        PathGeometry::Bezier {
+            start,
+            end,
+            controls,
+        } => {
             let sx = start.x;
             let sy = start.y;
             let ex = end.x;
@@ -335,10 +363,13 @@ pub fn render_edge_path(
                 cp2x = cp2.x,
                 cp2y = cp2.y,
             );
-            if let Some(custom_svg) = context
-                .graphic_painter()
-                .render_edge_path(&d, stroke, style, marker_end, marker_start)
-            {
+            if let Some(custom_svg) = context.graphic_painter().render_edge_path(
+                &d,
+                stroke,
+                style,
+                marker_end,
+                marker_start,
+            ) {
                 writeln!(svg, "{custom_svg}").unwrap();
             } else {
                 writeln!(
@@ -355,10 +386,16 @@ pub fn render_edge_path(
             let sy = start.y;
             let ex = end.x;
             let ey = end.y;
-            if let Some(custom_svg) = context
-                .graphic_painter()
-                .render_edge_line(sx, sy, ex, ey, stroke, style, marker_end, marker_start)
-            {
+            if let Some(custom_svg) = context.graphic_painter().render_edge_line(
+                sx,
+                sy,
+                ex,
+                ey,
+                stroke,
+                style,
+                marker_end,
+                marker_start,
+            ) {
                 writeln!(svg, "{custom_svg}").unwrap();
             } else {
                 writeln!(
@@ -371,11 +408,14 @@ pub fn render_edge_path(
             }
         }
         PathGeometry::Polyline { points } => {
-            let d = rounded_polyline_path(points, CORNER_RADIUS);
-            if let Some(custom_svg) = context
-                .graphic_painter()
-                .render_edge_path(&d, stroke, style, marker_end, marker_start)
-            {
+            let d = rounded_polyline_path(points, CORNER_RADIUS, annotation);
+            if let Some(custom_svg) = context.graphic_painter().render_edge_path(
+                &d,
+                stroke,
+                style,
+                marker_end,
+                marker_start,
+            ) {
                 writeln!(svg, "{custom_svg}").unwrap();
             } else {
                 writeln!(
@@ -393,19 +433,47 @@ pub fn render_edge_path(
 /// 折线拐弯处的圆角半径
 const CORNER_RADIUS: f64 = 8.0;
 
-/// 端口 clearance stub 索引（与 `grid_snap::protected_path_indices` 语义一致）
-fn is_port_stub_index(index: usize, len: usize) -> bool {
-    if len < 3 || index == 0 || index + 1 >= len {
-        return false;
-    }
-    if index == 1 {
-        return true;
-    }
-    len >= 5 && index == len - 2
+fn segment_overlaps_merge(a: Point, b: Point, merge: &MergeInterval) -> bool {
+    const TOL: f64 = 1.5;
+    let (s0, s1) = if merge.horizontal {
+        if (a.y - b.y).abs() > TOL || (a.y - merge.coord).abs() > TOL {
+            return false;
+        }
+        (a.x.min(b.x), a.x.max(b.x))
+    } else {
+        if (a.x - b.x).abs() > TOL || (a.x - merge.coord).abs() > TOL {
+            return false;
+        }
+        (a.y.min(b.y), a.y.max(b.y))
+    };
+    let m0 = merge.t0.min(merge.t1);
+    let m1 = merge.t0.max(merge.t1);
+    s1.min(m1) - s0.max(m0) > TOL
+}
+
+/// 显式 merge 区间的入口/出口保持直角；其它自由折点统一圆角。
+///
+/// 不再按 `points.len()` / 固定 index 猜 FanIn：同样长度的普通绕障路径与合流路径
+/// 语义不同，只有 C 末 `MergeInterval` 才是可靠来源。
+fn is_merge_corner(
+    prev: Point,
+    curr: Point,
+    next: Point,
+    annotation: Option<&EdgeRouteAnnotation>,
+) -> bool {
+    annotation.is_some_and(|ann| {
+        ann.merge_intervals.iter().any(|merge| {
+            segment_overlaps_merge(prev, curr, merge) || segment_overlaps_merge(curr, next, merge)
+        })
+    })
 }
 
 /// 将折线点序列生成带圆角拐弯的 SVG path
-fn rounded_polyline_path(points: &[Point], radius: f64) -> String {
+fn rounded_polyline_path(
+    points: &[Point],
+    radius: f64,
+    annotation: Option<&EdgeRouteAnnotation>,
+) -> String {
     if points.len() < 2 {
         return String::new();
     }
@@ -424,8 +492,7 @@ fn rounded_polyline_path(points: &[Point], radius: f64) -> String {
         let curr = points[i];
         let next = points[i + 1];
 
-        // stub 是 clearance 直线段，不做 Q 圆角（避免 snap 后 stub 处弧半径/切线漂移）
-        if is_port_stub_index(i, len) {
+        if is_merge_corner(prev, curr, next, annotation) {
             d.push_str(&format!(" L {:.1} {:.1}", curr.x, curr.y));
             continue;
         }
@@ -513,9 +580,7 @@ pub fn render_edge_label(
     let (w, h) = label.size;
 
     // 文字颜色：优先 compiled theme 中的 text_fill/label_color，回退到 label_style.text_color
-    let edge = context
-        .compiled
-        .edge_block(diagram_type.style_key(), None);
+    let edge = context.compiled.edge_block(diagram_type.style_key(), None);
     let color = edge
         .get("text_fill")
         .and_then(|v| v.as_str())
@@ -648,11 +713,7 @@ pub fn label_weight<'a>(style: &'a NodeStyle, fallback: &'a str) -> &'a str {
 /// 计算从矩形包围框中心射向外部点的射线与包围框边界的交点。
 ///
 /// `(center, size, target)` → 交点坐标。用于引线起点（避免引线穿透标签背景）。
-fn bbox_exit_point(
-    center: (f64, f64),
-    size: (f64, f64),
-    target: (f64, f64),
-) -> (f64, f64) {
+fn bbox_exit_point(center: (f64, f64), size: (f64, f64), target: (f64, f64)) -> (f64, f64) {
     let dx = target.0 - center.0;
     let dy = target.1 - center.1;
     let hw = size.0 / 2.0;
@@ -687,28 +748,96 @@ mod tests {
     use crate::layout::geometry::Point;
 
     #[test]
-    fn rounded_polyline_skips_q_arc_at_port_stub() {
+    fn rounded_polyline_four_point_rounds_stub_keeps_merge_sharp() {
+        // FanIn 典型四折点：第一弯（stub）圆角，第二弯（合流）直角
         let points = [
             Point::new(100.0, 100.0),
             Point::new(100.0, 116.0),
             Point::new(200.0, 116.0),
             Point::new(200.0, 200.0),
         ];
-        let d = rounded_polyline_path(&points, CORNER_RADIUS);
-        assert!(d.contains(" L 100.0 116.0"));
-        assert!(!d.contains("Q 100.0 116.0"));
+        let mut ann = crate::layout::edge::route_annotation::annotate_edge_from_path(
+            &points,
+            crate::layout::Port::Bottom,
+            crate::layout::Port::Top,
+            0,
+        )
+        .unwrap();
+        ann.merge_intervals.push(MergeInterval {
+            horizontal: false,
+            coord: 200.0,
+            t0: 116.0,
+            t1: 184.0,
+            group_key: Some("fanin".into()),
+        });
+        let d = rounded_polyline_path(&points, CORNER_RADIUS, Some(&ann));
+        assert!(
+            d.contains("Q 100.0 116.0"),
+            "stub corner should be rounded: {d}"
+        );
+        assert!(
+            d.contains(" L 200.0 116.0"),
+            "merge corner should be sharp: {d}"
+        );
+        assert!(
+            !d.contains("Q 200.0 116.0"),
+            "merge corner must not get Q arc: {d}"
+        );
     }
 
     #[test]
-    fn rounded_polyline_keeps_q_arc_at_channel_corner() {
+    fn rounded_polyline_five_point_fanin_rounds_first_keeps_merge_sharp() {
+        // 含目标 approach stub 的五折点 FanIn
+        let points = [
+            Point::new(189.5, 106.0),
+            Point::new(189.5, 122.0),
+            Point::new(229.8, 122.0),
+            Point::new(229.8, 238.0),
+            Point::new(229.8, 254.0),
+        ];
+        let mut ann = crate::layout::edge::route_annotation::annotate_edge_from_path(
+            &points,
+            crate::layout::Port::Bottom,
+            crate::layout::Port::Top,
+            0,
+        )
+        .unwrap();
+        ann.merge_intervals.push(MergeInterval {
+            horizontal: false,
+            coord: 229.8,
+            t0: 122.0,
+            t1: 238.0,
+            group_key: Some("fanin".into()),
+        });
+        let d = rounded_polyline_path(&points, CORNER_RADIUS, Some(&ann));
+        assert!(
+            d.contains("Q 189.5 122.0"),
+            "first bend should be rounded: {d}"
+        );
+        assert!(
+            !d.contains("Q 229.8 122.0"),
+            "merge bend should be sharp: {d}"
+        );
+        assert!(d.contains(" L 229.8 122.0"), "merge bend should use L: {d}");
+    }
+
+    #[test]
+    fn rounded_polyline_long_path_rounds_first_and_channel() {
         let points = [
             Point::new(100.0, 100.0),
             Point::new(100.0, 116.0),
-            Point::new(200.0, 116.0),
+            Point::new(150.0, 116.0),
+            Point::new(150.0, 180.0),
+            Point::new(200.0, 180.0),
             Point::new(200.0, 200.0),
         ];
-        let d = rounded_polyline_path(&points, CORNER_RADIUS);
-        assert!(d.contains("Q 200.0 116.0"));
+        let d = rounded_polyline_path(&points, CORNER_RADIUS, None);
+        assert!(d.contains("Q 100.0 116.0"), "first bend rounded: {d}");
+        assert!(d.contains("Q 150.0 116.0"), "channel bend rounded: {d}");
+        assert!(
+            d.contains("Q 200.0 180.0"),
+            "unannotated target bend should stay rounded: {d}"
+        );
     }
 
     // ─── bbox_exit_point ──────────────────────────────────────────

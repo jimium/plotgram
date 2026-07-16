@@ -32,12 +32,14 @@ pub(in super::super) fn assign_coordinates(
         .collect();
 
     // S2：邻层边带需求抬高 layer gap（路由前写权）
+    // 无组 architecture：可读余量更高，但仍按 demand 封顶——边少时不抬缝
     let parallel_gap =
         crate::layout::edge::segment_pair::parallel_gap_for_diagram(diagram.diagram_type.clone());
-    let profile =
-        crate::layout::edge_band_demand::EdgeBandDemandProfile::for_diagram_type(
-            diagram.diagram_type.clone(),
-        );
+    let has_groups = !diagram.groups.is_empty();
+    let profile = crate::layout::edge_band_demand::EdgeBandDemandProfile::for_diagram(
+        diagram.diagram_type.clone(),
+        has_groups,
+    );
     let per_layer_gaps = crate::layout::edge_band_demand::layer_gaps_from_demand(
         layers,
         &diagram.relations,
@@ -47,7 +49,7 @@ pub(in super::super) fn assign_coordinates(
     );
 
     // S4：无分组时侧通道水平 gutter（L/R 外廊）；竖向仍用 PADDING，避免层缝诊断虚高
-    let side_gutter = if diagram.groups.is_empty() {
+    let side_gutter = if !has_groups {
         crate::layout::edge_band_demand::side_channel_gutter(
             &diagram.relations,
             parallel_gap,
@@ -85,13 +87,27 @@ pub(in super::super) fn assign_coordinates(
                 uniform_initial_positions(std::slice::from_ref(node), sizes)[0]
             }))
             .collect();
-        adjusted_positions = resolve_x_overlaps(layer, &adjusted_positions, sizes);
+        adjusted_positions = resolve_layer_x_gaps(
+            layer,
+            &adjusted_positions,
+            sizes,
+            &diagram.relations,
+            parallel_gap,
+            profile,
+        );
 
         // 无组基础设施层：以连入该层的上游节点为锚点水平居中
         if is_infrastructure_layer(layer, group_map) {
             if let Some(anchor_x) = infrastructure_anchor_x(layer, graph, &nodes, reversed) {
                 center_layer_on_anchor(layer, &mut adjusted_positions, sizes, anchor_x);
-                adjusted_positions = resolve_x_overlaps(layer, &adjusted_positions, sizes);
+                adjusted_positions = resolve_layer_x_gaps(
+                    layer,
+                    &adjusted_positions,
+                    sizes,
+                    &diagram.relations,
+                    parallel_gap,
+                    profile,
+                );
             }
         }
 
@@ -115,6 +131,69 @@ pub(in super::super) fn assign_coordinates(
     }
 
     nodes
+}
+
+/// 同层 X 消重叠：无组可读走廊用 `adjacent_rank_gap`，否则 NODE_GAP。
+fn resolve_layer_x_gaps(
+    layer: &[String],
+    positions: &[f64],
+    sizes: &HashMap<String, (f64, f64)>,
+    relations: &[crate::ast::Relation],
+    parallel_gap: f64,
+    profile: crate::layout::edge_band_demand::EdgeBandDemandProfile,
+) -> Vec<f64> {
+    if profile.horizontal_max_extra <= 0.0 {
+        return resolve_x_overlaps(layer, positions, sizes);
+    }
+    let layer_ids: HashSet<&str> = layer.iter().map(|s| s.as_str()).collect();
+    resolve_x_overlaps_with_gaps(layer, positions, sizes, |a, b| {
+        crate::layout::edge_band_demand::adjacent_rank_gap(
+            a,
+            b,
+            &layer_ids,
+            relations,
+            NODE_GAP,
+            parallel_gap,
+            profile,
+        )
+    })
+}
+
+/// 邻接对齐 / 重叠消除后重申水平 demand 缝（否则会被 `resolve_x_overlaps(NODE_GAP)` 压回）。
+pub(in super::super) fn enforce_horizontal_demand_gaps(
+    diagram: &Diagram,
+    layers: &[Vec<String>],
+    sizes: &HashMap<String, (f64, f64)>,
+    nodes: &mut HashMap<String, NodeLayout>,
+) {
+    let profile = crate::layout::edge_band_demand::EdgeBandDemandProfile::for_diagram(
+        diagram.diagram_type.clone(),
+        !diagram.groups.is_empty(),
+    );
+    if profile.horizontal_max_extra <= 0.0 {
+        return;
+    }
+    let parallel_gap =
+        crate::layout::edge::segment_pair::parallel_gap_for_diagram(diagram.diagram_type.clone());
+    for layer in layers {
+        if layer.len() < 2 {
+            continue;
+        }
+        let centers: Vec<f64> = layer.iter().map(|n| node_center_x(n, nodes)).collect();
+        let resolved = resolve_layer_x_gaps(
+            layer,
+            &centers,
+            sizes,
+            &diagram.relations,
+            parallel_gap,
+            profile,
+        );
+        for (node, cx) in layer.iter().zip(resolved.iter()) {
+            if let Some(nl) = nodes.get_mut(node) {
+                nl.x = cx - nl.width / 2.0;
+            }
+        }
+    }
 }
 
 /// 从已放置节点读取层内中心；缺失节点用均匀分布补齐
@@ -546,6 +625,7 @@ pub(in super::super) fn center_layer_on_anchor(
 
 /// 重叠消除后，将无组基础设施行重新绕上游锚点居中（仅调整 x）
 pub(in super::super) fn rebalance_infrastructure_layers(
+    diagram: &Diagram,
     graph: &GraphIndex,
     group_map: &GroupMap,
     layers: &[Vec<String>],
@@ -553,6 +633,12 @@ pub(in super::super) fn rebalance_infrastructure_layers(
     nodes: &mut HashMap<String, NodeLayout>,
     reversed: &HashSet<(String, String)>,
 ) {
+    let parallel_gap =
+        crate::layout::edge::segment_pair::parallel_gap_for_diagram(diagram.diagram_type.clone());
+    let profile = crate::layout::edge_band_demand::EdgeBandDemandProfile::for_diagram(
+        diagram.diagram_type.clone(),
+        !diagram.groups.is_empty(),
+    );
     for layer in layers {
         if !is_infrastructure_layer(layer, group_map) {
             continue;
@@ -571,9 +657,15 @@ pub(in super::super) fn rebalance_infrastructure_layers(
             );
         }
         center_layer_on_anchor(layer, &mut centers, sizes, anchor_x);
-        // 与 assign_coordinates 一致：居中后再消重叠。此前缺这一步时，
-        // redis/postgres 等同层宽节点会被压到 NODE_GAP 以下甚至相交。
-        centers = resolve_x_overlaps(layer, &centers, sizes);
+        // 与 assign_coordinates 一致：居中后再按 demand 缝消重叠
+        centers = resolve_layer_x_gaps(
+            layer,
+            &centers,
+            sizes,
+            &diagram.relations,
+            parallel_gap,
+            profile,
+        );
 
         for (node, cx) in layer.iter().zip(centers.iter()) {
             if let Some(nl) = nodes.get_mut(node) {

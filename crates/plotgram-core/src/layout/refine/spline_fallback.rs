@@ -2,19 +2,18 @@
 
 use crate::ast::Diagram;
 use crate::layout::edge::common::edge_geometry::{
-    build_edge_labels, compute_bezier_controls, label_t_for_diagram,
-    point_at_path_t,
+    build_edge_labels, compute_bezier_controls, label_t_for_diagram, point_at_path_t,
 };
 use crate::layout::edge::common::obstacle_check::curve_intersects_obstacles;
 use crate::layout::edge::common::routing_skeleton::{resolve_endpoints, RoutingContext};
 use crate::layout::edge::common::self_loop::{route_self_loop, self_loop_indices, SelfLoopStyle};
+use crate::layout::edge::edge_routing_bezier::BezierConfig;
 use crate::layout::edge::edge_routing_spline::{
     build_full_path, fit_multi_segment_spline, sample_bezier,
 };
 use crate::layout::edge::visibility;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, LayoutResult, PathGeometry};
-use crate::layout::edge::edge_routing_bezier::BezierConfig;
 use std::collections::HashSet;
 
 use super::crossing::analyze_edge_node_crossings;
@@ -74,10 +73,7 @@ pub(crate) fn reroute_edges_with_spline(
         if rel.from.as_str() == rel.to.as_str() {
             if let Some(nl) = routing_snapshot.nodes.get(rel.from.as_str()) {
                 let loop_idx = self_loop_idx.get(&i).copied().unwrap_or(0);
-                updates.push((
-                    i,
-                    route_self_loop(rel, nl, loop_idx, SelfLoopStyle::Curved),
-                ));
+                updates.push((i, route_self_loop(rel, nl, loop_idx, SelfLoopStyle::Curved)));
             }
             continue;
         }
@@ -127,13 +123,19 @@ pub(crate) fn reroute_edges_with_spline(
         } else {
             let full_path = build_full_path(ep.start, &detour_path, ep.end);
             let sampled = fit_multi_segment_spline(&full_path, SPLINE_SAMPLES_PER_SEGMENT);
-            (PathGeometry::Polyline { points: sampled.clone() }, sampled)
+            (
+                PathGeometry::Polyline {
+                    points: sampled.clone(),
+                },
+                sampled,
+            )
         };
 
         let middle_t = label_t_for_diagram(diagram, rel);
-        let labels = build_edge_labels(rel, middle_t, Point::new(label_off.ox, label_off.oy), |t| {
-            point_at_path_t(&sampled_for_label, t)
-        });
+        let labels =
+            build_edge_labels(rel, middle_t, Point::new(label_off.ox, label_off.oy), |t| {
+                point_at_path_t(&sampled_for_label, t)
+            });
 
         let candidate = EdgeLayout {
             geometry,
@@ -144,20 +146,10 @@ pub(crate) fn reroute_edges_with_spline(
 
         // C9：仅 when after ≤ before 才替换（crossing 不增）。
         if let Some(original) = routing_snapshot.edges.get(i) {
-            let before = count_single_edge_crossings(
-                original,
-                &routing_snapshot,
-                diagram,
-                i,
-                config,
-            );
-            let after = count_single_edge_crossings(
-                &candidate,
-                &routing_snapshot,
-                diagram,
-                i,
-                config,
-            );
+            let before =
+                count_single_edge_crossings(original, &routing_snapshot, diagram, i, config);
+            let after =
+                count_single_edge_crossings(&candidate, &routing_snapshot, diagram, i, config);
             if after > before {
                 continue;
             }
@@ -282,10 +274,7 @@ mod tests {
             groups: Default::default(),
             edges: vec![EdgeLayout {
                 geometry: PathGeometry::Polyline {
-                    points: vec![
-                        Point::new(40.0, 20.0),
-                        Point::new(240.0, 20.0),
-                    ],
+                    points: vec![Point::new(40.0, 20.0), Point::new(240.0, 20.0)],
                 },
                 labels: Vec::new(),
                 from_port: crate::layout::Port::Right,

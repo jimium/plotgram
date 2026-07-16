@@ -2,7 +2,9 @@
 //!
 //! 在迭代推开之前，沿边路径生成有限候选框并打分，优先消除标签-节点硬冲突。
 
-use crate::layout::constants::DEFAULT_LABEL_PERP_OFFSET;
+use crate::layout::constants::{
+    ARCH_UNGROUPED_LABEL_PERP_OFFSET, DEFAULT_LABEL_PERP_OFFSET,
+};
 use crate::layout::edge::common::edge_geometry::{
     closest_point_in_arc_window, closest_point_on_path, point_at_path_t,
 };
@@ -22,6 +24,8 @@ const LABEL_OVERLAP_PENALTY: f64 = 1000.0;
 const FOREIGN_EDGE_PENALTY: f64 = 100.0;
 const GROUP_OVERLAP_PENALTY: f64 = 50.0;
 const PATH_DISTANCE_WEIGHT: f64 = 0.5;
+/// S5.2b：距己边短于 `perp_offset` 时的净空惩罚权重（大于 PATH_DISTANCE_WEIGHT，避免贴线胜出）
+const PATH_CLEARANCE_PENALTY: f64 = 40.0;
 const MIDPOINT_DISTANCE_WEIGHT: f64 = 0.1;
 /// 长标签放在足够长的直线段上时的 whitespace 奖励（architecture Phase 4）。
 const LONG_SEGMENT_WHITESPACE_BONUS: f64 = 25.0;
@@ -34,20 +38,48 @@ const NODE_OVERLAP_PENALTY: f64 = 10000.0;
 const NODE_OVERLAP_AREA_WEIGHT: f64 = 100.0;
 
 /// 图种相关的标签候选打分策略（Phase 4 architecture 专项）。
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LabelPlacementConfig {
     /// 偏好将较长标签放在有足够 whitespace 的直线段旁
     pub prefer_long_segment_whitespace: bool,
     /// 路径端点附近的标签与 group 边框壳层重叠时减轻惩罚
     pub soften_endpoint_group_shell: bool,
+    /// 标签相对路径的最小法向净空（候选距离阶梯单位；贴线冲突阈值）
+    pub perp_offset: f64,
+}
+
+impl Default for LabelPlacementConfig {
+    fn default() -> Self {
+        Self {
+            prefer_long_segment_whitespace: false,
+            soften_endpoint_group_shell: false,
+            perp_offset: DEFAULT_LABEL_PERP_OFFSET,
+        }
+    }
 }
 
 impl LabelPlacementConfig {
+    /// 仅知图种、未知是否有组时保守不抬升（有组语义）。
     pub fn for_diagram_type(diagram_type: DiagramType) -> Self {
+        Self::for_diagram(diagram_type, true)
+    }
+
+    /// S5.2b：`has_groups=false` 的 architecture 抬高 `perp_offset`；有组 / nested 保持默认。
+    pub fn for_diagram(diagram_type: DiagramType, has_groups: bool) -> Self {
         match diagram_type {
-            DiagramType::Architecture | DiagramType::Flowchart => Self {
+            DiagramType::Architecture => Self {
                 prefer_long_segment_whitespace: true,
-                soften_endpoint_group_shell: matches!(diagram_type, DiagramType::Architecture),
+                soften_endpoint_group_shell: true,
+                perp_offset: if has_groups {
+                    DEFAULT_LABEL_PERP_OFFSET
+                } else {
+                    ARCH_UNGROUPED_LABEL_PERP_OFFSET
+                },
+            },
+            DiagramType::Flowchart => Self {
+                prefer_long_segment_whitespace: true,
+                soften_endpoint_group_shell: false,
+                perp_offset: DEFAULT_LABEL_PERP_OFFSET,
             },
             _ => Self::default(),
         }
@@ -104,15 +136,17 @@ pub fn place_all_labels_by_candidates_with_config(
 
         let has_conflict = placement_has_conflict(
             current_bbox,
+            current,
             edge_idx,
             &path,
             &placed_bboxes,
             &node_obstacles,
             &edge_segments,
+            config.perp_offset,
         );
 
         if has_conflict {
-            let candidates = generate_candidates(&path, preferred_t, size);
+            let candidates = generate_candidates(&path, preferred_t, size, config.perp_offset);
             let ctx = CandidateScoringContext {
                 edge_idx,
                 path: &path,
@@ -154,11 +188,13 @@ pub fn place_all_labels_by_candidates_with_config(
 
 fn placement_has_conflict(
     bbox: (f64, f64, f64, f64),
+    center: Point,
     edge_idx: usize,
     path: &[Point],
     placed_bboxes: &[(f64, f64, f64, f64)],
     node_obstacles: &[(f64, f64, f64, f64)],
     edge_segments: &[Vec<(Point, Point)>],
+    perp_offset: f64,
 ) -> bool {
     for node_bbox in node_obstacles {
         if aabb_overlap(&bbox, node_bbox).is_some() {
@@ -167,6 +203,13 @@ fn placement_has_conflict(
     }
     for placed in placed_bboxes {
         if aabb_overlap(&bbox, placed).is_some() {
+            return true;
+        }
+    }
+    // S5.2b：仅抬高净空时，把「贴线但未穿 AABB」也当冲突；默认 8px 保持原语义以免有组回归
+    if perp_offset > DEFAULT_LABEL_PERP_OFFSET + 0.5 {
+        let (_, path_dist) = closest_point_on_path(path, center);
+        if path_dist < perp_offset {
             return true;
         }
     }
@@ -187,7 +230,6 @@ fn placement_has_conflict(
             }
         }
     }
-    let _ = path;
     false
 }
 
@@ -205,20 +247,29 @@ fn preferred_t_for_label(label_idx: usize, path: &[Point], current: Point) -> f6
     anchor_t
 }
 
-fn generate_candidates(path: &[Point], preferred_t: f64, size: (f64, f64)) -> Vec<Point> {
+fn generate_candidates(
+    path: &[Point],
+    preferred_t: f64,
+    size: (f64, f64),
+    perp_offset: f64,
+) -> Vec<Point> {
     // 覆盖短边场景：端点附近 (0.15/0.85) 增加候选，中段保持 0.3/0.5/0.7
     let mut ts = vec![0.15, 0.3, 0.5, 0.7, 0.85, preferred_t];
     ts.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     ts.dedup_by(|a, b| (*a - *b).abs() < 0.05);
 
     // 外偏需能覆盖半标签宽，否则 fan 组看得见冲突却移不动
-    let half_w = (size.0 * 0.5 + 6.0).max(DEFAULT_LABEL_PERP_OFFSET * 3.0);
-    let distances = [
-        DEFAULT_LABEL_PERP_OFFSET,
-        DEFAULT_LABEL_PERP_OFFSET * 2.0,
-        DEFAULT_LABEL_PERP_OFFSET * 3.0,
+    let half_w = (size.0 * 0.5 + 6.0).max(perp_offset * 3.0);
+    let mut distances = vec![
+        perp_offset,
+        perp_offset * 2.0,
+        perp_offset * 3.0,
         half_w,
     ];
+    // S5.2b：无组 architecture 再加一档更远候选，便于挤廊里躲开竖线
+    if perp_offset > DEFAULT_LABEL_PERP_OFFSET + 0.5 {
+        distances.push(half_w + perp_offset);
+    }
 
     let mut candidates = Vec::new();
     for t in ts {
@@ -322,6 +373,12 @@ fn score_candidate(
     }
 
     let (_, path_dist) = closest_point_on_path(ctx.path, center);
+    // S5.2b：仅无组 architecture（perp>默认）时惩罚贴线；其它图种保持原「略近更好」
+    if ctx.config.perp_offset > DEFAULT_LABEL_PERP_OFFSET + 0.5
+        && path_dist < ctx.config.perp_offset
+    {
+        score += (ctx.config.perp_offset - path_dist) * PATH_CLEARANCE_PENALTY;
+    }
     score += path_dist * PATH_DISTANCE_WEIGHT;
 
     let midpoint = point_at_path_t(ctx.path, 0.5);
@@ -400,13 +457,18 @@ mod tests {
 
     #[test]
     fn architecture_config_prefers_long_segment_whitespace() {
-        let cfg = LabelPlacementConfig::for_diagram_type(DiagramType::Architecture);
+        let cfg = LabelPlacementConfig::for_diagram(DiagramType::Architecture, true);
         assert!(cfg.prefer_long_segment_whitespace);
         assert!(cfg.soften_endpoint_group_shell);
+        assert!((cfg.perp_offset - DEFAULT_LABEL_PERP_OFFSET).abs() < 1e-9);
+
+        let ungrouped = LabelPlacementConfig::for_diagram(DiagramType::Architecture, false);
+        assert!((ungrouped.perp_offset - ARCH_UNGROUPED_LABEL_PERP_OFFSET).abs() < 1e-9);
 
         let flow = LabelPlacementConfig::for_diagram_type(DiagramType::Flowchart);
         assert!(flow.prefer_long_segment_whitespace);
         assert!(!flow.soften_endpoint_group_shell);
+        assert!((flow.perp_offset - DEFAULT_LABEL_PERP_OFFSET).abs() < 1e-9);
     }
 
     #[test]

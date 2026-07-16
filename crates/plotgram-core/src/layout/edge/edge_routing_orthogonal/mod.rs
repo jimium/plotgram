@@ -69,7 +69,7 @@ pub(super) use conflict_reroute::reroute_conflicting_edges;
 pub use sanitize::{
     sanitize_orthogonal_edges, sanitize_orthogonal_edges_ext, sanitize_orthogonal_edges_with_guard,
 };
-pub use lane_assignment::enforce_reverse_pair_min_gap;
+pub use lane_assignment::{enforce_reverse_pair_dock_separation, enforce_reverse_pair_min_gap};
 pub use stub_occupancy::{
     collect_stub_occupancy, estimate_layer_band_demands, find_stub_occupancy_conflicts,
     resolve_stub_occupancy_conflicts, LayerBandDemand, StubOccupancyConflict,
@@ -89,7 +89,7 @@ pub(super) use run::{
 pub(super) use crate::layout::constants::ORTHO_SLOT_PITCH as SLOT_PITCH;
 
 /// 紧凑分布模式（2-3 条边）的磁吸点间距
-pub(super) const COMPACT_SLOT_PITCH: f64 = 16.0;
+pub const COMPACT_SLOT_PITCH: f64 = 16.0;
 
 /// 侧通道绕行时距障碍节点的留白
 pub(super) const CHANNEL_MARGIN: f64 = 18.0;

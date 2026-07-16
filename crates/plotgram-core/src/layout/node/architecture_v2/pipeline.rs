@@ -22,7 +22,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::layout::coordinate::{
     align_client_nodes_to_hubs, align_nodes_to_neighbors, center_group_hub_nodes,
-    rebalance_infrastructure_layers,
+    enforce_horizontal_demand_gaps, rebalance_infrastructure_layers,
 };
 use super::layout::constants::GROUP_LABEL_HEIGHT;
 use super::layout::postprocess::{
@@ -80,12 +80,19 @@ impl Phase for OverlapRemovalPhase {
     fn apply(&self, ctx: &mut LayoutContext) {
         remove_node_overlaps(&mut ctx.nodes, ctx.sizes);
         rebalance_infrastructure_layers(
+            ctx.diagram,
             ctx.graph,
             ctx.group_map,
             ctx.ordered_layers,
             ctx.sizes,
             &mut ctx.nodes,
             ctx.reversed,
+        );
+        enforce_horizontal_demand_gaps(
+            ctx.diagram,
+            ctx.ordered_layers,
+            ctx.sizes,
+            &mut ctx.nodes,
         );
     }
 }
@@ -115,6 +122,12 @@ impl Phase for NeighborAlignmentPhase {
             &mut ctx.nodes,
             ctx.reversed,
         );
+        enforce_horizontal_demand_gaps(
+            ctx.diagram,
+            ctx.ordered_layers,
+            ctx.sizes,
+            &mut ctx.nodes,
+        );
     }
 }
 
@@ -141,12 +154,19 @@ impl Phase for HubCenteringPhase {
             ctx.reversed,
         );
         rebalance_infrastructure_layers(
+            ctx.diagram,
             ctx.graph,
             ctx.group_map,
             ctx.ordered_layers,
             ctx.sizes,
             &mut ctx.nodes,
             ctx.reversed,
+        );
+        enforce_horizontal_demand_gaps(
+            ctx.diagram,
+            ctx.ordered_layers,
+            ctx.sizes,
+            &mut ctx.nodes,
         );
     }
 }
@@ -190,12 +210,19 @@ struct GroupAlignmentPhase;
 impl Phase for GroupAlignmentPhase {
     fn apply(&self, ctx: &mut LayoutContext) {
         rebalance_infrastructure_layers(
+            ctx.diagram,
             ctx.graph,
             ctx.group_map,
             ctx.ordered_layers,
             ctx.sizes,
             &mut ctx.nodes,
             ctx.reversed,
+        );
+        enforce_horizontal_demand_gaps(
+            ctx.diagram,
+            ctx.ordered_layers,
+            ctx.sizes,
+            &mut ctx.nodes,
         );
     }
 }

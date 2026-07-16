@@ -143,6 +143,9 @@ impl LayoutStrategy for ArchitectureV2Layout {
             constants::PADDING,
         );
 
+        let mut space_budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
+        space_budget.enrich_adjacent_rank_demand(&ordered_layers, &ctx.nodes, diagram);
+
         LayoutResult {
             nodes: ctx.nodes,
             groups: ctx.groups,
@@ -152,6 +155,7 @@ impl LayoutStrategy for ArchitectureV2Layout {
             hints: crate::layout::LayoutHints {
                 edge_routing_style: crate::layout::EdgeRoutingStyle::Orthogonal,
                 sugiyama_ranks: Some(ranks),
+                space_budget: Some(space_budget),
                 ..Default::default()
             },
         }

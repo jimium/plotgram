@@ -2,17 +2,17 @@
 
 use crate::ast::Diagram;
 use crate::error::DiagnosticError;
+use crate::layout::canvas_finalize;
 use crate::layout::constants;
-use crate::layout::post_route;
 use crate::layout::grid_snap;
 use crate::layout::group_frame::GroupFramePass;
+use crate::layout::perf::Instant;
 use crate::layout::plan::LayoutPlan;
-use crate::layout::canvas_finalize;
+use crate::layout::post_route;
 use crate::layout::refine;
 use crate::layout::registry;
 use crate::layout::route_feedback::{LayoutRouteFeedback, PreRouteFeedback};
 use crate::layout::{resolve_effective_direction, EdgeRoutingStrategy, LayoutResult};
-use crate::layout::perf::Instant;
 use std::collections::{HashMap, HashSet};
 
 /// 布局管线。
@@ -46,7 +46,10 @@ impl<'a> LayoutPipeline<'a> {
         let t_layout = Instant::now();
         let mut result = strategy.compute(self.diagram);
         let layout_elapsed = t_layout.elapsed();
-        crate::perf_log!("[perf] layout: {:.2}ms", layout_elapsed.as_secs_f64() * 1000.0);
+        crate::perf_log!(
+            "[perf] layout: {:.2}ms",
+            layout_elapsed.as_secs_f64() * 1000.0
+        );
 
         // C13：sequence 等自产边布局若再跑 node align，边端点不会随节点更新。
         // 完整修复需 align 后按节点重锚定消息端点（改动面大）；此处对 produces_edges
@@ -63,7 +66,10 @@ impl<'a> LayoutPipeline<'a> {
         let t_routing = Instant::now();
         let mut result = self.run_routing_pipeline(algo, result)?;
         let routing_elapsed = t_routing.elapsed();
-        crate::perf_log!("[perf] routing: {:.2}ms", routing_elapsed.as_secs_f64() * 1000.0);
+        crate::perf_log!(
+            "[perf] routing: {:.2}ms",
+            routing_elapsed.as_secs_f64() * 1000.0
+        );
 
         canvas_finalize::finalize_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
         Ok(result)
@@ -103,7 +109,10 @@ impl<'a> LayoutPipeline<'a> {
         let PreRouteFeedback {
             result: mut result_v2,
         } = feedback.apply_pre_route(result);
-        crate::perf_log!("[perf]   pre-route: {:.2}ms", t0.elapsed().as_secs_f64() * 1000.0);
+        crate::perf_log!(
+            "[perf]   pre-route: {:.2}ms",
+            t0.elapsed().as_secs_f64() * 1000.0
+        );
 
         let edge_routing_style =
             LayoutPlan::resolve_effective_edge_routing(self.diagram, self.plan, &result_v2.hints);
@@ -135,17 +144,17 @@ impl<'a> LayoutPipeline<'a> {
             &refine_config,
             &edge_snap_config,
         );
-        crate::perf_log!("[perf]   route: {:.2}ms", t_route.elapsed().as_secs_f64() * 1000.0);
+        crate::perf_log!(
+            "[perf]   route: {:.2}ms",
+            t_route.elapsed().as_secs_f64() * 1000.0
+        );
 
         let t_post = Instant::now();
         // P1: 路由后仅做几何排斥（不含量化），量化推迟到管道末尾
-        post_route::repulse_edges_only(
-            &mut result.edges,
-            &result.groups,
-            &edge_snap_config,
-        );
+        post_route::repulse_edges_only(&mut result.edges, &result.groups, &edge_snap_config);
 
-        result = self.run_post_route_group_frame(algo, result, &gf_pass, &*router, &edge_snap_config)?;
+        result =
+            self.run_post_route_group_frame(algo, result, &gf_pass, &*router, &edge_snap_config)?;
 
         let hook = super::post_route::AlgoProfile::from_algo(algo).post_route_hook();
         result = hook.after_route(
@@ -215,12 +224,26 @@ impl<'a> LayoutPipeline<'a> {
                 &self.diagram.relations,
                 crate::layout::edge::parallel_gap_for_diagram(self.diagram.diagram_type.clone()),
             );
+            // 轨道 A：正反向同侧 dock 共锚（D 末最终写者，sanitize 之后）
+            let dock_gap =
+                crate::layout::edge::parallel_gap_for_diagram(self.diagram.diagram_type.clone())
+                    .max(crate::layout::edge::edge_routing_orthogonal::COMPACT_SLOT_PITCH);
+            let _ =
+                crate::layout::edge::edge_routing_orthogonal::enforce_reverse_pair_dock_separation(
+                    &mut result.edges,
+                    &self.diagram.relations,
+                    &result.nodes,
+                    &from_side,
+                    &to_side,
+                    dock_gap,
+                );
 
             // 标签避让必须是几何冻结后的**最终**步骤：sanitize 会按平行边规则
             // 重建所有标签；snap/repulse 又移动了路径。router 内不再提前 resolve（P3.3）。
             let label_config =
-                crate::layout::edge::common::label_candidate::LabelPlacementConfig::for_diagram_type(
+                crate::layout::edge::common::label_candidate::LabelPlacementConfig::for_diagram(
                     self.diagram.diagram_type.clone(),
+                    !result.groups.is_empty(),
                 );
             crate::layout::edge::common::label_avoidance::resolve_label_overlaps_with_config(
                 &mut result.edges,
@@ -228,9 +251,18 @@ impl<'a> LayoutPipeline<'a> {
                 &result.groups,
                 label_config,
             );
+            if let Some(annotations) = result.hints.route_annotations.as_ref() {
+                crate::layout::edge::common::label_avoidance::dedupe_labels_on_declared_merges(
+                    &mut result.edges,
+                    annotations,
+                );
+            }
         }
 
-        crate::perf_log!("[perf]   post-process: {:.2}ms", t_post.elapsed().as_secs_f64() * 1000.0);
+        crate::perf_log!(
+            "[perf]   post-process: {:.2}ms",
+            t_post.elapsed().as_secs_f64() * 1000.0
+        );
 
         Ok(result)
     }
@@ -283,9 +315,7 @@ impl<'a> LayoutPipeline<'a> {
                     pre_gf_positions.get(id).and_then(|(px, py)| {
                         let dx = n.x - px;
                         let dy = n.y - py;
-                        if (dx * dx + dy * dy).sqrt()
-                            >= super::post_route::NODE_MOVE_REROUTE_EPS
-                        {
+                        if (dx * dx + dy * dy).sqrt() >= super::post_route::NODE_MOVE_REROUTE_EPS {
                             Some(id.clone())
                         } else {
                             None
@@ -296,18 +326,10 @@ impl<'a> LayoutPipeline<'a> {
             result = router.route_after_node_moves(self.diagram, result, &moved_nodes);
 
             // P1: 组框修复后仅做几何排斥，量化推迟到管道末尾
-            post_route::repulse_edges_only(
-                &mut result.edges,
-                &result.groups,
-                edge_snap_config,
-            );
+            post_route::repulse_edges_only(&mut result.edges, &result.groups, edge_snap_config);
         } else {
             // P1: 无重路由时也仅做几何排斥
-            post_route::repulse_edges_only(
-                &mut result.edges,
-                &result.groups,
-                edge_snap_config,
-            );
+            post_route::repulse_edges_only(&mut result.edges, &result.groups, edge_snap_config);
         }
 
         grid_snap::update_canvas_bounds(&mut result, constants::DEFAULT_PADDING);

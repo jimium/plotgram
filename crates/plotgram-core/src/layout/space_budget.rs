@@ -8,7 +8,7 @@ use crate::layout::constants::{DEFAULT_LABEL_PADDING, GRID_SNAP_NODE_GAP_ARCH};
 use crate::layout::edge::common::label_avoidance::estimate_label_width;
 use crate::layout::group::constants::PORT_STUB_CLEARANCE;
 use crate::layout::NodeLayout;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// 默认同层节点间距（与 architecture NODE_GAP / grid snap 对齐）。
 pub const DEFAULT_NODE_GAP: f64 = GRID_SNAP_NODE_GAP_ARCH;
@@ -45,13 +45,7 @@ impl SpaceBudget {
         let mut rels: Vec<(&str, &str, Option<&str>)> = diagram
             .relations
             .iter()
-            .map(|r| {
-                (
-                    r.from.as_str(),
-                    r.to.as_str(),
-                    r.label.as_deref(),
-                )
-            })
+            .map(|r| (r.from.as_str(), r.to.as_str(), r.label.as_deref()))
             .collect();
         // 确定性：按端点 id 排序
         rels.sort_by(|a, b| a.0.cmp(b.0).then(a.1.cmp(b.1)).then(a.2.cmp(&b.2)));
@@ -70,6 +64,59 @@ impl SpaceBudget {
             budget.set_pair_gap(from, to, gap);
         }
         budget
+    }
+
+    /// 无组 architecture：把同排相邻节点的 demand 缝写入契约，防止 refine 压回 `default_node_gap`。
+    pub fn enrich_adjacent_rank_demand(
+        &mut self,
+        layers: &[Vec<String>],
+        nodes: &HashMap<String, NodeLayout>,
+        diagram: &Diagram,
+    ) {
+        let profile = crate::layout::edge_band_demand::EdgeBandDemandProfile::for_diagram(
+            diagram.diagram_type.clone(),
+            !diagram.groups.is_empty(),
+        );
+        if profile.horizontal_max_extra <= 0.0 {
+            return;
+        }
+        let parallel_gap = crate::layout::edge::segment_pair::parallel_gap_for_diagram(
+            diagram.diagram_type.clone(),
+        );
+        for layer in layers {
+            if layer.len() < 2 {
+                continue;
+            }
+            let mut ordered: Vec<&String> = layer.iter().collect();
+            ordered.sort_by(|a, b| {
+                let ca = nodes
+                    .get(a.as_str())
+                    .map(|nl| nl.x + nl.width / 2.0)
+                    .unwrap_or(0.0);
+                let cb = nodes
+                    .get(b.as_str())
+                    .map(|nl| nl.x + nl.width / 2.0)
+                    .unwrap_or(0.0);
+                ca.partial_cmp(&cb)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.cmp(b))
+            });
+            let layer_ids: HashSet<&str> = layer.iter().map(|s| s.as_str()).collect();
+            for w in ordered.windows(2) {
+                let left = w[0].as_str();
+                let right = w[1].as_str();
+                let gap = crate::layout::edge_band_demand::adjacent_rank_gap(
+                    left,
+                    right,
+                    &layer_ids,
+                    &diagram.relations,
+                    self.default_node_gap,
+                    parallel_gap,
+                    profile,
+                );
+                self.set_pair_gap(left, right, gap);
+            }
+        }
     }
 
     pub fn set_pair_gap(&mut self, a: &str, b: &str, gap: f64) {
@@ -168,6 +215,132 @@ pub fn enforce_horizontal_gaps(
     }
 
     moved.into_keys().collect()
+}
+
+/// 竖直 rank 轴强制最小层缝。
+///
+/// refine 会单独推动问题节点；若只看 AABB「同列」对，会漏掉斜向相连节点，
+/// 也会误推跨组但仅仅投影重叠的无关节点。这里以布局写入的 rank 为权威：
+/// 发现同一 leaf-group（无组图为 root）内相邻 rank band 间距不足时，整体下移
+/// 当前及后续 rank，保持同层与拓扑顺序。跨组 rank 不可直接比较其绝对 y。
+///
+/// 返回被移动的节点 id（确定性：按 rank、id 排序）。
+pub fn enforce_vertical_rank_gaps(
+    nodes: &mut HashMap<String, NodeLayout>,
+    budget: &SpaceBudget,
+    ranks: &HashMap<String, usize>,
+    scopes: &HashMap<String, String>,
+    reverse_pairs: &HashSet<(String, String)>,
+) -> Vec<String> {
+    if nodes.len() <= 1 || ranks.is_empty() {
+        return Vec::new();
+    }
+
+    let mut by_scope: BTreeMap<String, BTreeMap<usize, Vec<String>>> = BTreeMap::new();
+    for (id, &rank) in ranks {
+        if nodes.contains_key(id) {
+            by_scope
+                .entry(scopes.get(id).cloned().unwrap_or_default())
+                .or_default()
+                .entry(rank)
+                .or_default()
+                .push(id.clone());
+        }
+    }
+    let mut moved: BTreeMap<String, ()> = BTreeMap::new();
+
+    for by_rank in by_scope.values_mut() {
+        if by_rank.len() <= 1 {
+            continue;
+        }
+        for ids in by_rank.values_mut() {
+            ids.sort();
+        }
+
+        let rank_keys: Vec<usize> = by_rank.keys().copied().collect();
+        for boundary in 1..rank_keys.len() {
+            let upper_rank = rank_keys[boundary - 1];
+            let lower_rank = rank_keys[boundary];
+            let mut deficit = 0.0f64;
+            for upper_id in &by_rank[&upper_rank] {
+                for lower_id in &by_rank[&lower_rank] {
+                    let (Some(upper), Some(lower)) = (nodes.get(upper_id), nodes.get(lower_id))
+                    else {
+                        continue;
+                    };
+                    if upper.y > lower.y {
+                        continue;
+                    }
+                    let gap = lower.y - (upper.y + upper.height);
+                    let x_overlap =
+                        (upper.x + upper.width).min(lower.x + lower.width) - upper.x.max(lower.x);
+                    let projected_collision =
+                        gap < 0.5 && x_overlap >= upper.width.min(lower.width) * 0.5;
+                    let key = if upper_id <= lower_id {
+                        (upper_id.clone(), lower_id.clone())
+                    } else {
+                        (lower_id.clone(), upper_id.clone())
+                    };
+                    let reverse_pair = reverse_pairs.contains(&key);
+                    if projected_collision || reverse_pair {
+                        deficit = deficit.max(budget.default_node_gap - gap);
+                    }
+                }
+            }
+            if deficit <= 0.5 {
+                continue;
+            }
+            for &rank in &rank_keys[boundary..] {
+                for id in &by_rank[&rank] {
+                    if let Some(node) = nodes.get_mut(id) {
+                        node.y += deficit;
+                        moved.insert(id.clone(), ());
+                    }
+                }
+            }
+        }
+    }
+
+    moved.into_keys().collect()
+}
+
+/// 节点的 leaf-group scope；空串表示无组 root。
+pub fn node_group_scopes(diagram: &Diagram) -> HashMap<String, String> {
+    diagram
+        .entities
+        .iter()
+        .map(|entity| {
+            (
+                entity.id.as_str().to_string(),
+                entity
+                    .group_id
+                    .as_ref()
+                    .map(|id| id.as_str().to_string())
+                    .unwrap_or_default(),
+            )
+        })
+        .collect()
+}
+
+/// 同一无向节点对同时存在两个方向的 relation。
+pub fn reverse_relation_pairs(diagram: &Diagram) -> HashSet<(String, String)> {
+    let directed: HashSet<(String, String)> = diagram
+        .relations
+        .iter()
+        .map(|rel| (rel.from.as_str().to_string(), rel.to.as_str().to_string()))
+        .collect();
+    let mut out = HashSet::new();
+    for (from, to) in &directed {
+        if directed.contains(&(to.clone(), from.clone())) {
+            let key = if from <= to {
+                (from.clone(), to.clone())
+            } else {
+                (to.clone(), from.clone())
+            };
+            out.insert(key);
+        }
+    }
+    out
 }
 
 /// 检查是否仍有水平方向违反契约的节点对。
@@ -428,5 +601,61 @@ mod tests {
             "gap={gap} required={}",
             budget.min_gap("a", "b")
         );
+    }
+
+    #[test]
+    fn enforce_vertical_rank_gaps_moves_whole_lower_band() {
+        let budget = SpaceBudget::new();
+        let mut nodes = HashMap::from([
+            (
+                "upper_a".to_string(),
+                NodeLayout {
+                    x: 100.0,
+                    y: 100.0,
+                    width: 112.0,
+                    height: 50.0,
+                    ..Default::default()
+                },
+            ),
+            (
+                "lower_a".to_string(),
+                NodeLayout {
+                    x: 260.0,
+                    y: 150.0, // 贴边：gap_y=0
+                    width: 112.0,
+                    height: 50.0,
+                    ..Default::default()
+                },
+            ),
+            (
+                "lower_b".to_string(),
+                NodeLayout {
+                    x: 420.0,
+                    y: 150.0,
+                    width: 112.0,
+                    height: 50.0,
+                    ..Default::default()
+                },
+            ),
+        ]);
+        let ranks = HashMap::from([
+            ("upper_a".to_string(), 0usize),
+            ("lower_a".to_string(), 1usize),
+            ("lower_b".to_string(), 1usize),
+        ]);
+        let scopes = HashMap::from([
+            ("upper_a".to_string(), "g".to_string()),
+            ("lower_a".to_string(), "g".to_string()),
+            ("lower_b".to_string(), "g".to_string()),
+        ]);
+        let reverse_pairs = HashSet::from([("lower_a".to_string(), "upper_a".to_string())]);
+        enforce_vertical_rank_gaps(&mut nodes, &budget, &ranks, &scopes, &reverse_pairs);
+        let gap = nodes["lower_a"].y - (nodes["upper_a"].y + nodes["upper_a"].height);
+        assert!(
+            gap + 0.5 >= budget.default_node_gap,
+            "gap={gap} required={}",
+            budget.default_node_gap
+        );
+        assert_eq!(nodes["lower_a"].y, nodes["lower_b"].y);
     }
 }

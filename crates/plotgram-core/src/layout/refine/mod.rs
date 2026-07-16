@@ -15,8 +15,8 @@ mod reroute;
 mod spline_fallback;
 
 pub use crossing::analyze_edge_node_crossings;
-pub use geometry::segment_intersects_node;
 pub(crate) use geometry::segment_intersects_aabb;
+pub use geometry::segment_intersects_node;
 
 pub use push::MomentumHistory;
 
@@ -76,7 +76,10 @@ pub fn run_refine(
 
     let t_cross = crate::layout::perf::Instant::now();
     let best_metrics = crossing::analyze_crossings(&result, diagram, config);
-    crate::perf_log!("[perf]         analyze_crossings: {:.2}ms", t_cross.elapsed().as_secs_f64() * 1000.0);
+    crate::perf_log!(
+        "[perf]         analyze_crossings: {:.2}ms",
+        t_cross.elapsed().as_secs_f64() * 1000.0
+    );
     let mut best_score = combined_crossing_score(&best_metrics);
     if best_metrics.edge_node_crossings == 0 {
         return result;
@@ -117,14 +120,45 @@ pub fn run_refine(
             .count();
         total_push_count += push_count;
 
+        let pre_push_nodes = result.nodes.clone();
         push::push_problem_nodes(&mut result, &metrics, config, &mut momentum);
-        // 空间契约：推开后不得压穿同层标签缝
-        if let Some(budget) = result.hints.space_budget.clone() {
-            crate::layout::space_budget::enforce_horizontal_gaps(&mut result.nodes, &budget);
-        } else {
-            let budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
-            crate::layout::space_budget::enforce_horizontal_gaps(&mut result.nodes, &budget);
-            result.hints.space_budget = Some(budget);
+        // 空间契约：refine 候选若压穿相邻 rank 层缝，整轮拒绝。
+        // 不在反馈循环里“再推一次节点”修补，否则路由评分看到的是二次改写后的布局。
+        let rank_scopes = crate::layout::space_budget::node_group_scopes(diagram);
+        let no_reverse_pairs = HashSet::new();
+        let budget = result
+            .hints
+            .space_budget
+            .clone()
+            .unwrap_or_else(|| crate::layout::space_budget::SpaceBudget::from_diagram(diagram));
+        crate::layout::space_budget::enforce_horizontal_gaps(&mut result.nodes, &budget);
+        let rank_contract_broken = result.hints.sugiyama_ranks.as_ref().is_some_and(|ranks| {
+            let mut before_probe = pre_push_nodes.clone();
+            let before: HashSet<String> = crate::layout::space_budget::enforce_vertical_rank_gaps(
+                &mut before_probe,
+                &budget,
+                ranks,
+                &rank_scopes,
+                &no_reverse_pairs,
+            )
+            .into_iter()
+            .collect();
+            let mut after_probe = result.nodes.clone();
+            let after: HashSet<String> = crate::layout::space_budget::enforce_vertical_rank_gaps(
+                &mut after_probe,
+                &budget,
+                ranks,
+                &rank_scopes,
+                &no_reverse_pairs,
+            )
+            .into_iter()
+            .collect();
+            !after.is_subset(&before)
+        });
+        result.hints.space_budget = Some(budget);
+        if rank_contract_broken {
+            result.nodes = pre_push_nodes;
+            break;
         }
         reroute::reroute_subset(&mut result, diagram, router, &edges_to_reroute);
         passes_executed += 1;
@@ -154,12 +188,7 @@ pub fn run_refine(
         for info in final_metrics.problem_nodes.values() {
             fallback_edges.extend(info.edge_indices.iter().copied());
         }
-        spline_fallback::reroute_edges_with_spline(
-            &mut result,
-            diagram,
-            &fallback_edges,
-            config,
-        );
+        spline_fallback::reroute_edges_with_spline(&mut result, diagram, &fallback_edges, config);
     }
 
     result

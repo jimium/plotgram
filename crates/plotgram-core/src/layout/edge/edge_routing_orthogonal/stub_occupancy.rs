@@ -492,6 +492,9 @@ pub fn estimate_layer_band_demands(
             side_channel_scale: 0.0,
             side_channel_base: 0.0,
             side_channel_max: 0.0,
+            horizontal_parallel_scale: 0.0,
+            horizontal_label_per: 0.0,
+            horizontal_max_extra: 0.0,
         };
         // 诊断仍用粗公式（与 S0 可比）；布局写权走 edge_band_demand 完整 profile
         let demand = (cross as f64) * parallel_gap * profile.parallel_scale + profile.label_band;

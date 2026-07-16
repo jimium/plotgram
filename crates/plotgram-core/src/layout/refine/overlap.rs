@@ -129,12 +129,7 @@ pub(crate) fn analyze_edge_overlaps(result: &LayoutResult) -> usize {
 }
 
 /// 检测两条线段是否冲突（平行重叠或垂直交叉）
-pub(crate) fn segments_conflict_xy(
-    a1: Point,
-    a2: Point,
-    b1: Point,
-    b2: Point,
-) -> bool {
+pub(crate) fn segments_conflict_xy(a1: Point, a2: Point, b1: Point, b2: Point) -> bool {
     let a_horiz = (a1.y - a2.y).abs() < EPS;
     let b_horiz = (b1.y - b2.y).abs() < EPS;
     let a_vert = (a1.x - a2.x).abs() < EPS;
@@ -174,20 +169,12 @@ pub(crate) fn segments_conflict_xy(
     false
 }
 
-fn segments_cross_perpendicular_xy(
-    h1: Point,
-    h2: Point,
-    v1: Point,
-    v2: Point,
-) -> bool {
+fn segments_cross_perpendicular_xy(h1: Point, h2: Point, v1: Point, v2: Point) -> bool {
     let h_y = h1.y;
     let v_x = v1.x;
     let h_x_min = h1.x.min(h2.x);
     let h_x_max = h1.x.max(h2.x);
     let v_y_min = v1.y.min(v2.y);
     let v_y_max = v1.y.max(v2.y);
-    v_x > h_x_min + EPS
-        && v_x < h_x_max - EPS
-        && h_y > v_y_min + EPS
-        && h_y < v_y_max - EPS
+    v_x > h_x_min + EPS && v_x < h_x_max - EPS && h_y > v_y_min + EPS && h_y < v_y_max - EPS
 }

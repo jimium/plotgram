@@ -36,6 +36,12 @@ pub fn paint_export_edge(
             &config.diagram_type,
             edge.relation,
             &edge.layout,
+            scene
+                .layout
+                .hints
+                .route_annotations
+                .as_ref()
+                .and_then(|annotations| annotations.get(edge.index)),
             &edge.style,
             false, // 标签由 paint_export_edge_label 单独渲染（三图层）
             &scene.context,
@@ -68,6 +74,9 @@ pub fn paint_export_edge_label(
     );
 }
 
-pub fn paint_svg_defs(_config: &StandardStyleConfig, _context: &crate::render::CompiledRenderContext) -> Option<String> {
+pub fn paint_svg_defs(
+    _config: &StandardStyleConfig,
+    _context: &crate::render::CompiledRenderContext,
+) -> Option<String> {
     None
 }

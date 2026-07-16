@@ -1635,3 +1635,53 @@
         }
     }
 
+
+    /// 轨道 A：正反向在下层节点同侧不得共锚
+    #[test]
+    fn a_user_auth_reverse_pair_dock_separation() {
+        let source = include_str!("../../../../../../showcase/flowchart/n.user-auth.pgm");
+        let output = crate::pipeline::parse_prepare_validate(
+            source,
+            &crate::prepare::StyleRequest::default(),
+        );
+        let prepared = output.diagram.expect("valid");
+        let layout = crate::layout::compute_layout_with_plan(
+            prepared.inner(),
+            prepared.layout_plan(),
+        )
+        .expect("layout");
+        let relations = &prepared.inner().relations;
+        let min_gap = crate::layout::constants::ORTHO_PARALLEL_GAP
+            .max(crate::layout::edge::edge_routing_orthogonal::COMPACT_SLOT_PITCH);
+
+        for (a, b, lower) in [("auth", "db", "db"), ("auth", "cache", "cache")] {
+            let i = relations
+                .iter()
+                .position(|r| r.from.as_str() == a && r.to.as_str() == b)
+                .unwrap();
+            let j = relations
+                .iter()
+                .position(|r| r.from.as_str() == b && r.to.as_str() == a)
+                .unwrap();
+            let pi: Vec<Point> = layout.edges[i].path_points().into_owned();
+            let pj: Vec<Point> = layout.edges[j].path_points().into_owned();
+            let di = *pi.last().unwrap();
+            let dj = pj[0];
+            let gap = (di.x - dj.x).abs();
+            assert!(
+                gap + 1e-3 >= min_gap,
+                "{lower} reverse docks share endpoint: ({:.2},{:.2}) vs ({:.2},{:.2}) gap={gap} < {min_gap}",
+                di.x,
+                di.y,
+                dj.x,
+                dj.y
+            );
+            assert!(
+                (di.y - dj.y).abs() < 1.0,
+                "{lower} docks should share Top y, got {:.2} vs {:.2}",
+                di.y,
+                dj.y
+            );
+            let _ = lower;
+        }
+    }

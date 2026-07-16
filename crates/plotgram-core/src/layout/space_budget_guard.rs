@@ -4,12 +4,12 @@
 //! 消除两处复制并修复 R-4 行为差异(route_feedback 缺 repulse_edges_only)。
 
 use crate::ast::Diagram;
-use crate::layout::post_route;
 use crate::layout::grid_snap::EdgeSnapConfig;
+use crate::layout::post_route;
 use crate::layout::post_route::NODE_MOVE_REROUTE_EPS;
 use crate::layout::space_budget::{
-    has_node_aabb_overlaps, horizontal_gap_violations, resolve_residual_with_budget_and_ranks,
-    SpaceBudget,
+    enforce_vertical_rank_gaps, has_node_aabb_overlaps, horizontal_gap_violations,
+    node_group_scopes, resolve_residual_with_budget_and_ranks, reverse_relation_pairs, SpaceBudget,
 };
 use crate::layout::{EdgeRoutingStrategy, LayoutResult, NodeLayout};
 use std::collections::{HashMap, HashSet};
@@ -39,6 +39,8 @@ pub fn diff_moved_nodes(
 
 /// 检测水平缝违反或 AABB 节点重叠 → 推开 → 返回移动的节点集合。
 ///
+/// 同时按布局 rank 执行竖向最小层缝 enforce（修复 refine 上推吃掉邻 rank 缝）。
+///
 /// 若无违反且 space_budget 未设置,则设置 budget hint。
 /// 返回 (处理后的 result, 移动的节点集合)。
 pub fn resolve_budget_violations(
@@ -52,36 +54,39 @@ pub fn resolve_budget_violations(
         .unwrap_or_else(|| SpaceBudget::from_diagram(diagram));
     let gap_violations = horizontal_gap_violations(&result.nodes, &budget);
     // 斜向 AABB 碰撞兜底仅对无分组图启用：有组大图的 rank 回排易牵动壳内节点抬高穿模。
-    let aabb_overlaps =
-        result.groups.is_empty() && has_node_aabb_overlaps(&result.nodes);
+    let aabb_overlaps = result.groups.is_empty() && has_node_aabb_overlaps(&result.nodes);
     let needs_resolve = !gap_violations.is_empty() || aabb_overlaps;
+
+    let pre: HashMap<String, (f64, f64)> = result
+        .nodes
+        .iter()
+        .map(|(id, n)| (id.clone(), (n.x, n.y)))
+        .collect();
+
     if needs_resolve {
-        let pre: HashMap<String, (f64, f64)> = result
-            .nodes
-            .iter()
-            .map(|(id, n)| (id.clone(), (n.x, n.y)))
-            .collect();
         // 仅 AABB 碰撞时带 rank 回排；纯水平缝违反走原 BruteForce
         let ranks = if aabb_overlaps {
             result.hints.sugiyama_ranks.clone()
         } else {
             None
         };
-        resolve_residual_with_budget_and_ranks(
-            &mut result.nodes,
-            Some(&budget),
-            ranks.as_ref(),
-        );
-        result.hints.space_budget = Some(budget);
-        let moved = diff_moved_nodes(&pre, &result.nodes);
-        crate::perf_log!("[fallback] budget residual: {} moved nodes", moved.len());
-        (result, moved)
-    } else {
-        if result.hints.space_budget.is_none() {
-            result.hints.space_budget = Some(budget);
-        }
-        (result, HashSet::new())
+        resolve_residual_with_budget_and_ranks(&mut result.nodes, Some(&budget), ranks.as_ref());
     }
+
+    // 竖向 rank 缝：有组图也会被 refine 推贴边（gap_y=0 不算 AABB），必须守约。
+    // 依 rank 整带移动，不按投影重叠猜“同列”，避免误推无关跨组节点。
+    if let Some(ranks) = result.hints.sugiyama_ranks.as_ref() {
+        let scopes = node_group_scopes(diagram);
+        let reverse_pairs = reverse_relation_pairs(diagram);
+        enforce_vertical_rank_gaps(&mut result.nodes, &budget, ranks, &scopes, &reverse_pairs);
+    }
+
+    result.hints.space_budget = Some(budget);
+    let moved = diff_moved_nodes(&pre, &result.nodes);
+    if !moved.is_empty() {
+        crate::perf_log!("[fallback] budget residual: {} moved nodes", moved.len());
+    }
+    (result, moved)
 }
 
 /// 对移动的节点做增量重路由 + repulse(对齐 pipeline.rs S3 兜底)。

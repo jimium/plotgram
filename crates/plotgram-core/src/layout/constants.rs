@@ -54,6 +54,9 @@ pub const ORTHO_PARALLEL_GAP_ARCHITECTURE: f64 = 12.0;
 /// 默认标签垂直偏移（标签相对边路径的垂直距离）
 pub const DEFAULT_LABEL_PERP_OFFSET: f64 = 8.0;
 
+/// S5.2b：无组 architecture 的标签法向最小净空（有组 / nested 仍用 DEFAULT，避免回归）
+pub const ARCH_UNGROUPED_LABEL_PERP_OFFSET: f64 = 12.0;
+
 /// 默认标签字号
 pub const DEFAULT_LABEL_FONT_SIZE: f64 = 11.0;
 

@@ -13,8 +13,8 @@ use crate::layout::geometry::Point;
 use crate::layout::group::{CorridorAxis, GroupCorridor, GroupRoutingContext};
 use crate::layout::{GroupLayout, Port};
 
-use super::profile::OrthoRoutingProfile;
 use super::path::port_outward;
+use super::profile::OrthoRoutingProfile;
 use super::simplify::simplify_path;
 use super::EPS;
 
@@ -262,7 +262,10 @@ pub fn try_build_corridor_path(
         append_stub_leg(&mut waypoints, &mut current, exit_border, exit_side, stub);
         ortho_connect(&mut waypoints, &mut current, corridor_exit);
         ortho_connect(&mut waypoints, &mut current, corridor_entry);
-        append_stub_leg(&mut waypoints, &mut current, entry_border, entry_side, stub);
+        // 当前点已在目标组外侧走廊上；直接接到入组边框。
+        // 若在这里再按 entry_side 打「外向」stub，会先远离目标组再折返，
+        // 生成非单调 Z 折。端点 stub 由后面的 final leg 负责。
+        ortho_connect(&mut waypoints, &mut current, entry_border);
 
         current_group = next_group;
     }
@@ -372,15 +375,9 @@ fn border_point_on_side(
     cross_offset: f64,
 ) -> Point {
     let mut point = match side {
-        Port::Right => Point::new(
-            gl.x + gl.width,
-            reference.y.clamp(gl.y, gl.y + gl.height),
-        ),
+        Port::Right => Point::new(gl.x + gl.width, reference.y.clamp(gl.y, gl.y + gl.height)),
         Port::Left => Point::new(gl.x, reference.y.clamp(gl.y, gl.y + gl.height)),
-        Port::Bottom => Point::new(
-            reference.x.clamp(gl.x, gl.x + gl.width),
-            gl.y + gl.height,
-        ),
+        Port::Bottom => Point::new(reference.x.clamp(gl.x, gl.x + gl.width), gl.y + gl.height),
         Port::Top => Point::new(reference.x.clamp(gl.x, gl.x + gl.width), gl.y),
     };
     match corridor.axis {
@@ -557,11 +554,21 @@ mod tests {
         let mut groups = HashMap::new();
         groups.insert(
             "left".into(),
-            GroupLayout { x: 0.0, y: 0.0, width: 100.0, height: 80.0 },
+            GroupLayout {
+                x: 0.0,
+                y: 0.0,
+                width: 100.0,
+                height: 80.0,
+            },
         );
         groups.insert(
             "right".into(),
-            GroupLayout { x: 140.0, y: 0.0, width: 100.0, height: 80.0 },
+            GroupLayout {
+                x: 140.0,
+                y: 0.0,
+                width: 100.0,
+                height: 80.0,
+            },
         );
         GroupRoutingContext {
             groups,
@@ -648,7 +655,7 @@ mod tests {
         ]));
         let relations = vec![
             make_relation("a1", "b1"),
-            make_relation("a3", "b3"),  // 不同 SuperEdgePair 子组，但同 leaf group pair
+            make_relation("a3", "b3"), // 不同 SuperEdgePair 子组，但同 leaf group pair
             make_relation("a2", "b2"),
         ];
         let plan = plan_corridor_routes(
@@ -658,9 +665,21 @@ mod tests {
         );
         // 排序后应为 a1→b1, a2→b2, a3→b3（按 from_id 然后 to_id）
         // lane: a1→b1=0, a2→b2=1, a3→b3=2
-        assert_eq!(plan.lanes.get(&(0, 0)), Some(&0), "edge 0 (a1→b1) 应为 lane 0");
-        assert_eq!(plan.lanes.get(&(2, 0)), Some(&1), "edge 2 (a2→b2) 应为 lane 1");
-        assert_eq!(plan.lanes.get(&(1, 0)), Some(&2), "edge 1 (a3→b3) 应为 lane 2");
+        assert_eq!(
+            plan.lanes.get(&(0, 0)),
+            Some(&0),
+            "edge 0 (a1→b1) 应为 lane 0"
+        );
+        assert_eq!(
+            plan.lanes.get(&(2, 0)),
+            Some(&1),
+            "edge 2 (a2→b2) 应为 lane 1"
+        );
+        assert_eq!(
+            plan.lanes.get(&(1, 0)),
+            Some(&2),
+            "edge 1 (a3→b3) 应为 lane 2"
+        );
     }
 
     #[test]
@@ -672,10 +691,7 @@ mod tests {
             ("redis".into(), "right".into()),
             ("db".into(), "right".into()),
         ]));
-        let relations = vec![
-            make_relation("auth", "redis"),
-            make_relation("biz", "db"),
-        ];
+        let relations = vec![make_relation("auth", "redis"), make_relation("biz", "db")];
         let plan = plan_corridor_routes(
             &relations,
             &ctx,
@@ -694,10 +710,7 @@ mod tests {
             ("b1".into(), "right".into()),
             ("b2".into(), "right".into()),
         ]));
-        let relations = vec![
-            make_relation("a1", "b1"),
-            make_relation("a2", "b2"),
-        ];
+        let relations = vec![make_relation("a1", "b1"), make_relation("a2", "b2")];
         let plan = plan_corridor_routes(
             &relations,
             &ctx,
@@ -755,10 +768,7 @@ mod tests {
             ("auth".into(), "right".into()),
             ("biz".into(), "right".into()),
         ]));
-        let relations = vec![
-            make_relation("lb", "auth"),
-            make_relation("lb", "biz"),
-        ];
+        let relations = vec![make_relation("lb", "auth"), make_relation("lb", "biz")];
         let plan = plan_corridor_routes(
             &relations,
             &ctx,
@@ -782,11 +792,21 @@ mod tests {
         let mut groups = HashMap::new();
         groups.insert(
             "top".into(),
-            GroupLayout { x: 0.0, y: 0.0, width: 120.0, height: 60.0 },
+            GroupLayout {
+                x: 0.0,
+                y: 0.0,
+                width: 120.0,
+                height: 60.0,
+            },
         );
         groups.insert(
             "bottom".into(),
-            GroupLayout { x: 0.0, y: 140.0, width: 120.0, height: 60.0 },
+            GroupLayout {
+                x: 0.0,
+                y: 140.0,
+                width: 120.0,
+                height: 60.0,
+            },
         );
         let ctx = GroupRoutingContext {
             groups,
@@ -807,10 +827,7 @@ mod tests {
             sibling_orientation: HashMap::new(),
             group_ancestors: HashMap::new(),
         };
-        let relations = vec![
-            make_relation("a1", "b1"),
-            make_relation("a2", "b2"),
-        ];
+        let relations = vec![make_relation("a1", "b1"), make_relation("a2", "b2")];
         let plan = plan_corridor_routes(
             &relations,
             &ctx,
@@ -850,7 +867,10 @@ mod tests {
             .filter(|w| (w[0].x - w[1].x).abs() < EPS && (w[0].y - w[1].y).abs() > min_trunk)
             .map(|w| w[0].x)
             .collect();
-        assert!(!trunk_x0.is_empty() && !trunk_x1.is_empty(), "应有垂直 trunk 段");
+        assert!(
+            !trunk_x0.is_empty() && !trunk_x1.is_empty(),
+            "应有垂直 trunk 段"
+        );
         let dx = (trunk_x0[0] - trunk_x1[0]).abs();
         assert!(
             dx >= CORRIDOR_LANE_PITCH - EPS,

@@ -10,39 +10,35 @@
 //! client 对齐等特化优化）保留在本模块。未来 flowchart 分治布局将实现
 //! `IntraGroupLayouter` trait，共用同一套类型基础。
 
-use super::group_sizing::{
-    parse_group_sizing, GroupSizeBlock, GroupSizingPolicy,
-};
 use super::group_layout_hint::{
     align_nodes_in_column, assign_ranks_for_mode, parse_group_layout_hint,
     resolve_group_layout_hint, resolve_group_layout_mode, GroupLayoutHint, GroupLayoutMode,
 };
+use super::group_sizing::{parse_group_sizing, GroupSizeBlock, GroupSizingPolicy};
 use super::layout::acyclic::is_effective_edge;
+use super::layout::constants::PADDING;
 use super::layout::constants::{
     GROUP_GAP_X, GROUP_LABEL_HEIGHT, INTRA_LAYER_GAP, LAYER_GAP, NEIGHBOR_PULL_FACTOR, NODE_GAP,
 };
 use super::layout::coordinate::{
-    align_client_nodes_to_hubs, center_group_hub_nodes, layer_centers_from_placed,
-    pull_toward_neighbors, rebalance_infrastructure_layers, resolve_x_overlaps,
-    resolve_x_overlaps_with_gaps, uniform_initial_positions,
+    align_client_nodes_to_hubs, center_group_hub_nodes, enforce_horizontal_demand_gaps,
+    layer_centers_from_placed, pull_toward_neighbors, rebalance_infrastructure_layers,
+    resolve_x_overlaps, resolve_x_overlaps_with_gaps, uniform_initial_positions,
 };
 use super::layout::order::{build_layers, order_layers_group_aware};
 use super::layout::postprocess::clamp_to_canvas;
-use super::layout::constants::PADDING;
 use super::layout::rank::{assign_intra_ranks, assign_super_macro_ranks};
 use super::layout::types::{GraphIndex, GroupMap};
-use crate::layout::algorithm_config::ArchitectureV2LayoutConfig;
 use crate::ast::{Diagram, Group};
+use crate::layout::algorithm_config::ArchitectureV2LayoutConfig;
 use crate::layout::constants;
-use crate::layout::node::common::divide_and_conquer::{
-    GroupTree, IntraGroupLayouter, IntraLayout,
-};
+use crate::layout::group::constants::EPS;
+use crate::layout::node::common::divide_and_conquer::{GroupTree, IntraGroupLayouter, IntraLayout};
 use crate::layout::node::common::edge_gutter::estimate_side_gutters_with_hierarchy;
 use crate::layout::node::common::group_bounds::{
     compute_group_bounds, compute_group_bounds_with_side_gutters, container_padding_for_leaf,
     GroupPadding, SideGutter,
 };
-use crate::layout::group::constants::EPS;
 use crate::layout::{GroupLayout, LayoutResult, NodeLayout};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -115,13 +111,12 @@ pub(super) fn compute_two_phase_layout(
     layout_config: ArchitectureV2LayoutConfig,
 ) -> LayoutResult {
     // Phase D：默认用 asymmetric architecture_v2 壳；仅当 config 显式覆盖 group_padding 时退回 uniform
-    let padding = if (layout_config.group_padding - constants::ARCH_V2_GROUP_PADDING).abs()
-        < f64::EPSILON
-    {
-        GroupPadding::architecture_v2()
-    } else {
-        GroupPadding::uniform(layout_config.group_padding, GROUP_LABEL_HEIGHT)
-    };
+    let padding =
+        if (layout_config.group_padding - constants::ARCH_V2_GROUP_PADDING).abs() < f64::EPSILON {
+            GroupPadding::architecture_v2()
+        } else {
+            GroupPadding::uniform(layout_config.group_padding, GROUP_LABEL_HEIGHT)
+        };
     let canvas_padding = layout_config.padding;
 
     // ── Phase A: 组内布局（递归，支持嵌套分组）──
@@ -140,11 +135,17 @@ pub(super) fn compute_two_phase_layout(
     let (super_members, super_edges, pair_edge_counts, edge_weights) =
         build_super_graph(graph, group_map, reversed_edges);
     let group_decl = crate::layout::decl_order::group_sibling_decl_index(diagram);
-    let constraint_super_edges: HashSet<(String, String)> = diagram.constraints.iter()
+    let constraint_super_edges: HashSet<(String, String)> = diagram
+        .constraints
+        .iter()
         .filter_map(|c| {
             let from_super = super_node_id(c.from.as_str(), group_map);
             let to_super = super_node_id(c.to.as_str(), group_map);
-            if from_super != to_super { Some((from_super, to_super)) } else { None }
+            if from_super != to_super {
+                Some((from_super, to_super))
+            } else {
+                None
+            }
         })
         .collect();
     let macro_ranks = assign_super_macro_ranks(
@@ -267,7 +268,16 @@ fn phase_d_postprocess(
     // ── 后处理：基础设施行居中 ──
     // 从元数据重建全局层（替代旧版从 y 坐标反推）
     let layers = rebuild_layers_from_metadata(blocks, macro_ranks);
-    rebalance_infrastructure_layers(graph, group_map, &layers, sizes, nodes, reversed_edges);
+    rebalance_infrastructure_layers(
+        diagram,
+        graph,
+        group_map,
+        &layers,
+        sizes,
+        nodes,
+        reversed_edges,
+    );
+    enforce_horizontal_demand_gaps(diagram, &layers, sizes, nodes);
     clamp_to_canvas(nodes, sizes);
     // Phase F：同 leaf-group 内近邻 y 带节点微对齐（修小幅错位，不改层拓扑）
     align_intra_group_same_rank_y(diagram, nodes);
@@ -328,6 +338,30 @@ fn phase_d_postprocess(
             Some(&side_gutters),
         );
     }
+    // O2.3：group_frame 平移整组后重申 client↔hub 对称（曾稳定残留 ~8px 质心差）
+    align_client_nodes_to_hubs(
+        graph,
+        group_map,
+        &layers,
+        sizes,
+        &mut layout_scratch.nodes,
+        reversed_edges,
+    );
+    center_group_hub_nodes(
+        graph,
+        group_map,
+        &layers,
+        sizes,
+        &mut layout_scratch.nodes,
+        reversed_edges,
+    );
+    crate::layout::group_frame::expand_groups_to_contain_contents(
+        diagram,
+        &mut layout_scratch.groups,
+        &layout_scratch.nodes,
+        bounds_padding,
+        container_padding_for_leaf(bounds_padding),
+    );
     *nodes = layout_scratch.nodes;
     *groups = layout_scratch.groups;
     let max_side_gutter = side_gutters
@@ -349,7 +383,8 @@ fn phase_d_postprocess(
         canvas_area_delta_pct,
     };
 
-    // 空间契约：边感知间距写入 hints，并做一次水平缝 enforce
+    // 空间契约：边感知间距写入 hints，并做一次水平缝 enforce。
+    // 竖向 rank 缝由通用 refine/guard 依据最终 rank 元数据守约。
     let space_budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
     crate::layout::space_budget::enforce_horizontal_gaps(nodes, &space_budget);
     crate::layout::group_frame::expand_groups_to_contain_contents(
@@ -360,14 +395,10 @@ fn phase_d_postprocess(
         container_padding_for_leaf(bounds_padding),
     );
 
-    let (total_width, total_height) = crate::layout::node::common::canvas_bounds::canvas_size(
-        nodes,
-        groups,
-        PADDING,
-    );
+    let (total_width, total_height) =
+        crate::layout::node::common::canvas_bounds::canvas_size(nodes, groups, PADDING);
 
-    let sibling_corridors =
-        crate::layout::group::build_sibling_corridors(diagram, groups);
+    let sibling_corridors = crate::layout::group::build_sibling_corridors(diagram, groups);
     let corridors = crate::layout::group::merge_corridors(&sibling_corridors, groups);
     let group_routing = crate::layout::group::GroupRoutingHints {
         corridors,
@@ -420,10 +451,10 @@ fn layout_intra_group(
 
     if members.len() == 1 {
         let id = &members[0];
-        let (w, h) = sizes
-            .get(id)
-            .copied()
-            .unwrap_or((constants::DEFAULT_NODE_WIDTH, constants::DEFAULT_NODE_HEIGHT));
+        let (w, h) = sizes.get(id).copied().unwrap_or((
+            constants::DEFAULT_NODE_WIDTH,
+            constants::DEFAULT_NODE_HEIGHT,
+        ));
         return IntraLayout {
             nodes: HashMap::from([(
                 id.clone(),
@@ -462,13 +493,8 @@ fn layout_intra_group(
         .map(|(i, id)| (id.clone(), i))
         .collect();
     let layers = build_layers(&ranks, &decl_index);
-    let mut ordered_layers = order_layers_group_aware(
-        graph,
-        &intra_map,
-        &layers,
-        reversed,
-        &decl_index,
-    );
+    let mut ordered_layers =
+        order_layers_group_aware(graph, &intra_map, &layers, reversed, &decl_index);
 
     let member_set: HashSet<String> = members.iter().cloned().collect();
     let space_budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
@@ -481,8 +507,22 @@ fn layout_intra_group(
         reversed,
     );
 
-    center_group_hub_nodes(graph, &intra_map, &ordered_layers, sizes, &mut nodes, reversed);
-    align_client_nodes_to_hubs(graph, &intra_map, &ordered_layers, sizes, &mut nodes, reversed);
+    center_group_hub_nodes(
+        graph,
+        &intra_map,
+        &ordered_layers,
+        sizes,
+        &mut nodes,
+        reversed,
+    );
+    align_client_nodes_to_hubs(
+        graph,
+        &intra_map,
+        &ordered_layers,
+        sizes,
+        &mut nodes,
+        reversed,
+    );
 
     if mode == GroupLayoutMode::Vertical {
         align_nodes_in_column(&mut nodes);
@@ -501,7 +541,8 @@ fn layout_intra_group(
         let grid_mode = GroupLayoutMode::Grid;
         let ranks = assign_ranks_for_mode(&grid_mode, members, graph, reversed);
         let layers = build_layers(&ranks, &decl_index);
-        ordered_layers = order_layers_group_aware(graph, &intra_map, &layers, reversed, &decl_index);
+        ordered_layers =
+            order_layers_group_aware(graph, &intra_map, &layers, reversed, &decl_index);
         nodes = assign_coordinates_intra(
             graph,
             &ordered_layers,
@@ -510,8 +551,22 @@ fn layout_intra_group(
             Some(&space_budget),
             reversed,
         );
-        center_group_hub_nodes(graph, &intra_map, &ordered_layers, sizes, &mut nodes, reversed);
-        align_client_nodes_to_hubs(graph, &intra_map, &ordered_layers, sizes, &mut nodes, reversed);
+        center_group_hub_nodes(
+            graph,
+            &intra_map,
+            &ordered_layers,
+            sizes,
+            &mut nodes,
+            reversed,
+        );
+        align_client_nodes_to_hubs(
+            graph,
+            &intra_map,
+            &ordered_layers,
+            sizes,
+            &mut nodes,
+            reversed,
+        );
         normalize_to_origin(&mut nodes);
         (content_width, content_height) = content_bbox(&nodes);
     }
@@ -554,13 +609,7 @@ fn layout_intra_group_recursive(
     let mut child_intras: HashMap<String, IntraLayout> = HashMap::new();
     for child_id in children {
         let child_intra = layout_intra_group_recursive(
-            diagram,
-            child_id,
-            group_tree,
-            graph,
-            sizes,
-            reversed,
-            padding,
+            diagram, child_id, group_tree, graph, sizes, reversed, padding,
         );
         child_intras.insert(child_id.clone(), child_intra);
     }
@@ -614,14 +663,23 @@ fn layout_intra_group_recursive(
         build_super_graph_for_group(group_id, group_tree, graph, reversed);
     let group_decl = crate::layout::decl_order::group_sibling_decl_index(diagram);
     // 约束边映射到组内超级节点级别
-    let node_to_super: HashMap<&str, &str> = super_members.iter()
-        .flat_map(|(super_id, members)| members.iter().map(move |m| (m.as_str(), super_id.as_str())))
+    let node_to_super: HashMap<&str, &str> = super_members
+        .iter()
+        .flat_map(|(super_id, members)| {
+            members.iter().map(move |m| (m.as_str(), super_id.as_str()))
+        })
         .collect();
-    let constraint_super_edges: HashSet<(String, String)> = diagram.constraints.iter()
+    let constraint_super_edges: HashSet<(String, String)> = diagram
+        .constraints
+        .iter()
         .filter_map(|c| {
             let from_super = node_to_super.get(c.from.as_str())?;
             let to_super = node_to_super.get(c.to.as_str())?;
-            if from_super != to_super { Some((from_super.to_string(), to_super.to_string())) } else { None }
+            if from_super != to_super {
+                Some((from_super.to_string(), to_super.to_string()))
+            } else {
+                None
+            }
         })
         .collect();
     let macro_ranks = assign_super_macro_ranks(
@@ -753,10 +811,7 @@ fn build_super_graph_for_group(
         super_members.insert(child_id.clone(), group_tree.descendant_entities(child_id));
     }
     if !direct_entities.is_empty() {
-        super_members.insert(
-            format!("@direct:{group_id}"),
-            direct_entities.to_vec(),
-        );
+        super_members.insert(format!("@direct:{group_id}"), direct_entities.to_vec());
     }
 
     // 节点 → 所属超级节点
@@ -840,10 +895,8 @@ fn position_intra_macro_blocks(
             blocks[i].y = y_cursor;
         } else {
             // Iteration 2：band 内统一 lane_budget gap
-            let ordered_ids: Vec<String> = rank_indices
-                .iter()
-                .map(|&i| blocks[i].id.clone())
-                .collect();
+            let ordered_ids: Vec<String> =
+                rank_indices.iter().map(|&i| blocks[i].id.clone()).collect();
             let gap = band_uniform_gap(&ordered_ids, pair_edge_counts);
             let mut x_cursor = 0.0;
             for (pos, &i) in rank_indices.iter().enumerate() {
@@ -964,8 +1017,7 @@ fn compose_intra_layout_recursive(
     let mut layers: Vec<Vec<String>> = Vec::new();
     let mut sorted_blocks: Vec<&IntraMacroBlock> = blocks.iter().collect();
     sorted_blocks.sort_by(|a, b| {
-        a.y
-            .partial_cmp(&b.y)
+        a.y.partial_cmp(&b.y)
             .unwrap_or(std::cmp::Ordering::Equal)
             .then(a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal))
             .then(a.id.cmp(&b.id))
@@ -1028,7 +1080,9 @@ fn layout_ungrouped_cluster(
         &layers,
         sizes,
         &member_set,
-        Some(&crate::layout::space_budget::SpaceBudget::from_diagram(diagram)),
+        Some(&crate::layout::space_budget::SpaceBudget::from_diagram(
+            diagram,
+        )),
         reversed,
     );
     normalize_to_origin(&mut nodes);
@@ -1144,10 +1198,10 @@ fn assign_coordinates_intra(
         };
 
         for (i, node) in layer.iter().enumerate() {
-            let (width, height) = sizes
-                .get(node)
-                .copied()
-                .unwrap_or((constants::DEFAULT_NODE_WIDTH, constants::DEFAULT_NODE_HEIGHT));
+            let (width, height) = sizes.get(node).copied().unwrap_or((
+                constants::DEFAULT_NODE_WIDTH,
+                constants::DEFAULT_NODE_HEIGHT,
+            ));
             let x_center = adjusted[i];
             nodes.insert(
                 node.clone(),
@@ -1181,8 +1235,14 @@ fn content_bbox(nodes: &HashMap<String, NodeLayout>) -> (f64, f64) {
     if nodes.is_empty() {
         return (0.0, 0.0);
     }
-    let max_x = nodes.values().map(|n| n.x + n.width).fold(0.0_f64, f64::max);
-    let max_y = nodes.values().map(|n| n.y + n.height).fold(0.0_f64, f64::max);
+    let max_x = nodes
+        .values()
+        .map(|n| n.x + n.width)
+        .fold(0.0_f64, f64::max);
+    let max_y = nodes
+        .values()
+        .map(|n| n.y + n.height)
+        .fold(0.0_f64, f64::max);
     (max_x, max_y)
 }
 
@@ -1262,15 +1322,12 @@ fn build_macro_blocks(
     let mut blocks = Vec::new();
 
     for gid in &group_map.top_groups {
-        let intra = intra_by_group
-            .get(gid)
-            .cloned()
-            .unwrap_or(IntraLayout {
-                nodes: HashMap::new(),
-                content_width: 0.0,
-                content_height: 0.0,
-                layers: vec![],
-            });
+        let intra = intra_by_group.get(gid).cloned().unwrap_or(IntraLayout {
+            nodes: HashMap::new(),
+            content_width: 0.0,
+            content_height: 0.0,
+            layers: vec![],
+        });
         blocks.push(MacroBlock {
             id: gid.clone(),
             is_group: true,
@@ -1365,16 +1422,12 @@ fn adaptive_vertical_rank_gap<B: super::group_sizing::GroupWidthBlock>(
 
     let mut ids_a: Vec<String> = blocks
         .iter()
-        .filter(|b| {
-            b.is_group_block() && macro_ranks.get(b.block_id()).copied() == Some(rank)
-        })
+        .filter(|b| b.is_group_block() && macro_ranks.get(b.block_id()).copied() == Some(rank))
         .map(|b| b.block_id().to_string())
         .collect();
     let mut ids_b: Vec<String> = blocks
         .iter()
-        .filter(|b| {
-            b.is_group_block() && macro_ranks.get(b.block_id()).copied() == Some(rank + 1)
-        })
+        .filter(|b| b.is_group_block() && macro_ranks.get(b.block_id()).copied() == Some(rank + 1))
         .map(|b| b.block_id().to_string())
         .collect();
     ids_a.sort();
@@ -1391,8 +1444,8 @@ fn adaptive_vertical_rank_gap<B: super::group_sizing::GroupWidthBlock>(
             pair_max = pair_max.max(pair_edge_counts.get(&pair).copied().unwrap_or(0));
         }
     }
-    let from_pair = (pair_max as f64 * CROSS_EDGE_PAIR_VERTICAL_GAP_SCALE)
-        .min(MAX_EXTRA_PAIR_VERTICAL_GAP);
+    let from_pair =
+        (pair_max as f64 * CROSS_EDGE_PAIR_VERTICAL_GAP_SCALE).min(MAX_EXTRA_PAIR_VERTICAL_GAP);
 
     from_rank.max(from_pair)
 }
@@ -1461,10 +1514,8 @@ fn position_macro_blocks(
             blocks[i].y = y_cursor;
         } else {
             // Iteration 2：band 内统一 lane_budget gap（取相邻 pair 最大值）
-            let ordered_ids: Vec<String> = rank_indices
-                .iter()
-                .map(|&i| blocks[i].id.clone())
-                .collect();
+            let ordered_ids: Vec<String> =
+                rank_indices.iter().map(|&i| blocks[i].id.clone()).collect();
             let gap = band_uniform_gap(&ordered_ids, pair_edge_counts);
             let mut x_cursor = canvas_padding;
             for (pos, &i) in rank_indices.iter().enumerate() {
@@ -1620,8 +1671,7 @@ fn equalize_top_leaf_egb_deltas(
             continue;
         };
         let budget = side_gutters.get(gid).copied().unwrap_or_default();
-        let have_h =
-            (budget.left - base.left).max(0.0) + (budget.right - base.right).max(0.0);
+        let have_h = (budget.left - base.left).max(0.0) + (budget.right - base.right).max(0.0);
         // merge 时 lock_left，实际已扩的是 right 侧的 have_r
         let have_r = (budget.right - base.right).max(0.0);
         let have_t = (budget.top - base.top).max(0.0);
@@ -1712,8 +1762,10 @@ fn nudge_intra_nodes_toward_cross_group_edges(
     nudge_cross_group_y_alignment(nodes, super_edges, super_members, graph, reversed);
 
     // ── x 微调阶段（原有逻辑） ──
-    let node_targets = collect_cross_group_node_targets(super_edges, super_members, graph, reversed, nodes);
-    let group_node_targets = compute_group_node_targets(&node_targets, super_members, graph, reversed, nodes);
+    let node_targets =
+        collect_cross_group_node_targets(super_edges, super_members, graph, reversed, nodes);
+    let group_node_targets =
+        compute_group_node_targets(&node_targets, super_members, graph, reversed, nodes);
     apply_nudge_per_group(&group_node_targets, groups, nodes);
 }
 
@@ -1766,10 +1818,7 @@ fn collect_cross_group_node_targets(
                     continue;
                 };
                 let from_cx = from_nl.x + from_nl.width / 2.0;
-                node_targets
-                    .entry(succ.clone())
-                    .or_default()
-                    .push(from_cx);
+                node_targets.entry(succ.clone()).or_default().push(from_cx);
             }
         }
     }
@@ -1808,9 +1857,9 @@ fn compute_group_node_targets(
             .out_edges
             .get(node_id)
             .map(|succs| {
-                succs.iter().any(|s| {
-                    group_members.contains(s) && is_effective_edge(node_id, s, reversed)
-                })
+                succs
+                    .iter()
+                    .any(|s| group_members.contains(s) && is_effective_edge(node_id, s, reversed))
             })
             .unwrap_or(false);
         if has_intra_successors {
@@ -1820,10 +1869,11 @@ fn compute_group_node_targets(
         let current_cx = nl.x + nl.width / 2.0;
         let avg_target = targets.iter().sum::<f64>() / targets.len() as f64;
 
-        group_node_targets
-            .entry(gid.clone())
-            .or_default()
-            .push((node_id.clone(), current_cx, avg_target));
+        group_node_targets.entry(gid.clone()).or_default().push((
+            node_id.clone(),
+            current_cx,
+            avg_target,
+        ));
     }
     group_node_targets
 }
@@ -1853,7 +1903,9 @@ fn apply_nudge_per_group(
 
         // 动态位移上限：基于组宽和固定上限取小
         let width_based_cap = available_width * CROSS_GROUP_NUDGE_WIDTH_RATIO;
-        let dynamic_cap = width_based_cap.min(CROSS_GROUP_NUDGE_MAX).max(CROSS_GROUP_NUDGE_BASE);
+        let dynamic_cap = width_based_cap
+            .min(CROSS_GROUP_NUDGE_MAX)
+            .max(CROSS_GROUP_NUDGE_BASE);
 
         // 计算每个节点的期望新 x（左上角），保持原有顺序
         let mut planned: Vec<(String, f64, f64)> = entries
@@ -1940,11 +1992,7 @@ fn align_intra_group_same_rank_y(diagram: &Diagram, nodes: &mut HashMap<String, 
         }
         let mut items: Vec<(String, f64)> = members
             .iter()
-            .filter_map(|id| {
-                nodes
-                    .get(id)
-                    .map(|nl| (id.clone(), nl.y + nl.height / 2.0))
-            })
+            .filter_map(|id| nodes.get(id).map(|nl| (id.clone(), nl.y + nl.height / 2.0)))
             .collect();
         if items.len() < 2 {
             continue;
@@ -2128,10 +2176,10 @@ mod tests {
         ArrowType, AttributeMap, AttributeValue, Diagram, DiagramAttribute, Entity, Group,
         Identifier, Relation, SourceInfo, Span, TextValue,
     };
-    use crate::types::DiagramType;
     use crate::layout::constants;
     use crate::layout::node::architecture_v2::ArchitectureV2Layout;
     use crate::layout::LayoutStrategy;
+    use crate::types::DiagramType;
 
     fn entity_in_group(id: &str, label: &str, group: &str) -> Entity {
         Entity {
@@ -2168,9 +2216,10 @@ mod tests {
 
     fn make_group_with_layout(id: &str, label: &str, layout: &str, entity_ids: Vec<&str>) -> Group {
         let mut attrs = AttributeMap::default();
-        attrs
-            .standard
-            .insert("layout".to_string(), AttributeValue::String(TextValue::unquoted(layout.to_string())));
+        attrs.standard.insert(
+            "layout".to_string(),
+            AttributeValue::String(TextValue::unquoted(layout.to_string())),
+        );
         Group {
             id: Identifier::new_unchecked(id),
             label: label.to_string(),
@@ -2229,14 +2278,24 @@ mod tests {
                 relation("clickhouse", "bi"),
             ],
             groups: vec![
-                make_group_with_layout("source", "数据源层", "horizontal", vec!["app_db", "log_server"]),
+                make_group_with_layout(
+                    "source",
+                    "数据源层",
+                    "horizontal",
+                    vec!["app_db", "log_server"],
+                ),
                 make_group_with_layout(
                     "process",
                     "数据计算层",
                     "fan-out",
                     vec!["kafka", "flink", "spark"],
                 ),
-                make_group_with_layout("storage", "数据存储层", "vertical", vec!["hive", "clickhouse"]),
+                make_group_with_layout(
+                    "storage",
+                    "数据存储层",
+                    "vertical",
+                    vec!["hive", "clickhouse"],
+                ),
             ],
             style_decls: vec![],
             source_info: SourceInfo {
@@ -2314,8 +2373,8 @@ mod tests {
 
     #[test]
     fn group_frame_track_uniform_maps_to_equal_policy() {
-        use crate::layout::group_frame::{resolve_group_frame_spec, TrackSizing};
         use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
+        use crate::layout::group_frame::{resolve_group_frame_spec, TrackSizing};
 
         let d = etl_diagram_with_track(Some("uniform"));
         let spec = resolve_group_frame_spec(&d, "architecture");
@@ -2332,8 +2391,8 @@ mod tests {
 
     #[test]
     fn group_frame_track_fit_maps_to_fit_policy() {
-        use crate::layout::group_frame::{resolve_group_frame_spec, TrackSizing};
         use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
+        use crate::layout::group_frame::{resolve_group_frame_spec, TrackSizing};
 
         let d = etl_diagram_with_track(Some("fit"));
         assert_eq!(
@@ -2345,8 +2404,8 @@ mod tests {
 
     #[test]
     fn architecture_default_track_is_equal() {
-        use crate::layout::group_frame::{resolve_group_frame_spec, TrackSizing};
         use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
+        use crate::layout::group_frame::{resolve_group_frame_spec, TrackSizing};
 
         let d = etl_diagram_with_track(None);
         assert_eq!(

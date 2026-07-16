@@ -365,6 +365,174 @@ pub fn enforce_reverse_pair_min_gap(
     shifted
 }
 
+/// 正反向对在同一节点同一侧不得共锚（轨道 A）。
+///
+/// `enforce_reverse_pair_min_gap` 只保证干线间距；落点仍可能被 straighten / 通道
+/// 评分挤到同一 (x,y)。本函数在路径最终阶段拉开同侧 dock 的切向坐标，并带动
+/// 相邻 stub 点以保持外向 stub。
+pub fn enforce_reverse_pair_dock_separation(
+    edges: &mut [EdgeLayout],
+    relations: &[Relation],
+    nodes: &HashMap<String, NodeLayout>,
+    from_side: &[Port],
+    to_side: &[Port],
+    min_gap: f64,
+) -> usize {
+    use crate::layout::edge::common::edge_geometry::{canonical_pair, undirected_pair_key};
+
+    let n = edges.len().min(relations.len());
+    if n < 2 || min_gap <= EPS {
+        return 0;
+    }
+
+    let mut pair_groups: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+    for (i, rel) in relations.iter().enumerate().take(n) {
+        let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
+        pair_groups.entry(key).or_default().push(i);
+    }
+
+    let mut fixed = 0usize;
+    for indices in pair_groups.values() {
+        if indices.len() < 2 {
+            continue;
+        }
+        let rel0 = &relations[indices[0]];
+        let (can_from, can_to) = canonical_pair(rel0.from.as_str(), rel0.to.as_str());
+        let mut forward: Vec<usize> = Vec::new();
+        let mut backward: Vec<usize> = Vec::new();
+        for &i in indices {
+            let rel = &relations[i];
+            if rel.from.as_str() == can_from && rel.to.as_str() == can_to {
+                forward.push(i);
+            } else {
+                backward.push(i);
+            }
+        }
+        if forward.is_empty() || backward.is_empty() {
+            continue;
+        }
+        let fi = forward[0];
+        let bi = backward[0];
+        if edges[fi].path_is_empty() || edges[bi].path_is_empty() {
+            continue;
+        }
+
+        // 每个端点节点：若正反向落在同一侧，拉开 dock
+        for node_id in [can_from, can_to] {
+            let Some(nl) = nodes.get(node_id) else {
+                continue;
+            };
+            let (side_f, at_start_f) = if relations[fi].from.as_str() == node_id {
+                (from_side[fi], true)
+            } else if relations[fi].to.as_str() == node_id {
+                (to_side[fi], false)
+            } else {
+                continue;
+            };
+            let (side_b, at_start_b) = if relations[bi].from.as_str() == node_id {
+                (from_side[bi], true)
+            } else if relations[bi].to.as_str() == node_id {
+                (to_side[bi], false)
+            } else {
+                continue;
+            };
+            if side_f != side_b {
+                continue;
+            }
+
+            let mut pa: Vec<Point> = edges[fi].path_points().into_owned();
+            let mut pb: Vec<Point> = edges[bi].path_points().into_owned();
+            if pa.len() < 2 || pb.len() < 2 {
+                continue;
+            }
+
+            let vertical = is_vertical_port(side_f);
+            let (ta, tb) = if vertical {
+                let xa = if at_start_f { pa[0].x } else { pa[pa.len() - 1].x };
+                let xb = if at_start_b { pb[0].x } else { pb[pb.len() - 1].x };
+                (xa, xb)
+            } else {
+                let ya = if at_start_f { pa[0].y } else { pa[pa.len() - 1].y };
+                let yb = if at_start_b { pb[0].y } else { pb[pb.len() - 1].y };
+                (ya, yb)
+            };
+            if (ta - tb).abs() + 0.5 >= min_gap {
+                continue;
+            }
+
+            let mid = (ta + tb) * 0.5;
+            let (lo, hi) = if vertical {
+                let margin = nl.width * SLOT_MARGIN_RATIO;
+                (nl.x + margin, nl.x + nl.width - margin)
+            } else {
+                let margin = nl.height * SLOT_MARGIN_RATIO;
+                (nl.y + margin, nl.y + nl.height - margin)
+            };
+            let span = (hi - lo).max(0.0);
+            if span < 1.0 {
+                continue;
+            }
+            // 在可用边长内尽量达到 min_gap；边太窄则用满可用跨度（不强制贴死两端除非不够）
+            let use_gap = min_gap.min(span);
+            let mut left = mid - use_gap * 0.5;
+            let mut right = mid + use_gap * 0.5;
+            if left < lo {
+                right += lo - left;
+                left = lo;
+            }
+            if right > hi {
+                left -= right - hi;
+                right = hi;
+            }
+            left = left.clamp(lo, hi);
+            right = right.clamp(lo, hi);
+            let (a2, b2) = if fi <= bi {
+                (left, right)
+            } else {
+                (right, left)
+            };
+
+            shift_dock_tangent(&mut pa, at_start_f, vertical, a2);
+            shift_dock_tangent(&mut pb, at_start_b, vertical, b2);
+            edges[fi].set_polyline_points(pa);
+            edges[bi].set_polyline_points(pb);
+            fixed += 2;
+        }
+    }
+    fixed
+}
+
+/// 将路径在指定端的 dock（及紧邻 stub，若共切向）移到新切向坐标。
+fn shift_dock_tangent(pts: &mut [Point], at_start: bool, vertical: bool, new_tangent: f64) {
+    if pts.len() < 2 {
+        return;
+    }
+    let (dock_i, stub_i) = if at_start {
+        (0usize, 1usize)
+    } else {
+        (pts.len() - 1, pts.len() - 2)
+    };
+    let old = if vertical { pts[dock_i].x } else { pts[dock_i].y };
+    if vertical {
+        pts[dock_i].x = new_tangent;
+    } else {
+        pts[dock_i].y = new_tangent;
+    }
+    // stub 与 dock 共竖/共横时一并移动，保持 PORT_CLEARANCE 外向段
+    let stub_shares = if vertical {
+        (pts[stub_i].x - old).abs() < 1.0
+    } else {
+        (pts[stub_i].y - old).abs() < 1.0
+    };
+    if stub_shares {
+        if vertical {
+            pts[stub_i].x = new_tangent;
+        } else {
+            pts[stub_i].y = new_tangent;
+        }
+    }
+}
+
 /// X-3: 主入口——车道分配，分离残余平行重合段。
 ///
 /// 算法步骤：

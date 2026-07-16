@@ -1,7 +1,9 @@
-//! 层通道预算（S2）：邻层边带需求 → 布局阶段 layer gap 下界。
+//! 层通道预算（S2）：邻层边带 / 同排水平走廊需求 → 布局阶段 gap 下界。
 //!
 //! 写权：仅布局（Sugiyama / architecture coordinate / two_phase macro rank）。
-//! 路由后禁止用本模块补竖缝。
+//! 路由后禁止用本模块补缝。
+//!
+//! 设计：按 demand 预测，而非「无组固定加宽」——简单图 demand 低时仍落在 base_gap。
 
 use crate::ast::{ArrowType, Relation};
 use crate::types::DiagramType;
@@ -26,23 +28,52 @@ pub struct EdgeBandDemandProfile {
     pub side_channel_base: f64,
     /// S4：侧通道 gutter 上限（px）
     pub side_channel_max: f64,
+    /// 同排相邻节点：跨层边 × parallel_gap × 本系数 → 水平走廊
+    pub horizontal_parallel_scale: f64,
+    /// 同排相邻：跨层有标签边每条的水平带宽
+    pub horizontal_label_per: f64,
+    /// 同排水平走廊相对 NODE_GAP 的额外上限
+    pub horizontal_max_extra: f64,
 }
 
 impl EdgeBandDemandProfile {
+    /// 仅知图种时保守按「有组」处理（不抬无组可读余量）。
     pub fn for_diagram_type(dt: DiagramType) -> Self {
+        Self::for_diagram(dt, true)
+    }
+
+    /// `has_groups=false` 的 architecture：抬竖直可读系数 + 启水平走廊 demand。
+    /// 系数仍乘在 demand 上——边少/无标签时 gap 不会超过 base。
+    pub fn for_diagram(dt: DiagramType, has_groups: bool) -> Self {
         match dt {
-            DiagramType::Architecture => Self {
-                // S5：抬标签带宽；S4.x：侧通道小 gutter（无组监控外环占位）
-                parallel_scale: 0.55,
-                fanin_scale: 0.35,
-                label_band: 32.0,
-                label_per_edge: 4.0,
-                max_extra: 48.0,
-                // S4.x：很小侧廊，避免画布膨胀；有组路径不消费本 profile 的侧 gutter
-                side_channel_scale: 0.4,
-                side_channel_base: 12.0,
-                side_channel_max: 20.0,
-            },
+            DiagramType::Architecture => {
+                let mut p = Self {
+                    parallel_scale: 0.55,
+                    fanin_scale: 0.35,
+                    label_band: 32.0,
+                    label_per_edge: 4.0,
+                    max_extra: 48.0,
+                    side_channel_scale: 0.4,
+                    side_channel_base: 12.0,
+                    side_channel_max: 20.0,
+                    horizontal_parallel_scale: 0.0,
+                    horizontal_label_per: 0.0,
+                    horizontal_max_extra: 0.0,
+                };
+                if !has_groups {
+                    // 竖直：给挤廊图更多可读余量（demand 高才吃到 cap）
+                    p.parallel_scale = 0.65;
+                    p.fanin_scale = 0.42;
+                    p.label_band = 40.0;
+                    p.label_per_edge = 8.0;
+                    p.max_extra = 88.0;
+                    // 水平：同排节点间按跨层边/标签预测走廊
+                    p.horizontal_parallel_scale = 0.45;
+                    p.horizontal_label_per = 10.0;
+                    p.horizontal_max_extra = 56.0;
+                }
+                p
+            }
             _ => Self {
                 parallel_scale: 0.4,
                 fanin_scale: 0.2,
@@ -52,6 +83,9 @@ impl EdgeBandDemandProfile {
                 side_channel_scale: 0.0,
                 side_channel_base: 0.0,
                 side_channel_max: 0.0,
+                horizontal_parallel_scale: 0.0,
+                horizontal_label_per: 0.0,
+                horizontal_max_extra: 0.0,
             },
         }
     }
@@ -156,6 +190,54 @@ pub fn demand_extra_over_base(
     (target - base_gap).max(0.0)
 }
 
+/// 同排相邻节点水平缝：按两端跨层边/标签 demand 加宽（需求低则 ≈ base）。
+pub fn adjacent_rank_gap(
+    left: &str,
+    right: &str,
+    layer_ids: &HashSet<&str>,
+    relations: &[Relation],
+    base_gap: f64,
+    parallel_gap: f64,
+    profile: EdgeBandDemandProfile,
+) -> f64 {
+    if profile.horizontal_max_extra <= 0.0 {
+        return base_gap;
+    }
+    let (c_l, l_l) = node_cross_layer_stats(left, layer_ids, relations);
+    let (c_r, l_r) = node_cross_layer_stats(right, layer_ids, relations);
+    let demand = ((c_l + c_r) as f64) * parallel_gap * profile.horizontal_parallel_scale
+        + ((l_l + l_r) as f64) * profile.horizontal_label_per;
+    base_gap + demand.min(profile.horizontal_max_extra)
+}
+
+fn node_cross_layer_stats(
+    node: &str,
+    layer_ids: &HashSet<&str>,
+    relations: &[Relation],
+) -> (usize, usize) {
+    let mut crossing = 0usize;
+    let mut labeled = 0usize;
+    for rel in relations {
+        let from = rel.from.as_str();
+        let to = rel.to.as_str();
+        let other = if from == node {
+            to
+        } else if to == node {
+            from
+        } else {
+            continue;
+        };
+        if layer_ids.contains(other) {
+            continue;
+        }
+        crossing += 1;
+        if rel.label.is_some() || rel.head_label.is_some() || rel.tail_label.is_some() {
+            labeled += 1;
+        }
+    }
+    (crossing, labeled)
+}
+
 /// S4：监控枢纽侧通道水平 gutter（TB 布局左右外环占位）。
 ///
 /// 谓词与 `feedback_side::monitor_hub_edge_indices` 一致：同目标被动入边 ≥ 3。
@@ -218,7 +300,8 @@ mod tests {
             rel("a", "redis", None),
             rel("b", "redis", None),
         ];
-        let profile = EdgeBandDemandProfile::for_diagram_type(DiagramType::Architecture);
+        // 有组语义：与历史系数一致
+        let profile = EdgeBandDemandProfile::for_diagram(DiagramType::Architecture, true);
         let d1 = edge_band_demand(&upper, &lower, &relations, 12.0, profile);
         let d2 = edge_band_demand(&upper, &lower, &relations, 12.0, profile);
         assert_eq!(d1, d2);
@@ -227,6 +310,44 @@ mod tests {
         assert_eq!(d1.max_fanout, 2);
         // 5*12*0.55 + 3*12*0.35 + 3*4 + 32 = 33 + 12.6 + 12 + 32 = 89.6
         assert!((d1.demand - 89.6).abs() < 1e-9);
+    }
+
+    #[test]
+    fn ungrouped_raises_demand_but_sparse_stays_at_base() {
+        let layers = vec![vec!["a".into()], vec!["b".into()]];
+        let relations = vec![rel("a", "b", None)];
+        let profile = EdgeBandDemandProfile::for_diagram(DiagramType::Architecture, false);
+        let gaps = layer_gaps_from_demand(&layers, &relations, 72.0, 12.0, profile);
+        // demand = 1*12*0.65 + 40 = 47.8 < 72 → 仍 base
+        assert!((gaps[0] - 72.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn adjacent_rank_gap_scales_with_cross_layer_labels() {
+        let layer: HashSet<&str> = ["order", "user"].into_iter().collect();
+        let relations = vec![
+            rel("order", "pg", Some("rw")),
+            rel("order", "kafka", Some("ev")),
+            rel("user", "pg", Some("rw")),
+            rel("user", "kafka", Some("ev")),
+        ];
+        let profile = EdgeBandDemandProfile::for_diagram(DiagramType::Architecture, false);
+        let g = adjacent_rank_gap(
+            "order",
+            "user",
+            &layer,
+            &relations,
+            32.0,
+            12.0,
+            profile,
+        );
+        // c=2+2, l=2+2 → 4*12*0.45 + 4*10 = 21.6+40 = 61.6 → cap 56 → 32+56
+        assert!((g - 88.0).abs() < 1e-9);
+        let grouped = EdgeBandDemandProfile::for_diagram(DiagramType::Architecture, true);
+        assert_eq!(
+            adjacent_rank_gap("order", "user", &layer, &relations, 32.0, 12.0, grouped),
+            32.0
+        );
     }
 
     #[test]
@@ -245,6 +366,9 @@ mod tests {
             side_channel_scale: 0.0,
             side_channel_base: 0.0,
             side_channel_max: 0.0,
+            horizontal_parallel_scale: 0.0,
+            horizontal_label_per: 0.0,
+            horizontal_max_extra: 0.0,
         };
         let gaps = layer_gaps_from_demand(&layers, &relations, 72.0, 12.0, profile);
         assert_eq!(gaps.len(), 1);
@@ -287,7 +411,7 @@ mod tests {
             },
         ];
         let profile = EdgeBandDemandProfile::for_diagram_type(DiagramType::Architecture);
-        // S4.x：architecture 侧通道已开小系数；3 被动入边 → lanes=2
+        // 有组默认：侧通道仍开小系数；3 被动入边 → lanes=2
         // 2*12*0.4 + 12 = 21.6，cap 20 → 20
         let g = side_channel_gutter(&relations, 12.0, profile);
         assert!((g - 20.0).abs() < 1e-9);

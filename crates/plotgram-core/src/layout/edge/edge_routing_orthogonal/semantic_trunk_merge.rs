@@ -57,7 +57,10 @@ fn is_vertical_port(p: Port) -> bool {
     matches!(p, Port::Top | Port::Bottom)
 }
 
-/// C 阶段：仅无分组 architecture 执行 FanIn 合流（有组大图易抬 tight / 穿模）。
+/// C 阶段：architecture FanIn 合流。
+///
+/// - 无组：全开（S3）
+/// - 有组（S3.2b）：同样尝试；`try_merge_fan_in` 穿模则 degraded，不改路径
 pub fn apply_semantic_trunk_merge(
     edges: &mut [EdgeLayout],
     relations: &[Relation],
@@ -65,17 +68,58 @@ pub fn apply_semantic_trunk_merge(
     to_side: &[Port],
     nodes: &HashMap<String, NodeLayout>,
     diagram_type: DiagramType,
-    has_groups: bool,
+    _has_groups: bool,
+) -> SemanticTrunkMergeResult {
+    apply_semantic_trunk_merge_filtered(
+        edges,
+        relations,
+        from_side,
+        to_side,
+        nodes,
+        diagram_type,
+        None,
+    )
+}
+
+/// S4 之后对监控边做目标局部合流；只改 `allowed_edges`，不把监控干混入业务干。
+pub fn apply_monitor_local_trunk_merge(
+    edges: &mut [EdgeLayout],
+    relations: &[Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+    nodes: &HashMap<String, NodeLayout>,
+    diagram_type: DiagramType,
+    allowed_edges: &HashSet<usize>,
+) -> SemanticTrunkMergeResult {
+    apply_semantic_trunk_merge_filtered(
+        edges,
+        relations,
+        from_side,
+        to_side,
+        nodes,
+        diagram_type,
+        Some(allowed_edges),
+    )
+}
+
+fn apply_semantic_trunk_merge_filtered(
+    edges: &mut [EdgeLayout],
+    relations: &[Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+    nodes: &HashMap<String, NodeLayout>,
+    diagram_type: DiagramType,
+    allowed_edges: Option<&HashSet<usize>>,
 ) -> SemanticTrunkMergeResult {
     let mut out = SemanticTrunkMergeResult::default();
-    if !matches!(diagram_type, DiagramType::Architecture) || has_groups {
+    if !matches!(diagram_type, DiagramType::Architecture) {
         return out;
     }
     if relations.len() != edges.len() {
         return out;
     }
 
-    let groups = collect_semantic_merge_groups(relations, from_side, to_side);
+    let groups = collect_semantic_merge_groups(relations, to_side, allowed_edges);
     out.stats.groups_considered = groups.len();
 
     let mut claimed: HashSet<usize> = HashSet::new();
@@ -93,14 +137,7 @@ pub fn apply_semantic_trunk_merge(
         members.sort_unstable();
 
         let ok = try_merge_fan_in(
-            &members,
-            edges,
-            relations,
-            from_side,
-            to_side,
-            nodes,
-            &key,
-            &mut out,
+            &members, edges, relations, from_side, to_side, nodes, &key, &mut out,
         );
         if ok {
             out.stats.groups_merged += 1;
@@ -121,12 +158,15 @@ pub fn apply_semantic_trunk_merge(
 
 fn collect_semantic_merge_groups(
     relations: &[Relation],
-    from_side: &[Port],
     to_side: &[Port],
+    allowed_edges: Option<&HashSet<usize>>,
 ) -> BTreeMap<SemanticMergeKey, Vec<usize>> {
     let mut fanin: BTreeMap<SemanticMergeKey, Vec<usize>> = BTreeMap::new();
 
     for (ei, rel) in relations.iter().enumerate() {
+        if allowed_edges.is_some_and(|allowed| !allowed.contains(&ei)) {
+            continue;
+        }
         let ts = to_side.get(ei).copied().unwrap_or(Port::Top);
         let ctx = EdgeMergeContext {
             from_id: rel.from.as_str(),
@@ -183,57 +223,45 @@ fn try_merge_fan_in(
         return false;
     }
 
-    let mut ends: Vec<(usize, Point, Point, Port)> = Vec::new();
+    let mut ends: Vec<(usize, Vec<Point>, Point)> = Vec::new();
     for &ei in members {
-        let pts = edges[ei].path_points();
+        let pts: Vec<Point> = edges[ei].path_points().into_owned();
         if pts.len() < 2 {
             return false;
         }
-        let start = pts[0];
         let end = *pts.last().unwrap();
-        ends.push((ei, start, end, from_side[ei]));
+        ends.push((ei, pts, end));
     }
 
-    let mut end_xs: Vec<f64> = ends.iter().map(|(_, _, e, _)| e.x).collect();
+    let mut end_xs: Vec<f64> = ends.iter().map(|(_, _, e)| e.x).collect();
     end_xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let trunk_x = end_xs[end_xs.len() / 2];
 
-    let (tox, toy) = port_outward(to_port);
-    // 所有边应落在同一目标节点顶/底 → to_stub.y 一致
-    let to_stub_ys: Vec<f64> = ends
-        .iter()
-        .map(|(_, _, e, _)| e.y + toy * PORT_CLEARANCE)
-        .collect();
-    let fork_y = if toy < 0.0 {
-        to_stub_ys.iter().cloned().fold(f64::INFINITY, f64::min)
-    } else {
-        to_stub_ys.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+    let (_, toy) = port_outward(to_port);
+    let end_y = ends[0].2.y;
+    if !ends.iter().all(|(_, _, end)| (end.y - end_y).abs() <= 1.0) {
+        return false;
+    }
+    let fork_y = end_y + toy * PORT_CLEARANCE;
+    // 同 rank、同出侧的源节点优先在源 stub 后立即合流，保证 pendant fan-in 对称；
+    // 其它情况（监控外环等）只改目标局部 suffix。
+    let aligned_source_join = {
+        let fp = from_side[members[0]];
+        if !is_vertical_port(fp) || !members.iter().all(|&ei| from_side[ei] == fp) {
+            None
+        } else {
+            let (_, foy) = port_outward(fp);
+            let ys: Vec<f64> = ends
+                .iter()
+                .map(|(_, path, _)| path[0].y + foy * PORT_CLEARANCE)
+                .collect();
+            let y0 = ys[0];
+            ys.iter().all(|y| (y - y0).abs() <= 1.0).then_some(y0)
+        }
     };
-
-    let from_stub_ys: Vec<f64> = ends
-        .iter()
-        .map(|(_, s, _, fp)| {
-            let (ox, oy) = port_outward(*fp);
-            s.y + oy * PORT_CLEARANCE
-        })
-        .collect();
-    // 共享干线起点：在源 stub 与 fork 之间留够 MIN_SHARED
-    let join_y = if toy < 0.0 {
-        // Top 汇入：y 向下增大；from_stub.y < fork_y < end.y
-        let max_from = from_stub_ys
-            .iter()
-            .cloned()
-            .fold(f64::NEG_INFINITY, f64::max);
-        let desired = fork_y - MIN_SHARED_TRUNK_LEN.max(32.0);
-        desired.max(max_from + 4.0)
-    } else {
-        // Bottom 汇入：从下方上来
-        let min_from = from_stub_ys.iter().cloned().fold(f64::INFINITY, f64::min);
-        let desired = fork_y + MIN_SHARED_TRUNK_LEN.max(32.0);
-        desired.min(min_from - 4.0)
-    };
-
-    if (fork_y - join_y).abs() + EPS < MIN_SHARED_TRUNK_LEN {
+    let join_y =
+        aligned_source_join.unwrap_or_else(|| fork_y + toy * MIN_SHARED_TRUNK_LEN.max(32.0));
+    if (join_y - fork_y).abs() + EPS < MIN_SHARED_TRUNK_LEN {
         return false;
     }
 
@@ -247,35 +275,44 @@ fn try_merge_fan_in(
     };
 
     let mut new_paths: Vec<(usize, Vec<Point>)> = Vec::new();
-    for &(ei, start, end, fp) in &ends {
-        let (fox, foy) = port_outward(fp);
-        let from_stub = Point::new(start.x + fox * PORT_CLEARANCE, start.y + foy * PORT_CLEARANCE);
-        let to_stub = Point::new(end.x + tox * PORT_CLEARANCE, end.y + toy * PORT_CLEARANCE);
-
-        let mut pts = vec![start, from_stub];
-        // 走到共享干线入口
-        if (from_stub.x - trunk_x).abs() > EPS {
-            pts.push(Point::new(trunk_x, from_stub.y));
+    for (ei, old_path, end) in &ends {
+        let mut pts = if aligned_source_join.is_some() {
+            let start = old_path[0];
+            let (fox, foy) = port_outward(from_side[*ei]);
+            vec![
+                start,
+                Point::new(
+                    start.x + fox * PORT_CLEARANCE,
+                    start.y + foy * PORT_CLEARANCE,
+                ),
+            ]
+        } else {
+            // 只重写目标附近 suffix：源端 stub、走廊选择与绕障前缀保持原路由写者的结果。
+            let Some(prefix) = prefix_through_horizontal_cut(old_path, join_y) else {
+                return false;
+            };
+            prefix
+        };
+        let branch = *pts.last().unwrap();
+        let join = Point::new(trunk_x, join_y);
+        if (branch.x - join.x).abs() > EPS || (branch.y - join.y).abs() > EPS {
+            pts.push(join);
         }
-        if (from_stub.y - join_y).abs() > EPS || (pts.last().unwrap().y - join_y).abs() > EPS {
-            pts.push(Point::new(trunk_x, join_y));
+        let fork = Point::new(trunk_x, fork_y);
+        if (join.y - fork.y).abs() > EPS {
+            pts.push(fork);
         }
-        pts.push(Point::new(trunk_x, fork_y));
-        if (end.x - trunk_x).abs() > EPS {
-            pts.push(Point::new(end.x, fork_y));
-        }
-        if (to_stub.x - end.x).abs() > EPS || (to_stub.y - fork_y).abs() > EPS {
-            pts.push(to_stub);
-        }
-        pts.push(end);
+        // 合流后目标侧共锚（同一 trunk_x）。
+        let shared_end = Point::new(trunk_x, end.y);
+        pts.push(shared_end);
         let pts = simplify_path(pts, true);
         if pts.len() < 4 {
             return false;
         }
-        if path_hits_nodes(&pts, nodes, &relations[ei]) {
+        if path_hits_nodes(&pts, nodes, &relations[*ei]) {
             return false;
         }
-        new_paths.push((ei, pts));
+        new_paths.push((*ei, pts));
     }
 
     for (ei, pts) in new_paths {
@@ -284,6 +321,35 @@ fn try_merge_fan_in(
         out.stats.edges_rewritten += 1;
     }
     true
+}
+
+/// 保留路径到最后一次穿过 `cut_y` 的位置（面向目标的最近交点）。
+///
+/// FanIn 合流只改该交点之后的局部 suffix，避免重新发明源端 stub 与跨组走廊。
+fn prefix_through_horizontal_cut(points: &[Point], cut_y: f64) -> Option<Vec<Point>> {
+    for si in (0..points.len().saturating_sub(1)).rev() {
+        let a = points[si];
+        let b = points[si + 1];
+        if (a.x - b.x).abs() > EPS {
+            if (a.y - cut_y).abs() <= EPS && (b.y - cut_y).abs() <= EPS {
+                return Some(points[..=si + 1].to_vec());
+            }
+            continue;
+        }
+        if cut_y + EPS < a.y.min(b.y) || cut_y - EPS > a.y.max(b.y) {
+            continue;
+        }
+        let hit = Point::new(a.x, cut_y);
+        let mut prefix = points[..=si].to_vec();
+        if prefix
+            .last()
+            .is_none_or(|last| (last.x - hit.x).abs() > EPS || (last.y - hit.y).abs() > EPS)
+        {
+            prefix.push(hit);
+        }
+        return Some(prefix);
+    }
+    None
 }
 
 fn path_hits_nodes(points: &[Point], nodes: &HashMap<String, NodeLayout>, rel: &Relation) -> bool {
@@ -429,18 +495,12 @@ mod tests {
         let relations = vec![rel("a", "pg"), rel("b", "pg")];
         let mut edges = vec![
             edge(
-                vec![
-                    Point::new(100.0, 100.0),
-                    Point::new(100.0, 200.0),
-                ],
+                vec![Point::new(100.0, 100.0), Point::new(100.0, 200.0)],
                 Port::Bottom,
                 Port::Top,
             ),
             edge(
-                vec![
-                    Point::new(200.0, 100.0),
-                    Point::new(200.0, 200.0),
-                ],
+                vec![Point::new(200.0, 100.0), Point::new(200.0, 200.0)],
                 Port::Bottom,
                 Port::Top,
             ),
@@ -457,4 +517,39 @@ mod tests {
         assert_eq!(result.stats.groups_merged, 0);
         assert!(result.merge_intervals.is_empty());
     }
+}
+
+#[test]
+fn s32b_microservices_db_fanin_merges() {
+    let source = include_str!("../../../../../../showcase/architecture/n.microservices.pgm");
+    let output =
+        crate::pipeline::parse_prepare_validate(source, &crate::prepare::StyleRequest::default());
+    let prepared = output.diagram.expect("valid");
+    assert!(!prepared.inner().groups.is_empty());
+    let layout = crate::layout::compute_layout_with_plan(prepared.inner(), prepared.layout_plan())
+        .expect("layout");
+    let relations = &prepared.inner().relations;
+    let db_edges: Vec<usize> = relations
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.to.as_str() == "db")
+        .map(|(i, _)| i)
+        .collect();
+    assert!(db_edges.len() >= 2, "need fanin to db");
+    // 近目标竖直干线应共享（共锚：终点 x 一致）
+    let mut end_xs = Vec::new();
+    for &ei in &db_edges {
+        let pts: Vec<Point> = layout.edges[ei].path_points().into_owned();
+        let end = *pts.last().unwrap();
+        end_xs.push(end.x);
+    }
+    assert!(end_xs.len() >= 2);
+    let min_x = end_xs.iter().cloned().fold(f64::INFINITY, f64::min);
+    let max_x = end_xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    eprintln!("db end xs={end_xs:?}");
+    assert!(
+        (max_x - min_x).abs() < 2.0,
+        "S3.2b: db FanIn should share dock, xs span={}",
+        max_x - min_x
+    );
 }

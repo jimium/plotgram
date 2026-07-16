@@ -5,7 +5,7 @@
 > 手册：[`布局与路由核心手册-2026-07.md`](../../总结经验/布局与路由核心手册-2026-07.md)  
 > 共线纲领：[`collinear-problem-analysis-2026-07.md`](./collinear-problem-analysis-2026-07.md)  
 > 共线基建：[`collinear-execution-plan-2026-07.md`](./collinear-execution-plan-2026-07.md)（P0–P3 已完成）  
-> 状态：**S0–S5 ✅ · S4.x ✅**（2026-07-15）；其后可选 **S5.2b / S2.2b / S3.2b / collinear P4**（见 §5.1）
+> 状态：**S0–S5 ✅ · S4.x ✅ · S5.2b ✅**（2026-07-15）；其后可选 **S2.2b / S3.2b / collinear P4**（见 §5.1）
 
 ---
 
@@ -246,11 +246,35 @@ D  长跨 / feedback 侧通道
 
 | ID | 内容 | 触发条件 | 风险 |
 |----|------|----------|------|
-| **S5.2b** | 无组 architecture 专用标签侧向余量 | T2 目视字仍糊 | 勿波及有组 nested |
-| **S4.x** | 监控让道加强 ✅ | 虚线仍与业务实线共竖廊 / 穿模 | 见下方验收 |
+| **S5.2b** | 无组 architecture 专用标签侧向余量 ✅ | T2 目视字仍糊 | 见下方验收 |
+| **S2.h** | 无组双轴 demand 走廊 + SpaceBudget 守约 ✅ | 中轴仍挤 | 见下方验收 |
 | **S2.2b** | 有组 `two_phase` / sugiyama 叠 `edge_band_demand` | 有组 showcase 面距 deficit 仍高 | k8s 类 median_ms / tight 易升 |
 | **S3.2b** | FanOut 合流；有组 FanIn 写者 | 有组图「许可未兑现」可机器复现 | 穿模 / tight |
 | **collinear P4** | 同通道多条 `NeedsSeparation` 全局 lane | S1+S3+S5 后数据仍证同通道多干 | 扰动大；勿抢跑 |
+
+### Phase S5.2b — 无组 architecture 标签侧向余量 ✅
+
+| # | 任务 | DoD | 状态 |
+|---|------|-----|------|
+| S5.2b.1 | `LabelPlacementConfig.perp_offset`：无组 architecture 8→12（`ARCH_UNGROUPED_LABEL_PERP_OFFSET`） | 有组 / flowchart 仍 8 | ✅ |
+| S5.2b.2 | 抬升时：距己边 < perp 视为冲突 + 贴线净空惩罚；多一档远候选 | T2 字离线可读；不改路径写权 | ✅ |
+| S5.2b.3 | nested / collinear vs S4.x | nested 无新 `label_node_overlap` error；collinear **PASS** | ✅ |
+
+**明确不做**：全局抬 `DEFAULT_LABEL_PERP_OFFSET`（曾伤 nested，已在 S5.2 回滚）。
+
+### Phase S2.h — 无组双轴可读走廊（demand 驱动）✅
+
+**问题**：S5.2b 后标签离线，但无组微服务中轴仍挤——竖直层缝与同排节点缝都偏紧。  
+**原则**：只抬 **无组 architecture** 系数；demand 低时仍落在 `base_gap`（禁止「无组固定加宽」）。
+
+| # | 任务 | DoD | 状态 |
+|---|------|-----|------|
+| S2.h.1 | 竖直：无组 `parallel_scale/fanin/label_* / max_extra` 抬至可读档（cap 88） | 挤廊图吃到 cap；稀疏图 ≈ base | ✅ |
+| S2.h.2 | 水平：`adjacent_rank_gap` + `resolve_layer_x_gaps` / `enforce_horizontal_demand_gaps` | 同排跨层边多时缝加宽 | ✅ |
+| S2.h.3 | `SpaceBudget::enrich_adjacent_rank_demand` 写入 hints | refine 不得压回 `default_node_gap` | ✅ |
+| S2.h.4 | congestion T1/T2 + collinear vs S5.2b | T1 不变；T2 疏朗；collinear **PASS**（`--allow-node-fp`） | ✅ |
+
+**T2 抽检（S2.h）**：服务同排缝 ≈88px；`gw→svc` / `svc→data` face 显著 >72；`edge_through_node=0`；`edge_crossing` 15→14。
 
 ### Phase S4.x — 监控让道加强 ✅
 
@@ -319,9 +343,10 @@ D  长跨 / feedback 侧通道
 5. ~~**S4**~~ ✅（无组监控延后 + 外环/干线；侧 gutter 系数暂 0）  
 6. ~~**S5**~~ ✅（architecture 标签带宽；全局 perp 试过已回滚）  
 7. ~~**S4.x**~~ ✅（侧 gutter 小开 + 外环深 stub + 穿模兜底；T2 `edge_through_node`→0）  
-8. 目视 T2：字仍糊 → **S5.2b**  
-9. 有组大图喊挤 → **S2.2b** / **S3.2b**  
-10. 数据仍证同通道多条 `NeedsSeparation` → collinear **P4**
+8. ~~**S5.2b**~~ ✅（无组 architecture `perp_offset` 12；贴线冲突 + 净空惩罚）  
+9. ~~**S2.h**~~ ✅（无组双轴 demand 走廊 + SpaceBudget 守约）  
+10. 有组大图喊挤 → **S2.2b** / **S3.2b**  
+11. 数据仍证同通道多条 `NeedsSeparation` → collinear **P4**
 
 ---
 
@@ -329,9 +354,10 @@ D  长跨 / feedback 侧通道
 
 - **T1**：auth 底边可逐条追踪。 ← **S1**  
 - **T2**：服务↔数据面距达标（S2）；Postgres 入边语义共干（S3）；监控外环 `edge_crossing` 15→11（**S4**）  
-- **T2 标签**：`label_label_overlap` 4→2（**S5**）；目视仍糊则开 S5.2b  
+- **T2 标签**：`label_label_overlap` 4→2（**S5**）→ **S5.2b 后 T2 无 label_* warning**  
 - **T2 穿模**：**S4.x** 后 `edge_through_node`→0；外环绕行后 `edge_crossing` 可回升（约 15，可接受）  
-- **全局**：collinear S5→S4.x **PASS**（`--allow-node-fp`）
+- **T2 疏朗**：**S2.h** 后同排缝 ≈88、层缝 face ≫72；`edge_crossing` 15→14  
+- **全局**：collinear S5.2b→S2.h **PASS**（`--allow-node-fp`）
 
 ---
 
@@ -339,13 +365,21 @@ D  长跨 / feedback 侧通道
 
 | 产物 | 路径 |
 |------|------|
-| congestion S4.x | `benchmark-data/congestion-baseline-s4x-2026-07-15.json` |
-| collinear S4.x / latest | `benchmark-data/collinear-baseline-s4x-2026-07-15.json` → `collinear-baseline-latest.json` |
-| congestion/collinear S5 | `*-s5-2026-07-15.json`（对比基线） |
+| congestion S2.h | `benchmark-data/congestion-baseline-s2h-2026-07-16.json` |
+| collinear S2.h / latest | `benchmark-data/collinear-baseline-s2h-2026-07-16.json` → `collinear-baseline-latest.json` |
+| congestion S5.2b | `benchmark-data/congestion-baseline-s52b-2026-07-15.json` |
+| collinear S5.2b | `benchmark-data/collinear-baseline-s52b-2026-07-15.json` |
+| congestion/collinear S4.x | `*-s4x-2026-07-15.json`（对比基线） |
 | 监控/外环 | `feedback_side::monitor_hub_*`；`path::push_target_approach` / `force_outer_escape_path`；`scoring` trunk/outer；`run` S3 后 reroute + sanitize 后 escape |
+| 标签 S5.2b | `LabelPlacementConfig::for_diagram(Arch, has_groups)`；`ARCH_UNGROUPED_LABEL_PERP_OFFSET=12` |
+| 双轴 S2.h | `EdgeBandDemandProfile::for_diagram`；`adjacent_rank_gap`；`SpaceBudget::enrich_adjacent_rank_demand` |
 
 **T2 Postgres FanIn（S3）**：三服务 approach 共享竖直干线，再分叉到 Compact 落点；`merge_intervals` 写入 Annotation。
 
 **S5 系数**：architecture `label_band=32` / `label_per_edge=4` / `max_extra=48`。
 
 **S4.x 系数**：`side_channel_scale=0.4` / `base=12` / `max=20`；外环收束深距 = `PORT_CLEARANCE + NODE_OBSTACLE_PAD + 8`。
+
+**S5.2b**：无组 architecture `perp_offset=12`；有组 / flowchart 仍 8。
+
+**S2.h（无组）**：竖直 `parallel=0.65` / `fanin=0.42` / `label_band=40` / `label_per_edge=8` / `max_extra=88`；水平 `h_parallel=0.45` / `h_label=10` / `h_max_extra=56`。

@@ -1,9 +1,12 @@
 //! 通用边 SVG 绘制。
 
 use crate::ast::Relation;
+use crate::layout::edge::route_annotation::EdgeRouteAnnotation;
 use crate::layout::EdgeLayout;
-use crate::render::paint::svg_utils::{arrow_style, render_edge_labels, render_edge_path};
 use crate::render::color_queries::muted_text_color;
+use crate::render::paint::svg_utils::{
+    arrow_style, render_edge_labels, render_edge_path, render_edge_path_with_annotation,
+};
 use crate::render::visual::{ArrowStyle, EdgeStyle};
 use crate::render::CompiledRenderContext;
 use crate::types::DiagramType;
@@ -14,6 +17,7 @@ pub fn paint_arrowed_edge(
     diagram_type: &DiagramType,
     relation: &Relation,
     layout: &EdgeLayout,
+    annotation: Option<&EdgeRouteAnnotation>,
     style: &EdgeStyle,
     render_labels: bool,
     context: &CompiledRenderContext,
@@ -21,8 +25,16 @@ pub fn paint_arrowed_edge(
 ) {
     let passive_stroke = muted_text_color(diagram_type, context, "#999");
     let (stroke, dash, marker_end, marker_start) = arrow_style(relation, style, &passive_stroke);
-    render_edge_path(
-        layout, context, style, stroke, Some(dash), marker_end, marker_start, svg,
+    render_edge_path_with_annotation(
+        layout,
+        annotation,
+        context,
+        style,
+        stroke,
+        Some(dash),
+        marker_end,
+        marker_start,
+        svg,
     );
 
     if render_labels {

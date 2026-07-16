@@ -37,12 +37,16 @@ pub fn analyze_edge_node_crossings(
                 if node_id == from_id || node_id == to_id {
                     continue;
                 }
-                if segment_intersects_aabb(p1, p2, Rect::new(
-                    nl.x + config.node_shrink,
-                    nl.y + config.node_shrink,
-                    nl.width - 2.0 * config.node_shrink,
-                    nl.height - 2.0 * config.node_shrink,
-                )) {
+                if segment_intersects_aabb(
+                    p1,
+                    p2,
+                    Rect::new(
+                        nl.x + config.node_shrink,
+                        nl.y + config.node_shrink,
+                        nl.width - 2.0 * config.node_shrink,
+                        nl.height - 2.0 * config.node_shrink,
+                    ),
+                ) {
                     metrics.edge_node_crossings += 1;
                     accumulate_push(&mut metrics.problem_nodes, node_id, edge_idx, p1, p2, nl);
                 }

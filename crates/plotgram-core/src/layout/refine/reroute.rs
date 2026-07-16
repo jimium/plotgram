@@ -39,9 +39,7 @@ pub(crate) fn reroute_subset(
         hints: mem::take(&mut result.hints),
     };
 
-    let fresh = if preserve.is_empty()
-        || (preserve.len() as f64 / n as f64) < MIN_PRESERVE_RATIO
-    {
+    let fresh = if preserve.is_empty() || (preserve.len() as f64 / n as f64) < MIN_PRESERVE_RATIO {
         router.route(diagram, layout)
     } else {
         router.route_preserve(diagram, layout, &preserve)
