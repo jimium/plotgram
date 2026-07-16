@@ -407,6 +407,36 @@ pub struct AttributeMap {
     /// 渲染器通过 `node_style_from_attributes` / `edge_style_from_attributes` 消费。
     #[serde(default)]
     pub style: StyleMap,
+    /// DSL 解析时记录的 standard 属性源位置（不参与序列化）。
+    /// prepare / 手工构造写入的属性通常无 span，校验时回退到 entity/relation span。
+    #[serde(skip)]
+    pub standard_spans: HashMap<String, Span>,
+    /// DSL 解析时记录的 meta 属性源位置（不参与序列化）。
+    #[serde(skip)]
+    pub meta_spans: HashMap<String, Span>,
+}
+
+impl AttributeMap {
+    /// 写入 standard 属性并记录源 span（parser 路径）。
+    pub fn insert_standard(&mut self, key: String, value: AttributeValue, span: Span) {
+        self.standard_spans.insert(key.clone(), span);
+        self.standard.insert(key, value);
+    }
+
+    /// 写入 meta 属性并记录源 span（parser 路径）。
+    pub fn insert_meta(&mut self, key: String, value: AttributeValue, span: Span) {
+        self.meta_spans.insert(key.clone(), span);
+        self.meta.insert(key, value);
+    }
+
+    pub fn standard_span(&self, key: &str) -> Option<Span> {
+        self.standard_spans.get(key).copied()
+    }
+
+    /// 有属性级 span 时用之，否则回退到 owner（entity/relation）span。
+    pub fn standard_span_or(&self, key: &str, fallback: Span) -> Span {
+        self.standard_span(key).unwrap_or(fallback)
+    }
 }
 
 // ─── DiagramAttribute ──────────────────────────────────────────────

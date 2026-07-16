@@ -417,12 +417,13 @@ fn find_constraint_in_cycle(
 pub fn validate_groups(diagram: &Diagram, result: &mut ValidationResult) {
     for group in &diagram.groups {
         for (key, value) in &group.attributes.standard {
+            let span = group.attributes.standard_span_or(key, group.span);
             match key.as_str() {
                 group::BORDER_STYLE => {
                     if let Some(v) = value.as_str() {
                         if !attr_constants::group_border_style::ALL.contains(&v) {
                             result.add_error(DiagnosticError::invalid_enum_value(
-                                group.span,
+                                span,
                                 group::BORDER_STYLE,
                                 v,
                                 attr_constants::group_border_style::ALL,
@@ -430,7 +431,7 @@ pub fn validate_groups(diagram: &Diagram, result: &mut ValidationResult) {
                         }
                     } else if !is_atom_like(value) {
                         result.add_error(DiagnosticError::structure_violation(
-                            group.span,
+                            span,
                             format!("group '{}' 的 style 属性必须是 atom", group.id),
                         ));
                     }
@@ -438,7 +439,7 @@ pub fn validate_groups(diagram: &Diagram, result: &mut ValidationResult) {
                 group::COLOR => {
                     if !matches!(value, AttributeValue::String(_)) {
                         result.add_error(DiagnosticError::structure_violation(
-                            group.span,
+                            span,
                             format!("group '{}' 的 color 属性必须是字符串", group.id),
                         ));
                     }
@@ -447,7 +448,7 @@ pub fn validate_groups(diagram: &Diagram, result: &mut ValidationResult) {
                     if let Some(v) = value.as_str() {
                         if !is_valid_group_layout_atom(v) {
                             result.add_error(DiagnosticError::invalid_enum_value(
-                                group.span,
+                                span,
                                 group::LAYOUT,
                                 v,
                                 VALID_GROUP_LAYOUTS,
@@ -455,14 +456,14 @@ pub fn validate_groups(diagram: &Diagram, result: &mut ValidationResult) {
                         }
                     } else if !is_atom_like(value) {
                         result.add_error(DiagnosticError::structure_violation(
-                            group.span,
+                            span,
                             format!("group '{}' 的 layout 属性必须是 atom", group.id),
                         ));
                     }
                 }
                 _ => {
                     result.add_error(DiagnosticError::structure_violation(
-                        group.span,
+                        span,
                         format!("group '{}' 的未知属性 '{}'", group.id, key),
                     ));
                 }

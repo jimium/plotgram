@@ -102,9 +102,10 @@ impl Parser {
                     ),
                 ));
             }
-            attributes.standard.insert(
+            attributes.insert_standard(
                 "type".to_string(),
                 AttributeValue::String(TextValue::unquoted(type_name)),
+                type_span,
             );
         }
 
@@ -187,12 +188,13 @@ impl Parser {
             }
 
             if let Some(value) = self.parse_value_for_key(&key, &namespace) {
+                let attr_span = Span::new(attr_start.start, self.last_end());
                 match namespace {
                     AttrNamespace::Standard => {
-                        attrs.standard.insert(key, value);
+                        attrs.insert_standard(key, value, attr_span);
                     }
                     AttrNamespace::Meta => {
-                        attrs.meta.insert(key, value);
+                        attrs.insert_meta(key, value, attr_span);
                     }
                     AttrNamespace::Style => {
                         attrs.style.insert_with_source(
@@ -332,7 +334,7 @@ impl Parser {
                 TokenKind::Ident(_) if self.lookahead_is_attribute() => {
                     // Group attribute (style, color, etc.)
                     if let Some(attr) = self.parse_diagram_attribute() {
-                        group_attrs.standard.insert(attr.key, attr.value);
+                        group_attrs.insert_standard(attr.key, attr.value, attr.span);
                     }
                 }
                 TokenKind::Ident(_) => {

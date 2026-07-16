@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::ast::{AttributeValue, Diagram};
+use crate::ast::{AttributeValue, Diagram, Span};
 use crate::error::{DiagnosticError, ValidationResult};
 use crate::profile::profile_for;
 use crate::types::attr_constants;
@@ -18,9 +18,11 @@ pub fn validate_entity_attributes(diagram: &Diagram, result: &mut ValidationResu
 
         // 校验 standard 属性
         for (key, value) in &entity.attributes.standard {
+            let span = entity.attributes.standard_span_or(key, entity.span);
+
             if !seen_keys.insert(key.as_str()) {
                 result.add_error(DiagnosticError::structure_violation(
-                    entity.span,
+                    span,
                     format!("实体 '{}' 的属性 '{}' 重复声明", entity.id, key),
                 ));
                 continue;
@@ -28,7 +30,7 @@ pub fn validate_entity_attributes(diagram: &Diagram, result: &mut ValidationResu
 
             if !profile.standard_entity_attrs().contains(&key.as_str()) {
                 result.add_error(DiagnosticError::invalid_attribute(
-                    entity.span,
+                    span,
                     key,
                     entity.id.as_str(),
                     profile.standard_entity_attrs(),
@@ -43,7 +45,7 @@ pub fn validate_entity_attributes(diagram: &Diagram, result: &mut ValidationResu
                             && !profile.supports_entity_type(v)
                         {
                             result.add_error(DiagnosticError::invalid_enum_value(
-                                entity.span,
+                                span,
                                 entity::TYPE,
                                 v,
                                 profile.entity_types,
@@ -51,7 +53,7 @@ pub fn validate_entity_attributes(diagram: &Diagram, result: &mut ValidationResu
                         }
                     } else if !is_atom_like(value) {
                         result.add_error(DiagnosticError::structure_violation(
-                            entity.span,
+                            span,
                             format!("实体 '{}' 的属性 '{}' 必须是 atom", entity.id, entity::TYPE),
                         ));
                     }
@@ -60,7 +62,7 @@ pub fn validate_entity_attributes(diagram: &Diagram, result: &mut ValidationResu
                     if let Some(v) = value.as_str() {
                         if !attr_constants::status::ALL.contains(&v) {
                             result.add_error(DiagnosticError::invalid_enum_value(
-                                entity.span,
+                                span,
                                 entity::STATUS,
                                 v,
                                 attr_constants::status::ALL,
@@ -68,7 +70,7 @@ pub fn validate_entity_attributes(diagram: &Diagram, result: &mut ValidationResu
                         }
                     } else if !is_atom_like(value) {
                         result.add_error(DiagnosticError::structure_violation(
-                            entity.span,
+                            span,
                             format!("实体 '{}' 的属性 '{}' 必须是 atom", entity.id, entity::STATUS),
                         ));
                     }
@@ -76,7 +78,7 @@ pub fn validate_entity_attributes(diagram: &Diagram, result: &mut ValidationResu
                 entity::SEMANTIC | entity::ICON => {
                     if !is_atom_like(value) {
                         result.add_error(DiagnosticError::structure_violation(
-                            entity.span,
+                            span,
                             format!("实体 '{}' 的属性 '{}' 必须是 atom", entity.id, key),
                         ));
                     }
@@ -84,7 +86,7 @@ pub fn validate_entity_attributes(diagram: &Diagram, result: &mut ValidationResu
                 entity::OWNER | entity::DESCRIPTION => {
                     if !matches!(value, AttributeValue::String(_)) {
                         result.add_error(DiagnosticError::structure_violation(
-                            entity.span,
+                            span,
                             format!("实体 '{}' 的属性 '{}' 必须是字符串类型", entity.id, key),
                         ));
                     }
@@ -115,9 +117,11 @@ pub fn validate_relation_attributes(diagram: &Diagram, result: &mut ValidationRe
     for relation in &diagram.relations {
         // 校验 standard 属性
         for (key, value) in &relation.attributes.standard {
+            let span = relation.attributes.standard_span_or(key, relation.span);
+
             if !profile.standard_relation_attrs().contains(&key.as_str()) {
                 result.add_error(DiagnosticError::invalid_attribute(
-                    relation.span,
+                    span,
                     key,
                     &format!("{} -> {}", relation.from, relation.to),
                     profile.standard_relation_attrs(),
@@ -130,7 +134,7 @@ pub fn validate_relation_attributes(diagram: &Diagram, result: &mut ValidationRe
                     if let Some(v) = value.as_str() {
                         if !attr_constants::status::ALL.contains(&v) {
                             result.add_error(DiagnosticError::invalid_enum_value(
-                                relation.span,
+                                span,
                                 relation::STATUS,
                                 v,
                                 attr_constants::status::ALL,
@@ -138,7 +142,7 @@ pub fn validate_relation_attributes(diagram: &Diagram, result: &mut ValidationRe
                         }
                     } else if !is_atom_like(value) {
                         result.add_error(DiagnosticError::structure_violation(
-                            relation.span,
+                            span,
                             format!(
                                 "关系 '{} -> {}' 的属性 '{}' 必须是 atom",
                                 relation.from, relation.to, relation::STATUS
@@ -149,7 +153,7 @@ pub fn validate_relation_attributes(diagram: &Diagram, result: &mut ValidationRe
                 relation::LINE_STYLE => {
                     if !is_atom_like(value) {
                         result.add_error(DiagnosticError::structure_violation(
-                            relation.span,
+                            span,
                             format!(
                                 "关系 '{} -> {}' 的属性 '{}' 必须是 atom",
                                 relation.from, relation.to, relation::LINE_STYLE
@@ -160,7 +164,7 @@ pub fn validate_relation_attributes(diagram: &Diagram, result: &mut ValidationRe
                 relation::CARDINALITY => {
                     if !is_text_like(value) {
                         result.add_error(DiagnosticError::structure_violation(
-                            relation.span,
+                            span,
                             format!(
                                 "关系 '{} -> {}' 的属性 '{}' 必须是字符串类型",
                                 relation.from, relation.to, relation::CARDINALITY
@@ -183,7 +187,7 @@ pub fn validate_relation_attributes(diagram: &Diagram, result: &mut ValidationRe
 }
 
 /// 将 StylePropError 转换为 DiagnosticError 并加入 result。
-fn push_style_error(err: StylePropError, span: crate::ast::Span, context: &str, result: &mut ValidationResult) {
+fn push_style_error(err: StylePropError, span: Span, context: &str, result: &mut ValidationResult) {
     match err {
         StylePropError::UnknownKey { key, allowed } => {
             result.add_error(DiagnosticError::invalid_attribute(
@@ -203,4 +207,3 @@ fn push_style_error(err: StylePropError, span: crate::ast::Span, context: &str, 
         }
     }
 }
-
