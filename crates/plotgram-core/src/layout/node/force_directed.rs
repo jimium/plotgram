@@ -281,8 +281,11 @@ fn resolve_top_group(diagram: &Diagram, gid: &str) -> String {
 // build_node_sizes 已抽取到 common::node_sizing::standard_node_sizes
 
 fn estimate_area(sizes: &HashMap<String, (f64, f64)>, node_count: usize) -> f64 {
-    let total = sizes
-        .values()
+    let mut ids: Vec<&String> = sizes.keys().collect();
+    ids.sort();
+    let total = ids
+        .into_iter()
+        .filter_map(|id| sizes.get(id))
         .map(|(width, height)| (width + NODE_MARGIN) * (height + NODE_MARGIN))
         .sum::<f64>();
     total.max(node_count as f64 * 20_000.0)
@@ -563,7 +566,8 @@ fn apply_cross_group_repulsion(
         }
     }
 
-    let group_ids: Vec<&String> = grouped.keys().copied().collect();
+    let mut group_ids: Vec<&String> = grouped.keys().copied().collect();
+    group_ids.sort();
     // 遍历组对（i < j），对每对组遍历成员对
     for i in 0..group_ids.len() {
         for j in (i + 1)..group_ids.len() {

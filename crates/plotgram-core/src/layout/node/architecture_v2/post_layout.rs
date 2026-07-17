@@ -276,11 +276,176 @@ pub(crate) fn align_cross_scope_pendant_chains(
     moved
 }
 
+/// L2.2：仅对「多 client → 同一 hub」做刚体平移重申（不跑全层 `align_client_nodes_to_hubs`）。
+///
+/// 背景：全量重申会在 budget/frame 后大范围挪点，增量 reroute 曾导致多图穿组暴涨。
+/// 本函数只平移「独占指向同一 hub」的 client 集合，使组质心对齐 hub；
+/// 碰撞或越组内边距则 Skip（不破约硬推）。
+pub(crate) fn reassert_multi_client_hub_centroids(
+    diagram: &Diagram,
+    layout: &mut LayoutResult,
+) -> HashSet<String> {
+    let Some(ranks) = layout.hints.sugiyama_ranks.as_ref() else {
+        return HashSet::new();
+    };
+
+    let node_scope: HashMap<String, Option<String>> = diagram
+        .entities
+        .iter()
+        .map(|entity| {
+            (
+                entity.id.as_str().to_string(),
+                entity.group_id.as_ref().map(|id| id.as_str().to_string()),
+            )
+        })
+        .collect();
+
+    // hub → clients（确定性：边序 + client id 排序）
+    let mut hub_clients: HashMap<String, Vec<String>> = HashMap::new();
+    for relation in &diagram.relations {
+        let from = relation.from.as_str();
+        let to = relation.to.as_str();
+        let (Some(&from_rank), Some(&to_rank)) = (ranks.get(from), ranks.get(to)) else {
+            continue;
+        };
+        if to_rank != from_rank + 1 {
+            continue;
+        }
+        // client 仅此一条出边到 hub（独占 fan-in 叶）
+        let out_count = diagram
+            .relations
+            .iter()
+            .filter(|r| r.from.as_str() == from)
+            .count();
+        if out_count != 1 {
+            continue;
+        }
+        hub_clients
+            .entry(to.to_string())
+            .or_default()
+            .push(from.to_string());
+    }
+
+    let mut hub_ids: Vec<String> = hub_clients.keys().cloned().collect();
+    hub_ids.sort();
+    let mut moved = HashSet::new();
+
+    for hub_id in hub_ids {
+        let Some(clients) = hub_clients.get_mut(&hub_id) else {
+            continue;
+        };
+        clients.sort();
+        clients.dedup();
+        if clients.len() < 2 {
+            continue;
+        }
+        // 同一 leaf group（或均无组）才刚体平移，避免跨容器硬扯
+        let scopes: BTreeSet<Option<String>> = clients
+            .iter()
+            .map(|c| node_scope.get(c).cloned().flatten())
+            .collect();
+        if scopes.len() != 1 {
+            continue;
+        }
+        let client_scope = scopes.iter().next().cloned().flatten();
+
+        let Some(hub) = layout.nodes.get(&hub_id) else {
+            continue;
+        };
+        let hub_cx = hub.x + hub.width / 2.0;
+        let mut sum_cx = 0.0;
+        let mut ok = true;
+        for c in clients.iter() {
+            let Some(n) = layout.nodes.get(c) else {
+                ok = false;
+                break;
+            };
+            sum_cx += n.x + n.width / 2.0;
+        }
+        if !ok {
+            continue;
+        }
+        let clients_cx = sum_cx / clients.len() as f64;
+        let delta = hub_cx - clients_cx;
+        if delta.abs() <= PENDANT_ALIGN_EPS {
+            continue;
+        }
+
+        let block_set: HashSet<&str> = clients.iter().map(String::as_str).collect();
+        if let Some(group_id) = client_scope.as_ref() {
+            let Some(group) = layout.groups.get(group_id) else {
+                continue;
+            };
+            let inside = clients.iter().all(|id| {
+                layout.nodes.get(id).is_some_and(|node| {
+                    node.x + delta >= group.x + GROUP_INNER_GUARD
+                        && node.x + delta + node.width
+                            <= group.x + group.width - GROUP_INNER_GUARD
+                })
+            });
+            if !inside {
+                continue;
+            }
+        }
+
+        let collides = clients.iter().any(|id| {
+            let Some(node) = layout.nodes.get(id) else {
+                return true;
+            };
+            let left = node.x + delta;
+            let right = left + node.width;
+            let top = node.y;
+            let bottom = node.y + node.height;
+            layout.nodes.iter().any(|(other_id, other)| {
+                !block_set.contains(other_id.as_str())
+                    && left < other.x + other.width - 0.5
+                    && right > other.x + 0.5
+                    && top < other.y + other.height - 0.5
+                    && bottom > other.y + 0.5
+            })
+        });
+        if collides {
+            continue;
+        }
+
+        for id in clients.iter() {
+            if let Some(node) = layout.nodes.get_mut(id) {
+                node.x += delta;
+                moved.insert(id.clone());
+            }
+        }
+    }
+
+    moved
+}
+
 #[cfg(test)]
 mod tests {
     use crate::layout::compute_layout_with_plan;
     use crate::pipeline::parse_prepare_validate;
     use crate::prepare::StyleRequest;
+
+    #[test]
+    fn microservices_hub_client_centroid_within_eps_after_pipeline() {
+        // L2：web+mobile → gateway；刚体重申后质心 ≤2px，或 Skip（组框不够宽）时不崩。
+        let source =
+            include_str!("../../../../../../showcase/architecture/n.microservices.pgm");
+        let output = parse_prepare_validate(source, &StyleRequest::default());
+        let prepared = output.diagram.expect("valid diagram");
+        let layout =
+            compute_layout_with_plan(prepared.inner(), prepared.layout_plan()).expect("layout");
+
+        let web = layout.nodes.get("web").expect("web");
+        let mobile = layout.nodes.get("mobile").expect("mobile");
+        let gateway = layout.nodes.get("gateway").expect("gateway");
+        let clients_cx = ((web.x + web.width / 2.0) + (mobile.x + mobile.width / 2.0)) / 2.0;
+        let hub_cx = gateway.x + gateway.width / 2.0;
+        let delta = (clients_cx - hub_cx).abs();
+        assert!(
+            delta <= 2.0,
+            "hub↔client centroid delta {delta:.3}px exceeds 2px (clients={clients_cx:.3} hub={hub_cx:.3})"
+        );
+    }
 
     #[test]
     fn stress_nested_cloud_gets_left_gutter_budget() {

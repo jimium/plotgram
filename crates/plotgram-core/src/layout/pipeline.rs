@@ -192,11 +192,17 @@ impl<'a> LayoutPipeline<'a> {
                     gf_pass.padding,
                 );
             }
-            if algo == "architecture" && explicit_equal {
-                moved_for_overlap.extend(
-                    crate::layout::node::architecture_v2::post_layout::
-                        align_cross_scope_pendant_chains(self.diagram, &mut result),
-                );
+            if algo == "architecture" {
+                // L2.2：局部刚体重申多 client→hub 质心（Skip on 碰撞/越框）
+                let hub_moved = crate::layout::node::architecture_v2::post_layout::
+                    reassert_multi_client_hub_centroids(self.diagram, &mut result);
+                moved_for_overlap.extend(hub_moved);
+                if explicit_equal {
+                    moved_for_overlap.extend(
+                        crate::layout::node::architecture_v2::post_layout::
+                            align_cross_scope_pendant_chains(self.diagram, &mut result),
+                    );
+                }
             }
             for (id, node) in &result.nodes {
                 if pre_frame_nodes.get(id).is_some_and(|(x, y)| {

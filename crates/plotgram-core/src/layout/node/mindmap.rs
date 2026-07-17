@@ -256,15 +256,21 @@ fn find_root_id(diagram: &Diagram, children: &HashMap<String, Vec<String>>) -> S
         *in_degree.entry(rel.to.as_str()).or_insert(0) += 1;
     }
 
-    if let Some((id, _)) = in_degree.iter().find(|(_, deg)| **deg == 0) {
+    if let Some((id, _)) = in_degree
+        .iter()
+        .filter(|(_, deg)| **deg == 0)
+        .min_by_key(|(id, _)| *id)
+    {
         return id.to_string();
     }
 
-    children
-        .keys()
-        .next()
-        .cloned()
-        .unwrap_or_else(|| diagram.entities[0].id.as_str().to_string())
+    // 回退：按实体声明序，而非 HashMap key 序
+    for entity in &diagram.entities {
+        if children.contains_key(entity.id.as_str()) {
+            return entity.id.as_str().to_string();
+        }
+    }
+    diagram.entities[0].id.as_str().to_string()
 }
 
 /// 计算每个节点的深度（BFS 从 root 开始）

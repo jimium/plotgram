@@ -292,8 +292,11 @@ fn graph_center(nodes: &HashMap<String, NodeLayout>, horizontal: bool) -> f64 {
     if nodes.is_empty() {
         return 0.0;
     }
-    let sum: f64 = nodes
-        .values()
+    let mut ids: Vec<&String> = nodes.keys().collect();
+    ids.sort();
+    let sum: f64 = ids
+        .into_iter()
+        .filter_map(|id| nodes.get(id))
         .map(|n| {
             if horizontal {
                 n.y + n.height / 2.0
