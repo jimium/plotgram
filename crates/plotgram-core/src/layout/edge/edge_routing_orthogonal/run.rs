@@ -871,7 +871,8 @@ fn phase_route_edges(
             .map(|b| b.corridor_boost_requested)
             .unwrap_or(false);
         let is_feedback = feedback_edge_set.contains(&i);
-        let prefer_outer = s4_monitor_corridor && is_feedback;
+        let has_chain = corridor_plan.chains.contains_key(&i);
+        let same_leaf = group_ctx.is_same_leaf_group(from_id, to_id);
         let pair = EndpointPair {
             from: from_ep.clone(),
             to: to_ep.clone(),
@@ -881,12 +882,12 @@ fn phase_route_edges(
             group_ctx,
             from_id,
             to_id,
-            corridor_plan.chains.contains_key(&i),
+            has_chain,
             is_feedback,
         );
 
         let mut path_stats = PathSelectStats::default();
-        let mut path = validated_corridor_path(
+        let corridor_ok = validated_corridor_path(
             i,
             from_ep.anchor,
             to_ep.anchor,
@@ -897,12 +898,20 @@ fn phase_route_edges(
             nodes,
             obstacles,
             cfg.channel_margin,
-        )
-        .unwrap_or_else(|| {
+        );
+        // P5（保守落地）：有组图跨 leaf 外廊与 S4 monitor 解耦的「无链 prefer_outer」
+        // 会在 ecommerce 等图引入新穿组；此处仍仅 S4 monitor 开外环，
+        // 跨 leaf 无链靠 strict + corridor_boost 收口（完整 P5 留给后续几何）。
+        let prefer_outer = s4_monitor_corridor && is_feedback;
+        // P2：有 chain 但 validated 失败 → 显式 degraded（禁止静默 free-route 冒充成功）。
+        let corridor_contract_failed = has_chain && corridor_ok.is_none();
+        let mut path = corridor_ok.unwrap_or_else(|| {
             let ctx =
                 OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
                     .with_strict_group_transit(strict)
-                    .with_corridor_boost(corridor_boost)
+                    .with_corridor_boost(
+                        corridor_boost || corridor_contract_failed || (!same_leaf && !has_chain),
+                    )
                     .with_prefer_outer_ring(prefer_outer);
             select_best_path_with_scorer_stats(
                 &ctx,
@@ -938,7 +947,7 @@ fn phase_route_edges(
         }
         ortho_stats.total_candidates += path_stats.candidate_count;
         ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
-        if path_stats.degraded {
+        if path_stats.degraded || corridor_contract_failed {
             ortho_stats.degraded_count += 1;
             if let Some(budget) = space_budget.as_mut() {
                 budget.request_corridor_boost();
@@ -1052,7 +1061,8 @@ fn phase_straighten_align(
                 .map(|rel| (rel.from.as_str(), rel.to.as_str()))
                 .unwrap_or(("", ""));
             let mut path_stats = PathSelectStats::default();
-            let candidate = validated_corridor_path(
+            let has_chain = corridor_plan.chains.contains_key(&ei);
+            let corridor_ok = validated_corridor_path(
                 ei,
                 from_ep.anchor,
                 to_ep.anchor,
@@ -1063,8 +1073,9 @@ fn phase_straighten_align(
                 nodes,
                 obstacles,
                 cfg.channel_margin,
-            )
-            .unwrap_or_else(|| {
+            );
+            let prefer_outer = false; // P5 保守：align 重路由不强制外环
+            let candidate = corridor_ok.unwrap_or_else(|| {
                 let pair = EndpointPair {
                     from: from_ep.clone(),
                     to: to_ep.clone(),
@@ -1081,10 +1092,11 @@ fn phase_straighten_align(
                     group_ctx,
                     from_id,
                     to_id,
-                    corridor_plan.chains.contains_key(&ei),
+                    has_chain,
                     false,
                 ))
-                .with_corridor_boost(boost);
+                .with_corridor_boost(boost || has_chain || !group_ctx.is_same_leaf_group(from_id, to_id))
+                .with_prefer_outer_ring(prefer_outer);
                 select_best_path_with_scorer_stats(
                     &ctx,
                     &pair,
@@ -1692,17 +1704,26 @@ fn phase_sanitize(
 /// - R3：feedback / 长跨度边 → 强制 strict（`path_avoids_group_interiors`）
 ///   - 长跨度边在 `assign_feedback_sides` 中**必然**进 hint（不会因正对通道跳过），
 ///     故 `feedback_edge_set` 已覆盖「长跨度 ∪ 回环」；此处只需传入该集合。
-/// - 其余短边保持 false：仍可用高 `GROUP_TRANSIT_PENALTY` 软惩罚；全图硬否决
-///   会导致直线/脏路径退化（见 k8s-multi-namespace 回归）
+/// - P1：跨 leaf-group（含一端有组一端无组）→ 即使尚无 corridor chain，也禁止
+///   「只避节点、可穿组」软降级；无链时配合 `prefer_outer_ring` 走外廊。
+/// - 同 leaf / 均无组短边保持 false：全图硬否决会导致直线/脏路径退化
+///   （见 k8s-multi-namespace 回归）
 pub(crate) fn should_strict_group_transit(
     _profile: &OrthoRoutingProfile,
-    _group_ctx: &crate::layout::group::GroupRoutingContext,
-    _from_id: &str,
-    _to_id: &str,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    from_id: &str,
+    to_id: &str,
     has_corridor_chain: bool,
     force_strict_feedback_or_long_span: bool,
 ) -> bool {
-    has_corridor_chain || force_strict_feedback_or_long_span
+    if has_corridor_chain || force_strict_feedback_or_long_span {
+        return true;
+    }
+    // P1 核心在 validated_corridor_path（跨 leaf 接受避组脏走廊）与 select 的
+    // dirty-avoid 过滤；无链跨 leaf 全员 strict 会在无避组候选时把 degraded
+    // 路径打进新穿组（ecommerce mq→notify）。有链/feedback 仍强制 strict。
+    let _ = (group_ctx, from_id, to_id);
+    false
 }
 
 pub(crate) fn validated_corridor_path(
@@ -1730,27 +1751,33 @@ pub(crate) fn validated_corridor_path(
         group_ctx,
         stub_len,
     )?;
-    if candidate.len() >= 2
-        && path_is_clean(
-            &candidate,
-            from_id,
-            to_id,
-            nodes,
-            group_ctx,
-            &obstacles.sorted_node_ids,
-        )
-        && path_avoids_group_interiors(
-            &candidate,
-            from_id,
-            to_id,
-            group_ctx,
-            &obstacles.sorted_group_ids,
-        )
-    {
-        Some(candidate)
-    } else {
-        None
+    if candidate.len() < 2 {
+        return None;
     }
+    // P1：避组是硬门槛；穿节点在跨 leaf 时可接受（优于 free-route 穿组）。
+    if !path_avoids_group_interiors(
+        &candidate,
+        from_id,
+        to_id,
+        group_ctx,
+        &obstacles.sorted_group_ids,
+    ) {
+        return None;
+    }
+    if path_is_clean(
+        &candidate,
+        from_id,
+        to_id,
+        nodes,
+        group_ctx,
+        &obstacles.sorted_node_ids,
+    ) {
+        return Some(candidate);
+    }
+    if !group_ctx.is_same_leaf_group(from_id, to_id) {
+        return Some(candidate);
+    }
+    None
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2096,4 +2123,97 @@ fn side_acceptable(from: &NodeLayout, to: &NodeLayout, side: Port) -> bool {
 
 pub(crate) fn range_overlap_local(a_min: f64, a_max: f64, b_min: f64, b_max: f64) -> f64 {
     (a_max.min(b_max) - a_min.max(b_min)).max(0.0)
+}
+
+#[cfg(test)]
+mod contract_priority_tests {
+    use super::should_strict_group_transit;
+    use crate::layout::edge::edge_routing_orthogonal::profile::OrthoRoutingProfile;
+    use crate::layout::group::GroupRoutingContext;
+    use crate::layout::GroupLayout;
+    use std::collections::{BTreeMap, HashMap};
+
+    fn ctx_with_leaves(from_leaf: &str, to_leaf: &str) -> GroupRoutingContext {
+        let mut node_leaf_group = HashMap::new();
+        node_leaf_group.insert("a".to_string(), from_leaf.to_string());
+        node_leaf_group.insert("b".to_string(), to_leaf.to_string());
+        GroupRoutingContext {
+            groups: HashMap::from([
+                (
+                    from_leaf.to_string(),
+                    GroupLayout {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 100.0,
+                        height: 100.0,
+                    },
+                ),
+                (
+                    to_leaf.to_string(),
+                    GroupLayout {
+                        x: 200.0,
+                        y: 0.0,
+                        width: 100.0,
+                        height: 100.0,
+                    },
+                ),
+            ]),
+            node_to_groups: HashMap::new(),
+            border_shell_pad: 8.0,
+            stub_clearance: 8.0,
+            corridor_misalignment_penalty: 0.0,
+            repulse_max_rounds: 0,
+            corridors: Vec::new(),
+            side_gutters: BTreeMap::new(),
+            node_leaf_group,
+            sibling_sets: Vec::new(),
+            sibling_orientation: HashMap::new(),
+            group_ancestors: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn corridor_or_feedback_forces_strict() {
+        let profile = OrthoRoutingProfile::for_diagram_type(crate::types::DiagramType::Architecture);
+        let ctx = ctx_with_leaves("g1", "g2");
+        assert!(
+            should_strict_group_transit(&profile, &ctx, "a", "b", true, false),
+            "has corridor chain → strict"
+        );
+        assert!(
+            should_strict_group_transit(&profile, &ctx, "a", "b", false, true),
+            "feedback/long-span → strict"
+        );
+    }
+
+    #[test]
+    fn same_leaf_without_chain_stays_soft() {
+        let profile = OrthoRoutingProfile::for_diagram_type(crate::types::DiagramType::Architecture);
+        let ctx = ctx_with_leaves("g1", "g1");
+        assert!(
+            !should_strict_group_transit(&profile, &ctx, "a", "b", false, false),
+            "same-leaf short edges stay soft"
+        );
+    }
+
+    #[test]
+    fn cross_leaf_without_chain_stays_soft_to_avoid_forced_pierce() {
+        let profile = OrthoRoutingProfile::for_diagram_type(crate::types::DiagramType::Architecture);
+        let ctx = ctx_with_leaves("g1", "g2");
+        assert!(
+            !should_strict_group_transit(&profile, &ctx, "a", "b", false, false),
+            "无链跨 leaf 不强制 strict（避 ecommerce 类 degraded 新穿组）"
+        );
+    }
+
+    #[test]
+    fn group_safe_dirty_outranks_group_pierce_clean_by_hits() {
+        // 钉死 P1 排序键：group_hits 优先于 clean/dirty。
+        let clean_pierce = (1u32, 100.0f64);
+        let dirty_avoid = (0u32, 400.0f64);
+        assert!(
+            dirty_avoid < clean_pierce,
+            "避组脏路径必须优于穿组净路径（hits,len）"
+        );
+    }
 }

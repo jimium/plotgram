@@ -4,8 +4,8 @@
 > 状态：已实施（2026-07-10）  
 > 原文件名：`remove-intent-add-constrain-edge-2026-07.md`（已重命名并扩充）  
 > 相关文档：  
-> - [layout-routing-pipeline-full-analysis.md](./layout-routing-pipeline-full-analysis.md)（§14 intent 现状）  
-> - [layout-routing-optimization-proposal-2026-07.md](./layout-routing-optimization-proposal-2026-07.md)（布局/路由主优化，与本决策正交）  
+> - [layout-routing-pipeline-full-analysis.md](layout-routing-pipeline-full-analysis.md)（§14 intent 现状）  
+> - [layout-routing-optimization-proposal-2026-07.md](layout-routing-optimization-proposal-2026-07.md)（布局/路由主优化，与本决策正交）  
 > - 既有 intent 设计稿（将随删除一并废弃）：`docs/architecture/intent/`、`docs/guides/layout-intent.md`
 
 ---
@@ -225,7 +225,7 @@ Diagram {
 4. **不并行两套约束系统**  
    实施期间不要保留「半套 intent + 半套 constrain」。
 
-与 [layout-routing-optimization-proposal-2026-07.md](./layout-routing-optimization-proposal-2026-07.md) 的 RankBand / 通道预算等工作**正交**，可并行。  
+与 [layout-routing-optimization-proposal-2026-07.md](layout-routing-optimization-proposal-2026-07.md) 的 RankBand / 通道预算等工作**正交**，可并行。  
 优先级上：RankBand / 通道预算仍是观感主杠杆；本文件三项不阻塞那些优化，也勿把它们做成互相依赖。
 
 ---

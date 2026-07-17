@@ -2,9 +2,9 @@
 
 > 日期：2026-07-16  
 > 触发观感：`flowchart/n.user-auth`（DB 出入共端点）、`architecture/n.typical-microservice-architecture`（Prometheus 多箭）、`architecture/n.microservices`（有组 Postgres 未合流 / 标签歧义 / 客户端不对称）  
-> 前置：[`congestion-remediation-plan-2026-07.md`](./congestion-remediation-plan-2026-07.md)（S0–S5 / S4.x / S5.2b / S2.h ✅）  
-> 手册：[`布局与路由核心手册-2026-07.md`](../../总结经验/布局与路由核心手册-2026-07.md)  
-> 开放项：[`开放项执行计划-2026-07.md`](../../总结经验/开放项执行计划-2026-07.md)（O1 ✅ / O2 部分）  
+> 前置：[`congestion-remediation-plan-2026-07.md`](congestion-remediation-plan-2026-07.md)（S0–S5 / S4.x / S5.2b / S2.h ✅）  
+> 手册：[`布局与路由核心手册-2026-07.md`](../总结经验/布局与路由核心手册-2026-07.md)  
+> 开放项：[`开放项执行计划-2026-07.md`](../总结经验/开放项执行计划-2026-07.md)（O1 ✅ / O2 部分）  
 > 状态：**A ✅ · B.1/B.2 ✅ · C ✅ · D ✅**；2026-07-16 二次复盘已收口语义角、走廊 stub 与 rank 缝
 
 ---

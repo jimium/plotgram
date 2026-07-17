@@ -171,6 +171,8 @@ fn super_edge_pair_key(
 }
 
 /// 尝试为跨组边构建走廊路径；失败时返回 `None` 由通用路由兜底。
+///
+/// 多跳链：中间组只外绕、不入组内部（P2 走廊硬契约）。
 pub fn try_build_corridor_path(
     edge_index: usize,
     from_anchor: Point,
@@ -188,6 +190,7 @@ pub fn try_build_corridor_path(
 
     let from_group_id = group_ctx.node_leaf_group(from_id)?;
     let stub = stub_len.max(DEFAULT_STUB_LEN * 0.5);
+    let skirt_pad = group_ctx.border_shell_pad.max(12.0);
 
     let mut waypoints = vec![from_anchor];
     let mut current = from_anchor;
@@ -199,6 +202,8 @@ pub fn try_build_corridor_path(
         let lane_count = plan.corridor_load.get(&c_idx).copied().unwrap_or(1);
         let lane_coord = corridor_lane_coord(corridor, lane, lane_count);
         let cross_offset = corridor_cross_axis_offset(lane, lane_count);
+        let is_first = step == 0;
+        let is_last = step + 1 == chain.len();
 
         let next_group = if corridor.group_a == current_group {
             corridor.group_b.as_str()
@@ -210,62 +215,82 @@ pub fn try_build_corridor_path(
 
         let current_gl = group_ctx.groups.get(current_group)?;
         let next_gl = group_ctx.groups.get(next_group)?;
-
         let (exit_side, entry_side) = corridor_sides(corridor, current_group, next_group)?;
 
-        let travel_coord = if step == chain.len() - 1 {
-            match corridor.axis {
-                CorridorAxis::Vertical => to_anchor.y + cross_offset,
-                CorridorAxis::Horizontal => to_anchor.x + cross_offset,
-            }
+        if is_first {
+            let exit_border = border_point_on_side(
+                current_gl,
+                exit_side,
+                current,
+                corridor,
+                lane_coord,
+                cross_offset,
+            );
+            let corridor_exit = corridor_point(corridor, lane_coord, exit_border);
+            append_stub_leg(&mut waypoints, &mut current, exit_border, exit_side, stub);
+            ortho_connect(&mut waypoints, &mut current, corridor_exit);
         } else {
-            match corridor.axis {
-                CorridorAxis::Vertical => corridor.coord,
-                CorridorAxis::Horizontal => corridor.coord,
-            }
-        };
+            let join = corridor_point(corridor, lane_coord, current);
+            ortho_connect(&mut waypoints, &mut current, join);
+        }
 
-        let exit_border = border_point_on_side(
-            current_gl,
-            exit_side,
-            current,
-            corridor,
-            lane_coord,
-            cross_offset,
-        );
-        let corridor_exit = corridor_point(corridor, lane_coord, exit_border);
-        let corridor_entry = corridor_point(
-            corridor,
-            lane_coord,
-            Point::new(
+        if is_last {
+            let travel = Point::new(
                 if corridor.axis == CorridorAxis::Vertical {
                     lane_coord
                 } else {
-                    travel_coord
+                    to_anchor.x + cross_offset
                 },
                 if corridor.axis == CorridorAxis::Horizontal {
                     lane_coord
                 } else {
-                    travel_coord
+                    to_anchor.y + cross_offset
                 },
-            ),
-        );
-        let entry_border = border_point_on_side(
-            next_gl,
-            entry_side,
-            corridor_entry,
-            corridor,
-            lane_coord,
-            cross_offset,
-        );
+            );
+            let corridor_entry = corridor_point(corridor, lane_coord, travel);
+            let entry_border = border_point_on_side(
+                next_gl,
+                entry_side,
+                corridor_entry,
+                corridor,
+                lane_coord,
+                cross_offset,
+            );
+            ortho_connect(&mut waypoints, &mut current, corridor_entry);
+            // 目标组外侧直接入框；勿再打 entry 外向 stub（会非单调 Z 折）。
+            ortho_connect(&mut waypoints, &mut current, entry_border);
+        } else {
+            // 中间组：贴邻接面后外绕到下一段走廊，禁止穿中间组内部。
+            let approach = corridor_point(
+                corridor,
+                lane_coord,
+                Point::new(
+                    next_gl.x + next_gl.width * 0.5,
+                    next_gl.y + next_gl.height * 0.5,
+                ),
+            );
+            ortho_connect(&mut waypoints, &mut current, approach);
 
-        append_stub_leg(&mut waypoints, &mut current, exit_border, exit_side, stub);
-        ortho_connect(&mut waypoints, &mut current, corridor_exit);
-        ortho_connect(&mut waypoints, &mut current, corridor_entry);
-        // 当前点已在目标组外侧走廊上；直接接到入组边框。
-        // 若在这里再按 entry_side 打「外向」stub，会先远离目标组再折返，
-        // 生成非单调 Z 折。端点 stub 由后面的 final leg 负责。
-        ortho_connect(&mut waypoints, &mut current, entry_border);
+            let next_c_idx = chain[step + 1];
+            let next_corridor = group_ctx.corridors.get(next_c_idx)?;
+            let next_lane = plan
+                .lanes
+                .get(&(edge_index, next_c_idx))
+                .copied()
+                .unwrap_or(0);
+            let next_lane_count = plan.corridor_load.get(&next_c_idx).copied().unwrap_or(1);
+            let next_lane_coord = corridor_lane_coord(next_corridor, next_lane, next_lane_count);
+            skirt_around_group(
+                &mut waypoints,
+                &mut current,
+                next_gl,
+                next_group,
+                next_corridor,
+                next_lane_coord,
+                skirt_pad,
+                group_ctx,
+            );
+        }
 
         current_group = next_group;
     }
@@ -276,6 +301,131 @@ pub fn try_build_corridor_path(
 
     let path = simplify_path(waypoints, true);
     (path.len() >= 2).then_some(path)
+}
+
+/// 在中间组外侧绕行落到下一段走廊；选侧时避开其它分组内部。
+fn skirt_around_group(
+    waypoints: &mut Vec<Point>,
+    current: &mut Point,
+    intermediate: &GroupLayout,
+    intermediate_id: &str,
+    next_corridor: &GroupCorridor,
+    next_lane_coord: f64,
+    pad: f64,
+    group_ctx: &GroupRoutingContext,
+) {
+    let left = intermediate.x - pad;
+    let right = intermediate.x + intermediate.width + pad;
+    let top = intermediate.y - pad;
+    let bottom = intermediate.y + intermediate.height + pad;
+
+    let target = match next_corridor.axis {
+        CorridorAxis::Horizontal => {
+            let x = current
+                .x
+                .clamp(next_corridor.span_min, next_corridor.span_max);
+            corridor_point(
+                next_corridor,
+                next_lane_coord,
+                Point::new(x, next_corridor.coord),
+            )
+        }
+        CorridorAxis::Vertical => {
+            let y = current
+                .y
+                .clamp(next_corridor.span_min, next_corridor.span_max);
+            corridor_point(
+                next_corridor,
+                next_lane_coord,
+                Point::new(next_corridor.coord, y),
+            )
+        }
+    };
+
+    match next_corridor.axis {
+        CorridorAxis::Horizontal => {
+            let left_cost = (current.x - left).abs() + (target.x - left).abs();
+            let right_cost = (current.x - right).abs() + (target.x - right).abs();
+            let left_clear =
+                skirt_vertical_clear(left, current.y, target.y, intermediate_id, group_ctx);
+            let right_clear =
+                skirt_vertical_clear(right, current.y, target.y, intermediate_id, group_ctx);
+            let side_x = match (left_clear, right_clear) {
+                (true, false) => left,
+                (false, true) => right,
+                _ if left_cost <= right_cost => left,
+                _ => right,
+            };
+            ortho_connect(waypoints, current, Point::new(side_x, current.y));
+            ortho_connect(waypoints, current, Point::new(side_x, target.y));
+            ortho_connect(waypoints, current, target);
+        }
+        CorridorAxis::Vertical => {
+            let top_cost = (current.y - top).abs() + (target.y - top).abs();
+            let bottom_cost = (current.y - bottom).abs() + (target.y - bottom).abs();
+            let top_clear =
+                skirt_horizontal_clear(top, current.x, target.x, intermediate_id, group_ctx);
+            let bottom_clear =
+                skirt_horizontal_clear(bottom, current.x, target.x, intermediate_id, group_ctx);
+            let side_y = match (top_clear, bottom_clear) {
+                (true, false) => top,
+                (false, true) => bottom,
+                _ if top_cost <= bottom_cost => top,
+                _ => bottom,
+            };
+            ortho_connect(waypoints, current, Point::new(current.x, side_y));
+            ortho_connect(waypoints, current, Point::new(target.x, side_y));
+            ortho_connect(waypoints, current, target);
+        }
+    }
+}
+
+fn skirt_vertical_clear(
+    x: f64,
+    y0: f64,
+    y1: f64,
+    skip_group: &str,
+    group_ctx: &GroupRoutingContext,
+) -> bool {
+    let ymin = y0.min(y1);
+    let ymax = y0.max(y1);
+    for (gid, gl) in &group_ctx.groups {
+        if gid.as_str() == skip_group || gl.width <= 0.0 || gl.height <= 0.0 {
+            continue;
+        }
+        if x <= gl.x + EPS || x >= gl.x + gl.width - EPS {
+            continue;
+        }
+        if ymax <= gl.y + EPS || ymin >= gl.y + gl.height - EPS {
+            continue;
+        }
+        return false;
+    }
+    true
+}
+
+fn skirt_horizontal_clear(
+    y: f64,
+    x0: f64,
+    x1: f64,
+    skip_group: &str,
+    group_ctx: &GroupRoutingContext,
+) -> bool {
+    let xmin = x0.min(x1);
+    let xmax = x0.max(x1);
+    for (gid, gl) in &group_ctx.groups {
+        if gid.as_str() == skip_group || gl.width <= 0.0 || gl.height <= 0.0 {
+            continue;
+        }
+        if y <= gl.y + EPS || y >= gl.y + gl.height - EPS {
+            continue;
+        }
+        if xmax <= gl.x + EPS || xmin >= gl.x + gl.width - EPS {
+            continue;
+        }
+        return false;
+    }
+    true
 }
 
 fn find_corridor_chain(

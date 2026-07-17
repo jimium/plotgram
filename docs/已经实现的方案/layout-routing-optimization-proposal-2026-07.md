@@ -2,7 +2,7 @@
 
 > 日期：2026-07-09  
 > 状态：Iteration 1–3 已落地  
-> 前置文档：[layout-routing-pipeline-full-analysis.md](./layout-routing-pipeline-full-analysis.md)  
+> 前置文档：[layout-routing-pipeline-full-analysis.md](layout-routing-pipeline-full-analysis.md)  
 > 原则：**性能可控、架构合理、不过度复杂**；不推翻现有 Sugiyama-v2 / architecture_v2 / orthogonal 管线。
 
 ---

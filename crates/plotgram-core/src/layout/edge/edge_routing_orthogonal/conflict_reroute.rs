@@ -225,6 +225,7 @@ fn find_clean_reroute_path(
     corridor_plan: &corridor_route::CorridorRoutePlan,
 ) -> Option<(Vec<Point>, bool)> {
     // 先试 corridor 快速通道（保留原标签）
+    let has_chain = corridor_plan.chains.contains_key(&ei);
     if let Some(corridor_path) = validated_corridor_path(
         ei,
         from_ep.anchor,
@@ -241,6 +242,7 @@ fn find_clean_reroute_path(
             return Some((corridor_path, true));
         }
     }
+    let prefer_outer = false;
 
     // 递增 margin 尝试全候选搜索（重建标签）
     for &margin in reroute_margins {
@@ -263,10 +265,11 @@ fn find_clean_reroute_path(
             group_ctx,
             from_id,
             to_id,
-            corridor_plan.chains.contains_key(&ei),
+            has_chain,
             false,
         ))
-        .with_corridor_boost(boost);
+        .with_corridor_boost(boost || has_chain)
+        .with_prefer_outer_ring(prefer_outer);
         let pair = EndpointPair {
             from: from_ep.clone(),
             to: to_ep.clone(),

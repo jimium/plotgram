@@ -73,6 +73,10 @@ pub fn run_refine(
     if !config.enabled || config.max_passes == 0 {
         return result;
     }
+    // C3 验证钩子：`PLOTGRAM_SKIP_REFINE=1` 只看 router 输出。
+    if std::env::var_os("PLOTGRAM_SKIP_REFINE").is_some() {
+        return result;
+    }
 
     let t_cross = crate::layout::perf::Instant::now();
     let best_metrics = crossing::analyze_crossings(&result, diagram, config);
@@ -81,15 +85,23 @@ pub fn run_refine(
         t_cross.elapsed().as_secs_f64() * 1000.0
     );
     let mut best_score = combined_crossing_score(&best_metrics);
-    if best_metrics.edge_node_crossings == 0 {
+    if best_metrics.edge_node_crossings == 0 && result.groups.is_empty() {
         return result;
     }
+
+    // P3：有组图跳过 push（节点推开会在后续 group_frame 放大后制造新穿组，
+    // 且 refine 内 lint 尚看不到最终组框）。穿组修复只走下方 fallback。
+    let skip_push = !result.groups.is_empty();
+
+    let entry_snapshot = result.clone();
+    let entry_group_pierces = count_group_interior_edges(diagram, &entry_snapshot);
 
     let mut best_result = result.clone();
     let mut momentum = push::MomentumHistory::new();
     let mut passes_executed = 0usize;
     let mut total_push_count = 0usize;
 
+    if !skip_push {
     for _ in 0..config.max_passes {
         let metrics = crossing::analyze_crossings(&result, diagram, config);
         if metrics.edge_node_crossings == 0 {
@@ -160,7 +172,36 @@ pub fn run_refine(
             result.nodes = pre_push_nodes;
             break;
         }
+        // P3：push+reroute 不得留下穿组结果。
+        // - after 穿组 → 恢复旧几何（无论 before 是否已穿；穿组修复交给 fallback）
+        // - after 不穿组 → 保留（允许从穿组改善到避组）
+        let group_maps = (!result.groups.is_empty())
+            .then(|| crate::layout::lint::GroupInteriorMaps::new(diagram));
+        let mut preserve_edges: std::collections::HashMap<usize, crate::layout::EdgeLayout> =
+            std::collections::HashMap::new();
+        if group_maps.is_some() {
+            let mut locked: Vec<usize> = edges_to_reroute.iter().copied().collect();
+            locked.sort_unstable();
+            for ei in locked {
+                if ei < result.edges.len() {
+                    preserve_edges.insert(ei, result.edges[ei].clone());
+                }
+            }
+        }
         reroute::reroute_subset(&mut result, diagram, router, &edges_to_reroute);
+        if let Some(ref maps) = group_maps {
+            let mut restored: Vec<usize> = preserve_edges.keys().copied().collect();
+            restored.sort_unstable();
+            for ei in restored {
+                if crate::layout::lint::edge_crosses_group_interior_with_maps(
+                    diagram, &result, ei, maps,
+                ) {
+                    if let Some(old) = preserve_edges.remove(&ei) {
+                        result.edges[ei] = old;
+                    }
+                }
+            }
+        }
         passes_executed += 1;
 
         let new_metrics = crossing::analyze_crossings(&result, diagram, config);
@@ -173,6 +214,7 @@ pub fn run_refine(
             break;
         }
     }
+    } // !skip_push
 
     result.hints.refine_debug = Some(crate::layout::RefineDebugStats {
         push_count: total_push_count,
@@ -181,28 +223,47 @@ pub fn run_refine(
         spline_fallback_count: 0,
     });
 
-    // P2-2：多轮 refine 后仍穿节点/穿组的边，走正交 dogleg/外廊降级（architecture
-    // 禁止密采样 spline）。穿组内若不纳入候选，仅穿组不穿节点的边永远得不到纠正。
+    // P3：fallback 仅处理当前已穿组边；已避组、仅穿节点的边禁止进 dogleg
+    // （否则会把走廊外绕打回穿组 L 形）。
     let final_metrics = crossing::analyze_crossings(&result, diagram, config);
     let mut fallback_edges: HashSet<usize> = HashSet::new();
-    for info in final_metrics.problem_nodes.values() {
-        fallback_edges.extend(info.edge_indices.iter().copied());
+    if !skip_push {
+        for info in final_metrics.problem_nodes.values() {
+            fallback_edges.extend(info.edge_indices.iter().copied());
+        }
     }
     if !result.groups.is_empty() {
         let maps = crate::layout::lint::GroupInteriorMaps::new(diagram);
+        let mut group_pierce: HashSet<usize> = HashSet::new();
         for edge_index in 0..result.edges.len() {
             if crate::layout::lint::edge_crosses_group_interior_with_maps(
                 diagram, &result, edge_index, &maps,
             ) {
-                fallback_edges.insert(edge_index);
+                group_pierce.insert(edge_index);
             }
         }
+        fallback_edges.extend(group_pierce.iter().copied());
+        fallback_edges.retain(|ei| group_pierce.contains(ei));
     }
     if !fallback_edges.is_empty() {
         spline_fallback::reroute_edges_with_spline(&mut result, diagram, &fallback_edges, config);
     }
 
+    let after_group = count_group_interior_edges(diagram, &result);
+    if after_group > entry_group_pierces {
+        result = entry_snapshot;
+    }
+
     result
+}
+
+fn count_group_interior_edges(diagram: &Diagram, result: &LayoutResult) -> usize {
+    if result.groups.is_empty() {
+        return 0;
+    }
+    // 与 lint / collinear 一致：按 (边, 无关组) 违规条数计。
+    let report = crate::layout::lint::lint_layout(diagram, result);
+    crate::layout::lint::LintMetricsSummary::from_report(&report).edge_crosses_group_interior
 }
 
 #[cfg(test)]

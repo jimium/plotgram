@@ -1,10 +1,10 @@
 # 共线 / 重叠 / 合流方案 — 开发计划
 
 > 日期：2026-07-15  
-> 方案：[`collinear-problem-analysis-2026-07.md`](./collinear-problem-analysis-2026-07.md)  
-> 手册：[`布局与路由核心手册-2026-07.md`](../../总结经验/布局与路由核心手册-2026-07.md)  
-> 既有开放项：[`开放项执行计划-2026-07.md`](../../总结经验/开放项执行计划-2026-07.md)（O0 基线缺口、O6.5 与本计划 Phase 1 对齐）  
-> 状态：**P0–P3 ✅**（2026-07-15）；拥堵修正 **S0–S5 + S4.x + S5.2b ✅**（见 [`congestion-remediation-plan-2026-07.md`](./congestion-remediation-plan-2026-07.md)）；其后可选 S2.2b / S3.2b；**P4 暂缓**
+> 方案：[`collinear-problem-analysis-2026-07.md`](collinear-problem-analysis-2026-07.md)  
+> 手册：[`布局与路由核心手册-2026-07.md`](../总结经验/布局与路由核心手册-2026-07.md)  
+> 既有开放项：[`开放项执行计划-2026-07.md`](../总结经验/开放项执行计划-2026-07.md)（O0 基线缺口、O6.5 与本计划 Phase 1 对齐）  
+> 状态：**P0–P3 ✅**（2026-07-15）；拥堵修正 **S0–S5 + S4.x + S5.2b ✅**（见 [`congestion-remediation-plan-2026-07.md`](congestion-remediation-plan-2026-07.md)）；其后可选 S2.2b / S3.2b；**P4 暂缓**
 
 ---
 
@@ -238,9 +238,9 @@ P4  全局 lane（可选）           ← 仅数据证明需要时
 | Phase | 状态 | 基线指针 |
 |-------|------|----------|
 | P0 监测+钉基线 | **完成**（2026-07-15） | 已被 P1 基线接替；质量门禁字段已建立 |
-| P1 Measure+Classify | **完成**（2026-07-15） | [`collinear-baseline-p1-2026-07-15.json`](../../../benchmark-data/collinear-baseline-p1-2026-07-15.json) |
-| P2 Annotation+验证 | **完成**（2026-07-15） | [`collinear-baseline-p2-2026-07-15.json`](../../../benchmark-data/collinear-baseline-p2-2026-07-15.json) |
-| P3 写权收敛 | **完成**（2026-07-15） | [`collinear-baseline-p3-2026-07-15.json`](../../../benchmark-data/collinear-baseline-p3-2026-07-15.json) / [`…-latest.json`](../../../benchmark-data/collinear-baseline-latest.json) |
+| P1 Measure+Classify | **完成**（2026-07-15） | [`collinear-baseline-p1-2026-07-15.json`](../../benchmark-data/collinear-baseline-p1-2026-07-15.json) |
+| P2 Annotation+验证 | **完成**（2026-07-15） | [`collinear-baseline-p2-2026-07-15.json`](../../benchmark-data/collinear-baseline-p2-2026-07-15.json) |
+| P3 写权收敛 | **完成**（2026-07-15） | [`collinear-baseline-p3-2026-07-15.json`](../../benchmark-data/collinear-baseline-p3-2026-07-15.json) / [`…-latest.json`](../../benchmark-data/collinear-baseline-latest.json) |
 | P4 全局 lane | 未触发 | — |
 
 ### P0 落地摘要

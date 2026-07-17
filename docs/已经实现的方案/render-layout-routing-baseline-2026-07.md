@@ -4,10 +4,10 @@
 > 性质：**Agent 工作笔记**（总体分析，为后续重构改造升级打基础）  
 > 状态：基线快照；不替代 `layout/readme.md` 与各专项方案  
 > 相关：  
-> - [render-pipeline.md](../../guides/render-pipeline.md)  
-> - [layout-routing-pipeline-full-analysis.md](./layout-routing-pipeline-full-analysis.md)  
-> - [layout-routing-optimization-proposal-2026-07.md](./layout-routing-optimization-proposal-2026-07.md)  
-> - [orthogonal-split-and-bundling-removal.md](../../已经实现的方案/orthogonal-split-and-bundling-removal.md)  
+> - [render-pipeline.md](../guides/render-pipeline.md)  
+> - [layout-routing-pipeline-full-analysis.md](layout-routing-pipeline-full-analysis.md)  
+> - [layout-routing-optimization-proposal-2026-07.md](layout-routing-optimization-proposal-2026-07.md)  
+> - [orthogonal-split-and-bundling-removal.md](orthogonal-split-and-bundling-removal.md)  
 > - `crates/plotgram-core/src/layout/readme.md`
 
 ---
@@ -357,14 +357,14 @@ crates/plotgram-eval/src/metrics.rs
 | Phase 3 | 完成 | 组内 Sugiyama → `sugiyama_v2::ARCHITECTURE_PRESET`（`intra_sugiyama.rs`）；内置 rank/order 冻结 |
 | Phase 4 | 完成 | orthogonal 后处理拆至 `slot_replan` / `conflict_reroute` / `straighten` / `stub_fix` |
 | Phase 5 | 完成 | `post_route_hook`；`MIN_PRESERVE_RATIO=0.10`；旧 `sugiyama` 别名 v2 且移出 catalog 名表 |
-| Space Contract | 进行中→落地 | `SpaceBudget` + 边感知 gap enforce；sanitize 不变量-only；退化升档；末端消重叠仅契约失败兜底。见 [space-contract-2026-07.md](./space-contract-2026-07.md) |
+| Space Contract | 进行中→落地 | `SpaceBudget` + 边感知 gap enforce；sanitize 不变量-only；退化升档；末端消重叠仅契约失败兜底。见 [space-contract-2026-07.md](space-contract-2026-07.md) |
 
 ### §7.2 债表更新
 
 | 优先级 | 债 | 状态 |
 |--------|-----|------|
 | P0 | 双套 Sugiyama | **部分关闭**：组内已委托 v2；无顶层 group 全局路径仍用 architecture 内置（冻结） |
-| P0 | 布局↔路由预算被动 | **改善**：lane_budget↑ + 顶层走廊 + PRS 降触发；**空间契约**见 [space-contract-2026-07.md](./space-contract-2026-07.md) |
+| P0 | 布局↔路由预算被动 | **改善**：lane_budget↑ + 顶层走廊 + PRS 降触发；**空间契约**见 [space-contract-2026-07.md](space-contract-2026-07.md) |
 | P1 | orthogonal / two_phase 过大 | **部分关闭**：orthogonal 后处理已拆；two_phase 未拆子模块 |
 | P1 | Group 默认 Fit+Start | **关闭**：默认 Equal+Center |
 | P2 | Pipeline architecture 硬编码 | **关闭**：`post_route_hook` |

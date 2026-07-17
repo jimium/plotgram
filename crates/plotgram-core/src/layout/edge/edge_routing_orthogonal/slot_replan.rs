@@ -195,24 +195,8 @@ pub fn replan_slots(
             .get(ei)
             .map(|rel| (rel.from.as_str(), rel.to.as_str()))
             .unwrap_or(("", ""));
-        let ctx = OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
-            .with_strict_group_transit(should_strict_group_transit(
-                profile,
-                group_ctx,
-                from_id,
-                to_id,
-                corridor_plan.chains.contains_key(&ei),
-                false,
-            ))
-            // slot 重排后的重路由：允许升档外框绕行
-            .with_corridor_boost(true);
-        let pair = EndpointPair {
-            from: from_ep.clone(),
-            to: to_ep.clone(),
-        };
-
-        let mut path_stats = PathSelectStats::default();
-        let path = validated_corridor_path(
+        let has_chain = corridor_plan.chains.contains_key(&ei);
+        let corridor_ok = validated_corridor_path(
             ei,
             from_ep.anchor,
             to_ep.anchor,
@@ -223,8 +207,27 @@ pub fn replan_slots(
             nodes,
             obstacles,
             cfg.channel_margin,
-        )
-        .unwrap_or_else(|| {
+        );
+        let prefer_outer = false;
+        let ctx = OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
+            .with_strict_group_transit(should_strict_group_transit(
+                profile,
+                group_ctx,
+                from_id,
+                to_id,
+                has_chain,
+                false,
+            ))
+            // slot 重排后的重路由：允许升档外框绕行
+            .with_corridor_boost(true)
+            .with_prefer_outer_ring(prefer_outer);
+        let pair = EndpointPair {
+            from: from_ep.clone(),
+            to: to_ep.clone(),
+        };
+
+        let mut path_stats = PathSelectStats::default();
+        let path = corridor_ok.unwrap_or_else(|| {
             select_best_path_with_scorer_stats(
                 &ctx,
                 &pair,

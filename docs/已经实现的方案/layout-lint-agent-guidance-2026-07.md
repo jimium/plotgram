@@ -2,7 +2,7 @@
 
 > 日期：2026-07-12  
 > 状态：提案（未实现）  
-> 相关：[`docs/guides/layout-lint.md`](../../guides/layout-lint.md)、[`docs/guides/group-layout-and-frame.md`](../../guides/group-layout-and-frame.md)、[`docs/specs/error-model.md`](../../specs/error-model.md)、[`docs/product/agent-mcp-skills-strategy.md`](../../product/agent-mcp-skills-strategy.md)
+> 相关：[`docs/guides/layout-lint.md`](../guides/layout-lint.md)、[`docs/guides/group-layout-and-frame.md`](../guides/group-layout-and-frame.md)、[`docs/specs/error-model.md`](../specs/error-model.md)、[`docs/product/agent-mcp-skills-strategy.md`](../product/agent-mcp-skills-strategy.md)
 
 ---
 
@@ -65,7 +65,7 @@ LayoutLint 作为**几何硬门禁**已经够用（确定性、可归因、CLI/e
 
 ### 1.3 与错误模型的断层
 
-[`error-model.md`](../../specs/error-model.md) 已有成熟的 Agent 闭环：
+[`error-model.md`](../specs/error-model.md) 已有成熟的 Agent 闭环：
 
 ```text
 DiagnosticError → suggestion.text + suggestion.fix → Agent 改 DSL → 重试
@@ -83,7 +83,7 @@ LayoutLint 只有「哪里错了」，没有「怎么修」：
 
 ### 1.4 Group 相关旋钮（Agent 可调、但 lint 未指引）
 
-来自 [`group-layout-and-frame.md`](../../guides/group-layout-and-frame.md)：
+来自 [`group-layout-and-frame.md`](../guides/group-layout-and-frame.md)：
 
 | 层级 | DSL | 管什么 |
 |------|-----|--------|
@@ -447,7 +447,7 @@ Week 3（P2）
 5. 不要手写节点坐标；用 group { layout } 与 group_frame 调节
 ```
 
-参考指南：[`group-layout-and-frame.md`](../../guides/group-layout-and-frame.md)。
+参考指南：[`group-layout-and-frame.md`](../guides/group-layout-and-frame.md)。
 
 ---
 

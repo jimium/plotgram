@@ -3,8 +3,8 @@
 > 日期：2026-07-15  
 > 范围：正交路由 + `grid_snap` + pipeline 末尾 post-route  
 > 状态：架构纲领，尚未实现  
-> 执行计划：[`collinear-execution-plan-2026-07.md`](./collinear-execution-plan-2026-07.md)（含质量/性能门禁）  
-> 约束：对齐 [`布局与路由核心手册`](../../总结经验/布局与路由核心手册-2026-07.md)；**禁止**新建空壳 `EdgeGeometryContract` 式大重构再修行为
+> 执行计划：[`collinear-execution-plan-2026-07.md`](collinear-execution-plan-2026-07.md)（含质量/性能门禁）  
+> 约束：对齐 [`布局与路由核心手册`](../总结经验/布局与路由核心手册-2026-07.md)；**禁止**新建空壳 `EdgeGeometryContract` 式大重构再修行为
 
 ---
 

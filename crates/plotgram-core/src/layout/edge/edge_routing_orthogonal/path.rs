@@ -487,8 +487,8 @@ pub fn select_best_path_with_scorer_stats(
         s.degraded = state.best_strict.is_none() && state.best_nodes_only.is_none();
     }
 
-    // Iteration 2：有 corridor 时拒绝 nodes-only（穿组）；dirty 仅在不穿无关组时可用。
-    // R2：主选择路径禁止 node_dirty 胜出；无 clean 时走 orthogonal_degraded_fallback。
+    // Iteration 2 / P1：strict 时拒绝 nodes-only（穿组）；避组脏路径可胜出。
+    // R2：主选择路径禁止「穿组」；无 clean/避组时走 orthogonal_degraded_fallback。
     let chosen = if ctx.strict_group_transit {
         state.best_strict.or_else(|| {
             state.best_dirty.filter(|(_, path)| {
@@ -498,13 +498,6 @@ pub fn select_best_path_with_scorer_stats(
                     to_id,
                     ctx.group_ctx,
                     &ctx.obstacles.sorted_group_ids,
-                ) && path_is_clean(
-                    path,
-                    from_id,
-                    to_id,
-                    ctx.nodes,
-                    ctx.group_ctx,
-                    &ctx.obstacles.sorted_node_ids,
                 )
             })
         })
@@ -679,20 +672,50 @@ fn orthogonal_degraded_fallback(
         }
     }
 
-    best_clean
-        .map(|(_, _, p)| p)
-        .or_else(|| best_dirty.map(|(_, _, p)| p))
-        .unwrap_or_else(|| {
-            ensure_port_stubs(
-                simplify_path(vec![
-                    Point::new(sx, sy),
-                    Point::new(ex, sy),
-                    Point::new(ex, ey),
-                ], false),
+    // P1：strict 时优先少穿组（避组脏路径可胜于穿组净路径）；非 strict 仍先 clean。
+    if ctx.strict_group_transit {
+        match (best_clean, best_dirty) {
+            (Some(c), Some(d)) => {
+                if d.0 < c.0 {
+                    d.2
+                } else {
+                    c.2
+                }
+            }
+            (Some(c), None) => c.2,
+            (None, Some(d)) => d.2,
+            (None, None) => ensure_port_stubs(
+                simplify_path(
+                    vec![
+                        Point::new(sx, sy),
+                        Point::new(ex, sy),
+                        Point::new(ex, ey),
+                    ],
+                    false,
+                ),
                 from_side,
                 to_side,
-            )
-        })
+            ),
+        }
+    } else {
+        best_clean
+            .map(|(_, _, p)| p)
+            .or_else(|| best_dirty.map(|(_, _, p)| p))
+            .unwrap_or_else(|| {
+                ensure_port_stubs(
+                    simplify_path(
+                        vec![
+                            Point::new(sx, sy),
+                            Point::new(ex, sy),
+                            Point::new(ex, ey),
+                        ],
+                        false,
+                    ),
+                    from_side,
+                    to_side,
+                )
+            })
+    }
 }
 
 /// 保证路径首/末段沿端口外向离开/进入（退化兜底专用）。

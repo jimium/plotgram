@@ -721,7 +721,8 @@ fn evaluate_attempt(
         .unwrap_or(("", ""));
 
     let mut path_stats = PathSelectStats::default();
-    let candidate = validated_corridor_path(
+    let has_chain = corridor_plan.chains.contains_key(&ei);
+    let corridor_ok = validated_corridor_path(
         ei,
         nf_anchor,
         nt_anchor,
@@ -732,19 +733,21 @@ fn evaluate_attempt(
         nodes,
         obstacles,
         r_cfg.channel_margin,
-    )
-    .unwrap_or_else(|| {
+    );
+    let prefer_outer = false;
+    let candidate = corridor_ok.unwrap_or_else(|| {
         let ctx = OrthoRoutingContext::new(nodes, group_ctx, grid, r_cfg, profile, obstacles, None)
             .with_strict_group_transit(should_strict_group_transit(
                 profile,
                 group_ctx,
                 from_id,
                 to_id,
-                corridor_plan.chains.contains_key(&ei),
+                has_chain,
                 force_strict_feedback_or_long_span,
             ))
             // 换端口重试：升档外框通道
-            .with_corridor_boost(true);
+            .with_corridor_boost(true)
+            .with_prefer_outer_ring(prefer_outer);
         select_best_path_with_scorer_stats(
             &ctx,
             &pair,

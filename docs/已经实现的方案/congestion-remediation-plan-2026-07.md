@@ -2,9 +2,9 @@
 
 > 日期：2026-07-15  
 > 触发样例：`showcase/flowchart/n.user-auth.pgm`、`showcase/architecture/n.typical-microservice-architecture.pgm`  
-> 手册：[`布局与路由核心手册-2026-07.md`](../../总结经验/布局与路由核心手册-2026-07.md)  
-> 共线纲领：[`collinear-problem-analysis-2026-07.md`](./collinear-problem-analysis-2026-07.md)  
-> 共线基建：[`collinear-execution-plan-2026-07.md`](./collinear-execution-plan-2026-07.md)（P0–P3 已完成）  
+> 手册：[`布局与路由核心手册-2026-07.md`](../总结经验/布局与路由核心手册-2026-07.md)  
+> 共线纲领：[`collinear-problem-analysis-2026-07.md`](collinear-problem-analysis-2026-07.md)  
+> 共线基建：[`collinear-execution-plan-2026-07.md`](collinear-execution-plan-2026-07.md)（P0–P3 已完成）  
 > 状态：**S0–S5 ✅ · S4.x ✅ · S5.2b ✅**（2026-07-15）；其后可选 **S2.2b / S3.2b / collinear P4**（见 §5.1）
 
 ---
