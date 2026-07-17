@@ -14,6 +14,7 @@ pub mod visibility;
 
 pub use route_annotation::{
     annotate_edge_from_path, freeze_route_annotations, freeze_route_annotations_with_merges,
+    refresh_route_annotations_preserving_semantics,
     try_shape_edit, validate_route_edit, EdgeRouteAnnotation, MergeInterval, ProtectedRun,
     RouteAnnotationSet, RouteEditKind, RouteEditObstacleCtx, RouteEditValidateOpts,
     RouteEditViolation, VertexRole,

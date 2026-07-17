@@ -72,8 +72,8 @@ pub use sanitize::{
 pub use lane_assignment::{enforce_reverse_pair_dock_separation, enforce_reverse_pair_min_gap};
 pub use stub_occupancy::{
     collect_stub_occupancy, estimate_layer_band_demands, find_stub_occupancy_conflicts,
-    resolve_stub_occupancy_conflicts, LayerBandDemand, StubOccupancyConflict,
-    StubOccupancyRecord, StubOccupancyStats,
+    resolve_exact_stub_occupancy_post_route, resolve_stub_occupancy_conflicts, LayerBandDemand,
+    StubOccupancyConflict, StubOccupancyRecord, StubOccupancyStats,
 };
 pub(super) use straighten::straighten_preferred_alignments;
 pub(super) use stub_fix::fix_reverse_stub_ports;

@@ -429,6 +429,34 @@ pub fn freeze_route_annotations_with_merges(
     out
 }
 
+/// D 期改边后：按当前路径重建注解，保留既有 `merge_intervals` / `degraded`。
+pub fn refresh_route_annotations_preserving_semantics(
+    edges: &[EdgeLayout],
+    from_side: &[Port],
+    to_side: &[Port],
+    previous: Option<&RouteAnnotationSet>,
+) -> RouteAnnotationSet {
+    let mut merges: HashMap<usize, Vec<MergeInterval>> = HashMap::new();
+    let mut degraded: HashMap<usize, String> = HashMap::new();
+    if let Some(prev) = previous {
+        for ann in &prev.edges {
+            if !ann.merge_intervals.is_empty() {
+                merges.insert(ann.edge_index, ann.merge_intervals.clone());
+            }
+            if let Some(reason) = &ann.degraded {
+                degraded.insert(ann.edge_index, reason.clone());
+            }
+        }
+    }
+    freeze_route_annotations_with_merges(
+        edges,
+        from_side,
+        to_side,
+        (!merges.is_empty()).then_some(&merges),
+        (!degraded.is_empty()).then_some(&degraded),
+    )
+}
+
 fn protected_runs_preserved(after: &[Point], runs: &[ProtectedRun], coord_tol: f64) -> bool {
     if runs.is_empty() {
         return true;

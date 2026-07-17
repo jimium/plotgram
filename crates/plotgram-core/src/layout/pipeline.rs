@@ -275,6 +275,51 @@ impl<'a> LayoutPipeline<'a> {
                     dock_gap,
                 );
 
+            // L3：architecture 在 C 期 stub_occ 仅诊断；节点已冻结后于 D 末做 exact 跨对共柱真修。
+            // 只改边几何 → node_fp 不变；须在 label 避让前完成并刷新 annotation。
+            if algo == "architecture" {
+                let stub_gap = crate::layout::edge::parallel_gap_for_diagram(
+                    self.diagram.diagram_type.clone(),
+                );
+                let stub_stats = crate::layout::edge::edge_routing_orthogonal::
+                    resolve_exact_stub_occupancy_post_route(
+                        &mut result.edges,
+                        &self.diagram.relations,
+                        &from_side,
+                        &to_side,
+                        &result.nodes,
+                        stub_gap,
+                    );
+                if stub_stats.stubs_shifted > 0 {
+                    let prev = result.hints.route_annotations.clone();
+                    result.hints.route_annotations = Some(
+                        crate::layout::edge::refresh_route_annotations_preserving_semantics(
+                            &result.edges,
+                            &from_side,
+                            &to_side,
+                            prev.as_ref(),
+                        ),
+                    );
+                    crate::perf_log!(
+                        "[perf]     d_stub_exact_post_route: shifted={} unresolved_exact={} degraded={}",
+                        stub_stats.stubs_shifted,
+                        stub_stats.unresolved_conflicts,
+                        stub_stats.degraded
+                    );
+                }
+            }
+
+            // L5.1：几何冻结后、label 前 —— 对仍 through 的边做保组 dogleg 试修。
+            // refine 期有组图常看不到最终 through（后处理才引入）；此处与 lint 对齐。
+            {
+                let t_through = crate::layout::perf::Instant::now();
+                crate::layout::refine::repair_through_edges_post_route(self.diagram, &mut result);
+                crate::perf_log!(
+                    "[perf]     d_through_repair: {:.2}ms",
+                    t_through.elapsed().as_secs_f64() * 1000.0
+                );
+            }
+
             // 标签避让必须是几何冻结后的**最终**步骤：sanitize 会按平行边规则
             // 重建所有标签；snap/repulse 又移动了路径。router 内不再提前 resolve（P3.3）。
             let label_config =

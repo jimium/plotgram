@@ -272,6 +272,32 @@ pub fn resolve_stub_occupancy_conflicts(
     nodes: &HashMap<String, NodeLayout>,
     min_gap: f64,
 ) -> StubOccupancyStats {
+    resolve_exact_cross_pair_stub_conflicts(edges, relations, from_side, to_side, nodes, min_gap)
+}
+
+/// L3 / D 末端：architecture（C 期 diagnose-only）在节点冻结后做一次 exact 跨对共柱分离。
+///
+/// 与 [`resolve_stub_occupancy_conflicts`] 同策略；**只改边几何，不写节点**，故 `node_fp` 不变。
+/// 调用方须在 dock 分离之后、label 避让之前调用，并刷新 route annotations。
+pub fn resolve_exact_stub_occupancy_post_route(
+    edges: &mut [EdgeLayout],
+    relations: &[Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+    nodes: &HashMap<String, NodeLayout>,
+    min_gap: f64,
+) -> StubOccupancyStats {
+    resolve_exact_cross_pair_stub_conflicts(edges, relations, from_side, to_side, nodes, min_gap)
+}
+
+fn resolve_exact_cross_pair_stub_conflicts(
+    edges: &mut [EdgeLayout],
+    relations: &[Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+    nodes: &HashMap<String, NodeLayout>,
+    min_gap: f64,
+) -> StubOccupancyStats {
     let mut stats = StubOccupancyStats::default();
     let records = collect_stub_occupancy(edges, relations, from_side, to_side);
     stats.records = records.len();
@@ -653,6 +679,102 @@ mod tests {
         assert!(
             auth_bottom.is_empty(),
             "auth bottom conflicts remain: {auth_bottom:?}"
+        );
+    }
+
+    #[test]
+    fn post_route_entry_separates_exact_cross_pair() {
+        let mut edges = vec![
+            edge(
+                vec![
+                    Point::new(100.0, 300.0),
+                    Point::new(100.0, 280.0),
+                    Point::new(184.0, 280.0),
+                    Point::new(184.0, 250.0),
+                ],
+                Port::Top,
+                Port::Bottom,
+            ),
+            edge(
+                vec![
+                    Point::new(184.0, 250.0),
+                    Point::new(184.0, 270.0),
+                    Point::new(220.0, 270.0),
+                    Point::new(220.0, 300.0),
+                ],
+                Port::Bottom,
+                Port::Top,
+            ),
+        ];
+        let relations = vec![rel("db", "auth"), rel("auth", "cache")];
+        let from_side = vec![Port::Top, Port::Bottom];
+        let to_side = vec![Port::Bottom, Port::Top];
+        let mut nodes = HashMap::new();
+        nodes.insert(
+            "auth".into(),
+            NodeLayout {
+                x: 128.0,
+                y: 200.0,
+                width: 112.0,
+                height: 50.0,
+            },
+        );
+        nodes.insert(
+            "db".into(),
+            NodeLayout {
+                x: 50.0,
+                y: 300.0,
+                width: 112.0,
+                height: 50.0,
+            },
+        );
+        nodes.insert(
+            "cache".into(),
+            NodeLayout {
+                x: 200.0,
+                y: 300.0,
+                width: 112.0,
+                height: 50.0,
+            },
+        );
+        let stats = resolve_exact_stub_occupancy_post_route(
+            &mut edges,
+            &relations,
+            &from_side,
+            &to_side,
+            &nodes,
+            12.0,
+        );
+        assert!(stats.stubs_shifted >= 1, "stats={stats:?}");
+        assert_eq!(stats.unresolved_conflicts, 0, "stats={stats:?}");
+    }
+
+    #[test]
+    fn architecture_pipeline_reduces_exact_stub_cross_pairs_on_cloud_native() {
+        use crate::layout::compute_layout_with_plan;
+        use crate::pipeline::parse_prepare_validate;
+        use crate::prepare::StyleRequest;
+
+        let source =
+            include_str!("../../../../../../showcase/architecture/c.cloud-native.pgm");
+        let output = parse_prepare_validate(source, &StyleRequest::default());
+        let prepared = output.diagram.expect("valid diagram");
+        let diagram = prepared.inner();
+        let layout =
+            compute_layout_with_plan(diagram, prepared.layout_plan()).expect("layout");
+
+        let from_side: Vec<_> = layout.edges.iter().map(|e| e.from_port).collect();
+        let to_side: Vec<_> = layout.edges.iter().map(|e| e.to_port).collect();
+        let records = collect_stub_occupancy(&layout.edges, &diagram.relations, &from_side, &to_side);
+        let conflicts = find_stub_occupancy_conflicts(&records, &diagram.relations, 12.0);
+        let exact_cross = conflicts
+            .iter()
+            .filter(|c| !c.reverse_pair && c.gap < 1.0)
+            .count();
+        // D 末端真修后：exact 跨对共柱应为 0（侧 span 不足时 degraded，仍不得保留 gap≈0）
+        assert_eq!(
+            exact_cross, 0,
+            "exact cross-pair stub conflicts remain: {conflicts:?}"
         );
     }
 }

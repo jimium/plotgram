@@ -1323,8 +1323,9 @@ fn phase_lane(
     let gap_fixed = enforce_reverse_pair_min_gap(edges, relations, parallel_gap);
     ortho_stats.lane_segments_shifted += gap_fixed;
 
-    // S1：同侧 stub 占用。architecture（semantic_merge）仅诊断，避免 C 改边反馈 space-budget 动节点；
-    // flowchart 类启用跨对 exact 共柱分离（打 T1）。
+    // S1：同侧 stub 占用。architecture（semantic_merge）C 期仅诊断，避免改边反馈
+    // space-budget 动节点；exact 跨对共柱改在 pipeline D 末端
+    // `resolve_exact_stub_occupancy_post_route`（保 node_fp）。flowchart 仍在此真修。
     let records = collect_stub_occupancy(edges, relations, from_side, to_side);
     let conflicts = find_stub_occupancy_conflicts(&records, relations, parallel_gap);
     ortho_stats.stub_occupancy_conflicts = conflicts.len();

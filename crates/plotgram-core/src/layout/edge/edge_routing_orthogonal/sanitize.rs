@@ -85,7 +85,17 @@ pub fn sanitize_orthogonal_edges_with_guard(
         let ts = to_side.get(ei).copied().unwrap_or(edge.to_port);
 
         let frozen = annotations.and_then(|set| set.get(ei)).cloned();
-        let _ = (nodes, sorted_node_ids, relations.get(ei));
+        // L5.1：D 末形状编辑挂穿障硬回退——仅拒「编辑前干净 → 编辑后穿节点」。
+        // 已脏路径不在此清；清 through 走 refine dogleg（保组硬门禁）。
+        let obstacle = match (nodes, sorted_node_ids, relations.get(ei)) {
+            (Some(n), Some(ids), Some(rel)) => Some(RouteEditObstacleCtx {
+                nodes: n,
+                sorted_node_ids: ids,
+                from_id: rel.from.as_str(),
+                to_id: rel.to.as_str(),
+            }),
+            _ => None,
+        };
 
         sanitize_polyline_ext_guarded(
             &mut points,
@@ -94,9 +104,7 @@ pub fn sanitize_orthogonal_edges_with_guard(
             merge_overshoot,
             frozen.as_ref(),
             ei,
-            // 穿障检查保留在 validate API / 单测；挂到 D sanitize 时会回退
-            // 有益 overshoot 合并并抬高 trunk 严重度（门禁回归）。P3 再按证据打开。
-            None,
+            obstacle,
         );
         if points.len() < 2 {
             continue;

@@ -379,9 +379,16 @@ pub fn snap_edge_waypoints_with_guard(
                 a
             },
         );
-        let obstacle = None::<crate::layout::edge::RouteEditObstacleCtx<'_>>;
-        // 量化钩子：不做穿障硬回退（与 D sanitize 同因）；仍校验端点/stub/正交。
-        let _ = (nodes, sorted_node_ids, relations); // 保留签名供后续打开
+        // L5.1：snap/simplify 挂穿障硬回退（仅拒「干净→新穿节点」）。
+        let obstacle = match (nodes, sorted_node_ids, relations.and_then(|rs| rs.get(ei))) {
+            (Some(n), Some(ids), Some(rel)) => Some(crate::layout::edge::RouteEditObstacleCtx {
+                nodes: n,
+                sorted_node_ids: ids,
+                from_id: rel.from.as_str(),
+                to_id: rel.to.as_str(),
+            }),
+            _ => None,
+        };
 
         let final_pts = if let Some(ref ann) = ann {
             let opts = crate::layout::edge::RouteEditValidateOpts {

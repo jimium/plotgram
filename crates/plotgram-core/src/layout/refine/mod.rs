@@ -223,27 +223,23 @@ pub fn run_refine(
         spline_fallback_count: 0,
     });
 
-    // P3：fallback 仅处理当前已穿组边；已避组、仅穿节点的边禁止进 dogleg
-    // （否则会把走廊外绕打回穿组 L 形）。
+    // L5.1：穿组边 + 仅穿节点边均可进 dogleg。
+    // 硬门禁在 `orthogonal_detour`（残 through / 新穿组一律拒）；不得为消 through 留下穿组。
+    // 有组图仍 skip push；此处只是放开「已避组但 through」的末端试修写权。
     let final_metrics = crossing::analyze_crossings(&result, diagram, config);
     let mut fallback_edges: HashSet<usize> = HashSet::new();
-    if !skip_push {
-        for info in final_metrics.problem_nodes.values() {
-            fallback_edges.extend(info.edge_indices.iter().copied());
-        }
+    for info in final_metrics.problem_nodes.values() {
+        fallback_edges.extend(info.edge_indices.iter().copied());
     }
     if !result.groups.is_empty() {
         let maps = crate::layout::lint::GroupInteriorMaps::new(diagram);
-        let mut group_pierce: HashSet<usize> = HashSet::new();
         for edge_index in 0..result.edges.len() {
             if crate::layout::lint::edge_crosses_group_interior_with_maps(
                 diagram, &result, edge_index, &maps,
             ) {
-                group_pierce.insert(edge_index);
+                fallback_edges.insert(edge_index);
             }
         }
-        fallback_edges.extend(group_pierce.iter().copied());
-        fallback_edges.retain(|ei| group_pierce.contains(ei));
     }
     if !fallback_edges.is_empty() {
         spline_fallback::reroute_edges_with_spline(&mut result, diagram, &fallback_edges, config);
@@ -264,6 +260,69 @@ fn count_group_interior_edges(diagram: &Diagram, result: &LayoutResult) -> usize
     // 与 lint / collinear 一致：按 (边, 无关组) 违规条数计。
     let report = crate::layout::lint::lint_layout(diagram, result);
     crate::layout::lint::LintMetricsSummary::from_report(&report).edge_crosses_group_interior
+}
+
+/// 与 lint `edge_through_node` 对齐：跳过端点 stub 段，全尺寸节点相交。
+fn collect_lint_through_edge_indices(diagram: &Diagram, result: &LayoutResult) -> HashSet<usize> {
+    let mut out = HashSet::new();
+    let mut node_ids: Vec<&String> = result.nodes.keys().collect();
+    node_ids.sort();
+
+    for (index, edge) in result.edges.iter().enumerate() {
+        if edge.path_len() < 2 {
+            continue;
+        }
+        let Some(rel) = diagram.relations.get(index) else {
+            continue;
+        };
+        let from_id = rel.from.as_str();
+        let to_id = rel.to.as_str();
+        let path = edge.path_points();
+        let segment_count = path.len().saturating_sub(1);
+        let skip_endpoints = segment_count > 2;
+
+        for (seg_i, window) in path.windows(2).enumerate() {
+            if skip_endpoints && (seg_i == 0 || seg_i == segment_count - 1) {
+                continue;
+            }
+            let a = window[0];
+            let b = window[1];
+            for node_id in &node_ids {
+                let node_id = node_id.as_str();
+                if node_id == from_id || node_id == to_id {
+                    continue;
+                }
+                let nl = &result.nodes[node_id];
+                if segment_intersects_node(a, b, nl) {
+                    out.insert(index);
+                    break;
+                }
+            }
+        }
+    }
+    out
+}
+
+/// L5.1：节点/组框冻结后的穿节点试修（与 lint 对齐）。
+///
+/// 有干净正交绕行则替换；`orthogonal_detour` 硬拒残 through / 新穿组。
+/// 若整批试修抬高穿组计数则整批回退。
+pub fn repair_through_edges_post_route(diagram: &Diagram, result: &mut LayoutResult) {
+    let through_edges = collect_lint_through_edge_indices(diagram, result);
+    if through_edges.is_empty() {
+        return;
+    }
+    let entry_group = count_group_interior_edges(diagram, result);
+    let snapshot = result.clone();
+    spline_fallback::reroute_edges_with_spline(
+        result,
+        diagram,
+        &through_edges,
+        &RefineConfig::default(),
+    );
+    if count_group_interior_edges(diagram, result) > entry_group {
+        *result = snapshot;
+    }
 }
 
 #[cfg(test)]
