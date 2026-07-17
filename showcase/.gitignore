@@ -1,4 +1,2 @@
 **/*.png
 **/*.svg
-.history/**/*
-.history/manifest.json

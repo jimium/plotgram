@@ -99,7 +99,7 @@ showcase/
 # 渲染前先验证
 ./showcase/render-all.sh --validate -a
 
-# 在本地 HTTP 服务下浏览画廊（含历史版本对比）
+# 在本地 HTTP 服务下浏览画廊
 python3 -m http.server --directory showcase 4173
 # 打开 http://localhost:4173/index.html
 
@@ -110,17 +110,7 @@ cargo run -p plotgram-cli -- render showcase/flowchart/s.linear-chain.pgm
 cargo run -p plotgram-cli -- validate showcase/sequence/n.oauth-login.pgm
 ```
 
-## SVG 历史版本
-
-`render-all.sh` 在重新生成 SVG 时，若输出与现有文件内容不同，会把**旧版 SVG** 自动归档到 `showcase/.history/`，并更新 `showcase/.history/manifest.json`。
-
-在 `index.html` 大图预览中：
-
-- 侧栏 **版本历史** 列出当前版本与全部历史快照（按时间倒序）
-- `[` / `]` 在同一图的历史版本间切换
-- **对比相邻版本** 可左右并排查看新旧差异
-
-历史 SVG 默认不入库（见 `showcase/.gitignore`），`manifest.json` 可提交以便团队共享版本索引。
+`render-all.sh` 渲染时会对比输出与上次内容的 SHA256，在控制台标注 `[新建]`、`[无变化]` 或 `[已变化]`。
 
 ## 与 Mermaid 对照
 

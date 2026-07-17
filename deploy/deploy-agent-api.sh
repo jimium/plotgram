@@ -73,7 +73,6 @@ sync_source() {
     --exclude='playground/dist' \
     --exclude='website/dist' \
     --exclude='.git' \
-    --exclude='showcase/.history' \
     "$ROOT_DIR/" "$DEPLOY_HOST:$REMOTE_SRC/"
   log "源码同步完成"
 }

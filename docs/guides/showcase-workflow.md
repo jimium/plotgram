@@ -42,7 +42,7 @@ showcase/
 ./showcase/render-all.sh -f png
 ```
 
-输出目录默认 `showcase/output/`；历史 SVG 快照见 `showcase/.history/`（见 showcase README）。
+输出与源 `.pgm` 同目录、同名换后缀（如 `flowchart/s.linear-chain.svg`）。`render-all.sh` 会在控制台标注相对上次渲染是否有变化。
 
 ### 本地画廊
 

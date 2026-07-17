@@ -167,8 +167,7 @@ ssh shanxun 'cd /opt/plotgram-agent-api && ./stop.sh && ./start.sh'
 │   ├── assets/         # Agent Demo 打包 js / css
 │   └── plotgram-wasm/   # 与 playground 共用同一份 wasm 产物
 └── showcase/
-    ├── **/*.svg        # 各类型示例 SVG
-    └── .history/       # SVG 历史快照
+    └── **/*.svg        # 各类型示例 SVG
 ```
 
 ### CDN URL 映射
@@ -461,7 +460,7 @@ deploy-agent-api.sh  （独立，远程编译 Rust 服务端）
 | CDN `/plotgram-wasm/` | wasm 产物（三端共用） | — |
 | CDN `/website/assets/` | website 打包 js/css | — |
 | CDN `/playground/assets/` | playground 打包 js/css | — |
-| CDN `/showcase/` | SVG 文件 + 历史快照 | — |
+| CDN `/showcase/` | SVG 文件 | — |
 | CDN `/agent/assets/` | agent 打包 js/css | — |
 
 **关键**：website 脚本对两站根目录均使用 `--delete`，但已排除 `playground/` `showcase/` `agent/` 子目录，不会误删其他站点。镜像站通过 `rsync_to_both` 与主站保持同步。

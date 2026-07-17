@@ -111,7 +111,33 @@ format_duration_ms() {
   awk -v ms="$1" 'BEGIN { printf "%.3fs", ms / 1000 }'
 }
 
-# 仅统计 plotgram render 墙钟耗时（毫秒精度）；不含 svg-history 归档/写盘。
+sha256_file() {
+  shasum -a 256 "$1" | awk '{print $1}'
+}
+
+lookup_hash() {
+  awk -F'\t' -v key="$1" '$2 == key { print $1; found = 1; exit } END { if (!found) print "" }' "$HASH_DB"
+}
+
+change_note_for() {
+  local out="$1"
+  local old_hash new_hash
+  old_hash="$(lookup_hash "$out")"
+  if [[ ! -f "$out" ]]; then
+    echo ""
+    return
+  fi
+  new_hash="$(sha256_file "$out")"
+  if [[ -z "$old_hash" ]]; then
+    echo " [新建]"
+  elif [[ "$old_hash" == "$new_hash" ]]; then
+    echo " [无变化]"
+  else
+    echo " [已变化]"
+  fi
+}
+
+# 仅统计 plotgram render 墙钟耗时（毫秒精度）。
 # 子进程 stdout/stderr 重定向到 /dev/null，避免 [perf] 等日志污染输出。
 run_timed_render() {
   local render_args=(render "$1" -f "$2" -o "$3")
@@ -154,10 +180,8 @@ output_ext() {
 
 build_plotgram
 
-# 清理上次中断留下的临时渲染文件，避免污染 svg-history
-while IFS= read -r -d '' stale; do
-  rm -f "$stale"
-done < <(find "$SCRIPT_DIR" -name '*.rendering.*' -not -path '*/.*' -print0 2>/dev/null || true)
+HASH_DB="$(mktemp)"
+trap 'rm -f "$HASH_DB"' EXIT
 
 total_files=0
 while IFS= read -r -d '' _; do
@@ -179,6 +203,19 @@ echo "开始渲染: $total_files 个文件 × ${#FORMATS[@]} 种格式 = $total_
 echo "格式: ${FORMATS[*]}"
 echo
 
+echo "记录现有输出 hash..."
+while IFS= read -r -d '' dfy_file; do
+  base="${dfy_file%.pgm}"
+  for format in "${FORMATS[@]}"; do
+    ext="$(output_ext "$format")"
+    out="${base}.${ext}"
+    if [[ -f "$out" ]]; then
+      printf '%s\t%s\n' "$(sha256_file "$out")" "$out" >> "$HASH_DB"
+    fi
+  done
+done < <(find "$SCRIPT_DIR" -name '*.pgm' -not -path '*/.*' -print0 | sort -z)
+echo
+
 while IFS= read -r -d '' dfy_file; do
   rel="${dfy_file#"$SCRIPT_DIR"/}"
   base="${dfy_file%.pgm}"
@@ -196,30 +233,14 @@ while IFS= read -r -d '' dfy_file; do
     current=$((current + 1))
     ext="$(output_ext "$format")"
     out="${base}.${ext}"
-    render_out="$out"
-    history_note=""
 
-    if [[ "$format" == "svg" ]]; then
-      render_out="${out}.rendering.$$"
-    fi
-
-    if elapsed_ms="$(run_timed_render "$dfy_file" "$format" "$render_out")"; then
+    if elapsed_ms="$(run_timed_render "$dfy_file" "$format" "$out")"; then
       total_ms=$((total_ms + elapsed_ms))
-      if [[ "$format" == "svg" ]]; then
-        history_result="$(python3 "$SCRIPT_DIR/svg-history.py" commit "$rel" "$render_out" "$out")"
-        case "$history_result" in
-          archived) history_note=" [已归档旧版]" ;;
-          created)  history_note=" [新建]" ;;
-        esac
-      fi
       success=$((success + 1))
       printf '[%d/%d] %s -> %s (%s)%s\n' \
-        "$current" "$total_jobs" "$rel" "$(basename "$out")" "$(format_duration_ms "$elapsed_ms")" "$history_note"
+        "$current" "$total_jobs" "$rel" "$(basename "$out")" "$(format_duration_ms "$elapsed_ms")" "$(change_note_for "$out")"
     else
       failed=$((failed + 1))
-      if [[ "$format" == "svg" && -f "$render_out" ]]; then
-        rm -f "$render_out"
-      fi
       printf '[%d/%d] %s -> %s\n' \
         "$current" "$total_jobs" "$rel" "$(basename "$out")" >&2
       echo "  ✗ 失败" >&2

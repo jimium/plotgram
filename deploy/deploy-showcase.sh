@@ -3,7 +3,7 @@
 #
 # 产物：
 #   - demo 站:  /var/www/plotgram/showcase/  （页面、.pgm、manifest，不含 .svg）
-#   - CDN:      /showcase/                   （SVG 文件 + .history 历史快照）
+#   - CDN:      /showcase/                   （SVG 文件）
 #
 # 流程：cargo build plotgram-cli → 渲染 SVG → patch CDN/BUILD_HASH → 同步
 #
@@ -85,7 +85,7 @@ PY
 patch_build_hash() {
   local index_html="$1"
   local build_hash
-  build_hash=$(cd "$SHOWCASE_DIR" && find . -name '*.svg' -type f -not -path '*/.history/*' | sort | xargs cat | shasum -a 256 | cut -d' ' -f1 | head -c 8)
+  build_hash=$(cd "$SHOWCASE_DIR" && find . -name '*.svg' -type f | sort | xargs cat | shasum -a 256 | cut -d' ' -f1 | head -c 8)
 
   if [[ -z "$build_hash" ]]; then
     die "无法计算 BUILD_HASH（showcase 目录下没有 SVG 文件？）"
@@ -105,15 +105,12 @@ stage_artifacts() {
   STAGING_DIR="$(new_staging_dir)"
   mkdir -p "$STAGING_DIR/demo-showcase" "$STAGING_DIR/demo-showcase-cn" "$STAGING_DIR/cdn-showcase"
 
-  # demo 站：showcase 不含 svg / 历史快照（走 CDN）
+  # demo 站：showcase 不含 svg（走 CDN）
   # 例外：assets/brand/ 下的品牌 logo SVG 需跟随 demo 站（相对路径引用）
   rsync -a \
     --include='assets/brand/' \
     --include='assets/brand/*.svg' \
     --exclude='*.svg' \
-    --include='.history/' \
-    --include='.history/manifest.json' \
-    --exclude='.history/**' \
     --exclude='*.py' \
     --exclude='*.sh' \
     --exclude='test.md' \
@@ -126,7 +123,7 @@ stage_artifacts() {
   # 镜像站副本：复制后注入 ICP 备案号（仅 plotgram.cn）
   rsync -a "$STAGING_DIR/demo-showcase/" "$STAGING_DIR/demo-showcase-cn/"
 
-  # CDN：showcase svg + 历史快照
+  # CDN：showcase svg
   rsync -a \
     --include='*/' \
     --include='*.svg' \
