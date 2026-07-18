@@ -325,11 +325,11 @@ pub fn repair_through_edges_post_route(diagram: &Diagram, result: &mut LayoutRes
     }
 }
 
-/// 仅针对当前 lint `edge_crosses_group_interior` 边的局部 dogleg / 组裙边试修。
+/// 仅针对当前 lint `edge_crosses_group_interior` 边的局部试修。
 ///
-/// - 不建廊、不清伪邻接；只对 dirty 边生成外廊/绕已穿组 bbox 的候选。
-/// - 硬门禁在 `orthogonal_detour`（拒残 through / 新穿组）。
-/// - 整批后若穿组计数上升或 through 上升则回退。
+/// 顺序：① 有走廊链的跨 leaf 边优先贴廊重建；② 残余再走激进裙边/换侧。
+/// 硬门禁：贴廊走 `validated_corridor_path`；裙边走 `orthogonal_detour`。
+/// 整批后若穿组计数上升或 through 上升则回退。
 pub fn repair_group_interior_edges_post_route(diagram: &Diagram, result: &mut LayoutResult) {
     if result.groups.is_empty() {
         return;
@@ -342,33 +342,48 @@ pub fn repair_group_interior_edges_post_route(diagram: &Diagram, result: &mut La
     let entry_through = collect_lint_through_edge_indices(diagram, result).len();
     let snapshot = result.clone();
     let n = group_edges.len();
-    spline_fallback::reroute_edges_with_spline_ex(
-        result,
+
+    // ① 贴廊：只动有链的 dirty 边；失败的留给裙边。
+    let stuck = crate::layout::edge::edge_routing_orthogonal::stick_edges_onto_corridor(
         diagram,
+        result,
         &group_edges,
-        &RefineConfig::default(),
-        true,
     );
+
+    // ② 仍穿组的边：激进裙边 / 换侧。
+    let remain = collect_lint_group_interior_edge_indices(diagram, result);
+    if !remain.is_empty() {
+        spline_fallback::reroute_edges_with_spline_ex(
+            result,
+            diagram,
+            &remain,
+            &RefineConfig::default(),
+            true,
+        );
+    }
+
     let after_group = count_group_interior_edges(diagram, result);
     let after_through = collect_lint_through_edge_indices(diagram, result).len();
     if after_group > entry_group || after_through > entry_through {
         *result = snapshot;
         crate::perf_log!(
-            "[perf]     d_group_interior_repair: rolled_back (group {}→{} through {}→{}, tried={})",
+            "[perf]     d_group_interior_repair: rolled_back (group {}→{} through {}→{}, tried={}, stick={})",
             entry_group,
             after_group,
             entry_through,
             after_through,
-            n
+            n,
+            stuck
         );
     } else {
         crate::perf_log!(
-            "[perf]     d_group_interior_repair: group {}→{} through {}→{} tried={}",
+            "[perf]     d_group_interior_repair: group {}→{} through {}→{} tried={} stick={}",
             entry_group,
             after_group,
             entry_through,
             after_through,
-            n
+            n,
+            stuck
         );
     }
 }
