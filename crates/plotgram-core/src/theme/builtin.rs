@@ -19,6 +19,9 @@ use super::schema::CompiledTheme;
 pub const COMMON_THEME_IDS: &[&str] = &[
     "common.clean-light",
     "common.clean-dark",
+    "common.floating-cards",
+    "common.paper-ink",
+    "common.dual-channel",
     "common.blueprint",
     "common.presentation",
     "common.github-light",
@@ -32,7 +35,7 @@ pub const MINDMAP_THEME_IDS: &[&str] = &[
     "mindmap.ink-dark",
 ];
 
-/// 所有用户可见主题 ID（通用 + mindmap 专用，共 9 个）。
+/// 所有用户可见主题 ID（通用 + mindmap 专用）。
 pub fn all_theme_ids() -> Vec<&'static str> {
     COMMON_THEME_IDS
         .iter()
@@ -52,6 +55,9 @@ fn builtin_style_sheet(id: &str) -> Option<StyleSheet> {
         // 用户可见主题（themes/*.json）
         "common.clean-light" => include_str!("themes/common.clean-light.json"),
         "common.clean-dark" => include_str!("themes/common.clean-dark.json"),
+        "common.floating-cards" => include_str!("themes/common.floating-cards.json"),
+        "common.paper-ink" => include_str!("themes/common.paper-ink.json"),
+        "common.dual-channel" => include_str!("themes/common.dual-channel.json"),
         "common.blueprint" => include_str!("themes/common.blueprint.json"),
         "common.presentation" => include_str!("themes/common.presentation.json"),
         "common.github-light" => include_str!("themes/common.github-light.json"),
@@ -167,7 +173,7 @@ mod tests {
         let edge = compiled.edge_block("flowchart", None);
         assert_eq!(
             edge.get("stroke").and_then(|v| v.as_str()),
-            Some("#BDBDBD"),
+            Some("#9C9CA6"),
             "flowchart edge stroke"
         );
         assert_eq!(
@@ -190,14 +196,52 @@ mod tests {
                 .canvas
                 .get("background")
                 .and_then(|v| v.as_str()),
-            Some("#F5F5F5"),
+            Some("#F7F7F8"),
             "canvas background"
         );
         let node = compiled.node_block("flowchart", Some("process"));
         assert_eq!(
             node.get("fill").and_then(|v| v.as_str()),
-            Some("#E4E4E4"),
+            Some("#FFFFFF"),
             "process node fill"
+        );
+    }
+
+    #[test]
+    fn floating_cards_extends_clean_light() {
+        let compiled = compiled_builtin_theme("common.floating-cards").unwrap();
+        assert_eq!(
+            compiled.canvas.get("background").and_then(|v| v.as_str()),
+            Some("#E2E2E6")
+        );
+        let edge = compiled.edge_block("flowchart", None);
+        assert_eq!(
+            edge.get("stroke").and_then(|v| v.as_str()),
+            Some("#A8A8B0")
+        );
+    }
+
+    #[test]
+    fn paper_ink_and_dual_channel_compile() {
+        let paper = compiled_builtin_theme("common.paper-ink").unwrap();
+        assert_eq!(
+            paper.canvas.get("background").and_then(|v| v.as_str()),
+            Some("#F3F0EA")
+        );
+        let dual = compiled_builtin_theme("common.dual-channel").unwrap();
+        assert_eq!(
+            dual.canvas.get("background").and_then(|v| v.as_str()),
+            Some("#F5F5F5")
+        );
+        let edge = dual.edge_block("flowchart", None);
+        assert_eq!(
+            edge.get("stroke").and_then(|v| v.as_str()),
+            Some("#8F8F99")
+        );
+        assert_eq!(
+            edge.get("stroke_opacity").and_then(|v| v.as_number()),
+            Some(1.0),
+            "dual-channel must not demote edge opacity"
         );
     }
 

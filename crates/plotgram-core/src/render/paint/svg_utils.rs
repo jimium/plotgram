@@ -431,7 +431,7 @@ pub fn render_edge_path_with_annotation(
 }
 
 /// 折线拐弯处的圆角半径
-const CORNER_RADIUS: f64 = 8.0;
+const CORNER_RADIUS: f64 = 4.0;
 
 fn segment_overlaps_merge(a: Point, b: Point, merge: &MergeInterval) -> bool {
     const TOL: f64 = 1.5;

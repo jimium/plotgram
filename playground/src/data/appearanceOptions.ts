@@ -16,6 +16,9 @@ export const THEME_GROUPS: ThemeGroup[] = [
     options: [
       { value: 'common.clean-light', label: 'Clean Light' },
       { value: 'common.clean-dark', label: 'Clean Dark' },
+      { value: 'common.floating-cards', label: 'Floating Cards（浮岛）' },
+      { value: 'common.paper-ink', label: 'Paper & Ink（纸墨）' },
+      { value: 'common.dual-channel', label: 'Dual Channel（双通道）' },
       { value: 'common.blueprint', label: 'Blueprint' },
       { value: 'common.presentation', label: 'Presentation' },
       { value: 'common.github-light', label: 'GitHub Light' },

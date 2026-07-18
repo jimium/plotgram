@@ -4,30 +4,31 @@
   "name": "Clean Light",
   "meta": {
     "author": "Plotgram",
-    "description": "默认亮色基础样式：浅灰纸面 + 更深灰节点块，边线浅灰、箭头青绿强调，保留 Plotgram 语义色块分层",
+    "description": "默认亮色：近白画布 + 凹井式分组（越深越暗）+ 白底节点抬升；边线保持可追迹，适合嵌入 Cursor / Markdown 灰白宿主",
     "tags": [
       "light",
       "clean",
       "cool",
       "modern",
       "minimal",
-      "paper-gray"
+      "recessed-wells",
+      "embed-friendly"
     ]
   },
   "tokens": {
     "colors": {
-      "canvas": "#F5F5F5",
+      "canvas": "#F7F7F8",
       "text": "#18181B",
       "muted_text": "#71717A",
       "border": "#C9C9C9",
-      "border_strong": "#9CA3AF",
+      "border_strong": "#A1A1AA",
       "primary": "#5E6AD2",
-      "neutral_fill": "#E4E4E4",
+      "neutral_fill": "#FFFFFF",
       "neutral_stroke": "#C9C9C9",
-      "edge_stroke": "#BDBDBD",
+      "edge_stroke": "#9C9CA6",
       "arrow_fill": "#0F766E",
-      "group_fill": "transparent",
-      "group_stroke": "#9CA3AF"
+      "group_fill": "#ECECEF",
+      "group_stroke": "#B0B0B8"
     },
     "palette": {
       "blue": { "fill": "#EEF2FF", "stroke": "#93C5FD", "text_fill": "#1E3A8A" },
@@ -125,8 +126,8 @@
     "group": {
       "fill": "{colors.group_fill}",
       "stroke": "{colors.group_stroke}",
-      "stroke_width": "{strokes.normal}",
-      "stroke_dasharray": "5,4",
+      "stroke_width": 1.25,
+      "stroke_dasharray": "none",
       "text_fill": "{colors.muted_text}",
       "radius": "{radius.md}"
     }
@@ -223,10 +224,10 @@
       "context_palettes": {
         "group_nest": {
           "entries": [
-            { "fill": "transparent", "stroke": "{colors.group_stroke}", "stroke_width": 1.2, "border_radius": 10.0, "stroke_dasharray": "5,4" },
-            { "fill": "#FFFFFF", "stroke": "#D4D4D4", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
-            { "fill": "#F3F3F3", "stroke": "#D4D4D4", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" },
-            { "fill": "#EBEBEB", "stroke": "{colors.border_strong}", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" }
+            { "fill": "#ECECEF", "stroke": "#B0B0B8", "stroke_width": 1.25, "border_radius": 10.0, "stroke_dasharray": "none" },
+            { "fill": "#E2E2E6", "stroke": "#A8A8B0", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#D8D8DE", "stroke": "#A1A1AA", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#D0D0D6", "stroke": "#A1A1AA", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" }
           ],
           "index": { "from": "group_depth", "cap": 3 },
           "bindings": [
@@ -318,10 +319,10 @@
         "stroke_opacity": 0.85
       },
       "group": {
-        "stroke": "{colors.border_strong}",
-        "stroke_width": 1.2,
+        "stroke": "{colors.group_stroke}",
+        "stroke_width": 1.25,
         "stroke_dasharray": "none",
-        "fill": "#FFFFFF"
+        "fill": "{colors.group_fill}"
       },
       "entity_types": {
         "frontend": {
@@ -396,10 +397,10 @@
       "context_palettes": {
         "group_nest": {
           "entries": [
-            { "fill": "#FFFFFF", "stroke": "{colors.border_strong}", "stroke_width": 1.2, "border_radius": 10.0, "stroke_dasharray": "none" },
-            { "fill": "#F3F3F3", "stroke": "#D4D4D4", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
-            { "fill": "#EBEBEB", "stroke": "#D4D4D4", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" },
-            { "fill": "#E6E6E6", "stroke": "{colors.border_strong}", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" }
+            { "fill": "#ECECEF", "stroke": "#B0B0B8", "stroke_width": 1.25, "border_radius": 10.0, "stroke_dasharray": "none" },
+            { "fill": "#E2E2E6", "stroke": "#A8A8B0", "stroke_width": 1.0, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#D8D8DE", "stroke": "#A1A1AA", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" },
+            { "fill": "#D0D0D6", "stroke": "#A1A1AA", "stroke_width": 0.9, "border_radius": 8.0, "stroke_dasharray": "none" }
           ],
           "index": { "from": "group_depth", "cap": 3 },
           "bindings": [
