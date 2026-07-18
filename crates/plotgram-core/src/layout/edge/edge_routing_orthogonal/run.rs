@@ -518,6 +518,7 @@ pub(crate) fn validated_corridor_path(
         corridor_plan,
         group_ctx,
         stub_len,
+        false,
     )?;
     if candidate.len() < 2 {
         return None;

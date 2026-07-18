@@ -178,10 +178,12 @@ pub fn try_build_corridor_path(
     from_anchor: Point,
     to_anchor: Point,
     from_id: &str,
-    _to_id: &str,
+    to_id: &str,
     plan: &CorridorRoutePlan,
     group_ctx: &GroupRoutingContext,
     stub_len: f64,
+    // 冻结后贴廊专用：廊带外绕 / 实边出口 / 入框避组。主链必须 false，避免 node_fp 漂移。
+    outer_bypass: bool,
 ) -> Option<Vec<Point>> {
     let chain = plan.chains.get(&edge_index)?;
     if chain.is_empty() {
@@ -218,17 +220,35 @@ pub fn try_build_corridor_path(
         let (exit_side, entry_side) = corridor_sides(corridor, current_group, next_group)?;
 
         if is_first {
-            let exit_border = border_point_on_side(
-                current_gl,
-                exit_side,
-                current,
-                corridor,
-                lane_coord,
-                cross_offset,
-            );
-            let corridor_exit = corridor_point(corridor, lane_coord, exit_border);
-            append_stub_leg(&mut waypoints, &mut current, exit_border, exit_side, stub);
-            ortho_connect(&mut waypoints, &mut current, corridor_exit);
+            if outer_bypass {
+                // 出口停在组框实边上，禁止 corridor_point 把锚点拽到可能被埋的廊心。
+                let exit_border = group_side_border_point(current_gl, exit_side, current);
+                match corridor.axis {
+                    CorridorAxis::Horizontal if matches!(exit_side, Port::Top | Port::Bottom) => {
+                        let mut p = exit_border;
+                        p.x += cross_offset;
+                        append_stub_leg(&mut waypoints, &mut current, p, exit_side, stub);
+                    }
+                    CorridorAxis::Vertical if matches!(exit_side, Port::Left | Port::Right) => {
+                        let mut p = exit_border;
+                        p.y += cross_offset;
+                        append_stub_leg(&mut waypoints, &mut current, p, exit_side, stub);
+                    }
+                    _ => {
+                        append_stub_leg(&mut waypoints, &mut current, exit_border, exit_side, stub);
+                    }
+                }
+            } else {
+                let exit_border = border_point_on_side(
+                    current_gl,
+                    exit_side,
+                    current,
+                    corridor,
+                    lane_coord,
+                    cross_offset,
+                );
+                append_stub_leg(&mut waypoints, &mut current, exit_border, exit_side, stub);
+            }
         } else {
             let join = corridor_point(corridor, lane_coord, current);
             ortho_connect(&mut waypoints, &mut current, join);
@@ -256,11 +276,35 @@ pub fn try_build_corridor_path(
                 lane_coord,
                 cross_offset,
             );
-            ortho_connect(&mut waypoints, &mut current, corridor_entry);
-            // 目标组外侧直接入框；勿再打 entry 外向 stub（会非单调 Z 折）。
-            ortho_connect(&mut waypoints, &mut current, entry_border);
+            corridor_travel_skirting_foreign(
+                &mut waypoints,
+                &mut current,
+                corridor_entry,
+                corridor,
+                lane_coord,
+                from_id,
+                to_id,
+                group_ctx,
+                skirt_pad,
+                outer_bypass,
+            );
+            if outer_bypass {
+                let entry_ok = !foreign_point_in_group(entry_border, from_id, to_id, group_ctx);
+                if entry_ok {
+                    connect_skirting_foreign(
+                        &mut waypoints,
+                        &mut current,
+                        entry_border,
+                        from_id,
+                        to_id,
+                        group_ctx,
+                        skirt_pad,
+                    );
+                }
+            } else {
+                ortho_connect(&mut waypoints, &mut current, entry_border);
+            }
         } else {
-            // 中间组：贴邻接面后外绕到下一段走廊，禁止穿中间组内部。
             let approach = corridor_point(
                 corridor,
                 lane_coord,
@@ -269,7 +313,18 @@ pub fn try_build_corridor_path(
                     next_gl.y + next_gl.height * 0.5,
                 ),
             );
-            ortho_connect(&mut waypoints, &mut current, approach);
+            corridor_travel_skirting_foreign(
+                &mut waypoints,
+                &mut current,
+                approach,
+                corridor,
+                lane_coord,
+                from_id,
+                to_id,
+                group_ctx,
+                skirt_pad,
+                outer_bypass,
+            );
 
             let next_c_idx = chain[step + 1];
             let next_corridor = group_ctx.corridors.get(next_c_idx)?;
@@ -295,12 +350,591 @@ pub fn try_build_corridor_path(
         current_group = next_group;
     }
 
-    let final_side = infer_port_at_point(current, to_anchor);
-    append_stub_leg(&mut waypoints, &mut current, to_anchor, final_side, stub);
-    waypoints.push(to_anchor);
+    if outer_bypass {
+        connect_skirting_foreign(
+            &mut waypoints,
+            &mut current,
+            to_anchor,
+            from_id,
+            to_id,
+            group_ctx,
+            skirt_pad,
+        );
+    } else {
+        let final_side = infer_port_at_point(current, to_anchor);
+        append_stub_leg(&mut waypoints, &mut current, to_anchor, final_side, stub);
+        waypoints.push(to_anchor);
+    }
 
     let path = simplify_path(waypoints, true);
     (path.len() >= 2).then_some(path)
+}
+
+/// 沿走廊行驶：若廊心带会穿第三方组，则在廊带外侧绕过；廊心整段被埋时不落回廊心。
+///
+/// 关键：禁止先竖直落到廊心再检测——廊心 Y 落在第三方组内部时，落廊段本身已穿组
+/// （tenant `b_worker→object_store` 廊 y=755 ⊂ tenant_a y∈[650,870]）。
+fn corridor_travel_skirting_foreign(
+    waypoints: &mut Vec<Point>,
+    current: &mut Point,
+    target: Point,
+    corridor: &GroupCorridor,
+    lane_coord: f64,
+    from_id: &str,
+    to_id: &str,
+    group_ctx: &GroupRoutingContext,
+    pad: f64,
+    outer_bypass: bool,
+) {
+    let dest = corridor_point(corridor, lane_coord, target);
+
+    if !outer_bypass {
+        // 主链保守：落廊后若直行穿第三方组则逐个外绕回廊（贴廊前历史行为）。
+        let on_corridor = corridor_point(corridor, lane_coord, *current);
+        if (on_corridor.x - current.x).abs() > EPS || (on_corridor.y - current.y).abs() > EPS {
+            ortho_connect(waypoints, current, on_corridor);
+        }
+        let endpoint_groups = group_ctx.endpoint_group_set(from_id, to_id);
+        let mut blockers: Vec<(&str, &GroupLayout)> = Vec::new();
+        for (gid, gl) in &group_ctx.groups {
+            if endpoint_groups.contains(gid.as_str()) || gl.width <= 0.0 || gl.height <= 0.0 {
+                continue;
+            }
+            if crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+                *current, dest, gl,
+            ) {
+                blockers.push((gid.as_str(), gl));
+            }
+        }
+        match corridor.axis {
+            CorridorAxis::Horizontal => {
+                let forward = dest.x >= current.x;
+                blockers.sort_by(|a, b| {
+                    let ka = a.1.x + a.1.width * 0.5;
+                    let kb = b.1.x + b.1.width * 0.5;
+                    if forward {
+                        ka.partial_cmp(&kb).unwrap_or(std::cmp::Ordering::Equal)
+                    } else {
+                        kb.partial_cmp(&ka).unwrap_or(std::cmp::Ordering::Equal)
+                    }
+                });
+            }
+            CorridorAxis::Vertical => {
+                let forward = dest.y >= current.y;
+                blockers.sort_by(|a, b| {
+                    let ka = a.1.y + a.1.height * 0.5;
+                    let kb = b.1.y + b.1.height * 0.5;
+                    if forward {
+                        ka.partial_cmp(&kb).unwrap_or(std::cmp::Ordering::Equal)
+                    } else {
+                        kb.partial_cmp(&ka).unwrap_or(std::cmp::Ordering::Equal)
+                    }
+                });
+            }
+        }
+        for (gid, gl) in blockers {
+            if !crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+                *current, dest, gl,
+            ) {
+                continue;
+            }
+            conservative_skirt_blocker_back_to_corridor(
+                waypoints, current, gl, gid, corridor, lane_coord, dest, pad, group_ctx,
+            );
+        }
+        ortho_connect(waypoints, current, dest);
+        return;
+    }
+
+    let endpoint_groups = group_ctx.endpoint_group_set(from_id, to_id);
+
+    let mut blockers: Vec<(&str, &GroupLayout)> = Vec::new();
+    for (gid, gl) in &group_ctx.groups {
+        if endpoint_groups.contains(gid.as_str()) {
+            continue;
+        }
+        if gl.width <= 0.0 || gl.height <= 0.0 {
+            continue;
+        }
+        if lane_segment_threatens_group(*current, dest, corridor, lane_coord, gl) {
+            blockers.push((gid.as_str(), gl));
+        }
+    }
+
+    match corridor.axis {
+        CorridorAxis::Horizontal => {
+            let forward = dest.x >= current.x;
+            blockers.sort_by(|a, b| {
+                let ka = a.1.x + a.1.width * 0.5;
+                let kb = b.1.x + b.1.width * 0.5;
+                if forward {
+                    ka.partial_cmp(&kb).unwrap_or(std::cmp::Ordering::Equal)
+                } else {
+                    kb.partial_cmp(&ka).unwrap_or(std::cmp::Ordering::Equal)
+                }
+            });
+        }
+        CorridorAxis::Vertical => {
+            let forward = dest.y >= current.y;
+            blockers.sort_by(|a, b| {
+                let ka = a.1.y + a.1.height * 0.5;
+                let kb = b.1.y + b.1.height * 0.5;
+                if forward {
+                    ka.partial_cmp(&kb).unwrap_or(std::cmp::Ordering::Equal)
+                } else {
+                    kb.partial_cmp(&ka).unwrap_or(std::cmp::Ordering::Equal)
+                }
+            });
+        }
+    }
+
+    if blockers.is_empty() {
+        for (gid, gl) in &group_ctx.groups {
+            if endpoint_groups.contains(gid.as_str()) || gl.width <= 0.0 || gl.height <= 0.0 {
+                continue;
+            }
+            if point_in_group_interior(dest, gl)
+                || point_in_group_interior(corridor_point(corridor, lane_coord, *current), gl)
+            {
+                blockers.push((gid.as_str(), gl));
+            }
+        }
+        match corridor.axis {
+            CorridorAxis::Horizontal => {
+                let forward = dest.x >= current.x;
+                blockers.sort_by(|a, b| {
+                    let ka = a.1.x + a.1.width * 0.5;
+                    let kb = b.1.x + b.1.width * 0.5;
+                    if forward {
+                        ka.partial_cmp(&kb).unwrap_or(std::cmp::Ordering::Equal)
+                    } else {
+                        kb.partial_cmp(&ka).unwrap_or(std::cmp::Ordering::Equal)
+                    }
+                });
+            }
+            CorridorAxis::Vertical => {
+                let forward = dest.y >= current.y;
+                blockers.sort_by(|a, b| {
+                    let ka = a.1.y + a.1.height * 0.5;
+                    let kb = b.1.y + b.1.height * 0.5;
+                    if forward {
+                        ka.partial_cmp(&kb).unwrap_or(std::cmp::Ordering::Equal)
+                    } else {
+                        kb.partial_cmp(&ka).unwrap_or(std::cmp::Ordering::Equal)
+                    }
+                });
+            }
+        }
+    }
+
+    if blockers.is_empty() {
+        connect_skirting_foreign(
+            waypoints,
+            current,
+            dest,
+            from_id,
+            to_id,
+            group_ctx,
+            pad,
+        );
+        return;
+    }
+
+    bypass_corridor_on_outer_side(
+        waypoints,
+        current,
+        dest,
+        corridor,
+        lane_coord,
+        &blockers,
+        pad,
+        group_ctx,
+    );
+}
+
+/// 主链保守外绕：允许在 current.x 上先竖移（历史行为；埋廊场景留给 outer_bypass）。
+fn conservative_skirt_blocker_back_to_corridor(
+    waypoints: &mut Vec<Point>,
+    current: &mut Point,
+    blocker: &GroupLayout,
+    blocker_id: &str,
+    corridor: &GroupCorridor,
+    lane_coord: f64,
+    dest: Point,
+    pad: f64,
+    group_ctx: &GroupRoutingContext,
+) {
+    let left = blocker.x - pad;
+    let right = blocker.x + blocker.width + pad;
+    let top = blocker.y - pad;
+    let bottom = blocker.y + blocker.height + pad;
+
+    match corridor.axis {
+        CorridorAxis::Horizontal => {
+            let forward = dest.x >= current.x;
+            let ahead_x = if forward { right } else { left };
+            let top_clear =
+                skirt_horizontal_clear(top, current.x, ahead_x, blocker_id, group_ctx);
+            let bottom_clear =
+                skirt_horizontal_clear(bottom, current.x, ahead_x, blocker_id, group_ctx);
+            let top_cost = (current.y - top).abs() + (lane_coord - top).abs();
+            let bottom_cost = (current.y - bottom).abs() + (lane_coord - bottom).abs();
+            let side_y = match (top_clear, bottom_clear) {
+                (true, false) => top,
+                (false, true) => bottom,
+                _ if top_cost <= bottom_cost => top,
+                _ => bottom,
+            };
+            let rejoin = corridor_point(corridor, lane_coord, Point::new(ahead_x, lane_coord));
+            ortho_connect(waypoints, current, Point::new(current.x, side_y));
+            ortho_connect(waypoints, current, Point::new(rejoin.x, side_y));
+            ortho_connect(waypoints, current, rejoin);
+        }
+        CorridorAxis::Vertical => {
+            let forward = dest.y >= current.y;
+            let ahead_y = if forward { bottom } else { top };
+            let left_clear =
+                skirt_vertical_clear(left, current.y, ahead_y, blocker_id, group_ctx);
+            let right_clear =
+                skirt_vertical_clear(right, current.y, ahead_y, blocker_id, group_ctx);
+            let left_cost = (current.x - left).abs() + (lane_coord - left).abs();
+            let right_cost = (current.x - right).abs() + (lane_coord - right).abs();
+            let side_x = match (left_clear, right_clear) {
+                (true, false) => left,
+                (false, true) => right,
+                _ if left_cost <= right_cost => left,
+                _ => right,
+            };
+            let rejoin = corridor_point(corridor, lane_coord, Point::new(lane_coord, ahead_y));
+            ortho_connect(waypoints, current, Point::new(side_x, current.y));
+            ortho_connect(waypoints, current, Point::new(side_x, rejoin.y));
+            ortho_connect(waypoints, current, rejoin);
+        }
+    }
+}
+
+/// 廊心投影段、落廊竖/横段是否威胁某第三方组。
+fn lane_segment_threatens_group(
+    from: Point,
+    dest: Point,
+    corridor: &GroupCorridor,
+    lane_coord: f64,
+    gl: &GroupLayout,
+) -> bool {
+    let projected = corridor_point(corridor, lane_coord, from);
+    crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(from, projected, gl)
+        || crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+            projected, dest, gl,
+        )
+        || crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(from, dest, gl)
+        || point_in_group_interior(projected, gl)
+        || point_in_group_interior(dest, gl)
+}
+
+fn point_in_group_interior(p: Point, gl: &GroupLayout) -> bool {
+    p.x > gl.x + EPS
+        && p.x < gl.x + gl.width - EPS
+        && p.y > gl.y + EPS
+        && p.y < gl.y + gl.height - EPS
+}
+
+fn foreign_point_in_group(
+    p: Point,
+    from_id: &str,
+    to_id: &str,
+    group_ctx: &GroupRoutingContext,
+) -> bool {
+    let endpoint_groups = group_ctx.endpoint_group_set(from_id, to_id);
+    for (gid, gl) in &group_ctx.groups {
+        if endpoint_groups.contains(gid.as_str()) || gl.width <= 0.0 || gl.height <= 0.0 {
+            continue;
+        }
+        if point_in_group_interior(p, gl) {
+            return true;
+        }
+    }
+    false
+}
+
+/// 在所有阻挡组的同一外侧（上/下或左/右）旁路前进到 dest 的轴向投影外侧点。
+fn bypass_corridor_on_outer_side(
+    waypoints: &mut Vec<Point>,
+    current: &mut Point,
+    dest: Point,
+    corridor: &GroupCorridor,
+    lane_coord: f64,
+    blockers: &[(&str, &GroupLayout)],
+    pad: f64,
+    group_ctx: &GroupRoutingContext,
+) {
+    if blockers.is_empty() {
+        ortho_connect(waypoints, current, dest);
+        return;
+    }
+
+    match corridor.axis {
+        CorridorAxis::Horizontal => {
+            let forward = dest.x >= current.x;
+            let mut union_left = f64::INFINITY;
+            let mut union_right = f64::NEG_INFINITY;
+            let mut union_top = f64::INFINITY;
+            let mut union_bottom = f64::NEG_INFINITY;
+            for (_, gl) in blockers {
+                union_left = union_left.min(gl.x - pad);
+                union_right = union_right.max(gl.x + gl.width + pad);
+                union_top = union_top.min(gl.y - pad);
+                union_bottom = union_bottom.max(gl.y + gl.height + pad);
+            }
+            let ahead_x = if forward { union_right } else { union_left };
+            let top_clear = blockers.iter().all(|(gid, _)| {
+                skirt_horizontal_clear(union_top, current.x, ahead_x, gid, group_ctx)
+            });
+            let bottom_clear = blockers.iter().all(|(gid, _)| {
+                skirt_horizontal_clear(union_bottom, current.x, ahead_x, gid, group_ctx)
+            });
+            let top_cost = (current.y - union_top).abs() + (lane_coord - union_top).abs();
+            let bottom_cost = (current.y - union_bottom).abs() + (lane_coord - union_bottom).abs();
+            let side_y = match (top_clear, bottom_clear) {
+                (true, false) => union_top,
+                (false, true) => union_bottom,
+                _ if top_cost <= bottom_cost => union_top,
+                _ => union_bottom,
+            };
+
+            let x_inside = current.x > union_left + EPS && current.x < union_right - EPS;
+            let y_outside = current.y <= union_top + EPS || current.y >= union_bottom - EPS;
+
+            // 硬规则：已在并集上/下方时，必须先水平走到 ahead，禁止在 X 重叠处竖切。
+            if y_outside {
+                ortho_connect(waypoints, current, Point::new(ahead_x, current.y));
+                if (current.y - side_y).abs() > EPS {
+                    ortho_connect(waypoints, current, Point::new(ahead_x, side_y));
+                }
+            } else if x_inside {
+                // 廊心带内：经 side_y 外绕（竖移发生在已选的外侧线上之前仍可能擦边；
+                // 优先撤到 X 外侧角）。
+                let exit_x = if (current.x - union_left) <= (union_right - current.x) {
+                    union_left
+                } else {
+                    union_right
+                };
+                ortho_connect(waypoints, current, Point::new(exit_x, side_y));
+                ortho_connect(waypoints, current, Point::new(ahead_x, side_y));
+            } else {
+                ortho_connect(waypoints, current, Point::new(current.x, side_y));
+                ortho_connect(waypoints, current, Point::new(ahead_x, side_y));
+            }
+
+            // dest 若仍在并集内部，停在 ahead 外侧，不落回被埋廊心。
+            if point_in_group_interior(dest, blockers[0].1)
+                || blockers
+                    .iter()
+                    .any(|(_, gl)| point_in_group_interior(dest, gl))
+            {
+                // 保持在 (ahead_x, side_y)，由后续入框 connect 收束。
+                return;
+            }
+            // dest 已清：从外侧落到 dest（竖段在 ahead_x，X 在并集外）。
+            ortho_connect(waypoints, current, Point::new(ahead_x, dest.y));
+            ortho_connect(waypoints, current, dest);
+        }
+        CorridorAxis::Vertical => {
+            let forward = dest.y >= current.y;
+            let mut union_left = f64::INFINITY;
+            let mut union_right = f64::NEG_INFINITY;
+            let mut union_top = f64::INFINITY;
+            let mut union_bottom = f64::NEG_INFINITY;
+            for (_, gl) in blockers {
+                union_left = union_left.min(gl.x - pad);
+                union_right = union_right.max(gl.x + gl.width + pad);
+                union_top = union_top.min(gl.y - pad);
+                union_bottom = union_bottom.max(gl.y + gl.height + pad);
+            }
+            let ahead_y = if forward { union_bottom } else { union_top };
+            let left_clear = blockers.iter().all(|(gid, _)| {
+                skirt_vertical_clear(union_left, current.y, ahead_y, gid, group_ctx)
+            });
+            let right_clear = blockers.iter().all(|(gid, _)| {
+                skirt_vertical_clear(union_right, current.y, ahead_y, gid, group_ctx)
+            });
+            let left_cost = (current.x - union_left).abs() + (lane_coord - union_left).abs();
+            let right_cost = (current.x - union_right).abs() + (lane_coord - union_right).abs();
+            let side_x = match (left_clear, right_clear) {
+                (true, false) => union_left,
+                (false, true) => union_right,
+                _ if left_cost <= right_cost => union_left,
+                _ => union_right,
+            };
+
+            let y_inside = current.y > union_top + EPS && current.y < union_bottom - EPS;
+            let x_outside = current.x <= union_left + EPS || current.x >= union_right - EPS;
+            if y_inside && x_outside {
+                ortho_connect(waypoints, current, Point::new(current.x, ahead_y));
+                if (current.x - side_x).abs() > EPS {
+                    ortho_connect(waypoints, current, Point::new(side_x, ahead_y));
+                }
+            } else if y_inside {
+                let exit_y = if (current.y - union_top) <= (union_bottom - current.y) {
+                    union_top
+                } else {
+                    union_bottom
+                };
+                ortho_connect(waypoints, current, Point::new(side_x, current.y));
+                ortho_connect(waypoints, current, Point::new(side_x, exit_y));
+                ortho_connect(waypoints, current, Point::new(side_x, ahead_y));
+            } else {
+                ortho_connect(waypoints, current, Point::new(side_x, current.y));
+                ortho_connect(waypoints, current, Point::new(side_x, ahead_y));
+            }
+
+            if blockers
+                .iter()
+                .any(|(_, gl)| point_in_group_interior(dest, gl))
+            {
+                return;
+            }
+            ortho_connect(waypoints, current, Point::new(dest.x, ahead_y));
+            ortho_connect(waypoints, current, dest);
+        }
+    }
+}
+
+/// 正交接到目标；若 L/直达会穿第三方组则 U 形外绕。
+fn connect_skirting_foreign(
+    waypoints: &mut Vec<Point>,
+    current: &mut Point,
+    target: Point,
+    from_id: &str,
+    to_id: &str,
+    group_ctx: &GroupRoutingContext,
+    pad: f64,
+) {
+    let endpoint_groups = group_ctx.endpoint_group_set(from_id, to_id);
+    for _ in 0..8 {
+        let Some((gid, gl)) =
+            first_foreign_blocker_on_ortho(*current, target, &endpoint_groups, group_ctx)
+        else {
+            ortho_connect(waypoints, current, target);
+            return;
+        };
+        u_skirt_around_group(waypoints, current, gl, gid, target, pad, group_ctx);
+        if (current.x - target.x).abs() <= EPS && (current.y - target.y).abs() <= EPS {
+            return;
+        }
+    }
+    ortho_connect(waypoints, current, target);
+}
+
+fn first_foreign_blocker_on_ortho<'a>(
+    from: Point,
+    to: Point,
+    endpoint_groups: &HashSet<&str>,
+    group_ctx: &'a GroupRoutingContext,
+) -> Option<(&'a str, &'a GroupLayout)> {
+    let bend = Point::new(to.x, from.y);
+    let mut best: Option<(&str, &GroupLayout, f64)> = None;
+    for (gid, gl) in &group_ctx.groups {
+        if endpoint_groups.contains(gid.as_str()) || gl.width <= 0.0 || gl.height <= 0.0 {
+            continue;
+        }
+        let hit = crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+            from, to, gl,
+        ) || crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+            from, bend, gl,
+        ) || crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+            bend, to, gl,
+        );
+        if !hit {
+            continue;
+        }
+        let cx = gl.x + gl.width * 0.5;
+        let cy = gl.y + gl.height * 0.5;
+        let dist = (from.x - cx).abs() + (from.y - cy).abs();
+        if best.as_ref().is_none_or(|(_, _, d)| dist < *d) {
+            best = Some((gid.as_str(), gl, dist));
+        }
+    }
+    best.map(|(g, gl, _)| (g, gl))
+}
+
+/// 从当前点 U 形绕过组外侧，朝 target 方向推进到组外近侧。
+///
+/// 硬规则：X 与组重叠时禁止竖移；Y 与组重叠时禁止横移（避免切穿）。
+fn u_skirt_around_group(
+    waypoints: &mut Vec<Point>,
+    current: &mut Point,
+    blocker: &GroupLayout,
+    blocker_id: &str,
+    target: Point,
+    pad: f64,
+    group_ctx: &GroupRoutingContext,
+) {
+    let left = blocker.x - pad;
+    let right = blocker.x + blocker.width + pad;
+    let top = blocker.y - pad;
+    let bottom = blocker.y + blocker.height + pad;
+
+    let x_overlap = current.x > left + EPS && current.x < right - EPS;
+    let y_overlap = current.y > top + EPS && current.y < bottom - EPS;
+
+    let ahead_x = if target.x >= current.x { right } else { left };
+    let ahead_y = if target.y >= current.y { bottom } else { top };
+
+    let top_clear = skirt_horizontal_clear(top, current.x, ahead_x, blocker_id, group_ctx);
+    let bottom_clear =
+        skirt_horizontal_clear(bottom, current.x, ahead_x, blocker_id, group_ctx);
+    let top_cost = (current.y - top).abs() + (target.y - top).abs();
+    let bottom_cost = (current.y - bottom).abs() + (target.y - bottom).abs();
+    let side_y = match (top_clear, bottom_clear) {
+        (true, false) => top,
+        (false, true) => bottom,
+        _ if top_cost <= bottom_cost => top,
+        _ => bottom,
+    };
+
+    let left_clear = skirt_vertical_clear(left, current.y, ahead_y, blocker_id, group_ctx);
+    let right_clear = skirt_vertical_clear(right, current.y, ahead_y, blocker_id, group_ctx);
+    let left_cost = (current.x - left).abs() + (target.x - left).abs();
+    let right_cost = (current.x - right).abs() + (target.x - right).abs();
+    let side_x = match (left_clear, right_clear) {
+        (true, false) => left,
+        (false, true) => right,
+        _ if left_cost <= right_cost => left,
+        _ => right,
+    };
+
+    if x_overlap && !y_overlap {
+        // 上/下方：先水平出并集，再视需要抬到 side_y。
+        ortho_connect(waypoints, current, Point::new(ahead_x, current.y));
+        if (target.y - current.y).abs() > EPS {
+            let y = if (side_y - target.y).abs() <= (current.y - target.y).abs() {
+                side_y
+            } else {
+                current.y
+            };
+            ortho_connect(waypoints, current, Point::new(ahead_x, y));
+        }
+    } else if y_overlap && !x_overlap {
+        ortho_connect(waypoints, current, Point::new(current.x, ahead_y));
+        if (target.x - current.x).abs() > EPS {
+            let x = if (side_x - target.x).abs() <= (current.x - target.x).abs() {
+                side_x
+            } else {
+                current.x
+            };
+            ortho_connect(waypoints, current, Point::new(x, ahead_y));
+        }
+    } else if x_overlap && y_overlap {
+        // 内部：先到最近外侧角（仍可能有出框短段，但避免长切穿）。
+        ortho_connect(waypoints, current, Point::new(side_x, side_y));
+        ortho_connect(waypoints, current, Point::new(ahead_x, side_y));
+    } else if (target.x - current.x).abs() >= (target.y - current.y).abs() {
+        ortho_connect(waypoints, current, Point::new(current.x, side_y));
+        ortho_connect(waypoints, current, Point::new(ahead_x, side_y));
+    } else {
+        ortho_connect(waypoints, current, Point::new(side_x, current.y));
+        ortho_connect(waypoints, current, Point::new(side_x, ahead_y));
+    }
 }
 
 /// 在中间组外侧绕行落到下一段走廊；选侧时避开其它分组内部。
@@ -516,6 +1150,16 @@ fn corridor_point(corridor: &GroupCorridor, lane_coord: f64, reference: Point) -
     }
 }
 
+/// 组框某侧上的点（不贴廊心）。
+fn group_side_border_point(gl: &GroupLayout, side: Port, reference: Point) -> Point {
+    match side {
+        Port::Right => Point::new(gl.x + gl.width, reference.y.clamp(gl.y, gl.y + gl.height)),
+        Port::Left => Point::new(gl.x, reference.y.clamp(gl.y, gl.y + gl.height)),
+        Port::Bottom => Point::new(reference.x.clamp(gl.x, gl.x + gl.width), gl.y + gl.height),
+        Port::Top => Point::new(reference.x.clamp(gl.x, gl.x + gl.width), gl.y),
+    }
+}
+
 fn border_point_on_side(
     gl: &GroupLayout,
     side: Port,
@@ -524,12 +1168,7 @@ fn border_point_on_side(
     lane_coord: f64,
     cross_offset: f64,
 ) -> Point {
-    let mut point = match side {
-        Port::Right => Point::new(gl.x + gl.width, reference.y.clamp(gl.y, gl.y + gl.height)),
-        Port::Left => Point::new(gl.x, reference.y.clamp(gl.y, gl.y + gl.height)),
-        Port::Bottom => Point::new(reference.x.clamp(gl.x, gl.x + gl.width), gl.y + gl.height),
-        Port::Top => Point::new(reference.x.clamp(gl.x, gl.x + gl.width), gl.y),
-    };
+    let mut point = group_side_border_point(gl, side, reference);
     match corridor.axis {
         CorridorAxis::Horizontal if matches!(side, Port::Top | Port::Bottom) => {
             point.x += cross_offset;
@@ -885,6 +1524,7 @@ mod tests {
             &plan,
             &ctx,
             DEFAULT_STUB_LEN,
+            false,
         )
         .expect("corridor path");
         let path1 = try_build_corridor_path(
@@ -896,6 +1536,7 @@ mod tests {
             &plan,
             &ctx,
             DEFAULT_STUB_LEN,
+            false,
         )
         .expect("corridor path");
 
@@ -992,6 +1633,7 @@ mod tests {
             &plan,
             &ctx,
             DEFAULT_STUB_LEN,
+            false,
         )
         .expect("corridor path");
         let path1 = try_build_corridor_path(
@@ -1003,6 +1645,7 @@ mod tests {
             &plan,
             &ctx,
             DEFAULT_STUB_LEN,
+            false,
         )
         .expect("corridor path");
 

@@ -1,6 +1,9 @@
-//! 冻结后贴廊试修：对 lint 穿组且有走廊链的跨 leaf 边，重试 `validated_corridor_path`。
+//! 冻结后贴廊试修：对 lint 穿组且有走廊链的跨 leaf 边，重试走廊重建。
 //!
 //! 只改边几何；整批后穿组/through 变差则由调用方回退。不改主链规划/打分。
+//!
+//! 候选顺序：原锚点 → 换侧端口；每档先 `validated` 再 `try_build`+lint
+//!（`try_build` 已含廊上第三方组外绕）。
 
 use crate::ast::Diagram;
 use crate::layout::edge::common::edge_geometry::{
@@ -8,7 +11,7 @@ use crate::layout::edge::common::edge_geometry::{
 };
 use crate::layout::geometry::Point;
 use crate::layout::group::{routing_algo_for_diagram, GroupRoutingContext};
-use crate::layout::{EdgeLayout, LayoutResult, PathGeometry};
+use crate::layout::{EdgeLayout, LayoutResult, NodeLayout, PathGeometry, Port};
 use std::collections::HashSet;
 
 use super::context::PreparedObstacles;
@@ -65,57 +68,65 @@ pub(crate) fn stick_edges_onto_corridor(
         if pts.len() < 2 {
             continue;
         }
-        let from_anchor = pts[0];
-        let to_anchor = pts[pts.len() - 1];
-        let from_port = edge.from_port;
-        let to_port = edge.to_port;
+        let Some(from_nl) = result.nodes.get(from_id) else {
+            continue;
+        };
+        let Some(to_nl) = result.nodes.get(to_id) else {
+            continue;
+        };
 
-        let Some(path) = validated_corridor_path(
-            edge_index,
-            from_anchor,
-            to_anchor,
-            from_id,
-            to_id,
-            &plan,
-            &group_ctx,
-            &result.nodes,
-            &obstacles,
-            POST_ROUTE_CORRIDOR_STUB,
-        )
-        .or_else(|| {
-            // validated 因 path_avoids / clean 口径拒掉时，再用 lint 同语义收一次
-            // try_build 结果（P1：不穿组优先；跨 leaf 可容忍 through）。
-            let raw = try_build_corridor_path(
+        let mut port_pairs: Vec<(Point, Point, Port, Port)> = vec![(
+            pts[0],
+            pts[pts.len() - 1],
+            edge.from_port,
+            edge.to_port,
+        )];
+        const SIDES: [Port; 4] = [Port::Top, Port::Bottom, Port::Left, Port::Right];
+        for &fp in &SIDES {
+            for &tp in &SIDES {
+                if fp == edge.from_port && tp == edge.to_port {
+                    continue;
+                }
+                port_pairs.push((port_anchor(from_nl, fp), port_anchor(to_nl, tp), fp, tp));
+            }
+        }
+
+        let mut chosen: Option<(Vec<Point>, Port, Port)> = None;
+        let mut diag_none = 0usize;
+        let mut diag_pierce = 0usize;
+        for (from_anchor, to_anchor, from_port, to_port) in port_pairs {
+            match try_stick_path_diag(
+                diagram,
+                result,
                 edge_index,
-                from_anchor,
-                to_anchor,
                 from_id,
                 to_id,
-                &plan,
-                &group_ctx,
-                POST_ROUTE_CORRIDOR_STUB,
-            )?;
-            if raw.len() < 2 {
-                return None;
-            }
-            let mut probe = result.clone();
-            if edge_index >= probe.edges.len() {
-                return None;
-            }
-            probe.edges[edge_index] = EdgeLayout {
-                geometry: PathGeometry::Polyline {
-                    points: raw.clone(),
-                },
-                labels: Vec::new(),
+                from_anchor,
+                to_anchor,
                 from_port,
                 to_port,
-            };
-            if crate::layout::lint::edge_index_crosses_group_interior(diagram, &probe, edge_index)
-            {
-                return None;
+                &plan,
+                &group_ctx,
+                &obstacles,
+            ) {
+                StickTry::Ok(path) => {
+                    chosen = Some((path, from_port, to_port));
+                    break;
+                }
+                StickTry::BuildNone => diag_none += 1,
+                StickTry::StillPierces => diag_pierce += 1,
             }
-            Some(raw)
-        }) else {
+        }
+        let Some((path, from_port, to_port)) = chosen else {
+            crate::perf_log!(
+                "[perf]     corridor_stick: edge[{}] {}→{} fail none={} pierce={} chain={:?}",
+                edge_index,
+                from_id,
+                to_id,
+                diag_none,
+                diag_pierce,
+                plan.chains.get(&edge_index)
+            );
             continue;
         };
 
@@ -124,9 +135,7 @@ pub(crate) fn stick_edges_onto_corridor(
             point_at_path_t(&path, t)
         });
         let candidate = EdgeLayout {
-            geometry: PathGeometry::Polyline {
-                points: path,
-            },
+            geometry: PathGeometry::Polyline { points: path },
             labels,
             from_port,
             to_port,
@@ -136,7 +145,9 @@ pub(crate) fn stick_edges_onto_corridor(
         if edge_index < probe.edges.len() {
             probe.edges[edge_index] = candidate.clone();
         }
-        if crate::layout::lint::edge_index_crosses_group_interior(diagram, &probe, edge_index) {
+        if crate::layout::lint::edge_index_crosses_group_interior(diagram, &probe, edge_index)
+            || edge_index_through_foreign_node(diagram, &probe, edge_index)
+        {
             continue;
         }
 
@@ -158,4 +169,152 @@ pub(crate) fn stick_edges_onto_corridor(
         );
     }
     accepted
+}
+
+enum StickTry {
+    Ok(Vec<Point>),
+    BuildNone,
+    StillPierces,
+}
+
+fn try_stick_path_diag(
+    diagram: &Diagram,
+    result: &LayoutResult,
+    edge_index: usize,
+    from_id: &str,
+    to_id: &str,
+    from_anchor: Point,
+    to_anchor: Point,
+    from_port: Port,
+    to_port: Port,
+    plan: &super::corridor_route::CorridorRoutePlan,
+    group_ctx: &GroupRoutingContext,
+    obstacles: &PreparedObstacles,
+) -> StickTry {
+    let mut saw_pierce = false;
+    let mut saw_build = false;
+    for &stub in &[POST_ROUTE_CORRIDOR_STUB, POST_ROUTE_CORRIDOR_STUB * 2.0] {
+        if let Some(path) = validated_corridor_path(
+            edge_index,
+            from_anchor,
+            to_anchor,
+            from_id,
+            to_id,
+            plan,
+            group_ctx,
+            &result.nodes,
+            obstacles,
+            stub,
+        ) {
+            let mut probe = result.clone();
+            if edge_index < probe.edges.len() {
+                probe.edges[edge_index] = EdgeLayout {
+                    geometry: PathGeometry::Polyline {
+                        points: path.clone(),
+                    },
+                    labels: Vec::new(),
+                    from_port,
+                    to_port,
+                };
+                if !edge_index_through_foreign_node(diagram, &probe, edge_index) {
+                    return StickTry::Ok(path);
+                }
+            }
+            saw_pierce = true;
+            continue;
+        }
+        let Some(raw) = try_build_corridor_path(
+            edge_index,
+            from_anchor,
+            to_anchor,
+            from_id,
+            to_id,
+            plan,
+            group_ctx,
+            stub,
+            true,
+        ) else {
+            continue;
+        };
+        saw_build = true;
+        if raw.len() < 2 {
+            continue;
+        }
+        let mut probe = result.clone();
+        if edge_index >= probe.edges.len() {
+            continue;
+        }
+        probe.edges[edge_index] = EdgeLayout {
+            geometry: PathGeometry::Polyline {
+                points: raw.clone(),
+            },
+            labels: Vec::new(),
+            from_port,
+            to_port,
+        };
+        if !crate::layout::lint::edge_index_crosses_group_interior(diagram, &probe, edge_index)
+            && !edge_index_through_foreign_node(diagram, &probe, edge_index)
+        {
+            return StickTry::Ok(raw);
+        }
+        saw_pierce = true;
+    }
+    if saw_pierce {
+        StickTry::StillPierces
+    } else if saw_build {
+        StickTry::StillPierces
+    } else {
+        StickTry::BuildNone
+    }
+}
+
+fn port_anchor(nl: &NodeLayout, port: Port) -> Point {
+    match port {
+        Port::Top => Point::new(nl.x + nl.width * 0.5, nl.y),
+        Port::Bottom => Point::new(nl.x + nl.width * 0.5, nl.y + nl.height),
+        Port::Left => Point::new(nl.x, nl.y + nl.height * 0.5),
+        Port::Right => Point::new(nl.x + nl.width, nl.y + nl.height * 0.5),
+    }
+}
+
+/// 与 lint `edge_through_node` 同口径：贴廊候选不得引入穿节点（否则整批 repair 会因 through 回退）。
+fn edge_index_through_foreign_node(
+    diagram: &Diagram,
+    result: &LayoutResult,
+    edge_index: usize,
+) -> bool {
+    let Some(edge) = result.edges.get(edge_index) else {
+        return false;
+    };
+    let Some(rel) = diagram.relations.get(edge_index) else {
+        return false;
+    };
+    let path = edge.path_points();
+    if path.len() < 2 {
+        return false;
+    }
+    let from_id = rel.from.as_str();
+    let to_id = rel.to.as_str();
+    let segment_count = path.len().saturating_sub(1);
+    let skip_endpoints = segment_count > 2;
+    let mut node_ids: Vec<&String> = result.nodes.keys().collect();
+    node_ids.sort();
+    for (seg_i, window) in path.windows(2).enumerate() {
+        if skip_endpoints && (seg_i == 0 || seg_i == segment_count - 1) {
+            continue;
+        }
+        for node_id in &node_ids {
+            let node_id = node_id.as_str();
+            if node_id == from_id || node_id == to_id {
+                continue;
+            }
+            let Some(nl) = result.nodes.get(node_id) else {
+                continue;
+            };
+            if crate::layout::refine::segment_intersects_node(window[0], window[1], nl) {
+                return true;
+            }
+        }
+    }
+    false
 }
