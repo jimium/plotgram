@@ -670,7 +670,8 @@ pub fn path_is_clean_from_edges(
 }
 
 pub(super) fn segment_intersects_node(a: Point, b: Point, nl: &NodeLayout, pad: f64) -> bool {
-    Rect::from(nl).expanded(pad).segment_crosses_interior(a, b, EPS)
+    // A1：委托统一 primitive；语义等价于 expanded(pad).segment_crosses_interior(a,b,EPS)。
+    crate::layout::edge::common::geom_obstacle::segment_pierces_node(a, b, nl, pad)
 }
 
 /// 水平线段从节点正下方/正上方近距离擦过（视觉上的「穿节点」）

@@ -15,7 +15,7 @@
 use super::*;
 use crate::ast::Relation;
 use crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto;
-use crate::layout::geometry::{Point, Rect};
+use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
 use std::collections::{BTreeMap, HashMap};
 
@@ -110,10 +110,9 @@ fn segment_hits_node(
             {
                 continue;
             }
-            if Rect::from(nl)
-                .expanded(NODE_OBSTACLE_PAD)
-                .segment_crosses_interior(a, b, EPS)
-            {
+            if crate::layout::edge::common::geom_obstacle::segment_pierces_node(
+                a, b, nl, NODE_OBSTACLE_PAD,
+            ) {
                 return true;
             }
         }

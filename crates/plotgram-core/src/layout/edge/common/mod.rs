@@ -3,6 +3,7 @@
 pub mod circular_support;
 pub mod collinear_simplify;
 pub mod edge_geometry;
+pub mod geom_obstacle;
 pub mod label_avoidance;
 pub mod label_candidate;
 pub mod label_common;
