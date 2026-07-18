@@ -34,6 +34,7 @@
 pub mod algorithm_config;
 pub mod catalog;
 pub mod canvas_finalize;
+pub mod channel_occupancy;
 pub mod constants;
 pub mod decl_order;
 pub mod edge;
@@ -78,6 +79,10 @@ pub use lint::{
 pub use edge_band_demand::{
     demand_extra_over_base, edge_band_demand, layer_gaps_from_demand, EdgeBandDemandBreakdown,
     EdgeBandDemandProfile,
+};
+pub use channel_occupancy::{
+    compute_channel_occupancy_report, dump_channel_occupancy_if_enabled, ChannelEdgeRisk,
+    ChannelOccupancyReport, ChannelRiskKind, CorridorOccupancy,
 };
 pub use metrics::{
     compute_collinear_sample_metrics, compute_congestion_sample_metrics, node_fingerprint,
