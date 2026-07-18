@@ -105,6 +105,8 @@ impl<'a> LayoutPipeline<'a> {
         result: LayoutResult,
     ) -> Result<LayoutResult, DiagnosticError> {
         let t0 = Instant::now();
+        // A3：后处理写权表审计转储（PLOTGRAM_DUMP_EDGE_STAGES 置位时生效，默认零输出）。
+        crate::layout::edge_stages::dump_edge_stages();
         let feedback = LayoutRouteFeedback::new(self.diagram);
         let PreRouteFeedback {
             result: mut result_v2,
@@ -221,6 +223,9 @@ impl<'a> LayoutPipeline<'a> {
             &edge_snap_config,
         );
 
+        // A3 节点冻结屏障：step 10 之后节点坐标必须不变（此后仅改边几何/label/annotation）。
+        let node_freeze = crate::layout::edge_stages::NodeFreeze::capture(&result);
+
         // P1: 像素量化在管道最末尾执行，仅运行一次
         let sorted_node_ids: Vec<String> = {
             let mut ids: Vec<String> = result.nodes.keys().cloned().collect();
@@ -320,6 +325,9 @@ impl<'a> LayoutPipeline<'a> {
                 );
             }
 
+            // A3 折线冻结屏障：step 16 之后仅允许改 label/annotation，不得再动折点。
+            let polyline_freeze = crate::layout::edge_stages::PolylineFreeze::capture(&result);
+
             // 标签避让必须是几何冻结后的**最终**步骤：sanitize 会按平行边规则
             // 重建所有标签；snap/repulse 又移动了路径。router 内不再提前 resolve（P3.3）。
             let label_config =
@@ -339,12 +347,18 @@ impl<'a> LayoutPipeline<'a> {
                     annotations,
                 );
             }
+
+            // A3 折线冻结校验：label 阶段若改动了折点则打 warning（软校验，不 panic）。
+            polyline_freeze.warn_if_changed(&result);
         }
 
         crate::perf_log!(
             "[perf]   post-process: {:.2}ms",
             t_post.elapsed().as_secs_f64() * 1000.0
         );
+
+        // A3 节点冻结校验：后处理尾段（step 11-18）不得挪节点。
+        node_freeze.assert_unchanged(&result);
 
         Ok(result)
     }

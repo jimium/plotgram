@@ -38,6 +38,7 @@ pub mod constants;
 pub mod decl_order;
 pub mod edge;
 pub mod edge_band_demand;
+pub mod edge_stages;
 pub mod entry;
 pub mod geometry;
 pub mod geometry_helpers;
