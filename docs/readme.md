@@ -152,7 +152,7 @@ docs/
 |------|------|
 | [edge-routing-optimization-plan.md](architecture/布局优化/edge-routing-optimization-plan.md) | 边路由与标签布局优化方案 |
 | [group-subgraph-layout.md](architecture/布局优化/group-subgraph-layout.md) | Group 子图独立布局方案 |
-| [layout-routing-friendliness-evaluation.md](已经实现的方案/layout-routing-friendliness-evaluation.md) | ~~路由友好性评估~~（已移除；历史方案） |
+| [layout-routing-friendliness-evaluation.md](../backups/已经实现的方案/layout-routing-friendliness-evaluation.md) | ~~路由友好性评估~~（已移除；历史方案） |
 | [group-frame-spec.md](architecture/布局优化/group-frame-spec.md) | Group Frame 统一规范 — 组间/组内/节点三层框格模型 |
 | [hint-vs-intent-research.html](architecture/布局优化/hint-vs-intent-research.html) | Hint vs Intent 对比研究可视化 |
 

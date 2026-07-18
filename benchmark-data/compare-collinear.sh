@@ -6,10 +6,17 @@
 #   ./benchmark-data/compare-collinear.sh --allow-node-fp baseline.json current.json
 #   ./benchmark-data/compare-collinear.sh --allow-quality-debt baseline.json current.json
 #
-# 门禁分层（C4 / P4）:
+# 产品验收语言（Allowed / NeedsSeparation / Degraded）见:
+#   docs/architecture/方案计划/collinear-and-arrow-merge-comparison.md §2
+# 成功标准是「严重度与可归类」，不是「共线计数归零」。
+#
+# 门禁分层:
 #   正确性轨（硬）：edge_crosses_group_interior 不升；det 必须为 true
 #   质量轨（软/可债）：exact_sev / tight_sev / error_count / through /
-#                     unrelated_trunk / median_ms；node_fp（可用 --allow-node-fp）
+#                     unrelated_trunk / ortho.degraded_count / median_ms；
+#                     node_fp（可用 --allow-node-fp）
+#   观测（WARN，不单独失败）:
+#                     allowed_share_len 可升；若 allowed↑ 且 exact 未降 → 提示抽检误标
 #   默认：两轨任一 FAIL → exit 1
 #   --allow-quality-debt：仅正确性轨硬失败；质量轨 FAIL 打印为债（exit 0）
 #
@@ -77,10 +84,44 @@ for f in sorted(set(base_map) & set(cur_map)):
         else:
             quality.append(msg)
 
-    for key in ("exact_sev", "tight_sev"):
-        bv, cv = float(b.get(key, 0)), float(c.get(key, 0))
-        if cv > bv + EPS:
-            quality.append(f"{name}: {key} 上升 {bv:.3f} → {cv:.3f}")
+    be = float(b.get("exact_sev", 0) or 0)
+    ce = float(c.get("exact_sev", 0) or 0)
+    bt = float(b.get("tight_sev", 0) or 0)
+    ct = float(c.get("tight_sev", 0) or 0)
+    if ce > be + EPS:
+        quality.append(f"{name}: exact_sev 上升 {be:.3f} → {ce:.3f}")
+    if ct > bt + EPS:
+        quality.append(f"{name}: tight_sev 上升 {bt:.3f} → {ct:.3f}")
+
+    # allowed_share_len：合法合流可升（观测）；与 exact 交叉提示误标风险
+    ba = float(b.get("allowed_share_len", 0) or 0)
+    ca = float(c.get("allowed_share_len", 0) or 0)
+    if ca > ba + EPS:
+        warns.append(
+            f"{name}: allowed_share_len 上升 {ba:.3f} → {ca:.3f}"
+            f"（Allowed 可升；对应产品「有意合流」）"
+        )
+        if ce >= be - EPS:
+            warns.append(
+                f"{name}: allowed↑ 但 exact_sev 未降（{be:.3f} → {ce:.3f}）"
+                f"— 抽检是否误标 Allowed 掩盖 NeedsSeparation"
+            )
+
+    # ortho.degraded_count：空间不够时的可解释残余；计数不升（尚无 reason 分布）
+    bo = b.get("ortho") or {}
+    co = c.get("ortho") or {}
+    if "degraded_count" in bo or "degraded_count" in co:
+        bd = int(bo.get("degraded_count") or 0)
+        cd = int(co.get("degraded_count") or 0)
+        if cd > bd:
+            quality.append(
+                f"{name}: ortho.degraded_count 上升 {bd} → {cd}"
+                f"（Degraded 可不归零，但不得无说明地变多）"
+            )
+        elif cd < bd:
+            warns.append(
+                f"{name}: ortho.degraded_count 下降 {bd} → {cd}（收敛改进）"
+            )
 
     bl = b.get("lint") or {}
     cl = c.get("lint") or {}
@@ -133,7 +174,7 @@ if correctness:
 else:
     print("PASS")
 
-print("--- 质量轨（软/可债：sev / through / trunk / perf / node_fp）---")
+print("--- 质量轨（软/可债：sev / through / trunk / degraded / perf / node_fp）---")
 if quality:
     label = "FAIL（债）" if ALLOW_QUALITY_DEBT else "FAIL"
     print(f"{label}:")

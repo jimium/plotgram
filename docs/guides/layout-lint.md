@@ -383,4 +383,4 @@ LayoutLint **不读取 SVG**；两者互补：
 
 - [布局模块 readme](../../crates/plotgram-core/src/layout/readme.md)
 - [plotgram-eval readme](../../crates/plotgram-eval/readme.md) — 质量评分与算法对比
-- [layout-routing-friendliness-evaluation](../已经实现的方案/layout-routing-friendliness-evaluation.md) — 路由友好性研究（eval 指标来源）
+- [layout-routing-friendliness-evaluation](../../backups/已经实现的方案/layout-routing-friendliness-evaluation.md) — 路由友好性研究（eval 指标来源）

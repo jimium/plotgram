@@ -18,7 +18,7 @@ L3  Node Frame    — 节点：align（路由前）+ snap（路由后）
 
 **上手建议**：先读 [§1 Architecture macro rank](#1-architecture-macro-rank必读)（避免把上下分层误当成左右排），再看 [§5 按场景选用](#5-按场景选用)。
 
-> 设计规格：[group-frame-spec.md](../已经实现的方案/group-frame-spec.md)  
+> 设计规格：[group-frame-spec.md](../../backups/已经实现的方案/group-frame-spec.md)  
 > DSL：[dsl-writing-manual §5.3 / §6.6](../specs/dsl/dsl-writing-manual.md) · [language-spec §4.6 / §7.3](../specs/dsl/language-spec.md)  
 > 权威枚举：`attr_constants`（`group_layout` / `group_frame_track`）  
 > 实现：`group_layout_hint.rs`（L2）、`layout/group_frame/`（L1）
@@ -589,7 +589,7 @@ Layout hints 中可查看 `GroupFrameReport`（是否 equalized、matrix_applied
 - [DSL 写作手册 §5 Group / §6.6 group_frame](../specs/dsl/dsl-writing-manual.md)  
 - [语言规范 §4.6 / §7.3](../specs/dsl/language-spec.md)  
 - [架构图视觉语言](../specs/visual-language/diagrams/architecture.md)  
-- [group-frame-spec.md](../已经实现的方案/group-frame-spec.md) — 设计规格  
+- [group-frame-spec.md](../../backups/已经实现的方案/group-frame-spec.md) — 设计规格  
 - [layout-intent.md](layout-intent.md) — Pin / Align 与 Group Frame 交互  
 - [layout-lint.md](layout-lint.md) — 组重叠、节点溢出 group 等检查  
 - [theme-and-style.md](theme-and-style.md) — 组边框线型等  

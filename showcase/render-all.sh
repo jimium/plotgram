@@ -131,7 +131,7 @@ change_note_for() {
   if [[ -z "$old_hash" ]]; then
     echo " [新建]"
   elif [[ "$old_hash" == "$new_hash" ]]; then
-    echo " [无变化]"
+    echo ""
   else
     echo " [已变化]"
   fi

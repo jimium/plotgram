@@ -167,4 +167,4 @@ cargo test -p plotgram-eval -- --nocapture   # 跑 crate 内测试
 
 - [layout-lint.md](layout-lint.md) — 静态违规检查
 - [showcase-workflow.md](showcase-workflow.md) — 样例集回归
-- [layout-routing-friendliness-evaluation](../已经实现的方案/layout-routing-friendliness-evaluation.md) — 指标设计背景
+- [layout-routing-friendliness-evaluation](../../backups/已经实现的方案/layout-routing-friendliness-evaluation.md) — 指标设计背景
