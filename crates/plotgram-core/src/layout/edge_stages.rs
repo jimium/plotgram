@@ -243,6 +243,12 @@ impl PolylineFreeze {
 
 /// 边折线指纹：按边序（稳定）遍历 anchor 折点，量化后 fnv1a64 哈希。
 fn polyline_fingerprint(result: &crate::layout::LayoutResult) -> u64 {
+    edges_fingerprint(&result.edges)
+}
+
+/// 边集几何指纹（A3 折线冻结 / A5 D 审计幂等校验共用）：
+/// 按边序遍历 anchor 折点，量化（×100 取整）后 fnv1a64 哈希。
+pub(crate) fn edges_fingerprint(edges: &[crate::layout::types::EdgeLayout]) -> u64 {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     let mut mix = |v: i64| {
         for b in v.to_le_bytes() {
@@ -250,7 +256,7 @@ fn polyline_fingerprint(result: &crate::layout::LayoutResult) -> u64 {
             hash = hash.wrapping_mul(0x0100_0000_01b3);
         }
     };
-    for edge in &result.edges {
+    for edge in edges {
         for p in edge.geometry.anchor_points().iter() {
             mix((p.x * 100.0).round() as i64);
             mix((p.y * 100.0).round() as i64);

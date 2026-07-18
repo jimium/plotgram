@@ -261,16 +261,18 @@ impl<'a> LayoutPipeline<'a> {
             );
             // V3a / P3.1：D 一次正反向 gap 审计（C 预修在 phase_lane 末）。
             // 使用图类型对应 gap，避免 architecture 误用 flowchart 的 8px。
-            let _ = crate::layout::edge::edge_routing_orthogonal::enforce_reverse_pair_min_gap(
-                &mut result.edges,
-                &self.diagram.relations,
-                crate::layout::edge::parallel_gap_for_diagram(self.diagram.diagram_type.clone()),
-            );
+            let parallel_gap =
+                crate::layout::edge::parallel_gap_for_diagram(self.diagram.diagram_type.clone());
+            let d_gap_shifts =
+                crate::layout::edge::edge_routing_orthogonal::enforce_reverse_pair_min_gap(
+                    &mut result.edges,
+                    &self.diagram.relations,
+                    parallel_gap,
+                );
             // 轨道 A：正反向同侧 dock 共锚（D 末最终写者，sanitize 之后）
             let dock_gap =
-                crate::layout::edge::parallel_gap_for_diagram(self.diagram.diagram_type.clone())
-                    .max(crate::layout::edge::edge_routing_orthogonal::COMPACT_SLOT_PITCH);
-            let _ =
+                parallel_gap.max(crate::layout::edge::edge_routing_orthogonal::COMPACT_SLOT_PITCH);
+            let d_dock_shifts =
                 crate::layout::edge::edge_routing_orthogonal::enforce_reverse_pair_dock_separation(
                     &mut result.edges,
                     &self.diagram.relations,
@@ -279,6 +281,37 @@ impl<'a> LayoutPipeline<'a> {
                     &to_side,
                     dock_gap,
                 );
+
+            // A5：D 审计幂等校验（PLOTGRAM_CHECK_D_IDEMPOTENT 门控，默认零成本）。
+            // 于克隆边再跑一遍两个 enforcer；几何若仍变 ⇒ D 未达不动点，打 warning
+            // （视为上游 bug，不修正——probe 从不写回 result，行为不变）。
+            if std::env::var_os("PLOTGRAM_CHECK_D_IDEMPOTENT").is_some() {
+                let before = crate::layout::edge_stages::edges_fingerprint(&result.edges);
+                let mut probe = result.edges.clone();
+                let g2 = crate::layout::edge::edge_routing_orthogonal::enforce_reverse_pair_min_gap(
+                    &mut probe,
+                    &self.diagram.relations,
+                    parallel_gap,
+                );
+                let d2 = crate::layout::edge::edge_routing_orthogonal::
+                    enforce_reverse_pair_dock_separation(
+                        &mut probe,
+                        &self.diagram.relations,
+                        &result.nodes,
+                        &from_side,
+                        &to_side,
+                        dock_gap,
+                    );
+                if crate::layout::edge_stages::edges_fingerprint(&probe) != before {
+                    crate::perf_log!(
+                        "[warn] A5 D 审计非幂等：首遍 min_gap={} dock={} 后，二遍仍改动几何（min_gap={} dock={}），上游未达不动点",
+                        d_gap_shifts,
+                        d_dock_shifts,
+                        g2,
+                        d2
+                    );
+                }
+            }
 
             // L3：architecture 在 C 期 stub_occ 仅诊断；节点已冻结后于 D 末做 exact 跨对共柱真修。
             // 只改边几何 → node_fp 不变；须在 label 避让前完成并刷新 annotation。
