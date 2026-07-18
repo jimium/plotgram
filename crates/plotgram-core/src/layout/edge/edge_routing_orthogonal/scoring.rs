@@ -1,7 +1,7 @@
 //! Path scoring and obstacle avoidance for orthogonal edge routing
 
 use super::*;
-use crate::layout::geometry::{Point, Rect};
+use crate::layout::geometry::{Point, Rect, EPS};
 use crate::layout::group::{
     corridor_misalignment_penalty, segment_near_misses_group_shell, GroupRoutingContext,
     GROUP_BORDER_SHELL_PAD,
@@ -26,6 +26,10 @@ const GROUP_NEAR_MISS_EXTRA: f64 = 8.0;
 /// Iteration 2：提高到接近穿节点量级，使 scorer 强烈偏好绕行而非穿无关组。
 /// 硬过滤仍由 `path_avoids_group_interiors` + `strict_group_transit` 负责。
 const GROUP_TRANSIT_PENALTY: f64 = 8_000.0;
+/// N3 / B1：节点穿障**深度**软罚权重（像素重叠长度 × 本系数）。
+/// 叠在 `NODE_CROSSING_PENALTY` 之上，使「都不完美」时选穿得更浅的；
+/// **不**替代 `path_avoids_group_interiors` 等硬过滤。
+const NODE_PIERCE_DEPTH_WEIGHT: f64 = 50.0;
 
 /// P2-1: edge-overlap bbox 预筛选扩张量（含 EDGE_PARALLEL_GAP + 余量）。
 /// 用于 `edge_overlap_penalty` 中快速跳过 bbox 不相交的已路由段。
@@ -143,7 +147,12 @@ pub fn obstacle_penalty(
             }
             let pad = NODE_OBSTACLE_PAD;
             if segment_intersects_node(a, b, nl, pad) {
-                penalty += NODE_CROSSING_PENALTY;
+                // N3：固定穿模罚 + 连续穿透深度，浅穿优于深穿；硬过滤仍在 path_is_clean /
+                // path_avoids_group_interiors，此处只影响已过硬过滤或 degraded 候选的排序。
+                let depth = Rect::from(nl)
+                    .expanded(pad)
+                    .segment_interior_overlap_length(a, b, EPS);
+                penalty += NODE_CROSSING_PENALTY + depth * NODE_PIERCE_DEPTH_WEIGHT;
             } else if segment_near_misses_node(a, b, nl, pad) {
                 penalty += NODE_NEAR_MISS_PENALTY;
             }

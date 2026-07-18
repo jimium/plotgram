@@ -162,8 +162,58 @@ pub const POST_ROUTE_STAGES: &[EdgeStage] = &[
     },
 ];
 
+/// 管线后处理阶段名的权威序列（与 `pipeline::run_routing_pipeline` 及
+/// [`POST_ROUTE_STAGES`] 同步；改管线时必须同步改此常量与表）。
+pub const EXPECTED_STAGE_NAMES: &[&str] = &[
+    "complete_routing",
+    "repulse_edges_only",
+    "run_post_route_group_frame",
+    "hook.after_route",
+    "resolve_budget_violations",
+    "group_frame restore/recompute",
+    "reassert_multi_client_hub_centroids",
+    "align_cross_scope_pendant_chains",
+    "record_moved_for_overlap",
+    "reroute_and_repulse",
+    "snap_and_repulse_edges_with_guard",
+    "sanitize_orthogonal_edges_with_guard",
+    "enforce_reverse_pair_min_gap",
+    "enforce_reverse_pair_dock_separation",
+    "resolve_exact_stub_occupancy_post_route",
+    "repair_through_edges_post_route",
+    "resolve_label_overlaps_with_config",
+    "dedupe_labels_on_declared_merges",
+];
+
+/// 校验写权表 index 连续且与 [`EXPECTED_STAGE_NAMES`] 对齐（N1 防漂移）。
+pub fn assert_post_route_stages_consistent() {
+    debug_assert_eq!(
+        POST_ROUTE_STAGES.len(),
+        EXPECTED_STAGE_NAMES.len(),
+        "POST_ROUTE_STAGES 长度与 EXPECTED_STAGE_NAMES 不一致"
+    );
+    for (i, st) in POST_ROUTE_STAGES.iter().enumerate() {
+        debug_assert_eq!(
+            st.index as usize,
+            i + 1,
+            "POST_ROUTE_STAGES[{i}] index 不连续：期望 {}，实际 {}",
+            i + 1,
+            st.index
+        );
+        debug_assert_eq!(
+            st.name,
+            EXPECTED_STAGE_NAMES[i],
+            "POST_ROUTE_STAGES[{i}] 阶段名漂移：期望 {:?}, 实际 {:?}",
+            EXPECTED_STAGE_NAMES[i],
+            st.name
+        );
+    }
+}
+
 /// 转储后处理写权表（`PLOTGRAM_DUMP_EDGE_STAGES` 置位时生效，默认零输出）。
 pub fn dump_edge_stages() {
+    #[cfg(debug_assertions)]
+    assert_post_route_stages_consistent();
     if std::env::var_os("PLOTGRAM_DUMP_EDGE_STAGES").is_none() {
         return;
     }
@@ -265,4 +315,30 @@ pub(crate) fn edges_fingerprint(edges: &[crate::layout::types::EdgeLayout]) -> u
         mix(i64::MIN);
     }
     hash
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn post_route_stages_length_and_names_match_expected() {
+        assert_eq!(POST_ROUTE_STAGES.len(), 18);
+        assert_eq!(EXPECTED_STAGE_NAMES.len(), 18);
+        for (i, st) in POST_ROUTE_STAGES.iter().enumerate() {
+            assert_eq!(st.index as usize, i + 1, "index at {i}");
+            assert_eq!(st.name, EXPECTED_STAGE_NAMES[i], "name at {i}");
+        }
+        // 钉死首尾，防止只改中间时漏检。
+        assert_eq!(POST_ROUTE_STAGES[0].name, "complete_routing");
+        assert_eq!(
+            POST_ROUTE_STAGES[17].name,
+            "dedupe_labels_on_declared_merges"
+        );
+    }
+
+    #[test]
+    fn assert_post_route_stages_consistent_does_not_panic() {
+        assert_post_route_stages_consistent();
+    }
 }

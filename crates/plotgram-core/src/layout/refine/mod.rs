@@ -325,6 +325,43 @@ pub fn repair_through_edges_post_route(diagram: &Diagram, result: &mut LayoutRes
     }
 }
 
+/// N2：折线冻结点（`repair_through` 之后）用 lint 同语义做**只读复校**。
+///
+/// - 不改折点几何（禁止为消计数引入新穿模）。
+/// - 诊断：仍 through / crosses 的边数与边下标。
+/// - 若存在 `route_annotations`，对残留 dirty 边写入 `degraded` 原因（显式可见，不发明新契约类型）。
+pub fn recheck_lint_pierce_post_freeze(diagram: &Diagram, result: &mut LayoutResult) {
+    let through = collect_lint_through_edge_indices(diagram, result);
+    let group_count = count_group_interior_edges(diagram, result);
+
+    if through.is_empty() && group_count == 0 {
+        crate::perf_log!(
+            "[perf]     n2_lint_recheck: through=0 group_interior=0 (clean after repair)"
+        );
+        return;
+    }
+
+    let mut through_ids: Vec<usize> = through.iter().copied().collect();
+    through_ids.sort_unstable();
+    crate::perf_log!(
+        "[warn] N2 折线冻结复校：repair 后仍 dirty — through_edges={} {:?} group_interior_violations={}",
+        through_ids.len(),
+        through_ids,
+        group_count
+    );
+
+    // 显式 degraded：复用 annotation.degraded，不改 points。
+    if let Some(annotations) = result.hints.route_annotations.as_mut() {
+        for &ei in &through_ids {
+            if let Some(ann) = annotations.edges.iter_mut().find(|a| a.edge_index == ei) {
+                if ann.degraded.is_none() {
+                    ann.degraded = Some("n2_lint_recheck:edge_through_node".to_string());
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "refine_tests.rs"]
 mod tests;

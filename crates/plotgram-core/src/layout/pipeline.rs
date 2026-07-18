@@ -358,6 +358,9 @@ impl<'a> LayoutPipeline<'a> {
                 );
             }
 
+            // N2：repair 后 lint 同语义只读复校（记账 / degraded，不扩写几何）。
+            crate::layout::refine::recheck_lint_pierce_post_freeze(self.diagram, &mut result);
+
             // A3 折线冻结屏障：step 16 之后仅允许改 label/annotation，不得再动折点。
             let polyline_freeze = crate::layout::edge_stages::PolylineFreeze::capture(&result);
 
