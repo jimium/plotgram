@@ -27,8 +27,7 @@ use crate::layout::geometry::Point;
 use crate::layout::refine::segment_intersects_node;
 use crate::layout::{ContainmentViolationKind, LayoutResult};
 use geometry::{
-    group_overlap_area, node_overlap_area, point_in_rect_interior, segment_midpoint,
-    segment_on_group_border, segments_cross,
+    group_overlap_area, node_overlap_area, segment_on_group_border, segments_cross,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -498,8 +497,9 @@ fn check_edge_crosses_group_interior(diagram: &Diagram, result: &LayoutResult, o
                 continue;
             }
             for window in path.windows(2) {
-                let mid = segment_midpoint(window[0], window[1]);
-                if point_in_rect_interior(mid.x, mid.y, gl) {
+                if crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+                    window[0], window[1], gl,
+                ) {
                     out.push(
                         LayoutViolation::new(
                             LintRuleId::EdgeCrossesGroupInterior,
@@ -585,8 +585,9 @@ pub fn edge_crosses_group_interior_with_maps(
             continue;
         }
         for window in path.windows(2) {
-            let mid = segment_midpoint(window[0], window[1]);
-            if point_in_rect_interior(mid.x, mid.y, gl) {
+            if crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+                window[0], window[1], gl,
+            ) {
                 return true;
             }
         }
@@ -839,7 +840,11 @@ fn compute_pierce_severity(diagram: &Diagram, result: &LayoutResult) -> (f64, f6
                 continue;
             }
             for window in path.windows(2) {
-                group_sev += Rect::from(gl).segment_interior_overlap_length(window[0], window[1], EPS);
+                group_sev += Rect::from(gl).segment_interior_overlap_length(
+                    window[0],
+                    window[1],
+                    crate::layout::edge::common::geom_obstacle::GROUP_INTERIOR_EPS,
+                );
             }
         }
     }

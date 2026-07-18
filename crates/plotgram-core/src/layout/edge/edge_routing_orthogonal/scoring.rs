@@ -302,13 +302,14 @@ pub fn path_avoids_group_interiors(
     true
 }
 
-/// 检查线段是否穿越矩形的严格内部（不含边界）。
+/// 检查线段是否穿越分组严格内部——与 lint 共用
+/// [`geom_obstacle::segment_pierces_group_interior`]（`GROUP_INTERIOR_EPS` = router 原 EPS）。
 fn segment_crosses_rect_interior(
     a: Point,
     b: Point,
     gl: &GroupLayout,
 ) -> bool {
-    Rect::from(gl).segment_crosses_interior(a, b, EPS)
+    crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(a, b, gl)
 }
 
 /// 计算边段重叠惩罚。

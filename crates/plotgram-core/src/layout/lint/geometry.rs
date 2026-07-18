@@ -5,7 +5,6 @@ use crate::layout::{GroupLayout, NodeLayout};
 
 pub const OVERLAP_EPS: f64 = 0.5;
 pub const BORDER_EPS: f64 = 2.0;
-pub const GROUP_INTERIOR_INSET: f64 = 2.0;
 
 /// 两矩形 AABB 重叠面积（无重叠返回 0）。
 pub fn rect_overlap_area(
@@ -33,18 +32,6 @@ pub fn node_overlap_area(a: &NodeLayout, b: &NodeLayout) -> f64 {
 
 pub fn group_overlap_area(a: &GroupLayout, b: &GroupLayout) -> f64 {
     rect_overlap_area(a.x, a.y, a.width, a.height, b.x, b.y, b.width, b.height)
-}
-
-pub fn point_in_rect_interior(px: f64, py: f64, gl: &GroupLayout) -> bool {
-    px > gl.x + GROUP_INTERIOR_INSET
-        && px < gl.x + gl.width - GROUP_INTERIOR_INSET
-        && py > gl.y + GROUP_INTERIOR_INSET
-        && py < gl.y + gl.height - GROUP_INTERIOR_INSET
-}
-
-/// 线段中点。
-pub fn segment_midpoint(a: Point, b: Point) -> Point {
-    Point::new((a.x + b.x) / 2.0, (a.y + b.y) / 2.0)
 }
 
 /// 水平线段是否贴在矩形上/下边框上（长度与边框有实质重合）。
