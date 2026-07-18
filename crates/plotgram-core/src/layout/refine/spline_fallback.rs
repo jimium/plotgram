@@ -28,11 +28,24 @@ const MAX_LOCAL_ORTHOGONAL_QUALITY_EDGES: usize = 10;
 /// 对指定边索引用 spline 可见性图重路由（混合路由兜底）。
 ///
 /// C9：仅当替换后 crossing 不劣于原边时才采纳；空 detour 退 Bezier 后须复检穿障。
+///
+/// `aggressive_group_skirt`：并集裙边 + 换侧端口。仅用于节点冻结后的穿组试修，
+/// 避免在 refine（冻结前）改边连坐 space-budget / group_frame 导致 node_fp 漂移。
 pub(crate) fn reroute_edges_with_spline(
     result: &mut LayoutResult,
     diagram: &Diagram,
     edge_indices: &HashSet<usize>,
     config: &RefineConfig,
+) {
+    reroute_edges_with_spline_ex(result, diagram, edge_indices, config, false);
+}
+
+pub(crate) fn reroute_edges_with_spline_ex(
+    result: &mut LayoutResult,
+    diagram: &Diagram,
+    edge_indices: &HashSet<usize>,
+    config: &RefineConfig,
+    aggressive_group_skirt: bool,
 ) {
     if edge_indices.is_empty() {
         return;
@@ -108,63 +121,72 @@ pub(crate) fn reroute_edges_with_spline(
             .is_some_and(|edge| is_orthogonal(&edge.path_points()));
         let use_orthogonal_fallback = original_is_orthogonal
             || matches!(diagram.diagram_type, crate::types::DiagramType::Architecture);
-        let (geometry, sampled_for_label) = if use_orthogonal_fallback {
-            let Some(points) = orthogonal_detour(
-                ep.start,
-                ep.end,
-                ep.from_port,
-                ep.to_port,
-                diagram,
-                i,
-                &routing_snapshot,
-                &obstacle_index,
-                &skip,
-                fallback_lane,
-            ) else {
-                continue;
+        let (geometry, sampled_for_label, chosen_from_port, chosen_to_port) =
+            if use_orthogonal_fallback {
+                let Some((points, fp, tp)) = orthogonal_detour_try_ports(
+                    &ep,
+                    diagram,
+                    i,
+                    &routing_snapshot,
+                    &obstacle_index,
+                    &skip,
+                    fallback_lane,
+                    aggressive_group_skirt,
+                ) else {
+                    continue;
+                };
+                (
+                    PathGeometry::Polyline {
+                        points: points.clone(),
+                    },
+                    points,
+                    fp,
+                    tp,
+                )
+            } else if detour_path.is_empty() {
+                let cp = compute_bezier_controls(
+                    ep.start.x,
+                    ep.start.y,
+                    ep.end.x,
+                    ep.end.y,
+                    ep.from_port,
+                    ep.to_port,
+                    tension,
+                );
+                let sampled =
+                    sample_bezier(ep.start, cp[0], cp[1], ep.end, SPLINE_SAMPLES_PER_SEGMENT);
+                let candidate = EdgeLayout {
+                    geometry: PathGeometry::Bezier {
+                        start: ep.start,
+                        end: ep.end,
+                        controls: cp,
+                    },
+                    labels: Vec::new(),
+                    from_port: ep.from_port,
+                    to_port: ep.to_port,
+                };
+                // C9：空 detour 退 Bezier 后必须复检；仍穿障则保留原边。
+                if curve_intersects_obstacles(&candidate, &obstacle_index, &skip) {
+                    continue;
+                }
+                (
+                    candidate.geometry,
+                    sampled,
+                    ep.from_port,
+                    ep.to_port,
+                )
+            } else {
+                let full_path = build_full_path(ep.start, &detour_path, ep.end);
+                let sampled = fit_multi_segment_spline(&full_path, SPLINE_SAMPLES_PER_SEGMENT);
+                (
+                    PathGeometry::Polyline {
+                        points: sampled.clone(),
+                    },
+                    sampled,
+                    ep.from_port,
+                    ep.to_port,
+                )
             };
-            (
-                PathGeometry::Polyline {
-                    points: points.clone(),
-                },
-                points,
-            )
-        } else if detour_path.is_empty() {
-            let cp = compute_bezier_controls(
-                ep.start.x,
-                ep.start.y,
-                ep.end.x,
-                ep.end.y,
-                ep.from_port,
-                ep.to_port,
-                tension,
-            );
-            let sampled = sample_bezier(ep.start, cp[0], cp[1], ep.end, SPLINE_SAMPLES_PER_SEGMENT);
-            let candidate = EdgeLayout {
-                geometry: PathGeometry::Bezier {
-                    start: ep.start,
-                    end: ep.end,
-                    controls: cp,
-                },
-                labels: Vec::new(),
-                from_port: ep.from_port,
-                to_port: ep.to_port,
-            };
-            // C9：空 detour 退 Bezier 后必须复检；仍穿障则保留原边。
-            if curve_intersects_obstacles(&candidate, &obstacle_index, &skip) {
-                continue;
-            }
-            (candidate.geometry, sampled)
-        } else {
-            let full_path = build_full_path(ep.start, &detour_path, ep.end);
-            let sampled = fit_multi_segment_spline(&full_path, SPLINE_SAMPLES_PER_SEGMENT);
-            (
-                PathGeometry::Polyline {
-                    points: sampled.clone(),
-                },
-                sampled,
-            )
-        };
 
         let middle_t = label_t_for_diagram(diagram, rel);
         let labels =
@@ -175,8 +197,8 @@ pub(crate) fn reroute_edges_with_spline(
         let candidate = EdgeLayout {
             geometry,
             labels,
-            from_port: ep.from_port,
-            to_port: ep.to_port,
+            from_port: chosen_from_port,
+            to_port: chosen_to_port,
         };
 
         // C9：仅 when after ≤ before 才替换（crossing 不增）。
@@ -261,6 +283,69 @@ fn is_orthogonal(points: &[Point]) -> bool {
         .all(|w| (w[0].x - w[1].x).abs() < 0.1 || (w[0].y - w[1].y).abs() < 0.1)
 }
 
+/// 先用原端口 dogleg；`aggressive` 时失败再换侧端口。
+fn orthogonal_detour_try_ports(
+    ep: &crate::layout::edge::common::routing_skeleton::EdgeEndpoints,
+    diagram: &Diagram,
+    edge_index: usize,
+    result: &LayoutResult,
+    obstacles: &visibility::ObstacleIndex,
+    skip: &[usize],
+    fallback_lane: usize,
+    aggressive: bool,
+) -> Option<(Vec<Point>, Port, Port)> {
+    let mut port_pairs = vec![(ep.from_port, ep.to_port)];
+    if aggressive {
+        const SIDES: [Port; 4] = [Port::Top, Port::Bottom, Port::Left, Port::Right];
+        for &fp in &SIDES {
+            for &tp in &SIDES {
+                if (fp, tp) != (ep.from_port, ep.to_port) {
+                    port_pairs.push((fp, tp));
+                }
+            }
+        }
+    }
+    let from_nl = result.nodes.get(ep.from_id.as_str())?;
+    let to_nl = result.nodes.get(ep.to_id.as_str())?;
+    for (fp, tp) in port_pairs {
+        let start = if fp == ep.from_port && tp == ep.to_port {
+            ep.start
+        } else {
+            port_anchor(from_nl, fp)
+        };
+        let end = if fp == ep.from_port && tp == ep.to_port {
+            ep.end
+        } else {
+            port_anchor(to_nl, tp)
+        };
+        if let Some(points) = orthogonal_detour(
+            start,
+            end,
+            fp,
+            tp,
+            diagram,
+            edge_index,
+            result,
+            obstacles,
+            skip,
+            fallback_lane,
+            aggressive,
+        ) {
+            return Some((points, fp, tp));
+        }
+    }
+    None
+}
+
+fn port_anchor(nl: &crate::layout::NodeLayout, port: Port) -> Point {
+    match port {
+        Port::Top => Point::new(nl.x + nl.width * 0.5, nl.y),
+        Port::Bottom => Point::new(nl.x + nl.width * 0.5, nl.y + nl.height),
+        Port::Left => Point::new(nl.x, nl.y + nl.height * 0.5),
+        Port::Right => Point::new(nl.x + nl.width, nl.y + nl.height * 0.5),
+    }
+}
+
 /// 正交图的 refine 降级：只生成单次 dogleg / 外廊候选。
 ///
 /// 可见性样条的密采样点不能交给末尾 `force_orthogonal`，否则斜线会被栅格化成
@@ -276,6 +361,7 @@ fn orthogonal_detour(
     obstacles: &visibility::ObstacleIndex,
     skip: &[usize],
     fallback_lane: usize,
+    aggressive: bool,
 ) -> Option<Vec<Point>> {
     let (fox, foy) = port_outward(from_port);
     let (tox, toy) = port_outward(to_port);
@@ -320,6 +406,13 @@ fn orthogonal_detour(
             top = top.min(g.y);
             bottom = bottom.max(g.y + g.height);
         }
+        // 画布最终会按「节点+组+边」全局 bbox 平移；激进裙边若越出内容外廊，
+        // 会改变 min_x/min_y → 绝对坐标平移 → node_fp 假漂移。外廊上界用于选优。
+        let content_pad = ORTHOGONAL_OUTER_MARGIN + lane_offset + ORTHOGONAL_STUB * 2.0;
+        let content_x0 = left - content_pad;
+        let content_x1 = right + content_pad;
+        let content_y0 = top - content_pad;
+        let content_y1 = bottom + content_pad;
         // 先沿端口逃逸一档再折向外廊，减少同排横穿。
         let from_escape = Point::new(
             start.x + fox * (ORTHOGONAL_STUB * 3.0),
@@ -357,74 +450,108 @@ fn orthogonal_detour(
             }
         }
 
-        // 局部两跳/裙边：只绕「原路径已穿」的无关组 bbox，不做全局建廊剪枝。
+        // 局部两跳/裙边：只绕「原路径已穿」的无关组；多组连穿时再绕并集 bbox。
         if let Some(rel) = diagram.relations.get(edge_index) {
-            let pierced = foreign_groups_pierced_by_edge(diagram, result, edge_index, rel.from.as_str(), rel.to.as_str());
-            for gl in pierced {
-                for margin_extra in [ORTHOGONAL_STUB, ORTHOGONAL_STUB * 2.0, ORTHOGONAL_OUTER_MARGIN] {
-                    let m = margin_extra + lane_offset;
-                    let gx0 = gl.x - m;
-                    let gx1 = gl.x + gl.width + m;
-                    let gy0 = gl.y - m;
-                    let gy1 = gl.y + gl.height + m;
-                    for (exit_pt, entry_pt) in [(from_stub, to_stub), (from_escape, to_approach)] {
-                        for x in [gx0, gx1] {
-                            candidates.push(vec![
-                                start,
-                                exit_pt,
-                                Point::new(x, exit_pt.y),
-                                Point::new(x, entry_pt.y),
-                                entry_pt,
-                                end,
-                            ]);
-                        }
-                        for y in [gy0, gy1] {
-                            candidates.push(vec![
-                                start,
-                                exit_pt,
-                                Point::new(exit_pt.x, y),
-                                Point::new(entry_pt.x, y),
-                                entry_pt,
-                                end,
-                            ]);
-                        }
-                        // U 形两折绕组（上→侧→下 / 左→侧→右），覆盖单侧裙边不够的跨组。
-                        candidates.push(vec![
-                            start,
-                            exit_pt,
-                            Point::new(exit_pt.x, gy0),
-                            Point::new(entry_pt.x, gy0),
-                            entry_pt,
-                            end,
-                        ]);
-                        candidates.push(vec![
-                            start,
-                            exit_pt,
-                            Point::new(exit_pt.x, gy1),
-                            Point::new(entry_pt.x, gy1),
-                            entry_pt,
-                            end,
-                        ]);
-                        candidates.push(vec![
-                            start,
-                            exit_pt,
-                            Point::new(gx0, exit_pt.y),
-                            Point::new(gx0, entry_pt.y),
-                            entry_pt,
-                            end,
-                        ]);
-                        candidates.push(vec![
-                            start,
-                            exit_pt,
-                            Point::new(gx1, exit_pt.y),
-                            Point::new(gx1, entry_pt.y),
-                            entry_pt,
-                            end,
-                        ]);
-                    }
+            let pierced = foreign_groups_pierced_by_edge(
+                diagram,
+                result,
+                edge_index,
+                rel.from.as_str(),
+                rel.to.as_str(),
+            );
+            let stub_pairs = [(from_stub, to_stub), (from_escape, to_approach)];
+            for gl in &pierced {
+                push_rect_skirt_candidates(
+                    &mut candidates,
+                    start,
+                    end,
+                    &stub_pairs,
+                    gl.x,
+                    gl.y,
+                    gl.x + gl.width,
+                    gl.y + gl.height,
+                    lane_offset,
+                    aggressive,
+                );
+            }
+            // 多组连穿并集裙边：仅冻结后穿组试修开启，避免 refine 连坐 node_fp。
+            if aggressive && pierced.len() >= 2 {
+                let mut ux0 = f64::INFINITY;
+                let mut uy0 = f64::INFINITY;
+                let mut ux1 = f64::NEG_INFINITY;
+                let mut uy1 = f64::NEG_INFINITY;
+                for gl in &pierced {
+                    ux0 = ux0.min(gl.x);
+                    uy0 = uy0.min(gl.y);
+                    ux1 = ux1.max(gl.x + gl.width);
+                    uy1 = uy1.max(gl.y + gl.height);
                 }
+                push_rect_skirt_candidates(
+                    &mut candidates,
+                    start,
+                    end,
+                    &stub_pairs,
+                    ux0,
+                    uy0,
+                    ux1,
+                    uy1,
+                    lane_offset,
+                    true,
+                );
             }
         }
+
+        let group_maps = crate::layout::lint::GroupInteriorMaps::new(diagram);
+        let endpoint_ids = diagram.relations.get(edge_index).map(|rel| {
+            (
+                rel.from.as_str().to_string(),
+                rel.to.as_str().to_string(),
+            )
+        });
+        let mut clean: Vec<Vec<Point>> = candidates
+            .into_iter()
+            .map(simplify_orthogonal)
+            .filter(|path| {
+                path.len() >= 2
+                    && is_orthogonal(path)
+                    && path
+                        .windows(2)
+                        .all(|w| !obstacles.segment_hits_any(w[0], w[1], skip))
+                    && endpoint_ids.as_ref().is_some_and(|(from_id, to_id)| {
+                        !path_pierces_foreign_nodes(path, result, from_id, to_id)
+                    })
+                    && !path_crosses_foreign_group_interior(
+                        path,
+                        diagram,
+                        result,
+                        edge_index,
+                        &group_maps,
+                    )
+            })
+            .collect();
+        clean.sort_by(|a, b| {
+            // 激进模式：优先不越出内容外廊，避免 finalize_canvas 平移导致 node_fp 假漂移。
+            let rank = |path: &[Point]| -> i32 {
+                if !aggressive {
+                    return 0;
+                }
+                if path_within_rect(path, content_x0, content_y0, content_x1, content_y1) {
+                    0
+                } else {
+                    1
+                }
+            };
+            rank(a)
+                .cmp(&rank(b))
+                .then_with(|| a.len().cmp(&b.len()))
+                .then_with(|| {
+                    path_length(a)
+                        .partial_cmp(&path_length(b))
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .then_with(|| path_sort_key(a).cmp(&path_sort_key(b)))
+        });
+        return clean.into_iter().next();
     }
 
     let group_maps = crate::layout::lint::GroupInteriorMaps::new(diagram);
@@ -466,6 +593,11 @@ fn orthogonal_detour(
             .then_with(|| path_sort_key(a).cmp(&path_sort_key(b)))
     });
     clean.into_iter().next()
+}
+
+fn path_within_rect(path: &[Point], x0: f64, y0: f64, x1: f64, y1: f64) -> bool {
+    path.iter()
+        .all(|p| p.x >= x0 - 0.1 && p.x <= x1 + 0.1 && p.y >= y0 - 0.1 && p.y <= y1 + 0.1)
 }
 
 fn path_sort_key(points: &[Point]) -> Vec<(i64, i64)> {
@@ -519,6 +651,121 @@ fn path_crosses_foreign_group_interior(
         };
     }
     crate::layout::lint::edge_crosses_group_interior_with_maps(diagram, &probe, edge_index, maps)
+}
+
+/// 绕轴对齐矩形外框生成裙边 / U 形候选（局部两跳，非建廊）。
+///
+/// `aggressive`：额外大外扩 + 角绕行；仅冻结后穿组试修开启。
+fn push_rect_skirt_candidates(
+    candidates: &mut Vec<Vec<Point>>,
+    start: Point,
+    end: Point,
+    stub_pairs: &[(Point, Point)],
+    x0: f64,
+    y0: f64,
+    x1: f64,
+    y1: f64,
+    lane_offset: f64,
+    aggressive: bool,
+) {
+    // refine（非 aggressive）必须与历史三档外扩一致，否则改边会反馈 space-budget → node_fp。
+    let margins: &[f64] = if aggressive {
+        &[
+            ORTHOGONAL_STUB,
+            ORTHOGONAL_STUB * 2.0,
+            ORTHOGONAL_OUTER_MARGIN,
+            ORTHOGONAL_OUTER_MARGIN * 2.0,
+            ORTHOGONAL_STUB * 6.0,
+        ]
+    } else {
+        &[ORTHOGONAL_STUB, ORTHOGONAL_STUB * 2.0, ORTHOGONAL_OUTER_MARGIN]
+    };
+    for &margin_extra in margins {
+        let m = margin_extra + lane_offset;
+        let gx0 = x0 - m;
+        let gx1 = x1 + m;
+        let gy0 = y0 - m;
+        let gy1 = y1 + m;
+        for &(exit_pt, entry_pt) in stub_pairs {
+            for x in [gx0, gx1] {
+                candidates.push(vec![
+                    start,
+                    exit_pt,
+                    Point::new(x, exit_pt.y),
+                    Point::new(x, entry_pt.y),
+                    entry_pt,
+                    end,
+                ]);
+            }
+            for y in [gy0, gy1] {
+                candidates.push(vec![
+                    start,
+                    exit_pt,
+                    Point::new(exit_pt.x, y),
+                    Point::new(entry_pt.x, y),
+                    entry_pt,
+                    end,
+                ]);
+            }
+            // U 形两折绕组（上→侧→下 / 左→侧→右）
+            candidates.push(vec![
+                start,
+                exit_pt,
+                Point::new(exit_pt.x, gy0),
+                Point::new(entry_pt.x, gy0),
+                entry_pt,
+                end,
+            ]);
+            candidates.push(vec![
+                start,
+                exit_pt,
+                Point::new(exit_pt.x, gy1),
+                Point::new(entry_pt.x, gy1),
+                entry_pt,
+                end,
+            ]);
+            candidates.push(vec![
+                start,
+                exit_pt,
+                Point::new(gx0, exit_pt.y),
+                Point::new(gx0, entry_pt.y),
+                entry_pt,
+                end,
+            ]);
+            candidates.push(vec![
+                start,
+                exit_pt,
+                Point::new(gx1, exit_pt.y),
+                Point::new(gx1, entry_pt.y),
+                entry_pt,
+                end,
+            ]);
+            if !aggressive {
+                continue;
+            }
+            // 角绕行：一侧通道被节点堵死时绕矩形一角。
+            for (cx, cy) in [(gx0, gy0), (gx0, gy1), (gx1, gy0), (gx1, gy1)] {
+                candidates.push(vec![
+                    start,
+                    exit_pt,
+                    Point::new(exit_pt.x, cy),
+                    Point::new(cx, cy),
+                    Point::new(entry_pt.x, cy),
+                    entry_pt,
+                    end,
+                ]);
+                candidates.push(vec![
+                    start,
+                    exit_pt,
+                    Point::new(cx, exit_pt.y),
+                    Point::new(cx, cy),
+                    Point::new(cx, entry_pt.y),
+                    entry_pt,
+                    end,
+                ]);
+            }
+        }
+    }
 }
 
 /// 原路径穿入的无关组（按 id 排序，确定性）。用于局部裙边/两跳候选，禁止全图建廊。

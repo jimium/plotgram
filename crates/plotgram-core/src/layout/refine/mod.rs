@@ -342,11 +342,12 @@ pub fn repair_group_interior_edges_post_route(diagram: &Diagram, result: &mut La
     let entry_through = collect_lint_through_edge_indices(diagram, result).len();
     let snapshot = result.clone();
     let n = group_edges.len();
-    spline_fallback::reroute_edges_with_spline(
+    spline_fallback::reroute_edges_with_spline_ex(
         result,
         diagram,
         &group_edges,
         &RefineConfig::default(),
+        true,
     );
     let after_group = count_group_interior_edges(diagram, result);
     let after_through = collect_lint_through_edge_indices(diagram, result).len();
