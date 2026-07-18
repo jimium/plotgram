@@ -325,6 +325,73 @@ pub fn repair_through_edges_post_route(diagram: &Diagram, result: &mut LayoutRes
     }
 }
 
+/// 仅针对当前 lint `edge_crosses_group_interior` 边的局部 dogleg / 组裙边试修。
+///
+/// - 不建廊、不清伪邻接；只对 dirty 边生成外廊/绕已穿组 bbox 的候选。
+/// - 硬门禁在 `orthogonal_detour`（拒残 through / 新穿组）。
+/// - 整批后若穿组计数上升或 through 上升则回退。
+pub fn repair_group_interior_edges_post_route(diagram: &Diagram, result: &mut LayoutResult) {
+    if result.groups.is_empty() {
+        return;
+    }
+    let group_edges = collect_lint_group_interior_edge_indices(diagram, result);
+    if group_edges.is_empty() {
+        return;
+    }
+    let entry_group = count_group_interior_edges(diagram, result);
+    let entry_through = collect_lint_through_edge_indices(diagram, result).len();
+    let snapshot = result.clone();
+    let n = group_edges.len();
+    spline_fallback::reroute_edges_with_spline(
+        result,
+        diagram,
+        &group_edges,
+        &RefineConfig::default(),
+    );
+    let after_group = count_group_interior_edges(diagram, result);
+    let after_through = collect_lint_through_edge_indices(diagram, result).len();
+    if after_group > entry_group || after_through > entry_through {
+        *result = snapshot;
+        crate::perf_log!(
+            "[perf]     d_group_interior_repair: rolled_back (group {}→{} through {}→{}, tried={})",
+            entry_group,
+            after_group,
+            entry_through,
+            after_through,
+            n
+        );
+    } else {
+        crate::perf_log!(
+            "[perf]     d_group_interior_repair: group {}→{} through {}→{} tried={}",
+            entry_group,
+            after_group,
+            entry_through,
+            after_through,
+            n
+        );
+    }
+}
+
+/// 与 lint `edge_crosses_group_interior` 对齐的边下标集合。
+fn collect_lint_group_interior_edge_indices(
+    diagram: &Diagram,
+    result: &LayoutResult,
+) -> HashSet<usize> {
+    let mut out = HashSet::new();
+    if result.groups.is_empty() {
+        return out;
+    }
+    let maps = crate::layout::lint::GroupInteriorMaps::new(diagram);
+    for edge_index in 0..result.edges.len() {
+        if crate::layout::lint::edge_crosses_group_interior_with_maps(
+            diagram, result, edge_index, &maps,
+        ) {
+            out.insert(edge_index);
+        }
+    }
+    out
+}
+
 /// N2：折线冻结点（`repair_through` 之后）用 lint 同语义做**只读复校**。
 ///
 /// - 不改折点几何（禁止为消计数引入新穿模）。

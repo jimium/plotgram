@@ -356,6 +356,75 @@ fn orthogonal_detour(
                 }
             }
         }
+
+        // 局部两跳/裙边：只绕「原路径已穿」的无关组 bbox，不做全局建廊剪枝。
+        if let Some(rel) = diagram.relations.get(edge_index) {
+            let pierced = foreign_groups_pierced_by_edge(diagram, result, edge_index, rel.from.as_str(), rel.to.as_str());
+            for gl in pierced {
+                for margin_extra in [ORTHOGONAL_STUB, ORTHOGONAL_STUB * 2.0, ORTHOGONAL_OUTER_MARGIN] {
+                    let m = margin_extra + lane_offset;
+                    let gx0 = gl.x - m;
+                    let gx1 = gl.x + gl.width + m;
+                    let gy0 = gl.y - m;
+                    let gy1 = gl.y + gl.height + m;
+                    for (exit_pt, entry_pt) in [(from_stub, to_stub), (from_escape, to_approach)] {
+                        for x in [gx0, gx1] {
+                            candidates.push(vec![
+                                start,
+                                exit_pt,
+                                Point::new(x, exit_pt.y),
+                                Point::new(x, entry_pt.y),
+                                entry_pt,
+                                end,
+                            ]);
+                        }
+                        for y in [gy0, gy1] {
+                            candidates.push(vec![
+                                start,
+                                exit_pt,
+                                Point::new(exit_pt.x, y),
+                                Point::new(entry_pt.x, y),
+                                entry_pt,
+                                end,
+                            ]);
+                        }
+                        // U 形两折绕组（上→侧→下 / 左→侧→右），覆盖单侧裙边不够的跨组。
+                        candidates.push(vec![
+                            start,
+                            exit_pt,
+                            Point::new(exit_pt.x, gy0),
+                            Point::new(entry_pt.x, gy0),
+                            entry_pt,
+                            end,
+                        ]);
+                        candidates.push(vec![
+                            start,
+                            exit_pt,
+                            Point::new(exit_pt.x, gy1),
+                            Point::new(entry_pt.x, gy1),
+                            entry_pt,
+                            end,
+                        ]);
+                        candidates.push(vec![
+                            start,
+                            exit_pt,
+                            Point::new(gx0, exit_pt.y),
+                            Point::new(gx0, entry_pt.y),
+                            entry_pt,
+                            end,
+                        ]);
+                        candidates.push(vec![
+                            start,
+                            exit_pt,
+                            Point::new(gx1, exit_pt.y),
+                            Point::new(gx1, entry_pt.y),
+                            entry_pt,
+                            end,
+                        ]);
+                    }
+                }
+            }
+        }
     }
 
     let group_maps = crate::layout::lint::GroupInteriorMaps::new(diagram);
@@ -450,6 +519,59 @@ fn path_crosses_foreign_group_interior(
         };
     }
     crate::layout::lint::edge_crosses_group_interior_with_maps(diagram, &probe, edge_index, maps)
+}
+
+/// 原路径穿入的无关组（按 id 排序，确定性）。用于局部裙边/两跳候选，禁止全图建廊。
+fn foreign_groups_pierced_by_edge<'a>(
+    _diagram: &Diagram,
+    result: &'a LayoutResult,
+    edge_index: usize,
+    from_id: &str,
+    to_id: &str,
+) -> Vec<&'a crate::layout::GroupLayout> {
+    let Some(edge) = result.edges.get(edge_index) else {
+        return Vec::new();
+    };
+    let path = edge.path_points();
+    if path.len() < 2 || result.groups.is_empty() {
+        return Vec::new();
+    }
+    let mut gids: Vec<&String> = result.groups.keys().collect();
+    gids.sort();
+    let mut out = Vec::new();
+    for gid in gids {
+        let gl = &result.groups[gid];
+        if gl.width <= 0.0 || gl.height <= 0.0 {
+            continue;
+        }
+        // 端点所在组不做裙边目标（出组/入组腿会合法经过）。
+        let from_in = result
+            .nodes
+            .get(from_id)
+            .is_some_and(|nl| point_in_group_loose(nl, gl));
+        let to_in = result
+            .nodes
+            .get(to_id)
+            .is_some_and(|nl| point_in_group_loose(nl, gl));
+        if from_in || to_in {
+            continue;
+        }
+        let pierces = path.windows(2).any(|w| {
+            crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+                w[0], w[1], gl,
+            )
+        });
+        if pierces {
+            out.push(gl);
+        }
+    }
+    out
+}
+
+fn point_in_group_loose(nl: &crate::layout::NodeLayout, gl: &crate::layout::GroupLayout) -> bool {
+    let cx = nl.x + nl.width * 0.5;
+    let cy = nl.y + nl.height * 0.5;
+    cx >= gl.x && cx <= gl.x + gl.width && cy >= gl.y && cy <= gl.y + gl.height
 }
 
 fn port_outward(port: Port) -> (f64, f64) {

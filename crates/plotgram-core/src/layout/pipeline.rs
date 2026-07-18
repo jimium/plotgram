@@ -358,6 +358,19 @@ impl<'a> LayoutPipeline<'a> {
                 );
             }
 
+            // 仅 lint 穿组边：局部裙边/两跳 dogleg（禁全局建廊剪枝）。
+            {
+                let t_group = crate::layout::perf::Instant::now();
+                crate::layout::refine::repair_group_interior_edges_post_route(
+                    self.diagram,
+                    &mut result,
+                );
+                crate::perf_log!(
+                    "[perf]     d_group_interior_repair: {:.2}ms",
+                    t_group.elapsed().as_secs_f64() * 1000.0
+                );
+            }
+
             // N2：repair 后 lint 同语义只读复校（记账 / degraded，不扩写几何）。
             crate::layout::refine::recheck_lint_pierce_post_freeze(self.diagram, &mut result);
 
