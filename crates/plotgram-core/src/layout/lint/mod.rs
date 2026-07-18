@@ -729,6 +729,12 @@ pub struct LintMetricsSummary {
     pub unrelated_edge_trunk_merge: usize,
     /// 同级 sibling 同 RankBand 宽比过大（对称性软指标）
     pub sibling_width_ratio: usize,
+    /// B1 诊断轨：Σ 边穿**非端点节点**内部的重叠长度（连续量，非门禁硬指标）。
+    #[serde(default)]
+    pub pierce_node_sev: f64,
+    /// B1 诊断轨：Σ 边穿**非端点分组**内部的重叠长度（连续量，非门禁硬指标）。
+    #[serde(default)]
+    pub pierce_group_sev: f64,
     pub total_violations: usize,
     pub error_count: usize,
     pub warning_count: usize,
@@ -766,7 +772,79 @@ impl LintMetricsSummary {
 /// 计算布局质量 lint 指标（verbose 配置，含全部规则）。
 pub fn compute_lint_metrics(diagram: &Diagram, result: &LayoutResult) -> LintMetricsSummary {
     let report = LayoutLinter::with_config(LintConfig::verbose()).run(diagram, result);
-    LintMetricsSummary::from_report(&report)
+    let mut summary = LintMetricsSummary::from_report(&report);
+    let (node_sev, group_sev) = compute_pierce_severity(diagram, result);
+    summary.pierce_node_sev = node_sev;
+    summary.pierce_group_sev = group_sev;
+    summary
+}
+
+/// B1 诊断轨：边穿障**连续严重度**（Σ 穿内部重叠长度）。
+///
+/// 端点豁免口径与 `check_edge_through_nodes` / `check_edge_crosses_group_interior`
+/// 一致（跳过 from/to 节点、端点相关分组，长路径跳首末 stub 段），仅将布尔判定
+/// 替换为重叠长度累加。属**只读诊断**，不参与硬门禁，也不移动任何几何。
+fn compute_pierce_severity(diagram: &Diagram, result: &LayoutResult) -> (f64, f64) {
+    use crate::layout::geometry::{Rect, EPS};
+
+    let mut node_ids: Vec<&String> = result.nodes.keys().collect();
+    node_ids.sort();
+    let mut group_ids: Vec<&String> = result.groups.keys().collect();
+    group_ids.sort();
+    let entity_group = entity_to_group_map(diagram);
+    let ancestor_sets = build_group_ancestor_sets(diagram);
+
+    let mut node_sev = 0.0;
+    let mut group_sev = 0.0;
+
+    for (index, edge) in result.edges.iter().enumerate() {
+        if edge.path_len() < 2 {
+            continue;
+        }
+        let Some(rel) = diagram.relations.get(index) else {
+            continue;
+        };
+        let from_id = rel.from.as_str();
+        let to_id = rel.to.as_str();
+        let path = edge.path_points();
+        let segment_count = path.len().saturating_sub(1);
+        let skip_endpoints = segment_count > 2;
+
+        // 节点穿障：跳过 from/to 节点，长路径跳首末 stub 段。
+        for (seg_i, window) in path.windows(2).enumerate() {
+            if skip_endpoints && (seg_i == 0 || seg_i == segment_count - 1) {
+                continue;
+            }
+            let a = window[0];
+            let b = window[1];
+            for nid in &node_ids {
+                let nid = nid.as_str();
+                if nid == from_id || nid == to_id {
+                    continue;
+                }
+                let nl = &result.nodes[nid];
+                node_sev += Rect::from(nl).segment_interior_overlap_length(a, b, EPS);
+            }
+        }
+
+        // 分组穿障：跳过端点相关分组（含祖先链）。
+        let from_related = endpoint_related_groups(from_id, &entity_group, &ancestor_sets);
+        let to_related = endpoint_related_groups(to_id, &entity_group, &ancestor_sets);
+        for gid in &group_ids {
+            if from_related.contains(gid.as_str()) || to_related.contains(gid.as_str()) {
+                continue;
+            }
+            let gl = &result.groups[*gid];
+            if gl.width <= 0.0 || gl.height <= 0.0 {
+                continue;
+            }
+            for window in path.windows(2) {
+                group_sev += Rect::from(gl).segment_interior_overlap_length(window[0], window[1], EPS);
+            }
+        }
+    }
+
+    (node_sev, group_sev)
 }
 
 fn check_label_node_overlaps(

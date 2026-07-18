@@ -208,6 +208,59 @@ impl Rect {
         a_in != b_in
     }
 
+    /// 线段 `a→b` 落在本矩形**严格内部**（四边各向内收缩 `eps`）的重叠长度。
+    ///
+    /// 返回 0 表示不穿内部；>0 为穿透深度（连续量），用于穿障严重度（B1）。
+    /// 采用 Liang–Barsky 参数化裁剪，对轴对齐段与斜段均正确。
+    pub fn segment_interior_overlap_length(&self, a: Point, b: Point, eps: f64) -> f64 {
+        let left = self.x + eps;
+        let right = self.right() - eps;
+        let top = self.y + eps;
+        let bottom = self.bottom() - eps;
+        if right <= left || bottom <= top {
+            return 0.0;
+        }
+        let dx = b.x - a.x;
+        let dy = b.y - a.y;
+        let mut t0 = 0.0_f64;
+        let mut t1 = 1.0_f64;
+        // 依次针对左/右/上/下四条内缩边裁剪参数区间 [t0, t1]。
+        let clip = |p: f64, q: f64, t0: &mut f64, t1: &mut f64| -> bool {
+            if p == 0.0 {
+                // 平行于该边界：若在边界外侧则整体剔除。
+                return q >= 0.0;
+            }
+            let r = q / p;
+            if p < 0.0 {
+                if r > *t1 {
+                    return false;
+                }
+                if r > *t0 {
+                    *t0 = r;
+                }
+            } else {
+                if r < *t0 {
+                    return false;
+                }
+                if r < *t1 {
+                    *t1 = r;
+                }
+            }
+            true
+        };
+        if !clip(-dx, a.x - left, &mut t0, &mut t1)
+            || !clip(dx, right - a.x, &mut t0, &mut t1)
+            || !clip(-dy, a.y - top, &mut t0, &mut t1)
+            || !clip(dy, bottom - a.y, &mut t0, &mut t1)
+        {
+            return 0.0;
+        }
+        if t1 <= t0 {
+            return 0.0;
+        }
+        ((t1 - t0) * (dx * dx + dy * dy).sqrt()).max(0.0)
+    }
+
     pub fn range_on_axis(&self, axis: Axis) -> (f64, f64) {
         match axis {
             Axis::Horizontal => (self.left(), self.right()),
