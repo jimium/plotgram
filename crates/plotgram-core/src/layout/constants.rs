@@ -23,7 +23,8 @@ pub const DEFAULT_PADDING: f64 = 50.0;
 pub const DEFAULT_GROUP_PADDING: f64 = 20.0;
 
 /// 默认节点 margin（不可见外边框）：边路由时节点障碍物膨胀间距。
-/// 取 orthogonal 路由的 `NODE_OBSTACLE_PAD` 值，保持默认行为不变。
+/// A2：作为节点障碍物膨胀间距的单一来源；orthogonal 路由的 `NODE_OBSTACLE_PAD`
+/// 现引用本常量（同值 18.0，保持默认行为不变）。
 pub const DEFAULT_NODE_MARGIN: f64 = 18.0;
 
 /// 默认分组 margin（不可见外边框）：边路由通道绕行时距分组边框的留白。
@@ -33,6 +34,11 @@ pub const DEFAULT_GROUP_MARGIN: f64 = 18.0;
 
 /// 默认边偏移量（边与节点的最小间距）
 pub const DEFAULT_EDGE_OFFSET: f64 = 24.0;
+
+/// stub 段保护长度：从端点出发的第一段（stub）在此长度内不做硬间距检查
+/// （同节点相邻 slot 的 stub 天然平行近距，slot_pitch 可能小于 EDGE_PARALLEL_GAP）。
+/// A2：orthogonal 路由与 segment_pair 共线裁决共享的单一来源。
+pub const STUB_GUARD_LENGTH: f64 = 24.0;
 
 /// 默认障碍物内边距（可见性图与样条路由中使用）
 pub const DEFAULT_OBSTACLE_PADDING: f64 = 8.0;

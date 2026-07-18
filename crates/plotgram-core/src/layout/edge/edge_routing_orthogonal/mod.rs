@@ -216,7 +216,8 @@ pub(super) use crate::layout::constants::ORTHO_PARALLEL_GAP as EDGE_PARALLEL_GAP
 
 /// X-1: stub 段保护长度——从端点出发的第一段（stub）在此长度内不做硬间距检查，
 /// 因为同节点相邻 slot 的 stub 天然平行近距（slot_pitch 可能小于 EDGE_PARALLEL_GAP）。
-pub(super) const STUB_GUARD_LENGTH: f64 = 24.0;
+/// A2：单一来源见 `constants::STUB_GUARD_LENGTH`。
+pub(super) use crate::layout::constants::STUB_GUARD_LENGTH;
 /// 每个折点的惩罚（鼓励更少拐弯）
 pub(super) const BEND_PENALTY: f64 = 16.0;
 

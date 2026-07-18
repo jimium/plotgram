@@ -10,7 +10,8 @@ use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
 use std::collections::HashMap;
 
 /// 节点障碍物膨胀间距（边路由时节点障碍物膨胀的固定间距）。
-pub const NODE_OBSTACLE_PAD: f64 = 18.0;
+/// A2：单一来源为 `constants::DEFAULT_NODE_MARGIN`（同值 18.0），消除同值双写。
+pub const NODE_OBSTACLE_PAD: f64 = crate::layout::constants::DEFAULT_NODE_MARGIN;
 /// P1-3 / Border Shell：分组边框壳层厚度。
 pub const GROUP_OBSTACLE_PAD: f64 = GROUP_BORDER_SHELL_PAD;
 /// 近距擦过检测的额外余量（在节点 margin 基础上额外增加的距离）

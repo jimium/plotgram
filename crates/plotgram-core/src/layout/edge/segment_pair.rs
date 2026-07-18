@@ -13,8 +13,8 @@ use crate::types::DiagramType;
 use crate::ast::{Diagram, Relation};
 use crate::layout::LayoutResult;
 
-/// 与正交 stub 保护区对齐。
-pub const STUB_GUARD_LENGTH: f64 = 24.0;
+/// 与正交 stub 保护区对齐（A2：单一来源 `constants::STUB_GUARD_LENGTH`）。
+pub use crate::layout::constants::STUB_GUARD_LENGTH;
 const EPS: f64 = 0.1;
 /// lint 历史阈值：共享 trunk 最短长度
 pub const MIN_SHARED_TRUNK_LEN: f64 = 24.0;

@@ -11,7 +11,8 @@ use serde::Serialize;
 use std::collections::HashMap;
 
 const EPS: f64 = 1.0;
-/// 与正交路由 `NODE_OBSTACLE_PAD` 对齐的穿障垫量。
+/// 形状编辑验证专用的穿障垒量：独立于正交路由 `NODE_OBSTACLE_PAD`(=18)，
+/// 此处故意取更紧的 4.0（仅用于 route-annotation 后处理校验，非路由避障同语）。
 const NODE_PAD: f64 = 4.0;
 
 /// 折点角色（可由 Annotation 推导，不写入路径）。
