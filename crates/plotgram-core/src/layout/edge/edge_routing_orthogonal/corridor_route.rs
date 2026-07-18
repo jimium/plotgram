@@ -662,7 +662,7 @@ fn bypass_corridor_on_outer_side(
     current: &mut Point,
     dest: Point,
     corridor: &GroupCorridor,
-    lane_coord: f64,
+    _lane_coord: f64,
     blockers: &[(&str, &GroupLayout)],
     pad: f64,
     group_ctx: &GroupRoutingContext,
@@ -692,11 +692,14 @@ fn bypass_corridor_on_outer_side(
             let bottom_clear = blockers.iter().all(|(gid, _)| {
                 skirt_horizontal_clear(union_bottom, current.x, ahead_x, gid, group_ctx)
             });
-            let top_cost = (current.y - union_top).abs() + (lane_coord - union_top).abs();
-            let bottom_cost = (current.y - union_bottom).abs() + (lane_coord - union_bottom).abs();
+            // 选侧：优先目标侧 / 当前外侧，缩短外绕（降 tight_sev）。
+            let top_cost = (current.y - union_top).abs() + (dest.y - union_top).abs();
+            let bottom_cost = (current.y - union_bottom).abs() + (dest.y - union_bottom).abs();
             let side_y = match (top_clear, bottom_clear) {
                 (true, false) => union_top,
                 (false, true) => union_bottom,
+                _ if current.y <= union_top + EPS => union_top,
+                _ if current.y >= union_bottom - EPS => union_bottom,
                 _ if top_cost <= bottom_cost => union_top,
                 _ => union_bottom,
             };
@@ -704,15 +707,10 @@ fn bypass_corridor_on_outer_side(
             let x_inside = current.x > union_left + EPS && current.x < union_right - EPS;
             let y_outside = current.y <= union_top + EPS || current.y >= union_bottom - EPS;
 
-            // 硬规则：已在并集上/下方时，必须先水平走到 ahead，禁止在 X 重叠处竖切。
+            // 硬规则：已在并集上/下方时，先水平走到 ahead；保持当前 Y（勿再抬到 side_y）。
             if y_outside {
                 ortho_connect(waypoints, current, Point::new(ahead_x, current.y));
-                if (current.y - side_y).abs() > EPS {
-                    ortho_connect(waypoints, current, Point::new(ahead_x, side_y));
-                }
             } else if x_inside {
-                // 廊心带内：经 side_y 外绕（竖移发生在已选的外侧线上之前仍可能擦边；
-                // 优先撤到 X 外侧角）。
                 let exit_x = if (current.x - union_left) <= (union_right - current.x) {
                     union_left
                 } else {
@@ -757,22 +755,21 @@ fn bypass_corridor_on_outer_side(
             let right_clear = blockers.iter().all(|(gid, _)| {
                 skirt_vertical_clear(union_right, current.y, ahead_y, gid, group_ctx)
             });
-            let left_cost = (current.x - union_left).abs() + (lane_coord - union_left).abs();
-            let right_cost = (current.x - union_right).abs() + (lane_coord - union_right).abs();
+            let left_cost = (current.x - union_left).abs() + (dest.x - union_left).abs();
+            let right_cost = (current.x - union_right).abs() + (dest.x - union_right).abs();
             let side_x = match (left_clear, right_clear) {
                 (true, false) => union_left,
                 (false, true) => union_right,
+                _ if current.x <= union_left + EPS => union_left,
+                _ if current.x >= union_right - EPS => union_right,
                 _ if left_cost <= right_cost => union_left,
                 _ => union_right,
             };
 
             let y_inside = current.y > union_top + EPS && current.y < union_bottom - EPS;
             let x_outside = current.x <= union_left + EPS || current.x >= union_right - EPS;
-            if y_inside && x_outside {
+            if x_outside {
                 ortho_connect(waypoints, current, Point::new(current.x, ahead_y));
-                if (current.x - side_x).abs() > EPS {
-                    ortho_connect(waypoints, current, Point::new(side_x, ahead_y));
-                }
             } else if y_inside {
                 let exit_y = if (current.y - union_top) <= (union_bottom - current.y) {
                     union_top

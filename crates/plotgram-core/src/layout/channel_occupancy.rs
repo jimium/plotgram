@@ -1,14 +1,19 @@
 //! B2 通道占用只读诊断（候选架构，先观测后决策）。
 //!
-//! - 路由后对照：跨 leaf 边是否有走廊链、走廊负载是否超过 span 容量。
+//! - 路由后对照：跨 leaf 边是否有走廊链、走廊负载是否超过 **有效间隙** 容量。
 //! - 与 lint 穿组 / 穿节点实际 dirty 边做命中率对照。
 //! - **禁止改几何**；默认零输出，`PLOTGRAM_DUMP_CHANNEL_OCCUPANCY` 置位时 `perf_log`。
+//!
+//! ## 容量模型（v1）
+//! 车道沿廊的 **法向（gap）** 排布，不是沿 span。
+//! `capacity = floor(gap / 18)`；`gap < 18` 或 `span < 18` → DEGEN（不参与 OVER）。
+//! `load` = 以该廊为最短链成员的跨 leaf 边数（边介数代理）。
 
 use crate::ast::Diagram;
 use crate::layout::group::{
     routing_algo_for_diagram, CorridorAxis, GroupCorridor, GroupRoutingContext,
 };
-use crate::layout::LayoutResult;
+use crate::layout::{GroupLayout, LayoutResult};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 /// 与 `corridor_route` 车道间距对齐（诊断用，不导入私有常量）。
@@ -41,9 +46,14 @@ pub struct CorridorOccupancy {
     pub axis: CorridorAxis,
     pub group_a: String,
     pub group_b: String,
+    /// 跨 leaf 最短链经过本廊的边数（边介数代理）
     pub load: usize,
+    /// 法向有效间隙可容纳的车道数；DEGEN 时为 0
     pub capacity: usize,
+    /// 沿廊重叠长度（入口可用宽度）
     pub span: f64,
+    /// 组间法向间隙（车道排布维度）
+    pub gap: f64,
 }
 
 /// B2 只读诊断报告。
@@ -127,18 +137,15 @@ pub fn compute_channel_occupancy_report(
     }
 
     let mut corridor_loads: Vec<CorridorOccupancy> = Vec::new();
-    let mut overloaded: HashSet<usize> = HashSet::new();
+    let mut severe_overloaded: HashSet<usize> = HashSet::new();
     for (c_idx, c) in corridors.iter().enumerate() {
         let load = corridor_edge_counts.get(&c_idx).copied().unwrap_or(0);
         let span = (c.span_max - c.span_min).abs();
-        // 退化邻接（AABB 仅擦边、span < 一车道）不参与超容预测，避免伪阳性。
-        let capacity = if span + 0.1 < CORRIDOR_LANE_PITCH {
-            usize::MAX
-        } else {
-            ((span / CORRIDOR_LANE_PITCH).floor() as usize).max(1)
-        };
-        if capacity != usize::MAX && load > capacity {
-            overloaded.insert(c_idx);
+        let gap = corridor_gap(c, &group_ctx.groups);
+        let (capacity, degen) = corridor_capacity_v1(gap, span);
+        if !degen && load > capacity.saturating_mul(2) {
+            // 边级预测只扇出严重超容（>2×），降轻压刷屏；廊级 dump 仍按 load>capacity 标 OVER。
+            severe_overloaded.insert(c_idx);
         }
         corridor_loads.push(CorridorOccupancy {
             corridor_index: c_idx,
@@ -146,11 +153,11 @@ pub fn compute_channel_occupancy_report(
             group_a: c.group_a.clone(),
             group_b: c.group_b.clone(),
             load,
-            capacity: if capacity == usize::MAX { 0 } else { capacity },
+            capacity: if degen { 0 } else { capacity },
             span,
+            gap,
         });
     }
-    // capacity==0 表示退化廊（跳过超容）；展示时标 DEGEN
     corridor_loads.sort_by(|a, b| {
         b.load
             .cmp(&a.load)
@@ -158,7 +165,7 @@ pub fn compute_channel_occupancy_report(
     });
 
     for (edge_index, chain) in &edge_chains {
-        if chain.iter().any(|c| overloaded.contains(c)) {
+        if chain.iter().any(|c| severe_overloaded.contains(c)) {
             let rel = &diagram.relations[*edge_index];
             predicted.push(ChannelEdgeRisk {
                 edge_index: *edge_index,
@@ -198,7 +205,6 @@ pub fn compute_channel_occupancy_report(
         if edge_chains.contains_key(i) {
             group_with_chain += 1;
         } else {
-            // 跨 leaf 无链，或根本不是跨 leaf（同组内穿他组）
             group_no_chain += 1;
         }
     }
@@ -216,6 +222,51 @@ pub fn compute_channel_occupancy_report(
         group_with_chain,
         group_no_chain,
     }
+}
+
+/// 组间法向间隙：车道沿此方向以 `CORRIDOR_LANE_PITCH` 排布。
+fn corridor_gap(c: &GroupCorridor, groups: &HashMap<String, GroupLayout>) -> f64 {
+    let Some(ga) = groups.get(&c.group_a) else {
+        return 0.0;
+    };
+    let Some(gb) = groups.get(&c.group_b) else {
+        return 0.0;
+    };
+    match c.axis {
+        CorridorAxis::Horizontal => {
+            let a_bottom = ga.y + ga.height;
+            let b_bottom = gb.y + gb.height;
+            if a_bottom <= gb.y {
+                gb.y - a_bottom
+            } else if b_bottom <= ga.y {
+                ga.y - b_bottom
+            } else {
+                0.0
+            }
+        }
+        CorridorAxis::Vertical => {
+            let a_right = ga.x + ga.width;
+            let b_right = gb.x + gb.width;
+            if a_right <= gb.x {
+                gb.x - a_right
+            } else if b_right <= ga.x {
+                ga.x - b_right
+            } else {
+                0.0
+            }
+        }
+    }
+}
+
+/// v1 容量：法向 gap 定车道数；gap 或 span 小于一车道 → DEGEN。
+///
+/// 返回 `(capacity, is_degen)`。DEGEN 时 capacity 展示为 0，且不参与 OVER。
+fn corridor_capacity_v1(gap: f64, span: f64) -> (usize, bool) {
+    if gap + 0.1 < CORRIDOR_LANE_PITCH || span + 0.1 < CORRIDOR_LANE_PITCH {
+        return (0, true);
+    }
+    let cap = ((gap / CORRIDOR_LANE_PITCH).floor() as usize).max(1);
+    (cap, false)
 }
 
 /// Env 门控转储；默认零成本。
@@ -274,13 +325,14 @@ fn log_channel_occupancy_report(report: &ChannelOccupancyReport) {
             ""
         };
         crate::perf_log!(
-            "  corridor[{}] {:?} {}↔{} load={}/{} span={:.0}{}",
+            "  corridor[{}] {:?} {}↔{} load={}/{} gap={:.0} span={:.0}{}",
             c.corridor_index,
             c.axis,
             c.group_a,
             c.group_b,
             c.load,
             c.capacity,
+            c.gap,
             c.span,
             flag
         );
@@ -391,6 +443,20 @@ mod tests {
         assert_eq!(r.corridors, 0);
         assert_eq!(r.cross_scope_edges, 0);
         assert!(r.predicted.is_empty());
+    }
+
+    #[test]
+    fn capacity_uses_gap_not_span() {
+        // 旧模型：span=33 → cap=1 易伪 OVER；v1：gap=80 → cap=4。
+        let (cap, degen) = corridor_capacity_v1(80.0, 33.0);
+        assert!(!degen);
+        assert_eq!(cap, 4);
+        let (cap_thin, degen_thin) = corridor_capacity_v1(10.0, 100.0);
+        assert!(degen_thin);
+        assert_eq!(cap_thin, 0);
+        let (cap_short_span, degen_ss) = corridor_capacity_v1(80.0, 10.0);
+        assert!(degen_ss);
+        assert_eq!(cap_short_span, 0);
     }
 
     #[test]
