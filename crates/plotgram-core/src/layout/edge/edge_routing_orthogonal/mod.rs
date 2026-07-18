@@ -45,6 +45,7 @@ pub(super) mod stub_fix;
 pub(super) mod stub_occupancy;
 pub(super) mod semantic_trunk_merge;
 pub(super) mod run;
+pub(super) mod phases;
 
 // Re-exports for cross-submodule access via `use super::*;`
 pub(super) use profile::OrthoRoutingProfile;
@@ -82,6 +83,13 @@ pub(super) use stub_fix::fix_reverse_stub_ports;
 pub(super) use run::{
     endpoint_bundling_key, range_overlap_local, should_strict_group_transit,
     validated_corridor_path,
+};
+
+// run 总控各 phase 实现（A4 从 run.rs 拆出）；供总控与 stub_fix 经 `use super::*` 调用
+pub(super) use phases::{
+    aligned_fanin_target_port, extract_protected_vertical_trunks, phase_lane, phase_layer_order,
+    phase_port_slot, phase_reroute, phase_reroute_feedback_after_trunk, phase_route_edges,
+    phase_sanitize, phase_straighten_align, phase_stub_fix,
 };
 
 /// 相邻磁吸点之间的理想间距（像素）；边长不足时自动压缩。

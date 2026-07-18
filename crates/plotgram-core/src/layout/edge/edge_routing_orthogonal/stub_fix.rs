@@ -539,7 +539,7 @@ fn collect_edges_to_check(
                 .filter(|(_, other)| other.to == relation.to)
                 .map(|(edge_index, _)| edge_index)
                 .collect();
-            super::run::aligned_fanin_target_port(relation.to.as_str(), &members, relations, nodes)
+            aligned_fanin_target_port(relation.to.as_str(), &members, relations, nodes)
                 == Some(to_side[ei])
         });
 
