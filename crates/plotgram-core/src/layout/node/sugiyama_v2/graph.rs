@@ -56,6 +56,12 @@ pub(super) fn build_graph(diagram: &Diagram) -> DiGraph<String, EdgeMeta> {
         if relation.arrow == ArrowType::Passive {
             continue;
         }
+        // 自环（from == to）不参与分层/去环/排序：它只是节点自身的装饰性回环，
+        // 由路由阶段以节点为锚绘制。若进入 DAG 会污染 rank（`repair_rank_monotonicity`
+        // 对自环 `rank(u) >= rank(u)` 恒真而不收敛，导致秩膨胀与巨大空 rank）。
+        if relation.from.as_str() == relation.to.as_str() {
+            continue;
+        }
         if let (Some(from), Some(to)) = (index.get(relation.from.as_str()), index.get(relation.to.as_str())) {
             graph.add_edge(*from, *to, EdgeMeta { reversible: true });
         }
@@ -63,6 +69,9 @@ pub(super) fn build_graph(diagram: &Diagram) -> DiGraph<String, EdgeMeta> {
 
     // Phase 2: inject diagram.constraints as irreversible edges.
     for c in &diagram.constraints {
+        if c.from.as_str() == c.to.as_str() {
+            continue;
+        }
         if let (Some(from), Some(to)) = (index.get(c.from.as_str()), index.get(c.to.as_str())) {
             graph.add_edge(*from, *to, EdgeMeta { reversible: false });
         }

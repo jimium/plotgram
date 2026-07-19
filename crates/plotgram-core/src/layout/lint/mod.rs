@@ -408,6 +408,28 @@ fn check_edge_crossings(result: &LayoutResult, out: &mut Vec<LayoutViolation>) {
     }
 }
 
+/// 统计当前布局的边交叉总数（复用 check_edge_crossings 的采样+跨越判定口径）。
+/// 用于 post-route 分离的 crossing-neutral 守卫：只保留不增加总交叉的偏移。
+pub fn count_edge_crossings(result: &LayoutResult) -> usize {
+    let edges = &result.edges;
+    if edges.len() < 2 {
+        return 0;
+    }
+    let sampled: Vec<Vec<Point>> = edges.iter().map(|e| e.sampled_path(16)).collect();
+    let mut count = 0usize;
+    for i in 0..sampled.len() {
+        for j in (i + 1)..sampled.len() {
+            if edges_share_endpoint(&edges[i], &edges[j]) {
+                continue;
+            }
+            if polylines_cross(&sampled[i], &sampled[j]) {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
 fn edges_share_endpoint(a: &crate::layout::EdgeLayout, b: &crate::layout::EdgeLayout) -> bool {
     if a.path_is_empty() || b.path_is_empty() {
         return false;

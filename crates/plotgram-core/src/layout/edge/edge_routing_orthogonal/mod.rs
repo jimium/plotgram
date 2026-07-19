@@ -71,7 +71,10 @@ pub(super) use conflict_reroute::reroute_conflicting_edges;
 pub use sanitize::{
     sanitize_orthogonal_edges, sanitize_orthogonal_edges_ext, sanitize_orthogonal_edges_with_guard,
 };
-pub use lane_assignment::{enforce_reverse_pair_dock_separation, enforce_reverse_pair_min_gap};
+pub use lane_assignment::{
+    enforce_reverse_pair_dock_separation, enforce_reverse_pair_min_gap,
+    separate_unrelated_trunk_overlaps_post_route,
+};
 pub use stub_occupancy::{
     collect_stub_occupancy, estimate_layer_band_demands, find_stub_occupancy_conflicts,
     resolve_exact_stub_occupancy_post_route, resolve_stub_occupancy_conflicts, LayerBandDemand,

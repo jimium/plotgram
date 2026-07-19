@@ -388,6 +388,35 @@ pub fn repair_group_interior_edges_post_route(diagram: &Diagram, result: &mut La
     }
 }
 
+/// D 末（节点冻结后）：分离 lint 判定的残余非语义 trunk 重合对。
+///
+/// 路由期 `separate_unrelated_trunk_overlaps` 在 snap/repulse/sanitize 之前运行，
+/// 分离结果被后续管线重新贴靠合并；本 pass 在几何冻结后按 lint 口径重分。
+/// 仅动边、节点冻结；若整批抬高 through 或穿组计数则整批回退。
+pub fn separate_trunk_overlaps_post_route(diagram: &Diagram, result: &mut LayoutResult) {
+    let entry_through = collect_lint_through_edge_indices(diagram, result).len();
+    let entry_group = count_group_interior_edges(diagram, result);
+    let snapshot = result.clone();
+    let sep = crate::layout::edge::edge_routing_orthogonal::separate_unrelated_trunk_overlaps_post_route(
+        diagram, result,
+    );
+    if sep == 0 {
+        return;
+    }
+    let after_through = collect_lint_through_edge_indices(diagram, result).len();
+    let after_group = count_group_interior_edges(diagram, result);
+    if after_through > entry_through || after_group > entry_group {
+        *result = snapshot;
+        crate::perf_log!(
+            "[perf]     d_trunk_separate: rolled_back (sep={sep} through {entry_through}→{after_through} group {entry_group}→{after_group})"
+        );
+    } else {
+        crate::perf_log!(
+            "[perf]     d_trunk_separate: sep={sep} through {entry_through}→{after_through} group {entry_group}→{after_group}"
+        );
+    }
+}
+
 /// 与 lint `edge_crosses_group_interior` 对齐的边下标集合。
 fn collect_lint_group_interior_edge_indices(
     diagram: &Diagram,

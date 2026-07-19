@@ -371,6 +371,20 @@ impl<'a> LayoutPipeline<'a> {
                 );
             }
 
+            // 平行 trunk 分槽：repair 可能重建路径造成新非语义共线，在此（冻结后）按
+            // lint 口径最终分离。仅 architecture，回退保 through/穿组不劣化。
+            {
+                let t_sep = crate::layout::perf::Instant::now();
+                crate::layout::refine::separate_trunk_overlaps_post_route(
+                    self.diagram,
+                    &mut result,
+                );
+                crate::perf_log!(
+                    "[perf]     d_trunk_separate: {:.2}ms",
+                    t_sep.elapsed().as_secs_f64() * 1000.0
+                );
+            }
+
             // N2：repair 后 lint 同语义只读复校（记账 / degraded，不扩写几何）。
             crate::layout::refine::recheck_lint_pierce_post_freeze(self.diagram, &mut result);
 

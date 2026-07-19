@@ -96,12 +96,18 @@ fn segment_hits_node(
     b: Point,
     nodes: &HashMap<String, NodeLayout>,
     sorted_node_ids: &[String],
+    node_pad: f64,
+    endpoints: (&str, &str),
 ) -> bool {
-    let seg_xmin = a.x.min(b.x) - NODE_OBSTACLE_PAD;
-    let seg_xmax = a.x.max(b.x) + NODE_OBSTACLE_PAD;
-    let seg_ymin = a.y.min(b.y) - NODE_OBSTACLE_PAD;
-    let seg_ymax = a.y.max(b.y) + NODE_OBSTACLE_PAD;
+    let seg_xmin = a.x.min(b.x) - node_pad;
+    let seg_xmax = a.x.max(b.x) + node_pad;
+    let seg_ymin = a.y.min(b.y) - node_pad;
+    let seg_ymax = a.y.max(b.y) + node_pad;
     for node_id in sorted_node_ids {
+        // 边的自身端点节点（from/to）不算穿障：端口 stub 天然携在自身节点边界上。
+        if node_id.as_str() == endpoints.0 || node_id.as_str() == endpoints.1 {
+            continue;
+        }
         if let Some(nl) = nodes.get(node_id.as_str()) {
             if nl.x + nl.width < seg_xmin
                 || nl.x > seg_xmax
@@ -111,7 +117,7 @@ fn segment_hits_node(
                 continue;
             }
             if crate::layout::edge::common::geom_obstacle::segment_pierces_node(
-                a, b, nl, NODE_OBSTACLE_PAD,
+                a, b, nl, node_pad,
             ) {
                 return true;
             }
@@ -144,6 +150,8 @@ fn validate_shift(
     si: usize,
     nodes: &HashMap<String, NodeLayout>,
     sorted_node_ids: &[String],
+    node_pad: f64,
+    endpoints: (&str, &str),
 ) -> bool {
     if si == 0 || si + 1 >= new.len() {
         return false;
@@ -160,13 +168,13 @@ fn validate_shift(
         if adj_len < MIN_ADJACENT_LEN {
             return false;
         }
-        if segment_hits_node(new[si - 1], new[si], nodes, sorted_node_ids) {
+        if segment_hits_node(new[si - 1], new[si], nodes, sorted_node_ids, node_pad, endpoints) {
             return false;
         }
     }
 
     // 检查被偏移段 si 本身不穿节点
-    if segment_hits_node(new[si], new[si + 1], nodes, sorted_node_ids) {
+    if segment_hits_node(new[si], new[si + 1], nodes, sorted_node_ids, node_pad, endpoints) {
         return false;
     }
 
@@ -181,7 +189,7 @@ fn validate_shift(
         if adj_len < MIN_ADJACENT_LEN {
             return false;
         }
-        if segment_hits_node(new[si + 1], new[si + 2], nodes, sorted_node_ids) {
+        if segment_hits_node(new[si + 1], new[si + 2], nodes, sorted_node_ids, node_pad, endpoints) {
             return false;
         }
     }
@@ -691,7 +699,9 @@ pub fn assign_lanes(
                 new_points[seg.si + 1].x += offset;
             }
 
-            if validate_shift(&original, &new_points, seg.si, nodes, sorted_node_ids) {
+            // 路由期保持保守：self-endpoint 仍按穿障计（避免激进 shift 引入交叉）。
+            // 端点排除仅在几何冻结后的 post-route 分离权威口径中启用。
+            if validate_shift(&original, &new_points, seg.si, nodes, sorted_node_ids, NODE_OBSTACLE_PAD, ("", "")) {
                 commit_shifted_path(
                     edges,
                     seg.ei,
@@ -786,7 +796,8 @@ pub fn apply_corridor_planned_offsets(
             }
         }
 
-        if validate_shift(&original, &new_points, si, nodes, sorted_node_ids) {
+        // 路由期保守：见 assign_lanes 同注释。
+        if validate_shift(&original, &new_points, si, nodes, sorted_node_ids, NODE_OBSTACLE_PAD, ("", "")) {
             commit_shifted_path(edges, ei, &new_points, relations, from_side, to_side);
             shifted_edges.push(ei);
             shifted += 1;
@@ -855,6 +866,8 @@ pub fn separate_unrelated_trunk_overlaps(
                 relations,
                 from_side,
                 to_side,
+                NODE_OBSTACLE_PAD,
+                false,
             ) || try_separate_edge_pair(
                 &path_j,
                 edges,
@@ -865,6 +878,8 @@ pub fn separate_unrelated_trunk_overlaps(
                 relations,
                 from_side,
                 to_side,
+                NODE_OBSTACLE_PAD,
+                false,
             );
             if sep {
                 shifted_edges.push(j);
@@ -888,6 +903,92 @@ pub fn separate_unrelated_trunk_overlaps(
     separated
 }
 
+/// D 末（几何冻结后）：按 lint 口径对残余非语义 trunk 重合对做最终分槽。
+///
+/// 路由期 `separate_unrelated_trunk_overlaps` 在 snap/repulse/sanitize 之前运行，
+/// 其分离结果会被后续管线重新贴靠合并；本 pass 在节点冻结后，依据 lint 权威口径
+/// （`find_needs_separation_edge_pairs` 的 `NonSemanticTrunk`）重新分离仍重合的干线段。
+/// 仅移动边（节点已冻结），偏移沿用 `validate_shift`（不穿节点/不反向/不退化）。
+/// 返回成功分离的边对数。
+pub fn separate_unrelated_trunk_overlaps_post_route(
+    diagram: &crate::ast::Diagram,
+    result: &mut crate::layout::LayoutResult,
+) -> usize {
+    use crate::layout::edge::segment_pair::{
+        find_needs_separation_edge_pairs, SeparationReason,
+    };
+    if diagram.diagram_type != crate::types::DiagramType::Architecture {
+        return 0;
+    }
+    let pairs: Vec<(usize, usize)> = find_needs_separation_edge_pairs(diagram, result)
+        .into_iter()
+        .filter(|(_, _, reason, _)| matches!(reason, SeparationReason::NonSemanticTrunk))
+        .map(|(i, j, _, _)| (i, j))
+        .collect();
+    if pairs.is_empty() {
+        return 0;
+    }
+    let min_gap = crate::layout::edge::parallel_gap_for_diagram(diagram.diagram_type.clone());
+    let node_pad = NODE_OBSTACLE_PAD;
+    let from_side: Vec<Port> = result.edges.iter().map(|e| e.from_port).collect();
+    let to_side: Vec<Port> = result.edges.iter().map(|e| e.to_port).collect();
+    let mut sorted_node_ids: Vec<String> = result.nodes.keys().cloned().collect();
+    sorted_node_ids.sort();
+
+    // crossing-neutral 守卫：贪婪 pairwise nudge 可能把 gutter bundle 推得互相交叉。
+    // 每对分离前快照两条边，分离后若总交叉上升则回退（不计入 separated）。
+    let mut baseline_cross = crate::layout::lint::count_edge_crossings(result);
+
+    let mut separated = 0usize;
+    for (i, j) in pairs {
+        if result.edges[i].path_is_empty() || result.edges[j].path_is_empty() {
+            continue;
+        }
+        let snap_i = result.edges[i].clone();
+        let snap_j = result.edges[j].clone();
+        let path_i: Vec<Point> = result.edges[i].path_points().into_owned();
+        let path_j: Vec<Point> = result.edges[j].path_points().into_owned();
+        let sep = try_separate_edge_pair(
+            &path_i,
+            &mut result.edges,
+            j,
+            min_gap,
+            &result.nodes,
+            &sorted_node_ids,
+            &diagram.relations,
+            &from_side,
+            &to_side,
+            node_pad,
+            true,
+        ) || try_separate_edge_pair(
+            &path_j,
+            &mut result.edges,
+            i,
+            min_gap,
+            &result.nodes,
+            &sorted_node_ids,
+            &diagram.relations,
+            &from_side,
+            &to_side,
+            node_pad,
+            true,
+        );
+        if !sep {
+            continue;
+        }
+        let new_cross = crate::layout::lint::count_edge_crossings(result);
+        if new_cross > baseline_cross {
+            // 本对偏移制造了新交叉，回退两条边。
+            result.edges[i] = snap_i;
+            result.edges[j] = snap_j;
+        } else {
+            baseline_cross = new_cross;
+            separated += 1;
+        }
+    }
+    separated
+}
+
 fn try_separate_edge_pair(
     reference_path: &[Point],
     edges: &mut [EdgeLayout],
@@ -898,11 +999,22 @@ fn try_separate_edge_pair(
     relations: &[Relation],
     from_side: &[Port],
     to_side: &[Port],
+    node_pad: f64,
+    exclude_self_endpoints: bool,
 ) -> bool {
     let original: Vec<Point> = edges[target_ei].path_points().into_owned();
     if original.len() < 4 {
         return false;
     }
+    // 端点排除仅在 post-route 权威分离启用；路由期保守（空端点）。
+    let endpoints: (&str, &str) = if exclude_self_endpoints {
+        match relations.get(target_ei) {
+            Some(rel) => (rel.from.as_str(), rel.to.as_str()),
+            None => ("", ""),
+        }
+    } else {
+        ("", "")
+    };
 
     let n_segs = original.len() - 1;
     for si in 1..n_segs.saturating_sub(1) {
@@ -956,7 +1068,7 @@ fn try_separate_edge_pair(
                         new_points[si].y += offset;
                         new_points[si + 1].y += offset;
                     }
-                    if validate_shift(&original, &new_points, si, nodes, sorted_node_ids) {
+                    if validate_shift(&original, &new_points, si, nodes, sorted_node_ids, node_pad, endpoints) {
                         commit_shifted_path(
                             edges,
                             target_ei,
@@ -976,7 +1088,7 @@ fn try_separate_edge_pair(
                     let mut new_points = original.clone();
                     let target = shared_coord + magnitude * sign;
                     if force_shift_trunk_coord(&mut new_points, is_vertical, shared_coord, target)
-                        && validate_shift(&original, &new_points, si, nodes, sorted_node_ids)
+                        && validate_shift(&original, &new_points, si, nodes, sorted_node_ids, node_pad, endpoints)
                     {
                         commit_shifted_path(
                             edges,

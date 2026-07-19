@@ -391,6 +391,11 @@ fn repair_rank_monotonicity(
         // 确定性：按 (u.index, v.index) 排序
         edges.sort_by_key(|(u, v)| (u.index(), v.index()));
         for (u, v) in edges {
+            // 自环不参与单调修复：`rank(u) >= rank(u)` 恒真会导致不收敛。
+            // 正常路径下 build_graph 已过滤自环，此处为防御性双保险。
+            if u == v {
+                continue;
+            }
             let ru = ranks[&u];
             let rv = ranks[&v];
             if ru >= rv {
@@ -409,6 +414,9 @@ fn repair_rank_monotonicity(
             let mut outs: Vec<_> = dag.neighbors_directed(u, Direction::Outgoing).collect();
             outs.sort_by_key(|n| n.index());
             for v in outs {
+                if v == u {
+                    continue;
+                }
                 if ranks[&v] <= ru {
                     ranks.insert(v, ru + 1);
                 }

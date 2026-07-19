@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plotgram 布局/路由 — 局部问题标注（2026-07）</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --card:#1e222b; --line:#2a2f3a;
+    --txt:#e6e8ee; --muted:#9aa3b2; --accent:#5aa9ff;
+    --red:#ff5d5d; --orange:#ffa94d; --yellow:#ffd54d; --green:#4dd39a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+       font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;}
+  header{padding:28px 32px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:50}
+  header h1{margin:0 0 6px;font-size:20px}
+  header p{margin:2px 0;color:var(--muted);font-size:13px}
+  .wrap{max-width:1240px;margin:0 auto;padding:24px 20px 80px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin:14px 0 0}
+  .legend span{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+  .dot{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .sev-high{background:var(--red)} .sev-mid{background:var(--orange)} .sev-low{background:var(--yellow)} .sev-info{background:var(--accent)}
+  nav.toc{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:20px 0}
+  nav.toc a{color:var(--accent);text-decoration:none;margin-right:14px;font-size:13px;white-space:nowrap}
+  nav.toc a:hover{text-decoration:underline}
+  .fig{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin:26px 0}
+  .fig h2{margin:0 0 4px;font-size:16px}
+  .fig .meta{color:var(--muted);font-size:12px;margin-bottom:12px}
+  .fig .meta code{background:#0c0e13;padding:1px 6px;border-radius:4px;color:#c9d3e3}
+  .stage{position:relative;width:100%;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#f7f7f8}
+  .stage img{display:block;width:100%;height:auto}
+  .anno{position:absolute;border:2px solid var(--red);border-radius:4px;
+        box-shadow:0 0 0 2px rgba(255,93,93,.15);pointer-events:none}
+  .anno.mid{border-color:var(--orange);box-shadow:0 0 0 2px rgba(255,169,77,.15)}
+  .anno.low{border-color:var(--yellow);box-shadow:0 0 0 2px rgba(255,213,77,.12)}
+  .anno.info{border-color:var(--accent);box-shadow:0 0 0 2px rgba(90,169,255,.15)}
+  .badge{position:absolute;top:-11px;left:-11px;width:22px;height:22px;border-radius:50%;
+         background:var(--red);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;
+         box-shadow:0 1px 4px rgba(0,0,0,.5)}
+  .anno.mid .badge{background:var(--orange)} .anno.low .badge{background:var(--yellow);color:#333} .anno.info .badge{background:var(--accent)}
+  ol.notes{margin:14px 0 0;padding-left:0;list-style:none}
+  ol.notes li{display:flex;gap:10px;padding:7px 0;border-top:1px dashed var(--line);font-size:13px}
+  ol.notes li .n{flex:0 0 22px;height:22px;border-radius:50%;color:#fff;font-weight:700;font-size:12px;
+                 display:flex;align-items:center;justify-content:center;background:var(--red)}
+  ol.notes li.mid .n{background:var(--orange)} ol.notes li.low .n{background:var(--yellow);color:#333} ol.notes li.info .n{background:var(--accent)}
+  ol.notes li .txt b{color:#fff}
+  .metrics{margin-top:8px;font-size:12px;color:var(--muted)}
+  .metrics b{color:var(--txt)}
+  footer{color:var(--muted);font-size:12px;text-align:center;padding:30px}
+  .cause{margin-top:10px;font-size:12.5px;color:var(--muted);border-left:3px solid var(--line);padding:2px 0 2px 12px}
+  .cause b{color:#c9d3e3}
+</style>
+</head>
+<body>
+<header>
+  <h1>Plotgram 布局与路由 — 局部问题标注</h1>
+  <p>数据：showcase 全量 84 文件重评 + 最差案例 PNG 复核 · 2026-07 · 配套报告 <code>README.md</code></p>
+  <div class="legend">
+    <span><i class="dot sev-high"></i>高（正确性）</span>
+    <span><i class="dot sev-mid"></i>中（可读性/紧凑性）</span>
+    <span><i class="dot sev-low"></i>低（打磨）</span>
+    <span><i class="dot sev-info"></i>信息/度量</span>
+  </div>
+</header>
+<div class="wrap">
+  <nav class="toc" id="toc"></nav>
+  <div id="figs"></div>
+  <footer>用绝对定位框标出的问题区域为人工核查估计位置，用于定位讨论，非像素级精确。</footer>
+</div>
+
+<script>
+// 每个 figure：img 尺寸用于容器宽高比；anno 坐标为相对图片的百分比 {l,t,w,h}
+const FIGS = [
+{
+  id:"arch-namespace", title:"architecture / c.k8s-multi-namespace-overview",
+  img:"assets/architecture_c.k8s-multi-namespace-overview.png",
+  meta:"布局 <code>architecture(v2)</code> + 路由 <code>orthogonal</code>",
+  metrics:"边交叉 <b>72</b> · 边穿节点 <b>6</b> · 通道拥挤 <b>37</b> · 端口冲突 <b>603</b> · 面积利用率 <b>2.8%</b> · 评分 53.9",
+  cause:"根因：顶层分组竖向单列堆叠（<b>architecture_v2/two_phase</b>），跨组边天然极长；正交路由 <b>corridor_route/lane_assignment</b> 退化为沿外圈长通道。",
+  annos:[
+    {sev:"high", l:0.3,t:12,w:9,h:78, note:"多条跨组长边贴<b>画布左缘</b>绕行，近平行叠压成走线带"},
+    {sev:"high", l:90.5,t:6,w:9,h:82, note:"右缘同样的外圈绕行长边（deploy / 数据依赖）"},
+    {sev:"mid", l:45,t:10.5,w:26,h:10, note:"<b>user-prod</b> 分组框巨大但内部稀疏，拉长了所有入组边"},
+    {sev:"high", l:43,t:23,w:9,h:9, note:"跨组边切入 / 贴 <b>payment-prod</b> 无关分组边框"},
+  ]
+},
+{
+  id:"arch-moddeps", title:"architecture / c.plotgram-core-mod-deps",
+  img:"assets/architecture_c.plotgram-core-mod-deps.png",
+  meta:"布局 <code>architecture(v2)</code> + 路由 <code>orthogonal</code>",
+  metrics:"非语义平行重叠 <b>33</b>（全量最高）· 边穿节点 <b>10</b> · 边交叉 <b>29</b> · 评分 56.6",
+  cause:"根因：<b>edge_bundling/ 目录为空</b>，没有对无关同向长边做 trunk 分离/分槽；<b>semantic_trunk_merge</b> 只合并语义相关边。",
+  annos:[
+    {sev:"high", l:3.5,t:16,w:8,h:64, note:"<b>33 处平行长边</b>在同一竖直间隙里叠压，肉眼无法区分是几条边"},
+    {sev:"high", l:27,t:29,w:26,h:4, note:"长边直接<b>压穿节点框与文字</b>（theme/builtin·loader…）"},
+    {sev:"high", l:26,t:45.5,w:27,h:3.5, note:"同样：横线划穿 types diagram_type… 文字"},
+    {sev:"mid", l:88,t:16,w:10,h:58, note:"右缘另一组长边外圈绕行"},
+  ]
+},
+{
+  id:"arch-cloud", title:"architecture / c.cloud-native（嵌套分组）",
+  img:"assets/architecture_c.cloud-native.png",
+  meta:"布局 <code>architecture(v2)</code> + 路由 <code>orthogonal</code>",
+  metrics:"边穿节点 <b>7</b> · 通道拥挤 <b>26</b> · 面积利用率 <b>5.3%</b> · 评分 56.9",
+  cause:"根因：嵌套分组（Kubernetes 集群 ▸ 应用 Pod / 平台组件 / 持久化）下，路由未将<b>各层分组框</b>纳入障碍，边穿框进入内部。",
+  annos:[
+    {sev:"high", l:36,t:30,w:26,h:24, note:"边从 API服务/Worker <b>穿过嵌套分组边框</b>下沉到 配置中心/服务发现"},
+    {sev:"high", l:2,t:31,w:8,h:58, note:"跨组边贴<b>左缘绕行</b>整张图（可观测性 → 持久化）"},
+    {sev:"mid", l:5,t:78,w:90,h:20, note:"可观测性组与上方数据依赖间的长距离连线"},
+  ]
+},
+{
+  id:"arch-federation", title:"architecture / c.k8s-multi-cluster-federation",
+  img:"assets/architecture_c.k8s-multi-cluster-federation.png",
+  meta:"布局 <code>architecture(v2)</code> + 路由 <code>orthogonal</code>",
+  metrics:"边交叉 <b>52</b> · 边穿节点 <b>9</b> · 平行重叠 <b>6</b> · 通道拥挤 <b>33</b> · 评分 56.3",
+  cause:"根因：主/备两集群近似镜像竖排，跨集群与共享数据的边全部从两侧外圈绕行，形成密集“边框”。",
+  annos:[
+    {sev:"high", l:2.5,t:24,w:12,h:55, note:"左缘 image pull / cross-region replay 长边外圈绕行叠压"},
+    {sev:"high", l:84,t:7,w:14,h:72, note:"右缘 sync / failover traffic 长边外圈绕行"},
+    {sev:"mid", l:22,t:43,w:56,h:14, note:"华北集群内多条边彼此交叉、并压过 order-core/payment-core 节点"},
+  ]
+},
+{
+  id:"er-dense", title:"er / c.layout-stress-dense（单列 + 曲线带）",
+  img:"assets/er_c.layout-stress-dense.png",
+  meta:"布局 <code>er</code> + 路由 <code>spline</code>",
+  metrics:"采样拐点 <b>245</b>（度量假象）· 边交叉 <b>8</b> · 评分 63.1",
+  cause:"根因：<b>er/mod.rs</b> 实体近似排成一列，非相邻表关系只能大弧绕行，spline 汇成重叠 ribbon。bend_count 对曲线过度计数。",
+  annos:[
+    {sev:"mid", l:33,t:2,w:34,h:96, note:"所有实体<b>排成一竖列</b>，无二维展开"},
+    {sev:"high", l:6,t:10,w:15,h:80, note:"左侧关系边<b>汇成重叠曲线带</b>，无法追踪某条关系连了谁"},
+    {sev:"high", l:64,t:25,w:18,h:62, note:"右侧同样的曲线 ribbon 叠压"},
+  ]
+},
+{
+  id:"er-saas", title:"er / c.saas-schema（边穿分组内部）",
+  img:"assets/er_c.saas-schema.png",
+  meta:"布局 <code>er</code> + 路由 <code>spline</code>",
+  metrics:"采样拐点 <b>152</b> · <b>边穿分组内部 2</b> · 评分 60.9（ER 最低）",
+  cause:"根因：分组（核心身份/工作区）大面积空旷，跨组关系 spline 直接横切分组内部，且路由未避让分组框。",
+  annos:[
+    {sev:"mid", l:5,t:1.5,w:52,h:32, note:"<b>核心身份</b> 分组内部大面积空旷，节点挤在右上"},
+    {sev:"high", l:44,t:7,w:22,h:26, note:"关系边<b>穿过分组内部</b>（edge_through_groups × 2）"},
+    {sev:"mid", l:52,t:22,w:22,h:22, note:"User↔Workspace 等长曲线在中部交叉"},
+  ]
+},
+{
+  id:"state-transitions", title:"state / c.layout-stress-transitions（画布空转，全量最低分）",
+  img:"assets/state_c.layout-stress-transitions.png",
+  meta:"布局 <code>state</code> + 路由 <code>circular</code>",
+  metrics:"宽高比 <b>4.49</b> · 面积利用率 <b>1.5%</b> · 评分 <b>43.9</b>（全量最低）",
+  cause:"根因：<b>state</b> rank 分配遇自环/回边产生<b>巨大空 rank 间隙</b>，缺空 rank 压缩与 initial/final 就近安置。",
+  annos:[
+    {sev:"info", l:18,t:0.5,w:22,h:5, note:"<b>初始化 / 结束</b> 被孤立在顶端"},
+    {sev:"high", l:14,t:6,w:22,h:55, note:"一条边<b>纵贯上千像素空白</b>，形成巨大死区（利用率仅 1.5%）"},
+    {sev:"info", l:8,t:78,w:84,h:21, note:"真正的状态簇被压到画布最底部"},
+  ]
+},
+{
+  id:"fc-refund", title:"flowchart / c.customer-refund-process（决策段交叉）",
+  img:"assets/flowchart_c.customer-refund-process.png",
+  meta:"布局 <code>flowchart</code> + 路由 <code>orthogonal</code>",
+  metrics:"边交叉 <b>8</b> · 宽高比 <b>3.62</b> · 边长 CV <b>1.27</b> · 评分 51.3",
+  cause:"根因：决策密集段“否”分支向右折返再汇入，叠加长回边贴左侧从中段折到底部阶段。",
+  annos:[
+    {sev:"mid", l:26,t:27,w:58,h:26, note:"<b>审核阶段</b>：多个“否”分支右折返回，产生多处边交叉"},
+    {sev:"mid", l:3,t:29,w:9,h:31, note:"长“否”边贴<b>左侧</b>从中段一路折到底部阶段"},
+  ]
+},
+{
+  id:"fc-fulfillment", title:"flowchart / c.e-commerce-order-fulfillment（过度纵向拉伸）",
+  img:"assets/flowchart_c.e-commerce-order-fulfillment.png",
+  meta:"布局 <code>flowchart</code> + 路由 <code>orthogonal</code>",
+  metrics:"宽高比 <b>4.29</b> · 面积利用率低 · 评分 50.3（布局正确、0 重叠 0 穿节点）",
+  cause:"根因：多阶段（支付/仓储/物流）与决策分支均纵向单列展开，横向空间几乎未用；属紧凑性问题。",
+  annos:[
+    {sev:"mid", l:19,t:1.5,w:46,h:97, note:"三阶段排成<b>极窄单列</b>，宽高比 4.29，纵向极长"},
+    {sev:"low", l:68,t:4,w:30,h:42, note:"右侧大量空白，横向空间浪费（可分支横展/多列折叠）"},
+  ]
+},
+];
+
+const IMGDIM = {
+  "assets/architecture_c.k8s-multi-namespace-overview.png":[3462,1764],
+  "assets/architecture_c.plotgram-core-mod-deps.png":[1130,1852],
+  "assets/architecture_c.cloud-native.png":[1180,1208],
+  "assets/architecture_c.k8s-multi-cluster-federation.png":[1216,1314],
+  "assets/er_c.layout-stress-dense.png":[424,942],
+  "assets/er_c.saas-schema.png":[728,2074],
+  "assets/state_c.layout-stress-transitions.png":[686,3054],
+  "assets/flowchart_c.customer-refund-process.png":[613,2192],
+  "assets/flowchart_c.e-commerce-order-fulfillment.png":[539,2284],
+};
+const SEVCLASS={high:"",mid:"mid",low:"low",info:"info"};
+
+const toc = document.getElementById('toc');
+const figsEl = document.getElementById('figs');
+
+FIGS.forEach(f=>{
+  const a=document.createElement('a'); a.href="#"+f.id; a.textContent=f.title.split('/').pop().trim(); toc.appendChild(a);
+
+  const fig=document.createElement('div'); fig.className='fig'; fig.id=f.id;
+  const dim=IMGDIM[f.img]||[16,9];
+  let annoHtml="", notesHtml="";
+  f.annos.forEach((an,i)=>{
+    const cls=SEVCLASS[an.sev];
+    annoHtml+=`<div class="anno ${cls}" style="left:${an.l}%;top:${an.t}%;width:${an.w}%;height:${an.h}%">
+        <span class="badge">${i+1}</span></div>`;
+    notesHtml+=`<li class="${cls}"><span class="n">${i+1}</span><span class="txt">${an.note}</span></li>`;
+  });
+  fig.innerHTML=`
+    <h2>${f.title}</h2>
+    <div class="meta">${f.meta}</div>
+    <div class="stage" style="aspect-ratio:${dim[0]}/${dim[1]}">
+      <img src="${f.img}" alt="${f.title}" loading="lazy">
+      ${annoHtml}
+    </div>
+    <div class="metrics">${f.metrics}</div>
+    <ol class="notes">${notesHtml}</ol>
+    <div class="cause">${f.cause}</div>`;
+  figsEl.appendChild(fig);
+});
+</script>
+</body>
+</html>

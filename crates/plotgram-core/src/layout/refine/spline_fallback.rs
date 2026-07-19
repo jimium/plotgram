@@ -217,9 +217,17 @@ pub(crate) fn reroute_edges_with_spline_ex(
                 if i < hard_probe.edges.len() {
                     hard_probe.edges[i] = candidate.clone();
                 }
-                let after_through =
-                    count_single_edge_crossings(&candidate, &hard_probe, diagram, i, config);
-                if after_through > 0 {
+                // 硬门禁与 lint 对齐：用 path_pierces_foreign_nodes（跳过端口 stub 段）判定，
+                // 而非 analyze_edge_node_crossings（含端点段、node_shrink=1）。后者会把
+                // 仅在 fan-in 端口 stub 处轻掠邻节点、但 lint 判定干净的外廊候选误杀，
+                // 导致稠密图 through 边永远无法修复。C9（after ≤ before）仍守 analyze 不劣化。
+                let cand_pts = candidate.path_points();
+                if path_pierces_foreign_nodes(
+                    &cand_pts,
+                    &hard_probe,
+                    rel.from.as_str(),
+                    rel.to.as_str(),
+                ) {
                     continue;
                 }
                 if crate::layout::lint::edge_index_crosses_group_interior(diagram, &hard_probe, i) {
@@ -508,27 +516,38 @@ fn orthogonal_detour(
                 rel.to.as_str().to_string(),
             )
         });
-        let mut clean: Vec<Vec<Point>> = candidates
-            .into_iter()
-            .map(simplify_orthogonal)
+        // 与 lint 对齐的硬门禁：不穿非端点节点内部（0.5px 全框）、不穿无关组内部。
+        let lint_clean = |path: &[Point]| -> bool {
+            path.len() >= 2
+                && is_orthogonal(path)
+                && endpoint_ids.as_ref().is_some_and(|(from_id, to_id)| {
+                    !path_pierces_foreign_nodes(path, result, from_id, to_id)
+                })
+                && !path_crosses_foreign_group_interior(
+                    path,
+                    diagram,
+                    result,
+                    edge_index,
+                    &group_maps,
+                )
+        };
+        let simplified: Vec<Vec<Point>> =
+            candidates.into_iter().map(simplify_orthogonal).collect();
+        // 二档接受：优先 18px 净距（segment_hits_any）；稠密图无 18px 候选时，
+        // 兜底接受 lint 干净（净距 <18px 但仍不穿节点/组）候选——绝不放行 lint 违规路径。
+        let mut clean: Vec<Vec<Point>> = simplified
+            .iter()
             .filter(|path| {
-                path.len() >= 2
-                    && is_orthogonal(path)
+                lint_clean(path)
                     && path
                         .windows(2)
                         .all(|w| !obstacles.segment_hits_any(w[0], w[1], skip))
-                    && endpoint_ids.as_ref().is_some_and(|(from_id, to_id)| {
-                        !path_pierces_foreign_nodes(path, result, from_id, to_id)
-                    })
-                    && !path_crosses_foreign_group_interior(
-                        path,
-                        diagram,
-                        result,
-                        edge_index,
-                        &group_maps,
-                    )
             })
+            .cloned()
             .collect();
+        if clean.is_empty() {
+            clean = simplified.into_iter().filter(|p| lint_clean(p)).collect();
+        }
         clean.sort_by(|a, b| {
             // 激进模式：优先不越出内容外廊，避免 finalize_canvas 平移导致 node_fp 假漂移。
             let rank = |path: &[Point]| -> i32 {
