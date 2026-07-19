@@ -50,7 +50,7 @@ pub(super) mod phases;
 
 // Re-exports for cross-submodule access via `use super::*;`
 pub(super) use profile::OrthoRoutingProfile;
-pub(super) use channel_load::{channel_load_penalty, ChannelLoadMap};
+pub(super) use channel_load::{channel_load_penalty, corridor_overflow_penalty, ChannelLoadMap};
 pub(super) use context::{EndpointPair, PreparedObstacles, OrthoRoutingContext, SegmentGrid};
 pub(super) use lane_assignment::{
     apply_corridor_planned_offsets, assign_lanes, separate_unrelated_trunk_overlaps,

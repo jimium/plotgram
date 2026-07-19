@@ -37,6 +37,7 @@ pub mod canvas_finalize;
 pub mod channel_occupancy;
 pub mod constants;
 pub mod decl_order;
+pub mod demand;
 pub mod edge;
 pub mod edge_band_demand;
 pub mod edge_stages;
@@ -83,6 +84,11 @@ pub use edge_band_demand::{
 pub use channel_occupancy::{
     compute_channel_occupancy_report, dump_channel_occupancy_if_enabled, ChannelEdgeRisk,
     ChannelOccupancyReport, ChannelRiskKind, CorridorOccupancy,
+};
+pub use demand::{
+    collect_edge_features, compute_corridor_model, dump_edge_difficulty_if_enabled,
+    dump_grid_demand_if_enabled, dump_pre_route_pressure_if_enabled, score_edge, score_edges,
+    DifficultyProfile, EdgeFeatures, PressureSnapshot,
 };
 pub use metrics::{
     compute_collinear_sample_metrics, compute_congestion_sample_metrics, node_fingerprint,

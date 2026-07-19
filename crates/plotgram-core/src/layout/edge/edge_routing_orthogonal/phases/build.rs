@@ -29,6 +29,7 @@ pub(crate) fn phase_route_edges(
     space_budget: &mut Option<crate::layout::space_budget::SpaceBudget>,
     feedback_edge_set: &std::collections::HashSet<usize>,
     s4_monitor_corridor: bool,
+    corridor_model: Option<&crate::layout::demand::CorridorModel>,
 ) {
     for &i in edge_order {
         let t_edge = crate::layout::perf::Instant::now();
@@ -108,13 +109,16 @@ pub(crate) fn phase_route_edges(
         // P2：有 chain 但 validated 失败 → 显式 degraded（禁止静默 free-route 冒充成功）。
         let corridor_contract_failed = has_chain && corridor_ok.is_none();
         let mut path = corridor_ok.unwrap_or_else(|| {
-            let ctx =
+            let mut ctx =
                 OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
                     .with_strict_group_transit(strict)
                     .with_corridor_boost(
                         corridor_boost || corridor_contract_failed || (!same_leaf && !has_chain),
                     )
                     .with_prefer_outer_ring(prefer_outer);
+            if let Some(m) = corridor_model {
+                ctx = ctx.with_corridor_demands(m);
+            }
             select_best_path_with_scorer_stats(
                 &ctx,
                 &pair,
@@ -130,11 +134,14 @@ pub(crate) fn phase_route_edges(
                 budget.request_corridor_boost();
             }
             let mut boost_stats = PathSelectStats::default();
-            let ctx =
+            let mut ctx =
                 OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
                     .with_strict_group_transit(strict)
                     .with_corridor_boost(true)
                     .with_prefer_outer_ring(prefer_outer);
+            if let Some(m) = corridor_model {
+                ctx = ctx.with_corridor_demands(m);
+            }
             let boosted = select_best_path_with_scorer_stats(
                 &ctx,
                 &pair,

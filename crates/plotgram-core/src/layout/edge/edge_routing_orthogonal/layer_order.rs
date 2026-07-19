@@ -34,25 +34,39 @@ fn edge_min_rank(
     from.min(to)
 }
 
+/// 难度分量化键（毫分位）：避免 f64 直接 cmp 的不确定性。
+fn edge_score_key(scores: Option<&[f64]>, index: usize) -> i64 {
+    let s = scores.and_then(|v| v.get(index)).copied().unwrap_or(0.0);
+    if !s.is_finite() {
+        return 0;
+    }
+    (s * 1000.0).round() as i64
+}
+
 /// 确定性边路由顺序。
 ///
 /// 有 `sugiyama_ranks` 时按端点最小 rank 升序分批（低层先占通道），
 /// 层内：非 feedback 先于 feedback（避免回环边抢占前向通道），再按连接度降序。
 /// 无 rank 时退化为连接度排序。
+///
+/// `difficulty_scores`：可选边级难度（与 relations 下标对齐）；同 rank 内高分略提前占道。
+/// 可用 `PLOTGRAM_EDGE_ORDER_SCORE=0` 关闭（调用方不传即可）。
 pub(super) fn compute_edge_order(
     relations: &[Relation],
     sugiyama_ranks: Option<&HashMap<String, usize>>,
     node_degree: &HashMap<String, usize>,
 ) -> Vec<usize> {
-    compute_edge_order_with_feedback(relations, sugiyama_ranks, node_degree, None)
+    compute_edge_order_with_feedback(relations, sugiyama_ranks, node_degree, None, None)
 }
 
-/// 同 [`compute_edge_order`]，可传入 feedback（回环）边集合以延后路由。
+/// 同 [`compute_edge_order`]，可传入 feedback（回环）边集合以延后路由，
+/// 以及可选 `difficulty_scores`（Phase 2 soft 提前）。
 pub(super) fn compute_edge_order_with_feedback(
     relations: &[Relation],
     sugiyama_ranks: Option<&HashMap<String, usize>>,
     node_degree: &HashMap<String, usize>,
     feedback_edges: Option<&std::collections::HashSet<usize>>,
+    difficulty_scores: Option<&[f64]>,
 ) -> Vec<usize> {
     let n = relations.len();
     let mut order: Vec<usize> = (0..n).collect();
@@ -62,14 +76,19 @@ pub(super) fn compute_edge_order_with_feedback(
 
     match sugiyama_ranks {
         Some(ranks) => {
-            // 全局：非 feedback 先于 feedback，再按 min_rank / 连接度。
+            // 全局：非 feedback 先于 feedback，再按 min_rank / 难度分 / 连接度。
             // 避免长回环（低 min_rank）抢占高层前向边通道。
+            // 难度分：同层内高难边略提前占廊（soft；不推翻 feedback/rank 主序）。
             order.sort_by(|&a, &b| {
                 is_feedback(a)
                     .cmp(&is_feedback(b))
                     .then_with(|| {
                         edge_min_rank(relations, a, ranks)
                             .cmp(&edge_min_rank(relations, b, ranks))
+                    })
+                    .then_with(|| {
+                        edge_score_key(difficulty_scores, b)
+                            .cmp(&edge_score_key(difficulty_scores, a))
                     })
                     .then_with(|| {
                         let da = edge_complexity(relations, a, node_degree);
@@ -83,6 +102,10 @@ pub(super) fn compute_edge_order_with_feedback(
             order.sort_by(|&a, &b| {
                 is_feedback(a)
                     .cmp(&is_feedback(b))
+                    .then_with(|| {
+                        edge_score_key(difficulty_scores, b)
+                            .cmp(&edge_score_key(difficulty_scores, a))
+                    })
                     .then_with(|| {
                         let da = edge_complexity(relations, a, node_degree);
                         let db = edge_complexity(relations, b, node_degree);
@@ -146,8 +169,13 @@ mod tests {
         let degree = compute_node_degrees(&relations);
         let mut feedback = std::collections::HashSet::new();
         feedback.insert(0);
-        let order =
-            compute_edge_order_with_feedback(&relations, Some(&ranks), &degree, Some(&feedback));
+        let order = compute_edge_order_with_feedback(
+            &relations,
+            Some(&ranks),
+            &degree,
+            Some(&feedback),
+            None,
+        );
         assert_eq!(order.last().copied(), Some(0), "feedback should be last");
         assert!(order[..2].contains(&1) && order[..2].contains(&2));
     }
@@ -163,8 +191,13 @@ mod tests {
         let degree = compute_node_degrees(&relations);
         let mut feedback = std::collections::HashSet::new();
         feedback.insert(0); // c→a
-        let order =
-            compute_edge_order_with_feedback(&relations, Some(&ranks), &degree, Some(&feedback));
+        let order = compute_edge_order_with_feedback(
+            &relations,
+            Some(&ranks),
+            &degree,
+            Some(&feedback),
+            None,
+        );
         assert_eq!(order, vec![1, 0], "forward a→b before feedback c→a");
     }
 
@@ -175,5 +208,53 @@ mod tests {
         let order = compute_edge_order(&relations, None, &degree);
 
         assert_eq!(order, vec![0, 1]);
+    }
+
+    #[test]
+    fn higher_difficulty_score_routes_earlier_within_same_rank() {
+        // 同 min_rank、同 degree：高分边应更靠前
+        let relations = vec![
+            test_rel("a", "b"), // 0 score low
+            test_rel("c", "d"), // 1 score high
+        ];
+        let mut ranks = HashMap::new();
+        ranks.insert("a".into(), 0);
+        ranks.insert("b".into(), 1);
+        ranks.insert("c".into(), 0);
+        ranks.insert("d".into(), 1);
+        let degree = compute_node_degrees(&relations);
+        let scores = [1.0_f64, 3.5_f64];
+        let order = compute_edge_order_with_feedback(
+            &relations,
+            Some(&ranks),
+            &degree,
+            None,
+            Some(&scores),
+        );
+        assert_eq!(order, vec![1, 0]);
+    }
+
+    #[test]
+    fn difficulty_score_does_not_override_feedback_deferral() {
+        let relations = vec![
+            test_rel("c", "a"), // 0 feedback, 极高分
+            test_rel("a", "b"), // 1 forward, 低分
+        ];
+        let mut ranks = HashMap::new();
+        ranks.insert("a".into(), 0);
+        ranks.insert("b".into(), 1);
+        ranks.insert("c".into(), 2);
+        let degree = compute_node_degrees(&relations);
+        let mut feedback = std::collections::HashSet::new();
+        feedback.insert(0);
+        let scores = [9.0_f64, 0.1_f64];
+        let order = compute_edge_order_with_feedback(
+            &relations,
+            Some(&ranks),
+            &degree,
+            Some(&feedback),
+            Some(&scores),
+        );
+        assert_eq!(order, vec![1, 0]);
     }
 }

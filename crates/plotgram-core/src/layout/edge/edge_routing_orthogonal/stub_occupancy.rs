@@ -430,11 +430,15 @@ pub struct LayerBandDemand {
 ///
 /// `effective_gap` 用 **面距**（上层底边 → 下层顶边），不是中心距；
 /// 否则节点高度会吞掉真实 gutter，T2 类样例永远报不出 deficit。
+///
+/// **demand 单源**：经 [`crate::layout::edge_band_demand::edge_band_demand`] 计算；
+/// 本函数只负责层聚类、face_gap 与 deficit。诊断口径用
+/// [`EdgeBandDemandProfile::for_layer_band_diagnosis`]。
 pub fn estimate_layer_band_demands(
     nodes: &HashMap<String, NodeLayout>,
     relations: &[Relation],
     parallel_gap: f64,
-    label_band: f64,
+    profile: crate::layout::edge_band_demand::EdgeBandDemandProfile,
 ) -> Vec<LayerBandDemand> {
     if nodes.is_empty() {
         return Vec::new();
@@ -467,11 +471,6 @@ pub fn estimate_layer_band_demands(
         return Vec::new();
     }
 
-    let layer_of: HashMap<String, usize> = layers
-        .iter()
-        .enumerate()
-        .flat_map(|(li, ents)| ents.iter().map(move |id| (id.clone(), li)))
-        .collect();
     let layer_center_y: Vec<f64> = layers
         .iter()
         .map(|ents| {
@@ -485,18 +484,6 @@ pub fn estimate_layer_band_demands(
 
     let mut out = Vec::new();
     for li in 0..layers.len() - 1 {
-        let mut cross = 0usize;
-        for rel in relations {
-            let Some(&a) = layer_of.get(rel.from.as_str()) else {
-                continue;
-            };
-            let Some(&b) = layer_of.get(rel.to.as_str()) else {
-                continue;
-            };
-            if (a == li && b == li + 1) || (b == li && a == li + 1) {
-                cross += 1;
-            }
-        }
         // 面距：上一层最底边 → 下一层最顶边（y 向下增大时）
         let upper_bottom = layers[li]
             .iter()
@@ -509,28 +496,20 @@ pub fn estimate_layer_band_demands(
             .map(|nl| nl.y)
             .fold(f64::INFINITY, f64::min);
         let face_gap = (lower_top - upper_bottom).max(0.0);
-        let profile = crate::layout::edge_band_demand::EdgeBandDemandProfile {
-            parallel_scale: 0.5,
-            fanin_scale: 0.0,
-            label_band,
-            label_per_edge: 0.0,
-            max_extra: f64::INFINITY,
-            side_channel_scale: 0.0,
-            side_channel_base: 0.0,
-            side_channel_max: 0.0,
-            horizontal_parallel_scale: 0.0,
-            horizontal_label_per: 0.0,
-            horizontal_max_extra: 0.0,
-        };
-        // 诊断仍用粗公式（与 S0 可比）；布局写权走 edge_band_demand 完整 profile
-        let demand = (cross as f64) * parallel_gap * profile.parallel_scale + profile.label_band;
-        let deficit = (demand - face_gap).max(0.0);
+        let bd = crate::layout::edge_band_demand::edge_band_demand(
+            &layers[li],
+            &layers[li + 1],
+            relations,
+            parallel_gap,
+            profile,
+        );
+        let deficit = (bd.demand - face_gap).max(0.0);
         out.push(LayerBandDemand {
             upper_layer_y: layer_center_y[li].min(layer_center_y[li + 1]),
             lower_layer_y: layer_center_y[li].max(layer_center_y[li + 1]),
             effective_gap: face_gap,
-            crossing_edges: cross,
-            demand,
+            crossing_edges: bd.crossing_edges,
+            demand: bd.demand,
             deficit,
         });
     }
@@ -776,5 +755,61 @@ mod tests {
             exact_cross, 0,
             "exact cross-pair stub conflicts remain: {conflicts:?}"
         );
+    }
+
+    #[test]
+    fn estimate_layer_band_demand_matches_edge_band_demand() {
+        use crate::layout::edge_band_demand::{edge_band_demand, EdgeBandDemandProfile};
+
+        let mut nodes = HashMap::new();
+        nodes.insert(
+            "a".into(),
+            NodeLayout {
+                x: 0.0,
+                y: 0.0,
+                width: 80.0,
+                height: 40.0,
+            },
+        );
+        nodes.insert(
+            "b".into(),
+            NodeLayout {
+                x: 100.0,
+                y: 0.0,
+                width: 80.0,
+                height: 40.0,
+            },
+        );
+        nodes.insert(
+            "c".into(),
+            NodeLayout {
+                x: 0.0,
+                y: 100.0,
+                width: 80.0,
+                height: 40.0,
+            },
+        );
+        nodes.insert(
+            "d".into(),
+            NodeLayout {
+                x: 100.0,
+                y: 100.0,
+                width: 80.0,
+                height: 40.0,
+            },
+        );
+        let relations = vec![rel("a", "c"), rel("b", "d"), rel("a", "d")];
+        let parallel_gap = 12.0;
+        let profile = EdgeBandDemandProfile::for_layer_band_diagnosis(24.0);
+        let bands = estimate_layer_band_demands(&nodes, &relations, parallel_gap, profile);
+        assert_eq!(bands.len(), 1);
+        let upper = vec!["a".to_string(), "b".to_string()];
+        let lower = vec!["c".to_string(), "d".to_string()];
+        let bd = edge_band_demand(&upper, &lower, &relations, parallel_gap, profile);
+        assert_eq!(bands[0].crossing_edges, bd.crossing_edges);
+        assert!((bands[0].demand - bd.demand).abs() < 1e-9);
+        // face_gap = 100 - 40 = 60
+        assert!((bands[0].effective_gap - 60.0).abs() < 1e-9);
+        assert!((bands[0].deficit - (bd.demand - 60.0).max(0.0)).abs() < 1e-9);
     }
 }

@@ -11,6 +11,12 @@ use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, LayoutResult, NodeLayout, PathGeometry, Port};
 use std::collections::HashMap;
 
+fn edge_order_score_enabled() -> bool {
+    !std::env::var("PLOTGRAM_EDGE_ORDER_SCORE")
+        .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
+        .unwrap_or(false)
+}
+
 pub(super) fn route_edges_orthogonal_inner(
     diagram: &Diagram,
     mut result: LayoutResult,
@@ -49,6 +55,29 @@ pub(super) fn route_edges_orthogonal_inner(
     );
 
     let corridor_plan = corridor_route::plan_corridor_routes(relations, &group_ctx, &profile);
+    let corridor_model = crate::layout::demand::compute_corridor_model(diagram, &result);
+
+    // Phase 2：入口算一次边难度，注入边序（高分同层略提前；可 PLOTGRAM_EDGE_ORDER_SCORE=0 关）
+    let difficulty_scores = if edge_order_score_enabled() {
+        let features = crate::layout::demand::collect_edge_features(
+            diagram,
+            &result,
+            Some(&corridor_model),
+        );
+        let ranked = crate::layout::demand::score_edges(
+            &features,
+            &crate::layout::demand::DifficultyProfile::default(),
+        );
+        let mut dense = vec![0.0_f64; n];
+        for (idx, score) in ranked {
+            if let Some(slot) = dense.get_mut(idx) {
+                *slot = score;
+            }
+        }
+        Some(dense)
+    } else {
+        None
+    };
 
     // ── 1+2. 端口选择 + slot 分配 + 平行边偏移 ──
     let (mut from_side, mut to_side, _lane, mut endpoint_map, parallel, reverse_pairs) =
@@ -69,6 +98,7 @@ pub(super) fn route_edges_orthogonal_inner(
         result.hints.sugiyama_ranks.as_ref(),
         &feedback_assignment,
         s4_monitor_corridor,
+        difficulty_scores.as_deref(),
     );
 
     // ── 4. 逐边构建路径 ──
@@ -107,6 +137,7 @@ pub(super) fn route_edges_orthogonal_inner(
         &mut result.hints.space_budget,
         &feedback_edge_set,
         s4_monitor_corridor,
+        Some(&corridor_model),
     );
 
     // ── 4b. 后置交叉检测：修正 slot 排序与实际路由方向不一致的锚点 ──

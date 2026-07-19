@@ -37,6 +37,13 @@ pub(crate) fn phase_port_slot(
     let mut to_side = vec![Port::Top; n];
     let mut lane = vec![0usize; n];
 
+    // D4 P2：预路由端口压力表（仅 PREFER=1 时用于换轴）
+    let port_pressure_map = if port_pressure_prefer_enabled() {
+        Some(port_pressure_lookup(nodes, relations))
+    } else {
+        None
+    };
+
     let mut pair_keys: Vec<String> = pair_groups.keys().cloned().collect();
     pair_keys.sort();
     for key in &pair_keys {
@@ -50,6 +57,19 @@ pub(crate) fn phase_port_slot(
 
         let (side_a, side_b) =
             choose_pair_sides_with_group(a_nl, b_nl, can_from, can_to, Some(group_ctx));
+        // 换轴 soft 偏好默认关：microservice 上会抬交叉；需
+        // PLOTGRAM_PORT_PRESSURE_PREFER=1 显式开启。
+        let (side_a, side_b) = if port_pressure_prefer_enabled() {
+            if let Some(pressure) = port_pressure_map.as_ref() {
+                prefer_lower_pressure_pair(
+                    a_nl, b_nl, can_from, can_to, side_a, side_b, pressure,
+                )
+            } else {
+                (side_a, side_b)
+            }
+        } else {
+            (side_a, side_b)
+        };
 
         for (l, &i) in indices.iter().enumerate() {
             let rel = &relations[i];
@@ -82,6 +102,11 @@ pub(crate) fn phase_port_slot(
         &mut to_side,
         Some(group_ctx),
     );
+    // D4 P2：默认只「拒绝往超载侧合并」（见 coordinate 内）；主动分流需
+    // PLOTGRAM_PORT_PRESSURE_RELIEVE=1（较激进，可能抬交叉，默认关）。
+    if port_pressure_relieve_enabled() {
+        relieve_overloaded_port_sides(relations, nodes, &mut from_side, &mut to_side);
+    }
     apply_feedback_side_overrides(
         relations,
         feedback_assignment,
@@ -225,6 +250,15 @@ pub(crate) fn phase_port_slot(
         });
 
         let k = sub_groups.len();
+        // 本侧实际挂载端点数；≥ TRIG 时仅温和加大 Compact 组内 pitch（不改 Concentrate / 子组带）
+        let side_load: usize = sub_groups.iter().map(|g| g.len()).sum();
+        let high_pressure = port_pressure_slot_enabled() && side_load >= PORT_PRESSURE_TRIG;
+        let compact_pitch = if high_pressure {
+            pressure_aware_slot_pitch(cfg.slot_pitch, side_load, edge_len)
+        } else {
+            cfg.slot_pitch.min(COMPACT_SLOT_PITCH)
+        };
+
         for (group_rank, endpoints) in sub_groups.iter().enumerate() {
             let count = endpoints.len();
             let strategy = choose_docking_strategy(count);
@@ -249,8 +283,7 @@ pub(crate) fn phase_port_slot(
                 let frac = match strategy {
                     DockingStrategy::Single | DockingStrategy::Concentrate => base_frac,
                     DockingStrategy::Compact => {
-                        let pitch = cfg.slot_pitch.min(COMPACT_SLOT_PITCH);
-                        slot_fraction_around(rank, count, edge_len, pitch, base_frac)
+                        slot_fraction_around(rank, count, edge_len, compact_pitch, base_frac)
                     }
                 };
                 let anchor = slot_anchor(nl, side, frac);
@@ -576,24 +609,32 @@ fn coordinate_port_sides(
         // 协调出边（≥2 条才有协调意义）
         if out_ports.len() >= 2 {
             if let Some(majority_side) = find_majority_side(&out_ports) {
-                for entry in &out_ports {
-                    let pair_key = &entry.0;
-                    let side = entry.3;
-                    if side == majority_side || switched_pairs.contains(pair_key.as_str()) {
-                        continue;
-                    }
-                    if let Some(other_nl) = pair_other_node(pair_key, node_id, &pair_info, nodes) {
-                        if side_acceptable(node_nl, other_nl, majority_side) {
-                            switch_pair_side(
-                                pair_key,
-                                node_id,
-                                majority_side,
-                                &pair_info,
-                                relations,
-                                from_side,
-                                to_side,
-                            );
-                            switched_pairs.insert(pair_key.clone());
+                let maj_count = out_ports
+                    .iter()
+                    .filter(|e| e.3 == majority_side)
+                    .count();
+                // Phase 4：多数派侧已超载时不再把少数派拉过去（避免更挤）
+                if !(port_pressure_side_enabled() && maj_count >= PORT_PRESSURE_TRIG) {
+                    for entry in &out_ports {
+                        let pair_key = &entry.0;
+                        let side = entry.3;
+                        if side == majority_side || switched_pairs.contains(pair_key.as_str()) {
+                            continue;
+                        }
+                        if let Some(other_nl) = pair_other_node(pair_key, node_id, &pair_info, nodes)
+                        {
+                            if side_acceptable(node_nl, other_nl, majority_side) {
+                                switch_pair_side(
+                                    pair_key,
+                                    node_id,
+                                    majority_side,
+                                    &pair_info,
+                                    relations,
+                                    from_side,
+                                    to_side,
+                                );
+                                switched_pairs.insert(pair_key.clone());
+                            }
                         }
                     }
                 }
@@ -603,29 +644,261 @@ fn coordinate_port_sides(
         // 协调入边
         if in_ports.len() >= 2 {
             if let Some(majority_side) = find_majority_side(&in_ports) {
-                for entry in &in_ports {
-                    let pair_key = &entry.0;
-                    let side = entry.3;
-                    if side == majority_side || switched_pairs.contains(pair_key.as_str()) {
-                        continue;
-                    }
-                    if let Some(other_nl) = pair_other_node(pair_key, node_id, &pair_info, nodes) {
-                        if side_acceptable(node_nl, other_nl, majority_side) {
-                            switch_pair_side(
-                                pair_key,
-                                node_id,
-                                majority_side,
-                                &pair_info,
-                                relations,
-                                from_side,
-                                to_side,
-                            );
-                            switched_pairs.insert(pair_key.clone());
+                let maj_count = in_ports
+                    .iter()
+                    .filter(|e| e.3 == majority_side)
+                    .count();
+                if !(port_pressure_side_enabled() && maj_count >= PORT_PRESSURE_TRIG) {
+                    for entry in &in_ports {
+                        let pair_key = &entry.0;
+                        let side = entry.3;
+                        if side == majority_side || switched_pairs.contains(pair_key.as_str()) {
+                            continue;
+                        }
+                        if let Some(other_nl) = pair_other_node(pair_key, node_id, &pair_info, nodes)
+                        {
+                            if side_acceptable(node_nl, other_nl, majority_side) {
+                                switch_pair_side(
+                                    pair_key,
+                                    node_id,
+                                    majority_side,
+                                    &pair_info,
+                                    relations,
+                                    from_side,
+                                    to_side,
+                                );
+                                switched_pairs.insert(pair_key.clone());
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/// 与 `demand` 归一化 `REF_PORT` 对齐：单侧 ≥4 视为超载。
+const PORT_PRESSURE_TRIG: usize = 4;
+
+fn port_pressure_side_enabled() -> bool {
+    !std::env::var("PLOTGRAM_PORT_PRESSURE_SIDE")
+        .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
+        .unwrap_or(false)
+}
+
+/// 主动把超载侧边挪到邻侧；默认关（校准见 microservice 交叉 +2）。
+fn port_pressure_relieve_enabled() -> bool {
+    std::env::var("PLOTGRAM_PORT_PRESSURE_RELIEVE")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+}
+
+/// 选侧时按 demand 压力换轴；默认关（microservice 交叉 +5）。
+fn port_pressure_prefer_enabled() -> bool {
+    std::env::var("PLOTGRAM_PORT_PRESSURE_PREFER")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+}
+
+/// 同侧 slot 加大错开；默认开（不换侧，只拉开）。
+fn port_pressure_slot_enabled() -> bool {
+    !std::env::var("PLOTGRAM_PORT_PRESSURE_SLOT")
+        .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
+        .unwrap_or(false)
+}
+
+/// 高压侧 Compact pitch：从 16px 向 `slot_pitch` 温和靠拢，避免一步拉到 40 抬 stub 交叉。
+fn pressure_aware_slot_pitch(base_slot_pitch: f64, side_load: usize, edge_len: f64) -> f64 {
+    let overflow = side_load.saturating_sub(PORT_PRESSURE_TRIG);
+    let room = (base_slot_pitch - COMPACT_SLOT_PITCH).max(0.0);
+    // load=4 → +25% room；load=8 → +85% room
+    let t = 0.25 + 0.15 * (overflow.min(4) as f64);
+    let pitched = COMPACT_SLOT_PITCH + room * t;
+    pitched.min(edge_len * 0.2).max(COMPACT_SLOT_PITCH)
+}
+
+fn port_pressure_lookup(
+    nodes: &HashMap<String, NodeLayout>,
+    relations: &[crate::ast::Relation],
+) -> std::collections::BTreeMap<(String, Port), usize> {
+    let mut map = std::collections::BTreeMap::new();
+    for p in crate::layout::demand::aggregate_port_pressure(nodes, relations) {
+        map.insert((p.node_id, p.side), p.count);
+    }
+    map
+}
+
+fn pressure_of(
+    map: &std::collections::BTreeMap<(String, Port), usize>,
+    node: &str,
+    side: Port,
+) -> usize {
+    map.get(&(node.to_string(), side)).copied().unwrap_or(0)
+}
+
+/// 几何首选侧已超载时，若正交另一轴候选两端压力更低且可接受，则 soft 换轴。
+fn prefer_lower_pressure_pair(
+    a: &NodeLayout,
+    b: &NodeLayout,
+    a_id: &str,
+    b_id: &str,
+    side_a: Port,
+    side_b: Port,
+    pressure: &std::collections::BTreeMap<(String, Port), usize>,
+) -> (Port, Port) {
+    let pa = pressure_of(pressure, a_id, side_a);
+    let pb = pressure_of(pressure, b_id, side_b);
+    if pa < PORT_PRESSURE_TRIG && pb < PORT_PRESSURE_TRIG {
+        return (side_a, side_b);
+    }
+
+    let ac = node_center(a);
+    let bc = node_center(b);
+    let dx = bc.x - ac.x;
+    let dy = bc.y - ac.y;
+    let alt = if is_vertical_port(side_a) {
+        if dx >= 0.0 {
+            (Port::Right, Port::Left)
+        } else {
+            (Port::Left, Port::Right)
+        }
+    } else if dy >= 0.0 {
+        (Port::Bottom, Port::Top)
+    } else {
+        (Port::Top, Port::Bottom)
+    };
+    if alt == (side_a, side_b) {
+        return (side_a, side_b);
+    }
+    if !side_acceptable(a, b, alt.0) || !side_acceptable(b, a, alt.1) {
+        return (side_a, side_b);
+    }
+    let pa2 = pressure_of(pressure, a_id, alt.0);
+    let pb2 = pressure_of(pressure, b_id, alt.1);
+    // 仅当总压下降，且至少一端明显减压
+    if pa2 + pb2 < pa + pb && (pa2 < pa || pb2 < pb) {
+        alt
+    } else {
+        (side_a, side_b)
+    }
+}
+
+/// D4 P2：对超载 `(node, side)` 把多余边 soft 分流到几何可接受的邻侧。
+///
+/// 在 `coordinate_port_sides` 之后、feedback 覆盖之前执行；默认关，见
+/// [`port_pressure_relieve_enabled`]。
+fn relieve_overloaded_port_sides(
+    relations: &[crate::ast::Relation],
+    nodes: &HashMap<String, NodeLayout>,
+    from_side: &mut [Port],
+    to_side: &mut [Port],
+) {
+    if !port_pressure_side_enabled() || relations.is_empty() {
+        return;
+    }
+    use std::collections::{BTreeMap, BTreeSet};
+
+    let mut pair_info: BTreeMap<String, (String, String, Vec<usize>)> = BTreeMap::new();
+    for (i, rel) in relations.iter().enumerate() {
+        let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
+        let (can_from, can_to) = canonical_pair(rel.from.as_str(), rel.to.as_str());
+        pair_info
+            .entry(key)
+            .or_insert_with(|| (can_from.to_string(), can_to.to_string(), Vec::new()))
+            .2
+            .push(i);
+    }
+
+    // node -> Vec<(pair_key, edge_index, is_from, side)>
+    let mut node_ports: BTreeMap<String, Vec<(String, usize, bool, Port)>> = BTreeMap::new();
+    for (i, rel) in relations.iter().enumerate() {
+        let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
+        node_ports.entry(rel.from.to_string()).or_default().push((
+            key.clone(),
+            i,
+            true,
+            from_side[i],
+        ));
+        node_ports.entry(rel.to.to_string()).or_default().push((
+            key.clone(),
+            i,
+            false,
+            to_side[i],
+        ));
+    }
+
+    let port_order = [Port::Top, Port::Bottom, Port::Left, Port::Right];
+    let mut switched_pairs: BTreeSet<String> = BTreeSet::new();
+    let mut relieved = 0usize;
+
+    for (node_id, ports) in &node_ports {
+        let Some(node_nl) = nodes.get(node_id) else {
+            continue;
+        };
+        for is_from in [true, false] {
+            let mut by_side: BTreeMap<Port, Vec<(String, usize)>> = BTreeMap::new();
+            for (pair_key, ei, from_flag, side) in ports {
+                if *from_flag != is_from {
+                    continue;
+                }
+                by_side
+                    .entry(*side)
+                    .or_default()
+                    .push((pair_key.clone(), *ei));
+            }
+            for (over_side, mut edges) in by_side {
+                if edges.len() < PORT_PRESSURE_TRIG {
+                    continue;
+                }
+                // 后分配的边优先挪开（确定性：edge_index 降序）
+                edges.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+                let mut load = edges.len();
+                for (pair_key, _ei) in &edges {
+                    if load < PORT_PRESSURE_TRIG {
+                        break;
+                    }
+                    if switched_pairs.contains(pair_key.as_str()) {
+                        continue;
+                    }
+                    let Some(other_nl) =
+                        pair_other_node(pair_key, node_id, &pair_info, nodes)
+                    else {
+                        continue;
+                    };
+                    let mut moved = false;
+                    for &alt in &port_order {
+                        if alt == over_side {
+                            continue;
+                        }
+                        if !side_acceptable(node_nl, other_nl, alt) {
+                            continue;
+                        }
+                        switch_pair_side(
+                            pair_key,
+                            node_id,
+                            alt,
+                            &pair_info,
+                            relations,
+                            from_side,
+                            to_side,
+                        );
+                        switched_pairs.insert(pair_key.clone());
+                        load -= 1;
+                        relieved += 1;
+                        moved = true;
+                        break;
+                    }
+                    let _ = moved;
+                }
+            }
+        }
+    }
+
+    if std::env::var_os("PLOTGRAM_DEBUG_PORT_PRESSURE").is_some() {
+        eprintln!(
+            "[port-pressure] relieved_pairs={} trig={}",
+            relieved, PORT_PRESSURE_TRIG
+        );
     }
 }
 

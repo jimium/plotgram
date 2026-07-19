@@ -8,7 +8,7 @@ use crate::layout::GroupLayout;
 use super::constants::EPS;
 
 /// 组间优先路由走廊方向。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
 pub enum CorridorAxis {
     Vertical,
     Horizontal,

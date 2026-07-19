@@ -9,6 +9,7 @@ use crate::layout::group::GroupRoutingContext;
 use crate::layout::NodeLayout;
 use std::collections::HashMap;
 
+use crate::layout::demand::CorridorModel;
 use crate::layout::edge::common::spatial_grid::SpatialGrid;
 use super::{ChannelLoadMap, OrthoConfig, OrthoRoutingProfile, RoutedSegment};
 use super::slot::Endpoint;
@@ -28,6 +29,8 @@ pub struct OrthoRoutingContext<'a> {
     pub obstacles: &'a PreparedObstacles,
     /// Phase 3: 通道负载图（reroute 时传入 Some，初始路由为 None）
     pub channel_load: Option<&'a ChannelLoadMap>,
+    /// P2：预路由廊模型（只读）；None 时不做廊 OVER soft
+    pub corridor_model: Option<&'a CorridorModel>,
     /// 该边是否强制拒绝穿无关组内部（`path_avoids_group_interiors` 硬过滤）。
     ///
     /// 由 `should_strict_group_transit` 按边判定：存在 corridor chain 时为 true。
@@ -59,6 +62,7 @@ impl<'a> OrthoRoutingContext<'a> {
             profile,
             obstacles,
             channel_load,
+            corridor_model: None,
             // 默认 false，由调用方按边调用 should_strict_group_transit 覆盖
             strict_group_transit: false,
             corridor_boost: false,
@@ -75,6 +79,12 @@ impl<'a> OrthoRoutingContext<'a> {
 
     pub fn with_corridor_boost(mut self, boost: bool) -> Self {
         self.corridor_boost = boost;
+        self
+    }
+
+    /// P2：注入预计算廊模型（不改 `new` 签名）。
+    pub fn with_corridor_demands(mut self, model: &'a CorridorModel) -> Self {
+        self.corridor_model = Some(model);
         self
     }
 

@@ -17,9 +17,8 @@ use super::path::port_outward;
 use super::profile::OrthoRoutingProfile;
 use super::simplify::simplify_path;
 use super::EPS;
+use crate::layout::demand::CORRIDOR_LANE_PITCH;
 
-/// 走廊内相邻车道间距（像素）
-const CORRIDOR_LANE_PITCH: f64 = 18.0;
 /// 端口 stub 默认长度
 const DEFAULT_STUB_LEN: f64 = 24.0;
 

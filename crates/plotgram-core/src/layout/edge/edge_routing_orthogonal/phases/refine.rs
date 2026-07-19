@@ -159,6 +159,7 @@ pub(crate) fn phase_layer_order(
     sugiyama_ranks: Option<&HashMap<String, usize>>,
     feedback_assignment: &feedback_side::FeedbackSideAssignment,
     s4_monitor_corridor: bool,
+    difficulty_scores: Option<&[f64]>,
 ) -> (Vec<usize>, std::collections::HashSet<usize>) {
     let t2 = crate::layout::perf::Instant::now();
     let node_degree = layer_order::compute_node_degrees(relations);
@@ -175,7 +176,17 @@ pub(crate) fn phase_layer_order(
         sugiyama_ranks,
         &node_degree,
         Some(&feedback_edge_set),
+        difficulty_scores,
     );
+    if std::env::var_os("PLOTGRAM_DEBUG_EDGE_ORDER").is_some() {
+        let head: Vec<usize> = edge_order.iter().copied().take(12).collect();
+        eprintln!(
+            "[edge-order] n={} scores={} head={:?}",
+            relations.len(),
+            difficulty_scores.is_some(),
+            head
+        );
+    }
     crate::perf_log!(
         "[perf]     step2_slots+step3_order: {:.2}ms",
         t2.elapsed().as_secs_f64() * 1000.0

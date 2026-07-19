@@ -10,11 +10,11 @@ use crate::layout::group::hierarchy::{
 };
 use crate::layout::group::constants::EPS;
 use crate::layout::node::common::group_bounds::{GutterSide, SideGutter};
+use crate::layout::demand::CORRIDOR_LANE_PITCH;
 use crate::layout::{GroupLayout, NodeLayout};
 use std::collections::HashMap;
 
-/// 与走廊车道间距对齐（见 `corridor_route::CORRIDOR_LANE_PITCH`）。
-const LANE_PITCH: f64 = 18.0;
+/// 与走廊车道间距对齐（`demand::CORRIDOR_LANE_PITCH` 单源）。
 /// Phase C：侧 gutter 上限 56 → 40，减轻跨组边把窄组撑成空壳。
 const GUTTER_MAX: f64 = 40.0;
 /// 单侧至少累计到该权重才开 gutter（≈一条主出口边）。
@@ -172,7 +172,7 @@ fn demand_to_side_gutters(
         let lane_slots = d.lanes.floor().max(1.0) as u32;
         let gutter = (GROUP_BORDER_SHELL_PAD
             + PORT_STUB_CLEARANCE
-            + lane_slots.saturating_sub(1) as f64 * LANE_PITCH
+            + lane_slots.saturating_sub(1) as f64 * CORRIDOR_LANE_PITCH
             + d.label_w)
             .min(GUTTER_MAX);
         out.entry(gid.clone()).or_default().set_side(side, gutter);

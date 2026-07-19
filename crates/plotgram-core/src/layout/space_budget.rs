@@ -27,6 +27,8 @@ pub struct SpaceBudget {
     pub port_clearance: f64,
     /// 路由 0 候选时请求抬高走廊/车道预算（S2）。
     pub corridor_boost_requested: bool,
+    /// D4 P0：竖直 rank 缝下界；`None` 时 `enforce_vertical_rank_gaps` 用 `default_node_gap`。
+    pub min_vertical_rank_gap: Option<f64>,
 }
 
 impl SpaceBudget {
@@ -36,6 +38,7 @@ impl SpaceBudget {
             pair_gaps: BTreeMap::new(),
             port_clearance: PORT_STUB_CLEARANCE,
             corridor_boost_requested: false,
+            min_vertical_rank_gap: None,
         }
     }
 
@@ -142,6 +145,276 @@ impl SpaceBudget {
         self.corridor_boost_requested = false;
         v
     }
+
+    /// 竖直 rank 缝下界（D4 P0）。
+    pub fn vertical_rank_gap(&self) -> f64 {
+        self.min_vertical_rank_gap
+            .unwrap_or(self.default_node_gap)
+            .max(self.default_node_gap)
+    }
+
+    /// D4 P0 + P1.2/P3.2：用只读压力模型抬缝（可 `PLOTGRAM_PRESSURE_BUDGET=0` 关闭）。
+    ///
+    /// - 邻层 `deficit` → 抬 `min_vertical_rank_gap`（cap 于 diagram profile.max_extra）
+    /// - 廊级 `load > capacity` → `request_corridor_boost` + 跨廊组节点 pair_gaps
+    /// - 边级高 `obstacle_hits` / 高 `grid_overflow` → 端点 pair_gaps + 竖缝 / corridor_boost
+    ///   （可单独 `PLOTGRAM_EDGE_PRESSURE_BUDGET=0` 关闭边级项）
+    pub fn enrich_from_pressure(
+        &mut self,
+        diagram: &Diagram,
+        nodes: &HashMap<String, NodeLayout>,
+        corridor: &crate::layout::demand::CorridorModel,
+        bands: &[crate::layout::demand::BandDemand],
+        edge_features: &[crate::layout::demand::EdgeFeatures],
+    ) {
+        if std::env::var("PLOTGRAM_PRESSURE_BUDGET")
+            .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
+            .unwrap_or(false)
+        {
+            return;
+        }
+        let profile = crate::layout::edge_band_demand::EdgeBandDemandProfile::for_diagram(
+            diagram.diagram_type.clone(),
+            !diagram.groups.is_empty(),
+        );
+        let max_extra = if profile.max_extra.is_finite() {
+            profile.max_extra
+        } else {
+            48.0
+        };
+
+        let max_def = bands.iter().map(|b| b.deficit).fold(0.0_f64, f64::max);
+        if max_def > 1.0 {
+            let extra = max_def.min(max_extra);
+            let target = self.default_node_gap + extra;
+            self.min_vertical_rank_gap = Some(
+                self.min_vertical_rank_gap
+                    .unwrap_or(self.default_node_gap)
+                    .max(target),
+            );
+        }
+
+        let lane = crate::layout::demand::CORRIDOR_LANE_PITCH;
+        for c in corridor.demands.iter().filter(|d| d.is_over()) {
+            self.request_corridor_boost();
+            let overflow = c.overflow() as f64;
+            let extra = (overflow * lane).min(max_extra).max(lane);
+            // 跨廊两组：抬两端点节点对中「投影最近」的若干对
+            let mut ga_nodes: Vec<&str> = diagram
+                .entities
+                .iter()
+                .filter(|e| {
+                    e.group_id
+                        .as_ref()
+                        .is_some_and(|g| g.as_str() == c.group_a)
+                })
+                .map(|e| e.id.as_str())
+                .collect();
+            let mut gb_nodes: Vec<&str> = diagram
+                .entities
+                .iter()
+                .filter(|e| {
+                    e.group_id
+                        .as_ref()
+                        .is_some_and(|g| g.as_str() == c.group_b)
+                })
+                .map(|e| e.id.as_str())
+                .collect();
+            ga_nodes.sort_unstable();
+            gb_nodes.sort_unstable();
+            let mut best: Vec<(f64, &str, &str)> = Vec::new();
+            for a in &ga_nodes {
+                let Some(na) = nodes.get(*a) else { continue };
+                for b in &gb_nodes {
+                    let Some(nb) = nodes.get(*b) else { continue };
+                    let dist = match c.axis {
+                        crate::layout::group::CorridorAxis::Vertical => {
+                            // 组左右排列：水平间距
+                            if na.x <= nb.x {
+                                nb.x - (na.x + na.width)
+                            } else {
+                                na.x - (nb.x + nb.width)
+                            }
+                        }
+                        crate::layout::group::CorridorAxis::Horizontal => {
+                            if na.y <= nb.y {
+                                nb.y - (na.y + na.height)
+                            } else {
+                                na.y - (nb.y + nb.height)
+                            }
+                        }
+                    };
+                    best.push((dist, *a, *b));
+                }
+            }
+            best.sort_by(|x, y| {
+                x.0.partial_cmp(&y.0)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| x.1.cmp(y.1))
+                    .then_with(|| x.2.cmp(y.2))
+            });
+            for (_, a, b) in best.into_iter().take(4) {
+                let required = self.min_gap(a, b).max(self.default_node_gap + extra);
+                self.set_pair_gap(a, b, required);
+            }
+        }
+
+        if edge_pressure_budget_enabled() {
+            self.enrich_from_edge_features(diagram, nodes, edge_features, max_extra, lane);
+        }
+    }
+
+    /// P1.2 / P3.2：边级 hits / grid_overflow → soft 加缝。
+    ///
+    /// 阈值来自 Phase 0 校准：flowchart 顶部分位数 `grid≈4` 且 `hits=0`，
+    /// architecture 热点多为 `hits≥1` 且 `grid≥6`；故 hits≥1 或 grid≥6 才触发。
+    /// 跨组穿透边额外抬两组间最近节点对（与廊 OVER 同出口），否则仅端点 pair 在
+    /// 不同排时 `enforce_horizontal_gaps` 兑现不了。
+    fn enrich_from_edge_features(
+        &mut self,
+        diagram: &Diagram,
+        nodes: &HashMap<String, NodeLayout>,
+        edge_features: &[crate::layout::demand::EdgeFeatures],
+        max_extra: f64,
+        lane: f64,
+    ) {
+        const HITS_TRIG: usize = 1;
+        const GRID_TRIG: usize = 6;
+
+        let mut feats: Vec<&crate::layout::demand::EdgeFeatures> = edge_features.iter().collect();
+        feats.sort_by_key(|f| f.edge_index);
+
+        let mut max_vert_extra = 0.0_f64;
+        let mut pierce_hot = false;
+        for f in feats {
+            let hits = f.obstacle_hits;
+            let grid = f.grid_overflow;
+            if hits < HITS_TRIG && grid < GRID_TRIG {
+                continue;
+            }
+
+            let hits_extra = if hits >= HITS_TRIG {
+                (hits as f64) * lane
+            } else {
+                0.0
+            };
+            let grid_extra = if grid >= GRID_TRIG {
+                ((grid.saturating_sub(crate::layout::demand::GRID_SOFT_CAP)) as f64) * 8.0
+            } else {
+                0.0
+            };
+            let extra = hits_extra.max(grid_extra).min(max_extra).max(0.0);
+            if extra > 0.0 {
+                let required = self
+                    .min_gap(&f.from, &f.to)
+                    .max(self.default_node_gap + extra);
+                self.set_pair_gap(&f.from, &f.to, required);
+            }
+
+            // 有穿透的跨层边：竖缝是同 leaf-group 内 enforce 的主杠杆
+            if hits >= HITS_TRIG && f.span_ranks >= 1 {
+                max_vert_extra =
+                    max_vert_extra.max(((hits as f64) * lane).min(max_extra));
+            }
+
+            // 跨组穿透：抬两组间投影最近的若干对（仿廊 OVER）
+            if hits >= HITS_TRIG {
+                pierce_hot = true;
+                let ga = diagram
+                    .entities
+                    .iter()
+                    .find(|e| e.id.as_str() == f.from)
+                    .and_then(|e| e.group_id.as_ref().map(|g| g.as_str()));
+                let gb = diagram
+                    .entities
+                    .iter()
+                    .find(|e| e.id.as_str() == f.to)
+                    .and_then(|e| e.group_id.as_ref().map(|g| g.as_str()));
+                if let (Some(ga), Some(gb)) = (ga, gb) {
+                    if ga != gb && extra > 0.0 {
+                        raise_nearest_cross_group_pairs(self, diagram, nodes, ga, gb, extra);
+                    }
+                }
+            }
+        }
+
+        if max_vert_extra > 1.0 {
+            let target = self.default_node_gap + max_vert_extra;
+            self.min_vertical_rank_gap = Some(
+                self.min_vertical_rank_gap
+                    .unwrap_or(self.default_node_gap)
+                    .max(target),
+            );
+        }
+
+        if pierce_hot {
+            self.request_corridor_boost();
+        }
+
+        if std::env::var_os("PLOTGRAM_DEBUG_EDGE_PRESSURE").is_some() {
+            eprintln!(
+                "[edge-pressure] pierce_hot={} min_vert_gap={:?} pair_gaps={} corridor_boost={}",
+                pierce_hot,
+                self.min_vertical_rank_gap,
+                self.pair_gaps.len(),
+                self.corridor_boost_requested
+            );
+        }
+    }
+}
+
+/// 两组间投影最近的最多 4 对节点抬 `pair_gaps`（水平距离；跨组主缝）。
+fn raise_nearest_cross_group_pairs(
+    budget: &mut SpaceBudget,
+    diagram: &Diagram,
+    nodes: &HashMap<String, NodeLayout>,
+    group_a: &str,
+    group_b: &str,
+    extra: f64,
+) {
+    let mut ga_nodes: Vec<&str> = diagram
+        .entities
+        .iter()
+        .filter(|e| e.group_id.as_ref().is_some_and(|g| g.as_str() == group_a))
+        .map(|e| e.id.as_str())
+        .collect();
+    let mut gb_nodes: Vec<&str> = diagram
+        .entities
+        .iter()
+        .filter(|e| e.group_id.as_ref().is_some_and(|g| g.as_str() == group_b))
+        .map(|e| e.id.as_str())
+        .collect();
+    ga_nodes.sort_unstable();
+    gb_nodes.sort_unstable();
+    let mut best: Vec<(f64, &str, &str)> = Vec::new();
+    for a in &ga_nodes {
+        let Some(na) = nodes.get(*a) else { continue };
+        for b in &gb_nodes {
+            let Some(nb) = nodes.get(*b) else { continue };
+            let dist = if na.x <= nb.x {
+                nb.x - (na.x + na.width)
+            } else {
+                na.x - (nb.x + nb.width)
+            };
+            best.push((dist, *a, *b));
+        }
+    }
+    best.sort_by(|x, y| {
+        x.0.partial_cmp(&y.0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| x.1.cmp(y.1))
+            .then_with(|| x.2.cmp(y.2))
+    });
+    for (_, a, b) in best.into_iter().take(4) {
+        let required = budget.min_gap(a, b).max(budget.default_node_gap + extra);
+        budget.set_pair_gap(a, b, required);
+    }
+}
+
+fn edge_pressure_budget_enabled() -> bool {
+    !std::env::var("PLOTGRAM_EDGE_PRESSURE_BUDGET")
+        .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
+        .unwrap_or(false)
 }
 
 fn canonical_pair(a: &str, b: &str) -> (String, String) {
@@ -283,7 +556,7 @@ pub fn enforce_vertical_rank_gaps(
                     };
                     let reverse_pair = reverse_pairs.contains(&key);
                     if projected_collision || reverse_pair {
-                        deficit = deficit.max(budget.default_node_gap - gap);
+                        deficit = deficit.max(budget.vertical_rank_gap() - gap);
                     }
                 }
             }

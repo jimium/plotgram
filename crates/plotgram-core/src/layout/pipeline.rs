@@ -403,6 +403,8 @@ impl<'a> LayoutPipeline<'a> {
 
         // B2：最终几何上的通道占用只读诊断（对照 lint 残余；默认零输出）。
         crate::layout::channel_occupancy::dump_channel_occupancy_if_enabled(self.diagram, &result);
+        crate::layout::demand::dump_edge_difficulty_if_enabled(self.diagram, &result);
+        crate::layout::demand::dump_grid_demand_if_enabled(self.diagram, &result);
 
         crate::perf_log!(
             "[perf]   post-process: {:.2}ms",

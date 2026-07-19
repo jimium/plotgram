@@ -12,7 +12,9 @@
 //! 确定性（AGENTS.md §2）：使用 HashMap 但 key 为 (Axis, i64)，
 //! 查询时量化 layer 后查表，不依赖迭代顺序。
 
+use crate::layout::demand::{CorridorModel, CORRIDOR_LANE_PITCH};
 use crate::layout::geometry::{Axis, Point};
+use crate::layout::group::CorridorAxis;
 use crate::layout::EdgeLayout;
 use std::collections::HashMap;
 
@@ -21,6 +23,70 @@ const CHANNEL_LOAD_THRESHOLD: usize = 3;
 
 /// 每条多余边的惩罚值（介于 BEND_PENALTY=16 和 EDGE_OVERLAP_PENALTY=1200 之间）
 const CHANNEL_LOAD_PENALTY: f64 = 200.0;
+
+/// P2.1：廊 OVER soft（弱于段级 channel_load）
+const CORRIDOR_OVER_PENALTY: f64 = 80.0;
+
+fn corridor_soft_enabled() -> bool {
+    !std::env::var("PLOTGRAM_CORRIDOR_SOFT")
+        .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
+        .unwrap_or(false)
+}
+
+/// 路径是否占用某廊车道（轴对齐 coord 附近 + span 重叠）。
+fn path_uses_corridor(path: &[Point], axis: CorridorAxis, coord: f64, span_min: f64, span_max: f64) -> bool {
+    let lo = span_min.min(span_max);
+    let hi = span_min.max(span_max);
+    let tol = CORRIDOR_LANE_PITCH * 0.75;
+    for w in path.windows(2) {
+        let a = w[0];
+        let b = w[1];
+        match axis {
+            CorridorAxis::Vertical => {
+                // 竖廊：段接近 x=coord，且 y 与 span 重叠
+                let dx = (a.x - coord).abs().min((b.x - coord).abs());
+                let near = dx <= tol || ((a.x - coord) * (b.x - coord) <= 0.0 && (a.x - b.x).abs() < tol);
+                let y0 = a.y.min(b.y);
+                let y1 = a.y.max(b.y);
+                let y_overlap = y0 <= hi + tol && y1 >= lo - tol;
+                if near && y_overlap {
+                    return true;
+                }
+            }
+            CorridorAxis::Horizontal => {
+                let dy = (a.y - coord).abs().min((b.y - coord).abs());
+                let near = dy <= tol || ((a.y - coord) * (b.y - coord) <= 0.0 && (a.y - b.y).abs() < tol);
+                let x0 = a.x.min(b.x);
+                let x1 = a.x.max(b.x);
+                let x_overlap = x0 <= hi + tol && x1 >= lo - tol;
+                if near && x_overlap {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// 路径经过 OVER 廊时的 soft 惩罚；`PLOTGRAM_CORRIDOR_SOFT=0` 关闭。
+pub fn corridor_overflow_penalty(path: &[Point], model: &CorridorModel) -> f64 {
+    if !corridor_soft_enabled() || path.len() < 2 {
+        return 0.0;
+    }
+    let mut penalty = 0.0;
+    for d in &model.demands {
+        if !d.is_over() {
+            continue;
+        }
+        let Some(c) = model.corridors.get(d.corridor_index) else {
+            continue;
+        };
+        if path_uses_corridor(path, c.axis, c.coord, c.span_min, c.span_max) {
+            penalty += d.overflow() as f64 * CORRIDOR_OVER_PENALTY;
+        }
+    }
+    penalty
+}
 
 /// 通道负载图：key = (轴, 量化层坐标)，value = 该通道上的段数。
 ///

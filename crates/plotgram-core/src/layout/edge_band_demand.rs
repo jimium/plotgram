@@ -37,6 +37,25 @@ pub struct EdgeBandDemandProfile {
 }
 
 impl EdgeBandDemandProfile {
+    /// 层带诊断（S0 / congestion）用 profile：与历史粗估同口径，经 `edge_band_demand` 单源计算。
+    ///
+    /// `fanin_scale=0` / `label_per_edge=0`：诊断只看跨缝边数 × parallel + 固定 label_band。
+    pub fn for_layer_band_diagnosis(label_band: f64) -> Self {
+        Self {
+            parallel_scale: 0.5,
+            fanin_scale: 0.0,
+            label_band,
+            label_per_edge: 0.0,
+            max_extra: f64::INFINITY,
+            side_channel_scale: 0.0,
+            side_channel_base: 0.0,
+            side_channel_max: 0.0,
+            horizontal_parallel_scale: 0.0,
+            horizontal_label_per: 0.0,
+            horizontal_max_extra: 0.0,
+        }
+    }
+
     /// 仅知图种时保守按「有组」处理（不抬无组可读余量）。
     pub fn for_diagram_type(dt: DiagramType) -> Self {
         Self::for_diagram(dt, true)

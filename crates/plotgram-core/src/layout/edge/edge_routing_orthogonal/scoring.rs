@@ -85,6 +85,10 @@ impl CandidateScorer for DefaultScorer {
         if let Some(load_map) = ctx.channel_load {
             score += channel_load_penalty(path, load_map) * w.channel_load;
         }
+        // P2.1：廊级 OVER soft（与段级 channel_load 互补；可 PLOTGRAM_CORRIDOR_SOFT=0 关）
+        if let Some(model) = ctx.corridor_model {
+            score += corridor_overflow_penalty(path, model) * w.channel_load;
+        }
         if !ctx.group_ctx.corridors.is_empty() {
             score += corridor_misalignment_penalty(
                 path,
