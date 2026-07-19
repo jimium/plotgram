@@ -466,8 +466,16 @@ impl std::fmt::Display for QualityGrade {
     }
 }
 
-/// 计算路径拐点总数（相邻线段不共线则计为一个拐点）
+/// 语义折点阈值：相邻线段转角超过此值才计为一个拐点（30°）。
+///
+/// 归一化转角替代旧的未归一化叉积判定，避免样条被采样成密集折线后
+/// 每个微小采样转角都被计成折点（度量假象）。正交 90° 拐角、对角
+/// 45° stub 均 > 30° 仍计入；样条逐顶点微转 (<15°) 不计。
+const BEND_ANGLE_THRESHOLD_RAD: f64 = 30.0 * std::f64::consts::PI / 180.0;
+
+/// 计算路径语义拐点总数（相邻线段转角超过阈值计为一个拐点）
 fn count_bends(result: &LayoutResult) -> usize {
+    const EPS: f64 = 1e-6;
     let mut total = 0usize;
     for edge in &result.edges {
         let path = edge.path_points();
@@ -479,8 +487,17 @@ fn count_bends(result: &LayoutResult) -> usize {
             let dy1 = path[i].y - path[i - 1].y;
             let dx2 = path[i + 1].x - path[i].x;
             let dy2 = path[i + 1].y - path[i].y;
+            let len1 = dx1.hypot(dy1);
+            let len2 = dx2.hypot(dy2);
+            if len1 < EPS || len2 < EPS {
+                continue; // 零长段：无方向可言，跳过
+            }
+            // 转角 ∈ [0, π]：直线=0、90° 角=π/2、U 型反转=π。
+            // 用 atan2(cross, dot) 而非仅 sin/cross，以正确处理近 180° 反转。
             let cross = dx1 * dy2 - dy1 * dx2;
-            if cross.abs() > 0.5 {
+            let dot = dx1 * dx2 + dy1 * dy2;
+            let turn = cross.atan2(dot).abs();
+            if turn > BEND_ANGLE_THRESHOLD_RAD {
                 total += 1;
             }
         }
@@ -1195,5 +1212,70 @@ mod tests {
         let dims = metrics.dimension_scores();
         assert!(dims.correctness >= 0.0 && dims.correctness <= 1.0);
         assert!(dims.compactness >= 0.0 && dims.compactness <= 1.0);
+    }
+
+    /// 构造只含一条 Polyline 边的最小 LayoutResult（count_bends 仅读 edges）。
+    fn polyline_result(points: Vec<Point>) -> LayoutResult {
+        LayoutResult {
+            nodes: HashMap::new(),
+            groups: HashMap::new(),
+            edges: vec![EdgeLayout {
+                geometry: PathGeometry::Polyline { points },
+                labels: vec![],
+                from_port: Port::Right,
+                to_port: Port::Left,
+            }],
+            total_width: 0.0,
+            total_height: 0.0,
+            hints: Default::default(),
+        }
+    }
+
+    #[test]
+    fn count_bends_orthogonal_corner_counts_one() {
+        // L 形：一个 90° 拐角 → 1 个语义折点
+        let r = polyline_result(vec![
+            Point::new(0.0, 0.0),
+            Point::new(100.0, 0.0),
+            Point::new(100.0, 100.0),
+        ]);
+        assert_eq!(count_bends(&r), 1);
+    }
+
+    #[test]
+    fn count_bends_collinear_counts_zero() {
+        // 共线三点：无拐角
+        let r = polyline_result(vec![
+            Point::new(0.0, 0.0),
+            Point::new(50.0, 0.0),
+            Point::new(100.0, 0.0),
+        ]);
+        assert_eq!(count_bends(&r), 0);
+    }
+
+    #[test]
+    fn count_bends_sampled_smooth_curve_counts_zero() {
+        // 将 90° 圆弧密集采样（半径 100，24 段）：逐顶点转角 ~3.75° < 30°，
+        // 不该被计成折点（消除样条采样度量假象）
+        let mut points = Vec::new();
+        let steps = 24;
+        for i in 0..=steps {
+            let t = i as f64 / steps as f64;
+            let ang = t * std::f64::consts::FRAC_PI_2; // 0 → 90°
+            points.push(Point::new(100.0 * ang.cos(), 100.0 * ang.sin()));
+        }
+        let r = polyline_result(points);
+        assert_eq!(count_bends(&r), 0);
+    }
+
+    #[test]
+    fn count_bends_sharp_reversal_counts_one() {
+        // 近 180° U 型反转：sin→0 但确是尖折，必须仍计入
+        let r = polyline_result(vec![
+            Point::new(0.0, 0.0),
+            Point::new(100.0, 0.0),
+            Point::new(0.0, 1.0),
+        ]);
+        assert_eq!(count_bends(&r), 1);
     }
 }

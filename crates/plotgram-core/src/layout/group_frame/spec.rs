@@ -324,6 +324,19 @@ pub(crate) fn has_explicit_equal_track(diagram: &Diagram) -> bool {
     }
 }
 
+/// 是否由 DSL 显式声明了 `group_frame`（任意 arrangement/preset）。
+///
+/// 供 P1-6 flowchart aspect 自适应判断：仅当用户**未**显式声明时才自动
+/// 择优组间轴向，显式声明（如 `c.swimlane-order-process` 的 `axis: horizontal`）
+/// 一律尊重、不翻转。
+pub(crate) fn has_explicit_group_frame(diagram: &Diagram) -> bool {
+    diagram
+        .attributes
+        .iter()
+        .find(|attribute| attribute.key == dsl::GROUP_FRAME)
+        .is_some_and(|attr| attr.span != crate::ast::Span::dummy())
+}
+
 fn parse_stack_axis(axis: &str) -> Axis {
     match axis.to_ascii_lowercase().as_str() {
         "horizontal" | "h" => Axis::Horizontal,
@@ -398,15 +411,56 @@ fn read_num_option(options: &HashMap<String, AttributeValue>, key: &str) -> Opti
     }
 }
 
+/// P1-4 创新模式 gate：架构图顶层分组二维装箱（shelf packing）。
+///
+/// 默认**关闭**（opt-in）：仅 `PLOTGRAM_ARCH_PACK=1|on|true` 开启，启用行内
+/// shelf 装箱 + 自然宽（Fit）；其余情况（未设/其他值/WASM 无 env 返回 `Err`）
+/// 均走旧竖向单列 + 全局等宽。
+///
+/// 帕累托全量对比结果（showcase 25 架构图）：硬红线 overlap 恒 0 守住、
+/// 跨组边长 −8.6%、最差图（k8s-multi-namespace util 2.8%→4.9%）大幅改善；
+/// 但 `edge_through_groups` 0→3（单图 c.plotgram-core-mod-deps）、util 平均仅
+/// +0.3pp 且 n.d2-cell-tower-network 等小/嵌套图退化。退出判据未干净达成
+/// （through 上升 + util 非显著↑），故默认关 gate 兜底，保留代码供后续调优。
+pub fn architecture_pack_enabled() -> bool {
+    matches!(
+        std::env::var("PLOTGRAM_ARCH_PACK").ok().as_deref(),
+        Some("1") | Some("on") | Some("true")
+    )
+}
+
+/// P1-6 创新模式 gate：flowchart 分组图组间摆放 aspect 自适应轴翻转。
+///
+/// 默认**开启**：`PLOTGRAM_FLOW_ASPECT=0|off|false` 关闭，回退 flowchart
+/// 默认竖向堆叠。WASM 无 env → `Err` → 视为开启。仅影响**未显式声明
+/// `group_frame`** 的分组图。
+///
+/// 帕累托 settle（3 个最差样本，红线 overlap/through 全守 0→0）：aspect_ratio
+/// 全部大幅趋 1.6（e-commerce 4.29→1.06、ci-cd 3.72→1.14、refund 3.62→1.30）；
+/// ci-cd/e-commerce 为干净改善（util↑、边更短或可接受），refund 在 util/
+/// edge_length 上退化。综合主目标全改善 + 红线全守，默认 ON；`=0` 作为回退。
+pub fn flowchart_aspect_enabled() -> bool {
+    !matches!(
+        std::env::var("PLOTGRAM_FLOW_ASPECT").ok().as_deref(),
+        Some("0") | Some("off") | Some("false")
+    )
+}
+
 /// architecture 默认：`Stack(H) + Equal + Center + SharedLines`（同级 sibling 条带）。
 ///
 /// 默认等宽条带；显式 `group_frame { track: fit }` 经配置块覆盖退回内容贴合。
+/// P1-4：packing 开启时默认 `Fit`（保留装箱自然宽，避免全局等宽把行撑爆）；
+/// 显式 `track: equal|uniform` 仍由配置块覆盖回 Equal。
 fn resolve_architecture(diagram: &Diagram) -> GroupFrameSpec {
     GroupFrameSpec {
         arrangement: GroupArrangement::Stack {
             axis: Axis::Horizontal,
         },
-        track_sizing: TrackSizing::Equal,
+        track_sizing: if architecture_pack_enabled() {
+            TrackSizing::Fit
+        } else {
+            TrackSizing::Equal
+        },
         cross_align: CrossAlign::Center,
         gap: ARCH_GROUP_GAP,
         padding: GroupPadding::architecture_v2(),

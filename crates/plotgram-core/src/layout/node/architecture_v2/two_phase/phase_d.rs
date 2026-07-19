@@ -15,7 +15,7 @@ pub(super) fn phase_d_postprocess(
     nodes: &mut HashMap<String, NodeLayout>,
     groups: &mut HashMap<String, GroupLayout>,
     blocks: &[MacroBlock],
-    macro_ranks: &HashMap<String, usize>,
+    block_row: &HashMap<String, usize>,
     graph: &GraphIndex,
     group_map: &GroupMap,
     sizes: &HashMap<String, (f64, f64)>,
@@ -25,7 +25,7 @@ pub(super) fn phase_d_postprocess(
 ) -> LayoutResult {
     // ── 后处理：基础设施行居中 ──
     // 从元数据重建全局层（替代旧版从 y 坐标反推）
-    let layers = rebuild_layers_from_metadata(blocks, macro_ranks);
+    let layers = rebuild_layers_from_metadata(blocks, block_row);
     rebalance_infrastructure_layers(
         diagram,
         graph,
@@ -706,30 +706,30 @@ pub(super) fn nudge_cross_group_y_alignment(
 /// 从元数据重建全局层列表，供基础设施行居中使用
 ///
 /// 旧版 `rebuild_layers_from_positions` 从 y 坐标反推层（依赖 4px epsilon，
-/// 相邻层 y 接近时会误合并）。本版直接从 macro rank + intra layers 元数据
-/// 重建，确定性且无 epsilon 依赖。
+/// 相邻层 y 接近时会误合并）。本版直接从**视觉行号**（P1-4 shelf 装箱产出，
+/// gate 关闭时等于 macro rank）+ intra layers 元数据重建，确定性且无 epsilon 依赖。
 pub(super) fn rebuild_layers_from_metadata(
     blocks: &[MacroBlock],
-    macro_ranks: &HashMap<String, usize>,
+    block_row: &HashMap<String, usize>,
 ) -> Vec<Vec<String>> {
     if blocks.is_empty() {
         return vec![];
     }
 
-    let max_rank = macro_ranks.values().copied().max().unwrap_or(0);
+    let max_row = block_row.values().copied().max().unwrap_or(0);
 
-    // 收集每个 macro rank 下的 block，按 id 排序保证确定性
-    let mut rank_blocks: Vec<Vec<usize>> = vec![Vec::new(); max_rank + 1];
+    // 收集每个视觉行下的 block，按 id 排序保证确定性
+    let mut rank_blocks: Vec<Vec<usize>> = vec![Vec::new(); max_row + 1];
     for (i, b) in blocks.iter().enumerate() {
-        let r = macro_ranks.get(&b.id).copied().unwrap_or(0);
+        let r = block_row.get(&b.id).copied().unwrap_or(0);
         rank_blocks[r].push(i);
     }
     for indices in &mut rank_blocks {
         indices.sort_by(|&a, &b| blocks[a].id.cmp(&blocks[b].id));
     }
 
-    // 同一 macro rank 内，各 block 的 intra layer 0 对齐、layer 1 对齐……
-    // 不同 macro rank 产出独立的全局层
+    // 同一视觉行内，各 block 的 intra layer 0 对齐、layer 1 对齐……
+    // 不同视觉行产出独立的全局层
     let mut global_layers: Vec<Vec<String>> = Vec::new();
     for indices in &rank_blocks {
         if indices.is_empty() {

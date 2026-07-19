@@ -445,6 +445,62 @@ fn topological_sort_groups(
 
 // ─── 分治布局入口 ─────────────────────────────────────────
 
+/// P1-6 自适应目标宽高比（golden）。
+const FLOW_ASPECT_TARGET: f64 = 1.6;
+
+/// P1-6：组间摆放轴向 aspect 自适应择优。
+///
+/// gate 关闭或用户显式声明 `group_frame` 时直接返回 `default_mode`（现状）；
+/// 否则由组内 content 尺寸预估竖/横两种堆叠的 bbox，取归一化宽高比（log 距离）
+/// 更接近 [`FLOW_ASPECT_TARGET`] 的轴向。纯函数（只取 values 的 max/sum，与 key 序无关）。
+fn choose_arrangement_mode(
+    diagram: &Diagram,
+    intra_layouts: &HashMap<String, IntraLayout>,
+    gap: f64,
+    default_mode: ArrangementMode,
+) -> ArrangementMode {
+    if !crate::layout::group_frame::flowchart_aspect_enabled()
+        || crate::layout::group_frame::has_explicit_group_frame(diagram)
+    {
+        return default_mode;
+    }
+    let n = intra_layouts.len();
+    if n < 2 {
+        return default_mode;
+    }
+    let gaps = gap * (n as f64 - 1.0);
+    let max_w = intra_layouts
+        .values()
+        .map(|l| l.content_width)
+        .fold(0.0_f64, f64::max);
+    let sum_w: f64 = intra_layouts.values().map(|l| l.content_width).sum();
+    let max_h = intra_layouts
+        .values()
+        .map(|l| l.content_height)
+        .fold(0.0_f64, f64::max);
+    let sum_h: f64 = intra_layouts.values().map(|l| l.content_height).sum();
+
+    // 归一化宽高比到 target 的 log 距离（对高/宽对称）
+    let dist = |w: f64, h: f64| -> f64 {
+        if w <= 0.0 || h <= 0.0 {
+            return f64::INFINITY;
+        }
+        let ar = (w / h).max(h / w);
+        (ar.ln() - FLOW_ASPECT_TARGET.ln()).abs()
+    };
+
+    // 竖向：宽 = max(content_width)，高 = Σcontent_height + gaps
+    let v_dist = dist(max_w, sum_h + gaps);
+    // 横向：宽 = Σcontent_width + gaps，高 = max(content_height)
+    let h_dist = dist(sum_w + gaps, max_h);
+
+    if h_dist < v_dist {
+        ArrangementMode::Horizontal
+    } else {
+        ArrangementMode::Vertical
+    }
+}
+
 /// flowchart 分治布局入口
 ///
 /// 检测到 diagram 含 group 时调用此函数。无 group 时应走原路径
@@ -497,7 +553,8 @@ pub fn divide_flowchart_with_groups(
     if !ungrouped.is_empty() {
         all_group_ids.push(UNGROUPED_ID.to_string());
     }
-    let (gap, align, mode) = read_arrangement_config(diagram);
+    let (gap, align, default_mode) = read_arrangement_config(diagram);
+    let mode = choose_arrangement_mode(diagram, &intra_layouts, gap, default_mode);
     let arrangement = StackingArrangement::new(gap, align, mode);
     let order = topological_sort_groups(&all_group_ids, &cross_edges);
     let offsets = arrangement.arrange(&all_group_ids, &intra_layouts, &cross_edges);
@@ -917,14 +974,18 @@ mod tests {
         assert!(result.groups.contains_key("g1"));
         assert!(result.groups.contains_key("g2"));
 
-        // 验证：group 包围框不重叠（g1 在 g2 上方）
+        // 验证：group 包围框不重叠（轴向无关；P1-6 aspect 自适应下两个等尺寸
+        // group 会横向并排，故不再钉死 g1 在 g2 上方，只校验矩形不相交）。
         let g1 = &result.groups["g1"];
         let g2 = &result.groups["g2"];
+        let disjoint = g1.x + g1.width <= g2.x + f64::EPSILON
+            || g2.x + g2.width <= g1.x + f64::EPSILON
+            || g1.y + g1.height <= g2.y + f64::EPSILON
+            || g2.y + g2.height <= g1.y + f64::EPSILON;
         assert!(
-            g1.y + g1.height <= g2.y,
-            "g1 bottom ({}) should be <= g2 top ({})",
-            g1.y + g1.height,
-            g2.y
+            disjoint,
+            "group bboxes should not overlap: g1=({},{},{},{}) g2=({},{},{},{})",
+            g1.x, g1.y, g1.width, g1.height, g2.x, g2.y, g2.width, g2.height
         );
 
         // 验证：总尺寸合理

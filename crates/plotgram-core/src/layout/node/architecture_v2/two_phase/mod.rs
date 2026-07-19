@@ -181,7 +181,7 @@ pub(super) fn compute_two_phase_layout(
     let sizing = parse_group_sizing(diagram);
     // Phase 1：two_phase 只输出 content-fit 初值；Equal/Uniform 仅由 L1 GroupFramePass 执行。
 
-    position_macro_blocks(
+    let block_row = position_macro_blocks(
         &mut blocks,
         &macro_ranks,
         &super_edges,
@@ -214,7 +214,7 @@ pub(super) fn compute_two_phase_layout(
         &mut nodes,
         &mut groups,
         &blocks,
-        &macro_ranks,
+        &block_row,
         graph,
         group_map,
         sizes,
