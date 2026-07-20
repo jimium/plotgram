@@ -1,0 +1,26 @@
+// 视频流会话时序：鉴权 → 拉流 → 自适应码率 → CDN 分发
+// 业务场景: 在线视频点播的播放会话建立与自适应码率切换
+// Mermaid 对照: 复杂 sequenceDiagram 多组件流媒体
+// @role: demo  (authoritative: filename prefix)
+diagram sequence {
+    title: "视频流播放会话时序"
+
+    entity[actor] viewer "观众"
+    entity[boundary] player "播放器"
+    entity[control] auth "鉴权服务"
+    entity[control] cdn "CDN 边缘节点"
+    entity[control] origin "源站"
+
+    viewer -> player "1. 点击播放"
+    player -> auth "2. 请求播放凭证"
+    auth --> player "3. 返回签名 URL"
+    player -> cdn "4. 请求 m3u8 索引"
+    cdn -> origin "5. 回源拉取索引"
+    origin --> cdn "6. 返回索引"
+    cdn --> player "7. 下发索引"
+    player -> cdn "8. 请求高清分片"
+    cdn --> player "9. 返回分片"
+    player -> cdn "10. 网络下降，请求低清分片"
+    cdn --> player "11. 返回低清分片"
+    player --> viewer "12. 流畅播放"
+}

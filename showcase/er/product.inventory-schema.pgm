@@ -1,0 +1,37 @@
+// 库存管理 ER 模型：仓库 / 商品 / 库存 / 出入库单
+// 业务场景: 电商仓储库存系统的数据模型
+// Mermaid 对照: erDiagram 多实体关系
+// @role: product  (authoritative: filename prefix)
+diagram er {
+    title: "库存管理数据模型"
+
+    entity[database] warehouse "Warehouse" {
+        meta.pk: "id"
+        meta.fields: "name\nlocation"
+    }
+    entity[database] product "Product" {
+        meta.pk: "id"
+        meta.fields: "sku\nname\nprice"
+    }
+    entity[database] stock "Stock" {
+        meta.pk: "id"
+        meta.fields: "fk.warehouse_id\nfk.product_id\nquantity"
+    }
+    entity[database] inbound "InboundOrder" {
+        meta.pk: "id"
+        meta.fk: "warehouse_id"
+        meta.fields: "supplier\nstatus"
+    }
+    entity[database] outbound "OutboundOrder" {
+        meta.pk: "id"
+        meta.fk: "warehouse_id"
+        meta.fields: "customer\nstatus"
+    }
+
+    warehouse -> stock "存放" { cardinality: "1:N" }
+    product -> stock "库存项" { cardinality: "1:N" }
+    warehouse -> inbound "入库" { cardinality: "1:N" }
+    warehouse -> outbound "出库" { cardinality: "1:N" }
+    product -> inbound "入库明细" { cardinality: "1:N" }
+    product -> outbound "出库明细" { cardinality: "1:N" }
+}

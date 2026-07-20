@@ -1,0 +1,25 @@
+// 短信验证码登录时序：请求验证码 → 校验 → 签发登录态
+// 业务场景: 移动 App 手机号验证码免密登录
+// Mermaid 对照: sequenceDiagram 含第三方短信网关
+// @role: product  (authoritative: filename prefix)
+diagram sequence {
+    title: "短信验证码登录时序"
+
+    entity[actor] user "用户"
+    entity[boundary] app "移动 App"
+    entity[control] auth "认证服务"
+    entity[database] otp_store "验证码缓存"
+    entity[control] sms "短信网关"
+
+    user -> app "1. 输入手机号"
+    app -> auth "2. 请求验证码"
+    auth -> otp_store "3. 生成并缓存验证码"
+    auth -> sms "4. 调用短信下发"
+    sms --> user "5. 收到短信验证码"
+    user -> app "6. 输入验证码"
+    app -> auth "7. 提交手机号与验证码"
+    auth -> otp_store "8. 比对验证码"
+    otp_store --> auth "9. 校验通过"
+    auth --> app "10. 签发登录 Token"
+    app --> user "11. 登录成功"
+}

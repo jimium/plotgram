@@ -1,0 +1,42 @@
+// 市场营销计划思维导图：渠道 / 内容 / 预算 / 复盘
+// 业务场景: 市场团队年度营销计划的结构化脑图
+// Mermaid 对照: mindmap 分类展开
+// @role: product  (authoritative: filename prefix)
+diagram mindmap {
+    title: "市场营销计划"
+
+    entity[root] plan "营销计划"
+
+    entity[main] channel "推广渠道"
+    entity[branch] seo "搜索引擎"
+    entity[branch] social "社交媒体"
+    entity[branch] offline "线下活动"
+
+    entity[main] content "内容策略"
+    entity[branch] blog "博客文章"
+    entity[branch] video "短视频"
+    entity[branch] case "客户案例"
+
+    entity[main] budget "预算分配"
+    entity[leaf] ad_spend "广告投放"
+    entity[leaf] event_cost "活动费用"
+
+    entity[main] review "效果复盘"
+    entity[branch] roi "投产比"
+    entity[branch] lead "线索转化"
+
+    plan -> channel
+    plan -> content
+    plan -> budget
+    plan -> review
+    channel -> seo
+    channel -> social
+    channel -> offline
+    content -> blog
+    content -> video
+    content -> case
+    budget -> ad_spend
+    budget -> event_cost
+    review -> roi
+    review -> lead
+}

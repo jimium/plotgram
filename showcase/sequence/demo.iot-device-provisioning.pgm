@@ -1,0 +1,26 @@
+// IoT 设备接入时序：激活 → 注册 → 证书下发 → 建立连接
+// 业务场景: 物联网设备首次上电的接入与安全认证流程
+// Mermaid 对照: 复杂 sequenceDiagram 多组件设备接入
+// @role: demo  (authoritative: filename prefix)
+diagram sequence {
+    title: "IoT 设备接入时序"
+
+    entity[actor] device "IoT 设备"
+    entity[boundary] gateway "接入网关"
+    entity[control] registry "设备注册中心"
+    entity[control] ca "证书服务"
+    entity[control] broker "MQTT Broker"
+
+    device -> gateway "1. 上电激活请求"
+    gateway -> registry "2. 校验设备指纹"
+    registry --> gateway "3. 设备已白名单"
+    gateway -> ca "4. 申请设备证书"
+    ca --> gateway "5. 下发证书与密钥"
+    gateway --> device "6. 返回接入凭证"
+    device -> broker "7. TLS 建立 MQTT 连接"
+    broker -> registry "8. 校验证书状态"
+    registry --> broker "9. 证书有效"
+    broker --> device "10. 连接建立成功"
+    device -> broker "11. 上报遥测数据"
+    broker --> device "12. 下发控制指令"
+}

@@ -188,7 +188,7 @@ raise stress (expected): …探针可接受…；残余: stress.layout-stress-ne
 
 | 角色集 | 文件 |
 |--------|------|
-| product-gate | [`benchmarks/sets/product-regression-set.txt`](../../../benchmarks/sets/product-regression-set.txt)（18 张） |
+| product-gate | [`benchmarks/sets/product-regression-set.txt`](../../../benchmarks/sets/product-regression-set.txt)（26 张） |
 | stress-probe | [`benchmarks/sets/stress-probe-set.txt`](../../../benchmarks/sets/stress-probe-set.txt)（6 张 `stress.*`） |
 | mech-set | [`benchmarks/sets/mech-set.txt`](../../../benchmarks/sets/mech-set.txt) |
 | demo-observe | [`benchmarks/sets/demo-observe-set.txt`](../../../benchmarks/sets/demo-observe-set.txt) |

@@ -1,0 +1,24 @@
+// 订阅生命周期状态机：试用 → 生效 → 续费 / 逾期 / 取消
+// 业务场景: SaaS 订阅计费的订阅状态流转
+// Mermaid 对照: stateDiagram-v2 订阅状态
+// @role: product  (authoritative: filename prefix)
+diagram state {
+    title: "订阅生命周期"
+
+    entity[initial] init ""
+    entity[state] trial "试用期"
+    entity[state] active "已生效"
+    entity[state] past_due "逾期未付"
+    entity[state] suspended "已暂停"
+    entity[final] cancelled "已取消"
+
+    init -> trial
+    trial -> active "试用转付费"
+    trial -> cancelled "试用到期未付"
+    active -> past_due "扣款失败"
+    active -> cancelled "用户主动取消"
+    past_due -> active "补缴成功"
+    past_due -> suspended "宽限期结束"
+    suspended -> active "恢复订阅"
+    suspended -> cancelled "长期未付销户"
+}

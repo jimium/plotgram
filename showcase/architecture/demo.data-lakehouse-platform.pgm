@@ -1,0 +1,60 @@
+// 数据湖仓平台架构：接入 → 存储 → 计算 → 服务
+// 业务场景: 企业级数据湖仓一体（Lakehouse）平台的分层拓扑
+// Mermaid 对照: 复杂 graph + 多 subgraph 数据平台
+// @role: demo  (authoritative: filename prefix)
+diagram architecture {
+    title: "数据湖仓一体平台"
+    layout: architecture
+    edge_routing: orthogonal
+    theme: common.clean-light
+
+    group ingest "数据接入" {
+        entity[external] app_db "业务库" {
+            semantic: mysql
+        }
+        entity[external] logs "日志源"
+        entity[queue] kafka "Kafka" {
+            semantic: kafka
+        }
+        entity[service] cdc "CDC 采集"
+    }
+
+    group storage "湖仓存储" {
+        entity[storage] lake "数据湖" {
+            semantic: s3
+        }
+        entity[storage] iceberg "表格式层"
+        entity[database] warehouse "数据仓库" {
+            semantic: clickhouse
+        }
+    }
+
+    group compute "计算引擎" {
+        entity[service] spark "批处理" {
+            semantic: spark
+        }
+        entity[service] flink "流处理" {
+            semantic: flink
+        }
+    }
+
+    group serve "数据服务" {
+        entity[service] bi "BI 报表"
+        entity[service] api "数据 API"
+        entity[frontend] dashboard "数据看板"
+    }
+
+    app_db -> cdc "变更捕获"
+    cdc -> kafka "写入"
+    logs -> kafka "采集"
+    kafka -> flink "实时消费"
+    kafka -> lake "落地原始层"
+    lake -> iceberg "构建表"
+    iceberg -> spark "批量计算"
+    spark -> warehouse "写入宽表"
+    flink -> warehouse "实时更新"
+    warehouse -> bi "分析查询"
+    warehouse -> api "数据接口"
+    bi -> dashboard "展示"
+    api -> dashboard "取数"
+}

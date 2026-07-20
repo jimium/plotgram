@@ -1,0 +1,25 @@
+// 文件上传对象存储时序：预签名直传 + 回调确认
+// 业务场景: Web 应用大文件上传，采用预签名 URL 直传对象存储
+// Mermaid 对照: sequenceDiagram 前端直传 + 服务回调
+// @role: product  (authoritative: filename prefix)
+diagram sequence {
+    title: "文件上传对象存储时序"
+
+    entity[actor] user "用户"
+    entity[boundary] web "Web 前端"
+    entity[control] api "上传服务"
+    entity[database] metadb "元数据库"
+    entity[control] oss "对象存储"
+
+    user -> web "1. 选择文件"
+    web -> api "2. 申请预签名 URL"
+    api -> metadb "3. 创建上传记录"
+    metadb --> api "4. 记录已创建"
+    api --> web "5. 返回预签名 URL"
+    web -> oss "6. 直传文件内容"
+    oss --> web "7. 上传完成"
+    web -> api "8. 通知上传完成"
+    api -> metadb "9. 更新状态为已完成"
+    api --> web "10. 返回文件访问地址"
+    web --> user "11. 展示上传成功"
+}

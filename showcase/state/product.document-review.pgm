@@ -1,0 +1,24 @@
+// 文档审阅状态机：草稿 → 评审 → 发布 / 退回
+// 业务场景: 内容管理系统的文档审批发布状态
+// Mermaid 对照: stateDiagram-v2 审批流转
+// @role: product  (authoritative: filename prefix)
+diagram state {
+    title: "文档审阅状态"
+
+    entity[initial] init ""
+    entity[state] draft "草稿"
+    entity[state] in_review "评审中"
+    entity[choice] decision "评审结论"
+    entity[state] approved "已批准"
+    entity[state] published "已发布"
+    entity[final] archived "已归档"
+
+    init -> draft
+    draft -> in_review "提交评审"
+    in_review -> decision
+    decision -> approved "通过"
+    decision -> draft "退回修改"
+    approved -> published "发布上线"
+    published -> archived "下线归档"
+    published -> draft "撤回再编辑"
+}

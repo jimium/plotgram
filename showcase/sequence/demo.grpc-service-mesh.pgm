@@ -1,0 +1,24 @@
+// gRPC 服务网格调用时序：Sidecar 拦截 + mTLS + 熔断
+// 业务场景: Service Mesh（Istio 风格）下服务间 gRPC 调用的流量治理
+// Mermaid 对照: 复杂 sequenceDiagram Sidecar 代理链路
+// @role: demo  (authoritative: filename prefix)
+diagram sequence {
+    title: "gRPC 服务网格调用时序"
+
+    entity[control] client "客户端服务"
+    entity[boundary] client_proxy "客户端 Sidecar"
+    entity[boundary] server_proxy "服务端 Sidecar"
+    entity[control] server "服务端服务"
+    entity[control] control_plane "控制平面"
+
+    control_plane -> client_proxy "1. 下发路由规则"
+    control_plane -> server_proxy "2. 下发 mTLS 证书"
+    client -> client_proxy "3. gRPC 调用 (本地回环)"
+    client_proxy -> server_proxy "4. mTLS 加密转发"
+    server_proxy -> server "5. 转发到业务"
+    server --> server_proxy "6. 返回响应"
+    server_proxy --> client_proxy "7. 加密回传"
+    client_proxy --> client "8. 返回结果"
+    client_proxy --> control_plane "9. 上报调用指标"
+    server_proxy --> control_plane "10. 上报调用指标"
+}

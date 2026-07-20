@@ -1,0 +1,36 @@
+// CRM 客户关系 ER 模型：客户 / 联系人 / 商机 / 活动
+// 业务场景: 销售 CRM 系统的核心数据模型
+// Mermaid 对照: erDiagram 多实体关系
+// @role: product  (authoritative: filename prefix)
+diagram er {
+    title: "CRM 客户关系模型"
+
+    entity[database] account "Account" {
+        meta.pk: "id"
+        meta.fields: "name\nindustry"
+    }
+    entity[database] contact "Contact" {
+        meta.pk: "id"
+        meta.fk: "account_id"
+        meta.fields: "name\nemail\nphone"
+    }
+    entity[database] opportunity "Opportunity" {
+        meta.pk: "id"
+        meta.fk: "account_id"
+        meta.fields: "amount\nstage"
+    }
+    entity[database] activity "Activity" {
+        meta.pk: "id"
+        meta.fields: "fk.contact_id\ntype\ndue_date"
+    }
+    entity[database] sales_rep "SalesRep" {
+        meta.pk: "id"
+        meta.fields: "name\nteam"
+    }
+
+    account -> contact "联系人" { cardinality: "1:N" }
+    account -> opportunity "商机" { cardinality: "1:N" }
+    contact -> activity "跟进" { cardinality: "1:N" }
+    sales_rep -> account "负责" { cardinality: "1:N" }
+    sales_rep -> opportunity "推进" { cardinality: "1:N" }
+}

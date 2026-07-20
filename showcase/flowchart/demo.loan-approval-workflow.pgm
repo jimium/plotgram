@@ -1,0 +1,54 @@
+// 贷款审批工作流：申请 → 风控 → 授信 → 放款
+// 业务场景: 消费金融贷款自动化审批全链路，含反欺诈与人工复核
+// Mermaid 对照: 复杂 graph TD，含 group 分段与多决策回环
+// @role: demo  (authoritative: filename prefix)
+diagram flowchart {
+    title: "贷款审批工作流"
+    config {
+        direction: top-to-bottom
+    }
+
+    group intake "受理阶段" {
+        entity[start] apply "提交贷款申请"
+        entity[process] collect "采集资料"
+        entity[decision] complete_gate "资料是否完整？"
+        entity[process] supplement "补充材料"
+    }
+
+    group risk "风控阶段" {
+        entity[process] anti_fraud "反欺诈校验"
+        entity[decision] fraud_gate "是否命中欺诈？"
+        entity[process] credit_score "信用评分"
+        entity[decision] score_gate "评分是否达标？"
+        entity[process] manual_review "人工复核"
+        entity[decision] manual_gate "复核结论？"
+    }
+
+    group grant "授信放款" {
+        entity[process] set_limit "核定额度"
+        entity[process] sign "电子签约"
+        entity[process] disburse "放款到账"
+        entity[end] approved "放款完成"
+        entity[end] rejected "申请拒绝"
+    }
+
+    apply -> collect
+    collect -> complete_gate
+    complete_gate -> anti_fraud "完整"
+    complete_gate -> supplement "缺失"
+    supplement -> collect "补齐后重提"
+
+    anti_fraud -> fraud_gate
+    fraud_gate -> rejected "命中"
+    fraud_gate -> credit_score "通过"
+    credit_score -> score_gate
+    score_gate -> set_limit "达标"
+    score_gate -> manual_review "临界"
+    manual_review -> manual_gate
+    manual_gate -> set_limit "通过"
+    manual_gate -> rejected "拒绝"
+
+    set_limit -> sign
+    sign -> disburse
+    disburse -> approved
+}

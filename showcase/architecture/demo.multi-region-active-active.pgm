@@ -1,0 +1,53 @@
+// 多区域双活架构：两地数据中心 + 全局流量调度 + 数据同步
+// 业务场景: 高可用多区域（Active-Active）容灾部署拓扑
+// Mermaid 对照: 复杂 graph + 多 subgraph 双活容灾
+// @role: demo  (authoritative: filename prefix)
+diagram architecture {
+    title: "多区域双活架构"
+    layout: architecture
+    edge_routing: orthogonal
+    theme: common.clean-light
+
+    group global "全局接入" {
+        entity[frontend] client "用户" {
+            semantic: user
+        }
+        entity[gateway] gslb "全局流量调度" {
+            semantic: nginx
+        }
+    }
+
+    group region_a "区域 A（华东）" {
+        entity[gateway] lb_a "区域负载均衡"
+        entity[service] app_a "应用集群 A"
+        entity[database] db_a "主数据库 A" {
+            semantic: postgres
+        }
+        entity[cache] cache_a "缓存 A" {
+            semantic: redis
+        }
+    }
+
+    group region_b "区域 B（华北）" {
+        entity[gateway] lb_b "区域负载均衡"
+        entity[service] app_b "应用集群 B"
+        entity[database] db_b "主数据库 B" {
+            semantic: postgres
+        }
+        entity[cache] cache_b "缓存 B" {
+            semantic: redis
+        }
+    }
+
+    client -> gslb "就近解析"
+    gslb -> lb_a "路由到 A"
+    gslb -> lb_b "路由到 B"
+    lb_a -> app_a
+    lb_b -> app_b
+    app_a -> db_a "读写"
+    app_a -> cache_a
+    app_b -> db_b "读写"
+    app_b -> cache_b
+    db_a --> db_b "双向数据同步"
+    db_b --> db_a "双向数据同步"
+}

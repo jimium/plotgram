@@ -1,0 +1,37 @@
+// 监控告警栈架构：采集 → 存储 → 可视化 → 告警
+// 业务场景: 生产环境可观测性与告警链路
+// Mermaid 对照: graph + 监控组件拓扑与虚线上报
+// @role: product  (authoritative: filename prefix)
+diagram architecture {
+    title: "监控告警栈架构"
+    layout: architecture
+    edge_routing: orthogonal
+    theme: common.clean-light
+
+    group targets "被监控目标" {
+        entity[service] app "业务服务"
+        entity[service] node "主机 Node"
+    }
+
+    group collect "采集与存储" {
+        entity[service] prom "Prometheus" {
+            semantic: prometheus
+        }
+        entity[storage] tsdb "时序存储"
+    }
+
+    group visualize "可视化与告警" {
+        entity[frontend] grafana "Grafana" {
+            semantic: grafana
+        }
+        entity[service] alert "Alertmanager"
+        entity[external] notify "告警通道"
+    }
+
+    app --> prom "暴露指标"
+    node --> prom "暴露指标"
+    prom -> tsdb "持久化"
+    prom -> grafana "数据源"
+    prom -> alert "触发告警规则"
+    alert -> notify "推送通知"
+}

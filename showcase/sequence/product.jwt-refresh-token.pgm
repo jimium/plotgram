@@ -1,0 +1,24 @@
+// JWT 令牌刷新时序：Access Token 过期后用 Refresh Token 续期
+// 业务场景: 前后端分离应用的无感刷新登录态
+// Mermaid 对照: sequenceDiagram 多参与者 Token 续期
+// @role: product  (authoritative: filename prefix)
+diagram sequence {
+    title: "JWT 令牌刷新时序"
+
+    entity[actor] user "用户"
+    entity[boundary] spa "前端应用"
+    entity[control] api "业务 API"
+    entity[control] auth "认证服务"
+    entity[database] store "Token 存储"
+
+    user -> spa "1. 发起业务操作"
+    spa -> api "2. 携带 Access Token 请求"
+    api --> spa "3. 401 Token 已过期"
+    spa -> auth "4. 提交 Refresh Token"
+    auth -> store "5. 校验 Refresh Token"
+    store --> auth "6. 校验通过"
+    auth --> spa "7. 下发新 Access Token"
+    spa -> api "8. 重试业务请求"
+    api --> spa "9. 返回业务数据"
+    spa --> user "10. 展示结果"
+}

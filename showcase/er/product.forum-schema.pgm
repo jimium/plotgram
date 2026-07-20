@@ -1,0 +1,35 @@
+// 论坛社区 ER 模型：用户 / 版块 / 主题 / 回帖 / 点赞
+// 业务场景: 社区论坛系统的数据模型
+// Mermaid 对照: erDiagram 多实体关系
+// @role: product  (authoritative: filename prefix)
+diagram er {
+    title: "论坛社区数据模型"
+
+    entity[database] member "Member" {
+        meta.pk: "id"
+        meta.fields: "username\nreputation"
+    }
+    entity[database] board "Board" {
+        meta.pk: "id"
+        meta.fields: "name\ncategory"
+    }
+    entity[database] topic "Topic" {
+        meta.pk: "id"
+        meta.fields: "fk.board_id\nfk.member_id\ntitle"
+    }
+    entity[database] reply "Reply" {
+        meta.pk: "id"
+        meta.fields: "fk.topic_id\nfk.member_id\ncontent"
+    }
+    entity[database] vote "Vote" {
+        meta.pk: "id"
+        meta.fields: "fk.reply_id\nfk.member_id\nvalue"
+    }
+
+    board -> topic "包含" { cardinality: "1:N" }
+    member -> topic "发布" { cardinality: "1:N" }
+    topic -> reply "回帖" { cardinality: "1:N" }
+    member -> reply "回复" { cardinality: "1:N" }
+    reply -> vote "获赞" { cardinality: "1:N" }
+    member -> vote "点赞" { cardinality: "1:N" }
+}

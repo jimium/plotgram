@@ -1,0 +1,40 @@
+// 产品需求梳理思维导图：目标 / 用户 / 功能 / 指标
+// 业务场景: 产品经理梳理需求文档（PRD）的结构化脑图
+// Mermaid 对照: mindmap 分类展开
+// @role: product  (authoritative: filename prefix)
+diagram mindmap {
+    title: "产品需求梳理"
+
+    entity[root] prd "产品需求"
+
+    entity[main] goal "目标与背景"
+    entity[branch] problem "待解决问题"
+    entity[branch] value "业务价值"
+
+    entity[main] users "目标用户"
+    entity[branch] persona "用户画像"
+    entity[branch] scenario "使用场景"
+
+    entity[main] features "功能范围"
+    entity[branch] must "核心功能"
+    entity[branch] nice "增强功能"
+    entity[leaf] out_scope "本期不做"
+
+    entity[main] metrics "成功指标"
+    entity[branch] north_star "北极星指标"
+    entity[branch] guardrail "护栏指标"
+
+    prd -> goal
+    prd -> users
+    prd -> features
+    prd -> metrics
+    goal -> problem
+    goal -> value
+    users -> persona
+    users -> scenario
+    features -> must
+    features -> nice
+    features -> out_scope
+    metrics -> north_star
+    metrics -> guardrail
+}

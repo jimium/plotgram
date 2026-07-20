@@ -1,0 +1,25 @@
+// 购物车结算时序：库存校验 → 下单 → 支付 → 扣减
+// 业务场景: 电商购物车提交订单的核心结算链路
+// Mermaid 对照: sequenceDiagram 多服务结算
+// @role: product  (authoritative: filename prefix)
+diagram sequence {
+    title: "购物车结算时序"
+
+    entity[actor] user "用户"
+    entity[boundary] cart "购物车页"
+    entity[control] order "订单服务"
+    entity[control] inventory "库存服务"
+    entity[control] payment "支付服务"
+
+    user -> cart "1. 点击结算"
+    cart -> order "2. 创建订单"
+    order -> inventory "3. 校验并锁定库存"
+    inventory --> order "4. 库存锁定成功"
+    order --> cart "5. 返回待支付订单"
+    cart -> payment "6. 发起支付"
+    payment --> cart "7. 支付成功"
+    payment -> order "8. 通知支付完成"
+    order -> inventory "9. 扣减库存"
+    inventory --> order "10. 扣减完成"
+    order --> user "11. 下单成功"
+}

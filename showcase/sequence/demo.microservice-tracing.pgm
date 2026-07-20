@@ -1,0 +1,26 @@
+// 微服务分布式追踪时序：一次请求跨多服务的链路埋点
+// 业务场景: 微服务架构下 OpenTelemetry 全链路追踪采集
+// Mermaid 对照: 复杂 sequenceDiagram 多服务 + Trace 上报
+// @role: demo  (authoritative: filename prefix)
+diagram sequence {
+    title: "微服务分布式追踪时序"
+
+    entity[actor] user "用户"
+    entity[boundary] gateway "API 网关"
+    entity[control] order "订单服务"
+    entity[control] inventory "库存服务"
+    entity[control] payment "支付服务"
+    entity[database] collector "追踪收集器"
+
+    user -> gateway "1. 下单请求 (生成 TraceId)"
+    gateway -> order "2. 转发 (透传 span)"
+    order -> inventory "3. 查询库存 (子 span)"
+    inventory --> order "4. 库存充足"
+    order -> payment "5. 发起扣款 (子 span)"
+    payment --> order "6. 扣款成功"
+    order --> gateway "7. 下单完成"
+    gateway --> user "8. 返回结果"
+    order --> collector "9. 上报 span"
+    inventory --> collector "10. 上报 span"
+    payment --> collector "11. 上报 span"
+}

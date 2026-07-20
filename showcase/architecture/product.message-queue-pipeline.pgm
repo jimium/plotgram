@@ -1,0 +1,41 @@
+// 消息队列异步处理架构：生产者 → 队列 → 消费者
+// 业务场景: 订单系统削峰填谷的异步解耦拓扑
+// Mermaid 对照: graph + 队列中枢
+// @role: product  (authoritative: filename prefix)
+diagram architecture {
+    title: "消息队列异步处理架构"
+    layout: architecture
+    edge_routing: orthogonal
+    theme: common.clean-light
+
+    group producer "生产端" {
+        entity[service] order_svc "订单服务"
+        entity[service] user_svc "用户服务"
+    }
+
+    group broker "消息中间件" {
+        entity[queue] kafka "Kafka" {
+            semantic: kafka
+        }
+    }
+
+    group consumer "消费端" {
+        entity[service] email_svc "邮件服务"
+        entity[service] point_svc "积分服务"
+        entity[service] stat_svc "统计服务"
+    }
+
+    group store "持久化" {
+        entity[database] db "PostgreSQL" {
+            semantic: postgres
+        }
+    }
+
+    order_svc -> kafka "发布 order.created"
+    user_svc -> kafka "发布 user.registered"
+    kafka -> email_svc "订阅"
+    kafka -> point_svc "订阅"
+    kafka -> stat_svc "订阅"
+    point_svc -> db "写积分"
+    stat_svc -> db "写统计"
+}

@@ -1,7 +1,6 @@
 # Product-gate：日常质量硬门禁（精选）
 # 路径相对仓库根目录。宣称「无退化」默认只引用本集。
 # 文件名角色 = product；本清单只挑选进硬门禁的子集。
-# 来源：docs/architecture/重构方案/casev2/gates/product-regression-set.txt
 
 # --- architecture ---
 showcase/architecture/product.three-tier.pgm
@@ -10,25 +9,33 @@ showcase/architecture/product.microservices.pgm
 showcase/architecture/product.cdn-cache.pgm
 showcase/architecture/product.cloud-native.pgm
 showcase/architecture/product.ecommerce-platform.pgm
+showcase/architecture/product.message-queue-pipeline.pgm
+showcase/architecture/product.monitoring-stack.pgm
 
 # --- flowchart ---
 showcase/flowchart/product.linear-chain.pgm
 showcase/flowchart/product.user-auth.pgm
 showcase/flowchart/product.refund-process.pgm
 showcase/flowchart/product.swimlane-order-process.pgm
+showcase/flowchart/product.password-reset.pgm
+showcase/flowchart/product.leave-approval-process.pgm
 
 # --- sequence ---
 showcase/sequence/product.oauth-login.pgm
 showcase/sequence/product.payment-gateway.pgm
+showcase/sequence/product.sms-verification.pgm
+showcase/sequence/product.jwt-refresh-token.pgm
 
 # --- state ---
 showcase/state/product.order-lifecycle.pgm
 showcase/state/product.user-session.pgm
 showcase/state/product.payment-flow.pgm
+showcase/state/product.delivery-tracking.pgm
 
 # --- er ---
 showcase/er/product.blog-schema.pgm
 showcase/er/product.saas-schema.pgm
+showcase/er/product.crm-schema.pgm
 
 # --- mindmap ---
 showcase/mindmap/product.tech-stack.pgm
