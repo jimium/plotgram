@@ -7,6 +7,11 @@ use crate::layout::GroupLayout;
 
 use super::constants::EPS;
 
+/// 组间走廊最小间隙宽度（像素）。
+/// Phase A 优化：当两组间隙 < 此值时不生成走廊，迫使边路由走外环绕过组对，
+/// 而非挤入窄缝贴组边框走。
+const MIN_CORRIDOR_GAP: f64 = 44.0;
+
 /// 组间优先路由走廊方向。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
 pub enum CorridorAxis {
@@ -264,7 +269,7 @@ fn push_corridor_between(
 
     if y_overlap && a.2 <= b.0 - EPS {
         let gap = b.0 - a.2;
-        if gap < f64::INFINITY {
+        if gap >= MIN_CORRIDOR_GAP {
             out.push(GroupCorridor {
                 axis: CorridorAxis::Vertical,
                 coord: a.2 + gap * 0.5,
@@ -276,7 +281,7 @@ fn push_corridor_between(
         }
     } else if y_overlap && b.2 <= a.0 - EPS {
         let gap = a.0 - b.2;
-        if gap < f64::INFINITY {
+        if gap >= MIN_CORRIDOR_GAP {
             out.push(GroupCorridor {
                 axis: CorridorAxis::Vertical,
                 coord: b.2 + gap * 0.5,
@@ -290,7 +295,7 @@ fn push_corridor_between(
 
     if x_overlap && a.3 <= b.1 - EPS {
         let gap = b.1 - a.3;
-        if gap < f64::INFINITY {
+        if gap >= MIN_CORRIDOR_GAP {
             out.push(GroupCorridor {
                 axis: CorridorAxis::Horizontal,
                 coord: a.3 + gap * 0.5,
@@ -302,7 +307,7 @@ fn push_corridor_between(
         }
     } else if x_overlap && b.3 <= a.1 - EPS {
         let gap = a.1 - b.3;
-        if gap < f64::INFINITY {
+        if gap >= MIN_CORRIDOR_GAP {
             out.push(GroupCorridor {
                 axis: CorridorAxis::Horizontal,
                 coord: b.3 + gap * 0.5,
@@ -426,7 +431,7 @@ mod tests {
             "data_subnet".to_string(),
             GroupLayout {
                 x: 10.0,
-                y: 180.0,
+                y: 190.0,
                 width: 180.0,
                 height: 100.0,
             },
@@ -557,7 +562,7 @@ mod tests {
         groups.insert(
             "b".to_string(),
             GroupLayout {
-                x: 140.0,
+                x: 150.0,
                 y: 20.0,
                 width: 80.0,
                 height: 80.0,
@@ -566,7 +571,7 @@ mod tests {
         let corridors = build_corridors_from_groups(&groups);
         assert_eq!(corridors.len(), 1);
         assert_eq!(corridors[0].axis, CorridorAxis::Vertical);
-        assert!((corridors[0].coord - 120.0).abs() < EPS);
+        assert!((corridors[0].coord - 125.0).abs() < EPS);
     }
 
     #[test]
@@ -584,7 +589,7 @@ mod tests {
         groups.insert(
             "b".to_string(),
             GroupLayout {
-                x: 140.0,
+                x: 150.0,
                 y: 20.0,
                 width: 80.0,
                 height: 80.0,
@@ -602,7 +607,7 @@ mod tests {
         let merged = merge_corridors(&injected, &groups);
         assert_eq!(merged.len(), 1);
         assert!(
-            (merged[0].coord - 120.0).abs() < EPS,
+            (merged[0].coord - 125.0).abs() < EPS,
             "geometry mid-gap should win, got {}",
             merged[0].coord
         );

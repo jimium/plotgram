@@ -103,7 +103,8 @@ pub(super) use crate::layout::constants::ORTHO_SLOT_PITCH as SLOT_PITCH;
 pub const COMPACT_SLOT_PITCH: f64 = 16.0;
 
 /// 侧通道绕行时距障碍节点的留白
-pub(super) const CHANNEL_MARGIN: f64 = 18.0;
+/// Phase A 优化：18→24，给回环边和侧通道边更多空间。
+pub(super) const CHANNEL_MARGIN: f64 = 24.0;
 
 pub(crate) const ORTHOGONAL_OPTIONS: &[AlgorithmOptionSpec] = &[
     AlgorithmOptionSpec {
@@ -230,7 +231,12 @@ pub(super) use crate::layout::constants::ORTHO_PARALLEL_GAP as EDGE_PARALLEL_GAP
 /// A2：单一来源见 `constants::STUB_GUARD_LENGTH`。
 pub(super) use crate::layout::constants::STUB_GUARD_LENGTH;
 /// 每个折点的惩罚（鼓励更少拐弯）
-pub(super) const BEND_PENALTY: f64 = 16.0;
+/// Phase A 优化：16→28，使 scorer 更强烈偏好少弯折路径。
+pub(super) const BEND_PENALTY: f64 = 28.0;
+
+/// 首段弯折额外惩罚：出发后第一段就折弯（首段长 < PORT_CLEARANCE*2）时的额外惩罚。
+/// 视觉上“出发即折”最刺眼，额外加重。
+pub(super) const FIRST_BEND_EXTRA_PENALTY: f64 = 20.0;
 
 /// 侧通道距障碍节点的最小留白（即便被分组边框挤压也要保留）
 pub(super) const MIN_CHANNEL_CLEARANCE: f64 = 10.0;

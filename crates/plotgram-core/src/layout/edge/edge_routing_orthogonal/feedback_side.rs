@@ -91,19 +91,24 @@ pub fn assign_feedback_sides(
 
         let rank_span = rank_span_for_edge(rel, ranks, from_nl, to_nl, horizontal);
         // 相邻层且投影重叠：走几何正对端口，不进侧通道桶。
-        // 长跨度边（span≥阈值）即使投影重叠也强制侧通道，避免穿中间节点列。
         // R1：rank_span==1 时正对候选须 path_is_clean；不干净则仍进侧通道。
-        if rank_span < LONG_SPAN_SIDE_THRESHOLD
-            && prefers_opposite_ports_over_side_channel(from_nl, to_nl, rank_span, horizontal)
-            && opposite_channel_path_is_clean(
-                from_nl,
-                to_nl,
-                rel.from.as_str(),
-                rel.to.as_str(),
-                nodes,
-                horizontal,
-            )
-        {
+        // Phase A：长跨度边也检查正对路径是否干净；干净则不强制侧通道（无中间节点需绕行）。
+        let opposite_clean = opposite_channel_path_is_clean(
+            from_nl,
+            to_nl,
+            rel.from.as_str(),
+            rel.to.as_str(),
+            nodes,
+            horizontal,
+        );
+        if rank_span < LONG_SPAN_SIDE_THRESHOLD {
+            if prefers_opposite_ports_over_side_channel(from_nl, to_nl, rank_span, horizontal)
+                && opposite_clean
+            {
+                continue;
+            }
+        } else if opposite_clean && projections_overlap_on_cross_axis(from_nl, to_nl, horizontal) {
+            // 长跨度但正对路径干净且节点在交叉轴投影重叠 → 不强制侧通道
             continue;
         }
 
@@ -379,6 +384,24 @@ fn same_side_ports(side: Port) -> (Port, Port) {
 
 /// 相邻层 + 切线方向投影重叠（或间隙 < 16px）时，反馈边应走正对端口而非侧通道。
 const OPPOSITE_PORT_GAP_THRESHOLD: f64 = 16.0;
+
+/// 检查两节点在交叉轴上的投影是否重叠（TB 看 x 轴，LR 看 y 轴）。
+/// 不受 rank_span 限制，用于长跨度边的正对路径判断。
+fn projections_overlap_on_cross_axis(from_nl: &NodeLayout, to_nl: &NodeLayout, horizontal: bool) -> bool {
+    if horizontal {
+        let a0 = from_nl.y;
+        let a1 = from_nl.y + from_nl.height;
+        let b0 = to_nl.y;
+        let b1 = to_nl.y + to_nl.height;
+        (a1.min(b1) - a0.max(b0)) > 0.0
+    } else {
+        let a0 = from_nl.x;
+        let a1 = from_nl.x + from_nl.width;
+        let b0 = to_nl.x;
+        let b1 = to_nl.x + to_nl.width;
+        (a1.min(b1) - a0.max(b0)) > 0.0
+    }
+}
 
 fn prefers_opposite_ports_over_side_channel(
     from_nl: &NodeLayout,

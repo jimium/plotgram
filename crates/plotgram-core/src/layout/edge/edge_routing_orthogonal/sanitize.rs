@@ -25,7 +25,8 @@ use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
 use std::collections::HashMap;
 
 /// 短于该长度的折段视为「微折」，可折叠。
-const MICRO_JOG_LEN: f64 = 24.0;
+/// Phase A 优化：24→30，消除更多视觉冗余的中折。
+const MICRO_JOG_LEN: f64 = 30.0;
 
 /// 路由后处理：消除反向 stub / 斜段 / 微折，并重建标签。
 ///

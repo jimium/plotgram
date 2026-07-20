@@ -44,9 +44,149 @@ pub fn route_self_loop(
     }
 }
 
+/// Phase A: 空间感知自环路由。
+///
+/// 与 `route_self_loop` 的区别：
+/// - 感知周围节点，选择净空最大的方向（而非固定轮转）
+/// - 自适应环尺寸（根据可用空间调整）
+/// - 避免与邻居节点重叠
+pub fn route_self_loop_aware(
+    rel: &Relation,
+    node: &NodeLayout,
+    node_id: &str,
+    loop_index: usize,
+    style: SelfLoopStyle,
+    all_nodes: &std::collections::HashMap<String, NodeLayout>,
+) -> EdgeLayout {
+    // 计算四个方向的可用净空
+    let clearances = compute_corner_clearances(node, node_id, all_nodes);
+    // 选择最优方向（净空最大且未被先前的自环占用）
+    let best_corner_idx = select_best_corner_index(loop_index, &clearances);
+    match style {
+        SelfLoopStyle::Orthogonal => {
+            let loop_r = adaptive_loop_size(node, clearances[best_corner_idx].1, loop_index);
+            route_orthogonal_self_loop_with_size(rel, node, best_corner_idx, loop_r)
+        }
+        SelfLoopStyle::Curved => {
+            let loop_r = adaptive_loop_size(node, clearances[best_corner_idx].1, loop_index);
+            route_curved_self_loop_with_size(rel, node, best_corner_idx, loop_r)
+        }
+    }
+}
+
+/// 四个角落方向的净空距离（到最近邻居节点的距离）
+fn compute_corner_clearances(
+    node: &NodeLayout,
+    node_id: &str,
+    all_nodes: &std::collections::HashMap<String, NodeLayout>,
+) -> [(usize, f64); 4] {
+    // 四个方向：0=右上, 1=左上, 2=右下, 3=左下
+    let cx = node.x + node.width / 2.0;
+    let cy = node.y + node.height / 2.0;
+    let probe_dist = (node.width.max(node.height)) * 1.5 + 50.0;
+
+    let mut clearances = [f64::MAX; 4];
+
+    for (other_id, other) in all_nodes.iter() {
+        if other_id.as_str() == node_id {
+            continue;
+        }
+        let ocx = other.x + other.width / 2.0;
+        let ocy = other.y + other.height / 2.0;
+
+        // 判断邻居在哪个象限
+        let dx = ocx - cx;
+        let dy = ocy - cy;
+
+        // 计算到邻居的最近距离（边缘到边缘）
+        let gap_x = if dx > 0.0 {
+            (other.x - (node.x + node.width)).max(0.0)
+        } else {
+            (node.x - (other.x + other.width)).max(0.0)
+        };
+        let gap_y = if dy > 0.0 {
+            (other.y - (node.y + node.height)).max(0.0)
+        } else {
+            (node.y - (other.y + other.height)).max(0.0)
+        };
+        let dist = (gap_x * gap_x + gap_y * gap_y).sqrt();
+
+        // 更新对应象限的净空
+        if dx >= 0.0 && dy <= 0.0 {
+            clearances[0] = clearances[0].min(dist); // 右上
+        }
+        if dx <= 0.0 && dy <= 0.0 {
+            clearances[1] = clearances[1].min(dist); // 左上
+        }
+        if dx >= 0.0 && dy >= 0.0 {
+            clearances[2] = clearances[2].min(dist); // 右下
+        }
+        if dx <= 0.0 && dy >= 0.0 {
+            clearances[3] = clearances[3].min(dist); // 左下
+        }
+    }
+
+    // 限制探测范围
+    for c in clearances.iter_mut() {
+        *c = c.min(probe_dist);
+    }
+
+    // 返回 (corner_index, clearance) 按净空降序
+    let mut result = [
+        (0, clearances[0]),
+        (1, clearances[1]),
+        (2, clearances[2]),
+        (3, clearances[3]),
+    ];
+    result.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    result
+}
+
+/// 选择最优角落：净空最大且未被先前的自环占用
+fn select_best_corner_index(loop_index: usize, clearances: &[(usize, f64); 4]) -> usize {
+    // 对于第 N 个自环，跳过前 N-1 个已占用的方向
+    // clearances 已按净空降序排列
+    if loop_index < 4 {
+        clearances[loop_index].0
+    } else {
+        clearances[loop_index % 4].0
+    }
+}
+
+/// 根据可用净空自适应计算环尺寸
+fn adaptive_loop_size(node: &NodeLayout, clearance: f64, loop_index: usize) -> f64 {
+    let base = node.width.min(node.height);
+    let min_r = 14.0;
+    let max_r = base * 0.45;
+    // 净空的 50% 作为环尺寸，但不超过节点尺寸的 45%
+    let from_clearance = clearance * 0.5;
+    let from_node = base * 0.30 + loop_index as f64 * 8.0;
+    from_clearance.min(from_node).clamp(min_r, max_r)
+}
+
 fn route_orthogonal_self_loop(rel: &Relation, node: &NodeLayout, loop_index: usize) -> EdgeLayout {
     let corner = corner_for_index(loop_index);
     let loop_r = (node.width.min(node.height) * 0.28).max(16.0) + (loop_index as f64) * 6.0;
+    route_orthogonal_self_loop_inner(rel, node, corner, loop_r)
+}
+
+/// Phase A: 指定尺寸的自环路由（空间感知版本使用）
+fn route_orthogonal_self_loop_with_size(
+    rel: &Relation,
+    node: &NodeLayout,
+    corner_idx: usize,
+    loop_r: f64,
+) -> EdgeLayout {
+    let corner = corner_for_index(corner_idx);
+    route_orthogonal_self_loop_inner(rel, node, corner, loop_r)
+}
+
+fn route_orthogonal_self_loop_inner(
+    rel: &Relation,
+    node: &NodeLayout,
+    corner: Corner,
+    loop_r: f64,
+) -> EdgeLayout {
     let (path, label_point, from_port, to_port) =
         orthogonal_loop_geometry(node, corner, loop_r);
 
@@ -78,6 +218,26 @@ fn route_orthogonal_self_loop(rel: &Relation, node: &NodeLayout, loop_index: usi
 fn route_curved_self_loop(rel: &Relation, node: &NodeLayout, loop_index: usize) -> EdgeLayout {
     let corner = corner_for_index(loop_index);
     let loop_r = (node.width.min(node.height) * 0.30).max(18.0) + (loop_index as f64) * 5.0;
+    route_curved_self_loop_inner(rel, node, corner, loop_r)
+}
+
+/// Phase A: 指定尺寸的曲线自环路由（空间感知版本使用）
+fn route_curved_self_loop_with_size(
+    rel: &Relation,
+    node: &NodeLayout,
+    corner_idx: usize,
+    loop_r: f64,
+) -> EdgeLayout {
+    let corner = corner_for_index(corner_idx);
+    route_curved_self_loop_inner(rel, node, corner, loop_r)
+}
+
+fn route_curved_self_loop_inner(
+    rel: &Relation,
+    node: &NodeLayout,
+    corner: Corner,
+    loop_r: f64,
+) -> EdgeLayout {
     let (sx, sy, ex, ey, apex, from_port, to_port) =
         curved_loop_endpoints(node, corner, loop_r);
 

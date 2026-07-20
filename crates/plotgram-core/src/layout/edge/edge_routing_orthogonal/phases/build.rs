@@ -40,11 +40,14 @@ pub(crate) fn phase_route_edges(
         if from_id == to_id {
             if let Some(nl) = nodes.get(from_id) {
                 let loop_idx = self_loop_idx.get(&i).copied().unwrap_or(0);
-                edges[i] = self_loop::route_self_loop(
+                // Phase A: 使用空间感知自环路由，感知周围节点选择最优方向
+                edges[i] = self_loop::route_self_loop_aware(
                     rel,
                     nl,
+                    from_id,
                     loop_idx,
                     self_loop::SelfLoopStyle::Orthogonal,
+                    nodes,
                 );
             }
             continue;
@@ -105,7 +108,8 @@ pub(crate) fn phase_route_edges(
         // P5（保守落地）：有组图跨 leaf 外廊与 S4 monitor 解耦的「无链 prefer_outer」
         // 会在 ecommerce 等图引入新穿组；此处仍仅 S4 monitor 开外环，
         // 跨 leaf 无链靠 strict + corridor_boost 收口（完整 P5 留给后续几何）。
-        let prefer_outer = s4_monitor_corridor && is_feedback;
+        // Phase A: 回环边始终偏好外环路由，避免与正向边抢内部通道。
+        let prefer_outer = is_feedback || (s4_monitor_corridor && is_feedback);
         // P2：有 chain 但 validated 失败 → 显式 degraded（禁止静默 free-route 冒充成功）。
         let corridor_contract_failed = has_chain && corridor_ok.is_none();
         let mut path = corridor_ok.unwrap_or_else(|| {

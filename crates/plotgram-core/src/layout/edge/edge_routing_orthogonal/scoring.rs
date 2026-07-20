@@ -18,9 +18,11 @@ pub const GROUP_OBSTACLE_PAD: f64 = GROUP_BORDER_SHELL_PAD;
 const NODE_NEAR_MISS_EXTRA: f64 = 10.0;
 const NODE_NEAR_MISS_PENALTY: f64 = 2_500.0;
 /// 分组边框近距擦过惩罚
-const GROUP_NEAR_MISS_PENALTY: f64 = 2_000.0;
+/// Phase A 优化：2000→4500，使 scorer 更强烈偏好远离组边框的路径。
+const GROUP_NEAR_MISS_PENALTY: f64 = 4_500.0;
 /// 分组边框近距擦过检测额外余量
-const GROUP_NEAR_MISS_EXTRA: f64 = 8.0;
+/// Phase A 优化：8→16，扩大检测范围，让距组边框 16px 内的路径都被惩罚。
+const GROUP_NEAR_MISS_EXTRA: f64 = 16.0;
 /// 分组穿越（Transit/Interior/Crossing）软惩罚。
 ///
 /// Iteration 2：提高到接近穿节点量级，使 scorer 强烈偏好绕行而非穿无关组。
@@ -52,7 +54,17 @@ impl CandidateScorer for DefaultScorer {
     fn score(&self, path: &[Point], ctx: &OrthoRoutingContext, pair: &EndpointPair) -> f64 {
         let w = ctx.profile.scoring;
         let mut score = path_length(path) * w.path_length;
-        score += path.len().saturating_sub(2) as f64 * BEND_PENALTY * w.bend;
+        // Phase A: 弯折惩罚 + 首段弯折加重
+        let bend_count = path.len().saturating_sub(2) as f64;
+        score += bend_count * BEND_PENALTY * w.bend;
+        // 首段弯折加重：仅当首段异常短（< PORT_CLEARANCE，即 stub 退化）时额外惩罚。
+        // 正常 stub 长度 = PORT_CLEARANCE(16px)，不应被惩罚。
+        if path.len() >= 3 {
+            let first_seg_len = (path[1].x - path[0].x).abs() + (path[1].y - path[0].y).abs();
+            if first_seg_len < PORT_CLEARANCE * 0.8 {
+                score += FIRST_BEND_EXTRA_PENALTY * w.bend;
+            }
+        }
         // S4 / S4.x：feedback / 监控边对交叉加重（×3）；obstacle 穿模再 ×2
         let obst = obstacle_penalty(
             path,

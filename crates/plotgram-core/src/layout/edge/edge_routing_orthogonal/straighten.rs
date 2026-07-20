@@ -1,4 +1,4 @@
-//! Preferred-alignment straightening for opposite-port edges.
+//! Preferred-alignment straightening for opposite-port and L-shaped port edges.
 
 use super::*;
 use crate::layout::{NodeLayout, Port};
@@ -14,6 +14,12 @@ fn is_opposite_port_pair(from: Port, to: Port) -> bool {
             | (Port::Left, Port::Right)
             | (Port::Right, Port::Left)
     )
+}
+
+/// 判断两端口是否为 L 形端口对（一垂直一水平，路径自然有一个弯折）。
+/// Phase A 扩展：对 L 形端口对的自由端做切线对齐，减少不必要的额外弯折。
+fn is_l_shaped_port_pair(from: Port, to: Port) -> bool {
+    is_vertical_port(from) != is_vertical_port(to)
 }
 
 /// 直连偏好对齐：修正正对端口边因 slot 不对称导致的锚点错位。
@@ -233,6 +239,91 @@ pub fn straighten_preferred_alignments(
 
     // 应用对齐调整
     for (ei, is_from, target_tangent) in alignments {
+        if let Some(ep) = endpoint_map.get_mut(&(ei, is_from)) {
+            let vertical = is_vertical_port(ep.side);
+            if vertical {
+                ep.anchor.x = target_tangent;
+            } else {
+                ep.anchor.y = target_tangent;
+            }
+        }
+    }
+
+    // ── Phase A 扩展：L 形端口对切线对齐 ──
+    // 对于 L 形端口（一垂直一水平），调整自由端锚点的切线坐标，
+    // 使 L 路径的水平/垂直段更紧凑，减少不必要的额外弯折。
+    // 例如 Bottom→Right：调整 from_anchor.x 向 to_anchor.x 靠拢，缩短水平段。
+    let mut l_alignments: Vec<(usize, bool, f64)> = Vec::new();
+
+    for i in 0..n {
+        let fs = from_side[i];
+        let ts = to_side[i];
+
+        if !is_l_shaped_port_pair(fs, ts) {
+            continue;
+        }
+
+        let Some(from_ep) = endpoint_map.get(&(i, true)) else { continue };
+        let Some(to_ep) = endpoint_map.get(&(i, false)) else { continue };
+
+        let Some(from_nl) = nodes.get(&from_ep.node_id) else { continue };
+        let Some(to_nl) = nodes.get(&to_ep.node_id) else { continue };
+
+        let from_count = side_dir_count.get(&(from_ep.node_id.clone(), fs, true)).copied().unwrap_or(0);
+        let to_count = side_dir_count.get(&(to_ep.node_id.clone(), ts, false)).copied().unwrap_or(0);
+        let from_single = from_count == 1;
+        let to_single = to_count == 1;
+
+        // L 形对齐：将垂直端口端的切线坐标向水平端口端的对应坐标靠拢。
+        // from 是垂直端口（Bottom/Top）：切线=x，目标是 to_anchor.x
+        // from 是水平端口（Left/Right）：切线=y，目标是 to_anchor.y
+        if is_vertical_port(fs) {
+            // from 垂直，to 水平。调整 from.x 向 to.x 靠拢。
+            if from_single {
+                let target = to_ep.anchor.x;
+                let margin = from_nl.width * SLOT_MARGIN_RATIO;
+                let clamped = target.clamp(from_nl.x + margin, from_nl.x + from_nl.width - margin);
+                if (clamped - from_ep.anchor.x).abs() > 1.0 {
+                    l_alignments.push((i, true, clamped));
+                }
+            }
+        } else {
+            // from 水平，to 垂直。调整 from.y 向 to.y 靠拢。
+            if from_single {
+                let target = to_ep.anchor.y;
+                let margin = from_nl.height * SLOT_MARGIN_RATIO;
+                let clamped = target.clamp(from_nl.y + margin, from_nl.y + from_nl.height - margin);
+                if (clamped - from_ep.anchor.y).abs() > 1.0 {
+                    l_alignments.push((i, true, clamped));
+                }
+            }
+        }
+
+        // 反向：调整 to 端切线向 from 端对应坐标靠拢
+        if is_vertical_port(ts) {
+            // to 垂直，from 水平。调整 to.x 向 from.x 靠拢。
+            if to_single {
+                let target = from_ep.anchor.x;
+                let margin = to_nl.width * SLOT_MARGIN_RATIO;
+                let clamped = target.clamp(to_nl.x + margin, to_nl.x + to_nl.width - margin);
+                if (clamped - to_ep.anchor.x).abs() > 1.0 {
+                    l_alignments.push((i, false, clamped));
+                }
+            }
+        } else {
+            // to 水平，from 垂直。调整 to.y 向 from.y 靠拢。
+            if to_single {
+                let target = from_ep.anchor.y;
+                let margin = to_nl.height * SLOT_MARGIN_RATIO;
+                let clamped = target.clamp(to_nl.y + margin, to_nl.y + to_nl.height - margin);
+                if (clamped - to_ep.anchor.y).abs() > 1.0 {
+                    l_alignments.push((i, false, clamped));
+                }
+            }
+        }
+    }
+
+    for (ei, is_from, target_tangent) in l_alignments {
         if let Some(ep) = endpoint_map.get_mut(&(ei, is_from)) {
             let vertical = is_vertical_port(ep.side);
             if vertical {
