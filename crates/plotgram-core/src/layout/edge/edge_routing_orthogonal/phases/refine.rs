@@ -178,15 +178,13 @@ pub(crate) fn phase_layer_order(
         Some(&feedback_edge_set),
         difficulty_scores,
     );
-    if std::env::var_os("PLOTGRAM_DEBUG_EDGE_ORDER").is_some() {
-        let head: Vec<usize> = edge_order.iter().copied().take(12).collect();
-        eprintln!(
-            "[edge-order] n={} scores={} head={:?}",
-            relations.len(),
-            difficulty_scores.is_some(),
-            head
-        );
-    }
+    let head: Vec<usize> = edge_order.iter().copied().take(12).collect();
+    crate::perf_log!(
+        "[edge-order] n={} scores={} head={:?}",
+        relations.len(),
+        difficulty_scores.is_some(),
+        head
+    );
     crate::perf_log!(
         "[perf]     step2_slots+step3_order: {:.2}ms",
         t2.elapsed().as_secs_f64() * 1000.0

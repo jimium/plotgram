@@ -15,15 +15,6 @@ const EPS: f64 = 1.0;
 /// 此处故意取更紧的 4.0（仅用于 route-annotation 后处理校验，非路由避障同语）。
 const NODE_PAD: f64 = 4.0;
 
-/// 折点角色（可由 Annotation 推导，不写入路径）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub enum VertexRole {
-    Anchor,
-    StubBoundary,
-    ProtectedBoundary,
-    FreeCorner,
-}
-
 /// 受保护的轴对齐 run（lane / trunk 坐标）。
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct ProtectedRun {
@@ -388,16 +379,7 @@ pub fn annotate_edge_from_path(
     })
 }
 
-/// C 末冻结：为每条正交折线写旁路注解；可选合并 S3 merge_intervals / degraded。
-pub fn freeze_route_annotations(
-    edges: &[EdgeLayout],
-    from_side: &[Port],
-    to_side: &[Port],
-) -> RouteAnnotationSet {
-    freeze_route_annotations_with_merges(edges, from_side, to_side, None, None)
-}
-
-/// 同 [`freeze_route_annotations`]，附加语义合流声明。
+/// C 末冻结：为每条正交折线写旁路注解；可选附加 S3 merge_intervals / degraded 声明。
 pub fn freeze_route_annotations_with_merges(
     edges: &[EdgeLayout],
     from_side: &[Port],
@@ -571,38 +553,6 @@ pub fn validate_route_edit(
     Ok(())
 }
 
-/// 尝试形状编辑；验证失败则回退并返回 `false`。
-pub fn try_shape_edit(
-    points: &mut Vec<Point>,
-    ann: &EdgeRouteAnnotation,
-    obstacle: Option<RouteEditObstacleCtx<'_>>,
-    opts: RouteEditValidateOpts,
-    edit: impl FnOnce(&mut Vec<Point>),
-) -> bool {
-    let before = points.clone();
-    edit(points);
-    if validate_route_edit(&before, points, ann, obstacle, opts).is_ok() {
-        true
-    } else {
-        *points = before;
-        false
-    }
-}
-
-/// 推导折点角色（调试 / 单测）。
-pub fn vertex_role(ann: &EdgeRouteAnnotation, index: usize, path_len: usize) -> VertexRole {
-    if index == 0 || index + 1 == path_len {
-        return VertexRole::Anchor;
-    }
-    if index == 1 || (path_len >= 3 && index + 2 == path_len) {
-        return VertexRole::StubBoundary;
-    }
-    if !ann.protected_runs.is_empty() {
-        return VertexRole::ProtectedBoundary;
-    }
-    VertexRole::FreeCorner
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -648,25 +598,6 @@ mod tests {
         after[3] = Point::new(80.0, 0.0);
         let err = validate_route_edit(&pts, &after, &ann, None, RouteEditValidateOpts::default());
         assert_eq!(err, Err(RouteEditViolation::CrossProtectedRun));
-    }
-
-    #[test]
-    fn try_shape_edit_reverts_on_stub_failure() {
-        let mut pts = horiz_stair();
-        let before = pts.clone();
-        let ann = annotate_edge_from_path(&pts, Port::Right, Port::Left, 0).unwrap();
-        let ok = try_shape_edit(
-            &mut pts,
-            &ann,
-            None,
-            RouteEditValidateOpts::default(),
-            |p| {
-                // 毁掉起点 stub 外向
-                p[1] = Point::new(-16.0, 0.0);
-            },
-        );
-        assert!(!ok);
-        assert_eq!(pts, before);
     }
 
     #[test]

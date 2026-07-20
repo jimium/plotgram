@@ -1,11 +1,11 @@
 //! 拥堵 / 压力校准基线（S0 + P4.0b）
 //!
 //! 用法:
-//!   PLOTGRAM_PRESSURE_BUDGET=0 cargo run --release -p plotgram-core --bin congestion-baseline -- \
+//!   cargo run --release -p plotgram-core --bin congestion-baseline -- \
 //!     [--set FILE] [--date YYYY-MM-DD] [--calibrate] [file.pgm ...]
 //!
 //! 默认 set: benchmarks/sets/mech-set.txt（机制探针集，含 product 双用途样例）
-//! `--calibrate`：额外输出 score 分位 / top-k 边 / 归一化说明（观测模式建议关 budget）。
+//! `--calibrate`：额外输出 score 分位 / top-k 边 / 归一化说明。
 
 use std::env;
 use std::fs;
@@ -55,11 +55,6 @@ struct CalibrateExport {
 }
 
 fn main() {
-    // P4：默认观测模式关 D4 行为加缝，避免与校准混淆
-    if env::var_os("PLOTGRAM_PRESSURE_BUDGET").is_none() {
-        env::set_var("PLOTGRAM_PRESSURE_BUDGET", "0");
-    }
-
     let args: Vec<String> = env::args().skip(1).collect();
     let mut set_file: Option<PathBuf> = None;
     let mut date = String::from("unknown");
@@ -84,8 +79,7 @@ fn main() {
             "-h" | "--help" => {
                 eprintln!(
                     "用法: congestion-baseline [--set FILE] [--date YYYY-MM-DD] [--calibrate] [file.pgm ...]\n\
-                     默认 set: benchmarks/sets/mech-set.txt\n\
-                     默认 PLOTGRAM_PRESSURE_BUDGET=0（观测）"
+                     默认 set: benchmarks/sets/mech-set.txt"
                 );
                 process::exit(0);
             }
@@ -134,7 +128,7 @@ fn main() {
 
     let congestion = CongestionBaselineSnapshot {
         date: date.clone(),
-        note: "P4.0a norm score; P1 pierce; P3 grid; PRESSURE_BUDGET default 0 for calibrate".into(),
+        note: "P4.0a norm score; P1 pierce; P3 grid; pressure budget always on".into(),
         samples,
     };
 

@@ -12,7 +12,7 @@ use crate::layout::post_route;
 use crate::layout::refine;
 use crate::layout::registry;
 use crate::layout::route_feedback::{LayoutRouteFeedback, PreRouteFeedback};
-use crate::layout::{resolve_effective_direction, EdgeRoutingStrategy, LayoutResult};
+use crate::layout::{resolve_effective_direction, EdgeRoutingStrategy, LayoutResult, Port};
 use std::collections::{HashMap, HashSet};
 
 /// 布局管线。
@@ -257,29 +257,8 @@ impl<'a> LayoutPipeline<'a> {
                 Some(&result.nodes),
                 Some(&sorted_node_ids),
             );
-            // V3a / P3.1：D 一次正反向 gap 审计（C 预修在 phase_lane 末）。
-            // 使用图类型对应 gap，避免 architecture 误用 flowchart 的 8px。
-            let parallel_gap =
-                crate::layout::edge::parallel_gap_for_diagram(self.diagram.diagram_type.clone());
-            let d_gap_shifts =
-                crate::layout::edge::edge_routing_orthogonal::enforce_reverse_pair_min_gap(
-                    &mut result.edges,
-                    &self.diagram.relations,
-                    parallel_gap,
-                );
-            // 轨道 A：正反向同侧 dock 共锚（D 末最终写者，sanitize 之后）
-            let dock_gap =
-                parallel_gap.max(crate::layout::edge::edge_routing_orthogonal::COMPACT_SLOT_PITCH);
-            let d_dock_shifts =
-                crate::layout::edge::edge_routing_orthogonal::enforce_reverse_pair_dock_separation(
-                    &mut result.edges,
-                    &self.diagram.relations,
-                    &result.nodes,
-                    &from_side,
-                    &to_side,
-                    dock_gap,
-                );
-
+            // V3a / P3.1 + 轨道 A：D 末正反向 gap 审计 + 同侧 dock 共锚（sanitize 之后；C 预修在 phase_lane 末）。
+            self.enforce_d_stage_separation(&mut result, &from_side, &to_side);
 
             // L3：architecture 在 C 期 stub_occ 仅诊断；节点已冻结后于 D 末做 exact 跨对共柱真修。
             // 只改边几何 → node_fp 不变；须在 label 避让前完成并刷新 annotation。
@@ -394,6 +373,24 @@ impl<'a> LayoutPipeline<'a> {
         node_freeze.assert_unchanged(&result);
 
         Ok(result)
+    }
+
+    /// V3a / P3.1 + 轨道 A：D 末正反向 gap 审计（min_gap）+ 同侧 dock 共锚（dock_sep）。
+    /// sanitize 之后、label 之前；使用图类型对应 gap 避免 architecture 误用 flowchart 8px。
+    /// 内部仍分别走 [`enforce_reverse_pair_min_gap`] + [`enforce_reverse_pair_dock_separation`]，
+    /// 几何输出与两次独立调用字节级一致；仅编排入口合并以减少 pipeline.rs 重复 bookkeeping。
+    fn enforce_d_stage_separation(&self, result: &mut LayoutResult, from_side: &[Port], to_side: &[Port]) {
+        let parallel_gap =
+            crate::layout::edge::parallel_gap_for_diagram(self.diagram.diagram_type.clone());
+        crate::layout::edge::edge_routing_orthogonal::enforce_reverse_pair_min_gap(
+            &mut result.edges, &self.diagram.relations, parallel_gap,
+        );
+        let dock_gap = parallel_gap
+            .max(crate::layout::edge::edge_routing_orthogonal::COMPACT_SLOT_PITCH);
+        crate::layout::edge::edge_routing_orthogonal::enforce_reverse_pair_dock_separation(
+            &mut result.edges, &self.diagram.relations, &result.nodes,
+            from_side, to_side, dock_gap,
+        );
     }
 
     fn run_post_route_group_frame(

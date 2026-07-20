@@ -71,8 +71,6 @@ const MAX_EXTRA_PAIR_VERTICAL_GAP: f64 = 56.0;
 const CROSS_EDGE_GROUP_GAP_SCALE: f64 = 8.0;
 /// 组间距额外增加的上限（Phase 2：与 corridor_load 预算对齐，略抬高）
 const MAX_EXTRA_GROUP_GAP: f64 = 56.0;
-/// P1-4 packing 行宽预算的黄金比目标（面积 → 目标宽高比）。
-const PACK_ASPECT_TARGET: f64 = 1.6;
 
 /// 计算相邻组块间的间距（Phase 2：lane_budget ↔ 跨组边负载）。
 ///
@@ -180,30 +178,18 @@ pub(super) fn position_macro_blocks(
     if blocks.is_empty() {
         return HashMap::new();
     }
-    if crate::layout::group_frame::architecture_pack_enabled() {
-        position_macro_blocks_packed(
-            blocks,
-            macro_ranks,
-            super_edges,
-            pair_edge_counts,
-            canvas_padding,
-            row_align,
-            group_decl,
-        )
-    } else {
-        position_macro_blocks_stacked(
-            blocks,
-            macro_ranks,
-            super_edges,
-            pair_edge_counts,
-            canvas_padding,
-            row_align,
-            group_decl,
-        )
-    }
+    position_macro_blocks_stacked(
+        blocks,
+        macro_ranks,
+        super_edges,
+        pair_edge_counts,
+        canvas_padding,
+        row_align,
+        group_decl,
+    )
 }
 
-/// 旧版：逐 macro rank 纵向堆叠（单块 rank 独占一行）。gate 关闭时的回退路径。
+/// 逐 macro rank 纵向堆叠（单块 rank 独占一行）。
 ///
 /// 返回 `block_id -> macro_rank`（视觉行 == macro rank，行为与改造前一致）。
 fn position_macro_blocks_stacked(
@@ -283,121 +269,6 @@ fn position_macro_blocks_stacked(
         .iter()
         .map(|b| (b.id.clone(), macro_ranks.get(&b.id).copied().unwrap_or(0)))
         .collect()
-}
-
-/// P1-4：rank 行 shelf 装箱。保留 macro_rank 行序语义，但：
-/// - 多块 rank 作为独立行带（保留 band lane_budget 间距）；
-/// - 连续的单块 rank 合并进同一 shelf 行（横向多列，超行宽预算换行），
-///   从根上消除「链式单块 rank 竖向单列」。
-///
-/// 返回 `block_id -> 视觉行号`（0 起连续），供 phase_d 重建全局层。
-fn position_macro_blocks_packed(
-    blocks: &mut [MacroBlock],
-    macro_ranks: &HashMap<String, usize>,
-    super_edges: &HashSet<(String, String)>,
-    pair_edge_counts: &HashMap<(String, String), usize>,
-    canvas_padding: f64,
-    row_align: RowAlign,
-    group_decl: &HashMap<String, usize>,
-) -> HashMap<String, usize> {
-    let max_rank = macro_ranks.values().copied().max().unwrap_or(0);
-    let cross_edge_counts = count_cross_edges_per_rank_gap(super_edges, macro_ranks);
-
-    // 行宽预算：sqrt(总面积 × 黄金比) 与最宽块取较大（保证任何单块都能独放）。
-    let total_area: f64 = blocks
-        .iter()
-        .map(|b| b.width.max(0.0) * b.height.max(0.0))
-        .sum();
-    let widest = blocks.iter().map(|b| b.width).fold(0.0_f64, f64::max);
-    let row_budget = (total_area * PACK_ASPECT_TARGET).sqrt().max(widest);
-
-    let mut block_row: HashMap<String, usize> = HashMap::new();
-    let mut y_cursor = canvas_padding;
-    let mut visual_row = 0usize;
-
-    // 当前 shelf 行状态（累积连续单块 rank）
-    let mut shelf_x = canvas_padding;
-    let mut shelf_max_h = 0.0_f64;
-    let mut shelf_open = false;
-
-    for rank in 0..=max_rank {
-        let mut rank_indices: Vec<usize> = blocks
-            .iter()
-            .enumerate()
-            .filter(|(_, b)| macro_ranks.get(&b.id).copied().unwrap_or(0) == rank)
-            .map(|(i, _)| i)
-            .collect();
-        rank_indices.sort_by(|&a, &b| {
-            crate::layout::decl_order::cmp_by_decl_then_id(group_decl, &blocks[a].id, &blocks[b].id)
-        });
-        if rank_indices.is_empty() {
-            continue;
-        }
-
-        if rank_indices.len() > 1 {
-            // 多块 band：先 flush 当前 shelf 行，band 独立成行
-            if shelf_open {
-                y_cursor += shelf_max_h + LAYER_GAP;
-                visual_row += 1;
-                shelf_x = canvas_padding;
-                shelf_max_h = 0.0;
-                shelf_open = false;
-            }
-            let band_height = rank_indices
-                .iter()
-                .map(|&i| blocks[i].height)
-                .fold(0.0_f64, f64::max);
-            let ordered_ids: Vec<String> =
-                rank_indices.iter().map(|&i| blocks[i].id.clone()).collect();
-            let gap = band_uniform_gap(&ordered_ids, pair_edge_counts);
-            let mut x_cursor = canvas_padding;
-            for (pos, &i) in rank_indices.iter().enumerate() {
-                blocks[i].x = x_cursor;
-                blocks[i].y = y_cursor;
-                block_row.insert(blocks[i].id.clone(), visual_row);
-                x_cursor += blocks[i].width;
-                if pos + 1 < rank_indices.len() {
-                    x_cursor += gap;
-                }
-            }
-            let extra = adaptive_vertical_rank_gap(
-                rank,
-                blocks,
-                macro_ranks,
-                &cross_edge_counts,
-                pair_edge_counts,
-            );
-            y_cursor += band_height + LAYER_GAP + extra;
-            visual_row += 1;
-        } else {
-            // 单块 rank：放入当前 shelf 行；超行宽预算换行（首块必放，widest ≤ row_budget）
-            let i = rank_indices[0];
-            let w = blocks[i].width;
-            if shelf_open && (shelf_x - canvas_padding) + w > row_budget {
-                y_cursor += shelf_max_h + LAYER_GAP;
-                visual_row += 1;
-                shelf_x = canvas_padding;
-                shelf_max_h = 0.0;
-                shelf_open = false;
-            }
-            blocks[i].x = shelf_x;
-            blocks[i].y = y_cursor;
-            block_row.insert(blocks[i].id.clone(), visual_row);
-            shelf_x += w + GROUP_GAP_X;
-            shelf_max_h = shelf_max_h.max(blocks[i].height);
-            shelf_open = true;
-        }
-    }
-
-    if row_align == RowAlign::Center {
-        center_rank_rows(&block_row, blocks.len(), |i| {
-            (blocks[i].id.clone(), blocks[i].x, blocks[i].width)
-        })
-        .into_iter()
-        .for_each(|(i, shift)| blocks[i].x += shift);
-    }
-
-    block_row
 }
 
 // ─── Phase C: 全局坐标回填 ───────────────────────────────

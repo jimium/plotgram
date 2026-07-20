@@ -1,16 +1,15 @@
-//! refine 最后一轮：对仍穿障的边降级为 spline 可见性图绕障。
+//! refine 最后一轮：对仍穿障的边降级为正交 dogleg 绕障 + 显式 degraded 标注。
+//!
+//! Tier D（2026-07-20）：原 spline/bezier 密采样降级路径已删除（手册 §3.5 ★ 红线）。
+//! 所有 fallback 候选统一走 `orthogonal_detour_try_ports`（与 lint 对齐硬门禁）；
+//! 非正交原图若 dogleg 失败，保留原边并写入 `degraded` 归因。
 
 use crate::ast::Diagram;
 use crate::layout::edge::common::edge_geometry::{
-    build_edge_labels, compute_bezier_controls, label_t_for_diagram, point_at_path_t,
+    build_edge_labels, label_t_for_diagram, point_at_path_t,
 };
-use crate::layout::edge::common::obstacle_check::curve_intersects_obstacles;
 use crate::layout::edge::common::routing_skeleton::{resolve_endpoints, RoutingContext};
 use crate::layout::edge::common::self_loop::{route_self_loop, self_loop_indices, SelfLoopStyle};
-use crate::layout::edge::edge_routing_bezier::BezierConfig;
-use crate::layout::edge::edge_routing_spline::{
-    build_full_path, fit_multi_segment_spline, sample_bezier,
-};
 use crate::layout::edge::visibility;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, LayoutResult, PathGeometry, Port};
@@ -19,15 +18,17 @@ use std::collections::HashSet;
 use super::crossing::analyze_edge_node_crossings;
 use super::RefineConfig;
 
-const SPLINE_SAMPLES_PER_SEGMENT: usize = 12;
 const ORTHOGONAL_STUB: f64 = 16.0;
 const ORTHOGONAL_OUTER_MARGIN: f64 = 32.0;
 /// 全量共线/严重度门禁较贵；仅在问题边较少时启用。穿节点/穿组硬过滤不受此限。
 const MAX_LOCAL_ORTHOGONAL_QUALITY_EDGES: usize = 10;
 
-/// 对指定边索引用 spline 可见性图重路由（混合路由兜底）。
+/// degraded 标注原因：原 spline/bezier 密采样降级已删除，dogleg 替换未生成候选。
+const DEGRADED_REASON: &str = "spline_fallback_removed:bezier_or_multi_segment_spline";
+
+/// 对指定边索引用 dogleg 重路由（混合路由兜底）。
 ///
-/// C9：仅当替换后 crossing 不劣于原边时才采纳；空 detour 退 Bezier 后须复检穿障。
+/// C9：仅当替换后 crossing 不劣于原边时才采纳。
 ///
 /// `aggressive_group_skirt`：并集裙边 + 换侧端口。仅用于节点冻结后的穿组试修，
 /// 避免在 refine（冻结前）改边连坐 space-budget / group_frame 导致 node_fp 漂移。
@@ -63,7 +64,6 @@ pub(crate) fn reroute_edges_with_spline_ex(
     let ctx = RoutingContext::new(diagram, &routing_snapshot);
     let mut accepted_snapshot = routing_snapshot.clone();
     let self_loop_idx = self_loop_indices(relations);
-    let tension = BezierConfig::default().tension;
 
     let mut sorted_node_ids: Vec<String> = routing_snapshot.nodes.keys().cloned().collect();
     sorted_node_ids.sort();
@@ -110,83 +110,41 @@ pub(crate) fn reroute_edges_with_spline_ex(
             .unwrap_or(usize::MAX);
         let skip = [from_idx, to_idx];
 
-        let detour_path = obstacle_index.shortest_path(ep.start, ep.end, &skip);
-
-        // 正交原边、以及 architecture（默认正交路由）一律走 dogleg/外廊，禁止密采样
-        // spline：后者会被末尾 force_orthogonal 栅格化成假台阶，并在问题边较多时
-        // 绕过穿组/共线质量门禁（federation 类密集图）。
+        // 正交原边、以及 architecture（默认正交路由）一律走 dogleg/外廊。
+        // 非正交原图（state/er/mindmap 等）原本走 spline/bezier 密采样降级（平滑曲线）；
+        // Tier D 删除密采样路径后改走 dogleg 会把平滑曲线替换为正交折线，对 ER/State 等
+        // 紧密成对样例引入大量共线严重度（tight_sev 退化）。保守策略：非正交原图
+        // **保留原边 + 显式 degraded 标注**，由后续 `recheck_lint_pierce_post_freeze`
+        // 复用同一 degraded 字段做诊断。dogleg 仅用于正交原图（含 Architecture）。
         let original_is_orthogonal = routing_snapshot
             .edges
             .get(i)
             .is_some_and(|edge| is_orthogonal(&edge.path_points()));
         let use_orthogonal_fallback = original_is_orthogonal
             || matches!(diagram.diagram_type, crate::types::DiagramType::Architecture);
-        let (geometry, sampled_for_label, chosen_from_port, chosen_to_port) =
-            if use_orthogonal_fallback {
-                let Some((points, fp, tp)) = orthogonal_detour_try_ports(
-                    &ep,
-                    diagram,
-                    i,
-                    &routing_snapshot,
-                    &obstacle_index,
-                    &skip,
-                    fallback_lane,
-                    aggressive_group_skirt,
-                ) else {
-                    continue;
-                };
-                (
-                    PathGeometry::Polyline {
-                        points: points.clone(),
-                    },
-                    points,
-                    fp,
-                    tp,
-                )
-            } else if detour_path.is_empty() {
-                let cp = compute_bezier_controls(
-                    ep.start.x,
-                    ep.start.y,
-                    ep.end.x,
-                    ep.end.y,
-                    ep.from_port,
-                    ep.to_port,
-                    tension,
-                );
-                let sampled =
-                    sample_bezier(ep.start, cp[0], cp[1], ep.end, SPLINE_SAMPLES_PER_SEGMENT);
-                let candidate = EdgeLayout {
-                    geometry: PathGeometry::Bezier {
-                        start: ep.start,
-                        end: ep.end,
-                        controls: cp,
-                    },
-                    labels: Vec::new(),
-                    from_port: ep.from_port,
-                    to_port: ep.to_port,
-                };
-                // C9：空 detour 退 Bezier 后必须复检；仍穿障则保留原边。
-                if curve_intersects_obstacles(&candidate, &obstacle_index, &skip) {
-                    continue;
-                }
-                (
-                    candidate.geometry,
-                    sampled,
-                    ep.from_port,
-                    ep.to_port,
-                )
-            } else {
-                let full_path = build_full_path(ep.start, &detour_path, ep.end);
-                let sampled = fit_multi_segment_spline(&full_path, SPLINE_SAMPLES_PER_SEGMENT);
-                (
-                    PathGeometry::Polyline {
-                        points: sampled.clone(),
-                    },
-                    sampled,
-                    ep.from_port,
-                    ep.to_port,
-                )
-            };
+
+        if !use_orthogonal_fallback {
+            // 非正交原图：spline/bezier 已删除，dogleg 会破坏平滑几何；保留原边 + degraded。
+            mark_degraded(result, i, DEGRADED_REASON);
+            continue;
+        }
+
+        let Some((points, chosen_from_port, chosen_to_port)) = orthogonal_detour_try_ports(
+            &ep,
+            diagram,
+            i,
+            &routing_snapshot,
+            &obstacle_index,
+            &skip,
+            fallback_lane,
+            aggressive_group_skirt,
+        ) else {
+            // 正交原图 / Architecture dogleg 失败：与历史行为一致（continue 不标 degraded）。
+            continue;
+        };
+
+        let sampled_for_label = points.clone();
+        let geometry = PathGeometry::Polyline { points };
 
         let middle_t = label_t_for_diagram(diagram, rel);
         let labels =
@@ -289,6 +247,21 @@ fn is_orthogonal(points: &[Point]) -> bool {
     points
         .windows(2)
         .all(|w| (w[0].x - w[1].x).abs() < 0.1 || (w[0].y - w[1].y).abs() < 0.1)
+}
+
+/// 标记指定边为 degraded（若 route_annotations 已存在且该边尚未被标 degraded）。
+///
+/// 与 `recheck_lint_pierce_post_freeze`（mod.rs）的 degraded 写入语义对齐：
+/// 不改折点几何，仅记录归因字符串，便于诊断为何该边未被修复。
+fn mark_degraded(result: &mut LayoutResult, edge_index: usize, reason: &str) {
+    let Some(annotations) = result.hints.route_annotations.as_mut() else {
+        return;
+    };
+    for ann in annotations.edges.iter_mut() {
+        if ann.edge_index == edge_index && ann.degraded.is_none() {
+            ann.degraded = Some(reason.to_string());
+        }
+    }
 }
 
 /// 先用原端口 dogleg；`aggressive` 时失败再换侧端口。

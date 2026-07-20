@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-20-074141-tier-d-final",
+  "date": "2026-07-20-064042-b-2-after",
   "note": "role-aware baseline: product-gate hard; stress/demo quality soft",
   "samples": [
     {
@@ -96,9 +96,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 11.14,
-      "min_ms": 11.06,
-      "max_ms": 17.83,
+      "median_ms": 11.17,
+      "min_ms": 11.09,
+      "max_ms": 11.29,
       "det": true,
       "role": "product"
     },
@@ -146,8 +146,8 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 2.17,
-      "min_ms": 2.12,
+      "median_ms": 2.15,
+      "min_ms": 2.1,
       "max_ms": 2.17,
       "det": true,
       "role": "product"
@@ -196,9 +196,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 5.36,
-      "min_ms": 5.01,
-      "max_ms": 5.77,
+      "median_ms": 5.1,
+      "min_ms": 5.04,
+      "max_ms": 5.24,
       "det": true,
       "role": "product"
     },
@@ -246,9 +246,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 18.36,
-      "min_ms": 18.18,
-      "max_ms": 19.42,
+      "median_ms": 22.51,
+      "min_ms": 20.15,
+      "max_ms": 23.77,
       "det": true,
       "role": "product"
     },
@@ -296,9 +296,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 46.09,
-      "min_ms": 45.76,
-      "max_ms": 48.35,
+      "median_ms": 47.8,
+      "min_ms": 47.54,
+      "max_ms": 50.16,
       "det": true,
       "role": "product"
     },
@@ -346,7 +346,7 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 0.11,
+      "median_ms": 0.1,
       "min_ms": 0.1,
       "max_ms": 0.13,
       "det": true,
@@ -396,9 +396,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 2.06,
-      "min_ms": 2.03,
-      "max_ms": 2.09,
+      "median_ms": 2.02,
+      "min_ms": 2.01,
+      "max_ms": 2.07,
       "det": true,
       "role": "product"
     },
@@ -446,9 +446,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 2.88,
+      "median_ms": 2.91,
       "min_ms": 2.88,
-      "max_ms": 2.94,
+      "max_ms": 3.62,
       "det": true,
       "role": "product"
     },
@@ -496,9 +496,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 1.8,
-      "min_ms": 1.76,
-      "max_ms": 2.21,
+      "median_ms": 1.78,
+      "min_ms": 1.77,
+      "max_ms": 1.78,
       "det": true,
       "role": "product"
     },
@@ -537,7 +537,7 @@
       "min_gap": 8.0,
       "median_ms": 0.1,
       "min_ms": 0.1,
-      "max_ms": 0.13,
+      "max_ms": 0.11,
       "det": true,
       "role": "product"
     },
@@ -576,7 +576,7 @@
       "min_gap": 8.0,
       "median_ms": 0.17,
       "min_ms": 0.17,
-      "max_ms": 0.18,
+      "max_ms": 0.2,
       "det": true,
       "role": "product"
     },
@@ -624,9 +624,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 1.31,
-      "min_ms": 1.29,
-      "max_ms": 1.33,
+      "median_ms": 1.32,
+      "min_ms": 1.3,
+      "max_ms": 1.37,
       "det": true,
       "role": "product"
     },
@@ -674,9 +674,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 2.34,
-      "min_ms": 2.33,
-      "max_ms": 2.39,
+      "median_ms": 2.41,
+      "min_ms": 2.38,
+      "max_ms": 2.53,
       "det": true,
       "role": "product"
     },
@@ -724,9 +724,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 2.77,
-      "min_ms": 2.75,
-      "max_ms": 2.98,
+      "median_ms": 2.76,
+      "min_ms": 2.73,
+      "max_ms": 2.77,
       "det": true,
       "role": "product"
     },
@@ -763,8 +763,8 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 0.55,
-      "min_ms": 0.54,
+      "median_ms": 0.57,
+      "min_ms": 0.56,
       "max_ms": 0.58,
       "det": true,
       "role": "product"
@@ -802,9 +802,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 9.73,
-      "min_ms": 8.08,
-      "max_ms": 13.5,
+      "median_ms": 8.28,
+      "min_ms": 8.23,
+      "max_ms": 8.32,
       "det": true,
       "role": "product"
     },
@@ -843,7 +843,7 @@
       "min_gap": 8.0,
       "median_ms": 0.81,
       "min_ms": 0.8,
-      "max_ms": 0.85,
+      "max_ms": 0.83,
       "det": true,
       "role": "product"
     },
@@ -891,9 +891,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 7.15,
-      "min_ms": 7.08,
-      "max_ms": 7.35,
+      "median_ms": 7.37,
+      "min_ms": 7.29,
+      "max_ms": 7.43,
       "det": true,
       "role": "stress"
     },
@@ -930,9 +930,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 9.13,
-      "min_ms": 9.07,
-      "max_ms": 9.17,
+      "median_ms": 9.22,
+      "min_ms": 9.15,
+      "max_ms": 10.37,
       "det": true,
       "role": "stress"
     },
@@ -980,9 +980,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 5.48,
-      "min_ms": 5.44,
-      "max_ms": 5.55,
+      "median_ms": 5.45,
+      "min_ms": 5.43,
+      "max_ms": 5.51,
       "det": true,
       "role": "stress"
     },
@@ -1019,9 +1019,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 0.35,
+      "median_ms": 0.34,
       "min_ms": 0.33,
-      "max_ms": 0.35,
+      "max_ms": 0.36,
       "det": true,
       "role": "stress"
     },
@@ -1069,9 +1069,9 @@
         "stub_occupancy_shifted": 1
       },
       "min_gap": 8.0,
-      "median_ms": 3.57,
+      "median_ms": 3.56,
       "min_ms": 3.54,
-      "max_ms": 3.63,
+      "max_ms": 3.57,
       "det": true,
       "role": "stress"
     },
@@ -1108,9 +1108,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 99.91,
-      "min_ms": 99.08,
-      "max_ms": 101.34,
+      "median_ms": 100.73,
+      "min_ms": 99.28,
+      "max_ms": 101.63,
       "det": true,
       "role": "stress"
     }

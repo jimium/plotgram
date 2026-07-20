@@ -448,9 +448,9 @@ fn topological_sort_groups(
 /// P1-6 自适应目标宽高比（golden）。
 const FLOW_ASPECT_TARGET: f64 = 1.6;
 
-/// P1-6：组间摆放轴向 aspect 自适应择优。
+/// 组间摆放轴向 aspect 自适应择优。
 ///
-/// gate 关闭或用户显式声明 `group_frame` 时直接返回 `default_mode`（现状）；
+/// 用户显式声明 `group_frame` 时直接返回 `default_mode`（现状）；
 /// 否则由组内 content 尺寸预估竖/横两种堆叠的 bbox，取归一化宽高比（log 距离）
 /// 更接近 [`FLOW_ASPECT_TARGET`] 的轴向。纯函数（只取 values 的 max/sum，与 key 序无关）。
 fn choose_arrangement_mode(
@@ -459,9 +459,7 @@ fn choose_arrangement_mode(
     gap: f64,
     default_mode: ArrangementMode,
 ) -> ArrangementMode {
-    if !crate::layout::group_frame::flowchart_aspect_enabled()
-        || crate::layout::group_frame::has_explicit_group_frame(diagram)
-    {
+    if crate::layout::group_frame::has_explicit_group_frame(diagram) {
         return default_mode;
     }
     let n = intra_layouts.len();

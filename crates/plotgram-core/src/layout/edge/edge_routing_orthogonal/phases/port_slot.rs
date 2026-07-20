@@ -803,12 +803,10 @@ fn relieve_overloaded_port_sides(
         }
     }
 
-    if std::env::var_os("PLOTGRAM_DEBUG_PORT_PRESSURE").is_some() {
-        eprintln!(
-            "[port-pressure] relieved_pairs={} trig={}",
-            relieved, PORT_PRESSURE_TRIG
-        );
-    }
+    crate::perf_log!(
+        "[port-pressure] relieved_pairs={} trig={}",
+        relieved, PORT_PRESSURE_TRIG
+    );
 }
 
 /// 查找多数派端口。tiebreak：count 降序 → 最小 edge_index 升序 → 固定端口顺序。

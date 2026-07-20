@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-20-074141-tier-d-final",
+  "date": "2026-07-20-060443-a-3-after",
   "note": "role-aware baseline: product-gate hard; stress/demo quality soft",
   "samples": [
     {
@@ -48,7 +48,7 @@
       "min_gap": 12.0,
       "median_ms": 0.26,
       "min_ms": 0.24,
-      "max_ms": 0.29,
+      "max_ms": 0.28,
       "det": true,
       "role": "product"
     },
@@ -96,9 +96,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 11.14,
-      "min_ms": 11.06,
-      "max_ms": 17.83,
+      "median_ms": 11.27,
+      "min_ms": 11.2,
+      "max_ms": 11.44,
       "det": true,
       "role": "product"
     },
@@ -146,9 +146,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 2.17,
-      "min_ms": 2.12,
-      "max_ms": 2.17,
+      "median_ms": 2.14,
+      "min_ms": 2.13,
+      "max_ms": 2.2,
       "det": true,
       "role": "product"
     },
@@ -196,9 +196,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 5.36,
-      "min_ms": 5.01,
-      "max_ms": 5.77,
+      "median_ms": 5.64,
+      "min_ms": 5.32,
+      "max_ms": 5.78,
       "det": true,
       "role": "product"
     },
@@ -246,9 +246,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 18.36,
-      "min_ms": 18.18,
-      "max_ms": 19.42,
+      "median_ms": 18.7,
+      "min_ms": 18.6,
+      "max_ms": 18.77,
       "det": true,
       "role": "product"
     },
@@ -296,9 +296,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 46.09,
-      "min_ms": 45.76,
-      "max_ms": 48.35,
+      "median_ms": 49.17,
+      "min_ms": 46.92,
+      "max_ms": 57.97,
       "det": true,
       "role": "product"
     },
@@ -346,9 +346,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 0.11,
+      "median_ms": 0.1,
       "min_ms": 0.1,
-      "max_ms": 0.13,
+      "max_ms": 0.12,
       "det": true,
       "role": "product"
     },
@@ -396,9 +396,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 2.06,
-      "min_ms": 2.03,
-      "max_ms": 2.09,
+      "median_ms": 2.16,
+      "min_ms": 2.14,
+      "max_ms": 2.23,
       "det": true,
       "role": "product"
     },
@@ -446,9 +446,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 2.88,
-      "min_ms": 2.88,
-      "max_ms": 2.94,
+      "median_ms": 2.9,
+      "min_ms": 2.84,
+      "max_ms": 2.92,
       "det": true,
       "role": "product"
     },
@@ -496,9 +496,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 1.8,
+      "median_ms": 1.78,
       "min_ms": 1.76,
-      "max_ms": 2.21,
+      "max_ms": 1.82,
       "det": true,
       "role": "product"
     },
@@ -537,7 +537,7 @@
       "min_gap": 8.0,
       "median_ms": 0.1,
       "min_ms": 0.1,
-      "max_ms": 0.13,
+      "max_ms": 0.11,
       "det": true,
       "role": "product"
     },
@@ -624,9 +624,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 1.31,
-      "min_ms": 1.29,
-      "max_ms": 1.33,
+      "median_ms": 1.34,
+      "min_ms": 1.3,
+      "max_ms": 1.37,
       "det": true,
       "role": "product"
     },
@@ -674,8 +674,8 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 2.34,
-      "min_ms": 2.33,
+      "median_ms": 2.37,
+      "min_ms": 2.31,
       "max_ms": 2.39,
       "det": true,
       "role": "product"
@@ -724,9 +724,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 2.77,
-      "min_ms": 2.75,
-      "max_ms": 2.98,
+      "median_ms": 2.79,
+      "min_ms": 2.76,
+      "max_ms": 2.83,
       "det": true,
       "role": "product"
     },
@@ -802,9 +802,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 9.73,
-      "min_ms": 8.08,
-      "max_ms": 13.5,
+      "median_ms": 8.34,
+      "min_ms": 8.21,
+      "max_ms": 8.68,
       "det": true,
       "role": "product"
     },
@@ -841,9 +841,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 0.81,
-      "min_ms": 0.8,
-      "max_ms": 0.85,
+      "median_ms": 0.79,
+      "min_ms": 0.79,
+      "max_ms": 0.81,
       "det": true,
       "role": "product"
     },
@@ -891,9 +891,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 7.15,
-      "min_ms": 7.08,
-      "max_ms": 7.35,
+      "median_ms": 7.36,
+      "min_ms": 7.32,
+      "max_ms": 8.42,
       "det": true,
       "role": "stress"
     },
@@ -930,9 +930,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 9.13,
-      "min_ms": 9.07,
-      "max_ms": 9.17,
+      "median_ms": 9.17,
+      "min_ms": 9.12,
+      "max_ms": 9.21,
       "det": true,
       "role": "stress"
     },
@@ -980,9 +980,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 5.48,
-      "min_ms": 5.44,
-      "max_ms": 5.55,
+      "median_ms": 5.44,
+      "min_ms": 5.41,
+      "max_ms": 5.5,
       "det": true,
       "role": "stress"
     },
@@ -1019,7 +1019,7 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 0.35,
+      "median_ms": 0.34,
       "min_ms": 0.33,
       "max_ms": 0.35,
       "det": true,
@@ -1069,9 +1069,9 @@
         "stub_occupancy_shifted": 1
       },
       "min_gap": 8.0,
-      "median_ms": 3.57,
-      "min_ms": 3.54,
-      "max_ms": 3.63,
+      "median_ms": 10.09,
+      "min_ms": 7.95,
+      "max_ms": 10.44,
       "det": true,
       "role": "stress"
     },
@@ -1108,9 +1108,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 99.91,
-      "min_ms": 99.08,
-      "max_ms": 101.34,
+      "median_ms": 100.65,
+      "min_ms": 100.02,
+      "max_ms": 102.77,
       "det": true,
       "role": "stress"
     }

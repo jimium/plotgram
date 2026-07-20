@@ -19,8 +19,6 @@ pub enum GroupSizingPolicy {
 ///
 /// 默认 `Uniform`（同级条带，由 L1 GroupFramePass 拉齐）；
 /// 显式 `track: fit` 才退回内容贴合。two_phase 本身不再执行 Equal。
-/// P1-4：packing 开启且未显式声明 track 时默认 `Fit`（与 group_frame 的 Fit 切换对齐，
-/// 避免 phase_d 的条带等宽 EGB 与装箱冲突）。
 pub fn parse_group_sizing(diagram: &Diagram) -> GroupSizingPolicy {
     match diagram_group_frame_track(diagram) {
         Some(t) => match t.trim().to_ascii_lowercase().as_str() {
@@ -28,13 +26,7 @@ pub fn parse_group_sizing(diagram: &Diagram) -> GroupSizingPolicy {
             "equal" | "uniform" => GroupSizingPolicy::Uniform,
             _ => GroupSizingPolicy::Uniform,
         },
-        None => {
-            if crate::layout::group_frame::architecture_pack_enabled() {
-                GroupSizingPolicy::Fit
-            } else {
-                GroupSizingPolicy::Uniform
-            }
-        }
+        None => GroupSizingPolicy::Uniform,
     }
 }
 

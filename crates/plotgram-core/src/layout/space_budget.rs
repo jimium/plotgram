@@ -153,7 +153,7 @@ impl SpaceBudget {
             .max(self.default_node_gap)
     }
 
-    /// D4 P0 + P1.2/P3.2：用只读压力模型抬缝（可 `PLOTGRAM_PRESSURE_BUDGET=0` 关闭）。
+    /// D4 P0 + P1.2/P3.2：用只读压力模型抬缝。
     ///
     /// - 邻层 `deficit` → 抬 `min_vertical_rank_gap`（cap 于 diagram profile.max_extra）
     /// - 廊级 `load > capacity` → `request_corridor_boost` + 跨廊组节点 pair_gaps
@@ -167,12 +167,6 @@ impl SpaceBudget {
         bands: &[crate::layout::demand::BandDemand],
         edge_features: &[crate::layout::demand::EdgeFeatures],
     ) {
-        if std::env::var("PLOTGRAM_PRESSURE_BUDGET")
-            .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
-            .unwrap_or(false)
-        {
-            return;
-        }
         let profile = crate::layout::edge_band_demand::EdgeBandDemandProfile::for_diagram(
             diagram.diagram_type.clone(),
             !diagram.groups.is_empty(),
@@ -351,15 +345,13 @@ impl SpaceBudget {
             self.request_corridor_boost();
         }
 
-        if std::env::var_os("PLOTGRAM_DEBUG_EDGE_PRESSURE").is_some() {
-            eprintln!(
-                "[edge-pressure] pierce_hot={} min_vert_gap={:?} pair_gaps={} corridor_boost={}",
-                pierce_hot,
-                self.min_vertical_rank_gap,
-                self.pair_gaps.len(),
-                self.corridor_boost_requested
-            );
-        }
+        crate::perf_log!(
+            "[edge-pressure] pierce_hot={} min_vert_gap={:?} pair_gaps={} corridor_boost={}",
+            pierce_hot,
+            self.min_vertical_rank_gap,
+            self.pair_gaps.len(),
+            self.corridor_boost_requested
+        );
     }
 }
 
