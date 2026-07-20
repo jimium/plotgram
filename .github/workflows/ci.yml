@@ -23,9 +23,3 @@ jobs:
         run: |
           cargo test -p plotgram-core --lib
           cargo test -p plotgram-eval --lib deterministic
-
-      - name: Build eval CLI
-        run: cargo build -p plotgram-eval --bin eval
-
-      - name: Showcase baseline regression
-        run: ./showcase/eval-showcase.sh check

@@ -60,7 +60,7 @@ fn print_usage() {
   plotgram-eval batch <目录> [选项]            批量评估目录下所有 .pgm 文件
   plotgram-eval algo <算法名> <目录> [选项]    算法维度评估
   plotgram-eval diff <baseline.json> <current.json>  对比两次评估结果
-  plotgram-eval baseline <目录> [-o eval-data/showcase-baseline.json]  生成 showcase 质量基线
+  plotgram-eval baseline <目录> [-o target/showcase-baseline.json]  生成目录质量基线（可选工具；日常门禁见 benchmarks/）
   plotgram-eval baseline-check <目录> [--baseline <文件>]  与基线对比检测回归
 
 选项:
@@ -711,12 +711,12 @@ fn cmd_diff(args: &[String]) {
 
 fn cmd_baseline(args: &[String]) {
     if args.is_empty() {
-        eprintln!("用法: plotgram-eval baseline <showcase目录> [-o eval-data/showcase-baseline.json]");
+        eprintln!("用法: plotgram-eval baseline <showcase目录> [-o target/showcase-baseline.json]");
         std::process::exit(1);
     }
 
     let showcase_dir = Path::new(&args[0]);
-    let mut output = PathBuf::from("eval-data/showcase-baseline.json");
+    let mut output = PathBuf::from("target/showcase-baseline.json");
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
@@ -756,13 +756,13 @@ fn cmd_baseline(args: &[String]) {
 fn cmd_baseline_check(args: &[String]) {
     if args.is_empty() {
         eprintln!(
-            "用法: plotgram-eval baseline-check <showcase目录> [--baseline eval-data/showcase-baseline.json] [-f text|json] [-o 文件]"
+            "用法: plotgram-eval baseline-check <showcase目录> [--baseline target/showcase-baseline.json] [-f text|json] [-o 文件]"
         );
         std::process::exit(1);
     }
 
     let showcase_dir = Path::new(&args[0]);
-    let mut baseline_path = PathBuf::from("eval-data/showcase-baseline.json");
+    let mut baseline_path = PathBuf::from("target/showcase-baseline.json");
     let mut format = "text".to_string();
     let mut output: Option<String> = None;
     let mut i = 1;

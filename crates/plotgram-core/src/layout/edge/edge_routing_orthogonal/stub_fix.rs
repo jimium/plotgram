@@ -130,7 +130,7 @@ fn has_reverse_stub(points: &[Point], anchor_idx: usize, side: Port) -> bool {
     let is_start = anchor_idx == 0;
 
     // 情况0：首段（从锚点出发的第一段）直接反向——即使后续有正向行程也算反向 stub。
-    // 修复 c.layout-stress-nested 写/读/批量：Bottom 端口却先向上伸入节点。
+    // 修复 stress.layout-stress-nested 写/读/批量：Bottom 端口却先向上伸入节点。
     {
         let neighbor = if is_start {
             points.get(1).copied()

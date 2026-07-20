@@ -1440,12 +1440,13 @@
 
     const ROLE_ORDER = ["product", "smoke", "demo", "stress", "mech"];
 
-    // 主区角色（默认展示）：product + demo；工程探针（stress + mech）默认折叠
-    const PRIMARY_ROLES = ["product", "demo"];
+    // 主区角色（chip 列表）：product / smoke / demo
+    const PRIMARY_ROLES = ["product", "smoke", "demo"];
+    // 工程探针（默认折叠）：stress / mech
     const PROBE_ROLES = ["stress", "mech"];
 
-    // 默认选中的角色集（与 PRIMARY_ROLES 一致）
-    const DEFAULT_ROLES = new Set(PRIMARY_ROLES);
+    // 默认选中的角色集（product + demo；smoke 默认不展示但可勾选）
+    const DEFAULT_ROLES = new Set(["product", "demo"]);
 
     const FEATURED_FILES = new Set([
       "state/demo.k8s-rollout-state-machine.pgm",

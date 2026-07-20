@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gate Baseline Viewer</title>
+  <style>
+    :root {
+      --bg: #f6f4ef;
+      --ink: #1a1a18;
+      --muted: #5c5a54;
+      --line: #d9d4c8;
+      --panel: #fffcf7;
+      --accent: #0b6e4f;
+      --bad: #a33b2b;
+      --good: #0b6e4f;
+      --warn: #8a6a12;
+      --warn-soft: #f3ebcf;
+      --mono: "SF Mono", "Menlo", "Consolas", ui-monospace, monospace;
+      --sans: "IBM Plex Sans", "Source Han Sans SC", "Noto Sans SC", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--ink);
+      background:
+        radial-gradient(ellipse 80% 50% at 10% -10%, #e8efe9 0%, transparent 55%),
+        radial-gradient(ellipse 60% 40% at 100% 0%, #efe8dc 0%, transparent 50%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    header { padding: 28px 32px 12px; max-width: 1200px; margin: 0 auto; }
+    header h1 { margin: 0 0 6px; font-size: 1.55rem; font-weight: 650; letter-spacing: -0.02em; }
+    header p { margin: 0; color: var(--muted); font-size: 0.95rem; max-width: 70ch; line-height: 1.45; }
+    main { max-width: 1200px; margin: 0 auto; padding: 8px 32px 48px; display: grid; gap: 20px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+    .panel h2 { margin: 0 0 12px; font-size: 0.95rem; font-weight: 650; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+    label { display: flex; flex-direction: column; gap: 4px; font-size: 0.78rem; color: var(--muted); font-weight: 500; }
+    select, button {
+      font: inherit; font-size: 0.9rem; padding: 7px 10px; border-radius: 6px;
+      border: 1px solid var(--line); background: #fff; color: var(--ink);
+    }
+    button { background: var(--accent); color: #fff; border-color: var(--accent); cursor: pointer; font-weight: 560; }
+    button.secondary { background: #fff; color: var(--ink); border-color: var(--line); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .chip {
+      border: 1px solid var(--line); background: #fff; border-radius: 999px;
+      padding: 5px 12px; font-size: 0.82rem; cursor: pointer; color: var(--muted);
+    }
+    .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 560; }
+    .chip.soft.active { background: #8a6a12; border-color: #8a6a12; }
+    .hint { font-size: 0.8rem; color: var(--muted); margin: 0 0 12px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: #fff; }
+    .card .k { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .card .v { font-size: 1.25rem; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .card .d { font-size: 0.78rem; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .d.up { color: var(--bad); }
+    .d.down { color: var(--good); }
+    .d.flat { color: var(--muted); }
+    .d.warn { color: var(--warn); }
+    .snap-list { display: grid; gap: 8px; }
+    .snap { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: #fff; }
+    .snap .title { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-weight: 650; }
+    .snap .note { margin-top: 4px; color: var(--muted); font-size: 0.85rem; }
+    .badge {
+      display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 2px 7px;
+      border-radius: 999px; background: #d8efe6; color: var(--accent);
+    }
+    .role-badge {
+      display: inline-block; font-size: 0.7rem; font-weight: 600; padding: 2px 7px;
+      border-radius: 4px; text-transform: lowercase;
+    }
+    .role-badge.product { background: #d8efe6; color: #0b6e4f; }
+    .role-badge.stress { background: var(--warn-soft); color: var(--warn); }
+    .role-badge.demo { background: #e8eef5; color: #2a4a6b; }
+    .role-badge.smoke { background: #eee; color: #555; }
+    .role-badge.mech { background: #f0e8f5; color: #6b3a7a; }
+    .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+    .chart-box { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: #fff; }
+    .chart-box h3 { margin: 0 0 8px; font-size: 0.82rem; font-weight: 600; }
+    .chart { width: 100%; height: 180px; display: block; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+    th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    td.num { font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 0.8rem; }
+    td.name { font-family: var(--mono); font-size: 0.78rem; }
+    .delta-up { color: var(--bad); }
+    .delta-down { color: var(--good); }
+    .delta-warn { color: var(--warn); background: var(--warn-soft); }
+    .empty, .err { color: var(--muted); font-size: 0.9rem; }
+    .err { color: var(--bad); }
+    footer {
+      max-width: 1200px; margin: 0 auto; padding: 0 32px 32px;
+      color: var(--muted); font-size: 0.78rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Gate Baseline Viewer</h1>
+    <p>
+      读取 <code>benchmarks/baselines/{latest,YYYY-MM-DD}.json</code>。
+      <strong>无退化主叙事 = product-gate</strong>；stress/demo 质量为观测轨（升可不挡合并）。
+      <a href="/readme" style="color:var(--accent);font-weight:560">指标与门禁说明 →</a>
+    </p>
+  </header>
+
+  <main>
+    <section class="panel" id="overview">
+      <h2>快照总览</h2>
+      <div class="snap-list" id="snap-list"><p class="empty">加载中…</p></div>
+    </section>
+
+    <section class="panel">
+      <h2>趋势（按角色合计）</h2>
+      <p class="hint">默认只画 <strong>product</strong>（日常硬门禁）。勾选其他角色会叠加对应曲线合计。</p>
+      <div class="chips" id="trend-roles"></div>
+      <div class="charts" id="charts"></div>
+    </section>
+
+    <section class="panel">
+      <h2>两版对比</h2>
+      <div class="row" style="margin-bottom:12px">
+        <label>基线（旧）
+          <select id="sel-base"></select>
+        </label>
+        <label>当前（新）
+          <select id="sel-cur"></select>
+        </label>
+        <button type="button" id="btn-compare">对比</button>
+        <button type="button" class="secondary" id="btn-swap">交换</button>
+      </div>
+      <p class="hint">摘要卡片默认只汇总 <strong>product</strong>；表格可按角色筛选。stress 质量上升标为观测（琥珀），不按硬红显示。</p>
+      <div class="chips" id="compare-roles"></div>
+      <div class="cards" id="summary-cards"></div>
+      <div class="table-wrap" style="margin-top:14px">
+        <table>
+          <thead>
+            <tr>
+              <th>role</th>
+              <th>样例</th>
+              <th>exact_sev</th>
+              <th>tight_sev</th>
+              <th>lint_err</th>
+              <th>through</th>
+              <th>group_int</th>
+              <th>median_ms</th>
+              <th>node_fp</th>
+              <th>det</th>
+            </tr>
+          </thead>
+          <tbody id="diff-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    数据 API：<code>/api/baselines</code> · <code>/api/series</code> · <code>/api/baselines/&lt;file&gt;</code>
+    · 启动：<code>./benchmarks/serve-viewer.py</code>
+    · 门禁：product/smoke 质量硬 · stress/demo 质量软 · 正确性全角色硬
+  </footer>
+
+  <script>
+    const ROLE_ORDER = ["product", "smoke", "demo", "stress", "mech"];
+    const HARD_QUALITY = new Set(["product", "smoke"]);
+    const METRICS = [
+      { key: "exact_sev", label: "exact_sev", lowerBetter: true },
+      { key: "tight_sev", label: "tight_sev", lowerBetter: true },
+      { key: "lint_err", label: "lint error", lowerBetter: true },
+      { key: "through", label: "edge_through_node", lowerBetter: true },
+      { key: "group_interior", label: "group_interior", lowerBetter: true },
+      { key: "avg_median_ms", label: "avg median_ms", lowerBetter: true },
+    ];
+
+    const state = {
+      series: [],
+      trendRoles: new Set(["product"]),
+      compareRoles: new Set(["product"]),
+      availableRoles: new Set(["product"]),
+    };
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    function shortName(file) {
+      return (file || "").replace(/^showcase\/.*\//, "").replace(/\.pgm$/, "");
+    }
+
+    function deriveRole(sample) {
+      if (sample.role && ROLE_ORDER.includes(sample.role)) return sample.role;
+      const head = shortName(sample.file || "").split(".")[0];
+      return ROLE_ORDER.includes(head) ? head : "product";
+    }
+
+    function fmt(n, digits = 1) {
+      if (n == null || Number.isNaN(n)) return "—";
+      return Number(n).toLocaleString(undefined, {
+        maximumFractionDigits: digits,
+        minimumFractionDigits: 0,
+      });
+    }
+
+    function deltaClass(d, lowerBetter, soft) {
+      if (d == null || Math.abs(d) < 1e-9) return "flat";
+      const worse = lowerBetter ? d > 0 : d < 0;
+      if (!worse) return "down";
+      return soft ? "warn" : "up";
+    }
+
+    function deltaText(d, digits = 1) {
+      if (d == null || Math.abs(d) < 1e-9) return "±0";
+      const sign = d > 0 ? "+" : "";
+      return sign + fmt(d, digits);
+    }
+
+    function drawLineChart(el, points, label) {
+      const w = 560, h = 180, pad = { t: 16, r: 16, b: 28, l: 44 };
+      const vals = points.map(p => p.y).filter(v => v != null);
+      if (!vals.length) {
+        el.innerHTML = `<h3>${esc(label)}</h3><p class="empty">无数据</p>`;
+        return;
+      }
+      const ymin = Math.min(0, ...vals);
+      const ymax = Math.max(...vals) * 1.08 || 1;
+      const x0 = pad.l, x1 = w - pad.r, y1 = h - pad.b;
+      const xAt = i => x0 + (points.length <= 1 ? 0 : (i / (points.length - 1)) * (x1 - x0));
+      const yAt = v => y1 - ((v - ymin) / (ymax - ymin || 1)) * (y1 - pad.t);
+      const poly = points.map((p, i) => `${xAt(i).toFixed(1)},${yAt(p.y ?? ymin).toFixed(1)}`).join(" ");
+      const dots = points.map((p, i) => {
+        const cx = xAt(i), cy = yAt(p.y ?? ymin);
+        return `<circle cx="${cx}" cy="${cy}" r="3.5" fill="#0b6e4f" />
+          <title>${esc(p.x)}: ${fmt(p.y, 2)}</title>`;
+      }).join("");
+      const labels = points.map((p, i) =>
+        `<text x="${xAt(i)}" y="${h - 8}" text-anchor="middle" font-size="10" fill="#5c5a54">${esc(p.x)}</text>`
+      ).join("");
+      const yTicks = [ymin, (ymin + ymax) / 2, ymax].map(v => {
+        const y = yAt(v);
+        return `<text x="${pad.l - 6}" y="${y + 3}" text-anchor="end" font-size="10" fill="#5c5a54">${fmt(v, 1)}</text>
+          <line x1="${pad.l}" y1="${y}" x2="${x1}" y2="${y}" stroke="#eee8dc" />`;
+      }).join("");
+      el.innerHTML = `
+        <h3>${esc(label)}</h3>
+        <svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+          ${yTicks}
+          <polyline fill="none" stroke="#0b6e4f" stroke-width="2" points="${poly}" />
+          ${dots}
+          ${labels}
+        </svg>`;
+    }
+
+    async function loadJson(url) {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`${url}: ${r.status}`);
+      return r.json();
+    }
+
+    function renderRoleChips(containerId, selected, onToggle) {
+      const box = document.getElementById(containerId);
+      const roles = ROLE_ORDER.filter(r => state.availableRoles.has(r));
+      box.innerHTML = roles.map(r => {
+        const soft = !HARD_QUALITY.has(r);
+        const active = selected.has(r) ? "active" : "";
+        const softCls = soft ? "soft" : "";
+        const tag = HARD_QUALITY.has(r) ? "硬" : "观测";
+        return `<button type="button" class="chip ${active} ${softCls}" data-role="${r}">${r} · ${tag}</button>`;
+      }).join("");
+      box.querySelectorAll(".chip").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const role = btn.dataset.role;
+          if (selected.has(role)) {
+            if (selected.size > 1) selected.delete(role);
+          } else {
+            selected.add(role);
+          }
+          onToggle();
+        });
+      });
+    }
+
+    function renderSnaps(baselines) {
+      const box = document.getElementById("snap-list");
+      if (!baselines.length) {
+        box.innerHTML = `<p class="empty">未找到 baselines/{latest,YYYY-MM-DD}.json</p>`;
+        return;
+      }
+      box.innerHTML = baselines.map(b => {
+        if (b.error) {
+          return `<div class="snap"><div class="title">${esc(b.file)}</div><div class="err">${esc(b.error)}</div></div>`;
+        }
+        const rc = b.role_counts || {};
+        const roleBits = ROLE_ORDER
+          .filter(r => rc[r])
+          .map(r => `<span class="role-badge ${r}">${r} ${rc[r]}</span>`)
+          .join(" ");
+        return `<div class="snap">
+          <div class="title">
+            <span>${esc(b.date || "?")}</span>
+            <code style="font-size:0.78rem;color:var(--muted)">${esc(b.file)}</code>
+            ${b.is_latest ? `<span class="badge">latest</span>` : ""}
+            <span style="color:var(--muted);font-weight:500;font-size:0.8rem">${b.sample_count ?? 0} samples</span>
+            ${roleBits}
+          </div>
+          <div class="note">${esc(b.note || "（无 note）")}</div>
+        </div>`;
+      }).join("");
+    }
+
+    function fillSelects(baselines) {
+      const dated = baselines.filter(b => !b.is_latest && !b.error);
+      // latest 也可选：放在末尾
+      const latest = baselines.filter(b => b.is_latest && !b.error);
+      const all = [...dated, ...latest];
+      const opts = all.map(b =>
+        `<option value="${esc(b.file)}">${esc(b.date || "?")}${b.is_latest ? " (latest)" : ""} — ${esc(b.file)}</option>`
+      ).join("");
+      const base = document.getElementById("sel-base");
+      const cur = document.getElementById("sel-cur");
+      base.innerHTML = opts;
+      cur.innerHTML = opts;
+      if (dated.length >= 2) {
+        base.value = dated[dated.length - 2].file;
+        cur.value = dated[dated.length - 1].file;
+      } else if (latest.length && dated.length === 1) {
+        base.value = dated[0].file;
+        cur.value = latest[0].file;
+      } else if (all.length) {
+        base.value = all[0].file;
+        cur.value = all[all.length - 1].file;
+      }
+    }
+
+    function sumRoles(byRole, roles, key) {
+      let n = 0;
+      for (const r of roles) {
+        const t = byRole?.[r];
+        if (t && t[key] != null) n += Number(t[key]) || 0;
+      }
+      return n;
+    }
+
+    function renderCharts() {
+      const box = document.getElementById("charts");
+      box.innerHTML = "";
+      const roles = [...state.trendRoles];
+      const roleLabel = roles.join("+");
+      METRICS.forEach(m => {
+        const el = document.createElement("div");
+        el.className = "chart-box";
+        const points = state.series.map(s => ({
+          x: s.date || s.file,
+          y: sumRoles(s.by_role, roles, m.key),
+        }));
+        drawLineChart(el, points, `${m.label} · ${roleLabel}`);
+        box.appendChild(el);
+      });
+    }
+
+    function cellDelta(oldV, newV, lowerBetter, digits, soft) {
+      if (oldV == null && newV == null) return `<td class="num">—</td>`;
+      const d = (oldV != null && newV != null) ? (newV - oldV) : null;
+      let cls = "";
+      if (d != null && Math.abs(d) >= 1e-9) {
+        const worse = lowerBetter ? d > 0 : d < 0;
+        cls = !worse ? "delta-down" : (soft ? "delta-warn" : "delta-up");
+      }
+      const tip = d == null ? "" : ` title="${fmt(oldV, digits)} → ${fmt(newV, digits)}"`;
+      return `<td class="num ${cls}"${tip}>${fmt(newV, digits)}<div style="font-size:0.7rem;opacity:.85">${deltaText(d, digits)}</div></td>`;
+    }
+
+    async function compare() {
+      const baseFile = document.getElementById("sel-base").value;
+      const curFile = document.getElementById("sel-cur").value;
+      if (!baseFile || !curFile) return;
+      const [base, cur] = await Promise.all([
+        loadJson(`/api/baselines/${encodeURIComponent(baseFile)}`),
+        loadJson(`/api/baselines/${encodeURIComponent(curFile)}`),
+      ]);
+
+      const enrich = (s) => ({ ...s, role: deriveRole(s), _key: shortName(s.file) });
+      const bSamples = (base.samples || []).map(enrich);
+      const cSamples = (cur.samples || []).map(enrich);
+      const bMap = Object.fromEntries(bSamples.map(s => [s._key, s]));
+      const cMap = Object.fromEntries(cSamples.map(s => [s._key, s]));
+
+      const filterMap = (map) => Object.fromEntries(
+        Object.entries(map).filter(([, s]) => state.compareRoles.has(s.role))
+      );
+      const bF = filterMap(bMap);
+      const cF = filterMap(cMap);
+
+      const lint = (s, k) => Number((s.lint || {})[k] || 0);
+      const sum = (map, fn) => Object.values(map).reduce((a, s) => a + fn(s), 0);
+      const softSummary = [...state.compareRoles].every(r => !HARD_QUALITY.has(r));
+      const cards = [
+        { k: "exact_sev", b: sum(bF, s => +s.exact_sev || 0), c: sum(cF, s => +s.exact_sev || 0), dig: 1 },
+        { k: "tight_sev", b: sum(bF, s => +s.tight_sev || 0), c: sum(cF, s => +s.tight_sev || 0), dig: 1 },
+        { k: "lint_err", b: sum(bF, s => lint(s, "error_count")), c: sum(cF, s => lint(s, "error_count")), dig: 0 },
+        { k: "through", b: sum(bF, s => lint(s, "edge_through_node")), c: sum(cF, s => lint(s, "edge_through_node")), dig: 0 },
+        { k: "group_int", b: sum(bF, s => lint(s, "edge_crosses_group_interior")), c: sum(cF, s => lint(s, "edge_crosses_group_interior")), dig: 0 },
+      ];
+      const roleTag = [...state.compareRoles].join("+");
+      document.getElementById("summary-cards").innerHTML = cards.map(c => {
+        const d = c.c - c.b;
+        // group_int / det 类正确性始终硬着色；其余质量在纯观测角色集上用 warn
+        const soft = softSummary && c.k !== "group_int";
+        return `<div class="card">
+          <div class="k">${esc(c.k)} · ${esc(roleTag)}</div>
+          <div class="v">${fmt(c.c, c.dig)}</div>
+          <div class="d ${deltaClass(d, true, soft)}">${deltaText(d, c.dig)} vs base</div>
+        </div>`;
+      }).join("");
+
+      const names = [...new Set([...Object.keys(bMap), ...Object.keys(cMap)])]
+        .filter(n => {
+          const role = (cMap[n] || bMap[n]).role;
+          return state.compareRoles.has(role);
+        })
+        .sort((a, b) => {
+          const ra = ROLE_ORDER.indexOf((cMap[a] || bMap[a]).role);
+          const rb = ROLE_ORDER.indexOf((cMap[b] || bMap[b]).role);
+          if (ra !== rb) return ra - rb;
+          return a.localeCompare(b);
+        });
+
+      const body = document.getElementById("diff-body");
+      body.innerHTML = names.map(name => {
+        const b = bMap[name], c = cMap[name];
+        const role = (c || b).role;
+        const soft = !HARD_QUALITY.has(role);
+        if (!b || !c) {
+          return `<tr>
+            <td><span class="role-badge ${role}">${role}</span></td>
+            <td class="name">${esc(name)}</td>
+            <td colspan="8" class="empty">${!b ? "仅新快照" : "仅旧基线"}</td>
+          </tr>`;
+        }
+        const bl = b.lint || {}, cl = c.lint || {};
+        const fpB = (b.node_fp || "").slice(0, 12);
+        const fpC = (c.node_fp || "").slice(0, 12);
+        const fpCls = fpB !== fpC ? "delta-warn" : "";
+        const detCls = c.det === false ? "delta-up" : "";
+        return `<tr>
+          <td><span class="role-badge ${role}">${role}</span></td>
+          <td class="name">${esc(name)}</td>
+          ${cellDelta(+b.exact_sev || 0, +c.exact_sev || 0, true, 1, soft)}
+          ${cellDelta(+b.tight_sev || 0, +c.tight_sev || 0, true, 1, soft)}
+          ${cellDelta(+bl.error_count || 0, +cl.error_count || 0, true, 0, soft)}
+          ${cellDelta(+bl.edge_through_node || 0, +cl.edge_through_node || 0, true, 0, soft)}
+          ${cellDelta(+bl.edge_crosses_group_interior || 0, +cl.edge_crosses_group_interior || 0, true, 0, false)}
+          ${cellDelta(b.median_ms, c.median_ms, true, 2, soft)}
+          <td class="num ${fpCls}" title="${esc(fpB)} → ${esc(fpC)}">${esc(fpC)}</td>
+          <td class="num ${detCls}">${c.det === true ? "✓" : c.det === false ? "✗" : "—"}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    async function main() {
+      try {
+        const [{ baselines }, seriesPayload] = await Promise.all([
+          loadJson("/api/baselines"),
+          loadJson("/api/series"),
+        ]);
+        state.series = seriesPayload.series || [];
+        state.availableRoles = new Set();
+        for (const s of state.series) {
+          Object.keys(s.role_counts || {}).forEach(r => state.availableRoles.add(r));
+        }
+        for (const b of baselines) {
+          Object.keys(b.role_counts || {}).forEach(r => state.availableRoles.add(r));
+        }
+        if (!state.availableRoles.size) state.availableRoles.add("product");
+
+        state.trendRoles = new Set(
+          ["product"].filter(r => state.availableRoles.has(r))
+        );
+        if (!state.trendRoles.size) state.trendRoles = new Set(state.availableRoles);
+        state.compareRoles = new Set(state.trendRoles);
+
+        renderSnaps(baselines);
+        fillSelects(baselines);
+
+        const redrawTrend = () => {
+          renderRoleChips("trend-roles", state.trendRoles, redrawTrend);
+          renderCharts();
+        };
+        const redrawCompare = () => {
+          renderRoleChips("compare-roles", state.compareRoles, redrawCompare);
+          compare().catch(alert);
+        };
+        redrawTrend();
+        redrawCompare();
+      } catch (e) {
+        document.getElementById("snap-list").innerHTML =
+          `<p class="err">加载失败：${esc(e.message)}。请用 ./benchmarks/serve-viewer.py 启动。</p>`;
+      }
+    }
+
+    document.getElementById("btn-compare").addEventListener("click", () => compare().catch(alert));
+    document.getElementById("btn-swap").addEventListener("click", () => {
+      const a = document.getElementById("sel-base");
+      const b = document.getElementById("sel-cur");
+      const t = a.value; a.value = b.value; b.value = t;
+      compare().catch(alert);
+    });
+
+    main();
+  </script>
+</body>
+</html>

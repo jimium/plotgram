@@ -23,7 +23,7 @@ showcase/
 | `smoke.` | smoke | 必须干净 | 冒烟；正确性硬 |
 | `product.` | product | **必须好看** | **精选进质量硬棘轮** |
 | `demo.` | demo | 好看优先 | 观测 / 可债 |
-| `stress.` | stress | 可妥协 | 正确性硬；质量观测（`--allow-stress-debt`） |
+| `stress.` | stress | 可妥协 | 正确性硬；质量默认 WARN（`--strict-stress` 改硬） |
 | `mech.` | mech | 不追美观 | 机制断言 / 专项集 |
 
 旧 `s./n./c./x.` 规模前缀**已废弃**。UI / 工具按文件名第一段解析角色：
@@ -41,14 +41,14 @@ path.split('/').last().split('.')[0]  →  role
 
 ## 门禁清单
 
-门禁清单按角色分集，落在 [`../benchmark-data/`](../benchmark-data/)：
+门禁清单按角色分集，落在 [`../benchmarks/`](../benchmarks/)：
 
 | 清单 | 用途 |
 |------|------|
-| `benchmark-data/product-regression-set.txt` | 日常质量硬门禁（精选） |
-| `benchmark-data/stress-probe-set.txt` | 正确性硬 + 质量观测 |
-| `benchmark-data/mech-set.txt` | 机制探针 |
-| `benchmark-data/demo-observe-set.txt` | 观测 / 可债 |
+| `benchmarks/sets/product-regression-set.txt` | 日常质量硬门禁（精选） |
+| `benchmarks/sets/stress-probe-set.txt` | 正确性硬 + 质量观测 |
+| `benchmarks/sets/mech-set.txt` | 机制探针 |
+| `benchmarks/sets/demo-observe-set.txt` | 观测 / 可债 |
 
 日常宣称「无退化」默认只引用 **product-gate**。详见 [重构方案](../docs/architecture/重构方案/showcase-基线分层重构-2026-07.md)。
 

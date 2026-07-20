@@ -1,72 +1,93 @@
-# Performance Benchmark Data
+# benchmarks
 
-This folder stores benchmark results from each optimization round.
+布局 / 边路由的**回归门禁数据与工具**（角色感知）。
 
-## File Naming Convention
 ```
-round{XX}_{description}.json
+benchmarks/
+├── README.md / README.html   # 说明（本文件 + 可读版）
+├── sets/                     # 门禁样例清单
+├── baselines/                # 快照 JSON/MD（latest + YYYY-MM-DD）
+├── scripts/                  # snapshot / compare / serve-viewer
+├── viewer/                   # 基线趋势 UI
+├── snapshot.sh               # → scripts/ 薄包装
+├── compare.sh
+└── serve-viewer.py
 ```
 
-## Rounds
+完整说明（含流程 / 指标图解）见可读版：
 
-### Round 01: Baseline
-- **File**: `round01_baseline.json`
-- **Date**: Before any performance optimizations
-- **Description**: Original algorithm performance without optimizations
+- 文件：[`README.html`](./README.html)
+- 本地服务：`./benchmarks/serve-viewer.py` → http://127.0.0.1:8765/readme
 
-### Round 02: sugiyama_v2 + visibility Dijkstra Optimization ✅ KEEP
-- **File**: `round02_sugiyama_visibility_opt.json`
-- **Date**: 2026-06-13
-- **Changes**:
-  - `sugiyama_v2/rank.rs`: Pre-computed adjacency tables, Vec<bool> instead of HashSet
-  - `visibility.rs`: BinaryHeap for Dijkstra instead of linear scan
-- **Results**:
-  - sugiyama-v2: **100% score consistency** (51/51 diagrams)
-  - Performance: within measurement noise
-- **Status**: ✅ **KEPT** - Algorithm correctness preserved
+**产品规定（共线 / 合流验收语言）**：  
+[`docs/architecture/方案计划/collinear-and-arrow-merge-comparison.md`](../docs/architecture/方案计划/collinear-and-arrow-merge-comparison.md) §2  
+（Allowed / NeedsSeparation / Degraded；不以「共线计数归零」为成功标准。）
 
-### Round 03: Large Graph Degradation (node <=20, edges >25 threshold) ❌ ABANDONED
-- **File**: `round03_large_graph_degradation.json`
-- **Date**: 2026-06-13
-- **Changes**: Added threshold to skip network simplex for small/dense graphs
-- **Results**:
-  - Score regression on `c.k8s-tenant-isolation`: -3.44
-  - Mixed performance results
-- **Status**: ❌ **ABANDONED** - Hurt quality
+**角色分层重构方案**：[`docs/architecture/重构方案/showcase-基线分层重构-2026-07.md`](../docs/architecture/重构方案/showcase-基线分层重构-2026-07.md)
 
-### Round 04: Large Graph Degradation (node <=15 threshold) ❌ ABANDONED
-- **File**: `round04_final_verify.json` (same as round02, used for verification)
-- **Changes**: More aggressive threshold (node <=15)
-- **Results**:
-  - `n.school-schema`: score dropped from 88.14 to 75.22 (-12.92)
-  - `c.ecommerce-schema`: score dropped from 81.39 to 71.60 (-9.79)
-  - Multiple diagrams degraded
-- **Status**: ❌ **ABANDONED** - Severely hurt quality
+## 门禁集（按角色分集）
 
-## Conclusion
+| 清单 | 角色 | 用途 | compare 行为 |
+|------|------|------|--------------|
+| [`sets/product-regression-set.txt`](./sets/product-regression-set.txt) | `product` | 日常质量硬门禁（精选） | 正确性 + 质量 **硬 FAIL** |
+| [`sets/stress-probe-set.txt`](./sets/stress-probe-set.txt) | `stress` | 正确性硬 + 质量观测 | 正确性硬；质量 WARN（`--strict-stress` 改硬） |
+| [`sets/mech-set.txt`](./sets/mech-set.txt) | `mech` + 双用途 `product` | 机制探针 / 拥堵校准 | 默认不门禁（机制断言另跑） |
+| [`sets/demo-observe-set.txt`](./sets/demo-observe-set.txt) | `demo` | 观测 / 可债 | 正确性硬；质量 WARN |
 
-The large graph degradation optimization (Round 03/04) was abandoned because:
+日常宣称「无退化」默认只引用 **product-gate**。文件名首段即角色（`{role}.{slug}.pgm`），无需 manifest overrides。
 
-1. **Quality degradation**: Small/medium graphs benefit significantly from network simplex
-2. **Threshold tuning is difficult**: Even with 15-node threshold, quality degrades
-3. **Time savings are marginal**: The original network simplex is already fast enough for small graphs
-
-**Only Round 02 optimizations are kept:**
-- Pre-computed adjacency + Vec<bool> in sugiyama_v2
-- BinaryHeap Dijkstra in visibility
-
-## Comparison Script
+## 速查
 
 ```bash
-python3 << 'EOF'
-import json
+# 采快照（默认 product + stress → baselines/YYYY-MM-DD.{json,md} 与 latest）
+./benchmarks/snapshot.sh
 
-with open('benchmarks/round01_baseline.json') as f:
-    baseline = json.load(f)
-with open('benchmarks/round02_sugiyama_visibility_opt.json') as f:
-    optimized = json.load(f)
+# 只采 product 门禁
+./benchmarks/snapshot.sh --set benchmarks/sets/product-regression-set.txt
 
-# Compare scores and performance
-...
-EOF
+# 加入 demo 观测集
+./benchmarks/snapshot.sh \
+  --set benchmarks/sets/product-regression-set.txt \
+  --set benchmarks/sets/stress-probe-set.txt \
+  --set benchmarks/sets/demo-observe-set.txt
+
+# 对比门禁（默认：product 硬 / stress 软 / demo 软 / mech 不门禁）
+./benchmarks/compare.sh \
+  benchmarks/baselines/latest.json \
+  path/to/new-snapshot.json
+
+# 显式把 stress 质量也走硬 fail（探针严格模式）
+./benchmarks/compare.sh --strict-stress baseline.json current.json
+
+# 全部质量轨转 WARN（显式债，仍 exit 0）
+./benchmarks/compare.sh --allow-quality-debt baseline.json current.json
+
+# 可视化基线变化 + 打开文档
+./benchmarks/serve-viewer.py
 ```
+
+当前门禁指针：[`baselines/latest.json`](./baselines/latest.json)。
+
+## 角色感知分轨
+
+每条样本在 JSON 中带 `role` 字段（取文件名第一段：`product` / `stress` / `demo` / `mech` / `smoke`）。`compare.sh` 按角色决定质量轨是否挡合并：
+
+| 轨 | 检查 | product / smoke | demo | stress | mech |
+|----|------|-----------------|------|--------|------|
+| 正确性（硬） | `edge_crosses_group_interior` 不升；`det=true` | FAIL | FAIL | FAIL | FAIL |
+| 质量（默认真） | `exact_sev` / `tight_sev`；lint through/trunk/err；`ortho.degraded_count`；perf；`node_fp` | **FAIL** | WARN / 可债 | WARN（`--strict-stress` 改硬） | 不门禁 |
+| 观测（WARN） | `allowed_share_len` 可升；若 allowed↑ 且 exact 未降 → 提示抽检误标 Allowed | 同现网 | 同现网 | 同现网 | — |
+
+抬基线 `note` 强制带角色（手册 §1）：
+
+```text
+raise product: …原因…；残余: product.foo
+raise stress (expected): …探针可接受…；残余: stress.layout-stress-nested
+```
+
+## 与创新模式对齐（`AGENTS.md` §7）
+
+| 模式 | product-gate | stress-probe |
+|------|--------------|--------------|
+| 日常修复（棘轮） | 不劣化 | 质量可债；正确性不劣化 |
+| 算法级重写（帕累托） | 目标维度优先看本集 | 允许更大临时质量退化，退出时显式抬基线 + 列残余 |

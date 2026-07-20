@@ -46,7 +46,7 @@ fn main() {
         .iter()
         .position(|arg| arg == "--output" || arg == "-o")
         .and_then(|index| args.get(index + 1).cloned())
-        .unwrap_or_else(|| "benchmarks/ascii_export_round01.json".to_string());
+        .unwrap_or_else(|| "target/ascii_export_bench.json".to_string());
 
     let report = BenchReport {
         benchmark: "ascii_export_round01",

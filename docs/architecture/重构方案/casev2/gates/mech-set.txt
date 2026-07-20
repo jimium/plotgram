@@ -1,8 +1,0 @@
-# Mech-set：机制探针（禁图名特判；验规则，不追美观）
-# 路径相对 casev2/ 根目录。
-# 可与 product-gate 交集：机制用断言，美观用 product 指标，报告分栏。
-
-architecture/mech.constrain-cross-group.pgm
-flowchart/mech.constrain-sink.pgm
-flowchart/product.user-auth.pgm
-architecture/product.typical-microservice-architecture.pgm

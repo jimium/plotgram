@@ -1,8 +1,8 @@
 # Showcase 与基线分层重构方案
 
 > 日期：2026-07-20  
-> 状态：方案（样例稿已落在 [`casev2/`](./casev2/)，门禁脚本未改）  
-> 相关：[`AGENTS.md`](../../../AGENTS.md) §4–§7 · [`布局与路由核心手册`](../../总结经验/布局与路由核心手册-2026-07.md) §1 · [`benchmark-data/README.md`](../../../benchmark-data/README.md) · 样例评审稿 [`casev2/README.md`](./casev2/README.md)
+> 状态：已落地（[`showcase/`](../../../showcase/) + [`benchmarks/`](../../../benchmarks/)）  
+> 相关：[`AGENTS.md`](../../../AGENTS.md) §4–§7 · [`布局与路由核心手册`](../../总结经验/布局与路由核心手册-2026-07.md) §1 · [`benchmarks/README.md`](../../../benchmarks/README.md)
 
 ## 0. 一句话
 
@@ -31,7 +31,7 @@
 | **对外演示大图** | `c.supply-chain-control-tower`、`c.payment-clearing-platform` | 好看优先，可有限债 |
 | **人造压力探针** | `c.layout-stress-*`（5 张） | 可妥协美观 |
 
-另有一类**机制探针**（现挂在 `n.`）：`n.constrain-cross-group`、`n.constrain-sink`，以及 `benchmark-data/congestion-set.txt`——目的是验规则，不是刷美观分。
+另有一类**机制探针**（现挂在 `n.`）：`n.constrain-cross-group`、`n.constrain-sink`，以及当时的 `congestion-set.txt`（现为 `mech-set.txt`）——目的是验规则，不是刷美观分。
 
 规模统计（约）：`s.` 13 · `n.` 23 · `c.` 49。`c.` 过大，分类已失真。
 
@@ -40,7 +40,7 @@
 | 表面 | 事实 |
 |------|------|
 | 画廊给 `layout-stress` 打「布局压力」标签 | **仅 UI**，不进门禁策略 |
-| `collinear-regression-set.txt` 共 10 张 | 含 2 张 stress，与业务大图**同等**走 `compare-collinear.sh` |
+| `collinear-regression-set.txt` 共 10 张 | 含 2 张 stress，与业务大图**同等**走 `compare.sh` |
 | 正确性轨 / 质量轨 | 只按指标分轨，**不按样例角色分轨** |
 | `plotgram-eval` 的 `generate_baseline` / `compare_with_baseline` | 遍历 showcase `.pgm`，**无角色加权 / 豁免** |
 
@@ -114,7 +114,7 @@ UI / 工具：`filename.split('.')[0]` → role。旧 `s./n./c./x.` **退役**�
 - **角色**：看文件名（全库每张图都有）。  
 - **gates**：从全库**挑选子集**（谁进硬门 / 谁当探针）。  
 - 允许 mech-set 列出 `product.user-auth.pgm`（双用途）：UI 角色仍是 product，清单只表示「也跑机制断言」。  
-- **不需要** manifest `overrides`。样例见 [`casev2/`](./casev2/)。
+- **不需要** manifest `overrides`。现网样例见 [`showcase/`](../../../showcase/)。
 
 ---
 
@@ -125,7 +125,7 @@ UI / 工具：`filename.split('.')[0]` → role。旧 `s./n./c./x.` **退役**�
 | 集 | 内容 | 正确性轨 | 质量轨（sev / degraded / lint 摘要） | 宣称「无退化」时 |
 |----|------|----------|--------------------------------------|------------------|
 | **A · product-gate** | 精选 product（+ 少量 smoke） | 硬 | **硬** | **必须引用本集** |
-| **B · stress-probe** | 全部 stress | 硬（穿模 / det 等） | **观测**；可用 `--allow-stress-debt` | 须标明「探针集」 |
+| **B · stress-probe** | 全部 stress | 硬（穿模 / det 等） | **观测**（WARN）；`--strict-stress` 改硬 | 须标明「探针集」 |
 | **C · mech-set** | constrain / congestion 等 | 机制断言 | 可不进 sev 棘轮 | 单独叙述 |
 
 可选第四集 **D · demo-observe**：大图全量跑报告，不进硬质量门。
@@ -141,7 +141,7 @@ UI / 工具：`filename.split('.')[0]` → role。旧 `s./n./c./x.` **退役**�
 | 轨 | 典型指标 | product | demo | stress | mech |
 |----|----------|---------|------|--------|------|
 | 正确性（硬） | `edge_crosses_group_interior` 不升；`det=true`；节点穿模类 | FAIL | FAIL | FAIL | 按机制定义 |
-| 质量（默认真） | `exact_sev` / `tight_sev`；through / trunk / err；`ortho.degraded_count`；perf | FAIL | WARN / 可债 | WARN / `--allow-stress-debt` | 通常不门禁 |
+| 质量（默认真） | `exact_sev` / `tight_sev`；through / trunk / err；`ortho.degraded_count`；perf | FAIL | WARN / 可债 | WARN（`--strict-stress` 改硬） | 通常不门禁 |
 | 观测 | `allowed_share_len` 等 | 同现网 | 同现网 | 同现网 | — |
 
 说明：
@@ -160,22 +160,20 @@ UI / 工具：`filename.split('.')[0]` → role。旧 `s./n./c./x.` **退役**�
 抬基线 `note` 强制带角色，例如：
 
 ```text
-raise product: …原因…；残余: c.foo
-raise stress (expected): …探针可接受…；残余: x.layout-stress-nested
+raise product: …原因…；残余: product.cdn-cache
+raise stress (expected): …探针可接受…；残余: stress.layout-stress-nested
 ```
 
 ---
 
 ## 4. Showcase 内容与分类
 
-### 4.1 落地方式（casev2 已按此做）
+### 4.1 落地方式（已完成）
 
-1. **重命名**：`{role}.{slug}.pgm`（见 [`casev2/`](./casev2/)、[`rename-map.txt`](./casev2/gates/rename-map.txt)）。  
-2. **门禁清单**：`gates/product|stress|mech|demo-*.txt` → 迁入 `benchmark-data/`。  
-3. **manifest**：仅 roles 词典 + gates 指针（无 overrides）。  
-4. **画廊**：按文件名前缀 badge；默认折叠 `stress.` / `mech.`。  
-
-替换现网 `showcase/` 时同步：`README`、`index.html`、基线 JSON、单测路径等。
+1. **重命名**：`{role}.{slug}.pgm`（现网 [`showcase/`](../../../showcase/)）。  
+2. **门禁清单**：[`benchmarks/product|stress|mech|demo-*-set.txt`](../../../benchmarks/)。  
+3. **权威在文件名前缀 + gates**（无需 overrides）。  
+4. **画廊**：[`showcase/index.html`](../../../showcase/index.html) 按前缀 badge；默认 product+demo，smoke 可勾选，stress/mech 折叠。
 
 ### 4.2 Product-gate 选样原则
 
@@ -186,19 +184,14 @@ raise stress (expected): …探针可接受…；残余: x.layout-stress-nested
 - **明确排除**：全部 `layout-stress-*`；「为刷指标造的」超密图；过胖 demo 默认不进 A 集。  
 - 筛法口令：**用户会不会画成这样**，不按节点数筛。
 
-### 4.3 候选名单（已落到 casev2）
-
-权威清单见评审稿目录（路径相对 `casev2/`）：
+### 4.3 门禁清单（现网）
 
 | 角色集 | 文件 |
 |--------|------|
-| product-gate | [`casev2/gates/product-regression-set.txt`](./casev2/gates/product-regression-set.txt)（约 18 张） |
-| stress-probe | [`casev2/gates/stress-probe-set.txt`](./casev2/gates/stress-probe-set.txt)（6 张 `x.*`） |
-| mech-set | [`casev2/gates/mech-set.txt`](./casev2/gates/mech-set.txt) |
-| demo-observe | [`casev2/gates/demo-observe-set.txt`](./casev2/gates/demo-observe-set.txt) |
-| 角色总表 | [`casev2/manifest.yaml`](./casev2/manifest.yaml) |
-
-替换 `showcase/` 后，将上述清单迁到 `benchmark-data/`，路径改为 `showcase/...`。
+| product-gate | [`benchmarks/sets/product-regression-set.txt`](../../../benchmarks/sets/product-regression-set.txt)（18 张） |
+| stress-probe | [`benchmarks/sets/stress-probe-set.txt`](../../../benchmarks/sets/stress-probe-set.txt)（6 张 `stress.*`） |
+| mech-set | [`benchmarks/sets/mech-set.txt`](../../../benchmarks/sets/mech-set.txt) |
+| demo-observe | [`benchmarks/sets/demo-observe-set.txt`](../../../benchmarks/sets/demo-observe-set.txt) |
 
 mech 与 product 允许交集（同一文件两种用途时：机制用断言，美观用 product-gate 指标——报告里分栏，避免双重惩罚叙事混乱）。
 
@@ -212,7 +205,7 @@ mech 与 product 允许交集（同一文件两种用途时：机制用断言，
 
 ## 5. 工具与报告改动
 
-### 5.1 `compare-collinear.sh`（及同类 compare）
+### 5.1 `compare.sh`（及同类 compare）
 
 - 输入可带 role（来自清单分段注释，或 JSON 内 `role` 字段）。  
 - 输出示例：
@@ -223,8 +216,8 @@ mech 与 product 允许交集（同一文件两种用途时：机制用断言，
 ── demo-observe …          仅摘要
 ```
 
-- 新增 flag 建议：`--allow-stress-debt`（仅放松 stress 质量轨）；保留现有 `--allow-quality-debt` / `--allow-node-fp`。  
-- **默认日常命令**只对 product-gate 做硬 fail；全量探针可另跑一条 CI job（soft）。
+- 已实现：`--strict-stress`（把 stress 质量从 WARN 改硬 FAIL）；保留 `--allow-quality-debt` / `--allow-node-fp`。  
+- **默认日常命令**只对 product-gate 做硬 fail；stress/demo 质量默认 WARN。
 
 ### 5.2 `plotgram-eval` baseline
 
@@ -255,7 +248,7 @@ mech 与 product 允许交集（同一文件两种用途时：机制用断言，
 | **P0** | 拆 / 标注清单：stress 出硬质量门；新建 product-regression-set；compare 按段分轨 | 低 | 是 |
 | **P1** | 报告按角色汇总；宣称无退化默认只引用 product | 低 | 是 |
 | **P2** | `showcase/manifest.yaml`（或文件头 `@role`）；画廊按角色过滤 | 低 | 是 |
-| **P3** | 用 casev2 角色前缀替换现网 `showcase/` + 全仓引用 | 中（路径） | 是 |
+| **P3** | ~~用角色前缀替换现网 showcase~~ **已完成** | — | — |
 | **P4** | eval `baseline.rs` 角色感知；CI 分 job（product 硬 / stress soft） | 中 | 是 |
 
 **不要**把 P3 当第一步：门禁行为纠正后，命名只是可读性与防再混入。
@@ -296,5 +289,9 @@ mech 与 product 允许交集（同一文件两种用途时：机制用断言，
 |------|------|
 | 2026-07-20 | 初版：`x.` 前缀 + 全体 s/n/c 硬门禁 + 先改名 |
 | 2026-07-20 | 修正：角色两轴；product 精选门禁；stress 正确性硬/质量软；mech/demo；实施顺序改为清单优先 |
-| 2026-07-20 | [`casev2/`](./casev2/) 样例稿对齐：改 README 门禁口径、补 gates/manifest、修 refund 回环与 mindmap stress |
-| 2026-07-20 | 简化：废弃 `s/n/c/x` 与 overrides；**文件名即角色**（`smoke.|product.|demo.|stress.|mech.`），gates 只挑选 |
+| 2026-07-20 | 样例稿对齐后迁入现网：门禁分轨、文件名即角色 |
+| 2026-07-20 | 现网落地后收口：flag 统一为 `--strict-stress`；抬基线示例改角色前缀 |
+| 2026-07-20 | 删除考古数据：旧 `benchmarks/round*` / phase 报告；删除 `casev2/` 归档目录 |
+| 2026-07-20 | 删除旧空壳性能 dump 目录；`ascii_export_bench` 默认输出改为 `target/ascii_export_bench.json` |
+| 2026-07-20 | 退役 `eval-showcase` 门禁与 CI 步骤；删除 `eval-data/showcase-baseline.json` |
+| 2026-07-20 | `benchmark-data/` 重命名为 `benchmarks/` |
