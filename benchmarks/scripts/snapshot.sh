@@ -4,17 +4,17 @@
 # 用法（仓库根目录）:
 #   ./benchmarks/snapshot.sh
 #   ./benchmarks/snapshot.sh --runs 5
+#   ./benchmarks/snapshot.sh --tag after-stub-fix
 #   ./benchmarks/snapshot.sh --set benchmarks/sets/product-regression-set.txt
-#   ./benchmarks/snapshot.sh --set benchmarks/sets/product-regression-set.txt \
-#                            --set benchmarks/sets/stress-probe-set.txt
 #
 # 默认采集 product-gate + stress-probe（角色感知 baseline）。
 # 每条样本在 JSON 内补 role 字段（取文件名第一段：product/stress/demo/mech/smoke）。
 #
-# 输出:
-#   benchmarks/baselines/YYYY-MM-DD.json
-#   benchmarks/baselines/YYYY-MM-DD.md
-#   benchmarks/baselines/latest.{json,md}
+# 输出（同日多次不互相覆盖）:
+#   benchmarks/baselines/YYYY-MM-DD-HHMMSS.json
+#   benchmarks/baselines/YYYY-MM-DD-HHMMSS.md
+#   benchmarks/baselines/YYYY-MM-DD-HHMMSS-<tag>.*   # 若传 --tag
+#   benchmarks/baselines/latest.{json,md}            # 始终指向最近一次
 
 set -euo pipefail
 
@@ -24,20 +24,23 @@ ROOT="$(cd "$BM/.." && pwd)"
 cd "$ROOT"
 
 RUNS=5
+TAG=""
 DEFAULT_SET_FILES=(
   "$BM/sets/product-regression-set.txt"
   "$BM/sets/stress-probe-set.txt"
 )
 SET_FILES=()
-DATE="$(date +%Y-%m-%d)"
-JSON_OUT="$BM/baselines/${DATE}.json"
-MD_OUT="$BM/baselines/${DATE}.md"
+STAMP="$(date +%Y-%m-%d-%H%M%S)"
 JSON_LATEST="$BM/baselines/latest.json"
 MD_LATEST="$BM/baselines/latest.md"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --runs) RUNS="$2"; shift 2 ;;
+    --tag)
+      TAG="$2"
+      shift 2
+      ;;
     --set)
       SET_FILES+=("$2")
       shift 2
@@ -45,6 +48,18 @@ while [[ $# -gt 0 ]]; do
     *) echo "未知参数: $1" >&2; exit 1 ;;
   esac
 done
+
+# --tag 仅允许安全字符，便于文件名与 viewer 识别
+if [[ -n "$TAG" ]]; then
+  if [[ ! "$TAG" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "error: --tag 仅允许字母数字 / . _ -" >&2
+    exit 1
+  fi
+  STAMP="${STAMP}-${TAG}"
+fi
+
+JSON_OUT="$BM/baselines/${STAMP}.json"
+MD_OUT="$BM/baselines/${STAMP}.md"
 
 # 用户未传 --set 时使用默认集（product + stress）
 if [[ ${#SET_FILES[@]} -eq 0 ]]; then
@@ -84,10 +99,12 @@ while IFS= read -r f; do
 done < "$TMP_LIST"
 
 echo "▶ 共 ${#FILES[@]} 个样例（来自 ${#SET_FILES[@]} 个 set 文件）"
+echo "▶ 归档名: ${STAMP}"
 
 echo "▶ 质量指标（gate-baseline）..."
 # gate-baseline 接受 [file.pgm ...]，跳过 --set 自动扫描，直接传文件列表
-"$GATE" --runs 1 --date "$DATE" "${FILES[@]}" >"$JSON_OUT"
+# --date 写入 JSON 的 date 字段（与文件名 stamp 一致，便于同日多次排序）
+"$GATE" --runs 1 --date "$STAMP" "${FILES[@]}" >"$JSON_OUT"
 
 echo "▶ 性能 + 确定性..."
 TMP_PERF="$(mktemp)"

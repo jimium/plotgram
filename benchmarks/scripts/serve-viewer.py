@@ -26,8 +26,10 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 BM = SCRIPT_DIR.parent  # benchmarks/
 VIEWER = BM / "viewer"
 BASELINES = BM / "baselines"
-# latest.json 或 YYYY-MM-DD.json
-BASELINE_RE = re.compile(r"^(latest|\d{4}-\d{2}-\d{2})\.json$")
+# latest.json，或 YYYY-MM-DD.json（旧），或 YYYY-MM-DD-HHMMSS[-tag].json
+BASELINE_RE = re.compile(
+    r"^(latest|\d{4}-\d{2}-\d{2}(?:-\d{6}(?:-[A-Za-z0-9._-]+)?)?)\.json$"
+)
 ROLE_ORDER = ("smoke", "product", "demo", "stress", "mech")
 
 

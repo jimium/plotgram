@@ -6,7 +6,7 @@
 benchmarks/
 ├── README.md / README.html   # 说明（本文件 + 可读版）
 ├── sets/                     # 门禁样例清单
-├── baselines/                # 快照 JSON/MD（latest + YYYY-MM-DD）
+├── baselines/                # 快照 JSON/MD（latest + YYYY-MM-DD-HHMMSS）
 ├── scripts/                  # snapshot / compare / serve-viewer
 ├── viewer/                   # 基线趋势 UI
 ├── snapshot.sh               # → scripts/ 薄包装
@@ -39,8 +39,11 @@ benchmarks/
 ## 速查
 
 ```bash
-# 采快照（默认 product + stress → baselines/YYYY-MM-DD.{json,md} 与 latest）
+# 采快照（默认 product + stress → baselines/YYYY-MM-DD-HHMMSS.{json,md} 与 latest）
 ./benchmarks/snapshot.sh
+
+# 同日多次时加 tag，便于区分
+./benchmarks/snapshot.sh --tag after-stub-fix
 
 # 只采 product 门禁
 ./benchmarks/snapshot.sh --set benchmarks/sets/product-regression-set.txt
@@ -67,6 +70,25 @@ benchmarks/
 ```
 
 当前门禁指针：[`baselines/latest.json`](./baselines/latest.json)。
+
+### 快照命名与 `--tag`
+
+每次 `snapshot.sh` 写出一份**时间戳归档**，并同步覆盖 `latest`：
+
+| 产物 | 说明 |
+|------|------|
+| `baselines/YYYY-MM-DD-HHMMSS.{json,md}` | 默认归档名（精确到秒，同日多次不互相覆盖） |
+| `baselines/YYYY-MM-DD-HHMMSS-<tag>.{json,md}` | 传入 `--tag` 时追加可读后缀 |
+| `baselines/latest.{json,md}` | 始终指向**最近一次**采集 |
+
+```bash
+./benchmarks/snapshot.sh                         # → 2026-07-20-102530.*
+./benchmarks/snapshot.sh --tag after-stub-fix   # → 2026-07-20-102530-after-stub-fix.*
+```
+
+- `--tag` **可选**；仅允许字母、数字、`.`、`_`、`-`。
+- JSON 内 `date` 字段与归档 stamp 一致，便于 viewer / 同日多次排序。
+- 中间实验不必全进仓库；对照至少保留 `latest` + 上一版有意义快照。
 
 ## 角色感知分轨
 

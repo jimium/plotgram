@@ -109,7 +109,7 @@
   <header>
     <h1>Gate Baseline Viewer</h1>
     <p>
-      读取 <code>benchmarks/baselines/{latest,YYYY-MM-DD}.json</code>。
+      读取 <code>benchmarks/baselines/{latest,YYYY-MM-DD-HHMMSS}.json</code>。
       <strong>无退化主叙事 = product-gate</strong>；stress/demo 质量为观测轨（升可不挡合并）。
       <a href="/readme" style="color:var(--accent);font-weight:560">指标与门禁说明 →</a>
     </p>
@@ -295,7 +295,7 @@
     function renderSnaps(baselines) {
       const box = document.getElementById("snap-list");
       if (!baselines.length) {
-        box.innerHTML = `<p class="empty">未找到 baselines/{latest,YYYY-MM-DD}.json</p>`;
+        box.innerHTML = `<p class="empty">未找到 baselines/*.json（latest 或 YYYY-MM-DD-HHMMSS）</p>`;
         return;
       }
       box.innerHTML = baselines.map(b => {

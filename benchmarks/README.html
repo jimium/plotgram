@@ -294,10 +294,10 @@
       <table>
         <thead><tr><th>路径</th><th>作用</th></tr></thead>
         <tbody>
-          <tr><td><code>scripts/snapshot.sh</code>（根目录有薄包装）</td><td>采集门禁基线 → <code>baselines/</code> dated + <code>latest</code></td></tr>
+          <tr><td><code>scripts/snapshot.sh</code>（根目录有薄包装）</td><td>采集门禁基线 → <code>baselines/</code> 时间戳归档 + <code>latest</code></td></tr>
           <tr><td><code>scripts/compare.sh</code></td><td>两份 JSON 门禁对比（角色感知分轨）</td></tr>
           <tr><td><code>baselines/latest.*</code></td><td><strong>当前门禁指针</strong>（默认 product + stress 合并）</td></tr>
-          <tr><td><code>baselines/YYYY-MM-DD.*</code></td><td>按日归档</td></tr>
+          <tr><td><code>baselines/YYYY-MM-DD-HHMMSS[-tag].*</code></td><td>每次采集一份（同日不覆盖）；可选 <code>--tag</code></td></tr>
           <tr><td><code>scripts/serve-viewer.py</code> + <code>viewer/</code></td><td>本地 HTML（趋势 + 本文）</td></tr>
           <tr><td><code>README.html</code></td><td>本文（人类可读说明）</td></tr>
         </tbody>
@@ -347,7 +347,7 @@
           <line x1="320" y1="240" x2="320" y2="252" stroke="#5a574f" stroke-width="1.5" marker-end="url(#arr)"/>
 
           <rect x="160" y="254" width="200" height="36" rx="8" fill="#fffcf6" stroke="#d4cec0"/>
-          <text x="260" y="276" text-anchor="middle" font-size="11" font-family="IBM Plex Mono, monospace" fill="#1c1b19">…-YYYY-MM-DD.json</text>
+          <text x="260" y="276" text-anchor="middle" font-size="11" font-family="IBM Plex Mono, monospace" fill="#1c1b19">…-HHMMSS.json</text>
 
           <line x1="360" y1="272" x2="400" y2="272" stroke="#5a574f" stroke-width="1.5" marker-end="url(#arr)"/>
           <text x="380" y="262" text-anchor="middle" font-size="9" font-family="IBM Plex Sans, sans-serif" fill="#5a574f">sync</text>
@@ -387,6 +387,9 @@
 <pre><code># 默认 product + stress 合并
 ./benchmarks/snapshot.sh
 
+# 同日多次加可读后缀
+./benchmarks/snapshot.sh --tag after-stub-fix
+
 # 只采 product 门禁
 ./benchmarks/snapshot.sh \
   --set benchmarks/sets/product-regression-set.txt
@@ -398,8 +401,14 @@
   --set benchmarks/sets/demo-observe-set.txt
 
 # 可选: --runs 5  性能轮数
-# 可选: --date YYYY-MM-DD  指定归档日期</code></pre>
-      <p>覆盖当天的 dated 文件，并同步 <code>latest</code>。每条 sample 自动注入 <code>role</code> 字段（取文件名第一段）。</p>
+# 可选: --tag &lt;slug&gt;  归档名追加后缀（字母数字 . _ -）</code></pre>
+      <p>每次写入时间戳归档（同日不覆盖），并同步 <code>latest</code>：</p>
+      <ul>
+        <li><code>baselines/YYYY-MM-DD-HHMMSS.*</code> — 默认</li>
+        <li><code>baselines/YYYY-MM-DD-HHMMSS-&lt;tag&gt;.*</code> — 传了 <code>--tag</code></li>
+        <li><code>baselines/latest.*</code> — 始终指向最近一次</li>
+      </ul>
+      <p>每条 sample 自动注入 <code>role</code> 字段（取文件名第一段）。JSON 的 <code>date</code> 与归档 stamp 一致。</p>
 
       <h3>2. 对比门禁</h3>
 <pre><code># 默认：product 硬 / stress 软 / demo 软 / mech 不门禁
@@ -652,7 +661,7 @@ raise stress (expected): …探针可接受…；残余: stress.layout-stress-ne
 
       <h2 id="conventions">约定</h2>
       <ul>
-        <li><strong>只保留有意义的 dated 快照</strong>：中间实验步不要堆进本目录；至少留 <code>latest</code> + 上一版。</li>
+        <li><strong>只保留有意义的快照</strong>：同日可多次归档（时间戳不覆盖）；中间实验不必全进仓库，至少留 <code>latest</code> + 上一版对照。</li>
         <li><strong>不要改 latest 却不写 note</strong>：后续对比靠 note 理解 raise 原因。</li>
         <li>验证用本脚本构建的 release 二进制，勿盲目信任陈旧 <code>./target/release/plotgram</code>。</li>
       </ul>
