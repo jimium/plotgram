@@ -259,10 +259,10 @@ fn find_best_channel(
     best.map(|(coord, _)| coord)
 }
 
-/// 检查通道规划器是否启用
+/// 检查通道规划器是否启用（默认开启，PLOTGRAM_CHANNEL_PLANNER=0 关闭）
 pub fn channel_planner_enabled() -> bool {
-    std::env::var("PLOTGRAM_CHANNEL_PLANNER")
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+    !std::env::var("PLOTGRAM_CHANNEL_PLANNER")
+        .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
         .unwrap_or(false)
 }
 
@@ -316,8 +316,8 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_planner_disabled_by_default() {
-        assert!(!channel_planner_enabled());
+    fn test_channel_planner_enabled_by_default() {
+        assert!(channel_planner_enabled());
     }
 
     #[test]

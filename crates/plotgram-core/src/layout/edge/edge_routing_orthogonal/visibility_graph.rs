@@ -602,10 +602,10 @@ fn simplify_orthogonal_path(path: &[Point]) -> Vec<Point> {
     result
 }
 
-/// 检查 OVG 是否启用（环境变量 PLOTGRAM_OVG_ENABLED=1）
+/// 检查 OVG 是否启用（默认开启，PLOTGRAM_OVG_ENABLED=0 关闭）
 pub fn ovg_enabled() -> bool {
-    std::env::var("PLOTGRAM_OVG_ENABLED")
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+    !std::env::var("PLOTGRAM_OVG_ENABLED")
+        .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
         .unwrap_or(false)
 }
 
