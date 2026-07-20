@@ -153,7 +153,7 @@ pub(crate) fn phase_straighten_align(
     );
 }
 
-/// Phase 3：分层批量边序（有 rank 时低层先占通道；feedback / 监控枢纽全局延后）
+/// Phase 3：分层批量边序（有 rank 时低层先占通道；feedback + 监控枢纽全局延后）
 pub(crate) fn phase_layer_order(
     relations: &[crate::ast::Relation],
     sugiyama_ranks: Option<&HashMap<String, usize>>,
@@ -348,9 +348,7 @@ pub(crate) fn phase_lane(
             }
         }
     }
-    // V3a：2 点直连正反向对不会进 assign_lanes（需 ≥4 折点）；在此强制 trunk 间距
-    let gap_fixed = enforce_reverse_pair_min_gap(edges, relations, parallel_gap);
-    ortho_stats.lane_segments_shifted += gap_fixed;
+    // S2-5：C 期 min_gap 已移除（2 点直连正反向对不触发节点反馈）；pipeline D 末作为最终写者重做。
 
     // S1：同侧 stub 占用。architecture（semantic_merge）C 期仅诊断，避免改边反馈
     // space-budget 动节点；exact 跨对共柱改在 pipeline D 末端
@@ -388,7 +386,7 @@ pub(crate) fn phase_lane(
             "[perf]     x3_lane_assignment: {:.2}ms ({} groups, {} shifted, {} failed); stub_occ conflicts={} shifted={} degraded={}",
             t_lane.elapsed().as_secs_f64() * 1000.0,
             lane_stats.lane_groups,
-            lane_stats.segments_shifted + gap_fixed,
+            lane_stats.segments_shifted,
             lane_stats.shifts_failed,
             stub_stats.conflict_pairs_before,
             stub_stats.stubs_shifted,
@@ -399,13 +397,14 @@ pub(crate) fn phase_lane(
             "[perf]     x3_lane_assignment: {:.2}ms ({} groups, {} shifted, {} failed); stub_occ conflicts={} (arch diagnose-only)",
             t_lane.elapsed().as_secs_f64() * 1000.0,
             lane_stats.lane_groups,
-            lane_stats.segments_shifted + gap_fixed,
+            lane_stats.segments_shifted,
             lane_stats.shifts_failed,
             conflicts.len()
         );
     }
 
     // 轨道 A：正反向同侧 dock 共锚分离（落点最终写者；在 stub_occ 之后）
+    // 注：C 期运行（节点未冻结），其边改动会经反馈影响 node 定位（S2-5 实验证实不可删）。
     let dock_gap = parallel_gap.max(COMPACT_SLOT_PITCH);
     let dock_fixed =
         enforce_reverse_pair_dock_separation(edges, relations, nodes, from_side, to_side, dock_gap);

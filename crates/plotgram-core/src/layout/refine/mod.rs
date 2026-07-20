@@ -327,8 +327,7 @@ pub fn repair_through_edges_post_route(diagram: &Diagram, result: &mut LayoutRes
 
 /// 仅针对当前 lint `edge_crosses_group_interior` 边的局部试修。
 ///
-/// 顺序：① 有走廊链的跨 leaf 边优先贴廊重建；② 残余再走激进裙边/换侧。
-/// 硬门禁：贴廊走 `validated_corridor_path`；裙边走 `orthogonal_detour`。
+/// 跨组边走激进裙边/换侧（`orthogonal_detour` 硬门禁）；
 /// 整批后若穿组计数上升或 through 上升则回退。
 pub fn repair_group_interior_edges_post_route(diagram: &Diagram, result: &mut LayoutResult) {
     if result.groups.is_empty() {
@@ -343,14 +342,7 @@ pub fn repair_group_interior_edges_post_route(diagram: &Diagram, result: &mut La
     let snapshot = result.clone();
     let n = group_edges.len();
 
-    // ① 贴廊：只动有链的 dirty 边；失败的留给裙边。
-    let stuck = crate::layout::edge::edge_routing_orthogonal::stick_edges_onto_corridor(
-        diagram,
-        result,
-        &group_edges,
-    );
-
-    // ② 仍穿组的边：激进裙边 / 换侧。
+    // 仍穿组的边：激进裙边 / 换侧。
     let remain = collect_lint_group_interior_edge_indices(diagram, result);
     if !remain.is_empty() {
         spline_fallback::reroute_edges_with_spline_ex(
@@ -367,23 +359,21 @@ pub fn repair_group_interior_edges_post_route(diagram: &Diagram, result: &mut La
     if after_group > entry_group || after_through > entry_through {
         *result = snapshot;
         crate::perf_log!(
-            "[perf]     d_group_interior_repair: rolled_back (group {}→{} through {}→{}, tried={}, stick={})",
+            "[perf]     d_group_interior_repair: rolled_back (group {}→{} through {}→{}, tried={})",
             entry_group,
             after_group,
             entry_through,
             after_through,
-            n,
-            stuck
+            n
         );
     } else {
         crate::perf_log!(
-            "[perf]     d_group_interior_repair: group {}→{} through {}→{} tried={} stick={}",
+            "[perf]     d_group_interior_repair: group {}→{} through {}→{} tried={}",
             entry_group,
             after_group,
             entry_through,
             after_through,
-            n,
-            stuck
+            n
         );
     }
 }

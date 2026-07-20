@@ -133,21 +133,6 @@ pub fn compute_grid_demand_from_result(diagram: &Diagram, result: &LayoutResult)
     compute_grid_demand(diagram, &result.nodes)
 }
 
-pub fn dump_grid_demand_if_enabled(diagram: &Diagram, result: &LayoutResult) {
-    if std::env::var_os("PLOTGRAM_DUMP_GRID_DEMAND").is_none() {
-        return;
-    }
-    let grid = compute_grid_demand_from_result(diagram, result);
-    crate::perf_log!(
-        "[grid-demand] pitch={:.0} cells={} max_load={}",
-        grid.pitch,
-        grid.loads.len(),
-        grid.max_load()
-    );
-    for (k, load) in grid.loads.iter().filter(|(_, l)| **l > 0).take(16) {
-        crate::perf_log!("  cell[{},{}] load={}", k.ix, k.iy, load);
-    }
-}
 
 #[cfg(test)]
 mod tests {

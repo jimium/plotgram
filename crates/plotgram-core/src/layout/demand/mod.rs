@@ -15,16 +15,13 @@ pub use corridor::{
     compute_corridor_model, corridor_capacity_v1, find_corridor_chain, CorridorModel,
     CORRIDOR_LANE_PITCH,
 };
-pub use dump::{
-    dump_edge_difficulty_if_enabled, dump_pre_route_pressure_if_enabled,
-    log_pressure_snapshot_for_pre_route, PressureSnapshot,
-};
+pub use dump::PressureSnapshot;
 pub use features::{
     cluster_ranks_by_y, collect_edge_features, resolve_ranks, score_edge, score_edges,
     DifficultyProfile,
 };
 pub use grid::{
-    compute_grid_demand, compute_grid_demand_from_result, dump_grid_demand_if_enabled,
+    compute_grid_demand, compute_grid_demand_from_result,
     edge_grid_overflows, GridDemand, GRID_DEMAND_PITCH, GRID_SOFT_CAP,
 };
 pub use pierce::{obstacle_hits_for_edge, preferred_l_skeleton};

@@ -1,239 +1,9 @@
-//! A3：边路由后处理管线的**声明式阶段写权表**。
+//! 几何冻结屏障：确保管线后处理阶段不越权修改已冻结的几何。
 //!
-//! 本模块不参与调度、不改变任何执行顺序与结果——它是「管线时序」的
-//! 可执行文档：把 [`crate::layout::pipeline::LayoutPipeline::run_routing_pipeline`]
-//! 中 18 个后处理步骤各自「写什么」（节点 / 折点 / label / annotation / 分组 /
-//! 画布）显式登记下来，可通过 `PLOTGRAM_DUMP_EDGE_STAGES` 环境变量转储审计。
-//!
-//! 配套的两个几何冻结屏障（节点冻结 / 折线冻结）见 [`NodeFreeze`] 与
-//! [`PolylineFreeze`]（A3 双冻结点）。
-//!
-//! 设计约束（AGENTS.md §5 + 重构手册）：
-//! - **顺序与效果不变**：本表是纯描述，不驱动迭代；dump 靠 env 门控，默认零输出。
-//! - **不重排阶段**、**不引入空壳 EdgeGeometryContract**。
+//! - [`NodeFreeze`]：节点冻结屏障，step 10 之后不得再挪节点。
+//! - [`PolylineFreeze`]：折线冻结屏障，repair 之后仅允许改 label/annotation。
 
-/// 后处理阶段的写入目标：登记「这一步会改动哪些几何/语义状态」。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WriteTarget {
-    /// 节点坐标 (x, y)——节点冻结屏障之后不得再出现。
-    Nodes,
-    /// 边折点 / 路径几何——折线冻结屏障之后不得再出现。
-    Points,
-    /// 边 label 位置。
-    Labels,
-    /// route_annotation 语义。
-    Annotations,
-    /// 分组包围框。
-    Groups,
-    /// 画布边界。
-    CanvasBounds,
-}
-
-/// 单个后处理阶段的声明式写权条目。
-#[derive(Debug, Clone, Copy)]
-pub struct EdgeStage {
-    /// 管线内 1-based 序号（与 `run_routing_pipeline` 的实际执行顺序一致）。
-    pub index: u8,
-    /// 阶段函数名 / 语义标识。
-    pub name: &'static str,
-    /// 该阶段会写入的状态目标。
-    pub writes: &'static [WriteTarget],
-    /// 备注：适用条件（如 `[arch]`）、冻结屏障标注等。
-    pub note: &'static str,
-}
-
-/// 边路由后处理管线的 18 步写权表。
-///
-/// 顺序即 `run_routing_pipeline` 的实际执行顺序；步骤 12-18 仅在
-/// `edge_routing_style == "orthogonal"` 时执行。此表随管线改动手动维护。
-pub const POST_ROUTE_STAGES: &[EdgeStage] = &[
-    EdgeStage {
-        index: 1,
-        name: "complete_routing",
-        writes: &[WriteTarget::Points, WriteTarget::Labels],
-        note: "首轮路由产出边几何与初始 label",
-    },
-    EdgeStage {
-        index: 2,
-        name: "repulse_edges_only",
-        writes: &[WriteTarget::Points],
-        note: "路由后仅几何排斥（不含量化）",
-    },
-    EdgeStage {
-        index: 3,
-        name: "run_post_route_group_frame",
-        writes: &[
-            WriteTarget::Groups,
-            WriteTarget::Nodes,
-            WriteTarget::Points,
-            WriteTarget::CanvasBounds,
-        ],
-        note: "组框 restore/重路由，可能挪节点",
-    },
-    EdgeStage {
-        index: 4,
-        name: "hook.after_route",
-        writes: &[WriteTarget::Points, WriteTarget::Nodes, WriteTarget::Groups],
-        note: "算法专属后处理钩子（arch 可挪节点）",
-    },
-    EdgeStage {
-        index: 5,
-        name: "resolve_budget_violations",
-        writes: &[WriteTarget::Nodes],
-        note: "SpaceBudget 兜底移节点",
-    },
-    EdgeStage {
-        index: 6,
-        name: "group_frame restore/recompute",
-        writes: &[WriteTarget::Groups, WriteTarget::Nodes],
-        note: "budget guard 后恢复 L1 契约（track:equal 走 restore）",
-    },
-    EdgeStage {
-        index: 7,
-        name: "reassert_multi_client_hub_centroids",
-        writes: &[WriteTarget::Nodes],
-        note: "[arch] 局部刚体重申 hub 质心",
-    },
-    EdgeStage {
-        index: 8,
-        name: "align_cross_scope_pendant_chains",
-        writes: &[WriteTarget::Nodes],
-        note: "[arch] 跨 scope 悬挂链对齐（explicit_equal）",
-    },
-    EdgeStage {
-        index: 9,
-        name: "record_moved_for_overlap",
-        writes: &[],
-        note: "记账：收集本轮被挪节点，不写几何",
-    },
-    EdgeStage {
-        index: 10,
-        name: "reroute_and_repulse",
-        writes: &[WriteTarget::Points],
-        note: "对被挪节点重路由 —— 节点冻结屏障（此后禁止再挪节点）",
-    },
-    EdgeStage {
-        index: 11,
-        name: "snap_and_repulse_edges_with_guard",
-        writes: &[WriteTarget::Points],
-        note: "像素量化，管道末尾仅运行一次",
-    },
-    EdgeStage {
-        index: 12,
-        name: "sanitize_orthogonal_edges_with_guard",
-        writes: &[WriteTarget::Points, WriteTarget::Labels],
-        note: "[orthogonal] 量化后消毒，overshoot Z 合并；按平行边规则重建 label",
-    },
-    EdgeStage {
-        index: 13,
-        name: "enforce_reverse_pair_min_gap",
-        writes: &[WriteTarget::Points],
-        note: "[orthogonal] D 正反向 gap 审计",
-    },
-    EdgeStage {
-        index: 14,
-        name: "enforce_reverse_pair_dock_separation",
-        writes: &[WriteTarget::Points],
-        note: "[orthogonal] 正反向同侧 dock 共锚（D 末最终写者）",
-    },
-    EdgeStage {
-        index: 15,
-        name: "resolve_exact_stub_occupancy_post_route",
-        writes: &[WriteTarget::Points, WriteTarget::Annotations],
-        note: "[arch] 节点冻结后 exact 跨对共柱真修，刷新 annotation",
-    },
-    EdgeStage {
-        index: 16,
-        name: "repair_through_edges_post_route",
-        writes: &[WriteTarget::Points],
-        note: "[orthogonal] 保组 dogleg 试修 —— 折线冻结屏障（此后仅允许 label/annotation）",
-    },
-    EdgeStage {
-        index: 17,
-        name: "resolve_label_overlaps_with_config",
-        writes: &[WriteTarget::Labels],
-        note: "[orthogonal] 几何冻结后 label 避让（最终步骤）",
-    },
-    EdgeStage {
-        index: 18,
-        name: "dedupe_labels_on_declared_merges",
-        writes: &[WriteTarget::Labels],
-        note: "[orthogonal] 声明合并边的 label 去重",
-    },
-];
-
-/// 管线后处理阶段名的权威序列（与 `pipeline::run_routing_pipeline` 及
-/// [`POST_ROUTE_STAGES`] 同步；改管线时必须同步改此常量与表）。
-pub const EXPECTED_STAGE_NAMES: &[&str] = &[
-    "complete_routing",
-    "repulse_edges_only",
-    "run_post_route_group_frame",
-    "hook.after_route",
-    "resolve_budget_violations",
-    "group_frame restore/recompute",
-    "reassert_multi_client_hub_centroids",
-    "align_cross_scope_pendant_chains",
-    "record_moved_for_overlap",
-    "reroute_and_repulse",
-    "snap_and_repulse_edges_with_guard",
-    "sanitize_orthogonal_edges_with_guard",
-    "enforce_reverse_pair_min_gap",
-    "enforce_reverse_pair_dock_separation",
-    "resolve_exact_stub_occupancy_post_route",
-    "repair_through_edges_post_route",
-    "resolve_label_overlaps_with_config",
-    "dedupe_labels_on_declared_merges",
-];
-
-/// 校验写权表 index 连续且与 [`EXPECTED_STAGE_NAMES`] 对齐（N1 防漂移）。
-pub fn assert_post_route_stages_consistent() {
-    debug_assert_eq!(
-        POST_ROUTE_STAGES.len(),
-        EXPECTED_STAGE_NAMES.len(),
-        "POST_ROUTE_STAGES 长度与 EXPECTED_STAGE_NAMES 不一致"
-    );
-    for (i, st) in POST_ROUTE_STAGES.iter().enumerate() {
-        debug_assert_eq!(
-            st.index as usize,
-            i + 1,
-            "POST_ROUTE_STAGES[{i}] index 不连续：期望 {}，实际 {}",
-            i + 1,
-            st.index
-        );
-        debug_assert_eq!(
-            st.name,
-            EXPECTED_STAGE_NAMES[i],
-            "POST_ROUTE_STAGES[{i}] 阶段名漂移：期望 {:?}, 实际 {:?}",
-            EXPECTED_STAGE_NAMES[i],
-            st.name
-        );
-    }
-}
-
-/// 转储后处理写权表（`PLOTGRAM_DUMP_EDGE_STAGES` 置位时生效，默认零输出）。
-pub fn dump_edge_stages() {
-    #[cfg(debug_assertions)]
-    assert_post_route_stages_consistent();
-    if std::env::var_os("PLOTGRAM_DUMP_EDGE_STAGES").is_none() {
-        return;
-    }
-    crate::perf_log!("[edge-stages] 后处理写权表（顺序即执行顺序，仅供审计）:");
-    for st in POST_ROUTE_STAGES {
-        crate::perf_log!(
-            "  {:>2}. {:<38} writes={:?} — {}",
-            st.index,
-            st.name,
-            st.writes,
-            st.note
-        );
-    }
-}
-
-/// **节点冻结屏障**（A3）：快照节点指纹，之后断言未变。
-///
-/// 用于 step 10 `reroute_and_repulse` 之后：此后所有阶段仅应改边几何 / label /
-/// annotation，**不得再挪节点**。以 `debug_assert!` 钉死——release（含
-/// `cargo test --release`）会编译掉，对 fp / 性能零影响，完全符合「顺序效果不变」。
+/// **节点冻结屏障**：快照节点指纹，之后断言未变。
 pub struct NodeFreeze {
     #[cfg(debug_assertions)]
     fingerprint: String,
@@ -264,11 +34,7 @@ impl NodeFreeze {
     }
 }
 
-/// **折线冻结屏障**（A3）：快照边折线指纹，之后软校验。
-///
-/// 用于 step 16 `repair_through_edges_post_route` 之后：此后（label 避让 / 去重）
-/// 只允许改 label 与 annotation。折点若仍变动则打 warning、视为上游 bug——采用
-/// 软校验而非 `debug_assert`，因为 doc 意图容忍幂等微调，硬断言过严。
+/// **折线冻结屏障**：快照边折线指纹，之后软校验。
 pub struct PolylineFreeze {
     fingerprint: u64,
 }
@@ -296,9 +62,8 @@ fn polyline_fingerprint(result: &crate::layout::LayoutResult) -> u64 {
     edges_fingerprint(&result.edges)
 }
 
-/// 边集几何指纹（A3 折线冻结 / A5 D 审计幂等校验共用）：
-/// 按边序遍历 anchor 折点，量化（×100 取整）后 fnv1a64 哈希。
-pub(crate) fn edges_fingerprint(edges: &[crate::layout::types::EdgeLayout]) -> u64 {
+/// 边集几何指纹：按边序遍历 anchor 折点，量化（×100 取整）后 fnv1a64 哈希。
+fn edges_fingerprint(edges: &[crate::layout::types::EdgeLayout]) -> u64 {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     let mut mix = |v: i64| {
         for b in v.to_le_bytes() {
@@ -317,28 +82,4 @@ pub(crate) fn edges_fingerprint(edges: &[crate::layout::types::EdgeLayout]) -> u
     hash
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    #[test]
-    fn post_route_stages_length_and_names_match_expected() {
-        assert_eq!(POST_ROUTE_STAGES.len(), 18);
-        assert_eq!(EXPECTED_STAGE_NAMES.len(), 18);
-        for (i, st) in POST_ROUTE_STAGES.iter().enumerate() {
-            assert_eq!(st.index as usize, i + 1, "index at {i}");
-            assert_eq!(st.name, EXPECTED_STAGE_NAMES[i], "name at {i}");
-        }
-        // 钉死首尾，防止只改中间时漏检。
-        assert_eq!(POST_ROUTE_STAGES[0].name, "complete_routing");
-        assert_eq!(
-            POST_ROUTE_STAGES[17].name,
-            "dedupe_labels_on_declared_merges"
-        );
-    }
-
-    #[test]
-    fn assert_post_route_stages_consistent_does_not_panic() {
-        assert_post_route_stages_consistent();
-    }
-}

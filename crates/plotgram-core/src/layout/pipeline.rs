@@ -105,8 +105,6 @@ impl<'a> LayoutPipeline<'a> {
         result: LayoutResult,
     ) -> Result<LayoutResult, DiagnosticError> {
         let t0 = Instant::now();
-        // A3：后处理写权表审计转储（PLOTGRAM_DUMP_EDGE_STAGES 置位时生效，默认零输出）。
-        crate::layout::edge_stages::dump_edge_stages();
         let feedback = LayoutRouteFeedback::new(self.diagram);
         let PreRouteFeedback {
             result: mut result_v2,
@@ -282,36 +280,6 @@ impl<'a> LayoutPipeline<'a> {
                     dock_gap,
                 );
 
-            // A5：D 审计幂等校验（PLOTGRAM_CHECK_D_IDEMPOTENT 门控，默认零成本）。
-            // 于克隆边再跑一遍两个 enforcer；几何若仍变 ⇒ D 未达不动点，打 warning
-            // （视为上游 bug，不修正——probe 从不写回 result，行为不变）。
-            if std::env::var_os("PLOTGRAM_CHECK_D_IDEMPOTENT").is_some() {
-                let before = crate::layout::edge_stages::edges_fingerprint(&result.edges);
-                let mut probe = result.edges.clone();
-                let g2 = crate::layout::edge::edge_routing_orthogonal::enforce_reverse_pair_min_gap(
-                    &mut probe,
-                    &self.diagram.relations,
-                    parallel_gap,
-                );
-                let d2 = crate::layout::edge::edge_routing_orthogonal::
-                    enforce_reverse_pair_dock_separation(
-                        &mut probe,
-                        &self.diagram.relations,
-                        &result.nodes,
-                        &from_side,
-                        &to_side,
-                        dock_gap,
-                    );
-                if crate::layout::edge_stages::edges_fingerprint(&probe) != before {
-                    crate::perf_log!(
-                        "[warn] A5 D 审计非幂等：首遍 min_gap={} dock={} 后，二遍仍改动几何（min_gap={} dock={}），上游未达不动点",
-                        d_gap_shifts,
-                        d_dock_shifts,
-                        g2,
-                        d2
-                    );
-                }
-            }
 
             // L3：architecture 在 C 期 stub_occ 仅诊断；节点已冻结后于 D 末做 exact 跨对共柱真修。
             // 只改边几何 → node_fp 不变；须在 label 避让前完成并刷新 annotation。
@@ -415,10 +383,7 @@ impl<'a> LayoutPipeline<'a> {
             polyline_freeze.warn_if_changed(&result);
         }
 
-        // B2：最终几何上的通道占用只读诊断（对照 lint 残余；默认零输出）。
-        crate::layout::channel_occupancy::dump_channel_occupancy_if_enabled(self.diagram, &result);
-        crate::layout::demand::dump_edge_difficulty_if_enabled(self.diagram, &result);
-        crate::layout::demand::dump_grid_demand_if_enabled(self.diagram, &result);
+
 
         crate::perf_log!(
             "[perf]   post-process: {:.2}ms",

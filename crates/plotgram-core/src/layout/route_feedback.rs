@@ -30,13 +30,8 @@ impl<'a> LayoutRouteFeedback<'a> {
             result.hints.space_budget = Some(SpaceBudget::from_diagram(self.diagram));
         }
 
-        // D3 dump + D4 P0 enrich（只读模型 → SpaceBudget）；快照只算一次
+        // D4 P0 enrich（只读模型 → SpaceBudget）；快照只算一次
         let snap = PressureSnapshot::compute(self.diagram, &result);
-        if std::env::var_os("PLOTGRAM_DUMP_PRE_ROUTE_PRESSURE").is_some()
-            || std::env::var_os("PLOTGRAM_DUMP_EDGE_DIFFICULTY").is_some()
-        {
-            crate::layout::demand::log_pressure_snapshot_for_pre_route(&snap);
-        }
         if let Some(budget) = result.hints.space_budget.as_mut() {
             budget.enrich_from_pressure(
                 self.diagram,

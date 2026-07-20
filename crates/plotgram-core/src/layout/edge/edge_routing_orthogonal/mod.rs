@@ -30,7 +30,6 @@ pub(super) mod profile;
 pub(super) mod channel_load;
 pub(super) mod context;
 pub(super) mod corridor_route;
-pub(super) mod corridor_stick;
 pub(super) mod feedback_side;
 pub(super) mod lane_assignment;
 pub(super) mod layer_order;
@@ -80,7 +79,6 @@ pub use stub_occupancy::{
     resolve_exact_stub_occupancy_post_route, resolve_stub_occupancy_conflicts, LayerBandDemand,
     StubOccupancyConflict, StubOccupancyRecord, StubOccupancyStats,
 };
-pub(crate) use corridor_stick::stick_edges_onto_corridor;
 pub(super) use straighten::straighten_preferred_alignments;
 pub(super) use stub_fix::fix_reverse_stub_ports;
 

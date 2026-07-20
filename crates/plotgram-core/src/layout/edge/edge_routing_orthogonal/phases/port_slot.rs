@@ -37,13 +37,6 @@ pub(crate) fn phase_port_slot(
     let mut to_side = vec![Port::Top; n];
     let mut lane = vec![0usize; n];
 
-    // D4 P2：预路由端口压力表（仅 PREFER=1 时用于换轴）
-    let port_pressure_map = if port_pressure_prefer_enabled() {
-        Some(port_pressure_lookup(nodes, relations))
-    } else {
-        None
-    };
-
     let mut pair_keys: Vec<String> = pair_groups.keys().cloned().collect();
     pair_keys.sort();
     for key in &pair_keys {
@@ -57,19 +50,6 @@ pub(crate) fn phase_port_slot(
 
         let (side_a, side_b) =
             choose_pair_sides_with_group(a_nl, b_nl, can_from, can_to, Some(group_ctx));
-        // 换轴 soft 偏好默认关：microservice 上会抬交叉；需
-        // PLOTGRAM_PORT_PRESSURE_PREFER=1 显式开启。
-        let (side_a, side_b) = if port_pressure_prefer_enabled() {
-            if let Some(pressure) = port_pressure_map.as_ref() {
-                prefer_lower_pressure_pair(
-                    a_nl, b_nl, can_from, can_to, side_a, side_b, pressure,
-                )
-            } else {
-                (side_a, side_b)
-            }
-        } else {
-            (side_a, side_b)
-        };
 
         for (l, &i) in indices.iter().enumerate() {
             let rel = &relations[i];
@@ -693,12 +673,6 @@ fn port_pressure_relieve_enabled() -> bool {
         .unwrap_or(false)
 }
 
-/// 选侧时按 demand 压力换轴；默认关（microservice 交叉 +5）。
-fn port_pressure_prefer_enabled() -> bool {
-    std::env::var("PLOTGRAM_PORT_PRESSURE_PREFER")
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false)
-}
 
 /// 同侧 slot 加大错开；默认开（不换侧，只拉开）。
 fn port_pressure_slot_enabled() -> bool {
@@ -717,71 +691,6 @@ fn pressure_aware_slot_pitch(base_slot_pitch: f64, side_load: usize, edge_len: f
     pitched.min(edge_len * 0.2).max(COMPACT_SLOT_PITCH)
 }
 
-fn port_pressure_lookup(
-    nodes: &HashMap<String, NodeLayout>,
-    relations: &[crate::ast::Relation],
-) -> std::collections::BTreeMap<(String, Port), usize> {
-    let mut map = std::collections::BTreeMap::new();
-    for p in crate::layout::demand::aggregate_port_pressure(nodes, relations) {
-        map.insert((p.node_id, p.side), p.count);
-    }
-    map
-}
-
-fn pressure_of(
-    map: &std::collections::BTreeMap<(String, Port), usize>,
-    node: &str,
-    side: Port,
-) -> usize {
-    map.get(&(node.to_string(), side)).copied().unwrap_or(0)
-}
-
-/// 几何首选侧已超载时，若正交另一轴候选两端压力更低且可接受，则 soft 换轴。
-fn prefer_lower_pressure_pair(
-    a: &NodeLayout,
-    b: &NodeLayout,
-    a_id: &str,
-    b_id: &str,
-    side_a: Port,
-    side_b: Port,
-    pressure: &std::collections::BTreeMap<(String, Port), usize>,
-) -> (Port, Port) {
-    let pa = pressure_of(pressure, a_id, side_a);
-    let pb = pressure_of(pressure, b_id, side_b);
-    if pa < PORT_PRESSURE_TRIG && pb < PORT_PRESSURE_TRIG {
-        return (side_a, side_b);
-    }
-
-    let ac = node_center(a);
-    let bc = node_center(b);
-    let dx = bc.x - ac.x;
-    let dy = bc.y - ac.y;
-    let alt = if is_vertical_port(side_a) {
-        if dx >= 0.0 {
-            (Port::Right, Port::Left)
-        } else {
-            (Port::Left, Port::Right)
-        }
-    } else if dy >= 0.0 {
-        (Port::Bottom, Port::Top)
-    } else {
-        (Port::Top, Port::Bottom)
-    };
-    if alt == (side_a, side_b) {
-        return (side_a, side_b);
-    }
-    if !side_acceptable(a, b, alt.0) || !side_acceptable(b, a, alt.1) {
-        return (side_a, side_b);
-    }
-    let pa2 = pressure_of(pressure, a_id, alt.0);
-    let pb2 = pressure_of(pressure, b_id, alt.1);
-    // 仅当总压下降，且至少一端明显减压
-    if pa2 + pb2 < pa + pb && (pa2 < pa || pb2 < pb) {
-        alt
-    } else {
-        (side_a, side_b)
-    }
-}
 
 /// D4 P2：对超载 `(node, side)` 把多余边 soft 分流到几何可接受的邻侧。
 ///

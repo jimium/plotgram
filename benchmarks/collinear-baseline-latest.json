@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-20-125853-s3-rollback-verify",
+  "date": "2026-07-20",
   "note": "role-aware baseline: product-gate hard; stress/demo quality soft",
   "samples": [
     {
@@ -46,9 +46,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 0.46,
-      "min_ms": 0.44,
-      "max_ms": 0.54,
+      "median_ms": 0.27,
+      "min_ms": 0.27,
+      "max_ms": 0.32,
       "det": true,
       "role": "product"
     },
@@ -96,9 +96,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 9.06,
-      "min_ms": 8.88,
-      "max_ms": 9.24,
+      "median_ms": 9.18,
+      "min_ms": 8.84,
+      "max_ms": 9.47,
       "det": true,
       "role": "product"
     },
@@ -146,9 +146,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 1.72,
-      "min_ms": 1.66,
-      "max_ms": 1.99,
+      "median_ms": 1.83,
+      "min_ms": 1.76,
+      "max_ms": 1.92,
       "det": true,
       "role": "product"
     },
@@ -196,9 +196,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 3.91,
-      "min_ms": 3.71,
-      "max_ms": 4.11,
+      "median_ms": 3.97,
+      "min_ms": 3.85,
+      "max_ms": 4.17,
       "det": true,
       "role": "product"
     },
@@ -246,9 +246,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 14.73,
-      "min_ms": 14.3,
-      "max_ms": 15.13,
+      "median_ms": 15.0,
+      "min_ms": 14.64,
+      "max_ms": 15.11,
       "det": true,
       "role": "product"
     },
@@ -260,10 +260,10 @@
       "groups": 5,
       "node_fp": "7e475eead0e08725",
       "exact_sev": 0.0,
-      "tight_sev": 256.0,
+      "tight_sev": 478.13909090909146,
       "allowed_share_len": 1126.5284406565656,
       "exact_pairs": 0,
-      "tight_pairs": 2,
+      "tight_pairs": 3,
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
@@ -271,7 +271,7 @@
         "child_group_outside_parent": 0,
         "edge_through_node": 0,
         "edge_crossing": 9,
-        "edge_on_group_border": 0,
+        "edge_on_group_border": 1,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
@@ -279,9 +279,9 @@
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 9,
+        "total_violations": 10,
         "error_count": 0,
-        "warning_count": 9
+        "warning_count": 10
       },
       "ortho": {
         "edge_exact_overlap_pairs": 9,
@@ -296,9 +296,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 38.68,
-      "min_ms": 36.68,
-      "max_ms": 40.28,
+      "median_ms": 45.68,
+      "min_ms": 33.32,
+      "max_ms": 49.46,
       "det": true,
       "role": "product"
     },
@@ -347,7 +347,7 @@
       },
       "min_gap": 8.0,
       "median_ms": 0.14,
-      "min_ms": 0.13,
+      "min_ms": 0.14,
       "max_ms": 0.16,
       "det": true,
       "role": "product"
@@ -385,20 +385,20 @@
       },
       "ortho": {
         "edge_exact_overlap_pairs": 0,
-        "edge_tight_spacing_pairs": 3,
+        "edge_tight_spacing_pairs": 1,
         "degraded_count": 0,
         "reroute_iterations": 2,
         "rerouted_edges": 8,
         "lane_groups": 2,
-        "lane_segments_shifted": 4,
+        "lane_segments_shifted": 8,
         "stub_occupancy_conflicts": 3,
         "stub_cross_pair_conflicts": 1,
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 1.66,
-      "min_ms": 1.64,
-      "max_ms": 1.67,
+      "median_ms": 1.71,
+      "min_ms": 1.69,
+      "max_ms": 1.83,
       "det": true,
       "role": "product"
     },
@@ -446,9 +446,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 2.37,
-      "min_ms": 2.32,
-      "max_ms": 2.42,
+      "median_ms": 2.53,
+      "min_ms": 2.4,
+      "max_ms": 2.75,
       "det": true,
       "role": "product"
     },
@@ -496,9 +496,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 1.25,
-      "min_ms": 1.23,
-      "max_ms": 1.31,
+      "median_ms": 1.4,
+      "min_ms": 1.36,
+      "max_ms": 1.51,
       "det": true,
       "role": "product"
     },
@@ -537,7 +537,7 @@
       "min_gap": 8.0,
       "median_ms": 0.1,
       "min_ms": 0.1,
-      "max_ms": 0.1,
+      "max_ms": 0.11,
       "det": true,
       "role": "product"
     },
@@ -574,9 +574,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 0.15,
-      "min_ms": 0.15,
-      "max_ms": 0.15,
+      "median_ms": 0.42,
+      "min_ms": 0.17,
+      "max_ms": 1.3,
       "det": true,
       "role": "product"
     },
@@ -624,9 +624,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 1.09,
-      "min_ms": 1.06,
-      "max_ms": 1.15,
+      "median_ms": 1.18,
+      "min_ms": 1.14,
+      "max_ms": 1.26,
       "det": true,
       "role": "product"
     },
@@ -668,15 +668,15 @@
         "reroute_iterations": 3,
         "rerouted_edges": 21,
         "lane_groups": 1,
-        "lane_segments_shifted": 4,
-        "stub_occupancy_conflicts": 1,
+        "lane_segments_shifted": 6,
+        "stub_occupancy_conflicts": 0,
         "stub_cross_pair_conflicts": 0,
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 1.98,
-      "min_ms": 1.97,
-      "max_ms": 2.1,
+      "median_ms": 2.78,
+      "min_ms": 2.41,
+      "max_ms": 3.0,
       "det": true,
       "role": "product"
     },
@@ -724,9 +724,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 2.36,
-      "min_ms": 2.26,
-      "max_ms": 2.54,
+      "median_ms": 4.25,
+      "min_ms": 2.63,
+      "max_ms": 6.04,
       "det": true,
       "role": "product"
     },
@@ -763,9 +763,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 0.41,
-      "min_ms": 0.4,
-      "max_ms": 0.46,
+      "median_ms": 0.55,
+      "min_ms": 0.44,
+      "max_ms": 0.65,
       "det": true,
       "role": "product"
     },
@@ -802,9 +802,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 6.78,
-      "min_ms": 6.67,
-      "max_ms": 6.86,
+      "median_ms": 7.57,
+      "min_ms": 7.28,
+      "max_ms": 7.71,
       "det": true,
       "role": "product"
     },
@@ -841,9 +841,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 0.55,
-      "min_ms": 0.54,
-      "max_ms": 0.59,
+      "median_ms": 0.54,
+      "min_ms": 0.53,
+      "max_ms": 0.58,
       "det": true,
       "role": "product"
     },
@@ -891,9 +891,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 12.0,
-      "median_ms": 5.75,
-      "min_ms": 5.65,
-      "max_ms": 6.01,
+      "median_ms": 8.17,
+      "min_ms": 7.39,
+      "max_ms": 8.55,
       "det": true,
       "role": "stress"
     },
@@ -930,9 +930,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 7.28,
-      "min_ms": 7.08,
-      "max_ms": 7.32,
+      "median_ms": 7.8,
+      "min_ms": 7.67,
+      "max_ms": 15.41,
       "det": true,
       "role": "stress"
     },
@@ -980,9 +980,9 @@
         "stub_occupancy_shifted": 0
       },
       "min_gap": 8.0,
-      "median_ms": 9.82,
-      "min_ms": 4.94,
-      "max_ms": 18.71,
+      "median_ms": 4.98,
+      "min_ms": 4.76,
+      "max_ms": 5.11,
       "det": true,
       "role": "stress"
     },
@@ -1019,9 +1019,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 0.27,
+      "median_ms": 0.29,
       "min_ms": 0.27,
-      "max_ms": 0.28,
+      "max_ms": 0.32,
       "det": true,
       "role": "stress"
     },
@@ -1069,9 +1069,9 @@
         "stub_occupancy_shifted": 1
       },
       "min_gap": 8.0,
-      "median_ms": 2.97,
-      "min_ms": 2.84,
-      "max_ms": 3.06,
+      "median_ms": 3.02,
+      "min_ms": 2.89,
+      "max_ms": 3.16,
       "det": true,
       "role": "stress"
     },
@@ -1108,9 +1108,9 @@
       },
       "ortho": null,
       "min_gap": 8.0,
-      "median_ms": 83.59,
-      "min_ms": 81.48,
-      "max_ms": 84.73,
+      "median_ms": 82.86,
+      "min_ms": 81.76,
+      "max_ms": 83.48,
       "det": true,
       "role": "stress"
     }

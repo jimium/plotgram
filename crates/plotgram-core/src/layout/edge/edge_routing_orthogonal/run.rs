@@ -472,16 +472,8 @@ pub(super) fn route_edges_orthogonal_inner(
             ));
     }
 
-    // 轨道 A：sanitize / S4 escape 之后再次收口正反向同侧共锚
-    let dock_gap = parallel_gap.max(COMPACT_SLOT_PITCH);
-    let _dock_fixed = enforce_reverse_pair_dock_separation(
-        &mut edges,
-        relations,
-        &result.nodes,
-        &from_side,
-        &to_side,
-        dock_gap,
-    );
+    // S2-5：C 期末尾的 dock 收口已移除——D 段（pipeline）在 snap/sanitize 之后
+    // 作为「最终写者」重做 dock_sep，C 末这次会被 D 的 snap/sanitize 抖回后覆盖，属纯冗余。
 
     // P3.3：标签避让只在 pipeline 几何冻结后做一次。
     // sanitize 会重建平行边标签；此处再 resolve 会被 D 段 snap/sanitize 丢掉。
