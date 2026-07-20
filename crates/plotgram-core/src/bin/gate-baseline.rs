@@ -81,7 +81,7 @@ fn main() {
     let mut samples: Vec<CollinearSampleMetrics> = Vec::new();
     for path in &files {
         let rel = path.to_string_lossy().to_string();
-        eprint!("  collinear {rel} ... ");
+        eprint!("  gate {rel} ... ");
         let sample = measure_file(path, runs);
         let fp_short = &sample.node_fp[..8.min(sample.node_fp.len())];
         eprintln!(
