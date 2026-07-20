@@ -4,6 +4,7 @@ use super::path::port_outward;
 use super::*;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
+use crate::layout::edge::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
 use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════
@@ -359,6 +360,7 @@ pub fn fix_reverse_stub_ports(
     // 侧通道边（回环 / 长跨度）：禁止 stub_fix 把 Left/Right 改成 Top/Bottom，
     // 否则会重新走穿节点列的「捷径」。
     side_channel_edges: &std::collections::HashSet<usize>,
+    ovg: Option<&OrthogonalVisibilityGraph>,
 ) {
     let n = edges.len();
     if n == 0 {
@@ -438,6 +440,7 @@ pub fn fix_reverse_stub_ports(
                 ortho_stats,
                 endpoint_map,
                 side_channel_edges.contains(&ei),
+                ovg,
             ) {
                 let new_len = result.5;
                 let better = match &best {
@@ -661,6 +664,7 @@ fn evaluate_attempt(
     ortho_stats: &mut crate::layout::OrthoDebugStats,
     endpoint_map: &HashMap<(usize, bool), Endpoint>,
     force_strict_feedback_or_long_span: bool,
+    ovg: Option<&OrthogonalVisibilityGraph>,
 ) -> Option<(Port, Port, Endpoint, Endpoint, Vec<Point>, f64)> {
     let new_from = attempt.from.unwrap_or(old_from);
     let new_to = attempt.to.unwrap_or(old_to);
@@ -736,7 +740,7 @@ fn evaluate_attempt(
     );
     let prefer_outer = false;
     let candidate = corridor_ok.unwrap_or_else(|| {
-        let ctx = OrthoRoutingContext::new(nodes, group_ctx, grid, r_cfg, profile, obstacles, None)
+        let mut ctx = OrthoRoutingContext::new(nodes, group_ctx, grid, r_cfg, profile, obstacles, None)
             .with_strict_group_transit(should_strict_group_transit(
                 profile,
                 group_ctx,
@@ -748,6 +752,9 @@ fn evaluate_attempt(
             // 换端口重试：升档外框通道
             .with_corridor_boost(true)
             .with_prefer_outer_ring(prefer_outer);
+        if let Some(ovg_ref) = ovg {
+            ctx = ctx.with_ovg(ovg_ref);
+        }
         select_best_path_with_scorer_stats(
             &ctx,
             &pair,

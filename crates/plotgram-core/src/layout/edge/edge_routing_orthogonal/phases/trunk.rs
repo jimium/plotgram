@@ -4,6 +4,7 @@
 
 use super::super::*;
 use crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels;
+use crate::layout::edge::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
 use std::collections::HashMap;
 
 /// 从 S3 merge_intervals 提取垂直受保护干线 `(x, y_lo, y_hi)`（去重、排序）。
@@ -56,6 +57,7 @@ pub(crate) fn phase_reroute_feedback_after_trunk(
     parallel: &crate::layout::edge::common::parallel_edges::ParallelGroups,
     protected_trunks: &[(f64, f64, f64)],
     ortho_stats: &mut crate::layout::OrthoDebugStats,
+    ovg: Option<&OrthogonalVisibilityGraph>,
 ) -> usize {
     let mut order: Vec<usize> = feedback_edge_set.iter().copied().collect();
     order.sort_unstable();
@@ -104,11 +106,14 @@ pub(crate) fn phase_reroute_feedback_after_trunk(
             cfg.channel_margin,
         )
         .unwrap_or_else(|| {
-            let ctx =
+            let mut ctx =
                 OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
                     .with_strict_group_transit(strict)
                     .with_prefer_outer_ring(true)
                     .with_protected_trunks(protected_trunks);
+            if let Some(ovg_ref) = ovg {
+                ctx = ctx.with_ovg(ovg_ref);
+            }
             let mut first = select_best_path_with_scorer_stats(
                 &ctx,
                 &pair,
@@ -118,12 +123,15 @@ pub(crate) fn phase_reroute_feedback_after_trunk(
             );
             if path_stats.degraded {
                 let mut boost_stats = PathSelectStats::default();
-                let ctx2 =
+                let mut ctx2 =
                     OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
                         .with_strict_group_transit(strict)
                         .with_corridor_boost(true)
                         .with_prefer_outer_ring(true)
                         .with_protected_trunks(protected_trunks);
+                if let Some(ovg_ref) = ovg {
+                    ctx2 = ctx2.with_ovg(ovg_ref);
+                }
                 let boosted = select_best_path_with_scorer_stats(
                     &ctx2,
                     &pair,

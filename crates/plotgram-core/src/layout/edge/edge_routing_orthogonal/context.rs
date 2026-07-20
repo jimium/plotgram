@@ -13,6 +13,7 @@ use crate::layout::demand::CorridorModel;
 use crate::layout::edge::common::spatial_grid::SpatialGrid;
 use super::{ChannelLoadMap, OrthoConfig, OrthoRoutingProfile, RoutedSegment};
 use super::slot::Endpoint;
+use super::visibility_graph::OrthogonalVisibilityGraph;
 
 /// Shared, read-only routing context for a single `route_edges_orthogonal` call.
 ///
@@ -42,6 +43,11 @@ pub struct OrthoRoutingContext<'a> {
     pub prefer_outer_ring: bool,
     /// S4：受保护的垂直业务干线 `(x, y_lo, y_hi)`；穿越加重惩罚。
     pub protected_trunks: &'a [(f64, f64, f64)],
+    /// Phase B: 正交可见性图（OVG），用于 degraded 边的路径搜索。
+    pub ovg: Option<&'a OrthogonalVisibilityGraph>,
+    /// Phase B3: 全局通道规划分配的通道坐标（cross-axis coord）。
+    /// 注入 build_channel_detours 作为优先候选。
+    pub planned_channel: Option<f64>,
 }
 
 impl<'a> OrthoRoutingContext<'a> {
@@ -68,6 +74,8 @@ impl<'a> OrthoRoutingContext<'a> {
             corridor_boost: false,
             prefer_outer_ring: false,
             protected_trunks: &[],
+            ovg: None,
+            planned_channel: None,
         }
     }
 
@@ -95,6 +103,18 @@ impl<'a> OrthoRoutingContext<'a> {
 
     pub fn with_protected_trunks(mut self, trunks: &'a [(f64, f64, f64)]) -> Self {
         self.protected_trunks = trunks;
+        self
+    }
+
+    /// Phase B: 注入正交可见性图（OVG）。
+    pub fn with_ovg(mut self, ovg: &'a OrthogonalVisibilityGraph) -> Self {
+        self.ovg = Some(ovg);
+        self
+    }
+
+    /// Phase B3: 注入全局通道规划分配的通道坐标。
+    pub fn with_planned_channel(mut self, coord: Option<f64>) -> Self {
+        self.planned_channel = coord;
         self
     }
 }
@@ -233,6 +253,26 @@ impl SegmentGrid {
             }
         }
         result.sort_by_key(|s| (s.edge_index, s.x1.to_bits(), s.y1.to_bits(), s.x2.to_bits(), s.y2.to_bits()));
+        result
+    }
+
+    /// 查询 bbox 范围内的所有已路由段（用于 OVG 重叠惩罚）。
+    pub fn query_bbox(&self, x_lo: f64, y_lo: f64, x_hi: f64, y_hi: f64) -> Vec<&RoutedSegment> {
+        let (cx0, cx1, cy0, cy1) = self.grid.cell_range(x_lo, x_hi, y_lo, y_hi);
+        let mut seen: Vec<usize> = Vec::new();
+        let mut result = Vec::new();
+        for cx in cx0..=cx1 {
+            for cy in cy0..=cy1 {
+                if let Some(indices) = self.grid.cells().get(&(cx, cy)) {
+                    for &idx in indices {
+                        if !seen.contains(&idx) {
+                            seen.push(idx);
+                            result.push(&self.segments[idx]);
+                        }
+                    }
+                }
+            }
+        }
         result
     }
 

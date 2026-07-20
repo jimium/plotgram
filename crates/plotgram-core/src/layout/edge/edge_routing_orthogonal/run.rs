@@ -110,6 +110,36 @@ pub(super) fn route_edges_orthogonal_inner(
     };
     let mut grid = SegmentGrid::new();
 
+    // Phase B3：全局通道规划（默认关闭，PLOTGRAM_CHANNEL_PLANNER=1 启用）
+    let channel_plan = if channel_planner::channel_planner_enabled() {
+        Some(channel_planner::plan_channels(
+            relations,
+            &result.nodes,
+            &group_ctx,
+            &edge_order,
+        ))
+    } else {
+        None
+    };
+
+    // Phase B1：构建 OVG（仅当环境变量启用时）——节点障碍物阻断 + 组软惩罚
+    // 节点膨胀使用 NODE_OBSTACLE_PAD + 10，给路径更多 clearance，减少 tight 违规
+    let ovg = if visibility_graph::ovg_enabled() {
+        let group_rects: Vec<crate::layout::geometry::Rect> = obstacles.sorted_group_ids.iter()
+            .filter_map(|gid| group_ctx.groups.get(gid))
+            .map(|gl| crate::layout::geometry::Rect::from(gl))
+            .collect();
+        let ovg_graph = visibility_graph::build_ovg_with_groups(
+            &result.nodes,
+            &obstacles.sorted_node_ids,
+            NODE_OBSTACLE_PAD + 10.0,
+            &group_rects,
+        );
+        if ovg_graph.is_empty() { None } else { Some(ovg_graph) }
+    } else {
+        None
+    };
+
     // P2-1: 路由 debug 统计
     let mut ortho_stats = crate::layout::OrthoDebugStats {
         edge_count: n,
@@ -138,6 +168,8 @@ pub(super) fn route_edges_orthogonal_inner(
         &feedback_edge_set,
         s4_monitor_corridor,
         Some(&corridor_model),
+        ovg.as_ref(),
+        channel_plan.as_ref(),
     );
 
     // ── 4b. 后置交叉检测：修正 slot 排序与实际路由方向不一致的锚点 ──
@@ -181,6 +213,7 @@ pub(super) fn route_edges_orthogonal_inner(
         &cfg,
         &profile,
         &result.hints.space_budget,
+        ovg.as_ref(),
     );
 
     // ── 4d. X-1: 多轮冲突消解重路由 ──
@@ -198,6 +231,7 @@ pub(super) fn route_edges_orthogonal_inner(
         &corridor_plan,
         &mut ortho_stats,
         &profile,
+        ovg.as_ref(),
     );
 
     // ── 4e. X-2: 反向 stub 检测与端口翻转 ──
@@ -216,6 +250,7 @@ pub(super) fn route_edges_orthogonal_inner(
         &mut ortho_stats,
         &profile,
         &feedback_edge_set,
+        ovg.as_ref(),
     );
 
     // ── 4f. X-3: Lane Assignment 车道分配 ──
@@ -313,6 +348,7 @@ pub(super) fn route_edges_orthogonal_inner(
                 &parallel,
                 &protected_trunks,
                 &mut ortho_stats,
+                ovg.as_ref(),
             );
             crate::perf_log!(
                 "[perf]     s4_feedback_reroute: edges={} protected_trunks={}",

@@ -3,6 +3,7 @@
 use super::*;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
+use crate::layout::edge::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
 use std::collections::HashMap;
 
 /// X-1: 多轮重路由默认上限（违规边多时可升到此值）
@@ -37,6 +38,7 @@ pub fn reroute_conflicting_edges(
     corridor_plan: &corridor_route::CorridorRoutePlan,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
     profile: &OrthoRoutingProfile,
+    ovg: Option<&OrthogonalVisibilityGraph>,
 ) {
     use std::collections::HashSet;
 
@@ -129,6 +131,7 @@ pub fn reroute_conflicting_edges(
                 ortho_stats,
                 parallel_gap,
                 corridor_plan,
+                ovg,
             );
 
             match clean_path {
@@ -223,6 +226,7 @@ fn find_clean_reroute_path(
     ortho_stats: &mut crate::layout::OrthoDebugStats,
     parallel_gap: f64,
     corridor_plan: &corridor_route::CorridorRoutePlan,
+    ovg: Option<&OrthogonalVisibilityGraph>,
 ) -> Option<(Vec<Point>, bool)> {
     // 先试 corridor 快速通道（保留原标签）
     let has_chain = corridor_plan.chains.contains_key(&ei);
@@ -251,7 +255,7 @@ fn find_clean_reroute_path(
             ..*cfg
         };
         let boost = margin > cfg.channel_margin + 0.5;
-        let ctx = OrthoRoutingContext::new(
+        let mut ctx = OrthoRoutingContext::new(
             nodes,
             group_ctx,
             grid,
@@ -270,6 +274,9 @@ fn find_clean_reroute_path(
         ))
         .with_corridor_boost(boost || has_chain)
         .with_prefer_outer_ring(prefer_outer);
+        if let Some(ovg_ref) = ovg {
+            ctx = ctx.with_ovg(ovg_ref);
+        }
         let pair = EndpointPair {
             from: from_ep.clone(),
             to: to_ep.clone(),

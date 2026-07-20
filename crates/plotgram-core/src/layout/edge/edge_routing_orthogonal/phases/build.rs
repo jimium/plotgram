@@ -5,6 +5,8 @@
 use super::super::*;
 use crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels;
 use crate::layout::edge::common::self_loop;
+use crate::layout::edge::edge_routing_orthogonal::channel_planner::ChannelPlan;
+use crate::layout::edge::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
 use std::collections::HashMap;
 
 #[allow(clippy::too_many_arguments)]
@@ -30,7 +32,10 @@ pub(crate) fn phase_route_edges(
     feedback_edge_set: &std::collections::HashSet<usize>,
     s4_monitor_corridor: bool,
     corridor_model: Option<&crate::layout::demand::CorridorModel>,
+    ovg: Option<&OrthogonalVisibilityGraph>,
+    channel_plan: Option<&ChannelPlan>,
 ) {
+
     for &i in edge_order {
         let t_edge = crate::layout::perf::Instant::now();
         let rel = &relations[i];
@@ -112,6 +117,13 @@ pub(crate) fn phase_route_edges(
         let prefer_outer = is_feedback || (s4_monitor_corridor && is_feedback);
         // P2：有 chain 但 validated 失败 → 显式 degraded（禁止静默 free-route 冒充成功）。
         let corridor_contract_failed = has_chain && corridor_ok.is_none();
+        // Phase B3: 查询全局通道规划分配的通道坐标
+        let planned_ch = channel_plan.and_then(|cp| {
+            let (coord, is_vert) = cp.channel_for_edge(i)?;
+            // 只注入与当前轴匹配的通道
+            let from_vertical = is_vertical_port(from_ep.side);
+            if from_vertical == is_vert { Some(coord) } else { None }
+        });
         let mut path = corridor_ok.unwrap_or_else(|| {
             let mut ctx =
                 OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
@@ -122,6 +134,12 @@ pub(crate) fn phase_route_edges(
                     .with_prefer_outer_ring(prefer_outer);
             if let Some(m) = corridor_model {
                 ctx = ctx.with_corridor_demands(m);
+            }
+            if let Some(ovg_ref) = ovg {
+                ctx = ctx.with_ovg(ovg_ref);
+            }
+            if planned_ch.is_some() {
+                ctx = ctx.with_planned_channel(planned_ch);
             }
             select_best_path_with_scorer_stats(
                 &ctx,
@@ -145,6 +163,9 @@ pub(crate) fn phase_route_edges(
                     .with_prefer_outer_ring(prefer_outer);
             if let Some(m) = corridor_model {
                 ctx = ctx.with_corridor_demands(m);
+            }
+            if let Some(ovg_ref) = ovg {
+                ctx = ctx.with_ovg(ovg_ref);
             }
             let boosted = select_best_path_with_scorer_stats(
                 &ctx,

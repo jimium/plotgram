@@ -257,6 +257,52 @@ fn candidate_better(score: f64, path: &[Point], best: &Option<(f64, Vec<Point>)>
     }
 }
 
+/// OVG 单条路径评估（绕过 MAX_CANDIDATES 预算限制）。
+/// OVG 产出的是全局最短路径，质量通常优于启发式候选，不应被预算截断。
+fn evaluate_single_ovg_path(
+    path: Vec<Point>,
+    ctx: &OrthoRoutingContext,
+    pair: &EndpointPair,
+    scorer: &dyn CandidateScorer,
+    from_id: &str,
+    to_id: &str,
+    state: &mut PathEvalState,
+) {
+    state.candidate_count += 1;
+    if path_is_clean(
+        &path, from_id, to_id, ctx.nodes, ctx.group_ctx,
+        &ctx.obstacles.sorted_node_ids,
+    ) {
+        let lower_bound =
+            path_length(&path) + path.len().saturating_sub(2) as f64 * BEND_PENALTY;
+        if path_avoids_group_interiors(
+            &path, from_id, to_id, ctx.group_ctx,
+            &ctx.obstacles.sorted_group_ids,
+        ) {
+            state.strict_count += 1;
+            if state.best_strict.as_ref().is_none_or(|(bs, _)| lower_bound < *bs) {
+                let score = scorer.score(&path, ctx, pair);
+                if candidate_better(score, &path, &state.best_strict) {
+                    state.best_strict = Some((score, path));
+                }
+            }
+        } else {
+            state.nodes_only_count += 1;
+            if state.best_nodes_only.as_ref().is_none_or(|(bs, _)| lower_bound < *bs) {
+                let score = scorer.score(&path, ctx, pair);
+                if candidate_better(score, &path, &state.best_nodes_only) {
+                    state.best_nodes_only = Some((score, path));
+                }
+            }
+        }
+    } else {
+        let score = path_length(&path) + path.len().saturating_sub(2) as f64 * BEND_PENALTY;
+        if candidate_better(score, &path, &state.best_dirty) {
+            state.best_dirty = Some((score, path));
+        }
+    }
+}
+
 fn evaluate_path_batch(
     mut paths: Vec<Vec<Point>>,
     ctx: &OrthoRoutingContext,
@@ -457,6 +503,44 @@ pub fn select_best_path_with_scorer_stats(
             sx, sy, from_side, ex, ey, to_side, pair, ctx, FoldOrder::HorizontalFirst, corridor,
         ));
         evaluate_path_batch(phase2, ctx, pair, scorer, from_id, to_id, &mut state);
+    }
+
+    // Phase B Level 4: OVG 路径搜索（组感知 Dijkstra，仅当无 strict 候选时作为 fallback）
+    if state.best_strict.is_none() && !phase1_only {
+        if let Some(ovg) = ctx.ovg {
+            if !ovg.is_empty() {
+                // 找到 from/to 节点在障碍物列表中的索引
+                let from_idx = ctx.obstacles.sorted_node_ids.iter().position(|id| id == from_id);
+                let to_idx = ctx.obstacles.sorted_node_ids.iter().position(|id| id == to_id);
+                // 收集搜索范围内的已路由段（用于重叠惩罚）
+                let margin = 80.0;
+                let occ_x_lo = start.x.min(end.x) - margin;
+                let occ_x_hi = start.x.max(end.x) + margin;
+                let occ_y_lo = start.y.min(end.y) - margin;
+                let occ_y_hi = start.y.max(end.y) + margin;
+                let occupied: Vec<(f64, f64, f64, f64)> = ctx.grid
+                    .query_bbox(occ_x_lo, occ_y_lo, occ_x_hi, occ_y_hi)
+                    .iter()
+                    .map(|s| (s.x1, s.y1, s.x2, s.y2))
+                    .collect();
+                let ovg_result = ovg.shortest_path_excluding(
+                    start,
+                    end,
+                    from_side,
+                    to_side,
+                    BEND_PENALTY,
+                    from_idx,
+                    to_idx,
+                    &occupied,
+                );
+                if let Some(ovg_path) = ovg_result {
+                    // OVG 路径绕过 MAX_CANDIDATES 预算（单条高质量候选）
+                    evaluate_single_ovg_path(
+                        ovg_path, ctx, pair, scorer, from_id, to_id, &mut state,
+                    );
+                }
+            }
+        }
     }
 
     // R2：dirty 前强制升档——无 clean（strict / nodes_only）时再试更大 channel margin。
@@ -1524,6 +1608,11 @@ fn build_channel_detours_on_axis(
     };
 
     let mut channel_coords: Vec<f64> = Vec::new();
+
+    // Phase B3: 注入全局通道规划分配的坐标（优先候选）
+    if let Some(planned) = ctx.planned_channel {
+        channel_coords.push(planned);
+    }
 
     for &margin in margins {
         channel_coords.push(channel_coord_on_axis(

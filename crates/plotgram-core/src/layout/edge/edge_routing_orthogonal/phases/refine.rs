@@ -5,6 +5,7 @@
 use super::super::*;
 use crate::layout::edge::common::edge_geometry::undirected_pair_key;
 use crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels;
+use crate::layout::edge::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
 use std::collections::HashMap;
 
 #[allow(clippy::too_many_arguments)]
@@ -25,6 +26,7 @@ pub(crate) fn phase_straighten_align(
     cfg: &OrthoConfig,
     profile: &OrthoRoutingProfile,
     space_budget: &Option<crate::layout::space_budget::SpaceBudget>,
+    ovg: Option<&OrthogonalVisibilityGraph>,
 ) {
     // ── 4c. 直连偏好对齐：正对端口边的 slot 锚点对齐修正 ──
     // 在 replan_slots 之后执行，确保anchor位置是最终的slot排序结果。
@@ -102,7 +104,7 @@ pub(crate) fn phase_straighten_align(
                     .as_ref()
                     .map(|b| b.corridor_boost_requested)
                     .unwrap_or(false);
-                let ctx = OrthoRoutingContext::new(
+                let mut ctx = OrthoRoutingContext::new(
                     nodes, group_ctx, &grid, cfg, profile, obstacles, None,
                 )
                 .with_strict_group_transit(should_strict_group_transit(
@@ -115,6 +117,9 @@ pub(crate) fn phase_straighten_align(
                 ))
                 .with_corridor_boost(boost || has_chain || !group_ctx.is_same_leaf_group(from_id, to_id))
                 .with_prefer_outer_ring(prefer_outer);
+                if let Some(ovg_ref) = ovg {
+                    ctx = ctx.with_ovg(ovg_ref);
+                }
                 select_best_path_with_scorer_stats(
                     &ctx,
                     &pair,
@@ -208,6 +213,7 @@ pub(crate) fn phase_reroute(
     corridor_plan: &corridor_route::CorridorRoutePlan,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
     profile: &OrthoRoutingProfile,
+    ovg: Option<&OrthogonalVisibilityGraph>,
 ) {
     let t_x1 = crate::layout::perf::Instant::now();
     reroute_conflicting_edges(
@@ -224,6 +230,7 @@ pub(crate) fn phase_reroute(
         corridor_plan,
         ortho_stats,
         profile,
+        ovg,
     );
     crate::perf_log!(
         "[perf]     x1_reroute: {:.2}ms",
@@ -255,6 +262,7 @@ pub(crate) fn phase_stub_fix(
     ortho_stats: &mut crate::layout::OrthoDebugStats,
     profile: &OrthoRoutingProfile,
     feedback_edge_set: &std::collections::HashSet<usize>,
+    ovg: Option<&OrthogonalVisibilityGraph>,
 ) {
     let t_flip = crate::layout::perf::Instant::now();
     fix_reverse_stub_ports(
@@ -272,6 +280,7 @@ pub(crate) fn phase_stub_fix(
         ortho_stats,
         profile,
         feedback_edge_set,
+        ovg,
     );
     crate::perf_log!(
         "[perf]     x2_flip_stub: {:.2}ms (flipped {} edges)",
