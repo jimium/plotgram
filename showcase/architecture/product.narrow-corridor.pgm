@@ -1,0 +1,25 @@
+// 窄组间隙：边不应贴组边框走
+diagram architecture {
+    title: "窄走廊穿越"
+
+    group frontend "前端" {
+        entity[frontend] web "Web"
+        entity[frontend] mobile "Mobile"
+    }
+
+    group backend "后端" {
+        entity[service] api "API"
+        entity[service] worker "Worker"
+    }
+
+    group storage "存储" {
+        entity[database] db "DB"
+        entity[cache] cache "Cache"
+    }
+
+    web -> api
+    mobile -> api
+    api -> db
+    api -> cache
+    worker -> db
+}

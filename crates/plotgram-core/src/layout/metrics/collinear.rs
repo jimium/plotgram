@@ -11,6 +11,7 @@ use crate::layout::edge::segment_pair::{
 };
 use crate::layout::geometry::Point;
 use crate::layout::lint::{compute_lint_metrics, LintMetricsSummary};
+use crate::layout::metrics::aesthetics::{compute_aesthetics, AestheticsReport};
 use crate::layout::{LayoutResult, OrthoDebugStats};
 use serde::{Deserialize, Serialize};
 
@@ -46,6 +47,9 @@ pub struct CollinearSampleMetrics {
     pub max_ms: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub det: Option<bool>,
+    /// 美学指标（观测维度）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aesthetics: Option<AestheticsReport>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -108,6 +112,8 @@ pub fn compute_collinear_sample_metrics(
         .as_ref()
         .map(CollinearOrthoStats::from);
 
+    let aesthetics = compute_aesthetics(diagram, result);
+
     CollinearSampleMetrics {
         file: file.to_string(),
         diagram_type: format!("{:?}", diagram.diagram_type),
@@ -127,6 +133,7 @@ pub fn compute_collinear_sample_metrics(
         min_ms: None,
         max_ms: None,
         det: None,
+        aesthetics: Some(aesthetics),
     }
 }
 

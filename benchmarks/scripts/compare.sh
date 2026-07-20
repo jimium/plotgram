@@ -100,6 +100,7 @@ cur_map = {s["file"]: s for s in cur["samples"]}
 correctness = []      # 硬 fail（全角色）
 quality_hard = []     # 硬 fail（product/smoke；或 stress 当 --strict-stress）
 quality_soft = []     # WARN（stress/demo；或 product 当 --allow-quality-debt）
+aesthetics_warn = []  # 美学轨（当前阶段全 WARN，稳定后转硬）
 warns = []
 
 # 缺样例按角色归类
@@ -197,6 +198,36 @@ for f in sorted(set(base_map) & set(cur_map)):
     if c.get("det") is False:
         correctness.append(f"{name}: det=false（非确定，role={role}）")
 
+    # ── 美学轨（观测，当前阶段全 WARN）──
+    ba = b.get("aesthetics") or {}
+    ca = c.get("aesthetics") or {}
+    if ba and ca:
+        # 弯折数不升（容差 0.2）
+        b_bends = (ba.get("bends") or {}).get("avg_per_edge", 0)
+        c_bends = (ca.get("bends") or {}).get("avg_per_edge", 0)
+        if c_bends > b_bends + 0.2:
+            aesthetics_warn.append(f"{name}: avg_bends_per_edge 上升 {b_bends:.2f} → {c_bends:.2f} (role={role})")
+        # 贴边违规不升
+        b_hug = (ba.get("border_proximity") or {}).get("hugging_violations", 0)
+        c_hug = (ca.get("border_proximity") or {}).get("hugging_violations", 0)
+        if c_hug > b_hug:
+            aesthetics_warn.append(f"{name}: hugging_violations 上升 {b_hug} → {c_hug} (role={role})")
+        # 对称偏差不升（容差 0.05）
+        b_sym = (ba.get("symmetry") or {}).get("avg_deviation", 0)
+        c_sym = (ca.get("symmetry") or {}).get("avg_deviation", 0)
+        if c_sym > b_sym + 0.05:
+            aesthetics_warn.append(f"{name}: symmetry_deviation 上升 {b_sym:.3f} → {c_sym:.3f} (role={role})")
+        # 边交叉数不升
+        b_cross = (ba.get("crossings") or {}).get("total", 0)
+        c_cross = (ca.get("crossings") or {}).get("total", 0)
+        if c_cross > b_cross:
+            aesthetics_warn.append(f"{name}: total_crossings 上升 {b_cross} → {c_cross} (role={role})")
+        # 绕行比不升（容差 0.1）
+        b_det = (ba.get("detour") or {}).get("avg_ratio", 0)
+        c_det = (ca.get("detour") or {}).get("avg_ratio", 0)
+        if c_det > b_det + 0.1:
+            aesthetics_warn.append(f"{name}: avg_detour_ratio 上升 {b_det:.2f} → {c_det:.2f} (role={role})")
+
 # 按角色汇总
 roles_present = sorted({s.get("role", "product") for s in cur["samples"]})
 
@@ -234,6 +265,14 @@ if quality_soft:
         print(f"  - {e}")
 else:
     print("PASS (stress/demo/mech)")
+
+print("--- 美学轨（观测，WARN）---")
+if aesthetics_warn:
+    print("WARN:")
+    for e in aesthetics_warn:
+        print(f"  - {e}")
+else:
+    print("PASS")
 
 if correctness:
     sys.exit(1)

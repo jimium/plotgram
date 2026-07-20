@@ -49,6 +49,7 @@ pub(super) mod phases;
 pub(super) mod visibility_graph;
 pub(super) mod port_solver;
 pub(super) mod channel_planner;
+pub(super) mod crossing_reduction;
 
 // Re-exports for cross-submodule access via `use super::*;`
 pub(super) use profile::OrthoRoutingProfile;

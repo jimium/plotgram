@@ -1,8 +1,10 @@
 //! 布局观测指标（不改变算法行为）。
 
+pub mod aesthetics;
 pub mod collinear;
 pub mod congestion;
 
+pub use aesthetics::{compute_aesthetics, AestheticsReport};
 pub use collinear::{
     compute_collinear_sample_metrics, node_fingerprint, CollinearBaselineSnapshot,
     CollinearOrthoStats, CollinearSampleMetrics,

@@ -32,6 +32,16 @@ pub(super) fn assign_coordinates_brandes_koepf(
         3,
     );
 
+    // Phase C1: Fan-out/Fan-in 对称修正
+    enforce_fan_symmetry(
+        &mut centers,
+        dag,
+        layered_graph,
+        layers,
+        sizes,
+        preset,
+    );
+
     let mut nodes = HashMap::new();
     let (default_w, default_h) = preset.default_node_size();
     let layer_heights = postprocess::compute_layer_heights(layers, sizes, preset);
@@ -1264,4 +1274,197 @@ pub(crate) fn assign_layer_centers_for_string_graph(
         .into_iter()
         .filter_map(|(id, idx)| centers.get(&idx).map(|cx| (id, *cx)))
         .collect()
+}
+
+// ─── Phase C1: Fan-out/Fan-in 对称修正 ─────────────────────────────────────────
+
+/// 对称修正：检测 fan-out/fan-in 模式，将子节点组的重心对齐到父节点中心。
+///
+/// 约束：
+/// - 不破坏层内排序（order 不变）
+/// - 不制造新碰撞（间距 ≥ min_sep）
+/// - 仅对同层子节点操作
+fn enforce_fan_symmetry(
+    centers: &mut HashMap<NodeIndex, f64>,
+    _dag: &DiGraph<String, ()>,
+    layered_graph: &DiGraph<LayerNode, ()>,
+    layers: &[Vec<NodeIndex>],
+    sizes: &HashMap<NodeIndex, (f64, f64)>,
+    preset: &SugiyamaPreset,
+) {
+    let min_sep = preset.node_gap;
+
+    // 建立层索引：NodeIndex → (layer_idx, pos_in_layer)
+    let mut layer_of: HashMap<NodeIndex, (usize, usize)> = HashMap::new();
+    for (li, layer) in layers.iter().enumerate() {
+        for (pos, node) in layer.iter().enumerate() {
+            layer_of.insert(*node, (li, pos));
+        }
+    }
+
+    // 对每个 Real 节点，收集其同层后继（fan-out）
+    for (li, layer) in layers.iter().enumerate() {
+        if li + 1 >= layers.len() {
+            break;
+        }
+        let next_layer_set: HashSet<NodeIndex> = layers[li + 1].iter().copied().collect();
+
+        // 预计算下一层每个 Real 节点在当前层有多少个 Real 父节点
+        let mut parent_count: HashMap<NodeIndex, usize> = HashMap::new();
+        for &p in layer {
+            if !matches!(&layered_graph[p].kind, LayerNodeKind::Real(_)) {
+                continue;
+            }
+            for c in layered_graph.neighbors_directed(p, Direction::Outgoing) {
+                if next_layer_set.contains(&c)
+                    && matches!(&layered_graph[c].kind, LayerNodeKind::Real(_))
+                {
+                    *parent_count.entry(c).or_insert(0) += 1;
+                }
+            }
+        }
+
+        for &parent in layer {
+            // 只处理 Real 节点
+            if !matches!(&layered_graph[parent].kind, LayerNodeKind::Real(_)) {
+                continue;
+            }
+            // 收集同层后继（在下一层的 Real 节点，且仅属于当前父节点）
+            let children: Vec<NodeIndex> = layered_graph
+                .neighbors_directed(parent, Direction::Outgoing)
+                .filter(|c| {
+                    next_layer_set.contains(c)
+                        && matches!(&layered_graph[*c].kind, LayerNodeKind::Real(_))
+                        && parent_count.get(c).copied().unwrap_or(0) == 1
+                })
+                .collect();
+
+            if children.len() < 2 {
+                continue;
+            }
+
+            // 叶级约束：仅当子节点没有“分叉后继”时才操作。
+            // 安全条件：子节点无 Real 后继，或所有子节点的 Real 后继集合相同（汇聚型 fan-in）。
+            if li + 2 < layers.len() {
+                let next_next_set: HashSet<NodeIndex> = layers[li + 2].iter().copied().collect();
+                let child_successors: Vec<HashSet<NodeIndex>> = children
+                    .iter()
+                    .map(|c| {
+                        layered_graph
+                            .neighbors_directed(*c, Direction::Outgoing)
+                            .filter(|gc| {
+                                next_next_set.contains(gc)
+                                    && matches!(&layered_graph[*gc].kind, LayerNodeKind::Real(_))
+                            })
+                            .collect()
+                    })
+                    .collect();
+                let has_any = child_successors.iter().any(|s| !s.is_empty());
+                if has_any {
+                    // 检查所有子节点的后继集合是否相同（汇聚型）
+                    let first = &child_successors[0];
+                    let all_same = child_successors.iter().all(|s| s == first);
+                    if !all_same {
+                        continue; // 分叉后继，平移可能破坏其他 fan-out
+                    }
+                }
+            }
+
+            let parent_center = centers[&parent];
+
+            // 按层内位置排序（保持 order）
+            let mut children_sorted = children;
+            children_sorted.sort_by_key(|c| layer_of.get(c).map(|(_, p)| *p).unwrap_or(0));
+
+            // 计算子节点组重心
+            let centroid: f64 = children_sorted
+                .iter()
+                .map(|c| centers[c])
+                .sum::<f64>()
+                / children_sorted.len() as f64;
+
+            let shift = parent_center - centroid;
+            if shift.abs() < 1.0 {
+                continue; // 已经基本对称
+            }
+
+            // 尝试平移：检查是否会与同层其他节点碰撞
+            if can_shift_group(
+                &children_sorted,
+                shift,
+                layers,
+                li + 1,
+                centers,
+                sizes,
+                min_sep,
+                &layer_of,
+            ) {
+                for c in &children_sorted {
+                    centers.get_mut(c).map(|v| *v += shift);
+                }
+            }
+        }
+    }
+}
+
+/// 检查平移一组节点是否安全（不与同层其他节点碰撞）
+fn can_shift_group(
+    group: &[NodeIndex],
+    shift: f64,
+    layers: &[Vec<NodeIndex>],
+    layer_idx: usize,
+    centers: &HashMap<NodeIndex, f64>,
+    sizes: &HashMap<NodeIndex, (f64, f64)>,
+    min_sep: f64,
+    layer_of: &HashMap<NodeIndex, (usize, usize)>,
+) -> bool {
+    let group_set: HashSet<NodeIndex> = group.iter().copied().collect();
+    let layer = &layers[layer_idx];
+
+    // 找组内最左和最右节点
+    let min_pos = group
+        .iter()
+        .filter_map(|n| layer_of.get(n).map(|(_, p)| *p))
+        .min()
+        .unwrap_or(0);
+    let max_pos = group
+        .iter()
+        .filter_map(|n| layer_of.get(n).map(|(_, p)| *p))
+        .max()
+        .unwrap_or(0);
+
+    // 检查左邻居
+    if min_pos > 0 {
+        let left_neighbor = layer[min_pos - 1];
+        if !group_set.contains(&left_neighbor) {
+            let left_center = centers[&left_neighbor];
+            let left_w = sizes.get(&left_neighbor).map(|s| s.0).unwrap_or(0.0);
+            // 组内最左节点平移后的左缘
+            let leftmost_in_group = layer[min_pos];
+            let new_center = centers[&leftmost_in_group] + shift;
+            let new_w = sizes.get(&leftmost_in_group).map(|s| s.0).unwrap_or(0.0);
+            let gap = (new_center - new_w / 2.0) - (left_center + left_w / 2.0);
+            if gap < min_sep {
+                return false;
+            }
+        }
+    }
+
+    // 检查右邻居
+    if max_pos + 1 < layer.len() {
+        let right_neighbor = layer[max_pos + 1];
+        if !group_set.contains(&right_neighbor) {
+            let right_center = centers[&right_neighbor];
+            let right_w = sizes.get(&right_neighbor).map(|s| s.0).unwrap_or(0.0);
+            let rightmost_in_group = layer[max_pos];
+            let new_center = centers[&rightmost_in_group] + shift;
+            let new_w = sizes.get(&rightmost_in_group).map(|s| s.0).unwrap_or(0.0);
+            let gap = (right_center - right_w / 2.0) - (new_center + new_w / 2.0);
+            if gap < min_sep {
+                return false;
+            }
+        }
+    }
+
+    true
 }

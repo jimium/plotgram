@@ -518,6 +518,15 @@ pub(super) fn route_edges_orthogonal_inner(
         t_fix.elapsed().as_secs_f64() * 1000.0
     );
 
+    // Phase C2: 路由后交叉消解（待调优：当前版本检测算法与美学指标不一致，暂禁用）
+    // let crossings_eliminated = crossing_reduction::minimize_crossings_post_route(
+    //     &mut edges,
+    //     &result.nodes,
+    // );
+    // if crossings_eliminated > 0 {
+    //     ortho_stats.rerouted_edges += crossings_eliminated;
+    // }
+
     result.edges = edges;
     // P2-1: 导出 orthogonal 路由 debug 统计
     result.hints.orthogonal_debug = Some(ortho_stats);

@@ -1,0 +1,22 @@
+// 多自环场景：重试、状态回退、轮询
+diagram flowchart {
+    title: "重试与回退流程"
+    config { direction: top-to-bottom }
+
+    entity[start] init "初始化"
+    entity[process] fetch "获取数据"
+    entity[decision] check "数据有效？"
+    entity[process] transform "转换处理"
+    entity[decision] validate "校验通过？"
+    entity[process] save "保存结果"
+    entity[end] done "完成"
+
+    init -> fetch
+    fetch -> check
+    check -> transform "有效"
+    check -> fetch "无效，重试"
+    transform -> validate
+    validate -> save "通过"
+    validate -> transform "失败，重做"
+    save -> done
+}

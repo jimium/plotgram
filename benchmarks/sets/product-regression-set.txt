@@ -11,6 +11,7 @@ showcase/architecture/product.cloud-native.pgm
 showcase/architecture/product.ecommerce-platform.pgm
 showcase/architecture/product.message-queue-pipeline.pgm
 showcase/architecture/product.monitoring-stack.pgm
+showcase/architecture/product.narrow-corridor.pgm
 
 # --- flowchart ---
 showcase/flowchart/product.linear-chain.pgm
@@ -19,6 +20,8 @@ showcase/flowchart/product.refund-process.pgm
 showcase/flowchart/product.swimlane-order-process.pgm
 showcase/flowchart/product.password-reset.pgm
 showcase/flowchart/product.leave-approval-process.pgm
+showcase/flowchart/product.self-loop-retry.pgm
+showcase/flowchart/product.symmetric-fanout.pgm
 
 # --- sequence ---
 showcase/sequence/product.oauth-login.pgm

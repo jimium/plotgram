@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-21-030427-phase-c1",
+  "date": "2026-07-21-023757-with-aesthetics",
   "note": "role-aware baseline: product-gate hard; stress/demo quality soft",
   "samples": [
     {
@@ -75,9 +75,9 @@
           "max_ratio": 0.0
         }
       },
-      "median_ms": 0.8,
-      "min_ms": 0.68,
-      "max_ms": 0.9,
+      "median_ms": 0.65,
+      "min_ms": 0.65,
+      "max_ms": 0.69,
       "det": true,
       "role": "product"
     },
@@ -154,9 +154,9 @@
           "max_ratio": 1.688898415114272
         }
       },
-      "median_ms": 9.2,
-      "min_ms": 8.93,
-      "max_ms": 9.53,
+      "median_ms": 8.84,
+      "min_ms": 8.81,
+      "max_ms": 8.9,
       "det": true,
       "role": "product"
     },
@@ -233,9 +233,9 @@
           "max_ratio": 1.4141935653708058
         }
       },
-      "median_ms": 1.91,
-      "min_ms": 1.9,
-      "max_ms": 1.95,
+      "median_ms": 2.01,
+      "min_ms": 2.0,
+      "max_ms": 2.03,
       "det": true,
       "role": "product"
     },
@@ -312,9 +312,9 @@
           "max_ratio": 1.5541847534244042
         }
       },
-      "median_ms": 3.79,
-      "min_ms": 3.77,
-      "max_ms": 3.82,
+      "median_ms": 4.04,
+      "min_ms": 3.95,
+      "max_ms": 4.15,
       "det": true,
       "role": "product"
     },
@@ -391,9 +391,9 @@
           "max_ratio": 2.645036604252302
         }
       },
-      "median_ms": 13.15,
-      "min_ms": 13.15,
-      "max_ms": 13.16,
+      "median_ms": 13.69,
+      "min_ms": 13.69,
+      "max_ms": 13.69,
       "det": true,
       "role": "product"
     },
@@ -470,9 +470,9 @@
           "max_ratio": 2.5687098989827737
         }
       },
-      "median_ms": 33.69,
-      "min_ms": 33.61,
-      "max_ms": 33.87,
+      "median_ms": 35.44,
+      "min_ms": 35.38,
+      "max_ms": 35.54,
       "det": true,
       "role": "product"
     },
@@ -549,9 +549,9 @@
           "max_ratio": 1.4511502466923312
         }
       },
-      "median_ms": 1.48,
-      "min_ms": 1.47,
-      "max_ms": 1.5,
+      "median_ms": 1.53,
+      "min_ms": 1.51,
+      "max_ms": 1.56,
       "det": true,
       "role": "product"
     },
@@ -628,9 +628,9 @@
           "max_ratio": 1.3965592284003894
         }
       },
-      "median_ms": 0.88,
-      "min_ms": 0.85,
-      "max_ms": 0.91,
+      "median_ms": 0.9,
+      "min_ms": 0.89,
+      "max_ms": 0.94,
       "det": true,
       "role": "product"
     },
@@ -708,8 +708,8 @@
         }
       },
       "median_ms": 0.83,
-      "min_ms": 0.79,
-      "max_ms": 0.83,
+      "min_ms": 0.82,
+      "max_ms": 0.87,
       "det": true,
       "role": "product"
     },
@@ -787,8 +787,8 @@
         }
       },
       "median_ms": 0.15,
-      "min_ms": 0.14,
-      "max_ms": 0.16,
+      "min_ms": 0.15,
+      "max_ms": 0.17,
       "det": true,
       "role": "product"
     },
@@ -865,9 +865,9 @@
           "max_ratio": 1.3552629911009453
         }
       },
-      "median_ms": 1.62,
-      "min_ms": 1.62,
-      "max_ms": 1.63,
+      "median_ms": 1.68,
+      "min_ms": 1.66,
+      "max_ms": 1.7,
       "det": true,
       "role": "product"
     },
@@ -944,9 +944,9 @@
           "max_ratio": 1.5096713235240955
         }
       },
-      "median_ms": 2.73,
-      "min_ms": 2.71,
-      "max_ms": 2.73,
+      "median_ms": 2.79,
+      "min_ms": 2.78,
+      "max_ms": 2.79,
       "det": true,
       "role": "product"
     },
@@ -1023,9 +1023,9 @@
           "max_ratio": 2.844884449649456
         }
       },
-      "median_ms": 1.28,
-      "min_ms": 1.27,
-      "max_ms": 1.31,
+      "median_ms": 1.34,
+      "min_ms": 1.33,
+      "max_ms": 1.36,
       "det": true,
       "role": "product"
     },
@@ -1102,9 +1102,9 @@
           "max_ratio": 1.6032605091122512
         }
       },
-      "median_ms": 9.55,
-      "min_ms": 9.51,
-      "max_ms": 9.55,
+      "median_ms": 9.79,
+      "min_ms": 9.79,
+      "max_ms": 9.84,
       "det": true,
       "role": "product"
     },
@@ -1181,9 +1181,9 @@
           "max_ratio": 1.720927994993973
         }
       },
-      "median_ms": 9.75,
-      "min_ms": 9.74,
-      "max_ms": 9.82,
+      "median_ms": 10.07,
+      "min_ms": 10.03,
+      "max_ms": 10.13,
       "det": true,
       "role": "product"
     },
@@ -1260,9 +1260,9 @@
           "max_ratio": 1.4138695683424047
         }
       },
-      "median_ms": 1.71,
-      "min_ms": 1.69,
-      "max_ms": 1.92,
+      "median_ms": 1.76,
+      "min_ms": 1.74,
+      "max_ms": 1.77,
       "det": true,
       "role": "product"
     },
@@ -1272,7 +1272,7 @@
       "nodes": 6,
       "edges": 7,
       "groups": 0,
-      "node_fp": "f04c96299ba9737d",
+      "node_fp": "cbdebe36830613f1",
       "exact_sev": 0.0,
       "tight_sev": 0.0,
       "allowed_share_len": 0.0,
@@ -1324,8 +1324,8 @@
         },
         "symmetry": {
           "fan_out_nodes": 1,
-          "avg_deviation": 0.0,
-          "max_deviation": 0.0
+          "avg_deviation": 1.0,
+          "max_deviation": 1.0
         },
         "self_loops": {
           "count": 0,
@@ -1335,13 +1335,13 @@
           "total": 0
         },
         "detour": {
-          "avg_ratio": 1.34009255089867,
-          "max_ratio": 1.3520648275942797
+          "avg_ratio": 1.348642867095515,
+          "max_ratio": 1.369497551492089
         }
       },
-      "median_ms": 1.2,
-      "min_ms": 1.2,
-      "max_ms": 1.23,
+      "median_ms": 1.28,
+      "min_ms": 1.27,
+      "max_ms": 1.3,
       "det": true,
       "role": "product"
     },
@@ -1476,8 +1476,8 @@
         }
       },
       "median_ms": 0.15,
-      "min_ms": 0.14,
-      "max_ms": 0.15,
+      "min_ms": 0.15,
+      "max_ms": 0.16,
       "det": true,
       "role": "product"
     },
@@ -1543,9 +1543,9 @@
           "max_ratio": 0.0
         }
       },
-      "median_ms": 0.15,
+      "median_ms": 0.16,
       "min_ms": 0.15,
-      "max_ms": 0.16,
+      "max_ms": 0.17,
       "det": true,
       "role": "product"
     },
@@ -1611,9 +1611,9 @@
           "max_ratio": 0.0
         }
       },
-      "median_ms": 0.15,
+      "median_ms": 0.14,
       "min_ms": 0.14,
-      "max_ms": 0.15,
+      "max_ms": 0.14,
       "det": true,
       "role": "product"
     },
@@ -1690,9 +1690,9 @@
           "max_ratio": 1.3117097997258458
         }
       },
-      "median_ms": 1.16,
-      "min_ms": 1.16,
-      "max_ms": 1.17,
+      "median_ms": 1.15,
+      "min_ms": 1.13,
+      "max_ms": 1.18,
       "det": true,
       "role": "product"
     },
@@ -1769,9 +1769,9 @@
           "max_ratio": 1.2843880073158507
         }
       },
-      "median_ms": 2.07,
-      "min_ms": 2.06,
-      "max_ms": 2.08,
+      "median_ms": 1.9,
+      "min_ms": 1.88,
+      "max_ms": 1.9,
       "det": true,
       "role": "product"
     },
@@ -1781,7 +1781,7 @@
       "nodes": 10,
       "edges": 12,
       "groups": 0,
-      "node_fp": "f450344eba6c0208",
+      "node_fp": "44ff3cdd567c77ab",
       "exact_sev": 0.0,
       "tight_sev": 0.0,
       "allowed_share_len": 0.0,
@@ -1833,7 +1833,7 @@
         },
         "symmetry": {
           "fan_out_nodes": 2,
-          "avg_deviation": 0.9999999999999998,
+          "avg_deviation": 1.0,
           "max_deviation": 1.0
         },
         "self_loops": {
@@ -1844,13 +1844,13 @@
           "total": 2
         },
         "detour": {
-          "avg_ratio": 1.3090421437052202,
-          "max_ratio": 1.3787661595110563
+          "avg_ratio": 1.3363070748976267,
+          "max_ratio": 1.4226380795286746
         }
       },
-      "median_ms": 2.69,
-      "min_ms": 2.69,
-      "max_ms": 2.7,
+      "median_ms": 2.41,
+      "min_ms": 2.28,
+      "max_ms": 2.57,
       "det": true,
       "role": "product"
     },
@@ -1927,9 +1927,9 @@
           "max_ratio": 1.3249803534526798
         }
       },
-      "median_ms": 0.81,
-      "min_ms": 0.79,
-      "max_ms": 0.87,
+      "median_ms": 0.86,
+      "min_ms": 0.84,
+      "max_ms": 0.89,
       "det": true,
       "role": "product"
     },
@@ -1995,9 +1995,9 @@
           "max_ratio": 1.1518227435500876
         }
       },
-      "median_ms": 0.41,
-      "min_ms": 0.4,
-      "max_ms": 0.43,
+      "median_ms": 0.43,
+      "min_ms": 0.41,
+      "max_ms": 0.47,
       "det": true,
       "role": "product"
     },
@@ -2063,9 +2063,9 @@
           "max_ratio": 1.13331026165617
         }
       },
-      "median_ms": 6.33,
-      "min_ms": 6.25,
-      "max_ms": 6.71,
+      "median_ms": 6.39,
+      "min_ms": 6.33,
+      "max_ms": 6.46,
       "det": true,
       "role": "product"
     },
@@ -2132,8 +2132,8 @@
         }
       },
       "median_ms": 0.36,
-      "min_ms": 0.36,
-      "max_ms": 0.41,
+      "min_ms": 0.35,
+      "max_ms": 0.39,
       "det": true,
       "role": "product"
     },
@@ -2199,9 +2199,9 @@
           "max_ratio": 0.0
         }
       },
-      "median_ms": 0.53,
-      "min_ms": 0.51,
-      "max_ms": 0.55,
+      "median_ms": 0.55,
+      "min_ms": 0.54,
+      "max_ms": 0.58,
       "det": true,
       "role": "product"
     },
@@ -2278,9 +2278,9 @@
           "max_ratio": 2.9544944585911086
         }
       },
-      "median_ms": 5.47,
-      "min_ms": 5.44,
-      "max_ms": 5.58,
+      "median_ms": 5.5,
+      "min_ms": 5.45,
+      "max_ms": 5.51,
       "det": true,
       "role": "stress"
     },
@@ -2346,9 +2346,9 @@
           "max_ratio": 1.2140883573014458
         }
       },
-      "median_ms": 6.89,
-      "min_ms": 6.86,
-      "max_ms": 6.94,
+      "median_ms": 7.06,
+      "min_ms": 6.98,
+      "max_ms": 7.11,
       "det": true,
       "role": "stress"
     },
@@ -2425,9 +2425,9 @@
           "max_ratio": 1.64
         }
       },
-      "median_ms": 4.98,
-      "min_ms": 4.96,
-      "max_ms": 5.0,
+      "median_ms": 5.12,
+      "min_ms": 5.12,
+      "max_ms": 5.19,
       "det": true,
       "role": "stress"
     },
@@ -2493,9 +2493,9 @@
           "max_ratio": 14.333333333333334
         }
       },
-      "median_ms": 0.27,
+      "median_ms": 0.26,
       "min_ms": 0.26,
-      "max_ms": 0.28,
+      "max_ms": 0.27,
       "det": true,
       "role": "stress"
     },
@@ -2572,9 +2572,9 @@
           "max_ratio": 2.7359794733292193
         }
       },
-      "median_ms": 2.85,
-      "min_ms": 2.84,
-      "max_ms": 2.89,
+      "median_ms": 2.95,
+      "min_ms": 2.93,
+      "max_ms": 2.97,
       "det": true,
       "role": "stress"
     },
@@ -2640,9 +2640,9 @@
           "max_ratio": 0.0
         }
       },
-      "median_ms": 75.83,
-      "min_ms": 75.69,
-      "max_ms": 76.44,
+      "median_ms": 78.97,
+      "min_ms": 78.91,
+      "max_ms": 79.54,
       "det": true,
       "role": "stress"
     }
