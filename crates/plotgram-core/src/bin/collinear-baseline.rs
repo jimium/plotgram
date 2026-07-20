@@ -4,8 +4,9 @@
 //!   cargo run --release -p plotgram-core --bin collinear-baseline -- \
 //!     [--runs N] [--set FILE] [--date YYYY-MM-DD] [file.pgm ...]
 //!
-//! 默认读取 `benchmark-data/collinear-regression-set.txt`。
-//! 输出 JSON 到 stdout。
+//! 默认读取 `benchmark-data/product-regression-set.txt`（日常质量硬门禁）。
+//! 采集 stress 探针：`--set benchmark-data/stress-probe-set.txt`。
+//! 输出 JSON 到 stdout；每条样本可由文件名首段解析角色（product/stress/...）。
 
 use std::env;
 use std::fs;
@@ -48,7 +49,7 @@ fn main() {
             "-h" | "--help" => {
                 eprintln!(
                     "用法: collinear-baseline [--runs N] [--set FILE] [--date YYYY-MM-DD] [file.pgm ...]\n\
-                     默认 set: benchmark-data/collinear-regression-set.txt"
+                     默认 set: benchmark-data/product-regression-set.txt"
                 );
                 process::exit(0);
             }
@@ -61,7 +62,7 @@ fn main() {
     if files.is_empty() {
         let candidates = [
             set_file.clone(),
-            Some(PathBuf::from("benchmark-data/collinear-regression-set.txt")),
+            Some(PathBuf::from("benchmark-data/product-regression-set.txt")),
         ];
         let mut loaded = Vec::new();
         for c in candidates.into_iter().flatten() {
@@ -74,7 +75,7 @@ fn main() {
     }
 
     if files.is_empty() {
-        die("无输入文件（检查 --set 或 benchmark-data/collinear-regression-set.txt）");
+        die("无输入文件（检查 --set 或 benchmark-data/product-regression-set.txt）");
     }
 
     let mut samples: Vec<CollinearSampleMetrics> = Vec::new();
@@ -92,7 +93,7 @@ fn main() {
 
     let snap = CollinearBaselineSnapshot {
         date,
-        note: "P1: Classify buckets allowed_share_len; exact/tight = NeedsSeparation only".into(),
+        note: "role-aware baseline: product-gate hard; stress/demo quality soft".into(),
         samples,
         perf_runs: None,
     };

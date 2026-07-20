@@ -58,7 +58,7 @@ python3 -m http.server --directory showcase 4173
 ### 单文件
 
 ```bash
-plotgram lint showcase/architecture/c.k8s-platform-stack.pgm --profile strict
+plotgram lint showcase/architecture/demo.k8s-platform-stack.pgm --profile strict
 ```
 
 ### 批量（shell 示例）

@@ -85,9 +85,9 @@ fn print_usage() {
   例: plotgram-eval algo sugiyama showcase/
 
 示例:
-  plotgram-eval eval showcase/flowchart/s.decision-loop.pgm
-  plotgram-eval eval showcase/flowchart/s.decision-loop.pgm -a sugiyama
-  plotgram-eval eval showcase/flowchart/s.decision-loop.pgm -c combinations
+  plotgram-eval eval showcase/flowchart/smoke.decision-loop.pgm
+  plotgram-eval eval showcase/flowchart/smoke.decision-loop.pgm -a sugiyama
+  plotgram-eval eval showcase/flowchart/smoke.decision-loop.pgm -c combinations
   plotgram-eval batch showcase/ -o report.md
   plotgram-eval batch showcase/ -f json -o report.json
   plotgram-eval batch showcase/ --baseline baseline.json
@@ -938,8 +938,16 @@ fn get_configs(mode: &str) -> Vec<plotgram_eval::AlgorithmConfig> {
 }
 
 fn strip_complexity_prefix(stem: &str) -> &str {
+    // 旧前缀: c./n./s./x. (规模) — 仍保留以兼容历史用法
+    // 新前缀: smoke./product./demo./stress./mech. (角色)
     match stem.split_once('.') {
-        Some((prefix, rest)) if ["c", "n", "s"].contains(&prefix) && !rest.is_empty() => rest,
+        Some((prefix, rest)) if ["c", "n", "s", "x"].contains(&prefix) && !rest.is_empty() => rest,
+        Some((prefix, rest))
+            if ["smoke", "product", "demo", "stress", "mech"].contains(&prefix)
+                && !rest.is_empty() =>
+        {
+            rest
+        }
         _ => stem,
     }
 }

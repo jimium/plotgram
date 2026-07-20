@@ -1,0 +1,10 @@
+# Mech-set：机制探针（禁图名特判；验规则，不追美观）
+# 路径相对仓库根目录。
+# 可与 product-gate 交集：机制用断言，美观用 product 指标，报告分栏。
+# 在 compare-collinear.sh 中：默认不参与质量门禁（仅正确性 + 机制断言）。
+# 来源：docs/architecture/重构方案/casev2/gates/mech-set.txt
+
+showcase/architecture/mech.constrain-cross-group.pgm
+showcase/flowchart/mech.constrain-sink.pgm
+showcase/flowchart/product.user-auth.pgm
+showcase/architecture/product.typical-microservice-architecture.pgm

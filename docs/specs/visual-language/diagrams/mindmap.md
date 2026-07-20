@@ -119,12 +119,12 @@ diagram mindmap {
 
 ## 示例
 
-| 复杂度 | 路径 | 说明 |
-|--------|------|------|
-| 简单 | `showcase/mindmap/s.brainstorm.pgm` | 中心 + 三分支 |
-| 简单 | `showcase/mindmap/s.root-branches.pgm` | 基础树形 |
-| 正常 | `showcase/mindmap/n.tech-stack.pgm` | 技术栈 |
-| 复杂 | `showcase/mindmap/c.product-roadmap.pgm` | 产品路线图 |
+| 角色 | 路径 | 说明 |
+|------|------|------|
+| smoke | `showcase/mindmap/smoke.brainstorm.pgm` | 中心 + 三分支 |
+| smoke | `showcase/mindmap/smoke.root-branches.pgm` | 基础树形 |
+| product | `showcase/mindmap/product.tech-stack.pgm` | 技术栈 |
+| demo | `showcase/mindmap/demo.product-roadmap.pgm` | 产品路线图 |
 
 ---
 

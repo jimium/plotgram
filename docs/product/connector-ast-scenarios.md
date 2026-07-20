@@ -53,7 +53,7 @@
 
 **做法**：监听 Deployment / ReplicaSet 事件，将每次 Pod 创建、就绪、摘除写成 `sequence` AST 帧；Web 端像播放器一样 scrub 时间轴。
 
-静态示意见 `showcase/sequence/c.k8s-rolling-update.pgm`；Connector 将其变为**真实发布录像**。
+静态示意见 `showcase/sequence/demo.k8s-rolling-update.pgm`；Connector 将其变为**真实发布录像**。
 
 **反直觉之处**：序列图通常表达「设计意图」；这里表达的是**实际发生的时序**，与设计图对比可立刻发现 maxUnavailable、探针配置等问题。
 
@@ -105,7 +105,7 @@
 
 **做法**：K8s Node condition（MemoryPressure、DiskPressure、Cordoned…）驱动 `state` AST 当前状态高亮；规则引擎在 choice 节点旁渲染「建议：drain / replace」。
 
-静态示意见 `showcase/state/c.k8s-node-pressure-lifecycle.pgm`；Connector 将其变为**集群内每个 Node 的状态面板**。
+静态示意见 `showcase/state/demo.k8s-node-pressure-lifecycle.pgm`；Connector 将其变为**集群内每个 Node 的状态面板**。
 
 **实用价值**：值班人员不必背状态转换表；新人培训可用同一套 AST 做模拟演练。
 
@@ -151,7 +151,7 @@
 
 **做法**：Planner Agent 产出骨架 AST；Diagram Agent 只 Patch 实体 / 关系；Validator 返回结构化错误 → Patch Agent 修 AST（不碰全文 DSL）；WASM 每步预览。
 
-管线示意见 `showcase/architecture/c.ai-agent-docops-pipeline.pgm`。**直接消费 JSON AST** 比让 Agent 反复改文本稳定得多。
+管线示意见 `showcase/architecture/demo.ai-agent-docops-pipeline.pgm`。**直接消费 JSON AST** 比让 Agent 反复改文本稳定得多。
 
 **实用价值**：把 LLM 生成图的正确率从「猜语法」提升为「改结构化对象」。
 

@@ -174,12 +174,12 @@ api -> db
 
 ## 示例
 
-| 复杂度 | 路径 | 说明 |
-|--------|------|------|
-| 简单 | `showcase/flowchart/s.linear-chain.pgm` | 线性三步 |
-| 简单 | `showcase/flowchart/s.decision-loop.pgm` | 决策与回环 |
-| 正常 | `showcase/flowchart/n.user-auth.pgm` | 用户认证 |
-| 复杂 | `showcase/flowchart/c.software-release.pgm` | 发布流水线 |
+| 角色 | 路径 | 说明 |
+|------|------|------|
+| product | `showcase/flowchart/product.linear-chain.pgm` | 线性三步 |
+| smoke | `showcase/flowchart/smoke.decision-loop.pgm` | 决策与回环 |
+| product | `showcase/flowchart/product.user-auth.pgm` | 用户认证 |
+| demo | `showcase/flowchart/demo.software-release.pgm` | 发布流水线 |
 
 ---
 

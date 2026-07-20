@@ -360,7 +360,7 @@ mod tests {
 
     #[test]
     fn er_user_post_svg_keeps_table_nodes_in_viewbox() {
-        let source = include_str!("../../../../../showcase/er/s.user-post.pgm");
+        let source = include_str!("../../../../../showcase/er/smoke.user-post.pgm");
         let raw = parse(source).expect("parse user-post");
         let output = prepare(raw, &StyleRequest::default()).expect("prepare user-post");
         let prepared = &output.diagram;

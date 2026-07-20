@@ -271,17 +271,6 @@
       box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
     }
 
-    .complexity-row {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .complexity-all {
-      width: 100%;
-      justify-content: center;
-    }
-
     details.filter-section > summary {
       cursor: pointer;
       list-style: none;
@@ -499,7 +488,7 @@
       word-break: break-all;
     }
 
-    .complexity {
+    .role-badge {
       flex: 0 0 auto;
       padding: 4px 8px;
       border-radius: 999px;
@@ -509,19 +498,34 @@
       text-transform: uppercase;
     }
 
-    .complexity.s {
+    .role-badge.smoke {
       color: #166534;
       background: rgba(34, 197, 94, 0.14);
     }
 
-    .complexity.n {
-      color: #92400e;
-      background: rgba(251, 191, 36, 0.18);
-    }
-
-    .complexity.c {
+    .role-badge.product {
       color: var(--blue-strong);
       background: rgba(59, 130, 246, 0.14);
+    }
+
+    .role-badge.demo {
+      color: #6b21a8;
+      background: rgba(168, 85, 247, 0.16);
+    }
+
+    .role-badge.stress {
+      color: #9a3412;
+      background: rgba(249, 115, 22, 0.16);
+    }
+
+    .role-badge.mech {
+      color: #155e75;
+      background: rgba(6, 182, 212, 0.16);
+    }
+
+    .role-badge.dim {
+      opacity: 0.55;
+      filter: saturate(0.7);
     }
 
     .tag-row {
@@ -1159,15 +1163,21 @@
 
           <div class="filter-section">
             <div class="filter-label">
-              <span>复杂度</span>
+              <span>角色</span>
+              <span class="filter-count" id="roleFilterCount"></span>
             </div>
-            <div class="complexity-row">
-              <button class="chip complexity-all" id="complexityAllBtn" type="button">
-                <span>全部</span><small id="complexityAllCount">0</small>
-              </button>
-              <div class="segmented" id="complexityFilters" role="group" aria-label="复杂度筛选"></div>
-            </div>
+            <div class="chip-row" id="roleFilters"></div>
           </div>
+
+          <details class="filter-section" id="probeDetails">
+            <summary>
+              <span class="filter-label" style="text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--muted);">
+                工程探针 <span class="filter-count" id="probeFilterCount"></span>
+              </span>
+              <span class="caret">⌃</span>
+            </summary>
+            <div class="chip-row" id="probeFilters" style="margin-top:8px;"></div>
+          </details>
 
           <details class="filter-section" id="tagDetails">
             <summary>
@@ -1288,91 +1298,98 @@
 
     // manifest:start
     const SAMPLE_PATHS = [
-      "architecture/c.ai-agent-docops-pipeline.pgm",
-      "architecture/c.cloud-native.pgm",
-      "architecture/c.data-lineage-platform.pgm",
-      "architecture/c.ecommerce-platform.pgm",
-      "architecture/c.hybrid-cloud-dr-topology.pgm",
-      "architecture/c.k8s-blue-green-release-topology.pgm",
-      "architecture/c.k8s-multi-cluster-federation.pgm",
-      "architecture/c.k8s-multi-namespace-overview.pgm",
-      "architecture/c.k8s-platform-stack.pgm",
-      "architecture/c.k8s-tenant-isolation.pgm",
-      "architecture/c.layout-stress-nested.pgm",
-      "architecture/c.mcp-server-cluster-architecture.pgm",
-      "architecture/c.payment-clearing-platform.pgm",
-      "architecture/c.plotgram-core-mod-deps.pgm",
-      "architecture/c.supply-chain-control-tower.pgm",
-      "architecture/n.compiler-pipeline.pgm",
-      "architecture/n.constrain-cross-group.pgm",
-      "architecture/n.d2-cell-tower-network.pgm",
-      "architecture/n.data-pipeline.pgm",
-      "architecture/n.event-driven.pgm",
-      "architecture/n.microservices.pgm",
-      "architecture/n.typical-microservice-architecture.pgm",
-      "architecture/n.unite-config-publish.pgm",
-      "architecture/s.client-api-db.pgm",
-      "architecture/s.three-tier.pgm",
-      "er/c.ecommerce-schema.pgm",
-      "er/c.layout-stress-dense.pgm",
-      "er/c.saas-schema.pgm",
-      "er/n.blog-schema.pgm",
-      "er/n.school-schema.pgm",
-      "er/n.social-network.pgm",
-      "er/s.two-tables.pgm",
-      "er/s.user-post.pgm",
-      "flowchart/c.aml-case-investigation.pgm",
-      "flowchart/c.caffe-shop.pgm",
-      "flowchart/c.change-approval-workflow.pgm",
-      "flowchart/c.ci-cd-security-pipeline.pgm",
-      "flowchart/c.customer-refund-process.pgm",
-      "flowchart/c.e-commerce-order-fulfillment.pgm",
-      "flowchart/c.k8s-incident-response.pgm",
-      "flowchart/c.layout-stress-dag.pgm",
-      "flowchart/c.pr-architecture-review.pgm",
-      "flowchart/c.software-release.pgm",
-      "flowchart/c.swimlane-order-process.pgm",
-      "flowchart/n.constrain-sink.pgm",
-      "flowchart/n.employee-onboarding.pgm",
-      "flowchart/n.order-approval.pgm",
-      "flowchart/n.user-auth.pgm",
-      "flowchart/s.decision-loop.pgm",
-      "flowchart/s.fan-out-four.pgm",
-      "flowchart/s.linear-chain.pgm",
-      "mindmap/c.ai-learning-roadmap.pgm",
-      "mindmap/c.knowledge-map.pgm",
-      "mindmap/c.product-roadmap.pgm",
-      "mindmap/n.programming-learning.pgm",
-      "mindmap/n.project-plan.pgm",
-      "mindmap/n.tech-stack.pgm",
-      "mindmap/s.brainstorm.pgm",
-      "mindmap/s.root-branches.pgm",
-      "sequence/c.ai-agent-change-loop.pgm",
-      "sequence/c.cross-team-incident-escalation.pgm",
-      "sequence/c.distributed-saga.pgm",
-      "sequence/c.k8s-canary-rollback.pgm",
-      "sequence/c.k8s-node-failure-recovery.pgm",
-      "sequence/c.k8s-rolling-update.pgm",
-      "sequence/c.layout-stress-lifelines.pgm",
-      "sequence/c.microservice-checkout.pgm",
-      "sequence/c.real-time-risk-decisioning.pgm",
-      "sequence/n.api-call-chain.pgm",
-      "sequence/n.oauth-login.pgm",
-      "sequence/n.payment-gateway.pgm",
-      "sequence/s.ping-pong.pgm",
-      "sequence/s.request-response.pgm",
-      "state/c.document-sync-lifecycle.pgm",
-      "state/c.k8s-node-pressure-lifecycle.pgm",
-      "state/c.k8s-rollout-state-machine.pgm",
-      "state/c.layout-stress-transitions.pgm",
-      "state/c.payment-flow.pgm",
-      "state/c.service-degradation-lifecycle.pgm",
-      "state/c.settlement-reconciliation-lifecycle.pgm",
-      "state/c.tcp-connection.pgm",
-      "state/n.order-lifecycle.pgm",
-      "state/n.ticket-workflow.pgm",
-      "state/s.on-off.pgm",
-      "state/s.traffic-light.pgm"
+      "architecture/demo.ai-agent-docops-pipeline.pgm",
+      "architecture/demo.data-lineage-platform.pgm",
+      "architecture/demo.hybrid-cloud-dr-topology.pgm",
+      "architecture/demo.k8s-blue-green-release-topology.pgm",
+      "architecture/demo.k8s-multi-cluster-federation.pgm",
+      "architecture/demo.k8s-multi-namespace-overview.pgm",
+      "architecture/demo.k8s-platform-stack.pgm",
+      "architecture/demo.k8s-tenant-isolation.pgm",
+      "architecture/demo.mcp-server-cluster-architecture.pgm",
+      "architecture/demo.payment-clearing-platform.pgm",
+      "architecture/demo.plotgram-core-mod-deps.pgm",
+      "architecture/demo.supply-chain-control-tower.pgm",
+      "architecture/mech.constrain-cross-group.pgm",
+      "architecture/product.cdn-cache.pgm",
+      "architecture/product.cloud-native.pgm",
+      "architecture/product.compiler-pipeline.pgm",
+      "architecture/product.d2-cell-tower-network.pgm",
+      "architecture/product.data-pipeline.pgm",
+      "architecture/product.ecommerce-platform.pgm",
+      "architecture/product.event-driven.pgm",
+      "architecture/product.microservices.pgm",
+      "architecture/product.three-tier.pgm",
+      "architecture/product.typical-microservice-architecture.pgm",
+      "architecture/product.unite-config-publish.pgm",
+      "architecture/smoke.client-api-db.pgm",
+      "architecture/stress.layout-stress-nested.pgm",
+      "er/demo.ecommerce-schema.pgm",
+      "er/demo.hospital-system.pgm",
+      "er/demo.library-management.pgm",
+      "er/product.blog-schema.pgm",
+      "er/product.saas-schema.pgm",
+      "er/product.school-schema.pgm",
+      "er/product.social-network.pgm",
+      "er/smoke.two-tables.pgm",
+      "er/smoke.user-post.pgm",
+      "er/stress.layout-stress-dense.pgm",
+      "flowchart/demo.aml-case-investigation.pgm",
+      "flowchart/demo.caffe-shop.pgm",
+      "flowchart/demo.change-approval-workflow.pgm",
+      "flowchart/demo.ci-cd-security-pipeline.pgm",
+      "flowchart/demo.customer-refund-process.pgm",
+      "flowchart/demo.e-commerce-order-fulfillment.pgm",
+      "flowchart/demo.k8s-incident-response.pgm",
+      "flowchart/demo.pr-architecture-review.pgm",
+      "flowchart/demo.software-release.pgm",
+      "flowchart/mech.constrain-sink.pgm",
+      "flowchart/product.employee-onboarding.pgm",
+      "flowchart/product.linear-chain.pgm",
+      "flowchart/product.order-approval.pgm",
+      "flowchart/product.refund-process.pgm",
+      "flowchart/product.swimlane-order-process.pgm",
+      "flowchart/product.user-auth.pgm",
+      "flowchart/smoke.decision-loop.pgm",
+      "flowchart/smoke.fan-out-four.pgm",
+      "flowchart/stress.layout-stress-dag.pgm",
+      "mindmap/demo.ai-learning-roadmap.pgm",
+      "mindmap/demo.knowledge-map.pgm",
+      "mindmap/demo.product-roadmap.pgm",
+      "mindmap/product.programming-learning.pgm",
+      "mindmap/product.project-plan.pgm",
+      "mindmap/product.tech-stack.pgm",
+      "mindmap/smoke.brainstorm.pgm",
+      "mindmap/smoke.root-branches.pgm",
+      "mindmap/stress.layout-stress-deep.pgm",
+      "sequence/demo.ai-agent-change-loop.pgm",
+      "sequence/demo.cross-team-incident-escalation.pgm",
+      "sequence/demo.distributed-saga.pgm",
+      "sequence/demo.k8s-canary-rollback.pgm",
+      "sequence/demo.k8s-node-failure-recovery.pgm",
+      "sequence/demo.k8s-rolling-update.pgm",
+      "sequence/demo.microservice-checkout.pgm",
+      "sequence/demo.real-time-risk-decisioning.pgm",
+      "sequence/product.api-call-chain.pgm",
+      "sequence/product.oauth-login.pgm",
+      "sequence/product.payment-gateway.pgm",
+      "sequence/smoke.ping-pong.pgm",
+      "sequence/smoke.request-response.pgm",
+      "sequence/stress.layout-stress-lifelines.pgm",
+      "state/demo.document-sync-lifecycle.pgm",
+      "state/demo.k8s-node-pressure-lifecycle.pgm",
+      "state/demo.k8s-rollout-state-machine.pgm",
+      "state/demo.service-degradation-lifecycle.pgm",
+      "state/demo.settlement-reconciliation-lifecycle.pgm",
+      "state/demo.tcp-connection.pgm",
+      "state/product.notification-flow.pgm",
+      "state/product.order-lifecycle.pgm",
+      "state/product.payment-flow.pgm",
+      "state/product.ticket-workflow.pgm",
+      "state/product.user-session.pgm",
+      "state/smoke.on-off.pgm",
+      "state/smoke.traffic-light.pgm",
+      "state/stress.layout-stress-transitions.pgm"
     ];
 // manifest:end
 
@@ -1403,56 +1420,117 @@
       mindmap: "放射式层级布局 · 知识组织 · 分支收敛"
     };
 
-    const COMPLEXITY_LABELS = {
-      s: "Simple",
-      n: "Normal",
-      c: "Complex"
+    // ─── 角色系统（文件名首段即角色）─────────────
+    // 旧前缀 s./n./c./x. 已废弃；UI 由文件名第一段解析角色。
+    const ROLE_LABELS = {
+      smoke: "Smoke",
+      product: "Product",
+      demo: "Demo",
+      stress: "Stress",
+      mech: "Mech"
     };
 
-    const COMPLEXITY_CN = {
-      s: "简单",
-      n: "常规",
-      c: "复杂"
+    const ROLE_CN = {
+      smoke: "冒烟",
+      product: "产品",
+      demo: "演示",
+      stress: "压力",
+      mech: "机制"
     };
+
+    const ROLE_ORDER = ["product", "smoke", "demo", "stress", "mech"];
+
+    // 主区角色（默认展示）：product + demo；工程探针（stress + mech）默认折叠
+    const PRIMARY_ROLES = ["product", "demo"];
+    const PROBE_ROLES = ["stress", "mech"];
+
+    // 默认选中的角色集（与 PRIMARY_ROLES 一致）
+    const DEFAULT_ROLES = new Set(PRIMARY_ROLES);
 
     const FEATURED_FILES = new Set([
-      "state/c.k8s-rollout-state-machine.pgm",
-      "architecture/c.ai-agent-docops-pipeline.pgm",
-      "architecture/n.microservices.pgm",
-      "architecture/s.three-tier.pgm",
-      "architecture/n.data-pipeline.pgm",
-      "mindmap/c.ai-learning-roadmap.pgm",
-      "state/s.on-off.pgm",
-      "sequence/n.payment-gateway.pgm"
+      "state/demo.k8s-rollout-state-machine.pgm",
+      "architecture/demo.ai-agent-docops-pipeline.pgm",
+      "architecture/product.microservices.pgm",
+      "architecture/product.three-tier.pgm",
+      "architecture/product.data-pipeline.pgm",
+      "mindmap/demo.ai-learning-roadmap.pgm",
+      "state/smoke.on-off.pgm",
+      "sequence/product.payment-gateway.pgm"
     ]);
 
     const TITLE_OVERRIDES = {
-      "architecture/c.k8s-multi-namespace-overview.pgm": "K8s 多命名空间生产集群总览",
-      "architecture/c.k8s-multi-cluster-federation.pgm": "K8s 多集群跨地域拓扑",
-      "architecture/c.k8s-platform-stack.pgm": "K8s 平台栈与业务工作负载",
-      "architecture/c.k8s-blue-green-release-topology.pgm": "K8s 蓝绿发布拓扑",
-      "architecture/c.k8s-tenant-isolation.pgm": "K8s 多租户隔离拓扑",
-      "architecture/c.hybrid-cloud-dr-topology.pgm": "混合云灾备拓扑",
-      "architecture/c.data-lineage-platform.pgm": "企业数据血缘平台",
-      "architecture/c.ai-agent-docops-pipeline.pgm": "AI Agent 文档自动化管线",
-      "architecture/c.payment-clearing-platform.pgm": "支付清结算平台",
-      "architecture/c.supply-chain-control-tower.pgm": "供应链控制塔",
-      "architecture/n.typical-microservice-architecture.pgm": "典型微服务架构图",
-      "sequence/c.k8s-rolling-update.pgm": "K8s 滚动发布链路",
-      "sequence/c.k8s-node-failure-recovery.pgm": "K8s 节点故障恢复链路",
-      "sequence/c.k8s-canary-rollback.pgm": "K8s 金丝雀回滚链路",
-      "sequence/c.cross-team-incident-escalation.pgm": "跨团队故障升级协同",
-      "sequence/c.ai-agent-change-loop.pgm": "AI Agent 变更分析闭环",
-      "sequence/c.real-time-risk-decisioning.pgm": "实时风控决策链路",
-      "flowchart/c.k8s-incident-response.pgm": "K8s 生产集群故障响应流程",
-      "flowchart/c.change-approval-workflow.pgm": "生产变更审批流程",
-      "flowchart/c.pr-architecture-review.pgm": "PR 架构评审流程",
-      "flowchart/c.aml-case-investigation.pgm": "反洗钱案件调查流程",
-      "state/c.k8s-rollout-state-machine.pgm": "K8s 发布状态机",
-      "state/c.k8s-node-pressure-lifecycle.pgm": "K8s 节点压力与恢复状态机",
-      "state/c.service-degradation-lifecycle.pgm": "服务降级生命周期",
-      "state/c.document-sync-lifecycle.pgm": "文档同步生命周期",
-      "state/c.settlement-reconciliation-lifecycle.pgm": "清结算对账生命周期"
+      "architecture/demo.k8s-multi-namespace-overview.pgm": "K8s 多命名空间生产集群总览",
+      "architecture/demo.k8s-multi-cluster-federation.pgm": "K8s 多集群跨地域拓扑",
+      "architecture/demo.k8s-platform-stack.pgm": "K8s 平台栈与业务工作负载",
+      "architecture/demo.k8s-blue-green-release-topology.pgm": "K8s 蓝绿发布拓扑",
+      "architecture/demo.k8s-tenant-isolation.pgm": "K8s 多租户隔离拓扑",
+      "architecture/demo.hybrid-cloud-dr-topology.pgm": "混合云灾备拓扑",
+      "architecture/demo.data-lineage-platform.pgm": "企业数据血缘平台",
+      "architecture/demo.ai-agent-docops-pipeline.pgm": "AI Agent 文档自动化管线",
+      "architecture/demo.payment-clearing-platform.pgm": "支付清结算平台",
+      "architecture/demo.supply-chain-control-tower.pgm": "供应链控制塔",
+      "architecture/demo.plotgram-core-mod-deps.pgm": "Plotgram 模块依赖结构",
+      "architecture/demo.mcp-server-cluster-architecture.pgm": "MCP Server 集群架构",
+      "architecture/product.typical-microservice-architecture.pgm": "典型微服务架构图",
+      "architecture/product.d2-cell-tower-network.pgm": "D2 对照 · 基站网络拓扑",
+      "architecture/product.cdn-cache.pgm": "CDN 多级缓存架构",
+      "architecture/product.compiler-pipeline.pgm": "编译器流水线",
+      "architecture/product.event-driven.pgm": "事件驱动架构",
+      "architecture/product.unite-config-publish.pgm": "配置统一发布",
+      "architecture/product.cloud-native.pgm": "云原生全栈架构",
+      "architecture/product.ecommerce-platform.pgm": "电商平台全栈架构",
+      "architecture/mech.constrain-cross-group.pgm": "机制 · 跨组约束",
+      "sequence/demo.k8s-rolling-update.pgm": "K8s 滚动发布链路",
+      "sequence/demo.k8s-node-failure-recovery.pgm": "K8s 节点故障恢复链路",
+      "sequence/demo.k8s-canary-rollback.pgm": "K8s 金丝雀回滚链路",
+      "sequence/demo.cross-team-incident-escalation.pgm": "跨团队故障升级协同",
+      "sequence/demo.ai-agent-change-loop.pgm": "AI Agent 变更分析闭环",
+      "sequence/demo.real-time-risk-decisioning.pgm": "实时风控决策链路",
+      "sequence/demo.distributed-saga.pgm": "分布式 Saga 事务",
+      "sequence/demo.microservice-checkout.pgm": "微服务下单结算链路",
+      "sequence/product.api-call-chain.pgm": "API 调用链",
+      "sequence/product.oauth-login.pgm": "OAuth 第三方登录",
+      "sequence/product.payment-gateway.pgm": "支付网关交互",
+      "flowchart/demo.aml-case-investigation.pgm": "反洗钱案件调查流程",
+      "flowchart/demo.caffe-shop.pgm": "咖啡馆点单流程",
+      "flowchart/demo.change-approval-workflow.pgm": "生产变更审批流程",
+      "flowchart/demo.ci-cd-security-pipeline.pgm": "CI/CD 安全流水线",
+      "flowchart/demo.customer-refund-process.pgm": "客户退款流程",
+      "flowchart/demo.e-commerce-order-fulfillment.pgm": "电商订单履约流程",
+      "flowchart/demo.k8s-incident-response.pgm": "K8s 生产集群故障响应流程",
+      "flowchart/demo.pr-architecture-review.pgm": "PR 架构评审流程",
+      "flowchart/demo.software-release.pgm": "软件发布流程",
+      "flowchart/product.swimlane-order-process.pgm": "泳道订单流程",
+      "flowchart/product.user-auth.pgm": "用户认证流程",
+      "flowchart/product.order-approval.pgm": "订单审批流程",
+      "flowchart/product.refund-process.pgm": "退款流程",
+      "flowchart/product.employee-onboarding.pgm": "员工入职流程",
+      "flowchart/product.linear-chain.pgm": "线性链",
+      "flowchart/mech.constrain-sink.pgm": "机制 · Sink 约束",
+      "state/demo.k8s-rollout-state-machine.pgm": "K8s 发布状态机",
+      "state/demo.k8s-node-pressure-lifecycle.pgm": "K8s 节点压力与恢复状态机",
+      "state/demo.service-degradation-lifecycle.pgm": "服务降级生命周期",
+      "state/demo.document-sync-lifecycle.pgm": "文档同步生命周期",
+      "state/demo.settlement-reconciliation-lifecycle.pgm": "清结算对账生命周期",
+      "state/demo.tcp-connection.pgm": "TCP 连接状态机",
+      "state/product.order-lifecycle.pgm": "订单生命周期",
+      "state/product.user-session.pgm": "用户会话",
+      "state/product.payment-flow.pgm": "支付流程",
+      "state/product.ticket-workflow.pgm": "工单工作流",
+      "state/product.notification-flow.pgm": "通知流程",
+      "er/demo.ecommerce-schema.pgm": "电商 Schema",
+      "er/demo.hospital-system.pgm": "医院信息系统 Schema",
+      "er/demo.library-management.pgm": "图书馆管理 Schema",
+      "er/product.saas-schema.pgm": "SaaS 多租户 Schema",
+      "er/product.blog-schema.pgm": "博客 Schema",
+      "er/product.school-schema.pgm": "学校 Schema",
+      "er/product.social-network.pgm": "社交网络 Schema",
+      "mindmap/demo.ai-learning-roadmap.pgm": "AI 学习路线",
+      "mindmap/demo.knowledge-map.pgm": "知识地图",
+      "mindmap/demo.product-roadmap.pgm": "产品路线图",
+      "mindmap/product.tech-stack.pgm": "技术栈",
+      "mindmap/product.project-plan.pgm": "项目计划",
+      "mindmap/product.programming-learning.pgm": "编程学习大纲"
     };
 
     function humanizeSlug(slug) {
@@ -1488,7 +1566,9 @@
 
     const samples = SAMPLE_PATHS.map((path) => {
       const [type, file] = path.split("/");
-      const [complexity, slug] = file.replace(".pgm", "").split(".", 2);
+      // 文件名首段即角色：{role}.{slug}.pgm
+      const [role, ...slugParts] = file.replace(".pgm", "").split(".");
+      const slug = slugParts.join(".");
       const title = TITLE_OVERRIDES[path] || humanizeSlug(slug);
       const svgPath = path.replace(/\.pgm$/, ".svg");
       const tags = deriveTags(path);
@@ -1498,9 +1578,9 @@
         type,
         typeLabel: TYPE_LABELS[type] || type,
         typeCn: TYPE_CN[type] || type,
-        complexity,
-        complexityLabel: COMPLEXITY_LABELS[complexity] || complexity.toUpperCase(),
-        complexityCn: COMPLEXITY_CN[complexity] || complexity,
+        role,
+        roleLabel: ROLE_LABELS[role] || role.toUpperCase(),
+        roleCn: ROLE_CN[role] || role,
         slug,
         title,
         tags,
@@ -1512,7 +1592,8 @@
     const state = {
       search: "",
       type: "all",
-      complexity: "all",
+      // 多选角色集；默认 product + demo（主区）
+      roles: new Set(DEFAULT_ROLES),
       tag: "all",
       mode: "gallery",
       detailIndex: -1
@@ -1521,9 +1602,12 @@
     // ─── DOM 引用 ─────────────────────────────
     const topbarStats = document.getElementById("topbarStats");
     const typeFilters = document.getElementById("typeFilters");
-    const complexityFilters = document.getElementById("complexityFilters");
+    const roleFilters = document.getElementById("roleFilters");
+    const probeFilters = document.getElementById("probeFilters");
     const tagFilters = document.getElementById("tagFilters");
     const typeFilterCount = document.getElementById("typeFilterCount");
+    const roleFilterCount = document.getElementById("roleFilterCount");
+    const probeFilterCount = document.getElementById("probeFilterCount");
     const tagFilterCount = document.getElementById("tagFilterCount");
     const galleryGrid = document.getElementById("galleryGrid");
     const resultTitle = document.getElementById("resultTitle");
@@ -1564,7 +1648,11 @@
       const total = samples.length;
       const featured = samples.filter((s) => s.featured).length;
       const types = new Set(samples.map((s) => s.type)).size;
-      topbarStats.textContent = `${total} 个示例 · ${featured} 精选 · ${types} 种图类型`;
+      const productCount = samples.filter((s) => s.role === "product").length;
+      const demoCount = samples.filter((s) => s.role === "demo").length;
+      const stressCount = samples.filter((s) => s.role === "stress").length;
+      const mechCount = samples.filter((s) => s.role === "mech").length;
+      topbarStats.textContent = `${total} 个示例 · ${featured} 精选 · ${types} 种图类型 · product ${productCount} / demo ${demoCount} / stress ${stressCount} / mech ${mechCount}`;
     }
 
     // ─── 渲染：筛选器 ─────────────────────────
@@ -1591,10 +1679,33 @@
       return btn;
     }
 
+    function createRoleChip(label, role, count, dim) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chip";
+      if (state.roles.has(role)) btn.classList.add("active");
+      if (dim) btn.classList.add("muted");
+      btn.innerHTML = `<span>${label}</span>${typeof count === "number" ? `<small>${count}</small>` : ""}`;
+      btn.addEventListener("click", () => {
+        if (state.roles.has(role)) {
+          // 不允许清空：至少留一个角色
+          if (state.roles.size > 1) state.roles.delete(role);
+        } else {
+          state.roles.add(role);
+        }
+        if (state.mode === "detail") showGallery();
+        renderFilters();
+        renderCards();
+      });
+      return btn;
+    }
+
     function renderFilters() {
       const typeCounts = countBy(samples, (s) => s.type);
+      const roleCounts = countBy(samples, (s) => s.role);
       const tagCounts = countBy(samples.flatMap((s) => s.tags), (t) => t);
 
+      // ── 图类型筛选 ──
       typeFilters.innerHTML = "";
       typeFilters.appendChild(createChip("全部", "all", "type", samples.length));
       Object.keys(TYPE_LABELS).forEach((type) => {
@@ -1604,33 +1715,29 @@
       });
       typeFilterCount.textContent = state.type === "all" ? "" : TYPE_LABELS[state.type];
 
-      complexityFilters.innerHTML = "";
-      const allBtn = document.getElementById("complexityAllBtn");
-      const allCount = document.getElementById("complexityAllCount");
-      allCount.textContent = samples.length;
-      allBtn.classList.toggle("active", state.complexity === "all");
-      allBtn.onclick = () => {
-        state.complexity = "all";
-        if (state.mode === "detail") showGallery();
-        renderFilters();
-        renderCards();
-      };
-
-      const levels = [["s", "Simple"], ["n", "Normal"], ["c", "Complex"]];
-      levels.forEach(([val, label]) => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.textContent = label;
-        if (state.complexity === val) btn.classList.add("active");
-        btn.addEventListener("click", () => {
-          state.complexity = val;
-          if (state.mode === "detail") showGallery();
-          renderFilters();
-          renderCards();
-        });
-        complexityFilters.appendChild(btn);
+      // ── 角色筛选（主区：product / smoke / demo）──
+      roleFilters.innerHTML = "";
+      PRIMARY_ROLES.forEach((role) => {
+        // smoke 默认不展示但放在主区供用户勾选
+        const count = roleCounts[role] || 0;
+        roleFilters.appendChild(createRoleChip(ROLE_LABELS[role], role, count, !state.roles.has(role)));
       });
+      const activeRoles = Array.from(state.roles).sort((a, b) => ROLE_ORDER.indexOf(a) - ROLE_ORDER.indexOf(b));
+      roleFilterCount.textContent = state.roles.size === ROLE_ORDER.length ? "全部" : activeRoles.map((r) => ROLE_LABELS[r]).join("·");
 
+      // ── 工程探针（stress / mech）──
+      probeFilters.innerHTML = "";
+      PROBE_ROLES.forEach((role) => {
+        const count = roleCounts[role] || 0;
+        probeFilters.appendChild(createRoleChip(ROLE_LABELS[role], role, count, !state.roles.has(role)));
+      });
+      const activeProbes = PROBE_ROLES.filter((r) => state.roles.has(r));
+      probeFilterCount.textContent = activeProbes.length === 0 ? "隐藏" : activeProbes.map((r) => ROLE_LABELS[r]).join("·");
+      // 自动展开工程探针折叠区（如果用户已勾选其中任一角色）
+      const probeDetails = document.getElementById("probeDetails");
+      if (probeDetails && activeProbes.length > 0) probeDetails.open = true;
+
+      // ── 场景标签 ──
       tagFilters.innerHTML = "";
       tagFilters.appendChild(createChip("全部", "all", "tag", samples.length));
       Object.entries(tagCounts)
@@ -1644,7 +1751,10 @@
     function renderActiveFilters() {
       const filters = [];
       if (state.type !== "all") filters.push(`类型: ${TYPE_LABELS[state.type]}`);
-      if (state.complexity !== "all") filters.push(`复杂度: ${COMPLEXITY_LABELS[state.complexity]}`);
+      const roleArr = Array.from(state.roles).sort((a, b) => ROLE_ORDER.indexOf(a) - ROLE_ORDER.indexOf(b));
+      if (state.roles.size !== ROLE_ORDER.length) {
+        filters.push(`角色: ${roleArr.map((r) => ROLE_LABELS[r]).join("·")}`);
+      }
       if (state.tag !== "all") filters.push(`标签: ${state.tag}`);
       if (state.search.trim()) filters.push(`关键词: ${state.search.trim()}`);
 
@@ -1655,14 +1765,14 @@
 
     // ─── 筛选与排序 ───────────────────────────
     function matches(sample) {
-      const haystack = [sample.title, sample.path, sample.typeLabel, sample.typeCn, sample.complexityLabel, ...sample.tags]
+      const haystack = [sample.title, sample.path, sample.typeLabel, sample.typeCn, sample.roleLabel, sample.roleCn, ...sample.tags]
         .join(" ")
         .toLowerCase();
       const keyword = state.search.trim().toLowerCase();
 
       if (keyword && !haystack.includes(keyword)) return false;
       if (state.type !== "all" && sample.type !== state.type) return false;
-      if (state.complexity !== "all" && sample.complexity !== state.complexity) return false;
+      if (!state.roles.has(sample.role)) return false;
       if (state.tag !== "all" && !sample.tags.includes(state.tag)) return false;
       return true;
     }
@@ -1670,8 +1780,11 @@
     function sortSamples(items) {
       return items.sort((a, b) => {
         if (a.featured !== b.featured) return a.featured ? -1 : 1;
+        // 角色优先级：product < smoke < demo < stress < mech
+        const ra = ROLE_ORDER.indexOf(a.role);
+        const rb = ROLE_ORDER.indexOf(b.role);
+        if (ra !== rb) return ra - rb;
         if (a.type !== b.type) return a.type.localeCompare(b.type);
-        if (a.complexity !== b.complexity) return "scn".indexOf(a.complexity) - "scn".indexOf(b.complexity);
         return a.title.localeCompare(b.title, "zh-CN");
       });
     }
@@ -1681,7 +1794,7 @@
       const visible = sortSamples(samples.filter(matches));
       currentVisibleSamples = visible;
       const featuredVisible = visible.filter((s) => s.featured).length;
-      const filtering = state.search || state.type !== "all" || state.complexity !== "all" || state.tag !== "all";
+      const filtering = state.search || state.type !== "all" || state.roles.size !== ROLE_ORDER.length || state.tag !== "all";
 
       resultTitle.textContent = filtering ? "筛选结果" : "全部示例";
       resultMeta.textContent = `共 ${visible.length} 个示例${featuredVisible ? `，其中 ${featuredVisible} 个精选` : ""}。点击任意卡片查看「可视化 ↔ DSL」对照。`;
@@ -1706,9 +1819,9 @@
             <div class="card-top">
               <div>
                 <h3 class="card-title">${sample.title}</h3>
-                <p class="card-path">${sample.typeCn} · ${sample.complexityCn}</p>
+                <p class="card-path">${sample.typeCn} · ${sample.roleCn}</p>
               </div>
-              <span class="complexity ${sample.complexity}">${sample.complexityLabel}</span>
+              <span class="role-badge ${sample.role}">${sample.roleLabel}</span>
             </div>
             <div class="tag-row">${tagsMarkup}</div>
             <span class="card-cta">查看可视化 ↔ DSL →</span>
@@ -1878,8 +1991,8 @@
       if (!sample) return;
 
       detailTitle.textContent = sample.title;
-      detailPath.textContent = `${sample.path} · ${sample.typeCn} · ${sample.complexityCn}`;
-      detailVizTag.textContent = `${sample.typeLabel} / ${sample.complexityLabel}`;
+      detailPath.textContent = `${sample.path} · ${sample.typeCn} · ${sample.roleCn}`;
+      detailVizTag.textContent = `${sample.typeLabel} / ${sample.roleLabel}`;
 
       detailHighlightText.innerHTML = `<strong>${sample.typeCn}能力</strong> · ${sample.highlight}${sample.featured ? ' · <strong style="color:var(--blue)">精选案例</strong>' : ""}`;
 
@@ -1953,7 +2066,7 @@
     document.getElementById("resetFilters").addEventListener("click", () => {
       state.search = "";
       state.type = "all";
-      state.complexity = "all";
+      state.roles = new Set(DEFAULT_ROLES);
       state.tag = "all";
       searchInput.value = "";
       if (state.mode === "detail") showGallery();

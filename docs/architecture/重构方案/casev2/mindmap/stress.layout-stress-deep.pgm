@@ -1,0 +1,148 @@
+// Layout Stress: Deep Nested Mindmap
+// @role: stress  (authoritative: filename prefix)
+// 算法探针：深度嵌套 + 宽扇出 + 不对称子树（美观可妥协；正确性/确定性仍硬盯）
+// 拓扑：单根 → 5 主分支；最深 5 层（root→main→…→leaf）；约 70 节点；分支宽度不均
+diagram mindmap {
+    title: "布局测试：深度嵌套思维导图"
+
+    entity[root] root "根主题"
+
+    // A：深链（5 层）+ 窄扇出
+    entity[main] a "分支 A"
+    entity[branch] a1 "A.1"
+    entity[branch] a1a "A.1.a"
+    entity[branch] a1a1 "A.1.a.1"
+    entity[leaf] a1a1a "A.1.a.1.a"
+    entity[leaf] a1a1b "A.1.a.1.b"
+    entity[branch] a2 "A.2"
+    entity[leaf] a2a "A.2.a"
+    entity[leaf] a2b "A.2.b"
+
+    // B：中深 + 宽叶
+    entity[main] b "分支 B"
+    entity[branch] b1 "B.1"
+    entity[branch] b1a "B.1.a"
+    entity[leaf] b1a1 "B.1.a.1"
+    entity[leaf] b1a2 "B.1.a.2"
+    entity[leaf] b1a3 "B.1.a.3"
+    entity[branch] b2 "B.2"
+    entity[leaf] b2a "B.2.a"
+    entity[branch] b3 "B.3"
+    entity[leaf] b3a "B.3.a"
+    entity[leaf] b3b "B.3.b"
+    entity[leaf] b3c "B.3.c"
+    entity[leaf] b3d "B.3.d"
+    entity[leaf] b3e "B.3.e"
+
+    // C：双深链
+    entity[main] c "分支 C"
+    entity[branch] c1 "C.1"
+    entity[branch] c1a "C.1.a"
+    entity[branch] c1a1 "C.1.a.1"
+    entity[leaf] c1a1a "C.1.a.1.a"
+    entity[branch] c2 "C.2"
+    entity[leaf] c2a "C.2.a"
+    entity[leaf] c2b "C.2.b"
+    entity[branch] c3 "C.3"
+    entity[leaf] c3a "C.3.a"
+    entity[leaf] c3b "C.3.b"
+    entity[leaf] c3c "C.3.c"
+
+    // D：浅而宽
+    entity[main] d "分支 D"
+    entity[branch] d1 "D.1"
+    entity[leaf] d1a "D.1.a"
+    entity[leaf] d1b "D.1.b"
+    entity[leaf] d1c "D.1.c"
+    entity[leaf] d1d "D.1.d"
+    entity[branch] d2 "D.2"
+    entity[leaf] d2a "D.2.a"
+    entity[leaf] d2b "D.2.b"
+    entity[leaf] d2c "D.2.c"
+    entity[leaf] d2d "D.2.d"
+    entity[leaf] d2e "D.2.e"
+
+    // E：深链 + 侧枝
+    entity[main] e "分支 E"
+    entity[branch] e1 "E.1"
+    entity[branch] e1a "E.1.a"
+    entity[branch] e1a1 "E.1.a.1"
+    entity[leaf] e1a1a "E.1.a.1.a"
+    entity[leaf] e1a1b "E.1.a.1.b"
+    entity[branch] e2 "E.2"
+    entity[leaf] e2a "E.2.a"
+    entity[leaf] e2b "E.2.b"
+    entity[branch] e3 "E.3"
+    entity[leaf] e3a "E.3.a"
+    entity[leaf] e3b "E.3.b"
+    entity[leaf] e3c "E.3.c"
+    entity[leaf] e3d "E.3.d"
+    entity[leaf] e3e "E.3.e"
+
+    root -> a
+    a -> a1
+    a1 -> a1a
+    a1a -> a1a1
+    a1a1 -> a1a1a
+    a1a1 -> a1a1b
+    a -> a2
+    a2 -> a2a
+    a2 -> a2b
+
+    root -> b
+    b -> b1
+    b1 -> b1a
+    b1a -> b1a1
+    b1a -> b1a2
+    b1a -> b1a3
+    b -> b2
+    b2 -> b2a
+    b -> b3
+    b3 -> b3a
+    b3 -> b3b
+    b3 -> b3c
+    b3 -> b3d
+    b3 -> b3e
+
+    root -> c
+    c -> c1
+    c1 -> c1a
+    c1a -> c1a1
+    c1a1 -> c1a1a
+    c -> c2
+    c2 -> c2a
+    c2 -> c2b
+    c -> c3
+    c3 -> c3a
+    c3 -> c3b
+    c3 -> c3c
+
+    root -> d
+    d -> d1
+    d1 -> d1a
+    d1 -> d1b
+    d1 -> d1c
+    d1 -> d1d
+    d -> d2
+    d2 -> d2a
+    d2 -> d2b
+    d2 -> d2c
+    d2 -> d2d
+    d2 -> d2e
+
+    root -> e
+    e -> e1
+    e1 -> e1a
+    e1a -> e1a1
+    e1a1 -> e1a1a
+    e1a1 -> e1a1b
+    e -> e2
+    e2 -> e2a
+    e2 -> e2b
+    e -> e3
+    e3 -> e3a
+    e3 -> e3b
+    e3 -> e3c
+    e3 -> e3d
+    e3 -> e3e
+}

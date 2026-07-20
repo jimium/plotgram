@@ -1,0 +1,33 @@
+# Product-gate：日常质量硬门禁（精选）
+# 路径相对 casev2/ 根目录。宣称「无退化」默认只引用本集。
+# 约 18 张；文件名已是 product.*；本清单只挑选进硬门禁的子集。
+
+# --- architecture ---
+architecture/product.three-tier.pgm
+architecture/product.typical-microservice-architecture.pgm
+architecture/product.microservices.pgm
+architecture/product.cdn-cache.pgm
+architecture/product.cloud-native.pgm
+architecture/product.ecommerce-platform.pgm
+
+# --- flowchart ---
+flowchart/product.linear-chain.pgm
+flowchart/product.user-auth.pgm
+flowchart/product.refund-process.pgm
+flowchart/product.swimlane-order-process.pgm
+
+# --- sequence ---
+sequence/product.oauth-login.pgm
+sequence/product.payment-gateway.pgm
+
+# --- state ---
+state/product.order-lifecycle.pgm
+state/product.user-session.pgm
+state/product.payment-flow.pgm
+
+# --- er ---
+er/product.blog-schema.pgm
+er/product.saas-schema.pgm
+
+# --- mindmap ---
+mindmap/product.tech-stack.pgm

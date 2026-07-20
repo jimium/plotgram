@@ -123,12 +123,12 @@ group billing "计费" {
 
 ## 示例
 
-| 复杂度 | 路径 | 说明 |
-|--------|------|------|
-| 简单 | `showcase/er/s.user-post.pgm` | 两表一对多 |
-| 简单 | `showcase/er/s.two-tables.pgm` | 基础双表 |
-| 正常 | `showcase/er/n.blog-schema.pgm` | 博客 Schema |
-| 复杂 | `showcase/er/c.ecommerce-schema.pgm` | 电商多表 |
+| 角色 | 路径 | 说明 |
+|------|------|------|
+| smoke | `showcase/er/smoke.user-post.pgm` | 两表一对多 |
+| smoke | `showcase/er/smoke.two-tables.pgm` | 基础双表 |
+| product | `showcase/er/product.blog-schema.pgm` | 博客 Schema |
+| demo | `showcase/er/demo.ecommerce-schema.pgm` | 电商多表 |
 
 ---
 

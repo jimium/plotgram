@@ -4,7 +4,7 @@
 //!   PLOTGRAM_PRESSURE_BUDGET=0 cargo run --release -p plotgram-core --bin congestion-baseline -- \
 //!     [--set FILE] [--date YYYY-MM-DD] [--calibrate] [file.pgm ...]
 //!
-//! 默认 set: benchmark-data/congestion-set.txt
+//! 默认 set: benchmark-data/mech-set.txt（机制探针集，含 product 双用途样例）
 //! `--calibrate`：额外输出 score 分位 / top-k 边 / 归一化说明（观测模式建议关 budget）。
 
 use std::env;
@@ -84,7 +84,7 @@ fn main() {
             "-h" | "--help" => {
                 eprintln!(
                     "用法: congestion-baseline [--set FILE] [--date YYYY-MM-DD] [--calibrate] [file.pgm ...]\n\
-                     默认 set: benchmark-data/congestion-set.txt\n\
+                     默认 set: benchmark-data/mech-set.txt\n\
                      默认 PLOTGRAM_PRESSURE_BUDGET=0（观测）"
                 );
                 process::exit(0);
@@ -98,7 +98,7 @@ fn main() {
     if files.is_empty() {
         let candidates = [
             set_file.clone(),
-            Some(PathBuf::from("benchmark-data/congestion-set.txt")),
+            Some(PathBuf::from("benchmark-data/mech-set.txt")),
         ];
         for c in candidates.into_iter().flatten() {
             if c.exists() {
@@ -108,7 +108,7 @@ fn main() {
         }
     }
     if files.is_empty() {
-        die("无输入文件（检查 --set 或 benchmark-data/congestion-set.txt）");
+        die("无输入文件（检查 --set 或 benchmark-data/mech-set.txt）");
     }
 
     let mut samples: Vec<CongestionSampleMetrics> = Vec::new();

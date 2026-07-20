@@ -1,0 +1,9 @@
+# Stress-probe：正确性硬 + 质量观测（不挡日常质量棘轮）
+# 路径相对 casev2/ 根目录。
+
+architecture/stress.layout-stress-nested.pgm
+er/stress.layout-stress-dense.pgm
+flowchart/stress.layout-stress-dag.pgm
+sequence/stress.layout-stress-lifelines.pgm
+state/stress.layout-stress-transitions.pgm
+mindmap/stress.layout-stress-deep.pgm

@@ -1,7 +1,7 @@
 //! 分阶段性能基准测试：分别测量解析、布局、路由各阶段的耗时。
 //!
 //! 用法:
-//!   cargo run --release -p plotgram-core --bin bench-phases -- showcase/architecture/c.k8s-tenant-isolation.pgm
+//!   cargo run --release -p plotgram-core --bin bench-phases -- showcase/architecture/demo.k8s-tenant-isolation.pgm
 
 use std::time::Instant;
 

@@ -188,7 +188,7 @@ diagram architecture {
 }
 ```
 
-同级顶层 group 拉齐到最宽者，组内节点水平居中。见 `showcase/architecture/n.data-pipeline.pgm`。
+同级顶层 group 拉齐到最宽者，组内节点水平居中。见 `showcase/architecture/product.data-pipeline.pgm`。
 
 ```plotgram
 group backend "后端服务" {
@@ -234,12 +234,12 @@ group data "数据层" {
 
 ## 示例
 
-| 复杂度 | 路径 | 说明 |
-|--------|------|------|
-| 简单 | `showcase/architecture/s.client-api-db.pgm` | 三层单向流 |
-| 简单 | `showcase/architecture/s.three-tier.pgm` | 经典三层 |
-| 正常 | `showcase/architecture/n.microservices.pgm` | 微服务分组 |
-| 复杂 | `showcase/architecture/c.cloud-native.pgm` | 云原生全栈 |
+| 角色 | 路径 | 说明 |
+|------|------|------|
+| smoke | `showcase/architecture/smoke.client-api-db.pgm` | 三层单向流 |
+| product | `showcase/architecture/product.three-tier.pgm` | 经典三层 |
+| product | `showcase/architecture/product.microservices.pgm` | 微服务分组 |
+| product | `showcase/architecture/product.cloud-native.pgm` | 云原生全栈 |
 
 ---
 

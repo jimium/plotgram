@@ -42,7 +42,7 @@ npm run build
 打开任意 `.dfy` 文件，例如（相对于 monorepo 根目录）：
 
 ```
-showcase/flowchart/s.linear-chain.dfy
+showcase/flowchart/product.linear-chain.dfy
 ```
 
 在新窗口里通过 **文件 → 打开** 选择该文件即可。应能看到 `diagram`、`entity`、`->` 等关键字着色。

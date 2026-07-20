@@ -1,0 +1,70 @@
+// AI 学习路线思维导图
+// 业务场景：系统化的 AI 学习路径规划，涵盖数学基础、机器学习、深度学习到工程实践的完整知识体系
+// Mermaid 对照: 复杂 mindmap 多层级知识树
+// @role: demo  (authoritative: filename prefix)
+diagram mindmap {
+    title: "AI 学习路线"
+    config {
+        direction: radial
+    }
+
+    entity[root] ai_roadmap "AI 学习路线"
+
+    entity[main] math "数学基础"
+    entity[branch] linear_algebra "线性代数"
+    entity[branch] calculus "微积分"
+    entity[branch] probability "概率与统计"
+    entity[branch] optimization "最优化方法"
+
+    entity[main] ml "机器学习"
+    entity[branch] supervised "监督学习"
+    entity[branch] unsupervised "无监督学习"
+    entity[branch] feature_eng "特征工程"
+    entity[leaf] fe_encoding "编码与变换"
+    entity[leaf] fe_selection "特征选择"
+    entity[leaf] fe_scale "归一化与标准化"
+    entity[leaf] fe_extraction "特征提取"
+    entity[branch] model_eval "模型评估与调优"
+
+    entity[main] dl "深度学习"
+    entity[branch] cnn "卷积神经网络"
+    entity[branch] rnn "循环神经网络"
+    entity[branch] transformer "Transformer"
+    entity[branch] gan "生成对抗网络"
+
+    entity[main] practice "工程实践"
+    entity[branch] frameworks "深度学习框架"
+    entity[branch] mlops "MLOps"
+    entity[branch] deploy "模型部署"
+    entity[branch] projects "项目实战"
+
+    ai_roadmap -> math
+    ai_roadmap -> ml
+    ai_roadmap -> dl
+    ai_roadmap -> practice
+
+    math -> linear_algebra
+    math -> calculus
+    math -> probability
+    math -> optimization
+
+    ml -> supervised
+    ml -> unsupervised
+    ml -> feature_eng
+    ml -> model_eval
+
+    feature_eng -> fe_encoding
+    feature_eng -> fe_selection
+    feature_eng -> fe_scale
+    feature_eng -> fe_extraction
+
+    dl -> cnn
+    dl -> rnn
+    dl -> transformer
+    dl -> gan
+
+    practice -> frameworks
+    practice -> mlops
+    practice -> deploy
+    practice -> projects
+}

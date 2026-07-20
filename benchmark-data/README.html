@@ -245,7 +245,7 @@
       <a href="#sev">共线严重度</a>
       <a href="#lint">lint 字段</a>
       <a href="#gates">门禁判定</a>
-      <a href="#phase0">Phase 0</a>
+      <a href="#retired">旧文件退役</a>
       <a href="#conventions">约定</a>
       <div class="ext">
         <a href="/">→ 基线可视化</a>
@@ -254,30 +254,40 @@
 
     <article>
       <header class="hero">
-        <h1>回归门禁说明</h1>
-        <p class="lede">布局 / 边路由改动后，用这里的快照对比，避免正确性或质量静默退化。本文是原 README 的可读版，含流程与指标图解。</p>
+        <h1>回归门禁说明（角色感知）</h1>
+        <p class="lede">布局 / 边路由改动后，用这里的快照对比，避免正确性或质量静默退化。本文是原 README 的可读版，含流程与指标图解。门禁按 <code>smoke / product / demo / stress / mech</code> 五角色分轨：product 硬、stress 默认软、demo 可债、mech 不门禁。</p>
         <div class="callout">
           本地查看：<code>./benchmark-data/serve-viewer.py</code> → 打开
           <a href="/readme">/readme</a>；数据趋势页在 <a href="/">/</a>。<br />
           产品规定：<code>docs/architecture/方案计划/collinear-and-arrow-merge-comparison.md</code> §2
-          （Allowed / NeedsSeparation / Degraded；不以共线计数归零为成功标准）。
+          （Allowed / NeedsSeparation / Degraded；不以共线计数归零为成功标准）。<br />
+          角色分层方案：<code>docs/architecture/重构方案/showcase-基线分层重构-2026-07.md</code>。
         </div>
       </header>
 
       <h2 id="overview">概述</h2>
-      <p>本目录存放<strong>样例集、采集脚本、对比门禁、dated/latest 基线 JSON</strong>，以及可视化服务。日常共线回归以 <code>collinear-baseline-latest.json</code> 为准。监测对齐产品文 §2：看严重度与可归类，不追求「共线条数清零」。</p>
+      <p>本目录存放<strong>角色分集样例、采集脚本、对比门禁、dated/latest 基线 JSON</strong>，以及可视化服务。日常回归以 <code>collinear-baseline-latest.json</code> 为准（默认 product + stress 合并）。监测对齐产品文 §2：看严重度与可归类，不追求「共线条数清零」。</p>
 
       <h2 id="files">目录一览</h2>
+      <h3>门禁样例集（按角色分集）</h3>
+      <table>
+        <thead><tr><th>清单</th><th>角色</th><th>用途</th><th>compare 行为</th></tr></thead>
+        <tbody>
+          <tr><td><code>product-regression-set.txt</code></td><td><code>product</code></td><td>日常质量硬门禁（精选）</td><td>正确性 + 质量 <strong>硬 FAIL</strong></td></tr>
+          <tr><td><code>stress-probe-set.txt</code></td><td><code>stress</code></td><td>正确性硬 + 质量观测</td><td>正确性硬；质量 WARN（<code>--strict-stress</code> 改硬）</td></tr>
+          <tr><td><code>mech-set.txt</code></td><td><code>mech</code> + 双用途 <code>product</code></td><td>机制探针 / 拥堵校准</td><td>默认不门禁（机制断言另跑）</td></tr>
+          <tr><td><code>demo-observe-set.txt</code></td><td><code>demo</code></td><td>观测 / 可债</td><td>正确性硬；质量 WARN</td></tr>
+        </tbody>
+      </table>
+      <p>日常宣称「无退化」默认只引用 <strong>product-gate</strong>。文件名首段即角色（<code>{role}.{slug}.pgm</code>），无需 manifest overrides。</p>
+
+      <h3>脚本与产物</h3>
       <table>
         <thead><tr><th>文件</th><th>作用</th></tr></thead>
         <tbody>
-          <tr><td><code>collinear-regression-set.txt</code></td><td>共线门禁样例集（路径相对仓库根）</td></tr>
-          <tr><td><code>phase0-regression-set.txt</code></td><td>Phase 0 轻量样例集（子集）</td></tr>
-          <tr><td><code>congestion-set.txt</code></td><td>拥堵治理专项样例</td></tr>
-          <tr><td><code>snapshot-collinear.sh</code></td><td>采集共线基线 → dated + <code>latest</code></td></tr>
-          <tr><td><code>compare-collinear.sh</code></td><td>两份 JSON 门禁对比</td></tr>
-          <tr><td><code>snapshot-phase0.sh</code></td><td>Phase 0 lint + bench + 确定性（md）</td></tr>
-          <tr><td><code>collinear-baseline-latest.*</code></td><td><strong>当前门禁指针</strong></td></tr>
+          <tr><td><code>snapshot-collinear.sh</code></td><td>采集共线基线 → dated + <code>latest</code>（多 set 合并 + role 注入）</td></tr>
+          <tr><td><code>compare-collinear.sh</code></td><td>两份 JSON 门禁对比（角色感知分轨）</td></tr>
+          <tr><td><code>collinear-baseline-latest.*</code></td><td><strong>当前门禁指针</strong>（默认 product + stress 合并）</td></tr>
           <tr><td><code>collinear-baseline-YYYY-MM-DD.*</code></td><td>按日归档</td></tr>
           <tr><td><code>serve-viewer.py</code> + <code>viewer/</code></td><td>本地 HTML（趋势 + 本文）</td></tr>
           <tr><td><code>README.html</code></td><td>本文（人类可读说明）</td></tr>
@@ -339,47 +349,66 @@
         <div class="figcaption">图 1 · 快照采集：三路指标合并后写入 dated，并同步 latest</div>
       </div>
 
-      <p>对比阶段把旧基线与新快照对齐样例，分两轨判定：</p>
+      <p>对比阶段把旧基线与新快照对齐样例，按角色分轨判定（product 硬 / stress 软 / demo 软 / mech 不门禁）：</p>
       <div class="fig">
         <svg viewBox="0 0 640 200" xmlns="http://www.w3.org/2000/svg" role="img">
-          <title>正确性轨与质量轨</title>
+          <title>正确性轨与质量轨（角色感知）</title>
           <rect x="40" y="24" width="240" height="152" rx="10" fill="#fff7ed" stroke="#fdba74"/>
-          <text x="160" y="52" text-anchor="middle" font-size="14" font-weight="700" font-family="IBM Plex Sans, sans-serif" fill="#9a3412">正确性轨 · 硬</text>
-          <text x="160" y="82" text-anchor="middle" font-size="12" font-family="IBM Plex Sans, sans-serif" fill="#1c1b19">group_interior 不升</text>
-          <text x="160" y="104" text-anchor="middle" font-size="12" font-family="IBM Plex Sans, sans-serif" fill="#1c1b19">det 必须为 true</text>
-          <text x="160" y="136" text-anchor="middle" font-size="11" font-family="IBM Plex Sans, sans-serif" fill="#9a3412">FAIL → exit 1</text>
-          <text x="160" y="156" text-anchor="middle" font-size="10" font-family="IBM Plex Sans, sans-serif" fill="#5a574f">不可用债 flag 绕过</text>
+          <text x="160" y="48" text-anchor="middle" font-size="13" font-weight="700" font-family="IBM Plex Sans, sans-serif" fill="#9a3412">正确性轨 · 全角色硬</text>
+          <text x="160" y="74" text-anchor="middle" font-size="11" font-family="IBM Plex Sans, sans-serif" fill="#1c1b19">group_interior 不升</text>
+          <text x="160" y="92" text-anchor="middle" font-size="11" font-family="IBM Plex Sans, sans-serif" fill="#1c1b19">det 必须为 true</text>
+          <text x="160" y="120" text-anchor="middle" font-size="10" font-family="IBM Plex Sans, sans-serif" fill="#5a574f">product · smoke · demo</text>
+          <text x="160" y="136" text-anchor="middle" font-size="10" font-family="IBM Plex Sans, sans-serif" fill="#5a574f">stress · mech</text>
+          <text x="160" y="160" text-anchor="middle" font-size="11" font-family="IBM Plex Sans, sans-serif" fill="#9a3412">FAIL → exit 1（不可绕过）</text>
 
           <rect x="360" y="24" width="240" height="152" rx="10" fill="#fefce8" stroke="#fde047"/>
-          <text x="480" y="52" text-anchor="middle" font-size="14" font-weight="700" font-family="IBM Plex Sans, sans-serif" fill="#854d0e">质量轨 · 默认真</text>
-          <text x="480" y="76" text-anchor="middle" font-size="11" font-family="IBM Plex Sans, sans-serif" fill="#1c1b19">exact / tight sev</text>
-          <text x="480" y="92" text-anchor="middle" font-size="11" font-family="IBM Plex Sans, sans-serif" fill="#1c1b19">through · trunk · err</text>
-          <text x="480" y="108" text-anchor="middle" font-size="11" font-family="IBM Plex Sans, sans-serif" fill="#1c1b19">degraded_count · perf</text>
-          <text x="480" y="124" text-anchor="middle" font-size="11" font-family="IBM Plex Sans, sans-serif" fill="#1c1b19">node_fp</text>
-          <text x="480" y="148" text-anchor="middle" font-size="10" font-family="IBM Plex Sans, sans-serif" fill="#854d0e">--allow-quality-debt</text>
-          <text x="480" y="164" text-anchor="middle" font-size="10" font-family="IBM Plex Sans, sans-serif" fill="#5a574f">可标为债后 exit 0</text>
+          <text x="480" y="48" text-anchor="middle" font-size="13" font-weight="700" font-family="IBM Plex Sans, sans-serif" fill="#854d0e">质量轨 · 按角色分硬度</text>
+          <text x="480" y="72" text-anchor="middle" font-size="10" font-family="IBM Plex Mono, monospace" fill="#9a3412">product / smoke → 硬 FAIL</text>
+          <text x="480" y="88" text-anchor="middle" font-size="10" font-family="IBM Plex Mono, monospace" fill="#854d0e">stress → WARN (--strict-stress 改硬)</text>
+          <text x="480" y="104" text-anchor="middle" font-size="10" font-family="IBM Plex Mono, monospace" fill="#854d0e">demo → WARN / 可债</text>
+          <text x="480" y="120" text-anchor="middle" font-size="10" font-family="IBM Plex Mono, monospace" fill="#5a574f">mech → 不门禁</text>
+          <text x="480" y="146" text-anchor="middle" font-size="10" font-family="IBM Plex Sans, sans-serif" fill="#1c1b19">sev · through · trunk · err</text>
+          <text x="480" y="160" text-anchor="middle" font-size="10" font-family="IBM Plex Sans, sans-serif" fill="#1c1b19">degraded_count · perf · node_fp</text>
         </svg>
-        <div class="figcaption">图 2 · compare-collinear.sh 双轨门禁</div>
+        <div class="figcaption">图 2 · compare-collinear.sh 角色感知分轨门禁</div>
       </div>
 
       <h2 id="commands">常用命令</h2>
       <h3>1. 采快照</h3>
-<pre><code>./benchmark-data/snapshot-collinear.sh
-# 可选: --runs 5   性能轮数
-# 可选: --set path/to/set.txt</code></pre>
-      <p>覆盖当天的 dated 文件，并同步 <code>latest</code>。</p>
+<pre><code># 默认 product + stress 合并
+./benchmark-data/snapshot-collinear.sh
+
+# 只采 product 门禁
+./benchmark-data/snapshot-collinear.sh \
+  --set benchmark-data/product-regression-set.txt
+
+# 加入 demo 观测集（--set 可累加，多 set 自动去重保持顺序）
+./benchmark-data/snapshot-collinear.sh \
+  --set benchmark-data/product-regression-set.txt \
+  --set benchmark-data/stress-probe-set.txt \
+  --set benchmark-data/demo-observe-set.txt
+
+# 可选: --runs 5  性能轮数
+# 可选: --date YYYY-MM-DD  指定归档日期</code></pre>
+      <p>覆盖当天的 dated 文件，并同步 <code>latest</code>。每条 sample 自动注入 <code>role</code> 字段（取文件名第一段）。</p>
 
       <h3>2. 对比门禁</h3>
-<pre><code>./benchmark-data/compare-collinear.sh \
+<pre><code># 默认：product 硬 / stress 软 / demo 软 / mech 不门禁
+./benchmark-data/compare-collinear.sh \
   benchmark-data/collinear-baseline-latest.json \
   path/to/new-snapshot.json
+
+# 显式把 stress 质量也走硬 fail（探针严格模式）
+./benchmark-data/compare-collinear.sh --strict-stress &lt;base&gt; &lt;cur&gt;
 
 # 布局故意改了（node_fp 变）：
 ./benchmark-data/compare-collinear.sh --allow-node-fp &lt;base&gt; &lt;cur&gt;
 
-# 正确性过、质量债已知且要放行：
+# 正确性过、质量债已知且要放行（全角色质量轨转 WARN，仍 exit 0）：
 ./benchmark-data/compare-collinear.sh --allow-quality-debt &lt;base&gt; &lt;cur&gt;</code></pre>
-      <p><strong>抬基线</strong>：确认改进或债已记录后，再跑 snapshot，并在 JSON 的 <code>note</code> 里写清 raise 原因。</p>
+      <p><strong>抬基线</strong>：确认改进或债已记录后，再跑 snapshot，并在 JSON 的 <code>note</code> 里写清 raise 原因，强制带角色示例：</p>
+<pre><code>raise product: …原因…；残余: product.foo
+raise stress (expected): …探针可接受…；残余: stress.layout-stress-nested</code></pre>
 
       <h3>3. 可视化 + 本文</h3>
 <pre><code>./benchmark-data/serve-viewer.py
@@ -569,31 +598,61 @@
       </table>
       <p>性能预算（质量轨）：基线 &lt;10ms 允许绝对 +5ms；否则相对退化 ≤ 约 +10%。<code>det=false</code> → 正确性硬失败。</p>
 
-      <h2 id="gates">门禁判定</h2>
-      <div class="two-col">
-        <div class="rail hard">
-          <h4><span class="tag tag-hard">硬</span> 正确性轨</h4>
-          <ul>
-            <li><code>lint.edge_crosses_group_interior</code> 不升</li>
-            <li><code>det</code> 必须为 <code>true</code></li>
-          </ul>
-        </div>
-        <div class="rail soft">
-          <h4><span class="tag tag-soft">质量</span> 默认也硬</h4>
-          <ul>
-            <li><code>exact_sev</code> / <code>tight_sev</code> 不升（容差 1.0）— NeedsSeparation</li>
-            <li><code>error_count</code> / through / trunk 不升</li>
-            <li><code>ortho.degraded_count</code> 不升</li>
-            <li><code>median_ms</code> 不超预算</li>
-            <li><code>node_fp</code> 不变（或 <code>--allow-node-fp</code>）</li>
-          </ul>
-        </div>
-      </div>
-      <p><strong>观测（WARN，不单独失败）</strong>：<code>allowed_share_len</code> 上升是预期（有意合流 / Allowed）；若同时 <code>exact_sev</code> 未降，打印抽检提示，防止误标 Allowed 掩盖 NeedsSeparation。</p>
+      <h2 id="gates">门禁判定（角色感知分轨）</h2>
+      <p>每条样本在 JSON 中带 <code>role</code> 字段（取文件名第一段：<code>product</code> / <code>stress</code> / <code>demo</code> / <code>mech</code> / <code>smoke</code>）。<code>compare-collinear.sh</code> 按角色决定质量轨是否挡合并。缺 role 字段时按文件名推导（兼容旧 baseline）。</p>
+      <table>
+        <thead><tr><th>轨</th><th>检查</th><th>product / smoke</th><th>demo</th><th>stress</th><th>mech</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="tag tag-hard">正确性（硬）</span></td>
+            <td><code>edge_crosses_group_interior</code> 不升；<code>det=true</code></td>
+            <td><span class="tag tag-hard">FAIL</span></td>
+            <td><span class="tag tag-hard">FAIL</span></td>
+            <td><span class="tag tag-hard">FAIL</span></td>
+            <td><span class="tag tag-hard">FAIL</span></td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-soft">质量（默认真）</span></td>
+            <td><code>exact_sev</code> / <code>tight_sev</code>；lint through/trunk/err；<code>ortho.degraded_count</code>；perf；<code>node_fp</code></td>
+            <td><span class="tag tag-hard">FAIL</span></td>
+            <td><span class="tag tag-soft">WARN / 可债</span></td>
+            <td><span class="tag tag-soft">WARN</span>（<code>--strict-stress</code> 改硬）</td>
+            <td><span class="tag tag-obs">不门禁</span></td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-obs">观测（WARN）</span></td>
+            <td><code>allowed_share_len</code> 可升；若 allowed↑ 且 exact 未降 → 提示抽检误标 Allowed</td>
+            <td>同现网</td>
+            <td>同现网</td>
+            <td>同现网</td>
+            <td>—</td>
+          </tr>
+        </tbody>
+      </table>
+      <p><strong>退出码</strong>：正确性轨 FAIL 或质量轨 product/smoke FAIL → <code>exit 1</code>；质量轨 stress/demo/mech 仅 WARN（<code>--strict-stress</code> 时 stress 也 <code>exit 1</code>）。每条消息带 <code>(role=xxx)</code> 标注。</p>
       <p>常见读法：group_interior ↓ 但 sev ↑ → 正确性 PASS、质量 FAIL（债）；确认后 <code>--allow-quality-debt</code>，抬基线时在 <code>note</code> 写清残余。Degraded 变多同理须有 note / reason，不能 silently 堆 count。</p>
 
-      <h2 id="phase0">Phase 0</h2>
-      <p>更轻的历史门禁：<code>snapshot-phase0.sh</code> → <code>phase0-*.md</code>。日常以 <code>collinear-*</code> 为准；Phase 0 仍可用于快速 lint/perf 抽检。</p>
+      <h3>与创新模式对齐（<code>AGENTS.md</code> §7）</h3>
+      <table>
+        <thead><tr><th>模式</th><th>product-gate</th><th>stress-probe</th></tr></thead>
+        <tbody>
+          <tr><td>日常修复（棘轮）</td><td>不劣化</td><td>质量可债；正确性不劣化</td></tr>
+          <tr><td>算法级重写（帕累托）</td><td>目标维度优先看本集</td><td>允许更大临时质量退化，退出时显式抬基线 + 列残余</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="retired">旧文件退役清单</h2>
+      <p>以下文件在 2026-07-20 角色分层重构中删除，被新的角色感知门禁取代：</p>
+      <table>
+        <thead><tr><th>已删除文件</th><th>取代者</th></tr></thead>
+        <tbody>
+          <tr><td><code>collinear-baseline-*.json</code> / <code>collinear-baseline-latest.{json,md}</code>（旧基线）</td><td>新角色感知基线（默认 product + stress 合并）</td></tr>
+          <tr><td><code>collinear-regression-set.txt</code></td><td><code>product-regression-set.txt</code> + <code>stress-probe-set.txt</code></td></tr>
+          <tr><td><code>phase0-regression-set.txt</code> / <code>phase0-*.md</code> / <code>snapshot-phase0.sh</code></td><td>与 product-gate 重叠，已退役</td></tr>
+          <tr><td><code>congestion-set.txt</code></td><td><code>mech-set.txt</code>；<code>congestion-baseline</code> 默认 set 同步改为 <code>mech-set.txt</code></td></tr>
+          <tr><td><code>eval-data/showcase-baseline.json</code></td><td>由 <code>./showcase/eval-showcase.sh baseline</code> 重新生成</td></tr>
+        </tbody>
+      </table>
 
       <h2 id="conventions">约定</h2>
       <ul>

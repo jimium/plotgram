@@ -1,0 +1,40 @@
+// 图书馆管理系统 ER 模型
+// @role: demo  (authoritative: filename prefix)
+// Mermaid 对照: 复杂 erDiagram 馆藏/借阅/预约
+diagram er {
+    title: "图书馆数据模型"
+
+    entity[database] member "Member" {
+        meta.pk: "id"
+        meta.fields: "name\nphone"
+    }
+    entity[database] book "Book" {
+        meta.pk: "isbn"
+        meta.fields: "title\nauthor"
+    }
+    entity[database] copy "Copy" {
+        meta.pk: "id"
+        meta.fk: "isbn"
+        meta.fields: "shelf_code\nstatus"
+    }
+    entity[database] loan "Loan" {
+        meta.pk: "id"
+        meta.fields: "fk.member_id\nfk.copy_id\nborrowed_at\ndue_at"
+    }
+    entity[database] reservation "Reservation" {
+        meta.pk: "id"
+        meta.fields: "fk.member_id\nfk.isbn\nqueued_at"
+    }
+    entity[database] fine "Fine" {
+        meta.pk: "id"
+        meta.fk: "loan_id"
+        meta.fields: "amount\nstatus"
+    }
+
+    member -> loan "借阅" { cardinality: "1:N" }
+    book -> copy "副本" { cardinality: "1:N" }
+    copy -> loan "被借出" { cardinality: "1:N" }
+    member -> reservation "预约" { cardinality: "1:N" }
+    book -> reservation "被预约" { cardinality: "1:N" }
+    loan -> fine "产生罚金" { cardinality: "1:1" }
+}

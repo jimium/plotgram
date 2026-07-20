@@ -100,12 +100,12 @@ diagram sequence {
 
 ## 示例
 
-| 复杂度 | 路径 | 说明 |
-|--------|------|------|
-| 简单 | `showcase/sequence/s.request-response.pgm` | 单次请求-响应 |
-| 简单 | `showcase/sequence/s.ping-pong.pgm` | 双向 ping-pong |
-| 正常 | `showcase/sequence/n.oauth-login.pgm` | OAuth 登录 |
-| 复杂 | `showcase/sequence/c.distributed-saga.pgm` | 分布式 Saga |
+| 角色 | 路径 | 说明 |
+|------|------|------|
+| smoke | `showcase/sequence/smoke.request-response.pgm` | 单次请求-响应 |
+| smoke | `showcase/sequence/smoke.ping-pong.pgm` | 双向 ping-pong |
+| product | `showcase/sequence/product.oauth-login.pgm` | OAuth 登录 |
+| demo | `showcase/sequence/demo.distributed-saga.pgm` | 分布式 Saga |
 
 ---
 

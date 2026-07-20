@@ -167,7 +167,7 @@ plotgram patch diagram.pgm changes.json   # stdout
 ### 本地预览
 
 ```bash
-plotgram render showcase/flowchart/s.linear-chain.pgm -o /tmp/out.svg
+plotgram render showcase/flowchart/product.linear-chain.pgm -o /tmp/out.svg
 ```
 
 ### CI：语法 + 布局门禁

@@ -1,0 +1,36 @@
+// Rolling update flow from CI to cluster traffic shift
+// Mermaid mapping: complex sequence diagram for release automation
+// @role: demo  (authoritative: filename prefix)
+diagram sequence {
+    title: "K8s 滚动发布链路"
+
+    entity[actor] developer "开发者"
+    entity[control] ci "CI Pipeline"
+    entity[database] registry "镜像仓库"
+    entity[control] argo "Argo CD"
+    entity[control] apiserver "K8s API Server"
+    entity[control] scheduler "Scheduler"
+    entity[control] kubelet "Kubelet"
+    entity[control] deployment "Deployment"
+    entity[boundary] pods "新 Pod 副本集"
+    entity[boundary] ingress "Ingress Service"
+    entity[boundary] monitor "监控告警"
+
+    developer -> ci "push release tag"
+    ci -> registry "build and push image"
+    ci --> developer "build passed"
+    ci -> argo "update manifest"
+    argo -> apiserver "apply new deployment spec"
+    apiserver -> deployment "create new replica set"
+    deployment -> scheduler "request new pods"
+    scheduler -> kubelet "assign nodes"
+    kubelet -> pods "pull image and start"
+    pods --> kubelet "readiness probe ok"
+    kubelet --> apiserver "pod ready"
+    apiserver -> ingress "shift part of traffic"
+    ingress --> pods "live requests"
+    pods -> monitor "publish metrics"
+    monitor --> argo "canary healthy"
+    argo -> apiserver "scale down old pods"
+    apiserver --> developer "rollout complete"
+}

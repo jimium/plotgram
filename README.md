@@ -52,7 +52,7 @@ diagram flowchart {
 Render it:
 
 ```bash
-cargo run -p plotgram-cli -- render showcase/flowchart/s.linear-chain.pgm -f svg -o output.svg
+cargo run -p plotgram-cli -- render showcase/flowchart/product.linear-chain.pgm -f svg -o output.svg
 ```
 
 ---

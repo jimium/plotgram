@@ -1,0 +1,43 @@
+# Demo-observe：对外演示大图（观测/可债，不进日常质量硬门禁）
+# 路径相对仓库根目录。文件名角色 = demo。
+# 在 compare-collinear.sh 中：质量轨默认 WARN（可观测/可债），正确性轨仍硬。
+# 来源：docs/architecture/重构方案/casev2/gates/demo-observe-set.txt
+
+showcase/architecture/demo.k8s-multi-namespace-overview.pgm
+showcase/architecture/demo.k8s-multi-cluster-federation.pgm
+showcase/architecture/demo.k8s-platform-stack.pgm
+showcase/architecture/demo.k8s-tenant-isolation.pgm
+showcase/architecture/demo.k8s-blue-green-release-topology.pgm
+showcase/architecture/demo.hybrid-cloud-dr-topology.pgm
+showcase/architecture/demo.data-lineage-platform.pgm
+showcase/architecture/demo.ai-agent-docops-pipeline.pgm
+showcase/architecture/demo.payment-clearing-platform.pgm
+showcase/architecture/demo.supply-chain-control-tower.pgm
+showcase/architecture/demo.mcp-server-cluster-architecture.pgm
+showcase/architecture/demo.plotgram-core-mod-deps.pgm
+showcase/flowchart/demo.aml-case-investigation.pgm
+showcase/flowchart/demo.k8s-incident-response.pgm
+showcase/flowchart/demo.change-approval-workflow.pgm
+showcase/flowchart/demo.pr-architecture-review.pgm
+showcase/flowchart/demo.ci-cd-security-pipeline.pgm
+showcase/flowchart/demo.e-commerce-order-fulfillment.pgm
+showcase/flowchart/demo.customer-refund-process.pgm
+showcase/sequence/demo.k8s-rolling-update.pgm
+showcase/sequence/demo.k8s-canary-rollback.pgm
+showcase/sequence/demo.k8s-node-failure-recovery.pgm
+showcase/sequence/demo.cross-team-incident-escalation.pgm
+showcase/sequence/demo.ai-agent-change-loop.pgm
+showcase/sequence/demo.real-time-risk-decisioning.pgm
+showcase/sequence/demo.distributed-saga.pgm
+showcase/sequence/demo.microservice-checkout.pgm
+showcase/state/demo.k8s-rollout-state-machine.pgm
+showcase/state/demo.k8s-node-pressure-lifecycle.pgm
+showcase/state/demo.service-degradation-lifecycle.pgm
+showcase/state/demo.document-sync-lifecycle.pgm
+showcase/state/demo.settlement-reconciliation-lifecycle.pgm
+showcase/er/demo.ecommerce-schema.pgm
+showcase/er/demo.library-management.pgm
+showcase/er/demo.hospital-system.pgm
+showcase/mindmap/demo.ai-learning-roadmap.pgm
+showcase/mindmap/demo.knowledge-map.pgm
+showcase/mindmap/demo.product-roadmap.pgm

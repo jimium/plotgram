@@ -1,0 +1,25 @@
+// 通知发送与重试状态机
+// @role: product  (authoritative: filename prefix)
+// Mermaid 对照: stateDiagram-v2 消息推送流转
+diagram state {
+    title: "通知发送状态"
+
+    entity[initial] init ""
+    entity[state] pending "待发送"
+    entity[state] sending "发送中"
+    entity[state] sent "已送达"
+    entity[state] failed "发送失败"
+    entity[state] retrying "重试中"
+    entity[final] delivered "已读"
+    entity[final] dropped "已丢弃"
+
+    init -> pending
+    pending -> sending "调度触发"
+    sending -> sent "渠道返回成功"
+    sending -> failed "渠道返回错误"
+    failed -> retrying "重试次数 < 3"
+    retrying -> sending "退避后重试"
+    failed -> dropped "重试次数耗尽"
+    sent -> delivered "回执确认"
+    sent -> delivered "24 小时默认已读"
+}

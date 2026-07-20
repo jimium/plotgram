@@ -701,7 +701,7 @@ mod tests {
     /// V3b：n.user-auth 同层 db+cache 挂到 auth → 组质心对齐；auth/gateway/client 冻结。
     #[test]
     fn v3b_user_auth_pendants_pack_under_auth() {
-        let source = include_str!("../../../../../../showcase/flowchart/n.user-auth.pgm");
+        let source = include_str!("../../../../../../showcase/flowchart/product.user-auth.pgm");
         let output = crate::pipeline::parse_prepare_validate(
             source,
             &StyleRequest::default(),

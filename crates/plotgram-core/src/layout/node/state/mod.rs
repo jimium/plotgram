@@ -226,7 +226,7 @@ mod tests {
         use crate::pipeline::{parse, prepare};
         use crate::prepare::StyleRequest;
 
-        let source = include_str!("../../../../../../showcase/state/c.payment-flow.pgm");
+        let source = include_str!("../../../../../../showcase/state/product.payment-flow.pgm");
         let raw = parse(source).expect("parse payment-flow");
         let prepared = prepare(raw, &StyleRequest::default()).expect("prepare");
         let result = StateLayout::default().compute(&prepared.diagram);

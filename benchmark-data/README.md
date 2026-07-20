@@ -1,6 +1,6 @@
 # benchmark-data
 
-布局 / 边路由的**回归门禁数据与工具**。
+布局 / 边路由的**回归门禁数据与工具**（角色感知）。
 
 完整说明（含流程 / 指标图解）见可读版：
 
@@ -11,16 +11,44 @@
 [`docs/architecture/方案计划/collinear-and-arrow-merge-comparison.md`](../docs/architecture/方案计划/collinear-and-arrow-merge-comparison.md) §2  
 （Allowed / NeedsSeparation / Degraded；不以「共线计数归零」为成功标准。）
 
+**角色分层重构方案**：[`docs/architecture/重构方案/showcase-基线分层重构-2026-07.md`](../docs/architecture/重构方案/showcase-基线分层重构-2026-07.md)
+
+## 门禁集（按角色分集）
+
+| 清单 | 角色 | 用途 | compare 行为 |
+|------|------|------|--------------|
+| [`product-regression-set.txt`](./product-regression-set.txt) | `product` | 日常质量硬门禁（精选） | 正确性 + 质量 **硬 FAIL** |
+| [`stress-probe-set.txt`](./stress-probe-set.txt) | `stress` | 正确性硬 + 质量观测 | 正确性硬；质量 WARN（`--strict-stress` 改硬） |
+| [`mech-set.txt`](./mech-set.txt) | `mech` + 双用途 `product` | 机制探针 / 拥堵校准 | 默认不门禁（机制断言另跑） |
+| [`demo-observe-set.txt`](./demo-observe-set.txt) | `demo` | 观测 / 可债 | 正确性硬；质量 WARN |
+
+日常宣称「无退化」默认只引用 **product-gate**。文件名首段即角色（`{role}.{slug}.pgm`），无需 manifest overrides。
+
 ## 速查
 
 ```bash
-# 采快照
+# 采快照（默认 product + stress，写入 collinear-baseline-YYYY-MM-DD.{json,md} 与 latest）
 ./benchmark-data/snapshot-collinear.sh
 
-# 对比门禁
+# 只采 product 门禁
+./benchmark-data/snapshot-collinear.sh --set benchmark-data/product-regression-set.txt
+
+# 加入 demo 观测集
+./benchmark-data/snapshot-collinear.sh \
+  --set benchmark-data/product-regression-set.txt \
+  --set benchmark-data/stress-probe-set.txt \
+  --set benchmark-data/demo-observe-set.txt
+
+# 对比门禁（默认：product 硬 / stress 软 / demo 软 / mech 不门禁）
 ./benchmark-data/compare-collinear.sh \
   benchmark-data/collinear-baseline-latest.json \
   path/to/new-snapshot.json
+
+# 显式把 stress 质量也走硬 fail（探针严格模式）
+./benchmark-data/compare-collinear.sh --strict-stress baseline.json current.json
+
+# 全部质量轨转 WARN（显式债，仍 exit 0）
+./benchmark-data/compare-collinear.sh --allow-quality-debt baseline.json current.json
 
 # 可视化基线变化 + 打开文档
 ./benchmark-data/serve-viewer.py
@@ -28,12 +56,36 @@
 
 当前门禁指针：`collinear-baseline-latest.json`。
 
-`compare-collinear.sh` 摘要：
+## 角色感知分轨
 
-| 轨 | 检查 |
-|----|------|
-| 正确性（硬） | `edge_crosses_group_interior` 不升；`det=true` |
-| 质量（默认真 / 可债） | `exact_sev` / `tight_sev`；lint through/trunk/err；**`ortho.degraded_count` 不升**；perf；`node_fp` |
-| 观测（WARN） | **`allowed_share_len` 可升**；若 allowed↑ 且 exact 未降 → 提示抽检误标 Allowed |
+每条样本在 JSON 中带 `role` 字段（取文件名第一段：`product` / `stress` / `demo` / `mech` / `smoke`）。`compare-collinear.sh` 按角色决定质量轨是否挡合并：
 
-细节与图解见 HTML。
+| 轨 | 检查 | product / smoke | demo | stress | mech |
+|----|------|-----------------|------|--------|------|
+| 正确性（硬） | `edge_crosses_group_interior` 不升；`det=true` | FAIL | FAIL | FAIL | FAIL |
+| 质量（默认真） | `exact_sev` / `tight_sev`；lint through/trunk/err；`ortho.degraded_count`；perf；`node_fp` | **FAIL** | WARN / 可债 | WARN（`--strict-stress` 改硬） | 不门禁 |
+| 观测（WARN） | `allowed_share_len` 可升；若 allowed↑ 且 exact 未降 → 提示抽检误标 Allowed | 同现网 | 同现网 | 同现网 | — |
+
+抬基线 `note` 强制带角色（手册 §1）：
+
+```text
+raise product: …原因…；残余: product.foo
+raise stress (expected): …探针可接受…；残余: stress.layout-stress-nested
+```
+
+## 与创新模式对齐（`AGENTS.md` §7）
+
+| 模式 | product-gate | stress-probe |
+|------|--------------|--------------|
+| 日常修复（棘轮） | 不劣化 | 质量可债；正确性不劣化 |
+| 算法级重写（帕累托） | 目标维度优先看本集 | 允许更大临时质量退化，退出时显式抬基线 + 列残余 |
+
+## 旧文件退役清单
+
+以下文件在 2026-07-20 角色分层重构中删除：
+
+- `collinear-baseline-*.json` / `collinear-baseline-latest.{json,md}`（旧基线，被新角色感知基线取代）
+- `collinear-regression-set.txt`（被 `product-regression-set.txt` + `stress-probe-set.txt` 取代）
+- `phase0-regression-set.txt` / `phase0-*.md` / `snapshot-phase0.sh`（与 product-gate 重叠，已退役）
+- `congestion-set.txt`（被 `mech-set.txt` 取代；`congestion-baseline` 默认 set 改为 `mech-set.txt`）
+- `eval-data/showcase-baseline.json`（由 `./showcase/eval-showcase.sh baseline` 重新生成）

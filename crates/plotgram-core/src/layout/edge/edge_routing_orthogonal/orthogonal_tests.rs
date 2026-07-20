@@ -1285,7 +1285,7 @@
     #[test]
     fn stress_nested_unrelated_trunk_merge_baseline() {
         let source = include_str!(
-            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
+            "../../../../../../showcase/architecture/stress.layout-stress-nested.pgm"
         );
         let output = crate::pipeline::parse_prepare_validate(
             source,
@@ -1322,7 +1322,7 @@
         use crate::layout::geometry::Point;
 
         let source = include_str!(
-            "../../../../../../showcase/architecture/c.layout-stress-nested.pgm"
+            "../../../../../../showcase/architecture/stress.layout-stress-nested.pgm"
         );
         let output = crate::pipeline::parse_prepare_validate(
             source,
@@ -1457,7 +1457,7 @@
     /// 完整 n.user-auth 几何验收：禁止两节点替身。
     #[test]
     fn user_auth_flowchart_geometry_invariants() {
-        let source = include_str!("../../../../../../showcase/flowchart/n.user-auth.pgm");
+        let source = include_str!("../../../../../../showcase/flowchart/product.user-auth.pgm");
         let output = crate::pipeline::parse_prepare_validate(
             source,
             &crate::prepare::StyleRequest::default(),
@@ -1591,7 +1591,7 @@
     /// O1 dump: auth↔db / auth↔cache 最长竖干间距
     #[test]
     fn o1_user_auth_reverse_trunk_gap_dump() {
-        let source = include_str!("../../../../../../showcase/flowchart/n.user-auth.pgm");
+        let source = include_str!("../../../../../../showcase/flowchart/product.user-auth.pgm");
         let output = crate::pipeline::parse_prepare_validate(
             source,
             &crate::prepare::StyleRequest::default(),
@@ -1639,7 +1639,7 @@
     /// 轨道 A：正反向在下层节点同侧不得共锚
     #[test]
     fn a_user_auth_reverse_pair_dock_separation() {
-        let source = include_str!("../../../../../../showcase/flowchart/n.user-auth.pgm");
+        let source = include_str!("../../../../../../showcase/flowchart/product.user-auth.pgm");
         let output = crate::pipeline::parse_prepare_validate(
             source,
             &crate::prepare::StyleRequest::default(),

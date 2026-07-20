@@ -1,0 +1,33 @@
+// 退款审批流程（日常规模）
+// 与 c.customer-refund-process 互补：本图无分组泳道，聚焦金额决策 + 审核驳回重提回环
+// Mermaid 对照: graph TD 决策分支 + 回环
+// @role: product  (authoritative: filename prefix)
+diagram flowchart {
+    title: "退款审批流程"
+    config {
+        direction: top-to-bottom
+    }
+
+    entity[start] start "用户申请退款"
+    entity[process] submit "提交退款申请"
+    entity[decision] check_amount "金额是否超 1000"
+    entity[process] auto_approve "自动通过"
+    entity[process] manual_review "人工审核"
+    entity[decision] review_result "审核结果"
+    entity[process] refund "执行退款"
+    entity[process] revise "修改申请"
+    entity[end] end_ok "退款完成"
+    entity[end] end_fail "申请关闭"
+
+    start -> submit
+    submit -> check_amount
+    check_amount -> auto_approve "否"
+    check_amount -> manual_review "是"
+    manual_review -> review_result
+    review_result -> refund "通过"
+    review_result -> revise "驳回可改"
+    review_result -> end_fail "驳回关闭"
+    revise -> submit "重新提交"
+    auto_approve -> refund
+    refund -> end_ok
+}

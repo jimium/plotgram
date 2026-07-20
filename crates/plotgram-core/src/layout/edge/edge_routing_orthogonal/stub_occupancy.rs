@@ -735,7 +735,7 @@ mod tests {
         use crate::prepare::StyleRequest;
 
         let source =
-            include_str!("../../../../../../showcase/architecture/c.cloud-native.pgm");
+            include_str!("../../../../../../showcase/architecture/product.cloud-native.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
         let prepared = output.diagram.expect("valid diagram");
         let diagram = prepared.inner();

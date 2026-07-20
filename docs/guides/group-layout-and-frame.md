@@ -55,7 +55,7 @@ Group Frame 在**主布局算法之后**执行（路由前、路由后各会幂�
            │ 控制塔能力    │
            └──────────────┘
 
-参考：showcase/architecture/c.supply-chain-control-tower.pgm
+参考：showcase/architecture/demo.supply-chain-control-tower.pgm
 （未写 group_frame 时也是这样：上下由拓扑决定，不是 axis 写反了）
 ```
 
@@ -427,7 +427,7 @@ group_frame: stack {
 | `cross: center` | 交叉轴居中 |
 | `border: shared` | 边框共线，更「图纸感」 |
 
-常与 `edge_routing: orthogonal` 一起用。参考：[`c.supply-chain-control-tower.pgm`](../../showcase/architecture/c.supply-chain-control-tower.pgm)（竖向链）、[`c.ai-agent-docops-pipeline.pgm`](../../showcase/architecture/c.ai-agent-docops-pipeline.pgm)、[`n.data-pipeline.pgm`](../../showcase/architecture/n.data-pipeline.pgm)、[dsl-writing-manual §8.3](../specs/dsl/dsl-writing-manual.md#83-架构图分层服务使用-group_frame)。
+常与 `edge_routing: orthogonal` 一起用。参考：[`demo.supply-chain-control-tower.pgm`](../../showcase/architecture/demo.supply-chain-control-tower.pgm)（竖向链）、[`demo.ai-agent-docops-pipeline.pgm`](../../showcase/architecture/demo.ai-agent-docops-pipeline.pgm)、[`product.data-pipeline.pgm`](../../showcase/architecture/product.data-pipeline.pgm)、[dsl-writing-manual §8.3](../specs/dsl/dsl-writing-manual.md#83-架构图分层服务使用-group_frame)。
 
 ### 5.2 `fit` — 内容贴合
 
@@ -472,7 +472,7 @@ diagram flowchart {
 | `cross: start` | 顶对齐（水平堆叠时） |
 | `gap: 80` | 泳道间距偏大，边更好走 |
 
-参考：[`c.swimlane-order-process.pgm`](../../showcase/flowchart/c.swimlane-order-process.pgm)。
+参考：[`product.swimlane-order-process.pgm`](../../showcase/flowchart/product.swimlane-order-process.pgm)。
 
 ### 5.4 `stages` — 纵向阶段
 
@@ -576,8 +576,8 @@ diagram architecture {
 ### CLI 验证
 
 ```bash
-cargo run -p plotgram-cli -- render showcase/architecture/c.ai-agent-docops-pipeline.pgm -o /tmp/out.svg
-cargo run -p plotgram-cli -- lint showcase/architecture/c.ai-agent-docops-pipeline.pgm
+cargo run -p plotgram-cli -- render showcase/architecture/demo.ai-agent-docops-pipeline.pgm -o /tmp/out.svg
+cargo run -p plotgram-cli -- lint showcase/architecture/demo.ai-agent-docops-pipeline.pgm
 ```
 
 Layout hints 中可查看 `GroupFrameReport`（是否 equalized、matrix_applied 等），见 [render-pipeline.md](render-pipeline.md)。

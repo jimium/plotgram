@@ -429,7 +429,7 @@ mod tests {
     fn microservices_hub_client_centroid_within_eps_after_pipeline() {
         // L2：web+mobile → gateway；刚体重申后质心 ≤2px，或 Skip（组框不够宽）时不崩。
         let source =
-            include_str!("../../../../../../showcase/architecture/n.microservices.pgm");
+            include_str!("../../../../../../showcase/architecture/product.microservices.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
         let prepared = output.diagram.expect("valid diagram");
         let layout =
@@ -450,7 +450,7 @@ mod tests {
     #[test]
     fn stress_nested_cloud_gets_left_gutter_budget() {
         let source =
-            include_str!("../../../../../../showcase/architecture/c.layout-stress-nested.pgm");
+            include_str!("../../../../../../showcase/architecture/stress.layout-stress-nested.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
         let prepared = output.diagram.expect("valid diagram");
         let layout =
@@ -474,7 +474,7 @@ mod tests {
         use crate::layout::lint::{lint_layout, LintMetricsSummary};
 
         let source =
-            include_str!("../../../../../../showcase/architecture/c.layout-stress-nested.pgm");
+            include_str!("../../../../../../showcase/architecture/stress.layout-stress-nested.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
         let prepared = output.diagram.expect("valid diagram");
         let diagram = prepared.inner();
@@ -507,7 +507,7 @@ mod tests {
         use crate::layout::lint::{lint_layout, LintMetricsSummary};
 
         let source =
-            include_str!("../../../../../../showcase/architecture/c.layout-stress-nested.pgm");
+            include_str!("../../../../../../showcase/architecture/stress.layout-stress-nested.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
         let prepared = output.diagram.expect("valid diagram");
         let diagram = prepared.inner();
@@ -522,7 +522,7 @@ mod tests {
     #[test]
     fn stress_nested_nodes_stay_inside_leaf_groups() {
         let source =
-            include_str!("../../../../../../showcase/architecture/c.layout-stress-nested.pgm");
+            include_str!("../../../../../../showcase/architecture/stress.layout-stress-nested.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
         let prepared = output.diagram.expect("valid diagram");
         let diagram = prepared.inner();
@@ -561,7 +561,7 @@ mod tests {
         use crate::layout::lint::{lint_layout, LintMetricsSummary, LintRuleId};
 
         let source =
-            include_str!("../../../../../../showcase/architecture/c.layout-stress-nested.pgm");
+            include_str!("../../../../../../showcase/architecture/stress.layout-stress-nested.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
         let prepared = output.diagram.expect("valid diagram");
         let diagram = prepared.inner();
@@ -589,7 +589,7 @@ mod tests {
         use crate::layout::group::PORT_STUB_CLEARANCE;
 
         let source =
-            include_str!("../../../../../../showcase/architecture/c.layout-stress-nested.pgm");
+            include_str!("../../../../../../showcase/architecture/stress.layout-stress-nested.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
         let prepared = output.diagram.expect("valid diagram");
         let diagram = prepared.inner();

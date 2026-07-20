@@ -435,7 +435,7 @@ mod tests {
     #[test]
     fn k8s_architecture_layout_is_deterministic() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let path = root.join("showcase/architecture/c.k8s-multi-cluster-federation.pgm");
+        let path = root.join("showcase/architecture/demo.k8s-multi-cluster-federation.pgm");
         let first = evaluate_pgm_file(&path).expect("evaluate k8s showcase");
         for run in 1..=30 {
             let current = evaluate_pgm_file(&path).expect("evaluate k8s showcase");
@@ -465,7 +465,7 @@ mod tests {
     #[test]
     fn layout_stress_nested_is_deterministic() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let path = root.join("showcase/architecture/c.layout-stress-nested.pgm");
+        let path = root.join("showcase/architecture/stress.layout-stress-nested.pgm");
         let first = evaluate_pgm_file(&path).expect("evaluate stress-nested");
         for run in 1..=30 {
             let current = evaluate_pgm_file(&path).expect("evaluate stress-nested");

@@ -1,0 +1,24 @@
+# Showcase v2 catalog (draft)
+# Spec: ../showcase-基线分层重构-2026-07.md
+#
+# 文件名即角色：{role}.{slug}.pgm
+#   smoke. | product. | demo. | stress. | mech.
+# gates 只挑选子集进门禁；不需要 overrides。
+
+version: 1
+
+roles:
+  smoke: "语法/管线冒烟；须干净"
+  product: "情理之中的业务图；质量硬棘轮主 KPI"
+  demo: "对外演示大图；观测/可债"
+  stress: "人造边界；正确性硬、质量观测"
+  mech: "机制探针；验规则不追美观"
+
+# 从路径解析角色：取文件名第一个 '.' 之前的段
+filename_role: true
+
+gates:
+  product: gates/product-regression-set.txt
+  stress: gates/stress-probe-set.txt
+  mech: gates/mech-set.txt
+  demo: gates/demo-observe-set.txt

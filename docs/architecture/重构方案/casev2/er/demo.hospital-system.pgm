@@ -1,0 +1,46 @@
+// 医院挂号与就诊 ER 模型
+// @role: demo  (authoritative: filename prefix)
+// Mermaid 对照: 复杂 erDiagram 多科室/医生/患者/挂号
+diagram er {
+    title: "医院挂号数据模型"
+
+    entity[database] patient "Patient" {
+        meta.pk: "id"
+        meta.fields: "name\nid_card\nphone"
+    }
+    entity[database] department "Department" {
+        meta.pk: "id"
+        meta.fields: "name\nlocation"
+    }
+    entity[database] doctor "Doctor" {
+        meta.pk: "id"
+        meta.fk: "dept_id"
+        meta.fields: "name\ntitle"
+    }
+    entity[database] schedule "Schedule" {
+        meta.pk: "id"
+        meta.fk: "doctor_id"
+        meta.fields: "weekday\nam_pm\ncapacity"
+    }
+    entity[database] registration "Registration" {
+        meta.pk: "id"
+        meta.fields: "fk.patient_id\nfk.schedule_id\nseq_no\nstatus"
+    }
+    entity[database] medical_record "MedicalRecord" {
+        meta.pk: "id"
+        meta.fk: "registration_id"
+        meta.fields: "diagnosis\nprescription"
+    }
+    entity[database] payment "Payment" {
+        meta.pk: "id"
+        meta.fk: "registration_id"
+        meta.fields: "amount\nmethod\npaid_at"
+    }
+
+    department -> doctor "归属" { cardinality: "1:N" }
+    doctor -> schedule "出诊" { cardinality: "1:N" }
+    patient -> registration "挂号" { cardinality: "1:N" }
+    schedule -> registration "占用号源" { cardinality: "1:N" }
+    registration -> medical_record "产生病历" { cardinality: "1:1" }
+    registration -> payment "缴费" { cardinality: "1:1" }
+}

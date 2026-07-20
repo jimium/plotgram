@@ -1,6 +1,6 @@
 # Plotgram Showcase
 
-经典示例集，按图表类型组织，复杂度编码在文件名前缀中，便于与 [Mermaid](https://mermaid.js.org/) 等工具对比渲染效果与语法表达。
+经典示例集，按图表类型组织，**文件名即角色**（`{role}.{slug}.pgm`），便于与 [Mermaid](https://mermaid.js.org/) 等工具对比渲染效果与语法表达。
 
 ## 目录结构
 
@@ -14,51 +14,66 @@ showcase/
 └── mindmap/            # 思维导图（mindmap）
 ```
 
-每个类型目录下的文件以复杂度前缀命名：`s.`（简单）、`n.`（正常）、`c.`（复杂）。文件后缀为 `.pgm`。
+## 角色前缀
 
-## 复杂度前缀
+每个文件按角色命名：`{type}/{role}.{slug}.pgm`。角色决定**门禁策略**与画廊默认展示，与节点数无关。
 
-| 前缀 | 级别 | 节点数 | 特征 | 对比目的 |
-|------|------|--------|------|----------|
-| `s.` | simple | ≤4 | 线性链、单次交互 | 验证最基础语法与布局 |
-| `n.` | normal | 5-10 | 决策分支、分组、属性 | 验证日常业务场景 |
-| `c.` | complex | 10+ | 多决策、回环、嵌套分组 | 压力测试布局引擎 |
+| 前缀 | 角色 | 观感 | 门禁默认 |
+|------|------|------|----------|
+| `smoke.` | smoke | 必须干净 | 冒烟；正确性硬 |
+| `product.` | product | **必须好看** | **精选进质量硬棘轮** |
+| `demo.` | demo | 好看优先 | 观测 / 可债 |
+| `stress.` | stress | 可妥协 | 正确性硬；质量观测（`--allow-stress-debt`） |
+| `mech.` | mech | 不追美观 | 机制断言 / 专项集 |
 
-示例：`flowchart/s.linear-chain.pgm`、`sequence/n.oauth-login.pgm`、`er/c.ecommerce-schema.pgm`
+旧 `s./n./c./x.` 规模前缀**已废弃**。UI / 工具按文件名第一段解析角色：
 
-按复杂度筛选：`showcase/flowchart/s.*.pgm`
+```text
+path.split('/').last().split('.')[0]  →  role
+```
+
+判定口诀：
+
+- **product**：用户下周就可能画成这样
+- **demo**：给销售与官网看的大图
+- **stress**：故意造来打爆布局/路由的
+- **mech**：为钉死一条规则而写的最小反例
+
+## 门禁清单
+
+门禁清单按角色分集，落在 [`../benchmark-data/`](../benchmark-data/)：
+
+| 清单 | 用途 |
+|------|------|
+| `benchmark-data/product-regression-set.txt` | 日常质量硬门禁（精选） |
+| `benchmark-data/stress-probe-set.txt` | 正确性硬 + 质量观测 |
+| `benchmark-data/mech-set.txt` | 机制探针 |
+| `benchmark-data/demo-observe-set.txt` | 观测 / 可债 |
+
+日常宣称「无退化」默认只引用 **product-gate**。详见 [重构方案](../docs/architecture/重构方案/showcase-基线分层重构-2026-07.md)。
 
 ## 代表样例
 
-除了基础语法样例，`showcase/` 现在也包含一批面向生产环境的复杂场景，适合对外演示 Plotgram 在大规模系统、发布治理、故障恢复、合规流程中的表达能力。
+画廊默认显示 `product.` + `demo.`；`stress.` / `mech.` 折叠在「工程探针」区。
 
 | 主题 | 推荐文件 | 说明 |
 |------|----------|------|
-| 大规模 K8s 全景 | `architecture/c.k8s-multi-namespace-overview.pgm` | 多命名空间生产集群，按聚合后的业务工作负载组织 |
-| 多集群与容灾 | `architecture/c.k8s-multi-cluster-federation.pgm` | 跨地域主备、共享平台能力与复制关系 |
-| 平台栈视图 | `architecture/c.k8s-platform-stack.pgm` | 业务工作负载 + Ingress + CNI/CSI + 可观测组件 |
-| 蓝绿发布 | `architecture/c.k8s-blue-green-release-topology.pgm` | 流量切换、共享后端、健康信号驱动发布 |
-| 多租户隔离 | `architecture/c.k8s-tenant-isolation.pgm` | 多租户 SaaS 集群与共享平台服务 |
-| 混合云灾备 | `architecture/c.hybrid-cloud-dr-topology.pgm` | 本地数据中心 + 公有云灾备拓扑 |
-| 数据血缘平台 | `architecture/c.data-lineage-platform.pgm` | 数据采集、治理、血缘、分析消费全链路 |
-| AI 文档自动化 | `architecture/c.ai-agent-docops-pipeline.pgm` | Agent 生成、校验、修复、Diff、发布闭环 |
-| 支付清结算 | `architecture/c.payment-clearing-platform.pgm` | 支付、记账、清分、结算、对账一体化平台 |
-| 供应链控制塔 | `architecture/c.supply-chain-control-tower.pgm` | 计划、履约、物流、可视化与告警协同 |
-| 发布链路 | `sequence/c.k8s-rolling-update.pgm` | 从 CI 到 K8s 滚动发布与切流 |
-| 回滚链路 | `sequence/c.k8s-canary-rollback.pgm` | 金丝雀失败后的观测驱动回滚 |
-| 节点恢复 | `sequence/c.k8s-node-failure-recovery.pgm` | 节点故障后的重调度与自动扩容 |
-| 跨团队协同 | `sequence/c.cross-team-incident-escalation.pgm` | SRE、应用、数据库、安全团队联动排障 |
-| AI 变更闭环 | `sequence/c.ai-agent-change-loop.pgm` | 代码变更到图表修复与 PR 回写 |
-| 实时风控 | `sequence/c.real-time-risk-decisioning.pgm` | 特征、规则、模型串联的实时决策 |
-| 故障响应 | `flowchart/c.k8s-incident-response.pgm` | 节点、发布、流量三类故障分支 |
-| 变更审批 | `flowchart/c.change-approval-workflow.pgm` | 合规场景下的审批、验证、回滚与归档 |
-| PR 架构评审 | `flowchart/c.pr-architecture-review.pgm` | AI 自动生成与人工 gate 结合的评审流程 |
-| 反洗钱调查 | `flowchart/c.aml-case-investigation.pgm` | 告警、复筛、人工调查、监管报送 |
-| 发布状态机 | `state/c.k8s-rollout-state-machine.pgm` | 渐进式发布中的 pause / verify / rollback |
-| 节点状态机 | `state/c.k8s-node-pressure-lifecycle.pgm` | 节点压力、驱逐、修复、替换流程 |
-| 降级状态机 | `state/c.service-degradation-lifecycle.pgm` | 服务告警、降级、切换、恢复生命周期 |
-| 文档同步状态机 | `state/c.document-sync-lifecycle.pgm` | 文档从过期到生成、评审、发布 |
-| 清结算状态机 | `state/c.settlement-reconciliation-lifecycle.pgm` | 清分、结算、对账、异常处理生命周期 |
+| 云原生 / 微服务 | `architecture/product.cloud-native.pgm` | 主流云原生拓扑 |
+| 典型微服务 | `architecture/product.typical-microservice-architecture.pgm` | 网关 + 服务 + 数据层 |
+| 三层架构 | `architecture/product.three-tier.pgm` | 经典三层业务系统 |
+| CDN 缓存 | `architecture/product.cdn-cache.pgm` | 边缘缓存回源链路 |
+| 电商基础 | `architecture/product.ecommerce-platform.pgm` | 电商系统骨架 |
+| 用户认证 | `flowchart/product.user-auth.pgm` | 登录 / 注册 / 鉴权分支 |
+| 退款流程 | `flowchart/product.refund-process.pgm` | 退款业务泳道 |
+| OAuth 登录 | `sequence/product.oauth-login.pgm` | 标准 OAuth 2.0 时序 |
+| 支付网关 | `sequence/product.payment-gateway.pgm` | 支付网关交互时序 |
+| 订单生命周期 | `state/product.order-lifecycle.pgm` | 订单状态迁移 |
+| 支付流程状态机 | `state/product.payment-flow.pgm` | 支付状态迁移 |
+| 博客 ER | `er/product.blog-schema.pgm` | 博客系统 ER |
+| SaaS 多租户 ER | `er/product.saas-schema.pgm` | 多租户 SaaS ER |
+| 技术栈脑图 | `mindmap/product.tech-stack.pgm` | 前后端技术栈 |
+
+K8s / 故障恢复 / 大型业务大图多在 `demo.*`，从画廊切换「工程探针」可看到 `stress.*` 与 `mech.*`。
 
 ## D2 对照基准
 
@@ -66,23 +81,7 @@ showcase/
 
 | 主题 | 推荐文件 | 说明 |
 |------|----------|------|
-| 基站网络拓扑 | `architecture/n.d2-cell-tower-network.pgm` | D2 Terminal 主题风格网络图；含嵌套分组、多种形状、虚线边 |
-
-## 按场景浏览
-
-如果你是按业务或平台主题找样例，而不是按图类型找，可以直接从这里开始：
-
-| 场景 | 推荐文件 |
-|------|----------|
-| `K8s / 平台工程` | `architecture/c.k8s-multi-namespace-overview.pgm`、`architecture/c.k8s-platform-stack.pgm`、`sequence/c.k8s-rolling-update.pgm` |
-| `发布治理 / 回滚` | `architecture/c.k8s-blue-green-release-topology.pgm`、`sequence/c.k8s-canary-rollback.pgm`、`state/c.k8s-rollout-state-machine.pgm` |
-| `故障恢复 / 稳定性` | `flowchart/c.k8s-incident-response.pgm`、`sequence/c.k8s-node-failure-recovery.pgm`、`state/c.service-degradation-lifecycle.pgm` |
-| `多租户 / 混合云 / 合规` | `architecture/c.k8s-tenant-isolation.pgm`、`architecture/c.hybrid-cloud-dr-topology.pgm`、`flowchart/c.change-approval-workflow.pgm` |
-| `AI Agent / DocOps` | `architecture/c.ai-agent-docops-pipeline.pgm`、`sequence/c.ai-agent-change-loop.pgm`、`flowchart/c.pr-architecture-review.pgm` |
-| `数据治理 / 血缘` | `architecture/c.data-lineage-platform.pgm`、`state/c.document-sync-lifecycle.pgm` |
-| `金融 / 风控 / 清结算` | `architecture/c.payment-clearing-platform.pgm`、`sequence/c.real-time-risk-decisioning.pgm`、`flowchart/c.aml-case-investigation.pgm`、`state/c.settlement-reconciliation-lifecycle.pgm` |
-| `供应链协同` | `architecture/c.supply-chain-control-tower.pgm` |
-| `D2 渲染对照` | `architecture/n.d2-cell-tower-network.pgm` |
+| 基站网络拓扑 | `architecture/demo.d2-cell-tower-network.pgm` | D2 Terminal 主题风格网络图；含嵌套分组、多种形状、虚线边 |
 
 ## 快速使用
 
@@ -104,24 +103,24 @@ python3 -m http.server --directory showcase 4173
 # 打开 http://localhost:4173/index.html
 
 # 渲染单个示例
-cargo run -p plotgram-cli -- render showcase/flowchart/s.linear-chain.pgm
+cargo run -p plotgram-cli -- render showcase/flowchart/product.linear-chain.pgm
 
 # 验证语法
-cargo run -p plotgram-cli -- validate showcase/sequence/n.oauth-login.pgm
+cargo run -p plotgram-cli -- validate showcase/sequence/product.oauth-login.pgm
 ```
 
-`render-all.sh` 渲染时会对比输出与上次内容的 SHA256，在控制台标注 `[新建]`、`[无变化]` 或 `[已变化]`。
+`render-all.sh` 渲染时会对比输出与上次内容的 SHA256，在控制台标注 `[新建]`、`[无变化]` 或 `[已变化]`，并自动更新 `index.html` 内嵌的 `SAMPLE_PATHS` 列表。
 
 ## 与 Mermaid 对照
 
 | Plotgram 目录 | Mermaid 关键字 | 代表示例 |
 |-------------|-------------|----------|
-| `flowchart/` | `graph` / `flowchart` | `c.k8s-incident-response` ↔ 多分支故障处理 |
-| `sequence/` | `sequenceDiagram` | `c.k8s-rolling-update` ↔ 发布与切流链路 |
-| `architecture/` | `graph` + `subgraph` | `c.k8s-multi-namespace-overview` ↔ 大规模集群聚合视图 |
-| `state/` | `stateDiagram-v2` | `c.k8s-rollout-state-machine` ↔ 发布状态迁移 |
-| `er/` | `erDiagram` | `s.user-post` ↔ `USER \|\|--o{ POST` |
-| `mindmap/` | `mindmap` | `s.brainstorm` ↔ 中心主题三分支 |
+| `flowchart/` | `graph` / `flowchart` | `product.user-auth` ↔ 登录/鉴权分支 |
+| `sequence/` | `sequenceDiagram` | `product.oauth-login` ↔ 标准 OAuth 2.0 |
+| `architecture/` | `graph` + `subgraph` | `product.cloud-native` ↔ 云原生拓扑 |
+| `state/` | `stateDiagram-v2` | `product.payment-flow` ↔ 支付状态迁移 |
+| `er/` | `erDiagram` | `product.blog-schema` ↔ `USER \|\|--o{ POST` |
+| `mindmap/` | `mindmap` | `product.tech-stack` ↔ 前后端技术栈 |
 
 每个 `.pgm` 文件头部注释中标注了对应的 Mermaid 写法。
 
@@ -142,12 +141,12 @@ cargo run -p plotgram-cli -- validate showcase/sequence/n.oauth-login.pgm
 
 如果想快速了解 Plotgram 在生产场景中的表达能力，可以按下面顺序看：
 
-1. `architecture/c.k8s-multi-namespace-overview.pgm`：先看大规模系统全景。
-2. `architecture/c.ai-agent-docops-pipeline.pgm`：再看 AI 与文档自动化能力。
-3. `architecture/c.payment-clearing-platform.pgm`：再看高价值业务场景。
-4. `sequence/c.k8s-rolling-update.pgm`：看发布链路。
-5. `flowchart/c.k8s-incident-response.pgm`：看故障处理流程。
-6. `state/c.k8s-rollout-state-machine.pgm`：最后看状态机表达。
+1. `architecture/product.cloud-native.pgm`：先看主流云原生拓扑。
+2. `architecture/product.typical-microservice-architecture.pgm`：再看典型微服务分层。
+3. `architecture/product.ecommerce-platform.pgm`：再看高价值业务场景。
+4. `sequence/product.oauth-login.pgm`：看时序图基础表达。
+5. `flowchart/product.user-auth.pgm`：看流程图分支与回环。
+6. `state/product.payment-flow.pgm`：最后看状态机表达。
 
 ## 渲染状态
 

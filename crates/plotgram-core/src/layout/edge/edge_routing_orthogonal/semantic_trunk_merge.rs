@@ -533,7 +533,7 @@ mod tests {
 
 #[test]
 fn s32b_microservices_db_fanin_merges() {
-    let source = include_str!("../../../../../../showcase/architecture/n.microservices.pgm");
+    let source = include_str!("../../../../../../showcase/architecture/product.microservices.pgm");
     let output =
         crate::pipeline::parse_prepare_validate(source, &crate::prepare::StyleRequest::default());
     let prepared = output.diagram.expect("valid");

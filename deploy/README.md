@@ -179,7 +179,7 @@ ssh shanxun 'cd /opt/plotgram-agent-api && ./stop.sh && ./start.sh'
 | WASM 二进制 | `https://assets.pg.agcli.cn/playground/plotgram-wasm/plotgram_wasm_bg.wasm` |
 | Agent Demo JS/CSS | `https://assets.pg.agcli.cn/agent/assets/main-*.js` |
 | Agent Demo WASM | `https://assets.pg.agcli.cn/agent/plotgram-wasm/plotgram_wasm_bg.wasm` |
-| Showcase SVG | `https://assets.pg.agcli.cn/showcase/flowchart/s.linear-chain.svg` |
+| Showcase SVG | `https://assets.pg.agcli.cn/showcase/flowchart/product.linear-chain.svg` |
 
 ### 跨域（CORS）
 

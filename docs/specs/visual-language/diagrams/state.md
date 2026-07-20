@@ -111,12 +111,12 @@ diagram state {
 
 ## 示例
 
-| 复杂度 | 路径 | 说明 |
-|--------|------|------|
-| 简单 | `showcase/state/s.traffic-light.pgm` | 三状态循环 |
-| 简单 | `showcase/state/s.on-off.pgm` | 开关状态 |
-| 正常 | `showcase/state/n.order-lifecycle.pgm` | 订单生命周期 |
-| 复杂 | `showcase/state/c.payment-flow.pgm` | 支付状态机 |
+| 角色 | 路径 | 说明 |
+|------|------|------|
+| smoke | `showcase/state/smoke.traffic-light.pgm` | 三状态循环 |
+| smoke | `showcase/state/smoke.on-off.pgm` | 开关状态 |
+| product | `showcase/state/product.order-lifecycle.pgm` | 订单生命周期 |
+| product | `showcase/state/product.payment-flow.pgm` | 支付状态机 |
 
 ---
 
