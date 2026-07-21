@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-22-012359-p21-full",
+  "date": "2026-07-22-012251-p21-lane-offset",
   "note": "role-aware baseline: product-gate hard; stress/demo quality soft",
   "samples": [
     {
@@ -85,9 +85,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 0.79,
-      "min_ms": 0.65,
-      "max_ms": 0.91,
+      "median_ms": 0.82,
+      "min_ms": 0.71,
+      "max_ms": 1.02,
       "det": true,
       "role": "product"
     },
@@ -174,9 +174,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 9.34,
-      "min_ms": 9.09,
-      "max_ms": 10.2,
+      "median_ms": 9.08,
+      "min_ms": 9.04,
+      "max_ms": 9.68,
       "det": true,
       "role": "product"
     },
@@ -265,7 +265,7 @@
       },
       "median_ms": 0.92,
       "min_ms": 0.9,
-      "max_ms": 0.95,
+      "max_ms": 0.96,
       "det": true,
       "role": "product"
     },
@@ -352,9 +352,9 @@
           "unused_corridors": 1
         }
       },
-      "median_ms": 1.95,
+      "median_ms": 1.92,
       "min_ms": 1.9,
-      "max_ms": 2.01,
+      "max_ms": 1.94,
       "det": true,
       "role": "product"
     },
@@ -441,9 +441,9 @@
           "unused_corridors": 1
         }
       },
-      "median_ms": 4.09,
-      "min_ms": 4.05,
-      "max_ms": 4.13,
+      "median_ms": 4.06,
+      "min_ms": 4.04,
+      "max_ms": 4.09,
       "det": true,
       "role": "product"
     },
@@ -530,9 +530,9 @@
           "unused_corridors": 12
         }
       },
-      "median_ms": 14.2,
-      "min_ms": 13.93,
-      "max_ms": 14.32,
+      "median_ms": 13.83,
+      "min_ms": 13.76,
+      "max_ms": 13.94,
       "det": true,
       "role": "product"
     },
@@ -619,9 +619,9 @@
           "unused_corridors": 9
         }
       },
-      "median_ms": 36.55,
-      "min_ms": 36.17,
-      "max_ms": 36.62,
+      "median_ms": 35.69,
+      "min_ms": 35.48,
+      "max_ms": 36.0,
       "det": true,
       "role": "product"
     },
@@ -708,9 +708,9 @@
           "unused_corridors": 4
         }
       },
-      "median_ms": 1.4,
-      "min_ms": 1.37,
-      "max_ms": 1.41,
+      "median_ms": 1.41,
+      "min_ms": 1.39,
+      "max_ms": 1.44,
       "det": true,
       "role": "product"
     },
@@ -798,7 +798,7 @@
         }
       },
       "median_ms": 0.84,
-      "min_ms": 0.82,
+      "min_ms": 0.83,
       "max_ms": 0.87,
       "det": true,
       "role": "product"
@@ -886,9 +886,9 @@
           "unused_corridors": 3
         }
       },
-      "median_ms": 0.84,
+      "median_ms": 0.85,
       "min_ms": 0.82,
-      "max_ms": 0.86,
+      "max_ms": 0.88,
       "det": true,
       "role": "product"
     },
@@ -975,9 +975,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 0.15,
+      "median_ms": 0.14,
       "min_ms": 0.14,
-      "max_ms": 0.17,
+      "max_ms": 0.18,
       "det": true,
       "role": "product"
     },
@@ -1066,7 +1066,7 @@
       },
       "median_ms": 1.95,
       "min_ms": 1.93,
-      "max_ms": 2.03,
+      "max_ms": 2.09,
       "det": true,
       "role": "product"
     },
@@ -1153,9 +1153,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 2.85,
-      "min_ms": 2.83,
-      "max_ms": 2.86,
+      "median_ms": 2.83,
+      "min_ms": 2.78,
+      "max_ms": 2.85,
       "det": true,
       "role": "product"
     },
@@ -1242,9 +1242,9 @@
           "unused_corridors": 5
         }
       },
-      "median_ms": 1.2,
-      "min_ms": 1.19,
-      "max_ms": 1.24,
+      "median_ms": 1.23,
+      "min_ms": 1.22,
+      "max_ms": 1.25,
       "det": true,
       "role": "product"
     },
@@ -1331,9 +1331,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 10.1,
-      "min_ms": 9.99,
-      "max_ms": 10.23,
+      "median_ms": 10.02,
+      "min_ms": 9.97,
+      "max_ms": 10.33,
       "det": true,
       "role": "product"
     },
@@ -1420,9 +1420,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 9.43,
-      "min_ms": 9.4,
-      "max_ms": 9.47,
+      "median_ms": 10.07,
+      "min_ms": 10.06,
+      "max_ms": 10.4,
       "det": true,
       "role": "product"
     },
@@ -1509,9 +1509,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 1.75,
-      "min_ms": 1.7,
-      "max_ms": 1.8,
+      "median_ms": 1.66,
+      "min_ms": 1.6,
+      "max_ms": 1.79,
       "det": true,
       "role": "product"
     },
@@ -1598,9 +1598,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 1.1,
-      "min_ms": 1.1,
-      "max_ms": 1.14,
+      "median_ms": 1.11,
+      "min_ms": 1.11,
+      "max_ms": 1.17,
       "det": true,
       "role": "product"
     },
@@ -1676,7 +1676,7 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 0.1,
+      "median_ms": 0.09,
       "min_ms": 0.09,
       "max_ms": 0.1,
       "det": true,
@@ -1754,9 +1754,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 0.15,
-      "min_ms": 0.15,
-      "max_ms": 0.15,
+      "median_ms": 0.14,
+      "min_ms": 0.14,
+      "max_ms": 0.16,
       "det": true,
       "role": "product"
     },
@@ -2000,8 +2000,8 @@
         }
       },
       "median_ms": 1.0,
-      "min_ms": 0.98,
-      "max_ms": 1.0,
+      "min_ms": 0.97,
+      "max_ms": 1.01,
       "det": true,
       "role": "product"
     },
@@ -2088,9 +2088,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 2.12,
+      "median_ms": 2.13,
       "min_ms": 2.11,
-      "max_ms": 2.15,
+      "max_ms": 2.14,
       "det": true,
       "role": "product"
     },
@@ -2177,9 +2177,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 2.54,
-      "min_ms": 2.48,
-      "max_ms": 2.56,
+      "median_ms": 2.48,
+      "min_ms": 2.46,
+      "max_ms": 2.72,
       "det": true,
       "role": "product"
     },
@@ -2266,9 +2266,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 0.7,
-      "min_ms": 0.7,
-      "max_ms": 0.75,
+      "median_ms": 0.73,
+      "min_ms": 0.72,
+      "max_ms": 0.76,
       "det": true,
       "role": "product"
     },
@@ -2344,9 +2344,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 0.41,
-      "min_ms": 0.39,
-      "max_ms": 0.43,
+      "median_ms": 0.42,
+      "min_ms": 0.41,
+      "max_ms": 0.44,
       "det": true,
       "role": "product"
     },
@@ -2422,9 +2422,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 6.44,
-      "min_ms": 6.35,
-      "max_ms": 6.51,
+      "median_ms": 6.45,
+      "min_ms": 6.4,
+      "max_ms": 6.56,
       "det": true,
       "role": "product"
     },
@@ -2578,601 +2578,11 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 0.1,
+      "median_ms": 0.09,
       "min_ms": 0.09,
       "max_ms": 0.12,
       "det": true,
       "role": "product"
-    },
-    {
-      "file": "showcase/architecture/stress.layout-stress-nested.pgm",
-      "diagram_type": "Architecture",
-      "nodes": 11,
-      "edges": 13,
-      "groups": 5,
-      "node_fp": "9a6a0e378a2432d2",
-      "exact_sev": 0.0,
-      "tight_sev": 1221.2924291221395,
-      "allowed_share_len": 0.0,
-      "exact_pairs": 0,
-      "tight_pairs": 3,
-      "lint": {
-        "node_overlap": 0,
-        "group_overlap": 0,
-        "node_outside_group": 0,
-        "child_group_outside_parent": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 4,
-        "edge_on_group_border": 0,
-        "edge_crosses_group_interior": 0,
-        "label_node_overlap": 1,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 0,
-        "sibling_width_ratio": 0,
-        "pierce_node_sev": 0.0,
-        "pierce_group_sev": 0.0,
-        "total_violations": 5,
-        "error_count": 1,
-        "warning_count": 4
-      },
-      "ortho": {
-        "edge_exact_overlap_pairs": 1,
-        "edge_tight_spacing_pairs": 4,
-        "degraded_count": 4,
-        "reroute_iterations": 3,
-        "rerouted_edges": 18,
-        "lane_groups": 5,
-        "lane_segments_shifted": 2,
-        "stub_occupancy_conflicts": 0,
-        "stub_cross_pair_conflicts": 0,
-        "stub_occupancy_shifted": 0
-      },
-      "min_gap": 12.0,
-      "aesthetics": {
-        "bends": {
-          "total": 24,
-          "avg_per_edge": 1.8461538461538463,
-          "max_single_edge": 4,
-          "excessive_count": 0
-        },
-        "border_proximity": {
-          "min_distance_px": 4.0,
-          "segments_within_12px": 3,
-          "hugging_violations": 0
-        },
-        "symmetry": {
-          "fan_out_nodes": 2,
-          "avg_deviation": 0.3603125538943211,
-          "max_deviation": 0.6744186046511628
-        },
-        "self_loops": {
-          "count": 0,
-          "min_clearance_px": 9999.0
-        },
-        "crossings": {
-          "total": 4
-        },
-        "detour": {
-          "avg_ratio": 1.5686339610633364,
-          "max_ratio": 2.9544944585911086
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.4120178465144089,
-          "max_min_ratio": 3.829677861549006,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.14285714285714285,
-          "max_channel_load": 1,
-          "unused_corridors": 6
-        }
-      },
-      "median_ms": 5.62,
-      "min_ms": 5.45,
-      "max_ms": 5.95,
-      "det": true,
-      "role": "stress"
-    },
-    {
-      "file": "showcase/architecture/stress.layout-stress-flat-mesh.pgm",
-      "diagram_type": "Architecture",
-      "nodes": 11,
-      "edges": 20,
-      "groups": 0,
-      "node_fp": "248354c8f90f054d",
-      "exact_sev": 174.0,
-      "tight_sev": 1777.869321371167,
-      "allowed_share_len": 318.36,
-      "exact_pairs": 4,
-      "tight_pairs": 2,
-      "lint": {
-        "node_overlap": 0,
-        "group_overlap": 0,
-        "node_outside_group": 0,
-        "child_group_outside_parent": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 19,
-        "edge_on_group_border": 0,
-        "edge_crosses_group_interior": 0,
-        "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 3,
-        "sibling_width_ratio": 0,
-        "pierce_node_sev": 0.0,
-        "pierce_group_sev": 0.0,
-        "total_violations": 22,
-        "error_count": 0,
-        "warning_count": 22
-      },
-      "ortho": {
-        "edge_exact_overlap_pairs": 10,
-        "edge_tight_spacing_pairs": 2,
-        "degraded_count": 1,
-        "reroute_iterations": 3,
-        "rerouted_edges": 33,
-        "lane_groups": 5,
-        "lane_segments_shifted": 0,
-        "stub_occupancy_conflicts": 3,
-        "stub_cross_pair_conflicts": 3,
-        "stub_occupancy_shifted": 0
-      },
-      "min_gap": 12.0,
-      "aesthetics": {
-        "bends": {
-          "total": 51,
-          "avg_per_edge": 2.55,
-          "max_single_edge": 4,
-          "excessive_count": 0
-        },
-        "border_proximity": {
-          "min_distance_px": 9999.0,
-          "segments_within_12px": 0,
-          "hugging_violations": 0
-        },
-        "symmetry": {
-          "fan_out_nodes": 6,
-          "avg_deviation": 0.8864292468533149,
-          "max_deviation": 1.0
-        },
-        "self_loops": {
-          "count": 0,
-          "min_clearance_px": 9999.0
-        },
-        "crossings": {
-          "total": 27
-        },
-        "detour": {
-          "avg_ratio": 1.3466499020848444,
-          "max_ratio": 1.981831779843206
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.4103244676082737,
-          "max_min_ratio": 6.550104384133607,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
-        }
-      },
-      "median_ms": 18.91,
-      "min_ms": 18.77,
-      "max_ms": 18.99,
-      "det": false,
-      "role": "stress"
-    },
-    {
-      "file": "showcase/er/stress.layout-stress-dense.pgm",
-      "diagram_type": "Er",
-      "nodes": 7,
-      "edges": 16,
-      "groups": 0,
-      "node_fp": "b0ebcb2adf99a4d4",
-      "exact_sev": 0.0,
-      "tight_sev": 0.0,
-      "allowed_share_len": 0.0,
-      "exact_pairs": 0,
-      "tight_pairs": 0,
-      "lint": {
-        "node_overlap": 0,
-        "group_overlap": 0,
-        "node_outside_group": 0,
-        "child_group_outside_parent": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 8,
-        "edge_on_group_border": 0,
-        "edge_crosses_group_interior": 0,
-        "label_node_overlap": 1,
-        "label_label_overlap": 1,
-        "unrelated_edge_trunk_merge": 0,
-        "sibling_width_ratio": 0,
-        "pierce_node_sev": 0.0,
-        "pierce_group_sev": 0.0,
-        "total_violations": 10,
-        "error_count": 1,
-        "warning_count": 9
-      },
-      "ortho": null,
-      "min_gap": 8.0,
-      "aesthetics": {
-        "bends": {
-          "total": 246,
-          "avg_per_edge": 15.375,
-          "max_single_edge": 33,
-          "excessive_count": 10
-        },
-        "border_proximity": {
-          "min_distance_px": 9999.0,
-          "segments_within_12px": 0,
-          "hugging_violations": 0
-        },
-        "symmetry": {
-          "fan_out_nodes": 5,
-          "avg_deviation": 0.2,
-          "max_deviation": 1.0
-        },
-        "self_loops": {
-          "count": 0,
-          "min_clearance_px": 9999.0
-        },
-        "crossings": {
-          "total": 8
-        },
-        "detour": {
-          "avg_ratio": 1.0756723468989304,
-          "max_ratio": 1.2140883573014458
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.1673229535455679,
-          "max_min_ratio": 2.6343181414015238,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
-        }
-      },
-      "median_ms": 7.06,
-      "min_ms": 7.05,
-      "max_ms": 7.3,
-      "det": true,
-      "role": "stress"
-    },
-    {
-      "file": "showcase/flowchart/stress.layout-stress-dag.pgm",
-      "diagram_type": "Flowchart",
-      "nodes": 11,
-      "edges": 18,
-      "groups": 0,
-      "node_fp": "551853faab1d014a",
-      "exact_sev": 112.0,
-      "tight_sev": 957.5881250000002,
-      "allowed_share_len": 0.0,
-      "exact_pairs": 1,
-      "tight_pairs": 2,
-      "lint": {
-        "node_overlap": 0,
-        "group_overlap": 0,
-        "node_outside_group": 0,
-        "child_group_outside_parent": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 1,
-        "edge_on_group_border": 0,
-        "edge_crosses_group_interior": 0,
-        "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 0,
-        "sibling_width_ratio": 0,
-        "pierce_node_sev": 0.0,
-        "pierce_group_sev": 0.0,
-        "total_violations": 1,
-        "error_count": 0,
-        "warning_count": 1
-      },
-      "ortho": {
-        "edge_exact_overlap_pairs": 2,
-        "edge_tight_spacing_pairs": 1,
-        "degraded_count": 0,
-        "reroute_iterations": 3,
-        "rerouted_edges": 36,
-        "lane_groups": 2,
-        "lane_segments_shifted": 0,
-        "stub_occupancy_conflicts": 1,
-        "stub_cross_pair_conflicts": 1,
-        "stub_occupancy_shifted": 0
-      },
-      "min_gap": 8.0,
-      "aesthetics": {
-        "bends": {
-          "total": 14,
-          "avg_per_edge": 0.7777777777777778,
-          "max_single_edge": 2,
-          "excessive_count": 0
-        },
-        "border_proximity": {
-          "min_distance_px": 9999.0,
-          "segments_within_12px": 0,
-          "hugging_violations": 0
-        },
-        "symmetry": {
-          "fan_out_nodes": 3,
-          "avg_deviation": 0.9999999999999999,
-          "max_deviation": 1.0
-        },
-        "self_loops": {
-          "count": 2,
-          "min_clearance_px": 16.0
-        },
-        "crossings": {
-          "total": 2
-        },
-        "detour": {
-          "avg_ratio": 1.3733093127938951,
-          "max_ratio": 1.64
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.6551210186442851,
-          "max_min_ratio": 13.125627858231708,
-          "outlier_count": 1
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
-        }
-      },
-      "median_ms": 4.91,
-      "min_ms": 4.83,
-      "max_ms": 4.99,
-      "det": true,
-      "role": "stress"
-    },
-    {
-      "file": "showcase/sequence/stress.layout-stress-lifelines.pgm",
-      "diagram_type": "Sequence",
-      "nodes": 5,
-      "edges": 14,
-      "groups": 0,
-      "node_fp": "fe2fb3af31901a34",
-      "exact_sev": 0.0,
-      "tight_sev": 0.0,
-      "allowed_share_len": 0.0,
-      "exact_pairs": 0,
-      "tight_pairs": 0,
-      "lint": {
-        "node_overlap": 0,
-        "group_overlap": 0,
-        "node_outside_group": 0,
-        "child_group_outside_parent": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 0,
-        "edge_on_group_border": 0,
-        "edge_crosses_group_interior": 0,
-        "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 0,
-        "sibling_width_ratio": 0,
-        "pierce_node_sev": 0.0,
-        "pierce_group_sev": 0.0,
-        "total_violations": 0,
-        "error_count": 0,
-        "warning_count": 0
-      },
-      "ortho": null,
-      "min_gap": 8.0,
-      "aesthetics": {
-        "bends": {
-          "total": 6,
-          "avg_per_edge": 0.42857142857142855,
-          "max_single_edge": 2,
-          "excessive_count": 0
-        },
-        "border_proximity": {
-          "min_distance_px": 9999.0,
-          "segments_within_12px": 0,
-          "hugging_violations": 0
-        },
-        "symmetry": {
-          "fan_out_nodes": 4,
-          "avg_deviation": 0.25,
-          "max_deviation": 1.0
-        },
-        "self_loops": {
-          "count": 3,
-          "min_clearance_px": 124.0
-        },
-        "crossings": {
-          "total": 0
-        },
-        "detour": {
-          "avg_ratio": 14.333333333333334,
-          "max_ratio": 14.333333333333334
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 1.0,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
-        }
-      },
-      "median_ms": 0.26,
-      "min_ms": 0.26,
-      "max_ms": 0.28,
-      "det": true,
-      "role": "stress"
-    },
-    {
-      "file": "showcase/state/stress.layout-stress-transitions.pgm",
-      "diagram_type": "State",
-      "nodes": 9,
-      "edges": 14,
-      "groups": 0,
-      "node_fp": "eca06cfcc91bb671",
-      "exact_sev": 40.0,
-      "tight_sev": 0.0,
-      "allowed_share_len": 0.0,
-      "exact_pairs": 1,
-      "tight_pairs": 0,
-      "lint": {
-        "node_overlap": 0,
-        "group_overlap": 0,
-        "node_outside_group": 0,
-        "child_group_outside_parent": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 2,
-        "edge_on_group_border": 0,
-        "edge_crosses_group_interior": 0,
-        "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 0,
-        "sibling_width_ratio": 0,
-        "pierce_node_sev": 0.0,
-        "pierce_group_sev": 0.0,
-        "total_violations": 2,
-        "error_count": 0,
-        "warning_count": 2
-      },
-      "ortho": {
-        "edge_exact_overlap_pairs": 1,
-        "edge_tight_spacing_pairs": 0,
-        "degraded_count": 0,
-        "reroute_iterations": 3,
-        "rerouted_edges": 36,
-        "lane_groups": 1,
-        "lane_segments_shifted": 0,
-        "stub_occupancy_conflicts": 0,
-        "stub_cross_pair_conflicts": 0,
-        "stub_occupancy_shifted": 0
-      },
-      "min_gap": 8.0,
-      "aesthetics": {
-        "bends": {
-          "total": 20,
-          "avg_per_edge": 1.4285714285714286,
-          "max_single_edge": 4,
-          "excessive_count": 0
-        },
-        "border_proximity": {
-          "min_distance_px": 9999.0,
-          "segments_within_12px": 0,
-          "hugging_violations": 0
-        },
-        "symmetry": {
-          "fan_out_nodes": 3,
-          "avg_deviation": 0.9098846667256074,
-          "max_deviation": 1.0
-        },
-        "self_loops": {
-          "count": 3,
-          "min_clearance_px": 16.0
-        },
-        "crossings": {
-          "total": 2
-        },
-        "detour": {
-          "avg_ratio": 1.7268449672706416,
-          "max_ratio": 2.7359794733292193
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.7463548376150995,
-          "max_min_ratio": 10.237060433397795,
-          "outlier_count": 1
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
-        }
-      },
-      "median_ms": 2.97,
-      "min_ms": 2.95,
-      "max_ms": 2.98,
-      "det": true,
-      "role": "stress"
-    },
-    {
-      "file": "showcase/mindmap/stress.layout-stress-deep.pgm",
-      "diagram_type": "Mindmap",
-      "nodes": 63,
-      "edges": 62,
-      "groups": 0,
-      "node_fp": "ab55aa0d869410a1",
-      "exact_sev": 0.0,
-      "tight_sev": 0.0,
-      "allowed_share_len": 0.0,
-      "exact_pairs": 0,
-      "tight_pairs": 0,
-      "lint": {
-        "node_overlap": 0,
-        "group_overlap": 0,
-        "node_outside_group": 0,
-        "child_group_outside_parent": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 0,
-        "edge_on_group_border": 0,
-        "edge_crosses_group_interior": 0,
-        "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 0,
-        "sibling_width_ratio": 0,
-        "pierce_node_sev": 0.0,
-        "pierce_group_sev": 0.0,
-        "total_violations": 0,
-        "error_count": 0,
-        "warning_count": 0
-      },
-      "ortho": null,
-      "min_gap": 8.0,
-      "aesthetics": {
-        "bends": {
-          "total": 0,
-          "avg_per_edge": 0.0,
-          "max_single_edge": 0,
-          "excessive_count": 0
-        },
-        "border_proximity": {
-          "min_distance_px": 9999.0,
-          "segments_within_12px": 0,
-          "hugging_violations": 0
-        },
-        "symmetry": {
-          "fan_out_nodes": 0,
-          "avg_deviation": 0.0,
-          "max_deviation": 0.0
-        },
-        "self_loops": {
-          "count": 0,
-          "min_clearance_px": 9999.0
-        },
-        "crossings": {
-          "total": 0
-        },
-        "detour": {
-          "avg_ratio": 0.0,
-          "max_ratio": 0.0
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 0.0,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
-        }
-      },
-      "median_ms": 1.12,
-      "min_ms": 1.1,
-      "max_ms": 1.14,
-      "det": true,
-      "role": "stress"
     }
   ],
   "perf_runs": 5

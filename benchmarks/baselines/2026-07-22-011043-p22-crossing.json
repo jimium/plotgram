@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-22-012359-p21-full",
+  "date": "2026-07-22-011043-p22-crossing",
   "note": "role-aware baseline: product-gate hard; stress/demo quality soft",
   "samples": [
     {
@@ -85,9 +85,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 0.79,
-      "min_ms": 0.65,
-      "max_ms": 0.91,
+      "median_ms": 0.3,
+      "min_ms": 0.28,
+      "max_ms": 0.47,
       "det": true,
       "role": "product"
     },
@@ -174,9 +174,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 9.34,
-      "min_ms": 9.09,
-      "max_ms": 10.2,
+      "median_ms": 9.54,
+      "min_ms": 9.16,
+      "max_ms": 9.7,
       "det": true,
       "role": "product"
     },
@@ -264,8 +264,8 @@
         }
       },
       "median_ms": 0.92,
-      "min_ms": 0.9,
-      "max_ms": 0.95,
+      "min_ms": 0.92,
+      "max_ms": 1.02,
       "det": true,
       "role": "product"
     },
@@ -352,9 +352,9 @@
           "unused_corridors": 1
         }
       },
-      "median_ms": 1.95,
-      "min_ms": 1.9,
-      "max_ms": 2.01,
+      "median_ms": 1.89,
+      "min_ms": 1.88,
+      "max_ms": 1.97,
       "det": true,
       "role": "product"
     },
@@ -441,9 +441,9 @@
           "unused_corridors": 1
         }
       },
-      "median_ms": 4.09,
-      "min_ms": 4.05,
-      "max_ms": 4.13,
+      "median_ms": 4.07,
+      "min_ms": 4.04,
+      "max_ms": 4.27,
       "det": true,
       "role": "product"
     },
@@ -530,9 +530,9 @@
           "unused_corridors": 12
         }
       },
-      "median_ms": 14.2,
-      "min_ms": 13.93,
-      "max_ms": 14.32,
+      "median_ms": 13.88,
+      "min_ms": 13.83,
+      "max_ms": 13.9,
       "det": true,
       "role": "product"
     },
@@ -619,9 +619,9 @@
           "unused_corridors": 9
         }
       },
-      "median_ms": 36.55,
-      "min_ms": 36.17,
-      "max_ms": 36.62,
+      "median_ms": 35.55,
+      "min_ms": 35.47,
+      "max_ms": 35.87,
       "det": true,
       "role": "product"
     },
@@ -708,9 +708,9 @@
           "unused_corridors": 4
         }
       },
-      "median_ms": 1.4,
-      "min_ms": 1.37,
-      "max_ms": 1.41,
+      "median_ms": 1.42,
+      "min_ms": 1.42,
+      "max_ms": 1.43,
       "det": true,
       "role": "product"
     },
@@ -797,9 +797,9 @@
           "unused_corridors": 3
         }
       },
-      "median_ms": 0.84,
-      "min_ms": 0.82,
-      "max_ms": 0.87,
+      "median_ms": 0.88,
+      "min_ms": 0.84,
+      "max_ms": 0.9,
       "det": true,
       "role": "product"
     },
@@ -886,9 +886,9 @@
           "unused_corridors": 3
         }
       },
-      "median_ms": 0.84,
-      "min_ms": 0.82,
-      "max_ms": 0.86,
+      "median_ms": 0.86,
+      "min_ms": 0.84,
+      "max_ms": 0.91,
       "det": true,
       "role": "product"
     },
@@ -975,9 +975,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 0.15,
-      "min_ms": 0.14,
-      "max_ms": 0.17,
+      "median_ms": 0.16,
+      "min_ms": 0.15,
+      "max_ms": 0.18,
       "det": true,
       "role": "product"
     },
@@ -1064,9 +1064,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 1.95,
-      "min_ms": 1.93,
-      "max_ms": 2.03,
+      "median_ms": 1.98,
+      "min_ms": 1.98,
+      "max_ms": 2.11,
       "det": true,
       "role": "product"
     },
@@ -1153,9 +1153,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 2.85,
-      "min_ms": 2.83,
-      "max_ms": 2.86,
+      "median_ms": 2.87,
+      "min_ms": 2.86,
+      "max_ms": 3.03,
       "det": true,
       "role": "product"
     },
@@ -1242,9 +1242,9 @@
           "unused_corridors": 5
         }
       },
-      "median_ms": 1.2,
-      "min_ms": 1.19,
-      "max_ms": 1.24,
+      "median_ms": 1.26,
+      "min_ms": 1.25,
+      "max_ms": 1.43,
       "det": true,
       "role": "product"
     },
@@ -1331,9 +1331,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 10.1,
-      "min_ms": 9.99,
-      "max_ms": 10.23,
+      "median_ms": 10.11,
+      "min_ms": 10.08,
+      "max_ms": 10.35,
       "det": true,
       "role": "product"
     },
@@ -1420,9 +1420,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 9.43,
-      "min_ms": 9.4,
-      "max_ms": 9.47,
+      "median_ms": 10.03,
+      "min_ms": 9.64,
+      "max_ms": 10.39,
       "det": true,
       "role": "product"
     },
@@ -1509,9 +1509,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 1.75,
-      "min_ms": 1.7,
-      "max_ms": 1.8,
+      "median_ms": 1.6,
+      "min_ms": 1.59,
+      "max_ms": 1.61,
       "det": true,
       "role": "product"
     },
@@ -1598,8 +1598,8 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 1.1,
-      "min_ms": 1.1,
+      "median_ms": 1.09,
+      "min_ms": 1.08,
       "max_ms": 1.14,
       "det": true,
       "role": "product"
@@ -1677,7 +1677,7 @@
         }
       },
       "median_ms": 0.1,
-      "min_ms": 0.09,
+      "min_ms": 0.1,
       "max_ms": 0.1,
       "det": true,
       "role": "product"
@@ -1755,7 +1755,7 @@
         }
       },
       "median_ms": 0.15,
-      "min_ms": 0.15,
+      "min_ms": 0.14,
       "max_ms": 0.15,
       "det": true,
       "role": "product"
@@ -1910,7 +1910,7 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 0.13,
+      "median_ms": 0.14,
       "min_ms": 0.13,
       "max_ms": 0.14,
       "det": true,
@@ -1999,9 +1999,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 1.0,
-      "min_ms": 0.98,
-      "max_ms": 1.0,
+      "median_ms": 1.02,
+      "min_ms": 1.02,
+      "max_ms": 1.02,
       "det": true,
       "role": "product"
     },
@@ -2088,9 +2088,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 2.12,
-      "min_ms": 2.11,
-      "max_ms": 2.15,
+      "median_ms": 2.17,
+      "min_ms": 2.14,
+      "max_ms": 2.35,
       "det": true,
       "role": "product"
     },
@@ -2177,9 +2177,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 2.54,
-      "min_ms": 2.48,
-      "max_ms": 2.56,
+      "median_ms": 2.64,
+      "min_ms": 2.51,
+      "max_ms": 2.8,
       "det": true,
       "role": "product"
     },
@@ -2266,9 +2266,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 0.7,
-      "min_ms": 0.7,
-      "max_ms": 0.75,
+      "median_ms": 0.76,
+      "min_ms": 0.76,
+      "max_ms": 0.95,
       "det": true,
       "role": "product"
     },
@@ -2344,9 +2344,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 0.41,
-      "min_ms": 0.39,
-      "max_ms": 0.43,
+      "median_ms": 0.43,
+      "min_ms": 0.42,
+      "max_ms": 0.51,
       "det": true,
       "role": "product"
     },
@@ -2422,9 +2422,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 6.44,
-      "min_ms": 6.35,
-      "max_ms": 6.51,
+      "median_ms": 6.66,
+      "min_ms": 6.64,
+      "max_ms": 6.77,
       "det": true,
       "role": "product"
     },
@@ -2500,9 +2500,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 0.36,
-      "min_ms": 0.35,
-      "max_ms": 0.39,
+      "median_ms": 0.38,
+      "min_ms": 0.37,
+      "max_ms": 0.41,
       "det": true,
       "role": "product"
     },
@@ -2578,8 +2578,8 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 0.1,
-      "min_ms": 0.09,
+      "median_ms": 0.11,
+      "min_ms": 0.1,
       "max_ms": 0.12,
       "det": true,
       "role": "product"
@@ -2667,9 +2667,9 @@
           "unused_corridors": 6
         }
       },
-      "median_ms": 5.62,
-      "min_ms": 5.45,
-      "max_ms": 5.95,
+      "median_ms": 5.79,
+      "min_ms": 5.74,
+      "max_ms": 5.87,
       "det": true,
       "role": "stress"
     },
@@ -2682,7 +2682,7 @@
       "node_fp": "248354c8f90f054d",
       "exact_sev": 174.0,
       "tight_sev": 1777.869321371167,
-      "allowed_share_len": 318.36,
+      "allowed_share_len": 438.36,
       "exact_pairs": 4,
       "tight_pairs": 2,
       "lint": {
@@ -2695,22 +2695,22 @@
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
-        "label_label_overlap": 0,
+        "label_label_overlap": 1,
         "unrelated_edge_trunk_merge": 3,
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 22,
+        "total_violations": 23,
         "error_count": 0,
-        "warning_count": 22
+        "warning_count": 23
       },
       "ortho": {
-        "edge_exact_overlap_pairs": 10,
+        "edge_exact_overlap_pairs": 11,
         "edge_tight_spacing_pairs": 2,
         "degraded_count": 1,
         "reroute_iterations": 3,
         "rerouted_edges": 33,
-        "lane_groups": 5,
+        "lane_groups": 6,
         "lane_segments_shifted": 0,
         "stub_occupancy_conflicts": 3,
         "stub_cross_pair_conflicts": 3,
@@ -2731,7 +2731,7 @@
         },
         "symmetry": {
           "fan_out_nodes": 6,
-          "avg_deviation": 0.8864292468533149,
+          "avg_deviation": 0.8864292468533148,
           "max_deviation": 1.0
         },
         "self_loops": {
@@ -2756,10 +2756,10 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 18.91,
-      "min_ms": 18.77,
-      "max_ms": 18.99,
-      "det": false,
+      "median_ms": 19.19,
+      "min_ms": 19.0,
+      "max_ms": 19.41,
+      "det": true,
       "role": "stress"
     },
     {
@@ -2824,7 +2824,7 @@
           "max_ratio": 1.2140883573014458
         },
         "edge_length": {
-          "intra_layer_cv": 0.1673229535455679,
+          "intra_layer_cv": 0.16732295354556792,
           "max_min_ratio": 2.6343181414015238,
           "outlier_count": 0
         },
@@ -2834,9 +2834,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 7.06,
-      "min_ms": 7.05,
-      "max_ms": 7.3,
+      "median_ms": 7.22,
+      "min_ms": 7.2,
+      "max_ms": 7.24,
       "det": true,
       "role": "stress"
     },
@@ -2923,9 +2923,9 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 4.91,
-      "min_ms": 4.83,
-      "max_ms": 4.99,
+      "median_ms": 5.05,
+      "min_ms": 4.89,
+      "max_ms": 5.06,
       "det": true,
       "role": "stress"
     },
@@ -3003,7 +3003,7 @@
       },
       "median_ms": 0.26,
       "min_ms": 0.26,
-      "max_ms": 0.28,
+      "max_ms": 0.29,
       "det": true,
       "role": "stress"
     },
@@ -3091,8 +3091,8 @@
         }
       },
       "median_ms": 2.97,
-      "min_ms": 2.95,
-      "max_ms": 2.98,
+      "min_ms": 2.93,
+      "max_ms": 3.16,
       "det": true,
       "role": "stress"
     },
@@ -3168,12 +3168,12 @@
           "unused_corridors": 0
         }
       },
-      "median_ms": 1.12,
-      "min_ms": 1.1,
-      "max_ms": 1.14,
+      "median_ms": 1.16,
+      "min_ms": 1.12,
+      "max_ms": 1.29,
       "det": true,
       "role": "stress"
     }
   ],
-  "perf_runs": 5
+  "perf_runs": 3
 }

@@ -100,7 +100,8 @@ cur_map = {s["file"]: s for s in cur["samples"]}
 correctness = []      # 硬 fail（全角色）
 quality_hard = []     # 硬 fail（product/smoke；或 stress 当 --strict-stress）
 quality_soft = []     # WARN（stress/demo；或 product 当 --allow-quality-debt）
-aesthetics_warn = []  # 美学轨（当前阶段全 WARN，稳定后转硬）
+aesthetics_warn = []  # 美学轨 WARN（stress/demo/mech）
+aesthetics_hard = []  # 美学轨硬 FAIL（product/smoke：crossings + bends）
 warns = []
 
 # 缺样例按角色归类
@@ -198,31 +199,39 @@ for f in sorted(set(base_map) & set(cur_map)):
     if c.get("det") is False:
         correctness.append(f"{name}: det=false（非确定，role={role}）")
 
-    # ── 美学轨（观测，当前阶段全 WARN）──
+    # ── 美学轨（product/smoke 硬：crossings + bends；其余 WARN）──
     ba = b.get("aesthetics") or {}
     ca = c.get("aesthetics") or {}
     if ba and ca:
-        # 弯折数不升（容差 0.2）
+        # 弯折数不升（容差 0.2）—— product/smoke 硬
         b_bends = (ba.get("bends") or {}).get("avg_per_edge", 0)
         c_bends = (ca.get("bends") or {}).get("avg_per_edge", 0)
         if c_bends > b_bends + 0.2:
-            aesthetics_warn.append(f"{name}: avg_bends_per_edge 上升 {b_bends:.2f} → {c_bends:.2f} (role={role})")
-        # 贴边违规不升
+            msg = f"{name}: avg_bends_per_edge 上升 {b_bends:.2f} → {c_bends:.2f} (role={role})"
+            if role in ("product", "smoke"):
+                aesthetics_hard.append(msg)
+            else:
+                aesthetics_warn.append(msg)
+        # 贴边违规不升（WARN）
         b_hug = (ba.get("border_proximity") or {}).get("hugging_violations", 0)
         c_hug = (ca.get("border_proximity") or {}).get("hugging_violations", 0)
         if c_hug > b_hug:
             aesthetics_warn.append(f"{name}: hugging_violations 上升 {b_hug} → {c_hug} (role={role})")
-        # 对称偏差不升（容差 0.05）
+        # 对称偏差不升（容差 0.05，WARN）
         b_sym = (ba.get("symmetry") or {}).get("avg_deviation", 0)
         c_sym = (ca.get("symmetry") or {}).get("avg_deviation", 0)
         if c_sym > b_sym + 0.05:
             aesthetics_warn.append(f"{name}: symmetry_deviation 上升 {b_sym:.3f} → {c_sym:.3f} (role={role})")
-        # 边交叉数不升
+        # 边交叉数不升 —— product/smoke 硬
         b_cross = (ba.get("crossings") or {}).get("total", 0)
         c_cross = (ca.get("crossings") or {}).get("total", 0)
         if c_cross > b_cross:
-            aesthetics_warn.append(f"{name}: total_crossings 上升 {b_cross} → {c_cross} (role={role})")
-        # 绕行比不升（容差 0.1）
+            msg = f"{name}: total_crossings 上升 {b_cross} → {c_cross} (role={role})"
+            if role in ("product", "smoke"):
+                aesthetics_hard.append(msg)
+            else:
+                aesthetics_warn.append(msg)
+        # 绕行比不升（容差 0.1，WARN）
         b_det = (ba.get("detour") or {}).get("avg_ratio", 0)
         c_det = (ca.get("detour") or {}).get("avg_ratio", 0)
         if c_det > b_det + 0.1:
@@ -266,23 +275,31 @@ if quality_soft:
 else:
     print("PASS (stress/demo/mech)")
 
-print("--- 美学轨（观测，WARN）---")
+print("--- 美学轨（product/smoke 硬：crossings+bends；其余 WARN）---")
+if aesthetics_hard:
+    print("FAIL (product/smoke):")
+    for e in aesthetics_hard:
+        print(f"  - {e}")
+else:
+    print("PASS (product/smoke)")
 if aesthetics_warn:
-    print("WARN:")
+    print("WARN (stress/demo/mech):")
     for e in aesthetics_warn:
         print(f"  - {e}")
 else:
-    print("PASS")
+    print("PASS (stress/demo/mech)")
 
 if correctness:
     sys.exit(1)
 if quality_hard:
+    sys.exit(1)
+if aesthetics_hard:
     sys.exit(1)
 if quality_soft and STRICT_STRESS:
     sys.exit(1)
 if quality_soft and ALLOW_QUALITY_DEBT:
     print("PASS: 正确性轨通过；质量轨债已显式允许（--allow-quality-debt）")
     sys.exit(0)
-print("PASS: 正确性与 product 质量门禁通过")
+print("PASS: 正确性、product 质量与美学门禁通过")
 sys.exit(0)
 PY

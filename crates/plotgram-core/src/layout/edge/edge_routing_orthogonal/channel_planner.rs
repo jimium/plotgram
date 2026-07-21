@@ -22,6 +22,9 @@ pub struct ChannelPlan {
     pub vertical_channels: BTreeMap<i64, Vec<usize>>,
     /// 水平通道 y 坐标 → 分配给哪些边
     pub horizontal_channels: BTreeMap<i64, Vec<usize>>,
+    /// P2-1: 每条边的精确 lane 坐标（通道中心 + 偏移）
+    /// key = edge_idx, value = (lane_coord, is_vertical)
+    pub lane_assignments: HashMap<usize, (f64, bool)>,
 }
 
 impl ChannelPlan {
@@ -114,6 +117,31 @@ pub fn plan_channels(
     }
 
     plan
+}
+
+/// P2-1: 为同通道多边分配对称 lane 偏移，生成精确的 per-edge 车道坐标。
+///
+/// N 边通道：偏移从 -(N-1)*gap/2 到 +(N-1)*gap/2，保持通道中心对称。
+pub fn assign_lane_offsets(plan: &mut ChannelPlan, parallel_gap: f64) {
+    // 垂直通道：偏移沿 x 轴
+    for (&key, edges) in &plan.vertical_channels {
+        let center = key as f64 / 100.0;
+        let n = edges.len();
+        for (slot, &ei) in edges.iter().enumerate() {
+            let offset = (slot as f64 - (n - 1) as f64 / 2.0) * parallel_gap;
+            plan.lane_assignments.insert(ei, (center + offset, true));
+        }
+    }
+    // 水平通道：偏移沿 y 轴
+    for (&key, edges) in &plan.horizontal_channels {
+        let center = key as f64 / 100.0;
+        let n = edges.len();
+        for (slot, &ei) in edges.iter().enumerate() {
+            let offset = (slot as f64 - (n - 1) as f64 / 2.0) * parallel_gap;
+            // 如果边已有垂直通道分配，不覆盖（垂直优先）
+            plan.lane_assignments.entry(ei).or_insert((center + offset, false));
+        }
+    }
 }
 
 /// 收集通道候选坐标

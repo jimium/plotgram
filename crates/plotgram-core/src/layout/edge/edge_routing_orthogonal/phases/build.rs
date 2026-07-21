@@ -117,10 +117,17 @@ pub(crate) fn phase_route_edges(
         let prefer_outer = is_feedback || (s4_monitor_corridor && is_feedback);
         // P2：有 chain 但 validated 失败 → 显式 degraded（禁止静默 free-route 冒充成功）。
         let corridor_contract_failed = has_chain && corridor_ok.is_none();
-        // Phase B3: 查询全局通道规划分配的通道坐标
+        // Phase B3 + P2-1: 查询全局通道规划的精确 lane 坐标（优先）或通道中心（fallback）
         let planned_ch = channel_plan.and_then(|cp| {
+            // P2-1: 优先使用精确 lane 坐标（同通道多边已分离）
+            if let Some(&(lane_coord, is_vert)) = cp.lane_assignments.get(&i) {
+                let from_vertical = is_vertical_port(from_ep.side);
+                if from_vertical == is_vert {
+                    return Some(lane_coord);
+                }
+            }
+            // fallback: 通道中心坐标
             let (coord, is_vert) = cp.channel_for_edge(i)?;
-            // 只注入与当前轴匹配的通道
             let from_vertical = is_vertical_port(from_ep.side);
             if from_vertical == is_vert { Some(coord) } else { None }
         });

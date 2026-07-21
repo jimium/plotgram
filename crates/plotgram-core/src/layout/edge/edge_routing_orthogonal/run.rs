@@ -1,6 +1,24 @@
 //! 正交路由主流程：端口/slot → 逐边建路 → straighten / reroute / stub / lane / sanitize / labels。
 //!
 //! 从 `mod.rs` 抽出，便于按 phase 阅读与改时序；行为应与抽取前一致。
+//!
+//! # P2-4 写权契约（Write Authority Contract）
+//!
+//! 每个几何字段有且仅有一个最终写者，消除写权竞争。
+//!
+//! | 字段 | 最终写者 | 只读者 |
+//! |------|---------|--------|
+//! | from_side / to_side / endpoint_map | phase_port_correction (4b) | reroute, lane, sanitize, S3, S4 |
+//! | edge.geometry (初版) | phase_route_edges (4) | — |
+//! | edge.geometry (终版) | phase_sanitize (4g) + D段 snap/sanitize_ext | — |
+//! | edge.labels | D段 label_resolve（pipeline.rs） | — |
+//! | route_annotations | C末 freeze + S4.x refresh | sanitize（只读校验） |
+//! | grid (SegmentGrid) | 各阶段自行维护（remove+insert） | scorer（只读查询） |
+//!
+//! 原则：
+//! - 上游阶段写初版，下游阶段只读或做最终修正
+//! - 禁止中间阶段修改下游已冻结的字段
+//! - 违反写权契约的修改必须通过回归证明
 
 use super::*;
 use crate::ast::Diagram;
@@ -102,6 +120,7 @@ pub(super) fn route_edges_orthogonal_inner(
     );
 
     // ── 4. 逐边构建路径 ──
+    // 写权契约：写 edge.geometry（初版）+ grid；后续 4b/4c/4d/4g 可修正。
     let incremental = preserve_edges.is_some();
     let mut edges: Vec<EdgeLayout> = if incremental {
         result.edges.clone()
@@ -112,12 +131,15 @@ pub(super) fn route_edges_orthogonal_inner(
 
     // Phase B3：全局通道规划（默认关闭，PLOTGRAM_CHANNEL_PLANNER=1 启用）
     let channel_plan = if channel_planner::channel_planner_enabled() {
-        Some(channel_planner::plan_channels(
+        let mut plan = channel_planner::plan_channels(
             relations,
             &result.nodes,
             &group_ctx,
             &edge_order,
-        ))
+        );
+        // P2-1: 为同通道多边分配精确 lane 偏移
+        channel_planner::assign_lane_offsets(&mut plan, profile.parallel_gap);
+        Some(plan)
     } else {
         None
     };
@@ -336,6 +358,7 @@ pub(super) fn route_edges_orthogonal_inner(
     );
 
     // ── 4c. X-1: 多轮冲突消解重路由 ──
+    // 写权契约：只读 from_side/to_side/endpoint_map（4b 已冻结）；写 edge.geometry + grid。
     phase_reroute(
         &result.nodes,
         relations,
@@ -354,6 +377,7 @@ pub(super) fn route_edges_orthogonal_inner(
     );
 
     // ── 4d. X-3: Lane Assignment 车道分配 ──
+    // 写权契约：只读 from_side/to_side（4b 已冻结）；写 edge.geometry + grid。
     phase_lane(
         &mut edges,
         &mut grid,
@@ -469,6 +493,7 @@ pub(super) fn route_edges_orthogonal_inner(
     result.hints.route_annotations = Some(route_annotations.clone());
 
     // ── 4g. 锯齿消毒 + X-0 间距统计 ──
+    // 写权契约：只读 from_side/to_side + route_annotations；写 edge.geometry（C段终版）。
     phase_sanitize(
         &mut edges,
         relations,
@@ -612,7 +637,8 @@ pub(super) fn route_edges_orthogonal_inner(
     // 作为「最终写者」重做 dock_sep，C 末这次会被 D 的 snap/sanitize 抖回后覆盖，属纯冗余。
 
     // P3.3：标签避让只在 pipeline 几何冻结后做一次。
-    // sanitize 会重建平行边标签；此处再 resolve 会被 D 段 snap/sanitize 丢掉。
+    // 写权契约：edge.labels 的最终写者是 D段 label_resolve（pipeline.rs），
+    // C段内 sanitize 重建的平行边标签会被 D 段 snap/sanitize 后再次 resolve。
     crate::perf_log!(
         "[perf]     fix_inversions+labels: {:.2}ms",
         t_fix.elapsed().as_secs_f64() * 1000.0

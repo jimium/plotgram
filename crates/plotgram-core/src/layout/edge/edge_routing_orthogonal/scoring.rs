@@ -37,6 +37,9 @@ const NODE_PIERCE_DEPTH_WEIGHT: f64 = 50.0;
 /// 用于 `edge_overlap_penalty` 中快速跳过 bbox 不相交的已路由段。
 const BBOX_EXPAND: f64 = 10.0;
 
+/// P2-2: 每个交叉点的惩罚（约 2.5 个弯折代价，强于 bend 但弱于 obstacle）
+const CROSSING_PENALTY: f64 = 70.0;
+
 /// Scores a candidate path in the context of a routing request.
 ///
 /// Extracting the scoring policy behind a trait lets future optimizations
@@ -112,6 +115,8 @@ impl CandidateScorer for DefaultScorer {
         if let Some(planned) = ctx.planned_channel {
             score += channel_alignment_bonus(path, planned) * w.channel_alignment;
         }
+        // P2-2: 交叉惩罚——候选路径与已路由边交叉时惩罚
+        score += crossing_penalty(path, ctx.grid) * w.crossing;
         score
     }
 }
@@ -130,8 +135,10 @@ pub fn path_length(path: &[Point]) -> f64 {
 ///
 /// 仅对长度 > PORT_CLEARANCE*2 的非 stub 段计算，避免将短 stub 段误判为对齐。
 /// 只取第一个匹配段（避免重复奖励）。
-const CHANNEL_ALIGNMENT_BONUS: f64 = -40.0;
-const CHANNEL_ALIGNMENT_TOLERANCE: f64 = 6.0;
+// P2-1: 增强对齐奖励（从 -40 提升到 -80，约 2.9 个弯折代价，使路径强烈偏好规划车道）
+const CHANNEL_ALIGNMENT_BONUS: f64 = -80.0;
+// P2-1: 收紧容差（从 6px 收紧到 4px，匹配 parallel_gap/2 的 lane 精度）
+const CHANNEL_ALIGNMENT_TOLERANCE: f64 = 4.0;
 
 fn channel_alignment_bonus(path: &[Point], planned_channel: f64) -> f64 {
     if path.len() < 3 {
@@ -396,6 +403,67 @@ pub fn edge_overlap_penalty(
         }
     }
     penalty
+}
+
+/// P2-2: 计算候选路径与已路由边的交叉惩罚。
+///
+/// 利用 SegmentGrid 空间索引查询邻近段，仅检测正交交叉（水平×垂直）。
+/// 每个交叉点叠加 CROSSING_PENALTY，使路径选择时主动避让已路由边。
+pub fn crossing_penalty(path: &[Point], grid: &SegmentGrid) -> f64 {
+    let mut crossings = 0usize;
+    for window in path.windows(2) {
+        let (a, b) = (window[0], window[1]);
+        let is_h = (a.y - b.y).abs() < EPS;
+        let is_v = (a.x - b.x).abs() < EPS;
+        if !is_h && !is_v {
+            continue;
+        }
+        let seg = RoutedSegment {
+            x1: a.x,
+            y1: a.y,
+            x2: b.x,
+            y2: b.y,
+            edge_index: usize::MAX,
+        };
+        for existing in grid.query_overlapping(&seg, 0.0) {
+            if ortho_segments_cross(a, b, existing) {
+                crossings += 1;
+            }
+        }
+    }
+    crossings as f64 * CROSSING_PENALTY
+}
+
+/// P2-2: 正交段交叉检测：水平段与垂直段相交。
+/// 跳过共享端点（T 形连接不算交叉），仅计算严格内部穿越。
+fn ortho_segments_cross(a: Point, b: Point, other: &RoutedSegment) -> bool {
+    let other_h = (other.y1 - other.y2).abs() < EPS;
+    let other_v = (other.x1 - other.x2).abs() < EPS;
+    // 候选水平 × 已有垂直
+    if (a.y - b.y).abs() < EPS && other_v {
+        let y = a.y;
+        let (x_lo, x_hi) = if a.x < b.x { (a.x, b.x) } else { (b.x, a.x) };
+        let ox = other.x1;
+        let (oy_lo, oy_hi) = if other.y1 < other.y2 {
+            (other.y1, other.y2)
+        } else {
+            (other.y2, other.y1)
+        };
+        return ox > x_lo + EPS && ox < x_hi - EPS && y > oy_lo + EPS && y < oy_hi - EPS;
+    }
+    // 候选垂直 × 已有水平
+    if (a.x - b.x).abs() < EPS && other_h {
+        let x = a.x;
+        let (y_lo, y_hi) = if a.y < b.y { (a.y, b.y) } else { (b.y, a.y) };
+        let oy = other.y1;
+        let (ox_lo, ox_hi) = if other.x1 < other.x2 {
+            (other.x1, other.x2)
+        } else {
+            (other.x2, other.x1)
+        };
+        return x > ox_lo + EPS && x < ox_hi - EPS && oy > y_lo + EPS && oy < y_hi - EPS;
+    }
+    false
 }
 
 /// S4.x：水平段穿越受保护垂直干线（业务 FanIn 主缝）的加重惩罚。
