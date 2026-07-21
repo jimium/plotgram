@@ -214,8 +214,17 @@ pub fn route_edges_organic(
         config.shoulder_ratio
     };
 
-    let (node_id_to_idx, obstacle_index) =
-        crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
+    let is_mindmap = matches!(diagram.diagram_type, DiagramType::Mindmap);
+    // mindmap 树布局中所有边都是父子直连（depth diff=1），不会穿障，
+    // 跳过 O(n²) 的 ObstacleIndex 构建（63 节点 → 87ms → 0ms）
+    let need_obstacle_index = !(is_mindmap && node_depths.is_some());
+
+    let (node_id_to_idx, obstacle_index) = if need_obstacle_index {
+        let (idx, obs) = crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
+        (idx, Some(obs))
+    } else {
+        (HashMap::new(), None)
+    };
 
     // 父子映射：穿障检测时跳过同父兄弟，避免扇出曲线误判为穿障
     let mut children_of: HashMap<&str, Vec<&str>> = HashMap::new();
@@ -244,7 +253,6 @@ pub fn route_edges_organic(
     };
 
     let mut edges: Vec<EdgeLayout> = Vec::with_capacity(relations.len());
-    let is_mindmap = matches!(diagram.diagram_type, DiagramType::Mindmap);
 
     for (i, rel) in relations.iter().enumerate() {
         let Some((ep, label_off)) = endpoints[i].clone() else {
@@ -357,41 +365,44 @@ pub fn route_edges_organic(
         };
 
         // ── 穿障检测：采样曲线，若穿过非端点节点则退化到 spline 绕行 ──
-        let from_idx = node_id_to_idx.get(ep.from_id.as_str()).copied().unwrap_or(usize::MAX);
-        let to_idx = node_id_to_idx.get(ep.to_id.as_str()).copied().unwrap_or(usize::MAX);
-        let mut skip = vec![from_idx, to_idx];
-        // 同父兄弟扇出时曲线常擦过中间兄弟，属预期而非穿障
-        if let Some(siblings) = children_of.get(ep.from_id.as_str()) {
-            for sib in siblings {
-                if *sib != ep.to_id.as_str() {
-                    if let Some(&idx) = node_id_to_idx.get(sib) {
-                        skip.push(idx);
+        // mindmap 树布局已在上方跳过 ObstacleIndex 构建，此处 obstacle_index 为 None
+        if let Some(obstacle_index) = obstacle_index.as_ref() {
+            let from_idx = node_id_to_idx.get(ep.from_id.as_str()).copied().unwrap_or(usize::MAX);
+            let to_idx = node_id_to_idx.get(ep.to_id.as_str()).copied().unwrap_or(usize::MAX);
+            let mut skip = vec![from_idx, to_idx];
+            // 同父兄弟扇出时曲线常擦过中间兄弟，属预期而非穿障
+            if let Some(siblings) = children_of.get(ep.from_id.as_str()) {
+                for sib in siblings {
+                    if *sib != ep.to_id.as_str() {
+                        if let Some(&idx) = node_id_to_idx.get(sib) {
+                            skip.push(idx);
+                        }
                     }
                 }
             }
-        }
 
-        if crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(&edge, &obstacle_index, &skip) {
-            if is_mindmap {
-                // 思维导图保持平滑贝塞尔：用绕行中点拉弓，避免折线观感
-                if let Some(bowed) = bow_bezier_around_obstacles(
-                    &edge, &obstacle_index, &skip, from_port, to_port,
-                    effective_tension, adaptive_shoulder,
-                ) {
-                    edge.geometry = bowed;
-                    let sampled = edge.sampled_path(24);
-                    edge.labels = build_edge_labels(rel, middle_t, Point::new(label_off.ox, label_off.oy), |t| {
-                        point_at_path_t(&sampled, t)
-                    });
-                }
-            } else {
-                let detour = obstacle_index.shortest_path(start_pt, end_pt, &skip);
-                if !detour.is_empty() {
-                    edge.geometry = PathGeometry::Polyline { points: detour };
-                    let sampled = edge.path_points().into_owned();
-                    edge.labels = build_edge_labels(rel, middle_t, Point::new(label_off.ox, label_off.oy), |t| {
-                        point_at_path_t(&sampled, t)
-                    });
+            if crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(&edge, obstacle_index, &skip) {
+                if is_mindmap {
+                    // 思维导图保持平滑贝塞尔：用绕行中点拉弓，避免折线观感
+                    if let Some(bowed) = bow_bezier_around_obstacles(
+                        &edge, obstacle_index, &skip, from_port, to_port,
+                        effective_tension, adaptive_shoulder,
+                    ) {
+                        edge.geometry = bowed;
+                        let sampled = edge.sampled_path(24);
+                        edge.labels = build_edge_labels(rel, middle_t, Point::new(label_off.ox, label_off.oy), |t| {
+                            point_at_path_t(&sampled, t)
+                        });
+                    }
+                } else {
+                    let detour = obstacle_index.shortest_path(start_pt, end_pt, &skip);
+                    if !detour.is_empty() {
+                        edge.geometry = PathGeometry::Polyline { points: detour };
+                        let sampled = edge.path_points().into_owned();
+                        edge.labels = build_edge_labels(rel, middle_t, Point::new(label_off.ox, label_off.oy), |t| {
+                            point_at_path_t(&sampled, t)
+                        });
+                    }
                 }
             }
         }

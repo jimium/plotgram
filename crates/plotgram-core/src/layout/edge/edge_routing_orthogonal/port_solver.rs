@@ -40,6 +40,9 @@ const CONFLICT_WEIGHT: f64 = 6.0;
 /// 角度对齐惩罚权重：端口方向与对端方向偏差的惩罚
 const ANGULAR_WEIGHT: f64 = 2.0;
 
+/// 最小改善阈值：只有成本下降超过此值才接受端口变更（避免微小改善导致路由退化）
+const MIN_IMPROVEMENT: f64 = 2.0;
+
 /// 端口约束求解
 ///
 /// 目标函数：最小化 总弯折预估 + 端口冲突惩罚
@@ -157,7 +160,7 @@ fn local_search_optimize(
                     let new_cost =
                         edge_cost(i, relations, nodes, from_side, to_side);
 
-                    if new_cost < best_cost - EPS {
+                    if new_cost < best_cost - MIN_IMPROVEMENT {
                         best_cost = new_cost;
                         best_from = fs;
                         best_to = ts;
@@ -235,7 +238,7 @@ fn local_search_high_degree(
                     from_side[i] = fs;
                     to_side[i] = ts;
                     let new_cost = edge_cost(i, relations, nodes, from_side, to_side);
-                    if new_cost < best_cost - EPS {
+                    if new_cost < best_cost - MIN_IMPROVEMENT {
                         best_cost = new_cost;
                         best_from = fs;
                         best_to = ts;
@@ -386,10 +389,10 @@ fn angular_misalignment(port: Port, dx: f64, dy: f64) -> f64 {
     1.0 - dot
 }
 
-/// 检查端口求解器是否启用
+/// 检查端口求解器是否启用（默认开启，PLOTGRAM_PORT_SOLVER=0 关闭）
 pub fn port_solver_enabled() -> bool {
-    std::env::var("PLOTGRAM_PORT_SOLVER")
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+    !std::env::var("PLOTGRAM_PORT_SOLVER")
+        .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
         .unwrap_or(false)
 }
 
@@ -433,8 +436,8 @@ mod tests {
     }
 
     #[test]
-    fn test_port_solver_disabled_by_default() {
-        assert!(!port_solver_enabled());
+    fn test_port_solver_enabled_by_default() {
+        assert!(port_solver_enabled());
     }
 
     #[test]

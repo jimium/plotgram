@@ -60,8 +60,8 @@ pub fn reroute_conflicting_edges(
     let mut rounds_done = 0usize;
     let mut failed_edges: HashSet<usize> = HashSet::new();
     let mut max_channel_load = 0usize;
-    // Iteration 3：默认 2 轮；冲突边多时升到 3
-    let mut max_rounds = DEFAULT_REROUTE_ROUNDS;
+    // OVG 开启时初始路由质量更高，默认 1 轮即可；否则 2 轮
+    let mut max_rounds = if ovg.is_some() { 1 } else { DEFAULT_REROUTE_ROUNDS };
 
     for round in 0..MAX_REROUTE_ROUNDS {
         if round >= max_rounds {

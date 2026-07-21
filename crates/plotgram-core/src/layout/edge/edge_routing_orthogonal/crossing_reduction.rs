@@ -52,6 +52,9 @@ pub fn minimize_crossings_post_route(
     initial_crossings.saturating_sub(final_crossings)
 }
 
+/// 最小平移后边段间距（避免 tight_sev 退化；匹配 ORTHO_PARALLEL_GAP = 8px）
+const MIN_EDGE_CLEARANCE: f64 = 8.0;
+
 /// 尝试通过调整边 j 的折点来消除与边 i 的交叉
 fn try_resolve_crossing(
     edges: &mut [EdgeLayout],
@@ -89,13 +92,9 @@ fn try_resolve_crossing(
             continue;
         }
 
-        // 确定段方向并尝试平移
+        // 确定段方向并尝试平移（小偏移优先，减少 tight_sev 退化风险）
         let is_horizontal = (p1.y - p2.y).abs() < 0.01;
-        let offsets: &[f64] = if is_horizontal {
-            &[8.0, -8.0, 16.0, -16.0]
-        } else {
-            &[8.0, -8.0, 16.0, -16.0]
-        };
+        let offsets: &[f64] = &[4.0, -4.0, 8.0, -8.0];
 
         for &offset in offsets {
             let mut candidate = j_points.clone();
@@ -114,6 +113,11 @@ fn try_resolve_crossing(
 
             // 验证：消除了与边 i 的交叉
             if polylines_cross_points(&i_points, &candidate) {
+                continue;
+            }
+
+            // 验证：平移段与其他边段保持最小间距（避免 tight_sev 退化）
+            if !shifted_segment_clearance(&candidate, seg_idx, edges, j) {
                 continue;
             }
 
@@ -140,6 +144,85 @@ fn try_resolve_crossing(
     } else {
         false
     }
+}
+
+/// 检查被平移的段与其他边段的间距。
+/// 仅检查平移段（seg_idx → seg_idx+1），未移动的段不参与检查。
+/// 对平行重叠段要求更严格（避免 tight_sev 退化）。
+fn shifted_segment_clearance(
+    candidate: &[Point],
+    seg_idx: usize,
+    edges: &[EdgeLayout],
+    self_idx: usize,
+) -> bool {
+    let seg_a = (
+        candidate[seg_idx].x,
+        candidate[seg_idx].y,
+        candidate[seg_idx + 1].x,
+        candidate[seg_idx + 1].y,
+    );
+    let seg_len = ((seg_a.2 - seg_a.0).powi(2) + (seg_a.3 - seg_a.1).powi(2)).sqrt();
+    if seg_len < 1.0 {
+        return true;
+    }
+    let a_horiz = (seg_a.1 - seg_a.3).abs() < 0.01;
+    let a_vert = (seg_a.0 - seg_a.2).abs() < 0.01;
+
+    for (idx, edge) in edges.iter().enumerate() {
+        if idx == self_idx {
+            continue;
+        }
+        let other_pts = match &edge.geometry {
+            PathGeometry::Polyline { points } => points.as_slice(),
+            _ => continue,
+        };
+        for m in 0..other_pts.len().saturating_sub(1) {
+            let seg_b = (other_pts[m].x, other_pts[m].y, other_pts[m + 1].x, other_pts[m + 1].y);
+            let b_horiz = (seg_b.1 - seg_b.3).abs() < 0.01;
+            let b_vert = (seg_b.0 - seg_b.2).abs() < 0.01;
+
+            // 平行重叠段：要求更大间距（介于 ORTHO_PARALLEL_GAP=8 和 architecture=12 之间）
+            let required = if (a_horiz && b_horiz) || (a_vert && b_vert) {
+                10.0
+            } else {
+                MIN_EDGE_CLEARANCE
+            };
+
+            let dist = seg_to_seg_dist(seg_a, seg_b);
+            if dist < required {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// 两线段最小距离（简化：端点到对方线段距离的最小值）
+fn seg_to_seg_dist(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)) -> f64 {
+    let pa1 = Point::new(a.0, a.1);
+    let pa2 = Point::new(a.2, a.3);
+    let pb1 = Point::new(b.0, b.1);
+    let pb2 = Point::new(b.2, b.3);
+    let d1 = pt_seg_dist(pa1, pb1, pb2);
+    let d2 = pt_seg_dist(pa2, pb1, pb2);
+    let d3 = pt_seg_dist(pb1, pa1, pa2);
+    let d4 = pt_seg_dist(pb2, pa1, pa2);
+    d1.min(d2).min(d3).min(d4)
+}
+
+fn pt_seg_dist(p: Point, a: Point, b: Point) -> f64 {
+    let abx = b.x - a.x;
+    let aby = b.y - a.y;
+    let apx = p.x - a.x;
+    let apy = p.y - a.y;
+    let len_sq = abx * abx + aby * aby;
+    if len_sq < 1e-10 {
+        return ((p.x - a.x).powi(2) + (p.y - a.y).powi(2)).sqrt();
+    }
+    let t = ((apx * abx + apy * aby) / len_sq).clamp(0.0, 1.0);
+    let proj_x = a.x + t * abx;
+    let proj_y = a.y + t * aby;
+    ((p.x - proj_x).powi(2) + (p.y - proj_y).powi(2)).sqrt()
 }
 
 // ─── 交叉检测 ───────────────────────────────────────────────────────────────
@@ -307,18 +390,42 @@ fn segment_intersects_rect(p1: Point, p2: Point, rect: (f64, f64, f64, f64)) -> 
     mid_x > x1 + 2.0 && mid_x < x2 - 2.0 && mid_y > y1 + 2.0 && mid_y < y2 - 2.0
 }
 
+/// 线段相交检测（含共线端点落在线段上），与美学指标模块 `segments_intersect` 一致。
 fn segments_cross(a: Point, b: Point, c: Point, d: Point) -> bool {
     let d1 = cross_val(c, d, a);
     let d2 = cross_val(c, d, b);
     let d3 = cross_val(a, b, c);
     let d4 = cross_val(a, b, d);
 
+    // proper crossing
     if ((d1 > 0.0 && d2 < 0.0) || (d1 < 0.0 && d2 > 0.0))
         && ((d3 > 0.0 && d4 < 0.0) || (d3 < 0.0 && d4 > 0.0))
     {
         return true;
     }
+
+    // 共线端点落在线段上
+    const EPS: f64 = 0.01;
+    if d1.abs() < EPS && on_segment(c, d, a) {
+        return true;
+    }
+    if d2.abs() < EPS && on_segment(c, d, b) {
+        return true;
+    }
+    if d3.abs() < EPS && on_segment(a, b, c) {
+        return true;
+    }
+    if d4.abs() < EPS && on_segment(a, b, d) {
+        return true;
+    }
     false
+}
+
+fn on_segment(a: Point, b: Point, p: Point) -> bool {
+    p.x >= a.x.min(b.x) - 0.01
+        && p.x <= a.x.max(b.x) + 0.01
+        && p.y >= a.y.min(b.y) - 0.01
+        && p.y <= a.y.max(b.y) + 0.01
 }
 
 fn segment_intersection(a: Point, b: Point, c: Point, d: Point) -> Option<Point> {
@@ -333,6 +440,21 @@ fn segment_intersection(a: Point, b: Point, c: Point, d: Point) -> Option<Point>
         // 计算交点
         let t = d1 / (d1 - d2);
         return Some(Point::new(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y)));
+    }
+
+    // 共线端点：返回落在对方线段上的端点作为交叉点
+    const EPS: f64 = 0.01;
+    if d1.abs() < EPS && on_segment(c, d, a) {
+        return Some(a);
+    }
+    if d2.abs() < EPS && on_segment(c, d, b) {
+        return Some(b);
+    }
+    if d3.abs() < EPS && on_segment(a, b, c) {
+        return Some(c);
+    }
+    if d4.abs() < EPS && on_segment(a, b, d) {
+        return Some(d);
     }
     None
 }

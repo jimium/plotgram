@@ -87,7 +87,7 @@ pub(crate) fn phase_port_slot(
     if port_pressure_relieve_enabled() {
         relieve_overloaded_port_sides(relations, nodes, &mut from_side, &mut to_side);
     }
-    // Phase B2：端口约束求解器优化（默认关闭，PLOTGRAM_PORT_SOLVER=1 启用）
+    // Phase B2：端口约束求解器优化（默认开启，PLOTGRAM_PORT_SOLVER=0 关闭）
     if super::super::port_solver::port_solver_enabled() {
         let assignment = super::super::port_solver::solve_port_assignment(
             relations,
