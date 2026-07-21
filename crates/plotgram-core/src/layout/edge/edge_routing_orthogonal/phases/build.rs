@@ -34,6 +34,7 @@ pub(crate) fn phase_route_edges(
     corridor_model: Option<&crate::layout::demand::CorridorModel>,
     ovg: Option<&OrthogonalVisibilityGraph>,
     channel_plan: Option<&ChannelPlan>,
+    first_pass: bool,
 ) {
 
     for &i in edge_order {
@@ -138,7 +139,8 @@ pub(crate) fn phase_route_edges(
                     .with_corridor_boost(
                         corridor_boost || corridor_contract_failed || (!same_leaf && !has_chain),
                     )
-                    .with_prefer_outer_ring(prefer_outer);
+                    .with_prefer_outer_ring(prefer_outer)
+                    .with_first_pass(first_pass);
             if let Some(m) = corridor_model {
                 ctx = ctx.with_corridor_demands(m);
             }
@@ -167,7 +169,8 @@ pub(crate) fn phase_route_edges(
                 OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
                     .with_strict_group_transit(strict)
                     .with_corridor_boost(true)
-                    .with_prefer_outer_ring(prefer_outer);
+                    .with_prefer_outer_ring(prefer_outer)
+                    .with_first_pass(first_pass);
             if let Some(m) = corridor_model {
                 ctx = ctx.with_corridor_demands(m);
             }

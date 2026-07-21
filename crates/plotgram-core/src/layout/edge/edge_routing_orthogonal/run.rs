@@ -147,9 +147,14 @@ pub(super) fn route_edges_orthogonal_inner(
     // Phase B1：构建 OVG（仅当环境变量启用时）——节点障碍物阻断 + 组软惩罚
     // 节点膨胀使用 NODE_OBSTACLE_PAD + 10，给路径更多 clearance，减少 tight 违规
     // P1-3: 大图（>50 节点）延迟构建——先无 OVG 路由，收集 degraded 边后构建局部 OVG
+    // P3-1: 两轮路由与 P1-3 互斥——两轮路由已包含“粗→精”模式
     const OVG_DEFERRED_THRESHOLD: usize = 50;
+    /// P3-1: 两轮路由阈值——边数超过此值时启用粗→精两轮
+    const TWO_ROUND_THRESHOLD: usize = 40;
+    let use_two_round = n > TWO_ROUND_THRESHOLD;
     let use_deferred_ovg = visibility_graph::ovg_enabled()
-        && result.nodes.len() > OVG_DEFERRED_THRESHOLD;
+        && result.nodes.len() > OVG_DEFERRED_THRESHOLD
+        && !use_two_round;
     let group_rects: Vec<crate::layout::geometry::Rect> = obstacles.sorted_group_ids.iter()
         .filter_map(|gid| group_ctx.groups.get(gid))
         .map(|gl| crate::layout::geometry::Rect::from(gl))
@@ -194,9 +199,109 @@ pub(super) fn route_edges_orthogonal_inner(
         &feedback_edge_set,
         s4_monitor_corridor,
         Some(&corridor_model),
-        ovg.as_ref(),
+        // P3-1: 两轮模式下第一轮禁 OVG
+        if use_two_round { None } else { ovg.as_ref() },
         channel_plan.as_ref(),
+        // P3-1: 两轮模式下第一轮为 first_pass
+        use_two_round,
     );
+
+    // P3-1: 两轮路由——拥堵检测 + 精路由
+    if use_two_round {
+        let t_p31 = crate::layout::perf::Instant::now();
+        let congested_edges = detect_congestion(&edges, 3);
+        if !congested_edges.is_empty() {
+            // 收集拥堵区域 bbox 用于构建局部 OVG
+            let mut congested_regions: Vec<(Point, Point)> = Vec::new();
+            for &ei in &congested_edges {
+                if let (Some(from_ep), Some(to_ep)) = (
+                    endpoint_map.get(&(ei, true)),
+                    endpoint_map.get(&(ei, false)),
+                ) {
+                    congested_regions.push((from_ep.anchor, to_ep.anchor));
+                }
+            }
+            // 构建局部 OVG（覆盖拥堵区域 ± 80px）
+            let node_pad = NODE_OBSTACLE_PAD + 10.0;
+            let local = visibility_graph::build_local_ovg(
+                &congested_regions,
+                &result.nodes,
+                &obstacles.sorted_node_ids,
+                node_pad,
+                &group_rects,
+                80.0,
+            );
+            let p31_ovg = if local.is_empty() { None } else { Some(local) };
+
+            // 从 grid 移除拥堵边，逐条精路由
+            grid.remove_by_edges(&congested_edges);
+            let mut rerouted = 0usize;
+            for &ei in &congested_edges {
+                let Some(from_ep) = endpoint_map.get(&(ei, true)) else { continue };
+                let Some(to_ep) = endpoint_map.get(&(ei, false)) else { continue };
+                let (from_id, to_id) = (relations[ei].from.as_str(), relations[ei].to.as_str());
+                let pair = EndpointPair { from: from_ep.clone(), to: to_ep.clone() };
+                let has_chain = corridor_plan.chains.contains_key(&ei);
+                let strict = should_strict_group_transit(
+                    &profile, &group_ctx, from_id, to_id, has_chain, false,
+                );
+                let planned_ch = channel_plan.as_ref().and_then(|cp| {
+                    cp.lane_assignments.get(&ei).map(|&(coord, _)| coord)
+                        .or_else(|| cp.channel_for_edge(ei).map(|(c, _)| c))
+                });
+                let mut ctx = OrthoRoutingContext::new(
+                    &result.nodes, &group_ctx, &grid, &cfg, &profile, &obstacles, None,
+                )
+                .with_strict_group_transit(strict)
+                .with_corridor_boost(true);
+                if let Some(ref ovg_ref) = p31_ovg {
+                    ctx = ctx.with_ovg(ovg_ref);
+                }
+                if let Some(ch) = planned_ch {
+                    ctx = ctx.with_planned_channel(Some(ch));
+                }
+                // 精路由：first_pass=false，启用全 scorer（含 crossing_penalty）
+                let mut path_stats = PathSelectStats::default();
+                let new_path = select_best_path_with_scorer_stats(
+                    &ctx, &pair, &DefaultScorer, Some(&mut path_stats), false,
+                );
+                // 单调不劣化：仅当新路径非 degraded 时替换
+                if !path_stats.degraded {
+                    let labels = match relations.get(ei) {
+                        Some(rel) => crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto(
+                            rel, ei, relations, &new_path,
+                        ),
+                        None => Vec::new(),
+                    };
+                    grid.insert_path(&new_path, ei);
+                    let mut edge = EdgeLayout {
+                        geometry: PathGeometry::Polyline { points: Vec::new() },
+                        labels,
+                        from_port: from_side[ei],
+                        to_port: to_side[ei],
+                    };
+                    edge.set_polyline_points(new_path);
+                    edges[ei] = edge;
+                    rerouted += 1;
+                } else {
+                    // 保留原路径
+                    let pts: Vec<Point> = edges[ei].path_points().into_owned();
+                    grid.insert_path(&pts, ei);
+                }
+            }
+            crate::perf_log!(
+                "[perf]     p31_two_round: {:.2}ms ({} congested, {} rerouted)",
+                t_p31.elapsed().as_secs_f64() * 1000.0,
+                congested_edges.len(),
+                rerouted
+            );
+        } else {
+            crate::perf_log!(
+                "[perf]     p31_two_round: {:.2}ms (0 congested, skip)",
+                t_p31.elapsed().as_secs_f64() * 1000.0
+            );
+        }
+    }
 
     // P1-3: 大图延迟 OVG——收集 degraded 边，构建局部 OVG，重路由
     let local_ovg = if use_deferred_ovg {
@@ -649,6 +754,85 @@ pub(super) fn route_edges_orthogonal_inner(
     result.edges = edges;
     // P2-1: 导出 orthogonal 路由 debug 统计
     result.hints.orthogonal_debug = Some(ortho_stats);
+    result
+}
+
+/// P3-1: 拥堵检测——统计每个通道坐标的负载，返回经过拥堵区域的边索引。
+///
+/// 算法：
+/// 1. 遍历所有边的路径段，按 cross-axis 坐标分桶（精度 4px）
+/// 2. 统计每个桶的段数（负载）
+/// 3. 负载 >= threshold 的桶标记为拥堵
+/// 4. 返回经过拥堵桶的边索引（去重、按序）
+fn detect_congestion(edges: &[EdgeLayout], threshold: usize) -> Vec<usize> {
+    use std::collections::BTreeMap;
+    const BUCKET_WIDTH: f64 = 4.0;
+
+    // 垂直段按 x 分桶，水平段按 y 分桶
+    // key = (is_vertical, bucket_coord), value = 段数
+    let mut v_buckets: BTreeMap<i64, usize> = BTreeMap::new();
+    let mut h_buckets: BTreeMap<i64, usize> = BTreeMap::new();
+
+    for edge in edges.iter() {
+        if edge.path_is_empty() {
+            continue;
+        }
+        let pts: Vec<Point> = edge.path_points().into_owned();
+        for w in pts.windows(2) {
+            let dx = (w[1].x - w[0].x).abs();
+            let dy = (w[1].y - w[0].y).abs();
+            if dy < 1.0 && dx > 1.0 {
+                // 水平段：按 y 分桶
+                let key = (w[0].y / BUCKET_WIDTH).round() as i64;
+                *h_buckets.entry(key).or_default() += 1;
+            } else if dx < 1.0 && dy > 1.0 {
+                // 垂直段：按 x 分桶
+                let key = (w[0].x / BUCKET_WIDTH).round() as i64;
+                *v_buckets.entry(key).or_default() += 1;
+            }
+        }
+    }
+
+    // 收集拥堵桶
+    let congested_v: std::collections::HashSet<i64> = v_buckets
+        .iter()
+        .filter(|(_, &count)| count >= threshold)
+        .map(|(&k, _)| k)
+        .collect();
+    let congested_h: std::collections::HashSet<i64> = h_buckets
+        .iter()
+        .filter(|(_, &count)| count >= threshold)
+        .map(|(&k, _)| k)
+        .collect();
+
+    if congested_v.is_empty() && congested_h.is_empty() {
+        return Vec::new();
+    }
+
+    // 找出经过拥堵桶的边
+    let mut result: Vec<usize> = Vec::new();
+    for (ei, edge) in edges.iter().enumerate() {
+        if edge.path_is_empty() {
+            continue;
+        }
+        let pts: Vec<Point> = edge.path_points().into_owned();
+        let hits_congestion = pts.windows(2).any(|w| {
+            let dx = (w[1].x - w[0].x).abs();
+            let dy = (w[1].y - w[0].y).abs();
+            if dy < 1.0 && dx > 1.0 {
+                let key = (w[0].y / BUCKET_WIDTH).round() as i64;
+                congested_h.contains(&key)
+            } else if dx < 1.0 && dy > 1.0 {
+                let key = (w[0].x / BUCKET_WIDTH).round() as i64;
+                congested_v.contains(&key)
+            } else {
+                false
+            }
+        });
+        if hits_congestion {
+            result.push(ei);
+        }
+    }
     result
 }
 

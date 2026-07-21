@@ -48,6 +48,8 @@ pub struct OrthoRoutingContext<'a> {
     /// Phase B3: 全局通道规划分配的通道坐标（cross-axis coord）。
     /// 注入 build_channel_detours 作为优先候选。
     pub planned_channel: Option<f64>,
+    /// P3-1: 第一轮粗路由模式——跳过 crossing_penalty（尚无全局拥堵信息）
+    pub first_pass: bool,
 }
 
 impl<'a> OrthoRoutingContext<'a> {
@@ -76,6 +78,7 @@ impl<'a> OrthoRoutingContext<'a> {
             protected_trunks: &[],
             ovg: None,
             planned_channel: None,
+            first_pass: false,
         }
     }
 
@@ -115,6 +118,12 @@ impl<'a> OrthoRoutingContext<'a> {
     /// Phase B3: 注入全局通道规划分配的通道坐标。
     pub fn with_planned_channel(mut self, coord: Option<f64>) -> Self {
         self.planned_channel = coord;
+        self
+    }
+
+    /// P3-1: 设置第一轮粗路由模式。
+    pub fn with_first_pass(mut self, v: bool) -> Self {
+        self.first_pass = v;
         self
     }
 }

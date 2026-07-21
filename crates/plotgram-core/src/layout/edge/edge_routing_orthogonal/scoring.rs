@@ -116,7 +116,10 @@ impl CandidateScorer for DefaultScorer {
             score += channel_alignment_bonus(path, planned) * w.channel_alignment;
         }
         // P2-2: 交叉惩罚——候选路径与已路由边交叉时惩罚
-        score += crossing_penalty(path, ctx.grid) * w.crossing;
+        // P3-1: 第一轮粗路由跳过（无全局信息，惩罚无意义）
+        if !ctx.first_pass {
+            score += crossing_penalty(path, ctx.grid) * w.crossing;
+        }
         score
     }
 }
