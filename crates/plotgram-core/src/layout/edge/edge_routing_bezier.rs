@@ -5,6 +5,8 @@
 //!
 //! 障碍避让：路由完成后采样曲线检测穿障，穿障的边退化到 spline 绕行折线。
 
+use std::collections::HashMap;
+
 use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use crate::layout::algorithm_config::{AlgorithmOptionSpec, OptionKind};
@@ -113,8 +115,13 @@ pub fn route_edges_bezier(
     let ctx = RoutingContext::new(diagram, &result);
 
     // 构建障碍索引（用于穿障检测与退化绕行）
-    let (node_id_to_idx, obstacle_index) =
-        crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
+    // 4.2: 懒构建——快速预检无边可能穿障时跳过 O(n²) 构建
+    let (node_id_to_idx, obstacle_index) = if crate::layout::edge::common::routing_skeleton::quick_check_need_obstacle_index(&result, relations) {
+        let (idx, obs) = crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
+        (idx, Some(obs))
+    } else {
+        (HashMap::new(), None)
+    };
 
     let self_loop_idx = self_loop_indices(relations);
     let mut edges: Vec<EdgeLayout> = Vec::with_capacity(relations.len());
@@ -161,10 +168,12 @@ pub fn route_edges_bezier(
             from_port: ep.from_port,
             to_port: ep.to_port,
         };
-        if crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(&probe, &obstacle_index, &skip) {
-            let detour = obstacle_index.shortest_path(ep.start, ep.end, &skip);
-            if !detour.is_empty() {
-                geometry = PathGeometry::Polyline { points: detour };
+        if let Some(ref obstacle_index) = obstacle_index {
+            if crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(&probe, obstacle_index, &skip) {
+                let detour = obstacle_index.shortest_path(ep.start, ep.end, &skip);
+                if !detour.is_empty() {
+                    geometry = PathGeometry::Polyline { points: detour };
+                }
             }
         }
 

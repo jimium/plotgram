@@ -72,6 +72,8 @@ pub struct OrthogonalVisibilityGraph {
     node_obstacle_count: usize,
     /// 组矩形（软惩罚：Dijkstra 穿越时加权，不阻断可见性）
     group_rects: Vec<Rect>,
+    /// 4.3: 自适应搜索 margin（中图根据障碍物分布范围扩展）
+    search_margin: f64,
 }
 
 /// OVG 顶点数上限（超出则降级为候选枚举）
@@ -115,6 +117,9 @@ impl OrthogonalVisibilityGraph {
     }
 
     fn build_with_groups(obstacles: &[Rect], node_obstacle_count: usize, group_rects: &[Rect]) -> Self {
+        // 4.3: 自适应 margin——中图（30-80 节点）根据障碍物分布范围扩展
+        let search_margin = Self::compute_adaptive_margin(obstacles, node_obstacle_count);
+
         let mut vertices = Vec::new();
         let mut adjacency: Vec<Vec<OvgEdge>> = Vec::new();
 
@@ -142,6 +147,7 @@ impl OrthogonalVisibilityGraph {
                 obstacles: obstacles.to_vec(),
                 node_obstacle_count,
                 group_rects: group_rects.to_vec(),
+                search_margin,
             };
         }
 
@@ -183,7 +189,38 @@ impl OrthogonalVisibilityGraph {
             obstacles: obstacles.to_vec(),
             node_obstacle_count,
             group_rects: group_rects.to_vec(),
+            search_margin,
         }
+    }
+
+    /// 4.3: 计算自适应搜索 margin
+    /// - 小图（<30 节点）：固定 80px（当前行为）
+    /// - 中图（30-80 节点）：max(80, avg_edge_length * 0.3)，用障碍物 bbox 对角线估算
+    /// - 大图（>80 节点）：由 P1-3 延迟 OVG 处理，此处仍用自适应值
+    fn compute_adaptive_margin(obstacles: &[Rect], node_count: usize) -> f64 {
+        const BASE_MARGIN: f64 = 80.0;
+        if node_count < 30 || obstacles.is_empty() {
+            return BASE_MARGIN;
+        }
+        // 计算障碍物 bbox 的平均尺寸作为 edge_length 估算
+        let _avg_diag: f64 = obstacles.iter()
+            .take(node_count)
+            .map(|r| (r.width * r.width + r.height * r.height).sqrt())
+            .sum::<f64>() / node_count as f64;
+        // 平均间距估算：bbox 范围 / sqrt(n)
+        let x_min = obstacles.iter().take(node_count).map(|r| r.left()).fold(f64::INFINITY, f64::min);
+        let x_max = obstacles.iter().take(node_count).map(|r| r.right()).fold(f64::NEG_INFINITY, f64::max);
+        let y_min = obstacles.iter().take(node_count).map(|r| r.top()).fold(f64::INFINITY, f64::min);
+        let y_max = obstacles.iter().take(node_count).map(|r| r.bottom()).fold(f64::NEG_INFINITY, f64::max);
+        let spread = ((x_max - x_min).powi(2) + (y_max - y_min).powi(2)).sqrt();
+        let avg_spacing = spread / (node_count as f64).sqrt();
+        // margin = max(80, avg_spacing * 0.3)，上限 200px 防止过大
+        (BASE_MARGIN.max(avg_spacing * 0.3)).min(200.0)
+    }
+
+    /// 获取当前 OVG 的搜索 margin（供外部调用者使用）
+    pub fn search_margin(&self) -> f64 {
+        self.search_margin
     }
 
     /// 检查两点之间的水平/垂直线段是否可见
@@ -236,7 +273,7 @@ impl OrthogonalVisibilityGraph {
         let end_idx = n + 1;
 
         // 空间过滤：仅考虑边 bbox + margin 内的顶点
-        let margin = 80.0;
+        let margin = self.search_margin;
         let x_lo = start.x.min(end.x) - margin;
         let x_hi = start.x.max(end.x) + margin;
         let y_lo = start.y.min(end.y) - margin;

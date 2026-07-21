@@ -25,6 +25,8 @@ pub struct AestheticsReport {
     pub detour: DetourMetrics,
     pub edge_length: EdgeLengthMetrics,
     pub channel_utilization: ChannelUtilization,
+    pub port_distribution: PortDistribution,
+    pub path_monotonicity: PathMonotonicity,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -103,6 +105,24 @@ pub struct ChannelUtilization {
     pub unused_corridors: usize,
 }
 
+/// 5.2.3 端口分布均匀性指标
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PortDistribution {
+    /// 同节点同侧最大边数
+    pub max_same_side_edges: usize,
+    /// 端口利用率方差（各侧边数的方差）
+    pub side_utilization_variance: f64,
+}
+
+/// 5.2.4 路径单调性指标
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PathMonotonicity {
+    /// 非单调路径占比（路径在主轴方向有反向段）
+    pub non_monotone_ratio: f64,
+    /// 非单调路径数
+    pub non_monotone_count: usize,
+}
+
 // ─── 计算入口 ───────────────────────────────────────────────────────────────
 
 /// 计算完整美学指标报告。
@@ -115,6 +135,8 @@ pub fn compute_aesthetics(diagram: &Diagram, result: &LayoutResult) -> Aesthetic
     let detour = compute_detour_metrics(result);
     let edge_length = compute_edge_length_metrics(diagram, result);
     let channel_utilization = compute_channel_utilization(result);
+    let port_distribution = compute_port_distribution(diagram, result);
+    let path_monotonicity = compute_path_monotonicity(result);
     AestheticsReport {
         bends,
         border_proximity,
@@ -124,6 +146,8 @@ pub fn compute_aesthetics(diagram: &Diagram, result: &LayoutResult) -> Aesthetic
         detour,
         edge_length,
         channel_utilization,
+        port_distribution,
+        path_monotonicity,
     }
 }
 
@@ -641,6 +665,166 @@ fn compute_channel_utilization(result: &LayoutResult) -> ChannelUtilization {
         max_channel_load: max_load,
         unused_corridors: total - used_count,
     }
+}
+
+// ─── 5.2.3 端口分布均匀性 ─────────────────────────────────────────────────────
+
+fn compute_port_distribution(diagram: &Diagram, result: &LayoutResult) -> PortDistribution {
+    // 统计每个节点每侧的边数（通过边几何端点相对节点中心的位置推断侧）
+    // side: 0=top, 1=right, 2=bottom, 3=left
+    let mut side_counts: HashMap<&str, [usize; 4]> = HashMap::new();
+
+    for (i, rel) in diagram.relations.iter().enumerate() {
+        if rel.from.as_str() == rel.to.as_str() {
+            continue; // 跳过自环
+        }
+        let edge = result.edges.get(i);
+
+        // from 端：用边起点相对节点中心推断侧
+        if let Some(from_nl) = result.nodes.get(rel.from.as_str()) {
+            let side = infer_side_from_node(from_nl, edge, true);
+            side_counts.entry(rel.from.as_str()).or_insert([0; 4])[side] += 1;
+        }
+        // to 端
+        if let Some(to_nl) = result.nodes.get(rel.to.as_str()) {
+            let side = infer_side_from_node(to_nl, edge, false);
+            side_counts.entry(rel.to.as_str()).or_insert([0; 4])[side] += 1;
+        }
+    }
+
+    if side_counts.is_empty() {
+        return PortDistribution {
+            max_same_side_edges: 0,
+            side_utilization_variance: 0.0,
+        };
+    }
+
+    let mut max_same_side = 0usize;
+    let mut all_side_values: Vec<f64> = Vec::new();
+
+    for &counts in side_counts.values() {
+        for &c in &counts {
+            if c > max_same_side {
+                max_same_side = c;
+            }
+            if c > 0 {
+                all_side_values.push(c as f64);
+            }
+        }
+    }
+
+    let variance = if all_side_values.is_empty() {
+        0.0
+    } else {
+        let mean = all_side_values.iter().sum::<f64>() / all_side_values.len() as f64;
+        all_side_values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / all_side_values.len() as f64
+    };
+
+    PortDistribution {
+        max_same_side_edges: max_same_side,
+        side_utilization_variance: (variance * 100.0).round() / 100.0,
+    }
+}
+
+/// 通过边端点相对节点中心的位置推断端口侧（0=top, 1=right, 2=bottom, 3=left）
+fn infer_side_from_node(
+    nl: &crate::layout::NodeLayout,
+    edge: Option<&EdgeLayout>,
+    is_from: bool,
+) -> usize {
+    let cx = nl.x + nl.width / 2.0;
+    let cy = nl.y + nl.height / 2.0;
+
+    // 尝试从边几何获取端点
+    if let Some(e) = edge {
+        let pt = if is_from { e.path_start() } else { e.path_end() };
+        if let Some(p) = pt {
+            let dx = p.x - cx;
+            let dy = p.y - cy;
+            // 根据端点相对中心的方向推断侧
+            if dx.abs() > dy.abs() {
+                return if dx > 0.0 { 1 } else { 3 }; // right / left
+            } else {
+                return if dy > 0.0 { 2 } else { 0 }; // bottom / top
+            }
+        }
+    }
+    2 // 默认 bottom
+}
+
+// ─── 5.2.4 路径单调性 ─────────────────────────────────────────────────────────
+
+fn compute_path_monotonicity(result: &LayoutResult) -> PathMonotonicity {
+    let edges = &result.edges;
+    if edges.is_empty() {
+        return PathMonotonicity {
+            non_monotone_ratio: 0.0,
+            non_monotone_count: 0,
+        };
+    }
+
+    let mut non_monotone = 0usize;
+    let mut total_polyline = 0usize;
+
+    for edge in edges {
+        let points = match &edge.geometry {
+            PathGeometry::Polyline { points } if points.len() >= 3 => points,
+            _ => continue,
+        };
+        total_polyline += 1;
+
+        let start = &points[0];
+        let end = &points[points.len() - 1];
+        let dx = (end.x - start.x).abs();
+        let dy = (end.y - start.y).abs();
+
+        let is_non_monotone = if dx >= dy {
+            has_reversal(points, true)
+        } else {
+            has_reversal(points, false)
+        };
+
+        if is_non_monotone {
+            non_monotone += 1;
+        }
+    }
+
+    let ratio = if total_polyline > 0 {
+        non_monotone as f64 / total_polyline as f64
+    } else {
+        0.0
+    };
+
+    PathMonotonicity {
+        non_monotone_ratio: (ratio * 1000.0).round() / 1000.0,
+        non_monotone_count: non_monotone,
+    }
+}
+
+/// 检测折线在指定轴上是否有反向段（走回头路）
+fn has_reversal(points: &[Point], check_x: bool) -> bool {
+    if points.len() < 3 {
+        return false;
+    }
+    let overall_dir = if check_x {
+        points.last().unwrap().x - points[0].x
+    } else {
+        points.last().unwrap().y - points[0].y
+    };
+
+    // 起终点相同（自环等），跳过
+    if overall_dir.abs() < 1.0 {
+        return false;
+    }
+
+    const REVERSAL_TOLERANCE: f64 = 2.0;
+    for w in points.windows(2) {
+        let seg_dir = if check_x { w[1].x - w[0].x } else { w[1].y - w[0].y };
+        if seg_dir.abs() > REVERSAL_TOLERANCE && seg_dir.signum() != overall_dir.signum() {
+            return true;
+        }
+    }
+    false
 }
 
 // ─── 几何工具 ───────────────────────────────────────────────────────────────

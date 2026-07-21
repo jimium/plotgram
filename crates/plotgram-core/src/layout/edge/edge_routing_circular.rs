@@ -57,8 +57,13 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
     let (lane_offsets, arc_sides) = compute_lane_offsets(diagram, &node_placement);
 
     // 构建障碍索引（用于穿障检测与退化绕行）
-    let (node_id_to_idx, obstacle_index) =
-        crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
+    // 4.2: 懒构建——快速预检无边可能穿障时跳过 O(n²) 构建
+    let (node_id_to_idx, obstacle_index) = if crate::layout::edge::common::routing_skeleton::quick_check_need_obstacle_index(&result, &diagram.relations) {
+        let (idx, obs) = crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
+        (idx, Some(obs))
+    } else {
+        (HashMap::new(), None)
+    };
 
     let self_loop_idx = self_loop_indices(&diagram.relations);
     let mut edges = Vec::with_capacity(diagram.relations.len());
@@ -115,44 +120,46 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
         let to_idx = node_id_to_idx.get(to_id).copied().unwrap_or(usize::MAX);
         let skip = [from_idx, to_idx];
 
-        if crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(&edge, &obstacle_index, &skip) {
-            if let (Some(start), Some(end)) = (edge.path_start(), edge.path_end()) {
-                let detour = obstacle_index.shortest_path(start, end, &skip);
-                if !detour.is_empty() {
-                    edge.geometry = PathGeometry::Polyline { points: detour };
-                    // 几何已换：按折线重建标签
-                    let middle_t = crate::layout::edge::common::edge_geometry::parse_label_t(rel);
-                    let sampled = edge.path_points().into_owned();
-                    edge.labels = build_edge_labels(rel, middle_t, Point::new(0.0, -6.0), |t| {
-                        crate::layout::edge::common::edge_geometry::point_at_path_t(&sampled, t)
-                    });
-                } else {
-                    // R5：空 detour 时走 outer 折线兜底，避免静默保留穿障 Bezier
-                    let outer = outer_polyline_detour(start, end, &result.nodes, from_id, to_id);
-                    let probe = EdgeLayout {
-                        geometry: PathGeometry::Polyline {
-                            points: outer.clone(),
-                        },
-                        labels: Vec::new(),
-                        from_port: edge.from_port,
-                        to_port: edge.to_port,
-                    };
-                    if !crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(
-                        &probe,
-                        &obstacle_index,
-                        &skip,
-                    ) || outer.len() >= 3
-                    {
-                        edge.geometry = PathGeometry::Polyline { points: outer };
-                        let middle_t =
-                            crate::layout::edge::common::edge_geometry::parse_label_t(rel);
+        if let Some(ref obstacle_index) = obstacle_index {
+            if crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(&edge, obstacle_index, &skip) {
+                if let (Some(start), Some(end)) = (edge.path_start(), edge.path_end()) {
+                    let detour = obstacle_index.shortest_path(start, end, &skip);
+                    if !detour.is_empty() {
+                        edge.geometry = PathGeometry::Polyline { points: detour };
+                        // 几何已换：按折线重建标签
+                        let middle_t = crate::layout::edge::common::edge_geometry::parse_label_t(rel);
                         let sampled = edge.path_points().into_owned();
-                        edge.labels =
-                            build_edge_labels(rel, middle_t, Point::new(0.0, -6.0), |t| {
-                                crate::layout::edge::common::edge_geometry::point_at_path_t(
-                                    &sampled, t,
-                                )
-                            });
+                        edge.labels = build_edge_labels(rel, middle_t, Point::new(0.0, -6.0), |t| {
+                            crate::layout::edge::common::edge_geometry::point_at_path_t(&sampled, t)
+                        });
+                    } else {
+                        // R5：空 detour 时走 outer 折线兜底，避免静默保留穿障 Bezier
+                        let outer = outer_polyline_detour(start, end, &result.nodes, from_id, to_id);
+                        let probe = EdgeLayout {
+                            geometry: PathGeometry::Polyline {
+                                points: outer.clone(),
+                            },
+                            labels: Vec::new(),
+                            from_port: edge.from_port,
+                            to_port: edge.to_port,
+                        };
+                        if !crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(
+                            &probe,
+                            obstacle_index,
+                            &skip,
+                        ) || outer.len() >= 3
+                        {
+                            edge.geometry = PathGeometry::Polyline { points: outer };
+                            let middle_t =
+                                crate::layout::edge::common::edge_geometry::parse_label_t(rel);
+                            let sampled = edge.path_points().into_owned();
+                            edge.labels =
+                                build_edge_labels(rel, middle_t, Point::new(0.0, -6.0), |t| {
+                                    crate::layout::edge::common::edge_geometry::point_at_path_t(
+                                        &sampled, t,
+                                    )
+                                });
+                        }
                     }
                 }
             }

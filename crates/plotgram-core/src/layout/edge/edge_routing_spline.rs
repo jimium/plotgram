@@ -8,6 +8,8 @@
 //! - bezier: 简单贝塞尔，控制点基于端口方向，**无障碍避让**，边可能穿过节点
 //! - spline: 先用可见性图绕开障碍物，再拟合为平滑多段样条，**边不会穿过节点**
 
+use std::collections::HashMap;
+
 use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use crate::layout::algorithm_config::AlgorithmOptionSpec;
@@ -101,8 +103,13 @@ pub fn route_edges_spline(
     let tension = config.tension;
     let ctx = RoutingContext::new(diagram, &result);
 
-    let (node_id_to_idx, obstacle_index) =
-        crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
+    // 4.2: 懒构建——快速预检无边可能穿障时跳过 O(n²) 构建
+    let (node_id_to_idx, obstacle_index) = if crate::layout::edge::common::routing_skeleton::quick_check_need_obstacle_index(&result, relations) {
+        let (idx, obs) = crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
+        (idx, Some(obs))
+    } else {
+        (HashMap::new(), None)
+    };
 
     let self_loop_idx = self_loop_indices(relations);
     let mut edges: Vec<EdgeLayout> = Vec::with_capacity(relations.len());
@@ -126,11 +133,11 @@ pub fn route_edges_spline(
         let from_idx = node_id_to_idx.get(ep.from_id.as_str()).copied().unwrap_or(usize::MAX);
         let to_idx = node_id_to_idx.get(ep.to_id.as_str()).copied().unwrap_or(usize::MAX);
 
-        let detour_path = obstacle_index.shortest_path(
-            ep.start,
-            ep.end,
-            &[from_idx, to_idx],
-        );
+        let detour_path = if let Some(ref obstacle_index) = obstacle_index {
+            obstacle_index.shortest_path(ep.start, ep.end, &[from_idx, to_idx])
+        } else {
+            Vec::new()
+        };
 
         let (geometry, sampled_for_label) = if detour_path.is_empty() {
             let mut cp = compute_bezier_controls(

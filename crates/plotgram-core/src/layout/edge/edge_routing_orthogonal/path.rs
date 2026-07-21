@@ -513,7 +513,7 @@ pub fn select_best_path_with_scorer_stats(
                 let from_idx = ctx.obstacles.sorted_node_ids.iter().position(|id| id == from_id);
                 let to_idx = ctx.obstacles.sorted_node_ids.iter().position(|id| id == to_id);
                 // 收集搜索范围内的已路由段（用于重叠惩罚）
-                let margin = 80.0;
+                let margin = ovg.search_margin();
                 let occ_x_lo = start.x.min(end.x) - margin;
                 let occ_x_hi = start.x.max(end.x) + margin;
                 let occ_y_lo = start.y.min(end.y) - margin;
