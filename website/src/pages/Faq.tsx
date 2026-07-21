@@ -79,7 +79,7 @@ export default function Faq() {
         </div>
         <div className="faq-item">
           <h3><span className="q">Q</span>可以贡献代码吗？</h3>
-          <p>目前项目处于 TRAE AI 编程大赛参赛阶段，比赛结束后会开源并接受贡献。欢迎在 Playground 中试用并反馈问题。</p>
+          <p>项目计划开源，开源后欢迎贡献代码。目前可以在 Playground 中试用并反馈问题。</p>
         </div>
         <div className="faq-item">
           <h3><span className="q">Q</span>为什么叫 Plotgram？</h3>

@@ -518,14 +518,7 @@ pub(super) fn route_edges_orthogonal_inner(
         t_fix.elapsed().as_secs_f64() * 1000.0
     );
 
-    // Phase C2: 路由后交叉消解（检测算法已与美学指标模块统一，含共线端点检测）
-    let crossings_eliminated = crossing_reduction::minimize_crossings_post_route(
-        &mut edges,
-        &result.nodes,
-    );
-    if crossings_eliminated > 0 {
-        ortho_stats.rerouted_edges += crossings_eliminated;
-    }
+    // Phase C2 已移至管线后处理之后（pipeline.rs），避免 snap/sanitize 引入新交叉抵消效果。
 
     result.edges = edges;
     // P2-1: 导出 orthogonal 路由 debug 统计

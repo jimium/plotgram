@@ -214,10 +214,21 @@ mod tests {
 
         assert_eq!(routed.edges.len(), 2);
 
-        // 两条边应有不同的偏移
+        // 多条同向平行边共享 from 锚点（bundling / trunk+fork），路径在中段分离
         let s1 = routed.edges[0].path_start().unwrap();
         let s2 = routed.edges[1].path_start().unwrap();
-        assert!(s1.x != s2.x || s1.y != s2.y);
+        assert!(
+            (s1.x - s2.x).abs() < 1.0 && (s1.y - s2.y).abs() < 1.0,
+            "parallel edges should share from anchor, got {s1:?} vs {s2:?}"
+        );
+        let mid1 = routed.edges[0].path_points().into_owned();
+        let mid2 = routed.edges[1].path_points().into_owned();
+        let m1 = mid1[mid1.len() / 2];
+        let m2 = mid2[mid2.len() / 2];
+        assert!(
+            (m1.x - m2.x).abs() > 1.0 || (m1.y - m2.y).abs() > 1.0,
+            "parallel edges should diverge along path, mids {m1:?} vs {m2:?}"
+        );
     }
 
     #[test]

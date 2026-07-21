@@ -7,7 +7,6 @@ const NAV_ITEMS = [
   { id: 'algorithms', label: '核心引擎' },
   { id: 'diagram-types', label: '图表类型' },
   { id: 'comparison', label: '方案对比' },
-  { id: 'roadmap', label: '路线图' },
 ];
 
 export default function ScrollNav() {

@@ -1,0 +1,34 @@
+// 无 group 产品样例：用户常画的扁平 REST 后端（不画分层框）
+// 对照：product.rest-api-backend.pgm（同拓扑带 group）
+// Mermaid 对照: graph LR 无 subgraph
+// @role: product  (authoritative: filename prefix)
+diagram architecture {
+    title: "无分组：REST API 后端"
+    layout: architecture
+    edge_routing: orthogonal
+    theme: common.clean-light
+
+    entity[frontend] web "Web 客户端" {
+        semantic: browser
+    }
+    entity[gateway] lb "负载均衡" {
+        semantic: nginx
+    }
+    entity[service] api "REST API 服务"
+    entity[service] auth "认证鉴权"
+    entity[service] biz "业务逻辑服务"
+    entity[database] db "MySQL" {
+        semantic: mysql
+    }
+    entity[cache] redis "Redis 缓存" {
+        semantic: redis
+    }
+
+    web -> lb "HTTPS"
+    lb -> api "反向代理"
+    api -> auth "鉴权校验"
+    api -> biz "调用业务"
+    biz -> db "读写数据"
+    biz -> redis "读写缓存"
+    auth -> redis "会话存储"
+}

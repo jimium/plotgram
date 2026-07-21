@@ -23,22 +23,12 @@ ROOT_DIR="$(cd "$DEPLOY_DIR/.." && pwd)"
 NGINX_CONF_DIR="$DEPLOY_DIR/nginx"
 
 # ─── 默认部署目标（适用于 website / playground / showcase / agent-demo）────────
-# 注意：deploy-agent-api.sh 部署在 shanxun 而非 plotgram.dev，
-#       它在 source 本文件后会直接覆盖 DEPLOY_HOST / REMOTE_DIR。
-DEPLOY_HOST="${DEPLOY_HOST:-plotgram.dev}"
+# 主站：plotgram.cn（部署在 shanxun 服务器）
+DEPLOY_HOST="${DEPLOY_HOST:-shanxun}"
 ASSET_HOST="${ASSET_HOST:-shanxun}"
-REMOTE_DIR="${REMOTE_DIR:-/var/www/plotgram}"
+REMOTE_DIR="${REMOTE_DIR:-/var/www/plotgram.cn}"
 ASSET_REMOTE_DIR="${ASSET_REMOTE_DIR:-/var/www/assets.pg.agcli.cn}"
 CDN_BASE="${CDN_BASE:-https://assets.plotgram.cn/}"
-
-# ─── 国内主站镜像（plotgram.cn on shanxun）──────────────
-# 除发布到主 demo 站（plotgram.dev）外，每个前端站点（website / playground /
-# showcase / agent-demo）还会同步到 shanxun 的 plotgram.cn 镜像目录，由
-# plotgram.cn.conf 提供服务。
-# 设 MIRROR_ENABLED=false 可临时禁用镜像发布（如调试时只发布到主站）。
-SITE_MIRROR_HOST="${SITE_MIRROR_HOST:-shanxun}"
-SITE_MIRROR_DIR="${SITE_MIRROR_DIR:-/var/www/plotgram.cn}"
-MIRROR_ENABLED="${MIRROR_ENABLED:-true}"
 
 # SSH ControlMaster socket 路径（按 host+user 区分，%C 哈希）
 _DEPLOY_SSH_CONTROL_PATH="/tmp/plotgram-deploy-ssh-%C"
@@ -84,13 +74,13 @@ close_ssh_multiplexing() {
   done
 }
 
-# ─── ICP 备案号静态注入（仅 plotgram.cn 镜像站）────────
+# ─── ICP 备案号静态注入 ─────────
 # 法规要求备案号必须在原始 HTML 源码中可检测（工信部 33 号令第十三条），
 # 不能依赖 JS 动态渲染。本函数对指定 index.html 做 sed 静态注入：
 # 在 </body> 前插入一个与 footer 视觉融合的 <div>（与 React #root 同级）。
 # SPA 的 footer 由 JS 在 #root 内渲染，原始 HTML 无 footer 结构，因此
 # 备案号只能作为 #root 外的静态元素，样式上紧贴 footer 下方。
-# 调用方应在 stage_artifacts 阶段对 plotgram.cn 副本调用此函数。
+# 调用方应在 stage_artifacts 阶段调用此函数。
 ICP_NUMBER="${ICP_NUMBER:-沪ICP备2026029910号-2}"
 ICP_BADGE_HTML='<div style="text-align:center;padding:10px 0 24px;font-size:12px;color:#94A3B8;background:#FFFFFF;border-top:1px solid #E2E8F0;"><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" style="color:#94A3B8;text-decoration:none;">'"$ICP_NUMBER"'</a></div>'
 
@@ -139,47 +129,6 @@ rsync_to() {
   args+=("$@")
 
   rsync -avz "${args[@]}" "$src" "$dst"
-}
-
-# rsync_to_both <src_dir/> <main_dst> <mirror_dst> [rsync extras...]
-# 同时同步到主 demo 站（plotgram.dev）与 shanxun 镜像站（plotgram.cn）。
-# - src 必须以 / 结尾
-# - 两个目标均使用 --delete，extras 透传给两次 rsync
-# - 自动 ssh mkdir -p 远端目录（解析 host:path 中的 path 部分）
-# - MIRROR_ENABLED=false 时跳过镜像，仅同步主站
-rsync_to_both() {
-  require_cmd rsync
-  local src="$1"
-  local main_dst="$2"
-  local mirror_dst="$3"
-  shift 3
-  [[ "$src" == */ ]] || die "rsync_to_both: src 必须以 / 结尾，实际: $src"
-  [[ -d "$src" ]] || die "rsync_to_both: 源目录不存在: $src"
-
-  local args=(--delete)
-  args+=("$@")
-
-  # 解析 host:path → host、path（用于 ssh mkdir -p）
-  _ssh_mkdir_for() {
-    local dst="$1"
-    local host="${dst%%:*}"
-    local path="${dst#*:}"
-    path="${path%/}"
-    [[ -n "$path" && "$path" != "$dst" ]] || return 0
-    ssh "$host" "mkdir -p '$path'" 2>/dev/null || true
-  }
-
-  log "  → 主站: $main_dst"
-  _ssh_mkdir_for "$main_dst"
-  rsync -avz "${args[@]}" "$src" "$main_dst"
-
-  if [[ "$MIRROR_ENABLED" == "true" ]]; then
-    log "  → 镜像: $mirror_dst"
-    _ssh_mkdir_for "$mirror_dst"
-    rsync -avz "${args[@]}" "$src" "$mirror_dst"
-  else
-    log "  跳过镜像同步（MIRROR_ENABLED=false）"
-  fi
 }
 
 # ─── nginx 配置同步 ────────────────────────────────────

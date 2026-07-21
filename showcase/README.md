@@ -59,8 +59,9 @@ path.split('/').last().split('.')[0]  →  role
 | 主题 | 推荐文件 | 说明 |
 |------|----------|------|
 | 云原生 / 微服务 | `architecture/product.cloud-native.pgm` | 主流云原生拓扑 |
-| 典型微服务 | `architecture/product.typical-microservice-architecture.pgm` | 网关 + 服务 + 数据层 |
-| 三层架构 | `architecture/product.three-tier.pgm` | 经典三层业务系统 |
+| 典型微服务 | `architecture/product.typical-microservice-architecture.pgm` | 网关 + 服务 + 数据层（无 group） |
+| 扁平 REST | `architecture/product.flat-rest-api.pgm` | 同 `rest-api-backend` 拓扑、不画分层框 |
+| 三层架构 | `architecture/product.three-tier.pgm` | 经典三层业务系统（无 group） |
 | CDN 缓存 | `architecture/product.cdn-cache.pgm` | 边缘缓存回源链路 |
 | 电商基础 | `architecture/product.ecommerce-platform.pgm` | 电商系统骨架 |
 | 用户认证 | `flowchart/product.user-auth.pgm` | 登录 / 注册 / 鉴权分支 |

@@ -4,7 +4,7 @@
 
 本文档梳理 [Cytoscape.js](https://js.cytoscape.org/) 的核心能力与布局/图论算法，分析其与 Plotgram 的定位差异，并给出可借鉴的技术点与明确不应引入的部分。
 
-**相关文档**：[Graphviz 算法研究](./graphviz-algorithms-research.md) | [布局意图与增量约束](./layout-intent-refinement.md) | [竞争策略](../product/competitive-strategy.md)
+**相关文档**：[Graphviz 算法研究](graphviz-algorithms-research.md) | [布局意图与增量约束](./layout-intent-refinement.md) | [竞争策略](../product/competitive-strategy.md)
 
 ---
 
@@ -159,7 +159,7 @@ Plotgram 在 `plotgram-core` 中已实现可插拔布局框架（`LayoutStrategy
 
 ## 6. 可借鉴技术点（按优先级）
 
-结合 [竞争策略](../product/competitive-strategy.md)（布局做到 80 分、核心壁垒在语义微调）和 [Graphviz 算法研究](./graphviz-algorithms-research.md) 的差距分析：
+结合 [竞争策略](../product/competitive-strategy.md)（布局做到 80 分、核心壁垒在语义微调）和 [Graphviz 算法研究](graphviz-algorithms-research.md) 的差距分析：
 
 ### 6.1 高优先级 — 算法参考，建议深入研究
 
@@ -234,4 +234,4 @@ Phase 4（图预处理）
 - [dagre](https://github.com/dagrejs/dagre) — Sugiyama + Network Simplex JS 实现
 - [fcose](https://github.com/iVis-at-Bilkent/cytoscape.js-fcose) — 约束力导向布局
 - [ELK](https://eclipse.dev/elk/) — Eclipse Layout Kernel
-- Plotgram 内部：[Graphviz 算法研究](./graphviz-algorithms-research.md)
+- Plotgram 内部：[Graphviz 算法研究](graphviz-algorithms-research.md)

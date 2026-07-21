@@ -8,13 +8,15 @@
 docs/
 ├── readme.md                 ← 本文件
 ├── specs/                    语言规范、AST、样式系统、视觉语言
-├── guides/                   使用指南（CLI、LayoutLint 等实操文档）
+├── guides/                   使用指南（LayoutLint、diff/patch 等实操文档）
 ├── product/                  产品愿景、功能、竞品与路线图
-├── architecture/             系统架构、布局算法、边路由、WASM
+├── architecture/             系统架构总览（子文档待迁移整理）
 ├── enterprise/               企业场景需求与能力规划
-├── animation/                SVG 动画能力研究
-├── TRAE大赛/                 活动相关临时资料（非正式文档）
-└── 重构方案/                 占位目录（暂无文档）
+├── 优化重构/                 布局与路由全局优化专案（当前主线）
+├── 总结经验/                 踩坑复盘与核心手册
+├── 方案计划/                 各方向方案设计与规划
+├── 问题整理/                 问题清单与跟踪
+└── notes/                    研究笔记与外部参考资料
 ```
 
 ## 快速导航
@@ -24,39 +26,40 @@ docs/
 | 怎么写 `.pgm` 文件 | [specs/dsl/dsl-writing-manual.md](specs/dsl/dsl-writing-manual.md) |
 | 语法与语义完整定义 | [specs/dsl/language-spec.md](specs/dsl/language-spec.md) |
 | 六种图表怎么选、怎么画 | [specs/visual-language/](specs/visual-language/README.md) |
-| 系统整体架构 | [architecture/overview.md](architecture/overview.md) |
 | 产品定位与差异化 | [product/vision.md](product/vision.md) |
 | 企业落地路径 | [enterprise/scale-diagram-strategy.md](enterprise/scale-diagram-strategy.md) |
-| HTTP 服务 API | [architecture/plotgram-server-api.md](architecture/plotgram-server-api.md) |
 | 布局质量检查 LayoutLint | [guides/layout-lint.md](guides/layout-lint.md) |
-| CLI 与工具链 | [guides/plotgram-cli.md](guides/plotgram-cli.md) |
-| 渲染管线 | [guides/render-pipeline.md](guides/render-pipeline.md) |
+| 布局路由全局优化 | [优化重构/00-研究总览.html](优化重构/00-研究总览.html) |
+| 布局路由核心手册 | [总结经验/布局与路由核心手册-2026-07.md](总结经验/布局与路由核心手册-2026-07.md) |
 | Studio 前端文档 | [../studio/docs/README.md](../studio/docs/README.md) |
 
 ---
 
-## guides/ — 使用指南
+## 优化重构/ — 布局与路由全局优化专案
 
-> 详细索引：[guides/README.md](guides/README.md)
-
-### 工具与管线
+> 当前主线工作，Phase A/B/C 推进中。详见各阶段文档。
 
 | 文档 | 内容 |
 |------|------|
-| [plotgram-cli.md](guides/plotgram-cli.md) | CLI 全命令 |
-| [render-pipeline.md](guides/render-pipeline.md) | 渲染管线与 Rust API |
-| [diff-and-patch.md](guides/diff-and-patch.md) | 语义 diff / patch |
-| [plotgram-eval.md](guides/plotgram-eval.md) | 布局算法评估 |
-| [showcase-workflow.md](guides/showcase-workflow.md) | 样例集回归工作流 |
+| [00-研究总览.html](优化重构/00-研究总览.html) | 专案总览与导航页面 |
+| [01-布局路由算法审查-现状诊断与问题根因分析.md](优化重构/01-布局路由算法审查-现状诊断与问题根因分析.md) | 现状诊断与根因分析 |
+| [02-正交路由与布局优化方案.md](优化重构/02-正交路由与布局优化方案.md) | 整体优化方案设计 |
+| [03-同类算法调研-工业实践与学术方法.md](优化重构/03-同类算法调研-工业实践与学术方法.md) | 工业与学术方法调研 |
+| [04-Benchmarks美学指标扩展方案.md](优化重构/04-Benchmarks美学指标扩展方案.md) | Benchmark 美学指标扩展 |
+| [05-PhaseA实施细节-代码级修复指南.md](优化重构/05-PhaseA实施细节-代码级修复指南.md) | Phase A 实施指南 |
+| [06-PhaseA实施笔记-2026-07.md](优化重构/06-PhaseA实施笔记-2026-07.md) | Phase A 实施记录 |
+| [07-PhaseB实施笔记-2026-07.md](优化重构/07-PhaseB实施笔记-2026-07.md) | Phase B 实施记录 |
+| [08-PhaseC与美学指标实施笔记-2026-07.md](优化重构/08-PhaseC与美学指标实施笔记-2026-07.md) | Phase C 与美学指标实施记录 |
+| [09-布局路由算法全面技术审查与重构建议-2026-07.md](优化重构/09-布局路由算法全面技术审查与重构建议-2026-07.md) | 全面技术审查与重构建议 |
 
-### 布局与渲染
+---
+
+## 总结经验/ — 复盘与核心手册
 
 | 文档 | 内容 |
 |------|------|
-| [layout-lint.md](guides/layout-lint.md) | LayoutLint 布局质量检查 |
-| [layout-intent.md](guides/layout-intent.md) | Layout Intent 快速入门 |
-| [theme-and-style.md](guides/theme-and-style.md) | Theme 与 Graphic Style |
-| [svg-debug.md](guides/svg-debug.md) | SVG 调试元数据 |
+| [布局与路由核心手册-2026-07.md](总结经验/布局与路由核心手册-2026-07.md) | 布局与路由核心手册 — 踩坑复盘、缺陷审计、几何契约 |
+| [简化重构经验-哪些不可精简-2026-07.md](总结经验/简化重构经验-哪些不可精简-2026-07.md) | 简化重构经验 — 哪些模块不可精简 |
 
 ---
 
@@ -70,11 +73,8 @@ docs/
 |------|------|
 | [language-spec.md](specs/dsl/language-spec.md) | 语言语法与语义 — BNF、标识符、entity/relation/group 约束 |
 | [dsl-writing-manual.md](specs/dsl/dsl-writing-manual.md) | DSL 写作手册 — 场景化实践指南 |
-| [dsl-attribute-redesign.md](specs/dsl-attribute-redesign.md) | 属性设计优化方案 — AttributeValue、命名空间、parser 策略 |
 | [ast-spec.md](specs/ast-spec.md) | AST 数据结构 — Rust 结构体、JSON 序列化、Diff/Patch |
 | [export-scene-spec.md](specs/export-scene-spec.md) | Exporter Scene JSON — 对外导出契约与 schema |
-| [export-scene-spec.md](specs/export-scene-spec.md) | ExportScene 输入契约 |
-| [draw.io 导出说明](../crates/plotgram-core/src/render/encode/drawio/README.md) | draw.io 格式编码、映射与降级策略 |
 | [error-model.md](specs/error-model.md) | 错误模型 — 错误码、Fix Action、LSP 映射与实现参考 |
 
 ### 视觉语言
@@ -94,12 +94,22 @@ docs/
 
 ### 样式系统
 
-> 详细索引：[specs/style-system/README.md](specs/style-system/README.md)
+| 文档 | 内容 |
+|------|------|
+| [style-sheet-spec.md](specs/style-sheet-spec.md) | StyleSheet v0.2 — 三层 cascade、物化优先级、校验规则 |
+
+---
+
+## guides/ — 使用指南
+
+> 详细索引：[guides/README.md](guides/README.md)
 
 | 文档 | 内容 |
 |------|------|
-| [style-sheet-spec.md](specs/style-system/style-sheet-spec.md) | StyleSheet v0.2 — 三层 cascade、物化优先级、校验规则 |
-| [style-system/README.md](specs/style-system/README.md) | 22 套内置主题 JSON 索引与生成脚本说明 |
+| [layout-lint.md](guides/layout-lint.md) | LayoutLint — 布局静态质量检查 |
+| [group-layout-and-frame.md](guides/group-layout-and-frame.md) | Group `layout` + Group Frame；含 architecture macro rank 与场景短名 |
+| [theme-and-style.md](guides/theme-and-style.md) | Theme 与 Graphic Style |
+| [diff-and-patch.md](guides/diff-and-patch.md) | diff2 语义差异与 Agent 增量改图 |
 
 ---
 
@@ -122,66 +132,6 @@ docs/
 
 ---
 
-## architecture/ — 架构与算法
-
-> 详细索引：[architecture/README.md](architecture/README.md)（部分链接待更新，以本文件为准）
-
-### 系统架构
-
-| 文档 | 内容 |
-|------|------|
-| [overview.md](architecture/overview.md) | 整体架构 — 应用层、绑定层、核心引擎分层 |
-| [wasm-module.md](architecture/wasm-module.md) | WASM 模块设计 — plotgram-wasm 绑定与浏览器集成 |
-| [plotgram-server-api.md](architecture/plotgram-server-api.md) | Server API 使用说明 — HTTP 端点与调用示例 |
-| [plotgram-core-pipeline.html](architecture/plotgram-core-pipeline.html) | Core 渲染管线可视化 |
-| [graphic-style-and-theme.html](architecture/graphic-style-and-theme.html) | Graphic Style 与 Theme 架构分离 |
-| [layout-algorithms-classification.html](architecture/layout-algorithms-classification.html) | 布局算法分类可视化 |
-
-### 布局意图（intent/）
-
-| 文档 | 内容 |
-|------|------|
-| [layout-intent-optimized.md](architecture/intent/layout-intent-optimized.md) | Layout Intent 优化设计 v2.1 |
-| [layout-intent-usage.md](architecture/intent/layout-intent-usage.md) | Layout Intent 使用指南 |
-| [layout-intent-usage.html](architecture/intent/layout-intent-usage.html) | 使用指南可视化页面 |
-| [layout-refinement-todo.md](architecture/intent/layout-refinement-todo.md) | Grid Snap / Layout Intent 实施进度跟踪 |
-
-### 布局优化（布局优化/）
-
-| 文档 | 内容 |
-|------|------|
-| [edge-routing-optimization-plan.md](architecture/布局优化/edge-routing-optimization-plan.md) | 边路由与标签布局优化方案 |
-| [group-subgraph-layout.md](architecture/布局优化/group-subgraph-layout.md) | Group 子图独立布局方案 |
-| [layout-routing-friendliness-evaluation.md](../backups/已经实现的方案/layout-routing-friendliness-evaluation.md) | ~~路由友好性评估~~（已移除；历史方案） |
-| [group-frame-spec.md](architecture/布局优化/group-frame-spec.md) | Group Frame 统一规范 — 组间/组内/节点三层框格模型 |
-| [hint-vs-intent-research.html](architecture/布局优化/hint-vs-intent-research.html) | Hint vs Intent 对比研究可视化 |
-
-### 算法参考（algorithms/）
-
-| 文档 | 内容 |
-|------|------|
-| [layout-algorithms-index.html](architecture/algorithms/layout-algorithms-index.html) | 布局算法总览 |
-| [layout-sugiyama.html](architecture/algorithms/layout-sugiyama.html) | Sugiyama 层次布局 |
-| [layout-radial.html](architecture/algorithms/layout-radial.html) | 径向布局 |
-| [layout-node-algorithms.html](architecture/algorithms/layout-node-algorithms.html) | 节点级布局算法 |
-| [edge-routing-algorithms.html](architecture/algorithms/edge-routing-algorithms.html) | 边路由算法 |
-
-### 外部研究（参考资料/）
-
-| 文档 | 内容 |
-|------|------|
-| [graphviz-algorithms-research.md](architecture/参考资料/graphviz-algorithms-research.md) | Graphviz 核心算法研究与 Rust 实现路线 |
-| [cytoscape-js-research.md](architecture/参考资料/cytoscape-js-research.md) | Cytoscape.js 能力研究与 Plotgram 取舍 |
-
-### 归档（backup/）
-
-| 文档 | 内容 |
-|------|------|
-| [architecture-layout-improvement-plan.md](architecture/backup/architecture-layout-improvement-plan.md) | 布局改进计划（历史） |
-| [flowchart-layout-analysis.md](architecture/backup/flowchart-layout-analysis.md) | 流程图布局分析（历史） |
-
----
-
 ## enterprise/ — 企业场景
 
 > 详细索引：[enterprise/README.md](enterprise/README.md)
@@ -195,16 +145,48 @@ docs/
 
 ---
 
-## animation/ — 动画能力
+## 方案计划/ — 各方向方案设计
+
+### 顶层方案
 
 | 文档 | 内容 |
 |------|------|
-| [animation-capability-research.md](animation/animation-capability-research.md) | SVG 动画能力需求分析与技术实现评估 |
-| [animation-capability-research.html](animation/animation-capability-research.html) | 同上（可视化页面） |
-| [animation-implementation-plan.md](animation/animation-implementation-plan.md) | 动画能力分阶段落地方案 |
-| [export-format-guide.md](animation/export-format-guide.md) | 三类用户的导出格式选型与 Playground 提示文案 |
-| [svg-embed-comparison.html](animation/svg-embed-comparison.html) | SVG 嵌入方式对比（`<img>` 与 CSS 动画实测） |
-| [svg-css-animation-tutorial.html](animation/svg-css-animation-tutorial.html) | SVG 内嵌 CSS 动画简明教程（说明 + 效果展示） |
+| [架构图领域通用性反思-2026-07.md](方案计划/架构图领域通用性反思-2026-07.md) | 架构图领域通用性反思 |
+| [甘特图设计方案-2026-07.md](方案计划/甘特图设计方案-2026-07.md) | 甘特图设计方案 |
+
+### animation/ — SVG 动画能力
+
+| 文档 | 内容 |
+|------|------|
+| [animation-capability-research.md](方案计划/animation/animation-capability-research.md) | SVG 动画能力需求分析与技术实现评估 |
+| [animation-implementation-plan.md](方案计划/animation/animation-implementation-plan.md) | 动画能力分阶段落地方案 |
+| [export-format-guide.md](方案计划/animation/export-format-guide.md) | 三类用户的导出格式选型与 Playground 提示文案 |
+| [svg-embedding-design-impact.md](方案计划/animation/svg-embedding-design-impact.md) | SVG 嵌入方式对设计的影响 |
+
+---
+
+## 问题整理/
+
+| 文档 | 内容 |
+|------|------|
+| [问题清单.md](问题整理/问题清单.md) | 问题清单与跟踪 |
+
+---
+
+## notes/ — 研究笔记与参考资料
+
+### 参考资料/
+
+| 文档 | 内容 |
+|------|------|
+| [graphviz-algorithms-research.md](notes/参考资料/graphviz-algorithms-research.md) | Graphviz 核心算法研究与 Rust 实现路线 |
+| [cytoscape-js-research.md](notes/参考资料/cytoscape-js-research.md) | Cytoscape.js 能力研究与 Plotgram 取舍 |
+
+---
+
+## architecture/ — 系统架构
+
+> 待整理迁移，详见 [architecture/README.md](architecture/README.md)（内容可能滞后）
 
 ---
 
@@ -220,7 +202,7 @@ docs/
 
 ## 阅读建议
 
-1. **新贡献者**：`architecture/overview.md` → `specs/language-spec.md` → `specs/dsl-writing-manual.md`
+1. **新贡献者**：`specs/language-spec.md` → `specs/dsl-writing-manual.md` → `guides/layout-lint.md`
 2. **写图表**：`specs/visual-language/` → [showcase/](../showcase/)
-3. **布局/路由开发**：`architecture/参考资料/` → `architecture/布局优化/` → [guides/layout-lint.md](guides/layout-lint.md)
+3. **布局/路由开发**：[总结经验/布局与路由核心手册-2026-07.md](总结经验/布局与路由核心手册-2026-07.md) → [优化重构/](优化重构/00-研究总览.html) → `guides/layout-lint.md`
 4. **产品/战略**：`product/vision.md` → `product/competitive-strategy.md` → `enterprise/`

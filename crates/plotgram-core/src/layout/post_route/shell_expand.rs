@@ -309,6 +309,6 @@ mod tests {
     fn bump_overflow_is_capped() {
         let mut overflow = BTreeMap::new();
         bump_overflow(&mut overflow, "g", GutterSide::Bottom, 500.0);
-        assert_eq!(overflow.get(&("g".into(), GutterSide::Bottom)).copied(), Some(48.0));
+        assert_eq!(overflow.get(&("g".into(), GutterSide::Bottom)).copied(), Some(24.0));
     }
 }

@@ -59,7 +59,6 @@ export const DOCS_SIDEBAR = [
     label: '深度阅读',
     items: [
       { to: '/docs/how-it-works/', label: '技术揭秘', active: false },
-      { to: '/docs/trae-story/', label: 'TRAE 开发实践', active: false },
     ],
   },
 ];

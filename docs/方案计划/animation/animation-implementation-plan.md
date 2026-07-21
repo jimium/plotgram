@@ -27,7 +27,7 @@
 | 伪需求 | 来源 | 不做的原因 |
 |--------|------|------------|
 | 节点弹跳/呼吸/发光等装饰动画 | "动画看起来很酷" | 归入"图形美观"维度，Mermaid 追平成本低，不构成壁垒（[competitive-strategy.md](../product/competitive-strategy.md) §2.1） |
-| 交互式图探索（拖拽/缩放/折叠） | "像 Cytoscape 一样" | 与产品定位冲突——Plotgram 是静态导出，不是交互探索器（[cytoscape-js-research.md](../architecture/参考资料/cytoscape-js-research.md)） |
+| 交互式图探索（拖拽/缩放/折叠） | "像 Cytoscape 一样" | 与产品定位冲突——Plotgram 是静态导出，不是交互探索器（[cytoscape-js-research.md](../notes/参考资料/cytoscape-js-research.md)） |
 | DSL 中写 `animate: pulse` 等节点级动画属性 | "用户想精确控制" | 动画是渲染关注点，污染 DSL 后破坏"语义优先"原则，且 Agent 生成成本飙升 |
 | GIF/MP4 光栅化导出（首发） | "PPT 要嵌入" | 依赖 Playwright + ffmpeg 重依赖，且失真；先用 HTML 导出覆盖 90% 场景 |
 
@@ -716,7 +716,7 @@ plotgram render auth-flow.pgm --format html-animation -o demo.html
 | [ast-spec.md](../specs/ast-spec.md) | 本方案新增 `Diagram.steps` + `Step` 结构 |
 | [export-scene-spec.md](../specs/export-scene-spec.md) | 本方案新增 `anchor_id` 字段 |
 | [layout-refinement-todo.md](../architecture/intent/layout-refinement-todo.md) | 动画工作在 Layout Intent MVP 完成后启动 |
-| [cytoscape-js-research.md](../architecture/参考资料/cytoscape-js-research.md) | "静态导出，非交互探索"——本方案的交互动画限定为导出 SVG 自带的轻交互 |
+| [cytoscape-js-research.md](../notes/参考资料/cytoscape-js-research.md) | "静态导出，非交互探索"——本方案的交互动画限定为导出 SVG 自带的轻交互 |
 | [diff2/README.md](../../crates/plotgram-core/src/diff2/README.md) | `ChangeSet` 是 Patch 动画的语义源 |
 | [AGENTS.md](../../AGENTS.md) | 遵守 §1 无向后兼容（直接改 AST/DSL）、§2 确定性迭代（动画编排用 Vec 不用 HashMap） |
 

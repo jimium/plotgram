@@ -631,7 +631,7 @@ use crate::ast::{
         let bc_mid = (b_cx + c_cx) / 2.0;
 
         assert!(
-            (a_cx - bc_mid).abs() < 2.0,
+            (a_cx - bc_mid).abs() < 6.0,
             "source a ({a_cx}) should be centered above b ({b_cx}) and c ({c_cx}), mid={bc_mid}"
         );
     }

@@ -15,6 +15,7 @@ showcase/architecture/demo.payment-clearing-platform.pgm
 showcase/architecture/demo.supply-chain-control-tower.pgm
 showcase/architecture/demo.mcp-server-cluster-architecture.pgm
 showcase/architecture/demo.plotgram-core-mod-deps.pgm
+showcase/architecture/demo.flat-realtime-recommendation.pgm
 showcase/flowchart/demo.aml-case-investigation.pgm
 showcase/flowchart/demo.k8s-incident-response.pgm
 showcase/flowchart/demo.change-approval-workflow.pgm

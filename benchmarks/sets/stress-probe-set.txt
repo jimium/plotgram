@@ -4,6 +4,7 @@
 # 来源：docs/architecture/重构方案/casev2/gates/stress-probe-set.txt
 
 showcase/architecture/stress.layout-stress-nested.pgm
+showcase/architecture/stress.layout-stress-flat-mesh.pgm
 showcase/er/stress.layout-stress-dense.pgm
 showcase/flowchart/stress.layout-stress-dag.pgm
 showcase/sequence/stress.layout-stress-lifelines.pgm

@@ -67,6 +67,74 @@ pub fn build_obstacle_context<'a>(
     (node_id_to_idx, obstacle_index)
 }
 
+/// 快速检测是否有任何边可能穿障（直线段 vs 节点 bbox 粗检）。
+///
+/// 用于懒构建 ObstacleIndex：若无边可能穿障 → 跳过 O(n²) 构建。
+/// 粗检使用直线段（而非实际曲线），保守估计：
+/// - 若直线段不穿障，曲线也可能穿障（假阴性）→ 仍构建 ObstacleIndex
+/// - 若直线段穿障，曲线很可能穿障（真阳性）→ 构建 ObstacleIndex
+///
+/// 返回 `true` 表示需要构建 ObstacleIndex，`false` 表示可跳过。
+pub fn quick_check_need_obstacle_index(
+    result: &LayoutResult,
+    relations: &[Relation],
+) -> bool {
+    // 节点少于 3 个时不可能穿障（只有起止节点）
+    if result.nodes.len() <= 2 {
+        return false;
+    }
+
+    for rel in relations {
+        let Some(from_nl) = result.nodes.get(rel.from.as_str()) else {
+            continue;
+        };
+        let Some(to_nl) = result.nodes.get(rel.to.as_str()) else {
+            continue;
+        };
+
+        // 起止节点中心
+        let start = Point::new(
+            from_nl.x + from_nl.width / 2.0,
+            from_nl.y + from_nl.height / 2.0,
+        );
+        let end = Point::new(
+            to_nl.x + to_nl.width / 2.0,
+            to_nl.y + to_nl.height / 2.0,
+        );
+
+        // 检查直线段是否穿过任何其他节点的 bbox
+        for (id, nl) in &result.nodes {
+            // 跳过起止节点
+            if id == rel.from.as_str() || id == rel.to.as_str() {
+                continue;
+            }
+
+            // 节点 bbox（含 padding）
+            let pad = constants::DEFAULT_NODE_MARGIN;
+            let bbox = (
+                nl.x - pad,
+                nl.y - pad,
+                nl.x + nl.width + pad,
+                nl.y + nl.height + pad,
+            );
+
+            // 快速排斥：线段 bbox 与节点 bbox 不相交 → 不可能穿障
+            let seg_min_x = start.x.min(end.x);
+            let seg_max_x = start.x.max(end.x);
+            let seg_min_y = start.y.min(end.y);
+            let seg_max_y = start.y.max(end.y);
+            if seg_max_x < bbox.0 || seg_min_x > bbox.2 || seg_max_y < bbox.1 || seg_min_y > bbox.3 {
+                continue;
+            }
+
+            // 线段与 bbox 相交 → 可能需要穿障检测
+            return true;
+        }
+    }
+
+    false
+}
+
 /// 一条边的端点解析结果
 #[derive(Clone)]
 pub struct EdgeEndpoints {

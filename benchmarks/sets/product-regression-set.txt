@@ -5,6 +5,7 @@
 # --- architecture ---
 showcase/architecture/product.three-tier.pgm
 showcase/architecture/product.typical-microservice-architecture.pgm
+showcase/architecture/product.flat-rest-api.pgm
 showcase/architecture/product.microservices.pgm
 showcase/architecture/product.cdn-cache.pgm
 showcase/architecture/product.cloud-native.pgm

@@ -4,7 +4,6 @@ import Home from './pages/Home';
 import GettingStarted from './pages/GettingStarted';
 import AgentGuide from './pages/AgentGuide';
 import HowItWorks from './pages/HowItWorks';
-import TraeStory from './pages/TraeStory';
 import Faq from './pages/Faq';
 
 export default function App() {
@@ -16,7 +15,6 @@ export default function App() {
           <Route path="docs/getting-started" element={<GettingStarted />} />
           <Route path="docs/agent-guide" element={<AgentGuide />} />
           <Route path="docs/how-it-works" element={<HowItWorks />} />
-          <Route path="docs/trae-story" element={<TraeStory />} />
           <Route path="docs/faq" element={<Faq />} />
         </Route>
       </Routes>

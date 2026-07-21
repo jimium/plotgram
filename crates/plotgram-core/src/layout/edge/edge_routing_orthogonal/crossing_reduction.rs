@@ -55,6 +55,12 @@ pub fn minimize_crossings_post_route(
 /// 最小平移后边段间距（避免 tight_sev 退化；匹配 ORTHO_PARALLEL_GAP = 8px）
 const MIN_EDGE_CLEARANCE: f64 = 8.0;
 
+/// 渐进式 clearance 放松阈值（密集图 fallback）
+const RELAXED_EDGE_CLEARANCE: f64 = 6.0;
+
+/// 局部邻域检查范围（仅检查被平移段 bounding box 扩展此距离内的边段）
+const NEIGHBORHOOD_PADDING: f64 = 20.0;
+
 /// 尝试通过调整边 j 的折点来消除与边 i 的交叉
 fn try_resolve_crossing(
     edges: &mut [EdgeLayout],
@@ -94,41 +100,47 @@ fn try_resolve_crossing(
 
         // 确定段方向并尝试平移（小偏移优先，减少 tight_sev 退化风险）
         let is_horizontal = (p1.y - p2.y).abs() < 0.01;
-        let offsets: &[f64] = &[4.0, -4.0, 8.0, -8.0];
+        let offsets: &[f64] = &[4.0, -4.0, 8.0, -8.0, 12.0, -12.0];
 
-        for &offset in offsets {
-            let mut candidate = j_points.clone();
-            if is_horizontal {
-                candidate[seg_idx].y += offset;
-                candidate[seg_idx + 1].y += offset;
-            } else {
-                candidate[seg_idx].x += offset;
-                candidate[seg_idx + 1].x += offset;
+        // 渐进式 clearance：先严格，后放松
+        for &clearance_scale in &[1.0, 0.75] {
+            for &offset in offsets {
+                let mut candidate = j_points.clone();
+                if is_horizontal {
+                    candidate[seg_idx].y += offset;
+                    candidate[seg_idx + 1].y += offset;
+                } else {
+                    candidate[seg_idx].x += offset;
+                    candidate[seg_idx + 1].x += offset;
+                }
+
+                // 验证：不穿越节点
+                if path_crosses_any_node(&candidate, nodes, &edges[j]) {
+                    continue;
+                }
+
+                // 验证：消除了与边 i 的交叉
+                if polylines_cross_points(&i_points, &candidate) {
+                    continue;
+                }
+
+                // 验证：平移段与局部邻域边段保持最小间距（避免 tight_sev 退化）
+                if !shifted_segment_clearance_local(&candidate, seg_idx, edges, j, clearance_scale) {
+                    continue;
+                }
+
+                // 全局验证：临时应用候选，检查总交叉数严格下降
+                let old_geom = edges[j].geometry.clone();
+                edges[j].geometry = PathGeometry::Polyline { points: candidate.clone() };
+                let after_total = count_total_crossings(edges);
+                edges[j].geometry = old_geom;
+
+                if after_total < current_total {
+                    best_points = Some(candidate);
+                    break;
+                }
             }
-
-            // 验证：不穿越节点
-            if path_crosses_any_node(&candidate, nodes, &edges[j]) {
-                continue;
-            }
-
-            // 验证：消除了与边 i 的交叉
-            if polylines_cross_points(&i_points, &candidate) {
-                continue;
-            }
-
-            // 验证：平移段与其他边段保持最小间距（避免 tight_sev 退化）
-            if !shifted_segment_clearance(&candidate, seg_idx, edges, j) {
-                continue;
-            }
-
-            // 全局验证：临时应用候选，检查总交叉数严格下降
-            let old_geom = edges[j].geometry.clone();
-            edges[j].geometry = PathGeometry::Polyline { points: candidate.clone() };
-            let after_total = count_total_crossings(edges);
-            edges[j].geometry = old_geom;
-
-            if after_total < current_total {
-                best_points = Some(candidate);
+            if best_points.is_some() {
                 break;
             }
         }
@@ -146,7 +158,79 @@ fn try_resolve_crossing(
     }
 }
 
-/// 检查被平移的段与其他边段的间距。
+/// 检查被平移的段与局部邻域边段的间距。
+/// 仅检查平移段 bounding box 扩展 NEIGHBORHOOD_PADDING 内的边段（性能优化）。
+/// 对平行重叠段要求更严格（避免 tight_sev 退化）。
+/// `clearance_scale`: 1.0 = 严格约束，0.75 = 放松约束（密集图 fallback）
+fn shifted_segment_clearance_local(
+    candidate: &[Point],
+    seg_idx: usize,
+    edges: &[EdgeLayout],
+    self_idx: usize,
+    clearance_scale: f64,
+) -> bool {
+    let seg_a = (
+        candidate[seg_idx].x,
+        candidate[seg_idx].y,
+        candidate[seg_idx + 1].x,
+        candidate[seg_idx + 1].y,
+    );
+    let seg_len = ((seg_a.2 - seg_a.0).powi(2) + (seg_a.3 - seg_a.1).powi(2)).sqrt();
+    if seg_len < 1.0 {
+        return true;
+    }
+    let a_horiz = (seg_a.1 - seg_a.3).abs() < 0.01;
+    let a_vert = (seg_a.0 - seg_a.2).abs() < 0.01;
+
+    // 计算被平移段的 bounding box（扩展 NEIGHBORHOOD_PADDING）
+    let bbox = (
+        seg_a.0.min(seg_a.2) - NEIGHBORHOOD_PADDING,
+        seg_a.1.min(seg_a.3) - NEIGHBORHOOD_PADDING,
+        seg_a.0.max(seg_a.2) + NEIGHBORHOOD_PADDING,
+        seg_a.1.max(seg_a.3) + NEIGHBORHOOD_PADDING,
+    );
+
+    for (idx, edge) in edges.iter().enumerate() {
+        if idx == self_idx {
+            continue;
+        }
+        let other_pts = match &edge.geometry {
+            PathGeometry::Polyline { points } => points.as_slice(),
+            _ => continue,
+        };
+        for m in 0..other_pts.len().saturating_sub(1) {
+            let seg_b = (other_pts[m].x, other_pts[m].y, other_pts[m + 1].x, other_pts[m + 1].y);
+
+            // 局部邻域剪枝：跳过 bounding box 不相交的段
+            if seg_b.0.max(seg_b.2) < bbox.0
+                || seg_b.0.min(seg_b.2) > bbox.2
+                || seg_b.1.max(seg_b.3) < bbox.1
+                || seg_b.1.min(seg_b.3) > bbox.3
+            {
+                continue;
+            }
+
+            let b_horiz = (seg_b.1 - seg_b.3).abs() < 0.01;
+            let b_vert = (seg_b.0 - seg_b.2).abs() < 0.01;
+
+            // 平行重叠段：要求更大间距（介于 ORTHO_PARALLEL_GAP=8 和 architecture=12 之间）
+            let base_required = if (a_horiz && b_horiz) || (a_vert && b_vert) {
+                10.0
+            } else {
+                MIN_EDGE_CLEARANCE
+            };
+            let required = base_required * clearance_scale;
+
+            let dist = seg_to_seg_dist(seg_a, seg_b);
+            if dist < required {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// 检查被平移的段与其他边段的间距（全局版本，保留用于对比测试）。
 /// 仅检查平移段（seg_idx → seg_idx+1），未移动的段不参与检查。
 /// 对平行重叠段要求更严格（避免 tight_sev 退化）。
 fn shifted_segment_clearance(

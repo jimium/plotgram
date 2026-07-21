@@ -20,7 +20,7 @@ benchmarks/
 - 本地服务：`./benchmarks/serve-viewer.py` → http://127.0.0.1:8765/readme
 
 **产品规定（共线 / 合流验收语言）**：  
-[`docs/architecture/方案计划/collinear-and-arrow-merge-comparison.md`](../docs/architecture/方案计划/collinear-and-arrow-merge-comparison.md) §2  
+[`docs/architecture/方案计划/collinear-and-arrow-merge-comparison.md`](../docs/方案计划/collinear-and-arrow-merge-comparison.md) §2  
 （Allowed / NeedsSeparation / Degraded；不以「共线计数归零」为成功标准。）
 
 **角色分层重构方案**：[`docs/architecture/重构方案/showcase-基线分层重构-2026-07.md`](../docs/architecture/重构方案/showcase-基线分层重构-2026-07.md)

@@ -332,6 +332,26 @@ impl<'a> LayoutPipeline<'a> {
                 );
             }
 
+            // Phase C2: 路由后交叉消解（后处理之后调用，避免 snap/sanitize 引入新交叉抵消效果）
+            if edge_routing_style == "orthogonal" {
+                let t_c2 = crate::layout::perf::Instant::now();
+                let crossings_eliminated =
+                    crate::layout::edge::edge_routing_orthogonal::crossing_reduction::minimize_crossings_post_route(
+                        &mut result.edges,
+                        &result.nodes,
+                    );
+                if crossings_eliminated > 0 {
+                    crate::perf_log!(
+                        "[perf]     c2_crossing_reduction: eliminated={}",
+                        crossings_eliminated
+                    );
+                }
+                crate::perf_log!(
+                    "[perf]     c2_crossing_reduction: {:.2}ms",
+                    t_c2.elapsed().as_secs_f64() * 1000.0
+                );
+            }
+
             // N2：repair 后 lint 同语义只读复校（记账 / degraded，不扩写几何）。
             crate::layout::refine::recheck_lint_pierce_post_freeze(self.diagram, &mut result);
 

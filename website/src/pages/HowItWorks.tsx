@@ -177,10 +177,10 @@ export default function HowItWorks() {
           <p>将 Plotgram 嵌入 LLM 应用和 AI Agent</p>
           <span className="ql-arrow">→</span>
         </a>
-        <a href="/docs/trae-story/" className="quick-link-card">
-          <div className="ql-icon">📖</div>
-          <h4>TRAE 开发实践</h4>
-          <p>了解 Plotgram 的开发历程和经验</p>
+        <a href="/docs/getting-started/" className="quick-link-card">
+          <div className="ql-icon">🚀</div>
+          <h4>快速上手</h4>
+          <p>5 分钟学会用 Plotgram 画图</p>
           <span className="ql-arrow">→</span>
         </a>
         <a href="/playground/" className="quick-link-card" target="_blank" rel="noopener noreferrer">

@@ -5,6 +5,7 @@
 # 来源：docs/architecture/重构方案/casev2/gates/mech-set.txt
 
 showcase/architecture/mech.constrain-cross-group.pgm
+showcase/architecture/mech.constrain-flat-chain.pgm
 showcase/flowchart/mech.constrain-sink.pgm
 showcase/flowchart/product.user-auth.pgm
 showcase/architecture/product.typical-microservice-architecture.pgm

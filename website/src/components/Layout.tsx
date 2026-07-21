@@ -17,8 +17,6 @@ const NAV_ITEMS = [
   { to: '/', label: '首页', end: true },
   { to: '/docs/getting-started', label: '快速上手' },
   { to: '/docs/agent-guide', label: 'Agent 集成' },
-  { to: '/docs/trae-story', label: 'TRAE 开发实践' },
-  { to: '/#roadmap', label: '路线图', hash: true },
 ];
 
 export default function Layout() {
@@ -32,20 +30,14 @@ export default function Layout() {
           </Link>
           <div className="nav-links">
             {NAV_ITEMS.map((item) => (
-              item.hash ? (
-                <a key={item.to} href={item.to} className="nav-link-hash">
-                  {item.label}
-                </a>
-              ) : (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) => (isActive ? 'nav-link-active' : '')}
-                >
-                  {item.label}
-                </NavLink>
-              )
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) => (isActive ? 'nav-link-active' : '')}
+              >
+                {item.label}
+              </NavLink>
             ))}
           </div>
           <div className="nav-cta-group">
@@ -79,8 +71,6 @@ export default function Layout() {
             <a href="/docs/getting-started/">快速上手</a>
             <a href="/docs/agent-guide/">Agent 集成</a>
             <a href="/docs/how-it-works/">技术揭秘</a>
-            <a href="/docs/trae-story/">TRAE 开发实践</a>
-            <a href="/#roadmap">路线图</a>
             <a href="/docs/faq/">FAQ</a>
           </div>
         </div>

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# 构建并发布 playground 到 demo.plotgram.dev/playground/
+# 构建并发布 playground 到 plotgram.cn/playground/
 #
 # 产物：
-#   - demo 站:  /var/www/plotgram/playground/  （HTML、favicon、logo，不含 assets/、plotgram-wasm/）
-#   - CDN:      /playground/assets/             （打包 js / css）
+#   - 主站:  /var/www/plotgram.cn/playground/  （HTML、favicon、logo，不含 assets/、plotgram-wasm/）
+#   - CDN:   /playground/assets/                （打包 js / css）
 #
 # 前置条件：playground/plotgram-wasm/ 必须存在（由 deploy-wasm.sh 构建）。
 # 本脚本不构建 wasm，只负责 playground 自身的 vite build 与同步。
@@ -24,13 +24,13 @@ usage() {
   cat <<'EOF'
 用法: deploy/deploy-playground.sh [选项]
 
-构建 playground 并同步到 demo 站 /playground/ 与 CDN。
+构建 playground 并同步到 plotgram.cn/playground/ 与 CDN。
 
 前置：需先运行 ./deploy/deploy-wasm.sh 生成 playground/plotgram-wasm/。
 
 选项:
   --skip-build    跳过 vite build，用已有 dist 同步
-  --setup-nginx   同步 nginx 配置（demo 站 + CDN）
+  --setup-nginx   同步 nginx 配置
   -h, --help      显示此帮助
 EOF
 }
@@ -51,7 +51,6 @@ PLAYGROUND_DIR="$ROOT_DIR/playground"
 PLAYGROUND_BASE="/playground/"
 PLAYGROUND_CDN_BASE="${CDN_BASE}playground/"
 PLAYGROUND_REMOTE="$DEPLOY_HOST:$REMOTE_DIR/playground/"
-PLAYGROUND_MIRROR_REMOTE="$SITE_MIRROR_HOST:$SITE_MIRROR_DIR/playground/"
 CDN_PLAYGROUND_REMOTE="$ASSET_HOST:$ASSET_REMOTE_DIR/playground/"
 
 # ─── 构建 ───────────────────────────────────────────────
@@ -75,20 +74,17 @@ build() {
 # ─── 打包暂存 ───────────────────────────────────────────
 stage_artifacts() {
   STAGING_DIR="$(new_staging_dir)"
-  mkdir -p "$STAGING_DIR/demo-playground" "$STAGING_DIR/demo-playground-cn" "$STAGING_DIR/cdn-playground"
+  mkdir -p "$STAGING_DIR/playground" "$STAGING_DIR/cdn-playground"
 
-  # demo 站：playground 不含 wasm / 打包 assets（走 CDN）
+  # 主站：playground 不含 wasm / 打包 assets（走 CDN）
   rsync -a --delete \
     --exclude='plotgram-wasm/' \
     --exclude='assets/' \
-    "$PLAYGROUND_DIR/dist/" "$STAGING_DIR/demo-playground/"
+    "$PLAYGROUND_DIR/dist/" "$STAGING_DIR/playground/"
 
-  # 镜像站副本：复制后注入 ICP 备案号（仅 plotgram.cn）
-  rsync -a "$STAGING_DIR/demo-playground/" "$STAGING_DIR/demo-playground-cn/"
-  if [[ "$MIRROR_ENABLED" == "true" ]]; then
-    log "注入 ICP 备案号 → plotgram.cn playground/index.html"
-    inject_icp_badge "$STAGING_DIR/demo-playground-cn/index.html"
-  fi
+  # 注入 ICP 备案号
+  log "注入 ICP 备案号 → playground/index.html"
+  inject_icp_badge "$STAGING_DIR/playground/index.html"
 
   # CDN：playground 打包 assets（js / css），保留 assets/ 子目录层级
   mkdir -p "$STAGING_DIR/cdn-playground/assets"
@@ -99,21 +95,11 @@ stage_artifacts() {
 # ─── 上传 ───────────────────────────────────────────────
 upload() {
   require_cmd rsync
-  # 主站（plotgram.dev）
-  log "同步 demo → 主站 (plotgram.dev)"
+  # 主站（plotgram.cn）
+  log "同步 playground → plotgram.cn"
   ssh "$DEPLOY_HOST" "mkdir -p '$REMOTE_DIR/playground'"
   rsync -avz --delete \
-    "$STAGING_DIR/demo-playground/" "$PLAYGROUND_REMOTE"
-
-  # 镜像站（plotgram.cn，含 ICP badge）
-  if [[ "$MIRROR_ENABLED" == "true" ]]; then
-    log "同步 demo → 镜像站 (plotgram.cn，含 ICP badge)"
-    ssh "$SITE_MIRROR_HOST" "mkdir -p '$SITE_MIRROR_DIR/playground'"
-    rsync -avz --delete \
-      "$STAGING_DIR/demo-playground-cn/" "$PLAYGROUND_MIRROR_REMOTE"
-  else
-    log "跳过镜像同步（MIRROR_ENABLED=false）"
-  fi
+    "$STAGING_DIR/playground/" "$PLAYGROUND_REMOTE"
 
   log "同步 CDN → $CDN_PLAYGROUND_REMOTE"
   ssh "$ASSET_HOST" "mkdir -p '$ASSET_REMOTE_DIR/playground'"
@@ -124,13 +110,13 @@ upload() {
 # ─── 主流程 ─────────────────────────────────────────────
 main() {
   log "=== 发布 playground ==="
-  log "  访问地址: https://demo.plotgram.dev/playground/"
+  log "  访问地址: https://www.plotgram.cn/playground/"
 
   setup_ssh_multiplexing "$DEPLOY_HOST" "$ASSET_HOST"
 
   if [[ "$SETUP_NGINX" == true ]]; then
-    sync_nginx "$DEPLOY_HOST" nginx/demo.plotgram.dev.conf
-    sync_nginx "$ASSET_HOST" nginx/assets.pg.agcli.cn.conf nginx/plotgram.cn.conf
+    sync_nginx "$DEPLOY_HOST" nginx/plotgram.cn.conf
+    sync_nginx "$ASSET_HOST" nginx/assets.pg.agcli.cn.conf
   fi
 
   if [[ "$SKIP_BUILD" == false ]]; then
@@ -145,9 +131,8 @@ main() {
 
   echo ""
   echo "✅ 发布完成"
-  echo "   Playground (plotgram.dev): https://demo.plotgram.dev/playground/"
-  echo "   Playground (plotgram.cn):  https://www.plotgram.cn/playground/"
-  echo "   CDN:                       ${CDN_BASE}playground/assets/"
+  echo "   Playground: https://www.plotgram.cn/playground/"
+  echo "   CDN:        ${CDN_BASE}playground/assets/"
   echo ""
 }
 

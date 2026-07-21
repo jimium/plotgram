@@ -109,8 +109,8 @@ run_step() {
 main() {
   log "=== 全量发布 Plotgram ==="
   log "  步骤: ${STEPS[*]}"
-  log "  demo 站: $DEPLOY_HOST"
-  log "  CDN:     $ASSET_HOST"
+  log "  站点: $DEPLOY_HOST ($REMOTE_DIR)"
+  log "  CDN:  $ASSET_HOST ($ASSET_REMOTE_DIR)"
   if [[ "$SKIP_RENDER" == true ]]; then
     log "  showcase: 跳过 SVG 渲染"
   fi
@@ -133,18 +133,13 @@ main() {
     exit 1
   fi
   echo ""
-  echo "   plotgram.dev:"
-  echo "     Website:    https://demo.plotgram.dev/"
-  echo "     Playground: https://demo.plotgram.dev/playground/"
-  echo "     Showcase:   https://demo.plotgram.dev/showcase/"
-  echo "     Agent:      https://demo.plotgram.dev/agent/"
   echo "   plotgram.cn:"
   echo "     Website:    https://www.plotgram.cn/"
   echo "     Playground: https://www.plotgram.cn/playground/"
   echo "     Showcase:   https://www.plotgram.cn/showcase/"
   echo "     Agent:      https://www.plotgram.cn/agent/"
-  echo "   API:          https://api.pg.agcli.cn/health (或 https://api.plotgram.cn/health)"
-  echo "   CDN:          ${CDN_BASE} (或 https://assets.plotgram.cn/)"
+  echo "   API:          https://api.pg.agcli.cn/health"
+  echo "   CDN:          ${CDN_BASE}"
   echo ""
 }
 

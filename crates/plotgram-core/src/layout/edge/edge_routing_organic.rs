@@ -217,7 +217,13 @@ pub fn route_edges_organic(
     let is_mindmap = matches!(diagram.diagram_type, DiagramType::Mindmap);
     // mindmap 树布局中所有边都是父子直连（depth diff=1），不会穿障，
     // 跳过 O(n²) 的 ObstacleIndex 构建（63 节点 → 87ms → 0ms）
-    let need_obstacle_index = !(is_mindmap && node_depths.is_some());
+    // P0-3: 非 mindmap 也做快速粗检，若无边可能穿障则跳过构建
+    let need_obstacle_index = if is_mindmap && node_depths.is_some() {
+        false
+    } else {
+        // 快速检测：直线段 vs 节点 bbox 粗检
+        crate::layout::edge::common::routing_skeleton::quick_check_need_obstacle_index(&result, relations)
+    };
 
     let (node_id_to_idx, obstacle_index) = if need_obstacle_index {
         let (idx, obs) = crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
