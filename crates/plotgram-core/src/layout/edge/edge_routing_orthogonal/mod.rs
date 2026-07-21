@@ -95,8 +95,8 @@ pub(super) use run::{
 // run 总控各 phase 实现（A4 从 run.rs 拆出）；供总控与 stub_fix 经 `use super::*` 调用
 pub(super) use phases::{
     aligned_fanin_target_port, extract_protected_vertical_trunks, phase_lane, phase_layer_order,
-    phase_port_slot, phase_reroute, phase_reroute_feedback_after_trunk, phase_route_edges,
-    phase_sanitize, phase_straighten_align, phase_stub_fix,
+    phase_port_correction, phase_port_slot, phase_reroute, phase_reroute_feedback_after_trunk,
+    phase_route_edges, phase_sanitize,
 };
 
 /// 相邻磁吸点之间的理想间距（像素）；边长不足时自动压缩。

@@ -10,6 +10,8 @@ pub struct ScoringWeights {
     pub obstacle: f64,
     pub corridor_misalignment: f64,
     pub channel_load: f64,
+    /// P1-2: 通道对齐软约束权重（路径主段落在规划通道坐标上时奖励）
+    pub channel_alignment: f64,
 }
 
 impl Default for ScoringWeights {
@@ -20,6 +22,7 @@ impl Default for ScoringWeights {
             obstacle: 1.0,
             corridor_misalignment: 1.0,
             channel_load: 1.0,
+            channel_alignment: 1.0,
         }
     }
 }
@@ -87,6 +90,7 @@ fn architecture_default_profile() -> OrthoRoutingProfile {
             obstacle: 1.5,
             corridor_misalignment: 1.2,
             channel_load: 1.0,
+            channel_alignment: 1.0,
         },
         prefer_trunk_fork: false,
     }

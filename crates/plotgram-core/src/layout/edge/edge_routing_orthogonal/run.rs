@@ -124,11 +124,15 @@ pub(super) fn route_edges_orthogonal_inner(
 
     // Phase B1：构建 OVG（仅当环境变量启用时）——节点障碍物阻断 + 组软惩罚
     // 节点膨胀使用 NODE_OBSTACLE_PAD + 10，给路径更多 clearance，减少 tight 违规
-    let ovg = if visibility_graph::ovg_enabled() {
-        let group_rects: Vec<crate::layout::geometry::Rect> = obstacles.sorted_group_ids.iter()
-            .filter_map(|gid| group_ctx.groups.get(gid))
-            .map(|gl| crate::layout::geometry::Rect::from(gl))
-            .collect();
+    // P1-3: 大图（>50 节点）延迟构建——先无 OVG 路由，收集 degraded 边后构建局部 OVG
+    const OVG_DEFERRED_THRESHOLD: usize = 50;
+    let use_deferred_ovg = visibility_graph::ovg_enabled()
+        && result.nodes.len() > OVG_DEFERRED_THRESHOLD;
+    let group_rects: Vec<crate::layout::geometry::Rect> = obstacles.sorted_group_ids.iter()
+        .filter_map(|gid| group_ctx.groups.get(gid))
+        .map(|gl| crate::layout::geometry::Rect::from(gl))
+        .collect();
+    let ovg = if visibility_graph::ovg_enabled() && !use_deferred_ovg {
         let ovg_graph = visibility_graph::build_ovg_with_groups(
             &result.nodes,
             &obstacles.sorted_node_ids,
@@ -172,70 +176,145 @@ pub(super) fn route_edges_orthogonal_inner(
         channel_plan.as_ref(),
     );
 
-    // ── 4b. 后置交叉检测：修正 slot 排序与实际路由方向不一致的锚点 ──
+    // P1-3: 大图延迟 OVG——收集 degraded 边，构建局部 OVG，重路由
+    let local_ovg = if use_deferred_ovg {
+        let t_local = crate::layout::perf::Instant::now();
+        // 检测 degraded 边：路径穿越非自身节点障碍物
+        let node_pad = NODE_OBSTACLE_PAD + 10.0;
+        let node_obstacles: Vec<(usize, crate::layout::geometry::Rect)> = obstacles
+            .sorted_node_ids
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, id)| {
+                result.nodes.get(id).map(|nl| {
+                    (idx, crate::layout::geometry::Rect::new(nl.x, nl.y, nl.width, nl.height).expanded(node_pad))
+                })
+            })
+            .collect();
+
+        let mut degraded_regions: Vec<(Point, Point)> = Vec::new();
+        let mut degraded_indices: Vec<usize> = Vec::new();
+        for i in 0..n {
+            if edges[i].path_is_empty() {
+                continue;
+            }
+            let from_id = relations[i].from.as_str();
+            let to_id = relations[i].to.as_str();
+            let from_obs_idx = obstacles.sorted_node_ids.iter().position(|id| id == from_id);
+            let to_obs_idx = obstacles.sorted_node_ids.iter().position(|id| id == to_id);
+            let pts: Vec<Point> = edges[i].path_points().into_owned();
+            // 检查路径是否穿越任何非自身节点障碍物
+            let is_degraded = node_obstacles.iter().any(|(obs_idx, rect)| {
+                if Some(*obs_idx) == from_obs_idx || Some(*obs_idx) == to_obs_idx {
+                    return false;
+                }
+                pts.windows(2).any(|w| rect.segment_crosses_interior(w[0], w[1], 0.1))
+            });
+            if is_degraded {
+                if let (Some(from_ep), Some(to_ep)) = (
+                    endpoint_map.get(&(i, true)),
+                    endpoint_map.get(&(i, false)),
+                ) {
+                    degraded_regions.push((from_ep.anchor, to_ep.anchor));
+                    degraded_indices.push(i);
+                }
+            }
+        }
+
+        if degraded_regions.is_empty() {
+            crate::perf_log!(
+                "[perf]     p13_deferred_ovg: {:.2}ms (0 degraded, skip)",
+                t_local.elapsed().as_secs_f64() * 1000.0
+            );
+            None
+        } else {
+            let local = visibility_graph::build_local_ovg(
+                &degraded_regions,
+                &result.nodes,
+                &obstacles.sorted_node_ids,
+                node_pad,
+                &group_rects,
+                80.0,
+            );
+            crate::perf_log!(
+                "[perf]     p13_deferred_ovg: {:.2}ms ({} degraded edges, {} vertices)",
+                t_local.elapsed().as_secs_f64() * 1000.0,
+                degraded_indices.len(),
+                local.vertex_count()
+            );
+            if local.is_empty() {
+                None
+            } else {
+                // 重路由 degraded 边
+                grid.remove_by_edges(&degraded_indices);
+                let mut rerouted = 0usize;
+                for &ei in &degraded_indices {
+                    let Some(from_ep) = endpoint_map.get(&(ei, true)) else { continue };
+                    let Some(to_ep) = endpoint_map.get(&(ei, false)) else { continue };
+                    let (from_id, to_id) = (relations[ei].from.as_str(), relations[ei].to.as_str());
+                    let pair = EndpointPair { from: from_ep.clone(), to: to_ep.clone() };
+                    let has_chain = corridor_plan.chains.contains_key(&ei);
+                    let strict = should_strict_group_transit(
+                        &profile, &group_ctx, from_id, to_id, has_chain, false,
+                    );
+                    let mut ctx = OrthoRoutingContext::new(
+                        &result.nodes, &group_ctx, &grid, &cfg, &profile, &obstacles, None,
+                    )
+                    .with_strict_group_transit(strict)
+                    .with_corridor_boost(true)
+                    .with_ovg(&local);
+                    let mut path_stats = PathSelectStats::default();
+                    let new_path = select_best_path_with_scorer_stats(
+                        &ctx, &pair, &DefaultScorer, Some(&mut path_stats), false,
+                    );
+                    if !path_stats.degraded {
+                        let labels = match relations.get(ei) {
+                            Some(rel) => crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto(
+                                rel, ei, relations, &new_path,
+                            ),
+                            None => Vec::new(),
+                        };
+                        grid.insert_path(&new_path, ei);
+                        let mut edge = EdgeLayout {
+                            geometry: PathGeometry::Polyline { points: Vec::new() },
+                            labels,
+                            from_port: from_side[ei],
+                            to_port: to_side[ei],
+                        };
+                        edge.set_polyline_points(new_path);
+                        edges[ei] = edge;
+                        rerouted += 1;
+                        // 更新统计：从 degraded 中移除
+                        ortho_stats.degraded_count = ortho_stats.degraded_count.saturating_sub(1);
+                    } else {
+                        // 保留原路径
+                        let pts: Vec<Point> = edges[ei].path_points().into_owned();
+                        grid.insert_path(&pts, ei);
+                    }
+                }
+                crate::perf_log!(
+                    "[perf]     p13_reroute_degraded: {} / {} improved",
+                    rerouted,
+                    degraded_indices.len()
+                );
+                Some(local)
+            }
+        }
+    } else {
+        None
+    };
+    // P1-3: 延迟 OVG 模式下，后续阶段使用局部 OVG；否则使用全图 OVG
+    let effective_ovg = if use_deferred_ovg {
+        local_ovg.as_ref()
+    } else {
+        ovg.as_ref()
+    };
+
+    // ── 4b. 端口修正（合并 slot 重排 + 对齐修正 + stub 翻转）──
+    // 写权契约：本阶段是 from_side / to_side / endpoint_map 的最终写者，
+    // 后续阶段（reroute、lane、sanitize）只读端口，不修改。
     let t_fix = crate::layout::perf::Instant::now();
-    //
-    // slot 排序（步骤 2）按对端节点中心坐标排列，但当边的实际路由方向与对端位置
-    // 方向不一致时（如需要绕过中间节点），排序结果会导致出边交叉。
-    // 典型场景：节点 A 底部两条出边，左边 slot 的边实际向右绕行，右边 slot 的边
-    // 直下，两者在节点下方交叉。交换 slot 后即可消除交叉。
-    replan_slots(
-        &result.nodes,
-        &relations,
-        &from_side,
-        &to_side,
-        &mut endpoint_map,
-        &mut edges,
-        &mut grid,
-        &cfg,
-        &group_ctx,
-        &obstacles,
-        &corridor_plan,
-        &mut ortho_stats,
-        &profile,
-    );
-
-    // ── 4c. 直连偏好对齐：正对端口边的 slot 锚点对齐修正 ──
-    phase_straighten_align(
-        &result.nodes,
-        n,
-        &from_side,
-        &to_side,
-        &mut endpoint_map,
-        &mut edges,
-        &mut grid,
-        relations,
-        &reverse_pairs,
-        &parallel,
-        &corridor_plan,
-        &group_ctx,
-        &obstacles,
-        &cfg,
-        &profile,
-        &result.hints.space_budget,
-        ovg.as_ref(),
-    );
-
-    // ── 4d. X-1: 多轮冲突消解重路由 ──
-    phase_reroute(
-        &result.nodes,
-        relations,
-        &from_side,
-        &to_side,
-        &endpoint_map,
-        &mut edges,
-        &mut grid,
-        &cfg,
-        &group_ctx,
-        &obstacles,
-        &corridor_plan,
-        &mut ortho_stats,
-        &profile,
-        ovg.as_ref(),
-    );
-
-    // ── 4e. X-2: 反向 stub 检测与端口翻转 ──
-    phase_stub_fix(
+    phase_port_correction(
         &result.nodes,
         relations,
         &mut from_side,
@@ -250,10 +329,31 @@ pub(super) fn route_edges_orthogonal_inner(
         &mut ortho_stats,
         &profile,
         &feedback_edge_set,
-        ovg.as_ref(),
+        &reverse_pairs,
+        &parallel,
+        &result.hints.space_budget,
+        effective_ovg,
     );
 
-    // ── 4f. X-3: Lane Assignment 车道分配 ──
+    // ── 4c. X-1: 多轮冲突消解重路由 ──
+    phase_reroute(
+        &result.nodes,
+        relations,
+        &from_side,
+        &to_side,
+        &endpoint_map,
+        &mut edges,
+        &mut grid,
+        &cfg,
+        &group_ctx,
+        &obstacles,
+        &corridor_plan,
+        &mut ortho_stats,
+        &profile,
+        effective_ovg,
+    );
+
+    // ── 4d. X-3: Lane Assignment 车道分配 ──
     phase_lane(
         &mut edges,
         &mut grid,
@@ -348,7 +448,7 @@ pub(super) fn route_edges_orthogonal_inner(
                 &parallel,
                 &protected_trunks,
                 &mut ortho_stats,
-                ovg.as_ref(),
+                effective_ovg,
             );
             crate::perf_log!(
                 "[perf]     s4_feedback_reroute: edges={} protected_trunks={}",

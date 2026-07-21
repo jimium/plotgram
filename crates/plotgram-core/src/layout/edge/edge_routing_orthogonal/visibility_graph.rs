@@ -88,8 +88,12 @@ const GROUP_CROSSING_PENALTY: f64 = 500.0;
 /// 使 OVG 路径偏好与已有边分离，减少视觉重叠。
 const OVERLAP_PENALTY_PER_PX: f64 = 3.0;
 
-/// 重叠检测的垂直/水平容差（px）：两条段在此距离内视为“共线”。
+/// 重叠检测的垂直/水平容差（px）：两条段在此距离内视为"共线"。
 const OVERLAP_PROXIMITY: f64 = 4.0;
+
+/// P1-4: 端口方向违反惩罚——首/末段方向与 Port Solver 分配不一致时叠加。
+/// 约 1.5 个弯折代价，确保偏好对齐但不阻断非对齐路径。
+const PORT_DIRECTION_PENALTY: f64 = 42.0;
 
 impl OrthogonalVisibilityGraph {
     /// 从障碍物集合构建 OVG（所有障碍物均视为节点障碍物，无组惩罚）
@@ -211,12 +215,13 @@ impl OrthogonalVisibilityGraph {
     ///
     /// 性能优化：零克隆 + 轻量级投影（仅 bbox 内障碍物）+ 空间过滤。
     /// `occupied`: 已路由段列表 (x1, y1, x2, y2)，用于重叠惩罚。
+    /// P1-4: `from_port`/`to_port` 用于端口方向软约束——首/末段方向不一致时叠加惩罚。
     pub fn shortest_path_excluding(
         &self,
         start: Point,
         end: Point,
-        _from_port: Port,
-        _to_port: Port,
+        from_port: Port,
+        to_port: Port,
         bend_penalty: f64,
         from_exclude: Option<usize>,
         to_exclude: Option<usize>,
@@ -272,6 +277,9 @@ impl OrthogonalVisibilityGraph {
         let mut end_adj: Vec<OvgEdge> = Vec::new();
 
         // 连接端点到原图顶点（直接连接）
+        // P1-4: 端口方向软约束——首段应沿 from_port 外延，末段应从 to_port 外侧趋近
+        let (fpx, fpy) = port_outward_dir(from_port);
+        let (tpx, tpy) = port_outward_dir(to_port);
         for (i, v) in self.vertices.iter().enumerate() {
             if v.point.x < x_lo || v.point.x > x_hi || v.point.y < y_lo || v.point.y > y_hi {
                 continue;
@@ -280,15 +288,19 @@ impl OrthogonalVisibilityGraph {
             let v_s = (start.x - v.point.x).abs() < EPS;
             if (h_s || v_s) && Self::is_visible(start, v.point, &effective_obs) {
                 let w = start.distance_to(v.point);
-                start_adj.push(OvgEdge { to: i, weight: w, is_horizontal: h_s });
+                // 首段方向：start → v，应沿 from_port 外延
+                let pen = direction_penalty(fpx, fpy, v.point.x - start.x, v.point.y - start.y, true);
+                start_adj.push(OvgEdge { to: i, weight: w + pen, is_horizontal: h_s });
                 overlay_map.push((i, OvgEdge { to: start_idx, weight: w, is_horizontal: h_s }));
             }
             let h_e = (end.y - v.point.y).abs() < EPS;
             let v_e = (end.x - v.point.x).abs() < EPS;
             if (h_e || v_e) && Self::is_visible(end, v.point, &effective_obs) {
                 let w = end.distance_to(v.point);
-                end_adj.push(OvgEdge { to: i, weight: w, is_horizontal: h_e });
-                overlay_map.push((i, OvgEdge { to: end_idx, weight: w, is_horizontal: h_e }));
+                // 末段方向：v → end，应从 to_port 外侧趋近（方向与外延相反）
+                let pen = direction_penalty(tpx, tpy, end.x - v.point.x, end.y - v.point.y, false);
+                end_adj.push(OvgEdge { to: i, weight: w + pen, is_horizontal: h_e });
+                overlay_map.push((i, OvgEdge { to: end_idx, weight: w + pen, is_horizontal: h_e }));
             }
         }
 
@@ -297,21 +309,25 @@ impl OrthogonalVisibilityGraph {
             let h = (start.y - end.y).abs() < EPS;
             let v = (start.x - end.x).abs() < EPS;
             if h || v {
-                start_adj.push(OvgEdge { to: end_idx, weight: start.distance_to(end), is_horizontal: h });
+                let pen_s = direction_penalty(fpx, fpy, end.x - start.x, end.y - start.y, true);
+                let pen_e = direction_penalty(tpx, tpy, end.x - start.x, end.y - start.y, false);
+                start_adj.push(OvgEdge { to: end_idx, weight: start.distance_to(end) + pen_s + pen_e, is_horizontal: h });
             }
         }
 
-        // 轻量级投影：为 start 创建虚拟节点
+        // 轻量级投影：为 start 创建虚拟节点（P1-4: 传递端口方向）
         self.build_projections(
             start, start_idx, &effective_obs, &proj_y_coords, &proj_x_coords,
             x_lo, x_hi, y_lo, y_hi,
             &mut virt_points, &mut virt_adj, &mut overlay_map, &mut start_adj,
+            from_port, true,
         );
         // 为 end 创建虚拟节点
         self.build_projections(
             end, end_idx, &effective_obs, &proj_y_coords, &proj_x_coords,
             x_lo, x_hi, y_lo, y_hi,
             &mut virt_points, &mut virt_adj, &mut overlay_map, &mut end_adj,
+            to_port, false,
         );
 
         overlay_map.sort_by_key(|(src, _)| *src);
@@ -479,6 +495,8 @@ impl OrthogonalVisibilityGraph {
     }
 
     /// 轻量级投影：为端点创建虚拟节点（仅 bbox 内障碍物边界坐标）
+    /// P1-4: `port` + `is_start` 用于端口方向软约束。
+    #[allow(clippy::too_many_arguments)]
     fn build_projections(
         &self,
         endpoint: Point,
@@ -491,8 +509,11 @@ impl OrthogonalVisibilityGraph {
         virt_adj: &mut Vec<Vec<OvgEdge>>,
         overlay_map: &mut Vec<(usize, OvgEdge)>,
         endpoint_adj: &mut Vec<OvgEdge>,
+        port: Port,
+        is_start: bool,
     ) {
         let virt_base = self.vertices.len() + 2;
+        let (px, py) = port_outward_dir(port);
 
         // 垂直投影：(endpoint.x, y_coord)
         for &yc in y_coords {
@@ -509,7 +530,8 @@ impl OrthogonalVisibilityGraph {
             virt_adj.push(Vec::new());
 
             let w = endpoint.distance_to(proj);
-            endpoint_adj.push(OvgEdge { to: proj_idx, weight: w, is_horizontal: false });
+            let pen = direction_penalty(px, py, 0.0, yc - endpoint.y, is_start);
+            endpoint_adj.push(OvgEdge { to: proj_idx, weight: w + pen, is_horizontal: false });
             virt_adj[vi].push(OvgEdge { to: endpoint_idx, weight: w, is_horizontal: false });
 
             // 连接到同 y 的原图顶点
@@ -540,7 +562,8 @@ impl OrthogonalVisibilityGraph {
             virt_adj.push(Vec::new());
 
             let w = endpoint.distance_to(proj);
-            endpoint_adj.push(OvgEdge { to: proj_idx, weight: w, is_horizontal: true });
+            let pen = direction_penalty(px, py, xc - endpoint.x, 0.0, is_start);
+            endpoint_adj.push(OvgEdge { to: proj_idx, weight: w + pen, is_horizontal: true });
             virt_adj[vi].push(OvgEdge { to: endpoint_idx, weight: w, is_horizontal: true });
 
             // 连接到同 x 的原图顶点
@@ -577,6 +600,31 @@ impl OrthogonalVisibilityGraph {
     pub fn vertex_count(&self) -> usize {
         self.vertices.len()
     }
+}
+
+/// P1-4: 端口外延方向（与 path::port_outward 一致，避免跨模块依赖）
+#[inline]
+fn port_outward_dir(port: Port) -> (f64, f64) {
+    match port {
+        Port::Top => (0.0, -1.0),
+        Port::Bottom => (0.0, 1.0),
+        Port::Left => (-1.0, 0.0),
+        Port::Right => (1.0, 0.0),
+    }
+}
+
+/// P1-4: 计算端口方向违反惩罚。
+///
+/// - `is_start = true`：首段应沿端口外延方向离开（dot > 0 对齐）
+/// - `is_start = false`：末段应从端口外侧趋近（dot < 0 对齐）
+#[inline]
+fn direction_penalty(px: f64, py: f64, dx: f64, dy: f64, is_start: bool) -> f64 {
+    if dx.abs() < EPS && dy.abs() < EPS {
+        return 0.0;
+    }
+    let dot = px * dx + py * dy;
+    let aligned = if is_start { dot > EPS } else { dot < -EPS };
+    if aligned { 0.0 } else { PORT_DIRECTION_PENALTY }
 }
 
 /// 简化正交路径：移除共线点
@@ -633,6 +681,55 @@ pub fn build_ovg_with_groups(
         .map(|nl| Rect::new(nl.x, nl.y, nl.width, nl.height).expanded(node_pad))
         .collect();
     OrthogonalVisibilityGraph::build_with_group_obstacles(&node_obstacles, group_rects)
+}
+
+/// P1-3: 大图增量构建——仅为 degraded 边的邻域构建局部 OVG。
+///
+/// 只包含与 degraded 边 bbox（起终点 + margin）相交的障碍物，
+/// 大幅减少可见性检查的顶点对数（O(k²) vs O(n²)，k << n）。
+///
+/// - `regions`: degraded 边的 (start, end) 列表
+/// - `margin`: 邻域扩展量（默认 80px，与 shortest_path_excluding 内部一致）
+pub fn build_local_ovg(
+    regions: &[(Point, Point)],
+    nodes: &std::collections::HashMap<String, crate::layout::NodeLayout>,
+    sorted_node_ids: &[String],
+    node_pad: f64,
+    group_rects: &[Rect],
+    margin: f64,
+) -> OrthogonalVisibilityGraph {
+    // 计算所有 degraded 边的联合 bbox
+    let mut x_lo = f64::MAX;
+    let mut y_lo = f64::MAX;
+    let mut x_hi = f64::MIN;
+    let mut y_hi = f64::MIN;
+    for &(start, end) in regions {
+        x_lo = x_lo.min(start.x.min(end.x));
+        y_lo = y_lo.min(start.y.min(end.y));
+        x_hi = x_hi.max(start.x.max(end.x));
+        y_hi = y_hi.max(start.y.max(end.y));
+    }
+    x_lo -= margin;
+    y_lo -= margin;
+    x_hi += margin;
+    y_hi += margin;
+
+    // 过滤：仅保留与联合 bbox 相交的节点障碍物
+    let local_obstacles: Vec<Rect> = sorted_node_ids
+        .iter()
+        .filter_map(|id| nodes.get(id))
+        .map(|nl| Rect::new(nl.x, nl.y, nl.width, nl.height).expanded(node_pad))
+        .filter(|r| r.x < x_hi && r.x + r.width > x_lo && r.y < y_hi && r.y + r.height > y_lo)
+        .collect();
+
+    // 过滤组矩形：仅保留与联合 bbox 相交的
+    let local_groups: Vec<Rect> = group_rects
+        .iter()
+        .filter(|r| r.x < x_hi && r.x + r.width > x_lo && r.y < y_hi && r.y + r.height > y_lo)
+        .copied()
+        .collect();
+
+    OrthogonalVisibilityGraph::build_with_group_obstacles(&local_obstacles, &local_groups)
 }
 #[cfg(test)]
 mod tests {

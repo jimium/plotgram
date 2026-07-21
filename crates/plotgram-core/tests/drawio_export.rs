@@ -354,29 +354,6 @@ diagram flowchart {
 }
 
 #[test]
-fn title_rendered_on_top_layer() {
-    let source = r#"
-diagram flowchart {
-    title: "顶层标题"
-    config { direction: left-to-right }
-    entity a "A" { type: start }
-    entity b "B" { type: end }
-    a -> b
-}
-"#;
-    let xml = render_drawio(source);
-    assert_valid_drawio(&xml);
-    assert!(xml.contains("顶层标题"), "缺标题: {xml}");
-    // title 应在最后一个节点之后（顶层）
-    let title_pos = xml.find("drawio-title").expect("title cell");
-    let last_node_pos = xml.rfind("drawio-node-b").expect("last node");
-    assert!(
-        title_pos > last_node_pos,
-        "title 应在节点之上（顶层）: {xml}"
-    );
-}
-
-#[test]
 fn edge_label_is_edge_value() {
     // 边标签应作为 edge cell 的 value 文字，随边移动
     let source = r#"

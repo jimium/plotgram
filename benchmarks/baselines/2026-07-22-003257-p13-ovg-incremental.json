@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-22-005015-p14-final",
+  "date": "2026-07-22-003257-p13-ovg-incremental",
   "note": "role-aware baseline: product-gate hard; stress/demo quality soft",
   "samples": [
     {
@@ -73,21 +73,11 @@
         "detour": {
           "avg_ratio": 0.0,
           "max_ratio": 0.0
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 0.0,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 0.29,
+      "median_ms": 0.27,
       "min_ms": 0.27,
-      "max_ms": 0.3,
+      "max_ms": 0.32,
       "det": true,
       "role": "product"
     },
@@ -162,21 +152,11 @@
         "detour": {
           "avg_ratio": 1.3089097821573,
           "max_ratio": 1.688898415114272
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.3533635617600017,
-          "max_min_ratio": 6.60809334246834,
-          "outlier_count": 1
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 8.9,
-      "min_ms": 8.76,
-      "max_ms": 9.02,
+      "median_ms": 8.87,
+      "min_ms": 8.7,
+      "max_ms": 9.1,
       "det": true,
       "role": "product"
     },
@@ -251,21 +231,11 @@
         "detour": {
           "avg_ratio": 1.2335137083094987,
           "max_ratio": 1.3811611883405377
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.32850613679324814,
-          "max_min_ratio": 2.811676794696594,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 0.92,
-      "min_ms": 0.88,
-      "max_ms": 0.93,
+      "median_ms": 0.9,
+      "min_ms": 0.87,
+      "max_ms": 0.97,
       "det": true,
       "role": "product"
     },
@@ -340,21 +310,11 @@
         "detour": {
           "avg_ratio": 1.2430551085812966,
           "max_ratio": 1.4141935653708058
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.12318354542057201,
-          "max_min_ratio": 3.796229841239959,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 1
         }
       },
-      "median_ms": 2.07,
-      "min_ms": 2.07,
-      "max_ms": 2.21,
+      "median_ms": 2.0,
+      "min_ms": 1.86,
+      "max_ms": 2.12,
       "det": true,
       "role": "product"
     },
@@ -429,21 +389,11 @@
         "detour": {
           "avg_ratio": 1.3425081407276083,
           "max_ratio": 1.5541847534244042
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.3798364873434525,
-          "max_min_ratio": 5.701201923076923,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 1
         }
       },
-      "median_ms": 4.34,
-      "min_ms": 4.19,
-      "max_ms": 4.37,
+      "median_ms": 4.13,
+      "min_ms": 4.03,
+      "max_ms": 4.4,
       "det": true,
       "role": "product"
     },
@@ -518,21 +468,11 @@
         "detour": {
           "avg_ratio": 1.4751052099543251,
           "max_ratio": 2.6768255216022885
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.6044540538392004,
-          "max_min_ratio": 12.630937500000009,
-          "outlier_count": 1
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 12
         }
       },
-      "median_ms": 14.19,
-      "min_ms": 14.04,
-      "max_ms": 14.47,
+      "median_ms": 14.02,
+      "min_ms": 13.87,
+      "max_ms": 14.36,
       "det": true,
       "role": "product"
     },
@@ -607,21 +547,11 @@
         "detour": {
           "avg_ratio": 1.4066122092405537,
           "max_ratio": 2.5687098989827737
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.3842873691850812,
-          "max_min_ratio": 14.191672876304027,
-          "outlier_count": 1
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 9
         }
       },
-      "median_ms": 37.92,
-      "min_ms": 37.38,
-      "max_ms": 38.17,
+      "median_ms": 37.67,
+      "min_ms": 37.21,
+      "max_ms": 39.04,
       "det": true,
       "role": "product"
     },
@@ -696,21 +626,11 @@
         "detour": {
           "avg_ratio": 1.3277735431665394,
           "max_ratio": 1.4511502466923312
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.11542231983771703,
-          "max_min_ratio": 2.8637270309477754,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.3333333333333333,
-          "max_channel_load": 1,
-          "unused_corridors": 4
         }
       },
-      "median_ms": 1.56,
-      "min_ms": 1.46,
-      "max_ms": 1.67,
+      "median_ms": 1.58,
+      "min_ms": 1.43,
+      "max_ms": 1.63,
       "det": true,
       "role": "product"
     },
@@ -785,21 +705,11 @@
         "detour": {
           "avg_ratio": 1.2185873362800497,
           "max_ratio": 1.3965592284003894
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.4370993540708573,
-          "max_min_ratio": 3.121298606480963,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 3
         }
       },
-      "median_ms": 0.86,
-      "min_ms": 0.86,
-      "max_ms": 0.92,
+      "median_ms": 0.87,
+      "min_ms": 0.85,
+      "max_ms": 1.09,
       "det": true,
       "role": "product"
     },
@@ -874,21 +784,11 @@
         "detour": {
           "avg_ratio": 1.266510210804706,
           "max_ratio": 1.4119102814269127
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.2563680596029143,
-          "max_min_ratio": 1.8846153846153846,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 3
         }
       },
-      "median_ms": 0.82,
+      "median_ms": 0.84,
       "min_ms": 0.81,
-      "max_ms": 0.85,
+      "max_ms": 0.88,
       "det": true,
       "role": "product"
     },
@@ -963,21 +863,11 @@
         "detour": {
           "avg_ratio": 0.0,
           "max_ratio": 0.0
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 0.0,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
       "median_ms": 0.15,
       "min_ms": 0.15,
-      "max_ms": 0.16,
+      "max_ms": 0.17,
       "det": true,
       "role": "product"
     },
@@ -1052,21 +942,11 @@
         "detour": {
           "avg_ratio": 1.3552629911009453,
           "max_ratio": 1.3552629911009453
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 1.0,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 1.68,
-      "min_ms": 1.67,
-      "max_ms": 1.73,
+      "median_ms": 1.7,
+      "min_ms": 1.66,
+      "max_ms": 1.87,
       "det": true,
       "role": "product"
     },
@@ -1141,21 +1021,11 @@
         "detour": {
           "avg_ratio": 1.3874020510057552,
           "max_ratio": 1.5096713235240955
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.2453051593770504,
-          "max_min_ratio": 3.9089918580576946,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 3.05,
-      "min_ms": 3.01,
-      "max_ms": 3.08,
+      "median_ms": 2.8,
+      "min_ms": 2.74,
+      "max_ms": 3.03,
       "det": true,
       "role": "product"
     },
@@ -1230,21 +1100,11 @@
         "detour": {
           "avg_ratio": 1.7660526974181914,
           "max_ratio": 2.844884449649456
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 4.483606557377049,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.16666666666666666,
-          "max_channel_load": 1,
-          "unused_corridors": 5
         }
       },
-      "median_ms": 1.26,
-      "min_ms": 1.24,
-      "max_ms": 1.29,
+      "median_ms": 1.31,
+      "min_ms": 1.25,
+      "max_ms": 1.45,
       "det": true,
       "role": "product"
     },
@@ -1319,21 +1179,11 @@
         "detour": {
           "avg_ratio": 1.2852520499704476,
           "max_ratio": 1.6032605091122512
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.22765141637004305,
-          "max_min_ratio": 27.437544253714,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 10.1,
-      "min_ms": 10.05,
-      "max_ms": 10.58,
+      "median_ms": 9.94,
+      "min_ms": 9.73,
+      "max_ms": 10.13,
       "det": true,
       "role": "product"
     },
@@ -1408,21 +1258,11 @@
         "detour": {
           "avg_ratio": 1.4206304772149143,
           "max_ratio": 1.720927994993973
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0820612150395267,
-          "max_min_ratio": 9.516957441774126,
-          "outlier_count": 1
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
       "median_ms": 9.35,
-      "min_ms": 9.17,
-      "max_ms": 9.42,
+      "min_ms": 9.07,
+      "max_ms": 9.51,
       "det": true,
       "role": "product"
     },
@@ -1497,21 +1337,11 @@
         "detour": {
           "avg_ratio": 1.296847490943997,
           "max_ratio": 1.4138695683424047
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.18574947160748706,
-          "max_min_ratio": 2.664213106459292,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 1.7,
-      "min_ms": 1.6,
-      "max_ms": 1.86,
+      "median_ms": 1.67,
+      "min_ms": 1.55,
+      "max_ms": 1.9,
       "det": true,
       "role": "product"
     },
@@ -1586,21 +1416,11 @@
         "detour": {
           "avg_ratio": 1.34009255089867,
           "max_ratio": 1.3520648275942797
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 1.0933333333333333,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 1.1,
+      "median_ms": 1.11,
       "min_ms": 1.06,
-      "max_ms": 1.12,
+      "max_ms": 1.29,
       "det": true,
       "role": "product"
     },
@@ -1664,19 +1484,9 @@
         "detour": {
           "avg_ratio": 0.0,
           "max_ratio": 0.0
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 0.0,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 0.1,
+      "median_ms": 0.09,
       "min_ms": 0.09,
       "max_ms": 0.1,
       "det": true,
@@ -1742,21 +1552,11 @@
         "detour": {
           "avg_ratio": 0.0,
           "max_ratio": 0.0
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 0.0,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
       "median_ms": 0.15,
-      "min_ms": 0.15,
-      "max_ms": 0.16,
+      "min_ms": 0.14,
+      "max_ms": 0.15,
       "det": true,
       "role": "product"
     },
@@ -1820,21 +1620,11 @@
         "detour": {
           "avg_ratio": 0.0,
           "max_ratio": 0.0
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 0.0,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
       "median_ms": 0.16,
       "min_ms": 0.15,
-      "max_ms": 0.17,
+      "max_ms": 0.16,
       "det": true,
       "role": "product"
     },
@@ -1898,20 +1688,10 @@
         "detour": {
           "avg_ratio": 0.0,
           "max_ratio": 0.0
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 0.0,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 0.15,
-      "min_ms": 0.15,
+      "median_ms": 0.14,
+      "min_ms": 0.13,
       "max_ms": 0.15,
       "det": true,
       "role": "product"
@@ -1987,21 +1767,11 @@
         "detour": {
           "avg_ratio": 1.202401045070538,
           "max_ratio": 1.3117097997258458
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 3.888059701492537,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 1.05,
-      "min_ms": 1.04,
-      "max_ms": 1.08,
+      "median_ms": 1.01,
+      "min_ms": 0.97,
+      "max_ms": 1.15,
       "det": true,
       "role": "product"
     },
@@ -2076,21 +1846,11 @@
         "detour": {
           "avg_ratio": 1.1714199258514908,
           "max_ratio": 1.2843880073158507
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.2980204005217084,
-          "max_min_ratio": 4.951685510111714,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 2.22,
-      "min_ms": 2.09,
-      "max_ms": 2.35,
+      "median_ms": 2.17,
+      "min_ms": 2.01,
+      "max_ms": 2.33,
       "det": true,
       "role": "product"
     },
@@ -2165,21 +1925,11 @@
         "detour": {
           "avg_ratio": 1.3090421437052202,
           "max_ratio": 1.3787661595110563
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 2.96477761812302,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 2.53,
-      "min_ms": 2.48,
-      "max_ms": 2.66,
+      "median_ms": 2.45,
+      "min_ms": 2.42,
+      "max_ms": 2.72,
       "det": true,
       "role": "product"
     },
@@ -2254,21 +2004,11 @@
         "detour": {
           "avg_ratio": 1.2810817395691565,
           "max_ratio": 1.3249803534526798
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 2.0597014925373136,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 0.72,
-      "min_ms": 0.71,
-      "max_ms": 0.76,
+      "median_ms": 0.73,
+      "min_ms": 0.69,
+      "max_ms": 0.88,
       "det": true,
       "role": "product"
     },
@@ -2332,21 +2072,11 @@
         "detour": {
           "avg_ratio": 1.1518227435500876,
           "max_ratio": 1.1518227435500876
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 1.0,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 0.43,
-      "min_ms": 0.42,
-      "max_ms": 0.46,
+      "median_ms": 0.41,
+      "min_ms": 0.39,
+      "max_ms": 0.45,
       "det": true,
       "role": "product"
     },
@@ -2410,21 +2140,11 @@
         "detour": {
           "avg_ratio": 1.048870942003373,
           "max_ratio": 1.13331026165617
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.14000048728264636,
-          "max_min_ratio": 1.5996226974679657,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 6.9,
-      "min_ms": 6.71,
-      "max_ms": 6.96,
+      "median_ms": 6.68,
+      "min_ms": 6.28,
+      "max_ms": 6.81,
       "det": true,
       "role": "product"
     },
@@ -2488,21 +2208,11 @@
         "detour": {
           "avg_ratio": 1.0117702388973129,
           "max_ratio": 1.0117702388973129
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 1.0,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 0.38,
-      "min_ms": 0.37,
-      "max_ms": 0.39,
+      "median_ms": 0.36,
+      "min_ms": 0.35,
+      "max_ms": 0.42,
       "det": true,
       "role": "product"
     },
@@ -2566,21 +2276,11 @@
         "detour": {
           "avg_ratio": 0.0,
           "max_ratio": 0.0
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 0.0,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 0.13,
-      "min_ms": 0.13,
-      "max_ms": 0.15,
+      "median_ms": 0.11,
+      "min_ms": 0.09,
+      "max_ms": 0.11,
       "det": true,
       "role": "product"
     },
@@ -2655,21 +2355,11 @@
         "detour": {
           "avg_ratio": 1.5686339610633364,
           "max_ratio": 2.9544944585911086
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.4120178465144089,
-          "max_min_ratio": 3.829677861549006,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.14285714285714285,
-          "max_channel_load": 1,
-          "unused_corridors": 6
         }
       },
-      "median_ms": 5.95,
-      "min_ms": 5.7,
-      "max_ms": 6.08,
+      "median_ms": 5.82,
+      "min_ms": 5.55,
+      "max_ms": 5.92,
       "det": true,
       "role": "stress"
     },
@@ -2744,21 +2434,11 @@
         "detour": {
           "avg_ratio": 1.354354468271524,
           "max_ratio": 1.981831779843206
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.42351305343881473,
-          "max_min_ratio": 6.550104384133607,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 18.57,
-      "min_ms": 18.07,
-      "max_ms": 18.97,
+      "median_ms": 18.19,
+      "min_ms": 17.85,
+      "max_ms": 18.36,
       "det": true,
       "role": "stress"
     },
@@ -2822,21 +2502,11 @@
         "detour": {
           "avg_ratio": 1.0756723468989304,
           "max_ratio": 1.2140883573014458
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.1673229535455679,
-          "max_min_ratio": 2.6343181414015238,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 7.4,
-      "min_ms": 7.23,
-      "max_ms": 7.45,
+      "median_ms": 7.37,
+      "min_ms": 7.19,
+      "max_ms": 7.48,
       "det": true,
       "role": "stress"
     },
@@ -2911,21 +2581,11 @@
         "detour": {
           "avg_ratio": 1.3733093127938951,
           "max_ratio": 1.64
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.6551210186442851,
-          "max_min_ratio": 13.125627858231708,
-          "outlier_count": 1
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 4.96,
-      "min_ms": 4.73,
-      "max_ms": 5.29,
+      "median_ms": 4.9,
+      "min_ms": 4.77,
+      "max_ms": 5.04,
       "det": true,
       "role": "stress"
     },
@@ -2989,21 +2649,11 @@
         "detour": {
           "avg_ratio": 14.333333333333334,
           "max_ratio": 14.333333333333334
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 1.0,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 0.27,
+      "median_ms": 0.28,
       "min_ms": 0.26,
-      "max_ms": 0.28,
+      "max_ms": 0.29,
       "det": true,
       "role": "stress"
     },
@@ -3078,21 +2728,11 @@
         "detour": {
           "avg_ratio": 1.7268449672706416,
           "max_ratio": 2.7359794733292193
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.7463548376150995,
-          "max_min_ratio": 10.237060433397795,
-          "outlier_count": 1
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 3.12,
-      "min_ms": 2.96,
-      "max_ms": 3.24,
+      "median_ms": 2.94,
+      "min_ms": 2.84,
+      "max_ms": 2.98,
       "det": true,
       "role": "stress"
     },
@@ -3156,24 +2796,14 @@
         "detour": {
           "avg_ratio": 0.0,
           "max_ratio": 0.0
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.0,
-          "max_min_ratio": 0.0,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 0
         }
       },
-      "median_ms": 1.14,
-      "min_ms": 1.13,
-      "max_ms": 1.15,
+      "median_ms": 1.1,
+      "min_ms": 1.08,
+      "max_ms": 1.12,
       "det": true,
       "role": "stress"
     }
   ],
-  "perf_runs": 3
+  "perf_runs": 5
 }

@@ -23,6 +23,8 @@ pub struct AestheticsReport {
     pub self_loops: SelfLoopMetrics,
     pub crossings: CrossingMetrics,
     pub detour: DetourMetrics,
+    pub edge_length: EdgeLengthMetrics,
+    pub channel_utilization: ChannelUtilization,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -79,6 +81,28 @@ pub struct DetourMetrics {
     pub max_ratio: f64,
 }
 
+/// 边长均匀性指标
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct EdgeLengthMetrics {
+    /// 同层边长的变异系数（CV = std / mean）；无层信息时为全局 CV
+    pub intra_layer_cv: f64,
+    /// 最长边 / 最短边 比值
+    pub max_min_ratio: f64,
+    /// 异常长边数（超过均值 + 2*std）
+    pub outlier_count: usize,
+}
+
+/// 通道利用率指标
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ChannelUtilization {
+    /// 走廊中实际有边通过的占比
+    pub corridor_usage_ratio: f64,
+    /// 最拥堵通道的边数
+    pub max_channel_load: usize,
+    /// 未使用走廊数
+    pub unused_corridors: usize,
+}
+
 // ─── 计算入口 ───────────────────────────────────────────────────────────────
 
 /// 计算完整美学指标报告。
@@ -89,6 +113,8 @@ pub fn compute_aesthetics(diagram: &Diagram, result: &LayoutResult) -> Aesthetic
     let self_loops = compute_self_loop_metrics(diagram, result);
     let crossings = compute_crossing_metrics(result);
     let detour = compute_detour_metrics(result);
+    let edge_length = compute_edge_length_metrics(diagram, result);
+    let channel_utilization = compute_channel_utilization(result);
     AestheticsReport {
         bends,
         border_proximity,
@@ -96,6 +122,8 @@ pub fn compute_aesthetics(diagram: &Diagram, result: &LayoutResult) -> Aesthetic
         self_loops,
         crossings,
         detour,
+        edge_length,
+        channel_utilization,
     }
 }
 
@@ -456,6 +484,162 @@ fn compute_detour_metrics(result: &LayoutResult) -> DetourMetrics {
     DetourMetrics {
         avg_ratio: ratios.iter().sum::<f64>() / ratios.len() as f64,
         max_ratio: ratios.iter().cloned().fold(0.0f64, f64::max),
+    }
+}
+
+// ─── 边长均匀性指标 ─────────────────────────────────────────────────────────
+
+fn compute_edge_length_metrics(diagram: &Diagram, result: &LayoutResult) -> EdgeLengthMetrics {
+    let relations = &diagram.relations;
+    let ranks = result.hints.sugiyama_ranks.as_ref();
+
+    // 收集每条边的路径长度
+    let mut lengths: Vec<f64> = Vec::new();
+    // 按层分组（from 节点的 rank）
+    let mut layer_lengths: HashMap<usize, Vec<f64>> = HashMap::new();
+
+    for (i, edge) in result.edges.iter().enumerate() {
+        let points = match &edge.geometry {
+            PathGeometry::Polyline { points } if points.len() >= 2 => points.as_slice(),
+            _ => continue,
+        };
+        let len = polyline_length(points);
+        if len < 1.0 {
+            continue; // 极短边跳过
+        }
+        lengths.push(len);
+
+        // 按 from 节点的 rank 分组
+        if let (Some(ranks), Some(rel)) = (ranks, relations.get(i)) {
+            if let Some(&rank) = ranks.get(rel.from.as_str()) {
+                layer_lengths.entry(rank).or_default().push(len);
+            }
+        }
+    }
+
+    if lengths.is_empty() {
+        return EdgeLengthMetrics {
+            intra_layer_cv: 0.0,
+            max_min_ratio: 0.0,
+            outlier_count: 0,
+        };
+    }
+
+    // 全局统计
+    let mean = lengths.iter().sum::<f64>() / lengths.len() as f64;
+    let variance = lengths.iter().map(|l| (l - mean).powi(2)).sum::<f64>() / lengths.len() as f64;
+    let std_dev = variance.sqrt();
+    let min_len = lengths.iter().cloned().fold(f64::MAX, f64::min);
+    let max_len = lengths.iter().cloned().fold(0.0f64, f64::max);
+
+    // 同层 CV：各层 CV 的加权平均（权重 = 层内边数）
+    let intra_layer_cv = if layer_lengths.is_empty() {
+        // 无层信息，用全局 CV
+        if mean > 0.0 { std_dev / mean } else { 0.0 }
+    } else {
+        let mut weighted_cv = 0.0;
+        let mut total_edges = 0usize;
+        for (_, lens) in &layer_lengths {
+            if lens.len() < 2 {
+                continue; // 单边层无法计算 CV
+            }
+            let l_mean = lens.iter().sum::<f64>() / lens.len() as f64;
+            let l_var = lens.iter().map(|l| (l - l_mean).powi(2)).sum::<f64>() / lens.len() as f64;
+            let l_cv = if l_mean > 0.0 { l_var.sqrt() / l_mean } else { 0.0 };
+            weighted_cv += l_cv * lens.len() as f64;
+            total_edges += lens.len();
+        }
+        if total_edges > 0 { weighted_cv / total_edges as f64 } else { 0.0 }
+    };
+
+    // 异常长边：超过 mean + 2*std
+    let threshold = mean + 2.0 * std_dev;
+    let outlier_count = lengths.iter().filter(|&&l| l > threshold).count();
+
+    EdgeLengthMetrics {
+        intra_layer_cv,
+        max_min_ratio: if min_len > 0.0 { max_len / min_len } else { 0.0 },
+        outlier_count,
+    }
+}
+
+// ─── 通道利用率指标 ─────────────────────────────────────────────────────────
+
+fn compute_channel_utilization(result: &LayoutResult) -> ChannelUtilization {
+    let corridors = match &result.hints.group_routing {
+        Some(hints) if !hints.corridors.is_empty() => &hints.corridors,
+        _ => {
+            return ChannelUtilization {
+                corridor_usage_ratio: 0.0,
+                max_channel_load: 0,
+                unused_corridors: 0,
+            };
+        }
+    };
+
+    // 收集所有边的段
+    let mut all_segments: Vec<(f64, f64, f64, f64)> = Vec::new();
+    for edge in &result.edges {
+        let points = match &edge.geometry {
+            PathGeometry::Polyline { points } if points.len() >= 2 => points.as_slice(),
+            _ => continue,
+        };
+        for w in points.windows(2) {
+            all_segments.push((w[0].x, w[0].y, w[1].x, w[1].y));
+        }
+    }
+
+    if all_segments.is_empty() {
+        return ChannelUtilization {
+            corridor_usage_ratio: 0.0,
+            max_channel_load: 0,
+            unused_corridors: corridors.len(),
+        };
+    }
+
+    const CORRIDOR_PROXIMITY: f64 = 8.0;
+    let mut used_count = 0usize;
+    let mut max_load = 0usize;
+
+    for corridor in corridors {
+        // 检查哪些边段经过该走廊（平行且坐标接近）
+        let mut load = 0usize;
+        for &(x1, y1, x2, y2) in &all_segments {
+            let passes = match corridor.axis {
+                crate::layout::group::CorridorAxis::Vertical => {
+                    // 竖走廊：垂直段且 x 接近 coord，y 范围在 span 内
+                    let is_vert = (x1 - x2).abs() < 0.01;
+                    if !is_vert { continue; }
+                    (x1 - corridor.coord).abs() < CORRIDOR_PROXIMITY
+                        && y1.min(y2) < corridor.span_max
+                        && y1.max(y2) > corridor.span_min
+                }
+                crate::layout::group::CorridorAxis::Horizontal => {
+                    // 横走廊：水平段且 y 接近 coord，x 范围在 span 内
+                    let is_horiz = (y1 - y2).abs() < 0.01;
+                    if !is_horiz { continue; }
+                    (y1 - corridor.coord).abs() < CORRIDOR_PROXIMITY
+                        && x1.min(x2) < corridor.span_max
+                        && x1.max(x2) > corridor.span_min
+                }
+            };
+            if passes {
+                load += 1;
+            }
+        }
+        if load > 0 {
+            used_count += 1;
+        }
+        if load > max_load {
+            max_load = load;
+        }
+    }
+
+    let total = corridors.len();
+    ChannelUtilization {
+        corridor_usage_ratio: if total > 0 { used_count as f64 / total as f64 } else { 0.0 },
+        max_channel_load: max_load,
+        unused_corridors: total - used_count,
     }
 }
 

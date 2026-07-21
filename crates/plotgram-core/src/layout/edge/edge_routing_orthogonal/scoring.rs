@@ -108,6 +108,10 @@ impl CandidateScorer for DefaultScorer {
                 ctx.group_ctx.corridor_misalignment_penalty,
             ) * w.corridor_misalignment;
         }
+        // P1-2: 通道对齐软约束——路径主段落在规划通道坐标上时奖励
+        if let Some(planned) = ctx.planned_channel {
+            score += channel_alignment_bonus(path, planned) * w.channel_alignment;
+        }
         score
     }
 }
@@ -120,6 +124,45 @@ pub fn path_length(path: &[Point]) -> f64 {
             (dx * dx + dy * dy).sqrt()
         })
         .sum()
+}
+
+/// P1-2: 通道对齐奖励——路径主段落在规划通道坐标上时给予负分（奖励）。
+///
+/// 仅对长度 > PORT_CLEARANCE*2 的非 stub 段计算，避免将短 stub 段误判为对齐。
+/// 只取第一个匹配段（避免重复奖励）。
+const CHANNEL_ALIGNMENT_BONUS: f64 = -40.0;
+const CHANNEL_ALIGNMENT_TOLERANCE: f64 = 6.0;
+
+fn channel_alignment_bonus(path: &[Point], planned_channel: f64) -> f64 {
+    if path.len() < 3 {
+        return 0.0;
+    }
+    let min_seg_len = PORT_CLEARANCE * 2.0;
+
+    for w in path.windows(2) {
+        let dx = w[1].x - w[0].x;
+        let dy = w[1].y - w[0].y;
+        let seg_len = dx.abs() + dy.abs();
+        if seg_len < min_seg_len {
+            continue;
+        }
+
+        // 垂直段（x 恒定）：检查 x 是否接近 planned_channel
+        if dx.abs() < EPS && dy.abs() > min_seg_len {
+            let dist = (w[0].x - planned_channel).abs();
+            if dist <= CHANNEL_ALIGNMENT_TOLERANCE {
+                return CHANNEL_ALIGNMENT_BONUS;
+            }
+        }
+        // 水平段（y 恒定）：检查 y 是否接近 planned_channel
+        if dy.abs() < EPS && dx.abs() > min_seg_len {
+            let dist = (w[0].y - planned_channel).abs();
+            if dist <= CHANNEL_ALIGNMENT_TOLERANCE {
+                return CHANNEL_ALIGNMENT_BONUS;
+            }
+        }
+    }
+    0.0
 }
 
 pub fn obstacle_penalty(
