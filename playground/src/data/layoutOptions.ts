@@ -92,19 +92,6 @@ function parseAlignFromSource(token: string): AlignMode {
   }
 }
 
-function alignModeToDsl(mode: AlignMode): string | null {
-  switch (mode) {
-    case 'default':
-      return null;
-    case 'off':
-      return 'false';
-    case 'rank':
-    case 'layer':
-    case 'full':
-      return mode;
-  }
-}
-
 export interface LayoutOptions {
   layoutAlgo: string;
   edgeRouting: string;
@@ -125,6 +112,23 @@ export interface DiagramDefaults {
 /** 布局方向未指定时的内部值（不写入 DSL） */
 export const LAYOUT_DIRECTION_UNSPECIFIED = 'auto';
 
+/**
+ * 布局 / 边路由选择器的「自动」哨兵值。
+ * 表示「不在预览时覆盖」——渲染时保持源码 / 图表默认原样。
+ */
+export const LAYOUT_AUTO = 'auto';
+
+/** 面板未做任何覆盖的初始状态：布局与边路由均跟随源码 / 图表默认。 */
+export const AUTO_LAYOUT_OPTIONS: LayoutOptions = {
+  layoutAlgo: LAYOUT_AUTO,
+  edgeRouting: LAYOUT_AUTO,
+  layoutDirection: LAYOUT_DIRECTION_UNSPECIFIED,
+  gridSnap: true,
+  gridAlign: 'default',
+  layoutConfig: {},
+  edgeRoutingConfig: {},
+};
+
 export function layoutOptionsFromDefaults(defaults: DiagramDefaults): LayoutOptions {
   return {
     layoutAlgo: defaults.layoutAlgo,
@@ -137,35 +141,19 @@ export function layoutOptionsFromDefaults(defaults: DiagramDefaults): LayoutOpti
   };
 }
 
-/** localStorage 初始占位；具体算法在 normalize 时按图表默认填充 */
-export const EMPTY_LAYOUT_OPTIONS: LayoutOptions = {
-  layoutAlgo: '',
-  edgeRouting: '',
-  layoutDirection: LAYOUT_DIRECTION_UNSPECIFIED,
-  gridSnap: true,
-  gridAlign: 'default',
-  layoutConfig: {},
-  edgeRoutingConfig: {},
-};
+/** localStorage 初始占位；默认跟随源码 / 图表默认。 */
+export const EMPTY_LAYOUT_OPTIONS: LayoutOptions = AUTO_LAYOUT_OPTIONS;
 
-/** @deprecated 使用 EMPTY_LAYOUT_OPTIONS 或 layoutOptionsFromDefaults */
+/** @deprecated 使用 AUTO_LAYOUT_OPTIONS 或 layoutOptionsFromDefaults */
 export const DEFAULT_LAYOUT_OPTIONS = EMPTY_LAYOUT_OPTIONS;
 
 export function normalizeLayoutOptions(
   raw: Partial<LayoutOptions> | null | undefined,
-  defaults: DiagramDefaults | null = null,
+  _defaults: DiagramDefaults | null = null,
 ): LayoutOptions {
-  const fallback = defaults ? layoutOptionsFromDefaults(defaults) : EMPTY_LAYOUT_OPTIONS;
-
-  const layoutAlgo = !raw?.layoutAlgo || raw.layoutAlgo === 'auto'
-    ? fallback.layoutAlgo
-    : raw.layoutAlgo;
-
-  const edgeRouting = !raw?.edgeRouting || raw.edgeRouting === 'auto'
-    ? fallback.edgeRouting
-    : raw.edgeRouting;
-
-  const layoutDirection = raw?.layoutDirection ?? fallback.layoutDirection;
+  const layoutAlgo = raw?.layoutAlgo ? raw.layoutAlgo : LAYOUT_AUTO;
+  const edgeRouting = raw?.edgeRouting ? raw.edgeRouting : LAYOUT_AUTO;
+  const layoutDirection = raw?.layoutDirection ?? LAYOUT_DIRECTION_UNSPECIFIED;
 
   return {
     layoutAlgo,
@@ -457,13 +445,6 @@ export function getDiagramDefaults(
   return defaults;
 }
 
-function optionLabelWithDefault(baseLabel: string, value: string, defaultValue?: string): string {
-  if (defaultValue && value === defaultValue) {
-    return `${baseLabel}（默认）`;
-  }
-  return baseLabel;
-}
-
 export function buildLayoutAlgoOptions(
   catalog: LayoutCatalog | null,
   type: DiagramKind | null,
@@ -471,13 +452,14 @@ export function buildLayoutAlgoOptions(
 ): SelectOption[] {
   const entry = catalogForDiagramType(catalog, type);
   const names = entry?.layouts ?? catalog?.layouts.map((l) => l.name) ?? [];
-  return names.map((value) => {
-    const base = LAYOUT_LABELS[value] ?? value;
-    return {
-      value,
-      label: optionLabelWithDefault(base, value, defaults?.layoutAlgo),
-    };
-  });
+  const autoLabel = defaults?.layoutAlgo
+    ? `自动（${formatAlgoName(defaults.layoutAlgo)}）`
+    : '自动（跟随源码）';
+  const options: SelectOption[] = [{ value: LAYOUT_AUTO, label: autoLabel }];
+  for (const value of names) {
+    options.push({ value, label: LAYOUT_LABELS[value] ?? value });
+  }
+  return options;
 }
 
 export function buildEdgeRoutingOptions(
@@ -490,13 +472,15 @@ export function buildEdgeRoutingOptions(
     return [];
   }
   const names = entry?.edge_routings ?? allEdgeRoutingNames(catalog);
-  return names.map((value) => {
-    const base = EDGE_ROUTING_LABELS[value] ?? value;
-    return {
-      value,
-      label: optionLabelWithDefault(base, value, defaults?.edgeRouting),
-    };
-  });
+  if (names.length === 0) return [];
+  const autoLabel = defaults?.edgeRouting
+    ? `自动（${formatAlgoName(defaults.edgeRouting)}）`
+    : '自动（跟随源码）';
+  const options: SelectOption[] = [{ value: LAYOUT_AUTO, label: autoLabel }];
+  for (const value of names) {
+    options.push({ value, label: EDGE_ROUTING_LABELS[value] ?? value });
+  }
+  return options;
 }
 
 export function buildLayoutDirectionOptions(
@@ -536,20 +520,20 @@ export function reconcileLayoutOptionsWithDefaults(
   opts: LayoutOptions,
   catalog: LayoutCatalog | null,
   type: DiagramKind | null,
-  defaults: DiagramDefaults,
+  _defaults: DiagramDefaults,
 ): LayoutOptions {
   const layoutNames = buildLayoutAlgoOptions(catalog, type).map((o) => o.value);
   const routingNames = buildEdgeRoutingOptions(catalog, type).map((o) => o.value);
 
   const layoutAlgo = layoutNames.includes(opts.layoutAlgo)
     ? opts.layoutAlgo
-    : defaults.layoutAlgo;
+    : LAYOUT_AUTO;
 
   const edgeRouting = routingNames.length === 0
     ? ''
     : routingNames.includes(opts.edgeRouting)
       ? opts.edgeRouting
-      : (defaults.edgeRouting ?? routingNames[0] ?? '');
+      : LAYOUT_AUTO;
 
   return {
     ...opts,
@@ -767,8 +751,13 @@ export function isLayoutAtDefaults(
   return true;
 }
 
-/** 移除 diagram 块顶层的布局相关属性（含 `{ }` 配置块），便于预览时注入覆盖值 */
-export function stripLayoutAttributes(source: string): string {
+/** 移除 diagram 块顶层指定属性（含 `{ }` 配置块），便于预览时注入覆盖值。
+ * `attrs` 限定只剥离那些属性；缺省时剥离全部布局相关属性。 */
+export function stripLayoutAttributes(
+  source: string,
+  attrs: readonly string[] = ['layout', 'edge_routing', 'direction', 'snap', 'align'],
+): string {
+  const pattern = new RegExp(`^\\s*(${attrs.join('|')})\\s*:`);
   const lines = source.split('\n');
   let inDiagram = false;
   let depth = 0;
@@ -785,7 +774,7 @@ export function stripLayoutAttributes(source: string): string {
     }
 
     if (inDiagram) {
-      if (depth > 0 && LAYOUT_ATTR_PATTERN.test(line)) {
+      if (depth > 0 && pattern.test(line)) {
         let attrBalance = countBraceDelta(line);
         depth += attrBalance;
         while (attrBalance > 0 && i + 1 < lines.length) {
@@ -812,6 +801,8 @@ export function stripLayoutAttributes(source: string): string {
 
 /**
  * 在渲染前注入布局选项（仅影响预览，不修改编辑器中的源码）。
+ *
+ * 只覆盖用户显式选定的项：`layout` / `edge_routing` 为 `auto` 时保留源码原样。
  */
 export function applyLayoutOptions(
   source: string,
@@ -819,52 +810,46 @@ export function applyLayoutOptions(
   catalog: LayoutCatalog | null = null,
   defaults: DiagramDefaults | null = null,
 ): string {
-  if (!opts.layoutAlgo) return source;
+  const layoutOverride =
+    opts.layoutAlgo && opts.layoutAlgo !== LAYOUT_AUTO ? opts.layoutAlgo : null;
+  const routingOverride =
+    opts.edgeRouting && opts.edgeRouting !== LAYOUT_AUTO ? opts.edgeRouting : null;
+
+  // 没有任何显式覆盖 → 保持源码原样
+  if (!layoutOverride && !routingOverride) return source;
 
   const injections: string[] = [];
-  const layoutSpecs = activeLayoutOptionSpecs(catalog, opts, defaults);
-  const routingSpecs = activeEdgeRoutingOptionSpecs(catalog, opts, defaults);
-  const layoutAlgoName = opts.layoutAlgo;
-  const edgeRoutingName = opts.edgeRouting || null;
-  const diagramType = detectDiagramType(source);
-  const entry = catalogForDiagramType(catalog, diagramType);
-  const usesEdgeRouting = entry?.uses_edge_routing ?? true;
+  const strip: string[] = [];
 
-  injections.push(
-    buildAlgorithmAttribute('layout', layoutAlgoName, layoutSpecs, opts.layoutConfig),
-  );
-
-  const producesEdges = layoutProducesEdgeGeometry(catalog, layoutAlgoName);
-
-  if (
-    usesEdgeRouting
-    && !producesEdges
-    && edgeRoutingName
-  ) {
+  if (layoutOverride) {
+    const layoutSpecs = activeLayoutOptionSpecs(catalog, opts, defaults);
     injections.push(
-      buildAlgorithmAttribute('edge_routing', edgeRoutingName, routingSpecs, opts.edgeRoutingConfig),
+      buildAlgorithmAttribute('layout', layoutOverride, layoutSpecs, opts.layoutConfig),
     );
+    strip.push('layout');
   }
 
-  if (opts.layoutDirection && opts.layoutDirection !== LAYOUT_DIRECTION_UNSPECIFIED) {
-    injections.push(`    direction: ${opts.layoutDirection}`);
-  }
-
-  if (
-    layoutAlgoSupportsGridSnap(layoutAlgoName)
-    && opts.gridSnap === false
-  ) {
-    injections.push('    snap: false');
-  }
-
-  if (layoutAlgoSupportsGridSnap(layoutAlgoName)) {
-    const alignDsl = alignModeToDsl(opts.gridAlign);
-    if (alignDsl !== null) {
-      injections.push(`    align: ${alignDsl}`);
+  if (routingOverride) {
+    const diagramType = detectDiagramType(source);
+    const entry = catalogForDiagramType(catalog, diagramType);
+    const usesEdgeRouting = entry?.uses_edge_routing ?? true;
+    // 若有效布局自己生成边几何，则边路由无意义
+    const effectiveLayout = layoutOverride ?? defaults?.layoutAlgo ?? null;
+    const producesEdges = effectiveLayout
+      ? layoutProducesEdgeGeometry(catalog, effectiveLayout)
+      : false;
+    if (usesEdgeRouting && !producesEdges) {
+      const routingSpecs = activeEdgeRoutingOptionSpecs(catalog, opts, defaults);
+      injections.push(
+        buildAlgorithmAttribute('edge_routing', routingOverride, routingSpecs, opts.edgeRoutingConfig),
+      );
+      strip.push('edge_routing');
     }
   }
 
-  const stripped = stripLayoutAttributes(source);
+  if (injections.length === 0) return source;
+
+  const stripped = stripLayoutAttributes(source, strip);
   const replaced = stripped.replace(
     /(diagram\s+\w+\s*\{)\s*\n/,
     `$1\n${injections.join('\n')}\n`,

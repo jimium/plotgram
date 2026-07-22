@@ -133,9 +133,9 @@ const ENTITY_TYPES = [
   // 通用 / 流程图
   'start', 'process', 'decision', 'end', 'service', 'client', 'gateway',
   // 时序图
-  'actor', 'boundary', 'control',
+  'actor', 'boundary', 'control', 'participant', 'lifeline',
   // 架构图
-  'external', 'frontend', 'cache', 'queue', 'storage', 'database',
+  'external', 'frontend', 'backend', 'cache', 'queue', 'storage', 'database', 'person',
   // 状态图
   'state', 'initial', 'final', 'choice',
   // 思维导图
@@ -145,6 +145,10 @@ const ENTITY_TYPES = [
 const STATUS_VALUES = ['healthy', 'degraded', 'down', 'unknown'];
 
 const LINE_STYLE_VALUES = ['default', 'error', 'warning'];
+
+const BORDER_STYLE_VALUES = ['solid', 'dashed', 'dotted'];
+
+const GROUP_LAYOUT_VALUES = ['auto', 'horizontal', 'vertical', 'fan-out', 'fan-in', 'grid'];
 
 const LAYOUT_ALGO_VALUES = [
   'flowchart', 'er',
@@ -158,7 +162,7 @@ const EDGE_ROUTING_VALUES = [
   'circular', 'organic',
 ];
 
-const LAYOUT_DIR_VALUES = ['top-to-bottom', 'left-to-right'];
+const LAYOUT_DIR_VALUES = ['top-to-bottom', 'left-to-right', 'radial'];
 
 const RENDER_STYLE_VALUES = [
   'standard', 'excalidraw', 'cross-hatch', 'blueprint',
@@ -166,18 +170,37 @@ const RENDER_STYLE_VALUES = [
 ];
 
 const KEYWORD_COMPLETIONS: Completion[] = [
+  // 块声明关键字
   { label: 'diagram', type: 'keyword', detail: '图表声明' },
   { label: 'entity', type: 'keyword', detail: '实体声明' },
-  { label: 'group', type: 'keyword', detail: '分组' },
+  { label: 'group', type: 'keyword', detail: '分组声明' },
+  { label: 'relation', type: 'keyword', detail: '关系属性块' },
+  { label: 'node_style', type: 'keyword', detail: '节点样式声明' },
+  { label: 'edge_style', type: 'keyword', detail: '边样式声明' },
+  { label: 'meta', type: 'keyword', detail: '元数据命名空间' },
+  // diagram 级属性
   { label: 'title', type: 'property', detail: '标题属性' },
-  { label: 'direction', type: 'property', detail: '布局方向' },
+  { label: 'direction', type: 'property', detail: '布局方向（top-to-bottom | left-to-right | radial）' },
   { label: 'layout', type: 'property', detail: '布局算法（可带 { options }）' },
   { label: 'edge_routing', type: 'property', detail: '边路由（可带 { options }）' },
+  { label: 'group_frame', type: 'property', detail: '分组框架布局（可带 { options }）' },
   { label: 'snap', type: 'property', detail: '边像素量化（true | false，默认 true）' },
   { label: 'align', type: 'property', detail: '节点结构对齐（default | off | rank | layer | full）' },
   { label: 'theme', type: 'property', detail: '主题 ID（StyleSheet）' },
   { label: 'render_style', type: 'property', detail: '笔触皮肤' },
+  // entity 级属性
   { label: 'type', type: 'property', detail: '实体类型' },
+  { label: 'status', type: 'property', detail: '状态（healthy | degraded | down | unknown）' },
+  { label: 'semantic', type: 'property', detail: '语义标记' },
+  { label: 'icon', type: 'property', detail: '图标名' },
+  { label: 'owner', type: 'property', detail: '负责人' },
+  { label: 'description', type: 'property', detail: '描述文本' },
+  // group 级属性
+  { label: 'border_style', type: 'property', detail: '分组边框样式（solid | dashed | dotted）' },
+  { label: 'color', type: 'property', detail: '分组颜色' },
+  // relation 级属性
+  { label: 'line_style', type: 'property', detail: '连线样式' },
+  { label: 'cardinality', type: 'property', detail: '基数（ER 关系）' },
 ];
 
 
@@ -220,9 +243,21 @@ export function plotgramCompletions(context: CompletionContext): CompletionResul
         return listResult(from, valueCompletions(RENDER_STYLE_VALUES));
       case 'theme':
         return listResult(from, valueCompletions(THEME_IDS));
+      case 'border_style':
+        return listResult(from, valueCompletions(BORDER_STYLE_VALUES));
+      case 'group_layout':
+        return listResult(from, valueCompletions(GROUP_LAYOUT_VALUES));
       default:
         return null;
     }
+  }
+
+  // `diagram <type>`：补全图表类型
+  const diagramMatch = textBefore.match(/^\s*diagram\s+(\w*)$/);
+  if (diagramMatch) {
+    const partial = diagramMatch[1];
+    const from = context.pos - partial.length;
+    return listResult(from, valueCompletions([...DIAGRAM_TYPES]));
   }
 
   const word = context.matchBefore(/[\w-]+/);

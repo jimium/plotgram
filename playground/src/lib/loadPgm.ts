@@ -49,9 +49,17 @@ export async function fetchShowcasePgm(path: string): Promise<string> {
   return text;
 }
 
+/** Showcase → Editor 启动参数；载入后从地址栏清除，避免残留。 */
+const SHOWCASE_LAUNCH_QUERY_KEYS = ['pgm', 'scale', 'zoom', 'zoomScale', 'fit'] as const;
+
 export function clearPgmQuery(): void {
   const url = new URL(window.location.href);
-  if (!url.searchParams.has('pgm')) return;
-  url.searchParams.delete('pgm');
+  let changed = false;
+  for (const key of SHOWCASE_LAUNCH_QUERY_KEYS) {
+    if (!url.searchParams.has(key)) continue;
+    url.searchParams.delete(key);
+    changed = true;
+  }
+  if (!changed) return;
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }

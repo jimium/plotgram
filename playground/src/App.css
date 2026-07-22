@@ -13,6 +13,8 @@
 
 /* ─── TopBar ────────────────────────────────────────────── */
 .topbar {
+  position: relative;
+  z-index: 100;
   flex-shrink: 0;
   height: 48px;
   display: flex;
@@ -22,6 +24,7 @@
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   gap: 8px;
+  overflow: visible;
 }
 
 .topbar-left,
@@ -273,9 +276,14 @@
   cursor: pointer;
 }
 
-.export-menu button:hover {
+.export-menu button:hover:not(:disabled) {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.export-menu button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .export-menu-meta {
@@ -749,6 +757,21 @@
   min-height: 0;
 }
 
+.inspector-kind-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.inspector-footer {
+  padding: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .inspector-section {
   border-bottom: 1px solid var(--border);
 }
@@ -921,12 +944,18 @@
 
 /* Collapsed: status bar only */
 .bottom-panel:not(.expanded) {
+  height: 32px;
   max-height: 32px;
 }
 
-/* Expanded */
+/* Expanded: fixed, predictable height with internal scroll */
 .bottom-panel.expanded {
-  max-height: 240px;
+  height: 220px;
+  max-height: 220px;
+}
+
+.bottom-panel-bar {
+  flex-shrink: 0;
 }
 
 /* Tab bar */
@@ -1031,7 +1060,7 @@
 }
 
 /* Bottom panel content */
-.bottom-content {
+.bottom-panel-content {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
@@ -1173,21 +1202,28 @@
 }
 
 /* Stats tab */
-.stats-grid {
+.stats-pane {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 8px;
-  padding: 10px 14px;
+  padding: 12px 14px;
 }
 
-.stat-card {
+.stat-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   padding: 8px 10px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+}
+
+.stat-item .stat-value {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stat-label {
@@ -2368,6 +2404,14 @@ kbd {
   min-height: 0;
 }
 
+.ascii-viewer-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--editor-bg);
+}
+
 .scene-json-toolbar-actions {
   display: flex;
   align-items: center;
@@ -2495,61 +2539,109 @@ kbd {
 
 .lint-viewer-root {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: var(--editor-bg);
+  min-height: 0;
 }
 
-.lint-toolbar {
-  display: flex;
-  align-items: center;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel);
+/* Header: 状态 + 严重度分段筛选 + 建议数 */
+.lint-header {
   flex-shrink: 0;
-}
-
-.lint-toolbar-info {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12px;
-  color: var(--text-muted);
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
 }
 
-.lint-badge {
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 11px;
+.lint-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
   font-weight: 600;
-  font-family: var(--mono);
 }
 
-.lint-badge--ok {
+.lint-status--ok {
   color: var(--success);
   background: color-mix(in srgb, var(--success) 14%, transparent);
 }
 
-.lint-badge--bad {
+.lint-status--bad {
   color: var(--error);
   background: color-mix(in srgb, var(--error) 14%, transparent);
 }
 
-.lint-stat {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--text-muted);
+/* 严重度分段筛选 */
+.lint-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
-.lint-stat--error { color: var(--error); }
-.lint-stat--warn { color: var(--warning); }
+.lint-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease),
+              color var(--duration-fast) var(--ease);
+}
 
+.lint-seg-btn:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.lint-seg-btn.active {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.lint-seg-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.lint-seg-btn--error svg { color: var(--error); }
+.lint-seg-btn--warn svg { color: var(--warning); }
+.lint-seg-btn--error.active { color: var(--error); }
+.lint-seg-btn--warn.active { color: var(--warning); }
+
+.lint-seg-count {
+  opacity: 0.7;
+}
+
+.lint-advice-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--accent);
+}
+
+/* 规则筛选 chips */
 .lint-rule-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 6px 14px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--panel-2);
   flex-shrink: 0;
@@ -2558,13 +2650,52 @@ kbd {
 .lint-rule-chip {
   display: inline-flex;
   align-items: center;
+  gap: 5px;
   padding: 2px 8px;
   font-size: 11px;
   font-family: var(--mono);
   color: var(--text-muted);
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease),
+              color var(--duration-fast) var(--ease),
+              background var(--duration-fast) var(--ease);
+}
+
+.lint-rule-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.lint-rule-chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.lint-rule-chip--has-error::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--error);
+  flex-shrink: 0;
+}
+
+.lint-rule-chip-count {
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.lint-rule-chip--clear {
+  color: var(--text-faint);
+}
+
+.lint-rule-chip--clear:hover {
+  color: var(--error);
+  border-color: var(--error);
 }
 
 .lint-list {
@@ -2573,11 +2704,12 @@ kbd {
   padding: 4px 0;
   flex: 1;
   overflow: auto;
+  min-height: 0;
 }
 
 .lint-item {
   display: block;
-  padding: 8px 14px;
+  padding: 9px 14px;
   font-size: 12.5px;
   border-left: 2px solid transparent;
   border-bottom: 1px solid var(--border-soft, color-mix(in srgb, var(--border) 50%, transparent));
@@ -2590,75 +2722,121 @@ kbd {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
-.lint-item--error .lint-item-header svg { color: var(--error); }
-.lint-item--warning .lint-item-header svg { color: var(--warning); }
+.lint-item--error .lint-item-header > svg { color: var(--error); flex-shrink: 0; }
+.lint-item--warning .lint-item-header > svg { color: var(--warning); flex-shrink: 0; }
 
 .lint-item-rule {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--text);
+  border: none;
+  background: none;
+  padding: 1px 4px;
+  margin-left: -4px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease),
+              color var(--duration-fast) var(--ease);
 }
 
-.lint-item-severity {
-  font-size: 10px;
-  font-family: var(--mono);
-  padding: 1px 6px;
-  border-radius: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.lint-item-severity--error {
-  color: var(--error);
-  background: color-mix(in srgb, var(--error) 12%, transparent);
-}
-
-.lint-item-severity--warning {
-  color: var(--warning);
-  background: color-mix(in srgb, var(--warning) 12%, transparent);
-}
-
-.lint-item-loc,
-.lint-item-metric {
-  font-family: var(--mono);
-  font-size: 11px;
+.lint-item-rule:hover {
+  background: var(--accent-soft);
   color: var(--accent);
 }
 
-.lint-item-metric { color: var(--text-faint); }
+.lint-item-header-spacer {
+  flex: 1;
+}
+
+.lint-tag {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.lint-tag--loc {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.lint-tag--metric {
+  color: var(--text-faint);
+  background: var(--panel-2);
+}
 
 .lint-item-message {
-  margin-top: 4px;
+  margin-top: 5px;
   color: var(--text);
   line-height: 1.5;
 }
 
-.lint-item-meta {
-  margin-top: 3px;
-  padding-left: 22px;
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--text-muted);
+.lint-item-meta-row {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
 }
 
-.lint-item-meta-label {
+.lint-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 1px 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.lint-meta-chip-label {
   color: var(--text-faint);
   flex-shrink: 0;
 }
 
-.lint-item-meta-value {
+.lint-meta-chip-value {
   color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lint-advice-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  padding: 2px 6px 2px 2px;
+  border: none;
+  background: none;
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--accent);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.lint-advice-toggle:hover {
+  background: var(--accent-soft);
+}
+
+.lint-advice-toggle svg {
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.lint-advice-toggle svg.open {
+  transform: rotate(90deg);
 }
 
 .lint-advice-list {
   margin-top: 6px;
-  margin-left: 22px;
+  margin-left: 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -2668,6 +2846,7 @@ kbd {
   padding: 6px 8px;
   background: var(--panel-2);
   border: 1px solid var(--border);
+  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
   border-radius: 4px;
   font-size: 11.5px;
 }
@@ -2723,6 +2902,36 @@ kbd {
 
 .lint-summary--error {
   color: var(--error);
+}
+
+/* 无违规时的成功空态 */
+.lint-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 32px;
+  text-align: center;
+  min-height: 0;
+}
+
+.lint-empty > svg {
+  color: var(--success);
+}
+
+.lint-empty-title {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.lint-empty-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .ast-viewer,

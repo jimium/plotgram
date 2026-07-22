@@ -25,7 +25,6 @@ import {
   downloadWebp,
   downloadText,
   downloadJson,
-  downloadDrawio,
   openInDrawio,
   copyText,
   copyPngToClipboard,
@@ -41,8 +40,8 @@ import {
   applyLayoutOptions,
   detectDiagramType,
   getDiagramDefaults,
+  AUTO_LAYOUT_OPTIONS,
   EMPTY_LAYOUT_OPTIONS,
-  layoutOptionsFromDefaults,
   normalizeLayoutOptions,
   reconcileLayoutOptionsWithDefaults,
   type LayoutOptions,
@@ -65,7 +64,26 @@ type Theme = 'light' | 'dark';
 type MobilePane = 'editor' | 'preview' | 'inspector';
 type PreviewTab = 'graph' | 'ast' | 'ascii' | 'scene' | 'lint';
 type BottomTab = 'problems' | 'output' | 'stats';
-type LayoutSource = 'source' | 'panel';
+
+/** 首次访问时的起始示例，确保编辑器与预览都有内容可展示 */
+const STARTER_SOURCE = `diagram flowchart {
+    title: "快速开始"
+
+    entity start "开始" { type: start }
+    entity input "读取输入" { type: process }
+    entity check "数据合法？" { type: decision }
+    entity handle "处理数据" { type: process }
+    entity report "报告错误" { type: process }
+    entity done "结束" { type: end }
+
+    start -> input
+    input -> check
+    check -> handle "是"
+    check -> report "否"
+    handle -> done
+    report -> done
+}
+`;
 
 /** PNG / WebP 浏览器栅格化导出倍率选项 */
 export const RASTER_EXPORT_SCALES = [1, 2, 3] as const;
@@ -89,7 +107,7 @@ function App() {
   const layoutCatalog = useLayoutCatalog(wasm, ready);
 
   // ─── 持久化状态 ──────────────────────────────────────────
-  const [code, setCode] = useLocalStorage('plotgram.code', '');
+  const [code, setCode] = useLocalStorage('plotgram.code', STARTER_SOURCE);
   const [layoutOptionsStored, setLayoutOptions] = useLocalStorage<LayoutOptions>(
     'plotgram.layout',
     EMPTY_LAYOUT_OPTIONS,
@@ -117,17 +135,17 @@ function App() {
   const [sceneJson, setSceneJson] = useState('');
   const [, setDrawio] = useState('');
   const [drawioExportReport, setDrawioExportReport] = useState<ExportReport | null>(null);
+  void drawioExportReport;
   const [success, setSuccess] = useState(false);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [renderMs, setRenderMs] = useState<number | null>(null);
 
   // ─── Workbench 新增状态 ──────────────────────────────────
-  const [leftCollapsed, setLeftCollapsed] = useState(true);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [activePreviewTab, setActivePreviewTab] = useState<PreviewTab>('graph');
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('problems');
   const [bottomPanelExpanded, setBottomPanelExpanded] = useState(false);
-  const [layoutSource, setLayoutSource] = useState<LayoutSource>('panel');
   const [filename, setFilename] = useState('未命名.pgm');
   const [dirty, setDirty] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -309,12 +327,7 @@ function App() {
         setFilename(filenameFromPgmPath(pgmPath));
         setDirty(false);
         setAppearanceOptions(DEFAULT_APPEARANCE_OPTIONS);
-        const dt = detectDiagramType(source);
-        const defaults = getDiagramDefaults(layoutCatalog, dt);
-        if (defaults) {
-          setLayoutOptions(layoutOptionsFromDefaults(defaults));
-        }
-        setFitSignal((s) => s + 1);
+        setLayoutOptions(AUTO_LAYOUT_OPTIONS);
         clearPgmQuery();
         showToast(`已载入 ${pgmPath}`, 'success');
       } catch {
@@ -372,34 +385,28 @@ function App() {
     return { entities, groups };
   }, [astData]);
 
-  // ─── 布局选项：迁移 legacy auto、图表类型切换时同步默认 ───
+  // ─── 布局选项：图表类型切换时重置为自动、并校验所选算法仍然可用 ───
   useEffect(() => {
-    if (!diagramDefaults || !diagramType) return;
+    if (!diagramType) return;
 
     setLayoutOptions((stored) => {
-      const hasLegacyAuto = !stored.layoutAlgo
-        || stored.layoutAlgo === 'auto'
-        || stored.edgeRouting === 'auto';
-
+      // 图表类型变化 → 回到「自动」，跟随新图表默认
       if (prevDiagramTypeRef.current !== null && prevDiagramTypeRef.current !== diagramType) {
         prevDiagramTypeRef.current = diagramType;
-        return layoutOptionsFromDefaults(diagramDefaults);
+        return AUTO_LAYOUT_OPTIONS;
       }
-
       prevDiagramTypeRef.current = diagramType;
 
-      const normalized = normalizeLayoutOptions(stored, diagramDefaults);
+      if (!diagramDefaults) return stored;
+
+      const normalized = normalizeLayoutOptions(stored);
       const reconciled = reconcileLayoutOptionsWithDefaults(
         normalized,
         layoutCatalog,
         diagramType,
         diagramDefaults,
       );
-
-      if (hasLegacyAuto || JSON.stringify(reconciled) !== JSON.stringify(stored)) {
-        return reconciled;
-      }
-      return stored;
+      return JSON.stringify(reconciled) !== JSON.stringify(stored) ? reconciled : stored;
     });
   }, [diagramDefaults, diagramType, layoutCatalog, setLayoutOptions]);
 
@@ -435,10 +442,7 @@ function App() {
         return;
       }
 
-      const effectiveSource =
-        layoutSource === 'source'
-          ? code
-          : applyLayoutOptions(code, layoutOptions, layoutCatalog, diagramDefaults);
+      const effectiveSource = applyLayoutOptions(code, layoutOptions, layoutCatalog, diagramDefaults);
       const optionsJson = JSON.stringify(
         buildRenderOptions(appearanceOptions, previewBackground),
       );
@@ -554,7 +558,7 @@ function App() {
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
-  }, [code, layoutOptions, appearanceOptions, previewBackground, layoutSource, layoutCatalog, diagramDefaults, wasm, ready, activePreviewTab]);
+  }, [code, layoutOptions, appearanceOptions, previewBackground, layoutCatalog, diagramDefaults, wasm, ready, activePreviewTab]);
 
   // ─── AST 解析 ────────────────────────────────────────────
   useEffect(() => {
@@ -564,42 +568,13 @@ function App() {
   }, [code, wasm, ready]);
 
   // ─── 布局/外观变更 ───────────────────────────────────────
-  const handleLayoutChange = (key: 'layoutAlgo' | 'edgeRouting' | 'layoutDirection' | 'gridSnap' | 'gridAlign', value: string | boolean) => {
+  const handleLayoutChange = (key: 'layoutAlgo' | 'edgeRouting', value: string) => {
     setLayoutOptions((prev) => {
       const next = normalizeLayoutOptions(prev);
-      if (key === 'gridSnap') {
-        return { ...next, gridSnap: Boolean(value) };
+      if (key === 'layoutAlgo') {
+        return { ...next, layoutAlgo: value, layoutConfig: {} };
       }
-      if (key === 'gridAlign') {
-        return { ...next, gridAlign: value as LayoutOptions['gridAlign'] };
-      }
-      if (key === 'layoutAlgo' && value !== next.layoutAlgo) {
-        return { ...next, layoutAlgo: value as string, layoutConfig: {} };
-      }
-      if (key === 'edgeRouting' && value !== next.edgeRouting) {
-        return { ...next, edgeRouting: value as string, edgeRoutingConfig: {} };
-      }
-      return { ...next, [key]: value };
-    });
-  };
-
-  const handleLayoutConfigChange = (key: string, value: number | null) => {
-    setLayoutOptions((prev) => {
-      const next = normalizeLayoutOptions(prev);
-      return {
-        ...next,
-        layoutConfig: { ...next.layoutConfig, [key]: value },
-      };
-    });
-  };
-
-  const handleEdgeRoutingConfigChange = (key: string, value: number | null) => {
-    setLayoutOptions((prev) => {
-      const next = normalizeLayoutOptions(prev);
-      return {
-        ...next,
-        edgeRoutingConfig: { ...next.edgeRoutingConfig, [key]: value },
-      };
+      return { ...next, edgeRouting: value, edgeRoutingConfig: {} };
     });
   };
 
@@ -616,28 +591,16 @@ function App() {
     setDirty(false);
     fileHandleRef.current = null;
     setFitSignal((s) => s + 1);
-    const defaults = getDiagramDefaults(layoutCatalog, detectDiagramType(source));
-    if (defaults) {
-      setLayoutOptions(layoutOptionsFromDefaults(defaults));
-    }
+    setLayoutOptions(AUTO_LAYOUT_OPTIONS);
     setAppearanceOptions(DEFAULT_APPEARANCE_OPTIONS);
-  }, [layoutCatalog, setCode, setLayoutOptions, setAppearanceOptions]);
+  }, [setCode, setLayoutOptions, setAppearanceOptions]);
 
   const handleOpenShowcase = useCallback(() => {
     window.open('/showcase/', '_blank', 'noopener,noreferrer');
   }, []);
 
-  const handleResetLayout = () => {
-    if (!diagramDefaults) return;
-    setLayoutOptions(layoutOptionsFromDefaults(diagramDefaults));
-  };
-
-  const handleResetAppearance = () => {
-    setAppearanceOptions(DEFAULT_APPEARANCE_OPTIONS);
-  };
-
   const handleReset = () => {
-    handleResetLayout();
+    setLayoutOptions(AUTO_LAYOUT_OPTIONS);
     setAppearanceOptions(DEFAULT_APPEARANCE_OPTIONS);
   };
 
@@ -656,10 +619,7 @@ function App() {
   // 仅在用户点击 drawio 相关导出/打开按钮时触发，避免每次编辑的 WASM 开销。
   const generateDrawio = useCallback((): string | null => {
     if (!wasm || !ready) return null;
-    const effectiveSource =
-      layoutSource === 'source'
-        ? code
-        : applyLayoutOptions(code, layoutOptions, layoutCatalog, diagramDefaults);
+    const effectiveSource = applyLayoutOptions(code, layoutOptions, layoutCatalog, diagramDefaults);
     const optionsJson = JSON.stringify(buildRenderOptions(appearanceOptions));
     const result = renderSource(wasm, effectiveSource, 'drawio', optionsJson);
     if (result.success && result.text) {
@@ -671,7 +631,7 @@ function App() {
     setDrawioExportReport(null);
     showToast('drawio 渲染失败', 'error');
     return null;
-  }, [wasm, ready, code, layoutOptions, appearanceOptions, previewBackground, layoutSource, layoutCatalog, diagramDefaults, showToast]);
+  }, [wasm, ready, code, layoutOptions, appearanceOptions, previewBackground, layoutCatalog, diagramDefaults, showToast]);
 
   // ─── 导出 ────────────────────────────────────────────────
   const exportActions = useMemo<ExportActions>(() => ({
@@ -690,16 +650,6 @@ function App() {
         .then(() => showToast(`WebP 已导出（${rasterExportScale}x）`, 'success'))
         .catch(() => showToast('WebP 导出失败（浏览器可能不支持）', 'error'));
     },
-    downloadAscii: () => {
-      if (!ascii) return;
-      downloadText(ascii, `${filename.replace(/\.pgm$/, '') || 'diagram'}.txt`);
-      showToast('ASCII 已导出', 'success');
-    },
-    downloadJson: () => {
-      if (!sceneJson) return;
-      downloadJson(sceneJson, `${filename.replace(/\.pgm$/, '') || 'diagram'}.json`);
-      showToast('Scene JSON 已导出', 'success');
-    },
     copySvg: () => {
       if (!svg) return;
       copyText(svg)
@@ -712,38 +662,40 @@ function App() {
         .then(() => showToast(`PNG 已复制到剪贴板（${rasterExportScale}x）`, 'success'))
         .catch(() => showToast('复制 PNG 失败（浏览器可能不支持）', 'error'));
     },
-    copyAscii: () => {
-      if (!ascii) return;
-      copyText(ascii)
-        .then(() => showToast('ASCII 文本已复制', 'success'))
-        .catch(() => showToast('复制 ASCII 失败', 'error'));
-    },
-    copyJson: () => {
-      if (!sceneJson) return;
-      copyText(sceneJson)
-        .then(() => showToast('Scene JSON 已复制', 'success'))
-        .catch(() => showToast('复制 JSON 失败', 'error'));
-    },
-    downloadDrawio: () => {
-      const xml = generateDrawio();
-      if (!xml) return;
-      downloadDrawio(xml, `${filename.replace(/\.pgm$/, '') || 'diagram'}.drawio`);
-      showToast('Drawio 已导出', 'success');
-    },
-    copyDrawio: () => {
-      const xml = generateDrawio();
-      if (!xml) return;
-      copyText(xml)
-        .then(() => showToast('Drawio XML 已复制', 'success'))
-        .catch(() => showToast('复制 Drawio 失败', 'error'));
-    },
     openInDrawio: () => {
       const xml = generateDrawio();
       if (!xml) return;
       openInDrawio(xml);
       showToast('已在 draw.io 中打开', 'success');
     },
-  }), [svg, ascii, sceneJson, filename, rasterExportScale, showToast, generateDrawio]);
+  }), [svg, filename, rasterExportScale, showToast, generateDrawio]);
+
+  // ─── 文本/数据页签内导出（ASCII / Scene JSON / AST） ─────────────────
+  const baseExportName = useCallback(
+    () => filename.replace(/\.pgm$/, '') || 'diagram',
+    [filename],
+  );
+  const handleCopyAscii = useCallback(() => {
+    if (!ascii) return;
+    copyText(ascii)
+      .then(() => showToast('ASCII 文本已复制', 'success'))
+      .catch(() => showToast('复制 ASCII 失败', 'error'));
+  }, [ascii, showToast]);
+  const handleDownloadAscii = useCallback(() => {
+    if (!ascii) return;
+    downloadText(ascii, `${baseExportName()}.txt`);
+    showToast('ASCII 已导出', 'success');
+  }, [ascii, baseExportName, showToast]);
+  const handleDownloadSceneJson = useCallback(() => {
+    if (!sceneJson) return;
+    downloadJson(sceneJson, `${baseExportName()}.json`);
+    showToast('Scene JSON 已导出', 'success');
+  }, [sceneJson, baseExportName, showToast]);
+  const handleDownloadAst = useCallback(() => {
+    if (!astData) return;
+    downloadJson(JSON.stringify(astData, null, 2), `${baseExportName()}.ast.json`);
+    showToast('AST JSON 已导出', 'success');
+  }, [astData, baseExportName, showToast]);
 
   // ─── 文件操作 ────────────────────────────────────────────
   const handleNewFile = useCallback(() => {
@@ -901,8 +853,6 @@ function App() {
     { id: 'toggle-left', label: '切换编辑器面板', action: () => setLeftCollapsed(p => !p) },
     { id: 'toggle-right', label: '切换属性面板', action: () => setRightCollapsed(p => !p) },
     { id: 'toggle-bottom', label: '切换底部面板', action: handleToggleBottomPanel },
-    { id: 'layout-source', label: '布局来源：跟随源码', action: () => setLayoutSource('source') },
-    { id: 'layout-panel', label: '布局来源：面板覆盖', action: () => setLayoutSource('panel') },
     { id: 'theme', label: '切换主题', action: () => setTheme(t => t === 'dark' ? 'light' : 'dark') },
   ] as Command[], [handleNewFile, handleOpenFile, handleSaveFile, handleShare, handleOpenShowcase, handleToggleBottomPanel]);
 
@@ -914,7 +864,8 @@ function App() {
         version={version}
         filename={filename}
         dirty={dirty}
-        canExport={Boolean(svg || ascii || sceneJson)}
+        canExport={ready && Boolean(code.trim())}
+        hasSvg={Boolean(svg)}
         renderStatus={
           !ready
             ? 'idle'
@@ -1045,7 +996,7 @@ function App() {
           {activePreviewTab === 'ast' && (
             <div className="preview-alt-pane">
               {astData ? (
-                <AstViewer diagram={astData} />
+                <AstViewer diagram={astData} onDownload={handleDownloadAst} />
               ) : (
                 <pre className="ast-viewer">{ready ? '无 AST 数据' : 'WASM 加载中…'}</pre>
               )}
@@ -1053,13 +1004,30 @@ function App() {
           )}
           {activePreviewTab === 'ascii' && (
             <div className="preview-alt-pane">
-              <pre className="ascii-preview">{ascii || '无内容'}</pre>
+              {ascii ? (
+                <div className="ascii-viewer-root">
+                  <div className="ast-toolbar">
+                    <span className="ast-toolbar-info">ASCII 预览</span>
+                    <div className="scene-json-toolbar-actions">
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={handleCopyAscii}>
+                        复制
+                      </button>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={handleDownloadAscii}>
+                        下载 .txt
+                      </button>
+                    </div>
+                  </div>
+                  <pre className="ascii-preview">{ascii}</pre>
+                </div>
+              ) : (
+                <pre className="ascii-preview">{ready ? '无内容' : 'WASM 加载中…'}</pre>
+              )}
             </div>
           )}
           {activePreviewTab === 'scene' && (
             <div className="preview-alt-pane">
               {sceneJson ? (
-                <SceneJsonViewer sceneJson={sceneJson} theme={theme} />
+                <SceneJsonViewer sceneJson={sceneJson} theme={theme} onDownload={handleDownloadSceneJson} />
               ) : (
                 <pre className="scene-json-preview">{ready ? '无 Scene JSON 数据' : 'WASM 加载中…'}</pre>
               )}
@@ -1103,36 +1071,14 @@ function App() {
             </button>
           </div>
           <Inspector
-            sourceCode={code}
             layoutOptions={layoutOptions}
             appearanceOptions={appearanceOptions}
             diagramType={diagramType}
             layoutCatalog={layoutCatalog}
             diagramDefaults={diagramDefaults}
-            layoutSource={layoutSource}
             onLayoutChange={handleLayoutChange}
-            onLayoutConfigChange={handleLayoutConfigChange}
-            onEdgeRoutingConfigChange={handleEdgeRoutingConfigChange}
             onAppearanceChange={handleAppearanceChange}
-            onResetAppearance={handleResetAppearance}
-            onResetLayout={handleResetLayout}
             onReset={handleReset}
-            onLayoutSourceChange={setLayoutSource}
-            onExportSvg={exportActions.downloadSvg}
-            onExportPng={exportActions.downloadPng}
-            onExportWebp={exportActions.downloadWebp}
-            onExportAscii={exportActions.downloadAscii}
-            onExportJson={exportActions.downloadJson}
-            onExportDrawio={exportActions.downloadDrawio}
-            onCopySvg={exportActions.copySvg}
-            onCopyAscii={exportActions.copyAscii}
-            onCopyJson={exportActions.copyJson}
-            onCopyDrawio={exportActions.copyDrawio}
-            onOpenInDrawio={exportActions.openInDrawio}
-            drawioExportReport={drawioExportReport}
-            rasterScale={rasterExportScale}
-            onRasterScaleChange={handleRasterScaleChange}
-            canExport={Boolean(svg || ascii || sceneJson)}
           />
         </section>
       </main>
@@ -1160,12 +1106,12 @@ function App() {
                   <span className="tab-render-time">{renderMs.toFixed(1)} ms</span>
                 )}
                 {tab === 'problems' && diagnostics.filter(d => d.severity === 'error').length > 0 && (
-                  <span className="tab-badge tab-badge-error">
+                  <span className="bottom-tab-badge bottom-tab-badge--error">
                     {diagnostics.filter(d => d.severity === 'error').length}
                   </span>
                 )}
                 {tab === 'problems' && diagnostics.filter(d => d.severity === 'warning').length > 0 && (
-                  <span className="tab-badge tab-badge-warn">
+                  <span className="bottom-tab-badge bottom-tab-badge--warning">
                     {diagnostics.filter(d => d.severity === 'warning').length}
                   </span>
                 )}
@@ -1256,10 +1202,6 @@ function App() {
                 <div className="stat-item">
                   <span className="stat-label">渲染耗时</span>
                   <span className="stat-value">{renderMs != null ? `${renderMs.toFixed(1)} ms` : '—'}</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">布局来源</span>
-                  <span className="stat-value">{layoutSource === 'source' ? '跟随源码' : '面板覆盖'}</span>
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">文件名</span>

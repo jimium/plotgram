@@ -10,6 +10,7 @@ import type {
 
 interface AstViewerProps {
   diagram: DiagramJson;
+  onDownload?: () => void;
 }
 
 // 格式化属性值显示
@@ -82,7 +83,7 @@ function KeyLine({ label, value, valueColor }: KeyLineProps) {
   );
 }
 
-export function AstViewer({ diagram }: AstViewerProps) {
+export function AstViewer({ diagram, onDownload }: AstViewerProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopyJson = useCallback(() => {
@@ -97,9 +98,16 @@ export function AstViewer({ diagram }: AstViewerProps) {
         <span className="ast-toolbar-info">
           {diagram.entities.length} 实体 · {diagram.relations.length} 边 · {diagram.groups.length} 组
         </span>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={handleCopyJson}>
-          {copied ? '已复制!' : '复制 JSON'}
-        </button>
+        <div className="scene-json-toolbar-actions">
+          <button type="button" className="btn btn-ghost btn-sm" onClick={handleCopyJson}>
+            {copied ? '已复制!' : '复制 JSON'}
+          </button>
+          {onDownload && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onDownload}>
+              下载 JSON
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="ast-tree">

@@ -17,14 +17,8 @@ export interface ExportActions {
   downloadSvg: () => void;
   downloadPng: () => void;
   downloadWebp: () => void;
-  downloadAscii: () => void;
-  downloadJson: () => void;
-  downloadDrawio: () => void;
   copySvg: () => void;
   copyPng: () => void;
-  copyAscii: () => void;
-  copyJson: () => void;
-  copyDrawio: () => void;
   openInDrawio: () => void;
 }
 
@@ -34,6 +28,8 @@ interface TopBarProps {
   filename: string;
   dirty: boolean;
   canExport: boolean;
+  /** 是否已有 SVG 预览（栅格化/复制类导出依赖此项） */
+  hasSvg: boolean;
   renderStatus: 'idle' | 'rendering' | 'success' | 'error' | 'warning';
   errorCount: number;
   warningCount: number;
@@ -124,6 +120,7 @@ export function TopBar({
   filename,
   dirty,
   canExport,
+  hasSvg,
   renderStatus,
   errorCount,
   warningCount,
@@ -239,11 +236,11 @@ export function TopBar({
           </button>
           {exportOpen && (
             <div className="export-menu">
-              <button type="button" onClick={() => runExport(exportActions.downloadSvg)}>
+              <button type="button" disabled={!hasSvg} onClick={() => runExport(exportActions.downloadSvg)}>
                 下载 SVG
               </button>
               <div className="png-scale-row">
-                <button type="button" onClick={() => runExport(exportActions.downloadPng)}>
+                <button type="button" disabled={!hasSvg} onClick={() => runExport(exportActions.downloadPng)}>
                   下载 PNG
                 </button>
                 <span className="png-scale-selector" title="PNG / WebP 导出倍率">
@@ -262,39 +259,20 @@ export function TopBar({
                   ))}
                 </span>
               </div>
-              <button type="button" onClick={() => runExport(exportActions.downloadWebp)}>
+              <button type="button" disabled={!hasSvg} onClick={() => runExport(exportActions.downloadWebp)}>
                 下载 WebP
                 <span className="export-menu-meta">{rasterScale}x</span>
               </button>
               <div className="menu-divider" />
-              <button type="button" onClick={() => runExport(exportActions.downloadAscii)}>
-                下载 ASCII
-              </button>
-              <button type="button" onClick={() => runExport(exportActions.downloadJson)}>
-                下载 Scene JSON
-              </button>
-              <div className="menu-divider" />
-              <button type="button" onClick={() => runExport(exportActions.downloadDrawio)}>
-                下载 Drawio
-              </button>
               <button type="button" onClick={() => runExport(exportActions.openInDrawio)}>
                 在 draw.io 中打开
               </button>
               <div className="menu-divider" />
-              <button type="button" onClick={() => runExport(exportActions.copySvg)}>
+              <button type="button" disabled={!hasSvg} onClick={() => runExport(exportActions.copySvg)}>
                 复制 SVG 源码
               </button>
-              <button type="button" onClick={() => runExport(exportActions.copyPng)}>
+              <button type="button" disabled={!hasSvg} onClick={() => runExport(exportActions.copyPng)}>
                 复制 PNG 到剪贴板
-              </button>
-              <button type="button" onClick={() => runExport(exportActions.copyAscii)}>
-                复制 ASCII 文本
-              </button>
-              <button type="button" onClick={() => runExport(exportActions.copyJson)}>
-                复制 Scene JSON
-              </button>
-              <button type="button" onClick={() => runExport(exportActions.copyDrawio)}>
-                复制 Drawio XML
               </button>
             </div>
           )}

@@ -4,6 +4,7 @@ import { JsonReadonlyViewer, type JsonReadonlyViewerHandle } from './JsonReadonl
 interface SceneJsonViewerProps {
   sceneJson: string;
   theme: 'light' | 'dark';
+  onDownload?: () => void;
 }
 
 interface SceneSummary {
@@ -46,7 +47,7 @@ function parseSummary(sceneJson: string): SceneSummary | null {
   }
 }
 
-export function SceneJsonViewer({ sceneJson, theme }: SceneJsonViewerProps) {
+export function SceneJsonViewer({ sceneJson, theme, onDownload }: SceneJsonViewerProps) {
   const viewerRef = useRef<JsonReadonlyViewerHandle>(null);
   const [copied, setCopied] = useState(false);
   const summary = useMemo(() => parseSummary(sceneJson), [sceneJson]);
@@ -92,6 +93,11 @@ export function SceneJsonViewer({ sceneJson, theme }: SceneJsonViewerProps) {
           <button type="button" className="btn btn-ghost btn-sm" onClick={handleCopyJson}>
             {copied ? '已复制!' : '复制 JSON'}
           </button>
+          {onDownload && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onDownload}>
+              下载 JSON
+            </button>
+          )}
         </div>
       </div>
       <JsonReadonlyViewer ref={viewerRef} value={sceneJson} theme={theme} />

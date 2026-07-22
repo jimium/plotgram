@@ -1298,6 +1298,11 @@
       return `${CDN_BASE}showcase/${normalized}${suffix}`;
     }
 
+    /** Showcase → Editor：仅传样例路径，不传预览缩放倍率等参数。 */
+    function buildEditorHref(pgmPath) {
+      return `/editor/?pgm=${encodeURIComponent(pgmPath)}`;
+    }
+
     // manifest:start
     const SAMPLE_PATHS = [
       "architecture/demo.ai-agent-docops-pipeline.pgm",
@@ -2061,7 +2066,7 @@
         });
 
       // 链接
-      detailOpenEditor.href = `/editor/?pgm=${encodeURIComponent(sample.path)}`;
+      detailOpenEditor.href = buildEditorHref(sample.path);
       detailOpenSvg.href = assetUrl(sample.svgPath);
       detailOpenDsl.href = assetUrl(sample.path);
 

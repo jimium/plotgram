@@ -116,11 +116,9 @@ export function Preview({
     if (naturalW === 0 || naturalH === 0) return;
 
     const padding = 48;
-    const nextScale = clamp(
-      Math.min((cw - padding) / naturalW, (ch - padding) / naturalH),
-      MIN_SCALE,
-      MAX_SCALE,
-    );
+    // 适应窗口时上限锁定 100%：小图保持原始尺寸，避免被放大导致模糊/失真
+    const fitScale = Math.min((cw - padding) / naturalW, (ch - padding) / naturalH);
+    const nextScale = clamp(Math.min(fitScale, 1), MIN_SCALE, MAX_SCALE);
 
     setScale(nextScale);
     setTx((cw - naturalW * nextScale) / 2);
