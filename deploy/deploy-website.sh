@@ -5,8 +5,8 @@
 #   - 主站根目录:  /var/www/plotgram.cn/  （index.html + assets/brand/）
 #   - CDN:         /website/assets/       （打包 js / css）
 #
-# 重要：根目录 rsync 使用 --delete，但必须排除 playground/ showcase/ agent/ 等其他站点子目录，
-#       否则会误删其他站点（历史上 agent/ 曾因此被清空）。
+# 重要：根目录 rsync 使用 --delete，但必须排除 playground/ editor/ showcase/ agent/ 等其他站点子目录，
+#       否则会误删其他站点（历史上 agent/ 曾因此被清空；editor/ 曾因未排除而被 website 发布删掉）。
 #
 # 用法:
 #   ./deploy/deploy-website.sh              # 构建 + 同步
@@ -97,6 +97,7 @@ upload() {
   ssh "$DEPLOY_HOST" "mkdir -p '$REMOTE_DIR'"
   rsync -avz --delete \
     --exclude='playground/' \
+    --exclude='editor/' \
     --exclude='showcase/' \
     --exclude='agent/' \
     "$STAGING_DIR/site-root/" "$ROOT_REMOTE"

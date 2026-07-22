@@ -135,7 +135,7 @@ main() {
   echo ""
   echo "   plotgram.cn:"
   echo "     Website:    https://www.plotgram.cn/"
-  echo "     Playground: https://www.plotgram.cn/playground/"
+  echo "     Editor:     https://www.plotgram.cn/editor/"
   echo "     Showcase:   https://www.plotgram.cn/showcase/"
   echo "     Agent:      https://www.plotgram.cn/agent/"
   echo "   API:          https://api.pg.agcli.cn/health"

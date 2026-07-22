@@ -1,4 +1,4 @@
-import type { DiagramKind } from './examples';
+import type { DiagramKind } from './diagramKinds';
 
 export interface SelectOption {
   value: string;

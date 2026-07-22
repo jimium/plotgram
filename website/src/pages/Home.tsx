@@ -105,8 +105,8 @@ export default function Home() {
               浏览 80+ 示例
               <span className="hero-cta-arrow">→</span>
             </a>
-            <a href="/playground/" className="btn btn-agent" target="_blank" rel="noopener noreferrer">
-              打开 Playground
+            <a href="/editor/" className="btn btn-agent" target="_blank" rel="noopener noreferrer">
+              打开 Editor
             </a>
             <a href="/docs/getting-started/" className="btn btn-ghost">
               5 分钟快速上手

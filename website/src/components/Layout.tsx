@@ -41,8 +41,8 @@ export default function Layout() {
             ))}
           </div>
           <div className="nav-cta-group">
-            <a href="/playground/" className="nav-cta nav-cta-primary" target="_blank" rel="noopener noreferrer">
-              Playground
+            <a href="/editor/" className="nav-cta nav-cta-primary" target="_blank" rel="noopener noreferrer">
+              Editor
             </a>
             <a href="/showcase/" className="nav-cta" target="_blank" rel="noopener noreferrer">
               Showcase
@@ -65,7 +65,7 @@ export default function Layout() {
             <span>Plotgram</span>
           </div>
           <div className="footer-links">
-            <a href="/playground/" target="_blank" rel="noopener noreferrer">Playground</a>
+            <a href="/editor/" target="_blank" rel="noopener noreferrer">Editor</a>
             <a href="/showcase/" target="_blank" rel="noopener noreferrer">Showcase</a>
             <a href="/agent/" target="_blank" rel="noopener noreferrer">Agent</a>
             <a href="/docs/getting-started/">快速上手</a>

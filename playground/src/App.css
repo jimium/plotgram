@@ -59,7 +59,8 @@
   letter-spacing: -0.3px;
 }
 
-.brand-sub {
+.brand-sub,
+.brand-subtitle {
   font-size: 12px;
   color: var(--text-muted);
   font-weight: 500;
@@ -2855,5 +2856,89 @@ kbd {
   .command-palette {
     width: 95vw;
   }
+}
+
+/* ─── Editor 空白态 ───────────────────────────────────── */
+.empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  min-height: 280px;
+  background: var(--bg-subtle);
+}
+
+.empty-state-loading {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.empty-state-card {
+  max-width: 420px;
+  text-align: center;
+}
+
+.empty-state-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.empty-state-lead {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.empty-state-btn {
+  min-width: 140px;
+}
+
+.empty-state-file-input {
+  display: none;
+}
+
+.empty-state-paste {
+  margin-top: 8px;
+  text-align: left;
+}
+
+.empty-state-textarea {
+  width: 100%;
+  min-height: 160px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.empty-state-paste-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+
+.empty-state-hint {
+  margin: 16px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
 }
 

@@ -1192,6 +1192,7 @@
           <div class="sidebar-foot">
             <button class="sidebar-btn primary" id="scrollFeatured" type="button">精选示例</button>
             <button class="sidebar-btn" id="resetFilters" type="button">重置筛选</button>
+            <a class="sidebar-btn" href="/editor/" title="图表调校" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">Editor</a>
             <a class="sidebar-btn" href="/" title="返回 Plotgram 主站" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">主站</a>
           </div>
         </div>
@@ -1228,7 +1229,8 @@
               <button id="detailNext" type="button" aria-label="下一个">›</button>
             </div>
             <div class="detail-links">
-              <a class="primary" id="detailOpenSvg" target="_blank" rel="noopener">打开 SVG</a>
+              <a class="primary" id="detailOpenEditor" target="_blank" rel="noopener">在 Editor 中打开</a>
+              <a class="secondary" id="detailOpenSvg" target="_blank" rel="noopener">打开 SVG</a>
               <a class="secondary" id="detailOpenDsl" target="_blank" rel="noopener">.pgm 源文件</a>
             </div>
           </div>
@@ -1663,6 +1665,7 @@
     const detailPrev = document.getElementById("detailPrev");
     const detailNext = document.getElementById("detailNext");
     const detailCounter = document.getElementById("detailCounter");
+    const detailOpenEditor = document.getElementById("detailOpenEditor");
     const detailOpenSvg = document.getElementById("detailOpenSvg");
     const detailOpenDsl = document.getElementById("detailOpenDsl");
     const detailViz = document.getElementById("detailViz");
@@ -2058,6 +2061,7 @@
         });
 
       // 链接
+      detailOpenEditor.href = `/editor/?pgm=${encodeURIComponent(sample.path)}`;
       detailOpenSvg.href = assetUrl(sample.svgPath);
       detailOpenDsl.href = assetUrl(sample.path);
 

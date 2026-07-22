@@ -265,12 +265,17 @@ fn rebuild_layers_from_ranks(
 
 // ─── 组间排列策略 ─────────────────────────────────────────
 
+/// P2-3: 每条跨组边为组间距额外增加的像素
+const CROSS_EDGE_GAP_SCALE: f64 = 6.0;
+/// P2-3: 组间距额外增加的上限
+const MAX_EXTRA_PAIR_GAP: f64 = 40.0;
+
 /// 堆叠排列：拓扑排序 + 垂直/水平堆叠
 ///
 /// 实现 [`GroupArrangement`] trait，用于 flowchart 场景。
 /// 支持垂直堆叠（阶段划分）和水平堆叠（泳道图）。
 pub struct StackingArrangement {
-    /// group 间距
+    /// group 间距（基础值）
     pub gap: f64,
     /// 对齐模式
     pub align: AlignMode,
@@ -284,6 +289,15 @@ impl StackingArrangement {
     }
 }
 
+/// P2-3: 根据相邻组对间的跨组边数计算自适应间距。
+///
+/// `gap = base_gap + min(edge_count × scale, max_extra)`。
+/// 高负载组对预留更宽通道，减少路由贴边。
+fn adaptive_pair_gap(base_gap: f64, pair_edge_count: usize) -> f64 {
+    let extra = (pair_edge_count as f64 * CROSS_EDGE_GAP_SCALE).min(MAX_EXTRA_PAIR_GAP);
+    base_gap + extra
+}
+
 impl GroupArrangement for StackingArrangement {
     fn arrange(
         &self,
@@ -293,6 +307,9 @@ impl GroupArrangement for StackingArrangement {
     ) -> HashMap<String, (f64, f64)> {
         // 1. 拓扑排序
         let order = topological_sort_groups(group_ids, cross_edges);
+
+        // P2-3: 统计每对相邻组间的跨组边数
+        let pair_edge_counts = count_pair_edges(&order, cross_edges);
 
         let mut offsets = HashMap::new();
 
@@ -305,7 +322,7 @@ impl GroupArrangement for StackingArrangement {
                     .fold(0.0_f64, f64::max);
 
                 let mut y_offset = 0.0;
-                for gid in &order {
+                for (i, gid) in order.iter().enumerate() {
                     let intra = intra_layouts.get(gid);
                     if intra.is_none() {
                         offsets.insert(gid.clone(), (0.0, y_offset));
@@ -317,7 +334,13 @@ impl GroupArrangement for StackingArrangement {
                         AlignMode::Left => 0.0,
                     };
                     offsets.insert(gid.clone(), (x_offset, y_offset));
-                    y_offset += intra.content_height + self.gap;
+                    // P2-3: 逐对自适应间距
+                    let pair_count = if i + 1 < order.len() {
+                        pair_edge_counts.get(&(i, i + 1)).copied().unwrap_or(0)
+                    } else {
+                        0
+                    };
+                    y_offset += intra.content_height + adaptive_pair_gap(self.gap, pair_count);
                 }
             }
             ArrangementMode::Horizontal => {
@@ -328,7 +351,7 @@ impl GroupArrangement for StackingArrangement {
                     .fold(0.0_f64, f64::max);
 
                 let mut x_offset = 0.0;
-                for gid in &order {
+                for (i, gid) in order.iter().enumerate() {
                     let intra = intra_layouts.get(gid);
                     if intra.is_none() {
                         offsets.insert(gid.clone(), (x_offset, 0.0));
@@ -340,13 +363,50 @@ impl GroupArrangement for StackingArrangement {
                         AlignMode::Left => 0.0,
                     };
                     offsets.insert(gid.clone(), (x_offset, y_offset));
-                    x_offset += intra.content_width + self.gap;
+                    // P2-3: 逐对自适应间距
+                    let pair_count = if i + 1 < order.len() {
+                        pair_edge_counts.get(&(i, i + 1)).copied().unwrap_or(0)
+                    } else {
+                        0
+                    };
+                    x_offset += intra.content_width + adaptive_pair_gap(self.gap, pair_count);
                 }
             }
         }
 
         offsets
     }
+}
+
+/// P2-3: 统计拓扑排序后相邻组对间的跨组边数。
+///
+/// 返回 `(position_i, position_i+1) -> edge_count` 映射。
+fn count_pair_edges(
+    order: &[String],
+    cross_edges: &[CrossGroupEdge],
+) -> HashMap<(usize, usize), usize> {
+    // 组名 → 排序位置
+    let pos_of: HashMap<&str, usize> = order
+        .iter()
+        .enumerate()
+        .map(|(i, g)| (g.as_str(), i))
+        .collect();
+
+    let mut counts: HashMap<(usize, usize), usize> = HashMap::new();
+    for edge in cross_edges {
+        let from_pos = edge.from_group.as_deref().and_then(|g| pos_of.get(g));
+        let to_pos = edge.to_group.as_deref().and_then(|g| pos_of.get(g));
+        if let (Some(&fp), Some(&tp)) = (from_pos, to_pos) {
+            if fp != tp {
+                let pair = if fp < tp { (fp, tp) } else { (tp, fp) };
+                // 仅统计相邻位置对（非相邻组的边不影响间距）
+                if pair.1 - pair.0 == 1 {
+                    *counts.entry(pair).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+    counts
 }
 
 /// 拓扑排序 group（Kahn's algorithm，确定性）

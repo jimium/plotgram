@@ -4,7 +4,7 @@ import { TopBar, type ExportActions } from './components/TopBar';
 import { CodeEditor, type CodeEditorHandle } from './components/CodeEditor';
 import { Preview } from './components/Preview';
 import { Inspector } from './components/Inspector';
-import { ExampleDrawer } from './components/ExampleDrawer';
+import { EmptyState } from './components/EmptyState';
 import { HelpPanel } from './components/HelpPanel';
 import { ResizeHandle } from './components/ResizeHandle';
 import { Toast, type ToastMessage } from './components/Toast';
@@ -32,6 +32,12 @@ import {
 } from './lib/exportImage';
 import { buildShareUrl, readStateFromUrl } from './lib/share';
 import {
+  clearPgmQuery,
+  fetchShowcasePgm,
+  filenameFromPgmPath,
+  readPgmQuery,
+} from './lib/loadPgm';
+import {
   applyLayoutOptions,
   detectDiagramType,
   getDiagramDefaults,
@@ -53,29 +59,13 @@ import {
   PREVIEW_BG_STORAGE_KEY,
   type PreviewBackground,
 } from './data/previewBackground';
-import { EXAMPLES, DEFAULT_EXAMPLE_ID, getExample, type DiagramKind } from './data/examples';
+import type { DiagramKind } from './data/diagramKinds';
 
 type Theme = 'light' | 'dark';
 type MobilePane = 'editor' | 'preview' | 'inspector';
 type PreviewTab = 'graph' | 'ast' | 'ascii' | 'scene' | 'lint';
 type BottomTab = 'problems' | 'output' | 'stats';
 type LayoutSource = 'source' | 'panel';
-
-const DEFAULT_CODE = getExample(DEFAULT_EXAMPLE_ID)?.source ?? EXAMPLES[0].source;
-
-// 新建文件时的空白模板
-const BLANK_CODE = `diagram flowchart {
-    title: "未命名图表"
-
-    // 添加节点：entity[类型] id "标签"
-    // 类型可选：start / end / client / service / database / cache ...
-    entity[start] start "开始"
-    entity[end] end "结束"
-
-    // 添加边：source -> target "标签"
-    // 使用 --> 表示虚线/响应箭头
-    start -> end
-}`;
 
 /** PNG / WebP 浏览器栅格化导出倍率选项 */
 export const RASTER_EXPORT_SCALES = [1, 2, 3] as const;
@@ -99,7 +89,7 @@ function App() {
   const layoutCatalog = useLayoutCatalog(wasm, ready);
 
   // ─── 持久化状态 ──────────────────────────────────────────
-  const [code, setCode] = useLocalStorage('plotgram.code', DEFAULT_CODE);
+  const [code, setCode] = useLocalStorage('plotgram.code', '');
   const [layoutOptionsStored, setLayoutOptions] = useLocalStorage<LayoutOptions>(
     'plotgram.layout',
     EMPTY_LAYOUT_OPTIONS,
@@ -121,9 +111,7 @@ function App() {
   );
 
   // ─── 会话状态 ────────────────────────────────────────────
-  const [activeExampleId, setActiveExampleId] = useState(DEFAULT_EXAMPLE_ID);
-  // 示例库首次引导：用户打开过示例库抽屉后不再显示脉冲提示
-  const [examplesGuideSeen, setExamplesGuideSeen] = useLocalStorage('plotgram.examplesGuideSeen', false);
+  const [pgmLoading, setPgmLoading] = useState(false);
   const [svg, setSvg] = useState('');
   const [ascii, setAscii] = useState('');
   const [sceneJson, setSceneJson] = useState('');
@@ -134,27 +122,14 @@ function App() {
   const [renderMs, setRenderMs] = useState<number | null>(null);
 
   // ─── Workbench 新增状态 ──────────────────────────────────
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [leftCollapsed, setLeftCollapsed] = useState(true);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [activePreviewTab, setActivePreviewTab] = useState<PreviewTab>('graph');
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('problems');
   const [bottomPanelExpanded, setBottomPanelExpanded] = useState(false);
   const [layoutSource, setLayoutSource] = useState<LayoutSource>('panel');
-  // 首次访问(localStorage 无 plotgram.code)时,文件名与默认示例标题保持一致
-  const [filename, setFilename] = useState(() => {
-    try {
-      const raw = window.localStorage.getItem('plotgram.code');
-      if (raw === null) {
-        const ex = getExample(DEFAULT_EXAMPLE_ID);
-        return `${ex?.title ?? '未命名'}.pgm`;
-      }
-    } catch {
-      // ignore
-    }
-    return '未命名.pgm';
-  });
+  const [filename, setFilename] = useState('未命名.pgm');
   const [dirty, setDirty] = useState(false);
-  const [examplesDrawerOpen, setExamplesDrawerOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [renderLog, setRenderLog] = useState<string[]>([]);
   const [entityCount, setEntityCount] = useState<number | null>(null);
@@ -308,18 +283,52 @@ function App() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
-  // ─── 首次加载：从分享 URL 还原 ────────────────────────────
+  // ─── 首次加载：分享链接 / ?pgm= 样例路径 ─────────────────
   useEffect(() => {
     const shared = readStateFromUrl();
     if (shared) {
       setCode(shared.code);
       if (shared.layout) setLayoutOptions(normalizeLayoutOptions(shared.layout));
       if (shared.appearance) setAppearanceOptions(shared.appearance);
-      setActiveExampleId('');
       setDirty(false);
-      window.history.replaceState(null, '', window.location.pathname);
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
       showToast('已从分享链接载入', 'success');
+      return;
     }
+
+    const pgmPath = readPgmQuery();
+    if (!pgmPath) return;
+
+    let cancelled = false;
+    setPgmLoading(true);
+    void (async () => {
+      try {
+        const source = await fetchShowcasePgm(pgmPath);
+        if (cancelled) return;
+        setCode(source);
+        setFilename(filenameFromPgmPath(pgmPath));
+        setDirty(false);
+        setAppearanceOptions(DEFAULT_APPEARANCE_OPTIONS);
+        const dt = detectDiagramType(source);
+        const defaults = getDiagramDefaults(layoutCatalog, dt);
+        if (defaults) {
+          setLayoutOptions(layoutOptionsFromDefaults(defaults));
+        }
+        setFitSignal((s) => s + 1);
+        clearPgmQuery();
+        showToast(`已载入 ${pgmPath}`, 'success');
+      } catch {
+        if (!cancelled) {
+          showToast(`无法载入样例：${pgmPath}`, 'error');
+        }
+      } finally {
+        if (!cancelled) setPgmLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -330,6 +339,7 @@ function App() {
   }, [setCode]);
 
   const diagramType = useMemo(() => detectDiagramType(code), [code]);
+  const hasContent = code.trim().length > 0;
   const diagramDefaults = useMemo(
     () => getDiagramDefaults(layoutCatalog, diagramType),
     [layoutCatalog, diagramType],
@@ -411,6 +421,20 @@ function App() {
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
 
     debounceRef.current = window.setTimeout(() => {
+      if (!code.trim()) {
+        setSvg('');
+        setAscii('');
+        setSceneJson('');
+        setAstData(null);
+        setLintData(null);
+        setDiagnostics([]);
+        setSuccess(false);
+        setRenderMs(null);
+        setEntityCount(null);
+        setEdgeCount(null);
+        return;
+      }
+
       const effectiveSource =
         layoutSource === 'source'
           ? code
@@ -586,19 +610,22 @@ function App() {
     setAppearanceOptions((prev) => ({ ...prev, [key]: value }));
   };
 
-  // ─── 示例选择 ────────────────────────────────────────────
-  const handleSelectExample = (id: string) => {
-    const ex = getExample(id);
-    if (!ex) return;
-    setActiveExampleId(id);
-    setCode(ex.source);
-    const exDefaults = getDiagramDefaults(layoutCatalog, detectDiagramType(ex.source));
-    setLayoutOptions(exDefaults ? layoutOptionsFromDefaults(exDefaults) : EMPTY_LAYOUT_OPTIONS);
-    setAppearanceOptions(DEFAULT_APPEARANCE_OPTIONS);
-    setFilename(`${ex.title}.pgm`);
+  const handleLoadSource = useCallback((source: string, name = '未命名.pgm') => {
+    setCode(source);
+    setFilename(name);
     setDirty(false);
+    fileHandleRef.current = null;
     setFitSignal((s) => s + 1);
-  };
+    const defaults = getDiagramDefaults(layoutCatalog, detectDiagramType(source));
+    if (defaults) {
+      setLayoutOptions(layoutOptionsFromDefaults(defaults));
+    }
+    setAppearanceOptions(DEFAULT_APPEARANCE_OPTIONS);
+  }, [layoutCatalog, setCode, setLayoutOptions, setAppearanceOptions]);
+
+  const handleOpenShowcase = useCallback(() => {
+    window.open('/showcase/', '_blank', 'noopener,noreferrer');
+  }, []);
 
   const handleResetLayout = () => {
     if (!diagramDefaults) return;
@@ -720,13 +747,12 @@ function App() {
 
   // ─── 文件操作 ────────────────────────────────────────────
   const handleNewFile = useCallback(() => {
-    setCode(BLANK_CODE);
+    setCode('');
     setFilename('未命名.pgm');
     setDirty(false);
     fileHandleRef.current = null;
-    setActiveExampleId('');
     setFitSignal((s) => s + 1);
-    showToast('已新建文件', 'info');
+    showToast('已清空画布', 'info');
   }, [setCode, showToast]);
 
   const handleOpenFile = useCallback(async () => {
@@ -746,7 +772,6 @@ function App() {
         setFilename(handle.name);
         setDirty(false);
         fileHandleRef.current = handle;
-        setActiveExampleId('');
         showToast(`已打开 ${handle.name}`, 'success');
         return;
       } catch {
@@ -767,7 +792,6 @@ function App() {
       setFilename(file.name);
       setDirty(false);
       fileHandleRef.current = null;
-      setActiveExampleId('');
       showToast(`已打开 ${file.name}`, 'success');
     };
     input.click();
@@ -872,7 +896,7 @@ function App() {
     { id: 'open', label: '打开文件', shortcut: '⌘+O', action: handleOpenFile },
     { id: 'save', label: '保存文件', shortcut: '⌘+S', action: handleSaveFile },
     { id: 'share', label: '分享链接', action: handleShare },
-    { id: 'examples', label: '打开示例库', action: () => setExamplesDrawerOpen(true) },
+    { id: 'showcase', label: '打开 Showcase', action: handleOpenShowcase },
     { id: 'help', label: '语法速查', action: () => setHelpOpen(true) },
     { id: 'toggle-left', label: '切换编辑器面板', action: () => setLeftCollapsed(p => !p) },
     { id: 'toggle-right', label: '切换属性面板', action: () => setRightCollapsed(p => !p) },
@@ -880,7 +904,7 @@ function App() {
     { id: 'layout-source', label: '布局来源：跟随源码', action: () => setLayoutSource('source') },
     { id: 'layout-panel', label: '布局来源：面板覆盖', action: () => setLayoutSource('panel') },
     { id: 'theme', label: '切换主题', action: () => setTheme(t => t === 'dark' ? 'light' : 'dark') },
-  ] as Command[], [handleNewFile, handleOpenFile, handleSaveFile, handleShare, handleToggleBottomPanel]);
+  ] as Command[], [handleNewFile, handleOpenFile, handleSaveFile, handleShare, handleOpenShowcase, handleToggleBottomPanel]);
 
   // ─── 渲染 ────────────────────────────────────────────────
   return (
@@ -905,10 +929,7 @@ function App() {
         errorCount={diagnostics.filter(d => d.severity === 'error').length}
         warningCount={diagnostics.filter(d => d.severity === 'warning').length}
         renderMs={renderMs}
-        onOpenExamples={() => {
-          setExamplesDrawerOpen(true);
-          setExamplesGuideSeen(true);
-        }}
+        onOpenShowcase={handleOpenShowcase}
         onOpenDocs={() => setHelpOpen(true)}
         onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
         onShare={handleShare}
@@ -920,7 +941,6 @@ function App() {
         exportActions={exportActions}
         rasterScale={rasterExportScale}
         onRasterScaleChange={handleRasterScaleChange}
-        examplesGuideSeen={examplesGuideSeen}
       />
 
       {/* ─── 移动端标签 ──────────────────────────────────── */}
@@ -1005,14 +1025,22 @@ function App() {
           </div>
 
           {activePreviewTab === 'graph' && (
-            <Preview
-              svg={svg}
-              ready={ready}
-              errorText={previewError}
-              background={previewBackground}
-              onBackgroundChange={setPreviewBackground}
-              fitSignal={fitSignal}
-            />
+            pgmLoading ? (
+              <div className="empty-state empty-state-loading">
+                <p>正在载入样例…</p>
+              </div>
+            ) : !hasContent ? (
+              <EmptyState onLoadSource={handleLoadSource} />
+            ) : (
+              <Preview
+                svg={svg}
+                ready={ready}
+                errorText={previewError}
+                background={previewBackground}
+                onBackgroundChange={setPreviewBackground}
+                fitSignal={fitSignal}
+              />
+            )
           )}
           {activePreviewTab === 'ast' && (
             <div className="preview-alt-pane">
@@ -1243,15 +1271,6 @@ function App() {
         )}
       </div>
 
-      {/* ─── 示例库抽屉 ──────────────────────────────────── */}
-      <ExampleDrawer
-        open={examplesDrawerOpen}
-        activeId={activeExampleId}
-        onSelect={handleSelectExample}
-        onClose={() => setExamplesDrawerOpen(false)}
-      />
-
-      {/* ─── 帮助面板 ────────────────────────────────────── */}
       <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} />
 
       {/* ─── 命令面板 ────────────────────────────────────── */}

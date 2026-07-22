@@ -31,8 +31,8 @@ import {
   resolveEffectiveThemeId,
   type AppearanceOptions,
 } from '../data/appearanceOptions';
-import type { DiagramKind } from '../data/examples';
-import { KIND_LABELS } from '../data/examples';
+import type { DiagramKind } from '../data/diagramKinds';
+import { KIND_LABELS } from '../data/diagramKinds';
 import type { ExportReport } from '../lib/wasm';
 
 /* ─── 通用子组件 ─────────────────────────────────────────── */

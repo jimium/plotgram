@@ -4,19 +4,20 @@
 
 Plotgram Studio 是基于 [Plotgram](../) 构建的智能图表创作工具。用户用自然语言描述需求,LLM Agent 通过 Tool-Calling 操控 plotgram-wasm 生成与迭代图表,无需手写 DSL。
 
-## 与 Playground 的区别
+## 与 Editor 的区别
 
-| 能力 | Playground | Studio |
-|------|-----------|--------|
-| 手写 DSL 编辑 | 有 | 无 |
+| 能力 | Editor | Studio |
+|------|--------|--------|
+| 手写 DSL 编辑 | 有（可折叠） | 无 |
 | 布局/外观参数面板 | 有 | 无 |
-| 示例库浏览 | 有 | 无 |
+| Showcase 样例浏览 | 外链画廊 | 无 |
 | LLM 对话驱动 | 无 | 核心 |
 | Agent 多步迭代 | 无 | 核心 |
 | 变更 Diff 预览 | 无 | 核心 |
 | Agent Tool-Calling | 无 | 核心 |
+| 云保存 / 账号 | 无 | SaaS |
 
-Studio 不重复 Playground 的工作,专注 LLM 驱动与 Agent 绘图。
+Studio 不重复 Editor 的调校导出工作,专注 LLM 驱动与 Agent 绘图。
 
 ## 核心特性
 

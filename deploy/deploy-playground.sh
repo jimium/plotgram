@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# 构建并发布 playground 到 plotgram.cn/playground/
+# 构建并发布 Plotgram Editor（代码目录 playground/）到 plotgram.cn/editor/
 #
 # 产物：
-#   - 主站:  /var/www/plotgram.cn/playground/  （HTML、favicon、logo，不含 assets/、plotgram-wasm/）
-#   - CDN:   /playground/assets/                （打包 js / css）
+#   - 主站:  /var/www/plotgram.cn/editor/  （HTML、favicon、logo，不含 assets/、plotgram-wasm/）
+#   - CDN:   /editor/assets/                （打包 js / css）
+#
+# 兼容：nginx 将 /playground/ 301 重定向到 /editor/
 #
 # 前置条件：playground/plotgram-wasm/ 必须存在（由 deploy-wasm.sh 构建）。
-# 本脚本不构建 wasm，只负责 playground 自身的 vite build 与同步。
 #
 # 用法:
 #   ./deploy/deploy-playground.sh              # 构建 + 同步
@@ -24,7 +25,7 @@ usage() {
   cat <<'EOF'
 用法: deploy/deploy-playground.sh [选项]
 
-构建 playground 并同步到 plotgram.cn/playground/ 与 CDN。
+构建 Editor（playground/）并同步到 plotgram.cn/editor/ 与 CDN。
 
 前置：需先运行 ./deploy/deploy-wasm.sh 生成 playground/plotgram-wasm/。
 
@@ -48,25 +49,24 @@ trap cleanup_staging EXIT
 trap 'close_ssh_multiplexing "$DEPLOY_HOST" "$ASSET_HOST"' EXIT
 
 PLAYGROUND_DIR="$ROOT_DIR/playground"
-PLAYGROUND_BASE="/playground/"
-PLAYGROUND_CDN_BASE="${CDN_BASE}playground/"
-PLAYGROUND_REMOTE="$DEPLOY_HOST:$REMOTE_DIR/playground/"
-CDN_PLAYGROUND_REMOTE="$ASSET_HOST:$ASSET_REMOTE_DIR/playground/"
+EDITOR_BASE="/editor/"
+EDITOR_CDN_BASE="${CDN_BASE}editor/"
+EDITOR_REMOTE="$DEPLOY_HOST:$REMOTE_DIR/editor/"
+CDN_EDITOR_REMOTE="$ASSET_HOST:$ASSET_REMOTE_DIR/editor/"
 
 # ─── 构建 ───────────────────────────────────────────────
 build() {
-  # vite build 依赖 plotgram-wasm/（sync-wasm-dist.mjs 会复制到 dist）
   if [[ ! -f "$PLAYGROUND_DIR/plotgram-wasm/plotgram_wasm_bg.wasm" ]]; then
     die "缺少 playground/plotgram-wasm/，请先运行 ./deploy/deploy-wasm.sh"
   fi
 
-  log "构建 playground (base=${PLAYGROUND_BASE}, cdn=${PLAYGROUND_CDN_BASE})"
+  log "构建 Editor (base=${EDITOR_BASE}, cdn=${EDITOR_CDN_BASE})"
   require_cmd npm
   (
     cd "$PLAYGROUND_DIR"
     npm ci --silent
-    VITE_BASE_PATH="$PLAYGROUND_BASE" \
-      VITE_CDN_BASE="$PLAYGROUND_CDN_BASE" \
+    VITE_BASE_PATH="$EDITOR_BASE" \
+      VITE_CDN_BASE="$EDITOR_CDN_BASE" \
       npm run build
   )
 }
@@ -74,43 +74,39 @@ build() {
 # ─── 打包暂存 ───────────────────────────────────────────
 stage_artifacts() {
   STAGING_DIR="$(new_staging_dir)"
-  mkdir -p "$STAGING_DIR/playground" "$STAGING_DIR/cdn-playground"
+  mkdir -p "$STAGING_DIR/editor" "$STAGING_DIR/cdn-editor"
 
-  # 主站：playground 不含 wasm / 打包 assets（走 CDN）
   rsync -a --delete \
     --exclude='plotgram-wasm/' \
     --exclude='assets/' \
-    "$PLAYGROUND_DIR/dist/" "$STAGING_DIR/playground/"
+    "$PLAYGROUND_DIR/dist/" "$STAGING_DIR/editor/"
 
-  # 注入 ICP 备案号
-  log "注入 ICP 备案号 → playground/index.html"
-  inject_icp_badge "$STAGING_DIR/playground/index.html"
+  log "注入 ICP 备案号 → editor/index.html"
+  inject_icp_badge "$STAGING_DIR/editor/index.html"
 
-  # CDN：playground 打包 assets（js / css），保留 assets/ 子目录层级
-  mkdir -p "$STAGING_DIR/cdn-playground/assets"
+  mkdir -p "$STAGING_DIR/cdn-editor/assets"
   rsync -a --delete \
-    "$PLAYGROUND_DIR/dist/assets/" "$STAGING_DIR/cdn-playground/assets/"
+    "$PLAYGROUND_DIR/dist/assets/" "$STAGING_DIR/cdn-editor/assets/"
 }
 
 # ─── 上传 ───────────────────────────────────────────────
 upload() {
   require_cmd rsync
-  # 主站（plotgram.cn）
-  log "同步 playground → plotgram.cn"
-  ssh "$DEPLOY_HOST" "mkdir -p '$REMOTE_DIR/playground'"
+  log "同步 editor → plotgram.cn"
+  ssh "$DEPLOY_HOST" "mkdir -p '$REMOTE_DIR/editor'"
   rsync -avz --delete \
-    "$STAGING_DIR/playground/" "$PLAYGROUND_REMOTE"
+    "$STAGING_DIR/editor/" "$EDITOR_REMOTE"
 
-  log "同步 CDN → $CDN_PLAYGROUND_REMOTE"
-  ssh "$ASSET_HOST" "mkdir -p '$ASSET_REMOTE_DIR/playground'"
+  log "同步 CDN → $CDN_EDITOR_REMOTE"
+  ssh "$ASSET_HOST" "mkdir -p '$ASSET_REMOTE_DIR/editor'"
   rsync -avz --delete \
-    "$STAGING_DIR/cdn-playground/" "$CDN_PLAYGROUND_REMOTE"
+    "$STAGING_DIR/cdn-editor/" "$CDN_EDITOR_REMOTE"
 }
 
 # ─── 主流程 ─────────────────────────────────────────────
 main() {
-  log "=== 发布 playground ==="
-  log "  访问地址: https://www.plotgram.cn/playground/"
+  log "=== 发布 Plotgram Editor ==="
+  log "  访问地址: https://www.plotgram.cn/editor/"
 
   setup_ssh_multiplexing "$DEPLOY_HOST" "$ASSET_HOST"
 
@@ -131,8 +127,9 @@ main() {
 
   echo ""
   echo "✅ 发布完成"
-  echo "   Playground: https://www.plotgram.cn/playground/"
-  echo "   CDN:        ${CDN_BASE}playground/assets/"
+  echo "   Editor: https://www.plotgram.cn/editor/"
+  echo "   CDN:    ${CDN_BASE}editor/assets/"
+  echo "   兼容:   /playground/ → /editor/ (nginx 重定向)"
   echo ""
 }
 

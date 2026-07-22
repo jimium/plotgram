@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react';
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url));
 const wasmDir = resolve(rootDir, 'plotgram-wasm');
+const showcaseDir = resolve(rootDir, '../showcase');
 const cdnBase = process.env.VITE_CDN_BASE || '';
 
 /**
@@ -54,6 +55,40 @@ function servePlotgramWasm(): Plugin {
   };
 }
 
+function serveShowcase(): Plugin {
+  return {
+    name: 'serve-showcase',
+    configureServer(server) {
+      return () => {
+        server.middlewares.use((req, res, next) => {
+          const urlPath = req.url?.split('?')[0] ?? '';
+          if (!urlPath.startsWith('/showcase/')) {
+            next();
+            return;
+          }
+
+          const rel = decodeURIComponent(urlPath.slice('/showcase/'.length));
+          if (!rel || rel.includes('..')) {
+            next();
+            return;
+          }
+
+          const file = join(showcaseDir, rel);
+          if (!file.startsWith(showcaseDir) || !existsSync(file) || !statSync(file).isFile()) {
+            next();
+            return;
+          }
+
+          if (file.endsWith('.pgm')) {
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          }
+          createReadStream(file).pipe(res);
+        });
+      };
+    },
+  };
+}
+
 function rejectStalePublicWasm(): Plugin {
   const stale = resolve(rootDir, 'public/plotgram-wasm');
   return {
@@ -70,8 +105,8 @@ function rejectStalePublicWasm(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: process.env.VITE_BASE_PATH || '/',
-  plugins: [react(), rejectStalePublicWasm(), servePlotgramWasm()],
+  base: process.env.VITE_BASE_PATH || '/editor/',
+  plugins: [react(), rejectStalePublicWasm(), servePlotgramWasm(), serveShowcase()],
   resolve: {
     alias: {
       '../../plotgram-wasm/plotgram_wasm.js': resolve(rootDir, 'plotgram-wasm/plotgram_wasm.js'),

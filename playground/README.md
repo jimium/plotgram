@@ -1,6 +1,9 @@
-# Plotgram WASM 编辑器
+# Plotgram Editor（代码目录：`playground/`）
 
-这是一个基于 React 和 WASM 的 Plotgram 实时编辑器，可以在浏览器中编写和渲染图表。
+对外产品名 **Editor**——无需注册的浏览器出图调校台（调主题/布局、导出 SVG/PNG）。  
+代码目录暂保留 `playground/`，与 SaaS 产品 **Studio**（Agent 画图）区分。
+
+基于 React + WASM，可在浏览器中载入 `.pgm`、调校并渲染图表。改造任务见 [Editor 改造方案](../docs/方案计划/Playground改造方案-2026-07.md)。
 
 ## 快速开始
 
@@ -52,7 +55,7 @@ playground/
 
 ### 相关文档
 
-- [Playground 重新设计方案](../docs/product/playground-redesign.md)
+- [Editor 改造方案](../docs/方案计划/Playground改造方案-2026-07.md)
 - 项目 `/docs/` 目录：语法规范、架构设计、使用案例
 
 ## 其他 Plotgram 模块

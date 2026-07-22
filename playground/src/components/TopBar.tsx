@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  IconGallery,
   IconHelp,
   IconShare,
   IconDownload,
@@ -39,7 +38,7 @@ interface TopBarProps {
   errorCount: number;
   warningCount: number;
   renderMs: number | null;
-  onOpenExamples: () => void;
+  onOpenShowcase: () => void;
   onOpenDocs: () => void;
   onToggleTheme: () => void;
   onShare: () => void;
@@ -51,7 +50,6 @@ interface TopBarProps {
   exportActions: ExportActions;
   rasterScale: number;
   onRasterScaleChange: (scale: number) => void;
-  examplesGuideSeen: boolean;
 }
 
 function useClickOutside(ref: React.RefObject<HTMLElement | null>, open: boolean, onClose: () => void) {
@@ -130,7 +128,7 @@ export function TopBar({
   errorCount,
   warningCount,
   renderMs,
-  onOpenExamples,
+  onOpenShowcase,
   onOpenDocs,
   onToggleTheme,
   onShare,
@@ -142,7 +140,6 @@ export function TopBar({
   exportActions,
   rasterScale,
   onRasterScaleChange,
-  examplesGuideSeen,
 }: TopBarProps) {
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -167,6 +164,7 @@ export function TopBar({
       <div className="topbar-left">
         <div className="brand">
           <img className="brand-logo" src={withBase(theme === 'dark' ? 'logo-dark.svg' : 'logo.svg')} alt="Plotgram" />
+          <span className="brand-subtitle">Editor</span>
         </div>
 
         <div className="file-menu-wrap" ref={fileMenuRef}>
@@ -204,14 +202,8 @@ export function TopBar({
 
         <span className="topbar-divider" />
 
-        <button
-          type="button"
-          className={`btn btn-soft examples-btn${!examplesGuideSeen ? ' guide-pulse' : ''}`}
-          onClick={onOpenExamples}
-        >
-          <IconGallery />
-          <span>示例库</span>
-          {!examplesGuideSeen && <span className="guide-badge" />}
+        <button type="button" className="btn btn-soft" onClick={onOpenShowcase}>
+          <span>Showcase</span>
         </button>
 
         <button type="button" className="btn btn-ghost" onClick={onOpenDocs}>
