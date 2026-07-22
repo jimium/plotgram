@@ -4,13 +4,22 @@ use crate::ast::Diagram;
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
 use crate::layout::node::common::group_bounds::{self, GroupPadding};
 use crate::layout::{LayoutResult, EdgeRoutingStyle};
-use std::collections::HashMap;
+use petgraph::graph::NodeIndex;
+use std::collections::{HashMap, HashSet};
 
 use super::graph;
 use super::order;
 use super::postprocess;
 use super::preset::SugiyamaPreset;
 use super::{coordinate, rank};
+
+/// 同层边：rank 相同，order 阶段偏置（hub 排主前驱左侧），路由阶段消费。
+struct SameLayerEdge {
+    /// 主前驱（DAG 节点索引）
+    from: NodeIndex,
+    /// feedback hub（DAG 节点索引）
+    to: NodeIndex,
+}
 
 /// 密度感知间距：每条跨层边为 layer_gap 额外增加的像素
 const DENSITY_LAYER_GAP_SCALE: f64 = 2.0;
@@ -44,19 +53,45 @@ pub fn compute_with_preset(
     let g = graph::build_graph(diagram);
     let reversed_edges = graph::greedy_cycle_reversal(&g);
     let dag = graph::build_dag(&g, &reversed_edges);
+
+    // 构建反转边 id 集合（原图 from_id → to_id），供同层边识别使用。
+    let reversed_edge_ids: HashSet<(String, String)> = reversed_edges
+        .iter()
+        .map(|&(from, to)| (g[from].clone(), g[to].clone()))
+        .collect();
+
+    // 同层边识别：仅对无 group 的 Standard（flowchart）路径启用。
+    // 有 group 时 apply_group_rank_constraints 的窗口重分配会破坏同层关系。
+    let is_standard = preset.node_sizing == crate::layout::node::common::node_sizing::NodeSizing::Standard;
+    let same_layer_edges: Vec<SameLayerEdge> = if is_standard && diagram.groups.is_empty() {
+        identify_same_layer_edges(&dag, &reversed_edge_ids)
+    } else {
+        Vec::new()
+    };
+    // 需要从 sink clamp 中豁免的节点（hub / end 不因出度 0 沉底）
+    let exempt_nodes: HashSet<NodeIndex> = same_layer_edges.iter().map(|e| e.to).collect();
+
     let mut ranks = rank::assign_ranks_network_simplex_style(&dag);
     if preset.node_sizing == crate::layout::node::common::node_sizing::NodeSizing::State {
         apply_state_semantic_rank_constraints(&dag, &mut ranks, diagram);
-    } else if preset.node_sizing == crate::layout::node::common::node_sizing::NodeSizing::Standard {
-        apply_sink_rank_constraints(&dag, &mut ranks, diagram);
+    } else if is_standard {
+        apply_sink_rank_constraints(&dag, &mut ranks, diagram, &exempt_nodes);
     }
     // group 感知的 rank 重分配：为每个 group 分配不重叠的 rank 窗口，
     // 消除 group 包围框在分层方向上的重叠。
     apply_group_rank_constraints(&dag, &mut ranks, diagram);
     // Iteration 3：group 窗口重分配后再 clamp sink，避免 type=end / 出度 0 被抬离底层。
-    if preset.node_sizing == crate::layout::node::common::node_sizing::NodeSizing::Standard {
-        apply_sink_rank_constraints(&dag, &mut ranks, diagram);
+    if is_standard {
+        apply_sink_rank_constraints(&dag, &mut ranks, diagram, &exempt_nodes);
     }
+    // 同层边 rank 覆盖：强制 hub/end 与主前驱同层（在 sink clamp 之后执行）。
+    apply_same_layer_rank_overrides(&mut ranks, &same_layer_edges);
+
+    // 构建 order 偏置映射：to → from（hub → 主前驱），供排序阶段侧向偏置使用。
+    let order_bias: HashMap<NodeIndex, NodeIndex> = same_layer_edges
+        .iter()
+        .map(|e| (e.to, e.from))
+        .collect();
 
     // 导出 rank 映射（entity_id → rank），供路由友好性评估的"长边跨层度"使用。
     // dag 节点权重即 entity id 字符串（见 graph::build_graph / build_dag）。
@@ -73,6 +108,25 @@ pub fn compute_with_preset(
     let per_layer_gaps = compute_per_layer_gaps(&dag, &ranks, adjusted_preset.layer_gap);
 
     let proper = graph::build_proper_layer_graph(diagram, &dag, &ranks, &adjusted_preset);
+    // 构建 DAG NodeIndex → proper graph NodeIndex 映射，供同层边偏置使用。
+    let dag_to_proper: HashMap<NodeIndex, NodeIndex> = proper
+        .graph
+        .node_indices()
+        .filter_map(|n| match proper.graph[n].kind {
+            graph::LayerNodeKind::Real(dag_node) => Some((dag_node, n)),
+            _ => None,
+        })
+        .collect();
+    // 将 order_bias 从 DAG 索引转换为 proper graph 索引。
+    let order_bias_proper: HashMap<NodeIndex, NodeIndex> = order_bias
+        .iter()
+        .filter_map(|(&to, &from)| {
+            match (dag_to_proper.get(&to), dag_to_proper.get(&from)) {
+                (Some(&to_p), Some(&from_p)) => Some((to_p, from_p)),
+                _ => None,
+            }
+        })
+        .collect();
     // 构建 layered graph 节点 → group_id 映射，供排序阶段 group 偏置使用。
     // Real 节点取其 entity 的 group_id；Dummy 节点无 group（None）。
     let node_group = build_node_group_map(diagram, &dag, &proper.graph);
@@ -85,6 +139,7 @@ pub fn compute_with_preset(
         adjusted_preset.long_edge_barycenter_weight,
         &node_group,
         &group_decl,
+        &order_bias_proper,
     );
     let nodes = coordinate::assign_coordinates_brandes_koepf(
         &dag,
@@ -94,6 +149,7 @@ pub fn compute_with_preset(
         horizontal,
         &adjusted_preset,
         &per_layer_gaps,
+        !order_bias.is_empty(),
     );
     let groups = group_bounds::compute_group_bounds(
         diagram,
@@ -119,6 +175,14 @@ pub fn compute_with_preset(
             edge_routing_style: EdgeRoutingStyle::Orthogonal,
             sugiyama_ranks: Some(sugiyama_ranks),
             group_layout_warnings: group_warnings,
+            same_layer_edges: same_layer_edges
+                .iter()
+                .map(|e| (dag[e.from].clone(), dag[e.to].clone()))
+                .collect(),
+            feedback_hubs: same_layer_edges
+                .iter()
+                .map(|e| (dag[e.to].clone(), dag[e.from].clone()))
+                .collect(),
             ..Default::default()
         },
     };
@@ -428,10 +492,12 @@ fn repair_rank_monotonicity(
 /// 流程图终止节点强制落到最大 rank。
 ///
 /// Iteration 3：`type=end`，或出度 0（非自环 sink）均 clamp 到底层。
+/// `exempt_nodes` 中的节点不因出度 0 沉底（feedback hub / 可邻接 end）。
 fn apply_sink_rank_constraints(
     dag: &petgraph::graph::DiGraph<String, ()>,
     ranks: &mut HashMap<petgraph::graph::NodeIndex, usize>,
     diagram: &Diagram,
+    exempt_nodes: &HashSet<petgraph::graph::NodeIndex>,
 ) {
     use crate::types::attr_constants::entity_type;
     use petgraph::Direction;
@@ -450,7 +516,8 @@ fn apply_sink_rank_constraints(
         let is_end = entity_type_of(&dag[node]) == entity_type::END;
         let out_degree = dag.neighbors_directed(node, Direction::Outgoing).count();
         // 出度 0：真正的 sink（自环边在 DAG 中仍占出度，不会误伤自环节点）
-        if is_end || out_degree == 0 {
+        // exempt 节点（hub / 可邻接 end）不因出度 0 沉底
+        if is_end || (out_degree == 0 && !exempt_nodes.contains(&node)) {
             ranks.insert(node, max_rank);
         }
     }
@@ -483,4 +550,74 @@ fn build_node_group_map(
             (n, group)
         })
         .collect()
+}
+
+/// 识别同层边：Feedback Hub（P0）。
+///
+/// 通过节点 id 字符串判断反转边，避免 NodeIndex 跨图映射问题。
+/// `reversed_edge_ids`：原图中的 (from_id, to_id)，即被 FAS 反转的边。
+///
+/// 注：end 节点不再做同层旁置（原 P1/ISS-007）——主干拉直后，end 作为
+/// 主链延续放在最下方（传统流程图惯例）更合理，由坐标阶段 spine 对齐拉直。
+fn identify_same_layer_edges(
+    dag: &petgraph::graph::DiGraph<String, ()>,
+    reversed_edge_ids: &HashSet<(String, String)>,
+) -> Vec<SameLayerEdge> {
+    use petgraph::Direction;
+
+    // DAG 边 (u, v) 是否为 FAS 反转边：原图中 (v_id, u_id) 在反转集合中。
+    let is_reversed = |u: NodeIndex, v: NodeIndex| -> bool {
+        reversed_edge_ids.contains(&(dag[v].clone(), dag[u].clone()))
+    };
+
+    let mut result = Vec::new();
+    // 确定性：按 node.index() 排序遍历
+    let mut nodes: Vec<NodeIndex> = dag.node_indices().collect();
+    nodes.sort_by_key(|n| n.index());
+
+    for h in nodes {
+        let out_degree = dag.neighbors_directed(h, Direction::Outgoing).count();
+
+        // 收集入边，区分反转边和前向边
+        let mut reversed_preds: Vec<NodeIndex> = Vec::new();
+        let mut forward_preds: Vec<NodeIndex> = Vec::new();
+        let mut preds: Vec<NodeIndex> = dag.neighbors_directed(h, Direction::Incoming).collect();
+        preds.sort_by_key(|n| n.index());
+        for p in preds {
+            if is_reversed(p, h) {
+                reversed_preds.push(p);
+            } else {
+                forward_preds.push(p);
+            }
+        }
+
+        // P0: Feedback Hub 识别
+        // 条件1: DAG 中出度=0
+        // 条件2: 有至少一条反转入边（原图 h→u 被 FAS 反转）
+        // 条件3: 有至少一条前向入边
+        if out_degree == 0 && !reversed_preds.is_empty() && !forward_preds.is_empty() {
+            // 主前驱：前向入边中按 node.index() 取最小（确定性，等价于声明序）
+            let primary = forward_preds[0];
+            result.push(SameLayerEdge {
+                from: primary,
+                to: h,
+            });
+        }
+    }
+
+    result
+}
+
+/// 同层边 rank 覆盖：强制 `rank(to) = rank(from)`。
+///
+/// 在 sink clamp 之后执行，确保 hub/end 不被沉底后再覆盖回主前驱层。
+fn apply_same_layer_rank_overrides(
+    ranks: &mut HashMap<NodeIndex, usize>,
+    same_layer_edges: &[SameLayerEdge],
+) {
+    for e in same_layer_edges {
+        if let Some(&from_rank) = ranks.get(&e.from) {
+            ranks.insert(e.to, from_rank);
+        }
+    }
 }

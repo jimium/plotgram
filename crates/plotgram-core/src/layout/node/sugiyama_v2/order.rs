@@ -23,6 +23,7 @@ pub(super) fn order_layers_weighted_median(
     long_edge_barycenter_weight: f64,
     node_group: &HashMap<NodeIndex, Option<String>>,
     group_decl: &HashMap<String, usize>,
+    same_layer_bias: &HashMap<NodeIndex, NodeIndex>,
 ) -> Vec<Vec<NodeIndex>> {
     let max_sweeps = ordering_sweeps.clamp(1, ORDERING_SWEEP_MAX);
     let mut no_improve = 0usize;
@@ -43,9 +44,10 @@ pub(super) fn order_layers_weighted_median(
                     long_edge_barycenter_weight,
                     node_group,
                     group_decl,
+                    same_layer_bias,
                 )
             });
-            transpose_adjacent(layer_index, &mut layers, dag, long_edge_barycenter_weight);
+            transpose_adjacent(layer_index, &mut layers, dag, long_edge_barycenter_weight, same_layer_bias);
         }
 
         for layer_index in (0..layers.len().saturating_sub(1)).rev() {
@@ -62,9 +64,10 @@ pub(super) fn order_layers_weighted_median(
                     long_edge_barycenter_weight,
                     node_group,
                     group_decl,
+                    same_layer_bias,
                 )
             });
-            transpose_adjacent(layer_index, &mut layers, dag, long_edge_barycenter_weight);
+            transpose_adjacent(layer_index, &mut layers, dag, long_edge_barycenter_weight, same_layer_bias);
         }
 
         let crossings = count_layer_crossings(dag, &layers);
@@ -112,6 +115,7 @@ fn compare_nodes_for_layer(
     long_edge_barycenter_weight: f64,
     node_group: &HashMap<NodeIndex, Option<String>>,
     group_decl: &HashMap<String, usize>,
+    same_layer_bias: &HashMap<NodeIndex, NodeIndex>,
 ) -> Ordering {
     let left_stats = weighted_median_stats(dag, left, neighbor_pos, direction, long_edge_barycenter_weight);
     let right_stats = weighted_median_stats(dag, right, neighbor_pos, direction, long_edge_barycenter_weight);
@@ -125,6 +129,19 @@ fn compare_nodes_for_layer(
         .median
         .partial_cmp(&right_stats.median)
         .unwrap_or(Ordering::Equal);
+
+    // 同层侧向偏置：当两节点构成同层对时，无条件覆盖 median。
+    // hub 排主前驱左侧。
+    let same_layer_cmp = match (same_layer_bias.get(&left), same_layer_bias.get(&right)) {
+        (Some(pred), _) if *pred == right => Ordering::Less,
+        (_, Some(pred)) if *pred == left => Ordering::Greater,
+        _ => Ordering::Equal,
+    };
+    if same_layer_cmp != Ordering::Equal {
+        return same_layer_cmp;
+    }
+
+    // Group 偏置：当 median 接近时（差 < epsilon），优先把同 group 节点排在一起。
     let group_bias = if median_diff < GROUP_BIAS_EPSILON {
         match (
             node_group.get(&left).and_then(|g| g.as_deref()),
@@ -270,10 +287,17 @@ pub(super) fn transpose_adjacent(
     layers: &mut [Vec<NodeIndex>],
     dag: &DiGraph<LayerNode, ()>,
     long_edge_barycenter_weight: f64,
+    same_layer_bias: &HashMap<NodeIndex, NodeIndex>,
 ) {
     loop {
         let mut improved = false;
         for index in 0..layers[layer_index].len().saturating_sub(1) {
+            let a = layers[layer_index][index];
+            let b = layers[layer_index][index + 1];
+            // 同层约束保护：不允许 transpose 破坏 hub/end 与主前驱的相对顺序。
+            if breaks_same_layer_order(a, b, same_layer_bias) {
+                continue;
+            }
             let before_cross = crossing_score_around(layer_index, layers, dag);
             let before_penalty = alignment_penalty_around(layer_index, layers, dag, long_edge_barycenter_weight);
             let before_long = long_edge_crossing_score(layers, dag);
@@ -295,6 +319,21 @@ pub(super) fn transpose_adjacent(
         if !improved {
             break;
         }
+    }
+}
+
+/// 检查交换 (a, b) 是否会破坏同层约束。
+/// 当前顺序为 [..a, b..]，交换后变为 [..b, a..]。
+/// 如果 a 是 hub（FeedbackSide）且 b 是其主前驱，则当前顺序正确，交换会破坏。
+fn breaks_same_layer_order(
+    a: NodeIndex,
+    b: NodeIndex,
+    same_layer_bias: &HashMap<NodeIndex, NodeIndex>,
+) -> bool {
+    match (same_layer_bias.get(&a), same_layer_bias.get(&b)) {
+        // a 是 hub，b 是其主前驱 → 当前 [a, b] 正确，交换破坏
+        (Some(pred), _) if *pred == b => true,
+        _ => false,
     }
 }
 

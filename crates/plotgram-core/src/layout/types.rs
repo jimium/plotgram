@@ -469,6 +469,12 @@ pub struct LayoutHints {
     /// 正交路由 C 末旁路注解（stub / 受保护 trunk）；不改 `EdgeLayout`。
     // WRITE: render(route_edges_orthogonal @ C end)  READ: sanitize / grid_snap validate
     pub route_annotations: Option<crate::layout::edge::RouteAnnotationSet>,
+    /// 同层边：(from_entity_id, to_entity_id)，路由按短横/L 处理而非绕底廊。
+    // WRITE: layout(sugiyama same-layer)  READ: render(orthogonal routing)
+    pub same_layer_edges: Vec<(String, String)>,
+    /// Feedback hub：(hub_entity_id, primary_pred_entity_id)，路由走侧廊。
+    // WRITE: layout(sugiyama same-layer)  READ: render(orthogonal routing)
+    pub feedback_hubs: Vec<(String, String)>,
 }
 
 /// EGB + PRS 性能与效果观测（不影响布局结果）。

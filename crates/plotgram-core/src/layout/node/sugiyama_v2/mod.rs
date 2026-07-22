@@ -258,6 +258,7 @@ mod tests {
             preset::FLOWCHART_PRESET.long_edge_barycenter_weight,
             &std::collections::HashMap::new(),
             &std::collections::HashMap::new(),
+            &std::collections::HashMap::new(),
         );
         let centers = coordinate::assign_layer_centers_brandes_koepf(
             &proper.graph,
@@ -744,6 +745,73 @@ mod tests {
         assert!(
             (cx("gateway") - auth).abs() <= 2.0,
             "gateway 应仍与 auth 对齐"
+        );
+    }
+
+    #[test]
+    fn feedback_hub_same_layer_as_primary_pred() {
+        // order-approval 拓扑：ISS-006 + ISS-007
+        let src = r#"diagram flowchart {
+    entity[start] submit "S"
+    entity[process] review "R"
+    entity[decision] check "C"
+    entity[process] finance "F"
+    entity[process] approved "A"
+    entity[process] rejected "X"
+    entity[end] done "D"
+    submit -> review
+    review -> check
+    check -> finance
+    check -> approved
+    finance -> approved
+    finance -> rejected
+    approved -> done
+    rejected -> submit
+}"#;
+        let raw = parse(src).unwrap();
+        let prepared = prepare(raw, &StyleRequest::default()).unwrap().diagram;
+        let result = FlowchartLayout::default().compute(prepared.inner());
+        let finance = &result.nodes["finance"];
+        let rejected = &result.nodes["rejected"];
+        let approved = &result.nodes["approved"];
+        let done = &result.nodes["done"];
+        // ISS-006: rejected 与 finance 同高，且在 finance 左侧
+        assert!(
+            (rejected.y - finance.y).abs() < 1.0,
+            "rejected should be same row as finance: rejected.y={} finance.y={}",
+            rejected.y, finance.y
+        );
+        assert!(
+            rejected.x < finance.x,
+            "rejected should be left of finance: rejected.x={} finance.x={}",
+            rejected.x, finance.x
+        );
+        // ISS-007（修订）: end 不再同层旁置，作为主链延续放在最下方
+        assert!(
+            done.y > approved.y,
+            "done should be below approved: done.y={} approved.y={}",
+            done.y, approved.y
+        );
+        // 主干拉直：check → finance → approved → done 垂直成一列
+        let check = &result.nodes["check"];
+        let check_cx = check.x + check.width / 2.0;
+        let finance_cx = finance.x + finance.width / 2.0;
+        let approved_cx = approved.x + approved.width / 2.0;
+        let done_cx = done.x + done.width / 2.0;
+        assert!(
+            (finance_cx - check_cx).abs() < 1.0,
+            "finance should be vertically under check: check_cx={} finance_cx={}",
+            check_cx, finance_cx
+        );
+        assert!(
+            (approved_cx - finance_cx).abs() < 1.0,
+            "approved should be vertically under finance: finance_cx={} approved_cx={}",
+            finance_cx, approved_cx
+        );
+        assert!(
+            (done_cx - approved_cx).abs() < 1.0,
+            "done should be vertically under approved: approved_cx={} done_cx={}",
+            approved_cx, done_cx
         );
     }
 }

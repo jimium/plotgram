@@ -178,6 +178,29 @@ output_ext() {
   esac
 }
 
+# 若目标端口已有监听进程（含卡死的 vite preview 等），先结束再启动 showcase 静态服务。
+stop_port_listener() {
+  local port="$1"
+  local pids
+
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 0
+  fi
+
+  pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+  if [[ -z "$pids" ]]; then
+    return 0
+  fi
+
+  echo "端口 ${port} 已被占用，结束监听进程: ${pids//$'\n'/ }"
+  kill $pids 2>/dev/null || true
+  sleep 0.3
+  pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+  if [[ -n "$pids" ]]; then
+    kill -9 $pids 2>/dev/null || true
+  fi
+}
+
 build_plotgram
 
 HASH_DB="$(mktemp)"
@@ -269,6 +292,7 @@ python3 "$SCRIPT_DIR/update-gallery-manifest.py"
 [[ "${failed}" -eq 0 ]]
 
 if $SERVE; then
+  stop_port_listener "$SERVE_PORT"
   echo
   echo "启动 HTTP 服务: http://localhost:${SERVE_PORT}/index.html"
   echo "按 Ctrl+C 停止。"

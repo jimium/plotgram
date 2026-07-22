@@ -17,6 +17,7 @@ pub(super) fn assign_coordinates_brandes_koepf(
     horizontal: bool,
     preset: &SugiyamaPreset,
     layer_gaps: &[f64],
+    has_same_layer_edges: bool,
 ) -> HashMap<String, crate::layout::NodeLayout> {
     let spine = compute_spine_nodes(dag);
     let mut centers =
@@ -88,6 +89,19 @@ pub(super) fn assign_coordinates_brandes_koepf(
 
     resolve_real_node_overlaps(dag, layered_graph, layers, &mut nodes, horizontal, preset);
     align_singleton_layers_to_predecessors(dag, layered_graph, layers, &mut nodes, horizontal);
+    // 反馈结构主干拉直：仅当存在同层边（hub / end 旁置）时启用，
+    // 避免影响无反馈的普通 fan-out / 菱形居中美观。
+    if has_same_layer_edges {
+        align_spine_chain(
+            dag,
+            layered_graph,
+            layers,
+            &mut nodes,
+            horizontal,
+            &spine,
+            preset,
+        );
+    }
     // 先 normalize，再对齐悬挂叶：避免 pack 探出左缘后二次 normalize 把锚点（auth）整体平移。
     postprocess::normalize_layout_to_padding(&mut nodes, preset.padding);
     align_pendants_under_anchors(dag, layered_graph, layers, &mut nodes, horizontal, preset);
@@ -189,6 +203,132 @@ fn align_singleton_layers_to_predecessors(
             continue;
         }
         set_axis_center(nl, horizontal, target, size);
+    }
+}
+
+/// 反馈结构主干拉直：将 spine 主链上相邻层的节点垂直对齐成一列，
+/// 并把同层侧支节点向两侧推开，保证主路径（如 决策→复核→审批）为垂直直线。
+///
+/// 仅在存在同层边（feedback hub / end 旁置）时由调用方启用，
+/// 以免破坏无反馈图（菱形 / fan-out）的居中美观。
+///
+/// 确定性：spine 由 `compute_spine_nodes` 按 (出度, id) 稳定生成，
+/// 此处再按 (层号, id) 排序重建链序，不依赖 HashMap 迭代序。
+fn align_spine_chain(
+    dag: &DiGraph<String, ()>,
+    layered_graph: &DiGraph<LayerNode, ()>,
+    layers: &[Vec<NodeIndex>],
+    nodes: &mut HashMap<String, crate::layout::NodeLayout>,
+    horizontal: bool,
+    spine: &HashSet<NodeIndex>,
+    preset: &SugiyamaPreset,
+) {
+    // entity_id → 层号；层号 → 同层 Real id（按层内顺序）
+    let mut real_layer: HashMap<String, usize> = HashMap::new();
+    let mut layer_reals: Vec<Vec<String>> = vec![Vec::new(); layers.len()];
+    for (layer_index, layer) in layers.iter().enumerate() {
+        for node in layer {
+            if let LayerNodeKind::Real(original) = &layered_graph[*node].kind {
+                let id = dag[*original].clone();
+                real_layer.insert(id.clone(), layer_index);
+                layer_reals[layer_index].push(id);
+            }
+        }
+    }
+
+    // 按 (层号, id) 排序重建 spine 主链顺序
+    let mut spine_chain: Vec<(NodeIndex, String, usize)> = spine
+        .iter()
+        .filter_map(|n| {
+            let id = dag[*n].clone();
+            real_layer.get(&id).map(|&layer| (*n, id, layer))
+        })
+        .collect();
+    spine_chain.sort_by(|a, b| a.2.cmp(&b.2).then_with(|| a.1.cmp(&b.1)));
+
+    // 逐对对齐：N 是 P 的邻层后继时，把 N 中心拉到 P 中心
+    for pair in spine_chain.windows(2) {
+        let (pred_node, pred_id, pred_layer) = &pair[0];
+        let (succ_node, succ_id, succ_layer) = &pair[1];
+        if *succ_layer != *pred_layer + 1 {
+            continue;
+        }
+        // spine 可能跨层（长边），仅处理真实相邻的边
+        if !dag.contains_edge(*pred_node, *succ_node) {
+            continue;
+        }
+        let Some(target_center) = nodes.get(pred_id).map(|l| axis_center(l, horizontal)) else {
+            continue;
+        };
+        align_node_and_push_apart(
+            nodes,
+            horizontal,
+            &layer_reals[*succ_layer],
+            succ_id,
+            target_center,
+            preset.node_gap,
+        );
+    }
+}
+
+/// 将 `target_id` 对齐到 `target_center`，并把同层节点向左/右级联推开，
+/// 保持层内顺序与最小间距（不产生重叠）。
+fn align_node_and_push_apart(
+    nodes: &mut HashMap<String, crate::layout::NodeLayout>,
+    horizontal: bool,
+    layer_ids: &[String],
+    target_id: &str,
+    target_center: f64,
+    node_gap: f64,
+) {
+    let Some(pos) = layer_ids.iter().position(|id| id == target_id) else {
+        return;
+    };
+    let Some(target_size) = nodes.get(target_id).map(|l| axis_size(l, horizontal)) else {
+        return;
+    };
+    if let Some(target_layout) = nodes.get_mut(target_id) {
+        set_axis_center(target_layout, horizontal, target_center, target_size);
+    }
+
+    // 左侧节点向左级联推开
+    for i in (0..pos).rev() {
+        let right_id = &layer_ids[i + 1];
+        let left_id = &layer_ids[i];
+        let Some((right_center, right_size, left_size)) = nodes.get(right_id).and_then(|r| {
+            nodes
+                .get(left_id)
+                .map(|l| (axis_center(r, horizontal), axis_size(r, horizontal), axis_size(l, horizontal)))
+        }) else {
+            continue;
+        };
+        let min_left = right_center - right_size / 2.0 - left_size / 2.0 - node_gap;
+        let left_center = axis_center(&nodes[left_id], horizontal);
+        if left_center > min_left {
+            if let Some(left_layout) = nodes.get_mut(left_id) {
+                set_axis_center(left_layout, horizontal, min_left, left_size);
+            }
+        }
+    }
+
+    // 右侧节点向右级联推开
+    for i in (pos + 1)..layer_ids.len() {
+        let left_id = &layer_ids[i - 1];
+        let right_id = &layer_ids[i];
+        let Some((left_center, left_size, right_size)) = nodes.get(left_id).and_then(|l| {
+            nodes
+                .get(right_id)
+                .map(|r| (axis_center(l, horizontal), axis_size(l, horizontal), axis_size(r, horizontal)))
+        }) else {
+            continue;
+        };
+        let min_right = left_center + left_size / 2.0 + right_size / 2.0 + node_gap;
+        let right_center = axis_center(&nodes[right_id], horizontal);
+        if right_center < min_right {
+            if let Some(right_layout) = nodes.get_mut(right_id) {
+                set_axis_center(right_layout, horizontal, min_right, right_size);
+            }
+        }
     }
 }
 
