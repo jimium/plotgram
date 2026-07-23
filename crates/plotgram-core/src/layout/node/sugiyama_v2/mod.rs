@@ -814,4 +814,38 @@ mod tests {
             approved_cx, done_cx
         );
     }
+
+    #[test]
+    fn local_end_placed_below_single_pred_not_max_rank() {
+        // PR 架构评审：comment -> done 与 update -> collect 为并行分支，end 应局部收束而非沉底。
+        let src = include_str!("../../../../../../showcase/flowchart/demo.pr-architecture-review.pgm");
+        let raw = parse(src).unwrap();
+        let prepared = prepare(raw, &StyleRequest::default()).unwrap().diagram;
+        let result = FlowchartLayout::default().compute(prepared.inner());
+        let comment = &result.nodes["comment"];
+        let collect = &result.nodes["collect"];
+        let done = &result.nodes["done"];
+        let generate = &result.nodes["generate"];
+
+        assert!(
+            (done.y - collect.y).abs() < 1.0,
+            "done should share rank with collect (branch locals): done.y={} collect.y={}",
+            done.y,
+            collect.y
+        );
+        assert!(
+            done.y < generate.y,
+            "done should not sink below generate loop body: done.y={} generate.y={}",
+            done.y,
+            generate.y
+        );
+        let comment_cx = comment.x + comment.width / 2.0;
+        let done_cx = done.x + done.width / 2.0;
+        assert!(
+            (done_cx - comment_cx).abs() < 1.0,
+            "done should align under comment: comment_cx={} done_cx={}",
+            comment_cx,
+            done_cx
+        );
+    }
 }

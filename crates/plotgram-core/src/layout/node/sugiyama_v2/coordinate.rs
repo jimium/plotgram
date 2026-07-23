@@ -2,6 +2,9 @@ use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::Direction;
 use std::collections::{HashMap, HashSet};
 
+use crate::ast::Diagram;
+use crate::types::attr_constants::entity_type;
+
 use super::graph::{LayerNode, LayerNodeKind};
 use super::order;
 use super::postprocess;
@@ -18,6 +21,7 @@ pub(super) fn assign_coordinates_brandes_koepf(
     preset: &SugiyamaPreset,
     layer_gaps: &[f64],
     has_same_layer_edges: bool,
+    diagram: &Diagram,
 ) -> HashMap<String, crate::layout::NodeLayout> {
     let spine = compute_spine_nodes(dag);
     let mut centers =
@@ -102,6 +106,7 @@ pub(super) fn assign_coordinates_brandes_koepf(
             preset,
         );
     }
+    align_local_end_nodes(dag, diagram, &mut nodes, horizontal);
     // 先 normalize，再对齐悬挂叶：避免 pack 探出左缘后二次 normalize 把锚点（auth）整体平移。
     postprocess::normalize_layout_to_padding(&mut nodes, preset.padding);
     align_pendants_under_anchors(dag, layered_graph, layers, &mut nodes, horizontal, preset);
@@ -203,6 +208,54 @@ fn align_singleton_layers_to_predecessors(
             continue;
         }
         set_axis_center(nl, horizontal, target, size);
+    }
+}
+
+/// 单前驱 end（档 A/B）：在层内将 end 中心对齐到其唯一前驱中心（TB 下 x 对齐）。
+fn align_local_end_nodes(
+    dag: &DiGraph<String, ()>,
+    diagram: &Diagram,
+    nodes: &mut HashMap<String, crate::layout::NodeLayout>,
+    horizontal: bool,
+) {
+    let end_ids: HashSet<String> = diagram
+        .entities
+        .iter()
+        .filter(|e| {
+            e.attributes
+                .standard
+                .get("type")
+                .and_then(|v| v.as_str())
+                == Some(entity_type::END)
+        })
+        .map(|e| e.id.as_str().to_string())
+        .collect();
+
+    let mut end_nodes: Vec<NodeIndex> = dag
+        .node_indices()
+        .filter(|n| end_ids.contains(&dag[*n]))
+        .collect();
+    end_nodes.sort_by_key(|n| n.index());
+
+    for end in end_nodes {
+        let end_id = dag[end].clone();
+        let mut preds: Vec<NodeIndex> = dag.neighbors_directed(end, Direction::Incoming).collect();
+        preds.sort_by_key(|n| n.index());
+        if preds.len() != 1 {
+            continue;
+        }
+        let pred_id = &dag[preds[0]];
+        let target = nodes
+            .get(pred_id)
+            .map(|pred_layout| axis_center(pred_layout, horizontal));
+        let Some(target) = target else {
+            continue;
+        };
+        let Some(end_layout) = nodes.get_mut(&end_id) else {
+            continue;
+        };
+        let size = axis_size(end_layout, horizontal);
+        set_axis_center(end_layout, horizontal, target, size);
     }
 }
 

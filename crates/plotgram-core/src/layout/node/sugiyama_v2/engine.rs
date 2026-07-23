@@ -150,6 +150,7 @@ pub fn compute_with_preset(
         &adjusted_preset,
         &per_layer_gaps,
         !order_bias.is_empty(),
+        diagram,
     );
     let groups = group_bounds::compute_group_bounds(
         diagram,
@@ -489,10 +490,11 @@ fn repair_rank_monotonicity(
     }
 }
 
-/// 流程图终止节点强制落到最大 rank。
+/// 流程图 sink / end 的 rank 钳制。
 ///
-/// Iteration 3：`type=end`，或出度 0（非自环 sink）均 clamp 到底层。
-/// `exempt_nodes` 中的节点不因出度 0 沉底（feedback hub / 可邻接 end）。
+/// - `type=end` 且恰有一条 DAG 入边：档 A/B，落在 `rank(pred)+1`（分支局部 / 主干延续）。
+/// - `type=end` 多入边或无入边：档 C，仍落 `max_rank`。
+/// - 其它 `out_degree==0` 真 sink（非 exempt hub）：`max_rank`。
 fn apply_sink_rank_constraints(
     dag: &petgraph::graph::DiGraph<String, ()>,
     ranks: &mut HashMap<petgraph::graph::NodeIndex, usize>,
@@ -512,14 +514,39 @@ fn apply_sink_rank_constraints(
     };
 
     let max_rank = ranks.values().copied().max().unwrap_or(0);
-    for node in dag.node_indices() {
+    let mut nodes: Vec<_> = dag.node_indices().collect();
+    nodes.sort_by_key(|n| n.index());
+    for node in nodes {
         let is_end = entity_type_of(&dag[node]) == entity_type::END;
         let out_degree = dag.neighbors_directed(node, Direction::Outgoing).count();
+        if is_end {
+            ranks.insert(node, end_sink_rank(node, dag, ranks, max_rank));
+            continue;
+        }
         // 出度 0：真正的 sink（自环边在 DAG 中仍占出度，不会误伤自环节点）
-        // exempt 节点（hub / 可邻接 end）不因出度 0 沉底
-        if is_end || (out_degree == 0 && !exempt_nodes.contains(&node)) {
+        // exempt 节点（feedback hub）不因出度 0 沉底
+        if out_degree == 0 && !exempt_nodes.contains(&node) {
             ranks.insert(node, max_rank);
         }
+    }
+}
+
+/// 单前驱 end 的目标 rank：`rank(pred)+1`（档 A/B）；否则 `max_rank`（档 C）。
+fn end_sink_rank(
+    end: NodeIndex,
+    dag: &petgraph::graph::DiGraph<String, ()>,
+    ranks: &HashMap<NodeIndex, usize>,
+    max_rank: usize,
+) -> usize {
+    use petgraph::Direction;
+
+    let mut preds: Vec<NodeIndex> = dag.neighbors_directed(end, Direction::Incoming).collect();
+    preds.sort_by_key(|n| n.index());
+    if preds.len() == 1 {
+        let pred_rank = ranks.get(&preds[0]).copied().unwrap_or(0);
+        pred_rank + 1
+    } else {
+        max_rank
     }
 }
 
@@ -557,8 +584,8 @@ fn build_node_group_map(
 /// 通过节点 id 字符串判断反转边，避免 NodeIndex 跨图映射问题。
 /// `reversed_edge_ids`：原图中的 (from_id, to_id)，即被 FAS 反转的边。
 ///
-/// 注：end 节点不再做同层旁置（原 P1/ISS-007）——主干拉直后，end 作为
-/// 主链延续放在最下方（传统流程图惯例）更合理，由坐标阶段 spine 对齐拉直。
+/// 注：单前驱 `type=end` 由 `end_sink_rank` 落在 `rank(pred)+1`（档 A/B），
+/// 坐标阶段 `align_local_end_nodes` 对齐到前驱列；不再一律沉 `max_rank`。
 fn identify_same_layer_edges(
     dag: &petgraph::graph::DiGraph<String, ()>,
     reversed_edge_ids: &HashSet<(String, String)>,

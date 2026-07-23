@@ -17,6 +17,7 @@ pub(crate) fn phase_port_slot(
     n: usize,
     s4_monitor_corridor: bool,
     horizontal: bool,
+    shape_polygons: &HashMap<String, Vec<Point>>,
 ) -> (
     Vec<Port>,
     Vec<Port>,
@@ -283,6 +284,11 @@ pub(crate) fn phase_port_slot(
                     }
                 };
                 let anchor = slot_anchor(nl, side, frac);
+                // B 族（ISS-003）：非矩形形状锚点吸附到真实轮廓
+                let anchor = match shape_polygons.get(&node_id) {
+                    Some(poly) => super::super::shape_boundary::snap_anchor_to_boundary(anchor, side, poly),
+                    None => anchor,
+                };
                 endpoint_map.insert(
                     (ep.edge_index, ep.is_from),
                     Endpoint {

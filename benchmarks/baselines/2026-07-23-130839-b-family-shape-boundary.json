@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-23-220326-b-family-closest-point-fix",
+  "date": "2026-07-23-130839-b-family-shape-boundary",
   "note": "role-aware baseline: product-gate hard; stress/demo quality soft",
   "samples": [
     {
@@ -98,9 +98,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.3,
-      "min_ms": 0.28,
-      "max_ms": 0.35,
+      "median_ms": 0.32,
+      "min_ms": 0.29,
+      "max_ms": 0.76,
       "det": true,
       "role": "product"
     },
@@ -110,53 +110,53 @@
       "nodes": 8,
       "edges": 16,
       "groups": 0,
-      "node_fp": "61eadb19ff8ec0dc",
-      "exact_sev": 202.4979352678572,
-      "tight_sev": 1245.2352000000003,
-      "allowed_share_len": 249.95563616071445,
-      "exact_pairs": 1,
-      "tight_pairs": 2,
+      "node_fp": "a021056c4312779e",
+      "exact_sev": 0.0,
+      "tight_sev": 585.2552763909853,
+      "allowed_share_len": 89.00750147981057,
+      "exact_pairs": 0,
+      "tight_pairs": 4,
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "node_outside_group": 0,
         "child_group_outside_parent": 0,
         "edge_through_node": 0,
-        "edge_crossing": 6,
+        "edge_crossing": 23,
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 1,
+        "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 7,
+        "total_violations": 23,
         "error_count": 0,
-        "warning_count": 7
+        "warning_count": 23
       },
       "ortho": {
-        "edge_exact_overlap_pairs": 21,
-        "edge_tight_spacing_pairs": 8,
-        "degraded_count": 0,
+        "edge_exact_overlap_pairs": 14,
+        "edge_tight_spacing_pairs": 0,
+        "degraded_count": 6,
         "reroute_iterations": 3,
-        "rerouted_edges": 30,
+        "rerouted_edges": 21,
         "lane_groups": 2,
         "lane_segments_shifted": 0,
-        "stub_occupancy_conflicts": 3,
-        "stub_cross_pair_conflicts": 3,
+        "stub_occupancy_conflicts": 2,
+        "stub_cross_pair_conflicts": 2,
         "stub_occupancy_shifted": 0,
         "contract_stub_violations": 0,
         "contract_approach_violations": 0,
-        "contract_unnatural_to_port": 4,
-        "contract_away_segments": 3,
+        "contract_unnatural_to_port": 3,
+        "contract_away_segments": 2,
         "contract_away_edges": 2
       },
       "min_gap": 12.0,
       "aesthetics": {
         "bends": {
-          "total": 32,
-          "avg_per_edge": 2.0,
+          "total": 36,
+          "avg_per_edge": 2.25,
           "max_single_edge": 4,
           "excessive_count": 0
         },
@@ -167,7 +167,7 @@
         },
         "symmetry": {
           "fan_out_nodes": 4,
-          "avg_deviation": 0.5948536834377406,
+          "avg_deviation": 0.5793977865294073,
           "max_deviation": 1.0
         },
         "self_loops": {
@@ -175,15 +175,15 @@
           "min_clearance_px": 9999.0
         },
         "crossings": {
-          "total": 11
+          "total": 21
         },
         "detour": {
-          "avg_ratio": 1.3468820583592618,
-          "max_ratio": 1.688085893389245
+          "avg_ratio": 1.4767344360695225,
+          "max_ratio": 2.9971745005978563
         },
         "edge_length": {
-          "intra_layer_cv": 0.32938223483786094,
-          "max_min_ratio": 6.621449918324919,
+          "intra_layer_cv": 0.3049654935648273,
+          "max_min_ratio": 7.767903198347742,
           "outlier_count": 1
         },
         "channel_utilization": {
@@ -192,17 +192,17 @@
           "unused_corridors": 0
         },
         "port_distribution": {
-          "max_same_side_edges": 3,
-          "side_utilization_variance": 0.51
+          "max_same_side_edges": 4,
+          "side_utilization_variance": 0.93
         },
         "path_monotonicity": {
-          "non_monotone_ratio": 0.067,
-          "non_monotone_count": 1
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
         }
       },
-      "median_ms": 13.45,
-      "min_ms": 13.33,
-      "max_ms": 13.57,
+      "median_ms": 16.22,
+      "min_ms": 15.1,
+      "max_ms": 19.0,
       "det": true,
       "role": "product"
     },
@@ -212,7 +212,7 @@
       "nodes": 7,
       "edges": 7,
       "groups": 0,
-      "node_fp": "fa9ba0a40c682c37",
+      "node_fp": "d4e78ac57d33e7d5",
       "exact_sev": 0.0,
       "tight_sev": 0.0,
       "allowed_share_len": 0.0,
@@ -240,7 +240,7 @@
       "ortho": {
         "edge_exact_overlap_pairs": 2,
         "edge_tight_spacing_pairs": 0,
-        "degraded_count": 0,
+        "degraded_count": 2,
         "reroute_iterations": 1,
         "rerouted_edges": 7,
         "lane_groups": 0,
@@ -269,7 +269,7 @@
         },
         "symmetry": {
           "fan_out_nodes": 2,
-          "avg_deviation": 0.7185380221349518,
+          "avg_deviation": 0.7256874999999999,
           "max_deviation": 1.0
         },
         "self_loops": {
@@ -280,12 +280,12 @@
           "total": 0
         },
         "detour": {
-          "avg_ratio": 1.2049407155670528,
-          "max_ratio": 1.3724046887350116
+          "avg_ratio": 1.198623117722022,
+          "max_ratio": 1.370871316099971
         },
         "edge_length": {
-          "intra_layer_cv": 0.4606890599573811,
-          "max_min_ratio": 3.550389716879074,
+          "intra_layer_cv": 0.4663096799646981,
+          "max_min_ratio": 3.6126470386073377,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -302,9 +302,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.95,
-      "min_ms": 0.95,
-      "max_ms": 1.08,
+      "median_ms": 1.03,
+      "min_ms": 1.02,
+      "max_ms": 1.06,
       "det": true,
       "role": "product"
     },
@@ -314,7 +314,415 @@
       "nodes": 7,
       "edges": 8,
       "groups": 2,
-      "node_fp": "55bbadacaf8117b8",
+      "node_fp": "c9677e8dcc89da1f",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 2,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 2,
+        "error_count": 0,
+        "warning_count": 2
+      },
+      "ortho": {
+        "edge_exact_overlap_pairs": 4,
+        "edge_tight_spacing_pairs": 4,
+        "degraded_count": 8,
+        "reroute_iterations": 1,
+        "rerouted_edges": 4,
+        "lane_groups": 0,
+        "lane_segments_shifted": 0,
+        "stub_occupancy_conflicts": 0,
+        "stub_cross_pair_conflicts": 0,
+        "stub_occupancy_shifted": 0,
+        "contract_stub_violations": 4,
+        "contract_approach_violations": 0,
+        "contract_unnatural_to_port": 0,
+        "contract_away_segments": 0,
+        "contract_away_edges": 0
+      },
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 15,
+          "avg_per_edge": 1.875,
+          "max_single_edge": 2,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 4.0,
+          "segments_within_12px": 6,
+          "hugging_violations": 1
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.5,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 2
+        },
+        "detour": {
+          "avg_ratio": 1.1733794350772908,
+          "max_ratio": 1.404122604350159
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.18066693612104956,
+          "max_min_ratio": 2.367726320915987,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 1
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.25
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 2.28,
+      "min_ms": 2.27,
+      "max_ms": 2.31,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/architecture/product.cdn-cache.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 7,
+      "edges": 9,
+      "groups": 2,
+      "node_fp": "07c6f49a65d410f5",
+      "exact_sev": 0.0,
+      "tight_sev": 361.36099999999993,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 1,
+      "lint": {
+        "node_overlap": 1,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 1,
+        "edge_on_group_border": 1,
+        "edge_crosses_group_interior": 1,
+        "label_node_overlap": 1,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 3.8999999999999773,
+        "total_violations": 5,
+        "error_count": 3,
+        "warning_count": 2
+      },
+      "ortho": {
+        "edge_exact_overlap_pairs": 0,
+        "edge_tight_spacing_pairs": 0,
+        "degraded_count": 11,
+        "reroute_iterations": 3,
+        "rerouted_edges": 12,
+        "lane_groups": 0,
+        "lane_segments_shifted": 1,
+        "stub_occupancy_conflicts": 0,
+        "stub_cross_pair_conflicts": 0,
+        "stub_occupancy_shifted": 0,
+        "contract_stub_violations": 2,
+        "contract_approach_violations": 0,
+        "contract_unnatural_to_port": 3,
+        "contract_away_segments": 7,
+        "contract_away_edges": 4
+      },
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 12,
+          "avg_per_edge": 1.3333333333333333,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 1.8500000000000227,
+          "segments_within_12px": 2,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 3,
+          "avg_deviation": 1.0,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 1.2705476589535574,
+          "max_ratio": 1.5621051074501693
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.4819898007872638,
+          "max_min_ratio": 16.2212,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 1
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.16
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.2,
+          "non_monotone_count": 1
+        }
+      },
+      "median_ms": 4.63,
+      "min_ms": 4.59,
+      "max_ms": 4.67,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/architecture/product.cloud-native.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 12,
+      "edges": 14,
+      "groups": 6,
+      "node_fp": "9f65c150ca8dd1bb",
+      "exact_sev": 0.0,
+      "tight_sev": 6709.364282449742,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 12,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 5,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 5,
+        "error_count": 0,
+        "warning_count": 5
+      },
+      "ortho": {
+        "edge_exact_overlap_pairs": 3,
+        "edge_tight_spacing_pairs": 16,
+        "degraded_count": 15,
+        "reroute_iterations": 3,
+        "rerouted_edges": 6,
+        "lane_groups": 6,
+        "lane_segments_shifted": 5,
+        "stub_occupancy_conflicts": 3,
+        "stub_cross_pair_conflicts": 3,
+        "stub_occupancy_shifted": 0,
+        "contract_stub_violations": 2,
+        "contract_approach_violations": 0,
+        "contract_unnatural_to_port": 6,
+        "contract_away_segments": 5,
+        "contract_away_edges": 5
+      },
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 22,
+          "avg_per_edge": 1.5714285714285714,
+          "max_single_edge": 2,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 12.006249999999227,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.5074786178583649,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 5
+        },
+        "detour": {
+          "avg_ratio": 1.6554363131117569,
+          "max_ratio": 3.10851507687899
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.5549777867086442,
+          "max_min_ratio": 12.630937500000009,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 12
+        },
+        "port_distribution": {
+          "max_same_side_edges": 3,
+          "side_utilization_variance": 0.47
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 16.04,
+      "min_ms": 16.0,
+      "max_ms": 16.06,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/architecture/product.ecommerce-platform.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 18,
+      "edges": 19,
+      "groups": 5,
+      "node_fp": "7e475eead0e08725",
+      "exact_sev": 0.0,
+      "tight_sev": 3634.7999999999993,
+      "allowed_share_len": 1210.3715909090906,
+      "exact_pairs": 0,
+      "tight_pairs": 5,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 15,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 15,
+        "error_count": 0,
+        "warning_count": 15
+      },
+      "ortho": {
+        "edge_exact_overlap_pairs": 5,
+        "edge_tight_spacing_pairs": 10,
+        "degraded_count": 15,
+        "reroute_iterations": 3,
+        "rerouted_edges": 15,
+        "lane_groups": 3,
+        "lane_segments_shifted": 1,
+        "stub_occupancy_conflicts": 1,
+        "stub_cross_pair_conflicts": 1,
+        "stub_occupancy_shifted": 0,
+        "contract_stub_violations": 4,
+        "contract_approach_violations": 0,
+        "contract_unnatural_to_port": 10,
+        "contract_away_segments": 12,
+        "contract_away_edges": 10
+      },
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 34,
+          "avg_per_edge": 1.7894736842105263,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 4.0,
+          "segments_within_12px": 8,
+          "hugging_violations": 2
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.6335640161511357,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 14
+        },
+        "detour": {
+          "avg_ratio": 1.4975955956823095,
+          "max_ratio": 2.464280425265316
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.42897314851144724,
+          "max_min_ratio": 8.340229634489182,
+          "outlier_count": 1
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 9
+        },
+        "port_distribution": {
+          "max_same_side_edges": 4,
+          "side_utilization_variance": 0.49
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.25,
+          "non_monotone_count": 4
+        }
+      },
+      "median_ms": 37.11,
+      "min_ms": 37.01,
+      "max_ms": 37.25,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/architecture/product.message-queue-pipeline.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 7,
+      "edges": 7,
+      "groups": 4,
+      "node_fp": "d18fb9b4a109cdf0",
       "exact_sev": 0.0,
       "tight_sev": 0.0,
       "allowed_share_len": 0.0,
@@ -340,419 +748,11 @@
         "warning_count": 1
       },
       "ortho": {
-        "edge_exact_overlap_pairs": 4,
-        "edge_tight_spacing_pairs": 0,
-        "degraded_count": 0,
-        "reroute_iterations": 1,
-        "rerouted_edges": 6,
-        "lane_groups": 0,
-        "lane_segments_shifted": 0,
-        "stub_occupancy_conflicts": 0,
-        "stub_cross_pair_conflicts": 0,
-        "stub_occupancy_shifted": 0,
-        "contract_stub_violations": 4,
-        "contract_approach_violations": 0,
-        "contract_unnatural_to_port": 0,
-        "contract_away_segments": 0,
-        "contract_away_edges": 0
-      },
-      "min_gap": 12.0,
-      "aesthetics": {
-        "bends": {
-          "total": 14,
-          "avg_per_edge": 1.75,
-          "max_single_edge": 2,
-          "excessive_count": 0
-        },
-        "border_proximity": {
-          "min_distance_px": 4.0,
-          "segments_within_12px": 6,
-          "hugging_violations": 1
-        },
-        "symmetry": {
-          "fan_out_nodes": 2,
-          "avg_deviation": 0.5,
-          "max_deviation": 1.0
-        },
-        "self_loops": {
-          "count": 0,
-          "min_clearance_px": 9999.0
-        },
-        "crossings": {
-          "total": 1
-        },
-        "detour": {
-          "avg_ratio": 1.2475944775696544,
-          "max_ratio": 1.4006949990612672
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.13470977401617126,
-          "max_min_ratio": 4.390208525438017,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 1
-        },
-        "port_distribution": {
-          "max_same_side_edges": 2,
-          "side_utilization_variance": 0.25
-        },
-        "path_monotonicity": {
-          "non_monotone_ratio": 0.0,
-          "non_monotone_count": 0
-        }
-      },
-      "median_ms": 1.54,
-      "min_ms": 1.52,
-      "max_ms": 1.79,
-      "det": true,
-      "role": "product"
-    },
-    {
-      "file": "showcase/architecture/product.cdn-cache.pgm",
-      "diagram_type": "Architecture",
-      "nodes": 7,
-      "edges": 9,
-      "groups": 2,
-      "node_fp": "5ed0180f6f683052",
-      "exact_sev": 0.0,
-      "tight_sev": 0.0,
-      "allowed_share_len": 0.0,
-      "exact_pairs": 0,
-      "tight_pairs": 0,
-      "lint": {
-        "node_overlap": 1,
-        "group_overlap": 0,
-        "node_outside_group": 0,
-        "child_group_outside_parent": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 1,
-        "edge_on_group_border": 0,
-        "edge_crosses_group_interior": 1,
-        "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 0,
-        "sibling_width_ratio": 0,
-        "pierce_node_sev": 0.0,
-        "pierce_group_sev": 3.8999999999999773,
-        "total_violations": 3,
-        "error_count": 2,
-        "warning_count": 1
-      },
-      "ortho": {
-        "edge_exact_overlap_pairs": 0,
-        "edge_tight_spacing_pairs": 0,
-        "degraded_count": 4,
-        "reroute_iterations": 3,
-        "rerouted_edges": 12,
-        "lane_groups": 0,
-        "lane_segments_shifted": 2,
-        "stub_occupancy_conflicts": 1,
-        "stub_cross_pair_conflicts": 1,
-        "stub_occupancy_shifted": 0,
-        "contract_stub_violations": 2,
-        "contract_approach_violations": 0,
-        "contract_unnatural_to_port": 3,
-        "contract_away_segments": 6,
-        "contract_away_edges": 4
-      },
-      "min_gap": 12.0,
-      "aesthetics": {
-        "bends": {
-          "total": 10,
-          "avg_per_edge": 1.1111111111111112,
-          "max_single_edge": 2,
-          "excessive_count": 0
-        },
-        "border_proximity": {
-          "min_distance_px": 2.036376915337655,
-          "segments_within_12px": 5,
-          "hugging_violations": 0
-        },
-        "symmetry": {
-          "fan_out_nodes": 3,
-          "avg_deviation": 1.0,
-          "max_deviation": 1.0
-        },
-        "self_loops": {
-          "count": 0,
-          "min_clearance_px": 9999.0
-        },
-        "crossings": {
-          "total": 0
-        },
-        "detour": {
-          "avg_ratio": 1.2471511975329796,
-          "max_ratio": 1.4326588891838363
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.3216242062611793,
-          "max_min_ratio": 3.6858684613494446,
-          "outlier_count": 0
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 1
-        },
-        "port_distribution": {
-          "max_same_side_edges": 2,
-          "side_utilization_variance": 0.2
-        },
-        "path_monotonicity": {
-          "non_monotone_ratio": 0.2,
-          "non_monotone_count": 1
-        }
-      },
-      "median_ms": 4.45,
-      "min_ms": 4.26,
-      "max_ms": 4.74,
-      "det": true,
-      "role": "product"
-    },
-    {
-      "file": "showcase/architecture/product.cloud-native.pgm",
-      "diagram_type": "Architecture",
-      "nodes": 12,
-      "edges": 14,
-      "groups": 6,
-      "node_fp": "e1deca2064687dbc",
-      "exact_sev": 0.0,
-      "tight_sev": 5242.675213285427,
-      "allowed_share_len": 0.0,
-      "exact_pairs": 0,
-      "tight_pairs": 12,
-      "lint": {
-        "node_overlap": 0,
-        "group_overlap": 0,
-        "node_outside_group": 0,
-        "child_group_outside_parent": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 4,
-        "edge_on_group_border": 0,
-        "edge_crosses_group_interior": 0,
-        "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 0,
-        "sibling_width_ratio": 0,
-        "pierce_node_sev": 0.0,
-        "pierce_group_sev": 0.0,
-        "total_violations": 4,
-        "error_count": 0,
-        "warning_count": 4
-      },
-      "ortho": {
-        "edge_exact_overlap_pairs": 3,
-        "edge_tight_spacing_pairs": 16,
-        "degraded_count": 10,
-        "reroute_iterations": 3,
-        "rerouted_edges": 6,
-        "lane_groups": 6,
-        "lane_segments_shifted": 5,
-        "stub_occupancy_conflicts": 3,
-        "stub_cross_pair_conflicts": 3,
-        "stub_occupancy_shifted": 0,
-        "contract_stub_violations": 2,
-        "contract_approach_violations": 0,
-        "contract_unnatural_to_port": 6,
-        "contract_away_segments": 5,
-        "contract_away_edges": 5
-      },
-      "min_gap": 12.0,
-      "aesthetics": {
-        "bends": {
-          "total": 22,
-          "avg_per_edge": 1.5714285714285714,
-          "max_single_edge": 2,
-          "excessive_count": 0
-        },
-        "border_proximity": {
-          "min_distance_px": 10.743749999999409,
-          "segments_within_12px": 4,
-          "hugging_violations": 0
-        },
-        "symmetry": {
-          "fan_out_nodes": 2,
-          "avg_deviation": 0.511131266648208,
-          "max_deviation": 1.0
-        },
-        "self_loops": {
-          "count": 0,
-          "min_clearance_px": 9999.0
-        },
-        "crossings": {
-          "total": 4
-        },
-        "detour": {
-          "avg_ratio": 1.4829267951003855,
-          "max_ratio": 2.7051139437406917
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.6150715070523675,
-          "max_min_ratio": 12.726764951321261,
-          "outlier_count": 1
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 12
-        },
-        "port_distribution": {
-          "max_same_side_edges": 3,
-          "side_utilization_variance": 0.47
-        },
-        "path_monotonicity": {
-          "non_monotone_ratio": 0.0,
-          "non_monotone_count": 0
-        }
-      },
-      "median_ms": 16.14,
-      "min_ms": 15.62,
-      "max_ms": 18.92,
-      "det": true,
-      "role": "product"
-    },
-    {
-      "file": "showcase/architecture/product.ecommerce-platform.pgm",
-      "diagram_type": "Architecture",
-      "nodes": 18,
-      "edges": 19,
-      "groups": 5,
-      "node_fp": "e07104baea555f56",
-      "exact_sev": 0.0,
-      "tight_sev": 2412.0,
-      "allowed_share_len": 431.7580357142856,
-      "exact_pairs": 0,
-      "tight_pairs": 3,
-      "lint": {
-        "node_overlap": 0,
-        "group_overlap": 0,
-        "node_outside_group": 0,
-        "child_group_outside_parent": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 12,
-        "edge_on_group_border": 0,
-        "edge_crosses_group_interior": 0,
-        "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 0,
-        "sibling_width_ratio": 0,
-        "pierce_node_sev": 0.0,
-        "pierce_group_sev": 0.0,
-        "total_violations": 12,
-        "error_count": 0,
-        "warning_count": 12
-      },
-      "ortho": {
-        "edge_exact_overlap_pairs": 4,
-        "edge_tight_spacing_pairs": 7,
-        "degraded_count": 13,
-        "reroute_iterations": 3,
-        "rerouted_edges": 15,
-        "lane_groups": 5,
-        "lane_segments_shifted": 3,
-        "stub_occupancy_conflicts": 3,
-        "stub_cross_pair_conflicts": 3,
-        "stub_occupancy_shifted": 0,
-        "contract_stub_violations": 5,
-        "contract_approach_violations": 0,
-        "contract_unnatural_to_port": 10,
-        "contract_away_segments": 12,
-        "contract_away_edges": 10
-      },
-      "min_gap": 12.0,
-      "aesthetics": {
-        "bends": {
-          "total": 34,
-          "avg_per_edge": 1.7894736842105263,
-          "max_single_edge": 4,
-          "excessive_count": 0
-        },
-        "border_proximity": {
-          "min_distance_px": 4.0,
-          "segments_within_12px": 10,
-          "hugging_violations": 1
-        },
-        "symmetry": {
-          "fan_out_nodes": 2,
-          "avg_deviation": 0.6354267361002838,
-          "max_deviation": 1.0
-        },
-        "self_loops": {
-          "count": 0,
-          "min_clearance_px": 9999.0
-        },
-        "crossings": {
-          "total": 12
-        },
-        "detour": {
-          "avg_ratio": 1.4681709498035855,
-          "max_ratio": 2.5795311068769604
-        },
-        "edge_length": {
-          "intra_layer_cv": 0.4028683989404204,
-          "max_min_ratio": 10.706424216027877,
-          "outlier_count": 1
-        },
-        "channel_utilization": {
-          "corridor_usage_ratio": 0.0,
-          "max_channel_load": 0,
-          "unused_corridors": 9
-        },
-        "port_distribution": {
-          "max_same_side_edges": 4,
-          "side_utilization_variance": 0.46
-        },
-        "path_monotonicity": {
-          "non_monotone_ratio": 0.25,
-          "non_monotone_count": 4
-        }
-      },
-      "median_ms": 37.87,
-      "min_ms": 35.64,
-      "max_ms": 45.04,
-      "det": true,
-      "role": "product"
-    },
-    {
-      "file": "showcase/architecture/product.message-queue-pipeline.pgm",
-      "diagram_type": "Architecture",
-      "nodes": 7,
-      "edges": 7,
-      "groups": 4,
-      "node_fp": "d18fb9b4a109cdf0",
-      "exact_sev": 0.0,
-      "tight_sev": 0.0,
-      "allowed_share_len": 0.0,
-      "exact_pairs": 0,
-      "tight_pairs": 0,
-      "lint": {
-        "node_overlap": 0,
-        "group_overlap": 0,
-        "node_outside_group": 0,
-        "child_group_outside_parent": 0,
-        "edge_through_node": 0,
-        "edge_crossing": 0,
-        "edge_on_group_border": 0,
-        "edge_crosses_group_interior": 0,
-        "label_node_overlap": 0,
-        "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 0,
-        "sibling_width_ratio": 0,
-        "pierce_node_sev": 0.0,
-        "pierce_group_sev": 0.0,
-        "total_violations": 0,
-        "error_count": 0,
-        "warning_count": 0
-      },
-      "ortho": {
         "edge_exact_overlap_pairs": 2,
         "edge_tight_spacing_pairs": 0,
         "degraded_count": 0,
         "reroute_iterations": 1,
-        "rerouted_edges": 0,
+        "rerouted_edges": 1,
         "lane_groups": 0,
         "lane_segments_shifted": 0,
         "stub_occupancy_conflicts": 0,
@@ -787,15 +787,15 @@
           "min_clearance_px": 9999.0
         },
         "crossings": {
-          "total": 0
+          "total": 1
         },
         "detour": {
-          "avg_ratio": 1.3270607962320127,
-          "max_ratio": 1.4511502466923312
+          "avg_ratio": 1.331090885414399,
+          "max_ratio": 1.4947308749091053
         },
         "edge_length": {
-          "intra_layer_cv": 0.1138741777865831,
-          "max_min_ratio": 2.8637270309477754,
+          "intra_layer_cv": 0.11542231983771703,
+          "max_min_ratio": 3.5407096228239845,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -812,9 +812,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 1.41,
-      "min_ms": 1.4,
-      "max_ms": 1.55,
+      "median_ms": 1.56,
+      "min_ms": 1.53,
+      "max_ms": 1.6,
       "det": true,
       "role": "product"
     },
@@ -824,7 +824,7 @@
       "nodes": 7,
       "edges": 6,
       "groups": 3,
-      "node_fp": "4641e245c6f97496",
+      "node_fp": "ae58ba68efb9fdda",
       "exact_sev": 0.0,
       "tight_sev": 0.0,
       "allowed_share_len": 0.0,
@@ -863,7 +863,7 @@
         "contract_stub_violations": 3,
         "contract_approach_violations": 0,
         "contract_unnatural_to_port": 2,
-        "contract_away_segments": 3,
+        "contract_away_segments": 2,
         "contract_away_edges": 2
       },
       "min_gap": 12.0,
@@ -881,8 +881,8 @@
         },
         "symmetry": {
           "fan_out_nodes": 1,
-          "avg_deviation": 0.13753846153846094,
-          "max_deviation": 0.13753846153846094
+          "avg_deviation": 0.11587832191208515,
+          "max_deviation": 0.11587832191208515
         },
         "self_loops": {
           "count": 0,
@@ -892,12 +892,12 @@
           "total": 0
         },
         "detour": {
-          "avg_ratio": 1.3327605594017347,
-          "max_ratio": 1.5528961834192683
+          "avg_ratio": 1.334731609779867,
+          "max_ratio": 1.568047056116011
         },
         "edge_length": {
-          "intra_layer_cv": 0.4917906209340206,
-          "max_min_ratio": 3.9580007484639936,
+          "intra_layer_cv": 0.49799008887344487,
+          "max_min_ratio": 4.001080060217881,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -914,9 +914,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.95,
-      "min_ms": 0.89,
-      "max_ms": 1.1,
+      "median_ms": 0.88,
+      "min_ms": 0.86,
+      "max_ms": 0.94,
       "det": true,
       "role": "product"
     },
@@ -977,7 +977,7 @@
           "excessive_count": 0
         },
         "border_proximity": {
-          "min_distance_px": 24.0,
+          "min_distance_px": 20.0,
           "segments_within_12px": 0,
           "hugging_violations": 0
         },
@@ -994,12 +994,12 @@
           "total": 1
         },
         "detour": {
-          "avg_ratio": 1.266498450084274,
+          "avg_ratio": 1.2612881130063818,
           "max_ratio": 1.4119102814269127
         },
         "edge_length": {
-          "intra_layer_cv": 0.2562859953489783,
-          "max_min_ratio": 1.8846153846153846,
+          "intra_layer_cv": 0.2813252500758202,
+          "max_min_ratio": 2.2051282051282053,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -1016,9 +1016,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 1.2,
-      "min_ms": 1.16,
-      "max_ms": 1.41,
+      "median_ms": 1.05,
+      "min_ms": 1.03,
+      "max_ms": 1.07,
       "det": true,
       "role": "product"
     },
@@ -1120,7 +1120,7 @@
       },
       "median_ms": 0.16,
       "min_ms": 0.15,
-      "max_ms": 0.23,
+      "max_ms": 0.17,
       "det": true,
       "role": "product"
     },
@@ -1130,7 +1130,7 @@
       "nodes": 5,
       "edges": 8,
       "groups": 0,
-      "node_fp": "1fea184dc3bd548c",
+      "node_fp": "dbd04803f810f8cd",
       "exact_sev": 0.0,
       "tight_sev": 52.0,
       "allowed_share_len": 0.0,
@@ -1142,26 +1142,26 @@
         "node_outside_group": 0,
         "child_group_outside_parent": 0,
         "edge_through_node": 0,
-        "edge_crossing": 2,
+        "edge_crossing": 1,
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
-        "label_node_overlap": 1,
-        "label_label_overlap": 1,
+        "label_node_overlap": 2,
+        "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 4,
-        "error_count": 1,
-        "warning_count": 3
+        "total_violations": 3,
+        "error_count": 2,
+        "warning_count": 1
       },
       "ortho": {
         "edge_exact_overlap_pairs": 1,
-        "edge_tight_spacing_pairs": 3,
+        "edge_tight_spacing_pairs": 2,
         "degraded_count": 0,
         "reroute_iterations": 1,
         "rerouted_edges": 4,
-        "lane_groups": 3,
+        "lane_groups": 2,
         "lane_segments_shifted": 4,
         "stub_occupancy_conflicts": 3,
         "stub_cross_pair_conflicts": 1,
@@ -1187,23 +1187,23 @@
         },
         "symmetry": {
           "fan_out_nodes": 1,
-          "avg_deviation": 0.0,
-          "max_deviation": 0.0
+          "avg_deviation": 5.46571335200077e-16,
+          "max_deviation": 5.46571335200077e-16
         },
         "self_loops": {
           "count": 0,
           "min_clearance_px": 9999.0
         },
         "crossings": {
-          "total": 2
+          "total": 1
         },
         "detour": {
-          "avg_ratio": 1.3359409644288958,
-          "max_ratio": 1.405739597897827
+          "avg_ratio": 1.3546853875859253,
+          "max_ratio": 1.3552629911009453
         },
         "edge_length": {
-          "intra_layer_cv": 0.0868075173664955,
-          "max_min_ratio": 1.4163966376838089,
+          "intra_layer_cv": 0.0022140233561261328,
+          "max_min_ratio": 1.0044378722650986,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -1220,9 +1220,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 2.76,
-      "min_ms": 2.65,
-      "max_ms": 2.82,
+      "median_ms": 2.05,
+      "min_ms": 2.04,
+      "max_ms": 2.07,
       "det": true,
       "role": "product"
     },
@@ -1232,19 +1232,19 @@
       "nodes": 10,
       "edges": 11,
       "groups": 0,
-      "node_fp": "13d9f41f547e835e",
-      "exact_sev": 0.0,
-      "tight_sev": 718.7878254896737,
+      "node_fp": "db0669feabef1496",
+      "exact_sev": 42.559999999999945,
+      "tight_sev": 0.0,
       "allowed_share_len": 0.0,
-      "exact_pairs": 0,
-      "tight_pairs": 1,
+      "exact_pairs": 1,
+      "tight_pairs": 0,
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "node_outside_group": 0,
         "child_group_outside_parent": 0,
         "edge_through_node": 0,
-        "edge_crossing": 4,
+        "edge_crossing": 5,
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
@@ -1253,32 +1253,32 @@
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 4,
+        "total_violations": 5,
         "error_count": 0,
-        "warning_count": 4
+        "warning_count": 5
       },
       "ortho": {
         "edge_exact_overlap_pairs": 0,
-        "edge_tight_spacing_pairs": 1,
-        "degraded_count": 0,
+        "edge_tight_spacing_pairs": 0,
+        "degraded_count": 1,
         "reroute_iterations": 3,
-        "rerouted_edges": 27,
-        "lane_groups": 1,
+        "rerouted_edges": 33,
+        "lane_groups": 0,
         "lane_segments_shifted": 0,
         "stub_occupancy_conflicts": 0,
         "stub_cross_pair_conflicts": 0,
         "stub_occupancy_shifted": 0,
         "contract_stub_violations": 0,
         "contract_approach_violations": 0,
-        "contract_unnatural_to_port": 1,
-        "contract_away_segments": 2,
-        "contract_away_edges": 2
+        "contract_unnatural_to_port": 2,
+        "contract_away_segments": 3,
+        "contract_away_edges": 3
       },
       "min_gap": 8.0,
       "aesthetics": {
         "bends": {
-          "total": 14,
-          "avg_per_edge": 1.2727272727272727,
+          "total": 12,
+          "avg_per_edge": 1.0909090909090908,
           "max_single_edge": 4,
           "excessive_count": 0
         },
@@ -1289,7 +1289,7 @@
         },
         "symmetry": {
           "fan_out_nodes": 2,
-          "avg_deviation": 0.9703007204869842,
+          "avg_deviation": 0.549586776859504,
           "max_deviation": 1.0
         },
         "self_loops": {
@@ -1300,12 +1300,12 @@
           "total": 3
         },
         "detour": {
-          "avg_ratio": 1.5784444333669203,
-          "max_ratio": 2.9271339826698957
+          "avg_ratio": 1.7434448585661024,
+          "max_ratio": 3.174027466178626
         },
         "edge_length": {
-          "intra_layer_cv": 0.6506857987674544,
-          "max_min_ratio": 14.17433395917858,
+          "intra_layer_cv": 0.26574521663024087,
+          "max_min_ratio": 4.415372332082788,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -1314,17 +1314,17 @@
           "unused_corridors": 0
         },
         "port_distribution": {
-          "max_same_side_edges": 2,
-          "side_utilization_variance": 0.21
+          "max_same_side_edges": 3,
+          "side_utilization_variance": 0.44
         },
         "path_monotonicity": {
-          "non_monotone_ratio": 0.0,
-          "non_monotone_count": 0
+          "non_monotone_ratio": 0.2,
+          "non_monotone_count": 1
         }
       },
-      "median_ms": 5.06,
-      "min_ms": 4.84,
-      "max_ms": 5.26,
+      "median_ms": 5.57,
+      "min_ms": 5.54,
+      "max_ms": 5.63,
       "det": true,
       "role": "product"
     },
@@ -1334,7 +1334,7 @@
       "nodes": 8,
       "edges": 7,
       "groups": 4,
-      "node_fp": "66779b4cdad74bf1",
+      "node_fp": "f0d13f78e7cf0c84",
       "exact_sev": 0.0,
       "tight_sev": 0.0,
       "allowed_share_len": 0.0,
@@ -1360,21 +1360,21 @@
         "warning_count": 1
       },
       "ortho": {
-        "edge_exact_overlap_pairs": 0,
+        "edge_exact_overlap_pairs": 5,
         "edge_tight_spacing_pairs": 0,
         "degraded_count": 1,
         "reroute_iterations": 1,
-        "rerouted_edges": 5,
-        "lane_groups": 0,
+        "rerouted_edges": 3,
+        "lane_groups": 1,
         "lane_segments_shifted": 0,
         "stub_occupancy_conflicts": 0,
         "stub_cross_pair_conflicts": 0,
         "stub_occupancy_shifted": 0,
-        "contract_stub_violations": 2,
+        "contract_stub_violations": 1,
         "contract_approach_violations": 0,
         "contract_unnatural_to_port": 0,
-        "contract_away_segments": 3,
-        "contract_away_edges": 2
+        "contract_away_segments": 1,
+        "contract_away_edges": 1
       },
       "min_gap": 8.0,
       "aesthetics": {
@@ -1402,12 +1402,12 @@
           "total": 0
         },
         "detour": {
-          "avg_ratio": 1.3998071713023,
-          "max_ratio": 1.4448773663558714
+          "avg_ratio": 1.46904655390047,
+          "max_ratio": 1.696551724137931
         },
         "edge_length": {
           "intra_layer_cv": 0.0,
-          "max_min_ratio": 4.448,
+          "max_min_ratio": 3.616,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -1420,13 +1420,13 @@
           "side_utilization_variance": 0.0
         },
         "path_monotonicity": {
-          "non_monotone_ratio": 0.25,
-          "non_monotone_count": 1
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
         }
       },
-      "median_ms": 0.95,
-      "min_ms": 0.88,
-      "max_ms": 1.06,
+      "median_ms": 3.15,
+      "min_ms": 3.12,
+      "max_ms": 3.2,
       "det": true,
       "role": "product"
     },
@@ -1436,8 +1436,8 @@
       "nodes": 10,
       "edges": 11,
       "groups": 0,
-      "node_fp": "15e0a7832fdda906",
-      "exact_sev": 11.0,
+      "node_fp": "f6131319614eefe4",
+      "exact_sev": 50.0,
       "tight_sev": 0.0,
       "allowed_share_len": 0.0,
       "exact_pairs": 1,
@@ -1464,10 +1464,10 @@
       "ortho": {
         "edge_exact_overlap_pairs": 1,
         "edge_tight_spacing_pairs": 0,
-        "degraded_count": 0,
+        "degraded_count": 1,
         "reroute_iterations": 3,
-        "rerouted_edges": 21,
-        "lane_groups": 1,
+        "rerouted_edges": 18,
+        "lane_groups": 0,
         "lane_segments_shifted": 0,
         "stub_occupancy_conflicts": 0,
         "stub_cross_pair_conflicts": 0,
@@ -1481,8 +1481,8 @@
       "min_gap": 8.0,
       "aesthetics": {
         "bends": {
-          "total": 12,
-          "avg_per_edge": 1.0909090909090908,
+          "total": 10,
+          "avg_per_edge": 0.9090909090909091,
           "max_single_edge": 4,
           "excessive_count": 0
         },
@@ -1492,24 +1492,24 @@
           "hugging_violations": 0
         },
         "symmetry": {
-          "fan_out_nodes": 1,
-          "avg_deviation": 0.9999999999999996,
-          "max_deviation": 0.9999999999999996
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.9436326069425298,
+          "max_deviation": 1.0
         },
         "self_loops": {
           "count": 0,
           "min_clearance_px": 9999.0
         },
         "crossings": {
-          "total": 2
+          "total": 0
         },
         "detour": {
-          "avg_ratio": 1.399452842884958,
-          "max_ratio": 1.6095645967166297
+          "avg_ratio": 1.5191669442195161,
+          "max_ratio": 1.745315983709737
         },
         "edge_length": {
-          "intra_layer_cv": 0.02435977514053766,
-          "max_min_ratio": 1.6091115628363037,
+          "intra_layer_cv": 0.38244853737811485,
+          "max_min_ratio": 3.041445747420293,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -1519,16 +1519,16 @@
         },
         "port_distribution": {
           "max_same_side_edges": 2,
-          "side_utilization_variance": 0.09
+          "side_utilization_variance": 0.13
         },
         "path_monotonicity": {
-          "non_monotone_ratio": 0.25,
-          "non_monotone_count": 1
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
         }
       },
-      "median_ms": 3.27,
-      "min_ms": 3.08,
-      "max_ms": 3.58,
+      "median_ms": 5.59,
+      "min_ms": 5.56,
+      "max_ms": 5.64,
       "det": true,
       "role": "product"
     },
@@ -1538,11 +1538,11 @@
       "nodes": 10,
       "edges": 11,
       "groups": 0,
-      "node_fp": "ee22b6cb84277c86",
-      "exact_sev": 96.0,
+      "node_fp": "8c5eabcd8d581160",
+      "exact_sev": 64.0,
       "tight_sev": 0.0,
       "allowed_share_len": 0.0,
-      "exact_pairs": 2,
+      "exact_pairs": 1,
       "tight_pairs": 0,
       "lint": {
         "node_overlap": 0,
@@ -1550,7 +1550,7 @@
         "node_outside_group": 0,
         "child_group_outside_parent": 0,
         "edge_through_node": 0,
-        "edge_crossing": 2,
+        "edge_crossing": 4,
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 1,
@@ -1559,14 +1559,14 @@
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 3,
+        "total_violations": 5,
         "error_count": 1,
-        "warning_count": 2
+        "warning_count": 4
       },
       "ortho": {
-        "edge_exact_overlap_pairs": 1,
+        "edge_exact_overlap_pairs": 0,
         "edge_tight_spacing_pairs": 0,
-        "degraded_count": 0,
+        "degraded_count": 1,
         "reroute_iterations": 3,
         "rerouted_edges": 27,
         "lane_groups": 1,
@@ -1577,8 +1577,8 @@
         "contract_stub_violations": 0,
         "contract_approach_violations": 0,
         "contract_unnatural_to_port": 1,
-        "contract_away_segments": 2,
-        "contract_away_edges": 2
+        "contract_away_segments": 1,
+        "contract_away_edges": 1
       },
       "min_gap": 8.0,
       "aesthetics": {
@@ -1595,7 +1595,7 @@
         },
         "symmetry": {
           "fan_out_nodes": 2,
-          "avg_deviation": 1.0,
+          "avg_deviation": 0.9999999999999999,
           "max_deviation": 1.0
         },
         "self_loops": {
@@ -1603,15 +1603,15 @@
           "min_clearance_px": 9999.0
         },
         "crossings": {
-          "total": 3
+          "total": 2
         },
         "detour": {
-          "avg_ratio": 1.3467935419162005,
-          "max_ratio": 1.4793040048735664
+          "avg_ratio": 1.4224865423377056,
+          "max_ratio": 1.872965344864169
         },
         "edge_length": {
-          "intra_layer_cv": 0.3929643804521888,
-          "max_min_ratio": 3.2365599763389263,
+          "intra_layer_cv": 0.189869127965962,
+          "max_min_ratio": 3.0213906146367155,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -1621,16 +1621,16 @@
         },
         "port_distribution": {
           "max_same_side_edges": 3,
-          "side_utilization_variance": 0.33
+          "side_utilization_variance": 0.48
         },
         "path_monotonicity": {
-          "non_monotone_ratio": 0.0,
-          "non_monotone_count": 0
+          "non_monotone_ratio": 0.2,
+          "non_monotone_count": 1
         }
       },
-      "median_ms": 2.78,
-      "min_ms": 2.64,
-      "max_ms": 2.92,
+      "median_ms": 6.54,
+      "min_ms": 6.48,
+      "max_ms": 6.63,
       "det": true,
       "role": "product"
     },
@@ -1642,10 +1642,10 @@
       "groups": 0,
       "node_fp": "e2b6a467c43d5363",
       "exact_sev": 0.0,
-      "tight_sev": 80.0,
+      "tight_sev": 0.0,
       "allowed_share_len": 0.0,
       "exact_pairs": 0,
-      "tight_pairs": 1,
+      "tight_pairs": 0,
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
@@ -1668,18 +1668,18 @@
       "ortho": {
         "edge_exact_overlap_pairs": 0,
         "edge_tight_spacing_pairs": 0,
-        "degraded_count": 1,
+        "degraded_count": 2,
         "reroute_iterations": 1,
-        "rerouted_edges": 8,
+        "rerouted_edges": 6,
         "lane_groups": 0,
-        "lane_segments_shifted": 2,
-        "stub_occupancy_conflicts": 2,
+        "lane_segments_shifted": 0,
+        "stub_occupancy_conflicts": 1,
         "stub_cross_pair_conflicts": 1,
         "stub_occupancy_shifted": 0,
         "contract_stub_violations": 0,
         "contract_approach_violations": 0,
         "contract_unnatural_to_port": 0,
-        "contract_away_segments": 1,
+        "contract_away_segments": 2,
         "contract_away_edges": 1
       },
       "min_gap": 8.0,
@@ -1708,8 +1708,8 @@
           "total": 0
         },
         "detour": {
-          "avg_ratio": 1.189138035336422,
-          "max_ratio": 1.189138035336422
+          "avg_ratio": 1.2412643497155822,
+          "max_ratio": 1.2412643497155822
         },
         "edge_length": {
           "intra_layer_cv": 0.0,
@@ -1722,17 +1722,17 @@
           "unused_corridors": 0
         },
         "port_distribution": {
-          "max_same_side_edges": 2,
-          "side_utilization_variance": 0.22
+          "max_same_side_edges": 3,
+          "side_utilization_variance": 0.39
         },
         "path_monotonicity": {
           "non_monotone_ratio": 1.0,
           "non_monotone_count": 1
         }
       },
-      "median_ms": 1.14,
-      "min_ms": 1.07,
-      "max_ms": 1.25,
+      "median_ms": 0.76,
+      "min_ms": 0.75,
+      "max_ms": 0.8,
       "det": true,
       "role": "product"
     },
@@ -1743,10 +1743,10 @@
       "edges": 7,
       "groups": 0,
       "node_fp": "f04c96299ba9737d",
-      "exact_sev": 0.0,
+      "exact_sev": 50.0,
       "tight_sev": 0.0,
       "allowed_share_len": 0.0,
-      "exact_pairs": 0,
+      "exact_pairs": 1,
       "tight_pairs": 0,
       "lint": {
         "node_overlap": 0,
@@ -1757,22 +1757,22 @@
         "edge_crossing": 0,
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
-        "label_node_overlap": 1,
+        "label_node_overlap": 0,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 1,
-        "error_count": 1,
+        "total_violations": 0,
+        "error_count": 0,
         "warning_count": 0
       },
       "ortho": {
-        "edge_exact_overlap_pairs": 0,
+        "edge_exact_overlap_pairs": 1,
         "edge_tight_spacing_pairs": 0,
         "degraded_count": 0,
         "reroute_iterations": 1,
-        "rerouted_edges": 7,
+        "rerouted_edges": 5,
         "lane_groups": 0,
         "lane_segments_shifted": 0,
         "stub_occupancy_conflicts": 0,
@@ -1810,12 +1810,12 @@
           "total": 0
         },
         "detour": {
-          "avg_ratio": 1.3157245706032905,
-          "max_ratio": 1.3227267150632893
+          "avg_ratio": 1.3650609051055729,
+          "max_ratio": 1.4008490557878526
         },
         "edge_length": {
           "intra_layer_cv": 0.0,
-          "max_min_ratio": 1.0410225244046036,
+          "max_min_ratio": 1.1973684210526316,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -1832,9 +1832,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.92,
-      "min_ms": 0.87,
-      "max_ms": 1.16,
+      "median_ms": 0.83,
+      "min_ms": 0.81,
+      "max_ms": 0.87,
       "det": true,
       "role": "product"
     },
@@ -1918,9 +1918,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.09,
-      "min_ms": 0.09,
-      "max_ms": 0.1,
+      "median_ms": 0.1,
+      "min_ms": 0.1,
+      "max_ms": 0.11,
       "det": true,
       "role": "product"
     },
@@ -2005,8 +2005,8 @@
         }
       },
       "median_ms": 0.15,
-      "min_ms": 0.15,
-      "max_ms": 0.17,
+      "min_ms": 0.14,
+      "max_ms": 0.16,
       "det": true,
       "role": "product"
     },
@@ -2031,14 +2031,14 @@
         "edge_crossing": 0,
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
-        "label_node_overlap": 2,
+        "label_node_overlap": 0,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 2,
-        "error_count": 2,
+        "total_violations": 0,
+        "error_count": 0,
         "warning_count": 0
       },
       "ortho": null,
@@ -2117,14 +2117,14 @@
         "edge_crossing": 0,
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
-        "label_node_overlap": 2,
+        "label_node_overlap": 0,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 2,
-        "error_count": 2,
+        "total_violations": 0,
+        "error_count": 0,
         "warning_count": 0
       },
       "ortho": null,
@@ -2176,9 +2176,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.15,
-      "min_ms": 0.14,
-      "max_ms": 0.17,
+      "median_ms": 0.14,
+      "min_ms": 0.13,
+      "max_ms": 0.15,
       "det": true,
       "role": "product"
     },
@@ -2188,12 +2188,12 @@
       "nodes": 8,
       "edges": 8,
       "groups": 0,
-      "node_fp": "cc7e1d0b40de0db7",
+      "node_fp": "9fd4d91624d84a63",
       "exact_sev": 0.0,
-      "tight_sev": 0.0,
-      "allowed_share_len": 0.0,
+      "tight_sev": 216.0,
+      "allowed_share_len": 16.0,
       "exact_pairs": 0,
-      "tight_pairs": 0,
+      "tight_pairs": 1,
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
@@ -2233,9 +2233,9 @@
       "min_gap": 8.0,
       "aesthetics": {
         "bends": {
-          "total": 8,
-          "avg_per_edge": 1.0,
-          "max_single_edge": 4,
+          "total": 6,
+          "avg_per_edge": 0.75,
+          "max_single_edge": 2,
           "excessive_count": 0
         },
         "border_proximity": {
@@ -2244,9 +2244,9 @@
           "hugging_violations": 0
         },
         "symmetry": {
-          "fan_out_nodes": 0,
-          "avg_deviation": 0.0,
-          "max_deviation": 0.0
+          "fan_out_nodes": 2,
+          "avg_deviation": 1.0,
+          "max_deviation": 1.0
         },
         "self_loops": {
           "count": 0,
@@ -2256,12 +2256,12 @@
           "total": 1
         },
         "detour": {
-          "avg_ratio": 1.2359174044517949,
-          "max_ratio": 1.4122588778696161
+          "avg_ratio": 1.1612623573920606,
+          "max_ratio": 1.2898171708488648
         },
         "edge_length": {
           "intra_layer_cv": 0.0,
-          "max_min_ratio": 3.4276315789473686,
+          "max_min_ratio": 4.557382785164451,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -2278,9 +2278,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 1.77,
-      "min_ms": 1.39,
-      "max_ms": 2.06,
+      "median_ms": 1.5,
+      "min_ms": 1.47,
+      "max_ms": 1.54,
       "det": true,
       "role": "product"
     },
@@ -2302,7 +2302,7 @@
         "node_outside_group": 0,
         "child_group_outside_parent": 0,
         "edge_through_node": 0,
-        "edge_crossing": 0,
+        "edge_crossing": 1,
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
@@ -2311,9 +2311,9 @@
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 0,
+        "total_violations": 1,
         "error_count": 0,
-        "warning_count": 0
+        "warning_count": 1
       },
       "ortho": {
         "edge_exact_overlap_pairs": 1,
@@ -2358,12 +2358,12 @@
           "total": 1
         },
         "detour": {
-          "avg_ratio": 1.1714199258514908,
-          "max_ratio": 1.2843880073158507
+          "avg_ratio": 1.2171694200242842,
+          "max_ratio": 1.3945421057159126
         },
         "edge_length": {
-          "intra_layer_cv": 0.2980204005217084,
-          "max_min_ratio": 4.951685510111714,
+          "intra_layer_cv": 0.34271687428299247,
+          "max_min_ratio": 6.029254377597165,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -2380,9 +2380,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 2.42,
-      "min_ms": 2.34,
-      "max_ms": 2.65,
+      "median_ms": 2.12,
+      "min_ms": 2.08,
+      "max_ms": 2.44,
       "det": true,
       "role": "product"
     },
@@ -2392,7 +2392,7 @@
       "nodes": 10,
       "edges": 12,
       "groups": 0,
-      "node_fp": "f450344eba6c0208",
+      "node_fp": "9cb742ac08fbad13",
       "exact_sev": 0.0,
       "tight_sev": 0.0,
       "allowed_share_len": 0.0,
@@ -2404,7 +2404,7 @@
         "node_outside_group": 0,
         "child_group_outside_parent": 0,
         "edge_through_node": 0,
-        "edge_crossing": 2,
+        "edge_crossing": 3,
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
@@ -2413,9 +2413,9 @@
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 2,
+        "total_violations": 3,
         "error_count": 0,
-        "warning_count": 2
+        "warning_count": 3
       },
       "ortho": {
         "edge_exact_overlap_pairs": 0,
@@ -2431,8 +2431,8 @@
         "contract_stub_violations": 0,
         "contract_approach_violations": 0,
         "contract_unnatural_to_port": 3,
-        "contract_away_segments": 2,
-        "contract_away_edges": 2
+        "contract_away_segments": 3,
+        "contract_away_edges": 3
       },
       "min_gap": 8.0,
       "aesthetics": {
@@ -2460,12 +2460,12 @@
           "total": 2
         },
         "detour": {
-          "avg_ratio": 1.3050029479329337,
-          "max_ratio": 1.3787661595110563
+          "avg_ratio": 1.3065205046209858,
+          "max_ratio": 1.378766159511057
         },
         "edge_length": {
           "intra_layer_cv": 0.0,
-          "max_min_ratio": 2.5486702732179514,
+          "max_min_ratio": 2.7138872522414,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -2474,17 +2474,17 @@
           "unused_corridors": 0
         },
         "port_distribution": {
-          "max_same_side_edges": 2,
-          "side_utilization_variance": 0.12
+          "max_same_side_edges": 3,
+          "side_utilization_variance": 0.26
         },
         "path_monotonicity": {
           "non_monotone_ratio": 0.0,
           "non_monotone_count": 0
         }
       },
-      "median_ms": 2.65,
-      "min_ms": 2.55,
-      "max_ms": 2.94,
+      "median_ms": 2.64,
+      "min_ms": 2.61,
+      "max_ms": 2.69,
       "det": true,
       "role": "product"
     },
@@ -2494,7 +2494,7 @@
       "nodes": 7,
       "edges": 7,
       "groups": 0,
-      "node_fp": "5f0c91bb9cd4c873",
+      "node_fp": "ad9326db81e5a6f4",
       "exact_sev": 0.0,
       "tight_sev": 0.0,
       "allowed_share_len": 0.0,
@@ -2562,12 +2562,12 @@
           "total": 0
         },
         "detour": {
-          "avg_ratio": 1.3211538728414103,
-          "max_ratio": 1.4051246199971874
+          "avg_ratio": 1.4885620705703402,
+          "max_ratio": 1.5689588811772928
         },
         "edge_length": {
           "intra_layer_cv": 0.0,
-          "max_min_ratio": 1.7468354430379747,
+          "max_min_ratio": 1.8556701030927836,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -2584,9 +2584,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.79,
-      "min_ms": 0.72,
-      "max_ms": 0.93,
+      "median_ms": 0.65,
+      "min_ms": 0.64,
+      "max_ms": 0.68,
       "det": true,
       "role": "product"
     },
@@ -2596,7 +2596,7 @@
       "nodes": 5,
       "edges": 5,
       "groups": 0,
-      "node_fp": "3381fc011e352612",
+      "node_fp": "2697cc2801e83d78",
       "exact_sev": 0.0,
       "tight_sev": 0.0,
       "allowed_share_len": 0.0,
@@ -2637,7 +2637,7 @@
         },
         "symmetry": {
           "fan_out_nodes": 2,
-          "avg_deviation": 0.8439018906249999,
+          "avg_deviation": 0.843901890625,
           "max_deviation": 1.0
         },
         "self_loops": {
@@ -2670,9 +2670,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.48,
-      "min_ms": 0.46,
-      "max_ms": 0.53,
+      "median_ms": 0.42,
+      "min_ms": 0.4,
+      "max_ms": 0.43,
       "det": true,
       "role": "product"
     },
@@ -2756,9 +2756,9 @@
           "non_monotone_count": 1
         }
       },
-      "median_ms": 7.08,
-      "min_ms": 6.89,
-      "max_ms": 11.9,
+      "median_ms": 6.51,
+      "min_ms": 6.37,
+      "max_ms": 6.57,
       "det": true,
       "role": "product"
     },
@@ -2842,9 +2842,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.41,
-      "min_ms": 0.38,
-      "max_ms": 0.8,
+      "median_ms": 0.36,
+      "min_ms": 0.35,
+      "max_ms": 0.4,
       "det": true,
       "role": "product"
     },
@@ -2928,7 +2928,7 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.11,
+      "median_ms": 0.1,
       "min_ms": 0.1,
       "max_ms": 0.12,
       "det": true,
@@ -2940,65 +2940,65 @@
       "nodes": 11,
       "edges": 13,
       "groups": 5,
-      "node_fp": "fd0b14b3bd650a57",
+      "node_fp": "9a6a0e378a2432d2",
       "exact_sev": 0.0,
-      "tight_sev": 0.0,
+      "tight_sev": 1221.2924291221395,
       "allowed_share_len": 0.0,
       "exact_pairs": 0,
-      "tight_pairs": 0,
+      "tight_pairs": 3,
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "node_outside_group": 0,
         "child_group_outside_parent": 0,
         "edge_through_node": 0,
-        "edge_crossing": 4,
+        "edge_crossing": 7,
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
-        "label_node_overlap": 1,
+        "label_node_overlap": 0,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 5,
-        "error_count": 1,
-        "warning_count": 4
+        "total_violations": 7,
+        "error_count": 0,
+        "warning_count": 7
       },
       "ortho": {
-        "edge_exact_overlap_pairs": 1,
-        "edge_tight_spacing_pairs": 5,
-        "degraded_count": 4,
+        "edge_exact_overlap_pairs": 2,
+        "edge_tight_spacing_pairs": 4,
+        "degraded_count": 7,
         "reroute_iterations": 3,
         "rerouted_edges": 18,
-        "lane_groups": 8,
-        "lane_segments_shifted": 5,
+        "lane_groups": 7,
+        "lane_segments_shifted": 2,
         "stub_occupancy_conflicts": 0,
         "stub_cross_pair_conflicts": 0,
         "stub_occupancy_shifted": 0,
         "contract_stub_violations": 4,
         "contract_approach_violations": 0,
         "contract_unnatural_to_port": 7,
-        "contract_away_segments": 11,
+        "contract_away_segments": 10,
         "contract_away_edges": 9
       },
       "min_gap": 12.0,
       "aesthetics": {
         "bends": {
-          "total": 22,
-          "avg_per_edge": 1.6923076923076923,
+          "total": 24,
+          "avg_per_edge": 1.8461538461538463,
           "max_single_edge": 4,
           "excessive_count": 0
         },
         "border_proximity": {
           "min_distance_px": 4.0,
-          "segments_within_12px": 6,
+          "segments_within_12px": 3,
           "hugging_violations": 0
         },
         "symmetry": {
           "fan_out_nodes": 2,
-          "avg_deviation": 0.3644103915487958,
-          "max_deviation": 0.6760797342192687
+          "avg_deviation": 0.3603125538943211,
+          "max_deviation": 0.6744186046511628
         },
         "self_loops": {
           "count": 0,
@@ -3008,13 +3008,13 @@
           "total": 4
         },
         "detour": {
-          "avg_ratio": 1.4424611903703815,
-          "max_ratio": 1.932913289306383
+          "avg_ratio": 1.621844737572324,
+          "max_ratio": 2.9544944585911086
         },
         "edge_length": {
-          "intra_layer_cv": 0.4011330538983821,
-          "max_min_ratio": 3.830237882442243,
-          "outlier_count": 1
+          "intra_layer_cv": 0.4012408808000572,
+          "max_min_ratio": 3.1541066892464014,
+          "outlier_count": 0
         },
         "channel_utilization": {
           "corridor_usage_ratio": 0.14285714285714285,
@@ -3023,16 +3023,16 @@
         },
         "port_distribution": {
           "max_same_side_edges": 2,
-          "side_utilization_variance": 0.18
+          "side_utilization_variance": 0.08
         },
         "path_monotonicity": {
           "non_monotone_ratio": 0.0,
           "non_monotone_count": 0
         }
       },
-      "median_ms": 5.97,
-      "min_ms": 5.66,
-      "max_ms": 7.69,
+      "median_ms": 5.87,
+      "min_ms": 5.82,
+      "max_ms": 5.93,
       "det": true,
       "role": "stress"
     },
@@ -3042,53 +3042,53 @@
       "nodes": 11,
       "edges": 20,
       "groups": 0,
-      "node_fp": "d15044b370486841",
-      "exact_sev": 222.93886732252054,
-      "tight_sev": 3657.5324063367652,
-      "allowed_share_len": 40.0,
-      "exact_pairs": 4,
-      "tight_pairs": 8,
+      "node_fp": "f4a3dcb34a3dc0d8",
+      "exact_sev": 0.0,
+      "tight_sev": 1049.9234453740285,
+      "allowed_share_len": 12.0,
+      "exact_pairs": 0,
+      "tight_pairs": 4,
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "node_outside_group": 0,
         "child_group_outside_parent": 0,
         "edge_through_node": 0,
-        "edge_crossing": 30,
+        "edge_crossing": 31,
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 0,
         "label_label_overlap": 0,
-        "unrelated_edge_trunk_merge": 2,
+        "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 32,
+        "total_violations": 31,
         "error_count": 0,
-        "warning_count": 32
+        "warning_count": 31
       },
       "ortho": {
-        "edge_exact_overlap_pairs": 22,
-        "edge_tight_spacing_pairs": 7,
-        "degraded_count": 1,
+        "edge_exact_overlap_pairs": 3,
+        "edge_tight_spacing_pairs": 4,
+        "degraded_count": 3,
         "reroute_iterations": 3,
-        "rerouted_edges": 15,
-        "lane_groups": 8,
-        "lane_segments_shifted": 0,
+        "rerouted_edges": 27,
+        "lane_groups": 1,
+        "lane_segments_shifted": 2,
         "stub_occupancy_conflicts": 9,
         "stub_cross_pair_conflicts": 9,
         "stub_occupancy_shifted": 0,
         "contract_stub_violations": 0,
         "contract_approach_violations": 0,
         "contract_unnatural_to_port": 1,
-        "contract_away_segments": 4,
-        "contract_away_edges": 3
+        "contract_away_segments": 7,
+        "contract_away_edges": 6
       },
       "min_gap": 12.0,
       "aesthetics": {
         "bends": {
-          "total": 48,
-          "avg_per_edge": 2.4,
+          "total": 42,
+          "avg_per_edge": 2.1,
           "max_single_edge": 4,
           "excessive_count": 0
         },
@@ -3099,7 +3099,7 @@
         },
         "symmetry": {
           "fan_out_nodes": 6,
-          "avg_deviation": 0.8737702682731604,
+          "avg_deviation": 0.8693723478560681,
           "max_deviation": 1.0
         },
         "self_loops": {
@@ -3107,15 +3107,15 @@
           "min_clearance_px": 9999.0
         },
         "crossings": {
-          "total": 36
+          "total": 30
         },
         "detour": {
-          "avg_ratio": 1.3908464642679077,
-          "max_ratio": 1.981831779843206
+          "avg_ratio": 1.4055919507813786,
+          "max_ratio": 2.092678097782268
         },
         "edge_length": {
-          "intra_layer_cv": 0.4072011878341526,
-          "max_min_ratio": 6.787891440501038,
+          "intra_layer_cv": 0.29545400267246436,
+          "max_min_ratio": 6.119594233849433,
           "outlier_count": 0
         },
         "channel_utilization": {
@@ -3128,13 +3128,13 @@
           "side_utilization_variance": 0.8
         },
         "path_monotonicity": {
-          "non_monotone_ratio": 0.053,
+          "non_monotone_ratio": 0.059,
           "non_monotone_count": 1
         }
       },
-      "median_ms": 19.88,
-      "min_ms": 18.66,
-      "max_ms": 21.27,
+      "median_ms": 21.67,
+      "min_ms": 21.64,
+      "max_ms": 21.85,
       "det": true,
       "role": "stress"
     },
@@ -3160,14 +3160,14 @@
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 1,
-        "label_label_overlap": 0,
+        "label_label_overlap": 1,
         "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 9,
+        "total_violations": 10,
         "error_count": 1,
-        "warning_count": 8
+        "warning_count": 9
       },
       "ortho": null,
       "min_gap": 8.0,
@@ -3218,9 +3218,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 7.77,
-      "min_ms": 7.28,
-      "max_ms": 8.65,
+      "median_ms": 7.09,
+      "min_ms": 6.98,
+      "max_ms": 7.14,
       "det": true,
       "role": "stress"
     },
@@ -3230,53 +3230,53 @@
       "nodes": 11,
       "edges": 18,
       "groups": 0,
-      "node_fp": "551853faab1d014a",
-      "exact_sev": 112.0,
-      "tight_sev": 66.85906358016473,
+      "node_fp": "08dd00ffd794e077",
+      "exact_sev": 0.0,
+      "tight_sev": 45.58812500000022,
       "allowed_share_len": 0.0,
-      "exact_pairs": 1,
-      "tight_pairs": 2,
+      "exact_pairs": 0,
+      "tight_pairs": 1,
       "lint": {
         "node_overlap": 0,
         "group_overlap": 0,
         "node_outside_group": 0,
         "child_group_outside_parent": 0,
         "edge_through_node": 0,
-        "edge_crossing": 5,
+        "edge_crossing": 4,
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
-        "label_node_overlap": 1,
-        "label_label_overlap": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 1,
         "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 6,
-        "error_count": 1,
+        "total_violations": 5,
+        "error_count": 0,
         "warning_count": 5
       },
       "ortho": {
-        "edge_exact_overlap_pairs": 1,
-        "edge_tight_spacing_pairs": 3,
+        "edge_exact_overlap_pairs": 0,
+        "edge_tight_spacing_pairs": 1,
         "degraded_count": 0,
         "reroute_iterations": 3,
-        "rerouted_edges": 33,
-        "lane_groups": 1,
+        "rerouted_edges": 48,
+        "lane_groups": 0,
         "lane_segments_shifted": 0,
-        "stub_occupancy_conflicts": 4,
-        "stub_cross_pair_conflicts": 4,
+        "stub_occupancy_conflicts": 1,
+        "stub_cross_pair_conflicts": 1,
         "stub_occupancy_shifted": 0,
         "contract_stub_violations": 0,
         "contract_approach_violations": 0,
-        "contract_unnatural_to_port": 3,
+        "contract_unnatural_to_port": 4,
         "contract_away_segments": 7,
         "contract_away_edges": 7
       },
       "min_gap": 8.0,
       "aesthetics": {
         "bends": {
-          "total": 20,
-          "avg_per_edge": 1.1111111111111112,
+          "total": 18,
+          "avg_per_edge": 1.0,
           "max_single_edge": 4,
           "excessive_count": 0
         },
@@ -3286,24 +3286,24 @@
           "hugging_violations": 0
         },
         "symmetry": {
-          "fan_out_nodes": 3,
-          "avg_deviation": 0.9999999999999999,
+          "fan_out_nodes": 5,
+          "avg_deviation": 0.8808650546607186,
           "max_deviation": 1.0
         },
         "self_loops": {
           "count": 2,
-          "min_clearance_px": 13.022068598776912
+          "min_clearance_px": 12.428571428571445
         },
         "crossings": {
-          "total": 5
+          "total": 1
         },
         "detour": {
-          "avg_ratio": 1.611755822246753,
-          "max_ratio": 3.4581654132009705
+          "avg_ratio": 1.475934563066851,
+          "max_ratio": 2.4538722684264056
         },
         "edge_length": {
-          "intra_layer_cv": 0.6624660279913083,
-          "max_min_ratio": 14.153641872205005,
+          "intra_layer_cv": 0.6678848470560785,
+          "max_min_ratio": 16.408607615696557,
           "outlier_count": 1
         },
         "channel_utilization": {
@@ -3312,17 +3312,17 @@
           "unused_corridors": 0
         },
         "port_distribution": {
-          "max_same_side_edges": 2,
-          "side_utilization_variance": 0.12
+          "max_same_side_edges": 3,
+          "side_utilization_variance": 0.33
         },
         "path_monotonicity": {
           "non_monotone_ratio": 0.2,
           "non_monotone_count": 2
         }
       },
-      "median_ms": 8.93,
-      "min_ms": 6.96,
-      "max_ms": 13.48,
+      "median_ms": 9.09,
+      "min_ms": 9.01,
+      "max_ms": 9.12,
       "det": true,
       "role": "stress"
     },
@@ -3347,14 +3347,14 @@
         "edge_crossing": 0,
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
-        "label_node_overlap": 2,
+        "label_node_overlap": 0,
         "label_label_overlap": 0,
         "unrelated_edge_trunk_merge": 0,
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 2,
-        "error_count": 2,
+        "total_violations": 0,
+        "error_count": 0,
         "warning_count": 0
       },
       "ortho": null,
@@ -3407,7 +3407,7 @@
         }
       },
       "median_ms": 0.28,
-      "min_ms": 0.28,
+      "min_ms": 0.27,
       "max_ms": 0.29,
       "det": true,
       "role": "stress"
@@ -3418,11 +3418,11 @@
       "nodes": 9,
       "edges": 14,
       "groups": 0,
-      "node_fp": "eca06cfcc91bb671",
-      "exact_sev": 13.656480505795571,
+      "node_fp": "0f1a0601bfdf73c2",
+      "exact_sev": 0.0,
       "tight_sev": 0.0,
       "allowed_share_len": 0.0,
-      "exact_pairs": 1,
+      "exact_pairs": 0,
       "tight_pairs": 0,
       "lint": {
         "node_overlap": 0,
@@ -3430,7 +3430,7 @@
         "node_outside_group": 0,
         "child_group_outside_parent": 0,
         "edge_through_node": 0,
-        "edge_crossing": 2,
+        "edge_crossing": 3,
         "edge_on_group_border": 0,
         "edge_crosses_group_interior": 0,
         "label_node_overlap": 1,
@@ -3439,17 +3439,17 @@
         "sibling_width_ratio": 0,
         "pierce_node_sev": 0.0,
         "pierce_group_sev": 0.0,
-        "total_violations": 3,
+        "total_violations": 4,
         "error_count": 1,
-        "warning_count": 2
+        "warning_count": 3
       },
       "ortho": {
-        "edge_exact_overlap_pairs": 1,
+        "edge_exact_overlap_pairs": 0,
         "edge_tight_spacing_pairs": 0,
         "degraded_count": 0,
         "reroute_iterations": 3,
-        "rerouted_edges": 36,
-        "lane_groups": 1,
+        "rerouted_edges": 39,
+        "lane_groups": 0,
         "lane_segments_shifted": 0,
         "stub_occupancy_conflicts": 0,
         "stub_cross_pair_conflicts": 0,
@@ -3457,15 +3457,15 @@
         "contract_stub_violations": 0,
         "contract_approach_violations": 0,
         "contract_unnatural_to_port": 5,
-        "contract_away_segments": 6,
-        "contract_away_edges": 6
+        "contract_away_segments": 9,
+        "contract_away_edges": 7
       },
       "min_gap": 8.0,
       "aesthetics": {
         "bends": {
           "total": 20,
           "avg_per_edge": 1.4285714285714286,
-          "max_single_edge": 4,
+          "max_single_edge": 2,
           "excessive_count": 0
         },
         "border_proximity": {
@@ -3475,7 +3475,7 @@
         },
         "symmetry": {
           "fan_out_nodes": 3,
-          "avg_deviation": 0.9098846667256074,
+          "avg_deviation": 0.8574170790237371,
           "max_deviation": 1.0
         },
         "self_loops": {
@@ -3483,16 +3483,16 @@
           "min_clearance_px": 16.0
         },
         "crossings": {
-          "total": 2
+          "total": 3
         },
         "detour": {
-          "avg_ratio": 1.7855521782370876,
-          "max_ratio": 2.7359794733292193
+          "avg_ratio": 2.2843941380437545,
+          "max_ratio": 6.333333333333333
         },
         "edge_length": {
-          "intra_layer_cv": 0.7321706553425033,
-          "max_min_ratio": 10.237060433397795,
-          "outlier_count": 1
+          "intra_layer_cv": 0.5642348665023337,
+          "max_min_ratio": 13.784062387263427,
+          "outlier_count": 0
         },
         "channel_utilization": {
           "corridor_usage_ratio": 0.0,
@@ -3500,17 +3500,17 @@
           "unused_corridors": 0
         },
         "port_distribution": {
-          "max_same_side_edges": 2,
-          "side_utilization_variance": 0.09
+          "max_same_side_edges": 3,
+          "side_utilization_variance": 0.24
         },
         "path_monotonicity": {
-          "non_monotone_ratio": 0.5,
-          "non_monotone_count": 5
+          "non_monotone_ratio": 0.091,
+          "non_monotone_count": 1
         }
       },
-      "median_ms": 6.0,
-      "min_ms": 5.1,
-      "max_ms": 7.54,
+      "median_ms": 9.36,
+      "min_ms": 9.22,
+      "max_ms": 9.64,
       "det": true,
       "role": "stress"
     },
@@ -3594,9 +3594,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 1.48,
-      "min_ms": 1.35,
-      "max_ms": 1.99,
+      "median_ms": 1.1,
+      "min_ms": 1.08,
+      "max_ms": 1.12,
       "det": true,
       "role": "stress"
     }

@@ -63,6 +63,9 @@ pub(super) fn route_edges_orthogonal_inner(
     // 预排序节点/分组 ID，避免路由循环内重复排序（方案 2）
     let obstacles = PreparedObstacles::build(&result.nodes, &group_ctx);
 
+    // B 族（ISS-003）：构建非矩形形状的轮廓多边形映射，用于锚点吸附
+    let shape_polygons = shape_boundary::build_shape_polygons(&diagram.entities, &result.nodes);
+
     let horizontal = crate::layout::resolve_effective_direction(diagram) == Some("left-to-right");
     let feedback_assignment = feedback_side::assign_feedback_sides(
         diagram,
@@ -108,6 +111,7 @@ pub(super) fn route_edges_orthogonal_inner(
             n,
             s4_monitor_corridor,
             horizontal,
+            &shape_polygons,
         );
 
     if std::env::var("PLOTGRAM_ANCHOR_DEBUG")

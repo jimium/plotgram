@@ -36,6 +36,7 @@ pub(super) mod layer_order;
 pub(super) mod path;
 pub(super) mod scoring;
 pub(super) mod simplify;
+pub(super) mod shape_boundary;
 pub(super) mod slot;
 pub(super) mod slot_replan;
 pub(super) mod conflict_reroute;

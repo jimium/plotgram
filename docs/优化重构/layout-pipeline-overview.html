@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FlowML 布局管线总览 · SpaceBudget / Route Feedback</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --panel-2: #232d3a;
+      --line: #3a4a5c;
+      --text: #e7eef7;
+      --muted: #93a4b8;
+      --layer1: #3b82f6;
+      --layer1-bg: rgba(59, 130, 246, 0.12);
+      --layer2: #f59e0b;
+      --layer2-bg: rgba(245, 158, 11, 0.12);
+      --layer3: #10b981;
+      --layer3-bg: rgba(16, 185, 129, 0.12);
+      --layer4: #a78bfa;
+      --layer4-bg: rgba(167, 139, 250, 0.12);
+      --accent: #38bdf8;
+      --danger: #fb7185;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(59,130,246,0.18), transparent 60%),
+        radial-gradient(900px 500px at 90% 0%, rgba(245,158,11,0.12), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    .wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0 0 8px;
+    }
+    .lead {
+      color: var(--muted);
+      max-width: 70ch;
+      margin: 0 0 28px;
+      font-size: 0.98rem;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .pipeline {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .layer {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+    }
+    .layer-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .badge {
+      flex: 0 0 auto;
+      min-width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      color: #081018;
+    }
+    .layer-title {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+    .layer-sub {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .l1 .badge { background: var(--layer1); }
+    .l1 .layer-head { background: var(--layer1-bg); }
+    .l2 .badge { background: var(--layer2); }
+    .l2 .layer-head { background: var(--layer2-bg); }
+    .l3 .badge { background: var(--layer3); }
+    .l3 .layer-head { background: var(--layer3-bg); }
+    .l4 .badge { background: var(--layer4); }
+    .l4 .layer-head { background: var(--layer4-bg); }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      padding: 16px 18px 18px;
+    }
+    .card {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    .card h3 {
+      margin: 0 0 6px;
+      font-size: 0.92rem;
+    }
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+    .tag {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--accent);
+    }
+    .tag.warn { color: #fbbf24; }
+    .tag.shared { color: #34d399; }
+
+    .arrow {
+      display: flex;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      letter-spacing: 0.08em;
+    }
+    .arrow span {
+      border: 1px dashed var(--line);
+      border-radius: 999px;
+      padding: 4px 14px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .focus {
+      margin-top: 36px;
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      background: linear-gradient(180deg, rgba(245,158,11,0.08), rgba(26,34,44,0.9));
+      border-radius: 16px;
+      padding: 20px;
+    }
+    .focus h2 {
+      margin: 0 0 10px;
+      font-size: 1.15rem;
+    }
+    .focus p {
+      margin: 0 0 12px;
+      color: var(--muted);
+    }
+    .focus ul {
+      margin: 0;
+      padding-left: 1.2rem;
+      color: var(--text);
+    }
+    .focus li { margin: 6px 0; }
+    .focus code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.86em;
+      color: #fde68a;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 16px;
+      margin-top: 28px;
+    }
+    @media (max-width: 860px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      padding: 18px;
+    }
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 1.05rem;
+    }
+    .panel p, .panel li {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .panel strong { color: var(--text); }
+
+    .flow-mini {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.78rem;
+      color: #cbd5e1;
+      background: #0b1016;
+      border-radius: 12px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.45;
+    }
+
+    .answer {
+      margin-top: 28px;
+      padding: 18px 20px;
+      border-radius: 16px;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      background: rgba(56, 189, 248, 0.08);
+    }
+    .answer h2 {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+    }
+    .answer p { margin: 0 0 10px; color: var(--muted); }
+    .answer .verdict {
+      color: var(--text);
+      font-size: 1rem;
+      margin-bottom: 10px;
+    }
+
+    footer {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>布局管线总览</h1>
+    <p class="lead">
+      把「节点怎么摆」和「边怎么走」拆开看：第一层是各图类型自己的节点布局算法；
+      <strong style="color:#fbbf24">SpaceBudget / route feedback</strong>
+      处在布局之后、路由前后的共享层，用来补间距、消化压力、必要时再推节点。
+    </p>
+
+    <div class="legend">
+      <div class="chip"><span class="dot" style="background:var(--layer1)"></span>① 节点布局（算法分派）</div>
+      <div class="chip"><span class="dot" style="background:var(--layer2)"></span>② 共享空间契约 / 反馈</div>
+      <div class="chip"><span class="dot" style="background:var(--layer3)"></span>③ 边路由</div>
+      <div class="chip"><span class="dot" style="background:var(--layer4)"></span>④ 边后处理</div>
+    </div>
+
+    <div class="pipeline">
+      <!-- Layer 1 -->
+      <section class="layer l1">
+        <div class="layer-head">
+          <div class="badge">①</div>
+          <div>
+            <h2 class="layer-title">节点布局（按图类型分派）</h2>
+            <p class="layer-sub">输出：每个节点的 <code>NodeLayout {x,y,w,h}</code>。不同算法互不共用内部启发式。</p>
+          </div>
+        </div>
+        <div class="cards">
+          <div class="card">
+            <h3>Sugiyama V2</h3>
+            <p>flowchart / state / ER：rank → order → coordinate</p>
+            <span class="tag warn">方案主改点：coordinate</span>
+          </div>
+          <div class="card">
+            <h3>Architecture V2</h3>
+            <p>macro block + 组内布局；组框、基础设施层</p>
+            <span class="tag">另一套节点算法</span>
+          </div>
+          <div class="card">
+            <h3>Mindmap / Sequence / …</h3>
+            <p>各自独立的节点摆放策略</p>
+            <span class="tag">不共享 Sugiyama 内部</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="arrow"><span>↓ 节点坐标已有一版 · 进入共享层</span></div>
+
+      <!-- Layer 2 -->
+      <section class="layer l2">
+        <div class="layer-head">
+          <div class="badge">②</div>
+          <div>
+            <h2 class="layer-title">SpaceBudget / Route Feedback · 共享补丁与反馈层</h2>
+            <p class="layer-sub">
+              设计意图：不依赖「谁摆的节点」，只看通用 <code>nodes</code> + diagram，统一补缝、预路由守约、路由后 refine。
+            </p>
+          </div>
+        </div>
+        <div class="cards">
+          <div class="card">
+            <h3>SpaceBudget</h3>
+            <p>声明同层最小缝、label 缝、端口 clearance、压力加缝。契约数据放在 <code>hints.space_budget</code>。</p>
+            <span class="tag shared">跨算法共享</span>
+          </div>
+          <div class="card">
+            <h3>enforce_horizontal_gaps</h3>
+            <p>把契约兑现成「推开节点」。这是②层最显眼的坐标写者。</p>
+            <span class="tag warn">会改节点坐标</span>
+          </div>
+          <div class="card">
+            <h3>LayoutRouteFeedback</h3>
+            <p>预路由：enrich 压力 → enforce 缝；路由后：refine / 契约失败时兜底。</p>
+            <span class="tag shared">布局↔路由粘合剂</span>
+          </div>
+          <div class="card">
+            <h3>demand / PressureSnapshot</h3>
+            <p>只读压力模型（廊、层带、hits）。本身不写坐标，结果喂给 SpaceBudget。</p>
+            <span class="tag">只读输入</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="arrow"><span>↓ 节点几何尽量冻结 · 进入边算法</span></div>
+
+      <!-- Layer 3 -->
+      <section class="layer l3">
+        <div class="layer-head">
+          <div class="badge">③</div>
+          <div>
+            <h2 class="layer-title">边路由</h2>
+            <p class="layer-sub">消费冻结后的节点几何，画折线；可读取 SpaceBudget（走廊升档等），原则上不再当主写者改节点。</p>
+          </div>
+        </div>
+        <div class="cards">
+          <div class="card">
+            <h3>Orthogonal Router</h3>
+            <p>端口 / 通道 / OVG / 折线候选</p>
+          </div>
+          <div class="card">
+            <h3>Organic / Spline / …</h3>
+            <p>其他图类型的边策略</p>
+          </div>
+          <div class="card">
+            <h3>路由内部 feedback</h3>
+            <p>如 trunk 后重路由：主要改<strong>边</strong>，不是②层那种通用推节点契约。</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="arrow"><span>↓ 边几何再整形</span></div>
+
+      <!-- Layer 4 -->
+      <section class="layer l4">
+        <div class="layer-head">
+          <div class="badge">④</div>
+          <div>
+            <h2 class="layer-title">边后处理</h2>
+            <p class="layer-sub">sanitize、lane、label resolve… 正常只改边与标签。</p>
+          </div>
+        </div>
+        <div class="cards">
+          <div class="card">
+            <h3>sanitize / snap</h3>
+            <p>折点清理、量化</p>
+          </div>
+          <div class="card">
+            <h3>lane / gap enforce（边）</h3>
+            <p>平行边分离</p>
+          </div>
+          <div class="card">
+            <h3>label resolve</h3>
+            <p>最终标签避让</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="focus">
+      <h2>② 层当初想解决什么？</h2>
+      <p>
+        代码注释写得很清楚：这是一套 <strong>空间契约（Space Contract）</strong>——
+        <em>布局预留 → 路由消费 → 后处理守约</em>，避免末端「刚好不碰」式补丁。
+      </p>
+      <ul>
+        <li><strong>共用对象</strong>：不绑死 Sugiyama；flowchart / architecture 都可往 <code>hints.space_budget</code> 塞契约。</li>
+        <li><strong>共用操作</strong>：对任意 <code>HashMap&lt;id, NodeLayout&gt;</code> 做 <code>enforce_horizontal_gaps</code>。</li>
+        <li><strong>共用时序</strong>：挂在 pipeline 的预路由 / refine 路径，而不是某个算法内部。</li>
+        <li><strong>理想目标</strong>：第一层布局就把缝留够；② 只守约、少补丁。</li>
+        <li><strong>现实落点</strong>：第一层常留不够 → ② 变成「布局之后的通用推节点补丁 + 布局↔路由反馈环」。</li>
+      </ul>
+    </div>
+
+    <div class="grid-2">
+      <section class="panel">
+        <h2>理想设计（契约）</h2>
+        <p>SpaceBudget 更像「需求单」，不是「随便推一下」：</p>
+        <div class="flow-mini">① 节点布局尽量预留缝
+   ↓ 写入 SpaceBudget（pair_gaps…）
+② 预路由：压力 enrich + 守约
+   ↓
+③ 路由：按 clearance / corridor 消费
+   ↓
+④ 后处理：检查契约，失败才兜底</div>
+        <p style="margin-top:12px">所以：<strong>是的，它被设计成第一层之后的共享层</strong>；但本意是「通用空间契约」，不完全等于「万能补丁箱」。</p>
+      </section>
+
+      <section class="panel">
+        <h2>现实摩擦（为何和文档冲突）</h2>
+        <p>当第一层（如 Sugiyama coordinate）已经为对称/主轴摆好节点时：</p>
+        <ul>
+          <li><code>enforce_horizontal_gaps</code> 再推一层 → 破坏对称</li>
+          <li>route feedback / refine 再 enforce → 多写者</li>
+          <li>统一坐标求解若只改①，②仍可把结果推歪</li>
+        </ul>
+        <p>文档方案要把②从「直接推点」收成「只产 SpacingIntent，有界回到①重解」。</p>
+      </section>
+    </div>
+
+    <div class="answer">
+      <h2>直接回答你的问题</h2>
+      <p class="verdict">
+        <strong>大体正确：</strong>SpaceBudget / route feedback 被放在 pipeline 共享层，
+        就是为了在「任意第一层节点布局算法」之后，用同一套机制补缝、消化路由压力、在布局与路由之间反馈。
+      </p>
+      <p>
+        更精确一点：当初目标不完全是「事后万能补丁」，而是想建成跨算法的
+        <strong>空间契约</strong>（预留 / 消费 / 守约）。只是实践中，第一层常做不到一次留够，
+        于是②层越来越像通用补丁；这也是现在和「单一坐标写者」打架的原因。
+      </p>
+    </div>
+
+    <footer>
+      文件：docs/优化重构/layout-pipeline-overview.html · 对应方案见 11-统一坐标约束求解架构与执行计划-2026-07.md
+    </footer>
+  </div>
+</body>
+</html>
