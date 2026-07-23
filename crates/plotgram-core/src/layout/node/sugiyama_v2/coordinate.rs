@@ -10,7 +10,11 @@ use super::order;
 use super::postprocess;
 use super::preset::{self, SugiyamaPreset};
 
-use crate::layout::node::common::stats::median_f64;
+use crate::layout::node::coordinate_solver::auditor::audit_p0;
+use crate::layout::node::coordinate_solver::builder::build_with_mapping;
+use crate::layout::node::coordinate_solver::objectives::{build_basic_objectives, ObjectiveWeights};
+use crate::layout::node::coordinate_solver::structure_objectives::{build_structure_objectives, StructureWeights};
+use crate::layout::node::coordinate_solver::optimizer::solve;
 
 pub(super) fn assign_coordinates_brandes_koepf(
     dag: &DiGraph<String, ()>,
@@ -20,32 +24,71 @@ pub(super) fn assign_coordinates_brandes_koepf(
     horizontal: bool,
     preset: &SugiyamaPreset,
     layer_gaps: &[f64],
-    has_same_layer_edges: bool,
+    _has_same_layer_edges: bool,
     diagram: &Diagram,
 ) -> HashMap<String, crate::layout::NodeLayout> {
     let spine = compute_spine_nodes(dag);
     let mut centers =
         assign_layer_centers_brandes_koepf(layered_graph, layers, sizes, preset, &spine);
-    // Iteration 3：compaction 保持 3 轮；spine 邻居轻微加权（1.5，避免过度拉扯增交叉）
-    compact_layer_centers(
-        &mut centers,
-        layered_graph,
-        layers,
-        sizes,
-        preset,
-        &spine,
-        3,
-    );
+    // BK 后受限紧凑化（无 spine 加权，spine 概念已由 solver region axis 替代）
+    compact_layer_centers(&mut centers, layered_graph, layers, sizes, preset, 3);
 
-    // Phase C1: Fan-out/Fan-in 对称修正
-    enforce_fan_symmetry(
-        &mut centers,
-        dag,
-        layered_graph,
-        layers,
-        sizes,
-        preset,
-    );
+    // Phase 3+4: 统一坐标求解器——在 BK + compact + fan_symmetry 之后运行 optimizer
+    {
+        let build_output = build_with_mapping(
+            layered_graph, layers, sizes, &centers, preset, horizontal,
+        );
+        let mut problem = build_output.problem;
+
+        // 基础 objectives（P2: 边拉直 + dummy 共线，P3: BK 位置保持）
+        let mut objectives = build_basic_objectives(
+            layered_graph,
+            &build_output.node_to_var,
+            &problem.initial.values,
+            &ObjectiveWeights::default(),
+        );
+
+        // 结构 objectives（P1: end 跟随 + pendant 对齐，P2: singleton 对齐）
+        let end_ids: Vec<String> = diagram
+            .entities
+            .iter()
+            .filter(|e| {
+                e.attributes.standard.get("type").and_then(|v| v.as_str())
+                    == Some(entity_type::END)
+            })
+            .map(|e| e.id.as_str().to_string())
+            .collect();
+        let structure_objs = build_structure_objectives(
+            dag,
+            layered_graph,
+            layers,
+            &build_output.node_to_var,
+            &problem.initial.values,
+            &end_ids,
+            &StructureWeights::default(),
+        );
+        objectives.extend(structure_objs);
+        problem.objectives = objectives;
+
+        let result = solve(&problem);
+
+        // Phase 8: P0 审计——验证硬约束满足
+        let audit = audit_p0(&problem, &result.coordinates);
+        if !audit.passed() {
+            crate::perf_log!(
+                "[solver] P0 audit FAILED: {} violations, max={:.2}px",
+                audit.separation_violations,
+                audit.max_violation
+            );
+        }
+
+        // 用优化结果更新 centers（仅 Real 节点）
+        for (node, &var_id) in &build_output.node_to_var {
+            if matches!(&layered_graph[*node].kind, LayerNodeKind::Real(_)) {
+                centers.insert(*node, result.coordinates[var_id]);
+            }
+        }
+    }
 
     let mut nodes = HashMap::new();
     let (default_w, default_h) = preset.default_node_size();
@@ -91,693 +134,20 @@ pub(super) fn assign_coordinates_brandes_koepf(
         }
     }
 
-    resolve_real_node_overlaps(dag, layered_graph, layers, &mut nodes, horizontal, preset);
-    align_singleton_layers_to_predecessors(dag, layered_graph, layers, &mut nodes, horizontal);
-    // 反馈结构主干拉直：仅当存在同层边（hub / end 旁置）时启用，
-    // 避免影响无反馈的普通 fan-out / 菱形居中美观。
-    if has_same_layer_edges {
-        align_spine_chain(
-            dag,
-            layered_graph,
-            layers,
-            &mut nodes,
-            horizontal,
-            &spine,
-            preset,
-        );
-    }
-    align_local_end_nodes(dag, diagram, &mut nodes, horizontal);
-    // 先 normalize，再对齐悬挂叶：避免 pack 探出左缘后二次 normalize 把锚点（auth）整体平移。
+    // Phase 6: solver 是唯一相对坐标写者，无后处理 pass
     postprocess::normalize_layout_to_padding(&mut nodes, preset.padding);
-    align_pendants_under_anchors(dag, layered_graph, layers, &mut nodes, horizontal, preset);
     nodes
 }
 
-/// 单节点层对齐邻层前驱：拉直主轴，避免 fan-out / 回边假前驱把链拉歪。
-///
-/// 对恰好 1 个 Real 节点的层：只对齐**紧邻上一层**的前驱中心（median）；
-/// 无邻层前驱时回退到邻层后继；再没有才用全部前驱/后继。
-/// 多节点层不动，以免破坏 fan-out 间距。
-///
-/// 关键：FAS 反转长回边后，远端节点会变成「假前驱」，若参与 median
-/// 会把 `last_ack` 一类主链节点拉成阶梯右偏。
-fn align_singleton_layers_to_predecessors(
-    dag: &DiGraph<String, ()>,
-    layered_graph: &DiGraph<LayerNode, ()>,
-    layers: &[Vec<NodeIndex>],
-    nodes: &mut HashMap<String, crate::layout::NodeLayout>,
-    horizontal: bool,
-) {
-    // Real 节点 → 层下标（确定性：同 id 不跨层）
-    let mut real_layer: HashMap<String, usize> = HashMap::new();
-    for (layer_index, layer) in layers.iter().enumerate() {
-        for node in layer {
-            if let LayerNodeKind::Real(original) = &layered_graph[*node].kind {
-                real_layer.insert(dag[*original].clone(), layer_index);
-            }
-        }
-    }
 
-    for (layer_index, layer) in layers.iter().enumerate() {
-        let real_ids: Vec<String> = layer
-            .iter()
-            .filter_map(|node| match &layered_graph[*node].kind {
-                LayerNodeKind::Real(original) => Some(dag[*original].clone()),
-                LayerNodeKind::Dummy { .. } => None,
-            })
-            .collect();
-        if real_ids.len() != 1 {
-            continue;
-        }
-        let id = &real_ids[0];
-        let Some(original) = dag.node_indices().find(|&n| dag[n] == *id) else {
-            continue;
-        };
 
-        let mut adj_pred_centers: Vec<f64> = Vec::new();
-        for pred in dag.neighbors_directed(original, Direction::Incoming) {
-            let pred_id = &dag[pred];
-            let Some(nl) = nodes.get(pred_id) else {
-                continue;
-            };
-            let c = axis_center(nl, horizontal);
-            if real_layer.get(pred_id).copied() == layer_index.checked_sub(1) {
-                adj_pred_centers.push(c);
-            }
-        }
-        adj_pred_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
-        let target = if !adj_pred_centers.is_empty() {
-            median_f64(&adj_pred_centers)
-        } else {
-            // FAS 反转后，DAG 后继可能落在上一层（layer-1）而非 layer+1。
-            // 凡紧邻层的出边邻居均可作为对齐目标（仍禁止全图假邻居）。
-            let mut adj_succ_centers: Vec<f64> = Vec::new();
-            for succ in dag.neighbors_directed(original, Direction::Outgoing) {
-                let succ_id = &dag[succ];
-                let Some(nl) = nodes.get(succ_id) else {
-                    continue;
-                };
-                let c = axis_center(nl, horizontal);
-                let Some(&succ_layer) = real_layer.get(succ_id) else {
-                    continue;
-                };
-                let adjacent = succ_layer
-                    .checked_add(1)
-                    .is_some_and(|s| s == layer_index)
-                    || succ_layer == layer_index + 1;
-                if adjacent {
-                    adj_succ_centers.push(c);
-                }
-            }
-            adj_succ_centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            if !adj_succ_centers.is_empty() {
-                median_f64(&adj_succ_centers)
-            } else {
-                // 无邻层邻居则跳过，禁止全图假邻居 fallback
-                continue;
-            }
-        };
 
-        let Some(nl) = nodes.get_mut(id) else {
-            continue;
-        };
-        let size = axis_size(nl, horizontal);
-        let old = axis_center(nl, horizontal);
-        if (old - target).abs() <= 0.5 {
-            continue;
-        }
-        set_axis_center(nl, horizontal, target, size);
-    }
-}
 
-/// 单前驱 end（档 A/B）：在层内将 end 中心对齐到其唯一前驱中心（TB 下 x 对齐）。
-fn align_local_end_nodes(
-    dag: &DiGraph<String, ()>,
-    diagram: &Diagram,
-    nodes: &mut HashMap<String, crate::layout::NodeLayout>,
-    horizontal: bool,
-) {
-    let end_ids: HashSet<String> = diagram
-        .entities
-        .iter()
-        .filter(|e| {
-            e.attributes
-                .standard
-                .get("type")
-                .and_then(|v| v.as_str())
-                == Some(entity_type::END)
-        })
-        .map(|e| e.id.as_str().to_string())
-        .collect();
 
-    let mut end_nodes: Vec<NodeIndex> = dag
-        .node_indices()
-        .filter(|n| end_ids.contains(&dag[*n]))
-        .collect();
-    end_nodes.sort_by_key(|n| n.index());
 
-    for end in end_nodes {
-        let end_id = dag[end].clone();
-        let mut preds: Vec<NodeIndex> = dag.neighbors_directed(end, Direction::Incoming).collect();
-        preds.sort_by_key(|n| n.index());
-        if preds.len() != 1 {
-            continue;
-        }
-        let pred_id = &dag[preds[0]];
-        let target = nodes
-            .get(pred_id)
-            .map(|pred_layout| axis_center(pred_layout, horizontal));
-        let Some(target) = target else {
-            continue;
-        };
-        let Some(end_layout) = nodes.get_mut(&end_id) else {
-            continue;
-        };
-        let size = axis_size(end_layout, horizontal);
-        set_axis_center(end_layout, horizontal, target, size);
-    }
-}
 
-/// 反馈结构主干拉直：将 spine 主链上相邻层的节点垂直对齐成一列，
-/// 并把同层侧支节点向两侧推开，保证主路径（如 决策→复核→审批）为垂直直线。
-///
-/// 仅在存在同层边（feedback hub / end 旁置）时由调用方启用，
-/// 以免破坏无反馈图（菱形 / fan-out）的居中美观。
-///
-/// 确定性：spine 由 `compute_spine_nodes` 按 (出度, id) 稳定生成，
-/// 此处再按 (层号, id) 排序重建链序，不依赖 HashMap 迭代序。
-fn align_spine_chain(
-    dag: &DiGraph<String, ()>,
-    layered_graph: &DiGraph<LayerNode, ()>,
-    layers: &[Vec<NodeIndex>],
-    nodes: &mut HashMap<String, crate::layout::NodeLayout>,
-    horizontal: bool,
-    spine: &HashSet<NodeIndex>,
-    preset: &SugiyamaPreset,
-) {
-    // entity_id → 层号；层号 → 同层 Real id（按层内顺序）
-    let mut real_layer: HashMap<String, usize> = HashMap::new();
-    let mut layer_reals: Vec<Vec<String>> = vec![Vec::new(); layers.len()];
-    for (layer_index, layer) in layers.iter().enumerate() {
-        for node in layer {
-            if let LayerNodeKind::Real(original) = &layered_graph[*node].kind {
-                let id = dag[*original].clone();
-                real_layer.insert(id.clone(), layer_index);
-                layer_reals[layer_index].push(id);
-            }
-        }
-    }
 
-    // 按 (层号, id) 排序重建 spine 主链顺序
-    let mut spine_chain: Vec<(NodeIndex, String, usize)> = spine
-        .iter()
-        .filter_map(|n| {
-            let id = dag[*n].clone();
-            real_layer.get(&id).map(|&layer| (*n, id, layer))
-        })
-        .collect();
-    spine_chain.sort_by(|a, b| a.2.cmp(&b.2).then_with(|| a.1.cmp(&b.1)));
-
-    // 逐对对齐：N 是 P 的邻层后继时，把 N 中心拉到 P 中心
-    for pair in spine_chain.windows(2) {
-        let (pred_node, pred_id, pred_layer) = &pair[0];
-        let (succ_node, succ_id, succ_layer) = &pair[1];
-        if *succ_layer != *pred_layer + 1 {
-            continue;
-        }
-        // spine 可能跨层（长边），仅处理真实相邻的边
-        if !dag.contains_edge(*pred_node, *succ_node) {
-            continue;
-        }
-        let Some(target_center) = nodes.get(pred_id).map(|l| axis_center(l, horizontal)) else {
-            continue;
-        };
-        align_node_and_push_apart(
-            nodes,
-            horizontal,
-            &layer_reals[*succ_layer],
-            succ_id,
-            target_center,
-            preset.node_gap,
-        );
-    }
-}
-
-/// 将 `target_id` 对齐到 `target_center`，并把同层节点向左/右级联推开，
-/// 保持层内顺序与最小间距（不产生重叠）。
-fn align_node_and_push_apart(
-    nodes: &mut HashMap<String, crate::layout::NodeLayout>,
-    horizontal: bool,
-    layer_ids: &[String],
-    target_id: &str,
-    target_center: f64,
-    node_gap: f64,
-) {
-    let Some(pos) = layer_ids.iter().position(|id| id == target_id) else {
-        return;
-    };
-    let Some(target_size) = nodes.get(target_id).map(|l| axis_size(l, horizontal)) else {
-        return;
-    };
-    if let Some(target_layout) = nodes.get_mut(target_id) {
-        set_axis_center(target_layout, horizontal, target_center, target_size);
-    }
-
-    // 左侧节点向左级联推开
-    for i in (0..pos).rev() {
-        let right_id = &layer_ids[i + 1];
-        let left_id = &layer_ids[i];
-        let Some((right_center, right_size, left_size)) = nodes.get(right_id).and_then(|r| {
-            nodes
-                .get(left_id)
-                .map(|l| (axis_center(r, horizontal), axis_size(r, horizontal), axis_size(l, horizontal)))
-        }) else {
-            continue;
-        };
-        let min_left = right_center - right_size / 2.0 - left_size / 2.0 - node_gap;
-        let left_center = axis_center(&nodes[left_id], horizontal);
-        if left_center > min_left {
-            if let Some(left_layout) = nodes.get_mut(left_id) {
-                set_axis_center(left_layout, horizontal, min_left, left_size);
-            }
-        }
-    }
-
-    // 右侧节点向右级联推开
-    for i in (pos + 1)..layer_ids.len() {
-        let left_id = &layer_ids[i - 1];
-        let right_id = &layer_ids[i];
-        let Some((left_center, left_size, right_size)) = nodes.get(left_id).and_then(|l| {
-            nodes
-                .get(right_id)
-                .map(|r| (axis_center(l, horizontal), axis_size(l, horizontal), axis_size(r, horizontal)))
-        }) else {
-            continue;
-        };
-        let min_right = left_center + left_size / 2.0 + right_size / 2.0 + node_gap;
-        let right_center = axis_center(&nodes[right_id], horizontal);
-        if right_center < min_right {
-            if let Some(right_layout) = nodes.get_mut(right_id) {
-                set_axis_center(right_layout, horizontal, min_right, right_size);
-            }
-        }
-    }
-}
-
-/// V3b：邻层悬挂叶（P-Pendant）对齐到枢纽锚点。
-///
-/// - 单 pendant：主轴中心与锚点重合（无同层冲突时）。
-/// - 同锚同层多 pendant：整层皆为该组时 S-PackUnderAnchor（组质心 = 锚点）；否则逐个 SkipIfConflict。
-/// - 锚点永不移动；一轮内每个节点至多写入一次；pack 失败整组回滚。
-///
-/// 须在 `normalize_layout_to_padding` **之后**调用，以免 pack 后再次 normalize 拖动锚点。
-fn align_pendants_under_anchors(
-    dag: &DiGraph<String, ()>,
-    layered_graph: &DiGraph<LayerNode, ()>,
-    layers: &[Vec<NodeIndex>],
-    nodes: &mut HashMap<String, crate::layout::NodeLayout>,
-    horizontal: bool,
-    preset: &SugiyamaPreset,
-) {
-    const EPS: f64 = 1.0;
-
-    let mut real_layer: HashMap<String, usize> = HashMap::new();
-    let mut layer_reals: Vec<Vec<String>> = vec![Vec::new(); layers.len()];
-    for (layer_index, layer) in layers.iter().enumerate() {
-        for node in layer {
-            if let LayerNodeKind::Real(original) = &layered_graph[*node].kind {
-                let id = dag[*original].clone();
-                real_layer.insert(id.clone(), layer_index);
-                layer_reals[layer_index].push(id);
-            }
-        }
-        layer_reals[layer_index].sort();
-    }
-
-    // id → 无向邻层 Real 邻居（稳定：按 id 排序）
-    let mut adj_layer_nbrs: HashMap<String, Vec<String>> = HashMap::new();
-    for id in real_layer.keys() {
-        let Some(original) = dag.node_indices().find(|&n| dag[n] == *id) else {
-            continue;
-        };
-        let Some(&my_layer) = real_layer.get(id) else {
-            continue;
-        };
-        let mut nbrs: Vec<String> = Vec::new();
-        for nbr in dag
-            .neighbors_directed(original, Direction::Incoming)
-            .chain(dag.neighbors_directed(original, Direction::Outgoing))
-        {
-            let nbr_id = dag[nbr].clone();
-            let Some(&nbr_layer) = real_layer.get(&nbr_id) else {
-                continue;
-            };
-            let adjacent = my_layer.abs_diff(nbr_layer) == 1;
-            if adjacent && !nbrs.contains(&nbr_id) {
-                nbrs.push(nbr_id);
-            }
-        }
-        nbrs.sort();
-        adj_layer_nbrs.insert(id.clone(), nbrs);
-    }
-
-    // 候选 (movable, anchor)：movable 邻层邻居唯一且为锚点；锚点邻层邻居数 > 1（枢纽）
-    let mut candidates: Vec<(String, String)> = Vec::new();
-    let mut movable_ids: Vec<String> = real_layer.keys().cloned().collect();
-    movable_ids.sort();
-    for movable in &movable_ids {
-        let Some(nbrs) = adj_layer_nbrs.get(movable) else {
-            continue;
-        };
-        if nbrs.len() != 1 {
-            continue;
-        }
-        let anchor = &nbrs[0];
-        let Some(anchor_nbrs) = adj_layer_nbrs.get(anchor) else {
-            continue;
-        };
-        if anchor_nbrs.len() <= 1 {
-            // 两端皆叶 → P-Mutual，本切片不做
-            continue;
-        }
-        candidates.push((movable.clone(), anchor.clone()));
-    }
-
-    // 按 (movable_layer, anchor) 分组
-    let mut groups: HashMap<(usize, String), Vec<String>> = HashMap::new();
-    for (movable, anchor) in candidates {
-        let Some(&layer) = real_layer.get(&movable) else {
-            continue;
-        };
-        groups
-            .entry((layer, anchor))
-            .or_default()
-            .push(movable);
-    }
-    let mut group_keys: Vec<(usize, String)> = groups.keys().cloned().collect();
-    group_keys.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
-
-    let mut moved: HashSet<String> = HashSet::new();
-
-    for key in group_keys {
-        let Some(mut pendants) = groups.remove(&key) else {
-            continue;
-        };
-        pendants.retain(|id| !moved.contains(id));
-        if pendants.is_empty() {
-            continue;
-        }
-        let (layer, anchor) = key;
-        let Some(anchor_layout) = nodes.get(&anchor).cloned() else {
-            continue;
-        };
-        let anchor_cx = axis_center(&anchor_layout, horizontal);
-
-        // 同层非组成员
-        let layer_ids = &layer_reals[layer];
-        let non_group: Vec<&String> = layer_ids
-            .iter()
-            .filter(|id| !pendants.contains(id))
-            .collect();
-
-        if pendants.len() == 1 {
-            let movable = &pendants[0];
-            let Some(layout) = nodes.get(movable).cloned() else {
-                continue;
-            };
-            let size = axis_size(&layout, horizontal);
-            let old = axis_center(&layout, horizontal);
-            if (old - anchor_cx).abs() <= EPS {
-                moved.insert(movable.clone());
-                continue;
-            }
-            if same_layer_conflicts(
-                nodes,
-                horizontal,
-                movable,
-                anchor_cx,
-                size,
-                layer_ids,
-                preset.node_gap,
-            ) {
-                continue;
-            }
-            if let Some(nl) = nodes.get_mut(movable) {
-                set_axis_center(nl, horizontal, anchor_cx, size);
-            }
-            moved.insert(movable.clone());
-            continue;
-        }
-
-        // 多 pendant：E1/E2 — 整层 Real 全是本组时才 pack，否则 SkipIfConflict 逐个试
-        let entire_layer_is_group = non_group.is_empty() && layer_ids.len() == pendants.len();
-        if entire_layer_is_group {
-            if try_pack_under_anchor(
-                nodes,
-                horizontal,
-                &pendants,
-                anchor_cx,
-                preset.node_gap,
-                EPS,
-            ) {
-                for id in &pendants {
-                    moved.insert(id.clone());
-                }
-            }
-        } else {
-            // 按 (center, id) 稳定序逐个尝试对齐
-            pendants.sort_by(|a, b| {
-                let ca = nodes
-                    .get(a)
-                    .map(|n| axis_center(n, horizontal))
-                    .unwrap_or(0.0);
-                let cb = nodes
-                    .get(b)
-                    .map(|n| axis_center(n, horizontal))
-                    .unwrap_or(0.0);
-                ca.partial_cmp(&cb)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-                    .then_with(|| a.cmp(b))
-            });
-            for movable in &pendants {
-                if moved.contains(movable) {
-                    continue;
-                }
-                let Some(layout) = nodes.get(movable).cloned() else {
-                    continue;
-                };
-                let size = axis_size(&layout, horizontal);
-                let old = axis_center(&layout, horizontal);
-                if (old - anchor_cx).abs() <= EPS {
-                    moved.insert(movable.clone());
-                    continue;
-                }
-                if same_layer_conflicts(
-                    nodes,
-                    horizontal,
-                    movable,
-                    anchor_cx,
-                    size,
-                    layer_ids,
-                    preset.node_gap,
-                ) {
-                    continue;
-                }
-                if let Some(nl) = nodes.get_mut(movable) {
-                    set_axis_center(nl, horizontal, anchor_cx, size);
-                }
-                moved.insert(movable.clone());
-            }
-        }
-    }
-}
-
-fn same_layer_conflicts(
-    nodes: &HashMap<String, crate::layout::NodeLayout>,
-    horizontal: bool,
-    movable: &str,
-    trial_center: f64,
-    movable_size: f64,
-    layer_ids: &[String],
-    node_gap: f64,
-) -> bool {
-    for other in layer_ids {
-        if other == movable {
-            continue;
-        }
-        let Some(ol) = nodes.get(other) else {
-            continue;
-        };
-        let oc = axis_center(ol, horizontal);
-        let os = axis_size(ol, horizontal);
-        let min_sep = movable_size / 2.0 + os / 2.0 + node_gap;
-        if (trial_center - oc).abs() + 1e-6 < min_sep {
-            return true;
-        }
-    }
-    false
-}
-
-/// S-PackUnderAnchor：组内质心对齐锚点；失败回滚。返回是否成功写入。
-fn try_pack_under_anchor(
-    nodes: &mut HashMap<String, crate::layout::NodeLayout>,
-    horizontal: bool,
-    pendants: &[String],
-    anchor_cx: f64,
-    node_gap: f64,
-    eps: f64,
-) -> bool {
-    let mut items: Vec<(String, f64, f64)> = Vec::new(); // id, old_center, size
-    for id in pendants {
-        let Some(layout) = nodes.get(id) else {
-            return false;
-        };
-        items.push((
-            id.clone(),
-            axis_center(layout, horizontal),
-            axis_size(layout, horizontal),
-        ));
-    }
-    // 稳定序：(center, id)
-    items.sort_by(|a, b| {
-        a.1.partial_cmp(&b.1)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| a.0.cmp(&b.0))
-    });
-
-    let mut trial: Vec<f64> = Vec::with_capacity(items.len());
-    trial.push(0.0); // 相对坐标，稍后整体平移
-    for i in 1..items.len() {
-        let prev = trial[i - 1];
-        let sep = items[i - 1].2 / 2.0 + items[i].2 / 2.0 + node_gap;
-        trial.push(prev + sep);
-    }
-    let mean = trial.iter().sum::<f64>() / trial.len() as f64;
-    let shift = anchor_cx - mean;
-    for c in &mut trial {
-        *c += shift;
-    }
-
-    // 组内间距已由构造保证；检查相对「应不变」——本组无非成员时跳过外部校验
-    // 保存快照以便回滚
-    let snapshot: Vec<(String, crate::layout::NodeLayout)> = pendants
-        .iter()
-        .filter_map(|id| nodes.get(id).map(|n| (id.clone(), n.clone())))
-        .collect();
-
-    for (i, (id, _, size)) in items.iter().enumerate() {
-        let Some(nl) = nodes.get_mut(id) else {
-            // 回滚
-            for (sid, layout) in &snapshot {
-                if let Some(n) = nodes.get_mut(sid) {
-                    *n = layout.clone();
-                }
-            }
-            return false;
-        };
-        set_axis_center(nl, horizontal, trial[i], *size);
-    }
-
-    // 组质心校验
-    let centroid: f64 = items
-        .iter()
-        .filter_map(|(id, _, _)| nodes.get(id).map(|n| axis_center(n, horizontal)))
-        .sum::<f64>()
-        / items.len() as f64;
-    if (centroid - anchor_cx).abs() > eps + 1e-6 {
-        for (sid, layout) in &snapshot {
-            if let Some(n) = nodes.get_mut(sid) {
-                *n = layout.clone();
-            }
-        }
-        return false;
-    }
-
-    // 组内两两 node_gap
-    for i in 0..items.len() {
-        for j in (i + 1)..items.len() {
-            let ci = axis_center(&nodes[&items[i].0], horizontal);
-            let cj = axis_center(&nodes[&items[j].0], horizontal);
-            let min_sep = items[i].2 / 2.0 + items[j].2 / 2.0 + node_gap;
-            if (ci - cj).abs() + 1e-6 < min_sep {
-                for (sid, layout) in &snapshot {
-                    if let Some(n) = nodes.get_mut(sid) {
-                        *n = layout.clone();
-                    }
-                }
-                return false;
-            }
-        }
-    }
-
-    true
-}
-
-fn resolve_real_node_overlaps(
-    dag: &DiGraph<String, ()>,
-    layered_graph: &DiGraph<LayerNode, ()>,
-    layers: &[Vec<NodeIndex>],
-    nodes: &mut HashMap<String, crate::layout::NodeLayout>,
-    horizontal: bool,
-    preset: &SugiyamaPreset,
-) {
-    for layer in layers {
-        let ordered = layer
-            .iter()
-            .filter_map(|node| match layered_graph[*node].kind {
-                LayerNodeKind::Real(original) => {
-                    let id = dag[original].clone();
-                    nodes.get(&id).map(|layout| (*node, id, axis_center(layout, horizontal), axis_size(layout, horizontal)))
-                }
-                LayerNodeKind::Dummy { .. } => None,
-            })
-            .collect::<Vec<_>>();
-        if ordered.len() <= 1 {
-            continue;
-        }
-
-        let preferred = ordered.iter().map(|(_, _, center, _)| *center).collect::<Vec<_>>();
-        let sizes = ordered.iter().map(|(_, _, _, size)| *size).collect::<Vec<_>>();
-        let mut adjusted = preferred.clone();
-
-        for index in 1..adjusted.len() {
-            let min_center = adjusted[index - 1]
-                + sizes[index - 1] / 2.0
-                + sizes[index] / 2.0
-                + preset.node_gap;
-            if adjusted[index] < min_center {
-                adjusted[index] = min_center;
-            }
-        }
-
-        for index in (0..adjusted.len() - 1).rev() {
-            let max_center = adjusted[index + 1]
-                - sizes[index + 1] / 2.0
-                - sizes[index] / 2.0
-                - preset.node_gap;
-            if adjusted[index] > max_center {
-                adjusted[index] = max_center;
-            }
-        }
-
-        let average_preferred = preferred.iter().sum::<f64>() / preferred.len() as f64;
-        let average_adjusted = adjusted.iter().sum::<f64>() / adjusted.len() as f64;
-        let min_shift = adjusted
-            .iter()
-            .zip(sizes.iter())
-            .map(|(center, size)| preset.padding + size / 2.0 - center)
-            .fold(f64::NEG_INFINITY, f64::max);
-        let shift = (average_preferred - average_adjusted).max(min_shift);
-
-        for (((_, id, _, _), center), size) in ordered.iter().zip(adjusted.iter_mut()).zip(sizes.iter()) {
-            *center += shift;
-            if let Some(layout) = nodes.get_mut(id) {
-                set_axis_center(layout, horizontal, *center, *size);
-            }
-        }
-    }
-}
 
 fn axis_center(layout: &crate::layout::NodeLayout, horizontal: bool) -> f64 {
     if horizontal {
@@ -1060,19 +430,15 @@ fn compute_spine_nodes(dag: &DiGraph<String, ()>) -> HashSet<NodeIndex> {
 }
 
 /// BK 四趟后的受限紧凑化：向邻居重心靠拢，保持层内最小间距。
-///
-/// Iteration 3：spine 邻居在重心中权重 ×2，使主干更直。
 fn compact_layer_centers(
     centers: &mut HashMap<NodeIndex, f64>,
     layered_graph: &DiGraph<LayerNode, ()>,
     layers: &[Vec<NodeIndex>],
     sizes: &HashMap<NodeIndex, (f64, f64)>,
     preset: &SugiyamaPreset,
-    spine: &HashSet<NodeIndex>,
     passes: usize,
 ) {
     const DAMPING: f64 = 0.35;
-    const SPINE_NEIGHBOR_WEIGHT: f64 = 1.5;
     let (default_w, _) = preset.default_node_size();
 
     for _ in 0..passes {
@@ -1098,21 +464,8 @@ fn compact_layer_centers(
                 if neighbors.is_empty() {
                     continue;
                 }
-                let mut weight_sum = 0.0;
-                let mut weighted = 0.0;
-                for n in &neighbors {
-                    let on_spine = match &layered_graph[*n].kind {
-                        LayerNodeKind::Real(original) => spine.contains(original),
-                        LayerNodeKind::Dummy { .. } => false,
-                    };
-                    let w = if on_spine {
-                        SPINE_NEIGHBOR_WEIGHT
-                    } else {
-                        1.0
-                    };
-                    weighted += centers[n] * w;
-                    weight_sum += w;
-                }
+                let weight_sum = neighbors.len() as f64;
+                let weighted: f64 = neighbors.iter().map(|n| centers[n]).sum();
                 let target = weighted / weight_sum;
                 let current = centers[node];
                 centers.insert(*node, current + (target - current) * DAMPING);
@@ -1469,195 +822,4 @@ pub(crate) fn assign_layer_centers_for_string_graph(
         .collect()
 }
 
-// ─── Phase C1: Fan-out/Fan-in 对称修正 ─────────────────────────────────────────
 
-/// 对称修正：检测 fan-out/fan-in 模式，将子节点组的重心对齐到父节点中心。
-///
-/// 约束：
-/// - 不破坏层内排序（order 不变）
-/// - 不制造新碰撞（间距 ≥ min_sep）
-/// - 仅对同层子节点操作
-fn enforce_fan_symmetry(
-    centers: &mut HashMap<NodeIndex, f64>,
-    _dag: &DiGraph<String, ()>,
-    layered_graph: &DiGraph<LayerNode, ()>,
-    layers: &[Vec<NodeIndex>],
-    sizes: &HashMap<NodeIndex, (f64, f64)>,
-    preset: &SugiyamaPreset,
-) {
-    let min_sep = preset.node_gap;
-
-    // 建立层索引：NodeIndex → (layer_idx, pos_in_layer)
-    let mut layer_of: HashMap<NodeIndex, (usize, usize)> = HashMap::new();
-    for (li, layer) in layers.iter().enumerate() {
-        for (pos, node) in layer.iter().enumerate() {
-            layer_of.insert(*node, (li, pos));
-        }
-    }
-
-    // 对每个 Real 节点，收集其同层后继（fan-out）
-    for (li, layer) in layers.iter().enumerate() {
-        if li + 1 >= layers.len() {
-            break;
-        }
-        let next_layer_set: HashSet<NodeIndex> = layers[li + 1].iter().copied().collect();
-
-        // 预计算下一层每个 Real 节点在当前层有多少个 Real 父节点
-        let mut parent_count: HashMap<NodeIndex, usize> = HashMap::new();
-        for &p in layer {
-            if !matches!(&layered_graph[p].kind, LayerNodeKind::Real(_)) {
-                continue;
-            }
-            for c in layered_graph.neighbors_directed(p, Direction::Outgoing) {
-                if next_layer_set.contains(&c)
-                    && matches!(&layered_graph[c].kind, LayerNodeKind::Real(_))
-                {
-                    *parent_count.entry(c).or_insert(0) += 1;
-                }
-            }
-        }
-
-        for &parent in layer {
-            // 只处理 Real 节点
-            if !matches!(&layered_graph[parent].kind, LayerNodeKind::Real(_)) {
-                continue;
-            }
-            // 收集同层后继（在下一层的 Real 节点，且仅属于当前父节点）
-            let children: Vec<NodeIndex> = layered_graph
-                .neighbors_directed(parent, Direction::Outgoing)
-                .filter(|c| {
-                    next_layer_set.contains(c)
-                        && matches!(&layered_graph[*c].kind, LayerNodeKind::Real(_))
-                        && parent_count.get(c).copied().unwrap_or(0) == 1
-                })
-                .collect();
-
-            if children.len() < 2 {
-                continue;
-            }
-
-            // 叶级约束：仅当子节点没有“分叉后继”时才操作。
-            // 安全条件：子节点无 Real 后继，或所有子节点的 Real 后继集合相同（汇聚型 fan-in）。
-            if li + 2 < layers.len() {
-                let next_next_set: HashSet<NodeIndex> = layers[li + 2].iter().copied().collect();
-                let child_successors: Vec<HashSet<NodeIndex>> = children
-                    .iter()
-                    .map(|c| {
-                        layered_graph
-                            .neighbors_directed(*c, Direction::Outgoing)
-                            .filter(|gc| {
-                                next_next_set.contains(gc)
-                                    && matches!(&layered_graph[*gc].kind, LayerNodeKind::Real(_))
-                            })
-                            .collect()
-                    })
-                    .collect();
-                let has_any = child_successors.iter().any(|s| !s.is_empty());
-                if has_any {
-                    // 检查所有子节点的后继集合是否相同（汇聚型）
-                    let first = &child_successors[0];
-                    let all_same = child_successors.iter().all(|s| s == first);
-                    if !all_same {
-                        continue; // 分叉后继，平移可能破坏其他 fan-out
-                    }
-                }
-            }
-
-            let parent_center = centers[&parent];
-
-            // 按层内位置排序（保持 order）
-            let mut children_sorted = children;
-            children_sorted.sort_by_key(|c| layer_of.get(c).map(|(_, p)| *p).unwrap_or(0));
-
-            // 计算子节点组重心
-            let centroid: f64 = children_sorted
-                .iter()
-                .map(|c| centers[c])
-                .sum::<f64>()
-                / children_sorted.len() as f64;
-
-            let shift = parent_center - centroid;
-            if shift.abs() < 1.0 {
-                continue; // 已经基本对称
-            }
-
-            // 尝试平移：检查是否会与同层其他节点碰撞
-            if can_shift_group(
-                &children_sorted,
-                shift,
-                layers,
-                li + 1,
-                centers,
-                sizes,
-                min_sep,
-                &layer_of,
-            ) {
-                for c in &children_sorted {
-                    centers.get_mut(c).map(|v| *v += shift);
-                }
-            }
-        }
-    }
-}
-
-/// 检查平移一组节点是否安全（不与同层其他节点碰撞）
-fn can_shift_group(
-    group: &[NodeIndex],
-    shift: f64,
-    layers: &[Vec<NodeIndex>],
-    layer_idx: usize,
-    centers: &HashMap<NodeIndex, f64>,
-    sizes: &HashMap<NodeIndex, (f64, f64)>,
-    min_sep: f64,
-    layer_of: &HashMap<NodeIndex, (usize, usize)>,
-) -> bool {
-    let group_set: HashSet<NodeIndex> = group.iter().copied().collect();
-    let layer = &layers[layer_idx];
-
-    // 找组内最左和最右节点
-    let min_pos = group
-        .iter()
-        .filter_map(|n| layer_of.get(n).map(|(_, p)| *p))
-        .min()
-        .unwrap_or(0);
-    let max_pos = group
-        .iter()
-        .filter_map(|n| layer_of.get(n).map(|(_, p)| *p))
-        .max()
-        .unwrap_or(0);
-
-    // 检查左邻居
-    if min_pos > 0 {
-        let left_neighbor = layer[min_pos - 1];
-        if !group_set.contains(&left_neighbor) {
-            let left_center = centers[&left_neighbor];
-            let left_w = sizes.get(&left_neighbor).map(|s| s.0).unwrap_or(0.0);
-            // 组内最左节点平移后的左缘
-            let leftmost_in_group = layer[min_pos];
-            let new_center = centers[&leftmost_in_group] + shift;
-            let new_w = sizes.get(&leftmost_in_group).map(|s| s.0).unwrap_or(0.0);
-            let gap = (new_center - new_w / 2.0) - (left_center + left_w / 2.0);
-            if gap < min_sep {
-                return false;
-            }
-        }
-    }
-
-    // 检查右邻居
-    if max_pos + 1 < layer.len() {
-        let right_neighbor = layer[max_pos + 1];
-        if !group_set.contains(&right_neighbor) {
-            let right_center = centers[&right_neighbor];
-            let right_w = sizes.get(&right_neighbor).map(|s| s.0).unwrap_or(0.0);
-            let rightmost_in_group = layer[max_pos];
-            let new_center = centers[&rightmost_in_group] + shift;
-            let new_w = sizes.get(&rightmost_in_group).map(|s| s.0).unwrap_or(0.0);
-            let gap = (right_center - right_w / 2.0) - (new_center + new_w / 2.0);
-            if gap < min_sep {
-                return false;
-            }
-        }
-    }
-
-    true
-}

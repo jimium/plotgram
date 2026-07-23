@@ -91,7 +91,8 @@ pub fn run_refine(
 
     // P3：有组图跳过 push（节点推开会在后续 group_frame 放大后制造新穿组，
     // 且 refine 内 lint 尚看不到最终组框）。穿组修复只走下方 fallback。
-    let skip_push = !result.groups.is_empty();
+    // Phase B: 所有图类型使用 solver，节点已冻结，跳过 push。
+    let skip_push = true;
 
     let entry_snapshot = result.clone();
     let entry_group_pierces = count_group_interior_edges(diagram, &entry_snapshot);
@@ -143,7 +144,7 @@ pub fn run_refine(
             .space_budget
             .clone()
             .unwrap_or_else(|| crate::layout::space_budget::SpaceBudget::from_diagram(diagram));
-        crate::layout::space_budget::enforce_horizontal_gaps(&mut result.nodes, &budget);
+        // Phase B: 所有图类型使用 solver，节点已冻结，不再执行 enforce_horizontal_gaps
         let rank_contract_broken = result.hints.sugiyama_ranks.as_ref().is_some_and(|ranks| {
             let mut before_probe = pre_push_nodes.clone();
             let before: HashSet<String> = crate::layout::space_budget::enforce_vertical_rank_gaps(

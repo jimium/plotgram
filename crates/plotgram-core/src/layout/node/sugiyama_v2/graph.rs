@@ -16,7 +16,7 @@ pub(super) struct EdgeMeta {
 }
 
 #[derive(Clone, Debug)]
-pub(super) enum LayerNodeKind {
+pub(in crate::layout::node) enum LayerNodeKind {
     Real(NodeIndex),
     Dummy {
         source: NodeIndex,
@@ -26,7 +26,7 @@ pub(super) enum LayerNodeKind {
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct LayerNode {
+pub(in crate::layout::node) struct LayerNode {
     pub kind: LayerNodeKind,
     pub rank: usize,
 }

@@ -775,7 +775,9 @@
     }
 
     /// P2-1: refine 调试统计应正确导出 push_count 和 momentum_reversals
+    /// Phase B: push 已禁用（所有图类型使用 solver，节点冻结）
     #[test]
+    #[ignore = "Phase B: push disabled for all diagram types"]
     fn test_p2_1_refine_debug_stats() {
         use crate::layout::refine::{RefineConfig, run_refine};
         use crate::ast::{ArrowType, AttributeMap, Entity, Identifier, Relation, SourceInfo, Span};
@@ -795,7 +797,8 @@
             Relation { from: Identifier::new_unchecked("d"), to: Identifier::new_unchecked("c"), arrow: ArrowType::Active, label: None, head_label: None, tail_label: None, attributes: AttributeMap::default(), span },
         ];
         let diagram = Diagram {
-            diagram_type: DiagramType::Flowchart,
+            // Phase 7: 使用 Architecture 类型测试 refine push（Flowchart 节点已冻结）
+            diagram_type: DiagramType::Architecture,
             attributes: Vec::new(), entities, relations,
             groups: Vec::new(), style_decls: vec![],
             constraints: vec![],

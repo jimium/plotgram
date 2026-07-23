@@ -91,7 +91,7 @@ impl<'a> LayoutPipeline<'a> {
 
         let horizontal = effective_dir == Some("left-to-right");
 
-        grid_snap::align_nodes(result, node_align_config, horizontal);
+        // Phase B: 所有图类型使用 solver，solver 已处理对齐，跳过 align_nodes
         let algo = self.plan.layout_algo.as_str();
         let gf_pass = GroupFramePass::resolve(self.diagram, self.plan, algo);
         gf_pass.apply_after_node_snap(self.diagram, result, algo);

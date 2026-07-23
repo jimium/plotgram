@@ -72,13 +72,13 @@ pub(super) fn run_pipeline(ctx: &mut LayoutContext) {
 
 // ─── 具体 Phase 实现 ──────────────────────────────────────
 
-/// Phase 5: 节点重叠消除 + 基础设施行重平衡
+/// Phase 5: 基础设施行重平衡 + 水平 demand 缝
+/// Phase A3: 删除 remove_node_overlaps（solver PAVA 已处理层内分离）
 #[derive(Debug)]
 struct OverlapRemovalPhase;
 
 impl Phase for OverlapRemovalPhase {
     fn apply(&self, ctx: &mut LayoutContext) {
-        remove_node_overlaps(&mut ctx.nodes, ctx.sizes);
         rebalance_infrastructure_layers(
             ctx.diagram,
             ctx.graph,

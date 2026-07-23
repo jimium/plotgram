@@ -2,6 +2,7 @@
 
 pub mod architecture_v2;
 pub mod circular;
+pub mod coordinate_solver;
 pub mod er;
 pub mod flowchart;
 pub mod common;

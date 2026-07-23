@@ -77,46 +77,38 @@ pub(in super::super) fn assign_coordinates(
         h_pad,
     );
 
-    // 对每层分配 x 坐标（Brandes-Köpf 完整版 + 组/基础设施后处理）
+    // Phase A1: 使用 CoordinateSolver 替代 resolve_x_overlaps
+    let build_output = super::super::arch_builder::build_arch_coordinate_problem(
+        layers,
+        sizes,
+        &bk_centers,
+        graph,
+        reversed,
+        &diagram.relations,
+        &diagram.diagram_type,
+        has_groups,
+    );
+    let solver_result = crate::layout::kernel::coordinate::optimizer::solve(&build_output.problem);
+
+    // 从 solver 结果提取中心坐标
+    let solved_centers: HashMap<String, f64> = build_output
+        .node_to_var
+        .iter()
+        .map(|(node_id, &var_id)| (node_id.clone(), solver_result.coordinates[var_id]))
+        .collect();
+
+    // 对每层分配坐标（使用 solver 结果）
     for (layer_idx, layer) in layers.iter().enumerate() {
         let y_center = layer_y_offsets[layer_idx] + layer_heights[layer_idx] / 2.0;
 
-        let mut adjusted_positions: Vec<f64> = layer
-            .iter()
-            .map(|node| bk_centers.get(node).copied().unwrap_or_else(|| {
-                uniform_initial_positions(std::slice::from_ref(node), sizes)[0]
-            }))
-            .collect();
-        adjusted_positions = resolve_layer_x_gaps(
-            layer,
-            &adjusted_positions,
-            sizes,
-            &diagram.relations,
-            parallel_gap,
-            profile,
-        );
-
-        // 无组基础设施层：以连入该层的上游节点为锚点水平居中
-        if is_infrastructure_layer(layer, group_map) {
-            if let Some(anchor_x) = infrastructure_anchor_x(layer, graph, &nodes, reversed) {
-                center_layer_on_anchor(layer, &mut adjusted_positions, sizes, anchor_x);
-                adjusted_positions = resolve_layer_x_gaps(
-                    layer,
-                    &adjusted_positions,
-                    sizes,
-                    &diagram.relations,
-                    parallel_gap,
-                    profile,
-                );
-            }
-        }
-
-        for (i, node) in layer.iter().enumerate() {
+        for node in layer {
             let (width, height) = sizes
                 .get(node)
                 .copied()
                 .unwrap_or((constants::DEFAULT_NODE_WIDTH, constants::DEFAULT_NODE_HEIGHT));
-            let x_center = adjusted_positions[i];
+            let x_center = solved_centers.get(node).copied().unwrap_or_else(|| {
+                bk_centers.get(node).copied().unwrap_or(0.0)
+            });
 
             let layout = NodeLayout {
                 x: x_center - width / 2.0,
@@ -127,6 +119,24 @@ pub(in super::super) fn assign_coordinates(
             };
 
             nodes.insert(node.clone(), layout);
+        }
+    }
+
+    // 基础设施层居中（保留：跨层语义，solver 不覆盖）
+    for (layer_idx, layer) in layers.iter().enumerate() {
+        if is_infrastructure_layer(layer, group_map) {
+            if let Some(anchor_x) = infrastructure_anchor_x(layer, graph, &nodes, reversed) {
+                let mut centers: Vec<f64> = layer
+                    .iter()
+                    .map(|node| node_center_x(node, &nodes))
+                    .collect();
+                center_layer_on_anchor(layer, &mut centers, sizes, anchor_x);
+                for (node, cx) in layer.iter().zip(centers.iter()) {
+                    if let Some(nl) = nodes.get_mut(node) {
+                        nl.x = cx - nl.width / 2.0;
+                    }
+                }
+            }
         }
     }
 

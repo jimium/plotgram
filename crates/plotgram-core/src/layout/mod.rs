@@ -46,6 +46,7 @@ pub mod geometry_helpers;
 pub mod grid_snap;
 pub mod group;
 pub mod group_frame;
+pub mod kernel;
 pub mod lint;
 pub mod metrics;
 pub mod node;

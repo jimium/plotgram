@@ -475,6 +475,18 @@ pub struct LayoutHints {
     /// Feedback hub：(hub_entity_id, primary_pred_entity_id)，路由走侧廊。
     // WRITE: layout(sugiyama same-layer)  READ: render(orthogonal routing)
     pub feedback_hubs: Vec<(String, String)>,
+    /// solver 完成后的冻结节点快照（Phase C: typestate 守卫）。
+    ///
+    /// 路由/refine 阶段只读访问，用于运行时验证节点未被意外修改。
+    /// `None` 表示尚未冻结（兼容旧路径）。
+    // WRITE: layout(solver complete)  READ: render/refine(verify integrity)
+    pub frozen_nodes: Option<HashMap<String, crate::layout::kernel::frozen::FrozenNodeLayout>>,
+    /// 坐标求解问题 IR（Phase E: route feedback re-solve 用）。
+    ///
+    /// 布局策略在 solver 完成后填充，供路由压力反馈重新求解。
+    /// `None` 表示不支持 re-solve（兼容旧路径）。
+    // WRITE: layout(solver complete)  READ: route_feedback(re-solve)
+    pub coordinate_problem: Option<Box<crate::layout::kernel::coordinate::model::CoordinateProblem>>,
 }
 
 /// EGB + PRS 性能与效果观测（不影响布局结果）。

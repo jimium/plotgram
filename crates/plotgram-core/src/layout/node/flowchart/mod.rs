@@ -9,8 +9,13 @@
 //! 含 group 时走分治路径（[`group_divide::divide_flowchart_with_groups`]）：
 //! 每个 group 独立调用 Sugiyama 布局，再按拓扑序垂直堆叠合并。
 //! 无 group 时走原路径（`engine::compute_with_preset`），不受影响。
+//!
+//! # Recipe（Phase 9）
+//!
+//! [`recipe::FlowchartRecipe`] 显式编排布局生命周期：compile → solve → product → freeze。
 
 pub mod group_divide;
+pub mod recipe;
 
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;

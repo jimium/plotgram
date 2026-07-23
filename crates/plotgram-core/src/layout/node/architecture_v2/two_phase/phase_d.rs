@@ -141,10 +141,10 @@ pub(super) fn phase_d_postprocess(
         canvas_area_delta_pct,
     };
 
-    // 空间契约：边感知间距写入 hints，并做一次水平缝 enforce。
+    // 空间契约：边感知间距写入 hints。
+    // Phase A2: 删除 enforce_horizontal_gaps（solver 已处理层内分离）。
     // 竖向 rank 缝由通用 refine/guard 依据最终 rank 元数据守约。
     let space_budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
-    crate::layout::space_budget::enforce_horizontal_gaps(nodes, &space_budget);
     crate::layout::group_frame::expand_groups_to_contain_contents(
         diagram,
         groups,

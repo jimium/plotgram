@@ -43,6 +43,9 @@ pub fn diff_moved_nodes(
 ///
 /// 若无违反且 space_budget 未设置,则设置 budget hint。
 /// 返回 (处理后的 result, 移动的节点集合)。
+///
+/// Phase 7: 使用 coordinate solver 的图类型（flowchart/state/ER）节点已冻结，
+/// 跳过水平缝消解，仅保留竖向 rank 缝守约。
 pub fn resolve_budget_violations(
     diagram: &Diagram,
     mut result: LayoutResult,
@@ -52,27 +55,15 @@ pub fn resolve_budget_violations(
         .space_budget
         .clone()
         .unwrap_or_else(|| SpaceBudget::from_diagram(diagram));
-    let gap_violations = horizontal_gap_violations(&result.nodes, &budget);
-    // 斜向 AABB 碰撞兜底仅对无分组图启用：有组大图的 rank 回排易牵动壳内节点抬高穿模。
-    let aabb_overlaps = result.groups.is_empty() && has_node_aabb_overlaps(&result.nodes);
-    let needs_resolve = !gap_violations.is_empty() || aabb_overlaps;
-
+    
+    // Phase B: 所有图类型使用 solver，节点已冻结，跳过水平缝消解
+    
     let pre: HashMap<String, (f64, f64)> = result
         .nodes
         .iter()
         .map(|(id, n)| (id.clone(), (n.x, n.y)))
         .collect();
-
-    if needs_resolve {
-        // 仅 AABB 碰撞时带 rank 回排；纯水平缝违反走原 BruteForce
-        let ranks = if aabb_overlaps {
-            result.hints.sugiyama_ranks.clone()
-        } else {
-            None
-        };
-        resolve_residual_with_budget_and_ranks(&mut result.nodes, Some(&budget), ranks.as_ref());
-    }
-
+    
     // 竖向 rank 缝：有组图也会被 refine 推贴边（gap_y=0 不算 AABB），必须守约。
     // 依 rank 整带移动，不按投影重叠猜“同列”，避免误推无关跨组节点。
     if let Some(ranks) = result.hints.sugiyama_ranks.as_ref() {

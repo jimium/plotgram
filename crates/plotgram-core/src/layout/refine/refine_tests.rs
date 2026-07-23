@@ -140,7 +140,8 @@ fn make_test_diagram(relations: usize) -> Diagram {
         })
         .collect();
     Diagram {
-        diagram_type: DiagramType::Flowchart,
+        // Phase 7: 使用 Architecture 类型测试 push（Flowchart/State/ER 节点已冻结，跳过 push）
+        diagram_type: DiagramType::Architecture,
         attributes: Vec::new(),
         entities,
         relations: rels,
@@ -335,7 +336,8 @@ fn make_diagram_with_relations(rels: Vec<(&str, &str)>) -> Diagram {
         })
         .collect();
     Diagram {
-        diagram_type: DiagramType::Flowchart,
+        // Phase 7: 使用 Architecture 类型测试 push（Flowchart/State/ER 节点已冻结，跳过 push）
+        diagram_type: DiagramType::Architecture,
         attributes: Vec::new(),
         entities,
         relations: rels,
@@ -441,7 +443,9 @@ fn test_momentum_deterministic() {
 /// 锚点仍指向 D 的旧位置 → 边 1 "悬空"。
 /// 新逻辑（修复）：edges_to_reroute 扩展为包含所有连接 D 的边（边 0 + 边 1），
 /// 边 1 也被重新路由 → 锚点与 D 新位置一致。
+/// Phase B: push 已禁用（所有图类型使用 solver，节点冻结）
 #[test]
+#[ignore = "Phase B: push disabled for all diagram types"]
 fn test_p1_2_anchor_consistency_after_push() {
     // Diagram: A→B (穿障边), D→C (非穿障边，但连接被推开节点 D)
     let diagram = make_diagram_with_relations(vec![("a", "b"), ("d", "c")]);
@@ -886,7 +890,9 @@ impl EdgeRoutingStrategy for DetourRouter {
 }
 
 /// P1-2 Task 4: 穿障边直接推节点+重路由消除穿障（已移除 trial reroute 优化）
+/// Phase B: push 已禁用（所有图类型使用 solver，节点冻结）
 #[test]
+#[ignore = "Phase B: push disabled for all diagram types"]
 fn test_refine_preroute_skips_push_when_reroute_fixes() {
     let diagram = make_test_diagram(1);
     let result = make_result_with_crossing();
@@ -917,7 +923,9 @@ fn test_refine_preroute_skips_push_when_reroute_fixes() {
 }
 
 /// P1-2 Task 4: 单边重路由无法消除穿障时，仍应推节点
+/// Phase B: push 已禁用（所有图类型使用 solver，节点冻结）
 #[test]
+#[ignore = "Phase B: push disabled for all diagram types"]
 fn test_refine_preroute_falls_back_to_push() {
     let diagram = make_test_diagram(1);
     let result = make_result_with_crossing();
