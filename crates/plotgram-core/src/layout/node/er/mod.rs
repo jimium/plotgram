@@ -6,6 +6,7 @@
 
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
+use crate::layout::kernel::recipe::LayoutRecipe;
 use crate::layout::node::sugiyama_v2::{engine, preset};
 use crate::layout::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, EdgeRoutingStyle, LayoutResult, LayoutStrategy, NodeAlignConfig};
@@ -54,15 +55,59 @@ impl LayoutStrategy for ErLayout {
     }
 
     fn compute(&self, diagram: &Diagram) -> LayoutResult {
+        let recipe = ErRecipe { config: self.config };
+        recipe.execute(diagram)
+    }
+
+    fn node_align_config(&self) -> NodeAlignConfig {
+        NodeAlignConfig::default_er()
+    }
+}
+
+// ─── Recipe 实现 ────────────────────────────────────────
+
+/// ER 图布局配方。
+///
+/// 委托 Sugiyama 引擎 + ER_PRESET。
+struct ErRecipe {
+    config: SugiyamaLayoutConfig,
+}
+
+/// ER 图问题 IR。
+struct ErProblem;
+
+impl LayoutRecipe for ErRecipe {
+    type Problem = ErProblem;
+    type Solution = LayoutResult;
+
+    fn name(&self) -> &'static str {
+        "er"
+    }
+
+    fn compile(&self, _diagram: &Diagram) -> ErProblem {
+        ErProblem
+    }
+
+    fn solve(&self, _problem: &ErProblem) -> LayoutResult {
+        LayoutResult {
+            nodes: std::collections::HashMap::new(),
+            groups: std::collections::HashMap::new(),
+            edges: vec![],
+            total_width: 0.0,
+            total_height: 0.0,
+            hints: Default::default(),
+        }
+    }
+
+    fn product(&self, solution: &LayoutResult, _diagram: &Diagram) -> LayoutResult {
+        solution.clone()
+    }
+
+    fn execute(&self, diagram: &Diagram) -> LayoutResult {
         let mut result =
             engine::compute_with_preset(diagram, &preset::ER_PRESET, self.config);
         result.hints.edge_routing_style = recommended_er_edge_routing(diagram);
         result
-    }
-
-
-    fn node_align_config(&self) -> NodeAlignConfig {
-        NodeAlignConfig::default_er()
     }
 }
 

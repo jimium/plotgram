@@ -8,6 +8,7 @@
 use crate::ast::Diagram;
 use crate::types::DiagramType;
 use crate::layout::algorithm_config::{MindmapLayoutConfig, MINDMAP_LAYOUT_OPTIONS};
+use crate::layout::kernel::recipe::LayoutRecipe;
 use crate::layout::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeLayout};
 use std::collections::HashMap;
@@ -116,6 +117,59 @@ impl LayoutStrategy for MindmapLayout {
     }
 
     fn compute(&self, diagram: &Diagram) -> LayoutResult {
+        let recipe = MindmapRecipe { config: self.config };
+        recipe.execute(diagram)
+    }
+}
+
+// ─── Recipe 实现 ────────────────────────────────────────
+
+/// 思维导图布局配方。
+///
+/// 三种模式：Radial / TopToBottom / LeftToRight。
+struct MindmapRecipe {
+    config: MindmapLayoutConfig,
+}
+
+/// 思维导图问题 IR。
+enum MindmapProblem {
+    Empty,
+    Layout { mode: MindmapMode },
+}
+
+impl LayoutRecipe for MindmapRecipe {
+    type Problem = MindmapProblem;
+    type Solution = LayoutResult;
+
+    fn name(&self) -> &'static str {
+        "mindmap"
+    }
+
+    fn compile(&self, diagram: &Diagram) -> MindmapProblem {
+        if diagram.entities.is_empty() {
+            MindmapProblem::Empty
+        } else {
+            MindmapProblem::Layout { mode: layout_mode(diagram) }
+        }
+    }
+
+    fn solve(&self, _problem: &MindmapProblem) -> LayoutResult {
+        // 占位：实际逻辑在 execute 中
+        LayoutResult {
+            nodes: HashMap::new(),
+            groups: HashMap::new(),
+            edges: vec![],
+            total_width: 0.0,
+            total_height: 0.0,
+            hints: Default::default(),
+        }
+    }
+
+    fn product(&self, solution: &LayoutResult, _diagram: &Diagram) -> LayoutResult {
+        solution.clone()
+    }
+
+    fn execute(&self, diagram: &Diagram) -> LayoutResult {
         let config = self.config;
         if diagram.entities.is_empty() {
             return empty_result(config);
@@ -144,11 +198,7 @@ impl LayoutStrategy for MindmapLayout {
         }
 
         place_disconnected_nodes(diagram, &children, &root_id, &sizes, &mut centers, mode, config);
-
-        // 重叠检测与消除（安全网，所有模式通用）
         detect_and_fix_overlaps(&mut centers, &sizes, config.node_gap);
-
-        // 推开后可能越出画布，再次归一化到 padding
         normalize_to_padding(&mut centers, &sizes, config);
 
         let nodes = centers
@@ -168,10 +218,9 @@ impl LayoutStrategy for MindmapLayout {
             })
             .collect::<HashMap<_, _>>();
 
-        // 计算节点深度，供边路由层级感知使用
         let node_depths = compute_node_depths(&root_id, &children);
-
         let (total_width, total_height) = bounds_from_nodes(&nodes, config);
+
         LayoutResult {
             nodes,
             groups: HashMap::new(),
@@ -609,9 +658,179 @@ fn layout_directional_tree(
         config,
     );
 
+    // Phase H: solver 后优化——父居中 + 分离约束
+    mindmap_solver_optimize(
+        root_id, children, sizes, centers, horizontal, config,
+    );
+
     normalize_to_padding(centers, sizes, config);
 
     let _ = diagram;
+}
+
+/// Phase H: 用统一坐标求解器优化 MindMap 主轴坐标。
+///
+/// 递归子树布局已给出良好初值，solver 进一步优化：
+/// - P1: 父节点居中到子节点质心
+/// - P3: 保持初值（不大幅移动）
+/// - 硬约束: 同深度相邻节点最小分离
+fn mindmap_solver_optimize(
+    root_id: &str,
+    children: &HashMap<String, Vec<String>>,
+    sizes: &HashMap<String, (f64, f64)>,
+    centers: &mut HashMap<String, (f64, f64)>,
+    horizontal: bool,
+    config: MindmapLayoutConfig,
+) {
+    use crate::layout::kernel::coordinate::model::*;
+    use crate::layout::kernel::coordinate::optimizer::solve;
+
+    // 1. 按深度分层收集节点（BFS 保证顺序稳定）
+    let mut layers: Vec<Vec<String>> = Vec::new();
+    let mut queue = std::collections::VecDeque::new();
+    queue.push_back((root_id.to_string(), 0usize));
+    while let Some((node_id, depth)) = queue.pop_front() {
+        if depth >= layers.len() {
+            layers.resize(depth + 1, Vec::new());
+        }
+        layers[depth].push(node_id.clone());
+        if let Some(kids) = children.get(&node_id) {
+            for kid in kids {
+                queue.push_back((kid.clone(), depth + 1));
+            }
+        }
+    }
+
+    // 层内节点数太少时跳过（无优化空间）
+    let total_nodes: usize = layers.iter().map(|l| l.len()).sum();
+    if total_nodes < 3 {
+        return;
+    }
+
+    // 2. 构建 CoordinateProblem
+    let mut vars: Vec<NodeVariable> = Vec::new();
+    let mut node_to_var: HashMap<String, VarId> = HashMap::new();
+    let mut layer_constraints: Vec<LayerConstraintSet> = Vec::new();
+    let mut initial_values: Vec<f64> = Vec::new();
+
+    for (rank, layer) in layers.iter().enumerate() {
+        let mut layer_vars: Vec<VarId> = Vec::new();
+        let mut separations: Vec<f64> = Vec::new();
+
+        for (order, node_id) in layer.iter().enumerate() {
+            let var_id = vars.len();
+            let (w, h) = sizes.get(node_id).copied().unwrap_or((150.0, 48.0));
+            let axis_size = if horizontal { h } else { w };
+
+            // 主轴坐标：horizontal 时为 y，否则为 x
+            let main_axis = centers
+                .get(node_id)
+                .map(|(cx, cy)| if horizontal { *cy } else { *cx })
+                .unwrap_or(0.0);
+
+            vars.push(NodeVariable {
+                var_id,
+                stable_id: node_id.clone(),
+                kind: VarKind::Real,
+                rank,
+                order,
+                axis_size,
+                movable: true,
+            });
+            initial_values.push(main_axis);
+            node_to_var.insert(node_id.clone(), var_id);
+            layer_vars.push(var_id);
+
+            if order > 0 {
+                let prev_id = &layer[order - 1];
+                let prev_size = sizes
+                    .get(prev_id)
+                    .map(|(w, h)| if horizontal { *h } else { *w })
+                    .unwrap_or(if horizontal { 48.0 } else { 150.0 });
+                let sep = prev_size / 2.0 + config.branch_gap + axis_size / 2.0;
+                separations.push(sep);
+            }
+        }
+
+        layer_constraints.push(LayerConstraintSet {
+            rank,
+            vars: layer_vars,
+            separations,
+        });
+    }
+
+    // 3. Objectives
+    let mut objectives: Vec<ObjectiveTerm> = Vec::new();
+
+    // P3: 保持初值
+    for (var_id, &init) in initial_values.iter().enumerate() {
+        objectives.push(ObjectiveTerm {
+            priority: ObjectivePriority::P3,
+            coefficients: vec![(var_id, 1.0)],
+            constant: -init,
+            weight: 1.0,
+            source: ConstraintSource {
+                kind: ConstraintSourceKind::LayerOrder,
+                nodes: vec![vars[var_id].stable_id.clone()],
+                note: "prefer initial position",
+            },
+        });
+    }
+
+    // P1: 父居中到子节点质心
+    for (node_id, kids) in children.iter() {
+        if kids.is_empty() {
+            continue;
+        }
+        let Some(&parent_var) = node_to_var.get(node_id) else {
+            continue;
+        };
+        let child_vars: Vec<VarId> = kids
+            .iter()
+            .filter_map(|k| node_to_var.get(k).copied())
+            .collect();
+        if child_vars.is_empty() {
+            continue;
+        }
+        let n = child_vars.len() as f64;
+        let mut coeffs: Vec<(VarId, f64)> = vec![(parent_var, 1.0)];
+        for &cv in &child_vars {
+            coeffs.push((cv, -1.0 / n));
+        }
+        objectives.push(ObjectiveTerm {
+            priority: ObjectivePriority::P1,
+            coefficients: coeffs,
+            constant: 0.0,
+            weight: 2.0,
+            source: ConstraintSource {
+                kind: ConstraintSourceKind::NodeSeparation,
+                nodes: vec![node_id.clone()],
+                note: "parent center over children",
+            },
+        });
+    }
+
+    let problem = CoordinateProblem {
+        vars,
+        layers: layer_constraints,
+        hard: vec![],
+        objectives,
+        initial: InitialCoordinates { values: initial_values },
+        config: CoordinateSolverConfig::default(),
+    };
+
+    // 4. Solve + 回写
+    let result = solve(&problem);
+    for (node_id, &var_id) in &node_to_var {
+        let new_main = result.coordinates[var_id];
+        if let Some(center) = centers.get_mut(node_id) {
+            if horizontal {
+                center.1 = new_main;
+            } else {
+                center.0 = new_main;
+            }
+        }
+    }
 }
 
 fn compute_level_max_sizes(

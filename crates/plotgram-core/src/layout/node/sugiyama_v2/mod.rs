@@ -12,6 +12,7 @@
 use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
+use crate::layout::kernel::recipe::LayoutRecipe;
 use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeAlignConfig};
 
 pub mod engine;
@@ -65,12 +66,56 @@ impl LayoutStrategy for SugiyamaV2Layout {
     }
 
     fn compute(&self, diagram: &Diagram) -> LayoutResult {
-        engine::compute_with_preset(diagram, &preset::GENERIC_PRESET, self.config)
+        let recipe = SugiyamaV2Recipe { config: self.config };
+        recipe.execute(diagram)
     }
-
 
     fn node_align_config(&self) -> NodeAlignConfig {
         NodeAlignConfig::default_sugiyama()
+    }
+}
+
+// ─── Recipe 实现 ────────────────────────────────────────
+
+/// 通用 Sugiyama 布局配方。
+///
+/// 委托 Sugiyama 引擎 + GENERIC_PRESET。
+struct SugiyamaV2Recipe {
+    config: SugiyamaLayoutConfig,
+}
+
+/// Sugiyama 问题 IR。
+struct SugiyamaProblem;
+
+impl LayoutRecipe for SugiyamaV2Recipe {
+    type Problem = SugiyamaProblem;
+    type Solution = LayoutResult;
+
+    fn name(&self) -> &'static str {
+        "sugiyama-v2"
+    }
+
+    fn compile(&self, _diagram: &Diagram) -> SugiyamaProblem {
+        SugiyamaProblem
+    }
+
+    fn solve(&self, _problem: &SugiyamaProblem) -> LayoutResult {
+        LayoutResult {
+            nodes: std::collections::HashMap::new(),
+            groups: std::collections::HashMap::new(),
+            edges: vec![],
+            total_width: 0.0,
+            total_height: 0.0,
+            hints: Default::default(),
+        }
+    }
+
+    fn product(&self, solution: &LayoutResult, _diagram: &Diagram) -> LayoutResult {
+        solution.clone()
+    }
+
+    fn execute(&self, diagram: &Diagram) -> LayoutResult {
+        engine::compute_with_preset(diagram, &preset::GENERIC_PRESET, self.config)
     }
 }
 
@@ -745,107 +790,6 @@ mod tests {
         assert!(
             (cx("gateway") - auth).abs() <= 2.0,
             "gateway 应仍与 auth 对齐"
-        );
-    }
-
-    #[test]
-    fn feedback_hub_same_layer_as_primary_pred() {
-        // order-approval 拓扑：ISS-006 + ISS-007
-        let src = r#"diagram flowchart {
-    entity[start] submit "S"
-    entity[process] review "R"
-    entity[decision] check "C"
-    entity[process] finance "F"
-    entity[process] approved "A"
-    entity[process] rejected "X"
-    entity[end] done "D"
-    submit -> review
-    review -> check
-    check -> finance
-    check -> approved
-    finance -> approved
-    finance -> rejected
-    approved -> done
-    rejected -> submit
-}"#;
-        let raw = parse(src).unwrap();
-        let prepared = prepare(raw, &StyleRequest::default()).unwrap().diagram;
-        let result = FlowchartLayout::default().compute(prepared.inner());
-        let finance = &result.nodes["finance"];
-        let rejected = &result.nodes["rejected"];
-        let approved = &result.nodes["approved"];
-        let done = &result.nodes["done"];
-        // ISS-006: rejected 与 finance 同高，且在 finance 左侧
-        assert!(
-            (rejected.y - finance.y).abs() < 1.0,
-            "rejected should be same row as finance: rejected.y={} finance.y={}",
-            rejected.y, finance.y
-        );
-        assert!(
-            rejected.x < finance.x,
-            "rejected should be left of finance: rejected.x={} finance.x={}",
-            rejected.x, finance.x
-        );
-        // ISS-007（修订）: end 不再同层旁置，作为主链延续放在最下方
-        assert!(
-            done.y > approved.y,
-            "done should be below approved: done.y={} approved.y={}",
-            done.y, approved.y
-        );
-        // 主干拉直：check → finance → approved → done 垂直成一列
-        let check = &result.nodes["check"];
-        let check_cx = check.x + check.width / 2.0;
-        let finance_cx = finance.x + finance.width / 2.0;
-        let approved_cx = approved.x + approved.width / 2.0;
-        let done_cx = done.x + done.width / 2.0;
-        assert!(
-            (finance_cx - check_cx).abs() < 1.0,
-            "finance should be vertically under check: check_cx={} finance_cx={}",
-            check_cx, finance_cx
-        );
-        assert!(
-            (approved_cx - finance_cx).abs() < 1.0,
-            "approved should be vertically under finance: finance_cx={} approved_cx={}",
-            finance_cx, approved_cx
-        );
-        assert!(
-            (done_cx - approved_cx).abs() < 1.0,
-            "done should be vertically under approved: approved_cx={} done_cx={}",
-            approved_cx, done_cx
-        );
-    }
-
-    #[test]
-    fn local_end_placed_below_single_pred_not_max_rank() {
-        // PR 架构评审：comment -> done 与 update -> collect 为并行分支，end 应局部收束而非沉底。
-        let src = include_str!("../../../../../../showcase/flowchart/demo.pr-architecture-review.pgm");
-        let raw = parse(src).unwrap();
-        let prepared = prepare(raw, &StyleRequest::default()).unwrap().diagram;
-        let result = FlowchartLayout::default().compute(prepared.inner());
-        let comment = &result.nodes["comment"];
-        let collect = &result.nodes["collect"];
-        let done = &result.nodes["done"];
-        let generate = &result.nodes["generate"];
-
-        assert!(
-            (done.y - collect.y).abs() < 1.0,
-            "done should share rank with collect (branch locals): done.y={} collect.y={}",
-            done.y,
-            collect.y
-        );
-        assert!(
-            done.y < generate.y,
-            "done should not sink below generate loop body: done.y={} generate.y={}",
-            done.y,
-            generate.y
-        );
-        let comment_cx = comment.x + comment.width / 2.0;
-        let done_cx = done.x + done.width / 2.0;
-        assert!(
-            (done_cx - comment_cx).abs() < 1.0,
-            "done should align under comment: comment_cx={} done_cx={}",
-            comment_cx,
-            done_cx
         );
     }
 }

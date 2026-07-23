@@ -7,6 +7,7 @@
 
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::{ArchitectureV2LayoutConfig, ARCHITECTURE_V2_LAYOUT_OPTIONS};
+use crate::layout::kernel::recipe::LayoutRecipe;
 use crate::layout::node::common::node_sizing;
 use crate::layout::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeAlignConfig};
@@ -62,6 +63,83 @@ impl LayoutStrategy for ArchitectureV2Layout {
     }
 
     fn compute(&self, diagram: &Diagram) -> LayoutResult {
+        let recipe = ArchitectureRecipe { config: self.config };
+        recipe.execute(diagram)
+    }
+
+    fn node_align_config(&self) -> NodeAlignConfig {
+        NodeAlignConfig::default_architecture()
+    }
+}
+
+// ─── Recipe 实现 ────────────────────────────────────────
+
+/// 架构图布局配方。
+///
+/// 双路径分发：有 group 走 two_phase，无 group 走全局 Sugiyama + solver。
+struct ArchitectureRecipe {
+    config: ArchitectureV2LayoutConfig,
+}
+
+/// 架构图问题 IR。
+enum ArchProblem {
+    Empty,
+    /// 无 group：全局 Sugiyama 路径
+    Flat,
+    /// 有 group：two_phase 路径
+    Hierarchical,
+}
+
+impl LayoutRecipe for ArchitectureRecipe {
+    type Problem = ArchProblem;
+    type Solution = LayoutResult;
+
+    fn name(&self) -> &'static str {
+        "architecture"
+    }
+
+    fn compile(&self, diagram: &Diagram) -> ArchProblem {
+        if diagram.entities.is_empty() {
+            return ArchProblem::Empty;
+        }
+        let group_map = types::build_group_map(diagram);
+        if group_map.top_groups.is_empty() {
+            ArchProblem::Flat
+        } else {
+            ArchProblem::Hierarchical
+        }
+    }
+
+    fn solve(&self, problem: &ArchProblem) -> LayoutResult {
+        // solve 需要 diagram，但 trait 签名只给 problem。
+        // 架构图的 solve 是“占位”的，实际逻辑在 execute 中完成。
+        match problem {
+            ArchProblem::Empty => LayoutResult {
+                nodes: HashMap::new(),
+                groups: HashMap::new(),
+                edges: vec![],
+                total_width: self.config.padding * 2.0,
+                total_height: self.config.padding * 2.0,
+                hints: Default::default(),
+            },
+            _ => LayoutResult {
+                nodes: HashMap::new(),
+                groups: HashMap::new(),
+                edges: vec![],
+                total_width: 0.0,
+                total_height: 0.0,
+                hints: Default::default(),
+            },
+        }
+    }
+
+    fn product(&self, solution: &LayoutResult, _diagram: &Diagram) -> LayoutResult {
+        solution.clone()
+    }
+
+    /// 覆盖默认编排：架构图的 compile/solve/product 拆分不够自然，
+    /// 直接在 execute 中完成完整流程。
+    fn execute(&self, diagram: &Diagram) -> LayoutResult {
         let config = self.config;
         if diagram.entities.is_empty() {
             return LayoutResult {
@@ -78,8 +156,6 @@ impl LayoutStrategy for ArchitectureV2Layout {
         let mut graph = types::GraphIndex::build(diagram);
         let group_map = types::build_group_map(diagram);
 
-        // 先注入约束（与 sugiyama_v2::graph::build_graph 一致），使 FAS 能看到完整拓扑。
-        // 约束边参与图拓扑但不作为 FAS 反转候选（见 find_edges_to_reverse 的 non_reversible 参数）。
         let constraint_edges: Vec<(&str, &str)> = diagram
             .constraints
             .iter()
@@ -87,7 +163,6 @@ impl LayoutStrategy for ArchitectureV2Layout {
             .collect();
         acyclic::inject_irreversible_edges(&mut graph, &constraint_edges);
 
-        // FAS：约束边永不被反转
         let constraint_set: HashSet<(String, String)> = constraint_edges
             .iter()
             .map(|(f, t)| (f.to_string(), t.to_string()))
@@ -115,7 +190,7 @@ impl LayoutStrategy for ArchitectureV2Layout {
             &reversed_edges,
             &decl_index,
         );
-        let nodes = coordinate::assign_coordinates(
+        let (mut nodes, solved_problem) = coordinate::assign_coordinates(
             diagram,
             &graph,
             &group_map,
@@ -124,31 +199,20 @@ impl LayoutStrategy for ArchitectureV2Layout {
             &reversed_edges,
         );
 
-        let mut ctx = super::pipeline::LayoutContext {
-            diagram,
-            graph: &graph,
-            group_map: &group_map,
-            sizes: &sizes,
-            config,
-            ordered_layers: &ordered_layers,
-            reversed: &reversed_edges,
-            nodes,
-            groups: HashMap::new(),
-        };
-        super::pipeline::run_pipeline(&mut ctx);
+        super::layout::postprocess::clamp_to_canvas(&mut nodes, &sizes);
 
         let (total_width, total_height) = crate::layout::node::common::canvas_bounds::canvas_size(
-            &ctx.nodes,
-            &ctx.groups,
+            &nodes,
+            &HashMap::new(),
             constants::PADDING,
         );
 
         let mut space_budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
-        space_budget.enrich_adjacent_rank_demand(&ordered_layers, &ctx.nodes, diagram);
+        space_budget.enrich_adjacent_rank_demand(&ordered_layers, &nodes, diagram);
 
         LayoutResult {
-            nodes: ctx.nodes,
-            groups: ctx.groups,
+            nodes,
+            groups: HashMap::new(),
             edges: vec![],
             total_width,
             total_height,
@@ -156,13 +220,10 @@ impl LayoutStrategy for ArchitectureV2Layout {
                 edge_routing_style: crate::layout::EdgeRoutingStyle::Orthogonal,
                 sugiyama_ranks: Some(ranks),
                 space_budget: Some(space_budget),
+                coordinate_problem: solved_problem.map(Box::new),
                 ..Default::default()
             },
         }
-    }
-
-    fn node_align_config(&self) -> NodeAlignConfig {
-        NodeAlignConfig::default_architecture()
     }
 }
 

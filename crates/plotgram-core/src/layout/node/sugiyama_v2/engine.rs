@@ -141,7 +141,7 @@ pub fn compute_with_preset(
         &group_decl,
         &order_bias_proper,
     );
-    let nodes = coordinate::assign_coordinates_brandes_koepf(
+    let (nodes, solved_problem) = coordinate::assign_coordinates_brandes_koepf(
         &dag,
         &proper.graph,
         &layers,
@@ -184,6 +184,7 @@ pub fn compute_with_preset(
                 .iter()
                 .map(|e| (dag[e.to].clone(), dag[e.from].clone()))
                 .collect(),
+            coordinate_problem: solved_problem.map(Box::new),
             ..Default::default()
         },
     };

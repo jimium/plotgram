@@ -11,6 +11,7 @@
 use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use crate::layout::algorithm_config::{ForceDirectedLayoutConfig, FORCE_DIRECTED_LAYOUT_OPTIONS};
+use crate::layout::kernel::recipe::LayoutRecipe;
 use crate::layout::node::common::barnes_hut::BarnesHutTree;
 use crate::layout::node::common::group_bounds::{self, GroupPadding};
 use crate::layout::node::common::node_sizing;
@@ -80,6 +81,58 @@ impl LayoutStrategy for ForceDirectedLayout {
     }
 
     fn compute(&self, diagram: &Diagram) -> LayoutResult {
+        let recipe = ForceDirectedRecipe { config: self.config };
+        recipe.execute(diagram)
+    }
+}
+
+// ─── Recipe 实现 ────────────────────────────────────────
+
+/// 力导向布局配方。
+///
+/// 迭代求解器：Fruchterman-Reingold + Barnes-Hut + 模拟退火。
+struct ForceDirectedRecipe {
+    config: ForceDirectedLayoutConfig,
+}
+
+/// 力导向问题 IR。
+enum ForceProblem {
+    Empty,
+    Layout,
+}
+
+impl LayoutRecipe for ForceDirectedRecipe {
+    type Problem = ForceProblem;
+    type Solution = LayoutResult;
+
+    fn name(&self) -> &'static str {
+        "force-directed"
+    }
+
+    fn compile(&self, diagram: &Diagram) -> ForceProblem {
+        if diagram.entities.is_empty() {
+            ForceProblem::Empty
+        } else {
+            ForceProblem::Layout
+        }
+    }
+
+    fn solve(&self, _problem: &ForceProblem) -> LayoutResult {
+        LayoutResult {
+            nodes: HashMap::new(),
+            groups: HashMap::new(),
+            edges: vec![],
+            total_width: 0.0,
+            total_height: 0.0,
+            hints: Default::default(),
+        }
+    }
+
+    fn product(&self, solution: &LayoutResult, _diagram: &Diagram) -> LayoutResult {
+        solution.clone()
+    }
+
+    fn execute(&self, diagram: &Diagram) -> LayoutResult {
         let config = self.config;
         if diagram.entities.is_empty() {
             return LayoutResult {

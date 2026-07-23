@@ -16,3 +16,4 @@
 pub mod coordinate;
 pub mod coordinator;
 pub mod frozen;
+pub mod recipe;

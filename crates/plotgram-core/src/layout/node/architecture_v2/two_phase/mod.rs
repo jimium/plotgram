@@ -21,7 +21,7 @@ pub(super) use super::layout::constants::{
     GROUP_GAP_X, GROUP_LABEL_HEIGHT, INTRA_LAYER_GAP, LAYER_GAP, NEIGHBOR_PULL_FACTOR, NODE_GAP,
 };
 pub(super) use super::layout::coordinate::{
-    align_client_nodes_to_hubs, center_group_hub_nodes, enforce_horizontal_demand_gaps,
+    enforce_horizontal_demand_gaps,
     layer_centers_from_placed, pull_toward_neighbors, rebalance_infrastructure_layers,
     resolve_x_overlaps, resolve_x_overlaps_with_gaps, uniform_initial_positions,
 };
@@ -43,6 +43,7 @@ pub(super) use crate::layout::{GroupLayout, LayoutResult, NodeLayout};
 pub(super) use std::collections::{BTreeMap, HashMap, HashSet};
 
 mod intra;
+mod intra_builder;
 mod macro_block;
 mod phase_d;
 mod super_graph;

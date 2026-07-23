@@ -70,30 +70,14 @@ pub(super) fn layout_intra_group(
 
     let member_set: HashSet<String> = members.iter().cloned().collect();
     let space_budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
-    let mut nodes = assign_coordinates_intra(
+    let mut nodes = solve_intra_coordinates(
         graph,
         &ordered_layers,
         sizes,
+        &intra_map,
         &member_set,
+        reversed,
         Some(&space_budget),
-        reversed,
-    );
-
-    center_group_hub_nodes(
-        graph,
-        &intra_map,
-        &ordered_layers,
-        sizes,
-        &mut nodes,
-        reversed,
-    );
-    align_client_nodes_to_hubs(
-        graph,
-        &intra_map,
-        &ordered_layers,
-        sizes,
-        &mut nodes,
-        reversed,
     );
 
     if mode == GroupLayoutMode::Vertical {
@@ -115,29 +99,14 @@ pub(super) fn layout_intra_group(
         let layers = build_layers(&ranks, &decl_index);
         ordered_layers =
             order_layers_group_aware(graph, &intra_map, &layers, reversed, &decl_index);
-        nodes = assign_coordinates_intra(
+        nodes = solve_intra_coordinates(
             graph,
             &ordered_layers,
             sizes,
+            &intra_map,
             &member_set,
+            reversed,
             Some(&space_budget),
-            reversed,
-        );
-        center_group_hub_nodes(
-            graph,
-            &intra_map,
-            &ordered_layers,
-            sizes,
-            &mut nodes,
-            reversed,
-        );
-        align_client_nodes_to_hubs(
-            graph,
-            &intra_map,
-            &ordered_layers,
-            sizes,
-            &mut nodes,
-            reversed,
         );
         normalize_to_origin(&mut nodes);
         (content_width, content_height) = content_bbox(&nodes);
@@ -499,15 +468,14 @@ pub(super) fn layout_ungrouped_cluster(
     let layers = build_layers(&ranks, &decl_index);
     let member_set: HashSet<String> = members.iter().cloned().collect();
 
-    let mut nodes = assign_coordinates_intra(
+    let mut nodes = solve_intra_coordinates(
         graph,
         &layers,
         sizes,
+        &synthetic_group_map("@ungrouped", members),
         &member_set,
-        Some(&crate::layout::space_budget::SpaceBudget::from_diagram(
-            diagram,
-        )),
         reversed,
+        Some(&crate::layout::space_budget::SpaceBudget::from_diagram(diagram)),
     );
     normalize_to_origin(&mut nodes);
     let (content_width, content_height) = content_bbox(&nodes);
@@ -534,7 +502,82 @@ pub(super) fn synthetic_group_map(group_id: &str, members: &[String]) -> GroupMa
     }
 }
 
-/// 组内坐标分配：局部原点，邻接拉力仅限组内成员
+/// 组内坐标求解：构建 CoordinateProblem → solver → 回写 NodeLayout。
+///
+/// 替代旧的 `assign_coordinates_intra`（迭代 neighbor-pull + resolve_x_overlaps）。
+/// hub 居中 / client 对齐已编码为 P1 objectives，无需后处理。
+fn solve_intra_coordinates(
+    graph: &GraphIndex,
+    layers: &[Vec<String>],
+    sizes: &HashMap<String, (f64, f64)>,
+    group_map: &GroupMap,
+    member_set: &HashSet<String>,
+    reversed: &HashSet<(String, String)>,
+    budget: Option<&crate::layout::space_budget::SpaceBudget>,
+) -> HashMap<String, NodeLayout> {
+    use crate::layout::kernel::coordinator::LayoutCoordinator;
+    use crate::layout::kernel::coordinator::ArchitectureRecipeAdapter;
+    use super::intra_builder::build_intra_coordinate_problem;
+
+    let build_output = build_intra_coordinate_problem(
+        layers, sizes, graph, group_map, member_set, reversed, budget,
+    );
+    let result = LayoutCoordinator::run(&ArchitectureRecipeAdapter, &build_output.problem);
+
+    // 计算层 Y 偏移（与旧逻辑一致）
+    let layer_heights: Vec<f64> = layers
+        .iter()
+        .map(|layer| {
+            layer
+                .iter()
+                .map(|node| {
+                    sizes
+                        .get(node)
+                        .map(|(_, h)| *h)
+                        .unwrap_or(constants::DEFAULT_NODE_HEIGHT)
+                })
+                .fold(0.0_f64, f64::max)
+        })
+        .collect();
+
+    let mut layer_y_offsets = vec![0.0];
+    for i in 1..layers.len() {
+        layer_y_offsets.push(layer_y_offsets[i - 1] + layer_heights[i - 1] + INTRA_LAYER_GAP);
+    }
+
+    // 回写坐标
+    let mut nodes = HashMap::new();
+    for (rank, layer) in layers.iter().enumerate() {
+        let y_center = layer_y_offsets[rank] + layer_heights[rank] / 2.0;
+        for node_id in layer {
+            let (width, height) = sizes.get(node_id).copied().unwrap_or((
+                constants::DEFAULT_NODE_WIDTH,
+                constants::DEFAULT_NODE_HEIGHT,
+            ));
+            let x_center = build_output
+                .node_to_var
+                .get(node_id)
+                .and_then(|&var_id| result.coordinates.get(var_id))
+                .copied()
+                .unwrap_or(0.0);
+            nodes.insert(
+                node_id.clone(),
+                NodeLayout {
+                    x: x_center - width / 2.0,
+                    y: y_center - height / 2.0,
+                    width,
+                    height,
+                    ..Default::default()
+                },
+            );
+        }
+    }
+
+    nodes
+}
+
+/// 组内坐标分配（旧版迭代算法，保留供 fallback / 测试对比）
+#[allow(dead_code)]
 pub(super) fn assign_coordinates_intra(
     graph: &GraphIndex,
     layers: &[Vec<String>],

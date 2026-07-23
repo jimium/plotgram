@@ -7,6 +7,7 @@
 
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::{CircularLayoutConfig, SugiyamaLayoutConfig};
+use crate::layout::kernel::recipe::LayoutRecipe;
 use crate::layout::node::circular::CircularLayout;
 use crate::layout::node::common::acyclic::greedy_fas;
 use crate::layout::node::sugiyama_v2::{engine, preset};
@@ -75,6 +76,66 @@ impl LayoutStrategy for StateLayout {
     }
 
     fn compute(&self, diagram: &Diagram) -> LayoutResult {
+        let recipe = StateRecipe {
+            circular_config: self.circular_config,
+            sugiyama_config: self.sugiyama_config,
+        };
+        recipe.execute(diagram)
+    }
+
+    fn node_align_config(&self) -> NodeAlignConfig {
+        NodeAlignConfig::default_sugiyama()
+    }
+}
+
+// ─── Recipe 实现 ────────────────────────────────────────
+
+/// 状态图布局配方。
+///
+/// 委托配方：根据 FAS 反转率选择 Circular 或 Sugiyama。
+struct StateRecipe {
+    circular_config: CircularLayoutConfig,
+    sugiyama_config: SugiyamaLayoutConfig,
+}
+
+/// 状态图问题 IR。
+enum StateProblem {
+    Circular,
+    Sugiyama,
+}
+
+impl LayoutRecipe for StateRecipe {
+    type Problem = StateProblem;
+    type Solution = LayoutResult;
+
+    fn name(&self) -> &'static str {
+        "state"
+    }
+
+    fn compile(&self, diagram: &Diagram) -> StateProblem {
+        if user_requested_circular(diagram) || !should_use_sugiyama(diagram) {
+            StateProblem::Circular
+        } else {
+            StateProblem::Sugiyama
+        }
+    }
+
+    fn solve(&self, _problem: &StateProblem) -> LayoutResult {
+        LayoutResult {
+            nodes: HashMap::new(),
+            groups: HashMap::new(),
+            edges: vec![],
+            total_width: 0.0,
+            total_height: 0.0,
+            hints: Default::default(),
+        }
+    }
+
+    fn product(&self, solution: &LayoutResult, _diagram: &Diagram) -> LayoutResult {
+        solution.clone()
+    }
+
+    fn execute(&self, diagram: &Diagram) -> LayoutResult {
         if user_requested_circular(diagram) || !should_use_sugiyama(diagram) {
             let mut result = CircularLayout::new(self.circular_config).compute(diagram);
             result.hints.edge_routing_style = EdgeRoutingStyle::Curved;
@@ -88,10 +149,6 @@ impl LayoutStrategy for StateLayout {
         );
         result.hints.edge_routing_style = EdgeRoutingStyle::Orthogonal;
         result
-    }
-
-    fn node_align_config(&self) -> NodeAlignConfig {
-        NodeAlignConfig::default_sugiyama()
     }
 }
 

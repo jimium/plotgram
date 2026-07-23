@@ -96,23 +96,7 @@ pub(super) fn phase_d_postprocess(
             Some(&side_gutters),
         );
     }
-    // O2.3：group_frame 平移整组后重申 client↔hub 对称（曾稳定残留 ~8px 质心差）
-    align_client_nodes_to_hubs(
-        graph,
-        group_map,
-        &layers,
-        sizes,
-        &mut layout_scratch.nodes,
-        reversed_edges,
-    );
-    center_group_hub_nodes(
-        graph,
-        group_map,
-        &layers,
-        sizes,
-        &mut layout_scratch.nodes,
-        reversed_edges,
-    );
+    // Phase G: hub 居中 + client 对齐已由组内 solver P1 objectives 覆盖，不再后处理。
     crate::layout::group_frame::expand_groups_to_contain_contents(
         diagram,
         &mut layout_scratch.groups,

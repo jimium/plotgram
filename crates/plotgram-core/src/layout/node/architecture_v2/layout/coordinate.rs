@@ -17,7 +17,7 @@ pub(in super::super) fn assign_coordinates(
     layers: &[Vec<String>],
     sizes: &HashMap<String, (f64, f64)>,
     reversed: &HashSet<(String, String)>,
-) -> HashMap<String, NodeLayout> {
+) -> (HashMap<String, NodeLayout>, Option<crate::layout::kernel::coordinate::model::CoordinateProblem>) {
     let mut nodes = HashMap::new();
 
     // 计算每层的高度
@@ -87,8 +87,13 @@ pub(in super::super) fn assign_coordinates(
         &diagram.relations,
         &diagram.diagram_type,
         has_groups,
+        group_map,
     );
-    let solver_result = crate::layout::kernel::coordinate::optimizer::solve(&build_output.problem);
+    let solver_result = crate::layout::kernel::coordinator::LayoutCoordinator::run(
+        &crate::layout::kernel::coordinator::ArchitectureRecipeAdapter,
+        &build_output.problem,
+    );
+    let solved_problem = Some(build_output.problem);
 
     // 从 solver 结果提取中心坐标
     let solved_centers: HashMap<String, f64> = build_output
@@ -140,7 +145,7 @@ pub(in super::super) fn assign_coordinates(
         }
     }
 
-    nodes
+    (nodes, solved_problem)
 }
 
 /// 同层 X 消重叠：无组可读走廊用 `adjacent_rank_gap`，否则 NODE_GAP。

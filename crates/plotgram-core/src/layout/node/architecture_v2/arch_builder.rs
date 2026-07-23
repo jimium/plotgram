@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::layout::kernel::coordinate::model::*;
 use crate::layout::node::architecture_v2::layout::constants::NODE_GAP;
-use crate::layout::node::architecture_v2::layout::types::GraphIndex;
+use crate::layout::node::architecture_v2::layout::types::{GraphIndex, GroupMap};
 
 /// 构建输出：包含问题 IR 和节点→变量映射。
 pub(in crate::layout::node) struct ArchBuildOutput {
@@ -30,6 +30,7 @@ pub(in crate::layout::node) fn build_arch_coordinate_problem(
     relations: &[crate::ast::Relation],
     diagram_type: &crate::types::DiagramType,
     has_groups: bool,
+    group_map: &GroupMap,
 ) -> ArchBuildOutput {
     let mut vars: Vec<NodeVariable> = Vec::new();
     let mut node_to_var: HashMap<String, VarId> = HashMap::new();
@@ -162,6 +163,107 @@ pub(in crate::layout::node) fn build_arch_coordinate_problem(
                             kind: ConstraintSourceKind::NodeSeparation,
                             nodes: vec![node_id.clone(), succ.clone()],
                             note: "edge straightening",
+                        },
+                    });
+                }
+            }
+        }
+    }
+
+    // Phase G: P1 hub 居中 + client 对齐 objectives
+    if has_groups {
+        for (rank, layer) in layers.iter().enumerate() {
+            if rank + 1 >= layers.len() {
+                continue;
+            }
+            // 跳过基础设施层（无组归属的层）
+            let is_infra = !layer.is_empty()
+                && layer.iter().all(|n| !group_map.node_to_top_group.contains_key(n));
+            if is_infra {
+                continue;
+            }
+            let lower_set: HashSet<&str> = layers[rank + 1].iter().map(|s| s.as_str()).collect();
+
+            // P1: hub 居中到同组子节点质心
+            for hub_id in layer {
+                let Some(gid) = group_map.node_to_top_group.get(hub_id) else {
+                    continue;
+                };
+                let Some(&hub_var) = node_to_var.get(hub_id) else {
+                    continue;
+                };
+                let children: Vec<VarId> = graph
+                    .out_edges
+                    .get(hub_id)
+                    .map(|succs| {
+                        succs
+                            .iter()
+                            .filter(|s| {
+                                crate::layout::node::architecture_v2::layout::acyclic::is_effective_edge(
+                                    hub_id, s, reversed,
+                                ) && lower_set.contains(s.as_str())
+                                    && group_map.node_to_top_group.get(*s) == Some(gid)
+                            })
+                            .filter_map(|s| node_to_var.get(s).copied())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                if children.len() >= 2 {
+                    // (x[hub] - avg(children))²
+                    let n = children.len() as f64;
+                    let mut coeffs: Vec<(VarId, f64)> = vec![(hub_var, 1.0)];
+                    for &cv in &children {
+                        coeffs.push((cv, -1.0 / n));
+                    }
+                    objectives.push(ObjectiveTerm {
+                        priority: ObjectivePriority::P1,
+                        coefficients: coeffs,
+                        constant: 0.0,
+                        weight: 3.0,
+                        source: ConstraintSource {
+                            kind: ConstraintSourceKind::NodeSeparation,
+                            nodes: vec![hub_id.clone()],
+                            note: "hub centering over group children",
+                        },
+                    });
+                }
+            }
+
+            // P1: client 对齐到唯一 hub 目标
+            for client_id in layer {
+                let Some(&client_var) = node_to_var.get(client_id) else {
+                    continue;
+                };
+                let hubs: Vec<VarId> = graph
+                    .out_edges
+                    .get(client_id)
+                    .map(|succs| {
+                        succs
+                            .iter()
+                            .filter(|s| {
+                                crate::layout::node::architecture_v2::layout::acyclic::is_effective_edge(
+                                    client_id, s, reversed,
+                                ) && lower_set.contains(s.as_str())
+                                    && group_map.node_to_top_group.get(client_id)
+                                        == group_map.node_to_top_group.get(*s)
+                            })
+                            .filter_map(|s| node_to_var.get(s).copied())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                if hubs.len() == 1 {
+                    // (x[client] - x[hub])²
+                    objectives.push(ObjectiveTerm {
+                        priority: ObjectivePriority::P1,
+                        coefficients: vec![(client_var, 1.0), (hubs[0], -1.0)],
+                        constant: 0.0,
+                        weight: 2.0,
+                        source: ConstraintSource {
+                            kind: ConstraintSourceKind::NodeSeparation,
+                            nodes: vec![client_id.clone()],
+                            note: "client align to hub",
                         },
                     });
                 }

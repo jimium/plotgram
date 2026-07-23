@@ -31,6 +31,7 @@ use crate::types::DiagramType;
 use crate::ast::{ArrowType, Diagram};
 use crate::layout::algorithm_config::{SequenceLayoutConfig, SEQUENCE_LAYOUT_OPTIONS};
 use crate::layout::geometry::Point;
+use crate::layout::kernel::recipe::LayoutRecipe;
 use crate::layout::node::common::group_bounds::{self, GroupPadding};
 use crate::layout::edge::common::label_avoidance::resolve_label_overlaps;
 use crate::layout::plan::ResolvedAlgoOptions;
@@ -109,14 +110,57 @@ impl LayoutStrategy for SequenceLayout {
     }
 
     fn compute(&self, diagram: &Diagram) -> LayoutResult {
+        let recipe = SequenceRecipe { config: self.config };
+        recipe.execute(diagram)
+    }
+}
+
+// ─── Recipe 实现 ────────────────────────────────────────
+
+/// 时序图布局配方。
+///
+/// 规则求解器：参与者按声明顺序水平铺开，消息按声明顺序垂直排列。
+struct SequenceRecipe {
+    config: SequenceLayoutConfig,
+}
+
+/// 时序图问题 IR。
+struct SequenceProblem {
+    /// 参与者节点布局（已按声明顺序排列）
+    nodes: HashMap<String, NodeLayout>,
+    /// 画布宽度
+    total_width: f64,
+}
+
+/// 时序图解。
+struct SequenceSolution {
+    nodes: HashMap<String, NodeLayout>,
+    edges: Vec<EdgeLayout>,
+    total_width: f64,
+    total_height: f64,
+}
+
+impl LayoutRecipe for SequenceRecipe {
+    type Problem = SequenceProblem;
+    type Solution = SequenceSolution;
+
+    fn name(&self) -> &'static str {
+        "sequence"
+    }
+
+    fn compile(&self, diagram: &Diagram) -> SequenceProblem {
         let config = self.config;
         let node_count = diagram.entities.len();
 
-        // 1) 节点布局：按声明顺序水平铺开
+        // 参与者按声明顺序水平铺开
         let mut nodes: HashMap<String, NodeLayout> = HashMap::new();
         let mut current_x = constants::DEFAULT_PADDING;
         for entity in &diagram.entities {
-            let (w, h) = crate::layout::styled_node_size(entity, constants::DEFAULT_NODE_WIDTH, constants::DEFAULT_NODE_HEIGHT);
+            let (w, h) = crate::layout::styled_node_size(
+                entity,
+                constants::DEFAULT_NODE_WIDTH,
+                constants::DEFAULT_NODE_HEIGHT,
+            );
             nodes.insert(
                 entity.id.as_str().to_string(),
                 NodeLayout {
@@ -135,28 +179,48 @@ impl LayoutStrategy for SequenceLayout {
             current_x - config.node_spacing + constants::DEFAULT_PADDING
         };
 
-        // 2) 分组包围框
+        SequenceProblem { nodes, total_width }
+    }
+
+    fn solve(&self, problem: &SequenceProblem) -> SequenceSolution {
+        // solve 需要 diagram 来构建边，但 trait 签名只给 problem。
+        // 因此 sequence 的 "solve" 是 trivial 的（位置已在 compile 确定），
+        // 边构建放在 product 中（需要 diagram.relations）。
+        SequenceSolution {
+            nodes: problem.nodes.clone(),
+            edges: vec![],
+            total_width: problem.total_width,
+            total_height: 0.0, // product 中计算
+        }
+    }
+
+    fn product(&self, solution: &SequenceSolution, diagram: &Diagram) -> LayoutResult {
+        let config = self.config;
+        let nodes = solution.nodes.clone();
+
+        // 分组包围框
         let groups = group_bounds::compute_group_bounds(
             diagram,
             &nodes,
             GroupPadding::uniform(config.group_padding, 16.0),
         );
 
-        // 3) 边布局：按声明顺序分配时间步（y 坐标）
-        let message_start_y = constants::DEFAULT_PADDING + constants::DEFAULT_NODE_HEIGHT + FIRST_MESSAGE_OFFSET;
+        // 边布局：按声明顺序分配时间步（y 坐标）
+        let message_start_y =
+            constants::DEFAULT_PADDING + constants::DEFAULT_NODE_HEIGHT + FIRST_MESSAGE_OFFSET;
         let mut edges: Vec<EdgeLayout> = Vec::with_capacity(diagram.relations.len());
 
         for (idx, rel) in diagram.relations.iter().enumerate() {
             let y = message_start_y + idx as f64 * config.message_spacing;
 
-            // 找不到节点时输出空边，让上层 fallback
-            let (from_nl, to_nl) = match (nodes.get(rel.from.as_str()), nodes.get(rel.to.as_str())) {
-                (Some(f), Some(t)) => (f, t),
-                _ => {
-                    edges.push(EdgeLayout::empty());
-                    continue;
-                }
-            };
+            let (from_nl, to_nl) =
+                match (nodes.get(rel.from.as_str()), nodes.get(rel.to.as_str())) {
+                    (Some(f), Some(t)) => (f, t),
+                    _ => {
+                        edges.push(EdgeLayout::empty());
+                        continue;
+                    }
+                };
 
             let from_cx = from_nl.x + from_nl.width / 2.0;
             let to_cx = to_nl.x + to_nl.width / 2.0;
@@ -166,22 +230,24 @@ impl LayoutStrategy for SequenceLayout {
             } else {
                 let from_port = if to_cx >= from_cx { Port::Right } else { Port::Left };
                 let to_port = if to_cx >= from_cx { Port::Left } else { Port::Right };
-
-                // 消息锚定在生命线上，端点内缩以与虚线竖线留出视觉间隙
                 let (x1, x2) = inset_message_endpoints(from_cx, to_cx);
                 let path = vec![Point::new(x1, y), Point::new(x2, y)];
-                // 双向箭头用 Polyline 以便渲染层区分样式；其余用 Straight
                 let geometry = if matches!(rel.arrow, ArrowType::Bidirectional) {
                     PathGeometry::Polyline { points: path }
                 } else {
-                    PathGeometry::Straight { start: Point::new(x1, y), end: Point::new(x2, y) }
+                    PathGeometry::Straight {
+                        start: Point::new(x1, y),
+                        end: Point::new(x2, y),
+                    }
                 };
                 EdgeGeometry::new(geometry, from_port, to_port)
             };
 
-            let label_pos = label_position(&geometry.path_slice(), rel.arrow == ArrowType::Bidirectional);
-
-            let labels = rel.label.as_ref()
+            let label_pos =
+                label_position(&geometry.path_slice(), rel.arrow == ArrowType::Bidirectional);
+            let labels = rel
+                .label
+                .as_ref()
                 .map(|text| vec![EdgeLabelLayout::new(text, label_pos)])
                 .unwrap_or_default();
 
@@ -193,25 +259,28 @@ impl LayoutStrategy for SequenceLayout {
             });
         }
 
-        // 4) 标签统一避障（标签↔节点/分组/边路径/标签↔标签）
+        // 标签统一避障
         resolve_label_overlaps(&mut edges, &nodes, &groups);
 
-        // 5) 生命线缺口：收集每个参与者需避让的消息 y
+        // 生命线缺口
         let lifeline_gaps = collect_lifeline_gaps(diagram, &edges);
 
-        // 6) 画布高度 = 顶部到消息区底部 + 底部留白
+        // 画布高度
         let message_area_height = if diagram.relations.is_empty() {
             FIRST_MESSAGE_OFFSET
         } else {
             FIRST_MESSAGE_OFFSET + (diagram.relations.len() as f64 - 1.0) * config.message_spacing
         };
-        let total_height = constants::DEFAULT_PADDING + constants::DEFAULT_NODE_HEIGHT + message_area_height + BOTTOM_PADDING;
+        let total_height = constants::DEFAULT_PADDING
+            + constants::DEFAULT_NODE_HEIGHT
+            + message_area_height
+            + BOTTOM_PADDING;
 
         LayoutResult {
             nodes,
             groups,
             edges,
-            total_width,
+            total_width: solution.total_width,
             total_height,
             hints: SequenceLayoutHints { lifeline_gaps }.into_layout_hints(),
         }

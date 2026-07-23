@@ -115,9 +115,46 @@ impl<'a> LayoutRouteFeedback<'a> {
         let (routed, moved) = crate::layout::space_budget_guard::resolve_budget_violations(
             self.diagram, routed,
         );
-        crate::layout::space_budget_guard::reroute_and_repulse(
+        let mut routed = crate::layout::space_budget_guard::reroute_and_repulse(
             self.diagram, routed, router, &moved, edge_snap_config,
-        )
+        );
+
+        // Phase F: route feedback re-solve——路由后压力超阈值时重新求解坐标
+        if let Some(problem) = routed.hints.coordinate_problem.as_ref() {
+            let post_pressure = PressureSnapshot::compute(self.diagram, &routed);
+            // 从 nodes 提取当前 solver 空间坐标（cross-axis center）
+            let current_coords: Vec<f64> = problem
+                .vars
+                .iter()
+                .map(|v| {
+                    routed
+                        .nodes
+                        .get(&v.stable_id)
+                        .map(|n| n.x + n.width / 2.0)
+                        .unwrap_or(v.axis_size / 2.0) // dummy/axis: 用初值近似
+                })
+                .collect();
+
+            if let Some(new_coords) =
+                route_feedback_resolve(problem, &post_pressure, &current_coords, 2)
+            {
+                crate::perf_log!(
+                    "[route-feedback] applying re-solved coordinates, re-routing"
+                );
+                // 回写新坐标到 nodes
+                for (var, &new_c) in problem.vars.iter().zip(new_coords.iter()) {
+                    if let Some(node) = routed.nodes.get_mut(&var.stable_id) {
+                        node.x = new_c - node.width / 2.0;
+                    }
+                }
+                // 重新冻结 + 全量重路由
+                routed.hints.frozen_nodes =
+                    Some(crate::layout::kernel::frozen::freeze_nodes(&routed.nodes));
+                routed = router.route(self.diagram, routed);
+            }
+        }
+
+        routed
     }
 }
 

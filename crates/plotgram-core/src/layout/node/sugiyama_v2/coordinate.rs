@@ -26,7 +26,7 @@ pub(super) fn assign_coordinates_brandes_koepf(
     layer_gaps: &[f64],
     _has_same_layer_edges: bool,
     diagram: &Diagram,
-) -> HashMap<String, crate::layout::NodeLayout> {
+) -> (HashMap<String, crate::layout::NodeLayout>, Option<crate::layout::kernel::coordinate::model::CoordinateProblem>) {
     let spine = compute_spine_nodes(dag);
     let mut centers =
         assign_layer_centers_brandes_koepf(layered_graph, layers, sizes, preset, &spine);
@@ -34,7 +34,7 @@ pub(super) fn assign_coordinates_brandes_koepf(
     compact_layer_centers(&mut centers, layered_graph, layers, sizes, preset, 3);
 
     // Phase 3+4: 统一坐标求解器——在 BK + compact + fan_symmetry 之后运行 optimizer
-    {
+    let solved_problem = {
         let build_output = build_with_mapping(
             layered_graph, layers, sizes, &centers, preset, horizontal,
         );
@@ -88,7 +88,8 @@ pub(super) fn assign_coordinates_brandes_koepf(
                 centers.insert(*node, result.coordinates[var_id]);
             }
         }
-    }
+        Some(problem)
+    };
 
     let mut nodes = HashMap::new();
     let (default_w, default_h) = preset.default_node_size();
@@ -136,7 +137,7 @@ pub(super) fn assign_coordinates_brandes_koepf(
 
     // Phase 6: solver 是唯一相对坐标写者，无后处理 pass
     postprocess::normalize_layout_to_padding(&mut nodes, preset.padding);
-    nodes
+    (nodes, solved_problem)
 }
 
 
