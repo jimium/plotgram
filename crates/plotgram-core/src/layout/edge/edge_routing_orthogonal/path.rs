@@ -913,12 +913,6 @@ fn source_group_exit_stub_len(
         sy - group.y // Top
     };
     let len = (dist + GROUP_EXIT_STUB_MARGIN).max(PORT_CLEARANCE);
-    if std::env::var("PLOTGRAM_STUB_EXIT_DEBUG").map(|v| v == "1").unwrap_or(false) {
-        eprintln!(
-            "[stub_exit_dbg] {} -> {} side={:?} anchor=({:.0},{:.0}) group_bbox=({:.0},{:.0})-({:.0},{:.0}) dist={:.0} exit_stub={:.0}",
-            from_id, to_id, from_side, sx, sy, group.x, group.y, group.x + group.width, group.y + group.height, dist, len
-        );
-    }
     Some(len)
 }
 

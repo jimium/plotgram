@@ -308,6 +308,21 @@ fn detect_side_approach(points: &[Point], anchor_idx: usize, side: Port) -> Opti
     None
 }
 
+/// 近对角守卫：仅当建议侧所在轴向在边整体几何上「明显占主导」
+/// （超 2×，与 `contract.rs` `natural_to_port` 同口径）时，才允许 side-approach
+/// 把端口旋到该侧。近对角边（两轴接近）保留端口求解器选定的自然
+/// 主轴口，避免旋成侧向后箭头倒悬（ISS-002）。`edge_axis` 缺失时不作
+/// 限制（回退旧行为）。
+fn side_approach_axis_dominant(suggested: Port, edge_axis: Option<(f64, f64)>) -> bool {
+    let Some((dx, dy)) = edge_axis else {
+        return true;
+    };
+    match suggested {
+        Port::Left | Port::Right => dx.abs() > 2.0 * dy.abs(),
+        Port::Top | Port::Bottom => dy.abs() > 2.0 * dx.abs(),
+    }
+}
+
 // ─── PortFix / Attempt: 端口修正候选的类型定义（模块级） ───
 
 #[derive(Copy, Clone, Debug)]
@@ -544,17 +559,32 @@ fn collect_edges_to_check(
         // 退化 stub：路径极短且终点不在目标节点端口边 → 强制翻正对端口
         let degenerate = is_degenerate_stub_path(&points, to_nl, to_side[ei]);
 
+        // 边整体几何（from→to 中心位移），用于把 side-approach 旋转限制在真正
+        // 占主导的轴向；缺失时不作限制（回退旧行为）。
+        let edge_axis: Option<(f64, f64)> = endpoint_map
+            .get(&(ei, true))
+            .and_then(|ep| nodes.get(&ep.node_id))
+            .map(|from_nl| {
+                let fcx = from_nl.x + from_nl.width / 2.0;
+                let fcy = from_nl.y + from_nl.height / 2.0;
+                let tcx = to_nl.x + to_nl.width / 2.0;
+                let tcy = to_nl.y + to_nl.height / 2.0;
+                (tcx - fcx, tcy - fcy)
+            });
+
         let from_rev = has_reverse_stub(&points, 0, from_side[ei]);
         let to_rev = has_reverse_stub(&points, points.len() - 1, to_side[ei]);
         let from_side_approach = if from_rev || degenerate {
             None
         } else {
             detect_side_approach(&points, 0, from_side[ei])
+                .filter(|&s| side_approach_axis_dominant(s, edge_axis))
         };
         let to_side_approach = if to_rev || degenerate {
             None
         } else {
             detect_side_approach(&points, points.len() - 1, to_side[ei])
+                .filter(|&s| side_approach_axis_dominant(s, edge_axis))
         };
         let orig_from_side = from_side_approach.is_some();
         let orig_to_side = to_side_approach.is_some();

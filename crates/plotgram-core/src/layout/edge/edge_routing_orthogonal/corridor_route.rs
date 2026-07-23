@@ -1215,23 +1215,6 @@ fn group_exit_stub_len(gl: &GroupLayout, side: Port, anchor: Point, base_stub: f
     base_stub.max(dist + GROUP_EXIT_STUB_MARGIN)
 }
 
-/// A-3（契约①/Stub）：源组外边界出组余量（px）。首段转弯点须明确落在源组 bbox 之外。
-const GROUP_EXIT_STUB_MARGIN: f64 = 8.0;
-
-/// A-3（契约①）：把跨组边首段 stub 延伸到源组外边界 + 余量，保证首个转弯点在组外。
-///
-/// 沿 `side` 外向方向计算锚点到源组边界的距离；若基础 stub 已越过边界则保持不变。
-/// 确定性（AGENTS.md §2）：纯几何计算，不依赖任何迭代顺序。
-fn group_exit_stub_len(gl: &GroupLayout, side: Port, anchor: Point, base_stub: f64) -> f64 {
-    let dist = match side {
-        Port::Right => (gl.x + gl.width) - anchor.x,
-        Port::Left => anchor.x - gl.x,
-        Port::Bottom => (gl.y + gl.height) - anchor.y,
-        Port::Top => anchor.y - gl.y,
-    };
-    base_stub.max(dist + GROUP_EXIT_STUB_MARGIN)
-}
-
 fn append_stub_leg(
     waypoints: &mut Vec<Point>,
     current: &mut Point,
