@@ -110,6 +110,22 @@ pub(super) fn route_edges_orthogonal_inner(
             horizontal,
         );
 
+    if std::env::var("PLOTGRAM_ANCHOR_DEBUG")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+    {
+        for (i, rel) in relations.iter().enumerate() {
+            if rel.from.as_str().contains("revise") || rel.to.as_str().contains("revise") {
+                let fa = endpoint_map.get(&(i, true)).map(|e| e.anchor);
+                let ta = endpoint_map.get(&(i, false)).map(|e| e.anchor);
+                eprintln!(
+                    "[anchor_dbg] after_port_slot edge[{}] {} -> {} | from={:?}@{:?} to={:?}@{:?}",
+                    i, rel.from, rel.to, from_side[i], fa, to_side[i], ta
+                );
+            }
+        }
+    }
+
     // ── 3. 分层批量边序（有 rank 时低层先占通道；feedback 全局延后） ──
     let (edge_order, feedback_edge_set) = phase_layer_order(
         relations,
@@ -752,6 +768,27 @@ pub(super) fn route_edges_orthogonal_inner(
     // Phase C2 已移至管线后处理之后（pipeline.rs），避免 snap/sanitize 引入新交叉抵消效果。
 
     result.edges = edges;
+    // A-0：三段契约只读诊断（不改几何，仅量化现状供后续改善对比）。
+    let contract_diag = contract::diagnose_contract_violations(
+        relations,
+        &result.nodes,
+        &result.edges,
+        &group_ctx,
+        horizontal,
+    );
+    ortho_stats.contract_stub_violations = contract_diag.stub_violations;
+    ortho_stats.contract_approach_violations = contract_diag.approach_violations;
+    ortho_stats.contract_unnatural_to_port = contract_diag.unnatural_to_port;
+    ortho_stats.contract_away_segments = contract_diag.away_segments;
+    ortho_stats.contract_away_edges = contract_diag.away_edges;
+    crate::perf_log!(
+        "[perf]     contract_diag: stub={} approach={} unnatural_to_port={} away_segs={} away_edges={}",
+        contract_diag.stub_violations,
+        contract_diag.approach_violations,
+        contract_diag.unnatural_to_port,
+        contract_diag.away_segments,
+        contract_diag.away_edges
+    );
     // P2-1: 导出 orthogonal 路由 debug 统计
     result.hints.orthogonal_debug = Some(ortho_stats);
     result

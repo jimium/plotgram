@@ -67,6 +67,21 @@ pub struct CollinearOrthoStats {
     pub stub_cross_pair_conflicts: usize,
     #[serde(default)]
     pub stub_occupancy_shifted: usize,
+    /// A-0 契约诊断：stub 未出组边数
+    #[serde(default)]
+    pub contract_stub_violations: usize,
+    /// A-0 契约诊断：approach 方向违约边数（sanitize 后通常为 0）
+    #[serde(default)]
+    pub contract_approach_violations: usize,
+    /// A-0 契约诊断：目标端口未面向源节点的边数（ISS-002 直接信号）
+    #[serde(default)]
+    pub contract_unnatural_to_port: usize,
+    /// A-0 契约诊断：远离段总数
+    #[serde(default)]
+    pub contract_away_segments: usize,
+    /// A-0 契约诊断：含远离段的边数
+    #[serde(default)]
+    pub contract_away_edges: usize,
 }
 
 impl From<&OrthoDebugStats> for CollinearOrthoStats {
@@ -82,6 +97,11 @@ impl From<&OrthoDebugStats> for CollinearOrthoStats {
             stub_occupancy_conflicts: o.stub_occupancy_conflicts,
             stub_cross_pair_conflicts: o.stub_cross_pair_conflicts,
             stub_occupancy_shifted: o.stub_occupancy_shifted,
+            contract_stub_violations: o.contract_stub_violations,
+            contract_approach_violations: o.contract_approach_violations,
+            contract_unnatural_to_port: o.contract_unnatural_to_port,
+            contract_away_segments: o.contract_away_segments,
+            contract_away_edges: o.contract_away_edges,
         }
     }
 }

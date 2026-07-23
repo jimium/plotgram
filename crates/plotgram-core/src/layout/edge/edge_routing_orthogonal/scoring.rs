@@ -68,6 +68,10 @@ impl CandidateScorer for DefaultScorer {
                 score += FIRST_BEND_EXTRA_PENALTY * w.bend;
             }
         }
+        // A-2（契约③/Middle）：远离惩罚——单调趋近，消灭 U 形下沉/Z 形绕远。
+        score += away_penalty(path, pair.to_anchor()) * w.away;
+        // A-3（契约①/Stub）：跨组边首个转弯点仍在源组内时惩罚（引导出组再转弯，消灭 ISS-001）。
+        score += stub_inside_group_penalty(path, ctx, pair);
         // S4 / S4.x：feedback / 监控边对交叉加重（×3）；obstacle 穿模再 ×2
         let obst = obstacle_penalty(
             path,
@@ -132,6 +136,107 @@ pub fn path_length(path: &[Point]) -> f64 {
             (dx * dx + dy * dy).sqrt()
         })
         .sum()
+}
+
+/// A-2（契约③/Middle）：远离惩罚——对使到目标曼哈顿距离增大的段按增量惩罚。
+///
+/// 消灭 U 形下沉（ISS-009c）与 Z 形绕远（ISS-008）：任何“背高而驰”的段都付出
+/// 与偏离量成正比的代价，使评分器在“干净单调路径”与“绕远捷径”之间选择前者。
+///
+/// 软惩罚定位：避障（硬过滤 + NODE_CROSSING_PENALTY≈10⁴）优先级远高于本项
+/// （每 px 增量 × AWAY_PENALTY_PER_PX），单调路径若穿障，仍会选绕行远离路径。
+const AWAY_PENALTY_PER_PX: f64 = 2.0;
+/// 判定“远离”的曼哈顿距离增量阈值（吸收浮点噪声，与 contract.rs 一致）。
+const AWAY_EPS: f64 = 0.5;
+
+/// A-2: 远离惩罚每 px 增量费率；`PLOTGRAM_AWAY_PENALTY` 可覆盖（0=禁用，供 A/B 对比与调参）。
+fn away_penalty_rate() -> f64 {
+    std::env::var("PLOTGRAM_AWAY_PENALTY")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .unwrap_or(AWAY_PENALTY_PER_PX)
+}
+
+fn away_penalty(path: &[Point], target: Point) -> f64 {
+    let rate = away_penalty_rate();
+    if rate <= 0.0 {
+        return 0.0;
+    }
+    let mut penalty = 0.0;
+    for w in path.windows(2) {
+        let d_start = (w[0].x - target.x).abs() + (w[0].y - target.y).abs();
+        let d_end = (w[1].x - target.x).abs() + (w[1].y - target.y).abs();
+        let increase = d_end - d_start;
+        if increase > AWAY_EPS {
+            penalty += increase * rate;
+        }
+    }
+    penalty
+}
+
+/// A-3（契约①/Stub）：跨组边首个转弯点仍在源组内时的惩罚（引导出组再转弯，消灭 ISS-001）。
+///
+/// 软惩罚定位：与 path.rs 的「出组 stub 候选」配合——候选生成提供出组路径，本惩罚
+/// 使评分器在「组内提前转弯（略短）」与「出组后转弯」之间选择后者。
+/// 避障硬过滤优先级远高于本项；「端口正对兄弟节点」的边无法靠出组 stub 解决
+/// （会穿障），由 A-5 端口决策修复。
+const STUB_INSIDE_GROUP_PENALTY: f64 = 120.0;
+
+/// A-3: stub 出组惩罚量；`PLOTGRAM_STUB_EXIT_PENALTY` 可覆盖（0=禁用，供 A/B 对比与调参）。
+fn stub_exit_penalty_rate() -> f64 {
+    std::env::var("PLOTGRAM_STUB_EXIT_PENALTY")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .unwrap_or(STUB_INSIDE_GROUP_PENALTY)
+}
+
+fn stub_inside_group_penalty(path: &[Point], ctx: &OrthoRoutingContext, pair: &EndpointPair) -> f64 {
+    let rate = stub_exit_penalty_rate();
+    if rate <= 0.0 || path.len() < 3 {
+        return 0.0;
+    }
+    let from_id = pair.from_id();
+    let to_id = pair.to_id();
+    let Some(from_leaf) = ctx.group_ctx.node_leaf_group.get(from_id) else {
+        return 0.0;
+    };
+    if ctx.group_ctx.node_leaf_group.get(to_id) == Some(from_leaf) {
+        return 0.0; // 同叶子组内部边豁免
+    }
+    let Some(group) = ctx.group_ctx.groups.get(from_leaf) else {
+        return 0.0;
+    };
+    // 找首个转弯点（方向改变处），判断是否仍在源组内。
+    for i in 1..path.len() - 1 {
+        let d_in = stub_seg_dir(&path[i - 1], &path[i]);
+        let d_out = stub_seg_dir(&path[i], &path[i + 1]);
+        if d_in != (0, 0) && d_out != (0, 0) && d_in != d_out {
+            return if stub_point_in_group(&path[i], group) { rate } else { 0.0 };
+        }
+    }
+    0.0
+}
+
+/// 线段方向离散化（主轴符号；正交路径只有 ±1 单轴方向）。
+fn stub_seg_dir(a: &Point, b: &Point) -> (i32, i32) {
+    let dx = b.x - a.x;
+    let dy = b.y - a.y;
+    if dx.abs() > dy.abs() {
+        (if dx > 0.0 { 1 } else { -1 }, 0)
+    } else if dy.abs() > dx.abs() {
+        (0, if dy > 0.0 { 1 } else { -1 })
+    } else {
+        (0, 0)
+    }
+}
+
+/// 点是否严格位于组 bbox 内部（向内收缩 0.5px，与 contract.rs 一致）。
+fn stub_point_in_group(p: &Point, group: &GroupLayout) -> bool {
+    const M: f64 = 0.5;
+    p.x > group.x + M
+        && p.x < group.x + group.width - M
+        && p.y > group.y + M
+        && p.y < group.y + group.height - M
 }
 
 /// P1-2: 通道对齐奖励——路径主段落在规划通道坐标上时给予负分（奖励）。

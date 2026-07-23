@@ -22,6 +22,92 @@ fn is_l_shaped_port_pair(from: Port, to: Port) -> bool {
     is_vertical_port(from) != is_vertical_port(to)
 }
 
+/// 判断沿给定切线坐标的直连路径是否被其他节点阻挡。
+///
+/// 用于直连偏好对齐的前置检查：若对齐后的直连路径会被中间节点阻挡，
+/// 则对齐无意义（路由仍会绕行），跳过以避免把锚点挪到被挡位置、
+/// 追使路由从被挡切线出发绕行而产生多余折点（ISS-008 回环边 Z 形根因）。
+fn straight_path_blocked(
+    nodes: &HashMap<String, NodeLayout>,
+    from_id: &str,
+    to_id: &str,
+    from_side: Port,
+    to_side: Port,
+    from_nl: &NodeLayout,
+    to_nl: &NodeLayout,
+    tangent: f64,
+) -> bool {
+    let (p1, p2) = if is_vertical_port(from_side) {
+        let y1 = match from_side {
+            Port::Top => from_nl.y,
+            Port::Bottom => from_nl.y + from_nl.height,
+            _ => return false,
+        };
+        let y2 = match to_side {
+            Port::Top => to_nl.y,
+            Port::Bottom => to_nl.y + to_nl.height,
+            _ => return false,
+        };
+        (Point::new(tangent, y1), Point::new(tangent, y2))
+    } else {
+        let x1 = match from_side {
+            Port::Left => from_nl.x,
+            Port::Right => from_nl.x + from_nl.width,
+            _ => return false,
+        };
+        let x2 = match to_side {
+            Port::Left => to_nl.x,
+            Port::Right => to_nl.x + to_nl.width,
+            _ => return false,
+        };
+        (Point::new(x1, tangent), Point::new(x2, tangent))
+    };
+    nodes.iter().any(|(node_id, node)| {
+        node_id.as_str() != from_id
+            && node_id.as_str() != to_id
+            && crate::layout::geometry::Rect::from(node)
+                .expanded(NODE_OBSTACLE_PAD)
+                .segment_crosses_interior(p1, p2, 0.5)
+    })
+}
+
+/// 目标切线被阻挡时，判断是否应跳过对齐。
+///
+/// 仅当**被移动端**的原切线干净时才跳过——留在干净原切线优于挪到被挡目标
+/// （ISS-008 回环边 Z 形根因：from 原切线 x=366 是干净走廊，对齐目标 x=324 被挡）。
+/// 若被移动端的原切线同样被挡，则对齐（两端锚点取齐使绕行更紧凑）不劣于
+/// 不对齐，不应跳过（password-reset 回环边：from 原切线 y=138 与目标 y=165
+/// 均被中间节点阻挡，对齐后垂直段更短，避免共线重叠）。
+fn should_skip_blocked_alignment(
+    nodes: &HashMap<String, NodeLayout>,
+    from_id: &str,
+    to_id: &str,
+    from_side: Port,
+    to_side: Port,
+    from_nl: &NodeLayout,
+    to_nl: &NodeLayout,
+    from_tangent: f64,
+    to_tangent: f64,
+    moves_from: bool,
+    moves_to: bool,
+) -> bool {
+    if moves_from
+        && !straight_path_blocked(
+            nodes, from_id, to_id, from_side, to_side, from_nl, to_nl, from_tangent,
+        )
+    {
+        return true; // from 原切线干净 → 留在原处
+    }
+    if moves_to
+        && !straight_path_blocked(
+            nodes, from_id, to_id, from_side, to_side, from_nl, to_nl, to_tangent,
+        )
+    {
+        return true; // to 原切线干净 → 留在原处
+    }
+    false
+}
+
 /// 直连偏好对齐：修正正对端口边因 slot 不对称导致的锚点错位。
 ///
 /// 核心逻辑：
@@ -70,6 +156,9 @@ pub fn straighten_preferred_alignments(
 
         let Some(from_nl) = nodes.get(&from_ep.node_id) else { continue };
         let Some(to_nl) = nodes.get(&to_ep.node_id) else { continue };
+
+        let fid = from_ep.node_id.as_str();
+        let tid = to_ep.node_id.as_str();
 
         let vertical = is_vertical_port(fs); // Top/Bottom 端口 → 垂直连接，需对齐 x
 
@@ -148,6 +237,15 @@ pub fn straighten_preferred_alignments(
                     offset
                 };
                 let target = base + adj_offset;
+                // 目标切线被中间节点阻挡时：仅当被移动端原切线干净才跳过（留在干净
+                // 原切线，ISS-008 回环边 Z 形根因）；两端原切线均被挡时对齐不劣，不跳过。
+                if straight_path_blocked(nodes, fid, tid, fs, ts, from_nl, to_nl, target)
+                    && should_skip_blocked_alignment(
+                        nodes, fid, tid, fs, ts, from_nl, to_nl, from_tangent, to_tangent, true, true,
+                    )
+                {
+                    continue;
+                }
                 // 限制目标在节点边的有效范围内
                 let target_clamped = if vertical {
                     let margin = from_nl.width * SLOT_MARGIN_RATIO;
@@ -170,6 +268,13 @@ pub fn straighten_preferred_alignments(
             (true, false) => {
                 // from 端是 Single，to 端有多个边：将 from 端对齐到 to 端
                 let target = to_tangent;
+                if straight_path_blocked(nodes, fid, tid, fs, ts, from_nl, to_nl, target)
+                    && should_skip_blocked_alignment(
+                        nodes, fid, tid, fs, ts, from_nl, to_nl, from_tangent, to_tangent, true, false,
+                    )
+                {
+                    continue;
+                }
                 let target_clamped = if vertical {
                     let margin = from_nl.width * SLOT_MARGIN_RATIO;
                     target.clamp(from_nl.x + margin, from_nl.x + from_nl.width - margin)
@@ -182,6 +287,13 @@ pub fn straighten_preferred_alignments(
             (false, true) => {
                 // to 端是 Single，from 端有多个边：将 to 端对齐到 from 端
                 let target = from_tangent;
+                if straight_path_blocked(nodes, fid, tid, fs, ts, from_nl, to_nl, target)
+                    && should_skip_blocked_alignment(
+                        nodes, fid, tid, fs, ts, from_nl, to_nl, from_tangent, to_tangent, false, true,
+                    )
+                {
+                    continue;
+                }
                 let target_clamped = if vertical {
                     let margin = to_nl.width * SLOT_MARGIN_RATIO;
                     target.clamp(to_nl.x + margin, to_nl.x + to_nl.width - margin)
@@ -216,6 +328,13 @@ pub fn straighten_preferred_alignments(
                     };
                     let offset = parallel_offsets.get(i).copied().unwrap_or(0.0);
                     let target = base + offset;
+                    if straight_path_blocked(nodes, fid, tid, fs, ts, from_nl, to_nl, target)
+                        && should_skip_blocked_alignment(
+                            nodes, fid, tid, fs, ts, from_nl, to_nl, from_tangent, to_tangent, true, true,
+                        )
+                    {
+                        continue;
+                    }
                     let target_clamped_from = if vertical {
                         let margin = from_nl.width * SLOT_MARGIN_RATIO;
                         target.clamp(from_nl.x + margin, from_nl.x + from_nl.width - margin)

@@ -549,6 +549,18 @@ pub struct OrthoDebugStats {
     pub semantic_trunk_degraded: usize,
     /// S4：S3 后为避 FanIn 干线而重路由的 feedback 边数
     pub feedback_rerouted_after_trunk: usize,
+    /// A-0 契约诊断：跨组边首个转弯点仍在源组边界内的边数（stub 未出组，ISS-001）
+    pub contract_stub_violations: usize,
+    /// A-0 契约诊断：末段方向与目标端口方向不一致的边数（approach 违约，ISS-002）
+    /// 注：sanitize 已强制末段贴合端口，该计数通常为 0；ISS-002 真正根因由
+    /// contract_unnatural_to_port 捕获。
+    pub contract_approach_violations: usize,
+    /// A-0 契约诊断：目标端口未面向源节点的边数（箭头“倒悬”，ISS-002 直接信号）
+    pub contract_unnatural_to_port: usize,
+    /// A-0 契约诊断：使到目标曼哈顿距离增大的段的总数（远离段，ISS-008/009c）
+    pub contract_away_segments: usize,
+    /// A-0 契约诊断：含至少一个远离段的边数
+    pub contract_away_edges: usize,
 }
 
 impl OrthoDebugStats {

@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-23-022021-det-fix",
+  "date": "2026-07-23-005610-before-a1",
   "note": "role-aware baseline: product-gate hard; stress/demo quality soft",
   "samples": [
     {
@@ -98,7 +98,7 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.27,
+      "median_ms": 0.28,
       "min_ms": 0.27,
       "max_ms": 0.3,
       "det": true,
@@ -200,9 +200,9 @@
           "non_monotone_count": 1
         }
       },
-      "median_ms": 9.73,
-      "min_ms": 9.58,
-      "max_ms": 9.88,
+      "median_ms": 9.51,
+      "min_ms": 9.32,
+      "max_ms": 9.93,
       "det": true,
       "role": "product"
     },
@@ -302,9 +302,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 1.03,
-      "min_ms": 0.94,
-      "max_ms": 1.16,
+      "median_ms": 0.94,
+      "min_ms": 0.92,
+      "max_ms": 0.99,
       "det": true,
       "role": "product"
     },
@@ -404,9 +404,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 2.03,
-      "min_ms": 1.98,
-      "max_ms": 2.35,
+      "median_ms": 1.97,
+      "min_ms": 1.95,
+      "max_ms": 2.09,
       "det": true,
       "role": "product"
     },
@@ -506,9 +506,9 @@
           "non_monotone_count": 1
         }
       },
-      "median_ms": 4.52,
-      "min_ms": 4.27,
-      "max_ms": 4.71,
+      "median_ms": 4.43,
+      "min_ms": 4.13,
+      "max_ms": 4.52,
       "det": true,
       "role": "product"
     },
@@ -608,9 +608,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 14.59,
-      "min_ms": 14.21,
-      "max_ms": 14.83,
+      "median_ms": 14.72,
+      "min_ms": 14.36,
+      "max_ms": 14.92,
       "det": true,
       "role": "product"
     },
@@ -710,9 +710,9 @@
           "non_monotone_count": 4
         }
       },
-      "median_ms": 38.57,
-      "min_ms": 38.05,
-      "max_ms": 41.76,
+      "median_ms": 38.66,
+      "min_ms": 38.14,
+      "max_ms": 39.4,
       "det": true,
       "role": "product"
     },
@@ -812,9 +812,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 1.52,
-      "min_ms": 1.47,
-      "max_ms": 1.57,
+      "median_ms": 1.47,
+      "min_ms": 1.43,
+      "max_ms": 1.54,
       "det": true,
       "role": "product"
     },
@@ -892,11 +892,11 @@
           "total": 0
         },
         "detour": {
-          "avg_ratio": 1.2485337145993767,
+          "avg_ratio": 1.2185873362800497,
           "max_ratio": 1.3965592284003894
         },
         "edge_length": {
-          "intra_layer_cv": 0.3985806560567738,
+          "intra_layer_cv": 0.4370993540708573,
           "max_min_ratio": 3.121298606480963,
           "outlier_count": 0
         },
@@ -914,9 +914,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.88,
+      "median_ms": 0.89,
       "min_ms": 0.85,
-      "max_ms": 0.93,
+      "max_ms": 0.92,
       "det": true,
       "role": "product"
     },
@@ -1016,9 +1016,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.86,
-      "min_ms": 0.85,
-      "max_ms": 0.87,
+      "median_ms": 0.96,
+      "min_ms": 0.89,
+      "max_ms": 0.98,
       "det": true,
       "role": "product"
     },
@@ -1118,9 +1118,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.16,
+      "median_ms": 0.17,
       "min_ms": 0.15,
-      "max_ms": 0.18,
+      "max_ms": 0.2,
       "det": true,
       "role": "product"
     },
@@ -1220,9 +1220,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 2.12,
-      "min_ms": 2.02,
-      "max_ms": 2.18,
+      "median_ms": 2.08,
+      "min_ms": 2.04,
+      "max_ms": 2.21,
       "det": true,
       "role": "product"
     },
@@ -1271,14 +1271,14 @@
         "contract_stub_violations": 0,
         "contract_approach_violations": 0,
         "contract_unnatural_to_port": 4,
-        "contract_away_segments": 1,
-        "contract_away_edges": 1
+        "contract_away_segments": 2,
+        "contract_away_edges": 2
       },
       "min_gap": 8.0,
       "aesthetics": {
         "bends": {
-          "total": 10,
-          "avg_per_edge": 0.9090909090909091,
+          "total": 12,
+          "avg_per_edge": 1.0909090909090908,
           "max_single_edge": 3,
           "excessive_count": 0
         },
@@ -1300,11 +1300,11 @@
           "total": 2
         },
         "detour": {
-          "avg_ratio": 1.3056022678604642,
+          "avg_ratio": 1.3251707211697916,
           "max_ratio": 1.5066856681252845
         },
         "edge_length": {
-          "intra_layer_cv": 0.07075422171448069,
+          "intra_layer_cv": 0.05321277999064701,
           "max_min_ratio": 3.311979181622398,
           "outlier_count": 0
         },
@@ -1322,9 +1322,9 @@
           "non_monotone_count": 1
         }
       },
-      "median_ms": 2.49,
-      "min_ms": 2.43,
-      "max_ms": 2.61,
+      "median_ms": 2.42,
+      "min_ms": 2.38,
+      "max_ms": 2.55,
       "det": true,
       "role": "product"
     },
@@ -1424,9 +1424,9 @@
           "non_monotone_count": 1
         }
       },
-      "median_ms": 1.4,
+      "median_ms": 1.35,
       "min_ms": 1.32,
-      "max_ms": 1.5,
+      "max_ms": 1.47,
       "det": true,
       "role": "product"
     },
@@ -1526,8 +1526,8 @@
           "non_monotone_count": 1
         }
       },
-      "median_ms": 3.34,
-      "min_ms": 3.28,
+      "median_ms": 3.24,
+      "min_ms": 3.19,
       "max_ms": 3.48,
       "det": true,
       "role": "product"
@@ -1628,9 +1628,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 6.33,
-      "min_ms": 6.27,
-      "max_ms": 6.55,
+      "median_ms": 6.43,
+      "min_ms": 6.17,
+      "max_ms": 6.71,
       "det": true,
       "role": "product"
     },
@@ -1730,9 +1730,9 @@
           "non_monotone_count": 1
         }
       },
-      "median_ms": 0.8,
-      "min_ms": 0.78,
-      "max_ms": 1.05,
+      "median_ms": 0.85,
+      "min_ms": 0.82,
+      "max_ms": 0.92,
       "det": true,
       "role": "product"
     },
@@ -1832,9 +1832,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 1.2,
+      "median_ms": 1.15,
       "min_ms": 1.13,
-      "max_ms": 1.36,
+      "max_ms": 1.17,
       "det": true,
       "role": "product"
     },
@@ -1918,8 +1918,8 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.09,
-      "min_ms": 0.09,
+      "median_ms": 0.1,
+      "min_ms": 0.1,
       "max_ms": 0.11,
       "det": true,
       "role": "product"
@@ -2006,7 +2006,7 @@
       },
       "median_ms": 0.15,
       "min_ms": 0.15,
-      "max_ms": 0.16,
+      "max_ms": 0.15,
       "det": true,
       "role": "product"
     },
@@ -2090,9 +2090,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.15,
+      "median_ms": 0.16,
       "min_ms": 0.15,
-      "max_ms": 0.16,
+      "max_ms": 0.17,
       "det": true,
       "role": "product"
     },
@@ -2177,8 +2177,8 @@
         }
       },
       "median_ms": 0.14,
-      "min_ms": 0.13,
-      "max_ms": 0.14,
+      "min_ms": 0.14,
+      "max_ms": 0.24,
       "det": true,
       "role": "product"
     },
@@ -2278,9 +2278,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 1.05,
-      "min_ms": 1.01,
-      "max_ms": 1.1,
+      "median_ms": 1.1,
+      "min_ms": 1.04,
+      "max_ms": 1.16,
       "det": true,
       "role": "product"
     },
@@ -2380,9 +2380,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 2.38,
-      "min_ms": 2.18,
-      "max_ms": 2.41,
+      "median_ms": 2.28,
+      "min_ms": 2.25,
+      "max_ms": 2.4,
       "det": true,
       "role": "product"
     },
@@ -2482,9 +2482,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 2.66,
-      "min_ms": 2.57,
-      "max_ms": 2.95,
+      "median_ms": 2.65,
+      "min_ms": 2.6,
+      "max_ms": 2.8,
       "det": true,
       "role": "product"
     },
@@ -2584,9 +2584,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.77,
+      "median_ms": 0.75,
       "min_ms": 0.72,
-      "max_ms": 0.79,
+      "max_ms": 0.78,
       "det": true,
       "role": "product"
     },
@@ -2670,9 +2670,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.47,
-      "min_ms": 0.42,
-      "max_ms": 0.49,
+      "median_ms": 0.41,
+      "min_ms": 0.41,
+      "max_ms": 0.45,
       "det": true,
       "role": "product"
     },
@@ -2756,9 +2756,9 @@
           "non_monotone_count": 1
         }
       },
-      "median_ms": 6.74,
-      "min_ms": 6.65,
-      "max_ms": 6.92,
+      "median_ms": 6.69,
+      "min_ms": 6.55,
+      "max_ms": 6.89,
       "det": true,
       "role": "product"
     },
@@ -2842,9 +2842,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.38,
+      "median_ms": 0.39,
       "min_ms": 0.37,
-      "max_ms": 0.43,
+      "max_ms": 0.44,
       "det": true,
       "role": "product"
     },
@@ -3030,9 +3030,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 6.19,
-      "min_ms": 6.02,
-      "max_ms": 6.36,
+      "median_ms": 6.22,
+      "min_ms": 5.81,
+      "max_ms": 6.8,
       "det": true,
       "role": "stress"
     },
@@ -3099,7 +3099,7 @@
         },
         "symmetry": {
           "fan_out_nodes": 6,
-          "avg_deviation": 0.8864292468533149,
+          "avg_deviation": 0.8864292468533148,
           "max_deviation": 1.0
         },
         "self_loops": {
@@ -3132,9 +3132,9 @@
           "non_monotone_count": 1
         }
       },
-      "median_ms": 20.52,
-      "min_ms": 20.28,
-      "max_ms": 20.82,
+      "median_ms": 19.24,
+      "min_ms": 18.98,
+      "max_ms": 20.0,
       "det": true,
       "role": "stress"
     },
@@ -3200,7 +3200,7 @@
           "max_ratio": 1.2140883573014458
         },
         "edge_length": {
-          "intra_layer_cv": 0.16732295354556792,
+          "intra_layer_cv": 0.1673229535455679,
           "max_min_ratio": 2.6343181414015238,
           "outlier_count": 0
         },
@@ -3218,9 +3218,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 7.39,
-      "min_ms": 7.18,
-      "max_ms": 7.66,
+      "median_ms": 7.31,
+      "min_ms": 7.07,
+      "max_ms": 7.52,
       "det": true,
       "role": "stress"
     },
@@ -3320,9 +3320,9 @@
           "non_monotone_count": 2
         }
       },
-      "median_ms": 5.21,
-      "min_ms": 4.97,
-      "max_ms": 5.55,
+      "median_ms": 4.96,
+      "min_ms": 4.85,
+      "max_ms": 5.11,
       "det": true,
       "role": "stress"
     },
@@ -3406,9 +3406,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.29,
-      "min_ms": 0.28,
-      "max_ms": 0.37,
+      "median_ms": 0.27,
+      "min_ms": 0.26,
+      "max_ms": 0.27,
       "det": true,
       "role": "stress"
     },
@@ -3508,9 +3508,9 @@
           "non_monotone_count": 5
         }
       },
-      "median_ms": 3.37,
-      "min_ms": 3.28,
-      "max_ms": 3.43,
+      "median_ms": 3.16,
+      "min_ms": 3.14,
+      "max_ms": 3.22,
       "det": true,
       "role": "stress"
     },
@@ -3594,9 +3594,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 1.16,
-      "min_ms": 1.13,
-      "max_ms": 1.24,
+      "median_ms": 1.11,
+      "min_ms": 1.1,
+      "max_ms": 1.23,
       "det": true,
       "role": "stress"
     }

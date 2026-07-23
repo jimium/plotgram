@@ -455,6 +455,16 @@ pub fn fix_reverse_stub_ports(
 
         match best {
             Some((new_from, new_to, nf_ep, nt_ep, candidate, _)) => {
+                if stubfix_dbg_edge(relations, ei) {
+                    let path_str: Vec<String> = candidate
+                        .iter()
+                        .map(|p| format!("({:.0},{:.0})", p.x, p.y))
+                        .collect();
+                    eprintln!(
+                        "[stubfix_dbg] edge[{}] ACCEPT from {:?}->{:?} to {:?}->{:?} (old_len={:.0})\n    new_path: {}",
+                        ei, old_from, new_from, old_to, new_to, old_path_len, path_str.join(" -> ")
+                    );
+                }
                 from_side[ei] = new_from;
                 to_side[ei] = new_to;
                 endpoint_map.insert((ei, true), nf_ep);
@@ -492,6 +502,19 @@ pub fn fix_reverse_stub_ports(
 ///
 /// 跳过空路径边和侧通道边。对每条边检测 from/to 端点的反向 stub、
 /// 侧向接入、退化 stub，生成对应的 `PortFix` 建议。
+fn stubfix_dbg_enabled() -> bool {
+    std::env::var("PLOTGRAM_STUBFIX_DEBUG")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+}
+
+fn stubfix_dbg_edge(relations: &[crate::ast::Relation], ei: usize) -> bool {
+    stubfix_dbg_enabled()
+        && relations
+            .get(ei)
+            .is_some_and(|r| r.from.as_str().contains("revise") || r.to.as_str().contains("revise"))
+}
+
 fn collect_edges_to_check(
     edges: &[EdgeLayout],
     relations: &[crate::ast::Relation],
@@ -566,6 +589,28 @@ fn collect_edges_to_check(
         };
 
         if !matches!(from_fix, PortFix::None) || !matches!(to_fix, PortFix::None) {
+            if stubfix_dbg_edge(relations, ei) {
+                let path_str: Vec<String> = points
+                    .iter()
+                    .map(|p| format!("({:.0},{:.0})", p.x, p.y))
+                    .collect();
+                eprintln!(
+                    "[stubfix_dbg] edge[{}] {} -> {} | from_side={:?} to_side={:?}\n    from_rev={} to_rev={} degenerate={} from_side_app={:?} to_side_app={:?}\n    from_fix={:?} to_fix={:?}\n    path: {}",
+                    ei,
+                    relations[ei].from,
+                    relations[ei].to,
+                    from_side[ei],
+                    to_side[ei],
+                    from_rev,
+                    to_rev,
+                    degenerate,
+                    from_side_approach,
+                    to_side_approach,
+                    from_fix,
+                    to_fix,
+                    path_str.join(" -> ")
+                );
+            }
             edges_to_check.push(EdgeToCheck {
                 ei,
                 from_fix,

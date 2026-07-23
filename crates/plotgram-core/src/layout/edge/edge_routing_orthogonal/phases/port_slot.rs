@@ -75,6 +75,7 @@ pub(crate) fn phase_port_slot(
     // choose_pair_sides 逐对独立选端口，同一节点的多条边可能分散在不同侧出发，
     // 导致节点附近不必要的交叉。此阶段对每个节点的多条边做"同侧偏好"协调：
     // 统计各侧边数，让少数派边在几何可接受时切换到多数派侧。
+    dbg_ports("after_choose", relations, &from_side, &to_side);
     coordinate_port_sides(
         relations,
         nodes,
@@ -82,6 +83,7 @@ pub(crate) fn phase_port_slot(
         &mut to_side,
         Some(group_ctx),
     );
+    dbg_ports("after_coordinate", relations, &from_side, &to_side);
     // D4 P2：默认只「拒绝往超载侧合并」（见 coordinate 内）；主动分流需
     // PLOTGRAM_PORT_PRESSURE_RELIEVE=1（较激进，可能抬交叉，默认关）。
     if port_pressure_relieve_enabled() {
@@ -98,6 +100,7 @@ pub(crate) fn phase_port_slot(
         from_side = assignment.from_side;
         to_side = assignment.to_side;
     }
+    dbg_ports("after_port_solver", relations, &from_side, &to_side);
     apply_feedback_side_overrides(
         relations,
         feedback_assignment,
@@ -105,6 +108,7 @@ pub(crate) fn phase_port_slot(
         &mut to_side,
         &mut lane,
     );
+    dbg_ports("after_feedback_override", relations, &from_side, &to_side);
     // S4.x：监控边同排侧廊被堵时改正对端口（须在 slot/endpoint 之前）
     if s4_monitor_corridor {
         feedback_side::apply_monitor_hub_escape_ports(
@@ -116,6 +120,7 @@ pub(crate) fn phase_port_slot(
         );
     }
     align_fanin_target_sides(relations, nodes, &mut to_side);
+    dbg_ports("after_fanin_align", relations, &from_side, &to_side);
     crate::perf_log!(
         "[perf]     step1_ports: {:.2}ms",
         t1.elapsed().as_secs_f64() * 1000.0
@@ -368,6 +373,29 @@ pub(crate) fn phase_port_slot(
         parallel,
         reverse_pairs,
     )
+}
+
+/// 临时调试：PLOTGRAM_PORT_DEBUG=1 时打印含 "revise" 的边的端口流转。
+fn dbg_ports(
+    label: &str,
+    relations: &[crate::ast::Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+) {
+    if !std::env::var("PLOTGRAM_PORT_DEBUG")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+    {
+        return;
+    }
+    for (i, rel) in relations.iter().enumerate() {
+        if rel.from.as_str().contains("revise") || rel.to.as_str().contains("revise") {
+            eprintln!(
+                "[port_dbg] {:24} edge[{}] {} -> {} | from={:?} to={:?}",
+                label, i, rel.from, rel.to, from_side[i], to_side[i]
+            );
+        }
+    }
 }
 
 /// 同宿 FanIn 若全部源节点位于目标同一侧，统一使用目标正对端口。

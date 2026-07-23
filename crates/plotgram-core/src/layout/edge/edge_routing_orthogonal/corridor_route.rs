@@ -219,6 +219,9 @@ pub fn try_build_corridor_path(
         let (exit_side, entry_side) = corridor_sides(corridor, current_group, next_group)?;
 
         if is_first {
+            // A-3（契约①/Stub）：跨组边首段须出源组外边界才允许转弯。corridor 边同样适用——
+            // 把首段 stub 延伸到源组外边界 + 余量，使首个转弯点落在组外（消灭 ISS-001）。
+            let first_stub = group_exit_stub_len(current_gl, exit_side, current, stub);
             if outer_bypass {
                 // 出口停在组框实边上，禁止 corridor_point 把锚点拽到可能被埋的廊心。
                 let exit_border = group_side_border_point(current_gl, exit_side, current);
@@ -226,15 +229,15 @@ pub fn try_build_corridor_path(
                     CorridorAxis::Horizontal if matches!(exit_side, Port::Top | Port::Bottom) => {
                         let mut p = exit_border;
                         p.x += cross_offset;
-                        append_stub_leg(&mut waypoints, &mut current, p, exit_side, stub);
+                        append_stub_leg(&mut waypoints, &mut current, p, exit_side, first_stub);
                     }
                     CorridorAxis::Vertical if matches!(exit_side, Port::Left | Port::Right) => {
                         let mut p = exit_border;
                         p.y += cross_offset;
-                        append_stub_leg(&mut waypoints, &mut current, p, exit_side, stub);
+                        append_stub_leg(&mut waypoints, &mut current, p, exit_side, first_stub);
                     }
                     _ => {
-                        append_stub_leg(&mut waypoints, &mut current, exit_border, exit_side, stub);
+                        append_stub_leg(&mut waypoints, &mut current, exit_border, exit_side, first_stub);
                     }
                 }
             } else {
@@ -246,7 +249,7 @@ pub fn try_build_corridor_path(
                     lane_coord,
                     cross_offset,
                 );
-                append_stub_leg(&mut waypoints, &mut current, exit_border, exit_side, stub);
+                append_stub_leg(&mut waypoints, &mut current, exit_border, exit_side, first_stub);
             }
         } else {
             let join = corridor_point(corridor, lane_coord, current);
@@ -1193,6 +1196,40 @@ pub(crate) fn planned_cross_axis_offset_for_edge(
         return None;
     }
     Some((corridor.axis, offset))
+}
+
+/// A-3（契约①/Stub）：源组外边界出组余量（px）。首段转弯点须明确落在源组 bbox 之外。
+const GROUP_EXIT_STUB_MARGIN: f64 = 8.0;
+
+/// A-3（契约①）：把跨组边首段 stub 延伸到源组外边界 + 余量，保证首个转弯点在组外。
+///
+/// 沿 `side` 外向方向计算锚点到源组边界的距离；若基础 stub 已越过边界则保持不变。
+/// 确定性（AGENTS.md §2）：纯几何计算，不依赖任何迭代顺序。
+fn group_exit_stub_len(gl: &GroupLayout, side: Port, anchor: Point, base_stub: f64) -> f64 {
+    let dist = match side {
+        Port::Right => (gl.x + gl.width) - anchor.x,
+        Port::Left => anchor.x - gl.x,
+        Port::Bottom => (gl.y + gl.height) - anchor.y,
+        Port::Top => anchor.y - gl.y,
+    };
+    base_stub.max(dist + GROUP_EXIT_STUB_MARGIN)
+}
+
+/// A-3（契约①/Stub）：源组外边界出组余量（px）。首段转弯点须明确落在源组 bbox 之外。
+const GROUP_EXIT_STUB_MARGIN: f64 = 8.0;
+
+/// A-3（契约①）：把跨组边首段 stub 延伸到源组外边界 + 余量，保证首个转弯点在组外。
+///
+/// 沿 `side` 外向方向计算锚点到源组边界的距离；若基础 stub 已越过边界则保持不变。
+/// 确定性（AGENTS.md §2）：纯几何计算，不依赖任何迭代顺序。
+fn group_exit_stub_len(gl: &GroupLayout, side: Port, anchor: Point, base_stub: f64) -> f64 {
+    let dist = match side {
+        Port::Right => (gl.x + gl.width) - anchor.x,
+        Port::Left => anchor.x - gl.x,
+        Port::Bottom => (gl.y + gl.height) - anchor.y,
+        Port::Top => anchor.y - gl.y,
+    };
+    base_stub.max(dist + GROUP_EXIT_STUB_MARGIN)
 }
 
 fn append_stub_leg(

@@ -1,4 +1,4 @@
-# Gate baseline 2026-07-22-025109
+# Gate baseline 2026-07-23-022021-det-fix
 
 - note: role-aware baseline: product-gate hard; stress/demo quality soft
 - perf_runs: 5
@@ -8,43 +8,43 @@
 
 | role | file | nodes | edges | exact_sev | tight_sev | exact_pairs | unrelated_trunk | lint_err | median_ms | det | node_fp |
 |------|------|------:|------:|----------:|----------:|------------:|----------------:|---------:|----------:|:---:|---------|
-| product | `product.three-tier.pgm` | 3 | 4 | 0.0 | 0.0 | 0 | 0 | 0 | 0.65 | True | `3e259f98e91b` |
-| product | `product.typical-microservice-architecture.pgm` | 8 | 16 | 0.0 | 1048.5 | 0 | 0 | 0 | 10.41 | True | `4a4f75c01284` |
-| product | `product.flat-rest-api.pgm` | 7 | 7 | 0.0 | 0.0 | 0 | 0 | 0 | 0.92 | True | `d4e78ac57d33` |
-| product | `product.microservices.pgm` | 7 | 8 | 0.0 | 0.0 | 0 | 0 | 0 | 2.04 | True | `c9677e8dcc89` |
-| product | `product.cdn-cache.pgm` | 7 | 9 | 0.0 | 0.0 | 0 | 0 | 3 | 4.27 | True | `07c6f49a65d4` |
-| product | `product.cloud-native.pgm` | 12 | 14 | 0.0 | 3737.9 | 0 | 0 | 0 | 14.79 | True | `9f65c150ca8d` |
-| product | `product.ecommerce-platform.pgm` | 18 | 19 | 0.0 | 256.0 | 0 | 0 | 0 | 38.2 | True | `7e475eead0e0` |
-| product | `product.message-queue-pipeline.pgm` | 7 | 7 | 0.0 | 0.0 | 0 | 0 | 0 | 1.46 | True | `d18fb9b4a109` |
-| product | `product.monitoring-stack.pgm` | 7 | 6 | 0.0 | 0.0 | 0 | 0 | 0 | 0.86 | True | `ae58ba68efb9` |
-| product | `product.narrow-corridor.pgm` | 6 | 5 | 0.0 | 924.0 | 0 | 0 | 0 | 0.95 | True | `40ceea55a4fa` |
-| product | `product.linear-chain.pgm` | 3 | 2 | 0.0 | 0.0 | 0 | 0 | 0 | 0.15 | True | `5f5d07b14332` |
-| product | `product.user-auth.pgm` | 5 | 8 | 0.0 | 52.0 | 0 | 0 | 2 | 2.1 | True | `dbd04803f810` |
-| product | `product.refund-process.pgm` | 10 | 11 | 0.0 | 0.0 | 0 | 0 | 0 | 3.08 | True | `666e5bba2d22` |
-| product | `product.swimlane-order-process.pgm` | 8 | 7 | 0.0 | 0.0 | 0 | 0 | 0 | 1.3 | True | `66779b4cdad7` |
-| product | `product.password-reset.pgm` | 10 | 11 | 0.0 | 0.0 | 0 | 0 | 0 | 11.06 | True | `361dcb53f1ce` |
-| product | `product.leave-approval-process.pgm` | 10 | 11 | 0.0 | 0.0 | 0 | 0 | 0 | 10.18 | True | `715d71a2dc16` |
-| product | `product.self-loop-retry.pgm` | 7 | 8 | 0.0 | 0.0 | 0 | 0 | 0 | 1.68 | True | `bcb00f9dcbc5` |
-| product | `product.symmetric-fanout.pgm` | 6 | 7 | 0.0 | 0.0 | 0 | 0 | 0 | 1.18 | True | `f04c96299ba9` |
-| product | `product.oauth-login.pgm` | 4 | 8 | 0.0 | 0.0 | 0 | 0 | 0 | 0.1 | True | `4755c2fe5499` |
+| product | `product.three-tier.pgm` | 3 | 4 | 0.0 | 0.0 | 0 | 0 | 0 | 0.27 | True | `3e259f98e91b` |
+| product | `product.typical-microservice-architecture.pgm` | 8 | 16 | 0.0 | 1048.5 | 0 | 0 | 0 | 9.73 | True | `4a4f75c01284` |
+| product | `product.flat-rest-api.pgm` | 7 | 7 | 0.0 | 0.0 | 0 | 0 | 0 | 1.03 | True | `d4e78ac57d33` |
+| product | `product.microservices.pgm` | 7 | 8 | 0.0 | 0.0 | 0 | 0 | 0 | 2.03 | True | `c9677e8dcc89` |
+| product | `product.cdn-cache.pgm` | 7 | 9 | 0.0 | 0.0 | 0 | 0 | 3 | 4.52 | True | `07c6f49a65d4` |
+| product | `product.cloud-native.pgm` | 12 | 14 | 0.0 | 3737.9 | 0 | 0 | 0 | 14.59 | True | `9f65c150ca8d` |
+| product | `product.ecommerce-platform.pgm` | 18 | 19 | 0.0 | 256.0 | 0 | 0 | 0 | 38.57 | True | `7e475eead0e0` |
+| product | `product.message-queue-pipeline.pgm` | 7 | 7 | 0.0 | 0.0 | 0 | 0 | 0 | 1.52 | True | `d18fb9b4a109` |
+| product | `product.monitoring-stack.pgm` | 7 | 6 | 0.0 | 0.0 | 0 | 0 | 0 | 0.88 | True | `ae58ba68efb9` |
+| product | `product.narrow-corridor.pgm` | 6 | 5 | 0.0 | 924.0 | 0 | 0 | 0 | 0.86 | True | `40ceea55a4fa` |
+| product | `product.linear-chain.pgm` | 3 | 2 | 0.0 | 0.0 | 0 | 0 | 0 | 0.16 | True | `5f5d07b14332` |
+| product | `product.user-auth.pgm` | 5 | 8 | 0.0 | 52.0 | 0 | 0 | 2 | 2.12 | True | `dbd04803f810` |
+| product | `product.refund-process.pgm` | 10 | 11 | 0.0 | 0.0 | 0 | 0 | 1 | 2.49 | True | `e7684b609462` |
+| product | `product.swimlane-order-process.pgm` | 8 | 7 | 0.0 | 0.0 | 0 | 0 | 0 | 1.4 | True | `66779b4cdad7` |
+| product | `product.password-reset.pgm` | 10 | 11 | 11.0 | 0.0 | 1 | 0 | 1 | 3.34 | True | `5255a3b5f303` |
+| product | `product.leave-approval-process.pgm` | 10 | 11 | 56.0 | 0.0 | 1 | 0 | 0 | 6.33 | True | `0ac70ec76688` |
+| product | `product.self-loop-retry.pgm` | 7 | 8 | 0.0 | 0.0 | 0 | 0 | 0 | 0.8 | True | `e2b6a467c43d` |
+| product | `product.symmetric-fanout.pgm` | 6 | 7 | 0.0 | 0.0 | 0 | 0 | 0 | 1.2 | True | `f04c96299ba9` |
+| product | `product.oauth-login.pgm` | 4 | 8 | 0.0 | 0.0 | 0 | 0 | 0 | 0.09 | True | `4755c2fe5499` |
 | product | `product.payment-gateway.pgm` | 5 | 11 | 0.0 | 0.0 | 0 | 0 | 0 | 0.15 | True | `7a84ab95e0db` |
 | product | `product.sms-verification.pgm` | 5 | 11 | 0.0 | 0.0 | 0 | 0 | 0 | 0.15 | True | `fbfce343e7cb` |
 | product | `product.jwt-refresh-token.pgm` | 5 | 10 | 0.0 | 0.0 | 0 | 0 | 0 | 0.14 | True | `ac27d97f63bf` |
 | product | `product.order-lifecycle.pgm` | 8 | 8 | 0.0 | 0.0 | 0 | 0 | 0 | 1.05 | True | `cc7e1d0b40de` |
-| product | `product.user-session.pgm` | 7 | 9 | 0.0 | 0.0 | 0 | 0 | 0 | 2.36 | True | `693382c52243` |
-| product | `product.payment-flow.pgm` | 10 | 12 | 0.0 | 0.0 | 0 | 0 | 0 | 2.65 | True | `f450344eba6c` |
-| product | `product.delivery-tracking.pgm` | 7 | 7 | 0.0 | 0.0 | 0 | 0 | 0 | 0.85 | True | `5f0c91bb9cd4` |
-| product | `product.blog-schema.pgm` | 5 | 5 | 0.0 | 0.0 | 0 | 0 | 0 | 0.46 | True | `2697cc2801e8` |
-| product | `product.saas-schema.pgm` | 9 | 10 | 0.0 | 0.0 | 0 | 0 | 2 | 6.84 | True | `d5b707a7ffd5` |
-| product | `product.crm-schema.pgm` | 5 | 5 | 0.0 | 0.0 | 0 | 0 | 0 | 0.42 | True | `48dc1acfbfd1` |
-| product | `product.tech-stack.pgm` | 10 | 9 | 0.0 | 0.0 | 0 | 0 | 0 | 0.11 | True | `0ca6f63c0463` |
-| stress | `stress.layout-stress-nested.pgm` | 11 | 13 | 0.0 | 1221.3 | 0 | 0 | 1 | 5.97 | True | `9a6a0e378a24` |
-| stress | `stress.layout-stress-flat-mesh.pgm` | 11 | 20 | 174.0 | 1777.9 | 4 | 3 | 0 | 19.92 | True | `248354c8f90f` |
-| stress | `stress.layout-stress-dense.pgm` | 7 | 16 | 0.0 | 0.0 | 0 | 0 | 1 | 7.25 | True | `b0ebcb2adf99` |
-| stress | `stress.layout-stress-dag.pgm` | 11 | 18 | 112.0 | 957.6 | 1 | 0 | 0 | 5.33 | True | `551853faab1d` |
-| stress | `stress.layout-stress-lifelines.pgm` | 5 | 14 | 0.0 | 0.0 | 0 | 0 | 0 | 0.27 | True | `fe2fb3af3190` |
-| stress | `stress.layout-stress-transitions.pgm` | 9 | 14 | 40.0 | 0.0 | 1 | 0 | 0 | 3.14 | True | `eca06cfcc91b` |
-| stress | `stress.layout-stress-deep.pgm` | 63 | 62 | 0.0 | 0.0 | 0 | 0 | 0 | 1.21 | True | `ab55aa0d8694` |
+| product | `product.user-session.pgm` | 7 | 9 | 0.0 | 0.0 | 0 | 0 | 0 | 2.38 | True | `693382c52243` |
+| product | `product.payment-flow.pgm` | 10 | 12 | 0.0 | 0.0 | 0 | 0 | 0 | 2.66 | True | `f450344eba6c` |
+| product | `product.delivery-tracking.pgm` | 7 | 7 | 0.0 | 0.0 | 0 | 0 | 0 | 0.77 | True | `5f0c91bb9cd4` |
+| product | `product.blog-schema.pgm` | 5 | 5 | 0.0 | 0.0 | 0 | 0 | 0 | 0.47 | True | `2697cc2801e8` |
+| product | `product.saas-schema.pgm` | 9 | 10 | 0.0 | 0.0 | 0 | 0 | 2 | 6.74 | True | `d5b707a7ffd5` |
+| product | `product.crm-schema.pgm` | 5 | 5 | 0.0 | 0.0 | 0 | 0 | 0 | 0.38 | True | `48dc1acfbfd1` |
+| product | `product.tech-stack.pgm` | 10 | 9 | 0.0 | 0.0 | 0 | 0 | 0 | 0.1 | True | `0ca6f63c0463` |
+| stress | `stress.layout-stress-nested.pgm` | 11 | 13 | 0.0 | 1221.3 | 0 | 0 | 1 | 6.19 | True | `9a6a0e378a24` |
+| stress | `stress.layout-stress-flat-mesh.pgm` | 11 | 20 | 174.0 | 1777.9 | 4 | 3 | 0 | 20.52 | True | `248354c8f90f` |
+| stress | `stress.layout-stress-dense.pgm` | 7 | 16 | 0.0 | 0.0 | 0 | 0 | 1 | 7.39 | True | `b0ebcb2adf99` |
+| stress | `stress.layout-stress-dag.pgm` | 11 | 18 | 112.0 | 957.6 | 1 | 0 | 0 | 5.21 | True | `551853faab1d` |
+| stress | `stress.layout-stress-lifelines.pgm` | 5 | 14 | 0.0 | 0.0 | 0 | 0 | 0 | 0.29 | True | `fe2fb3af3190` |
+| stress | `stress.layout-stress-transitions.pgm` | 9 | 14 | 40.0 | 0.0 | 1 | 0 | 0 | 3.37 | True | `eca06cfcc91b` |
+| stress | `stress.layout-stress-deep.pgm` | 63 | 62 | 0.0 | 0.0 | 0 | 0 | 0 | 1.16 | True | `ab55aa0d8694` |
 
 复跑: `./benchmarks/snapshot.sh`
 对比: `./benchmarks/compare.sh <baseline.json> <current.json>`

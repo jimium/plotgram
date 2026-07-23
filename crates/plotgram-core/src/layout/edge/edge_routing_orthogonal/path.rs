@@ -424,6 +424,22 @@ pub fn select_best_path_with_scorer_stats(
         &mut state,
     );
 
+    // A-3（契约①/Stub）：跨组边追加「出组 stub」候选——首段延伸到源组外边界再转弯，
+    // 使评分器能在「组内提前转弯」与「出组后转弯」之间选择后者（消灭 ISS-001）。
+    if let Some(exit_stub) = source_group_exit_stub_len(ctx, from_id, to_id, from_side, sx, sy) {
+        if exit_stub > PORT_CLEARANCE + EPS {
+            evaluate_path_batch(
+                build_candidate_paths(sx, sy, from_side, ex, ey, to_side, exit_stub, PORT_CLEARANCE),
+                ctx,
+                pair,
+                scorer,
+                from_id,
+                to_id,
+                &mut state,
+            );
+        }
+    }
+
     // P1-1 trunk+fork：flowchart profile 额外评估 fork 候选（单侧 stub_len=0）
     if ctx.profile.prefer_trunk_fork {
         evaluate_path_batch(
@@ -858,6 +874,52 @@ fn ensure_port_stubs(mut path: Vec<Point>, from_side: Port, to_side: Port) -> Ve
     }
     out.push(end);
     simplify_path(out, true)
+}
+
+/// A-3（契约①/Stub）：出组 stub 需越过源组外边界的额外余量（px）。
+///
+/// stub 终点（首个转弯点）须明确落在源组 bbox 之外，余量保证转弯点不贴在边界上。
+const GROUP_EXIT_STUB_MARGIN: f64 = 8.0;
+
+/// A-3（契约①/Stub）：跨组边源端 stub 需延伸到源组外边界的最小长度。
+///
+/// 跨组边（源在某叶子组内、目标不在同叶子组）从源锚点沿端口外向延伸，首段终点
+/// 必须越过源组外边界才允许首个转弯。返回 `Some(len)`（≥ PORT_CLEARANCE）表示
+/// 该边需要这么长的出组 stub；返回 `None` 表示非跨组边 / 无组，沿用 PORT_CLEARANCE。
+///
+/// 确定性（AGENTS.md §2）：仅做 HashMap 查询，不参与迭代驱动。
+fn source_group_exit_stub_len(
+    ctx: &OrthoRoutingContext<'_>,
+    from_id: &str,
+    to_id: &str,
+    from_side: Port,
+    sx: f64,
+    sy: f64,
+) -> Option<f64> {
+    let from_leaf = ctx.group_ctx.node_leaf_group.get(from_id)?;
+    if ctx.group_ctx.node_leaf_group.get(to_id) == Some(from_leaf) {
+        return None; // 同叶子组内部边，无需出组
+    }
+    let group = ctx.group_ctx.groups.get(from_leaf)?;
+    let (ox, oy) = port_outward(from_side);
+    // 沿端口外向方向，从源锚点到源组外边界的距离。
+    let dist = if ox > 0.0 {
+        (group.x + group.width) - sx // Right
+    } else if ox < 0.0 {
+        sx - group.x // Left
+    } else if oy > 0.0 {
+        (group.y + group.height) - sy // Bottom
+    } else {
+        sy - group.y // Top
+    };
+    let len = (dist + GROUP_EXIT_STUB_MARGIN).max(PORT_CLEARANCE);
+    if std::env::var("PLOTGRAM_STUB_EXIT_DEBUG").map(|v| v == "1").unwrap_or(false) {
+        eprintln!(
+            "[stub_exit_dbg] {} -> {} side={:?} anchor=({:.0},{:.0}) group_bbox=({:.0},{:.0})-({:.0},{:.0}) dist={:.0} exit_stub={:.0}",
+            from_id, to_id, from_side, sx, sy, group.x, group.y, group.x + group.width, group.y + group.height, dist, len
+        );
+    }
+    Some(len)
 }
 
 fn groups_outer_bounds(ctx: &OrthoRoutingContext<'_>) -> Option<(f64, f64, f64, f64)> {

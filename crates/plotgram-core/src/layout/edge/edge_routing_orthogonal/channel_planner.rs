@@ -152,7 +152,11 @@ fn collect_channel_candidates(
     let mut candidates = Vec::new();
 
     // 组间隙中点
-    let group_ids: Vec<&String> = group_ctx.groups.keys().collect();
+    // 确定性（AGENTS.md §2）：HashMap keys 迭代序不稳定，排序后再枚举对，
+    // 保证 candidates Vec 顺序确定——find_best_channel 平局按 Vec 序取胜，
+    // 顺序不定会导致 planned_ch 跨运行抖动（flat-mesh 非确定性根因）。
+    let mut group_ids: Vec<&String> = group_ctx.groups.keys().collect();
+    group_ids.sort();
     for i in 0..group_ids.len() {
         for j in (i + 1)..group_ids.len() {
             let g1 = &group_ctx.groups[group_ids[i]];
@@ -195,7 +199,9 @@ fn collect_channel_candidates(
     }
 
     // 节点间隙中点
-    let node_ids: Vec<&String> = nodes.keys().collect();
+    // 确定性（AGENTS.md §2）：同上，排序后再枚举对。
+    let mut node_ids: Vec<&String> = nodes.keys().collect();
+    node_ids.sort();
     for i in 0..node_ids.len() {
         for j in (i + 1)..node_ids.len() {
             let n1 = &nodes[node_ids[i]];
@@ -365,7 +371,8 @@ mod tests {
     /// 仅收集节点间隙候选（用于测试）
     fn collect_node_gap_candidates(nodes: &HashMap<String, NodeLayout>) -> Vec<ChannelCandidate> {
         let mut candidates = Vec::new();
-        let node_ids: Vec<&String> = nodes.keys().collect();
+        let mut node_ids: Vec<&String> = nodes.keys().collect();
+        node_ids.sort();
         for i in 0..node_ids.len() {
             for j in (i + 1)..node_ids.len() {
                 let n1 = &nodes[node_ids[i]];

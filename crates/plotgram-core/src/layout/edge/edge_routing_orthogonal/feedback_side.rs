@@ -101,14 +101,27 @@ pub fn assign_feedback_sides(
             nodes,
             horizontal,
         );
+        let proj_overlap = projections_overlap_on_cross_axis(from_nl, to_nl, horizontal);
+        if feedback_dbg_enabled() {
+            eprintln!(
+                "[feedback_dbg] edge[{}] {} -> {} | span={} opposite_clean={} proj_overlap={}",
+                edge_index, rel.from, rel.to, rank_span, opposite_clean, proj_overlap
+            );
+        }
         if rank_span < LONG_SPAN_SIDE_THRESHOLD {
             if prefers_opposite_ports_over_side_channel(from_nl, to_nl, rank_span, horizontal)
                 && opposite_clean
             {
+                if feedback_dbg_enabled() {
+                    eprintln!("[feedback_dbg]   -> SKIP (short-span opposite)");
+                }
                 continue;
             }
-        } else if opposite_clean && projections_overlap_on_cross_axis(from_nl, to_nl, horizontal) {
+        } else if opposite_clean && proj_overlap {
             // 长跨度但正对路径干净且节点在交叉轴投影重叠 → 不强制侧通道
+            if feedback_dbg_enabled() {
+                eprintln!("[feedback_dbg]   -> SKIP (long-span opposite clean+overlap)");
+            }
             continue;
         }
 
@@ -291,6 +304,13 @@ fn reversed_edge_indices(diagram: &Diagram, relations: &[Relation]) -> Vec<usize
         .collect();
     indices.sort();
     indices
+}
+
+/// 临时调试开关：PLOTGRAM_FEEDBACK_DEBUG=1 时打印回环边侧通道决策明细。
+fn feedback_dbg_enabled() -> bool {
+    std::env::var("PLOTGRAM_FEEDBACK_DEBUG")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
 }
 
 fn graph_center(nodes: &HashMap<String, NodeLayout>, horizontal: bool) -> f64 {

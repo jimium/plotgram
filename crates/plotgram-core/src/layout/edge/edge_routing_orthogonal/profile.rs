@@ -14,6 +14,8 @@ pub struct ScoringWeights {
     pub channel_alignment: f64,
     /// P2-2: 交叉惩罚权重（候选路径与已路由边交叉时惩罚）
     pub crossing: f64,
+    /// A-2（契约③/Middle）：远离惩罚权重（段使到目标曼哈顿距离增大时按增量惩罚）
+    pub away: f64,
 }
 
 impl Default for ScoringWeights {
@@ -26,6 +28,7 @@ impl Default for ScoringWeights {
             channel_load: 1.0,
             channel_alignment: 1.0,
             crossing: 1.0,
+            away: 1.0,
         }
     }
 }
@@ -95,6 +98,7 @@ fn architecture_default_profile() -> OrthoRoutingProfile {
             channel_load: 1.0,
             channel_alignment: 1.0,
             crossing: 1.0,
+            away: 1.0,
         },
         prefer_trunk_fork: false,
     }

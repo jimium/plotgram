@@ -69,3 +69,12 @@
 - **卫生红线不豁免**：确定性（§2）、禁止图名特判、`cargo run -p plotgram-cli` 验真、WASM 禁 `std::time`——仍然有效。
 
 **恢复条件**：本轮全局优化完成（Phase A/B/C 收敛）后，删除本节或标注「已失效」，恢复正常门禁。
+
+## 9. 日常验证禁止默认 `--release`
+
+日常改代码、跑测试、验渲染时，**不得默认使用 `cargo build --release` 或 `cargo test --release`**。release 编译慢，且与多数验证场景无关。
+
+- **编译检查**：`cargo check -p plotgram-core`（或目标 crate），不必先 `build --release`。
+- **单元测试**：`cargo test -p plotgram-core`（默认 debug profile，与 CI 一致）。`cargo test` 不会用到 `target/release/` 下的产物；先 `build --release` 再 `cargo test` 等于白等一轮慢编译。
+- **渲染验真**：`cargo run -p plotgram-cli -- render <图> -o /tmp/out.svg`（默认 debug）。勿直接执行 `./target/release/plotgram`，易命中陈旧 binary（见 §5）。
+- **仅以下场景用 `--release`**：性能测量、`bench-phases` / `gate-baseline`、或 [`benchmarks/snapshot.sh`](benchmarks/snapshot.sh) / [`benchmarks/compare.sh`](benchmarks/compare.sh) 等门禁脚本（脚本内已自行 release 构建）。

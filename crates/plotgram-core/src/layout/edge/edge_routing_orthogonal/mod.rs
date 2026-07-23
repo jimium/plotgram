@@ -39,6 +39,7 @@ pub(super) mod simplify;
 pub(super) mod slot;
 pub(super) mod slot_replan;
 pub(super) mod conflict_reroute;
+pub(super) mod contract;
 pub(super) mod sanitize;
 pub(super) mod straighten;
 pub(super) mod stub_fix;
