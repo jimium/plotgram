@@ -13,10 +13,10 @@ use crate::ast::{Diagram, Entity};
 use crate::layout;
 
 /// 节点标签渲染字号（与 Clean Light `typography.label_size` 对齐）。
-pub const NODE_LABEL_FONT_SIZE: f64 = 13.0;
+pub const NODE_LABEL_FONT_SIZE: f64 = 17.0;
 
 /// 边标签估宽所用的参考字号（`DEFAULT_*_CHAR_WIDTH` 的标定基准）。
-const LABEL_WIDTH_REF_FONT_SIZE: f64 = 11.0;
+const LABEL_WIDTH_REF_FONT_SIZE: f64 = 14.0;
 
 /// 左右 padding + border 总宽度（约 `2 × node_padding_x(14) + stroke`）。
 pub const LABEL_WIDTH_OFFSET: f64 = 32.0;

@@ -192,6 +192,16 @@ mod tests {
             "flowchart edge stroke_opacity"
         );
         assert_eq!(
+            edge.get("label_bg").and_then(|v| v.as_str()),
+            Some("canvas"),
+            "flowchart edge label_bg follows canvas"
+        );
+        assert_eq!(
+            edge.get("label_bg_opacity").and_then(|v| v.as_number()),
+            Some(1.0),
+            "flowchart edge label_bg_opacity"
+        );
+        assert_eq!(
             compiled
                 .canvas
                 .get("background")

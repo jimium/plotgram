@@ -112,7 +112,7 @@ pub fn edge_style_from_attributes(relation: &Relation) -> EdgeStyle {
         ls.font_weight = Some(v);
     }
 
-    // 背景色（"none" = 透明）
+    // 背景色（"none" = 透明，"canvas" = 跟随画布背景色）
     if let Some(AttributeValue::String(v)) = s.get(style_attr_keys::LABEL_BG) {
         ls.bg_color = if v.eq_ignore_ascii_case("none") {
             None

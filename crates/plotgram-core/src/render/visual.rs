@@ -147,12 +147,12 @@ pub struct EdgeLabelStyle {
 impl Default for EdgeLabelStyle {
     fn default() -> Self {
         Self {
-            font_size: 11.0,
+            font_size: 14.0,
             font_family: "inherit".to_string(),
             font_weight: None,
             text_color: "#666".to_string(),
             bg_color: Some("#ffffff".to_string()),
-            bg_opacity: 0.85,
+            bg_opacity: 1.0,
             border_color: None,
             border_width: 0.0,
             border_radius: 3.0,

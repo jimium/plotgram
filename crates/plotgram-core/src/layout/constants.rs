@@ -63,8 +63,8 @@ pub const DEFAULT_LABEL_PERP_OFFSET: f64 = 8.0;
 /// S5.2b：无组 architecture 的标签法向最小净空（有组 / nested 仍用 DEFAULT，避免回归）
 pub const ARCH_UNGROUPED_LABEL_PERP_OFFSET: f64 = 12.0;
 
-/// 默认标签字号
-pub const DEFAULT_LABEL_FONT_SIZE: f64 = 11.0;
+/// 默认标签字号（与 Clean Light `typography.small_size` 对齐）
+pub const DEFAULT_LABEL_FONT_SIZE: f64 = 14.0;
 
 /// 默认标签内边距（circular 使用 6.0）
 pub const DEFAULT_LABEL_PADDING: f64 = 4.0;

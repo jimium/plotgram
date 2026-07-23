@@ -49,9 +49,9 @@
     },
     "typography": {
       "font_family": "'Inter', 'Noto Sans CJK SC', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif",
-      "title_size": 16,
-      "label_size": 13,
-      "small_size": 11,
+      "title_size": 21,
+      "label_size": 17,
+      "small_size": 14,
       "font_weight_regular": 400,
       "font_weight_medium": 500,
       "font_weight_bold": 600
@@ -116,9 +116,9 @@
       "stroke_opacity": 1.0,
       "arrow_style": "normal",
       "arrow_fill": "{colors.arrow_fill}",
-      "label_bg": "none",
+      "label_bg": "canvas",
       "label_border": "none",
-      "label_bg_opacity": 0,
+      "label_bg_opacity": 1.0,
       "label_border_width": 0,
       "label_border_radius": 4,
       "label_padding": 3
@@ -135,7 +135,9 @@
   "diagrams": {
     "flowchart": {
       "edge": {
-        "stroke": "{colors.edge_stroke}"
+        "stroke": "{colors.edge_stroke}",
+        "label_bg": "canvas",
+        "label_bg_opacity": 1.0
       },
       "entity_types": {
         "service": {

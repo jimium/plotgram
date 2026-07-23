@@ -11,7 +11,7 @@ use crate::types::DiagramType;
 use std::fmt::Write;
 
 pub const ARROW_SIZE: f64 = 8.0;
-pub const FONT_SIZE: f64 = 13.0;
+pub const FONT_SIZE: f64 = 17.0;
 pub const NODE_RX: f64 = 8.0;
 
 pub const ATTRIBUTION_URL: &str = "https://demo.plotgram.dev/";
@@ -621,8 +621,22 @@ pub fn render_edge_label(
         .unwrap();
     }
 
-    // 背景矩形（半透明白底，避免边路径穿过文字）
+    // 背景矩形（不透明画布背景色，完全遮盖边路径）
+    // ISS-004：bg 色取主题画布背景（默认白），而非硬编码；透明度 1.0
     if let Some(ref bg) = label_style.bg_color {
+        let effective_bg = if bg.eq_ignore_ascii_case("canvas")
+            || bg == "#ffffff"
+            || bg.eq_ignore_ascii_case("white")
+        {
+            context
+                .compiled
+                .canvas_block()
+                .get("background")
+                .and_then(|v| v.as_str())
+                .unwrap_or("#ffffff")
+        } else {
+            bg.as_str()
+        };
         let rx = lx - w / 2.0;
         let ry = ly - h / 2.0;
         let border_attr = label_style
@@ -644,7 +658,7 @@ pub fn render_edge_label(
             w = w,
             h = h,
             br = label_style.border_radius,
-            bg = escape_xml(bg),
+            bg = escape_xml(effective_bg),
             op = label_style.bg_opacity,
             border = border_attr,
         )

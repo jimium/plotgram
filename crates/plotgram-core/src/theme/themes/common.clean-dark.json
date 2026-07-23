@@ -111,9 +111,9 @@
       "stroke_linejoin": "round",
       "stroke_opacity": 0.45,
       "arrow_style": "normal",
-      "label_bg": "none",
+      "label_bg": "canvas",
       "label_border": "none",
-      "label_bg_opacity": 0,
+      "label_bg_opacity": 1.0,
       "label_border_width": 0,
       "label_border_radius": 4,
       "label_padding": 3
