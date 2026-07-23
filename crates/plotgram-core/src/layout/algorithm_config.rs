@@ -139,16 +139,6 @@ define_layout_config! {
 }
 
 define_layout_config! {
-    /// 力导向布局已解析的运行时配置。
-    pub struct ForceDirectedLayoutConfig {
-        options = FORCE_DIRECTED_LAYOUT_OPTIONS;
-        group_padding: "group_padding" ; OptionKind::NonNegativeNumber ; constants::FORCE_DIRECTED_GROUP_PADDING ; "分组包围框内边距",
-        padding: "padding" ; OptionKind::NonNegativeNumber ; constants::WIDE_PADDING ; "画布内边距",
-        component_gap: "component_gap" ; OptionKind::NonNegativeNumber ; constants::FORCE_DIRECTED_COMPONENT_GAP ; "连通分量之间的水平间距",
-    }
-}
-
-define_layout_config! {
     /// architecture 布局已解析的运行时配置。
     pub struct ArchitectureV2LayoutConfig {
         options = ARCHITECTURE_V2_LAYOUT_OPTIONS;

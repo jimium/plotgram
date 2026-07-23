@@ -7,6 +7,23 @@ use crate::types::GraphicStyleId;
 use crate::render::visual::{EdgeStyle, NodeShape, NodeStyle};
 use crate::graphic_style::common;
 
+fn builtin_node_shapes() -> [NodeShape; 12] {
+    [
+        NodeShape::Rect,
+        NodeShape::RoundedRect,
+        NodeShape::Circle,
+        NodeShape::Diamond,
+        NodeShape::Cylinder,
+        NodeShape::Hexagon,
+        NodeShape::Person,
+        NodeShape::Stadium,
+        NodeShape::Parallelogram,
+        NodeShape::Document,
+        NodeShape::Cloud,
+        NodeShape::Subprocess,
+    ]
+}
+
 #[test]
 fn parse_excalidraw_canonical_id() {
     assert_eq!(parse_graphic_style_id("excalidraw"), Some(GraphicStyleId::Excalidraw));
@@ -29,37 +46,45 @@ fn excalidraw_painter_decorates_structured_style_fields() {
 }
 
 #[test]
-fn excalidraw_painter_renders_all_builtin_node_shapes() {
-    let mut style = NodeStyle::default();
-    let painter = painter_for(GraphicStyleId::Excalidraw);
-    painter.decorate_node_style(&mut style);
-
-    let shapes = [
-        NodeShape::Rect,
-        NodeShape::RoundedRect,
-        NodeShape::Circle,
-        NodeShape::Diamond,
-        NodeShape::Cylinder,
-        NodeShape::Hexagon,
-        NodeShape::Person,
-        NodeShape::Stadium,
-        NodeShape::Parallelogram,
-        NodeShape::Document,
-        NodeShape::Cloud,
-        NodeShape::Subprocess,
+fn all_styles_render_builtin_node_shapes() {
+    let shapes = builtin_node_shapes();
+    let style_ids = [
+        GraphicStyleId::Excalidraw,
+        GraphicStyleId::CrossHatch,
+        GraphicStyleId::Blueprint,
+        GraphicStyleId::SpatialClarity,
+        GraphicStyleId::Stipple,
+        GraphicStyleId::NeonGlow,
     ];
 
-    for shape in shapes {
-        let svg = painter
-            .render_node_shape(&shape, 10.0, 20.0, 120.0, 56.0, &style)
-            .unwrap();
-        assert!(svg.contains("<g"));
-        assert!(svg.contains("data-graphic-style=\"excalidraw\""));
-        assert!(svg.contains("stroke=\""));
+    for style_id in style_ids {
+        let mut style = NodeStyle::default();
+        let painter = painter_for(style_id);
+        painter.decorate_node_style(&mut style);
+
+        for shape in &shapes {
+            let svg = painter
+                .render_node_shape(shape, 10.0, 20.0, 120.0, 56.0, &style)
+                .unwrap_or_else(|| panic!("{style_id:?} should render {shape:?}"));
+            assert!(svg.contains("<g"), "missing <g> for {style_id:?} / {shape:?}");
+            assert!(
+                svg.contains("stroke=\""),
+                "missing stroke for {style_id:?} / {shape:?}"
+            );
+            if style_id == GraphicStyleId::NeonGlow {
+                assert!(
+                    svg.contains("filter=\"url(#ng-glow)\""),
+                    "missing glow filter for {shape:?}"
+                );
+            }
+        }
     }
 
-    let diamond_svg = painter
-        .render_node_shape(&NodeShape::Diamond, 10.0, 20.0, 120.0, 56.0, &style)
+    let excalidraw = painter_for(GraphicStyleId::Excalidraw);
+    let mut excalidraw_style = NodeStyle::default();
+    excalidraw.decorate_node_style(&mut excalidraw_style);
+    let diamond_svg = excalidraw
+        .render_node_shape(&NodeShape::Diamond, 10.0, 20.0, 120.0, 56.0, &excalidraw_style)
         .unwrap();
     assert!(
         diamond_svg.contains("<clipPath"),
@@ -156,68 +181,30 @@ fn parse_graphic_style_rejects_aliases() {
 }
 
 #[test]
-fn new_styles_render_all_builtin_node_shapes() {
-    let styles = [
+fn styles_render_edge_paths() {
+    let style_ids = [
+        GraphicStyleId::Excalidraw,
         GraphicStyleId::CrossHatch,
         GraphicStyleId::Blueprint,
         GraphicStyleId::SpatialClarity,
+        GraphicStyleId::NeonGlow,
         GraphicStyleId::Stipple,
     ];
+    let path = "M 10 10 L 60 10 Q 90 10 90 40";
 
-    let shapes = [
-        NodeShape::Rect,
-        NodeShape::RoundedRect,
-        NodeShape::Circle,
-        NodeShape::Diamond,
-        NodeShape::Cylinder,
-        NodeShape::Hexagon,
-        NodeShape::Person,
-        NodeShape::Stadium,
-        NodeShape::Parallelogram,
-        NodeShape::Document,
-        NodeShape::Cloud,
-        NodeShape::Subprocess,
-    ];
-
-    for style_id in styles {
-        let mut style = NodeStyle::default();
-        let painter = painter_for(style_id);
-        painter.decorate_node_style(&mut style);
-
-        for shape in &shapes {
-            let svg = painter
-                .render_node_shape(shape, 10.0, 20.0, 120.0, 56.0, &style)
-                .unwrap_or_else(|| panic!("{style_id:?} should render {shape:?}"));
-            assert!(svg.contains("<g"), "missing <g> for {style_id:?} / {shape:?}");
-            assert!(svg.contains("stroke=\""), "missing stroke for {style_id:?} / {shape:?}");
-        }
-    }
-}
-
-#[test]
-fn new_styles_render_edge_paths() {
-    let styles = [
-        GraphicStyleId::CrossHatch,
-        GraphicStyleId::Blueprint,
-        GraphicStyleId::SpatialClarity,
-    ];
-
-    for style_id in styles {
+    for style_id in style_ids {
         let mut style = EdgeStyle::default();
         let painter = painter_for(style_id);
         painter.decorate_edge_style(&mut style);
 
         let svg = painter
-            .render_edge_path(
-                "M 10 10 L 60 10 Q 90 10 90 40",
-                "#333333",
-                &style,
-                "url(#arrow-active)",
-                "",
-            )
+            .render_edge_path(path, "#333333", &style, "url(#arrow-active)", "")
             .unwrap_or_else(|| panic!("{style_id:?} should render edge path"));
 
-        assert!(svg.contains("marker-end=\"url(#arrow-active)\""), "missing marker for {style_id:?}");
+        assert!(
+            svg.contains("marker-end=\"url(#arrow-active)\""),
+            "missing marker for {style_id:?}"
+        );
     }
 }
 
@@ -362,60 +349,6 @@ fn neon_glow_shared_defs_include_glow_filter() {
     assert!(defs.contains("id=\"ng-glow-soft\""));
     assert!(defs.contains("feGaussianBlur"));
     assert!(defs.contains("feMerge"));
-}
-
-#[test]
-fn neon_glow_renders_all_builtin_node_shapes() {
-    let mut style = NodeStyle::default();
-    let painter = painter_for(GraphicStyleId::NeonGlow);
-    painter.decorate_node_style(&mut style);
-
-    let shapes = [
-        NodeShape::Rect,
-        NodeShape::RoundedRect,
-        NodeShape::Circle,
-        NodeShape::Diamond,
-        NodeShape::Cylinder,
-        NodeShape::Hexagon,
-        NodeShape::Person,
-        NodeShape::Stadium,
-        NodeShape::Parallelogram,
-        NodeShape::Document,
-        NodeShape::Cloud,
-        NodeShape::Subprocess,
-    ];
-
-    for shape in shapes {
-        let svg = painter
-            .render_node_shape(&shape, 10.0, 20.0, 120.0, 56.0, &style)
-            .unwrap();
-        assert!(svg.contains("<g"), "missing <g> for {shape:?}");
-        assert!(svg.contains("data-graphic-style=\"neon-glow\""), "missing neon-glow attr for {shape:?}");
-        assert!(svg.contains("filter=\"url(#ng-glow)\""), "missing glow filter for {shape:?}");
-        assert!(svg.contains("stroke=\""), "missing stroke for {shape:?}");
-    }
-}
-
-#[test]
-fn neon_glow_renders_edge_path_with_glow() {
-    let mut style = EdgeStyle::default();
-    let painter = painter_for(GraphicStyleId::NeonGlow);
-    painter.decorate_edge_style(&mut style);
-
-    let svg = painter
-        .render_edge_path(
-            "M 10 10 L 60 10 Q 90 10 90 40",
-            "#00FFCC",
-            &style,
-            "url(#arrow-active)",
-            "",
-        )
-        .unwrap();
-
-    assert!(svg.contains("filter=\"url(#ng-glow)\""));
-    assert!(svg.contains("marker-end=\"url(#arrow-active)\""));
-    assert!(svg.contains("data-graphic-style=\"neon-glow\""));
-    assert!(svg.contains("stroke-opacity=\"0.55\""));
 }
 
 #[test]

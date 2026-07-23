@@ -17,7 +17,7 @@ pub fn routing_algo_for_diagram(diagram: &crate::ast::Diagram) -> &'static str {
     match diagram.diagram_type {
         DiagramType::Architecture => "architecture",
         DiagramType::Flowchart => "flowchart",
-        _ => "sugiyama-v2",
+        _ => "flowchart",
     }
 }
 

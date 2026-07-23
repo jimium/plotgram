@@ -5,57 +5,23 @@ use crate::layout::{EdgeLayout, LayoutResult, NodeLayout, PathGeometry, Port};
 use std::collections::HashMap;
 
 #[test]
-fn segment_clear_of_aabb() {
-    assert!(!segment_intersects_aabb(
-        Point::new(0.0, 0.0),
-        Point::new(10.0, 0.0),
-        Rect::new(2.0, 2.0, 6.0, 6.0),
-    ));
-}
-
-#[test]
-fn segment_crosses_aabb() {
-    assert!(segment_intersects_aabb(
-        Point::new(5.0, 0.0),
-        Point::new(5.0, 10.0),
-        Rect::new(2.0, 2.0, 6.0, 6.0),
-    ));
-}
-
-#[test]
-fn segment_touches_aabb_edge() {
-    assert!(segment_intersects_aabb(
-        Point::new(2.0, 0.0),
-        Point::new(2.0, 5.0),
-        Rect::new(2.0, 2.0, 6.0, 6.0),
-    ));
-}
-
-#[test]
-fn segment_parallel_to_x_inside() {
-    assert!(segment_intersects_aabb(
-        Point::new(3.0, 5.0),
-        Point::new(7.0, 5.0),
-        Rect::new(2.0, 2.0, 6.0, 6.0),
-    ));
-}
-
-#[test]
-fn segment_parallel_to_x_outside() {
-    assert!(!segment_intersects_aabb(
-        Point::new(3.0, 0.0),
-        Point::new(7.0, 0.0),
-        Rect::new(2.0, 2.0, 6.0, 6.0),
-    ));
-}
-
-#[test]
-fn diagonal_segment_misses() {
-    assert!(!segment_intersects_aabb(
-        Point::new(0.0, 1.5),
-        Point::new(1.5, 0.0),
-        Rect::new(2.0, 2.0, 5.0, 5.0),
-    ));
+fn segment_intersects_aabb_cases() {
+    let aabb = Rect::new(2.0, 2.0, 6.0, 6.0);
+    let cases: &[(Point, Point, bool)] = &[
+        (Point::new(0.0, 0.0), Point::new(10.0, 0.0), false),
+        (Point::new(5.0, 0.0), Point::new(5.0, 10.0), true),
+        (Point::new(2.0, 0.0), Point::new(2.0, 5.0), true),
+        (Point::new(3.0, 5.0), Point::new(7.0, 5.0), true),
+        (Point::new(3.0, 0.0), Point::new(7.0, 0.0), false),
+        (Point::new(0.0, 1.5), Point::new(1.5, 0.0), false),
+    ];
+    for (p1, p2, expected) in cases {
+        assert_eq!(
+            segment_intersects_aabb(*p1, *p2, aabb),
+            *expected,
+            "segment {p1:?}->{p2:?}"
+        );
+    }
 }
 
 #[test]
@@ -432,132 +398,6 @@ fn test_momentum_deterministic() {
     assert_eq!(run(), run());
 }
 
-/// P1-2 核心测试：refine 推开节点后，连接该节点的所有边的锚点
-/// 必须与节点新位置一致（修复 G4 锚点脱节）。
-///
-/// 场景：
-/// - 边 0: A→B 折线穿过节点 D（D 是问题节点，会被推开）
-/// - 边 1: D→C 折线不穿过任何节点（不是穿障边）
-///
-/// 旧逻辑（bug）：reroute_subset 仅替换穿障边（边 0），边 1 保留旧路径，
-/// 锚点仍指向 D 的旧位置 → 边 1 "悬空"。
-/// 新逻辑（修复）：edges_to_reroute 扩展为包含所有连接 D 的边（边 0 + 边 1），
-/// 边 1 也被重新路由 → 锚点与 D 新位置一致。
-/// Phase B: push 已禁用（所有图类型使用 solver，节点冻结）
-#[test]
-#[ignore = "Phase B: push disabled for all diagram types"]
-fn test_p1_2_anchor_consistency_after_push() {
-    // Diagram: A→B (穿障边), D→C (非穿障边，但连接被推开节点 D)
-    let diagram = make_diagram_with_relations(vec![("a", "b"), ("d", "c")]);
-
-    // 节点布局
-    let mut nodes = HashMap::new();
-    nodes.insert(
-        "a".to_string(),
-        NodeLayout {
-            x: 0.0,
-            y: 0.0,
-            width: 40.0,
-            height: 30.0,
-        },
-    );
-    nodes.insert(
-        "b".to_string(),
-        NodeLayout {
-            x: 200.0,
-            y: 0.0,
-            width: 40.0,
-            height: 30.0,
-        },
-    );
-    // D 在 A→B 路径上（y=15 穿过 D 的 y=[10,30]）
-    nodes.insert(
-        "d".to_string(),
-        NodeLayout {
-            x: 90.0,
-            y: 10.0,
-            width: 20.0,
-            height: 20.0,
-        },
-    );
-    nodes.insert(
-        "c".to_string(),
-        NodeLayout {
-            x: 100.0,
-            y: 200.0,
-            width: 40.0,
-            height: 30.0,
-        },
-    );
-
-    // 边 0: A→B 折线穿过 D
-    // 边 1: D→C 折线（初始路径，不穿障）
-    let edges = vec![
-        EdgeLayout {
-            geometry: PathGeometry::Polyline {
-                points: vec![Point::new(40.0, 15.0), Point::new(200.0, 15.0)],
-            },
-            labels: vec![],
-            from_port: Port::Right,
-            to_port: Port::Left,
-        },
-        EdgeLayout {
-            geometry: PathGeometry::Polyline {
-                points: vec![Point::new(100.0, 30.0), Point::new(100.0, 200.0)],
-            },
-            labels: vec![],
-            from_port: Port::Bottom,
-            to_port: Port::Top,
-        },
-    ];
-
-    let result = LayoutResult {
-        nodes,
-        groups: HashMap::new(),
-        edges,
-        total_width: 240.0,
-        total_height: 240.0,
-        hints: LayoutHints::default(),
-    };
-
-    let config = RefineConfig::default();
-    let router = CenterLineRouter;
-
-    // 验证初始有穿障
-    let before = analyze_edge_node_crossings(&result, &diagram, &config).edge_node_crossings;
-    assert!(before > 0, "初始应有穿障");
-
-    let output = run_refine(&diagram, result, &router, &config);
-
-    // 验证穿障消除
-    let after = analyze_edge_node_crossings(&output, &diagram, &config).edge_node_crossings;
-    assert_eq!(after, 0, "refine 后穿障应为 0");
-
-    // 验证 D 节点被推开
-    let d_after = output.nodes.get("d").unwrap();
-    assert!(d_after.y > 10.0, "D 应被向下推开, 实际 y={}", d_after.y);
-
-    // P1-2 核心：边 1 (D→C) 的路径应反映 D 的新位置
-    // CenterLineRouter 会将边 1 替换为 D 中心→C 中心的直线
-    let edge1 = &output.edges[1];
-    let points = edge1.path_points();
-    let first = points[0];
-    let d_center_y = d_after.y + d_after.height / 2.0;
-    assert!(
-        (first.y - d_center_y).abs() < 1.0,
-        "边 1 起点应与 D 新中心一致: got y={}, expected y={}",
-        first.y,
-        d_center_y
-    );
-
-    // 旧 bug 下边 1 起点会是 (100, 30)（D 旧 bottom），与新中心差距大
-    assert!(
-        (first.y - 30.0).abs() > 5.0,
-        "边 1 起点不应停留在旧位置 y=30, got y={}",
-        first.y
-    );
-}
-
 /// P1-2 确定性测试：同一输入多次运行 refine，结果应完全一致（AGENTS.md §2）
 #[test]
 fn test_p1_2_refine_deterministic() {
@@ -867,84 +707,6 @@ fn test_refine_rollback_when_overlap_outweighs_crossing_gain() {
         (output_c.x, output_c.y),
         (original_c.x, original_c.y),
         "push_distance=0 时应回退"
-    );
-}
-
-// ── P1-2 Task 4: 前置单边重路由测试 ──
-
-/// 路由器：将穿障边替换为绕行路径（不穿节点 C）
-struct DetourRouter;
-impl EdgeRoutingStrategy for DetourRouter {
-    fn name(&self) -> &'static str {
-        "detour"
-    }
-    fn route(&self, _diagram: &Diagram, mut result: LayoutResult) -> LayoutResult {
-        // 将所有边替换为 y=0 的水平直线（绕开 y=[5,25] 的节点 C）
-        for edge in result.edges.iter_mut() {
-            edge.geometry = PathGeometry::Polyline {
-                points: vec![Point::new(0.0, 0.0), Point::new(200.0, 0.0)],
-            };
-        }
-        result
-    }
-}
-
-/// P1-2 Task 4: 穿障边直接推节点+重路由消除穿障（已移除 trial reroute 优化）
-/// Phase B: push 已禁用（所有图类型使用 solver，节点冻结）
-#[test]
-#[ignore = "Phase B: push disabled for all diagram types"]
-fn test_refine_preroute_skips_push_when_reroute_fixes() {
-    let diagram = make_test_diagram(1);
-    let result = make_result_with_crossing();
-
-    // DetourRouter 会将边替换为 y=0 的直线，绕开节点 C（y=[5,25]）
-    let config = RefineConfig::default();
-    let output = run_refine(&diagram, result.clone(), &DetourRouter, &config);
-
-    // 穿障应消除
-    let after = analyze_edge_node_crossings(&output, &diagram, &config).edge_node_crossings;
-    assert_eq!(after, 0, "穿障应通过推节点+重路由消除");
-
-    // 节点 C 被推开（当前直接推节点，不再尝试 trial reroute）
-    let original_c = result.nodes.get("c").unwrap();
-    let output_c = output.nodes.get("c").unwrap();
-    assert_ne!(
-        (output_c.x, output_c.y),
-        (original_c.x, original_c.y),
-        "推节点后 C 的位置应发生变化"
-    );
-
-    // push_count 应为 1（推了节点）
-    assert_eq!(
-        output.hints.refine_debug.as_ref().unwrap().push_count,
-        1,
-        "push_count 应为 1（推了节点）"
-    );
-}
-
-/// P1-2 Task 4: 单边重路由无法消除穿障时，仍应推节点
-/// Phase B: push 已禁用（所有图类型使用 solver，节点冻结）
-#[test]
-#[ignore = "Phase B: push disabled for all diagram types"]
-fn test_refine_preroute_falls_back_to_push() {
-    let diagram = make_test_diagram(1);
-    let result = make_result_with_crossing();
-
-    // IdentityRouter 不改路径，单边重路由无法消除穿障 → 应回退到推节点
-    let config = RefineConfig::default();
-    let output = run_refine(&diagram, result.clone(), &IdentityRouter, &config);
-
-    // 穿障应消除（通过推节点）
-    let after = analyze_edge_node_crossings(&output, &diagram, &config).edge_node_crossings;
-    assert_eq!(after, 0, "穿障应通过推节点消除");
-
-    // 节点 C 应被推开
-    let original_c = result.nodes.get("c").unwrap();
-    let output_c = output.nodes.get("c").unwrap();
-    assert_ne!(
-        (output_c.x, output_c.y),
-        (original_c.x, original_c.y),
-        "单边重路由失败时，节点 C 应被推开"
     );
 }
 

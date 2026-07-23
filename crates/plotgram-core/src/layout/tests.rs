@@ -1,6 +1,9 @@
 use super::*;
 use crate::layout::geometry::Point;
 use crate::ast::{AttributeValue, Diagram, DiagramAttribute, Position, SourceInfo, Span, TextValue};
+use crate::layout::algorithm_config::SUGIYAMA_LAYOUT_OPTIONS;
+use crate::layout::edge::edge_routing_bezier::BEZIER_OPTIONS;
+use crate::layout::edge::edge_routing_orthogonal::ORTHOGONAL_OPTIONS;
 use crate::types::DiagramType;
 use crate::profile::profile_for;
 
@@ -20,6 +23,124 @@ fn atom_attr(key: &str, value: &str) -> DiagramAttribute {
         value: AttributeValue::String(TextValue::unquoted(value.to_string())),
         span: Span::new(Position::new(1, 1), Position::new(1, 1)),
     }
+}
+
+fn config_attr(key: &str, algo: &str, options: &[(&str, AttributeValue)]) -> DiagramAttribute {
+    DiagramAttribute {
+        key: key.to_string(),
+        value: AttributeValue::Config {
+            algo: algo.to_string(),
+            options: options
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect(),
+        },
+        span: Span::new(Position::new(1, 1), Position::new(1, 1)),
+    }
+}
+
+// ── LayoutPlan::resolve config block tests ──
+
+#[test]
+fn resolve_uses_profile_defaults_when_attrs_missing() {
+    let diagram = sample_diagram(DiagramType::Flowchart);
+    let profile = profile_for(&diagram.diagram_type);
+    let plan = LayoutPlan::resolve(&diagram, profile);
+
+    assert_eq!(plan.layout_algo, "flowchart");
+    assert_eq!(plan.edge_routing, "orthogonal");
+}
+
+#[test]
+fn resolve_edge_options_from_config_block() {
+    let mut diagram = sample_diagram(DiagramType::Flowchart);
+    diagram.attributes.push(config_attr(
+        "edge_routing",
+        "orthogonal",
+        &[
+            ("slot_pitch", AttributeValue::Number(55.0)),
+            ("channel_margin", AttributeValue::Number(22.0)),
+        ],
+    ));
+    let profile = profile_for(&diagram.diagram_type);
+    let plan = LayoutPlan::resolve(&diagram, profile);
+
+    assert_eq!(
+        plan.edge_options.get_or_default(&ORTHOGONAL_OPTIONS[0]),
+        55.0
+    );
+    assert_eq!(
+        plan.edge_options.get_or_default(&ORTHOGONAL_OPTIONS[1]),
+        22.0
+    );
+}
+
+#[test]
+fn resolve_bezier_tension_from_config_block() {
+    let mut diagram = sample_diagram(DiagramType::Flowchart);
+    diagram.attributes.push(config_attr(
+        "edge_routing",
+        "bezier",
+        &[("tension", AttributeValue::Number(1.2))],
+    ));
+    let profile = profile_for(&diagram.diagram_type);
+    let plan = LayoutPlan::resolve(&diagram, profile);
+
+    assert_eq!(plan.edge_routing, "bezier");
+    assert_eq!(plan.edge_options.get_or_default(&BEZIER_OPTIONS[0]), 1.2);
+}
+
+#[test]
+fn resolve_layout_group_padding_from_config_block() {
+    let mut diagram = sample_diagram(DiagramType::Flowchart);
+    diagram.attributes.push(config_attr(
+        "layout",
+        "flowchart",
+        &[("group_padding", AttributeValue::Number(40.0))],
+    ));
+    let profile = profile_for(&diagram.diagram_type);
+    let plan = LayoutPlan::resolve(&diagram, profile);
+
+    assert_eq!(
+        plan.layout_options.get_or_default(&SUGIYAMA_LAYOUT_OPTIONS[0]),
+        40.0
+    );
+}
+
+#[test]
+fn invalid_layout_option_emits_warning() {
+    let mut diagram = sample_diagram(DiagramType::Flowchart);
+    diagram.attributes.push(config_attr(
+        "layout",
+        "flowchart",
+        &[("group_padding", AttributeValue::Number(-5.0))],
+    ));
+    let profile = profile_for(&diagram.diagram_type);
+    let plan = LayoutPlan::resolve(&diagram, profile);
+    let mut result = crate::error::ValidationResult::new();
+    crate::layout::validate_layout_plan_warnings(&diagram, &plan, &mut result);
+    assert!(!result.warnings.is_empty());
+}
+
+#[test]
+fn auto_resolves_to_profile_default_layout() {
+    let mut diagram = sample_diagram(DiagramType::Flowchart);
+    diagram.attributes.push(config_attr("layout", "auto", &[]));
+    let profile = profile_for(&diagram.diagram_type);
+    let plan = LayoutPlan::resolve(&diagram, profile);
+
+    assert_eq!(plan.layout_algo, "auto");
+    assert_eq!(plan.resolved_auto_algo.as_deref(), Some("flowchart"));
+}
+
+#[test]
+fn non_auto_has_no_resolved_auto_algo() {
+    let diagram = sample_diagram(DiagramType::Flowchart);
+    let profile = profile_for(&diagram.diagram_type);
+    let plan = LayoutPlan::resolve(&diagram, profile);
+
+    assert_eq!(plan.layout_algo, "flowchart");
+    assert_eq!(plan.resolved_auto_algo, None);
 }
 
 #[test]
@@ -43,47 +164,26 @@ fn sequence_rejects_edge_routing_attribute() {
 #[test]
 fn explicit_overrides_still_take_priority() {
     let mut diagram = sample_diagram(DiagramType::Flowchart);
-    diagram.attributes.push(atom_attr("layout", "force-directed"));
+    diagram.attributes.push(atom_attr("layout", "er"));
     diagram.attributes.push(atom_attr("edge_routing", "bezier"));
     let profile = profile_for(&diagram.diagram_type);
     let plan = LayoutPlan::resolve(&diagram, profile);
 
-    assert_eq!(plan.layout_algo, "force-directed");
+    assert_eq!(plan.layout_algo, "er");
     assert_eq!(plan.edge_routing, "bezier");
-}
-
-#[test]
-fn force_directed_resolves_on_flowchart() {
-    let mut diagram = sample_diagram(DiagramType::Flowchart);
-    diagram
-        .attributes
-        .push(atom_attr("layout", "force-directed"));
-    let plan = LayoutPlan::resolve(&diagram, profile_for(&diagram.diagram_type));
-
-    assert_eq!(plan.layout_algo, "force-directed");
-    assert!(compute_layout(&diagram).is_ok());
-}
-
-#[test]
-fn sugiyama_v2_resolves() {
-    let mut diagram = sample_diagram(DiagramType::Flowchart);
-    diagram.attributes.push(atom_attr("layout", "sugiyama-v2"));
-    let plan = LayoutPlan::resolve(&diagram, profile_for(&diagram.diagram_type));
-
-    assert_eq!(plan.layout_algo, "sugiyama-v2");
 }
 
 #[test]
 fn string_layout_attrs_are_resolved() {
     let mut diagram = sample_diagram(DiagramType::Flowchart);
     diagram.attributes.push(atom_attr("direction", "left-to-right"));
-    diagram.attributes.push(atom_attr("layout", "circular"));
+    diagram.attributes.push(atom_attr("layout", "er"));
     diagram.attributes.push(atom_attr("edge_routing", "bezier"));
     let profile = profile_for(&diagram.diagram_type);
     let plan = LayoutPlan::resolve(&diagram, profile);
 
     assert_eq!(diagram.direction(), "left-to-right");
-    assert_eq!(plan.layout_algo, "circular");
+    assert_eq!(plan.layout_algo, "er");
     assert_eq!(plan.edge_routing, "bezier");
 }
 
@@ -114,7 +214,7 @@ fn compute_layout_applies_grid_snap_for_sugiyama_v2() {
 
     let span = Span::new(Position::new(1, 1), Position::new(1, 1));
     let mut diagram = sample_diagram(DiagramType::Flowchart);
-    diagram.attributes.push(atom_attr("layout", "sugiyama-v2"));
+    diagram.attributes.push(atom_attr("layout", "flowchart"));
     for id in ["a", "b", "c", "d"] {
         diagram.entities.push(Entity {
             id: Identifier::new_unchecked(id),
@@ -156,7 +256,7 @@ fn compute_layout_snaps_orthogonal_edge_waypoints() {
 
     let span = Span::new(Position::new(1, 1), Position::new(1, 1));
     let mut diagram = sample_diagram(DiagramType::Flowchart);
-    diagram.attributes.push(atom_attr("layout", "sugiyama-v2"));
+    diagram.attributes.push(atom_attr("layout", "flowchart"));
     for id in ["a", "b"] {
         diagram.entities.push(Entity {
             id: Identifier::new_unchecked(id),
@@ -233,7 +333,7 @@ fn compute_layout_respects_snap_false_attribute() {
 
     let span = Span::new(Position::new(1, 1), Position::new(1, 1));
     let mut diagram = sample_diagram(DiagramType::Flowchart);
-    diagram.attributes.push(atom_attr("layout", "sugiyama-v2"));
+    diagram.attributes.push(atom_attr("layout", "flowchart"));
     diagram.attributes.push(DiagramAttribute {
         key: "snap".into(),
         value: AttributeValue::Boolean(false),

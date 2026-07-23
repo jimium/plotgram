@@ -10,7 +10,6 @@ use crate::layout::{GroupLayout, NodeLayout};
 pub fn routing_group_padding(algo: &str, group_padding: f64) -> GroupPadding {
     match algo {
         "architecture" => GroupPadding::architecture_v2(),
-        "force-directed" => GroupPadding::force_directed(),
         _ => GroupPadding::uniform(group_padding, 16.0),
     }
 }

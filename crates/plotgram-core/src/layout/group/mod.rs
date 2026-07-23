@@ -1,16 +1,18 @@
-//! 分组 Border Shell 与组间路由走廊子系统。
+//! 分组子系统：Border Shell、组间路由走廊、L1 Group Frame。
 //!
 //! - [`border_shell`]：路径段 vs 分组边框关系分类 + 贴边平行检测
 //! - [`corridor`]：组间优先走廊（布局注入 + 几何 fallback）
 //! - [`post_route`]：snap 后投影与 repulse 安全网
 //! - [`rect`]：路由权威 `GroupLayout` 来源
 //! - [`context`]：边路由阶段共享上下文
+//! - [`frame`]：L1 Group Frame（组间排列/尺寸/对齐/间距/量化）
 
 pub mod border_shell;
 pub mod config;
 pub mod constants;
 pub mod context;
 pub mod corridor;
+pub mod frame;
 pub mod hierarchy;
 pub mod post_route;
 pub mod rect;

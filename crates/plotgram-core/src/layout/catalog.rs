@@ -211,7 +211,7 @@ mod tests {
         assert_eq!(flowchart.default_layout, "flowchart");
         assert_eq!(flowchart.default_edge_routing, "orthogonal");
         assert!(flowchart.layouts.contains(&"flowchart".to_string()));
-        assert!(flowchart.layouts.contains(&"sugiyama-v2".to_string()));
+        assert_eq!(flowchart.layouts.len(), 1);
     }
 
     #[test]
@@ -277,14 +277,14 @@ mod tests {
     #[test]
     fn layout_algo_options_are_exported() {
         let catalog = layout_catalog();
-        let sugiyama = catalog
+        let flowchart = catalog
             .layouts
             .iter()
-            .find(|l| l.name == "sugiyama-v2")
-            .expect("sugiyama-v2");
-        assert_eq!(sugiyama.options.len(), 1);
-        assert_eq!(sugiyama.options[0].key, "group_padding");
-        assert_eq!(sugiyama.options[0].kind, "non_negative_number");
+            .find(|l| l.name == "flowchart")
+            .expect("flowchart");
+        assert_eq!(flowchart.options.len(), 1);
+        assert_eq!(flowchart.options[0].key, "group_padding");
+        assert_eq!(flowchart.options[0].kind, "non_negative_number");
     }
 
     #[test]

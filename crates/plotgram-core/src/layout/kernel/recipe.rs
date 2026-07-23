@@ -47,10 +47,10 @@ pub trait LayoutRecipe {
     }
 }
 
-/// 类型擦除的 Recipe 接口（仅用于 LayoutStrategy 委托）。
+/// 类型擦除的 Recipe 接口（预留：未来 LayoutStrategy 统一委托入口）。
 ///
 /// 由于 `LayoutRecipe` 使用 associated types，无法直接做 trait object。
-/// 此 trait 提供擦除后的统一调用入口。
+/// 此 trait 提供擦除后的统一调用入口。当前无调用方，待 Phase R2+ 启用。
 pub trait LayoutRecipeDyn {
     /// 配方名称。
     fn recipe_name(&self) -> &'static str;

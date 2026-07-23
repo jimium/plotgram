@@ -490,64 +490,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "C2 激进间隙清除已暂缓：误杀 ecommerce 合法邻接；待 L1.1 betweenness 谓词"]
-    fn build_corridors_skips_gap_blocked_by_third_group() {
-        let mut groups = HashMap::new();
-        groups.insert(
-            "left".to_string(),
-            GroupLayout {
-                x: 0.0,
-                y: 0.0,
-                width: 100.0,
-                height: 200.0,
-            },
-        );
-        groups.insert(
-            "mid".to_string(),
-            GroupLayout {
-                x: 120.0,
-                y: 40.0,
-                width: 80.0,
-                height: 120.0,
-            },
-        );
-        groups.insert(
-            "right".to_string(),
-            GroupLayout {
-                x: 220.0,
-                y: 0.0,
-                width: 100.0,
-                height: 200.0,
-            },
-        );
-        let corridors = build_corridors_from_groups(&groups);
-        assert!(
-            !corridors.iter().any(|c| {
-                let (a, b) = corridor_pair_key(&c.group_a, &c.group_b);
-                let (l, r) = corridor_pair_key("left", "right");
-                a == l && b == r
-            }),
-            "blocked left-right corridor must not exist: {corridors:?}"
-        );
-        assert!(
-            corridors.iter().any(|c| {
-                let (a, b) = corridor_pair_key(&c.group_a, &c.group_b);
-                let (l, m) = corridor_pair_key("left", "mid");
-                a == l && b == m
-            }),
-            "left-mid corridor expected"
-        );
-        assert!(
-            corridors.iter().any(|c| {
-                let (a, b) = corridor_pair_key(&c.group_a, &c.group_b);
-                let (m, r) = corridor_pair_key("mid", "right");
-                a == m && b == r
-            }),
-            "mid-right corridor expected"
-        );
-    }
-
-    #[test]
     fn build_corridors_vertical_gap() {
         let mut groups = HashMap::new();
         groups.insert(

@@ -1,31 +1,32 @@
-//! 统一布局生命周期管理。
+//! Coordinate Kernel 调用封装。
 //!
-//! Phase D: LayoutCoordinator 编排 compile → solve → audit → product 流程。
-//! 不包含图类型业务分支，只编排通用流程。
+//! 提供 `CoordinateProblem → solve + P0 audit` 的统一入口。
+//! 由分层类 LayoutRecipe（flowchart/architecture）在 solve 阶段调用。
+//!
+//! ## 与 LayoutRecipe 的关系
+//!
+//! - [`LayoutRecipe`](super::recipe::LayoutRecipe)：整图节点布局的生命周期（compile → solve → audit → product）
+//! - [`CoordinateSolveStep`]（本模块）：仅 CoordinateProblem → 坐标，是 LayoutRecipe::solve 内部的一个步骤
 //!
 //! ## 设计原则
 //!
-//! 1. **无图类型语义**：Coordinator 不知道 flowchart/architecture 的区别
-//! 2. **Recipe 驱动**：所有布局语义由 Recipe 实现提供
-//! 3. **确定性**：相同输入必须产生相同输出
+//! 1. **无图类型语义**：不知道 flowchart/architecture 的区别
+//! 2. **确定性**：相同输入必须产生相同输出
 
 use super::coordinate::auditor::audit_p0;
 use super::coordinate::model::{CoordinateProblem, SolverStatus};
 use super::coordinate::optimizer::solve;
 
-/// 布局配方 trait：定义从 IR 到坐标的完整生命周期。
+/// Coordinate Kernel 调用步骤：定义 solve + audit 的封装。
 ///
-/// 每个图类型实现此 trait，提供自己的 compile/product 逻辑。
-/// Coordinator 只编排通用流程（solve + audit），不关心图类型语义。
-pub trait Recipe {
-    /// 配方名称（用于日志）。
+/// 由分层类 LayoutRecipe 在 solve 阶段调用。
+/// 默认实现调用 kernel solver + P0 审计。
+pub trait CoordinateSolveStep {
+    /// 步骤名称（用于日志）。
     fn name(&self) -> &'static str;
 
     /// 求解坐标（通用流程：solve + audit）。
-    ///
-    /// 默认实现调用 kernel solver + P0 审计。
-    /// Recipe 可覆盖此方法以添加自定义后处理。
-    fn solve(&self, problem: &CoordinateProblem) -> RecipeOutput {
+    fn solve(&self, problem: &CoordinateProblem) -> CoordinateSolveOutput {
         let result = solve(problem);
 
         let audit = audit_p0(problem, &result.coordinates);
@@ -38,7 +39,7 @@ pub trait Recipe {
             );
         }
 
-        RecipeOutput {
+        CoordinateSolveOutput {
             coordinates: result.coordinates.clone(),
             status: result.status,
             audit_passed: audit.passed(),
@@ -49,9 +50,9 @@ pub trait Recipe {
     }
 }
 
-/// Recipe 输出：求解结果 + 审计状态。
+/// Coordinate Kernel 求解输出：坐标 + 审计状态。
 #[derive(Debug, Clone)]
-pub struct RecipeOutput {
+pub struct CoordinateSolveOutput {
     /// 最终坐标（下标 = var_id）。
     pub coordinates: Vec<f64>,
     /// 求解状态。
@@ -64,54 +65,49 @@ pub struct RecipeOutput {
     pub loss_p3: f64,
 }
 
-/// 统一布局生命周期管理器。
+/// Coordinate Kernel 统一入口。
 ///
-/// 编排 compile → solve → audit → product 流程。
-/// 不包含图类型业务分支，只消费 Recipe 提供的 IR。
+/// 封装 solve + P0 audit 流程，由 LayoutRecipe 在 solve 阶段调用。
 ///
 /// ## 使用示例
 ///
 /// ```ignore
-/// let recipe = FlowchartRecipeAdapter;
-/// let problem = recipe.compile(&diagram);
-/// let output = LayoutCoordinator::run(&recipe, &problem);
-/// let nodes = recipe.product(&output, &diagram);
+/// let output = LayoutCoordinator::run(&ArchitectureRecipeAdapter, &problem);
+/// let centers = output.coordinates;
 /// ```
 pub struct LayoutCoordinator;
 
 impl LayoutCoordinator {
-    /// 执行布局求解流程。
+    /// 执行 Coordinate Kernel 求解流程。
     ///
-    /// 1. 调用 Recipe::solve（内部执行 kernel solver + P0 审计）
-    /// 2. 返回 RecipeOutput（坐标 + 审计状态 + loss）
-    ///
-    /// 调用方负责 compile（构建 CoordinateProblem）和 product（物化坐标）。
-    pub fn run<R: Recipe>(recipe: &R, problem: &CoordinateProblem) -> RecipeOutput {
+    /// 1. 调用 CoordinateSolveStep::solve（内部执行 kernel solver + P0 审计）
+    /// 2. 返回 CoordinateSolveOutput（坐标 + 审计状态 + loss）
+    pub fn run<R: CoordinateSolveStep>(step: &R, problem: &CoordinateProblem) -> CoordinateSolveOutput {
         crate::perf_log!(
-            "[coordinator] running recipe '{}' with {} vars, {} layers",
-            recipe.name(),
+            "[coordinator] running step '{}' with {} vars, {} layers",
+            step.name(),
             problem.vars.len(),
             problem.layers.len(),
         );
-        recipe.solve(problem)
+        step.solve(problem)
     }
 }
 
-// ─── 适配器：将现有 Recipe 结构体适配为 trait ─────────────────────────────────
+// ─── 适配器：为不同图种提供命名 ─────────────────────────────────
 
-/// FlowchartRecipe 的 Recipe trait 适配器。
+/// Flowchart 坐标求解步骤。
 pub struct FlowchartRecipeAdapter;
 
-impl Recipe for FlowchartRecipeAdapter {
+impl CoordinateSolveStep for FlowchartRecipeAdapter {
     fn name(&self) -> &'static str {
         "flowchart"
     }
 }
 
-/// ArchitectureRecipe 的 Recipe trait 适配器。
+/// Architecture 坐标求解步骤。
 pub struct ArchitectureRecipeAdapter;
 
-impl Recipe for ArchitectureRecipeAdapter {
+impl CoordinateSolveStep for ArchitectureRecipeAdapter {
     fn name(&self) -> &'static str {
         "architecture"
     }

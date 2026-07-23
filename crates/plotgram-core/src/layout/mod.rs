@@ -3,74 +3,66 @@
 //! 提供可插拔的布局算法框架。每种布局算法实现 `LayoutStrategy` trait，
 //! 通过 `compute_layout` 统一调度。
 //!
-//! ## 布局管线层级（Group Frame 三层模型）
+//! ## 模块组织（按职责分层）
 //!
-//! 详见 `docs/architecture/布局优化/group-frame-spec.md`（v0.2）。
-//!
-//! ```text
-//! ┌──────────────────────────────────────────────────────────────┐
-//! │ 拓扑主布局（Sugiyama / two_phase / group_divide）              │
-//! │   L2 Intra Frame：组内节点排列（group_layout_hint）            │
-//! ├──────────────────────────────────────────────────────────────┤
-//! │ L3 Node Frame（grid_snap::align_nodes）：rank/layer 轴独立对齐       │
-//! │   rank 轴：同层中心线对齐；layer 轴：重叠消除（保持层重心）          │
-//! │   仅节点坐标调整；由 `align` 属性控制（rank/layer 分级）        │
-//! ├──────────────────────────────────────────────────────────────┤
-//! │ recompute group bounds from nodes（L3→L1 数据流桥梁）         │
-//! ├──────────────────────────────────────────────────────────────┤
-//! │ L1 Group Frame（group_frame）：组间排列/尺寸/对齐/间距/量化    │
-//! │   apply_group_frame：Equal / border_align / quantize groups   │
-//! ├──────────────────────────────────────────────────────────────┤
-//! │ route + refine（LayoutRouteFeedback）                       │
-//! ├──────────────────────────────────────────────────────────────┤
-//! │ L1 Group Frame（幂等恢复）                                    │
-//! ├──────────────────────────────────────────────────────────────┤
-//! │ Edge Pixel Snap（grid_snap::snap_edge_waypoints）             │
-//! │   边 waypoint 量化 + 边框排斥；管道末尾仅执行一次，由 `snap`   │
-//! │   属性控制；grid_step 按节点密度自适应（P5）                   │
-//! └──────────────────────────────────────────────────────────────┘
-//! ```
+//! | 模块 | 职责 |
+//! |------|------|
+//! | [`pipeline`] | 管线编排：入口调度、算法注册、计划解析、阶段执行 |
+//! | [`recipes`] | 布局配方：每个图类型一个专属实现 |
+//! | [`engines`] | 共享引擎：分层布局、坐标求解构建器、通用工具 |
+//! | [`kernel`] | 坐标内核：PAVA + Projected Gradient 求解器 |
+//! | [`routing`] | 边路由：orthogonal / bezier / spline / organic 等 |
+//! | [`group`] | 分组子系统：Border Shell、走廊、L1 Group Frame |
+//! | [`quality`] | 质量保障：lint 规则 + 布局度量指标 |
+//! | [`demand`] | 空间需求：边带预算、走廊模型、SpaceBudget |
+//! | [`snap`] | 对齐与量化：grid snap、画布最终化 |
+//! | [`post_route`] | 路由后处理 |
+//! | [`refine`] | 布局精化 |
 
 pub mod algorithm_config;
 pub mod catalog;
-pub mod canvas_finalize;
+pub mod snap;
 pub mod constants;
 pub mod decl_order;
 pub mod demand;
-pub mod edge;
-pub mod edge_band_demand;
+pub mod routing;
+// 过渡期：保持旧路径可用
+pub use demand::band as edge_band_demand;
 pub mod edge_stages;
-pub mod entry;
+pub mod engines;
 pub mod geometry;
 pub mod geometry_helpers;
-pub mod grid_snap;
 pub mod group;
-pub mod group_frame;
+// 过渡期：保持 crate::layout::group_frame:: 路径可用
+pub use group::frame as group_frame;
 pub mod kernel;
-pub mod lint;
-pub mod metrics;
-pub mod node;
-pub mod plan;
+pub mod quality;
+// 过渡期：保持 crate::layout::lint:: 和 crate::layout::metrics:: 路径可用
+pub use quality::lint;
+pub use quality::metrics;
+pub mod recipes;
 pub mod perf;
 pub mod pipeline;
 pub mod post_route;
 pub mod refine;
-pub mod registry;
 pub mod route_feedback;
-pub mod space_budget;
-pub mod space_budget_guard;
+// 过渡期：保持旧路径可用
+pub use demand::space_budget;
+pub use demand::space_budget_guard;
 pub mod traits;
 pub mod types;
 
 pub use algorithm_config::{
-    AlgorithmOptionSpec, ArchitectureV2LayoutConfig, CircularLayoutConfig, ForceDirectedLayoutConfig,
+    AlgorithmOptionSpec, ArchitectureV2LayoutConfig, CircularLayoutConfig,
     MindmapLayoutConfig, OptionKind, SequenceLayoutConfig, SugiyamaLayoutConfig,
 };
 pub use catalog::{
     layout_catalog, AlgorithmOptionInfo, DiagramTypeCatalog, EdgeRoutingAlgoInfo, LayoutAlgoInfo,
     LayoutCatalog,
 };
-pub use plan::{validate_layout_plan_warnings, LayoutPlan, ResolvedAlgoOptions};
+pub use pipeline::plan::{validate_layout_plan_warnings, LayoutPlan, ResolvedAlgoOptions};
+pub use pipeline::plan; // 保持 crate::layout::plan::X 路径可用
+pub use pipeline::registry; // 保持 crate::layout::registry::X 路径可用
 pub use lint::{
     compute_lint_metrics, count_unrelated_parallel_overlaps, lint_layout, parse_lint_profile,
     parse_lint_rule, parse_lint_rules_list, AdviceConfidence, LayoutKnob, LintAdvice,
@@ -90,23 +82,30 @@ pub use metrics::{
     CollinearBaselineSnapshot, CollinearOrthoStats, CollinearSampleMetrics,
     CongestionBaselineSnapshot, CongestionSampleMetrics,
 };
-pub use registry::{EDGE_ROUTING_NAMES, LAYOUT_ALGORITHM_NAMES};
-pub use grid_snap::{DiagramAlignOverride, EdgeSnapConfig, LayerAxisAlign, NodeAlignConfig};
-pub use edge::segment_pair::{
+pub use pipeline::registry::{EDGE_ROUTING_NAMES, LAYOUT_ALGORITHM_NAMES};
+pub use snap::grid_snap::{DiagramAlignOverride, EdgeSnapConfig, LayerAxisAlign, NodeAlignConfig};
+// 过渡期：保持 crate::layout::grid_snap:: 和 crate::layout::canvas_finalize:: 路径可用
+pub use snap::grid_snap;
+pub use snap::canvas_finalize;
+pub use routing::segment_pair::{
     classify_segment_pair, find_needs_separation_edge_pairs, measure_segment_pair,
     ClassifyPairContext, ClassifyResult, ConflictDisposition, OrthoSegment, SegmentPairMeasure,
     SeparationReason, SpacingClass,
 };
 
 // 向后兼容：保持 `crate::layout::sugiyama` 等路径可用
-pub use edge::{
+pub use routing::{
     edge_routing, edge_routing_bezier, edge_routing_circular,
     edge_routing_organic, edge_routing_orthogonal, edge_routing_spline, visibility,
 };
-pub use node::{
-    architecture_v2, circular, er, flowchart, force_directed, mindmap, sequence,
-    sugiyama_v2,
+// 过渡期：保持 crate::layout::edge:: 路径可用
+pub use routing as edge;
+pub use recipes::{
+    architecture, circular, er, flowchart, mindmap, sequence,
 };
+pub use engines::layered as sugiyama_v2;
+// 过渡期：保持 crate::layout::node:: 路径可用
+pub use recipes as node;
 
 // Re-exports from split modules (preserve external API)
 pub use types::{
@@ -117,22 +116,14 @@ pub use types::{
 };
 pub use traits::{LayoutStrategy, EdgeRoutingStrategy};
 pub use geometry_helpers::{styled_node_size, edge_point, ellipse_edge_point};
-pub use entry::{
+pub use pipeline::entry::{
     resolve_effective_direction, compute_layout, compute_layout_with_plan,
     layout_option_specs, edge_routing_option_specs, applicable_layouts_for_type,
     applicable_routings_for_type, diagram_types_for_layout, diagram_types_for_routing,
     BUILTIN_DIAGRAM_TYPES,
 };
-// `pub(crate)` items can't be re-exported via `pub use` (would widen visibility),
-// so re-export them at the same visibility.
-pub(crate) use entry::{
-    known_layout_algo_names, known_edge_routing_names, layout_config_error,
-};
-// `pub(super)` items from `entry` are visible to `layout`; bind them privately here
-// so siblings like `catalog` can still call `super::all_layout_strategies()`.
-// A private `use` is accessible to `layout` and its descendants, matching the
-// original effective visibility for in-`layout` callers.
-use entry::{all_layout_strategies, all_routing_strategies};
+// `pub(in crate::layout)` items from pipeline modules
+use pipeline::registry::{all_layout_strategies, all_routing_strategies};
 
 #[cfg(test)]
 mod tests;

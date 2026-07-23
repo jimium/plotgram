@@ -110,10 +110,6 @@ pub const MINDMAP_CENTER_GAP: f64 = 96.0;
 pub const SEQUENCE_NODE_SPACING: f64 = 80.0;
 pub const SEQUENCE_MESSAGE_SPACING: f64 = 50.0;
 
-/// 力导向布局默认间距（`group_padding` 默认与 `GroupPadding::force_directed` 水平边距一致）
-pub const FORCE_DIRECTED_COMPONENT_GAP: f64 = 120.0;
-pub const FORCE_DIRECTED_GROUP_PADDING: f64 = 20.0;
-
 /// architecture 画布与分组内边距
 pub const ARCH_V2_PADDING: f64 = DEFAULT_PADDING;
 /// 与 [`GroupPadding::architecture_v2`] 水平边距对齐（Phase D：28 → 20）

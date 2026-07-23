@@ -1,14 +1,17 @@
-//! 路由压力只读模型：band / corridor / port / EdgeDifficulty。
+//! 路由压力与空间需求模型：band / corridor / port / EdgeDifficulty / SpaceBudget。
 //!
 //! 布局加缝、诊断 dump、B2 报告共用同一套数字；本模块**不改几何**。
 //! 写权仍走 `SpaceBudget` / pipeline。
 
+pub mod band;
 mod corridor;
 mod dump;
 mod features;
 mod grid;
 mod pierce;
 mod port;
+pub mod space_budget;
+pub mod space_budget_guard;
 mod types;
 
 pub use corridor::{
@@ -28,6 +31,6 @@ pub use pierce::{obstacle_hits_for_edge, preferred_l_skeleton};
 pub use port::{aggregate_port_pressure, preferred_exit_side};
 pub use types::{BandDemand, CorridorDemand, CorridorRisk, EdgeFeatures, PortPressure};
 
-pub use crate::layout::edge_band_demand::{
+pub use band::{
     edge_band_demand, EdgeBandDemandBreakdown, EdgeBandDemandProfile,
 };

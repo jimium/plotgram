@@ -183,7 +183,7 @@ mod tests {
         let mut diagram = make_diagram(DiagramType::Flowchart, vec![make_entity("a", "process")], vec![]);
         diagram.attributes.push(DiagramAttribute {
             key: "layout".to_string(),
-            value: AttributeValue::String(TextValue::unquoted("sugiyama-v2".to_string())),
+            value: AttributeValue::String(TextValue::unquoted("flowchart".to_string())),
             span: span(),
         });
 
