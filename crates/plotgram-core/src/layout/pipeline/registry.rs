@@ -24,8 +24,8 @@ pub(super) fn build_layout_strategy(
     algo: &str,
     plan: &LayoutPlan,
 ) -> Option<Box<dyn LayoutStrategy>> {
-    use crate::layout::node::{
-        architecture_v2, er, flowchart, mindmap, sequence, state,
+    use crate::layout::recipes::{
+        architecture, er, flowchart, mindmap, sequence, state,
     };
 
     // "auto" 解析为 profile 默认算法（由 LayoutPlan::resolve 已处理）。
@@ -42,7 +42,7 @@ pub(super) fn build_layout_strategy(
         "flowchart" => Box::new(flowchart::FlowchartLayout::from_options(&plan.layout_options)),
         "er" => Box::new(er::ErLayout::from_options(&plan.layout_options)),
         "state" => Box::new(state::StateLayout::from_options(&plan.layout_options)),
-        "architecture" => Box::new(architecture_v2::ArchitectureV2Layout::from_options(
+        "architecture" => Box::new(architecture::ArchitectureV2Layout::from_options(
             &plan.layout_options,
         )),
         _ => return None,

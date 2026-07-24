@@ -16,7 +16,7 @@ use plotgram_core::layout::{compute_layout_with_plan, LayoutResult};
 // 与 core 对齐:使用 WASM-safe 的 perf::Instant(eval 本身为 native-only 工具,
 // 不会编译到 wasm32,但统一引用路径便于跨 crate 维护)
 use plotgram_core::layout::perf::Instant;
-use plotgram_core::layout::plan::LayoutPlan;
+use plotgram_core::layout::pipeline::plan::LayoutPlan;
 use plotgram_core::profile::profile_for;
 use std::sync::mpsc;
 use std::time::Duration;

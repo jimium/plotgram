@@ -504,7 +504,7 @@ mod tests {
     use super::*;
     use crate::types::DiagramType;
     use crate::ast::{ArrowType, AttributeMap, AttributeValue, Diagram, Entity, Identifier, Relation, SourceInfo, Span, TextValue};
-    use crate::layout::node::architecture_v2::layout::types::GraphIndex;
+    use crate::layout::recipes::architecture::layout::types::GraphIndex;
 
     fn member_graph(edges: &[(&str, &str)]) -> (GraphIndex, Vec<String>) {
         let mut entities = Vec::new();

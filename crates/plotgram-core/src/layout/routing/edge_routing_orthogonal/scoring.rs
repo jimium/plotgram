@@ -483,7 +483,7 @@ fn segment_crosses_rect_interior(
     b: Point,
     gl: &GroupLayout,
 ) -> bool {
-    crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(a, b, gl)
+    crate::layout::routing::common::geom_obstacle::segment_pierces_group_interior(a, b, gl)
 }
 
 /// 计算边段重叠惩罚。
@@ -671,7 +671,7 @@ struct ParallelPairInfo {
 /// 不检查 `edge_index`；调用方需自行跳过同边。
 /// 返回间隙和投影重叠信息；非平行（含非轴向）返回 `None`。
 fn classify_parallel_pair(a: &RoutedSegment, b: &RoutedSegment) -> Option<ParallelPairInfo> {
-    use crate::layout::edge::segment_pair::{measure_segment_pair, OrthoSegment};
+    use crate::layout::routing::segment_pair::{measure_segment_pair, OrthoSegment};
     let oa = OrthoSegment {
         x1: a.x1,
         y1: a.y1,
@@ -917,7 +917,7 @@ pub fn path_is_clean_from_edges(
 
 pub(super) fn segment_intersects_node(a: Point, b: Point, nl: &NodeLayout, pad: f64) -> bool {
     // A1：委托统一 primitive；语义等价于 expanded(pad).segment_crosses_interior(a,b,EPS)。
-    crate::layout::edge::common::geom_obstacle::segment_pierces_node(a, b, nl, pad)
+    crate::layout::routing::common::geom_obstacle::segment_pierces_node(a, b, nl, pad)
 }
 
 /// 水平线段从节点正下方/正上方近距离擦过（视觉上的「穿节点」）

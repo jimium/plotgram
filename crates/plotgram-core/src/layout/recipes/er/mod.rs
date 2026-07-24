@@ -7,8 +7,9 @@
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
 use crate::layout::kernel::recipe::LayoutRecipe;
-use crate::layout::node::sugiyama_v2::{engine, preset};
-use crate::layout::plan::ResolvedAlgoOptions;
+use crate::layout::engines::common::group_bounds::{self, GroupPadding};
+use crate::layout::engines::layered::{coordinate, layered_kernel::LayeredKernel, preset};
+use crate::layout::pipeline::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, EdgeRoutingStyle, LayoutResult, LayoutStrategy, NodeAlignConfig};
 use crate::types::DiagramType;
 
@@ -75,13 +76,14 @@ struct ErRecipe {
 
 /// ER 图问题 IR：LayeredKernel 产出的分层草稿。
 struct ErProblem {
-    draft: crate::layout::node::sugiyama_v2::layered_kernel::LayeredDraft,
+    draft: crate::layout::engines::layered::layered_kernel::LayeredDraft,
 }
 
 /// ER 图求解结果。
 struct ErSolution {
     nodes: std::collections::HashMap<String, crate::layout::NodeLayout>,
     solved_problem: Option<crate::layout::kernel::coordinate::model::CoordinateProblem>,
+    draft: crate::layout::engines::layered::layered_kernel::LayeredDraft,
 }
 
 impl LayoutRecipe for ErRecipe {
@@ -93,7 +95,7 @@ impl LayoutRecipe for ErRecipe {
     }
 
     fn compile(&self, diagram: &Diagram) -> ErProblem {
-        let draft = crate::layout::node::sugiyama_v2::layered_kernel::LayeredKernel::compute(
+        let draft = LayeredKernel::compute(
             diagram,
             &preset::ER_PRESET,
             self.config,
@@ -103,35 +105,76 @@ impl LayoutRecipe for ErRecipe {
 
     fn solve(&self, problem: &ErProblem) -> ErSolution {
         let draft = &problem.draft;
-        let (nodes, solved_problem) =
-            crate::layout::node::sugiyama_v2::coordinate::assign_coordinates_brandes_koepf(
-                &draft.dag,
-                &draft.proper_graph,
-                &draft.layers,
-                &draft.sizes,
-                draft.horizontal,
-                &draft.preset,
-                &draft.per_layer_gaps,
-                draft.has_order_bias,
-                &draft.end_ids,
-            );
-        ErSolution { nodes, solved_problem }
+        let (nodes, solved_problem) = coordinate::assign_coordinates_brandes_koepf(
+            &draft.dag,
+            &draft.proper_graph,
+            &draft.layers,
+            &draft.sizes,
+            draft.horizontal,
+            &draft.preset,
+            &draft.per_layer_gaps,
+            draft.has_order_bias,
+            &draft.end_ids,
+        );
+        ErSolution { nodes, solved_problem, draft: draft.clone() }
     }
 
-    fn product(&self, _solution: &ErSolution, _diagram: &Diagram) -> LayoutResult {
-        unreachable!("product called directly; use execute()")
+    fn product(&self, solution: &ErSolution, diagram: &Diagram) -> LayoutResult {
+        let ErSolution { nodes, solved_problem, draft } = solution;
+        let groups = group_bounds::compute_group_bounds(
+            diagram,
+            nodes,
+            GroupPadding::uniform(self.config.group_padding, 16.0),
+        );
+        let group_warnings =
+            group_bounds::detect_group_layout_warnings(diagram, nodes, &groups);
+        let (total_width, total_height) =
+            crate::layout::engines::common::canvas_bounds::canvas_size(
+                nodes,
+                &groups,
+                draft.padding,
+            );
+
+        let mut result = LayoutResult {
+            nodes: nodes.clone(),
+            groups,
+            edges: vec![],
+            total_width,
+            total_height,
+            hints: crate::layout::LayoutHints {
+                edge_routing_style: EdgeRoutingStyle::Spline,
+                sugiyama_ranks: Some(draft.sugiyama_ranks.clone()),
+                group_layout_warnings: group_warnings,
+                same_layer_edges: draft.same_layer_edges.clone(),
+                feedback_hubs: draft.feedback_hubs.clone(),
+                coordinate_problem: solved_problem.clone().map(Box::new),
+                ..Default::default()
+            },
+        };
+
+        if let Some(finish) = draft.preset.finish_layout {
+            finish(&mut result, &draft.preset);
+        }
+
+        result
     }
 
     fn execute(&self, diagram: &Diagram) -> LayoutResult {
-        let mut result =
-            engine::compute_with_preset(diagram, &preset::ER_PRESET, self.config);
-        result.hints.edge_routing_style = recommended_er_edge_routing(diagram);
-        result
-    }
-}
+        // 空图快速返回
+        if diagram.entities.is_empty() {
+            return LayoutResult {
+                nodes: std::collections::HashMap::new(),
+                groups: std::collections::HashMap::new(),
+                edges: vec![],
+                total_width: preset::ER_PRESET.padding * 2.0,
+                total_height: preset::ER_PRESET.padding * 2.0,
+                hints: Default::default(),
+            };
+        }
 
-/// 稠密 ER（边数 > 节点数 × 1.5）与默认路径均推荐 spline 路由。
-fn recommended_er_edge_routing(diagram: &Diagram) -> EdgeRoutingStyle {
-    let _ = diagram;
-    EdgeRoutingStyle::Spline
+        // 标准生命周期：compile → solve → product
+        let problem = self.compile(diagram);
+        let solution = self.solve(&problem);
+        self.product(&solution, diagram)
+    }
 }

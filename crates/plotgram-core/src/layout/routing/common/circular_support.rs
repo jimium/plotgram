@@ -1,7 +1,7 @@
 //! circular 布局与 circular 边路由共享的数据类型与工具。
 //!
 //! 此模块下沉了原先 `node::circular::common` 中被边路由反向依赖的类型，
-//! 使 `edge` 模块不再 `use crate::layout::node::`。
+//! 使 `edge` 模块不再 `use crate::layout::recipes::`。
 //! `node::circular::common` 通过 re-export 保持原有路径可用。
 
 use crate::types::DiagramType;

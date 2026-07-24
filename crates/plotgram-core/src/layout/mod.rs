@@ -26,29 +26,19 @@ pub mod constants;
 pub mod decl_order;
 pub mod demand;
 pub mod routing;
-// 过渡期：保持旧路径可用
-pub use demand::band as edge_band_demand;
 pub mod edge_stages;
 pub mod engines;
 pub mod geometry;
 pub mod geometry_helpers;
 pub mod group;
-// 过渡期：保持 crate::layout::group_frame:: 路径可用
-pub use group::frame as group_frame;
 pub mod kernel;
 pub mod quality;
-// 过渡期：保持 crate::layout::lint:: 和 crate::layout::metrics:: 路径可用
-pub use quality::lint;
-pub use quality::metrics;
 pub mod recipes;
 pub mod perf;
 pub mod pipeline;
 pub mod post_route;
 pub mod refine;
 pub mod route_feedback;
-// 过渡期：保持旧路径可用
-pub use demand::space_budget;
-pub use demand::space_budget_guard;
 pub mod traits;
 pub mod types;
 
@@ -61,15 +51,13 @@ pub use catalog::{
     LayoutCatalog,
 };
 pub use pipeline::plan::{validate_layout_plan_warnings, LayoutPlan, ResolvedAlgoOptions};
-pub use pipeline::plan; // 保持 crate::layout::plan::X 路径可用
-pub use pipeline::registry; // 保持 crate::layout::registry::X 路径可用
-pub use lint::{
+pub use quality::lint::{
     compute_lint_metrics, count_unrelated_parallel_overlaps, lint_layout, parse_lint_profile,
     parse_lint_rule, parse_lint_rules_list, AdviceConfidence, LayoutKnob, LintAdvice,
     LayoutLinter, LayoutViolation, LintConfig, LintMetricsSummary, LintProfile, LintReport,
     LintRuleId, LintSeverity, RuleConfig,
 };
-pub use edge_band_demand::{
+pub use demand::band::{
     demand_extra_over_base, edge_band_demand, layer_gaps_from_demand, EdgeBandDemandBreakdown,
     EdgeBandDemandProfile,
 };
@@ -77,35 +65,26 @@ pub use demand::{
     collect_edge_features, compute_corridor_model, score_edge, score_edges,
     DifficultyProfile, EdgeFeatures, PressureSnapshot,
 };
-pub use metrics::{
+pub use quality::metrics::{
     compute_collinear_sample_metrics, compute_congestion_sample_metrics, node_fingerprint,
     CollinearBaselineSnapshot, CollinearOrthoStats, CollinearSampleMetrics,
     CongestionBaselineSnapshot, CongestionSampleMetrics,
 };
 pub use pipeline::registry::{EDGE_ROUTING_NAMES, LAYOUT_ALGORITHM_NAMES};
 pub use snap::grid_snap::{DiagramAlignOverride, EdgeSnapConfig, LayerAxisAlign, NodeAlignConfig};
-// 过渡期：保持 crate::layout::grid_snap:: 和 crate::layout::canvas_finalize:: 路径可用
-pub use snap::grid_snap;
-pub use snap::canvas_finalize;
 pub use routing::segment_pair::{
     classify_segment_pair, find_needs_separation_edge_pairs, measure_segment_pair,
     ClassifyPairContext, ClassifyResult, ConflictDisposition, OrthoSegment, SegmentPairMeasure,
     SeparationReason, SpacingClass,
 };
 
-// 向后兼容：保持 `crate::layout::sugiyama` 等路径可用
 pub use routing::{
     edge_routing, edge_routing_bezier, edge_routing_circular,
     edge_routing_organic, edge_routing_orthogonal, edge_routing_spline, visibility,
 };
-// 过渡期：保持 crate::layout::edge:: 路径可用
-pub use routing as edge;
 pub use recipes::{
     architecture, circular, er, flowchart, mindmap, sequence,
 };
-pub use engines::layered as sugiyama_v2;
-// 过渡期：保持 crate::layout::node:: 路径可用
-pub use recipes as node;
 
 // Re-exports from split modules (preserve external API)
 pub use types::{

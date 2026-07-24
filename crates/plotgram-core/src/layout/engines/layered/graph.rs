@@ -1,5 +1,5 @@
 use crate::ast::{ArrowType, Diagram};
-use crate::layout::node::common::acyclic;
+use crate::layout::engines::common::acyclic;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;

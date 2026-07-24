@@ -3,7 +3,7 @@
 //! # Recipe
 //!
 //! 通过 [`LayoutRecipe`](crate::layout::kernel::recipe::LayoutRecipe) 编排布局生命周期，
-//! 坐标求解经由 [`LayoutCoordinator`](crate::layout::kernel::coordinator::LayoutCoordinator)（solve + P0 审计）。
+//! 坐标求解经由 [`CoordinateKernel`](crate::layout::kernel::coordinator::CoordinateKernel)（validate + solve + P0 审计）。
 
 pub(crate) mod arch_builder;
 mod group_layout_hint;

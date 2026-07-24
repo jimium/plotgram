@@ -4,7 +4,7 @@
 //! 仅对「会改形状」的后处理（换角 / overshoot / 量化后简化）做 `validate_route_edit`，
 //! 失败则回退 `before`。严格共线删点可跳过全量验证。
 
-use crate::layout::edge::segment_pair::{MIN_SHARED_TRUNK_LEN, STUB_GUARD_LENGTH};
+use crate::layout::routing::segment_pair::{MIN_SHARED_TRUNK_LEN, STUB_GUARD_LENGTH};
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, NodeLayout, Port};
 use serde::Serialize;

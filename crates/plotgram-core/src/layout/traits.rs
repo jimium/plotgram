@@ -1,7 +1,7 @@
 use crate::ast::Diagram;
 use crate::types::DiagramType;
 use crate::layout::algorithm_config::AlgorithmOptionSpec;
-use crate::layout::grid_snap::{NodeAlignConfig, EdgeSnapConfig};
+use crate::layout::snap::grid_snap::{NodeAlignConfig, EdgeSnapConfig};
 use super::types::LayoutResult;
 use std::collections::HashSet;
 

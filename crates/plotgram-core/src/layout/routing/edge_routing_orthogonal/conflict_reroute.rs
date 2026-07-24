@@ -3,7 +3,7 @@
 use super::*;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
-use crate::layout::edge::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
+use crate::layout::routing::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
 use std::collections::HashMap;
 
 /// X-1: 多轮重路由默认上限（违规边多时可升到此值）
@@ -141,7 +141,7 @@ pub fn reroute_conflicting_edges(
                     } else if path.len() >= 2 {
                         match relations.get(ei) {
                             Some(rel) => {
-                                crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto(
+                                crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels_auto(
                                     rel, ei, relations, &path,
                                 )
                             }

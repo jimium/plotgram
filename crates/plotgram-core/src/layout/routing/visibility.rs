@@ -13,7 +13,7 @@
 use crate::layout::geometry::{Point, Rect};
 use crate::layout::{constants, NodeLayout};
 
-use crate::layout::edge::common::spatial_grid::SpatialGrid;
+use crate::layout::routing::common::spatial_grid::SpatialGrid;
 
 /// 坐标比较容差
 const EPS: f64 = 0.1;

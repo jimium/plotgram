@@ -202,6 +202,18 @@ impl Default for CoordinateSolverConfig {
     }
 }
 
+// ─── 求解轴 ───────────────────────────────────────────────────────────────────
+
+/// 求解轴标注：告知 solver/materializer 当前求解的是哪个物理轴。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SolveAxis {
+    /// 横轴（TB 布局下的 x，LR 布局下的 y）。
+    #[default]
+    Cross,
+    /// 主轴（TB 布局下的 y，LR 布局下的 x）。
+    Main,
+}
+
 // ─── 顶层问题对象 ─────────────────────────────────────────────────────────────
 
 /// 坐标求解问题的完整 IR。
@@ -221,6 +233,8 @@ pub struct CoordinateProblem {
     pub initial: InitialCoordinates,
     /// 求解器配置。
     pub config: CoordinateSolverConfig,
+    /// 求解轴标注（告知 materializer 坐标写回哪个物理轴）。
+    pub axis: SolveAxis,
 }
 
 impl CoordinateProblem {
@@ -263,8 +277,41 @@ pub struct SolverResult {
     pub iterations: usize,
     /// 硬约束最大违反量（0 = 无违反）。
     pub max_hard_violation: f64,
-    /// 诊断信息。
-    pub diagnostics: Vec<String>,
+    /// 结构化诊断信息。
+    pub diagnostics: SolverDiagnostics,
+}
+
+/// 结构化求解诊断（替代旧版 `Vec<String>`）。
+#[derive(Debug, Clone, Default)]
+pub struct SolverDiagnostics {
+    /// 投影轮次（Dykstra 交替投影实际执行轮数）。
+    pub projection_rounds: usize,
+    /// 各 phase 实际迭代次数 [P1, P2, P3]。
+    pub phase_iterations: [usize; 3],
+    /// 活跃分离约束数（被 PAVA 触碰的 separation 数）。
+    pub active_separation_count: usize,
+    /// 连通分量数（objective/hard 关联图的 weak components）。
+    pub component_count: usize,
+    /// 文本诊断（兼容旧日志）。
+    pub notes: Vec<String>,
+}
+
+impl SolverResult {
+    /// 是否可行（硬约束全部满足）。
+    pub fn is_feasible(&self) -> bool {
+        self.status != SolverStatus::Infeasible
+    }
+
+    /// 安全获取坐标：仅在可行时返回 Some。
+    ///
+    /// 调用方应优先使用此方法，避免物化不可行解。
+    pub fn feasible_coordinates(&self) -> Option<&[f64]> {
+        if self.is_feasible() {
+            Some(&self.coordinates)
+        } else {
+            None
+        }
+    }
 }
 
 // ─── 诊断 ─────────────────────────────────────────────────────────────────────

@@ -9,16 +9,16 @@
 //!
 //! # 与通用框架的关系
 //!
-//! 复用 [`crate::layout::node::common::divide_and_conquer`] 的
+//! 复用 [`crate::layout::engines::common::divide_and_conquer`] 的
 //! `IntraLayout`、`GroupTree`、`CrossGroupEdge`、`IntraGroupLayouter`、
 //! `GroupArrangement` 类型与 trait。本模块实现 flowchart 场景的特化策略。
 
 use crate::ast::{Diagram, DiagramAttribute, Entity, Relation};
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
-use crate::layout::node::common::divide_and_conquer::{
+use crate::layout::engines::common::divide_and_conquer::{
     CrossGroupEdge, GroupArrangement, GroupTree, IntraGroupLayouter, IntraLayout,
 };
-use crate::layout::node::sugiyama_v2::{engine, preset};
+use crate::layout::engines::layered::{engine, preset};
 use crate::layout::{EdgeRoutingStyle, LayoutHints, LayoutResult, NodeLayout};
 use std::collections::{HashMap, HashSet};
 
@@ -73,19 +73,19 @@ impl AlignMode {
 
 /// 从 `group_frame` 读取组间排列配置（与 L1 同一真源）。
 fn read_arrangement_config(diagram: &Diagram) -> (f64, AlignMode, ArrangementMode) {
-    let spec = crate::layout::group_frame::resolve_group_frame_spec(diagram, "flowchart");
+    let spec = crate::layout::group::frame::resolve_group_frame_spec(diagram, "flowchart");
     let gap = if spec.gap > 0.0 {
         spec.gap
     } else {
         48.0
     };
     let align = match spec.cross_align {
-        crate::layout::group_frame::CrossAlign::Start => AlignMode::Left,
+        crate::layout::group::frame::CrossAlign::Start => AlignMode::Left,
         _ => AlignMode::Center,
     };
     let mode = match spec.arrangement {
-        crate::layout::group_frame::GroupArrangement::Stack {
-            axis: crate::layout::group_frame::Axis::Horizontal,
+        crate::layout::group::frame::GroupArrangement::Stack {
+            axis: crate::layout::group::frame::Axis::Horizontal,
         } => ArrangementMode::Horizontal,
         _ => ArrangementMode::Vertical,
     };
@@ -178,7 +178,7 @@ impl<'a> IntraGroupLayouter for FlowchartIntraGroupLayouter<'a> {
                 .iter()
                 .find(|e| e.id.as_str() == members[0].as_str());
             if let Some(e) = entity {
-                let (w, h) = crate::layout::node::common::node_sizing::standard_node_size(e);
+                let (w, h) = crate::layout::engines::common::node_sizing::standard_node_size(e);
                 return IntraLayout::single(&members[0], w, h);
             }
         }
@@ -519,7 +519,7 @@ fn choose_arrangement_mode(
     gap: f64,
     default_mode: ArrangementMode,
 ) -> ArrangementMode {
-    if crate::layout::group_frame::has_explicit_group_frame(diagram) {
+    if crate::layout::group::frame::has_explicit_group_frame(diagram) {
         return default_mode;
     }
     let n = intra_layouts.len();

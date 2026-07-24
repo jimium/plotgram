@@ -18,15 +18,15 @@ use crate::ast::Diagram;
 use crate::layout::geometry::Point;
 use crate::layout::algorithm_config::{AlgorithmOptionSpec, OptionKind};
 use crate::layout::{EdgeLayout, EdgeRoutingStrategy, LayoutResult, PathGeometry};
-use crate::layout::edge::common::edge_geometry::{
+use crate::layout::routing::common::edge_geometry::{
     build_edge_labels, compute_bezier_controls_organic,
     compute_bezier_controls_organic_tangents, cubic_bezier_point, parse_label_t, point_at_path_t,
     port_direction, radial_outward_tangent, DEFAULT_BEZIER_TENSION, DEFAULT_SHOULDER_RATIO,
 };
-use crate::layout::edge::common::routing_skeleton::{
+use crate::layout::routing::common::routing_skeleton::{
     finalize_edges, resolve_endpoints, EdgeEndpoints, LabelOffset, RoutingContext,
 };
-use crate::layout::edge::visibility;
+use crate::layout::routing::visibility;
 use std::collections::HashMap;
 
 const APPLICABLE_TYPES: &[DiagramType] = &[
@@ -131,14 +131,14 @@ pub struct OrganicRouting {
 
 impl Default for OrganicRouting {
     fn default() -> Self {
-        Self::from_options(&crate::layout::plan::ResolvedAlgoOptions::from_spec_defaults(
+        Self::from_options(&crate::layout::pipeline::plan::ResolvedAlgoOptions::from_spec_defaults(
             ORGANIC_OPTIONS,
         ))
     }
 }
 
 impl OrganicRouting {
-    pub fn from_options(options: &crate::layout::plan::ResolvedAlgoOptions) -> Self {
+    pub fn from_options(options: &crate::layout::pipeline::plan::ResolvedAlgoOptions) -> Self {
         Self {
             config: OrganicConfig {
                 tension: options.get_or_default(&ORGANIC_OPTIONS[0]),
@@ -222,11 +222,11 @@ pub fn route_edges_organic(
         false
     } else {
         // 快速检测：直线段 vs 节点 bbox 粗检
-        crate::layout::edge::common::routing_skeleton::quick_check_need_obstacle_index(&result, relations)
+        crate::layout::routing::common::routing_skeleton::quick_check_need_obstacle_index(&result, relations)
     };
 
     let (node_id_to_idx, obstacle_index) = if need_obstacle_index {
-        let (idx, obs) = crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
+        let (idx, obs) = crate::layout::routing::common::routing_skeleton::build_obstacle_context(&result);
         (idx, Some(obs))
     } else {
         (HashMap::new(), None)
@@ -387,7 +387,7 @@ pub fn route_edges_organic(
                 }
             }
 
-            if crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(&edge, obstacle_index, &skip) {
+            if crate::layout::routing::common::obstacle_check::curve_intersects_obstacles(&edge, obstacle_index, &skip) {
                 if is_mindmap {
                     // 思维导图保持平滑贝塞尔：用绕行中点拉弓，避免折线观感
                     if let Some(bowed) = bow_bezier_around_obstacles(
@@ -675,7 +675,7 @@ fn bow_bezier_around_obstacles(
         from_port,
         to_port,
     };
-    if crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(&candidate, obstacles, skip) {
+    if crate::layout::routing::common::obstacle_check::curve_intersects_obstacles(&candidate, obstacles, skip) {
         // 仍穿障则保留原曲线（比折线观感更好）
         None
     } else {

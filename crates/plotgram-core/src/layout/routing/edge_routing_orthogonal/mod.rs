@@ -152,14 +152,14 @@ pub struct OrthogonalRouting {
 
 impl Default for OrthogonalRouting {
     fn default() -> Self {
-        Self::from_options(&crate::layout::plan::ResolvedAlgoOptions::from_spec_defaults(
+        Self::from_options(&crate::layout::pipeline::plan::ResolvedAlgoOptions::from_spec_defaults(
             ORTHOGONAL_OPTIONS,
         ))
     }
 }
 
 impl OrthogonalRouting {
-    pub fn from_options(options: &crate::layout::plan::ResolvedAlgoOptions) -> Self {
+    pub fn from_options(options: &crate::layout::pipeline::plan::ResolvedAlgoOptions) -> Self {
         Self {
             config: OrthoConfig {
                 slot_pitch: options.get_or_default(&ORTHOGONAL_OPTIONS[0]),

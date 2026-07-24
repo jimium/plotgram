@@ -5,10 +5,10 @@
 //! `MergeInterval`；失败则 `Degraded(MergeInfeasible)`，不改路径。
 
 use crate::ast::Relation;
-use crate::layout::edge::edge_merge_policy::merge_groups_for_edge;
-use crate::layout::edge::edge_merge_policy::{EdgeMergeContext, MergeGroup};
-use crate::layout::edge::route_annotation::MergeInterval;
-use crate::layout::edge::segment_pair::MIN_SHARED_TRUNK_LEN;
+use crate::layout::routing::edge_merge_policy::merge_groups_for_edge;
+use crate::layout::routing::edge_merge_policy::{EdgeMergeContext, MergeGroup};
+use crate::layout::routing::route_annotation::MergeInterval;
+use crate::layout::routing::segment_pair::MIN_SHARED_TRUNK_LEN;
 use crate::layout::geometry::Point;
 use crate::layout::refine::segment_intersects_node;
 use crate::layout::{EdgeLayout, NodeLayout, Port};

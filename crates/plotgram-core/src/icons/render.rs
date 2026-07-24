@@ -2,7 +2,7 @@
 
 use crate::ast::Entity;
 use crate::render::visual::NodeShape;
-use crate::layout::edge::common::label_avoidance::estimate_label_width;
+use crate::layout::routing::common::label_avoidance::estimate_label_width;
 
 use super::catalog::{IconDef, IconPlacement};
 use super::resolve::{resolve, ResolveOptions};

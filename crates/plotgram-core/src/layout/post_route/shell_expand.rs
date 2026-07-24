@@ -7,7 +7,7 @@ use crate::layout::geometry::Point;
 use crate::layout::group::constants::{EPS, GROUP_BORDER_SHELL_PAD};
 use crate::layout::group::context::build_node_to_groups;
 use crate::layout::group::hierarchy::build_group_hierarchy;
-use crate::layout::node::common::group_bounds::GutterSide;
+use crate::layout::engines::common::group_bounds::GutterSide;
 use crate::layout::{GroupLayout, LayoutResult};
 
 /// 单侧最大补扩（EGB/lane_budget 已预留主预算，PRS 只做小步安全网）。

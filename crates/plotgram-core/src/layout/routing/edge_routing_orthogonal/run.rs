@@ -22,9 +22,9 @@
 
 use super::*;
 use crate::ast::Diagram;
-use crate::layout::edge::common::edge_geometry::{arrow_type_tag, edge_line_style_signature};
-use crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels;
-use crate::layout::edge::common::self_loop;
+use crate::layout::routing::common::edge_geometry::{arrow_type_tag, edge_line_style_signature};
+use crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels;
+use crate::layout::routing::common::self_loop;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, LayoutResult, NodeLayout, PathGeometry, Port};
 use std::collections::HashMap;
@@ -288,7 +288,7 @@ pub(super) fn route_edges_orthogonal_inner(
                 // 单调不劣化：仅当新路径非 degraded 时替换
                 if !path_stats.degraded {
                     let labels = match relations.get(ei) {
-                        Some(rel) => crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto(
+                        Some(rel) => crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels_auto(
                             rel, ei, relations, &new_path,
                         ),
                         None => Vec::new(),
@@ -416,7 +416,7 @@ pub(super) fn route_edges_orthogonal_inner(
                     );
                     if !path_stats.degraded {
                         let labels = match relations.get(ei) {
-                            Some(rel) => crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto(
+                            Some(rel) => crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels_auto(
                                 rel, ei, relations, &new_path,
                             ),
                             None => Vec::new(),
@@ -608,7 +608,7 @@ pub(super) fn route_edges_orthogonal_inner(
     }
 
     // C 末冻结旁路 Annotation（stub / 受保护 trunk / S3 merge），供 sanitize / 后续 D 验证
-    let route_annotations = crate::layout::edge::freeze_route_annotations_with_merges(
+    let route_annotations = crate::layout::routing::freeze_route_annotations_with_merges(
         &edges,
         &from_side,
         &to_side,
@@ -702,7 +702,7 @@ pub(super) fn route_edges_orthogonal_inner(
         );
         if s4_repaired > 0 {
             // 几何已改：刷新 Annotation，供 D 末激进 sanitize 校验
-            let refreshed = crate::layout::edge::freeze_route_annotations_with_merges(
+            let refreshed = crate::layout::routing::freeze_route_annotations_with_merges(
                 &edges,
                 &from_side,
                 &to_side,
@@ -749,7 +749,7 @@ pub(super) fn route_edges_orthogonal_inner(
         }
         // 几何与 merge 声明均可能变化，刷新最终 Annotation。
         result.hints.route_annotations =
-            Some(crate::layout::edge::freeze_route_annotations_with_merges(
+            Some(crate::layout::routing::freeze_route_annotations_with_merges(
                 &edges,
                 &from_side,
                 &to_side,
@@ -995,7 +995,7 @@ pub(crate) fn range_overlap_local(a_min: f64, a_max: f64, b_min: f64, b_max: f64
 #[cfg(test)]
 mod contract_priority_tests {
     use super::should_strict_group_transit;
-    use crate::layout::edge::edge_routing_orthogonal::profile::OrthoRoutingProfile;
+    use crate::layout::routing::edge_routing_orthogonal::profile::OrthoRoutingProfile;
     use crate::layout::group::GroupRoutingContext;
     use crate::layout::GroupLayout;
     use std::collections::{BTreeMap, HashMap};

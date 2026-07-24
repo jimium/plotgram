@@ -14,4 +14,4 @@ pub mod pack;
 pub mod stats;
 
 // Re-export: label_placement 已下沉到 edge::common，此处保留兼容入口
-pub use crate::layout::edge::common::label_placement;
+pub use crate::layout::routing::common::label_placement;

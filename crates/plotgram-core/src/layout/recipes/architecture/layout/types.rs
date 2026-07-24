@@ -1,12 +1,31 @@
 //! 图索引与分组映射。
 
-use crate::ast::Diagram;
-use crate::layout::node::common::graph_index::DirectedGraphIndex;
-use crate::layout::node::common::group_map;
+use crate::ast::{Diagram, Relation};
+use crate::layout::engines::common::graph_index::DirectedGraphIndex;
+use crate::layout::engines::common::group_map;
+use crate::types::DiagramType;
 use std::collections::HashMap;
 
 /// 架构图布局使用的有向图索引（过滤 Passive 边）。
 pub(in super::super) type GraphIndex = DirectedGraphIndex;
+
+/// 架构图坐标求解所需的图级事实（解耦对 `&Diagram` 的直接依赖）。
+#[derive(Clone)]
+pub(in super::super) struct ArchDiagramFacts {
+    pub diagram_type: DiagramType,
+    pub relations: Vec<Relation>,
+    pub has_groups: bool,
+}
+
+impl ArchDiagramFacts {
+    pub fn from_diagram(diagram: &Diagram) -> Self {
+        Self {
+            diagram_type: diagram.diagram_type.clone(),
+            relations: diagram.relations.clone(),
+            has_groups: !diagram.groups.is_empty(),
+        }
+    }
+}
 
 pub(in super::super) struct GroupMap {
     pub(in super::super) node_to_top_group: HashMap<String, String>,

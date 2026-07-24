@@ -11,8 +11,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::layout::kernel::coordinate::model::*;
-use crate::layout::node::architecture_v2::layout::constants::NODE_GAP;
-use crate::layout::node::architecture_v2::layout::types::{GraphIndex, GroupMap};
+use crate::layout::recipes::architecture::layout::constants::NODE_GAP;
+use crate::layout::recipes::architecture::layout::types::{GraphIndex, GroupMap};
 
 /// 组内构建输出。
 pub(super) struct IntraBuildOutput {
@@ -37,7 +37,7 @@ pub(super) fn build_intra_coordinate_problem(
     group_map: &GroupMap,
     member_set: &HashSet<String>,
     reversed: &HashSet<(String, String)>,
-    budget: Option<&crate::layout::space_budget::SpaceBudget>,
+    budget: Option<&crate::layout::demand::space_budget::SpaceBudget>,
 ) -> IntraBuildOutput {
     let mut vars: Vec<NodeVariable> = Vec::new();
     let mut node_to_var: HashMap<String, VarId> = HashMap::new();
@@ -154,7 +154,7 @@ pub(super) fn build_intra_coordinate_problem(
                     if !member_set.contains(succ) {
                         continue;
                     }
-                    if !crate::layout::node::architecture_v2::layout::acyclic::is_effective_edge(
+                    if !crate::layout::recipes::architecture::layout::acyclic::is_effective_edge(
                         node_id, succ, reversed,
                     ) {
                         continue;
@@ -200,7 +200,7 @@ pub(super) fn build_intra_coordinate_problem(
                     succs
                         .iter()
                         .filter(|s| {
-                            crate::layout::node::architecture_v2::layout::acyclic::is_effective_edge(
+                            crate::layout::recipes::architecture::layout::acyclic::is_effective_edge(
                                 hub_id, s, reversed,
                             ) && lower_set.contains(s.as_str())
                                 && member_set.contains(*s)
@@ -243,7 +243,7 @@ pub(super) fn build_intra_coordinate_problem(
                     succs
                         .iter()
                         .filter(|s| {
-                            crate::layout::node::architecture_v2::layout::acyclic::is_effective_edge(
+                            crate::layout::recipes::architecture::layout::acyclic::is_effective_edge(
                                 client_id, s, reversed,
                             ) && lower_set.contains(s.as_str())
                                 && member_set.contains(*s)
@@ -278,6 +278,7 @@ pub(super) fn build_intra_coordinate_problem(
         objectives,
         initial: InitialCoordinates { values: initial_values },
         config: CoordinateSolverConfig::default(),
+        axis: Default::default(),
     };
 
     IntraBuildOutput {

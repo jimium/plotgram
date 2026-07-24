@@ -9,7 +9,7 @@
 //! 4. 冲突消解：同通道多边按 lane 偏移
 
 use crate::ast::Relation;
-use crate::layout::edge::common::edge_geometry::node_center;
+use crate::layout::routing::common::edge_geometry::node_center;
 use crate::layout::geometry::{Point, EPS};
 use crate::layout::group::GroupRoutingContext;
 use crate::layout::NodeLayout;

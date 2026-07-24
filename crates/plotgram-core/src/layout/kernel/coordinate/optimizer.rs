@@ -8,8 +8,9 @@
 //! 4. Barzilai-Borwein 自适应步长加速收敛。
 //! 5. 未收敛时返回 best feasible snapshot，标记 Degraded。
 
+use super::analysis::analyze_components;
 use super::model::*;
-use super::projection::{project_all_layers, project_bounds, max_separation_violation};
+use super::projection::{project_hard_constraints, max_hard_violation};
 
 /// 求解 CoordinateProblem，返回最终坐标和诊断。
 pub fn solve(problem: &CoordinateProblem) -> SolverResult {
@@ -23,7 +24,7 @@ pub fn solve(problem: &CoordinateProblem) -> SolverResult {
             loss_p3: 0.0,
             iterations: 0,
             max_hard_violation: 0.0,
-            diagnostics: vec![],
+            diagnostics: Default::default(),
         };
     }
 
@@ -32,55 +33,66 @@ pub fn solve(problem: &CoordinateProblem) -> SolverResult {
     // 初值 = BK 坐标
     let mut coords = problem.initial.values.clone();
 
-    // 初始 PAVA 投影：确保硬约束满足
-    project_all_layers(&mut coords, problem);
-    project_bounds(&mut coords, problem);
+    // 初始 Dykstra 投影：确保所有硬约束满足
+    project_hard_constraints(&mut coords, problem);
 
-    // 无 objectives 时直接返回 PAVA 投影结果
+    // 无 objectives 时直接返回投影结果
     if problem.objectives.is_empty() {
-        let violation = max_separation_violation(&coords, problem);
+        let violation = max_hard_violation(&coords, problem);
         return SolverResult {
             coordinates: coords,
-            status: if violation < 1e-9 { SolverStatus::Converged } else { SolverStatus::Infeasible },
+            status: if violation < 1e-6 { SolverStatus::Converged } else { SolverStatus::Infeasible },
             loss_p1: 0.0,
             loss_p2: 0.0,
             loss_p3: 0.0,
             iterations: 0,
             max_hard_violation: violation,
-            diagnostics: vec![],
+            diagnostics: Default::default(),
         };
     }
 
     let mut total_iterations = 0;
-    let mut diagnostics = Vec::new();
+    let mut diag_notes: Vec<String> = Vec::new();
+
+    // 连通分量分析（填充诊断信息）
+    let component_analysis = analyze_components(problem);
+
+    // 预索引各优先级 terms（避免每步重复过滤）
+    let p1_terms: Vec<&ObjectiveTerm> = problem.objectives_by_priority(ObjectivePriority::P1).collect();
+    let p2_terms: Vec<&ObjectiveTerm> = problem.objectives_by_priority(ObjectivePriority::P2).collect();
+    let p3_terms: Vec<&ObjectiveTerm> = problem.objectives_by_priority(ObjectivePriority::P3).collect();
+
+    // 可复用 workspace（避免每轮分配）
+    let mut gradient = vec![0.0f64; n];
+    let mut candidate = vec![0.0f64; n];
 
     // 分层优化：P1 → P2 → P3
-    let phases: [(ObjectivePriority, usize, &str); 3] = [
-        (ObjectivePriority::P1, config.max_iter_p1, "P1"),
-        (ObjectivePriority::P2, config.max_iter_p2, "P2"),
-        (ObjectivePriority::P3, config.max_iter_p3, "P3"),
+    let phases: [(ObjectivePriority, usize, &str, &[&ObjectiveTerm]); 3] = [
+        (ObjectivePriority::P1, config.max_iter_p1, "P1", &p1_terms),
+        (ObjectivePriority::P2, config.max_iter_p2, "P2", &p2_terms),
+        (ObjectivePriority::P3, config.max_iter_p3, "P3", &p3_terms),
     ];
 
-    // 记录 P1 loss 用于 tolerance 约束
+    // 记录 P1/P2 loss 用于 tolerance 约束
     let mut loss_p1_budget = f64::INFINITY;
+    let mut loss_p2_budget = f64::INFINITY;
 
-    for (priority, max_iter, phase_name) in &phases {
-        let terms: Vec<&ObjectiveTerm> = problem.objectives_by_priority(*priority).collect();
+    for (priority, max_iter, phase_name, terms) in &phases {
         if terms.is_empty() {
             continue;
         }
 
         let mut step = config.initial_step;
         let mut best_coords = coords.clone();
-        let mut best_loss = compute_loss(&coords, &terms);
+        let mut best_loss = compute_loss(&coords, terms);
         let mut prev_gradient = vec![0.0f64; n];
         let mut prev_coords = coords.clone();
         let mut converged = false;
 
         for iter in 0..*max_iter {
-            // 计算梯度
-            let mut gradient = vec![0.0f64; n];
-            compute_gradient(&coords, &terms, &mut gradient);
+            // 计算梯度（复用 buffer）
+            gradient.iter_mut().for_each(|g| *g = 0.0);
+            compute_gradient(&coords, terms, &mut gradient);
 
             // Barzilai-Borwein 自适应步长（第 2 步起）
             if iter > 0 {
@@ -92,18 +104,16 @@ pub fn solve(problem: &CoordinateProblem) -> SolverResult {
                 }
             }
 
-            // 梯度下降步
-            let mut candidate = vec![0.0f64; n];
+            // 梯度下降步（复用 candidate buffer）
             for i in 0..n {
                 candidate[i] = coords[i] - step * gradient[i];
             }
 
-            // PAVA 投影回可行域
-            project_all_layers(&mut candidate, problem);
-            project_bounds(&mut candidate, problem);
+            // Dykstra 投影回可行域
+            project_hard_constraints(&mut candidate, problem);
 
             // 检查 loss
-            let candidate_loss = compute_loss(&candidate, &terms);
+            let candidate_loss = compute_loss(&candidate, terms);
 
             // 步长 backoff：如果 loss 增加，二分步长重试
             let mut accepted = candidate_loss <= best_loss + config.epsilon;
@@ -114,9 +124,8 @@ pub fn solve(problem: &CoordinateProblem) -> SolverResult {
                     for i in 0..n {
                         candidate[i] = coords[i] - backoff_step * gradient[i];
                     }
-                    project_all_layers(&mut candidate, problem);
-                    project_bounds(&mut candidate, problem);
-                    let bl = compute_loss(&candidate, &terms);
+                    project_hard_constraints(&mut candidate, problem);
+                    let bl = compute_loss(&candidate, terms);
                     if bl <= best_loss + config.epsilon {
                         step = backoff_step;
                         accepted = true;
@@ -126,18 +135,28 @@ pub fn solve(problem: &CoordinateProblem) -> SolverResult {
             }
 
             if accepted {
-                let candidate_loss = compute_loss(&candidate, &terms);
+                let candidate_loss = compute_loss(&candidate, terms);
 
                 // P2/P3 阶段：检查不破坏 P1 budget
                 if *priority != ObjectivePriority::P1 && loss_p1_budget.is_finite() {
-                    let p1_terms: Vec<&ObjectiveTerm> =
-                        problem.objectives_by_priority(ObjectivePriority::P1).collect();
                     if !p1_terms.is_empty() {
                         let p1_loss = compute_loss(&candidate, &p1_terms);
                         if p1_loss > loss_p1_budget + config.p1_tolerance {
                             // 拒绝此步：P1 退化超限
-                            prev_coords = coords.clone();
-                            prev_gradient = gradient;
+                            std::mem::swap(&mut prev_coords, &mut coords);
+                            prev_gradient.copy_from_slice(&gradient);
+                            continue;
+                        }
+                    }
+                }
+
+                // P3 阶段：检查不破坏 P2 budget
+                if *priority == ObjectivePriority::P3 && loss_p2_budget.is_finite() {
+                    if !p2_terms.is_empty() {
+                        let p2_loss = compute_loss(&candidate, &p2_terms);
+                        if p2_loss > loss_p2_budget + config.p1_tolerance {
+                            std::mem::swap(&mut prev_coords, &mut coords);
+                            prev_gradient.copy_from_slice(&gradient);
                             continue;
                         }
                     }
@@ -149,9 +168,9 @@ pub fn solve(problem: &CoordinateProblem) -> SolverResult {
                     .map(|(a, b)| (a - b).abs())
                     .fold(0.0f64, f64::max);
 
-                prev_coords = coords.clone();
-                prev_gradient = gradient;
-                coords = candidate;
+                prev_gradient.copy_from_slice(&gradient);
+                std::mem::swap(&mut prev_coords, &mut coords);
+                std::mem::swap(&mut coords, &mut candidate);
 
                 if candidate_loss < best_loss {
                     best_loss = candidate_loss;
@@ -165,42 +184,42 @@ pub fn solve(problem: &CoordinateProblem) -> SolverResult {
                 }
             } else {
                 // 所有 backoff 失败，梯度方向无法改善
-                prev_gradient = gradient;
-                prev_coords = coords.clone();
+                prev_gradient.copy_from_slice(&gradient);
+                prev_coords.copy_from_slice(&coords);
             }
         }
 
         if !converged {
             total_iterations += max_iter;
-            diagnostics.push(format!(
+            diag_notes.push(format!(
                 "{}: not converged after {} iters, loss={:.4}",
                 phase_name, max_iter, best_loss
             ));
         }
 
-        // P1 完成后记录 budget
+        // P1 完成后记录 budget（复用预索引 terms）
         if *priority == ObjectivePriority::P1 {
-            let p1_terms: Vec<&ObjectiveTerm> =
-                problem.objectives_by_priority(ObjectivePriority::P1).collect();
             loss_p1_budget = compute_loss(&coords, &p1_terms);
         }
 
-        let _ = best_coords; // best snapshot 已在 coords 中（贪心接受）
+        // P2 完成后记录 budget（复用预索引 terms）
+        if *priority == ObjectivePriority::P2 {
+            loss_p2_budget = compute_loss(&coords, &p2_terms);
+        }
+
+        // 恢复 best snapshot（确保最终坐标是该 phase 的最优解）
+        coords = best_coords;
     }
 
-    // 最终 loss
-    let p1_terms: Vec<&ObjectiveTerm> = problem.objectives_by_priority(ObjectivePriority::P1).collect();
-    let p2_terms: Vec<&ObjectiveTerm> = problem.objectives_by_priority(ObjectivePriority::P2).collect();
-    let p3_terms: Vec<&ObjectiveTerm> = problem.objectives_by_priority(ObjectivePriority::P3).collect();
-
+    // 最终 loss（复用预索引 terms）
     let final_p1 = compute_loss(&coords, &p1_terms);
     let final_p2 = compute_loss(&coords, &p2_terms);
     let final_p3 = compute_loss(&coords, &p3_terms);
-    let violation = max_separation_violation(&coords, problem);
+    let violation = max_hard_violation(&coords, problem);
 
     let status = if violation > 1e-6 {
         SolverStatus::Infeasible
-    } else if diagnostics.is_empty() {
+    } else if diag_notes.is_empty() {
         SolverStatus::Converged
     } else {
         SolverStatus::Degraded
@@ -214,7 +233,11 @@ pub fn solve(problem: &CoordinateProblem) -> SolverResult {
         loss_p3: final_p3,
         iterations: total_iterations,
         max_hard_violation: violation,
-        diagnostics,
+        diagnostics: SolverDiagnostics {
+            component_count: component_analysis.count,
+            notes: diag_notes,
+            ..Default::default()
+        },
     }
 }
 
@@ -274,7 +297,7 @@ fn barzilai_borwein_step(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layout::node::coordinate_solver::model::*;
+    use crate::layout::kernel::coordinate::model::*;
 
     /// 无 objectives 时，结果 = PAVA 投影初值。
     #[test]
@@ -298,6 +321,7 @@ mod tests {
             objectives: vec![],
             initial: InitialCoordinates { values: vec![0.0, 30.0, 60.0] },
             config: CoordinateSolverConfig::default(),
+            axis: Default::default(),
         };
 
         let result = solve(&problem);
@@ -351,6 +375,7 @@ mod tests {
             ],
             initial: InitialCoordinates { values: vec![100.0, 200.0, 300.0] },
             config: CoordinateSolverConfig::default(),
+            axis: Default::default(),
         };
 
         let result = solve(&problem);
@@ -387,6 +412,7 @@ mod tests {
             ],
             initial: InitialCoordinates { values: vec![0.0, 80.0] },
             config: CoordinateSolverConfig::default(),
+            axis: Default::default(),
         };
 
         let result = solve(&problem);
@@ -432,6 +458,7 @@ mod tests {
             ],
             initial: InitialCoordinates { values: vec![0.0, 50.0, 100.0, 150.0] },
             config: CoordinateSolverConfig::default(),
+            axis: Default::default(),
         };
 
         let r1 = solve(&problem);

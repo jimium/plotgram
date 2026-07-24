@@ -454,7 +454,7 @@ fn canonical_path_normal(path: &[Point], t: f64) -> Point {
 mod tests {
     use super::*;
     use crate::ast::{ArrowType, AttributeMap, Identifier, Relation, Span};
-    use crate::layout::edge::common::label_avoidance::aabb_overlap;
+    use crate::layout::routing::common::label_avoidance::aabb_overlap;
 
     fn rel(from: &str, to: &str, label: &str) -> Relation {
         Relation {

@@ -3,7 +3,7 @@
 //! 从 `run.rs` 原样搬迁（A4 结构重构，行为不变）。
 
 use super::super::*;
-use crate::layout::edge::common::edge_geometry::{
+use crate::layout::routing::common::edge_geometry::{
     arrow_type_tag, canonical_pair, edge_line_style_signature, node_center, undirected_pair_key,
 };
 use std::collections::HashMap;
@@ -23,7 +23,7 @@ pub(crate) fn phase_port_slot(
     Vec<Port>,
     Vec<usize>,
     HashMap<(usize, bool), Endpoint>,
-    crate::layout::edge::common::parallel_edges::ParallelGroups,
+    crate::layout::routing::common::parallel_edges::ParallelGroups,
     std::collections::BTreeSet<String>,
 ) {
     // ── 1. 按无向节点对分组，并确定每条边的端口（连接边） ──
@@ -307,7 +307,7 @@ pub(crate) fn phase_port_slot(
     }
 
     // 平行边切线偏移：仅 A↔B 正反向对对称错开；同向多边由 slot 分布处理。
-    let parallel = crate::layout::edge::common::parallel_edges::group_parallel_edges(
+    let parallel = crate::layout::routing::common::parallel_edges::group_parallel_edges(
         relations,
         crate::layout::constants::DEFAULT_EDGE_OFFSET,
     );

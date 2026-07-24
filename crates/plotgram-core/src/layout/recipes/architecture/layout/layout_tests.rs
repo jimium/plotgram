@@ -255,7 +255,7 @@ use crate::ast::{
         );
 
         // 所有组成员节点应落在分组包围框内（architecture_v2 非对称 padding）
-        let pad = crate::layout::node::common::group_bounds::GroupPadding::architecture_v2();
+        let pad = crate::layout::engines::common::group_bounds::GroupPadding::architecture();
         for eid in ["web", "mobile"] {
             let n = result.nodes.get(eid).unwrap();
             assert!(

@@ -1,7 +1,7 @@
 //! SVG 文档结构工具（头部、尾部、分组、边路径渲染）。
 
 use crate::ast::*;
-use crate::layout::edge::route_annotation::{EdgeRouteAnnotation, MergeInterval};
+use crate::layout::routing::route_annotation::{EdgeRouteAnnotation, MergeInterval};
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLabelLayout, EdgeLayout, PathGeometry};
 use crate::render::scene::ExportScene;
@@ -770,7 +770,7 @@ mod tests {
             Point::new(200.0, 116.0),
             Point::new(200.0, 200.0),
         ];
-        let mut ann = crate::layout::edge::route_annotation::annotate_edge_from_path(
+        let mut ann = crate::layout::routing::route_annotation::annotate_edge_from_path(
             &points,
             crate::layout::Port::Bottom,
             crate::layout::Port::Top,
@@ -809,7 +809,7 @@ mod tests {
             Point::new(229.8, 238.0),
             Point::new(229.8, 254.0),
         ];
-        let mut ann = crate::layout::edge::route_annotation::annotate_edge_from_path(
+        let mut ann = crate::layout::routing::route_annotation::annotate_edge_from_path(
             &points,
             crate::layout::Port::Bottom,
             crate::layout::Port::Top,

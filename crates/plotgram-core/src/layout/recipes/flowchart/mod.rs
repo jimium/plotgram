@@ -22,9 +22,9 @@ pub mod group_divide;
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
 use crate::layout::kernel::recipe::LayoutRecipe;
-use crate::layout::node::common::group_bounds::{self, GroupPadding};
-use crate::layout::node::sugiyama_v2::{coordinate, layered_kernel::LayeredKernel, preset};
-use crate::layout::plan::ResolvedAlgoOptions;
+use crate::layout::engines::common::group_bounds::{self, GroupPadding};
+use crate::layout::engines::layered::{coordinate, layered_kernel::LayeredKernel, preset};
+use crate::layout::pipeline::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, EdgeRoutingStyle, LayoutResult, LayoutStrategy, NodeAlignConfig};
 use crate::types::DiagramType;
 
@@ -96,15 +96,17 @@ struct FlowchartLayoutRecipe {
 /// 流程图问题 IR。
 enum FlowchartProblem {
     /// 无 group：LayeredKernel 产出的分层 IR
-    Flat(crate::layout::node::sugiyama_v2::layered_kernel::LayeredDraft),
-    /// 有 group：分治路径（保留 execute 覆盖）
+    Flat(crate::layout::engines::layered::layered_kernel::LayeredDraft),
+    /// 有 group：分治路径
     DivideConquer,
 }
 
 /// 流程图求解结果。
 struct FlowchartSolution {
+    /// 坐标求解结果 + draft 元数据
     nodes: std::collections::HashMap<String, crate::layout::NodeLayout>,
     solved_problem: Option<crate::layout::kernel::coordinate::model::CoordinateProblem>,
+    draft: crate::layout::engines::layered::layered_kernel::LayeredDraft,
 }
 
 impl LayoutRecipe for FlowchartLayoutRecipe {
@@ -142,21 +144,57 @@ impl LayoutRecipe for FlowchartLayoutRecipe {
                     draft.has_order_bias,
                     &draft.end_ids,
                 );
-                FlowchartSolution { nodes, solved_problem }
+                FlowchartSolution { nodes, solved_problem, draft: draft.clone() }
             }
-            FlowchartProblem::DivideConquer => FlowchartSolution {
-                nodes: std::collections::HashMap::new(),
-                solved_problem: None,
-            },
+            FlowchartProblem::DivideConquer => {
+                // 分治路径由 execute() 直接处理，不会走到这里
+                panic!("DivideConquer should be handled in execute()")
+            }
         }
     }
 
-    fn product(&self, _solution: &FlowchartSolution, _diagram: &Diagram) -> LayoutResult {
-        // DivideConquer 路径由 execute 覆盖处理，此处不会被调用
-        unreachable!("product called directly; use execute()")
+    fn product(&self, solution: &FlowchartSolution, diagram: &Diagram) -> LayoutResult {
+        let FlowchartSolution { nodes, solved_problem, draft } = solution;
+        let groups = group_bounds::compute_group_bounds(
+            diagram,
+            nodes,
+            GroupPadding::uniform(self.config.group_padding, 16.0),
+        );
+        let group_warnings =
+            group_bounds::detect_group_layout_warnings(diagram, nodes, &groups);
+        let (total_width, total_height) =
+            crate::layout::engines::common::canvas_bounds::canvas_size(
+                nodes,
+                &groups,
+                draft.padding,
+            );
+
+        let mut result = LayoutResult {
+            nodes: nodes.clone(),
+            groups,
+            edges: vec![],
+            total_width,
+            total_height,
+            hints: crate::layout::LayoutHints {
+                edge_routing_style: EdgeRoutingStyle::Orthogonal,
+                sugiyama_ranks: Some(draft.sugiyama_ranks.clone()),
+                group_layout_warnings: group_warnings,
+                same_layer_edges: draft.same_layer_edges.clone(),
+                feedback_hubs: draft.feedback_hubs.clone(),
+                coordinate_problem: solved_problem.clone().map(Box::new),
+                ..Default::default()
+            },
+        };
+
+        if let Some(finish) = draft.preset.finish_layout {
+            finish(&mut result, &draft.preset);
+        }
+
+        result
     }
 
     fn execute(&self, diagram: &Diagram) -> LayoutResult {
+        // 分治路径需要特殊处理（compile 时无法获取 diagram）
         if group_divide::should_divide(diagram) {
             return group_divide::divide_flowchart_with_groups(diagram, self.config);
         }
@@ -173,62 +211,9 @@ impl LayoutRecipe for FlowchartLayoutRecipe {
             };
         }
 
-        // compile: LayeredKernel (Step 1-7)
-        let draft = LayeredKernel::compute(
-            diagram,
-            &preset::FLOWCHART_PRESET,
-            self.config,
-        );
-
-        // solve: CoordinateKernel (Step 8)
-        let (nodes, solved_problem) = coordinate::assign_coordinates_brandes_koepf(
-            &draft.dag,
-            &draft.proper_graph,
-            &draft.layers,
-            &draft.sizes,
-            draft.horizontal,
-            &draft.preset,
-            &draft.per_layer_gaps,
-            draft.has_order_bias,
-            &draft.end_ids,
-        );
-
-        // product: 组装 LayoutResult (Step 9-10)
-        let groups = group_bounds::compute_group_bounds(
-            diagram,
-            &nodes,
-            GroupPadding::uniform(self.config.group_padding, 16.0),
-        );
-        let group_warnings =
-            group_bounds::detect_group_layout_warnings(diagram, &nodes, &groups);
-        let (total_width, total_height) =
-            crate::layout::node::common::canvas_bounds::canvas_size(
-                &nodes,
-                &groups,
-                draft.padding,
-            );
-
-        let mut result = LayoutResult {
-            nodes,
-            groups,
-            edges: vec![],
-            total_width,
-            total_height,
-            hints: crate::layout::LayoutHints {
-                edge_routing_style: EdgeRoutingStyle::Orthogonal,
-                sugiyama_ranks: Some(draft.sugiyama_ranks),
-                group_layout_warnings: group_warnings,
-                same_layer_edges: draft.same_layer_edges,
-                feedback_hubs: draft.feedback_hubs,
-                coordinate_problem: solved_problem.map(Box::new),
-                ..Default::default()
-            },
-        };
-
-        if let Some(finish) = draft.preset.finish_layout {
-            finish(&mut result, &draft.preset);
-        }
-
-        result
+        // 标准生命周期：compile → solve → product
+        let problem = self.compile(diagram);
+        let solution = self.solve(&problem);
+        self.product(&solution, diagram)
     }
 }

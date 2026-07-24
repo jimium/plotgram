@@ -3,13 +3,13 @@
 //! 从 `run.rs` 原样搬迁（A4 结构重构，行为不变）。
 
 use super::super::*;
-use crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels;
-use crate::layout::edge::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
+use crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels;
+use crate::layout::routing::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
 use std::collections::HashMap;
 
 /// 从 S3 merge_intervals 提取垂直受保护干线 `(x, y_lo, y_hi)`（去重、排序）。
 pub(crate) fn extract_protected_vertical_trunks(
-    merge_intervals: &std::collections::HashMap<usize, Vec<crate::layout::edge::MergeInterval>>,
+    merge_intervals: &std::collections::HashMap<usize, Vec<crate::layout::routing::MergeInterval>>,
 ) -> Vec<(f64, f64, f64)> {
     let mut trunks: Vec<(f64, f64, f64)> = Vec::new();
     let mut keys: Vec<usize> = merge_intervals.keys().copied().collect();
@@ -54,7 +54,7 @@ pub(crate) fn phase_reroute_feedback_after_trunk(
     group_ctx: &crate::layout::group::GroupRoutingContext,
     obstacles: &PreparedObstacles,
     corridor_plan: &corridor_route::CorridorRoutePlan,
-    parallel: &crate::layout::edge::common::parallel_edges::ParallelGroups,
+    parallel: &crate::layout::routing::common::parallel_edges::ParallelGroups,
     protected_trunks: &[(f64, f64, f64)],
     ortho_stats: &mut crate::layout::OrthoDebugStats,
     ovg: Option<&OrthogonalVisibilityGraph>,

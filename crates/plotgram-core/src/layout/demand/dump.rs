@@ -40,9 +40,9 @@ impl PressureSnapshot {
 }
 
 fn features_to_bands_proxy(diagram: &Diagram, result: &LayoutResult) -> Vec<BandDemand> {
-    use crate::layout::edge::edge_routing_orthogonal::estimate_layer_band_demands;
-    use crate::layout::edge::segment_pair::parallel_gap_for_diagram;
-    use crate::layout::edge_band_demand::EdgeBandDemandProfile;
+    use crate::layout::routing::edge_routing_orthogonal::estimate_layer_band_demands;
+    use crate::layout::routing::segment_pair::parallel_gap_for_diagram;
+    use crate::layout::demand::band::EdgeBandDemandProfile;
     let parallel_gap = parallel_gap_for_diagram(diagram.diagram_type.clone());
     estimate_layer_band_demands(
         &result.nodes,

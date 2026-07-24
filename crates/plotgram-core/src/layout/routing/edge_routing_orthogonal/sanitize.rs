@@ -15,8 +15,8 @@ use super::path::{port_aware_elbow, port_outward};
 use super::simplify::simplify_path;
 use super::{EPS, PORT_CLEARANCE};
 use crate::ast::Relation;
-use crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto;
-use crate::layout::edge::route_annotation::{
+use crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels_auto;
+use crate::layout::routing::route_annotation::{
     annotate_edge_from_path, validate_route_edit, RouteAnnotationSet, RouteEditObstacleCtx,
     RouteEditValidateOpts,
 };
@@ -149,7 +149,7 @@ fn sanitize_polyline_ext_guarded(
     from_side: Port,
     to_side: Port,
     merge_overshoot: bool,
-    frozen: Option<&crate::layout::edge::EdgeRouteAnnotation>,
+    frozen: Option<&crate::layout::routing::EdgeRouteAnnotation>,
     edge_index: usize,
     obstacle: Option<RouteEditObstacleCtx<'_>>,
 ) {

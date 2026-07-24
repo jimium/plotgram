@@ -2,13 +2,23 @@
 //!
 //! 同层节点缝、有 label 的水平边、端口 clearance 在布局阶段显式预算，
 //! 避免末端「刚好不碰」式补丁。
+//!
+//! ## L3 迁移方向
+//!
+//! 本模块将逐步拆分为：
+//! - [`SpacingDemandStore`](super::spacing_contract::SpacingDemandStore)：布局求解输入
+//! - [`RoutingContract`](super::spacing_contract::RoutingContract)：路由只读消费
+//!
+//! 当前 `SpaceBudget` 保留为兼容层，提供 `to_spacing_demand()` 和 `to_routing_contract()` 拆分方法。
 
 use crate::ast::Diagram;
 use crate::layout::constants::{DEFAULT_LABEL_PADDING, GRID_SNAP_NODE_GAP_ARCH};
-use crate::layout::edge::common::label_avoidance::estimate_label_width;
+use crate::layout::routing::common::label_avoidance::estimate_label_width;
 use crate::layout::group::constants::PORT_STUB_CLEARANCE;
 use crate::layout::NodeLayout;
 use std::collections::{BTreeMap, HashMap, HashSet};
+
+pub use super::spacing_contract::{RoutingContract, SpacingDemandStore};
 
 /// 默认同层节点间距（与 architecture NODE_GAP / grid snap 对齐）。
 pub const DEFAULT_NODE_GAP: f64 = GRID_SNAP_NODE_GAP_ARCH;
@@ -76,14 +86,14 @@ impl SpaceBudget {
         nodes: &HashMap<String, NodeLayout>,
         diagram: &Diagram,
     ) {
-        let profile = crate::layout::edge_band_demand::EdgeBandDemandProfile::for_diagram(
+        let profile = crate::layout::demand::band::EdgeBandDemandProfile::for_diagram(
             diagram.diagram_type.clone(),
             !diagram.groups.is_empty(),
         );
         if profile.horizontal_max_extra <= 0.0 {
             return;
         }
-        let parallel_gap = crate::layout::edge::segment_pair::parallel_gap_for_diagram(
+        let parallel_gap = crate::layout::routing::segment_pair::parallel_gap_for_diagram(
             diagram.diagram_type.clone(),
         );
         for layer in layers {
@@ -108,7 +118,7 @@ impl SpaceBudget {
             for w in ordered.windows(2) {
                 let left = w[0].as_str();
                 let right = w[1].as_str();
-                let gap = crate::layout::edge_band_demand::adjacent_rank_gap(
+                let gap = crate::layout::demand::band::adjacent_rank_gap(
                     left,
                     right,
                     &layer_ids,
@@ -153,6 +163,36 @@ impl SpaceBudget {
             .max(self.default_node_gap)
     }
 
+    // ─── L3 拆分方法 ─────────────────────────────────────────────────────────
+
+    /// 提取布局空间需求（编译进 CoordinateProblem 的输入）。
+    pub fn to_spacing_demand(&self) -> SpacingDemandStore {
+        SpacingDemandStore {
+            default_node_gap: self.default_node_gap,
+            pair_gaps: self.pair_gaps.clone(),
+            min_vertical_rank_gap: self.min_vertical_rank_gap,
+        }
+    }
+
+    /// 提取路由只读契约。
+    pub fn to_routing_contract(&self) -> RoutingContract {
+        RoutingContract {
+            port_clearance: self.port_clearance,
+            corridor_boost_requested: self.corridor_boost_requested,
+        }
+    }
+
+    /// 从拆分后的两个对象重建 SpaceBudget（兼容旧代码）。
+    pub fn from_parts(demand: &SpacingDemandStore, contract: &RoutingContract) -> Self {
+        Self {
+            default_node_gap: demand.default_node_gap,
+            pair_gaps: demand.pair_gaps.clone(),
+            port_clearance: contract.port_clearance,
+            corridor_boost_requested: contract.corridor_boost_requested,
+            min_vertical_rank_gap: demand.min_vertical_rank_gap,
+        }
+    }
+
     /// D4 P0 + P1.2/P3.2：用只读压力模型抬缝。
     ///
     /// - 邻层 `deficit` → 抬 `min_vertical_rank_gap`（cap 于 diagram profile.max_extra）
@@ -167,7 +207,7 @@ impl SpaceBudget {
         bands: &[crate::layout::demand::BandDemand],
         edge_features: &[crate::layout::demand::EdgeFeatures],
     ) {
-        let profile = crate::layout::edge_band_demand::EdgeBandDemandProfile::for_diagram(
+        let profile = crate::layout::demand::band::EdgeBandDemandProfile::for_diagram(
             diagram.diagram_type.clone(),
             !diagram.groups.is_empty(),
         );
@@ -696,7 +736,7 @@ pub fn resolve_residual_with_budget_and_ranks(
     if ran_rank_realign && !has_node_aabb_overlaps(nodes) {
         return;
     }
-    use crate::layout::node::common::overlap::{
+    use crate::layout::engines::common::overlap::{
         BruteForceResolver, OverlapConfig, OverlapResolver,
     };
     let config = OverlapConfig {

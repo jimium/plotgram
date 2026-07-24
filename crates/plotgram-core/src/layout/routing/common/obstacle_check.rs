@@ -4,7 +4,7 @@
 //! 和 `OBSTACLE_CHECK_SAMPLES` 常量。spline 路由器无此函数(走可见性图避障),
 //! 但共享 `OBSTACLE_CHECK_SAMPLES` 语义。
 
-use crate::layout::edge::visibility;
+use crate::layout::routing::visibility;
 use crate::layout::EdgeLayout;
 
 /// 穿障检测的曲线采样点数（C12：16→32，降低窄障碍漏检）

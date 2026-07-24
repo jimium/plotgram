@@ -4,8 +4,8 @@
 //! 不改变路由选路行为——供 lint / 基线 / 后续 X-1 只读消费。
 
 use crate::layout::constants::{ORTHO_PARALLEL_GAP, ORTHO_PARALLEL_GAP_ARCHITECTURE};
-use crate::layout::edge::common::edge_geometry::{canonical_pair, undirected_pair_key};
-use crate::layout::edge::edge_merge_policy::{
+use crate::layout::routing::common::edge_geometry::{canonical_pair, undirected_pair_key};
+use crate::layout::routing::edge_merge_policy::{
     edge_merge_context, edges_may_share_trunk, requires_semantic_merge, EdgeMergeContext,
 };
 use crate::layout::geometry::Point;

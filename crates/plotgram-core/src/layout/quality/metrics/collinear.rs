@@ -3,15 +3,15 @@
 //! P0：观测基建。P1：`allowed_share_len` / exact/tight 经 Classify 分桶。
 
 use crate::ast::Diagram;
-use crate::layout::edge::edge_merge_policy::edge_merge_context;
-use crate::layout::edge::segment_pair::{
+use crate::layout::routing::edge_merge_policy::edge_merge_context;
+use crate::layout::routing::segment_pair::{
     classify_segment_pair, is_reverse_pair, measure_segment_pair, parallel_gap_for_diagram,
     segment_is_stub, AllowedReason, ClassifyPairContext, OrthoSegment, SpacingClass,
     STUB_GUARD_LENGTH,
 };
 use crate::layout::geometry::Point;
-use crate::layout::lint::{compute_lint_metrics, LintMetricsSummary};
-use crate::layout::metrics::aesthetics::{compute_aesthetics, AestheticsReport};
+use crate::layout::quality::lint::{compute_lint_metrics, LintMetricsSummary};
+use crate::layout::quality::metrics::aesthetics::{compute_aesthetics, AestheticsReport};
 use crate::layout::{LayoutResult, OrthoDebugStats};
 use serde::{Deserialize, Serialize};
 

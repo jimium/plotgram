@@ -245,7 +245,7 @@ pub fn replan_slots(
         let labels = if path.len() >= 2 {
             match relations.get(ei) {
                 Some(rel) => {
-                    crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto(
+                    crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels_auto(
                         rel, ei, relations, &path,
                     )
                 }

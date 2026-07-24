@@ -5,12 +5,12 @@
 //! 非正交原图若 dogleg 失败，保留原边并写入 `degraded` 归因。
 
 use crate::ast::Diagram;
-use crate::layout::edge::common::edge_geometry::{
+use crate::layout::routing::common::edge_geometry::{
     build_edge_labels, label_t_for_diagram, point_at_path_t,
 };
-use crate::layout::edge::common::routing_skeleton::{resolve_endpoints, RoutingContext};
-use crate::layout::edge::common::self_loop::{route_self_loop, self_loop_indices, SelfLoopStyle};
-use crate::layout::edge::visibility;
+use crate::layout::routing::common::routing_skeleton::{resolve_endpoints, RoutingContext};
+use crate::layout::routing::common::self_loop::{route_self_loop, self_loop_indices, SelfLoopStyle};
+use crate::layout::routing::visibility;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, LayoutResult, PathGeometry, Port};
 use std::collections::HashSet;
@@ -188,17 +188,17 @@ pub(crate) fn reroute_edges_with_spline_ex(
                 ) {
                     continue;
                 }
-                if crate::layout::lint::edge_index_crosses_group_interior(diagram, &hard_probe, i) {
+                if crate::layout::quality::lint::edge_index_crosses_group_interior(diagram, &hard_probe, i) {
                     continue;
                 }
 
                 if edge_indices.len() <= MAX_LOCAL_ORTHOGONAL_QUALITY_EDGES {
-                    let before_quality = crate::layout::metrics::compute_collinear_sample_metrics(
+                    let before_quality = crate::layout::quality::metrics::compute_collinear_sample_metrics(
                         "",
                         diagram,
                         &accepted_snapshot,
                     );
-                    let after_quality = crate::layout::metrics::compute_collinear_sample_metrics(
+                    let after_quality = crate::layout::quality::metrics::compute_collinear_sample_metrics(
                         "",
                         diagram,
                         &hard_probe,
@@ -266,7 +266,7 @@ fn mark_degraded(result: &mut LayoutResult, edge_index: usize, reason: &str) {
 
 /// 先用原端口 dogleg；`aggressive` 时失败再换侧端口。
 fn orthogonal_detour_try_ports(
-    ep: &crate::layout::edge::common::routing_skeleton::EdgeEndpoints,
+    ep: &crate::layout::routing::common::routing_skeleton::EdgeEndpoints,
     diagram: &Diagram,
     edge_index: usize,
     result: &LayoutResult,
@@ -482,7 +482,7 @@ fn orthogonal_detour(
             }
         }
 
-        let group_maps = crate::layout::lint::GroupInteriorMaps::new(diagram);
+        let group_maps = crate::layout::quality::lint::GroupInteriorMaps::new(diagram);
         let endpoint_ids = diagram.relations.get(edge_index).map(|rel| {
             (
                 rel.from.as_str().to_string(),
@@ -546,7 +546,7 @@ fn orthogonal_detour(
         return clean.into_iter().next();
     }
 
-    let group_maps = crate::layout::lint::GroupInteriorMaps::new(diagram);
+    let group_maps = crate::layout::quality::lint::GroupInteriorMaps::new(diagram);
     let endpoint_ids = diagram.relations.get(edge_index).map(|rel| {
         (
             rel.from.as_str().to_string(),
@@ -629,7 +629,7 @@ fn path_crosses_foreign_group_interior(
     diagram: &Diagram,
     result: &LayoutResult,
     edge_index: usize,
-    maps: &crate::layout::lint::GroupInteriorMaps,
+    maps: &crate::layout::quality::lint::GroupInteriorMaps,
 ) -> bool {
     let mut probe = result.clone();
     if edge_index < probe.edges.len() {
@@ -642,7 +642,7 @@ fn path_crosses_foreign_group_interior(
             to_port: Port::Left,
         };
     }
-    crate::layout::lint::edge_crosses_group_interior_with_maps(diagram, &probe, edge_index, maps)
+    crate::layout::quality::lint::edge_crosses_group_interior_with_maps(diagram, &probe, edge_index, maps)
 }
 
 /// 绕轴对齐矩形外框生成裙边 / U 形候选（局部两跳，非建廊）。
@@ -796,7 +796,7 @@ fn foreign_groups_pierced_by_edge<'a>(
             continue;
         }
         let pierces = path.windows(2).any(|w| {
-            crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+            crate::layout::routing::common::geom_obstacle::segment_pierces_group_interior(
                 w[0], w[1], gl,
             )
         });

@@ -7,7 +7,7 @@
 use super::slot::is_vertical_port;
 use super::{EPS, PORT_CLEARANCE, SLOT_MARGIN_RATIO};
 use crate::ast::Relation;
-use crate::layout::edge::segment_pair::is_reverse_pair;
+use crate::layout::routing::segment_pair::is_reverse_pair;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, NodeLayout, Port};
 use serde::Serialize;
@@ -431,14 +431,14 @@ pub struct LayerBandDemand {
 /// `effective_gap` 用 **面距**（上层底边 → 下层顶边），不是中心距；
 /// 否则节点高度会吞掉真实 gutter，T2 类样例永远报不出 deficit。
 ///
-/// **demand 单源**：经 [`crate::layout::edge_band_demand::edge_band_demand`] 计算；
+/// **demand 单源**：经 [`crate::layout::demand::band::edge_band_demand`] 计算；
 /// 本函数只负责层聚类、face_gap 与 deficit。诊断口径用
 /// [`EdgeBandDemandProfile::for_layer_band_diagnosis`]。
 pub fn estimate_layer_band_demands(
     nodes: &HashMap<String, NodeLayout>,
     relations: &[Relation],
     parallel_gap: f64,
-    profile: crate::layout::edge_band_demand::EdgeBandDemandProfile,
+    profile: crate::layout::demand::band::EdgeBandDemandProfile,
 ) -> Vec<LayerBandDemand> {
     if nodes.is_empty() {
         return Vec::new();
@@ -496,7 +496,7 @@ pub fn estimate_layer_band_demands(
             .map(|nl| nl.y)
             .fold(f64::INFINITY, f64::min);
         let face_gap = (lower_top - upper_bottom).max(0.0);
-        let bd = crate::layout::edge_band_demand::edge_band_demand(
+        let bd = crate::layout::demand::band::edge_band_demand(
             &layers[li],
             &layers[li + 1],
             relations,
@@ -759,7 +759,7 @@ mod tests {
 
     #[test]
     fn estimate_layer_band_demand_matches_edge_band_demand() {
-        use crate::layout::edge_band_demand::{edge_band_demand, EdgeBandDemandProfile};
+        use crate::layout::demand::band::{edge_band_demand, EdgeBandDemandProfile};
 
         let mut nodes = HashMap::new();
         nodes.insert(

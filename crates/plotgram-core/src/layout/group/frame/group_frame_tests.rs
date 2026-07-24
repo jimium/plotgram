@@ -34,7 +34,7 @@
         assert_eq!(spec.cross_align, CrossAlign::Center);
         assert!((spec.gap - 40.0).abs() < f64::EPSILON);
         assert_eq!(spec.border_align, BorderAlign::SharedLines);
-        assert_eq!(spec.padding, GroupPadding::architecture_v2());
+        assert_eq!(spec.padding, GroupPadding::architecture());
         // architecture 在 snap 白名单内，snap 未声明 → 默认 true
         assert!(spec.quantize.enabled);
         assert!((spec.quantize.step - 8.0).abs() < f64::EPSILON);
@@ -517,7 +517,7 @@
             track_sizing: TrackSizing::Equal,
             cross_align: CrossAlign::Start,
             gap: 50.0,
-            padding: GroupPadding::architecture_v2(),
+            padding: GroupPadding::architecture(),
             border_align: BorderAlign::None,
             quantize: QuantizeSpec {
                 enabled: false,
@@ -562,7 +562,7 @@
             track_sizing: TrackSizing::Fit,
             cross_align: CrossAlign::Start,
             gap: 50.0,
-            padding: GroupPadding::architecture_v2(),
+            padding: GroupPadding::architecture(),
             border_align: BorderAlign::None,
             quantize: QuantizeSpec {
                 enabled: false,
@@ -607,7 +607,7 @@
             track_sizing: TrackSizing::Fit,
             cross_align: CrossAlign::Start,
             gap: 50.0,
-            padding: GroupPadding::architecture_v2(),
+            padding: GroupPadding::architecture(),
             border_align: BorderAlign::None,
             quantize: QuantizeSpec {
                 enabled: false,
@@ -657,7 +657,7 @@
             track_sizing: TrackSizing::Fit,
             cross_align: CrossAlign::Center,
             gap: 50.0,
-            padding: GroupPadding::architecture_v2(),
+            padding: GroupPadding::architecture(),
             border_align: BorderAlign::SharedLines,
             quantize: QuantizeSpec {
                 enabled: false,
@@ -705,7 +705,7 @@
             track_sizing: TrackSizing::Fit,
             cross_align: CrossAlign::Center,
             gap: 50.0,
-            padding: GroupPadding::architecture_v2(),
+            padding: GroupPadding::architecture(),
             border_align: BorderAlign::None,
             quantize: QuantizeSpec {
                 enabled: true,
@@ -746,7 +746,7 @@
             track_sizing: TrackSizing::Equal,
             cross_align: CrossAlign::Start,
             gap: 50.0,
-            padding: GroupPadding::architecture_v2(),
+            padding: GroupPadding::architecture(),
             border_align: BorderAlign::None,
             quantize: QuantizeSpec {
                 enabled: false,
@@ -796,7 +796,7 @@
             track_sizing: TrackSizing::Equal,
             cross_align: CrossAlign::Start,
             gap: 60.0,
-            padding: GroupPadding::architecture_v2(),
+            padding: GroupPadding::architecture(),
             border_align: BorderAlign::SharedLines,
             quantize: QuantizeSpec::default(),
         };
@@ -868,7 +868,7 @@
             track_sizing: track,
             cross_align: cross,
             gap,
-            padding: GroupPadding::architecture_v2(),
+            padding: GroupPadding::architecture(),
             border_align: BorderAlign::None,
             quantize: QuantizeSpec {
                 enabled: false,
@@ -1109,7 +1109,7 @@
             track_sizing: track,
             cross_align: cross,
             gap: 10.0,
-            padding: GroupPadding::architecture_v2(),
+            padding: GroupPadding::architecture(),
             border_align: BorderAlign::None,
             quantize: QuantizeSpec {
                 enabled: false,

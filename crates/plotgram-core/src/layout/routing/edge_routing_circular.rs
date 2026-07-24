@@ -8,18 +8,18 @@
 use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use crate::layout::geometry::Point;
-use crate::layout::edge::common::circular_support::{
+use crate::layout::routing::common::circular_support::{
     APPLICABLE_TYPES as CIRCULAR_APPLICABLE_TYPES, CircleGroup, resolve_circle_groups,
 };
 use crate::layout::{
     edge_point, EdgeLayout, EdgeRoutingStrategy, LayoutResult, NodeLayout, PathGeometry,
 };
-use crate::layout::edge::common::edge_geometry::{
+use crate::layout::routing::common::edge_geometry::{
     node_center, undirected_pair_key, select_port, compute_bezier_controls, cubic_bezier_point,
     DEFAULT_BEZIER_TENSION, build_edge_labels,
 };
-use crate::layout::edge::common::self_loop::{self_loop_indices, route_self_loop, SelfLoopStyle};
-use crate::layout::edge::common::label_placement::{LabelContext, LabelPlacer, RadialPlacer};
+use crate::layout::routing::common::self_loop::{self_loop_indices, route_self_loop, SelfLoopStyle};
+use crate::layout::routing::common::label_placement::{LabelContext, LabelPlacer, RadialPlacer};
 use std::collections::HashMap;
 
 const PARALLEL_SPACING: f64 = 0.10;
@@ -58,8 +58,8 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
 
     // 构建障碍索引（用于穿障检测与退化绕行）
     // 4.2: 懒构建——快速预检无边可能穿障时跳过 O(n²) 构建
-    let (node_id_to_idx, obstacle_index) = if crate::layout::edge::common::routing_skeleton::quick_check_need_obstacle_index(&result, &diagram.relations) {
-        let (idx, obs) = crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
+    let (node_id_to_idx, obstacle_index) = if crate::layout::routing::common::routing_skeleton::quick_check_need_obstacle_index(&result, &diagram.relations) {
+        let (idx, obs) = crate::layout::routing::common::routing_skeleton::build_obstacle_context(&result);
         (idx, Some(obs))
     } else {
         (HashMap::new(), None)
@@ -121,16 +121,16 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
         let skip = [from_idx, to_idx];
 
         if let Some(ref obstacle_index) = obstacle_index {
-            if crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(&edge, obstacle_index, &skip) {
+            if crate::layout::routing::common::obstacle_check::curve_intersects_obstacles(&edge, obstacle_index, &skip) {
                 if let (Some(start), Some(end)) = (edge.path_start(), edge.path_end()) {
                     let detour = obstacle_index.shortest_path(start, end, &skip);
                     if !detour.is_empty() {
                         edge.geometry = PathGeometry::Polyline { points: detour };
                         // 几何已换：按折线重建标签
-                        let middle_t = crate::layout::edge::common::edge_geometry::parse_label_t(rel);
+                        let middle_t = crate::layout::routing::common::edge_geometry::parse_label_t(rel);
                         let sampled = edge.path_points().into_owned();
                         edge.labels = build_edge_labels(rel, middle_t, Point::new(0.0, -6.0), |t| {
-                            crate::layout::edge::common::edge_geometry::point_at_path_t(&sampled, t)
+                            crate::layout::routing::common::edge_geometry::point_at_path_t(&sampled, t)
                         });
                     } else {
                         // R5：空 detour 时走 outer 折线兜底，避免静默保留穿障 Bezier
@@ -143,7 +143,7 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
                             from_port: edge.from_port,
                             to_port: edge.to_port,
                         };
-                        if !crate::layout::edge::common::obstacle_check::curve_intersects_obstacles(
+                        if !crate::layout::routing::common::obstacle_check::curve_intersects_obstacles(
                             &probe,
                             obstacle_index,
                             &skip,
@@ -151,11 +151,11 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
                         {
                             edge.geometry = PathGeometry::Polyline { points: outer };
                             let middle_t =
-                                crate::layout::edge::common::edge_geometry::parse_label_t(rel);
+                                crate::layout::routing::common::edge_geometry::parse_label_t(rel);
                             let sampled = edge.path_points().into_owned();
                             edge.labels =
                                 build_edge_labels(rel, middle_t, Point::new(0.0, -6.0), |t| {
-                                    crate::layout::edge::common::edge_geometry::point_at_path_t(
+                                    crate::layout::routing::common::edge_geometry::point_at_path_t(
                                         &sampled, t,
                                     )
                                 });
@@ -563,7 +563,7 @@ mod tests {
         ArrowType, AttributeMap, Diagram, Entity, Identifier, Relation, SourceInfo, Span,
     };
     use crate::types::DiagramType;
-    use crate::layout::node::circular::CircularLayoutHints;
+    use crate::layout::recipes::circular::CircularLayoutHints;
     use crate::layout::NodeLayout;
     use std::collections::HashMap;
 

@@ -6,13 +6,13 @@ use crate::ast::Diagram;
 use crate::layout::demand::{
     collect_edge_features, compute_corridor_model, score_edges, DifficultyProfile,
 };
-use crate::layout::edge::edge_routing_orthogonal::{
+use crate::layout::routing::edge_routing_orthogonal::{
     collect_stub_occupancy, estimate_layer_band_demands, find_stub_occupancy_conflicts,
 };
-use crate::layout::edge::segment_pair::parallel_gap_for_diagram;
-use crate::layout::edge_band_demand::EdgeBandDemandProfile;
-use crate::layout::lint::compute_lint_metrics;
-use crate::layout::metrics::node_fingerprint;
+use crate::layout::routing::segment_pair::parallel_gap_for_diagram;
+use crate::layout::demand::band::EdgeBandDemandProfile;
+use crate::layout::quality::lint::compute_lint_metrics;
+use crate::layout::quality::metrics::node_fingerprint;
 use crate::layout::LayoutResult;
 use serde::{Deserialize, Serialize};
 

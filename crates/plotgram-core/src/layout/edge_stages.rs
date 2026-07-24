@@ -17,7 +17,7 @@ impl NodeFreeze {
         let _ = result;
         Self {
             #[cfg(debug_assertions)]
-            fingerprint: crate::layout::metrics::node_fingerprint(result),
+            fingerprint: crate::layout::quality::metrics::node_fingerprint(result),
         }
     }
 
@@ -28,7 +28,7 @@ impl NodeFreeze {
         #[cfg(debug_assertions)]
         debug_assert_eq!(
             self.fingerprint,
-            crate::layout::metrics::node_fingerprint(result),
+            crate::layout::quality::metrics::node_fingerprint(result),
             "A3 节点冻结屏障被破坏：step 10 之后仍有阶段挪动了节点（应只改边几何/label）"
         );
     }

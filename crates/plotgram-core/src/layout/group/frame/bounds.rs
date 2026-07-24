@@ -3,7 +3,7 @@
 //! 本文件从 `mod.rs` 拆分而来，仅做代码搬家，无行为变更。
 
 use crate::ast::Diagram;
-use crate::layout::node::common::group_bounds::{
+use crate::layout::engines::common::group_bounds::{
     compute_group_bounds, compute_group_bounds_with_side_gutters,
     container_padding_for_leaf, GroupPadding,
 };
@@ -108,7 +108,7 @@ pub fn shrink_groups_to_required_padding(
     nodes: &HashMap<String, NodeLayout>,
     leaf_padding: GroupPadding,
     container_padding: GroupPadding,
-    side_gutters: Option<&std::collections::BTreeMap<String, crate::layout::node::common::group_bounds::SideGutter>>,
+    side_gutters: Option<&std::collections::BTreeMap<String, crate::layout::engines::common::group_bounds::SideGutter>>,
 ) {
     let mut group_ids: Vec<String> = diagram
         .groups

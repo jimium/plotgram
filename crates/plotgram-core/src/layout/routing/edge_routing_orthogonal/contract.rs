@@ -20,7 +20,7 @@
 //! HashMap 只作查询，不参与迭代驱动。
 
 use crate::ast::Relation;
-use crate::layout::edge::common::edge_geometry::{node_center, port_direction};
+use crate::layout::routing::common::edge_geometry::{node_center, port_direction};
 use crate::layout::geometry::Point;
 use crate::layout::group::GroupRoutingContext;
 use crate::layout::{EdgeLayout, NodeLayout, Port};

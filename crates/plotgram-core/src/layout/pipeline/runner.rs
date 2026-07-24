@@ -2,10 +2,10 @@
 
 use crate::ast::Diagram;
 use crate::error::DiagnosticError;
-use crate::layout::canvas_finalize;
+use crate::layout::snap::canvas_finalize;
 use crate::layout::constants;
-use crate::layout::grid_snap;
-use crate::layout::group_frame::GroupFramePass;
+use crate::layout::snap::grid_snap;
+use crate::layout::group::frame::GroupFramePass;
 use crate::layout::perf::Instant;
 use super::plan::LayoutPlan;
 use crate::layout::post_route;
@@ -168,9 +168,9 @@ impl<'a> LayoutPipeline<'a> {
 
         // S3：PRS 后仅在契约失败时兜底；margin 来自 SpaceBudget
         let (mut result, mut moved_for_overlap) =
-            crate::layout::space_budget_guard::resolve_budget_violations(self.diagram, result);
+            crate::layout::demand::space_budget_guard::resolve_budget_violations(self.diagram, result);
         if !result.groups.is_empty() {
-            let explicit_equal = crate::layout::group_frame::has_explicit_equal_track(self.diagram);
+            let explicit_equal = crate::layout::group::frame::has_explicit_equal_track(self.diagram);
             // budget guard 之后由 GroupFramePass 恢复完整 L1 契约；不能只做
             // content-fit recompute，否则 `track: equal` 会在管线末尾被冲掉。
             let pre_recompute_y: HashMap<String, f64> = result
@@ -186,7 +186,7 @@ impl<'a> LayoutPipeline<'a> {
             if explicit_equal {
                 gf_pass.restore_after_node_moves(self.diagram, &mut result, algo, &pre_recompute_y);
             } else {
-                crate::layout::group_frame::recompute_group_bounds(
+                crate::layout::group::frame::recompute_group_bounds(
                     self.diagram,
                     &mut result,
                     gf_pass.padding,
@@ -194,12 +194,12 @@ impl<'a> LayoutPipeline<'a> {
             }
             if algo == "architecture" {
                 // L2.2：局部刚体重申多 client→hub 质心（Skip on 碰撞/越框）
-                let hub_moved = crate::layout::node::architecture_v2::post_layout::
+                let hub_moved = crate::layout::recipes::architecture::post_layout::
                     reassert_multi_client_hub_centroids(self.diagram, &mut result);
                 moved_for_overlap.extend(hub_moved);
                 if explicit_equal {
                     moved_for_overlap.extend(
-                        crate::layout::node::architecture_v2::post_layout::
+                        crate::layout::recipes::architecture::post_layout::
                             align_cross_scope_pendant_chains(self.diagram, &mut result),
                     );
                 }
@@ -213,7 +213,7 @@ impl<'a> LayoutPipeline<'a> {
                 }
             }
         }
-        result = crate::layout::space_budget_guard::reroute_and_repulse(
+        result = crate::layout::demand::space_budget_guard::reroute_and_repulse(
             self.diagram,
             result,
             router.as_ref(),
@@ -247,7 +247,7 @@ impl<'a> LayoutPipeline<'a> {
             let to_side: Vec<_> = result.edges.iter().map(|e| e.to_port).collect();
             // 几何已冻结：启用 overshoot Z 折合并，清理「冲过端口再折回」的多余折点。
             // 保守版（router step 4g）不合并，避免改动反馈进节点重定位扰动全局布局。
-            crate::layout::edge::edge_routing_orthogonal::sanitize_orthogonal_edges_with_guard(
+            crate::layout::routing::edge_routing_orthogonal::sanitize_orthogonal_edges_with_guard(
                 &mut result.edges,
                 &self.diagram.relations,
                 &from_side,
@@ -263,10 +263,10 @@ impl<'a> LayoutPipeline<'a> {
             // L3：architecture 在 C 期 stub_occ 仅诊断；节点已冻结后于 D 末做 exact 跨对共柱真修。
             // 只改边几何 → node_fp 不变；须在 label 避让前完成并刷新 annotation。
             if algo == "architecture" {
-                let stub_gap = crate::layout::edge::parallel_gap_for_diagram(
+                let stub_gap = crate::layout::routing::parallel_gap_for_diagram(
                     self.diagram.diagram_type.clone(),
                 );
-                let stub_stats = crate::layout::edge::edge_routing_orthogonal::
+                let stub_stats = crate::layout::routing::edge_routing_orthogonal::
                     resolve_exact_stub_occupancy_post_route(
                         &mut result.edges,
                         &self.diagram.relations,
@@ -278,7 +278,7 @@ impl<'a> LayoutPipeline<'a> {
                 if stub_stats.stubs_shifted > 0 {
                     let prev = result.hints.route_annotations.clone();
                     result.hints.route_annotations = Some(
-                        crate::layout::edge::refresh_route_annotations_preserving_semantics(
+                        crate::layout::routing::refresh_route_annotations_preserving_semantics(
                             &result.edges,
                             &from_side,
                             &to_side,
@@ -336,7 +336,7 @@ impl<'a> LayoutPipeline<'a> {
             if edge_routing_style == "orthogonal" {
                 let t_c2 = crate::layout::perf::Instant::now();
                 let crossings_eliminated =
-                    crate::layout::edge::edge_routing_orthogonal::crossing_reduction::minimize_crossings_post_route(
+                    crate::layout::routing::edge_routing_orthogonal::crossing_reduction::minimize_crossings_post_route(
                         &mut result.edges,
                         &result.nodes,
                     );
@@ -361,18 +361,18 @@ impl<'a> LayoutPipeline<'a> {
             // 标签避让必须是几何冻结后的**最终**步骤：sanitize 会按平行边规则
             // 重建所有标签；snap/repulse 又移动了路径。router 内不再提前 resolve（P3.3）。
             let label_config =
-                crate::layout::edge::common::label_candidate::LabelPlacementConfig::for_diagram(
+                crate::layout::routing::common::label_candidate::LabelPlacementConfig::for_diagram(
                     self.diagram.diagram_type.clone(),
                     !result.groups.is_empty(),
                 );
-            crate::layout::edge::common::label_avoidance::resolve_label_overlaps_with_config(
+            crate::layout::routing::common::label_avoidance::resolve_label_overlaps_with_config(
                 &mut result.edges,
                 &result.nodes,
                 &result.groups,
                 label_config,
             );
             if let Some(annotations) = result.hints.route_annotations.as_ref() {
-                crate::layout::edge::common::label_avoidance::dedupe_labels_on_declared_merges(
+                crate::layout::routing::common::label_avoidance::dedupe_labels_on_declared_merges(
                     &mut result.edges,
                     annotations,
                 );
@@ -401,13 +401,13 @@ impl<'a> LayoutPipeline<'a> {
     /// 几何输出与两次独立调用字节级一致；仅编排入口合并以减少 pipeline.rs 重复 bookkeeping。
     fn enforce_d_stage_separation(&self, result: &mut LayoutResult, from_side: &[Port], to_side: &[Port]) {
         let parallel_gap =
-            crate::layout::edge::parallel_gap_for_diagram(self.diagram.diagram_type.clone());
-        crate::layout::edge::edge_routing_orthogonal::enforce_reverse_pair_min_gap(
+            crate::layout::routing::parallel_gap_for_diagram(self.diagram.diagram_type.clone());
+        crate::layout::routing::edge_routing_orthogonal::enforce_reverse_pair_min_gap(
             &mut result.edges, &self.diagram.relations, parallel_gap,
         );
         let dock_gap = parallel_gap
-            .max(crate::layout::edge::edge_routing_orthogonal::COMPACT_SLOT_PITCH);
-        crate::layout::edge::edge_routing_orthogonal::enforce_reverse_pair_dock_separation(
+            .max(crate::layout::routing::edge_routing_orthogonal::COMPACT_SLOT_PITCH);
+        crate::layout::routing::edge_routing_orthogonal::enforce_reverse_pair_dock_separation(
             &mut result.edges, &self.diagram.relations, &result.nodes,
             from_side, to_side, dock_gap,
         );

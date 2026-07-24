@@ -9,8 +9,8 @@ use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, EdgeRoutingStrategy, LayoutResult, PathGeometry};
-use crate::layout::edge::common::edge_geometry::{build_edge_labels, parse_label_t, point_at_path_t};
-use crate::layout::edge::common::routing_skeleton::{
+use crate::layout::routing::common::edge_geometry::{build_edge_labels, parse_label_t, point_at_path_t};
+use crate::layout::routing::common::routing_skeleton::{
     finalize_edges, resolve_endpoints, RoutingContext,
 };
 
@@ -93,14 +93,14 @@ pub fn route_edges(diagram: &Diagram, result: LayoutResult) -> LayoutResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layout::edge::common::edge_geometry::{undirected_pair_key, canonical_pair, select_port};
+    use crate::layout::routing::common::edge_geometry::{undirected_pair_key, canonical_pair, select_port};
     use crate::ast::{Diagram, SourceInfo};
     use crate::layout::{NodeLayout, LayoutResult, Port, EdgeLabelLayout};
     use crate::layout::geometry::Point;
-    use crate::layout::edge::common::label_avoidance::{
+    use crate::layout::routing::common::label_avoidance::{
         aabb_overlap, estimate_label_width,
     };
-    use crate::layout::edge::common::test_fixtures::make_diagram_with_layout;
+    use crate::layout::routing::common::test_fixtures::make_diagram_with_layout;
     use crate::layout::constants;
     use std::collections::HashMap;
 

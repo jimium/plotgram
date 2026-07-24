@@ -4,7 +4,7 @@
 //! - [`repulse_edges_only`]：仅执行分组边框排斥（几何投影），不含量化。在路由后、组框修复后执行。
 //! - [`snap_and_repulse_edges`]：执行像素量化 + 边框排斥 + 简化。在管道最末尾执行（仅一次）。
 
-use crate::layout::grid_snap;
+use crate::layout::snap::grid_snap;
 use crate::layout::group;
 use crate::layout::{EdgeLayout, EdgeSnapConfig, GroupLayout};
 use std::collections::HashMap;
@@ -47,7 +47,7 @@ pub fn snap_and_repulse_edges_with_guard(
     edges: &mut [EdgeLayout],
     groups: &HashMap<String, GroupLayout>,
     config: &EdgeSnapConfig,
-    annotations: Option<&crate::layout::edge::RouteAnnotationSet>,
+    annotations: Option<&crate::layout::routing::RouteAnnotationSet>,
     nodes: Option<&std::collections::HashMap<String, crate::layout::NodeLayout>>,
     relations: Option<&[crate::ast::Relation]>,
     sorted_node_ids: Option<&[String]>,

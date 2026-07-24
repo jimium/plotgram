@@ -6,7 +6,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::ast::Relation;
-use crate::layout::edge::edge_merge_policy::{
+use crate::layout::routing::edge_merge_policy::{
     edge_merge_context_with_groups, edges_may_share_trunk,
 };
 use crate::layout::geometry::Point;
@@ -165,7 +165,7 @@ fn super_edge_pair_key(
     if from_g == to_g {
         return None;
     }
-    let (a, b) = crate::layout::edge::common::edge_geometry::canonical_pair(from_g, to_g);
+    let (a, b) = crate::layout::routing::common::edge_geometry::canonical_pair(from_g, to_g);
     Some((a.to_string(), b.to_string()))
 }
 
@@ -402,7 +402,7 @@ fn corridor_travel_skirting_foreign(
             if endpoint_groups.contains(gid.as_str()) || gl.width <= 0.0 || gl.height <= 0.0 {
                 continue;
             }
-            if crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+            if crate::layout::routing::common::geom_obstacle::segment_pierces_group_interior(
                 *current, dest, gl,
             ) {
                 blockers.push((gid.as_str(), gl));
@@ -435,7 +435,7 @@ fn corridor_travel_skirting_foreign(
             }
         }
         for (gid, gl) in blockers {
-            if !crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+            if !crate::layout::routing::common::geom_obstacle::segment_pierces_group_interior(
                 *current, dest, gl,
             ) {
                 continue;
@@ -624,11 +624,11 @@ fn lane_segment_threatens_group(
     gl: &GroupLayout,
 ) -> bool {
     let projected = corridor_point(corridor, lane_coord, from);
-    crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(from, projected, gl)
-        || crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+    crate::layout::routing::common::geom_obstacle::segment_pierces_group_interior(from, projected, gl)
+        || crate::layout::routing::common::geom_obstacle::segment_pierces_group_interior(
             projected, dest, gl,
         )
-        || crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(from, dest, gl)
+        || crate::layout::routing::common::geom_obstacle::segment_pierces_group_interior(from, dest, gl)
         || point_in_group_interior(projected, gl)
         || point_in_group_interior(dest, gl)
 }
@@ -836,11 +836,11 @@ fn first_foreign_blocker_on_ortho<'a>(
         if endpoint_groups.contains(gid.as_str()) || gl.width <= 0.0 || gl.height <= 0.0 {
             continue;
         }
-        let hit = crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+        let hit = crate::layout::routing::common::geom_obstacle::segment_pierces_group_interior(
             from, to, gl,
-        ) || crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+        ) || crate::layout::routing::common::geom_obstacle::segment_pierces_group_interior(
             from, bend, gl,
-        ) || crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+        ) || crate::layout::routing::common::geom_obstacle::segment_pierces_group_interior(
             bend, to, gl,
         );
         if !hit {

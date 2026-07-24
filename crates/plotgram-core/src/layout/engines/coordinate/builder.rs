@@ -8,8 +8,8 @@ use petgraph::graph::{DiGraph, NodeIndex};
 use std::collections::HashMap;
 
 use super::model::*;
-use crate::layout::node::sugiyama_v2::graph::{LayerNode, LayerNodeKind};
-use crate::layout::node::sugiyama_v2::preset::SugiyamaPreset;
+use crate::layout::engines::layered::graph::{LayerNode, LayerNodeKind};
+use crate::layout::engines::layered::preset::SugiyamaPreset;
 
 /// 构建输出：包含问题 IR 和节点→变量映射。
 pub(in crate::layout) struct BuildOutput {
@@ -107,6 +107,7 @@ pub(in crate::layout) fn build_coordinate_problem(
             values: initial_values,
         },
         config: CoordinateSolverConfig::default(),
+        axis: Default::default(),
     }
 }
 
@@ -191,6 +192,7 @@ pub(in crate::layout) fn build_with_mapping(
             objectives: Vec::new(),
             initial: InitialCoordinates { values: initial_values },
             config: CoordinateSolverConfig::default(),
+            axis: Default::default(),
         },
         node_to_var,
     }

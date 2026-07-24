@@ -332,7 +332,7 @@ pub fn snap_edge_waypoints_with_guard(
     edges: &mut [EdgeLayout],
     groups: &HashMap<String, GroupLayout>,
     config: &EdgeSnapConfig,
-    annotations: Option<&crate::layout::edge::RouteAnnotationSet>,
+    annotations: Option<&crate::layout::routing::RouteAnnotationSet>,
     nodes: Option<&HashMap<String, NodeLayout>>,
     relations: Option<&[crate::ast::Relation]>,
     sorted_node_ids: Option<&[String]>,
@@ -370,7 +370,7 @@ pub fn snap_edge_waypoints_with_guard(
         let after_snap = points.clone();
         let simplified = simplify_polyline_path_preserving_stubs(&after_snap);
 
-        let ann = crate::layout::edge::annotate_edge_from_path(&before, fs, ts, ei).map(
+        let ann = crate::layout::routing::annotate_edge_from_path(&before, fs, ts, ei).map(
             |mut a| {
                 if let Some(frozen) = annotations.and_then(|set| set.get(ei)) {
                     a.merge_intervals = frozen.merge_intervals.clone();
@@ -381,7 +381,7 @@ pub fn snap_edge_waypoints_with_guard(
         );
         // L5.1：snap/simplify 挂穿障硬回退（仅拒「干净→新穿节点」）。
         let obstacle = match (nodes, sorted_node_ids, relations.and_then(|rs| rs.get(ei))) {
-            (Some(n), Some(ids), Some(rel)) => Some(crate::layout::edge::RouteEditObstacleCtx {
+            (Some(n), Some(ids), Some(rel)) => Some(crate::layout::routing::RouteEditObstacleCtx {
                 nodes: n,
                 sorted_node_ids: ids,
                 from_id: rel.from.as_str(),
@@ -391,12 +391,12 @@ pub fn snap_edge_waypoints_with_guard(
         };
 
         let final_pts = if let Some(ref ann) = ann {
-            let opts = crate::layout::edge::RouteEditValidateOpts {
+            let opts = crate::layout::routing::RouteEditValidateOpts {
                 coord_tol: config.grid_step.max(POST_QUANTIZE_SIMPLIFY_EPS),
-                edit_kind: crate::layout::edge::RouteEditKind::ShapeChanging,
+                edit_kind: crate::layout::routing::RouteEditKind::ShapeChanging,
             };
             // 先试 simplify；失败则保留 snap 后未简化路径（仍须通过验证，否则整边回退）
-            if crate::layout::edge::validate_route_edit(
+            if crate::layout::routing::validate_route_edit(
                 &before,
                 &simplified,
                 ann,
@@ -406,7 +406,7 @@ pub fn snap_edge_waypoints_with_guard(
             .is_ok()
             {
                 simplified
-            } else if crate::layout::edge::validate_route_edit(
+            } else if crate::layout::routing::validate_route_edit(
                 &before,
                 &after_snap,
                 ann,
@@ -433,7 +433,7 @@ pub fn snap_edge_waypoints_with_guard(
 /// 根据 nodes / groups 更新画布 total 尺寸
 pub fn update_canvas_bounds(layout: &mut LayoutResult, padding: f64) {
     let (total_width, total_height) =
-        crate::layout::node::common::canvas_bounds::canvas_size(&layout.nodes, &layout.groups, padding);
+        crate::layout::engines::common::canvas_bounds::canvas_size(&layout.nodes, &layout.groups, padding);
     layout.total_width = total_width;
     layout.total_height = total_height;
 }
@@ -605,7 +605,7 @@ fn snap_edge_path_channels(path: &mut [Point], step: f64) -> usize {
 
 fn simplify_polyline_path_preserving_stubs(path: &[Point]) -> Vec<Point> {
     // 量化后使用放大容差消除量化产生的微小折点；仍走公共严格共线模块（非改形状路由）。
-    crate::layout::edge::common::collinear_simplify::simplify_collinear_polyline(
+    crate::layout::routing::common::collinear_simplify::simplify_collinear_polyline(
         path.to_vec(),
         true,
         POST_QUANTIZE_SIMPLIFY_EPS,

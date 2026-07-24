@@ -14,7 +14,7 @@
 
 use plotgram_core::ast::{DiagramAttribute, Diagram, AttributeValue, TextValue};
 use plotgram_core::layout;
-use plotgram_core::layout::edge::common::label_avoidance::{aabb_overlap, label_bbox};
+use plotgram_core::layout::routing::common::label_avoidance::{aabb_overlap, label_bbox};
 use plotgram_eval::metrics::LayoutMetrics;
 use serde::Serialize;
 use std::fs;

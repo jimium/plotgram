@@ -6,7 +6,7 @@ use petgraph::graph::NodeIndex;
 use std::collections::HashMap;
 
 use super::preset::SugiyamaPreset;
-use crate::layout::node::common::node_sizing::NodeSizing;
+use crate::layout::engines::common::node_sizing::NodeSizing;
 
 pub(super) fn compute_layer_heights(
     layers: &[Vec<NodeIndex>],
@@ -99,7 +99,7 @@ pub(super) fn sized_node_for(
     entity: &Entity,
     preset: &SugiyamaPreset,
 ) -> (f64, f64) {
-    use crate::layout::node::common::node_sizing::{
+    use crate::layout::engines::common::node_sizing::{
         estimate_standard_node_width, DEFAULT_NODE_HEIGHT,
     };
 

@@ -16,6 +16,7 @@
 //! 2. **确定性**：相同输入必须产生相同输出
 //! 3. **可审计**：所有约束违反都可追溯
 
+pub mod analysis;
 pub mod auditor;
 pub mod model;
 pub mod optimizer;

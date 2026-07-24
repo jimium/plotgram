@@ -8,7 +8,6 @@
 //! 1. **associated types**：每种配方有自己的 Problem/Solution 类型，避免 Box 开销
 //! 2. **默认编排**：`execute()` 有默认实现，简单配方只需实现 4 个方法
 //! 3. **可插拔 solver**：coordinate 类用 PAVA+梯度，sequence 用规则，circular 用几何
-//! 4. **类型擦除**：[`LayoutRecipeDyn`] 用于 LayoutStrategy 委托，避免泛型传染
 
 use crate::ast::Diagram;
 use crate::layout::LayoutResult;
@@ -44,28 +43,5 @@ pub trait LayoutRecipe {
         let solution = self.solve(&problem);
         self.audit(&problem, &solution);
         self.product(&solution, diagram)
-    }
-}
-
-/// 类型擦除的 Recipe 接口（预留：未来 LayoutStrategy 统一委托入口）。
-///
-/// 由于 `LayoutRecipe` 使用 associated types，无法直接做 trait object。
-/// 此 trait 提供擦除后的统一调用入口。当前无调用方，待 Phase R2+ 启用。
-pub trait LayoutRecipeDyn {
-    /// 配方名称。
-    fn recipe_name(&self) -> &'static str;
-
-    /// 类型擦除的完整执行。
-    fn execute_erased(&self, diagram: &Diagram) -> LayoutResult;
-}
-
-/// 所有 LayoutRecipe 自动实现 LayoutRecipeDyn。
-impl<T: LayoutRecipe> LayoutRecipeDyn for T {
-    fn recipe_name(&self) -> &'static str {
-        <T as LayoutRecipe>::name(self)
-    }
-
-    fn execute_erased(&self, diagram: &Diagram) -> LayoutResult {
-        <T as LayoutRecipe>::execute(self, diagram)
     }
 }

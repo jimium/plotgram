@@ -33,7 +33,7 @@ mod tests {
     use crate::layout::algorithm_config::SugiyamaLayoutConfig;
     use crate::layout::{LayoutResult, LayoutStrategy, NodeLayout};
     use crate::layout::GroupLayout;
-    use crate::layout::node::flowchart::FlowchartLayout;
+    use crate::layout::recipes::flowchart::FlowchartLayout;
     use crate::pipeline::{parse, prepare};
     use petgraph::graph::{DiGraph, NodeIndex};
     use std::collections::{HashMap, HashSet};

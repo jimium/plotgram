@@ -7,11 +7,11 @@ use super::order;
 use super::postprocess;
 use super::preset::{self, SugiyamaPreset};
 
-use crate::layout::node::coordinate_solver::auditor::audit_p0;
-use crate::layout::node::coordinate_solver::builder::build_with_mapping;
-use crate::layout::node::coordinate_solver::objectives::{build_basic_objectives, ObjectiveWeights};
-use crate::layout::node::coordinate_solver::structure_objectives::{build_structure_objectives, StructureWeights};
-use crate::layout::node::coordinate_solver::optimizer::solve;
+use crate::layout::engines::coordinate::auditor::audit_p0;
+use crate::layout::engines::coordinate::builder::build_with_mapping;
+use crate::layout::engines::coordinate::objectives::{build_basic_objectives, ObjectiveWeights};
+use crate::layout::engines::coordinate::structure_objectives::{build_structure_objectives, StructureWeights};
+use crate::layout::engines::coordinate::optimizer::solve;
 
 pub(in crate::layout) fn assign_coordinates_brandes_koepf(
     dag: &DiGraph<String, ()>,

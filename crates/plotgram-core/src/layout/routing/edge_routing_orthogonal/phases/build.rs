@@ -3,10 +3,10 @@
 //! 从 `run.rs` 原样搬迁（A4 结构重构，行为不变）。
 
 use super::super::*;
-use crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels;
-use crate::layout::edge::common::self_loop;
-use crate::layout::edge::edge_routing_orthogonal::channel_planner::ChannelPlan;
-use crate::layout::edge::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
+use crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels;
+use crate::layout::routing::common::self_loop;
+use crate::layout::routing::edge_routing_orthogonal::channel_planner::ChannelPlan;
+use crate::layout::routing::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
 use std::collections::HashMap;
 
 #[allow(clippy::too_many_arguments)]
@@ -25,10 +25,10 @@ pub(crate) fn phase_route_edges(
     group_ctx: &crate::layout::group::GroupRoutingContext,
     obstacles: &PreparedObstacles,
     corridor_plan: &corridor_route::CorridorRoutePlan,
-    parallel: &crate::layout::edge::common::parallel_edges::ParallelGroups,
+    parallel: &crate::layout::routing::common::parallel_edges::ParallelGroups,
     preserve_edges: &Option<std::collections::HashSet<usize>>,
     self_loop_idx: &HashMap<usize, usize>,
-    space_budget: &mut Option<crate::layout::space_budget::SpaceBudget>,
+    space_budget: &mut Option<crate::layout::demand::space_budget::SpaceBudget>,
     feedback_edge_set: &std::collections::HashSet<usize>,
     s4_monitor_corridor: bool,
     corridor_model: Option<&crate::layout::demand::CorridorModel>,

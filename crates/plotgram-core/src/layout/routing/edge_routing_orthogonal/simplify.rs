@@ -1,9 +1,9 @@
 //! Path simplification for orthogonal edge routing.
 //!
-//! 严格共线压缩委托 [`crate::layout::edge::common::collinear_simplify`]；
+//! 严格共线压缩委托 [`crate::layout::routing::common::collinear_simplify`]；
 //! 改形状逻辑（换角 / overshoot）不在此模块。
 
-use crate::layout::edge::common::collinear_simplify::{
+use crate::layout::routing::common::collinear_simplify::{
     is_collinear_eps, simplify_collinear_polyline, STRICT_COLLINEAR_EPS,
 };
 use crate::layout::geometry::Point;

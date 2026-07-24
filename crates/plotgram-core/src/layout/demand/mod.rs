@@ -12,6 +12,7 @@ mod pierce;
 mod port;
 pub mod space_budget;
 pub mod space_budget_guard;
+pub mod spacing_contract;
 mod types;
 
 pub use corridor::{

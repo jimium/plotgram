@@ -2,7 +2,7 @@
 //!
 //! architecture 图启用语义门控；flowchart 等图几何优先，不做语义拦截。
 
-use crate::layout::edge::common::edge_geometry::canonical_pair;
+use crate::layout::routing::common::edge_geometry::canonical_pair;
 use crate::types::DiagramType;
 
 /// 合并组类型（用于调试与 lint）。

@@ -15,12 +15,12 @@ use crate::types::DiagramType;
 use crate::layout::{
     edge_point, EdgeLayout, GroupLayout, LayoutResult, NodeLayout, Port,
 };
-use crate::layout::edge::common::edge_geometry::{
+use crate::layout::routing::common::edge_geometry::{
     canonical_perpendicular, node_center, select_port,
 };
-use crate::layout::edge::common::label_avoidance::resolve_label_overlaps;
-use crate::layout::edge::common::parallel_edges::group_parallel_edges;
-use crate::layout::edge::visibility;
+use crate::layout::routing::common::label_avoidance::resolve_label_overlaps;
+use crate::layout::routing::common::parallel_edges::group_parallel_edges;
+use crate::layout::routing::visibility;
 use crate::layout::constants;
 use std::collections::HashMap;
 

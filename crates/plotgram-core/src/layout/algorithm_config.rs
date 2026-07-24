@@ -84,7 +84,7 @@ macro_rules! define_layout_config {
         }
 
         impl $name {
-            pub fn from_options(options: &super::plan::ResolvedAlgoOptions) -> Self {
+            pub fn from_options(options: &crate::layout::pipeline::plan::ResolvedAlgoOptions) -> Self {
                 let opts: &[AlgorithmOptionSpec] = $options_const;
                 let mut iter = opts.iter();
                 $(

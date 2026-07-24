@@ -10,7 +10,7 @@ use crate::layout::NodeLayout;
 use std::collections::HashMap;
 
 use crate::layout::demand::CorridorModel;
-use crate::layout::edge::common::spatial_grid::SpatialGrid;
+use crate::layout::routing::common::spatial_grid::SpatialGrid;
 use super::{ChannelLoadMap, OrthoConfig, OrthoRoutingProfile, RoutedSegment};
 use super::slot::Endpoint;
 use super::visibility_graph::OrthogonalVisibilityGraph;

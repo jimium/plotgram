@@ -5,8 +5,8 @@ use crate::layout::algorithm_config::{ArchitectureV2LayoutConfig, SugiyamaLayout
 use crate::layout::constants;
 #[allow(unused_imports)]
 use crate::layout::group;
-use crate::layout::node::architecture_v2::post_layout;
-use crate::layout::plan::LayoutPlan;
+use crate::layout::recipes::architecture::post_layout;
+use crate::layout::pipeline::plan::LayoutPlan;
 use crate::layout::LayoutResult;
 use std::collections::HashMap;
 
@@ -101,12 +101,12 @@ impl GroupFramePass {
                 .group_routing
                 .as_ref()
                 .map(|h| &h.side_gutters);
-            crate::layout::group_frame::shrink_groups_to_required_padding(
+            crate::layout::group::frame::shrink_groups_to_required_padding(
                 diagram,
                 &mut layout.groups,
                 &layout.nodes,
                 self.padding,
-                crate::layout::node::common::group_bounds::container_padding_for_leaf(self.padding),
+                crate::layout::engines::common::group_bounds::container_padding_for_leaf(self.padding),
                 side_gutters,
             );
         }

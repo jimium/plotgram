@@ -26,8 +26,9 @@ pub(super) fn phase_d_postprocess(
     // ── 后处理：基础设施行居中 ──
     // 从元数据重建全局层（替代旧版从 y 坐标反推）
     let layers = rebuild_layers_from_metadata(blocks, block_row);
+    let facts = ArchDiagramFacts::from_diagram(diagram);
     rebalance_infrastructure_layers(
-        diagram,
+        &facts,
         graph,
         group_map,
         &layers,
@@ -35,7 +36,7 @@ pub(super) fn phase_d_postprocess(
         nodes,
         reversed_edges,
     );
-    enforce_horizontal_demand_gaps(diagram, &layers, sizes, nodes);
+    enforce_horizontal_demand_gaps(&facts, &layers, sizes, nodes);
     clamp_to_canvas(nodes, sizes);
     // Phase F：同 leaf-group 内近邻 y 带节点微对齐（修小幅错位，不改层拓扑）
     align_intra_group_same_rank_y(diagram, nodes);
@@ -64,7 +65,7 @@ pub(super) fn phase_d_postprocess(
     if sizing != GroupSizingPolicy::Fit {
         equalize_top_leaf_egb_deltas(diagram, groups, &side_gutters, bounds_padding);
     }
-    let gf_spec = crate::layout::group_frame::resolve_group_frame_spec(diagram, "architecture");
+    let gf_spec = crate::layout::group::frame::resolve_group_frame_spec(diagram, "architecture");
     let mut layout_scratch = LayoutResult {
         nodes: std::mem::take(nodes),
         groups: std::mem::take(groups),
@@ -73,12 +74,12 @@ pub(super) fn phase_d_postprocess(
         total_height: 0.0,
         hints: Default::default(),
     };
-    crate::layout::group_frame::resolve_all_sibling_overlaps(
+    crate::layout::group::frame::resolve_all_sibling_overlaps(
         &gf_spec,
         diagram,
         &mut layout_scratch,
     );
-    crate::layout::group_frame::expand_groups_to_contain_contents(
+    crate::layout::group::frame::expand_groups_to_contain_contents(
         diagram,
         &mut layout_scratch.groups,
         &layout_scratch.nodes,
@@ -87,7 +88,7 @@ pub(super) fn phase_d_postprocess(
     );
     // Phase F：仅 Fit 时收回高于 base∪egb 的残余空壳（uniform/Equal 条带不收缩）
     if sizing == GroupSizingPolicy::Fit {
-        crate::layout::group_frame::shrink_groups_to_required_padding(
+        crate::layout::group::frame::shrink_groups_to_required_padding(
             diagram,
             &mut layout_scratch.groups,
             &layout_scratch.nodes,
@@ -97,7 +98,7 @@ pub(super) fn phase_d_postprocess(
         );
     }
     // Phase G: hub 居中 + client 对齐已由组内 solver P1 objectives 覆盖，不再后处理。
-    crate::layout::group_frame::expand_groups_to_contain_contents(
+    crate::layout::group::frame::expand_groups_to_contain_contents(
         diagram,
         &mut layout_scratch.groups,
         &layout_scratch.nodes,
@@ -128,8 +129,8 @@ pub(super) fn phase_d_postprocess(
     // 空间契约：边感知间距写入 hints。
     // Phase A2: 删除 enforce_horizontal_gaps（solver 已处理层内分离）。
     // 竖向 rank 缝由通用 refine/guard 依据最终 rank 元数据守约。
-    let space_budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
-    crate::layout::group_frame::expand_groups_to_contain_contents(
+    let space_budget = crate::layout::demand::space_budget::SpaceBudget::from_diagram(diagram);
+    crate::layout::group::frame::expand_groups_to_contain_contents(
         diagram,
         groups,
         nodes,
@@ -138,7 +139,7 @@ pub(super) fn phase_d_postprocess(
     );
 
     let (total_width, total_height) =
-        crate::layout::node::common::canvas_bounds::canvas_size(nodes, groups, PADDING);
+        crate::layout::engines::common::canvas_bounds::canvas_size(nodes, groups, PADDING);
 
     let sibling_corridors = crate::layout::group::build_sibling_corridors(diagram, groups);
     let corridors = crate::layout::group::merge_corridors(&sibling_corridors, groups);
@@ -469,7 +470,7 @@ pub(super) fn apply_nudge_per_group(
         let Some(gl) = groups.get(&gid) else {
             continue;
         };
-        let pad = GroupPadding::architecture_v2().left;
+        let pad = GroupPadding::architecture().left;
         let group_min_x = gl.x + pad;
         let group_max_x = gl.x + gl.width - pad;
         let available_width = (group_max_x - group_min_x).max(0.0);
@@ -551,7 +552,7 @@ pub(super) fn align_intra_group_same_rank_y(diagram: &Diagram, nodes: &mut HashM
         .map(|g| {
             // C4：复用 effective_entity_ids，覆盖仅靠 group_id 挂靠的成员。
             let mut ids =
-                crate::layout::node::common::group_bounds::effective_entity_ids(g, diagram);
+                crate::layout::engines::common::group_bounds::effective_entity_ids(g, diagram);
             ids.sort();
             ids.dedup();
             (g.id.as_str().to_string(), ids)

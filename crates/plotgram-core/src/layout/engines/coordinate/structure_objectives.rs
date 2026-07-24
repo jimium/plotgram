@@ -11,7 +11,7 @@ use petgraph::Direction;
 use std::collections::HashMap;
 
 use super::model::*;
-use crate::layout::node::sugiyama_v2::graph::{LayerNode, LayerNodeKind};
+use crate::layout::engines::layered::graph::{LayerNode, LayerNodeKind};
 
 /// 结构目标权重。
 pub(in crate::layout) struct StructureWeights {

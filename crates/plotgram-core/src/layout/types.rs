@@ -5,7 +5,10 @@ use std::collections::HashMap;
 
 // Bring layout submodules into scope so `LayoutHints` field references such as
 // `node::circular::CircularLayoutHints` resolve from this submodule.
-use crate::layout::{group, group_frame, node, space_budget};
+use crate::layout::{group, demand};
+use crate::layout::group::frame as group_frame;
+use crate::layout::recipes as node;
+use crate::layout::demand::space_budget;
 
 // ─── Layout 数据结构 ─────────────────────────────────────
 
@@ -221,7 +224,7 @@ pub struct EdgeLabelLayout {
 impl EdgeLabelLayout {
     pub fn new(text: impl Into<String>, center: Point) -> Self {
         let text = text.into();
-        let size = crate::layout::edge::common::label_avoidance::label_metrics(&text);
+        let size = crate::layout::routing::common::label_avoidance::label_metrics(&text);
         Self {
             text,
             center,
@@ -468,7 +471,7 @@ pub struct LayoutHints {
     pub space_budget: Option<space_budget::SpaceBudget>,
     /// 正交路由 C 末旁路注解（stub / 受保护 trunk）；不改 `EdgeLayout`。
     // WRITE: render(route_edges_orthogonal @ C end)  READ: sanitize / grid_snap validate
-    pub route_annotations: Option<crate::layout::edge::RouteAnnotationSet>,
+    pub route_annotations: Option<crate::layout::routing::RouteAnnotationSet>,
     /// 同层边：(from_entity_id, to_entity_id)，路由按短横/L 处理而非绕底廊。
     // WRITE: layout(sugiyama same-layer)  READ: render(orthogonal routing)
     pub same_layer_edges: Vec<(String, String)>,

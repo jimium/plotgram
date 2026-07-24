@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 
 use super::graph::{LayerNode, LayerNodeKind};
-use crate::layout::node::common::crossings::count_crossings_from_edges;
+use crate::layout::engines::common::crossings::count_crossings_from_edges;
 
 /// Group 偏置触发阈值：当两节点 median 差小于此值时，视为"位置接近"，
 /// 启用 group 偏置 tiebreaker（优先同 group 节点相邻）。

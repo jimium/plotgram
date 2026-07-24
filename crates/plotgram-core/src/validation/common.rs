@@ -5,7 +5,7 @@ use crate::types::attr_constants;
 use crate::types::attr_schema;
 use crate::ast::{is_valid_atom, AttributeValue, Diagram};
 use crate::error::{DiagnosticError, ValidationResult};
-use crate::layout::node::architecture_v2::{is_valid_group_layout_atom, VALID_GROUP_LAYOUTS};
+use crate::layout::recipes::architecture::{is_valid_group_layout_atom, VALID_GROUP_LAYOUTS};
 
 use crate::types::style_attrs::{is_atom_like, is_boolean_like, is_number_like, is_string_like};
 
@@ -241,7 +241,7 @@ pub fn validate_constraints(diagram: &Diagram, result: &mut ValidationResult) {
 /// 关系边可反转破环；约束边不可反转。
 /// 对关系图做 greedy FAS 得到 DAG 后加入约束边，若仍有环则不可满足。
 fn validate_constraint_satisfiability(diagram: &Diagram, result: &mut ValidationResult) {
-    use crate::layout::node::common::acyclic::greedy_fas;
+    use crate::layout::engines::common::acyclic::greedy_fas;
     use std::collections::{HashMap, HashSet as StdHashSet};
 
     let mut nodes: StdHashSet<String> = StdHashSet::new();

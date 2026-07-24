@@ -20,8 +20,8 @@
 //! 详见 `docs/architecture/布局优化/group-frame-spec.md`（v0.2）。
 
 use crate::ast::Diagram;
-use crate::layout::grid_snap::{snap_floor, snap_ceil};
-use crate::layout::node::common::group_bounds::GroupPadding;
+use crate::layout::snap::grid_snap::{snap_floor, snap_ceil};
+use crate::layout::engines::common::group_bounds::GroupPadding;
 use crate::layout::{GroupLayout, LayoutResult, NodeLayout};
 use std::collections::HashMap;
 

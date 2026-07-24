@@ -8,7 +8,7 @@ use std::f64::consts::PI;
 
 // CircleGroup / APPLICABLE_TYPES / infer_single_circle_from_nodes / resolve_circle_groups
 // 已下沉到 edge::common::circular_support，此处 re-export 保持原路径可用。
-pub use crate::layout::edge::common::circular_support::{
+pub use crate::layout::routing::common::circular_support::{
     APPLICABLE_TYPES, CircleGroup, infer_single_circle_from_nodes, resolve_circle_groups,
 };
 

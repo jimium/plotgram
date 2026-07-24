@@ -4,7 +4,7 @@ use super::*;
 use crate::layout::geometry::Point;
 use crate::layout::group::{CorridorAxis, GroupRoutingContext, SiblingOrientation};
 use crate::layout::{NodeLayout, Port};
-use crate::layout::edge::common::edge_geometry::node_center;
+use crate::layout::routing::common::edge_geometry::node_center;
 
 const VERTICAL_PREFERENCE_THRESHOLD_SAME_GROUP: f64 = 0.4;
 const VERTICAL_PREFERENCE_THRESHOLD_HORIZONTAL_SIBLINGS: f64 = 0.8;

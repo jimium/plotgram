@@ -4,7 +4,7 @@ use super::path::port_outward;
 use super::*;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
-use crate::layout::edge::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
+use crate::layout::routing::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
 use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════
@@ -487,7 +487,7 @@ pub fn fix_reverse_stub_ports(
 
                 let labels = match relations.get(ei) {
                     Some(rel) => {
-                        crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto(
+                        crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels_auto(
                             rel, ei, relations, &candidate,
                         )
                     }

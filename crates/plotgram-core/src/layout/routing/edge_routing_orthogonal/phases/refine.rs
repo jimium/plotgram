@@ -3,9 +3,9 @@
 //! 从 `run.rs` 原样搬迁（A4 结构重构，行为不变）。
 
 use super::super::*;
-use crate::layout::edge::common::edge_geometry::undirected_pair_key;
-use crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels;
-use crate::layout::edge::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
+use crate::layout::routing::common::edge_geometry::undirected_pair_key;
+use crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels;
+use crate::layout::routing::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
 use std::collections::HashMap;
 
 #[allow(clippy::too_many_arguments)]
@@ -19,13 +19,13 @@ pub(crate) fn phase_straighten_align(
     grid: &mut SegmentGrid,
     relations: &[crate::ast::Relation],
     reverse_pairs: &std::collections::BTreeSet<String>,
-    parallel: &crate::layout::edge::common::parallel_edges::ParallelGroups,
+    parallel: &crate::layout::routing::common::parallel_edges::ParallelGroups,
     corridor_plan: &corridor_route::CorridorRoutePlan,
     group_ctx: &crate::layout::group::GroupRoutingContext,
     obstacles: &PreparedObstacles,
     cfg: &OrthoConfig,
     profile: &OrthoRoutingProfile,
-    space_budget: &Option<crate::layout::space_budget::SpaceBudget>,
+    space_budget: &Option<crate::layout::demand::space_budget::SpaceBudget>,
     ovg: Option<&OrthogonalVisibilityGraph>,
 ) {
     // ── 4c. 直连偏好对齐：正对端口边的 slot 锚点对齐修正 ──

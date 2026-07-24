@@ -31,7 +31,7 @@ impl GroupPadding {
     ///
     /// Phase D：收紧组壳（原 28/48/28 → 20/36/20），标题区仍由 `top` 覆盖
     ///（`GROUP_LABEL_HEIGHT=20`，内容顶隙 ≥16）。
-    pub fn architecture_v2() -> Self {
+    pub fn architecture() -> Self {
         Self {
             left: 20.0,
             right: 20.0,
@@ -507,7 +507,7 @@ mod tests {
 
     #[test]
     fn side_gutter_overrides_container_half_padding() {
-        let leaf = GroupPadding::architecture_v2();
+        let leaf = GroupPadding::architecture();
         let container = container_padding(leaf);
         assert!(container.left < leaf.left);
         let merged = container.max_per_side(SideGutter {

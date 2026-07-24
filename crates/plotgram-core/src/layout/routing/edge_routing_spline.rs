@@ -13,19 +13,19 @@ use std::collections::HashMap;
 use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use crate::layout::algorithm_config::AlgorithmOptionSpec;
-use crate::layout::edge::edge_routing_bezier::{BezierConfig, BEZIER_OPTIONS};
+use crate::layout::routing::edge_routing_bezier::{BezierConfig, BEZIER_OPTIONS};
 use crate::layout::geometry::Point;
 use crate::layout::{
     EdgeLayout, EdgeRoutingStrategy, LayoutResult, PathGeometry,
 };
-use crate::layout::edge::common::edge_geometry::{
+use crate::layout::routing::common::edge_geometry::{
     build_edge_labels, compute_bezier_controls, cubic_bezier_point, label_t_for_diagram,
     point_at_path_t,
 };
-use crate::layout::edge::common::routing_skeleton::{
+use crate::layout::routing::common::routing_skeleton::{
     finalize_edges, resolve_endpoints, RoutingContext,
 };
-use crate::layout::edge::common::self_loop::{self_loop_indices, route_self_loop, SelfLoopStyle};
+use crate::layout::routing::common::self_loop::{self_loop_indices, route_self_loop, SelfLoopStyle};
 
 const APPLICABLE_TYPES: &[DiagramType] = &[
     DiagramType::Flowchart,
@@ -41,14 +41,14 @@ pub struct SplineRouting {
 
 impl Default for SplineRouting {
     fn default() -> Self {
-        Self::from_options(&crate::layout::plan::ResolvedAlgoOptions::from_spec_defaults(
+        Self::from_options(&crate::layout::pipeline::plan::ResolvedAlgoOptions::from_spec_defaults(
             BEZIER_OPTIONS,
         ))
     }
 }
 
 impl SplineRouting {
-    pub fn from_options(options: &crate::layout::plan::ResolvedAlgoOptions) -> Self {
+    pub fn from_options(options: &crate::layout::pipeline::plan::ResolvedAlgoOptions) -> Self {
         Self {
             config: BezierConfig {
                 tension: options.get_or_default(&BEZIER_OPTIONS[0]),
@@ -104,8 +104,8 @@ pub fn route_edges_spline(
     let ctx = RoutingContext::new(diagram, &result);
 
     // 4.2: 懒构建——快速预检无边可能穿障时跳过 O(n²) 构建
-    let (node_id_to_idx, obstacle_index) = if crate::layout::edge::common::routing_skeleton::quick_check_need_obstacle_index(&result, relations) {
-        let (idx, obs) = crate::layout::edge::common::routing_skeleton::build_obstacle_context(&result);
+    let (node_id_to_idx, obstacle_index) = if crate::layout::routing::common::routing_skeleton::quick_check_need_obstacle_index(&result, relations) {
+        let (idx, obs) = crate::layout::routing::common::routing_skeleton::build_obstacle_context(&result);
         (idx, Some(obs))
     } else {
         (HashMap::new(), None)
@@ -328,7 +328,7 @@ pub(crate) fn sample_bezier(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layout::edge::common::test_fixtures::make_diagram_with_layout;
+    use crate::layout::routing::common::test_fixtures::make_diagram_with_layout;
 
     #[test]
     fn test_spline_no_obstacle() {

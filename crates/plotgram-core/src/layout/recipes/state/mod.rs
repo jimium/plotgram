@@ -8,10 +8,11 @@
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::{CircularLayoutConfig, SugiyamaLayoutConfig};
 use crate::layout::kernel::recipe::LayoutRecipe;
-use crate::layout::node::circular::CircularLayout;
-use crate::layout::node::common::acyclic::greedy_fas;
-use crate::layout::node::sugiyama_v2::{engine, preset};
-use crate::layout::plan::{diagram_algorithm_name, ResolvedAlgoOptions};
+use crate::layout::recipes::circular::CircularLayout;
+use crate::layout::engines::common::acyclic::greedy_fas;
+use crate::layout::engines::common::group_bounds::{self, GroupPadding};
+use crate::layout::engines::layered::{coordinate, layered_kernel::LayeredKernel, preset};
+use crate::layout::pipeline::plan::{diagram_algorithm_name, ResolvedAlgoOptions};
 use crate::layout::{AlgorithmOptionSpec, EdgeRoutingStyle, LayoutResult, LayoutStrategy, NodeAlignConfig};
 use crate::types::standard_attr_keys::diagram;
 use crate::types::DiagramType;
@@ -103,12 +104,14 @@ enum StateProblem {
     /// Circular 布局路径
     Circular,
     /// Sugiyama 布局路径：LayeredKernel 产出的分层草稿
-    Sugiyama(crate::layout::node::sugiyama_v2::layered_kernel::LayeredDraft),
+    Sugiyama(crate::layout::engines::layered::layered_kernel::LayeredDraft),
 }
 
 /// 状态图求解结果。
 struct StateSolution {
-    result: LayoutResult,
+    nodes: HashMap<String, crate::layout::NodeLayout>,
+    solved_problem: Option<crate::layout::kernel::coordinate::model::CoordinateProblem>,
+    draft: Option<crate::layout::engines::layered::layered_kernel::LayeredDraft>,
 }
 
 impl LayoutRecipe for StateRecipe {
@@ -123,7 +126,7 @@ impl LayoutRecipe for StateRecipe {
         if user_requested_circular(diagram) || !should_use_sugiyama(diagram) {
             StateProblem::Circular
         } else {
-            let draft = crate::layout::node::sugiyama_v2::layered_kernel::LayeredKernel::compute(
+            let draft = crate::layout::engines::layered::layered_kernel::LayeredKernel::compute(
                 diagram,
                 &preset::STATE_PRESET,
                 self.sugiyama_config,
@@ -135,61 +138,93 @@ impl LayoutRecipe for StateRecipe {
     fn solve(&self, problem: &StateProblem) -> StateSolution {
         match problem {
             StateProblem::Sugiyama(draft) => {
-                let (nodes, solved_problem) =
-                    crate::layout::node::sugiyama_v2::coordinate::assign_coordinates_brandes_koepf(
-                        &draft.dag,
-                        &draft.proper_graph,
-                        &draft.layers,
-                        &draft.sizes,
-                        draft.horizontal,
-                        &draft.preset,
-                        &draft.per_layer_gaps,
-                        draft.has_order_bias,
-                        &draft.end_ids,
-                    );
-                // solve 产出节点坐标，完整 LayoutResult 由 execute 组装
-                StateSolution {
-                    result: LayoutResult {
-                        nodes,
-                        groups: HashMap::new(),
-                        edges: vec![],
-                        total_width: 0.0,
-                        total_height: 0.0,
-                        hints: Default::default(),
-                    },
-                }
+                let (nodes, solved_problem) = coordinate::assign_coordinates_brandes_koepf(
+                    &draft.dag,
+                    &draft.proper_graph,
+                    &draft.layers,
+                    &draft.sizes,
+                    draft.horizontal,
+                    &draft.preset,
+                    &draft.per_layer_gaps,
+                    draft.has_order_bias,
+                    &draft.end_ids,
+                );
+                StateSolution { nodes, solved_problem, draft: Some(draft.clone()) }
             }
             StateProblem::Circular => StateSolution {
-                result: LayoutResult {
-                    nodes: HashMap::new(),
-                    groups: HashMap::new(),
-                    edges: vec![],
-                    total_width: 0.0,
-                    total_height: 0.0,
-                    hints: Default::default(),
-                },
+                nodes: HashMap::new(),
+                solved_problem: None,
+                draft: None,
             },
         }
     }
 
-    fn product(&self, _solution: &StateSolution, _diagram: &Diagram) -> LayoutResult {
-        unreachable!("product called directly; use execute()")
+    fn product(&self, solution: &StateSolution, diagram: &Diagram) -> LayoutResult {
+        let StateSolution { nodes, solved_problem, draft } = solution;
+        let draft = draft.as_ref().expect("product called for Sugiyama path");
+
+        let groups = group_bounds::compute_group_bounds(
+            diagram,
+            nodes,
+            GroupPadding::uniform(self.sugiyama_config.group_padding, 16.0),
+        );
+        let group_warnings =
+            group_bounds::detect_group_layout_warnings(diagram, nodes, &groups);
+        let (total_width, total_height) =
+            crate::layout::engines::common::canvas_bounds::canvas_size(
+                nodes,
+                &groups,
+                draft.padding,
+            );
+
+        let mut result = LayoutResult {
+            nodes: nodes.clone(),
+            groups,
+            edges: vec![],
+            total_width,
+            total_height,
+            hints: crate::layout::LayoutHints {
+                edge_routing_style: EdgeRoutingStyle::Orthogonal,
+                sugiyama_ranks: Some(draft.sugiyama_ranks.clone()),
+                group_layout_warnings: group_warnings,
+                same_layer_edges: draft.same_layer_edges.clone(),
+                feedback_hubs: draft.feedback_hubs.clone(),
+                coordinate_problem: solved_problem.clone().map(Box::new),
+                ..Default::default()
+            },
+        };
+
+        if let Some(finish) = draft.preset.finish_layout {
+            finish(&mut result, &draft.preset);
+        }
+
+        result
     }
 
     fn execute(&self, diagram: &Diagram) -> LayoutResult {
+        // Circular 路径：委托 CircularLayout
         if user_requested_circular(diagram) || !should_use_sugiyama(diagram) {
             let mut result = CircularLayout::new(self.circular_config).compute(diagram);
             result.hints.edge_routing_style = EdgeRoutingStyle::Curved;
             return result;
         }
 
-        let mut result = engine::compute_with_preset(
-            diagram,
-            &preset::STATE_PRESET,
-            self.sugiyama_config,
-        );
-        result.hints.edge_routing_style = EdgeRoutingStyle::Orthogonal;
-        result
+        // 空图快速返回
+        if diagram.entities.is_empty() {
+            return LayoutResult {
+                nodes: HashMap::new(),
+                groups: HashMap::new(),
+                edges: vec![],
+                total_width: preset::STATE_PRESET.padding * 2.0,
+                total_height: preset::STATE_PRESET.padding * 2.0,
+                hints: Default::default(),
+            };
+        }
+
+        // 标准生命周期：compile → solve → product
+        let problem = self.compile(diagram);
+        let solution = self.solve(&problem);
+        self.product(&solution, diagram)
     }
 }
 

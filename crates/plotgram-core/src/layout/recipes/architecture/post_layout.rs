@@ -471,7 +471,7 @@ mod tests {
 
     #[test]
     fn stress_nested_no_node_overlap() {
-        use crate::layout::lint::{lint_layout, LintMetricsSummary};
+        use crate::layout::quality::lint::{lint_layout, LintMetricsSummary};
 
         let source =
             include_str!("../../../../../../showcase/architecture/stress.layout-stress-nested.pgm");
@@ -504,7 +504,7 @@ mod tests {
 
     #[test]
     fn stress_nested_has_no_sibling_group_overlap() {
-        use crate::layout::lint::{lint_layout, LintMetricsSummary};
+        use crate::layout::quality::lint::{lint_layout, LintMetricsSummary};
 
         let source =
             include_str!("../../../../../../showcase/architecture/stress.layout-stress-nested.pgm");
@@ -558,7 +558,7 @@ mod tests {
 
     #[test]
     fn stress_nested_child_groups_stay_inside_parents() {
-        use crate::layout::lint::{lint_layout, LintMetricsSummary, LintRuleId};
+        use crate::layout::quality::lint::{lint_layout, LintMetricsSummary, LintRuleId};
 
         let source =
             include_str!("../../../../../../showcase/architecture/stress.layout-stress-nested.pgm");

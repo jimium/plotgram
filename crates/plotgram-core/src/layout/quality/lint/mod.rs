@@ -17,10 +17,10 @@ pub use violation::{
     LintSeverity,
 };
 
-use crate::layout::edge::common::label_avoidance::aabb_overlap;
+use crate::layout::routing::common::label_avoidance::aabb_overlap;
 
 use crate::ast::Diagram;
-use crate::layout::edge::segment_pair::{
+use crate::layout::routing::segment_pair::{
     find_needs_separation_edge_pairs, SeparationReason,
 };
 use crate::layout::geometry::Point;
@@ -519,7 +519,7 @@ fn check_edge_crosses_group_interior(diagram: &Diagram, result: &LayoutResult, o
                 continue;
             }
             for window in path.windows(2) {
-                if crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+                if crate::layout::routing::common::geom_obstacle::segment_pierces_group_interior(
                     window[0], window[1], gl,
                 ) {
                     out.push(
@@ -607,7 +607,7 @@ pub fn edge_crosses_group_interior_with_maps(
             continue;
         }
         for window in path.windows(2) {
-            if crate::layout::edge::common::geom_obstacle::segment_pierces_group_interior(
+            if crate::layout::routing::common::geom_obstacle::segment_pierces_group_interior(
                 window[0], window[1], gl,
             ) {
                 return true;
@@ -865,7 +865,7 @@ fn compute_pierce_severity(diagram: &Diagram, result: &LayoutResult) -> (f64, f6
                 group_sev += Rect::from(gl).segment_interior_overlap_length(
                     window[0],
                     window[1],
-                    crate::layout::edge::common::geom_obstacle::GROUP_INTERIOR_EPS,
+                    crate::layout::routing::common::geom_obstacle::GROUP_INTERIOR_EPS,
                 );
             }
         }

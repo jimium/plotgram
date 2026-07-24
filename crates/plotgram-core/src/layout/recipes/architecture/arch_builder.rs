@@ -6,8 +6,8 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::layout::kernel::coordinate::model::*;
-use crate::layout::node::architecture_v2::layout::constants::NODE_GAP;
-use crate::layout::node::architecture_v2::layout::types::{GraphIndex, GroupMap};
+use crate::layout::recipes::architecture::layout::constants::NODE_GAP;
+use crate::layout::recipes::architecture::layout::types::{GraphIndex, GroupMap};
 
 /// 构建输出：包含问题 IR 和节点→变量映射。
 pub(in crate::layout::recipes) struct ArchBuildOutput {
@@ -39,8 +39,8 @@ pub(in crate::layout::recipes) fn build_arch_coordinate_problem(
 
     // edge_band_demand 参数
     let parallel_gap =
-        crate::layout::edge::segment_pair::parallel_gap_for_diagram(diagram_type.clone());
-    let profile = crate::layout::edge_band_demand::EdgeBandDemandProfile::for_diagram(
+        crate::layout::routing::segment_pair::parallel_gap_for_diagram(diagram_type.clone());
+    let profile = crate::layout::demand::band::EdgeBandDemandProfile::for_diagram(
         diagram_type.clone(),
         has_groups,
     );
@@ -84,7 +84,7 @@ pub(in crate::layout::recipes) fn build_arch_coordinate_problem(
                 // 使用 edge_band_demand 的 adjacent_rank_gap（如果启用）
                 let gap = if profile.horizontal_max_extra > 0.0 {
                     let layer_ids: HashSet<&str> = layer.iter().map(|s| s.as_str()).collect();
-                    crate::layout::edge_band_demand::adjacent_rank_gap(
+                    crate::layout::demand::band::adjacent_rank_gap(
                         prev_id,
                         node_id,
                         &layer_ids,
@@ -145,7 +145,7 @@ pub(in crate::layout::recipes) fn build_arch_coordinate_problem(
                     if !lower_set.contains(succ.as_str()) {
                         continue;
                     }
-                    if !crate::layout::node::architecture_v2::layout::acyclic::is_effective_edge(
+                    if !crate::layout::recipes::architecture::layout::acyclic::is_effective_edge(
                         node_id, succ, reversed,
                     ) {
                         continue;
@@ -199,7 +199,7 @@ pub(in crate::layout::recipes) fn build_arch_coordinate_problem(
                         succs
                             .iter()
                             .filter(|s| {
-                                crate::layout::node::architecture_v2::layout::acyclic::is_effective_edge(
+                                crate::layout::recipes::architecture::layout::acyclic::is_effective_edge(
                                     hub_id, s, reversed,
                                 ) && lower_set.contains(s.as_str())
                                     && group_map.node_to_top_group.get(*s) == Some(gid)
@@ -242,7 +242,7 @@ pub(in crate::layout::recipes) fn build_arch_coordinate_problem(
                         succs
                             .iter()
                             .filter(|s| {
-                                crate::layout::node::architecture_v2::layout::acyclic::is_effective_edge(
+                                crate::layout::recipes::architecture::layout::acyclic::is_effective_edge(
                                     client_id, s, reversed,
                                 ) && lower_set.contains(s.as_str())
                                     && group_map.node_to_top_group.get(client_id)
@@ -271,6 +271,71 @@ pub(in crate::layout::recipes) fn build_arch_coordinate_problem(
         }
     }
 
+    // Phase I: P1 基础设施层居中 objective（L4: 替代 post-layout mutation）
+    // 对于无组归属的基础设施层，将每个节点拉向其邻居（上下游）的质心
+    for (rank, layer) in layers.iter().enumerate() {
+        let is_infra = !layer.is_empty()
+            && layer.iter().all(|n| !group_map.node_to_top_group.contains_key(n));
+        if !is_infra {
+            continue;
+        }
+
+        for node_id in layer {
+            let Some(&node_var) = node_to_var.get(node_id) else {
+                continue;
+            };
+
+            // 收集所有 effective 邻居（上游 + 下游）
+            let mut neighbors: Vec<VarId> = Vec::new();
+
+            // 上游邻居
+            if let Some(preds) = graph.in_edges.get(node_id) {
+                for pred in preds {
+                    if crate::layout::recipes::architecture::layout::acyclic::is_effective_edge(
+                        pred, node_id, reversed,
+                    ) {
+                        if let Some(&pv) = node_to_var.get(pred) {
+                            neighbors.push(pv);
+                        }
+                    }
+                }
+            }
+
+            // 下游邻居
+            if let Some(succs) = graph.out_edges.get(node_id) {
+                for succ in succs {
+                    if crate::layout::recipes::architecture::layout::acyclic::is_effective_edge(
+                        node_id, succ, reversed,
+                    ) {
+                        if let Some(&sv) = node_to_var.get(succ) {
+                            neighbors.push(sv);
+                        }
+                    }
+                }
+            }
+
+            if !neighbors.is_empty() {
+                // (x[node] - avg(neighbors))²
+                let n = neighbors.len() as f64;
+                let mut coeffs: Vec<(VarId, f64)> = vec![(node_var, 1.0)];
+                for &nv in &neighbors {
+                    coeffs.push((nv, -1.0 / n));
+                }
+                objectives.push(ObjectiveTerm {
+                    priority: ObjectivePriority::P1,
+                    coefficients: coeffs,
+                    constant: 0.0,
+                    weight: 2.5, // 略低于 hub centering，高于 edge straightening
+                    source: ConstraintSource {
+                        kind: ConstraintSourceKind::NodeSeparation,
+                        nodes: vec![node_id.clone()],
+                        note: "infrastructure layer centering",
+                    },
+                });
+            }
+        }
+    }
+
     let problem = CoordinateProblem {
         vars,
         layers: layer_constraints,
@@ -278,6 +343,7 @@ pub(in crate::layout::recipes) fn build_arch_coordinate_problem(
         objectives,
         initial: InitialCoordinates { values: initial_values },
         config: CoordinateSolverConfig::default(),
+        axis: Default::default(),
     };
 
     ArchBuildOutput {

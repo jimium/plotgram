@@ -1,7 +1,7 @@
 //! Phase 5+: 重叠消除、钳制与画布尺寸。
 
 use crate::ast::Diagram;
-use crate::layout::node::common::overlap::{
+use crate::layout::engines::common::overlap::{
     BruteForceResolver, ChainedResolver, ForceDirectedResolver, OverlapConfig, OverlapResolver,
 };
 use crate::layout::{GroupLayout, NodeLayout};

@@ -18,7 +18,7 @@
 
 use super::super::*;
 use super::refine::{phase_straighten_align, phase_stub_fix};
-use crate::layout::edge::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
+use crate::layout::routing::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 /// Phase 4b：端口修正（合并 slot 重排 + 对齐修正 + stub 翻转）
@@ -46,8 +46,8 @@ pub(crate) fn phase_port_correction(
     profile: &OrthoRoutingProfile,
     feedback_edge_set: &HashSet<usize>,
     reverse_pairs: &BTreeSet<String>,
-    parallel: &crate::layout::edge::common::parallel_edges::ParallelGroups,
-    space_budget: &Option<crate::layout::space_budget::SpaceBudget>,
+    parallel: &crate::layout::routing::common::parallel_edges::ParallelGroups,
+    space_budget: &Option<crate::layout::demand::space_budget::SpaceBudget>,
     ovg: Option<&OrthogonalVisibilityGraph>,
 ) {
     let t_pc = crate::layout::perf::Instant::now();

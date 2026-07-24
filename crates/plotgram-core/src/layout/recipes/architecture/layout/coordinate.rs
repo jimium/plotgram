@@ -1,17 +1,16 @@
 //! Phase 4: 坐标分配与邻接对齐。
 
-use crate::ast::Diagram;
 use crate::layout::constants;
 use crate::layout::{NodeLayout};
 use std::collections::{HashMap, HashSet};
 
 use super::acyclic::is_effective_edge;
 use super::constants::{LAYER_GAP, NEIGHBOR_ALIGN_MAX_PASSES, NODE_GAP, PADDING};
-use super::types::{GraphIndex, GroupMap};
-use crate::layout::node::sugiyama_v2::coordinate::assign_layer_centers_for_string_graph;
+use super::types::{ArchDiagramFacts, GraphIndex, GroupMap};
+use crate::layout::engines::layered::coordinate::assign_layer_centers_for_string_graph;
 
 pub(in super::super) fn assign_coordinates(
-    diagram: &Diagram,
+    facts: &ArchDiagramFacts,
     graph: &GraphIndex,
     group_map: &GroupMap,
     layers: &[Vec<String>],
@@ -34,15 +33,15 @@ pub(in super::super) fn assign_coordinates(
     // S2：邻层边带需求抬高 layer gap（路由前写权）
     // 无组 architecture：可读余量更高，但仍按 demand 封顶——边少时不抬缝
     let parallel_gap =
-        crate::layout::edge::segment_pair::parallel_gap_for_diagram(diagram.diagram_type.clone());
-    let has_groups = !diagram.groups.is_empty();
-    let profile = crate::layout::edge_band_demand::EdgeBandDemandProfile::for_diagram(
-        diagram.diagram_type.clone(),
+        crate::layout::routing::segment_pair::parallel_gap_for_diagram(facts.diagram_type.clone());
+    let has_groups = facts.has_groups;
+    let profile = crate::layout::demand::band::EdgeBandDemandProfile::for_diagram(
+        facts.diagram_type.clone(),
         has_groups,
     );
-    let per_layer_gaps = crate::layout::edge_band_demand::layer_gaps_from_demand(
+    let per_layer_gaps = crate::layout::demand::band::layer_gaps_from_demand(
         layers,
-        &diagram.relations,
+        &facts.relations,
         LAYER_GAP,
         parallel_gap,
         profile,
@@ -50,8 +49,8 @@ pub(in super::super) fn assign_coordinates(
 
     // S4：无分组时侧通道水平 gutter（L/R 外廊）；竖向仍用 PADDING，避免层缝诊断虚高
     let side_gutter = if !has_groups {
-        crate::layout::edge_band_demand::side_channel_gutter(
-            &diagram.relations,
+        crate::layout::demand::band::side_channel_gutter(
+            &facts.relations,
             parallel_gap,
             profile,
         )
@@ -84,13 +83,13 @@ pub(in super::super) fn assign_coordinates(
         &bk_centers,
         graph,
         reversed,
-        &diagram.relations,
-        &diagram.diagram_type,
+        &facts.relations,
+        &facts.diagram_type,
         has_groups,
         group_map,
     );
-    let solver_result = crate::layout::kernel::coordinator::LayoutCoordinator::run(
-        &crate::layout::kernel::coordinator::ArchitectureRecipeAdapter,
+    let solver_result = crate::layout::kernel::coordinator::CoordinateKernel::solve(
+        "architecture",
         &build_output.problem,
     );
     let solved_problem = Some(build_output.problem);
@@ -127,7 +126,9 @@ pub(in super::super) fn assign_coordinates(
         }
     }
 
-    // 基础设施层居中（保留：跨层语义，solver 不覆盖）
+    // 基础设施层居中（L4: 已由 arch_builder Phase I objective 替代）
+    // 保留作为安全网：若 objective 未完全收敛，此处做最终修正。
+    // 待 objective 稳定后可删除。
     for (layer_idx, layer) in layers.iter().enumerate() {
         if is_infrastructure_layer(layer, group_map) {
             if let Some(anchor_x) = infrastructure_anchor_x(layer, graph, &nodes, reversed) {
@@ -155,14 +156,14 @@ fn resolve_layer_x_gaps(
     sizes: &HashMap<String, (f64, f64)>,
     relations: &[crate::ast::Relation],
     parallel_gap: f64,
-    profile: crate::layout::edge_band_demand::EdgeBandDemandProfile,
+    profile: crate::layout::demand::band::EdgeBandDemandProfile,
 ) -> Vec<f64> {
     if profile.horizontal_max_extra <= 0.0 {
         return resolve_x_overlaps(layer, positions, sizes);
     }
     let layer_ids: HashSet<&str> = layer.iter().map(|s| s.as_str()).collect();
     resolve_x_overlaps_with_gaps(layer, positions, sizes, |a, b| {
-        crate::layout::edge_band_demand::adjacent_rank_gap(
+        crate::layout::demand::band::adjacent_rank_gap(
             a,
             b,
             &layer_ids,
@@ -176,20 +177,20 @@ fn resolve_layer_x_gaps(
 
 /// 邻接对齐 / 重叠消除后重申水平 demand 缝（否则会被 `resolve_x_overlaps(NODE_GAP)` 压回）。
 pub(in super::super) fn enforce_horizontal_demand_gaps(
-    diagram: &Diagram,
+    facts: &ArchDiagramFacts,
     layers: &[Vec<String>],
     sizes: &HashMap<String, (f64, f64)>,
     nodes: &mut HashMap<String, NodeLayout>,
 ) {
-    let profile = crate::layout::edge_band_demand::EdgeBandDemandProfile::for_diagram(
-        diagram.diagram_type.clone(),
-        !diagram.groups.is_empty(),
+    let profile = crate::layout::demand::band::EdgeBandDemandProfile::for_diagram(
+        facts.diagram_type.clone(),
+        facts.has_groups,
     );
     if profile.horizontal_max_extra <= 0.0 {
         return;
     }
     let parallel_gap =
-        crate::layout::edge::segment_pair::parallel_gap_for_diagram(diagram.diagram_type.clone());
+        crate::layout::routing::segment_pair::parallel_gap_for_diagram(facts.diagram_type.clone());
     for layer in layers {
         if layer.len() < 2 {
             continue;
@@ -199,7 +200,7 @@ pub(in super::super) fn enforce_horizontal_demand_gaps(
             layer,
             &centers,
             sizes,
-            &diagram.relations,
+            &facts.relations,
             parallel_gap,
             profile,
         );
@@ -640,7 +641,7 @@ pub(in super::super) fn center_layer_on_anchor(
 
 /// 重叠消除后，将无组基础设施行重新绕上游锚点居中（仅调整 x）
 pub(in super::super) fn rebalance_infrastructure_layers(
-    diagram: &Diagram,
+    facts: &ArchDiagramFacts,
     graph: &GraphIndex,
     group_map: &GroupMap,
     layers: &[Vec<String>],
@@ -649,10 +650,10 @@ pub(in super::super) fn rebalance_infrastructure_layers(
     reversed: &HashSet<(String, String)>,
 ) {
     let parallel_gap =
-        crate::layout::edge::segment_pair::parallel_gap_for_diagram(diagram.diagram_type.clone());
-    let profile = crate::layout::edge_band_demand::EdgeBandDemandProfile::for_diagram(
-        diagram.diagram_type.clone(),
-        !diagram.groups.is_empty(),
+        crate::layout::routing::segment_pair::parallel_gap_for_diagram(facts.diagram_type.clone());
+    let profile = crate::layout::demand::band::EdgeBandDemandProfile::for_diagram(
+        facts.diagram_type.clone(),
+        facts.has_groups,
     );
     for layer in layers {
         if !is_infrastructure_layer(layer, group_map) {
@@ -677,7 +678,7 @@ pub(in super::super) fn rebalance_infrastructure_layers(
             layer,
             &centers,
             sizes,
-            &diagram.relations,
+            &facts.relations,
             parallel_gap,
             profile,
         );
@@ -832,7 +833,7 @@ pub(in super::super) fn align_nodes_to_neighbors(
 
 /// 计算 architecture 布局专用的中位数。
 ///
-/// **注意**:此实现与 `crate::layout::node::common::stats::median_f64` 有意不同:
+/// **注意**:此实现与 `crate::layout::engines::common::stats::median_f64` 有意不同:
 /// - 此处对输入内部排序(调用方传入无序的 in/out 邻居 center_x 混合切片)
 /// - 此处对偶数长度返回 `sorted[len/2]`(上中位元素),而非算术平均
 ///

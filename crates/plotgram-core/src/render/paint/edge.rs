@@ -1,7 +1,7 @@
 //! 通用边 SVG 绘制。
 
 use crate::ast::Relation;
-use crate::layout::edge::route_annotation::EdgeRouteAnnotation;
+use crate::layout::routing::route_annotation::EdgeRouteAnnotation;
 use crate::layout::EdgeLayout;
 use crate::render::color_queries::muted_text_color;
 use crate::render::paint::svg_utils::{

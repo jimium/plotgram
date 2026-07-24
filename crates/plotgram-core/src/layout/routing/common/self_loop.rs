@@ -4,7 +4,7 @@ use crate::ast::Relation;
 use crate::layout::edge_point;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
-use crate::layout::edge::common::edge_geometry::{build_edge_labels, node_center, parse_label_t, point_at_path_t};
+use crate::layout::routing::common::edge_geometry::{build_edge_labels, node_center, parse_label_t, point_at_path_t};
 
 /// 自环绘制风格
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

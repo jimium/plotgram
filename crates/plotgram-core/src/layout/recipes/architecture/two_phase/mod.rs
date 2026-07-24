@@ -5,7 +5,7 @@
 //!
 //! # 与通用分治框架的关系
 //!
-//! 本模块复用 [`crate::layout::node::common::divide_and_conquer`] 的
+//! 本模块复用 [`crate::layout::engines::common::divide_and_conquer`] 的
 //! `IntraLayout`、`GroupTree` 数据结构。组内布局的具体实现（含 hub 居中、
 //! client 对齐等特化优化）保留在本模块。未来 flowchart 分治布局将实现
 //! `IntraGroupLayouter` trait，共用同一套类型基础。
@@ -28,14 +28,14 @@ pub(super) use super::layout::coordinate::{
 pub(super) use super::layout::order::{build_layers, order_layers_group_aware};
 pub(super) use super::layout::postprocess::clamp_to_canvas;
 pub(super) use super::layout::rank::{assign_intra_ranks, assign_super_macro_ranks};
-pub(super) use super::layout::types::{GraphIndex, GroupMap};
+pub(super) use super::layout::types::{ArchDiagramFacts, GraphIndex, GroupMap};
 pub(super) use crate::ast::{Diagram, Group};
 pub(super) use crate::layout::algorithm_config::ArchitectureV2LayoutConfig;
 pub(super) use crate::layout::constants;
 pub(super) use crate::layout::group::constants::EPS;
-pub(super) use crate::layout::node::common::divide_and_conquer::{GroupTree, IntraLayout};
-pub(super) use crate::layout::node::common::edge_gutter::estimate_side_gutters_with_hierarchy;
-pub(super) use crate::layout::node::common::group_bounds::{
+pub(super) use crate::layout::engines::common::divide_and_conquer::{GroupTree, IntraLayout};
+pub(super) use crate::layout::engines::common::edge_gutter::estimate_side_gutters_with_hierarchy;
+pub(super) use crate::layout::engines::common::group_bounds::{
     compute_group_bounds, compute_group_bounds_with_side_gutters, container_padding_for_leaf,
     GroupPadding, SideGutter,
 };
@@ -124,7 +124,7 @@ pub(super) fn compute_two_phase_layout(
     // Phase D：默认用 asymmetric architecture_v2 壳；仅当 config 显式覆盖 group_padding 时退回 uniform
     let padding =
         if (layout_config.group_padding - constants::ARCH_V2_GROUP_PADDING).abs() < f64::EPSILON {
-            GroupPadding::architecture_v2()
+            GroupPadding::architecture()
         } else {
             GroupPadding::uniform(layout_config.group_padding, GROUP_LABEL_HEIGHT)
         };
@@ -347,7 +347,7 @@ mod tests {
         Identifier, Relation, SourceInfo, Span, TextValue,
     };
     use crate::layout::constants;
-    use crate::layout::node::architecture_v2::ArchitectureV2Layout;
+    use crate::layout::recipes::architecture::ArchitectureV2Layout;
     use crate::layout::LayoutStrategy;
     use crate::types::DiagramType;
 
@@ -517,7 +517,7 @@ mod tests {
         assert!(hive.y + hive.height < ch.y);
 
         // 所有组内节点在组框内（按 architecture_v2 非对称 padding）
-        let pad = GroupPadding::architecture_v2();
+        let pad = GroupPadding::architecture();
         for (gid, members) in [
             ("source", vec!["app_db", "log_server"]),
             ("process", vec!["kafka", "flink", "spark"]),
@@ -544,7 +544,7 @@ mod tests {
     #[test]
     fn group_frame_track_uniform_maps_to_equal_policy() {
         use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
-        use crate::layout::group_frame::{resolve_group_frame_spec, TrackSizing};
+        use crate::layout::group::frame::{resolve_group_frame_spec, TrackSizing};
 
         let d = etl_diagram_with_track(Some("uniform"));
         let spec = resolve_group_frame_spec(&d, "architecture");
@@ -562,7 +562,7 @@ mod tests {
     #[test]
     fn group_frame_track_fit_maps_to_fit_policy() {
         use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
-        use crate::layout::group_frame::{resolve_group_frame_spec, TrackSizing};
+        use crate::layout::group::frame::{resolve_group_frame_spec, TrackSizing};
 
         let d = etl_diagram_with_track(Some("fit"));
         assert_eq!(
@@ -575,7 +575,7 @@ mod tests {
     #[test]
     fn architecture_default_track_is_equal() {
         use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
-        use crate::layout::group_frame::{resolve_group_frame_spec, TrackSizing};
+        use crate::layout::group::frame::{resolve_group_frame_spec, TrackSizing};
 
         let d = etl_diagram_with_track(None);
         assert_eq!(

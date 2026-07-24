@@ -18,8 +18,8 @@ use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use crate::layout::algorithm_config::{CircularLayoutConfig, CIRCULAR_LAYOUT_OPTIONS};
 use crate::layout::kernel::recipe::LayoutRecipe;
-use crate::layout::node::common::group_bounds::{self, GroupPadding};
-use crate::layout::plan::ResolvedAlgoOptions;
+use crate::layout::engines::common::group_bounds::{self, GroupPadding};
+use crate::layout::pipeline::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, LayoutHints, LayoutResult, LayoutStrategy, NodeLayout};
 use common::{
     circle_radius_for_bcc, find_articulation_points, find_biconnected_components,

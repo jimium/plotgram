@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::ast::Diagram;
 use crate::layout::geometry::Point;
-use crate::layout::node::common::group_bounds::SideGutter;
+use crate::layout::engines::common::group_bounds::SideGutter;
 use crate::layout::{GroupLayout, LayoutResult};
 
 use super::border_shell::group_segment_violates_border_shell;

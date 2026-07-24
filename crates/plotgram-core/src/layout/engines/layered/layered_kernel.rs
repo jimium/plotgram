@@ -7,10 +7,10 @@
 
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
-use crate::layout::node::sugiyama_v2::graph;
-use crate::layout::node::sugiyama_v2::order;
-use crate::layout::node::sugiyama_v2::rank;
-use crate::layout::node::sugiyama_v2::preset::SugiyamaPreset;
+use crate::layout::engines::layered::graph;
+use crate::layout::engines::layered::order;
+use crate::layout::engines::layered::rank;
+use crate::layout::engines::layered::preset::SugiyamaPreset;
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::collections::{HashMap, HashSet};
 
@@ -24,6 +24,7 @@ use super::engine::{
 ///
 /// 由 [`LayeredKernel::compute`] 产出，供坐标求解阶段消费。
 /// 包含从 Diagram 到排序后分层图的全部中间状态。
+#[derive(Clone)]
 pub(in crate::layout) struct LayeredDraft {
     // ─── 图结构 ───
     /// DAG（节点权重 = entity_id 字符串）。
@@ -94,7 +95,7 @@ impl LayeredKernel {
             .collect();
 
         let is_standard = preset.node_sizing
-            == crate::layout::node::common::node_sizing::NodeSizing::Standard;
+            == crate::layout::engines::common::node_sizing::NodeSizing::Standard;
         let same_layer_edges: Vec<SameLayerEdge> =
             if is_standard && diagram.groups.is_empty() {
                 identify_same_layer_edges(&dag, &reversed_edge_ids)
@@ -107,7 +108,7 @@ impl LayeredKernel {
         // Step 4: Rank 分配（5 轮覆盖）
         let mut ranks = rank::assign_ranks_network_simplex_style(&dag);
         if preset.node_sizing
-            == crate::layout::node::common::node_sizing::NodeSizing::State
+            == crate::layout::engines::common::node_sizing::NodeSizing::State
         {
             apply_state_semantic_rank_constraints(&dag, &mut ranks, diagram);
         } else if is_standard {
@@ -205,7 +206,7 @@ fn build_node_group_map(
     layered_graph: &DiGraph<graph::LayerNode, ()>,
 ) -> HashMap<NodeIndex, Option<String>> {
     let node_to_top =
-        crate::layout::node::common::group_map::build_node_to_top_group(diagram);
+        crate::layout::engines::common::group_map::build_node_to_top_group(diagram);
 
     layered_graph
         .node_indices()

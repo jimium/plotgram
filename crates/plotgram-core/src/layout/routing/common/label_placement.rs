@@ -12,7 +12,7 @@
 
 use crate::layout::constants::DEFAULT_MAX_LABEL_ITERATIONS;
 use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
-use crate::layout::edge::common::edge_geometry::node_center;
+use crate::layout::routing::common::edge_geometry::node_center;
 use std::collections::HashMap;
 
 /// 标签避让上下文：提供节点与分组障碍信息
@@ -59,7 +59,7 @@ impl Default for AxisAlignedPlacer {
 
 impl LabelPlacer for AxisAlignedPlacer {
     fn place(&self, edges: &mut [EdgeLayout], ctx: &LabelContext) {
-        crate::layout::edge::common::label_avoidance::resolve_label_overlaps(
+        crate::layout::routing::common::label_avoidance::resolve_label_overlaps(
             edges,
             ctx.nodes,
             ctx.groups,
@@ -97,7 +97,7 @@ impl LabelPlacer for RadialPlacer {
         resolve_label_collisions_radial(edges, self.max_iterations, self.label_push_factor);
         push_labels_away_from_nodes_radial(edges, ctx.nodes, self.node_push_margin);
         // 候选打分 + 轴对齐推开：节点碰撞硬否决、标签-标签分离
-        crate::layout::edge::common::label_avoidance::resolve_label_overlaps(
+        crate::layout::routing::common::label_avoidance::resolve_label_overlaps(
             edges,
             ctx.nodes,
             ctx.groups,
@@ -245,7 +245,7 @@ fn separation_vector(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layout::edge::common::label_avoidance::{label_bbox, label_bbox_overlaps_group_shell};
+    use crate::layout::routing::common::label_avoidance::{label_bbox, label_bbox_overlaps_group_shell};
     use crate::layout::geometry::Point;
     use crate::layout::group::constants::GROUP_BORDER_SHELL_PAD;
     use crate::layout::{EdgeLabelLayout, EdgeLayout, GroupLayout, NodeLayout, PathGeometry, Port};

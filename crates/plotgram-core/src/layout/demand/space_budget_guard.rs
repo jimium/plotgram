@@ -4,10 +4,10 @@
 //! 消除两处复制并修复 R-4 行为差异(route_feedback 缺 repulse_edges_only)。
 
 use crate::ast::Diagram;
-use crate::layout::grid_snap::EdgeSnapConfig;
+use crate::layout::snap::grid_snap::EdgeSnapConfig;
 use crate::layout::post_route;
 use crate::layout::post_route::NODE_MOVE_REROUTE_EPS;
-use crate::layout::space_budget::{
+use crate::layout::demand::space_budget::{
     enforce_vertical_rank_gaps, has_node_aabb_overlaps, horizontal_gap_violations,
     node_group_scopes, resolve_residual_with_budget_and_ranks, reverse_relation_pairs, SpaceBudget,
 };

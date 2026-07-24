@@ -10,7 +10,7 @@ use petgraph::visit::EdgeRef;
 use std::collections::HashMap;
 
 use super::model::*;
-use crate::layout::node::sugiyama_v2::graph::{LayerNode, LayerNodeKind};
+use crate::layout::engines::layered::graph::{LayerNode, LayerNodeKind};
 
 /// 目标权重配置。
 pub(in crate::layout) struct ObjectiveWeights {

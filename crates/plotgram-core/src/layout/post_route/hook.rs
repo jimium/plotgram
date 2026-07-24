@@ -17,9 +17,9 @@ pub(crate) trait PostRouteHook {
         diagram: &Diagram,
         result: LayoutResult,
         router: &dyn EdgeRoutingStrategy,
-        gf_spec: &crate::layout::group_frame::GroupFrameSpec,
-        edge_snap_config: &crate::layout::grid_snap::EdgeSnapConfig,
-        leaf_pad: crate::layout::node::common::group_bounds::GroupPadding,
+        gf_spec: &crate::layout::group::frame::GroupFrameSpec,
+        edge_snap_config: &crate::layout::snap::grid_snap::EdgeSnapConfig,
+        leaf_pad: crate::layout::engines::common::group_bounds::GroupPadding,
     ) -> LayoutResult;
 }
 
@@ -32,9 +32,9 @@ impl PostRouteHook for NoopPostRouteHook {
         _diagram: &Diagram,
         result: LayoutResult,
         _router: &dyn EdgeRoutingStrategy,
-        _gf_spec: &crate::layout::group_frame::GroupFrameSpec,
-        _edge_snap_config: &crate::layout::grid_snap::EdgeSnapConfig,
-        _leaf_pad: crate::layout::node::common::group_bounds::GroupPadding,
+        _gf_spec: &crate::layout::group::frame::GroupFrameSpec,
+        _edge_snap_config: &crate::layout::snap::grid_snap::EdgeSnapConfig,
+        _leaf_pad: crate::layout::engines::common::group_bounds::GroupPadding,
     ) -> LayoutResult {
         result
     }
@@ -49,9 +49,9 @@ impl PostRouteHook for ArchitecturePostRouteHook {
         diagram: &Diagram,
         mut result: LayoutResult,
         router: &dyn EdgeRoutingStrategy,
-        gf_spec: &crate::layout::group_frame::GroupFrameSpec,
-        edge_snap_config: &crate::layout::grid_snap::EdgeSnapConfig,
-        leaf_pad: crate::layout::node::common::group_bounds::GroupPadding,
+        gf_spec: &crate::layout::group::frame::GroupFrameSpec,
+        edge_snap_config: &crate::layout::snap::grid_snap::EdgeSnapConfig,
+        leaf_pad: crate::layout::engines::common::group_bounds::GroupPadding,
     ) -> LayoutResult {
         let t_prs = crate::layout::perf::Instant::now();
         let prs_grew =
@@ -63,8 +63,8 @@ impl PostRouteHook for ArchitecturePostRouteHook {
                 .iter()
                 .map(|(id, n)| (id.clone(), (n.x, n.y)))
                 .collect();
-            crate::layout::group_frame::resolve_all_sibling_overlaps(gf_spec, diagram, &mut result);
-            let moved_nodes = crate::layout::space_budget_guard::diff_moved_nodes(
+            crate::layout::group::frame::resolve_all_sibling_overlaps(gf_spec, diagram, &mut result);
+            let moved_nodes = crate::layout::demand::space_budget_guard::diff_moved_nodes(
                 &pre_positions,
                 &result.nodes,
             );
@@ -73,15 +73,15 @@ impl PostRouteHook for ArchitecturePostRouteHook {
             }
         }
         let container_pad =
-            crate::layout::node::common::group_bounds::container_padding_for_leaf(leaf_pad);
-        crate::layout::group_frame::expand_groups_to_contain_contents(
+            crate::layout::engines::common::group_bounds::container_padding_for_leaf(leaf_pad);
+        crate::layout::group::frame::expand_groups_to_contain_contents(
             diagram,
             &mut result.groups,
             &result.nodes,
             leaf_pad,
             container_pad,
         );
-        crate::layout::grid_snap::update_canvas_bounds(
+        crate::layout::snap::grid_snap::update_canvas_bounds(
             &mut result,
             crate::layout::constants::DEFAULT_PADDING,
         );

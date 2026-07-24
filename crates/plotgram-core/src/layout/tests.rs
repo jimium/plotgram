@@ -2,8 +2,8 @@ use super::*;
 use crate::layout::geometry::Point;
 use crate::ast::{AttributeValue, Diagram, DiagramAttribute, Position, SourceInfo, Span, TextValue};
 use crate::layout::algorithm_config::SUGIYAMA_LAYOUT_OPTIONS;
-use crate::layout::edge::edge_routing_bezier::BEZIER_OPTIONS;
-use crate::layout::edge::edge_routing_orthogonal::ORTHOGONAL_OPTIONS;
+use crate::layout::routing::edge_routing_bezier::BEZIER_OPTIONS;
+use crate::layout::routing::edge_routing_orthogonal::ORTHOGONAL_OPTIONS;
 use crate::types::DiagramType;
 use crate::profile::profile_for;
 

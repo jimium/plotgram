@@ -5,10 +5,10 @@
 use crate::layout::constants::{
     ARCH_UNGROUPED_LABEL_PERP_OFFSET, DEFAULT_LABEL_PERP_OFFSET,
 };
-use crate::layout::edge::common::edge_geometry::{
+use crate::layout::routing::common::edge_geometry::{
     closest_point_in_arc_window, closest_point_on_path, point_at_path_t,
 };
-use crate::layout::edge::common::label_avoidance::{
+use crate::layout::routing::common::label_avoidance::{
     aabb_overlap, label_bbox_overlaps_group_shell, segment_vs_aabb_intersect,
 };
 use crate::layout::geometry::Point;
@@ -508,7 +508,7 @@ mod tests {
 
     #[test]
     fn bbox_from_center_contains_center() {
-        let (w, h) = crate::layout::edge::common::label_avoidance::label_metrics("ab");
+        let (w, h) = crate::layout::routing::common::label_avoidance::label_metrics("ab");
         let bbox = bbox_from_center(Point::new(10.0, 20.0), (w, h));
         assert!(bbox.0 <= 10.0 && bbox.2 >= 10.0);
         assert!(bbox.1 <= 20.0 && bbox.3 >= 20.0);

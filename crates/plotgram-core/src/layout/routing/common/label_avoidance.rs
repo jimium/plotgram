@@ -14,12 +14,12 @@
 //! 避障以 `(edge_idx, label_idx)` 为最小单元独立处理每个标签。
 
 use crate::layout::constants::*;
-use crate::layout::edge::common::edge_geometry::{closest_point_on_path, leader_anchor_on_path};
-use crate::layout::edge::common::label_candidate::{
+use crate::layout::routing::common::edge_geometry::{closest_point_on_path, leader_anchor_on_path};
+use crate::layout::routing::common::label_candidate::{
     place_all_labels_by_candidates, place_all_labels_by_candidates_with_config,
     LabelPlacementConfig,
 };
-use crate::layout::edge::common::label_common::sorted_node_obstacles;
+use crate::layout::routing::common::label_common::sorted_node_obstacles;
 use crate::layout::geometry::{Point, Rect};
 use crate::layout::group::constants::GROUP_BORDER_SHELL_PAD;
 use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
@@ -44,7 +44,7 @@ type LabelKey = (usize, usize);
 /// index 作为确定性代表，其余重复布局删除；不同文案仍各自保留。
 pub fn dedupe_labels_on_declared_merges(
     edges: &mut [EdgeLayout],
-    annotations: &crate::layout::edge::RouteAnnotationSet,
+    annotations: &crate::layout::routing::RouteAnnotationSet,
 ) {
     let mut groups: BTreeMap<(String, String), Vec<usize>> = BTreeMap::new();
     for ann in &annotations.edges {

@@ -15,7 +15,7 @@
 //! | 概念 | 职责 | 输入 → 输出 |
 //! |------|------|------------|
 //! | `LayoutRecipe` | 整图节点布局 | Diagram → LayoutResult |
-//! | `CoordinateSolveStep` | 坐标求解步骤 | CoordinateProblem → 坐标 |
+//! | `CoordinateKernel` | 坐标求解入口 | CoordinateProblem → 坐标 + 审计 |
 //! | `coordinate::optimizer` | 纯求解器 | CoordinateProblem → SolverResult |
 //!
 //! ## 设计原则

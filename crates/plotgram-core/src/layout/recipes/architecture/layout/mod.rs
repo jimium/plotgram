@@ -8,11 +8,13 @@
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::{ArchitectureV2LayoutConfig, ARCHITECTURE_V2_LAYOUT_OPTIONS};
 use crate::layout::kernel::recipe::LayoutRecipe;
-use crate::layout::node::common::node_sizing;
-use crate::layout::plan::ResolvedAlgoOptions;
+use crate::layout::engines::common::node_sizing;
+use crate::layout::pipeline::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeAlignConfig};
 use crate::types::DiagramType;
 use std::collections::{HashMap, HashSet};
+
+use super::layout::types::ArchDiagramFacts;
 
 pub(in super::super) mod acyclic;
 pub(in super::super) mod constants;
@@ -81,77 +83,46 @@ struct ArchitectureRecipe {
     config: ArchitectureV2LayoutConfig,
 }
 
-/// 架构图问题 IR。
-enum ArchProblem {
-    Empty,
-    /// 无 group：全局 Sugiyama 路径
-    Flat,
-    /// 有 group：two_phase 路径
-    Hierarchical,
+/// 架构图问题 IR：包含 flat 路径所需的全部中间数据。
+struct ArchProblem {
+    /// 图级事实（解耦 Diagram）
+    facts: ArchDiagramFacts,
+    /// 图索引
+    graph: types::GraphIndex,
+    /// 分组映射
+    group_map: types::GroupMap,
+    /// 节点尺寸
+    sizes: HashMap<String, (f64, f64)>,
+    /// 被 FAS 反转的边
+    reversed_edges: HashSet<(String, String)>,
+    /// 排序后的层
+    ordered_layers: Vec<Vec<String>>,
+    /// rank 映射
+    ranks: HashMap<String, usize>,
+    /// 是否有顶层 group（走 two_phase）
+    hierarchical: bool,
+}
+
+/// 架构图求解结果。
+struct ArchSolution {
+    nodes: HashMap<String, crate::layout::NodeLayout>,
+    solved_problem: Option<crate::layout::kernel::coordinate::model::CoordinateProblem>,
+    /// 保留 problem 中的元数据供 product 使用
+    ordered_layers: Vec<Vec<String>>,
+    ranks: HashMap<String, usize>,
+    sizes: HashMap<String, (f64, f64)>,
 }
 
 impl LayoutRecipe for ArchitectureRecipe {
     type Problem = ArchProblem;
-    type Solution = LayoutResult;
+    type Solution = ArchSolution;
 
     fn name(&self) -> &'static str {
         "architecture"
     }
 
     fn compile(&self, diagram: &Diagram) -> ArchProblem {
-        if diagram.entities.is_empty() {
-            return ArchProblem::Empty;
-        }
-        let group_map = types::build_group_map(diagram);
-        if group_map.top_groups.is_empty() {
-            ArchProblem::Flat
-        } else {
-            ArchProblem::Hierarchical
-        }
-    }
-
-    fn solve(&self, problem: &ArchProblem) -> LayoutResult {
-        // solve 需要 diagram，但 trait 签名只给 problem。
-        // 架构图的 solve 是“占位”的，实际逻辑在 execute 中完成。
-        match problem {
-            ArchProblem::Empty => LayoutResult {
-                nodes: HashMap::new(),
-                groups: HashMap::new(),
-                edges: vec![],
-                total_width: self.config.padding * 2.0,
-                total_height: self.config.padding * 2.0,
-                hints: Default::default(),
-            },
-            _ => LayoutResult {
-                nodes: HashMap::new(),
-                groups: HashMap::new(),
-                edges: vec![],
-                total_width: 0.0,
-                total_height: 0.0,
-                hints: Default::default(),
-            },
-        }
-    }
-
-    fn product(&self, solution: &LayoutResult, _diagram: &Diagram) -> LayoutResult {
-        solution.clone()
-    }
-
-    /// 覆盖默认编排：架构图的 compile/solve/product 拆分不够自然，
-    /// 直接在 execute 中完成完整流程。
-    fn execute(&self, diagram: &Diagram) -> LayoutResult {
-        let config = self.config;
-        if diagram.entities.is_empty() {
-            return LayoutResult {
-                nodes: HashMap::new(),
-                groups: HashMap::new(),
-                edges: vec![],
-                total_width: config.padding * 2.0,
-                total_height: config.padding * 2.0,
-                hints: Default::default(),
-            };
-        }
-
+        let facts = ArchDiagramFacts::from_diagram(diagram);
         let sizes = node_sizing::standard_node_sizes(diagram);
         let mut graph = types::GraphIndex::build(diagram);
         let group_map = types::build_group_map(diagram);
@@ -169,17 +140,9 @@ impl LayoutRecipe for ArchitectureRecipe {
             .collect();
         let reversed_edges = acyclic::find_edges_to_reverse(&graph, &constraint_set);
 
-        if !group_map.top_groups.is_empty() {
-            return super::two_phase::compute_two_phase_layout(
-                diagram,
-                &graph,
-                &group_map,
-                &sizes,
-                &reversed_edges,
-                config,
-            );
-        }
+        let hierarchical = !group_map.top_groups.is_empty();
 
+        // flat 路径：rank → order
         let ranks = rank::assign_ranks_group_aware(diagram, &graph, &group_map, &reversed_edges, &constraint_set);
         let decl_index = crate::layout::decl_order::entity_sibling_decl_index(diagram);
         let layers = order::build_layers(&ranks, &decl_index);
@@ -190,25 +153,51 @@ impl LayoutRecipe for ArchitectureRecipe {
             &reversed_edges,
             &decl_index,
         );
-        let (mut nodes, solved_problem) = coordinate::assign_coordinates(
-            diagram,
-            &graph,
-            &group_map,
-            &ordered_layers,
-            &sizes,
-            &reversed_edges,
+
+        ArchProblem {
+            facts,
+            graph,
+            group_map,
+            sizes,
+            reversed_edges,
+            ordered_layers,
+            ranks,
+            hierarchical,
+        }
+    }
+
+    fn solve(&self, problem: &ArchProblem) -> ArchSolution {
+        let (nodes, solved_problem) = coordinate::assign_coordinates(
+            &problem.facts,
+            &problem.graph,
+            &problem.group_map,
+            &problem.ordered_layers,
+            &problem.sizes,
+            &problem.reversed_edges,
         );
+        ArchSolution {
+            nodes,
+            solved_problem,
+            ordered_layers: problem.ordered_layers.clone(),
+            ranks: problem.ranks.clone(),
+            sizes: problem.sizes.clone(),
+        }
+    }
 
-        super::layout::postprocess::clamp_to_canvas(&mut nodes, &sizes);
+    fn product(&self, solution: &ArchSolution, diagram: &Diagram) -> LayoutResult {
+        let ArchSolution { nodes, solved_problem, ordered_layers, ranks, sizes } = solution;
+        let mut nodes = nodes.clone();
 
-        let (total_width, total_height) = crate::layout::node::common::canvas_bounds::canvas_size(
+        postprocess::clamp_to_canvas(&mut nodes, sizes);
+
+        let (total_width, total_height) = crate::layout::engines::common::canvas_bounds::canvas_size(
             &nodes,
             &HashMap::new(),
             constants::PADDING,
         );
 
-        let mut space_budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
-        space_budget.enrich_adjacent_rank_demand(&ordered_layers, &nodes, diagram);
+        let mut space_budget = crate::layout::demand::space_budget::SpaceBudget::from_diagram(diagram);
+        space_budget.enrich_adjacent_rank_demand(ordered_layers, &nodes, diagram);
 
         LayoutResult {
             nodes,
@@ -218,12 +207,45 @@ impl LayoutRecipe for ArchitectureRecipe {
             total_height,
             hints: crate::layout::LayoutHints {
                 edge_routing_style: crate::layout::EdgeRoutingStyle::Orthogonal,
-                sugiyama_ranks: Some(ranks),
+                sugiyama_ranks: Some(ranks.clone()),
                 space_budget: Some(space_budget),
-                coordinate_problem: solved_problem.map(Box::new),
+                coordinate_problem: solved_problem.clone().map(Box::new),
                 ..Default::default()
             },
         }
+    }
+
+    fn execute(&self, diagram: &Diagram) -> LayoutResult {
+        let config = self.config;
+        if diagram.entities.is_empty() {
+            return LayoutResult {
+                nodes: HashMap::new(),
+                groups: HashMap::new(),
+                edges: vec![],
+                total_width: config.padding * 2.0,
+                total_height: config.padding * 2.0,
+                hints: Default::default(),
+            };
+        }
+
+        // compile
+        let problem = self.compile(diagram);
+
+        // 有 group：委托 two_phase
+        if problem.hierarchical {
+            return super::two_phase::compute_two_phase_layout(
+                diagram,
+                &problem.graph,
+                &problem.group_map,
+                &problem.sizes,
+                &problem.reversed_edges,
+                config,
+            );
+        }
+
+        // 标准生命周期：solve → product
+        let solution = self.solve(&problem);
+        self.product(&solution, diagram)
     }
 }
 

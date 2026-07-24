@@ -3,7 +3,7 @@
 use std::fmt::Write as FmtWrite;
 
 use crate::ast::*;
-use crate::layout::node::sequence::LIFELINE_MESSAGE_GAP_HALF;
+use crate::layout::recipes::sequence::LIFELINE_MESSAGE_GAP_HALF;
 use crate::layout::{EdgeLayout, NodeLayout};
 use crate::render::paint::node::paint_rect_header;
 use crate::render::paint::style_mapping::{edge_paint_attrs, node_style_from_attributes, edge_style_from_attributes};

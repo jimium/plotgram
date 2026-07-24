@@ -14,7 +14,7 @@ pub(crate) fn phase_sanitize(
     grid: &SegmentGrid,
     parallel_gap: f64,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
-    annotations: Option<&crate::layout::edge::RouteAnnotationSet>,
+    annotations: Option<&crate::layout::routing::RouteAnnotationSet>,
     nodes: Option<&HashMap<String, NodeLayout>>,
     sorted_node_ids: Option<&[String]>,
 ) {

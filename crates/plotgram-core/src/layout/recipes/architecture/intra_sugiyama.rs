@@ -4,8 +4,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::ast::{Diagram, DiagramAttribute, Entity, Relation};
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
-use crate::layout::node::common::divide_and_conquer::IntraLayout;
-use crate::layout::node::sugiyama_v2::{engine, preset};
+use crate::layout::engines::common::divide_and_conquer::IntraLayout;
+use crate::layout::engines::layered::{engine, preset};
 use crate::layout::NodeLayout;
 
 /// 构建仅含 members 的子 Diagram，并调用 sugiyama_v2 `ARCHITECTURE_PRESET`。

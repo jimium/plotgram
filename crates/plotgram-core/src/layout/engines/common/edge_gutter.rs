@@ -3,13 +3,13 @@
 use std::collections::BTreeMap;
 
 use crate::ast::Diagram;
-use crate::layout::edge::common::label_avoidance::estimate_label_width;
+use crate::layout::routing::common::label_avoidance::estimate_label_width;
 use crate::layout::group::constants::{GROUP_BORDER_SHELL_PAD, PORT_STUB_CLEARANCE};
 use crate::layout::group::hierarchy::{
     ancestor_set_excluding_self, build_group_hierarchy, lowest_common_ancestor, GroupHierarchy,
 };
 use crate::layout::group::constants::EPS;
-use crate::layout::node::common::group_bounds::{GutterSide, SideGutter};
+use crate::layout::engines::common::group_bounds::{GutterSide, SideGutter};
 use crate::layout::demand::CORRIDOR_LANE_PITCH;
 use crate::layout::{GroupLayout, NodeLayout};
 use std::collections::HashMap;
@@ -269,7 +269,7 @@ fn exit_side_weights(
 mod tests {
     use super::*;
     use crate::ast::{ArrowType, AttributeMap, Diagram, Entity, Group, Identifier, Relation, Span};
-    use crate::layout::node::common::group_bounds::{compute_group_bounds, GroupPadding};
+    use crate::layout::engines::common::group_bounds::{compute_group_bounds, GroupPadding};
     use crate::types::DiagramType;
 
     fn span() -> Span {
@@ -373,7 +373,7 @@ mod tests {
                 },
             ),
         ]);
-        let pad = GroupPadding::architecture_v2();
+        let pad = GroupPadding::architecture();
         let base_groups = compute_group_bounds(&diagram, &nodes, pad);
         let gutters = estimate_side_gutters_with_hierarchy(&diagram, &nodes, &base_groups);
         let cloud = gutters.get("cloud").copied().unwrap_or_default();
@@ -476,7 +476,7 @@ mod tests {
                 },
             ),
         ]);
-        let pad = GroupPadding::architecture_v2();
+        let pad = GroupPadding::architecture();
         let base = compute_group_bounds(&diagram, &nodes, pad);
         let a = estimate_side_gutters_with_hierarchy(&diagram, &nodes, &base);
         let b = estimate_side_gutters_with_hierarchy(&diagram, &nodes, &base);

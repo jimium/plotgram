@@ -3,7 +3,7 @@
     use crate::ast::{ArrowType, AttributeValue};
     use crate::layout::geometry::Point;
     use crate::layout::NodeLayout;
-    use crate::layout::edge::common::test_fixtures::make_diagram_with_layout;
+    use crate::layout::routing::common::test_fixtures::make_diagram_with_layout;
     use crate::layout::group::GroupRoutingContext;
 
     fn test_group_ctx(
@@ -121,7 +121,7 @@
                 let (ref ta, ba) = bboxes[i];
                 let (ref tb, bb) = bboxes[j];
                 assert!(
-                    crate::layout::edge::common::label_avoidance::aabb_overlap(&ba, &bb).is_none(),
+                    crate::layout::routing::common::label_avoidance::aabb_overlap(&ba, &bb).is_none(),
                     "labels '{ta}' and '{tb}' overlap: {ba:?} vs {bb:?}"
                 );
             }
@@ -1182,7 +1182,7 @@
     /// 无关边（不同源、不同宿、不同无向对）→ 不同 key → 不同组 ↔ `edges_may_share_trunk == false`
     #[test]
     fn slot_bundling_key_aligns_with_merge_policy() {
-        use crate::layout::edge::edge_merge_policy::{edges_may_share_trunk, edge_merge_context};
+        use crate::layout::routing::edge_merge_policy::{edges_may_share_trunk, edge_merge_context};
         use crate::types::DiagramType as DT;
         use crate::ast::{ArrowType, AttributeMap, Identifier, Relation, Span};
 
@@ -1249,14 +1249,14 @@
             prepared.layout_plan(),
         )
         .expect("layout");
-        let lint_result = crate::layout::lint::lint_layout(prepared.inner(), &layout);
+        let lint_result = crate::layout::quality::lint::lint_layout(prepared.inner(), &layout);
         let unrelated = lint_result
             .violations
             .iter()
             .filter(|v| {
                 matches!(
                     v.rule,
-                    crate::layout::lint::LintRuleId::UnrelatedEdgeTrunkMerge
+                    crate::layout::quality::lint::LintRuleId::UnrelatedEdgeTrunkMerge
                 )
             })
             .count();
@@ -1470,7 +1470,7 @@
         .expect("layout");
         let relations = &prepared.inner().relations;
         let min_gap = crate::layout::constants::ORTHO_PARALLEL_GAP
-            .max(crate::layout::edge::edge_routing_orthogonal::COMPACT_SLOT_PITCH);
+            .max(crate::layout::routing::edge_routing_orthogonal::COMPACT_SLOT_PITCH);
 
         for (a, b, lower) in [("auth", "db", "db"), ("auth", "cache", "cache")] {
             let i = relations

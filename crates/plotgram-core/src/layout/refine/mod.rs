@@ -137,17 +137,17 @@ pub fn run_refine(
         push::push_problem_nodes(&mut result, &metrics, config, &mut momentum);
         // 空间契约：refine 候选若压穿相邻 rank 层缝，整轮拒绝。
         // 不在反馈循环里“再推一次节点”修补，否则路由评分看到的是二次改写后的布局。
-        let rank_scopes = crate::layout::space_budget::node_group_scopes(diagram);
+        let rank_scopes = crate::layout::demand::space_budget::node_group_scopes(diagram);
         let no_reverse_pairs = HashSet::new();
         let budget = result
             .hints
             .space_budget
             .clone()
-            .unwrap_or_else(|| crate::layout::space_budget::SpaceBudget::from_diagram(diagram));
+            .unwrap_or_else(|| crate::layout::demand::space_budget::SpaceBudget::from_diagram(diagram));
         // Phase B: 所有图类型使用 solver，节点已冻结，不再执行 enforce_horizontal_gaps
         let rank_contract_broken = result.hints.sugiyama_ranks.as_ref().is_some_and(|ranks| {
             let mut before_probe = pre_push_nodes.clone();
-            let before: HashSet<String> = crate::layout::space_budget::enforce_vertical_rank_gaps(
+            let before: HashSet<String> = crate::layout::demand::space_budget::enforce_vertical_rank_gaps(
                 &mut before_probe,
                 &budget,
                 ranks,
@@ -157,7 +157,7 @@ pub fn run_refine(
             .into_iter()
             .collect();
             let mut after_probe = result.nodes.clone();
-            let after: HashSet<String> = crate::layout::space_budget::enforce_vertical_rank_gaps(
+            let after: HashSet<String> = crate::layout::demand::space_budget::enforce_vertical_rank_gaps(
                 &mut after_probe,
                 &budget,
                 ranks,
@@ -177,7 +177,7 @@ pub fn run_refine(
         // - after 穿组 → 恢复旧几何（无论 before 是否已穿；穿组修复交给 fallback）
         // - after 不穿组 → 保留（允许从穿组改善到避组）
         let group_maps = (!result.groups.is_empty())
-            .then(|| crate::layout::lint::GroupInteriorMaps::new(diagram));
+            .then(|| crate::layout::quality::lint::GroupInteriorMaps::new(diagram));
         let mut preserve_edges: std::collections::HashMap<usize, crate::layout::EdgeLayout> =
             std::collections::HashMap::new();
         if group_maps.is_some() {
@@ -194,7 +194,7 @@ pub fn run_refine(
             let mut restored: Vec<usize> = preserve_edges.keys().copied().collect();
             restored.sort_unstable();
             for ei in restored {
-                if crate::layout::lint::edge_crosses_group_interior_with_maps(
+                if crate::layout::quality::lint::edge_crosses_group_interior_with_maps(
                     diagram, &result, ei, maps,
                 ) {
                     if let Some(old) = preserve_edges.remove(&ei) {
@@ -233,9 +233,9 @@ pub fn run_refine(
         fallback_edges.extend(info.edge_indices.iter().copied());
     }
     if !result.groups.is_empty() {
-        let maps = crate::layout::lint::GroupInteriorMaps::new(diagram);
+        let maps = crate::layout::quality::lint::GroupInteriorMaps::new(diagram);
         for edge_index in 0..result.edges.len() {
-            if crate::layout::lint::edge_crosses_group_interior_with_maps(
+            if crate::layout::quality::lint::edge_crosses_group_interior_with_maps(
                 diagram, &result, edge_index, &maps,
             ) {
                 fallback_edges.insert(edge_index);
@@ -259,8 +259,8 @@ fn count_group_interior_edges(diagram: &Diagram, result: &LayoutResult) -> usize
         return 0;
     }
     // 与 lint / collinear 一致：按 (边, 无关组) 违规条数计。
-    let report = crate::layout::lint::lint_layout(diagram, result);
-    crate::layout::lint::LintMetricsSummary::from_report(&report).edge_crosses_group_interior
+    let report = crate::layout::quality::lint::lint_layout(diagram, result);
+    crate::layout::quality::lint::LintMetricsSummary::from_report(&report).edge_crosses_group_interior
 }
 
 /// 与 lint `edge_through_node` 对齐：跳过端点 stub 段，全尺寸节点相交。
@@ -388,7 +388,7 @@ pub fn separate_trunk_overlaps_post_route(diagram: &Diagram, result: &mut Layout
     let entry_through = collect_lint_through_edge_indices(diagram, result).len();
     let entry_group = count_group_interior_edges(diagram, result);
     let snapshot = result.clone();
-    let sep = crate::layout::edge::edge_routing_orthogonal::separate_unrelated_trunk_overlaps_post_route(
+    let sep = crate::layout::routing::edge_routing_orthogonal::separate_unrelated_trunk_overlaps_post_route(
         diagram, result,
     );
     if sep == 0 {
@@ -417,9 +417,9 @@ fn collect_lint_group_interior_edge_indices(
     if result.groups.is_empty() {
         return out;
     }
-    let maps = crate::layout::lint::GroupInteriorMaps::new(diagram);
+    let maps = crate::layout::quality::lint::GroupInteriorMaps::new(diagram);
     for edge_index in 0..result.edges.len() {
-        if crate::layout::lint::edge_crosses_group_interior_with_maps(
+        if crate::layout::quality::lint::edge_crosses_group_interior_with_maps(
             diagram, result, edge_index, &maps,
         ) {
             out.insert(edge_index);

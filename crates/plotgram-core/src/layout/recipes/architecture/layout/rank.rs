@@ -209,7 +209,7 @@ pub(in super::super) fn assign_super_macro_ranks(
     // 这确保 sink 节点（如 data_ns）不会被错误地分配到 rank 0。
     let mut sorted_supers: Vec<String> = all_supers.iter().cloned().collect();
     sorted_supers.sort();
-    let mut super_reversed = crate::layout::node::common::acyclic::greedy_fas(&sorted_supers, &super_out, &super_in);
+    let mut super_reversed = crate::layout::engines::common::acyclic::greedy_fas(&sorted_supers, &super_out, &super_in);
     // 约束边永不被反转：从 FAS 结果中剔除约束 super-edge
     super_reversed.retain(|e| !constraint_super_edges.contains(e));
     super_reversed.extend(pre_reversed);

@@ -14,7 +14,7 @@
 
 use super::*;
 use crate::ast::Relation;
-use crate::layout::edge::common::parallel_edges::build_parallel_aware_edge_labels_auto;
+use crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels_auto;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
 use std::collections::{BTreeMap, HashMap};
@@ -116,7 +116,7 @@ fn segment_hits_node(
             {
                 continue;
             }
-            if crate::layout::edge::common::geom_obstacle::segment_pierces_node(
+            if crate::layout::routing::common::geom_obstacle::segment_pierces_node(
                 a, b, nl, node_pad,
             ) {
                 return true;
@@ -235,7 +235,7 @@ pub fn enforce_reverse_pair_min_gap(
     relations: &[Relation],
     min_gap: f64,
 ) -> usize {
-    use crate::layout::edge::common::edge_geometry::{canonical_pair, undirected_pair_key};
+    use crate::layout::routing::common::edge_geometry::{canonical_pair, undirected_pair_key};
 
     let n = edges.len().min(relations.len());
     if n < 2 || min_gap <= EPS {
@@ -385,7 +385,7 @@ pub fn enforce_reverse_pair_dock_separation(
     to_side: &[Port],
     min_gap: f64,
 ) -> usize {
-    use crate::layout::edge::common::edge_geometry::{canonical_pair, undirected_pair_key};
+    use crate::layout::routing::common::edge_geometry::{canonical_pair, undirected_pair_key};
 
     let n = edges.len().min(relations.len());
     if n < 2 || min_gap <= EPS {
@@ -828,7 +828,7 @@ pub fn separate_unrelated_trunk_overlaps(
     min_gap: f64,
     profile: &super::OrthoRoutingProfile,
 ) -> usize {
-    use crate::layout::edge::edge_merge_policy::{edge_merge_context, edges_may_share_trunk};
+    use crate::layout::routing::edge_merge_policy::{edge_merge_context, edges_may_share_trunk};
 
     let n = edges.len();
     if n < 2 {
@@ -914,7 +914,7 @@ pub fn separate_unrelated_trunk_overlaps_post_route(
     diagram: &crate::ast::Diagram,
     result: &mut crate::layout::LayoutResult,
 ) -> usize {
-    use crate::layout::edge::segment_pair::{
+    use crate::layout::routing::segment_pair::{
         find_needs_separation_edge_pairs, SeparationReason,
     };
     if diagram.diagram_type != crate::types::DiagramType::Architecture {
@@ -928,7 +928,7 @@ pub fn separate_unrelated_trunk_overlaps_post_route(
     if pairs.is_empty() {
         return 0;
     }
-    let min_gap = crate::layout::edge::parallel_gap_for_diagram(diagram.diagram_type.clone());
+    let min_gap = crate::layout::routing::parallel_gap_for_diagram(diagram.diagram_type.clone());
     let node_pad = NODE_OBSTACLE_PAD;
     let from_side: Vec<Port> = result.edges.iter().map(|e| e.from_port).collect();
     let to_side: Vec<Port> = result.edges.iter().map(|e| e.to_port).collect();
@@ -937,7 +937,7 @@ pub fn separate_unrelated_trunk_overlaps_post_route(
 
     // crossing-neutral 守卫：贪婪 pairwise nudge 可能把 gutter bundle 推得互相交叉。
     // 每对分离前快照两条边，分离后若总交叉上升则回退（不计入 separated）。
-    let mut baseline_cross = crate::layout::lint::count_edge_crossings(result);
+    let mut baseline_cross = crate::layout::quality::lint::count_edge_crossings(result);
 
     let mut separated = 0usize;
     for (i, j) in pairs {
@@ -976,7 +976,7 @@ pub fn separate_unrelated_trunk_overlaps_post_route(
         if !sep {
             continue;
         }
-        let new_cross = crate::layout::lint::count_edge_crossings(result);
+        let new_cross = crate::layout::quality::lint::count_edge_crossings(result);
         if new_cross > baseline_cross {
             // 本对偏移制造了新交叉，回退两条边。
             result.edges[i] = snap_i;

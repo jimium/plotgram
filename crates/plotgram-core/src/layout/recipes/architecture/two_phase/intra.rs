@@ -69,7 +69,7 @@ pub(super) fn layout_intra_group(
         order_layers_group_aware(graph, &intra_map, &layers, reversed, &decl_index);
 
     let member_set: HashSet<String> = members.iter().cloned().collect();
-    let space_budget = crate::layout::space_budget::SpaceBudget::from_diagram(diagram);
+    let space_budget = crate::layout::demand::space_budget::SpaceBudget::from_diagram(diagram);
     let mut nodes = solve_intra_coordinates(
         graph,
         &ordered_layers,
@@ -475,7 +475,7 @@ pub(super) fn layout_ungrouped_cluster(
         &synthetic_group_map("@ungrouped", members),
         &member_set,
         reversed,
-        Some(&crate::layout::space_budget::SpaceBudget::from_diagram(diagram)),
+        Some(&crate::layout::demand::space_budget::SpaceBudget::from_diagram(diagram)),
     );
     normalize_to_origin(&mut nodes);
     let (content_width, content_height) = content_bbox(&nodes);
@@ -513,16 +513,15 @@ fn solve_intra_coordinates(
     group_map: &GroupMap,
     member_set: &HashSet<String>,
     reversed: &HashSet<(String, String)>,
-    budget: Option<&crate::layout::space_budget::SpaceBudget>,
+    budget: Option<&crate::layout::demand::space_budget::SpaceBudget>,
 ) -> HashMap<String, NodeLayout> {
-    use crate::layout::kernel::coordinator::LayoutCoordinator;
-    use crate::layout::kernel::coordinator::ArchitectureRecipeAdapter;
+    use crate::layout::kernel::coordinator::CoordinateKernel;
     use super::intra_builder::build_intra_coordinate_problem;
 
     let build_output = build_intra_coordinate_problem(
         layers, sizes, graph, group_map, member_set, reversed, budget,
     );
-    let result = LayoutCoordinator::run(&ArchitectureRecipeAdapter, &build_output.problem);
+    let result = CoordinateKernel::solve("architecture-intra", &build_output.problem);
 
     // 计算层 Y 偏移（与旧逻辑一致）
     let layer_heights: Vec<f64> = layers
@@ -583,7 +582,7 @@ pub(super) fn assign_coordinates_intra(
     layers: &[Vec<String>],
     sizes: &HashMap<String, (f64, f64)>,
     member_set: &HashSet<String>,
-    budget: Option<&crate::layout::space_budget::SpaceBudget>,
+    budget: Option<&crate::layout::demand::space_budget::SpaceBudget>,
     reversed: &HashSet<(String, String)>,
 ) -> HashMap<String, NodeLayout> {
     let mut nodes = HashMap::new();

@@ -7,7 +7,7 @@ use crate::layout::kernel::coordinate::model::{
 };
 use crate::layout::kernel::coordinate::optimizer::solve;
 use crate::layout::refine::{run_refine, RefineConfig};
-use crate::layout::space_budget::{
+use crate::layout::demand::space_budget::{
     enforce_vertical_rank_gaps, node_group_scopes,
     reverse_relation_pairs, SpaceBudget,
 };
@@ -112,10 +112,10 @@ impl<'a> LayoutRouteFeedback<'a> {
 
         // S3：仅当水平缝仍违反契约时才兜底推开 + 增量重路由 + repulse
         // (R-4:与 pipeline.rs S3 兜底保持一致,含 repulse_edges_only；snap 配置与 pipeline 对齐)
-        let (routed, moved) = crate::layout::space_budget_guard::resolve_budget_violations(
+        let (routed, moved) = crate::layout::demand::space_budget_guard::resolve_budget_violations(
             self.diagram, routed,
         );
-        let mut routed = crate::layout::space_budget_guard::reroute_and_repulse(
+        let mut routed = crate::layout::demand::space_budget_guard::reroute_and_repulse(
             self.diagram, routed, router, &moved, edge_snap_config,
         );
 

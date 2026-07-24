@@ -9,7 +9,7 @@ use crate::ast::Diagram;
 use crate::types::DiagramType;
 use crate::layout::algorithm_config::{MindmapLayoutConfig, MINDMAP_LAYOUT_OPTIONS};
 use crate::layout::kernel::recipe::LayoutRecipe;
-use crate::layout::plan::ResolvedAlgoOptions;
+use crate::layout::pipeline::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeLayout};
 use std::collections::HashMap;
 use unicode_width::UnicodeWidthStr;
@@ -375,7 +375,7 @@ fn detect_and_fix_overlaps(
         return;
     }
 
-    use crate::layout::node::common::overlap::{
+    use crate::layout::engines::common::overlap::{
         BruteForceResolver, OverlapConfig, OverlapResolver,
     };
 
@@ -817,6 +817,7 @@ fn mindmap_solver_optimize(
         objectives,
         initial: InitialCoordinates { values: initial_values },
         config: CoordinateSolverConfig::default(),
+        axis: Default::default(),
     };
 
     // 4. Solve + 回写

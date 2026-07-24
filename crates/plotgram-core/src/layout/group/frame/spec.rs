@@ -4,8 +4,8 @@
 
 use crate::ast::{AttributeValue, Diagram};
 use crate::layout::constants::SUGIYAMA_GROUP_PADDING;
-use crate::layout::grid_snap::diagram_snap_attribute;
-use crate::layout::node::common::group_bounds::GroupPadding;
+use crate::layout::snap::grid_snap::diagram_snap_attribute;
+use crate::layout::engines::common::group_bounds::GroupPadding;
 use crate::types::standard_attr_keys::diagram as dsl;
 use std::collections::HashMap;
 
@@ -423,7 +423,7 @@ fn resolve_architecture(diagram: &Diagram) -> GroupFrameSpec {
         track_sizing: TrackSizing::Equal,
         cross_align: CrossAlign::Center,
         gap: ARCH_GROUP_GAP,
-        padding: GroupPadding::architecture_v2(),
+        padding: GroupPadding::architecture(),
         border_align: BorderAlign::SharedLines,
         quantize: resolve_quantize(diagram),
     }
