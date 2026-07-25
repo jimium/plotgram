@@ -109,6 +109,36 @@ impl RoutingRecipe for OrthogonalRecipe {
         }
     }
 
+    /// Slice F2c：逐边 preserve 增量重解——draft.result.edges 已按声明序 seeded
+    ///（preserve 边携带 prev 冻结几何），`route_edges_orthogonal_inner` 的
+    /// incremental 分支据此仅重解 dirty 边。
+    fn solve_preserving(
+        &self,
+        draft: &Self::Draft<'_>,
+        preserve: &std::collections::HashSet<usize>,
+    ) -> Option<RecipeSolution> {
+        let routed = crate::layout::routing::edge_routing_orthogonal::route_orthogonal_inner(
+            draft.diagram,
+            draft.result.clone(),
+            self.config,
+            Some(preserve.clone()),
+        );
+
+        let n = routed.edges.len();
+        let solution = routed
+            .hints
+            .route_solution
+            .clone()
+            .unwrap_or_default();
+        // R12c：标签由 D-stage finalizer 统一构建（与 solve 一致）。
+        let label_plans: Vec<Option<super::EdgeLabelPlan>> = (0..n).map(|_| None).collect();
+
+        Some(RecipeSolution {
+            solution,
+            label_plans,
+        })
+    }
+
     fn finalize(
         &self,
         mut result: LayoutResult,

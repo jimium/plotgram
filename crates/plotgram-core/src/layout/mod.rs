@@ -95,7 +95,8 @@ pub use types::{
 pub use traits::{LayoutStrategy, RoutingProduct, RoutingRecipeDyn};
 pub use geometry_helpers::{styled_node_size, edge_point, ellipse_edge_point};
 pub use pipeline::entry::{
-    resolve_effective_direction, compute_layout, compute_layout_with_plan,
+    resolve_effective_direction, compute_layout, compute_layout_incremental,
+    compute_layout_with_plan,
     layout_option_specs, edge_routing_option_specs, applicable_layouts_for_type,
     applicable_routings_for_type, diagram_types_for_layout, diagram_types_for_routing,
     BUILTIN_DIAGRAM_TYPES,

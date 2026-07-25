@@ -34,7 +34,7 @@ use crate::layout::routing::common::edge_geometry::{
     build_edge_labels, cubic_bezier_point, point_at_path_t,
 };
 use crate::layout::routing::common::label_avoidance::{
-    dedupe_labels_on_declared_merges, resolve_label_overlaps_with_config,
+    aabb_overlap, dedupe_labels_on_declared_merges, resolve_label_overlaps_with_config,
 };
 use crate::layout::routing::common::label_candidate::LabelPlacementConfig;
 use crate::layout::routing::model::FrozenRouteGeometry;
@@ -79,11 +79,19 @@ pub struct LabelProblem<'a> {
     pub merge_annotations: Option<&'a RouteAnnotationSet>,
 }
 
-/// 标签冲突求解结果（doc16 §14.3）。
+/// 标签冲突求解结果（doc16 §14.3 / Slice F1.4）。
 #[derive(Debug, Clone, Default)]
 pub struct LabelAssignment {
-    /// 冲突消解后仍存在的 label-label 重叠数（0 = 全部消解）。
+    /// 冲突消解后仍存在的 label-label 重叠对数（0 = 全部消解），
+    /// 按固定 (edge_idx, label_idx) 序真实统计。
     pub conflicts_remaining: usize,
+    /// 显式退化清单：(edge_idx, reason)。残余 label-label 重叠 =
+    /// `"label_overlap_residual"`；标签仍压节点（无可行候选）=
+    /// `"label_node_overlap"`。按 edge_idx 升序、同边按 reason 先后序。
+    pub degraded: Vec<(usize, &'static str)>,
+    /// 最终标签状态的确定性指纹：中心量化 0.01px + 文案的 FNV-1a hash。
+    /// 同输入两次 solve 必须一致（单测钉死）。
+    pub signature: u64,
 }
 
 /// 冻结几何后的统一标签放置器 + 冲突求解器。
@@ -112,9 +120,15 @@ impl LabelSolver {
         if let Some(annotations) = problem.merge_annotations {
             dedupe_labels_on_declared_merges(problem.edges, annotations);
         }
-        // TODO(R10): 统计残余冲突数（当前 label_avoidance 内部已最大化消解）。
+        // Slice F1.4：按固定 (edge_idx, label_idx) 序真实统计残余冲突 +
+        // 显式退化清单 + 确定性 signature。
+        let (conflicts_remaining, degraded) =
+            audit_residual_conflicts(problem.edges, problem.nodes);
+        let signature = assignment_signature(problem.edges);
         LabelAssignment {
-            conflicts_remaining: 0,
+            conflicts_remaining,
+            degraded,
+            signature,
         }
     }
 
@@ -177,5 +191,185 @@ fn place_on_geometry(
         } => build_edge_labels(rel, plan.middle_t, plan.offset, |t| {
             cubic_bezier_point(*start, controls[0], controls[1], *end, t)
         }),
+    }
+}
+
+/// Slice F1.4：solve 后按固定 (edge_idx, label_idx) 序真实统计残余冲突。
+///
+/// 返回 (残余 label-label 重叠对数, 退化清单)。退化清单按 edge_idx 升序，
+/// 同一边同一 reason 只记一次；标签仍压节点 bbox 视为无可行候选。
+fn audit_residual_conflicts(
+    edges: &[EdgeLayout],
+    nodes: &HashMap<String, NodeLayout>,
+) -> (usize, Vec<(usize, &'static str)>) {
+    // 固定序收集所有非空标签 bbox：(edge_idx, bbox)。
+    let mut label_boxes: Vec<(usize, (f64, f64, f64, f64))> = Vec::new();
+    for (edge_idx, edge) in edges.iter().enumerate() {
+        for label in &edge.labels {
+            if label.text.is_empty() || label.size.0 <= 0.0 || label.size.1 <= 0.0 {
+                continue;
+            }
+            let (w, h) = label.size;
+            label_boxes.push((
+                edge_idx,
+                (
+                    label.center.x - w * 0.5,
+                    label.center.y - h * 0.5,
+                    label.center.x + w * 0.5,
+                    label.center.y + h * 0.5,
+                ),
+            ));
+        }
+    }
+
+    // 节点障碍按 id 排序（确定性，不依赖 HashMap 迭代序）。
+    let mut node_ids: Vec<&String> = nodes.keys().collect();
+    node_ids.sort();
+    let node_boxes: Vec<(f64, f64, f64, f64)> = node_ids
+        .iter()
+        .map(|id| {
+            let nl = &nodes[*id];
+            (nl.x, nl.y, nl.x + nl.width, nl.y + nl.height)
+        })
+        .collect();
+
+    let mut conflicts = 0usize;
+    let mut degraded: Vec<(usize, &'static str)> = Vec::new();
+    for i in 0..label_boxes.len() {
+        for j in (i + 1)..label_boxes.len() {
+            if aabb_overlap(&label_boxes[i].1, &label_boxes[j].1).is_some() {
+                conflicts += 1;
+                for &(edge_idx, _) in [&label_boxes[i], &label_boxes[j]] {
+                    if !degraded.contains(&(edge_idx, "label_overlap_residual")) {
+                        degraded.push((edge_idx, "label_overlap_residual"));
+                    }
+                }
+            }
+        }
+        for nb in &node_boxes {
+            if aabb_overlap(&label_boxes[i].1, nb).is_some() {
+                let entry = (label_boxes[i].0, "label_node_overlap");
+                if !degraded.contains(&entry) {
+                    degraded.push(entry);
+                }
+                break;
+            }
+        }
+    }
+    degraded.sort();
+    (conflicts, degraded)
+}
+
+/// Slice F1.4：最终标签状态的确定性指纹。
+///
+/// 按固定 (edge_idx, label_idx) 序逐字段混入：文案字节 + 中心坐标量化 0.01px。
+/// FNV-1a 64（确定性算法，无随机种子，WASM 兼容）。
+fn assignment_signature(edges: &[EdgeLayout]) -> u64 {
+    const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+    const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+    let mut hash = FNV_OFFSET;
+    let mut eat = |bytes: &[u8]| {
+        for &b in bytes {
+            hash ^= b as u64;
+            hash = hash.wrapping_mul(FNV_PRIME);
+        }
+    };
+    for (edge_idx, edge) in edges.iter().enumerate() {
+        for (label_idx, label) in edge.labels.iter().enumerate() {
+            eat(&(edge_idx as u64).to_le_bytes());
+            eat(&(label_idx as u64).to_le_bytes());
+            eat(label.text.as_bytes());
+            // 量化 0.01px，避免浮点尾差影响指纹。
+            eat(&(((label.center.x * 100.0).round()) as i64).to_le_bytes());
+            eat(&(((label.center.y * 100.0).round()) as i64).to_le_bytes());
+        }
+    }
+    hash
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn edge_with_label(text: &str, center: Point) -> EdgeLayout {
+        EdgeLayout {
+            geometry: PathGeometry::Straight {
+                start: Point::new(center.x - 50.0, center.y + 20.0),
+                end: Point::new(center.x + 50.0, center.y + 20.0),
+            },
+            labels: vec![EdgeLabelLayout::new(text, center)],
+            from_port: crate::layout::types::Port::Bottom,
+            to_port: crate::layout::types::Port::Top,
+        }
+    }
+
+    /// F1.4 退出判据：同输入两次 solve，signature / conflicts / degraded 必须一致。
+    #[test]
+    fn label_assignment_signature_stable_for_same_input() {
+        let nodes: HashMap<String, NodeLayout> = HashMap::new();
+        let groups: HashMap<String, GroupLayout> = HashMap::new();
+        let make_edges = || {
+            vec![
+                edge_with_label("alpha", Point::new(100.0, 50.0)),
+                edge_with_label("beta", Point::new(300.0, 50.0)),
+            ]
+        };
+
+        let mut edges_a = make_edges();
+        let a = LabelSolver::solve(LabelProblem {
+            edges: &mut edges_a,
+            nodes: &nodes,
+            groups: &groups,
+            config: LabelPlacementConfig::default(),
+            merge_annotations: None,
+        });
+        let mut edges_b = make_edges();
+        let b = LabelSolver::solve(LabelProblem {
+            edges: &mut edges_b,
+            nodes: &nodes,
+            groups: &groups,
+            config: LabelPlacementConfig::default(),
+            merge_annotations: None,
+        });
+
+        assert_eq!(a.signature, b.signature, "同输入两次 solve signature 必须一致");
+        assert_eq!(a.conflicts_remaining, b.conflicts_remaining);
+        assert_eq!(a.degraded, b.degraded);
+        assert_ne!(a.signature, 0, "有标签时 signature 不应为初始值 0");
+    }
+
+    /// 残余重叠真实统计：人为构造两个重叠标签直接过 audit（不经推开）。
+    #[test]
+    fn residual_conflict_audit_counts_overlaps() {
+        let nodes: HashMap<String, NodeLayout> = HashMap::new();
+        let edges = vec![
+            edge_with_label("one", Point::new(100.0, 50.0)),
+            edge_with_label("two", Point::new(102.0, 51.0)),
+        ];
+        let (conflicts, degraded) = audit_residual_conflicts(&edges, &nodes);
+        assert_eq!(conflicts, 1, "重叠标签应计为 1 对");
+        assert_eq!(
+            degraded,
+            vec![(0, "label_overlap_residual"), (1, "label_overlap_residual")]
+        );
+    }
+
+    /// 标签压节点（无可行候选）计入退化清单。
+    #[test]
+    fn node_overlap_marks_degraded() {
+        let mut nodes: HashMap<String, NodeLayout> = HashMap::new();
+        nodes.insert(
+            "n".to_string(),
+            NodeLayout {
+                x: 80.0,
+                y: 30.0,
+                width: 60.0,
+                height: 40.0,
+                ..Default::default()
+            },
+        );
+        let edges = vec![edge_with_label("stuck", Point::new(100.0, 50.0))];
+        let (_, degraded) = audit_residual_conflicts(&edges, &nodes);
+        assert!(degraded.contains(&(0, "label_node_overlap")));
     }
 }

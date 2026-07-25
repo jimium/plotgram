@@ -7,7 +7,6 @@ pub mod geom_obstacle;
 pub mod label_avoidance;
 pub mod label_candidate;
 pub mod label_common;
-pub mod label_placement;
 pub mod obstacle_check;
 pub mod parallel_edges;
 pub mod routing_skeleton;

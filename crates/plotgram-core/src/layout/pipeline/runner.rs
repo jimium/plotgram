@@ -18,11 +18,26 @@ use std::collections::HashMap;
 pub(crate) struct LayoutPipeline<'a> {
     diagram: &'a Diagram,
     plan: &'a LayoutPlan,
+    /// Slice F2c：上次渲染的冻结路由解（增量入口透传给 Coordinator）。
+    prev: Option<&'a crate::layout::routing::model::FrozenRoutingSolution>,
 }
 
 impl<'a> LayoutPipeline<'a> {
     pub fn new(diagram: &'a Diagram, plan: &'a LayoutPlan) -> Self {
-        Self { diagram, plan }
+        Self {
+            diagram,
+            plan,
+            prev: None,
+        }
+    }
+
+    /// Slice F2c：挂载上次渲染的冻结路由解（增量模式）。
+    pub fn with_prev(
+        mut self,
+        prev: &'a crate::layout::routing::model::FrozenRoutingSolution,
+    ) -> Self {
+        self.prev = Some(prev);
+        self
     }
 
     pub fn run(self) -> Result<LayoutResult, DiagnosticError> {
@@ -235,7 +250,7 @@ impl<'a> LayoutPipeline<'a> {
             }
         }
         // Budget guard hint（不推节点，仅设置 hints）。
-        let (result_v2, _) =
+        let result_v2 =
             crate::layout::demand::space_budget_guard::resolve_budget_violations(
                 self.diagram, result_v2,
             );
@@ -280,6 +295,7 @@ impl<'a> LayoutPipeline<'a> {
             &edge_snap_config,
             Default::default(), // RoutingConfig：待后续从 pipeline 传入
             algo,
+            self.prev,
         );
         crate::perf_log!(
             "[perf]   route: {:.2}ms",

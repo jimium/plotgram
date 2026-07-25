@@ -46,6 +46,9 @@ pub struct LabelPlacementConfig {
     pub soften_endpoint_group_shell: bool,
     /// 标签相对路径的最小法向净空（候选距离阶梯单位；贴线冲突阈值）
     pub perp_offset: f64,
+    /// Slice F1：径向候选中心（circular family）。`Some` 时额外产出沿
+    /// 「中心→锚点」放射方向的阶梯候选，取代已删除的径向推开后处理。
+    pub radial_center: Option<Point>,
 }
 
 impl Default for LabelPlacementConfig {
@@ -54,6 +57,7 @@ impl Default for LabelPlacementConfig {
             prefer_long_segment_whitespace: false,
             soften_endpoint_group_shell: false,
             perp_offset: DEFAULT_LABEL_PERP_OFFSET,
+            radial_center: None,
         }
     }
 }
@@ -75,11 +79,13 @@ impl LabelPlacementConfig {
                 } else {
                     ARCH_UNGROUPED_LABEL_PERP_OFFSET
                 },
+                radial_center: None,
             },
             DiagramType::Flowchart => Self {
                 prefer_long_segment_whitespace: true,
                 soften_endpoint_group_shell: false,
                 perp_offset: DEFAULT_LABEL_PERP_OFFSET,
+                radial_center: None,
             },
             _ => Self::default(),
         }
@@ -146,7 +152,8 @@ pub fn place_all_labels_by_candidates_with_config(
         );
 
         if has_conflict {
-            let candidates = generate_candidates(&path, preferred_t, size, config.perp_offset);
+            let candidates =
+                generate_candidates(&path, preferred_t, size, config.perp_offset, config.radial_center);
             let ctx = CandidateScoringContext {
                 edge_idx,
                 path: &path,
@@ -252,6 +259,7 @@ fn generate_candidates(
     preferred_t: f64,
     size: (f64, f64),
     perp_offset: f64,
+    radial_center: Option<Point>,
 ) -> Vec<Point> {
     // 覆盖短边场景：端点附近 (0.15/0.85) 增加候选，中段保持 0.3/0.5/0.7
     let mut ts = vec![0.15, 0.3, 0.5, 0.7, 0.85, preferred_t];
@@ -272,14 +280,34 @@ fn generate_candidates(
     }
 
     let mut candidates = Vec::new();
-    for t in ts {
-        let (normal, anchor) = normal_at_path_t(path, t);
+    for t in &ts {
+        let (normal, anchor) = normal_at_path_t(path, *t);
         for sign in [1.0, -1.0] {
             for &dist in &distances {
                 let offset = dist * sign;
                 candidates.push(Point::new(
                     anchor.x + normal.x * offset,
                     anchor.y + normal.y * offset,
+                ));
+            }
+        }
+    }
+    // Slice F1（circular）：沿「radial_center→锚点」放射方向的阶梯候选，
+    // 保持弧形布局标签放射分布的美感（固定 t 序 × 固定距离阶梯，确定性）。
+    if let Some(center) = radial_center {
+        for t in &ts {
+            let anchor = point_at_path_t(path, *t);
+            let dx = anchor.x - center.x;
+            let dy = anchor.y - center.y;
+            let len = (dx * dx + dy * dy).sqrt();
+            if len < 1e-6 {
+                continue;
+            }
+            let dir = Point::new(dx / len, dy / len);
+            for &dist in &distances {
+                candidates.push(Point::new(
+                    anchor.x + dir.x * dist,
+                    anchor.y + dir.y * dist,
                 ));
             }
         }

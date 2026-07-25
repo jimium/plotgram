@@ -329,6 +329,41 @@ typestate 还有一个实际旁路：RecipeRouter 遇到全部为 `TooFewPoints`
 - freeze 后无任何写者：label solve 统一在 Coordinator freeze 之后执行，只写
   label/annotation；残余 obstacle-model 违规由 E3 repair loop 显式 degraded 报告。
 
+#### 【Slice F 后事实更新（2026-07，F2c）】label 唯一写者与增量入口
+
+仅记录事实，不改 Slice 定义。Slice F1+F2 后：
+
+- **label 唯一写者**：label solve 全 family 统一在 Coordinator 唯一 freeze 之后
+  执行（`routing/coordinator.rs`），Recipe 内提前 `LabelSolver::solve` 已删除
+  （`recipe/mod.rs` 仅保留 plan-based `LabelSolver::place` 初始放置）；
+  circular 的 `RadialPlacer` 第二写者已删除——径向候选并入
+  `common/label_candidate.rs`（`LabelPlacementConfig.radial_center`），
+  `common/label_placement.rs` 整个模块与 legacy `route_edges_circular` 已删除。
+- **LabelAssignment 真实字段**：`conflicts_remaining`（固定序真实统计残余
+  label-label 重叠）、`degraded: Vec<(edge_idx, reason)>`、`signature: u64`
+  （量化 0.01px 中心 + 文案的确定性 FNV hash，同输入稳定，单测钉死）。
+- **已删旧入口/旧写者（crates 内 grep=0）**：`RadialPlacer` / `LabelPlacer` /
+  `label_placement`；`edge_routing_orthogonal` 的旧节点位移增量入口
+  （reroute_edges_touching_nodes / reroute_edges_preserve）；`space_budget_guard`
+  的空转增量路径（diff_moved_nodes / reroute_and_repulse，`resolve_budget_violations`
+  仅保留 budget hint 设置）；`post_route::NODE_MOVE_REROUTE_EPS`。
+- **增量依赖记录**：`StableEdge` 增 `identity`（from/to/parallel_ordinal），
+  `StableEdgeStore::match_identities` 产出确定性 `EdgeIdentityDiff`；
+  `routing/model/frozen_solution.rs` 的 `FrozenRoutingSolution::capture` 在
+  freeze + label solve 后构建（逐边依赖记录：geometry/ports/端点/路径段/
+  邻近障碍/group gates/bundle/conflict partners/label bbox/声明文案 +
+  节点组几何指纹 + route_annotations），经 `LayoutResult.hints.frozen_routing`
+  （Arc）暴露，无全局会话态；`dirty_set` 由指纹变化/边增删出发沿
+  conflicts+bundle 做固定序连通分量闭包；E3 repair loop stalled 轮次按
+  依赖图做 1 跳固定序扩张。
+- **跨渲染增量入口**：`compute_layout_incremental(diagram, prev)`
+  （`pipeline/entry.rs`）→ coordinator `execute(..., prev)`：identity match +
+  `dirty_set` → preserved 边复用前逐边重过 `RouteAuditor::audit_extended`
+  hard check（fail → 固定序扩张 ≤2 跳，仍 fail 回退全图）；zero-diff
+  快路径原样写回冻结 edges/annotations（集成测试钉死字节一致）；
+  orthogonal 走 `route_preserving` 逐边 preserve，非正交 family 全量重解；
+  preserve 比例 < `MIN_PRESERVE_RATIO` 回退全图路由。
+
 ### 3.5 geometry freeze 不是全管线的真实冻结点
 
 RecipeRouter 在初始 route 内已经 freeze 并运行 LabelSolver，但随后 pipeline 还会：
@@ -783,6 +818,24 @@ solve
 - 同一输入的 label assignment signature 稳定。
 - 单节点移动不会无关地重路由全图。
 - preserved route 在复用前会重新过 hard audit。
+
+#### 【Slice F 后事实更新（2026-07）】
+
+Slice F1+F2 已全部落地，退出判据逐条钉死为测试：
+
+- label solve 是最后写者：Coordinator freeze 后仅 label solve +
+  `FrozenRoutingSolution::capture` 执行，二者均不改 edge geometry。
+- signature 稳定：`recipe/label.rs` 单测（同输入两次 solve signature 一致）。
+- 单节点移动 dirty_set 只含依赖分量内边：`frozen_solution.rs` 单测
+  （含平行边 ordinal / 头部插入新 relation 后 identity 保持匹配）。
+- preserved route 复用前重过 hard audit：`coordinator.rs` 单测（audit fail
+  触发扩张 / 全 fail 回退 None / 改文案只脏对应边）。
+- 同一 diagram 两次渲染（zero diff）→ 全 preserve 且边/注解输出字节一致：
+  `coordinator.rs` 集成测试（经 `compute_layout_incremental` 入口）。
+- `StableEdgeId` 保留为 solve 内 positional handle；一切跨版本持久 key
+  统一用 `StableEdgeIdentity`（模块 doc 已说明定位）。
+- circular 标签输出字节有意变化（radial 候选替代 RadialPlacer 后处理），
+  按 AGENTS §8 豁免期重采基线（tag=sliceF）。
 
 ---
 

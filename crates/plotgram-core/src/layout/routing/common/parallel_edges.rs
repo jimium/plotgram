@@ -204,7 +204,7 @@ fn same_endpoint_fan_siblings(
 /// - **正反向对**：两侧外偏，t 保持中段；若同 from/to 另有 ≥2 条同向边，再叠加 Fan 的 t 错开与外推。
 /// - **同向多边 / fan**：外偏 + 按稳定序错开 t，避免水平走廊上宽标签互撞。
 /// - 用户显式设置 `label_position` 时保留其 t，仍施加侧向偏移。
-pub fn label_placement_for_parallel_edge(
+pub fn parallel_edge_label_plan(
     rel: &crate::ast::Relation,
     edge_index: usize,
     relations: &[crate::ast::Relation],
@@ -401,7 +401,7 @@ pub fn build_parallel_aware_edge_labels(
     path: &[Point],
 ) -> Vec<EdgeLabelLayout> {
     let (middle_t, offset) =
-        label_placement_for_parallel_edge(rel, edge_index, relations, parallel_offsets, path);
+        parallel_edge_label_plan(rel, edge_index, relations, parallel_offsets, path);
     let mut labels = build_edge_labels(rel, middle_t, offset, |t| point_at_path_t(path, t));
     attach_leaders_if_offset(&mut labels, path);
     labels
@@ -479,14 +479,14 @@ mod tests {
         let path_down = vec![Point::new(0.0, 0.0), Point::new(0.0, 100.0)];
         let path_up = vec![Point::new(0.0, 100.0), Point::new(0.0, 0.0)];
 
-        let (t0, off0) = label_placement_for_parallel_edge(
+        let (t0, off0) = parallel_edge_label_plan(
             &relations[0],
             0,
             &relations,
             &parallel.offsets,
             &path_down,
         );
-        let (t1, off1) = label_placement_for_parallel_edge(
+        let (t1, off1) = parallel_edge_label_plan(
             &relations[1],
             1,
             &relations,
@@ -512,7 +512,7 @@ mod tests {
 
         let ts: Vec<f64> = (0..3)
             .map(|i| {
-                label_placement_for_parallel_edge(
+                parallel_edge_label_plan(
                     &relations[i],
                     i,
                     &relations,
@@ -647,14 +647,14 @@ mod tests {
         let path_db = vec![Point::new(200.0, 300.0), Point::new(200.0, 420.0)];
         let path_cache = vec![Point::new(280.0, 300.0), Point::new(280.0, 420.0)];
 
-        let (t_db, off_db) = label_placement_for_parallel_edge(
+        let (t_db, off_db) = parallel_edge_label_plan(
             &relations[0],
             0,
             &relations,
             &parallel.offsets,
             &path_db,
         );
-        let (t_cache, off_cache) = label_placement_for_parallel_edge(
+        let (t_cache, off_cache) = parallel_edge_label_plan(
             &relations[2],
             2,
             &relations,

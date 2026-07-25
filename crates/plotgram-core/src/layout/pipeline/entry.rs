@@ -61,6 +61,25 @@ pub fn compute_layout_with_plan(
     crate::layout::pipeline::runner::LayoutPipeline::new(diagram, plan).run()
 }
 
+/// Slice F2c：跨渲染增量布局入口。
+///
+/// 正常跑 layout，routing 阶段把 `prev`（上次渲染经
+/// `LayoutResult.hints.frozen_routing` 持有的冻结路由解）透传给 Coordinator：
+/// clean 边直接复用冻结 geometry/labels（复用前必过 hard audit），dirty 边
+/// 局部重解；preserve 比例过低或审计扩张仍失败时回退全图路由。
+/// 调用方跨渲染自行持有 `prev`（Arc），不引入任何全局会话状态。
+pub fn compute_layout_incremental(
+    diagram: &Diagram,
+    prev: &crate::layout::routing::model::FrozenRoutingSolution,
+) -> std::result::Result<LayoutResult, DiagnosticError> {
+    let profile = profile_for(&diagram.diagram_type);
+    let plan = crate::layout::pipeline::plan::LayoutPlan::resolve(diagram, profile);
+    validate_layout_config(diagram)?;
+    crate::layout::pipeline::runner::LayoutPipeline::new(diagram, &plan)
+        .with_prev(prev)
+        .run()
+}
+
 fn layout_strategy_for(algo: &str) -> Option<Box<dyn LayoutStrategy>> {
     crate::layout::pipeline::registry::build_layout_strategy(algo, &crate::layout::pipeline::plan::LayoutPlan::default_for_catalog())
 }

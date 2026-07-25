@@ -6,6 +6,7 @@
 //! ## 模块结构
 //!
 //! - [`stable_edge`]：`StableEdgeId` + `StableEdgeStore`——稳定边身份（下标即声明序）。
+//! - [`frozen_solution`]（Slice F2b）：`FrozenRoutingSolution`——跨渲染增量依赖记录。
 //! - [`frozen_store`]：`FrozenNodeStore` / `FrozenGroupStore`——只读节点/分组快照。
 //! - [`contract`]：富 `RoutingContract`——typed roles/intents（区别于既有极简同名类型）。
 //! - [`prepared`]：`PreparedRoutingInput` + `prepare()` + problem signature。
@@ -20,6 +21,7 @@
 
 pub mod audit;
 pub mod contract;
+pub mod frozen_solution;
 pub mod frozen_store;
 pub mod materialize;
 pub mod prepared;
@@ -32,9 +34,15 @@ pub use contract::{
     ParallelGroupId, PortIntent, RoutingContract, RoutingTopologyMetadata, SideGutterResource,
     TransitIntent,
 };
+pub use frozen_solution::{
+    edge_conflict_adjacency, group_fingerprints_of, node_fingerprints_of, EdgeDependencyRecord,
+    FrozenRoutingSolution, GeometryFingerprint,
+};
 pub use frozen_store::{FrozenGroupStore, FrozenNodeStore};
 pub use prepared::{PreparedRoutingInput, RoutingCanvas};
-pub use stable_edge::{StableEdge, StableEdgeId, StableEdgeStore};
+pub use stable_edge::{
+    EdgeIdentityDiff, StableEdge, StableEdgeId, StableEdgeIdentity, StableEdgeStore,
+};
 
 pub use audit::{AuditReport, AuditViolation, RouteAuditContext, RouteAuditor, ViolationKind};
 pub use repair::{RepairPriority, RouteAuditReport, RouteConstraintId, RouteRepairIntent};

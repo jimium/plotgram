@@ -1,6 +1,6 @@
 //! 圆形布局弧形边路由 Recipe（doc16 §5.1 / R3 Slice 3.4）。
 //!
-//! 把 [`super::super::edge_routing_circular::route_edges_circular`] 拆分到 [`RoutingRecipe`]
+//! 把历史直接入口（已删除）的 circular 逐边逻辑拆分到 [`RoutingRecipe`]
 //! 接口后面：
 //!
 //! - `compile`：解析圆簇（无圆簇 / 无边 → `should_skip`）、构造节点圆位与 lane 偏移、
@@ -8,7 +8,8 @@
 //!   [`inter_circle_bezier`]、自环走共享 [`solve_self_loop`]。
 //! - `solve`：逐边产 family-neutral [`RoutePath`]：弧形边 → `Radial`；穿障退化 →
 //!   `Spline`（可见性图绕行 / outer 折线兜底）；自环无退化 → `Cubic` + anchor 标签计划。
-//! - `finalize`：覆盖默认收尾，用 circular 专属径向推开 [`RadialPlacer`]（与 legacy 一致）。
+//! - `finalize`：走默认收尾 [`finalize_edges`](crate::layout::routing::common::routing_skeleton::finalize_edges)；
+//!   标签冲突消解由 Coordinator 在唯一 freeze 之后以径向候选统一执行（Slice F1）。
 //!
 //! ## byte-identical 要点
 //!
@@ -17,7 +18,6 @@
 //! - 穿障退化 `Spline` → materialize `Polyline` → LabelSolver 用 `point_at_path_t` 取点，
 //!   偏移固定 `(0, -6)`、`middle_t = parse_label_t`，与 legacy 折线重建逐字一致。
 //! - 自环标签锚定环 apex（[`EdgeLabelPlan::anchor`]），与遗留 `|_| apex` 取点字节一致。
-//! - 收尾 `RadialPlacer` 与 legacy 同一实例、同一 `LabelContext`，标签推开字节一致。
 
 use std::collections::HashMap;
 
@@ -25,7 +25,6 @@ use crate::ast::Diagram;
 use crate::layout::geometry::Point;
 use crate::layout::routing::common::circular_support::{resolve_circle_groups, APPLICABLE_TYPES};
 use crate::layout::routing::common::edge_geometry::parse_label_t;
-use crate::layout::routing::common::label_placement::{LabelContext, LabelPlacer, RadialPlacer};
 use crate::layout::routing::common::obstacle_check::curve_intersects_obstacles;
 use crate::layout::routing::common::routing_skeleton::{
     build_obstacle_context, quick_check_need_obstacle_index,
@@ -92,7 +91,7 @@ impl<'a> CircularDraft<'a> {
     }
 }
 
-/// 穿障退化决策：复刻 legacy `route_edges_circular` 的逐边 detour 分支。
+/// 穿障退化决策：逐边 detour 分支（沿用历史 circular 入口的行为）。
 ///
 /// 返回 `Some(points)` 表示应退化为折线绕行；`None` 表示保持原几何（未穿障 / 兜底失败）。
 fn resolve_detour(
@@ -367,19 +366,6 @@ impl RoutingRecipe for CircularRecipe {
     fn should_skip(&self, draft: &CircularDraft<'_>) -> bool {
         draft.skip
     }
-
-    /// circular 收尾：径向推开标签（`RadialPlacer`），与 legacy `route_edges_circular` 一致。
-    fn finalize(
-        &self,
-        mut result: LayoutResult,
-        mut edges: Vec<EdgeLayout>,
-        _diagram: &Diagram,
-    ) -> LayoutResult {
-        let label_ctx = LabelContext::new(&result.nodes, &result.groups);
-        RadialPlacer::default().place(&mut edges, &label_ctx);
-        result.edges = edges;
-        result
-    }
 }
 
 #[cfg(test)]
@@ -391,7 +377,6 @@ mod tests {
     use crate::layout::recipes::circular::CircularLayoutHints;
     use crate::layout::routing::common::circular_support::CircleGroup;
     use crate::layout::routing::common::test_fixtures::route_via_prepared;
-    use crate::layout::routing::edge_routing_circular::route_edges_circular;
     use crate::layout::routing::recipe::RecipeRouter;
     use crate::layout::NodeLayout;
 
@@ -498,122 +483,77 @@ mod tests {
         assert!(draft.is_skipped());
     }
 
-    /// PathGeometry 未派生 PartialEq，逐变体逐字段比较。
-    fn geom_eq(a: &PathGeometry, b: &PathGeometry) -> bool {
-        use PathGeometry as G;
-        match (a, b) {
-            (G::Straight { start: s1, end: e1 }, G::Straight { start: s2, end: e2 }) => {
-                s1 == s2 && e1 == e2
-            }
-            (
-                G::Bezier {
-                    start: s1,
-                    end: e1,
-                    controls: c1,
-                },
-                G::Bezier {
-                    start: s2,
-                    end: e2,
-                    controls: c2,
-                },
-            ) => s1 == s2 && e1 == e2 && c1 == c2,
-            (G::Polyline { points: p1 }, G::Polyline { points: p2 }) => p1 == p2,
-            _ => false,
-        }
+    /// 同圆两节点弧形边应产出 Bezier（含控制点）。
+    #[test]
+    fn circular_recipe_produces_bezier_edges() {
+        let (diagram, result) = make_circular(
+            vec![("a", 100.0, 100.0, 80.0, 44.0), ("b", 200.0, 100.0, 80.0, 44.0)],
+            vec![("a", "b", Some("go"))],
+            vec![CircleGroup {
+                center: (150.0, 150.0),
+                radius: 100.0,
+                entity_indices: vec![0, 1],
+            }],
+        );
+        let router = RecipeRouter::new(CircularRecipe);
+        let routed = route_via_prepared(&router, &diagram, &result);
+        assert_eq!(routed.edges.len(), 1);
+        assert!(routed.edges[0].is_bezier());
+        assert!(routed.edges[0].bezier_controls().is_some());
     }
 
-    /// RecipeRouter<CircularRecipe> 与原 route_edges_circular 输出等价。
+    /// 跨圆边穿障（a→c 穿过 b）应退化为绕行 Polyline。
     #[test]
-    fn recipe_router_matches_legacy_circular() {
-        let cases: Vec<(
-            Vec<(&str, f64, f64, f64, f64)>,
-            Vec<(&str, &str, Option<&str>)>,
-            Vec<CircleGroup>,
-        )> = vec![
-            // 同圆两节点弧形边（保持 Radial → Bezier）。
-            (
-                vec![
-                    ("a", 100.0, 100.0, 80.0, 44.0),
-                    ("b", 300.0, 100.0, 80.0, 44.0),
-                ],
-                vec![("a", "b", Some("lbl"))],
-                vec![CircleGroup {
-                    center: (240.0, 122.0),
-                    radius: 140.0,
+    fn circular_recipe_detours_around_obstacle() {
+        let (diagram, result) = make_circular(
+            vec![
+                ("a", 50.0, 100.0, 80.0, 44.0),
+                ("b", 200.0, 100.0, 80.0, 44.0),
+                ("c", 350.0, 100.0, 80.0, 44.0),
+            ],
+            vec![("a", "c", Some("go"))],
+            vec![
+                CircleGroup {
+                    center: (170.0, 122.0),
+                    radius: 130.0,
                     entity_indices: vec![0, 1],
-                }],
-            ),
-            // 正反双向边（弦两侧分离）。
-            (
-                vec![
-                    ("a", 100.0, 100.0, 80.0, 44.0),
-                    ("b", 300.0, 100.0, 80.0, 44.0),
-                ],
-                vec![("a", "b", None), ("b", "a", None)],
-                vec![CircleGroup {
-                    center: (240.0, 122.0),
-                    radius: 140.0,
-                    entity_indices: vec![0, 1],
-                }],
-            ),
-            // 跨圆边 a→c 穿过 b → 退化 Polyline。
-            (
-                vec![
-                    ("a", 50.0, 100.0, 80.0, 44.0),
-                    ("b", 200.0, 100.0, 80.0, 44.0),
-                    ("c", 350.0, 100.0, 80.0, 44.0),
-                ],
-                vec![("a", "c", Some("through"))],
-                vec![
-                    CircleGroup {
-                        center: (170.0, 122.0),
-                        radius: 130.0,
-                        entity_indices: vec![0, 1],
-                    },
-                    CircleGroup {
-                        center: (390.0, 122.0),
-                        radius: 50.0,
-                        entity_indices: vec![2],
-                    },
-                ],
-            ),
-            // 自环 + 普通边。
-            (
-                vec![
-                    ("a", 100.0, 100.0, 80.0, 44.0),
-                    ("b", 300.0, 100.0, 80.0, 44.0),
-                ],
-                vec![("a", "a", Some("retry")), ("a", "b", None)],
-                vec![CircleGroup {
-                    center: (240.0, 122.0),
-                    radius: 140.0,
-                    entity_indices: vec![0, 1],
-                }],
-            ),
-        ];
+                },
+                CircleGroup {
+                    center: (390.0, 122.0),
+                    radius: 50.0,
+                    entity_indices: vec![2],
+                },
+            ],
+        );
+        let router = RecipeRouter::new(CircularRecipe);
+        let routed = route_via_prepared(&router, &diagram, &result);
+        assert_eq!(routed.edges.len(), 1);
+        assert!(
+            routed.edges[0].is_polyline(),
+            "circular edge through obstacle should degrade to polyline, got {:?}",
+            routed.edges[0].geometry
+        );
+    }
 
-        for (entities, relations, circles) in cases {
-            let (diagram, result) = make_circular(entities, relations, circles);
-            let legacy = route_edges_circular(&diagram, result.clone());
-            let router = RecipeRouter::new(CircularRecipe);
-            let recipe = route_via_prepared(&router, &diagram, &result);
-
-            assert_eq!(legacy.edges.len(), recipe.edges.len(), "边数应一致");
-            for (idx, (l, r)) in legacy.edges.iter().zip(recipe.edges.iter()).enumerate() {
-                assert!(
-                    geom_eq(&l.geometry, &r.geometry),
-                    "边 {idx} 几何应字节一致: {:?} vs {:?}",
-                    l.geometry,
-                    r.geometry
-                );
-                assert_eq!(l.from_port, r.from_port, "边 {idx} from_port");
-                assert_eq!(l.to_port, r.to_port, "边 {idx} to_port");
-                assert_eq!(l.labels.len(), r.labels.len(), "边 {idx} 标签数");
-                // R9a：标签位置由 LabelSolver::solve() 统一消解（有意改善）。
-                for (ll, rl) in l.labels.iter().zip(r.labels.iter()) {
-                    assert_eq!(ll.text, rl.text, "边 {idx} 标签文本");
-                }
-            }
-        }
+    /// 无中间障碍时应保持 Bezier（不误退化）。
+    #[test]
+    fn circular_recipe_keeps_bezier_when_no_obstacle() {
+        let (diagram, result) = make_circular(
+            vec![("a", 100.0, 100.0, 80.0, 44.0), ("b", 300.0, 100.0, 80.0, 44.0)],
+            vec![("a", "b", Some("go"))],
+            vec![CircleGroup {
+                center: (240.0, 122.0),
+                radius: 140.0,
+                entity_indices: vec![0, 1],
+            }],
+        );
+        let router = RecipeRouter::new(CircularRecipe);
+        let routed = route_via_prepared(&router, &diagram, &result);
+        assert_eq!(routed.edges.len(), 1);
+        assert!(
+            routed.edges[0].is_bezier(),
+            "circular edge without obstacle should stay bezier, got {:?}",
+            routed.edges[0].geometry
+        );
     }
 }

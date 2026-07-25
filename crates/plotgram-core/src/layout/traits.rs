@@ -104,6 +104,19 @@ pub trait RoutingRecipeDyn {
     /// 类型上不可能修改 nodes/groups。
     fn route(&self, input: &PreparedRoutingInput<'_>) -> RoutingProduct;
 
+    /// Slice F2c：增量路由入口——`seeded_edges` 按声明序预填充（preserve 边
+    /// 携带 prev 冻结 geometry/labels，dirty 边为空占位），仅重解 `preserve`
+    /// 之外的边。返回 `None` 表示该 family 不支持逐边 preserve（调用方回退
+    /// 全量 [`route`](Self::route)，非正交 family 全量重解成本低）。
+    fn route_preserving(
+        &self,
+        _input: &PreparedRoutingInput<'_>,
+        _seeded_edges: Vec<EdgeLayout>,
+        _preserve: &std::collections::HashSet<usize>,
+    ) -> Option<RoutingProduct> {
+        None
+    }
+
     /// 该路由算法适用的内置图表类型列表。
     fn applicable_diagram_types(&self) -> &'static [DiagramType] {
         &[]

@@ -9,7 +9,9 @@
 //! ```
 //!
 //! [`RecipeRouter`] 是泛型适配器，实现既有 [`RoutingRecipeDyn`]：内部串起
-//! compile → solve → materialize → audit → freeze → LabelSolver → finalize_edges。
+//! compile → solve → materialize → audit → freeze → LabelSolver::place（plan-based
+//! 初始放置）→ finalize_edges。标签冲突消解统一由 Coordinator 在唯一 freeze
+//! 之后执行（Slice F1，标签唯一最后写者）。
 //! registry 只需把 `Box::new(StraightRouting)` 换成 `Box::new(RecipeRouter::new(StraightRecipe))`，
 //! pipeline 与全部 post-route 阶段零改动 → 输出字节不变。
 //!
@@ -101,6 +103,17 @@ pub trait RoutingRecipe {
     /// 求解：Draft → family-neutral [`RecipeSolution`]。
     fn solve(&self, draft: &Self::Draft<'_>) -> RecipeSolution;
 
+    /// Slice F2c：preserve 求解——`draft` 编译自 seeded edges（preserve 边已携带
+    /// prev 冻结几何），仅重解 `preserve` 之外的边。默认 `None`（family 不支持
+    /// 逐边 preserve，调用方回退全量 [`solve`](Self::solve)）。
+    fn solve_preserving(
+        &self,
+        _draft: &Self::Draft<'_>,
+        _preserve: &std::collections::HashSet<usize>,
+    ) -> Option<RecipeSolution> {
+        None
+    }
+
     /// 短路判定：某些家族（如 circular）在无可路由结构时直接返回原 `result`（不改
     /// `edges`），跳过物化 / 求解 / 收尾。默认从不短路。
     fn should_skip(&self, _draft: &Self::Draft<'_>) -> bool {
@@ -108,8 +121,7 @@ pub trait RoutingRecipe {
     }
 
     /// 收尾：把物化好的 `edges` 写回 `result`。默认走
-    /// [`finalize_edges`]（mindmap 清标签 + `resolve_label_overlaps`）。circular 家族
-    /// 覆盖为径向推开（`RadialPlacer`），与 legacy 收尾字节一致。
+    /// [`finalize_edges`]（mindmap 清标签 + `resolve_label_overlaps`）。
     fn finalize(
         &self,
         result: LayoutResult,
@@ -123,7 +135,7 @@ pub trait RoutingRecipe {
 
 /// 泛型适配器：把 [`RoutingRecipe`] 包装成既有 [`RoutingRecipeDyn`]。
 ///
-/// 承载 compile → solve → materialize → audit → freeze → LabelSolver → finalize_edges
+/// 承载 compile → solve → materialize → audit → freeze → LabelSolver::place → finalize_edges
 /// 的统一驱动，使各家族的具体 Recipe 不再各自实现 `route()`。
 pub struct RecipeRouter<R: RoutingRecipe> {
     recipe: R,
@@ -133,61 +145,32 @@ impl<R: RoutingRecipe> RecipeRouter<R> {
     pub fn new(recipe: R) -> Self {
         Self { recipe }
     }
-}
 
-impl<R: RoutingRecipe> RoutingRecipeDyn for RecipeRouter<R> {
-    fn name(&self) -> &'static str {
-        self.recipe.name()
-    }
-
-    fn applicable_diagram_types(&self) -> &'static [DiagramType] {
-        self.recipe.applicable_diagram_types()
-    }
-
-    fn supports_custom(&self) -> bool {
-        self.recipe.supports_custom()
-    }
-
-    fn option_specs(&self) -> &'static [AlgorithmOptionSpec] {
-        self.recipe.option_specs()
-    }
-
-    fn edge_snap_config(&self) -> EdgeSnapConfig {
-        self.recipe.edge_snap_config()
-    }
-
-    fn route(&self, input: &PreparedRoutingInput<'_>) -> RoutingProduct {
-        // 从 input.frozen + input.hints 构造临时 LayoutResult（仅供内部算法消费，不暴露给 trait 边界）。
-        let mut temp_result = LayoutResult {
+    /// 从 input.frozen + input.hints 构造临时 LayoutResult（仅供内部算法消费，
+    /// 不暴露给 trait 边界）。
+    fn temp_result(&self, input: &PreparedRoutingInput<'_>) -> LayoutResult {
+        LayoutResult {
             nodes: input.frozen.nodes.clone(),
             groups: input.frozen.groups.clone(),
             edges: Vec::new(),
             total_width: input.canvas.width,
             total_height: input.canvas.height,
             hints: input.hints.clone(),
-        };
+        }
+    }
 
-        // compile + solve 借用 temp_result；在移动 result 进 finalize 前必须结束借用。
-        let solved = {
-            let draft = self.recipe.compile(input.diagram, &temp_result);
-            if self.recipe.should_skip(&draft) {
-                None
-            } else {
-                Some(self.recipe.solve(&draft))
-            }
-        };
+    /// 共用尾部（Slice F2c 抽取，route / route_preserving 共享）：
+    /// materialize → audit → freeze → LabelSolver::place → finalize → RoutingProduct。
+    fn drive_solution(
+        &self,
+        mut temp_result: LayoutResult,
+        solved: RecipeSolution,
+        diagram: &Diagram,
+    ) -> RoutingProduct {
         let RecipeSolution {
             mut solution,
             label_plans,
-        } = match solved {
-            Some(s) => s,
-            None => return RoutingProduct {
-                edges: Vec::new(),
-                group_routing: temp_result.hints.group_routing.take(),
-                route_annotations: None,
-                orthogonal_debug: None,
-            },
-        };
+        } = solved;
 
         // 几何唯一写者物化 → 只读审计 → 冻结（Slice D2：无审计旁路）。
         let materialized = GeometryMaterializer::materialize(&solution);
@@ -218,7 +201,7 @@ impl<R: RoutingRecipe> RoutingRecipeDyn for RecipeRouter<R> {
         let frozen = audited.freeze();
 
         // 标签：在冻结几何之后按声明序放置。
-        let placed = LabelSolver::place(input.diagram, &label_plans, &frozen);
+        let placed = LabelSolver::place(diagram, &label_plans, &frozen);
 
         // 组装 EdgeLayout：几何来自冻结几何，端口来自 solution.ports。
         let entries = frozen.entries();
@@ -237,17 +220,10 @@ impl<R: RoutingRecipe> RoutingRecipeDyn for RecipeRouter<R> {
             });
         }
 
-        // 统一标签冲突消解。
-        let _assignment = LabelSolver::solve(LabelProblem {
-            edges: &mut edges,
-            nodes: &temp_result.nodes,
-            groups: &temp_result.groups,
-            config: crate::layout::routing::common::label_candidate::LabelPlacementConfig::default(),
-            merge_annotations: None,
-        });
+        // 标签冲突消解由 Coordinator 在唯一 freeze 之后统一执行（Slice F1）。
 
         // finalize：把物化好的 edges 写回 temp_result。
-        temp_result = self.recipe.finalize(temp_result, edges, input.diagram);
+        temp_result = self.recipe.finalize(temp_result, edges, diagram);
 
         // 提取 RoutingProduct（edges + hints delta）。
         RoutingProduct {
@@ -256,5 +232,74 @@ impl<R: RoutingRecipe> RoutingRecipeDyn for RecipeRouter<R> {
             route_annotations: temp_result.hints.route_annotations,
             orthogonal_debug: temp_result.hints.orthogonal_debug,
         }
+    }
+}
+
+impl<R: RoutingRecipe> RoutingRecipeDyn for RecipeRouter<R> {
+    fn name(&self) -> &'static str {
+        self.recipe.name()
+    }
+
+    fn applicable_diagram_types(&self) -> &'static [DiagramType] {
+        self.recipe.applicable_diagram_types()
+    }
+
+    fn supports_custom(&self) -> bool {
+        self.recipe.supports_custom()
+    }
+
+    fn option_specs(&self) -> &'static [AlgorithmOptionSpec] {
+        self.recipe.option_specs()
+    }
+
+    fn edge_snap_config(&self) -> EdgeSnapConfig {
+        self.recipe.edge_snap_config()
+    }
+
+    fn route(&self, input: &PreparedRoutingInput<'_>) -> RoutingProduct {
+        let mut temp_result = self.temp_result(input);
+
+        // compile + solve 借用 temp_result；在移动 result 进 finalize 前必须结束借用。
+        let solved = {
+            let draft = self.recipe.compile(input.diagram, &temp_result);
+            if self.recipe.should_skip(&draft) {
+                None
+            } else {
+                Some(self.recipe.solve(&draft))
+            }
+        };
+        match solved {
+            Some(s) => self.drive_solution(temp_result, s, input.diagram),
+            None => RoutingProduct {
+                edges: Vec::new(),
+                group_routing: temp_result.hints.group_routing.take(),
+                route_annotations: None,
+                orthogonal_debug: None,
+            },
+        }
+    }
+
+    /// Slice F2c：增量路由——seeded edges 携带 preserve 边的 prev 冻结几何，
+    /// 经 `solve_preserving` 仅重解 dirty 边，尾部与 `route` 共用
+    /// materialize → audit → freeze → place → finalize。
+    fn route_preserving(
+        &self,
+        input: &PreparedRoutingInput<'_>,
+        seeded_edges: Vec<EdgeLayout>,
+        preserve: &std::collections::HashSet<usize>,
+    ) -> Option<RoutingProduct> {
+        let mut temp_result = self.temp_result(input);
+        temp_result.edges = seeded_edges;
+
+        let solved = {
+            let draft = self.recipe.compile(input.diagram, &temp_result);
+            if self.recipe.should_skip(&draft) {
+                return None;
+            }
+            self.recipe.solve_preserving(&draft, preserve)?
+        };
+        // seeded edges 已被 solve 消费（经 draft.result 克隆），drive 会用冻结几何重建 edges。
+        temp_result.edges = Vec::new();
+        Some(self.drive_solution(temp_result, solved, input.diagram))
     }
 }

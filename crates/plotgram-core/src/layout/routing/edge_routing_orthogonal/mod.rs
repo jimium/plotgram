@@ -215,6 +215,9 @@ pub fn route_edges_orthogonal(
 }
 
 /// 正交路由内核（支持 preserve 增量重路由）——供 recipe/orthogonal.rs 调用。
+///
+/// Slice F2c：本模块旧的节点位移增量重路由入口已删除，
+/// 跨渲染增量统一走 Coordinator 的 `FrozenRoutingSolution` 依赖记录。
 pub(crate) fn route_orthogonal_inner(
     diagram: &Diagram,
     result: LayoutResult,
@@ -222,99 +225,6 @@ pub(crate) fn route_orthogonal_inner(
     preserve: Option<std::collections::HashSet<usize>>,
 ) -> LayoutResult {
     run::route_edges_orthogonal_inner(diagram, result, cfg, preserve)
-}
-
-/// 节点位移后的增量重路由：仅重算端点落在 `moved_node_ids` 上的边。
-///
-/// 若需重路由的边占比过高（≥ 85%），回退为全图重路由以保持质量与简单性。
-pub fn reroute_edges_touching_nodes(
-    diagram: &Diagram,
-    result: LayoutResult,
-    cfg: OrthoConfig,
-    moved_node_ids: &std::collections::HashSet<String>,
-) -> LayoutResult {
-    if moved_node_ids.is_empty() {
-        return result;
-    }
-    let n = diagram.relations.len();
-    if n == 0 {
-        return result;
-    }
-    let mut preserve = std::collections::HashSet::new();
-    for (i, rel) in diagram.relations.iter().enumerate() {
-        let incident = moved_node_ids.contains(rel.from.as_str())
-            || moved_node_ids.contains(rel.to.as_str());
-        if incident {
-            continue;
-        }
-        // S4.x：节点被 residual/refine 推开后，非关联边也可能新穿入该节点；
-        // 仅重路由端点关联边会漏掉 postgres→prometheus 穿 order_svc 这类。
-        if edge_pierces_moved_nodes(&result, i, rel.from.as_str(), rel.to.as_str(), moved_node_ids)
-        {
-            continue;
-        }
-        preserve.insert(i);
-    }
-    if preserve.is_empty() || (preserve.len() as f64 / n as f64) < crate::layout::post_route::MIN_PRESERVE_RATIO {
-        return route_edges_orthogonal(diagram, result, cfg);
-    }
-    run::route_edges_orthogonal_inner(diagram, result, cfg, Some(preserve))
-}
-
-fn edge_pierces_moved_nodes(
-    result: &LayoutResult,
-    edge_index: usize,
-    from_id: &str,
-    to_id: &str,
-    moved_node_ids: &std::collections::HashSet<String>,
-) -> bool {
-    let Some(edge) = result.edges.get(edge_index) else {
-        return false;
-    };
-    if edge.path_is_empty() {
-        return false;
-    }
-    let pts: Vec<Point> = edge.path_points().into_owned();
-    if pts.len() < 2 {
-        return false;
-    }
-    let mut moved: Vec<&str> = moved_node_ids.iter().map(|s| s.as_str()).collect();
-    moved.sort_unstable();
-    for window in pts.windows(2) {
-        let a = window[0];
-        let b = window[1];
-        for &nid in &moved {
-            if nid == from_id || nid == to_id {
-                continue;
-            }
-            let Some(nl) = result.nodes.get(nid) else {
-                continue;
-            };
-            if scoring::segment_intersects_node(a, b, nl, scoring::NODE_OBSTACLE_PAD) {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-/// refine / 局部更新：保留 `preserve_edges` 中的边，仅重算其余边。
-///
-/// 若可保留边占比过低（< 15%），回退为全图重路由。
-pub fn reroute_edges_preserve(
-    diagram: &Diagram,
-    result: LayoutResult,
-    cfg: OrthoConfig,
-    preserve_edges: &std::collections::HashSet<usize>,
-) -> LayoutResult {
-    let n = diagram.relations.len();
-    if n == 0 || preserve_edges.is_empty() {
-        return route_edges_orthogonal(diagram, result, cfg);
-    }
-    if (preserve_edges.len() as f64 / n as f64) < crate::layout::post_route::MIN_PRESERVE_RATIO {
-        return route_edges_orthogonal(diagram, result, cfg);
-    }
-    run::route_edges_orthogonal_inner(diagram, result, cfg, Some(preserve_edges.clone()))
 }
 
 #[cfg(test)]
