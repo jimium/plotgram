@@ -15,27 +15,8 @@ const VERTICAL_PREFERENCE_THRESHOLD_CROSS_ANCESTOR: f64 = 0.5;
 const SIDE_ALIGN_MARGIN: f64 = 20.0;
 const EXIT_CHECK_DISTANCE: f64 = 32.0;
 
-/// 同侧多边的汇流策略
-///
-/// 根据同一节点同一侧的边数自适应选择分布模式，实现"入口箭头合并"效果。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DockingStrategy {
-    /// 1 条边：单点居中
-    Single,
-    /// 2-3 条边：紧凑分布（间距压缩到 16px），接近汇流但仍可区分
-    Compact,
-    /// 4+ 条边：汇流模式，所有边共享中心入口点，路径自然分支
-    Concentrate,
-}
-
-/// 根据同侧边数选择汇流策略
-pub fn choose_docking_strategy(count: usize) -> DockingStrategy {
-    match count {
-        0..=1 => DockingStrategy::Single,
-        2..=3 => DockingStrategy::Compact,
-        _ => DockingStrategy::Concentrate,
-    }
-}
+// DockingStrategy + choose_docking_strategy 已迁入 crate::layout::routing::model::solution（Slice C1）。
+pub use crate::layout::routing::model::solution::{choose_docking_strategy, DockingStrategy};
 
 /// Endpoint descriptor for slot assignment and path building.
 ///

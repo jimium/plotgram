@@ -197,104 +197,14 @@ pub(crate) fn phase_layer_order(
     (edge_order, feedback_edge_set)
 }
 
-/// Phase 4d (X-1)：多轮冲突消解重路由
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn phase_reroute(
-    nodes: &HashMap<String, NodeLayout>,
-    relations: &[crate::ast::Relation],
-    from_side: &[Port],
-    to_side: &[Port],
-    endpoint_map: &HashMap<(usize, bool), Endpoint>,
-    edges: &mut Vec<EdgeLayout>,
-    grid: &mut SegmentGrid,
-    cfg: &OrthoConfig,
-    group_ctx: &crate::layout::group::GroupRoutingContext,
-    obstacles: &PreparedObstacles,
-    corridor_plan: &corridor_route::CorridorRoutePlan,
-    ortho_stats: &mut crate::layout::OrthoDebugStats,
-    profile: &OrthoRoutingProfile,
-    ovg: Option<&OrthogonalVisibilityGraph>,
-) {
-    let t_x1 = crate::layout::perf::Instant::now();
-    reroute_conflicting_edges(
-        nodes,
-        relations,
-        from_side,
-        to_side,
-        endpoint_map,
-        edges,
-        grid,
-        cfg,
-        group_ctx,
-        obstacles,
-        corridor_plan,
-        ortho_stats,
-        profile,
-        ovg,
-    );
-    crate::perf_log!(
-        "[perf]     x1_reroute: {:.2}ms",
-        t_x1.elapsed().as_secs_f64() * 1000.0
-    );
-}
-
-/// Phase 4e (X-2)：反向 stub 检测与端口翻转
-///
-/// 问题场景：由于分组障碍物/走廊限制，choose_pair_sides 基于几何中心选择的端口
-/// 在实际路由时被证明是"反向"的——路径从端口出发后不得不沿反方向折返穿过节点
-/// 投影平面才能到达目标，导致箭头方向与主路径方向冲突（视觉上"搞笑箭头"）。
-///
-/// 修正策略：路由完成后检测路径上的反向stub端点，将其端口翻转到对面（Bottom↔Top,
-/// Left↔Right），重新计算anchor并重路由。若新路径无反向stub且质量可接受，则接受。
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn phase_stub_fix(
-    nodes: &HashMap<String, NodeLayout>,
-    relations: &[crate::ast::Relation],
-    from_side: &mut [Port],
-    to_side: &mut [Port],
-    endpoint_map: &mut HashMap<(usize, bool), Endpoint>,
-    edges: &mut Vec<EdgeLayout>,
-    grid: &mut SegmentGrid,
-    cfg: &OrthoConfig,
-    group_ctx: &crate::layout::group::GroupRoutingContext,
-    obstacles: &PreparedObstacles,
-    corridor_plan: &corridor_route::CorridorRoutePlan,
-    ortho_stats: &mut crate::layout::OrthoDebugStats,
-    profile: &OrthoRoutingProfile,
-    feedback_edge_set: &std::collections::HashSet<usize>,
-    ovg: Option<&OrthogonalVisibilityGraph>,
-) {
-    let t_flip = crate::layout::perf::Instant::now();
-    fix_reverse_stub_ports(
-        nodes,
-        relations,
-        from_side,
-        to_side,
-        endpoint_map,
-        edges,
-        grid,
-        cfg,
-        group_ctx,
-        obstacles,
-        corridor_plan,
-        ortho_stats,
-        profile,
-        feedback_edge_set,
-        ovg,
-    );
-    crate::perf_log!(
-        "[perf]     x2_flip_stub: {:.2}ms (flipped {} edges)",
-        t_flip.elapsed().as_secs_f64() * 1000.0,
-        ortho_stats.flipped_stub_edges
-    );
-}
-
 /// Phase 4f (X-3)：Lane Assignment 车道分配
 ///
 /// 对 bundling 无法合并的残余平行段，通过平移 cross-axis 坐标分离重合段。
 /// 不插入 Z 字弯，保持正交性。
+/// Slice C3.2：solve 从 `paths` 读取，返回 `Vec<LaneAssignment>` 供 RouteSolution 携带。
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn phase_lane(
+    paths: &[crate::layout::routing::model::solution::RoutePath],
     edges: &mut [EdgeLayout],
     grid: &mut SegmentGrid,
     nodes: &HashMap<String, NodeLayout>,
@@ -307,9 +217,10 @@ pub(crate) fn phase_lane(
     group_ctx: &crate::layout::group::GroupRoutingContext,
     profile: &OrthoRoutingProfile,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
-) {
+) -> Vec<crate::layout::routing::model::solution::LaneAssignment> {
     let t_lane = crate::layout::perf::Instant::now();
-    let lane_stats = assign_lanes(
+    let (lane_assignments, lane_stats) = assign_lanes(
+        paths,
         edges,
         grid,
         nodes,
@@ -427,4 +338,6 @@ pub(crate) fn phase_lane(
             grid.insert_path(&pts, ei);
         }
     }
+
+    lane_assignments
 }

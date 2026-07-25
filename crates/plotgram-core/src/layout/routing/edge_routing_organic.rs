@@ -17,7 +17,7 @@ use crate::types::DiagramType;
 use crate::ast::Diagram;
 use crate::layout::geometry::Point;
 use crate::layout::algorithm_config::{AlgorithmOptionSpec, OptionKind};
-use crate::layout::{EdgeLayout, EdgeRoutingStrategy, LayoutResult, PathGeometry};
+use crate::layout::{EdgeLayout, LayoutResult, PathGeometry};
 use crate::layout::routing::common::edge_geometry::{
     build_edge_labels, compute_bezier_controls_organic,
     compute_bezier_controls_organic_tangents, cubic_bezier_point, parse_label_t, point_at_path_t,
@@ -28,14 +28,6 @@ use crate::layout::routing::common::routing_skeleton::{
 };
 use crate::layout::routing::visibility;
 use std::collections::HashMap;
-
-const APPLICABLE_TYPES: &[DiagramType] = &[
-    DiagramType::Flowchart,
-    DiagramType::Architecture,
-    DiagramType::State,
-    DiagramType::Er,
-    DiagramType::Mindmap,
-];
 
 /// 默认深度衰减系数（每深入一层，曲线参数乘以该比例）
 const DEFAULT_DEPTH_DECAY: f64 = 0.72;
@@ -125,58 +117,10 @@ impl Default for OrganicConfig {
 }
 
 /// 有机贝塞尔边路由策略
-pub struct OrganicRouting {
-    config: OrganicConfig,
-}
-
-impl Default for OrganicRouting {
-    fn default() -> Self {
-        Self::from_options(&crate::layout::pipeline::plan::ResolvedAlgoOptions::from_spec_defaults(
-            ORGANIC_OPTIONS,
-        ))
-    }
-}
-
-impl OrganicRouting {
-    pub fn from_options(options: &crate::layout::pipeline::plan::ResolvedAlgoOptions) -> Self {
-        Self {
-            config: OrganicConfig {
-                tension: options.get_or_default(&ORGANIC_OPTIONS[0]),
-                shoulder_ratio: options.get_or_default(&ORGANIC_OPTIONS[1]),
-                depth_decay: options.get_or_default(&ORGANIC_OPTIONS[2]),
-                curve_style: options.get_or_default(&ORGANIC_OPTIONS[3]),
-                port_distribution: options.get_or_default(&ORGANIC_OPTIONS[4]),
-            },
-        }
-    }
-}
-
-impl EdgeRoutingStrategy for OrganicRouting {
-    fn name(&self) -> &'static str {
-        "organic"
-    }
-
-    fn applicable_diagram_types(&self) -> &'static [DiagramType] {
-        APPLICABLE_TYPES
-    }
-
-    fn supports_custom(&self) -> bool {
-        true
-    }
-
-    fn option_specs(&self) -> &'static [AlgorithmOptionSpec] {
-        ORGANIC_OPTIONS
-    }
-
-    fn route(&self, diagram: &Diagram, result: LayoutResult) -> LayoutResult {
-        route_edges_organic(diagram, result, self.config)
-    }
-
-    /// 穿障后会退化为 Polyline，需要 refine 检测并兜底。
-    fn supports_refine(&self) -> bool {
-        true
-    }
-}
+///
+/// R3 Slice 3.4：路由入口已迁移到 [`OrganicRecipe`](crate::layout::routing::recipe::OrganicRecipe)
+/// + [`RecipeRouter`](crate::layout::routing::recipe::RecipeRouter)。此处 [`route_edges_organic`]
+/// 保留为 recipe 的字节对拍参照（parity 单测），不再经 `RoutingRecipeDyn` 直接驱动。
 
 /// 在节点布局完成后，为所有边计算有机贝塞尔路径与标签位置
 pub fn route_edges_organic(
@@ -309,43 +253,16 @@ pub fn route_edges_organic(
             (ep.end, ep.to_port)
         };
 
-        let start_x = start_pt.x;
-        let start_y = start_pt.y;
-        let end_x = end_pt.x;
-        let end_y = end_pt.y;
-
-        // 大跨度边加长水平肩
-        let dx = (end_x - start_x).abs();
-        let dy = (end_y - start_y).abs();
-        let aspect = if dx > 1.0 { (dy / dx).min(2.5) } else { 0.0 };
-        let adaptive_shoulder = effective_shoulder * (1.0 + 0.28 * aspect);
-
-        // 圆形 parent：径向绽放出边；矩形 parent：端口法向出边
-        let control_points = if let Some(from_nl) = result.nodes.get(ep.from_id.as_str()) {
-            let aspect_n = from_nl.width / from_nl.height.max(1e-6);
-            if (aspect_n - 1.0).abs() < 0.08 {
-                let from_dir = radial_outward_tangent(from_nl, start_pt);
-                let to_dir = port_direction(to_port);
-                compute_bezier_controls_organic_tangents(
-                    start_x, start_y, end_x, end_y,
-                    from_dir, to_dir, effective_tension, adaptive_shoulder,
-                )
-            } else {
-                compute_bezier_controls_organic(
-                    start_x, start_y, end_x, end_y,
-                    from_port, to_port, effective_tension, adaptive_shoulder,
-                )
-            }
-        } else {
-            compute_bezier_controls_organic(
-                start_x, start_y, end_x, end_y,
-                from_port, to_port, effective_tension, adaptive_shoulder,
-            )
-        };
-        let control_points = [
-            Point::new(control_points[0].x + ep.mid_ox, control_points[0].y + ep.mid_oy),
-            Point::new(control_points[1].x + ep.mid_ox, control_points[1].y + ep.mid_oy),
-        ];
+        let (control_points, adaptive_shoulder) = organic_control_points(
+            &result,
+            &ep,
+            start_pt,
+            from_port,
+            end_pt,
+            to_port,
+            effective_tension,
+            effective_shoulder,
+        );
 
         // 标签位于曲线 t 处（由 label_position 锚点决定）
         let cp0 = control_points[0];
@@ -419,6 +336,62 @@ pub fn route_edges_organic(
     finalize_edges(result, edges, diagram)
 }
 
+/// 有机曲线单边控制点 + 自适应肩长（几何核心）。
+///
+/// R3 Slice 3.4：把 legacy 逐边控制点计算拆出，供 [`OrganicRecipe`](crate::layout::routing::recipe::OrganicRecipe)
+/// 与 legacy [`route_edges_organic`] 共用，保证贝塞尔控制点逐字一致。
+///
+/// 返回 `(控制点（含平行中段偏移）, adaptive_shoulder（供 mindmap 拉弓复用）)`。
+pub(crate) fn organic_control_points(
+    result: &LayoutResult,
+    ep: &EdgeEndpoints,
+    start_pt: Point,
+    from_port: crate::layout::Port,
+    end_pt: Point,
+    to_port: crate::layout::Port,
+    effective_tension: f64,
+    effective_shoulder: f64,
+) -> ([Point; 2], f64) {
+    let start_x = start_pt.x;
+    let start_y = start_pt.y;
+    let end_x = end_pt.x;
+    let end_y = end_pt.y;
+
+    // 大跨度边加长水平肩
+    let dx = (end_x - start_x).abs();
+    let dy = (end_y - start_y).abs();
+    let aspect = if dx > 1.0 { (dy / dx).min(2.5) } else { 0.0 };
+    let adaptive_shoulder = effective_shoulder * (1.0 + 0.28 * aspect);
+
+    // 圆形 parent：径向绽放出边；矩形 parent：端口法向出边
+    let control_points = if let Some(from_nl) = result.nodes.get(ep.from_id.as_str()) {
+        let aspect_n = from_nl.width / from_nl.height.max(1e-6);
+        if (aspect_n - 1.0).abs() < 0.08 {
+            let from_dir = radial_outward_tangent(from_nl, start_pt);
+            let to_dir = port_direction(to_port);
+            compute_bezier_controls_organic_tangents(
+                start_x, start_y, end_x, end_y,
+                from_dir, to_dir, effective_tension, adaptive_shoulder,
+            )
+        } else {
+            compute_bezier_controls_organic(
+                start_x, start_y, end_x, end_y,
+                from_port, to_port, effective_tension, adaptive_shoulder,
+            )
+        }
+    } else {
+        compute_bezier_controls_organic(
+            start_x, start_y, end_x, end_y,
+            from_port, to_port, effective_tension, adaptive_shoulder,
+        )
+    };
+    let control_points = [
+        Point::new(control_points[0].x + ep.mid_ox, control_points[0].y + ep.mid_oy),
+        Point::new(control_points[1].x + ep.mid_ox, control_points[1].y + ep.mid_oy),
+    ];
+    (control_points, adaptive_shoulder)
+}
+
 /// 计算同一父节点的子节点连接点均匀分布后的精确边界坐标
 ///
 /// 基于真实的连接点 y 坐标，在父节点高度范围内均匀分配，
@@ -429,7 +402,7 @@ pub fn route_edges_organic(
 /// 抢同一组 y 槽位，导致一侧连接点落到圆外或分布失衡。
 ///
 /// 返回 HashMap<edge_index, (start_x, start_y)>
-fn compute_distributed_port_points(
+pub(crate) fn compute_distributed_port_points(
     result: &LayoutResult,
     _relations: &[crate::ast::Relation],
     endpoints: &[Option<(EdgeEndpoints, LabelOffset)>],
@@ -553,7 +526,7 @@ fn snap_to_side(
 }
 
 /// 思维导图：若起点落在 Top/Bottom（斜角矩形交点），按子节点水平侧改吸附。
-fn coerce_mindmap_start_to_horizontal_port(
+pub(crate) fn coerce_mindmap_start_to_horizontal_port(
     result: &LayoutResult,
     ep: &EdgeEndpoints,
 ) -> (Point, crate::layout::Port) {
@@ -584,7 +557,7 @@ fn coerce_mindmap_start_to_horizontal_port(
 }
 
 /// 思维导图终点：强制接到子节点朝向父节点的那一侧中部，杜绝角点接入。
-fn snap_mindmap_end(
+pub(crate) fn snap_mindmap_end(
     result: &LayoutResult,
     ep: &EdgeEndpoints,
     start: &Point,
@@ -608,7 +581,7 @@ fn snap_mindmap_end(
 /// 思维导图穿障时保持贝塞尔：沿绕行折线中点拉弓，生成平滑曲线。
 ///
 /// 若绕行失败或拉弓后仍穿障，返回 `None`（调用方保留原曲线，不退化折线）。
-fn bow_bezier_around_obstacles(
+pub(crate) fn bow_bezier_around_obstacles(
     edge: &EdgeLayout,
     obstacles: &visibility::ObstacleIndex,
     skip: &[usize],

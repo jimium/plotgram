@@ -4,7 +4,7 @@ use crate::ast::Diagram;
 use crate::error::DiagnosticError;
 use crate::profile::profile_for;
 use crate::layout::types::LayoutResult;
-use crate::layout::traits::{LayoutStrategy, EdgeRoutingStrategy};
+use crate::layout::traits::{LayoutStrategy, RoutingRecipeDyn};
 
 // ─── Layout 调度 ─────────────────────────────────────────
 
@@ -65,7 +65,7 @@ fn layout_strategy_for(algo: &str) -> Option<Box<dyn LayoutStrategy>> {
     crate::layout::pipeline::registry::build_layout_strategy(algo, &crate::layout::pipeline::plan::LayoutPlan::default_for_catalog())
 }
 
-fn edge_routing_strategy_for(algo: &str) -> Option<Box<dyn EdgeRoutingStrategy>> {
+fn edge_routing_strategy_for(algo: &str) -> Option<Box<dyn RoutingRecipeDyn>> {
     crate::layout::pipeline::registry::build_edge_routing_strategy(algo, &crate::layout::pipeline::plan::LayoutPlan::catalog_edge_plan(algo))
 }
 
@@ -87,7 +87,7 @@ pub(super) fn all_layout_strategies() -> Vec<Box<dyn LayoutStrategy>> {
 }
 
 /// 返回所有已注册的边路由策略实例（catalog / 元数据查询，使用 spec 默认值）。
-pub(super) fn all_routing_strategies() -> Vec<Box<dyn EdgeRoutingStrategy>> {
+pub(super) fn all_routing_strategies() -> Vec<Box<dyn RoutingRecipeDyn>> {
     crate::layout::pipeline::registry::all_routing_strategies()
 }
 

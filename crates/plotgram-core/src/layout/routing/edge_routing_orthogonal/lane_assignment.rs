@@ -16,6 +16,8 @@ use super::*;
 use crate::ast::Relation;
 use crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels_auto;
 use crate::layout::geometry::Point;
+use crate::layout::routing::model::solution::{LaneAssignment, RoutePath};
+use crate::layout::routing::model::StableEdgeId;
 use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
 use std::collections::{BTreeMap, HashMap};
 
@@ -222,6 +224,7 @@ fn commit_shifted_path(
         from_port: from_side[ei],
         to_port: to_side[ei],
     };
+    // 写者归属（E6）：C 段 lane 分槽 solver，freeze 前执行。
     edge.set_polyline_points(new_points.to_vec());
     edges[ei] = edge;
 }
@@ -365,6 +368,7 @@ pub fn enforce_reverse_pair_min_gap(
                 }
             }
         }
+        // 写者归属（E6）：C 段 reverse-pair gap 收口（E4 收编为 solver finalize 步）。
         edges[fi].set_polyline_points(pa);
         edges[bi].set_polyline_points(pb);
         shifted += 2;
@@ -501,6 +505,7 @@ pub fn enforce_reverse_pair_dock_separation(
 
             shift_dock_tangent(&mut pa, at_start_f, vertical, a2);
             shift_dock_tangent(&mut pb, at_start_b, vertical, b2);
+            // 写者归属（E6）：C 段 dock 共锚分离（E4 收编为 solver finalize 步）。
             edges[fi].set_polyline_points(pa);
             edges[bi].set_polyline_points(pb);
             fixed += 2;
@@ -540,15 +545,29 @@ fn shift_dock_tangent(pts: &mut [Point], at_start: bool, vertical: bool, new_tan
     }
 }
 
+/// R7 7b：单段车道偏移决策——由 [`solve_lanes`] 产出、[`materialize_lanes`] 消费。
+///
+/// commit 时按 `si` 读**当前** `edges[ei]` 几何再施加 `offset`（与旧 `assign_lanes`
+/// 内联逐段 re-read 一致）。
+struct LaneShift {
+    ei: usize,
+    si: usize,
+    is_horizontal: bool,
+    offset: f64,
+}
+
+/// R7 7b：`solve_lanes` 输出——纯决策，不写任何几何。
+struct LaneSolution {
+    lane_groups: usize,
+    shifts: Vec<LaneShift>,
+}
+
 /// X-3: 主入口——车道分配，分离残余平行重合段。
 ///
-/// 算法步骤：
-/// 1. 收集所有 interior 段（1 ≤ si ≤ n_segs-2）
-/// 2. O(N²) 检测冲突对，Union-Find 分组
-/// 3. 每组按 (is_positive, ei, si) 排序，分配对称偏移
-/// 4. 逐段应用偏移 + 验证（反转/退化/穿透）
-/// 5. 重建 SegmentGrid
+/// Slice C3.2：solve 从 `&[RoutePath]` 读取（不依赖 EdgeLayout），
+/// materialize 仍写 EdgeLayout（过渡期，C3.4 移入 Materializer）。
 pub fn assign_lanes(
+    paths: &[RoutePath],
     edges: &mut [EdgeLayout],
     grid: &mut SegmentGrid,
     nodes: &HashMap<String, NodeLayout>,
@@ -557,20 +576,45 @@ pub fn assign_lanes(
     from_side: &[Port],
     to_side: &[Port],
     min_gap: f64,
-) -> LaneAssignmentStats {
-    let mut stats = LaneAssignmentStats::default();
-    let n = edges.len();
+) -> (Vec<LaneAssignment>, LaneAssignmentStats) {
+    let solution = solve_lanes(paths, min_gap);
+    let assignments = solution_to_assignments(&solution, paths.len());
+    let stats = materialize_lanes(
+        edges,
+        grid,
+        nodes,
+        sorted_node_ids,
+        relations,
+        from_side,
+        to_side,
+        &solution,
+    );
+    (assignments, stats)
+}
+
+/// R7 7b / Slice C3.2：车道求解——只读 `paths`，产出逐段对称 lane 偏移决策，不写几何。
+///
+/// 算法步骤（与旧 `assign_lanes` Step 1–3 逐字节等价）：
+/// 1. 收集所有 interior 段（1 ≤ si ≤ n_segs-2）
+/// 2. O(N²) 检测冲突对，Union-Find 分组
+/// 3. 每组按 (is_positive, ei, si) 排序，分配对称偏移
+fn solve_lanes(paths: &[RoutePath], min_gap: f64) -> LaneSolution {
+    let mut solution = LaneSolution {
+        lane_groups: 0,
+        shifts: Vec::new(),
+    };
+    let n = paths.len();
     if n < 2 {
-        return stats;
+        return solution;
     }
 
     // ── Step 1: 收集可偏移段 ──
     let mut segments: Vec<SegmentInfo> = Vec::new();
     for ei in 0..n {
-        if edges[ei].path_is_empty() {
+        if paths[ei].is_empty() {
             continue;
         }
-        let points: Vec<Point> = edges[ei].path_points().into_owned();
+        let points = paths[ei].points();
         if points.len() < 4 {
             continue;
         }
@@ -608,7 +652,7 @@ pub fn assign_lanes(
     }
 
     if segments.is_empty() {
-        return stats;
+        return solution;
     }
 
     // ── Step 2: 检测冲突对 + Union-Find 分组 ──
@@ -652,12 +696,10 @@ pub fn assign_lanes(
     }
 
     let multi_groups: Vec<Vec<usize>> = groups.into_values().filter(|g| g.len() >= 2).collect();
-    stats.lane_groups = multi_groups.len();
+    solution.lane_groups = multi_groups.len();
     if multi_groups.is_empty() {
-        return stats;
+        return solution;
     }
-
-    let mut shifted_edges: Vec<usize> = Vec::new();
 
     for group in &multi_groups {
         // 按 (is_positive, ei, si) 排序——Negative 在前，Positive 在后
@@ -679,42 +721,125 @@ pub fn assign_lanes(
             if offset.abs() < EPS {
                 continue;
             }
+            solution.shifts.push(LaneShift {
+                ei: seg.ei,
+                si: seg.si,
+                is_horizontal: seg.is_horizontal,
+                offset,
+            });
+        }
+    }
 
-            if edges[seg.ei].path_is_empty() {
-                stats.shifts_failed += 1;
-                continue;
-            }
-            let original: Vec<Point> = edges[seg.ei].path_points().into_owned();
-            if seg.si == 0 || seg.si + 1 >= original.len() {
-                stats.shifts_failed += 1;
-                continue;
-            }
+    solution
+}
 
-            let mut new_points = original.clone();
-            if seg.is_horizontal {
-                new_points[seg.si].y += offset;
-                new_points[seg.si + 1].y += offset;
+/// Slice C3.2：将内部 `LaneSolution` 转换为模型层 `Vec<LaneAssignment>`。
+///
+/// 每条边的 `segment_offsets` 为该边所有 interior 段的 cross-axis 偏移
+/// （索引对齐 points 的段下标，首尾段始终为 0）。
+fn solution_to_assignments(solution: &LaneSolution, n_edges: usize) -> Vec<LaneAssignment> {
+    // 收集每条边的最大偏移绝对值作为 lane index 参考。
+    let mut offsets_per_edge: Vec<Vec<(usize, f64)>> = vec![Vec::new(); n_edges];
+    for shift in &solution.shifts {
+        if shift.ei < n_edges {
+            offsets_per_edge[shift.ei].push((shift.si, shift.offset));
+        }
+    }
+    (0..n_edges)
+        .map(|ei| {
+            let segs = &offsets_per_edge[ei];
+            if segs.is_empty() {
+                LaneAssignment {
+                    edge: StableEdgeId(ei),
+                    segment_offsets: Vec::new(),
+                    lane: 0,
+                }
             } else {
-                new_points[seg.si].x += offset;
-                new_points[seg.si + 1].x += offset;
+                // 构建逐段偏移向量（以最大 si 为长度参考）。
+                let max_si = segs.iter().map(|(si, _)| *si).max().unwrap_or(0);
+                let mut segment_offsets = vec![0.0f64; max_si + 2]; // si+1 存在
+                for &(si, offset) in segs {
+                    if si < segment_offsets.len() {
+                        segment_offsets[si] = offset;
+                    }
+                }
+                // lane index：取最大偏移方向的符号 × 位置。
+                let max_abs = segs
+                    .iter()
+                    .map(|(_, o)| o.abs())
+                    .fold(0.0f64, f64::max);
+                let sign = segs
+                    .iter()
+                    .find(|(_, o)| o.abs() >= max_abs - f64::EPSILON)
+                    .map(|(_, o)| if *o > 0.0 { 1i32 } else { -1i32 })
+                    .unwrap_or(0);
+                LaneAssignment {
+                    edge: StableEdgeId(ei),
+                    segment_offsets,
+                    lane: sign,
+                }
             }
+        })
+        .collect()
+}
 
-            // 路由期保持保守：self-endpoint 仍按穿障计（避免激进 shift 引入交叉）。
-            // 端点排除仅在几何冻结后的 post-route 分离权威口径中启用。
-            if validate_shift(&original, &new_points, seg.si, nodes, sorted_node_ids, NODE_OBSTACLE_PAD, ("", "")) {
-                commit_shifted_path(
-                    edges,
-                    seg.ei,
-                    &new_points,
-                    relations,
-                    from_side,
-                    to_side,
-                );
-                shifted_edges.push(seg.ei);
-                stats.segments_shifted += 1;
-            } else {
-                stats.shifts_failed += 1;
-            }
+/// R7 7b：车道物化——edge 几何偏移与 `SegmentGrid` 重建的唯一写者。
+///
+/// 逐段读**当前** `edges[ei]` 几何、施加 offset、validate 后 commit（与旧
+/// `assign_lanes` Step 4–5 逐字节等价：fresh re-read、验证不过计 `shifts_failed`）。
+fn materialize_lanes(
+    edges: &mut [EdgeLayout],
+    grid: &mut SegmentGrid,
+    nodes: &HashMap<String, NodeLayout>,
+    sorted_node_ids: &[String],
+    relations: &[Relation],
+    from_side: &[Port],
+    to_side: &[Port],
+    solution: &LaneSolution,
+) -> LaneAssignmentStats {
+    let mut stats = LaneAssignmentStats {
+        lane_groups: solution.lane_groups,
+        ..Default::default()
+    };
+
+    let mut shifted_edges: Vec<usize> = Vec::new();
+
+    // ── Step 4: 逐段应用偏移 + 验证 ──
+    for shift in &solution.shifts {
+        if edges[shift.ei].path_is_empty() {
+            stats.shifts_failed += 1;
+            continue;
+        }
+        let original: Vec<Point> = edges[shift.ei].path_points().into_owned();
+        if shift.si == 0 || shift.si + 1 >= original.len() {
+            stats.shifts_failed += 1;
+            continue;
+        }
+
+        let mut new_points = original.clone();
+        if shift.is_horizontal {
+            new_points[shift.si].y += shift.offset;
+            new_points[shift.si + 1].y += shift.offset;
+        } else {
+            new_points[shift.si].x += shift.offset;
+            new_points[shift.si + 1].x += shift.offset;
+        }
+
+        // 路由期保持保守：self-endpoint 仍按穿障计（避免激进 shift 引入交叉）。
+        // 端点排除仅在几何冻结后的 post-route 分离权威口径中启用。
+        if validate_shift(&original, &new_points, shift.si, nodes, sorted_node_ids, NODE_OBSTACLE_PAD, ("", "")) {
+            commit_shifted_path(
+                edges,
+                shift.ei,
+                &new_points,
+                relations,
+                from_side,
+                to_side,
+            );
+            shifted_edges.push(shift.ei);
+            stats.segments_shifted += 1;
+        } else {
+            stats.shifts_failed += 1;
         }
     }
 
@@ -1171,6 +1296,13 @@ mod tests {
         Point::new(x, y)
     }
 
+    fn edges_to_paths(edges: &[EdgeLayout]) -> Vec<RoutePath> {
+        edges
+            .iter()
+            .map(|e| RoutePath::orthogonal(e.path_points().into_owned()))
+            .collect()
+    }
+
     #[test]
     fn test_two_anti_parallel_v_segments_separated() {
         // 两条 V 段同 x=200，方向相反（anti-parallel），投影重叠 → 应被分离
@@ -1182,8 +1314,9 @@ mod tests {
         grid.insert_path(&p1, 1);
         let (from_side, to_side) = empty_sides(2);
 
-        let stats = assign_lanes(
-            &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
+        let paths = edges_to_paths(&edges);
+        let (_, stats) = assign_lanes(
+            &paths, &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
             &from_side, &to_side, 8.0,
         );
 
@@ -1210,8 +1343,9 @@ mod tests {
         grid.insert_path(&p1, 1);
         let (from_side, to_side) = empty_sides(2);
 
-        let stats = assign_lanes(
-            &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
+        let paths = edges_to_paths(&edges);
+        let (_, stats) = assign_lanes(
+            &paths, &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
             &from_side, &to_side, 8.0,
         );
 
@@ -1231,8 +1365,9 @@ mod tests {
         }
         let (from_side, to_side) = empty_sides(3);
 
-        let stats = assign_lanes(
-            &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
+        let paths = edges_to_paths(&edges);
+        let (_, stats) = assign_lanes(
+            &paths, &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
             &from_side, &to_side, 8.0,
         );
 
@@ -1252,8 +1387,9 @@ mod tests {
         grid.insert_path(&p1, 1);
         let (from_side, to_side) = empty_sides(2);
 
-        let stats = assign_lanes(
-            &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
+        let paths = edges_to_paths(&edges);
+        let (_, stats) = assign_lanes(
+            &paths, &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
             &from_side, &to_side, 8.0,
         );
 
@@ -1272,8 +1408,9 @@ mod tests {
         grid.insert_path(&p1, 1);
         let (from_side, to_side) = empty_sides(2);
 
-        let stats = assign_lanes(
-            &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
+        let paths = edges_to_paths(&edges);
+        let (_, stats) = assign_lanes(
+            &paths, &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
             &from_side, &to_side, 8.0,
         );
 
@@ -1304,8 +1441,9 @@ mod tests {
         let sorted_node_ids: Vec<String> = vec!["obstacle".to_string()];
         let (from_side, to_side) = empty_sides(2);
 
-        let stats = assign_lanes(
-            &mut edges, &mut grid, &nodes, &sorted_node_ids, &empty_relations(),
+        let paths = edges_to_paths(&edges);
+        let (_, stats) = assign_lanes(
+            &paths, &mut edges, &mut grid, &nodes, &sorted_node_ids, &empty_relations(),
             &from_side, &to_side, 8.0,
         );
 
@@ -1327,8 +1465,9 @@ mod tests {
         grid.insert_path(&p1, 1);
         let (from_side, to_side) = empty_sides(2);
 
-        let stats = assign_lanes(
-            &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
+        let paths = edges_to_paths(&edges);
+        let (_, stats) = assign_lanes(
+            &paths, &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
             &from_side, &to_side, 8.0,
         );
 
@@ -1352,8 +1491,9 @@ mod tests {
         grid.insert_path(&p1, 1);
         let (from_side, to_side) = empty_sides(2);
 
-        let stats = assign_lanes(
-            &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
+        let paths = edges_to_paths(&edges);
+        let (_, stats) = assign_lanes(
+            &paths, &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
             &from_side, &to_side, 8.0,
         );
 
@@ -1372,8 +1512,9 @@ mod tests {
         grid.insert_path(&p1, 1);
         let (from_side, to_side) = empty_sides(2);
 
-        let stats = assign_lanes(
-            &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
+        let paths = edges_to_paths(&edges);
+        let (_, stats) = assign_lanes(
+            &paths, &mut edges, &mut grid, &empty_nodes(), &[], &empty_relations(),
             &from_side, &to_side, 8.0,
         );
 
@@ -1414,12 +1555,14 @@ mod tests {
         let (mut edges_a, mut grid_a, fs_a, ts_a) = mk();
         let (mut edges_b, mut grid_b, fs_b, ts_b) = mk();
 
-        let stats_a = assign_lanes(
-            &mut edges_a, &mut grid_a, &empty_nodes(), &[], &empty_relations(),
+        let paths_a = edges_to_paths(&edges_a);
+        let (_, stats_a) = assign_lanes(
+            &paths_a, &mut edges_a, &mut grid_a, &empty_nodes(), &[], &empty_relations(),
             &fs_a, &ts_a, 8.0,
         );
-        let stats_b = assign_lanes(
-            &mut edges_b, &mut grid_b, &empty_nodes(), &[], &empty_relations(),
+        let paths_b = edges_to_paths(&edges_b);
+        let (_, stats_b) = assign_lanes(
+            &paths_b, &mut edges_b, &mut grid_b, &empty_nodes(), &[], &empty_relations(),
             &fs_b, &ts_b, 8.0,
         );
 
@@ -1463,8 +1606,9 @@ mod tests {
         let sorted_node_ids: Vec<String> = vec!["obstacle".to_string()];
         let (from_side, to_side) = empty_sides(2);
 
-        let stats = assign_lanes(
-            &mut edges, &mut grid, &nodes, &sorted_node_ids, &empty_relations(),
+        let paths = edges_to_paths(&edges);
+        let (_, stats) = assign_lanes(
+            &paths, &mut edges, &mut grid, &nodes, &sorted_node_ids, &empty_relations(),
             &from_side, &to_side, 8.0,
         );
 

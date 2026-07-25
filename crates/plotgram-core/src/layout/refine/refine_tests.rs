@@ -54,16 +54,23 @@ use crate::ast::{
     ArrowType, AttributeMap, Diagram, Entity, Identifier, Relation, SourceInfo, Span,
 };
 use crate::layout::LayoutHints;
+use crate::layout::routing::model::prepared::PreparedRoutingInput;
+use crate::layout::RoutingProduct;
 use crate::types::DiagramType;
 
-/// 恒等路由器：返回 result 不做任何修改（用于测试 refine 逻辑而非路由逻辑）
+/// 恒等路由器：返回空 RoutingProduct（用于测试 refine 逻辑而非路由逻辑）
 struct IdentityRouter;
-impl EdgeRoutingStrategy for IdentityRouter {
+impl RoutingRecipeDyn for IdentityRouter {
     fn name(&self) -> &'static str {
         "identity"
     }
-    fn route(&self, _diagram: &Diagram, result: LayoutResult) -> LayoutResult {
-        result
+    fn route(&self, _input: &PreparedRoutingInput<'_>) -> RoutingProduct {
+        RoutingProduct {
+            edges: Vec::new(),
+            group_routing: None,
+            route_annotations: None,
+            orthogonal_debug: None,
+        }
     }
 }
 
@@ -321,30 +328,39 @@ fn make_diagram_with_relations(rels: Vec<(&str, &str)>) -> Diagram {
 /// 测试用路由器：将每条边路径替换为 from→to 节点中心的直线
 /// 用于验证 refine 后哪些边被重新路由（锚点是否与节点位置一致）
 struct CenterLineRouter;
-impl EdgeRoutingStrategy for CenterLineRouter {
+impl RoutingRecipeDyn for CenterLineRouter {
     fn name(&self) -> &'static str {
         "center-line"
     }
-    fn route(&self, diagram: &Diagram, mut result: LayoutResult) -> LayoutResult {
-        for (i, edge) in result.edges.iter_mut().enumerate() {
-            let Some(rel) = diagram.relations.get(i) else {
-                continue;
-            };
+    fn route(&self, input: &PreparedRoutingInput<'_>) -> RoutingProduct {
+        let mut edges = Vec::new();
+        for (i, rel) in input.diagram.relations.iter().enumerate() {
             let (Some(from_nl), Some(to_nl)) = (
-                result.nodes.get(rel.from.as_str()),
-                result.nodes.get(rel.to.as_str()),
+                input.frozen.nodes.get(rel.from.as_str()),
+                input.frozen.nodes.get(rel.to.as_str()),
             ) else {
+                edges.push(EdgeLayout::empty());
                 continue;
             };
             let from_x = from_nl.x + from_nl.width / 2.0;
             let from_y = from_nl.y + from_nl.height / 2.0;
             let to_x = to_nl.x + to_nl.width / 2.0;
             let to_y = to_nl.y + to_nl.height / 2.0;
-            edge.geometry = PathGeometry::Polyline {
-                points: vec![Point::new(from_x, from_y), Point::new(to_x, to_y)],
-            };
+            edges.push(EdgeLayout {
+                geometry: PathGeometry::Polyline {
+                    points: vec![Point::new(from_x, from_y), Point::new(to_x, to_y)],
+                },
+                labels: Vec::new(),
+                from_port: Port::Bottom,
+                to_port: Port::Top,
+            });
         }
-        result
+        RoutingProduct {
+            edges,
+            group_routing: None,
+            route_annotations: None,
+            orthogonal_debug: None,
+        }
     }
 }
 

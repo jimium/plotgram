@@ -293,12 +293,6 @@ fn find_best_channel(
     best.map(|(coord, _)| coord)
 }
 
-/// 检查通道规划器是否启用（默认开启，PLOTGRAM_CHANNEL_PLANNER=0 关闭）
-pub fn channel_planner_enabled() -> bool {
-    !std::env::var("PLOTGRAM_CHANNEL_PLANNER")
-        .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
-        .unwrap_or(false)
-}
 
 impl ChannelPlan {
     /// 获取边的垂直通道坐标
@@ -349,10 +343,6 @@ mod tests {
         assert_eq!(plan.vertical_channel_for_edge(0), None);
     }
 
-    #[test]
-    fn test_channel_planner_enabled_by_default() {
-        assert!(channel_planner_enabled());
-    }
 
     #[test]
     fn test_collect_channel_candidates() {

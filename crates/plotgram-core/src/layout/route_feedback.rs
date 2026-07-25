@@ -1,4 +1,7 @@
-//! 布局 ↔ 路由反馈：路由与 refine。
+//! 布局 ↔ 路由反馈：预路由准备 + SpacingDemandProbe。
+//!
+//! R12a：`complete_routing` 已迁入 `RoutingCoordinator::execute`。
+//! Slice A：Phase F 改为预路由 `spacing_demand_probe`（路由前估计间距需求，重解坐标）。
 
 use crate::ast::Diagram;
 use crate::layout::demand::PressureSnapshot;
@@ -6,12 +9,11 @@ use crate::layout::kernel::coordinate::model::{
     ConstraintSource, ConstraintSourceKind, CoordinateProblem, HardConstraint,
 };
 use crate::layout::kernel::coordinate::optimizer::solve;
-use crate::layout::refine::{run_refine, RefineConfig};
 use crate::layout::demand::space_budget::{
     enforce_vertical_rank_gaps, node_group_scopes,
     reverse_relation_pairs, SpaceBudget,
 };
-use crate::layout::{EdgeRoutingStrategy, LayoutResult};
+use crate::layout::LayoutResult;
 
 /// 预路由反馈：待路由布局。
 pub struct PreRouteFeedback {
@@ -29,7 +31,7 @@ impl<'a> LayoutRouteFeedback<'a> {
     }
 
     /// 预路由：确保 SpaceBudget 存在、压力 enrich、enforce 同层缝 / 可选竖缝。
-    pub fn apply_pre_route(&self, mut result: LayoutResult) -> PreRouteFeedback {
+    pub fn apply_pre_route(&self, mut result: LayoutResult, edge_pressure_budget: bool) -> PreRouteFeedback {
         if result.hints.space_budget.is_none() {
             result.hints.space_budget = Some(SpaceBudget::from_diagram(self.diagram));
         }
@@ -43,6 +45,7 @@ impl<'a> LayoutRouteFeedback<'a> {
                 &snap.corridor,
                 &snap.bands,
                 &snap.features,
+                edge_pressure_budget,
             );
         }
 
@@ -66,99 +69,37 @@ impl<'a> LayoutRouteFeedback<'a> {
         PreRouteFeedback { result }
     }
 
-    /// 路由 → refine → 仅在契约失败时兜底消重叠并增量重路由。
-    ///
-    /// `edge_snap_config` 须与 pipeline 使用同一份（含 `snap:false` / 自适应 grid_step），
-    /// 避免 S3 `reroute_and_repulse` 与后续 post_route 排斥配置不一致。
-    pub fn complete_routing(
-        &self,
-        router: &dyn EdgeRoutingStrategy,
-        mut layout: LayoutResult,
-        refine_config: &RefineConfig,
-        edge_snap_config: &crate::layout::EdgeSnapConfig,
-    ) -> LayoutResult {
-        // Phase C: 路由前冻结节点快照，路由不应修改节点坐标
-        layout.hints.frozen_nodes =
-            Some(crate::layout::kernel::frozen::freeze_nodes(&layout.nodes));
-
-        let t_route = crate::layout::perf::Instant::now();
-        let mut routed = router.route(self.diagram, layout);
-        crate::perf_log!(
-            "[perf]       router.route: {:.2}ms",
-            t_route.elapsed().as_secs_f64() * 1000.0
-        );
-
-        // Phase C: 运行时守卫——验证路由未修改节点坐标
-        if let Some(frozen) = routed.hints.frozen_nodes.as_ref() {
-            let modified = crate::layout::kernel::frozen::verify_frozen_integrity(
-                frozen,
-                &routed.nodes,
-            );
-            debug_assert!(
-                modified.is_empty(),
-                "[Phase C] 路由意外修改了节点坐标: {:?}",
-                modified
-            );
-        }
-
-        if router.supports_refine() {
-            let t_refine = crate::layout::perf::Instant::now();
-            routed = run_refine(self.diagram, routed, router, refine_config);
-            crate::perf_log!(
-                "[perf]       run_refine: {:.2}ms",
-                t_refine.elapsed().as_secs_f64() * 1000.0
-            );
-        }
-
-        // S3：仅当水平缝仍违反契约时才兜底推开 + 增量重路由 + repulse
-        // (R-4:与 pipeline.rs S3 兜底保持一致,含 repulse_edges_only；snap 配置与 pipeline 对齐)
-        let (routed, moved) = crate::layout::demand::space_budget_guard::resolve_budget_violations(
-            self.diagram, routed,
-        );
-        let mut routed = crate::layout::demand::space_budget_guard::reroute_and_repulse(
-            self.diagram, routed, router, &moved, edge_snap_config,
-        );
-
-        // Phase F: route feedback re-solve——路由后压力超阈值时重新求解坐标
-        if let Some(problem) = routed.hints.coordinate_problem.as_ref() {
-            let post_pressure = PressureSnapshot::compute(self.diagram, &routed);
-            // 从 nodes 提取当前 solver 空间坐标（cross-axis center）
-            let current_coords: Vec<f64> = problem
-                .vars
-                .iter()
-                .map(|v| {
-                    routed
-                        .nodes
-                        .get(&v.stable_id)
-                        .map(|n| n.x + n.width / 2.0)
-                        .unwrap_or(v.axis_size / 2.0) // dummy/axis: 用初值近似
-                })
-                .collect();
-
-            if let Some(new_coords) =
-                route_feedback_resolve(problem, &post_pressure, &current_coords, 2)
-            {
-                crate::perf_log!(
-                    "[route-feedback] applying re-solved coordinates, re-routing"
-                );
-                // 回写新坐标到 nodes
-                for (var, &new_c) in problem.vars.iter().zip(new_coords.iter()) {
-                    if let Some(node) = routed.nodes.get_mut(&var.stable_id) {
-                        node.x = new_c - node.width / 2.0;
-                    }
-                }
-                // 重新冻结 + 全量重路由
-                routed.hints.frozen_nodes =
-                    Some(crate::layout::kernel::frozen::freeze_nodes(&routed.nodes));
-                routed = router.route(self.diagram, routed);
-            }
-        }
-
-        routed
-    }
 }
 
-// ─── Phase E: Route feedback re-solve ────────────────────────────────────────
+// ─── Slice A: SpacingDemandProbe ─────────────────────────────────────────────
+
+/// 预路由间距需求探测（Slice A）。
+///
+/// 在正式路由之前估计 routing 压力，若超阈值则重解坐标。
+/// 不生成 edge geometry——仅输出新坐标供调用方应用。
+///
+/// 返回 `Some(new_coordinates)` 表示有改善，`None` 表示无需调整。
+pub fn spacing_demand_probe(diagram: &Diagram, result: &LayoutResult) -> Option<Vec<f64>> {
+    let problem = result.hints.coordinate_problem.as_ref()?;
+
+    // 用当前节点坐标计算压力（edges 可能为空，PressureSnapshot 容忍）。
+    let pressure = PressureSnapshot::compute(diagram, result);
+    let current_coords: Vec<f64> = problem
+        .vars
+        .iter()
+        .map(|v| {
+            result
+                .nodes
+                .get(&v.stable_id)
+                .map(|n| n.x + n.width / 2.0)
+                .unwrap_or(v.axis_size / 2.0)
+        })
+        .collect();
+
+    route_feedback_resolve(problem, &pressure, &current_coords, 2)
+}
+
+// ─── Route feedback re-solve 内核 ────────────────────────────────────────────
 
 /// 路由压力反馈阈值：corridor 超载数超过此值时触发 re-solve。
 const PRESSURE_THRESHOLD_CORRIDORS: usize = 2;

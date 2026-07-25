@@ -1,9 +1,9 @@
 use crate::ast::Diagram;
 use crate::types::DiagramType;
 use crate::layout::algorithm_config::AlgorithmOptionSpec;
+use crate::layout::routing::model::prepared::PreparedRoutingInput;
 use crate::layout::snap::grid_snap::{NodeAlignConfig, EdgeSnapConfig};
-use super::types::LayoutResult;
-use std::collections::HashSet;
+use super::types::{EdgeLayout, LayoutResult};
 
 // ─── Layout Trait ────────────────────────────────────────
 
@@ -23,7 +23,7 @@ pub trait LayoutStrategy {
     /// 避免覆盖已经精心计算好的路径。
     ///
     /// 当前返回 `true` 的布局：`sequence`。
-    /// 其他布局返回 `false`（默认），由 `EdgeRoutingStrategy` 统一计算边路径。
+    /// 其他布局返回 `false`（默认），由 `RoutingRecipeDyn` 统一计算边路径。
     fn produces_edge_geometry(&self) -> bool {
         false
     }
@@ -78,16 +78,31 @@ pub trait LayoutStrategy {
 
 // ─── EdgeRouting Trait ───────────────────────────────────
 
+/// 路由产物：只含 edges + hints delta（不含 nodes/groups）。
+///
+/// 类型上不可能修改 nodes/groups（Slice B 退出判据）。
+pub struct RoutingProduct {
+    pub edges: Vec<EdgeLayout>,
+    /// 路由写入的分组路由提示。
+    pub group_routing: Option<crate::layout::group::GroupRoutingHints>,
+    /// 路由写入的边注释集。
+    pub route_annotations: Option<crate::layout::routing::RouteAnnotationSet>,
+    /// 正交路由调试统计。
+    pub orthogonal_debug: Option<super::types::OrthoDebugStats>,
+}
+
 /// 边路由策略 trait
 ///
 /// 所有边路由算法都需要实现此 trait。
 /// 在节点布局完成后，为每条边计算几何路径与标签位置。
-pub trait EdgeRoutingStrategy {
+pub trait RoutingRecipeDyn {
     /// 算法名称
     fn name(&self) -> &'static str;
 
-    /// 在节点布局完成后，为所有边计算几何路径
-    fn route(&self, diagram: &Diagram, result: LayoutResult) -> LayoutResult;
+    /// 唯一路由入口：消费只读 PreparedRoutingInput，产出 RoutingProduct。
+    ///
+    /// 类型上不可能修改 nodes/groups。
+    fn route(&self, input: &PreparedRoutingInput<'_>) -> RoutingProduct;
 
     /// 该路由算法适用的内置图表类型列表。
     fn applicable_diagram_types(&self) -> &'static [DiagramType] {
@@ -110,50 +125,6 @@ pub trait EdgeRoutingStrategy {
     /// 该算法支持的 DSL 配置块 option 列表。
     fn option_specs(&self) -> &'static [AlgorithmOptionSpec] {
         &[]
-    }
-
-    /// 是否输出可被 refine 后处理消费的 Polyline 路径。
-    ///
-    /// refine（`refine::run_refine`）只检测 `PathGeometry::Polyline` 的穿障情况，
-    /// 对直线 / 贝塞尔路径是空跑。返回 `false` 的 router 不会进入 refine 循环。
-    /// 默认 `false`，需要 refine 的 router（如 spline / orthogonal）覆写为 `true`。
-    fn supports_refine(&self) -> bool {
-        false
-    }
-
-    /// 是否需要避障索引（用于调度层决定是否预建全图障碍索引）。
-    ///
-    /// 当前仅 spline 路由会用到可见性图避障；其他 router 返回 `false`，
-    /// 调度层据此跳过 `ObstacleIndex` 的构建开销。S3 阶段接入。
-    fn needs_obstacle_index(&self) -> bool {
-        false
-    }
-
-    /// 节点位移后的增量重路由（默认回退为全图重路由）。
-    ///
-    /// 正交路由覆写为仅重路由端点落在 `moved_node_ids` 上的边，
-    /// 其余边保留已有路径并作为已路由段参与避让。
-    fn route_after_node_moves(
-        &self,
-        diagram: &Diagram,
-        result: LayoutResult,
-        moved_node_ids: &HashSet<String>,
-    ) -> LayoutResult {
-        let _ = moved_node_ids;
-        self.route(diagram, result)
-    }
-
-    /// refine 增量重路由：保留 `preserve_edges` 中的已有路径，仅重算其余边。
-    ///
-    /// 默认实现回退为全图重路由；orthogonal 覆写为 `preserve_edges` 增量模式。
-    fn route_preserve(
-        &self,
-        diagram: &Diagram,
-        result: LayoutResult,
-        preserve_edges: &HashSet<usize>,
-    ) -> LayoutResult {
-        let _ = preserve_edges;
-        self.route(diagram, result)
     }
 
     /// 声明该路由算法的边 waypoint snap 配置。

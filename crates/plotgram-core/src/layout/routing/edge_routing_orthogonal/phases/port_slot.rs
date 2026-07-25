@@ -71,57 +71,28 @@ pub(crate) fn phase_port_slot(
         }
     }
 
-    // ── 1b. 端口选择全局协调（同侧偏好，G8 修复） ──
+    // ── 1b. 端口 side 单一写者（Slice 5） ──
     //
-    // choose_pair_sides 逐对独立选端口，同一节点的多条边可能分散在不同侧出发，
-    // 导致节点附近不必要的交叉。此阶段对每个节点的多条边做"同侧偏好"协调：
-    // 统计各侧边数，让少数派边在几何可接受时切换到多数派侧。
+    // 端口约束求解器是 pre-route 端口 side 的**唯一写者**：feedback 回环边
+    // 锁定、monitor 侧向逃逸、fanin 对齐、反向 stub 预测均已并入求解器。
+    // 上方 choose 循环仅保留为 lane 初始化（side 被求解器覆写）。
+    // 原散落的 coordinate / relieve / feedback_override / monitor / fanin pass 已删除。
     dbg_ports("after_choose", relations, &from_side, &to_side);
-    coordinate_port_sides(
-        relations,
-        nodes,
-        &mut from_side,
-        &mut to_side,
-        Some(group_ctx),
-    );
-    dbg_ports("after_coordinate", relations, &from_side, &to_side);
-    // D4 P2：默认只「拒绝往超载侧合并」（见 coordinate 内）；主动分流需
-    // PLOTGRAM_PORT_PRESSURE_RELIEVE=1（较激进，可能抬交叉，默认关）。
-    if port_pressure_relieve_enabled() {
-        relieve_overloaded_port_sides(relations, nodes, &mut from_side, &mut to_side);
-    }
-    // Phase B2：端口约束求解器优化（默认开启，PLOTGRAM_PORT_SOLVER=0 关闭）
-    if super::super::port_solver::port_solver_enabled() {
-        let assignment = super::super::port_solver::solve_port_assignment(
+    {
+        let input = super::super::port_solver::PortSolverInput {
             relations,
             nodes,
             group_ctx,
-            feedback_assignment,
-        );
+            feedback: feedback_assignment,
+            s4_monitor_corridor,
+            horizontal,
+            port_solver_v2: cfg.routing.port_solver_v2,
+        };
+        let assignment = super::super::port_solver::solve_port_assignment(&input);
         from_side = assignment.from_side;
         to_side = assignment.to_side;
     }
     dbg_ports("after_port_solver", relations, &from_side, &to_side);
-    apply_feedback_side_overrides(
-        relations,
-        feedback_assignment,
-        &mut from_side,
-        &mut to_side,
-        &mut lane,
-    );
-    dbg_ports("after_feedback_override", relations, &from_side, &to_side);
-    // S4.x：监控边同排侧廊被堵时改正对端口（须在 slot/endpoint 之前）
-    if s4_monitor_corridor {
-        feedback_side::apply_monitor_hub_escape_ports(
-            relations,
-            nodes,
-            &mut from_side,
-            &mut to_side,
-            horizontal,
-        );
-    }
-    align_fanin_target_sides(relations, nodes, &mut to_side);
-    dbg_ports("after_fanin_align", relations, &from_side, &to_side);
     crate::perf_log!(
         "[perf]     step1_ports: {:.2}ms",
         t1.elapsed().as_secs_f64() * 1000.0
@@ -249,7 +220,7 @@ pub(crate) fn phase_port_slot(
         let k = sub_groups.len();
         // 本侧实际挂载端点数；≥ TRIG 时仅温和加大 Compact 组内 pitch（不改 Concentrate / 子组带）
         let side_load: usize = sub_groups.iter().map(|g| g.len()).sum();
-        let high_pressure = port_pressure_slot_enabled() && side_load >= PORT_PRESSURE_TRIG;
+        let high_pressure = cfg.routing.port_pressure_slot && side_load >= PORT_PRESSURE_TRIG;
         let compact_pitch = if high_pressure {
             pressure_aware_slot_pitch(cfg.slot_pitch, side_load, edge_len)
         } else {
@@ -404,34 +375,6 @@ fn dbg_ports(
     }
 }
 
-/// 同宿 FanIn 若全部源节点位于目标同一侧，统一使用目标正对端口。
-///
-/// 逐边最近侧选择会把较远成员旋到 Left/Right，导致语义合流组在 S3 前被拆散。
-/// 这里只处理明确的全上/全下关系；混合方向仍保留逐边端口选择。
-fn align_fanin_target_sides(
-    relations: &[crate::ast::Relation],
-    nodes: &HashMap<String, NodeLayout>,
-    to_side: &mut [Port],
-) {
-    let mut by_target: std::collections::BTreeMap<&str, Vec<usize>> =
-        std::collections::BTreeMap::new();
-    for (edge_index, relation) in relations.iter().enumerate() {
-        by_target
-            .entry(relation.to.as_str())
-            .or_default()
-            .push(edge_index);
-    }
-    for (target_id, members) in by_target {
-        if let Some(common) = aligned_fanin_target_port(target_id, &members, relations, nodes) {
-            for edge_index in members {
-                if let Some(side) = to_side.get_mut(edge_index) {
-                    *side = common;
-                }
-            }
-        }
-    }
-}
-
 pub(crate) fn aligned_fanin_target_port(
     target_id: &str,
     members: &[usize],
@@ -535,196 +478,9 @@ fn sub_group_sort_key(
     )
 }
 
-// ═══════════════════════════════════════════════════════════
-//  P1-3: 回环边侧向通道覆盖（在端口协调后强制执行）
-// ═══════════════════════════════════════════════════════════
-
-fn apply_feedback_side_overrides(
-    relations: &[crate::ast::Relation],
-    assignment: &feedback_side::FeedbackSideAssignment,
-    from_side: &mut [Port],
-    to_side: &mut [Port],
-    lane: &mut [usize],
-) {
-    for (&edge_index, hint) in &assignment.hints {
-        if edge_index >= relations.len() {
-            continue;
-        }
-        from_side[edge_index] = hint.from_side;
-        to_side[edge_index] = hint.to_side;
-        lane[edge_index] = hint.lane;
-    }
-}
-
-// ═══════════════════════════════════════════════════════════
-//  P0-3: 端口选择全局协调（同侧偏好）
-// ═══════════════════════════════════════════════════════════
-
-/// 端口选择全局协调：对每个节点的多条边做"同侧偏好"协调。
-///
-/// `choose_pair_sides` 逐对独立选端口，同一节点的多条边可能分散在不同侧出发，
-/// 导致节点附近不必要的交叉。此函数统计各侧边数，让少数派边在几何可接受时
-/// 切换到多数派侧。
-///
-/// 协调以 pair_group 为最小单元（保持组内端口对一致性），出边/入边分开协调。
-/// 确定性：节点按 node_id 排序，多数派 tiebreak 用最小 edge_index。
-fn coordinate_port_sides(
-    relations: &[crate::ast::Relation],
-    nodes: &HashMap<String, NodeLayout>,
-    from_side: &mut [Port],
-    to_side: &mut [Port],
-    _group_ctx: Option<&crate::layout::group::GroupRoutingContext>,
-) {
-    use std::collections::{BTreeMap, BTreeSet};
-    let n = relations.len();
-    if n == 0 {
-        return;
-    }
-
-    // 1. 重建 pair_groups: pair_key -> (can_from, can_to, edge_indices)
-    let mut pair_info: BTreeMap<String, (String, String, Vec<usize>)> = BTreeMap::new();
-    for (i, rel) in relations.iter().enumerate() {
-        let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
-        let (can_from, can_to) = canonical_pair(rel.from.as_str(), rel.to.as_str());
-        pair_info
-            .entry(key)
-            .or_insert_with(|| (can_from.to_string(), can_to.to_string(), Vec::new()))
-            .2
-            .push(i);
-    }
-
-    // 2. 收集每个节点的端口信息: node_id -> Vec<(pair_key, edge_index, is_from, side_on_node)>
-    let mut node_ports: BTreeMap<String, Vec<(String, usize, bool, Port)>> = BTreeMap::new();
-    for (i, rel) in relations.iter().enumerate() {
-        let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
-        node_ports.entry(rel.from.to_string()).or_default().push((
-            key.clone(),
-            i,
-            true,
-            from_side[i],
-        ));
-        node_ports
-            .entry(rel.to.to_string())
-            .or_default()
-            .push((key.clone(), i, false, to_side[i]));
-    }
-
-    // 3. 按确定性顺序协调每个节点（已切换的 pair_group 不再处理，避免振荡）
-    let mut switched_pairs: BTreeSet<String> = BTreeSet::new();
-
-    for (node_id, ports) in &node_ports {
-        let Some(node_nl) = nodes.get(node_id) else {
-            continue;
-        };
-
-        // 分离出边和入边（排除已切换的 pair_group）
-        let mut out_ports: Vec<&(String, usize, bool, Port)> = Vec::new();
-        let mut in_ports: Vec<&(String, usize, bool, Port)> = Vec::new();
-        for entry in ports {
-            if switched_pairs.contains(&entry.0) {
-                continue;
-            }
-            if entry.2 {
-                out_ports.push(entry);
-            } else {
-                in_ports.push(entry);
-            }
-        }
-
-        // 协调出边（≥2 条才有协调意义）
-        if out_ports.len() >= 2 {
-            if let Some(majority_side) = find_majority_side(&out_ports) {
-                let maj_count = out_ports
-                    .iter()
-                    .filter(|e| e.3 == majority_side)
-                    .count();
-                // Phase 4：多数派侧已超载时不再把少数派拉过去（避免更挤）
-                if !(port_pressure_side_enabled() && maj_count >= PORT_PRESSURE_TRIG) {
-                    for entry in &out_ports {
-                        let pair_key = &entry.0;
-                        let side = entry.3;
-                        if side == majority_side || switched_pairs.contains(pair_key.as_str()) {
-                            continue;
-                        }
-                        if let Some(other_nl) = pair_other_node(pair_key, node_id, &pair_info, nodes)
-                        {
-                            if side_acceptable(node_nl, other_nl, majority_side) {
-                                switch_pair_side(
-                                    pair_key,
-                                    node_id,
-                                    majority_side,
-                                    &pair_info,
-                                    relations,
-                                    from_side,
-                                    to_side,
-                                );
-                                switched_pairs.insert(pair_key.clone());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // 协调入边
-        if in_ports.len() >= 2 {
-            if let Some(majority_side) = find_majority_side(&in_ports) {
-                let maj_count = in_ports
-                    .iter()
-                    .filter(|e| e.3 == majority_side)
-                    .count();
-                if !(port_pressure_side_enabled() && maj_count >= PORT_PRESSURE_TRIG) {
-                    for entry in &in_ports {
-                        let pair_key = &entry.0;
-                        let side = entry.3;
-                        if side == majority_side || switched_pairs.contains(pair_key.as_str()) {
-                            continue;
-                        }
-                        if let Some(other_nl) = pair_other_node(pair_key, node_id, &pair_info, nodes)
-                        {
-                            if side_acceptable(node_nl, other_nl, majority_side) {
-                                switch_pair_side(
-                                    pair_key,
-                                    node_id,
-                                    majority_side,
-                                    &pair_info,
-                                    relations,
-                                    from_side,
-                                    to_side,
-                                );
-                                switched_pairs.insert(pair_key.clone());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 /// 与 `demand` 归一化 `REF_PORT` 对齐：单侧 ≥4 视为超载。
 const PORT_PRESSURE_TRIG: usize = 4;
 
-fn port_pressure_side_enabled() -> bool {
-    !std::env::var("PLOTGRAM_PORT_PRESSURE_SIDE")
-        .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
-        .unwrap_or(false)
-}
-
-/// 主动把超载侧边挪到邻侧；默认关（校准见 microservice 交叉 +2）。
-fn port_pressure_relieve_enabled() -> bool {
-    std::env::var("PLOTGRAM_PORT_PRESSURE_RELIEVE")
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false)
-}
-
-
-/// 同侧 slot 加大错开；默认开（不换侧，只拉开）。
-fn port_pressure_slot_enabled() -> bool {
-    !std::env::var("PLOTGRAM_PORT_PRESSURE_SLOT")
-        .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
-        .unwrap_or(false)
-}
 
 /// 高压侧 Compact pitch：从 16px 向 `slot_pitch` 温和靠拢，避免一步拉到 40 抬 stub 交叉。
 fn pressure_aware_slot_pitch(base_slot_pitch: f64, side_load: usize, edge_len: f64) -> f64 {
@@ -736,262 +492,3 @@ fn pressure_aware_slot_pitch(base_slot_pitch: f64, side_load: usize, edge_len: f
     pitched.min(edge_len * 0.2).max(COMPACT_SLOT_PITCH)
 }
 
-
-/// D4 P2：对超载 `(node, side)` 把多余边 soft 分流到几何可接受的邻侧。
-///
-/// 在 `coordinate_port_sides` 之后、feedback 覆盖之前执行；默认关，见
-/// [`port_pressure_relieve_enabled`]。
-fn relieve_overloaded_port_sides(
-    relations: &[crate::ast::Relation],
-    nodes: &HashMap<String, NodeLayout>,
-    from_side: &mut [Port],
-    to_side: &mut [Port],
-) {
-    if !port_pressure_side_enabled() || relations.is_empty() {
-        return;
-    }
-    use std::collections::{BTreeMap, BTreeSet};
-
-    let mut pair_info: BTreeMap<String, (String, String, Vec<usize>)> = BTreeMap::new();
-    for (i, rel) in relations.iter().enumerate() {
-        let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
-        let (can_from, can_to) = canonical_pair(rel.from.as_str(), rel.to.as_str());
-        pair_info
-            .entry(key)
-            .or_insert_with(|| (can_from.to_string(), can_to.to_string(), Vec::new()))
-            .2
-            .push(i);
-    }
-
-    // node -> Vec<(pair_key, edge_index, is_from, side)>
-    let mut node_ports: BTreeMap<String, Vec<(String, usize, bool, Port)>> = BTreeMap::new();
-    for (i, rel) in relations.iter().enumerate() {
-        let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
-        node_ports.entry(rel.from.to_string()).or_default().push((
-            key.clone(),
-            i,
-            true,
-            from_side[i],
-        ));
-        node_ports.entry(rel.to.to_string()).or_default().push((
-            key.clone(),
-            i,
-            false,
-            to_side[i],
-        ));
-    }
-
-    let port_order = [Port::Top, Port::Bottom, Port::Left, Port::Right];
-    let mut switched_pairs: BTreeSet<String> = BTreeSet::new();
-    let mut relieved = 0usize;
-
-    for (node_id, ports) in &node_ports {
-        let Some(node_nl) = nodes.get(node_id) else {
-            continue;
-        };
-        for is_from in [true, false] {
-            let mut by_side: BTreeMap<Port, Vec<(String, usize)>> = BTreeMap::new();
-            for (pair_key, ei, from_flag, side) in ports {
-                if *from_flag != is_from {
-                    continue;
-                }
-                by_side
-                    .entry(*side)
-                    .or_default()
-                    .push((pair_key.clone(), *ei));
-            }
-            for (over_side, mut edges) in by_side {
-                if edges.len() < PORT_PRESSURE_TRIG {
-                    continue;
-                }
-                // 后分配的边优先挪开（确定性：edge_index 降序）
-                edges.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                let mut load = edges.len();
-                for (pair_key, _ei) in &edges {
-                    if load < PORT_PRESSURE_TRIG {
-                        break;
-                    }
-                    if switched_pairs.contains(pair_key.as_str()) {
-                        continue;
-                    }
-                    let Some(other_nl) =
-                        pair_other_node(pair_key, node_id, &pair_info, nodes)
-                    else {
-                        continue;
-                    };
-                    let mut moved = false;
-                    for &alt in &port_order {
-                        if alt == over_side {
-                            continue;
-                        }
-                        if !side_acceptable(node_nl, other_nl, alt) {
-                            continue;
-                        }
-                        switch_pair_side(
-                            pair_key,
-                            node_id,
-                            alt,
-                            &pair_info,
-                            relations,
-                            from_side,
-                            to_side,
-                        );
-                        switched_pairs.insert(pair_key.clone());
-                        load -= 1;
-                        relieved += 1;
-                        moved = true;
-                        break;
-                    }
-                    let _ = moved;
-                }
-            }
-        }
-    }
-
-    crate::perf_log!(
-        "[port-pressure] relieved_pairs={} trig={}",
-        relieved, PORT_PRESSURE_TRIG
-    );
-}
-
-/// 查找多数派端口。tiebreak：count 降序 → 最小 edge_index 升序 → 固定端口顺序。
-fn find_majority_side(ports: &[&(String, usize, bool, Port)]) -> Option<Port> {
-    let port_order = [Port::Top, Port::Bottom, Port::Left, Port::Right];
-    let mut counts: [(usize, usize); 4] = [(0, usize::MAX); 4]; // (count, min_edge_index)
-    for entry in ports {
-        let edge_index = entry.1;
-        let side = entry.3;
-        for (idx, p) in port_order.iter().enumerate() {
-            if side == *p {
-                counts[idx].0 += 1;
-                counts[idx].1 = counts[idx].1.min(edge_index);
-                break;
-            }
-        }
-    }
-    let mut best_idx: Option<usize> = None;
-    for (idx, (count, min_edge)) in counts.iter().enumerate() {
-        if *count == 0 {
-            continue;
-        }
-        let is_better = match best_idx {
-            None => true,
-            Some(bi) => {
-                let (bc, be) = counts[bi];
-                count > &bc
-                    || (*count == bc && min_edge < &be)
-                    || (*count == bc && min_edge == &be && idx < bi)
-            }
-        };
-        if is_better {
-            best_idx = Some(idx);
-        }
-    }
-    best_idx.map(|idx| port_order[idx])
-}
-
-/// 获取 pair_group 中 node_id 之外另一个节点的布局
-fn pair_other_node<'a>(
-    pair_key: &str,
-    node_id: &str,
-    pair_info: &std::collections::BTreeMap<String, (String, String, Vec<usize>)>,
-    nodes: &'a HashMap<String, NodeLayout>,
-) -> Option<&'a NodeLayout> {
-    let (can_from, can_to, _) = pair_info.get(pair_key)?;
-    let other_id = if can_from == node_id {
-        can_to.as_str()
-    } else {
-        can_from.as_str()
-    };
-    nodes.get(other_id)
-}
-
-/// 切换 pair_group 中 node_id 侧的端口为 new_side，保持组内端口对一致性。
-fn switch_pair_side(
-    pair_key: &str,
-    node_id: &str,
-    new_side: Port,
-    pair_info: &std::collections::BTreeMap<String, (String, String, Vec<usize>)>,
-    relations: &[crate::ast::Relation],
-    from_side: &mut [Port],
-    to_side: &mut [Port],
-) {
-    let Some((can_from, _can_to, edge_indices)) = pair_info.get(pair_key) else {
-        return;
-    };
-    for &i in edge_indices {
-        let rel = &relations[i];
-        let is_can_from_from = rel.from.as_str() == can_from.as_str();
-        if can_from == node_id {
-            // node_id 的端口是 side_a
-            if is_can_from_from {
-                from_side[i] = new_side;
-            } else {
-                to_side[i] = new_side;
-            }
-        } else {
-            // node_id == can_to，端口是 side_b
-            if is_can_from_from {
-                to_side[i] = new_side;
-            } else {
-                from_side[i] = new_side;
-            }
-        }
-    }
-}
-
-/// 判断 `side` 作为 `from` 节点连接 `to` 节点的端口是否几何可接受。
-///
-/// 复用 `choose_pair_sides` 的阈值逻辑（`slot.rs` `dy.abs() >= dx.abs() * 0.4`）。
-/// 若该方向的对端节点位移比例低于阈值，则代价过高、不可接受。
-fn side_acceptable(from: &NodeLayout, to: &NodeLayout, side: Port) -> bool {
-    let fc = node_center(from);
-    let tc = node_center(to);
-    let dx = tc.x - fc.x;
-    let dy = tc.y - fc.y;
-    let ox = range_overlap_local(from.x, from.x + from.width, to.x, to.x + to.width);
-    let oy = range_overlap_local(from.y, from.y + from.height, to.y, to.y + to.height);
-
-    match side {
-        Port::Top | Port::Bottom => {
-            if oy > EPS && ox <= EPS {
-                return false;
-            }
-            let direction_ok = match side {
-                Port::Bottom => dy > EPS,
-                Port::Top => dy < -EPS,
-                _ => unreachable!(),
-            };
-            if !direction_ok {
-                return false;
-            }
-            if ox <= EPS && oy <= EPS {
-                return dy.abs() >= dx.abs() * 0.4 - EPS;
-            }
-            if ox > EPS && oy > EPS {
-                return dy.abs() >= dx.abs() - EPS;
-            }
-            true
-        }
-        Port::Left | Port::Right => {
-            if ox > EPS && oy <= EPS {
-                return false;
-            }
-            let direction_ok = match side {
-                Port::Right => dx > EPS,
-                Port::Left => dx < -EPS,
-                _ => unreachable!(),
-            };
-            if !direction_ok {
-                return false;
-            }
-            if ox <= EPS && oy <= EPS {
-                return dx.abs() >= dy.abs() * 0.4 - EPS;
-            }
-            if ox > EPS && oy > EPS {
-                return dx.abs() >= dy.abs() - EPS;
-            }
-            true
-        }
-    }
-}

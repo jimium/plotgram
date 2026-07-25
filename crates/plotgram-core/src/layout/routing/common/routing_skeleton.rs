@@ -18,7 +18,6 @@ use crate::layout::{
 use crate::layout::routing::common::edge_geometry::{
     canonical_perpendicular, node_center, select_port,
 };
-use crate::layout::routing::common::label_avoidance::resolve_label_overlaps;
 use crate::layout::routing::common::parallel_edges::group_parallel_edges;
 use crate::layout::routing::visibility;
 use crate::layout::constants;
@@ -234,7 +233,8 @@ pub fn finalize_edges(
             edge.labels.clear();
         }
     }
-    resolve_label_overlaps(&mut edges, &result.nodes, &result.groups);
+    // R9 Slice 9a：标签冲突消解已迁至 LabelSolver::solve() 统一入口（RecipeRouter 在
+    // finalize 前调用）。此处不再重复调用 resolve_label_overlaps。
     result.edges = edges;
     result
 }

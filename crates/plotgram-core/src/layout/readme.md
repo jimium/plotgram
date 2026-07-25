@@ -3,7 +3,7 @@
 `crates/plotgram-core/src/layout` 负责 Plotgram 的节点布局与边路由。架构分为两层：
 
 - **`LayoutStrategy`**：负责节点与分组的几何布局。
-- **`EdgeRoutingStrategy`**：负责在节点布局完成后计算边路径。
+- **`RoutingRecipeDyn`**：负责在节点布局完成后计算边路径。
 
 若新方案对旧实现的改动超过 30% 或核心逻辑发生颠覆性变化，应以独立文件新增，避免破坏历史版本，便于 A/B 测试。
 

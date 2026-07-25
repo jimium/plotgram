@@ -39,6 +39,52 @@ pub struct SemanticTrunkMergeResult {
     pub degraded: HashMap<usize, String>,
 }
 
+/// R7：合流模式——区分全图 FanIn（S3）与监控枢纽局部合流（B.2）。
+///
+/// `LocalMonitor` 携带其约束（仅监控集参与），使 mode 成为 load-bearing 的
+/// 单一意图来源，而非旁挂的 `allowed_edges` 布尔旗。
+#[derive(Debug, Clone, Copy)]
+pub enum MergeMode<'a> {
+    /// S3：全图同目标 FanIn 合流。
+    GlobalFanIn,
+    /// B.2：仅 `allowed_edges` 内的监控枢纽边参与目标局部合流。
+    LocalMonitor { allowed_edges: &'a HashSet<usize> },
+}
+
+impl MergeMode<'_> {
+    fn allowed_edges(&self) -> Option<&HashSet<usize>> {
+        match self {
+            MergeMode::GlobalFanIn => None,
+            MergeMode::LocalMonitor { allowed_edges } => Some(allowed_edges),
+        }
+    }
+}
+
+/// R7：bundle 求解问题——编译 semantic merge 的输入事实（只读引用）。
+pub struct BundleProblem<'a> {
+    pub mode: MergeMode<'a>,
+    pub relations: &'a [Relation],
+    pub from_side: &'a [Port],
+    pub to_side: &'a [Port],
+    pub nodes: &'a HashMap<String, NodeLayout>,
+    pub diagram_type: DiagramType,
+}
+
+/// R7：单个 bundle 的求解结果——merge 区间决策 + 每个成员待物化的折线。
+struct BundlePlan {
+    interval: MergeInterval,
+    /// `(edge_index, 合流后折线)`；下标即 bundle 成员（按声明序）。
+    new_paths: Vec<(usize, Vec<Point>)>,
+}
+
+/// R7：`solve_bundles` 的输出——纯决策，不含几何写权。
+#[derive(Default)]
+pub struct BundleSolveResult {
+    plans: Vec<BundlePlan>,
+    degraded: HashMap<usize, String>,
+    stats: SemanticTrunkMergeStats,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum SemanticMergeKey {
     FanIn { to_id: String, to_port: u8 },
@@ -60,7 +106,7 @@ fn is_vertical_port(p: Port) -> bool {
 /// C 阶段：architecture FanIn 合流。
 ///
 /// - 无组：全开（S3）
-/// - 有组（S3.2b）：同样尝试；`try_merge_fan_in` 穿模则 degraded，不改路径
+/// - 有组（S3.2b）：同样尝试；`solve_fan_in` 穿模则 degraded，不改路径
 pub fn apply_semantic_trunk_merge(
     edges: &mut [EdgeLayout],
     relations: &[Relation],
@@ -69,16 +115,19 @@ pub fn apply_semantic_trunk_merge(
     nodes: &HashMap<String, NodeLayout>,
     diagram_type: DiagramType,
     _has_groups: bool,
-) -> SemanticTrunkMergeResult {
-    apply_semantic_trunk_merge_filtered(
-        edges,
+) -> (SemanticTrunkMergeResult, Vec<crate::layout::routing::model::BundleSolution>) {
+    let problem = BundleProblem {
+        mode: MergeMode::GlobalFanIn,
         relations,
         from_side,
         to_side,
         nodes,
         diagram_type,
-        None,
-    )
+    };
+    let solved = solve_bundles(&problem, edges);
+    let bundle_solutions = bundle_solutions_from_solve(&solved);
+    let result = materialize_bundles(edges, &solved);
+    (result, bundle_solutions)
 }
 
 /// S4 之后对监控边做目标局部合流；只改 `allowed_edges`，不把监控干混入业务干。
@@ -91,36 +140,86 @@ pub fn apply_monitor_local_trunk_merge(
     diagram_type: DiagramType,
     allowed_edges: &HashSet<usize>,
 ) -> SemanticTrunkMergeResult {
-    apply_semantic_trunk_merge_filtered(
-        edges,
+    let problem = BundleProblem {
+        mode: MergeMode::LocalMonitor { allowed_edges },
         relations,
         from_side,
         to_side,
         nodes,
         diagram_type,
-        Some(allowed_edges),
-    )
+    };
+    let solved = solve_bundles(&problem, edges);
+    materialize_bundles(edges, &solved)
 }
 
-fn apply_semantic_trunk_merge_filtered(
-    edges: &mut [EdgeLayout],
-    relations: &[Relation],
-    from_side: &[Port],
-    to_side: &[Port],
-    nodes: &HashMap<String, NodeLayout>,
-    diagram_type: DiagramType,
-    allowed_edges: Option<&HashSet<usize>>,
-) -> SemanticTrunkMergeResult {
-    let mut out = SemanticTrunkMergeResult::default();
-    if !matches!(diagram_type, DiagramType::Architecture) {
-        return out;
+/// Slice C3.3：将内部 `BundleSolveResult` 转换为模型层 `Vec<BundleSolution>`。
+///
+/// 每个 `BundlePlan` 产出一个 `BundleSolution`，携带 trunk 共享段坐标、
+/// junction 分支点、退化标记。
+pub fn bundle_solutions_from_solve(solved: &BundleSolveResult) -> Vec<crate::layout::routing::model::BundleSolution> {
+    use crate::layout::routing::model::{BundleSolution, StableEdgeId};
+    solved
+        .plans
+        .iter()
+        .map(|plan| {
+            let members: Vec<StableEdgeId> = plan
+                .new_paths
+                .iter()
+                .map(|(ei, _)| StableEdgeId(*ei))
+                .collect();
+            // trunk 共享段：从 MergeInterval 提取起止点。
+            let iv = &plan.interval;
+            let (start, end) = if iv.horizontal {
+                (
+                    Point::new(iv.t0, iv.coord),
+                    Point::new(iv.t1, iv.coord),
+                )
+            } else {
+                (
+                    Point::new(iv.coord, iv.t0),
+                    Point::new(iv.coord, iv.t1),
+                )
+            };
+            // junction：trunk 两端点即为分支点。
+            let junctions = vec![start, end];
+            BundleSolution {
+                members,
+                trunk_segments: vec![(start, end)],
+                junctions,
+                degraded: false,
+            }
+        })
+        .chain(solved.degraded.keys().map(|&ei| {
+            BundleSolution {
+                members: vec![StableEdgeId(ei)],
+                trunk_segments: Vec::new(),
+                junctions: Vec::new(),
+                degraded: true,
+            }
+        }))
+        .collect()
+}
+
+/// R7：bundle 求解——只读 `edges`，产出每个 bundle 的成员/merge 区间/物化折线决策。
+///
+/// 不写任何几何（几何写权归 [`materialize_bundles`]）。分组按 `SemanticMergeKey`
+/// 稳定序处理、先到先占（`claimed`）：各组只读/只写自身成员、且成员集互斥，故
+/// 「先求解全部计划再统一物化」与旧的「逐组即时改写」逐字节等价。
+pub fn solve_bundles(problem: &BundleProblem, edges: &[EdgeLayout]) -> BundleSolveResult {
+    let mut solved = BundleSolveResult::default();
+    if !matches!(problem.diagram_type, DiagramType::Architecture) {
+        return solved;
     }
-    if relations.len() != edges.len() {
-        return out;
+    if problem.relations.len() != edges.len() {
+        return solved;
     }
 
-    let groups = collect_semantic_merge_groups(relations, to_side, allowed_edges);
-    out.stats.groups_considered = groups.len();
+    let groups = collect_semantic_merge_groups(
+        problem.relations,
+        problem.to_side,
+        problem.mode.allowed_edges(),
+    );
+    solved.stats.groups_considered = groups.len();
 
     let mut claimed: HashSet<usize> = HashSet::new();
     let mut keys: Vec<SemanticMergeKey> = groups.keys().cloned().collect();
@@ -136,21 +235,44 @@ fn apply_semantic_trunk_merge_filtered(
         }
         members.sort_unstable();
 
-        let ok = try_merge_fan_in(
-            &members, edges, relations, from_side, to_side, nodes, &key, &mut out,
-        );
-        if ok {
-            out.stats.groups_merged += 1;
-            for &ei in &members {
-                claimed.insert(ei);
+        match solve_fan_in(&members, edges, problem, &key) {
+            Some(plan) => {
+                solved.stats.groups_merged += 1;
+                for &ei in &members {
+                    claimed.insert(ei);
+                }
+                solved.plans.push(plan);
             }
-        } else {
-            out.stats.degraded_groups += 1;
-            for &ei in &members {
-                out.degraded
-                    .entry(ei)
-                    .or_insert_with(|| DEGRADED_MERGE.to_string());
+            None => {
+                solved.stats.degraded_groups += 1;
+                for &ei in &members {
+                    solved
+                        .degraded
+                        .entry(ei)
+                        .or_insert_with(|| DEGRADED_MERGE.to_string());
+                }
             }
+        }
+    }
+    solved
+}
+
+/// R7：bundle 物化——edge geometry 与 `merge_intervals` 的唯一写者。
+pub fn materialize_bundles(
+    edges: &mut [EdgeLayout],
+    solved: &BundleSolveResult,
+) -> SemanticTrunkMergeResult {
+    let mut out = SemanticTrunkMergeResult {
+        stats: solved.stats.clone(),
+        merge_intervals: HashMap::new(),
+        degraded: solved.degraded.clone(),
+    };
+    for plan in &solved.plans {
+        for (ei, pts) in &plan.new_paths {
+            // 写者归属（E6）：C 段语义 trunk 合并 solver，freeze 前执行。
+            edges[*ei].set_polyline_points(pts.clone());
+            out.merge_intervals.insert(*ei, vec![plan.interval.clone()]);
+            out.stats.edges_rewritten += 1;
         }
     }
     out
@@ -208,26 +330,30 @@ fn group_key_str(key: &SemanticMergeKey) -> String {
     }
 }
 
-fn try_merge_fan_in(
+/// R7：单 bundle 求解——只读 `edges`，不写几何。
+///
+/// 由旧 `try_merge_fan_in` 抽出：所有原 `return false`（不可合流）→ `None`，
+/// 末尾原地写 edge 的分支改为返回 [`BundlePlan`]（区间 + 每成员待物化折线）。
+fn solve_fan_in(
     members: &[usize],
-    edges: &mut [EdgeLayout],
-    relations: &[Relation],
-    from_side: &[Port],
-    to_side: &[Port],
-    nodes: &HashMap<String, NodeLayout>,
+    edges: &[EdgeLayout],
+    problem: &BundleProblem,
     key: &SemanticMergeKey,
-    out: &mut SemanticTrunkMergeResult,
-) -> bool {
+) -> Option<BundlePlan> {
+    let relations = problem.relations;
+    let from_side = problem.from_side;
+    let to_side = problem.to_side;
+    let nodes = problem.nodes;
     let to_port = to_side[members[0]];
     if !members.iter().all(|&ei| to_side[ei] == to_port) {
-        return false;
+        return None;
     }
 
     let mut ends: Vec<(usize, Vec<Point>, Point)> = Vec::new();
     for &ei in members {
         let pts: Vec<Point> = edges[ei].path_points().into_owned();
         if pts.len() < 2 {
-            return false;
+            return None;
         }
         let end = *pts.last().unwrap();
         ends.push((ei, pts, end));
@@ -240,7 +366,7 @@ fn try_merge_fan_in(
     let (_, toy) = port_outward(to_port);
     let end_y = ends[0].2.y;
     if !ends.iter().all(|(_, _, end)| (end.y - end_y).abs() <= 1.0) {
-        return false;
+        return None;
     }
     let fork_y = end_y + toy * PORT_CLEARANCE;
     // 同 rank、同出侧的源节点优先在源 stub 后立即合流，保证 pendant fan-in 对称；
@@ -274,7 +400,7 @@ fn try_merge_fan_in(
     let join_y =
         aligned_source_join.unwrap_or_else(|| fork_y + toy * MIN_SHARED_TRUNK_LEN.max(32.0));
     if (join_y - fork_y).abs() + EPS < MIN_SHARED_TRUNK_LEN {
-        return false;
+        return None;
     }
 
     let gkey = group_key_str(key);
@@ -301,7 +427,7 @@ fn try_merge_fan_in(
         } else {
             // 只重写目标附近 suffix：源端 stub、走廊选择与绕障前缀保持原路由写者的结果。
             let Some(prefix) = prefix_through_horizontal_cut(old_path, join_y) else {
-                return false;
+                return None;
             };
             prefix
         };
@@ -319,20 +445,18 @@ fn try_merge_fan_in(
         pts.push(shared_end);
         let pts = simplify_path(pts, true);
         if pts.len() < 4 {
-            return false;
+            return None;
         }
         if path_hits_nodes(&pts, nodes, &relations[*ei]) {
-            return false;
+            return None;
         }
         new_paths.push((*ei, pts));
     }
 
-    for (ei, pts) in new_paths {
-        edges[ei].set_polyline_points(pts);
-        out.merge_intervals.insert(ei, vec![interval.clone()]);
-        out.stats.edges_rewritten += 1;
-    }
-    true
+    Some(BundlePlan {
+        interval,
+        new_paths,
+    })
 }
 
 /// 保留路径到最后一次穿过 `cut_y` 的位置（面向目标的最近交点）。
@@ -469,7 +593,7 @@ mod tests {
         nodes.insert("c".into(), node(270.0, 50.0, 60.0, 50.0));
         nodes.insert("pg".into(), node(160.0, 200.0, 100.0, 50.0));
 
-        let result = apply_semantic_trunk_merge(
+        let (result, _) = apply_semantic_trunk_merge(
             &mut edges,
             &relations,
             &from_side,
@@ -517,7 +641,7 @@ mod tests {
                 Port::Top,
             ),
         ];
-        let result = apply_semantic_trunk_merge(
+        let (result, _) = apply_semantic_trunk_merge(
             &mut edges,
             &relations,
             &[Port::Bottom, Port::Bottom],

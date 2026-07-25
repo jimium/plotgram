@@ -11,7 +11,7 @@
 //! - 错位节点对（如认证服务 ↔ 数据库/缓存），slot 不对齐 → 自然生成折线。
 
 use crate::layout::algorithm_config::{AlgorithmOptionSpec, OptionKind};
-use crate::layout::{EdgeRoutingStrategy, EdgeSnapConfig, LayoutResult};
+use crate::layout::LayoutResult;
 use crate::types::DiagramType;
 use crate::ast::Diagram;
 
@@ -38,19 +38,20 @@ pub(super) mod scoring;
 pub(super) mod simplify;
 pub(super) mod shape_boundary;
 pub(super) mod slot;
-pub(super) mod slot_replan;
 pub(super) mod conflict_reroute;
 pub(super) mod contract;
 pub(super) mod sanitize;
 pub(super) mod straighten;
-pub(super) mod stub_fix;
 pub(super) mod stub_occupancy;
 pub(super) mod semantic_trunk_merge;
+pub(super) mod draft;
 pub(super) mod run;
 pub(super) mod phases;
 pub(super) mod visibility_graph;
 pub(super) mod port_solver;
 pub(super) mod channel_planner;
+pub(super) mod resource_graph;
+pub(super) mod path_solver;
 pub mod crossing_reduction;
 
 // Re-exports for cross-submodule access via `use super::*;`
@@ -71,11 +72,8 @@ pub(super) use slot::{
     choose_docking_strategy, choose_pair_sides, choose_pair_sides_with_group, is_vertical_port, slot_anchor, slot_fraction,
     slot_fraction_around, DockingStrategy, Endpoint,
 };
-pub(super) use slot_replan::replan_slots;
-pub(super) use conflict_reroute::reroute_conflicting_edges;
-pub use sanitize::{
-    sanitize_orthogonal_edges, sanitize_orthogonal_edges_ext, sanitize_orthogonal_edges_with_guard,
-};
+// Slice D3：sanitize 内核不再对外再导出——canonicalize 归 materializer，
+// 调用方经 `GeometryMaterializer::canonicalize_orthogonal_edges` 进入。
 pub use lane_assignment::{
     enforce_reverse_pair_dock_separation, enforce_reverse_pair_min_gap,
     separate_unrelated_trunk_overlaps_post_route,
@@ -86,18 +84,17 @@ pub use stub_occupancy::{
     StubOccupancyConflict, StubOccupancyRecord, StubOccupancyStats,
 };
 pub(super) use straighten::straighten_preferred_alignments;
-pub(super) use stub_fix::fix_reverse_stub_ports;
 
-// run.rs 内被 slot_replan / conflict_reroute / straighten / stub_fix 等兄弟模块调用的共享辅助
+// run.rs 内被 conflict_reroute / straighten 等兄弟模块调用的共享辅助
 pub(super) use run::{
     endpoint_bundling_key, range_overlap_local, should_strict_group_transit,
     validated_corridor_path,
 };
 
-// run 总控各 phase 实现（A4 从 run.rs 拆出）；供总控与 stub_fix 经 `use super::*` 调用
+// run 总控各 phase 实现（A4 从 run.rs 拆出）；供总控调用
 pub(super) use phases::{
-    aligned_fanin_target_port, extract_protected_vertical_trunks, phase_lane, phase_layer_order,
-    phase_port_correction, phase_port_slot, phase_reroute, phase_reroute_feedback_after_trunk,
+    extract_protected_vertical_trunks, phase_lane, phase_layer_order,
+    phase_port_slot, phase_reroute_feedback_after_trunk,
     phase_route_edges, phase_sanitize,
 };
 
@@ -134,6 +131,8 @@ pub struct OrthoConfig {
     pub slot_pitch: f64,
     /// 侧通道距障碍节点的留白
     pub channel_margin: f64,
+    /// 路由算法正式配置（Slice B：原 PLOTGRAM_* 正式 env 硬切于此）。
+    pub routing: crate::layout::routing::config::RoutingConfig,
 }
 
 impl OrthoConfig {
@@ -141,6 +140,7 @@ impl OrthoConfig {
         Self {
             slot_pitch: ORTHOGONAL_OPTIONS[0].default,
             channel_margin: ORTHOGONAL_OPTIONS[1].default,
+            routing: Default::default(),
         }
     }
 }
@@ -164,59 +164,14 @@ impl OrthogonalRouting {
             config: OrthoConfig {
                 slot_pitch: options.get_or_default(&ORTHOGONAL_OPTIONS[0]),
                 channel_margin: options.get_or_default(&ORTHOGONAL_OPTIONS[1]),
+                routing: Default::default(),
             },
         }
     }
 }
 
-impl EdgeRoutingStrategy for OrthogonalRouting {
-    fn name(&self) -> &'static str {
-        "orthogonal"
-    }
-
-    fn applicable_diagram_types(&self) -> &'static [DiagramType] {
-        APPLICABLE_TYPES
-    }
-
-    fn supports_custom(&self) -> bool {
-        true
-    }
-
-    fn option_specs(&self) -> &'static [AlgorithmOptionSpec] {
-        ORTHOGONAL_OPTIONS
-    }
-
-    fn route(&self, diagram: &Diagram, result: LayoutResult) -> LayoutResult {
-        route_edges_orthogonal(diagram, result, self.config)
-    }
-
-    fn route_after_node_moves(
-        &self,
-        diagram: &Diagram,
-        result: LayoutResult,
-        moved_node_ids: &std::collections::HashSet<String>,
-    ) -> LayoutResult {
-        reroute_edges_touching_nodes(diagram, result, self.config, moved_node_ids)
-    }
-
-    fn route_preserve(
-        &self,
-        diagram: &Diagram,
-        result: LayoutResult,
-        preserve_edges: &std::collections::HashSet<usize>,
-    ) -> LayoutResult {
-        reroute_edges_preserve(diagram, result, self.config, preserve_edges)
-    }
-
-    /// orthogonal 输出 Polyline（折线路径），需要 refine 检测穿障并推开问题节点。
-    fn supports_refine(&self) -> bool {
-        true
-    }
-
-    fn edge_snap_config(&self) -> EdgeSnapConfig {
-        EdgeSnapConfig::default_orthogonal()
-    }
-}
+// R10b: RoutingRecipeDyn impl 已删除——orthogonal 经 RecipeRouter<OrthogonalRecipe> 驱动。
+// OrthogonalRouting 保留为历史参考，不再参与 pipeline 调度。
 
 /// 从节点边界向外延伸的短线段，避免一出线就折回节点内部
 pub(super) const PORT_CLEARANCE: f64 = 16.0;
@@ -257,6 +212,16 @@ pub fn route_edges_orthogonal(
     cfg: OrthoConfig,
 ) -> LayoutResult {
     run::route_edges_orthogonal_inner(diagram, result, cfg, None)
+}
+
+/// 正交路由内核（支持 preserve 增量重路由）——供 recipe/orthogonal.rs 调用。
+pub(crate) fn route_orthogonal_inner(
+    diagram: &Diagram,
+    result: LayoutResult,
+    cfg: OrthoConfig,
+    preserve: Option<std::collections::HashSet<usize>>,
+) -> LayoutResult {
+    run::route_edges_orthogonal_inner(diagram, result, cfg, preserve)
 }
 
 /// 节点位移后的增量重路由：仅重算端点落在 `moved_node_ids` 上的边。

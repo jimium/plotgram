@@ -1,0 +1,90 @@
+// Layout Stress: yFiles 数据管道拓扑（仅图形结构）
+// @role: stress  (authoritative: filename prefix)
+//
+// 来源：yFiles 官网/文档截图中的数据管道示例图（拓扑转写，节点语义已抽象）。
+// 算法探针：23 节点 / 31 边 DAG；顶层四路扇出、bypass 长边、多路扇入汇聚、正交路由通道争用。
+diagram flowchart {
+    title: "布局测试：yFiles 数据管道拓扑"
+    config {
+        direction: top-to-bottom
+        edge_routing: orthogonal
+    }
+
+    // ── 主干 ──
+    entity[start] n0 "入口"
+    entity[process] n1 "路由"
+    entity[process] j1 "·"          // 无标签小方块
+    entity[process] n2 "湖仓"
+    entity[process] n3 "API"
+    entity[end]   n_sink "出口"
+
+    // ── 路由三分支 ──
+    entity[process] j2 "·"
+    entity[process] c1 "·"          // 竖向胶囊 → flowchart 无独立形状，用 process 占位
+    entity[process] n4 "重试队列"
+
+    // ── 左路：三路汇入去重 ──
+    entity[process] n5 "批处理"
+    entity[process] j3 "·"
+    entity[process] n6 "预取"
+    entity[process] n7 "源A"
+    entity[process] c2 "·"
+    entity[process] j4 "·"
+    entity[process] n8 "去重"
+
+    // ── 右路：两路汇入发布 ──
+    entity[process] j5 "·"
+    entity[process] n9 "流处理"
+    entity[process] c3 "·"
+    entity[process] j6 "·"
+
+    // ── 湖仓支路 ──
+    entity[process] c4 "·"
+    entity[process] n10 "归档"
+    entity[process] n11 "发布"      // 汇聚点
+
+    // 顶层四路扇出
+    n0 -> n1
+    n0 -> j1
+    n0 -> n3
+    n0 -> n_sink                    // 右侧 bypass 长边
+
+    // 路由三分支
+    n1 -> j2
+    n1 -> c1
+    n1 -> n4
+
+    // 左路 → 去重 → 发布
+    j2 -> n5
+    j2 -> j3
+    j2 -> n7
+    n5 -> n8
+    j3 -> n6
+    n6 -> n8
+    n7 -> c2
+    c2 -> j4
+    j4 -> n8
+    n8 -> n11
+
+    // 中路直达
+    c1 -> n11
+
+    // 右路 → 发布
+    n4 -> j5
+    n4 -> c3
+    j5 -> n9
+    n9 -> n11
+    c3 -> j6
+    j6 -> n11
+
+    // 湖仓支路
+    j1 -> n2
+    n2 -> c4
+    c4 -> n11
+    c4 -> n10
+    n10 -> n_sink
+
+    // 其余汇流
+    n3 -> n_sink
+    n11 -> n_sink
+}

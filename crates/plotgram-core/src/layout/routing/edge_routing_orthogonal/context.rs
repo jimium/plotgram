@@ -14,6 +14,7 @@ use crate::layout::routing::common::spatial_grid::SpatialGrid;
 use super::{ChannelLoadMap, OrthoConfig, OrthoRoutingProfile, RoutedSegment};
 use super::slot::Endpoint;
 use super::visibility_graph::OrthogonalVisibilityGraph;
+use super::resource_graph::ResourceGraph;
 
 /// Shared, read-only routing context for a single `route_edges_orthogonal` call.
 ///
@@ -50,6 +51,9 @@ pub struct OrthoRoutingContext<'a> {
     pub planned_channel: Option<f64>,
     /// P3-1: 第一轮粗路由模式——跳过 crossing_penalty（尚无全局拥堵信息）
     pub first_pass: bool,
+    /// Slice 6a: 只读资源统一层（obstacles/OVG/channel/corridor 收敛视图）。
+    /// flag `PLOTGRAM_RESOURCE_GRAPH` 关闭时为 None；Slice 6b PathAssignmentSolver 消费。
+    pub resource_graph: Option<&'a ResourceGraph<'a>>,
 }
 
 impl<'a> OrthoRoutingContext<'a> {
@@ -79,6 +83,7 @@ impl<'a> OrthoRoutingContext<'a> {
             ovg: None,
             planned_channel: None,
             first_pass: false,
+            resource_graph: None,
         }
     }
 
@@ -124,6 +129,13 @@ impl<'a> OrthoRoutingContext<'a> {
     /// P3-1: 设置第一轮粗路由模式。
     pub fn with_first_pass(mut self, v: bool) -> Self {
         self.first_pass = v;
+        self
+    }
+
+    /// Slice 6a: 注入只读资源统一层。
+    #[allow(dead_code)] // Slice 6b PathAssignmentSolver 消费
+    pub fn with_resource_graph(mut self, rg: &'a ResourceGraph<'a>) -> Self {
+        self.resource_graph = Some(rg);
         self
     }
 }

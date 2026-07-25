@@ -206,6 +206,7 @@ impl SpaceBudget {
         corridor: &crate::layout::demand::CorridorModel,
         bands: &[crate::layout::demand::BandDemand],
         edge_features: &[crate::layout::demand::EdgeFeatures],
+        edge_pressure_budget: bool,
     ) {
         let profile = crate::layout::demand::band::EdgeBandDemandProfile::for_diagram(
             diagram.diagram_type.clone(),
@@ -293,7 +294,7 @@ impl SpaceBudget {
             }
         }
 
-        if edge_pressure_budget_enabled() {
+        if edge_pressure_budget {
             self.enrich_from_edge_features(diagram, nodes, edge_features, max_extra, lane);
         }
     }
@@ -443,11 +444,6 @@ fn raise_nearest_cross_group_pairs(
     }
 }
 
-fn edge_pressure_budget_enabled() -> bool {
-    !std::env::var("PLOTGRAM_EDGE_PRESSURE_BUDGET")
-        .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
-        .unwrap_or(false)
-}
 
 fn canonical_pair(a: &str, b: &str) -> (String, String) {
     if a <= b {

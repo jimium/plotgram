@@ -5,6 +5,7 @@
 use super::super::*;
 use crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels;
 use crate::layout::routing::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
+use crate::layout::routing::model::solution::EndpointAssignment;
 use std::collections::HashMap;
 
 /// 从 S3 merge_intervals 提取垂直受保护干线 `(x, y_lo, y_hi)`（去重、排序）。
@@ -44,9 +45,7 @@ pub(crate) fn phase_reroute_feedback_after_trunk(
     feedback_edge_set: &std::collections::HashSet<usize>,
     relations: &[crate::ast::Relation],
     nodes: &HashMap<String, NodeLayout>,
-    from_side: &[Port],
-    to_side: &[Port],
-    endpoint_map: &HashMap<(usize, bool), Endpoint>,
+    endpoint_assignments: &[EndpointAssignment],
     edges: &mut [EdgeLayout],
     grid: &mut SegmentGrid,
     cfg: &OrthoConfig,
@@ -67,12 +66,10 @@ pub(crate) fn phase_reroute_feedback_after_trunk(
     grid.remove_by_edges(&order);
     let mut rerouted = 0usize;
     for &ei in &order {
-        let Some(from_ep) = endpoint_map.get(&(ei, true)) else {
+        if ei >= endpoint_assignments.len() {
             continue;
-        };
-        let Some(to_ep) = endpoint_map.get(&(ei, false)) else {
-            continue;
-        };
+        }
+        let ea = &endpoint_assignments[ei];
         let (from_id, to_id) = relations
             .get(ei)
             .map(|rel| (rel.from.as_str(), rel.to.as_str()))
@@ -80,6 +77,8 @@ pub(crate) fn phase_reroute_feedback_after_trunk(
         if from_id == to_id {
             continue;
         }
+        let from_ep = ea.project_endpoint(true, from_id.to_string(), Point::zero());
+        let to_ep = ea.project_endpoint(false, to_id.to_string(), Point::zero());
         let pair = EndpointPair {
             from: from_ep.clone(),
             to: to_ep.clone(),
@@ -163,8 +162,8 @@ pub(crate) fn phase_reroute_feedback_after_trunk(
         let mut edge = EdgeLayout {
             geometry: PathGeometry::Polyline { points: Vec::new() },
             labels,
-            from_port: from_side[ei],
-            to_port: to_side[ei],
+            from_port: ea.from_port,
+            to_port: ea.to_port,
         };
         edge.set_polyline_points(path);
         edges[ei] = edge;

@@ -366,7 +366,9 @@ impl EdgeLayout {
         self.geometry.polyline_points()
     }
 
-    pub fn polyline_points_mut(&mut self) -> Option<&mut Vec<Point>> {
+    /// Slice E5：几何写入口收敛——生产路径仅限 materializer 边界与
+    /// freeze 前的 solver/snap 阶段，不对 crate 外暴露。
+    pub(crate) fn polyline_points_mut(&mut self) -> Option<&mut Vec<Point>> {
         self.geometry.polyline_points_mut()
     }
 
@@ -382,7 +384,9 @@ impl EdgeLayout {
         }
     }
 
-    pub fn set_polyline_points(&mut self, points: Vec<Point>) {
+    /// Slice E5：几何写入口收敛——同 `polyline_points_mut`，仅 crate 内
+    ///（materializer 边界 / freeze 前 solver）可写。
+    pub(crate) fn set_polyline_points(&mut self, points: Vec<Point>) {
         self.geometry = if points.len() <= 2 {
             PathGeometry::Straight {
                 start: points[0],
@@ -478,18 +482,18 @@ pub struct LayoutHints {
     /// Feedback hub：(hub_entity_id, primary_pred_entity_id)，路由走侧廊。
     // WRITE: layout(sugiyama same-layer)  READ: render(orthogonal routing)
     pub feedback_hubs: Vec<(String, String)>,
-    /// solver 完成后的冻结节点快照（Phase C: typestate 守卫）。
-    ///
-    /// 路由/refine 阶段只读访问，用于运行时验证节点未被意外修改。
-    /// `None` 表示尚未冻结（兼容旧路径）。
-    // WRITE: layout(solver complete)  READ: render/refine(verify integrity)
-    pub frozen_nodes: Option<HashMap<String, crate::layout::kernel::frozen::FrozenNodeLayout>>,
     /// 坐标求解问题 IR（Phase E: route feedback re-solve 用）。
     ///
     /// 布局策略在 solver 完成后填充，供路由压力反馈重新求解。
     /// `None` 表示不支持 re-solve（兼容旧路径）。
     // WRITE: layout(solver complete)  READ: route_feedback(re-solve)
     pub coordinate_problem: Option<Box<crate::layout::kernel::coordinate::model::CoordinateProblem>>,
+    /// 正交路由 C 段结构化解（Slice C2c：ports + paths + lanes + bundles）。
+    ///
+    /// 由 `route_edges_orthogonal_inner` 在 C 末组装；供 Recipe 直接消费，
+    /// 避免事后从 EdgeLayout lift 为 RoutePath。
+    // WRITE: render(route_edges_orthogonal @ C end)  READ: recipe(materialize)
+    pub route_solution: Option<crate::layout::routing::model::RouteSolution>,
 }
 
 /// EGB + PRS 性能与效果观测（不影响布局结果）。

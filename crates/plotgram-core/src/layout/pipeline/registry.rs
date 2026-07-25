@@ -1,7 +1,7 @@
 //! 布局/边路由算法注册表（名称列表与工厂入口的唯一来源）。
 
 use super::plan::LayoutPlan;
-use crate::layout::{EdgeRoutingStrategy, LayoutStrategy};
+use crate::layout::{RoutingRecipeDyn, LayoutStrategy};
 
 /// 已注册的节点布局算法名（与 `build_layout_strategy` 保持一致）。
 ///
@@ -53,27 +53,27 @@ pub(super) fn build_layout_strategy(
 pub(super) fn build_edge_routing_strategy(
     algo: &str,
     plan: &LayoutPlan,
-) -> Option<Box<dyn EdgeRoutingStrategy>> {
-    use crate::layout::routing::{
-        edge_routing, edge_routing_bezier, edge_routing_circular, edge_routing_organic,
-        edge_routing_orthogonal, edge_routing_spline,
+) -> Option<Box<dyn RoutingRecipeDyn>> {
+    use crate::layout::routing::recipe::{
+        BezierRecipe, CircularRecipe, OrganicRecipe, OrthogonalRecipe, RecipeRouter, SplineRecipe,
+        StraightRecipe,
     };
 
-    let strategy: Box<dyn EdgeRoutingStrategy> = match algo {
-        "straight" => Box::new(edge_routing::StraightRouting),
-        "bezier" => Box::new(edge_routing_bezier::BezierRouting::from_options(
+    let strategy: Box<dyn RoutingRecipeDyn> = match algo {
+        "straight" => Box::new(RecipeRouter::new(StraightRecipe)),
+        "bezier" => Box::new(RecipeRouter::new(BezierRecipe::from_options(
             &plan.edge_options,
-        )),
-        "spline" => Box::new(edge_routing_spline::SplineRouting::from_options(
+        ))),
+        "spline" => Box::new(RecipeRouter::new(SplineRecipe::from_options(
             &plan.edge_options,
-        )),
-        "circular" => Box::new(edge_routing_circular::CircularRouting),
-        "orthogonal" => Box::new(edge_routing_orthogonal::OrthogonalRouting::from_options(
+        ))),
+        "circular" => Box::new(RecipeRouter::new(CircularRecipe)),
+        "orthogonal" => Box::new(RecipeRouter::new(OrthogonalRecipe::from_options(
             &plan.edge_options,
-        )),
-        "organic" => Box::new(edge_routing_organic::OrganicRouting::from_options(
+        ))),
+        "organic" => Box::new(RecipeRouter::new(OrganicRecipe::from_options(
             &plan.edge_options,
-        )),
+        ))),
         _ => return None,
     };
     Some(strategy)
@@ -88,7 +88,7 @@ pub(in crate::layout) fn all_layout_strategies() -> Vec<Box<dyn LayoutStrategy>>
         .collect()
 }
 
-pub(in crate::layout) fn all_routing_strategies() -> Vec<Box<dyn EdgeRoutingStrategy>> {
+pub(in crate::layout) fn all_routing_strategies() -> Vec<Box<dyn RoutingRecipeDyn>> {
     EDGE_ROUTING_NAMES
         .iter()
         .filter_map(|name| {

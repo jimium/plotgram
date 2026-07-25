@@ -7,6 +7,7 @@ showcase/architecture/stress.layout-stress-nested.pgm
 showcase/architecture/stress.layout-stress-flat-mesh.pgm
 showcase/er/stress.layout-stress-dense.pgm
 showcase/flowchart/stress.layout-stress-dag.pgm
+showcase/flowchart/stress.layout-stress-yfiles-pipeline.pgm
 showcase/sequence/stress.layout-stress-lifelines.pgm
 showcase/state/stress.layout-stress-transitions.pgm
 showcase/mindmap/stress.layout-stress-deep.pgm

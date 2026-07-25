@@ -8,7 +8,7 @@
 use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use crate::layout::geometry::Point;
-use crate::layout::{EdgeLayout, EdgeRoutingStrategy, LayoutResult, PathGeometry};
+use crate::layout::{EdgeLayout, LayoutResult, PathGeometry};
 use crate::layout::routing::common::edge_geometry::{build_edge_labels, parse_label_t, point_at_path_t};
 use crate::layout::routing::common::routing_skeleton::{
     finalize_edges, resolve_endpoints, RoutingContext,
@@ -17,22 +17,8 @@ use crate::layout::routing::common::routing_skeleton::{
 /// 直线路由适用于 ER 等简单关系图；时序图边几何由 `sequence` 布局内置，不支持本路由。
 const APPLICABLE_TYPES: &[DiagramType] = &[DiagramType::Er];
 
-/// 直线边路由策略
+/// 直线边路由策略（legacy，已由 RecipeRouter<StraightRecipe> 替代）。
 pub struct StraightRouting;
-
-impl EdgeRoutingStrategy for StraightRouting {
-    fn name(&self) -> &'static str {
-        "straight"
-    }
-
-    fn applicable_diagram_types(&self) -> &'static [DiagramType] {
-        APPLICABLE_TYPES
-    }
-
-    fn route(&self, diagram: &Diagram, result: LayoutResult) -> LayoutResult {
-        route_edges(diagram, result)
-    }
-}
 
 /// 在节点布局完成后，为所有边计算几何路径与标签位置
 ///

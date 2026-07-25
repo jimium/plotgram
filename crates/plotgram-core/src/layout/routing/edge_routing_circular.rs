@@ -5,14 +5,13 @@
 //!
 //! 障碍避让：路由完成后采样曲线检测穿障，穿障的边退化到 spline 绕行折线。
 
-use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use crate::layout::geometry::Point;
 use crate::layout::routing::common::circular_support::{
-    APPLICABLE_TYPES as CIRCULAR_APPLICABLE_TYPES, CircleGroup, resolve_circle_groups,
+    CircleGroup, resolve_circle_groups,
 };
 use crate::layout::{
-    edge_point, EdgeLayout, EdgeRoutingStrategy, LayoutResult, NodeLayout, PathGeometry,
+    edge_point, EdgeLayout, LayoutResult, NodeLayout, PathGeometry, Port,
 };
 use crate::layout::routing::common::edge_geometry::{
     node_center, undirected_pair_key, select_port, compute_bezier_controls, cubic_bezier_point,
@@ -23,28 +22,6 @@ use crate::layout::routing::common::label_placement::{LabelContext, LabelPlacer,
 use std::collections::HashMap;
 
 const PARALLEL_SPACING: f64 = 0.10;
-
-/// 弧形边路由策略
-pub struct CircularRouting;
-
-impl EdgeRoutingStrategy for CircularRouting {
-    fn name(&self) -> &'static str {
-        "circular"
-    }
-
-    fn applicable_diagram_types(&self) -> &'static [DiagramType] {
-        CIRCULAR_APPLICABLE_TYPES
-    }
-
-    fn route(&self, diagram: &Diagram, result: LayoutResult) -> LayoutResult {
-        route_edges_circular(diagram, result)
-    }
-
-    /// circular 穿障后会退化为 Polyline，需要 refine 检测并兜底。
-    fn supports_refine(&self) -> bool {
-        true
-    }
-}
 
 /// 在圆形节点布局完成后，为所有边计算弧形路径
 pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> LayoutResult {
@@ -179,12 +156,12 @@ pub fn route_edges_circular(diagram: &Diagram, mut result: LayoutResult) -> Layo
     result
 }
 
-struct NodeCirclePos {
-    circle_idx: usize,
-    pos_idx: usize,
+pub(crate) struct NodeCirclePos {
+    pub(crate) circle_idx: usize,
+    pub(crate) pos_idx: usize,
 }
 
-fn build_node_placement(diagram: &Diagram, circles: &[CircleGroup]) -> HashMap<String, NodeCirclePos> {
+pub(crate) fn build_node_placement(diagram: &Diagram, circles: &[CircleGroup]) -> HashMap<String, NodeCirclePos> {
     let mut map = HashMap::new();
     for (circle_idx, circle) in circles.iter().enumerate() {
         for (pos_idx, &entity_idx) in circle.entity_indices.iter().enumerate() {
@@ -202,7 +179,7 @@ fn build_node_placement(diagram: &Diagram, circles: &[CircleGroup]) -> HashMap<S
 /// 计算平行边 lane 偏移，以及对向边的弧侧符号（+1 / -1 = 弦两侧）。
 ///
 /// 对 A↔B 正反边强制分到弦的两侧（一个上弧一个下弧），避免两条短弧贴在一起。
-fn compute_lane_offsets(
+pub(crate) fn compute_lane_offsets(
     diagram: &Diagram,
     node_placement: &HashMap<String, NodeCirclePos>,
 ) -> (Vec<f64>, Vec<f64>) {
@@ -314,7 +291,22 @@ fn compute_lane_offsets(
     (lane_offsets, arc_sides)
 }
 
-fn route_intra_circle_edge(
+/// 同圆内 / 跨圆边的弧形贝塞尔几何 + 标签参数（不含 label 文本渲染）。
+///
+/// R3 Slice 3.4：把 legacy 逐边几何拆出，供 [`CircularRecipe`](crate::layout::routing::recipe::CircularRecipe)
+/// 与 legacy [`route_edges_circular`] 共用，保证 solve 产出的 `Radial` 几何与标签计划逐字一致。
+pub(crate) struct CircularBezier {
+    pub start: Point,
+    pub end: Point,
+    pub controls: [Point; 2],
+    pub from_port: Port,
+    pub to_port: Port,
+    pub label_t: f64,
+    pub label_offset: Point,
+}
+
+/// 同圆内边：弦上鼓起的弧形贝塞尔（几何 + 标签参数）。
+pub(crate) fn intra_circle_bezier(
     from_nl: &NodeLayout,
     to_nl: &NodeLayout,
     circle: &CircleGroup,
@@ -322,8 +314,7 @@ fn route_intra_circle_edge(
     to_idx: usize,
     lane: f64,
     arc_side: f64,
-    rel: &crate::ast::Relation,
-) -> EdgeLayout {
+) -> CircularBezier {
     let n = circle.entity_indices.len().max(1);
     let center_pt = Point::new(circle.center.0, circle.center.1);
     let radius = circle.radius;
@@ -366,29 +357,52 @@ fn route_intra_circle_edge(
         let off = offset_label_by_side(base, Point::new(sx, sy), Point::new(ex, ey), lane, arc_side);
         (off.x - base.x, off.y - base.y)
     };
-    let labels = build_edge_labels(rel, label_t, Point::new(off_x, off_y), |t| {
-        cubic_bezier_point(Point::new(sx, sy), cp1, cp2, Point::new(ex, ey), t)
-    });
 
-    EdgeLayout {
-        geometry: PathGeometry::Bezier {
-            start: Point::new(sx, sy),
-            end: Point::new(ex, ey),
-            controls: [cp1, cp2],
-        },
-        labels,
+    CircularBezier {
+        start: Point::new(sx, sy),
+        end: Point::new(ex, ey),
+        controls: [cp1, cp2],
         from_port: select_port(sx, sy, from_nl),
         to_port: select_port(ex, ey, to_nl),
+        label_t,
+        label_offset: Point::new(off_x, off_y),
     }
 }
 
-fn route_inter_circle_edge(
+fn route_intra_circle_edge(
     from_nl: &NodeLayout,
     to_nl: &NodeLayout,
+    circle: &CircleGroup,
+    from_idx: usize,
+    to_idx: usize,
     lane: f64,
     arc_side: f64,
     rel: &crate::ast::Relation,
 ) -> EdgeLayout {
+    let b = intra_circle_bezier(from_nl, to_nl, circle, from_idx, to_idx, lane, arc_side);
+    let labels = build_edge_labels(rel, b.label_t, b.label_offset, |t| {
+        cubic_bezier_point(b.start, b.controls[0], b.controls[1], b.end, t)
+    });
+
+    EdgeLayout {
+        geometry: PathGeometry::Bezier {
+            start: b.start,
+            end: b.end,
+            controls: b.controls,
+        },
+        labels,
+        from_port: b.from_port,
+        to_port: b.to_port,
+    }
+}
+
+/// 跨圆边：端口方向贝塞尔 + 沿弦法向鼓起（几何 + 标签参数）。
+pub(crate) fn inter_circle_bezier(
+    from_nl: &NodeLayout,
+    to_nl: &NodeLayout,
+    lane: f64,
+    arc_side: f64,
+) -> CircularBezier {
     let from_center = node_center(from_nl);
     let to_center = node_center(to_nl);
     let (fcx, fcy) = (from_center.x, from_center.y);
@@ -410,24 +424,44 @@ fn route_inter_circle_edge(
     let lift = (12.0 + lane.abs() * 16.0) * side;
     cp[0] = Point::new(cp[0].x + nx * lift, cp[0].y + ny * lift);
     cp[1] = Point::new(cp[1].x + nx * lift, cp[1].y + ny * lift);
-    let labels = build_edge_labels(rel, 0.5, Point::new(nx * lift * 0.5, ny * lift * 0.5), |t| {
-        cubic_bezier_point(Point::new(sx, sy), cp[0], cp[1], Point::new(ex, ey), t)
+
+    CircularBezier {
+        start: Point::new(sx, sy),
+        end: Point::new(ex, ey),
+        controls: cp,
+        from_port,
+        to_port,
+        label_t: 0.5,
+        label_offset: Point::new(nx * lift * 0.5, ny * lift * 0.5),
+    }
+}
+
+fn route_inter_circle_edge(
+    from_nl: &NodeLayout,
+    to_nl: &NodeLayout,
+    lane: f64,
+    arc_side: f64,
+    rel: &crate::ast::Relation,
+) -> EdgeLayout {
+    let b = inter_circle_bezier(from_nl, to_nl, lane, arc_side);
+    let labels = build_edge_labels(rel, b.label_t, b.label_offset, |t| {
+        cubic_bezier_point(b.start, b.controls[0], b.controls[1], b.end, t)
     });
 
     EdgeLayout {
         geometry: PathGeometry::Bezier {
-            start: Point::new(sx, sy),
-            end: Point::new(ex, ey),
-            controls: cp,
+            start: b.start,
+            end: b.end,
+            controls: b.controls,
         },
         labels,
-        from_port,
-        to_port,
+        from_port: b.from_port,
+        to_port: b.to_port,
     }
 }
 
 /// R5：shortest_path 为空时，绕节点外框走 start→mid→end 折线。
-fn outer_polyline_detour(
+pub(crate) fn outer_polyline_detour(
     start: Point,
     end: Point,
     nodes: &HashMap<String, NodeLayout>,

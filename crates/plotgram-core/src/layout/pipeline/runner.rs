@@ -8,12 +8,11 @@ use crate::layout::snap::grid_snap;
 use crate::layout::group::frame::GroupFramePass;
 use crate::layout::perf::Instant;
 use super::plan::LayoutPlan;
-use crate::layout::post_route;
 use crate::layout::refine;
 use super::registry;
 use crate::layout::route_feedback::{LayoutRouteFeedback, PreRouteFeedback};
-use crate::layout::{resolve_effective_direction, EdgeRoutingStrategy, LayoutResult, Port};
-use std::collections::{HashMap, HashSet};
+use crate::layout::{resolve_effective_direction, LayoutResult};
+use std::collections::HashMap;
 
 /// 布局管线。
 pub(crate) struct LayoutPipeline<'a> {
@@ -108,7 +107,7 @@ impl<'a> LayoutPipeline<'a> {
         let feedback = LayoutRouteFeedback::new(self.diagram);
         let PreRouteFeedback {
             result: mut result_v2,
-        } = feedback.apply_pre_route(result);
+        } = feedback.apply_pre_route(result, true);
         crate::perf_log!(
             "[perf]   pre-route: {:.2}ms",
             t0.elapsed().as_secs_f64() * 1000.0
@@ -136,349 +135,167 @@ impl<'a> LayoutPipeline<'a> {
             gf_pass.refresh_before_route(self.diagram, &mut result_v2, algo);
         }
 
+        // Slice A: SpacingDemandProbe——路由前估计间距需求，重解坐标。
+        if let Some(new_coords) =
+            crate::layout::route_feedback::spacing_demand_probe(self.diagram, &result_v2)
+        {
+            crate::perf_log!("[spacing-probe] applying re-solved coordinates");
+            if let Some(problem) = result_v2.hints.coordinate_problem.as_ref() {
+                for (var, &new_c) in problem.vars.iter().zip(new_coords.iter()) {
+                    if let Some(node) = result_v2.nodes.get_mut(&var.stable_id) {
+                        node.x = new_c - node.width / 2.0;
+                    }
+                }
+            }
+        }
+
+        // Slice A: layout finalize——所有节点/组几何变更在正式 route 之前完成。
+        // 组框恢复（所有图类型）——必须在 arch 重申之前（与旧管线时序一致）。
+        if !self.diagram.groups.is_empty() {
+            let explicit_equal = crate::layout::group::frame::has_explicit_equal_track(self.diagram);
+            let pre_recompute_y: HashMap<String, f64> = result_v2
+                .groups
+                .iter()
+                .map(|(id, g)| (id.clone(), g.y))
+                .collect();
+            if explicit_equal {
+                gf_pass.restore_after_node_moves(self.diagram, &mut result_v2, algo, &pre_recompute_y);
+            } else {
+                crate::layout::group::frame::recompute_group_bounds(
+                    self.diagram,
+                    &mut result_v2,
+                    gf_pass.padding,
+                );
+            }
+        }
+        // PRS 需要 edge geometry 估计溢出，使用 preview route（产物不进入最终产品）。
+        if algo == "architecture" && !self.diagram.groups.is_empty() {
+            // Preview route：仅供 PRS 检测 shell overflow，产物丢弃。
+            let preview_frozen =
+                crate::layout::routing::coordinator::FrozenNodeProduct::capture(&result_v2);
+            let preview_input = crate::layout::routing::model::prepared::PreparedRoutingInput::prepare(
+                &preview_frozen,
+                self.diagram,
+                &result_v2.hints,
+                "",
+                router.name(),
+                Default::default(),
+                crate::layout::routing::model::prepared::RoutingCanvas {
+                    width: result_v2.total_width,
+                    height: result_v2.total_height,
+                },
+            );
+            let preview_product = router.route(&preview_input);
+            // 将 edges 填入临时 result 供 post_route_shell_expand 消费。
+            let mut preview_result = result_v2.clone();
+            preview_result.edges = preview_product.edges;
+            let prs_grew = crate::layout::post_route::shell_expand::post_route_shell_expand(
+                self.diagram,
+                &mut preview_result,
+            );
+            if prs_grew {
+                // 将扩壳结果应用到 result_v2（仅 groups）。
+                result_v2.groups = preview_result.groups.clone();
+                crate::layout::group::frame::resolve_all_sibling_overlaps(
+                    &gf_pass.spec,
+                    self.diagram,
+                    &mut result_v2,
+                );
+            }
+            let container_pad =
+                crate::layout::engines::common::group_bounds::container_padding_for_leaf(
+                    gf_pass.padding,
+                );
+            crate::layout::group::frame::expand_groups_to_contain_contents(
+                self.diagram,
+                &mut result_v2.groups,
+                &result_v2.nodes,
+                gf_pass.padding,
+                container_pad,
+            );
+            // architecture 质心/pendant 重申（只需 node positions + group bounds）。
+            crate::layout::recipes::architecture::post_layout::reassert_multi_client_hub_centroids(
+                self.diagram,
+                &mut result_v2,
+            );
+            if crate::layout::group::frame::has_explicit_equal_track(self.diagram) {
+                crate::layout::recipes::architecture::post_layout::align_cross_scope_pendant_chains(
+                    self.diagram,
+                    &mut result_v2,
+                );
+            }
+            // PRS debug hints
+            if let Some(debug) = result_v2.hints.gutter_budget_debug.as_mut() {
+                debug.prs_grew = prs_grew;
+            } else {
+                result_v2.hints.gutter_budget_debug = Some(crate::layout::GutterBudgetDebug {
+                    prs_grew,
+                    ..Default::default()
+                });
+            }
+        }
+        // Budget guard hint（不推节点，仅设置 hints）。
+        let (result_v2, _) =
+            crate::layout::demand::space_budget_guard::resolve_budget_violations(
+                self.diagram, result_v2,
+            );
+
         let refine_config = refine::RefineConfig::default();
+        // Slice A: FrozenNodeProduct 唯一冻结点——layout finalize 后捕获，
+        // 覆盖 route + 全部后处理直到 canvas transform。
+        let frozen =
+            crate::layout::routing::coordinator::FrozenNodeProduct::capture(&result_v2);
+        // Slice B：构造只读 PreparedRoutingInput 并记录 problem signature。
+        let _sig = {
+            let direction = resolve_effective_direction(self.diagram).unwrap_or("");
+            let prepared = crate::layout::routing::model::PreparedRoutingInput::prepare(
+                &frozen,
+                self.diagram,
+                &result_v2.hints,
+                direction,
+                edge_routing_style.as_str(),
+                Default::default(),
+                crate::layout::routing::model::prepared::RoutingCanvas {
+                    width: result_v2.total_width,
+                    height: result_v2.total_height,
+                },
+            );
+            let sig = prepared.problem_signature();
+            crate::perf_log!("[perf]   route-model: {}", prepared.signature_describe());
+            sig
+        };
+        // RoutingCoordinator 是路由的唯一编排入口。
+        let coordinator =
+            crate::layout::routing::coordinator::RoutingCoordinator::new(Default::default());
+        let _ = _sig;
         let t_route = Instant::now();
-        let mut result = feedback.complete_routing(
+        // Slice D4：snap/quantize 与 D 段 finalize 已前移进 Coordinator（唯一真冻结点
+        // 在 execute 内 materialize→audit→freeze）；runner 只消费返回的审计报告。
+        let (mut result, route_audit) = coordinator.execute(
+            self.diagram,
+            &frozen,
             router.as_ref(),
             result_v2,
             &refine_config,
             &edge_snap_config,
+            Default::default(), // RoutingConfig：待后续从 pipeline 传入
+            algo,
         );
         crate::perf_log!(
             "[perf]   route: {:.2}ms",
             t_route.elapsed().as_secs_f64() * 1000.0
         );
 
-        let t_post = Instant::now();
-        // P1: 路由后仅做几何排斥（不含量化），量化推迟到管道末尾
-        post_route::repulse_edges_only(&mut result.edges, &result.groups, &edge_snap_config);
+        // Slice A: 唯一冻结校验——覆盖 route + 全部后处理直到 canvas transform。
+        frozen.assert_unchanged(&result);
 
-        result =
-            self.run_post_route_group_frame(algo, result, &gf_pass, &*router, &edge_snap_config)?;
-
-        let hook = crate::layout::post_route::AlgoProfile::from_algo(algo).post_route_hook();
-        result = hook.after_route(
-            self.diagram,
-            result,
-            &*router,
-            &gf_pass.spec,
-            &edge_snap_config,
-            gf_pass.padding,
-        );
-
-        // S3：PRS 后仅在契约失败时兜底；margin 来自 SpaceBudget
-        let (mut result, mut moved_for_overlap) =
-            crate::layout::demand::space_budget_guard::resolve_budget_violations(self.diagram, result);
-        if !result.groups.is_empty() {
-            let explicit_equal = crate::layout::group::frame::has_explicit_equal_track(self.diagram);
-            // budget guard 之后由 GroupFramePass 恢复完整 L1 契约；不能只做
-            // content-fit recompute，否则 `track: equal` 会在管线末尾被冲掉。
-            let pre_recompute_y: HashMap<String, f64> = result
-                .groups
-                .iter()
-                .map(|(id, group)| (id.clone(), group.y))
-                .collect();
-            let pre_frame_nodes: HashMap<String, (f64, f64)> = result
-                .nodes
-                .iter()
-                .map(|(id, node)| (id.clone(), (node.x, node.y)))
-                .collect();
-            if explicit_equal {
-                gf_pass.restore_after_node_moves(self.diagram, &mut result, algo, &pre_recompute_y);
-            } else {
-                crate::layout::group::frame::recompute_group_bounds(
-                    self.diagram,
-                    &mut result,
-                    gf_pass.padding,
-                );
-            }
-            if algo == "architecture" {
-                // L2.2：局部刚体重申多 client→hub 质心（Skip on 碰撞/越框）
-                let hub_moved = crate::layout::recipes::architecture::post_layout::
-                    reassert_multi_client_hub_centroids(self.diagram, &mut result);
-                moved_for_overlap.extend(hub_moved);
-                if explicit_equal {
-                    moved_for_overlap.extend(
-                        crate::layout::recipes::architecture::post_layout::
-                            align_cross_scope_pendant_chains(self.diagram, &mut result),
-                    );
-                }
-            }
-            for (id, node) in &result.nodes {
-                if pre_frame_nodes.get(id).is_some_and(|(x, y)| {
-                    (node.x - x).abs() > crate::layout::post_route::NODE_MOVE_REROUTE_EPS
-                        || (node.y - y).abs() > crate::layout::post_route::NODE_MOVE_REROUTE_EPS
-                }) {
-                    moved_for_overlap.insert(id.clone());
-                }
-            }
-        }
-        result = crate::layout::demand::space_budget_guard::reroute_and_repulse(
-            self.diagram,
-            result,
-            router.as_ref(),
-            &moved_for_overlap,
-            &edge_snap_config,
-        );
-
-        // A3 节点冻结屏障：step 10 之后节点坐标必须不变（此后仅改边几何/label/annotation）。
-        let node_freeze = crate::layout::edge_stages::NodeFreeze::capture(&result);
-
-        // P1: 像素量化在管道最末尾执行，仅运行一次
-        let sorted_node_ids: Vec<String> = {
-            let mut ids: Vec<String> = result.nodes.keys().cloned().collect();
-            ids.sort();
-            ids
-        };
-        let annotations = result.hints.route_annotations.clone();
-        post_route::snap_and_repulse_edges_with_guard(
-            &mut result.edges,
-            &result.groups,
-            &edge_snap_config,
-            annotations.as_ref(),
-            Some(&result.nodes),
-            Some(&self.diagram.relations),
-            Some(&sorted_node_ids),
-        );
-
-        // 消毒 2.0：snap/repulse 可能抖回微台阶与斜段，正交路由在量化后再消一次
-        if edge_routing_style == "orthogonal" {
-            let from_side: Vec<_> = result.edges.iter().map(|e| e.from_port).collect();
-            let to_side: Vec<_> = result.edges.iter().map(|e| e.to_port).collect();
-            // 几何已冻结：启用 overshoot Z 折合并，清理「冲过端口再折回」的多余折点。
-            // 保守版（router step 4g）不合并，避免改动反馈进节点重定位扰动全局布局。
-            crate::layout::routing::edge_routing_orthogonal::sanitize_orthogonal_edges_with_guard(
-                &mut result.edges,
-                &self.diagram.relations,
-                &from_side,
-                &to_side,
-                true,
-                annotations.as_ref(),
-                Some(&result.nodes),
-                Some(&sorted_node_ids),
-            );
-            // V3a / P3.1 + 轨道 A：D 末正反向 gap 审计 + 同侧 dock 共锚（sanitize 之后；C 预修在 phase_lane 末）。
-            self.enforce_d_stage_separation(&mut result, &from_side, &to_side);
-
-            // L3：architecture 在 C 期 stub_occ 仅诊断；节点已冻结后于 D 末做 exact 跨对共柱真修。
-            // 只改边几何 → node_fp 不变；须在 label 避让前完成并刷新 annotation。
-            if algo == "architecture" {
-                let stub_gap = crate::layout::routing::parallel_gap_for_diagram(
-                    self.diagram.diagram_type.clone(),
-                );
-                let stub_stats = crate::layout::routing::edge_routing_orthogonal::
-                    resolve_exact_stub_occupancy_post_route(
-                        &mut result.edges,
-                        &self.diagram.relations,
-                        &from_side,
-                        &to_side,
-                        &result.nodes,
-                        stub_gap,
-                    );
-                if stub_stats.stubs_shifted > 0 {
-                    let prev = result.hints.route_annotations.clone();
-                    result.hints.route_annotations = Some(
-                        crate::layout::routing::refresh_route_annotations_preserving_semantics(
-                            &result.edges,
-                            &from_side,
-                            &to_side,
-                            prev.as_ref(),
-                        ),
-                    );
-                    crate::perf_log!(
-                        "[perf]     d_stub_exact_post_route: shifted={} unresolved_exact={} degraded={}",
-                        stub_stats.stubs_shifted,
-                        stub_stats.unresolved_conflicts,
-                        stub_stats.degraded
-                    );
-                }
-            }
-
-            // L5.1：几何冻结后、label 前 —— 对仍 through 的边做保组 dogleg 试修。
-            // refine 期有组图常看不到最终 through（后处理才引入）；此处与 lint 对齐。
-            {
-                let t_through = crate::layout::perf::Instant::now();
-                crate::layout::refine::repair_through_edges_post_route(self.diagram, &mut result);
-                crate::perf_log!(
-                    "[perf]     d_through_repair: {:.2}ms",
-                    t_through.elapsed().as_secs_f64() * 1000.0
-                );
-            }
-
-            // 仅 lint 穿组边：局部裙边/两跳 dogleg（禁全局建廊剪枝）。
-            {
-                let t_group = crate::layout::perf::Instant::now();
-                crate::layout::refine::repair_group_interior_edges_post_route(
-                    self.diagram,
-                    &mut result,
-                );
-                crate::perf_log!(
-                    "[perf]     d_group_interior_repair: {:.2}ms",
-                    t_group.elapsed().as_secs_f64() * 1000.0
-                );
-            }
-
-            // 平行 trunk 分槽：repair 可能重建路径造成新非语义共线，在此（冻结后）按
-            // lint 口径最终分离。仅 architecture，回退保 through/穿组不劣化。
-            {
-                let t_sep = crate::layout::perf::Instant::now();
-                crate::layout::refine::separate_trunk_overlaps_post_route(
-                    self.diagram,
-                    &mut result,
-                );
-                crate::perf_log!(
-                    "[perf]     d_trunk_separate: {:.2}ms",
-                    t_sep.elapsed().as_secs_f64() * 1000.0
-                );
-            }
-
-            // Phase C2: 路由后交叉消解（后处理之后调用，避免 snap/sanitize 引入新交叉抵消效果）
-            if edge_routing_style == "orthogonal" {
-                let t_c2 = crate::layout::perf::Instant::now();
-                let crossings_eliminated =
-                    crate::layout::routing::edge_routing_orthogonal::crossing_reduction::minimize_crossings_post_route(
-                        &mut result.edges,
-                        &result.nodes,
-                    );
-                if crossings_eliminated > 0 {
-                    crate::perf_log!(
-                        "[perf]     c2_crossing_reduction: eliminated={}",
-                        crossings_eliminated
-                    );
-                }
-                crate::perf_log!(
-                    "[perf]     c2_crossing_reduction: {:.2}ms",
-                    t_c2.elapsed().as_secs_f64() * 1000.0
-                );
-            }
-
-            // N2：repair 后 lint 同语义只读复校（记账 / degraded，不扩写几何）。
-            crate::layout::refine::recheck_lint_pierce_post_freeze(self.diagram, &mut result);
-
-            // A3 折线冻结屏障：step 16 之后仅允许改 label/annotation，不得再动折点。
-            let polyline_freeze = crate::layout::edge_stages::PolylineFreeze::capture(&result);
-
-            // 标签避让必须是几何冻结后的**最终**步骤：sanitize 会按平行边规则
-            // 重建所有标签；snap/repulse 又移动了路径。router 内不再提前 resolve（P3.3）。
-            let label_config =
-                crate::layout::routing::common::label_candidate::LabelPlacementConfig::for_diagram(
-                    self.diagram.diagram_type.clone(),
-                    !result.groups.is_empty(),
-                );
-            crate::layout::routing::common::label_avoidance::resolve_label_overlaps_with_config(
-                &mut result.edges,
-                &result.nodes,
-                &result.groups,
-                label_config,
-            );
-            if let Some(annotations) = result.hints.route_annotations.as_ref() {
-                crate::layout::routing::common::label_avoidance::dedupe_labels_on_declared_merges(
-                    &mut result.edges,
-                    annotations,
-                );
-            }
-
-            // A3 折线冻结校验：label 阶段若改动了折点则打 warning（软校验，不 panic）。
-            polyline_freeze.warn_if_changed(&result);
+        // Slice E5：R8 shadow audit（lift→materialize→round-trip debug_assert）已删除，
+        // 由 Coordinator 内正式 audit（E3 repair loop + 唯一真冻结点）取代；
+        // runner 只消费 Coordinator 返回的最终审计报告。
+        if route_audit.degraded {
+            crate::perf_log!("[warn] route audit degraded: {}", route_audit.describe());
         }
 
-
-
-        crate::perf_log!(
-            "[perf]   post-process: {:.2}ms",
-            t_post.elapsed().as_secs_f64() * 1000.0
-        );
-
-        // A3 节点冻结校验：后处理尾段（step 11-18）不得挪节点。
-        node_freeze.assert_unchanged(&result);
-
-        Ok(result)
-    }
-
-    /// V3a / P3.1 + 轨道 A：D 末正反向 gap 审计（min_gap）+ 同侧 dock 共锚（dock_sep）。
-    /// sanitize 之后、label 之前；使用图类型对应 gap 避免 architecture 误用 flowchart 8px。
-    /// 内部仍分别走 [`enforce_reverse_pair_min_gap`] + [`enforce_reverse_pair_dock_separation`]，
-    /// 几何输出与两次独立调用字节级一致；仅编排入口合并以减少 pipeline.rs 重复 bookkeeping。
-    fn enforce_d_stage_separation(&self, result: &mut LayoutResult, from_side: &[Port], to_side: &[Port]) {
-        let parallel_gap =
-            crate::layout::routing::parallel_gap_for_diagram(self.diagram.diagram_type.clone());
-        crate::layout::routing::edge_routing_orthogonal::enforce_reverse_pair_min_gap(
-            &mut result.edges, &self.diagram.relations, parallel_gap,
-        );
-        let dock_gap = parallel_gap
-            .max(crate::layout::routing::edge_routing_orthogonal::COMPACT_SLOT_PITCH);
-        crate::layout::routing::edge_routing_orthogonal::enforce_reverse_pair_dock_separation(
-            &mut result.edges, &self.diagram.relations, &result.nodes,
-            from_side, to_side, dock_gap,
-        );
-    }
-
-    fn run_post_route_group_frame(
-        &self,
-        algo: &str,
-        mut result: LayoutResult,
-        gf_pass: &GroupFramePass,
-        router: &dyn EdgeRoutingStrategy,
-        edge_snap_config: &grid_snap::EdgeSnapConfig,
-    ) -> Result<LayoutResult, DiagnosticError> {
-        if result.groups.is_empty() {
-            return Ok(result);
-        }
-
-        let pre_recompute_y: HashMap<String, f64> = result
-            .groups
-            .iter()
-            .map(|(id, g)| (id.clone(), g.y))
-            .collect();
-        let pre_gf_positions: HashMap<String, (f64, f64)> = result
-            .nodes
-            .iter()
-            .map(|(id, n)| (id.clone(), (n.x, n.y)))
-            .collect();
-
-        gf_pass.restore_after_node_moves(self.diagram, &mut result, algo, &pre_recompute_y);
-
-        let max_node_disp = result
-            .nodes
-            .iter()
-            .map(|(id, n)| {
-                pre_gf_positions
-                    .get(id)
-                    .map(|(px, py)| {
-                        let dx = n.x - px;
-                        let dy = n.y - py;
-                        (dx * dx + dy * dy).sqrt()
-                    })
-                    .unwrap_or(f64::MAX)
-            })
-            .fold(0.0f64, f64::max);
-
-        if max_node_disp >= crate::layout::post_route::NODE_MOVE_REROUTE_EPS {
-            let moved_nodes: HashSet<String> = result
-                .nodes
-                .iter()
-                .filter_map(|(id, n)| {
-                    pre_gf_positions.get(id).and_then(|(px, py)| {
-                        let dx = n.x - px;
-                        let dy = n.y - py;
-                        if (dx * dx + dy * dy).sqrt() >= crate::layout::post_route::NODE_MOVE_REROUTE_EPS {
-                            Some(id.clone())
-                        } else {
-                            None
-                        }
-                    })
-                })
-                .collect();
-            result = router.route_after_node_moves(self.diagram, result, &moved_nodes);
-
-            // P1: 组框修复后仅做几何排斥，量化推迟到管道末尾
-            post_route::repulse_edges_only(&mut result.edges, &result.groups, edge_snap_config);
-        } else {
-            // P1: 无重路由时也仅做几何排斥
-            post_route::repulse_edges_only(&mut result.edges, &result.groups, edge_snap_config);
-        }
-
-        grid_snap::update_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
         Ok(result)
     }
 }

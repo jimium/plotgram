@@ -69,7 +69,7 @@ impl CandidateScorer for DefaultScorer {
             }
         }
         // A-2（契约③/Middle）：远离惩罚——单调趋近，消灭 U 形下沉/Z 形绕远。
-        score += away_penalty(path, pair.to_anchor()) * w.away;
+        score += away_penalty(path, pair.to_anchor(), ctx.cfg.routing.away_penalty_rate) * w.away;
         // A-3（契约①/Stub）：跨组边首个转弯点仍在源组内时惩罚（引导出组再转弯，消灭 ISS-001）。
         score += stub_inside_group_penalty(path, ctx, pair);
         // S4 / S4.x：feedback / 监控边对交叉加重（×3）；obstacle 穿模再 ×2
@@ -104,9 +104,9 @@ impl CandidateScorer for DefaultScorer {
         if let Some(load_map) = ctx.channel_load {
             score += channel_load_penalty(path, load_map) * w.channel_load;
         }
-        // P2.1：廊级 OVER soft（与段级 channel_load 互补；可 PLOTGRAM_CORRIDOR_SOFT=0 关）
+        // P2.1：廊级 OVER soft（与段级 channel_load 互补）
         if let Some(model) = ctx.corridor_model {
-            score += corridor_overflow_penalty(path, model) * w.channel_load;
+            score += corridor_overflow_penalty(path, model, ctx.cfg.routing.corridor_soft) * w.channel_load;
         }
         if !ctx.group_ctx.corridors.is_empty() {
             score += corridor_misalignment_penalty(
@@ -149,16 +149,7 @@ const AWAY_PENALTY_PER_PX: f64 = 2.0;
 /// 判定“远离”的曼哈顿距离增量阈值（吸收浮点噪声，与 contract.rs 一致）。
 const AWAY_EPS: f64 = 0.5;
 
-/// A-2: 远离惩罚每 px 增量费率；`PLOTGRAM_AWAY_PENALTY` 可覆盖（0=禁用，供 A/B 对比与调参）。
-fn away_penalty_rate() -> f64 {
-    std::env::var("PLOTGRAM_AWAY_PENALTY")
-        .ok()
-        .and_then(|v| v.parse::<f64>().ok())
-        .unwrap_or(AWAY_PENALTY_PER_PX)
-}
-
-fn away_penalty(path: &[Point], target: Point) -> f64 {
-    let rate = away_penalty_rate();
+fn away_penalty(path: &[Point], target: Point, rate: f64) -> f64 {
     if rate <= 0.0 {
         return 0.0;
     }
@@ -182,16 +173,8 @@ fn away_penalty(path: &[Point], target: Point) -> f64 {
 /// （会穿障），由 A-5 端口决策修复。
 const STUB_INSIDE_GROUP_PENALTY: f64 = 120.0;
 
-/// A-3: stub 出组惩罚量；`PLOTGRAM_STUB_EXIT_PENALTY` 可覆盖（0=禁用，供 A/B 对比与调参）。
-fn stub_exit_penalty_rate() -> f64 {
-    std::env::var("PLOTGRAM_STUB_EXIT_PENALTY")
-        .ok()
-        .and_then(|v| v.parse::<f64>().ok())
-        .unwrap_or(STUB_INSIDE_GROUP_PENALTY)
-}
-
 fn stub_inside_group_penalty(path: &[Point], ctx: &OrthoRoutingContext, pair: &EndpointPair) -> f64 {
-    let rate = stub_exit_penalty_rate();
+    let rate = ctx.cfg.routing.stub_exit_penalty;
     if rate <= 0.0 || path.len() < 3 {
         return 0.0;
     }

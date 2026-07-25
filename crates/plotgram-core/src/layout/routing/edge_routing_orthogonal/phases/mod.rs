@@ -4,16 +4,12 @@
 
 mod build;
 mod finalize;
-mod port_correction;
 mod port_slot;
 mod refine;
 mod trunk;
 
 pub(crate) use build::phase_route_edges;
 pub(crate) use finalize::phase_sanitize;
-pub(crate) use port_correction::phase_port_correction;
 pub(crate) use port_slot::{aligned_fanin_target_port, phase_port_slot};
-pub(crate) use refine::{
-    phase_lane, phase_layer_order, phase_reroute, phase_straighten_align, phase_stub_fix,
-};
+pub(crate) use refine::{phase_lane, phase_layer_order};
 pub(crate) use trunk::{extract_protected_vertical_trunks, phase_reroute_feedback_after_trunk};

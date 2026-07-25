@@ -30,41 +30,16 @@ const MICRO_JOG_LEN: f64 = 30.0;
 
 /// 路由后处理：消除反向 stub / 斜段 / 微折，并重建标签。
 ///
+/// Slice D3：本内核仅供 [`GeometryMaterializer::canonicalize_orthogonal_edges`]
+/// 调用（canonicalize 归 materializer 语义），管线不得再直呼。
+///
 /// 路由内部（step 4g）调用保持**保守**（`merge_overshoot=false`），避免改动被
 /// 后续 node/space-budget 反馈用于重定位节点而扰动全局布局；管线末尾几何冻结后
 /// 调用启用 `merge_overshoot=true`，清理「冲过端口再折回」的 overshoot Z 折。
-pub fn sanitize_orthogonal_edges(
-    edges: &mut [EdgeLayout],
-    relations: &[Relation],
-    from_side: &[Port],
-    to_side: &[Port],
-) {
-    sanitize_orthogonal_edges_ext(edges, relations, from_side, to_side, false);
-}
-
-/// 见 [`sanitize_orthogonal_edges`]；`merge_overshoot` 控制是否合并 overshoot Z 折。
-pub fn sanitize_orthogonal_edges_ext(
-    edges: &mut [EdgeLayout],
-    relations: &[Relation],
-    from_side: &[Port],
-    to_side: &[Port],
-    merge_overshoot: bool,
-) {
-    sanitize_orthogonal_edges_with_guard(
-        edges,
-        relations,
-        from_side,
-        to_side,
-        merge_overshoot,
-        None,
-        None,
-        None,
-    );
-}
-
-/// 消毒 + 可选形状验证上下文（节点 / 冻结 Annotation）。
+///
+/// [`GeometryMaterializer::canonicalize_orthogonal_edges`]: crate::layout::routing::model::GeometryMaterializer::canonicalize_orthogonal_edges
 #[allow(clippy::too_many_arguments)]
-pub fn sanitize_orthogonal_edges_with_guard(
+pub(crate) fn sanitize_orthogonal_edges_with_guard(
     edges: &mut [EdgeLayout],
     relations: &[Relation],
     from_side: &[Port],
@@ -122,6 +97,7 @@ pub fn sanitize_orthogonal_edges_with_guard(
             from_port: fs,
             to_port: ts,
         };
+        // 写者归属（E6）：materializer canonicalize 内核边界（D3 收编），freeze 前。
         new_edge.set_polyline_points(points);
         *edge = new_edge;
     }

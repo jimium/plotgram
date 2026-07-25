@@ -1,23 +1,30 @@
-//! 逐边构建路径
+//! 逐边构建路径（Slice C2a：输出 RoutePath）
 //!
-//! 从 `run.rs` 原样搬迁（A4 结构重构，行为不变）。
+//! 从 `run.rs` 原样搬迁（A4 结构重构）；Slice C2a 将输出从 EdgeLayout 切换为 RoutePath。
 
 use super::super::*;
 use crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels;
 use crate::layout::routing::common::self_loop;
 use crate::layout::routing::edge_routing_orthogonal::channel_planner::ChannelPlan;
 use crate::layout::routing::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
+use crate::layout::routing::model::solution::{EndpointAssignment, RoutePath};
 use std::collections::HashMap;
+
+/// `phase_route_edges` 的返回值：逐边路径骨架 + 标签（Slice C2a）。
+pub(crate) struct InitialPaths {
+    /// 逐边路径（按边序，未求解的为 Empty）。
+    pub paths: Vec<RoutePath>,
+    /// 逐边标签（与 paths 对齐）。
+    pub labels: Vec<Vec<crate::layout::EdgeLabelLayout>>,
+}
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn phase_route_edges(
     edge_order: &[usize],
     relations: &[crate::ast::Relation],
     nodes: &HashMap<String, NodeLayout>,
-    from_side: &[Port],
-    to_side: &[Port],
-    endpoint_map: &HashMap<(usize, bool), Endpoint>,
-    edges: &mut [EdgeLayout],
+    endpoint_assignments: &[EndpointAssignment],
+    existing_edges: &[EdgeLayout],
     grid: &mut SegmentGrid,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
     cfg: &OrthoConfig,
@@ -35,7 +42,12 @@ pub(crate) fn phase_route_edges(
     ovg: Option<&OrthogonalVisibilityGraph>,
     channel_plan: Option<&ChannelPlan>,
     first_pass: bool,
-) {
+) -> InitialPaths {
+    let n = relations.len();
+    let mut paths: Vec<RoutePath> = (0..n)
+        .map(|_| RoutePath::Empty(crate::layout::routing::model::solution::EmptyRouteReason::Unresolved))
+        .collect();
+    let mut labels: Vec<Vec<crate::layout::EdgeLabelLayout>> = (0..n).map(|_| Vec::new()).collect();
 
     for &i in edge_order {
         let t_edge = crate::layout::perf::Instant::now();
@@ -47,7 +59,7 @@ pub(crate) fn phase_route_edges(
             if let Some(nl) = nodes.get(from_id) {
                 let loop_idx = self_loop_idx.get(&i).copied().unwrap_or(0);
                 // Phase A: 使用空间感知自环路由，感知周围节点选择最优方向
-                edges[i] = self_loop::route_self_loop_aware(
+                let sl_edge = self_loop::route_self_loop_aware(
                     rel,
                     nl,
                     from_id,
@@ -55,14 +67,19 @@ pub(crate) fn phase_route_edges(
                     self_loop::SelfLoopStyle::Orthogonal,
                     nodes,
                 );
+                let pts: Vec<Point> = sl_edge.path_points().into_owned();
+                paths[i] = RoutePath::orthogonal(pts);
+                labels[i] = sl_edge.labels;
             }
             continue;
         }
 
         if let Some(ref preserve) = preserve_edges {
-            if preserve.contains(&i) && edges[i].path_len() >= 2 {
-                let path: Vec<Point> = edges[i].path_points().into_owned();
+            if preserve.contains(&i) && existing_edges[i].path_len() >= 2 {
+                let path: Vec<Point> = existing_edges[i].path_points().into_owned();
                 grid.insert_path(&path, i);
+                paths[i] = RoutePath::orthogonal(path);
+                labels[i] = existing_edges[i].labels.clone();
                 continue;
             }
         }
@@ -71,12 +88,9 @@ pub(crate) fn phase_route_edges(
             continue;
         };
 
-        let Some(from_ep) = endpoint_map.get(&(i, true)) else {
-            continue;
-        };
-        let Some(to_ep) = endpoint_map.get(&(i, false)) else {
-            continue;
-        };
+        let ea = &endpoint_assignments[i];
+        let from_ep = ea.project_endpoint(true, from_id.to_string(), Point::zero());
+        let to_ep = ea.project_endpoint(false, to_id.to_string(), Point::zero());
 
         let mut corridor_boost = space_budget
             .as_ref()
@@ -86,8 +100,8 @@ pub(crate) fn phase_route_edges(
         let has_chain = corridor_plan.chains.contains_key(&i);
         let same_leaf = group_ctx.is_same_leaf_group(from_id, to_id);
         let pair = EndpointPair {
-            from: from_ep.clone(),
-            to: to_ep.clone(),
+            from: from_ep,
+            to: to_ep,
         };
         let strict = should_strict_group_transit(
             profile,
@@ -101,8 +115,8 @@ pub(crate) fn phase_route_edges(
         let mut path_stats = PathSelectStats::default();
         let corridor_ok = validated_corridor_path(
             i,
-            from_ep.anchor,
-            to_ep.anchor,
+            ea.from_anchor,
+            ea.to_anchor,
             from_id,
             to_id,
             corridor_plan,
@@ -122,14 +136,14 @@ pub(crate) fn phase_route_edges(
         let planned_ch = channel_plan.and_then(|cp| {
             // P2-1: 优先使用精确 lane 坐标（同通道多边已分离）
             if let Some(&(lane_coord, is_vert)) = cp.lane_assignments.get(&i) {
-                let from_vertical = is_vertical_port(from_ep.side);
+                let from_vertical = is_vertical_port(ea.from_port);
                 if from_vertical == is_vert {
                     return Some(lane_coord);
                 }
             }
             // fallback: 通道中心坐标
             let (coord, is_vert) = cp.channel_for_edge(i)?;
-            let from_vertical = is_vertical_port(from_ep.side);
+            let from_vertical = is_vertical_port(ea.from_port);
             if from_vertical == is_vert { Some(coord) } else { None }
         });
         let mut path = corridor_ok.unwrap_or_else(|| {
@@ -199,7 +213,7 @@ pub(crate) fn phase_route_edges(
         }
 
         // 标签位置：平行/反向边错开 t + 法向偏移，避免双向边标签重叠
-        let labels = if path.len() >= 2 {
+        labels[i] = if path.len() >= 2 {
             match relations.get(i) {
                 Some(rel) => {
                     build_parallel_aware_edge_labels(rel, i, relations, &parallel.offsets, &path)
@@ -211,17 +225,8 @@ pub(crate) fn phase_route_edges(
         };
 
         grid.insert_path(&path, i);
+        paths[i] = RoutePath::orthogonal(path);
 
-        let mut edge = EdgeLayout {
-            // 临时占位，下面用 set_polyline_points 根据 path 点数自动选择 Straight/Polyline
-            geometry: PathGeometry::Polyline { points: Vec::new() },
-            labels,
-            from_port: from_side[i],
-            to_port: to_side[i],
-        };
-        edge.set_polyline_points(path);
-
-        edges[i] = edge;
         crate::perf_log!(
             "[perf]     edge[{}] {}->{}: {} candidates, {:.2}ms",
             i,
@@ -231,4 +236,6 @@ pub(crate) fn phase_route_edges(
             t_edge.elapsed().as_secs_f64() * 1000.0
         );
     }
+
+    InitialPaths { paths, labels }
 }

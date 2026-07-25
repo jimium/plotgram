@@ -373,6 +373,7 @@ fn resolve_exact_cross_pair_stub_conflicts(
         }
         shift_stub_column(&mut pts, rec.at_from, c.side, new_c);
         ensure_minimal_stub_len(&mut pts, rec.at_from, c.side);
+        // 写者归属（E6）：E4 收编为 Coordinator solver finalize 步（freeze 前）。
         edge.set_polyline_points(pts);
         stats.stubs_shifted += 1;
         shifted_edges.push(move_ei);

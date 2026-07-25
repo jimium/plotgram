@@ -5,6 +5,7 @@ use crate::layout::edge_point;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
 use crate::layout::routing::common::edge_geometry::{build_edge_labels, node_center, parse_label_t, point_at_path_t};
+use crate::layout::routing::model::{CubicPath, RoutePath};
 
 /// 自环绘制风格
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,6 +30,70 @@ pub fn self_loop_indices(relations: &[Relation]) -> std::collections::HashMap<us
         per_node.insert(node.to_string(), idx + 1);
     }
     indices
+}
+
+/// 自环拓扑解（Slice D1）：只产 topology（[`RoutePath`]）+ 标签锚点事实，
+/// 几何物化由 GeometryMaterializer 完成，标签由 LabelSolver 在冻结几何上放置。
+#[derive(Debug, Clone)]
+pub struct SelfLoopSolution {
+    /// 路径拓扑：Curved → `Cubic`，Orthogonal → `Orthogonal` 折线。
+    pub path: RoutePath,
+    /// 标签锚点（Curved=贝塞尔 apex，Orthogonal=环外侧中点）。
+    pub label_anchor: Point,
+    /// 标签相对锚点的外向偏移。
+    pub label_offset: Point,
+    pub from_port: Port,
+    pub to_port: Port,
+}
+
+/// 求解自环拓扑（Slice D1）：与 [`route_self_loop`] 同源同参，但不产 `EdgeLayout`。
+pub fn solve_self_loop(
+    node: &NodeLayout,
+    loop_index: usize,
+    style: SelfLoopStyle,
+) -> SelfLoopSolution {
+    let corner = corner_for_index(loop_index);
+    match style {
+        SelfLoopStyle::Orthogonal => {
+            let loop_r = (node.width.min(node.height) * 0.28).max(16.0) + (loop_index as f64) * 6.0;
+            solve_orthogonal_self_loop(node, corner, loop_r)
+        }
+        SelfLoopStyle::Curved => {
+            let loop_r = (node.width.min(node.height) * 0.30).max(18.0) + (loop_index as f64) * 5.0;
+            solve_curved_self_loop(node, corner, loop_r)
+        }
+    }
+}
+
+fn solve_orthogonal_self_loop(node: &NodeLayout, corner: Corner, loop_r: f64) -> SelfLoopSolution {
+    let (path, label_point, from_port, to_port) = orthogonal_loop_geometry(node, corner, loop_r);
+    SelfLoopSolution {
+        path: RoutePath::orthogonal(path),
+        label_anchor: label_point,
+        label_offset: label_outward_offset(corner, loop_r),
+        from_port,
+        to_port,
+    }
+}
+
+fn solve_curved_self_loop(node: &NodeLayout, corner: Corner, loop_r: f64) -> SelfLoopSolution {
+    let (sx, sy, ex, ey, apex, from_port, to_port) = curved_loop_endpoints(node, corner, loop_r);
+    let cp1 = Point::new(sx + loop_r * corner.dx, sy + loop_r * corner.dy);
+    let cp2 = Point::new(
+        apex.x - loop_r * corner.perp_x * 0.35,
+        apex.y - loop_r * corner.perp_y * 0.35,
+    );
+    SelfLoopSolution {
+        path: RoutePath::Cubic(CubicPath {
+            start: Point::new(sx, sy),
+            end: Point::new(ex, ey),
+            controls: [cp1, cp2],
+        }),
+        label_anchor: apex,
+        label_offset: label_outward_offset(corner, loop_r),
+        from_port,
+        to_port,
+    }
 }
 
 /// 生成标准化自环几何；`loop_index` 决定角落轮转（0=右上，1=左上，2=右下，3=左下）。
@@ -238,27 +303,22 @@ fn route_curved_self_loop_inner(
     corner: Corner,
     loop_r: f64,
 ) -> EdgeLayout {
-    let (sx, sy, ex, ey, apex, from_port, to_port) =
-        curved_loop_endpoints(node, corner, loop_r);
-
-    let cp1 = Point::new(sx + loop_r * corner.dx, sy + loop_r * corner.dy);
-    let cp2 = Point::new(
-        apex.x - loop_r * corner.perp_x * 0.35,
-        apex.y - loop_r * corner.perp_y * 0.35,
-    );
-
-    let label_offset = label_outward_offset(corner, loop_r);
-    let labels = build_edge_labels(rel, 0.5, label_offset, |_| apex);
-
+    // Slice D1：与 solve_curved_self_loop 同一求解核，遗留调用方字节不变。
+    let sol = solve_curved_self_loop(node, corner, loop_r);
+    let apex = sol.label_anchor;
+    let labels = build_edge_labels(rel, 0.5, sol.label_offset, |_| apex);
+    let RoutePath::Cubic(cubic) = sol.path else {
+        unreachable!("solve_curved_self_loop 必产 Cubic");
+    };
     EdgeLayout {
         geometry: PathGeometry::Bezier {
-            start: Point::new(sx, sy),
-            end: Point::new(ex, ey),
-            controls: [cp1, cp2],
+            start: cubic.start,
+            end: cubic.end,
+            controls: cubic.controls,
         },
         labels,
-        from_port,
-        to_port,
+        from_port: sol.from_port,
+        to_port: sol.to_port,
     }
 }
 

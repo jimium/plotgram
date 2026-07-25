@@ -18,7 +18,8 @@ pub(crate) fn phase_sanitize(
     nodes: Option<&HashMap<String, NodeLayout>>,
     sorted_node_ids: Option<&[String]>,
 ) {
-    sanitize_orthogonal_edges_with_guard(
+    // Slice D3：canonicalize 归 materializer（C 末保守版，merge_overshoot=false）。
+    crate::layout::routing::model::GeometryMaterializer::canonicalize_orthogonal_edges(
         edges,
         relations,
         from_side,

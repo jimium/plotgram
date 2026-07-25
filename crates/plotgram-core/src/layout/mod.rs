@@ -26,7 +26,6 @@ pub mod constants;
 pub mod decl_order;
 pub mod demand;
 pub mod routing;
-pub mod edge_stages;
 pub mod engines;
 pub mod geometry;
 pub mod geometry_helpers;
@@ -93,7 +92,7 @@ pub use types::{
     OrthoDebugStats, GroupLayoutWarning, GroupLayoutWarningKind,
     LayoutResult, GroupContainmentViolation, ContainmentViolationKind,
 };
-pub use traits::{LayoutStrategy, EdgeRoutingStrategy};
+pub use traits::{LayoutStrategy, RoutingProduct, RoutingRecipeDyn};
 pub use geometry_helpers::{styled_node_size, edge_point, ellipse_edge_point};
 pub use pipeline::entry::{
     resolve_effective_direction, compute_layout, compute_layout_with_plan,

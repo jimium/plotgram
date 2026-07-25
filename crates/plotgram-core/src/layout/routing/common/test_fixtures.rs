@@ -179,6 +179,30 @@ pub fn make_diagram_grid(rows: usize, cols: usize) -> (Diagram, LayoutResult) {
     (diagram, result)
 }
 
+/// 测试辅助：从 (Diagram, LayoutResult) 构造 PreparedRoutingInput 并调用 router.route。
+///
+/// 返回 RoutingProduct，测试可直接访问 `.edges`。
+pub fn route_via_prepared(
+    router: &dyn crate::layout::RoutingRecipeDyn,
+    diagram: &Diagram,
+    result: &LayoutResult,
+) -> crate::layout::RoutingProduct {
+    let frozen = crate::layout::routing::coordinator::FrozenNodeProduct::capture(result);
+    let input = crate::layout::routing::model::prepared::PreparedRoutingInput::prepare(
+        &frozen,
+        diagram,
+        &result.hints,
+        "",
+        router.name(),
+        Default::default(),
+        crate::layout::routing::model::prepared::RoutingCanvas {
+            width: result.total_width,
+            height: result.total_height,
+        },
+    );
+    router.route(&input)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -15,7 +15,6 @@
 use crate::layout::demand::{CorridorModel, CORRIDOR_LANE_PITCH};
 use crate::layout::geometry::{Axis, Point};
 use crate::layout::group::CorridorAxis;
-use crate::layout::EdgeLayout;
 use std::collections::HashMap;
 
 /// 通道负载阈值——负载超过此值才开始惩罚
@@ -27,11 +26,6 @@ const CHANNEL_LOAD_PENALTY: f64 = 200.0;
 /// P2.1：廊 OVER soft（弱于段级 channel_load）
 const CORRIDOR_OVER_PENALTY: f64 = 80.0;
 
-fn corridor_soft_enabled() -> bool {
-    !std::env::var("PLOTGRAM_CORRIDOR_SOFT")
-        .map(|v| v == "0" || v.eq_ignore_ascii_case("false"))
-        .unwrap_or(false)
-}
 
 /// 路径是否占用某廊车道（轴对齐 coord 附近 + span 重叠）。
 fn path_uses_corridor(path: &[Point], axis: CorridorAxis, coord: f64, span_min: f64, span_max: f64) -> bool {
@@ -68,9 +62,9 @@ fn path_uses_corridor(path: &[Point], axis: CorridorAxis, coord: f64, span_min: 
     false
 }
 
-/// 路径经过 OVER 廊时的 soft 惩罚；`PLOTGRAM_CORRIDOR_SOFT=0` 关闭。
-pub fn corridor_overflow_penalty(path: &[Point], model: &CorridorModel) -> f64 {
-    if !corridor_soft_enabled() || path.len() < 2 {
+/// 路径经过 OVER 廊时的 soft 惩罚；`corridor_soft=false` 关闭。
+pub fn corridor_overflow_penalty(path: &[Point], model: &CorridorModel, corridor_soft: bool) -> f64 {
+    if !corridor_soft || path.len() < 2 {
         return 0.0;
     }
     let mut penalty = 0.0;
@@ -102,16 +96,16 @@ impl ChannelLoadMap {
     /// 从所有边的路径构建通道负载图。
     ///
     /// 遍历每条边的每段，按段方向（H/V）和层坐标（H段=y, V段=x）量化后计数。
-    pub fn build(edges: &[EdgeLayout], step: f64) -> Self {
+    pub fn build(paths: &[crate::layout::routing::model::solution::RoutePath], step: f64) -> Self {
         let mut loads: HashMap<(Axis, i64), usize> = HashMap::new();
         if step <= 0.0 {
             return Self { loads, step: 8.0 };
         }
-        for ei in 0..edges.len() {
-            if edges[ei].path_is_empty() {
+        for path in paths.iter() {
+            if path.is_empty() {
                 continue;
             }
-            let points = edges[ei].path_points();
+            let points = path.points();
             for w in points.windows(2) {
                 let dx = (w[1].x - w[0].x).abs();
                 let dy = (w[1].y - w[0].y).abs();
@@ -172,17 +166,10 @@ pub fn channel_load_penalty(path: &[Point], load_map: &ChannelLoadMap) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layout::PathGeometry;
+    use crate::layout::routing::model::solution::RoutePath;
 
-    fn mk_edge(points: &[Point]) -> EdgeLayout {
-        let mut e = EdgeLayout {
-            geometry: PathGeometry::Polyline { points: Vec::new() },
-            labels: vec![],
-            from_port: crate::layout::Port::Bottom,
-            to_port: crate::layout::Port::Top,
-        };
-        e.set_polyline_points(points.to_vec());
-        e
+    fn mk_path(points: &[Point]) -> RoutePath {
+        RoutePath::orthogonal(points.to_vec())
     }
 
     fn pt(x: f64, y: f64) -> Point {
@@ -195,9 +182,9 @@ mod tests {
         let p0 = vec![pt(200.0, 100.0), pt(200.0, 300.0)]; // V 段
         let p1 = vec![pt(200.0, 100.0), pt(200.0, 300.0)]; // V 段
         let p2 = vec![pt(100.0, 100.0), pt(300.0, 100.0)]; // H 段
-        let edges = vec![mk_edge(&p0), mk_edge(&p1), mk_edge(&p2)];
+        let paths = vec![mk_path(&p0), mk_path(&p1), mk_path(&p2)];
 
-        let map = ChannelLoadMap::build(&edges, 8.0);
+        let map = ChannelLoadMap::build(&paths, 8.0);
         // x=200 量化为 200/8=25
         assert_eq!(map.load(Axis::Vertical, 200.0), 2, "x=200 应有 2 条 V 段");
         // y=100 量化为 100/8=12.5 → round=13
@@ -206,8 +193,8 @@ mod tests {
 
     #[test]
     fn test_load_returns_zero_for_empty_channel() {
-        let edges: Vec<EdgeLayout> = Vec::new();
-        let map = ChannelLoadMap::build(&edges, 8.0);
+        let paths: Vec<RoutePath> = Vec::new();
+        let map = ChannelLoadMap::build(&paths, 8.0);
         assert_eq!(map.load(Axis::Vertical, 200.0), 0, "空图应返回 0");
         assert_eq!(map.load(Axis::Horizontal, 100.0), 0, "空图应返回 0");
     }
@@ -217,9 +204,9 @@ mod tests {
         // x=199.9 和 x=200.1 应量化到同一通道
         let p0 = vec![pt(199.9, 100.0), pt(199.9, 300.0)];
         let p1 = vec![pt(200.1, 100.0), pt(200.1, 300.0)];
-        let edges = vec![mk_edge(&p0), mk_edge(&p1)];
+        let paths = vec![mk_path(&p0), mk_path(&p1)];
 
-        let map = ChannelLoadMap::build(&edges, 8.0);
+        let map = ChannelLoadMap::build(&paths, 8.0);
         // 199.9/8=24.9875 → round=25, 200.1/8=25.0125 → round=25
         let load = map.load(Axis::Vertical, 200.0);
         assert_eq!(load, 2, "相近 layer 应量化到同一通道，load={}", load);
@@ -231,8 +218,8 @@ mod tests {
         let p0 = vec![pt(200.0, 100.0), pt(200.0, 300.0)];
         let p1 = vec![pt(200.0, 100.0), pt(200.0, 300.0)];
         let p2 = vec![pt(200.0, 100.0), pt(200.0, 300.0)];
-        let edges = vec![mk_edge(&p0), mk_edge(&p1), mk_edge(&p2)];
-        let map = ChannelLoadMap::build(&edges, 8.0);
+        let paths = vec![mk_path(&p0), mk_path(&p1), mk_path(&p2)];
+        let map = ChannelLoadMap::build(&paths, 8.0);
 
         let test_path = vec![pt(200.0, 100.0), pt(200.0, 300.0)];
         let penalty = channel_load_penalty(&test_path, &map);
@@ -243,8 +230,8 @@ mod tests {
     fn test_channel_load_penalty_scales_with_load() {
         // 5 条 V 段在 x=200 → load=5, 多余 2 条 → 2×200=400
         let p = vec![pt(200.0, 100.0), pt(200.0, 300.0)];
-        let edges = vec![mk_edge(&p); 5];
-        let map = ChannelLoadMap::build(&edges, 8.0);
+        let paths = vec![mk_path(&p); 5];
+        let map = ChannelLoadMap::build(&paths, 8.0);
 
         let test_path = vec![pt(200.0, 100.0), pt(200.0, 300.0)];
         let penalty = channel_load_penalty(&test_path, &map);
@@ -262,8 +249,8 @@ mod tests {
         // 路径 B 经过 load=0 通道 → 无惩罚
         // 验证 channel_load_penalty 对 A 的惩罚 > B
         let p = vec![pt(200.0, 100.0), pt(200.0, 300.0)];
-        let edges = vec![mk_edge(&p); 5];
-        let map = ChannelLoadMap::build(&edges, 8.0);
+        let paths = vec![mk_path(&p); 5];
+        let map = ChannelLoadMap::build(&paths, 8.0);
 
         let congested_path = vec![pt(200.0, 100.0), pt(200.0, 300.0)];
         let free_path = vec![pt(400.0, 100.0), pt(400.0, 300.0)];

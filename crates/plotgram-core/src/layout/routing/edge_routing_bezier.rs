@@ -11,7 +11,7 @@ use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use crate::layout::algorithm_config::{AlgorithmOptionSpec, OptionKind};
 use crate::layout::geometry::Point;
-use crate::layout::{EdgeLayout, EdgeRoutingStrategy, LayoutResult, PathGeometry};
+use crate::layout::{EdgeLayout, LayoutResult, PathGeometry};
 use crate::layout::routing::common::edge_geometry::{
     build_edge_labels, compute_bezier_controls,
     cubic_bezier_point, parse_label_t, point_at_path_t, DEFAULT_BEZIER_TENSION,
@@ -74,33 +74,6 @@ impl BezierRouting {
                 tension: options.get_or_default(&BEZIER_OPTIONS[0]),
             },
         }
-    }
-}
-
-impl EdgeRoutingStrategy for BezierRouting {
-    fn name(&self) -> &'static str {
-        "bezier"
-    }
-
-    fn applicable_diagram_types(&self) -> &'static [DiagramType] {
-        APPLICABLE_TYPES
-    }
-
-    fn supports_custom(&self) -> bool {
-        true
-    }
-
-    fn option_specs(&self) -> &'static [AlgorithmOptionSpec] {
-        BEZIER_OPTIONS
-    }
-
-    fn route(&self, diagram: &Diagram, result: LayoutResult) -> LayoutResult {
-        route_edges_bezier(diagram, result, self.config)
-    }
-
-    /// bezier 穿障后会退化为 Polyline，需要 refine 检测并兜底。
-    fn supports_refine(&self) -> bool {
-        true
     }
 }
 

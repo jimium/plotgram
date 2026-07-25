@@ -16,7 +16,7 @@ use crate::layout::algorithm_config::AlgorithmOptionSpec;
 use crate::layout::routing::edge_routing_bezier::{BezierConfig, BEZIER_OPTIONS};
 use crate::layout::geometry::Point;
 use crate::layout::{
-    EdgeLayout, EdgeRoutingStrategy, LayoutResult, PathGeometry,
+    EdgeLayout, LayoutResult, PathGeometry,
 };
 use crate::layout::routing::common::edge_geometry::{
     build_edge_labels, compute_bezier_controls, cubic_bezier_point, label_t_for_diagram,
@@ -54,39 +54,6 @@ impl SplineRouting {
                 tension: options.get_or_default(&BEZIER_OPTIONS[0]),
             },
         }
-    }
-}
-
-impl EdgeRoutingStrategy for SplineRouting {
-    fn name(&self) -> &'static str {
-        "spline"
-    }
-
-    fn applicable_diagram_types(&self) -> &'static [DiagramType] {
-        APPLICABLE_TYPES
-    }
-
-    fn supports_custom(&self) -> bool {
-        true
-    }
-
-    fn option_specs(&self) -> &'static [AlgorithmOptionSpec] {
-        BEZIER_OPTIONS
-    }
-
-    fn route(&self, diagram: &Diagram, result: LayoutResult) -> LayoutResult {
-        route_edges_spline(diagram, result, self.config)
-    }
-
-    /// spline 在有障碍绕行时会退化为密集 Polyline（多段样条采样），
-    /// 需要 refine 检测穿障并推开问题节点。
-    fn supports_refine(&self) -> bool {
-        true
-    }
-
-    /// spline 使用可见性图避障，S3 阶段会接入图级 `ObstacleIndex` 缓存。
-    fn needs_obstacle_index(&self) -> bool {
-        true
     }
 }
 

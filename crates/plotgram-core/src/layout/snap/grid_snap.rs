@@ -146,7 +146,7 @@ impl NodeAlignConfig {
     }
 }
 
-/// 边像素量化配置（由 [`EdgeRoutingStrategy::edge_snap_config()`] 声明）。
+/// 边像素量化配置（由 [`RoutingRecipeDyn::edge_snap_config()`] 声明）。
 ///
 /// 控制正交折线路径的通道轴坐标量化，以及分组边框排斥的几何参数。
 /// 属于像素量化阶段，在路由完成后执行，**不改拓扑**。

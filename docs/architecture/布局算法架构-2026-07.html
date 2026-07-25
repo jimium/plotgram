@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>布局算法架构文档 - Plotgram</title>
+    <title>布局算法架构 - Plotgram 2026-07</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -12,6 +12,8 @@
             --success-light: #dcfce7;
             --warning: #d97706;
             --warning-light: #fef3c7;
+            --danger: #dc2626;
+            --danger-light: #fee2e2;
             --gray-50: #f9fafb;
             --gray-100: #f3f4f6;
             --gray-200: #e5e7eb;
@@ -25,15 +27,15 @@
             line-height: 1.7;
             color: var(--gray-800);
             background: var(--gray-50);
-            padding: 2rem;
+            padding: 1.5rem;
         }
         .container {
-            max-width: 960px;
+            max-width: 1100px;
             margin: 0 auto;
             background: white;
             border-radius: 12px;
             box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-            padding: 3rem;
+            padding: 2.5rem 3rem;
         }
         h1 {
             font-size: 2rem;
@@ -45,27 +47,31 @@
         .meta {
             color: var(--gray-600);
             font-size: 0.9rem;
-            margin-bottom: 2rem;
+            margin-bottom: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
         }
-        .meta span {
-            display: inline-block;
+        .meta span { background: var(--gray-100); padding: 0.25rem 0.75rem; border-radius: 4px; }
+        #wasm-status {
+            font-size: 0.82rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
             background: var(--gray-100);
-            padding: 0.25rem 0.75rem;
-            border-radius: 4px;
-            margin-right: 0.5rem;
         }
+        #wasm-status[data-kind="ok"] { background: var(--success-light); color: var(--success); }
+        #wasm-status[data-kind="warn"] { background: var(--warning-light); color: var(--warning); }
+        #wasm-status[data-kind="error"] { background: var(--danger-light); color: var(--danger); }
+        #wasm-status[data-kind="loading"] { background: var(--primary-light); color: var(--primary); }
         h2 {
-            font-size: 1.4rem;
+            font-size: 1.35rem;
             color: var(--gray-900);
             margin: 2.5rem 0 1rem;
             padding-left: 0.75rem;
             border-left: 4px solid var(--primary);
         }
-        h3 {
-            font-size: 1.1rem;
-            color: var(--gray-800);
-            margin: 1.5rem 0 0.75rem;
-        }
+        h3 { font-size: 1.05rem; margin: 1.5rem 0 0.75rem; }
         p { margin: 0.75rem 0; }
         code {
             background: var(--gray-100);
@@ -77,327 +83,519 @@
         pre {
             background: var(--gray-900);
             color: #e5e7eb;
-            padding: 1.25rem;
+            padding: 1rem;
             border-radius: 8px;
             overflow-x: auto;
-            margin: 1rem 0;
-            font-size: 0.85rem;
+            font-size: 0.78rem;
             line-height: 1.5;
         }
-        pre code {
-            background: none;
-            padding: 0;
-            color: inherit;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 1rem 0;
-            font-size: 0.9rem;
-        }
-        th, td {
-            padding: 0.75rem 1rem;
-            text-align: left;
-            border-bottom: 1px solid var(--gray-200);
-        }
-        th {
-            background: var(--gray-100);
-            font-weight: 600;
-            color: var(--gray-900);
-        }
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.88rem; }
+        th, td { padding: 0.65rem 0.9rem; text-align: left; border-bottom: 1px solid var(--gray-200); }
+        th { background: var(--gray-100); font-weight: 600; }
         tr:hover { background: var(--gray-50); }
         .badge {
             display: inline-block;
-            padding: 0.2rem 0.6rem;
+            padding: 0.15rem 0.55rem;
             border-radius: 4px;
-            font-size: 0.8rem;
+            font-size: 0.78rem;
             font-weight: 500;
         }
         .badge-success { background: var(--success-light); color: var(--success); }
         .badge-warning { background: var(--warning-light); color: var(--warning); }
+        .badge-danger { background: var(--danger-light); color: var(--danger); }
         .badge-primary { background: var(--primary-light); color: var(--primary); }
-        .arch-diagram {
-            background: var(--gray-100);
-            border: 2px solid var(--gray-200);
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin: 1.5rem 0;
-            font-family: 'SF Mono', monospace;
-            font-size: 0.8rem;
-            line-height: 1.4;
-            overflow-x: auto;
+        .badge-muted { background: var(--gray-100); color: var(--gray-600); }
+        .diagram-box {
+            background: #fafbfc;
+            border: 1px solid var(--gray-200);
+            border-radius: 10px;
+            padding: 1rem 1.25rem 1.25rem;
+            margin: 1.25rem 0;
         }
-        .layer {
-            border: 2px solid var(--primary);
+        .diagram-caption {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+            margin-top: 0.75rem;
+            text-align: center;
+        }
+        .plotgram-render {
+            display: block;
+            padding: 0;
+            min-height: 0;
+        }
+        .plotgram-viewport {
+            width: 100%;
+            max-width: 100%;
+            margin: 0 auto;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            /* 默认上限：文档插图不应占满整屏 */
+            max-height: min(52vh, 480px);
+        }
+        .plotgram-viewport--wide {
+            max-height: min(42vh, 360px);
+        }
+        .plotgram-viewport--tall {
+            max-height: min(62vh, 560px);
+        }
+        .plotgram-svg-wrap {
+            flex: 0 0 auto;
+            line-height: 0;
+        }
+        .plotgram-svg-wrap svg {
+            display: block;
+            max-width: 100%;
+        }
+        .plotgram-render.plotgram-loading .plotgram-viewport::after {
+            content: 'Plotgram 渲染中…';
+            display: block;
+            text-align: center;
+            color: var(--gray-600);
+            font-size: 0.9rem;
+            padding: 2rem;
+        }
+        .plotgram-error {
+            background: var(--danger-light);
+            border: 1px solid #fecaca;
             border-radius: 8px;
             padding: 1rem;
-            margin: 0.5rem 0;
-            background: white;
-        }
-        .layer-title {
-            font-weight: 600;
-            color: var(--primary);
-            margin-bottom: 0.5rem;
-        }
-        .layer-content {
-            color: var(--gray-600);
             font-size: 0.85rem;
+            width: 100%;
         }
+        .plotgram-error pre {
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            background: #1f2937;
+        }
+        details.plotgram-src {
+            margin-top: 0.75rem;
+            font-size: 0.82rem;
+        }
+        details.plotgram-src summary {
+            cursor: pointer;
+            color: var(--primary);
+            user-select: none;
+        }
+        .callout {
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+        .callout-info { background: var(--primary-light); border-left: 4px solid var(--primary); }
+        .callout-warn { background: var(--warning-light); border-left: 4px solid var(--warning); }
+        .toc {
+            background: var(--gray-100);
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            margin: 1.5rem 0;
+            columns: 2;
+            column-gap: 2rem;
+        }
+        .toc-title { font-weight: 600; margin-bottom: 0.75rem; column-span: all; }
+        .toc a { color: var(--primary); text-decoration: none; font-size: 0.9rem; }
+        .toc ul { list-style: none; padding-left: 0; }
+        .toc li { margin: 0.25rem 0; break-inside: avoid; }
         .file-tree {
             background: var(--gray-900);
             color: #a5b4fc;
             padding: 1.25rem;
             border-radius: 8px;
             font-family: 'SF Mono', monospace;
-            font-size: 0.8rem;
-            line-height: 1.6;
+            font-size: 0.78rem;
+            line-height: 1.65;
+            overflow-x: auto;
         }
         .file-tree .dir { color: #93c5fd; }
         .file-tree .file { color: #d1d5db; }
         .file-tree .comment { color: #6b7280; }
-        ul, ol {
-            margin: 0.75rem 0;
-            padding-left: 1.5rem;
+        ul { margin: 0.75rem 0; padding-left: 1.5rem; }
+        li { margin: 0.35rem 0; }
+        @media (max-width: 768px) {
+            .container { padding: 1.5rem; }
+            .toc { columns: 1; }
         }
-        li { margin: 0.4rem 0; }
-        .toc {
-            background: var(--gray-100);
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin: 1.5rem 0;
-        }
-        .toc-title {
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-        }
-        .toc a {
-            color: var(--primary);
-            text-decoration: none;
-        }
-        .toc a:hover { text-decoration: underline; }
-        .toc ul { list-style: none; padding-left: 0; }
-        .toc li { margin: 0.3rem 0; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>布局算法架构文档</h1>
     <div class="meta">
-        <span>版本 2.0</span>
-        <span>2026-07-23</span>
-        <span class="badge badge-success">Phase 1-10 完成</span>
+        <span>版本 3.1</span>
+        <span>2026-07-24</span>
+        <span class="badge badge-primary">Plotgram 自绘架构图</span>
+        <span id="wasm-status" data-kind="loading">初始化…</span>
+    </div>
+
+    <div class="callout callout-info">
+        本页架构图由 <strong>Plotgram WASM</strong> 在线渲染（与 Playground 生产环境同源：
+        <code>assets.plotgram.cn/plotgram-wasm/</code>），用自家布局引擎绘制流程图——吃狗粮验证。
+        请通过 <code>http://</code> 本地服务打开（直接 <code>file://</code> 可能因 ES module 限制无法加载 WASM）。
+        插图按容器 <strong>fit-to-view 缩小</strong>（最大宽约 720px、高 420–520px，不放大）。
     </div>
 
     <div class="toc">
         <div class="toc-title">目录</div>
         <ul>
-            <li><a href="#overview">1. 概述</a></li>
-            <li><a href="#layers">2. 架构分层</a></li>
-            <li><a href="#solver">3. 坐标求解器</a></li>
-            <li><a href="#pipeline">4. Sugiyama 布局管线</a></li>
-            <li><a href="#freeze">5. 节点冻结机制</a></li>
-            <li><a href="#diagram-types">6. 图类型支持</a></li>
-            <li><a href="#files">7. 文件索引</a></li>
-            <li><a href="#decisions">8. 设计决策记录</a></li>
-            <li><a href="#future">9. 后续演进</a></li>
+            <li><a href="#overview">1. 主数据流</a></li>
+            <li><a href="#layers">2. 四层架构</a></li>
+            <li><a href="#pipeline">3. Pipeline 生命周期</a></li>
+            <li><a href="#recipe">4. Recipe 生命周期</a></li>
+            <li><a href="#paths">5. Recipe 路径</a></li>
+            <li><a href="#sugiyama">6. Sugiyama 坐标链</a></li>
+            <li><a href="#kernel">7. CoordinateKernel</a></li>
+            <li><a href="#dykstra">8. Dykstra 投影</a></li>
+            <li><a href="#priority">9. P0–P3 优先级</a></li>
+            <li><a href="#demand">10. 空间需求契约</a></li>
+            <li><a href="#freeze">11. 节点冻结时序</a></li>
+            <li><a href="#routing">12. 路由分支</a></li>
+            <li><a href="#matrix">13. 图类型矩阵</a></li>
+            <li><a href="#gaps">14. 已知缺口</a></li>
         </ul>
     </div>
 
-    <h2 id="overview">1. 概述</h2>
-    <p>Plotgram 布局系统采用 <strong>Kernel/Recipe 分层架构</strong>，将核心坐标求解算法与图类型语义解耦：</p>
+    <h2 id="overview">1. 主数据流</h2>
+    <p>从 AST 到最终 SVG：布局 Recipe 产出节点坐标，Pipeline 编排路由与后处理。</p>
+    <div class="diagram-box">
+        <div class="plotgram-render" id="diag-overview"></div>
+        <div class="diagram-caption">图 1-1：Pipeline → Recipe → 路由 → 最终产物</div>
+        <details class="plotgram-src"><summary>Plotgram 源码</summary><pre id="src-overview"></pre></details>
+    </div>
+
+    <h2 id="layers">2. 四层架构</h2>
+    <div class="diagram-box">
+        <div class="plotgram-render" id="diag-layers"></div>
+        <div class="diagram-caption">图 2-1：Pipeline / Recipes / Engines / Kernel 泳道</div>
+        <details class="plotgram-src"><summary>Plotgram 源码</summary><pre id="src-layers"></pre></details>
+    </div>
+
+    <h2 id="pipeline">3. LayoutPipeline 全阶段</h2>
+    <div class="diagram-box">
+        <div class="plotgram-render" id="diag-pipeline"></div>
+        <div class="diagram-caption">图 3-1：compute → 路由 → NodeFreeze → label（简化主链）</div>
+        <details class="plotgram-src"><summary>Plotgram 源码</summary><pre id="src-pipeline"></pre></details>
+    </div>
+
+    <h2 id="recipe">4. LayoutRecipe 生命周期</h2>
+    <div class="diagram-box">
+        <div class="plotgram-render" id="diag-recipe"></div>
+        <div class="diagram-caption">图 4-1：compile → solve → audit → product</div>
+        <details class="plotgram-src"><summary>Plotgram 源码</summary><pre id="src-recipe"></pre></details>
+    </div>
+
+    <h2 id="paths">5. 各图类型 Recipe 路径</h2>
+    <div class="diagram-box">
+        <div class="plotgram-render" id="diag-paths"></div>
+        <div class="diagram-caption">图 5-1：主路径与 group_divide / two_phase bypass</div>
+        <details class="plotgram-src"><summary>Plotgram 源码</summary><pre id="src-paths"></pre></details>
+    </div>
+
+    <h2 id="sugiyama">6. Sugiyama + 坐标链</h2>
+    <div class="diagram-box">
+        <div class="plotgram-render" id="diag-sugiyama"></div>
+        <div class="diagram-caption">图 6-1：LayeredKernel → BK → builder → optimizer → NodeLayout</div>
+        <details class="plotgram-src"><summary>Plotgram 源码</summary><pre id="src-sugiyama"></pre></details>
+    </div>
+
+    <h2 id="kernel">7. CoordinateKernel 求解</h2>
+    <div class="diagram-box">
+        <div class="plotgram-render" id="diag-kernel"></div>
+        <div class="diagram-caption">图 7-1：validate → Dykstra → P1/P2/P3 → audit</div>
+        <details class="plotgram-src"><summary>Plotgram 源码</summary><pre id="src-kernel"></pre></details>
+    </div>
+
+    <h2 id="dykstra">8. Dykstra 交替投影</h2>
+    <div class="diagram-box">
+        <div class="plotgram-render" id="diag-dykstra"></div>
+        <div class="diagram-caption">图 8-1：PAVA ↔ bounds ↔ MinSeparation 固定轮次迭代</div>
+        <details class="plotgram-src"><summary>Plotgram 源码</summary><pre id="src-dykstra"></pre></details>
+    </div>
+
+    <h2 id="priority">9. P0–P3 优先级</h2>
+    <div class="diagram-box">
+        <div class="plotgram-render" id="diag-priority"></div>
+        <div class="diagram-caption">图 9-1：硬约束 → 结构 → 边友好 → 审美</div>
+        <details class="plotgram-src"><summary>Plotgram 源码</summary><pre id="src-priority"></pre></details>
+    </div>
+
+    <h2 id="demand">10. 空间需求契约</h2>
+    <div class="diagram-box">
+        <div class="plotgram-render" id="diag-demand"></div>
+        <div class="diagram-caption">图 10-1：SpaceBudget 拆分为布局需求与路由契约</div>
+        <details class="plotgram-src"><summary>Plotgram 源码</summary><pre id="src-demand"></pre></details>
+    </div>
+
+    <h2 id="freeze">11. 节点冻结时序</h2>
+    <div class="diagram-box">
+        <div class="plotgram-render" id="diag-freeze"></div>
+        <div class="diagram-caption">图 11-1：★ NodeFreeze 后仅改边几何与 label</div>
+        <details class="plotgram-src"><summary>Plotgram 源码</summary><pre id="src-freeze"></pre></details>
+    </div>
+
+    <h2 id="routing">12. 路由风格分支</h2>
+    <div class="callout callout-warn">路由尚未 Recipe 化，仍是命令式管线（见文档 16）。</div>
+    <div class="diagram-box">
+        <div class="plotgram-render" id="diag-routing"></div>
+        <div class="diagram-caption">图 12-1：orthogonal / 曲线 / 圆形有机 → 统一 D 段与 label</div>
+        <details class="plotgram-src"><summary>Plotgram 源码</summary><pre id="src-routing"></pre></details>
+    </div>
+
+    <h2 id="matrix">13. 图类型矩阵</h2>
+    <table>
+        <tr><th>图类型</th><th>Recipe</th><th>CoordinateKernel</th><th>成熟度</th></tr>
+        <tr><td>Flowchart</td><td>✅</td><td>✅</td><td><span class="badge badge-success">主路径成熟</span></td></tr>
+        <tr><td>State / ER</td><td>✅</td><td>✅</td><td><span class="badge badge-success">成熟</span></td></tr>
+        <tr><td>Architecture</td><td>✅</td><td>✅ flat/intra</td><td><span class="badge badge-warning">后处理仍推点</span></td></tr>
+        <tr><td>Sequence</td><td>✅</td><td>—</td><td><span class="badge badge-primary">自产边</span></td></tr>
+        <tr><td>Mindmap / Circular</td><td>✅</td><td>部分/—</td><td><span class="badge badge-muted">独立 solver</span></td></tr>
+    </table>
+
+    <h2 id="gaps">14. 已知缺口</h2>
+    <table>
+        <tr><th>项</th><th>严重度</th><th>说明</th></tr>
+        <tr><td>flowchart stable_id</td><td><span class="badge badge-danger">P0</span></td><td>builder 与 route feedback entity id 不一致</td></tr>
+        <tr><td>LR 轴语义</td><td><span class="badge badge-danger">P0</span></td><td>feedback 仍固定写 node.x</td></tr>
+        <tr><td>竖缝 imperative push</td><td><span class="badge badge-warning">P1</span></td><td>SpacingDemand 未完全进 solver</td></tr>
+        <tr><td>路由 Recipe 化</td><td><span class="badge badge-muted">规划</span></td><td>文档 16</td></tr>
+    </table>
+
+    <h3>相关文档</h3>
     <ul>
-        <li><strong>Kernel 层</strong>：共享的坐标约束求解器，不接受 <code>DiagramType</code>，只消费 IR</li>
-        <li><strong>Node 层适配器</strong>：将图类型语义编译为 IR（builder + objectives）</li>
-        <li><strong>Recipe 层</strong>：显式编排布局生命周期（compile → solve → audit → product）</li>
+        <li><a href="布局算法架构-2026-07.md">Markdown 版（含全部 Plotgram 源码）</a></li>
+        <li><a href="../优化重构/15-布局模型落地审计与后续提高方案-2026-07.md">布局审计与提高方案</a></li>
+        <li><a href="../优化重构/16-路由Recipe-Kernel与求解器架构改造方案-2026-07.md">路由 Recipe 改造</a></li>
     </ul>
-
-    <h2 id="layers">2. 架构分层</h2>
-    <div class="layer">
-        <div class="layer-title">Recipe 层（图类型编排）</div>
-        <div class="layer-content">
-            FlowchartRecipe / ArchitectureRecipe / StateRecipe<br>
-            职责：编排布局生命周期，调用 builder → solver → auditor
-        </div>
-    </div>
-    <div class="layer">
-        <div class="layer-title">Node 层适配器</div>
-        <div class="layer-content">
-            builder.rs / objectives.rs / structure_objectives.rs<br>
-            职责：AST + Sugiyama layers → CoordinateProblem IR
-        </div>
-    </div>
-    <div class="layer">
-        <div class="layer-title">Kernel 层（共享内核）</div>
-        <div class="layer-content">
-            model.rs / optimizer.rs / projection.rs / auditor.rs<br>
-            职责：消费 IR，输出坐标，无图类型语义
-        </div>
-    </div>
-
-    <h3>2.1 Kernel 层</h3>
-    <p><strong>位置</strong>：<code>crates/plotgram-core/src/layout/kernel/coordinate/</code></p>
-    <table>
-        <tr><th>模块</th><th>职责</th></tr>
-        <tr><td><code>model.rs</code></td><td>IR 数据结构（CoordinateProblem、HardConstraint、Objective）</td></tr>
-        <tr><td><code>optimizer.rs</code></td><td>Projected Gradient 求解器（P1→P2→P3 分层优化）</td></tr>
-        <tr><td><code>projection.rs</code></td><td>PAVA 硬约束投影（层内最小分离）</td></tr>
-        <tr><td><code>auditor.rs</code></td><td>P0 约束审计（solver 后验证）</td></tr>
-    </table>
-    <p><strong>设计原则</strong>：</p>
-    <ol>
-        <li>不接受 <code>DiagramType</code> 参数</li>
-        <li>只消费 <code>CoordinateProblem</code> IR</li>
-        <li>确定性：相同输入产生相同输出</li>
-    </ol>
-
-    <h3>2.2 Node 层适配器</h3>
-    <p><strong>位置</strong>：<code>crates/plotgram-core/src/layout/node/coordinate_solver/</code></p>
-    <table>
-        <tr><th>模块</th><th>职责</th></tr>
-        <tr><td><code>builder.rs</code></td><td>从 Sugiyama layers/sizes 构建 CoordinateProblem</td></tr>
-        <tr><td><code>objectives.rs</code></td><td>基础目标（BK 位置保持、边拉直、dummy 共线）</td></tr>
-        <tr><td><code>structure_objectives.rs</code></td><td>结构目标（线性链、end 跟随、pendant 对齐）</td></tr>
-    </table>
-
-    <h3>2.3 Recipe 层</h3>
-    <p><strong>编排流程</strong>：</p>
-    <pre><code>compile (AST → IR)
-  → solve (IR → coordinates)
-  → audit (验证 P0 约束)
-  → product (coordinates → NodeLayout)</code></pre>
-
-    <h2 id="solver">3. 坐标求解器</h2>
-    <h3>3.1 IR 数据结构</h3>
-    <pre><code>pub struct CoordinateProblem {
-    pub vars: Vec&lt;NodeVariable&gt;,          // 坐标变量
-    pub layers: Vec&lt;LayerConstraintSet&gt;,  // 层约束（含最小分离）
-    pub hard: Vec&lt;HardConstraint&gt;,        // P0 硬约束
-    pub objectives: Vec&lt;Objective&gt;,       // P1/P2/P3 软目标
-    pub initial: InitialValues,           // BK 初值
-    pub config: SolverConfig,             // 求解配置
-}</code></pre>
-
-    <h3>3.2 优先级分层</h3>
-    <table>
-        <tr><th>优先级</th><th>含义</th><th>示例</th></tr>
-        <tr><td><span class="badge badge-primary">P0</span></td><td>硬约束（可行域）</td><td>层内最小分离、节点不重叠</td></tr>
-        <tr><td><span class="badge badge-success">P1</span></td><td>结构目标</td><td>线性链共轴、end 跟随、pendant 对齐</td></tr>
-        <tr><td><span class="badge badge-warning">P2</span></td><td>边友好目标</td><td>边拉直、dummy 共线、singleton 对齐</td></tr>
-        <tr><td>P3</td><td>审美目标</td><td>BK 位置保持</td></tr>
-    </table>
-
-    <h3>3.3 求解算法</h3>
-    <ol>
-        <li><strong>PAVA 投影</strong>：将坐标投影到硬约束可行域（O(n) 时间）</li>
-        <li><strong>Projected Gradient</strong>：在可行域内按 P1→P2→P3 分层优化</li>
-        <li><strong>Barzilai-Borwein 步长</strong>：自适应加速收敛</li>
-        <li><strong>Best Feasible Snapshot</strong>：未收敛时返回最佳可行解</li>
-    </ol>
-
-    <h2 id="pipeline">4. Sugiyama 布局管线</h2>
-    <div class="arch-diagram">
-┌─────────────────────────────────────────────────────────────┐
-│ 1. 预处理                                                    │
-│    - 解析 AST → Diagram                                      │
-│    - 确定方向（TB/LR）                                        │
-├─────────────────────────────────────────────────────────────┤
-│ 2. 分层（Rank Assignment）                                    │
-│    - 拓扑排序 → 层分配                                        │
-│    - 长边插入 dummy 节点                                      │
-├─────────────────────────────────────────────────────────────┤
-│ 3. 层内排序（Ordering）                                       │
-│    - 重心法 / 中位数法减少交叉                                 │
-├─────────────────────────────────────────────────────────────┤
-│ 4. 坐标分配（Coordinate Assignment）                          │
-│    - BK 算法 → 初值                                          │
-│    - Compact → 紧凑化                                        │
-│    - <strong>CoordinateSolver → 统一求解</strong>                          │
-│    - 物化 → NodeLayout                                       │
-├─────────────────────────────────────────────────────────────┤
-│ 5. 后处理                                                    │
-│    - Normalize（刚性平移到 padding）                          │
-│    - Group bounds 计算                                       │
-├─────────────────────────────────────────────────────────────┤
-│ 6. 边路由（Edge Routing）                                     │
-│    - 正交路由 / 贝塞尔 / 样条                                 │
-│    - Refine（推开穿障节点，solver 冻结图类型跳过）             │
-└─────────────────────────────────────────────────────────────┘
-    </div>
-
-    <h2 id="freeze">5. 节点冻结机制</h2>
-    <p><strong>Phase 7 引入</strong>：使用 coordinate solver 的图类型（Flowchart/State/ER），solver 完成后节点即冻结：</p>
-    <table>
-        <tr><th>组件</th><th>冻结行为</th></tr>
-        <tr><td><code>route_feedback.rs</code></td><td>跳过 <code>enforce_horizontal_gaps</code></td></tr>
-        <tr><td><code>refine/mod.rs</code></td><td>跳过 push（不推开节点）</td></tr>
-        <tr><td><code>space_budget_guard.rs</code></td><td>跳过水平缝消解</td></tr>
-        <tr><td><code>pipeline.rs</code></td><td>跳过 <code>align_nodes</code></td></tr>
-    </table>
-    <p><strong>保留</strong>：<code>enforce_vertical_rank_gaps</code>（层缝硬约束仍需守约）</p>
-
-    <h2 id="diagram-types">6. 图类型支持</h2>
-    <table>
-        <tr><th>图类型</th><th>布局算法</th><th>坐标求解</th><th>状态</th></tr>
-        <tr><td>Flowchart</td><td>Sugiyama V2</td><td>CoordinateSolver</td><td><span class="badge badge-success">完全迁移</span></td></tr>
-        <tr><td>State</td><td>Sugiyama V2</td><td>CoordinateSolver</td><td><span class="badge badge-success">完全迁移</span></td></tr>
-        <tr><td>ER</td><td>Sugiyama V2</td><td>CoordinateSolver</td><td><span class="badge badge-success">完全迁移</span></td></tr>
-        <tr><td>Architecture</td><td>Two-Phase</td><td>旧路径</td><td><span class="badge badge-warning">待迁移</span></td></tr>
-        <tr><td>Sequence</td><td>专用</td><td>N/A</td><td>-</td></tr>
-        <tr><td>Mindmap</td><td>专用</td><td>N/A</td><td>-</td></tr>
-        <tr><td>Circular</td><td>专用</td><td>N/A</td><td>-</td></tr>
-    </table>
-
-    <h2 id="files">7. 文件索引</h2>
-    <h3>Kernel 层</h3>
-    <div class="file-tree">
-<span class="dir">crates/plotgram-core/src/layout/kernel/</span>
-├── mod.rs
-└── <span class="dir">coordinate/</span>
-    ├── mod.rs
-    ├── model.rs          <span class="comment"># IR 数据结构（281 行）</span>
-    ├── optimizer.rs      <span class="comment"># Projected Gradient（443 行）</span>
-    ├── projection.rs     <span class="comment"># PAVA 投影（229 行）</span>
-    └── auditor.rs        <span class="comment"># P0 审计（139 行）</span>
-    </div>
-
-    <h3>Node 层适配器</h3>
-    <div class="file-tree">
-<span class="dir">crates/plotgram-core/src/layout/node/coordinate_solver/</span>
-├── mod.rs                <span class="comment"># 从 kernel 重导出 + 本地模块</span>
-├── builder.rs            <span class="comment"># Sugiyama → IR（224 行）</span>
-├── objectives.rs         <span class="comment"># 基础目标（175 行）</span>
-└── structure_objectives.rs  <span class="comment"># 结构目标（485 行）</span>
-    </div>
-
-    <h3>Recipe 层</h3>
-    <div class="file-tree">
-<span class="dir">crates/plotgram-core/src/layout/node/</span>
-├── <span class="dir">flowchart/</span>
-│   └── recipe.rs         <span class="comment"># FlowchartRecipe</span>
-└── <span class="dir">architecture_v2/</span>
-    └── recipe.rs         <span class="comment"># ArchitectureRecipe</span>
-    </div>
-
-    <h2 id="decisions">8. 设计决策记录</h2>
-    <table>
-        <tr><th>#</th><th>决策</th><th>理由</th><th>替代方案</th></tr>
-        <tr><td>1</td><td>PAVA 替代前扫+后扫</td><td>L2 最优投影，O(n)</td><td>线性规划（过重）</td></tr>
-        <tr><td>2</td><td>BK 作为初值</td><td>良好起点，加速收敛</td><td>随机初值（收敛慢）</td></tr>
-        <tr><td>3</td><td>分层优先级</td><td>硬约束不可违反</td><td>加权求和（权重难调）</td></tr>
-        <tr><td>4</td><td>后处理全部删除</td><td>消除顺序耦合</td><td>保留部分（复杂度高）</td></tr>
-        <tr><td>5</td><td>Kernel 不接受 DiagramType</td><td>语义解耦</td><td>图类型分支（耦合）</td></tr>
-        <tr><td>6</td><td>Recipe 是普通代码</td><td>避免过度抽象</td><td>动态插件（过重）</td></tr>
-    </table>
-
-    <h2 id="future">9. 后续演进</h2>
-    <table>
-        <tr><th>任务</th><th>优先级</th><th>说明</th></tr>
-        <tr><td>Architecture 完全迁移</td><td><span class="badge badge-warning">中</span></td><td>重写 macro/intra 两阶段逻辑</td></tr>
-        <tr><td>删除临时条件分支</td><td><span class="badge badge-warning">中</span></td><td>待 architecture 迁移后</td></tr>
-        <tr><td>FrozenNodeLayout typestate</td><td>低</td><td>类型层面保证冻结</td></tr>
-        <tr><td>LayoutCoordinator</td><td>低</td><td>统一生命周期管理</td></tr>
-        <tr><td>Route feedback re-solve</td><td>低</td><td>路由压力反馈到 solver</td></tr>
-    </table>
 </div>
+
+<script>
+window.PLOTGRAM_DIAGRAMS = {
+"diag-overview": `diagram flowchart {
+    title: "主数据流"
+    edge_routing: orthogonal
+    config { direction: top-to-bottom }
+    entity[start] ast "Diagram AST"
+    entity[process] plan "LayoutPlan"
+    entity[process] strategy "LayoutStrategy"
+    entity[process] recipe "LayoutRecipe"
+    entity[process] lr "LayoutResult"
+    entity[process] route "路由管线"
+    entity[end] done "最终 SVG"
+    ast -> strategy
+    plan -> strategy
+    strategy -> recipe
+    recipe -> lr
+    lr -> route
+    route -> done
+}`,
+"diag-layers": `diagram flowchart {
+    title: "四层架构"
+    edge_routing: orthogonal
+    config {
+        direction: top-to-bottom
+        group_frame: stack {
+            axis: horizontal
+            gap: 20
+            cross: center
+        }
+    }
+    group pipeline "Pipeline" {
+        entity[process] runner "runner.rs"
+        entity[process] registry "registry / plan"
+    }
+    group recipes "Recipes" {
+        entity[process] fc "flowchart"
+        entity[process] arch "architecture"
+        entity[process] state "state / er"
+    }
+    group engines "Engines" {
+        entity[process] layered "LayeredKernel"
+        entity[process] builder "coordinate/builder"
+    }
+    group kernel "Kernel" {
+        entity[process] coord "CoordinateKernel"
+        entity[process] pava "PAVA + optimizer"
+    }
+    runner -> fc
+    fc -> layered
+    layered -> coord
+}`,
+"diag-pipeline": `diagram flowchart {
+    title: "LayoutPipeline"
+    edge_routing: orthogonal
+    config { direction: top-to-bottom }
+    entity[start] s1 "strategy.compute"
+    entity[process] s2 "apply_node_frame"
+    entity[process] s3 "apply_pre_route"
+    entity[process] s4 "complete_routing"
+    entity[process] s5 "post_route + budget"
+    entity[process] s6 "NodeFreeze.capture"
+    entity[process] s7 "snap + sanitize_ext"
+    entity[process] s8 "label_resolve"
+    entity[end] s9 "canvas_finalize"
+    s1 -> s2
+    s2 -> s3
+    s3 -> s4
+    s4 -> s5
+    s5 -> s6
+    s6 -> s7
+    s7 -> s8
+    s8 -> s9
+}`,
+"diag-recipe": `diagram flowchart {
+    title: "LayoutRecipe 生命周期"
+    edge_routing: orthogonal
+    config { direction: left-to-right }
+    entity[start] c "compile"
+    entity[process] so "solve"
+    entity[process] a "audit"
+    entity[end] p "product"
+    c -> so
+    so -> a
+    a -> p
+}`,
+"diag-paths": `diagram flowchart {
+    title: "Recipe 路径"
+    edge_routing: orthogonal
+    config { direction: top-to-bottom }
+    entity[start] ex "execute()"
+    entity[process] fc "Flowchart: LayeredKernel"
+    entity[process] arch "Architecture: flat"
+    entity[process] bypass "group_divide / two_phase"
+    entity[end] lr "LayoutResult"
+    ex -> fc
+    ex -> arch
+    ex -> bypass
+    fc -> lr
+    arch -> lr
+    bypass -> lr
+}`,
+"diag-sugiyama": `diagram flowchart {
+    title: "Sugiyama + 坐标链"
+    edge_routing: orthogonal
+    config { direction: top-to-bottom }
+    entity[start] d "Diagram"
+    entity[process] lk "LayeredKernel"
+    entity[process] bk "BK 初值 + compact"
+    entity[process] b "builder → CoordinateProblem"
+    entity[process] obj "objectives"
+    entity[process] sol "optimizer::solve"
+    entity[end] m "NodeLayout"
+    d -> lk
+    lk -> bk
+    bk -> b
+    b -> obj
+    obj -> sol
+    sol -> m
+}`,
+"diag-kernel": `diagram flowchart {
+    title: "CoordinateKernel"
+    edge_routing: orthogonal
+    config { direction: top-to-bottom }
+    entity[start] in0 "CoordinateProblem"
+    entity[process] v "validate_problem"
+    entity[process] dyk "project_hard_constraints"
+    entity[process] p1 "Phase P1"
+    entity[process] p2 "Phase P2"
+    entity[process] p3 "Phase P3"
+    entity[process] aud "audit_p0"
+    entity[end] out0 "CoordinateSolveOutput"
+    in0 -> v
+    v -> dyk
+    dyk -> p1
+    p1 -> p2
+    p2 -> p3
+    p3 -> aud
+    aud -> out0
+}`,
+"diag-dykstra": `diagram flowchart {
+    title: "Dykstra 交替投影"
+    edge_routing: orthogonal
+    config { direction: top-to-bottom }
+    entity[start] in0 "候选坐标"
+    entity[process] l1 "PAVA 层内分离"
+    entity[process] l2 "bounds / fixed"
+    entity[process] l3 "跨层 MinSeparation"
+    entity[decision] chk "收敛?"
+    entity[end] out0 "可行坐标"
+    in0 -> l1
+    l1 -> l2
+    l2 -> l3
+    l3 -> chk
+    chk -> out0
+    chk --> l1
+}`,
+"diag-priority": `diagram flowchart {
+    title: "P0–P3 优先级"
+    edge_routing: orthogonal
+    config { direction: top-to-bottom }
+    entity[process] p0 "P0 硬约束"
+    entity[process] p1 "P1 结构目标"
+    entity[process] p2 "P2 边友好"
+    entity[process] p3 "P3 审美 BK"
+    p0 -> p1
+    p1 -> p2
+    p2 -> p3
+}`,
+"diag-demand": `diagram flowchart {
+    title: "空间需求契约"
+    edge_routing: orthogonal
+    config { direction: top-to-bottom }
+    entity[process] sb "SpaceBudget"
+    entity[process] sd "SpacingDemandStore"
+    entity[process] rc "RoutingContract"
+    entity[process] cp "CoordinateProblem"
+    entity[process] rt "Router"
+    sb -> sd
+    sb -> rc
+    sd -> cp "编译 MinSeparation"
+    rc -> rt "只读消费"
+}`,
+"diag-freeze": `diagram flowchart {
+    title: "节点冻结时序"
+    edge_routing: orthogonal
+    config { direction: top-to-bottom }
+    entity[process] r "Recipe.solve"
+    entity[process] pr "pre_route 竖缝"
+    entity[process] rt "router + refine"
+    entity[process] fb "route_feedback"
+    entity[process] fz "NodeFreeze.capture"
+    entity[process] lb "label_resolve"
+    entity[end] ok "assert 节点未变"
+    r -> pr
+    pr -> rt
+    rt -> fb
+    fb -> fz
+    fz -> lb
+    lb -> ok
+}`,
+"diag-routing": `diagram flowchart {
+    title: "路由风格分支"
+    edge_routing: orthogonal
+    config { direction: top-to-bottom }
+    entity[start] r0 "EdgeRoutingStrategy"
+    entity[process] orth "orthogonal"
+    entity[process] curv "bezier / spline"
+    entity[process] circ "circular / organic"
+    entity[process] san "sanitize D 段"
+    entity[end] lbl "label_resolve"
+    r0 -> orth
+    r0 -> curv
+    r0 -> circ
+    orth -> san
+    curv -> san
+    circ -> san
+    san -> lbl
+}`,
+};
+
+// 填充「查看源码」折叠块
+Object.entries(window.PLOTGRAM_DIAGRAMS).forEach(([id, src]) => {
+  const pre = document.getElementById('src-' + id.replace('diag-', ''));
+  if (pre) pre.textContent = src.trim();
+});
+</script>
+<script src="plotgram-doc-bootstrap.js"></script>
 </body>
 </html>

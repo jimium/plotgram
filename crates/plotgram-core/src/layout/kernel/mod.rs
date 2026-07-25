@@ -8,7 +8,6 @@
 //! - [`recipe`]: 统一布局配方 trait（`LayoutRecipe`）——整图节点布局的生命周期
 //! - [`coordinate`]: 统一坐标约束求解器（PAVA + Projected Gradient）
 //! - [`coordinator`]: Coordinate Kernel 调用封装（solve + P0 audit）
-//! - [`frozen`]: 节点布局冻结（布局完成后不可再修改坐标）
 //!
 //! ## 概念边界
 //!
@@ -26,5 +25,4 @@
 
 pub mod coordinate;
 pub mod coordinator;
-pub mod frozen;
 pub mod recipe;
