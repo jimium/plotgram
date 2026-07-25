@@ -5,6 +5,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
+# shellcheck source=benchmarks/scripts/gate-switch.sh
+source "$(dirname "$0")/gate-switch.sh"
+gate_skip_unless_enabled "check-builder-entry.sh"
+
 # 内联结构体字面量（排除 struct/impl 定义与测试）
 inline_hits="$(
   rg -n 'CoordinateProblem\s*\{' crates/plotgram-core/src/layout -g '*.rs' \

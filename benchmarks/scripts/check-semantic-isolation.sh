@@ -4,6 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
+# shellcheck source=benchmarks/scripts/gate-switch.sh
+source "$(dirname "$0")/gate-switch.sh"
+gate_skip_unless_enabled "check-semantic-isolation.sh"
+
 fail=0
 
 # 仅匹配「代码中的 DiagramType 标识符」，忽略注释/文档行。

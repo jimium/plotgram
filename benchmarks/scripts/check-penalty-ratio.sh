@@ -5,6 +5,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
+# shellcheck source=benchmarks/scripts/gate-switch.sh
+source "$(dirname "$0")/gate-switch.sh"
+gate_skip_unless_enabled "check-penalty-ratio.sh"
+
 out="$(cargo test -p plotgram-core --lib layout::routing::objectives::tests -- --nocapture 2>&1)"
 if echo "$out" | rg -q "test result: FAILED|FAILED\."; then
   echo "$out" | tail -40

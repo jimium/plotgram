@@ -6,6 +6,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
+# shellcheck source=benchmarks/scripts/gate-switch.sh
+source "$(dirname "$0")/gate-switch.sh"
+gate_skip_unless_enabled "check-group-writes.sh"
+
 THRESHOLD="${GROUP_WRITE_THRESHOLD:-1}"
 SAMPLE="${GROUP_WRITE_SAMPLE:-showcase/architecture/product.cloud-native.pgm}"
 

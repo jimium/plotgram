@@ -37,6 +37,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BM="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=benchmarks/scripts/gate-switch.sh
+source "$SCRIPT_DIR/gate-switch.sh"
+# 新架构期：compare 仍跑全部对比并打印，但不以非零码阻断（AGENTS.md §10）。
+REPORT_ONLY=0
+gate_enabled || REPORT_ONLY=1
 ALLOW_NODE_FP=0
 ALLOW_QUALITY_DEBT=0
 STRICT_STRESS=0
@@ -58,7 +63,7 @@ if [[ -z "$CUR" ]]; then
   exit 2
 fi
 
-python3 - "$BASE" "$CUR" "$ALLOW_NODE_FP" "$ALLOW_QUALITY_DEBT" "$STRICT_STRESS" <<'PY'
+python3 - "$BASE" "$CUR" "$ALLOW_NODE_FP" "$ALLOW_QUALITY_DEBT" "$STRICT_STRESS" "$REPORT_ONLY" <<'PY'
 import json, sys
 
 PERF_BUDGET = 0.10
@@ -66,6 +71,7 @@ EPS = 1.0  # 严重度浮点容差（px·加权）
 ALLOW_NODE_FP = sys.argv[3] == "1"
 ALLOW_QUALITY_DEBT = sys.argv[4] == "1"
 STRICT_STRESS = sys.argv[5] == "1"
+REPORT_ONLY = sys.argv[6] == "1"
 
 ROLE_ORDER = ["smoke", "product", "demo", "stress", "mech"]
 def derive_role(path):
@@ -298,6 +304,14 @@ if aesthetics_warn:
         print(f"  - {e}")
 else:
     print("PASS (stress/demo/mech)")
+
+if REPORT_ONLY:
+    blocked = bool(correctness) or bool(quality_hard) or bool(aesthetics_hard)
+    if blocked:
+        print("REPORT-ONLY: 上述本应阻断的项已降为观测（新架构期门禁关闭；PLOTGRAM_GATES=on 可恢复）")
+    else:
+        print("REPORT-ONLY: 无阻断项（新架构期门禁关闭）")
+    sys.exit(0)
 
 if correctness:
     sys.exit(1)
