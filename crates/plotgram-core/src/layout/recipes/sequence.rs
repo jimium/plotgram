@@ -135,9 +135,9 @@ struct SequenceProblem {
 /// 时序图解。
 struct SequenceSolution {
     nodes: HashMap<String, NodeLayout>,
-    edges: Vec<EdgeLayout>,
+    _edges: Vec<EdgeLayout>,
     total_width: f64,
-    total_height: f64,
+    _total_height: f64,
 }
 
 impl LayoutRecipe for SequenceRecipe {
@@ -188,9 +188,9 @@ impl LayoutRecipe for SequenceRecipe {
         // 边构建放在 product 中（需要 diagram.relations）。
         SequenceSolution {
             nodes: problem.nodes.clone(),
-            edges: vec![],
+            _edges: vec![],
             total_width: problem.total_width,
-            total_height: 0.0, // product 中计算
+            _total_height: 0.0, // product 中计算
         }
     }
 

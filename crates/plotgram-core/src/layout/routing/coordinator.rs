@@ -107,7 +107,6 @@ impl RoutingCoordinator {
         refine_config: &RefineConfig,
         edge_snap_config: &EdgeSnapConfig,
         routing_config: crate::layout::routing::config::RoutingConfig,
-        algo: &str,
         prev: Option<&crate::layout::routing::model::FrozenRoutingSolution>,
     ) -> (LayoutResult, crate::layout::routing::model::RouteAuditReport) {
         // 构造只读 PreparedRoutingInput（Slice B：类型上不可能修改 nodes/groups）。
@@ -256,36 +255,34 @@ impl RoutingCoordinator {
                 dock_gap,
             );
 
-            // Slice E4：architecture exact stub 共柱收口收编为 solver finalize 步
-            //（原 D 段调用；C 期 stub_occ 仅诊断）。只改边几何 → node_fp 不变；
+            // Phase 0（策略 B）：exact stub 共柱收口对所有正交图统一执行（不再按
+            // algo == "architecture" 分支）。只改边几何 → node_fp 不变；
             // 须在 repair loop / label 前完成并刷新 annotation。
-            if algo == "architecture" {
-                let stub_stats = crate::layout::routing::edge_routing_orthogonal::
-                    resolve_exact_stub_occupancy_post_route(
-                        &mut result.edges,
-                        &diagram.relations,
+            let stub_stats = crate::layout::routing::edge_routing_orthogonal::
+                resolve_exact_stub_occupancy_post_route(
+                    &mut result.edges,
+                    &diagram.relations,
+                    &from_side,
+                    &to_side,
+                    &result.nodes,
+                    parallel_gap,
+                );
+            if stub_stats.stubs_shifted > 0 {
+                let prev = result.hints.route_annotations.clone();
+                result.hints.route_annotations = Some(
+                    crate::layout::routing::refresh_route_annotations_preserving_semantics(
+                        &result.edges,
                         &from_side,
                         &to_side,
-                        &result.nodes,
-                        parallel_gap,
-                    );
-                if stub_stats.stubs_shifted > 0 {
-                    let prev = result.hints.route_annotations.clone();
-                    result.hints.route_annotations = Some(
-                        crate::layout::routing::refresh_route_annotations_preserving_semantics(
-                            &result.edges,
-                            &from_side,
-                            &to_side,
-                            prev.as_ref(),
-                        ),
-                    );
-                    crate::perf_log!(
-                        "[perf]     d_stub_exact_post_route: shifted={} unresolved_exact={} degraded={}",
-                        stub_stats.stubs_shifted,
-                        stub_stats.unresolved_conflicts,
-                        stub_stats.degraded
-                    );
-                }
+                        prev.as_ref(),
+                    ),
+                );
+                crate::perf_log!(
+                    "[perf]     d_stub_exact_post_route: shifted={} unresolved_exact={} degraded={}",
+                    stub_stats.stubs_shifted,
+                    stub_stats.unresolved_conflicts,
+                    stub_stats.degraded
+                );
             }
         }
 
@@ -502,7 +499,6 @@ impl RoutingCoordinator {
             );
             result.hints.frozen_routing = Some(std::sync::Arc::new(frozen));
         }
-        let _ = algo;
 
         (result, route_audit)
     }

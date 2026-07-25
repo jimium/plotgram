@@ -103,21 +103,6 @@ pub(crate) fn sanitize_orthogonal_edges_with_guard(
     }
 }
 
-/// 对单条正交折线做不变量消毒（供测试与管道复用）。
-pub fn sanitize_polyline(points: &mut Vec<Point>, from_side: Port, to_side: Port) {
-    sanitize_polyline_ext(points, from_side, to_side, false);
-}
-
-/// 见 [`sanitize_polyline`]；`merge_overshoot` 控制是否合并 overshoot Z 折。
-pub fn sanitize_polyline_ext(
-    points: &mut Vec<Point>,
-    from_side: Port,
-    to_side: Port,
-    merge_overshoot: bool,
-) {
-    sanitize_polyline_ext_guarded(points, from_side, to_side, merge_overshoot, None, 0, None);
-}
-
 /// 消毒单边；仅在 `merge_overshoot`（管线末激进清理）时挂形状验证。
 /// router 内保守消毒不验证，避免回退改变边几何后经 space-budget 反馈扰动节点（node_fp）。
 fn sanitize_polyline_ext_guarded(
@@ -636,30 +621,32 @@ fn seg_len(a: Point, b: Point) -> f64 {
     (dx * dx + dy * dy).sqrt()
 }
 
-/// 首段是否沿端口外向反向（供检测与测试）。
-pub fn first_segment_is_reverse(points: &[Point], side: Port) -> bool {
-    if points.len() < 2 {
-        return false;
-    }
-    let (ox, oy) = port_outward(side);
-    let dx = points[1].x - points[0].x;
-    let dy = points[1].y - points[0].y;
-    dx * ox + dy * oy < -1.0
-}
-
-/// 路径是否含非正交段。
-pub fn has_non_orthogonal_segment(points: &[Point]) -> bool {
-    points.windows(2).any(|w| {
-        let dx = (w[1].x - w[0].x).abs();
-        let dy = (w[1].y - w[0].y).abs();
-        dx > EPS && dy > EPS
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::layout::Port;
+
+    fn first_segment_is_reverse(points: &[Point], side: Port) -> bool {
+        if points.len() < 2 {
+            return false;
+        }
+        let (ox, oy) = port_outward(side);
+        let dx = points[1].x - points[0].x;
+        let dy = points[1].y - points[0].y;
+        dx * ox + dy * oy < -1.0
+    }
+
+    fn has_non_orthogonal_segment(points: &[Point]) -> bool {
+        points.windows(2).any(|w| {
+            let dx = (w[1].x - w[0].x).abs();
+            let dy = (w[1].y - w[0].y).abs();
+            dx > EPS && dy > EPS
+        })
+    }
+
+    fn sanitize_polyline(points: &mut Vec<Point>, from_side: Port, to_side: Port) {
+        sanitize_polyline_ext_guarded(points, from_side, to_side, false, None, 0, None);
+    }
 
     #[test]
     fn fixes_bottom_port_upward_micro_stub() {

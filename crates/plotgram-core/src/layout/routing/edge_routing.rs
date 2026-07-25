@@ -5,7 +5,6 @@
 //! - 端口选择：根据节点相对位置选择连接侧（上/下/左/右）
 //! - 标签定位：沿路径中点计算标签坐标
 
-use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, LayoutResult, PathGeometry};
@@ -13,9 +12,6 @@ use crate::layout::routing::common::edge_geometry::{build_edge_labels, parse_lab
 use crate::layout::routing::common::routing_skeleton::{
     finalize_edges, resolve_endpoints, RoutingContext,
 };
-
-/// 直线路由适用于 ER 等简单关系图；时序图边几何由 `sequence` 布局内置，不支持本路由。
-const APPLICABLE_TYPES: &[DiagramType] = &[DiagramType::Er];
 
 /// 直线边路由策略（legacy，已由 RecipeRouter<StraightRecipe> 替代）。
 pub struct StraightRouting;
@@ -81,6 +77,7 @@ mod tests {
     use super::*;
     use crate::layout::routing::common::edge_geometry::{undirected_pair_key, canonical_pair, select_port};
     use crate::ast::{Diagram, SourceInfo};
+    use crate::types::DiagramType;
     use crate::layout::{NodeLayout, LayoutResult, Port, EdgeLabelLayout};
     use crate::layout::geometry::Point;
     use crate::layout::routing::common::label_avoidance::{

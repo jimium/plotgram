@@ -51,16 +51,8 @@ fn edge_score_key(scores: Option<&[f64]>, index: usize) -> i64 {
 ///
 /// `difficulty_scores`：可选边级难度（与 relations 下标对齐）；同 rank 内高分略提前占道。
 /// 可用 `PLOTGRAM_EDGE_ORDER_SCORE=0` 关闭（调用方不传即可）。
-pub(super) fn compute_edge_order(
-    relations: &[Relation],
-    sugiyama_ranks: Option<&HashMap<String, usize>>,
-    node_degree: &HashMap<String, usize>,
-) -> Vec<usize> {
-    compute_edge_order_with_feedback(relations, sugiyama_ranks, node_degree, None, None)
-}
-
-/// 同 [`compute_edge_order`]，可传入 feedback（回环）边集合以延后路由，
-/// 以及可选 `difficulty_scores`（Phase 2 soft 提前）。
+///
+/// 可传入 feedback（回环）边集合以延后路由，以及可选 `difficulty_scores`（Phase 2 soft 提前）。
 pub(super) fn compute_edge_order_with_feedback(
     relations: &[Relation],
     sugiyama_ranks: Option<&HashMap<String, usize>>,
@@ -147,7 +139,7 @@ mod tests {
         ranks.insert("d".into(), 3);
 
         let degree = compute_node_degrees(&relations);
-        let order = compute_edge_order(&relations, Some(&ranks), &degree);
+        let order = compute_edge_order_with_feedback(&relations, Some(&ranks), &degree, None, None);
 
         assert_eq!(order, vec![1, 0]);
     }
@@ -205,7 +197,7 @@ mod tests {
     fn without_ranks_falls_back_to_degree_order() {
         let relations = vec![test_rel("hub", "a"), test_rel("b", "c")];
         let degree = compute_node_degrees(&relations);
-        let order = compute_edge_order(&relations, None, &degree);
+        let order = compute_edge_order_with_feedback(&relations, None, &degree, None, None);
 
         assert_eq!(order, vec![0, 1]);
     }

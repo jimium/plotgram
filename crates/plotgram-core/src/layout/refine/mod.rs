@@ -11,7 +11,6 @@ mod crossing;
 mod geometry;
 mod overlap;
 mod push;
-mod reroute;
 mod spline_fallback;
 
 pub use crossing::analyze_edge_node_crossings;
@@ -59,6 +58,7 @@ pub struct NodePushInfo {
     pub edge_indices: Vec<usize>,
 }
 
+#[cfg(test)]
 fn combined_crossing_score(metrics: &RefineMetrics) -> usize {
     metrics.edge_node_crossings * 10 + metrics.edge_overlaps
 }
@@ -67,14 +67,10 @@ fn combined_crossing_score(metrics: &RefineMetrics) -> usize {
 pub fn run_refine(
     diagram: &Diagram,
     mut result: LayoutResult,
-    router: &dyn RoutingRecipeDyn,
+    _router: &dyn RoutingRecipeDyn,
     config: &RefineConfig,
 ) -> LayoutResult {
     if !config.enabled || config.max_passes == 0 {
-        return result;
-    }
-    // C3 验证钩子：`PLOTGRAM_SKIP_REFINE=1` 只看 router 输出。
-    if std::env::var_os("PLOTGRAM_SKIP_REFINE").is_some() {
         return result;
     }
 
@@ -84,143 +80,18 @@ pub fn run_refine(
         "[perf]         analyze_crossings: {:.2}ms",
         t_cross.elapsed().as_secs_f64() * 1000.0
     );
-    let mut best_score = combined_crossing_score(&best_metrics);
     if best_metrics.edge_node_crossings == 0 && result.groups.is_empty() {
         return result;
     }
 
-    // P3：有组图跳过 push（节点推开会在后续 group_frame 放大后制造新穿组，
-    // 且 refine 内 lint 尚看不到最终组框）。穿组修复只走下方 fallback。
-    // Phase B: 所有图类型使用 solver，节点已冻结，跳过 push。
-    let skip_push = true;
-
+    // Phase B: 所有图类型使用 solver，节点已冻结；push 循环已退役。
+    // 穿组 / through 修复只走下方 spline fallback。
     let entry_snapshot = result.clone();
-    let entry_group_pierces = count_group_interior_edges(diagram, &entry_snapshot);
-
-    let mut best_result = result.clone();
-    let mut momentum = push::MomentumHistory::new();
-    let mut passes_executed = 0usize;
-    let mut total_push_count = 0usize;
-
-    if !skip_push {
-    for _ in 0..config.max_passes {
-        let metrics = crossing::analyze_crossings(&result, diagram, config);
-        if metrics.edge_node_crossings == 0 {
-            break;
-        }
-
-        // 直接推节点 + 重路由，跳过 trial reroute（不推节点时重路由几乎无效）
-
-        let mut edges_to_reroute: HashSet<usize> = HashSet::new();
-        for info in metrics.problem_nodes.values() {
-            edges_to_reroute.extend(info.edge_indices.iter().copied());
-        }
-        for node_id in metrics.problem_nodes.keys() {
-            for (i, rel) in diagram.relations.iter().enumerate() {
-                if rel.from.as_str() == node_id.as_str() || rel.to.as_str() == node_id.as_str() {
-                    edges_to_reroute.insert(i);
-                }
-            }
-        }
-
-        let push_count = metrics
-            .problem_nodes
-            .values()
-            .filter(|info| {
-                let len = (info.push_fx * info.push_fx + info.push_fy * info.push_fy).sqrt();
-                len >= f64::EPSILON
-            })
-            .count();
-        total_push_count += push_count;
-
-        let pre_push_nodes = result.nodes.clone();
-        push::push_problem_nodes(&mut result, &metrics, config, &mut momentum);
-        // 空间契约：refine 候选若压穿相邻 rank 层缝，整轮拒绝。
-        // 不在反馈循环里“再推一次节点”修补，否则路由评分看到的是二次改写后的布局。
-        let rank_scopes = crate::layout::demand::space_budget::node_group_scopes(diagram);
-        let no_reverse_pairs = HashSet::new();
-        let budget = result
-            .hints
-            .space_budget
-            .clone()
-            .unwrap_or_else(|| crate::layout::demand::space_budget::SpaceBudget::from_diagram(diagram));
-        // Phase B: 所有图类型使用 solver，节点已冻结，不再执行 enforce_horizontal_gaps
-        let rank_contract_broken = result.hints.sugiyama_ranks.as_ref().is_some_and(|ranks| {
-            let mut before_probe = pre_push_nodes.clone();
-            let before: HashSet<String> = crate::layout::demand::space_budget::enforce_vertical_rank_gaps(
-                &mut before_probe,
-                &budget,
-                ranks,
-                &rank_scopes,
-                &no_reverse_pairs,
-            )
-            .into_iter()
-            .collect();
-            let mut after_probe = result.nodes.clone();
-            let after: HashSet<String> = crate::layout::demand::space_budget::enforce_vertical_rank_gaps(
-                &mut after_probe,
-                &budget,
-                ranks,
-                &rank_scopes,
-                &no_reverse_pairs,
-            )
-            .into_iter()
-            .collect();
-            !after.is_subset(&before)
-        });
-        result.hints.space_budget = Some(budget);
-        if rank_contract_broken {
-            result.nodes = pre_push_nodes;
-            break;
-        }
-        // P3：push+reroute 不得留下穿组结果。
-        // - after 穿组 → 恢复旧几何（无论 before 是否已穿；穿组修复交给 fallback）
-        // - after 不穿组 → 保留（允许从穿组改善到避组）
-        let group_maps = (!result.groups.is_empty())
-            .then(|| crate::layout::quality::lint::GroupInteriorMaps::new(diagram));
-        let mut preserve_edges: std::collections::HashMap<usize, crate::layout::EdgeLayout> =
-            std::collections::HashMap::new();
-        if group_maps.is_some() {
-            let mut locked: Vec<usize> = edges_to_reroute.iter().copied().collect();
-            locked.sort_unstable();
-            for ei in locked {
-                if ei < result.edges.len() {
-                    preserve_edges.insert(ei, result.edges[ei].clone());
-                }
-            }
-        }
-        reroute::reroute_subset(&mut result, diagram, router, &edges_to_reroute);
-        if let Some(ref maps) = group_maps {
-            let mut restored: Vec<usize> = preserve_edges.keys().copied().collect();
-            restored.sort_unstable();
-            for ei in restored {
-                if crate::layout::quality::lint::edge_crosses_group_interior_with_maps(
-                    diagram, &result, ei, maps,
-                ) {
-                    if let Some(old) = preserve_edges.remove(&ei) {
-                        result.edges[ei] = old;
-                    }
-                }
-            }
-        }
-        passes_executed += 1;
-
-        let new_metrics = crossing::analyze_crossings(&result, diagram, config);
-        let new_score = combined_crossing_score(&new_metrics);
-        if new_score < best_score {
-            best_result = result.clone();
-            best_score = new_score;
-        } else {
-            result = best_result;
-            break;
-        }
-    }
-    } // !skip_push
 
     result.hints.refine_debug = Some(crate::layout::RefineDebugStats {
-        push_count: total_push_count,
-        momentum_reversals: momentum.reversal_count,
-        passes_executed,
+        push_count: 0,
+        momentum_reversals: 0,
+        passes_executed: 0,
         spline_fallback_count: 0,
     });
 
@@ -247,8 +118,44 @@ pub fn run_refine(
     }
 
     let after_group = count_group_interior_edges(diagram, &result);
+    let entry_group_pierces = count_group_interior_edges(diagram, &entry_snapshot);
     if after_group > entry_group_pierces {
         result = entry_snapshot;
+    }
+
+    // Phase 2 红线：refine 结束后仍穿组则外框 U 形硬修（与 lint 同口径）
+    if !result.groups.is_empty()
+        && count_group_interior_edges(diagram, &result) > 0
+    {
+        let mut grid =
+            crate::layout::routing::edge_routing_orthogonal::OrthoSegmentGrid::new();
+        for (ei, edge) in result.edges.iter().enumerate() {
+            if edge.path_is_empty() {
+                continue;
+            }
+            grid.insert_path(&edge.path_points().into_owned(), ei);
+        }
+        let sorted: Vec<String> = {
+            let mut g: Vec<String> = result.groups.keys().cloned().collect();
+            g.sort();
+            g
+        };
+        let group_ctx = crate::layout::group::GroupRoutingContext::from_layout(
+            diagram,
+            &result,
+            crate::layout::group::routing_algo_for_diagram(diagram),
+        );
+        let n = crate::layout::routing::edge_routing_orthogonal::repair_group_interior_crossings(
+            &mut result.edges,
+            diagram,
+            &result.groups,
+            &group_ctx,
+            &sorted,
+            &mut grid,
+        );
+        if n > 0 {
+            crate::perf_log!("[perf]     refine_phase2_group_repair: repaired={}", n);
+        }
     }
 
     result
@@ -261,47 +168,6 @@ fn count_group_interior_edges(diagram: &Diagram, result: &LayoutResult) -> usize
     // 与 lint / collinear 一致：按 (边, 无关组) 违规条数计。
     let report = crate::layout::quality::lint::lint_layout(diagram, result);
     crate::layout::quality::lint::LintMetricsSummary::from_report(&report).edge_crosses_group_interior
-}
-
-/// 与 lint `edge_through_node` 对齐：跳过端点 stub 段，全尺寸节点相交。
-fn collect_lint_through_edge_indices(diagram: &Diagram, result: &LayoutResult) -> HashSet<usize> {
-    let mut out = HashSet::new();
-    let mut node_ids: Vec<&String> = result.nodes.keys().collect();
-    node_ids.sort();
-
-    for (index, edge) in result.edges.iter().enumerate() {
-        if edge.path_len() < 2 {
-            continue;
-        }
-        let Some(rel) = diagram.relations.get(index) else {
-            continue;
-        };
-        let from_id = rel.from.as_str();
-        let to_id = rel.to.as_str();
-        let path = edge.path_points();
-        let segment_count = path.len().saturating_sub(1);
-        let skip_endpoints = segment_count > 2;
-
-        for (seg_i, window) in path.windows(2).enumerate() {
-            if skip_endpoints && (seg_i == 0 || seg_i == segment_count - 1) {
-                continue;
-            }
-            let a = window[0];
-            let b = window[1];
-            for node_id in &node_ids {
-                let node_id = node_id.as_str();
-                if node_id == from_id || node_id == to_id {
-                    continue;
-                }
-                let nl = &result.nodes[node_id];
-                if segment_intersects_node(a, b, nl) {
-                    out.insert(index);
-                    break;
-                }
-            }
-        }
-    }
-    out
 }
 
 // E4：`repair_through_edges_post_route` / `repair_group_interior_edges_post_route`

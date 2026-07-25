@@ -8,14 +8,7 @@
 //! - [`recipe`]: 统一布局配方 trait（`LayoutRecipe`）——整图节点布局的生命周期
 //! - [`coordinate`]: 统一坐标约束求解器（PAVA + Projected Gradient）
 //! - [`coordinator`]: Coordinate Kernel 调用封装（solve + P0 audit）
-//!
-//! ## 概念边界
-//!
-//! | 概念 | 职责 | 输入 → 输出 |
-//! |------|------|------------|
-//! | `LayoutRecipe` | 整图节点布局 | Diagram → LayoutResult |
-//! | `CoordinateKernel` | 坐标求解入口 | CoordinateProblem → 坐标 + 审计 |
-//! | `coordinate::optimizer` | 纯求解器 | CoordinateProblem → SolverResult |
+//! - [`route`]: 路由问题 IR + 可行性判定 + 离线硬审计（Phase 1，未接线生产）
 //!
 //! ## 设计原则
 //!
@@ -26,3 +19,4 @@
 pub mod coordinate;
 pub mod coordinator;
 pub mod recipe;
+pub mod route;

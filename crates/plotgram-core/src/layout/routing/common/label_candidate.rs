@@ -19,7 +19,6 @@ use std::collections::HashMap;
 
 use super::label_common::{build_edge_segments, collect_label_keys, sorted_node_obstacles};
 
-const REJECT_SCORE: f64 = f64::INFINITY;
 const LABEL_OVERLAP_PENALTY: f64 = 1000.0;
 const FOREIGN_EDGE_PENALTY: f64 = 100.0;
 const GROUP_OVERLAP_PENALTY: f64 = 50.0;

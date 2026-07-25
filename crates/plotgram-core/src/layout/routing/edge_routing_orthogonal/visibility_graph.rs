@@ -34,22 +34,10 @@ impl Ord for Cost {
     }
 }
 
-/// OVG 顶点类型
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum VertexKind {
-    /// 障碍物角落（膨胀后 bbox 的四角）
-    ObstacleCorner,
-    /// 路径端点（起点/终点）
-    Endpoint,
-    /// 通道交汇点（端点在各轴上的投影）
-    ChannelJunction,
-}
-
 /// OVG 顶点
 #[derive(Clone, Copy, Debug)]
 pub struct OvgVertex {
     pub point: Point,
-    pub kind: VertexKind,
 }
 
 /// 邻接边
@@ -98,11 +86,6 @@ const OVERLAP_PROXIMITY: f64 = 4.0;
 const PORT_DIRECTION_PENALTY: f64 = 42.0;
 
 impl OrthogonalVisibilityGraph {
-    /// 从障碍物集合构建 OVG（所有障碍物均视为节点障碍物，无组惩罚）
-    pub fn build(obstacles: &[Rect]) -> Self {
-        Self::build_with_groups(obstacles, obstacles.len(), &[])
-    }
-
     /// 从节点障碍物 + 组障碍物构建 OVG
     ///
     /// - `node_obstacles`: 节点 bbox（膨胀后）——用于可见性阻断
@@ -134,7 +117,6 @@ impl OrthogonalVisibilityGraph {
             for corner in corners {
                 vertices.push(OvgVertex {
                     point: corner,
-                    kind: VertexKind::ObstacleCorner,
                 });
             }
         }
@@ -231,21 +213,6 @@ impl OrthogonalVisibilityGraph {
             }
         }
         true
-    }
-
-    /// 搜索最短路径
-    ///
-    /// `from_obstacle_idx` / `to_obstacle_idx`: 端点所属节点的障碍物索引（连接时跳过）。
-    /// 传 None 表示不跳过任何障碍物。
-    pub fn shortest_path(
-        &self,
-        start: Point,
-        end: Point,
-        from_port: Port,
-        to_port: Port,
-        bend_penalty: f64,
-    ) -> Option<Vec<Point>> {
-        self.shortest_path_excluding(start, end, from_port, to_port, bend_penalty, None, None, &[])
     }
 
     /// 搜索最短路径（可排除端点所属障碍物）
@@ -633,10 +600,6 @@ impl OrthogonalVisibilityGraph {
         self.vertices.is_empty()
     }
 
-    /// 顶点数
-    pub fn vertex_count(&self) -> usize {
-        self.vertices.len()
-    }
 }
 
 /// P1-4: 端口外延方向（与 path::port_outward 一致，避免跨模块依赖）
@@ -687,17 +650,6 @@ fn simplify_orthogonal_path(path: &[Point]) -> Vec<Point> {
     result
 }
 
-
-/// 从节点布局 + 组布局构建 OVG
-///
-/// 节点 bbox 膨胀后作为硬障碍物，组 bbox 作为软障碍物（图边不穿组，端点可穿越）。
-pub fn build_ovg_from_nodes(
-    nodes: &std::collections::HashMap<String, crate::layout::NodeLayout>,
-    sorted_node_ids: &[String],
-    node_pad: f64,
-) -> OrthogonalVisibilityGraph {
-    build_ovg_with_groups(nodes, sorted_node_ids, node_pad, &[])
-}
 
 /// 从节点 + 组构建 OVG（含组障碍物）
 pub fn build_ovg_with_groups(
@@ -772,17 +724,16 @@ mod tests {
 
     #[test]
     fn test_ovg_empty_obstacles() {
-        let ovg = OrthogonalVisibilityGraph::build(&[]);
+        let ovg = OrthogonalVisibilityGraph::build_with_group_obstacles(&[], &[]);
         assert!(ovg.is_empty());
     }
 
     #[test]
     fn test_ovg_single_obstacle() {
         let obstacles = vec![rect(100.0, 100.0, 50.0, 50.0)];
-        let ovg = OrthogonalVisibilityGraph::build(&obstacles);
+        let ovg = OrthogonalVisibilityGraph::build_with_group_obstacles(&obstacles, &[]);
 
         assert!(!ovg.is_empty());
-        assert_eq!(ovg.vertex_count(), 4);
     }
 
     #[test]
@@ -792,12 +743,12 @@ mod tests {
             rect(100.0, 50.0, 40.0, 80.0),   // 上方障碍
             rect(100.0, 200.0, 40.0, 80.0),  // 下方障碍
         ];
-        let ovg = OrthogonalVisibilityGraph::build(&obstacles);
+        let ovg = OrthogonalVisibilityGraph::build_with_group_obstacles(&obstacles, &[]);
 
         let start = Point::new(50.0, 165.0);  // 在通道中间
         let end = Point::new(200.0, 165.0);
 
-        let path = ovg.shortest_path(start, end, Port::Right, Port::Left, 28.0);
+        let path = ovg.shortest_path_excluding(start, end, Port::Right, Port::Left, 28.0, None, None, &[]);
 
         assert!(path.is_some(), "Should find path through gap");
         let path = path.unwrap();
@@ -810,12 +761,12 @@ mod tests {
     fn test_ovg_path_around_obstacle() {
         // 单个障碍物挡在中间
         let obstacles = vec![rect(100.0, 100.0, 100.0, 100.0)];
-        let ovg = OrthogonalVisibilityGraph::build(&obstacles);
+        let ovg = OrthogonalVisibilityGraph::build_with_group_obstacles(&obstacles, &[]);
 
         let start = Point::new(50.0, 150.0);
         let end = Point::new(250.0, 150.0);
 
-        let path = ovg.shortest_path(start, end, Port::Right, Port::Left, 28.0);
+        let path = ovg.shortest_path_excluding(start, end, Port::Right, Port::Left, 28.0, None, None, &[]);
 
         assert!(path.is_some(), "Should find path around obstacle");
         let path = path.unwrap();
@@ -858,16 +809,15 @@ mod tests {
             rect(80.0, 180.0, 40.0, 40.0),  // 左下
             rect(180.0, 130.0, 40.0, 40.0), // 右中
         ];
-        let ovg = OrthogonalVisibilityGraph::build(&obstacles);
+        let ovg = OrthogonalVisibilityGraph::build_with_group_obstacles(&obstacles, &[]);
 
         assert!(!ovg.is_empty());
-        assert_eq!(ovg.vertex_count(), 12); // 3 obstacles * 4 corners
 
         // 从左侧到右侧，应能找到绕行路径
         let start = Point::new(30.0, 150.0);
         let end = Point::new(270.0, 150.0);
 
-        let path = ovg.shortest_path(start, end, Port::Right, Port::Left, 28.0);
+        let path = ovg.shortest_path_excluding(start, end, Port::Right, Port::Left, 28.0, None, None, &[]);
         assert!(path.is_some(), "Should find path through multiple obstacles");
         let path = path.unwrap();
         assert!(path.len() >= 2);
@@ -879,13 +829,13 @@ mod tests {
     fn test_ovg_simple_obstacle() {
         // OVG 单障碍物绕行：起点和终点在障碍物两侧，路径必须绕行
         let obstacles = vec![rect(100.0, 100.0, 100.0, 100.0)];
-        let ovg = OrthogonalVisibilityGraph::build(&obstacles);
+        let ovg = OrthogonalVisibilityGraph::build_with_group_obstacles(&obstacles, &[]);
 
         // 起点在障碍物左侧，终点在右侧，同一水平线穿过障碍物
         let start = Point::new(50.0, 150.0);
         let end = Point::new(250.0, 150.0);
 
-        let path = ovg.shortest_path(start, end, Port::Right, Port::Left, 28.0);
+        let path = ovg.shortest_path_excluding(start, end, Port::Right, Port::Left, 28.0, None, None, &[]);
         assert!(path.is_some(), "OVG should find path around single obstacle");
         let path = path.unwrap();
 

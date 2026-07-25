@@ -6,7 +6,6 @@
 //! 产出的 [`LayeredDraft`] 是纯数据 IR，供 CoordinateKernel 消费。
 
 use crate::ast::Diagram;
-use crate::layout::algorithm_config::SugiyamaLayoutConfig;
 use crate::layout::engines::layered::graph;
 use crate::layout::engines::layered::order;
 use crate::layout::engines::layered::rank;
@@ -39,8 +38,6 @@ pub(in crate::layout) struct LayeredDraft {
     // ─── 尺寸与间距 ───
     /// 逐层 boundary gap（gap[i] 用于 rank i 与 i+1 之间）。
     pub per_layer_gaps: Vec<f64>,
-    /// 层内间距（密度调整后）。
-    pub node_gap: f64,
     /// 画布 padding。
     pub padding: f64,
     /// 完整 preset（坐标赋值需要）。
@@ -59,10 +56,6 @@ pub(in crate::layout) struct LayeredDraft {
     pub has_order_bias: bool,
     /// type=end 的实体 ID 列表（供坐标求解器结构 objectives）。
     pub end_ids: Vec<String>,
-
-    // ─── 配置 ───
-    /// 布局配置（group padding 等）。
-    pub layout_config: SugiyamaLayoutConfig,
 }
 
 /// 分层布局内核。
@@ -78,7 +71,6 @@ impl LayeredKernel {
     pub fn compute(
         diagram: &Diagram,
         preset: &SugiyamaPreset,
-        layout_config: SugiyamaLayoutConfig,
     ) -> LayeredDraft {
         let horizontal =
             crate::layout::resolve_effective_direction(diagram) == Some("left-to-right");
@@ -185,7 +177,6 @@ impl LayeredKernel {
             layers,
             sizes: proper.sizes,
             per_layer_gaps,
-            node_gap: adjusted_preset.node_gap,
             padding: adjusted_preset.padding,
             preset: adjusted_preset,
             sugiyama_ranks,
@@ -194,7 +185,6 @@ impl LayeredKernel {
             horizontal,
             has_order_bias: !order_bias.is_empty(),
             end_ids: extract_end_ids(diagram),
-            layout_config,
         }
     }
 }

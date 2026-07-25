@@ -7,10 +7,13 @@
 //! Slice D1：自环边不再走 override 旁路——其几何已由 C 末 lift 进
 //! `RouteSolution.paths`，ports 来自 `endpoint_assignments`，标签由 D-stage
 //! finalizer（sanitize）统一重建，故全部边走标准 materialize 管线。
+//!
+//! Phase 0：`compile_with_config` 从 [`PreparedRoutingInput`] 注入真实 [`RoutingConfig`]。
 
 use super::{RecipeSolution, RoutingRecipe};
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::AlgorithmOptionSpec;
+use crate::layout::routing::config::RoutingConfig;
 use crate::layout::routing::edge_routing_orthogonal::{
     OrthoConfig, ORTHOGONAL_OPTIONS,
 };
@@ -28,6 +31,7 @@ const APPLICABLE_TYPES: &[DiagramType] = &[
 /// 正交路由 Recipe：包装既有 `route_edges_orthogonal_inner` 为 compile/solve 接口。
 #[derive(Clone, Copy)]
 pub struct OrthogonalRecipe {
+    /// DSL option 派生的 slot/channel 参数；`routing` 字段在 `compile_with_config` 时覆盖。
     config: OrthoConfig,
 }
 
@@ -37,16 +41,18 @@ impl OrthogonalRecipe {
             config: OrthoConfig {
                 slot_pitch: options.get_or_default(&ORTHOGONAL_OPTIONS[0]),
                 channel_margin: options.get_or_default(&ORTHOGONAL_OPTIONS[1]),
+                // 占位；生产路径经 `compile_with_config` 注入 PreparedRoutingInput.config。
                 routing: Default::default(),
             },
         }
     }
 }
 
-/// compile 产出的 Draft：借用 diagram + 克隆 result（供 solve 消费）。
+/// compile 产出的 Draft：借用 diagram + 克隆 result + 已注入的 OrthoConfig。
 pub struct OrthogonalSolveDraft<'a> {
     diagram: &'a Diagram,
     result: LayoutResult,
+    config: OrthoConfig,
 }
 
 impl RoutingRecipe for OrthogonalRecipe {
@@ -64,7 +70,6 @@ impl RoutingRecipe for OrthogonalRecipe {
         true
     }
 
-
     fn option_specs(&self) -> &'static [AlgorithmOptionSpec] {
         ORTHOGONAL_OPTIONS
     }
@@ -74,9 +79,21 @@ impl RoutingRecipe for OrthogonalRecipe {
     }
 
     fn compile<'a>(&self, diagram: &'a Diagram, result: &'a LayoutResult) -> Self::Draft<'a> {
+        self.compile_with_config(diagram, result, Default::default())
+    }
+
+    fn compile_with_config<'a>(
+        &self,
+        diagram: &'a Diagram,
+        result: &'a LayoutResult,
+        routing_config: RoutingConfig,
+    ) -> Self::Draft<'a> {
+        let mut config = self.config;
+        config.routing = routing_config;
         OrthogonalSolveDraft {
             diagram,
             result: result.clone(),
+            config,
         }
     }
 
@@ -85,7 +102,7 @@ impl RoutingRecipe for OrthogonalRecipe {
         let routed = crate::layout::routing::edge_routing_orthogonal::route_orthogonal_inner(
             draft.diagram,
             draft.result.clone(),
-            self.config,
+            draft.config,
             None,
         );
 
@@ -120,7 +137,7 @@ impl RoutingRecipe for OrthogonalRecipe {
         let routed = crate::layout::routing::edge_routing_orthogonal::route_orthogonal_inner(
             draft.diagram,
             draft.result.clone(),
-            self.config,
+            draft.config,
             Some(preserve.clone()),
         );
 
@@ -157,5 +174,4 @@ impl RoutingRecipe for OrthogonalRecipe {
         }
         result
     }
-
 }

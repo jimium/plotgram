@@ -124,7 +124,6 @@ impl LayoutRecipe for FlowchartLayoutRecipe {
             let draft = LayeredKernel::compute(
                 diagram,
                 &preset::FLOWCHART_PRESET,
-                self.config,
             );
             FlowchartProblem::Flat(draft)
         }

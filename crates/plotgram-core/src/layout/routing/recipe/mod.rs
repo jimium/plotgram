@@ -100,6 +100,17 @@ pub trait RoutingRecipe {
     /// 编译：从 diagram 声明语义 + 已冻结布局构造家族专属 Draft。
     fn compile<'a>(&self, diagram: &'a Diagram, result: &'a LayoutResult) -> Self::Draft<'a>;
 
+    /// Phase 0：带正式 [`RoutingConfig`](crate::layout::routing::config::RoutingConfig) 的编译。
+    /// 默认忽略 config，等价于 [`compile`](Self::compile)；正交家族注入 `OrthoConfig.routing`。
+    fn compile_with_config<'a>(
+        &self,
+        diagram: &'a Diagram,
+        result: &'a LayoutResult,
+        _routing_config: crate::layout::routing::config::RoutingConfig,
+    ) -> Self::Draft<'a> {
+        self.compile(diagram, result)
+    }
+
     /// 求解：Draft → family-neutral [`RecipeSolution`]。
     fn solve(&self, draft: &Self::Draft<'_>) -> RecipeSolution;
 
@@ -261,7 +272,9 @@ impl<R: RoutingRecipe> RoutingRecipeDyn for RecipeRouter<R> {
 
         // compile + solve 借用 temp_result；在移动 result 进 finalize 前必须结束借用。
         let solved = {
-            let draft = self.recipe.compile(input.diagram, &temp_result);
+            let draft =
+                self.recipe
+                    .compile_with_config(input.diagram, &temp_result, input.config);
             if self.recipe.should_skip(&draft) {
                 None
             } else {
@@ -292,7 +305,9 @@ impl<R: RoutingRecipe> RoutingRecipeDyn for RecipeRouter<R> {
         temp_result.edges = seeded_edges;
 
         let solved = {
-            let draft = self.recipe.compile(input.diagram, &temp_result);
+            let draft =
+                self.recipe
+                    .compile_with_config(input.diagram, &temp_result, input.config);
             if self.recipe.should_skip(&draft) {
                 return None;
             }

@@ -3,6 +3,16 @@
 //! 原 `PLOTGRAM_*` 正式环境变量硬切为此结构体字段。
 //! debug/trace 类 env（`*_DEBUG`）保留原样，不纳入。
 
+/// 正交选路内核（Phase 2 双轨；Phase 3 删除 Legacy）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RouteKernelKind {
+    /// 词典序 A* + kernel ResourceGraph（默认）。
+    #[default]
+    LexAStar,
+    /// 模板枚举（仅调试回退）。
+    Legacy,
+}
+
 /// 路由算法正式配置。
 ///
 /// 所有影响路由算法行为的可调参数集中于此，由 pipeline 构造后注入路由管线。
@@ -12,6 +22,7 @@ pub struct RoutingConfig {
     /// 按边难度注入边序（原 `PLOTGRAM_EDGE_ORDER_SCORE`，默认 true）。
     pub edge_order_score: bool,
     /// 全局通道规划（原 `PLOTGRAM_CHANNEL_PLANNER`，默认 false）。
+    /// Phase 2：LexAStar 轨忽略此字段；Legacy 轨仍可读。
     pub channel_planner: bool,
     /// OVG 可见性图（原 `PLOTGRAM_OVG_ENABLED`，默认 true）。
     pub ovg_enabled: bool,
@@ -27,6 +38,8 @@ pub struct RoutingConfig {
     pub stub_exit_penalty: f64,
     /// 边级压力预算（原 `PLOTGRAM_EDGE_PRESSURE_BUDGET`，默认 true）。
     pub edge_pressure_budget: bool,
+    /// Phase 2：选路内核（默认 LexAStar）。
+    pub route_kernel: RouteKernelKind,
 }
 
 impl Default for RoutingConfig {
@@ -41,6 +54,7 @@ impl Default for RoutingConfig {
             away_penalty_rate: 2.0,
             stub_exit_penalty: 120.0,
             edge_pressure_budget: true,
+            route_kernel: RouteKernelKind::LexAStar,
         }
     }
 }

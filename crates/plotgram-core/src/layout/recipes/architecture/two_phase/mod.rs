@@ -14,7 +14,7 @@ pub(super) use super::group_layout_hint::{
     align_nodes_in_column, assign_ranks_for_mode, resolve_group_layout_hint,
     resolve_group_layout_mode, GroupLayoutHint, GroupLayoutMode,
 };
-pub(super) use super::group_sizing::{parse_group_sizing, GroupSizeBlock, GroupSizingPolicy};
+pub(super) use super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
 pub(super) use super::layout::acyclic::is_effective_edge;
 pub(super) use super::layout::constants::PADDING;
 pub(super) use super::layout::constants::{
@@ -71,38 +71,6 @@ impl super::group_sizing::GroupWidthBlock for MacroBlock {
 
     fn is_group_block(&self) -> bool {
         self.is_group
-    }
-
-    fn block_width(&self) -> f64 {
-        self.width
-    }
-
-    fn set_block_width(&mut self, width: f64) {
-        self.width = width;
-    }
-
-    fn shift_intra_nodes_x(&mut self, delta: f64) {
-        for nl in self.intra.nodes.values_mut() {
-            nl.x += delta;
-        }
-        self.intra.content_width += delta;
-    }
-}
-
-impl GroupSizeBlock for MacroBlock {
-    fn block_height(&self) -> f64 {
-        self.height
-    }
-
-    fn set_block_height(&mut self, height: f64) {
-        self.height = height;
-    }
-
-    fn shift_intra_nodes_y(&mut self, delta: f64) {
-        for nl in self.intra.nodes.values_mut() {
-            nl.y += delta;
-        }
-        self.intra.content_height += delta;
     }
 }
 
@@ -275,38 +243,6 @@ impl super::group_sizing::GroupWidthBlock for IntraMacroBlock {
 
     fn is_group_block(&self) -> bool {
         self.is_group
-    }
-
-    fn block_width(&self) -> f64 {
-        self.width
-    }
-
-    fn set_block_width(&mut self, width: f64) {
-        self.width = width;
-    }
-
-    fn shift_intra_nodes_x(&mut self, delta: f64) {
-        for nl in self.intra.nodes.values_mut() {
-            nl.x += delta;
-        }
-        self.intra.content_width += delta;
-    }
-}
-
-impl GroupSizeBlock for IntraMacroBlock {
-    fn block_height(&self) -> f64 {
-        self.height
-    }
-
-    fn set_block_height(&mut self, height: f64) {
-        self.height = height;
-    }
-
-    fn shift_intra_nodes_y(&mut self, delta: f64) {
-        for nl in self.intra.nodes.values_mut() {
-            nl.y += delta;
-        }
-        self.intra.content_height += delta;
     }
 }
 

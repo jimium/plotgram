@@ -1,8 +1,7 @@
 //! `PathAssignmentSolver`：R6 单一路径求解主流程（Slice 6b）。
 //!
 //! 取代原本三套并行的重路由控制流——two-round（拥堵检测 + 精路由）、deferred
-//! OVG（大图 degraded 边局部 OVG 重路由）、conflict reroute（`phase_reroute` →
-//! `reroute_conflicting_edges`）——收敛为一条主流程：
+//! OVG（大图 degraded 边局部 OVG 重路由）、conflict reroute——收敛为一条主流程：
 //!
 //! 1. **initial shortest path**：由 `phase_route_edges` 逐边求得（solver 之前已执行）。
 //! 2. **conflict graph**：把 congestion（[`detect_congestion`]）、obstacle crossing
@@ -24,8 +23,6 @@
 //! - 确定性：冲突集合以 `BTreeMap` 收敛并按 `(reason, edge_index)` 稳定排序；不依赖
 //!   `HashMap` 迭代序。
 
-use super::conflict_reroute::{collect_spacing_conflicts, find_clean_reroute_path};
-use super::resource_graph::ResourceGraph;
 use super::run::detect_congestion;
 use super::visibility_graph::{build_local_ovg, OrthogonalVisibilityGraph};
 use super::*;
@@ -34,12 +31,130 @@ use crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_la
 use crate::layout::routing::model::solution::{DegradedReason, EndpointAssignment, RoutePath};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-/// 多轮 rip-up/reroute 上限（对齐 `conflict_reroute::MAX_REROUTE_ROUNDS`）。
+/// 多轮 rip-up/reroute 上限。
 const MAX_REROUTE_ROUNDS: usize = 3;
 /// 拥堵桶阈值（对齐旧 two-round `detect_congestion(&edges, 3)`）。
 const CONGESTION_THRESHOLD: usize = 3;
 /// 局部 OVG 覆盖冲突区域的外扩边距（对齐旧 two-round / deferred OVG 的 80px）。
 const LOCAL_OVG_MARGIN: f64 = 80.0;
+
+/// 收集所有存在间距违规的边索引及其违规数。
+///
+/// 跳过空路径边和已标记失败的边。stub 段在 `path_edge_spacing_violations`
+/// 内部已豁免。
+fn collect_spacing_conflicts(
+    paths: &[RoutePath],
+    grid: &SegmentGrid,
+    parallel_gap: f64,
+    failed_edges: &HashSet<usize>,
+) -> Vec<(usize, usize)> {
+    let mut conflicts: Vec<(usize, usize)> = Vec::new();
+    for ei in 0..paths.len() {
+        if paths[ei].is_empty() || failed_edges.contains(&ei) {
+            continue;
+        }
+        let points = paths[ei].points();
+        let viols = path_edge_spacing_violations(points, grid, parallel_gap);
+        if !viols.is_empty() {
+            conflicts.push((ei, viols.len()));
+        }
+    }
+    conflicts
+}
+
+/// 为一条冲突边寻找干净的重路由路径。
+///
+/// 递增 `channel_margin` 调用 `select_best_path_with_scorer_stats`（默认 LexA*）。
+/// 返回第一条通过节点/分组/边间距硬检查的路径；若全部失败返回 `None`。
+#[allow(clippy::too_many_arguments)]
+fn find_clean_reroute_path(
+    from_ep: &Endpoint,
+    to_ep: &Endpoint,
+    from_id: &str,
+    to_id: &str,
+    cfg: &OrthoConfig,
+    reroute_margins: &[f64],
+    nodes: &HashMap<String, NodeLayout>,
+    group_ctx: &crate::layout::group::GroupRoutingContext,
+    grid: &SegmentGrid,
+    profile: &OrthoRoutingProfile,
+    obstacles: &PreparedObstacles,
+    load_map: &ChannelLoadMap,
+    ortho_stats: &mut crate::layout::OrthoDebugStats,
+    parallel_gap: f64,
+    ovg: Option<&OrthogonalVisibilityGraph>,
+) -> Option<Vec<Point>> {
+    for &margin in reroute_margins {
+        let r_cfg = OrthoConfig {
+            channel_margin: margin,
+            ..*cfg
+        };
+        let boost = margin > cfg.channel_margin + 0.5;
+        let mut ctx = OrthoRoutingContext::new(
+            nodes,
+            group_ctx,
+            grid,
+            &r_cfg,
+            profile,
+            obstacles,
+            Some(load_map),
+        )
+        .with_strict_group_transit(should_strict_group_transit(
+            profile,
+            group_ctx,
+            from_id,
+            to_id,
+            false,
+            false,
+        ))
+        .with_corridor_boost(boost)
+        .with_prefer_outer_ring(false);
+        if let Some(ovg_ref) = ovg {
+            ctx = ctx.with_ovg(ovg_ref);
+        }
+        let pair = EndpointPair {
+            from: from_ep.clone(),
+            to: to_ep.clone(),
+        };
+        let mut path_stats = PathSelectStats::default();
+        // 使用全候选（phase1_only=false），包含 staircases，增加找到干净路径的概率
+        let candidate = select_best_path_with_scorer_stats(
+            &ctx,
+            &pair,
+            &DefaultScorer,
+            Some(&mut path_stats),
+            false,
+        );
+        ortho_stats.total_candidates += path_stats.candidate_count;
+        ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
+        if path_stats.degraded {
+            ortho_stats.degraded_count += 1;
+        }
+
+        if candidate.len() >= 2
+            && path_is_clean(
+                &candidate,
+                pair.from_id(),
+                pair.to_id(),
+                nodes,
+                group_ctx,
+                &obstacles.sorted_node_ids,
+            )
+            && path_avoids_group_interiors(
+                &candidate,
+                pair.from_id(),
+                pair.to_id(),
+                group_ctx,
+                &obstacles.sorted_group_ids,
+            )
+            && path_is_clean_from_edges(&candidate, grid, parallel_gap, STUB_GUARD_LENGTH)
+        {
+            return Some(candidate);
+        }
+    }
+
+    None
+}
 
 /// 冲突原因的处理优先级（越小越先重路由）：先修硬穿障，再修间距，最后拥堵。
 fn reason_rank(reason: DegradedReason) -> u8 {
@@ -139,8 +254,8 @@ fn global_score(edges: &[EdgeLayout], grid: &SegmentGrid, parallel_gap: f64) -> 
     score
 }
 
-/// R6 单一主流程：消费 [`ResourceGraph`]，对已初始路由的 `paths` 做统一
-/// 冲突检测 + bounded rip-up/reroute（单调不劣化，末轮即最优）。
+/// R6 单一主流程：对已初始路由的 `paths` 做统一冲突检测 + bounded rip-up/reroute
+/// （单调不劣化，末轮即最优）。
 ///
 /// 返回仍降级的边及其类型化原因（`(edge_index, DegradedReason)`，按边序）。
 #[allow(clippy::too_many_arguments)]
@@ -153,7 +268,9 @@ pub(super) fn solve_paths(
     grid: &mut SegmentGrid,
     cfg: &OrthoConfig,
     group_ctx: &crate::layout::group::GroupRoutingContext,
-    resources: &ResourceGraph,
+    obstacles: &PreparedObstacles,
+    ovg: Option<&OrthogonalVisibilityGraph>,
+    group_rects: &[Rect],
     ortho_stats: &mut crate::layout::OrthoDebugStats,
     profile: &OrthoRoutingProfile,
     parallel_gap: f64,
@@ -162,10 +279,8 @@ pub(super) fn solve_paths(
     if n < 2 {
         return Vec::new();
     }
-    let obstacles = resources.obstacles();
-    let corridor_plan = resources.corridor_plan();
 
-    // 重路由 margin 档位：逐步增大生成更多绕行候选（对齐 conflict_reroute）。
+    // 重路由 margin 档位：逐步增大生成更多绕行候选。
     let reroute_margins: [f64; 3] = [
         cfg.channel_margin + 10.0,
         cfg.channel_margin + 25.0,
@@ -175,7 +290,7 @@ pub(super) fn solve_paths(
     // ── 2. 冲突邻域局部 OVG（内部策略）──
     // 有全图 OVG 直接复用；否则在初始冲突邻域按需构建局部 OVG。
     let no_fail: HashSet<usize> = HashSet::new();
-    let local_ovg: Option<OrthogonalVisibilityGraph> = if resources.visibility().is_some() {
+    let local_ovg: Option<OrthogonalVisibilityGraph> = if ovg.is_some() {
         None
     } else {
         let initial = detect_conflicts(paths, grid, parallel_gap, obstacles, relations, nodes, &no_fail, true);
@@ -195,7 +310,7 @@ pub(super) fn solve_paths(
                 nodes,
                 &obstacles.sorted_node_ids,
                 node_pad,
-                resources.group_rects(),
+                group_rects,
                 LOCAL_OVG_MARGIN,
             );
             if local.is_empty() {
@@ -205,13 +320,12 @@ pub(super) fn solve_paths(
             }
         }
     };
-    let ovg_ref: Option<&OrthogonalVisibilityGraph> =
-        resources.visibility().or(local_ovg.as_ref());
+    let ovg_ref: Option<&OrthogonalVisibilityGraph> = ovg.or(local_ovg.as_ref());
 
     // ── 3. bounded rip-up/reroute（单调不劣化：只接受洁净路径）──
     // 拥堵仅在无全图 OVG（走局部 OVG）时作为冲突源，避免在已绕障良好的 OVG 图上
     // 因拥堵徒增绕行/间距（对齐旧 two-round 语义）。
-    let include_congestion = resources.visibility().is_none();
+    let include_congestion = ovg.is_none();
     let mut failed: HashSet<usize> = HashSet::new();
     let mut degraded: BTreeMap<usize, DegradedReason> = BTreeMap::new();
     let mut rounds_done = 0usize;
@@ -255,7 +369,6 @@ pub(super) fn solve_paths(
             let old_points: Vec<Point> = paths[ei].points().to_vec();
 
             let clean_path = find_clean_reroute_path(
-                ei,
                 &from_ep,
                 &to_ep,
                 from_id,
@@ -270,29 +383,24 @@ pub(super) fn solve_paths(
                 &load_map,
                 ortho_stats,
                 parallel_gap,
-                corridor_plan,
                 ovg_ref,
             );
 
             match clean_path {
-                Some((path, preserve_old_labels)) => {
-                    if !preserve_old_labels {
-                        labels[ei] = if path.len() >= 2 {
-                            match relations.get(ei) {
-                                Some(rel) => {
-                                    build_parallel_aware_edge_labels_auto(rel, ei, relations, &path)
-                                }
-                                None => Vec::new(),
+                Some(path) => {
+                    labels[ei] = if path.len() >= 2 {
+                        match relations.get(ei) {
+                            Some(rel) => {
+                                build_parallel_aware_edge_labels_auto(rel, ei, relations, &path)
                             }
-                        } else {
-                            Vec::new()
-                        };
-                    }
+                            None => Vec::new(),
+                        }
+                    } else {
+                        Vec::new()
+                    };
                     grid.insert_path(&path, ei);
                     paths[ei] = RoutePath::orthogonal(path);
-                    if !preserve_old_labels {
-                        total_rerouted += 1;
-                    }
+                    total_rerouted += 1;
                     degraded.remove(&ei);
                 }
                 None => {

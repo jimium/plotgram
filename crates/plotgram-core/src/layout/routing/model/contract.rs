@@ -95,6 +95,8 @@ pub struct PortIntent {
 pub struct TransitIntent {
     pub edge: StableEdgeId,
     pub cross_group: bool,
+    /// Phase 2：偏好外围通道（feedback / Monitor）；LexA* Q5。
+    pub prefer_periphery: bool,
 }
 
 /// 走廊资源（后续 Slice 由 ResourceGraph 填充）。

@@ -134,7 +134,7 @@ struct MindmapRecipe {
 /// 思维导图问题 IR。
 enum MindmapProblem {
     Empty,
-    Layout { mode: MindmapMode },
+    Layout { _mode: MindmapMode },
 }
 
 impl LayoutRecipe for MindmapRecipe {
@@ -149,7 +149,7 @@ impl LayoutRecipe for MindmapRecipe {
         if diagram.entities.is_empty() {
             MindmapProblem::Empty
         } else {
-            MindmapProblem::Layout { mode: layout_mode(diagram) }
+            MindmapProblem::Layout { _mode: layout_mode(diagram) }
         }
     }
 

@@ -10,10 +10,8 @@
 
 use std::collections::HashMap;
 
-use crate::types::DiagramType;
 use crate::ast::{Diagram};
-use crate::layout::algorithm_config::AlgorithmOptionSpec;
-use crate::layout::routing::edge_routing_bezier::{BezierConfig, BEZIER_OPTIONS};
+use crate::layout::routing::edge_routing_bezier::BezierConfig;
 use crate::layout::geometry::Point;
 use crate::layout::{
     EdgeLayout, LayoutResult, PathGeometry,
@@ -26,36 +24,6 @@ use crate::layout::routing::common::routing_skeleton::{
     finalize_edges, resolve_endpoints, RoutingContext,
 };
 use crate::layout::routing::common::self_loop::{self_loop_indices, route_self_loop, SelfLoopStyle};
-
-const APPLICABLE_TYPES: &[DiagramType] = &[
-    DiagramType::Flowchart,
-    DiagramType::Architecture,
-    DiagramType::State,
-    DiagramType::Er,
-];
-
-/// 障碍避让多段样条路由策略（构造时注入已解析的 option）。
-pub struct SplineRouting {
-    config: BezierConfig,
-}
-
-impl Default for SplineRouting {
-    fn default() -> Self {
-        Self::from_options(&crate::layout::pipeline::plan::ResolvedAlgoOptions::from_spec_defaults(
-            BEZIER_OPTIONS,
-        ))
-    }
-}
-
-impl SplineRouting {
-    pub fn from_options(options: &crate::layout::pipeline::plan::ResolvedAlgoOptions) -> Self {
-        Self {
-            config: BezierConfig {
-                tension: options.get_or_default(&BEZIER_OPTIONS[0]),
-            },
-        }
-    }
-}
 
 /// 贝塞尔路径每段的采样点数
 const BEZIER_SAMPLES_PER_SEGMENT: usize = 12;

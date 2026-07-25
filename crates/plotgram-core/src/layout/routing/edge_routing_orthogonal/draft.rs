@@ -46,16 +46,16 @@ pub(super) struct OrthogonalDraft {
     pub(super) corridor_plan: corridor_route::CorridorRoutePlan,
     /// 走廊需求模型（供难度评分与逐边路由参考）。
     pub(super) corridor_model: crate::layout::demand::CorridorModel,
-    /// 每条边的起点端口（phase_port_correction 会最终修正）。
-    pub(super) from_side: Vec<Port>,
-    /// 每条边的终点端口（phase_port_correction 会最终修正）。
-    pub(super) to_side: Vec<Port>,
-    /// 端点几何映射 `(edge_idx, is_from) -> Endpoint`（phase_port_correction 最终写者）。
-    pub(super) endpoint_map: HashMap<(usize, bool), Endpoint>,
+    /// 每条边的起点端口（Phase 1/2 将消费；当前经 endpoint_assignments 派生）。
+    pub(super) _from_side: Vec<Port>,
+    /// 每条边的终点端口（Phase 1/2 将消费；当前经 endpoint_assignments 派生）。
+    pub(super) _to_side: Vec<Port>,
+    /// 端点几何映射 `(edge_idx, is_from) -> Endpoint`（Phase 1/2 将消费）。
+    pub(super) _endpoint_map: HashMap<(usize, bool), Endpoint>,
     /// 平行边分组与偏移。
     pub(super) parallel: crate::layout::routing::common::parallel_edges::ParallelGroups,
-    /// 反向平行边对（用于 dock 分离）。
-    pub(super) reverse_pairs: std::collections::BTreeSet<String>,
+    /// 反向平行边对（用于 dock 分离；Phase 1/2 将消费）。
+    pub(super) _reverse_pairs: std::collections::BTreeSet<String>,
     /// 逐边路由顺序（低层先占通道；feedback 全局延后）。
     pub(super) edge_order: Vec<usize>,
     /// feedback 边集合（全局延后路由）。
@@ -86,8 +86,8 @@ impl OrthogonalDraft {
         let self_loop_idx = self_loop::self_loop_indices(relations);
         let profile = OrthoRoutingProfile::for_diagram_type(diagram.diagram_type.clone());
         let parallel_gap = profile.parallel_gap;
-        // S4：与 S3 同门控——仅无分组 architecture；有组大图强制外环/监控延后会抬 high tight/穿模
-        let s4_monitor_corridor = profile.semantic_merge && diagram.groups.is_empty();
+        // Phase 2.4：S4 monitor corridor 行为已删除；门控恒 false（禁止图名/空组特判）。
+        let s4_monitor_corridor = false;
 
         let routing_algo = crate::layout::group::routing_algo_for_diagram(diagram);
         let group_ctx =
@@ -229,11 +229,11 @@ impl OrthogonalDraft {
             obstacles,
             corridor_plan,
             corridor_model,
-            from_side,
-            to_side,
-            endpoint_map,
+            _from_side: from_side,
+            _to_side: to_side,
+            _endpoint_map: endpoint_map,
             parallel,
-            reverse_pairs,
+            _reverse_pairs: reverse_pairs,
             edge_order,
             feedback_edge_set,
             channel_plan,
@@ -348,7 +348,7 @@ mod tests {
     ) {
         // endpoint_map: 显式排序 key，anchor 用 to_bits 避免 f64 直接比较。
         let mut ep: Vec<((usize, bool), Port, u64, u64)> = d
-            .endpoint_map
+            ._endpoint_map
             .iter()
             .map(|(k, e)| (*k, e.side, e.anchor.x.to_bits(), e.anchor.y.to_bits()))
             .collect();
@@ -358,8 +358,8 @@ mod tests {
         self_loops.sort_unstable();
 
         (
-            d.from_side.clone(),
-            d.to_side.clone(),
+            d._from_side.clone(),
+            d._to_side.clone(),
             d.edge_order.clone(),
             d.obstacles.sorted_node_ids.clone(),
             d.obstacles.sorted_group_ids.clone(),
@@ -392,8 +392,8 @@ mod tests {
         let d = OrthogonalDraft::compile(&diagram, &mut result, &cfg);
 
         // 每条边都有起/终端口选择。
-        assert_eq!(d.from_side.len(), n);
-        assert_eq!(d.to_side.len(), n);
+        assert_eq!(d._from_side.len(), n);
+        assert_eq!(d._to_side.len(), n);
         // edge_order 是 0..n 的一个排列。
         assert_eq!(d.edge_order.len(), n);
         let mut sorted = d.edge_order.clone();

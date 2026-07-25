@@ -294,7 +294,6 @@ impl<'a> LayoutPipeline<'a> {
             &refine_config,
             &edge_snap_config,
             Default::default(), // RoutingConfig：待后续从 pipeline 传入
-            algo,
             self.prev,
         );
         crate::perf_log!(

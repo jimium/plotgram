@@ -149,9 +149,10 @@
 
     #[test]
     fn test_is_collinear() {
-        assert!(is_collinear(Point::new(0.0, 0.0), Point::new(50.0, 0.0), Point::new(100.0, 0.0)));
-        assert!(is_collinear(Point::new(0.0, 0.0), Point::new(50.0, 50.0), Point::new(100.0, 100.0)));
-        assert!(!is_collinear(Point::new(0.0, 0.0), Point::new(50.0, 10.0), Point::new(100.0, 100.0)));
+        use crate::layout::routing::common::collinear_simplify::{is_collinear_eps, STRICT_COLLINEAR_EPS};
+        assert!(is_collinear_eps(Point::new(0.0, 0.0), Point::new(50.0, 0.0), Point::new(100.0, 0.0), STRICT_COLLINEAR_EPS));
+        assert!(is_collinear_eps(Point::new(0.0, 0.0), Point::new(50.0, 50.0), Point::new(100.0, 100.0), STRICT_COLLINEAR_EPS));
+        assert!(!is_collinear_eps(Point::new(0.0, 0.0), Point::new(50.0, 10.0), Point::new(100.0, 100.0), STRICT_COLLINEAR_EPS));
     }
 
     #[test]
@@ -1270,8 +1271,30 @@
     /// 锯齿消毒 2.0：无反向 stub、无斜段、关键边无同轴 U 折。
     #[test]
     fn stress_nested_no_reverse_exit_stubs() {
-        use super::sanitize::{first_segment_is_reverse, has_non_orthogonal_segment};
         use crate::layout::geometry::Point;
+        use crate::layout::Port;
+
+        fn first_segment_is_reverse(points: &[Point], side: Port) -> bool {
+            if points.len() < 2 {
+                return false;
+            }
+            let (ox, oy) = match side {
+                Port::Top => (0.0, -1.0),
+                Port::Bottom => (0.0, 1.0),
+                Port::Left => (-1.0, 0.0),
+                Port::Right => (1.0, 0.0),
+            };
+            let dx = points[1].x - points[0].x;
+            let dy = points[1].y - points[0].y;
+            dx * ox + dy * oy < -1.0
+        }
+        fn has_non_orthogonal_segment(points: &[Point]) -> bool {
+            points.windows(2).any(|w| {
+                let dx = (w[1].x - w[0].x).abs();
+                let dy = (w[1].y - w[0].y).abs();
+                dx > 0.1 && dy > 0.1
+            })
+        }
 
         let source = include_str!(
             "../../../../../../showcase/architecture/stress.layout-stress-nested.pgm"

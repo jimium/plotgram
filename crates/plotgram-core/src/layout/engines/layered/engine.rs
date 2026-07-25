@@ -46,7 +46,7 @@ pub fn compute_with_preset(
     }
 
     // compile: LayeredKernel (Step 1-7)
-    let draft = super::layered_kernel::LayeredKernel::compute(diagram, preset, layout_config);
+    let draft = super::layered_kernel::LayeredKernel::compute(diagram, preset);
 
     // solve: CoordinateKernel (Step 8)
     let (nodes, solved_problem) = coordinate::assign_coordinates_brandes_koepf(

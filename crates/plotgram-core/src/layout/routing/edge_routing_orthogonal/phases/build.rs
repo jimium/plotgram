@@ -37,7 +37,7 @@ pub(crate) fn phase_route_edges(
     self_loop_idx: &HashMap<usize, usize>,
     space_budget: &mut Option<crate::layout::demand::space_budget::SpaceBudget>,
     feedback_edge_set: &std::collections::HashSet<usize>,
-    s4_monitor_corridor: bool,
+    _s4_monitor_corridor: bool,
     corridor_model: Option<&crate::layout::demand::CorridorModel>,
     ovg: Option<&OrthogonalVisibilityGraph>,
     channel_plan: Option<&ChannelPlan>,
@@ -125,11 +125,9 @@ pub(crate) fn phase_route_edges(
             obstacles,
             cfg.channel_margin,
         );
-        // P5（保守落地）：有组图跨 leaf 外廊与 S4 monitor 解耦的「无链 prefer_outer」
-        // 会在 ecommerce 等图引入新穿组；此处仍仅 S4 monitor 开外环，
-        // 跨 leaf 无链靠 strict + corridor_boost 收口（完整 P5 留给后续几何）。
         // Phase A: 回环边始终偏好外环路由，避免与正向边抢内部通道。
-        let prefer_outer = is_feedback || (s4_monitor_corridor && is_feedback);
+        // with_prefer_outer_ring 同时置 prefer_periphery（LexA* Q5）。
+        let prefer_outer = is_feedback;
         // P2：有 chain 但 validated 失败 → 显式 degraded（禁止静默 free-route 冒充成功）。
         let corridor_contract_failed = has_chain && corridor_ok.is_none();
         // Phase B3 + P2-1: 查询全局通道规划的精确 lane 坐标（优先）或通道中心（fallback）

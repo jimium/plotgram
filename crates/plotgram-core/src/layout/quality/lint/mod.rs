@@ -506,9 +506,21 @@ fn check_edge_crosses_group_interior(diagram: &Diagram, result: &LayoutResult, o
             continue;
         }
         let rel = &diagram.relations[index];
-        let from_related = endpoint_related_groups(rel.from.as_str(), &entity_group, &ancestor_sets);
-        let to_related = endpoint_related_groups(rel.to.as_str(), &entity_group, &ancestor_sets);
+        let mut from_related = endpoint_related_groups(rel.from.as_str(), &entity_group, &ancestor_sets);
+        let mut to_related = endpoint_related_groups(rel.to.as_str(), &entity_group, &ancestor_sets);
         let path = edge.path_points();
+        let start = path[0];
+        let end = path[path.len() - 1];
+        // 几何端点豁免：端点落在组框内时允许进入（补 entity.group_id 缺失/漂移）
+        for gid in &group_ids {
+            let gl = &result.groups[*gid];
+            if point_in_or_on_group_layout(start, gl) {
+                from_related.insert((*gid).clone());
+            }
+            if point_in_or_on_group_layout(end, gl) {
+                to_related.insert((*gid).clone());
+            }
+        }
 
         for gid in &group_ids {
             if from_related.contains(gid.as_str()) || to_related.contains(gid.as_str()) {
@@ -542,6 +554,14 @@ fn check_edge_crosses_group_interior(diagram: &Diagram, result: &LayoutResult, o
     }
 }
 
+fn point_in_or_on_group_layout(p: crate::layout::geometry::Point, gl: &crate::layout::GroupLayout) -> bool {
+    const EPS: f64 = 1.0;
+    p.x >= gl.x - EPS
+        && p.x <= gl.x + gl.width + EPS
+        && p.y >= gl.y - EPS
+        && p.y <= gl.y + gl.height + EPS
+}
+
 fn entity_to_group_map(diagram: &Diagram) -> HashMap<String, String> {
     diagram
         .entities
@@ -568,6 +588,11 @@ impl GroupInteriorMaps {
             ancestor_sets: build_group_ancestor_sets(diagram),
         }
     }
+
+    /// 端点相关组（直接组 + 祖先），与 lint 穿组豁免口径一致。
+    pub fn related_groups(&self, entity_id: &str) -> HashSet<String> {
+        endpoint_related_groups(entity_id, &self.entity_group, &self.ancestor_sets)
+    }
 }
 
 /// 使用预计算 maps 检查指定边是否穿越非端点分组内部。
@@ -592,9 +617,25 @@ pub fn edge_crosses_group_interior_with_maps(
     let to_related =
         endpoint_related_groups(rel.to.as_str(), &maps.entity_group, &maps.ancestor_sets);
     let path = edge.path_points();
+    let start = path[0];
+    let end = path[path.len() - 1];
 
     let mut group_ids: Vec<&String> = result.groups.keys().collect();
     group_ids.sort();
+
+    let mut from_related = from_related;
+    let mut to_related = to_related;
+    for gid in &group_ids {
+        let Some(gl) = result.groups.get(*gid) else {
+            continue;
+        };
+        if point_in_or_on_group_layout(start, gl) {
+            from_related.insert((*gid).clone());
+        }
+        if point_in_or_on_group_layout(end, gl) {
+            to_related.insert((*gid).clone());
+        }
+    }
 
     for gid in group_ids {
         if from_related.contains(gid.as_str()) || to_related.contains(gid.as_str()) {

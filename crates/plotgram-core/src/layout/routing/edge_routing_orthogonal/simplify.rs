@@ -4,7 +4,7 @@
 //! 改形状逻辑（换角 / overshoot）不在此模块。
 
 use crate::layout::routing::common::collinear_simplify::{
-    is_collinear_eps, simplify_collinear_polyline, STRICT_COLLINEAR_EPS,
+    simplify_collinear_polyline, STRICT_COLLINEAR_EPS,
 };
 use crate::layout::geometry::Point;
 
@@ -14,8 +14,4 @@ pub fn simplify_path(path: Vec<Point>, preserve_stubs: bool) -> Vec<Point> {
 
 pub fn simplify_path_with_eps(path: Vec<Point>, preserve_stubs: bool, eps: f64) -> Vec<Point> {
     simplify_collinear_polyline(path, preserve_stubs, eps)
-}
-
-pub fn is_collinear(a: Point, b: Point, c: Point) -> bool {
-    is_collinear_eps(a, b, c, STRICT_COLLINEAR_EPS)
 }

@@ -14,7 +14,6 @@ use crate::layout::routing::common::spatial_grid::SpatialGrid;
 use super::{ChannelLoadMap, OrthoConfig, OrthoRoutingProfile, RoutedSegment};
 use super::slot::Endpoint;
 use super::visibility_graph::OrthogonalVisibilityGraph;
-use super::resource_graph::ResourceGraph;
 
 /// Shared, read-only routing context for a single `route_edges_orthogonal` call.
 ///
@@ -40,8 +39,10 @@ pub struct OrthoRoutingContext<'a> {
     pub strict_group_transit: bool,
     /// 空间契约：0 候选升档后加大外框绕行垫（S2）。
     pub corridor_boost: bool,
-    /// S4：优先评估外环绕行候选（feedback / 监控枢纽边）。
+    /// S4：优先评估外环绕行候选（feedback / 监控枢纽边）。Legacy 轨使用。
     pub prefer_outer_ring: bool,
+    /// Phase 2：外围通道偏好（TransitIntent.prefer_periphery → LexA* Q5）。
+    pub prefer_periphery: bool,
     /// S4：受保护的垂直业务干线 `(x, y_lo, y_hi)`；穿越加重惩罚。
     pub protected_trunks: &'a [(f64, f64, f64)],
     /// Phase B: 正交可见性图（OVG），用于 degraded 边的路径搜索。
@@ -51,9 +52,6 @@ pub struct OrthoRoutingContext<'a> {
     pub planned_channel: Option<f64>,
     /// P3-1: 第一轮粗路由模式——跳过 crossing_penalty（尚无全局拥堵信息）
     pub first_pass: bool,
-    /// Slice 6a: 只读资源统一层（obstacles/OVG/channel/corridor 收敛视图）。
-    /// flag `PLOTGRAM_RESOURCE_GRAPH` 关闭时为 None；Slice 6b PathAssignmentSolver 消费。
-    pub resource_graph: Option<&'a ResourceGraph<'a>>,
 }
 
 impl<'a> OrthoRoutingContext<'a> {
@@ -79,11 +77,11 @@ impl<'a> OrthoRoutingContext<'a> {
             strict_group_transit: false,
             corridor_boost: false,
             prefer_outer_ring: false,
+            prefer_periphery: false,
             protected_trunks: &[],
             ovg: None,
             planned_channel: None,
             first_pass: false,
-            resource_graph: None,
         }
     }
 
@@ -106,6 +104,12 @@ impl<'a> OrthoRoutingContext<'a> {
 
     pub fn with_prefer_outer_ring(mut self, prefer: bool) -> Self {
         self.prefer_outer_ring = prefer;
+        self.prefer_periphery = prefer;
+        self
+    }
+
+    pub fn with_prefer_periphery(mut self, prefer: bool) -> Self {
+        self.prefer_periphery = prefer;
         self
     }
 
@@ -129,13 +133,6 @@ impl<'a> OrthoRoutingContext<'a> {
     /// P3-1: 设置第一轮粗路由模式。
     pub fn with_first_pass(mut self, v: bool) -> Self {
         self.first_pass = v;
-        self
-    }
-
-    /// Slice 6a: 注入只读资源统一层。
-    #[allow(dead_code)] // Slice 6b PathAssignmentSolver 消费
-    pub fn with_resource_graph(mut self, rg: &'a ResourceGraph<'a>) -> Self {
-        self.resource_graph = Some(rg);
         self
     }
 }
@@ -173,6 +170,7 @@ impl PreparedObstacles {
 ///
 /// 所有段均为轴对齐（水平/垂直），cell 大小 64px 是 BBOX_EXPAND(10) 的
 /// 合理倍数，保证绝大多数段仅覆盖 1-2 个 cell。
+/// Shared spatial grid of routed segments — pub(crate) for Phase 2 group repair from refine.
 pub struct SegmentGrid {
     grid: SpatialGrid<usize>,
     segments: Vec<RoutedSegment>,

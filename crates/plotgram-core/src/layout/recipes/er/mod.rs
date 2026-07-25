@@ -98,7 +98,6 @@ impl LayoutRecipe for ErRecipe {
         let draft = LayeredKernel::compute(
             diagram,
             &preset::ER_PRESET,
-            self.config,
         );
         ErProblem { draft }
     }

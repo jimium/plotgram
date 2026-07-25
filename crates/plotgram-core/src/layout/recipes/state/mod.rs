@@ -129,7 +129,6 @@ impl LayoutRecipe for StateRecipe {
             let draft = crate::layout::engines::layered::layered_kernel::LayeredKernel::compute(
                 diagram,
                 &preset::STATE_PRESET,
-                self.sugiyama_config,
             );
             StateProblem::Sugiyama(draft)
         }

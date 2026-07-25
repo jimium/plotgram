@@ -23,7 +23,6 @@
 use super::*;
 use crate::ast::Diagram;
 use crate::layout::routing::common::edge_geometry::{arrow_type_tag, edge_line_style_signature};
-use crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, LayoutResult, NodeLayout, PathGeometry, Port};
 use std::collections::HashMap;
@@ -67,11 +66,11 @@ pub(super) fn route_edges_orthogonal_inner(
         obstacles,
         corridor_plan,
         corridor_model,
-        from_side: _,
-        to_side: _,
-        endpoint_map: _,
+        _from_side: _,
+        _to_side: _,
+        _endpoint_map: _,
         parallel,
-        reverse_pairs,
+        _reverse_pairs: _,
         edge_order,
         feedback_edge_set,
         channel_plan,
@@ -154,15 +153,7 @@ pub(super) fn route_edges_orthogonal_inner(
 
     // ── 4c. R6: PathAssignmentSolver 单一主流程 ──
     // R6：单一路径求解主流程，取代原 two-round / deferred OVG / conflict reroute
-    // 三套并行控制流；消费 ResourceGraph 统一资源视图。
-    let rg = resource_graph::ResourceGraph::assemble(
-        &obstacles,
-        ovg.as_ref(),
-        channel_plan.as_ref(),
-        &corridor_plan,
-        &corridor_model,
-        &group_rects,
-    );
+    // 三套并行控制流；直接消费 obstacles / OVG / group_rects。
     let degraded = path_solver::solve_paths(
         &result.nodes,
         relations,
@@ -172,7 +163,9 @@ pub(super) fn route_edges_orthogonal_inner(
         &mut grid,
         &cfg,
         &group_ctx,
-        &rg,
+        &obstacles,
+        ovg.as_ref(),
+        &group_rects,
         &mut ortho_stats,
         &profile,
         parallel_gap,
@@ -223,7 +216,7 @@ pub(super) fn route_edges_orthogonal_inner(
     // S3：语义 FanIn/FanOut 合流（仅 architecture）；写路径 + merge_intervals
     // Slice C3.3：同时产出 Vec<BundleSolution> 供 RouteSolution 携带。
     let mut bundle_solutions: Vec<crate::layout::routing::model::BundleSolution> = Vec::new();
-    let mut merge_result = if profile.semantic_merge {
+    let merge_result = if profile.semantic_merge {
         let (mr, bs) = semantic_trunk_merge::apply_semantic_trunk_merge(
             &mut edges,
             relations,
@@ -258,56 +251,20 @@ pub(super) fn route_edges_orthogonal_inner(
         None
     };
 
-    // S4：S3 合流后重路由监控枢纽边（仅无分组 architecture）
-    if s4_monitor_corridor {
-        let protected_trunks = merge_result
-            .as_ref()
-            .map(|m| extract_protected_vertical_trunks(&m.merge_intervals))
-            .unwrap_or_default();
-        let monitor_set: std::collections::HashSet<usize> =
-            feedback_side::monitor_hub_edge_indices(relations)
-                .into_iter()
-                .collect();
-        let mut to_reroute: std::collections::HashSet<usize> = feedback_edge_set
-            .iter()
-            .copied()
-            .filter(|ei| monitor_set.contains(ei))
-            .collect();
-        if !protected_trunks.is_empty() {
-            for &ei in &feedback_edge_set {
-                if monitor_set.contains(&ei) || ei >= edges.len() || edges[ei].path_is_empty() {
-                    continue;
-                }
-                let pts: Vec<Point> = edges[ei].path_points().into_owned();
-                if scoring::protected_trunk_crossing_penalty(&pts, &protected_trunks) > 0.0 {
-                    to_reroute.insert(ei);
-                }
-            }
-        }
-        if !to_reroute.is_empty() {
-            let rerouted = phase_reroute_feedback_after_trunk(
-                &to_reroute,
-                relations,
-                &result.nodes,
-                &endpoint_assignments,
-                &mut edges,
-                &mut grid,
-                &cfg,
-                &profile,
-                &group_ctx,
-                &obstacles,
-                &corridor_plan,
-                &parallel,
-                &protected_trunks,
-                &mut ortho_stats,
-                ovg.as_ref(),
-            );
-            crate::perf_log!(
-                "[perf]     s4_feedback_reroute: edges={} protected_trunks={}",
-                rerouted,
-                protected_trunks.len()
-            );
-        }
+    // Phase 2 红线：穿无关组硬修复（lane/semantic merge 之后）
+    let group_repaired = path_kernel::repair_group_interior_crossings(
+        &mut edges,
+        diagram,
+        &result.groups,
+        &group_ctx,
+        &obstacles.sorted_group_ids,
+        &mut grid,
+    );
+    if group_repaired > 0 {
+        crate::perf_log!(
+            "[perf]     phase2_group_interior_repair: repaired={}",
+            group_repaired
+        );
     }
 
     // C 末冻结旁路 Annotation（stub / 受保护 trunk / S3 merge），供 sanitize / 后续 D 验证
@@ -320,138 +277,8 @@ pub(super) fn route_edges_orthogonal_inner(
     );
     result.hints.route_annotations = Some(route_annotations.clone());
 
-    // ── 4g. 锯齿消毒 + X-0 间距统计 ──
-    // 写权契约：只读 from_side/to_side + route_annotations；写 edge.geometry（C段终版）。
-    phase_sanitize(
-        &mut edges,
-        relations,
-        &from_side,
-        &to_side,
-        &grid,
-        parallel_gap,
-        &mut ortho_stats,
-        Some(&route_annotations),
-        Some(&result.nodes),
-        Some(&obstacles.sorted_node_ids),
-    );
-
-    // S4.x：sanitize 的 ensure_outward_stub 曾会吃掉外环 U 形；在消毒后强制修复仍穿模的监控边
-    if s4_monitor_corridor {
-        let monitor_set: std::collections::HashSet<usize> =
-            feedback_side::monitor_hub_edge_indices(relations)
-                .into_iter()
-                .collect();
-        let mut s4_repaired = 0usize;
-        let mut s4_dirty = 0usize;
-        let mut s4_force_none = 0usize;
-        for &ei in &monitor_set {
-            if ei >= edges.len() || edges[ei].path_is_empty() {
-                continue;
-            }
-            let rel = &relations[ei];
-            let from_id = rel.from.as_str();
-            let to_id = rel.to.as_str();
-            let pts: Vec<Point> = edges[ei].path_points().into_owned();
-            if path_is_clean(
-                &pts,
-                from_id,
-                to_id,
-                &result.nodes,
-                &group_ctx,
-                &obstacles.sorted_node_ids,
-            ) {
-                continue;
-            }
-            s4_dirty += 1;
-            let ea = &endpoint_assignments[ei];
-            let Some(path) = path::force_outer_escape_path(
-                ea.from_anchor,
-                ea.to_anchor,
-                ea.from_port,
-                ea.to_port,
-                from_id,
-                to_id,
-                &result.nodes,
-                &group_ctx,
-                &obstacles,
-            ) else {
-                s4_force_none += 1;
-                continue;
-            };
-            grid.remove_by_edges(std::slice::from_ref(&ei));
-            grid.insert_path(&path, ei);
-            let labels =
-                build_parallel_aware_edge_labels(rel, ei, relations, &parallel.offsets, &path);
-            let mut edge = EdgeLayout {
-                geometry: PathGeometry::Polyline { points: Vec::new() },
-                labels,
-                from_port: ea.from_port,
-                to_port: ea.to_port,
-            };
-            // 写者归属（E6）：C 段 solver 产出→EdgeLayout 桥，freeze 前唯一正式落盘点。
-            edge.set_polyline_points(path);
-            edges[ei] = edge;
-            s4_repaired += 1;
-        }
-        crate::perf_log!(
-            "[perf]     s4_escape_repair: dirty={} repaired={} force_none={}",
-            s4_dirty,
-            s4_repaired,
-            s4_force_none
-        );
-        if s4_repaired > 0 {
-            // 几何已改：经同源生成器重生 Annotation，供 D 末激进 sanitize 校验
-            result.hints.route_annotations = Some(route_annotations_from_solution(
-                &edges,
-                &from_side,
-                &to_side,
-                merge_result.as_ref(),
-            ));
-        }
-    }
-
-    // B.2：监控外环已稳定后，仅在目标附近按端口侧做局部 trunk。
-    // 复用原路径前缀，避免把监控边重新拉回业务走廊；失败保持 S4 外环。
-    if s4_monitor_corridor && profile.semantic_merge {
-        let monitor_set: std::collections::HashSet<usize> =
-            feedback_side::monitor_hub_edge_indices(relations)
-                .into_iter()
-                .collect();
-        let local = semantic_trunk_merge::apply_monitor_local_trunk_merge(
-            &mut edges,
-            relations,
-            &from_side,
-            &to_side,
-            &result.nodes,
-            diagram.diagram_type.clone(),
-            &monitor_set,
-        );
-        if local.stats.edges_rewritten > 0 {
-            grid.remove_by_edges(&monitor_set.iter().copied().collect::<Vec<_>>());
-            for &ei in &monitor_set {
-                if ei < edges.len() && !edges[ei].path_is_empty() {
-                    grid.insert_path(edges[ei].path_points().as_ref(), ei);
-                }
-            }
-        }
-        if let Some(base) = merge_result.as_mut() {
-            base.stats.groups_considered += local.stats.groups_considered;
-            base.stats.groups_merged += local.stats.groups_merged;
-            base.stats.edges_rewritten += local.stats.edges_rewritten;
-            base.stats.degraded_groups += local.stats.degraded_groups;
-            base.merge_intervals.extend(local.merge_intervals);
-            base.degraded.extend(local.degraded);
-        } else {
-            merge_result = Some(local);
-        }
-        // 几何与 merge 声明均可能变化，经同源生成器重生最终 Annotation。
-        result.hints.route_annotations = Some(route_annotations_from_solution(
-            &edges,
-            &from_side,
-            &to_side,
-            merge_result.as_ref(),
-        ));
-    }
+    // ── 4g. X-0 间距统计（canonicalize 已迁至 D 段唯一写点，Phase 0 策略 B）──
+    phase_sanitize(&edges, &grid, parallel_gap, &mut ortho_stats);
 
     // S2-5：C 期末尾的 dock 收口已移除——D 段（pipeline）在 snap/sanitize 之后
     // 作为「最终写者」重做 dock_sep，C 末这次会被 D 的 snap/sanitize 抖回后覆盖，属纯冗余。
@@ -710,10 +537,6 @@ pub(crate) fn endpoint_bundling_key(
         arrow_type_tag(&rel.arrow),
         edge_line_style_signature(rel),
     )
-}
-
-pub(crate) fn range_overlap_local(a_min: f64, a_max: f64, b_min: f64, b_max: f64) -> f64 {
-    (a_max.min(b_max) - a_min.max(b_min)).max(0.0)
 }
 
 #[cfg(test)]

@@ -12,19 +12,12 @@
 
 use crate::layout::algorithm_config::{AlgorithmOptionSpec, OptionKind};
 use crate::layout::LayoutResult;
-use crate::types::DiagramType;
 use crate::ast::Diagram;
 
 // 子模块 / 测试经 `use super::*` 共享的类型与几何
 pub(super) use crate::layout::geometry::Point;
 pub(super) use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
-
-const APPLICABLE_TYPES: &[DiagramType] = &[
-    DiagramType::Flowchart,
-    DiagramType::Architecture,
-    DiagramType::State,
-    DiagramType::Er,
-];
+pub(super) use crate::types::DiagramType;
 
 pub(super) mod profile;
 pub(super) mod channel_load;
@@ -34,14 +27,15 @@ pub(super) mod feedback_side;
 pub(super) mod lane_assignment;
 pub(super) mod layer_order;
 pub(super) mod path;
+pub(super) mod path_kernel;
+pub(crate) use path_kernel::repair_group_interior_crossings;
+pub(super) mod path_legacy;
 pub(super) mod scoring;
 pub(super) mod simplify;
 pub(super) mod shape_boundary;
 pub(super) mod slot;
-pub(super) mod conflict_reroute;
 pub(super) mod contract;
 pub(super) mod sanitize;
-pub(super) mod straighten;
 pub(super) mod stub_occupancy;
 pub(super) mod semantic_trunk_merge;
 pub(super) mod draft;
@@ -50,23 +44,22 @@ pub(super) mod phases;
 pub(super) mod visibility_graph;
 pub(super) mod port_solver;
 pub(super) mod channel_planner;
-pub(super) mod resource_graph;
 pub(super) mod path_solver;
-pub mod crossing_reduction;
 
 // Re-exports for cross-submodule access via `use super::*;`
 pub(super) use profile::OrthoRoutingProfile;
 pub(super) use channel_load::{channel_load_penalty, corridor_overflow_penalty, ChannelLoadMap};
 pub(super) use context::{EndpointPair, PreparedObstacles, OrthoRoutingContext, SegmentGrid};
+pub(crate) use context::SegmentGrid as OrthoSegmentGrid;
 pub(super) use lane_assignment::{
     apply_corridor_planned_offsets, assign_lanes, separate_unrelated_trunk_overlaps,
 };
 pub(super) use path::{select_best_path_with_scorer_stats, PathSelectStats, RoutedSegment};
 #[allow(unused_imports)] // SpacingViolationKind/segments_violate_spacing/path_edge_spacing_violations used in X-1
-pub(super) use scoring::{CandidateScorer, DefaultScorer, GROUP_OBSTACLE_PAD, NODE_OBSTACLE_PAD, path_avoids_group_interiors, path_is_clean, path_is_clean_from_edges, path_length, SpacingViolationKind, segments_violate_spacing, path_edge_spacing_violations, count_all_edge_spacing_violations};
+pub(super) use scoring::{CandidateScorer, DefaultScorer, GROUP_OBSTACLE_PAD, NODE_OBSTACLE_PAD, path_is_clean_from_edges, path_length, SpacingViolationKind, segments_violate_spacing, path_edge_spacing_violations, count_all_edge_spacing_violations};
+/// Phase 1：供 `kernel::route::feasibility` 薄封装复用（生产调用点仍在本模块内）。
+pub(crate) use scoring::{path_avoids_group_interiors, path_is_clean};
 pub(super) use simplify::simplify_path;
-#[allow(unused_imports)] // used by tests via `use super::*;`
-pub(super) use simplify::is_collinear;
 #[allow(unused_imports)] // choose_pair_sides is used by tests
 pub(super) use slot::{
     choose_docking_strategy, choose_pair_sides, choose_pair_sides_with_group, is_vertical_port, slot_anchor, slot_fraction,
@@ -76,26 +69,21 @@ pub(super) use slot::{
 // 调用方经 `GeometryMaterializer::canonicalize_orthogonal_edges` 进入。
 pub use lane_assignment::{
     enforce_reverse_pair_dock_separation, enforce_reverse_pair_min_gap,
-    separate_unrelated_trunk_overlaps_post_route,
 };
 pub use stub_occupancy::{
     collect_stub_occupancy, estimate_layer_band_demands, find_stub_occupancy_conflicts,
     resolve_exact_stub_occupancy_post_route, resolve_stub_occupancy_conflicts, LayerBandDemand,
     StubOccupancyConflict, StubOccupancyRecord, StubOccupancyStats,
 };
-pub(super) use straighten::straighten_preferred_alignments;
 
-// run.rs 内被 conflict_reroute / straighten 等兄弟模块调用的共享辅助
+// run.rs 内被 path_solver 等兄弟模块调用的共享辅助
 pub(super) use run::{
-    endpoint_bundling_key, range_overlap_local, should_strict_group_transit,
-    validated_corridor_path,
+    endpoint_bundling_key, should_strict_group_transit, validated_corridor_path,
 };
 
 // run 总控各 phase 实现（A4 从 run.rs 拆出）；供总控调用
 pub(super) use phases::{
-    extract_protected_vertical_trunks, phase_lane, phase_layer_order,
-    phase_port_slot, phase_reroute_feedback_after_trunk,
-    phase_route_edges, phase_sanitize,
+    phase_lane, phase_layer_order, phase_port_slot, phase_route_edges, phase_sanitize,
 };
 
 /// 相邻磁吸点之间的理想间距（像素）；边长不足时自动压缩。
@@ -145,42 +133,13 @@ impl OrthoConfig {
     }
 }
 
-/// 正交边路由策略（构造时注入已解析的 option）。
-pub struct OrthogonalRouting {
-    config: OrthoConfig,
-}
-
-impl Default for OrthogonalRouting {
-    fn default() -> Self {
-        Self::from_options(&crate::layout::pipeline::plan::ResolvedAlgoOptions::from_spec_defaults(
-            ORTHOGONAL_OPTIONS,
-        ))
-    }
-}
-
-impl OrthogonalRouting {
-    pub fn from_options(options: &crate::layout::pipeline::plan::ResolvedAlgoOptions) -> Self {
-        Self {
-            config: OrthoConfig {
-                slot_pitch: options.get_or_default(&ORTHOGONAL_OPTIONS[0]),
-                channel_margin: options.get_or_default(&ORTHOGONAL_OPTIONS[1]),
-                routing: Default::default(),
-            },
-        }
-    }
-}
-
-// R10b: RoutingRecipeDyn impl 已删除——orthogonal 经 RecipeRouter<OrthogonalRecipe> 驱动。
-// OrthogonalRouting 保留为历史参考，不再参与 pipeline 调度。
+// R10b: RoutingRecipeDyn / OrthogonalRouting 已删除——orthogonal 经 RecipeRouter<OrthogonalRecipe> 驱动。
 
 /// 从节点边界向外延伸的短线段，避免一出线就折回节点内部
 pub(super) const PORT_CLEARANCE: f64 = 16.0;
 
 /// slot 在节点边上分布时保留的边界余量（占边长比例）
 pub(super) const SLOT_MARGIN_RATIO: f64 = 0.12;
-
-/// 路径穿过节点时的惩罚，确保候选路径优先绕开障碍物
-pub(super) const NODE_CROSSING_PENALTY: f64 = 10_000.0;
 
 /// 已路由边段重叠惩罚
 pub(super) const EDGE_OVERLAP_PENALTY: f64 = 1_200.0;
@@ -194,10 +153,6 @@ pub(super) use crate::layout::constants::STUB_GUARD_LENGTH;
 /// 每个折点的惩罚（鼓励更少拐弯）
 /// Phase A 优化：16→28，使 scorer 更强烈偏好少弯折路径。
 pub(super) const BEND_PENALTY: f64 = 28.0;
-
-/// 首段弯折额外惩罚：出发后第一段就折弯（首段长 < PORT_CLEARANCE*2）时的额外惩罚。
-/// 视觉上“出发即折”最刺眼，额外加重。
-pub(super) const FIRST_BEND_EXTRA_PENALTY: f64 = 20.0;
 
 /// 侧通道距障碍节点的最小留白（即便被分组边框挤压也要保留）
 pub(super) const MIN_CHANNEL_CLEARANCE: f64 = 10.0;

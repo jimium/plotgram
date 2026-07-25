@@ -129,39 +129,6 @@ pub(in crate::layout) fn assign_coordinates_brandes_koepf(
 }
 
 
-
-
-
-
-
-
-
-
-
-fn axis_center(layout: &crate::layout::NodeLayout, horizontal: bool) -> f64 {
-    if horizontal {
-        layout.y + layout.height / 2.0
-    } else {
-        layout.x + layout.width / 2.0
-    }
-}
-
-fn axis_size(layout: &crate::layout::NodeLayout, horizontal: bool) -> f64 {
-    if horizontal {
-        layout.height
-    } else {
-        layout.width
-    }
-}
-
-fn set_axis_center(layout: &mut crate::layout::NodeLayout, horizontal: bool, center: f64, size: f64) {
-    if horizontal {
-        layout.y = center - size / 2.0;
-    } else {
-        layout.x = center - size / 2.0;
-    }
-}
-
 pub(super) fn assign_layer_centers_brandes_koepf(
     dag: &DiGraph<LayerNode, ()>,
     layers: &[Vec<NodeIndex>],
