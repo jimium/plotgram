@@ -185,7 +185,7 @@ impl RoutingRecipe for OrganicRecipe {
         };
         let (node_id_to_idx, obstacle_index): (HashMap<&str, usize>, Option<ObstacleIndex>) =
             if need_obstacle_index {
-                let (idx, obs) = build_obstacle_context(result);
+                let (idx, obs, _) = build_obstacle_context(result);
                 (idx, Some(obs))
             } else {
                 (HashMap::new(), None)

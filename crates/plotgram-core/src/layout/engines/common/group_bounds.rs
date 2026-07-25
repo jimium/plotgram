@@ -163,27 +163,38 @@ fn resolve_padding(
     merged
 }
 
-/// 计算分组的包围框
+/// 计算分组的包围框（计 1 次 `materialize` 写权）。
 pub fn compute_group_bounds(
     diagram: &Diagram,
     nodes: &HashMap<String, NodeLayout>,
     leaf_padding: GroupPadding,
 ) -> HashMap<String, GroupLayout> {
-    let groups = compute_group_bounds_inner(
+    let groups = compute_group_bounds_unrecorded(
         diagram,
         nodes,
         leaf_padding,
         container_padding(leaf_padding),
         None,
     );
-    // G3：空表不计写权（intra sugiyama 子图无 groups 时仍会调用本函数）。
+    // 空表不计写权（intra sugiyama 子图无 groups 时仍会调用本函数）。
     if !groups.is_empty() {
-        crate::layout::group::write_counter::record_group_write_at("compute_group_bounds");
+        crate::layout::group::write_counter::record_group_write_at("materialize");
     }
     groups
 }
 
-/// 与 [`compute_group_bounds`] 相同，但叠加 EGB 产出的逐组 `side_gutters`。
+/// 与 [`compute_group_bounds`] 相同但不记账（供会话内 seed→gutters→最终物化）。
+pub fn compute_group_bounds_unrecorded(
+    diagram: &Diagram,
+    nodes: &HashMap<String, NodeLayout>,
+    leaf_padding: GroupPadding,
+    container_pad: GroupPadding,
+    side_gutters: Option<&BTreeMap<String, SideGutter>>,
+) -> HashMap<String, GroupLayout> {
+    compute_group_bounds_inner(diagram, nodes, leaf_padding, container_pad, side_gutters)
+}
+
+/// 与 [`compute_group_bounds`] 相同，但叠加 EGB 产出的逐组 `side_gutters`（计 1 次写权）。
 pub fn compute_group_bounds_with_side_gutters(
     diagram: &Diagram,
     nodes: &HashMap<String, NodeLayout>,
@@ -191,16 +202,16 @@ pub fn compute_group_bounds_with_side_gutters(
     container_pad: GroupPadding,
     side_gutters: Option<&BTreeMap<String, SideGutter>>,
 ) -> HashMap<String, GroupLayout> {
-    let groups = compute_group_bounds_inner(
+    let groups = compute_group_bounds_unrecorded(
         diagram,
         nodes,
         leaf_padding,
         container_pad,
         side_gutters,
     );
-    crate::layout::group::write_counter::record_group_write_at(
-        "compute_group_bounds_with_side_gutters",
-    );
+    if !groups.is_empty() {
+        crate::layout::group::write_counter::record_group_write_at("materialize");
+    }
     groups
 }
 

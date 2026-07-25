@@ -4,10 +4,10 @@
 
 use super::*;
 
-/// Phase D：节点落定后，由 [`LayoutSession`] 单次物化组框（朴素容器）。
+/// Phase D：节点落定后，单次物化组框（朴素容器 + RouteDemand side_gutters）。
 ///
 /// G3：删除 EGB merge/equalize、sibling→expand→shrink、`apply_group_frame`。
-/// `side_gutters` 仍估计并写入 hints（供路由 / PRS），**不**回写组几何。
+/// 工程收口：corridor gutters 在同一次 `materialize` 写入组几何。
 pub(super) fn phase_d_postprocess(
     diagram: &Diagram,
     nodes: &mut HashMap<String, NodeLayout>,
@@ -28,22 +28,20 @@ pub(super) fn phase_d_postprocess(
     let _ = (&facts, graph, group_map, sizes, reversed_edges, sizing);
     clamp_to_canvas(nodes, sizes);
 
-    // G3：compose 产出的 provisional groups 作废；会话单次物化为唯一写者。
+    // compose provisional 作废；seed → gutters → 单次 materialize。
     let _ = std::mem::take(groups);
     let t_egb = crate::layout::perf::Instant::now();
-    let solution = crate::layout::kernel::coordinate::session::LayoutSession::new(
+    let seed = crate::layout::engines::common::group_bounds::compute_group_bounds_unrecorded(
         diagram,
         nodes,
         bounds_padding,
-    )
-    .with_sibling_gap(GROUP_GAP_X)
-    .materialize_plain();
-    *groups = solution.groups.into_map();
-    let mut side_gutters = estimate_side_gutters_with_hierarchy(diagram, nodes, groups);
-    // G4：走廊 RouteDemand 抬 sibling 间隙记账进 gutters（不另写 groups）
+        crate::layout::engines::common::group_bounds::container_padding_for_leaf(bounds_padding),
+        None,
+    );
+    let mut side_gutters = estimate_side_gutters_with_hierarchy(diagram, nodes, &seed);
     {
         let corridor_model =
-            crate::layout::demand::compute_corridor_model_from_groups(diagram, groups);
+            crate::layout::demand::compute_corridor_model_from_groups(diagram, &seed);
         let pair_gaps =
             crate::layout::kernel::coordinate::group_ir::pair_gaps_from_corridor_demands(
                 &corridor_model.demands,
@@ -55,8 +53,6 @@ pub(super) fn phase_d_postprocess(
             if half <= 0.0 {
                 continue;
             }
-            // 把额外走廊需求均摊到两侧 right/left（竖邻）或 bottom/top（横邻）——
-            // 无轴信息时两侧都抬一点，供路由容量消费。
             for gid in [a.as_str(), b.as_str()] {
                 let g = side_gutters.entry(gid.to_string()).or_default();
                 g.left = g.left.max(half);
@@ -66,6 +62,13 @@ pub(super) fn phase_d_postprocess(
             }
         }
     }
+    *groups = crate::layout::engines::common::group_bounds::compute_group_bounds_with_side_gutters(
+        diagram,
+        nodes,
+        bounds_padding,
+        crate::layout::engines::common::group_bounds::container_padding_for_leaf(bounds_padding),
+        Some(&side_gutters),
+    );
     let egb_ms = t_egb.elapsed().as_secs_f64() * 1000.0;
 
     let max_side_gutter = side_gutters

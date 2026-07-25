@@ -139,13 +139,10 @@ fn translate_all(result: &mut LayoutResult, dx: f64, dy: f64) {
         nl.y += dy;
     }
 
-    // 分组
-    if !result.groups.is_empty() {
-        crate::layout::group::write_counter::record_group_write_at("canvas_finalize_translate_groups");
-        for gl in result.groups.values_mut() {
-            gl.x += dx;
-            gl.y += dy;
-        }
+    // 分组：刚体平移并入 materialize 令牌，不另计写权（工程收口写权→1）。
+    for gl in result.groups.values_mut() {
+        gl.x += dx;
+        gl.y += dy;
     }
 
     // 边（路径 + 标签 + 引线）

@@ -318,11 +318,11 @@ impl RouteAuditor {
             if materialized.empty_reason(idx).is_some() {
                 continue;
             }
-            let pts: Vec<Point> = match geometry {
-                PathGeometry::Polyline { points } => points.clone(),
-                PathGeometry::Straight { start, end } => vec![*start, *end],
-                // 曲线族无正交/obstacle 约定（lint 另行采样）。
-                PathGeometry::Bezier { .. } => continue,
+            let (pts, is_curve): (Vec<Point>, bool) = match geometry {
+                PathGeometry::Polyline { points } => (points.clone(), false),
+                PathGeometry::Straight { start, end } => (vec![*start, *end], false),
+                // 曲线族：采样折线做穿节点/穿组硬审；跳过正交约定检查。
+                PathGeometry::Bezier { .. } => (geometry.sample(16), true),
             };
             if pts.len() < 2 {
                 continue;
@@ -332,7 +332,7 @@ impl RouteAuditor {
             // 已显式 degraded 的边（如 spline fallback）不重复报正交约定违规。
             let degraded = ann.is_some_and(|a| a.degraded.is_some());
 
-            if ctx.orthogonal_family && !degraded {
+            if ctx.orthogonal_family && !degraded && !is_curve {
                 Self::check_orthogonality(*id, &pts, &mut violations);
                 if let Some((from_id, to_id)) = endpoints {
                     Self::check_endpoint_boundary(*id, &pts, from_id, to_id, ctx, &mut violations);

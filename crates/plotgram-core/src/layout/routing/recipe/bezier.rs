@@ -148,7 +148,7 @@ impl RoutingRecipe for BezierRecipe {
         // 懒构建避障索引：快速预检无边可能穿障时跳过 O(n²) 构建。
         let (node_id_to_idx, obstacle_index): (HashMap<&str, usize>, Option<ObstacleIndex>) =
             if quick_check_need_obstacle_index(result, relations) {
-                let (idx, obs) = build_obstacle_context(result);
+                let (idx, obs, _) = build_obstacle_context(result);
                 (idx, Some(obs))
             } else {
                 (HashMap::new(), None)

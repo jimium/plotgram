@@ -29,7 +29,7 @@ fi
 item_count="$(
   rg -n '^\s*\("[A-Z_]+_PENALTY"' crates/plotgram-core/src/layout/routing/objectives.rs | wc -l | tr -d ' '
 )"
-MAX_ITEMS="${PENALTY_ITEM_MAX:-13}"
+MAX_ITEMS="${PENALTY_ITEM_MAX:-8}"
 if (( item_count > MAX_ITEMS )); then
   echo "FAIL: SOFT_RANKING item_count=${item_count} > ${MAX_ITEMS}"
   exit 1

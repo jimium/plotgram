@@ -26,8 +26,8 @@ use crate::layout::geometry::Point;
 use crate::layout::pipeline::plan::ResolvedAlgoOptions;
 use crate::layout::routing::common::edge_geometry::{compute_bezier_controls, label_t_for_diagram};
 use crate::layout::routing::common::routing_skeleton::{
-    build_obstacle_context, quick_check_need_obstacle_index, resolve_endpoints, EdgeEndpoints,
-    LabelOffset, RoutingContext,
+    build_obstacle_context, quick_check_need_obstacle_index, resolve_endpoints,
+    sorted_group_obstacle_ids, EdgeEndpoints, LabelOffset, RoutingContext,
 };
 use crate::layout::routing::common::self_loop::{
     self_loop_indices, solve_self_loop, SelfLoopStyle,
@@ -107,6 +107,9 @@ pub struct SplineDraft<'a> {
     edges: Vec<SplineEdgePlan>,
     node_id_to_idx: HashMap<&'a str, usize>,
     obstacle_index: Option<ObstacleIndex>,
+    /// group 障碍在 ObstacleIndex 中的起始下标；`group_ids[i]` ↔ `group_start + i`。
+    group_start: usize,
+    group_ids: Vec<String>,
     tension: f64,
 }
 
@@ -146,13 +149,17 @@ impl RoutingRecipe for SplineRecipe {
         let ctx = RoutingContext::new(diagram, result);
         let relations = &diagram.relations;
 
-        let (node_id_to_idx, obstacle_index): (HashMap<&str, usize>, Option<ObstacleIndex>) =
-            if quick_check_need_obstacle_index(result, relations) {
-                let (idx, obs) = build_obstacle_context(result);
-                (idx, Some(obs))
-            } else {
-                (HashMap::new(), None)
-            };
+        let (node_id_to_idx, obstacle_index, group_start): (
+            HashMap<&str, usize>,
+            Option<ObstacleIndex>,
+            usize,
+        ) = if quick_check_need_obstacle_index(result, relations) || !result.groups.is_empty() {
+            let (idx, obs, gs) = build_obstacle_context(result);
+            (idx, Some(obs), gs)
+        } else {
+            (HashMap::new(), None, 0)
+        };
+        let group_ids = sorted_group_obstacle_ids(result);
 
         let self_loop_idx = self_loop_indices(relations);
         let mut edges = Vec::with_capacity(relations.len());
@@ -178,6 +185,8 @@ impl RoutingRecipe for SplineRecipe {
             edges,
             node_id_to_idx,
             obstacle_index,
+            group_start,
+            group_ids,
             tension: self.config.tension,
         }
     }
@@ -228,8 +237,21 @@ impl RoutingRecipe for SplineRecipe {
                         .copied()
                         .unwrap_or(usize::MAX);
 
+                    let mut skip = vec![from_idx, to_idx];
+                    if !draft.group_ids.is_empty() {
+                        let maps =
+                            crate::layout::quality::lint::GroupInteriorMaps::new(draft.diagram);
+                        let from_rel = maps.related_groups(ep.from_id.as_str());
+                        let to_rel = maps.related_groups(ep.to_id.as_str());
+                        for (gi, gid) in draft.group_ids.iter().enumerate() {
+                            if from_rel.contains(gid.as_str()) || to_rel.contains(gid.as_str()) {
+                                skip.push(draft.group_start + gi);
+                            }
+                        }
+                    }
+
                     let detour_path = if let Some(ref obstacle_index) = draft.obstacle_index {
-                        obstacle_index.shortest_path(ep.start, ep.end, &[from_idx, to_idx])
+                        obstacle_index.shortest_path(ep.start, ep.end, &skip)
                     } else {
                         Vec::new()
                     };

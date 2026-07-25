@@ -682,10 +682,42 @@ fn mindmap_solver_optimize(
     horizontal: bool,
     config: MindmapLayoutConfig,
 ) {
-    use crate::layout::kernel::coordinate::model::*;
+    use crate::layout::kernel::coordinate::model::CoordinateProblem;
     use crate::layout::kernel::coordinate::optimizer::solve;
 
-    // 1. 按深度分层收集节点（BFS 保证顺序稳定）
+    let Some(contract) =
+        compile_mindmap_contract(root_id, children, sizes, centers, horizontal, config)
+    else {
+        return;
+    };
+    let problem = CoordinateProblem::from_contract(contract);
+    let result = solve(&problem);
+    for var in &problem.vars {
+        let new_main = result.coordinates[var.var_id];
+        if let Some(center) = centers.get_mut(&var.stable_id) {
+            if horizontal {
+                center.1 = new_main;
+            } else {
+                center.0 = new_main;
+            }
+        }
+    }
+}
+
+/// 将 mindmap 树形语义编译为 [`LayoutContract`]（objectives 不再内联拼 CoordinateProblem）。
+fn compile_mindmap_contract(
+    root_id: &str,
+    children: &HashMap<String, Vec<String>>,
+    sizes: &HashMap<String, (f64, f64)>,
+    centers: &HashMap<String, (f64, f64)>,
+    horizontal: bool,
+    config: MindmapLayoutConfig,
+) -> Option<crate::layout::kernel::coordinate::layout_contract::LayoutContract> {
+    use crate::layout::kernel::coordinate::layout_contract::{
+        ContractLayer, ContractRankNode, LayoutContract,
+    };
+    use crate::layout::kernel::coordinate::model::*;
+
     let mut layers: Vec<Vec<String>> = Vec::new();
     let mut queue = std::collections::VecDeque::new();
     queue.push_back((root_id.to_string(), 0usize));
@@ -701,69 +733,54 @@ fn mindmap_solver_optimize(
         }
     }
 
-    // 层内节点数太少时跳过（无优化空间）
     let total_nodes: usize = layers.iter().map(|l| l.len()).sum();
     if total_nodes < 3 {
-        return;
+        return None;
     }
 
-    // 2. 构建 CoordinateProblem
-    let mut vars: Vec<NodeVariable> = Vec::new();
+    let mut contract_layers: Vec<ContractLayer> = Vec::new();
     let mut node_to_var: HashMap<String, VarId> = HashMap::new();
-    let mut layer_constraints: Vec<LayerConstraintSet> = Vec::new();
-    let mut initial_values: Vec<f64> = Vec::new();
+    let mut var_counter = 0usize;
+    let mut initial_by_var: Vec<f64> = Vec::new();
 
     for (rank, layer) in layers.iter().enumerate() {
-        let mut layer_vars: Vec<VarId> = Vec::new();
-        let mut separations: Vec<f64> = Vec::new();
-
+        let mut nodes = Vec::new();
+        let mut adjacent_gaps = Vec::new();
         for (order, node_id) in layer.iter().enumerate() {
-            let var_id = vars.len();
             let (w, h) = sizes.get(node_id).copied().unwrap_or((150.0, 48.0));
             let axis_size = if horizontal { h } else { w };
-
-            // 主轴坐标：horizontal 时为 y，否则为 x
             let main_axis = centers
                 .get(node_id)
                 .map(|(cx, cy)| if horizontal { *cy } else { *cx })
                 .unwrap_or(0.0);
-
-            vars.push(NodeVariable {
-                var_id,
+            node_to_var.insert(node_id.clone(), var_counter);
+            initial_by_var.push(main_axis);
+            var_counter += 1;
+            nodes.push(ContractRankNode {
                 stable_id: node_id.clone(),
-                kind: VarKind::Real,
-                rank,
-                order,
                 axis_size,
-                movable: true,
+                initial_center: main_axis,
+                kind: VarKind::Real,
             });
-            initial_values.push(main_axis);
-            node_to_var.insert(node_id.clone(), var_id);
-            layer_vars.push(var_id);
-
             if order > 0 {
-                let prev_id = &layer[order - 1];
-                let prev_size = sizes
-                    .get(prev_id)
-                    .map(|(w, h)| if horizontal { *h } else { *w })
-                    .unwrap_or(if horizontal { 48.0 } else { 150.0 });
-                let sep = prev_size / 2.0 + config.branch_gap + axis_size / 2.0;
-                separations.push(sep);
+                adjacent_gaps.push(config.branch_gap);
             }
+            let _ = order;
         }
-
-        layer_constraints.push(LayerConstraintSet {
+        contract_layers.push(ContractLayer {
             rank,
-            vars: layer_vars,
-            separations,
+            nodes,
+            adjacent_gaps,
         });
     }
 
-    // 3. Objectives
     let mut objectives: Vec<ObjectiveTerm> = Vec::new();
-
-    // P3: 保持初值
-    for (var_id, &init) in initial_values.iter().enumerate() {
+    for (var_id, &init) in initial_by_var.iter().enumerate() {
+        let sid = node_to_var
+            .iter()
+            .find(|(_, &v)| v == var_id)
+            .map(|(k, _)| k.clone())
+            .unwrap_or_default();
         objectives.push(ObjectiveTerm {
             priority: ObjectivePriority::P3,
             coefficients: vec![(var_id, 1.0)],
@@ -771,13 +788,12 @@ fn mindmap_solver_optimize(
             weight: 1.0,
             source: ConstraintSource {
                 kind: ConstraintSourceKind::LayerOrder,
-                nodes: vec![vars[var_id].stable_id.clone()],
+                nodes: vec![sid],
                 note: "prefer initial position",
             },
         });
     }
 
-    // P1: 父居中到子节点质心
     for (node_id, kids) in children.iter() {
         if kids.is_empty() {
             continue;
@@ -810,29 +826,14 @@ fn mindmap_solver_optimize(
         });
     }
 
-    // G5：经 CoordinateProblem::build 门面；树形 objectives 仍由本 recipe 组装（记债：未并入 LayoutContract）。
-    let problem = CoordinateProblem::build(
-        vars,
-        layer_constraints,
-        vec![],
+    Some(LayoutContract {
+        layers: contract_layers,
+        hard_constraints: vec![],
         objectives,
-        InitialCoordinates { values: initial_values },
-        SolveAxis::Cross,
-    );
-
-    // 4. Solve + 回写
-    let result = solve(&problem);
-    for (node_id, &var_id) in &node_to_var {
-        let new_main = result.coordinates[var_id];
-        if let Some(center) = centers.get_mut(node_id) {
-            if horizontal {
-                center.1 = new_main;
-            } else {
-                center.0 = new_main;
-            }
-        }
-    }
+        axis: SolveAxis::Cross,
+    })
 }
+
 
 fn compute_level_max_sizes(
     root_id: &str,

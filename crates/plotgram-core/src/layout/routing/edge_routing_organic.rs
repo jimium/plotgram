@@ -170,7 +170,7 @@ pub fn route_edges_organic(
     };
 
     let (node_id_to_idx, obstacle_index) = if need_obstacle_index {
-        let (idx, obs) = crate::layout::routing::common::routing_skeleton::build_obstacle_context(&result);
+        let (idx, obs, _) = crate::layout::routing::common::routing_skeleton::build_obstacle_context(&result);
         (idx, Some(obs))
     } else {
         (HashMap::new(), None)

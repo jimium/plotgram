@@ -74,7 +74,7 @@ impl<'a> LayoutPipeline<'a> {
 
         if produces_edges {
             canvas_finalize::finalize_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
-            crate::layout::group::write_counter::warn_if_group_writes_excessive(2);
+            crate::layout::group::write_counter::warn_if_group_writes_excessive(1);
             return Ok(result);
         }
 
@@ -87,8 +87,8 @@ impl<'a> LayoutPipeline<'a> {
         );
 
         canvas_finalize::finalize_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
-        // G4：compute_bounds + canvas translate（≤2）；供 check-group-writes.sh。
-        crate::layout::group::write_counter::warn_if_group_writes_excessive(2);
+        // 写权→1：仅 materialize；canvas 刚体平移不计。
+        crate::layout::group::write_counter::warn_if_group_writes_excessive(1);
         Ok(result)
     }
 
@@ -155,12 +155,16 @@ impl<'a> LayoutPipeline<'a> {
 
         // Phase 5 / D4-6：删除 spacing_demand_probe 二次求解——间距走 layout builder / SpaceBudget。
 
-        // G4：orthosketch 只抬 side_gutters（不计 group 写权）；不再扩写 groups。
+        // orthosketch 抬 side_gutters；随后把 gutters 物化进 groups（仍属同一 materialize 令牌）。
         if gf_pass.arch_post_layout && !self.diagram.groups.is_empty() {
             let prs_grew = {
                 let mut shell = crate::layout::group::GroupShellMut::new(self.diagram, &mut result_v2);
                 shell.feedforward_orthosketch()
             };
+            crate::layout::post_route::shell_expand::commit_side_gutters_into_groups(
+                self.diagram,
+                &mut result_v2,
+            );
             crate::layout::recipes::architecture::post_layout::reassert_multi_client_hub_centroids(
                 self.diagram,
                 &mut result_v2,
@@ -181,7 +185,7 @@ impl<'a> LayoutPipeline<'a> {
             );
 
         let refine_config = refine::RefineConfig::default();
-        crate::layout::group::write_counter::warn_if_group_writes_excessive(2);
+        crate::layout::group::write_counter::warn_if_group_writes_excessive(1);
         // Slice A: FrozenNodeProduct 唯一冻结点——layout finalize 后捕获，
         // 覆盖 route + 全部后处理直到 canvas transform。
         let frozen =

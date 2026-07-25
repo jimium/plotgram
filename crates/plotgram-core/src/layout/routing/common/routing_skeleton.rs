@@ -45,10 +45,14 @@ impl<'a> RoutingContext<'a> {
 /// 构建穿障检测上下文:节点 id → 索引映射 + 障碍物索引。
 ///
 /// 统一 bezier / circular / organic / spline 四处逐字符相同的前置设置序列。
-/// 返回的 `HashMap<&str, usize>` 借用 `result.nodes` 的 key。
+/// 若 `result.groups` 非空，将组框矩形并入障碍（硬绕行）；端点相关组由调用方经
+/// `skip_obstacles` 豁免。
+///
+/// 返回的 `HashMap<&str, usize>` 借用 `result.nodes` 的 key；
+/// 第三项为 group 障碍起始索引（`nodes.len()`），供按边跳过相关组。
 pub fn build_obstacle_context<'a>(
     result: &'a LayoutResult,
-) -> (HashMap<&'a str, usize>, visibility::ObstacleIndex) {
+) -> (HashMap<&'a str, usize>, visibility::ObstacleIndex, usize) {
     // R7：按 node id 排序再建索引，保证障碍索引确定性。
     let mut sorted_ids: Vec<&'a str> = result.nodes.keys().map(|s| s.as_str()).collect();
     sorted_ids.sort_unstable();
@@ -62,8 +66,26 @@ pub fn build_obstacle_context<'a>(
         .enumerate()
         .map(|(i, id)| (*id, i))
         .collect();
-    let obstacle_index = visibility::ObstacleIndex::build(&node_list);
-    (node_id_to_idx, obstacle_index)
+    let group_start = node_list.len();
+    let mut group_ids: Vec<&str> = result.groups.keys().map(|s| s.as_str()).collect();
+    group_ids.sort_unstable();
+    let extra: Vec<crate::layout::geometry::Rect> = group_ids
+        .iter()
+        .filter_map(|gid| result.groups.get(*gid).map(crate::layout::geometry::Rect::from))
+        .collect();
+    let obstacle_index = if extra.is_empty() {
+        visibility::ObstacleIndex::build(&node_list)
+    } else {
+        visibility::ObstacleIndex::build_with_extra_rects(&node_list, &extra)
+    };
+    (node_id_to_idx, obstacle_index, group_start)
+}
+
+/// 按稳定序返回 group id 列表（与 `build_obstacle_context` 中 extra 顺序一致）。
+pub fn sorted_group_obstacle_ids(result: &LayoutResult) -> Vec<String> {
+    let mut ids: Vec<String> = result.groups.keys().cloned().collect();
+    ids.sort();
+    ids
 }
 
 /// 快速检测是否有任何边可能穿障（直线段 vs 节点 bbox 粗检）。

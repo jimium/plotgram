@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# G0/G4：group 写权棘轮——解析 CLI `[group_write] main=N`，断言 main ≤ THRESHOLD。
-# G4：cloud-native 目标 main≤2（compute_bounds + canvas_translate）；理想 1。
+# group 写权棘轮——解析 CLI `[group_write] main=N`，断言 main ≤ THRESHOLD。
+# 工程收口：cloud-native 目标 main≤1（单次 materialize；canvas 平移不计）。
 # 可用 GROUP_WRITE_THRESHOLD 覆盖。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-THRESHOLD="${GROUP_WRITE_THRESHOLD:-2}"
+THRESHOLD="${GROUP_WRITE_THRESHOLD:-1}"
 SAMPLE="${GROUP_WRITE_SAMPLE:-showcase/architecture/product.cloud-native.pgm}"
 
 if [[ ! -f "$SAMPLE" ]]; then

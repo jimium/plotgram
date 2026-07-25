@@ -241,7 +241,6 @@ pub fn recompute_group_bounds(
     layout: &mut LayoutResult,
     padding: GroupPadding,
 ) {
-    crate::layout::group::write_counter::record_group_write_at("recompute_group_bounds");
     let side_gutters = layout
         .hints
         .group_routing

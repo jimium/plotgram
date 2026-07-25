@@ -20,6 +20,7 @@ pub mod analysis;
 pub mod auditor;
 pub mod builder_common;
 pub mod group_ir;
+pub mod layout_contract;
 pub mod main_axis;
 pub mod model;
 pub mod optimizer;
@@ -40,6 +41,7 @@ pub mod builder {
         pair_gaps_from_cross_group_edge_loads, materialize_group_cross_bounds,
         materialize_group_main_bounds, refine_group_frames, refine_group_frames_cross,
     };
+    pub use super::layout_contract::{ContractLayer, ContractRankNode, LayoutContract};
     pub use super::main_axis::{layer_center_ys_from_tops, solve_main_axis_layer_tops};
     pub use super::model::CoordinateProblem;
     pub use super::session::{LayoutSession, LayoutSolution};

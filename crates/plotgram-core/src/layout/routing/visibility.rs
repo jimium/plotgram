@@ -100,6 +100,15 @@ impl Obstacle {
         }
     }
 
+    /// 从矩形创建障碍物（group 壳等；无关联节点，不可经 skip 豁免）。
+    pub fn from_rect(rect: Rect) -> Self {
+        let padding = constants::DEFAULT_NODE_MARGIN;
+        Self {
+            node_id: None,
+            rect: rect.expanded(padding),
+        }
+    }
+
     /// 提取四个角点
     pub fn corners(&self) -> [Point; 4] {
         [
@@ -150,7 +159,24 @@ impl ObstacleIndex {
             .iter()
             .map(|&(idx, nl)| Obstacle::from_node(idx, nl))
             .collect();
+        Self::from_obstacles(obstacles)
+    }
 
+    /// 节点障碍 + 额外矩形（通常为无关 group 内缩/膨胀壳）。
+    ///
+    /// `extra` 顺序稳定；其障碍索引为 `nodes.len() .. nodes.len()+extra.len()`。
+    pub fn build_with_extra_rects(nodes: &[(usize, &NodeLayout)], extra: &[Rect]) -> Self {
+        let mut obstacles: Vec<Obstacle> = nodes
+            .iter()
+            .map(|&(idx, nl)| Obstacle::from_node(idx, nl))
+            .collect();
+        for rect in extra {
+            obstacles.push(Obstacle::from_rect(*rect));
+        }
+        Self::from_obstacles(obstacles)
+    }
+
+    fn from_obstacles(obstacles: Vec<Obstacle>) -> Self {
         let grid = ObstacleGrid::build(&obstacles);
 
         let corners: Vec<(Point, usize)> = obstacles
@@ -167,14 +193,11 @@ impl ObstacleIndex {
                 let (pi, _) = corners[i];
                 let (pj, _) = corners[j];
                 let mut bl = Vec::new();
-                // 方案 4：用障碍物网格只检查 bbox 与该角点对段相交的障碍物，
-                // 将内层 O(N) 降为 O(k)。返回值已按索引升序去重，故 bl 顺序确定。
                 for oi in grid.query_segment(pi, pj) {
                     if segment_intersects_obstacle(&pi, &pj, &obstacles[oi]) {
                         bl.push(oi);
                     }
                 }
-                // 对称存储
                 blockers[i * num_corners + j] = bl.clone();
                 blockers[j * num_corners + i] = bl;
             }

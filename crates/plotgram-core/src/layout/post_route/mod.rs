@@ -9,6 +9,7 @@ pub(super) mod border_repulse;
 pub const MIN_PRESERVE_RATIO: f64 = 0.10;
 
 pub use shell_expand::{
-    feedforward_shell_from_orthosketch, post_route_shell_expand, route_shell_overflow_remaining,
+    commit_side_gutters_into_groups, feedforward_shell_from_orthosketch, post_route_shell_expand,
+    route_shell_overflow_remaining,
 };
 pub use border_repulse::{repulse_edges_only, snap_and_repulse_edges, snap_and_repulse_edges_with_guard};

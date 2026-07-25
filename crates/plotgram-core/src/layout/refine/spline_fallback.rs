@@ -110,21 +110,22 @@ pub(crate) fn reroute_edges_with_spline_ex(
             .unwrap_or(usize::MAX);
         let skip = [from_idx, to_idx];
 
-        // 正交原边、以及 architecture（默认正交路由）一律走 dogleg/外廊。
-        // 非正交原图（state/er/mindmap 等）原本走 spline/bezier 密采样降级（平滑曲线）；
-        // Tier D 删除密采样路径后改走 dogleg 会把平滑曲线替换为正交折线，对 ER/State 等
-        // 紧密成对样例引入大量共线严重度（tight_sev 退化）。保守策略：非正交原图
-        // **保留原边 + 显式 degraded 标注**，由后续 Coordinator E3 repair loop 审计
-        // 复用同一 degraded 字段做诊断。dogleg 仅用于正交原图（含 Architecture）。
+        // 正交原边、architecture，以及**穿组**边：走 dogleg（穿组硬修优先于曲线美学）。
         let original_is_orthogonal = routing_snapshot
             .edges
             .get(i)
             .is_some_and(|edge| is_orthogonal(&edge.path_points()));
+        let pierces_group = crate::layout::quality::lint::edge_index_crosses_group_interior(
+            diagram,
+            &routing_snapshot,
+            i,
+        );
         let use_orthogonal_fallback = original_is_orthogonal
-            || matches!(diagram.diagram_type, crate::types::DiagramType::Architecture);
+            || matches!(diagram.diagram_type, crate::types::DiagramType::Architecture)
+            || pierces_group;
 
         if !use_orthogonal_fallback {
-            // 非正交原图：spline/bezier 已删除，dogleg 会破坏平滑几何；保留原边 + degraded。
+            // 非正交原图且未穿组：保留原边 + degraded。
             mark_degraded(result, i, DEGRADED_REASON);
             continue;
         }

@@ -1,9 +1,10 @@
 //! Phase 4 / D4-1：group 几何写入可观测计数。
 //!
 //! 一次 layout run 中对 `layout.groups` 的**整表或批量改写 pass** 次数。
-//! 退出目标：正式 route 前主计数 = 1（PRS 窗口内写入另计 `prs_writes`）。
+//! 退出目标：主计数 = 1（`materialize`；canvas 刚体平移不另计；PRS 另计 `prs_writes`）。
 //!
-//! D4-1：凡改写 group 几何的生产函数均须 `record_group_write_at`；覆盖不全则仪表失真。
+//! D4-1：凡**重算/改写相对几何**的生产函数均须 `record_group_write_at`；
+//! 画布整体刚体平移属 materialize 令牌生命周期，不计第二次写。
 
 use std::cell::{Cell, RefCell};
 
@@ -64,7 +65,7 @@ fn sites_joined(prs: bool) -> String {
 
 /// 正式 route 前：始终打摘要；主计数 > threshold 时抬 WARN。
 ///
-/// Phase 6 / G4 棘轮：默认 threshold=2（compute_bounds + canvas；目标=1 记债）。
+/// 工程收口棘轮：默认 threshold=1（单次 materialize）。
 /// 设 `PLOTGRAM_STRICT_GROUP_WRITES=1` 时超阈 panic。
 pub fn warn_if_group_writes_excessive(threshold: u32) {
     let n = group_write_count();
@@ -80,7 +81,7 @@ pub fn warn_if_group_writes_excessive(threshold: u32) {
     );
     if n > threshold {
         crate::perf_log!(
-            "[warn] group_writes={} > threshold={} (Phase6 ratchet; target=1)",
+            "[warn] group_writes={} > threshold={} (materialize-only ratchet)",
             n,
             threshold
         );

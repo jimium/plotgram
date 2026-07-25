@@ -58,7 +58,7 @@ pub fn route_edges_bezier(
     // 构建障碍索引（用于穿障检测与退化绕行）
     // 4.2: 懒构建——快速预检无边可能穿障时跳过 O(n²) 构建
     let (node_id_to_idx, obstacle_index) = if crate::layout::routing::common::routing_skeleton::quick_check_need_obstacle_index(&result, relations) {
-        let (idx, obs) = crate::layout::routing::common::routing_skeleton::build_obstacle_context(&result);
+        let (idx, obs, _) = crate::layout::routing::common::routing_skeleton::build_obstacle_context(&result);
         (idx, Some(obs))
     } else {
         (HashMap::new(), None)

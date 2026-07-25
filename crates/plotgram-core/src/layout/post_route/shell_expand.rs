@@ -28,6 +28,31 @@ pub fn post_route_shell_expand(diagram: &Diagram, layout: &mut LayoutResult) -> 
     grew
 }
 
+/// 将当前 `side_gutters` 物化进 `layout.groups`（不另计写权）。
+///
+/// 供 feedforward 抬 gutter 后、`FrozenNodeProduct` 捕获前调用；属同一 materialize 令牌。
+pub fn commit_side_gutters_into_groups(diagram: &Diagram, layout: &mut LayoutResult) {
+    if diagram.groups.is_empty() || layout.nodes.is_empty() {
+        return;
+    }
+    let Some(gr) = layout.hints.group_routing.as_ref() else {
+        return;
+    };
+    if gr.side_gutters.is_empty() {
+        return;
+    }
+    let pad = crate::layout::engines::common::group_bounds::GroupPadding::architecture();
+    let gutters = gr.side_gutters.clone();
+    layout.groups = crate::layout::engines::common::group_bounds::compute_group_bounds_unrecorded(
+        diagram,
+        &layout.nodes,
+        pad,
+        crate::layout::engines::common::group_bounds::container_padding_for_leaf(pad),
+        Some(&gutters),
+    )
+    .into();
+}
+
 /// G4：orthosketch 溢出 → 只抬 `side_gutters` hints，**不写** `layout.groups`。
 ///
 /// 用端点中心曼哈顿折线估计边对相关 group shell 的溢出。
@@ -90,7 +115,8 @@ pub fn route_shell_overflow_remaining(diagram: &Diagram, layout: &LayoutResult) 
             .get(gid)
             .map(|g| g.get_side(*side))
             .unwrap_or(0.0);
-        if raw_delta - reserved * 0.5 > EPS {
+        // groups 已与 gutters 同步物化后，按全额预留抵扣。
+        if raw_delta - reserved > EPS {
             return true;
         }
     }

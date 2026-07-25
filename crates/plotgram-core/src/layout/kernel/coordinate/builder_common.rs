@@ -1,7 +1,7 @@
 //! 共享 CoordinateProblem 构造辅助（Phase 4.C）。
 //!
-//! flat Sugiyama / architecture / intra 共用「按层建变量 + 相邻 MinSeparation」逻辑，
-//! 避免三处手写漂移。mindmap 差异大，暂留内联构造（记债）。
+//! flat Sugiyama / architecture / intra 共用「按层建变量 + 相邻 MinSeparation」逻辑。
+//! mindmap 经 `layout_contract::LayoutContract` 编译后走同一路径。
 
 use super::model::{LayerConstraintSet, NodeVariable, VarId, VarKind};
 
