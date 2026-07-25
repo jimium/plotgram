@@ -4,6 +4,7 @@
 
 ## 文档列表
 
+- [布局与路由架构（可视化）](./layout-routing-architecture.html) - 2026-07 现行分层 / 管线 / 写权与质量评估（HTML）
 - [整体架构](./overview.md) - Plotgram 系统的整体架构
 - [布局算法](./layout-algorithms.md) - 各图表类型的默认布局算法
 - [布局意图与增量约束](./layout-intent-refinement.md) - 自动布局之上的意图约束与微调设计
