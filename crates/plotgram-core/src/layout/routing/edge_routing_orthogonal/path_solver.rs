@@ -70,8 +70,6 @@ fn collect_spacing_conflicts(
 fn find_clean_reroute_path(
     from_ep: &Endpoint,
     to_ep: &Endpoint,
-    from_id: &str,
-    to_id: &str,
     cfg: &OrthoConfig,
     reroute_margins: &[f64],
     nodes: &HashMap<String, NodeLayout>,
@@ -99,14 +97,7 @@ fn find_clean_reroute_path(
             obstacles,
             Some(load_map),
         )
-        .with_strict_group_transit(should_strict_group_transit(
-            profile,
-            group_ctx,
-            from_id,
-            to_id,
-            false,
-            false,
-        ))
+        .with_strict_group_transit(should_strict_group_transit(false))
         .with_corridor_boost(boost)
         .with_prefer_outer_ring(false);
         if let Some(ovg_ref) = ovg {
@@ -262,7 +253,7 @@ fn global_score(edges: &[EdgeLayout], grid: &SegmentGrid, parallel_gap: f64) -> 
 pub(super) fn solve_paths(
     nodes: &HashMap<String, NodeLayout>,
     relations: &[crate::ast::Relation],
-    endpoint_assignments: &[EndpointAssignment],
+    endpoint_assignments: &mut [EndpointAssignment],
     paths: &mut Vec<RoutePath>,
     labels: &mut Vec<Vec<crate::layout::EdgeLabelLayout>>,
     grid: &mut SegmentGrid,
@@ -368,11 +359,9 @@ pub(super) fn solve_paths(
             grid.remove_by_edges(&[ei]);
             let old_points: Vec<Point> = paths[ei].points().to_vec();
 
-            let clean_path = find_clean_reroute_path(
+            let mut clean_path = find_clean_reroute_path(
                 &from_ep,
                 &to_ep,
-                from_id,
-                to_id,
                 cfg,
                 &reroute_margins,
                 nodes,
@@ -386,8 +375,67 @@ pub(super) fn solve_paths(
                 ovg_ref,
             );
 
+            // Phase 3 H4：同环内尝试端口候选（四向），再 LexA*。
+            let mut chosen_ports: Option<(Port, Port, Point, Point)> = None;
+            if clean_path.is_none() {
+                if let (Some(from_nl), Some(to_nl)) = (nodes.get(from_id), nodes.get(to_id)) {
+                    let ports = [
+                        Port::Top,
+                        Port::Right,
+                        Port::Bottom,
+                        Port::Left,
+                    ];
+                    let cur_fp = ea.from_port;
+                    let cur_tp = ea.to_port;
+                    // 确定性：端口序固定；当前端口已试过，跳过 (cur_fp, cur_tp)
+                    for &fp in &ports {
+                        for &tp in &ports {
+                            if fp == cur_fp && tp == cur_tp {
+                                continue;
+                            }
+                            let from_anchor = super::slot::slot_anchor(from_nl, fp, 0.5);
+                            let to_anchor = super::slot::slot_anchor(to_nl, tp, 0.5);
+                            let mut from_try = from_ep.clone();
+                            from_try.side = fp;
+                            from_try.anchor = from_anchor;
+                            let mut to_try = to_ep.clone();
+                            to_try.side = tp;
+                            to_try.anchor = to_anchor;
+                            if let Some(path) = find_clean_reroute_path(
+                                &from_try,
+                                &to_try,
+                                cfg,
+                                &reroute_margins,
+                                nodes,
+                                group_ctx,
+                                grid,
+                                profile,
+                                obstacles,
+                                &load_map,
+                                ortho_stats,
+                                parallel_gap,
+                                ovg_ref,
+                            ) {
+                                clean_path = Some(path);
+                                chosen_ports = Some((fp, tp, from_anchor, to_anchor));
+                                break;
+                            }
+                        }
+                        if clean_path.is_some() {
+                            break;
+                        }
+                    }
+                }
+            }
+
             match clean_path {
                 Some(path) => {
+                    if let Some((fp, tp, fa, ta)) = chosen_ports {
+                        endpoint_assignments[ei].from_port = fp;
+                        endpoint_assignments[ei].to_port = tp;
+                        endpoint_assignments[ei].from_anchor = fa;
+                        endpoint_assignments[ei].to_anchor = ta;
+                    }
                     labels[ei] = if path.len() >= 2 {
                         match relations.get(ei) {
                             Some(rel) => {

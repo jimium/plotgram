@@ -86,7 +86,7 @@ impl GroupRoutingContext {
             .map(|h| h.side_gutters.clone())
             .unwrap_or_default();
         Self {
-            groups: result.groups.clone(),
+            groups: result.groups.clone().into_map(),
             node_to_groups,
             border_shell_pad: profile.border_shell_pad,
             stub_clearance: profile.stub_clearance,
@@ -94,6 +94,32 @@ impl GroupRoutingContext {
             repulse_max_rounds: profile.repulse_max_rounds,
             corridors,
             side_gutters,
+            node_leaf_group: hierarchy.node_leaf_group,
+            sibling_sets: hierarchy.sibling_sets,
+            sibling_orientation: hierarchy.sibling_orientation,
+            group_ancestors: hierarchy.group_ancestors,
+        }
+    }
+
+    /// 仅 groups 表（phase_d 物化后、hints 完备前）。
+    pub fn from_groups(
+        diagram: &Diagram,
+        groups: &HashMap<String, GroupLayout>,
+        algo: &str,
+    ) -> Self {
+        let profile = GroupRoutingProfile::for_algo(algo);
+        let node_to_groups = build_node_to_groups(diagram);
+        let corridors = super::corridor::build_corridors_from_groups(groups);
+        let hierarchy = build_group_hierarchy(diagram, groups);
+        Self {
+            groups: groups.clone(),
+            node_to_groups,
+            border_shell_pad: profile.border_shell_pad,
+            stub_clearance: profile.stub_clearance,
+            corridor_misalignment_penalty: profile.corridor_misalignment_penalty,
+            repulse_max_rounds: profile.repulse_max_rounds,
+            corridors,
+            side_gutters: BTreeMap::new(),
             node_leaf_group: hierarchy.node_leaf_group,
             sibling_sets: hierarchy.sibling_sets,
             sibling_orientation: hierarchy.sibling_orientation,
@@ -285,7 +311,7 @@ mod tests {
         }]);
         let result = LayoutResult {
             nodes: HashMap::new(),
-            groups,
+            groups: groups.into(),
             edges: vec![],
             total_width: 0.0,
             total_height: 0.0,

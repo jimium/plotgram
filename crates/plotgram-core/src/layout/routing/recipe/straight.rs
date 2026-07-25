@@ -113,6 +113,7 @@ impl RoutingRecipe for StraightRecipe {
         RecipeSolution {
             solution,
             label_plans,
+            orthogonal_debug: None,
         }
     }
 }

@@ -86,7 +86,7 @@ pub fn make_diagram_with_layout(
 
     let result = LayoutResult {
         nodes,
-        groups: HashMap::new(),
+        groups: crate::layout::GroupTable::new(),
         edges: vec![],
         total_width: DEFAULT_CANVAS_WIDTH,
         total_height: DEFAULT_CANVAS_HEIGHT,
@@ -169,7 +169,7 @@ pub fn make_diagram_grid(rows: usize, cols: usize) -> (Diagram, LayoutResult) {
 
     let result = LayoutResult {
         nodes,
-        groups: HashMap::new(),
+        groups: crate::layout::GroupTable::new(),
         edges: vec![],
         total_width: DEFAULT_CANVAS_WIDTH,
         total_height: DEFAULT_CANVAS_HEIGHT,

@@ -10,8 +10,7 @@ use crate::layout::kernel::coordinate::model::{
 };
 use crate::layout::kernel::coordinate::optimizer::solve;
 use crate::layout::demand::space_budget::{
-    enforce_vertical_rank_gaps, node_group_scopes,
-    reverse_relation_pairs, SpaceBudget,
+    SpaceBudget,
 };
 use crate::layout::LayoutResult;
 
@@ -50,20 +49,11 @@ impl<'a> LayoutRouteFeedback<'a> {
         }
 
         if let Some(budget) = result.hints.space_budget.clone() {
-            // Phase B: 所有图类型使用 solver，节点已冻结，不再执行 enforce_horizontal_gaps
-            if let Some(ranks) = result.hints.sugiyama_ranks.as_ref() {
-                if budget.min_vertical_rank_gap.is_some() {
-                    let scopes = node_group_scopes(self.diagram);
-                    let reverse_pairs = reverse_relation_pairs(self.diagram);
-                    enforce_vertical_rank_gaps(
-                        &mut result.nodes,
-                        &budget,
-                        ranks,
-                        &scopes,
-                        &reverse_pairs,
-                    );
-                }
-            }
+            // Phase 5：竖向 rank 缝由 builder MinSeparation / Main 轴求解；不再 pre-route 推点。
+            let _ = (
+                budget.min_vertical_rank_gap,
+                result.hints.sugiyama_ranks.as_ref(),
+            );
             result.hints.space_budget = Some(budget);
         }
         PreRouteFeedback { result }
@@ -73,30 +63,11 @@ impl<'a> LayoutRouteFeedback<'a> {
 
 // ─── Slice A: SpacingDemandProbe ─────────────────────────────────────────────
 
-/// 预路由间距需求探测（Slice A）。
+/// 预路由间距需求探测（Phase 5 / D4-6：已掏空）。
 ///
-/// 在正式路由之前估计 routing 压力，若超阈值则重解坐标。
-/// 不生成 edge geometry——仅输出新坐标供调用方应用。
-///
-/// 返回 `Some(new_coordinates)` 表示有改善，`None` 表示无需调整。
-pub fn spacing_demand_probe(diagram: &Diagram, result: &LayoutResult) -> Option<Vec<f64>> {
-    let problem = result.hints.coordinate_problem.as_ref()?;
-
-    // 用当前节点坐标计算压力（edges 可能为空，PressureSnapshot 容忍）。
-    let pressure = PressureSnapshot::compute(diagram, result);
-    let current_coords: Vec<f64> = problem
-        .vars
-        .iter()
-        .map(|v| {
-            result
-                .nodes
-                .get(&v.stable_id)
-                .map(|n| n.x + n.width / 2.0)
-                .unwrap_or(v.axis_size / 2.0)
-        })
-        .collect();
-
-    route_feedback_resolve(problem, &pressure, &current_coords, 2)
+/// RouteDemand 已前馈进 layout builder；禁止 route 前二次 `optimizer::solve`。
+pub fn spacing_demand_probe(_diagram: &Diagram, _result: &LayoutResult) -> Option<Vec<f64>> {
+    None
 }
 
 // ─── Route feedback re-solve 内核 ────────────────────────────────────────────

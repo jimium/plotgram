@@ -278,7 +278,7 @@ impl LayoutRecipe for SequenceRecipe {
 
         LayoutResult {
             nodes,
-            groups,
+            groups: groups.into(),
             edges,
             total_width: solution.total_width,
             total_height,

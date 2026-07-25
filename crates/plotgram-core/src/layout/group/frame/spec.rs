@@ -47,6 +47,8 @@ pub struct GroupFrameSpec {
     pub border_align: BorderAlign,
     /// 像素量化（可与 L3 合并配置）
     pub quantize: QuantizeSpec,
+    /// Phase 5：architecture 配方标记（替代生产路径散落的 `algo == "architecture"`）。
+    pub architecture_recipe: bool,
 }
 
 /// 组间排列方式。
@@ -133,48 +135,23 @@ const FLOWCHART_GROUP_GAP: f64 = 48.0;
 
 /// 从 diagram 属性 + 算法名解析 [`GroupFrameSpec`]。
 ///
-/// # 算法默认值
+/// # G-pre（doc 31）
 ///
-/// | 算法 | arrangement | track_sizing | cross_align | gap | border_align |
-/// |------|-------------|--------------|-------------|-----|--------------|
-/// | `architecture` | `Stack(H)` | `Equal`（`group_frame { track: fit }` 可退回） | `Center` | 40.0 | `SharedLines` |
-/// | `flowchart` | `Stack(V)` | `Fit` | `Center` | 48.0 | `None` |
-/// | 其他含 group 算法 | `Stack(V)` | `Fit` | `Center` | 48.0 | `None` |
-///
-/// `quantize.enabled` 由 `snap` 属性 + 节点 snap 是否启用决定。
-///
-/// # `group_frame:` 配置块
-///
-/// 若 diagram 声明了 `group_frame: stack { … }`、`group_frame: matrix { … }`，
-/// 或以场景短名 `strips` / `fit` / `lanes` / `stages` / `tiles`（可带 `{ … }` 覆盖），
-/// 则以配置覆盖算法默认值；未声明的字段保留算法默认。
-/// 组间几何的唯一 DSL 入口；旧 `group_sizing` / `group_arrangement` 等已移除。
+/// **不再消费** `group_frame:` DSL。仅返回算法默认规格；architecture 默认已改为
+/// Fit + BorderAlign::None（朴素容器，无 Equal/SharedLines）。
 pub fn resolve_group_frame_spec(diagram: &Diagram, algo: &str) -> GroupFrameSpec {
-    // 优先消费 `group_frame:` 配置块（覆盖算法默认值）
-    if let Some(spec) = resolve_from_group_frame_config(diagram, algo) {
-        return spec;
-    }
     if algo == "architecture" {
         resolve_architecture(diagram)
     } else {
-        // flowchart / er / sugiyama-v2 等含 group 的算法走通用 stack 解析
         resolve_stack(diagram)
     }
 }
 
-/// 从 `group_frame: stack { ... }` / 场景短名解析 Spec，覆盖算法默认值。
+/// 从 `group_frame: stack { ... }` / 场景短名解析 Spec。
 ///
-/// 配置块选项：
-/// - `axis`: `"horizontal"` | `"vertical"`（stack 排列轴）
-/// - `gap`: number（组间间距）
-/// - `track`: `"fit"` | `"equal"` | `"uniform"`（track 尺寸策略）
-/// - `cross`: `"start"` | `"center"` | `"end"` | `"stretch"`（交叉轴对齐）
-/// - `border`: `"none"` | `"shared"` | `"shared_lines"`（边框共线策略）
-/// - `snap`: number（量化步长）或 boolean（开关）
-/// - `rows` / `cols`: matrix / `tiles` 网格尺寸
-///
-/// 场景短名（`strips` / `fit` / `lanes` / `stages` / `tiles`）先展开默认组合，
-/// 再用 `{ … }` 覆盖单项。返回 `None` 表示未声明 `group_frame`。
+/// G-pre：生产路径已停用；保留函数体供单测与后续删除前对照。
+/// 返回 `None` 表示未声明 `group_frame`。
+#[allow(dead_code)]
 fn resolve_from_group_frame_config(diagram: &Diagram, algo: &str) -> Option<GroupFrameSpec> {
     let attr = diagram
         .attributes
@@ -293,48 +270,14 @@ fn resolve_from_group_frame_config(diagram: &Diagram, algo: &str) -> Option<Grou
     Some(spec)
 }
 
-/// 是否由 DSL 显式声明了 Equal track 契约。
-///
-/// 与算法默认值分开：末尾重申 L1 尺寸只应作用于用户声明的契约，不能把默认
-/// architecture Equal 扩散为所有图的最终坐标重写。
-pub(crate) fn has_explicit_equal_track(diagram: &Diagram) -> bool {
-    let Some(attr) = diagram
-        .attributes
-        .iter()
-        .find(|attribute| attribute.key == dsl::GROUP_FRAME)
-    else {
-        return false;
-    };
-    if attr.span == crate::ast::Span::dummy() {
-        return false;
-    }
-    match &attr.value {
-        AttributeValue::Config { algo, options } => {
-            let preset_equal =
-                algo.eq_ignore_ascii_case(crate::types::attr_constants::group_frame_preset::STRIPS);
-            let option_equal = read_str_option(options, "track").is_some_and(|track| {
-                track.eq_ignore_ascii_case("equal") || track.eq_ignore_ascii_case("uniform")
-            });
-            preset_equal || option_equal
-        }
-        AttributeValue::String(value) => {
-            value.eq_ignore_ascii_case(crate::types::attr_constants::group_frame_preset::STRIPS)
-        }
-        _ => false,
-    }
+/// G-pre：`group_frame` DSL 已停消费；恒为 false（不再因显式 equal 重写坐标）。
+pub(crate) fn has_explicit_equal_track(_diagram: &Diagram) -> bool {
+    false
 }
 
-/// 是否由 DSL 显式声明了 `group_frame`（任意 arrangement/preset）。
-///
-/// 供 P1-6 flowchart aspect 自适应判断：仅当用户**未**显式声明时才自动
-/// 择优组间轴向，显式声明（如 `c.swimlane-order-process` 的 `axis: horizontal`）
-/// 一律尊重、不翻转。
-pub(crate) fn has_explicit_group_frame(diagram: &Diagram) -> bool {
-    diagram
-        .attributes
-        .iter()
-        .find(|attribute| attribute.key == dsl::GROUP_FRAME)
-        .is_some_and(|attr| attr.span != crate::ast::Span::dummy())
+/// G-pre：`group_frame` DSL 已停消费；恒为 false。
+pub(crate) fn has_explicit_group_frame(_diagram: &Diagram) -> bool {
+    false
 }
 
 fn parse_stack_axis(axis: &str) -> Axis {
@@ -411,21 +354,21 @@ fn read_num_option(options: &HashMap<String, AttributeValue>, key: &str) -> Opti
     }
 }
 
-/// architecture 默认：`Stack(H) + Equal + Center + SharedLines`（同级 sibling 条带）。
+/// architecture 默认：朴素容器 `Stack(H) + Fit + Center + None`（G-pre / doc 31）。
 ///
-/// 默认等宽条带；显式 `group_frame { track: fit }` 经配置块覆盖退回内容贴合；
-/// 显式 `track: equal|uniform` 仍由配置块覆盖回 Equal。
+/// 不再默认 Equal/SharedLines；结构美学留给未来语义 DSL。
 fn resolve_architecture(diagram: &Diagram) -> GroupFrameSpec {
     GroupFrameSpec {
         arrangement: GroupArrangement::Stack {
             axis: Axis::Horizontal,
         },
-        track_sizing: TrackSizing::Equal,
+        track_sizing: TrackSizing::Fit,
         cross_align: CrossAlign::Center,
         gap: ARCH_GROUP_GAP,
         padding: GroupPadding::architecture(),
-        border_align: BorderAlign::SharedLines,
+        border_align: BorderAlign::None,
         quantize: resolve_quantize(diagram),
+        architecture_recipe: true,
     }
 }
 
@@ -441,6 +384,7 @@ fn resolve_stack(diagram: &Diagram) -> GroupFrameSpec {
         padding: GroupPadding::uniform(SUGIYAMA_GROUP_PADDING, GROUP_LABEL_HEIGHT),
         border_align: BorderAlign::None,
         quantize: resolve_quantize(diagram),
+        architecture_recipe: false,
     }
 }
 

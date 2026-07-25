@@ -96,6 +96,7 @@ pub fn apply_group_frame(
     diagram: &Diagram,
     layout: &mut LayoutResult,
 ) -> GroupFrameReport {
+    crate::layout::group::write_counter::record_group_write_at("apply_group_frame");
     // 自顶向下收集 sibling sets：第一个为顶层（parent=None），后续为各 parent 的直接子 group
     let sibling_sets = collect_sibling_sets(diagram);
     let mut report = GroupFrameReport {

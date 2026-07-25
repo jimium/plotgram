@@ -509,7 +509,7 @@ mod tests {
         nodes.insert("d".to_string(), node(100.0, 500.0));
         let result = LayoutResult {
             nodes,
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![
                 straight_edge(10.0, 5.0, 100.0, 5.0),
                 straight_edge(10.0, 505.0, 100.0, 505.0),
@@ -598,7 +598,7 @@ mod tests {
         nodes.insert("d".to_string(), node(100.0, 20.0));
         let result = LayoutResult {
             nodes,
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![
                 straight_edge(10.0, 5.0, 100.0, 5.0),
                 straight_edge(10.0, 15.0, 100.0, 0.0),

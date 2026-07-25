@@ -3,29 +3,103 @@
 use super::*;
 use crate::layout::geometry::{Point, EPS};
 use crate::layout::group::GroupRoutingContext;
+use crate::layout::kernel::route::model::{LexCost, OrderedF64};
 use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
+use crate::layout::routing::objectives::CROSSING_PENALTY;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 
 pub const NODE_OBSTACLE_PAD: f64 = crate::layout::constants::DEFAULT_NODE_MARGIN;
 pub const GROUP_OBSTACLE_PAD: f64 = crate::layout::group::GROUP_BORDER_SHELL_PAD;
 const BBOX_EXPAND: f64 = 10.0;
-const CROSSING_PENALTY: f64 = 70.0;
 
 pub trait CandidateScorer {
+    /// 墨量层兼容分数（越小越好）；择优请用 [`Self::prefer`] / [`Self::lex_cost`]。
     fn score(&self, path: &[Point], ctx: &OrthoRoutingContext, pair: &EndpointPair) -> f64;
+
+    /// G6：词典序代价（硬残差 → 弯折 → 长度）。
+    fn lex_cost(&self, path: &[Point], ctx: &OrthoRoutingContext, pair: &EndpointPair) -> LexCost {
+        let _ = (ctx, pair);
+        let bends = path.len().saturating_sub(2) as u32;
+        LexCost {
+            q1_hard_residual: OrderedF64(0.0),
+            q3_bends: bends,
+            q4_length: OrderedF64(path_length(path)),
+            ..LexCost::default()
+        }
+    }
+
+    /// 词典序择优（默认实现）。
+    fn prefer(
+        &self,
+        a: &[Point],
+        b: &[Point],
+        ctx: &OrthoRoutingContext,
+        pair: &EndpointPair,
+    ) -> Ordering {
+        self.lex_cost(a, ctx, pair)
+            .cmp(&self.lex_cost(b, ctx, pair))
+    }
 }
 
-/// Legacy template scorer. LexAStar owns its own lexicographic cost model.
+/// Legacy template scorer. LexAStar owns its own lexicographic cost model;
+/// DefaultScorer 择优亦走 [`LexCost`]（`(hard_residual, bends, length)`）。
 pub struct DefaultScorer;
 impl CandidateScorer for DefaultScorer {
-    fn score(&self, path: &[Point], ctx: &OrthoRoutingContext, _pair: &EndpointPair) -> f64 {
+    fn score(&self, path: &[Point], ctx: &OrthoRoutingContext, pair: &EndpointPair) -> f64 {
+        // 对外兼容：返回墨量层（长度 + 软罚）；候选比较用 lex_cost / prefer。
+        let _ = pair;
         let w = ctx.profile.scoring;
         let bends = path.len().saturating_sub(2) as f64;
         let mut score = path_length(path) * w.path_length + bends * BEND_PENALTY * w.bend;
         score += edge_overlap_penalty(path, ctx.grid);
-        if !ctx.first_pass { score += crossing_penalty(path, ctx.grid) * w.crossing; }
+        if !ctx.first_pass {
+            score += crossing_penalty(path, ctx.grid) * w.crossing;
+        }
         score
     }
+
+    fn lex_cost(&self, path: &[Point], ctx: &OrthoRoutingContext, pair: &EndpointPair) -> LexCost {
+        let hard = hard_residual(path, pair, ctx);
+        let bends = path.len().saturating_sub(2) as u32;
+        let crossings = if ctx.first_pass {
+            0
+        } else {
+            (crossing_penalty(path, ctx.grid) / CROSSING_PENALTY.max(1.0)).round() as u32
+        };
+        LexCost {
+            q1_hard_residual: OrderedF64(hard),
+            q2_crossings: crossings,
+            q3_bends: bends,
+            q4_length: OrderedF64(path_length(path)),
+            ..LexCost::default()
+        }
+    }
+}
+
+/// 硬残差：穿节点 / 穿组计为 >0（降级解才允许）。
+fn hard_residual(path: &[Point], pair: &EndpointPair, ctx: &OrthoRoutingContext<'_>) -> f64 {
+    let mut r = 0.0;
+    if !path_is_clean(
+        path,
+        pair.from_id(),
+        pair.to_id(),
+        ctx.nodes,
+        ctx.group_ctx,
+        &ctx.obstacles.sorted_node_ids,
+    ) {
+        r += 1.0;
+    }
+    if !path_avoids_group_interiors(
+        path,
+        pair.from_id(),
+        pair.to_id(),
+        ctx.group_ctx,
+        &ctx.obstacles.sorted_group_ids,
+    ) {
+        r += 1.0;
+    }
+    r
 }
 
 pub fn path_length(path: &[Point]) -> f64 {

@@ -1,6 +1,4 @@
-//! 图种相关的正交路由策略预设。
-
-use crate::types::DiagramType;
+//! 正交路由策略预设（Phase 6：无 `DiagramType`——由图种无关标量/开关表达）。
 
 /// 路径打分权重倍率（相对 DefaultScorer 基准项）。
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -10,11 +8,11 @@ pub struct ScoringWeights {
     pub obstacle: f64,
     pub corridor_misalignment: f64,
     pub channel_load: f64,
-    /// P1-2: 通道对齐软约束权重（路径主段落在规划通道坐标上时奖励）
+    /// P1-2: 通道对齐软约束权重
     pub channel_alignment: f64,
-    /// P2-2: 交叉惩罚权重（候选路径与已路由边交叉时惩罚）
+    /// P2-2: 交叉惩罚权重
     pub crossing: f64,
-    /// A-2（契约③/Middle）：远离惩罚权重（段使到目标曼哈顿距离增大时按增量惩罚）
+    /// A-2：远离惩罚权重
     pub away: f64,
 }
 
@@ -33,74 +31,67 @@ impl Default for ScoringWeights {
     }
 }
 
-/// 图种相关的正交路由策略预设（不可变配置 + 阶段开关）。
+/// 正交路由策略预设（不可变配置 + 阶段开关）。
+///
+/// Phase 6：不再持有 `DiagramType`；architecture 族由 [`Self::architecture`] /
+/// `arch_family` 标量表达，由 recipe 在 ortho 边界外解析图种后注入。
 #[derive(Clone, Debug, PartialEq)]
 pub struct OrthoRoutingProfile {
-    pub diagram_type: DiagramType,
+    /// 是否 architecture 族预设（平行缝更大、语义合流、分离无关 trunk）。
+    pub arch_family: bool,
     /// 平行边最小间距
     pub parallel_gap: f64,
-    /// 是否启用走廊规划后 lane 偏移
-    pub corridor_lane_offsets: bool,
     /// 是否在 lane 阶段分离无关 trunk
     pub separate_unrelated_trunks: bool,
-    /// trunk 共享是否走语义门控（architecture = true）
+    /// trunk 共享是否走语义门控
     pub semantic_merge: bool,
     /// 打分权重倍率
     pub scoring: ScoringWeights,
-    /// 是否偏好 P1-1 trunk+fork 路径形态（flowchart fan-out）
+    /// 是否偏好 trunk+fork 路径形态
     pub prefer_trunk_fork: bool,
 }
 
 impl OrthoRoutingProfile {
-    /// 按图种选择预设；State / Er / Custom 继承 flowchart 默认。
-    pub fn for_diagram_type(diagram_type: DiagramType) -> Self {
-        match diagram_type {
-            DiagramType::Architecture => architecture_default_profile(),
-            _ => flowchart_default_profile(),
+    /// flowchart / 默认族。
+    pub fn flowchart() -> Self {
+        Self {
+            arch_family: false,
+            parallel_gap: crate::layout::constants::ORTHO_PARALLEL_GAP,
+            separate_unrelated_trunks: false,
+            semantic_merge: false,
+            scoring: ScoringWeights::default(),
+            prefer_trunk_fork: true,
         }
     }
 
-    /// 供 `edge_merge_policy::edges_may_share_trunk` 使用的等效图种门控。
-    pub fn merge_policy_diagram_type(&self) -> DiagramType {
-        if self.semantic_merge {
-            DiagramType::Architecture
+    /// architecture 族。
+    pub fn architecture() -> Self {
+        Self {
+            arch_family: true,
+            parallel_gap: crate::layout::constants::ORTHO_PARALLEL_GAP_ARCHITECTURE,
+            separate_unrelated_trunks: true,
+            semantic_merge: true,
+            scoring: ScoringWeights {
+                path_length: 1.0,
+                bend: 1.0,
+                obstacle: 1.5,
+                corridor_misalignment: 1.2,
+                channel_load: 1.0,
+                channel_alignment: 1.0,
+                crossing: 1.0,
+                away: 1.0,
+            },
+            prefer_trunk_fork: false,
+        }
+    }
+
+    /// 由 recipe/契约注入：ShareTrunk / arch 预设。
+    pub fn from_arch_family(arch_family: bool) -> Self {
+        if arch_family {
+            Self::architecture()
         } else {
-            DiagramType::Flowchart
+            Self::flowchart()
         }
-    }
-}
-
-fn flowchart_default_profile() -> OrthoRoutingProfile {
-    OrthoRoutingProfile {
-        diagram_type: DiagramType::Flowchart,
-        parallel_gap: crate::layout::constants::ORTHO_PARALLEL_GAP,
-        corridor_lane_offsets: false,
-        separate_unrelated_trunks: false,
-        semantic_merge: false,
-        scoring: ScoringWeights::default(),
-        prefer_trunk_fork: true,
-    }
-}
-
-fn architecture_default_profile() -> OrthoRoutingProfile {
-    OrthoRoutingProfile {
-        diagram_type: DiagramType::Architecture,
-        parallel_gap: crate::layout::constants::ORTHO_PARALLEL_GAP_ARCHITECTURE,
-        corridor_lane_offsets: true,
-        separate_unrelated_trunks: true,
-        semantic_merge: true,
-        // Iteration 2：提高障碍权重，强化穿组/擦边代价
-        scoring: ScoringWeights {
-            path_length: 1.0,
-            bend: 1.0,
-            obstacle: 1.5,
-            corridor_misalignment: 1.2,
-            channel_load: 1.0,
-            channel_alignment: 1.0,
-            crossing: 1.0,
-            away: 1.0,
-        },
-        prefer_trunk_fork: false,
     }
 }
 
@@ -111,33 +102,22 @@ mod tests {
 
     #[test]
     fn flowchart_profile_defaults() {
-        let p = OrthoRoutingProfile::for_diagram_type(DiagramType::Flowchart);
-        assert_eq!(p.diagram_type, DiagramType::Flowchart);
+        let p = OrthoRoutingProfile::flowchart();
+        assert!(!p.arch_family);
         assert!((p.parallel_gap - ORTHO_PARALLEL_GAP).abs() < f64::EPSILON);
         assert!(!p.semantic_merge);
-        assert!(!p.corridor_lane_offsets);
         assert!(!p.separate_unrelated_trunks);
         assert!(p.prefer_trunk_fork);
     }
 
     #[test]
     fn architecture_profile_defaults() {
-        let p = OrthoRoutingProfile::for_diagram_type(DiagramType::Architecture);
-        assert_eq!(p.diagram_type, DiagramType::Architecture);
+        let p = OrthoRoutingProfile::architecture();
+        assert!(p.arch_family);
         assert!((p.parallel_gap - ORTHO_PARALLEL_GAP_ARCHITECTURE).abs() < f64::EPSILON);
         assert!(p.parallel_gap > ORTHO_PARALLEL_GAP);
         assert!(p.semantic_merge);
-        assert!(p.corridor_lane_offsets);
         assert!(p.separate_unrelated_trunks);
         assert!(!p.prefer_trunk_fork);
-    }
-
-    #[test]
-    fn state_and_custom_use_flowchart_profile() {
-        let state = OrthoRoutingProfile::for_diagram_type(DiagramType::State);
-        let custom = OrthoRoutingProfile::for_diagram_type(DiagramType::Custom("x".into()));
-        let flow = OrthoRoutingProfile::for_diagram_type(DiagramType::Flowchart);
-        assert_eq!(state.semantic_merge, flow.semantic_merge);
-        assert_eq!(custom.prefer_trunk_fork, flow.prefer_trunk_fork);
     }
 }

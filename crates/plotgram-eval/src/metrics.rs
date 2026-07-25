@@ -1008,7 +1008,7 @@ mod tests {
                     },
                 ),
             ]),
-            groups: HashMap::new(),
+            groups: plotgram_core::layout::GroupTable::new(),
             edges: vec![EdgeLayout {
                 geometry: PathGeometry::Straight {
                     start: Point::new(100.0, 25.0),
@@ -1218,7 +1218,7 @@ mod tests {
     fn polyline_result(points: Vec<Point>) -> LayoutResult {
         LayoutResult {
             nodes: HashMap::new(),
-            groups: HashMap::new(),
+            groups: plotgram_core::layout::GroupTable::new(),
             edges: vec![EdgeLayout {
                 geometry: PathGeometry::Polyline { points },
                 labels: vec![],

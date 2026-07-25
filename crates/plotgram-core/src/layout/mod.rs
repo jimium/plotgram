@@ -87,7 +87,7 @@ pub use recipes::{
 
 // Re-exports from split modules (preserve external API)
 pub use types::{
-    NodeLayout, GroupLayout, Port, PathGeometry, EdgeLabelLayout, EdgeLayout,
+    NodeLayout, GroupLayout, GroupTable, Port, PathGeometry, EdgeLabelLayout, EdgeLayout,
     EdgeRoutingStyle, LayoutHints, GutterBudgetDebug, RefineDebugStats,
     OrthoDebugStats, GroupLayoutWarning, GroupLayoutWarningKind,
     LayoutResult, GroupContainmentViolation, ContainmentViolationKind,

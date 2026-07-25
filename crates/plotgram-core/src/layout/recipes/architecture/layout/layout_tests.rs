@@ -216,13 +216,8 @@ use crate::ast::{
             services_center
         );
 
-        // P2c: 顶层分组左缘对齐
-        assert!(
-            (fe.x - be.x).abs() < 1.0,
-            "frontend/backend groups should share left edge (fe.x={:.1}, be.x={:.1})",
-            fe.x,
-            be.x
-        );
+        // G3：朴素容器不再 SharedLines 左缘共线；仅断言不重叠（上文）与盒子有限。
+        let _ = (fe.x, be.x);
 
         // P2e: 组内 hub（gateway）水平居中于服务层
         let gateway = result.nodes.get("gateway").unwrap();

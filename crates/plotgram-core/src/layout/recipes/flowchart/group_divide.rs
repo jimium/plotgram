@@ -71,25 +71,9 @@ impl AlignMode {
     }
 }
 
-/// 从 `group_frame` 读取组间排列配置（与 L1 同一真源）。
-fn read_arrangement_config(diagram: &Diagram) -> (f64, AlignMode, ArrangementMode) {
-    let spec = crate::layout::group::frame::resolve_group_frame_spec(diagram, "flowchart");
-    let gap = if spec.gap > 0.0 {
-        spec.gap
-    } else {
-        48.0
-    };
-    let align = match spec.cross_align {
-        crate::layout::group::frame::CrossAlign::Start => AlignMode::Left,
-        _ => AlignMode::Center,
-    };
-    let mode = match spec.arrangement {
-        crate::layout::group::frame::GroupArrangement::Stack {
-            axis: crate::layout::group::frame::Axis::Horizontal,
-        } => ArrangementMode::Horizontal,
-        _ => ArrangementMode::Vertical,
-    };
-    (gap, align, mode)
+/// flowchart 组间排列硬默认（G-pre：不再读 `group_frame` DSL）。
+fn read_arrangement_config(_diagram: &Diagram) -> (f64, AlignMode, ArrangementMode) {
+    (48.0, AlignMode::Center, ArrangementMode::Vertical)
 }
 
 // ─── 组内布局策略 ─────────────────────────────────────────
@@ -682,7 +666,7 @@ pub fn divide_flowchart_with_groups(
 
     LayoutResult {
         nodes,
-        groups,
+        groups: groups.into(),
         edges: vec![],
         total_width,
         total_height,
@@ -1116,10 +1100,11 @@ mod tests {
             }],
             ..Default::default()
         };
+        // G-pre：DSL 忽略，硬默认 (48, Center, Vertical)
         let (gap, align, mode) = read_arrangement_config(&diagram);
-        assert_eq!(gap, 120.0);
-        assert_eq!(align, AlignMode::Left);
-        assert_eq!(mode, ArrangementMode::Horizontal);
+        assert_eq!(gap, 48.0);
+        assert_eq!(align, AlignMode::Center);
+        assert_eq!(mode, ArrangementMode::Vertical);
     }
 
     #[test]

@@ -18,12 +18,7 @@ pub(super) use super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
 pub(super) use super::layout::acyclic::is_effective_edge;
 pub(super) use super::layout::constants::PADDING;
 pub(super) use super::layout::constants::{
-    GROUP_GAP_X, GROUP_LABEL_HEIGHT, INTRA_LAYER_GAP, LAYER_GAP, NEIGHBOR_PULL_FACTOR, NODE_GAP,
-};
-pub(super) use super::layout::coordinate::{
-    enforce_horizontal_demand_gaps,
-    layer_centers_from_placed, pull_toward_neighbors, rebalance_infrastructure_layers,
-    resolve_x_overlaps, resolve_x_overlaps_with_gaps, uniform_initial_positions,
+    GROUP_GAP_X, GROUP_LABEL_HEIGHT, INTRA_LAYER_GAP, LAYER_GAP, NODE_GAP,
 };
 pub(super) use super::layout::order::{build_layers, order_layers_group_aware};
 pub(super) use super::layout::postprocess::clamp_to_canvas;
@@ -32,15 +27,11 @@ pub(super) use super::layout::types::{ArchDiagramFacts, GraphIndex, GroupMap};
 pub(super) use crate::ast::{Diagram, Group};
 pub(super) use crate::layout::algorithm_config::ArchitectureV2LayoutConfig;
 pub(super) use crate::layout::constants;
-pub(super) use crate::layout::group::constants::EPS;
 pub(super) use crate::layout::engines::common::divide_and_conquer::{GroupTree, IntraLayout};
 pub(super) use crate::layout::engines::common::edge_gutter::estimate_side_gutters_with_hierarchy;
-pub(super) use crate::layout::engines::common::group_bounds::{
-    compute_group_bounds, compute_group_bounds_with_side_gutters, container_padding_for_leaf,
-    GroupPadding, SideGutter,
-};
+pub(super) use crate::layout::engines::common::group_bounds::GroupPadding;
 pub(super) use crate::layout::{GroupLayout, LayoutResult, NodeLayout};
-pub(super) use std::collections::{BTreeMap, HashMap, HashSet};
+pub(super) use std::collections::{HashMap, HashSet};
 
 mod intra;
 mod intra_builder;
@@ -148,7 +139,7 @@ pub(super) fn compute_two_phase_layout(
     );
 
     let sizing = parse_group_sizing(diagram);
-    // Phase 1：two_phase 只输出 content-fit 初值；Equal/Uniform 仅由 L1 GroupFramePass 执行。
+    // G3：two_phase 只产出节点 + provisional contract；组框由 phase_d LayoutSession 物化。
 
     let block_row = position_macro_blocks(
         &mut blocks,
@@ -161,13 +152,12 @@ pub(super) fn compute_two_phase_layout(
         &group_decl,
     );
 
-    // ── Phase C: 回填全局坐标 ──
+    // ── Phase C: 回填全局节点坐标（provisional groups 仅供 nudge clamp，非最终框）──
     let (mut nodes, mut groups) = compose_global_layout(&blocks, &padding);
 
     // Phase C+: 两阶段 spacing 微调
     // 组框已定，对涉及跨组边的组内节点朝跨组边方向做小幅 x 微调，
     // 减少跨组边折弯。这是"先定组框再微调组内节点"的反转步骤。
-    // L1 Equal 在 pipeline 中拉齐；此处始终基于 content-fit 初值微调。
     nudge_intra_nodes_toward_cross_group_edges(
         &mut nodes,
         &groups,
@@ -177,7 +167,7 @@ pub(super) fn compute_two_phase_layout(
         reversed_edges,
     );
 
-    // ── Phase D: 后处理（基础设施行居中 + EGB + group_frame + space_budget + canvas）──
+    // ── Phase D: LayoutSession 单次物化组框 + hints / canvas ──
     phase_d_postprocess(
         diagram,
         &mut nodes,
@@ -478,48 +468,32 @@ mod tests {
     }
 
     #[test]
-    fn group_frame_track_uniform_maps_to_equal_policy() {
+    fn group_frame_track_dsl_ignored_stays_fit() {
         use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
         use crate::layout::group::frame::{resolve_group_frame_spec, TrackSizing};
 
-        let d = etl_diagram_with_track(Some("uniform"));
-        let spec = resolve_group_frame_spec(&d, "architecture");
-        assert_eq!(spec.track_sizing, TrackSizing::Equal);
-        assert_eq!(parse_group_sizing(&d), GroupSizingPolicy::Uniform);
-
-        let d_eq = etl_diagram_with_track(Some("equal"));
-        assert_eq!(
-            resolve_group_frame_spec(&d_eq, "architecture").track_sizing,
-            TrackSizing::Equal
-        );
-        assert_eq!(parse_group_sizing(&d_eq), GroupSizingPolicy::Uniform);
+        // G-pre：uniform/equal DSL 不再映射到 Equal；恒 Fit
+        for track in [Some("uniform"), Some("equal"), Some("fit"), None] {
+            let d = etl_diagram_with_track(track);
+            assert_eq!(
+                resolve_group_frame_spec(&d, "architecture").track_sizing,
+                TrackSizing::Fit
+            );
+            assert_eq!(parse_group_sizing(&d), GroupSizingPolicy::Fit);
+        }
     }
 
     #[test]
-    fn group_frame_track_fit_maps_to_fit_policy() {
-        use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
-        use crate::layout::group::frame::{resolve_group_frame_spec, TrackSizing};
-
-        let d = etl_diagram_with_track(Some("fit"));
-        assert_eq!(
-            resolve_group_frame_spec(&d, "architecture").track_sizing,
-            TrackSizing::Fit
-        );
-        assert_eq!(parse_group_sizing(&d), GroupSizingPolicy::Fit);
-    }
-
-    #[test]
-    fn architecture_default_track_is_equal() {
+    fn architecture_default_track_is_fit() {
         use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
         use crate::layout::group::frame::{resolve_group_frame_spec, TrackSizing};
 
         let d = etl_diagram_with_track(None);
         assert_eq!(
             resolve_group_frame_spec(&d, "architecture").track_sizing,
-            TrackSizing::Equal
+            TrackSizing::Fit
         );
-        // 无 group_frame 时 policy 默认 Uniform（与 L1 Equal 对齐）
-        assert_eq!(parse_group_sizing(&d), GroupSizingPolicy::Uniform);
+        assert_eq!(parse_group_sizing(&d), GroupSizingPolicy::Fit);
     }
 
     #[test]

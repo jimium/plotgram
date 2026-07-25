@@ -121,6 +121,14 @@ pub struct MergeIntent {
     pub edges: Vec<StableEdgeId>,
 }
 
+/// Phase 3：共享干线意图（Architecture FanIn/FanOut 美学契约）。
+///
+/// 由 profile / recipe 注入，**不**在 merge 实现里读 `DiagramType`。
+#[derive(Debug, Clone, Serialize)]
+pub struct ShareTrunkIntent {
+    pub edges: Vec<StableEdgeId>,
+}
+
 /// 标签策略。
 #[derive(Debug, Clone, Serialize)]
 pub struct LabelPolicy {
@@ -157,6 +165,8 @@ pub struct RoutingContract {
     pub corridors: Vec<CorridorResource>,
     pub side_gutters: Vec<SideGutterResource>,
     pub merge_intents: Vec<MergeIntent>,
+    /// Phase 3：ShareTrunk 契约（驱动 semantic_trunk_merge）。
+    pub share_trunk_intents: Vec<ShareTrunkIntent>,
     /// 逐边环成员，长度与边一致（Slice 1 全 `None`）。
     pub circle_membership: Vec<Option<CircleId>>,
     pub topology: RoutingTopologyMetadata,
@@ -213,6 +223,7 @@ impl RoutingContract {
             corridors: Vec::new(),
             side_gutters: Vec::new(),
             merge_intents: Vec::new(),
+            share_trunk_intents: Vec::new(),
             circle_membership: vec![None; n],
             topology: RoutingTopologyMetadata {
                 edge_count: n,
@@ -221,6 +232,47 @@ impl RoutingContract {
             },
             label_policy: LabelPolicy::default(),
         }
+    }
+
+    /// 为 feedback / monitor 边填实 `TransitIntent.prefer_periphery`。
+    ///
+    /// 调用方在得知布局拓扑角色后调用；不读 `DiagramType`。
+    pub fn fill_prefer_periphery(&mut self, periphery_edges: &[StableEdgeId]) {
+        let mut want: BTreeMap<usize, ()> = BTreeMap::new();
+        for id in periphery_edges {
+            want.insert(id.index(), ());
+            if let Some(set) = self.edge_roles.get_mut(id.index()) {
+                set.insert(EdgeRole::Feedback);
+            }
+        }
+        self.transit_intents.clear();
+        for (i, _) in self.edge_roles.iter().enumerate() {
+            if want.contains_key(&i) {
+                self.transit_intents.push(TransitIntent {
+                    edge: StableEdgeId(i),
+                    cross_group: false,
+                    prefer_periphery: true,
+                });
+            }
+        }
+    }
+
+    /// 边是否偏好外围（LexA* Q5）。
+    pub fn prefer_periphery(&self, id: StableEdgeId) -> bool {
+        self.transit_intents
+            .iter()
+            .any(|t| t.edge == id && t.prefer_periphery)
+    }
+
+    /// 注入 ShareTrunk 意图（语义合流）。
+    pub fn with_share_trunk(&mut self, edges: Vec<StableEdgeId>) {
+        if !edges.is_empty() {
+            self.share_trunk_intents.push(ShareTrunkIntent { edges });
+        }
+    }
+
+    pub fn has_share_trunk(&self) -> bool {
+        !self.share_trunk_intents.is_empty()
     }
 
     /// 边角色集合（越界返回空引用不便，故返回 Option）。

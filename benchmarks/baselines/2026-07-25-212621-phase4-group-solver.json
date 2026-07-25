@@ -1,0 +1,3275 @@
+{
+  "date": "2026-07-25-212621-phase4-group-solver",
+  "note": "role-aware baseline: product-gate hard; stress/demo quality soft",
+  "samples": [
+    {
+      "file": "showcase/architecture/product.three-tier.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 3,
+      "edges": 4,
+      "groups": 0,
+      "node_fp": "409c160929daf1ce",
+      "exact_sev": 76.63999999999999,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 1,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 0,
+          "avg_per_edge": 0.0,
+          "max_single_edge": 0,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 0,
+          "avg_deviation": 0.0,
+          "max_deviation": 0.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 1.0,
+          "max_ratio": 1.0
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.0,
+          "max_min_ratio": 1.0,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.22
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 0.53,
+      "min_ms": 0.49,
+      "max_ms": 0.72,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/architecture/product.typical-microservice-architecture.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 8,
+      "edges": 16,
+      "groups": 0,
+      "node_fp": "176213891ff45e41",
+      "exact_sev": 149.64999999999998,
+      "tight_sev": 3058.39371387916,
+      "allowed_share_len": 950.1433232415704,
+      "exact_pairs": 1,
+      "tight_pairs": 7,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 15,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 1,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 16,
+        "error_count": 0,
+        "warning_count": 16
+      },
+      "ortho": null,
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 38,
+          "avg_per_edge": 2.375,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 4,
+          "avg_deviation": 0.7801094455757587,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 17
+        },
+        "detour": {
+          "avg_ratio": 1.5114281077030085,
+          "max_ratio": 2.370402291751349
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.45963770634928597,
+          "max_min_ratio": 5.054833079010745,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 5,
+          "side_utilization_variance": 1.2
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.063,
+          "non_monotone_count": 1
+        }
+      },
+      "median_ms": 26.8,
+      "min_ms": 26.42,
+      "max_ms": 28.3,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/architecture/product.flat-rest-api.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 7,
+      "edges": 7,
+      "groups": 0,
+      "node_fp": "00629dd372736d64",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 1,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 1,
+        "error_count": 0,
+        "warning_count": 1
+      },
+      "ortho": null,
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 21,
+          "avg_per_edge": 3.0,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.5889534818017702,
+          "max_deviation": 0.9991005374288863
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 1
+        },
+        "detour": {
+          "avg_ratio": 1.5666997585605744,
+          "max_ratio": 2.583221753951007
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.2805175453776233,
+          "max_min_ratio": 3.4868972240176728,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.07
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.143,
+          "non_monotone_count": 1
+        }
+      },
+      "median_ms": 4.94,
+      "min_ms": 4.69,
+      "max_ms": 5.39,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/architecture/product.microservices.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 7,
+      "edges": 8,
+      "groups": 2,
+      "node_fp": "4bed9b918ea56b94",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 132.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 4,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 4,
+        "error_count": 0,
+        "warning_count": 4
+      },
+      "ortho": null,
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 20,
+          "avg_per_edge": 2.5,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 12.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.5625,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 4
+        },
+        "detour": {
+          "avg_ratio": 1.4101077616339304,
+          "max_ratio": 1.778710540914401
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.31320577034077374,
+          "max_min_ratio": 6.737798295454545,
+          "outlier_count": 1
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 1
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.22
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.125,
+          "non_monotone_count": 1
+        }
+      },
+      "median_ms": 16.12,
+      "min_ms": 15.61,
+      "max_ms": 16.17,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/architecture/product.cdn-cache.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 7,
+      "edges": 9,
+      "groups": 2,
+      "node_fp": "714875dc8e19f590",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 16.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 1,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 7.899999999999976,
+        "total_violations": 1,
+        "error_count": 1,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 25,
+          "avg_per_edge": 2.7777777777777777,
+          "max_single_edge": 5,
+          "excessive_count": 1
+        },
+        "border_proximity": {
+          "min_distance_px": 5.753571428571433,
+          "segments_within_12px": 2,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 3,
+          "avg_deviation": 1.0,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 1
+        },
+        "detour": {
+          "avg_ratio": 1.465107508851375,
+          "max_ratio": 2.5436018397578586
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.5325238001748299,
+          "max_min_ratio": 14.414940476190477,
+          "outlier_count": 1
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 1
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.11
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.125,
+          "non_monotone_count": 1
+        }
+      },
+      "median_ms": 29.77,
+      "min_ms": 28.88,
+      "max_ms": 30.39,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/architecture/product.cloud-native.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 12,
+      "edges": 14,
+      "groups": 6,
+      "node_fp": "4319e21a1b50148f",
+      "exact_sev": 90.0,
+      "tight_sev": 2767.214285714288,
+      "allowed_share_len": 158.0,
+      "exact_pairs": 1,
+      "tight_pairs": 4,
+      "lint": {
+        "node_overlap": 2,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 8,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 1,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 11,
+        "error_count": 2,
+        "warning_count": 9
+      },
+      "ortho": null,
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 34,
+          "avg_per_edge": 2.4285714285714284,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 6.0,
+          "segments_within_12px": 3,
+          "hugging_violations": 1
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.5817429646259349,
+          "max_deviation": 0.9128582954313732
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 9
+        },
+        "detour": {
+          "avg_ratio": 1.4135181593789097,
+          "max_ratio": 2.4803941710511066
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.4020376246181023,
+          "max_min_ratio": 23.125930059523807,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.125,
+          "max_channel_load": 1,
+          "unused_corridors": 7
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.22
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 211.14,
+      "min_ms": 203.31,
+      "max_ms": 229.89,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/architecture/product.ecommerce-platform.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 18,
+      "edges": 19,
+      "groups": 5,
+      "node_fp": "ff63bd007f7ae5fd",
+      "exact_sev": 0.0,
+      "tight_sev": 2488.617924312852,
+      "allowed_share_len": 196.50412432755525,
+      "exact_pairs": 0,
+      "tight_pairs": 2,
+      "lint": {
+        "node_overlap": 3,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 15,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 18,
+        "error_count": 3,
+        "warning_count": 15
+      },
+      "ortho": null,
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 54,
+          "avg_per_edge": 2.8421052631578947,
+          "max_single_edge": 6,
+          "excessive_count": 1
+        },
+        "border_proximity": {
+          "min_distance_px": 12.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.6795474938839094,
+          "max_deviation": 0.7243589743589743
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 16
+        },
+        "detour": {
+          "avg_ratio": 1.4715730348329437,
+          "max_ratio": 4.118990443801991
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.4436127713275131,
+          "max_min_ratio": 23.216666666666665,
+          "outlier_count": 1
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 7
+        },
+        "port_distribution": {
+          "max_same_side_edges": 3,
+          "side_utilization_variance": 0.4
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 354.05,
+      "min_ms": 351.87,
+      "max_ms": 360.19,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/architecture/product.message-queue-pipeline.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 7,
+      "edges": 7,
+      "groups": 4,
+      "node_fp": "cbfd352154d712df",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 132.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 1,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 1,
+        "error_count": 0,
+        "warning_count": 1
+      },
+      "ortho": null,
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 22,
+          "avg_per_edge": 3.142857142857143,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 12.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 1,
+          "avg_deviation": 0.5491823108186573,
+          "max_deviation": 0.5491823108186573
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 1
+        },
+        "detour": {
+          "avg_ratio": 1.3563568924327816,
+          "max_ratio": 1.6003355859746113
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.20251101362192075,
+          "max_min_ratio": 2.3266939573532106,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.16666666666666666,
+          "max_channel_load": 1,
+          "unused_corridors": 5
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.14
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 10.78,
+      "min_ms": 10.6,
+      "max_ms": 10.87,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/architecture/product.monitoring-stack.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 7,
+      "edges": 6,
+      "groups": 3,
+      "node_fp": "402d463a0750cff5",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 134.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 12,
+          "avg_per_edge": 2.0,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 12.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 1,
+          "avg_deviation": 0.27179218017231876,
+          "max_deviation": 0.27179218017231876
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 1.3173183691614267,
+          "max_ratio": 1.4038967984447046
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.3304719856651917,
+          "max_min_ratio": 2.3152404526166896,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 2
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.08
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 4.11,
+      "min_ms": 3.87,
+      "max_ms": 4.29,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/architecture/product.narrow-corridor.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 6,
+      "edges": 5,
+      "groups": 3,
+      "node_fp": "727efe912725995d",
+      "exact_sev": 0.0,
+      "tight_sev": 336.0,
+      "allowed_share_len": 274.08441180291175,
+      "exact_pairs": 0,
+      "tight_pairs": 2,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 1,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 1,
+        "error_count": 0,
+        "warning_count": 1
+      },
+      "ortho": null,
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 12,
+          "avg_per_edge": 2.4,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 14.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 1,
+          "avg_deviation": 1.0,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 1
+        },
+        "detour": {
+          "avg_ratio": 1.2661988246209412,
+          "max_ratio": 1.412258877869616
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.2417790150030429,
+          "max_min_ratio": 1.7707808564231735,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 3
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.24
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 3.68,
+      "min_ms": 3.41,
+      "max_ms": 3.81,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/flowchart/product.linear-chain.pgm",
+      "diagram_type": "Flowchart",
+      "nodes": 3,
+      "edges": 2,
+      "groups": 0,
+      "node_fp": "5f5d07b143320152",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 0,
+          "avg_per_edge": 0.0,
+          "max_single_edge": 0,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 0,
+          "avg_deviation": 0.0,
+          "max_deviation": 0.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 0.0,
+          "max_ratio": 0.0
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.0,
+          "max_min_ratio": 0.0,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 1,
+          "side_utilization_variance": 0.0
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 0.2,
+      "min_ms": 0.19,
+      "max_ms": 0.24,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/flowchart/product.user-auth.pgm",
+      "diagram_type": "Flowchart",
+      "nodes": 5,
+      "edges": 8,
+      "groups": 0,
+      "node_fp": "2ff500c15fd39af9",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 32.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 25,
+          "avg_per_edge": 3.125,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 1,
+          "avg_deviation": 1.6513469171658914e-06,
+          "max_deviation": 1.6513469171658914e-06
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 1.7874544761049795,
+          "max_ratio": 3.0061259301868635
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.19376953394188984,
+          "max_min_ratio": 3.2001097873421833,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 4,
+          "side_utilization_variance": 0.84
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.25,
+          "non_monotone_count": 2
+        }
+      },
+      "median_ms": 4.13,
+      "min_ms": 3.9,
+      "max_ms": 4.3,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/flowchart/product.refund-process.pgm",
+      "diagram_type": "Flowchart",
+      "nodes": 10,
+      "edges": 11,
+      "groups": 0,
+      "node_fp": "2cf7f7dcbfeb4e21",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 1,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 1,
+        "error_count": 0,
+        "warning_count": 1
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 23,
+          "avg_per_edge": 2.090909090909091,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.2963416737557438,
+          "max_deviation": 0.4846202087736891
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 1
+        },
+        "detour": {
+          "avg_ratio": 1.253412794705356,
+          "max_ratio": 1.5058080633543354
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.46291993968240336,
+          "max_min_ratio": 5.834814211831066,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.13
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 6.18,
+      "min_ms": 6.15,
+      "max_ms": 6.43,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/flowchart/product.swimlane-order-process.pgm",
+      "diagram_type": "Flowchart",
+      "nodes": 8,
+      "edges": 7,
+      "groups": 4,
+      "node_fp": "d76d07c0c2032381",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 1,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 1,
+        "error_count": 0,
+        "warning_count": 1
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 10,
+          "avg_per_edge": 1.4285714285714286,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 12.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 0,
+          "avg_deviation": 0.0,
+          "max_deviation": 0.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 1.3736206391053234,
+          "max_ratio": 1.403298161568652
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.0,
+          "max_min_ratio": 4.32,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.3333333333333333,
+          "max_channel_load": 1,
+          "unused_corridors": 4
+        },
+        "port_distribution": {
+          "max_same_side_edges": 1,
+          "side_utilization_variance": 0.0
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.25,
+          "non_monotone_count": 1
+        }
+      },
+      "median_ms": 3.89,
+      "min_ms": 3.81,
+      "max_ms": 4.0,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/flowchart/product.password-reset.pgm",
+      "diagram_type": "Flowchart",
+      "nodes": 10,
+      "edges": 11,
+      "groups": 0,
+      "node_fp": "5f551d70df89e12e",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 33,
+          "avg_per_edge": 3.0,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 1,
+          "avg_deviation": 0.16222148976513992,
+          "max_deviation": 0.16222148976513992
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 1.560599654200034,
+          "max_ratio": 3.1457724996627405
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.44371685485970486,
+          "max_min_ratio": 5.416256056812068,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.09
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 6.17,
+      "min_ms": 5.88,
+      "max_ms": 6.44,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/flowchart/product.leave-approval-process.pgm",
+      "diagram_type": "Flowchart",
+      "nodes": 10,
+      "edges": 11,
+      "groups": 0,
+      "node_fp": "de694443efab34f2",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 1,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 1,
+        "error_count": 0,
+        "warning_count": 1
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 26,
+          "avg_per_edge": 2.3636363636363638,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.7813341878901686,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 1
+        },
+        "detour": {
+          "avg_ratio": 1.3401276656751122,
+          "max_ratio": 1.526383787892697
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.24608492319727482,
+          "max_min_ratio": 4.0474432491583086,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.13
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 6.11,
+      "min_ms": 5.95,
+      "max_ms": 6.33,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/flowchart/product.self-loop-retry.pgm",
+      "diagram_type": "Flowchart",
+      "nodes": 7,
+      "edges": 8,
+      "groups": 0,
+      "node_fp": "9b057fac6aa8ba4b",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 16,
+          "avg_per_edge": 2.0,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 1,
+          "avg_deviation": 0.7777777416774843,
+          "max_deviation": 0.7777777416774843
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 1.8106817707855427,
+          "max_ratio": 3.247431625874177
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.5209733492968583,
+          "max_min_ratio": 4.043668553667351,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.12
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 1.9,
+      "min_ms": 1.82,
+      "max_ms": 2.1,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/flowchart/product.symmetric-fanout.pgm",
+      "diagram_type": "Flowchart",
+      "nodes": 6,
+      "edges": 7,
+      "groups": 0,
+      "node_fp": "e619983b061a632c",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 16,
+          "avg_per_edge": 2.2857142857142856,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 1,
+          "avg_deviation": 0.00023501812779873772,
+          "max_deviation": 0.00023501812779873772
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 1.2104830478646635,
+          "max_ratio": 1.3227587039505906
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.4389484628020048,
+          "max_min_ratio": 3.5264584532498717,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 3,
+          "side_utilization_variance": 0.64
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 2.42,
+      "min_ms": 2.29,
+      "max_ms": 2.58,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/sequence/product.oauth-login.pgm",
+      "diagram_type": "Sequence",
+      "nodes": 4,
+      "edges": 8,
+      "groups": 0,
+      "node_fp": "4755c2fe54995429",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 0,
+          "avg_per_edge": 0.0,
+          "max_single_edge": 0,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 1.0,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 0.0,
+          "max_ratio": 0.0
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.0,
+          "max_min_ratio": 0.0,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 7,
+          "side_utilization_variance": 4.5
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 0.1,
+      "min_ms": 0.1,
+      "max_ms": 0.12,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/sequence/product.payment-gateway.pgm",
+      "diagram_type": "Sequence",
+      "nodes": 5,
+      "edges": 11,
+      "groups": 0,
+      "node_fp": "7a84ab95e0db383c",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 0,
+          "avg_per_edge": 0.0,
+          "max_single_edge": 0,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 3,
+          "avg_deviation": 0.7916666666666666,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 0.0,
+          "max_ratio": 0.0
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.0,
+          "max_min_ratio": 0.0,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 7,
+          "side_utilization_variance": 3.44
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 0.16,
+      "min_ms": 0.16,
+      "max_ms": 0.18,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/sequence/product.sms-verification.pgm",
+      "diagram_type": "Sequence",
+      "nodes": 5,
+      "edges": 11,
+      "groups": 0,
+      "node_fp": "fbfce343e7cb2ec7",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 2,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 2,
+        "error_count": 2,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 0,
+          "avg_per_edge": 0.0,
+          "max_single_edge": 0,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.6160714285714286,
+          "max_deviation": 0.8571428571428571
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 0.0,
+          "max_ratio": 0.0
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.0,
+          "max_min_ratio": 0.0,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 7,
+          "side_utilization_variance": 3.44
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 0.17,
+      "min_ms": 0.16,
+      "max_ms": 0.18,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/sequence/product.jwt-refresh-token.pgm",
+      "diagram_type": "Sequence",
+      "nodes": 5,
+      "edges": 10,
+      "groups": 0,
+      "node_fp": "ac27d97f63bfaa95",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 2,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 2,
+        "error_count": 2,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 0,
+          "avg_per_edge": 0.0,
+          "max_single_edge": 0,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.5952380952380952,
+          "max_deviation": 0.8571428571428571
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 0.0,
+          "max_ratio": 0.0
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.0,
+          "max_min_ratio": 0.0,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 8,
+          "side_utilization_variance": 4.8
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 0.15,
+      "min_ms": 0.14,
+      "max_ms": 0.21,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/state/product.order-lifecycle.pgm",
+      "diagram_type": "State",
+      "nodes": 8,
+      "edges": 8,
+      "groups": 0,
+      "node_fp": "779812fa7d4460bb",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 16.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 1,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 1,
+        "error_count": 0,
+        "warning_count": 1
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 26,
+          "avg_per_edge": 3.25,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.4531745367832478,
+          "max_deviation": 0.5959947362747918
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 1
+        },
+        "detour": {
+          "avg_ratio": 1.2915083059835817,
+          "max_ratio": 1.7884610740235893
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.5801225317548133,
+          "max_min_ratio": 10.07508568187341,
+          "outlier_count": 1
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.06
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.125,
+          "non_monotone_count": 1
+        }
+      },
+      "median_ms": 4.29,
+      "min_ms": 4.01,
+      "max_ms": 4.67,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/state/product.user-session.pgm",
+      "diagram_type": "State",
+      "nodes": 7,
+      "edges": 9,
+      "groups": 0,
+      "node_fp": "e364654882434e68",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 1,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 1,
+        "error_count": 0,
+        "warning_count": 1
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 23,
+          "avg_per_edge": 2.5555555555555554,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 1,
+          "avg_deviation": 0.3296120036924345,
+          "max_deviation": 0.3296120036924345
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 1
+        },
+        "detour": {
+          "avg_ratio": 1.4276361543353209,
+          "max_ratio": 2.824856481241435
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.2921308009833841,
+          "max_min_ratio": 6.453396056511381,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.16
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.125,
+          "non_monotone_count": 1
+        }
+      },
+      "median_ms": 4.25,
+      "min_ms": 3.89,
+      "max_ms": 4.38,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/state/product.payment-flow.pgm",
+      "diagram_type": "State",
+      "nodes": 10,
+      "edges": 12,
+      "groups": 0,
+      "node_fp": "aef8b19629bc736d",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 1,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 1,
+        "error_count": 0,
+        "warning_count": 1
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 32,
+          "avg_per_edge": 2.6666666666666665,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 3,
+          "avg_deviation": 0.5277525292491326,
+          "max_deviation": 0.8161660148620343
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 1
+        },
+        "detour": {
+          "avg_ratio": 1.4958556742975586,
+          "max_ratio": 3.3033525092456375
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.50289940295201,
+          "max_min_ratio": 8.57480201637035,
+          "outlier_count": 1
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.08
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 6.59,
+      "min_ms": 6.57,
+      "max_ms": 6.83,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/state/product.delivery-tracking.pgm",
+      "diagram_type": "State",
+      "nodes": 7,
+      "edges": 7,
+      "groups": 0,
+      "node_fp": "9602a444d8520ecd",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 19,
+          "avg_per_edge": 2.7142857142857144,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.7609193093206612,
+          "max_deviation": 0.8562234725179955
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 1.1994022955183803,
+          "max_ratio": 1.8630113604189462
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.4332311263800182,
+          "max_min_ratio": 4.755469741535035,
+          "outlier_count": 1
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.07
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 2.83,
+      "min_ms": 2.79,
+      "max_ms": 3.08,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/er/product.blog-schema.pgm",
+      "diagram_type": "Er",
+      "nodes": 5,
+      "edges": 5,
+      "groups": 0,
+      "node_fp": "8b27957af7495f06",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 33,
+          "avg_per_edge": 6.6,
+          "max_single_edge": 33,
+          "excessive_count": 1
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.49689861765831944,
+          "max_deviation": 0.6795116014389954
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 1.1297210348294522,
+          "max_ratio": 1.1297210348294522
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.0,
+          "max_min_ratio": 1.0,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.22
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 0.5,
+      "min_ms": 0.49,
+      "max_ms": 0.53,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/er/product.saas-schema.pgm",
+      "diagram_type": "Er",
+      "nodes": 9,
+      "edges": 10,
+      "groups": 3,
+      "node_fp": "339840f11b0ee31f",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 1,
+        "edge_on_group_border": 1,
+        "edge_crosses_group_interior": 1,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 558.0425103207324,
+        "total_violations": 3,
+        "error_count": 1,
+        "warning_count": 2
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 144,
+          "avg_per_edge": 14.4,
+          "max_single_edge": 45,
+          "excessive_count": 4
+        },
+        "border_proximity": {
+          "min_distance_px": 1.2470693635730186,
+          "segments_within_12px": 38,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 3,
+          "avg_deviation": 0.1392077445200681,
+          "max_deviation": 0.2602165133686342
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 1
+        },
+        "detour": {
+          "avg_ratio": 1.0262634603960896,
+          "max_ratio": 1.0607325788221904
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.13053077460175383,
+          "max_min_ratio": 1.6209500087536248,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 3,
+          "side_utilization_variance": 0.39
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 9.05,
+      "min_ms": 8.75,
+      "max_ms": 9.56,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/er/product.crm-schema.pgm",
+      "diagram_type": "Er",
+      "nodes": 5,
+      "edges": 5,
+      "groups": 0,
+      "node_fp": "b0c07d7b30efdb04",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 33,
+          "avg_per_edge": 6.6,
+          "max_single_edge": 33,
+          "excessive_count": 1
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.5172379987076229,
+          "max_deviation": 0.7201864785522757
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 1.1380461626826326,
+          "max_ratio": 1.1380461626826326
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.0,
+          "max_min_ratio": 1.0,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.24
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 0.51,
+      "min_ms": 0.51,
+      "max_ms": 0.69,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/mindmap/product.tech-stack.pgm",
+      "diagram_type": "Mindmap",
+      "nodes": 10,
+      "edges": 9,
+      "groups": 0,
+      "node_fp": "0ca6f63c0463c831",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 0,
+          "avg_per_edge": 0.0,
+          "max_single_edge": 0,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 0,
+          "avg_deviation": 0.0,
+          "max_deviation": 0.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 0.0,
+          "max_ratio": 0.0
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.0,
+          "max_min_ratio": 0.0,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 3,
+          "side_utilization_variance": 0.39
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 0.14,
+      "min_ms": 0.12,
+      "max_ms": 0.16,
+      "det": true,
+      "role": "product"
+    },
+    {
+      "file": "showcase/architecture/stress.layout-stress-nested.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 11,
+      "edges": 13,
+      "groups": 5,
+      "node_fp": "cd410a5f8764dd59",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 16.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 5,
+        "edge_on_group_border": 1,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 6,
+        "error_count": 0,
+        "warning_count": 6
+      },
+      "ortho": null,
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 33,
+          "avg_per_edge": 2.5384615384615383,
+          "max_single_edge": 5,
+          "excessive_count": 1
+        },
+        "border_proximity": {
+          "min_distance_px": 2.0,
+          "segments_within_12px": 6,
+          "hugging_violations": 2
+        },
+        "symmetry": {
+          "fan_out_nodes": 2,
+          "avg_deviation": 0.6475409836065573,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 5
+        },
+        "detour": {
+          "avg_ratio": 1.3763283611641492,
+          "max_ratio": 1.7219741533882795
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.3886490592771906,
+          "max_min_ratio": 3.743914313534567,
+          "outlier_count": 1
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 7
+        },
+        "port_distribution": {
+          "max_same_side_edges": 3,
+          "side_utilization_variance": 0.24
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 110.29,
+      "min_ms": 109.75,
+      "max_ms": 112.68,
+      "det": true,
+      "role": "stress"
+    },
+    {
+      "file": "showcase/architecture/stress.layout-stress-flat-mesh.pgm",
+      "diagram_type": "Architecture",
+      "nodes": 11,
+      "edges": 20,
+      "groups": 0,
+      "node_fp": "eafcc7491954c2cc",
+      "exact_sev": 544.9773021862268,
+      "tight_sev": 0.0,
+      "allowed_share_len": 1842.9319065586803,
+      "exact_pairs": 7,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 16,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 7,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 23,
+        "error_count": 0,
+        "warning_count": 23
+      },
+      "ortho": null,
+      "min_gap": 12.0,
+      "aesthetics": {
+        "bends": {
+          "total": 58,
+          "avg_per_edge": 2.9,
+          "max_single_edge": 7,
+          "excessive_count": 2
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 6,
+          "avg_deviation": 0.9035891136504351,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 26
+        },
+        "detour": {
+          "avg_ratio": 1.6600870996264558,
+          "max_ratio": 4.617727272727273
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.6442971730726667,
+          "max_min_ratio": 8.036635730961908,
+          "outlier_count": 1
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 4,
+          "side_utilization_variance": 0.81
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.158,
+          "non_monotone_count": 3
+        }
+      },
+      "median_ms": 41.71,
+      "min_ms": 41.04,
+      "max_ms": 42.0,
+      "det": true,
+      "role": "stress"
+    },
+    {
+      "file": "showcase/er/stress.layout-stress-dense.pgm",
+      "diagram_type": "Er",
+      "nodes": 7,
+      "edges": 16,
+      "groups": 0,
+      "node_fp": "aad86723b6190857",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 7,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 2,
+        "label_label_overlap": 2,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 11,
+        "error_count": 2,
+        "warning_count": 9
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 306,
+          "avg_per_edge": 19.125,
+          "max_single_edge": 45,
+          "excessive_count": 10
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 5,
+          "avg_deviation": 0.13852425841977462,
+          "max_deviation": 0.2873125243448865
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 7
+        },
+        "detour": {
+          "avg_ratio": 1.0462984748417985,
+          "max_ratio": 1.0999961928708186
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.19859195857926198,
+          "max_min_ratio": 2.892788469889048,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 5,
+          "side_utilization_variance": 1.9
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 8.26,
+      "min_ms": 8.2,
+      "max_ms": 8.38,
+      "det": true,
+      "role": "stress"
+    },
+    {
+      "file": "showcase/flowchart/stress.layout-stress-dag.pgm",
+      "diagram_type": "Flowchart",
+      "nodes": 11,
+      "edges": 18,
+      "groups": 0,
+      "node_fp": "b76aa0c4049bd56a",
+      "exact_sev": 0.0,
+      "tight_sev": 10.0217564433762,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 1,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 4,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 4,
+        "error_count": 0,
+        "warning_count": 4
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 58,
+          "avg_per_edge": 3.2222222222222223,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 6,
+          "avg_deviation": 0.4945388747006671,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 2,
+          "min_clearance_px": 13.022068598776968
+        },
+        "crossings": {
+          "total": 4
+        },
+        "detour": {
+          "avg_ratio": 2.1741037369591503,
+          "max_ratio": 6.948535701285294
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.38134437141647953,
+          "max_min_ratio": 14.149313188163692,
+          "outlier_count": 1
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.09
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.059,
+          "non_monotone_count": 1
+        }
+      },
+      "median_ms": 11.6,
+      "min_ms": 11.42,
+      "max_ms": 11.89,
+      "det": true,
+      "role": "stress"
+    },
+    {
+      "file": "showcase/flowchart/stress.layout-stress-yfiles-pipeline.pgm",
+      "diagram_type": "Flowchart",
+      "nodes": 23,
+      "edges": 31,
+      "groups": 0,
+      "node_fp": "7dd4071ba827bb2a",
+      "exact_sev": 0.0,
+      "tight_sev": 212.32842238833837,
+      "allowed_share_len": 32.0,
+      "exact_pairs": 0,
+      "tight_pairs": 1,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 12,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 12,
+        "error_count": 0,
+        "warning_count": 12
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 97,
+          "avg_per_edge": 3.129032258064516,
+          "max_single_edge": 6,
+          "excessive_count": 1
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 5,
+          "avg_deviation": 0.8744419903331128,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 12
+        },
+        "detour": {
+          "avg_ratio": 1.3985577013423456,
+          "max_ratio": 3.0217300354298193
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.7594239566795886,
+          "max_min_ratio": 18.24461969791642,
+          "outlier_count": 2
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.16
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.129,
+          "non_monotone_count": 4
+        }
+      },
+      "median_ms": 139.29,
+      "min_ms": 137.24,
+      "max_ms": 141.87,
+      "det": true,
+      "role": "stress"
+    },
+    {
+      "file": "showcase/sequence/stress.layout-stress-lifelines.pgm",
+      "diagram_type": "Sequence",
+      "nodes": 5,
+      "edges": 14,
+      "groups": 0,
+      "node_fp": "fe2fb3af31901a34",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 2,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 2,
+        "error_count": 2,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 6,
+          "avg_per_edge": 0.42857142857142855,
+          "max_single_edge": 2,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 4,
+          "avg_deviation": 0.25,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 3,
+          "min_clearance_px": 124.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 14.333333333333334,
+          "max_ratio": 14.333333333333334
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.0,
+          "max_min_ratio": 1.0,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 7,
+          "side_utilization_variance": 1.84
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 0.29,
+      "min_ms": 0.27,
+      "max_ms": 0.3,
+      "det": true,
+      "role": "stress"
+    },
+    {
+      "file": "showcase/state/stress.layout-stress-transitions.pgm",
+      "diagram_type": "State",
+      "nodes": 9,
+      "edges": 14,
+      "groups": 0,
+      "node_fp": "37c3dd25075f12ef",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 30,
+          "avg_per_edge": 2.142857142857143,
+          "max_single_edge": 4,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 3,
+          "avg_deviation": 0.7861987635413615,
+          "max_deviation": 1.0
+        },
+        "self_loops": {
+          "count": 3,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 1.5361894469866273,
+          "max_ratio": 2.87785930185148
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.45080515702872515,
+          "max_min_ratio": 4.743338969006795,
+          "outlier_count": 1
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 2,
+          "side_utilization_variance": 0.09
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 5.53,
+      "min_ms": 5.44,
+      "max_ms": 5.75,
+      "det": true,
+      "role": "stress"
+    },
+    {
+      "file": "showcase/mindmap/stress.layout-stress-deep.pgm",
+      "diagram_type": "Mindmap",
+      "nodes": 63,
+      "edges": 62,
+      "groups": 0,
+      "node_fp": "5ff5efa1c4ca9d3e",
+      "exact_sev": 0.0,
+      "tight_sev": 0.0,
+      "allowed_share_len": 0.0,
+      "exact_pairs": 0,
+      "tight_pairs": 0,
+      "lint": {
+        "node_overlap": 0,
+        "group_overlap": 0,
+        "node_outside_group": 0,
+        "child_group_outside_parent": 0,
+        "edge_through_node": 0,
+        "edge_crossing": 0,
+        "edge_on_group_border": 0,
+        "edge_crosses_group_interior": 0,
+        "label_node_overlap": 0,
+        "label_label_overlap": 0,
+        "unrelated_edge_trunk_merge": 0,
+        "sibling_width_ratio": 0,
+        "pierce_node_sev": 0.0,
+        "pierce_group_sev": 0.0,
+        "total_violations": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "ortho": null,
+      "min_gap": 8.0,
+      "aesthetics": {
+        "bends": {
+          "total": 0,
+          "avg_per_edge": 0.0,
+          "max_single_edge": 0,
+          "excessive_count": 0
+        },
+        "border_proximity": {
+          "min_distance_px": 9999.0,
+          "segments_within_12px": 0,
+          "hugging_violations": 0
+        },
+        "symmetry": {
+          "fan_out_nodes": 0,
+          "avg_deviation": 0.0,
+          "max_deviation": 0.0
+        },
+        "self_loops": {
+          "count": 0,
+          "min_clearance_px": 9999.0
+        },
+        "crossings": {
+          "total": 0
+        },
+        "detour": {
+          "avg_ratio": 0.0,
+          "max_ratio": 0.0
+        },
+        "edge_length": {
+          "intra_layer_cv": 0.0,
+          "max_min_ratio": 0.0,
+          "outlier_count": 0
+        },
+        "channel_utilization": {
+          "corridor_usage_ratio": 0.0,
+          "max_channel_load": 0,
+          "unused_corridors": 0
+        },
+        "port_distribution": {
+          "max_same_side_edges": 5,
+          "side_utilization_variance": 0.97
+        },
+        "path_monotonicity": {
+          "non_monotone_ratio": 0.0,
+          "non_monotone_count": 0
+        }
+      },
+      "median_ms": 1.3,
+      "min_ms": 1.26,
+      "max_ms": 1.48,
+      "det": true,
+      "role": "stress"
+    }
+  ],
+  "perf_runs": 5
+}

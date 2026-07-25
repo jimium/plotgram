@@ -11,6 +11,9 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::layout::kernel::coordinate::model::*;
+use crate::layout::kernel::coordinate::builder::{
+    append_rank_layer_vars, build_adjacent_min_separations, RankNodeSpec,
+};
 use crate::layout::recipes::architecture::layout::constants::NODE_GAP;
 use crate::layout::recipes::architecture::layout::types::{GraphIndex, GroupMap};
 
@@ -44,54 +47,42 @@ pub(super) fn build_intra_coordinate_problem(
     let mut layer_constraints: Vec<LayerConstraintSet> = Vec::new();
     let mut initial_values: Vec<f64> = Vec::new();
 
-    // 1. 创建变量 + 层约束
+    // 1. 创建变量 + 层约束（共享 builder_common；初值先占位，下面覆写 uniform）
     for (rank, layer) in layers.iter().enumerate() {
-        let mut layer_vars: Vec<VarId> = Vec::new();
-        let mut separations: Vec<f64> = Vec::new();
-
-        for (order, node_id) in layer.iter().enumerate() {
-            let var_id = vars.len();
-            let (w, _h) = sizes
-                .get(node_id)
-                .copied()
-                .unwrap_or((
+        let rank_specs: Vec<RankNodeSpec<'_>> = layer
+            .iter()
+            .map(|node_id| {
+                let (w, _h) = sizes.get(node_id).copied().unwrap_or((
                     crate::layout::constants::DEFAULT_NODE_WIDTH,
                     crate::layout::constants::DEFAULT_NODE_HEIGHT,
                 ));
-
-            vars.push(NodeVariable {
-                var_id,
-                stable_id: node_id.clone(),
-                kind: VarKind::Real,
-                rank,
-                order,
-                axis_size: w,
-                movable: true,
-            });
-
+                RankNodeSpec {
+                    stable_id: node_id.as_str(),
+                    axis_size: w,
+                    initial_center: 0.0,
+                    kind: VarKind::Real,
+                }
+            })
+            .collect();
+        let layer_vars = append_rank_layer_vars(&mut vars, &mut initial_values, rank, &rank_specs);
+        for (node_id, &var_id) in layer.iter().zip(layer_vars.iter()) {
             node_to_var.insert(node_id.clone(), var_id);
-            layer_vars.push(var_id);
-
-            // 与前一节点的最小分离（使用 SpaceBudget 的 per-pair gap）
-            if order > 0 {
-                let prev_id = &layer[order - 1];
-                let prev_w = sizes
-                    .get(prev_id)
-                    .map(|(w, _)| *w)
-                    .unwrap_or(crate::layout::constants::DEFAULT_NODE_WIDTH);
-                let gap = budget
-                    .map(|b| b.min_gap(prev_id, node_id))
-                    .unwrap_or(NODE_GAP);
-                let sep = prev_w / 2.0 + gap + w / 2.0;
-                separations.push(sep);
-            }
         }
-
-        layer_constraints.push(LayerConstraintSet {
+        let mut gaps = Vec::with_capacity(layer_vars.len().saturating_sub(1));
+        for order in 1..layer.len() {
+            let prev_id = &layer[order - 1];
+            let node_id = &layer[order];
+            let gap = budget
+                .map(|b| b.min_gap(prev_id, node_id))
+                .unwrap_or(NODE_GAP);
+            gaps.push(gap);
+        }
+        layer_constraints.push(build_adjacent_min_separations(
             rank,
-            vars: layer_vars,
-            separations,
-        });
+            layer_vars,
+            &vars,
+            &gaps,
+        ));
     }
 
     // 2. 计算初值：uniform 分布（与旧逻辑一致）
@@ -110,8 +101,9 @@ pub(super) fn build_intra_coordinate_problem(
                 .unwrap_or(crate::layout::constants::DEFAULT_NODE_WIDTH);
             let center = cursor + w / 2.0;
             if let Some(&var_id) = node_to_var.get(node_id) {
-                initial_values.resize(var_id + 1, 0.0);
-                initial_values[var_id] = center;
+                if var_id < initial_values.len() {
+                    initial_values[var_id] = center;
+                }
             }
             cursor += w + NODE_GAP;
         }
@@ -271,15 +263,14 @@ pub(super) fn build_intra_coordinate_problem(
         }
     }
 
-    let problem = CoordinateProblem {
+    let problem = CoordinateProblem::build(
         vars,
-        layers: layer_constraints,
-        hard: vec![],
+        layer_constraints,
+        vec![],
         objectives,
-        initial: InitialCoordinates { values: initial_values },
-        config: CoordinateSolverConfig::default(),
-        axis: Default::default(),
-    };
+        InitialCoordinates { values: initial_values },
+        SolveAxis::Cross,
+    );
 
     IntraBuildOutput {
         problem,

@@ -24,6 +24,7 @@ pub fn expand_groups_to_contain_contents(
     leaf_padding: GroupPadding,
     container_padding: GroupPadding,
 ) {
+    crate::layout::group::write_counter::record_group_write_at("expand_groups_to_contain_contents");
     let mut group_ids: Vec<String> = diagram
         .groups
         .iter()
@@ -110,6 +111,7 @@ pub fn shrink_groups_to_required_padding(
     container_padding: GroupPadding,
     side_gutters: Option<&std::collections::BTreeMap<String, crate::layout::engines::common::group_bounds::SideGutter>>,
 ) {
+    crate::layout::group::write_counter::record_group_write_at("shrink_groups_to_required_padding");
     let mut group_ids: Vec<String> = diagram
         .groups
         .iter()
@@ -239,6 +241,7 @@ pub fn recompute_group_bounds(
     layout: &mut LayoutResult,
     padding: GroupPadding,
 ) {
+    crate::layout::group::write_counter::record_group_write_at("recompute_group_bounds");
     let side_gutters = layout
         .hints
         .group_routing
@@ -255,5 +258,6 @@ pub fn recompute_group_bounds(
         )
     } else {
         compute_group_bounds(diagram, &layout.nodes, padding)
-    };
+    }
+    .into();
 }

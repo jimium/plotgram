@@ -178,7 +178,7 @@ impl LayoutRecipe for StateRecipe {
 
         let mut result = LayoutResult {
             nodes: nodes.clone(),
-            groups,
+            groups: groups.into(),
             edges: vec![],
             total_width,
             total_height,
@@ -212,7 +212,7 @@ impl LayoutRecipe for StateRecipe {
         if diagram.entities.is_empty() {
             return LayoutResult {
                 nodes: HashMap::new(),
-                groups: HashMap::new(),
+                groups: crate::layout::GroupTable::new(),
                 edges: vec![],
                 total_width: preset::STATE_PRESET.padding * 2.0,
                 total_height: preset::STATE_PRESET.padding * 2.0,

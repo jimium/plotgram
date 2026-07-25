@@ -74,8 +74,8 @@ pub fn merge_corridors(
 /// 从 group 包围框推导相邻组对的走廊中线（确定性：group id 排序）。
 ///
 /// C2 注：激进「间隙无第三组」清除在 federation 上有效，但会误杀侧旁擦边邻接
-/// （ecommerce / multi-namespace 正确性回归）。伪邻接改由 `try_build` 多跳外绕
-/// + `validated_corridor_path` 避组门槛消化；间隙清除留给后续更严 betweenness。
+/// （ecommerce / multi-namespace 正确性回归）。伪邻接由正交内核的避组搜索消化；
+/// 间隙清除留给后续更严 betweenness。
 pub fn build_corridors_from_groups(groups: &HashMap<String, GroupLayout>) -> Vec<GroupCorridor> {
     let mut ids: Vec<&String> = groups.keys().collect();
     ids.sort();

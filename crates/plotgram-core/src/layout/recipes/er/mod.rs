@@ -136,7 +136,7 @@ impl LayoutRecipe for ErRecipe {
 
         let mut result = LayoutResult {
             nodes: nodes.clone(),
-            groups,
+            groups: groups.into(),
             edges: vec![],
             total_width,
             total_height,
@@ -163,7 +163,7 @@ impl LayoutRecipe for ErRecipe {
         if diagram.entities.is_empty() {
             return LayoutResult {
                 nodes: std::collections::HashMap::new(),
-                groups: std::collections::HashMap::new(),
+                groups: crate::layout::GroupTable::new(),
                 edges: vec![],
                 total_width: preset::ER_PRESET.padding * 2.0,
                 total_height: preset::ER_PRESET.padding * 2.0,

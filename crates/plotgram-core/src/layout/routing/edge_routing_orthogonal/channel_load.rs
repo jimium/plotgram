@@ -20,11 +20,7 @@ use std::collections::HashMap;
 /// 通道负载阈值——负载超过此值才开始惩罚
 const CHANNEL_LOAD_THRESHOLD: usize = 3;
 
-/// 每条多余边的惩罚值（介于 BEND_PENALTY=16 和 EDGE_OVERLAP_PENALTY=1200 之间）
-const CHANNEL_LOAD_PENALTY: f64 = 200.0;
-
-/// P2.1：廊 OVER soft（弱于段级 channel_load）
-const CORRIDOR_OVER_PENALTY: f64 = 80.0;
+use crate::layout::routing::objectives::{CHANNEL_LOAD_PENALTY, CORRIDOR_OVER_PENALTY};
 
 
 /// 路径是否占用某廊车道（轴对齐 coord 附近 + span 重叠）。

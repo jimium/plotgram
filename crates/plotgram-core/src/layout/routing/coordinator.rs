@@ -26,16 +26,16 @@ use std::collections::HashMap;
 
 /// 只读节点/分组快照（doc16 §5.4 FrozenNodeProduct）。
 ///
-/// router 只消费它（读取节点位置/尺寸/端口），不得修改节点坐标。
-/// R12b：fingerprint 校验在所有构建模式下执行（release 也校验）。
+/// Phase 6 typestate：字段私有，仅提供 `&` getter；禁止外部可变写入。
+/// G4：同时冻结 groups 指纹——route 后组框不得再变（canvas 平移在 assert 之后）。
 #[derive(Debug, Clone)]
 pub struct FrozenNodeProduct {
-    /// 节点布局快照（id → 位置/尺寸/端口）。
-    pub nodes: HashMap<String, NodeLayout>,
-    /// 分组布局快照（id → 位置/尺寸）。
-    pub groups: HashMap<String, GroupLayout>,
+    nodes: HashMap<String, NodeLayout>,
+    groups: HashMap<String, GroupLayout>,
     /// 节点指纹（用于校验冻结契约）。
     fingerprint: String,
+    /// 分组几何指纹（量化 0.01px）。
+    groups_fingerprint: String,
 }
 
 impl FrozenNodeProduct {
@@ -43,19 +43,55 @@ impl FrozenNodeProduct {
     pub fn capture(result: &LayoutResult) -> Self {
         Self {
             fingerprint: crate::layout::quality::metrics::node_fingerprint(result),
+            groups_fingerprint: groups_geometry_fingerprint(result),
             nodes: result.nodes.clone(),
-            groups: result.groups.clone(),
+            groups: result.groups.clone().into_map(),
         }
     }
 
-    /// 校验路由后节点未被修改（所有构建模式下执行）。
+    /// 只读节点表。
+    pub fn nodes(&self) -> &HashMap<String, NodeLayout> {
+        &self.nodes
+    }
+
+    /// 只读分组表。
+    pub fn groups(&self) -> &HashMap<String, GroupLayout> {
+        &self.groups
+    }
+
+    /// 校验路由后节点与分组均未被修改（所有构建模式下执行）。
     pub fn assert_unchanged(&self, result: &LayoutResult) {
         assert_eq!(
             self.fingerprint,
             crate::layout::quality::metrics::node_fingerprint(result),
             "FrozenNodeProduct: 路由修改了节点坐标（违反冻结契约）"
         );
+        assert_eq!(
+            self.groups_fingerprint,
+            groups_geometry_fingerprint(result),
+            "FrozenNodeProduct: 路由修改了 group 几何（违反冻结契约）"
+        );
     }
+}
+
+/// 确定性 groups 几何指纹（按 id 排序，量化到 0.01）。
+fn groups_geometry_fingerprint(result: &LayoutResult) -> String {
+    use std::collections::BTreeMap;
+    let mut parts: BTreeMap<&str, String> = BTreeMap::new();
+    for (id, g) in result.groups.iter() {
+        parts.insert(
+            id.as_str(),
+            format!(
+                "{:.2},{:.2},{:.2},{:.2}",
+                g.x, g.y, g.width, g.height
+            ),
+        );
+    }
+    parts
+        .into_iter()
+        .map(|(id, geom)| format!("{id}:{geom}"))
+        .collect::<Vec<_>>()
+        .join("|")
 }
 
 /// 协调器配置（doc16 §5.4 CoordinatorConfig）。
@@ -232,58 +268,7 @@ impl RoutingCoordinator {
                 Some(&result.nodes),
                 Some(&sorted_node_ids),
             );
-
-            // Slice E4：reverse pair gap / dock 共锚收口收编为 solver finalize 步
-            //（原 D 段 enforce_d_stage_separation）——C 段 lane/refine 预修后，
-            // snap/canonicalize 可能重新贴靠，此处做最终收口。
-            let parallel_gap = crate::layout::routing::parallel_gap_for_diagram(
-                diagram.diagram_type.clone(),
-            );
-            crate::layout::routing::edge_routing_orthogonal::enforce_reverse_pair_min_gap(
-                &mut result.edges,
-                &diagram.relations,
-                parallel_gap,
-            );
-            let dock_gap = parallel_gap
-                .max(crate::layout::routing::edge_routing_orthogonal::COMPACT_SLOT_PITCH);
-            crate::layout::routing::edge_routing_orthogonal::enforce_reverse_pair_dock_separation(
-                &mut result.edges,
-                &diagram.relations,
-                &result.nodes,
-                &from_side,
-                &to_side,
-                dock_gap,
-            );
-
-            // Phase 0（策略 B）：exact stub 共柱收口对所有正交图统一执行（不再按
-            // algo == "architecture" 分支）。只改边几何 → node_fp 不变；
-            // 须在 repair loop / label 前完成并刷新 annotation。
-            let stub_stats = crate::layout::routing::edge_routing_orthogonal::
-                resolve_exact_stub_occupancy_post_route(
-                    &mut result.edges,
-                    &diagram.relations,
-                    &from_side,
-                    &to_side,
-                    &result.nodes,
-                    parallel_gap,
-                );
-            if stub_stats.stubs_shifted > 0 {
-                let prev = result.hints.route_annotations.clone();
-                result.hints.route_annotations = Some(
-                    crate::layout::routing::refresh_route_annotations_preserving_semantics(
-                        &result.edges,
-                        &from_side,
-                        &to_side,
-                        prev.as_ref(),
-                    ),
-                );
-                crate::perf_log!(
-                    "[perf]     d_stub_exact_post_route: shifted={} unresolved_exact={} degraded={}",
-                    stub_stats.stubs_shifted,
-                    stub_stats.unresolved_conflicts,
-                    stub_stats.degraded
-                );
-            }
+            // Phase 3：stub/dock/trunk 事后分离已删；间距由 H4/H5 + LexA* rip-up 承担。
         }
 
         // Slice E5：旧 D 段 finalizer 入口已删除——收尾（recheck / label）由
@@ -778,7 +763,7 @@ mod tests {
         nodes.insert("d".to_string(), node(100.0, 500.0));
         let result = LayoutResult {
             nodes,
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![
                 straight_edge(10.0, 5.0, 100.0, 5.0),
                 straight_edge(10.0, 505.0, 100.0, 505.0),
@@ -820,7 +805,7 @@ mod tests {
         nodes.insert("d".to_string(), node(100.0, 500.0));
         let result = LayoutResult {
             nodes,
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![
                 straight_edge(10.0, 5.0, 200.0, 5.0),
                 straight_edge(10.0, 505.0, 100.0, 505.0),
@@ -848,7 +833,7 @@ mod tests {
         nodes.insert("mid".to_string(), node(95.0, 0.0));
         let result = LayoutResult {
             nodes,
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![straight_edge(10.0, 5.0, 200.0, 5.0)],
             total_width: 210.0,
             total_height: 10.0,

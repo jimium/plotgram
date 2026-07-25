@@ -70,20 +70,12 @@ const MAX_VERTICES: usize = 500;
 /// 可见性检查的额外余量（与 geometry::EPS 对齐，确保 OVG 路径通过 path_is_clean）
 const VISIBILITY_EPS: f64 = 0.1;
 
-/// 组穿越软惩罚：Dijkstra 中边段穿越组内部时叠加的权重。
-/// 使 OVG 路径自然偏好绕行组，从而产出 strict（避节点+避组）候选。
-const GROUP_CROSSING_PENALTY: f64 = 500.0;
-
-/// 已路由边重叠惩罚：每像素共线重叠的惩罚权重。
-/// 使 OVG 路径偏好与已有边分离，减少视觉重叠。
-const OVERLAP_PENALTY_PER_PX: f64 = 3.0;
+use crate::layout::routing::objectives::{
+    GROUP_CROSSING_PENALTY, OVERLAP_PENALTY_PER_PX, PORT_DIRECTION_PENALTY,
+};
 
 /// 重叠检测的垂直/水平容差（px）：两条段在此距离内视为"共线"。
 const OVERLAP_PROXIMITY: f64 = 4.0;
-
-/// P1-4: 端口方向违反惩罚——首/末段方向与 Port Solver 分配不一致时叠加。
-/// 约 1.5 个弯折代价，确保偏好对齐但不阻断非对齐路径。
-const PORT_DIRECTION_PENALTY: f64 = 42.0;
 
 impl OrthogonalVisibilityGraph {
     /// 从节点障碍物 + 组障碍物构建 OVG

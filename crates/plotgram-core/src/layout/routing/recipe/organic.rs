@@ -432,6 +432,7 @@ impl RoutingRecipe for OrganicRecipe {
         RecipeSolution {
             solution,
             label_plans,
+            orthogonal_debug: None,
         }
     }
 }

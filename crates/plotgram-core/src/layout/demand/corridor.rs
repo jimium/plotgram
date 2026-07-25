@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::types::CorridorDemand;
 
-/// 与 `corridor_route` 车道间距对齐。
+/// 走廊需求模型使用的车道间距。
 pub const CORRIDOR_LANE_PITCH: f64 = 18.0;
 
 /// 廊模型快照（折线无关）。
@@ -48,6 +48,16 @@ impl CorridorModel {
 pub fn compute_corridor_model(diagram: &Diagram, result: &LayoutResult) -> CorridorModel {
     let algo = routing_algo_for_diagram(diagram);
     let group_ctx = GroupRoutingContext::from_layout(diagram, result, algo);
+    compute_corridor_model_from_ctx(diagram, &group_ctx)
+}
+
+/// 仅有 nodes/groups 时计算走廊 demand（phase_d 物化后即可）。
+pub fn compute_corridor_model_from_groups(
+    diagram: &Diagram,
+    groups: &HashMap<String, GroupLayout>,
+) -> CorridorModel {
+    let algo = routing_algo_for_diagram(diagram);
+    let group_ctx = GroupRoutingContext::from_groups(diagram, groups, algo);
     compute_corridor_model_from_ctx(diagram, &group_ctx)
 }
 

@@ -54,8 +54,9 @@ pub(super) fn route_edges_orthogonal_inner(
     mut result: LayoutResult,
     cfg: OrthoConfig,
     preserve_edges: Option<std::collections::HashSet<usize>>,
+    prepared_contract: Option<crate::layout::routing::model::RoutingContract>,
 ) -> LayoutResult {
-    let draft = draft::OrthogonalDraft::compile(diagram, &mut result, &cfg);
+    let draft = draft::OrthogonalDraft::compile(diagram, &mut result, &cfg, prepared_contract);
     let draft::OrthogonalDraft {
         profile,
         parallel_gap,
@@ -64,7 +65,6 @@ pub(super) fn route_edges_orthogonal_inner(
         self_loop_idx,
         group_ctx,
         obstacles,
-        corridor_plan,
         corridor_model,
         _from_side: _,
         _to_side: _,
@@ -73,16 +73,15 @@ pub(super) fn route_edges_orthogonal_inner(
         _reverse_pairs: _,
         edge_order,
         feedback_edge_set,
-        channel_plan,
         use_two_round,
         group_rects,
         ovg,
         endpoint_assignments,
+        routing_contract,
     } = draft;
 
-    // Slice C1.4：从 EndpointAssignment 派生只读 side 视图（供尚未迁移的下游函数使用）。
-    let from_side: Vec<Port> = endpoint_assignments.iter().map(|ea| ea.from_port).collect();
-    let to_side: Vec<Port> = endpoint_assignments.iter().map(|ea| ea.to_port).collect();
+    // Slice C1.4：从 EndpointAssignment 派生 side 视图；solve_paths 可能改端口后重算。
+    let mut endpoint_assignments = endpoint_assignments;
 
     let relations = &diagram.relations;
     let n = relations.len();
@@ -129,7 +128,6 @@ pub(super) fn route_edges_orthogonal_inner(
         &profile,
         &group_ctx,
         &obstacles,
-        &corridor_plan,
         &parallel,
         &preserve_edges,
         &self_loop_idx,
@@ -139,9 +137,9 @@ pub(super) fn route_edges_orthogonal_inner(
         Some(&corridor_model),
         // P3-1: 两轮模式下第一轮禁 OVG
         if use_two_round { None } else { ovg.as_ref() },
-        channel_plan.as_ref(),
         // P3-1: 两轮模式下第一轮为 first_pass
         use_two_round,
+        &routing_contract,
     );
 
     // Slice C2b：路径求解器直接操作 RoutePath，桥接在 solve_paths 之后重建。
@@ -151,13 +149,11 @@ pub(super) fn route_edges_orthogonal_inner(
     // ── 4b. 端口修正已删除（Slice C1：pre-route PortAssignmentSolver 为唯一写者）──
     let t_fix = crate::layout::perf::Instant::now();
 
-    // ── 4c. R6: PathAssignmentSolver 单一主流程 ──
-    // R6：单一路径求解主流程，取代原 two-round / deferred OVG / conflict reroute
-    // 三套并行控制流；直接消费 obstacles / OVG / group_rects。
+    // ── 4c. R6: PathAssignmentSolver 单一主流程（含端口候选 H4 rip-up）──
     let degraded = path_solver::solve_paths(
         &result.nodes,
         relations,
-        &endpoint_assignments,
+        &mut endpoint_assignments,
         &mut paths,
         &mut labels,
         &mut grid,
@@ -174,6 +170,9 @@ pub(super) fn route_edges_orthogonal_inner(
         "[perf]     r6_path_solver: {} degraded edges",
         degraded.len()
     );
+
+    let from_side: Vec<Port> = endpoint_assignments.iter().map(|ea| ea.from_port).collect();
+    let to_side: Vec<Port> = endpoint_assignments.iter().map(|ea| ea.to_port).collect();
 
     // Bridge: RoutePath -> EdgeLayout（C2c 将删除此桥接，下游直接消费 RoutePath）
     let mut edges: Vec<EdgeLayout> = (0..n)
@@ -207,8 +206,6 @@ pub(super) fn route_edges_orthogonal_inner(
         &from_side,
         &to_side,
         parallel_gap,
-        &corridor_plan,
-        &group_ctx,
         &profile,
         &mut ortho_stats,
     );
@@ -216,15 +213,14 @@ pub(super) fn route_edges_orthogonal_inner(
     // S3：语义 FanIn/FanOut 合流（仅 architecture）；写路径 + merge_intervals
     // Slice C3.3：同时产出 Vec<BundleSolution> 供 RouteSolution 携带。
     let mut bundle_solutions: Vec<crate::layout::routing::model::BundleSolution> = Vec::new();
-    let merge_result = if profile.semantic_merge {
+    let merge_result = if routing_contract.has_share_trunk() {
         let (mr, bs) = semantic_trunk_merge::apply_semantic_trunk_merge(
             &mut edges,
             relations,
             &from_side,
             &to_side,
             &result.nodes,
-            diagram.diagram_type.clone(),
-            !diagram.groups.is_empty(),
+            true, // ShareTrunk：契约 has_share_trunk，不读图种枚举
         );
         bundle_solutions = bs;
         ortho_stats.semantic_trunk_groups_merged = mr.stats.groups_merged;
@@ -251,21 +247,7 @@ pub(super) fn route_edges_orthogonal_inner(
         None
     };
 
-    // Phase 2 红线：穿无关组硬修复（lane/semantic merge 之后）
-    let group_repaired = path_kernel::repair_group_interior_crossings(
-        &mut edges,
-        diagram,
-        &result.groups,
-        &group_ctx,
-        &obstacles.sorted_group_ids,
-        &mut grid,
-    );
-    if group_repaired > 0 {
-        crate::perf_log!(
-            "[perf]     phase2_group_interior_repair: repaired={}",
-            group_repaired
-        );
-    }
+    // Phase 3：穿组 U 形补丁已删；H2 由 ResourceGraph 构图保证。
 
     // C 末冻结旁路 Annotation（stub / 受保护 trunk / S3 merge），供 sanitize / 后续 D 验证
     // R7 7c：经单一同源生成器 [`route_annotations_from_solution`]（merge_result 为唯一来源）。
@@ -428,88 +410,9 @@ pub(super) fn detect_congestion(paths: &[crate::layout::routing::model::solution
     result
 }
 
-/// 走廊边路径重建：有计划且通过穿障/穿组校验时返回路径。
-/// Iteration 2：是否对该边启用穿组硬约束（拒绝 `best_nodes_only` 穿无关组）。
-///
-/// - 已有 corridor chain → 强制 strict（应走走廊，禁止穿组软降级）
-/// - R3：feedback / 长跨度边 → 强制 strict（`path_avoids_group_interiors`）
-///   - 长跨度边在 `assign_feedback_sides` 中**必然**进 hint（不会因正对通道跳过），
-///     故 `feedback_edge_set` 已覆盖「长跨度 ∪ 回环」；此处只需传入该集合。
-/// - P1：跨 leaf-group（含一端有组一端无组）→ 即使尚无 corridor chain，也禁止
-///   「只避节点、可穿组」软降级；无链时配合 `prefer_outer_ring` 走外廊。
-/// - 同 leaf / 均无组短边保持 false：全图硬否决会导致直线/脏路径退化
-///   （见 k8s-multi-namespace 回归）
-pub(crate) fn should_strict_group_transit(
-    _profile: &OrthoRoutingProfile,
-    group_ctx: &crate::layout::group::GroupRoutingContext,
-    from_id: &str,
-    to_id: &str,
-    has_corridor_chain: bool,
-    force_strict_feedback_or_long_span: bool,
-) -> bool {
-    if has_corridor_chain || force_strict_feedback_or_long_span {
-        return true;
-    }
-    // P1 核心在 validated_corridor_path（跨 leaf 接受避组脏走廊）与 select 的
-    // dirty-avoid 过滤；无链跨 leaf 全员 strict 会在无避组候选时把 degraded
-    // 路径打进新穿组（ecommerce mq→notify）。有链/feedback 仍强制 strict。
-    let _ = (group_ctx, from_id, to_id);
-    false
-}
-
-pub(crate) fn validated_corridor_path(
-    edge_index: usize,
-    from_anchor: Point,
-    to_anchor: Point,
-    from_id: &str,
-    to_id: &str,
-    corridor_plan: &corridor_route::CorridorRoutePlan,
-    group_ctx: &crate::layout::group::GroupRoutingContext,
-    nodes: &HashMap<String, NodeLayout>,
-    obstacles: &PreparedObstacles,
-    stub_len: f64,
-) -> Option<Vec<Point>> {
-    if !corridor_plan.chains.contains_key(&edge_index) {
-        return None;
-    }
-    let candidate = corridor_route::try_build_corridor_path(
-        edge_index,
-        from_anchor,
-        to_anchor,
-        from_id,
-        to_id,
-        corridor_plan,
-        group_ctx,
-        stub_len,
-        false,
-    )?;
-    if candidate.len() < 2 {
-        return None;
-    }
-    // P1：避组是硬门槛；穿节点在跨 leaf 时可接受（优于 free-route 穿组）。
-    if !path_avoids_group_interiors(
-        &candidate,
-        from_id,
-        to_id,
-        group_ctx,
-        &obstacles.sorted_group_ids,
-    ) {
-        return None;
-    }
-    if path_is_clean(
-        &candidate,
-        from_id,
-        to_id,
-        nodes,
-        group_ctx,
-        &obstacles.sorted_node_ids,
-    ) {
-        return Some(candidate);
-    }
-    if !group_ctx.is_same_leaf_group(from_id, to_id) {
-        return Some(candidate);
-    }
-    None
+/// Feedback 和长跨度边强制启用避组硬约束。
+pub(crate) fn should_strict_group_transit(force_strict_feedback_or_long_span: bool) -> bool {
+    force_strict_feedback_or_long_span
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -587,36 +490,14 @@ mod contract_priority_tests {
     }
 
     #[test]
-    fn corridor_or_feedback_forces_strict() {
-        let profile = OrthoRoutingProfile::for_diagram_type(crate::types::DiagramType::Architecture);
-        let ctx = ctx_with_leaves("g1", "g2");
+    fn feedback_or_long_span_forces_strict() {
         assert!(
-            should_strict_group_transit(&profile, &ctx, "a", "b", true, false),
-            "has corridor chain → strict"
-        );
-        assert!(
-            should_strict_group_transit(&profile, &ctx, "a", "b", false, true),
+            should_strict_group_transit(true),
             "feedback/long-span → strict"
         );
-    }
-
-    #[test]
-    fn same_leaf_without_chain_stays_soft() {
-        let profile = OrthoRoutingProfile::for_diagram_type(crate::types::DiagramType::Architecture);
-        let ctx = ctx_with_leaves("g1", "g1");
         assert!(
-            !should_strict_group_transit(&profile, &ctx, "a", "b", false, false),
-            "same-leaf short edges stay soft"
-        );
-    }
-
-    #[test]
-    fn cross_leaf_without_chain_stays_soft_to_avoid_forced_pierce() {
-        let profile = OrthoRoutingProfile::for_diagram_type(crate::types::DiagramType::Architecture);
-        let ctx = ctx_with_leaves("g1", "g2");
-        assert!(
-            !should_strict_group_transit(&profile, &ctx, "a", "b", false, false),
-            "无链跨 leaf 不强制 strict（避 ecommerce 类 degraded 新穿组）"
+            !should_strict_group_transit(false),
+            "ordinary edges stay soft"
         );
     }
 

@@ -152,12 +152,22 @@ for f in sorted(set(base_map) & set(cur_map)):
             )
 
     # ortho.degraded_count：空间不够时的可解释残余；计数不升（尚无 reason 分布）
-    bo = b.get("ortho") or {}
-    co = c.get("ortho") or {}
+    # 基线无 ortho（null/{}）时视为「首次接通 A6 可见性」，记 WARN 不挡——避免 null→N 假回归。
+    bo_raw = b.get("ortho")
+    co_raw = c.get("ortho")
+    bo = bo_raw or {}
+    co = co_raw or {}
     if "degraded_count" in bo or "degraded_count" in co:
         bd = int(bo.get("degraded_count") or 0)
         cd = int(co.get("degraded_count") or 0)
-        if cd > bd:
+        baseline_missing = bo_raw is None or (
+            isinstance(bo_raw, dict) and "degraded_count" not in bo_raw and not bo_raw
+        )
+        if baseline_missing and cd > 0:
+            warns.append(
+                f"{name}: ortho.degraded_count 首次可见 → {cd} (role={role})（A6 接通，非质量上升）"
+            )
+        elif cd > bd:
             msg = f"{name}: ortho.degraded_count 上升 {bd} → {cd} (role={role})"
             (quality_hard if quality_is_hard(role) else quality_soft).append(msg + "（Degraded 可不归零，但不得无说明地变多）")
         elif cd < bd:

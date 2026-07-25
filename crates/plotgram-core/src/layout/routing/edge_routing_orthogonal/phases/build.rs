@@ -5,7 +5,6 @@
 use super::super::*;
 use crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels;
 use crate::layout::routing::common::self_loop;
-use crate::layout::routing::edge_routing_orthogonal::channel_planner::ChannelPlan;
 use crate::layout::routing::edge_routing_orthogonal::visibility_graph::OrthogonalVisibilityGraph;
 use crate::layout::routing::model::solution::{EndpointAssignment, RoutePath};
 use std::collections::HashMap;
@@ -31,7 +30,6 @@ pub(crate) fn phase_route_edges(
     profile: &OrthoRoutingProfile,
     group_ctx: &crate::layout::group::GroupRoutingContext,
     obstacles: &PreparedObstacles,
-    corridor_plan: &corridor_route::CorridorRoutePlan,
     parallel: &crate::layout::routing::common::parallel_edges::ParallelGroups,
     preserve_edges: &Option<std::collections::HashSet<usize>>,
     self_loop_idx: &HashMap<usize, usize>,
@@ -40,8 +38,8 @@ pub(crate) fn phase_route_edges(
     _s4_monitor_corridor: bool,
     corridor_model: Option<&crate::layout::demand::CorridorModel>,
     ovg: Option<&OrthogonalVisibilityGraph>,
-    channel_plan: Option<&ChannelPlan>,
     first_pass: bool,
+    routing_contract: &crate::layout::routing::model::RoutingContract,
 ) -> InitialPaths {
     let n = relations.len();
     let mut paths: Vec<RoutePath> = (0..n)
@@ -97,79 +95,37 @@ pub(crate) fn phase_route_edges(
             .map(|b| b.corridor_boost_requested)
             .unwrap_or(false);
         let is_feedback = feedback_edge_set.contains(&i);
-        let has_chain = corridor_plan.chains.contains_key(&i);
-        let same_leaf = group_ctx.is_same_leaf_group(from_id, to_id);
         let pair = EndpointPair {
             from: from_ep,
             to: to_ep,
         };
-        let strict = should_strict_group_transit(
-            profile,
-            group_ctx,
-            from_id,
-            to_id,
-            has_chain,
-            is_feedback,
-        );
+        let strict = should_strict_group_transit(is_feedback);
 
         let mut path_stats = PathSelectStats::default();
-        let corridor_ok = validated_corridor_path(
-            i,
-            ea.from_anchor,
-            ea.to_anchor,
-            from_id,
-            to_id,
-            corridor_plan,
-            group_ctx,
-            nodes,
-            obstacles,
-            cfg.channel_margin,
+        // Phase 3.x：prefer_periphery 优先读 RoutingContract TransitIntent。
+        let prefer_outer = routing_contract
+            .prefer_periphery(crate::layout::routing::model::StableEdgeId(i))
+            || is_feedback;
+        let mut ctx =
+            OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
+                .with_strict_group_transit(strict)
+                .with_corridor_boost(corridor_boost || !group_ctx.is_same_leaf_group(from_id, to_id))
+                .with_prefer_outer_ring(prefer_outer)
+                .with_prefer_periphery(prefer_outer)
+                .with_first_pass(first_pass);
+        if let Some(m) = corridor_model {
+            ctx = ctx.with_corridor_demands(m);
+        }
+        if let Some(ovg_ref) = ovg {
+            ctx = ctx.with_ovg(ovg_ref);
+        }
+        let mut path = select_best_path_with_scorer_stats(
+            &ctx,
+            &pair,
+            &DefaultScorer,
+            Some(&mut path_stats),
+            false,
         );
-        // Phase A: 回环边始终偏好外环路由，避免与正向边抢内部通道。
-        // with_prefer_outer_ring 同时置 prefer_periphery（LexA* Q5）。
-        let prefer_outer = is_feedback;
-        // P2：有 chain 但 validated 失败 → 显式 degraded（禁止静默 free-route 冒充成功）。
-        let corridor_contract_failed = has_chain && corridor_ok.is_none();
-        // Phase B3 + P2-1: 查询全局通道规划的精确 lane 坐标（优先）或通道中心（fallback）
-        let planned_ch = channel_plan.and_then(|cp| {
-            // P2-1: 优先使用精确 lane 坐标（同通道多边已分离）
-            if let Some(&(lane_coord, is_vert)) = cp.lane_assignments.get(&i) {
-                let from_vertical = is_vertical_port(ea.from_port);
-                if from_vertical == is_vert {
-                    return Some(lane_coord);
-                }
-            }
-            // fallback: 通道中心坐标
-            let (coord, is_vert) = cp.channel_for_edge(i)?;
-            let from_vertical = is_vertical_port(ea.from_port);
-            if from_vertical == is_vert { Some(coord) } else { None }
-        });
-        let mut path = corridor_ok.unwrap_or_else(|| {
-            let mut ctx =
-                OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
-                    .with_strict_group_transit(strict)
-                    .with_corridor_boost(
-                        corridor_boost || corridor_contract_failed || (!same_leaf && !has_chain),
-                    )
-                    .with_prefer_outer_ring(prefer_outer)
-                    .with_first_pass(first_pass);
-            if let Some(m) = corridor_model {
-                ctx = ctx.with_corridor_demands(m);
-            }
-            if let Some(ovg_ref) = ovg {
-                ctx = ctx.with_ovg(ovg_ref);
-            }
-            if planned_ch.is_some() {
-                ctx = ctx.with_planned_channel(planned_ch);
-            }
-            select_best_path_with_scorer_stats(
-                &ctx,
-                &pair,
-                &DefaultScorer,
-                Some(&mut path_stats),
-                false,
-            )
-        });
         // S2：0 候选/退化 → 升走廊预算再路由一次（加大外框垫），禁止静默脏折线
         if path_stats.degraded && !corridor_boost {
             corridor_boost = true;
@@ -203,7 +159,7 @@ pub(crate) fn phase_route_edges(
         }
         ortho_stats.total_candidates += path_stats.candidate_count;
         ortho_stats.hard_filter_reject_count += path_stats.hard_filter_reject_count;
-        if path_stats.degraded || corridor_contract_failed {
+        if path_stats.degraded {
             ortho_stats.degraded_count += 1;
             if let Some(budget) = space_budget.as_mut() {
                 budget.request_corridor_boost();

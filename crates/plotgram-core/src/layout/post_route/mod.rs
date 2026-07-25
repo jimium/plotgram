@@ -8,5 +8,7 @@ pub(super) mod border_repulse;
 /// 可保留边占比低于该阈值时退回全图重路由（Slice F2c：增量复用门槛）。
 pub const MIN_PRESERVE_RATIO: f64 = 0.10;
 
-pub use shell_expand::post_route_shell_expand;
+pub use shell_expand::{
+    feedforward_shell_from_orthosketch, post_route_shell_expand, route_shell_overflow_remaining,
+};
 pub use border_repulse::{repulse_edges_only, snap_and_repulse_edges, snap_and_repulse_edges_with_guard};

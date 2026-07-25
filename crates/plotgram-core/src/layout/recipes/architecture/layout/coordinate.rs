@@ -59,12 +59,13 @@ pub(in super::super) fn assign_coordinates(
     };
     let h_pad = PADDING + side_gutter;
 
-    // 计算每层的 y 偏移
-    let mut layer_y_offsets = vec![PADDING];
-    for i in 1..layers.len() {
-        let gap = per_layer_gaps.get(i - 1).copied().unwrap_or(LAYER_GAP);
-        layer_y_offsets.push(layer_y_offsets[i - 1] + layer_heights[i - 1] + gap);
-    }
+    // 计算每层的 y 偏移（Phase 5：Main 轴二次求解，替代纯启发式堆叠）
+    let layer_y_offsets = crate::layout::kernel::coordinate::main_axis::solve_main_axis_layer_tops(
+        &layer_heights,
+        &per_layer_gaps,
+        PADDING,
+        LAYER_GAP,
+    );
 
     // 完整 BK 四趟：effective DAG + 跨层 dummy
     let bk_centers = assign_layer_centers_for_string_graph(
@@ -87,6 +88,7 @@ pub(in super::super) fn assign_coordinates(
         &facts.diagram_type,
         has_groups,
         group_map,
+        None, // hierarchical 走 two_phase；flat 无组时 diagram 可选
     );
     let solver_result = crate::layout::kernel::coordinator::CoordinateKernel::solve(
         "architecture",
@@ -149,221 +151,12 @@ pub(in super::super) fn assign_coordinates(
     (nodes, solved_problem)
 }
 
-/// 同层 X 消重叠：无组可读走廊用 `adjacent_rank_gap`，否则 NODE_GAP。
-fn resolve_layer_x_gaps(
-    layer: &[String],
-    positions: &[f64],
-    sizes: &HashMap<String, (f64, f64)>,
-    relations: &[crate::ast::Relation],
-    parallel_gap: f64,
-    profile: crate::layout::demand::band::EdgeBandDemandProfile,
-) -> Vec<f64> {
-    if profile.horizontal_max_extra <= 0.0 {
-        return resolve_x_overlaps(layer, positions, sizes);
-    }
-    let layer_ids: HashSet<&str> = layer.iter().map(|s| s.as_str()).collect();
-    resolve_x_overlaps_with_gaps(layer, positions, sizes, |a, b| {
-        crate::layout::demand::band::adjacent_rank_gap(
-            a,
-            b,
-            &layer_ids,
-            relations,
-            NODE_GAP,
-            parallel_gap,
-            profile,
-        )
-    })
-}
-
-/// 邻接对齐 / 重叠消除后重申水平 demand 缝（否则会被 `resolve_x_overlaps(NODE_GAP)` 压回）。
-pub(in super::super) fn enforce_horizontal_demand_gaps(
-    facts: &ArchDiagramFacts,
-    layers: &[Vec<String>],
-    sizes: &HashMap<String, (f64, f64)>,
-    nodes: &mut HashMap<String, NodeLayout>,
-) {
-    let profile = crate::layout::demand::band::EdgeBandDemandProfile::for_diagram(
-        facts.diagram_type.clone(),
-        facts.has_groups,
-    );
-    if profile.horizontal_max_extra <= 0.0 {
-        return;
-    }
-    let parallel_gap =
-        crate::layout::routing::segment_pair::parallel_gap_for_diagram(facts.diagram_type.clone());
-    for layer in layers {
-        if layer.len() < 2 {
-            continue;
-        }
-        let centers: Vec<f64> = layer.iter().map(|n| node_center_x(n, nodes)).collect();
-        let resolved = resolve_layer_x_gaps(
-            layer,
-            &centers,
-            sizes,
-            &facts.relations,
-            parallel_gap,
-            profile,
-        );
-        for (node, cx) in layer.iter().zip(resolved.iter()) {
-            if let Some(nl) = nodes.get_mut(node) {
-                nl.x = cx - nl.width / 2.0;
-            }
-        }
-    }
-}
-
-/// 从已放置节点读取层内中心；缺失节点用均匀分布补齐
-pub(in super::super) fn layer_centers_from_placed(
-    layer: &[String],
-    placed: &HashMap<String, NodeLayout>,
-    sizes: &HashMap<String, (f64, f64)>,
-) -> HashMap<String, f64> {
-    let fallback = uniform_initial_positions(layer, sizes);
-    layer
-        .iter()
-        .enumerate()
-        .map(|(i, id)| {
-            let cx = placed
-                .get(id)
-                .map(|nl| nl.x + nl.width / 2.0)
-                .unwrap_or(fallback[i]);
-            (id.clone(), cx)
-        })
-        .collect()
-}
-
 fn node_center_x(node: &str, nodes: &HashMap<String, NodeLayout>) -> f64 {
     nodes
         .get(node)
         .map(|nl| nl.x + nl.width / 2.0)
         .unwrap_or(0.0)
 }
-
-/// 为一层的节点生成均匀非负的初始 x 中心
-pub(in super::super) fn uniform_initial_positions(
-    layer: &[String],
-    sizes: &HashMap<String, (f64, f64)>,
-) -> Vec<f64> {
-    let mut positions = Vec::with_capacity(layer.len());
-    let mut cursor = PADDING;
-    for node in layer {
-        let width = sizes.get(node).map(|(w, _)| *w).unwrap_or(constants::DEFAULT_NODE_WIDTH);
-        positions.push(cursor + width / 2.0);
-        cursor += width + NODE_GAP;
-    }
-    positions
-}
-
-/// 朝邻层中位数方向拉动节点（坐标分配阶段）
-///
-/// `filter` 为 `Some` 时仅考虑 filter 内的邻居（组内布局场景）；
-/// 为 `None` 时考虑所有邻居（全局布局场景）。
-///
-/// `pull_factor` 控制单次拉力强度（0.0=不动，1.0=直接跳到中位数）。
-/// 邻居必须是 effective DAG 边（过滤 FAS 反转边）。
-pub(in super::super) fn pull_toward_neighbors(
-    layer: &[String],
-    positions: &mut [f64],
-    neighbor_x: &HashMap<String, f64>,
-    graph: &GraphIndex,
-    reversed: &HashSet<(String, String)>,
-    filter: Option<&HashSet<String>>,
-    from_upper: bool,
-    pull_factor: f64,
-) {
-    for (i, node) in layer.iter().enumerate() {
-        let neighbors = if from_upper {
-            graph.in_edges.get(node).cloned().unwrap_or_default()
-        } else {
-            graph.out_edges.get(node).cloned().unwrap_or_default()
-        };
-
-        let positions_set: Vec<f64> = neighbors
-            .iter()
-            .filter(|n| filter.map_or(true, |f| f.contains(*n)))
-            .filter(|n| {
-                if from_upper {
-                    is_effective_edge(n, node, reversed)
-                } else {
-                    is_effective_edge(node, n, reversed)
-                }
-            })
-            .filter_map(|n| neighbor_x.get(n).copied())
-            .collect();
-
-        if positions_set.is_empty() {
-            continue;
-        }
-
-        let median = {
-            let mut sorted = positions_set;
-            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            sorted[sorted.len() / 2]
-        };
-
-        // 朝中位数方向移动（部分移动，避免跳跃）
-        let current = positions[i];
-        let pull = (median - current) * pull_factor;
-        positions[i] = current + pull;
-    }
-}
-
-pub(in super::super) fn resolve_x_overlaps(
-    layer: &[String],
-    positions: &[f64],
-    sizes: &HashMap<String, (f64, f64)>,
-) -> Vec<f64> {
-    resolve_x_overlaps_with_gaps(layer, positions, sizes, |_, _| NODE_GAP)
-}
-
-/// 同层 X 重叠消除，间距由 `gap_between(left_id, right_id)` 提供（空间契约）。
-pub(in super::super) fn resolve_x_overlaps_with_gaps<F>(
-    layer: &[String],
-    positions: &[f64],
-    sizes: &HashMap<String, (f64, f64)>,
-    gap_between: F,
-) -> Vec<f64>
-where
-    F: Fn(&str, &str) -> f64,
-{
-    let n = layer.len();
-    if n <= 1 {
-        return positions.to_vec();
-    }
-
-    let mut adjusted = positions.to_vec();
-
-    for i in 1..n {
-        let prev_width = sizes.get(&layer[i - 1]).map(|(w, _)| *w).unwrap_or(constants::DEFAULT_NODE_WIDTH);
-        let curr_width = sizes.get(&layer[i]).map(|(w, _)| *w).unwrap_or(constants::DEFAULT_NODE_WIDTH);
-        let gap = gap_between(&layer[i - 1], &layer[i]);
-        let min_center = adjusted[i - 1] + prev_width / 2.0 + gap + curr_width / 2.0;
-        if adjusted[i] < min_center {
-            adjusted[i] = min_center;
-        }
-    }
-
-    for i in (0..n.saturating_sub(1)).rev() {
-        let next_width = sizes.get(&layer[i + 1]).map(|(w, _)| *w).unwrap_or(constants::DEFAULT_NODE_WIDTH);
-        let curr_width = sizes.get(&layer[i]).map(|(w, _)| *w).unwrap_or(constants::DEFAULT_NODE_WIDTH);
-        let gap = gap_between(&layer[i], &layer[i + 1]);
-        let max_center = adjusted[i + 1] - next_width / 2.0 - gap - curr_width / 2.0;
-        if adjusted[i] > max_center {
-            adjusted[i] = max_center;
-        }
-    }
-
-    for i in 0..n {
-        let width = sizes.get(&layer[i]).map(|(w, _)| *w).unwrap_or(constants::DEFAULT_NODE_WIDTH);
-        let min_x = PADDING + width / 2.0;
-        if adjusted[i] < min_x {
-            adjusted[i] = min_x;
-        }
-    }
-
-    adjusted
-}
-
 /// 层内节点是否全部无顶层 group（基础设施行）
 fn is_infrastructure_layer(layer: &[String], group_map: &GroupMap) -> bool {
     !layer.is_empty()
@@ -454,56 +247,3 @@ pub(in super::super) fn center_layer_on_anchor(
         cursor += width + NODE_GAP;
     }
 }
-
-/// 重叠消除后，将无组基础设施行重新绕上游锚点居中（仅调整 x）
-pub(in super::super) fn rebalance_infrastructure_layers(
-    facts: &ArchDiagramFacts,
-    graph: &GraphIndex,
-    group_map: &GroupMap,
-    layers: &[Vec<String>],
-    sizes: &HashMap<String, (f64, f64)>,
-    nodes: &mut HashMap<String, NodeLayout>,
-    reversed: &HashSet<(String, String)>,
-) {
-    let parallel_gap =
-        crate::layout::routing::segment_pair::parallel_gap_for_diagram(facts.diagram_type.clone());
-    let profile = crate::layout::demand::band::EdgeBandDemandProfile::for_diagram(
-        facts.diagram_type.clone(),
-        facts.has_groups,
-    );
-    for layer in layers {
-        if !is_infrastructure_layer(layer, group_map) {
-            continue;
-        }
-        let Some(anchor_x) = infrastructure_anchor_x(layer, graph, nodes, reversed) else {
-            continue;
-        };
-
-        let mut centers: Vec<f64> = Vec::with_capacity(layer.len());
-        for node in layer {
-            centers.push(
-                nodes
-                    .get(node)
-                    .map(|nl| nl.x + nl.width / 2.0)
-                    .unwrap_or(anchor_x),
-            );
-        }
-        center_layer_on_anchor(layer, &mut centers, sizes, anchor_x);
-        // 与 assign_coordinates 一致：居中后再按 demand 缝消重叠
-        centers = resolve_layer_x_gaps(
-            layer,
-            &centers,
-            sizes,
-            &facts.relations,
-            parallel_gap,
-            profile,
-        );
-
-        for (node, cx) in layer.iter().zip(centers.iter()) {
-            if let Some(nl) = nodes.get_mut(node) {
-                nl.x = cx - nl.width / 2.0;
-            }
-        }
-    }
-}
-

@@ -9,7 +9,7 @@
 //! - Kernel/prepare 不读取 `DiagramType`（本模块只读 relations/groups/nodes 几何与声明语义）。
 
 use super::contract::RoutingContract;
-use super::stable_edge::StableEdgeStore;
+use super::stable_edge::{StableEdgeId, StableEdgeStore};
 use crate::ast::Diagram;
 use crate::layout::routing::config::RoutingConfig;
 use crate::layout::routing::coordinator::FrozenNodeProduct;
@@ -59,11 +59,29 @@ impl<'a> PreparedRoutingInput<'a> {
         hints: &'a LayoutHints,
         direction: &str,
         family: &str,
-        config: RoutingConfig,
+        mut config: RoutingConfig,
         canvas: RoutingCanvas,
     ) -> Self {
         let edges = StableEdgeStore::from_diagram(diagram);
-        let contract = RoutingContract::compile(&edges);
+        let mut contract = RoutingContract::compile(&edges);
+
+        // D4-4：在 prepare 边界富化契约（单一真源）。
+        // ShareTrunk：recipe/pipeline 可预置 config.share_trunk；若未置位则按
+        // edge_merge_policy 一次判定（不经 OrthoRoutingProfile）。
+        if !config.share_trunk
+            && crate::layout::routing::edge_merge_policy::requires_semantic_merge(
+                diagram.diagram_type.clone(),
+            )
+        {
+            config.share_trunk = true;
+        }
+        let periphery = periphery_edge_ids(&edges, hints.sugiyama_ranks.as_ref());
+        contract.fill_prefer_periphery(&periphery);
+        if config.share_trunk && edges.len() > 0 {
+            let all: Vec<_> = (0..edges.len()).map(StableEdgeId).collect();
+            contract.with_share_trunk(all);
+        }
+
         Self {
             frozen,
             diagram,
@@ -79,12 +97,12 @@ impl<'a> PreparedRoutingInput<'a> {
 
     /// 便捷方法：只读节点 map。
     pub fn nodes(&self) -> &std::collections::HashMap<String, NodeLayout> {
-        &self.frozen.nodes
+        self.frozen.nodes()
     }
 
     /// 便捷方法：只读分组 map。
     pub fn groups(&self) -> &std::collections::HashMap<String, GroupLayout> {
-        &self.frozen.groups
+        self.frozen.groups()
     }
 
     /// 确定性 problem signature（u64）：可完整描述一次 route run 的输入。
@@ -103,7 +121,7 @@ impl<'a> PreparedRoutingInput<'a> {
         format!("{:?}", self.config).hash(&mut h);
 
         // 节点几何：按 id 升序
-        let mut node_entries: Vec<(&String, &NodeLayout)> = self.frozen.nodes.iter().collect();
+        let mut node_entries: Vec<(&String, &NodeLayout)> = self.frozen.nodes().iter().collect();
         node_entries.sort_by(|a, b| a.0.cmp(b.0));
         for (id, n) in node_entries {
             id.hash(&mut h);
@@ -114,7 +132,7 @@ impl<'a> PreparedRoutingInput<'a> {
         }
 
         // 分组几何：按 id 升序
-        let mut group_entries: Vec<(&String, &GroupLayout)> = self.frozen.groups.iter().collect();
+        let mut group_entries: Vec<(&String, &GroupLayout)> = self.frozen.groups().iter().collect();
         group_entries.sort_by(|a, b| a.0.cmp(b.0));
         for (id, g) in group_entries {
             id.hash(&mut h);
@@ -150,13 +168,37 @@ impl<'a> PreparedRoutingInput<'a> {
             self.family,
             if self.direction.is_empty() { "-" } else { &self.direction },
             self.edges.len(),
-            self.frozen.nodes.len(),
-            self.frozen.groups.len(),
+            self.frozen.nodes().len(),
+            self.frozen.groups().len(),
             self.contract.topology.self_loop_count,
             self.contract.topology.parallel_group_count,
             self.problem_signature(),
         )
     }
+}
+
+/// 从 sugiyama ranks 推断 periphery（feedback / 同层）边：`from_rank >= to_rank`。
+fn periphery_edge_ids(
+    edges: &StableEdgeStore,
+    ranks: Option<&std::collections::HashMap<String, usize>>,
+) -> Vec<StableEdgeId> {
+    let Some(ranks) = ranks else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for e in edges.iter() {
+        let Some(&fr) = ranks.get(&e.from) else {
+            continue;
+        };
+        let Some(&tr) = ranks.get(&e.to) else {
+            continue;
+        };
+        if fr >= tr {
+            out.push(e.id);
+        }
+    }
+    out.sort_by_key(|id| id.index());
+    out
 }
 
 #[cfg(test)]
@@ -193,7 +235,7 @@ mod tests {
         nodes.insert("c".into(), NodeLayout { x: 200.0, y: 0.0, width: 40.0, height: 30.0, ..Default::default() });
         let result = LayoutResult {
             nodes,
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: Vec::new(),
             total_width: 300.0,
             total_height: 100.0,

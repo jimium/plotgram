@@ -1,15 +1,10 @@
 // 泳道图：跨部门订单处理流程
-// group 水平排列（泳道），组内垂直布局
+// 结构靠 group 分区表达；泳道几何语义留给后续 DSL（本阶段不写 group_frame）
 // @role: product  (authoritative: filename prefix)
 diagram flowchart {
     title: "跨部门订单处理（泳道图）"
     config {
         direction: top-to-bottom
-        group_frame: stack {
-            axis: horizontal
-            cross: start
-            gap: 80
-        }
     }
 
     group customer "客户" {

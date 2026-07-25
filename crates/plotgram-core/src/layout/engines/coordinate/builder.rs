@@ -10,6 +10,9 @@ use std::collections::HashMap;
 use super::model::*;
 use crate::layout::engines::layered::graph::{LayerNode, LayerNodeKind};
 use crate::layout::engines::layered::preset::SugiyamaPreset;
+use crate::layout::kernel::coordinate::builder::{
+    append_rank_layer_vars, build_adjacent_min_separations, RankNodeSpec,
+};
 
 /// 构建输出：包含问题 IR 和节点→变量映射。
 pub(in crate::layout) struct BuildOutput {
@@ -30,76 +33,62 @@ pub(in crate::layout) fn build_with_mapping(
 
     let mut vars: Vec<NodeVariable> = Vec::new();
     let mut node_to_var: HashMap<NodeIndex, VarId> = HashMap::new();
-    let mut layer_var_ids: Vec<Vec<VarId>> = Vec::with_capacity(layers.len());
+    let mut initial_values: Vec<f64> = Vec::new();
+    let mut layer_constraints: Vec<LayerConstraintSet> = Vec::with_capacity(layers.len());
 
     for (rank, layer) in layers.iter().enumerate() {
-        let mut layer_vars = Vec::new();
-        for (order, node) in layer.iter().enumerate() {
-            let (w, h) = sizes.get(node).copied().unwrap_or((default_w, default_h));
-            let axis_size = if horizontal { h } else { w };
-
-            let kind = match &layered_graph[*node].kind {
-                LayerNodeKind::Real(_) => VarKind::Real,
-                LayerNodeKind::Dummy { .. } => VarKind::Dummy,
-            };
-
-            let stable_id = match &layered_graph[*node].kind {
+        // stable_id 缓冲：RankNodeSpec 只借引用。
+        let ids: Vec<String> = layer
+            .iter()
+            .map(|node| match &layered_graph[*node].kind {
                 LayerNodeKind::Real(_) => format!("n{}", node.index()),
                 LayerNodeKind::Dummy { .. } => format!("d{}", node.index()),
-            };
-
-            let var_id = vars.len();
-            vars.push(NodeVariable {
-                var_id,
-                stable_id,
-                kind,
-                rank,
-                order,
-                axis_size,
-                movable: true,
-            });
+            })
+            .collect();
+        let rank_specs: Vec<RankNodeSpec<'_>> = layer
+            .iter()
+            .enumerate()
+            .map(|(i, node)| {
+                let (w, h) = sizes.get(node).copied().unwrap_or((default_w, default_h));
+                let axis_size = if horizontal { h } else { w };
+                let kind = match &layered_graph[*node].kind {
+                    LayerNodeKind::Real(_) => VarKind::Real,
+                    LayerNodeKind::Dummy { .. } => VarKind::Dummy,
+                };
+                RankNodeSpec {
+                    stable_id: &ids[i],
+                    axis_size,
+                    initial_center: centers.get(node).copied().unwrap_or(0.0),
+                    kind,
+                }
+            })
+            .collect();
+        let layer_vars = append_rank_layer_vars(&mut vars, &mut initial_values, rank, &rank_specs);
+        for (node, &var_id) in layer.iter().zip(layer_vars.iter()) {
             node_to_var.insert(*node, var_id);
-            layer_vars.push(var_id);
         }
-        layer_var_ids.push(layer_vars);
-    }
-
-    let mut layer_constraints: Vec<LayerConstraintSet> = Vec::with_capacity(layers.len());
-    for (rank, layer_vars) in layer_var_ids.iter().enumerate() {
-        let mut separations = Vec::with_capacity(layer_vars.len().saturating_sub(1));
-        for i in 0..layer_vars.len().saturating_sub(1) {
-            let left_var = layer_vars[i];
-            let right_var = layer_vars[i + 1];
-            let left_size = vars[left_var].axis_size;
-            let right_size = vars[right_var].axis_size;
-            let gap = preset.node_gap;
-            let sep = left_size / 2.0 + right_size / 2.0 + gap;
-            separations.push(sep);
-        }
-        layer_constraints.push(LayerConstraintSet {
+        let gaps: Vec<f64> = (0..layer_vars.len().saturating_sub(1))
+            .map(|_| preset.node_gap)
+            .collect();
+        layer_constraints.push(build_adjacent_min_separations(
             rank,
-            vars: layer_vars.clone(),
-            separations,
-        });
-    }
-
-    let mut initial_values = vec![0.0f64; vars.len()];
-    for (node, &var_id) in &node_to_var {
-        if let Some(&center) = centers.get(node) {
-            initial_values[var_id] = center;
-        }
+            layer_vars,
+            &vars,
+            &gaps,
+        ));
     }
 
     BuildOutput {
-        problem: CoordinateProblem {
+        problem: CoordinateProblem::build(
             vars,
-            layers: layer_constraints,
-            hard: Vec::new(),
-            objectives: Vec::new(),
-            initial: InitialCoordinates { values: initial_values },
-            config: CoordinateSolverConfig::default(),
-            axis: Default::default(),
-        },
+            layer_constraints,
+            Vec::new(),
+            Vec::new(),
+            InitialCoordinates {
+                values: initial_values,
+            },
+            SolveAxis::Cross,
+        ),
         node_to_var,
     }
 }

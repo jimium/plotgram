@@ -4,20 +4,13 @@
 // @role: product  (authoritative: filename prefix)
 diagram architecture {
     title: "数据仓ETL处理架构"
-    config {
-        group_frame: stack {
-            track: equal
-        }
-    }
 
     group source "数据源层" {
-        layout: horizontal
         entity[database] app_db "业务数据库"
         entity[service] log_server "日志服务器"
     }
 
     group process "数据计算层" {
-        layout: fan-out
         entity[queue] kafka "消息队列(Kafka)" {
             semantic: kafka
         }
@@ -30,7 +23,6 @@ diagram architecture {
     }
 
     group storage "数据存储层" {
-        layout: vertical
         entity[database] hive "数仓(Hive)" {
             semantic: hive
         }

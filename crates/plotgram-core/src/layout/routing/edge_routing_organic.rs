@@ -713,7 +713,7 @@ mod tests {
         let result = LayoutResult {
             nodes,
             edges: Vec::new(),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             total_width: 300.0,
             total_height: 200.0,
             hints: LayoutHints::default(),
@@ -810,7 +810,7 @@ mod tests {
         let result = LayoutResult {
             nodes,
             edges: Vec::new(),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             total_width: 500.0,
             total_height: 200.0,
             hints: LayoutHints {
@@ -898,7 +898,7 @@ mod tests {
         let result = LayoutResult {
             nodes,
             edges: Vec::new(),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             total_width: 300.0,
             total_height: 200.0,
             hints: LayoutHints::default(), // 无 mindmap_depths

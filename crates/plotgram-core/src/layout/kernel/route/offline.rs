@@ -3,6 +3,10 @@
 //! **不接线生产**。供 Phase 1 确定性单测与硬约束违反清单产出。
 
 use super::auditor::{RouteHardAuditReport, audit_problem_against_layout};
+use super::capacity::{
+    all_port_candidates, compile_min_separation_constraints, compile_port_capacity_constraints,
+    port_to_id,
+};
 use super::graph::ResourceGraph;
 use super::model::{
     ConstraintSource, ConstraintSourceKind, EdgeVariable, RouteHardConstraint, RouteObjective,
@@ -41,7 +45,7 @@ impl OfflineViolationSummary {
         let _ = writeln!(s, "# {title}\n");
         let _ = writeln!(
             s,
-            "> Phase 1 离线硬约束校验（H0–H3）。H4/H5 尚未逐边展开；H6 由签名确定性单测覆盖。\n"
+            "> Phase 3 离线硬约束校验（H0–H5）。H6 由签名确定性单测覆盖。\n"
         );
         let _ = writeln!(s, "## 汇总\n");
         let _ = writeln!(s, "| 样本数 | 检查边数 | 违规总数 |");
@@ -89,7 +93,7 @@ impl OfflineViolationSummary {
     }
 }
 
-/// 从生产布局反向构造 `RouteProblem`（Phase 1 最小 IR）。
+/// 从生产布局反向构造 `RouteProblem`（Phase 3：含端口候选域 + H4/H5）。
 pub fn build_route_problem_from_layout(diagram: &Diagram, layout: &LayoutResult) -> RouteProblem {
     let mut nodes_bt: BTreeMap<String, crate::layout::types::NodeLayout> = BTreeMap::new();
     for (k, v) in &layout.nodes {
@@ -100,23 +104,40 @@ pub fn build_route_problem_from_layout(diagram: &Diagram, layout: &LayoutResult)
 
     let mut edges = Vec::with_capacity(diagram.relations.len());
     let mut hard = Vec::new();
+    let mut edge_ports: Vec<(usize, &str, Port, &str, Port)> = Vec::new();
+    let mut sep_pairs: Vec<(usize, usize)> = Vec::new();
+
     for (i, rel) in diagram.relations.iter().enumerate() {
         let (from_port, to_port) = layout
             .edges
             .get(i)
             .map(|e| (e.from_port, e.to_port))
             .unwrap_or((Port::Bottom, Port::Top));
+        // 决策域：四向候选（已选端口置前，保证签名稳定且含当前解）
+        let mut from_cands = all_port_candidates();
+        let mut to_cands = all_port_candidates();
+        let fp = port_to_id(from_port);
+        let tp = port_to_id(to_port);
+        from_cands.sort_by_key(|&p| if p == fp { 0 } else { 1 + p });
+        to_cands.sort_by_key(|&p| if p == tp { 0 } else { 1 + p });
         edges.push(EdgeVariable {
             edge: i,
             from_node: rel.from.as_str().to_string(),
             to_node: rel.to.as_str().to_string(),
-            from_port_candidates: vec![port_to_id(from_port)],
-            to_port_candidates: vec![port_to_id(to_port)],
+            from_port_candidates: from_cands,
+            to_port_candidates: to_cands,
         });
+        edge_ports.push((
+            i,
+            rel.from.as_str(),
+            from_port,
+            rel.to.as_str(),
+            to_port,
+        ));
         hard.push(RouteHardConstraint::EndpointOnBoundary {
             edge: i,
             node: rel.from.as_str().to_string(),
-            port: port_to_id(from_port),
+            port: fp,
             source: ConstraintSource {
                 kind: ConstraintSourceKind::EndpointGeometry,
                 entities: vec![rel.from.as_str().to_string()],
@@ -126,7 +147,7 @@ pub fn build_route_problem_from_layout(diagram: &Diagram, layout: &LayoutResult)
         hard.push(RouteHardConstraint::EndpointOnBoundary {
             edge: i,
             node: rel.to.as_str().to_string(),
-            port: port_to_id(to_port),
+            port: tp,
             source: ConstraintSource {
                 kind: ConstraintSourceKind::EndpointGeometry,
                 entities: vec![rel.to.as_str().to_string()],
@@ -149,6 +170,32 @@ pub fn build_route_problem_from_layout(diagram: &Diagram, layout: &LayoutResult)
             });
         }
     }
+
+    // 同无序端点对 → H5 候选对
+    let mut by_pair: BTreeMap<(String, String), Vec<usize>> = BTreeMap::new();
+    for (i, rel) in diagram.relations.iter().enumerate() {
+        let a = rel.from.as_str();
+        let b = rel.to.as_str();
+        let key = if a <= b {
+            (a.to_string(), b.to_string())
+        } else {
+            (b.to_string(), a.to_string())
+        };
+        by_pair.entry(key).or_default().push(i);
+    }
+    for members in by_pair.values() {
+        if members.len() < 2 {
+            continue;
+        }
+        for i in 0..members.len() {
+            for j in (i + 1)..members.len() {
+                sep_pairs.push((members[i], members[j]));
+            }
+        }
+    }
+    // 默认间距 8（flowchart）；审计用统一阈值
+    hard.extend(compile_min_separation_constraints(&sep_pairs, 8.0));
+    hard.extend(compile_port_capacity_constraints(&edge_ports));
 
     let objectives = vec![
         RouteObjective {
@@ -174,15 +221,6 @@ pub fn build_route_problem_from_layout(diagram: &Diagram, layout: &LayoutResult)
         hard,
         objectives,
         config: RouteSolverConfig::default(),
-    }
-}
-
-fn port_to_id(p: Port) -> u8 {
-    match p {
-        Port::Top => 0,
-        Port::Right => 1,
-        Port::Bottom => 2,
-        Port::Left => 3,
     }
 }
 
@@ -251,10 +289,10 @@ diagram flowchart {
 
     /// 跑 product-regression 全集并写入硬约束违反清单。
     /// 日常 `cargo test` 跳过；显式：
-    /// `cargo test -p plotgram-core --lib write_phase1_hard_constraint_report -- --ignored --nocapture`
+    /// `cargo test -p plotgram-core --lib write_phase3_hard_constraint_report -- --ignored --nocapture`
     #[test]
-    #[ignore = "writes docs/优化重构/25-Phase2-硬约束违反清单-2026-07.md"]
-    fn write_phase1_hard_constraint_report() {
+    #[ignore = "writes docs/优化重构/26-Phase3-硬约束违反清单-2026-07.md"]
+    fn write_phase3_hard_constraint_report() {
         use std::path::PathBuf;
         let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let root = manifest.join("../..");
@@ -298,9 +336,9 @@ diagram flowchart {
         }
         let summary = OfflineViolationSummary { reports };
         let md = summary.to_markdown(
-            "Phase 2 硬约束违反清单（LexAStar 切轨后，product-regression）",
+            "Phase 3 硬约束违反清单（端口/lane 联合求解后，product-regression）",
         );
-        let out = root.join("docs/优化重构/25-Phase2-硬约束违反清单-2026-07.md");
+        let out = root.join("docs/优化重构/26-Phase3-硬约束违反清单-2026-07.md");
         std::fs::write(&out, &md).expect("write report");
         eprintln!("wrote {} ({} bytes)", out.display(), md.len());
         assert!(

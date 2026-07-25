@@ -23,3 +23,15 @@ jobs:
         run: |
           cargo test -p plotgram-core --lib
           cargo test -p plotgram-eval --lib deterministic
+
+      - name: Phase6 penalty ratio + registry
+        run: ./benchmarks/scripts/check-penalty-ratio.sh
+
+      - name: Phase6 semantic isolation
+        run: ./benchmarks/scripts/check-semantic-isolation.sh
+
+      - name: G0 group write ratchet
+        run: ./benchmarks/scripts/check-group-writes.sh
+
+      - name: G5 builder entry ratchet
+        run: ./benchmarks/scripts/check-builder-entry.sh

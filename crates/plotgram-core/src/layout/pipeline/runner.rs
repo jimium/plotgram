@@ -12,7 +12,6 @@ use crate::layout::refine;
 use super::registry;
 use crate::layout::route_feedback::{LayoutRouteFeedback, PreRouteFeedback};
 use crate::layout::{resolve_effective_direction, LayoutResult};
-use std::collections::HashMap;
 
 /// 布局管线。
 pub(crate) struct LayoutPipeline<'a> {
@@ -41,6 +40,7 @@ impl<'a> LayoutPipeline<'a> {
     }
 
     pub fn run(self) -> Result<LayoutResult, DiagnosticError> {
+        crate::layout::group::write_counter::reset_group_write_counters();
         let algo = self.plan.layout_algo.as_str();
 
         let strategy = registry::build_layout_strategy(algo, self.plan).ok_or_else(|| {
@@ -74,6 +74,7 @@ impl<'a> LayoutPipeline<'a> {
 
         if produces_edges {
             canvas_finalize::finalize_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
+            crate::layout::group::write_counter::warn_if_group_writes_excessive(2);
             return Ok(result);
         }
 
@@ -86,6 +87,8 @@ impl<'a> LayoutPipeline<'a> {
         );
 
         canvas_finalize::finalize_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
+        // G4：compute_bounds + canvas translate（≤2）；供 check-group-writes.sh。
+        crate::layout::group::write_counter::warn_if_group_writes_excessive(2);
         Ok(result)
     }
 
@@ -103,9 +106,8 @@ impl<'a> LayoutPipeline<'a> {
             return Ok(());
         }
 
-        let horizontal = effective_dir == Some("left-to-right");
-
-        // Phase B: 所有图类型使用 solver，solver 已处理对齐，跳过 align_nodes
+        // Phase B: 所有图类型使用 solver，solver 已处理对齐，跳过 align_nodes。
+        // G3：GroupFramePass 空壳，不再改写组几何。
         let algo = self.plan.layout_algo.as_str();
         let gf_pass = GroupFramePass::resolve(self.diagram, self.plan, algo);
         gf_pass.apply_after_node_snap(self.diagram, result, algo);
@@ -146,100 +148,23 @@ impl<'a> LayoutPipeline<'a> {
         // P5: 按节点密度自适应网格步长（小图精细、大图粗放，减少密集区视觉碎片）
         edge_snap_config.grid_step = grid_snap::adaptive_grid_step(result_v2.nodes.len());
         let gf_pass = GroupFramePass::resolve(self.diagram, self.plan, algo);
+        // G3：Frame apply/refresh/restore 空壳；不再 sibling/expand/recompute。
         if !self.diagram.groups.is_empty() {
             gf_pass.refresh_before_route(self.diagram, &mut result_v2, algo);
         }
 
-        // Slice A: SpacingDemandProbe——路由前估计间距需求，重解坐标。
-        if let Some(new_coords) =
-            crate::layout::route_feedback::spacing_demand_probe(self.diagram, &result_v2)
-        {
-            crate::perf_log!("[spacing-probe] applying re-solved coordinates");
-            if let Some(problem) = result_v2.hints.coordinate_problem.as_ref() {
-                for (var, &new_c) in problem.vars.iter().zip(new_coords.iter()) {
-                    if let Some(node) = result_v2.nodes.get_mut(&var.stable_id) {
-                        node.x = new_c - node.width / 2.0;
-                    }
-                }
-            }
-        }
+        // Phase 5 / D4-6：删除 spacing_demand_probe 二次求解——间距走 layout builder / SpaceBudget。
 
-        // Slice A: layout finalize——所有节点/组几何变更在正式 route 之前完成。
-        // 组框恢复（所有图类型）——必须在 arch 重申之前（与旧管线时序一致）。
-        if !self.diagram.groups.is_empty() {
-            let explicit_equal = crate::layout::group::frame::has_explicit_equal_track(self.diagram);
-            let pre_recompute_y: HashMap<String, f64> = result_v2
-                .groups
-                .iter()
-                .map(|(id, g)| (id.clone(), g.y))
-                .collect();
-            if explicit_equal {
-                gf_pass.restore_after_node_moves(self.diagram, &mut result_v2, algo, &pre_recompute_y);
-            } else {
-                crate::layout::group::frame::recompute_group_bounds(
-                    self.diagram,
-                    &mut result_v2,
-                    gf_pass.padding,
-                );
-            }
-        }
-        // PRS 需要 edge geometry 估计溢出，使用 preview route（产物不进入最终产品）。
-        if algo == "architecture" && !self.diagram.groups.is_empty() {
-            // Preview route：仅供 PRS 检测 shell overflow，产物丢弃。
-            let preview_frozen =
-                crate::layout::routing::coordinator::FrozenNodeProduct::capture(&result_v2);
-            let preview_input = crate::layout::routing::model::prepared::PreparedRoutingInput::prepare(
-                &preview_frozen,
-                self.diagram,
-                &result_v2.hints,
-                "",
-                router.name(),
-                Default::default(),
-                crate::layout::routing::model::prepared::RoutingCanvas {
-                    width: result_v2.total_width,
-                    height: result_v2.total_height,
-                },
-            );
-            let preview_product = router.route(&preview_input);
-            // 将 edges 填入临时 result 供 post_route_shell_expand 消费。
-            let mut preview_result = result_v2.clone();
-            preview_result.edges = preview_product.edges;
-            let prs_grew = crate::layout::post_route::shell_expand::post_route_shell_expand(
-                self.diagram,
-                &mut preview_result,
-            );
-            if prs_grew {
-                // 将扩壳结果应用到 result_v2（仅 groups）。
-                result_v2.groups = preview_result.groups.clone();
-                crate::layout::group::frame::resolve_all_sibling_overlaps(
-                    &gf_pass.spec,
-                    self.diagram,
-                    &mut result_v2,
-                );
-            }
-            let container_pad =
-                crate::layout::engines::common::group_bounds::container_padding_for_leaf(
-                    gf_pass.padding,
-                );
-            crate::layout::group::frame::expand_groups_to_contain_contents(
-                self.diagram,
-                &mut result_v2.groups,
-                &result_v2.nodes,
-                gf_pass.padding,
-                container_pad,
-            );
-            // architecture 质心/pendant 重申（只需 node positions + group bounds）。
+        // G4：orthosketch 只抬 side_gutters（不计 group 写权）；不再扩写 groups。
+        if gf_pass.arch_post_layout && !self.diagram.groups.is_empty() {
+            let prs_grew = {
+                let mut shell = crate::layout::group::GroupShellMut::new(self.diagram, &mut result_v2);
+                shell.feedforward_orthosketch()
+            };
             crate::layout::recipes::architecture::post_layout::reassert_multi_client_hub_centroids(
                 self.diagram,
                 &mut result_v2,
             );
-            if crate::layout::group::frame::has_explicit_equal_track(self.diagram) {
-                crate::layout::recipes::architecture::post_layout::align_cross_scope_pendant_chains(
-                    self.diagram,
-                    &mut result_v2,
-                );
-            }
-            // PRS debug hints
             if let Some(debug) = result_v2.hints.gutter_budget_debug.as_mut() {
                 debug.prs_grew = prs_grew;
             } else {
@@ -256,6 +181,7 @@ impl<'a> LayoutPipeline<'a> {
             );
 
         let refine_config = refine::RefineConfig::default();
+        crate::layout::group::write_counter::warn_if_group_writes_excessive(2);
         // Slice A: FrozenNodeProduct 唯一冻结点——layout finalize 后捕获，
         // 覆盖 route + 全部后处理直到 canvas transform。
         let frozen =
@@ -301,15 +227,50 @@ impl<'a> LayoutPipeline<'a> {
             t_route.elapsed().as_secs_f64() * 1000.0
         );
 
-        // Slice A: 唯一冻结校验——覆盖 route + 全部后处理直到 canvas transform。
+        // G4：删除 post_route_shell_expand；残留 shell 溢出 → Degraded（不改 groups）。
+        let shell_overflow = gf_pass.arch_post_layout
+            && !self.diagram.groups.is_empty()
+            && crate::layout::post_route::shell_expand::route_shell_overflow_remaining(
+                self.diagram,
+                &result,
+            );
+
+        // Slice A: 冻结校验——route 后 nodes + groups 均不可变（canvas 平移在 assert 之后）。
         frozen.assert_unchanged(&result);
 
         // Slice E5：R8 shadow audit（lift→materialize→round-trip debug_assert）已删除，
         // 由 Coordinator 内正式 audit（E3 repair loop + 唯一真冻结点）取代；
         // runner 只消费 Coordinator 返回的最终审计报告。
-        if route_audit.degraded {
-            crate::perf_log!("[warn] route audit degraded: {}", route_audit.describe());
+        if route_audit.degraded || shell_overflow {
+            if shell_overflow {
+                crate::perf_log!("[warn] route shell overflow remaining → degraded (no post_route expand)");
+            }
+            if route_audit.degraded {
+                crate::perf_log!("[warn] route audit degraded: {}", route_audit.describe());
+            }
+            // Phase 6：降级显式进 hints，禁止静默（bench 经 orthogonal_debug.degraded_count 可见）
+            match result.hints.orthogonal_debug.as_mut() {
+                Some(stats) => {
+                    stats.degraded_count = stats.degraded_count.max(1);
+                }
+                None => {
+                    result.hints.orthogonal_debug = Some(crate::layout::OrthoDebugStats {
+                        degraded_count: 1,
+                        ..Default::default()
+                    });
+                }
+            }
         }
+        crate::perf_log!(
+            "[solver-status] route_audit_degraded={} ortho_degraded_count={}",
+            route_audit.degraded,
+            result
+                .hints
+                .orthogonal_debug
+                .as_ref()
+                .map(|s| s.degraded_count)
+                .unwrap_or(0)
+        );
 
         Ok(result)
     }

@@ -37,7 +37,7 @@ pub fn compute_with_preset(
     if diagram.entities.is_empty() {
         return LayoutResult {
             nodes: HashMap::new(),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![],
             total_width: preset.padding * 2.0,
             total_height: preset.padding * 2.0,
@@ -76,7 +76,7 @@ pub fn compute_with_preset(
 
     let mut result = LayoutResult {
         nodes,
-        groups,
+        groups: groups.into(),
         edges: vec![],
         total_width,
         total_height,

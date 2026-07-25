@@ -1044,7 +1044,7 @@ mod tests {
                 ("a".into(), node("a", 0.0, 0.0, 100.0, 50.0)),
                 ("b".into(), node("b", 50.0, 10.0, 100.0, 50.0)),
             ]),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![],
             total_width: 200.0,
             total_height: 100.0,
@@ -1090,10 +1090,10 @@ mod tests {
         };
         let result = LayoutResult {
             nodes: HashMap::new(),
-            groups: HashMap::from([
+            groups: crate::layout::GroupTable::from(HashMap::from([
                 ("g1".into(), group_layout(0.0, 0.0, 200.0, 100.0)),
                 ("g2".into(), group_layout(100.0, 20.0, 200.0, 100.0)),
-            ]),
+            ])),
             edges: vec![],
             total_width: 400.0,
             total_height: 200.0,
@@ -1138,10 +1138,10 @@ mod tests {
         };
         let result = LayoutResult {
             nodes: HashMap::new(),
-            groups: HashMap::from([
+            groups: crate::layout::GroupTable::from(HashMap::from([
                 ("parent".into(), group_layout(0.0, 0.0, 300.0, 200.0)),
                 ("child".into(), group_layout(20.0, 20.0, 100.0, 80.0)),
-            ]),
+            ])),
             edges: vec![],
             total_width: 300.0,
             total_height: 200.0,
@@ -1180,7 +1180,7 @@ mod tests {
         };
         let result = LayoutResult {
             nodes: HashMap::from([("n1".into(), node("n1", -10.0, 10.0, 80.0, 40.0))]),
-            groups: HashMap::from([("g1".into(), group_layout(0.0, 0.0, 200.0, 100.0))]),
+            groups: crate::layout::GroupTable::from(HashMap::from([("g1".into(), group_layout(0.0, 0.0, 200.0, 100.0))])),
             edges: vec![],
             total_width: 200.0,
             total_height: 100.0,
@@ -1254,10 +1254,10 @@ mod tests {
                 ("a".into(), node("a", 30.0, 40.0, 60.0, 30.0)),
                 ("b".into(), node("b", 30.0, 120.0, 60.0, 30.0)),
             ]),
-            groups: HashMap::from([
+            groups: crate::layout::GroupTable::from(HashMap::from([
                 ("parent".into(), group_layout(0.0, 0.0, 200.0, 200.0)),
                 ("child".into(), group_layout(20.0, 20.0, 160.0, 160.0)),
-            ]),
+            ])),
             edges: vec![crate::layout::EdgeLayout {
                 geometry: crate::layout::PathGeometry::Polyline {
                     points: vec![Point::new(60.0, 55.0), Point::new(60.0, 100.0), Point::new(60.0, 120.0)],
@@ -1309,7 +1309,7 @@ mod tests {
                 ("a".into(), node("a", 0.0, 0.0, 100.0, 50.0)),
                 ("b".into(), node("b", 50.0, 10.0, 100.0, 50.0)),
             ]),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![],
             total_width: 200.0,
             total_height: 100.0,
@@ -1363,7 +1363,7 @@ mod tests {
                 ("a".into(), node("a", 0.0, 0.0, 80.0, 40.0)),
                 ("b".into(), node("b", 200.0, 0.0, 80.0, 40.0)),
             ]),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![crate::layout::EdgeLayout {
                 geometry: crate::layout::PathGeometry::Straight {
                     start: Point::new(80.0, 20.0),

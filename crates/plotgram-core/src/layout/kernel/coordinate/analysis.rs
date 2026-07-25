@@ -95,6 +95,8 @@ pub fn analyze_components(problem: &CoordinateProblem) -> ComponentAnalysis {
                 // 单变量约束不产生耦合（但标记为自身分量）
                 let _ = var;
             }
+            HardConstraint::GroupContainment { .. }
+            | HardConstraint::GroupSiblingSeparation { .. } => {}
         }
     }
 
@@ -192,6 +194,28 @@ pub fn problem_signature(problem: &CoordinateProblem) -> u64 {
                 feed(&(*var as u64).to_le_bytes());
                 feed(&(value.to_bits()).to_le_bytes());
             }
+            HardConstraint::GroupContainment {
+                group_index,
+                member_var,
+                pad,
+                ..
+            } => {
+                feed(&[5u8]);
+                feed(&(*group_index as u64).to_le_bytes());
+                feed(&(*member_var as u64).to_le_bytes());
+                feed(&(pad.to_bits()).to_le_bytes());
+            }
+            HardConstraint::GroupSiblingSeparation {
+                left_group,
+                right_group,
+                distance,
+                ..
+            } => {
+                feed(&[6u8]);
+                feed(&(*left_group as u64).to_le_bytes());
+                feed(&(*right_group as u64).to_le_bytes());
+                feed(&(distance.to_bits()).to_le_bytes());
+            }
         }
     }
 
@@ -248,6 +272,7 @@ mod tests {
             initial: InitialCoordinates { values: vec![0.0, 60.0, 10.0, 70.0] },
             config: CoordinateSolverConfig::default(),
             axis: Default::default(),
+            groups: Vec::new(),
         }
     }
 
@@ -282,6 +307,7 @@ mod tests {
             initial: InitialCoordinates { values: vec![0.0, 60.0, 0.0, 60.0] },
             config: CoordinateSolverConfig::default(),
             axis: Default::default(),
+            groups: Vec::new(),
         };
         let analysis = analyze_components(&problem);
         assert_eq!(analysis.count, 2);

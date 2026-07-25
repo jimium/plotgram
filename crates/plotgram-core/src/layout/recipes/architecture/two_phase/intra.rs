@@ -539,15 +539,18 @@ fn solve_intra_coordinates(
         })
         .collect();
 
-    let mut layer_y_offsets = vec![0.0];
-    for i in 1..layers.len() {
-        layer_y_offsets.push(layer_y_offsets[i - 1] + layer_heights[i - 1] + INTRA_LAYER_GAP);
-    }
+    let layer_y_offsets = crate::layout::kernel::coordinate::main_axis::solve_main_axis_layer_tops(
+        &layer_heights,
+        &vec![INTRA_LAYER_GAP; layers.len().saturating_sub(1)],
+        0.0,
+        INTRA_LAYER_GAP,
+    );
 
     // 回写坐标
     let mut nodes = HashMap::new();
     for (rank, layer) in layers.iter().enumerate() {
-        let y_center = layer_y_offsets[rank] + layer_heights[rank] / 2.0;
+        let y_center = layer_y_offsets.get(rank).copied().unwrap_or(0.0)
+            + layer_heights.get(rank).copied().unwrap_or(0.0) / 2.0;
         for node_id in layer {
             let (width, height) = sizes.get(node_id).copied().unwrap_or((
                 constants::DEFAULT_NODE_WIDTH,
@@ -574,114 +577,3 @@ fn solve_intra_coordinates(
 
     nodes
 }
-
-/// 组内坐标分配（旧版迭代算法，保留供 fallback / 测试对比）
-#[allow(dead_code)]
-pub(super) fn assign_coordinates_intra(
-    graph: &GraphIndex,
-    layers: &[Vec<String>],
-    sizes: &HashMap<String, (f64, f64)>,
-    member_set: &HashSet<String>,
-    budget: Option<&crate::layout::demand::space_budget::SpaceBudget>,
-    reversed: &HashSet<(String, String)>,
-) -> HashMap<String, NodeLayout> {
-    let mut nodes = HashMap::new();
-
-    let layer_heights: Vec<f64> = layers
-        .iter()
-        .map(|layer| {
-            layer
-                .iter()
-                .map(|node| {
-                    sizes
-                        .get(node)
-                        .map(|(_, h)| *h)
-                        .unwrap_or(constants::DEFAULT_NODE_HEIGHT)
-                })
-                .fold(0.0_f64, f64::max)
-        })
-        .collect();
-
-    let mut layer_y_offsets = vec![0.0];
-    for i in 1..layers.len() {
-        layer_y_offsets.push(layer_y_offsets[i - 1] + layer_heights[i - 1] + INTRA_LAYER_GAP);
-    }
-
-    for (layer_idx, layer) in layers.iter().enumerate() {
-        let y_center = layer_y_offsets[layer_idx] + layer_heights[layer_idx] / 2.0;
-        let mut positions = uniform_initial_positions(layer, sizes);
-
-        let upper_x = if layer_idx > 0 {
-            Some(layer_centers_from_placed(
-                &layers[layer_idx - 1],
-                &nodes,
-                sizes,
-            ))
-        } else {
-            None
-        };
-        let lower_x = if layer_idx + 1 < layers.len() {
-            Some(layer_centers_from_placed(
-                &layers[layer_idx + 1],
-                &nodes,
-                sizes,
-            ))
-        } else {
-            None
-        };
-
-        for _ in 0..6 {
-            if let Some(ref upper) = upper_x {
-                pull_toward_neighbors(
-                    layer,
-                    &mut positions,
-                    upper,
-                    graph,
-                    reversed,
-                    Some(member_set),
-                    true,
-                    NEIGHBOR_PULL_FACTOR,
-                );
-            }
-            if let Some(ref lower) = lower_x {
-                pull_toward_neighbors(
-                    layer,
-                    &mut positions,
-                    lower,
-                    graph,
-                    reversed,
-                    Some(member_set),
-                    false,
-                    NEIGHBOR_PULL_FACTOR,
-                );
-            }
-        }
-
-        let adjusted = if let Some(b) = budget {
-            resolve_x_overlaps_with_gaps(layer, &positions, sizes, |a, c| b.min_gap(a, c))
-        } else {
-            resolve_x_overlaps(layer, &positions, sizes)
-        };
-
-        for (i, node) in layer.iter().enumerate() {
-            let (width, height) = sizes.get(node).copied().unwrap_or((
-                constants::DEFAULT_NODE_WIDTH,
-                constants::DEFAULT_NODE_HEIGHT,
-            ));
-            let x_center = adjusted[i];
-            nodes.insert(
-                node.clone(),
-                NodeLayout {
-                    x: x_center - width / 2.0,
-                    y: y_center - height / 2.0,
-                    width,
-                    height,
-                    ..Default::default()
-                },
-            );
-        }
-    }
-
-    nodes
-}
-

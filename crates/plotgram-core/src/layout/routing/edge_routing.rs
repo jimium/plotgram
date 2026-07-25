@@ -95,7 +95,7 @@ mod tests {
         });
         let result = LayoutResult {
             nodes: HashMap::new(),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![],
             total_width: 100.0,
             total_height: 100.0,

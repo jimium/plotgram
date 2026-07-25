@@ -43,16 +43,19 @@ impl OrthogonalRecipe {
                 channel_margin: options.get_or_default(&ORTHOGONAL_OPTIONS[1]),
                 // 占位；生产路径经 `compile_with_config` 注入 PreparedRoutingInput.config。
                 routing: Default::default(),
+                arch_family: false,
             },
         }
     }
 }
 
-/// compile 产出的 Draft：借用 diagram + 克隆 result + 已注入的 OrthoConfig。
+/// compile 产出的 Draft：借用 diagram + 克隆 result + 已注入的 OrthoConfig + 富契约。
 pub struct OrthogonalSolveDraft<'a> {
     diagram: &'a Diagram,
     result: LayoutResult,
     config: OrthoConfig,
+    /// D4-4：来自 PreparedRoutingInput 的富契约（draft 不再二次瘦 compile）。
+    routing_contract: crate::layout::routing::model::RoutingContract,
 }
 
 impl RoutingRecipe for OrthogonalRecipe {
@@ -88,12 +91,33 @@ impl RoutingRecipe for OrthogonalRecipe {
         result: &'a LayoutResult,
         routing_config: RoutingConfig,
     ) -> Self::Draft<'a> {
+        // 无 Prepared 时回退：瘦 compile（测试路径）；生产走 compile_from_prepared。
+        let edges = crate::layout::routing::model::StableEdgeStore::from_diagram(diagram);
+        let contract = crate::layout::routing::model::RoutingContract::compile(&edges);
         let mut config = self.config;
         config.routing = routing_config;
+        config.arch_family = matches!(diagram.diagram_type, DiagramType::Architecture);
         OrthogonalSolveDraft {
             diagram,
             result: result.clone(),
             config,
+            routing_contract: contract,
+        }
+    }
+
+    fn compile_from_prepared<'a>(
+        &self,
+        input: &crate::layout::routing::model::prepared::PreparedRoutingInput<'a>,
+        result: &'a LayoutResult,
+    ) -> Self::Draft<'a> {
+        let mut config = self.config;
+        config.routing = input.config;
+        config.arch_family = matches!(input.diagram.diagram_type, DiagramType::Architecture);
+        OrthogonalSolveDraft {
+            diagram: input.diagram,
+            result: result.clone(),
+            config,
+            routing_contract: input.contract.clone(),
         }
     }
 
@@ -104,6 +128,7 @@ impl RoutingRecipe for OrthogonalRecipe {
             draft.result.clone(),
             draft.config,
             None,
+            Some(draft.routing_contract.clone()),
         );
 
         let n = routed.edges.len();
@@ -123,6 +148,7 @@ impl RoutingRecipe for OrthogonalRecipe {
         RecipeSolution {
             solution,
             label_plans,
+            orthogonal_debug: routed.hints.orthogonal_debug,
         }
     }
 
@@ -139,6 +165,7 @@ impl RoutingRecipe for OrthogonalRecipe {
             draft.result.clone(),
             draft.config,
             Some(preserve.clone()),
+            Some(draft.routing_contract.clone()),
         );
 
         let n = routed.edges.len();
@@ -147,12 +174,12 @@ impl RoutingRecipe for OrthogonalRecipe {
             .route_solution
             .clone()
             .unwrap_or_default();
-        // R12c：标签由 D-stage finalizer 统一构建（与 solve 一致）。
         let label_plans: Vec<Option<super::EdgeLabelPlan>> = (0..n).map(|_| None).collect();
 
         Some(RecipeSolution {
             solution,
             label_plans,
+            orthogonal_debug: routed.hints.orthogonal_debug,
         })
     }
 

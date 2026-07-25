@@ -16,6 +16,8 @@ pub mod frame;
 pub mod hierarchy;
 pub mod post_route;
 pub mod rect;
+pub mod shell_mut;
+pub mod write_counter;
 
 pub use border_shell::{
     group_segment_violates_border_shell, segment_hugs_group_border,
@@ -35,6 +37,7 @@ pub use post_route::{
     repulse_edges_from_group_borders,
 };
 pub use rect::{finalize_routing_groups, routing_group_padding};
+pub use shell_mut::GroupShellMut;
 #[cfg(debug_assertions)]
 pub use rect::debug_assert_routing_groups_contain_members;
 

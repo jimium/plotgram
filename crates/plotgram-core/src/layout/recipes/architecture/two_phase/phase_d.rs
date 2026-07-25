@@ -4,12 +4,10 @@
 
 use super::*;
 
-/// Phase D：从 Phase C 产出的 nodes/groups 出发，依次完成：
-/// (1) 重建全局层 + 基础设施行居中 + canvas clamp + 同 leaf-group y 微对齐；
-/// (2) EGB（逐组侧 gutter 估计 + group bounds 重算 + Uniform/Equal 条带拉齐）；
-/// (3) group_frame 三段（sibling overlap resolve / expand / Fit 收回）；
-/// (4) space_budget enforce + expand 兜底；
-/// (5) 计算 canvas_size + sibling_corridors + sugiyama_ranks，组装 LayoutResult。
+/// Phase D：节点落定后，由 [`LayoutSession`] 单次物化组框（朴素容器）。
+///
+/// G3：删除 EGB merge/equalize、sibling→expand→shrink、`apply_group_frame`。
+/// `side_gutters` 仍估计并写入 hints（供路由 / PRS），**不**回写组几何。
 pub(super) fn phase_d_postprocess(
     diagram: &Diagram,
     nodes: &mut HashMap<String, NodeLayout>,
@@ -23,120 +21,66 @@ pub(super) fn phase_d_postprocess(
     sizing: GroupSizingPolicy,
     reversed_edges: &HashSet<(String, String)>,
 ) -> LayoutResult {
-    // ── 后处理：基础设施行居中 ──
-    // 从元数据重建全局层（替代旧版从 y 坐标反推）
     let layers = rebuild_layers_from_metadata(blocks, block_row);
     let facts = ArchDiagramFacts::from_diagram(diagram);
-    rebalance_infrastructure_layers(
-        &facts,
-        graph,
-        group_map,
-        &layers,
-        sizes,
-        nodes,
-        reversed_edges,
-    );
-    enforce_horizontal_demand_gaps(&facts, &layers, sizes, nodes);
+    // Phase 4.D：demand gaps / infra rebalance / same-rank y 已由 arch|intra builder
+    // 的 MinSeparation + P1 objectives 覆盖，不再后处理扫节点。
+    let _ = (&facts, graph, group_map, sizes, reversed_edges, sizing);
     clamp_to_canvas(nodes, sizes);
-    // Phase F：同 leaf-group 内近邻 y 带节点微对齐（修小幅错位，不改层拓扑）
-    align_intra_group_same_rank_y(diagram, nodes);
 
-    // EGB：节点落定后估计逐组侧 gutter，重算 group bounds 并持久化至 hints。
-    let base_groups = compute_group_bounds(diagram, nodes, bounds_padding);
+    // G3：compose 产出的 provisional groups 作废；会话单次物化为唯一写者。
+    let _ = std::mem::take(groups);
     let t_egb = crate::layout::perf::Instant::now();
-    let side_gutters = estimate_side_gutters_with_hierarchy(diagram, nodes, &base_groups);
-    let egb_ms = t_egb.elapsed().as_secs_f64() * 1000.0;
-    let computed_groups = compute_group_bounds_with_side_gutters(
+    let solution = crate::layout::kernel::coordinate::session::LayoutSession::new(
         diagram,
         nodes,
         bounds_padding,
-        container_padding_for_leaf(bounds_padding),
-        Some(&side_gutters),
-    );
-    merge_egb_groups(
-        diagram,
-        groups,
-        computed_groups,
-        &side_gutters,
-        bounds_padding,
-    );
-    // Uniform/Equal 条带：各顶层叶子 EGB 增量可能不同，拉齐到同带最大增量，避免等宽被拆。
-    // Fit 逃生舱跳过。
-    if sizing != GroupSizingPolicy::Fit {
-        equalize_top_leaf_egb_deltas(diagram, groups, &side_gutters, bounds_padding);
+    )
+    .with_sibling_gap(GROUP_GAP_X)
+    .materialize_plain();
+    *groups = solution.groups.into_map();
+    let mut side_gutters = estimate_side_gutters_with_hierarchy(diagram, nodes, groups);
+    // G4：走廊 RouteDemand 抬 sibling 间隙记账进 gutters（不另写 groups）
+    {
+        let corridor_model =
+            crate::layout::demand::compute_corridor_model_from_groups(diagram, groups);
+        let pair_gaps =
+            crate::layout::kernel::coordinate::group_ir::pair_gaps_from_corridor_demands(
+                &corridor_model.demands,
+                GROUP_GAP_X,
+                crate::layout::demand::CORRIDOR_LANE_PITCH,
+            );
+        for ((a, b), need) in &pair_gaps {
+            let half = (need - GROUP_GAP_X).max(0.0) * 0.5;
+            if half <= 0.0 {
+                continue;
+            }
+            // 把额外走廊需求均摊到两侧 right/left（竖邻）或 bottom/top（横邻）——
+            // 无轴信息时两侧都抬一点，供路由容量消费。
+            for gid in [a.as_str(), b.as_str()] {
+                let g = side_gutters.entry(gid.to_string()).or_default();
+                g.left = g.left.max(half);
+                g.right = g.right.max(half);
+                g.top = g.top.max(half * 0.5);
+                g.bottom = g.bottom.max(half * 0.5);
+            }
+        }
     }
-    let gf_spec = crate::layout::group::frame::resolve_group_frame_spec(diagram, "architecture");
-    let mut layout_scratch = LayoutResult {
-        nodes: std::mem::take(nodes),
-        groups: std::mem::take(groups),
-        edges: vec![],
-        total_width: 0.0,
-        total_height: 0.0,
-        hints: Default::default(),
-    };
-    crate::layout::group::frame::resolve_all_sibling_overlaps(
-        &gf_spec,
-        diagram,
-        &mut layout_scratch,
-    );
-    crate::layout::group::frame::expand_groups_to_contain_contents(
-        diagram,
-        &mut layout_scratch.groups,
-        &layout_scratch.nodes,
-        bounds_padding,
-        container_padding_for_leaf(bounds_padding),
-    );
-    // Phase F：仅 Fit 时收回高于 base∪egb 的残余空壳（uniform/Equal 条带不收缩）
-    if sizing == GroupSizingPolicy::Fit {
-        crate::layout::group::frame::shrink_groups_to_required_padding(
-            diagram,
-            &mut layout_scratch.groups,
-            &layout_scratch.nodes,
-            bounds_padding,
-            container_padding_for_leaf(bounds_padding),
-            Some(&side_gutters),
-        );
-    }
-    // Phase G: hub 居中 + client 对齐已由组内 solver P1 objectives 覆盖，不再后处理。
-    crate::layout::group::frame::expand_groups_to_contain_contents(
-        diagram,
-        &mut layout_scratch.groups,
-        &layout_scratch.nodes,
-        bounds_padding,
-        container_padding_for_leaf(bounds_padding),
-    );
-    *nodes = layout_scratch.nodes;
-    *groups = layout_scratch.groups;
+    let egb_ms = t_egb.elapsed().as_secs_f64() * 1000.0;
+
     let max_side_gutter = side_gutters
         .values()
         .flat_map(|g| [g.left, g.right, g.top, g.bottom])
         .fold(0.0_f64, f64::max);
-    let pre_egb_area: f64 = base_groups.values().map(|g| g.width * g.height).sum();
-    let post_egb_area: f64 = groups.values().map(|g| g.width * g.height).sum();
-    let canvas_area_delta_pct = if pre_egb_area > EPS {
-        (post_egb_area - pre_egb_area) / pre_egb_area * 100.0
-    } else {
-        0.0
-    };
     let gutter_budget_debug = crate::layout::GutterBudgetDebug {
         egb_ms,
         prs_ms: 0.0,
         prs_grew: false,
         max_side_gutter,
-        canvas_area_delta_pct,
+        canvas_area_delta_pct: 0.0,
     };
 
-    // 空间契约：边感知间距写入 hints。
-    // Phase A2: 删除 enforce_horizontal_gaps（solver 已处理层内分离）。
-    // 竖向 rank 缝由通用 refine/guard 依据最终 rank 元数据守约。
     let space_budget = crate::layout::demand::space_budget::SpaceBudget::from_diagram(diagram);
-    crate::layout::group::frame::expand_groups_to_contain_contents(
-        diagram,
-        groups,
-        nodes,
-        bounds_padding,
-        container_padding_for_leaf(bounds_padding),
-    );
 
     let (total_width, total_height) =
         crate::layout::engines::common::canvas_bounds::canvas_size(nodes, groups, PADDING);
@@ -149,7 +93,6 @@ pub(super) fn phase_d_postprocess(
         side_gutters,
     };
 
-    // 从全局层导出 sugiyama_ranks（entity_id → rank），供拓扑意图满足度评估使用。
     let sugiyama_ranks: HashMap<String, usize> = layers
         .iter()
         .enumerate()
@@ -158,7 +101,7 @@ pub(super) fn phase_d_postprocess(
 
     LayoutResult {
         nodes: std::mem::take(nodes),
-        groups: std::mem::take(groups),
+        groups: std::mem::take(groups).into(),
         edges: vec![],
         total_width,
         total_height,
@@ -174,123 +117,6 @@ pub(super) fn phase_d_postprocess(
 }
 
 // ─── Phase A: 组内布局 ───────────────────────────────────
-
-/// 将 EGB 结果合并进 compose 产出的组框：顶层叶子组保留 macro 定位，容器/嵌套组采用重算结果。
-pub(super) fn merge_egb_groups(
-    diagram: &Diagram,
-    compose_groups: &mut HashMap<String, GroupLayout>,
-    computed_groups: HashMap<String, GroupLayout>,
-    side_gutters: &BTreeMap<String, SideGutter>,
-    base_padding: GroupPadding,
-) {
-    let top_level: HashSet<String> = diagram
-        .groups
-        .iter()
-        .filter(|g| g.parent_id.is_none())
-        .map(|g| g.id.as_str().to_string())
-        .collect();
-
-    for (gid, cgl) in computed_groups {
-        let Some(ast_group) = diagram.groups.iter().find(|g| g.id.as_str() == gid) else {
-            compose_groups.insert(gid, cgl);
-            continue;
-        };
-        let is_top_leaf = top_level.contains(&gid) && !is_container_group_ast(ast_group);
-        if is_top_leaf {
-            if let Some(budget) = side_gutters.get(&gid) {
-                if let Some(gl) = compose_groups.get_mut(&gid) {
-                    // max(base, egb) 增量扩壳；顶层不扩左侧，避免拆 SharedLines 左缘
-                    expand_gutter_delta_in_place(gl, *budget, base_padding, true);
-                }
-            }
-        } else {
-            compose_groups.insert(gid, cgl);
-        }
-    }
-}
-
-/// Uniform：顶层叶子按「全带最大 EGB 增量」同步扩壳，保持等宽。
-pub(super) fn equalize_top_leaf_egb_deltas(
-    diagram: &Diagram,
-    groups: &mut HashMap<String, GroupLayout>,
-    side_gutters: &BTreeMap<String, SideGutter>,
-    base: GroupPadding,
-) {
-    let top_leaves: Vec<String> = diagram
-        .groups
-        .iter()
-        .filter(|g| g.parent_id.is_none() && g.child_group_ids.is_empty())
-        .map(|g| g.id.as_str().to_string())
-        .collect();
-    if top_leaves.len() < 2 {
-        return;
-    }
-
-    // 顶层左缘锁定：水平增量只补到右侧，保持等宽且不拆 SharedLines。
-    let mut max_right = 0.0_f64;
-    let mut max_top = 0.0_f64;
-    let mut max_bottom = 0.0_f64;
-    for gid in &top_leaves {
-        let Some(budget) = side_gutters.get(gid) else {
-            continue;
-        };
-        let h = (budget.left - base.left).max(0.0) + (budget.right - base.right).max(0.0);
-        max_right = max_right.max(h);
-        max_top = max_top.max((budget.top - base.top).max(0.0));
-        max_bottom = max_bottom.max((budget.bottom - base.bottom).max(0.0));
-    }
-
-    for gid in &top_leaves {
-        let Some(gl) = groups.get_mut(gid) else {
-            continue;
-        };
-        let budget = side_gutters.get(gid).copied().unwrap_or_default();
-        let have_h = (budget.left - base.left).max(0.0) + (budget.right - base.right).max(0.0);
-        // merge 时 lock_left，实际已扩的是 right 侧的 have_r
-        let have_r = (budget.right - base.right).max(0.0);
-        let have_t = (budget.top - base.top).max(0.0);
-        let have_b = (budget.bottom - base.bottom).max(0.0);
-        let add_r = max_right - have_r;
-        let add_t = max_top - have_t;
-        let add_b = max_bottom - have_b;
-        let _ = have_h;
-        if add_r + add_t + add_b <= f64::EPSILON {
-            continue;
-        }
-        gl.width += add_r;
-        gl.y -= add_t;
-        gl.height += add_t + add_b;
-    }
-}
-
-pub(super) fn is_container_group_ast(group: &Group) -> bool {
-    !group.child_group_ids.is_empty()
-}
-
-/// 仅扩出超出 base padding 的 EGB 差额（总内边 = max(base, egb)）。
-/// `lock_left`：顶层叶子锁定左缘，把通道预留放在有边的一侧。
-pub(super) fn expand_gutter_delta_in_place(
-    gl: &mut GroupLayout,
-    budget: SideGutter,
-    base: GroupPadding,
-    lock_left: bool,
-) {
-    let left = if lock_left {
-        0.0
-    } else {
-        (budget.left - base.left).max(0.0)
-    };
-    let right = (budget.right - base.right).max(0.0);
-    let top = (budget.top - base.top).max(0.0);
-    let bottom = (budget.bottom - base.bottom).max(0.0);
-    if left + right + top + bottom <= f64::EPSILON {
-        return;
-    }
-    gl.x -= left;
-    gl.width += left + right;
-    gl.y -= top;
-    gl.height += top + bottom;
-}
 
 /// 跨组边端口微调的基础位移（像素），作为动态计算的下限
 const CROSS_GROUP_NUDGE_BASE: f64 = 16.0;
@@ -537,66 +363,6 @@ pub(super) fn apply_nudge_per_group(
             let lo = node_min_x.min(node_max_x);
             let hi = node_min_x.max(node_max_x);
             nl.x = desired_x.clamp(lo, hi);
-        }
-    }
-}
-
-/// Phase F：同 leaf-group 内 y 中心接近的节点微对齐到中位数。
-///
-/// 仅处理中心距 < `NODE_GAP` 的近邻带，避免把不同 Sugiyama 层强行并层。
-pub(super) fn align_intra_group_same_rank_y(diagram: &Diagram, nodes: &mut HashMap<String, NodeLayout>) {
-    let mut leaf_members: Vec<(String, Vec<String>)> = diagram
-        .groups
-        .iter()
-        .filter(|g| g.child_group_ids.is_empty())
-        .map(|g| {
-            // C4：复用 effective_entity_ids，覆盖仅靠 group_id 挂靠的成员。
-            let mut ids =
-                crate::layout::engines::common::group_bounds::effective_entity_ids(g, diagram);
-            ids.sort();
-            ids.dedup();
-            (g.id.as_str().to_string(), ids)
-        })
-        .collect();
-    leaf_members.sort_by(|a, b| a.0.cmp(&b.0));
-
-    for (_gid, members) in leaf_members {
-        if members.len() < 2 {
-            continue;
-        }
-        let mut items: Vec<(String, f64)> = members
-            .iter()
-            .filter_map(|id| nodes.get(id).map(|nl| (id.clone(), nl.y + nl.height / 2.0)))
-            .collect();
-        if items.len() < 2 {
-            continue;
-        }
-        items.sort_by(|a, b| {
-            a.1.partial_cmp(&b.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.0.cmp(&b.0))
-        });
-
-        let mut i = 0;
-        while i < items.len() {
-            let mut j = i + 1;
-            while j < items.len() && (items[j].1 - items[i].1) < NODE_GAP {
-                j += 1;
-            }
-            if j - i >= 2 {
-                let mut centers: Vec<f64> = items[i..j].iter().map(|(_, cy)| *cy).collect();
-                centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-                let median = centers[centers.len() / 2];
-                for (id, _) in &items[i..j] {
-                    if let Some(nl) = nodes.get_mut(id) {
-                        let target_y = median - nl.height / 2.0;
-                        let delta = (target_y - nl.y)
-                            .clamp(-CROSS_GROUP_Y_ALIGN_MAX, CROSS_GROUP_Y_ALIGN_MAX);
-                        nl.y += delta;
-                    }
-                }
-            }
-            i = j;
         }
     }
 }

@@ -61,8 +61,6 @@ pub(crate) fn phase_lane(
     from_side: &[Port],
     to_side: &[Port],
     parallel_gap: f64,
-    corridor_plan: &corridor_route::CorridorRoutePlan,
-    group_ctx: &crate::layout::group::GroupRoutingContext,
     profile: &OrthoRoutingProfile,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
 ) -> Vec<crate::layout::routing::model::solution::LaneAssignment> {
@@ -81,57 +79,21 @@ pub(crate) fn phase_lane(
     ortho_stats.lane_groups = lane_stats.lane_groups;
     ortho_stats.lane_segments_shifted = lane_stats.segments_shifted;
     ortho_stats.lane_shifts_failed = lane_stats.shifts_failed;
-    if profile.corridor_lane_offsets {
-        let corridor_shifted = apply_corridor_planned_offsets(
-            edges,
-            grid,
-            nodes,
-            sorted_node_ids,
-            relations,
-            from_side,
-            to_side,
-            corridor_plan,
-            group_ctx,
-        );
-        ortho_stats.lane_segments_shifted += corridor_shifted;
-        if profile.separate_unrelated_trunks {
-            for _ in 0..2 {
-                let shifted = separate_unrelated_trunk_overlaps(
-                    edges,
-                    Some(grid),
-                    relations,
-                    from_side,
-                    to_side,
-                    nodes,
-                    sorted_node_ids,
-                    parallel_gap,
-                    profile,
-                );
-                ortho_stats.lane_segments_shifted += shifted;
-                if shifted == 0 {
-                    break;
-                }
-            }
-        }
-    }
-    // S2-5：C 期 min_gap 已移除（2 点直连正反向对不触发节点反馈）；pipeline D 末作为最终写者重做。
+    let _ = profile; // separate_unrelated_trunks 事后分离已删（H5 rip-up）
 
-    // Phase 0（策略 B）：C 段 stub 仅诊断；真修统一迁至 D 段
-    // `resolve_exact_stub_occupancy_post_route`（全正交图）。
+    // Phase 3：C 段 stub 仅诊断；真修已删（H4 端口容量 + rip-up）。
     let records = collect_stub_occupancy(edges, relations, from_side, to_side);
     let conflicts = find_stub_occupancy_conflicts(&records, relations, parallel_gap);
     ortho_stats.stub_occupancy_conflicts = conflicts.len();
     ortho_stats.stub_cross_pair_conflicts = conflicts.iter().filter(|c| !c.reverse_pair).count();
     crate::perf_log!(
-        "[perf]     x3_lane_assignment: {:.2}ms ({} groups, {} shifted, {} failed); stub_occ conflicts={} (C diagnose-only)",
+        "[perf]     x3_lane_assignment: {:.2}ms ({} groups, {} shifted, {} failed); stub_occ conflicts={} (diagnose-only)",
         t_lane.elapsed().as_secs_f64() * 1000.0,
         lane_stats.lane_groups,
         lane_stats.segments_shifted,
         lane_stats.shifts_failed,
         conflicts.len()
     );
-
-    // Phase 0（策略 B）：C 段 dock 分离已删；D 段 coordinator 唯一收口（接受 S2-5 节点反馈变化）。
 
     lane_assignments
 }

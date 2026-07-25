@@ -6,6 +6,9 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::layout::kernel::coordinate::model::*;
+use crate::layout::kernel::coordinate::builder::{
+    append_rank_layer_vars, build_adjacent_min_separations, RankNodeSpec,
+};
 use crate::layout::recipes::architecture::layout::constants::NODE_GAP;
 use crate::layout::recipes::architecture::layout::types::{GraphIndex, GroupMap};
 
@@ -21,6 +24,7 @@ pub(in crate::layout::recipes) struct ArchBuildOutput {
 /// - 每层的相邻变量间编码 MinSeparation（NODE_GAP 或 edge_band_demand gap）。
 /// - BK 坐标作为 initial values。
 /// - Objectives: P2 边拉直 + P3 BK 位置保持。
+/// - Phase 5：可选挂 Group IR；SpacingDemandStore / RouteDemand 前馈抬缝。
 pub(in crate::layout::recipes) fn build_arch_coordinate_problem(
     layers: &[Vec<String>],
     sizes: &HashMap<String, (f64, f64)>,
@@ -31,6 +35,7 @@ pub(in crate::layout::recipes) fn build_arch_coordinate_problem(
     diagram_type: &crate::types::DiagramType,
     has_groups: bool,
     group_map: &GroupMap,
+    diagram: Option<&crate::ast::Diagram>,
 ) -> ArchBuildOutput {
     let mut vars: Vec<NodeVariable> = Vec::new();
     let mut node_to_var: HashMap<String, VarId> = HashMap::new();
@@ -45,69 +50,62 @@ pub(in crate::layout::recipes) fn build_arch_coordinate_problem(
         has_groups,
     );
 
-    // 1. 创建变量 + 层约束
+    // 1. 创建变量 + 层约束（共享 builder_common）
     for (rank, layer) in layers.iter().enumerate() {
-        let mut layer_vars: Vec<VarId> = Vec::new();
-        let mut separations: Vec<f64> = Vec::new();
-
-        for (order, node_id) in layer.iter().enumerate() {
-            let var_id = vars.len();
-            let (w, _h) = sizes
-                .get(node_id)
-                .copied()
-                .unwrap_or((crate::layout::constants::DEFAULT_NODE_WIDTH, crate::layout::constants::DEFAULT_NODE_HEIGHT));
-
-            vars.push(NodeVariable {
-                var_id,
-                stable_id: node_id.clone(),
-                kind: VarKind::Real,
-                rank,
-                order,
-                axis_size: w,
-                movable: true,
-            });
-
-            let cx = centers.get(node_id).copied().unwrap_or(0.0);
-            initial_values.push(cx);
+        let rank_specs: Vec<RankNodeSpec<'_>> = layer
+            .iter()
+            .map(|node_id| {
+                let (w, _h) = sizes.get(node_id).copied().unwrap_or((
+                    crate::layout::constants::DEFAULT_NODE_WIDTH,
+                    crate::layout::constants::DEFAULT_NODE_HEIGHT,
+                ));
+                RankNodeSpec {
+                    stable_id: node_id.as_str(),
+                    axis_size: w,
+                    initial_center: centers.get(node_id).copied().unwrap_or(0.0),
+                    kind: VarKind::Real,
+                }
+            })
+            .collect();
+        let layer_vars = append_rank_layer_vars(&mut vars, &mut initial_values, rank, &rank_specs);
+        for (node_id, &var_id) in layer.iter().zip(layer_vars.iter()) {
             node_to_var.insert(node_id.clone(), var_id);
-            layer_vars.push(var_id);
-
-            // 计算与前一节点的最小分离
-            if order > 0 {
-                let prev_id = &layer[order - 1];
-                let prev_w = sizes
-                    .get(prev_id)
-                    .map(|(w, _)| *w)
-                    .unwrap_or(crate::layout::constants::DEFAULT_NODE_WIDTH);
-                let curr_w = w;
-
-                // 使用 edge_band_demand 的 adjacent_rank_gap（如果启用）
-                let gap = if profile.horizontal_max_extra > 0.0 {
-                    let layer_ids: HashSet<&str> = layer.iter().map(|s| s.as_str()).collect();
-                    crate::layout::demand::band::adjacent_rank_gap(
-                        prev_id,
-                        node_id,
-                        &layer_ids,
-                        relations,
-                        NODE_GAP,
-                        parallel_gap,
-                        profile,
-                    )
-                } else {
-                    NODE_GAP
-                };
-
-                // separation = prev_half_width + gap + curr_half_width
-                let sep = prev_w / 2.0 + gap + curr_w / 2.0;
-                separations.push(sep);
-            }
         }
 
-        layer_constraints.push(LayerConstraintSet {
+        let mut gaps = Vec::with_capacity(layer_vars.len().saturating_sub(1));
+        for order in 1..layer.len() {
+            let prev_id = &layer[order - 1];
+            let node_id = &layer[order];
+            let gap = if profile.horizontal_max_extra > 0.0 {
+                let layer_ids: HashSet<&str> = layer.iter().map(|s| s.as_str()).collect();
+                crate::layout::demand::band::adjacent_rank_gap(
+                    prev_id,
+                    node_id,
+                    &layer_ids,
+                    relations,
+                    NODE_GAP,
+                    parallel_gap,
+                    profile,
+                )
+            } else {
+                NODE_GAP
+            };
+            // Phase 5 / D4-6：RouteDemand 前馈——反馈边邻对额外抬缝（不再 route 前二次 solve）
+            let route_extra = if reversed.contains(&(prev_id.clone(), node_id.clone()))
+                || reversed.contains(&(node_id.clone(), prev_id.clone()))
+            {
+                12.0
+            } else {
+                0.0
+            };
+            gaps.push(gap + route_extra);
+        }
+        layer_constraints.push(build_adjacent_min_separations(
             rank,
-            vars: layer_vars,
-            separations,
-        });
+            layer_vars,
+            &vars,
+            &gaps,
+        ));
     }
 
     // 2. 构建 objectives
@@ -336,15 +334,60 @@ pub(in crate::layout::recipes) fn build_arch_coordinate_problem(
         }
     }
 
-    let problem = CoordinateProblem {
+    let mut problem = CoordinateProblem::build(
         vars,
-        layers: layer_constraints,
-        hard: vec![],
+        layer_constraints,
+        vec![],
         objectives,
-        initial: InitialCoordinates { values: initial_values },
-        config: CoordinateSolverConfig::default(),
-        axis: Default::default(),
-    };
+        InitialCoordinates { values: initial_values },
+        SolveAxis::Cross,
+    );
+
+    // Phase 5 / D4-2：Group IR 进 Cross 轴求解（G1 shadow；不写回生产框）
+    if has_groups {
+        if let Some(d) = diagram {
+            let pad =
+                crate::layout::engines::common::group_bounds::GroupPadding::architecture();
+            let sibling_gap = 40.0;
+            crate::layout::kernel::coordinate::group_ir::attach_group_ir(
+                &mut problem,
+                d,
+                &node_to_var,
+                pad,
+                sibling_gap,
+            );
+            // G4：跨组边负载 → H-G3 RouteDemand（无几何走廊时用拓扑估计）
+            let pair_gaps =
+                crate::layout::kernel::coordinate::group_ir::pair_gaps_from_cross_group_edge_loads(
+                    d,
+                    sibling_gap,
+                    crate::layout::demand::CORRIDOR_LANE_PITCH,
+                );
+            crate::layout::kernel::coordinate::group_ir::draft_boost_h_g3_from_pair_gaps(
+                &mut problem,
+                &pair_gaps,
+            );
+        }
+    }
+
+    // Phase 5：SpacingDemandStore pair gaps → 抬高层内分离（前馈）
+    if let Some(d) = diagram {
+        let demand = crate::layout::demand::space_budget::SpaceBudget::from_diagram(d)
+            .to_spacing_demand();
+        if demand.has_custom_demands() {
+            for layer in &mut problem.layers {
+                for i in 0..layer.separations.len() {
+                    let left_id = &problem.vars[layer.vars[i]].stable_id;
+                    let right_id = &problem.vars[layer.vars[i + 1]].stable_id;
+                    let need = demand.min_gap(left_id, right_id);
+                    let half_sum = problem.vars[layer.vars[i]].axis_size * 0.5
+                        + problem.vars[layer.vars[i + 1]].axis_size * 0.5;
+                    // separations 存的是中心距；pair_gaps 是外缘距 → 中心距 = half_sum + gap
+                    layer.separations[i] = layer.separations[i].max(half_sum + need);
+                }
+            }
+        }
+    }
 
     ArchBuildOutput {
         problem,

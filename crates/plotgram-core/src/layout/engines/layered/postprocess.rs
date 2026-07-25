@@ -60,9 +60,14 @@ pub(super) fn normalize_layout_result_to_padding(result: &mut LayoutResult, padd
         node.x += dx;
         node.y += dy;
     }
-    for group in result.groups.values_mut() {
-        group.x += dx;
-        group.y += dy;
+    if !result.groups.is_empty() {
+        crate::layout::group::write_counter::record_group_write_at(
+            "layered_normalize_translate_groups",
+        );
+        for group in result.groups.values_mut() {
+            group.x += dx;
+            group.y += dy;
+        }
     }
     result.total_width += dx;
     result.total_height += dy;

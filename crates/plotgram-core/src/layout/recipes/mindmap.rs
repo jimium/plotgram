@@ -157,7 +157,7 @@ impl LayoutRecipe for MindmapRecipe {
         // 占位：实际逻辑在 execute 中
         LayoutResult {
             nodes: HashMap::new(),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![],
             total_width: 0.0,
             total_height: 0.0,
@@ -223,7 +223,7 @@ impl LayoutRecipe for MindmapRecipe {
 
         LayoutResult {
             nodes,
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![],
             total_width,
             total_height,
@@ -239,7 +239,7 @@ impl LayoutRecipe for MindmapRecipe {
 fn empty_result(config: MindmapLayoutConfig) -> LayoutResult {
     LayoutResult {
         nodes: HashMap::new(),
-        groups: HashMap::new(),
+        groups: crate::layout::GroupTable::new(),
         edges: vec![],
         total_width: config.padding * 2.0,
         total_height: config.padding * 2.0,
@@ -810,15 +810,15 @@ fn mindmap_solver_optimize(
         });
     }
 
-    let problem = CoordinateProblem {
+    // G5：经 CoordinateProblem::build 门面；树形 objectives 仍由本 recipe 组装（记债：未并入 LayoutContract）。
+    let problem = CoordinateProblem::build(
         vars,
-        layers: layer_constraints,
-        hard: vec![],
+        layer_constraints,
+        vec![],
         objectives,
-        initial: InitialCoordinates { values: initial_values },
-        config: CoordinateSolverConfig::default(),
-        axis: Default::default(),
-    };
+        InitialCoordinates { values: initial_values },
+        SolveAxis::Cross,
+    );
 
     // 4. Solve + 回写
     let result = solve(&problem);

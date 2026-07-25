@@ -111,6 +111,58 @@ pub enum HardConstraint {
         value: f64,
         source: ConstraintSource,
     },
+    /// 成员须落在组框内（Phase 4.B 槽位；生产求解器首期不投影，仅 IR/shadow）。
+    GroupContainment {
+        group_index: usize,
+        member_var: VarId,
+        pad: f64,
+        source: ConstraintSource,
+    },
+    /// 同级组在主/交叉轴上最小分离（Phase 4.B 槽位；首期不投影）。
+    GroupSiblingSeparation {
+        left_group: usize,
+        right_group: usize,
+        distance: f64,
+        source: ConstraintSource,
+    },
+}
+
+/// 组在 `CoordinateProblem.groups` 中的下标。
+pub type GroupIx = usize;
+
+/// 组角色（来自 LayoutContract；禁止按 DiagramType 分支）。
+///
+/// 过渡期以 `Container` 为主；将来 `Lane` / `TableCell` 由结构语义 DSL 注入。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GroupRole {
+    /// 诚实容器：框 = 成员包围 + padding。
+    #[default]
+    Container,
+}
+
+/// 组框变量（G1）：四边界 + 父子结构 + padding/role。
+///
+/// 边界 `VarId` 在 `compile_group_variables` 时为 `None`；`attach_group_ir` 按
+/// `SolveAxis` 分配当前轴两侧（Cross→left/right，Main→top/bottom）且必须为 `Some`。
+/// G3：生产写权经 `LayoutSession::materialize*`；本 IR 供投影与会话物化。
+#[derive(Debug, Clone)]
+pub struct GroupVariable {
+    /// 组稳定 id。
+    pub stable_id: String,
+    pub left: Option<VarId>,
+    pub right: Option<VarId>,
+    pub top: Option<VarId>,
+    pub bottom: Option<VarId>,
+    /// 父组下标（`None` = 顶层）。
+    pub parent: Option<GroupIx>,
+    /// 直接子组下标（按 stable_id 排序，确定性）。
+    pub children: Vec<GroupIx>,
+    /// 成员节点 stable_id（构建时按 id 排序，保证确定性）。
+    pub members: Vec<String>,
+    /// 容纳约束参数（非事后加数）。
+    pub padding: crate::layout::engines::common::group_bounds::GroupPadding,
+    /// 组角色。
+    pub role: GroupRole,
 }
 
 // ─── 目标 ─────────────────────────────────────────────────────────────────────
@@ -235,9 +287,32 @@ pub struct CoordinateProblem {
     pub config: CoordinateSolverConfig,
     /// 求解轴标注（告知 materializer 坐标写回哪个物理轴）。
     pub axis: SolveAxis,
+    /// 组框变量（Phase 4；默认可空）。
+    pub groups: Vec<GroupVariable>,
 }
 
 impl CoordinateProblem {
+    /// G5：统一生产构造门面（flat / arch / intra 经此组装；mindmap 仍白名单债）。
+    pub fn build(
+        vars: Vec<NodeVariable>,
+        layers: Vec<LayerConstraintSet>,
+        hard: Vec<HardConstraint>,
+        objectives: Vec<ObjectiveTerm>,
+        initial: InitialCoordinates,
+        axis: SolveAxis,
+    ) -> Self {
+        Self {
+            vars,
+            layers,
+            hard,
+            objectives,
+            initial,
+            config: CoordinateSolverConfig::default(),
+            axis,
+            groups: Vec::new(),
+        }
+    }
+
     /// 变量数量。
     pub fn var_count(&self) -> usize {
         self.vars.len()

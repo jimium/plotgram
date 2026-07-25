@@ -137,6 +137,7 @@ mod tests {
             initial: InitialCoordinates { values: vec![0.0, 100.0] },
             config: CoordinateSolverConfig::default(),
             axis: Default::default(),
+            groups: Vec::new(),
         }
     }
 

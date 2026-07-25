@@ -18,6 +18,7 @@ pub fn realign_group_rows(
     if groups.is_empty() || pre_recompute_y.is_empty() {
         return;
     }
+    crate::layout::group::write_counter::record_group_write_at("realign_group_rows");
 
     let mut sorted: Vec<(String, f64)> = pre_recompute_y
         .iter()

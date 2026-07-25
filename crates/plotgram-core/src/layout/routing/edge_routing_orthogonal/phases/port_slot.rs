@@ -89,8 +89,9 @@ pub(crate) fn phase_port_slot(
             port_solver_v2: cfg.routing.port_solver_v2,
         };
         let assignment = super::super::port_solver::solve_port_assignment(&input);
-        from_side = assignment.from_side;
-        to_side = assignment.to_side;
+        let (fs, ts) = assignment.into_sides();
+        from_side = fs;
+        to_side = ts;
     }
     dbg_ports("after_port_solver", relations, &from_side, &to_side);
     crate::perf_log!(

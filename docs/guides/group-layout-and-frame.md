@@ -1,5 +1,18 @@
 # Group 布局 Hint 与 Group Frame
 
+> **状态：G-pre（doc 31）已失效 Frame hint 面**  
+> 自 2026-07 起：生产路径**不再消费** `group_frame:` 与 `group { layout: … }`；
+> architecture 默认为**朴素容器**（Fit，无 Equal/SharedLines）。  
+> group = 结构容器（成员包围 + padding + 嵌套/同级分离）；条带/泳道/表格等版式
+> 留给未来**结构语义 DSL**，不要复活几何旋钮。  
+> 权威方案：[31-Group一等公民与终态收敛方案](../优化重构/31-Group一等公民与终态收敛方案-2026-07.md)。
+>
+> 下文保留作历史对照，**勿再按 L1/L2 遥控器指导写作**。
+
+---
+
+# （历史）Group 布局 Hint 与 Group Frame
+
 组内排版与组间宏观几何的**唯一指南**：选项能力、典型配方、调节步骤与排错。
 
 | 层级 | 写在哪里 | 管什么 |

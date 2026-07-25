@@ -140,9 +140,12 @@ fn translate_all(result: &mut LayoutResult, dx: f64, dy: f64) {
     }
 
     // 分组
-    for gl in result.groups.values_mut() {
-        gl.x += dx;
-        gl.y += dy;
+    if !result.groups.is_empty() {
+        crate::layout::group::write_counter::record_group_write_at("canvas_finalize_translate_groups");
+        for gl in result.groups.values_mut() {
+            gl.x += dx;
+            gl.y += dy;
+        }
     }
 
     // 边（路径 + 标签 + 引线）
@@ -188,7 +191,7 @@ mod tests {
     fn empty_result() -> LayoutResult {
         LayoutResult {
             nodes: HashMap::new(),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![],
             total_width: 0.0,
             total_height: 0.0,

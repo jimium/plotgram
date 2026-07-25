@@ -591,7 +591,7 @@ mod tests {
                     "g1".to_string(),
                     GroupLayout { x: 2.0, y: 2.0, width: 60.0, height: 40.0 },
                 );
-                m
+                m.into()
             },
             edges: vec![],
             total_width: 42.0,
@@ -629,7 +629,7 @@ mod tests {
                     "g1".to_string(),
                     GroupLayout { x: 20.0, y: 20.0, width: 60.0, height: 40.0 },
                 );
-                m
+                m.into()
             },
             edges: vec![],
             total_width: 60.0,

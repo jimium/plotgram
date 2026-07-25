@@ -889,7 +889,7 @@ mod tests {
     fn sample_layout(nodes: HashMap<String, NodeLayout>) -> LayoutResult {
         LayoutResult {
             nodes,
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: Vec::<EdgeLayout>::new(),
             total_width: 400.0,
             total_height: 300.0,

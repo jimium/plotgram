@@ -179,7 +179,7 @@ fn make_result_with_crossing() -> LayoutResult {
 
     LayoutResult {
         nodes,
-        groups: HashMap::new(),
+        groups: crate::layout::GroupTable::new(),
         edges,
         total_width: 240.0,
         total_height: 30.0,
@@ -336,8 +336,8 @@ impl RoutingRecipeDyn for CenterLineRouter {
         let mut edges = Vec::new();
         for (i, rel) in input.diagram.relations.iter().enumerate() {
             let (Some(from_nl), Some(to_nl)) = (
-                input.frozen.nodes.get(rel.from.as_str()),
-                input.frozen.nodes.get(rel.to.as_str()),
+                input.frozen.nodes().get(rel.from.as_str()),
+                input.frozen.nodes().get(rel.to.as_str()),
             ) else {
                 edges.push(EdgeLayout::empty());
                 continue;
@@ -477,7 +477,7 @@ fn test_p1_2_refine_deterministic() {
         ];
         LayoutResult {
             nodes,
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges,
             total_width: 240.0,
             total_height: 240.0,
@@ -599,7 +599,7 @@ fn test_analyze_edge_overlaps_detects_parallel() {
     ];
     let result = LayoutResult {
         nodes: HashMap::new(),
-        groups: HashMap::new(),
+        groups: crate::layout::GroupTable::new(),
         edges,
         total_width: 100.0,
         total_height: 20.0,
@@ -631,7 +631,7 @@ fn test_analyze_edge_overlaps_detects_crossing() {
     ];
     let result = LayoutResult {
         nodes: HashMap::new(),
-        groups: HashMap::new(),
+        groups: crate::layout::GroupTable::new(),
         edges,
         total_width: 100.0,
         total_height: 100.0,
@@ -663,7 +663,7 @@ fn test_analyze_edge_overlaps_no_overlap() {
     ];
     let result = LayoutResult {
         nodes: HashMap::new(),
-        groups: HashMap::new(),
+        groups: crate::layout::GroupTable::new(),
         edges,
         total_width: 100.0,
         total_height: 200.0,

@@ -18,23 +18,17 @@ use crate::types::DiagramType;
 use std::collections::HashMap;
 
 use super::label_common::{build_edge_segments, collect_label_keys, sorted_node_obstacles};
+use crate::layout::routing::objectives::{
+    FOREIGN_EDGE_PENALTY, GROUP_OVERLAP_PENALTY, LABEL_OVERLAP_PENALTY, NODE_OVERLAP_AREA_WEIGHT,
+    NODE_OVERLAP_PENALTY, PATH_CLEARANCE_PENALTY,
+};
 
-const LABEL_OVERLAP_PENALTY: f64 = 1000.0;
-const FOREIGN_EDGE_PENALTY: f64 = 100.0;
-const GROUP_OVERLAP_PENALTY: f64 = 50.0;
 const PATH_DISTANCE_WEIGHT: f64 = 0.5;
-/// S5.2b：距己边短于 `perp_offset` 时的净空惩罚权重（大于 PATH_DISTANCE_WEIGHT，避免贴线胜出）
-const PATH_CLEARANCE_PENALTY: f64 = 40.0;
 const MIDPOINT_DISTANCE_WEIGHT: f64 = 0.1;
 /// 长标签放在足够长的直线段上时的 whitespace 奖励（architecture Phase 4）。
 const LONG_SEGMENT_WHITESPACE_BONUS: f64 = 25.0;
 const LONG_LABEL_MIN_WIDTH: f64 = 48.0;
 const LONG_SEGMENT_MIN_RATIO: f64 = 1.25;
-/// 节点重叠：高有限惩罚（>LABEL_OVERLAP_PENALTY），按重叠面积加权。
-/// 不用 INFINITY 以保证「所有候选都碰节点」时仍能选出重叠最小的候选，
-/// 避免回退到原始冲突位置（label_avoidance Phase 2 不处理 label-node）。
-const NODE_OVERLAP_PENALTY: f64 = 10000.0;
-const NODE_OVERLAP_AREA_WEIGHT: f64 = 100.0;
 
 /// 图种相关的标签候选打分策略（Phase 4 architecture 专项）。
 #[derive(Clone, Copy, Debug, PartialEq)]

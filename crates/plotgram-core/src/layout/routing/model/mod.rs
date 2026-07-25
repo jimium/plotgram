@@ -31,8 +31,8 @@ pub mod stable_edge;
 
 pub use contract::{
     CircleId, CorridorResource, EdgeRole, EdgeRoleSet, LabelPolicy, MergeGroupId, MergeIntent,
-    ParallelGroupId, PortIntent, RoutingContract, RoutingTopologyMetadata, SideGutterResource,
-    TransitIntent,
+    ParallelGroupId, PortIntent, RoutingContract, RoutingTopologyMetadata, ShareTrunkIntent,
+    SideGutterResource, TransitIntent,
 };
 pub use frozen_solution::{
     edge_conflict_adjacency, group_fingerprints_of, node_fingerprints_of, EdgeDependencyRecord,

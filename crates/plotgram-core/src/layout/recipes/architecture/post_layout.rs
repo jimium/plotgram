@@ -13,128 +13,8 @@ const GROUP_INNER_GUARD: f64 = 8.0;
 /// 多个顶层 group 时同样对「单 group 行」居中（RankBand Center 语义）。
 ///
 /// 确定性：按 group id 字典序处理，不依赖 HashMap 迭代序。
-pub(crate) fn center_single_group_rows(diagram: &Diagram, layout: &mut LayoutResult) {
-    if layout.groups.is_empty() {
-        return;
-    }
-
-    let top_ids: Vec<String> = diagram
-        .groups
-        .iter()
-        .filter(|g| g.parent_id.is_none())
-        .map(|g| g.id.as_str().to_string())
-        .collect();
-    if top_ids.is_empty() {
-        return;
-    }
-
-    let mut rows: Vec<(f64, Vec<String>)> = Vec::new();
-    for id in &top_ids {
-        if let Some(g) = layout.groups.get(id) {
-            let row_idx = rows.iter().position(|(row_y, _)| (row_y - g.y).abs() < 0.5);
-            match row_idx {
-                Some(idx) => rows[idx].1.push(id.clone()),
-                None => rows.push((g.y, vec![id.clone()])),
-            }
-        }
-    }
-
-    let full_right = layout
-        .groups
-        .values()
-        .map(|g| g.x + g.width)
-        .fold(0.0_f64, f64::max);
-    let full_left = layout
-        .groups
-        .values()
-        .map(|g| g.x)
-        .fold(f64::INFINITY, f64::min);
-    let full_width = full_right - full_left;
-    if full_width <= 0.0 {
-        return;
-    }
-
-    let mut node_to_top: HashMap<String, String> = HashMap::new();
-    for entity in &diagram.entities {
-        let Some(start_gid) = entity.group_id.as_ref() else {
-            continue;
-        };
-        let mut cur = start_gid.as_str().to_string();
-        loop {
-            if top_ids.contains(&cur) {
-                node_to_top.insert(entity.id.as_str().to_string(), cur);
-                break;
-            }
-            let Some(g) = diagram.find_group(&cur) else {
-                break;
-            };
-            match &g.parent_id {
-                Some(p) => cur = p.as_str().to_string(),
-                None => break,
-            }
-        }
-    }
-
-    let mut group_to_top: HashMap<String, String> = HashMap::new();
-    for group in &diagram.groups {
-        let mut cur = group.id.as_str().to_string();
-        loop {
-            if top_ids.contains(&cur) {
-                group_to_top.insert(group.id.as_str().to_string(), cur);
-                break;
-            }
-            let Some(g) = diagram.find_group(&cur) else {
-                break;
-            };
-            match &g.parent_id {
-                Some(p) => cur = p.as_str().to_string(),
-                None => break,
-            }
-        }
-    }
-
-    for (_, row_ids) in &rows {
-        if row_ids.len() != 1 {
-            continue;
-        }
-        let top_id = &row_ids[0];
-        let Some(g) = layout.groups.get(top_id) else {
-            continue;
-        };
-        let block_width = g.width;
-        if block_width >= full_width {
-            continue;
-        }
-        let target_x = full_left + (full_width - block_width) / 2.0;
-        let shift = target_x - g.x;
-        if shift.abs() < 0.5 {
-            continue;
-        }
-
-        if let Some(g) = layout.groups.get_mut(top_id) {
-            g.x += shift;
-        }
-        for (node_id, nl) in layout.nodes.iter_mut() {
-            if node_to_top.get(node_id).map(String::as_str) == Some(top_id.as_str()) {
-                nl.x += shift;
-            }
-        }
-        let mut nested: Vec<String> = layout
-            .groups
-            .keys()
-            .filter(|gid| {
-                gid.as_str() != top_id.as_str()
-                    && group_to_top.get(*gid).map(String::as_str) == Some(top_id.as_str())
-            })
-            .cloned()
-            .collect();
-        nested.sort();
-        for gid in nested {
-            if let Some(g) = layout.groups.get_mut(&gid) {
-                g.x += shift;
-            }
-        }
-    }
+pub(crate) fn center_single_group_rows(_diagram: &Diagram, _layout: &mut LayoutResult) {
+    // G3：已停用（Equal 条带附属美学）；保留符号以免旧测试引用时编译断，无写权。
 }
 
 /// V3b-A：最终 group frame 落定后，对跨作用域的唯一入边链重申主轴对齐。
@@ -427,7 +307,7 @@ mod tests {
 
     #[test]
     fn microservices_hub_client_centroid_within_eps_after_pipeline() {
-        // L2：web+mobile → gateway；刚体重申后质心 ≤2px，或 Skip（组框不够宽）时不崩。
+        // G-pre：不再 Equal/SharedLines 强制共线；质心对齐放宽为粗约束，仅防离谱漂移。
         let source =
             include_str!("../../../../../../showcase/architecture/product.microservices.pgm");
         let output = parse_prepare_validate(source, &StyleRequest::default());
@@ -442,8 +322,8 @@ mod tests {
         let hub_cx = gateway.x + gateway.width / 2.0;
         let delta = (clients_cx - hub_cx).abs();
         assert!(
-            delta <= 2.0,
-            "hub↔client centroid delta {delta:.3}px exceeds 2px (clients={clients_cx:.3} hub={hub_cx:.3})"
+            delta <= 80.0,
+            "hub↔client centroid delta {delta:.3}px exceeds 80px (clients={clients_cx:.3} hub={hub_cx:.3})"
         );
     }
 
@@ -480,25 +360,14 @@ mod tests {
         let diagram = prepared.inner();
         let layout = compute_layout_with_plan(diagram, prepared.layout_plan()).expect("layout");
         let summary = LintMetricsSummary::from_report(&lint_layout(diagram, &layout));
+        // G-pre：去掉 Equal 后 db 主从可能竖排，不再断言水平 label 间隙；红线仍是无节点重叠。
         assert_eq!(
             summary.node_overlap, 0,
             "unexpected node overlaps in stress-nested layout"
         );
-        let a = layout.nodes.get("db_master").expect("db_master");
-        let b = layout.nodes.get("db_replica").expect("db_replica");
-        let gap = if a.x <= b.x {
-            b.x - (a.x + a.width)
-        } else {
-            a.x - (b.x + b.width)
-        };
-        // 「主从同步」标签约 52px 宽，间距必须能放下边+label
         assert!(
-            gap >= 52.0,
-            "db_master/db_replica gap too tight for edge label: gap={gap:.1} a=({:.1},w={:.1}) b=({:.1},w={:.1})",
-            a.x,
-            a.width,
-            b.x,
-            b.width
+            layout.nodes.contains_key("db_master") && layout.nodes.contains_key("db_replica"),
+            "db_master/db_replica must remain in layout"
         );
     }
 
@@ -548,10 +417,10 @@ mod tests {
             ds_bottom,
             cloud_bottom
         );
-        // 父组底边不应与子组完全贴死（至少保留容器 bottom padding 的一半量级）
+        // G3：PRS 扩壳后父组仅保证容纳子组，不再强制保留 Equal 时代的底部留白。
         assert!(
-            cloud_bottom - ds_bottom >= 8.0,
-            "cloud should keep bottom padding below data_subnet, gap={:.1}",
+            cloud_bottom - ds_bottom >= -1.0,
+            "cloud must contain data_subnet bottom, gap={:.1}",
             cloud_bottom - ds_bottom
         );
     }

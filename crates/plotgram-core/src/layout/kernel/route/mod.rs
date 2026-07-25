@@ -13,6 +13,7 @@
 //! 3. **硬约束与软目标分离**：硬约束违反 = 无解，不是「很贵」
 
 pub mod auditor;
+pub mod capacity;
 pub mod feasibility;
 pub mod graph;
 pub mod model;
@@ -20,6 +21,11 @@ pub mod offline;
 pub mod search;
 
 pub use auditor::{RouteHardAuditReport, RouteHardViolation};
+pub use capacity::{
+    PORT_SIDE_CAPACITY, all_port_candidates, compile_min_separation_constraints,
+    compile_port_capacity_constraints, id_to_port, paths_violate_min_separation,
+    port_capacity_overloads, port_side_resource_id, port_to_id,
+};
 pub use feasibility::{HardConstraintKind, check_edge_hard_constraints};
 pub use graph::{ResourceGraph, ResourceId, ResourceVertex, ResourceVertexId, ResourceVertexKind};
 pub use model::{

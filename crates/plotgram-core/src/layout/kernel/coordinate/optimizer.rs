@@ -322,6 +322,7 @@ mod tests {
             initial: InitialCoordinates { values: vec![0.0, 30.0, 60.0] },
             config: CoordinateSolverConfig::default(),
             axis: Default::default(),
+            groups: Vec::new(),
         };
 
         let result = solve(&problem);
@@ -376,6 +377,7 @@ mod tests {
             initial: InitialCoordinates { values: vec![100.0, 200.0, 300.0] },
             config: CoordinateSolverConfig::default(),
             axis: Default::default(),
+            groups: Vec::new(),
         };
 
         let result = solve(&problem);
@@ -413,6 +415,7 @@ mod tests {
             initial: InitialCoordinates { values: vec![0.0, 80.0] },
             config: CoordinateSolverConfig::default(),
             axis: Default::default(),
+            groups: Vec::new(),
         };
 
         let result = solve(&problem);
@@ -459,6 +462,7 @@ mod tests {
             initial: InitialCoordinates { values: vec![0.0, 50.0, 100.0, 150.0] },
             config: CoordinateSolverConfig::default(),
             axis: Default::default(),
+            groups: Vec::new(),
         };
 
         let r1 = solve(&problem);

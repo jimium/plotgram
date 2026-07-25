@@ -66,30 +66,9 @@ pub fn parse_group_layout_hint(group: &Group) -> GroupLayoutHint {
         .unwrap_or(GroupLayoutHint::Auto)
 }
 
-/// 解析组内布局 hint：DSL 显式 `layout:` 优先，其次架构图子网启发式。
-pub fn resolve_group_layout_hint(group: &Group, diagram_type: DiagramType) -> GroupLayoutHint {
-    let parsed = parse_group_layout_hint(group);
-    if parsed != GroupLayoutHint::Auto {
-        return parsed;
-    }
-    if diagram_type == DiagramType::Architecture {
-        if let Some(hint) = architecture_subnet_layout_hint(group) {
-            return hint;
-        }
-    }
+/// G-pre：不再消费 DSL `layout:` 与 id 子串启发式；恒 Auto（拓扑推断）。
+pub fn resolve_group_layout_hint(_group: &Group, _diagram_type: DiagramType) -> GroupLayoutHint {
     GroupLayoutHint::Auto
-}
-
-/// 架构图常见子网命名：公有/数据子网默认竖排（gateway→lb、db 栈等）。
-fn architecture_subnet_layout_hint(group: &Group) -> Option<GroupLayoutHint> {
-    let id = group.id.as_str().to_ascii_lowercase();
-    if id.contains("public_subnet") || id.contains("public-subnet") {
-        return Some(GroupLayoutHint::Vertical);
-    }
-    if id.contains("data_subnet") || id.contains("data-subnet") {
-        return Some(GroupLayoutHint::Grid);
-    }
-    None
 }
 
 fn parse_layout_atom(raw: &str) -> GroupLayoutHint {
@@ -552,7 +531,8 @@ mod tests {
     }
 
     #[test]
-    fn architecture_subnet_hint_vertical_for_public_and_data() {
+    fn architecture_subnet_hint_always_auto() {
+        // G-pre：不再按 id 子串启发；恒 Auto
         use crate::ast::{AttributeMap, Identifier, Span};
         let mk = |id: &str| Group {
             id: Identifier::new_unchecked(id),
@@ -564,22 +544,17 @@ mod tests {
             child_group_ids: vec![],
             span: Span::dummy(),
         };
-        assert_eq!(
-            resolve_group_layout_hint(&mk("public_subnet"), DiagramType::Architecture),
-            GroupLayoutHint::Vertical
-        );
-        assert_eq!(
-            resolve_group_layout_hint(&mk("data_subnet"), DiagramType::Architecture),
-            GroupLayoutHint::Grid
-        );
-        assert_eq!(
-            resolve_group_layout_hint(&mk("private_subnet"), DiagramType::Architecture),
-            GroupLayoutHint::Auto
-        );
+        for id in ["public_subnet", "data_subnet", "private_subnet"] {
+            assert_eq!(
+                resolve_group_layout_hint(&mk(id), DiagramType::Architecture),
+                GroupLayoutHint::Auto
+            );
+        }
     }
 
     #[test]
-    fn explicit_layout_overrides_subnet_hint() {
+    fn explicit_layout_dsl_ignored_stays_auto() {
+        // G-pre：DSL `layout:` 不再被 resolve_group_layout_hint 消费
         use crate::ast::{AttributeMap, AttributeValue, Identifier, Span, TextValue};
         let mut attrs = AttributeMap::default();
         attrs.standard.insert(
@@ -598,7 +573,7 @@ mod tests {
         };
         assert_eq!(
             resolve_group_layout_hint(&group, DiagramType::Architecture),
-            GroupLayoutHint::Grid
+            GroupLayoutHint::Auto
         );
     }
 

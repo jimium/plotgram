@@ -137,10 +137,168 @@ pub fn audit_p0(problem: &CoordinateProblem, coordinates: &[f64]) -> AuditReport
                     ));
                 }
             }
+            // Phase 4.B：组槽位由 shadow_audit_group_bounds 对照，不参与 1D P0 投影审计。
+            HardConstraint::GroupContainment { .. }
+            | HardConstraint::GroupSiblingSeparation { .. } => {}
         }
     }
 
     report
+}
+
+/// Phase 4.B shadow：对照现有组框与 `compute_group_bounds`，只报不改。
+#[derive(Debug, Clone, Default)]
+pub struct GroupBoundsShadowReport {
+    pub groups_checked: usize,
+    pub position_mismatches: usize,
+    pub size_mismatches: usize,
+    pub missing_in_layout: usize,
+    pub notes: Vec<String>,
+}
+
+/// 将 `layout_groups` 与按节点重算的包围盒对照；差异写入 `notes`，不修改几何。
+pub fn shadow_audit_group_bounds(
+    diagram: &crate::ast::Diagram,
+    nodes: &std::collections::HashMap<String, crate::layout::NodeLayout>,
+    layout_groups: &std::collections::HashMap<String, crate::layout::GroupLayout>,
+    padding: crate::layout::engines::common::group_bounds::GroupPadding,
+) -> GroupBoundsShadowReport {
+    let mut report = GroupBoundsShadowReport::default();
+    let expected = crate::layout::engines::common::group_bounds::compute_group_bounds(
+        diagram, nodes, padding,
+    );
+    let mut ids: Vec<&String> = expected.keys().collect();
+    ids.sort();
+    for gid in ids {
+        report.groups_checked += 1;
+        let Some(exp) = expected.get(gid) else {
+            continue;
+        };
+        let Some(got) = layout_groups.get(gid) else {
+            report.missing_in_layout += 1;
+            report.notes.push(format!("group {gid}: missing in layout.groups"));
+            continue;
+        };
+        const EPS: f64 = 1.5;
+        let pos_err = (got.x - exp.x).abs().max((got.y - exp.y).abs());
+        let size_err = (got.width - exp.width)
+            .abs()
+            .max((got.height - exp.height).abs());
+        if pos_err > EPS {
+            report.position_mismatches += 1;
+            report.notes.push(format!(
+                "group {gid}: pos delta={pos_err:.2} layout=({:.1},{:.1}) expected=({:.1},{:.1})",
+                got.x, got.y, exp.x, exp.y
+            ));
+        }
+        if size_err > EPS {
+            report.size_mismatches += 1;
+            report.notes.push(format!(
+                "group {gid}: size delta={size_err:.2} layout=({:.1}x{:.1}) expected=({:.1}x{:.1})",
+                got.width, got.height, exp.width, exp.height
+            ));
+        }
+    }
+    if !report.notes.is_empty() {
+        crate::perf_log!(
+            "[shadow] group_bounds checked={} pos_mis={} size_mis={} missing={}",
+            report.groups_checked,
+            report.position_mismatches,
+            report.size_mismatches,
+            report.missing_in_layout
+        );
+    }
+    report
+}
+
+/// 从 diagram 编译 `GroupVariable` 列表（边界 VarId 留空；结构字段齐全）。
+///
+/// - 成员 / 子组按 id 排序（确定性）
+/// - `parent` / `children` 按排序后的下标互指
+/// - `padding` 默认全 0；`attach_group_ir` 写入真实 padding
+/// - `role` = `Container`
+pub fn compile_group_variables(
+    diagram: &crate::ast::Diagram,
+) -> Vec<crate::layout::kernel::coordinate::model::GroupVariable> {
+    use crate::layout::kernel::coordinate::model::{GroupRole, GroupVariable};
+    use std::collections::HashMap;
+
+    let mut groups: Vec<GroupVariable> = diagram
+        .groups
+        .iter()
+        .map(|g| {
+            let mut members =
+                crate::layout::engines::common::group_bounds::effective_entity_ids(g, diagram);
+            members.sort();
+            members.dedup();
+            GroupVariable {
+                stable_id: g.id.as_str().to_string(),
+                left: None,
+                right: None,
+                top: None,
+                bottom: None,
+                parent: None,
+                children: Vec::new(),
+                members,
+                padding: crate::layout::engines::common::group_bounds::GroupPadding::default(),
+                role: GroupRole::Container,
+            }
+        })
+        .collect();
+    groups.sort_by(|a, b| a.stable_id.cmp(&b.stable_id));
+
+    let id_to_ix: HashMap<String, usize> = groups
+        .iter()
+        .enumerate()
+        .map(|(i, g)| (g.stable_id.clone(), i))
+        .collect();
+
+    // 1) parent
+    for gdef in &diagram.groups {
+        let Some(&ix) = id_to_ix.get(gdef.id.as_str()) else {
+            continue;
+        };
+        if let Some(pid) = gdef.parent_id.as_ref() {
+            if let Some(&pix) = id_to_ix.get(pid.as_str()) {
+                groups[ix].parent = Some(pix);
+            }
+        }
+    }
+
+    // 2) children：优先 AST child_group_ids，否则由 parent 反推
+    for gdef in &diagram.groups {
+        let Some(&ix) = id_to_ix.get(gdef.id.as_str()) else {
+            continue;
+        };
+        let mut child_ixs: Vec<usize> = gdef
+            .child_group_ids
+            .iter()
+            .filter_map(|cid| id_to_ix.get(cid.as_str()).copied())
+            .collect();
+        if child_ixs.is_empty() {
+            child_ixs = groups
+                .iter()
+                .enumerate()
+                .filter(|(_, g)| g.parent == Some(ix))
+                .map(|(ci, _)| ci)
+                .collect();
+        }
+        child_ixs.sort_unstable();
+        child_ixs.dedup();
+        groups[ix].children = child_ixs;
+    }
+
+    // 3) 补齐：仅有 parent_id 时父侧可能漏子
+    for ix in 0..groups.len() {
+        if let Some(pix) = groups[ix].parent {
+            if !groups[pix].children.contains(&ix) {
+                groups[pix].children.push(ix);
+                groups[pix].children.sort_unstable();
+            }
+        }
+    }
+
+    groups
 }
 
 /// 验证 CoordinateProblem IR 结构合法性（solve 前调用）。
@@ -257,6 +415,39 @@ pub fn validate_problem(problem: &CoordinateProblem) -> Result<(), Vec<String>> 
                     errors.push(format!("hard[{}] invalid fixed value={}", hi, value));
                 }
             }
+            HardConstraint::GroupContainment {
+                group_index,
+                member_var,
+                pad,
+                ..
+            } => {
+                if *group_index >= problem.groups.len() {
+                    errors.push(format!(
+                        "hard[{}] group_index {} out of range",
+                        hi, group_index
+                    ));
+                }
+                check_var(*member_var, &mut errors);
+                if !pad.is_finite() || *pad < 0.0 {
+                    errors.push(format!("hard[{}] invalid pad={}", hi, pad));
+                }
+            }
+            HardConstraint::GroupSiblingSeparation {
+                left_group,
+                right_group,
+                distance,
+                ..
+            } => {
+                if *left_group >= problem.groups.len() || *right_group >= problem.groups.len() {
+                    errors.push(format!(
+                        "hard[{}] sibling groups out of range ({},{})",
+                        hi, left_group, right_group
+                    ));
+                }
+                if !distance.is_finite() || *distance < 0.0 {
+                    errors.push(format!("hard[{}] invalid sibling distance={}", hi, distance));
+                }
+            }
         }
     }
 
@@ -299,6 +490,7 @@ mod tests {
             },
             config: CoordinateSolverConfig::default(),
             axis: Default::default(),
+            groups: Vec::new(),
         }
     }
 

@@ -169,13 +169,18 @@ pub fn compute_group_bounds(
     nodes: &HashMap<String, NodeLayout>,
     leaf_padding: GroupPadding,
 ) -> HashMap<String, GroupLayout> {
-    compute_group_bounds_with_side_gutters(
+    let groups = compute_group_bounds_inner(
         diagram,
         nodes,
         leaf_padding,
         container_padding(leaf_padding),
         None,
-    )
+    );
+    // G3：空表不计写权（intra sugiyama 子图无 groups 时仍会调用本函数）。
+    if !groups.is_empty() {
+        crate::layout::group::write_counter::record_group_write_at("compute_group_bounds");
+    }
+    groups
 }
 
 /// 与 [`compute_group_bounds`] 相同，但叠加 EGB 产出的逐组 `side_gutters`。
@@ -186,13 +191,17 @@ pub fn compute_group_bounds_with_side_gutters(
     container_pad: GroupPadding,
     side_gutters: Option<&BTreeMap<String, SideGutter>>,
 ) -> HashMap<String, GroupLayout> {
-    compute_group_bounds_inner(
+    let groups = compute_group_bounds_inner(
         diagram,
         nodes,
         leaf_padding,
         container_pad,
         side_gutters,
-    )
+    );
+    crate::layout::group::write_counter::record_group_write_at(
+        "compute_group_bounds_with_side_gutters",
+    );
+    groups
 }
 
 /// 容器组 padding（由叶子 padding 推导，供 GroupFrame 重算）。
@@ -217,13 +226,17 @@ pub fn compute_group_bounds_with_container_padding(
     leaf_padding: GroupPadding,
     container_padding: GroupPadding,
 ) -> HashMap<String, GroupLayout> {
-    compute_group_bounds_inner(
+    let groups = compute_group_bounds_inner(
         diagram,
         nodes,
         leaf_padding,
         container_padding,
         None,
-    )
+    );
+    crate::layout::group::write_counter::record_group_write_at(
+        "compute_group_bounds_with_container_padding",
+    );
+    groups
 }
 
 fn compute_group_bounds_inner(

@@ -63,6 +63,8 @@ use crate::types::DiagramType;
 pub struct RecipeSolution {
     pub solution: RouteSolution,
     pub label_plans: Vec<Option<EdgeLabelPlan>>,
+    /// Phase 6 / A6：正交内核统计（含 `degraded_count`）；非正交家族为 `None`。
+    pub orthogonal_debug: Option<crate::layout::OrthoDebugStats>,
 }
 
 /// 一个边路由家族的编译语义（doc16 §5.1）。
@@ -109,6 +111,15 @@ pub trait RoutingRecipe {
         _routing_config: crate::layout::routing::config::RoutingConfig,
     ) -> Self::Draft<'a> {
         self.compile(diagram, result)
+    }
+
+    /// Phase 5 / D4-4：从 PreparedRoutingInput 编译（可携带富契约）。
+    fn compile_from_prepared<'a>(
+        &self,
+        input: &PreparedRoutingInput<'a>,
+        result: &'a LayoutResult,
+    ) -> Self::Draft<'a> {
+        self.compile_with_config(input.diagram, result, input.config)
     }
 
     /// 求解：Draft → family-neutral [`RecipeSolution`]。
@@ -161,8 +172,8 @@ impl<R: RoutingRecipe> RecipeRouter<R> {
     /// 不暴露给 trait 边界）。
     fn temp_result(&self, input: &PreparedRoutingInput<'_>) -> LayoutResult {
         LayoutResult {
-            nodes: input.frozen.nodes.clone(),
-            groups: input.frozen.groups.clone(),
+            nodes: input.frozen.nodes().clone(),
+            groups: input.frozen.groups().clone().into(),
             edges: Vec::new(),
             total_width: input.canvas.width,
             total_height: input.canvas.height,
@@ -181,6 +192,7 @@ impl<R: RoutingRecipe> RecipeRouter<R> {
         let RecipeSolution {
             mut solution,
             label_plans,
+            orthogonal_debug,
         } = solved;
 
         // 几何唯一写者物化 → 只读审计 → 冻结（Slice D2：无审计旁路）。
@@ -237,11 +249,13 @@ impl<R: RoutingRecipe> RecipeRouter<R> {
         temp_result = self.recipe.finalize(temp_result, edges, diagram);
 
         // 提取 RoutingProduct（edges + hints delta）。
+        // Phase 6：优先消费 solve 带回的 ortho stats（勿再读空的 temp_result.hints）。
+        let orthogonal_debug = orthogonal_debug.or(temp_result.hints.orthogonal_debug);
         RoutingProduct {
             edges: temp_result.edges,
             group_routing: temp_result.hints.group_routing,
             route_annotations: temp_result.hints.route_annotations,
-            orthogonal_debug: temp_result.hints.orthogonal_debug,
+            orthogonal_debug,
         }
     }
 }
@@ -272,9 +286,7 @@ impl<R: RoutingRecipe> RoutingRecipeDyn for RecipeRouter<R> {
 
         // compile + solve 借用 temp_result；在移动 result 进 finalize 前必须结束借用。
         let solved = {
-            let draft =
-                self.recipe
-                    .compile_with_config(input.diagram, &temp_result, input.config);
+            let draft = self.recipe.compile_from_prepared(input, &temp_result);
             if self.recipe.should_skip(&draft) {
                 None
             } else {
@@ -305,9 +317,7 @@ impl<R: RoutingRecipe> RoutingRecipeDyn for RecipeRouter<R> {
         temp_result.edges = seeded_edges;
 
         let solved = {
-            let draft =
-                self.recipe
-                    .compile_with_config(input.diagram, &temp_result, input.config);
+            let draft = self.recipe.compile_from_prepared(input, &temp_result);
             if self.recipe.should_skip(&draft) {
                 return None;
             }

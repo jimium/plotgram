@@ -201,7 +201,7 @@ impl LayoutRecipe for ArchitectureRecipe {
 
         LayoutResult {
             nodes,
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![],
             total_width,
             total_height,
@@ -220,7 +220,7 @@ impl LayoutRecipe for ArchitectureRecipe {
         if diagram.entities.is_empty() {
             return LayoutResult {
                 nodes: HashMap::new(),
-                groups: HashMap::new(),
+                groups: crate::layout::GroupTable::new(),
                 edges: vec![],
                 total_width: config.padding * 2.0,
                 total_height: config.padding * 2.0,

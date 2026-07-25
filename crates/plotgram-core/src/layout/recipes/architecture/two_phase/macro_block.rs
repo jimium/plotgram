@@ -282,6 +282,8 @@ pub(super) fn compose_global_layout(
 
     for block in blocks {
         if block.is_group {
+            // G3：provisional 框仅供 Phase C+ nudge clamp；最终框由 LayoutSession 物化。
+            // 不计写权（非 GroupTable 权威写者）。
             groups.insert(
                 block.id.clone(),
                 GroupLayout {

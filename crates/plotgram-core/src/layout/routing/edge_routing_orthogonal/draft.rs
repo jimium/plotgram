@@ -42,8 +42,6 @@ pub(super) struct OrthogonalDraft {
     pub(super) group_ctx: crate::layout::group::GroupRoutingContext,
     /// 预排序的节点/分组障碍物。
     pub(super) obstacles: PreparedObstacles,
-    /// 走廊路由规划（分组穿越链）。
-    pub(super) corridor_plan: corridor_route::CorridorRoutePlan,
     /// 走廊需求模型（供难度评分与逐边路由参考）。
     pub(super) corridor_model: crate::layout::demand::CorridorModel,
     /// 每条边的起点端口（Phase 1/2 将消费；当前经 endpoint_assignments 派生）。
@@ -60,8 +58,6 @@ pub(super) struct OrthogonalDraft {
     pub(super) edge_order: Vec<usize>,
     /// feedback 边集合（全局延后路由）。
     pub(super) feedback_edge_set: std::collections::HashSet<usize>,
-    /// 全局通道规划（默认关闭，`PLOTGRAM_CHANNEL_PLANNER=1` 启用）。
-    pub(super) channel_plan: Option<channel_planner::ChannelPlan>,
     /// 是否启用粗→精两轮路由（边数超阈值）。
     pub(super) use_two_round: bool,
     /// 分组矩形（供局部 OVG / 两轮路由使用）。
@@ -70,6 +66,8 @@ pub(super) struct OrthogonalDraft {
     pub(super) ovg: Option<visibility_graph::OrthogonalVisibilityGraph>,
     /// Slice C1：统一端口分配（side + slot + anchor + capacity + protected stub）。
     pub(super) endpoint_assignments: Vec<EndpointAssignment>,
+    /// Phase 3.x：富路由契约（prefer_periphery / ShareTrunk）。
+    pub(super) routing_contract: crate::layout::routing::model::RoutingContract,
 }
 
 impl OrthogonalDraft {
@@ -80,11 +78,12 @@ impl OrthogonalDraft {
         diagram: &Diagram,
         result: &mut LayoutResult,
         cfg: &OrthoConfig,
+        prepared_contract: Option<crate::layout::routing::model::RoutingContract>,
     ) -> OrthogonalDraft {
         let relations = &diagram.relations;
         let n = relations.len();
         let self_loop_idx = self_loop::self_loop_indices(relations);
-        let profile = OrthoRoutingProfile::for_diagram_type(diagram.diagram_type.clone());
+        let profile = OrthoRoutingProfile::from_arch_family(cfg.arch_family);
         let parallel_gap = profile.parallel_gap;
         // Phase 2.4：S4 monitor corridor 行为已删除；门控恒 false（禁止图名/空组特判）。
         let s4_monitor_corridor = false;
@@ -116,7 +115,6 @@ impl OrthogonalDraft {
             horizontal,
         );
 
-        let corridor_plan = corridor_route::plan_corridor_routes(relations, &group_ctx, &profile);
         let corridor_model = crate::layout::demand::compute_corridor_model(diagram, &*result);
 
         // Phase 2：入口算一次边难度，注入边序（高分同层略提前）
@@ -163,21 +161,6 @@ impl OrthogonalDraft {
             difficulty_scores.as_deref(),
         );
 
-        // Phase B3：全局通道规划（默认关闭）
-        let channel_plan = if cfg.routing.channel_planner {
-            let mut plan = channel_planner::plan_channels(
-                relations,
-                &result.nodes,
-                &group_ctx,
-                &edge_order,
-            );
-            // P2-1: 为同通道多边分配精确 lane 偏移
-            channel_planner::assign_lane_offsets(&mut plan, profile.parallel_gap);
-            Some(plan)
-        } else {
-            None
-        };
-
         // Phase B1：构建 OVG（仅当环境变量启用时）——节点障碍物阻断 + 组软惩罚
         // 节点膨胀使用 NODE_OBSTACLE_PAD + 10，给路径更多 clearance，减少 tight 违规
         // R6：大图（>50 节点且非两轮）跳过全局 OVG 构建——由 PathAssignmentSolver 在
@@ -219,6 +202,37 @@ impl OrthogonalDraft {
             &feedback_edge_set,
         );
 
+        // Phase 5 / D4-4：优先消费 PreparedRoutingInput 富契约；无则瘦 compile + feedback periphery。
+        let routing_contract = if let Some(c) = prepared_contract {
+            c
+        } else {
+            let mut routing_contract =
+                crate::layout::routing::model::RoutingContract::compile(
+                    &crate::layout::routing::model::StableEdgeStore::from_diagram(diagram),
+                );
+            let periphery: Vec<crate::layout::routing::model::StableEdgeId> = {
+                let mut v: Vec<_> = feedback_edge_set
+                    .iter()
+                    .copied()
+                    .map(crate::layout::routing::model::StableEdgeId)
+                    .collect();
+                v.sort_by_key(|e| e.index());
+                v
+            };
+            routing_contract.fill_prefer_periphery(&periphery);
+            if cfg.routing.share_trunk
+                || crate::layout::routing::edge_merge_policy::requires_semantic_merge(
+                    diagram.diagram_type.clone(),
+                )
+            {
+                let all: Vec<_> = (0..n)
+                    .map(crate::layout::routing::model::StableEdgeId)
+                    .collect();
+                routing_contract.with_share_trunk(all);
+            }
+            routing_contract
+        };
+
         OrthogonalDraft {
             profile,
             parallel_gap,
@@ -227,7 +241,6 @@ impl OrthogonalDraft {
             self_loop_idx,
             group_ctx,
             obstacles,
-            corridor_plan,
             corridor_model,
             _from_side: from_side,
             _to_side: to_side,
@@ -236,11 +249,11 @@ impl OrthogonalDraft {
             _reverse_pairs: reverse_pairs,
             edge_order,
             feedback_edge_set,
-            channel_plan,
             use_two_round,
             group_rects,
             ovg,
             endpoint_assignments,
+            routing_contract,
         }
     }
 }
@@ -375,9 +388,9 @@ mod tests {
         let (diagram, base) = make_diagram_grid(3, 3);
 
         let mut r1 = base.clone();
-        let d1 = OrthogonalDraft::compile(&diagram, &mut r1, &cfg);
+        let d1 = OrthogonalDraft::compile(&diagram, &mut r1, &cfg, None);
         let mut r2 = base.clone();
-        let d2 = OrthogonalDraft::compile(&diagram, &mut r2, &cfg);
+        let d2 = OrthogonalDraft::compile(&diagram, &mut r2, &cfg, None);
 
         assert_eq!(fingerprint(&d1), fingerprint(&d2));
     }
@@ -389,7 +402,7 @@ mod tests {
         let (diagram, mut result) = make_diagram_grid(3, 3);
         let n = diagram.relations.len();
 
-        let d = OrthogonalDraft::compile(&diagram, &mut result, &cfg);
+        let d = OrthogonalDraft::compile(&diagram, &mut result, &cfg, None);
 
         // 每条边都有起/终端口选择。
         assert_eq!(d._from_side.len(), n);

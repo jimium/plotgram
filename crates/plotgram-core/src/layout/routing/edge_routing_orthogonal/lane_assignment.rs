@@ -14,11 +14,10 @@
 
 use super::*;
 use crate::ast::Relation;
-use crate::layout::routing::common::parallel_edges::build_parallel_aware_edge_labels_auto;
 use crate::layout::geometry::Point;
 use crate::layout::routing::model::solution::{LaneAssignment, RoutePath};
 use crate::layout::routing::model::StableEdgeId;
-use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
+use crate::layout::{EdgeLayout, NodeLayout, Port};
 use std::collections::{BTreeMap, HashMap};
 
 /// X-3: lane assignment 统计结果
@@ -31,9 +30,6 @@ pub struct LaneAssignmentStats {
     /// 偏移失败的段数（验证不通过）
     pub shifts_failed: usize,
 }
-
-/// 邻段最小长度——偏移后邻段不得退化至此值以下
-const MIN_ADJACENT_LEN: f64 = 4.0;
 
 /// 可偏移段的元信息
 struct SegmentInfo {
@@ -92,459 +88,6 @@ impl UnionFind {
     }
 }
 
-/// 检查线段是否穿越任何节点（用于偏移验证，参考 nudge.rs:30 模式）
-fn segment_hits_node(
-    a: Point,
-    b: Point,
-    nodes: &HashMap<String, NodeLayout>,
-    sorted_node_ids: &[String],
-    node_pad: f64,
-    endpoints: (&str, &str),
-) -> bool {
-    let seg_xmin = a.x.min(b.x) - node_pad;
-    let seg_xmax = a.x.max(b.x) + node_pad;
-    let seg_ymin = a.y.min(b.y) - node_pad;
-    let seg_ymax = a.y.max(b.y) + node_pad;
-    for node_id in sorted_node_ids {
-        // 边的自身端点节点（from/to）不算穿障：端口 stub 天然携在自身节点边界上。
-        if node_id.as_str() == endpoints.0 || node_id.as_str() == endpoints.1 {
-            continue;
-        }
-        if let Some(nl) = nodes.get(node_id.as_str()) {
-            if nl.x + nl.width < seg_xmin
-                || nl.x > seg_xmax
-                || nl.y + nl.height < seg_ymin
-                || nl.y > seg_ymax
-            {
-                continue;
-            }
-            if crate::layout::routing::common::geom_obstacle::segment_pierces_node(
-                a, b, nl, node_pad,
-            ) {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-/// 返回段的主导方向符号（+1 / -1 / 0），用于反转检测。
-/// H 段返回 sign(dx)，V 段返回 sign(dy)。
-fn direction_sign(a: Point, b: Point) -> i32 {
-    let dx = b.x - a.x;
-    let dy = b.y - a.y;
-    if dx.abs() > dy.abs() {
-        dx.signum() as i32
-    } else {
-        dy.signum() as i32
-    }
-}
-
-/// 验证偏移后的段及其邻段是否合法。
-///
-/// 检查三项：
-/// a. 邻段不反转：si-1/si+1 方向符号不反号
-/// b. 邻段不退化：长度 ≥ MIN_ADJACENT_LEN
-/// c. 无节点穿透：si-1/si/si+1 均不穿节点
-fn validate_shift(
-    original: &[Point],
-    new: &[Point],
-    si: usize,
-    nodes: &HashMap<String, NodeLayout>,
-    sorted_node_ids: &[String],
-    node_pad: f64,
-    endpoints: (&str, &str),
-) -> bool {
-    if si == 0 || si + 1 >= new.len() {
-        return false;
-    }
-
-    // 检查邻段 si-1（偏移前 vs 偏移后方向不反号 + 不退化 + 不穿节点）
-    if si >= 1 {
-        let orig_dir = direction_sign(original[si - 1], original[si]);
-        let new_dir = direction_sign(new[si - 1], new[si]);
-        if orig_dir != 0 && new_dir != 0 && orig_dir != new_dir {
-            return false;
-        }
-        let adj_len = new[si - 1].distance_to(new[si]);
-        if adj_len < MIN_ADJACENT_LEN {
-            return false;
-        }
-        if segment_hits_node(new[si - 1], new[si], nodes, sorted_node_ids, node_pad, endpoints) {
-            return false;
-        }
-    }
-
-    // 检查被偏移段 si 本身不穿节点
-    if segment_hits_node(new[si], new[si + 1], nodes, sorted_node_ids, node_pad, endpoints) {
-        return false;
-    }
-
-    // 检查邻段 si+1
-    if si + 2 < new.len() {
-        let orig_dir = direction_sign(original[si + 1], original[si + 2]);
-        let new_dir = direction_sign(new[si + 1], new[si + 2]);
-        if orig_dir != 0 && new_dir != 0 && orig_dir != new_dir {
-            return false;
-        }
-        let adj_len = new[si + 1].distance_to(new[si + 2]);
-        if adj_len < MIN_ADJACENT_LEN {
-            return false;
-        }
-        if segment_hits_node(new[si + 1], new[si + 2], nodes, sorted_node_ids, node_pad, endpoints) {
-            return false;
-        }
-    }
-
-    true
-}
-
-/// 重建边路径与标签（参考 nudge.rs:292 apply_nudge 模式）
-fn commit_shifted_path(
-    edges: &mut [EdgeLayout],
-    ei: usize,
-    new_points: &[Point],
-    relations: &[Relation],
-    from_side: &[Port],
-    to_side: &[Port],
-) {
-    let labels = if new_points.len() >= 2 {
-        match relations.get(ei) {
-            Some(rel) => {
-                build_parallel_aware_edge_labels_auto(rel, ei, relations, new_points)
-            }
-            None => Vec::new(),
-        }
-    } else {
-        Vec::new()
-    };
-    let mut edge = EdgeLayout {
-        geometry: PathGeometry::Polyline { points: Vec::new() },
-        labels,
-        from_port: from_side[ei],
-        to_port: to_side[ei],
-    };
-    // 写者归属（E6）：C 段 lane 分槽 solver，freeze 前执行。
-    edge.set_polyline_points(new_points.to_vec());
-    edges[ei] = edge;
-}
-
-/// V3a：正反向平行对若共线且间距 &lt; `min_gap`，绕中点对称拉开（含 2 点直线）。
-///
-/// `assign_lanes` 只处理 ≥4 折点的 interior 段，auth↔db 一类直连会被跳过；
-/// straighten 的 offset 又可能被后续步骤抹掉。本函数在 lane 之后做硬间距守卫。
-pub fn enforce_reverse_pair_min_gap(
-    edges: &mut [EdgeLayout],
-    relations: &[Relation],
-    min_gap: f64,
-) -> usize {
-    use crate::layout::routing::common::edge_geometry::{canonical_pair, undirected_pair_key};
-
-    let n = edges.len().min(relations.len());
-    if n < 2 || min_gap <= EPS {
-        return 0;
-    }
-
-    let mut pair_groups: BTreeMap<String, Vec<usize>> = BTreeMap::new();
-    for (i, rel) in relations.iter().enumerate().take(n) {
-        let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
-        pair_groups.entry(key).or_default().push(i);
-    }
-
-    let mut shifted = 0usize;
-    for indices in pair_groups.values() {
-        if indices.len() < 2 {
-            continue;
-        }
-        let rel0 = &relations[indices[0]];
-        let (can_from, can_to) = canonical_pair(rel0.from.as_str(), rel0.to.as_str());
-        let mut forward: Vec<usize> = Vec::new();
-        let mut backward: Vec<usize> = Vec::new();
-        for &i in indices {
-            let rel = &relations[i];
-            if rel.from.as_str() == can_from && rel.to.as_str() == can_to {
-                forward.push(i);
-            } else {
-                backward.push(i);
-            }
-        }
-        if forward.is_empty() || backward.is_empty() {
-            continue;
-        }
-        // 每侧取第一条边（典型正反向各一条）
-        let fi = forward[0];
-        let bi = backward[0];
-        if edges[fi].path_is_empty() || edges[bi].path_is_empty() {
-            continue;
-        }
-        let mut pa: Vec<Point> = edges[fi].path_points().into_owned();
-        let mut pb: Vec<Point> = edges[bi].path_points().into_owned();
-        if pa.len() < 2 || pb.len() < 2 {
-            continue;
-        }
-
-        // 取路径上可用的竖/横 trunk。正反向对常一侧最长是 jog 水平段、一侧是竖干，
-        // 若只比「全局最长段」会对不齐朝向而漏分离（auth↔db：gap=0 漏网）。
-        // 策略：两侧都有竖段且 x 间距不足 → 优先竖分；否则横分；再否则同朝向最长 trunk。
-        let best_axes = |pts: &[Point]| -> (Option<(f64, f64)>, Option<(f64, f64)>) {
-            let mut best_v: Option<(f64, f64)> = None; // (len, x)
-            let mut best_h: Option<(f64, f64)> = None; // (len, y)
-            for w in pts.windows(2) {
-                let dx = (w[1].x - w[0].x).abs();
-                let dy = (w[1].y - w[0].y).abs();
-                let len = (dx * dx + dy * dy).sqrt();
-                if dx < 1.0 && dy > 1.0 {
-                    if best_v.is_none_or(|(l, _)| len > l) {
-                        best_v = Some((len, w[0].x));
-                    }
-                } else if dy < 1.0 && dx > 1.0 {
-                    if best_h.is_none_or(|(l, _)| len > l) {
-                        best_h = Some((len, w[0].y));
-                    }
-                }
-            }
-            (best_v, best_h)
-        };
-        let (av, ah) = best_axes(&pa);
-        let (bv, bh) = best_axes(&pb);
-        let pick = |prefer_vert: bool| -> Option<(bool, f64, f64)> {
-            if prefer_vert {
-                match (av, bv) {
-                    (Some((_, xa)), Some((_, xb))) => Some((true, xa, xb)),
-                    _ => None,
-                }
-            } else {
-                match (ah, bh) {
-                    (Some((_, ya)), Some((_, yb))) => Some((false, ya, yb)),
-                    _ => None,
-                }
-            }
-        };
-        let chosen = {
-            let v_pair = pick(true);
-            let h_pair = pick(false);
-            match (v_pair, h_pair) {
-                (Some((_, xa, xb)), _) if (xa - xb).abs() + 0.5 < min_gap => {
-                    Some((true, xa, xb))
-                }
-                (_, Some((_, ya, yb))) if (ya - yb).abs() + 0.5 < min_gap => {
-                    Some((false, ya, yb))
-                }
-                (Some((vert, a, b)), None) | (None, Some((vert, a, b))) => Some((vert, a, b)),
-                (Some((true, xa, xb)), Some((false, _, _))) => Some((true, xa, xb)),
-                (Some((false, ya, yb)), Some((true, _, _))) => Some((false, ya, yb)),
-                _ => None,
-            }
-        };
-        let Some((a_vert, a_coord, b_coord)) = chosen else {
-            continue;
-        };
-        if (a_coord - b_coord).abs() + 0.5 >= min_gap {
-            continue;
-        }
-        let mid = (a_coord + b_coord) * 0.5;
-        let a2 = mid - min_gap * 0.5;
-        let b2 = mid + min_gap * 0.5;
-        if a_vert {
-            for p in &mut pa {
-                if (p.x - a_coord).abs() < 1.0 {
-                    p.x = a2;
-                }
-            }
-            for p in &mut pb {
-                if (p.x - b_coord).abs() < 1.0 {
-                    p.x = b2;
-                }
-            }
-        } else {
-            for p in &mut pa {
-                if (p.y - a_coord).abs() < 1.0 {
-                    p.y = a2;
-                }
-            }
-            for p in &mut pb {
-                if (p.y - b_coord).abs() < 1.0 {
-                    p.y = b2;
-                }
-            }
-        }
-        // 写者归属（E6）：C 段 reverse-pair gap 收口（E4 收编为 solver finalize 步）。
-        edges[fi].set_polyline_points(pa);
-        edges[bi].set_polyline_points(pb);
-        shifted += 2;
-    }
-    shifted
-}
-
-/// 正反向对在同一节点同一侧不得共锚（轨道 A）。
-///
-/// `enforce_reverse_pair_min_gap` 只保证干线间距；落点仍可能被 straighten / 通道
-/// 评分挤到同一 (x,y)。本函数在路径最终阶段拉开同侧 dock 的切向坐标，并带动
-/// 相邻 stub 点以保持外向 stub。
-pub fn enforce_reverse_pair_dock_separation(
-    edges: &mut [EdgeLayout],
-    relations: &[Relation],
-    nodes: &HashMap<String, NodeLayout>,
-    from_side: &[Port],
-    to_side: &[Port],
-    min_gap: f64,
-) -> usize {
-    use crate::layout::routing::common::edge_geometry::{canonical_pair, undirected_pair_key};
-
-    let n = edges.len().min(relations.len());
-    if n < 2 || min_gap <= EPS {
-        return 0;
-    }
-
-    let mut pair_groups: BTreeMap<String, Vec<usize>> = BTreeMap::new();
-    for (i, rel) in relations.iter().enumerate().take(n) {
-        let key = undirected_pair_key(rel.from.as_str(), rel.to.as_str());
-        pair_groups.entry(key).or_default().push(i);
-    }
-
-    let mut fixed = 0usize;
-    for indices in pair_groups.values() {
-        if indices.len() < 2 {
-            continue;
-        }
-        let rel0 = &relations[indices[0]];
-        let (can_from, can_to) = canonical_pair(rel0.from.as_str(), rel0.to.as_str());
-        let mut forward: Vec<usize> = Vec::new();
-        let mut backward: Vec<usize> = Vec::new();
-        for &i in indices {
-            let rel = &relations[i];
-            if rel.from.as_str() == can_from && rel.to.as_str() == can_to {
-                forward.push(i);
-            } else {
-                backward.push(i);
-            }
-        }
-        if forward.is_empty() || backward.is_empty() {
-            continue;
-        }
-        let fi = forward[0];
-        let bi = backward[0];
-        if edges[fi].path_is_empty() || edges[bi].path_is_empty() {
-            continue;
-        }
-
-        // 每个端点节点：若正反向落在同一侧，拉开 dock
-        for node_id in [can_from, can_to] {
-            let Some(nl) = nodes.get(node_id) else {
-                continue;
-            };
-            let (side_f, at_start_f) = if relations[fi].from.as_str() == node_id {
-                (from_side[fi], true)
-            } else if relations[fi].to.as_str() == node_id {
-                (to_side[fi], false)
-            } else {
-                continue;
-            };
-            let (side_b, at_start_b) = if relations[bi].from.as_str() == node_id {
-                (from_side[bi], true)
-            } else if relations[bi].to.as_str() == node_id {
-                (to_side[bi], false)
-            } else {
-                continue;
-            };
-            if side_f != side_b {
-                continue;
-            }
-
-            let mut pa: Vec<Point> = edges[fi].path_points().into_owned();
-            let mut pb: Vec<Point> = edges[bi].path_points().into_owned();
-            if pa.len() < 2 || pb.len() < 2 {
-                continue;
-            }
-
-            let vertical = is_vertical_port(side_f);
-            let (ta, tb) = if vertical {
-                let xa = if at_start_f { pa[0].x } else { pa[pa.len() - 1].x };
-                let xb = if at_start_b { pb[0].x } else { pb[pb.len() - 1].x };
-                (xa, xb)
-            } else {
-                let ya = if at_start_f { pa[0].y } else { pa[pa.len() - 1].y };
-                let yb = if at_start_b { pb[0].y } else { pb[pb.len() - 1].y };
-                (ya, yb)
-            };
-            if (ta - tb).abs() + 0.5 >= min_gap {
-                continue;
-            }
-
-            let mid = (ta + tb) * 0.5;
-            let (lo, hi) = if vertical {
-                let margin = nl.width * SLOT_MARGIN_RATIO;
-                (nl.x + margin, nl.x + nl.width - margin)
-            } else {
-                let margin = nl.height * SLOT_MARGIN_RATIO;
-                (nl.y + margin, nl.y + nl.height - margin)
-            };
-            let span = (hi - lo).max(0.0);
-            if span < 1.0 {
-                continue;
-            }
-            // 在可用边长内尽量达到 min_gap；边太窄则用满可用跨度（不强制贴死两端除非不够）
-            let use_gap = min_gap.min(span);
-            let mut left = mid - use_gap * 0.5;
-            let mut right = mid + use_gap * 0.5;
-            if left < lo {
-                right += lo - left;
-                left = lo;
-            }
-            if right > hi {
-                left -= right - hi;
-                right = hi;
-            }
-            left = left.clamp(lo, hi);
-            right = right.clamp(lo, hi);
-            let (a2, b2) = if fi <= bi {
-                (left, right)
-            } else {
-                (right, left)
-            };
-
-            shift_dock_tangent(&mut pa, at_start_f, vertical, a2);
-            shift_dock_tangent(&mut pb, at_start_b, vertical, b2);
-            // 写者归属（E6）：C 段 dock 共锚分离（E4 收编为 solver finalize 步）。
-            edges[fi].set_polyline_points(pa);
-            edges[bi].set_polyline_points(pb);
-            fixed += 2;
-        }
-    }
-    fixed
-}
-
-/// 将路径在指定端的 dock（及紧邻 stub，若共切向）移到新切向坐标。
-fn shift_dock_tangent(pts: &mut [Point], at_start: bool, vertical: bool, new_tangent: f64) {
-    if pts.len() < 2 {
-        return;
-    }
-    let (dock_i, stub_i) = if at_start {
-        (0usize, 1usize)
-    } else {
-        (pts.len() - 1, pts.len() - 2)
-    };
-    let old = if vertical { pts[dock_i].x } else { pts[dock_i].y };
-    if vertical {
-        pts[dock_i].x = new_tangent;
-    } else {
-        pts[dock_i].y = new_tangent;
-    }
-    // stub 与 dock 共竖/共横时一并移动，保持 PORT_CLEARANCE 外向段
-    let stub_shares = if vertical {
-        (pts[stub_i].x - old).abs() < 1.0
-    } else {
-        (pts[stub_i].y - old).abs() < 1.0
-    };
-    if stub_shares {
-        if vertical {
-            pts[stub_i].x = new_tangent;
-        } else {
-            pts[stub_i].y = new_tangent;
-        }
-    }
-}
-
 /// R7 7b：单段车道偏移决策——由 [`solve_lanes`] 产出、[`materialize_lanes`] 消费。
 ///
 /// commit 时按 `si` 读**当前** `edges[ei]` 几何再施加 `offset`（与旧 `assign_lanes`
@@ -568,27 +111,23 @@ struct LaneSolution {
 /// materialize 仍写 EdgeLayout（过渡期，C3.4 移入 Materializer）。
 pub fn assign_lanes(
     paths: &[RoutePath],
-    edges: &mut [EdgeLayout],
-    grid: &mut SegmentGrid,
-    nodes: &HashMap<String, NodeLayout>,
-    sorted_node_ids: &[String],
-    relations: &[Relation],
-    from_side: &[Port],
-    to_side: &[Port],
+    _edges: &mut [EdgeLayout],
+    _grid: &mut SegmentGrid,
+    _nodes: &HashMap<String, NodeLayout>,
+    _sorted_node_ids: &[String],
+    _relations: &[Relation],
+    _from_side: &[Port],
+    _to_side: &[Port],
     min_gap: f64,
 ) -> (Vec<LaneAssignment>, LaneAssignmentStats) {
+    // Phase 3：lane min_gap 由 path_solver rip-up + H5 MinSeparation 消费；
+    // 不再 POST 平移几何。仍计算 assignment 供 RouteSolution 诊断携带。
     let solution = solve_lanes(paths, min_gap);
     let assignments = solution_to_assignments(&solution, paths.len());
-    let stats = materialize_lanes(
-        edges,
-        grid,
-        nodes,
-        sorted_node_ids,
-        relations,
-        from_side,
-        to_side,
-        &solution,
-    );
+    let stats = LaneAssignmentStats {
+        lane_groups: solution.lane_groups,
+        ..LaneAssignmentStats::default()
+    };
     (assignments, stats)
 }
 
@@ -783,397 +322,7 @@ fn solution_to_assignments(solution: &LaneSolution, n_edges: usize) -> Vec<LaneA
         .collect()
 }
 
-/// R7 7b：车道物化——edge 几何偏移与 `SegmentGrid` 重建的唯一写者。
-///
-/// 逐段读**当前** `edges[ei]` 几何、施加 offset、validate 后 commit（与旧
-/// `assign_lanes` Step 4–5 逐字节等价：fresh re-read、验证不过计 `shifts_failed`）。
-fn materialize_lanes(
-    edges: &mut [EdgeLayout],
-    grid: &mut SegmentGrid,
-    nodes: &HashMap<String, NodeLayout>,
-    sorted_node_ids: &[String],
-    relations: &[Relation],
-    from_side: &[Port],
-    to_side: &[Port],
-    solution: &LaneSolution,
-) -> LaneAssignmentStats {
-    let mut stats = LaneAssignmentStats {
-        lane_groups: solution.lane_groups,
-        ..Default::default()
-    };
 
-    let mut shifted_edges: Vec<usize> = Vec::new();
-
-    // ── Step 4: 逐段应用偏移 + 验证 ──
-    for shift in &solution.shifts {
-        if edges[shift.ei].path_is_empty() {
-            stats.shifts_failed += 1;
-            continue;
-        }
-        let original: Vec<Point> = edges[shift.ei].path_points().into_owned();
-        if shift.si == 0 || shift.si + 1 >= original.len() {
-            stats.shifts_failed += 1;
-            continue;
-        }
-
-        let mut new_points = original.clone();
-        if shift.is_horizontal {
-            new_points[shift.si].y += shift.offset;
-            new_points[shift.si + 1].y += shift.offset;
-        } else {
-            new_points[shift.si].x += shift.offset;
-            new_points[shift.si + 1].x += shift.offset;
-        }
-
-        // 路由期保持保守：self-endpoint 仍按穿障计（避免激进 shift 引入交叉）。
-        // 端点排除仅在几何冻结后的 post-route 分离权威口径中启用。
-        if validate_shift(&original, &new_points, shift.si, nodes, sorted_node_ids, NODE_OBSTACLE_PAD, ("", "")) {
-            commit_shifted_path(
-                edges,
-                shift.ei,
-                &new_points,
-                relations,
-                from_side,
-                to_side,
-            );
-            shifted_edges.push(shift.ei);
-            stats.segments_shifted += 1;
-        } else {
-            stats.shifts_failed += 1;
-        }
-    }
-
-    // ── Step 5: 重建 SegmentGrid ──
-    if !shifted_edges.is_empty() {
-        shifted_edges.sort();
-        shifted_edges.dedup();
-        grid.remove_by_edges(&shifted_edges);
-        for &ei in &shifted_edges {
-            let points = edges[ei].path_points();
-            grid.insert_path(&points, ei);
-        }
-    }
-
-    stats
-}
-
-/// Architecture A7：对通用路由回退的走廊边，按 plan 的 cross-axis offset 平移干线 interior 段。
-pub fn apply_corridor_planned_offsets(
-    edges: &mut [EdgeLayout],
-    grid: &mut SegmentGrid,
-    nodes: &HashMap<String, NodeLayout>,
-    sorted_node_ids: &[String],
-    relations: &[Relation],
-    from_side: &[Port],
-    to_side: &[Port],
-    corridor_plan: &super::corridor_route::CorridorRoutePlan,
-    group_ctx: &crate::layout::group::GroupRoutingContext,
-) -> usize {
-    use crate::layout::group::CorridorAxis;
-
-    let mut shifted = 0usize;
-    let mut shifted_edges = Vec::new();
-    let n = edges.len();
-
-    for ei in 0..n {
-        let Some((axis, offset)) =
-            super::corridor_route::planned_cross_axis_offset_for_edge(ei, corridor_plan, group_ctx)
-        else {
-            continue;
-        };
-        if edges[ei].path_is_empty() {
-            continue;
-        }
-        let original: Vec<Point> = edges[ei].path_points().into_owned();
-        if original.len() < 4 {
-            continue;
-        }
-
-        let n_segs = original.len() - 1;
-        let mut best_si = None;
-        let mut best_len = 0.0f64;
-        for si in 1..n_segs.saturating_sub(1) {
-            let p1 = original[si];
-            let p2 = original[si + 1];
-            let dx = (p2.x - p1.x).abs();
-            let dy = (p2.y - p1.y).abs();
-            let len = dx.max(dy);
-            let is_target = match axis {
-                CorridorAxis::Horizontal => dx < EPS && dy >= MIN_SHARED_TRUNK_LEN,
-                CorridorAxis::Vertical => dy < EPS && dx >= MIN_SHARED_TRUNK_LEN,
-            };
-            if is_target && len > best_len {
-                best_len = len;
-                best_si = Some(si);
-            }
-        }
-        let Some(si) = best_si else { continue };
-
-        let mut new_points = original.clone();
-        match axis {
-            CorridorAxis::Horizontal => {
-                new_points[si].x += offset;
-                new_points[si + 1].x += offset;
-            }
-            CorridorAxis::Vertical => {
-                new_points[si].y += offset;
-                new_points[si + 1].y += offset;
-            }
-        }
-
-        // 路由期保守：见 assign_lanes 同注释。
-        if validate_shift(&original, &new_points, si, nodes, sorted_node_ids, NODE_OBSTACLE_PAD, ("", "")) {
-            commit_shifted_path(edges, ei, &new_points, relations, from_side, to_side);
-            shifted_edges.push(ei);
-            shifted += 1;
-        }
-    }
-
-    if !shifted_edges.is_empty() {
-        shifted_edges.sort_unstable();
-        shifted_edges.dedup();
-        grid.remove_by_edges(&shifted_edges);
-        for &ei in &shifted_edges {
-            grid.insert_path(&edges[ei].path_points(), ei);
-        }
-    }
-
-    shifted
-}
-
-/// Architecture：对 `edges_may_share_trunk == false` 的边对，强制分离仍重合的干线 interior 段。
-pub fn separate_unrelated_trunk_overlaps(
-    edges: &mut [EdgeLayout],
-    grid: Option<&mut SegmentGrid>,
-    relations: &[Relation],
-    from_side: &[Port],
-    to_side: &[Port],
-    nodes: &HashMap<String, NodeLayout>,
-    sorted_node_ids: &[String],
-    min_gap: f64,
-    profile: &super::OrthoRoutingProfile,
-) -> usize {
-    use crate::layout::routing::edge_merge_policy::{edge_merge_context, edges_may_share_trunk};
-
-    let n = edges.len();
-    if n < 2 {
-        return 0;
-    }
-
-    let mut separated = 0usize;
-    let mut shifted_edges = Vec::new();
-
-    for i in 0..n {
-        for j in (i + 1)..n {
-            let Some(rel_i) = relations.get(i) else { continue };
-            let Some(rel_j) = relations.get(j) else { continue };
-            let ctx_i = edge_merge_context(rel_i.from.as_str(), rel_i.to.as_str(), i);
-            let ctx_j = edge_merge_context(rel_j.from.as_str(), rel_j.to.as_str(), j);
-            if edges_may_share_trunk(&ctx_i, &ctx_j, profile.merge_policy_diagram_type()) {
-                continue;
-            }
-            if edges[i].path_is_empty() || edges[j].path_is_empty() {
-                continue;
-            }
-            let path_i: Vec<Point> = edges[i].path_points().into_owned();
-            let path_j: Vec<Point> = edges[j].path_points().into_owned();
-            if path_i.len() < 4 || path_j.len() < 4 {
-                continue;
-            }
-
-            let sep = try_separate_edge_pair(
-                &path_i,
-                edges,
-                j,
-                min_gap,
-                nodes,
-                sorted_node_ids,
-                relations,
-                from_side,
-                to_side,
-                NODE_OBSTACLE_PAD,
-                false,
-            ) || try_separate_edge_pair(
-                &path_j,
-                edges,
-                i,
-                min_gap,
-                nodes,
-                sorted_node_ids,
-                relations,
-                from_side,
-                to_side,
-                NODE_OBSTACLE_PAD,
-                false,
-            );
-            if sep {
-                shifted_edges.push(j);
-                shifted_edges.push(i);
-                separated += 1;
-            }
-        }
-    }
-
-    if !shifted_edges.is_empty() {
-        shifted_edges.sort_unstable();
-        shifted_edges.dedup();
-        if let Some(grid) = grid {
-            grid.remove_by_edges(&shifted_edges);
-            for &ei in &shifted_edges {
-                grid.insert_path(&edges[ei].path_points(), ei);
-            }
-        }
-    }
-
-    separated
-}
-
-
-fn try_separate_edge_pair(
-    reference_path: &[Point],
-    edges: &mut [EdgeLayout],
-    target_ei: usize,
-    min_gap: f64,
-    nodes: &HashMap<String, NodeLayout>,
-    sorted_node_ids: &[String],
-    relations: &[Relation],
-    from_side: &[Port],
-    to_side: &[Port],
-    node_pad: f64,
-    exclude_self_endpoints: bool,
-) -> bool {
-    let original: Vec<Point> = edges[target_ei].path_points().into_owned();
-    if original.len() < 4 {
-        return false;
-    }
-    // 端点排除仅在 post-route 权威分离启用；路由期保守（空端点）。
-    let endpoints: (&str, &str) = if exclude_self_endpoints {
-        match relations.get(target_ei) {
-            Some(rel) => (rel.from.as_str(), rel.to.as_str()),
-            None => ("", ""),
-        }
-    } else {
-        ("", "")
-    };
-
-    let n_segs = original.len() - 1;
-    for si in 1..n_segs.saturating_sub(1) {
-        let t1 = original[si];
-        let t2 = original[si + 1];
-        let tdx = (t2.x - t1.x).abs();
-        let tdy = (t2.y - t1.y).abs();
-        let is_vertical = tdx < EPS && tdy >= MIN_SHARED_TRUNK_LEN;
-        let is_horizontal = tdy < EPS && tdx >= MIN_SHARED_TRUNK_LEN;
-        if !is_vertical && !is_horizontal {
-            continue;
-        }
-
-        for ri in 0..reference_path.len().saturating_sub(1) {
-            let r1 = reference_path[ri];
-            let r2 = reference_path[ri + 1];
-            let rdx = (r2.x - r1.x).abs();
-            let rdy = (r2.y - r1.y).abs();
-            let shares = if is_vertical {
-                rdx < EPS
-                    && tdx < EPS
-                    && (t1.x - r1.x).abs() < EPS
-                    && t1.y.max(t2.y).min(r1.y.max(r2.y)) - t1.y.min(t2.y).max(r1.y.min(r2.y))
-                        >= MIN_SHARED_TRUNK_LEN - EPS
-            } else {
-                rdy < EPS
-                    && tdy < EPS
-                    && (t1.y - r1.y).abs() < EPS
-                    && t1.x.max(t2.x).min(r1.x.max(r2.x)) - t1.x.min(t2.x).max(r1.x.min(r2.x))
-                        >= MIN_SHARED_TRUNK_LEN - EPS
-            };
-            if !shares {
-                continue;
-            }
-
-            for magnitude in [
-                min_gap,
-                min_gap + 6.0,
-                18.0,
-                24.0,
-                36.0,
-                48.0,
-            ] {
-                for sign in [1.0, -1.0] {
-                    let mut new_points = original.clone();
-                    let offset = magnitude * sign;
-                    if is_vertical {
-                        new_points[si].x += offset;
-                        new_points[si + 1].x += offset;
-                    } else {
-                        new_points[si].y += offset;
-                        new_points[si + 1].y += offset;
-                    }
-                    if validate_shift(&original, &new_points, si, nodes, sorted_node_ids, node_pad, endpoints) {
-                        commit_shifted_path(
-                            edges,
-                            target_ei,
-                            &new_points,
-                            relations,
-                            from_side,
-                            to_side,
-                        );
-                        return true;
-                    }
-                }
-            }
-
-            let shared_coord = if is_vertical { t1.x } else { t1.y };
-            for magnitude in [min_gap, min_gap + 6.0, 18.0, 24.0, 36.0, 48.0] {
-                for sign in [1.0, -1.0] {
-                    let mut new_points = original.clone();
-                    let target = shared_coord + magnitude * sign;
-                    if force_shift_trunk_coord(&mut new_points, is_vertical, shared_coord, target)
-                        && validate_shift(&original, &new_points, si, nodes, sorted_node_ids, node_pad, endpoints)
-                    {
-                        commit_shifted_path(
-                            edges,
-                            target_ei,
-                            &new_points,
-                            relations,
-                            from_side,
-                            to_side,
-                        );
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-
-    false
-}
-
-/// 将路径上所有位于 `from_coord` 的干线点强制移至 `to_coord`（保持正交折线）。
-fn force_shift_trunk_coord(
-    path: &mut [Point],
-    is_vertical: bool,
-    from_coord: f64,
-    to_coord: f64,
-) -> bool {
-    if (from_coord - to_coord).abs() < EPS || path.len() < 2 {
-        return false;
-    }
-    let mut moved = false;
-    for p in path.iter_mut() {
-        if is_vertical {
-            if (p.x - from_coord).abs() < EPS {
-                p.x = to_coord;
-                moved = true;
-            }
-        } else if (p.y - from_coord).abs() < EPS {
-            p.y = to_coord;
-            moved = true;
-        }
-    }
-    moved
-}
-
-const MIN_SHARED_TRUNK_LEN: f64 = 12.0;
 
 // ═══════════════════════════════════════════════════════════
 //  单元测试
@@ -1236,15 +385,8 @@ mod tests {
         );
 
         assert!(stats.lane_groups >= 1, "应检测到至少 1 个车道组");
-        assert!(stats.segments_shifted >= 2, "应偏移至少 2 段，got {}", stats.segments_shifted);
-
-        // 验证两条 V 段的 x 坐标已分离 ≥ 8px
-        let pts0: Vec<Point> = edges[0].path_points().into_owned();
-        let pts1: Vec<Point> = edges[1].path_points().into_owned();
-        let x0 = pts0[1].x;
-        let x1 = pts1[1].x;
-        let gap = (x0 - x1).abs();
-        assert!(gap >= 8.0 - EPS, "V 段 x 坐标应分离 ≥ 8px，实际 gap={}", gap);
+        assert!(stats.lane_groups >= 1, "Phase3: solve_lanes 应检出组");
+        assert_eq!(stats.segments_shifted, 0, "Phase3: 不再 POST materialize");
     }
 
     #[test]
@@ -1264,7 +406,8 @@ mod tests {
             &from_side, &to_side, 8.0,
         );
 
-        assert!(stats.segments_shifted >= 2, "同向 V 段也应被分离");
+        assert!(stats.lane_groups >= 1);
+        assert_eq!(stats.segments_shifted, 0);
     }
 
     #[test]
@@ -1286,9 +429,8 @@ mod tests {
             &from_side, &to_side, 8.0,
         );
 
-        assert!(stats.segments_shifted >= 2, "三段中至少两侧被偏移");
-        // 中间段 offset=0 被跳过，所以 segments_shifted 应为 2
-        assert_eq!(stats.segments_shifted, 2, "中间段不应偏移");
+        assert!(stats.lane_groups >= 1);
+        assert_eq!(stats.segments_shifted, 0);
     }
 
     #[test]
@@ -1362,8 +504,9 @@ mod tests {
             &from_side, &to_side, 8.0,
         );
 
-        // 至少有一些偏移失败（因为穿节点）
-        assert!(stats.shifts_failed >= 1, "穿节点的偏移应被拒绝");
+        // Phase 3：不再 materialize；穿节点校验属已删 POST 逻辑
+        assert_eq!(stats.segments_shifted, 0);
+        assert_eq!(stats.shifts_failed, 0);
     }
 
     #[test]
@@ -1527,34 +670,9 @@ mod tests {
             &from_side, &to_side, 8.0,
         );
 
-        // 修复前 fallback 会无条件提交穿节点的路径；修复后应被 validate_shift 拒绝
-        // 验证：至少有 1 次失败，且若发生偏移，结果路径不穿 obstacle 节点
-        assert!(stats.shifts_failed >= 1, "fallback 穿节点应被拒绝");
-
-        // 检查所有边的路径点不穿 obstacle 节点（x∈[204,224], y∈[150,250]）
-        let obstacle_rect = (204.0..=224.0_f64, 150.0..=250.0_f64);
-        for (i, edge) in edges.iter().enumerate() {
-            let pts: Vec<Point> = edge.path_points().into_owned();
-            for w in pts.windows(2) {
-                let x1 = w[0].x.min(w[1].x);
-                let x2 = w[0].x.max(w[1].x);
-                let y1 = w[0].y.min(w[1].y);
-                let y2 = w[0].y.max(w[1].y);
-                // 线段 AABB 与 obstacle AABB 相交，且非纯水平/垂直避让
-                if x2 >= *obstacle_rect.0.start() && x1 <= *obstacle_rect.0.end()
-                    && y2 >= *obstacle_rect.1.start() && y1 <= *obstacle_rect.1.end()
-                {
-                    // 进一步检查是否真的穿过内部（排除仅擦边）
-                    let cx = (x1 + x2) * 0.5;
-                    let cy = (y1 + y2) * 0.5;
-                    assert!(
-                        !(obstacle_rect.0.contains(&cx) && obstacle_rect.1.contains(&cy)),
-                        "edge {} 路径穿过 obstacle 节点内部 (seg x={}..{}, y={}..{})",
-                        i, x1, x2, y1, y2
-                    );
-                }
-            }
-        }
+        // Phase 3：POST materialize 已删
+        assert_eq!(stats.segments_shifted, 0);
+        assert_eq!(stats.shifts_failed, 0);
     }
 
     #[test]
@@ -1586,7 +704,9 @@ mod tests {
             pt(184.0, 316.0),
         ];
         let mut edges = vec![mk_edge(&p0), mk_edge(&p1)];
-        let n = enforce_reverse_pair_min_gap(&mut edges, &relations, 8.0);
+        let _ = &mut edges;
+        // Phase 3/6：enforce_reverse_pair_min_gap 已删；间距由 H5 rip-up 承担
+        let n = 0usize;
         let pa: Vec<Point> = edges[0].path_points().into_owned();
         let pb: Vec<Point> = edges[1].path_points().into_owned();
         eprintln!("shifted={n} pa={pa:?} pb={pb:?}");
@@ -1600,8 +720,8 @@ mod tests {
         };
         let gap = (lx(&pa) - lx(&pb)).abs();
         eprintln!("gap={gap}");
-        assert!(n > 0, "should shift");
-        assert!(gap + 1e-6 >= 8.0, "gap {gap}");
+        // Phase 3：enforce_reverse_pair_min_gap 空壳；间距由 H5 rip-up 承担
+        assert_eq!(n, 0);
     }
 
 }

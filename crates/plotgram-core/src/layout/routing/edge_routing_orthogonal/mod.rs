@@ -17,19 +17,16 @@ use crate::ast::Diagram;
 // 子模块 / 测试经 `use super::*` 共享的类型与几何
 pub(super) use crate::layout::geometry::Point;
 pub(super) use crate::layout::{EdgeLayout, NodeLayout, PathGeometry, Port};
-pub(super) use crate::types::DiagramType;
 
 pub(super) mod profile;
 pub(super) mod channel_load;
 pub(super) mod context;
-pub(super) mod corridor_route;
 pub(super) mod feedback_side;
 pub(super) mod lane_assignment;
 pub(super) mod layer_order;
 pub(super) mod path;
 pub(super) mod path_kernel;
 pub(crate) use path_kernel::repair_group_interior_crossings;
-pub(super) mod path_legacy;
 pub(super) mod scoring;
 pub(super) mod simplify;
 pub(super) mod shape_boundary;
@@ -43,7 +40,6 @@ pub(super) mod run;
 pub(super) mod phases;
 pub(super) mod visibility_graph;
 pub(super) mod port_solver;
-pub(super) mod channel_planner;
 pub(super) mod path_solver;
 
 // Re-exports for cross-submodule access via `use super::*;`
@@ -51,9 +47,7 @@ pub(super) use profile::OrthoRoutingProfile;
 pub(super) use channel_load::{channel_load_penalty, corridor_overflow_penalty, ChannelLoadMap};
 pub(super) use context::{EndpointPair, PreparedObstacles, OrthoRoutingContext, SegmentGrid};
 pub(crate) use context::SegmentGrid as OrthoSegmentGrid;
-pub(super) use lane_assignment::{
-    apply_corridor_planned_offsets, assign_lanes, separate_unrelated_trunk_overlaps,
-};
+pub(super) use lane_assignment::assign_lanes;
 pub(super) use path::{select_best_path_with_scorer_stats, PathSelectStats, RoutedSegment};
 #[allow(unused_imports)] // SpacingViolationKind/segments_violate_spacing/path_edge_spacing_violations used in X-1
 pub(super) use scoring::{CandidateScorer, DefaultScorer, GROUP_OBSTACLE_PAD, NODE_OBSTACLE_PAD, path_is_clean_from_edges, path_length, SpacingViolationKind, segments_violate_spacing, path_edge_spacing_violations, count_all_edge_spacing_violations};
@@ -67,18 +61,15 @@ pub(super) use slot::{
 };
 // Slice D3：sanitize 内核不再对外再导出——canonicalize 归 materializer，
 // 调用方经 `GeometryMaterializer::canonicalize_orthogonal_edges` 进入。
-pub use lane_assignment::{
-    enforce_reverse_pair_dock_separation, enforce_reverse_pair_min_gap,
-};
+// Phase 6：空壳 enforce_reverse_* / resolve_*stub 已删，不再 pub 导出。
 pub use stub_occupancy::{
     collect_stub_occupancy, estimate_layer_band_demands, find_stub_occupancy_conflicts,
-    resolve_exact_stub_occupancy_post_route, resolve_stub_occupancy_conflicts, LayerBandDemand,
-    StubOccupancyConflict, StubOccupancyRecord, StubOccupancyStats,
+    LayerBandDemand, StubOccupancyConflict, StubOccupancyRecord, StubOccupancyStats,
 };
 
 // run.rs 内被 path_solver 等兄弟模块调用的共享辅助
 pub(super) use run::{
-    endpoint_bundling_key, should_strict_group_transit, validated_corridor_path,
+    endpoint_bundling_key, should_strict_group_transit,
 };
 
 // run 总控各 phase 实现（A4 从 run.rs 拆出）；供总控调用
@@ -121,6 +112,8 @@ pub struct OrthoConfig {
     pub channel_margin: f64,
     /// 路由算法正式配置（Slice B：原 PLOTGRAM_* 正式 env 硬切于此）。
     pub routing: crate::layout::routing::config::RoutingConfig,
+    /// Phase 6：architecture 族预设（由 recipe 在 ortho 外解析图种后注入）。
+    pub arch_family: bool,
 }
 
 impl OrthoConfig {
@@ -129,6 +122,7 @@ impl OrthoConfig {
             slot_pitch: ORTHOGONAL_OPTIONS[0].default,
             channel_margin: ORTHOGONAL_OPTIONS[1].default,
             routing: Default::default(),
+            arch_family: false,
         }
     }
 }
@@ -141,8 +135,8 @@ pub(super) const PORT_CLEARANCE: f64 = 16.0;
 /// slot 在节点边上分布时保留的边界余量（占边长比例）
 pub(super) const SLOT_MARGIN_RATIO: f64 = 0.12;
 
-/// 已路由边段重叠惩罚
-pub(super) const EDGE_OVERLAP_PENALTY: f64 = 1_200.0;
+/// 已路由边段重叠惩罚（Phase 6：真源见 `routing::objectives`）。
+pub(super) use crate::layout::routing::objectives::EDGE_OVERLAP_PENALTY;
 /// 平行边重叠判定阈值（与 refine/segments_conflict_xy 共享）
 pub(super) use crate::layout::constants::ORTHO_PARALLEL_GAP as EDGE_PARALLEL_GAP;
 
@@ -150,9 +144,8 @@ pub(super) use crate::layout::constants::ORTHO_PARALLEL_GAP as EDGE_PARALLEL_GAP
 /// 因为同节点相邻 slot 的 stub 天然平行近距（slot_pitch 可能小于 EDGE_PARALLEL_GAP）。
 /// A2：单一来源见 `constants::STUB_GUARD_LENGTH`。
 pub(super) use crate::layout::constants::STUB_GUARD_LENGTH;
-/// 每个折点的惩罚（鼓励更少拐弯）
-/// Phase A 优化：16→28，使 scorer 更强烈偏好少弯折路径。
-pub(super) const BEND_PENALTY: f64 = 28.0;
+/// 每个折点的惩罚（Phase 6：真源见 `routing::objectives`）。
+pub(super) use crate::layout::routing::objectives::BEND_PENALTY;
 
 /// 侧通道距障碍节点的最小留白（即便被分组边框挤压也要保留）
 pub(super) const MIN_CHANNEL_CLEARANCE: f64 = 10.0;
@@ -166,20 +159,23 @@ pub fn route_edges_orthogonal(
     result: LayoutResult,
     cfg: OrthoConfig,
 ) -> LayoutResult {
-    run::route_edges_orthogonal_inner(diagram, result, cfg, None)
+    run::route_edges_orthogonal_inner(diagram, result, cfg, None, None)
 }
 
 /// 正交路由内核（支持 preserve 增量重路由）——供 recipe/orthogonal.rs 调用。
 ///
 /// Slice F2c：本模块旧的节点位移增量重路由入口已删除，
 /// 跨渲染增量统一走 Coordinator 的 `FrozenRoutingSolution` 依赖记录。
+///
+/// `routing_contract`：D4-4 由 PreparedRoutingInput 注入；`None` 时 draft 自行瘦 compile。
 pub(crate) fn route_orthogonal_inner(
     diagram: &Diagram,
     result: LayoutResult,
     cfg: OrthoConfig,
     preserve: Option<std::collections::HashSet<usize>>,
+    routing_contract: Option<crate::layout::routing::model::RoutingContract>,
 ) -> LayoutResult {
-    run::route_edges_orthogonal_inner(diagram, result, cfg, preserve)
+    run::route_edges_orthogonal_inner(diagram, result, cfg, preserve, routing_contract)
 }
 
 #[cfg(test)]

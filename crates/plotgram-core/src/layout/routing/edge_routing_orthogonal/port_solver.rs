@@ -22,11 +22,26 @@ use super::feedback_side::FeedbackSideAssignment;
 use super::path::port_outward;
 use super::slot::choose_pair_sides_with_group;
 
-/// 端口分配结果
+/// 端口分配结果（Phase 6：字段私有；求解后只读消费，禁止下游 `&mut` 改 side）。
 #[derive(Clone, Debug)]
 pub struct PortAssignment {
-    pub from_side: Vec<Port>,
-    pub to_side: Vec<Port>,
+    from_side: Vec<Port>,
+    to_side: Vec<Port>,
+}
+
+impl PortAssignment {
+    pub fn from_side(&self) -> &[Port] {
+        &self.from_side
+    }
+
+    pub fn to_side(&self) -> &[Port] {
+        &self.to_side
+    }
+
+    /// 消费为可变向量（仅 port_slot 初始化 lane/slot 时一次性拆出）。
+    pub fn into_sides(self) -> (Vec<Port>, Vec<Port>) {
+        (self.from_side, self.to_side)
+    }
 }
 
 /// 端口求解器输入（Slice 5：把 pre-route 端口 side 的全部上下文收敛到求解器）。
@@ -558,7 +573,7 @@ mod tests {
 
         let layout_result = LayoutResult {
             nodes: HashMap::new(),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![],
             total_width: 0.0,
             total_height: 0.0,
@@ -583,8 +598,8 @@ mod tests {
         let assignment = solve_port_assignment(&input);
 
         // a 在 b 上方，应该使用 Bottom->Top
-        assert_eq!(assignment.from_side[0], Port::Bottom);
-        assert_eq!(assignment.to_side[0], Port::Top);
+        assert_eq!(assignment.from_side()[0], Port::Bottom);
+        assert_eq!(assignment.to_side()[0], Port::Top);
     }
 
     #[test]
@@ -622,7 +637,7 @@ mod tests {
         }];
         let layout_result = LayoutResult {
             nodes: HashMap::new(),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![],
             total_width: 0.0,
             total_height: 0.0,
@@ -674,7 +689,7 @@ mod tests {
         use crate::layout::LayoutResult;
         let layout_result = LayoutResult {
             nodes: HashMap::new(),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![],
             total_width: 0.0,
             total_height: 0.0,
@@ -719,8 +734,8 @@ mod tests {
         };
         let assignment = solve_port_assignment(&input);
         // 锁定：hint 的 side 原样保留，未被局部搜索翻正。
-        assert_eq!(assignment.from_side[0], Port::Left);
-        assert_eq!(assignment.to_side[0], Port::Right);
+        assert_eq!(assignment.from_side()[0], Port::Left);
+        assert_eq!(assignment.to_side()[0], Port::Right);
     }
 
     #[test]
@@ -747,8 +762,8 @@ mod tests {
         };
         let assignment = solve_port_assignment(&input);
         // 两条汇入边统一到 c 的 Top 端口（源在上方）。
-        assert_eq!(assignment.to_side[0], Port::Top);
-        assert_eq!(assignment.to_side[1], Port::Top);
+        assert_eq!(assignment.to_side()[0], Port::Top);
+        assert_eq!(assignment.to_side()[1], Port::Top);
     }
 
     #[test]

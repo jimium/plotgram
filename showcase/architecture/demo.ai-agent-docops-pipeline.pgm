@@ -3,19 +3,8 @@
 // @role: demo  (authoritative: filename prefix)
 diagram architecture {
     title: "AI Agent 文档自动化管线"
-    config {
-        group_frame: stack {
-            axis: horizontal
-            track: equal
-            cross: start
-            gap: 50
-            border: shared
-        }
-    }
 
     group inputs "输入源" {
-        layout: horizontal
-
         entity[storage] repo "代码仓库"
         entity[service] pr "Pull Request"
         entity[service] cmdb "服务目录 / CMDB"
@@ -23,8 +12,6 @@ diagram architecture {
     }
 
     group agent_runtime "Agent 运行时" {
-        layout: fan-out
-
         entity[service] orchestrator "Agent Orchestrator"
         entity[service] planner "Planning Agent"
         entity[service] graph_agent "Diagram Agent"
@@ -32,8 +19,6 @@ diagram architecture {
     }
 
     group drawify_stack "Drawify 栈" {
-        layout: horizontal
-
         entity[service] validate "Drawify Validator"
         entity[service] render "Drawify Renderer"
         entity[service] diff "Diagram Diff Engine"
@@ -41,8 +26,6 @@ diagram architecture {
     }
 
     group delivery "交付与反馈" {
-        layout: horizontal
-
         entity[frontend] docs "Docs Portal"
         entity[service] review "PR Review Bot"
         entity[frontend] wiki "Knowledge Base"

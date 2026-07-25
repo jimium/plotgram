@@ -296,6 +296,7 @@ impl RoutingRecipe for SplineRecipe {
         RecipeSolution {
             solution,
             label_plans,
+            orthogonal_debug: None,
         }
     }
 }

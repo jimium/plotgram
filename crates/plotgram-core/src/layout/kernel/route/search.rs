@@ -164,17 +164,25 @@ fn step_cost(
     c.q3_bends = c.q3_bends.saturating_add(bend);
     c.q4_length = OrderedF64(c.q4_length.0 + edge.length);
 
-    // Q2：与已占用段轴对齐重叠近似
+    // Q2：与已占用段轴对齐重叠近似；同时计命中数供 H4
+    let mut overlap_hits = 0u32;
     if let (Some(from_v), Some(to_v)) = (graph.vertex(edge.from), graph.vertex(edge.to)) {
         let overlap = axis_overlap_len(
             from_v.position,
             to_v.position,
             edge.is_horizontal,
             occupied,
+            &mut overlap_hits,
         );
         if overlap > 0.0 {
             c.q2_crossings = c.q2_crossings.saturating_add(1);
         }
+    }
+
+    // H4：ResourceEdge.capacity —— 与已占用段并发数超过容量 → q1 硬残差
+    if overlap_hits >= edge.capacity {
+        c.q1_hard_residual =
+            OrderedF64(c.q1_hard_residual.0 + f64::from(overlap_hits - edge.capacity + 1));
     }
 
     // Q5：外围偏好 —— GroupGate 给负对齐代价
@@ -197,6 +205,7 @@ fn axis_overlap_len(
     b: Point,
     horizontal: bool,
     occupied: &[(f64, f64, f64, f64)],
+    hit_count: &mut u32,
 ) -> f64 {
     const PROX: f64 = 4.0;
     let mut total = 0.0;
@@ -216,6 +225,7 @@ fn axis_overlap_len(
             let o = t1.min(u1) - t0.max(u0);
             if o > 0.0 {
                 total += o;
+                *hit_count = hit_count.saturating_add(1);
             }
         } else {
             if (a.x - x1).abs() > PROX {
@@ -228,6 +238,7 @@ fn axis_overlap_len(
             let o = t1.min(u1) - t0.max(u0);
             if o > 0.0 {
                 total += o;
+                *hit_count = hit_count.saturating_add(1);
             }
         }
     }

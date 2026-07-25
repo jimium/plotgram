@@ -52,7 +52,6 @@ pub(crate) fn phase_reroute_feedback_after_trunk(
     profile: &OrthoRoutingProfile,
     group_ctx: &crate::layout::group::GroupRoutingContext,
     obstacles: &PreparedObstacles,
-    corridor_plan: &corridor_route::CorridorRoutePlan,
     parallel: &crate::layout::routing::common::parallel_edges::ParallelGroups,
     protected_trunks: &[(f64, f64, f64)],
     ortho_stats: &mut crate::layout::OrthoDebugStats,
@@ -83,69 +82,46 @@ pub(crate) fn phase_reroute_feedback_after_trunk(
             from: from_ep.clone(),
             to: to_ep.clone(),
         };
-        let strict = should_strict_group_transit(
-            profile,
-            group_ctx,
-            from_id,
-            to_id,
-            corridor_plan.chains.contains_key(&ei),
-            true,
-        );
+        let strict = should_strict_group_transit(true);
         let mut path_stats = PathSelectStats::default();
-        let path = validated_corridor_path(
-            ei,
-            from_ep.anchor,
-            to_ep.anchor,
-            from_id,
-            to_id,
-            corridor_plan,
-            group_ctx,
-            nodes,
-            obstacles,
-            cfg.channel_margin,
-        )
-        .unwrap_or_else(|| {
-            let mut ctx =
+        let mut ctx =
+            OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
+                .with_strict_group_transit(strict)
+                .with_prefer_outer_ring(true)
+                .with_protected_trunks(protected_trunks);
+        if let Some(ovg_ref) = ovg {
+            ctx = ctx.with_ovg(ovg_ref);
+        }
+        let mut path = select_best_path_with_scorer_stats(
+            &ctx,
+            &pair,
+            &DefaultScorer,
+            Some(&mut path_stats),
+            false,
+        );
+        if path_stats.degraded {
+            let mut boost_stats = PathSelectStats::default();
+            let mut ctx2 =
                 OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
                     .with_strict_group_transit(strict)
+                    .with_corridor_boost(true)
                     .with_prefer_outer_ring(true)
                     .with_protected_trunks(protected_trunks);
             if let Some(ovg_ref) = ovg {
-                ctx = ctx.with_ovg(ovg_ref);
+                ctx2 = ctx2.with_ovg(ovg_ref);
             }
-            let mut first = select_best_path_with_scorer_stats(
-                &ctx,
+            let boosted = select_best_path_with_scorer_stats(
+                &ctx2,
                 &pair,
                 &DefaultScorer,
-                Some(&mut path_stats),
+                Some(&mut boost_stats),
                 false,
             );
-            if path_stats.degraded {
-                let mut boost_stats = PathSelectStats::default();
-                let mut ctx2 =
-                    OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
-                        .with_strict_group_transit(strict)
-                        .with_corridor_boost(true)
-                        .with_prefer_outer_ring(true)
-                        .with_protected_trunks(protected_trunks);
-                if let Some(ovg_ref) = ovg {
-                    ctx2 = ctx2.with_ovg(ovg_ref);
-                }
-                let boosted = select_best_path_with_scorer_stats(
-                    &ctx2,
-                    &pair,
-                    &DefaultScorer,
-                    Some(&mut boost_stats),
-                    false,
-                );
-                if !boost_stats.degraded || boost_stats.candidate_count > path_stats.candidate_count
-                {
-                    path_stats = boost_stats;
-                    first = boosted;
-                }
+            if !boost_stats.degraded || boost_stats.candidate_count > path_stats.candidate_count {
+                path_stats = boost_stats;
+                path = boosted;
             }
-            first
-        });
+        }
         if path.len() < 2 {
             continue;
         }

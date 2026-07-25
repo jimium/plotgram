@@ -22,19 +22,15 @@ pub struct PathSelectStats {
     pub degraded: bool,
 }
 
-/// Select a route with the configured kernel.
+/// Select a route with the LexAStar kernel.
 pub fn select_best_path_with_scorer_stats(
     ctx: &OrthoRoutingContext,
     pair: &EndpointPair,
-    scorer: &dyn CandidateScorer,
+    _scorer: &dyn CandidateScorer,
     stats: Option<&mut PathSelectStats>,
-    phase1_only: bool,
+    _phase1_only: bool,
 ) -> Vec<Point> {
-    if path_kernel::use_lex_astar(ctx.cfg) {
-        path_kernel::select_best_path_lex_astar(ctx, pair, stats)
-    } else {
-        path_legacy::select_best_path_legacy(ctx, pair, scorer, stats, phase1_only)
-    }
+    path_kernel::select_best_path_lex_astar(ctx, pair, stats)
 }
 
 /// Convert a port side to its outward unit vector.

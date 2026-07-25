@@ -271,7 +271,7 @@ mod tests {
     fn test_calculate_canvas_size() {
         let layout = LayoutResult {
             nodes: HashMap::new(),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![],
             total_width: 500.0,
             total_height: 300.0,

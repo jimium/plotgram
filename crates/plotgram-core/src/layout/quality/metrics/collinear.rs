@@ -347,7 +347,7 @@ mod tests {
     fn empty_result() -> LayoutResult {
         LayoutResult {
             nodes: HashMap::new(),
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: Vec::new(),
             total_width: 0.0,
             total_height: 0.0,

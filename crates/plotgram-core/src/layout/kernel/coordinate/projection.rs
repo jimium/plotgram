@@ -154,6 +154,116 @@ pub fn project_bounds(
                 }
             }
             HardConstraint::MinSeparation { .. } => {}
+            HardConstraint::GroupContainment { .. }
+            | HardConstraint::GroupSiblingSeparation { .. } => {}
+        }
+    }
+    project_group_constraints(coords, problem);
+}
+
+/// G2：投影 H-G1 GroupContainment / H-G3 GroupSiblingSeparation。
+///
+/// - Cross：`left`/`right`；Main：`top`/`bottom`
+/// - containment：扩组框包住成员（优先动 Axis 边界；用 `GroupVariable.padding`）
+/// - sibling：保证 `hi(left_group) + distance <= lo(right_group)`
+///
+/// H-G2 嵌套与 H-G6 画布下界已编码为 `MinSeparation` / `LowerBound`，
+/// 由 `project_cross_layer_min_separation` / `project_bounds` 处理。
+pub fn project_group_constraints(coords: &mut [f64], problem: &CoordinateProblem) {
+    use super::model::SolveAxis;
+
+    for hc in &problem.hard {
+        match hc {
+            HardConstraint::GroupContainment {
+                group_index,
+                member_var,
+                pad: _,
+                ..
+            } => {
+                let Some(g) = problem.groups.get(*group_index) else {
+                    continue;
+                };
+                let (lo_id, hi_id, pad_lo, pad_hi) = match problem.axis {
+                    SolveAxis::Cross => {
+                        let (Some(l), Some(r)) = (g.left, g.right) else {
+                            continue;
+                        };
+                        (l, r, g.padding.left, g.padding.right)
+                    }
+                    SolveAxis::Main => {
+                        let (Some(t), Some(b)) = (g.top, g.bottom) else {
+                            continue;
+                        };
+                        (t, b, g.padding.top, g.padding.bottom)
+                    }
+                };
+                if *member_var >= coords.len()
+                    || lo_id >= coords.len()
+                    || hi_id >= coords.len()
+                {
+                    continue;
+                }
+                let half = problem
+                    .vars
+                    .get(*member_var)
+                    .map(|v| v.axis_size * 0.5)
+                    .unwrap_or(0.0);
+                let m = coords[*member_var];
+                let need_lo = m - half - pad_lo;
+                let need_hi = m + half + pad_hi;
+                if coords[lo_id] > need_lo {
+                    coords[lo_id] = need_lo;
+                }
+                if coords[hi_id] < need_hi {
+                    coords[hi_id] = need_hi;
+                }
+            }
+            HardConstraint::GroupSiblingSeparation {
+                left_group,
+                right_group,
+                distance,
+                ..
+            } => {
+                let (Some(lg), Some(rg)) = (
+                    problem.groups.get(*left_group),
+                    problem.groups.get(*right_group),
+                ) else {
+                    continue;
+                };
+                let (l_hi, r_lo) = match problem.axis {
+                    SolveAxis::Cross => {
+                        let (Some(lr), Some(rl)) = (lg.right, rg.left) else {
+                            continue;
+                        };
+                        (lr, rl)
+                    }
+                    SolveAxis::Main => {
+                        let (Some(lb), Some(rt)) = (lg.bottom, rg.top) else {
+                            continue;
+                        };
+                        (lb, rt)
+                    }
+                };
+                if l_hi >= coords.len() || r_lo >= coords.len() {
+                    continue;
+                }
+                let actual = coords[r_lo] - coords[l_hi];
+                if actual < *distance - 1e-9 {
+                    let deficit = *distance - actual;
+                    let l_movable = problem.vars.get(l_hi).map(|v| v.movable).unwrap_or(true);
+                    let r_movable = problem.vars.get(r_lo).map(|v| v.movable).unwrap_or(true);
+                    match (l_movable, r_movable) {
+                        (true, true) => {
+                            coords[l_hi] -= deficit * 0.5;
+                            coords[r_lo] += deficit * 0.5;
+                        }
+                        (false, true) => coords[r_lo] += deficit,
+                        (true, false) => coords[l_hi] -= deficit,
+                        (false, false) => {}
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -214,10 +324,15 @@ pub fn project_hard_constraints(
     const CONVERGENCE_EPS: f64 = 1e-6;
 
     let has_cross_constraints = problem.hard.iter().any(|hc| {
-        matches!(hc, HardConstraint::MinSeparation { .. }
-            | HardConstraint::LowerBound { .. }
-            | HardConstraint::UpperBound { .. }
-            | HardConstraint::Fixed { .. })
+        matches!(
+            hc,
+            HardConstraint::MinSeparation { .. }
+                | HardConstraint::LowerBound { .. }
+                | HardConstraint::UpperBound { .. }
+                | HardConstraint::Fixed { .. }
+                | HardConstraint::GroupContainment { .. }
+                | HardConstraint::GroupSiblingSeparation { .. }
+        )
     });
 
     // 无跨层约束时，单次 PAVA + bounds 即可
@@ -230,7 +345,7 @@ pub fn project_hard_constraints(
     for round in 0..MAX_ROUNDS {
         // Step 1: 层内 PAVA
         project_all_layers(coords, problem);
-        // Step 2: bounds/fixed
+        // Step 2: bounds/fixed + group IR
         project_bounds(coords, problem);
         // Step 3: 跨层 MinSeparation
         project_cross_layer_min_separation(coords, problem);
@@ -291,6 +406,66 @@ pub fn max_hard_violation(
             }
             HardConstraint::Fixed { var, value, .. } => {
                 (coords[*var] - *value).abs()
+            }
+            HardConstraint::GroupContainment {
+                group_index,
+                member_var,
+                ..
+            } => {
+                use super::model::SolveAxis;
+                (|| -> Option<f64> {
+                    let g = problem.groups.get(*group_index)?;
+                    let (lo_id, hi_id, pad_lo, pad_hi) = match problem.axis {
+                        SolveAxis::Cross => {
+                            (g.left?, g.right?, g.padding.left, g.padding.right)
+                        }
+                        SolveAxis::Main => {
+                            (g.top?, g.bottom?, g.padding.top, g.padding.bottom)
+                        }
+                    };
+                    if *member_var >= coords.len()
+                        || lo_id >= coords.len()
+                        || hi_id >= coords.len()
+                    {
+                        return Some(0.0);
+                    }
+                    let half = problem
+                        .vars
+                        .get(*member_var)
+                        .map(|v| v.axis_size * 0.5)
+                        .unwrap_or(0.0);
+                    let m = coords[*member_var];
+                    let lo_v = (m - half - pad_lo - coords[lo_id]).min(0.0).abs();
+                    let hi_v = (coords[hi_id] - (m + half + pad_hi)).min(0.0).abs();
+                    Some(lo_v.max(hi_v))
+                })()
+                .unwrap_or(0.0)
+            }
+            HardConstraint::GroupSiblingSeparation {
+                left_group,
+                right_group,
+                distance,
+                ..
+            } => {
+                use super::model::SolveAxis;
+                (|| -> Option<f64> {
+                    let lg = problem.groups.get(*left_group)?;
+                    let rg = problem.groups.get(*right_group)?;
+                    let (l_hi, r_lo) = match problem.axis {
+                        SolveAxis::Cross => (lg.right?, rg.left?),
+                        SolveAxis::Main => (lg.bottom?, rg.top?),
+                    };
+                    if l_hi >= coords.len() || r_lo >= coords.len() {
+                        return Some(0.0);
+                    }
+                    let actual = coords[r_lo] - coords[l_hi];
+                    Some(if actual < *distance - 1e-9 {
+                        *distance - actual
+                    } else {
+                        0.0
+                    })
+                })()
+                .unwrap_or(0.0)
             }
         };
         max_v = max_v.max(v);

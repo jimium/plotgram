@@ -360,6 +360,7 @@ impl RoutingRecipe for CircularRecipe {
         RecipeSolution {
             solution,
             label_plans,
+            orthogonal_debug: None,
         }
     }
 
@@ -441,7 +442,7 @@ mod tests {
 
         let result = LayoutResult {
             nodes,
-            groups: HashMap::new(),
+            groups: crate::layout::GroupTable::new(),
             edges: vec![],
             total_width: 600.0,
             total_height: 400.0,

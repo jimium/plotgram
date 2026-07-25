@@ -165,7 +165,7 @@ impl LayoutRecipe for CircularRecipe {
         if solution.nodes.is_empty() {
             return LayoutResult {
                 nodes: HashMap::new(),
-                groups: HashMap::new(),
+                groups: crate::layout::GroupTable::new(),
                 edges: vec![],
                 total_width: solution.total_width,
                 total_height: solution.total_height,
@@ -184,7 +184,7 @@ impl LayoutRecipe for CircularRecipe {
 
         LayoutResult {
             nodes: solution.nodes.clone(),
-            groups,
+            groups: groups.into(),
             edges: vec![],
             total_width: solution.total_width,
             total_height: solution.total_height,

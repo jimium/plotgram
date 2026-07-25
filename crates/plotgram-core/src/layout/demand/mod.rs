@@ -16,8 +16,8 @@ pub mod spacing_contract;
 mod types;
 
 pub use corridor::{
-    compute_corridor_model, corridor_capacity_v1, find_corridor_chain, CorridorModel,
-    CORRIDOR_LANE_PITCH,
+    compute_corridor_model, compute_corridor_model_from_groups, corridor_capacity_v1,
+    find_corridor_chain, CorridorModel, CORRIDOR_LANE_PITCH,
 };
 pub use dump::PressureSnapshot;
 pub use features::{

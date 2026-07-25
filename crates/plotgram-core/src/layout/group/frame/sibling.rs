@@ -16,6 +16,7 @@ pub fn resolve_all_sibling_overlaps(
     diagram: &Diagram,
     layout: &mut LayoutResult,
 ) {
+    crate::layout::group::write_counter::record_group_write_at("resolve_all_sibling_overlaps");
     let sibling_sets = collect_sibling_sets(diagram);
     for target_ids in sibling_sets {
         if target_ids.len() < 2 {

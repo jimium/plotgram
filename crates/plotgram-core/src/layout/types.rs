@@ -2,6 +2,7 @@ use crate::layout::geometry::Point;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 
 // Bring layout submodules into scope so `LayoutHints` field references such as
 // `node::circular::CircularLayoutHints` resolve from this submodule.
@@ -49,6 +50,129 @@ impl Default for GroupLayout {
             width: 0.0,
             height: 0.0,
         }
+    }
+}
+
+/// Group 几何表（G0：newtype + Deref 过渡；G3 封死写权）。
+///
+/// 公开读接口走 inherent 方法 / `iter_sorted`；可变写经 `DerefMut` 或
+/// `pub(crate)` 方法令牌化，便于枚举写者。
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(transparent)]
+pub struct GroupTable(HashMap<String, GroupLayout>);
+
+impl GroupTable {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
+
+    pub fn get(&self, id: &str) -> Option<&GroupLayout> {
+        self.0.get(id)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn contains_key(&self, id: &str) -> bool {
+        self.0.contains_key(id)
+    }
+
+    /// 按 group id 升序的确定性遍历（AGENTS.md §2）。
+    pub fn iter_sorted(&self) -> impl Iterator<Item = (&String, &GroupLayout)> {
+        let mut entries: Vec<_> = self.0.iter().collect();
+        entries.sort_by(|a, b| a.0.cmp(b.0));
+        entries.into_iter()
+    }
+
+    pub fn keys_sorted(&self) -> Vec<String> {
+        let mut keys: Vec<_> = self.0.keys().cloned().collect();
+        keys.sort();
+        keys
+    }
+
+    pub(crate) fn insert(&mut self, id: String, layout: GroupLayout) -> Option<GroupLayout> {
+        self.0.insert(id, layout)
+    }
+
+    pub(crate) fn get_mut(&mut self, id: &str) -> Option<&mut GroupLayout> {
+        self.0.get_mut(id)
+    }
+
+    pub(crate) fn retain<F>(&mut self, f: F)
+    where
+        F: FnMut(&String, &mut GroupLayout) -> bool,
+    {
+        self.0.retain(f);
+    }
+
+    pub(crate) fn clear(&mut self) {
+        self.0.clear();
+    }
+
+    pub(crate) fn values_mut(&mut self) -> impl Iterator<Item = &mut GroupLayout> {
+        self.0.values_mut()
+    }
+
+    /// G0 过渡：暴露底层 map 以便逐步替换调用点。
+    pub(crate) fn as_mut_map(&mut self) -> &mut HashMap<String, GroupLayout> {
+        &mut self.0
+    }
+
+    pub fn as_map(&self) -> &HashMap<String, GroupLayout> {
+        &self.0
+    }
+
+    pub fn into_map(self) -> HashMap<String, GroupLayout> {
+        self.0
+    }
+}
+
+impl Deref for GroupTable {
+    type Target = HashMap<String, GroupLayout>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for GroupTable {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl From<HashMap<String, GroupLayout>> for GroupTable {
+    fn from(map: HashMap<String, GroupLayout>) -> Self {
+        Self(map)
+    }
+}
+
+impl From<GroupTable> for HashMap<String, GroupLayout> {
+    fn from(table: GroupTable) -> Self {
+        table.0
+    }
+}
+
+impl IntoIterator for GroupTable {
+    type Item = (String, GroupLayout);
+    type IntoIter = std::collections::hash_map::IntoIter<String, GroupLayout>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a GroupTable {
+    type Item = (&'a String, &'a GroupLayout);
+    type IntoIter = std::collections::hash_map::Iter<'a, String, GroupLayout>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }
 
@@ -636,7 +760,7 @@ pub enum GroupLayoutWarningKind {
 #[derive(Debug, Clone)]
 pub struct LayoutResult {
     pub nodes: HashMap<String, NodeLayout>,
-    pub groups: HashMap<String, GroupLayout>,
+    pub groups: GroupTable,
     pub edges: Vec<EdgeLayout>,
     pub total_width: f64,
     pub total_height: f64,
