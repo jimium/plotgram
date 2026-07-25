@@ -364,55 +364,11 @@ impl RoutingRecipeDyn for CenterLineRouter {
     }
 }
 
-#[test]
-fn test_momentum_dampens_reversal() {
-    let mut m = MomentumHistory::new();
-    // 第一次：向右推，无历史 → 不衰减
-    let (fx, fy) = m.damp("a", 1.0, 0.0);
-    assert_eq!((fx, fy), (1.0, 0.0));
-    m.update("a", 1.0, 0.0);
 
-    // 第二次：向左推（方向反转）→ 0.5x 衰减
-    let (fx, fy) = m.damp("a", -1.0, 0.0);
-    assert_eq!((fx, fy), (-0.5, 0.0));
-    assert_eq!(m.reversal_count, 1);
-    m.update("a", -1.0, 0.0);
 
-    // 第三次：向右推（再次反转）→ 0.5x 衰减
-    let (fx, fy) = m.damp("a", 1.0, 0.0);
-    assert_eq!((fx, fy), (0.5, 0.0));
-    assert_eq!(m.reversal_count, 2);
-}
 
-#[test]
-fn test_momentum_no_damp_same_direction() {
-    let mut m = MomentumHistory::new();
-    m.update("a", 1.0, 0.0);
-    // 同方向 → 不衰减
-    let (fx, fy) = m.damp("a", 2.0, 0.0);
-    assert_eq!((fx, fy), (2.0, 0.0));
-    assert_eq!(m.reversal_count, 0);
 
-    // 不同节点 → 不衰减
-    let (fx, fy) = m.damp("b", -1.0, 0.0);
-    assert_eq!((fx, fy), (-1.0, 0.0));
-    assert_eq!(m.reversal_count, 0);
-}
 
-#[test]
-fn test_momentum_deterministic() {
-    let run = || {
-        let mut m = MomentumHistory::new();
-        m.update("a", 1.0, 0.0);
-        m.update("b", 0.0, 1.0);
-        (
-            m.damp("a", -1.0, 0.0),
-            m.damp("b", 0.0, -1.0),
-            m.reversal_count,
-        )
-    };
-    assert_eq!(run(), run());
-}
 
 /// P1-2 确定性测试：同一输入多次运行 refine，结果应完全一致（AGENTS.md §2）
 #[test]

@@ -12,6 +12,8 @@ pub mod edge_routing_orthogonal;
 pub mod edge_routing_spline;
 pub mod model;
 pub mod objectives;
+pub mod post_route;
+pub mod group_ctx;
 pub mod recipe;
 pub mod route_annotation;
 pub mod segment_pair;

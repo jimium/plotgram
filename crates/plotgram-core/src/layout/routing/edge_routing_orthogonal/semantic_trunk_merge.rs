@@ -10,7 +10,7 @@ use crate::layout::routing::edge_merge_policy::{EdgeMergeContext, MergeGroup};
 use crate::layout::routing::route_annotation::MergeInterval;
 use crate::layout::routing::segment_pair::MIN_SHARED_TRUNK_LEN;
 use crate::layout::geometry::Point;
-use crate::layout::refine::segment_intersects_node;
+use crate::layout::quality::refine::segment_intersects_node;
 use crate::layout::{EdgeLayout, NodeLayout, Port};
 use std::collections::{BTreeMap, HashMap, HashSet};
 

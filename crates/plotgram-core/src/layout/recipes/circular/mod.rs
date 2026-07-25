@@ -18,7 +18,7 @@ use crate::types::DiagramType;
 use crate::ast::{Diagram};
 use crate::layout::algorithm_config::{CircularLayoutConfig, CIRCULAR_LAYOUT_OPTIONS};
 use crate::layout::kernel::recipe::LayoutRecipe;
-use crate::layout::engines::common::group_bounds::{self, GroupPadding};
+use crate::layout::kernel::common::group_bounds::{self, GroupPadding};
 use crate::layout::pipeline::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, LayoutHints, LayoutResult, LayoutStrategy, NodeLayout};
 use common::{

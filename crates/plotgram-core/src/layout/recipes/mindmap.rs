@@ -375,7 +375,7 @@ fn detect_and_fix_overlaps(
         return;
     }
 
-    use crate::layout::engines::common::overlap::{
+    use crate::layout::kernel::common::overlap::{
         BruteForceResolver, OverlapConfig, OverlapResolver,
     };
 

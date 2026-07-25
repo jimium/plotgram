@@ -1,8 +1,8 @@
 //! 图索引与分组映射。
 
 use crate::ast::{Diagram, Relation};
-use crate::layout::engines::common::graph_index::DirectedGraphIndex;
-use crate::layout::engines::common::group_map;
+use crate::layout::kernel::common::graph_index::DirectedGraphIndex;
+use crate::layout::kernel::common::group_map;
 use crate::types::DiagramType;
 use std::collections::HashMap;
 

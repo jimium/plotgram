@@ -463,6 +463,6 @@ fn count_layer_crossings(
     }
 
     // 使用共享的 Fenwick Tree 扫描线算法，O(E log V) 替代原 O(E²) 双重循环
-    crate::layout::engines::common::crossings::count_crossings_from_edges(&edges, lower.len())
+    crate::layout::kernel::common::crossings::count_crossings_from_edges(&edges, lower.len())
 }
 

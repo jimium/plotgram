@@ -3,21 +3,20 @@
 //! 提供可插拔的布局算法框架。每种布局算法实现 `LayoutStrategy` trait，
 //! 通过 `compute_layout` 统一调度。
 //!
-//! ## 模块组织（按职责分层）
+//! ## 模块组织（doc 34 结构收敛后）
 //!
 //! | 模块 | 职责 |
 //! |------|------|
-//! | [`pipeline`] | 管线编排：入口调度、算法注册、计划解析、阶段执行 |
-//! | [`recipes`] | 布局配方：每个图类型一个专属实现 |
-//! | [`engines`] | 共享引擎：分层布局、坐标求解构建器、通用工具 |
-//! | [`kernel`] | 坐标内核：PAVA + Projected Gradient 求解器 |
-//! | [`routing`] | 边路由：orthogonal / bezier / spline / organic 等 |
-//! | [`group`] | 分组子系统：Border Shell、走廊、L1 Group Frame |
-//! | [`quality`] | 质量保障：lint 规则 + 布局度量指标 |
-//! | [`demand`] | 空间需求：边带预算、走廊模型、SpaceBudget |
-//! | [`snap`] | 对齐与量化：grid snap、画布最终化 |
-//! | [`post_route`] | 路由后处理 |
-//! | [`refine`] | 布局精化 |
+//! | [`pipeline`] | 管线编排：入口调度、算法注册、计划解析 |
+//! | [`recipes`] | 布局配方：compile → LayoutContract / CoordinateProblem |
+//! | [`kernel`] | 求解内核：坐标 / Group IR / layered / common |
+//! | [`routing`] | 边路由 + post_route + group_ctx |
+//! | [`quality`] | lint / metrics / refine |
+//! | [`group`] | 走廊 / 写权 / 常量（收缩后） |
+//! | [`demand`] | 空间需求与走廊模型 |
+//! | [`snap`] | 对齐与画布最终化 |
+//!
+//! 过渡：[`engines`] 仅保留遗留 `coordinate` builder；common/layered 已在 kernel。
 
 pub mod algorithm_config;
 pub mod catalog;
@@ -35,8 +34,6 @@ pub mod quality;
 pub mod recipes;
 pub mod perf;
 pub mod pipeline;
-pub mod post_route;
-pub mod refine;
 pub mod route_feedback;
 pub mod traits;
 pub mod types;

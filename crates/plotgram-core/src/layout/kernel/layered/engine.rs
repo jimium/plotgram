@@ -2,7 +2,7 @@
 
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
-use crate::layout::engines::common::group_bounds::{self, GroupPadding};
+use crate::layout::kernel::group::bounds::{self as group_bounds, GroupPadding};
 use crate::layout::{LayoutResult, EdgeRoutingStyle};
 use petgraph::graph::NodeIndex;
 use std::collections::{HashMap, HashSet};
@@ -68,7 +68,7 @@ pub fn compute_with_preset(
         GroupPadding::uniform(layout_config.group_padding, 16.0),
     );
     let group_warnings = group_bounds::detect_group_layout_warnings(diagram, &nodes, &groups);
-    let (total_width, total_height) = crate::layout::engines::common::canvas_bounds::canvas_size(
+    let (total_width, total_height) = crate::layout::kernel::common::canvas_bounds::canvas_size(
         &nodes,
         &groups,
         draft.padding,
@@ -218,7 +218,7 @@ pub(super) fn apply_group_rank_constraints(
     diagram: &Diagram,
 ) {
     let node_to_group =
-        crate::layout::engines::common::group_map::build_node_to_top_group(diagram);
+        crate::layout::kernel::common::group_map::build_node_to_top_group(diagram);
 
     // 收集每个 group 的节点
     let mut group_nodes: HashMap<String, Vec<petgraph::graph::NodeIndex>> = HashMap::new();

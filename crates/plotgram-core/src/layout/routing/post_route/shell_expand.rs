@@ -1,32 +1,20 @@
 //! G4：RouteDemand / orthosketch 壳预算（不再写 groups）。
 //!
-//! 生产路径：orthosketch 溢出只抬 `side_gutters`；`post_route_shell_expand` 仅供测试
-//! / 诊断，runner 不再调用。
+//! 生产路径：orthosketch 溢出只抬 `side_gutters`。
 
 use std::collections::{BTreeMap, HashSet};
 
 use crate::ast::Diagram;
 use crate::layout::geometry::Point;
 use crate::layout::group::constants::{EPS, GROUP_BORDER_SHELL_PAD};
-use crate::layout::group::context::build_node_to_groups;
-use crate::layout::group::hierarchy::build_group_hierarchy;
-use crate::layout::engines::common::group_bounds::{GutterSide, SideGutter};
+use crate::layout::routing::group_ctx::context::build_node_to_groups;
+use crate::layout::kernel::group::hierarchy::build_group_hierarchy;
+use crate::layout::kernel::group::bounds::{GutterSide, SideGutter};
 use crate::layout::{GroupLayout, LayoutResult};
 
 /// 单侧最大补扩（EGB/lane_budget 已预留主预算，PRS 只做小步安全网）。
 /// Phase 2：从 48 降到 24，降低事后扩壳对条带对称的破坏。
 const PRS_MAX_PER_SIDE: f64 = 24.0;
-
-/// 路由后若边/标签越出 shell：扩壳（**非生产**；G4 runner 已删除调用）。
-///
-/// 保留供单测与诊断；写入 groups 会计入写权。
-pub fn post_route_shell_expand(diagram: &Diagram, layout: &mut LayoutResult) -> bool {
-    let grew = apply_shell_expand_from_edges(diagram, layout);
-    if grew {
-        crate::layout::group::write_counter::record_group_write_at("post_route_shell_expand");
-    }
-    grew
-}
 
 /// 将当前 `side_gutters` 物化进 `layout.groups`（不另计写权）。
 ///
@@ -41,13 +29,13 @@ pub fn commit_side_gutters_into_groups(diagram: &Diagram, layout: &mut LayoutRes
     if gr.side_gutters.is_empty() {
         return;
     }
-    let pad = crate::layout::engines::common::group_bounds::GroupPadding::architecture();
+    let pad = crate::layout::kernel::group::bounds::GroupPadding::architecture();
     let gutters = gr.side_gutters.clone();
-    layout.groups = crate::layout::engines::common::group_bounds::compute_group_bounds_unrecorded(
+    layout.groups = crate::layout::kernel::group::bounds::compute_group_bounds_unrecorded(
         diagram,
         &layout.nodes,
         pad,
-        crate::layout::engines::common::group_bounds::container_padding_for_leaf(pad),
+        crate::layout::kernel::group::bounds::container_padding_for_leaf(pad),
         Some(&gutters),
     )
     .into();
@@ -178,128 +166,11 @@ fn merge_overflow_into_side_gutters(
     }
 }
 
-fn apply_shell_expand_from_edges(diagram: &Diagram, layout: &mut LayoutResult) -> bool {
-    let shell_pad = layout
-        .hints
-        .group_routing
-        .as_ref()
-        .map(|h| h.border_shell_pad)
-        .unwrap_or(GROUP_BORDER_SHELL_PAD);
-
-    let side_gutters = layout
-        .hints
-        .group_routing
-        .as_ref()
-        .map(|h| h.side_gutters.clone())
-        .unwrap_or_default();
-
-    let hierarchy = build_group_hierarchy(diagram, &layout.groups);
-    let node_to_groups = build_node_to_groups(diagram);
-
-    let overflow = scan_shell_overflow(
-        diagram,
-        layout,
-        shell_pad,
-        &hierarchy,
-        &node_to_groups,
-    );
-    if overflow.is_empty() {
-        return false;
-    }
-
-    let mut grew = false;
-    let keys: Vec<(String, GutterSide)> = overflow.keys().cloned().collect();
-    for (gid, side) in keys {
-        let Some(raw_delta) = overflow.get(&(gid.clone(), side)).copied() else {
-            continue;
-        };
-        if raw_delta <= EPS {
-            continue;
-        }
-        // 已预留 gutter 的一侧：只补超出预留的部分
-        let reserved = side_gutters
-            .get(&gid)
-            .map(|g| match side {
-                GutterSide::Left => g.left,
-                GutterSide::Right => g.right,
-                GutterSide::Top => g.top,
-                GutterSide::Bottom => g.bottom,
-            })
-            .unwrap_or(0.0);
-        let delta = (raw_delta - reserved * 0.5).max(0.0).min(PRS_MAX_PER_SIDE);
-        if delta <= EPS {
-            continue;
-        }
-        if let Some(gl) = layout.groups.get_mut(&gid) {
-            grow_border_outward(gl, side, delta);
-            grew = true;
-        }
-    }
-
-    // G3：子组扩壳后父组须至少容纳子框（同一次 PRS 写，不另开写权站点）。
-    if grew {
-        expand_ancestors_to_fit_children(diagram, &mut layout.groups);
-    }
-
-    grew
-}
-
-/// 自深向浅：父组矩形至少包住直接子组（无额外 padding，仅闭合嵌套）。
-fn expand_ancestors_to_fit_children(
-    diagram: &Diagram,
-    groups: &mut crate::layout::GroupTable,
-) {
-    let mut order: Vec<&crate::ast::Group> = diagram.groups.iter().collect();
-    order.sort_by(|a, b| b.depth.cmp(&a.depth).then_with(|| a.id.as_str().cmp(b.id.as_str())));
-    for gdef in order {
-        if gdef.child_group_ids.is_empty() {
-            continue;
-        }
-        let mut min_x = f64::MAX;
-        let mut min_y = f64::MAX;
-        let mut max_x = f64::MIN;
-        let mut max_y = f64::MIN;
-        let mut has_child = false;
-        for child_id in &gdef.child_group_ids {
-            let Some(child) = groups.get(child_id.as_str()) else {
-                continue;
-            };
-            has_child = true;
-            min_x = min_x.min(child.x);
-            min_y = min_y.min(child.y);
-            max_x = max_x.max(child.x + child.width);
-            max_y = max_y.max(child.y + child.height);
-        }
-        if !has_child {
-            continue;
-        }
-        let Some(parent) = groups.get_mut(gdef.id.as_str()) else {
-            continue;
-        };
-        let right = parent.x + parent.width;
-        let bottom = parent.y + parent.height;
-        if min_x < parent.x {
-            parent.width += parent.x - min_x;
-            parent.x = min_x;
-        }
-        if min_y < parent.y {
-            parent.height += parent.y - min_y;
-            parent.y = min_y;
-        }
-        if max_x > right {
-            parent.width = max_x - parent.x;
-        }
-        if max_y > bottom {
-            parent.height = max_y - parent.y;
-        }
-    }
-}
-
 fn scan_shell_overflow(
     diagram: &Diagram,
     layout: &LayoutResult,
     shell_pad: f64,
-    hierarchy: &crate::layout::group::hierarchy::GroupHierarchy,
+    hierarchy: &crate::layout::kernel::group::hierarchy::GroupHierarchy,
     node_to_groups: &std::collections::HashMap<String, Vec<String>>,
 ) -> BTreeMap<(String, GutterSide), f64> {
     let mut overflow: BTreeMap<(String, GutterSide), f64> = BTreeMap::new();
@@ -347,7 +218,7 @@ fn scan_shell_overflow(
 fn relevant_groups_for_edge(
     from_id: &str,
     to_id: &str,
-    hierarchy: &crate::layout::group::hierarchy::GroupHierarchy,
+    hierarchy: &crate::layout::kernel::group::hierarchy::GroupHierarchy,
     node_to_groups: &std::collections::HashMap<String, Vec<String>>,
 ) -> HashSet<String> {
     let mut set = HashSet::new();

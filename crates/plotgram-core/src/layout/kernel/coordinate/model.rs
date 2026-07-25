@@ -160,7 +160,7 @@ pub struct GroupVariable {
     /// 成员节点 stable_id（构建时按 id 排序，保证确定性）。
     pub members: Vec<String>,
     /// 容纳约束参数（非事后加数）。
-    pub padding: crate::layout::engines::common::group_bounds::GroupPadding,
+    pub padding: crate::layout::kernel::group::bounds::GroupPadding,
     /// 组角色。
     pub role: GroupRole,
 }

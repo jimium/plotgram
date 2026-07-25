@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 use crate::ast::Diagram;
-use crate::layout::engines::common::group_bounds::{compute_group_bounds, GroupPadding};
+use crate::layout::kernel::group::bounds::{compute_group_bounds, GroupPadding};
 use crate::layout::kernel::coordinate::group_ir::{
     materialize_group_cross_bounds, materialize_group_main_bounds, refine_group_frames,
 };

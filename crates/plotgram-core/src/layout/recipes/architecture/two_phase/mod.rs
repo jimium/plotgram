@@ -5,7 +5,7 @@
 //!
 //! # 与通用分治框架的关系
 //!
-//! 本模块复用 [`crate::layout::engines::common::divide_and_conquer`] 的
+//! 本模块复用 [`crate::layout::kernel::common::divide_and_conquer`] 的
 //! `IntraLayout`、`GroupTree` 数据结构。组内布局的具体实现（含 hub 居中、
 //! client 对齐等特化优化）保留在本模块。未来 flowchart 分治布局将实现
 //! `IntraGroupLayouter` trait，共用同一套类型基础。
@@ -27,9 +27,9 @@ pub(super) use super::layout::types::{ArchDiagramFacts, GraphIndex, GroupMap};
 pub(super) use crate::ast::{Diagram, Group};
 pub(super) use crate::layout::algorithm_config::ArchitectureV2LayoutConfig;
 pub(super) use crate::layout::constants;
-pub(super) use crate::layout::engines::common::divide_and_conquer::{GroupTree, IntraLayout};
-pub(super) use crate::layout::engines::common::edge_gutter::estimate_side_gutters_with_hierarchy;
-pub(super) use crate::layout::engines::common::group_bounds::GroupPadding;
+pub(super) use crate::layout::kernel::common::divide_and_conquer::{GroupTree, IntraLayout};
+pub(super) use crate::layout::kernel::common::edge_gutter::estimate_side_gutters_with_hierarchy;
+pub(super) use crate::layout::kernel::common::group_bounds::GroupPadding;
 pub(super) use crate::layout::{GroupLayout, LayoutResult, NodeLayout};
 pub(super) use std::collections::{HashMap, HashSet};
 
@@ -470,7 +470,7 @@ mod tests {
     #[test]
     fn group_frame_track_dsl_ignored_stays_fit() {
         use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
-        use crate::layout::group::frame::{resolve_group_frame_spec, TrackSizing};
+        use crate::layout::recipes::frame_spec::{resolve_group_frame_spec, TrackSizing};
 
         // G-pre：uniform/equal DSL 不再映射到 Equal；恒 Fit
         for track in [Some("uniform"), Some("equal"), Some("fit"), None] {
@@ -486,7 +486,7 @@ mod tests {
     #[test]
     fn architecture_default_track_is_fit() {
         use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
-        use crate::layout::group::frame::{resolve_group_frame_spec, TrackSizing};
+        use crate::layout::recipes::frame_spec::{resolve_group_frame_spec, TrackSizing};
 
         let d = etl_diagram_with_track(None);
         assert_eq!(

@@ -32,7 +32,7 @@ use crate::ast::{ArrowType, Diagram};
 use crate::layout::algorithm_config::{SequenceLayoutConfig, SEQUENCE_LAYOUT_OPTIONS};
 use crate::layout::geometry::Point;
 use crate::layout::kernel::recipe::LayoutRecipe;
-use crate::layout::engines::common::group_bounds::{self, GroupPadding};
+use crate::layout::kernel::common::group_bounds::{self, GroupPadding};
 use crate::layout::routing::common::label_avoidance::resolve_label_overlaps;
 use crate::layout::pipeline::plan::ResolvedAlgoOptions;
 use crate::layout::constants;

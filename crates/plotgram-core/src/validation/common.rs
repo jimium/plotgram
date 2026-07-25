@@ -241,7 +241,7 @@ pub fn validate_constraints(diagram: &Diagram, result: &mut ValidationResult) {
 /// 关系边可反转破环；约束边不可反转。
 /// 对关系图做 greedy FAS 得到 DAG 后加入约束边，若仍有环则不可满足。
 fn validate_constraint_satisfiability(diagram: &Diagram, result: &mut ValidationResult) {
-    use crate::layout::engines::common::acyclic::greedy_fas;
+    use crate::layout::kernel::common::acyclic::greedy_fas;
     use std::collections::{HashMap, HashSet as StdHashSet};
 
     let mut nodes: StdHashSet<String> = StdHashSet::new();

@@ -1,7 +1,7 @@
 //! 布局阶段图标尺寸调整。
 
 use crate::ast::Entity;
-use crate::layout::engines::common::node_sizing::NODE_LABEL_FONT_SIZE;
+use crate::layout::kernel::common::node_sizing::NODE_LABEL_FONT_SIZE;
 
 use super::render::extra_node_width;
 use super::resolve::{node_shape_from_entity, resolve, ResolveOptions};

@@ -5,7 +5,7 @@
 use crate::ast::{AttributeValue, Diagram};
 use crate::layout::constants::SUGIYAMA_GROUP_PADDING;
 use crate::layout::snap::grid_snap::diagram_snap_attribute;
-use crate::layout::engines::common::group_bounds::GroupPadding;
+use crate::layout::kernel::group::bounds::GroupPadding;
 use crate::types::standard_attr_keys::diagram as dsl;
 use std::collections::HashMap;
 

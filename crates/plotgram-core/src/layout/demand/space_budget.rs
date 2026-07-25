@@ -732,7 +732,7 @@ pub fn resolve_residual_with_budget_and_ranks(
     if ran_rank_realign && !has_node_aabb_overlaps(nodes) {
         return;
     }
-    use crate::layout::engines::common::overlap::{
+    use crate::layout::kernel::common::overlap::{
         BruteForceResolver, OverlapConfig, OverlapResolver,
     };
     let config = OverlapConfig {

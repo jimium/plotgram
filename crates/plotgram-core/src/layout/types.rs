@@ -7,7 +7,7 @@ use std::ops::{Deref, DerefMut};
 // Bring layout submodules into scope so `LayoutHints` field references such as
 // `node::circular::CircularLayoutHints` resolve from this submodule.
 use crate::layout::{group, demand};
-use crate::layout::group::frame as group_frame;
+use crate::layout::recipes::frame_spec as group_frame;
 use crate::layout::recipes as node;
 use crate::layout::demand::space_budget;
 

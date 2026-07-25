@@ -2,7 +2,7 @@
 //!
 //! 本文件从 `mod.rs` 拆分而来，仅做代码搬家，无行为变更。
 
-use crate::layout::engines::common::group_bounds::GroupPadding;
+use crate::layout::kernel::group::bounds::GroupPadding;
 
 /// 按算法返回 Group Frame 使用的 padding（与 `grid_snap::refresh_layout_bounds` 对齐）。
 ///

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::ast::Diagram;
 use crate::layout::GroupLayout;
 
-use super::constants::EPS;
+use crate::layout::group::constants::EPS;
 
 const GROUP_GAP_THRESHOLD: f64 = 48.0;
 

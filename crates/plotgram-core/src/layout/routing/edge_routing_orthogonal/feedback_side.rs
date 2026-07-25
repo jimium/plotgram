@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{ArrowType, Diagram, Relation};
-use crate::layout::engines::common::acyclic::greedy_fas;
+use crate::layout::kernel::common::acyclic::greedy_fas;
 use crate::layout::{NodeLayout, Port};
 
 /// 同侧回环边超过此阈值时溢出到另一侧。

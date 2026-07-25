@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use crate::ast::Diagram;
-use crate::layout::engines::common::group_bounds::{self, GroupPadding};
+use crate::layout::kernel::common::group_bounds::{self, GroupPadding};
 use crate::layout::{GroupLayout, NodeLayout};
 
 /// 按布局算法选择 `GroupPadding` 配置。
@@ -58,7 +58,7 @@ pub fn debug_assert_routing_groups_contain_members(
 mod tests {
     use super::*;
     use crate::ast::{AttributeMap, Diagram, Entity, Group, Identifier, Span};
-    use crate::layout::engines::common::group_bounds::{self, GroupPadding};
+    use crate::layout::kernel::common::group_bounds::{self, GroupPadding};
     use crate::layout::{NodeLayout};
     use crate::types::DiagramType;
 

@@ -347,7 +347,7 @@ pub(in crate::layout::recipes) fn build_arch_coordinate_problem(
     if has_groups {
         if let Some(d) = diagram {
             let pad =
-                crate::layout::engines::common::group_bounds::GroupPadding::architecture();
+                crate::layout::kernel::common::group_bounds::GroupPadding::architecture();
             let sibling_gap = 40.0;
             crate::layout::kernel::coordinate::group_ir::attach_group_ir(
                 &mut problem,

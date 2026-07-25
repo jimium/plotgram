@@ -11,7 +11,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::ast::Diagram;
-use crate::layout::engines::common::group_bounds::GroupPadding;
+use crate::layout::kernel::group::bounds::GroupPadding;
 use crate::layout::kernel::coordinate::model::{
     ConstraintSource, ConstraintSourceKind, CoordinateProblem, HardConstraint, NodeVariable,
     SolveAxis, VarId, VarKind,
@@ -943,7 +943,7 @@ mod tests {
             },
         );
         let pad = GroupPadding::uniform(10.0, 16.0);
-        let plain = crate::layout::engines::common::group_bounds::compute_group_bounds(
+        let plain = crate::layout::kernel::group::bounds::compute_group_bounds(
             &d, &nodes, pad,
         );
         let mut shadow = plain.clone();

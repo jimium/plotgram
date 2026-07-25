@@ -6,10 +6,10 @@
 //! 产出的 [`LayeredDraft`] 是纯数据 IR，供 CoordinateKernel 消费。
 
 use crate::ast::Diagram;
-use crate::layout::engines::layered::graph;
-use crate::layout::engines::layered::order;
-use crate::layout::engines::layered::rank;
-use crate::layout::engines::layered::preset::SugiyamaPreset;
+use crate::layout::kernel::layered::graph;
+use crate::layout::kernel::layered::order;
+use crate::layout::kernel::layered::rank;
+use crate::layout::kernel::layered::preset::SugiyamaPreset;
 use petgraph::graph::{DiGraph, NodeIndex};
 use std::collections::{HashMap, HashSet};
 
@@ -87,7 +87,7 @@ impl LayeredKernel {
             .collect();
 
         let is_standard = preset.node_sizing
-            == crate::layout::engines::common::node_sizing::NodeSizing::Standard;
+            == crate::layout::kernel::common::node_sizing::NodeSizing::Standard;
         let same_layer_edges: Vec<SameLayerEdge> =
             if is_standard && diagram.groups.is_empty() {
                 identify_same_layer_edges(&dag, &reversed_edge_ids)
@@ -100,7 +100,7 @@ impl LayeredKernel {
         // Step 4: Rank 分配（5 轮覆盖）
         let mut ranks = rank::assign_ranks_network_simplex_style(&dag);
         if preset.node_sizing
-            == crate::layout::engines::common::node_sizing::NodeSizing::State
+            == crate::layout::kernel::common::node_sizing::NodeSizing::State
         {
             apply_state_semantic_rank_constraints(&dag, &mut ranks, diagram);
         } else if is_standard {
@@ -196,7 +196,7 @@ fn build_node_group_map(
     layered_graph: &DiGraph<graph::LayerNode, ()>,
 ) -> HashMap<NodeIndex, Option<String>> {
     let node_to_top =
-        crate::layout::engines::common::group_map::build_node_to_top_group(diagram);
+        crate::layout::kernel::common::group_map::build_node_to_top_group(diagram);
 
     layered_graph
         .node_indices()

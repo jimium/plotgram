@@ -9,7 +9,7 @@ use crate::layout::group::hierarchy::{
     ancestor_set_excluding_self, build_group_hierarchy, lowest_common_ancestor, GroupHierarchy,
 };
 use crate::layout::group::constants::EPS;
-use crate::layout::engines::common::group_bounds::{GutterSide, SideGutter};
+use crate::layout::kernel::group::bounds::{GutterSide, SideGutter};
 use crate::layout::demand::CORRIDOR_LANE_PITCH;
 use crate::layout::{GroupLayout, NodeLayout};
 use std::collections::HashMap;
@@ -269,7 +269,7 @@ fn exit_side_weights(
 mod tests {
     use super::*;
     use crate::ast::{ArrowType, AttributeMap, Diagram, Entity, Group, Identifier, Relation, Span};
-    use crate::layout::engines::common::group_bounds::{compute_group_bounds, GroupPadding};
+    use crate::layout::kernel::group::bounds::{compute_group_bounds, GroupPadding};
     use crate::types::DiagramType;
 
     fn span() -> Span {

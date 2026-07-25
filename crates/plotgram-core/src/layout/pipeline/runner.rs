@@ -5,10 +5,10 @@ use crate::error::DiagnosticError;
 use crate::layout::snap::canvas_finalize;
 use crate::layout::constants;
 use crate::layout::snap::grid_snap;
-use crate::layout::group::frame::GroupFramePass;
+use crate::layout::recipes::architecture::ArchRouteFlags;
 use crate::layout::perf::Instant;
 use super::plan::LayoutPlan;
-use crate::layout::refine;
+use crate::layout::quality::refine;
 use super::registry;
 use crate::layout::route_feedback::{LayoutRouteFeedback, PreRouteFeedback};
 use crate::layout::{resolve_effective_direction, LayoutResult};
@@ -107,10 +107,8 @@ impl<'a> LayoutPipeline<'a> {
         }
 
         // Phase B: 所有图类型使用 solver，solver 已处理对齐，跳过 align_nodes。
-        // G3：GroupFramePass 空壳，不再改写组几何。
-        let algo = self.plan.layout_algo.as_str();
-        let gf_pass = GroupFramePass::resolve(self.diagram, self.plan, algo);
-        gf_pass.apply_after_node_snap(self.diagram, result, algo);
+        // 组几何由 materialize 物化，此处不再跑 Frame pass。
+        let _ = self.plan.layout_algo.as_str();
         grid_snap::update_canvas_bounds(result, constants::DEFAULT_PADDING);
         Ok(())
     }
@@ -147,21 +145,17 @@ impl<'a> LayoutPipeline<'a> {
         }
         // P5: 按节点密度自适应网格步长（小图精细、大图粗放，减少密集区视觉碎片）
         edge_snap_config.grid_step = grid_snap::adaptive_grid_step(result_v2.nodes.len());
-        let gf_pass = GroupFramePass::resolve(self.diagram, self.plan, algo);
-        // G3：Frame apply/refresh/restore 空壳；不再 sibling/expand/recompute。
-        if !self.diagram.groups.is_empty() {
-            gf_pass.refresh_before_route(self.diagram, &mut result_v2, algo);
-        }
+        let arch_flags = ArchRouteFlags::resolve(self.diagram, self.plan, algo);
 
         // Phase 5 / D4-6：删除 spacing_demand_probe 二次求解——间距走 layout builder / SpaceBudget。
 
         // orthosketch 抬 side_gutters；随后把 gutters 物化进 groups（仍属同一 materialize 令牌）。
-        if gf_pass.arch_post_layout && !self.diagram.groups.is_empty() {
-            let prs_grew = {
-                let mut shell = crate::layout::group::GroupShellMut::new(self.diagram, &mut result_v2);
-                shell.feedforward_orthosketch()
-            };
-            crate::layout::post_route::shell_expand::commit_side_gutters_into_groups(
+        if arch_flags.arch_post_layout && !self.diagram.groups.is_empty() {
+            let prs_grew = crate::layout::routing::post_route::shell_expand::feedforward_shell_from_orthosketch(
+                self.diagram,
+                &mut result_v2,
+            );
+            crate::layout::routing::post_route::shell_expand::commit_side_gutters_into_groups(
                 self.diagram,
                 &mut result_v2,
             );
@@ -232,9 +226,9 @@ impl<'a> LayoutPipeline<'a> {
         );
 
         // G4：删除 post_route_shell_expand；残留 shell 溢出 → Degraded（不改 groups）。
-        let shell_overflow = gf_pass.arch_post_layout
+        let shell_overflow = arch_flags.arch_post_layout
             && !self.diagram.groups.is_empty()
-            && crate::layout::post_route::shell_expand::route_shell_overflow_remaining(
+            && crate::layout::routing::post_route::shell_expand::route_shell_overflow_remaining(
                 self.diagram,
                 &result,
             );

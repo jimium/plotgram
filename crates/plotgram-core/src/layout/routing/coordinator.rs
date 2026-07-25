@@ -20,7 +20,7 @@
 use crate::ast::Diagram;
 use crate::layout::types::{GroupLayout, LayoutResult, NodeLayout};
 use crate::layout::RoutingRecipeDyn;
-use crate::layout::refine::RefineConfig;
+use crate::layout::quality::refine::RefineConfig;
 use crate::layout::snap::grid_snap::EdgeSnapConfig;
 use std::collections::HashMap;
 
@@ -223,7 +223,7 @@ impl RoutingCoordinator {
 
         // R11a: refine 对所有 router 无条件执行（非 Polyline 路径是空跑）。
         let t_refine = crate::layout::perf::Instant::now();
-        result = crate::layout::refine::run_refine(diagram, result, router, refine_config);
+        result = crate::layout::quality::refine::run_refine(diagram, result, router, refine_config);
         crate::perf_log!(
             "[perf]       run_refine: {:.2}ms",
             t_refine.elapsed().as_secs_f64() * 1000.0
@@ -242,7 +242,7 @@ impl RoutingCoordinator {
             ids
         };
         let annotations = result.hints.route_annotations.clone();
-        crate::layout::post_route::snap_and_repulse_edges_with_guard(
+        crate::layout::routing::post_route::snap_and_repulse_edges_with_guard(
             &mut result.edges,
             &result.groups,
             edge_snap_config,
@@ -363,10 +363,10 @@ impl RoutingCoordinator {
                     expand_one_hop(&mut normal, &adjacency);
                     expand_one_hop(&mut aggressive, &adjacency);
                 }
-                crate::layout::refine::reroute_edges_for_repair(
+                crate::layout::quality::refine::reroute_edges_for_repair(
                     &mut result, diagram, &normal, false,
                 );
-                crate::layout::refine::reroute_edges_for_repair(
+                crate::layout::quality::refine::reroute_edges_for_repair(
                     &mut result, diagram, &aggressive, true,
                 );
             }
@@ -666,7 +666,7 @@ fn plan_incremental_reuse(
         // preserve 比例过低 → 回退全图路由（现有路径）。
         if preserve.is_empty()
             || (preserve.len() as f64 / n as f64)
-                < crate::layout::post_route::MIN_PRESERVE_RATIO
+                < crate::layout::routing::post_route::MIN_PRESERVE_RATIO
         {
             return None;
         }

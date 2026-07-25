@@ -11,7 +11,9 @@ mod group_sizing;
 mod intra_sugiyama;
 mod layout;
 pub(crate) mod post_layout;
+pub(crate) mod route_flags;
 mod two_phase;
 
 pub(crate) use group_layout_hint::{is_valid_group_layout_atom, VALID_GROUP_LAYOUTS};
 pub use layout::ArchitectureV2Layout;
+pub(crate) use route_flags::ArchRouteFlags;

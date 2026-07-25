@@ -7,8 +7,8 @@
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
 use crate::layout::kernel::recipe::LayoutRecipe;
-use crate::layout::engines::common::group_bounds::{self, GroupPadding};
-use crate::layout::engines::layered::{coordinate, layered_kernel::LayeredKernel, preset};
+use crate::layout::kernel::common::group_bounds::{self, GroupPadding};
+use crate::layout::kernel::layered::{coordinate, layered_kernel::LayeredKernel, preset};
 use crate::layout::pipeline::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, EdgeRoutingStyle, LayoutResult, LayoutStrategy, NodeAlignConfig};
 use crate::types::DiagramType;
@@ -76,14 +76,14 @@ struct ErRecipe {
 
 /// ER 图问题 IR：LayeredKernel 产出的分层草稿。
 struct ErProblem {
-    draft: crate::layout::engines::layered::layered_kernel::LayeredDraft,
+    draft: crate::layout::kernel::layered::layered_kernel::LayeredDraft,
 }
 
 /// ER 图求解结果。
 struct ErSolution {
     nodes: std::collections::HashMap<String, crate::layout::NodeLayout>,
     solved_problem: Option<crate::layout::kernel::coordinate::model::CoordinateProblem>,
-    draft: crate::layout::engines::layered::layered_kernel::LayeredDraft,
+    draft: crate::layout::kernel::layered::layered_kernel::LayeredDraft,
 }
 
 impl LayoutRecipe for ErRecipe {
@@ -128,7 +128,7 @@ impl LayoutRecipe for ErRecipe {
         let group_warnings =
             group_bounds::detect_group_layout_warnings(diagram, nodes, &groups);
         let (total_width, total_height) =
-            crate::layout::engines::common::canvas_bounds::canvas_size(
+            crate::layout::kernel::common::canvas_bounds::canvas_size(
                 nodes,
                 &groups,
                 draft.padding,

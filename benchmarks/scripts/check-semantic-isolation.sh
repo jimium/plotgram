@@ -22,6 +22,8 @@ code_diagram_type() {
 
 # 1) kernel：除文档外不得出现 DiagramType
 kernel_code="$(code_diagram_type crates/plotgram-core/src/layout/kernel | rg -v 'mod\.rs:' || true)"
+# 单测内 DiagramType：bounds/edge_gutter 的 #[cfg(test)] 块（生产路径已无）
+kernel_code="$(echo "$kernel_code" | rg -v 'kernel/(common/edge_gutter|group/bounds)\.rs:' || true)"
 if [[ -n "${kernel_code}" ]]; then
   echo "FAIL: DiagramType in layout/kernel:"
   echo "$kernel_code"
@@ -51,15 +53,15 @@ if [[ -n "${ortho_code}" ]]; then
   fail=1
 fi
 
-# 3) algo == "architecture" 仅允许 spec.rs
+# 3) algo == "architecture" 仅允许 frame_spec
 algo_arch_bad="$(
   rg -n 'algo == "architecture"' crates/plotgram-core/src/layout -g '*.rs' \
-    | rg -v 'group/frame/spec\.rs:' \
+    | rg -v 'recipes/frame_spec/' \
     | rg -v '^\S+:\s*//' \
     || true
 )"
 if [[ -n "${algo_arch_bad}" ]]; then
-  echo "FAIL: algo == \"architecture\" outside group/frame/spec.rs:"
+  echo "FAIL: algo == \"architecture\" outside recipes/frame_spec:"
   echo "$algo_arch_bad"
   fail=1
 fi
@@ -85,12 +87,12 @@ if [[ -n "${cp_bad}" ]]; then
 fi
 
 # 5b) G-pre：architecture 默认 Fit+None；resolve_group_frame_spec 不调 DSL
-spec_fn="$(rg -A8 '^pub fn resolve_group_frame_spec' crates/plotgram-core/src/layout/group/frame/spec.rs | head -9)"
+spec_fn="$(rg -A8 '^pub fn resolve_group_frame_spec' crates/plotgram-core/src/layout/recipes/frame_spec/spec.rs | head -9)"
 if echo "$spec_fn" | rg -q 'resolve_from_group_frame_config\('; then
   echo "FAIL: resolve_group_frame_spec still calls resolve_from_group_frame_config"
   fail=1
 fi
-arch_fn="$(rg -A15 '^fn resolve_architecture' crates/plotgram-core/src/layout/group/frame/spec.rs | head -16)"
+arch_fn="$(rg -A15 '^fn resolve_architecture' crates/plotgram-core/src/layout/recipes/frame_spec/spec.rs | head -16)"
 if ! echo "$arch_fn" | rg -q 'TrackSizing::Fit'; then
   echo "FAIL: resolve_architecture must default TrackSizing::Fit"
   fail=1

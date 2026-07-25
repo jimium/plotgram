@@ -24,7 +24,7 @@ use crate::layout::routing::segment_pair::{
     find_needs_separation_edge_pairs, SeparationReason,
 };
 use crate::layout::geometry::Point;
-use crate::layout::refine::segment_intersects_node;
+use crate::layout::quality::refine::segment_intersects_node;
 use crate::layout::{ContainmentViolationKind, LayoutResult};
 use geometry::{
     group_overlap_area, node_overlap_area, segment_on_group_border, segments_cross,

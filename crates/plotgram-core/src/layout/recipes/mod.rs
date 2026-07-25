@@ -4,6 +4,7 @@ pub mod architecture;
 pub mod circular;
 pub mod er;
 pub mod flowchart;
+pub mod frame_spec;
 pub mod mindmap;
 pub mod sequence;
 pub mod state;

@@ -3,7 +3,7 @@
 use crate::layout::geometry::Point;
 use crate::layout::GroupLayout;
 
-use super::constants::{COLLINEAR_EPS, EPS};
+use crate::layout::group::constants::{COLLINEAR_EPS, EPS};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SegmentGroupRelation {

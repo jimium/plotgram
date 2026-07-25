@@ -8,7 +8,7 @@
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::{ArchitectureV2LayoutConfig, ARCHITECTURE_V2_LAYOUT_OPTIONS};
 use crate::layout::kernel::recipe::LayoutRecipe;
-use crate::layout::engines::common::node_sizing;
+use crate::layout::kernel::common::node_sizing;
 use crate::layout::pipeline::plan::ResolvedAlgoOptions;
 use crate::layout::{AlgorithmOptionSpec, LayoutResult, LayoutStrategy, NodeAlignConfig};
 use crate::types::DiagramType;
@@ -190,7 +190,7 @@ impl LayoutRecipe for ArchitectureRecipe {
 
         postprocess::clamp_to_canvas(&mut nodes, sizes);
 
-        let (total_width, total_height) = crate::layout::engines::common::canvas_bounds::canvas_size(
+        let (total_width, total_height) = crate::layout::kernel::common::canvas_bounds::canvas_size(
             &nodes,
             &HashMap::new(),
             constants::PADDING,

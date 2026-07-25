@@ -1,6 +1,6 @@
 //! Phase 1: 去环与不可逆约束边注入。
 
-use crate::layout::engines::common::acyclic;
+use crate::layout::kernel::common::acyclic;
 use std::collections::HashSet;
 
 use super::types::{GraphIndex, GroupMap};

@@ -10,14 +10,11 @@ use std::collections::HashSet;
 mod crossing;
 mod geometry;
 mod overlap;
-mod push;
 mod spline_fallback;
 
 pub use crossing::analyze_edge_node_crossings;
 pub(crate) use geometry::segment_intersects_aabb;
 pub use geometry::segment_intersects_node;
-
-pub use push::MomentumHistory;
 
 /// refine 配置
 #[derive(Debug, Clone, Copy)]

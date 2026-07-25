@@ -1,45 +1,39 @@
-//! 分组子系统：Border Shell、组间路由走廊、L1 Group Frame。
+//! 分组子系统（收缩后）：走廊、写权、常量；Frame Spec 见 recipes::frame_spec。
 //!
-//! - [`border_shell`]：路径段 vs 分组边框关系分类 + 贴边平行检测
-//! - [`corridor`]：组间优先走廊（布局注入 + 几何 fallback）
-//! - [`post_route`]：snap 后投影与 repulse 安全网
-//! - [`rect`]：路由权威 `GroupLayout` 来源
-//! - [`context`]：边路由阶段共享上下文
-//! - [`frame`]：L1 Group Frame（组间排列/尺寸/对齐/间距/量化）
+//! - 物化：[`crate::layout::kernel::group`]
+//! - 路由上下文：[`crate::layout::routing::group_ctx`]
+//! - Frame Spec：[`crate::layout::recipes::frame_spec`]
 
-pub mod border_shell;
-pub mod config;
 pub mod constants;
-pub mod context;
 pub mod corridor;
-pub mod frame;
-pub mod hierarchy;
-pub mod post_route;
 pub mod rect;
-pub mod shell_mut;
 pub mod write_counter;
 
-pub use border_shell::{
-    group_segment_violates_border_shell, segment_hugs_group_border,
-    segment_intersects_group_shell, segment_near_misses_group_shell,
-    segment_within_port_stub_zone,
-};
-pub use config::{routing_algo_for_diagram, GroupRoutingProfile};
 pub use constants::{GROUP_BORDER_SHELL_PAD, PORT_STUB_CLEARANCE};
-pub use context::{build_node_to_groups, GroupRoutingContext, GroupRoutingHints, SiblingOrientation};
 pub use corridor::{
     build_corridors_from_groups, build_sibling_corridors, build_stacking_corridors,
     corridor_misalignment_penalty, merge_corridors, prefer_corridor_coord, CorridorAxis,
     GroupCorridor,
 };
-pub use post_route::{
+pub use crate::layout::routing::group_ctx::{
+    build_node_to_groups, group_segment_violates_border_shell, routing_algo_for_diagram,
+    segment_hugs_group_border, segment_intersects_group_shell, segment_near_misses_group_shell,
+    segment_within_port_stub_zone, GroupRoutingContext, GroupRoutingHints, GroupRoutingProfile,
+};
+pub use crate::layout::routing::post_route::{
     project_path_off_group_borders, project_path_off_group_borders_with_stub,
     repulse_edges_from_group_borders,
 };
+pub use crate::layout::kernel::group::hierarchy::{build_group_hierarchy, GroupHierarchy, SiblingOrientation};
 pub use rect::{finalize_routing_groups, routing_group_padding};
-pub use shell_mut::GroupShellMut;
 #[cfg(debug_assertions)]
 pub use rect::debug_assert_routing_groups_contain_members;
+
+/// 过渡：旧 `group::border_shell` / `context` / `config` / `hierarchy` 路径。
+pub use crate::layout::routing::group_ctx::border_shell;
+pub use crate::layout::routing::group_ctx::config;
+pub use crate::layout::routing::group_ctx::context;
+pub use crate::layout::kernel::group::hierarchy;
 
 #[cfg(test)]
 mod integration_tests {

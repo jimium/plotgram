@@ -9,16 +9,16 @@
 //!
 //! # 与通用框架的关系
 //!
-//! 复用 [`crate::layout::engines::common::divide_and_conquer`] 的
+//! 复用 [`crate::layout::kernel::common::divide_and_conquer`] 的
 //! `IntraLayout`、`GroupTree`、`CrossGroupEdge`、`IntraGroupLayouter`、
 //! `GroupArrangement` 类型与 trait。本模块实现 flowchart 场景的特化策略。
 
 use crate::ast::{Diagram, DiagramAttribute, Entity, Relation};
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
-use crate::layout::engines::common::divide_and_conquer::{
+use crate::layout::kernel::common::divide_and_conquer::{
     CrossGroupEdge, GroupArrangement, GroupTree, IntraGroupLayouter, IntraLayout,
 };
-use crate::layout::engines::layered::{engine, preset};
+use crate::layout::kernel::layered::{engine, preset};
 use crate::layout::{EdgeRoutingStyle, LayoutHints, LayoutResult, NodeLayout};
 use std::collections::{HashMap, HashSet};
 
@@ -162,7 +162,7 @@ impl<'a> IntraGroupLayouter for FlowchartIntraGroupLayouter<'a> {
                 .iter()
                 .find(|e| e.id.as_str() == members[0].as_str());
             if let Some(e) = entity {
-                let (w, h) = crate::layout::engines::common::node_sizing::standard_node_size(e);
+                let (w, h) = crate::layout::kernel::common::node_sizing::standard_node_size(e);
                 return IntraLayout::single(&members[0], w, h);
             }
         }
@@ -503,7 +503,7 @@ fn choose_arrangement_mode(
     gap: f64,
     default_mode: ArrangementMode,
 ) -> ArrangementMode {
-    if crate::layout::group::frame::has_explicit_group_frame(diagram) {
+    if crate::layout::recipes::frame_spec::has_explicit_group_frame(diagram) {
         return default_mode;
     }
     let n = intra_layouts.len();

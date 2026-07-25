@@ -4,16 +4,16 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::ast::Diagram;
 use crate::layout::geometry::Point;
-use crate::layout::engines::common::group_bounds::SideGutter;
+use crate::layout::kernel::common::group_bounds::SideGutter;
 use crate::layout::{GroupLayout, LayoutResult};
 
 use super::border_shell::group_segment_violates_border_shell;
 use super::config::GroupRoutingProfile;
-use super::constants::{GROUP_BORDER_SHELL_PAD, EPS};
-use super::corridor::{merge_corridors, CorridorAxis, GroupCorridor};
-use super::hierarchy::build_group_hierarchy;
+use crate::layout::group::constants::{GROUP_BORDER_SHELL_PAD, EPS};
+use crate::layout::group::corridor::{merge_corridors, CorridorAxis, GroupCorridor};
+use crate::layout::kernel::group::hierarchy::build_group_hierarchy;
 
-pub use super::hierarchy::SiblingOrientation;
+pub use crate::layout::kernel::group::hierarchy::SiblingOrientation;
 
 /// 布局阶段产出的分组路由提示。
 #[derive(Debug, Clone)]
@@ -37,7 +37,7 @@ impl Default for GroupRoutingHints {
 impl GroupRoutingHints {
     pub fn from_groups(groups: &HashMap<String, GroupLayout>) -> Self {
         Self {
-            corridors: super::corridor::build_corridors_from_groups(groups),
+            corridors: crate::layout::group::corridor::build_corridors_from_groups(groups),
             border_shell_pad: GROUP_BORDER_SHELL_PAD,
             side_gutters: BTreeMap::new(),
         }
@@ -76,7 +76,7 @@ impl GroupRoutingContext {
         let corridors = if let Some(hints) = &result.hints.group_routing {
             merge_corridors(&hints.corridors, &result.groups)
         } else {
-            super::corridor::build_corridors_from_groups(&result.groups)
+            crate::layout::group::corridor::build_corridors_from_groups(&result.groups)
         };
         let hierarchy = build_group_hierarchy(diagram, &result.groups);
         let side_gutters = result
@@ -109,7 +109,7 @@ impl GroupRoutingContext {
     ) -> Self {
         let profile = GroupRoutingProfile::for_algo(algo);
         let node_to_groups = build_node_to_groups(diagram);
-        let corridors = super::corridor::build_corridors_from_groups(groups);
+        let corridors = crate::layout::group::corridor::build_corridors_from_groups(groups);
         let hierarchy = build_group_hierarchy(diagram, groups);
         Self {
             groups: groups.clone(),
@@ -301,8 +301,8 @@ mod tests {
                 height: 80.0,
             },
         );
-        let hints = GroupRoutingHints::with_corridors(vec![super::super::corridor::GroupCorridor {
-            axis: super::super::corridor::CorridorAxis::Vertical,
+        let hints = GroupRoutingHints::with_corridors(vec![crate::layout::group::corridor::GroupCorridor {
+            axis: crate::layout::group::corridor::CorridorAxis::Vertical,
             coord: 130.0,
             span_min: 0.0,
             span_max: 80.0,

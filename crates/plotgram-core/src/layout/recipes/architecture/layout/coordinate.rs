@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use super::acyclic::is_effective_edge;
 use super::constants::{LAYER_GAP, NODE_GAP, PADDING};
 use super::types::{ArchDiagramFacts, GraphIndex, GroupMap};
-use crate::layout::engines::layered::coordinate::assign_layer_centers_for_string_graph;
+use crate::layout::kernel::layered::coordinate::assign_layer_centers_for_string_graph;
 
 pub(in super::super) fn assign_coordinates(
     facts: &ArchDiagramFacts,

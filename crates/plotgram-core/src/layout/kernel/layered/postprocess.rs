@@ -1,4 +1,3 @@
-use crate::types::DiagramType;
 use crate::ast::{Diagram, Entity};
 use crate::layout::{GroupLayout, LayoutResult, NodeLayout};
 use crate::kinds::er::semantics::entity_node_size;
@@ -6,7 +5,7 @@ use petgraph::graph::NodeIndex;
 use std::collections::HashMap;
 
 use super::preset::SugiyamaPreset;
-use crate::layout::engines::common::node_sizing::NodeSizing;
+use crate::layout::kernel::common::node_sizing::NodeSizing;
 
 pub(super) fn compute_layer_heights(
     layers: &[Vec<NodeIndex>],
@@ -104,25 +103,18 @@ pub(super) fn sized_node_for(
     entity: &Entity,
     preset: &SugiyamaPreset,
 ) -> (f64, f64) {
-    use crate::layout::engines::common::node_sizing::{
+    use crate::layout::kernel::common::node_sizing::{
         estimate_standard_node_width, DEFAULT_NODE_HEIGHT,
     };
 
     let (default_w, default_h) = match preset.node_sizing {
         NodeSizing::Er => entity_node_size(entity),
         NodeSizing::State => state_fallback_node_size(diagram, entity),
-        NodeSizing::InferFromDiagram => {
-            if diagram.diagram_type == DiagramType::Er {
-                entity_node_size(entity)
-            } else if diagram.diagram_type == DiagramType::State {
-                state_fallback_node_size(diagram, entity)
-            } else {
-                (
-                    estimate_standard_node_width(entity.label.as_str()),
-                    DEFAULT_NODE_HEIGHT,
-                )
-            }
-        }
+        // recipes 须显式设 Er/State/Standard；Infer 回退标准估宽（禁 DiagramType）。
+        NodeSizing::InferFromDiagram => (
+            estimate_standard_node_width(entity.label.as_str()),
+            DEFAULT_NODE_HEIGHT,
+        ),
         // Phase B：flowchart 按标签估宽，不再固定 160。
         NodeSizing::Standard => (
             estimate_standard_node_width(entity.label.as_str()),

@@ -433,7 +433,7 @@ pub fn snap_edge_waypoints_with_guard(
 /// 根据 nodes / groups 更新画布 total 尺寸
 pub fn update_canvas_bounds(layout: &mut LayoutResult, padding: f64) {
     let (total_width, total_height) =
-        crate::layout::engines::common::canvas_bounds::canvas_size(&layout.nodes, &layout.groups, padding);
+        crate::layout::kernel::common::canvas_bounds::canvas_size(&layout.nodes, &layout.groups, padding);
     layout.total_width = total_width;
     layout.total_height = total_height;
 }

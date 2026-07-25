@@ -31,11 +31,11 @@ pub(super) fn phase_d_postprocess(
     // compose provisional 作废；seed → gutters → 单次 materialize。
     let _ = std::mem::take(groups);
     let t_egb = crate::layout::perf::Instant::now();
-    let seed = crate::layout::engines::common::group_bounds::compute_group_bounds_unrecorded(
+    let seed = crate::layout::kernel::common::group_bounds::compute_group_bounds_unrecorded(
         diagram,
         nodes,
         bounds_padding,
-        crate::layout::engines::common::group_bounds::container_padding_for_leaf(bounds_padding),
+        crate::layout::kernel::common::group_bounds::container_padding_for_leaf(bounds_padding),
         None,
     );
     let mut side_gutters = estimate_side_gutters_with_hierarchy(diagram, nodes, &seed);
@@ -62,11 +62,11 @@ pub(super) fn phase_d_postprocess(
             }
         }
     }
-    *groups = crate::layout::engines::common::group_bounds::compute_group_bounds_with_side_gutters(
+    *groups = crate::layout::kernel::common::group_bounds::compute_group_bounds_with_side_gutters(
         diagram,
         nodes,
         bounds_padding,
-        crate::layout::engines::common::group_bounds::container_padding_for_leaf(bounds_padding),
+        crate::layout::kernel::common::group_bounds::container_padding_for_leaf(bounds_padding),
         Some(&side_gutters),
     );
     let egb_ms = t_egb.elapsed().as_secs_f64() * 1000.0;
@@ -86,7 +86,7 @@ pub(super) fn phase_d_postprocess(
     let space_budget = crate::layout::demand::space_budget::SpaceBudget::from_diagram(diagram);
 
     let (total_width, total_height) =
-        crate::layout::engines::common::canvas_bounds::canvas_size(nodes, groups, PADDING);
+        crate::layout::kernel::common::canvas_bounds::canvas_size(nodes, groups, PADDING);
 
     let sibling_corridors = crate::layout::group::build_sibling_corridors(diagram, groups);
     let corridors = crate::layout::group::merge_corridors(&sibling_corridors, groups);

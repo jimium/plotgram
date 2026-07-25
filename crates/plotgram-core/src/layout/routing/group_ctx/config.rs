@@ -1,6 +1,6 @@
 //! 图类型级分组路由默认参数。
 
-use super::constants::{GROUP_BORDER_SHELL_PAD, PORT_STUB_CLEARANCE};
+use crate::layout::group::constants::{GROUP_BORDER_SHELL_PAD, PORT_STUB_CLEARANCE};
 
 /// 边路由阶段的分组障碍与走廊软约束参数。
 #[derive(Debug, Clone, Copy)]

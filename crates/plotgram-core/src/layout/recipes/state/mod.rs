@@ -9,9 +9,9 @@ use crate::ast::Diagram;
 use crate::layout::algorithm_config::{CircularLayoutConfig, SugiyamaLayoutConfig};
 use crate::layout::kernel::recipe::LayoutRecipe;
 use crate::layout::recipes::circular::CircularLayout;
-use crate::layout::engines::common::acyclic::greedy_fas;
-use crate::layout::engines::common::group_bounds::{self, GroupPadding};
-use crate::layout::engines::layered::{coordinate, layered_kernel::LayeredKernel, preset};
+use crate::layout::kernel::common::acyclic::greedy_fas;
+use crate::layout::kernel::common::group_bounds::{self, GroupPadding};
+use crate::layout::kernel::layered::{coordinate, layered_kernel::LayeredKernel, preset};
 use crate::layout::pipeline::plan::{diagram_algorithm_name, ResolvedAlgoOptions};
 use crate::layout::{AlgorithmOptionSpec, EdgeRoutingStyle, LayoutResult, LayoutStrategy, NodeAlignConfig};
 use crate::types::standard_attr_keys::diagram;
@@ -104,14 +104,14 @@ enum StateProblem {
     /// Circular 布局路径
     Circular,
     /// Sugiyama 布局路径：LayeredKernel 产出的分层草稿
-    Sugiyama(crate::layout::engines::layered::layered_kernel::LayeredDraft),
+    Sugiyama(crate::layout::kernel::layered::layered_kernel::LayeredDraft),
 }
 
 /// 状态图求解结果。
 struct StateSolution {
     nodes: HashMap<String, crate::layout::NodeLayout>,
     solved_problem: Option<crate::layout::kernel::coordinate::model::CoordinateProblem>,
-    draft: Option<crate::layout::engines::layered::layered_kernel::LayeredDraft>,
+    draft: Option<crate::layout::kernel::layered::layered_kernel::LayeredDraft>,
 }
 
 impl LayoutRecipe for StateRecipe {
@@ -126,7 +126,7 @@ impl LayoutRecipe for StateRecipe {
         if user_requested_circular(diagram) || !should_use_sugiyama(diagram) {
             StateProblem::Circular
         } else {
-            let draft = crate::layout::engines::layered::layered_kernel::LayeredKernel::compute(
+            let draft = crate::layout::kernel::layered::layered_kernel::LayeredKernel::compute(
                 diagram,
                 &preset::STATE_PRESET,
             );
@@ -170,7 +170,7 @@ impl LayoutRecipe for StateRecipe {
         let group_warnings =
             group_bounds::detect_group_layout_warnings(diagram, nodes, &groups);
         let (total_width, total_height) =
-            crate::layout::engines::common::canvas_bounds::canvas_size(
+            crate::layout::kernel::common::canvas_bounds::canvas_size(
                 nodes,
                 &groups,
                 draft.padding,

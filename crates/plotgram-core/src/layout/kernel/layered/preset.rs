@@ -3,7 +3,7 @@
 //! [`NodeSizing`] 枚举已抽取到 [`common::node_sizing`]，供所有算法共享。
 
 use crate::layout::LayoutResult;
-use crate::layout::engines::common::node_sizing::NodeSizing;
+use crate::layout::kernel::common::node_sizing::NodeSizing;
 
 /// Sugiyama v2 布局参数集。
 #[derive(Debug, Clone, Copy)]

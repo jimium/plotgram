@@ -5,11 +5,11 @@ use std::collections::HashMap;
 use crate::layout::geometry::Point;
 use crate::layout::{EdgeLayout, GroupLayout};
 
-use super::border_shell::{
+use crate::layout::routing::group_ctx::border_shell::{
     is_horizontal_segment, is_vertical_segment, segment_hugs_group_border,
     segment_within_port_stub_zone,
 };
-use super::constants::PORT_STUB_CLEARANCE;
+use crate::layout::group::constants::PORT_STUB_CLEARANCE;
 
 fn snap_ceil_to_grid(value: f64, step: f64) -> f64 {
     if step <= f64::EPSILON {

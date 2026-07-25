@@ -1,7 +1,7 @@
 //! 障碍穿透 proxy：最短正交两段 L 骨架 + 线段×节点 primitive。
 
 use crate::layout::geometry::Point;
-use crate::layout::refine::segment_intersects_node;
+use crate::layout::quality::refine::segment_intersects_node;
 use crate::layout::NodeLayout;
 use std::collections::HashMap;
 

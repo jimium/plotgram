@@ -8,8 +8,8 @@ use petgraph::graph::{DiGraph, NodeIndex};
 use std::collections::HashMap;
 
 use super::model::*;
-use crate::layout::engines::layered::graph::{LayerNode, LayerNodeKind};
-use crate::layout::engines::layered::preset::SugiyamaPreset;
+use crate::layout::kernel::layered::graph::{LayerNode, LayerNodeKind};
+use crate::layout::kernel::layered::preset::SugiyamaPreset;
 use crate::layout::kernel::coordinate::builder::{
     append_rank_layer_vars, build_adjacent_min_separations, RankNodeSpec,
 };

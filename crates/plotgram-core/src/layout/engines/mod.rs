@@ -1,9 +1,6 @@
-//! 共享布局引擎：与具体图类型语义解耦的算法构建块。
+//! 遗留引擎目录 —— 仅保留 `coordinate` builder。
 //!
-//! - [`layered`]: Sugiyama 分层布局引擎（graph → rank → order → coordinate → postprocess）
-//! - [`coordinate`]: 坐标约束问题构建器（消费 LayeredGraph → CoordinateProblem）
-//! - [`common`]: 通用工具（node_sizing、acyclic、overlap、group_bounds、pack 等）
+//! - `common` / `layered` 真源：[`crate::layout::kernel`]
+//! - [`coordinate`]：遗留 builder，仍驻本目录并 re-export kernel 求解面
 
-pub mod common;
 pub mod coordinate;
-pub mod layered;

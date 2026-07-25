@@ -161,10 +161,10 @@ pub fn shadow_audit_group_bounds(
     diagram: &crate::ast::Diagram,
     nodes: &std::collections::HashMap<String, crate::layout::NodeLayout>,
     layout_groups: &std::collections::HashMap<String, crate::layout::GroupLayout>,
-    padding: crate::layout::engines::common::group_bounds::GroupPadding,
+    padding: crate::layout::kernel::group::bounds::GroupPadding,
 ) -> GroupBoundsShadowReport {
     let mut report = GroupBoundsShadowReport::default();
-    let expected = crate::layout::engines::common::group_bounds::compute_group_bounds(
+    let expected = crate::layout::kernel::group::bounds::compute_group_bounds(
         diagram, nodes, padding,
     );
     let mut ids: Vec<&String> = expected.keys().collect();
@@ -228,7 +228,7 @@ pub fn compile_group_variables(
         .iter()
         .map(|g| {
             let mut members =
-                crate::layout::engines::common::group_bounds::effective_entity_ids(g, diagram);
+                crate::layout::kernel::group::bounds::effective_entity_ids(g, diagram);
             members.sort();
             members.dedup();
             GroupVariable {
@@ -240,7 +240,7 @@ pub fn compile_group_variables(
                 parent: None,
                 children: Vec::new(),
                 members,
-                padding: crate::layout::engines::common::group_bounds::GroupPadding::default(),
+                padding: crate::layout::kernel::group::bounds::GroupPadding::default(),
                 role: GroupRole::Container,
             }
         })

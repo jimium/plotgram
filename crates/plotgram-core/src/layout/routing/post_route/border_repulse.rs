@@ -5,7 +5,7 @@
 //! - [`snap_and_repulse_edges`]：执行像素量化 + 边框排斥 + 简化。在管道最末尾执行（仅一次）。
 
 use crate::layout::snap::grid_snap;
-use crate::layout::group;
+use crate::layout::routing::post_route::path_projection;
 use crate::layout::{EdgeLayout, EdgeSnapConfig, GroupLayout};
 use std::collections::HashMap;
 
@@ -21,7 +21,7 @@ pub fn repulse_edges_only(
     if !config.enabled {
         return;
     }
-    group::repulse_edges_from_group_borders(
+    path_projection::repulse_edges_from_group_borders(
         edges,
         groups,
         config.shell_pad,
@@ -64,7 +64,7 @@ pub fn snap_and_repulse_edges_with_guard(
         relations,
         sorted_node_ids,
     );
-    group::repulse_edges_from_group_borders(
+    path_projection::repulse_edges_from_group_borders(
         edges,
         groups,
         config.shell_pad,
