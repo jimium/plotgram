@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use crate::ast::{AttributeValue, Diagram, Span};
 use crate::error::{DiagnosticError, ValidationResult};
 use crate::profile::DiagramProfile;
+use crate::types::attr_constants::pipeline as pipeline_atoms;
 use crate::types::standard_attr_keys::diagram;
 
 use crate::layout::algorithm_config::{diagram_algorithm_config, AlgorithmOptionSpec, OptionsReader};
@@ -72,6 +73,52 @@ impl ResolvedAlgoOptions {
     }
 }
 
+/// 布局管线选择（Atlas Stage 0 交付 0.4，23 号文 §0.3）。
+///
+/// 解析优先级：diagram attr `pipeline:` > 环境变量 `PLOTGRAM_PIPELINE` >
+/// 默认 [`Legacy`](PipelineChoice::Legacy)。非法环境变量值静默回落 Legacy
+/// （attr 值由 validation 拦截，不会走到这里）；WASM 上 `env::var` 返回
+/// Err，天然回落。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PipelineChoice {
+    /// 现有两段式管线（节点求解 → 冻结 → 边路由）。
+    #[default]
+    Legacy,
+    /// Atlas 三相管线（Stage 0 为转发 legacy 的空壳）。
+    Atlas,
+    /// 双跑对拍：返回 legacy 结果，差异摘要打 stderr。
+    Shadow,
+}
+
+impl PipelineChoice {
+    /// 从字符串解析（attr 与环境变量共用）。
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            pipeline_atoms::LEGACY => Some(Self::Legacy),
+            pipeline_atoms::ATLAS => Some(Self::Atlas),
+            pipeline_atoms::SHADOW => Some(Self::Shadow),
+            _ => None,
+        }
+    }
+
+    fn resolve(diagram: &Diagram) -> Self {
+        if let Some(v) = diagram
+            .attributes
+            .iter()
+            .find(|a| a.key == diagram::PIPELINE)
+            .and_then(|a| a.value.as_str())
+        {
+            if let Some(choice) = Self::parse(v) {
+                return choice;
+            }
+        }
+        std::env::var("PLOTGRAM_PIPELINE")
+            .ok()
+            .and_then(|v| Self::parse(&v))
+            .unwrap_or_default()
+    }
+}
+
 /// 单次布局所需的算法选择与已解析 option。
 #[derive(Debug, Clone, PartialEq)]
 pub struct LayoutPlan {
@@ -82,6 +129,8 @@ pub struct LayoutPlan {
     pub layout_options: ResolvedAlgoOptions,
     pub edge_routing: String,
     pub edge_options: ResolvedAlgoOptions,
+    /// 管线选择（legacy / atlas / shadow）。
+    pub pipeline: PipelineChoice,
 }
 
 impl LayoutPlan {
@@ -123,6 +172,7 @@ impl LayoutPlan {
             layout_options,
             edge_routing,
             edge_options,
+            pipeline: PipelineChoice::resolve(diagram),
         }
     }
 
@@ -160,6 +210,7 @@ impl LayoutPlan {
             layout_options: ResolvedAlgoOptions::default(),
             edge_routing: String::new(),
             edge_options: ResolvedAlgoOptions::default(),
+            pipeline: PipelineChoice::default(),
         }
     }
 
@@ -171,6 +222,7 @@ impl LayoutPlan {
             layout_options: ResolvedAlgoOptions::default(),
             edge_routing: algo.to_string(),
             edge_options: ResolvedAlgoOptions::default(),
+            pipeline: PipelineChoice::default(),
         }
     }
 }
@@ -249,4 +301,84 @@ fn attr_span(diagram: &Diagram, key: &str) -> Span {
         .find(|a| a.key == key)
         .map(|a| a.span)
         .unwrap_or_else(Span::dummy)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::{DiagramAttribute, TextValue};
+
+    fn diagram_with_pipeline_attr(value: &str) -> Diagram {
+        let mut d = Diagram::default();
+        d.attributes.push(DiagramAttribute {
+            key: diagram::PIPELINE.to_string(),
+            value: AttributeValue::String(TextValue::unquoted(value)),
+            span: Span::dummy(),
+        });
+        d
+    }
+
+    #[test]
+    fn pipeline_choice_parses_known_atoms_only() {
+        assert_eq!(PipelineChoice::parse("legacy"), Some(PipelineChoice::Legacy));
+        assert_eq!(PipelineChoice::parse("atlas"), Some(PipelineChoice::Atlas));
+        assert_eq!(PipelineChoice::parse("shadow"), Some(PipelineChoice::Shadow));
+        assert_eq!(PipelineChoice::parse("bogus"), None);
+        assert_eq!(PipelineChoice::parse(""), None);
+    }
+
+    /// 解析优先级：attr > 环境变量 > 默认；非法 env 值静默回落。
+    /// env 操作集中在单个测试内串行，且仅使用 atlas（S0 转发 legacy，
+    /// 并行测试即使读到也零行为差异）与非法值（回落 Legacy = 默认）。
+    #[test]
+    fn pipeline_choice_resolution_priority() {
+        std::env::remove_var("PLOTGRAM_PIPELINE");
+        assert_eq!(
+            PipelineChoice::resolve(&Diagram::default()),
+            PipelineChoice::Legacy,
+            "无 attr 无 env → 默认 Legacy"
+        );
+
+        std::env::set_var("PLOTGRAM_PIPELINE", "atlas");
+        assert_eq!(
+            PipelineChoice::resolve(&Diagram::default()),
+            PipelineChoice::Atlas,
+            "无 attr → env 生效"
+        );
+        assert_eq!(
+            PipelineChoice::resolve(&diagram_with_pipeline_attr("shadow")),
+            PipelineChoice::Shadow,
+            "attr 优先于 env"
+        );
+
+        std::env::set_var("PLOTGRAM_PIPELINE", "bogus");
+        assert_eq!(
+            PipelineChoice::resolve(&Diagram::default()),
+            PipelineChoice::Legacy,
+            "非法 env 值静默回落 Legacy"
+        );
+
+        std::env::remove_var("PLOTGRAM_PIPELINE");
+    }
+
+    /// DSL 全链：parser 接受 `pipeline:` atom，validation 枚举校验，
+    /// LayoutPlan 解析到位；非法值被 validation 拦截。
+    #[test]
+    fn pipeline_attr_flows_through_dsl_chain() {
+        let ok = crate::pipeline::parse_prepare_validate(
+            "diagram flowchart {\n    config {\n        pipeline: shadow\n    }\n    entity a \"A\"\n}",
+            &crate::prepare::StyleRequest::default(),
+        );
+        assert!(ok.is_valid(), "{:?}", ok.errors);
+        assert_eq!(
+            ok.diagram.unwrap().layout_plan().pipeline,
+            PipelineChoice::Shadow
+        );
+
+        let bad = crate::pipeline::parse_prepare_validate(
+            "diagram flowchart {\n    config {\n        pipeline: bogus\n    }\n    entity a \"A\"\n}",
+            &crate::prepare::StyleRequest::default(),
+        );
+        assert!(!bad.is_valid(), "非法 pipeline 值应被 validation 拦截");
+    }
 }

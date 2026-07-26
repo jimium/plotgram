@@ -53,12 +53,34 @@ pub fn compute_layout(
 }
 
 /// 使用已解析的 [`crate::layout::pipeline::plan::LayoutPlan`] 计算布局（`PreparedDiagram` 在 prepare 阶段已解析 plan 时走此路径）。
+///
+/// 按 `plan.pipeline` 三态分发（Atlas Stage 0 交付 0.4）：
+/// - `Legacy`：现路径不变；
+/// - `Atlas`：[`AtlasPipeline`](crate::layout::atlas::pipeline::AtlasPipeline)（S0 转发 legacy）；
+/// - `Shadow`：双跑对拍，返回 legacy 结果，差异摘要一行打 stderr。
 pub fn compute_layout_with_plan(
     diagram: &Diagram,
     plan: &crate::layout::pipeline::plan::LayoutPlan,
 ) -> std::result::Result<LayoutResult, DiagnosticError> {
     validate_layout_config(diagram)?;
-    crate::layout::pipeline::runner::LayoutPipeline::new(diagram, plan).run()
+    use crate::layout::pipeline::plan::PipelineChoice;
+    match plan.pipeline {
+        PipelineChoice::Legacy => {
+            crate::layout::pipeline::runner::LayoutPipeline::new(diagram, plan).run()
+        }
+        PipelineChoice::Atlas => {
+            crate::layout::atlas::pipeline::AtlasPipeline::new(diagram, plan).run()
+        }
+        PipelineChoice::Shadow => {
+            let run = crate::layout::atlas::shadow::run_shadow(
+                diagram.title().unwrap_or("<diagram>"),
+                diagram,
+                plan,
+            )?;
+            eprintln!("{}", run.report.summary_line());
+            Ok(run.legacy)
+        }
+    }
 }
 
 /// Slice F2c：跨渲染增量布局入口。

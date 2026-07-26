@@ -16,7 +16,7 @@ use plotgram_core::layout::{
     compute_lint_metrics, count_unrelated_parallel_overlaps, EdgeLayout, LayoutResult,
     LintMetricsSummary, NodeLayout,
 };
-use plotgram_core::layout::refine::segment_intersects_node;
+use plotgram_core::layout::quality::refine::segment_intersects_node;
 use plotgram_core::layout::geometry::{Point, Rect};
 use std::collections::HashMap;
 

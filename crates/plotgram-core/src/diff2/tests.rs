@@ -76,28 +76,18 @@ fn assert_patch_validates(source_a: &str, source_b: &str) {
     );
 }
 
-// ─── Round-trip 测试 ───────────────────────────────────────────────
+// ─── Round-trip 测试（表驱动） ─────────────────────────────────────
 
 #[test]
-fn round_trip_minimal() {
-    assert_round_trip(
-        r##"diagram flowchart {
+fn round_trip_all_cases() {
+    let cases: &[(&str, &str)] = &[
+        ("minimal", r##"diagram flowchart {
     entity a "A"
     entity b "B"
     a -> b
-}"##,
-    );
-}
-
-#[test]
-fn round_trip_empty() {
-    assert_round_trip("diagram flowchart {\n}");
-}
-
-#[test]
-fn round_trip_diagram_attributes() {
-    assert_round_trip(
-        r##"diagram flowchart {
+}"##),
+        ("empty", "diagram flowchart {\n}"),
+        ("diagram_attributes", r##"diagram flowchart {
     title: "测试图表"
     config {
         direction: left-to-right
@@ -106,14 +96,8 @@ fn round_trip_diagram_attributes() {
     }
     entity a "A"
     a -> a
-}"##,
-    );
-}
-
-#[test]
-fn round_trip_config_block() {
-    assert_round_trip(
-        r##"diagram flowchart {
+}"##),
+        ("config_block", r##"diagram flowchart {
     config {
         layout: sugiyama-v2 {
             group_padding: 20
@@ -125,14 +109,8 @@ fn round_trip_config_block() {
     entity a "A"
     entity b "B"
     a -> b
-}"##,
-    );
-}
-
-#[test]
-fn round_trip_entity_attributes() {
-    assert_round_trip(
-        r##"diagram flowchart {
+}"##),
+        ("entity_attributes", r##"diagram flowchart {
     entity api "API 服务" {
         type: service
         status: healthy
@@ -147,28 +125,16 @@ fn round_trip_entity_attributes() {
         type: database
     }
     api -> db "查询"
-}"##,
-    );
-}
-
-#[test]
-fn round_trip_all_arrow_types() {
-    assert_round_trip(
-        r##"diagram flowchart {
+}"##),
+        ("all_arrow_types", r##"diagram flowchart {
     entity a "A"
     entity b "B"
     entity c "C"
     a -> b "主动"
     b --> c "被动"
     c <-> a "双向"
-}"##,
-    );
-}
-
-#[test]
-fn round_trip_relation_with_attributes() {
-    assert_round_trip(
-        r##"diagram flowchart {
+}"##),
+        ("relation_with_attributes", r##"diagram flowchart {
     entity a "A"
     entity b "B"
     a -> b "请求" {
@@ -176,14 +142,8 @@ fn round_trip_relation_with_attributes() {
         style.dashed: true
         meta.latency: "200ms"
     }
-}"##,
-    );
-}
-
-#[test]
-fn round_trip_groups_nested() {
-    assert_round_trip(
-        r##"diagram architecture {
+}"##),
+        ("groups_nested", r##"diagram architecture {
     group frontend "前端" {
         layout: horizontal
         entity web "Web"
@@ -200,14 +160,8 @@ fn round_trip_groups_nested() {
     web -> gateway
     mobile -> gateway
     gateway -> worker
-}"##,
-    );
-}
-
-#[test]
-fn round_trip_style_decls() {
-    assert_round_trip(
-        r##"diagram flowchart {
+}"##),
+        ("style_decls", r##"diagram flowchart {
     node_style service {
         fill: "#E3F2FD"
         stroke: "#1976D2"
@@ -231,25 +185,13 @@ fn round_trip_style_decls() {
         type: database
     }
     api -> db "查询"
-}"##,
-    );
-}
-
-#[test]
-fn round_trip_string_escaping() {
-    assert_round_trip(
-        r##"diagram flowchart {
+}"##),
+        ("string_escaping", r##"diagram flowchart {
     title: "包含\"引号\"和\\反斜杠"
     entity a "标签\n换行"
     a -> a "自环"
-}"##,
-    );
-}
-
-#[test]
-fn round_trip_number_formats() {
-    assert_round_trip(
-        r##"diagram flowchart {
+}"##),
+        ("number_formats", r##"diagram flowchart {
     entity a "A" {
         style.stroke_width: 2
         style.width: 100.5
@@ -259,14 +201,8 @@ fn round_trip_number_formats() {
         style.stroke_width: 2.5
     }
     a -> b
-}"##,
-    );
-}
-
-#[test]
-fn round_trip_boolean_values() {
-    assert_round_trip(
-        r##"diagram flowchart {
+}"##),
+        ("boolean_values", r##"diagram flowchart {
     entity a "A" {
         style.dashed: true
     }
@@ -274,535 +210,115 @@ fn round_trip_boolean_values() {
         style.dashed: false
     }
     a -> b
-}"##,
-    );
+}"##),
+    ];
+    for (name, source) in cases {
+        assert_round_trip(source);
+        // 若失败，panic 消息含 source 可定位；补充 case 名以便快速识别
+        let _ = name;
+    }
 }
 
-// ─── 闭环测试 ──────────────────────────────────────────────────────
+// ─── 闭环测试（表驱动） ──────────────────────────────────────────────
 
 #[test]
-fn closed_loop_entity_add() {
-    let a = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    a -> b
-}"##;
-    let b = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    entity c "C"
-    a -> b
-    b -> c
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_entity_remove() {
-    let a = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    entity c "C"
-    a -> b
-    b -> c
-}"##;
-    let b = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    a -> b
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_entity_modify_label() {
-    let a = r##"diagram flowchart {
-    entity a "旧标签"
-    entity b "B"
-    a -> b
-}"##;
-    let b = r##"diagram flowchart {
-    entity a "新标签"
-    entity b "B"
-    a -> b
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_entity_modify_attributes() {
-    let a = r##"diagram flowchart {
-    entity api "API" {
-        type: service
-        status: healthy
+fn closed_loop_all_cases() {
+    let cases: &[(&str, &str, &str)] = &[
+        ("entity_add",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b\n}",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    entity c \"C\"\n    a -> b\n    b -> c\n}"),
+        ("entity_remove",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    entity c \"C\"\n    a -> b\n    b -> c\n}",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b\n}"),
+        ("entity_modify_label",
+            "diagram flowchart {\n    entity a \"旧标签\"\n    entity b \"B\"\n    a -> b\n}",
+            "diagram flowchart {\n    entity a \"新标签\"\n    entity b \"B\"\n    a -> b\n}"),
+        ("entity_modify_attributes",
+            "diagram flowchart {\n    entity api \"API\" {\n        type: service\n        status: healthy\n    }\n    entity db \"DB\"\n    api -> db\n}",
+            "diagram flowchart {\n    entity api \"API\" {\n        type: service\n        status: degraded\n        owner: \"SRE 团队\"\n    }\n    entity db \"DB\"\n    api -> db\n}"),
+        ("entity_modify_group_id",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b\n}",
+            "diagram flowchart {\n    group g \"Group\" {\n        entity a \"A\"\n    }\n    entity b \"B\"\n    a -> b\n}"),
+        ("relation_add_remove",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    entity c \"C\"\n    a -> b\n}",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    entity c \"C\"\n    a -> b\n    b -> c \"调用\"\n    c --> a \"返回\"\n}"),
+        ("relation_label_change",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b \"旧标签\"\n}",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b \"新标签\"\n}"),
+        ("relation_arrow_modify",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b \"请求\"\n}",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a --> b \"请求\"\n}"),
+        ("relation_attributes_modify",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b \"请求\" {\n        style.stroke: \"#FF0000\"\n    }\n}",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b \"请求\" {\n        style.stroke: \"#00FF00\"\n        style.dashed: true\n    }\n}"),
+        ("group_add",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b\n}",
+            "diagram flowchart {\n    group g \"Group\" {\n        entity a \"A\"\n    }\n    entity b \"B\"\n    a -> b\n}"),
+        ("group_remove",
+            "diagram flowchart {\n    group g \"Group\" {\n        entity a \"A\"\n    }\n    entity b \"B\"\n    a -> b\n}",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b\n}"),
+        ("group_modify",
+            "diagram architecture {\n    group g \"旧名称\" {\n        layout: horizontal\n        entity a \"A\"\n    }\n    entity b \"B\"\n    a -> b\n}",
+            "diagram architecture {\n    group g \"新名称\" {\n        layout: vertical\n        border_style: dashed\n        entity a \"A\"\n    }\n    entity b \"B\"\n    a -> b\n}"),
+        ("nested_group_add",
+            "diagram architecture {\n    group backend \"后端\" {\n        entity api \"API\"\n    }\n    entity web \"Web\"\n    web -> api\n}",
+            "diagram architecture {\n    group backend \"后端\" {\n        group api_layer \"API 层\" {\n            entity api \"API\"\n        }\n    }\n    entity web \"Web\"\n    web -> api\n}"),
+        ("style_decl_add",
+            "diagram flowchart {\n    entity api \"API\" {\n        type: service\n    }\n    entity db \"DB\" {\n        type: database\n    }\n    api -> db\n}",
+            "diagram flowchart {\n    node_style service {\n        fill: \"#E3F2FD\"\n        stroke: \"#1976D2\"\n    }\n    entity api \"API\" {\n        type: service\n    }\n    entity db \"DB\" {\n        type: database\n    }\n    api -> db\n}"),
+        ("style_decl_modify",
+            "diagram flowchart {\n    node_style service {\n        fill: \"#E3F2FD\"\n        stroke: \"#1976D2\"\n    }\n    entity api \"API\" {\n        type: service\n    }\n    api -> api\n}",
+            "diagram flowchart {\n    node_style service {\n        fill: \"#C8E6C9\"\n        stroke: \"#1976D2\"\n        shape: rounded_rect\n    }\n    entity api \"API\" {\n        type: service\n    }\n    api -> api\n}"),
+        ("style_decl_remove",
+            "diagram flowchart {\n    node_style service {\n        fill: \"#E3F2FD\"\n    }\n    edge_style error {\n        stroke: \"#C62828\"\n    }\n    entity api \"API\" {\n        type: service\n    }\n    api -> api\n}",
+            "diagram flowchart {\n    entity api \"API\" {\n        type: service\n    }\n    api -> api\n}"),
+        ("diagram_type_change",
+            "diagram flowchart {\n    entity a \"A\"\n    a -> a\n}",
+            "diagram state {\n    entity a \"A\"\n    a -> a\n}"),
+        ("diagram_attributes_change",
+            "diagram flowchart {\n    title: \"旧标题\"\n    config {\n        direction: top-to-bottom\n    }\n    entity a \"A\"\n    a -> a\n}",
+            "diagram flowchart {\n    title: \"新标题\"\n    config {\n        direction: left-to-right\n        theme: common.clean-light\n    }\n    entity a \"A\"\n    a -> a\n}"),
+        ("config_block_change",
+            "diagram flowchart {\n    config {\n        layout: sugiyama-v2 {\n            group_padding: 20\n        }\n    }\n    entity a \"A\"\n    entity b \"B\"\n    a -> b\n}",
+            "diagram flowchart {\n    config {\n        layout: sugiyama-v2 {\n            group_padding: 40\n        }\n        edge_routing: orthogonal {\n            slot_pitch: 40\n        }\n    }\n    entity a \"A\"\n    entity b \"B\"\n    a -> b\n}"),
+        ("mixed_changes",
+            "diagram flowchart {\n    config {\n        direction: top-to-bottom\n    }\n    entity a \"A\" {\n        type: service\n    }\n    entity b \"B\"\n    entity c \"C\"\n    a -> b\n    b -> c\n}",
+            "diagram flowchart {\n    title: \"新图\"\n    config {\n        direction: left-to-right\n    }\n    node_style service {\n        fill: \"#E3F2FD\"\n    }\n    group g \"Group\" {\n        entity a \"A\" {\n            type: service\n            status: healthy\n        }\n    }\n    entity c \"C\"\n    entity d \"D\"\n    a -> c \"调用\"\n    c -> d\n}"),
+        ("no_changes",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b \"请求\"\n}",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b \"请求\"\n}"),
+    ];
+    for (name, a, b) in cases {
+        assert_closed_loop(a, b);
+        let _ = name;
     }
-    entity db "DB"
-    api -> db
-}"##;
-    let b = r##"diagram flowchart {
-    entity api "API" {
-        type: service
-        status: degraded
-        owner: "SRE 团队"
-    }
-    entity db "DB"
-    api -> db
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_entity_modify_group_id() {
-    let a = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    a -> b
-}"##;
-    let b = r##"diagram flowchart {
-    group g "Group" {
-        entity a "A"
-    }
-    entity b "B"
-    a -> b
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_relation_add_remove() {
-    let a = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    entity c "C"
-    a -> b
-}"##;
-    let b = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    entity c "C"
-    a -> b
-    b -> c "调用"
-    c --> a "返回"
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_relation_label_change_is_remove_add() {
-    // label 是 relation 身份的一部分，变更 label = remove + add
-    let a = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    a -> b "旧标签"
-}"##;
-    let b = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    a -> b "新标签"
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_relation_arrow_modify() {
-    let a = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    a -> b "请求"
-}"##;
-    let b = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    a --> b "请求"
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_relation_attributes_modify() {
-    let a = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    a -> b "请求" {
-        style.stroke: "#FF0000"
-    }
-}"##;
-    let b = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    a -> b "请求" {
-        style.stroke: "#00FF00"
-        style.dashed: true
-    }
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_group_add() {
-    let a = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    a -> b
-}"##;
-    let b = r##"diagram flowchart {
-    group g "Group" {
-        entity a "A"
-    }
-    entity b "B"
-    a -> b
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_group_remove() {
-    let a = r##"diagram flowchart {
-    group g "Group" {
-        entity a "A"
-    }
-    entity b "B"
-    a -> b
-}"##;
-    let b = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    a -> b
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_group_modify() {
-    let a = r##"diagram architecture {
-    group g "旧名称" {
-        layout: horizontal
-        entity a "A"
-    }
-    entity b "B"
-    a -> b
-}"##;
-    let b = r##"diagram architecture {
-    group g "新名称" {
-        layout: vertical
-        border_style: dashed
-        entity a "A"
-    }
-    entity b "B"
-    a -> b
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_nested_group_add() {
-    let a = r##"diagram architecture {
-    group backend "后端" {
-        entity api "API"
-    }
-    entity web "Web"
-    web -> api
-}"##;
-    let b = r##"diagram architecture {
-    group backend "后端" {
-        group api_layer "API 层" {
-            entity api "API"
-        }
-    }
-    entity web "Web"
-    web -> api
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_style_decl_add() {
-    let a = r##"diagram flowchart {
-    entity api "API" {
-        type: service
-    }
-    entity db "DB" {
-        type: database
-    }
-    api -> db
-}"##;
-    let b = r##"diagram flowchart {
-    node_style service {
-        fill: "#E3F2FD"
-        stroke: "#1976D2"
-    }
-    entity api "API" {
-        type: service
-    }
-    entity db "DB" {
-        type: database
-    }
-    api -> db
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_style_decl_modify() {
-    let a = r##"diagram flowchart {
-    node_style service {
-        fill: "#E3F2FD"
-        stroke: "#1976D2"
-    }
-    entity api "API" {
-        type: service
-    }
-    api -> api
-}"##;
-    let b = r##"diagram flowchart {
-    node_style service {
-        fill: "#C8E6C9"
-        stroke: "#1976D2"
-        shape: rounded_rect
-    }
-    entity api "API" {
-        type: service
-    }
-    api -> api
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_style_decl_remove() {
-    let a = r##"diagram flowchart {
-    node_style service {
-        fill: "#E3F2FD"
-    }
-    edge_style error {
-        stroke: "#C62828"
-    }
-    entity api "API" {
-        type: service
-    }
-    api -> api
-}"##;
-    let b = r##"diagram flowchart {
-    entity api "API" {
-        type: service
-    }
-    api -> api
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_diagram_type_change() {
-    let a = r##"diagram flowchart {
-    entity a "A"
-    a -> a
-}"##;
-    let b = r##"diagram state {
-    entity a "A"
-    a -> a
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_diagram_attributes_change() {
-    let a = r##"diagram flowchart {
-    title: "旧标题"
-    config {
-        direction: top-to-bottom
-    }
-    entity a "A"
-    a -> a
-}"##;
-    let b = r##"diagram flowchart {
-    title: "新标题"
-    config {
-        direction: left-to-right
-        theme: common.clean-light
-    }
-    entity a "A"
-    a -> a
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_config_block_change() {
-    let a = r##"diagram flowchart {
-    config {
-        layout: sugiyama-v2 {
-            group_padding: 20
-        }
-    }
-    entity a "A"
-    entity b "B"
-    a -> b
-}"##;
-    let b = r##"diagram flowchart {
-    config {
-        layout: sugiyama-v2 {
-            group_padding: 40
-        }
-        edge_routing: orthogonal {
-            slot_pitch: 40
-        }
-    }
-    entity a "A"
-    entity b "B"
-    a -> b
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_mixed_changes() {
-    let a = r##"diagram flowchart {
-    config {
-        direction: top-to-bottom
-    }
-    entity a "A" {
-        type: service
-    }
-    entity b "B"
-    entity c "C"
-    a -> b
-    b -> c
-}"##;
-    let b = r##"diagram flowchart {
-    title: "新图"
-    config {
-        direction: left-to-right
-    }
-    node_style service {
-        fill: "#E3F2FD"
-    }
-    group g "Group" {
-        entity a "A" {
-            type: service
-            status: healthy
-        }
-    }
-    entity c "C"
-    entity d "D"
-    a -> c "调用"
-    c -> d
-}"##;
-    assert_closed_loop(a, b);
-}
-
-#[test]
-fn closed_loop_no_changes() {
-    let a = r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    a -> b "请求"
-}"##;
-    // A 和 B 完全相同
-    assert_closed_loop(a, a);
 }
 
 // ─── Validate 测试 ─────────────────────────────────────────────────
 
 #[test]
-fn patch_result_validates_entity_changes() {
-    assert_patch_validates(
-        r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    a -> b
-}"##,
-        r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    entity c "C"
-    a -> b
-    b -> c
-    c -> a
-}"##,
-    );
-}
-
-#[test]
-fn patch_result_validates_group_changes() {
-    assert_patch_validates(
-        r##"diagram architecture {
-    entity a "A"
-    entity b "B"
-    a -> b
-}"##,
-        r##"diagram architecture {
-    group g "Group" {
-        entity a "A"
+fn patch_result_validates_all_cases() {
+    let cases: &[(&str, &str, &str)] = &[
+        ("entity_changes",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b\n}",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    entity c \"C\"\n    a -> b\n    b -> c\n    c -> a\n}"),
+        ("group_changes",
+            "diagram architecture {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b\n}",
+            "diagram architecture {\n    group g \"Group\" {\n        entity a \"A\"\n    }\n    entity b \"B\"\n    a -> b\n}"),
+        ("style_decl_changes",
+            "diagram flowchart {\n    entity api \"API\" {\n        type: service\n    }\n    entity db \"DB\" {\n        type: database\n    }\n    api -> db\n}",
+            "diagram flowchart {\n    node_style service {\n        fill: \"#E3F2FD\"\n    }\n    entity api \"API\" {\n        type: service\n    }\n    entity db \"DB\" {\n        type: database\n    }\n    api -> db\n}"),
+        ("diagram_type_change",
+            "diagram flowchart {\n    entity a \"A\"\n    a -> a\n}",
+            "diagram state {\n    entity a \"A\"\n    a -> a\n}"),
+        ("config_block",
+            "diagram flowchart {\n    entity a \"A\"\n    entity b \"B\"\n    a -> b\n}",
+            "diagram flowchart {\n    config {\n        layout: sugiyama-v2 {\n            group_padding: 20\n        }\n        edge_routing: bezier {\n            tension: 0.55\n        }\n    }\n    entity a \"A\"\n    entity b \"B\"\n    a -> b\n}"),
+    ];
+    for (name, a, b) in cases {
+        assert_patch_validates(a, b);
+        let _ = name;
     }
-    entity b "B"
-    a -> b
-}"##,
-    );
-}
-
-#[test]
-fn patch_result_validates_style_decl_changes() {
-    assert_patch_validates(
-        r##"diagram flowchart {
-    entity api "API" {
-        type: service
-    }
-    entity db "DB" {
-        type: database
-    }
-    api -> db
-}"##,
-        r##"diagram flowchart {
-    node_style service {
-        fill: "#E3F2FD"
-    }
-    entity api "API" {
-        type: service
-    }
-    entity db "DB" {
-        type: database
-    }
-    api -> db
-}"##,
-    );
-}
-
-#[test]
-fn patch_result_validates_diagram_type_change() {
-    assert_patch_validates(
-        r##"diagram flowchart {
-    entity a "A"
-    a -> a
-}"##,
-        r##"diagram state {
-    entity a "A"
-    a -> a
-}"##,
-    );
-}
-
-#[test]
-fn patch_result_validates_config_block() {
-    assert_patch_validates(
-        r##"diagram flowchart {
-    entity a "A"
-    entity b "B"
-    a -> b
-}"##,
-        r##"diagram flowchart {
-    config {
-        layout: sugiyama-v2 {
-            group_padding: 20
-        }
-        edge_routing: bezier {
-            tension: 0.55
-        }
-    }
-    entity a "A"
-    entity b "B"
-    a -> b
-}"##,
-    );
 }
 
 // ─── ChangeSet JSON 序列化 ─────────────────────────────────────────

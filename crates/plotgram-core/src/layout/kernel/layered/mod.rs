@@ -259,26 +259,7 @@ mod tests {
         assert!(!rectangles_overlap(db, cache));
     }
 
-    #[test]
-    fn v2_layout_is_deterministic_across_runs() {
-        let diagram = test_diagram(
-            vec!["client", "gateway", "auth", "db", "cache"],
-            vec![
-                ("client", "gateway"),
-                ("gateway", "auth"),
-                ("auth", "db"),
-                ("auth", "cache"),
-                ("client", "auth"),
-                ("gateway", "cache"),
-            ],
-        );
-
-        let baseline = layout_signature(&engine::compute_with_preset(&diagram, &preset::GENERIC_PRESET, SugiyamaLayoutConfig::default()));
-        for _ in 0..4 {
-            let current = layout_signature(&engine::compute_with_preset(&diagram, &preset::GENERIC_PRESET, SugiyamaLayoutConfig::default()));
-            assert_eq!(current, baseline);
-        }
-    }
+    // 确定性已由 v2_layout_is_deterministic_from_source_pipeline 覆盖（走完整 pipeline 含本层）。
 
     #[test]
     fn v2_layout_is_deterministic_from_source_pipeline() {

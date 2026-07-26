@@ -34,7 +34,8 @@ pub fn validate_diagram_attributes(diagram: &Diagram, result: &mut ValidationRes
             | diagram::EDGE_ROUTING
             | diagram::GROUP_FRAME
             | diagram::THEME
-            | diagram::RENDER_STYLE => match &attr.value {
+            | diagram::RENDER_STYLE
+            | diagram::PIPELINE => match &attr.value {
                 AttributeValue::String(_) => {
                     if !is_atom_like(&attr.value) {
                         result.add_error(DiagnosticError::structure_violation(

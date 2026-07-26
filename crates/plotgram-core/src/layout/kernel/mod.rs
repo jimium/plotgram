@@ -6,6 +6,7 @@
 //! ## 模块结构
 //!
 //! - [`recipe`]: 统一布局配方 trait（`LayoutRecipe`）——整图节点布局的生命周期
+//! - [`cost`]: 跨管线共享的代价与求解状态词汇（`LexCost` / `OrderedF64` / `SolverStatus`）
 //! - [`coordinate`]: 统一坐标约束求解器（PAVA + Projected Gradient）
 //! - [`coordinator`]: Coordinate Kernel 调用封装（solve + P0 audit）
 //! - [`route`]: 路由问题 IR + 可行性判定 + 离线硬审计（Phase 1，未接线生产）
@@ -19,6 +20,7 @@
 pub mod coordinate;
 pub mod coordinator;
 pub mod common;
+pub mod cost;
 pub mod group;
 pub mod layered;
 pub mod recipe;

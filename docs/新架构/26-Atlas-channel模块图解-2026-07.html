@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>channel 模块图解 —— 在没有坐标的世界里为边选路</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --ink: #1c2333;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --good: #059669;
+    --good-soft: #d1fae5;
+    --bad: #dc2626;
+    --bad-soft: #fee2e2;
+    --warn: #d97706;
+    --warn-soft: #fef3c7;
+    --track: #94a3b8;
+    --mono: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 16px 80px;
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.75;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  header { padding: 56px 0 8px; }
+  header h1 { font-size: 30px; margin: 0 0 8px; letter-spacing: .5px; }
+  header .sub { color: var(--muted); font-size: 15px; }
+  header .path { font-family: var(--mono); font-size: 13px; color: var(--accent); background: var(--accent-soft); padding: 2px 8px; border-radius: 6px; }
+  section { margin-top: 40px; }
+  h2 { font-size: 21px; margin: 0 0 4px; padding-left: 12px; border-left: 4px solid var(--accent); }
+  h2 .no { color: var(--accent); font-family: var(--mono); margin-right: 6px; }
+  .lead { color: var(--muted); font-size: 14.5px; margin: 4px 0 16px 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+  .cols { display: flex; gap: 18px; flex-wrap: wrap; }
+  .cols > .card { flex: 1 1 380px; }
+  .big-q {
+    font-size: 24px; font-weight: 700; text-align: center; padding: 34px 20px;
+    background: linear-gradient(135deg, #1e3a8a, #2563eb); color: #fff; border-radius: 14px;
+  }
+  .big-q small { display: block; font-size: 14px; font-weight: 400; opacity: .85; margin-top: 10px; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 999px; margin-right: 6px; vertical-align: 2px; }
+  .tag.good { background: var(--good-soft); color: var(--good); }
+  .tag.bad { background: var(--bad-soft); color: var(--bad); }
+  .tag.info { background: var(--accent-soft); color: var(--accent); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  code { font-family: var(--mono); font-size: .92em; background: #eef1f5; padding: 1px 6px; border-radius: 5px; }
+  svg { display: block; margin: 12px auto; max-width: 100%; height: auto; }
+  svg text { font-family: -apple-system, "PingFang SC", sans-serif; }
+  svg .mono { font-family: var(--mono); }
+  .caption { text-align: center; color: var(--muted); font-size: 13.5px; margin-top: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 10px 0; }
+  th, td { border: 1px solid var(--line); padding: 7px 12px; text-align: left; }
+  th { background: #f1f5f9; font-weight: 600; }
+  td code { white-space: nowrap; }
+  .pipeline { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; justify-content: center; margin: 18px 0 8px; }
+  .pipeline .stage {
+    background: var(--card); border: 1.5px solid var(--accent); border-radius: 10px;
+    padding: 10px 14px; min-width: 148px; text-align: center;
+  }
+  .pipeline .stage b { display: block; font-family: var(--mono); font-size: 14px; color: var(--accent); }
+  .pipeline .stage span { font-size: 12px; color: var(--muted); }
+  .pipeline .arr { align-self: center; padding: 0 8px; color: var(--accent); font-weight: 700; }
+  .pipeline .arr small { display:block; font-size: 11px; color: var(--muted); font-weight: 400; text-align:center; }
+  .stat-row { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px; }
+  .stat { flex: 1 1 150px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; text-align: center; }
+  .stat .n { font-size: 30px; font-weight: 800; color: var(--good); font-family: var(--mono); }
+  .stat .l { font-size: 13px; color: var(--muted); }
+  .qa { border-left: 3px solid var(--line); padding: 2px 0 2px 16px; margin: 14px 0; }
+  .qa b { color: var(--accent); }
+  ul.tight { margin: 8px 0; padding-left: 22px; }
+  ul.tight li { margin: 4px 0; }
+  footer { margin-top: 60px; color: var(--muted); font-size: 13px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>channel 模块图解</h1>
+  <div class="sub">
+    <span class="path">crates/plotgram-core/src/layout/atlas/channel/</span>
+    &nbsp;·&nbsp;Atlas 三相架构 · 组合相 I.6 · 2026-07
+  </div>
+</header>
+
+<!-- ============ 0. 核心命题 ============ -->
+<section>
+  <div class="big-q">
+    channel 回答的唯一问题：<br>
+    「在<u>没有坐标</u>的世界里，一条边应该走哪几条<u>轨道</u>？」
+    <small>路径不是一串像素点，而是一个 track 序列。坐标由度量相（相 II）事后一次性求出，<br>
+    所以路径永远不会因为坐标变动而失效 —— repair loop 从根上失去存在理由。</small>
+  </div>
+</section>
+
+<!-- ============ 1. 为什么需要它 ============ -->
+<section>
+  <h2><span class="no">1</span>为什么需要它：旧世界的死循环</h2>
+  <p class="lead">今天的 <code>layout::routing</code> 是「几何路由」：先有临时坐标，才能算可见图、才能走线。坐标一变，路径作废。</p>
+  <div class="cols">
+    <div class="card">
+      <span class="tag bad">旧：几何路由</span><b>路径 = 像素点序列</b>
+      <svg viewBox="0 0 400 230" width="400">
+        <defs>
+          <marker id="arr-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker>
+        </defs>
+        <!-- node A -->
+        <rect x="30" y="30" width="90" height="42" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+        <text x="75" y="56" text-anchor="middle" font-size="14">A</text>
+        <!-- node B original (ghost) -->
+        <rect x="270" y="150" width="90" height="42" rx="8" fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="315" y="176" text-anchor="middle" font-size="13" fill="#cbd5e1">B（原位）</text>
+        <!-- node B moved -->
+        <rect x="180" y="120" width="90" height="42" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+        <text x="225" y="146" text-anchor="middle" font-size="14">B（被撑开后）</text>
+        <!-- stale pixel path A -> B original: crosses moved B -->
+        <polyline points="120,51 250,51 250,171 270,171" fill="none" stroke="#dc2626" stroke-width="2.5" marker-end="url(#arr-r)"/>
+        <text x="252" y="44" font-size="11" fill="#dc2626" class="mono">(120,51)→(250,51)→(250,171)…</text>
+        <!-- collision mark -->
+        <text x="250" y="140" text-anchor="middle" font-size="20">💥</text>
+        <text x="200" y="215" text-anchor="middle" font-size="12.5" fill="#dc2626">节点被撑开 → 坐标全变 → 旧路径穿模 → repair / 重路由</text>
+      </svg>
+      <div class="caption">路径绑定具体坐标：任何后续空间调整都可能让它作废。</div>
+    </div>
+    <div class="card">
+      <span class="tag good">新：通道图选路</span><b>路径 = track 序列</b>
+      <svg viewBox="0 0 400 230" width="400">
+        <defs>
+          <marker id="arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker>
+        </defs>
+        <!-- tracks -->
+        <line x1="20" y1="95" x2="380" y2="95" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="6 5"/>
+        <text x="24" y="88" font-size="11" fill="#64748b" class="mono">cross₁（层间缝）</text>
+        <line x1="160" y1="15" x2="160" y2="215" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="6 5"/>
+        <text x="165" y="212" font-size="11" fill="#64748b" class="mono">main₁（走廊）</text>
+        <!-- nodes -->
+        <rect x="30" y="30" width="90" height="42" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+        <text x="75" y="56" text-anchor="middle" font-size="14">A</text>
+        <rect x="250" y="140" width="90" height="42" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+        <text x="295" y="166" text-anchor="middle" font-size="14">B</text>
+        <!-- route along tracks -->
+        <polyline points="75,72 75,95 160,95 160,161 250,161" fill="none" stroke="#059669" stroke-width="2.5" marker-end="url(#arr-g)"/>
+        <text x="200" y="120" font-size="12" fill="#059669" class="mono">path = [cross₁ → main₁]</text>
+        <text x="200" y="215" text-anchor="middle" font-size="12.5" fill="#059669">「走哪条缝」是拓扑决定；缝在哪个像素，是相 II 以后的事</text>
+      </svg>
+      <div class="caption">节点再怎么被撑开，「先走 cross₁ 再转 main₁」这句话依然成立。</div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:18px">
+    <table>
+      <tr><th></th><th>几何可见图（<code>kernel/route::ResourceGraph</code>）</th><th>通道图（<code>ChannelGraph</code>）</th></tr>
+      <tr><td>顶点</td><td>坐标点（障碍角点投影，带 <code>Point</code>）</td><td><b>轨道</b>（<code>TrackId</code>，无坐标）</td></tr>
+      <tr><td>边</td><td>轴向可见段（依赖临时坐标）</td><td>link（轨道交口）/ gate（组闸口）</td></tr>
+      <tr><td>规模</td><td>O(V²)，需规模开关 <code>ovg_enabled ≤ 50</code></td><td>O(层数 × 通道数)，小约两个数量级</td></tr>
+      <tr><td>坐标变动</td><td>路径失效 → repair loop</td><td><b>不受影响</b>（无坐标可失效）</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 2. 城市比喻 ============ -->
+<section>
+  <h2><span class="no">2</span>一个比喻：先选街道，再修马路</h2>
+  <p class="lead">把图想成一座规划中的城市 —— 关键是：这座城市还没动工，只有规划图。</p>
+  <div class="card">
+    <table>
+      <tr><th>城市</th><th>channel 概念</th><th>说明</th></tr>
+      <tr><td>街道（还没修，只在规划图上）</td><td><code>Track</code>（Cross 层间缝 / Main 纵向走廊）</td><td>没有宽度、没有坐标，只有「第几条」（gap 索引）和走向</td></tr>
+      <tr><td>十字路口</td><td><code>link</code></td><td>只有横竖异向的街道才有交口 —— <b>每个转弯 = 一次 link 转移</b></td></tr>
+      <tr><td>封闭小区的大门</td><td><code>Gate</code>（边界段容量池）</td><td>进出小区（组）只能走大门；翻墙的路<b>在地图上根本不存在</b></td></tr>
+      <tr><td>门牌 / 停车位</td><td><code>PortSlot</code>（node, side, slot_index）</td><td>边从节点哪一侧、第几个槽位出入</td></tr>
+      <tr><td>某条街上跑了几辆车</td><td><code>lane_demand</code>（输出）</td><td>选路时不限流；事后告诉修路队「这条街要修 N 车道」</td></tr>
+      <tr><td>导航偏好</td><td><code>LexCost</code>（词典序：折点 &gt; 长度）</td><td>先比谁转弯少，再比谁路程短</td></tr>
+    </table>
+    <p style="margin:10px 0 0">
+      旧管线的顺序是「先修好马路（定坐标）→ 再让车找路（几何路由）→ 发现路不够宽 → 拆了重修」。
+      channel 把顺序倒过来：<b>先在规划图上给所有车选好街道序列，再按实际车流量一次性决定每条马路修多宽</b>。
+    </p>
+  </div>
+</section>
+
+<!-- ============ 3. 基底 Substrate ============ -->
+<section>
+  <h2><span class="no">3</span>世界长什么样：Substrate（基底）</h2>
+  <p class="lead">输入只有三样无坐标信息：节点的 <code>(rank, order)</code> 槽位、组树、边列表（<code>ChannelBlueprint</code>）。<code>derive_substrate</code> 据此铺出轨道网格。</p>
+  <div class="card">
+    <svg viewBox="0 0 560 340" width="620">
+      <!-- cross tracks -->
+      <g stroke="#94a3b8" stroke-width="1.3" stroke-dasharray="7 5">
+        <line x1="18" y1="40" x2="542" y2="40"/>
+        <line x1="18" y1="165" x2="542" y2="165"/>
+        <line x1="18" y1="290" x2="542" y2="290"/>
+      </g>
+      <g font-size="11.5" fill="#475569" class="mono">
+        <text x="20" y="33">cross₀</text>
+        <text x="20" y="158">cross₁</text>
+        <text x="20" y="283">cross₂</text>
+      </g>
+      <!-- main tracks -->
+      <g stroke="#94a3b8" stroke-width="1.3" stroke-dasharray="7 5">
+        <line x1="60" y1="14" x2="60" y2="322"/>
+        <line x1="205" y1="14" x2="205" y2="322"/>
+        <line x1="350" y1="14" x2="350" y2="322"/>
+        <line x1="495" y1="14" x2="495" y2="322"/>
+      </g>
+      <g font-size="11.5" fill="#475569" class="mono">
+        <text x="44" y="336">main₀</text>
+        <text x="189" y="336">main₁</text>
+        <text x="334" y="336">main₂</text>
+        <text x="479" y="336">main₃</text>
+      </g>
+      <!-- link markers at some intersections -->
+      <g fill="#2563eb">
+        <circle cx="205" cy="165" r="4"/>
+        <circle cx="350" cy="165" r="4"/>
+        <circle cx="60" cy="165" r="4"/>
+        <circle cx="495" cy="165" r="4"/>
+        <circle cx="205" cy="40" r="4"/>
+        <circle cx="350" cy="40" r="4"/>
+        <circle cx="205" cy="290" r="4"/>
+        <circle cx="350" cy="290" r="4"/>
+      </g>
+      <text x="215" y="185" font-size="11" fill="#2563eb">● link（Main × Cross 交口）</text>
+      <!-- nodes -->
+      <g>
+        <rect x="87" y="80" width="90" height="44" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+        <text x="132" y="99" text-anchor="middle" font-size="13.5">A</text>
+        <text x="132" y="115" text-anchor="middle" font-size="10.5" fill="#94a3b8" class="mono">(rank0,order0)</text>
+        <rect x="232" y="80" width="90" height="44" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+        <text x="277" y="99" text-anchor="middle" font-size="13.5">B</text>
+        <text x="277" y="115" text-anchor="middle" font-size="10.5" fill="#94a3b8" class="mono">(rank0,order1)</text>
+        <rect x="377" y="80" width="90" height="44" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+        <text x="422" y="99" text-anchor="middle" font-size="13.5">C</text>
+        <text x="422" y="115" text-anchor="middle" font-size="10.5" fill="#94a3b8" class="mono">(rank0,order2)</text>
+        <rect x="87" y="205" width="90" height="44" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+        <text x="132" y="224" text-anchor="middle" font-size="13.5">D</text>
+        <text x="132" y="240" text-anchor="middle" font-size="10.5" fill="#94a3b8" class="mono">(rank1,order0)</text>
+        <rect x="232" y="205" width="90" height="44" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+        <text x="277" y="224" text-anchor="middle" font-size="13.5">E</text>
+        <text x="277" y="240" text-anchor="middle" font-size="10.5" fill="#94a3b8" class="mono">(rank1,order1)</text>
+        <rect x="377" y="205" width="90" height="44" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+        <text x="422" y="224" text-anchor="middle" font-size="13.5">F</text>
+        <text x="422" y="240" text-anchor="middle" font-size="10.5" fill="#94a3b8" class="mono">(rank1,order2)</text>
+      </g>
+    </svg>
+    <div class="caption">
+      6 个节点只声明了「第几层、层内第几个」。derive 自动在每条层间铺 <b>Cross 缝</b>、每条列间铺 <b>Main 走廊</b>
+      （含包围盒外圈各一条），异向轨道相交处生成 link。<b>整张图没有一个像素坐标。</b>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. 一条边怎么选路 ============ -->
+<section>
+  <h2><span class="no">4</span>例子一：一条边怎么选路（词典序代价）</h2>
+  <p class="lead">边 A → F。搜索器是词典序 Dijkstra：先比 <b>Q3 折点数</b>（= link 转移次数，拓扑事实），再比 <b>Q4 长度</b>（跨度权重和）。</p>
+  <div class="card">
+    <svg viewBox="0 0 560 340" width="620">
+      <defs>
+        <marker id="arr-g2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker>
+        <marker id="arr-o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker>
+      </defs>
+      <!-- tracks -->
+      <g stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="7 5">
+        <line x1="18" y1="40" x2="542" y2="40"/>
+        <line x1="18" y1="165" x2="542" y2="165"/>
+        <line x1="18" y1="290" x2="542" y2="290"/>
+        <line x1="60" y1="14" x2="60" y2="322"/>
+        <line x1="205" y1="14" x2="205" y2="322"/>
+        <line x1="350" y1="14" x2="350" y2="322"/>
+        <line x1="495" y1="14" x2="495" y2="322"/>
+      </g>
+      <g font-size="11" fill="#94a3b8" class="mono">
+        <text x="20" y="158">cross₁</text>
+        <text x="20" y="283">cross₂</text>
+        <text x="44" y="336">main₀</text>
+        <text x="334" y="336">main₂</text>
+      </g>
+      <!-- nodes A and F only, others faded -->
+      <g opacity="0.25">
+        <rect x="232" y="80" width="90" height="44" rx="8" fill="#fff" stroke="#1c2333"/>
+        <rect x="377" y="80" width="90" height="44" rx="8" fill="#fff" stroke="#1c2333"/>
+        <rect x="87" y="205" width="90" height="44" rx="8" fill="#fff" stroke="#1c2333"/>
+        <rect x="232" y="205" width="90" height="44" rx="8" fill="#fff" stroke="#1c2333"/>
+        <text x="277" y="106" text-anchor="middle" font-size="13">B</text>
+        <text x="422" y="106" text-anchor="middle" font-size="13">C</text>
+        <text x="132" y="231" text-anchor="middle" font-size="13">D</text>
+        <text x="277" y="231" text-anchor="middle" font-size="13">E</text>
+      </g>
+      <rect x="87" y="80" width="90" height="44" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+      <text x="132" y="106" text-anchor="middle" font-size="13.5" font-weight="600">A</text>
+      <rect x="377" y="205" width="90" height="44" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+      <text x="422" y="231" text-anchor="middle" font-size="13.5" font-weight="600">F</text>
+      <!-- P1 winner: A bottom -> cross1 -> main2 -> F left -->
+      <polyline points="132,124 132,165 350,165 350,227 372,227" fill="none" stroke="#059669" stroke-width="3" marker-end="url(#arr-g2)"/>
+      <circle cx="350" cy="165" r="6" fill="none" stroke="#059669" stroke-width="2.5"/>
+      <text x="240" y="155" font-size="12.5" fill="#059669" font-weight="600" class="mono">P1 = [cross₁, main₂]</text>
+      <text x="360" y="152" font-size="11.5" fill="#059669">唯一折点：cross₁→main₂ 的 link</text>
+      <!-- P2 loser: A left -> main0 -> cross2 -> main2 -> F left (detour) -->
+      <polyline points="87,102 60,102 60,290 350,290 350,258" fill="none" stroke="#d97706" stroke-width="2" stroke-dasharray="7 4" marker-end="url(#arr-o)"/>
+      <circle cx="60" cy="290" r="5" fill="none" stroke="#d97706" stroke-width="2"/>
+      <circle cx="350" cy="290" r="5" fill="none" stroke="#d97706" stroke-width="2"/>
+      <text x="110" y="312" font-size="12.5" fill="#d97706" class="mono">P2 = [main₀, cross₂, main₂]</text>
+    </svg>
+    <table>
+      <tr><th>候选</th><th>track 序列</th><th>Q3 折点（link 数）</th><th>Q4 长度</th><th>词典序判定</th></tr>
+      <tr><td><b style="color:var(--good)">P1</b></td><td><code>[cross₁, main₂]</code></td><td><b>1</b></td><td>短</td><td><span class="tag good">胜</span>折点更少，Q4 不用比</td></tr>
+      <tr><td><b style="color:var(--warn)">P2</b></td><td><code>[main₀, cross₂, main₂]</code></td><td>2</td><td>长</td><td>Q3 已输</td></tr>
+    </table>
+    <div class="caption">
+      注意：「折点 = link 转移」是<b>构造保证</b>的 —— link 只允许 Main × Cross 异向轨道相连（平行轨道无交点，<code>ParallelLink</code> 拒绝），
+      所以折点计数是拓扑事实，不需要任何几何测量。返回值 <code>RouteOutcome</code> 就是这串 track 序列 + gate 序列 + <code>LexCost</code>。
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5. 组与 gate ============ -->
+<section>
+  <h2><span class="no">5</span>例子二：组与 gate —— 穿组「不可表达」</h2>
+  <p class="lead">旧世界里「边穿组」是路由完再检测、再修补的缺陷。channel 里它<b>连发生的资格都没有</b>：跨 scope 的轨道 link 在构建期就被拒绝（<code>CrossScopeConnection</code>），跨组转移只能经 <code>Gate</code>。</p>
+  <div class="card">
+    <svg viewBox="0 0 560 360" width="620">
+      <defs>
+        <marker id="arr-g3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker>
+      </defs>
+      <!-- outer tracks -->
+      <g stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="7 5">
+        <line x1="18" y1="40" x2="542" y2="40"/>
+        <line x1="18" y1="160" x2="542" y2="160"/>
+        <line x1="60" y1="14" x2="60" y2="345"/>
+        <line x1="205" y1="14" x2="205" y2="178"/>
+        <line x1="350" y1="14" x2="350" y2="178"/>
+        <line x1="495" y1="14" x2="495" y2="345"/>
+      </g>
+      <g font-size="11" fill="#94a3b8" class="mono">
+        <text x="20" y="153">cross₁</text>
+        <text x="189" y="30">main₁</text>
+      </g>
+      <!-- group -->
+      <rect x="80" y="192" width="340" height="130" rx="12" fill="#f0f9ff" stroke="#0ea5e9" stroke-width="2"/>
+      <text x="92" y="214" font-size="13" fill="#0284c7" font-weight="600">组 G（GroupScope）</text>
+      <!-- inner main track -->
+      <line x1="250" y1="196" x2="250" y2="318" stroke="#7dd3fc" stroke-width="1.4" stroke-dasharray="6 4"/>
+      <text x="256" y="314" font-size="10.5" fill="#0284c7" class="mono">G 内部 main</text>
+      <!-- gate on top border -->
+      <rect x="232" y="185" width="36" height="14" rx="4" fill="#fff" stroke="#0ea5e9" stroke-width="2"/>
+      <text x="276" y="198" font-size="12" fill="#0284c7" font-weight="600">gate（容量池 cap）</text>
+      <!-- inner nodes -->
+      <rect x="110" y="240" width="90" height="44" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+      <text x="155" y="266" text-anchor="middle" font-size="13.5">D</text>
+      <rect x="300" y="240" width="90" height="44" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+      <text x="345" y="266" text-anchor="middle" font-size="13.5">E</text>
+      <!-- outer nodes -->
+      <rect x="87" y="78" width="90" height="44" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+      <text x="132" y="104" text-anchor="middle" font-size="13.5" font-weight="600">A</text>
+      <rect x="377" y="78" width="90" height="44" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+      <text x="422" y="104" text-anchor="middle" font-size="13.5">C</text>
+      <!-- legal path: A bottom -> cross1 -> main1(outer) -> gate -> inner main -> E left -->
+      <polyline points="132,122 132,160 250,160 250,185" fill="none" stroke="#059669" stroke-width="3"/>
+      <polyline points="250,199 250,262 295,262" fill="none" stroke="#059669" stroke-width="3" marker-end="url(#arr-g3)"/>
+      <text x="120" y="180" font-size="12" fill="#059669" font-weight="600" class="mono">A→E：…外部轨道 → gate → 内部轨道</text>
+      <!-- illegal crossing -->
+      <line x1="422" y1="122" x2="360" y2="238" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 5"/>
+      <text x="400" y="185" font-size="17">🚫</text>
+      <text x="430" y="210" font-size="11.5" fill="#dc2626">无 gate 处的跨界转移</text>
+      <text x="430" y="226" font-size="11.5" fill="#dc2626">在图上不存在这条转移边</text>
+      <text x="430" y="242" font-size="10.5" fill="#dc2626" class="mono">CrossScopeConnection（构建期拒绝）</text>
+    </svg>
+    <div class="caption">
+      gate 是<b>边界段容量池</b>：覆盖组边界的一段，服务多对（内轨道, 外轨道），穿越的每条边占 1 单位容量。
+      满容后该 gate 的全部转移<b>从图上消失</b> —— 后来的边「看不见门」，只能绕道或返回 <code>Infeasible</code>。
+      生产路径容量是自适应的：<code>max(下限, 组边界度数)</code>，探针实测三集 100% 通过。
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6. lane 是输出 ============ -->
+<section>
+  <h2><span class="no">6</span>例子三：lane 数是「输出」，不是「上限」</h2>
+  <p class="lead">这是删除 SpaceBudget 单向预告回环的核心机制（B1 不变量）：轨道占用无上限，N 条边挤同一轨道<b>全部成功</b>，需求 N 作为 Demand 交给度量相。</p>
+  <div class="cols">
+    <div class="card">
+      <span class="tag info">相 I 选路时</span><b>3 条边挤 cross₁，没有一条被拒</b>
+      <svg viewBox="0 0 400 190" width="400">
+        <line x1="20" y1="100" x2="380" y2="100" stroke="#94a3b8" stroke-width="1.3" stroke-dasharray="7 5"/>
+        <text x="24" y="93" font-size="11" fill="#64748b" class="mono">cross₁</text>
+        <!-- three edges overlapping on same track -->
+        <polyline points="60,40 60,100 330,100 330,150" fill="none" stroke="#2563eb" stroke-width="2.5" opacity="0.9"/>
+        <polyline points="130,40 130,100 260,100 260,150" fill="none" stroke="#7c3aed" stroke-width="2.5" opacity="0.75"/>
+        <polyline points="200,40 200,100 300,100 300,150" fill="none" stroke="#db2777" stroke-width="2.5" opacity="0.6"/>
+        <rect x="228" y="66" width="150" height="24" rx="12" fill="#dbeafe"/>
+        <text x="303" y="83" text-anchor="middle" font-size="12.5" fill="#1d4ed8" font-weight="700" class="mono">lane_demand = 3</text>
+      </svg>
+      <div class="caption">占用账本只<b>记账</b>：<code>Occupancy::lane_demand(cross₁) = 3</code>。</div>
+    </div>
+    <div class="card">
+      <span class="tag good">相 II 度量相</span><b>按 demand 一次性撑开通道</b>
+      <svg viewBox="0 0 400 190" width="400">
+        <rect x="20" y="76" width="360" height="52" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.2"/>
+        <text x="28" y="70" font-size="11" fill="#059669" class="mono">cross₁ 通道宽度 = 3 lanes</text>
+        <line x1="30" y1="88" x2="370" y2="88" stroke="#2563eb" stroke-width="2.5"/>
+        <line x1="30" y1="102" x2="370" y2="102" stroke="#7c3aed" stroke-width="2.5"/>
+        <line x1="30" y1="116" x2="370" y2="116" stroke="#db2777" stroke-width="2.5"/>
+        <text x="375" y="92" font-size="10" fill="#64748b" class="mono" text-anchor="end"> </text>
+        <text x="200" y="160" text-anchor="middle" font-size="12.5" fill="#059669">度量相把两侧节点撑开 → 每条边各得一条 lane（落笔相指派次序）</text>
+      </svg>
+      <div class="caption">先有需求，后有空间 —— 与旧世界「先猜预算、不够再返工」方向相反。</div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:18px">
+    <b>与之相对，只有两种「硬」容量</b>（满了就是满了，可行性信号必须诚实）：
+    <ul class="tight">
+      <li><b>gate 容量池</b> —— 组边界段的物理长度有限（= 边界段长 / 最小间距），满容后转移从图上消失；</li>
+      <li><b>端口侧容量</b> —— 同一挂接点可容纳的边数上限（<code>capacity=0</code> 视为不限），满容后该端点此刻不可布。</li>
+    </ul>
+    无路可走时返回 <code>SolverStatus::Infeasible</code> + 空路径。本模型无坐标，<b>连伪造一条「直线兜底」都做不到</b> —— 这正是可行率探针需要的诚实信号。
+  </div>
+</section>
+
+<!-- ============ 7. 端口挂接 ============ -->
+<section>
+  <h2><span class="no">7</span>例子四：边从节点哪一侧出发？—— PortSlot 与候选端点（24 号文）</h2>
+  <p class="lead">「选哪几条轨道」之前还有半个问题：「从节点的哪一侧、哪个槽位接进轨道网」。channel 用 <code>PortSlot</code> 回答，且支持把「候选侧」交给搜索器一起选。</p>
+  <div class="cols">
+    <div class="card">
+      <b>四侧语义（无几何、与基底轴对齐）</b>
+      <svg viewBox="0 0 420 290" width="420">
+        <!-- host tracks -->
+        <g stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="6 4">
+          <line x1="30" y1="60" x2="390" y2="60"/>
+          <line x1="30" y1="230" x2="390" y2="230"/>
+          <line x1="90" y1="20" x2="90" y2="270"/>
+          <line x1="330" y1="20" x2="330" y2="270"/>
+        </g>
+        <g font-size="10.5" fill="#64748b" class="mono">
+          <text x="32" y="53">cross[rank]</text>
+          <text x="32" y="248">cross[rank+1]</text>
+          <text x="96" y="266">main[order]</text>
+          <text x="252" y="266">main[order+1]</text>
+        </g>
+        <!-- node -->
+        <rect x="140" y="105" width="140" height="80" rx="10" fill="#fff" stroke="#1c2333" stroke-width="1.8"/>
+        <text x="210" y="140" text-anchor="middle" font-size="14" font-weight="600">节点 N</text>
+        <text x="210" y="158" text-anchor="middle" font-size="10.5" fill="#94a3b8" class="mono">(rank, order)</text>
+        <!-- side labels -->
+        <g font-size="11.5" class="mono">
+          <text x="210" y="98" text-anchor="middle" fill="#2563eb">MainLow（≈Top）</text>
+          <text x="210" y="203" text-anchor="middle" fill="#2563eb">MainHigh（≈Bottom）</text>
+          <text x="132" y="132" text-anchor="end" fill="#7c3aed">CrossLow（≈Left）</text>
+          <text x="288" y="132" fill="#7c3aed">CrossHigh（≈Right）</text>
+        </g>
+        <!-- connectors to host tracks -->
+        <g stroke="#2563eb" stroke-width="1.6">
+          <line x1="185" y1="105" x2="185" y2="60"/>
+          <line x1="185" y1="185" x2="185" y2="230"/>
+        </g>
+        <g stroke="#7c3aed" stroke-width="1.6">
+          <line x1="140" y1="168" x2="90" y2="168"/>
+          <line x1="280" y1="168" x2="330" y2="168"/>
+        </g>
+        <!-- slots on bottom -->
+        <g fill="#2563eb">
+          <circle cx="230" cy="185" r="4"/>
+          <circle cx="248" cy="185" r="4"/>
+          <circle cx="266" cy="185" r="4"/>
+        </g>
+        <text x="236" y="176" font-size="9.5" fill="#2563eb" class="mono">slot 0 1 2</text>
+      </svg>
+      <div class="caption">
+        每侧宿主轨道由 <code>resolve_host_track</code> 纯函数解析（上表四条规则）。同侧多条边靠
+        <code>slot_index</code> 区分 —— <code>(node, side, slot_index)</code> 全局唯一（P-inv-2），
+        平行边从「隐式覆盖」变成「显式建模」。
+      </div>
+    </div>
+    <div class="card">
+      <b>候选端点选路：<code>route_candidates</code></b>
+      <svg viewBox="0 0 420 290" width="420">
+        <defs>
+          <marker id="arr-g4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker>
+        </defs>
+        <rect x="40" y="40" width="110" height="52" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+        <text x="95" y="71" text-anchor="middle" font-size="13.5" font-weight="600">A</text>
+        <rect x="270" y="195" width="110" height="52" rx="9" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+        <text x="325" y="226" text-anchor="middle" font-size="13.5" font-weight="600">B</text>
+        <!-- candidate ports on A: bottom(p0) and right(p1) -->
+        <circle cx="95" cy="92" r="5" fill="#059669"/>
+        <text x="72" y="110" font-size="10.5" fill="#059669" class="mono">p0（下侧）</text>
+        <circle cx="150" cy="66" r="5" fill="#d97706"/>
+        <text x="158" y="60" font-size="10.5" fill="#d97706" class="mono">p1（右侧）</text>
+        <!-- candidate ports on B: top(q0) left(q1) -->
+        <circle cx="325" cy="195" r="5" fill="#059669"/>
+        <text x="333" y="190" font-size="10.5" fill="#059669" class="mono">q0（上侧）</text>
+        <circle cx="270" cy="221" r="5" fill="#d97706"/>
+        <text x="200" y="215" font-size="10.5" fill="#d97706" class="mono">q1（左侧）</text>
+        <!-- winning route p0 -> q0 -->
+        <polyline points="95,92 95,145 325,145 325,190" fill="none" stroke="#059669" stroke-width="3" marker-end="url(#arr-g4)"/>
+        <text x="140" y="138" font-size="11.5" fill="#059669" font-weight="600">胜者：(p0, q0)，LexCost 最小</text>
+        <!-- losing pairs faint -->
+        <polyline points="155,66 230,66 230,221 265,221" fill="none" stroke="#d97706" stroke-width="1.6" stroke-dasharray="5 4" opacity="0.6"/>
+        <text x="60" y="272" font-size="11" fill="#6b7280">在 from × to 全部候选对上各跑一次搜索，取词典序最优；</text>
+        <text x="60" y="286" font-size="11" fill="#6b7280">平局按 (from_id, to_id) 升序 —— 结果与传入顺序无关（确定性）。</text>
+      </svg>
+      <div class="caption">
+        满容端口直接跳过；全部不可行 → <code>Ok(infeasible())</code> 不伪造路径；空候选 → <code>Err(EmptyCandidates)</code>。
+        便利入口 <code>route_node_sides(a, [下,右], b, [上,左], …)</code> 按「节点 + 侧」查槽位后转此函数。
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:18px">
+    <span class="tag warn">边界</span>
+    <b>channel 只负责「给定端点（或候选端点）→ track 序列」。</b>
+    「到底该选哪一侧」的全局决策（反馈边启发、平行边全局求解等）属相 I.5，落点在 <code>atlas/port</code> / Plan 装配层 ——
+    channel 不读 <code>Diagram</code>、无图名分支、零几何。
+  </div>
+</section>
+
+<!-- ============ 8. 合流 bundle ============ -->
+<section>
+  <h2><span class="no">8</span>例子五：合流是拓扑事实，不是几何巧合</h2>
+  <p class="lead">今天 <code>semantic_trunk_merge</code> 要在渲染坐标上「找共线段」来猜测哪些边该合并主干。channel 里合流有精确定义：<b>≥2 条边共享 track 序列后缀 = bundle</b>。</p>
+  <div class="card">
+    <svg viewBox="0 0 560 250" width="620">
+      <defs>
+        <marker id="arr-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+      </defs>
+      <g stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="7 5">
+        <line x1="18" y1="120" x2="542" y2="120"/>
+        <line x1="380" y1="14" x2="380" y2="236"/>
+      </g>
+      <g font-size="11" fill="#94a3b8" class="mono">
+        <text x="20" y="113">cross₁</text>
+        <text x="386" y="230">main₂</text>
+      </g>
+      <rect x="40" y="30" width="90" height="42" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+      <text x="85" y="56" text-anchor="middle" font-size="13.5">A</text>
+      <rect x="180" y="30" width="90" height="42" rx="8" fill="#fff" stroke="#1c2333" stroke-width="1.5"/>
+      <text x="225" y="56" text-anchor="middle" font-size="13.5">B</text>
+      <rect x="420" y="180" width="90" height="42" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+      <text x="465" y="206" text-anchor="middle" font-size="13.5" font-weight="600">F</text>
+      <!-- e1 -->
+      <polyline points="85,72 85,120 380,120" fill="none" stroke="#7c3aed" stroke-width="2.2"/>
+      <!-- e2 -->
+      <polyline points="225,72 225,120 380,120" fill="none" stroke="#db2777" stroke-width="2.2"/>
+      <!-- shared suffix trunk -->
+      <polyline points="380,120 380,201 415,201" fill="none" stroke="#2563eb" stroke-width="4.5" marker-end="url(#arr-b)"/>
+      <rect x="255" y="132" width="230" height="24" rx="12" fill="#dbeafe"/>
+      <text x="370" y="149" text-anchor="middle" font-size="12" fill="#1d4ed8" class="mono">共享后缀 [main₂] → Bundle{e1,e2}</text>
+      <text x="90" y="100" font-size="10.5" fill="#7c3aed" class="mono">e1 = [cross₁, main₂]</text>
+      <text x="230" y="100" font-size="10.5" fill="#db2777" class="mono">e2 = [cross₁, main₂]（从更靠右处进入）</text>
+    </svg>
+    <div class="caption">
+      <code>detect_bundles</code> 在反向后缀 trie 上找共享后缀。合流成为可以证明的拓扑事实：
+      两条边在 track 语言里字面上写了同一个结尾。落笔相（相 III）据此画主干合并，不再需要几何共线检测。
+    </div>
+  </div>
+</section>
+
+<!-- ============ 9. 全链路 ============ -->
+<section>
+  <h2><span class="no">9</span>把它串起来：模块内部流水线</h2>
+  <div class="card">
+    <div class="pipeline">
+      <div class="stage"><b>ChannelBlueprint</b><span>无坐标输入契约<br>(rank,order) + 组树 + 边</span></div>
+      <div class="arr">→<small>derive_substrate</small></div>
+      <div class="stage"><b>Substrate</b><span>Track / GroupScope /<br>Gate / PortSlot</span></div>
+      <div class="arr">→<small>from_substrate</small></div>
+      <div class="stage"><b>ChannelGraph</b><span>确定性邻接表<br>+ Occupancy 账本</span></div>
+      <div class="arr">→<small>route / route_candidates</small></div>
+      <div class="stage"><b>RouteOutcome</b><span>track 序列 + gate 序列<br>+ LexCost</span></div>
+      <div class="arr">→<small>detect_bundles</small></div>
+      <div class="stage"><b>Bundle</b><span>合流束<br>（共享后缀）</span></div>
+    </div>
+    <ul class="tight" style="margin-top:14px">
+      <li><b>确定性</b>（AGENTS.md §2）：全程 <code>BTreeMap</code> + 显式排序 + 堆平局按 <code>TrackId</code> 打破 —— 同一输入重复求解逐字段一致。</li>
+      <li><b>账本可逆</b>：<code>Occupancy::commit / release</code>、<code>commit_ports / release_ports</code> 严格互逆，是未来「词典序有界回溯」（泛化 rip-up/reroute）的前提。</li>
+      <li><b>单边只计 Q3/Q4</b>：交叉（Q2）、对齐（Q5）、对称（Q6）是跨边量，留给上层全局协调，本层不做像素级近似。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 10. 实测 ============ -->
+<section>
+  <h2><span class="no">10</span>它答得怎么样：可行率探针实测（2026-07-26）</h2>
+  <p class="lead">22 号文风险台账第一条问的是「抽象通道图的粒度是否够细」。探针在三个图集上给出了回答（详见 <b>25 号文</b>《Atlas 相 I 可行率探针报告》）。</p>
+  <div class="stat-row">
+    <div class="stat"><div class="n">100%</div><div class="l">单边可行率<br>77 图 / 1152 边，零不可表达</div></div>
+    <div class="stat"><div class="n">100%</div><div class="l">多边争用成功率<br>自适应 gate 容量（生产路径）</div></div>
+    <div class="stat"><div class="n">33</div><div class="l">峰值 lane demand<br>（stress-deep，度量相需求上界）</div></div>
+    <div class="stat"><div class="n">18</div><div class="l">峰值 gate 需求<br>（demo K8s 多命名空间图）</div></div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <b>解读</b>：flat 网格 + gate + 端口槽位的表达粒度对现有全部图集<b>够用</b>；「不可行」不再是常态，
+    而是精确的容量诊断信号（哪个 gate、哪个端口、差多少）。lane demand / gate 需求两个数字，
+    正是度量相（相 II）「撑开多少空间」要吃的输入。
+  </div>
+</section>
+
+<!-- ============ 11. 刻意不做 ============ -->
+<section>
+  <h2><span class="no">11</span>它刻意不回答的问题</h2>
+  <div class="card">
+    <div class="qa"><b>Q：这条边最终画在哪些像素上？</b><br>不回答。折点展开、坐标落地是落笔相（相 III / Ink）的职责。channel 里没有 <code>Point</code>、没有 <code>Rect</code>、没有一个像素。</div>
+    <div class="qa"><b>Q：多条边之间怎么排布最好看（交叉最少 / 对称）？</b><br>不回答。Q2/Q5/Q6 是跨边全局量，属上层全局协调（有界块坐标下降，I.7）。本层单边只算折点与长度。</div>
+    <div class="qa"><b>Q：边该从节点哪一侧出发？</b><br>半回答。channel 提供机制（PortSlot 四侧 + 候选端点选路），但「选侧」的全局决策是相 I.5（<code>atlas/port</code>）的事。</div>
+    <div class="qa"><b>Q：track 上挤了 N 条边，通道要多宽？</b><br>不回答，只上报。<code>lane_demand</code> 输出裸计数，由度量相换算成实际宽度。</div>
+    <div class="qa"><b>Q：什么时候接生产管线？</b><br>现在是纯旁路（孵化中），生产仍走 <code>layout::routing</code>；接线时机是 23 号文 Stage 4（对拍 → 切换 → 删补救），回滚 = 删目录。</div>
+  </div>
+</section>
+
+<footer>
+  素材来源：<code>crates/plotgram-core/src/layout/atlas/channel/README.md</code> ·
+  22 号文 §5.1 I.6 · 24 号文 R1–R5 · 25 号文探针报告 —— flowml / Atlas · 2026-07
+</footer>
+
+</div>
+</body>
+</html>

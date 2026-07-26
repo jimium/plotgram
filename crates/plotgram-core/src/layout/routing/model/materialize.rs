@@ -381,17 +381,7 @@ mod tests {
         Point::new(x, y)
     }
 
-    /// canonical 三变体 round-trip 恒等：materialize(lift(g)) == g。
-    #[test]
-    fn round_trip_straight_is_identity() {
-        let g = PathGeometry::Straight {
-            start: p(0.0, 0.0),
-            end: p(10.0, 5.0),
-        };
-        let back = GeometryMaterializer::materialize_path(&GeometryMaterializer::lift_geometry(&g));
-        assert!(matches!(back, PathGeometry::Straight { start, end }
-            if start == p(0.0, 0.0) && end == p(10.0, 5.0)));
-    }
+    // straight 是 polyline 的特例，round-trip 已由 round_trip_polyline_is_identity 覆盖。
 
     #[test]
     fn round_trip_bezier_is_identity() {

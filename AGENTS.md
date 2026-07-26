@@ -103,3 +103,10 @@
 - 验证用 `cargo run -p plotgram-cli`，勿信陈旧 binary（§5）。
 
 **退出条件**：23 号文 Stage 4 完成（新三相管线成为五图种默认路径）后，把 `GATES_DEFAULT` 改回 `on`，删除 `.github/workflows/ci.yml` 的 `PLOTGRAM_GATES` 与 `continue-on-error`，依据新架构不变量重建门禁（Stage 7），并将本节标记为已失效。
+
+## 11. 单元测试编写原则
+
+- **表驱动优先**：同一函数的多个输入 case 合并为一个 `#[test]` + `for case in cases` 循环，不要每个 case 单独一个函数。
+- **断言可观测输出，不断言内部状态**：测试应断言最终路径点/坐标/SVG 等外部可见结果，不要断言 `orthogonal_debug.total_candidates` 之类内部计数器——重构内部结构时这类测试全碎。
+- **布局坐标用 insta 快照**：需要断言具体坐标值时，用 `insta::assert_json_snapshot!`（见 `layout/snapshot_tests.rs`），重构后 `cargo insta review` 批量审阅，不用逐个改 magic number。
+- **确定性测试保留最高层即可**：同一属性（如确定性）不必在 kernel / routing / pipeline 三层各测一次，保留 pipeline 级（或 shadow 对拍）覆盖即可。

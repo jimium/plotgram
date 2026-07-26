@@ -19,6 +19,7 @@
 //! 过渡：[`engines`] 仅保留遗留 `coordinate` builder；common/layered 已在 kernel。
 
 pub mod algorithm_config;
+pub mod atlas;
 pub mod catalog;
 pub mod snap;
 pub mod constants;
@@ -103,3 +104,6 @@ use pipeline::registry::{all_layout_strategies, all_routing_strategies};
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod snapshot_tests;

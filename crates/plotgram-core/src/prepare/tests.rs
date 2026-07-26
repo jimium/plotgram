@@ -29,161 +29,61 @@ fn make_entity(id: &str, label: &str, attrs: AttributeMap) -> Entity {
 }
 
 #[test]
-fn state_diagram_gets_default_type_state() {
-    let diagram = Diagram {
-        diagram_type: DiagramType::State,
-        attributes: vec![],
-        entities: vec![
-            make_entity("s1", "待支付", AttributeMap::default()),
-            make_entity("s2", "处理中", AttributeMap::default()),
-        ],
-        relations: vec![],
-        groups: vec![],
+fn default_entity_type_per_diagram_type() {
+    // (diagram_type, entity_id, label, expected_type_or_none)
+    let cases: &[(DiagramType, &str, &str, Option<&str>)] = &[
+        (DiagramType::State, "s1", "待支付", Some("state")),
+        (DiagramType::Flowchart, "step1", "步骤1", Some("process")),
+        (DiagramType::Sequence, "api", "API", Some("participant")),
+        (DiagramType::Architecture, "svc", "服务", Some("service")),
+        (DiagramType::Er, "user", "User", None),
+    ];
+    for (dt, eid, label, expected) in cases {
+        let diagram = Diagram {
+            diagram_type: dt.clone(),
+            attributes: vec![],
+            entities: vec![make_entity(eid, label, AttributeMap::default())],
+            relations: vec![],
+            groups: vec![],
             constraints: vec![],
-        style_decls: vec![],
-        source_info: SourceInfo {
-            file: None,
-            line_count: 5,
-        },
+            style_decls: vec![],
+            source_info: SourceInfo { file: None, line_count: 3 },
             ..Default::default()
-    };
-
-    let result = apply_profile_defaults(diagram).unwrap();
-
-    assert_eq!(
-        result.entities[0].attributes.standard.get("type"),
-        Some(&AttributeValue::String(TextValue::unquoted("state")))
-    );
-    assert_eq!(
-        result.entities[1].attributes.standard.get("type"),
-        Some(&AttributeValue::String(TextValue::unquoted("state")))
-    );
+        };
+        let result = apply_profile_defaults(diagram).unwrap();
+        match expected {
+            Some(t) => assert_eq!(
+                result.entities[0].attributes.standard.get("type"),
+                Some(&AttributeValue::String(TextValue::unquoted(*t))),
+                "diagram_type={dt:?} should get default type \"{t}\""
+            ),
+            None => assert!(
+                result.entities[0].attributes.standard.get("type").is_none(),
+                "diagram_type={dt:?} should NOT get default type"
+            ),
+        }
+    }
 }
 
 #[test]
 fn existing_type_not_overridden() {
     let mut attrs = AttributeMap::default();
-    attrs
-        .standard
-        .insert("type".to_string(), AttributeValue::String(TextValue::unquoted("initial")));
-
+    attrs.standard.insert("type".to_string(), AttributeValue::String(TextValue::unquoted("initial")));
     let diagram = Diagram {
         diagram_type: DiagramType::State,
         attributes: vec![],
         entities: vec![make_entity("init", "初始化", attrs)],
         relations: vec![],
         groups: vec![],
-            constraints: vec![],
+        constraints: vec![],
         style_decls: vec![],
-        source_info: SourceInfo {
-            file: None,
-            line_count: 3,
-        },
-            ..Default::default()
+        source_info: SourceInfo { file: None, line_count: 3 },
+        ..Default::default()
     };
-
     let result = apply_profile_defaults(diagram).unwrap();
-
     assert_eq!(
         result.entities[0].attributes.standard.get("type"),
         Some(&AttributeValue::String(TextValue::unquoted("initial")))
-    );
-}
-
-#[test]
-fn er_diagram_no_default_type() {
-    let diagram = Diagram {
-        diagram_type: DiagramType::Er,
-        attributes: vec![],
-        entities: vec![make_entity("user", "User", AttributeMap::default())],
-        relations: vec![],
-        groups: vec![],
-            constraints: vec![],
-        style_decls: vec![],
-        source_info: SourceInfo {
-            file: None,
-            line_count: 3,
-        },
-            ..Default::default()
-    };
-
-    let result = apply_profile_defaults(diagram).unwrap();
-
-    assert!(result.entities[0].attributes.standard.get("type").is_none());
-}
-
-#[test]
-fn flowchart_gets_default_type_process() {
-    let diagram = Diagram {
-        diagram_type: DiagramType::Flowchart,
-        attributes: vec![],
-        entities: vec![make_entity("step1", "步骤1", AttributeMap::default())],
-        relations: vec![],
-        groups: vec![],
-            constraints: vec![],
-        style_decls: vec![],
-        source_info: SourceInfo {
-            file: None,
-            line_count: 3,
-        },
-            ..Default::default()
-    };
-
-    let result = apply_profile_defaults(diagram).unwrap();
-
-    assert_eq!(
-        result.entities[0].attributes.standard.get("type"),
-        Some(&AttributeValue::String(TextValue::unquoted("process")))
-    );
-}
-
-#[test]
-fn sequence_gets_default_type_participant() {
-    let diagram = Diagram {
-        diagram_type: DiagramType::Sequence,
-        attributes: vec![],
-        entities: vec![make_entity("api", "API", AttributeMap::default())],
-        relations: vec![],
-        groups: vec![],
-            constraints: vec![],
-        style_decls: vec![],
-        source_info: SourceInfo {
-            file: None,
-            line_count: 3,
-        },
-            ..Default::default()
-    };
-
-    let result = apply_profile_defaults(diagram).unwrap();
-
-    assert_eq!(
-        result.entities[0].attributes.standard.get("type"),
-        Some(&AttributeValue::String(TextValue::unquoted("participant")))
-    );
-}
-
-#[test]
-fn architecture_gets_default_type_service() {
-    let diagram = Diagram {
-        diagram_type: DiagramType::Architecture,
-        attributes: vec![],
-        entities: vec![make_entity("svc", "服务", AttributeMap::default())],
-        relations: vec![],
-        groups: vec![],
-            constraints: vec![],
-        style_decls: vec![],
-        source_info: SourceInfo {
-            file: None,
-            line_count: 3,
-        },
-            ..Default::default()
-    };
-
-    let result = apply_profile_defaults(diagram).unwrap();
-
-    assert_eq!(
-        result.entities[0].attributes.standard.get("type"),
-        Some(&AttributeValue::String(TextValue::unquoted("service")))
     );
 }
 

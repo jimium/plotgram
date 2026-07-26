@@ -123,7 +123,8 @@ impl Parser {
             | relation::LINE_STYLE
             | group::BORDER_STYLE
             | diagram::RENDER_STYLE
-            | diagram::THEME => self.parse_atom_attribute_value(),
+            | diagram::THEME
+            | diagram::PIPELINE => self.parse_atom_attribute_value(),
             entity::OWNER
             | entity::DESCRIPTION
             | group::COLOR

@@ -103,6 +103,12 @@ pub const DIAGRAM_ATTRS: &[AttrSchema] = &[
         None,
     ),
     AttrSchema::new(
+        diagram::PIPELINE,
+        AttrScope::Diagram,
+        AttrValueType::Atom,
+        Some(attr_constants::pipeline::ALL),
+    ),
+    AttrSchema::new(
         diagram::GROUP_FRAME,
         AttrScope::Diagram,
         AttrValueType::AlgorithmConfig,

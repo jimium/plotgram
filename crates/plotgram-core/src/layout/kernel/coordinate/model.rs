@@ -4,7 +4,9 @@
 //! 所有布局语义（结构识别、审美目标、间距需求）在外部编译为 IR，
 //! 求解器只消费 IR，不读取 AST 或图类型语义。
 
-use std::fmt;
+// `SolverStatus` 现居中立模块 [`crate::layout::kernel::cost`]（路由/坐标/通道图共用）；
+// 此处重导出以保持 `coordinate::model::SolverStatus` 既有路径可用。
+pub use crate::layout::kernel::cost::SolverStatus;
 
 // ─── 变量 ─────────────────────────────────────────────────────────────────────
 
@@ -326,17 +328,6 @@ impl CoordinateProblem {
 
 // ─── 求解结果 ─────────────────────────────────────────────────────────────────
 
-/// 求解结果状态。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SolverStatus {
-    /// 正常收敛。
-    Converged,
-    /// 未收敛但返回最佳可行解。
-    Degraded,
-    /// 硬约束不可行。
-    Infeasible,
-}
-
 /// 求解结果。
 #[derive(Debug, Clone)]
 pub struct SolverResult {
@@ -391,12 +382,3 @@ impl SolverResult {
 
 // ─── 诊断 ─────────────────────────────────────────────────────────────────────
 
-impl fmt::Display for SolverStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Converged => write!(f, "converged"),
-            Self::Degraded => write!(f, "degraded"),
-            Self::Infeasible => write!(f, "infeasible"),
-        }
-    }
-}

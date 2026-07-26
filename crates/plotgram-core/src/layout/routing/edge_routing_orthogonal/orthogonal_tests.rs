@@ -6,6 +6,14 @@
     use crate::layout::routing::common::test_fixtures::make_diagram_with_layout;
     use crate::layout::group::GroupRoutingContext;
 
+    /// 判断线段 (a,b) 是否穿过矩形 (left, top, right, bottom) 内部。
+    /// 简化检测：取线段中点判断是否在矩形内（对正交路径足够）。
+    fn segment_crosses_rect(a: Point, b: Point, rect: (f64, f64, f64, f64)) -> bool {
+        let (left, top, right, bottom) = rect;
+        let mid = Point::new((a.x + b.x) / 2.0, (a.y + b.y) / 2.0);
+        mid.x > left + 1.0 && mid.x < right - 1.0 && mid.y > top + 1.0 && mid.y < bottom - 1.0
+    }
+
     fn test_group_ctx(
         groups: HashMap<String, crate::layout::GroupLayout>,
         node_to_groups: HashMap<String, Vec<String>>,
@@ -1005,98 +1013,68 @@
     // ═══════════════════════════════════════════════════════════
 
     #[test]
-    fn test_p2_1_orthogonal_debug_stats_populated() {
-        // 简单双节点图，orthogonal 路由后应填充 orthogonal_debug
+    fn test_p2_1_orthogonal_simple_route_produces_valid_path() {
+        // 简单双节点图，路由后应产出非空正交路径
         let (diagram, result) = make_diagram_with_layout(
             vec![("a", 0.0, 0.0), ("b", 200.0, 0.0)],
             vec![("a", "b", None)],
         );
         let routed = route_edges_orthogonal(&diagram, result, OrthoConfig::from_spec_defaults());
 
-        let stats = routed.hints.orthogonal_debug
-            .expect("orthogonal_debug should be populated after routing");
-        assert_eq!(stats.edge_count, 1, "应路由 1 条边");
-        assert!(stats.total_candidates > 0, "应生成候选路径, got {}", stats.total_candidates);
-        assert!(stats.avg_candidates_per_edge() > 0.0, "avg_candidates_per_edge 应 > 0");
-        // 无障碍时不应退化
-        assert_eq!(stats.degraded_count, 0, "无障碍时不应有退化边");
+        assert_eq!(routed.edges.len(), 1, "应路由 1 条边");
+        let points: Vec<Point> = routed.edges[0].path_points().into_owned();
+        assert!(points.len() >= 2, "路径应至少含起终点");
+        // 无障碍时路径应为正交（每段水平或垂直）
+        for w in points.windows(2) {
+            let (p, q) = (&w[0], &w[1]);
+            assert!(
+                (p.x - q.x).abs() < 0.01 || (p.y - q.y).abs() < 0.01,
+                "路径段应为正交: {:?} -> {:?}", p, q
+            );
+        }
     }
 
     #[test]
-    fn test_p2_1_orthogonal_debug_stats_degraded_with_obstacle() {
-        // 三节点纵列：A→C 边穿过 B，应触发退化（硬过滤拒绝所有干净候选）
+    fn test_p2_1_orthogonal_obstacle_route_avoids_penetration() {
+        // 三节点横列：A→C 边穿过 B，路由应绕行避障
         let (diagram, result) = make_diagram_with_layout(
             vec![("a", 0.0, 0.0), ("b", 100.0, 0.0), ("c", 200.0, 0.0)],
             vec![("a", "c", None)],
         );
         let routed = route_edges_orthogonal(&diagram, result, OrthoConfig::from_spec_defaults());
 
-        let stats = routed.hints.orthogonal_debug
-            .expect("orthogonal_debug should be populated");
-        assert_eq!(stats.edge_count, 1);
-        // B 在 A→C 直线路径上，应有硬过滤拒绝
-        // 注意：orthogonal 可能生成绕行候选，degraded_count 可能为 0
-        // 但 total_candidates 应 > 0
-        assert!(stats.total_candidates > 0, "应生成候选路径");
+        assert_eq!(routed.edges.len(), 1);
+        let points: Vec<Point> = routed.edges[0].path_points().into_owned();
+        assert!(points.len() >= 2, "路径应非空");
+        // 路径不应穿过 B 的内部（B 在 (100,0)，默认宽 80 高 40）
+        let b_rect = (60.0, -20.0, 140.0, 20.0); // (left, top, right, bottom)
+        let penetrates = points.windows(2).any(|w| {
+            segment_crosses_rect(w[0], w[1], b_rect)
+        });
+        assert!(!penetrates, "路径不应穿过节点 B 内部, got: {:?}", points);
     }
 
     #[test]
-    fn test_p2_1_orthogonal_debug_stats_multi_edge() {
-        // 多边图：验证 edge_count 和 total_candidates 正确累计
+    fn test_p2_1_orthogonal_multi_edge_all_routed() {
+        // 多边图：所有边应产出有效路径
         let (diagram, result) = make_diagram_with_layout(
             vec![("a", 0.0, 0.0), ("b", 200.0, 0.0), ("c", 0.0, 200.0), ("d", 200.0, 200.0)],
             vec![("a", "b", None), ("c", "d", None), ("a", "c", None), ("b", "d", None)],
         );
         let routed = route_edges_orthogonal(&diagram, result, OrthoConfig::from_spec_defaults());
 
-        let stats = routed.hints.orthogonal_debug
-            .expect("orthogonal_debug should be populated");
-        assert_eq!(stats.edge_count, 4, "应路由 4 条边");
-        assert!(stats.total_candidates >= 4, "每条边至少 1 个候选, got {}", stats.total_candidates);
-        // avg_candidates_per_edge 应合理
-        let avg = stats.avg_candidates_per_edge();
-        assert!(avg >= 1.0, "avg_candidates_per_edge 应 >= 1.0, got {}", avg);
+        assert_eq!(routed.edges.len(), 4, "应路由 4 条边");
+        for (i, edge) in routed.edges.iter().enumerate() {
+            let points: Vec<Point> = edge.path_points().into_owned();
+            assert!(points.len() >= 2, "边 {} 路径应非空", i);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
     //  S3: 退化一致性测试（共享避障基础设施）
     // ═══════════════════════════════════════════════════════════
 
-    /// S3: orthogonal 硬退化路径在多轮渲染中应确定性一致（AGENTS.md §2）
-    ///
-    /// 同一穿障场景多次路由，路径应完全相同。这验证 orthogonal 的候选生成、
-    /// 硬过滤、评分、退化选择全链路确定性。
-    #[test]
-    fn test_s3_orthogonal_degradation_deterministic() {
-        // 三节点纵列：A→C 穿过 B，触发硬过滤 + 退化
-        let make = || {
-            let (diagram, result) = make_diagram_with_layout(
-                vec![("a", 100.0, 40.0), ("b", 100.0, 170.0), ("c", 100.0, 300.0)],
-                vec![("a", "c", None)],
-            );
-            route_edges_orthogonal(&diagram, result, OrthoConfig::from_spec_defaults())
-        };
-
-        let out1 = make();
-        let out2 = make();
-
-        // 路径应非空
-        assert!(out1.edges[0].path_len() >= 2, "退化路径应非空");
-
-        // 路径应完全一致
-        let p1: Vec<_> = out1.edges[0].path_points().into_owned();
-        let p2: Vec<_> = out2.edges[0].path_points().into_owned();
-        assert_eq!(p1.len(), p2.len(), "退化路径点数应一致");
-        for (i, (a, b)) in p1.iter().zip(p2.iter()).enumerate() {
-            assert_eq!(a, b, "退化路径点 {} 应一致: {:?} vs {:?}", i, a, b);
-        }
-
-        // debug 统计也应一致
-        let s1 = out1.hints.orthogonal_debug.as_ref().unwrap();
-        let s2 = out2.hints.orthogonal_debug.as_ref().unwrap();
-        assert_eq!(s1.total_candidates, s2.total_candidates, "候选数应一致");
-        assert_eq!(s1.degraded_count, s2.degraded_count, "退化数应一致");
-    }
+    // 单边确定性已由 test_s3_multi_edge_degradation_deterministic 覆盖（多边含单边）。
 
     /// S3: orthogonal 硬过滤后的路径不穿障（退化也不穿障）
     ///

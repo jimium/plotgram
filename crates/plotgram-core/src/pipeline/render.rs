@@ -98,6 +98,25 @@ pub fn render_json(diagram: &PreparedDiagram) -> String {
     render_text(&request).unwrap_or_default()
 }
 
+/// 用预算好的 [`LayoutResult`](crate::layout::types::LayoutResult) 渲染 SVG，
+/// 跳过布局阶段（Atlas Stage 0 交付 0.6：shadow 对拍为同图的两份布局各出一张 SVG）。
+///
+/// 与 [`render_output`] 的 Scene 路径保持一致（含 title band 调整），仅布局来源不同。
+pub fn render_svg_with_layout(
+    request: &RenderRequest<'_>,
+    mut layout: crate::layout::types::LayoutResult,
+) -> Result<String> {
+    crate::render::scene::apply_title_band_layout_adjustment(&mut layout, request.show_title);
+    let scene = crate::render::scene::build_scene(request, layout)?;
+    let encoder = encoder_for(RenderFormat::Svg)?;
+    match encoder.encode_scene(&scene)? {
+        RenderOutput::Text(text) => Ok(text),
+        RenderOutput::Binary(_) => Err(PlotgramError::render_internal_msg(
+            "svg encoder unexpectedly produced binary output".to_string(),
+        )),
+    }
+}
+
 /// 使用内联 style JSON 渲染(供 CLI / Server 传入自定义主题)。
 pub fn render_with_style_json(
     diagram: &PreparedDiagram,
