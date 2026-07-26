@@ -9,7 +9,7 @@ use crate::layout::kernel::layered::{engine, preset};
 use crate::layout::NodeLayout;
 
 /// 构建仅含 members 的子 Diagram，并调用 sugiyama_v2 `ARCHITECTURE_PRESET`。
-pub(super) fn layout_intra_with_sugiyama_v2(
+pub(crate) fn layout_intra_with_sugiyama_v2(
     diagram: &Diagram,
     members: &[String],
 ) -> IntraLayout {

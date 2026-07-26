@@ -7,11 +7,11 @@ use crate::types::DiagramType;
 use std::collections::HashMap;
 
 /// 架构图布局使用的有向图索引（过滤 Passive 边）。
-pub(in super::super) type GraphIndex = DirectedGraphIndex;
+pub(crate) type GraphIndex = DirectedGraphIndex;
 
 /// 架构图坐标求解所需的图级事实（解耦对 `&Diagram` 的直接依赖）。
 #[derive(Clone)]
-pub(in super::super) struct ArchDiagramFacts {
+pub(crate) struct ArchDiagramFacts {
     pub diagram_type: DiagramType,
     pub relations: Vec<Relation>,
     pub has_groups: bool,
@@ -27,14 +27,14 @@ impl ArchDiagramFacts {
     }
 }
 
-pub(in super::super) struct GroupMap {
-    pub(in super::super) node_to_top_group: HashMap<String, String>,
-    pub(in super::super) top_group_members: HashMap<String, Vec<String>>,
-    pub(in super::super) top_groups: Vec<String>,
-    pub(in super::super) ungrouped: Vec<String>,
+pub(crate) struct GroupMap {
+    pub(crate) node_to_top_group: HashMap<String, String>,
+    pub(crate) top_group_members: HashMap<String, Vec<String>>,
+    pub(crate) top_groups: Vec<String>,
+    pub(crate) ungrouped: Vec<String>,
 }
 
-pub(in super::super) fn build_group_map(diagram: &Diagram) -> GroupMap {
+pub(crate) fn build_group_map(diagram: &Diagram) -> GroupMap {
     let mut top_groups = Vec::new();
     for group in &diagram.groups {
         if group.parent_id.is_none() {

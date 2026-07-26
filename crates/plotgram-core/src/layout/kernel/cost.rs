@@ -8,6 +8,9 @@
 //! **归属说明**：本模块住在中立的 `kernel` 层、不属于任何将被删除的旧管线。
 //! 旧 `route::model` 与 `coordinate::model` 均从此处重导出——Atlas 直接依赖本模块，
 //! 不依赖 `kernel/route`，因此 Stage 4c 删除旧路由内核时共享词汇安然无恙。
+//!
+//! **词典序不变量（Stage 7）**：[`LexCost`] 各层不可跨层求和或折叠为标量；
+//! 比较只能走 `Ord`（高位优先）。禁止 `Add` / `as_scalar` / `total_cost` 类 API。
 
 use std::fmt;
 
@@ -36,6 +39,8 @@ impl Ord for OrderedF64 {
 }
 
 /// 词典序代价：高位优先，低位不得破坏高位。
+///
+/// 层字段仅供逐层比较；**不得**相加或加权求和成标量罚项。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LexCost {
     /// Q1：硬约束残差（理想为 0；>0 表示降级解）。

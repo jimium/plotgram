@@ -1,4 +1,4 @@
-//! Atlas channel 合法化探针（27 号文 §5.1）：三口径并列采样。
+//! Atlas channel 合法化探针（诊断工具，**非 CI 门禁**；27 号文 §5.1）。
 //!
 //! 对图集里每张图：`Diagram` → `ChannelBlueprint`（flat rank/order 网格）→
 //! `Substrate`（段模型 derive）→ `ChannelGraph`，先跑 L6 组穿透检查（A1），再按

@@ -54,10 +54,9 @@ pub fn compute_layout(
 
 /// 使用已解析的 [`crate::layout::pipeline::plan::LayoutPlan`] 计算布局（`PreparedDiagram` 在 prepare 阶段已解析 plan 时走此路径）。
 ///
-/// 按 `plan.pipeline` 三态分发（Atlas Stage 0 交付 0.4）：
-/// - `Legacy`：现路径不变；
-/// - `Atlas`：[`AtlasPipeline`](crate::layout::atlas::pipeline::AtlasPipeline)（S0 转发 legacy）；
-/// - `Shadow`：双跑对拍，返回 legacy 结果，差异摘要一行打 stderr。
+/// 按 `plan.pipeline` 分发（Atlas Stage 7）：
+/// - `Atlas`：[`AtlasPipeline`](crate::layout::atlas::pipeline::AtlasPipeline)；
+/// - `Shadow`：双跑对拍（LayoutPipeline vs Atlas），返回 Atlas 结果，差异摘要打 stderr。
 pub fn compute_layout_with_plan(
     diagram: &Diagram,
     plan: &crate::layout::pipeline::plan::LayoutPlan,
@@ -65,9 +64,6 @@ pub fn compute_layout_with_plan(
     validate_layout_config(diagram)?;
     use crate::layout::pipeline::plan::PipelineChoice;
     match plan.pipeline {
-        PipelineChoice::Legacy => {
-            crate::layout::pipeline::runner::LayoutPipeline::new(diagram, plan).run()
-        }
         PipelineChoice::Atlas => {
             crate::layout::atlas::pipeline::AtlasPipeline::new(diagram, plan).run()
         }
@@ -78,28 +74,34 @@ pub fn compute_layout_with_plan(
                 plan,
             )?;
             eprintln!("{}", run.report.summary_line());
-            Ok(run.legacy)
+            Ok(run.atlas)
         }
     }
 }
 
-/// Slice F2c：跨渲染增量布局入口。
+/// Stage 6+：跨渲染增量布局入口（Plan diff 驱动）。
 ///
-/// 正常跑 layout，routing 阶段把 `prev`（上次渲染经
-/// `LayoutResult.hints.frozen_routing` 持有的冻结路由解）透传给 Coordinator：
-/// clean 边直接复用冻结 geometry/labels（复用前必过 hard audit），dirty 边
-/// 局部重解；preserve 比例过低或审计扩张仍失败时回退全图路由。
-/// 调用方跨渲染自行持有 `prev`（Arc），不引入任何全局会话状态。
+/// 传入上次 `hints.atlas_plan`。槽位与边通道齐全且与本次一致时，
+/// [`solve_from_contract_with_prev`] 跳过相 I 选路搜索，仍重跑度量/Ink/Label。
 pub fn compute_layout_incremental(
     diagram: &Diagram,
-    prev: &crate::layout::routing::model::FrozenRoutingSolution,
+    prev_plan: &crate::layout::atlas::plan::Plan,
 ) -> std::result::Result<LayoutResult, DiagnosticError> {
     let profile = profile_for(&diagram.diagram_type);
     let plan = crate::layout::pipeline::plan::LayoutPlan::resolve(diagram, profile);
     validate_layout_config(diagram)?;
-    crate::layout::pipeline::runner::LayoutPipeline::new(diagram, &plan)
-        .with_prev(prev)
+    crate::layout::atlas::pipeline::AtlasPipeline::new(diagram, &plan)
+        .with_prev_plan(prev_plan)
         .run()
+}
+
+/// 兼容旧签名：忽略 FrozenRoutingSolution，走全量布局。
+#[deprecated(note = "use compute_layout_incremental with atlas Plan")]
+pub fn compute_layout_incremental_frozen(
+    diagram: &Diagram,
+    _prev: &crate::layout::routing::model::FrozenRoutingSolution,
+) -> std::result::Result<LayoutResult, DiagnosticError> {
+    compute_layout(diagram)
 }
 
 fn layout_strategy_for(algo: &str) -> Option<Box<dyn LayoutStrategy>> {

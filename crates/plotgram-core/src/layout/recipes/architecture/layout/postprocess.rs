@@ -11,7 +11,7 @@ use super::constants::PADDING;
 ///
 /// 算法：找出所有节点最小的 x 坐标；如果小于 PADDING，整体平移；
 /// 同时逐个把 x 钳到不低于 PADDING。
-pub(in super::super) fn clamp_to_canvas(
+pub(crate) fn clamp_to_canvas(
     nodes: &mut HashMap<String, NodeLayout>,
     _sizes: &HashMap<String, (f64, f64)>,
 ) {

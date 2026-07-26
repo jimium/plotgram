@@ -10,7 +10,7 @@ use super::types::{GraphIndex, GroupMap};
 /// 传入完整图拓扑（含约束边）使 FAS 能识别约束引入的环，并可能反转 relation 边来打破环。
 /// `non_reversible` 中的边（约束边）从反转结果中剔除——约束边永不被反转。
 /// 若剔除约束边后仍有残余环，由下游 rank 分配兜底处理。
-pub(in super::super) fn find_edges_to_reverse(
+pub(crate) fn find_edges_to_reverse(
     graph: &GraphIndex,
     non_reversible: &HashSet<(String, String)>,
 ) -> HashSet<(String, String)> {
@@ -23,7 +23,7 @@ pub(in super::super) fn find_edges_to_reverse(
 }
 
 /// 判断边 (from -> to) 是否为有效边（未被反转）
-pub(in super::super) fn is_effective_edge(from: &str, to: &str, reversed: &HashSet<(String, String)>) -> bool {
+pub(crate) fn is_effective_edge(from: &str, to: &str, reversed: &HashSet<(String, String)>) -> bool {
     !reversed.contains(&(from.to_string(), to.to_string()))
 }
 
@@ -31,7 +31,7 @@ pub(in super::super) fn is_effective_edge(from: &str, to: &str, reversed: &HashS
 ///
 /// `edges` 为 `(from, to)`，语义为 `rank(from) < rank(to)`。
 /// 跨顶层 group 的约束由调用方决定是否注入或报错；本函数不做静默跳过。
-pub(in super::super) fn inject_irreversible_edges(
+pub(crate) fn inject_irreversible_edges(
     graph: &mut GraphIndex,
     edges: &[(&str, &str)],
 ) {

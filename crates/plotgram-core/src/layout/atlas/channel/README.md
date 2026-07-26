@@ -1,9 +1,10 @@
 # 抽象通道图（`layout/atlas/channel`）
 
-> 状态：**孵化中，不接线生产**（对应 [23 号文](../../../../../../docs/新架构/23-Atlas分阶段推进方案-2026-07.md) D1 的 `layout/atlas/` 子树；设计出处：[22 号文 §5.1 I.6](../../../../../../docs/新架构/22-Atlas下一代布局与路由架构-总纲-2026-07.md)）
+> 状态：**生产接线中**（Hierarchical Ink 路径经 `channel_metric` → Plan → Ink；
+> Stage 7 后为默认）。设计出处：[22 号文 §5.1 I.6](../../../../../../docs/新架构/22-Atlas下一代布局与路由架构-总纲-2026-07.md)；
+> 推进：[23 号文](../../../../../../docs/新架构/23-Atlas分阶段推进方案-2026-07.md)。
 >
-> 用途：提前验证 Atlas 最高风险假设——「**抽象通道图的粒度是否够细**」（22 号文 §8 风险台账第一条）。
-> 生产路径仍走 `layout::routing`；本 mod 是纯旁路，回滚 = 删目录。
+> Tree / Sequence / Circular 仍委托 `LayoutPipeline`（Wave3 记债：非 Hier Ink 内化）。
 
 ## 一句话
 
@@ -17,7 +18,7 @@
 | 边 | 轴向可见段（基于临时坐标计算） | link（轨道交口）/ gate（组闸口） |
 | 规模 | O(V²)，需 `ovg_enabled ≤ 50` 规模开关 | O(层数 × 通道数)，小约两个数量级 |
 | 坐标变动 | 路径失效 → repair | 不受影响（无坐标可失效） |
-| 复用 | — | `LexCost` / `SolverStatus` 复用自中立模块 `kernel::cost`（不依赖待删的 `kernel/route`） |
+| 复用 | — | `LexCost` / `SolverStatus` 复用自中立模块 `kernel::cost` |
 
 ## 核心类型
 

@@ -1,31 +1,17 @@
-//! Plan IR（23 号文 Stage 1 交付 1.1/1.2）：整图离散决策的唯一中间表示。
+//! Plan IR：整图离散决策的唯一中间表示（Stage 1 交付 → Stage 4+ 生产接线）。
 //!
-//! **本阶段不接线生产**（同 [`super::channel`]）：生产路径仍走 `layout::routing`，
-//! 本模块只提供旁路可测的 IR——可序列化（serde）、可稳定哈希（[`Plan::fingerprint`]）、
-//! 可 diff（[`diff::diff`]），供 Stage 1 门 B「表达力验证」与后续对拍/增量使用。
+//! Hierarchical Ink 路径消费本 IR；可序列化（serde）、可稳定哈希（[`Plan::fingerprint`]）、
+//! 可 diff（[`diff::diff`]），供对拍与增量使用。
 //!
 //! ## 与 `channel::Substrate` 的边界
 //!
-//! Plan **不嵌入** [`super::channel::Substrate`]：后者是 `derive_substrate` 的运行态
-//! 重产物（段 links、端口容量、gate crossings），由 blueprint 确定性重建即可，
-//! 序列化它只会引入冗余与漂移面。Plan 只存 rank×order 网格摘要
-//! [`SubstrateSketch`] + 组覆盖区间 [`GroupScopeSpec`]（Adapter 分段所需），
-//! 保证 IR 轻量、可序列化、可逐字段 diff。
+//! Plan **不嵌入** [`super::channel::Substrate`]：后者是运行态重产物，由 blueprint
+//! 确定性重建。Plan 只存 [`SubstrateSketch`] + [`GroupScopeSpec`]。
 //!
 //! ## 相等口径
 //!
-//! - `==`（derive）：逐字段结构相等（含 `slot_id`、`provenance`、bundles 顺序），
-//!   供 serde 往返、「拒收后不变」类断言使用。
-//! - **决策口径**（[`Plan::fingerprint`] / [`Plan::semantic_eq`] / [`diff::diff`] 一致）：
-//!   `provenance`、`PortRef::slot_id`、bundles 的 Vec 顺序均不参与。
-//!   增量缓存用指纹判「决策是否变」与 diff 判空不会互相误判。
-//!
-//! ## 留债（本阶段显式不做）
-//!
-//! - TODO(Stage1-1.3)：Legacy Adapter——从旧管线中间产物（`LayeredDraft`、
-//!   `endpoint_map`、`LaneAssignment`、`MergeInterval`）反向构造 Plan。
-//! - TODO(Stage1-1.4)：Ink 原型——`(Plan, 旧坐标) → 边几何` 与旧几何对拍。
-//! - TODO(Stage1-I.5)：端口策略——`ports` 字段本阶段由调用方填入。
+//! - `==`：结构相等（含 provenance / slot_id）。
+//! - 决策口径：[`Plan::fingerprint`] / [`Plan::semantic_eq`] / [`diff::diff`] 一致。
 
 pub mod diff;
 pub mod fingerprint;
@@ -139,6 +125,8 @@ pub struct Plan {
     pub gates: BTreeMap<EdgeId, Vec<GateId>>,
     /// track/段序列 = 路径拓扑（与 [`RouteOutcome::tracks`] 对齐）。
     pub channels: BTreeMap<EdgeId, Vec<TrackId>>,
+    /// 每条边在各 track 上的 lane 下标（与 `channels[edge]` 等长；Stage 4）。
+    pub lane_indices: BTreeMap<EdgeId, Vec<u32>>,
     /// 共享 track 后缀 = 合流（[`detect_bundles`] 产物）。
     pub bundles: Vec<Bundle>,
     /// 每边决策来源。
@@ -160,8 +148,78 @@ impl Plan {
         self.channels.insert(edge, out.tracks.clone());
         self.gates.insert(edge, out.gates.clone());
         self.provenance.insert(edge, Provenance::ChannelRoute);
+        self.lane_indices.remove(&edge);
         self.bundles.clear();
         Ok(())
+    }
+
+    /// 从选路结果写入 `ports`（需 Substrate 解析 PortSlot → PortRef）。
+    pub fn record_ports_from_outcome(
+        &mut self,
+        edge: EdgeId,
+        out: &RouteOutcome,
+        substrate: &super::channel::Substrate,
+    ) {
+        let (Some(fid), Some(tid)) = (out.from_port, out.to_port) else {
+            return;
+        };
+        let (Some(fp), Some(tp)) = (substrate.port(fid), substrate.port(tid)) else {
+            return;
+        };
+        self.ports.insert(
+            edge,
+            EdgePorts {
+                from: PortRef {
+                    node: fp.node.clone(),
+                    side: fp.side,
+                    slot_index: fp.slot_index,
+                    slot_id: Some(fid),
+                },
+                to: PortRef {
+                    node: tp.node.clone(),
+                    side: tp.side,
+                    slot_index: tp.slot_index,
+                    slot_id: Some(tid),
+                },
+            },
+        );
+    }
+
+    /// 按 EdgeId 升序为每条边的每个 track 分配确定性 lane 下标。
+    ///
+    /// 同一 track 上的边按 EdgeId 排序依次得 0,1,2…；供 Ink `lane_centers` 使用。
+    pub fn assign_lane_indices(&mut self) {
+        let mut per_track: BTreeMap<TrackId, Vec<EdgeId>> = BTreeMap::new();
+        for (&eid, tracks) in &self.channels {
+            for &tid in tracks {
+                per_track.entry(tid).or_default().push(eid);
+            }
+        }
+        for edges in per_track.values_mut() {
+            edges.sort_unstable();
+            edges.dedup();
+        }
+
+        let mut lane_indices: BTreeMap<EdgeId, Vec<u32>> = BTreeMap::new();
+        for (&eid, tracks) in &self.channels {
+            lane_indices.insert(eid, vec![0u32; tracks.len()]);
+        }
+        for (tid, edges) in &per_track {
+            for (lane, &eid) in edges.iter().enumerate() {
+                let Some(tracks) = self.channels.get(&eid) else {
+                    continue;
+                };
+                let Some(lanes) = lane_indices.get_mut(&eid) else {
+                    continue;
+                };
+                for (i, &t) in tracks.iter().enumerate() {
+                    if t == *tid {
+                        lanes[i] = lane as u32;
+                    }
+                }
+            }
+        }
+        self.lane_indices = lane_indices;
     }
 
     /// 从已收录的 `channels` 检测合流并写入 `bundles`。

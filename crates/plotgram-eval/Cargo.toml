@@ -7,7 +7,7 @@ rust-version.workspace = true
 description = "Layout and edge-routing quality evaluator for Plotgram"
 
 [dependencies]
-plotgram-core = { workspace = true, features = ["raster", "svg-debug"] }
+plotgram-core = { workspace = true, default-features = false }
 serde.workspace = true
 serde_json.workspace = true
 

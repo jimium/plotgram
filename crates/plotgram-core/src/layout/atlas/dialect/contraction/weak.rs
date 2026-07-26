@@ -543,18 +543,22 @@ fn choose_arrangement_mode(
     }
 }
 
-/// flowchart 分治布局入口
-///
-/// 检测到 diagram 含 group 时调用此函数。无 group 时应走原路径
-/// （`engine::compute_with_preset`）。
-pub fn divide_flowchart_with_groups(
+/// 分治节点产出（不含组框）。Stage 2b Atlas 用 IR 物化组框时走此入口。
+pub struct DivideNodesOutput {
+    pub nodes: HashMap<String, NodeLayout>,
+    pub order: Vec<String>,
+    pub mode: ArrangementMode,
+    pub sugiyama_ranks: HashMap<String, usize>,
+    pub canvas_padding: f64,
+}
+
+/// 分治布局：只产出节点坐标与 rank 元数据，**不**写组框。
+pub fn divide_flowchart_nodes(
     diagram: &Diagram,
     config: SugiyamaLayoutConfig,
-) -> LayoutResult {
-    // 1. 构建分组树
+) -> DivideNodesOutput {
     let tree = GroupTree::build(diagram);
 
-    // 2. 识别顶层 group（按 diagram 声明顺序，保证主流程方向）和无 group 节点
     let top_groups: Vec<String> = diagram
         .groups
         .iter()
@@ -568,10 +572,8 @@ pub fn divide_flowchart_with_groups(
         .map(|e| e.id.as_str().to_string())
         .collect();
 
-    // 3. 构建 entity → 顶层 group 映射（用于跨 group 边收集）
     let entity_to_group = build_entity_to_top_group(diagram, &top_groups, &tree);
 
-    // 4. 组内布局
     let layouter = FlowchartIntraGroupLayouter::new(diagram, config);
     let mut intra_layouts: HashMap<String, IntraLayout> = HashMap::new();
 
@@ -581,16 +583,13 @@ pub fn divide_flowchart_with_groups(
         intra_layouts.insert(gid.clone(), intra);
     }
 
-    // 无 group 节点作为虚拟 group
     if !ungrouped.is_empty() {
         let intra = layouter.layout_intra(UNGROUPED_ID, &ungrouped);
         intra_layouts.insert(UNGROUPED_ID.to_string(), intra);
     }
 
-    // 5. 收集跨 group 边
     let cross_edges = collect_cross_edges(diagram, &entity_to_group);
 
-    // 6. 组间排列
     let mut all_group_ids = top_groups.clone();
     if !ungrouped.is_empty() {
         all_group_ids.push(UNGROUPED_ID.to_string());
@@ -601,13 +600,10 @@ pub fn divide_flowchart_with_groups(
     let order = topological_sort_groups(&all_group_ids, &cross_edges);
     let offsets = arrangement.arrange(&all_group_ids, &intra_layouts, &cross_edges);
 
-    // 7. 合并全局坐标
     let mut nodes: HashMap<String, NodeLayout> = HashMap::new();
-
     for gid in &all_group_ids {
         let intra = &intra_layouts[gid];
         let (x_off, y_off) = offsets[gid];
-
         for (id, node) in &intra.nodes {
             let mut global_node = node.clone();
             global_node.x += x_off;
@@ -616,41 +612,6 @@ pub fn divide_flowchart_with_groups(
         }
     }
 
-    let groups = crate::layout::group::finalize_routing_groups(
-        diagram,
-        &nodes,
-        "flowchart",
-        config.group_padding,
-    );
-
-    let stacking_corridors = crate::layout::group::build_stacking_corridors(
-        &order,
-        &groups,
-        mode == ArrangementMode::Vertical,
-    );
-    let group_routing = crate::layout::group::GroupRoutingHints {
-        corridors: crate::layout::group::merge_corridors(&stacking_corridors, &groups),
-        border_shell_pad: crate::layout::group::GROUP_BORDER_SHELL_PAD,
-        side_gutters: std::collections::BTreeMap::new(),
-    };
-
-    // 8. 计算总尺寸
-    let padding = preset::FLOWCHART_PRESET.padding;
-    let total_width = nodes
-        .values()
-        .map(|n| n.x + n.width)
-        .fold(0.0_f64, f64::max)
-        .max(groups.values().map(|g| g.x + g.width).fold(0.0_f64, f64::max))
-        + padding;
-    let total_height = nodes
-        .values()
-        .map(|n| n.y + n.height)
-        .fold(0.0_f64, f64::max)
-        .max(groups.values().map(|g| g.y + g.height).fold(0.0_f64, f64::max))
-        + padding;
-
-    // 9. 从 intra_layouts 的 layers 重建全局 sugiyama_ranks（修复 P09）
-    // 按堆叠顺序累加每组 layers.len() 作为 rank offset，保证 rank 单调对应 y 位置
     let mut sugiyama_ranks: HashMap<String, usize> = HashMap::new();
     let mut rank_offset = 0usize;
     for gid in &order {
@@ -663,6 +624,51 @@ pub fn divide_flowchart_with_groups(
             rank_offset += intra.layers.len();
         }
     }
+
+    DivideNodesOutput {
+        nodes,
+        order,
+        mode,
+        sugiyama_ranks,
+        canvas_padding: preset::FLOWCHART_PRESET.padding,
+    }
+}
+
+/// 用已有组框装配分治 `LayoutResult`（走廊 / 画布 / hints）。
+pub fn assemble_divide_result(
+    diagram: &Diagram,
+    nodes: HashMap<String, NodeLayout>,
+    groups: HashMap<String, crate::layout::GroupLayout>,
+    order: &[String],
+    mode: ArrangementMode,
+    sugiyama_ranks: HashMap<String, usize>,
+    canvas_padding: f64,
+) -> LayoutResult {
+    let stacking_corridors = crate::layout::group::build_stacking_corridors(
+        order,
+        &groups,
+        mode == ArrangementMode::Vertical,
+    );
+    let group_routing = crate::layout::group::GroupRoutingHints {
+        corridors: crate::layout::group::merge_corridors(&stacking_corridors, &groups),
+        border_shell_pad: crate::layout::group::GROUP_BORDER_SHELL_PAD,
+        side_gutters: std::collections::BTreeMap::new(),
+    };
+
+    let total_width = nodes
+        .values()
+        .map(|n| n.x + n.width)
+        .fold(0.0_f64, f64::max)
+        .max(groups.values().map(|g| g.x + g.width).fold(0.0_f64, f64::max))
+        + canvas_padding;
+    let total_height = nodes
+        .values()
+        .map(|n| n.y + n.height)
+        .fold(0.0_f64, f64::max)
+        .max(groups.values().map(|g| g.y + g.height).fold(0.0_f64, f64::max))
+        + canvas_padding;
+
+    let _ = diagram; // 保留签名，便于日后挂 group_layout_warnings
 
     LayoutResult {
         nodes,
@@ -681,6 +687,33 @@ pub fn divide_flowchart_with_groups(
             ..Default::default()
         },
     }
+}
+
+/// flowchart 分治布局入口
+///
+/// 检测到 diagram 含 group 时调用此函数。无 group 时应走原路径
+/// （`engine::compute_with_preset`）。
+pub fn divide_flowchart_with_groups(
+    diagram: &Diagram,
+    config: SugiyamaLayoutConfig,
+) -> LayoutResult {
+    let group_padding = config.group_padding;
+    let out = divide_flowchart_nodes(diagram, config);
+    let groups = crate::layout::group::finalize_routing_groups(
+        diagram,
+        &out.nodes,
+        "flowchart",
+        group_padding,
+    );
+    assemble_divide_result(
+        diagram,
+        out.nodes,
+        groups,
+        &out.order,
+        out.mode,
+        out.sugiyama_ranks,
+        out.canvas_padding,
+    )
 }
 
 /// 构建 entity → 顶层 group 映射

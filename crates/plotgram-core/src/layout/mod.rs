@@ -16,7 +16,7 @@
 //! | [`demand`] | 空间需求与走廊模型 |
 //! | [`snap`] | 对齐与画布最终化 |
 //!
-//! 过渡：[`engines`] 仅保留遗留 `coordinate` builder；common/layered 已在 kernel。
+//! 过渡：engines 已迁入 kernel/coordinate 并删除空壳（Stage 2a/2b）。
 
 pub mod algorithm_config;
 pub mod atlas;
@@ -26,7 +26,6 @@ pub mod constants;
 pub mod decl_order;
 pub mod demand;
 pub mod routing;
-pub mod engines;
 pub mod geometry;
 pub mod geometry_helpers;
 pub mod group;

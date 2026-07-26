@@ -7,11 +7,11 @@ use super::order;
 use super::postprocess;
 use super::preset::{self, SugiyamaPreset};
 
-use crate::layout::engines::coordinate::auditor::audit_p0;
-use crate::layout::engines::coordinate::builder::build_with_mapping;
-use crate::layout::engines::coordinate::objectives::{build_basic_objectives, ObjectiveWeights};
-use crate::layout::engines::coordinate::structure_objectives::{build_structure_objectives, StructureWeights};
-use crate::layout::engines::coordinate::optimizer::solve;
+use crate::layout::kernel::coordinate::auditor::audit_p0;
+use crate::layout::kernel::coordinate::builder_legacy::build_with_mapping;
+use crate::layout::kernel::coordinate::objectives::{build_basic_objectives, ObjectiveWeights};
+use crate::layout::kernel::coordinate::structure_objectives::{build_structure_objectives, StructureWeights};
+use crate::layout::kernel::coordinate::optimizer::solve;
 
 pub(in crate::layout) fn assign_coordinates_brandes_koepf(
     dag: &DiGraph<String, ()>,
@@ -23,6 +23,33 @@ pub(in crate::layout) fn assign_coordinates_brandes_koepf(
     layer_gaps: &[f64],
     _has_same_layer_edges: bool,
     end_ids: &[String],
+) -> (HashMap<String, crate::layout::NodeLayout>, Option<crate::layout::kernel::coordinate::model::CoordinateProblem>) {
+    assign_coordinates_brandes_koepf_with_main_tops(
+        dag,
+        layered_graph,
+        layers,
+        sizes,
+        horizontal,
+        preset,
+        layer_gaps,
+        _has_same_layer_edges,
+        end_ids,
+        None,
+    )
+}
+
+/// 与 [`assign_coordinates_brandes_koepf`] 相同，但可用 Main 轴 LP 产出的层顶替换启发式 Y 堆叠。
+pub(in crate::layout) fn assign_coordinates_brandes_koepf_with_main_tops(
+    dag: &DiGraph<String, ()>,
+    layered_graph: &DiGraph<LayerNode, ()>,
+    layers: &[Vec<NodeIndex>],
+    sizes: &HashMap<NodeIndex, (f64, f64)>,
+    horizontal: bool,
+    preset: &SugiyamaPreset,
+    layer_gaps: &[f64],
+    _has_same_layer_edges: bool,
+    end_ids: &[String],
+    layer_tops: Option<&[f64]>,
 ) -> (HashMap<String, crate::layout::NodeLayout>, Option<crate::layout::kernel::coordinate::model::CoordinateProblem>) {
     let spine = compute_spine_nodes(dag);
     let mut centers =
@@ -83,14 +110,28 @@ pub(in crate::layout) fn assign_coordinates_brandes_koepf(
     let (default_w, default_h) = preset.default_node_size();
     let layer_heights = postprocess::compute_layer_heights(layers, sizes, preset);
     let mut layer_offsets = vec![preset.padding; layers.len()];
-    for layer_index in 1..layers.len() {
-        // 逐层密度感知：优先使用 per-layer gap，回退到 preset.layer_gap
-        let gap = layer_gaps
-            .get(layer_index - 1)
-            .copied()
-            .unwrap_or(preset.layer_gap);
-        layer_offsets[layer_index] =
-            layer_offsets[layer_index - 1] + layer_heights[layer_index - 1] + gap;
+    if let Some(tops) = layer_tops {
+        for (i, &top) in tops.iter().enumerate().take(layers.len()) {
+            layer_offsets[i] = top;
+        }
+        // 若 tops 短于层数，余下层用启发式续推
+        for layer_index in tops.len().max(1)..layers.len() {
+            let gap = layer_gaps
+                .get(layer_index - 1)
+                .copied()
+                .unwrap_or(preset.layer_gap);
+            layer_offsets[layer_index] =
+                layer_offsets[layer_index - 1] + layer_heights[layer_index - 1] + gap;
+        }
+    } else {
+        for layer_index in 1..layers.len() {
+            let gap = layer_gaps
+                .get(layer_index - 1)
+                .copied()
+                .unwrap_or(preset.layer_gap);
+            layer_offsets[layer_index] =
+                layer_offsets[layer_index - 1] + layer_heights[layer_index - 1] + gap;
+        }
     }
 
     for (layer_index, layer) in layers.iter().enumerate() {

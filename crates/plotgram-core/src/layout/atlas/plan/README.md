@@ -1,9 +1,9 @@
-# Plan IR（Stage 1 交付 1.1 / 1.2）
+# Plan IR（Stage 1 交付 1.1 / 1.2 → Stage 4+ 生产）
 
 整图离散决策的唯一中间表示：`Plan` 可序列化（serde）、可稳定指纹
 （`Plan::fingerprint()`，手写 FNV-1a 64 规范编码，跨双跑/构建/平台一致）、
-可逐字段 diff（`diff(a, b) -> PlanDiff`）。**旁路模块，不接线生产管线**——
-生产路径仍走 `pipeline` → `recipes` → `routing`（23 号文 D1）。
+可逐字段 diff（`diff(a, b) -> PlanDiff`）。**Hierarchical Ink 路径消费本 IR**；
+增量入口 `compute_layout_incremental` 用槽位对齐跳过相 I 选路。
 
 ## 与 `channel::Substrate` 的边界
 
@@ -33,13 +33,11 @@ Plan **不嵌入** `channel::Substrate`：后者是 `derive_substrate` 的运行
 - `record_route` 成功即清空 `bundles`（channels 变更后旧合流失效，须重跑
   `detect_and_set_bundles`）
 - `Plan::validate()`：轻量不变量（channels 有边必有 gates/provenance、组
-  parent 不悬空且区间不倒置、端口只引用已知节点），Stage 1.3 Adapter
-  的入口门槛
+  parent 不悬空且区间不倒置、端口只引用已知节点）
 - `RouteOutcome.cost` 不进 Plan：拓扑 IR 只存决策，代价是求解过程量
 
 ## 留债
 
-- **TODO(Stage1-1.3)** Legacy Adapter：从旧管线中间产物（`LayeredDraft`、
-  `endpoint_map`、`LaneAssignment`、`MergeInterval`）反向构造 Plan
-- **TODO(Stage1-1.4)** Ink 原型：`(Plan, 旧坐标) → 边几何`，与旧几何对拍
-- **TODO(Stage1-I.5)** 端口策略：`ports` 字段本阶段由调用方填入
+- 标签-only 更细增量（CLI：`PLOTGRAM_ATLAS_PLAN_CACHE`）
+- MCF Gate / I.7 见 `gate_mcf` / `coord_descent`
+- 非 Hier Ink 内化前 Tree/Sequence/Circular 仍委托 LayoutPipeline

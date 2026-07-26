@@ -123,7 +123,8 @@ impl LayoutRecipe for StateRecipe {
     }
 
     fn compile(&self, diagram: &Diagram) -> StateProblem {
-        if user_requested_circular(diagram) || !should_use_sugiyama(diagram) {
+        // Stage 6：决策迁入 Dialect；此处与 `state_prefers_circular` 对齐
+        if crate::layout::atlas::dialect::state_prefers_circular(diagram) {
             StateProblem::Circular
         } else {
             let draft = crate::layout::kernel::layered::layered_kernel::LayeredKernel::compute(

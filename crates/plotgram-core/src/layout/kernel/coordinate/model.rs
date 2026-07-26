@@ -20,8 +20,10 @@ pub enum VarKind {
     Real,
     /// Dummy 节点（长边引入的虚拟节点）。
     Dummy,
-    /// 虚拟轴（region axis，不属于任何层）。
+    /// 虚拟轴（region axis / rank 层顶，不属于任何层）。
     Axis,
+    /// Stage 3：通道轨道（lane 带中心；法向坐标由度量相求解）。
+    Track,
 }
 
 /// 单个坐标变量。
@@ -113,14 +115,14 @@ pub enum HardConstraint {
         value: f64,
         source: ConstraintSource,
     },
-    /// 成员须落在组框内（Phase 4.B 槽位；生产求解器首期不投影，仅 IR/shadow）。
+    /// 成员须落在组框内（由 [`super::projection::project_group_constraints`] 投影）。
     GroupContainment {
         group_index: usize,
         member_var: VarId,
         pad: f64,
         source: ConstraintSource,
     },
-    /// 同级组在主/交叉轴上最小分离（Phase 4.B 槽位；首期不投影）。
+    /// 同级组在主/交叉轴上最小分离（由 [`super::projection::project_group_constraints`] 投影）。
     GroupSiblingSeparation {
         left_group: usize,
         right_group: usize,

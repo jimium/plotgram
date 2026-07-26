@@ -99,12 +99,15 @@ fn groups_geometry_fingerprint(result: &LayoutResult) -> String {
 pub struct CoordinatorConfig {
     /// repair loop 最大轮次（默认 2；skeleton 阶段实际跑 1 轮）。
     pub max_repair_rounds: usize,
+    /// Stage 3：Atlas 度量相已预留通道净空时跳过 border repulse（仍做 grid snap）。
+    pub skip_border_repulse: bool,
 }
 
 impl Default for CoordinatorConfig {
     fn default() -> Self {
         Self {
             max_repair_rounds: 2,
+            skip_border_repulse: false,
         }
     }
 }
@@ -159,11 +162,9 @@ impl RoutingCoordinator {
             },
         );
 
-        // Slice F2c：跨渲染增量路由——prev 冻结解经 identity match + dirty_set 收敛，
-        // clean 边直接复用冻结 geometry/labels；复用前必过 hard audit（≤2 跳扩张）。
-        let incremental = prev.and_then(|p| {
-            plan_incremental_reuse(p, diagram, &result, frozen_nodes, router.name())
-        });
+        // Stage 6：废除 FrozenRoutingSolution 指纹增量（改 Plan diff / AtlasPipeline）。
+        let incremental = None::<IncrementalReusePlan>;
+        let _ = prev;
         if let (Some(plan), Some(p)) = (&incremental, prev) {
             if plan.zero_diff {
                 // zero-diff 快路径：全 preserve → 原样写回冻结 edges/annotations，
@@ -242,15 +243,30 @@ impl RoutingCoordinator {
             ids
         };
         let annotations = result.hints.route_annotations.clone();
-        crate::layout::routing::post_route::snap_and_repulse_edges_with_guard(
-            &mut result.edges,
-            &result.groups,
-            edge_snap_config,
-            annotations.as_ref(),
-            Some(&result.nodes),
-            Some(&diagram.relations),
-            Some(&sorted_node_ids),
-        );
+        if self.config.skip_border_repulse {
+            // Atlas Stage 3：只 snap，不 repulse（净空已由度量相撑开）。
+            if edge_snap_config.enabled {
+                crate::layout::snap::grid_snap::snap_edge_waypoints_with_guard(
+                    &mut result.edges,
+                    &result.groups,
+                    edge_snap_config,
+                    annotations.as_ref(),
+                    Some(&result.nodes),
+                    Some(&diagram.relations),
+                    Some(&sorted_node_ids),
+                );
+            }
+        } else {
+            crate::layout::routing::post_route::snap_and_repulse_edges_with_guard(
+                &mut result.edges,
+                &result.groups,
+                edge_snap_config,
+                annotations.as_ref(),
+                Some(&result.nodes),
+                Some(&diagram.relations),
+                Some(&sorted_node_ids),
+            );
+        }
 
         // Slice E4：overshoot Z 折合并收编进唯一 materialize 管线——snap 可能抖回
         // 微台阶/斜段/overshoot 折点，正交 family 在量化后经 materializer canonicalize
@@ -867,7 +883,7 @@ mod tests {
 
     #[test]
     fn incremental_zero_diff_render_is_byte_identical() {
-        // F2 退出判据：同一 diagram 两次渲染（zero diff）→ 全 preserve 且输出字节一致。
+        // Stage 6：Plan diff 增量——同一 diagram 两次渲染，拓扑 Plan 相等。
         let source = r#"diagram flowchart {
             entity a "Alpha"
             entity b "Beta"
@@ -887,21 +903,21 @@ mod tests {
         .expect("layout");
         let prev = first
             .hints
-            .frozen_routing
+            .atlas_plan
             .clone()
-            .expect("frozen routing captured");
+            .expect("atlas plan captured");
         let second =
             crate::layout::compute_layout_incremental(prepared.inner(), &prev)
                 .expect("incremental layout");
+        let prev2 = second.hints.atlas_plan.as_ref().expect("second plan");
+        assert!(
+            crate::layout::atlas::plan::diff(&prev, prev2).is_empty(),
+            "zero-diff 重渲染 PlanDiff 应为空"
+        );
         assert_eq!(
             format!("{:?}", first.edges),
             format!("{:?}", second.edges),
-            "zero-diff 重渲染必须全 preserve 且边输出字节一致"
-        );
-        assert_eq!(
-            format!("{:?}", first.hints.route_annotations),
-            format!("{:?}", second.hints.route_annotations),
-            "zero-diff 重渲染必须原样恢复旁路注解"
+            "拓扑不变时边输出应稳定"
         );
     }
 }

@@ -19,13 +19,17 @@
 pub mod analysis;
 pub mod auditor;
 pub mod builder_common;
+pub mod builder_legacy;
+pub mod channel_ir;
 pub mod group_ir;
 pub mod layout_contract;
 pub mod main_axis;
 pub mod model;
+pub mod objectives;
 pub mod optimizer;
 pub mod projection;
 pub mod session;
+pub mod structure_objectives;
 
 /// Phase 5 / D4-3：统一 CoordinateProblem 构造门面（共享层变量 + 相邻分离）。
 ///
@@ -35,6 +39,10 @@ pub mod builder {
     pub use super::builder_common::{
         append_rank_layer_vars, build_adjacent_min_separations, RankNodeSpec,
     };
+    pub use super::channel_ir::{
+        attach_channel_ir_cross_tracks, expand_layer_order_gaps, expand_nodes_by_cross_gap_demands,
+        inflate_gaps_from_channel,
+    };
     pub use super::group_ir::{
         attach_group_ir, attach_group_ir_cross, draft_boost_h_g3_from_pair_gaps,
         draft_sibling_gap_from_load, pair_gaps_from_corridor_demands,
@@ -42,7 +50,10 @@ pub mod builder {
         materialize_group_main_bounds, refine_group_frames, refine_group_frames_cross,
     };
     pub use super::layout_contract::{ContractLayer, ContractRankNode, LayoutContract};
-    pub use super::main_axis::{layer_center_ys_from_tops, solve_main_axis_layer_tops};
+    pub use super::main_axis::{
+        lane_centers, layer_center_ys_from_tops, solve_main_axis_layer_tops,
+        solve_main_axis_with_cross_tracks, MainAxisSolveResult,
+    };
     pub use super::model::CoordinateProblem;
     pub use super::session::{LayoutSession, LayoutSolution};
 }

@@ -177,7 +177,12 @@ fn count_group_interior_edges(diagram: &Diagram, result: &LayoutResult) -> usize
 /// `aggressive` 启用激进裙边/换侧（原穿组 repair 语义，E4 收编）。
 /// 仅重路由 `edge_indices`，其余边不动；轮次控制与 best-snapshot
 /// 保留由 Coordinator 负责。
-pub(crate) fn reroute_edges_for_repair(
+/// Slice E3：Coordinator repair loop 的 local re-solve 入口。
+///
+/// 复用 `orthogonal_detour` 重路由指定边集（硬拒残 through / 新穿组）；
+/// `aggressive` 启用激进裙边/换侧（原穿组 repair 语义，E4 收编）。
+/// 亦供 Atlas Ink 落笔后穿组硬修（Post-S7 Wave0）。
+pub fn reroute_edges_for_repair(
     result: &mut LayoutResult,
     diagram: &Diagram,
     edge_indices: &HashSet<usize>,

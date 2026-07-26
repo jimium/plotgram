@@ -114,7 +114,7 @@ pub fn derive_channel_blueprint(diagram: &Diagram) -> ChannelBlueprint {
 /// 探针口径（该组约束变松，A2 检验力度按图打折），探针报告以「丢交叠组」
 /// 标注受影响图；生产接线（Legacy Adapter）将镜像真实分区布局，不经此
 /// 路径。全程 BTreeMap/排序遍历，确定性。
-fn sanitize_overlapping_groups(bp: &mut ChannelBlueprint) {
+pub fn sanitize_overlapping_groups(bp: &mut ChannelBlueprint) {
     if bp.groups.is_empty() {
         return;
     }

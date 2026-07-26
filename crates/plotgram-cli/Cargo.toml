@@ -11,8 +11,11 @@ name = "plotgram"
 path = "src/main.rs"
 
 [dependencies]
-plotgram-core = { workspace = true, features = ["raster", "svg-debug"] }
+plotgram-core = { workspace = true, default-features = false }
 clap = { version = "4", features = ["derive"] }
 serde_json.workspace = true
 
-
+[features]
+default = []
+raster = ["plotgram-core/raster"]
+svg-debug = ["plotgram-core/svg-debug"]

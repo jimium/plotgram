@@ -27,7 +27,7 @@ pub const DIRECTION: &str = "direction";
 pub const RENDER_STYLE: &str = "render_style";
 /// 主题
 pub const THEME: &str = "theme";
-/// 布局管线选择（legacy / atlas / shadow，Atlas Stage 0 对拍开关）
+/// 布局管线选择（`atlas` / `shadow`；`legacy` 已于 Stage 7 删除）
 pub const PIPELINE: &str = "pipeline";
 
 // 值类型：Boolean

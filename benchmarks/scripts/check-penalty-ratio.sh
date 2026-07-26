@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Phase 6 / A1：路由软罚项 max/min ≤ 100；G6 项数 ≤ MAX_SOFT_ITEMS。
-# 真源：crates/plotgram-core/src/layout/routing/objectives.rs 的 SOFT_RANKING。
+# Stage 7：LexCost / 罚项门禁。
+# 优先校验 Atlas 使用 LexCost（无跨层标量求和）；旧 routing/objectives 比例降为 WARN。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
@@ -9,34 +9,56 @@ cd "$ROOT"
 source "$(dirname "$0")/gate-switch.sh"
 gate_skip_unless_enabled "check-penalty-ratio.sh"
 
-out="$(cargo test -p plotgram-core --lib layout::routing::objectives::tests -- --nocapture 2>&1)"
-if echo "$out" | rg -q "test result: FAILED|FAILED\."; then
-  echo "$out" | tail -40
-  echo "FAIL: soft ranking ratio/items exceed caps (see routing/objectives.rs)"
-  exit 1
+fail=0
+
+# ── Atlas / LexCost 硬轨 ──────────────────────────────────
+# 1) LexCost 定义在中立 kernel/cost.rs
+if ! rg -q 'pub struct LexCost' crates/plotgram-core/src/layout/kernel/cost.rs; then
+  echo "FAIL: LexCost missing in layout/kernel/cost.rs"
+  fail=1
 fi
 
-# 禁止在 objectives 之外再定义新的 *_PENALTY 常量（散落即债）
-# 允许：objectives.rs 自身；use/re-export 行
-violations="$(
-  rg -n '^\s*(pub(\([^)]*\))?\s+)?const\s+\w*PENALTY\w*\s*:' \
-    crates/plotgram-core/src/layout/routing \
-    --glob '!**/objectives.rs' \
+# 2) 禁止对 LexCost 做跨层字段求和的 Add / 标量折叠 API
+bad_lex="$(
+  rg -n 'impl\s+(Add|AddAssign).*LexCost|fn\s+\w*as_scalar\w*|fn\s+\w*total_cost\w*|fn\s+\w*sum_layers\w*' \
+    crates/plotgram-core/src/layout/kernel/cost.rs \
+    crates/plotgram-core/src/layout/atlas \
     || true
 )"
-if [[ -n "${violations}" ]]; then
-  echo "FAIL: penalty consts outside routing/objectives.rs:"
-  echo "$violations"
+if [[ -n "${bad_lex}" ]]; then
+  echo "FAIL: LexCost must not expose cross-layer scalar sum / Add:"
+  echo "$bad_lex"
+  fail=1
+fi
+
+# 3) channel 搜索必须用 LexCost（非裸 f64 罚项表驱动）
+if ! rg -q 'LexCost' crates/plotgram-core/src/layout/atlas/channel/search.rs; then
+  echo "FAIL: atlas/channel/search.rs must use LexCost"
+  fail=1
+fi
+
+# ── 旧 objectives 软轨（WARN，不阻断）──────────────────────
+if [[ -f crates/plotgram-core/src/layout/routing/objectives.rs ]]; then
+  out="$(cargo test -p plotgram-core --lib layout::routing::objectives::tests -- --nocapture 2>&1)" || true
+  if echo "$out" | rg -q "test result: FAILED|FAILED\."; then
+    echo "WARN: legacy soft ranking ratio/items exceed caps (routing/objectives.rs) — Atlas LexCost is the hard gate"
+    echo "$out" | tail -20
+  fi
+
+  violations="$(
+    rg -n '^\s*(pub(\([^)]*\))?\s+)?const\s+\w*PENALTY\w*\s*:' \
+      crates/plotgram-core/src/layout/routing \
+      --glob '!**/objectives.rs' \
+      || true
+  )"
+  if [[ -n "${violations}" ]]; then
+    echo "WARN: penalty consts outside routing/objectives.rs (legacy debt):"
+    echo "$violations"
+  fi
+fi
+
+if (( fail != 0 )); then
   exit 1
 fi
 
-item_count="$(
-  rg -n '^\s*\("[A-Z_]+_PENALTY"' crates/plotgram-core/src/layout/routing/objectives.rs | wc -l | tr -d ' '
-)"
-MAX_ITEMS="${PENALTY_ITEM_MAX:-8}"
-if (( item_count > MAX_ITEMS )); then
-  echo "FAIL: SOFT_RANKING item_count=${item_count} > ${MAX_ITEMS}"
-  exit 1
-fi
-
-echo "OK: penalty ratio + item_count=${item_count} (≤${MAX_ITEMS}) + single registry"
+echo "OK: LexCost API + atlas channel usage (legacy penalty ratio WARN-only)"

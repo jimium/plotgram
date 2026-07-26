@@ -600,14 +600,15 @@ pub struct LayoutHints {
     /// 正交路由 C 末旁路注解（stub / 受保护 trunk）；不改 `EdgeLayout`。
     // WRITE: render(route_edges_orthogonal @ C end)  READ: sanitize / grid_snap validate
     pub route_annotations: Option<crate::layout::routing::RouteAnnotationSet>,
-    /// 冻结路由解（Slice F2b）：逐边依赖记录 + 节点/分组指纹。
+    /// 冻结路由解（已废弃增量用途，Stage 6 由 Plan diff 取代）。
     ///
-    /// Coordinator 在唯一 freeze + label solve 后 capture；调用方跨渲染自行
-    /// 持有 `Arc`，下次渲染经 `compute_layout_incremental` 传入做增量路由；
-    /// 不引入任何全局会话状态。
-    // WRITE: render(coordinator capture)  READ: caller(跨渲染增量入口)
+    /// 仍可能由 legacy Coordinator capture 写入；Atlas 路径不再依赖。
+    // WRITE: legacy coordinator  READ: deprecated
     pub frozen_routing:
         Option<std::sync::Arc<crate::layout::routing::model::FrozenRoutingSolution>>,
+    /// Atlas Plan（Stage 6）：跨渲染增量用；拓扑不变可跳过相 I。
+    // WRITE: atlas pipeline  READ: compute_layout_incremental
+    pub atlas_plan: Option<std::sync::Arc<crate::layout::atlas::plan::Plan>>,
     /// 同层边：(from_entity_id, to_entity_id)，路由按短横/L 处理而非绕底廊。
     // WRITE: layout(sugiyama same-layer)  READ: render(orthogonal routing)
     pub same_layer_edges: Vec<(String, String)>,

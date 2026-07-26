@@ -55,7 +55,9 @@ pub(super) fn layout_intra_group(
 
     // Phase 3：复杂拓扑 / Sugiyama 模式委托 sugiyama_v2（hint 几何模式仍走本地路径）
     if mode == GroupLayoutMode::Sugiyama {
-        return super::super::intra_sugiyama::layout_intra_with_sugiyama_v2(diagram, members);
+        return crate::layout::recipes::architecture::intra_sugiyama::layout_intra_with_sugiyama_v2(
+            diagram, members,
+        );
     }
 
     let ranks = assign_ranks_for_mode(&mode, members, graph, reversed);

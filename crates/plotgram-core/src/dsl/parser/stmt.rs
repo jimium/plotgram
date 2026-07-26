@@ -298,10 +298,11 @@ impl Parser {
         let (label, _) = self.expect_string()?;
         self.register_id(id.as_str(), id_span);
 
-        if depth > 1 {
+        // Contraction 支持任意深度；放宽 DSL 上限（原 2 层 → 8 层，D4）。
+        if depth > 7 {
             self.errors.push(DiagnosticError::structure_violation(
                 start,
-                "group 嵌套深度超过 2 层",
+                "group 嵌套深度超过 8 层",
             ));
         }
 

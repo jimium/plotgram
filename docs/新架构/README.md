@@ -2,8 +2,7 @@
 
 布局与路由下一代架构（**Atlas**）的设计与推进文档。
 
-> **当前状态**：设计期，门禁全关（[`AGENTS.md`](../../AGENTS.md) §10）。  
-> 开关在 [`benchmarks/scripts/gate-switch.sh`](../../benchmarks/scripts/gate-switch.sh)；临时校验用 `PLOTGRAM_GATES=on`。
+> **当前状态**：设计期结束（Stage 7 收口）。门禁已开闸（[`AGENTS.md`](../../AGENTS.md) §10 已失效；[`gate-switch.sh`](../../benchmarks/scripts/gate-switch.sh) `GATES_DEFAULT=on`）。
 
 ## 阅读顺序
 
@@ -27,13 +26,20 @@ Atlas 把节点、组框、边通道、标签统一为**占位体**，先做完�
 
 ## 当前位置
 
-`layout/atlas/channel/` 的 **L1–L8 合法化改造已落地**（28 号文）：
+23 号文 **Stage 7 新门禁与收口已完成**；设计期结束。基线 tag：`atlas-final`。
 
-- ✅ **粒度够、性能够** —— 三集 1152 边零「网格不可表达」，channel 本体段模型后≈ 3.6 ms。22 号文风险台账第一条结案。
-- ✅ **合法性已修** —— 27 号文两条 Blocker（穿组词典序最优、gate side 装饰化）由构造消除：A1/A2/A3 三集归零、A4 仍 100%（重采见 25 号文 §8）。
-- ⚠️ **留债** —— L7-T3/T4（T5 自环已修：同节点显式 `Infeasible`）；探针仍是 flat 口径，生产接线后需按真实分区几何复测。
+| 已完成 | 内容 |
+|--------|------|
+| Stage 0–6 | 地基、Plan、度量相、Ink、Dialect、四内核、Plan diff 增量 |
+| **Stage 7** | Provenance / phase-api 门禁；`GATES_DEFAULT=on`；删 Legacy；手册/HTML 收口 |
 
-下一步是 23 号文 **Stage 1 生产接线**：Legacy Adapter 出 blueprint → channel 选路 → 对拍现行路由。
+| 记债（不挡出口；Wave3 创新模式） | 内容 |
+|------------------|------|
+| **MCF Gate** | [`gate_mcf`](../../crates/plotgram-core/src/layout/atlas/gate_mcf.rs) 骨架已登记；生产仍 Occupancy+Unbounded |
+| **I.7 三块有界下降** | [`coord_descent`](../../crates/plotgram-core/src/layout/atlas/coord_descent.rs) 骨架已登记；未改生产求解 |
+| **ortho 物理清空** | Hierarchical 已不进；非 Hier 仍委托 LayoutPipeline（不可在 Wave3 整目录清空） |
+| **非 Hier Ink 内化** | Tree/Sequence/Circular 仍 recipe 路由 |
+| 标签-only 更细增量 | `PLOTGRAM_ATLAS_PLAN_CACHE` 已接线 lint + SVG render |
 
 ## 相关
 

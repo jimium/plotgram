@@ -1,6 +1,6 @@
 //! 架构图专用布局 v2
 //!
-//! **有顶层分组时**：走 `two_phase`（组内 hint 或 sugiyama_v2 → 组间宏观定位 → 坐标回填）。
+//! **有顶层分组时**：走 Dialect StrongMacro Contraction（原 `two_phase`）。
 //! **无分组时**：走本目录全局 Sugiyama（`rank` → `order` → `coordinate`）；
 //! Phase 3 起组内复杂拓扑已委托 `sugiyama_v2::ARCHITECTURE_PRESET`，本目录 rank/order/coordinate
 //! **冻结扩展**（仅服务无顶层 group 路径与 hint 几何模式）。
@@ -16,13 +16,13 @@ use std::collections::{HashMap, HashSet};
 
 use super::layout::types::ArchDiagramFacts;
 
-pub(in super::super) mod acyclic;
-pub(in super::super) mod constants;
-pub(in super::super) mod coordinate;
-pub(in super::super) mod order;
-pub(in super::super) mod postprocess;
-pub(in super::super) mod rank;
-pub(in super::super) mod types;
+pub(crate) mod acyclic;
+pub(crate) mod constants;
+pub(crate) mod coordinate;
+pub(crate) mod order;
+pub(crate) mod postprocess;
+pub(crate) mod rank;
+pub(crate) mod types;
 
 const APPLICABLE_TYPES: &[DiagramType] = &[DiagramType::Architecture];
 
@@ -231,9 +231,9 @@ impl LayoutRecipe for ArchitectureRecipe {
         // compile
         let problem = self.compile(diagram);
 
-        // 有 group：委托 two_phase
+        // 有 group：委托 Dialect StrongMacro Contraction
         if problem.hierarchical {
-            return super::two_phase::compute_two_phase_layout(
+            return crate::layout::atlas::dialect::contraction::strong_macro::compute_two_phase_layout(
                 diagram,
                 &problem.graph,
                 &problem.group_map,

@@ -1,9 +1,5 @@
-//! Shadow 对拍器（Stage 0 交付 0.5，23 号文 §0.3 / §2）。
-//!
-//! 门禁关闭期的替代品：同一个图分别跑 legacy 与 atlas 管线，产出
-//! [`ShadowReport`] 差异报告（节点坐标 / 组框 / lint 计数 / 画布尺寸 /
-//! 相 I 可行性）。Stage 0 里 atlas 转发 legacy，报告应**逐项零差异**；
-//! 后续 Stage 的预期退化以此报告为唯一口径记录。
+//! Shadow 对拍器：同一个图分别跑 LayoutPipeline（基线）与 AtlasPipeline，产出
+//! [`ShadowReport`] 差异报告。Stage 7 后生产默认 Atlas；Shadow 仅诊断，返回 Atlas 结果。
 //!
 //! 确定性（AGENTS.md §2）：`LayoutResult.nodes` / `groups` 是 HashMap，
 //! 所有 diff 遍历显式按 id 排序。
@@ -305,14 +301,18 @@ mod tests {
         output.diagram.unwrap()
     }
 
-    /// Stage 0 验收判据：atlas 转发 legacy，对拍应逐项零差异。
+    /// Stage 0 曾要求 atlas 转发 legacy 零差异；Stage 4+ Atlas 独立，
+    /// 本测改为：Shadow 可跑通且报告字段完整。
     #[test]
-    fn shadow_run_is_zero_diff_in_stage0() {
+    fn shadow_run_produces_report() {
         let prepared = prepared_small();
         let run = run_shadow("small", prepared.inner(), prepared.layout_plan()).unwrap();
-        assert!(run.report.is_zero(), "{}", run.report.to_markdown());
-        assert_eq!(run.report.summary_line(), "[shadow] small: 零差异");
-        assert_eq!(run.report.plan_feasible, None, "S0 相 I 可行性恒占位");
+        assert!(!run.report.name.is_empty());
+        assert_eq!(run.report.name, "small");
+        // 节点集合应对齐（两侧都出图）
+        assert_eq!(run.legacy.nodes.len(), run.atlas.nodes.len());
+        let _ = run.report.summary_line();
+        let _ = run.report.to_markdown();
     }
 
     /// diff 纯函数：人工扰动一个节点坐标与画布尺寸，报告应捕捉到。

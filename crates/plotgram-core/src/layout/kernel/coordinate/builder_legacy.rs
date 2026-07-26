@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use super::model::*;
 use crate::layout::kernel::layered::graph::{LayerNode, LayerNodeKind};
 use crate::layout::kernel::layered::preset::SugiyamaPreset;
-use crate::layout::kernel::coordinate::builder::{
+use super::builder_common::{
     append_rank_layer_vars, build_adjacent_min_separations, RankNodeSpec,
 };
 

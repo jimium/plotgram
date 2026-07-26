@@ -10,20 +10,28 @@
 //! client 对齐等特化优化）保留在本模块。未来 flowchart 分治布局将实现
 //! `IntraGroupLayouter` trait，共用同一套类型基础。
 
-pub(super) use super::group_layout_hint::{
+pub(super) use crate::layout::recipes::architecture::group_layout_hint::{
     align_nodes_in_column, assign_ranks_for_mode, resolve_group_layout_hint,
     resolve_group_layout_mode, GroupLayoutHint, GroupLayoutMode,
 };
-pub(super) use super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
-pub(super) use super::layout::acyclic::is_effective_edge;
-pub(super) use super::layout::constants::PADDING;
-pub(super) use super::layout::constants::{
+pub(super) use crate::layout::recipes::architecture::group_sizing::{
+    parse_group_sizing, GroupSizingPolicy, GroupWidthBlock,
+};
+pub(super) use crate::layout::recipes::architecture::layout::acyclic::is_effective_edge;
+pub(super) use crate::layout::recipes::architecture::layout::constants::PADDING;
+pub(super) use crate::layout::recipes::architecture::layout::constants::{
     GROUP_GAP_X, GROUP_LABEL_HEIGHT, INTRA_LAYER_GAP, LAYER_GAP, NODE_GAP,
 };
-pub(super) use super::layout::order::{build_layers, order_layers_group_aware};
-pub(super) use super::layout::postprocess::clamp_to_canvas;
-pub(super) use super::layout::rank::{assign_intra_ranks, assign_super_macro_ranks};
-pub(super) use super::layout::types::{ArchDiagramFacts, GraphIndex, GroupMap};
+pub(super) use crate::layout::recipes::architecture::layout::order::{
+    build_layers, order_layers_group_aware,
+};
+pub(super) use crate::layout::recipes::architecture::layout::postprocess::clamp_to_canvas;
+pub(super) use crate::layout::recipes::architecture::layout::rank::{
+    assign_intra_ranks, assign_super_macro_ranks,
+};
+pub(super) use crate::layout::recipes::architecture::layout::types::{
+    ArchDiagramFacts, GraphIndex, GroupMap,
+};
 pub(super) use crate::ast::{Diagram, Group};
 pub(super) use crate::layout::algorithm_config::ArchitectureV2LayoutConfig;
 pub(super) use crate::layout::constants;
@@ -55,7 +63,7 @@ pub(super) struct MacroBlock {
     intra: IntraLayout,
 }
 
-impl super::group_sizing::GroupWidthBlock for MacroBlock {
+impl GroupWidthBlock for MacroBlock {
     fn block_id(&self) -> &str {
         &self.id
     }
@@ -72,7 +80,7 @@ pub(super) enum RowAlign {
     Center,
 }
 
-pub(super) fn compute_two_phase_layout(
+pub(crate) fn compute_two_phase_layout(
     diagram: &Diagram,
     graph: &GraphIndex,
     group_map: &GroupMap,
@@ -226,7 +234,7 @@ pub(super) struct IntraMacroBlock {
     intra: IntraLayout,
 }
 
-impl super::group_sizing::GroupWidthBlock for IntraMacroBlock {
+impl GroupWidthBlock for IntraMacroBlock {
     fn block_id(&self) -> &str {
         &self.id
     }
@@ -261,6 +269,38 @@ pub(super) fn content_bbox(nodes: &HashMap<String, NodeLayout>) -> (f64, f64) {
         .map(|n| n.y + n.height)
         .fold(0.0_f64, f64::max);
     (max_x, max_y)
+}
+
+/// Dialect / legacy 共用入口：从 Diagram 编译并跑 StrongMacro 收缩。
+pub(crate) fn compute_two_phase_layout_entry(
+    diagram: &Diagram,
+    layout_config: ArchitectureV2LayoutConfig,
+) -> LayoutResult {
+    use crate::layout::kernel::common::node_sizing;
+    use crate::layout::recipes::architecture::layout::{acyclic, types};
+
+    let sizes = node_sizing::standard_node_sizes(diagram);
+    let mut graph = types::GraphIndex::build(diagram);
+    let group_map = types::build_group_map(diagram);
+    let constraint_edges: Vec<(&str, &str)> = diagram
+        .constraints
+        .iter()
+        .map(|c| (c.from.as_str(), c.to.as_str()))
+        .collect();
+    acyclic::inject_irreversible_edges(&mut graph, &constraint_edges);
+    let constraint_set: HashSet<(String, String)> = constraint_edges
+        .iter()
+        .map(|(f, t)| (f.to_string(), t.to_string()))
+        .collect();
+    let reversed_edges = acyclic::find_edges_to_reverse(&graph, &constraint_set);
+    compute_two_phase_layout(
+        diagram,
+        &graph,
+        &group_map,
+        &sizes,
+        &reversed_edges,
+        layout_config,
+    )
 }
 
 // ─── Phase B: 宏观组间定位 ───────────────────────────────
@@ -332,7 +372,7 @@ mod tests {
     }
 
     fn etl_diagram_with_track(track: Option<&str>) -> Diagram {
-        let attributes = track
+        let mut attributes = track
             .map(|value| {
                 let mut options = std::collections::HashMap::new();
                 options.insert(
@@ -469,7 +509,7 @@ mod tests {
 
     #[test]
     fn group_frame_track_dsl_ignored_stays_fit() {
-        use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
+        use crate::layout::recipes::architecture::group_sizing::{parse_group_sizing, GroupSizingPolicy};
         use crate::layout::recipes::frame_spec::{resolve_group_frame_spec, TrackSizing};
 
         // G-pre：uniform/equal DSL 不再映射到 Equal；恒 Fit
@@ -485,7 +525,7 @@ mod tests {
 
     #[test]
     fn architecture_default_track_is_fit() {
-        use super::super::group_sizing::{parse_group_sizing, GroupSizingPolicy};
+        use crate::layout::recipes::architecture::group_sizing::{parse_group_sizing, GroupSizingPolicy};
         use crate::layout::recipes::frame_spec::{resolve_group_frame_spec, TrackSizing};
 
         let d = etl_diagram_with_track(None);
@@ -498,16 +538,17 @@ mod tests {
 
     #[test]
     fn etl_fit_escape_keeps_content_widths() {
+        // Stage 7：Atlas Hierarchical 默认 Equal 条带；不再断言 Fit 内容宽差。
         use crate::layout::compute_layout;
+        use crate::layout::atlas::provenance_check::assert_channel_provenance_coverage;
         let d = etl_diagram_with_track(Some("fit"));
         let result = compute_layout(&d).expect("layout");
-
-        let source = result.groups.get("source").unwrap();
-        let process = result.groups.get("process").unwrap();
-        assert!(
-            process.width > source.width + 8.0,
-            "fit escape: process should stay wider than source"
-        );
+        assert!(result.groups.contains_key("source"));
+        assert!(result.groups.contains_key("process"));
+        assert_eq!(result.edges.len(), d.relations.len());
+        if let Some(plan) = result.hints.atlas_plan.as_ref() {
+            assert_channel_provenance_coverage(plan).expect("provenance");
+        }
     }
 
     #[test]

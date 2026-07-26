@@ -9,7 +9,7 @@ use super::constants::{LAYER_GAP, NODE_GAP, PADDING};
 use super::types::{ArchDiagramFacts, GraphIndex, GroupMap};
 use crate::layout::kernel::layered::coordinate::assign_layer_centers_for_string_graph;
 
-pub(in super::super) fn assign_coordinates(
+pub(crate) fn assign_coordinates(
     facts: &ArchDiagramFacts,
     graph: &GraphIndex,
     group_map: &GroupMap,
@@ -170,7 +170,7 @@ fn is_infrastructure_layer(layer: &[String], group_map: &GroupMap) -> bool {
 /// 原实现仅考虑上游（in_edges）已放置节点，对"基础设施行下游还有已放置节点"
 /// 的场景（如基础设施行位于图中部）会偏移。扩展为同时收集上游和下游已放置
 /// 节点的 x 中心，取联合跨度的中心作为锚点，使基础设施行在上下游之间居中。
-pub(in super::super) fn infrastructure_anchor_x(
+pub(crate) fn infrastructure_anchor_x(
     layer: &[String],
     graph: &GraphIndex,
     placed: &HashMap<String, NodeLayout>,
@@ -210,7 +210,7 @@ pub(in super::super) fn infrastructure_anchor_x(
 }
 
 /// 将一层节点作为整体绕 anchor_x 居中排布
-pub(in super::super) fn center_layer_on_anchor(
+pub(crate) fn center_layer_on_anchor(
     layer: &[String],
     positions: &mut [f64],
     sizes: &HashMap<String, (f64, f64)>,

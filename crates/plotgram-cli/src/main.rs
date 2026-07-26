@@ -11,6 +11,7 @@ use plotgram_core::interchange::mindmap::{
 use plotgram_core::prepare::StyleRequest;
 use plotgram_core::pipeline::{import_prepare_validate, parse_prepare, parse_prepare_validate, PipelineOutput};
 use plotgram_core::pipeline::{render_bytes, render_json, render_text};
+#[cfg(feature = "raster")]
 use plotgram_core::render::encode::{fonts_dir, set_fonts_dir};
 use plotgram_core::RenderFormat;
 use std::fs;
@@ -110,7 +111,7 @@ enum Commands {
         #[arg(short, long)]
         output: Option<String>,
     },
-    /// legacy vs atlas 双管线影子对拍（Atlas Stage 0，退出码恒 0 只报告不阻断）
+    /// Atlas vs LayoutPipeline 影子对拍（诊断工具，退出码恒 0；非 CI 门禁）
     Shadow {
         /// 图集清单 (.txt，每行一个 .pgm 路径，`#` 注释) 或单个 .pgm 文件
         input: String,
@@ -176,6 +177,7 @@ fn read_source(path: &str) -> String {
     })
 }
 
+#[cfg(feature = "raster")]
 fn configure_fonts_dir(cli_fonts_dir: Option<&str>) {
     if let Some(dir) = cli_fonts_dir {
         set_fonts_dir(PathBuf::from(dir));
@@ -316,7 +318,10 @@ fn cmd_render(
     transparent_background: bool,
     show_title: bool,
 ) {
+    #[cfg(feature = "raster")]
     configure_fonts_dir(fonts_dir);
+    #[cfg(not(feature = "raster"))]
+    let _ = fonts_dir;
 
     let format = RenderFormat::from_str(format_str).unwrap_or_else(|| {
         eprintln!(
@@ -364,31 +369,65 @@ fn cmd_render(
 
     let prepared = pipeline_output.diagram.unwrap();
 
-    // Render
+    // Render（可选：PLOTGRAM_ATLAS_PLAN_CACHE 走 Plan 增量；SVG 注入 layout）
     let mut request = plotgram_core::render::RenderRequest::new(&prepared, format);
     request.transparent_background = transparent_background;
     request.show_title = show_title;
+
+    let cached_layout = if let Ok(cache) = std::env::var("PLOTGRAM_ATLAS_PLAN_CACHE") {
+        match layout_with_optional_plan_cache(
+            prepared.inner(),
+            prepared.layout_plan(),
+            &cache,
+        ) {
+            Ok(layout) => Some(layout),
+            Err(e) => {
+                eprintln!("错误: 增量布局失败: {}", e);
+                std::process::exit(1);
+            }
+        }
+    } else {
+        None
+    };
+
     match output {
         Some(path) => {
             match format {
-                RenderFormat::Png
-                | RenderFormat::Webp => {
-                    let output_bytes =
-                        render_bytes(&request).unwrap_or_else(|e| {
-                            print_render_error(e, Some(&source));
-                            std::process::exit(1);
-                        });
+                RenderFormat::Png | RenderFormat::Webp => {
+                    // 光栅路径仍走默认管线；缓存文件已由上面 layout 调用刷新
+                    let _ = &cached_layout;
+                    let output_bytes = render_bytes(&request).unwrap_or_else(|e| {
+                        print_render_error(e, Some(&source));
+                        std::process::exit(1);
+                    });
                     fs::write(path, output_bytes).unwrap_or_else(|e| {
                         eprintln!("错误: 无法写入文件 '{}': {}", path, e);
                         std::process::exit(1);
                     });
                 }
-                _ => {
-                    let output_content = render_text(&request)
-                        .unwrap_or_else(|e| {
+                RenderFormat::Svg => {
+                    let output_content = if let Some(ref layout) = cached_layout {
+                        plotgram_core::pipeline::render_svg_with_layout(&request, layout.clone())
+                            .unwrap_or_else(|e| {
+                                print_render_error(e, Some(&source));
+                                std::process::exit(1);
+                            })
+                    } else {
+                        render_text(&request).unwrap_or_else(|e| {
                             print_render_error(e, Some(&source));
                             std::process::exit(1);
-                        });
+                        })
+                    };
+                    fs::write(path, &output_content).unwrap_or_else(|e| {
+                        eprintln!("错误: 无法写入文件 '{}': {}", path, e);
+                        std::process::exit(1);
+                    });
+                }
+                _ => {
+                    let output_content = render_text(&request).unwrap_or_else(|e| {
+                        print_render_error(e, Some(&source));
+                        std::process::exit(1);
+                    });
                     fs::write(path, &output_content).unwrap_or_else(|e| {
                         eprintln!("错误: 无法写入文件 '{}': {}", path, e);
                         std::process::exit(1);
@@ -397,32 +436,34 @@ fn cmd_render(
             }
             println!("{} 已写入: {}", format.to_string().to_uppercase(), path);
         }
-        None => {
-            // 输出到 stdout
-            match format {
-                RenderFormat::Png
-                | RenderFormat::Webp => {
-                    eprintln!("错误: PNG 和 WebP 格式需要指定输出文件（使用 -o 或 --output）");
-                    std::process::exit(1);
-                }
-                RenderFormat::Drawio => {
-                    let output_content = render_text(&request)
-                        .unwrap_or_else(|e| {
-                            print_render_error(e, Some(&source));
-                            std::process::exit(1);
-                        });
-                    println!("{}", output_content);
-                }
-                _ => {
-                    let output_content = render_text(&request)
-                        .unwrap_or_else(|e| {
-                            print_render_error(e, Some(&source));
-                            std::process::exit(1);
-                        });
-                    println!("{}", output_content);
-                }
+        None => match format {
+            RenderFormat::Png | RenderFormat::Webp => {
+                eprintln!("错误: PNG 和 WebP 格式需要指定输出文件（使用 -o 或 --output）");
+                std::process::exit(1);
             }
-        }
+            RenderFormat::Svg => {
+                let output_content = if let Some(ref layout) = cached_layout {
+                    plotgram_core::pipeline::render_svg_with_layout(&request, layout.clone())
+                        .unwrap_or_else(|e| {
+                            print_render_error(e, Some(&source));
+                            std::process::exit(1);
+                        })
+                } else {
+                    render_text(&request).unwrap_or_else(|e| {
+                        print_render_error(e, Some(&source));
+                        std::process::exit(1);
+                    })
+                };
+                println!("{}", output_content);
+            }
+            _ => {
+                let output_content = render_text(&request).unwrap_or_else(|e| {
+                    print_render_error(e, Some(&source));
+                    std::process::exit(1);
+                });
+                println!("{}", output_content);
+            }
+        },
     }
 }
 
@@ -500,8 +541,40 @@ fn run_layout_lint(
     config: &plotgram_core::layout::LintConfig,
 ) -> Result<plotgram_core::layout::LintReport, plotgram_core::error::DiagnosticError> {
     let diagram = prepared.inner();
-    let layout = plotgram_core::layout::compute_layout_with_plan(diagram, prepared.layout_plan())?;
+    let layout = if let Ok(cache) = std::env::var("PLOTGRAM_ATLAS_PLAN_CACHE") {
+        layout_with_optional_plan_cache(diagram, prepared.layout_plan(), &cache)?
+    } else {
+        plotgram_core::layout::compute_layout_with_plan(diagram, prepared.layout_plan())?
+    };
     Ok(plotgram_core::layout::LayoutLinter::with_config(config.clone()).run(diagram, &layout))
+}
+
+fn layout_with_optional_plan_cache(
+    diagram: &plotgram_core::ast::Diagram,
+    plan: &plotgram_core::layout::pipeline::plan::LayoutPlan,
+    cache_path: &str,
+) -> Result<plotgram_core::layout::LayoutResult, plotgram_core::error::DiagnosticError> {
+    let path = std::path::Path::new(cache_path);
+    if path.is_file() {
+        if let Ok(bytes) = std::fs::read(path) {
+            if let Ok(prev) =
+                serde_json::from_slice::<plotgram_core::layout::atlas::plan::Plan>(&bytes)
+            {
+                eprintln!("[atlas] incremental via PLOTGRAM_ATLAS_PLAN_CACHE");
+                let layout =
+                    plotgram_core::layout::compute_layout_incremental(diagram, &prev)?;
+                if let Some(p) = layout.hints.atlas_plan.as_ref() {
+                    let _ = std::fs::write(path, serde_json::to_vec_pretty(p.as_ref()).unwrap_or_default());
+                }
+                return Ok(layout);
+            }
+        }
+    }
+    let layout = plotgram_core::layout::compute_layout_with_plan(diagram, plan)?;
+    if let Some(p) = layout.hints.atlas_plan.as_ref() {
+        let _ = std::fs::write(path, serde_json::to_vec_pretty(p.as_ref()).unwrap_or_default());
+    }
+    Ok(layout)
 }
 
 fn print_lint_report_text(

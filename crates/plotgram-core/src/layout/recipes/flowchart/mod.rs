@@ -6,8 +6,8 @@
 //!
 //! # 分治布局
 //!
-//! 含 group 时走分治路径（[`group_divide::divide_flowchart_with_groups`]）：
-//! 每个 group 独立调用 Sugiyama 布局，再按拓扑序垂直堆叠合并。
+//! 含 group 时走 Dialect Weak Contraction（原 `group_divide`，现
+//! [`crate::layout::atlas::dialect::contraction::weak`]）。
 //! 无 group 时走 LayeredKernel + CoordinateKernel 路径。
 //!
 //! # Recipe
@@ -17,7 +17,8 @@
 //! - solve: coordinate::assign_coordinates_brandes_koepf → 节点坐标
 //! - product: 组装 LayoutResult（groups + canvas + hints）
 
-pub mod group_divide;
+/// Stage 5：分治实现迁入 Dialect；保留旧模块名供 legacy recipe 引用。
+pub use crate::layout::atlas::dialect::contraction::weak as group_divide;
 
 use crate::ast::Diagram;
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;

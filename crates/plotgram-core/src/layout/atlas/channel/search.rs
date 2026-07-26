@@ -72,6 +72,10 @@ pub struct RouteOutcome {
     pub tracks: Vec<TrackId>,
     /// 途经闸口序列（按穿越顺序）。
     pub gates: Vec<GateId>,
+    /// 胜出起点端口（`Infeasible` 时为 None）。
+    pub from_port: Option<PortSlotId>,
+    /// 胜出终点端口。
+    pub to_port: Option<PortSlotId>,
     pub cost: LexCost,
     pub status: SolverStatus,
 }
@@ -82,6 +86,8 @@ impl RouteOutcome {
         Self {
             tracks: Vec::new(),
             gates: Vec::new(),
+            from_port: None,
+            to_port: None,
             cost: LexCost {
                 q1_hard_residual: OrderedF64(1.0),
                 ..LexCost::default()
@@ -160,6 +166,8 @@ pub fn route(
         return Ok(RouteOutcome {
             tracks: vec![start],
             gates: Vec::new(),
+            from_port: Some(from),
+            to_port: Some(to),
             cost: start_cost,
             status: SolverStatus::Converged,
         });
@@ -185,6 +193,8 @@ pub fn route(
             return Ok(RouteOutcome {
                 tracks,
                 gates,
+                from_port: Some(from),
+                to_port: Some(to),
                 cost,
                 status: SolverStatus::Converged,
             });
@@ -306,19 +316,23 @@ pub fn route_candidates(
     tos.sort();
     tos.dedup();
 
-    let mut best: Option<RouteOutcome> = None;
+    let mut best: Option<(RouteOutcome, PortSlotId, PortSlotId)> = None;
     for &f in &froms {
         for &t in &tos {
-            if let Ok(out) = route(graph, f, t, occupancy, allowed) {
+            if let Ok(mut out) = route(graph, f, t, occupancy, allowed) {
                 if out.status == SolverStatus::Converged
-                    && best.as_ref().is_none_or(|b| out.cost < b.cost)
+                    && best
+                        .as_ref()
+                        .is_none_or(|(b, _, _)| out.cost < b.cost)
                 {
-                    best = Some(out);
+                    out.from_port = Some(f);
+                    out.to_port = Some(t);
+                    best = Some((out, f, t));
                 }
             }
         }
     }
-    Ok(best.unwrap_or_else(RouteOutcome::infeasible))
+    Ok(best.map(|(out, _, _)| out).unwrap_or_else(RouteOutcome::infeasible))
 }
 
 /// 便利 API：按节点×侧候选集选路（24 号文 R3 可选）。

@@ -1,8 +1,7 @@
 //! 抽象通道图（22 号文 §5.1 I.6）：**在没有坐标的抽象通道图上选路**。
 //!
-//! **本阶段不接线生产**（同 [`crate::layout::kernel::route`] 的 Phase 1 策略）。
-//! 生产路径仍走 `layout::routing`；本模块提供 Atlas 相 I 通道规划的独立原型，
-//! 用于提前验证「通道图粒度是否够细」这一最高风险假设（22 号文 §8 风险台账）。
+//! Hierarchical 生产路径经 `channel_metric` 消费本模块；非 Hier 图种仍可走
+//! `layout::routing`（Wave3 记债）。
 //!
 //! 设计约束（详见 [README](./README.md)）：
 //! 1. **零几何**：无 `Point` / `Rect` / 像素坐标，只有 id 与拓扑

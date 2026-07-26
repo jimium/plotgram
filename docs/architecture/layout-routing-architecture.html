@@ -454,11 +454,12 @@
   <div class="wrap">
     <header class="hero">
       <div>
-        <p class="eyebrow">docs/architecture · 2026-07-26</p>
+        <p class="eyebrow">docs/architecture · 2026-07-27 · Atlas Stage 7</p>
         <h1>布局与路由架构</h1>
         <p class="lede">
-          Phase 0–6 第一性原理重构与 Group 一等公民收敛后的现行结构：
-          <strong style="color:var(--text);font-weight:600">pipeline → recipes → kernel → routing → quality</strong>。
+          Atlas 三相架构已成为生产默认：
+          <strong style="color:var(--text);font-weight:600">组合相 → 度量相 → 落笔相</strong>
+          （<code>layout/atlas/</code>）。旧两段式冻结路由已退出生产；门禁按新不变量开闸。
           本页是目录/写权/管线的可视化快照，不是冻结规格书。
         </p>
       </div>
@@ -466,12 +467,12 @@
         <div class="grade-row">
           <div class="grade-letter">A−</div>
           <div class="grade-meta">
-            <strong>结构质量优秀</strong>
-            <span>算法债仍重 · 门禁已固化</span>
+            <strong>Atlas 已收口</strong>
+            <span>设计期结束 · 新门禁生效</span>
           </div>
         </div>
         <div class="grade-bar" aria-hidden="true"><i></i></div>
-        <p class="grade-note">分层清晰、公理可机检；正交路由体量大、双轨 IR 与遗留 coordinate 仍待收口。</p>
+        <p class="grade-note">Provenance / LexCost / 语义隔离可机检；ortho 目录与 Main 组框联合仍记债。</p>
       </aside>
     </header>
 
@@ -489,14 +490,14 @@
     <section id="verdict" class="verdict">
       <h2>评估结论</h2>
       <p style="margin:0;color:var(--muted);font-size:0.95rem">
-        当前布局/路由<strong style="color:var(--text)">架构质量高</strong>：职责分层、写权冻结、语义隔离与罚项注册表均有机械门禁；
-        目录在 doc 34 后已收敛到可读的目标形态。算法实现本身仍是<strong style="color:var(--text)">高复杂度工程系统</strong>
-        （~72k LOC / 220 文件，正交路由约占四成），产品观感与压力图上仍有有界债，但不再是「结构混乱导致改不动」。
+        <strong style="color:var(--text)">Atlas Stage 7 已完成</strong>：全图种默认三相管线；
+        <code>PipelineChoice::Legacy</code> 已删；门禁按 Provenance / phase-api / LexCost / 穿组构造保证重建。
+        旧 <code>edge_routing_orthogonal</code> 仍在仓库（记债），但 Hierarchical 落笔走 Ink。
       </p>
       <ul>
-        <li><strong>可以放心改</strong>：contract / Group IR / FrozenNodeProduct 之后的路径，写权边界清楚。</li>
-        <li><strong>改前必读</strong>：手册写权时序；正交阶段序（sanitize / label / refine）。</li>
-        <li><strong>下一刀优先</strong>：消化 <code>engines/coordinate</code> 遗留；评估 <code>kernel/route</code> 与生产 <code>routing</code> 双轨合并；拆超大文件（mindmap / lint / ortho）。</li>
+        <li><strong>可以放心改</strong>：<code>atlas/dialect</code> → Plan → Ink；写权边界清楚。</li>
+        <li><strong>改前必读</strong>：手册 §3 Atlas 三相地图；23 号文不变量表。</li>
+        <li><strong>下一刀优先</strong>：MCF Gate；ortho 目录物理清空；Main 组框联合；标签-only 更细增量。</li>
       </ul>
     </section>
 
@@ -678,29 +679,28 @@
     </section>
 
     <section id="pipeline">
-      <h2>运行时管线</h2>
-      <p class="section-lead">左侧是 LayoutPipeline；右侧是 RoutingCoordinator（路由唯一编排入口）。琥珀色步骤为冻结点。</p>
+      <h2>运行时管线（Atlas 三相）</h2>
+      <p class="section-lead">生产默认 <code>AtlasPipeline</code>。琥珀色为 Plan / 几何冻结点。Shadow 仅作对拍诊断。</p>
       <div class="pipeline">
         <div class="pipe-card">
-          <h3>LayoutPipeline <span class="tag">runner</span></h3>
+          <h3>AtlasPipeline <span class="tag">atlas</span></h3>
           <ol class="steps">
-            <li><strong>strategy.compute</strong><span>recipe → kernel 求解节点 / group 物化</span></li>
-            <li><strong>pre-route feedback</strong><span>布局侧预反馈（不改冻结契约）</span></li>
-            <li><strong>shell / gutters → groups</strong><span>architecture：orthosketch 物化进 groups（仍属 materialize）</span></li>
-            <li class="freeze"><strong>FrozenNodeProduct::capture</strong><span>节点 + groups 指纹冻结；路由只读</span></li>
-            <li><strong>RoutingCoordinator::execute</strong><span>边几何唯一编排入口</span></li>
-            <li><strong>assert_unchanged + canvas</strong><span>校验冻结；画布平移不计写权</span></li>
+            <li><strong>compile_atlas</strong><span>Dialect / Scheme / Contract（唯一读 DiagramType）</span></li>
+            <li class="freeze"><strong>组合相 → Plan</strong><span>Channel 选路；provenance 全覆盖</span></li>
+            <li><strong>度量相</strong><span>solve_from_contract；Occupant / track LP；只读 Plan</span></li>
+            <li class="freeze"><strong>落笔 Ink</strong><span>materialize_edges(&amp;Plan)；无离散决策</span></li>
+            <li><strong>LabelSolver + canvas</strong><span>几何冻结后避让；画布收尾</span></li>
           </ol>
         </div>
         <div class="pipe-card">
-          <h3>RoutingCoordinator <span class="tag">route</span></h3>
+          <h3>门禁（Stage 7） <span class="tag">gates</span></h3>
           <ol class="steps">
-            <li><strong>prepare → compile</strong><span>PreparedRoutingInput / problem signature</span></li>
-            <li><strong>solve → materialize</strong><span>recipe（正交 / spline / …）产出路径</span></li>
-            <li><strong>audit → repair loop</strong><span>硬约束审计；有界修复轮次</span></li>
-            <li class="freeze"><strong>geometry freeze</strong><span>真冻结点；其后不做拓扑狂改</span></li>
-            <li><strong>label → refine</strong><span>标签与局部 refine；破约拒绝</span></li>
-            <li><strong>budget / repulse → product</strong><span>最终审计；degraded 显式上报</span></li>
+            <li><strong>phase-api</strong><span>Ink 仅 &amp;Plan；禁 DiagramType</span></li>
+            <li><strong>provenance</strong><span>channels ⊆ provenance = 100%</span></li>
+            <li><strong>semantic-isolation</strong><span>kernel 无 DiagramType</span></li>
+            <li><strong>LexCost</strong><span>无跨层求和；旧 objectives WARN</span></li>
+            <li><strong>group-writes</strong><span>materialize-only ≤1</span></li>
+            <li><strong>L6 / route_scope</strong><span>穿组由构造保证</span></li>
           </ol>
         </div>
       </div>

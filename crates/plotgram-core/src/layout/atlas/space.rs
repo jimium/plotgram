@@ -1,13 +1,12 @@
 //! 空间占用抽象：`Occupant` / `Demand`（Stage 0 交付 0.2，23 号文 §2）。
 //!
 //! 度量相（相 II）的统一词汇：节点、组框、通道、label 都是「占空间的东西」，
-//! 对每根轴报出 [`Demand`]，由求解器统一分配坐标。Stage 0 仅定义类型，
-//! 无实现者；Stage 2（组框进 LP）/ Stage 3（Channel 成为 Occupant）接入。
+//! 对每根轴报出 [`Demand`]，由求解器统一分配坐标。
 //!
 //! **Substrate 不在此重复定义**：rank × order 骨架已落地在
-//! [`super::channel::substrate::Substrate`]（相 I 通道图的无坐标基底），
-//! 度量相直接消费同一结构，此处仅 re-export。
+//! [`super::channel::substrate::Substrate`]，度量相直接消费同一结构，此处仅 re-export。
 
+use super::channel::{TrackId, TrackOrient};
 use super::provenance::Provenance;
 
 pub use super::channel::substrate::Substrate;
@@ -59,14 +58,36 @@ impl Demand {
 }
 
 /// 空间占用者：向度量相报出每根轴的需求。
-///
-/// Stage 0 无实现者；接入时（Stage 2/3）实现方自带 [`Provenance`]，
-/// 使「这个 Demand 是谁算的」可追。
 pub trait Occupant {
     fn id(&self) -> OccupantId;
     fn kind(&self) -> OccupantKind;
     fn demand(&self, axis: Axis) -> Demand;
     fn provenance(&self) -> &Provenance;
+}
+
+/// Stage 3：通道 Occupant——一条 track 上的 lane 带。
+#[derive(Debug, Clone)]
+pub struct ChannelOccupant {
+    pub track_id: TrackId,
+    pub orient: TrackOrient,
+    /// 法向带宽（`lanes * pitch + 2 * clearance`）。
+    pub band: Demand,
+    pub provenance: Provenance,
+}
+
+impl ChannelOccupant {
+    pub fn from_lanes(track_id: TrackId, orient: TrackOrient, lanes: u32) -> Self {
+        let width = super::channel_metric::channel_band_width(lanes);
+        Self {
+            track_id,
+            orient,
+            band: Demand::rigid(width),
+            provenance: Provenance::with_detail(
+                "metric/channel:lane_demand",
+                format!("track={} lanes={}", track_id.0, lanes),
+            ),
+        }
+    }
 }
 
 #[cfg(test)]

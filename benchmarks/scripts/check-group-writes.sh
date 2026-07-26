@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # group 写权棘轮——解析 CLI `[group_write] main=N`，断言 main ≤ THRESHOLD。
-# 工程收口：cloud-native 目标 main≤1（单次 materialize；canvas 平移不计）。
-# 可用 GROUP_WRITE_THRESHOLD 覆盖。
+# Stage 7 / Atlas：Hierarchical 路径仅 materialize 写组框（write_counter ≤ 1）；
+# canvas 平移不计。可用 GROUP_WRITE_THRESHOLD 覆盖。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
@@ -11,14 +11,16 @@ source "$(dirname "$0")/gate-switch.sh"
 gate_skip_unless_enabled "check-group-writes.sh"
 
 THRESHOLD="${GROUP_WRITE_THRESHOLD:-1}"
+# Atlas：flowchart Cross materialize 写权 0；architecture StrongMacro materialize ≤1。
+# 样本取 architecture，阈值 1 = materialize-only（canvas 平移不计）。
 SAMPLE="${GROUP_WRITE_SAMPLE:-showcase/architecture/product.cloud-native.pgm}"
+# flowchart 路径另验：GROUP_WRITE_SAMPLE=showcase/flowchart/product.user-auth.pgm GROUP_WRITE_THRESHOLD=0
 
 if [[ ! -f "$SAMPLE" ]]; then
   echo "FAIL: sample not found: $SAMPLE"
   exit 1
 fi
 
-# PLOTGRAM_PERF=1 为文档约定；当前 perf_log 在非 wasm 下始终打 stderr。
 out="$(
   PLOTGRAM_PERF=1 cargo run -q -p plotgram-cli -- render "$SAMPLE" -o /tmp/plotgram-group-writes-check.svg 2>&1
 )" || {
@@ -42,7 +44,7 @@ sites="$(
   echo "$out" | rg '\[group_write\] main=' | tail -1 || true
 )"
 
-echo "OK: group_writes main=${main} (threshold≤${THRESHOLD}) sample=${SAMPLE}"
+echo "OK: group_writes main=${main} (threshold≤${THRESHOLD}) sample=${SAMPLE} (Atlas materialize-only)"
 echo "    ${sites}"
 
 if (( main > THRESHOLD )); then

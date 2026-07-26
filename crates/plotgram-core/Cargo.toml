@@ -7,7 +7,7 @@ rust-version.workspace = true
 description = "Core library for Plotgram: parser, AST, validator, and renderer"
 
 [features]
-default = ["raster", "svg-debug"]
+default = []
 raster = ["dep:resvg", "dep:usvg", "dep:image"]
 svg-debug = []
 compressed-drawio = ["dep:flate2", "dep:base64"]

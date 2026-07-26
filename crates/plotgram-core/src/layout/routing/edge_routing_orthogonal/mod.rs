@@ -1,5 +1,10 @@
 //! 正交边路由模块（固定磁吸点方案）
 //!
+//! **Post-S7 Wave3**：Hierarchical 生产路径已不进本目录；Tree/Sequence/Circular
+//! 仍经 `LayoutPipeline` 委托。整目录物理删除须走 AGENTS §7 创新模式
+//!（见 [`crate::layout::atlas::gate_mcf`] / 新架构 README 记债表），不可在
+//! 非 Hier Ink 内化前清空。
+//!
 //! 设计要点：
 //! - 每个矩形节点的边线连接点为固定「磁吸点（slot）」，仿照画图软件：
 //!   上/下边各 3 个候选点，左/右边各 1 个候选点。实际锚点按该边的边数

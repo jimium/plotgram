@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
-# 全局门禁开关（新架构重大设计调整期）。
+# 全局门禁开关。
 #
-# 现状：`GATES_DEFAULT=off` —— 所有棘轮脚本默认跳过，compare 降为「只报告不阻断」。
-# 依据：AGENTS.md §10（下一代布局与路由架构设计期门禁豁免）。
-#
-# 临时开启单次运行：
-#   PLOTGRAM_GATES=on ./benchmarks/scripts/check-semantic-isolation.sh
-# 期末恢复：把 GATES_DEFAULT 改回 on，并删除 AGENTS.md §10。
+# 现状：`GATES_DEFAULT=on` —— Stage 7 收口后恢复棘轮（AGENTS.md §10 已失效）。
+# 临时关闭单次运行：
+#   PLOTGRAM_GATES=off ./benchmarks/scripts/check-semantic-isolation.sh
 
-GATES_DEFAULT="off"
+GATES_DEFAULT="on"
 
 gate_enabled() {
   [[ "${PLOTGRAM_GATES:-$GATES_DEFAULT}" == "on" ]]
@@ -17,7 +14,7 @@ gate_enabled() {
 # 棘轮脚本：门禁关闭时直接跳过并以 0 退出。
 gate_skip_unless_enabled() {
   if ! gate_enabled; then
-    echo "SKIP: ${1:-gate} —— 新架构期门禁默认关闭（PLOTGRAM_GATES=on 可临时开启）"
+    echo "SKIP: ${1:-gate} —— 门禁已关闭（PLOTGRAM_GATES=off）"
     exit 0
   fi
 }

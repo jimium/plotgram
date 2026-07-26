@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use super::preset::SugiyamaPreset;
 use crate::layout::kernel::common::node_sizing::NodeSizing;
 
-pub(super) fn compute_layer_heights(
+pub(in crate::layout) fn compute_layer_heights(
     layers: &[Vec<NodeIndex>],
     sizes: &HashMap<NodeIndex, (f64, f64)>,
     preset: &SugiyamaPreset,
@@ -24,7 +24,7 @@ pub(super) fn compute_layer_heights(
         .collect()
 }
 
-pub(super) fn normalize_layout_to_padding(
+pub(in crate::layout) fn normalize_layout_to_padding(
     nodes: &mut HashMap<String, NodeLayout>,
     padding: f64,
 ) {

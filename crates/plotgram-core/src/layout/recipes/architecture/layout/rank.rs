@@ -19,7 +19,7 @@ fn super_node_id(node: &str, group_map: &GroupMap) -> String {
 /// `constraints` 为 DSL `constrain` 边集合 `(from, to)`，语义为 `rank(from) < rank(to)`。
 /// 约束边永不被反转：在 macro 级 `resolve_bidirectional_pairs_by_weight` 和 super-node FAS
 /// 中均被排除出反转候选。
-pub(in super::super) fn assign_ranks_group_aware(
+pub(crate) fn assign_ranks_group_aware(
     diagram: &Diagram,
     graph: &GraphIndex,
     group_map: &GroupMap,
@@ -165,7 +165,7 @@ fn assign_macro_group_ranks(
 /// 4 边方向。因此在 FAS 之前先按 `edge_weights`（有向跨组实际边数）裁决所有
 /// 双向对：多数方向保留、少数方向直接标记反转；权重平局时，组声明序更早的
 /// 组视为上游（优先 group sibling decl，回退到成员全局声明序）。
-pub(in super::super) fn assign_super_macro_ranks(
+pub(crate) fn assign_super_macro_ranks(
     super_members: &HashMap<String, Vec<String>>,
     super_edges: &HashSet<(String, String)>,
     edge_weights: &HashMap<(String, String), usize>,
@@ -408,7 +408,7 @@ fn topological_sort_super_nodes(
 }
 
 /// 超级节点内部微观 rank（仅组内边）
-pub(in super::super) fn assign_intra_ranks(
+pub(crate) fn assign_intra_ranks(
     members: &[String],
     graph: &GraphIndex,
     reversed: &HashSet<(String, String)>,

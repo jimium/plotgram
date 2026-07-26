@@ -103,7 +103,7 @@ pub(super) fn band_uniform_gap(
 }
 
 /// 相邻 macro rank 之间：取 rank 总跨组边密度与「上下行组对」最大边数的较大值，放大垂直通道。
-pub(super) fn adaptive_vertical_rank_gap<B: super::super::group_sizing::GroupWidthBlock>(
+pub(super) fn adaptive_vertical_rank_gap<B: crate::layout::recipes::architecture::group_sizing::GroupWidthBlock>(
     rank: usize,
     blocks: &[B],
     macro_ranks: &HashMap<String, usize>,

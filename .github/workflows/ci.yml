@@ -8,9 +8,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   PLOTGRAM_FONTS_DIR: ${{ github.workspace }}/fonts
-  # 新架构重大设计调整期：门禁全关（AGENTS.md §10）。
-  # 恢复时删除本行，并把 benchmarks/scripts/gate-switch.sh 的 GATES_DEFAULT 改回 on。
-  PLOTGRAM_GATES: "off"
 
 jobs:
   test:
@@ -22,14 +19,12 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      # 新架构期：单测结果仍打印，但不阻断（大量断言绑定旧管线，见 AGENTS.md §10）。
       - name: Unit tests (core + eval)
-        continue-on-error: true
         run: |
           cargo test -p plotgram-core --lib
           cargo test -p plotgram-eval --lib deterministic
 
-      - name: Phase6 penalty ratio + registry
+      - name: LexCost + legacy penalty WARN
         run: ./benchmarks/scripts/check-penalty-ratio.sh
 
       - name: Phase6 semantic isolation
@@ -40,3 +35,12 @@ jobs:
 
       - name: G5 builder entry ratchet
         run: ./benchmarks/scripts/check-builder-entry.sh
+
+      - name: Atlas provenance coverage
+        run: ./benchmarks/scripts/check-provenance-coverage.sh
+
+      - name: Atlas phase API
+        run: ./benchmarks/scripts/check-atlas-phase-api.sh
+
+      - name: Product penetration (post-Ink)
+        run: ./benchmarks/scripts/check-product-penetration.sh

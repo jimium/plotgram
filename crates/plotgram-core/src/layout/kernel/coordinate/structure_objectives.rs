@@ -88,13 +88,10 @@ pub(in crate::layout) fn build_structure_objectives(
     }
 
     // ─── P1: 线性链共轴 ───────────────────────────────────────────────────
-    // 线性链：每个节点（除首）恰好 1 个前驱，每个节点（除尾）恰好 1 个后继。
-    // 连续链节点应共轴（垂直对齐）。
     let mut sorted_nodes: Vec<NodeIndex> = dag.node_indices().collect();
     sorted_nodes.sort_by_key(|n| n.index());
 
     if weights.chain_align > 0.0 {
-        // 找出所有链头：入度=0 或 入度>1 的节点的后继
         let mut chain_starts: Vec<NodeIndex> = Vec::new();
 
         for node in &sorted_nodes {
@@ -102,10 +99,8 @@ pub(in crate::layout) fn build_structure_objectives(
             if in_deg == 0 {
                 chain_starts.push(*node);
             } else if in_deg > 1 {
-                // 多入度节点自身是链头（汇聚后继续）
                 chain_starts.push(*node);
             } else {
-                // 入度=1：检查前驱是否有多后继
                 let pred = dag.neighbors_directed(*node, Direction::Incoming).next().unwrap();
                 let pred_out = dag.neighbors_directed(pred, Direction::Outgoing).count();
                 if pred_out > 1 {
@@ -115,7 +110,6 @@ pub(in crate::layout) fn build_structure_objectives(
         }
         chain_starts.sort_by_key(|n| n.index());
 
-        // 从每个链头沿唯一后继延伸
         let mut visited: std::collections::HashSet<NodeIndex> = std::collections::HashSet::new();
         for start in &chain_starts {
             if visited.contains(start) {
@@ -142,12 +136,10 @@ pub(in crate::layout) fn build_structure_objectives(
                 current = next;
             }
 
-            // 只对长度 >= 2 的链生成目标
             if chain.len() < 2 {
                 continue;
             }
 
-            // 连续对共轴：(x[a] - x[b])²
             for pair in chain.windows(2) {
                 let a_id = &dag[pair[0]];
                 let b_id = &dag[pair[1]];
@@ -172,14 +164,12 @@ pub(in crate::layout) fn build_structure_objectives(
     }
 
     // ─── P1: Fan 对称 ─────────────────────────────────────────────────────
-    // Fan-out: hub 对齐 children 质心；Fan-in: join 对齐 parents 质心。
     if weights.fan_symmetry > 0.0 {
         for node in &sorted_nodes {
             let node_id = &dag[*node];
             let Some(&node_layered) = id_to_layered.get(node_id) else { continue };
             let Some(&node_var) = node_to_var.get(&node_layered) else { continue };
 
-            // Fan-out: 多出度节点对齐后继质心
             let succs: Vec<NodeIndex> = dag.neighbors_directed(*node, Direction::Outgoing).collect();
             if succs.len() >= 2 {
                 let mut coefficients: Vec<(VarId, f64)> = Vec::new();
@@ -207,7 +197,6 @@ pub(in crate::layout) fn build_structure_objectives(
                 }
             }
 
-            // Fan-in: 多入度节点对齐前驱质心
             let preds: Vec<NodeIndex> = dag.neighbors_directed(*node, Direction::Incoming).collect();
             if preds.len() >= 2 {
                 let mut coefficients: Vec<(VarId, f64)> = Vec::new();
@@ -256,12 +245,10 @@ pub(in crate::layout) fn build_structure_objectives(
                 continue;
             };
 
-            // 找 dag 中的对应节点
             let Some(dag_node) = dag.node_indices().find(|&n| dag[n] == *singleton_id) else {
                 continue;
             };
 
-            // 收集邻层前驱的初值中心
             let mut target_positions: Vec<f64> = Vec::new();
             for pred in dag.neighbors_directed(dag_node, Direction::Incoming) {
                 let pred_id = &dag[pred];
@@ -275,7 +262,6 @@ pub(in crate::layout) fn build_structure_objectives(
                     }
                 }
             }
-            // 无前驱时看后继
             if target_positions.is_empty() {
                 for succ in dag.neighbors_directed(dag_node, Direction::Outgoing) {
                     let succ_id = &dag[succ];
@@ -295,11 +281,9 @@ pub(in crate::layout) fn build_structure_objectives(
                 continue;
             }
 
-            // 目标 = 中位数
             target_positions.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             let target = target_positions[target_positions.len() / 2];
 
-            // (x[singleton] - target)²
             objectives.push(ObjectiveTerm {
                 priority: ObjectivePriority::P2,
                 coefficients: vec![(singleton_var, 1.0)],
@@ -343,7 +327,6 @@ pub(in crate::layout) fn build_structure_objectives(
                 continue;
             };
 
-            // (x[end] - x[pred])² → 共轴
             objectives.push(ObjectiveTerm {
                 priority: ObjectivePriority::P1,
                 coefficients: vec![(end_var, 1.0), (pred_var, -1.0)],
@@ -360,11 +343,9 @@ pub(in crate::layout) fn build_structure_objectives(
 
     // ─── P1: Pendant 对齐锚点 ───────────────────────────────────────────────
     if weights.pendant_align > 0.0 {
-        // 识别 pendant：邻层 Real 邻居恰好 1 个，且该邻居邻层邻居 > 1（枢纽）
         let mut all_ids: Vec<String> = id_to_layer.keys().cloned().collect();
         all_ids.sort();
 
-        // 收集候选 (movable_id, anchor_id, movable_layer)
         let mut candidates: Vec<(String, String, usize)> = Vec::new();
 
         for movable_id in &all_ids {
@@ -375,7 +356,6 @@ pub(in crate::layout) fn build_structure_objectives(
                 continue;
             };
 
-            // 收集邻层 Real 邻居
             let mut adj_nbrs: Vec<String> = Vec::new();
             for nbr in dag
                 .neighbors_directed(dag_node, Direction::Incoming)
@@ -394,7 +374,6 @@ pub(in crate::layout) fn build_structure_objectives(
             }
             let anchor_id = &adj_nbrs[0];
 
-            // 验证锚点是枢纽（邻层邻居 > 1）
             let Some(anchor_dag) = dag.node_indices().find(|&n| dag[n] == *anchor_id) else {
                 continue;
             };
@@ -420,7 +399,6 @@ pub(in crate::layout) fn build_structure_objectives(
             candidates.push((movable_id.clone(), anchor_id.clone(), movable_layer));
         }
 
-        // 按 (layer, anchor) 分组
         let mut groups: HashMap<(usize, String), Vec<String>> = HashMap::new();
         for (movable, anchor, layer) in &candidates {
             groups.entry((*layer, anchor.clone())).or_default().push(movable.clone());
@@ -436,7 +414,6 @@ pub(in crate::layout) fn build_structure_objectives(
             let Some(&anchor_var) = node_to_var.get(&anchor_layered) else { continue };
 
             if pendants.len() == 1 {
-                // 单 pendant：直接对齐锚点
                 let movable_id = &pendants[0];
                 let Some(&movable_layered) = id_to_layered.get(movable_id) else { continue };
                 let Some(&movable_var) = node_to_var.get(&movable_layered) else { continue };
@@ -453,8 +430,6 @@ pub(in crate::layout) fn build_structure_objectives(
                     },
                 });
             } else {
-                // 多 pendant：组质心对齐锚点
-                // (Σ x[Pi]/n - x[A])² = (x[P1]/n + x[P2]/n + ... - x[A])²
                 let n = pendants.len() as f64;
                 let mut coefficients: Vec<(VarId, f64)> = Vec::new();
                 let mut valid = true;
@@ -470,7 +445,7 @@ pub(in crate::layout) fn build_structure_objectives(
                     priority: ObjectivePriority::P1,
                     coefficients,
                     constant: 0.0,
-                    weight: weights.pendant_align * 2.0, // 组质心权重更高
+                    weight: weights.pendant_align * 2.0,
                     source: ConstraintSource {
                         kind: ConstraintSourceKind::NodeSeparation,
                         nodes: vec![anchor_id.clone()],

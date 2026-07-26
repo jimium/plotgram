@@ -338,7 +338,7 @@ pub(super) fn apply_nudge_per_group(
                 .then_with(|| a.0.cmp(&b.0))
         });
 
-        let min_gap = super::super::layout::constants::NODE_GAP;
+        let min_gap = crate::layout::recipes::architecture::layout::constants::NODE_GAP;
         let n = planned.len();
         for i in 1..n {
             let prev_right = planned[i - 1].2 + planned[i - 1].1;

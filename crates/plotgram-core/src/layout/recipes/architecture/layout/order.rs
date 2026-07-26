@@ -8,7 +8,7 @@ use super::constants::{
 };
 use super::types::{GraphIndex, GroupMap};
 
-pub(in super::super) fn build_layers(
+pub(crate) fn build_layers(
     ranks: &HashMap<String, usize>,
     decl_index: &HashMap<String, usize>,
 ) -> Vec<Vec<String>> {
@@ -37,7 +37,7 @@ pub(in super::super) fn build_layers(
 /// 1. 加权中位数排序，但同组节点保持相邻
 /// 2. 相邻交换优化
 /// 3. 多轮迭代（sweep 数根据初始交叉数自适应，稀疏图减少迭代）
-pub(in super::super) fn order_layers_group_aware(
+pub(crate) fn order_layers_group_aware(
     graph: &GraphIndex,
     group_map: &GroupMap,
     layers: &[Vec<String>],

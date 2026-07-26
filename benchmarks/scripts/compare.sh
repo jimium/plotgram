@@ -39,7 +39,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BM="$(cd "$SCRIPT_DIR/.." && pwd)"
 # shellcheck source=benchmarks/scripts/gate-switch.sh
 source "$SCRIPT_DIR/gate-switch.sh"
-# 新架构期：compare 仍跑全部对比并打印，但不以非零码阻断（AGENTS.md §10）。
+# 门禁关闭时（PLOTGRAM_GATES=off）：仍跑全部对比并打印，但不以非零码阻断。
 REPORT_ONLY=0
 gate_enabled || REPORT_ONLY=1
 ALLOW_NODE_FP=0

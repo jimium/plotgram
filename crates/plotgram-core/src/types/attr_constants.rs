@@ -66,13 +66,12 @@ pub mod direction {
     pub const ALL: &[&str] = &[TOP_TO_BOTTOM, LEFT_TO_RIGHT, RADIAL];
 }
 
-/// 布局管线选择枚举值（diagram 级 `pipeline` 属性，Atlas Stage 0）。
+/// 布局管线选择枚举值（diagram 级 `pipeline` 属性，Atlas Stage 7：无 legacy）。
 pub mod pipeline {
-    pub const LEGACY: &str = "legacy";
     pub const ATLAS: &str = "atlas";
     pub const SHADOW: &str = "shadow";
 
-    pub const ALL: &[&str] = &[LEGACY, ATLAS, SHADOW];
+    pub const ALL: &[&str] = &[ATLAS, SHADOW];
 }
 
 /// 分组边框样式枚举值（group 级 `border_style` 属性）。

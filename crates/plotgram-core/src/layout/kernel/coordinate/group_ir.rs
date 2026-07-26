@@ -548,6 +548,8 @@ pub fn pair_gaps_from_cross_group_edge_loads(
 }
 
 /// 将 Cross 轴求解后的组左/右边界物化为 `GroupLayout` 的 x/width。
+///
+/// Stage 2b：缺失条目会 upsert（不再依赖 `compute_group_bounds` 种子表）。
 pub fn materialize_group_cross_bounds(
     problem: &CoordinateProblem,
     coords: &[f64],
@@ -563,14 +565,15 @@ pub fn materialize_group_cross_bounds(
         let left = coords[l];
         let right = coords[r];
         let width = (right - left).max(1.0);
-        if let Some(entry) = groups_out.get_mut(&g.stable_id) {
-            entry.x = left;
-            entry.width = width;
-        }
+        let entry = groups_out.entry(g.stable_id.clone()).or_default();
+        entry.x = left;
+        entry.width = width;
     }
 }
 
 /// 将 Main 轴求解后的组顶/底边界物化为 `GroupLayout` 的 y/height。
+///
+/// Stage 2b：缺失条目会 upsert。
 pub fn materialize_group_main_bounds(
     problem: &CoordinateProblem,
     coords: &[f64],
@@ -586,10 +589,9 @@ pub fn materialize_group_main_bounds(
         let top = coords[t];
         let bottom = coords[b];
         let height = (bottom - top).max(1.0);
-        if let Some(entry) = groups_out.get_mut(&g.stable_id) {
-            entry.y = top;
-            entry.height = height;
-        }
+        let entry = groups_out.entry(g.stable_id.clone()).or_default();
+        entry.y = top;
+        entry.height = height;
     }
 }
 

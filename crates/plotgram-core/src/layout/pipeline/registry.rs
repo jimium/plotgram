@@ -6,7 +6,7 @@ use crate::layout::{RoutingRecipeDyn, LayoutStrategy};
 /// 已注册的节点布局算法名（与 `build_layout_strategy` 保持一致）。
 ///
 /// 每个图类型对应一个专属配方，`auto` 为元选择器（解析为 profile 默认算法）。
-/// `circular` 为内部实现（StateRecipe 备选路径），不暴露于注册表。
+/// Stage 6：`circular` 一等注册（原仅 StateRecipe 内部委托）。
 pub const LAYOUT_ALGORITHM_NAMES: &[&str] = &[
     "auto",
     "mindmap",
@@ -15,6 +15,7 @@ pub const LAYOUT_ALGORITHM_NAMES: &[&str] = &[
     "er",
     "state",
     "architecture",
+    "circular",
 ];
 
 /// 已注册的边路由算法名（与 `build_edge_routing_strategy` 保持一致）。
@@ -25,7 +26,7 @@ pub(super) fn build_layout_strategy(
     plan: &LayoutPlan,
 ) -> Option<Box<dyn LayoutStrategy>> {
     use crate::layout::recipes::{
-        architecture, er, flowchart, mindmap, sequence, state,
+        architecture, circular, er, flowchart, mindmap, sequence, state,
     };
 
     // "auto" 解析为 profile 默认算法（由 LayoutPlan::resolve 已处理）。
@@ -45,12 +46,13 @@ pub(super) fn build_layout_strategy(
         "architecture" => Box::new(architecture::ArchitectureV2Layout::from_options(
             &plan.layout_options,
         )),
+        "circular" => Box::new(circular::CircularLayout::from_options(&plan.layout_options)),
         _ => return None,
     };
     Some(strategy)
 }
 
-pub(super) fn build_edge_routing_strategy(
+pub(in crate::layout) fn build_edge_routing_strategy(
     algo: &str,
     plan: &LayoutPlan,
 ) -> Option<Box<dyn RoutingRecipeDyn>> {

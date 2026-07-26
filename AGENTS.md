@@ -77,32 +77,20 @@
 - **渲染验真**：`cargo run -p plotgram-cli -- render <图> -o /tmp/out.svg`（默认 debug）。勿直接执行 `./target/release/plotgram`，易命中陈旧 binary（见 §5）。
 - **仅以下场景用 `--release`**：性能测量、`bench-phases` / `gate-baseline`、或 [`benchmarks/snapshot.sh`](benchmarks/snapshot.sh) / [`benchmarks/compare.sh`](benchmarks/compare.sh) 等门禁脚本（脚本内已自行 release 构建）。
 
-## 10. 【生效中】下一代布局与路由架构设计期：门禁全关（2026-07-26～）
+## 10. 【已失效】下一代布局与路由架构设计期：门禁全关（2026-07-26～2026-07-27）
 
-> **触发**：布局与路由的重大架构调整（[`docs/新架构/`](docs/新架构/) 22 总纲 / 23 推进方案）。  
-> 目标形态推翻现有「节点求解 → 冻结 → 边路由」的两段式管线，改为**组合相 / 度量相 / 落笔相**三相架构；旧棘轮绑定旧管线的中间量，继续硬阻断只会把探索卡死在第一步。
+> **状态：已失效（Stage 7 / `atlas-final` 退出）**  
+> 原触发：布局与路由重大架构调整（[`docs/新架构/`](docs/新架构/) 22 总纲 / 23 推进方案）。Stage 0–7 完成后恢复正常棘轮。
 
-**开关**：[`benchmarks/scripts/gate-switch.sh`](benchmarks/scripts/gate-switch.sh) 的 `GATES_DEFAULT=off`。
+**恢复后规则**（与 §5 / §7 / 手册 / 23 §9 一致）：
 
-| 对象 | 本期行为 |
-|------|----------|
-| `check-penalty-ratio` / `check-semantic-isolation` / `check-group-writes` / `check-builder-entry` | **跳过**（打印 SKIP，退出 0） |
-| `benchmarks/compare.sh` | **只报告不阻断**：仍打印全部对比与本应 FAIL 的项，退出码恒 0 |
-| CI `cargo test` | `continue-on-error`，结果仍打印 |
-| `benchmarks/snapshot.sh` | 不变（数据采集不是门禁），鼓励继续打 tag 留痕 |
+- [`benchmarks/scripts/gate-switch.sh`](benchmarks/scripts/gate-switch.sh) 的 `GATES_DEFAULT=on`。
+- `check-*.sh`（含 Stage 7 新增的 provenance / phase-api）与 `compare.sh` 硬轨恢复阻断。
+- CI `cargo test` 阻断；无 `PLOTGRAM_GATES=off` / `continue-on-error` 豁免。
+- 生产管线仅 `PipelineChoice::Atlas`（默认）与 `Shadow`（对拍诊断）；`legacy` 已删除。
+- 算法级重写仍可走 §7 创新模式（须显式登记）。
 
-临时开启单次校验：`PLOTGRAM_GATES=on ./benchmarks/scripts/check-semantic-isolation.sh`。
-
-**门禁关闭 ≠ 质量放弃。** 本期用**对拍**替代阻断：新旧管线并行跑同一图集，产出差异报告（见 23 号文 Stage 0 的影子执行）。抬基线仍要写 note 与角色。
-
-**仍然适用的 ★ 卫生红线**（不因关门禁而豁免）：
-
-- 确定性（§2）：禁止靠 HashMap key 序驱动布局/路由。  
-- WASM 禁 `std::time`（§6）。  
-- 禁止图名特判。  
-- 验证用 `cargo run -p plotgram-cli`，勿信陈旧 binary（§5）。
-
-**退出条件**：23 号文 Stage 4 完成（新三相管线成为五图种默认路径）后，把 `GATES_DEFAULT` 改回 `on`，删除 `.github/workflows/ci.yml` 的 `PLOTGRAM_GATES` 与 `continue-on-error`，依据新架构不变量重建门禁（Stage 7），并将本节标记为已失效。
+历史豁免条款正文已归档；勿再按「门禁全关」理解本仓库。
 
 ## 11. 单元测试编写原则
 

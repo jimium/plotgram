@@ -22,6 +22,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
 
+[profile.dev]
+split-debuginfo = "unpacked"
+codegen-units = 256
+
+[profile.dev.package."*"]
+opt-level = 1
+
 [profile.release]
 opt-level = "s"
 lto = true

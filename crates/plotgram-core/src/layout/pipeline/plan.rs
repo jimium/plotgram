@@ -73,20 +73,17 @@ impl ResolvedAlgoOptions {
     }
 }
 
-/// 布局管线选择（Atlas Stage 0 交付 0.4，23 号文 §0.3）。
+/// 布局管线选择（Atlas Stage 7：生产仅 Atlas；Shadow 供对拍诊断）。
 ///
 /// 解析优先级：diagram attr `pipeline:` > 环境变量 `PLOTGRAM_PIPELINE` >
-/// 默认 [`Legacy`](PipelineChoice::Legacy)。非法环境变量值静默回落 Legacy
-/// （attr 值由 validation 拦截，不会走到这里）；WASM 上 `env::var` 返回
-/// Err，天然回落。
+/// 默认 Atlas。非法值静默回落默认；WASM 上 `env::var` 返回 Err，天然回落。
+/// `legacy` 已删除，不再解析。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PipelineChoice {
-    /// 现有两段式管线（节点求解 → 冻结 → 边路由）。
+    /// Atlas 三相管线（默认生产路径）。
     #[default]
-    Legacy,
-    /// Atlas 三相管线（Stage 0 为转发 legacy 的空壳）。
     Atlas,
-    /// 双跑对拍：返回 legacy 结果，差异摘要打 stderr。
+    /// 双跑对拍：LayoutPipeline vs Atlas，差异摘要打 stderr；返回 Atlas 结果。
     Shadow,
 }
 
@@ -94,7 +91,6 @@ impl PipelineChoice {
     /// 从字符串解析（attr 与环境变量共用）。
     pub fn parse(value: &str) -> Option<Self> {
         match value {
-            pipeline_atoms::LEGACY => Some(Self::Legacy),
             pipeline_atoms::ATLAS => Some(Self::Atlas),
             pipeline_atoms::SHADOW => Some(Self::Shadow),
             _ => None,
@@ -102,6 +98,7 @@ impl PipelineChoice {
     }
 
     fn resolve(diagram: &Diagram) -> Self {
+        // 1. 显式属性优先
         if let Some(v) = diagram
             .attributes
             .iter()
@@ -112,10 +109,15 @@ impl PipelineChoice {
                 return choice;
             }
         }
-        std::env::var("PLOTGRAM_PIPELINE")
+        // 2. 环境变量次之
+        if let Some(choice) = std::env::var("PLOTGRAM_PIPELINE")
             .ok()
             .and_then(|v| Self::parse(&v))
-            .unwrap_or_default()
+        {
+            return choice;
+        }
+        // 3. 默认 Atlas（Stage 7）
+        Self::Atlas
     }
 }
 
@@ -129,7 +131,7 @@ pub struct LayoutPlan {
     pub layout_options: ResolvedAlgoOptions,
     pub edge_routing: String,
     pub edge_options: ResolvedAlgoOptions,
-    /// 管线选择（legacy / atlas / shadow）。
+    /// 管线选择（atlas / shadow）。
     pub pipeline: PipelineChoice,
 }
 
@@ -320,7 +322,7 @@ mod tests {
 
     #[test]
     fn pipeline_choice_parses_known_atoms_only() {
-        assert_eq!(PipelineChoice::parse("legacy"), Some(PipelineChoice::Legacy));
+        assert_eq!(PipelineChoice::parse("legacy"), None, "legacy 已删除");
         assert_eq!(PipelineChoice::parse("atlas"), Some(PipelineChoice::Atlas));
         assert_eq!(PipelineChoice::parse("shadow"), Some(PipelineChoice::Shadow));
         assert_eq!(PipelineChoice::parse("bogus"), None);
@@ -328,34 +330,91 @@ mod tests {
     }
 
     /// 解析优先级：attr > 环境变量 > 默认；非法 env 值静默回落。
-    /// env 操作集中在单个测试内串行，且仅使用 atlas（S0 转发 legacy，
-    /// 并行测试即使读到也零行为差异）与非法值（回落 Legacy = 默认）。
+    /// Stage 7 默认：全部图种 → Atlas；无 legacy。
     #[test]
     fn pipeline_choice_resolution_priority() {
         std::env::remove_var("PLOTGRAM_PIPELINE");
-        assert_eq!(
-            PipelineChoice::resolve(&Diagram::default()),
-            PipelineChoice::Legacy,
-            "无 attr 无 env → 默认 Legacy"
-        );
 
-        std::env::set_var("PLOTGRAM_PIPELINE", "atlas");
+        // 无组 flowchart → Atlas
         assert_eq!(
             PipelineChoice::resolve(&Diagram::default()),
             PipelineChoice::Atlas,
+            "无 attr 无 env，无组 flowchart → Atlas"
+        );
+
+        // 有组 flowchart → Atlas
+        let mut with_group = Diagram::default();
+        with_group.groups = vec![crate::ast::Group {
+            id: crate::ast::Identifier::new_unchecked("g1"),
+            label: "G1".into(),
+            attributes: Default::default(),
+            parent_id: None,
+            depth: 0,
+            entity_ids: vec![],
+            child_group_ids: vec![],
+            span: crate::ast::Span::dummy(),
+        }];
+        assert_eq!(
+            PipelineChoice::resolve(&with_group),
+            PipelineChoice::Atlas,
+            "有组 flowchart → Atlas"
+        );
+
+        // architecture → Atlas
+        let mut arch = Diagram::default();
+        arch.diagram_type = crate::types::DiagramType::Architecture;
+        assert_eq!(
+            PipelineChoice::resolve(&arch),
+            PipelineChoice::Atlas,
+            "architecture → Atlas"
+        );
+
+        // er → Atlas
+        let mut er = Diagram::default();
+        er.diagram_type = crate::types::DiagramType::Er;
+        assert_eq!(
+            PipelineChoice::resolve(&er),
+            PipelineChoice::Atlas,
+            "er → Atlas"
+        );
+
+        // mindmap → Atlas
+        let mut mm = Diagram::default();
+        mm.diagram_type = crate::types::DiagramType::Mindmap;
+        assert_eq!(
+            PipelineChoice::resolve(&mm),
+            PipelineChoice::Atlas,
+            "mindmap → Atlas"
+        );
+
+        // env 生效（shadow）
+        std::env::set_var("PLOTGRAM_PIPELINE", "shadow");
+        assert_eq!(
+            PipelineChoice::resolve(&Diagram::default()),
+            PipelineChoice::Shadow,
             "无 attr → env 生效"
         );
+
+        // attr 优先于 env
         assert_eq!(
-            PipelineChoice::resolve(&diagram_with_pipeline_attr("shadow")),
-            PipelineChoice::Shadow,
+            PipelineChoice::resolve(&diagram_with_pipeline_attr("atlas")),
+            PipelineChoice::Atlas,
             "attr 优先于 env"
+        );
+
+        // 非法 env（含已删 legacy）静默回落默认值
+        std::env::set_var("PLOTGRAM_PIPELINE", "legacy");
+        assert_eq!(
+            PipelineChoice::resolve(&Diagram::default()),
+            PipelineChoice::Atlas,
+            "legacy env 不再识别 → 回落 Atlas"
         );
 
         std::env::set_var("PLOTGRAM_PIPELINE", "bogus");
         assert_eq!(
             PipelineChoice::resolve(&Diagram::default()),
-            PipelineChoice::Legacy,
-            "非法 env 值静默回落 Legacy"
+            PipelineChoice::Atlas,
+            "非法 env 值回落默认值（flowchart → Atlas）"
         );
 
         std::env::remove_var("PLOTGRAM_PIPELINE");

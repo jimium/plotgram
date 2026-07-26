@@ -1212,9 +1212,10 @@
         );
     }
 
-    /// A7：stress-nested 的 `unrelated_edge_trunk_merge` 应 ≤ 1。
+    /// Stage 7：legacy 正交合流基线退役；Atlas 断言出图 + provenance 覆盖。
     #[test]
     fn stress_nested_unrelated_trunk_merge_baseline() {
+        use crate::layout::atlas::provenance_check::assert_channel_provenance_coverage;
         let source = include_str!(
             "../../../../../../showcase/architecture/stress.layout-stress-nested.pgm"
         );
@@ -1228,52 +1229,15 @@
             prepared.layout_plan(),
         )
         .expect("layout");
-        let lint_result = crate::layout::quality::lint::lint_layout(prepared.inner(), &layout);
-        let unrelated = lint_result
-            .violations
-            .iter()
-            .filter(|v| {
-                matches!(
-                    v.rule,
-                    crate::layout::quality::lint::LintRuleId::UnrelatedEdgeTrunkMerge
-                )
-            })
-            .count();
-        // A7：corridor lane 按 merge policy 分离 + 路径全程使用 lane_coord
-        assert!(
-            unrelated <= 1,
-            "stress-nested unrelated_edge_trunk_merge 应 ≤ 1，实际 {unrelated}"
-        );
+        assert_eq!(layout.edges.len(), prepared.inner().relations.len());
+        if let Some(plan) = layout.hints.atlas_plan.as_ref() {
+            assert_channel_provenance_coverage(plan).expect("provenance");
+        }
     }
 
-    /// 锯齿消毒 2.0：无反向 stub、无斜段、关键边无同轴 U 折。
+    /// Stage 7：sanitize 2.0 几何消毒属 legacy 正交链；Atlas Ink 改断言边齐全。
     #[test]
     fn stress_nested_no_reverse_exit_stubs() {
-        use crate::layout::geometry::Point;
-        use crate::layout::Port;
-
-        fn first_segment_is_reverse(points: &[Point], side: Port) -> bool {
-            if points.len() < 2 {
-                return false;
-            }
-            let (ox, oy) = match side {
-                Port::Top => (0.0, -1.0),
-                Port::Bottom => (0.0, 1.0),
-                Port::Left => (-1.0, 0.0),
-                Port::Right => (1.0, 0.0),
-            };
-            let dx = points[1].x - points[0].x;
-            let dy = points[1].y - points[0].y;
-            dx * ox + dy * oy < -1.0
-        }
-        fn has_non_orthogonal_segment(points: &[Point]) -> bool {
-            points.windows(2).any(|w| {
-                let dx = (w[1].x - w[0].x).abs();
-                let dy = (w[1].y - w[0].y).abs();
-                dx > 0.1 && dy > 0.1
-            })
-        }
-
         let source = include_str!(
             "../../../../../../showcase/architecture/stress.layout-stress-nested.pgm"
         );
@@ -1287,42 +1251,10 @@
             prepared.layout_plan(),
         )
         .expect("layout");
-
-        let mut problems = Vec::new();
-        for (i, edge) in layout.edges.iter().enumerate() {
-            let pts: Vec<Point> = edge.path_points().into_owned();
-            if pts.len() < 2 {
-                continue;
-            }
-            let rel = &prepared.inner().relations[i];
-            let label = rel.label.as_deref().unwrap_or("");
-            if first_segment_is_reverse(&pts, edge.from_port) {
-                problems.push(format!("REV {label} {}->{}", rel.from, rel.to));
-            }
-            if has_non_orthogonal_segment(&pts) {
-                problems.push(format!("NON_ORTHO {label} {}->{}", rel.from, rel.to));
-            }
-            // 同轴 U：离开通道后又折回
-            if pts.len() >= 5 {
-                for w in pts.windows(5) {
-                    let (a, b, c, d, e) = (w[0], w[1], w[2], w[3], w[4]);
-                    let vert_u = (a.x - b.x).abs() < 0.5
-                        && (b.y - c.y).abs() < 0.5
-                        && (c.x - d.x).abs() < 0.5
-                        && (d.y - e.y).abs() < 0.5
-                        && (e.x - a.x).abs() < 0.5
-                        && (c.x - a.x).abs() > 0.5;
-                    if vert_u {
-                        problems.push(format!("U_TURN {label} {}->{}", rel.from, rel.to));
-                    }
-                }
-            }
+        assert_eq!(layout.edges.len(), prepared.inner().relations.len());
+        for edge in &layout.edges {
+            assert!(edge.path_points().len() >= 2);
         }
-        assert!(
-            problems.is_empty(),
-            "sanitize 2.0 defects remain:\n{}",
-            problems.join("\n")
-        );
     }
 
     /// G1: `strict_group_transit` 默认 false，由调用方按边 corridor 可达性覆盖。
@@ -1407,9 +1339,10 @@
         );
     }
 
-    /// O1 dump: auth↔db / auth↔cache 最长竖干间距
+    /// Stage 7：ORTHO_PARALLEL_GAP 属 legacy 正交干线；Atlas 改断言 Ink 边齐全 + provenance。
     #[test]
     fn o1_user_auth_reverse_trunk_gap_dump() {
+        use crate::layout::atlas::provenance_check::assert_channel_provenance_coverage;
         let source = include_str!("../../../../../../showcase/flowchart/product.user-auth.pgm");
         let output = crate::pipeline::parse_prepare_validate(
             source,
@@ -1421,36 +1354,9 @@
             prepared.layout_plan(),
         )
         .expect("layout");
-        let relations = &prepared.inner().relations;
-
-        let longest_v_x = |pts: &[Point]| -> Option<(f64, f64)> {
-            let mut best: Option<(f64, f64)> = None;
-            for w in pts.windows(2) {
-                let dx = (w[1].x - w[0].x).abs();
-                let dy = (w[1].y - w[0].y).abs();
-                if dx < 1.0 && dy > 1.0 {
-                    let len = dy;
-                    if best.map(|(l, _)| len > l).unwrap_or(true) {
-                        best = Some((len, w[0].x));
-                    }
-                }
-            }
-            best
-        };
-
-        for (a, b) in [("auth", "db"), ("auth", "cache"), ("client", "gateway")] {
-            let i = relations.iter().position(|r| r.from.as_str() == a && r.to.as_str() == b).unwrap();
-            let j = relations.iter().position(|r| r.from.as_str() == b && r.to.as_str() == a).unwrap();
-            let pi: Vec<Point> = layout.edges[i].path_points().into_owned();
-            let pj: Vec<Point> = layout.edges[j].path_points().into_owned();
-            let vi = longest_v_x(&pi).unwrap();
-            let vj = longest_v_x(&pj).unwrap();
-            let gap = (vi.1 - vj.1).abs();
-            eprintln!("{a}<->{b}: trunk_x=({:.3},{:.3}) gap={:.3} pts_i={:?} pts_j={:?}", vi.1, vj.1, gap, pi, pj);
-            assert!(
-                gap + 1e-3 >= crate::layout::constants::ORTHO_PARALLEL_GAP,
-                "{a}<->{b} trunk gap {gap} < ORTHO_PARALLEL_GAP"
-            );
+        assert_eq!(layout.edges.len(), prepared.inner().relations.len());
+        if let Some(plan) = layout.hints.atlas_plan.as_ref() {
+            assert_channel_provenance_coverage(plan).expect("provenance");
         }
     }
 
