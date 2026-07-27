@@ -3,7 +3,7 @@ source: crates/plotgram-core/src/layout/snapshot_tests.rs
 expression: summary
 ---
 {
-  "canvas_h": 368.0,
+  "canvas_h": 404.0,
   "canvas_w": 368.0,
   "nodes": [
     {
@@ -18,7 +18,7 @@ expression: summary
       "id": "no",
       "w": 112.0,
       "x": 206.0,
-      "y": 268.0
+      "y": 304.0
     },
     {
       "h": 50.0,
@@ -32,7 +32,7 @@ expression: summary
       "id": "yes",
       "w": 112.0,
       "x": 50.0,
-      "y": 268.0
+      "y": 304.0
     }
   ]
 }

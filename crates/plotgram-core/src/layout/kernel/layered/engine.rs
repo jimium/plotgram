@@ -34,6 +34,24 @@ pub fn compute_with_preset(
     preset: &SugiyamaPreset,
     layout_config: SugiyamaLayoutConfig,
 ) -> LayoutResult {
+    compute_with_preset_inner(diagram, preset, layout_config, false)
+}
+
+/// Atlas M5：子布局恒输出规范空间（rank=Y）；LTR 由管线末端 orientation 统一处理。
+pub fn compute_with_preset_canonical(
+    diagram: &Diagram,
+    preset: &SugiyamaPreset,
+    layout_config: SugiyamaLayoutConfig,
+) -> LayoutResult {
+    compute_with_preset_inner(diagram, preset, layout_config, true)
+}
+
+fn compute_with_preset_inner(
+    diagram: &Diagram,
+    preset: &SugiyamaPreset,
+    layout_config: SugiyamaLayoutConfig,
+    emit_canonical: bool,
+) -> LayoutResult {
     if diagram.entities.is_empty() {
         return LayoutResult {
             nodes: HashMap::new(),
@@ -49,17 +67,34 @@ pub fn compute_with_preset(
     let draft = super::layered_kernel::LayeredKernel::compute(diagram, preset);
 
     // solve: CoordinateKernel (Step 8)
-    let (nodes, solved_problem) = coordinate::assign_coordinates_brandes_koepf(
-        &draft.dag,
-        &draft.proper_graph,
-        &draft.layers,
-        &draft.sizes,
-        draft.horizontal,
-        &draft.preset,
-        &draft.per_layer_gaps,
-        draft.has_order_bias,
-        &draft.end_ids,
-    );
+    // Atlas canonical：强制 TB + emit_canonical，忽略 draft.horizontal
+    let (nodes, solved_problem) = if emit_canonical {
+        coordinate::assign_coordinates_brandes_koepf_with_main_tops(
+            &draft.dag,
+            &draft.proper_graph,
+            &draft.layers,
+            &draft.sizes,
+            false,
+            &draft.preset,
+            &draft.per_layer_gaps,
+            draft.has_order_bias,
+            &draft.end_ids,
+            None,
+            true,
+        )
+    } else {
+        coordinate::assign_coordinates_brandes_koepf(
+            &draft.dag,
+            &draft.proper_graph,
+            &draft.layers,
+            &draft.sizes,
+            draft.horizontal,
+            &draft.preset,
+            &draft.per_layer_gaps,
+            draft.has_order_bias,
+            &draft.end_ids,
+        )
+    };
 
     // product: 组装 LayoutResult (Step 9-10)
     let groups = group_bounds::compute_group_bounds(

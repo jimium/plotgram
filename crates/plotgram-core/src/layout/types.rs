@@ -609,6 +609,9 @@ pub struct LayoutHints {
     /// Atlas Plan（Stage 6）：跨渲染增量用；拓扑不变可跳过相 I。
     // WRITE: atlas pipeline  READ: compute_layout_incremental
     pub atlas_plan: Option<std::sync::Arc<crate::layout::atlas::plan::Plan>>,
+    /// M7：曾记录 Ink 后 dogleg 失真边；**M7 后期 repair 已删**，生产路径恒空（字段保留供诊断/兼容）。
+    // WRITE: atlas pipeline（clear）  READ: ink_verify / 增量诊断
+    pub atlas_plan_distorted_edges: Vec<usize>,
     /// 同层边：(from_entity_id, to_entity_id)，路由按短横/L 处理而非绕底廊。
     // WRITE: layout(sugiyama same-layer)  READ: render(orthogonal routing)
     pub same_layer_edges: Vec<(String, String)>,
@@ -699,8 +702,6 @@ pub struct OrthoDebugStats {
     pub semantic_trunk_groups_merged: usize,
     /// S3：合流失败 degraded 的组数
     pub semantic_trunk_degraded: usize,
-    /// S4：S3 后为避 FanIn 干线而重路由的 feedback 边数
-    pub feedback_rerouted_after_trunk: usize,
     /// A-0 契约诊断：跨组边首个转弯点仍在源组边界内的边数（stub 未出组，ISS-001）
     pub contract_stub_violations: usize,
     /// A-0 契约诊断：末段方向与目标端口方向不一致的边数（approach 违约，ISS-002）

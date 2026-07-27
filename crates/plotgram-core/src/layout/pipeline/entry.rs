@@ -54,35 +54,23 @@ pub fn compute_layout(
 
 /// 使用已解析的 [`crate::layout::pipeline::plan::LayoutPlan`] 计算布局（`PreparedDiagram` 在 prepare 阶段已解析 plan 时走此路径）。
 ///
-/// 按 `plan.pipeline` 分发（Atlas Stage 7）：
-/// - `Atlas`：[`AtlasPipeline`](crate::layout::atlas::pipeline::AtlasPipeline)；
-/// - `Shadow`：双跑对拍（LayoutPipeline vs Atlas），返回 Atlas 结果，差异摘要打 stderr。
+/// 按 `plan.pipeline` 分发（Atlas Stage 7+）：仅 [`AtlasPipeline`](crate::layout::atlas::pipeline::AtlasPipeline)。
 pub fn compute_layout_with_plan(
     diagram: &Diagram,
     plan: &crate::layout::pipeline::plan::LayoutPlan,
 ) -> std::result::Result<LayoutResult, DiagnosticError> {
     validate_layout_config(diagram)?;
-    use crate::layout::pipeline::plan::PipelineChoice;
-    match plan.pipeline {
-        PipelineChoice::Atlas => {
-            crate::layout::atlas::pipeline::AtlasPipeline::new(diagram, plan).run()
-        }
-        PipelineChoice::Shadow => {
-            let run = crate::layout::atlas::shadow::run_shadow(
-                diagram.title().unwrap_or("<diagram>"),
-                diagram,
-                plan,
-            )?;
-            eprintln!("{}", run.report.summary_line());
-            Ok(run.atlas)
-        }
-    }
+    let _ = plan.pipeline; // 仅 Atlas；Shadow 已退役（R2）
+    crate::layout::atlas::pipeline::AtlasPipeline::new(diagram, plan).run()
 }
 
 /// Stage 6+：跨渲染增量布局入口（Plan diff 驱动）。
 ///
-/// 传入上次 `hints.atlas_plan`。槽位与边通道齐全且与本次一致时，
-/// [`solve_from_contract_with_prev`] 跳过相 I 选路搜索，仍重跑度量/Ink/Label。
+/// **实验特性（M8）**：供 CLI `PLOTGRAM_ATLAS_PLAN_CACHE` 等可选入口使用；
+/// 默认 `compute_layout` / `compute_layout_with_plan` **不**走本路径。生产勿默认打开。
+///
+/// 传入上次 `hints.atlas_plan`。槽位 rank/order 拓扑同构且边通道齐全时，
+/// 跳过相 I 选路搜索（仍重跑度量/Ink/Label）；绝对槽可重定位写入新 Plan。
 pub fn compute_layout_incremental(
     diagram: &Diagram,
     prev_plan: &crate::layout::atlas::plan::Plan,

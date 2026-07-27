@@ -14,32 +14,17 @@ use crate::layout::kernel::coordinate::model::{
 };
 use crate::layout::NodeLayout;
 
-/// 由 Plan + Substrate 回放占用后，按 Cross track 抬高层间缝。
+/// 由 Plan + Substrate 回放占用后，按 Cross track 抬高层间缝（含 M6 label 预留）。
 pub fn inflate_gaps_from_channel(
     base_gaps: &[f64],
+    diagram: &crate::ast::Diagram,
     plan: &Plan,
     substrate: &Substrate,
     occupancy: &Occupancy,
 ) -> Vec<f64> {
-    let rank_count = plan.substrate.rank_count;
-    let mut dem: BTreeMap<usize, f64> = BTreeMap::new();
-    for t in substrate.tracks() {
-        if t.orient != TrackOrient::Cross {
-            continue;
-        }
-        let lanes = occupancy.lane_demand(t.id);
-        if lanes == 0 {
-            continue;
-        }
-        let line = t.line;
-        if line == 0 || line >= rank_count {
-            continue;
-        }
-        let gap_idx = line - 1;
-        let need = channel_band_width(lanes);
-        let e = dem.entry(gap_idx).or_insert(0.0);
-        *e = e.max(need);
-    }
+    let dem = crate::layout::atlas::channel_metric::cross_gap_demands_from(
+        diagram, plan, substrate, occupancy,
+    );
     inflate_layer_gaps(base_gaps, &dem)
 }
 
@@ -251,11 +236,155 @@ pub fn expand_layer_order_gaps(
     }
 }
 
+/// M4：把 Main 走廊中心写入 `track_coords`（不覆盖已有 Cross 键）。
+///
+/// 在节点几何与 `expand_layer_order_gaps` 定稿后调用；与 Ink `order_gap_x` seed
+/// 同构（列 bbox 中点 / 外框 margin），但写者在度量相侧。
+///
+/// `horizontal`：与 BK / expand 一致——true 时 order 轴在画布 Y。
+pub fn publish_main_track_coords(
+    track_coords: &mut BTreeMap<u32, f64>,
+    substrate: &Substrate,
+    plan: &Plan,
+    nodes: &HashMap<String, NodeLayout>,
+    horizontal: bool,
+) {
+    let order_count = plan.substrate.order_count;
+    if order_count == 0 {
+        return;
+    }
+
+    let mut order_lo: Vec<f64> = vec![f64::MAX; order_count];
+    let mut order_hi: Vec<f64> = vec![f64::MIN; order_count];
+    for (node, slot) in &plan.node_slots {
+        let Some(nl) = nodes.get(node) else {
+            continue;
+        };
+        let o = slot.order.min(order_count.saturating_sub(1));
+        let (lo, hi) = if horizontal {
+            (nl.y, nl.y + nl.height)
+        } else {
+            (nl.x, nl.x + nl.width)
+        };
+        order_lo[o] = order_lo[o].min(lo);
+        order_hi[o] = order_hi[o].max(hi);
+    }
+
+    const MARGIN: f64 = 20.0;
+    let mut main_tracks: Vec<_> = substrate
+        .tracks()
+        .filter(|t| t.orient == TrackOrient::Main)
+        .collect();
+    main_tracks.sort_by_key(|t| t.id);
+
+    for t in main_tracks {
+        if track_coords.contains_key(&t.id.0) {
+            continue; // 不覆盖 Cross 或已有值
+        }
+        let line = t.line;
+        let x = if line == 0 {
+            let left = if order_lo[0] < f64::MAX {
+                order_lo[0]
+            } else {
+                0.0
+            };
+            left - MARGIN
+        } else if line >= order_count {
+            let right = if order_hi[order_count - 1] > f64::MIN {
+                order_hi[order_count - 1]
+            } else {
+                100.0
+            };
+            right + MARGIN
+        } else {
+            let prev_hi = order_hi[line - 1];
+            let next_lo = order_lo[line];
+            if prev_hi > f64::MIN && next_lo < f64::MAX {
+                (prev_hi + next_lo) * 0.5
+            } else {
+                line as f64 * 50.0
+            }
+        };
+        track_coords.insert(t.id.0, x);
+    }
+}
+
+/// R5：把 Cross 走廊中心写入 `track_coords`（不覆盖已有键，如 flat Cross LP）。
+///
+/// 与 Ink 原 `rank_gap_y` seed 同构（行 bbox 中点 / 外框 margin）。
+/// `horizontal`：true 时 rank 轴在画布 X（与 BK / Ink 转置约定一致）。
+pub fn publish_cross_track_coords(
+    track_coords: &mut BTreeMap<u32, f64>,
+    substrate: &Substrate,
+    plan: &Plan,
+    nodes: &HashMap<String, NodeLayout>,
+    horizontal: bool,
+) {
+    let rank_count = plan.substrate.rank_count;
+    if rank_count == 0 {
+        return;
+    }
+
+    let mut rank_lo: Vec<f64> = vec![f64::MAX; rank_count];
+    let mut rank_hi: Vec<f64> = vec![f64::MIN; rank_count];
+    for (node, slot) in &plan.node_slots {
+        let Some(nl) = nodes.get(node) else {
+            continue;
+        };
+        let r = slot.rank.min(rank_count.saturating_sub(1));
+        let (lo, hi) = if horizontal {
+            (nl.x, nl.x + nl.width)
+        } else {
+            (nl.y, nl.y + nl.height)
+        };
+        rank_lo[r] = rank_lo[r].min(lo);
+        rank_hi[r] = rank_hi[r].max(hi);
+    }
+
+    const MARGIN: f64 = 20.0;
+    let mut cross_tracks: Vec<_> = substrate
+        .tracks()
+        .filter(|t| t.orient == TrackOrient::Cross)
+        .collect();
+    cross_tracks.sort_by_key(|t| t.id);
+
+    for t in cross_tracks {
+        if track_coords.contains_key(&t.id.0) {
+            continue;
+        }
+        let line = t.line;
+        let y = if line == 0 {
+            let top = if rank_lo[0] < f64::MAX {
+                rank_lo[0]
+            } else {
+                0.0
+            };
+            top - MARGIN
+        } else if line >= rank_count {
+            let bottom = if rank_hi[rank_count - 1] > f64::MIN {
+                rank_hi[rank_count - 1]
+            } else {
+                100.0
+            };
+            bottom + MARGIN
+        } else {
+            let prev_hi = rank_hi[line - 1];
+            let next_lo = rank_lo[line];
+            if prev_hi > f64::MIN && next_lo < f64::MAX {
+                (prev_hi + next_lo) * 0.5
+            } else {
+                line as f64 * 50.0
+            }
+        };
+        track_coords.insert(t.id.0, y);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layout::atlas::channel::{GateId, TrackId};
-    use crate::layout::atlas::plan::{Plan, SubstrateSketch};
+    use crate::layout::atlas::channel::{GateId, TrackId, TrackOrient};
+    use crate::layout::atlas::plan::{Plan, Slot, SubstrateSketch};
 
     #[test]
     fn inflate_noop_when_no_occupancy() {
@@ -269,9 +398,114 @@ mod tests {
         let substrate = Substrate::default();
         let occ = Occupancy::new();
         let base = vec![40.0, 40.0];
-        let out = inflate_gaps_from_channel(&base, &plan, &substrate, &occ);
+        let out = inflate_gaps_from_channel(
+            &base,
+            &crate::ast::Diagram::default(),
+            &plan,
+            &substrate,
+            &occ,
+        );
         assert_eq!(out, base);
         let _ = (TrackId(0), GateId(0));
+    }
+
+    #[test]
+    fn publish_main_track_coords_midpoint_between_order_columns() {
+        let mut substrate = Substrate::default();
+        substrate
+            .add_track(TrackId(10), TrackOrient::Main, None, 1.0, 1, (0, 1))
+            .unwrap();
+        // Cross 同 id 空间另一键，确认不覆盖
+        substrate
+            .add_track(TrackId(20), TrackOrient::Cross, None, 1.0, 1, (0, 1))
+            .unwrap();
+
+        let mut plan = Plan {
+            substrate: SubstrateSketch {
+                rank_count: 1,
+                order_count: 2,
+            },
+            ..Plan::default()
+        };
+        plan.node_slots.insert("a".into(), Slot { rank: 0, order: 0 });
+        plan.node_slots.insert("b".into(), Slot { rank: 0, order: 1 });
+
+        let mut nodes = HashMap::new();
+        nodes.insert(
+            "a".into(),
+            NodeLayout {
+                x: 0.0,
+                y: 0.0,
+                width: 40.0,
+                height: 40.0,
+                ..Default::default()
+            },
+        );
+        nodes.insert(
+            "b".into(),
+            NodeLayout {
+                x: 100.0,
+                y: 0.0,
+                width: 40.0,
+                height: 40.0,
+                ..Default::default()
+            },
+        );
+
+        let mut coords = BTreeMap::new();
+        coords.insert(20, 99.0); // 假装已有 Cross
+        publish_main_track_coords(&mut coords, &substrate, &plan, &nodes, false);
+        assert_eq!(coords.get(&10).copied(), Some(70.0)); // (40+100)/2
+        assert_eq!(coords.get(&20).copied(), Some(99.0)); // Cross 未改
+    }
+
+    #[test]
+    fn publish_cross_track_coords_midpoint_between_ranks() {
+        let mut substrate = Substrate::default();
+        substrate
+            .add_track(TrackId(5), TrackOrient::Cross, None, 1.0, 1, (0, 1))
+            .unwrap();
+        substrate
+            .add_track(TrackId(15), TrackOrient::Main, None, 1.0, 1, (0, 1))
+            .unwrap();
+
+        let mut plan = Plan {
+            substrate: SubstrateSketch {
+                rank_count: 2,
+                order_count: 1,
+            },
+            ..Plan::default()
+        };
+        plan.node_slots.insert("a".into(), Slot { rank: 0, order: 0 });
+        plan.node_slots.insert("b".into(), Slot { rank: 1, order: 0 });
+
+        let mut nodes = HashMap::new();
+        nodes.insert(
+            "a".into(),
+            NodeLayout {
+                x: 0.0,
+                y: 0.0,
+                width: 40.0,
+                height: 40.0,
+                ..Default::default()
+            },
+        );
+        nodes.insert(
+            "b".into(),
+            NodeLayout {
+                x: 0.0,
+                y: 100.0,
+                width: 40.0,
+                height: 40.0,
+                ..Default::default()
+            },
+        );
+
+        let mut coords = BTreeMap::new();
+        coords.insert(15, 88.0); // 假装已有 Main
+        publish_cross_track_coords(&mut coords, &substrate, &plan, &nodes, false);
+        assert_eq!(coords.get(&5).copied(), Some(70.0)); // (40+100)/2
+        assert_eq!(coords.get(&15).copied(), Some(88.0)); // Main 未改
     }
 
     #[test]

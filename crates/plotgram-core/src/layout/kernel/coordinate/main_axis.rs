@@ -7,7 +7,11 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::layout::atlas::channel::{Occupancy, Substrate, TrackOrient};
-use crate::layout::atlas::channel_metric::channel_band_width;
+use crate::layout::atlas::channel_metric::{
+    cross_track_band_need, labeled_edge_counts_by_cross_track,
+};
+use crate::layout::atlas::plan::Plan;
+use crate::ast::Diagram;
 use crate::layout::kernel::coordinate::model::{
     ConstraintSource, ConstraintSourceKind, CoordinateProblem, CoordinateSolverConfig,
     HardConstraint, InitialCoordinates, LayerConstraintSet, NodeVariable, SolveAxis, SolverStatus,
@@ -132,6 +136,8 @@ pub fn solve_main_axis_with_cross_tracks(
     substrate: &Substrate,
     occupancy: &Occupancy,
     band_scale: f64,
+    diagram: &Diagram,
+    plan: &Plan,
 ) -> MainAxisSolveResult {
     let n = layer_heights.len();
     let empty = MainAxisSolveResult {
@@ -157,6 +163,8 @@ pub fn solve_main_axis_with_cross_tracks(
     let mut initial = Vec::with_capacity(n + 8);
     let mut cursor = first_top;
 
+    let labeled = labeled_edge_counts_by_cross_track(diagram, plan, substrate);
+
     // 预收集 Cross track（按 TrackId 排序，确定性）
     let mut tracks: Vec<(u32, usize, f64)> = Vec::new(); // (id, line, band)
     for t in substrate.tracks() {
@@ -171,7 +179,8 @@ pub fn solve_main_axis_with_cross_tracks(
         if line == 0 || line >= n {
             continue;
         }
-        let band = channel_band_width(lanes) * scale;
+        let labeled_n = labeled.get(&t.id).copied().unwrap_or(0);
+        let band = cross_track_band_need(lanes, labeled_n) * scale;
         tracks.push((t.id.0, line, band));
     }
     tracks.sort_by_key(|(id, _, _)| *id);

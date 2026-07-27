@@ -38,6 +38,7 @@ Plan **不嵌入** `channel::Substrate`：后者是 `derive_substrate` 的运行
 
 ## 留债
 
-- 标签-only 更细增量（CLI：`PLOTGRAM_ATLAS_PLAN_CACHE`）
-- MCF Gate / I.7 见 `gate_mcf` / `coord_descent`
+- **实验增量**（M8）：CLI `PLOTGRAM_ATLAS_PLAN_CACHE` → `compute_layout_incremental`；
+  生产勿默认打开；无 CI 门禁。槽位拓扑未对齐时静默全量相 I。
 - 非 Hier Ink 内化前 Tree/Sequence/Circular 仍委托 LayoutPipeline
+- 真 MCF / I.7：占位已删，未实现

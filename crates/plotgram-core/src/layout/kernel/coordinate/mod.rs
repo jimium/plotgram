@@ -41,7 +41,7 @@ pub mod builder {
     };
     pub use super::channel_ir::{
         attach_channel_ir_cross_tracks, expand_layer_order_gaps, expand_nodes_by_cross_gap_demands,
-        inflate_gaps_from_channel,
+        inflate_gaps_from_channel, publish_cross_track_coords, publish_main_track_coords,
     };
     pub use super::group_ir::{
         attach_group_ir, attach_group_ir_cross, draft_boost_h_g3_from_pair_gaps,

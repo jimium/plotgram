@@ -22,7 +22,10 @@ pub use derive::{
     SegmentRef, derive_node_ports, derive_substrate,
 };
 pub use graph::{ChannelGraph, EndpointError, Occupancy, Transition, Via};
-pub use search::{RouteOutcome, ScopeMask, route, route_candidates, route_node_sides};
+pub use search::{
+    RouteOutcome, ScopeMask, path_lane_load, route, route_candidates, route_candidates_congested,
+    route_congested, route_node_sides,
+};
 pub use substrate::{
     EdgeId, Gate, GateCapacity, GateId, GateSide, GroupId, GroupScope, NodeKey,
     PenetrationViolation, PortSide, PortSlot, PortSlotId, Substrate, SubstrateError, Track,

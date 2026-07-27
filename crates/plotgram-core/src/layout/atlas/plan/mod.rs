@@ -72,16 +72,23 @@ pub struct GroupScopeSpec {
 
 /// 端口引用：`(node, side, slot_index)` 三元组是语义身份（24 号文 R1）；
 /// `slot_id` 仅当来自已 derive 的基底时携带（重建后可能重编号，不参与指纹）。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// `side_order` / `along_offset` 是同 `(node, side)` 上的侧内决策（M1），参与指纹/diff。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PortRef {
     pub node: NodeKey,
     pub side: PortSide,
     pub slot_index: u32,
     pub slot_id: Option<PortSlotId>,
+    /// 同 `(node, side)` 上的侧内序（0..n-1）；由 [`Plan::assign_port_side_orders`] 写入。
+    #[serde(default)]
+    pub side_order: u32,
+    /// 相对侧中点、沿侧切向的有符号偏移（像素）；由 [`Plan::assign_port_along_offsets`] 写入。
+    #[serde(default)]
+    pub along_offset: f64,
 }
 
 /// 一条边的两端端口。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EdgePorts {
     pub from: PortRef,
     pub to: PortRef,
@@ -174,30 +181,144 @@ impl Plan {
                     side: fp.side,
                     slot_index: fp.slot_index,
                     slot_id: Some(fid),
+                    side_order: 0,
+                    along_offset: 0.0,
                 },
                 to: PortRef {
                     node: tp.node.clone(),
                     side: tp.side,
                     slot_index: tp.slot_index,
                     slot_id: Some(tid),
+                    side_order: 0,
+                    along_offset: 0.0,
                 },
             },
         );
     }
 
-    /// 按 EdgeId 升序为每条边的每个 track 分配确定性 lane 下标。
+    /// M1：为每条边端点写入同 `(node, side)` 上的 `side_order`（0..n-1）。
     ///
-    /// 同一 track 上的边按 EdgeId 排序依次得 0,1,2…；供 Ink `lane_centers` 使用。
-    pub fn assign_lane_indices(&mut self) {
+    /// 排序键用对端 `node_slots` 沿散布轴的离散坐标（Main 侧 → order，Cross 侧 → rank），
+    /// 平局用 EdgeId；不依赖像素坐标。幂等覆盖。
+    pub fn assign_port_side_orders(&mut self) {
+        // (node, side) → [(sort_key, eid, is_from)]
+        let mut groups: BTreeMap<(NodeKey, PortSide), Vec<(usize, EdgeId, bool)>> = BTreeMap::new();
+        for (&eid, ep) in &self.ports {
+            if ep.from.node == ep.to.node {
+                continue;
+            }
+            for (pr, other, is_from) in [
+                (&ep.from, &ep.to.node, true),
+                (&ep.to, &ep.from.node, false),
+            ] {
+                let peer = self.node_slots.get(other.as_str());
+                let key = match pr.side {
+                    PortSide::MainLow | PortSide::MainHigh => peer.map(|s| s.order).unwrap_or(0),
+                    PortSide::CrossLow | PortSide::CrossHigh => peer.map(|s| s.rank).unwrap_or(0),
+                };
+                groups
+                    .entry((pr.node.clone(), pr.side))
+                    .or_default()
+                    .push((key, eid, is_from));
+            }
+        }
+        for members in groups.values_mut() {
+            members.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
+            for (order, &(_, eid, is_from)) in members.iter().enumerate() {
+                let Some(ep) = self.ports.get_mut(&eid) else {
+                    continue;
+                };
+                let pr = if is_from { &mut ep.from } else { &mut ep.to };
+                pr.side_order = order as u32;
+            }
+        }
+    }
+
+    /// M1：按已定 `side_order` 与节点 bbox 写入各端 `along_offset`（相对侧中点切向像素）。
+    ///
+    /// 须在节点几何冻结后、Ink 落笔前调用。间距策略与历史 Ink `expand_port_points` 一致。
+    pub fn assign_port_along_offsets(
+        &mut self,
+        node_rects: &BTreeMap<String, (f64, f64, f64, f64)>,
+    ) {
+        use crate::layout::demand::CORRIDOR_LANE_PITCH;
+        use crate::layout::kernel::coordinate::main_axis::lane_centers;
+
+        let mut side_counts: BTreeMap<(NodeKey, PortSide), u32> = BTreeMap::new();
+        for ep in self.ports.values() {
+            if ep.from.node == ep.to.node {
+                continue;
+            }
+            *side_counts
+                .entry((ep.from.node.clone(), ep.from.side))
+                .or_insert(0) += 1;
+            *side_counts
+                .entry((ep.to.node.clone(), ep.to.side))
+                .or_insert(0) += 1;
+        }
+
+        // 先收集要写的值，避免边迭代中双重可变借用
+        let mut updates: Vec<(EdgeId, bool, f64)> = Vec::new();
+        for (&eid, ep) in &self.ports {
+            if ep.from.node == ep.to.node {
+                continue;
+            }
+            for (pr, is_from) in [(&ep.from, true), (&ep.to, false)] {
+                let Some(&(_, _, w, h)) = node_rects.get(pr.node.as_str()) else {
+                    continue;
+                };
+                let n = side_counts
+                    .get(&(pr.node.clone(), pr.side))
+                    .copied()
+                    .unwrap_or(1)
+                    .max(1);
+                let side_len = match pr.side {
+                    PortSide::MainLow | PortSide::MainHigh => w,
+                    PortSide::CrossLow | PortSide::CrossHigh => h,
+                };
+                let pitch = if n > 1 {
+                    CORRIDOR_LANE_PITCH.min(side_len * 0.6 / (n - 1) as f64)
+                } else {
+                    0.0
+                };
+                // base=0 的 lane_centers → 相对中点的偏移
+                let centers = lane_centers(0.0, n, pitch);
+                let along = centers
+                    .get(pr.side_order as usize)
+                    .copied()
+                    .unwrap_or(0.0);
+                updates.push((eid, is_from, along));
+            }
+        }
+        for (eid, is_from, along) in updates {
+            let Some(ep) = self.ports.get_mut(&eid) else {
+                continue;
+            };
+            let pr = if is_from { &mut ep.from } else { &mut ep.to };
+            pr.along_offset = along;
+        }
+    }
+
+    /// M3：按端点槽位字典序为每条边的每个 track 分配确定性 lane 下标。
+    ///
+    /// - Cross track：`(from.order, to.order, eid)`
+    /// - Main track：`(from.rank, to.rank, eid)`
+    /// - 缺 ports/slots 时回退 EdgeId。
+    pub fn assign_lane_indices(&mut self, substrate: &super::channel::Substrate) {
         let mut per_track: BTreeMap<TrackId, Vec<EdgeId>> = BTreeMap::new();
         for (&eid, tracks) in &self.channels {
             for &tid in tracks {
                 per_track.entry(tid).or_default().push(eid);
             }
         }
-        for edges in per_track.values_mut() {
+        for (tid, edges) in &mut per_track {
             edges.sort_unstable();
             edges.dedup();
+            let orient = substrate.track(*tid).map(|t| t.orient);
+            edges.sort_by(|&a, &b| {
+                self.lane_sort_key(a, orient)
+                    .cmp(&self.lane_sort_key(b, orient))
+            });
         }
 
         let mut lane_indices: BTreeMap<EdgeId, Vec<u32>> = BTreeMap::new();
@@ -222,6 +343,31 @@ impl Plan {
         self.lane_indices = lane_indices;
     }
 
+    fn lane_sort_key(
+        &self,
+        eid: EdgeId,
+        orient: Option<super::channel::TrackOrient>,
+    ) -> (usize, usize, EdgeId) {
+        let Some(ep) = self.ports.get(&eid) else {
+            return (0, 0, eid);
+        };
+        let from = self.node_slots.get(&ep.from.node);
+        let to = self.node_slots.get(&ep.to.node);
+        match orient {
+            Some(super::channel::TrackOrient::Cross) => (
+                from.map(|s| s.order).unwrap_or(0),
+                to.map(|s| s.order).unwrap_or(0),
+                eid,
+            ),
+            Some(super::channel::TrackOrient::Main) => (
+                from.map(|s| s.rank).unwrap_or(0),
+                to.map(|s| s.rank).unwrap_or(0),
+                eid,
+            ),
+            None => (0, 0, eid),
+        }
+    }
+
     /// 从已收录的 `channels` 检测合流并写入 `bundles`。
     ///
     /// `BTreeMap` 迭代序即 `EdgeId` 升序，与 [`detect_bundles`] 的确定性
@@ -240,7 +386,11 @@ impl Plan {
     /// `a.semantic_eq(&b)` → 指纹必相等；`==` 则是结构相等。
     pub fn semantic_eq(&self, other: &Plan) -> bool {
         fn port_eq(a: &PortRef, b: &PortRef) -> bool {
-            a.node == b.node && a.side == b.side && a.slot_index == b.slot_index
+            a.node == b.node
+                && a.side == b.side
+                && a.slot_index == b.slot_index
+                && a.side_order == b.side_order
+                && a.along_offset.to_bits() == b.along_offset.to_bits()
         }
         self.substrate == other.substrate
             && self.node_slots == other.node_slots

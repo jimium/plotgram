@@ -120,41 +120,6 @@ pub fn run_refine(
         result = entry_snapshot;
     }
 
-    // Phase 2 红线：refine 结束后仍穿组则外框 U 形硬修（与 lint 同口径）
-    if !result.groups.is_empty()
-        && count_group_interior_edges(diagram, &result) > 0
-    {
-        let mut grid =
-            crate::layout::routing::edge_routing_orthogonal::OrthoSegmentGrid::new();
-        for (ei, edge) in result.edges.iter().enumerate() {
-            if edge.path_is_empty() {
-                continue;
-            }
-            grid.insert_path(&edge.path_points().into_owned(), ei);
-        }
-        let sorted: Vec<String> = {
-            let mut g: Vec<String> = result.groups.keys().cloned().collect();
-            g.sort();
-            g
-        };
-        let group_ctx = crate::layout::group::GroupRoutingContext::from_layout(
-            diagram,
-            &result,
-            crate::layout::group::routing_algo_for_diagram(diagram),
-        );
-        let n = crate::layout::routing::edge_routing_orthogonal::repair_group_interior_crossings(
-            &mut result.edges,
-            diagram,
-            &result.groups,
-            &group_ctx,
-            &sorted,
-            &mut grid,
-        );
-        if n > 0 {
-            crate::perf_log!("[perf]     refine_phase2_group_repair: repaired={}", n);
-        }
-    }
-
     result
 }
 

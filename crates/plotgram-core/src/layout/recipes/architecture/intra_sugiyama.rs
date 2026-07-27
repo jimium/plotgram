@@ -23,7 +23,7 @@ pub(crate) fn layout_intra_with_sugiyama_v2(
     }
 
     let sub = build_sub_diagram(diagram, members);
-    let result = engine::compute_with_preset(
+    let result = engine::compute_with_preset_canonical(
         &sub,
         &preset::ARCHITECTURE_PRESET,
         SugiyamaLayoutConfig::default(),

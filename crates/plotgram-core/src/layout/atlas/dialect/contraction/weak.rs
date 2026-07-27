@@ -168,7 +168,7 @@ impl<'a> IntraGroupLayouter for FlowchartIntraGroupLayouter<'a> {
         }
 
         let sub_diagram = self.build_sub_diagram(members);
-        let result = engine::compute_with_preset(
+        let result = engine::compute_with_preset_canonical(
             &sub_diagram,
             &preset::FLOWCHART_PRESET,
             self.config,

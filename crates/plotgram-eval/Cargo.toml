@@ -11,4 +11,8 @@ plotgram-core = { workspace = true, default-features = false }
 serde.workspace = true
 serde_json.workspace = true
 
+[[bin]]
+name = "atlas_repair_baseline"
+path = "src/bin/atlas_repair_baseline.rs"
+
 [dev-dependencies]

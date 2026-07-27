@@ -23,6 +23,7 @@ pub mod atlas;
 pub mod catalog;
 pub mod snap;
 pub mod constants;
+pub mod orientation;
 pub mod decl_order;
 pub mod demand;
 pub mod routing;

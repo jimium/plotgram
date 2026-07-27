@@ -35,10 +35,14 @@ pub(in crate::layout) fn assign_coordinates_brandes_koepf(
         _has_same_layer_edges,
         end_ids,
         None,
+        false,
     )
 }
 
 /// 与 [`assign_coordinates_brandes_koepf`] 相同，但可用 Main 轴 LP 产出的层顶替换启发式 Y 堆叠。
+///
+/// `emit_canonical`：true 时跳过画布轴转置，恒输出规范空间（rank=Y）；LTR 由管线末端
+/// [`crate::layout::orientation::apply_layout_orientation`] 统一处理（Atlas M5）。
 pub(in crate::layout) fn assign_coordinates_brandes_koepf_with_main_tops(
     dag: &DiGraph<String, ()>,
     layered_graph: &DiGraph<LayerNode, ()>,
@@ -50,6 +54,7 @@ pub(in crate::layout) fn assign_coordinates_brandes_koepf_with_main_tops(
     _has_same_layer_edges: bool,
     end_ids: &[String],
     layer_tops: Option<&[f64]>,
+    emit_canonical: bool,
 ) -> (HashMap<String, crate::layout::NodeLayout>, Option<crate::layout::kernel::coordinate::model::CoordinateProblem>) {
     let spine = compute_spine_nodes(dag);
     let mut centers =
@@ -142,7 +147,8 @@ pub(in crate::layout) fn assign_coordinates_brandes_koepf_with_main_tops(
             let LayerNodeKind::Real(original_node) = layered_graph[*node].kind.clone() else {
                 continue;
             };
-            let layout = if horizontal {
+            // M5：emit_canonical 时恒规范空间；recipe 仍可用 horizontal 画布转置
+            let layout = if horizontal && !emit_canonical {
                 crate::layout::NodeLayout {
                     x: center_y - height / 2.0,
                     y: x - width / 2.0,

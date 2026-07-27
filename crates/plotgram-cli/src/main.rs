@@ -1,6 +1,13 @@
 //! Plotgram CLI
 //!
 //! 命令行工具，用于解析、验证和渲染 Plotgram 文件（.pgm）。
+//!
+//! ## 实验环境变量
+//!
+//! - `PLOTGRAM_ATLAS_PLAN_CACHE=<path>`：**实验特性**（M8）。指向可读写的 Plan JSON
+//!   缓存文件，命中时走 `compute_layout_incremental`（可跳过相 I 选路）。
+//!   默认渲染路径**不**依赖此变量；无 CI 门禁。槽位拓扑未对齐时静默全量相 I。
+//!   生产勿默认打开。
 
 use clap::{Parser, Subcommand};
 use plotgram_core::diff2::{self, ChangeSet, ChangeOp};
@@ -13,7 +20,6 @@ use plotgram_core::pipeline::{import_prepare_validate, parse_prepare, parse_prep
 use plotgram_core::pipeline::{render_json, render_text};
 use plotgram_core::RenderFormat;
 use std::fs;
-use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(
@@ -106,14 +112,6 @@ enum Commands {
         #[arg(short, long)]
         output: Option<String>,
     },
-    /// Atlas vs LayoutPipeline 影子对拍（诊断工具，退出码恒 0；非 CI 门禁）
-    Shadow {
-        /// 图集清单 (.txt，每行一个 .pgm 路径，`#` 注释) 或单个 .pgm 文件
-        input: String,
-        /// HTML 报告输出路径（SVG 并排 + 节点 diff 表；缺省只打 stdout 汇总）
-        #[arg(short, long)]
-        output: Option<String>,
-    },
 }
 
 fn main() {
@@ -155,7 +153,6 @@ fn main() {
             patch_file,
             output,
         }) => cmd_patch(&input, &patch_file, output.as_deref()),
-        Some(Commands::Shadow { input, output }) => cmd_shadow(&input, output.as_deref()),
         None => {
             println!("Plotgram - Turn anything into a diagram");
             println!("使用 'plotgram --help' 查看可用命令");
@@ -341,7 +338,7 @@ fn cmd_render(
 
     let prepared = pipeline_output.diagram.unwrap();
 
-    // Render（可选：PLOTGRAM_ATLAS_PLAN_CACHE 走 Plan 增量；SVG 注入 layout）
+    // Render（实验：PLOTGRAM_ATLAS_PLAN_CACHE → Plan 增量；SVG 注入 layout）
     let mut request = plotgram_core::render::RenderRequest::new(&prepared, format);
     request.transparent_background = transparent_background;
     request.show_title = show_title;
@@ -516,7 +513,9 @@ fn layout_with_optional_plan_cache(
             if let Ok(prev) =
                 serde_json::from_slice::<plotgram_core::layout::atlas::plan::Plan>(&bytes)
             {
-                eprintln!("[atlas] incremental via PLOTGRAM_ATLAS_PLAN_CACHE");
+                eprintln!(
+                    "[atlas] experimental PLOTGRAM_ATLAS_PLAN_CACHE → incremental"
+                );
                 let layout =
                     plotgram_core::layout::compute_layout_incremental(diagram, &prev)?;
                 if let Some(p) = layout.hints.atlas_plan.as_ref() {
@@ -786,193 +785,3 @@ fn cmd_patch(input: &str, patch_file: &str, output: Option<&str>) {
     }
 }
 
-// ─── shadow 对拍（Atlas Stage 0 交付 0.6） ─────────────────────────
-
-/// 单图对拍产出：报告 + 两张 SVG；失败时记录原因（不阻断后续图）。
-struct ShadowItem {
-    name: String,
-    outcome: Result<(plotgram_core::layout::atlas::shadow::ShadowReport, String, String), String>,
-}
-
-/// 收集输入：单个 .pgm，或图集清单（每行一个 .pgm 路径，相对 cwd，`#` 注释）。
-fn collect_shadow_inputs(input: &str) -> Vec<(String, PathBuf)> {
-    let display_name = |p: &str| {
-        PathBuf::from(p)
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| p.to_string())
-    };
-    if input.ends_with(".pgm") {
-        return vec![(display_name(input), PathBuf::from(input))];
-    }
-    let content = read_source(input);
-    content
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .map(|l| (display_name(l), PathBuf::from(l)))
-        .collect()
-}
-
-fn run_shadow_item(
-    name: &str,
-    path: &PathBuf,
-) -> Result<(plotgram_core::layout::atlas::shadow::ShadowReport, String, String), String> {
-    use plotgram_core::layout::atlas::shadow::{run_shadow, ShadowRun};
-    use plotgram_core::pipeline::render_svg_with_layout;
-    use plotgram_core::render::RenderRequest;
-
-    let source =
-        fs::read_to_string(path).map_err(|e| format!("无法读取 {}: {}", path.display(), e))?;
-    let output = parse_prepare_validate(&source, &StyleRequest::default());
-    if !output.is_valid() {
-        return Err(format!("验证未通过（{} 个错误）", output.errors.len()));
-    }
-    let prepared = output.diagram.unwrap();
-    let ShadowRun {
-        legacy,
-        atlas,
-        report,
-    } = run_shadow(name, prepared.inner(), prepared.layout_plan())
-        .map_err(|e| format!("布局失败: {}", e))?;
-    let request = RenderRequest::new(&prepared, RenderFormat::Svg);
-    let svg_legacy = render_svg_with_layout(&request, legacy)
-        .map_err(|e| format!("legacy SVG 渲染失败: {}", e))?;
-    let svg_atlas = render_svg_with_layout(&request, atlas)
-        .map_err(|e| format!("atlas SVG 渲染失败: {}", e))?;
-    Ok((report, svg_legacy, svg_atlas))
-}
-
-/// legacy vs atlas 影子对拍：stdout 汇总 + 可选 HTML 报告。退出码恒 0
-/// （门禁关闭期只报告不阻断，23 号文 §2）。
-fn cmd_shadow(input: &str, output: Option<&str>) {
-    let inputs = collect_shadow_inputs(input);
-    if inputs.is_empty() {
-        eprintln!("图集清单为空: {}", input);
-        return;
-    }
-
-    let mut items = Vec::new();
-    let mut zero_count = 0usize;
-    let mut fail_count = 0usize;
-    for (name, path) in &inputs {
-        let outcome = run_shadow_item(name, path);
-        match &outcome {
-            Ok((report, _, _)) => {
-                if report.is_zero() {
-                    zero_count += 1;
-                }
-                println!("{}", report.summary_line());
-            }
-            Err(reason) => {
-                fail_count += 1;
-                println!("[shadow] {}: 跳过（{}）", name, reason);
-            }
-        }
-        items.push(ShadowItem {
-            name: name.clone(),
-            outcome,
-        });
-    }
-    let compared = items.len() - fail_count;
-    println!(
-        "[shadow] 汇总: {}/{} 零差异（对拍 {} 图，跳过 {} 图）",
-        zero_count, compared, compared, fail_count
-    );
-
-    if let Some(path) = output {
-        let html = build_shadow_html(&items);
-        fs::write(path, html).unwrap_or_else(|e| {
-            eprintln!("错误: 无法写入文件 '{}': {}", path, e);
-            std::process::exit(1);
-        });
-        println!("已写入: {}", path);
-    }
-}
-
-fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
-}
-
-/// HTML 报告：顶部汇总表 + 每图节点 diff 表与两张 SVG 并排。
-fn build_shadow_html(items: &[ShadowItem]) -> String {
-    let mut html = String::from(
-        "<!DOCTYPE html><html><head><meta charset=\"utf-8\">\
-         <title>Atlas Shadow 对拍报告</title><style>\
-         body{font-family:sans-serif;margin:20px}\
-         table{border-collapse:collapse;margin:8px 0}\
-         th,td{border:1px solid #ccc;padding:4px 10px;font-size:13px}\
-         .zero{color:#0a0}.diff{color:#c00}.skip{color:#888}\
-         .pair{display:flex;gap:16px;overflow-x:auto}\
-         .pair>div{border:1px solid #ddd;padding:8px}\
-         .pair svg{max-width:640px;height:auto}\
-         details{margin:12px 0}summary{cursor:pointer;font-weight:bold}\
-         </style></head><body><h1>Atlas Shadow 对拍报告</h1>\n",
-    );
-
-    // 汇总表
-    html.push_str("<table><tr><th>图</th><th>节点 diff</th><th>p95 (px)</th><th>max (px)</th><th>组 diff</th><th>lint</th><th>画布 Δ</th><th>零差异</th></tr>\n");
-    for item in items {
-        match &item.outcome {
-            Ok((r, _, _)) => {
-                let mark = if r.is_zero() {
-                    "<td class=\"zero\">✓</td>"
-                } else {
-                    "<td class=\"diff\">✗</td>"
-                };
-                html.push_str(&format!(
-                    "<tr><td>{}</td><td>{}</td><td>{:.2}</td><td>{:.2}</td><td>{}</td><td>{}</td><td>({:.1}, {:.1})</td>{}</tr>\n",
-                    html_escape(&item.name),
-                    r.node_diffs.len(),
-                    r.node_stats.p95,
-                    r.node_stats.max,
-                    r.group_diffs.len(),
-                    if r.lint_legacy == r.lint_atlas { "持平" } else { "有变化" },
-                    r.canvas_dw,
-                    r.canvas_dh,
-                    mark,
-                ));
-            }
-            Err(reason) => {
-                html.push_str(&format!(
-                    "<tr><td>{}</td><td colspan=\"7\" class=\"skip\">跳过：{}</td></tr>\n",
-                    html_escape(&item.name),
-                    html_escape(reason),
-                ));
-            }
-        }
-    }
-    html.push_str("</table>\n");
-
-    // 每图明细
-    for item in items {
-        let Ok((report, svg_legacy, svg_atlas)) = &item.outcome else {
-            continue;
-        };
-        html.push_str(&format!(
-            "<details{}><summary>{} — {}</summary>\n",
-            if report.is_zero() { "" } else { " open" },
-            html_escape(&item.name),
-            html_escape(&report.summary_line()),
-        ));
-        if !report.node_diffs.is_empty() {
-            html.push_str("<table><tr><th>节点</th><th>dx</th><th>dy</th></tr>\n");
-            for d in &report.node_diffs {
-                html.push_str(&format!(
-                    "<tr><td>{}</td><td>{:.2}</td><td>{:.2}</td></tr>\n",
-                    html_escape(&d.id),
-                    d.dx,
-                    d.dy
-                ));
-            }
-            html.push_str("</table>\n");
-        }
-        html.push_str(&format!(
-            "<div class=\"pair\"><div><h3>legacy</h3>{}</div><div><h3>atlas</h3>{}</div></div></details>\n",
-            svg_legacy, svg_atlas
-        ));
-    }
-
-    html.push_str("</body></html>\n");
-    html
-}

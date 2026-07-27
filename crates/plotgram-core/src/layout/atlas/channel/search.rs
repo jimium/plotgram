@@ -141,6 +141,28 @@ pub fn route(
     occupancy: &Occupancy,
     allowed: &ScopeMask,
 ) -> Result<RouteOutcome, EndpointError> {
+    route_inner(graph, from, to, occupancy, allowed, false)
+}
+
+/// M2：在 bends/length 之后用 `lane_demand` 作软偏好（写入 LexCost.q5）。
+pub fn route_congested(
+    graph: &ChannelGraph<'_>,
+    from: PortSlotId,
+    to: PortSlotId,
+    occupancy: &Occupancy,
+    allowed: &ScopeMask,
+) -> Result<RouteOutcome, EndpointError> {
+    route_inner(graph, from, to, occupancy, allowed, true)
+}
+
+fn route_inner(
+    graph: &ChannelGraph<'_>,
+    from: PortSlotId,
+    to: PortSlotId,
+    occupancy: &Occupancy,
+    allowed: &ScopeMask,
+    congestion_bias: bool,
+) -> Result<RouteOutcome, EndpointError> {
     let substrate = graph.substrate();
     let from_port = substrate.port(from).ok_or(EndpointError::UnknownPort(from))?;
     let to_port = substrate.port(to).ok_or(EndpointError::UnknownPort(to))?;
@@ -157,10 +179,14 @@ pub fn route(
         return Ok(RouteOutcome::infeasible());
     }
 
-    let start_cost = LexCost {
+    let mut start_cost = LexCost {
         q4_length: OrderedF64(substrate.track(start).map_or(0.0, |t| t.span_weight)),
         ..LexCost::default()
     };
+    if congestion_bias {
+        start_cost.q5_alignment =
+            OrderedF64(occupancy.lane_demand(start) as f64);
+    }
     if start == goal {
         // 不同节点、同宿主轨道（如 B7 退化组的边界缝）：单轨道解合法。
         return Ok(RouteOutcome {
@@ -214,7 +240,14 @@ pub fn route(
             if !allowed.allows(target_scope) {
                 continue;
             }
-            let next_cost = step_cost(graph, &cost, track, tr.to, tr.via);
+            let next_cost = step_cost(
+                graph,
+                &cost,
+                track,
+                tr.to,
+                tr.via,
+                congestion_bias.then_some(occupancy),
+            );
             let better = match best.get(&tr.to) {
                 None => true,
                 Some((bc, _, _)) => next_cost < *bc,
@@ -238,6 +271,7 @@ fn step_cost(
     from: TrackId,
     to: TrackId,
     via: Via,
+    occupancy: Option<&Occupancy>,
 ) -> LexCost {
     let substrate = graph.substrate();
     let mut c = *prev;
@@ -257,6 +291,10 @@ fn step_cost(
     };
     c.q3_bends = c.q3_bends.saturating_add(bend);
     c.q4_length = OrderedF64(c.q4_length.0 + substrate.track(to).map_or(0.0, |t| t.span_weight));
+    if let Some(occ) = occupancy {
+        // q5：低于 bends/length 的拥塞软偏好（M2 rip-up）
+        c.q5_alignment = OrderedF64(c.q5_alignment.0 + occ.lane_demand(to) as f64);
+    }
     c
 }
 
@@ -320,6 +358,50 @@ pub fn route_candidates(
     for &f in &froms {
         for &t in &tos {
             if let Ok(mut out) = route(graph, f, t, occupancy, allowed) {
+                if out.status == SolverStatus::Converged
+                    && best
+                        .as_ref()
+                        .is_none_or(|(b, _, _)| out.cost < b.cost)
+                {
+                    out.from_port = Some(f);
+                    out.to_port = Some(t);
+                    best = Some((out, f, t));
+                }
+            }
+        }
+    }
+    Ok(best.map(|(out, _, _)| out).unwrap_or_else(RouteOutcome::infeasible))
+}
+
+/// 路径上各 track 的 `lane_demand` 之和（rip-up 次级键；不修改 occupancy）。
+pub fn path_lane_load(occupancy: &Occupancy, tracks: &[TrackId]) -> u32 {
+    tracks.iter().map(|&t| occupancy.lane_demand(t)).sum()
+}
+
+/// M2 rip-up 用：Dijkstra 内以 `lane_demand` 写入 LexCost.q5（低于 bends/length）。
+///
+/// 端点笛卡尔积上取完整 LexCost 最小；平局 `(from_id, to_id)`。
+pub fn route_candidates_congested(
+    graph: &ChannelGraph<'_>,
+    from_candidates: &[PortSlotId],
+    to_candidates: &[PortSlotId],
+    occupancy: &Occupancy,
+    allowed: &ScopeMask,
+) -> Result<RouteOutcome, EndpointError> {
+    if from_candidates.is_empty() || to_candidates.is_empty() {
+        return Err(EndpointError::EmptyCandidates);
+    }
+    let mut froms: Vec<PortSlotId> = from_candidates.to_vec();
+    froms.sort();
+    froms.dedup();
+    let mut tos: Vec<PortSlotId> = to_candidates.to_vec();
+    tos.sort();
+    tos.dedup();
+
+    let mut best: Option<(RouteOutcome, PortSlotId, PortSlotId)> = None;
+    for &f in &froms {
+        for &t in &tos {
+            if let Ok(mut out) = route_congested(graph, f, t, occupancy, allowed) {
                 if out.status == SolverStatus::Converged
                     && best
                         .as_ref()

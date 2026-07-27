@@ -19,7 +19,9 @@ use super::derive::{
     derive_substrate,
 };
 use super::graph::{ChannelGraph, EndpointError, Occupancy};
-use super::search::{ScopeMask, route, route_candidates, route_node_sides};
+use super::search::{
+    ScopeMask, path_lane_load, route, route_candidates, route_candidates_congested, route_node_sides,
+};
 use super::substrate::{
     GateCapacity, GateId, GateSide, GroupId, PortSide, PortSlotId, Substrate, SubstrateError,
     TrackId, TrackOrient,
@@ -603,6 +605,39 @@ fn equal_bends_prefer_shorter_length() {
 // ---------------------------------------------------------------------------
 // 确定性（AGENTS.md §2）
 // ---------------------------------------------------------------------------
+
+#[test]
+fn route_candidates_congested_prefers_lower_path_load() {
+    // 菱形平局：贪心取小 TrackId(M10)；M10 已占用后 congested 应改走 M11。
+    let mut s = Substrate::new();
+    s.add_track(tid(0), CROSS, None, 1.0, 0, (0, 4)).unwrap();
+    s.add_track(tid(1), CROSS, None, 1.0, 1, (0, 4)).unwrap();
+    s.add_track(tid(10), MAIN, None, 1.0, 0, (0, 2)).unwrap();
+    s.add_track(tid(11), MAIN, None, 1.0, 1, (0, 2)).unwrap();
+    for m in 10..12 {
+        s.link(tid(0), tid(m)).unwrap();
+        s.link(tid(1), tid(m)).unwrap();
+    }
+    attach(&mut s, 0, 0);
+    attach(&mut s, 1, 1);
+
+    let g = ChannelGraph::from_substrate(&s);
+    let mask = ScopeMask::for_ports(&s, port(0), port(1)).unwrap();
+    let mut occ = Occupancy::new();
+    let first = route(&g, port(0), port(1), &occ, &mask).unwrap();
+    assert_eq!(first.tracks, vec![tid(0), tid(10), tid(1)]);
+    occ.commit(&first.tracks, &first.gates);
+
+    let plain = route_candidates(&g, &[port(0)], &[port(1)], &occ, &mask).unwrap();
+    assert_eq!(plain.tracks, first.tracks, "无拥塞键时仍选同一 LexCost 路径");
+
+    let biased = route_candidates_congested(&g, &[port(0)], &[port(1)], &occ, &mask).unwrap();
+    assert_eq!(biased.tracks, vec![tid(0), tid(11), tid(1)]);
+    assert!(
+        path_lane_load(&occ, &biased.tracks) < path_lane_load(&occ, &plain.tracks),
+        "拥塞键应降低 path_load"
+    );
+}
 
 #[test]
 fn route_is_deterministic_under_exact_ties() {

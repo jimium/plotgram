@@ -9,7 +9,8 @@
 //!
 //! **决策口径**（与 [`super::diff`] / [`Plan::semantic_eq`] 一致）：`provenance`
 //! 不参与（溯源是元数据非决策）；`bundles` 按规范序编码（Vec 顺序不携带
-//! 语义，同 diff 的集合差口径）；`PortRef::slot_id` 不参与。
+//! 语义，同 diff 的集合差口径）；`PortRef::slot_id` 不参与；**`side_order` /
+//! `along_offset` 参与**（M1 侧内序与切向偏移是决策）。
 //!
 //! 非密码学哈希：仅供一致性判定与未来增量缓存键，不抗恶意碰撞。
 
@@ -64,12 +65,14 @@ fn side_code(side: PortSide) -> u8 {
     }
 }
 
-/// 端口引用编码：`(node, side, slot_index)` 语义身份；`slot_id` **不参与**
-/// （基底重建后 PortSlotId 可能重编号，指纹只认语义身份，见 `PortRef` doc）。
+/// 端口引用编码：`(node, side, slot_index, side_order, along_offset bits)`；
+/// `slot_id` **不参与**（基底重建后 PortSlotId 可能重编号）。
 fn write_port(h: &mut Fnv1a, p: &PortRef) {
     h.str(&p.node);
     h.bytes(&[side_code(p.side)]);
     h.u64(u64::from(p.slot_index));
+    h.u64(u64::from(p.side_order));
+    h.u64(p.along_offset.to_bits());
 }
 
 impl Plan {

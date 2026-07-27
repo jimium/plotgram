@@ -10,7 +10,7 @@ use crate::error::DiagnosticError;
 use crate::layout::atlas::dialect::{
     compile_atlas, AtlasContract, DialectKind, HierarchicalPreset,
 };
-use crate::layout::atlas::plan::{Plan, Slot, SubstrateSketch};
+use crate::layout::atlas::plan::Plan;
 use crate::layout::pipeline::plan::LayoutPlan;
 use crate::layout::types::LayoutResult;
 
@@ -53,32 +53,26 @@ impl<'a> AtlasPipeline<'a> {
 
         if let Some(prev) = self.prev_plan {
             // 拓扑粗检：实体序一致则后续 metric 路径可跳过相 I 选路
-            let topo = topology_plan(self.diagram);
-            let slots_match = prev.node_slots.len() == topo.node_slots.len()
-                && prev
-                    .node_slots
-                    .keys()
-                    .zip(topo.node_slots.keys())
-                    .all(|(a, b)| a == b);
+            let ids = entity_ids_in_order(self.diagram);
+            let slots_match = prev.node_slots.len() == ids.len()
+                && prev.node_slots.keys().zip(ids.iter()).all(|(a, b)| a == b);
             if slots_match && !prev.channels.is_empty() {
                 crate::perf_log!("[atlas] prev Plan present → attempt phase I skip");
             }
         }
 
-        let mut result = match &contract {
+        let result = match &contract {
             AtlasContract::Hierarchical(hc) => self.run_hierarchical(hc)?,
             AtlasContract::Tree { .. }
             | AtlasContract::Sequence { .. }
             | AtlasContract::Circular { .. } => {
                 // Tree / Sequence / Circular：复用现有 recipe + 路由（BuiltinEdges 自动跳过路由）
                 // Wave3 记债：非 Hier Ink 内化前仍委托 LayoutPipeline
+                // R4：非 Hier 不写入假 atlas_plan（channels 空 / rank=0）
                 crate::layout::pipeline::runner::LayoutPipeline::new(self.diagram, self.plan).run()?
             }
         };
 
-        if result.hints.atlas_plan.is_none() {
-            result.hints.atlas_plan = Some(Arc::new(topology_plan(self.diagram)));
-        }
         Ok(result)
     }
 
@@ -165,24 +159,93 @@ impl<'a> AtlasPipeline<'a> {
                     ),
                 ));
             }
+            let ink_plan = {
+                let node_rects: std::collections::BTreeMap<String, (f64, f64, f64, f64)> = result
+                    .nodes
+                    .iter()
+                    .map(|(id, n)| (id.clone(), (n.x, n.y, n.width, n.height)))
+                    .collect();
+                let mut plan = metric.plan.clone();
+                plan.assign_port_along_offsets(&node_rects);
+                plan
+            };
             result.edges = super::ink::materialize_edges(
                 self.diagram,
-                &metric.plan,
+                &ink_plan,
                 &metric.substrate,
                 &result.nodes,
+                &result.groups,
                 &output.track_coords,
-                // flat 路径的内核轴转置（left-to-right）；divide/strong 恒垂直 rank
-                output.draft.as_ref().is_some_and(|d| d.horizontal),
             );
-            result.hints.atlas_plan = Some(Arc::new(metric.plan.clone()));
+            result.hints.atlas_plan = Some(Arc::new(ink_plan.clone()));
             crate::perf_log!(
                 "[atlas] ink materialize: {} edges (channels={})",
                 result.edges.len(),
-                metric.plan.channels.len()
+                ink_plan.channels.len()
             );
-            // Ink 几何可能与组框 AABB 相交（channel L6 只证 track 拓扑）；
-            // 落笔后对穿组边做 dogleg 硬修，闭合 D3 穿组=0 证明链。
-            repair_ink_group_pierces(self.diagram, &mut result);
+            {
+                let pre = super::ink_verify::verify_ink_vs_plan(
+                    &ink_plan,
+                    &metric.substrate,
+                    &result.nodes,
+                    &result.edges,
+                    &output.track_coords,
+                    &std::collections::BTreeSet::new(),
+                    Some(&result.groups),
+                );
+                if !pre.is_empty() {
+                    crate::perf_log!("[atlas/ink-verify] pre-ink: {}", pre.len());
+                }
+            }
+            // M7 后期：第三道 dogleg 已删；穿组由 Ink 守 gate/裙边 + M7-2 + lint 承担。
+            result.hints.atlas_plan_distorted_edges.clear();
+            {
+                let post = super::ink_verify::verify_ink_vs_plan(
+                    &ink_plan,
+                    &metric.substrate,
+                    &result.nodes,
+                    &result.edges,
+                    &output.track_coords,
+                    &std::collections::BTreeSet::new(),
+                    Some(&result.groups),
+                );
+                let (geom, dist_n) = super::ink_verify::partition_violations(&post);
+                let hard = super::ink_verify::hard_geom_count(&post);
+                if dist_n > 0 || geom > hard {
+                    crate::perf_log!(
+                        "[atlas/ink-verify] post-ink: soft_other={}",
+                        geom.saturating_sub(hard)
+                    );
+                }
+                // M7-2：几何硬 FAIL（含 PortSideMismatch）；PlanDistorted 仍软
+                if hard > 0 {
+                    let sample: Vec<String> = post
+                        .iter()
+                        .filter(|v| {
+                            matches!(
+                                v,
+                                super::ink_verify::InkPlanViolation::MissingGeometry(_)
+                                    | super::ink_verify::InkPlanViolation::NonOrthogonal(_)
+                                    | super::ink_verify::InkPlanViolation::CorridorMiss { .. }
+                                    | super::ink_verify::InkPlanViolation::GateMiss { .. }
+                                    | super::ink_verify::InkPlanViolation::PortSideMismatch { .. }
+                                    | super::ink_verify::InkPlanViolation::Scope(_, _)
+                            )
+                        })
+                        .take(8)
+                        .map(|v| format!("{v:?}"))
+                        .collect();
+                    crate::perf_log!(
+                        "[atlas/ink-verify] post-ink: hard_geom={hard} → fail sample={sample:?}"
+                    );
+                    return Err(DiagnosticError::layout_failed(
+                        crate::ast::Span::dummy(),
+                        format!(
+                            "atlas ink↔plan geometric mismatch: {hard} hard violation(s); sample={sample:?}"
+                        ),
+                    ));
+                }
+            }
             let non_ortho = super::ink::audit_orthogonal_segments(&result.edges);
             if non_ortho > 0 {
                 crate::perf_log!("[atlas] ink ortho audit: {non_ortho} non-axis segment(s)");
@@ -239,6 +302,11 @@ impl<'a> AtlasPipeline<'a> {
         );
 
         frozen.assert_unchanged(&result);
+        // M5：规范 → 画布 LTR（节点/边/组/label）；须在 frozen assert 之后
+        if crate::layout::orientation::needs_axis_transpose(self.diagram) {
+            crate::layout::orientation::apply_layout_orientation(&mut result);
+            crate::perf_log!("[atlas] orientation: left-to-right axis transpose");
+        }
         canvas_finalize::finalize_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
         let write_thresh = match self.diagram.diagram_type {
             crate::types::DiagramType::Architecture => 1,
@@ -250,50 +318,11 @@ impl<'a> AtlasPipeline<'a> {
     }
 }
 
-/// Ink 后穿组硬修：对 `edge_crosses_group_interior` 边跑 dogleg（aggressive 裙边）。
-fn repair_ink_group_pierces(diagram: &Diagram, result: &mut LayoutResult) {
-    use std::collections::HashSet;
-    if result.groups.is_empty() || result.edges.is_empty() {
-        return;
-    }
-    let mut pierced = HashSet::new();
-    for i in 0..result.edges.len() {
-        if crate::layout::quality::lint::edge_index_crosses_group_interior(diagram, result, i) {
-            pierced.insert(i);
-        }
-    }
-    if pierced.is_empty() {
-        return;
-    }
-    crate::perf_log!(
-        "[atlas] ink post-repair: {} group-pierce edge(s)",
-        pierced.len()
-    );
-    crate::layout::quality::refine::reroute_edges_for_repair(result, diagram, &pierced, true);
-}
-
-/// 拓扑级 Plan：实体序 + 边 id 集合，供 PlanDiff / 增量入口。
-pub fn topology_plan(diagram: &Diagram) -> Plan {
-    let mut node_slots = std::collections::BTreeMap::new();
-    for (i, e) in diagram.entities.iter().enumerate() {
-        node_slots.insert(
-            e.id.as_str().to_string(),
-            Slot {
-                rank: 0,
-                order: i,
-            },
-        );
-    }
-    let mut plan = Plan {
-        substrate: SubstrateSketch {
-            rank_count: 1,
-            order_count: diagram.entities.len(),
-        },
-        ..Default::default()
-    };
-    plan.node_slots = node_slots;
-    for (i, _) in diagram.relations.iter().enumerate() {
-        plan.channels.insert(i, Vec::new());
-    }
-    plan
+/// 实体 id 插入序（确定性粗检用；非假 Plan）。
+fn entity_ids_in_order(diagram: &Diagram) -> Vec<String> {
+    diagram
+        .entities
+        .iter()
+        .map(|e| e.id.as_str().to_string())
+        .collect()
 }

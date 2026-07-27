@@ -73,18 +73,16 @@ impl ResolvedAlgoOptions {
     }
 }
 
-/// 布局管线选择（Atlas Stage 7：生产仅 Atlas；Shadow 供对拍诊断）。
+/// 布局管线选择（Atlas Stage 7+：仅 Atlas；Shadow 对拍已退役，见 doc 30 R2）。
 ///
 /// 解析优先级：diagram attr `pipeline:` > 环境变量 `PLOTGRAM_PIPELINE` >
-/// 默认 Atlas。非法值静默回落默认；WASM 上 `env::var` 返回 Err，天然回落。
-/// `legacy` 已删除，不再解析。
+/// 默认 Atlas。非法值（含已删的 `shadow` / `legacy`）静默回落默认；
+/// WASM 上 `env::var` 返回 Err，天然回落。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PipelineChoice {
     /// Atlas 三相管线（默认生产路径）。
     #[default]
     Atlas,
-    /// 双跑对拍：LayoutPipeline vs Atlas，差异摘要打 stderr；返回 Atlas 结果。
-    Shadow,
 }
 
 impl PipelineChoice {
@@ -92,7 +90,6 @@ impl PipelineChoice {
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             pipeline_atoms::ATLAS => Some(Self::Atlas),
-            pipeline_atoms::SHADOW => Some(Self::Shadow),
             _ => None,
         }
     }
@@ -108,15 +105,20 @@ impl PipelineChoice {
             if let Some(choice) = Self::parse(v) {
                 return choice;
             }
+            crate::perf_log!(
+                "[pipeline] unknown pipeline={v:?} (shadow retired); falling back to atlas"
+            );
         }
         // 2. 环境变量次之
-        if let Some(choice) = std::env::var("PLOTGRAM_PIPELINE")
-            .ok()
-            .and_then(|v| Self::parse(&v))
-        {
-            return choice;
+        if let Ok(v) = std::env::var("PLOTGRAM_PIPELINE") {
+            if let Some(choice) = Self::parse(&v) {
+                return choice;
+            }
+            crate::perf_log!(
+                "[pipeline] unknown PLOTGRAM_PIPELINE={v:?} (shadow retired); falling back to atlas"
+            );
         }
-        // 3. 默认 Atlas（Stage 7）
+        // 3. 默认 Atlas
         Self::Atlas
     }
 }
@@ -131,7 +133,7 @@ pub struct LayoutPlan {
     pub layout_options: ResolvedAlgoOptions,
     pub edge_routing: String,
     pub edge_options: ResolvedAlgoOptions,
-    /// 管线选择（atlas / shadow）。
+    /// 管线选择（仅 atlas）。
     pub pipeline: PipelineChoice,
 }
 
@@ -324,13 +326,13 @@ mod tests {
     fn pipeline_choice_parses_known_atoms_only() {
         assert_eq!(PipelineChoice::parse("legacy"), None, "legacy 已删除");
         assert_eq!(PipelineChoice::parse("atlas"), Some(PipelineChoice::Atlas));
-        assert_eq!(PipelineChoice::parse("shadow"), Some(PipelineChoice::Shadow));
+        assert_eq!(PipelineChoice::parse("shadow"), None, "shadow 已退役");
         assert_eq!(PipelineChoice::parse("bogus"), None);
         assert_eq!(PipelineChoice::parse(""), None);
     }
 
     /// 解析优先级：attr > 环境变量 > 默认；非法 env 值静默回落。
-    /// Stage 7 默认：全部图种 → Atlas；无 legacy。
+    /// Stage 7 默认：全部图种 → Atlas；无 legacy / shadow。
     #[test]
     fn pipeline_choice_resolution_priority() {
         std::env::remove_var("PLOTGRAM_PIPELINE");
@@ -387,19 +389,19 @@ mod tests {
             "mindmap → Atlas"
         );
 
-        // env 生效（shadow）
+        // 已退役 shadow env → 回落 Atlas
         std::env::set_var("PLOTGRAM_PIPELINE", "shadow");
         assert_eq!(
             PipelineChoice::resolve(&Diagram::default()),
-            PipelineChoice::Shadow,
-            "无 attr → env 生效"
+            PipelineChoice::Atlas,
+            "shadow env 不再识别 → 回落 Atlas"
         );
 
-        // attr 优先于 env
+        // attr atlas
         assert_eq!(
             PipelineChoice::resolve(&diagram_with_pipeline_attr("atlas")),
             PipelineChoice::Atlas,
-            "attr 优先于 env"
+            "attr atlas"
         );
 
         // 非法 env（含已删 legacy）静默回落默认值
@@ -421,17 +423,27 @@ mod tests {
     }
 
     /// DSL 全链：parser 接受 `pipeline:` atom，validation 枚举校验，
-    /// LayoutPlan 解析到位；非法值被 validation 拦截。
+    /// LayoutPlan 解析到位；非法值（含 shadow）被 validation 拦截。
     #[test]
     fn pipeline_attr_flows_through_dsl_chain() {
         let ok = crate::pipeline::parse_prepare_validate(
-            "diagram flowchart {\n    config {\n        pipeline: shadow\n    }\n    entity a \"A\"\n}",
+            "diagram flowchart {\n    config {\n        pipeline: atlas\n    }\n    entity a \"A\"\n}",
             &crate::prepare::StyleRequest::default(),
         );
         assert!(ok.is_valid(), "{:?}", ok.errors);
         assert_eq!(
             ok.diagram.unwrap().layout_plan().pipeline,
-            PipelineChoice::Shadow
+            PipelineChoice::Atlas
+        );
+
+        let retired = crate::pipeline::parse_prepare_validate(
+            "diagram flowchart {\n    config {\n        pipeline: shadow\n    }\n    entity a \"A\"\n}",
+            &crate::prepare::StyleRequest::default(),
+        );
+        assert!(
+            !retired.is_valid(),
+            "shadow 应被 validation 拦截: {:?}",
+            retired.errors
         );
 
         let bad = crate::pipeline::parse_prepare_validate(

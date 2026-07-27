@@ -25,6 +25,8 @@ fn port_ref(node: &str, side: PortSide, slot_index: u32) -> PortRef {
         side,
         slot_index,
         slot_id: None,
+        side_order: 0,
+        along_offset: 0.0,
     }
 }
 
@@ -114,6 +116,16 @@ fn fingerprint_is_sensitive_to_each_field() {
     let mut p = base.clone();
     p.ports.get_mut(&0).unwrap().from.slot_index = 3;
     assert_ne!(p.fingerprint(), f0, "端口 slot_index 变更应改变指纹");
+
+    // side_order 变更（M1 决策）
+    let mut p = base.clone();
+    p.ports.get_mut(&0).unwrap().from.side_order = 1;
+    assert_ne!(p.fingerprint(), f0, "端口 side_order 变更应改变指纹");
+
+    // along_offset 变更（M1 决策）
+    let mut p = base.clone();
+    p.ports.get_mut(&0).unwrap().from.along_offset = 9.0;
+    assert_ne!(p.fingerprint(), f0, "端口 along_offset 变更应改变指纹");
 
     // bundle 增删
     let mut p = base.clone();
@@ -380,4 +392,151 @@ fn serde_roundtrip_preserves_fingerprint() {
     let b: Plan = serde_json::from_str(&json).unwrap();
     assert_eq!(a, b);
     assert_eq!(a.fingerprint(), b.fingerprint());
+}
+
+// ---------------------------------------------------------------------------
+// M1 side_order / M3 lane 端点序
+// ---------------------------------------------------------------------------
+
+#[test]
+fn assign_port_side_orders_by_peer_slot() {
+    // 节点 s 底边连向左(order=0)与右(order=2)两目标 → side_order 跟对端 order
+    let cases = [
+        ("left_first", 0usize, 2usize, 0u32, 1u32),
+        ("right_first_slots", 2usize, 0usize, 1u32, 0u32),
+    ];
+    for (name, order_b, order_c, expect_edge0, expect_edge1) in cases {
+        let mut p = Plan {
+            substrate: SubstrateSketch {
+                rank_count: 2,
+                order_count: 3,
+            },
+            ..Plan::default()
+        };
+        p.node_slots.insert("s".into(), slot(0, 1));
+        p.node_slots.insert("b".into(), slot(1, order_b));
+        p.node_slots.insert("c".into(), slot(1, order_c));
+        // 故意先插入 EdgeId=1 再 EdgeId=0，验证不按插入序
+        p.ports.insert(
+            1,
+            EdgePorts {
+                from: port_ref("s", PortSide::MainHigh, 0),
+                to: port_ref("c", PortSide::MainLow, 0),
+            },
+        );
+        p.ports.insert(
+            0,
+            EdgePorts {
+                from: port_ref("s", PortSide::MainHigh, 0),
+                to: port_ref("b", PortSide::MainLow, 0),
+            },
+        );
+        p.assign_port_side_orders();
+        assert_eq!(
+            p.ports[&0].from.side_order, expect_edge0,
+            "{name}: edge0"
+        );
+        assert_eq!(
+            p.ports[&1].from.side_order, expect_edge1,
+            "{name}: edge1"
+        );
+    }
+}
+
+#[test]
+fn assign_port_along_offsets_orders_same_side() {
+    // 同侧两端口：side_order 0/1 → along_offset 一负一正（相对中点）
+    use std::collections::BTreeMap;
+    let cases = [
+        (0u32, 1u32), // edge0 order0, edge1 order1
+    ];
+    for (ord0, ord1) in cases {
+        let mut p = Plan {
+            substrate: SubstrateSketch {
+                rank_count: 2,
+                order_count: 2,
+            },
+            ..Plan::default()
+        };
+        p.node_slots.insert("s".into(), slot(0, 0));
+        p.node_slots.insert("a".into(), slot(1, 0));
+        p.node_slots.insert("b".into(), slot(1, 1));
+        p.ports.insert(
+            0,
+            EdgePorts {
+                from: {
+                    let mut r = port_ref("s", PortSide::MainHigh, 0);
+                    r.side_order = ord0;
+                    r
+                },
+                to: port_ref("a", PortSide::MainLow, 0),
+            },
+        );
+        p.ports.insert(
+            1,
+            EdgePorts {
+                from: {
+                    let mut r = port_ref("s", PortSide::MainHigh, 0);
+                    r.side_order = ord1;
+                    r
+                },
+                to: port_ref("b", PortSide::MainLow, 0),
+            },
+        );
+        let mut rects = BTreeMap::new();
+        rects.insert("s".into(), (0.0, 0.0, 100.0, 40.0));
+        rects.insert("a".into(), (0.0, 80.0, 40.0, 40.0));
+        rects.insert("b".into(), (60.0, 80.0, 40.0, 40.0));
+        p.assign_port_along_offsets(&rects);
+        let a0 = p.ports[&0].from.along_offset;
+        let a1 = p.ports[&1].from.along_offset;
+        assert!(
+            a0 < a1,
+            "side_order {ord0}<{ord1} → along {a0} < {a1}"
+        );
+        assert!((a0 + a1).abs() < 1e-9, "对称中点两侧偏移应互为相反数");
+    }
+}
+
+#[test]
+fn assign_lane_indices_follows_endpoint_slots_not_edge_id() {
+    // Cross 走廊：边 0 端点 order (2,2)，边 1 端点 order (0,0)
+    // 若按 EdgeId：edge0→lane0；按槽位：edge1 应 lane0
+    let mut s = Substrate::new();
+    s.add_track(tid(0), TrackOrient::Cross, None, 1.0, 1, (0, 2))
+        .unwrap();
+
+    let mut p = Plan {
+        substrate: SubstrateSketch {
+            rank_count: 2,
+            order_count: 3,
+        },
+        ..Plan::default()
+    };
+    p.node_slots.insert("a".into(), slot(0, 2));
+    p.node_slots.insert("b".into(), slot(1, 2));
+    p.node_slots.insert("c".into(), slot(0, 0));
+    p.node_slots.insert("d".into(), slot(1, 0));
+    p.ports.insert(
+        0,
+        EdgePorts {
+            from: port_ref("a", PortSide::MainHigh, 0),
+            to: port_ref("b", PortSide::MainLow, 0),
+        },
+    );
+    p.ports.insert(
+        1,
+        EdgePorts {
+            from: port_ref("c", PortSide::MainHigh, 0),
+            to: port_ref("d", PortSide::MainLow, 0),
+        },
+    );
+    p.channels.insert(0, vec![tid(0)]);
+    p.channels.insert(1, vec![tid(0)]);
+    p.gates.insert(0, vec![]);
+    p.gates.insert(1, vec![]);
+
+    p.assign_lane_indices(&s);
+    assert_eq!(p.lane_indices[&1][0], 0, "较小 order 的边应得 lane 0");
+    assert_eq!(p.lane_indices[&0][0], 1, "较大 order 的边应得 lane 1");
 }
