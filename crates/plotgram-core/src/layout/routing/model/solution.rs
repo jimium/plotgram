@@ -122,8 +122,8 @@ impl EndpointAssignment {
         is_from: bool,
         node_id: String,
         target: Point,
-    ) -> crate::layout::routing::edge_routing_orthogonal::slot::Endpoint {
-        use crate::layout::routing::edge_routing_orthogonal::slot::Endpoint;
+    ) -> crate::layout::routing::model::Endpoint {
+        use crate::layout::routing::model::Endpoint;
         Endpoint {
             edge_index: self.edge.index(),
             is_from,

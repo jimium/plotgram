@@ -18,26 +18,8 @@ const EXIT_CHECK_DISTANCE: f64 = 32.0;
 // DockingStrategy + choose_docking_strategy 已迁入 crate::layout::routing::model::solution（Slice C1）。
 pub use crate::layout::routing::model::solution::{choose_docking_strategy, DockingStrategy};
 
-/// Endpoint descriptor for slot assignment and path building.
-///
-/// Carries everything the slot-assignment pass (sorting by target) and the
-/// path-building pass (anchor / side / node_id) need, so that `EndpointPair`
-/// can be handed to `select_best_path` without extra parameters.
-#[derive(Clone)]
-pub struct Endpoint {
-    pub edge_index: usize,
-    pub is_from: bool,
-    /// Opposite node center, used for slot sorting along the side.
-    pub target_x: f64,
-    pub target_y: f64,
-    pub lane: usize,
-    /// Node id this endpoint sits on.
-    pub node_id: String,
-    /// Connection side (port) on the node.
-    pub side: Port,
-    /// Resolved slot anchor coordinates (filled in during slot assignment).
-    pub anchor: Point,
-}
+/// R1：Endpoint 已外提到 `routing/model`；保留转发供 ortho 内 `use super::*`。
+pub use crate::layout::routing::model::Endpoint;
 
 /// Deterministically choose connection sides based on geometric relationship
 ///

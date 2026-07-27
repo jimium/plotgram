@@ -114,7 +114,9 @@ pub fn cross_track_band_need(lanes: u32, labeled_on_track: u32) -> f64 {
     channel_band_width(lanes) + (labeled_on_track as f64) * CROSS_LABEL_HEIGHT
 }
 
-/// 按 Cross `TrackId` 统计路径含该 track 且中段 label 非空的边数。
+/// 按 Cross `TrackId` 统计路径含该 track 且带任一非空 label 的边数。
+///
+/// 「带 label」= 主 `label` / `head_label` / `tail_label` 任一非空（每边至多计 1）。
 pub fn labeled_edge_counts_by_cross_track(
     diagram: &Diagram,
     plan: &Plan,
@@ -125,7 +127,10 @@ pub fn labeled_edge_counts_by_cross_track(
         let Some(rel) = diagram.relations.get(eid) else {
             continue;
         };
-        if !rel.label.as_deref().is_some_and(|s| !s.is_empty()) {
+        let has_label = [rel.label.as_deref(), rel.head_label.as_deref(), rel.tail_label.as_deref()]
+            .into_iter()
+            .any(|s| s.is_some_and(|t| !t.is_empty()));
+        if !has_label {
             continue;
         }
         for &tid in tracks {
@@ -767,8 +772,18 @@ mod tests {
             dem.get(&0)
         );
 
-        // 去掉 label → 仅 lane band
+        // 去掉主 label，改用 head_label → 仍计 1 份高度
         diagram.relations[0].label = None;
+        diagram.relations[0].head_label = Some("H".into());
+        let dem_head = metric.cross_gap_demands(&diagram);
+        assert!(
+            (dem_head.get(&0).copied().unwrap_or(0.0) - expected).abs() < 1e-9,
+            "head_label should count; got {:?}",
+            dem_head.get(&0)
+        );
+
+        // 清空全部 label → 仅 lane band
+        diagram.relations[0].head_label = None;
         let dem2 = metric.cross_gap_demands(&diagram);
         assert!(
             (dem2.get(&0).copied().unwrap_or(0.0) - channel_band_width(2)).abs() < 1e-9,

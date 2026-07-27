@@ -21,6 +21,7 @@
 
 pub mod audit;
 pub mod contract;
+pub mod endpoint;
 pub mod frozen_solution;
 pub mod frozen_store;
 pub mod materialize;
@@ -45,6 +46,7 @@ pub use stable_edge::{
 };
 
 pub use audit::{AuditReport, AuditViolation, RouteAuditContext, RouteAuditor, ViolationKind};
+pub use endpoint::Endpoint;
 pub use repair::{RepairPriority, RouteAuditReport, RouteConstraintId, RouteRepairIntent};
 pub use materialize::{
     AuditedRouteGeometry, FrozenRouteGeometry, GeometryMaterializer, MaterializedRouteGeometry,

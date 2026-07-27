@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use crate::layout::demand::CorridorModel;
 use crate::layout::routing::common::spatial_grid::SpatialGrid;
 use super::{OrthoConfig, OrthoRoutingProfile, RoutedSegment};
-use super::slot::Endpoint;
+use crate::layout::routing::model::Endpoint;
 use super::visibility_graph::OrthogonalVisibilityGraph;
 
 /// Shared, read-only routing context for a single `route_edges_orthogonal` call.
