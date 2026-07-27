@@ -171,6 +171,8 @@ impl<'a> AtlasPipeline<'a> {
                 &metric.substrate,
                 &result.nodes,
                 &output.track_coords,
+                // flat 路径的内核轴转置（left-to-right）；divide/strong 恒垂直 rank
+                output.draft.as_ref().is_some_and(|d| d.horizontal),
             );
             result.hints.atlas_plan = Some(Arc::new(metric.plan.clone()));
             crate::perf_log!(

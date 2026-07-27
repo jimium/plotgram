@@ -5,7 +5,7 @@
 //!
 //! - [`scene`]:布局 + 主题/样式物化 → [`ExportScene`]
 //! - [`paint`]:SVG 绘制原语(路径、颜色、样式映射)
-//! - [`encode`]:格式编码(SVG / JSON / ASCII / PNG / WebP)
+//! - [`encode`]:格式编码(SVG / JSON / ASCII 等)
 //!
 //! 图表类型差异见 [`crate::kinds`],笔触皮肤见 [`crate::graphic_style`]。
 
@@ -22,13 +22,6 @@ pub use crate::graphic_style::parse_graphic_style_id;
 pub use encode::{
     encoder_for, AsciiRenderer, DiagramEncodeOutput, DrawioRenderer, EncodingPath, FormatEncoder,
     JsonRenderer, SvgRenderer,
-};
-#[cfg(feature = "raster")]
-pub use encode::{PngRenderer, WebpRenderer};
-#[cfg(feature = "raster")]
-pub use encode::{
-    build_usvg_options, default_fonts_dir, fonts_dir, fonts_dir_from_env, set_fonts_dir,
-    FONTS_DIR_ENV_VAR,
 };
 pub use output::RenderOutput;
 pub use paint::{color_queries, style_mapping, svg_utils};
@@ -48,8 +41,6 @@ pub use visual::{ArrowStyle, EdgeLabelStyle, EdgeStyle, LabelAnchor, NodeShape, 
 pub enum RenderFormat {
     Svg,
     Ascii,
-    Png,
-    Webp,
     Json,
     Drawio,
     MdOutline,
@@ -62,8 +53,6 @@ impl fmt::Display for RenderFormat {
         match self {
             RenderFormat::Svg => write!(f, "svg"),
             RenderFormat::Ascii => write!(f, "ascii"),
-            RenderFormat::Png => write!(f, "png"),
-            RenderFormat::Webp => write!(f, "webp"),
             RenderFormat::Json => write!(f, "json"),
             RenderFormat::Drawio => write!(f, "drawio"),
             RenderFormat::MdOutline => write!(f, "md-outline"),
@@ -78,8 +67,6 @@ impl RenderFormat {
         match s.to_lowercase().as_str() {
             "svg" => Some(RenderFormat::Svg),
             "ascii" | "text" => Some(RenderFormat::Ascii),
-            "png" => Some(RenderFormat::Png),
-            "webp" => Some(RenderFormat::Webp),
             "json" => Some(RenderFormat::Json),
             "drawio" => Some(RenderFormat::Drawio),
             "md-outline" | "md" => Some(RenderFormat::MdOutline),
@@ -93,8 +80,6 @@ impl RenderFormat {
         match self {
             RenderFormat::Svg => "svg",
             RenderFormat::Ascii => "txt",
-            RenderFormat::Png => "png",
-            RenderFormat::Webp => "webp",
             RenderFormat::Json => "json",
             RenderFormat::Drawio => "drawio",
             RenderFormat::MdOutline => "md",

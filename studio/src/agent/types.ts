@@ -50,7 +50,7 @@ export interface PatchResult {
 }
 
 /** 渲染格式(与 Rust RenderFormat 对齐) */
-export type RenderFormat = 'svg' | 'ascii' | 'json' | 'png' | 'webp';
+export type RenderFormat = 'svg' | 'ascii' | 'json';
 
 /** 渲染结果(对应 Rust RenderResult) */
 export interface RenderResult {

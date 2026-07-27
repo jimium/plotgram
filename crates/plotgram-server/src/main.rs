@@ -6,35 +6,14 @@ mod agent_proxy;
 mod api;
 
 use axum::{routing::get, routing::post, Router};
-use plotgram_core::render::encode::{fonts_dir, set_fonts_dir};
 use std::env;
-use std::path::PathBuf;
 
 async fn health() -> &'static str {
     "ok"
 }
 
-fn configure_fonts_dir() {
-    if let Ok(dir) = env::var("PLOTGRAM_FONTS_DIR") {
-        let dir = dir.trim();
-        if !dir.is_empty() {
-            set_fonts_dir(PathBuf::from(dir));
-        }
-    }
-
-    let dir = fonts_dir();
-    if !dir.is_dir() {
-        eprintln!(
-            "警告: 字体目录不存在 '{}'，PNG/WebP 渲染中的中文可能显示异常",
-            dir.display()
-        );
-    }
-}
-
 #[tokio::main]
 async fn main() {
-    configure_fonts_dir();
-
     // Agent Proxy 配置（即使未启用也构造，便于路由注册）
     let proxy_config = agent_proxy::AgentProxyConfig::from_env();
     let proxy_state = agent_proxy::AgentProxyState::new(proxy_config.clone());
@@ -59,7 +38,7 @@ async fn main() {
 
     println!("Plotgram Server listening on {addr}");
     println!("  POST /validate    — 语法与语义校验");
-    println!("  POST /render      — 渲染 (svg/ascii/png/webp/json)");
+    println!("  POST /render      — 渲染 (svg/ascii/json)");
     println!("  POST /agent/chat  — DeepSeek 中转 (SSE) [enabled={}]", proxy_config.enabled);
     println!("  GET  /health      — 健康检查");
 

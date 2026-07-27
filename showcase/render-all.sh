@@ -10,6 +10,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # 默认 release：计时反映真实渲染性能；开发时可 PLOTGRAM_PROFILE=debug
 PLOTGRAM_PROFILE="${PLOTGRAM_PROFILE:-release}"
 PLOTGRAM_BIN="$ROOT_DIR/target/$PLOTGRAM_PROFILE/plotgram"
+RASTER_BIN="$ROOT_DIR/target/$PLOTGRAM_PROFILE/plotgram-raster"
 export PLOTGRAM_FONTS_DIR="${PLOTGRAM_FONTS_DIR:-$ROOT_DIR/fonts}"
 
 FORMATS=("svg")
@@ -27,7 +28,7 @@ usage() {
 输出与源文件同目录、同名换后缀（如 flowchart/s.linear-chain.svg）。
 
 选项:
-  -f, --format FORMAT   输出格式: svg | png | webp | ascii | json（默认 svg）
+  -f, --format FORMAT   输出格式: svg | png | webp | ascii | json（默认 svg；png/webp 由 plotgram-raster 从 SVG 转换）
   -a, --all             同时渲染 svg 和 png（便于与 Mermaid 截图对比）
       --validate        渲染前先执行语法验证
   -s, --serve [PORT]    渲染完成后启动 HTTP 服务（默认 4173），便于在浏览器中查看 index.html
@@ -88,13 +89,27 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+needs_raster() {
+  local f
+  for f in "${FORMATS[@]}"; do
+    if [[ "$f" == "png" || "$f" == "webp" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 build_plotgram() {
   export CARGO_TARGET_DIR="$ROOT_DIR/target"
-  echo "构建 plotgram-cli ($PLOTGRAM_PROFILE)..."
+  local packages=(-p plotgram-cli)
+  if needs_raster; then
+    packages+=(-p plotgram-raster)
+  fi
+  echo "构建 ${packages[*]#-p } ($PLOTGRAM_PROFILE)..."
   if [[ "$PLOTGRAM_PROFILE" == "release" ]]; then
-    (cd "$ROOT_DIR" && cargo build --release -p plotgram-cli)
+    (cd "$ROOT_DIR" && cargo build --release "${packages[@]}")
   else
-    (cd "$ROOT_DIR" && cargo build -p plotgram-cli)
+    (cd "$ROOT_DIR" && cargo build "${packages[@]}")
   fi
   echo
 }
@@ -139,14 +154,7 @@ change_note_for() {
 
 # 仅统计 plotgram render 墙钟耗时（毫秒精度）。
 # 子进程 stdout/stderr 重定向到 /dev/null，避免 [perf] 等日志污染输出。
-run_timed_render() {
-  local render_args=(render "$1" -f "$2" -o "$3")
-  if $TRANSPARENT_BG; then
-    render_args+=(--transparent-background)
-  fi
-  if $SHOW_TITLE; then
-    render_args+=(--title)
-  fi
+timed_exec() {
   perl -MTime::HiRes=time -e '
     use strict;
     my $start = time();
@@ -161,7 +169,44 @@ run_timed_render() {
     my $rc = $? >> 8;
     print int((time() - $start) * 1000 + 0.5), "\n";
     exit($rc);
-  ' -- "$PLOTGRAM_BIN" "${render_args[@]}"
+  ' -- "$@"
+}
+
+run_timed_render() {
+  local input="$1" format="$2" out="$3"
+  local render_format="$format" render_out="$out" tmp_svg=""
+
+  # png/webp 先渲 SVG，再由 plotgram-raster 转位图；计时仅覆盖 plotgram render
+  if [[ "$format" == "png" || "$format" == "webp" ]]; then
+    render_format="svg"
+    tmp_svg="$(mktemp)"
+    render_out="$tmp_svg"
+  fi
+
+  local render_args=(render "$input" -f "$render_format" -o "$render_out")
+  if $TRANSPARENT_BG; then
+    render_args+=(--transparent-background)
+  fi
+  if $SHOW_TITLE; then
+    render_args+=(--title)
+  fi
+
+  local elapsed_ms rc=0
+  elapsed_ms="$(timed_exec "$PLOTGRAM_BIN" "${render_args[@]}")" || rc=$?
+  if [[ $rc -ne 0 ]]; then
+    [[ -n "$tmp_svg" ]] && rm -f "$tmp_svg"
+    return "$rc"
+  fi
+
+  if [[ -n "$tmp_svg" ]]; then
+    if ! "$RASTER_BIN" "$tmp_svg" -o "$out" -f "$format" >/dev/null 2>&1; then
+      rm -f "$tmp_svg"
+      return 1
+    fi
+    rm -f "$tmp_svg"
+  fi
+
+  echo "$elapsed_ms"
 }
 
 output_ext() {

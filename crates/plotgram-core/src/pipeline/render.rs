@@ -75,18 +75,7 @@ pub fn render_text(request: &RenderRequest<'_>) -> Result<String> {
     match render_output(request)? {
         RenderOutput::Text(text) => Ok(text),
         RenderOutput::Binary(_) => Err(PlotgramError::render_internal_msg(format!(
-            "format '{}' produces binary output, use render_bytes instead",
-            request.format
-        ))),
-    }
-}
-
-/// 渲染为字节(PNG/WebP)。
-pub fn render_bytes(request: &RenderRequest<'_>) -> Result<Vec<u8>> {
-    match render_output(request)? {
-        RenderOutput::Binary(bytes) => Ok(bytes),
-        RenderOutput::Text(_) => Err(PlotgramError::render_internal_msg(format!(
-            "format '{}' produces text output, use render_text instead",
+            "format '{}' produces binary output, not text",
             request.format
         ))),
     }

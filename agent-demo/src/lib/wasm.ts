@@ -6,7 +6,7 @@
  */
 
 /** 渲染格式标识，与 Rust 端 RenderFormat::from_str 对齐。 */
-export type RenderFormat = 'svg' | 'ascii' | 'json' | 'png' | 'webp' | 'drawio' | 'md-outline' | 'opml' | 'freemind';
+export type RenderFormat = 'svg' | 'ascii' | 'json' | 'drawio' | 'md-outline' | 'opml' | 'freemind';
 
 /** 源码位置（行列从 1 开始）。 */
 export interface SpanJson {

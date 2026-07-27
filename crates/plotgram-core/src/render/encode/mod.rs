@@ -1,4 +1,4 @@
-//! 格式编码层:将 [`super::scene::ExportScene`] 编码为 SVG / JSON / ASCII / PNG / WebP 等输出。
+//! 格式编码层:将 [`super::scene::ExportScene`] 编码为 SVG / JSON / ASCII 等输出。
 //!
 //! 编码器只负责 `ExportScene → RenderOutput`,不参与布局计算或视觉物化。
 //! 流水线编排(布局 → 物化 → 编码)由 [`crate::pipeline::render`] 统一调度。
@@ -13,28 +13,11 @@ pub mod ascii;
 pub mod drawio;
 pub mod json;
 pub mod svg;
-#[cfg(feature = "raster")]
-pub mod font;
-#[cfg(feature = "raster")]
-pub mod png;
-#[cfg(feature = "raster")]
-pub mod rasterize;
-#[cfg(feature = "raster")]
-pub mod webp;
 
 pub use ascii::AsciiRenderer;
 pub use drawio::{DrawioRenderer, ExportReport, ExportWarning, DegradeTier};
 pub use json::JsonRenderer;
 pub use svg::SvgRenderer;
-#[cfg(feature = "raster")]
-pub use font::{
-    build_usvg_options, default_fonts_dir, fonts_dir, fonts_dir_from_env, set_fonts_dir,
-    FONTS_DIR_ENV_VAR,
-};
-#[cfg(feature = "raster")]
-pub use png::PngRenderer;
-#[cfg(feature = "raster")]
-pub use webp::WebpRenderer;
 
 /// 编码路径：声明编码器需要哪条管线分支。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,10 +95,6 @@ static SVG_RENDERER: SvgRenderer = SvgRenderer;
 static ASCII_RENDERER: AsciiRenderer = AsciiRenderer;
 static JSON_RENDERER: JsonRenderer = JsonRenderer;
 static DRAWIO_RENDERER: DrawioRenderer = DrawioRenderer;
-#[cfg(feature = "raster")]
-static PNG_RENDERER: PngRenderer = PngRenderer;
-#[cfg(feature = "raster")]
-static WEBP_RENDERER: WebpRenderer = WebpRenderer;
 static MD_OUTLINE_RENDERER: MdOutlineEncoder = MdOutlineEncoder;
 static OPML_RENDERER: OpmlEncoder = OpmlEncoder;
 static FREEMIND_RENDERER: FreemindEncoder = FreemindEncoder;
@@ -127,30 +106,6 @@ pub fn encoder_for(format: RenderFormat) -> Result<&'static dyn FormatEncoder> {
         RenderFormat::Ascii => Ok(&ASCII_RENDERER),
         RenderFormat::Json => Ok(&JSON_RENDERER),
         RenderFormat::Drawio => Ok(&DRAWIO_RENDERER),
-        RenderFormat::Png => {
-            #[cfg(feature = "raster")]
-            {
-                Ok(&PNG_RENDERER)
-            }
-            #[cfg(not(feature = "raster"))]
-            {
-                Err(crate::error::PlotgramError::render_internal_msg(
-                    "format 'png' requires the 'raster' feature",
-                ))
-            }
-        }
-        RenderFormat::Webp => {
-            #[cfg(feature = "raster")]
-            {
-                Ok(&WEBP_RENDERER)
-            }
-            #[cfg(not(feature = "raster"))]
-            {
-                Err(crate::error::PlotgramError::render_internal_msg(
-                    "format 'webp' requires the 'raster' feature",
-                ))
-            }
-        }
         RenderFormat::MdOutline => Ok(&MD_OUTLINE_RENDERER),
         RenderFormat::Opml => Ok(&OPML_RENDERER),
         RenderFormat::Freemind => Ok(&FREEMIND_RENDERER),

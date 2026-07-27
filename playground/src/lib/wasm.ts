@@ -234,7 +234,7 @@ function safeParse<T>(json: string, fallback: T): T {
 }
 
 /** 渲染格式标识,与 Rust 端 RenderFormat::from_str 对齐。 */
-export type RenderFormat = 'svg' | 'ascii' | 'json' | 'png' | 'webp' | 'drawio' | 'md-outline' | 'opml' | 'freemind';
+export type RenderFormat = 'svg' | 'ascii' | 'json' | 'drawio' | 'md-outline' | 'opml' | 'freemind';
 
 /** 构造一个最小 fallback DiagnosticErrorJson。 */
 function fallbackDiag(message: string, severity: 'error' | 'warning' = 'error'): DiagnosticErrorJson {

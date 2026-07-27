@@ -34,7 +34,7 @@ pub mod validation;
 
 pub use dsl::{lexer, parser};
 pub use pipeline::{
-    import_prepare_validate, parse, parse_prepare, parse_prepare_validate, render_bytes,
+    import_prepare_validate, parse, parse_prepare, parse_prepare_validate,
     render_json, render_output, render_text, render_with_style_json, run, PipelineOutput,
     PipelineResult, PrepareOutput,
 };

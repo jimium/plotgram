@@ -181,7 +181,7 @@ pub async fn render_handler(Json(body): Json<RenderRequestBody>) -> Response {
             let check = CheckResult {
                 passed: false,
                 errors: vec![request_error(format!(
-                    "unsupported format '{format_str}'; supported: svg, ascii, png, webp, json"
+                    "unsupported format '{format_str}'; supported: svg, ascii, json"
                 ))],
                 warnings: vec![],
             };
@@ -248,8 +248,6 @@ fn content_type_for(format: RenderFormat) -> String {
     match format {
         RenderFormat::Svg => "image/svg+xml".to_string(),
         RenderFormat::Ascii => "text/plain; charset=utf-8".to_string(),
-        RenderFormat::Png => "image/png".to_string(),
-        RenderFormat::Webp => "image/webp".to_string(),
         RenderFormat::Json => "application/json".to_string(),
         RenderFormat::Drawio => "application/xml; charset=utf-8".to_string(),
         RenderFormat::MdOutline => "text/markdown; charset=utf-8".to_string(),

@@ -17,5 +17,4 @@ serde_json.workspace = true
 
 [features]
 default = []
-raster = ["plotgram-core/raster"]
 svg-debug = ["plotgram-core/svg-debug"]

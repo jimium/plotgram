@@ -11,7 +11,7 @@ name = "plotgram-server"
 path = "src/main.rs"
 
 [dependencies]
-plotgram-core = { workspace = true, features = ["raster", "svg-debug"] }
+plotgram-core = { workspace = true, features = ["svg-debug"] }
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }
 serde = { workspace = true, features = ["derive"] }

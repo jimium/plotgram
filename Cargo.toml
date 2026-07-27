@@ -6,6 +6,7 @@ members = [
     "crates/plotgram-server",
     "crates/plotgram-wasm",
     "crates/plotgram-eval",
+    "crates/plotgram-raster",
 ]
 
 [workspace.package]

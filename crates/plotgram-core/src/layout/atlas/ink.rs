@@ -131,19 +131,33 @@ impl InkContext {
 }
 
 /// Stage 4：Plan + 坐标 → 与 `diagram.relations` 对齐的 `Vec<EdgeLayout>`。
+///
+/// `horizontal`：布局内核是否做了轴转置（left-to-right，rank 轴 = X）。
+/// Plan/Substrate 恒在抽象 (rank, order) 空间；Ink 内部统一按 rank=Y 的
+/// 规范空间计算，水平布局时输入转置矩形、输出转置折线与端口。
 pub fn materialize_edges(
     diagram: &Diagram,
     plan: &Plan,
     substrate: &Substrate,
     nodes: &HashMap<String, NodeLayout>,
     track_coords: &BTreeMap<u32, f64>,
+    horizontal: bool,
 ) -> Vec<EdgeLayout> {
     let node_rects: BTreeMap<String, (f64, f64, f64, f64)> = nodes
         .iter()
-        .map(|(id, n)| (id.clone(), (n.x, n.y, n.width, n.height)))
+        .map(|(id, n)| {
+            let r = if horizontal {
+                // 转置到规范空间：rank 轴回到 Y
+                (n.y, n.x, n.height, n.width)
+            } else {
+                (n.x, n.y, n.width, n.height)
+            };
+            (id.clone(), r)
+        })
         .collect();
     let mut ctx = InkContext::from_plan_and_rects(plan, node_rects);
     ctx.apply_track_coords(substrate, track_coords);
+    let port_points = spread_port_points(plan, &ctx);
 
     let n = diagram.relations.len();
     let mut edges: Vec<EdgeLayout> = Vec::with_capacity(n);
@@ -160,7 +174,7 @@ pub fn materialize_edges(
             continue;
         }
 
-        if let Some(pts) = ink_edge_with_lanes(plan, substrate, &ctx, eid) {
+        if let Some(pts) = ink_edge_with_lanes(plan, substrate, &ctx, eid, Some(&port_points)) {
             raw.insert(eid, pts.clone());
             let (fp, tp) = ports_for_edge(plan, eid);
             edges.push(edge_from_points(&pts, fp, tp, label));
@@ -173,7 +187,33 @@ pub fn materialize_edges(
     }
 
     apply_bundle_suffixes(&mut edges, &raw, plan);
+
+    if horizontal {
+        // 规范空间 → 画布空间：转置折线、label 中心与端口朝向
+        for e in &mut edges {
+            if let PathGeometry::Polyline { points } = &mut e.geometry {
+                for p in points.iter_mut() {
+                    std::mem::swap(&mut p.x, &mut p.y);
+                }
+            }
+            for l in &mut e.labels {
+                std::mem::swap(&mut l.center.x, &mut l.center.y);
+            }
+            e.from_port = transpose_port(e.from_port);
+            e.to_port = transpose_port(e.to_port);
+        }
+    }
     edges
+}
+
+/// 转置端口朝向（rank 轴 Y↔X）。
+fn transpose_port(p: Port) -> Port {
+    match p {
+        Port::Top => Port::Left,
+        Port::Bottom => Port::Right,
+        Port::Left => Port::Top,
+        Port::Right => Port::Bottom,
+    }
 }
 
 fn ink_edge_with_lanes(
@@ -181,6 +221,7 @@ fn ink_edge_with_lanes(
     substrate: &Substrate,
     ctx: &InkContext,
     edge: EdgeId,
+    port_points: Option<&BTreeMap<(EdgeId, bool), (f64, f64)>>,
 ) -> Option<Vec<(f64, f64)>> {
     let tracks = plan.channels.get(&edge)?;
     if tracks.is_empty() {
@@ -196,7 +237,10 @@ fn ink_edge_with_lanes(
 
     if let Some(ep) = plan.ports.get(&edge) {
         if let Some(&(x, y, w, h)) = ctx.node_rects.get(&ep.from.node) {
-            points.push(port_boundary_point(x, y, w, h, ep.from.side));
+            let p = port_points
+                .and_then(|m| m.get(&(edge, true)).copied())
+                .unwrap_or_else(|| port_boundary_point(x, y, w, h, ep.from.side));
+            points.push(p);
         }
     }
 
@@ -240,7 +284,26 @@ fn ink_edge_with_lanes(
 
     if let Some(ep) = plan.ports.get(&edge) {
         if let Some(&(x, y, w, h)) = ctx.node_rects.get(&ep.to.node) {
-            points.push(port_boundary_point(x, y, w, h, ep.to.side));
+            let end = port_points
+                .and_then(|m| m.get(&(edge, false)).copied())
+                .unwrap_or_else(|| port_boundary_point(x, y, w, h, ep.to.side));
+            // 插入正交肘点：保证最后一段是轴对齐的
+            if let Some(&last) = points.last() {
+                let needs_elbow = (last.0 - end.0).abs() > 0.5 && (last.1 - end.1).abs() > 0.5;
+                if needs_elbow {
+                    match ep.to.side {
+                        // 从 MainLow/MainHigh 端口进入 → 最后一段必须垂直
+                        PortSide::MainLow | PortSide::MainHigh => {
+                            push_point(&mut points, (end.0, last.1));
+                        }
+                        // 从 CrossLow/CrossHigh 端口进入 → 最后一段必须水平
+                        PortSide::CrossLow | PortSide::CrossHigh => {
+                            push_point(&mut points, (last.0, end.1));
+                        }
+                    }
+                }
+            }
+            push_point(&mut points, end);
         }
     }
 
@@ -284,6 +347,13 @@ fn apply_bundle_suffixes(
                 .first()
                 .map(|l| l.text.clone());
             let mut merged = pts[..pts.len() - suffix_pts].to_vec();
+            // 接合处正交修补：prefix 末尾与 shared 开头不共享坐标时插入肘点
+            if let (Some(&tail), Some(&head)) = (merged.last(), shared.first()) {
+                if (tail.0 - head.0).abs() > 0.5 && (tail.1 - head.1).abs() > 0.5 {
+                    // 保持 prefix 最后一段的方向延续到 head 的一个坐标
+                    merged.push((head.0, tail.1));
+                }
+            }
             merged.extend_from_slice(shared);
             let (fp, tp) = ports_for_edge(plan, eid);
             edges[eid] = edge_from_points(&merged, fp, tp, label.as_deref());
@@ -425,7 +495,7 @@ pub fn ink_edge(
     ctx: &InkContext,
     edge: EdgeId,
 ) -> Option<Vec<(f64, f64)>> {
-    ink_edge_with_lanes(plan, substrate, ctx, edge)
+    ink_edge_with_lanes(plan, substrate, ctx, edge, None)
 }
 
 /// 全图 Ink：返回每条边的重建折线。
@@ -484,6 +554,70 @@ pub fn compare_ink_vs_legacy(
     }
 
     report
+}
+
+/// 端口散布：同一 `(node, side)` 被多条边共用时，把锚点沿该侧均匀展开。
+///
+/// 背景：`derive_node_ports` 每侧只挂一个 slot（capacity>1），反向对边 / 平行边
+/// 会共用同一物理端口；若都落在侧中点，几何完全重合。此处按「对端节点沿散布轴
+/// 的中心坐标 → EdgeId」排序（减少交叉且确定性，AGENTS.md §2），以
+/// `lane_centers` 均匀展开，间距取 `CORRIDOR_LANE_PITCH` 与侧长 60% 均分的较小者。
+/// 返回 `(EdgeId, is_from)` → 规范空间锚点。
+fn spread_port_points(plan: &Plan, ctx: &InkContext) -> BTreeMap<(EdgeId, bool), (f64, f64)> {
+    // (node, side) → [(对端中心坐标, eid, is_from)]
+    let mut groups: BTreeMap<(String, PortSide), Vec<(f64, EdgeId, bool)>> = BTreeMap::new();
+    for (&eid, ep) in &plan.ports {
+        if ep.from.node == ep.to.node {
+            continue; // 自环走 stub_self_loop
+        }
+        for (pr, other, is_from) in [
+            (&ep.from, &ep.to.node, true),
+            (&ep.to, &ep.from.node, false),
+        ] {
+            let other_center = ctx
+                .node_rects
+                .get(other.as_str())
+                .map(|&(x, y, w, h)| match pr.side {
+                    PortSide::MainLow | PortSide::MainHigh => x + w / 2.0,
+                    PortSide::CrossLow | PortSide::CrossHigh => y + h / 2.0,
+                })
+                .unwrap_or(0.0);
+            groups
+                .entry((pr.node.clone(), pr.side))
+                .or_default()
+                .push((other_center, eid, is_from));
+        }
+    }
+
+    let mut out = BTreeMap::new();
+    for ((node, side), mut members) in groups {
+        let Some(&(x, y, w, h)) = ctx.node_rects.get(node.as_str()) else {
+            continue;
+        };
+        members.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        let n = members.len();
+        let (base, side_len) = match side {
+            PortSide::MainLow | PortSide::MainHigh => (x + w / 2.0, w),
+            PortSide::CrossLow | PortSide::CrossHigh => (y + h / 2.0, h),
+        };
+        let pitch = if n > 1 {
+            CORRIDOR_LANE_PITCH.min(side_len * 0.6 / (n - 1) as f64)
+        } else {
+            0.0
+        };
+        let centers = lane_centers(base, n as u32, pitch);
+        for (i, &(_, eid, is_from)) in members.iter().enumerate() {
+            let c = centers.get(i).copied().unwrap_or(base);
+            let p = match side {
+                PortSide::MainLow => (c, y),
+                PortSide::MainHigh => (c, y + h),
+                PortSide::CrossLow => (x, c),
+                PortSide::CrossHigh => (x + w, c),
+            };
+            out.insert((eid, is_from), p);
+        }
+    }
+    out
 }
 
 fn port_boundary_point(x: f64, y: f64, w: f64, h: f64, side: PortSide) -> (f64, f64) {

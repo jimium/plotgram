@@ -10,9 +10,7 @@ use plotgram_core::interchange::mindmap::{
 };
 use plotgram_core::prepare::StyleRequest;
 use plotgram_core::pipeline::{import_prepare_validate, parse_prepare, parse_prepare_validate, PipelineOutput};
-use plotgram_core::pipeline::{render_bytes, render_json, render_text};
-#[cfg(feature = "raster")]
-use plotgram_core::render::encode::{fonts_dir, set_fonts_dir};
+use plotgram_core::pipeline::{render_json, render_text};
 use plotgram_core::RenderFormat;
 use std::fs;
 use std::path::PathBuf;
@@ -34,19 +32,16 @@ enum Commands {
     Render {
         /// 输入的 .pgm 文件路径
         input: String,
-        /// 输出格式 (svg/ascii/png/webp/json/drawio/md-outline/opml/freemind)
+        /// 输出格式 (svg/ascii/json/drawio/md-outline/opml/freemind)；位图请用 plotgram-raster 转换 SVG
         #[arg(short, long, default_value = "svg")]
         format: String,
         /// 输出文件路径（默认 stdout）
         #[arg(short, long)]
         output: Option<String>,
-        /// 字体文件目录（覆盖 PLOTGRAM_FONTS_DIR 环境变量；均未设置时使用 cwd/fonts/）
-        #[arg(long = "fonts-dir")]
-        fonts_dir: Option<String>,
         /// 输入格式 (dfy/md-outline)，默认根据文件扩展名推断
         #[arg(long = "input-format")]
         input_format: Option<String>,
-        /// 省略画布背景（SVG/PNG/WebP 等输出为透明底）
+        /// 省略画布背景（SVG 输出为透明底）
         #[arg(long = "transparent-background")]
         transparent_background: bool,
         /// 在画布顶部绘制 DSL title（默认不绘制）
@@ -129,7 +124,6 @@ fn main() {
             input,
             format,
             output,
-            fonts_dir,
             input_format,
             transparent_background,
             title,
@@ -137,7 +131,6 @@ fn main() {
             &input,
             &format,
             output.as_deref(),
-            fonts_dir.as_deref(),
             input_format.as_deref(),
             transparent_background,
             title,
@@ -175,21 +168,6 @@ fn read_source(path: &str) -> String {
         eprintln!("错误: 无法读取文件 '{}': {}", path, e);
         std::process::exit(1);
     })
-}
-
-#[cfg(feature = "raster")]
-fn configure_fonts_dir(cli_fonts_dir: Option<&str>) {
-    if let Some(dir) = cli_fonts_dir {
-        set_fonts_dir(PathBuf::from(dir));
-    }
-
-    let dir = fonts_dir();
-    if !dir.is_dir() {
-        eprintln!(
-            "警告: 字体目录不存在 '{}'，PNG/WebP 渲染中的中文可能显示异常",
-            dir.display()
-        );
-    }
 }
 
 /// 解析 + prepare（不 validate）；用于 diff / export / patch。
@@ -313,19 +291,13 @@ fn cmd_render(
     input: &str,
     format_str: &str,
     output: Option<&str>,
-    fonts_dir: Option<&str>,
     input_format: Option<&str>,
     transparent_background: bool,
     show_title: bool,
 ) {
-    #[cfg(feature = "raster")]
-    configure_fonts_dir(fonts_dir);
-    #[cfg(not(feature = "raster"))]
-    let _ = fonts_dir;
-
     let format = RenderFormat::from_str(format_str).unwrap_or_else(|| {
         eprintln!(
-            "错误: 不支持的格式 '{}'。支持的格式: svg, ascii, png, webp, json, drawio, md-outline, opml, freemind",
+            "错误: 不支持的格式 '{}'。支持的格式: svg, ascii, json, drawio, md-outline, opml, freemind（位图请用 plotgram-raster 将 SVG 转为 PNG/WebP）",
             format_str
         );
         std::process::exit(1);
@@ -393,18 +365,6 @@ fn cmd_render(
     match output {
         Some(path) => {
             match format {
-                RenderFormat::Png | RenderFormat::Webp => {
-                    // 光栅路径仍走默认管线；缓存文件已由上面 layout 调用刷新
-                    let _ = &cached_layout;
-                    let output_bytes = render_bytes(&request).unwrap_or_else(|e| {
-                        print_render_error(e, Some(&source));
-                        std::process::exit(1);
-                    });
-                    fs::write(path, output_bytes).unwrap_or_else(|e| {
-                        eprintln!("错误: 无法写入文件 '{}': {}", path, e);
-                        std::process::exit(1);
-                    });
-                }
                 RenderFormat::Svg => {
                     let output_content = if let Some(ref layout) = cached_layout {
                         plotgram_core::pipeline::render_svg_with_layout(&request, layout.clone())
@@ -437,10 +397,6 @@ fn cmd_render(
             println!("{} 已写入: {}", format.to_string().to_uppercase(), path);
         }
         None => match format {
-            RenderFormat::Png | RenderFormat::Webp => {
-                eprintln!("错误: PNG 和 WebP 格式需要指定输出文件（使用 -o 或 --output）");
-                std::process::exit(1);
-            }
             RenderFormat::Svg => {
                 let output_content = if let Some(ref layout) = cached_layout {
                     plotgram_core::pipeline::render_svg_with_layout(&request, layout.clone())

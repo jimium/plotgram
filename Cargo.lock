@@ -1535,15 +1535,12 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "flate2",
- "image",
  "insta",
  "petgraph",
- "resvg",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
  "unicode-width",
- "usvg",
 ]
 
 [[package]]
@@ -1553,6 +1550,17 @@ dependencies = [
  "plotgram-core",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "plotgram-raster"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "image",
+ "resvg",
+ "thiserror 1.0.69",
+ "usvg",
 ]
 
 [[package]]

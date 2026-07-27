@@ -26,7 +26,7 @@ pub use prepare::{
     PrepareOutput,
 };
 pub use render::{
-    render_bytes, render_json, render_output, render_output_with_report, render_svg_with_layout,
+    render_json, render_output, render_output_with_report, render_svg_with_layout,
     render_text, render_with_style_json, RenderOutputWithReport,
 };
 
