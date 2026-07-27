@@ -18,6 +18,7 @@
 | 28 | [channel 合法化实现总结与审查](28-Atlas-channel合法化实现总结与审查-2026-07.md) | **总结（已落地）**：L1–L8 实现定案、A1–A10 验收全过、独立代码审查结论与留债清单 |
 | 29 | [路径级作用域自反证 verifier 报告](29-Atlas-路径级作用域自反证verifier报告-2026-07.md) | **证明义务（已落地）**：`verify_route_scope` 独立验证器，A2 证据链升级 + A2b 新指标，三集恒 0。22 号文台账第二项在作用域线上闭环 |
 | **30** | [实现检讨：冗余与缺失](30-Atlas实现检讨-冗余与缺失-2026-07.md) | **Stage7 / Post-S7 之后下一刀**：yFiles 第一性原理；M1–M8 / R1–R5；**纠偏**「先 MCF / 整目录清空 ortho」 |
+| **31** | [M7 Ink repair 基线](31-Atlas-M7-0-ink-repair基线-2026-07.md) | **测量 + 收口**：product∪stress `distorted=0`；**M7 后期已删** Atlas dogleg repair |
 
 ## 一句话
 
@@ -36,13 +37,15 @@ Atlas 把节点、组框、边通道、标签统一为**占位体**，先做完�
 
 | 记债（不挡出口；下一刀见 [30](30-Atlas实现检讨-冗余与缺失-2026-07.md)） | 内容 |
 |------------------|------|
-| **优先：M1/M3/M4** | 端口位置进 Plan；lane 端点序；Main `track_coords` 回传 |
-| **优先：M2 有界返工** | 先于 MCF；`Occupancy::release` 已具备零件 |
-| **MCF Gate** | [`gate_mcf`](../../crates/plotgram-core/src/layout/atlas/gate_mcf.rs) 占位；生产仍 Occupancy+Unbounded |
-| **I.7 三块有界下降** | [`coord_descent`](../../crates/plotgram-core/src/layout/atlas/coord_descent.rs) 占位；未改生产求解 |
-| **ortho 物理清空** | Hier 主路径不用 OVG；须先拆 repair 岛 + 退役 Shadow（见 30 · R1/R2） |
+| **M1–M6 / R5** | **M1–M4 已收口**（`along_offset`；有界返工；lane 端点序；Main+Cross `track_coords`）；其余：多 slot、规范空间 orientation、**Cross label Demand** 等见 30 |
+| **R2** | **已落地**：删 adapter/shadow/compare；`ink_verify` 挂 Hier Ink（**M7-2 已将几何升为硬 FAIL**；见 30 · R2 / 31） |
+| **R4** | **已落地**：删 `gate_mcf` / `coord_descent`；删兼容别名；非 Hier 不写假 `atlas_plan`（见 30 · R4） |
+| **M7** | **已闭环**：中期守 gate + M7-2 硬门禁（**含 PortSideMismatch 升硬**）+ **后期删** `repair_ink_group_pierces`（见 [31](31-Atlas-M7-0-ink-repair基线-2026-07.md)） |
+| **真 MCF / I.7** | 占位模块已删（R4）；未实现，勿当交付 |
+| **ortho 物理清空** | Hier 主路径不用 OVG；R1 桥接 + **加深**（删孤儿 trunk / 兼容 re-export）；整目录清空仍待（见 30 · R1） |
 | **非 Hier Ink 内化** | Tree/Sequence/Circular 仍 recipe 路由 |
-| 标签-only 更细增量 | `PLOTGRAM_ATLAS_PLAN_CACHE` 已接线；命中过严见 30 · M8 |
+| **M8** | **A+B 已落地**：实验 env 收口 + slots 拓扑同构 skip / 重定位（见 30 · M8）；仍 opt-in，勿默认开 |
+| **R3** | **首片**（决策树文档 + weak/strong slots→channel glue）已落地；全量「收缩→flat→展开」待 §7 创新模式（见 30 · R3） |
 
 ## 相关
 
