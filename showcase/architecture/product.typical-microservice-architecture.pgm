@@ -4,8 +4,7 @@
 diagram architecture {
   title: "典型微服务架构图"
   layout: architecture
-  edge_routing: orthogonal
-  theme: common.clean-light
+theme: common.clean-light
   render_style: standard
 
   // ========== 实体声明 ==========

@@ -27,9 +27,9 @@
 
 | 图表 | 关键字 | 核心问题 | 默认布局 | 默认边路由 | 实现状态 |
 |------|--------|----------|----------|-----------|----------|
-| [流程图](./diagrams/flowchart.md) | `flowchart` | 步骤怎么流转？ | `sugiyama-v2` | `orthogonal` | ✅ 已实现 |
+| [流程图](./diagrams/flowchart.md) | `flowchart` | 步骤怎么流转？ | `sugiyama-v2` | Atlas Ink | ✅ 已实现 |
 | [时序图](./diagrams/sequence.md) | `sequence` | 谁按什么顺序交互？ | `sequence` | —（内置） | ✅ 已实现 |
-| [架构图](./diagrams/architecture.md) | `architecture` | 系统由哪些组件构成？ | `architecture-v2` | `orthogonal` | ✅ 已实现 |
+| [架构图](./diagrams/architecture.md) | `architecture` | 系统由哪些组件构成？ | `architecture-v2` | Atlas Ink | ✅ 已实现 |
 | [状态图](./diagrams/state.md) | `state` | 状态如何迁移？ | `circular` | `circular` | ⏳ 渲染器中，未标记稳定 |
 | [ER 图](./diagrams/er.md) | `er` | 数据实体如何关联？ | `sugiyama-v2` | `straight` | ⏳ 渲染器中，未标记稳定 |
 | [思维导图](./diagrams/mindmap.md) | `mindmap` | 知识如何分层展开？ | `mindmap` | `bezier` | ⏳ 渲染器中，未标记稳定 |

@@ -190,7 +190,10 @@ impl LayoutPlan {
             return plan.edge_routing.clone();
         }
         match hints.edge_routing_style {
-            crate::layout::EdgeRoutingStyle::Orthogonal => "orthogonal".to_string(),
+            crate::layout::EdgeRoutingStyle::Orthogonal => {
+                // R1：OVG 已删；Hier 走 Atlas Ink。LayoutPipeline 若见此 hint，回落 plan 默认。
+                plan.edge_routing.clone()
+            }
             crate::layout::EdgeRoutingStyle::Curved => {
                 if diagram.diagram_type == crate::types::DiagramType::Mindmap {
                     "organic".to_string()

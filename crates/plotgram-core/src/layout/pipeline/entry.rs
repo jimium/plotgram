@@ -21,13 +21,13 @@ use crate::layout::traits::{LayoutStrategy, RoutingRecipeDyn};
 ///
 /// 可通过 diagram 属性 `layout: 算法名` 切换。
 ///
-/// 支持多种边路由算法：
-/// - "orthogonal": 正交路由（折线路由）（默认）
+/// 支持多种边路由算法（非 Hierarchical；Hier 正交由 Atlas Channel Ink 落笔）：
 /// - "straight": 直线路由
 /// - "bezier": 贝塞尔曲线路由
-/// - "spline": 障碍避让多段样条路由（可见性图 + Catmull-Rom → 多段贝塞尔，C1 连续）
+/// - "spline": 障碍避让多段样条路由
 /// - "circular": 弧形边路由（圆形布局专用）
-/// 节点布局完成后自动执行边路由。
+/// - "organic": 有机曲线（mindmap）
+/// 节点布局完成后自动执行边路由（flowchart/architecture 除外）。
 ///
 /// 解析 diagram 的有效布局方向。
 ///
@@ -259,7 +259,8 @@ fn validate_layout_config(diagram: &Diagram) -> std::result::Result<(), Diagnost
                         attr.span,
                         format!(
                             "diagram type '{}' does not support edge_routing; \
-                             message paths are computed by layout: sequence",
+                             hierarchical diagrams use Atlas channel ink; \
+                             sequence message paths are computed by layout",
                             profile_for(&diagram.diagram_type).name,
                         ),
                     ));

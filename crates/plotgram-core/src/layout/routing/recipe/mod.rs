@@ -28,7 +28,6 @@ pub mod bezier;
 pub mod circular;
 pub mod label;
 pub mod organic;
-pub mod orthogonal;
 pub mod spline;
 pub mod straight;
 
@@ -36,7 +35,6 @@ pub use bezier::BezierRecipe;
 pub use circular::CircularRecipe;
 pub use label::{EdgeLabelPlan, LabelAssignment, LabelProblem, LabelSolver};
 pub use organic::OrganicRecipe;
-pub use orthogonal::OrthogonalRecipe;
 pub use spline::SplineRecipe;
 pub use straight::StraightRecipe;
 

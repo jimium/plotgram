@@ -19,7 +19,7 @@ pub const LAYOUT_ALGORITHM_NAMES: &[&str] = &[
 ];
 
 /// 已注册的边路由算法名（与 `build_edge_routing_strategy` 保持一致）。
-pub const EDGE_ROUTING_NAMES: &[&str] = &["straight", "bezier", "spline", "circular", "orthogonal", "organic"];
+pub const EDGE_ROUTING_NAMES: &[&str] = &["straight", "bezier", "spline", "circular", "organic"];
 
 pub(super) fn build_layout_strategy(
     algo: &str,
@@ -57,8 +57,7 @@ pub(in crate::layout) fn build_edge_routing_strategy(
     plan: &LayoutPlan,
 ) -> Option<Box<dyn RoutingRecipeDyn>> {
     use crate::layout::routing::recipe::{
-        BezierRecipe, CircularRecipe, OrganicRecipe, OrthogonalRecipe, RecipeRouter, SplineRecipe,
-        StraightRecipe,
+        BezierRecipe, CircularRecipe, OrganicRecipe, RecipeRouter, SplineRecipe, StraightRecipe,
     };
 
     let strategy: Box<dyn RoutingRecipeDyn> = match algo {
@@ -70,9 +69,6 @@ pub(in crate::layout) fn build_edge_routing_strategy(
             &plan.edge_options,
         ))),
         "circular" => Box::new(RecipeRouter::new(CircularRecipe)),
-        "orthogonal" => Box::new(RecipeRouter::new(OrthogonalRecipe::from_options(
-            &plan.edge_options,
-        ))),
         "organic" => Box::new(RecipeRouter::new(OrganicRecipe::from_options(
             &plan.edge_options,
         ))),

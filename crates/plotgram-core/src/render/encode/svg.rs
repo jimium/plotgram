@@ -389,11 +389,6 @@ mod tests {
                     value: AttributeValue::String(TextValue::quoted("left-to-right".to_string())),
                     span,
                 },
-                DiagramAttribute {
-                    key: "edge_routing".to_string(),
-                    value: AttributeValue::String(TextValue::quoted("orthogonal".to_string())),
-                    span,
-                },
             ],
             entities: vec![
                 Entity {

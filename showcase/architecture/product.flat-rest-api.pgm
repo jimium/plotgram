@@ -5,8 +5,7 @@
 diagram architecture {
     title: "无分组：REST API 后端"
     layout: architecture
-    edge_routing: orthogonal
-    theme: common.clean-light
+theme: common.clean-light
 
     entity[frontend] web "Web 客户端" {
         semantic: browser

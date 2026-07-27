@@ -78,7 +78,7 @@ diagram flowchart {
 | 属性 | 默认值 | 说明 |
 |------|--------|------|
 | `layout-algo` | `sugiyama-v2` | 分层布局，适合 DAG 与含回边流程 |
-| `edge-routing` | `orthogonal` | 正交折线，便于阅读分支 |
+| `edge-routing` | （勿声明） | Hierarchical 正交由 Atlas Channel Ink 落笔 |
 | `layout` | `top-to-bottom` | 可改为 `left-to-right` |
 | 样式方案 | `builtin.clean-light` | 亮色简洁主题 |
 

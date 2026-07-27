@@ -5,8 +5,7 @@
 diagram architecture {
     title: "无分组：实时推荐系统"
     layout: architecture
-    edge_routing: orthogonal
-    theme: common.clean-light
+theme: common.clean-light
 
     entity[frontend] app "移动 App" {
         semantic: mobile

@@ -822,16 +822,15 @@ pub mod presets {
     /// 常用的边路由对比配置
     pub fn routing_comparison() -> Vec<AlgorithmConfig> {
         vec![
-            set_edge_routing("orthogonal"),
             set_edge_routing("bezier"),
             set_edge_routing("spline"),
+            set_edge_routing("organic"),
         ]
     }
 
-    /// sugiyama + 不同边路由的完整对比
+    /// sugiyama + 不同边路由的完整对比（Hier 正交由 Atlas Ink，无 orthogonal 算法）
     pub fn sugiyama_routing_comparison() -> Vec<AlgorithmConfig> {
         vec![
-            set_layout_and_routing("sugiyama", "orthogonal"),
             set_layout_and_routing("sugiyama", "bezier"),
             set_layout_and_routing("sugiyama", "spline"),
         ]
@@ -970,7 +969,7 @@ mod tests {
         let configs = presets::routing_comparison();
         let report = engine.compare("test", &diagram, &configs);
 
-        let worst = engine.find_worst_cases(&report.results, "orthogonal", 1);
+        let worst = engine.find_worst_cases(&report.results, "bezier", 1);
         assert!(worst.len() <= 1);
     }
 

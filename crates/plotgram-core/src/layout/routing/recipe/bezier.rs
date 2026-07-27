@@ -48,8 +48,6 @@ use super::{EdgeLabelPlan, RecipeSolution, RoutingRecipe};
 
 /// 贝塞尔路由适用的内置图类型（与原 `BezierRouting` 一致）。
 const APPLICABLE_TYPES: &[DiagramType] = &[
-    DiagramType::Flowchart,
-    DiagramType::Architecture,
     DiagramType::State,
     DiagramType::Er,
     DiagramType::Mindmap,

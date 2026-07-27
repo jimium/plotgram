@@ -1,7 +1,7 @@
 //! 正交路径断言式消毒（Phase 3）。
 //!
 //! R1：从 OVG `sanitize` 迁入 `routing/common`，供 materializer canonicalize
-//! 与非 Hier OVG 共用，避免目录外直依赖 `edge_routing_orthogonal`。
+//! 正交折线几何消毒（外提自原 OVG 目录；供 materialize / 非 Hier recipe 共用）。
 //!
 //! H3 由 LexA* 图结构保证。本模块**不修复几何**：
 //! - debug：非正交段 → 记 violation（不 panic）

@@ -97,7 +97,7 @@ export function HelpPanel({ open, onClose }: HelpPanelProps) {
                 <Row name="title: &quot;…&quot;" desc="图表标题" />
                 <Row name="direction: top-to-bottom | left-to-right" desc="布局方向" />
                 <Row name="layout: flowchart | er | sugiyama-v2 | …" desc="布局算法" />
-                <Row name="edge_routing: orthogonal | spline | bezier | …" desc="边路由方式" />
+                <Row name="edge_routing: spline | bezier | organic | …" desc="边路由方式（flowchart/architecture 由 Atlas Ink，无需声明）" />
                 <Row name="snap: true | false" desc="边像素量化（默认 true，flowchart / er / sugiyama-v2 / architecture-v2）" />
                 <Row name="align: default | off | rank | layer | full" desc="节点结构对齐（L3，路由前）；默认使用算法策略" />
                 <Row name="theme: common.clean-light | common.github-dark | mindmap.vivid-branches | …" desc="颜色/字体主题（StyleSheet ID）" />

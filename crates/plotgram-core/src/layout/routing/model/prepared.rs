@@ -254,8 +254,8 @@ mod tests {
         let f = frozen();
         let hints = LayoutHints::default();
         let cfg = RoutingConfig::default();
-        let a = PreparedRoutingInput::prepare(&f, &d, &hints, "top-to-bottom", "orthogonal", cfg, canvas()).problem_signature();
-        let b = PreparedRoutingInput::prepare(&f, &d, &hints, "top-to-bottom", "orthogonal", cfg, canvas()).problem_signature();
+        let a = PreparedRoutingInput::prepare(&f, &d, &hints, "top-to-bottom", "spline", cfg, canvas()).problem_signature();
+        let b = PreparedRoutingInput::prepare(&f, &d, &hints, "top-to-bottom", "spline", cfg, canvas()).problem_signature();
         assert_eq!(a, b);
     }
 
@@ -265,9 +265,9 @@ mod tests {
         let f = frozen();
         let hints = LayoutHints::default();
         let cfg = RoutingConfig::default();
-        let base = PreparedRoutingInput::prepare(&f, &d, &hints, "top-to-bottom", "orthogonal", cfg, canvas()).problem_signature();
+        let base = PreparedRoutingInput::prepare(&f, &d, &hints, "top-to-bottom", "spline", cfg, canvas()).problem_signature();
         let diff_family = PreparedRoutingInput::prepare(&f, &d, &hints, "top-to-bottom", "straight", cfg, canvas()).problem_signature();
-        let diff_dir = PreparedRoutingInput::prepare(&f, &d, &hints, "left-to-right", "orthogonal", cfg, canvas()).problem_signature();
+        let diff_dir = PreparedRoutingInput::prepare(&f, &d, &hints, "left-to-right", "spline", cfg, canvas()).problem_signature();
         assert_ne!(base, diff_family);
         assert_ne!(base, diff_dir);
     }

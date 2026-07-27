@@ -111,13 +111,14 @@ diagram, entity, group, relation, flowchart, sequence, architecture, state, er, 
 - circular: 自适应圆形布局；options: group_padding, padding, component_gap
 
 ## 边路由算法(edge_routing 可选值)
-- orthogonal: 正交折线(flowchart/architecture默认)；options: slot_pitch, channel_margin
-- straight: 直线(ER图默认)
+- flowchart/architecture：**不要声明** edge_routing；正交边由 Atlas 通道落笔（Ink）生成
+- straight: 直线
 - bezier: 贝塞尔曲线；options: tension
-- spline: 障碍避让多段样条
-- circular: 弧形边(配合layout:circular/state；state默认)
+- spline: 障碍避让多段样条（ER 默认）
+- circular: 弧形边(配合layout:circular/state；state 默认)
 - organic: 有机自然曲线(mindmap默认)
 - 注意: 时序图(diagram sequence)不支持edge_routing，消息路径由layout:sequence生成
+- 注意: `orthogonal` 算法已移除（旧 OVG）
 
 ## 实体 type 完整枚举
 | 值 | 语义 | 推荐渲染形状 | 适用图表 |
@@ -266,7 +267,7 @@ Relation样式: style.stroke, style.stroke_width, style.dashed, style.label_colo
 const KNOWLEDGE_MODULES: Record<string, string> = {
   flowchart: `## Flowchart 专项知识
 - 默认布局: flowchart (共享 sugiyama-v2 引擎)，默认方向 top-to-bottom
-- 默认边路由: orthogonal
+- 默认边路由: （勿声明；Atlas Channel Ink）
 - 常用 type: start(圆形起点) / end(双圆终点) / process(矩形) / decision(菱形) / service / database / cache / gateway / client / person
 - 流程图最佳实践:
   - 用 start/end 标记流程首尾
@@ -291,7 +292,7 @@ diagram flowchart {
   architecture: `## Architecture 专项知识
 - 默认布局: architecture (分组分层)
 - **不支持 direction 属性**（写了会报错）；组间左右排列用 group_frame: strips
-- 默认边路由: orthogonal
+- 默认边路由: （勿声明；Atlas Channel Ink）
 - 常用 type: service / database / cache / gateway / queue / storage / frontend / backend / external
 - 组内布局通过 group 的 layout 属性控制: auto / horizontal / vertical / fan-out / fan-in / grid
 - group_frame 场景短名: strips(等宽条带;架构图层间仍上→下) / fit(贴合) / lanes(泳道) / stages(纵向阶段) / tiles(2x2网格)

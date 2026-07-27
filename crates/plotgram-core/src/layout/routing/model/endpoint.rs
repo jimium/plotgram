@@ -1,7 +1,7 @@
 //! 路径构建用的轻量端点描述（R1：自 OVG `slot` 外提）。
 //!
 //! 供 slot 分配与 path building 共用；`solution::EndpointAssignment::project_endpoint`
-//! 与 ortho `EndpointPair` 均指向本类型，避免 model 反依赖 `edge_routing_orthogonal`。
+//! 端点投影类型（外提自原 OVG slot；model 不反依赖已删的 `edge_routing_orthogonal`）。
 
 use crate::layout::geometry::Point;
 use crate::layout::types::Port;

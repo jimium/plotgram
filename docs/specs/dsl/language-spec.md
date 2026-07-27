@@ -194,7 +194,7 @@ diagram flowchart {
     config {
         direction: left-to-right
         layout: sugiyama-v2
-        edge_routing: orthogonal
+        # edge_routing omitted — Atlas Ink for hierarchical
         theme: common.clean-light
         render_style: excalidraw
     }
@@ -242,7 +242,7 @@ diagram flowchart {
 
 | 值                   | 说明              |
 | ------------------- | --------------- |
-| `orthogonal`        | 正交折线路由（flowchart/architecture 默认；options: `slot_pitch`, `channel_margin`） |
+| ~~`orthogonal`~~    | **已移除（R1 OVG）**；flowchart/architecture 正交由 Atlas Channel Ink 落笔 |
 | `straight`          | 直线连接（ER 图默认） |
 | `bezier`            | 贝塞尔曲线路由；options: `tension` |
 | `spline`            | 障碍避让多段样条 |
@@ -994,7 +994,7 @@ diagram flowchart {
     config {
         direction: top-to-bottom
         layout: sugiyama-v2
-        edge_routing: orthogonal
+        # edge_routing omitted — Atlas Ink for hierarchical
         theme: common.clean-light
         render_style: standard
     }

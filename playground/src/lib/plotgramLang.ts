@@ -158,7 +158,8 @@ const LAYOUT_ALGO_VALUES = [
 ];
 
 const EDGE_ROUTING_VALUES = [
-  'orthogonal', 'straight', 'bezier', 'spline',
+  'straight', 'bezier', 'spline',
+  'circular', 'organic',
   'circular', 'organic',
 ];
 

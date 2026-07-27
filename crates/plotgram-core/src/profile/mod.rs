@@ -134,7 +134,7 @@ static FLOWCHART_PROFILE: DiagramProfile = DiagramProfile {
     kind: DiagramType::Flowchart,
     name: "flowchart",
     default_layout: "flowchart",
-    default_edge_routing: "orthogonal",
+    default_edge_routing: "",
     default_theme_id: "common.clean-light",
     dark_theme_id: Some(DEFAULT_DARK_THEME_ID),
     default_graphic_style: DEFAULT_GRAPHIC_STYLE,
@@ -164,7 +164,7 @@ static ARCHITECTURE_PROFILE: DiagramProfile = DiagramProfile {
     kind: DiagramType::Architecture,
     name: "architecture",
     default_layout: "architecture",
-    default_edge_routing: "orthogonal",
+    default_edge_routing: "",
     default_theme_id: "common.clean-light",
     dark_theme_id: Some(DEFAULT_DARK_THEME_ID),
     default_graphic_style: DEFAULT_GRAPHIC_STYLE,
@@ -309,8 +309,13 @@ mod tests {
             assert!(!profile.default_theme_id.is_empty());
             assert_eq!(profile.default_graphic_style.as_str(), "standard");
 
-            if kind != DiagramType::Sequence {
+            if kind != DiagramType::Sequence
+                && kind != DiagramType::Flowchart
+                && kind != DiagramType::Architecture
+            {
                 assert!(!profile.default_edge_routing.is_empty());
+            } else {
+                assert!(profile.default_edge_routing.is_empty());
             }
         }
     }
@@ -320,7 +325,7 @@ mod tests {
         let profile = profile_for(&DiagramType::Custom("custom-x".to_string()));
         assert_eq!(profile.name, "custom");
         assert_eq!(profile.default_layout, "flowchart");
-        assert_eq!(profile.default_edge_routing, "orthogonal");
+        assert_eq!(profile.default_edge_routing, "");
     }
 
     #[test]

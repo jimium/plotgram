@@ -49,8 +49,6 @@ use super::{EdgeLabelPlan, RecipeSolution, RoutingRecipe};
 
 /// 样条路由适用的内置图类型（与原 `SplineRouting` 一致，无 Mindmap）。
 const APPLICABLE_TYPES: &[DiagramType] = &[
-    DiagramType::Flowchart,
-    DiagramType::Architecture,
     DiagramType::State,
     DiagramType::Er,
 ];

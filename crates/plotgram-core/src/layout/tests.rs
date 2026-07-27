@@ -3,7 +3,6 @@ use crate::layout::geometry::Point;
 use crate::ast::{AttributeValue, Diagram, DiagramAttribute, Position, SourceInfo, Span, TextValue};
 use crate::layout::algorithm_config::SUGIYAMA_LAYOUT_OPTIONS;
 use crate::layout::routing::edge_routing_bezier::BEZIER_OPTIONS;
-use crate::layout::routing::edge_routing_orthogonal::ORTHOGONAL_OPTIONS;
 use crate::types::DiagramType;
 use crate::profile::profile_for;
 
@@ -48,36 +47,43 @@ fn resolve_uses_profile_defaults_when_attrs_missing() {
     let plan = LayoutPlan::resolve(&diagram, profile);
 
     assert_eq!(plan.layout_algo, "flowchart");
-    assert_eq!(plan.edge_routing, "orthogonal");
+    assert_eq!(plan.edge_routing, "");
 }
 
 #[test]
-fn resolve_edge_options_from_config_block() {
+fn resolve_rejects_removed_orthogonal_edge_routing() {
     let mut diagram = sample_diagram(DiagramType::Flowchart);
+    diagram.attributes.push(atom_attr("edge_routing", "orthogonal"));
+    let result = compute_layout(&diagram);
+    assert!(result.is_err(), "orthogonal routing removed in R1");
+    let err = result.unwrap_err();
+    assert!(
+        err.message.contains("edge_routing") || err.message.contains("orthogonal"),
+        "unexpected error: {}",
+        err.message
+    );
+}
+
+#[test]
+fn resolve_bezier_options_on_er_config_block() {
+    let mut diagram = sample_diagram(DiagramType::Er);
     diagram.attributes.push(config_attr(
         "edge_routing",
-        "orthogonal",
-        &[
-            ("slot_pitch", AttributeValue::Number(55.0)),
-            ("channel_margin", AttributeValue::Number(22.0)),
-        ],
+        "bezier",
+        &[("tension", AttributeValue::Number(0.42))],
     ));
     let profile = profile_for(&diagram.diagram_type);
     let plan = LayoutPlan::resolve(&diagram, profile);
 
     assert_eq!(
-        plan.edge_options.get_or_default(&ORTHOGONAL_OPTIONS[0]),
-        55.0
-    );
-    assert_eq!(
-        plan.edge_options.get_or_default(&ORTHOGONAL_OPTIONS[1]),
-        22.0
+        plan.edge_options.get_or_default(&BEZIER_OPTIONS[0]),
+        0.42
     );
 }
 
 #[test]
 fn resolve_bezier_tension_from_config_block() {
-    let mut diagram = sample_diagram(DiagramType::Flowchart);
+    let mut diagram = sample_diagram(DiagramType::Er);
     diagram.attributes.push(config_attr(
         "edge_routing",
         "bezier",
@@ -527,7 +533,7 @@ fn make_parallel_edges_test_diagram() -> Diagram {
     let span = Span::new(Position::new(1, 1), Position::new(1, 1));
     let mut diagram = sample_diagram(DiagramType::Flowchart);
     diagram.attributes.push(atom_attr("direction", "left-to-right"));
-    diagram.attributes.push(atom_attr("edge_routing", "orthogonal"));
+    // R1：Hier 不再声明 edge_routing（Atlas Ink）
 
     for id in ["a", "b"] {
         diagram.entities.push(Entity {
@@ -555,17 +561,16 @@ fn make_parallel_edges_test_diagram() -> Diagram {
     }
 
 #[test]
-fn unknown_bundling_option_emits_warning() {
+fn unknown_edge_routing_option_emits_warning() {
     use crate::ast::{AttributeMap, AttributeValue, DiagramAttribute};
     use crate::layout::algorithm_config::validate_algorithm_config_warnings;
 
-    let mut diagram = make_parallel_edges_test_diagram();
-    diagram.attributes.retain(|a| a.key != "edge_routing");
+    let mut diagram = sample_diagram(DiagramType::Er);
     let span = Span::new(Position::new(1, 1), Position::new(1, 1));
     diagram.attributes.push(DiagramAttribute {
         key: "edge_routing".into(),
         value: AttributeValue::Config {
-            algo: "orthogonal".into(),
+            algo: "bezier".into(),
             options: std::collections::HashMap::from([(
                 "bundling".to_string(),
                 AttributeValue::Number(1.0),
@@ -581,7 +586,7 @@ fn unknown_bundling_option_emits_warning() {
             .warnings
             .iter()
             .any(|w| w.message.contains("未知选项 'bundling'")),
-        "removed bundling option should be reported as unknown"
+        "unknown option should be reported"
     );
 }
 

@@ -77,7 +77,7 @@ pub use routing::segment_pair::{
 
 pub use routing::{
     edge_routing, edge_routing_bezier, edge_routing_circular,
-    edge_routing_organic, edge_routing_orthogonal, edge_routing_spline, visibility,
+    edge_routing_organic, edge_routing_spline, visibility,
 };
 pub use recipes::{
     architecture, circular, er, flowchart, mindmap, sequence,

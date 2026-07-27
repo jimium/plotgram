@@ -195,7 +195,7 @@ impl RoutingCoordinator {
                     plan.dirty.len(),
                     plan.preserve.len()
                 );
-                // orthogonal 走逐边 preserve；其它 family 返回 None → 全量重解（成本低）。
+                // 支持 preserve 的 family 逐边复用；否则全量重解。
                 router
                     .route_preserving(&input, plan.seeded_edges.clone(), &plan.preserve)
                     .unwrap_or_else(|| router.route(&input))
@@ -268,27 +268,9 @@ impl RoutingCoordinator {
             );
         }
 
-        // Slice E4：overshoot Z 折合并收编进唯一 materialize 管线——snap 可能抖回
-        // 微台阶/斜段/overshoot 折点，正交 family 在量化后经 materializer canonicalize
-        // 一次性归一（原 finalize.rs D 段调用已删）。
-        if router.name() == "orthogonal" {
-            let from_side: Vec<_> = result.edges.iter().map(|e| e.from_port).collect();
-            let to_side: Vec<_> = result.edges.iter().map(|e| e.to_port).collect();
-            crate::layout::routing::model::GeometryMaterializer::canonicalize_orthogonal_edges(
-                &mut result.edges,
-                &diagram.relations,
-                &from_side,
-                &to_side,
-                true,
-                annotations.as_ref(),
-                Some(&result.nodes),
-                Some(&sorted_node_ids),
-            );
-            // Phase 3：stub/dock/trunk 事后分离已删；间距由 H4/H5 + LexA* rip-up 承担。
-        }
-
         // Slice E5：旧 D 段 finalizer 入口已删除——收尾（recheck / label）由
         // E3 repair loop 的最终审计与 freeze 后统一 label solve 取代。
+        // R1：OVG / OrthogonalRecipe 已删；canonicalize_orthogonal_edges 不再经 Coordinator。
 
         // Slice E3：固定轮次 repair loop——lift → materialize → audit_extended →
         // compile intents → local re-solve（≤ max_repair_rounds）。retain best
@@ -796,7 +778,7 @@ mod tests {
         let (diagram, result) = clean_fixture();
         let prev = FrozenRoutingSolution::capture(&diagram, &result);
         let frozen_nodes = FrozenNodeProduct::capture(&result);
-        let plan = plan_incremental_reuse(&prev, &diagram, &result, &frozen_nodes, "orthogonal")
+        let plan = plan_incremental_reuse(&prev, &diagram, &result, &frozen_nodes, "spline")
             .expect("zero-diff 必须可增量");
         assert!(plan.zero_diff);
         assert!(plan.dirty.is_empty());
@@ -832,7 +814,7 @@ mod tests {
         };
         let prev = FrozenRoutingSolution::capture(&diagram, &result);
         let frozen_nodes = FrozenNodeProduct::capture(&result);
-        let plan = plan_incremental_reuse(&prev, &diagram, &result, &frozen_nodes, "orthogonal")
+        let plan = plan_incremental_reuse(&prev, &diagram, &result, &frozen_nodes, "spline")
             .expect("扩张后仍有可 preserve 边 → Some");
         assert!(!plan.zero_diff);
         assert!(plan.dirty.contains(&0), "穿节点边必须 dirty: {:?}", plan.dirty);
@@ -858,7 +840,7 @@ mod tests {
         let prev = FrozenRoutingSolution::capture(&diagram, &result);
         let frozen_nodes = FrozenNodeProduct::capture(&result);
         assert!(
-            plan_incremental_reuse(&prev, &diagram, &result, &frozen_nodes, "orthogonal")
+            plan_incremental_reuse(&prev, &diagram, &result, &frozen_nodes, "spline")
                 .is_none()
         );
     }
@@ -874,7 +856,7 @@ mod tests {
         relabeled.label = Some("changed".to_string());
         let new_diagram = diagram_with(vec![relabeled, rel("c", "d")]);
         let plan =
-            plan_incremental_reuse(&prev, &new_diagram, &result, &frozen_nodes, "orthogonal")
+            plan_incremental_reuse(&prev, &new_diagram, &result, &frozen_nodes, "spline")
                 .expect("另一条边仍可 preserve");
         assert!(!plan.zero_diff);
         assert_eq!(plan.dirty.iter().copied().collect::<Vec<_>>(), vec![0]);

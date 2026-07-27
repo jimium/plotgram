@@ -78,7 +78,7 @@ diagram architecture {
 | 属性 | 默认值 | 说明 |
 |------|--------|------|
 | `layout` | `architecture` | 默认分组分层；`force-directed` 适合关系复杂、需自然散开的拓扑 |
-| `edge_routing` | `orthogonal` | 正交折线表达依赖与绕行 |
+| `edge_routing` | （勿声明） | Hierarchical 正交由 Atlas Channel Ink 落笔 |
 | `direction` | **不支持** | 默认布局不消费 `direction`；写了会校验报错 |
 | 样式方案 | 主题决定 | 常用蓝图/技术图纸感主题 |
 

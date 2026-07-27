@@ -209,7 +209,9 @@ mod tests {
             .find(|d| d.name == "flowchart")
             .expect("flowchart entry");
         assert_eq!(flowchart.default_layout, "flowchart");
-        assert_eq!(flowchart.default_edge_routing, "orthogonal");
+        assert_eq!(flowchart.default_edge_routing, "");
+        assert!(!flowchart.uses_edge_routing);
+        assert!(flowchart.edge_routings.is_empty());
         assert!(flowchart.layouts.contains(&"flowchart".to_string()));
         assert_eq!(flowchart.layouts.len(), 1);
     }
@@ -247,6 +249,9 @@ mod tests {
             .find(|d| d.name == "architecture")
             .expect("architecture entry");
         assert_eq!(arch.default_layout, "architecture");
+        assert_eq!(arch.default_edge_routing, "");
+        assert!(!arch.uses_edge_routing);
+        assert!(arch.edge_routings.is_empty());
     }
 
     #[test]
@@ -301,11 +306,10 @@ mod tests {
         let orthogonal = catalog
             .edge_routings
             .iter()
-            .find(|r| r.name == "orthogonal")
-            .expect("orthogonal");
-        assert_eq!(orthogonal.options.len(), 2);
-        let keys: Vec<&str> = orthogonal.options.iter().map(|o| o.key.as_str()).collect();
-        assert!(keys.contains(&"slot_pitch"));
-        assert!(keys.contains(&"channel_margin"));
+            .find(|r| r.name == "orthogonal");
+        assert!(
+            orthogonal.is_none(),
+            "R1: orthogonal / OVG routing must be removed from catalog"
+        );
     }
 }

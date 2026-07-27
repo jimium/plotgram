@@ -37,12 +37,12 @@ Atlas 把节点、组框、边通道、标签统一为**占位体**，先做完�
 
 | 记债（不挡出口；下一刀见 [30](30-Atlas实现检讨-冗余与缺失-2026-07.md)） | 内容 |
 |------------------|------|
-| **M1–M6 / R5** | **已收口**（含真多 slot、orientation、Cross label Demand+诊断对齐、R5 无 bbox seed）；完整 integrated labeling / ortho 整目录仍见 30 |
+| **M1–M6 / R5** | **已收口**；完整 integrated labeling 仍见 30 |
 | **R2** | **已落地**：删 adapter/shadow/compare；`ink_verify` 挂 Hier Ink（**M7-2 已将几何升为硬 FAIL**；见 30 · R2 / 31） |
 | **R4** | **已落地**：删 `gate_mcf` / `coord_descent`；删兼容别名；非 Hier 不写假 `atlas_plan`（见 30 · R4） |
 | **M7** | **已闭环**：中期守 gate + M7-2 硬门禁（**含 PortSideMismatch 升硬**）+ **后期删** `repair_ink_group_pierces`（见 [31](31-Atlas-M7-0-ink-repair基线-2026-07.md)） |
 | **真 MCF / I.7** | 占位模块已删（R4）；未实现，勿当交付 |
-| **ortho 物理清空** | Hier 主路径不用 OVG；R1 桥接 + trunk + **外提 stub/sanitize/Endpoint + 死 channel_load**；整目录清空仍待（见 30 · R1） |
+| **ortho / OVG** | **R1 已物理删除** `edge_routing_orthogonal` + `OrthogonalRecipe`；Hier=Atlas Ink；保留 sanitize/Endpoint/Label 岛（见 30 · R1） |
 | **非 Hier Ink 内化** | Tree/Sequence/Circular 仍 recipe 路由 |
 | **M8** | **A+B 已落地**：实验 env 收口 + slots 拓扑同构 skip / 重定位（见 30 · M8）；仍 opt-in，勿默认开 |
 | **R3** | **R3-1～R3-5 组合壳已落地**（度量尾段 + L2 + weak/strong expand + 显式 slots）；残余：Horizontal draft 必填 / Super LK（strong）/ `AtlasSolveOutput` 全必填（见 30 · R3） |

@@ -236,7 +236,7 @@ pub fn audit_layout_result(
     layout: &LayoutResult,
 ) -> RouteHardAuditReport {
     let problem = build_route_problem_from_layout(diagram, layout);
-    let group_ctx = GroupRoutingContext::from_layout(diagram, layout, "orthogonal");
+    let group_ctx = GroupRoutingContext::from_layout(diagram, layout, "spline");
     audit_problem_against_layout(sample_name, &problem, diagram, layout, &group_ctx)
 }
 

@@ -180,7 +180,6 @@ const LAYOUT_LABELS: Record<string, string> = {
 };
 
 const EDGE_ROUTING_LABELS: Record<string, string> = {
-  'orthogonal': 'orthogonal — 正交折线',
   'straight': 'straight — 直线',
   'bezier': 'bezier — 自适应贝塞尔曲线',
   'spline': 'spline — 多段样条（避障）',

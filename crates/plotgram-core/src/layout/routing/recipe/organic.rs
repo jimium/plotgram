@@ -49,8 +49,6 @@ use super::{EdgeLabelPlan, RecipeSolution, RoutingRecipe};
 
 /// 有机曲线边路由适用的内置图类型（与原 `OrganicRouting` 一致）。
 const APPLICABLE_TYPES: &[DiagramType] = &[
-    DiagramType::Flowchart,
-    DiagramType::Architecture,
     DiagramType::State,
     DiagramType::Er,
     DiagramType::Mindmap,

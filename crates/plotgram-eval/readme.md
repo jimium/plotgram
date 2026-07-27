@@ -67,8 +67,8 @@ let engine = EvalEngine::with_weights(MetricWeights {                    // 自�
 ```rust
 // 使用 presets 快速创建
 let config = presets::set_layout_algo("sugiyama");
-let config = presets::set_edge_routing("orthogonal");
-let config = presets::set_layout_and_routing("sugiyama", "orthogonal");
+let config = presets::set_edge_routing("bezier");
+let config = presets::set_layout_and_routing("sugiyama", "spline");
 ```
 
 ### 预定义配置组

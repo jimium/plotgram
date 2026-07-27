@@ -5,8 +5,7 @@
 diagram architecture {
     title: "数据湖仓一体平台"
     layout: architecture
-    edge_routing: orthogonal
-    theme: common.clean-light
+theme: common.clean-light
 
     group ingest "数据接入" {
         entity[external] app_db "业务库" {

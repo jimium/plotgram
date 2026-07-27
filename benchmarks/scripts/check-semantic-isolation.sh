@@ -34,26 +34,15 @@ if [[ -n "${kernel_code}" ]]; then
   fail=1
 fi
 
-# 2) edge_routing_orthogonal 生产代码
-ortho_code="$(code_diagram_type crates/plotgram-core/src/layout/routing/edge_routing_orthogonal)"
-# feedback_side：仅允许 cfg(test) 内
-if echo "$ortho_code" | rg -q 'feedback_side\.rs:'; then
-  prod_fb="$(
-    awk '
-      /^#\[cfg\(test\)\]/ {test=1}
-      test==0 && /DiagramType/ && $0 !~ /^[[:space:]]*\/\// && $0 !~ /^[[:space:]]*\/\*/ {print NR":"$0}
-    ' crates/plotgram-core/src/layout/routing/edge_routing_orthogonal/feedback_side.rs
-  )"
-  if [[ -n "${prod_fb}" ]]; then
-    echo "FAIL: DiagramType in feedback_side production:"
-    echo "$prod_fb"
-    fail=1
-  fi
-  ortho_code="$(echo "$ortho_code" | rg -v 'feedback_side\.rs:' || true)"
+# 2) R1：OVG 目录必须已物理删除
+if [[ -d crates/plotgram-core/src/layout/routing/edge_routing_orthogonal ]]; then
+  echo "FAIL: edge_routing_orthogonal still present (R1 remove OVG)"
+  fail=1
 fi
-if [[ -n "${ortho_code}" ]]; then
-  echo "FAIL: DiagramType in edge_routing_orthogonal production:"
-  echo "$ortho_code"
+if rg -n 'OrthogonalRecipe|edge_routing_orthogonal::' crates/plotgram-core/src -g '*.rs' \
+  | rg -v '^\S+:\s*//' | rg -v '^\S+:\s*//!' | rg -q .; then
+  echo "FAIL: OrthogonalRecipe / edge_routing_orthogonal references remain"
+  rg -n 'OrthogonalRecipe|edge_routing_orthogonal::' crates/plotgram-core/src -g '*.rs' || true
   fail=1
 fi
 

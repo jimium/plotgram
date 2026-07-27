@@ -280,7 +280,7 @@ fn closed_loop_all_cases() {
             "diagram flowchart {\n    title: \"新标题\"\n    config {\n        direction: left-to-right\n        theme: common.clean-light\n    }\n    entity a \"A\"\n    a -> a\n}"),
         ("config_block_change",
             "diagram flowchart {\n    config {\n        layout: sugiyama-v2 {\n            group_padding: 20\n        }\n    }\n    entity a \"A\"\n    entity b \"B\"\n    a -> b\n}",
-            "diagram flowchart {\n    config {\n        layout: sugiyama-v2 {\n            group_padding: 40\n        }\n        edge_routing: orthogonal {\n            slot_pitch: 40\n        }\n    }\n    entity a \"A\"\n    entity b \"B\"\n    a -> b\n}"),
+            "diagram flowchart {\n    config {\n        layout: sugiyama-v2 {\n            group_padding: 40\n        }\n    }\n    entity a \"A\"\n    entity b \"B\"\n    a -> b\n}"),
         ("mixed_changes",
             "diagram flowchart {\n    config {\n        direction: top-to-bottom\n    }\n    entity a \"A\" {\n        type: service\n    }\n    entity b \"B\"\n    entity c \"C\"\n    a -> b\n    b -> c\n}",
             "diagram flowchart {\n    title: \"新图\"\n    config {\n        direction: left-to-right\n    }\n    node_style service {\n        fill: \"#E3F2FD\"\n    }\n    group g \"Group\" {\n        entity a \"A\" {\n            type: service\n            status: healthy\n        }\n    }\n    entity c \"C\"\n    entity d \"D\"\n    a -> c \"调用\"\n    c -> d\n}"),

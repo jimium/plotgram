@@ -69,9 +69,9 @@ diagram <类型> {
 
 | 类型 | 关键字 | 适用场景 | 默认布局 | 默认边路由 |
 | --- | --- | --- | --- | --- |
-| 流程图 | `flowchart` | 决策流程、审批流、状态转换 | `flowchart` (sugiyama-v2) | `orthogonal` |
+| 流程图 | `flowchart` | 决策流程、审批流、状态转换 | `flowchart` (sugiyama-v2) | （Atlas Ink，勿声明） |
 | 时序图 | `sequence` | 交互时序、消息传递 | `sequence` | 无（布局生成） |
-| 架构图 | `architecture` | 系统架构、分层服务 | `architecture` | `orthogonal` |
+| 架构图 | `architecture` | 系统架构、分层服务 | `architecture` | （Atlas Ink，勿声明） |
 | 状态图 | `state` | 状态机、状态转换 | `state` (circular) | `circular` |
 | ER 图 | `er` | 数据模型、表关系 | `er` (sugiyama-v2) | `straight` |
 | 思维导图 | `mindmap` | 知识结构、脑图 | `mindmap` | `organic` |
@@ -339,7 +339,7 @@ diagram flowchart {
     config {
         direction: left-to-right
         layout: sugiyama-v2
-        edge_routing: orthogonal
+        # hierarchical: no edge_routing (Atlas Ink)
         theme: common.clean-light
         render_style: excalidraw
         group_frame: strips { gap: 40 }
@@ -384,7 +384,7 @@ diagram flowchart {
 
 | 值 | 说明 | 常用 option |
 | --- | --- | --- |
-| `orthogonal` | 正交折线路由（flowchart/architecture 默认） | `slot_pitch`, `channel_margin` |
+| ~~`orthogonal`~~ | **已移除（R1）** | — |
 | `straight` | 直线连接（ER 图默认） | — |
 | `bezier` | 贝塞尔曲线路由 | `tension` |
 | `spline` | 障碍避让多段样条 | — |
@@ -668,7 +668,7 @@ diagram architecture {
             gap: 50
             cross: start
         }
-        edge_routing: orthogonal
+        # hierarchical: no edge_routing (Atlas Ink)
     }
 
     group gateway "网关层" {
@@ -829,7 +829,7 @@ diagram flowchart {
     title: "微服务调用全景"
     config {
         direction: left-to-right
-        edge_routing: orthogonal {
+        # hierarchical: no edge_routing (Atlas Ink) {
             slot_pitch: 30
         }
     }

@@ -5,8 +5,7 @@
 diagram architecture {
     title: "REST API 后端分层架构"
     layout: architecture
-    edge_routing: orthogonal
-    theme: common.clean-light
+theme: common.clean-light
 
     group edge "接入层" {
         entity[frontend] web "Web 客户端" {

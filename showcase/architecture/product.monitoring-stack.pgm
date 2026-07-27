@@ -5,8 +5,7 @@
 diagram architecture {
     title: "监控告警栈架构"
     layout: architecture
-    edge_routing: orthogonal
-    theme: common.clean-light
+theme: common.clean-light
 
     group targets "被监控目标" {
         entity[service] app "业务服务"
