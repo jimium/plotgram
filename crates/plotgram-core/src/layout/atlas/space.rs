@@ -77,14 +77,27 @@ pub struct ChannelOccupant {
 
 impl ChannelOccupant {
     pub fn from_lanes(track_id: TrackId, orient: TrackOrient, lanes: u32) -> Self {
-        let width = super::channel_metric::channel_band_width(lanes);
+        Self::from_lanes_and_label_band(track_id, orient, lanes, 0.0)
+    }
+
+    /// `label_band`：Cross 上 label 法向合计（Main 传 0）；与 `cross_gap_demands` 同口径。
+    pub fn from_lanes_and_label_band(
+        track_id: TrackId,
+        orient: TrackOrient,
+        lanes: u32,
+        label_band: f64,
+    ) -> Self {
+        let width = super::channel_metric::cross_track_band_need(lanes, label_band);
         Self {
             track_id,
             orient,
             band: Demand::rigid(width),
             provenance: Provenance::with_detail(
                 "metric/channel:lane_demand",
-                format!("track={} lanes={}", track_id.0, lanes),
+                format!(
+                    "track={} lanes={} label_band={label_band:.1}",
+                    track_id.0, lanes
+                ),
             ),
         }
     }

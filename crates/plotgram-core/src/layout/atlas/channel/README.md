@@ -155,7 +155,7 @@ PortSlot {
 ### derive 可选批量挂端口（R5）
 
 `derive_node_ports(substrate, bp, index, options)`：对每个节点、`options.sides` 中每一侧，
-`resolve_host_track` 成功 → `attach_node_port`；失败 → **跳过该侧**（不整图失败）。
+`resolve_host_track` 成功 → 挂接 `slot_index = 0 .. default_capacity`（每槽 `capacity=1`）；失败 → **跳过该侧**（不整图失败）。
 挂接结果写入 `BlueprintIndex.node_ports: BTreeMap<NodeKey, Vec<PortSlotId>>`（按挂接序，确定性）。
 
 ```text

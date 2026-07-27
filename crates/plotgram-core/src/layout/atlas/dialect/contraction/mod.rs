@@ -10,8 +10,15 @@ use crate::layout::types::LayoutResult;
 use crate::layout::{GroupTable, NodeLayout};
 use std::collections::HashMap;
 
+pub mod meta;
 pub mod strong_macro;
+pub mod strong_super;
 pub mod weak;
+pub mod weak_super;
+
+pub use meta::{expand_contraction, ContractionMeta};
+pub use strong_super::{solve_strong_contract_expand, StrongExpandResult};
+pub use weak_super::{solve_weak_contract_expand, WeakExpandResult};
 
 /// 有组时是否走收缩（分治 / macro）而非 flat LayeredKernel。
 pub fn should_contract(diagram: &Diagram) -> bool {

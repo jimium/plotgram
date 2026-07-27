@@ -584,11 +584,12 @@ impl Default for DerivePortsOptions {
 /// 为每个节点批量挂接侧端口（24 号文 R5）。
 ///
 /// 对 `bp.nodes` 中每个节点、`options.sides` 中每一侧：[`BlueprintIndex::resolve_host_track`]
-/// 成功 → `attach_node_port`；失败（边界无该侧缝）→ **跳过该侧**（不整图失败）。
+/// 成功 → 挂接 `slot_index = 0 .. default_capacity`（每槽 `capacity=1`，真多 slot）；
+/// 失败（边界无该侧缝）→ **跳过该侧**（不整图失败）。
 /// 挂接结果写入 `index.node_ports`（节点名 → 端口 id，按挂接序）。
 ///
 /// 端口 id 由 `substrate.alloc_port_id()` 顺序分配；节点按名升序、侧按 `options.sides`
-/// 序遍历，故挂接序与 id 分配均确定（AGENTS.md §2）。
+/// 序、槽按 `slot_index` 升序遍历，故挂接序与 id 分配均确定（AGENTS.md §2）。
 pub fn derive_node_ports(
     substrate: &mut Substrate,
     bp: &ChannelBlueprint,
@@ -598,13 +599,17 @@ pub fn derive_node_ports(
     if !options.enabled {
         return Ok(());
     }
+    let slot_n = options.default_capacity.max(1);
     for node in bp.nodes.keys() {
         let mut attached: Vec<PortSlotId> = Vec::new();
         for &side in &options.sides {
             if let Some(track) = index.resolve_host_track(bp, node, side) {
-                let id = substrate.alloc_port_id();
-                substrate.attach_port(id, node, side, 0, track, options.default_capacity)?;
-                attached.push(id);
+                for slot_index in 0..slot_n {
+                    let id = substrate.alloc_port_id();
+                    // 每槽独占一条边（capacity=1）；平行边靠不同 slot_index 区分
+                    substrate.attach_port(id, node, side, slot_index, track, 1)?;
+                    attached.push(id);
+                }
             }
         }
         if !attached.is_empty() {

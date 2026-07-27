@@ -33,66 +33,10 @@ impl InkContext {
         let rank_count = plan.substrate.rank_count;
         let order_count = plan.substrate.order_count;
 
-        let mut rank_top: Vec<f64> = vec![f64::MAX; rank_count];
-        let mut rank_bottom: Vec<f64> = vec![f64::MIN; rank_count];
-        let mut order_left: Vec<f64> = vec![f64::MAX; order_count];
-        let mut order_right: Vec<f64> = vec![f64::MIN; order_count];
-
-        for (node, slot) in &plan.node_slots {
-            if let Some(&(x, y, w, h)) = node_rects.get(node) {
-                let r = slot.rank.min(rank_count.saturating_sub(1));
-                let o = slot.order.min(order_count.saturating_sub(1));
-                rank_top[r] = rank_top[r].min(y);
-                rank_bottom[r] = rank_bottom[r].max(y + h);
-                order_left[o] = order_left[o].min(x);
-                order_right[o] = order_right[o].max(x + w);
-            }
-        }
-
-        let margin = 20.0;
-        let mut rank_gap_y = Vec::with_capacity(rank_count + 1);
-        for k in 0..=rank_count {
-            if k == 0 {
-                let top = if rank_count > 0 && rank_top[0] < f64::MAX {
-                    rank_top[0]
-                } else {
-                    0.0
-                };
-                rank_gap_y.push(top - margin);
-            } else if k == rank_count {
-                let bottom = if rank_count > 0 && rank_bottom[rank_count - 1] > f64::MIN {
-                    rank_bottom[rank_count - 1]
-                } else {
-                    100.0
-                };
-                rank_gap_y.push(bottom + margin);
-            } else {
-                // R5：interior 不再用 bbox 中点双写；占位后靠 apply_track_coords 覆盖
-                rank_gap_y.push(k as f64 * 50.0);
-            }
-        }
-
-        let mut order_gap_x = Vec::with_capacity(order_count + 1);
-        for og in 0..=order_count {
-            if og == 0 {
-                let left = if order_count > 0 && order_left[0] < f64::MAX {
-                    order_left[0]
-                } else {
-                    0.0
-                };
-                order_gap_x.push(left - margin);
-            } else if og == order_count {
-                let right = if order_count > 0 && order_right[order_count - 1] > f64::MIN {
-                    order_right[order_count - 1]
-                } else {
-                    100.0
-                };
-                order_gap_x.push(right + margin);
-            } else {
-                // R5：interior 不再用 bbox 中点双写；占位后靠 apply_track_coords 覆盖
-                order_gap_x.push(og as f64 * 50.0);
-            }
-        }
+        // R5：间隙表仅占位；真值一律由度量相 `track_coords` → `apply_track_coords` 写入。
+        // 边界也不再 bbox±20 seed（与 `publish_*_track_coords` 的 MARGIN 单一真源）。
+        let rank_gap_y: Vec<f64> = (0..=rank_count).map(|k| k as f64 * 50.0).collect();
+        let order_gap_x: Vec<f64> = (0..=order_count).map(|og| og as f64 * 50.0).collect();
 
         Self {
             node_rects,
@@ -103,7 +47,7 @@ impl InkContext {
 
     /// 用 Metric track 坐标覆盖走廊：Cross → `rank_gap_y`，Main → `order_gap_x`。
     ///
-    /// substrate 有 track 但 `track_coords` 缺键时保留 bbox seed，并 `perf_log` 回退次数。
+    /// substrate 有 track 但 `track_coords` 缺键时保留占位，并 `perf_log` 回退次数（R5：无 bbox 兜底）。
     pub fn apply_track_coords(
         &mut self,
         substrate: &Substrate,
@@ -743,7 +687,20 @@ mod tests {
         };
         let mut rects = BTreeMap::new();
         rects.insert("a".into(), (0.0, 0.0, 40.0, 40.0));
-        let ctx = InkContext::from_plan_and_rects(&plan, rects);
+        let mut ctx = InkContext::from_plan_and_rects(&plan, rects);
+        // R5：边界真值来自 track_coords（与 publish MARGIN 同构），不再靠 Ink bbox seed
+        let mut substrate = Substrate::new();
+        substrate
+            .add_track(tid(10), TrackOrient::Main, None, 1.0, 0, (0, 1))
+            .unwrap();
+        substrate
+            .add_track(tid(11), TrackOrient::Main, None, 1.0, 1, (0, 1))
+            .unwrap();
+        let mut coords = BTreeMap::new();
+        coords.insert(10, -20.0);
+        coords.insert(11, 60.0);
+        ctx.apply_track_coords(&substrate, &coords);
+
         let mut groups = GroupTable::new();
         groups.insert(
             "g".into(),
@@ -754,9 +711,9 @@ mod tests {
                 height: 80.0,
             },
         );
-        // order_gap margin = left-20 / right+20；组内 x=50 应裙到左侧 margin
+        // order_gap = -20 / 60；组内 x=50 应裙到左侧 margin
         assert!((skirt_root_main_x(50.0, &ctx, &groups) - (-20.0)).abs() < 1e-9
-            || (skirt_root_main_x(50.0, &ctx, &groups) - 20.0).abs() < 1e-9
+            || (skirt_root_main_x(50.0, &ctx, &groups) - 60.0).abs() < 1e-9
             || !axis_inside_groups(50.0, false, &groups));
         assert!((skirt_root_main_x(15.0, &ctx, &groups) - 15.0).abs() < 1e-9
             || axis_inside_groups(15.0, false, &groups));

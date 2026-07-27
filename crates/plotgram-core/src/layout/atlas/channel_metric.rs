@@ -36,28 +36,42 @@ pub struct ChannelMetric {
 }
 
 impl ChannelMetric {
-    /// 按 track 汇总的 lane Demand（刚性）。
-    pub fn track_demands(&self) -> BTreeMap<TrackId, Demand> {
+    /// 按 track 汇总的 Demand（刚性）。Cross 含 M6 label 法向预留，与 `cross_gap_demands` 对齐。
+    pub fn track_demands(&self, diagram: &Diagram) -> BTreeMap<TrackId, Demand> {
+        let label_band = label_band_by_cross_track(diagram, &self.plan, &self.substrate);
         let mut out = BTreeMap::new();
         for t in self.substrate.tracks() {
             let lanes = self.occupancy.lane_demand(t.id);
             if lanes == 0 {
                 continue;
             }
-            out.insert(t.id, Demand::rigid(channel_band_width(lanes)));
+            let need = if t.orient == TrackOrient::Cross {
+                cross_track_band_need(lanes, label_band.get(&t.id).copied().unwrap_or(0.0))
+            } else {
+                channel_band_width(lanes)
+            };
+            out.insert(t.id, Demand::rigid(need));
         }
         out
     }
 
-    /// 构造 Channel Occupant 列表（供诊断 / 后续 attach_channel_ir）。
-    pub fn occupants(&self) -> Vec<ChannelOccupant> {
+    /// 构造 Channel Occupant 列表（供诊断）；Cross 含 label band，与 gap demand 同口径。
+    pub fn occupants(&self, diagram: &Diagram) -> Vec<ChannelOccupant> {
+        let label_band = label_band_by_cross_track(diagram, &self.plan, &self.substrate);
         let mut out = Vec::new();
         for t in self.substrate.tracks() {
             let lanes = self.occupancy.lane_demand(t.id);
             if lanes == 0 {
                 continue;
             }
-            out.push(ChannelOccupant::from_lanes(t.id, t.orient, lanes));
+            let lb = if t.orient == TrackOrient::Cross {
+                label_band.get(&t.id).copied().unwrap_or(0.0)
+            } else {
+                0.0
+            };
+            out.push(ChannelOccupant::from_lanes_and_label_band(
+                t.id, t.orient, lanes, lb,
+            ));
         }
         out.sort_by_key(|o| o.track_id);
         out
@@ -68,8 +82,7 @@ impl ChannelMetric {
     /// Cross `line = k`（`1 <= k < rank_count`）对应 `per_layer_gaps[k - 1]`
     /// （rank `k-1` 与 `k` 之间）。外框线 `0` / `rank_count` 不进层缝表。
     ///
-    /// `need = channel_band_width(lanes) + labeled_on_track * CROSS_LABEL_HEIGHT`，
-    /// 同 gap 多 track 取 max。
+    /// `need = channel_band_width(lanes) + Σ label_metrics 高度`，同 gap 多 track 取 max。
     pub fn cross_gap_demands(&self, diagram: &Diagram) -> BTreeMap<usize, f64> {
         cross_gap_demands_from(
             diagram,
@@ -106,12 +119,57 @@ impl ChannelMetric {
     }
 }
 
-/// 单条 Cross track 的法向带宽：lane band + 带 label 边数 × 固定高度。
-pub fn cross_track_band_need(lanes: u32, labeled_on_track: u32) -> f64 {
+/// 单条 Cross track 的法向带宽：lane band + label 法向合计高度。
+pub fn cross_track_band_need(lanes: u32, label_band: f64) -> f64 {
     if lanes == 0 {
         return 0.0;
     }
-    channel_band_width(lanes) + (labeled_on_track as f64) * CROSS_LABEL_HEIGHT
+    channel_band_width(lanes) + label_band
+}
+
+/// 一条边上 Cross 法向 label 预留：主/`head`/`tail` 非空文本取 `label_metrics` 高度之 max。
+fn relation_cross_label_band(rel: &crate::ast::Relation) -> f64 {
+    use crate::layout::routing::common::label_avoidance::label_metrics;
+    let mut h = 0.0f64;
+    for text in [
+        rel.label.as_deref(),
+        rel.head_label.as_deref(),
+        rel.tail_label.as_deref(),
+    ] {
+        if let Some(t) = text.filter(|s| !s.is_empty()) {
+            let (_, lh) = label_metrics(t);
+            h = h.max(lh);
+        }
+    }
+    h
+}
+
+/// 按 Cross track 累加边上的 label 法向高度（与 `cross_gap_demands` / `track_demands` 同口径）。
+pub fn label_band_by_cross_track(
+    diagram: &Diagram,
+    plan: &Plan,
+    substrate: &Substrate,
+) -> BTreeMap<TrackId, f64> {
+    let mut out: BTreeMap<TrackId, f64> = BTreeMap::new();
+    for (&eid, tracks) in &plan.channels {
+        let Some(rel) = diagram.relations.get(eid) else {
+            continue;
+        };
+        let band = relation_cross_label_band(rel);
+        if band <= 0.0 {
+            continue;
+        }
+        for &tid in tracks {
+            let Some(t) = substrate.track(tid) else {
+                continue;
+            };
+            if t.orient != TrackOrient::Cross {
+                continue;
+            }
+            *out.entry(tid).or_insert(0.0) += band;
+        }
+    }
+    out
 }
 
 /// 按 Cross `TrackId` 统计路径含该 track 且带任一非空 label 的边数。
@@ -154,7 +212,7 @@ pub fn cross_gap_demands_from(
     occupancy: &Occupancy,
 ) -> BTreeMap<usize, f64> {
     let rank_count = plan.substrate.rank_count;
-    let labeled = labeled_edge_counts_by_cross_track(diagram, plan, substrate);
+    let label_band = label_band_by_cross_track(diagram, plan, substrate);
     let mut out: BTreeMap<usize, f64> = BTreeMap::new();
     for t in substrate.tracks() {
         if t.orient != TrackOrient::Cross {
@@ -169,8 +227,8 @@ pub fn cross_gap_demands_from(
             continue;
         }
         let gap_idx = line - 1;
-        let labeled_n = labeled.get(&t.id).copied().unwrap_or(0);
-        let need = cross_track_band_need(lanes, labeled_n);
+        let lb = label_band.get(&t.id).copied().unwrap_or(0.0);
+        let need = cross_track_band_need(lanes, lb);
         let e = out.entry(gap_idx).or_insert(0.0);
         *e = e.max(need);
     }
@@ -765,19 +823,29 @@ mod tests {
             occupancy,
         };
         let dem = metric.cross_gap_demands(&diagram);
-        let expected = channel_band_width(2) + CROSS_LABEL_HEIGHT; // 仅一条带 label
+        let (_, label_h) = crate::layout::routing::common::label_avoidance::label_metrics("go");
+        let expected = channel_band_width(2) + label_h; // 仅一条带 label
         assert!(
             (dem.get(&0).copied().unwrap_or(0.0) - expected).abs() < 1e-9,
             "got {:?} want {expected}",
             dem.get(&0)
         );
 
-        // 去掉主 label，改用 head_label → 仍计 1 份高度
+        // 诊断 API 与 gap 同口径
+        let td = metric.track_demands(&diagram);
+        assert!(
+            (td.get(&TrackId(1)).map(|d| d.preferred).unwrap_or(0.0) - expected).abs() < 1e-9,
+            "track_demands Cross should match gap need"
+        );
+
+        // 去掉主 label，改用 head_label → 仍计 label_metrics 高度
         diagram.relations[0].label = None;
         diagram.relations[0].head_label = Some("H".into());
+        let (_, head_h) = crate::layout::routing::common::label_avoidance::label_metrics("H");
+        let expected_head = channel_band_width(2) + head_h;
         let dem_head = metric.cross_gap_demands(&diagram);
         assert!(
-            (dem_head.get(&0).copied().unwrap_or(0.0) - expected).abs() < 1e-9,
+            (dem_head.get(&0).copied().unwrap_or(0.0) - expected_head).abs() < 1e-9,
             "head_label should count; got {:?}",
             dem_head.get(&0)
         );

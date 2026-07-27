@@ -28,6 +28,7 @@ use super::substrate::{
 };
 use super::verify::{RouteScopeViolation, verify_route_scope};
 use crate::layout::kernel::cost::SolverStatus;
+use std::collections::BTreeMap;
 
 const MAIN: TrackOrient = TrackOrient::Main;
 const CROSS: TrackOrient = TrackOrient::Cross;
@@ -1462,20 +1463,27 @@ fn t5_derive_auto_attaches_node_ports() {
     let (mut s, mut idx) = derive_substrate(&bp).unwrap();
     derive_node_ports(&mut s, &bp, &mut idx, &DerivePortsOptions::default()).unwrap();
 
-    // 默认四侧：A、B 各挂 4 个端口
-    assert_eq!(idx.node_ports.get("A").map(Vec::len), Some(4));
-    assert_eq!(idx.node_ports.get("B").map(Vec::len), Some(4));
-    // node_ports 中的 id 都能在 substrate 查到，且 node 字段回填正确
+    // 默认四侧 × default_capacity(4) slot
+    assert_eq!(idx.node_ports.get("A").map(Vec::len), Some(16));
+    assert_eq!(idx.node_ports.get("B").map(Vec::len), Some(16));
     for (node, ids) in &idx.node_ports {
-        for &id in ids {
-            assert_eq!(s.port(id).unwrap().node, *node);
+        assert_eq!(ids.len(), 16);
+        let mut by_side: BTreeMap<_, Vec<_>> = BTreeMap::new();
+        for id in ids {
+            let p = s.port(*id).unwrap();
+            assert_eq!(&p.node, node);
+            by_side.entry(p.side).or_default().push(p.slot_index);
+        }
+        for idxs in by_side.values() {
+            assert_eq!(idxs, &vec![0, 1, 2, 3]);
         }
     }
     // find_port 能定位自动挂的端口
     assert!(s.find_port("A", PortSide::MainLow, 0).is_some());
+    assert!(s.find_port("A", PortSide::MainLow, 3).is_some());
     assert!(s.find_port("B", PortSide::CrossHigh, 0).is_some());
 
-    // 只挂部分侧：sides 过滤生效，每节点只挂指定侧
+    // 只挂部分侧：sides 过滤生效，每节点只挂指定侧 × capacity
     let (mut s2, mut idx2) = derive_substrate(&bp).unwrap();
     let partial = DerivePortsOptions {
         enabled: true,
@@ -1483,7 +1491,7 @@ fn t5_derive_auto_attaches_node_ports() {
         sides: vec![PortSide::MainLow, PortSide::CrossHigh],
     };
     derive_node_ports(&mut s2, &bp, &mut idx2, &partial).unwrap();
-    assert_eq!(idx2.node_ports.get("A").map(Vec::len), Some(2));
+    assert_eq!(idx2.node_ports.get("A").map(Vec::len), Some(8));
     assert!(s2.find_port("A", PortSide::MainLow, 0).is_some());
     assert!(s2.find_port("A", PortSide::CrossHigh, 0).is_some());
     assert!(s2.find_port("A", PortSide::MainHigh, 0).is_none(), "未指定侧不应挂接");

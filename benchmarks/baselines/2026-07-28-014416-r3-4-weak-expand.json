@@ -1,6 +1,6 @@
 {
-  "date": "2026-07-28-015438-r3-5-strong-converge",
-  "note": "role-aware baseline: product-gate hard; stress/demo quality soft",
+  "date": "2026-07-28-014416-r3-4-weak-expand",
+  "note": "raise product: R3-4 weak Hybrid expand — Vertical Super LK+BK; product.swimlane-order-process (aspect=Vertical) node_fp/lint/crossings vs r3-3; penetration=0. role-aware baseline.",
   "samples": [
     {
       "file": "showcase/architecture/product.three-tier.pgm",
@@ -82,9 +82,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 1.8,
+      "median_ms": 1.73,
       "min_ms": 1.68,
-      "max_ms": 2.03,
+      "max_ms": 2.16,
       "det": true,
       "role": "product"
     },
@@ -150,7 +150,7 @@
           "max_ratio": 2.2612129903115035
         },
         "edge_length": {
-          "intra_layer_cv": 0.5129393422514316,
+          "intra_layer_cv": 0.5129393422514317,
           "max_min_ratio": 9.465677388589574,
           "outlier_count": 1
         },
@@ -168,9 +168,9 @@
           "non_monotone_count": 1
         }
       },
-      "median_ms": 6.37,
-      "min_ms": 6.26,
-      "max_ms": 6.85,
+      "median_ms": 6.36,
+      "min_ms": 6.21,
+      "max_ms": 6.47,
       "det": true,
       "role": "product"
     },
@@ -254,9 +254,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 2.11,
-      "min_ms": 1.99,
-      "max_ms": 2.15,
+      "median_ms": 2.02,
+      "min_ms": 1.98,
+      "max_ms": 2.21,
       "det": true,
       "role": "product"
     },
@@ -340,9 +340,9 @@
           "non_monotone_count": 2
         }
       },
-      "median_ms": 3.59,
-      "min_ms": 3.43,
-      "max_ms": 3.97,
+      "median_ms": 3.64,
+      "min_ms": 3.48,
+      "max_ms": 3.75,
       "det": true,
       "role": "product"
     },
@@ -426,9 +426,9 @@
           "non_monotone_count": 3
         }
       },
-      "median_ms": 3.57,
-      "min_ms": 3.37,
-      "max_ms": 3.72,
+      "median_ms": 3.58,
+      "min_ms": 3.49,
+      "max_ms": 3.68,
       "det": true,
       "role": "product"
     },
@@ -512,9 +512,9 @@
           "non_monotone_count": 5
         }
       },
-      "median_ms": 11.07,
-      "min_ms": 10.99,
-      "max_ms": 11.12,
+      "median_ms": 10.97,
+      "min_ms": 10.93,
+      "max_ms": 11.16,
       "det": true,
       "role": "product"
     },
@@ -598,9 +598,9 @@
           "non_monotone_count": 9
         }
       },
-      "median_ms": 17.37,
-      "min_ms": 16.99,
-      "max_ms": 17.5,
+      "median_ms": 17.57,
+      "min_ms": 17.47,
+      "max_ms": 17.79,
       "det": true,
       "role": "product"
     },
@@ -684,9 +684,9 @@
           "non_monotone_count": 2
         }
       },
-      "median_ms": 3.43,
-      "min_ms": 3.36,
-      "max_ms": 3.55,
+      "median_ms": 3.48,
+      "min_ms": 3.29,
+      "max_ms": 3.64,
       "det": true,
       "role": "product"
     },
@@ -770,9 +770,9 @@
           "non_monotone_count": 3
         }
       },
-      "median_ms": 2.75,
-      "min_ms": 2.69,
-      "max_ms": 2.81,
+      "median_ms": 2.77,
+      "min_ms": 2.65,
+      "max_ms": 2.84,
       "det": true,
       "role": "product"
     },
@@ -856,9 +856,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 2.63,
-      "min_ms": 2.58,
-      "max_ms": 2.73,
+      "median_ms": 2.64,
+      "min_ms": 2.55,
+      "max_ms": 2.7,
       "det": true,
       "role": "product"
     },
@@ -942,9 +942,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.25,
-      "min_ms": 0.25,
-      "max_ms": 0.27,
+      "median_ms": 0.28,
+      "min_ms": 0.26,
+      "max_ms": 0.29,
       "det": true,
       "role": "product"
     },
@@ -1010,7 +1010,7 @@
           "max_ratio": 1.2691919160033034
         },
         "edge_length": {
-          "intra_layer_cv": 0.1493917304778142,
+          "intra_layer_cv": 0.14939173047781423,
           "max_min_ratio": 2.4583589202267326,
           "outlier_count": 0
         },
@@ -1028,9 +1028,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 1.93,
-      "min_ms": 1.89,
-      "max_ms": 1.97,
+      "median_ms": 1.95,
+      "min_ms": 1.87,
+      "max_ms": 2.03,
       "det": true,
       "role": "product"
     },
@@ -1114,9 +1114,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 4.54,
-      "min_ms": 4.47,
-      "max_ms": 4.7,
+      "median_ms": 4.48,
+      "min_ms": 4.38,
+      "max_ms": 4.78,
       "det": true,
       "role": "product"
     },
@@ -1200,9 +1200,9 @@
           "non_monotone_count": 1
         }
       },
-      "median_ms": 2.18,
-      "min_ms": 2.08,
-      "max_ms": 2.55,
+      "median_ms": 2.22,
+      "min_ms": 2.09,
+      "max_ms": 2.36,
       "det": true,
       "role": "product"
     },
@@ -1268,7 +1268,7 @@
           "max_ratio": 1.666089965397924
         },
         "edge_length": {
-          "intra_layer_cv": 0.4348801805513006,
+          "intra_layer_cv": 0.4348801805513007,
           "max_min_ratio": 7.551108311372969,
           "outlier_count": 0
         },
@@ -1286,9 +1286,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 7.3,
-      "min_ms": 6.87,
-      "max_ms": 7.44,
+      "median_ms": 7.06,
+      "min_ms": 6.72,
+      "max_ms": 7.1,
       "det": true,
       "role": "product"
     },
@@ -1354,7 +1354,7 @@
           "max_ratio": 1.4632128863735303
         },
         "edge_length": {
-          "intra_layer_cv": 0.45754759675803064,
+          "intra_layer_cv": 0.4575475967580306,
           "max_min_ratio": 10.974333615955128,
           "outlier_count": 1
         },
@@ -1372,9 +1372,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 5.82,
-      "min_ms": 5.63,
-      "max_ms": 5.99,
+      "median_ms": 5.53,
+      "min_ms": 5.45,
+      "max_ms": 5.69,
       "det": true,
       "role": "product"
     },
@@ -1458,9 +1458,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 3.38,
-      "min_ms": 3.26,
-      "max_ms": 3.7,
+      "median_ms": 3.22,
+      "min_ms": 3.16,
+      "max_ms": 3.33,
       "det": true,
       "role": "product"
     },
@@ -1544,9 +1544,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 2.47,
-      "min_ms": 2.44,
-      "max_ms": 2.62,
+      "median_ms": 2.44,
+      "min_ms": 2.38,
+      "max_ms": 2.63,
       "det": true,
       "role": "product"
     },
@@ -1630,9 +1630,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.11,
+      "median_ms": 0.1,
       "min_ms": 0.1,
-      "max_ms": 0.13,
+      "max_ms": 0.11,
       "det": true,
       "role": "product"
     },
@@ -1716,9 +1716,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.17,
-      "min_ms": 0.17,
-      "max_ms": 0.2,
+      "median_ms": 0.16,
+      "min_ms": 0.15,
+      "max_ms": 0.16,
       "det": true,
       "role": "product"
     },
@@ -1803,8 +1803,8 @@
         }
       },
       "median_ms": 0.19,
-      "min_ms": 0.18,
-      "max_ms": 0.27,
+      "min_ms": 0.17,
+      "max_ms": 0.23,
       "det": true,
       "role": "product"
     },
@@ -1888,9 +1888,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.16,
-      "min_ms": 0.15,
-      "max_ms": 0.17,
+      "median_ms": 0.15,
+      "min_ms": 0.14,
+      "max_ms": 0.16,
       "det": true,
       "role": "product"
     },
@@ -1975,8 +1975,8 @@
         }
       },
       "median_ms": 2.75,
-      "min_ms": 2.65,
-      "max_ms": 2.82,
+      "min_ms": 2.64,
+      "max_ms": 2.86,
       "det": true,
       "role": "product"
     },
@@ -2060,9 +2060,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 2.65,
-      "min_ms": 2.57,
-      "max_ms": 2.81,
+      "median_ms": 2.71,
+      "min_ms": 2.61,
+      "max_ms": 2.83,
       "det": true,
       "role": "product"
     },
@@ -2147,8 +2147,8 @@
         }
       },
       "median_ms": 7.58,
-      "min_ms": 7.4,
-      "max_ms": 7.9,
+      "min_ms": 7.47,
+      "max_ms": 7.72,
       "det": true,
       "role": "product"
     },
@@ -2232,9 +2232,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 2.08,
-      "min_ms": 2.03,
-      "max_ms": 2.15,
+      "median_ms": 2.02,
+      "min_ms": 1.99,
+      "max_ms": 2.1,
       "det": true,
       "role": "product"
     },
@@ -2318,9 +2318,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.49,
-      "min_ms": 0.48,
-      "max_ms": 0.54,
+      "median_ms": 0.51,
+      "min_ms": 0.47,
+      "max_ms": 0.53,
       "det": true,
       "role": "product"
     },
@@ -2404,9 +2404,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 7.6,
-      "min_ms": 7.57,
-      "max_ms": 7.77,
+      "median_ms": 7.77,
+      "min_ms": 7.39,
+      "max_ms": 7.99,
       "det": true,
       "role": "product"
     },
@@ -2490,9 +2490,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.54,
-      "min_ms": 0.5,
-      "max_ms": 0.64,
+      "median_ms": 0.49,
+      "min_ms": 0.48,
+      "max_ms": 0.52,
       "det": true,
       "role": "product"
     },
@@ -2576,9 +2576,9 @@
           "non_monotone_count": 0
         }
       },
-      "median_ms": 0.18,
-      "min_ms": 0.16,
-      "max_ms": 0.19,
+      "median_ms": 0.26,
+      "min_ms": 0.21,
+      "max_ms": 0.34,
       "det": true,
       "role": "product"
     }

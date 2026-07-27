@@ -49,7 +49,7 @@ pub struct AtlasSolveOutput {
     pub nodes: HashMap<String, NodeLayout>,
     pub groups: GroupTable,
     pub cross_problem: Option<CoordinateProblem>,
-    /// Main 轴问题（含 Track 变量）；分治路径可能为 None。
+    /// Main 轴问题（含 Track 变量）；metric 成功时 flat/weak/strong 均为 Some（R3-1）。
     pub main_problem: Option<CoordinateProblem>,
     /// 度量相通道选路产物（Stage 4 落笔消费）；失败时为 None。
     pub channel: Option<ChannelMetric>,
@@ -187,80 +187,24 @@ fn solve_atlas_flat(
                     );
                 }
                 let mut metric = metric;
-                let (mut tops, mut problem, mut coords, still_bad) = try_main_axis_l0_l1(
+                let (tops, problem, coords, _still_bad) = run_main_axis_ladder_l0_l3(
                     diagram,
                     &layer_heights,
                     &draft.per_layer_gaps,
                     draft.padding,
                     draft.preset.layer_gap,
-                    &metric,
+                    &mut metric,
                     &mut ladder,
-                );
-                // L2：主轴 L1 后仍不可行 → 反向边序重跑相 I（改争用）
-                if still_bad {
-                    ladder.push(
-                        RelaxLevel::L2,
-                        "metric/relax",
-                        "phase-I reverse edge order after L1 infeasible",
-                    );
-                    // L2 必全量相 I（Reverse 禁止 skip）；传入 prev 不改变 Reverse 语义，
-                    // 仅保持调用面一致（不做 Reverse 热启动）。
-                    if let Ok(m2) = build_channel_metric_with_opts(
-                        diagram,
-                        &draft,
-                        prev_plan,
-                        PhaseIEdgeOrder::Reverse,
-                    ) {
-                        metric = m2;
-                        let r2 = try_main_axis_l0_l1(
+                    || {
+                        build_channel_metric_with_opts(
                             diagram,
-                            &layer_heights,
-                            &draft.per_layer_gaps,
-                            draft.padding,
-                            draft.preset.layer_gap,
-                            &metric,
-                            &mut ladder,
-                        );
-                        tops = r2.0;
-                        problem = r2.1;
-                        coords = r2.2;
-                        if r2.3 {
-                            ladder.push(
-                                RelaxLevel::L3,
-                                "metric/relax",
-                                "fallback inflate_layer_gaps heuristic tops (skirt→Demand)",
-                            );
-                            let gaps = inflate_layer_gaps(
-                                &draft.per_layer_gaps,
-                                &metric.cross_gap_demands(diagram),
-                            );
-                            tops = vec![draft.padding; layer_heights.len()];
-                            for i in 1..layer_heights.len() {
-                                let gap = gaps
-                                    .get(i - 1)
-                                    .copied()
-                                    .unwrap_or(draft.preset.layer_gap);
-                                tops[i] = tops[i - 1] + layer_heights[i - 1] + gap;
-                            }
-                        }
-                    } else {
-                        ladder.push(
-                            RelaxLevel::L3,
-                            "metric/relax",
-                            "fallback inflate_layer_gaps heuristic tops (skirt→Demand)",
-                        );
-                        let gaps =
-                            inflate_layer_gaps(&draft.per_layer_gaps, &metric.cross_gap_demands(diagram));
-                        tops = vec![draft.padding; layer_heights.len()];
-                        for i in 1..layer_heights.len() {
-                            let gap = gaps
-                                .get(i - 1)
-                                .copied()
-                                .unwrap_or(draft.preset.layer_gap);
-                            tops[i] = tops[i - 1] + layer_heights[i - 1] + gap;
-                        }
-                    }
-                }
+                            &draft,
+                            prev_plan,
+                            PhaseIEdgeOrder::Reverse,
+                        )
+                        .ok()
+                    },
+                );
                 (Some(tops), Some(problem), coords, Some(metric))
             }
             Err(e) => {
@@ -294,47 +238,38 @@ fn solve_atlas_flat(
         true,
     );
 
-    // Main 走廊 → Cross 轴 order 缝
+    // Main 走廊 → Cross 轴 order 缝 + publish（与 weak/strong 共用尾段）
     let mut track_coords = track_coords;
     if let Some(metric) = &metric_opt {
-        let main_dem = metric.main_gap_demands();
-        if !main_dem.is_empty() {
-            let id_layers: Vec<Vec<String>> = draft
-                .layers
-                .iter()
-                .map(|layer| {
-                    layer
-                        .iter()
-                        .filter_map(|&n| match &draft.proper_graph[n].kind {
-                            crate::layout::kernel::layered::graph::LayerNodeKind::Real(d) => {
-                                Some(draft.dag[*d].clone())
-                            }
-                            _ => None,
-                        })
-                        .collect()
-                })
-                .collect();
-            expand_layer_order_gaps(&mut nodes, &id_layers, &main_dem, false);
+        let id_layers: Vec<Vec<String>> = draft
+            .layers
+            .iter()
+            .map(|layer| {
+                layer
+                    .iter()
+                    .filter_map(|&n| match &draft.proper_graph[n].kind {
+                        crate::layout::kernel::layered::graph::LayerNodeKind::Real(d) => {
+                            Some(draft.dag[*d].clone())
+                        }
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .collect();
+        finalize_metric_tail_on_nodes(
+            &mut nodes,
+            metric,
+            &id_layers,
+            &mut track_coords,
+            true,
+            None,
+        );
+        if !metric.main_gap_demands().is_empty() {
             crate::layout::kernel::layered::postprocess::normalize_layout_to_padding(
                 &mut nodes,
                 draft.padding,
             );
         }
-        // M4/R5：节点定稿后发布 Main + Cross track 中心（不覆盖已有 LP）
-        publish_main_track_coords(
-            &mut track_coords,
-            &metric.substrate,
-            &metric.plan,
-            &nodes,
-            false,
-        );
-        publish_cross_track_coords(
-            &mut track_coords,
-            &metric.substrate,
-            &metric.plan,
-            &nodes,
-            false,
-        );
     }
 
     let groups = if diagram.groups.is_empty() {
@@ -375,33 +310,73 @@ fn solve_atlas_flat(
     }
 }
 
-fn solve_main_with_ladder(
+/// R3-2：Main LP 松弛阶梯 L0→L1→L2 Reverse→L3（flat / weak / strong 共用）。
+///
+/// `rebuild_reverse`：L1 不可行时全量重跑相 I（Reverse 禁止 skip；不做热启动）。
+/// 返回的 `still_bad` 表示 L2 后仍不可行（已落到 L3 启发式 tops）。
+fn run_main_axis_ladder_l0_l3<F>(
     diagram: &Diagram,
     layer_heights: &[f64],
     base_gaps: &[f64],
     first_top: f64,
     default_gap: f64,
-    metric: &ChannelMetric,
+    metric: &mut ChannelMetric,
     ladder: &mut RelaxationLadder,
-) -> (Vec<f64>, CoordinateProblem, BTreeMap<u32, f64>) {
-    let (tops, problem, coords, still_bad) =
-        try_main_axis_l0_l1(diagram, layer_heights, base_gaps, first_top, default_gap, metric, ladder);
-    if !still_bad {
-        return (tops, problem, coords);
-    }
-    // L3：裙边 Demand 抬缝（inflate_layer_gaps）作启发式层顶
-    ladder.push(
-        RelaxLevel::L3,
-        "metric/relax",
-        "fallback inflate_layer_gaps heuristic tops (skirt→Demand)",
+    rebuild_reverse: F,
+) -> (Vec<f64>, CoordinateProblem, BTreeMap<u32, f64>, bool)
+where
+    F: FnOnce() -> Option<ChannelMetric>,
+{
+    let (mut tops, mut problem, mut coords, still_bad) = try_main_axis_l0_l1(
+        diagram,
+        layer_heights,
+        base_gaps,
+        first_top,
+        default_gap,
+        metric,
+        ladder,
     );
-    let gaps = inflate_layer_gaps(base_gaps, &metric.cross_gap_demands(diagram));
-    let mut tops = vec![first_top; layer_heights.len()];
-    for i in 1..layer_heights.len() {
-        let gap = gaps.get(i - 1).copied().unwrap_or(default_gap);
-        tops[i] = tops[i - 1] + layer_heights[i - 1] + gap;
+    if !still_bad {
+        return (tops, problem, coords, false);
     }
-    (tops, problem, coords)
+
+    // L2：主轴 L1 后仍不可行 → 反向边序重跑相 I（改争用）
+    ladder.push(
+        RelaxLevel::L2,
+        "metric/relax",
+        "phase-I reverse edge order after L1 infeasible",
+    );
+    let mut still_bad = true;
+    if let Some(m2) = rebuild_reverse() {
+        *metric = m2;
+        let r2 = try_main_axis_l0_l1(
+            diagram,
+            layer_heights,
+            base_gaps,
+            first_top,
+            default_gap,
+            metric,
+            ladder,
+        );
+        tops = r2.0;
+        problem = r2.1;
+        coords = r2.2;
+        still_bad = r2.3;
+    }
+    if still_bad {
+        ladder.push(
+            RelaxLevel::L3,
+            "metric/relax",
+            "fallback inflate_layer_gaps heuristic tops (skirt→Demand)",
+        );
+        let gaps = inflate_layer_gaps(base_gaps, &metric.cross_gap_demands(diagram));
+        tops = vec![first_top; layer_heights.len()];
+        for i in 1..layer_heights.len() {
+            let gap = gaps.get(i - 1).copied().unwrap_or(default_gap);
+            tops[i] = tops[i - 1] + layer_heights[i - 1] + gap;
+        }
+    }
+    (tops, problem, coords, still_bad)
 }
 
 /// L0→L1 主轴求解；返回 `still_bad=true` 表示需 L2/L3。
@@ -460,21 +435,25 @@ fn solve_atlas_weak(
 ) -> AtlasSolveOutput {
     let _ = profile;
     let mut ladder = RelaxationLadder::pristine();
-    let mut out = group_divide::divide_flowchart_nodes(diagram, config);
+    // R3-4：contract → place (LK|stack) → expand
+    let mut out = contraction::solve_weak_contract_expand(diagram, config);
+    let draft = out.draft.take();
+    let cross_problem = out.cross_problem.take();
 
-    let slots = slots_from_ranks(&out.nodes, &out.sugiyama_ranks);
-    let (channel, track_coords) = metric_from_slots_publish_tracks(
+    let (channel, track_coords, main_problem) = metric_from_slots_publish_tracks(
         diagram,
         &mut out.nodes,
         &out.sugiyama_ranks,
-        slots,
+        out.slots,
         prev_plan,
         &mut ladder,
         SlotChannelOpts {
-            cross_expand: CrossGapExpandPolicy::VerticalOnly(out.mode),
+            y_apply: YLayerApplyPolicy::VerticalOnly(out.mode),
             expand_main: true,
+            first_top: out.canvas_padding,
+            default_gap: preset::FLOWCHART_PRESET.layer_gap,
             ladder_site: "metric/divide",
-            success_note: "Main track_coords published; no Cross Main LP on divide",
+            success_note: "Main LP metric tail + track_coords published (R3-4)",
             fail_note: "divide channel metric build failed",
             perf_tag: "divide",
         },
@@ -497,11 +476,11 @@ fn solve_atlas_weak(
     AtlasSolveOutput {
         nodes: assembled.nodes,
         groups: assembled.groups,
-        cross_problem: None,
-        main_problem: None,
+        cross_problem,
+        main_problem,
         channel,
         track_coords,
-        draft: None,
+        draft,
         hints: assembled.hints,
         canvas_padding: out.canvas_padding,
         total_width: assembled.total_width,
@@ -531,50 +510,51 @@ fn solve_atlas_strong(
     );
 
     let arch_config = ArchitectureV2LayoutConfig::default();
-    let seed = contraction::contract_strong_macro(diagram, arch_config);
+    // R3-5：ContractionMeta → macro place → expand → 显式 slots
+    let mut out = contraction::solve_strong_contract_expand(diagram, arch_config);
     crate::layout::recipes::architecture::group_sizing::clear_override_for_solve();
 
-    let ranks = seed.hints.sugiyama_ranks.clone().unwrap_or_default();
-    let mut nodes = seed.nodes;
-    let canvas_padding = arch_config.padding;
-
-    let slots = slots_from_ranks(&nodes, &ranks);
-    let (channel, track_coords) = metric_from_slots_publish_tracks(
+    let canvas_padding = out.canvas_padding;
+    let (channel, track_coords, main_problem) = metric_from_slots_publish_tracks(
         diagram,
-        &mut nodes,
-        &ranks,
-        slots,
+        &mut out.nodes,
+        &out.sugiyama_ranks,
+        out.slots,
         prev_plan,
         &mut ladder,
         SlotChannelOpts {
-            cross_expand: CrossGapExpandPolicy::Always,
-            expand_main: false,
+            y_apply: YLayerApplyPolicy::Always,
+            expand_main: true,
+            first_top: canvas_padding,
+            default_gap: preset::ARCHITECTURE_PRESET.layer_gap,
             ladder_site: "metric/strong",
-            success_note: "architecture contraction; Main track_coords published",
+            success_note: "Main LP metric tail + track_coords published (R3-5)",
             fail_note: "strong-macro channel metric build failed",
             perf_tag: "strong-macro",
         },
     );
 
-    // Atlas：组框以 LayoutSession 为准（与 flowchart 一致）；seed.groups 作参考丢弃
-    let groups = LayoutSession::new(diagram, &nodes, padding)
+    let groups = LayoutSession::new(diagram, &out.nodes, padding)
         .materialize()
         .groups;
 
-    let (total_width, total_height) =
-        crate::layout::kernel::common::canvas_bounds::canvas_size(&nodes, &groups, canvas_padding);
+    let (total_width, total_height) = crate::layout::kernel::common::canvas_bounds::canvas_size(
+        &out.nodes,
+        &groups,
+        canvas_padding,
+    );
 
     let hints = LayoutHints {
         edge_routing_style: EdgeRoutingStyle::Orthogonal,
-        sugiyama_ranks: Some(ranks),
+        sugiyama_ranks: Some(out.sugiyama_ranks),
         ..Default::default()
     };
 
     AtlasSolveOutput {
-        nodes,
+        nodes: out.nodes,
         groups,
         cross_problem: None,
-        main_problem: None,
+        main_problem,
         channel,
         track_coords,
         draft: None,
@@ -587,26 +567,152 @@ fn solve_atlas_strong(
     }
 }
 
-/// R3 首片：weak/strong 共用的 cross-gap 展开策略（行为与抽取前一致）。
-enum CrossGapExpandPolicy {
-    /// strong：有 demand 即展开 Y。
+/// R3-1：层顶 Y 平移门控（Horizontal 跳过，与旧启发式 Y expand 语义一致）。
+enum YLayerApplyPolicy {
     Always,
-    /// weak：仅 Vertical 堆叠时展开；Horizontal 只记 ladder。
     VerticalOnly(group_divide::ArrangementMode),
 }
 
 struct SlotChannelOpts {
-    cross_expand: CrossGapExpandPolicy,
+    y_apply: YLayerApplyPolicy,
     expand_main: bool,
+    first_top: f64,
+    default_gap: f64,
     ladder_site: &'static str,
     success_note: &'static str,
     fail_note: &'static str,
     perf_tag: &'static str,
 }
 
-/// R3 首片 glue：slots → channel metric →（可选）gap expand → publish track coords。
+/// R3-1：按 rank 取层高（该 rank 节点 max height）。
+fn layer_heights_from_ranked_nodes(
+    nodes: &HashMap<String, NodeLayout>,
+    ranks: &HashMap<String, usize>,
+) -> Vec<f64> {
+    let max_rank = ranks.values().copied().max().unwrap_or(0);
+    let mut heights = vec![0.0_f64; max_rank + 1];
+    for (id, &r) in ranks {
+        if let Some(n) = nodes.get(id) {
+            heights[r] = heights[r].max(n.height);
+        }
+    }
+    for h in &mut heights {
+        if *h <= 0.0 {
+            *h = 40.0;
+        }
+    }
+    heights
+}
+
+/// R3-1：层间 base gap（长度 = heights.len()-1），用 default_gap 填满。
+fn base_gaps_from_ranked_nodes(layer_count: usize, default_gap: f64) -> Vec<f64> {
+    if layer_count == 0 {
+        return Vec::new();
+    }
+    vec![default_gap; layer_count.saturating_sub(1)]
+}
+
+/// R3-1：按 Main LP 层顶只扩不缩地抬缝（不改变 rank0 绝对位置，不压缩已有间距）。
 ///
-/// 零行为抽取：不改变 weak/strong 各自的 expand 门控与 ladder 文案语义。
+/// 对相邻 rank：若当前 `min_y[r+1]-min_y[r]` 小于 LP 的 `tops[r+1]-tops[r]`，
+/// 则把 rank≥r+1 的节点整体下移差额。避免绝对覆盖打散 divide / strong 布局。
+fn apply_layer_tops_to_nodes(
+    nodes: &mut HashMap<String, NodeLayout>,
+    ranks: &HashMap<String, usize>,
+    layer_tops: &[f64],
+) {
+    if layer_tops.len() < 2 {
+        return;
+    }
+    let max_rank = ranks.values().copied().max().unwrap_or(0);
+    let n = (max_rank + 1).min(layer_tops.len());
+
+    let mut rank_min_y = vec![f64::INFINITY; n];
+    for (id, &r) in ranks {
+        if r >= n {
+            continue;
+        }
+        if let Some(node) = nodes.get(id) {
+            rank_min_y[r] = rank_min_y[r].min(node.y);
+        }
+    }
+
+    let mut shift_from = vec![0.0_f64; n];
+    for r in 0..n.saturating_sub(1) {
+        if !rank_min_y[r].is_finite() || !rank_min_y[r + 1].is_finite() {
+            continue;
+        }
+        let required_span = layer_tops[r + 1] - layer_tops[r];
+        let current_span = rank_min_y[r + 1] - rank_min_y[r];
+        let need = required_span - current_span;
+        if need > 1e-9 {
+            for k in (r + 1)..n {
+                shift_from[k] += need;
+                if rank_min_y[k].is_finite() {
+                    rank_min_y[k] += need;
+                }
+            }
+        }
+    }
+
+    if shift_from.iter().all(|&d| d.abs() <= 1e-9) {
+        return;
+    }
+    let mut ids: Vec<String> = nodes.keys().cloned().collect();
+    ids.sort();
+    for id in ids {
+        let Some(&r) = ranks.get(&id) else {
+            continue;
+        };
+        if r >= n {
+            continue;
+        }
+        let d = shift_from[r];
+        if d.abs() <= 1e-9 {
+            continue;
+        }
+        if let Some(node) = nodes.get_mut(&id) {
+            node.y += d;
+        }
+    }
+}
+
+/// 节点定稿后：Main order 缝 expand + publish Main/Cross track（flat / weak / strong 共用）。
+fn finalize_metric_tail_on_nodes(
+    nodes: &mut HashMap<String, NodeLayout>,
+    metric: &ChannelMetric,
+    id_layers: &[Vec<String>],
+    track_coords: &mut BTreeMap<u32, f64>,
+    expand_main: bool,
+    main_cap: Option<f64>,
+) {
+    if expand_main {
+        let main_dem = metric.main_gap_demands();
+        if !main_dem.is_empty() {
+            let dem = match main_cap {
+                Some(c) => cap_gap_demands(&main_dem, c),
+                None => main_dem,
+            };
+            expand_layer_order_gaps(nodes, id_layers, &dem, false);
+        }
+    }
+    publish_main_track_coords(
+        track_coords,
+        &metric.substrate,
+        &metric.plan,
+        nodes,
+        false,
+    );
+    publish_cross_track_coords(
+        track_coords,
+        &metric.substrate,
+        &metric.plan,
+        nodes,
+        false,
+    );
+}
+
+/// R3-2 glue：slots → 相 I → [`run_metric_tail_after_channel`]（含 L2 Reverse）。
 fn metric_from_slots_publish_tracks(
     diagram: &Diagram,
     nodes: &mut HashMap<String, NodeLayout>,
@@ -615,105 +721,136 @@ fn metric_from_slots_publish_tracks(
     prev_plan: Option<&Plan>,
     ladder: &mut RelaxationLadder,
     opts: SlotChannelOpts,
-) -> (Option<ChannelMetric>, BTreeMap<u32, f64>) {
-    let mut track_coords = BTreeMap::new();
-    let Ok(metric) = build_channel_metric_from_slots_with_opts(
+) -> (
+    Option<ChannelMetric>,
+    BTreeMap<u32, f64>,
+    Option<CoordinateProblem>,
+) {
+    let slots_for_l2 = slots.clone();
+    let Ok(mut metric) = build_channel_metric_from_slots_with_opts(
         diagram,
         slots,
         prev_plan,
         PhaseIEdgeOrder::Forward,
     ) else {
         ladder.push(RelaxLevel::L4, "metric/channel", opts.fail_note);
-        return (None, track_coords);
+        return (None, BTreeMap::new(), None);
     };
 
-    let dem = metric.cross_gap_demands(diagram);
-    if !dem.is_empty() {
-        match &opts.cross_expand {
-            CrossGapExpandPolicy::Always => {
+    let (_tops, main_problem, track_coords) = run_metric_tail_after_channel(
+        diagram,
+        nodes,
+        ranks,
+        &mut metric,
+        ladder,
+        &opts,
+        || {
+            build_channel_metric_from_slots_with_opts(
+                diagram,
+                slots_for_l2,
+                prev_plan,
+                PhaseIEdgeOrder::Reverse,
+            )
+            .ok()
+        },
+    );
+    ladder.push(RelaxLevel::L3, opts.ladder_site, opts.success_note);
+    (Some(metric), track_coords, Some(main_problem))
+}
+
+/// R3-2 共享度量尾段（相 I 之后）：Main LP L0–L3（含 L2 Reverse）→（可选）Y 层顶 → expand Main + publish。
+///
+/// flat 因 BK，仅复用 [`run_main_axis_ladder_l0_l3`] + [`finalize_metric_tail_on_nodes`]；本入口供 weak/strong。
+fn run_metric_tail_after_channel<F>(
+    diagram: &Diagram,
+    nodes: &mut HashMap<String, NodeLayout>,
+    ranks: &HashMap<String, usize>,
+    metric: &mut ChannelMetric,
+    ladder: &mut RelaxationLadder,
+    opts: &SlotChannelOpts,
+    rebuild_reverse: F,
+) -> (Vec<f64>, CoordinateProblem, BTreeMap<u32, f64>)
+where
+    F: FnOnce() -> Option<ChannelMetric>,
+{
+    let layer_heights = layer_heights_from_ranked_nodes(nodes, ranks);
+    let base_gaps = base_gaps_from_ranked_nodes(layer_heights.len(), opts.default_gap);
+    let (layer_tops, main_problem, mut track_coords, still_bad) = run_main_axis_ladder_l0_l3(
+        diagram,
+        &layer_heights,
+        &base_gaps,
+        opts.first_top,
+        opts.default_gap,
+        metric,
+        ladder,
+        rebuild_reverse,
+    );
+
+    let allow_y = match &opts.y_apply {
+        YLayerApplyPolicy::Always => true,
+        YLayerApplyPolicy::VerticalOnly(mode) => {
+            if matches!(mode, group_divide::ArrangementMode::Vertical) {
+                true
+            } else {
+                ladder.push(
+                    RelaxLevel::L3,
+                    opts.ladder_site,
+                    "skip cross-gap Y expand on horizontal arrangement",
+                );
+                false
+            }
+        }
+    };
+
+    if allow_y {
+        apply_layer_tops_to_nodes(nodes, ranks, &layer_tops);
+        // Main LP（含 L2）仍失败时回退启发式 Y expand（保留 DIVIDE_MAX_GAP_BAND）
+        if still_bad {
+            let dem = metric.cross_gap_demands(diagram);
+            if !dem.is_empty() {
                 let capped = cap_gap_demands(&dem, DIVIDE_MAX_GAP_BAND);
                 expand_nodes_by_cross_gap_demands(nodes, ranks, &capped, false);
                 crate::perf_log!(
-                    "[atlas] {} channel: {} cross-gap demands",
+                    "[atlas] {} channel: Main LP failed → heuristic Y expand ({} demands)",
                     opts.perf_tag,
                     dem.len()
                 );
             }
-            CrossGapExpandPolicy::VerticalOnly(mode) => {
+        } else {
+            let cross_n = metric.cross_gap_demands(diagram).len();
+            let main_n = metric.main_gap_demands().len();
+            if cross_n + main_n > 0 {
                 crate::perf_log!(
-                    "[atlas] divide channel metric: {} cross-gap demands (mode={:?})",
-                    dem.len(),
-                    mode
+                    "[atlas] {} channel metric: {} cross-gap, {} main-gap (Main LP)",
+                    opts.perf_tag,
+                    cross_n,
+                    main_n
                 );
-                if matches!(mode, group_divide::ArrangementMode::Vertical) {
-                    let capped = cap_gap_demands(&dem, DIVIDE_MAX_GAP_BAND);
-                    expand_nodes_by_cross_gap_demands(nodes, ranks, &capped, false);
-                } else {
-                    ladder.push(
-                        RelaxLevel::L3,
-                        opts.ladder_site,
-                        "skip cross-gap Y expand on horizontal arrangement",
-                    );
-                }
             }
         }
     }
 
-    if opts.expand_main {
-        let main_dem = metric.main_gap_demands();
-        if !main_dem.is_empty() {
-            let capped = cap_gap_demands(&main_dem, DIVIDE_MAX_GAP_BAND);
-            let mut by_rank: BTreeMap<usize, Vec<String>> = BTreeMap::new();
-            for (id, &r) in ranks {
-                by_rank.entry(r).or_default().push(id.clone());
-            }
-            let layers: Vec<Vec<String>> = by_rank.into_values().collect();
-            expand_layer_order_gaps(nodes, &layers, &capped, false);
-        }
-    }
-
-    publish_main_track_coords(
-        &mut track_coords,
-        &metric.substrate,
-        &metric.plan,
-        nodes,
-        false,
-    );
-    publish_cross_track_coords(
-        &mut track_coords,
-        &metric.substrate,
-        &metric.plan,
-        nodes,
-        false,
-    );
-    ladder.push(RelaxLevel::L3, opts.ladder_site, opts.success_note);
-    (Some(metric), track_coords)
-}
-
-fn slots_from_ranks(
-    nodes: &HashMap<String, NodeLayout>,
-    ranks: &HashMap<String, usize>,
-) -> BTreeMap<String, Slot> {
     let mut by_rank: BTreeMap<usize, Vec<String>> = BTreeMap::new();
     for (id, &r) in ranks {
-        if nodes.contains_key(id) {
-            by_rank.entry(r).or_default().push(id.clone());
-        }
+        by_rank.entry(r).or_default().push(id.clone());
     }
-    let mut slots = BTreeMap::new();
-    for (rank, mut ids) in by_rank {
-        ids.sort_by(|a, b| {
-            let xa = nodes.get(a).map(|n| n.x).unwrap_or(0.0);
-            let xb = nodes.get(b).map(|n| n.x).unwrap_or(0.0);
-            xa.partial_cmp(&xb)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.cmp(b))
-        });
-        for (order, id) in ids.into_iter().enumerate() {
-            slots.insert(id, Slot { rank, order });
-        }
+    for ids in by_rank.values_mut() {
+        ids.sort();
     }
-    slots
+    let id_layers: Vec<Vec<String>> = by_rank.into_values().collect();
+    // weak/strong 未跑 BK：节点未落到 LP 绝对层顶。清空 LP track，改由节点几何 publish，
+    // 避免「LP 绝对 Y + 未对齐节点」错位穿组；Main LP 仍通过抬缝 / main_problem 生效。
+    track_coords.clear();
+    finalize_metric_tail_on_nodes(
+        nodes,
+        metric,
+        &id_layers,
+        &mut track_coords,
+        opts.expand_main,
+        Some(DIVIDE_MAX_GAP_BAND),
+    );
+
+    (layer_tops, main_problem, track_coords)
 }
 
 /// 从 AtlasSolveOutput 组装 LayoutResult（不含 edges）。
@@ -735,4 +872,44 @@ pub fn assemble_layout_result(output: &AtlasSolveOutput, diagram: &Diagram) -> L
 
     let _ = diagram;
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn nl(x: f64, y: f64, w: f64, h: f64) -> NodeLayout {
+        NodeLayout {
+            x,
+            y,
+            width: w,
+            height: h,
+        }
+    }
+
+    #[test]
+    fn r31_helpers_heights_gaps_and_delta_tops() {
+        let mut nodes = HashMap::new();
+        nodes.insert("a".into(), nl(0.0, 10.0, 40.0, 20.0));
+        nodes.insert("b".into(), nl(50.0, 12.0, 40.0, 30.0));
+        nodes.insert("c".into(), nl(0.0, 100.0, 40.0, 25.0));
+        let mut ranks = HashMap::new();
+        ranks.insert("a".into(), 0usize);
+        ranks.insert("b".into(), 0usize);
+        ranks.insert("c".into(), 1usize);
+
+        let heights = layer_heights_from_ranked_nodes(&nodes, &ranks);
+        assert_eq!(heights, vec![30.0, 25.0]);
+        assert_eq!(base_gaps_from_ranked_nodes(heights.len(), 56.0), vec![56.0]);
+
+        apply_layer_tops_to_nodes(&mut nodes, &ranks, &[0.0, 120.0]);
+        // 当前 span=90，LP 要求 120 → 只扩不缩，rank1 +30
+        assert!((nodes["a"].y - 10.0).abs() < 1e-9);
+        assert!((nodes["b"].y - 12.0).abs() < 1e-9);
+        assert!((nodes["c"].y - 130.0).abs() < 1e-9);
+
+        // 更紧的 tops 不压缩
+        apply_layer_tops_to_nodes(&mut nodes, &ranks, &[0.0, 50.0]);
+        assert!((nodes["c"].y - 130.0).abs() < 1e-9);
+    }
 }

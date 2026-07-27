@@ -15,12 +15,13 @@
 
 use crate::ast::{Diagram, DiagramAttribute, Entity, Relation};
 use crate::layout::algorithm_config::SugiyamaLayoutConfig;
+use crate::layout::atlas::plan::Slot;
 use crate::layout::kernel::common::divide_and_conquer::{
     CrossGroupEdge, GroupArrangement, GroupTree, IntraGroupLayouter, IntraLayout,
 };
 use crate::layout::kernel::layered::{engine, preset};
 use crate::layout::{EdgeRoutingStyle, LayoutHints, LayoutResult, NodeLayout};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// 无 group 节点的虚拟 group ID
 pub const UNGROUPED_ID: &str = "__ungrouped__";
@@ -72,6 +73,10 @@ impl AlignMode {
 }
 
 /// flowchart 组间排列硬默认（G-pre：不再读 `group_frame` DSL）。
+pub(crate) fn read_arrangement_config_pub(diagram: &Diagram) -> (f64, AlignMode, ArrangementMode) {
+    read_arrangement_config(diagram)
+}
+
 fn read_arrangement_config(_diagram: &Diagram) -> (f64, AlignMode, ArrangementMode) {
     (48.0, AlignMode::Center, ArrangementMode::Vertical)
 }
@@ -406,6 +411,20 @@ fn topological_sort_groups(
     group_ids: &[String],
     cross_edges: &[CrossGroupEdge],
 ) -> Vec<String> {
+    topological_sort_groups_inner(group_ids, cross_edges)
+}
+
+pub(crate) fn topological_sort_groups_pub(
+    group_ids: &[String],
+    cross_edges: &[CrossGroupEdge],
+) -> Vec<String> {
+    topological_sort_groups_inner(group_ids, cross_edges)
+}
+
+fn topological_sort_groups_inner(
+    group_ids: &[String],
+    cross_edges: &[CrossGroupEdge],
+) -> Vec<String> {
     use std::cmp::Reverse;
     use std::collections::BinaryHeap;
 
@@ -497,6 +516,19 @@ const FLOW_ASPECT_TARGET: f64 = 1.6;
 /// 用户显式声明 `group_frame` 时直接返回 `default_mode`（现状）；
 /// 否则由组内 content 尺寸预估竖/横两种堆叠的 bbox，取归一化宽高比（log 距离）
 /// 更接近 [`FLOW_ASPECT_TARGET`] 的轴向。纯函数（只取 values 的 max/sum，与 key 序无关）。
+pub(crate) fn choose_arrangement_mode_pub(
+    diagram: &Diagram,
+    intra_layouts: &BTreeMap<String, IntraLayout>,
+    gap: f64,
+    default_mode: ArrangementMode,
+) -> ArrangementMode {
+    let map: HashMap<String, IntraLayout> = intra_layouts
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    choose_arrangement_mode(diagram, &map, gap, default_mode)
+}
+
 fn choose_arrangement_mode(
     diagram: &Diagram,
     intra_layouts: &HashMap<String, IntraLayout>,
@@ -549,88 +581,26 @@ pub struct DivideNodesOutput {
     pub order: Vec<String>,
     pub mode: ArrangementMode,
     pub sugiyama_ranks: HashMap<String, usize>,
+    /// R3-3：组合相显式 slots（组内 order←IntraLayout.layers；不用像素 x 反推）。
+    pub slots: BTreeMap<String, Slot>,
     pub canvas_padding: f64,
 }
 
 /// 分治布局：只产出节点坐标与 rank 元数据，**不**写组框。
+///
+/// R3-4：内部走 `weak_super::solve_weak_contract_expand`（Vertical=LK+BK / Horizontal=堆叠）。
 pub fn divide_flowchart_nodes(
     diagram: &Diagram,
     config: SugiyamaLayoutConfig,
 ) -> DivideNodesOutput {
-    let tree = GroupTree::build(diagram);
-
-    let top_groups: Vec<String> = diagram
-        .groups
-        .iter()
-        .filter(|g| g.parent_id.is_none())
-        .map(|g| g.id.as_str().to_string())
-        .collect();
-    let ungrouped: Vec<String> = diagram
-        .entities
-        .iter()
-        .filter(|e| e.group_id.is_none())
-        .map(|e| e.id.as_str().to_string())
-        .collect();
-
-    let entity_to_group = build_entity_to_top_group(diagram, &top_groups, &tree);
-
-    let layouter = FlowchartIntraGroupLayouter::new(diagram, config);
-    let mut intra_layouts: HashMap<String, IntraLayout> = HashMap::new();
-
-    for gid in &top_groups {
-        let members = tree.descendant_entities(gid);
-        let intra = layouter.layout_intra(gid, &members);
-        intra_layouts.insert(gid.clone(), intra);
-    }
-
-    if !ungrouped.is_empty() {
-        let intra = layouter.layout_intra(UNGROUPED_ID, &ungrouped);
-        intra_layouts.insert(UNGROUPED_ID.to_string(), intra);
-    }
-
-    let cross_edges = collect_cross_edges(diagram, &entity_to_group);
-
-    let mut all_group_ids = top_groups.clone();
-    if !ungrouped.is_empty() {
-        all_group_ids.push(UNGROUPED_ID.to_string());
-    }
-    let (gap, align, default_mode) = read_arrangement_config(diagram);
-    let mode = choose_arrangement_mode(diagram, &intra_layouts, gap, default_mode);
-    let arrangement = StackingArrangement::new(gap, align, mode);
-    let order = topological_sort_groups(&all_group_ids, &cross_edges);
-    let offsets = arrangement.arrange(&all_group_ids, &intra_layouts, &cross_edges);
-
-    let mut nodes: HashMap<String, NodeLayout> = HashMap::new();
-    for gid in &all_group_ids {
-        let intra = &intra_layouts[gid];
-        let (x_off, y_off) = offsets[gid];
-        for (id, node) in &intra.nodes {
-            let mut global_node = node.clone();
-            global_node.x += x_off;
-            global_node.y += y_off;
-            nodes.insert(id.clone(), global_node);
-        }
-    }
-
-    let mut sugiyama_ranks: HashMap<String, usize> = HashMap::new();
-    let mut rank_offset = 0usize;
-    for gid in &order {
-        if let Some(intra) = intra_layouts.get(gid) {
-            for (local_rank, layer) in intra.layers.iter().enumerate() {
-                for id in layer {
-                    sugiyama_ranks.insert(id.clone(), rank_offset + local_rank);
-                }
-            }
-            rank_offset += intra.layers.len();
-        }
-    }
-
+    let expanded = super::weak_super::solve_weak_contract_expand(diagram, config);
     DivideNodesOutput {
-        nodes,
-        order,
-        mode,
-        sugiyama_ranks,
-        canvas_padding: preset::FLOWCHART_PRESET.padding,
+        nodes: expanded.nodes,
+        order: expanded.order,
+        mode: expanded.mode,
+        sugiyama_ranks: expanded.sugiyama_ranks,
+        slots: expanded.slots,
+        canvas_padding: expanded.canvas_padding,
     }
 }
 
@@ -717,6 +687,14 @@ pub fn divide_flowchart_with_groups(
 }
 
 /// 构建 entity → 顶层 group 映射
+pub(crate) fn build_entity_to_top_group_pub(
+    diagram: &Diagram,
+    top_groups: &[String],
+    tree: &GroupTree,
+) -> HashMap<String, String> {
+    build_entity_to_top_group(diagram, top_groups, tree)
+}
+
 fn build_entity_to_top_group(
     diagram: &Diagram,
     top_groups: &[String],
@@ -738,6 +716,13 @@ fn build_entity_to_top_group(
 }
 
 /// 收集跨 group 边（真实边 + 跨组 constrain）
+pub(crate) fn collect_cross_edges_pub(
+    diagram: &Diagram,
+    entity_to_group: &HashMap<String, String>,
+) -> Vec<CrossGroupEdge> {
+    collect_cross_edges(diagram, entity_to_group)
+}
+
 fn collect_cross_edges(
     diagram: &Diagram,
     entity_to_group: &HashMap<String, String>,

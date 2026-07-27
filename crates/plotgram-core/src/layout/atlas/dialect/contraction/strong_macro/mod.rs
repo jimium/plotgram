@@ -88,7 +88,97 @@ pub(crate) fn compute_two_phase_layout(
     reversed_edges: &HashSet<(String, String)>,
     layout_config: ArchitectureV2LayoutConfig,
 ) -> LayoutResult {
-    // Phase D：默认用 asymmetric architecture_v2 壳；仅当 config 显式覆盖 group_padding 时退回 uniform
+    let core = strong_layout_core(
+        diagram,
+        graph,
+        group_map,
+        sizes,
+        reversed_edges,
+        layout_config,
+    );
+    let mut nodes = core.nodes;
+    let mut groups = core.provisional_groups;
+    phase_d_postprocess(
+        diagram,
+        &mut nodes,
+        &mut groups,
+        &core.blocks,
+        &core.block_row,
+        graph,
+        group_map,
+        sizes,
+        core.padding,
+        core.sizing,
+        reversed_edges,
+    )
+}
+
+/// R3-5：Atlas / 测试共用的收缩→放置→expand 核（不含 Phase D 物化）。
+pub struct StrongExpandResult {
+    pub nodes: HashMap<String, NodeLayout>,
+    pub slots: std::collections::BTreeMap<String, crate::layout::atlas::plan::Slot>,
+    pub sugiyama_ranks: HashMap<String, usize>,
+    pub canvas_padding: f64,
+}
+
+/// R3-5：contract → macro place → expand → 显式 slots（无 `slots_from_ranks`）。
+pub fn solve_strong_contract_expand(
+    diagram: &Diagram,
+    layout_config: ArchitectureV2LayoutConfig,
+) -> StrongExpandResult {
+    use crate::layout::kernel::common::node_sizing;
+    use crate::layout::recipes::architecture::layout::{acyclic, types};
+
+    let sizes = node_sizing::standard_node_sizes(diagram);
+    let mut graph = types::GraphIndex::build(diagram);
+    let group_map = types::build_group_map(diagram);
+    let constraint_edges: Vec<(&str, &str)> = diagram
+        .constraints
+        .iter()
+        .map(|c| (c.from.as_str(), c.to.as_str()))
+        .collect();
+    acyclic::inject_irreversible_edges(&mut graph, &constraint_edges);
+    let constraint_set: HashSet<(String, String)> = constraint_edges
+        .iter()
+        .map(|(f, t)| (f.to_string(), t.to_string()))
+        .collect();
+    let reversed_edges = acyclic::find_edges_to_reverse(&graph, &constraint_set);
+    let core = strong_layout_core(
+        diagram,
+        &graph,
+        &group_map,
+        &sizes,
+        &reversed_edges,
+        layout_config,
+    );
+    StrongExpandResult {
+        nodes: core.nodes,
+        slots: core.slots,
+        sugiyama_ranks: core.sugiyama_ranks,
+        canvas_padding: core.canvas_padding,
+    }
+}
+
+struct StrongLayoutCore {
+    nodes: HashMap<String, NodeLayout>,
+    provisional_groups: HashMap<String, GroupLayout>,
+    blocks: Vec<MacroBlock>,
+    block_row: HashMap<String, usize>,
+    padding: GroupPadding,
+    sizing: GroupSizingPolicy,
+    slots: std::collections::BTreeMap<String, crate::layout::atlas::plan::Slot>,
+    sugiyama_ranks: HashMap<String, usize>,
+    canvas_padding: f64,
+}
+
+fn strong_layout_core(
+    diagram: &Diagram,
+    graph: &GraphIndex,
+    group_map: &GroupMap,
+    sizes: &HashMap<String, (f64, f64)>,
+    reversed_edges: &HashSet<(String, String)>,
+    layout_config: ArchitectureV2LayoutConfig,
+) -> StrongLayoutCore {
     let padding =
         if (layout_config.group_padding - constants::ARCH_V2_GROUP_PADDING).abs() < f64::EPSILON {
             GroupPadding::architecture()
@@ -97,7 +187,6 @@ pub(crate) fn compute_two_phase_layout(
         };
     let canvas_padding = layout_config.padding;
 
-    // ── Phase A: 组内布局（递归，支持嵌套分组）──
     let group_tree = GroupTree::build(diagram);
     let intra_by_group = phase_a_intra_layout(
         diagram,
@@ -109,7 +198,6 @@ pub(crate) fn compute_two_phase_layout(
         &padding,
     );
 
-    // ── Phase B: 宏观超级节点分层 ──
     let (super_members, super_edges, pair_edge_counts, edge_weights) =
         build_super_graph(graph, group_map, reversed_edges);
     let group_decl = crate::layout::decl_order::group_sibling_decl_index(diagram);
@@ -147,7 +235,6 @@ pub(crate) fn compute_two_phase_layout(
     );
 
     let sizing = parse_group_sizing(diagram);
-    // G3：two_phase 只产出节点 + provisional contract；组框由 phase_d LayoutSession 物化。
 
     let block_row = position_macro_blocks(
         &mut blocks,
@@ -155,17 +242,13 @@ pub(crate) fn compute_two_phase_layout(
         &super_edges,
         &pair_edge_counts,
         canvas_padding,
-        // 初值左对齐；L1 Center 在 pipeline 中对单行做居中
         RowAlign::Start,
         &group_decl,
     );
 
-    // ── Phase C: 回填全局节点坐标（provisional groups 仅供 nudge clamp，非最终框）──
-    let (mut nodes, mut groups) = compose_global_layout(&blocks, &padding);
+    // R3-5：expand_contraction（Super=内容原点）替代 compose_global_layout 手写回填
+    let (mut nodes, mut groups) = expand_global_layout(&blocks, &padding);
 
-    // Phase C+: 两阶段 spacing 微调
-    // 组框已定，对涉及跨组边的组内节点朝跨组边方向做小幅 x 微调，
-    // 减少跨组边折弯。这是"先定组框再微调组内节点"的反转步骤。
     nudge_intra_nodes_toward_cross_group_edges(
         &mut nodes,
         &groups,
@@ -175,20 +258,118 @@ pub(crate) fn compute_two_phase_layout(
         reversed_edges,
     );
 
-    // ── Phase D: LayoutSession 单次物化组框 + hints / canvas ──
-    phase_d_postprocess(
-        diagram,
-        &mut nodes,
-        &mut groups,
-        &blocks,
-        &block_row,
-        graph,
-        group_map,
-        sizes,
+    // 与 Phase D 种子一致：canvas clamp 后再建 slots（层归属来自对齐层，order 按 x）
+    clamp_to_canvas(&mut nodes, sizes);
+    let (slots, sugiyama_ranks) = member_slots_from_blocks(&blocks, &block_row, &nodes);
+
+    StrongLayoutCore {
+        nodes,
+        provisional_groups: groups,
+        blocks,
+        block_row,
         padding,
         sizing,
-        reversed_edges,
-    )
+        slots,
+        sugiyama_ranks,
+        canvas_padding,
+    }
+}
+
+/// Super 点 = 内容原点（组块含 padding.left/top）；与 `compose_global_layout` 数值对齐。
+fn expand_global_layout(
+    blocks: &[MacroBlock],
+    padding: &GroupPadding,
+) -> (HashMap<String, NodeLayout>, HashMap<String, GroupLayout>) {
+    use crate::layout::atlas::dialect::contraction::meta::{expand_contraction, ContractionMeta};
+    use crate::layout::atlas::dialect::contraction::weak::ArrangementMode;
+    use std::collections::BTreeMap;
+
+    let mut intras = BTreeMap::new();
+    let mut entity_to_super = BTreeMap::new();
+    let mut super_ids = Vec::new();
+    let mut super_nodes = HashMap::new();
+    let mut groups = HashMap::new();
+
+    for block in blocks {
+        super_ids.push(block.id.clone());
+        for nid in block.intra.nodes.keys() {
+            entity_to_super.insert(nid.clone(), block.id.clone());
+        }
+        intras.insert(block.id.clone(), block.intra.clone());
+
+        let (sx, sy) = if block.is_group {
+            (block.x + padding.left, block.y + padding.top)
+        } else {
+            (block.x, block.y)
+        };
+        super_nodes.insert(
+            block.id.clone(),
+            NodeLayout {
+                x: sx,
+                y: sy,
+                width: block.width,
+                height: block.height,
+            },
+        );
+
+        if block.is_group {
+            groups.insert(
+                block.id.clone(),
+                GroupLayout {
+                    x: block.x,
+                    y: block.y,
+                    width: block.width,
+                    height: block.height,
+                    ..Default::default()
+                },
+            );
+        }
+    }
+
+    let meta = ContractionMeta {
+        intras,
+        super_ids,
+        entity_to_super,
+        mode: ArrangementMode::Vertical,
+    };
+    let nodes = expand_contraction(&meta, &super_nodes);
+    (nodes, groups)
+}
+
+/// 层归属：同行对齐 `intra.layers`；同层 order：按 expand 后 x（确定性，对齐旧 slots_from_ranks）。
+fn member_slots_from_blocks(
+    blocks: &[MacroBlock],
+    block_row: &HashMap<String, usize>,
+    nodes: &HashMap<String, NodeLayout>,
+) -> (
+    std::collections::BTreeMap<String, crate::layout::atlas::plan::Slot>,
+    HashMap<String, usize>,
+) {
+    use crate::layout::atlas::plan::Slot;
+    use std::collections::BTreeMap;
+
+    let layers = rebuild_layers_from_metadata(blocks, block_row);
+    let mut slots = BTreeMap::new();
+    let mut sugiyama_ranks = HashMap::new();
+    for (rank, layer) in layers.iter().enumerate() {
+        let mut ids: Vec<String> = layer
+            .iter()
+            .filter(|id| nodes.contains_key(id.as_str()))
+            .cloned()
+            .collect();
+        ids.sort_by(|a, b| {
+            let xa = nodes.get(a).map(|n| n.x).unwrap_or(0.0);
+            let xb = nodes.get(b).map(|n| n.x).unwrap_or(0.0);
+            xa.partial_cmp(&xb)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.cmp(b))
+        });
+        for (order, id) in ids.into_iter().enumerate() {
+            sugiyama_ranks.insert(id.clone(), rank);
+            slots.insert(id, Slot { rank, order });
+        }
+    }
+    (slots, sugiyama_ranks)
 }
 
 // ─── Phase A: 组内布局 ───────────────────────────────────

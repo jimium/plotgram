@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::layout::atlas::channel::{Occupancy, Substrate, TrackOrient};
 use crate::layout::atlas::channel_metric::{
-    cross_track_band_need, labeled_edge_counts_by_cross_track,
+    cross_track_band_need, label_band_by_cross_track,
 };
 use crate::layout::atlas::plan::Plan;
 use crate::ast::Diagram;
@@ -163,7 +163,7 @@ pub fn solve_main_axis_with_cross_tracks(
     let mut initial = Vec::with_capacity(n + 8);
     let mut cursor = first_top;
 
-    let labeled = labeled_edge_counts_by_cross_track(diagram, plan, substrate);
+    let label_band = label_band_by_cross_track(diagram, plan, substrate);
 
     // 预收集 Cross track（按 TrackId 排序，确定性）
     let mut tracks: Vec<(u32, usize, f64)> = Vec::new(); // (id, line, band)
@@ -179,8 +179,8 @@ pub fn solve_main_axis_with_cross_tracks(
         if line == 0 || line >= n {
             continue;
         }
-        let labeled_n = labeled.get(&t.id).copied().unwrap_or(0);
-        let band = cross_track_band_need(lanes, labeled_n) * scale;
+        let lb = label_band.get(&t.id).copied().unwrap_or(0.0);
+        let band = cross_track_band_need(lanes, lb) * scale;
         tracks.push((t.id.0, line, band));
     }
     tracks.sort_by_key(|(id, _, _)| *id);

@@ -271,57 +271,5 @@ fn position_macro_blocks_stacked(
         .collect()
 }
 
-// ─── Phase C: 全局坐标回填 ───────────────────────────────
-
-pub(super) fn compose_global_layout(
-    blocks: &[MacroBlock],
-    padding: &GroupPadding,
-) -> (HashMap<String, NodeLayout>, HashMap<String, GroupLayout>) {
-    let mut nodes = HashMap::new();
-    let mut groups = HashMap::new();
-
-    for block in blocks {
-        if block.is_group {
-            // G3：provisional 框仅供 Phase C+ nudge clamp；最终框由 LayoutSession 物化。
-            // 不计写权（非 GroupTable 权威写者）。
-            groups.insert(
-                block.id.clone(),
-                GroupLayout {
-                    x: block.x,
-                    y: block.y,
-                    width: block.width,
-                    height: block.height,
-                    ..Default::default()
-                },
-            );
-            for (nid, local) in &block.intra.nodes {
-                nodes.insert(
-                    nid.clone(),
-                    NodeLayout {
-                        x: block.x + padding.left + local.x,
-                        y: block.y + padding.top + local.y,
-                        width: local.width,
-                        height: local.height,
-                        ..Default::default()
-                    },
-                );
-            }
-        } else {
-            for (nid, local) in &block.intra.nodes {
-                nodes.insert(
-                    nid.clone(),
-                    NodeLayout {
-                        x: block.x + local.x,
-                        y: block.y + local.y,
-                        width: local.width,
-                        height: local.height,
-                        ..Default::default()
-                    },
-                );
-            }
-        }
-    }
-
-    (nodes, groups)
-}
+// ─── Phase C: 全局坐标回填（R3-5：见 `expand_global_layout`） ─
 
