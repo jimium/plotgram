@@ -17,6 +17,7 @@
 | 27 | [channel 审查与改造需求](27-Atlas-channel模块审查与改造需求-2026-07.md) | **审查**：粒度与性能结案；合法性缺口 + **L1–L8** 合法化改造（编号刻意不用 R*，以免与 24 号文 R1–R5 撞车） |
 | 28 | [channel 合法化实现总结与审查](28-Atlas-channel合法化实现总结与审查-2026-07.md) | **总结（已落地）**：L1–L8 实现定案、A1–A10 验收全过、独立代码审查结论与留债清单 |
 | 29 | [路径级作用域自反证 verifier 报告](29-Atlas-路径级作用域自反证verifier报告-2026-07.md) | **证明义务（已落地）**：`verify_route_scope` 独立验证器，A2 证据链升级 + A2b 新指标，三集恒 0。22 号文台账第二项在作用域线上闭环 |
+| **30** | [实现检讨：冗余与缺失](30-Atlas实现检讨-冗余与缺失-2026-07.md) | **Stage7 / Post-S7 之后下一刀**：yFiles 第一性原理；M1–M8 / R1–R5；**纠偏**「先 MCF / 整目录清空 ortho」 |
 
 ## 一句话
 
@@ -33,13 +34,15 @@ Atlas 把节点、组框、边通道、标签统一为**占位体**，先做完�
 | Stage 0–6 | 地基、Plan、度量相、Ink、Dialect、四内核、Plan diff 增量 |
 | **Stage 7** | Provenance / phase-api 门禁；`GATES_DEFAULT=on`；删 Legacy；手册/HTML 收口 |
 
-| 记债（不挡出口；Wave3 创新模式） | 内容 |
+| 记债（不挡出口；下一刀见 [30](30-Atlas实现检讨-冗余与缺失-2026-07.md)） | 内容 |
 |------------------|------|
-| **MCF Gate** | [`gate_mcf`](../../crates/plotgram-core/src/layout/atlas/gate_mcf.rs) 骨架已登记；生产仍 Occupancy+Unbounded |
-| **I.7 三块有界下降** | [`coord_descent`](../../crates/plotgram-core/src/layout/atlas/coord_descent.rs) 骨架已登记；未改生产求解 |
-| **ortho 物理清空** | Hierarchical 已不进；非 Hier 仍委托 LayoutPipeline（不可在 Wave3 整目录清空） |
+| **优先：M1/M3/M4** | 端口位置进 Plan；lane 端点序；Main `track_coords` 回传 |
+| **优先：M2 有界返工** | 先于 MCF；`Occupancy::release` 已具备零件 |
+| **MCF Gate** | [`gate_mcf`](../../crates/plotgram-core/src/layout/atlas/gate_mcf.rs) 占位；生产仍 Occupancy+Unbounded |
+| **I.7 三块有界下降** | [`coord_descent`](../../crates/plotgram-core/src/layout/atlas/coord_descent.rs) 占位；未改生产求解 |
+| **ortho 物理清空** | Hier 主路径不用 OVG；须先拆 repair 岛 + 退役 Shadow（见 30 · R1/R2） |
 | **非 Hier Ink 内化** | Tree/Sequence/Circular 仍 recipe 路由 |
-| 标签-only 更细增量 | `PLOTGRAM_ATLAS_PLAN_CACHE` 已接线 lint + SVG render |
+| 标签-only 更细增量 | `PLOTGRAM_ATLAS_PLAN_CACHE` 已接线；命中过严见 30 · M8 |
 
 ## 相关
 
