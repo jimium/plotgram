@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use crate::layout::demand::CorridorModel;
 use crate::layout::routing::common::spatial_grid::SpatialGrid;
-use super::{ChannelLoadMap, OrthoConfig, OrthoRoutingProfile, RoutedSegment};
+use super::{OrthoConfig, OrthoRoutingProfile, RoutedSegment};
 use super::slot::Endpoint;
 use super::visibility_graph::OrthogonalVisibilityGraph;
 
@@ -28,8 +28,6 @@ pub struct OrthoRoutingContext<'a> {
     pub cfg: &'a OrthoConfig,
     pub profile: &'a OrthoRoutingProfile,
     pub obstacles: &'a PreparedObstacles,
-    /// Phase 3: 通道负载图（reroute 时传入 Some，初始路由为 None）
-    pub channel_load: Option<&'a ChannelLoadMap>,
     /// P2：预路由廊模型（只读）；None 时不做廊 OVER soft
     pub corridor_model: Option<&'a CorridorModel>,
     /// 该边是否强制拒绝穿无关组内部（`path_avoids_group_interiors` 硬过滤）。
@@ -43,8 +41,6 @@ pub struct OrthoRoutingContext<'a> {
     pub prefer_outer_ring: bool,
     /// Phase 2：外围通道偏好（TransitIntent.prefer_periphery → LexA* Q5）。
     pub prefer_periphery: bool,
-    /// S4：受保护的垂直业务干线 `(x, y_lo, y_hi)`；穿越加重惩罚。
-    pub protected_trunks: &'a [(f64, f64, f64)],
     /// Phase B: 正交可见性图（OVG），用于 degraded 边的路径搜索。
     pub ovg: Option<&'a OrthogonalVisibilityGraph>,
     /// Phase B3: 全局通道规划分配的通道坐标（cross-axis coord）。
@@ -62,7 +58,6 @@ impl<'a> OrthoRoutingContext<'a> {
         cfg: &'a OrthoConfig,
         profile: &'a OrthoRoutingProfile,
         obstacles: &'a PreparedObstacles,
-        channel_load: Option<&'a ChannelLoadMap>,
     ) -> Self {
         Self {
             nodes,
@@ -71,14 +66,12 @@ impl<'a> OrthoRoutingContext<'a> {
             cfg,
             profile,
             obstacles,
-            channel_load,
             corridor_model: None,
             // 默认 false，由调用方按边调用 should_strict_group_transit 覆盖
             strict_group_transit: false,
             corridor_boost: false,
             prefer_outer_ring: false,
             prefer_periphery: false,
-            protected_trunks: &[],
             ovg: None,
             planned_channel: None,
             first_pass: false,
@@ -110,11 +103,6 @@ impl<'a> OrthoRoutingContext<'a> {
 
     pub fn with_prefer_periphery(mut self, prefer: bool) -> Self {
         self.prefer_periphery = prefer;
-        self
-    }
-
-    pub fn with_protected_trunks(mut self, trunks: &'a [(f64, f64, f64)]) -> Self {
-        self.protected_trunks = trunks;
         self
     }
 

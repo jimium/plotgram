@@ -1,9 +1,14 @@
 //! 正交边路由模块（固定磁吸点方案）
 //!
-//! **Post-S7 Wave3**：Hierarchical 生产路径已不进本目录；Tree/Sequence/Circular
-//! 仍经 `LayoutPipeline` 委托。整目录物理删除须走 AGENTS §7 创新模式
-//!（见 [`crate::layout::atlas::gate_mcf`] / 新架构 README 记债表），不可在
-//! 非 Hier Ink 内化前清空。
+//! **Post-S7 / R1–R2**：Hierarchical 生产路径不进本目录（Ink + spline_fallback repair）；
+//! Tree/Sequence/Circular 仍经 `LayoutPipeline` → `OrthogonalRecipe`。整目录物理删除
+//! 须走 AGENTS §7 创新模式。
+//!
+//! **R1（2026-07）**：`path_is_clean*` → `routing/common/path_clean`；
+//! `estimate_layer_band_demands` → `demand::band`；`stub_occupancy` → `demand::stub_occupancy`；
+//! sanitize → `routing/common/orthogonal_sanitize`；channel_load 惩罚 API 仅 `#[cfg(test)]`。
+//! **R1 加深**：删孤儿 `phases/trunk` + `protected_trunks` + 死 `channel_load` 接线。
+//! 不可在非 Hier Ink 内化前清空本目录。
 //!
 //! 设计要点：
 //! - 每个矩形节点的边线连接点为固定「磁吸点（slot）」，仿照画图软件：
@@ -31,14 +36,11 @@ pub(super) mod lane_assignment;
 pub(super) mod layer_order;
 pub(super) mod path;
 pub(super) mod path_kernel;
-pub(crate) use path_kernel::repair_group_interior_crossings;
 pub(super) mod scoring;
 pub(super) mod simplify;
 pub(super) mod shape_boundary;
 pub(super) mod slot;
 pub(super) mod contract;
-pub(super) mod sanitize;
-pub(super) mod stub_occupancy;
 pub(super) mod semantic_trunk_merge;
 pub(super) mod draft;
 pub(super) mod run;
@@ -49,14 +51,12 @@ pub(super) mod path_solver;
 
 // Re-exports for cross-submodule access via `use super::*;`
 pub(super) use profile::OrthoRoutingProfile;
-pub(super) use channel_load::{channel_load_penalty, corridor_overflow_penalty, ChannelLoadMap};
+pub(super) use channel_load::ChannelLoadMap;
 pub(super) use context::{EndpointPair, PreparedObstacles, OrthoRoutingContext, SegmentGrid};
-pub(crate) use context::SegmentGrid as OrthoSegmentGrid;
 pub(super) use lane_assignment::assign_lanes;
 pub(super) use path::{select_best_path_with_scorer_stats, PathSelectStats, RoutedSegment};
-#[allow(unused_imports)] // SpacingViolationKind/segments_violate_spacing/path_edge_spacing_violations used in X-1
 pub(super) use scoring::{CandidateScorer, DefaultScorer, GROUP_OBSTACLE_PAD, NODE_OBSTACLE_PAD, path_is_clean_from_edges, path_length, SpacingViolationKind, segments_violate_spacing, path_edge_spacing_violations, count_all_edge_spacing_violations};
-/// Phase 1：供 `kernel::route::feasibility` 薄封装复用（生产调用点仍在本模块内）。
+/// R1：亦从 `common::path_clean` 再导出，供 ortho 内 `use super::*`；kernel 应直接用 common。
 pub(crate) use scoring::{path_avoids_group_interiors, path_is_clean};
 pub(super) use simplify::simplify_path;
 #[allow(unused_imports)] // choose_pair_sides is used by tests
@@ -64,13 +64,8 @@ pub(super) use slot::{
     choose_docking_strategy, choose_pair_sides, choose_pair_sides_with_group, is_vertical_port, slot_anchor, slot_fraction,
     slot_fraction_around, DockingStrategy, Endpoint,
 };
-// Slice D3：sanitize 内核不再对外再导出——canonicalize 归 materializer，
-// 调用方经 `GeometryMaterializer::canonicalize_orthogonal_edges` 进入。
-// Phase 6：空壳 enforce_reverse_* / resolve_*stub 已删，不再 pub 导出。
-pub use stub_occupancy::{
-    collect_stub_occupancy, estimate_layer_band_demands, find_stub_occupancy_conflicts,
-    LayerBandDemand, StubOccupancyConflict, StubOccupancyRecord, StubOccupancyStats,
-};
+// Slice D3 / R1：sanitize → `routing/common/orthogonal_sanitize`；
+// stub 占用 → `demand::stub_occupancy`。canonicalize 仍经 materializer。
 
 // run.rs 内被 path_solver 等兄弟模块调用的共享辅助
 pub(super) use run::{
@@ -151,9 +146,6 @@ pub(super) use crate::layout::constants::ORTHO_PARALLEL_GAP as EDGE_PARALLEL_GAP
 pub(super) use crate::layout::constants::STUB_GUARD_LENGTH;
 /// 每个折点的惩罚（Phase 6：真源见 `routing::objectives`）。
 pub(super) use crate::layout::routing::objectives::BEND_PENALTY;
-
-/// 侧通道距障碍节点的最小留白（即便被分组边框挤压也要保留）
-pub(super) const MIN_CHANNEL_CLEARANCE: f64 = 10.0;
 
 /// 坐标比较容差
 pub(super) const EPS: f64 = 0.1;

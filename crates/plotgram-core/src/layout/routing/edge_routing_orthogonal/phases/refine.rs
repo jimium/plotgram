@@ -82,6 +82,8 @@ pub(crate) fn phase_lane(
     let _ = profile; // separate_unrelated_trunks 事后分离已删（H5 rip-up）
 
     // Phase 3：C 段 stub 仅诊断；真修已删（H4 端口容量 + rip-up）。
+    // R1：stub 占用已外提到 demand::stub_occupancy。
+    use crate::layout::demand::{collect_stub_occupancy, find_stub_occupancy_conflicts};
     let records = collect_stub_occupancy(edges, relations, from_side, to_side);
     let conflicts = find_stub_occupancy_conflicts(&records, relations, parallel_gap);
     ortho_stats.stub_occupancy_conflicts = conflicts.len();

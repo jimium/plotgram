@@ -77,7 +77,6 @@ fn find_clean_reroute_path(
     grid: &SegmentGrid,
     profile: &OrthoRoutingProfile,
     obstacles: &PreparedObstacles,
-    load_map: &ChannelLoadMap,
     ortho_stats: &mut crate::layout::OrthoDebugStats,
     parallel_gap: f64,
     ovg: Option<&OrthogonalVisibilityGraph>,
@@ -95,7 +94,6 @@ fn find_clean_reroute_path(
             &r_cfg,
             profile,
             obstacles,
-            Some(load_map),
         )
         .with_strict_group_transit(should_strict_group_transit(false))
         .with_corridor_boost(boost)
@@ -369,7 +367,6 @@ pub(super) fn solve_paths(
                 grid,
                 profile,
                 obstacles,
-                &load_map,
                 ortho_stats,
                 parallel_gap,
                 ovg_ref,
@@ -411,7 +408,6 @@ pub(super) fn solve_paths(
                                 grid,
                                 profile,
                                 obstacles,
-                                &load_map,
                                 ortho_stats,
                                 parallel_gap,
                                 ovg_ref,

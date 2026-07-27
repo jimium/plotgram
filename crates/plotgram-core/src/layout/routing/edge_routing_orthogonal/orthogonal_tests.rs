@@ -683,7 +683,6 @@
             &cfg,
             &profile,
             &obstacles,
-            None,
         );
 
         // A bottom anchor: (180, 150)，B left anchor: (400, 325)
@@ -1278,7 +1277,6 @@
             &cfg,
             &profile,
             &obstacles,
-            None,
         );
         assert!(
             !ctx.strict_group_transit,
@@ -1324,7 +1322,6 @@
             &cfg,
             &profile,
             &obstacles,
-            None,
         );
         assert!(
             !ctx.strict_group_transit,

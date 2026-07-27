@@ -1,20 +1,32 @@
 //! 正交路径断言式消毒（Phase 3）。
 //!
+//! R1：从 OVG `sanitize` 迁入 `routing/common`，供 materializer canonicalize
+//! 与非 Hier OVG 共用，避免目录外直依赖 `edge_routing_orthogonal`。
+//!
 //! H3 由 LexA* 图结构保证。本模块**不修复几何**：
-//! - debug：非正交段 → panic
+//! - debug：非正交段 → 记 violation（不 panic）
 //! - 反向 stub / 其它：记 violation 计数，不改路径
 
-use super::path::port_outward;
-use super::EPS;
 use crate::ast::Relation;
 use crate::layout::geometry::Point;
 use crate::layout::routing::route_annotation::RouteAnnotationSet;
 use crate::layout::{EdgeLayout, NodeLayout, Port};
 use std::collections::HashMap;
 
+const EPS: f64 = 0.1;
+
+fn port_outward(side: Port) -> (f64, f64) {
+    match side {
+        Port::Top => (0.0, -1.0),
+        Port::Bottom => (0.0, 1.0),
+        Port::Left => (-1.0, 0.0),
+        Port::Right => (1.0, 0.0),
+    }
+}
+
 /// 断言式扫描：不改几何。签名兼容 materializer canonicalize。
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn sanitize_orthogonal_edges_with_guard(
+pub fn sanitize_orthogonal_edges_with_guard(
     edges: &mut [EdgeLayout],
     _relations: &[Relation],
     from_side: &[Port],
@@ -40,14 +52,18 @@ pub(crate) fn sanitize_orthogonal_edges_with_guard(
     let _ = violations;
 }
 
-fn assert_orthogonal_path(points: &[Point], from_side: Port, to_side: Port, edge_index: usize) -> usize {
+fn assert_orthogonal_path(
+    points: &[Point],
+    from_side: Port,
+    to_side: Port,
+    _edge_index: usize,
+) -> usize {
     let mut n = 0usize;
     for w in points.windows(2) {
         let dx = (w[1].x - w[0].x).abs();
         let dy = (w[1].y - w[0].y).abs();
         if dx > EPS && dy > EPS {
             n += 1;
-            // Phase 3：H3 记债，不 panic（浮点近斜段仍可能出现；release/debug 均不改几何）
         }
     }
     if points.len() >= 2 {

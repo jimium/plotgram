@@ -107,7 +107,7 @@ pub(crate) fn phase_route_edges(
             .prefer_periphery(crate::layout::routing::model::StableEdgeId(i))
             || is_feedback;
         let mut ctx =
-            OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
+            OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles)
                 .with_strict_group_transit(strict)
                 .with_corridor_boost(corridor_boost || !group_ctx.is_same_leaf_group(from_id, to_id))
                 .with_prefer_outer_ring(prefer_outer)
@@ -134,7 +134,7 @@ pub(crate) fn phase_route_edges(
             }
             let mut boost_stats = PathSelectStats::default();
             let mut ctx =
-                OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles, None)
+                OrthoRoutingContext::new(nodes, group_ctx, grid, cfg, profile, obstacles)
                     .with_strict_group_transit(strict)
                     .with_corridor_boost(true)
                     .with_prefer_outer_ring(prefer_outer)

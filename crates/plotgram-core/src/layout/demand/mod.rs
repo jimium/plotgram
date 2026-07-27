@@ -13,6 +13,7 @@ mod port;
 pub mod space_budget;
 pub mod space_budget_guard;
 pub mod spacing_contract;
+pub mod stub_occupancy;
 mod types;
 
 pub use corridor::{
@@ -33,5 +34,10 @@ pub use port::{aggregate_port_pressure, preferred_exit_side};
 pub use types::{BandDemand, CorridorDemand, CorridorRisk, EdgeFeatures, PortPressure};
 
 pub use band::{
-    edge_band_demand, EdgeBandDemandBreakdown, EdgeBandDemandProfile,
+    edge_band_demand, estimate_layer_band_demands, EdgeBandDemandBreakdown, EdgeBandDemandProfile,
+    LayerBandDemand,
+};
+pub use stub_occupancy::{
+    collect_stub_occupancy, find_stub_occupancy_conflicts, StubOccupancyConflict,
+    StubOccupancyRecord, StubOccupancyStats,
 };

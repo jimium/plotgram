@@ -6,11 +6,9 @@ use crate::ast::Diagram;
 use crate::layout::demand::{
     collect_edge_features, compute_corridor_model, score_edges, DifficultyProfile,
 };
-use crate::layout::routing::edge_routing_orthogonal::{
-    collect_stub_occupancy, estimate_layer_band_demands, find_stub_occupancy_conflicts,
-};
+use crate::layout::demand::band::{estimate_layer_band_demands, EdgeBandDemandProfile};
+use crate::layout::demand::{collect_stub_occupancy, find_stub_occupancy_conflicts};
 use crate::layout::routing::segment_pair::parallel_gap_for_diagram;
-use crate::layout::demand::band::EdgeBandDemandProfile;
 use crate::layout::quality::lint::compute_lint_metrics;
 use crate::layout::quality::metrics::node_fingerprint;
 use crate::layout::LayoutResult;
@@ -33,7 +31,6 @@ pub struct CongestionSampleMetrics {
     pub ortho_stub_conflicts: Option<usize>,
     /// S4：边交叉违规数（lint EdgeCrossing）
     pub edge_crossing: usize,
-    pub ortho_feedback_rerouted: Option<usize>,
     /// D2：边难度评分最大值
     #[serde(default)]
     pub max_edge_score: f64,
@@ -119,7 +116,6 @@ pub fn compute_congestion_sample_metrics(
         ortho_stub_shifted: ortho.map(|o| o.stub_occupancy_shifted),
         ortho_stub_conflicts: ortho.map(|o| o.stub_occupancy_conflicts),
         edge_crossing,
-        ortho_feedback_rerouted: ortho.map(|o| o.feedback_rerouted_after_trunk),
         max_edge_score,
         edges_over_score_p90,
         corridors_over,

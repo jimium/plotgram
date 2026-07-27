@@ -1,82 +1,14 @@
-//! Phase 3: 通道负载感知 Reroute 增强。
+//! Phase 3: 通道负载图（诊断 / rip-up 统计）。
 //!
-//! 在 X-1 reroute 的 scorer 中加入通道负载惩罚，使重路由优先选择低负载通道，
-//! 从源头减少拥堵。
-//!
-//! 设计：
-//! - `ChannelLoadMap`：key = (轴, 量化层坐标)，value = 段数
-//! - 在 reroute 每轮开始时从当前所有边路径构建
-//! - `channel_load_penalty`：负载 > 阈值时按多余边数惩罚
-//! - 通过 `OrthoRoutingContext.channel_load` 传入 scorer
+//! R1：惩罚 API（`channel_load_penalty` 等）仅 `#[cfg(test)]`；
+//! `OrthoRoutingContext` / `ScoringWeights` 已不再接线 channel_load（DefaultScorer 不读）。
+//! 生产路径保留 `ChannelLoadMap::build` + `max_load`（path_solver 统计）。
 //!
 //! 确定性（AGENTS.md §2）：使用 HashMap 但 key 为 (Axis, i64)，
 //! 查询时量化 layer 后查表，不依赖迭代顺序。
 
-use crate::layout::demand::{CorridorModel, CORRIDOR_LANE_PITCH};
-use crate::layout::geometry::{Axis, Point};
-use crate::layout::group::CorridorAxis;
+use crate::layout::geometry::Axis;
 use std::collections::HashMap;
-
-/// 通道负载阈值——负载超过此值才开始惩罚
-const CHANNEL_LOAD_THRESHOLD: usize = 3;
-
-use crate::layout::routing::objectives::{CHANNEL_LOAD_PENALTY, CORRIDOR_OVER_PENALTY};
-
-
-/// 路径是否占用某廊车道（轴对齐 coord 附近 + span 重叠）。
-fn path_uses_corridor(path: &[Point], axis: CorridorAxis, coord: f64, span_min: f64, span_max: f64) -> bool {
-    let lo = span_min.min(span_max);
-    let hi = span_min.max(span_max);
-    let tol = CORRIDOR_LANE_PITCH * 0.75;
-    for w in path.windows(2) {
-        let a = w[0];
-        let b = w[1];
-        match axis {
-            CorridorAxis::Vertical => {
-                // 竖廊：段接近 x=coord，且 y 与 span 重叠
-                let dx = (a.x - coord).abs().min((b.x - coord).abs());
-                let near = dx <= tol || ((a.x - coord) * (b.x - coord) <= 0.0 && (a.x - b.x).abs() < tol);
-                let y0 = a.y.min(b.y);
-                let y1 = a.y.max(b.y);
-                let y_overlap = y0 <= hi + tol && y1 >= lo - tol;
-                if near && y_overlap {
-                    return true;
-                }
-            }
-            CorridorAxis::Horizontal => {
-                let dy = (a.y - coord).abs().min((b.y - coord).abs());
-                let near = dy <= tol || ((a.y - coord) * (b.y - coord) <= 0.0 && (a.y - b.y).abs() < tol);
-                let x0 = a.x.min(b.x);
-                let x1 = a.x.max(b.x);
-                let x_overlap = x0 <= hi + tol && x1 >= lo - tol;
-                if near && x_overlap {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
-/// 路径经过 OVER 廊时的 soft 惩罚；`corridor_soft=false` 关闭。
-pub fn corridor_overflow_penalty(path: &[Point], model: &CorridorModel, corridor_soft: bool) -> f64 {
-    if !corridor_soft || path.len() < 2 {
-        return 0.0;
-    }
-    let mut penalty = 0.0;
-    for d in &model.demands {
-        if !d.is_over() {
-            continue;
-        }
-        let Some(c) = model.corridors.get(d.corridor_index) else {
-            continue;
-        };
-        if path_uses_corridor(path, c.axis, c.coord, c.span_min, c.span_max) {
-            penalty += d.overflow() as f64 * CORRIDOR_OVER_PENALTY;
-        }
-    }
-    penalty
-}
 
 /// 通道负载图：key = (轴, 量化层坐标)，value = 该通道上的段数。
 ///
@@ -120,6 +52,7 @@ impl ChannelLoadMap {
     }
 
     /// 查询指定通道的负载数。量化 layer 后查表，未命中返回 0。
+    #[cfg(test)]
     pub fn load(&self, axis: Axis, layer: f64) -> usize {
         let key = (axis, (layer / self.step).round() as i64);
         *self.loads.get(&key).unwrap_or(&0)
@@ -131,28 +64,102 @@ impl ChannelLoadMap {
     }
 }
 
-/// 计算路径的通道负载惩罚。
-///
-/// 对路径中每段查询其所在通道的负载，负载 > CHANNEL_LOAD_THRESHOLD 时
-/// 按多余边数 × CHANNEL_LOAD_PENALTY 累加惩罚。
-pub fn channel_load_penalty(path: &[Point], load_map: &ChannelLoadMap) -> f64 {
-    let mut penalty = 0.0;
-    for w in path.windows(2) {
-        let dx = (w[1].x - w[0].x).abs();
-        let dy = (w[1].y - w[0].y).abs();
-        let (axis, layer) = if dx < crate::layout::geometry::EPS && dy > crate::layout::geometry::EPS {
-            (Axis::Vertical, w[0].x)
-        } else if dy < crate::layout::geometry::EPS && dx > crate::layout::geometry::EPS {
-            (Axis::Horizontal, w[0].y)
-        } else {
-            continue;
-        };
-        let load = load_map.load(axis, layer);
-        if load > CHANNEL_LOAD_THRESHOLD {
-            penalty += (load - CHANNEL_LOAD_THRESHOLD) as f64 * CHANNEL_LOAD_PENALTY;
+/// R1：生产 scorer 未接入；保留供单测的负载惩罚。
+#[cfg(test)]
+mod penalties {
+    use super::*;
+    use crate::layout::demand::{CorridorModel, CORRIDOR_LANE_PITCH};
+    use crate::layout::geometry::Point;
+    use crate::layout::group::CorridorAxis;
+    use crate::layout::routing::objectives::{CHANNEL_LOAD_PENALTY, CORRIDOR_OVER_PENALTY};
+
+    const CHANNEL_LOAD_THRESHOLD: usize = 3;
+
+    fn path_uses_corridor(
+        path: &[Point],
+        axis: CorridorAxis,
+        coord: f64,
+        span_min: f64,
+        span_max: f64,
+    ) -> bool {
+        let lo = span_min.min(span_max);
+        let hi = span_min.max(span_max);
+        let tol = CORRIDOR_LANE_PITCH * 0.75;
+        for w in path.windows(2) {
+            let a = w[0];
+            let b = w[1];
+            match axis {
+                CorridorAxis::Vertical => {
+                    let dx = (a.x - coord).abs().min((b.x - coord).abs());
+                    let near = dx <= tol
+                        || ((a.x - coord) * (b.x - coord) <= 0.0 && (a.x - b.x).abs() < tol);
+                    let y0 = a.y.min(b.y);
+                    let y1 = a.y.max(b.y);
+                    let y_overlap = y0 <= hi + tol && y1 >= lo - tol;
+                    if near && y_overlap {
+                        return true;
+                    }
+                }
+                CorridorAxis::Horizontal => {
+                    let dy = (a.y - coord).abs().min((b.y - coord).abs());
+                    let near = dy <= tol
+                        || ((a.y - coord) * (b.y - coord) <= 0.0 && (a.y - b.y).abs() < tol);
+                    let x0 = a.x.min(b.x);
+                    let x1 = a.x.max(b.x);
+                    let x_overlap = x0 <= hi + tol && x1 >= lo - tol;
+                    if near && x_overlap {
+                        return true;
+                    }
+                }
+            }
         }
+        false
     }
-    penalty
+
+    #[allow(dead_code)] // 单测未覆盖；保留与 channel_load_penalty 对称的诊断 API
+    pub fn corridor_overflow_penalty(
+        path: &[Point],
+        model: &CorridorModel,
+        corridor_soft: bool,
+    ) -> f64 {
+        if !corridor_soft || path.len() < 2 {
+            return 0.0;
+        }
+        let mut penalty = 0.0;
+        for d in &model.demands {
+            if !d.is_over() {
+                continue;
+            }
+            let Some(c) = model.corridors.get(d.corridor_index) else {
+                continue;
+            };
+            if path_uses_corridor(path, c.axis, c.coord, c.span_min, c.span_max) {
+                penalty += d.overflow() as f64 * CORRIDOR_OVER_PENALTY;
+            }
+        }
+        penalty
+    }
+
+    pub fn channel_load_penalty(path: &[Point], load_map: &ChannelLoadMap) -> f64 {
+        let mut penalty = 0.0;
+        for w in path.windows(2) {
+            let dx = (w[1].x - w[0].x).abs();
+            let dy = (w[1].y - w[0].y).abs();
+            let (axis, layer) =
+                if dx < crate::layout::geometry::EPS && dy > crate::layout::geometry::EPS {
+                    (Axis::Vertical, w[0].x)
+                } else if dy < crate::layout::geometry::EPS && dx > crate::layout::geometry::EPS {
+                    (Axis::Horizontal, w[0].y)
+                } else {
+                    continue;
+                };
+            let load = load_map.load(axis, layer);
+            if load > CHANNEL_LOAD_THRESHOLD {
+                penalty += (load - CHANNEL_LOAD_THRESHOLD) as f64 * CHANNEL_LOAD_PENALTY;
+            }
+        }
+        penalty
+    }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -161,7 +168,9 @@ pub fn channel_load_penalty(path: &[Point], load_map: &ChannelLoadMap) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use super::penalties::channel_load_penalty;
     use super::*;
+    use crate::layout::geometry::Point;
     use crate::layout::routing::model::solution::RoutePath;
 
     fn mk_path(points: &[Point]) -> RoutePath {

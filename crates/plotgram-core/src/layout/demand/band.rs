@@ -290,6 +290,105 @@ pub fn side_channel_gutter(
     demand.min(profile.side_channel_max)
 }
 
+/// 层缝 vs 边带需求的粗估（S0.3 诊断；不改布局）。
+///
+/// R1：从 OVG `stub_occupancy` 迁入 demand，与 [`edge_band_demand`] 同域。
+#[derive(Debug, Clone, serde::Serialize, PartialEq)]
+pub struct LayerBandDemand {
+    pub upper_layer_y: f64,
+    pub lower_layer_y: f64,
+    pub effective_gap: f64,
+    pub crossing_edges: usize,
+    pub demand: f64,
+    pub deficit: f64,
+}
+
+/// 按节点 y 中心聚成层，估邻层边带需求。
+///
+/// `effective_gap` 用 **面距**（上层底边 → 下层顶边），不是中心距。
+/// demand 经 [`edge_band_demand`]；诊断口径用
+/// [`EdgeBandDemandProfile::for_layer_band_diagnosis`]。
+pub fn estimate_layer_band_demands(
+    nodes: &std::collections::HashMap<String, crate::layout::NodeLayout>,
+    relations: &[Relation],
+    parallel_gap: f64,
+    profile: EdgeBandDemandProfile,
+) -> Vec<LayerBandDemand> {
+    use crate::layout::NodeLayout;
+    if nodes.is_empty() {
+        return Vec::new();
+    }
+    let mut centers: Vec<(String, f64)> = nodes
+        .iter()
+        .map(|(id, nl)| (id.clone(), nl.y + nl.height * 0.5))
+        .collect();
+    centers.sort_by(|a, b| {
+        a.1.partial_cmp(&b.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.0.cmp(&b.0))
+    });
+
+    let mut layers: Vec<Vec<String>> = Vec::new();
+    for (id, cy) in centers {
+        if layers
+            .last()
+            .and_then(|l| l.first())
+            .and_then(|id0| nodes.get(id0))
+            .is_some_and(|nl0| (cy - (nl0.y + nl0.height * 0.5)).abs() <= 40.0)
+        {
+            layers.last_mut().unwrap().push(id);
+        } else {
+            layers.push(vec![id]);
+        }
+    }
+    if layers.len() < 2 {
+        return Vec::new();
+    }
+
+    let layer_center_y: Vec<f64> = layers
+        .iter()
+        .map(|ents| {
+            ents.iter()
+                .filter_map(|id| nodes.get(id))
+                .map(|nl: &NodeLayout| nl.y + nl.height * 0.5)
+                .sum::<f64>()
+                / ents.len().max(1) as f64
+        })
+        .collect();
+
+    let mut out = Vec::new();
+    for li in 0..layers.len() - 1 {
+        let upper_bottom = layers[li]
+            .iter()
+            .filter_map(|id| nodes.get(id))
+            .map(|nl| nl.y + nl.height)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let lower_top = layers[li + 1]
+            .iter()
+            .filter_map(|id| nodes.get(id))
+            .map(|nl| nl.y)
+            .fold(f64::INFINITY, f64::min);
+        let face_gap = (lower_top - upper_bottom).max(0.0);
+        let bd = edge_band_demand(
+            &layers[li],
+            &layers[li + 1],
+            relations,
+            parallel_gap,
+            profile,
+        );
+        let deficit = (bd.demand - face_gap).max(0.0);
+        out.push(LayerBandDemand {
+            upper_layer_y: layer_center_y[li].min(layer_center_y[li + 1]),
+            lower_layer_y: layer_center_y[li].max(layer_center_y[li + 1]),
+            effective_gap: face_gap,
+            crossing_edges: bd.crossing_edges,
+            demand: bd.demand,
+            deficit,
+        });
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -443,5 +542,61 @@ mod tests {
         assert!((g2 - 38.0).abs() < 1e-9);
         let flowchart = EdgeBandDemandProfile::for_diagram_type(DiagramType::Flowchart);
         assert_eq!(side_channel_gutter(&relations, 12.0, flowchart), 0.0);
+    }
+
+    #[test]
+    fn estimate_layer_band_demand_matches_edge_band_demand() {
+        use crate::layout::NodeLayout;
+        use std::collections::HashMap;
+
+        let mut nodes = HashMap::new();
+        nodes.insert(
+            "a".into(),
+            NodeLayout {
+                x: 0.0,
+                y: 0.0,
+                width: 80.0,
+                height: 40.0,
+            },
+        );
+        nodes.insert(
+            "b".into(),
+            NodeLayout {
+                x: 100.0,
+                y: 0.0,
+                width: 80.0,
+                height: 40.0,
+            },
+        );
+        nodes.insert(
+            "c".into(),
+            NodeLayout {
+                x: 0.0,
+                y: 100.0,
+                width: 80.0,
+                height: 40.0,
+            },
+        );
+        nodes.insert(
+            "d".into(),
+            NodeLayout {
+                x: 100.0,
+                y: 100.0,
+                width: 80.0,
+                height: 40.0,
+            },
+        );
+        let relations = vec![rel("a", "c", None), rel("b", "d", None), rel("a", "d", None)];
+        let parallel_gap = 12.0;
+        let profile = EdgeBandDemandProfile::for_layer_band_diagnosis(24.0);
+        let bands = estimate_layer_band_demands(&nodes, &relations, parallel_gap, profile);
+        assert_eq!(bands.len(), 1);
+        let upper = vec!["a".to_string(), "b".to_string()];
+        let lower = vec!["c".to_string(), "d".to_string()];
+        let bd = edge_band_demand(&upper, &lower, &relations, parallel_gap, profile);
+        assert_eq!(bands[0].crossing_edges, bd.crossing_edges);
+        assert!((bands[0].demand - bd.demand).abs() < 1e-9);
+        assert!((bands[0].effective_gap - 60.0).abs() < 1e-9);
+        assert!((bands[0].deficit - (bd.demand - 60.0).max(0.0)).abs() < 1e-9);
     }
 }

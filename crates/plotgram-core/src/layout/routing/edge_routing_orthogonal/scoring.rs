@@ -4,15 +4,20 @@ use super::*;
 use crate::layout::geometry::{Point, EPS};
 use crate::layout::group::GroupRoutingContext;
 use crate::layout::kernel::route::model::{LexCost, OrderedF64};
-use crate::layout::{EdgeLayout, GroupLayout, NodeLayout};
+use crate::layout::{EdgeLayout, NodeLayout};
+use crate::layout::routing::common::path_clean;
 use crate::layout::routing::objectives::CROSSING_PENALTY;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
-pub const NODE_OBSTACLE_PAD: f64 = crate::layout::constants::DEFAULT_NODE_MARGIN;
-pub const GROUP_OBSTACLE_PAD: f64 = crate::layout::group::GROUP_BORDER_SHELL_PAD;
+pub use path_clean::{
+    path_avoids_group_interiors, path_is_clean, GROUP_OBSTACLE_PAD, NODE_OBSTACLE_PAD,
+};
+
 const BBOX_EXPAND: f64 = 10.0;
 
+/// LexAStar 已接管择优；本 trait 仍为 API 形参（`_scorer`），方法暂保留兼容调用面。
+#[allow(dead_code)]
 pub trait CandidateScorer {
     /// 墨量层兼容分数（越小越好）；择优请用 [`Self::prefer`] / [`Self::lex_cost`]。
     fn score(&self, path: &[Point], ctx: &OrthoRoutingContext, pair: &EndpointPair) -> f64;
@@ -44,6 +49,7 @@ pub trait CandidateScorer {
 
 /// Legacy template scorer. LexAStar owns its own lexicographic cost model;
 /// DefaultScorer 择优亦走 [`LexCost`]（`(hard_residual, bends, length)`）。
+#[allow(dead_code)]
 pub struct DefaultScorer;
 impl CandidateScorer for DefaultScorer {
     fn score(&self, path: &[Point], ctx: &OrthoRoutingContext, pair: &EndpointPair) -> f64 {
@@ -112,6 +118,9 @@ pub fn path_length(path: &[Point]) -> f64 {
 
 /// Compatibility diagnostic for callers that still request an obstacle score.
 /// Routing correctness is enforced by the hard checks below, not this value.
+/// Compatibility diagnostic for callers that still request an obstacle score.
+/// Routing correctness is enforced by the hard checks below, not this value.
+#[cfg(test)]
 pub fn obstacle_penalty(path: &[Point], from_id: &str, to_id: &str, nodes: &HashMap<String, NodeLayout>, _groups: &GroupRoutingContext, obstacles: &PreparedObstacles) -> f64 {
     path.windows(2).enumerate().map(|(si, w)| obstacles.sorted_node_ids.iter().filter(|id| {
         let endpoint_stub = (id.as_str() == from_id && si == 0)
@@ -120,26 +129,7 @@ pub fn obstacle_penalty(path: &[Point], from_id: &str, to_id: &str, nodes: &Hash
     }).count() as f64).sum()
 }
 
-pub fn path_is_clean(path: &[Point], from_id: &str, to_id: &str, nodes: &HashMap<String, NodeLayout>, _groups: &GroupRoutingContext, sorted_node_ids: &[String]) -> bool {
-    let last = path.len().saturating_sub(2);
-    path.windows(2).enumerate().all(|(si, w)| sorted_node_ids.iter().all(|id| {
-        if (id == from_id && si == 0) || (id == to_id && si == last) { return true; }
-        let Some(node) = nodes.get(id) else { return true; };
-        let pad = if id == from_id || id == to_id { 0.0 } else { NODE_OBSTACLE_PAD };
-        !segment_intersects_node(w[0], w[1], node, pad)
-    }))
-}
-
-pub fn path_avoids_group_interiors(path: &[Point], from_id: &str, to_id: &str, groups: &GroupRoutingContext, sorted_group_ids: &[String]) -> bool {
-    let endpoints = groups.endpoint_group_set(from_id, to_id);
-    path.windows(2).all(|w| sorted_group_ids.iter().all(|id| {
-        endpoints.contains(id.as_str()) || groups.groups.get(id).is_none_or(|g| !segment_crosses_rect_interior(w[0], w[1], g))
-    }))
-}
-
-fn segment_crosses_rect_interior(a: Point, b: Point, group: &GroupLayout) -> bool {
-    crate::layout::routing::common::geom_obstacle::segment_pierces_group_interior(a, b, group)
-}
+#[cfg(test)]
 pub(super) fn segment_intersects_node(a: Point, b: Point, node: &NodeLayout, pad: f64) -> bool {
     crate::layout::routing::common::geom_obstacle::segment_pierces_node(a, b, node, pad)
 }

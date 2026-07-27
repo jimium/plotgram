@@ -4,7 +4,7 @@
 
 use crate::layout::geometry::Point;
 use crate::layout::group::GroupRoutingContext;
-use crate::layout::routing::edge_routing_orthogonal::{
+use crate::layout::routing::common::path_clean::{
     path_avoids_group_interiors, path_is_clean,
 };
 use crate::layout::types::{EdgeLayout, GroupLayout, NodeLayout, Port};

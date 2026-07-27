@@ -276,7 +276,7 @@ impl GeometryMaterializer {
         nodes: Option<&std::collections::HashMap<String, crate::layout::types::NodeLayout>>,
         sorted_node_ids: Option<&[String]>,
     ) {
-        crate::layout::routing::edge_routing_orthogonal::sanitize::sanitize_orthogonal_edges_with_guard(
+        crate::layout::routing::common::orthogonal_sanitize::sanitize_orthogonal_edges_with_guard(
             edges,
             relations,
             from_side,

@@ -3,7 +3,7 @@
 use super::context::{EndpointPair, OrthoRoutingContext};
 use super::path::{port_outward, source_group_exit_stub_len, PathSelectStats};
 use super::simplify::simplify_path;
-use super::{NODE_OBSTACLE_PAD, PORT_CLEARANCE, EPS, SegmentGrid};
+use super::{NODE_OBSTACLE_PAD, PORT_CLEARANCE, EPS};
 use crate::layout::geometry::{Point, Rect};
 use crate::layout::kernel::route::{lex_astar, ResourceGraph, SolverStatus};
 
@@ -129,15 +129,4 @@ fn assemble_with_stubs(
         path.push(end);
     }
     simplify_path(path, false)
-}
-/// Phase 3：U 形穿组补丁已删；H2 由构图 + 联合约束保证，残余记债。
-pub(crate) fn repair_group_interior_crossings(
-    _edges: &mut [crate::layout::EdgeLayout],
-    _diagram: &crate::ast::Diagram,
-    _groups: &std::collections::HashMap<String, crate::layout::GroupLayout>,
-    _group_ctx: &crate::layout::group::GroupRoutingContext,
-    _sorted_group_ids: &[String],
-    _grid: &mut SegmentGrid,
-) -> usize {
-    0
 }

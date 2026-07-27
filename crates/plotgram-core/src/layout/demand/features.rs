@@ -1,9 +1,8 @@
 //! EdgeFeatures 采集与 EdgeDifficulty 评分（含量纲归一化）。
 
 use crate::ast::Diagram;
-use crate::layout::routing::edge_routing_orthogonal::estimate_layer_band_demands;
+use crate::layout::demand::band::{estimate_layer_band_demands, EdgeBandDemandProfile};
 use crate::layout::routing::segment_pair::parallel_gap_for_diagram;
-use crate::layout::demand::band::EdgeBandDemandProfile;
 use crate::layout::{LayoutResult, NodeLayout};
 use std::collections::HashMap;
 

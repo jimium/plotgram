@@ -7,7 +7,6 @@ pub struct ScoringWeights {
     pub bend: f64,
     pub obstacle: f64,
     pub corridor_misalignment: f64,
-    pub channel_load: f64,
     /// P1-2: 通道对齐软约束权重
     pub channel_alignment: f64,
     /// P2-2: 交叉惩罚权重
@@ -23,7 +22,6 @@ impl Default for ScoringWeights {
             bend: 1.0,
             obstacle: 1.0,
             corridor_misalignment: 1.0,
-            channel_load: 1.0,
             channel_alignment: 1.0,
             crossing: 1.0,
             away: 1.0,
@@ -76,7 +74,6 @@ impl OrthoRoutingProfile {
                 bend: 1.0,
                 obstacle: 1.5,
                 corridor_misalignment: 1.2,
-                channel_load: 1.0,
                 channel_alignment: 1.0,
                 crossing: 1.0,
                 away: 1.0,
