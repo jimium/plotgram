@@ -1,100 +1,52 @@
 # AGENTS.md
 
-本文件记录本仓库中所有 agent(包括 AI 助手与人类协作者)必须遵守的项目规则。
+本仓库所有 agent（AI 助手与人类协作者）必须遵守的**现行**约束。  
+历史豁免与设计期叙事见 [`docs/新架构/23`](docs/新架构/23-Atlas分阶段推进方案-2026-07.md) / git；勿再按「门禁全关」理解本仓库。
 
-## 1. 无向后兼容约束
+## 1. 无向后兼容
 
-本项目尚未对外发布,**不需要考虑向后兼容**。
+项目尚未对外发布。可自由重命名、删除、重构公共 API；直接删旧代码，不要留 deprecated 转发层。
 
-- 可以自由重命名、删除、重构公共 API。
-- 可以删除过时的模块、函数、类型,无需保留 deprecated 标记或兼容包装器。
-- 重构时直接删除旧代码,不要保留"向后兼容的转发层"。
+## 2. 布局与边路由：确定性迭代
 
-## 2. 布局与边路由的确定性迭代
+**不得**依赖 `HashMap` 的 key 排序驱动迭代。需要稳定序时用显式排序或 `IndexMap` / `BTreeMap`，并在排序键上保证确定性。
 
-实现布局算法、边路由算法时,**不得依赖 HashMap 的 key 排序来驱动迭代顺序**。
+## 3. WASM 禁裸 `std::time`
 
-- HashMap 的迭代顺序不稳定,同一输入多次渲染可能产生不同结果,导致图形抖动。
-- 需要稳定顺序时,应使用显式排序(如按 id、拓扑序、插入序)或 `IndexMap`/`BTreeMap` 等有序容器,并在排序键上保证确定性。
+`plotgram-core` 会编到 WASM。在 `crates/plotgram-core/src` 内禁止 `std::time::{Instant, SystemTime}`。计时与性能日志统一走 [`layout/perf.rs`](crates/plotgram-core/src/layout/perf.rs) 的 `Instant` 与 `perf_log!`。
 
-## 3. docs/已经实现的方案 文件夹
-这个文件夹下存放已经实现的方案。可用来参考，但不一定代表代码的最终实现。
+## 4. 日常验证
 
-## 4. 算法优化中 lint 的使用原则
+- **禁默认 `--release`**：日常用 `cargo check` / `cargo test` / `cargo run -p plotgram-cli`（debug）。`--release` 仅用于性能测量与门禁脚本（脚本内自行构建）。
+- **勿信陈旧 binary**：优先 `cargo run -p plotgram-cli`，勿直接跑 `./target/release/plotgram`。
+- 现行门禁：[`gate-switch.sh`](benchmarks/scripts/gate-switch.sh) `GATES_DEFAULT=on`。
 
-优化布局/路由算法时，**lint 结果只是参考，没必要 100% 消除所有 warning**。
+## 5. 质量棘轮与禁止图名特判
 
-- lint 规则（尤其是 Warning 级别）用于提示潜在质量退化，但算法性能、简洁性和可维护性同样重要。
-- 在性能与 lint 干净度发生冲突时，优先保证算法性能与代码简洁性。
-- 不得为了消除 lint warning 而引入过度复杂的逻辑或显著降低性能。
-- 对于 edge bundling 等启发式算法，少量 warning 是可接受的，只要核心效果（ink 节省、视觉清晰度）达标。
+- 日常「无退化」看 [`benchmarks/`](benchmarks/) **product-gate**（[`product-regression-set.txt`](benchmarks/sets/product-regression-set.txt)），不是全量 showcase / stress。stress 质量默认 WARN；穿组 / `det=true` 全角色仍硬。
+- 抬基线 `note` 须带角色（`raise product:` / `raise stress (expected):`）。
+- **禁止图名特判**；不可为压 stress 数字加图名分支。
 
-## 5. 改造 / 修复布局与边路由时的注意事项
+## 6. 创新模式（算法 / 架构级重写）
 
-改造或修复布局、边路由算法前，先阅读 [`docs/总结经验/布局与路由核心手册-2026-07.md`](docs/总结经验/布局与路由核心手册-2026-07.md)。该手册合并了踩坑复盘、缺陷审计、几何契约与 V3b 等经验；后续任务至少遵守：
+仅限推翻管线或更换生成器一类重写；日常 bug / 调参仍走 §5 棘轮。
 
-- **先追管线时序，再调局部启发**：确认「最终几何/label 是谁写的」（router → snap/repulse → sanitize → resolve/assign）。sanitize 会重建 label 时，避让必须作为几何冻结后的最终步骤，否则结果会被丢弃。
-- **激进几何清理放在管线末尾**：router 内部 sanitize 保持保守；`merge_overshoot` 等会改变折点拓扑的逻辑，不得在节点仍可能重定位的阶段启用，否则会反馈进 space-budget 造成假回归。
-- **验证产物，勿信陈旧 binary**：不要默认信任 `./target/release/plotgram`；优先 `cargo run -p plotgram-cli`。日志与源码不一致时，先核对 binary mtime / fingerprint，再怀疑控制流。
-- **无退化要可量化**：对比节点坐标是否不变；日常「无退化」看 [`benchmarks/`](benchmarks/) **product-gate** 的严重度/质量轨（[`product-regression-set.txt`](benchmarks/sets/product-regression-set.txt)），**不是**全量 showcase、也不是 stress 探针集。stress 质量默认 WARN；正确性（穿组 / det）全角色仍硬。抬基线 `note` 须带角色（如 `raise product:` / `raise stress (expected):`）。仓库既有测试失败先钉死基线，勿与本次改动混谈。
-- **禁止图名特判**：从通用规则（时序、死锁启发、端口去冲突、邻近感知）出发修复；可接受合法单调台阶暂留；不可为消 warning 引入穿模或显著复杂化。**不可为压 stress 数字加图名分支**——压力图差记债或抬探针基线即可。
+开启前写清：**目标维度**、**可接受的临时退化范围**、**退出判据**。评判用帕累托（目标显著改善，其它关键维无不可接受退化）；提交须显式抬基线。  
+§2 / §3 / 禁图名特判 / `cargo run` 验真——创新模式下**不豁免**。
 
-## 6. WASM 平台禁用 `std::time::{Instant, SystemTime}`
+## 7. 改布局 / 路由时读什么
 
-`plotgram-core` 会编译到 WASM（playground / agent-demo），在 `crates/plotgram-core/src` 内禁止裸用 `std::time::{Instant, SystemTime}`，否则会运行时 panic。计时与性能日志统一走 [`crates/plotgram-core/src/layout/perf.rs`](crates/plotgram-core/src/layout/perf.rs) 的 `crate::layout::perf::Instant` 与 `perf_log!` 宏。
+Hier 生产路径是 **Atlas 三相**（组合 → 度量 → Ink），不要默认按旧正交 coordinator 时序改。
 
-## 7. 算法级重构的"创新模式"例外通道
+1. [`布局与路由核心手册`](docs/总结经验/布局与路由核心手册-2026-07.md) — 踩坑与验证红线  
+2. [`docs/新架构/README`](docs/新架构/README.md) — Atlas 文档入口  
+3. [`30 实现检讨`](docs/新架构/30-Atlas实现检讨-冗余与缺失-2026-07.md) — Stage7 后下一刀（优先 M1/M3/M4，勿先 MCF / 整目录清空 ortho）
 
-日常修复走**单调不劣化棘轮**：候选破约即回滚、**product-gate** 严重度/质量须持平或显式抬基线（见 §4–§5 与手册 §1）；stress/demo 质量可 WARN。但**算法级重写**（推翻管线时序、更换路由/布局生成器等）几乎必然要先经历一段有界退化，才能到达新架构的收益区；纯贪心 no-regression 会把这类探索在第一步就否掉，陷入局部最优。
+`docs/已经实现的方案/` 可参考，不代表最终实现。lint warning 只是参考，不为消 warning 牺牲性能或引入图名特判。
 
-因此明确开一条例外通道，**仅在算法/架构级重写时适用**：
+## 8. 单元测试
 
-- **适用边界**：仅限「算法 / 架构级重写」，不含日常 bug 修复或局部启发调参。日常改动仍走棘轮，默认不劣化 **product-gate**。
-- **评判口径换成帕累托**：不再要求「任一维度都不许退」，改为「在**目标维度**上帕累托更优」——目标指标显著改善，且未在其他关键维度上造成不可接受的退化。目标维度**优先看 product-gate**；stress 允许更大临时质量退化。允许过程中接受**有界的临时退化**（类似模拟退火），只要最终收敛更优。
-- **显式登记**：开启创新模式须先写清三件事——目标维度、可接受的临时退化范围、退出（收敛）判据；并在提交说明中显式抬基线（note 带角色）、列残余样例（手册 §1 ○9）。
-- **红线不豁免**：确定性（§2）、禁止图名特判、验证用 `cargo run -p plotgram-cli` 核 binary、WASM 禁 `std::time`、勿信陈旧产物——这些 ★ 卫生红线在创新模式下**同样适用**。它们约束的是「怎么证明结论可信」，不是被优化的对象。
-
-## 8. 【已失效】布局路由全局优化期间门禁豁免（2026-07-20～2026-07-25）
-
-> **状态：已失效（Phase 6 / `first-principles-final` 退出）**  
-> 原触发：布局与正交路由全局算法级优化（`docs/优化重构/`）。Phase 0–6 完成后恢复正常棘轮。
-
-**恢复后规则**（与 §5 / §7 / 手册一致）：
-
-- `benchmarks/compare.sh` 的 **product/smoke 质量轨恢复硬 FAIL**；stress/demo 质量默认 WARN。
-- 正确性（穿组 / `det=true`）仍硬。
-- 有意抬基线须 `raise product:` / `raise stress (expected):` note，不得静默接受退化。
-- 算法级重写仍可走 §7 创新模式（须显式登记目标维度 / 临时退化范围 / 退出判据）。
-
-历史豁免条款正文已归档；勿再按「质量轨不阻挡」理解本仓库门禁。
-
-## 9. 日常验证禁止默认 `--release`
-
-日常改代码、跑测试、验渲染时，**不得默认使用 `cargo build --release` 或 `cargo test --release`**。release 编译慢，且与多数验证场景无关。
-
-- **编译检查**：`cargo check -p plotgram-core`（或目标 crate），不必先 `build --release`。
-- **单元测试**：`cargo test -p plotgram-core`（默认 debug profile，与 CI 一致）。`cargo test` 不会用到 `target/release/` 下的产物；先 `build --release` 再 `cargo test` 等于白等一轮慢编译。
-- **渲染验真**：`cargo run -p plotgram-cli -- render <图> -o /tmp/out.svg`（默认 debug）。勿直接执行 `./target/release/plotgram`，易命中陈旧 binary（见 §5）。
-- **仅以下场景用 `--release`**：性能测量、`bench-phases` / `gate-baseline`、或 [`benchmarks/snapshot.sh`](benchmarks/snapshot.sh) / [`benchmarks/compare.sh`](benchmarks/compare.sh) 等门禁脚本（脚本内已自行 release 构建）。
-
-## 10. 【已失效】下一代布局与路由架构设计期：门禁全关（2026-07-26～2026-07-27）
-
-> **状态：已失效（Stage 7 / `atlas-final` 退出）**  
-> 原触发：布局与路由重大架构调整（[`docs/新架构/`](docs/新架构/) 22 总纲 / 23 推进方案）。Stage 0–7 完成后恢复正常棘轮。
-
-**恢复后规则**（与 §5 / §7 / 手册 / 23 §9 一致）：
-
-- [`benchmarks/scripts/gate-switch.sh`](benchmarks/scripts/gate-switch.sh) 的 `GATES_DEFAULT=on`。
-- `check-*.sh`（含 Stage 7 新增的 provenance / phase-api）与 `compare.sh` 硬轨恢复阻断。
-- CI `cargo test` 阻断；无 `PLOTGRAM_GATES=off` / `continue-on-error` 豁免。
-- 生产管线仅 `PipelineChoice::Atlas`（默认）与 `Shadow`（对拍诊断）；`legacy` 已删除。
-- 算法级重写仍可走 §7 创新模式（须显式登记）。
-
-历史豁免条款正文已归档；勿再按「门禁全关」理解本仓库。
-
-## 11. 单元测试编写原则
-
-- **表驱动优先**：同一函数的多个输入 case 合并为一个 `#[test]` + `for case in cases` 循环，不要每个 case 单独一个函数。
-- **断言可观测输出，不断言内部状态**：测试应断言最终路径点/坐标/SVG 等外部可见结果，不要断言 `orthogonal_debug.total_candidates` 之类内部计数器——重构内部结构时这类测试全碎。
-- **布局坐标用 insta 快照**：需要断言具体坐标值时，用 `insta::assert_json_snapshot!`（见 `layout/snapshot_tests.rs`），重构后 `cargo insta review` 批量审阅，不用逐个改 magic number。
-- **确定性测试保留最高层即可**：同一属性（如确定性）不必在 kernel / routing / pipeline 三层各测一次，保留 pipeline 级（或 shadow 对拍）覆盖即可。
+- **表驱动**：多 case 合并为一个 `#[test]` + 循环。  
+- **断言可观测输出**（坐标 / 路径 / SVG），不断言内部计数器。  
+- 布局坐标优先 `insta::assert_json_snapshot!`。  
+- 确定性等属性保留最高层（pipeline / shadow）即可，勿三层各测一遍。
