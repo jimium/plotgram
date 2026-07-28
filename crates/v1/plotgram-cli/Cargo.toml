@@ -1,0 +1,20 @@
+[package]
+name = "plotgram-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "CLI tool for Plotgram — Turn anything into a diagram"
+
+[[bin]]
+name = "plotgram"
+path = "src/main.rs"
+
+[dependencies]
+plotgram-core = { workspace = true, default-features = false }
+clap = { version = "4", features = ["derive"] }
+serde_json.workspace = true
+
+[features]
+default = []
+svg-debug = ["plotgram-core/svg-debug"]

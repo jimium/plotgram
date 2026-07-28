@@ -1,0 +1,10 @@
+[package]
+name = "plotgram-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Plotgram layout and edge routing engine"
+
+[dependencies]
+plotgram-model = { path = "../plotgram-model" }
+indexmap = "2"

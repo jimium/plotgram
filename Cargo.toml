@@ -1,12 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/plotgram-core",
+    "crates/plotgram-model",
+    "crates/plotgram-engine",
+    "crates/plotgram-render",
     "crates/plotgram-cli",
-    "crates/plotgram-server",
-    "crates/plotgram-wasm",
-    "crates/plotgram-eval",
-    "crates/plotgram-raster",
 ]
 
 [workspace.package]
@@ -18,7 +16,9 @@ repository = "https://github.com/your-org/plotgram"
 description = "A chart description language and rendering engine designed for AI Agents — Turn anything into a diagram"
 
 [workspace.dependencies]
-plotgram-core = { path = "crates/plotgram-core", default-features = false }
+plotgram-model = { path = "crates/plotgram-model" }
+plotgram-engine = { path = "crates/plotgram-engine" }
+plotgram-render = { path = "crates/plotgram-render" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
@@ -38,5 +38,3 @@ panic = "abort"
 strip = true
 debug = 0
 
-[profile.release.package.plotgram-wasm]
-opt-level = "z"

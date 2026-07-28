@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M7-0：跑 Ink dogleg repair 基线探针，写出 docs/新架构/31 报告。
+# M7-0：跑 Ink dogleg repair 基线探针，写出 docs/altlas/31 报告。
 # 不改布局算法；仅测量 hints.atlas_plan_distorted_edges。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"

@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>yFiles 布局算法与路由风格 — plotgram 基础参考</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --ink: #1c2333;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --good: #059669;
+    --good-soft: #d1fae5;
+    --warn: #d97706;
+    --warn-soft: #fef3c7;
+    --info: #0284c7;
+    --info-soft: #e0f2fe;
+    --neutral-soft: #f1f5f9;
+    --mono: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 16px 80px;
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.65;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  header { padding: 48px 0 12px; }
+  header h1 { font-size: 28px; margin: 0 0 10px; letter-spacing: .3px; }
+  header .sub { color: var(--muted); font-size: 15px; max-width: 52em; }
+  header .meta { margin-top: 12px; font-size: 13px; color: var(--muted); }
+  header a { color: var(--accent); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0 8px; }
+  .stat {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .stat .v { font-size: 28px; font-weight: 700; color: var(--accent); line-height: 1.1; }
+  .stat .l { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .stat.good .v { color: var(--good); }
+  section { margin-top: 36px; }
+  h2 {
+    font-size: 20px; margin: 0 0 6px; padding-left: 12px;
+    border-left: 4px solid var(--accent);
+  }
+  .lead { color: var(--muted); font-size: 14px; margin: 4px 0 16px 16px; }
+  .callout {
+    background: var(--accent-soft); border: 1px solid #bfdbfe; border-radius: 12px;
+    padding: 14px 18px; font-size: 14.5px;
+  }
+  .callout.neutral { background: var(--neutral-soft); border-color: var(--line); }
+  .callout strong { display: block; margin-bottom: 4px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 820px) {
+    .grid, .stats { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .card h3 {
+    margin: 0 0 6px; font-size: 15px; font-family: var(--mono); font-weight: 650;
+  }
+  .card .aka { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .card ul { margin: 0 0 10px; padding-left: 1.15em; font-size: 13.5px; }
+  .card li { margin: 2px 0; }
+  .sig {
+    display: inline-block; font-size: 11.5px; font-weight: 600;
+    background: var(--neutral-soft); color: var(--ink);
+    padding: 2px 8px; border-radius: 999px; margin-bottom: 8px;
+  }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .pill {
+    display: inline-block; font-size: 11.5px; font-weight: 600;
+    padding: 2px 8px; border-radius: 999px;
+  }
+  .pill.native { background: var(--good-soft); color: var(--good); }
+  .pill.post { background: var(--info-soft); color: var(--info); }
+  .pill.limited { background: var(--warn-soft); color: var(--warn); }
+  .pill.none { background: var(--neutral-soft); color: var(--muted); }
+  .note { font-size: 12.5px; color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; background: var(--card); }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; }
+  th { background: #f1f5f9; font-weight: 600; text-align: center; }
+  th:first-child, td:first-child { text-align: left; font-family: var(--mono); font-size: 12.5px; }
+  td { text-align: center; }
+  .scroll { overflow-x: auto; border-radius: 12px; border: 1px solid var(--line); }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .pick h3 { font-size: 15px; margin: 0 0 6px; font-family: inherit; }
+  .pick p { margin: 0; font-size: 13.5px; color: var(--ink); }
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  footer a { color: var(--accent); }
+  code { font-family: var(--mono); font-size: .92em; background: #eef1f5; padding: 1px 6px; border-radius: 5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>yFiles 布局算法与路由风格</h1>
+    <p class="sub">
+      plotgram 架构决策的基础信息参考。产品面概览（yFiles for HTML）：布局算节点+边；
+      独立 Edge Router 只改边；Labeling 另成一类。「Profile」按各算法内建 / 可后接的路由风格理解。
+    </p>
+    <p class="meta">
+      2026-07-28 ·
+      <a href="layouts-and-routing.md">Markdown 源</a> ·
+      Source: yWorks docs · Automatic Layouts / Hierarchical / Edge Routing
+    </p>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="v">10</div><div class="l">主布局风格</div></div>
+    <div class="stat"><div class="v">6</div><div class="l">独立边路由器</div></div>
+    <div class="stat good"><div class="v">4</div><div class="l">Hier 内建路由档</div></div>
+  </div>
+
+  <section>
+    <div class="callout">
+      <strong>三类算法，不要混用职责</strong>
+      Layout：放置节点并通常同时生成边路径。Edge routing stage：节点冻结，只算边。
+      Labeling：节点与边路径不动，只摆标签。独立 Router 可作为任意 Layout 的后处理（<code>ILayoutStage</code>）。
+    </div>
+  </section>
+
+  <section>
+    <h2>主布局算法 · 特色</h2>
+    <p class="lead">十个主风格；卡片右上为签名，下方为路由能力摘要。</p>
+    <div class="grid">
+
+      <article class="card">
+        <h3>HierarchicalLayout</h3>
+        <div class="aka">分层 / Sugiyama · 流程图、调用图、ER、泳道、生化通路</div>
+        <span class="sig">有向流、层序、最小化交叉</span>
+        <ul>
+          <li>节点分到 rank 层，多数边朝主方向</li>
+          <li>层内序优化交叉；端口 / 边组 / 增量 / group 一等公民</li>
+          <li>plotgram Atlas 主路径最接近的产品族</li>
+        </ul>
+        <div class="pills">
+          <span class="pill native">Ortho·内建</span>
+          <span class="pill native">Poly·内建</span>
+          <span class="pill none">Straight·—</span>
+          <span class="pill native">Curve·内建</span>
+        </div>
+        <p class="note">默认 orthogonal；bus 靠 edge grouping；递归边另有 policy</p>
+      </article>
+
+      <article class="card">
+        <h3>OrganicLayout</h3>
+        <div class="aka">力导向 · 社交/企业网络、生物信息、网格、系统管理</div>
+        <span class="sig">自然散布、显簇与对称</span>
+        <ul>
+          <li>节点互斥、边如弹簧；布局紧凑、邻接贴近</li>
+          <li>边默认等长直线；另有 InteractiveOrganicLayout</li>
+          <li>适合无强方向的中大型无向图</li>
+        </ul>
+        <div class="pills">
+          <span class="pill post">Ortho·可后接</span>
+          <span class="pill post">Poly·可后接</span>
+          <span class="pill native">Straight·内建</span>
+          <span class="pill post">Curve·可后接</span>
+        </div>
+        <p class="note">内建直线；正交/曲线通常后接 EdgeRouter / OrganicEdgeRouter</p>
+      </article>
+
+      <article class="card">
+        <h3>TreeLayout</h3>
+        <div class="aka">树 + 子树放置器 · 组织树、数据流、软件结构、行政管理</div>
+        <span class="sig">树结构专用、高度可定制子树风格</span>
+        <ul>
+          <li>多种 ISubtreePlacer：正交、分层、压缩等</li>
+          <li>可控制边序、端口、子树朝向</li>
+          <li>非树边需预处理或换其它布局</li>
+        </ul>
+        <div class="pills">
+          <span class="pill native">Ortho·内建</span>
+          <span class="pill native">Poly·内建</span>
+          <span class="pill native">Straight·内建</span>
+          <span class="pill post">Curve·可后接</span>
+        </div>
+        <p class="note">路由风格 largely 由 subtree placer 决定，非整图单一 descriptor</p>
+      </article>
+
+      <article class="card">
+        <h3>RadialTreeLayout</h3>
+        <div class="aka">气球 / 径向树 · 层级浏览、相似规模子树、目录树</div>
+        <span class="sig">子树绕父节点呈星/气球</span>
+        <ul>
+          <li>子女落在父节点圆周；子树像气球</li>
+          <li>强调根到叶的径向层次感</li>
+          <li>边通常直线</li>
+        </ul>
+        <div class="pills">
+          <span class="pill post">Ortho·可后接</span>
+          <span class="pill post">Poly·可后接</span>
+          <span class="pill native">Straight·内建</span>
+          <span class="pill post">Curve·可后接</span>
+        </div>
+        <p class="note">内建直线；换风格需独立 EdgeRouter</p>
+      </article>
+
+      <article class="card">
+        <h3>OrthogonalLayout</h3>
+        <div class="aka">正交构图 · UML、DB schema、VLSI、楼层规划、知识表示</div>
+        <span class="sig">边全正交、紧凑、少弯少交叉</span>
+        <ul>
+          <li>边仅为水平/垂直段交替</li>
+          <li>无节点重叠；适合中小稀疏图</li>
+          <li>与 Hierarchical 正交不同：不强调全局层流</li>
+        </ul>
+        <div class="pills">
+          <span class="pill native">Ortho·内建</span>
+          <span class="pill none">Poly·—</span>
+          <span class="pill none">Straight·—</span>
+          <span class="pill none">Curve·—</span>
+        </div>
+        <p class="note">路由风格即正交；定向边可配 monotonic 约束</p>
+      </article>
+
+      <article class="card">
+        <h3>CircularLayout</h3>
+        <div class="aka">环 / 多环 · 社交网络、电信、WWW、电商拓扑</div>
+        <span class="sig">按连通分区成环，强调群组</span>
+        <ul>
+          <li>单环或多环（分区盘）</li>
+          <li>可突出 group / tree 子结构</li>
+          <li>常配合边捆绑降 clutter</li>
+        </ul>
+        <div class="pills">
+          <span class="pill post">Ortho·可后接</span>
+          <span class="pill post">Poly·可后接</span>
+          <span class="pill native">Straight·内建</span>
+          <span class="pill limited">Curve·有限</span>
+        </div>
+        <p class="note">默认弦/直线；bundling 是常见风格扩展</p>
+      </article>
+
+      <article class="card">
+        <h3>RadialLayout</h3>
+        <div class="aka">同心圆层 · 聚类、社交、生物信息、树状径向变体</div>
+        <span class="sig">节点落在绕中心的同心层上</span>
+        <ul>
+          <li>多种 layering 策略（含 dendrogram）</li>
+          <li>中心–外围语义清晰</li>
+          <li>与 RadialTree 不同：不要求严格树</li>
+        </ul>
+        <div class="pills">
+          <span class="pill post">Ortho·可后接</span>
+          <span class="pill post">Poly·可后接</span>
+          <span class="pill native">Straight·内建</span>
+          <span class="pill post">Curve·可后接</span>
+        </div>
+        <p class="note">内建径向直线为主</p>
+      </article>
+
+      <article class="card">
+        <h3>SeriesParallelLayout</h3>
+        <div class="aka">串并联 · 电路、调用树、结构化流程图</div>
+        <span class="sig">单源单汇、边弯最少、突出主路径</span>
+        <ul>
+          <li>图须（或近似）串并联可分解</li>
+          <li>强调 source→sink 主方向</li>
+          <li>路径感强、弯点少</li>
+        </ul>
+        <div class="pills">
+          <span class="pill native">Ortho·内建</span>
+          <span class="pill native">Poly·内建</span>
+          <span class="pill limited">Straight·有限</span>
+          <span class="pill post">Curve·可后接</span>
+        </div>
+        <p class="note">内建偏正交/折线，强调最少弯</p>
+      </article>
+
+      <article class="card">
+        <h3>RadialGroupLayout</h3>
+        <div class="aka">仙人掌分组 · 深层嵌套 group、包图式浏览</div>
+        <span class="sig">组成员绕组边界递归排布</span>
+        <ul>
+          <li>每组直接成员贴组边界排布</li>
+          <li>递归树感像 cactus</li>
+          <li>专为 hierarchically grouped 图</li>
+        </ul>
+        <div class="pills">
+          <span class="pill post">Ortho·可后接</span>
+          <span class="pill post">Poly·可后接</span>
+          <span class="pill native">Straight·内建</span>
+          <span class="pill post">Curve·可后接</span>
+        </div>
+        <p class="note">节点放置是主角；边风格常后处理</p>
+      </article>
+
+      <article class="card">
+        <h3>CompactDiskLayout</h3>
+        <div class="aka">紧致圆盘 · 集合展示、无强边语义的节点云</div>
+        <span class="sig">节点塞进圆盘、最大化紧凑</span>
+        <ul>
+          <li>优化圆盘内紧凑放置</li>
+          <li>弱化边几何，强调占用面积</li>
+          <li>适合一堆节点而非复杂拓扑</li>
+        </ul>
+        <div class="pills">
+          <span class="pill post">Ortho·可后接</span>
+          <span class="pill post">Poly·可后接</span>
+          <span class="pill native">Straight·内建</span>
+          <span class="pill post">Curve·可后接</span>
+        </div>
+        <p class="note">边非优化目标；需要路径时后接 Router</p>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>路由风格矩阵（Layout × Style）</h2>
+    <p class="lead">内建 = 自带 descriptor / 固有几何；可后接 = 后再跑 EdgeRouter；有限 = grouping / placer 间接得到。</p>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Layout</th>
+            <th>Orthogonal</th>
+            <th>Polyline</th>
+            <th>Octilinear</th>
+            <th>Curved</th>
+            <th>Straight</th>
+            <th>Bus</th>
+            <th>Organic</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Hierarchical</td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill none">—</span></td>
+            <td><span class="pill limited">有限</span></td>
+            <td><span class="pill post">可后接</span></td>
+          </tr>
+          <tr>
+            <td>Organic</td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill native">内建</span></td>
+          </tr>
+          <tr>
+            <td>Tree</td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill limited">有限</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill limited">有限</span></td>
+            <td><span class="pill none">—</span></td>
+          </tr>
+          <tr>
+            <td>RadialTree</td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill none">—</span></td>
+            <td><span class="pill none">—</span></td>
+          </tr>
+          <tr>
+            <td>Orthogonal</td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill none">—</span></td>
+            <td><span class="pill none">—</span></td>
+            <td><span class="pill none">—</span></td>
+            <td><span class="pill none">—</span></td>
+            <td><span class="pill limited">有限</span></td>
+            <td><span class="pill none">—</span></td>
+          </tr>
+          <tr>
+            <td>Circular</td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill limited">有限</span></td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill limited">有限</span></td>
+            <td><span class="pill post">可后接</span></td>
+          </tr>
+          <tr>
+            <td>Radial</td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill none">—</span></td>
+            <td><span class="pill none">—</span></td>
+          </tr>
+          <tr>
+            <td>SeriesParallel</td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill limited">有限</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill limited">有限</span></td>
+            <td><span class="pill none">—</span></td>
+            <td><span class="pill none">—</span></td>
+          </tr>
+          <tr>
+            <td>RadialGroup</td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill none">—</span></td>
+            <td><span class="pill none">—</span></td>
+          </tr>
+          <tr>
+            <td>CompactDisk</td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill post">可后接</span></td>
+            <td><span class="pill native">内建</span></td>
+            <td><span class="pill none">—</span></td>
+            <td><span class="pill none">—</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="legend">
+      图例
+      <span class="pill native">内建</span>
+      <span class="pill post">可后接</span>
+      <span class="pill limited">有限</span>
+      <span class="pill none">—</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>独立边路由器（节点冻结）</h2>
+    <p class="lead">实现 ILayoutStage；可挂在任意 Layout 之后：先放节点，再换边几何。</p>
+    <div class="grid">
+      <article class="card">
+        <h3>EdgeRouter</h3>
+        <div class="aka">主力独立路由器</div>
+        <p><strong>orthogonal · octilinear · curved · bus</strong></p>
+        <p class="note">节点冻结；增量重路由；可模仿 Hier/Ortho 的 monotonic 约束</p>
+      </article>
+      <article class="card">
+        <h3>OrganicEdgeRouter</h3>
+        <div class="aka">有机曲线</div>
+        <p><strong>smooth curves around nodes</strong></p>
+        <p class="note">绕节点平滑曲线；避重叠、减交叉</p>
+      </article>
+      <article class="card">
+        <h3>ParallelEdgeRouter</h3>
+        <div class="aka">多边错开</div>
+        <p><strong>parallel multi-edges</strong></p>
+        <p class="note">同对端点多边均匀错开</p>
+      </article>
+      <article class="card">
+        <h3>SelfLoopRouter</h3>
+        <div class="aka">自环</div>
+        <p><strong>loops</strong></p>
+        <p class="note">自环尺寸与曲率可配</p>
+      </article>
+      <article class="card">
+        <h3>BundledEdgeRouter</h3>
+        <div class="aka">边捆绑</div>
+        <p><strong>edge bundles</strong></p>
+        <p class="note">共享束降低 clutter、强调主流</p>
+      </article>
+      <article class="card">
+        <h3>StraightLineEdgeRouter</h3>
+        <div class="aka">直线复位</div>
+        <p><strong>straight</strong></p>
+        <p class="note">最简：端点直连</p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>如何选（产品视角）</h2>
+    <div class="grid" style="margin-top:14px">
+      <div class="card pick">
+        <h3>有主方向 / 流程</h3>
+        <p>优先 Hierarchical（正交默认）。结构化单源单汇可试 Series-Parallel。需要泳道 / group 时 Hier 原生支持最强。</p>
+      </div>
+      <div class="card pick">
+        <h3>无方向网络</h3>
+        <p>Organic 看簇与对称；要正交外观则 Organic 放置 + EdgeRouter。Circular / Radial 强调环与中心外围。</p>
+      </div>
+      <div class="card pick">
+        <h3>严格树</h3>
+        <p>TreeLayout（正交/折线 placer）或 RadialTreeLayout（气球）。非树边先剥离或改 Hier/Organic。</p>
+      </div>
+      <div class="card pick">
+        <h3>已有节点坐标</h3>
+        <p>只用 EdgeRouter / OrganicEdgeRouter / Bundled… 增量 Scope 可只重路由新增边，保 mental map。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="callout neutral">
+      <strong>对 plotgram 的映射提示</strong>
+      轻量子集：Hier ≈ Atlas 三相（组合→度量→Ink）；Tree / Sequence / Circular 为其它内核；
+      独立正交 OVG 已删，Hier 正交真源是 Channel Ink。yFiles 的「Layout 内建多种 routing style +
+      可后接 Router」双模式，对应产品上的 profile：内建路由 vs 节点冻结后的独立路由——不必复刻全表，
+      但选算法时先问主方向与边几何自由度写者。
+    </div>
+  </section>
+
+  <footer>
+    延伸阅读：
+    <a href="https://docs.yfiles.com/yfiles-html/dguide/automatic-layouts-main-chapter/">Automatic Layouts</a> ·
+    <a href="https://docs.yfiles.com/yfiles-html/dguide/hierarchical_layout/">Hierarchical</a> ·
+    <a href="https://docs.yfiles.com/yfiles-html/dguide/polyline_router/">Edge Routing</a> ·
+    仓库 <a href="../../AGENTS.md">AGENTS.md §1</a> ·
+    <a href="../总结经验/yFiles第一性原理与写权纪律-2026-07.md">写权纪律</a> ·
+    <a href="layouts-and-routing.md">本页 Markdown</a>
+  </footer>
+</div>
+</body>
+</html>
