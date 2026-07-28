@@ -107,7 +107,7 @@ raise product: …原因…；残余: product.foo
 raise stress (expected): …探针可接受…；残余: stress.layout-stress-nested
 ```
 
-## 与创新模式对齐（`AGENTS.md` §7）
+## 与创新模式对齐（`AGENTS.md` §7；设计尺子见 §1）
 
 | 模式 | product-gate | stress-probe |
 |------|--------------|--------------|

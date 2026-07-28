@@ -5,6 +5,7 @@
 pub mod channel;
 pub mod channel_metric;
 pub mod dialect;
+pub mod group_invariant;
 pub mod ink;
 pub mod ink_verify;
 pub mod pipeline;

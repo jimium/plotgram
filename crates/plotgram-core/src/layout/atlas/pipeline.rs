@@ -307,6 +307,8 @@ impl<'a> AtlasPipeline<'a> {
             crate::layout::orientation::apply_layout_orientation(&mut result);
             crate::perf_log!("[atlas] orientation: left-to-right axis transpose");
         }
+        // GroupInvariantPass：containment + sibling separation 校验/修复
+        super::group_invariant::enforce_group_invariants(&mut result, self.diagram);
         canvas_finalize::finalize_canvas_bounds(&mut result, constants::DEFAULT_PADDING);
         let write_thresh = match self.diagram.diagram_type {
             crate::types::DiagramType::Architecture => 1,
