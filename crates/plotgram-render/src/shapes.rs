@@ -250,9 +250,17 @@ pub(crate) fn is_paintable(fill: &str) -> bool {
 }
 
 /// Stable pattern id derived from the fill color.
+///
+/// The alphanumeric prefix keeps ids readable, but it is lossy
+/// (`rgb(10,20,30)` and `rgb(102,0,30)` clean to the same key), so a hash
+/// of the full fill string is appended to make the id collision-free.
 pub(crate) fn hatch_pattern_id(fill: &str) -> String {
-    let key: String = fill.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
-    format!("hatch-{key}")
+    let key: String = fill
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .take(12)
+        .collect();
+    format!("hatch-{key}-{:x}", util::hash_id(fill, 17))
 }
 
 /// Diagonal hatch pattern def for a fill color.
@@ -281,4 +289,29 @@ fn extra_attrs(style: &ResolvedNodeStyle) -> String {
         attrs.push(format!(r#"stroke-opacity="{op:.2}""#));
     }
     attrs.join(" ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hatch_pattern_id_is_stable_and_collision_free() {
+        // (fill_a, fill_b, must_differ): pairs whose alphanumeric cleanup
+        // collides must still get distinct ids; identical fills must not.
+        let cases = [
+            ("rgb(10,20,30)", "rgb(102,0,30)", true),
+            ("#ABC", "#AB C", true),
+            ("rgb(10,20,30)", "rgb(10,20,30)", false),
+            ("#E3F2FD", "#E3F2FD", false),
+        ];
+        for (a, b, must_differ) in cases {
+            let (ia, ib) = (hatch_pattern_id(a), hatch_pattern_id(b));
+            if must_differ {
+                assert_ne!(ia, ib, "{a:?} vs {b:?} must get distinct pattern ids");
+            } else {
+                assert_eq!(ia, ib, "{a:?} must yield a stable pattern id");
+            }
+        }
+    }
 }

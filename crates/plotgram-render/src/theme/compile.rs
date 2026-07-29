@@ -243,14 +243,13 @@ fn compile_defaults(file: &ThemeFile, tokens: &BTreeMap<String, String>) -> Comp
         radius: get_f64(&d.group, "radius", tokens).unwrap_or(10.0),
         stroke_dasharray: get_resolved(&d.group, "stroke_dasharray", tokens)
             .filter(|s| s != "none"),
+        fill_opacity: get_f64(&d.group, "fill_opacity", tokens),
     };
 
     let typography = Typography {
-        font_family: get_resolved(&file.tokens.typography.iter().map(|(k, v)| (k.clone(), v.clone())).collect(), "font_family", tokens)
+        font_family: get_resolved(&file.tokens.typography, "font_family", tokens)
             .unwrap_or_else(|| "sans-serif".to_string()),
-        title_size: title_font_size,
-        label_size: get_f64(&file.tokens.typography.iter().map(|(k, v)| (k.clone(), v.clone())).collect(), "label_size", tokens).unwrap_or(17.0),
-        small_size: get_f64(&file.tokens.typography.iter().map(|(k, v)| (k.clone(), v.clone())).collect(), "small_size", tokens).unwrap_or(14.0),
+        small_size: get_f64(&file.tokens.typography, "small_size", tokens).unwrap_or(14.0),
     };
 
     CompiledDefaults {

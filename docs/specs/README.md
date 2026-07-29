@@ -1,15 +1,29 @@
-# Plotgram 语言规范
+# Plotgram 规范目录
 
-> 此目录存放 Plotgram 语言的设计规范文档。
+> 本目录存放 Plotgram 的**现行**语言与契约规范。重建期（v2）以标「现行」的文档为准。
 
-## 文档索引
+## 现行
 
-| 文档 | 内容 |
+| 文档 | 内容 | 真源范围 |
+|------|------|----------|
+| [dsl-spec.md](dsl-spec.md) | DSL 2.4 — 语法形态（node / group / edge `{}` + 糖）+ **§14 属性注册表** | **语法 + 语义属性** |
+| [archetype-spec.md](archetype-spec.md) | Archetype 展开糖 — CSV 真源、只填空、编译进二进制 | **archetype 目录 / 展开** |
+| [style-sheet-spec.md](style-sheet-spec.md) | Theme 2.4 — 视觉属性词表 + 主题 JSON（`variants`）+ cascade | **视觉属性 / 主题** |
+
+三者互不重叠：一个属性只在一处被定义，跨文档只引用、不复制表格（见 dsl-spec §14.10）。
+
+CSV 真源：`crates/plotgram-model/assets/archetypes.csv`。
+
+## v1 遗留（待重写，不驱动 v2 实现）
+
+| 文档 | 状态 |
 |------|------|
-| [language-spec.md](language-spec.md) | 语言语法与语义规范 — 完整的 BNF 语法、标识符规则、entity/relation/group 语义约束 |
-| [visual-language/](visual-language/README.md) | 视觉语言标准 — 六种图表类型的定位、适用场景、实体 type 与视觉约定 |
-| [visual-language/entity-types.md](visual-language/entity-types.md) | 实体 type 标准 — 跨图表语义、别名归一化、适用矩阵与选型速查 |
-| [ast-spec.md](ast-spec.md) | AST 数据结构定义 — Rust 结构体、JSON 序列化格式、Diff/Patch 操作规范 |
-| [export-scene-spec.md](export-scene-spec.md) | Exporter Scene JSON 规范 — 对外导出契约、字段 schema、兼容性与完整示例 |
-| [error-model.md](error-model.md) | 错误模型与反馈机制设计 — 结构化错误码体系、Fix Action、LSP 兼容映射 |
-| [style-sheet-spec.md](style-sheet-spec.md) | Theme / StyleSheet V2 — 扁平 tokens + defaults + kind_styles |
+| [ast-spec.md](ast-spec.md) | 0.1.0-draft；描述 v1 AST，与 `plotgram-model` 的 `Graph` / `LayoutContract` 不对齐 |
+| [export-scene-spec.md](export-scene-spec.md) | 0.1.0-draft；基于 v1 `PreparedDiagram` / Exporter 分层 |
+| [error-model.md](error-model.md) | 0.1.0；实现引用已不存在的 `crates/plotgram-core` |
+
+## 相关
+
+- [../design/](../design/) — 现行设计与 ADR（写权纪律、model boundary、图名不进引擎）
+- [../reference/](../reference/) — yFiles / graphviz / cytoscape 能力参考
+- [../archive/](../archive/) — 历史设计（只读）

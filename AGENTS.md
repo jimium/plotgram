@@ -27,9 +27,10 @@ plotgram 由 yFiles 经验孵化：轻量 DSL 画图引擎。设计布局与边�
 ## 3. 读什么
 
 1. [`docs/design/`](docs/design/) — 现行设计与 ADR  
-2. [`docs/specs/dsl/dsl-spec.md`](docs/specs/dsl/dsl-spec.md) — DSL 2.0 语法契约  
-3. [`docs/reference/yFiles-layouts-and-routing.md`](docs/reference/yFiles-layouts-and-routing.md) — yFiles 产品能力参考  
-4. [`docs/archive/`](docs/archive/) — 历史设计（**只读**，不驱动实现）
+2. [`docs/specs/dsl/dsl-spec.md`](docs/specs/dsl/dsl-spec.md) — DSL 语法契约 + 属性注册表（§14）；[`archetype-spec.md`](docs/specs/archetype-spec.md) — archetype / CSV
+3. [`docs/specs/style-sheet-spec.md`](docs/specs/style-sheet-spec.md) — 主题与视觉词表
+4. [`docs/reference/yFiles-layouts-and-routing.md`](docs/reference/yFiles-layouts-and-routing.md) — yFiles 产品能力参考
+5. [`docs/archive/`](docs/archive/) — 历史设计（**只读**，不驱动实现）
 
 ## 4. 单元测试
 

@@ -110,6 +110,32 @@ impl Graph {
     pub fn edge_count(&self) -> usize {
         self.edges.len() + self.groups.iter().map(|g| g.edge_count()).sum::<usize>()
     }
+
+    /// Look up a node by id (top-level first, then groups in declaration order).
+    pub fn find_node(&self, id: &str) -> Option<&Node> {
+        if let Some(n) = self.nodes.iter().find(|n| n.id == id) {
+            return Some(n);
+        }
+        for g in &self.groups {
+            if let Some(n) = g.find_node(id) {
+                return Some(n);
+            }
+        }
+        None
+    }
+
+    /// Look up an edge by id (top-level first, then groups in declaration order).
+    pub fn find_edge(&self, id: &str) -> Option<&Edge> {
+        if let Some(e) = self.edges.iter().find(|e| e.id == id) {
+            return Some(e);
+        }
+        for g in &self.groups {
+            if let Some(e) = g.find_edge(id) {
+                return Some(e);
+            }
+        }
+        None
+    }
 }
 
 impl Default for Graph {
@@ -127,5 +153,104 @@ impl Group {
     /// Recursive edge count within this group.
     pub fn edge_count(&self) -> usize {
         self.edges.len() + self.groups.iter().map(|g| g.edge_count()).sum::<usize>()
+    }
+
+    /// Look up a node by id within this group subtree.
+    pub fn find_node(&self, id: &str) -> Option<&Node> {
+        if let Some(n) = self.nodes.iter().find(|n| n.id == id) {
+            return Some(n);
+        }
+        for g in &self.groups {
+            if let Some(n) = g.find_node(id) {
+                return Some(n);
+            }
+        }
+        None
+    }
+
+    /// Look up an edge by id within this group subtree.
+    pub fn find_edge(&self, id: &str) -> Option<&Edge> {
+        if let Some(e) = self.edges.iter().find(|e| e.id == id) {
+            return Some(e);
+        }
+        for g in &self.groups {
+            if let Some(e) = g.find_edge(id) {
+                return Some(e);
+            }
+        }
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn node(id: &str) -> Node {
+        Node {
+            id: id.to_string(),
+            label: Some(id.to_string()),
+            shape: None,
+            attrs: AttrMap::new(),
+        }
+    }
+
+    fn edge(id: &str, arrow: Arrow) -> Edge {
+        Edge {
+            id: id.to_string(),
+            source: "a".to_string(),
+            target: "b".to_string(),
+            arrow,
+            label: None,
+            head_label: None,
+            tail_label: None,
+            attrs: AttrMap::new(),
+        }
+    }
+
+    #[test]
+    fn find_node_and_edge_recurse_into_nested_groups() {
+        let cases = [
+            ("top_node", true, false),
+            ("inner_node", true, false),
+            ("deep_node", true, false),
+            ("missing", false, false),
+            ("top_edge", false, true),
+            ("inner_edge", false, true),
+            ("deep_edge", false, true),
+        ];
+
+        let graph = Graph {
+            nodes: vec![node("top_node")],
+            edges: vec![edge("top_edge", Arrow::Forward)],
+            groups: vec![Group {
+                id: "g1".to_string(),
+                label: "G1".to_string(),
+                attrs: AttrMap::new(),
+                nodes: vec![node("inner_node")],
+                edges: vec![edge("inner_edge", Arrow::Response)],
+                groups: vec![Group {
+                    id: "g2".to_string(),
+                    label: "G2".to_string(),
+                    attrs: AttrMap::new(),
+                    nodes: vec![node("deep_node")],
+                    edges: vec![edge("deep_edge", Arrow::Bidirectional)],
+                    groups: vec![],
+                }],
+            }],
+        };
+
+        for (id, want_node, want_edge) in cases {
+            assert_eq!(graph.find_node(id).is_some(), want_node, "find_node({id})");
+            assert_eq!(graph.find_edge(id).is_some(), want_edge, "find_edge({id})");
+        }
+        assert_eq!(
+            graph.find_edge("inner_edge").map(|e| e.arrow),
+            Some(Arrow::Response)
+        );
+        assert_eq!(
+            graph.find_edge("deep_edge").map(|e| e.arrow),
+            Some(Arrow::Bidirectional)
+        );
     }
 }

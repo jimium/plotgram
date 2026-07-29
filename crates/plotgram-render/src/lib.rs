@@ -36,12 +36,6 @@ pub fn render_svg(input: &RenderInput) -> String {
 
     let mut svg = SvgBuilder::new(input.layout.canvas_width, input.layout.canvas_height);
 
-    // Shared defs (arrow markers; empty when arrow_style is "none")
-    let marker_defs = edges::arrow_marker_defs(&theme);
-    if !marker_defs.is_empty() {
-        svg.add_def(marker_defs);
-    }
-
     // Canvas background
     svg.canvas_bg(&theme);
 
@@ -89,10 +83,6 @@ impl SvgBuilder {
             def_keys: std::collections::BTreeSet::new(),
             body: Vec::new(),
         }
-    }
-
-    pub fn add_def(&mut self, def: String) {
-        self.defs.push(def);
     }
 
     /// Add a def keyed by id substring (e.g. hatch pattern id), skipping duplicates.
@@ -202,16 +192,59 @@ mod tests {
     }
 
     #[test]
+    fn render_is_deterministic() {
+        use plotgram_model::attr::AttrValue;
+
+        // Sketch mode exercises the nondeterminism-prone paths: per-id jitter
+        // seeds, hatch pattern defs, and the def dedup set.
+        let mut input = minimal_input();
+        input.meta.render_style = Some("sketch".to_string());
+        input.graph.nodes[0]
+            .attrs
+            .insert("style.fill".to_string(), AttrValue::Str("#E3F2FD".to_string()));
+        input.graph.nodes[1]
+            .attrs
+            .insert("style.fill".to_string(), AttrValue::Str("#FFF3E0".to_string()));
+
+        let first_svg = render_svg(&input);
+        let first_ascii = render_ascii(&input);
+        for _ in 0..2 {
+            assert_eq!(render_svg(&input), first_svg, "render_svg must be byte-identical");
+            assert_eq!(render_ascii(&input), first_ascii, "render_ascii must be byte-identical");
+        }
+    }
+
+    #[test]
+    fn add_def_once_keeps_first_def_per_id() {
+        let mut svg = SvgBuilder::new(100.0, 100.0);
+        svg.add_def_once(r#"<pattern id="p1" data="first"/>"#.to_string());
+        svg.add_def_once(r#"<pattern id="p1" data="second"/>"#.to_string());
+        svg.add_def_once(r#"<pattern id="p2"/>"#.to_string());
+        // No id attribute: dedup falls back to the full string
+        svg.add_def_once("<filter x=\"0\"/>".to_string());
+        svg.add_def_once("<filter x=\"0\"/>".to_string());
+        let out = svg.finish();
+        assert!(out.contains(r#"data="first""#), "first def per id wins:\n{out}");
+        assert!(!out.contains(r#"data="second""#), "same id must not be emitted twice:\n{out}");
+        assert!(out.contains(r#"id="p2""#), "distinct ids all emitted:\n{out}");
+        assert_eq!(
+            out.matches("<filter").count(),
+            1,
+            "id-less defs dedup by full string:\n{out}"
+        );
+    }
+
+    #[test]
     fn arrow_marker_def_is_emitted_and_referenced() {
         let svg = render_svg(&minimal_input());
         // Marker definition present in <defs>
         assert!(
-            svg.contains(r#"<marker id="arrow-head""#),
+            svg.contains(r#"<marker id="arrow-head-normal-"#),
             "missing arrow marker def in SVG:\n{svg}"
         );
         // Edge references the marker
         assert!(
-            svg.contains(r##"marker-end="url(#arrow-head)""##),
+            svg.contains(r##"marker-end="url(#arrow-head-normal-"##),
             "missing marker-end reference in SVG:\n{svg}"
         );
     }
@@ -230,7 +263,7 @@ mod tests {
         input.graph.edges[0].arrow = Arrow::Bidirectional;
         let svg = render_svg(&input);
         assert!(
-            svg.contains(r##"marker-start="url(#arrow-head)""##),
+            svg.contains(r##"marker-start="url(#arrow-head-"##),
             "bidirectional edge should have marker-start:\n{svg}"
         );
 
@@ -248,6 +281,65 @@ mod tests {
         assert!(
             !svg.contains("<marker") && !svg.contains("marker-end"),
             "arrow_style none should suppress markers:\n{svg}"
+        );
+    }
+
+    #[test]
+    fn per_edge_arrow_color_and_style_overrides() {
+        use plotgram_model::attr::AttrValue;
+
+        // Inline style.stroke: arrow head follows the edge color
+        let mut input = minimal_input();
+        input.graph.edges[0].attrs.insert(
+            "style.stroke".to_string(),
+            AttrValue::Str("#C62828".to_string()),
+        );
+        let svg = render_svg(&input);
+        assert!(
+            svg.contains(r##"points="0 0, 10 3.5, 0 7" fill="#C62828""##),
+            "marker fill should follow inline stroke:\n{svg}"
+        );
+
+        // Two edges, one overridden: two distinct marker defs, each referenced
+        let mut input = minimal_input();
+        input.graph.edges.push(Edge {
+            id: "e2".to_string(),
+            source: "b".to_string(),
+            target: "a".to_string(),
+            arrow: Arrow::Forward,
+            label: None,
+            head_label: None,
+            tail_label: None,
+            attrs: {
+                let mut a = AttrMap::new();
+                a.insert(
+                    "style.stroke".to_string(),
+                    AttrValue::Str("#C62828".to_string()),
+                );
+                a
+            },
+        });
+        input.layout.edges.push(EdgePlacement {
+            id: "e2".to_string(),
+            source: "b".to_string(),
+            target: "a".to_string(),
+            path: EdgePath {
+                points: vec![Point { x: 60.0, y: 110.0 }, Point { x: 60.0, y: 50.0 }],
+            },
+        });
+        let svg = render_svg(&input);
+        assert_eq!(svg.matches("<marker").count(), 2, "one def per color:\n{svg}");
+
+        // Per-edge arrow_style: none suppresses this edge's markers only
+        input.graph.edges[1]
+            .attrs
+            .insert("style.arrow_style".to_string(), AttrValue::Atom("none".to_string()));
+        let svg = render_svg(&input);
+        assert_eq!(svg.matches("<marker").count(), 1, "only e1's marker remains:\n{svg}");
+        assert_eq!(
+            svg.matches("marker-end").count(),
+            1,
+            "e2 must not reference a marker:\n{svg}"
         );
     }
 
@@ -293,6 +385,18 @@ mod tests {
             svg.contains("<g transform=\"translate("),
             "kind=queue node label should include an icon glyph:\n{svg}"
         );
+
+        // Degrade: icon + label wider than the frame → icon dropped, text kept
+        input.layout.labels[0].frame = Rect::new(10.0, 10.0, 24.0, 40.0);
+        let svg = render_svg(&input);
+        assert!(
+            !svg.contains("<g transform=\"translate("),
+            "icon must be dropped when it cannot fit the frame:\n{svg}"
+        );
+        assert!(
+            svg.contains(r#"text-anchor="middle""#) && svg.contains(">a</text>"),
+            "label text must survive the icon degrade:\n{svg}"
+        );
     }
 
     #[test]
@@ -319,6 +423,7 @@ mod tests {
                     "style.fill".to_string(),
                     AttrValue::Str("#FFE0B2".to_string()),
                 );
+                a.insert("style.fill_opacity".to_string(), AttrValue::Num(0.4));
                 a
             },
             nodes: vec![],
@@ -343,14 +448,32 @@ mod tests {
             svg.contains("fill=\"#FFE0B2\""),
             "group style.fill should appear:\n{svg}"
         );
+        assert!(
+            svg.contains(r#"fill-opacity="0.40""#),
+            "group style.fill_opacity should appear:\n{svg}"
+        );
+
+        // Theme defaults.group.fill_opacity (blueprint = 0.5)
+        input.meta.theme = Some("common.blueprint".to_string());
+        input.graph.groups[0].attrs.remove("style.fill_opacity");
+        let svg = render_svg(&input);
+        assert!(
+            svg.contains(r#"fill-opacity="0.50""#),
+            "blueprint group fill_opacity should appear:\n{svg}"
+        );
     }
 
     #[test]
     fn edge_label_bg_and_title_not_drawn() {
+        use plotgram_model::attr::AttrValue;
         use plotgram_model::result::{LabelOwner, LabelSlot};
 
         let mut input = minimal_input();
         input.meta.title = Some("Demo Title".to_string());
+        input.graph.edges[0].attrs.insert(
+            "style.text_fill".to_string(),
+            AttrValue::Str("#AB1234".to_string()),
+        );
         input.layout.labels.push(LabelSlot {
             owner: LabelOwner::Edge("e1".to_string()),
             role: Some("mid".to_string()),
@@ -367,6 +490,10 @@ mod tests {
         assert!(
             svg.contains(r##"rx="2" fill="#F7F7F8" fill-opacity="1.00""##),
             "edge label should get a canvas-colored label_bg rect:\n{svg}"
+        );
+        assert!(
+            svg.contains("fill=\"#AB1234\""),
+            "edge style.text_fill should color the label:\n{svg}"
         );
         insta::assert_snapshot!("edge_label_svg", svg);
     }

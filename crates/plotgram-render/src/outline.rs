@@ -229,3 +229,68 @@ pub fn closed_path_d(points: &[Point]) -> String {
     d.push_str(" Z");
     d
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use plotgram_model::attr::AttrMap;
+    use plotgram_model::graph::Node;
+
+    #[test]
+    fn sampled_outlines_are_dense_finite_and_bounded() {
+        let theme = crate::theme::load(None);
+        let style = crate::resolve::resolve_node(
+            &Node {
+                id: "n".to_string(),
+                label: None,
+                shape: None,
+                attrs: AttrMap::new(),
+            },
+            &theme,
+        );
+        let frame = Rect::new(100.0, 50.0, 120.0, 60.0);
+
+        // (shape, subpath count, allowed overshoot beyond frame in px).
+        // Cloud bulges past its frame by design (r_mod peaks at ~1.34);
+        // every other shape must stay inside. This is the safety net against
+        // sketch-vs-standard geometry drift (the hexagon lesson).
+        let cases = [
+            ("rect", 1, 0.5),
+            ("rounded_rect", 1, 0.5),
+            ("stadium", 1, 0.5),
+            ("circle", 1, 0.5),
+            ("diamond", 1, 0.5),
+            ("hexagon", 1, 0.5),
+            ("parallelogram", 1, 0.5),
+            ("person", 2, 0.5),
+            ("cylinder", 2, 0.5),
+            ("document", 1, 0.5),
+            ("cloud", 1, 45.0),
+            ("subprocess", 2, 0.5),
+        ];
+        for (shape, subpaths, overshoot) in cases {
+            let outlines = shape_outlines(shape, &frame, &style);
+            assert_eq!(outlines.len(), subpaths, "{shape}: subpath count");
+            for (pts, _) in &outlines {
+                assert!(pts.len() >= 8, "{shape}: sampling too sparse ({} pts)", pts.len());
+                for p in pts {
+                    assert!(p.x.is_finite() && p.y.is_finite(), "{shape}: NaN/inf point");
+                    assert!(
+                        p.x >= frame.x - overshoot
+                            && p.x <= frame.x + frame.width + overshoot
+                            && p.y >= frame.y - overshoot
+                            && p.y <= frame.y + frame.height + overshoot,
+                        "{shape}: point ({:.1}, {:.1}) escapes frame",
+                        p.x,
+                        p.y
+                    );
+                }
+            }
+        }
+
+        // Subprocess inner frame is a stroke-only accent: repainting fill
+        // there would cover the hatch pattern in sketch mode.
+        let sp = shape_outlines("subprocess", &frame, &style);
+        assert_eq!(sp[1].1.as_deref(), Some("none"));
+    }
+}

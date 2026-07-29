@@ -1,0 +1,14 @@
+id,shape,variant,icon,note
+database,cylinder,info,,generic store; cylinder skips DB-family icons — use sugar icon + shape override if needed
+cache,rounded_rect,info,cache,
+queue,rounded_rect,info,queue,
+storage,rounded_rect,info,storage,
+gateway,diamond,primary,gateway,
+external,rounded_rect,muted,external,third-party or out-of-scope
+service,rounded_rect,primary,,generic service without icon
+client,rounded_rect,secondary,browser,
+decision,diamond,default,,flowchart decision
+start,circle,default,,flowchart start
+end,stadium,default,,flowchart end
+actor,person,secondary,user,
+root,circle,primary,,mindmap center

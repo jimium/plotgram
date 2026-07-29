@@ -75,14 +75,13 @@ pub struct GroupDefaults {
     pub text_fill: String,
     pub radius: f64,
     pub stroke_dasharray: Option<String>,
+    pub fill_opacity: Option<f64>,
 }
 
 /// Typography tokens.
 #[derive(Debug, Clone)]
 pub struct Typography {
     pub font_family: String,
-    pub title_size: f64,
-    pub label_size: f64,
     pub small_size: f64,
 }
 
@@ -146,5 +145,42 @@ fn embedded_theme(id: &str) -> Option<&'static str> {
         "mindmap.ink-dark" => Some(include_str!("themes/mindmap.ink-dark.json")),
         "mindmap.vivid-branches" => Some(include_str!("themes/mindmap.vivid-branches.json")),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn all_builtin_themes_compile_with_sane_defaults() {
+        // Theme JSONs are edited by hand: this catches broken token refs,
+        // id/registry drift, and missing defaults at test time, not render time.
+        for &id in BUILTIN_THEME_IDS {
+            let t = load(Some(id));
+            assert_eq!(t.id, id, "embedded JSON id must match registry id");
+            assert!(!t.defaults.canvas_background.is_empty(), "{id}: canvas background");
+            assert!(!t.defaults.node.fill.is_empty(), "{id}: node fill");
+            assert!(!t.defaults.node.text_fill.is_empty(), "{id}: node text_fill");
+            assert!(t.defaults.node.stroke_width > 0.0, "{id}: node stroke_width");
+            assert!(t.defaults.node.font_size > 0.0, "{id}: node font_size");
+            assert!(t.defaults.edge.font_size > 0.0, "{id}: edge font_size");
+            assert!(!t.defaults.edge.response_dasharray.is_empty(), "{id}: response dasharray");
+            // Unresolved token refs would leak braces into SVG attributes
+            for (kind, ks) in &t.kind_styles {
+                assert!(
+                    !ks.fill.contains('{') && !ks.stroke.contains('{'),
+                    "{id}/{kind}: unresolved token reference: fill={} stroke={}",
+                    ks.fill,
+                    ks.stroke
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn unknown_theme_falls_back_to_clean_light() {
+        assert_eq!(load(Some("no.such.theme")).id, "common.clean-light");
+        assert_eq!(load(None).id, "common.clean-light");
     }
 }

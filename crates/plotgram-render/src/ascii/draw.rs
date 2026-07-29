@@ -41,45 +41,50 @@ pub(super) fn clean_label(label: &str) -> String {
         .collect()
 }
 
+/// Box-drawing glyph set for [`draw_box`].
+pub(super) struct BoxChars {
+    pub tl: char,
+    pub tr: char,
+    pub bl: char,
+    pub br: char,
+    pub v: char,
+    pub h: char,
+}
+
 pub(super) fn draw_box(
     canvas: &mut DisplayCanvas,
     x: usize,
     y: usize,
     w: usize,
     h: usize,
-    tl: char,
-    tr: char,
-    bl: char,
-    br: char,
-    v: char,
-    h_ch: char,
+    chars: &BoxChars,
 ) {
     if w == 0 || h == 0 {
         return;
     }
 
-    canvas.set_char(x, y, tl);
+    canvas.set_char(x, y, chars.tl);
     for i in 1..w.saturating_sub(1) {
-        canvas.set_char(x + i, y, h_ch);
+        canvas.set_char(x + i, y, chars.h);
     }
     if w > 1 {
-        canvas.set_char(x + w - 1, y, tr);
+        canvas.set_char(x + w - 1, y, chars.tr);
     }
 
     if h > 1 {
-        canvas.set_char(x, y + h - 1, bl);
+        canvas.set_char(x, y + h - 1, chars.bl);
         for i in 1..w.saturating_sub(1) {
-            canvas.set_char(x + i, y + h - 1, h_ch);
+            canvas.set_char(x + i, y + h - 1, chars.h);
         }
         if w > 1 {
-            canvas.set_char(x + w - 1, y + h - 1, br);
+            canvas.set_char(x + w - 1, y + h - 1, chars.br);
         }
     }
 
     for j in 1..h.saturating_sub(1) {
-        canvas.set_char(x, y + j, v);
+        canvas.set_char(x, y + j, chars.v);
         if w > 1 {
-            canvas.set_char(x + w - 1, y + j, v);
+            canvas.set_char(x + w - 1, y + j, chars.v);
         }
     }
 }
@@ -102,7 +107,9 @@ pub(super) fn draw_edge_route(
         let (x1, y1) = points[n - 2];
         let (x2, y2) = points[n - 1];
         if let Some((ax, ay, ch)) = arrow_before_end(x1, y1, x2, y2) {
-            if !canvas.is_interior(ax, ay, node_rects) {
+            if !canvas.is_interior(ax, ay, node_rects)
+                && !is_on_rect_boundary(ax, ay, node_rects)
+            {
                 canvas.set_char(ax, ay, ch);
             }
         }
@@ -111,7 +118,9 @@ pub(super) fn draw_edge_route(
             let (x0, y0) = points[0];
             let (bx, by) = points[1];
             if let Some((ax, ay, ch)) = arrow_before_end(bx, by, x0, y0) {
-                if !canvas.is_interior(ax, ay, node_rects) {
+                if !canvas.is_interior(ax, ay, node_rects)
+                    && !is_on_rect_boundary(ax, ay, node_rects)
+                {
                     canvas.set_char(ax, ay, ch);
                 }
             }

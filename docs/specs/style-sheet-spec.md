@@ -1,44 +1,58 @@
 # Plotgram Theme（StyleSheet）规范
 
-> 版本：2.0 | 状态：现行（以 `plotgram-render` 实现为准）
+> 版本：2.4 | 状态：现行（规范已定；实现仍漂移，见 §6.4）
 >
-> 取代此前 v0.2-draft 的「三层 cascade + `diagrams.*`」草案。图种差异不进主题（ADR-001）。
+> 取代 v0.2-draft 的「三层 cascade + `diagrams.*`」草案。图种差异不进主题（ADR-001）。  
+> 2.2：`kind` / `kind_styles` → `**variant` / `variants**`（与 `shape` / `icon` 正交）  
+> 2.4：统一 compile / resolve 叙述；**node / group / edge** 共用 `variants`；对齐 dsl-spec 2.4
 
-本文档定义 Plotgram 主题 JSON 的结构与解析语义。实现入口：
+本文档定义两件事，且**只**定义这两件事：
 
-- 主题加载 / 编译：`crates/plotgram-render/src/theme/`
-- 样式 cascade：`crates/plotgram-render/src/resolve.rs`
-- DSL 内联样式：见 [dsl-spec.md](dsl/dsl-spec.md) `style.*`
+**视觉属性词表**（§5）—— 名字、值类型、适用元素、是否可内联。视觉属性的**单一真源**。
+
+1. **主题 JSON 结构与解析语义** —— tokens / defaults / variants / extends / cascade。
+
+DSL 语法与语义属性登记见 [dsl-spec.md](dsl-spec.md)（§5–§7 / §14）；archetype 见 [archetype-spec.md](archetype-spec.md)。DSL 只引用 §5 词表，不另立键名清单。
+
+实现入口：`crates/plotgram-render/src/theme/`（编译）、`resolve.rs`（cascade）。
 
 ---
 
 ## 1. 设计原则
 
-| 原则 | 说明 |
-|------|------|
-| 扁平主题 | 顶层只有 `tokens` / `defaults` / `kind_styles`；**无** `diagrams` 段 |
-| Theme = 颜料 | 颜色、字体、线宽、圆角、默认 shape |
-| `render_style` = 笔触 | `standard` / `sketch` 等，写在 diagram 属性，**不**写入主题 JSON |
-| kind 驱动视觉差 | 同一主题下用 `kind_styles[kind]` 区分节点外观；不用图种命名空间 |
-| 内联最高优 | DSL `style.*` 覆盖主题默认与 kind 样式 |
+
+| 原则                  | 说明                                                                |
+| ------------------- | ----------------------------------------------------------------- |
+| 扁平主题                | 顶层只有 `tokens` / `defaults` / `variants`；**无** `diagrams` 段        |
+| Theme = 颜料          | 颜色、字体、线宽、圆角、**全局**默认 shape                                        |
+| `render_style` = 笔触 | `standard` / `sketch` 等；写在 diagram 属性，**不**进主题 JSON               |
+| variant 驱动视觉差       | node / group / edge 共用 `variants` 表区分语义色；**不含** per-variant shape |
+| 三轴正交（node）          | `shape` × `variant` × `icon`；见 [dsl-spec.md](dsl-spec.md) §14.3   |
+| 内联最高优               | DSL `style.*` 覆盖主题与 variant 颜料                                    |
+
 
 ### 非目标
 
-- 在主题 JSON 中描述手绘抖动 / hatch（属 `render_style`）
-- 按 `DiagramType` 分支的主题段（违反 ADR-001）
-- 实例级 structural / context palettes（`group_nest` / `branch`）— **暂缓**，待 `LayoutResult` 提供 depth / slot 索引后再设计
+- 主题 JSON 中描述手绘抖动 / hatch（属 `render_style`）
+- 按 `DiagramType` 分支的主题段（ADR-001）
+- structural / context palette（待 `LayoutResult` 索引后再设计）
+- 领域实体名（`database`…）作 variant 键
+- 主题中定义 archetype（CSV → 二进制，见 archetype-spec）
 
 ---
 
 ## 2. 术语
 
-| 术语 | 含义 | 示例 |
-|------|------|------|
-| Theme / StyleSheet | 一份扁平视觉主题 JSON | `common.clean-light` |
-| tokens | 可复用设计原料 | `colors.canvas` |
-| defaults | 全局兜底（canvas / title / node / edge / group） | `defaults.node.fill` |
-| kind_styles | 按节点 `kind` 覆盖的样式块 | `kind_styles.database` |
-| cascade | resolve 时的优先级链 | 见 §6 |
+
+| 术语                 | 含义                                            | 示例                   |
+| ------------------ | --------------------------------------------- | -------------------- |
+| Theme / StyleSheet | 扁平视觉主题 JSON                                   | `common.clean-light` |
+| tokens             | 可复用设计原料                                       | `colors.canvas`      |
+| defaults           | 全局兜底（canvas / title / node / edge / group）    | `defaults.node.fill` |
+| variants           | 按 `variant` 属性的**颜料**覆盖块（compile 期物化）         | `variants.primary`   |
+| compiled_variants  | compile 后 `defaults.node ⊕ variants[v]` 的颜料快照 | 供 resolve 读取         |
+| cascade            | compile + resolve 优先级链                        | §6                   |
+
 
 ---
 
@@ -66,186 +80,245 @@
     "edge": {},
     "group": {}
   },
-  "kind_styles": {
-    "service": {},
-    "database": {}
+  "variants": {
+    "default": {},
+    "primary": {},
+    "secondary": {},
+    "muted": {},
+    "info": {}
   }
 }
 ```
 
 ### 3.2 顶层字段
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `id` | `string` | 是 | 唯一标识，如 `common.clean-light` |
-| `name` | `string` | 是 | 显示名 |
-| `extends` | `string \| null` | 否 | 父主题 id；支持**链式**继承 |
-| `tokens` | `object` | 是 | 设计 token |
-| `defaults` | `object` | 否 | 全局兜底（缺省为空对象） |
-| `kind_styles` | `object` | 否 | kind → 样式块 |
 
-**禁止**字段：`diagrams`、`structural_palettes`、`context_palettes`、`version`（版本由本规范文档管理，不写进 JSON）。
+| 字段         | 类型              | 必填  | 说明                      |
+| ---------- | --------------- | --- | ----------------------- |
+| `id`       | `string`        | 是   | 唯一标识                    |
+| `name`     | `string`        | 是   | 显示名                     |
+| `extends`  | `string | null` | 否   | 父主题 id；链式继承             |
+| `tokens`   | `object`        | 是   | 设计 token                |
+| `defaults` | `object`        | 否   | 全局兜底                    |
+| `variants` | `object`        | 否   | variant → 颜料块；键属封闭集（§7） |
+
+
+**禁止**：`diagrams`、`structural_palettes`、`context_palettes`、`version`、`kind_styles`、`archetypes`。
 
 ### 3.3 `extends` 继承
 
-- 子主题 `extends` 父主题 id；父主题可再 `extends`（链式）。
-- Merge：对象字段 deep merge（子覆盖父）；`kind_styles` 按 kind 名 deep merge 属性。
-- Merge **不**展开 token 引用；token 在 compile 阶段统一解析。
+- 子 `extends` 父；可链式。
+- Merge：对象 deep merge（子覆盖父）；`variants` 按 variant 名 deep merge 属性。
+- Merge **不**展开 token；token 在 compile 统一解析。
 - 合并后 `id` / `name` 取子主题。
-
-实现：`theme/compile.rs` 的 `resolve_extends` + `merge_theme_files`。
 
 ---
 
 ## 4. Tokens
 
-`tokens` 通过 `{category.key}`（及 palette 的 `{palette.role.key}` / 兼容别名 `{role.role.key}`）引用。
+`tokens` 通过 `{category.key}`（及 `{palette.role.key}` / 别名 `{role.role.key}`）引用。
 
-| 组 | 用途 | 示例键 |
-|----|------|--------|
-| `colors` | 画布、文字、边、组等全局色 | `canvas`, `text`, `edge_stroke` |
-| `palette` | 按角色的 fill/stroke/text_fill | `blue.fill`, `start_green.text_fill` |
-| `typography` | 字体族、字号、字重 | `font_family`, `label_size` |
-| `strokes` | 线宽与虚线数组 | `normal`, `dashed` → `"4,3"` |
-| `radius` | 圆角 | `sm`, `md`, `lg`, `pill` |
-| `spacing` | 间距（布局可参考；render 侧主要消费视觉 token） | `node_padding_x` |
 
-### 4.1 Token 引用解析
+| 组            | 用途                         | 示例键                             |
+| ------------ | -------------------------- | ------------------------------- |
+| `colors`     | 画布、文字、边、组等                 | `canvas`, `text`, `edge_stroke` |
+| `palette`    | 按角色的 fill/stroke/text_fill | `blue.fill`                     |
+| `typography` | 字体族、字号                     | `font_family`, `label_size`     |
+| `strokes`    | 线宽与虚线                      | `normal`, `dashed`              |
+| `radius`     | 圆角                         | `sm`, `md`, `pill`              |
+| `spacing`    | 间距（布局可参考）                  | `node_padding_x`                |
 
-- 字符串值中的 `{token.path}` 在 compile 时替换为字面量。
-- 不可解析的 `{...}` **原样保留**，解析器保证前进（不死循环）。
-- `palette.<role>.*` 同时注册为 `role.<role>.*`，便于主题稿写 `{role.blue.fill}`。
+
+### 4.1 引用规则
+
+- `{token.path}` 在 compile 时替换为字面量；不可解析则**原样保留**。
+- `palette.<role>.*` 同时注册为 `role.<role>.*`。
+- token 路径里的 `role`（如 `role.blue`）是**色板角色**，与 DSL 属性 `variant` **无关**。
 
 ### 4.2 值类型
 
-JSON 中样式值可以是：
-
-- string（颜色、token 引用、shape 名、dasharray）
-- number（字号、线宽、圆角）
-- boolean
-- number 数组（如 `[4, 3]` → SVG `"4,3"`）
+string · number · boolean · number 数组（如 `[4, 3]` → SVG `"4,3"`）。
 
 ---
 
-## 5. Defaults
+## 5. 属性词表（视觉属性单一真源）
 
-| 块 | 常见字段 |
-|----|----------|
-| `canvas` | `background` |
-| `title` | `fill`, `font_size`, `font_weight` |
-| `node` | `fill`, `stroke`, `stroke_width`, `text_fill`, `font_size`, `font_weight`, `radius`, `shape`, `stroke_linecap`, `stroke_linejoin`, opacities, `stroke_dasharray` |
-| `edge` | `stroke`, `stroke_width`, `text_fill`, `font_size`, `arrow_style`（`normal` / `hollow` / `none`）, `arrow_fill`, `response_dasharray`（`-->` 回程线虚线模式，默认 `6,4`）, linecap/linejoin/opacity, `label_bg`, `label_bg_opacity` |
-| `group` | `fill`, `stroke`, `stroke_width`, `text_fill`, `radius`, `stroke_dasharray` |
+「主题块」= 可写在 `defaults.<块>`（`variants.*` 仅颜料，见 §7）；「可内联」= DSL `style.<prop>`。**两列都空则静默忽略。**
 
-`label_bg: "canvas"` 在 render 时解析为画布背景色，用于边标签衬底。
+
+| 属性                   | 值类型                          | 主题块                           | 可内联                                    |
+| -------------------- | ---------------------------- | ----------------------------- | -------------------------------------- |
+| `background`         | color                        | `canvas`                      | —                                      |
+| `fill`               | color                        | `node` `group`                | node、group                             |
+| `stroke`             | color                        | `node` `edge` `group`         | node、edge、group                        |
+| `stroke_width`       | number                       | `node` `edge` `group`         | node、edge、group                        |
+| `text_fill`          | color                        | `title` `node` `edge` `group` | node、edge、group                        |
+| `font_size`          | number                       | `title` `node` `edge`         | node、edge                              |
+| `font_weight`        | string                       | `node`                        | node                                   |
+| `radius`             | number                       | `node` `group`                | node、group                             |
+| `shape`              | atom（封闭集）                    | `node`（**仅** `defaults.node`） | **—**（DSL 用 `shape:`，见 dsl-spec §14.6） |
+| `stroke_dasharray`   | string | number[]            | `node` `group`                | node、edge、group                        |
+| `stroke_linecap`     | string                       | `node` `edge`                 | node、edge                              |
+| `stroke_linejoin`    | string                       | `node` `edge`                 | node、edge                              |
+| `fill_opacity`       | number                       | `node` `group`                | node、group                             |
+| `stroke_opacity`     | number                       | `node` `edge`                 | node、edge                              |
+| `arrow_style`        | `normal` / `hollow` / `none` | `edge`                        | edge                                   |
+| `arrow_fill`         | color                        | `edge`                        | **—**（内联 `style.stroke` 连带，§6.3）       |
+| `response_dasharray` | string | number[]            | `edge`                        | —                                      |
+| `label_bg`           | color | `"canvas"`           | `edge`                        | —                                      |
+| `label_bg_opacity`   | number                       | `edge`                        | —                                      |
+| `dashed`             | bool                         | **—**                         | node、edge、group                        |
+
+
+### 5.1 注解
+
+- `shape` 封闭集与缺省链：dsl-spec §14.6 / §14.3.2；**不得**写入 `variants.`*
+- `dashed`（仅 DSL）：`true` → `stroke_dasharray = "4,3"`，`false` → 清除 dash
+- edge 通用虚线**只能内联** `stroke_dasharray`；主题 edge 块用 `response_dasharray` 管 `-->` 默认虚线
+- `label_bg: "canvas"` 解析为画布背景色
+- `group` 无 `stroke_linecap` / `stroke_linejoin` / `stroke_opacity` / `font_size` 主题字段
+- `title.font_weight` 当前未实现
 
 ---
 
-## 6. Cascade（resolve）
-
-Render 入口收到 `RenderInput { graph, layout, meta }` 后：
+## 6. Cascade
 
 ```text
-theme = load(meta.theme)
+theme = load(meta.theme)          // compile：tokens + defaults + compiled_variants
 resolved = resolve_graph(graph, theme)
 ```
 
-### 6.1 节点
+### 6.1 Compile 期
 
 ```text
-defaults.node
-  → kind_styles[node.kind]   （若有；编译期已相对 defaults 物化）
-  → DSL `: shape`            （显式形状覆盖）
-  → node.attrs["style.*"]    （最高）
-  → icon 解析（icon: / kind 推断 + shape 兼容性）
+defaults.*     ← tokens 解析后的各块兜底
+compiled_variants[v] = defaults.node ⊕ variants[v]   // 颜料字段；禁止 shape
 ```
 
-### 6.2 边
+- `variants.default` 可为 `{}`；物化后 `compiled_variants.default` 等同 `defaults.node` 颜料。
+- 主题合并后 `variants` **必须**含 §7 五个键；缺键 → compile 报错。
 
-```text
-defaults.edge
-  → edge.attrs["style.*"]
-  → Arrow::Response 且尚无 dash → stroke_dasharray = "6,4"
-```
+### 6.2 Resolve 期（目标行为）
 
-支持的内联键：`style.stroke`, `style.stroke_width`, `style.dashed`, `style.stroke_dasharray`, `style.stroke_linecap`, `style.stroke_linejoin`, `style.stroke_opacity`。
 
-### 6.3 组
+| 元素        | 几何 / 结构链                                                      | 颜料链                                                                | 后处理                                              |
+| --------- | ------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------ |
+| **node**  | `defaults.node.shape` → profile → archetype 填空 → DSL `shape:` | `compiled_variants[v]` → `style.`*                                 | `icon:` 显式解析 + shape 兼容（**不从 variant 推断**）       |
+| **edge**  | `Edge::arrow`（语法）                                             | `defaults.edge` ⊕ `pick(compiled_variants[v], edge)` → `style.`*   | `Arrow::Response` 且无 dash → `response_dasharray` |
+| **group** | —                                                             | `defaults.group` ⊕ `pick(compiled_variants[v], group)` → `style.`* | —                                                |
 
-```text
-defaults.group
-  → group.attrs["style.*"]
-```
 
-支持：`style.fill`, `style.stroke`, `style.stroke_width`, `style.text_fill`, `style.radius`, `style.dashed`, `style.stroke_dasharray`。
+记 `v = element.variant ?? default`。`pick(…, element)` = 仅保留 §5 词表中该元素「主题块」或「可内联」列出现的属性名。
 
-### 6.4 与 DSL 的边界
+**作者须知**：`variants.`* 以 **node 颜料超集**书写。edge / group 只拾取同名兼容键；若某 variant 只写了 `fill`，边设 `variant:` 可能几乎不改变 stroke（仍走 `defaults.edge`）。
 
-- 批量主题：diagram `theme:` atom → `RenderMeta.theme`
-- 笔触：diagram `render_style:` → `RenderMeta.render_style`（非主题字段）
-- 单元素覆盖：仅内联 `style.*`（无顶层 `node_style` / `edge_style` 声明）
+**边的不对称点**（§5 词表外行为）：
+
+- 内联 `style.stroke` **同时**写 `arrow_fill`
+- `label_bg` / `label_bg_opacity` 仅主题 `defaults.edge` 可设
+
+内联键构造：`style.<prop>`，`<prop>` 取自 §5「可内联」列。
+
+### 6.3 与 DSL 的边界
+
+- diagram `theme:` → `RenderMeta.theme`；`render_style:` → 笔触（非主题 JSON）
+- 语义属性（`label` / `shape` / `variant` / 端口 / archetype …）登记在 **dsl-spec §14**；本文只定义视觉 cascade
+- `archetype` 展开后才进入 node 几何/颜料链；主题**不**查 archetype 名
+
+### 6.4 实现漂移（相对本规范）
+
+
+| 规范（§6）                          | 当前 `plotgram-render`       |
+| ------------------------------- | -------------------------- |
+| `variant` + `compiled_variants` | 仍 `kind` + `kind_styles`   |
+| edge / group `variant` cascade  | 仅 `defaults.*` + `style.*` |
+| node shape 链含 archetype         | 仍 `Node::kind()`           |
+
+
+迁移跟踪：[dsl-spec.md](dsl-spec.md) §14.10.2。**规范优先于旧实现。**
 
 ---
 
-## 7. `kind_styles`
+## 7. `variants`
 
-键为节点 `kind`（atom）。值是与 `defaults.node` 同形的部分样式块；compile 时相对 `defaults.node` 填充缺省字段。
+键为 **node / group / edge** 的 DSL 属性 `variant`，**必须**属于 [dsl-spec.md](dsl-spec.md) §14.7 封闭集：
 
-常见 kind：`service`, `database`, `person`, `gateway`, `cache`, `queue`, `start`, `end`, `decision`, `root`, `leaf`, …（以各主题 JSON 为准）。
+```
+default | primary | secondary | muted | info
+```
 
-主题**不**按 flowchart / mindmap 分命名空间；mindmap 主题通过不同 `kind_styles` 与默认值表达差异（如 `mindmap.base`）。
+值为**部分颜料**样式块（与 `defaults.node` 同形字段集）；compile 物化为 `compiled_variants`（§6.1）。
+
+
+| 规则         | 说明                                                      |
+| ---------- | ------------------------------------------------------- |
+| 禁止 `shape` | 几何与颜料拆开                                                 |
+| 缺省         | DSL 未知 variant → resolve 用 `default`（不报错）               |
+| 命名空间       | 不按 flowchart / mindmap 分表；导图差异用不同主题文件（如 `mindmap.base`） |
+| 三元素共用      | 同一 `variants.primary` 可同时影响节点填充、组框描边、边描边——取决于块内写了哪些键    |
+
 
 ---
 
 ## 8. 内置主题 id
 
-嵌入于 `plotgram-render`：
+嵌入于 `plotgram-render`（信息索引，非封闭承诺）：
 
-| id | 说明 |
-|----|------|
-| `common.clean-light` | 默认浅色 |
-| `common.clean-dark` | 深色 |
-| `common.blueprint` | 蓝图 / hollow 箭头 |
-| `common.paper-ink` | 纸墨 |
-| `common.github-light` / `common.github-dark` | GitHub 风 |
-| `common.presentation` | 演示 |
-| `common.floating-cards` | 卡片 |
-| `common.dual-channel` | 双通道 |
-| `common.okabe-ito` | 色觉友好 |
-| `mindmap.base` | 思维导图基座（常 `arrow_style: none`） |
+
+| id                                            | 说明                |
+| --------------------------------------------- | ----------------- |
+| `common.clean-light`                          | 默认浅色              |
+| `common.clean-dark`                           | 深色                |
+| `common.blueprint`                            | 蓝图 / hollow 箭头    |
+| `common.paper-ink`                            | 纸墨                |
+| `common.github-light` / `common.github-dark`  | GitHub 风          |
+| `common.presentation`                         | 演示                |
+| `common.floating-cards`                       | 卡片                |
+| `common.dual-channel`                         | 双通道               |
+| `common.okabe-ito`                            | 色觉友好              |
+| `mindmap.base`                                | 思维导图基座            |
 | `mindmap.ink-dark` / `mindmap.vivid-branches` | 导图变体（可 `extends`） |
 
-未知 id 回退到 `common.clean-light`。
+
+未知 id 回退 `common.clean-light`。
 
 ---
 
-## 9. 管线位置
+## 9. Render 特例
 
-```text
-.pgm
-  → parse / profile expand
-  → LayoutContract → engine → LayoutResult
-  → RenderInput { graph, layout, meta: { title, theme, render_style } }
-  → theme::load + resolve_graph
-  → SVG（或 ASCII）
-```
 
-| 产物 | 含有 | 不含 |
-|------|------|------|
-| `LayoutResult` | 几何框、折线、label 槽 | shape / kind / theme |
-| Theme JSON | tokens、defaults、kind_styles | render_style、layout 参数 |
-| resolve 输出 | 每元素已解析颜色/线宽/shape | 布局坐标 |
+| 后端        | 行为                                                                   |
+| --------- | -------------------------------------------------------------------- |
+| **SVG**   | `theme::load` + `resolve_graph`；**暂不画** diagram title（layout 未预留标题带） |
+| **ASCII** | 可画 title；跳过 group、形状方框化；**不走** theme resolve                         |
+
+
+完整 parse → layout 管线见 dsl-spec §8。
 
 ---
 
-## 10. 相对旧草案的变更
+## 附录 A：变更记录
 
-| v0.2-draft | V2 现行 |
-|------------|---------|
-| `diagrams.<type>.entity_types` | `kind_styles` |
-| 三层 cascade + prepare 物化到 AST | render 侧 `resolve_graph` |
-| `context_palettes` / `structural_palettes` | **暂缓删除** |
-| 单层 `extends` | 链式 `extends` |
-| `GraphicStyle` 写入 StyleSheet | 禁止；用 `render_style` |
+### A.1 相对 v0.2-draft
 
-旧 v1 / prepare 物化路径仅存在于 `crates/v1/`，不驱动本规范。
+
+| 旧                                          | 新                        |
+| ------------------------------------------ | ------------------------ |
+| `diagrams.<type>.*`                        | 扁平 `variants`            |
+| 三层 cascade + AST 物化                        | render 侧 `resolve_graph` |
+| `context_palettes` / `structural_palettes` | 已移除                      |
+| `GraphicStyle` 进主题                         | `render_style` 在 diagram |
+
+
+### A.2 2.2 → 2.4
+
+
+| 项            | 2.2              | 2.4                                                 |
+| ------------ | ---------------- | --------------------------------------------------- |
+| variant 适用范围 | 主要写 node         | **node / group / edge** 共用表 + `pick`                |
+| cascade 文档   | §6 三节重复          | compile / resolve 分述 + 一表                           |
+| DSL 对齐       | node 2.2         | 对齐 dsl-spec 2.4（group/edge `variant`、edge 标签进 `{}`） |
+| 实现状态         | 仅提 `kind_styles` | §6.4 漂移表                                            |
+
+
+更早版本（2.0→2.1→2.2）与 `kind` 迁出细节见 [dsl-spec.md](dsl-spec.md) §14.10。

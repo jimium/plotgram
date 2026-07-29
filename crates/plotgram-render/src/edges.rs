@@ -48,16 +48,19 @@ pub fn render_edge(
         attrs.push_str(&format!(r#" stroke-dasharray="{dash}""#));
     }
 
-    // Arrow marker references (skipped when the theme says arrow_style: none)
-    let arrow_style = if style.arrow_style.is_empty() {
-        theme.defaults.edge.arrow_style.as_str()
-    } else {
-        style.arrow_style.as_str()
-    };
-    if arrow_style != "none" {
-        attrs.push_str(r##" marker-end="url(#arrow-head)""##);
+    // Arrow markers: emitted per (style, color) so heads follow inline
+    // stroke overrides; `arrow_style: none` (theme or per-edge) skips them.
+    if style.arrow_style != "none" {
+        let marker_id = arrow_marker_id(&style.arrow_style, &style.arrow_fill);
+        svg.add_def_once(arrow_marker_def(
+            &marker_id,
+            &style.arrow_style,
+            &style.arrow_fill,
+            &theme.defaults.canvas_background,
+        ));
+        attrs.push_str(&format!(r##" marker-end="url(#{marker_id})""##));
         if style.arrow == Arrow::Bidirectional {
-            attrs.push_str(r##" marker-start="url(#arrow-head)""##);
+            attrs.push_str(&format!(r##" marker-start="url(#{marker_id})""##));
         }
     }
 
@@ -77,27 +80,34 @@ fn build_path_d(points: &[plotgram_model::geometry::Point]) -> String {
     d
 }
 
-/// Generate the arrow marker SVG defs.
+/// Stable marker id derived from arrow style + fill color (cf. hatch ids).
+pub fn arrow_marker_id(arrow_style: &str, fill: &str) -> String {
+    let key: String = fill
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .take(12)
+        .collect();
+    format!(
+        "arrow-head-{arrow_style}-{key}-{:x}",
+        crate::util::hash_id(fill, 23)
+    )
+}
+
+/// Generate one arrow marker SVG def.
 ///
-/// Marker appearance follows the theme's `arrow_style`:
-/// - `normal`: filled triangle
+/// Marker appearance follows `arrow_style`:
+/// - `normal` (default): filled triangle
 /// - `hollow`: outlined triangle filled with the canvas color
-/// - `none`: no markers at all (returns an empty string)
 ///
 /// A single marker with `orient="auto-start-reverse"` serves both
 /// `marker-end` and `marker-start` (bidirectional edges).
-pub fn arrow_marker_defs(theme: &CompiledTheme) -> String {
-    let fill = &theme.defaults.edge.arrow_fill;
-    match theme.defaults.edge.arrow_style.as_str() {
-        "none" => String::new(),
-        "hollow" => {
-            let canvas = &theme.defaults.canvas_background;
-            format!(
-                r#"<marker id="arrow-head" markerWidth="12" markerHeight="9" refX="10.5" refY="4.5" orient="auto-start-reverse"><polygon points="1 1, 11 4.5, 1 8" fill="{canvas}" stroke="{fill}" stroke-width="1.2" stroke-linejoin="miter"/></marker>"#
-            )
-        }
+pub fn arrow_marker_def(id: &str, arrow_style: &str, fill: &str, canvas: &str) -> String {
+    match arrow_style {
+        "hollow" => format!(
+            r#"<marker id="{id}" markerWidth="12" markerHeight="9" refX="10.5" refY="4.5" orient="auto-start-reverse"><polygon points="1 1, 11 4.5, 1 8" fill="{canvas}" stroke="{fill}" stroke-width="1.2" stroke-linejoin="miter"/></marker>"#
+        ),
         _ => format!(
-            r#"<marker id="arrow-head" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto-start-reverse"><polygon points="0 0, 10 3.5, 0 7" fill="{fill}"/></marker>"#
+            r#"<marker id="{id}" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto-start-reverse"><polygon points="0 0, 10 3.5, 0 7" fill="{fill}"/></marker>"#
         ),
     }
 }

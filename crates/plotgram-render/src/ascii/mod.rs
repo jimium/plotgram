@@ -14,7 +14,7 @@ use plotgram_model::render::RenderInput;
 use plotgram_model::result::LabelOwner;
 
 use canvas::{text_width, truncate_string, DisplayCanvas, GridMapper, GridRect};
-use draw::{clean_label, draw_box, draw_edge_route, render_junctions, simplify_points};
+use draw::{clean_label, draw_box, draw_edge_route, render_junctions, simplify_points, BoxChars};
 
 /// Pixels per character column (1 char ≈ 6×12 px).
 pub(crate) const SCALE_X: f64 = 6.0;
@@ -80,9 +80,7 @@ pub fn render_ascii(input: &RenderInput) -> String {
             .or_else(|| {
                 input
                     .graph
-                    .nodes
-                    .iter()
-                    .find(|n| n.id == np.id)
+                    .find_node(&np.id)
                     .and_then(|n| n.label.as_deref())
             })
             .unwrap_or("");
@@ -109,10 +107,10 @@ pub fn render_ascii(input: &RenderInput) -> String {
         .collect();
 
     for b in &boxes {
-        draw_box(
-            &mut cv, b.rect.x, b.rect.y, b.rect.w, b.rect.h, BOX_TL, BOX_TR, BOX_BL, BOX_BR,
-            BOX_V, BOX_H,
-        );
+        let chars = BoxChars {
+            tl: BOX_TL, tr: BOX_TR, bl: BOX_BL, br: BOX_BR, v: BOX_V, h: BOX_H,
+        };
+        draw_box(&mut cv, b.rect.x, b.rect.y, b.rect.w, b.rect.h, &chars);
     }
 
     // ── Edges: quantize layout polylines, simplify, draw ──
@@ -130,9 +128,7 @@ pub fn render_ascii(input: &RenderInput) -> String {
         }
         let arrow = input
             .graph
-            .edges
-            .iter()
-            .find(|e| e.id == ep.id)
+            .find_edge(&ep.id)
             .map(|e| e.arrow)
             .unwrap_or(Arrow::Forward);
         let dashed = arrow == Arrow::Response;
@@ -177,7 +173,7 @@ pub fn render_ascii(input: &RenderInput) -> String {
 
     // Group placements and group labels are intentionally skipped.
 
-    cv.to_string()
+    cv.render()
 }
 
 #[cfg(test)]
@@ -320,6 +316,44 @@ mod tests {
         });
         let out = render_ascii(&input);
         assert!(out.contains("yes"), "edge label missing in:\n{out}");
+    }
+
+    #[test]
+    fn interior_blank_rows_are_preserved() {
+        // Two disconnected nodes stacked vertically with a gap: the blank
+        // rows between them carry geometry and must not be collapsed.
+        let graph = Graph {
+            nodes: vec![node("a", "Top"), node("b", "Bottom")],
+            edges: vec![],
+            groups: vec![],
+        };
+        let layout = LayoutResult {
+            nodes: vec![place("a", 0.0, 0.0, 96.0, 36.0), place("b", 0.0, 120.0, 96.0, 36.0)],
+            edges: vec![],
+            groups: vec![],
+            labels: vec![
+                node_label("a", "Top", Rect::new(0.0, 0.0, 96.0, 36.0)),
+                node_label("b", "Bottom", Rect::new(0.0, 120.0, 96.0, 36.0)),
+            ],
+            canvas_width: 96.0,
+            canvas_height: 156.0,
+        };
+        let input = RenderInput {
+            graph,
+            layout,
+            meta: RenderMeta { title: None, theme: None, render_style: None },
+        };
+        let out = render_ascii(&input);
+        let lines: Vec<&str> = out.lines().collect();
+        let top_bottom = lines.iter().position(|l| l.contains('└')).unwrap();
+        let bottom_top = lines.iter().rposition(|l| l.contains('┌')).unwrap();
+        assert!(
+            lines[top_bottom + 1..bottom_top].iter().any(|l| l.is_empty()),
+            "blank gap rows between boxes must survive:\n{out}"
+        );
+        // No leading/trailing blank lines
+        assert!(!lines.first().unwrap().is_empty(), "leading blanks trimmed:\n{out}");
+        assert!(!lines.last().unwrap().is_empty(), "trailing blanks trimmed:\n{out}");
     }
 
     #[test]

@@ -29,9 +29,12 @@ pub fn render_group(
         fill = format!("url(#{pattern_id})");
     }
 
-    let mut dash_attr = String::new();
+    let mut extra = String::new();
     if let Some(dash) = &style.stroke_dasharray {
-        dash_attr.push_str(&format!(r#" stroke-dasharray="{dash}""#));
+        extra.push_str(&format!(r#" stroke-dasharray="{dash}""#));
+    }
+    if let Some(op) = style.fill_opacity {
+        extra.push_str(&format!(r#" fill-opacity="{op:.2}""#));
     }
 
     if strategy.sample_outlines() {
@@ -40,7 +43,7 @@ pub fn render_group(
         let jittered = strategy.transform_path(&pts, seed);
         let d = closed_path_d(&jittered);
         svg.add_element(format!(
-            r#"<path d="{d}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash_attr}/>"#,
+            r#"<path d="{d}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{extra}/>"#,
             stroke = style.stroke,
             sw = style.stroke_width,
         ));
@@ -48,7 +51,7 @@ pub fn render_group(
     }
 
     svg.add_element(format!(
-        r#"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{dash_attr}/>"#,
+        r#"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"{extra}/>"#,
         x = frame.x,
         y = frame.y,
         w = frame.width,

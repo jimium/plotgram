@@ -3,28 +3,10 @@
 use plotgram_model::result::{LabelOwner, LabelSlot};
 
 use crate::icons;
-use crate::resolve::ResolvedGraph;
+use crate::resolve::{ResolvedEdgeStyle, ResolvedGraph};
 use crate::theme::CompiledTheme;
 use crate::util::escape_xml;
 use crate::SvgBuilder;
-
-/// Render the diagram title near the top of the canvas.
-///
-/// Currently NOT wired into `render_svg`: layout reserves no space for the
-/// title, so painting it would overlap top-most nodes. Re-enable once the
-/// canvas grows a dedicated title band.
-pub fn render_title(svg: &mut SvgBuilder, title: &str, theme: &CompiledTheme) {
-    let fill = &theme.defaults.title_fill;
-    let font_size = theme.defaults.title_font_size;
-    let font_family = &theme.defaults.typography.font_family;
-    // Slight inset from top-left of the canvas
-    let x = 16.0;
-    let y = font_size + 8.0;
-    svg.add_element(format!(
-        r#"<text x="{x:.1}" y="{y:.1}" text-anchor="start" dominant-baseline="auto" fill="{fill}" font-size="{font_size}" font-family="{font_family}" font-weight="600">{text}</text>"#,
-        text = escape_xml(title)
-    ));
-}
 
 /// Render a label slot to SVG.
 pub fn render_label(
@@ -41,10 +23,13 @@ pub fn render_label(
     let (fill, font_size, font_weight) = match &slot.owner {
         LabelOwner::Node(id) => {
             if let Some(ns) = resolved.nodes.get(id) {
-                // Node with icon: render icon + left-anchored label as a group
+                // Node with icon: render icon + left-anchored label as a group.
+                // Falls through to plain text when the pair doesn't fit the
+                // frame (layout owns node width; we degrade, not overflow).
                 if let Some(icon) = ns.icon {
-                    render_icon_label(svg, slot, icon, ns, theme);
-                    return;
+                    if render_icon_label(svg, slot, icon, ns, theme) {
+                        return;
+                    }
                 }
                 (
                     ns.text_fill.clone(),
@@ -59,22 +44,27 @@ pub fn render_label(
                 )
             }
         }
-        LabelOwner::Edge(_) => {
-            maybe_edge_label_bg(svg, slot, theme);
-            // Backlog (not dsl-spec promised): per-edge inline `style.text_fill` /
-            // `style.font_size` overrides and `slot.role` (mid/head/tail) based
-            // styling are not supported — all edge labels use theme edge defaults.
-            (
-                theme.defaults.edge.text_fill.clone(),
-                theme.defaults.edge.font_size,
-                None,
-            )
+        LabelOwner::Edge(id) => {
+            let es = resolved.edges.get(id);
+            maybe_edge_label_bg(svg, slot, es, theme);
+            if let Some(es) = es {
+                (es.text_fill.clone(), es.font_size, None)
+            } else {
+                (
+                    theme.defaults.edge.text_fill.clone(),
+                    theme.defaults.edge.font_size,
+                    None,
+                )
+            }
         }
-        LabelOwner::Group(_) => (
-            theme.defaults.group.text_fill.clone(),
-            theme.defaults.typography.small_size,
-            Some("500".to_string()),
-        ),
+        LabelOwner::Group(id) => {
+            let fill = resolved
+                .groups
+                .get(id)
+                .map(|g| g.text_fill.clone())
+                .unwrap_or_else(|| theme.defaults.group.text_fill.clone());
+            (fill, theme.defaults.typography.small_size, Some("500".to_string()))
+        }
     };
 
     let weight_attr = font_weight
@@ -89,9 +79,21 @@ pub fn render_label(
     ));
 }
 
-/// Optional background rect behind an edge label (`label_bg` theme field).
-fn maybe_edge_label_bg(svg: &mut SvgBuilder, slot: &LabelSlot, theme: &CompiledTheme) {
-    let Some(raw) = theme.defaults.edge.label_bg.as_deref() else {
+/// Optional background rect behind an edge label (`label_bg` from resolved edge style).
+fn maybe_edge_label_bg(
+    svg: &mut SvgBuilder,
+    slot: &LabelSlot,
+    edge_style: Option<&ResolvedEdgeStyle>,
+    theme: &CompiledTheme,
+) {
+    let (raw, opacity) = match edge_style {
+        Some(es) => (es.label_bg.as_deref(), es.label_bg_opacity),
+        None => (
+            theme.defaults.edge.label_bg.as_deref(),
+            theme.defaults.edge.label_bg_opacity,
+        ),
+    };
+    let Some(raw) = raw else {
         return;
     };
     if raw.is_empty() || raw == "none" {
@@ -102,7 +104,6 @@ fn maybe_edge_label_bg(svg: &mut SvgBuilder, slot: &LabelSlot, theme: &CompiledT
     } else {
         raw
     };
-    let opacity = theme.defaults.edge.label_bg_opacity;
     let frame = &slot.frame;
     let pad = 2.0;
     svg.add_element(format!(
@@ -116,13 +117,17 @@ fn maybe_edge_label_bg(svg: &mut SvgBuilder, slot: &LabelSlot, theme: &CompiledT
 
 /// Render a node label with its decoration icon: icon glyph + left-anchored text,
 /// the pair centered as a group inside the label frame.
+///
+/// Returns `false` without drawing when icon + gap + label is wider than the
+/// frame: layout sized the node without the icon, so the icon is dropped
+/// rather than overflowing the shape.
 fn render_icon_label(
     svg: &mut SvgBuilder,
     slot: &LabelSlot,
     icon: &'static icons::IconDef,
     ns: &crate::resolve::ResolvedNodeStyle,
     theme: &CompiledTheme,
-) {
+) -> bool {
     let frame = &slot.frame;
     let label_width = estimate_text_width(&slot.text, ns.font_size);
     let layout = icons::render::layout_inside(
@@ -133,6 +138,9 @@ fn render_icon_label(
         ns.font_size,
         label_width,
     );
+    if layout.group_width > frame.width {
+        return false;
+    }
 
     svg.add_element(icons::render::render_icon(
         icon,
@@ -143,7 +151,7 @@ fn render_icon_label(
     ));
 
     if slot.text.is_empty() {
-        return;
+        return true;
     }
     let weight_attr = ns
         .font_weight
@@ -159,6 +167,7 @@ fn render_icon_label(
         font_size = ns.font_size,
         text = escape_xml(&slot.text)
     ));
+    true
 }
 
 /// Rough text width estimate: wide (2-column) glyphs ≈ 1.0 em, others ≈ 0.6 em.

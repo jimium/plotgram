@@ -92,7 +92,7 @@ impl DisplayCanvas {
         })
     }
 
-    pub(super) fn to_string(&self) -> String {
+    pub(super) fn render(&self) -> String {
         // Convert each row to a trimmed string
         let lines: Vec<String> = self
             .rows
@@ -110,27 +110,28 @@ impl DisplayCanvas {
             })
             .collect();
 
-        // Find the max display width across all non-empty lines
-        let max_width = lines
+        // Trim leading/trailing blank rows only: interior blank rows carry
+        // vertical spacing (e.g. gaps between disconnected components).
+        let first = lines.iter().position(|l| !l.is_empty()).unwrap_or(0);
+        let last = lines.iter().rposition(|l| !l.is_empty()).unwrap_or(0);
+
+        // Find the max display width across all lines
+        let max_width = lines[first..=last]
             .iter()
-            .filter(|l| !l.is_empty())
             .map(|l| text_width(l))
             .max()
             .unwrap_or(0);
 
-        // Pad all non-empty lines to the same display width so that terminal
+        // Pad content lines to the same display width so that terminal
         // line-wrapping doesn't misalign the right borders.
-        lines
-            .into_iter()
-            .filter(|line| !line.is_empty())
+        lines[first..=last]
+            .iter()
             .map(|line| {
-                let pad = max_width.saturating_sub(text_width(&line));
-                if pad > 0 {
-                    let mut padded = line;
-                    padded.push_str(&" ".repeat(pad));
-                    padded
+                let pad = max_width.saturating_sub(text_width(line));
+                if pad > 0 && !line.is_empty() {
+                    format!("{line}{}", " ".repeat(pad))
                 } else {
-                    line
+                    line.clone()
                 }
             })
             .collect::<Vec<_>>()
