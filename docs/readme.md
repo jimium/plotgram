@@ -38,7 +38,7 @@ docs/
 | [ast-spec.md](specs/ast-spec.md) | AST 数据结构 — Rust 结构体、JSON 序列化、Diff/Patch |
 | [export-scene-spec.md](specs/export-scene-spec.md) | Exporter Scene JSON — 对外导出契约与 schema |
 | [error-model.md](specs/error-model.md) | 错误模型 — 错误码、Fix Action、LSP 映射 |
-| [style-sheet-spec.md](specs/style-sheet-spec.md) | StyleSheet v0.2 — 三层 cascade、物化优先级 |
+| [style-sheet-spec.md](specs/style-sheet-spec.md) | Theme / StyleSheet V2 — 扁平 kind_styles cascade |
 
 ### 视觉语言
 

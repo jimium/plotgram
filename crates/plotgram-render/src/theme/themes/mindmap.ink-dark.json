@@ -1,0 +1,69 @@
+{
+  "id": "mindmap.ink-dark",
+  "name": "Ink Dark",
+  "extends": "mindmap.base",
+  "tokens": {
+    "colors": {
+      "canvas": "#1A1B2E",
+      "text": "#E8EAF0",
+      "muted_text": "#8B8FA3",
+      "border": "#2E3047",
+      "primary": "#7C5CFC",
+      "neutral_fill": "#252640",
+      "neutral_stroke": "#4A4C6A",
+      "edge_stroke": "#4A4C6A",
+      "arrow_fill": "#8B8FA3",
+      "group_fill": "#1F2035",
+      "group_stroke": "#3D3F5C"
+    },
+    "palette": {
+      "root": {
+        "fill": "#7C5CFC",
+        "stroke": "#9B7FFF",
+        "text_fill": "#FFFFFF"
+      }
+    },
+    "typography": {
+      "title_size": 17,
+      "label_size": 14,
+      "small_size": 12
+    },
+    "strokes": {
+      "thin": 1.5,
+      "normal": 2.0,
+      "thick": 3.0,
+      "dashed": [
+        8,
+        4
+      ],
+      "dotted": [
+        3,
+        5
+      ]
+    },
+    "radius": {
+      "sm": 6,
+      "md": 10,
+      "lg": 16
+    },
+    "spacing": {
+      "node_padding_x": 14,
+      "node_padding_y": 10,
+      "group_padding": 18,
+      "label_gap": 7
+    }
+  },
+  "defaults": {
+    "node": {
+      "radius": "{radius.md}"
+    }
+  },
+  "kind_styles": {
+    "main": {
+      "font_weight": "bold"
+    },
+    "branch": {
+      "font_weight": "medium"
+    }
+  }
+}

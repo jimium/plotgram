@@ -3,8 +3,13 @@ name = "plotgram-render"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Plotgram rendering: SVG and Scene JSON output"
+description = "Plotgram SVG renderer: theme-driven, strategy-based"
 
 [dependencies]
-plotgram-model = { path = "../plotgram-model" }
-plotgram-engine = { path = "../plotgram-engine" }
+plotgram-model = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+unicode-width = "0.2"
+
+[dev-dependencies]
+insta = "1"

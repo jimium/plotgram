@@ -1,6 +1,6 @@
 # 主题与视觉风格使用指南
 
-Plotgram 的视觉外观由 **Theme（StyleSheet）** 和 **Graphic Style（手绘/蓝图等渲染风格）** 两层控制。本文说明在 DSL、CLI 和 Rust API 中如何指定它们。
+Plotgram 的视觉外观由 **Theme（StyleSheet）** 和 **render_style（笔触）** 两层控制。本文说明在 DSL 与重建后的 render crate 中如何指定它们。
 
 > 规范：[style-sheet-spec.md](../specs/style-sheet-spec.md)
 
@@ -9,12 +9,14 @@ Plotgram 的视觉外观由 **Theme（StyleSheet）** 和 **Graphic Style（手�
 ## 两层模型
 
 ```text
-StyleSheet (theme)     → 颜色、字号、边宽、分组填充等「语义样式」
-GraphicStyle           → 几何绘制方式（标准 / Excalidraw / Spatial Clarity …）
+Theme (theme)          → 颜色、字号、边宽、kind 默认样式等「颜料」
+render_style           → 几何绘制方式（standard / sketch）
 ```
 
-- **prepare** 阶段：theme cascade 物化到 `entity.attributes.style`
-- **render** 阶段：graphic style 影响 SVG 路径、滤镜、marker
+- **resolve** 阶段（`plotgram-render`）：`defaults` → `kind_styles` → DSL `: shape` → 内联 `style.*`
+- **render** 阶段：`render_style` 影响路径抖动、hatch 等笔触
+
+主题 JSON **无** `diagrams` 段；图种差异不进主题（ADR-001）。
 
 ---
 
@@ -24,115 +26,69 @@ GraphicStyle           → 几何绘制方式（标准 / Excalidraw / Spatial Cl
 
 ```plotgram
 diagram flowchart {
-    theme: "common.clean-light"
+    theme: common.clean-light
     // ...
 }
 ```
 
-### Graphic Style（diagram 级）
+### 笔触（diagram 级）
 
 ```plotgram
 diagram architecture {
-    graphic_style: excalidraw
+    render_style: sketch
     // ...
 }
 ```
 
-具体可用 id 见 `GraphicStyleId` 与 profile 默认值。
+### 节点 / 边 / 组内联样式
 
-### 实体 / 边局部样式
+v2 **仅**支持内联 `style.*`（见 dsl-spec）：
 
-在 `entity` / `relation` 的 `style { }` 或 `standard { }` 块中覆盖（物化前写入 RawDiagram，prepare 时与 theme 合并）。
+```plotgram
+node api "API" { kind: service, style.fill: "#E3F2FD" }
+api -> db "查询" { style.stroke: "#C62828", style.dashed: true }
+```
 
 ---
 
-## CLI
+## Render 入口
 
-当前 `plotgram render` **未暴露** `--theme` / `--graphic-style` 参数，使用 diagram 内声明 + profile 默认 theme。
+重建管线：
 
-自定义 theme JSON 需在 Rust `RenderRequest.explicit_style_json` 中传入（见下文）。
-
----
-
-## Rust API
-
-### prepare：`StyleRequest`
-
-```rust
-use plotgram_core::prepare::StyleRequest;
-
-let req = StyleRequest {
-    theme_id: Some("common.clean-light".into()),
-    dark_mode: false,
-};
-let output = parse_prepare_validate(source, &req)?;
+```text
+RenderInput { graph, layout, meta: { title, theme, render_style } }
+  → plotgram_render::render_svg / render_ascii
 ```
 
-Theme 优先级：`StyleRequest.theme_id` > diagram `theme` 属性 > dark 默认 > profile 默认。
-
-### render：`RenderRequest`
-
 ```rust
-use plotgram_core::render::{RenderRequest, RenderFormat};
-use plotgram_core::types::GraphicStyleId;
+use plotgram_model::render::{RenderInput, RenderMeta};
+use plotgram_render::render_svg;
 
-let mut req = RenderRequest::new(&prepared, RenderFormat::Svg);
-req.explicit_theme_id = Some("common.clean-light");
-req.dark_mode = false;
-req.explicit_graphic_style = Some(GraphicStyleId::Excalidraw);
-req.transparent_background = true;
-req.attribution = false;
-```
-
-### 内联 StyleSheet JSON
-
-```rust
-req.explicit_style_json = Some(r##"{
-    "version": "0.2",
-    "id": "custom.demo",
-    "name": "Demo",
-    "tokens": { "colors": { "canvas": "#101820" } },
-    "defaults": {
-        "canvas": { "background": "#101820" },
-        "node": { "fill": "#243447", "stroke": "#67B7D1" },
-        "edge": { "stroke": "#67B7D1" }
+let svg = render_svg(&RenderInput {
+    graph,
+    layout,
+    meta: RenderMeta {
+        title: Some("示例".into()),
+        theme: Some("common.blueprint".into()),
+        render_style: Some("sketch".into()),
     },
-    "diagrams": {}
-}"##);
+});
 ```
 
-`explicit_style_json` 优先级高于 builtin theme。
-
-### Graphic Style 解析顺序
-
-1. `RenderRequest.explicit_graphic_style`
-2. diagram 属性 `graphic_style`
-3. profile `default_graphic_style`
+未知 `theme` id 回退到 `common.clean-light`。
 
 ---
 
 ## 内置 Theme
 
-主题 JSON 位于仓库 theme 资源目录；内置主题说明见 specs 目录下样式相关文档。
+嵌入于 `crates/plotgram-render/src/theme/themes/`。完整 id 列表见 [style-sheet-spec.md](../specs/style-sheet-spec.md) §8。
 
-注意：**不能**直接使用 internal base theme（如仅用于 `extends` 的基座），`prepare` 会报错。
-
----
-
-## 调试技巧
-
-```bash
-# 查看物化后的 AST（含 attributes.style）
-plotgram export diagram.pgm | jq '.entities[0].attributes'
-
-# 对比不同 theme 的渲染
-# （需在 Rust 测试或 playground 中切换 RenderRequest）
-```
+子主题可通过 `extends` 链式继承父主题（如 `mindmap.vivid-branches` → `mindmap.base`）。
 
 ---
 
 ## 相关文档
 
-- [render-pipeline.md](render-pipeline.md) — prepare / render 阶段
-- [graphic-style-and-theme.html](../architecture/graphic-style-and-theme.html) — 架构说明
-- [crates/plotgram-core/src/graphic_style/README.md](../../crates/plotgram-core/src/graphic_style/README.md) — 各 graphic style 实现
+- [dsl-spec.md](../specs/dsl/dsl-spec.md) — `theme` / `render_style` / `style.*`
+- [model-boundary.md](../design/model-boundary.md) — `RenderInput` 边界
+- [ADR-001](../design/adr/001-diagram-type-not-in-engine.md) — 引擎 / 主题禁止按图种分支

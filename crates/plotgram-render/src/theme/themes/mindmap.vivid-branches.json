@@ -1,0 +1,45 @@
+{
+  "id": "mindmap.vivid-branches",
+  "name": "Vivid Branches",
+  "extends": "mindmap.base",
+  "tokens": {
+    "typography": {
+      "title_size": 18,
+      "label_size": 14,
+      "small_size": 12,
+      "font_weight_medium": 600
+    },
+    "strokes": {
+      "thin": 1.5,
+      "normal": 2.5,
+      "thick": 3.5,
+      "dashed": [
+        8,
+        4
+      ],
+      "dotted": [
+        3,
+        5
+      ]
+    },
+    "radius": {
+      "sm": 6,
+      "md": 12,
+      "lg": 18
+    },
+    "spacing": {
+      "node_padding_x": 16,
+      "node_padding_y": 10,
+      "group_padding": 20,
+      "label_gap": 8
+    }
+  },
+  "kind_styles": {
+    "main": {
+      "font_weight": "bold"
+    },
+    "branch": {
+      "font_weight": "medium"
+    }
+  }
+}

@@ -1,0 +1,168 @@
+{
+  "id": "common.blueprint",
+  "name": "Blueprint",
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#FAFCFF",
+      "text": "#0D2B45",
+      "muted_text": "#3D6080",
+      "border": "#6B8DAD",
+      "primary": "#1565C0",
+      "neutral_fill": "#EEF4FA",
+      "neutral_stroke": "#395672",
+      "edge_stroke": "#4A6A88",
+      "arrow_fill": "#1565C0",
+      "group_fill": "#E8F1FA",
+      "group_stroke": "#4A80B8"
+    },
+    "palette": {
+      "blue": {
+        "fill": "#E3F2FD",
+        "stroke": "#1565C0",
+        "text_fill": "#0D47A1"
+      },
+      "orange": {
+        "fill": "#EAF3FB",
+        "stroke": "#1976D2",
+        "text_fill": "#0D47A1"
+      },
+      "green": {
+        "fill": "#E8F5E9",
+        "stroke": "#1B5E20",
+        "text_fill": "#1B5E20"
+      },
+      "purple": {
+        "fill": "#EAF0FA",
+        "stroke": "#283593",
+        "text_fill": "#283593"
+      },
+      "yellow": {
+        "fill": "#FFFDE7",
+        "stroke": "#F57F17",
+        "text_fill": "#E65100"
+      },
+      "red": {
+        "fill": "#FFEBEE",
+        "stroke": "#B71C1C",
+        "text_fill": "#B71C1C"
+      },
+      "cyan": {
+        "fill": "#E0F7FA",
+        "stroke": "#006064",
+        "text_fill": "#006064"
+      },
+      "brown": {
+        "fill": "#EFEBE9",
+        "stroke": "#3E2723",
+        "text_fill": "#3E2723"
+      },
+      "gray": {
+        "fill": "#F5F8FA",
+        "stroke": "#546E7A",
+        "text_fill": "#37474F"
+      },
+      "amber": {
+        "fill": "#FFF8E1",
+        "stroke": "#E65100",
+        "text_fill": "#E65100"
+      },
+      "blue_gray": {
+        "fill": "#ECEFF1",
+        "stroke": "#37474F",
+        "text_fill": "#37474F"
+      },
+      "start_green": {
+        "fill": "#C8E6C9",
+        "stroke": "#1B5E20",
+        "text_fill": "#1B5E20"
+      },
+      "end_red": {
+        "fill": "#FFCDD2",
+        "stroke": "#B71C1C",
+        "text_fill": "#B71C1C"
+      },
+      "arch_blue": {
+        "fill": "#D6E9FA",
+        "stroke": "#0D47A1",
+        "text_fill": "#0D47A1"
+      },
+      "root": {
+        "fill": "#0D47A1",
+        "stroke": "#0A3577",
+        "text_fill": "#FFFFFF"
+      }
+    },
+    "typography": {
+      "font_family": "'JetBrains Mono', 'Fira Code', 'Source Code Pro', monospace",
+      "title_size": 16,
+      "label_size": 12,
+      "small_size": 10,
+      "font_weight_medium": 600
+    },
+    "strokes": {
+      "thin": 0.8,
+      "normal": 1.2,
+      "thick": 2.0,
+      "dashed": [
+        5,
+        3
+      ],
+      "dotted": [
+        1.5,
+        3
+      ]
+    },
+    "radius": {
+      "sm": 0,
+      "md": 3,
+      "lg": 5,
+      "pill": 999
+    },
+    "spacing": {
+      "node_padding_x": 12,
+      "node_padding_y": 7,
+      "group_padding": 16,
+      "label_gap": 6
+    }
+  },
+  "defaults": {
+    "node": {
+      "fill_opacity": 0.25,
+      "stroke": "{colors.neutral_stroke}",
+      "stroke_linecap": "butt",
+      "stroke_linejoin": "miter",
+      "shape": "rect",
+      "radius": 0
+    },
+    "edge": {
+      "stroke": "{colors.edge_stroke}",
+      "stroke_linecap": "butt",
+      "stroke_linejoin": "miter",
+      "stroke_opacity": 0.9,
+      "arrow_style": "hollow"
+    },
+    "group": {
+      "fill_opacity": 0.5,
+      "stroke_dasharray": "6,3"
+    }
+  },
+  "kind_styles": {
+    "start": {
+      "shape": "circle"
+    },
+    "end": {
+      "shape": "circle",
+      "fill_opacity": 0.8
+    },
+    "decision": {
+      "shape": "diamond"
+    },
+    "process": {
+      "shape": "rect"
+    },
+    "external": {
+      "stroke_dasharray": "4,4"
+    }
+  }
+}

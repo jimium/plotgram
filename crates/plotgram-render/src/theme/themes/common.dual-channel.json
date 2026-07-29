@@ -1,0 +1,29 @@
+{
+  "id": "common.dual-channel",
+  "name": "Dual Channel",
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#F5F5F5",
+      "border_strong": "#7A7A86",
+      "neutral_fill": "#FFFFFF",
+      "neutral_stroke": "#C9C9C9",
+      "edge_stroke": "#8F8F99",
+      "group_fill": "#ECEEF2",
+      "group_stroke": "#7A7A86"
+    }
+  },
+  "defaults": {
+    "group": {
+      "fill": "{colors.group_fill}",
+      "stroke": "{colors.group_stroke}",
+      "stroke_width": 1.35,
+      "stroke_dasharray": "none"
+    },
+    "edge": {
+      "stroke": "{colors.edge_stroke}",
+      "stroke_width": 1.35,
+      "stroke_opacity": 1.0
+    }
+  }
+}

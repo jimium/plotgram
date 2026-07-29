@@ -12,5 +12,4 @@
 | [ast-spec.md](ast-spec.md) | AST 数据结构定义 — Rust 结构体、JSON 序列化格式、Diff/Patch 操作规范 |
 | [export-scene-spec.md](export-scene-spec.md) | Exporter Scene JSON 规范 — 对外导出契约、字段 schema、兼容性与完整示例 |
 | [error-model.md](error-model.md) | 错误模型与反馈机制设计 — 结构化错误码体系、Fix Action、LSP 兼容映射 |
-| [style-sheet-spec.md](style-sheet-spec.md) | 样式方案 JSON 结构草案（v0.1，历史参考） |
-| [style-system/](style-system/README.md) | 样式系统规范 v0.2 — 三层 cascade、Expand Pass 物化、完整 Blueprint 样式稿示例 |
+| [style-sheet-spec.md](style-sheet-spec.md) | Theme / StyleSheet V2 — 扁平 tokens + defaults + kind_styles |

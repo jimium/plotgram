@@ -1,0 +1,27 @@
+{
+  "id": "common.paper-ink",
+  "name": "Paper & Ink",
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#F3F0EA",
+      "muted_text": "#6B6560",
+      "border": "#C9C3B8",
+      "border_strong": "#A39E94",
+      "neutral_fill": "#FFFEFA",
+      "neutral_stroke": "#C9C3B8",
+      "edge_stroke": "#8A8790",
+      "group_fill": "#EAE6DF",
+      "group_stroke": "#A39E94"
+    }
+  },
+  "defaults": {
+    "group": {
+      "fill": "{colors.group_fill}",
+      "stroke": "{colors.group_stroke}",
+      "stroke_width": 1.25,
+      "stroke_dasharray": "none",
+      "text_fill": "{colors.muted_text}"
+    }
+  }
+}

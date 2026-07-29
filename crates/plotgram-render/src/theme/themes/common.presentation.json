@@ -1,0 +1,157 @@
+{
+  "id": "common.presentation",
+  "name": "Presentation",
+  "extends": "common.clean-light",
+  "tokens": {
+    "colors": {
+      "canvas": "#FFFDF8",
+      "text": "#111827",
+      "muted_text": "#4B5563",
+      "border": "#9CA3AF",
+      "primary": "#1D4ED8",
+      "neutral_fill": "#F3F4F6",
+      "neutral_stroke": "#1F2937",
+      "edge_stroke": "#374151",
+      "arrow_fill": "#1D4ED8",
+      "group_fill": "#FEF3C7",
+      "group_stroke": "#92400E"
+    },
+    "palette": {
+      "blue": {
+        "fill": "#DBEAFE",
+        "stroke": "#1D4ED8",
+        "text_fill": "#1E3A8A"
+      },
+      "orange": {
+        "fill": "#FFEDD5",
+        "stroke": "#C2410C",
+        "text_fill": "#9A3412"
+      },
+      "green": {
+        "fill": "#BBF7D0",
+        "stroke": "#15803D",
+        "text_fill": "#166534"
+      },
+      "purple": {
+        "fill": "#E9D5FF",
+        "stroke": "#7E22CE",
+        "text_fill": "#6B21A8"
+      },
+      "yellow": {
+        "fill": "#FEF08A",
+        "stroke": "#A16207",
+        "text_fill": "#854D0E"
+      },
+      "red": {
+        "fill": "#FECACA",
+        "stroke": "#B91C1C",
+        "text_fill": "#991B1B"
+      },
+      "cyan": {
+        "fill": "#A5F3FC",
+        "stroke": "#0E7490",
+        "text_fill": "#155E75"
+      },
+      "brown": {
+        "fill": "#E7E5E4",
+        "stroke": "#57534E",
+        "text_fill": "#44403C"
+      },
+      "gray": {
+        "fill": "#F3F4F6",
+        "stroke": "#4B5563",
+        "text_fill": "#374151"
+      },
+      "amber": {
+        "fill": "#FEF3C7",
+        "stroke": "#92400E",
+        "text_fill": "#78350F"
+      },
+      "blue_gray": {
+        "fill": "#E5E7EB",
+        "stroke": "#1F2937",
+        "text_fill": "#111827"
+      },
+      "start_green": {
+        "fill": "#BBF7D0",
+        "stroke": "#15803D",
+        "text_fill": "#166534"
+      },
+      "end_red": {
+        "fill": "#FECACA",
+        "stroke": "#B91C1C",
+        "text_fill": "#991B1B"
+      },
+      "arch_blue": {
+        "fill": "#BFDBFE",
+        "stroke": "#1D4ED8",
+        "text_fill": "#1E3A8A"
+      },
+      "root": {
+        "fill": "#4338CA",
+        "stroke": "#312E81",
+        "text_fill": "#FFFFFF"
+      }
+    },
+    "typography": {
+      "font_family": "'Inter', 'Noto Sans CJK SC', 'Segoe UI', sans-serif",
+      "title_size": 20,
+      "label_size": 15,
+      "small_size": 13,
+      "font_weight_medium": 600,
+      "font_weight_bold": 800
+    },
+    "strokes": {
+      "thin": 1.5,
+      "normal": 2.2,
+      "thick": 3.0,
+      "dashed": [
+        8,
+        4
+      ],
+      "dotted": [
+        2,
+        4
+      ]
+    },
+    "radius": {
+      "sm": 8,
+      "md": 12,
+      "lg": 18,
+      "pill": 999
+    },
+    "spacing": {
+      "node_padding_x": 16,
+      "node_padding_y": 11,
+      "group_padding": 20,
+      "label_gap": 8
+    }
+  },
+  "defaults": {
+    "node": {
+      "stroke": "{colors.neutral_stroke}",
+      "stroke_linecap": "round",
+      "stroke_linejoin": "round",
+      "font_weight": "{typography.font_weight_medium}"
+    },
+    "edge": {
+      "stroke": "{colors.edge_stroke}",
+      "stroke_linecap": "round",
+      "stroke_linejoin": "round",
+      "stroke_opacity": 1.0,
+      "arrow_style": "normal"
+    },
+    "group": {
+      "stroke": "{colors.group_stroke}",
+      "stroke_width": "{strokes.normal}"
+    }
+  },
+  "kind_styles": {
+    "leaf": {
+      "fill": "#F5F3FF"
+    },
+    "main": {
+      "font_weight": "bold"
+    }
+  }
+}

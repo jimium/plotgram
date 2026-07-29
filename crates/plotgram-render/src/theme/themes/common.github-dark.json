@@ -1,0 +1,107 @@
+{
+  "id": "common.github-dark",
+  "name": "GitHub Dark",
+  "extends": "common.clean-dark",
+  "tokens": {
+    "colors": {
+      "canvas": "#0d1117",
+      "text": "#e6edf3",
+      "muted_text": "#7d8590",
+      "border": "#30363d",
+      "primary": "#4493f8",
+      "neutral_fill": "#161b22",
+      "neutral_stroke": "#7d8590",
+      "edge_stroke": "#484f58",
+      "arrow_fill": "#4493f8",
+      "group_fill": "#161b22",
+      "group_stroke": "#30363d"
+    },
+    "palette": {
+      "blue": {
+        "fill": "#0f1d2f",
+        "stroke": "#4493f8",
+        "text_fill": "#9ec5ff"
+      },
+      "orange": {
+        "fill": "#1d160d",
+        "stroke": "#db6d28",
+        "text_fill": "#ffb757"
+      },
+      "green": {
+        "fill": "#0c2014",
+        "stroke": "#3fb950",
+        "text_fill": "#7ee787"
+      },
+      "purple": {
+        "fill": "#1a1226",
+        "stroke": "#a371f7",
+        "text_fill": "#d2a8ff"
+      },
+      "yellow": {
+        "fill": "#1f1a0a",
+        "stroke": "#d29922",
+        "text_fill": "#e3b341"
+      },
+      "red": {
+        "fill": "#201013",
+        "stroke": "#f85149",
+        "text_fill": "#ff9492"
+      },
+      "cyan": {
+        "fill": "#0a1c25",
+        "stroke": "#39c5cf",
+        "text_fill": "#79e3eb"
+      },
+      "brown": {
+        "fill": "#161b22",
+        "stroke": "#6e7681",
+        "text_fill": "#b1bac4"
+      },
+      "gray": {
+        "fill": "#0d1117",
+        "stroke": "#484f58",
+        "text_fill": "#b1bac4"
+      },
+      "amber": {
+        "fill": "#1d160d",
+        "stroke": "#db6d28",
+        "text_fill": "#ffb757"
+      },
+      "blue_gray": {
+        "fill": "#161b22",
+        "stroke": "#8b949e",
+        "text_fill": "#b1bac4"
+      },
+      "start_green": {
+        "fill": "#0c2014",
+        "stroke": "#3fb950",
+        "text_fill": "#7ee787"
+      },
+      "end_red": {
+        "fill": "#201013",
+        "stroke": "#f85149",
+        "text_fill": "#ff9492"
+      },
+      "arch_blue": {
+        "fill": "#0f1d2f",
+        "stroke": "#4493f8",
+        "text_fill": "#9ec5ff"
+      },
+      "root": {
+        "fill": "#1f6feb",
+        "stroke": "#4493f8",
+        "text_fill": "#ffffff"
+      }
+    }
+  },
+  "defaults": {
+    "edge": {
+      "stroke_opacity": 0.7
+    }
+  },
+  "kind_styles": {
+    "leaf": {
+      "fill": "#1c2128"
+    }
+  }
+}

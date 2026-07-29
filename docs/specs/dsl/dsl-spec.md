@@ -2,7 +2,7 @@
 
 > 版本：2.0-draft  
 > 状态：语法契约草案（相对 [`language-spec.md`](language-spec.md) 的瘦身重设计）  
-> 定稿选择：`kind` + `: shape`；无声明式样式；ER 内容扩展另文；自环默认禁、profile 可开
+> 定稿选择：`kind` + `: shape`；边端口 `side` + `slot`（默认算法推断）；无声明式样式；ER 内容扩展另文；自环默认禁、profile 可开
 
 ---
 
@@ -354,7 +354,97 @@ mobile -> api
 - 中间标签：紧跟箭头后的 string
 - 端点标签：`>"head"` 靠近目标，`<"tail"` 靠近源
 
-### 7.4 示例
+### 7.4 端口（side + slot）
+
+边不仅连接「哪个 node」，还连接「节点的哪一侧、侧上第几档」。这是 Hierarchical 正交主路径的**结构性**字段：避免落笔猜侧中点导致正反边重合。
+
+#### 7.4.1 模型（IR / 引擎）
+
+每条边两端各有一个端口引用（概念类型，落地在 model / Plan）：
+
+```
+PortRef = { side: Side, slot: u32 }
+Side    = north | south | east | west
+```
+
+| 字段 | 含义 |
+|------|------|
+| `side` | 锚在节点的哪条边（封闭四向） |
+| `slot` | 同侧多条边的离散档位（`0, 1, 2, …`），用于错开 |
+
+**写权（硬纪律）：**
+
+- 端口的 **side / slot 由布局组合相（端口决策）写入**；度量相只算像素锚点；**Ink / 落笔不得发明或改写端口**。
+- DSL 未写明的端口 → 解析后为「未指定」→ **算法推断并写入**，不是渲染器猜测。
+
+坐标系约定：与 `layout: hierarchical { direction: … }` 独立——`north/south/east/west` 相对**节点自身框**，不随画布转置改名；画布 LTR/TTB 只影响默认推断策略。
+
+#### 7.4.2 DSL 表面（保持轻量）
+
+**默认：不写端口。** `a -> b` 合法；推断交给 Hier（或当前 layout）。
+
+需要钉死时，在边的属性块中声明（均为可选，键为标准属性）：
+
+| 属性键 | 类型 | 说明 |
+|--------|------|------|
+| `from_side` | atom（`north`/`south`/`east`/`west`） | 源端侧 |
+| `to_side` | atom（同上） | 目标端侧 |
+| `from_slot` | number（非负整数） | 源端档位；省略则算法可在该侧内分配 |
+| `to_slot` | number（非负整数） | 目标端档位 |
+
+规则：
+
+1. **四者皆省略** → 两端端口完全由算法决定。  
+2. **只写 `*_side`** → 该端侧固定；`slot` 仍可由算法在该侧内分配。  
+3. **写了 `*_slot` 必须同时写对应 `*_side`** → 否则解析/校验错误。  
+4. **side + slot 都写** → 该端端口固定（布局须尊重；无法满足时显式降级/告警，禁止静默改侧）。  
+5. 未识别的 side atom → 校验错误（封闭集，不回退）。
+
+不引入新的箭头语法或 `@south` 后缀；端口只走属性块，避免语法爆炸。
+
+#### 7.4.3 示例（正反边错开）
+
+```plotgram
+node a "A"
+node b "B"
+
+// 默认：端口由 hierarchical 推断（推荐）
+a -> b "req"
+b --> a "resp"
+
+// 显式钉死：同侧不同 slot，避免重合
+a -> b "req" {
+    from_side: south
+    to_side: north
+    from_slot: 0
+    to_slot: 0
+}
+b --> a "resp" {
+    from_side: north
+    to_side: south
+    from_slot: 1
+    to_slot: 1
+}
+```
+
+示意（算法或显式指定后）：
+
+```
+    ┌───────┐
+    │   A   │
+    └──┬─┬──┘  south slot0 / slot1
+       │ │
+    ┌──┴─┴──┐
+    │   B   │
+    └───────┘
+```
+
+### 7.5 标签
+
+- 中间标签：紧跟箭头后的 string
+- 端点标签：`>"head"` 靠近目标，`<"tail"` 靠近源
+
+### 7.6 示例
 
 ```plotgram
 user -> api "请求"
@@ -362,13 +452,15 @@ api --> user "响应"
 a <-> b "同步"
 api -> db "查询" >"1" <"N"
 api -> cache { status: degraded }
+db -> api "回写" { from_side: north, to_side: south }
 ```
 
-### 7.5 规则
+### 7.7 规则
 
 - 两端必须是已声明的 **node**（不能是 group）
-- 允许同一对 node 多条边
+- 允许同一对 node 多条边（靠解析器分配的稳定 `edge id` 区分；端口/slot 负责几何错开）
 - **自环**（`a -> a`）：默认禁止；flowchart / state 等 profile 可显式允许（见 §8）
+- 端口属性遵守 §7.4.2；Ink 不得补端口
 
 ---
 
@@ -378,12 +470,13 @@ api -> cache { status: degraded }
 .pgm
   → parse（AST 可保留 diagram_type，供诊断 / profile）
   → profile expand（默认 layout / edge_routing、kind 默认、自环策略、图种约束）
-  → LayoutContract（算法名 + 参数 + 图模型）
-  → layout / routing 引擎
+  → LayoutContract（算法名 + 参数 + 图模型；边可含未决或已钉死的端口）
+  → layout / routing 引擎（组合相补全端口 → 度量 → 落笔）
 ```
 
 - 引擎入口**不**按图名分支（禁图名特判）；差异只来自 contract / profile 已展开的字段
 - 默认算法与约束表由引擎注册表维护；本规范只要求「有 profile、可展开」
+- **端口**：DSL 可选约束；Hier 主路径必须在落笔前完成端口决策（见 §7.4）
 - 示意（非封闭承诺，以实现注册表为准）：
 
 | diagram_type | 默认 layout（示意） | 默认 edge_routing（示意） | 自环 |
@@ -487,6 +580,8 @@ true, false
 | 7 | 自环默认非法；仅 profile 允许时合法 |
 | 8 | 形状未识别 → 渲染回退 `rect` |
 | 9 | 无声明式样式；仅 `style.*` / `theme` / `render_style` |
+| 10 | 边端口：`from_slot`/`to_slot` 不得单独出现；`*_side` 必须是四向封闭集 |
+| 11 | 端口写者是布局组合相；落笔不得发明 side/slot |
 
 ---
 
@@ -515,9 +610,11 @@ diagram flowchart {
     login -> api "提交"
     api --> login "结果"
     login -> ok
-    ok -> start "重试"    // 若 profile 允许自环以外的回边；自环仍依 §7.5
+    ok -> start "重试"    // 回边；自环仍依 §7.7
 }
 ```
+
+端口显式示例见 §7.4.3；上例故意不写端口，由 hierarchical 推断。
 
 ---
 
@@ -528,6 +625,7 @@ diagram flowchart {
 | 节点关键字 | `entity` | `node` |
 | 语义标注 | `entity[database]` / `type:` | `kind:` |
 | 形状 | 多由 type 推断 / style.shape | `: shape` 显式覆盖 |
+| 边端口 | 无（落笔易猜中点） | **`from_side`/`to_side` + slot**；默认算法推断 |
 | 声明式样式 | `node_style` / `edge_style` | **删除**；仅内联 `style.*` |
 | ER `field` | （旧亦弱） | **本草案不做**；另文 |
 | 自环 | decision 例外 | 默认禁，profile 可开 |
