@@ -6,8 +6,8 @@
 //!
 //! Design principles:
 //! - Theme = paint (colors, fonts); render_style = brush (standard / sketch)
-//! - No `diagrams` section in themes; visual variance driven by `kind`
-//! - Icons inferred from `kind`, overridable via `icon:` attribute
+//! - No `diagrams` section in themes; visual variance driven by `variant`
+//! - Icons from explicit `icon:` attribute only (no inference)
 
 pub mod ascii;
 pub mod edges;
@@ -178,6 +178,8 @@ mod tests {
                 path: EdgePath {
                     points: vec![Point { x: 50.0, y: 50.0 }, Point { x: 50.0, y: 110.0 }],
                 },
+                from_port: None,
+                to_port: None,
             }],
             groups: vec![],
             labels: vec![],
@@ -326,6 +328,8 @@ mod tests {
             path: EdgePath {
                 points: vec![Point { x: 60.0, y: 110.0 }, Point { x: 60.0, y: 50.0 }],
             },
+            from_port: None,
+            to_port: None,
         });
         let svg = render_svg(&input);
         assert_eq!(svg.matches("<marker").count(), 2, "one def per color:\n{svg}");
@@ -366,14 +370,14 @@ mod tests {
     }
 
     #[test]
-    fn node_icon_is_rendered_from_kind() {
+    fn node_icon_is_rendered_from_explicit_attr() {
         use plotgram_model::attr::AttrValue;
         use plotgram_model::result::{LabelOwner, LabelSlot};
 
         let mut input = minimal_input();
         input.graph.nodes[0]
             .attrs
-            .insert("kind".to_string(), AttrValue::Atom("queue".to_string()));
+            .insert("icon".to_string(), AttrValue::Atom("queue".to_string()));
         input.layout.labels.push(LabelSlot {
             owner: LabelOwner::Node("a".to_string()),
             role: None,
@@ -383,7 +387,7 @@ mod tests {
         let svg = render_svg(&input);
         assert!(
             svg.contains("<g transform=\"translate("),
-            "kind=queue node label should include an icon glyph:\n{svg}"
+            "icon=queue node label should include an icon glyph:\n{svg}"
         );
 
         // Degrade: icon + label wider than the frame → icon dropped, text kept
@@ -416,7 +420,7 @@ mod tests {
 
         input.graph.groups.push(Group {
             id: "g1".to_string(),
-            label: "G".to_string(),
+            label: Some("G".to_string()),
             attrs: {
                 let mut a = AttrMap::new();
                 a.insert(

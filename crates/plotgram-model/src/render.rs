@@ -19,7 +19,7 @@ pub struct RenderMeta {
 /// Everything the renderer needs to produce SVG (or other backends).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RenderInput {
-    /// Structural IR: shape, kind, arrow, style.*, labels text sources.
+    /// Structural IR: shape, variant, arrow, style.*, labels text sources.
     pub graph: Graph,
     /// Geometry from the engine.
     pub layout: LayoutResult,

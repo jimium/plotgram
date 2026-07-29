@@ -221,6 +221,8 @@ mod tests {
             path: EdgePath {
                 points: pts.iter().map(|&(x, y)| Point { x, y }).collect(),
             },
+            from_port: None,
+            to_port: None,
         }
     }
 

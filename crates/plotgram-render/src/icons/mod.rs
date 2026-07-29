@@ -1,6 +1,6 @@
 //! Icon system: resolve and render node decoration icons.
 //!
-//! Resolution priority: `icon: none` → explicit `icon: <id>` → kind inference → none.
+//! Resolution: `icon: none` → explicit `icon: <id>` → none. No inference.
 
 pub mod catalog;
 pub mod render;
@@ -14,8 +14,9 @@ use plotgram_model::graph::Node;
 ///
 /// 1. `icon: none` → None
 /// 2. `icon: <id>` → explicit lookup (by id or alias)
-/// 3. `kind` → inference table
-/// 4. Shape compatibility check (skip icon if incompatible)
+/// 3. No icon attribute → None
+///
+/// No inference from variant or other attributes (dsl-spec §14.3.1).
 pub fn resolve_icon(node: &Node, shape: &str) -> Option<&'static IconDef> {
     // Check explicit icon attribute
     if let Some(icon_val) = node.attrs.get("icon").and_then(|v| v.as_str()) {
@@ -28,15 +29,6 @@ pub fn resolve_icon(node: &Node, shape: &str) -> Option<&'static IconDef> {
             }
             // Explicit icon but incompatible shape → skip
             return None;
-        }
-    }
-
-    // Infer from kind
-    if let Some(kind) = node.kind() {
-        if let Some(icon) = catalog::icon_for_kind(kind) {
-            if render::is_compatible(icon, shape) {
-                return Some(icon);
-            }
         }
     }
 

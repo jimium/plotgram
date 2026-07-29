@@ -1,6 +1,6 @@
 //! Theme system: loading, compilation, and resolved access.
 //!
-//! V2 themes are flat: no `diagrams` section. Visual variance is driven by `kind`.
+//! V2 themes are flat: no `diagrams` section. Visual variance is driven by `variant`.
 
 pub mod compile;
 pub mod schema;
@@ -14,7 +14,7 @@ pub struct CompiledTheme {
     pub id: String,
     pub name: String,
     pub defaults: CompiledDefaults,
-    pub kind_styles: BTreeMap<String, KindStyle>,
+    pub compiled_variants: BTreeMap<String, VariantStyle>,
     pub tokens: schema::Tokens,
 }
 
@@ -24,22 +24,23 @@ pub struct CompiledDefaults {
     pub canvas_background: String,
     pub title_fill: String,
     pub title_font_size: f64,
-    pub node: KindStyle,
+    /// Global default node shape (from `defaults.node.shape`; fallback "rounded_rect").
+    pub node_shape: String,
+    pub node: VariantStyle,
     pub edge: EdgeDefaults,
     pub group: GroupDefaults,
     pub typography: Typography,
 }
 
-/// Style entry for a kind (or the default node style).
+/// Paint block for a variant (or the default node paint). No shape (style-sheet-spec §7).
 #[derive(Debug, Clone)]
-pub struct KindStyle {
+pub struct VariantStyle {
     pub fill: String,
     pub stroke: String,
     pub stroke_width: f64,
     pub text_fill: String,
     pub font_size: f64,
     pub font_weight: Option<String>,
-    pub shape: Option<String>,
     pub radius: Option<f64>,
     pub stroke_dasharray: Option<String>,
     pub stroke_linecap: Option<String>,
@@ -167,12 +168,12 @@ mod tests {
             assert!(t.defaults.edge.font_size > 0.0, "{id}: edge font_size");
             assert!(!t.defaults.edge.response_dasharray.is_empty(), "{id}: response dasharray");
             // Unresolved token refs would leak braces into SVG attributes
-            for (kind, ks) in &t.kind_styles {
+            for (variant, vs) in &t.compiled_variants {
                 assert!(
-                    !ks.fill.contains('{') && !ks.stroke.contains('{'),
-                    "{id}/{kind}: unresolved token reference: fill={} stroke={}",
-                    ks.fill,
-                    ks.stroke
+                    !vs.fill.contains('{') && !vs.stroke.contains('{'),
+                    "{id}/{variant}: unresolved token reference: fill={} stroke={}",
+                    vs.fill,
+                    vs.stroke
                 );
             }
         }

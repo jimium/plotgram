@@ -1,7 +1,7 @@
 //! Style resolution: (Graph + Theme) → per-element resolved styles.
 //!
-//! Priority chain: node.attrs["style.*"] > theme.kind_styles[kind] > theme.defaults.node
-//! Edge / group: theme.defaults → inline style.*
+//! Priority chain (node): compiled_variants[variant] → style.*
+//! Priority chain (edge/group): defaults.* → variant cascade → style.*
 
 use std::collections::BTreeMap;
 
@@ -9,7 +9,7 @@ use plotgram_model::attr::{AttrMap, AttrValue};
 use plotgram_model::graph::{Arrow, Edge, Graph, Group, Node};
 
 use crate::icons::{self, IconDef};
-use crate::theme::{CompiledTheme, KindStyle};
+use crate::theme::{CompiledTheme, VariantStyle};
 
 /// Resolved styles for all elements in a graph, keyed by element id.
 #[derive(Debug, Clone)]
@@ -35,7 +35,7 @@ pub struct ResolvedNodeStyle {
     pub stroke_linejoin: Option<String>,
     pub fill_opacity: Option<f64>,
     pub stroke_opacity: Option<f64>,
-    /// Decoration icon (from `icon:` attr or kind inference; shape-compatible).
+    /// Decoration icon (from explicit `icon:` attr only; shape-compatible).
     pub icon: Option<&'static IconDef>,
 }
 
@@ -115,27 +115,24 @@ fn resolve_group_recursive(
 
 /// Resolve a single node's style.
 pub fn resolve_node(node: &Node, theme: &CompiledTheme) -> ResolvedNodeStyle {
-    // Layer 1: theme defaults (compiled KindStyle)
-    // Layer 2: kind_styles — full replace (already materialized against defaults at compile)
-    let base = if let Some(kind) = node.kind() {
-        theme
-            .kind_styles
-            .get(kind)
-            .unwrap_or(&theme.defaults.node)
-    } else {
-        &theme.defaults.node
-    };
-    let mut style = kind_style_to_resolved(base);
+    // Shape chain: defaults.node_shape → DSL shape: (archetype/profile filled upstream)
+    let shape = node
+        .shape
+        .clone()
+        .unwrap_or_else(|| theme.defaults.node_shape.clone());
 
-    // Layer 3: explicit shape from DSL (`: cylinder`)
-    if let Some(shape) = &node.shape {
-        style.shape = shape.clone();
-    }
+    // Paint chain: compiled_variants[variant] → style.*
+    let variant_key = node.variant().unwrap_or("default");
+    let base = theme
+        .compiled_variants
+        .get(variant_key)
+        .unwrap_or(&theme.defaults.node);
+    let mut style = variant_style_to_resolved(base, shape);
 
-    // Layer 4: inline style.* attrs (highest priority)
+    // Inline style.* attrs (highest priority)
     apply_inline_node_styles(&mut style, &node.attrs);
 
-    // Icon: resolved last, against the final shape (compatibility check)
+    // Icon: explicit only, against final shape (dsl-spec §14.3.1)
     style.icon = icons::resolve_icon(node, &style.shape);
 
     style
@@ -159,6 +156,20 @@ fn resolve_edge(edge: &Edge, theme: &CompiledTheme) -> ResolvedEdgeStyle {
         label_bg_opacity: e.label_bg_opacity,
     };
 
+    // Variant cascade: pick edge-applicable fields from compiled_variants[v]
+    let variant_key = edge
+        .attrs
+        .get("variant")
+        .and_then(|v| v.as_str())
+        .unwrap_or("default");
+    if variant_key != "default" {
+        if let Some(vs) = theme.compiled_variants.get(variant_key) {
+            // pick: stroke, text_fill (edge applicable keys per style-sheet-spec §5)
+            style.stroke = vs.stroke.clone();
+            style.text_fill = vs.text_fill.clone();
+        }
+    }
+
     apply_inline_edge_styles(&mut style, &edge.attrs);
 
     // `-->` response / return: dashed unless author already set dash
@@ -180,25 +191,43 @@ fn resolve_group_style(group: &Group, theme: &CompiledTheme) -> ResolvedGroupSty
         stroke_dasharray: g.stroke_dasharray.clone(),
         fill_opacity: g.fill_opacity,
     };
+
+    // Variant cascade: pick group-applicable fields from compiled_variants[v]
+    let variant_key = group
+        .attrs
+        .get("variant")
+        .and_then(|v| v.as_str())
+        .unwrap_or("default");
+    if variant_key != "default" {
+        if let Some(vs) = theme.compiled_variants.get(variant_key) {
+            // pick: fill, stroke, radius (group applicable keys per style-sheet-spec §5)
+            style.fill = vs.fill.clone();
+            style.stroke = vs.stroke.clone();
+            if let Some(r) = vs.radius {
+                style.radius = r;
+            }
+        }
+    }
+
     apply_inline_group_styles(&mut style, &group.attrs);
     style
 }
 
-fn kind_style_to_resolved(ks: &KindStyle) -> ResolvedNodeStyle {
+fn variant_style_to_resolved(vs: &VariantStyle, shape: String) -> ResolvedNodeStyle {
     ResolvedNodeStyle {
-        fill: ks.fill.clone(),
-        stroke: ks.stroke.clone(),
-        stroke_width: ks.stroke_width,
-        shape: ks.shape.clone().unwrap_or_else(|| "rounded_rect".to_string()),
-        text_fill: ks.text_fill.clone(),
-        font_size: ks.font_size,
-        font_weight: ks.font_weight.clone(),
-        radius: ks.radius,
-        stroke_dasharray: ks.stroke_dasharray.clone(),
-        stroke_linecap: ks.stroke_linecap.clone(),
-        stroke_linejoin: ks.stroke_linejoin.clone(),
-        fill_opacity: ks.fill_opacity,
-        stroke_opacity: ks.stroke_opacity,
+        fill: vs.fill.clone(),
+        stroke: vs.stroke.clone(),
+        stroke_width: vs.stroke_width,
+        shape,
+        text_fill: vs.text_fill.clone(),
+        font_size: vs.font_size,
+        font_weight: vs.font_weight.clone(),
+        radius: vs.radius,
+        stroke_dasharray: vs.stroke_dasharray.clone(),
+        stroke_linecap: vs.stroke_linecap.clone(),
+        stroke_linejoin: vs.stroke_linejoin.clone(),
+        fill_opacity: vs.fill_opacity,
+        stroke_opacity: vs.stroke_opacity,
         icon: None,
     }
 }
@@ -352,10 +381,10 @@ fn apply_inline_group_styles(style: &mut ResolvedGroupStyle, attrs: &AttrMap) {
 mod tests {
     use super::*;
 
-    fn node(kind: Option<&str>, shape: Option<&str>, styles: &[(&str, AttrValue)]) -> Node {
+    fn node(variant: Option<&str>, shape: Option<&str>, styles: &[(&str, AttrValue)]) -> Node {
         let mut attrs = AttrMap::new();
-        if let Some(k) = kind {
-            attrs.insert("kind".to_string(), AttrValue::Atom(k.to_string()));
+        if let Some(v) = variant {
+            attrs.insert("variant".to_string(), AttrValue::Atom(v.to_string()));
         }
         for (k, v) in styles {
             attrs.insert((*k).to_string(), v.clone());
@@ -372,31 +401,31 @@ mod tests {
     fn node_style_priority_chain() {
         let theme = crate::theme::load(None);
         let defaults = &theme.defaults.node;
-        let decision = &theme.kind_styles["decision"];
+        let primary = &theme.compiled_variants["primary"];
         assert_ne!(
-            decision.fill, defaults.fill,
-            "precondition: decision kind must differ from defaults for this test"
+            primary.fill, defaults.fill,
+            "precondition: primary variant must differ from defaults for this test"
         );
 
-        // Layer 1: theme defaults only
+        // Layer 1: theme defaults only (variant=default equals defaults.node)
         let r = resolve_node(&node(None, None, &[]), &theme);
         assert_eq!(r.fill, defaults.fill);
-        assert_eq!(r.shape, "rounded_rect");
+        assert_eq!(r.shape, theme.defaults.node_shape);
 
-        // Layer 2: kind replaces the whole base
-        let r = resolve_node(&node(Some("decision"), None, &[]), &theme);
-        assert_eq!(r.shape, "diamond");
-        assert_eq!(r.fill, decision.fill);
+        // Layer 2: variant replaces paint, shape stays independent
+        let r = resolve_node(&node(Some("primary"), None, &[]), &theme);
+        assert_eq!(r.fill, primary.fill);
+        assert_eq!(r.shape, theme.defaults.node_shape);
 
-        // Layer 3: explicit DSL shape overrides kind shape, paint untouched
-        let r = resolve_node(&node(Some("decision"), Some("hexagon"), &[]), &theme);
+        // Layer 3: explicit DSL shape overrides default shape, paint from variant
+        let r = resolve_node(&node(Some("primary"), Some("hexagon"), &[]), &theme);
         assert_eq!(r.shape, "hexagon");
-        assert_eq!(r.fill, decision.fill);
+        assert_eq!(r.fill, primary.fill);
 
         // Layer 4: inline style.* beats everything below
         let r = resolve_node(
             &node(
-                Some("decision"),
+                Some("primary"),
                 Some("hexagon"),
                 &[
                     ("style.fill", AttrValue::Str("#123456".to_string())),
@@ -411,18 +440,18 @@ mod tests {
         assert_eq!(r.stroke_width, 3.0);
         assert_eq!(r.stroke_dasharray.as_deref(), Some("4,3"));
 
-        // style.dashed: false clears a prior dash (e.g. from kind)
+        // style.dashed: false clears a prior dash (e.g. from muted variant)
         let r = resolve_node(
             &node(
-                Some("external"),
+                Some("muted"),
                 None,
                 &[("style.dashed", AttrValue::Bool(false))],
             ),
             &theme,
         );
         assert!(
-            theme.kind_styles["external"].stroke_dasharray.is_some(),
-            "precondition: external kind has dash"
+            theme.compiled_variants["muted"].stroke_dasharray.is_some(),
+            "precondition: muted variant has dash"
         );
         assert_eq!(r.stroke_dasharray, None);
 

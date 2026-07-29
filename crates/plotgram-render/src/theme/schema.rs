@@ -14,7 +14,7 @@ pub struct ThemeFile {
     #[serde(default)]
     pub defaults: Defaults,
     #[serde(default)]
-    pub kind_styles: BTreeMap<String, BTreeMap<String, StyleValue>>,
+    pub variants: BTreeMap<String, BTreeMap<String, StyleValue>>,
 }
 
 /// Design tokens.

@@ -34,11 +34,11 @@
       "label_gap": 8
     }
   },
-  "kind_styles": {
-    "main": {
+  "variants": {
+    "default": {
       "font_weight": "bold"
     },
-    "branch": {
+    "secondary": {
       "font_weight": "medium"
     }
   }

@@ -99,8 +99,8 @@
       "stroke_opacity": 0.7
     }
   },
-  "kind_styles": {
-    "leaf": {
+  "variants": {
+    "muted": {
       "fill": "#1c2128"
     }
   }

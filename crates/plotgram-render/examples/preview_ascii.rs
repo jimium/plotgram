@@ -48,6 +48,8 @@ fn route(id: &str, source: &str, target: &str, pts: &[(f64, f64)]) -> EdgePlacem
         path: EdgePath {
             points: pts.iter().map(|&(x, y)| Point { x, y }).collect(),
         },
+        from_port: None,
+        to_port: None,
     }
 }
 

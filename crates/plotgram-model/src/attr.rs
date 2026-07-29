@@ -16,7 +16,7 @@ use std::fmt;
 pub enum AttrValue {
     /// Quoted string literal.
     Str(String),
-    /// Unquoted atom (algorithm names, kind, status, shape, …).
+    /// Unquoted atom (algorithm names, variant, icon, status, …).
     Atom(String),
     /// Numeric literal.
     Num(f64),

@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 use super::schema::{StyleValue, ThemeFile};
 use super::{
-    CompiledDefaults, CompiledTheme, EdgeDefaults, GroupDefaults, KindStyle, Typography,
+    CompiledDefaults, CompiledTheme, EdgeDefaults, GroupDefaults, Typography, VariantStyle,
 };
 
 /// Compile a theme, resolving `extends` inheritance chain.
@@ -70,7 +70,7 @@ fn merge_theme_files(parent: ThemeFile, child: ThemeFile) -> ThemeFile {
             edge: merge_maps(parent.defaults.edge, child.defaults.edge),
             group: merge_maps(parent.defaults.group, child.defaults.group),
         },
-        kind_styles: merge_nested_maps(parent.kind_styles, child.kind_styles),
+        variants: merge_nested_maps(parent.variants, child.variants),
     }
 }
 
@@ -103,6 +103,9 @@ fn merge_nested_maps(
     parent
 }
 
+/// The five required variant keys (dsl-spec §14.7 closed set).
+const REQUIRED_VARIANTS: &[&str] = &["default", "primary", "secondary", "muted", "info"];
+
 /// Compile a fully-resolved ThemeFile (no extends) into CompiledTheme.
 fn compile_resolved(file: ThemeFile) -> CompiledTheme {
     // Build flat token lookup: "colors.canvas" → "#F7F7F8"
@@ -111,18 +114,30 @@ fn compile_resolved(file: ThemeFile) -> CompiledTheme {
     // Resolve defaults
     let defaults = compile_defaults(&file, &token_map);
 
-    // Resolve kind_styles
-    let kind_styles = file
-        .kind_styles
+    // Validate required variant keys (style-sheet-spec §6.1)
+    for &key in REQUIRED_VARIANTS {
+        if !file.variants.contains_key(key) {
+            panic!(
+                "theme '{}': missing required variant '{}' (must have: {:?})",
+                file.id, key, REQUIRED_VARIANTS
+            );
+        }
+    }
+
+    // Resolve variants: compiled_variants[v] = defaults.node ⊕ variants[v]
+    let compiled_variants = file
+        .variants
         .iter()
-        .map(|(kind, props)| (kind.clone(), compile_kind_style(props, &token_map, &defaults.node)))
+        .map(|(variant, props)| {
+            (variant.clone(), compile_variant_style(props, &token_map, &defaults.node))
+        })
         .collect();
 
     CompiledTheme {
         id: file.id,
         name: file.name,
         defaults,
-        kind_styles,
+        compiled_variants,
         tokens: file.tokens,
     }
 }
@@ -217,7 +232,11 @@ fn compile_defaults(file: &ThemeFile, tokens: &BTreeMap<String, String>) -> Comp
         .unwrap_or_else(|| "#18181B".to_string());
     let title_font_size = get_f64(&d.title, "font_size", tokens).unwrap_or(21.0);
 
-    let node = compile_kind_style(&d.node, tokens, &default_node_style());
+    // Extract node shape separately (variants must not contain shape)
+    let node_shape = get_resolved(&d.node, "shape", tokens)
+        .unwrap_or_else(|| "rounded_rect".to_string());
+
+    let node = compile_variant_style(&d.node, tokens, &default_node_style());
 
     let edge = EdgeDefaults {
         stroke: get_resolved(&d.edge, "stroke", tokens).unwrap_or_else(|| "#9C9CA6".to_string()),
@@ -256,6 +275,7 @@ fn compile_defaults(file: &ThemeFile, tokens: &BTreeMap<String, String>) -> Comp
         canvas_background,
         title_fill,
         title_font_size,
+        node_shape,
         node,
         edge,
         group,
@@ -263,19 +283,18 @@ fn compile_defaults(file: &ThemeFile, tokens: &BTreeMap<String, String>) -> Comp
     }
 }
 
-fn compile_kind_style(
+fn compile_variant_style(
     props: &BTreeMap<String, StyleValue>,
     tokens: &BTreeMap<String, String>,
-    base: &KindStyle,
-) -> KindStyle {
-    KindStyle {
+    base: &VariantStyle,
+) -> VariantStyle {
+    VariantStyle {
         fill: get_resolved(props, "fill", tokens).unwrap_or_else(|| base.fill.clone()),
         stroke: get_resolved(props, "stroke", tokens).unwrap_or_else(|| base.stroke.clone()),
         stroke_width: get_f64(props, "stroke_width", tokens).unwrap_or(base.stroke_width),
         text_fill: get_resolved(props, "text_fill", tokens).unwrap_or_else(|| base.text_fill.clone()),
         font_size: get_f64(props, "font_size", tokens).unwrap_or(base.font_size),
         font_weight: get_resolved(props, "font_weight", tokens).or_else(|| base.font_weight.clone()),
-        shape: get_resolved(props, "shape", tokens).or_else(|| base.shape.clone()),
         radius: get_f64(props, "radius", tokens).or(base.radius),
         stroke_dasharray: get_resolved(props, "stroke_dasharray", tokens)
             .filter(|s| s != "none")
@@ -287,15 +306,14 @@ fn compile_kind_style(
     }
 }
 
-fn default_node_style() -> KindStyle {
-    KindStyle {
+fn default_node_style() -> VariantStyle {
+    VariantStyle {
         fill: "#FFFFFF".to_string(),
         stroke: "#C9C9C9".to_string(),
         stroke_width: 1.0,
         text_fill: "#18181B".to_string(),
         font_size: 17.0,
         font_weight: None,
-        shape: Some("rounded_rect".to_string()),
         radius: Some(10.0),
         stroke_dasharray: None,
         stroke_linecap: Some("round".to_string()),

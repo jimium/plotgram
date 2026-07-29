@@ -123,22 +123,6 @@ static ICONS: &[IconDef] = &[
     IconDef { id: "globe", category: IconCategory::Generic, aliases: &["internet", "world"], svg_content: include_str!("../../assets/glyphs/generic/globe.svg"), incompatible_shapes: &[] },
 ];
 
-// ─── Kind → Icon inference table ─────────────────────────────────
-
-/// Map from V2 `kind` to default icon id.
-static KIND_ICON_MAP: &[(&str, &str)] = &[
-    ("database", "database"),
-    ("cache", "cache"),
-    ("queue", "queue"),
-    ("gateway", "gateway"),
-    ("storage", "storage"),
-    ("external", "external"),
-    ("client", "browser"),
-    ("person", "user"),
-    ("frontend", "browser"),
-    ("server", "server"),
-];
-
 // ─── Public API ──────────────────────────────────────────────────
 
 /// All registered icons.
@@ -162,14 +146,6 @@ pub fn icon_by_key(key: &str) -> Option<&'static IconDef> {
             .iter()
             .find(|icon| icon.aliases.iter().any(|alias| normalize_key(alias) == key))
     })
-}
-
-/// Infer icon from kind.
-pub fn icon_for_kind(kind: &str) -> Option<&'static IconDef> {
-    KIND_ICON_MAP
-        .iter()
-        .find(|(k, _)| *k == kind)
-        .and_then(|(_, icon_id)| icon_by_id(icon_id))
 }
 
 /// Normalize icon key: lowercase, `-` → `_`, trim.

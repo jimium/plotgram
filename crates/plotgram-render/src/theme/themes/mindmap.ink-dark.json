@@ -58,11 +58,11 @@
       "radius": "{radius.md}"
     }
   },
-  "kind_styles": {
-    "main": {
+  "variants": {
+    "default": {
       "font_weight": "bold"
     },
-    "branch": {
+    "secondary": {
       "font_weight": "medium"
     }
   }

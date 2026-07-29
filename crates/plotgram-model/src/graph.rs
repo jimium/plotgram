@@ -25,16 +25,16 @@ pub struct Node {
     pub id: String,
     /// Display label; `None` = unlabeled pure shape.
     pub label: Option<String>,
-    /// Explicit rendering shape override (closed set; `None` = inferred by kind/profile).
+    /// Explicit rendering shape override (closed set; `None` = resolved via shape chain, dsl-spec §14.3.2).
     pub shape: Option<String>,
-    /// Free-form attributes (`kind`, `status`, `style.*`, `meta.*`, …).
+    /// Free-form attributes (`variant`, `icon`, `status`, `style.*`, `meta.*`, …).
     pub attrs: AttrMap,
 }
 
 impl Node {
-    /// Semantic kind from attrs (`kind:`), if present.
-    pub fn kind(&self) -> Option<&str> {
-        self.attrs.get("kind").and_then(|v| v.as_str())
+    /// Visual variant from attrs (`variant:`), if present (dsl-spec §14.7).
+    pub fn variant(&self) -> Option<&str> {
+        self.attrs.get("variant").and_then(|v| v.as_str())
     }
 }
 
@@ -61,13 +61,30 @@ pub struct Edge {
     pub attrs: AttrMap,
 }
 
+impl Edge {
+    /// Source-end port constraint from attrs (`from_side` / `from_slot`),
+    /// validated per dsl-spec §7.4.2. `Ok(None)` = fully algorithm-decided.
+    pub fn from_port_constraint(
+        &self,
+    ) -> Result<Option<crate::port::PortConstraint>, crate::port::PortConstraintError> {
+        crate::port::port_constraint(&self.attrs, "from_side", "from_slot")
+    }
+
+    /// Target-end port constraint from attrs (`to_side` / `to_slot`).
+    pub fn to_port_constraint(
+        &self,
+    ) -> Result<Option<crate::port::PortConstraint>, crate::port::PortConstraintError> {
+        crate::port::port_constraint(&self.attrs, "to_side", "to_slot")
+    }
+}
+
 /// A group container (dsl-spec §6). Recursive: may contain nested groups.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Group {
     /// Unique identifier.
     pub id: String,
-    /// Display label (required for groups).
-    pub label: String,
+    /// Display label; `None` = untitled group (dsl-spec §6.2).
+    pub label: Option<String>,
     /// Group-level attributes (`layout` hint, `style.*`, …).
     pub attrs: AttrMap,
     /// Child nodes.
@@ -225,13 +242,13 @@ mod tests {
             edges: vec![edge("top_edge", Arrow::Forward)],
             groups: vec![Group {
                 id: "g1".to_string(),
-                label: "G1".to_string(),
+                label: Some("G1".to_string()),
                 attrs: AttrMap::new(),
                 nodes: vec![node("inner_node")],
                 edges: vec![edge("inner_edge", Arrow::Response)],
                 groups: vec![Group {
                     id: "g2".to_string(),
-                    label: "G2".to_string(),
+                    label: Some("G2".to_string()),
                     attrs: AttrMap::new(),
                     nodes: vec![node("deep_node")],
                     edges: vec![edge("deep_edge", Arrow::Bidirectional)],

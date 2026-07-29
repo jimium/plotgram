@@ -99,27 +99,23 @@
       "radius": "{radius.sm}"
     }
   },
-  "kind_styles": {
-    "root": {
-      "shape": "circle",
+  "variants": {
+    "default": {
+      "font_size": "{typography.label_size}",
+      "font_weight": "medium"
+    },
+    "primary": {
       "fill": "{role.root.fill}",
       "stroke": "{role.root.stroke}",
       "text_fill": "{role.root.text_fill}",
       "font_size": "{typography.title_size}",
       "font_weight": "bold"
     },
-    "main": {
-      "shape": "rounded_rect",
-      "font_size": "{typography.label_size}",
-      "font_weight": "medium"
-    },
-    "branch": {
-      "shape": "rounded_rect"
-    },
-    "leaf": {
-      "shape": "rounded_rect",
+    "secondary": {},
+    "muted": {
       "stroke": "transparent",
       "font_size": "{typography.small_size}"
-    }
+    },
+    "info": {}
   }
 }

@@ -11,10 +11,11 @@ model 是**纯数据层**：定义所有 crate 共享的类型，不含逻辑（
 | 模块 | 核心类型 | 消费者 |
 |------|----------|--------|
 | `geometry` | `Point`, `Rect` | 全部 |
-| `attr` | `AttrValue`, `AttrMap` | 全部 |
+| `attr` | `AttrValue`, `AttrMap`（`BTreeMap` 别名） | 全部 |
 | `graph` | `Node`, `Edge`（含稳定 `id`）, `Group`, `Graph`, `Arrow` | engine, render |
+| `port` | `Side`, `PortRef`（已解析端口）, `PortConstraint`（作者约束） | engine |
 | `contract` | `AlgorithmRef`, `LayoutContract` | **engine 入口** |
-| `result` | `LayoutResult`, `LabelOwner`, placements | engine 产出 |
+| `result` | `LayoutResult`, `NodePlacement`, `EdgePlacement`, `LabelSlot`, `LabelOwner` | engine 产出 |
 | `render` | `RenderMeta`, `RenderInput` | **render 入口** |
 | `profile` | `DiagramType`, `Profile` | **仅** DSL / profile 展开（engine 禁止 import） |
 

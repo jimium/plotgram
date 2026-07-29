@@ -147,21 +147,8 @@
       "stroke_dasharray": "6,3"
     }
   },
-  "kind_styles": {
-    "start": {
-      "shape": "circle"
-    },
-    "end": {
-      "shape": "circle",
-      "fill_opacity": 0.8
-    },
-    "decision": {
-      "shape": "diamond"
-    },
-    "process": {
-      "shape": "rect"
-    },
-    "external": {
+  "variants": {
+    "muted": {
       "stroke_dasharray": "4,4"
     }
   }

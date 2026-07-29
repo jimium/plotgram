@@ -1,5 +1,5 @@
 //! Visual preview: hand-crafted RenderInput covering all 12 shapes,
-//! kind styles, a group, edges and labels. Outputs SVG files for eyeballing.
+//! variant styles, a group, edges and labels. Outputs SVG files for eyeballing.
 //!
 //! Run: `cargo run -p plotgram-render --example preview`
 //! Output: `target/render-preview/*.svg`
@@ -13,10 +13,10 @@ use plotgram_model::result::{
 };
 use plotgram_render::render_svg;
 
-fn node(id: &str, label: &str, shape: Option<&str>, kind: Option<&str>) -> Node {
+fn node(id: &str, label: &str, shape: Option<&str>, variant: Option<&str>) -> Node {
     let mut attrs = AttrMap::new();
-    if let Some(k) = kind {
-        attrs.insert("kind".to_string(), AttrValue::Atom(k.to_string()));
+    if let Some(v) = variant {
+        attrs.insert("variant".to_string(), AttrValue::Atom(v.to_string()));
     }
     Node {
         id: id.to_string(),
@@ -55,6 +55,8 @@ fn route(id: &str, source: &str, target: &str, pts: &[(f64, f64)]) -> EdgePlacem
         path: EdgePath {
             points: pts.iter().map(|&(x, y)| Point { x, y }).collect(),
         },
+        from_port: None,
+        to_port: None,
     }
 }
 
@@ -68,23 +70,23 @@ fn node_label(id: &str, text: &str, frame: Rect) -> LabelSlot {
 }
 
 fn build_input(theme: Option<&str>, render_style: Option<&str>) -> RenderInput {
-    // ── Graph: 12 shapes, kinds where themes define kind_styles ──
+    // ── Graph: 12 shapes, variants where themes define paint overrides ──
     let graph = Graph {
         nodes: vec![
             // Row 1: a small flow
             node("start", "开始", Some("stadium"), None),
-            node("check", "库存足够?", Some("diamond"), Some("decision")),
-            node("svc", "订单服务", Some("rounded_rect"), Some("service")),
-            node("db", "订单库", Some("cylinder"), Some("database")),
+            node("check", "库存足够?", Some("diamond"), Some("info")),
+            node("svc", "订单服务", Some("rounded_rect"), Some("primary")),
+            node("db", "订单库", Some("cylinder"), Some("secondary")),
             // Row 2: process-ish shapes
             node("doc", "对账单", Some("document"), None),
             node("sub", "扣减库存", Some("subprocess"), None),
             node("para", "导入数据", Some("parallelogram"), None),
-            node("gw", "网关", Some("hexagon"), Some("gateway")),
+            node("gw", "网关", Some("hexagon"), Some("info")),
             // Row 3: actors & misc
-            node("buyer", "买家", Some("person"), Some("person")),
-            node("cache", "缓存", Some("circle"), Some("cache")),
-            node("cdn", "CDN", Some("cloud"), Some("external")),
+            node("buyer", "买家", Some("person"), Some("secondary")),
+            node("cache", "缓存", Some("circle"), Some("primary")),
+            node("cdn", "CDN", Some("cloud"), Some("muted")),
             node("plain", "普通矩形", Some("rect"), None),
         ],
         edges: vec![
@@ -135,7 +137,7 @@ fn build_input(theme: Option<&str>, render_style: Option<&str>) -> RenderInput {
     let mut graph = graph;
     graph.groups.push(plotgram_model::graph::Group {
         id: "backend".to_string(),
-        label: "后端服务".to_string(),
+        label: Some("后端服务".to_string()),
         attrs: AttrMap::new(),
         nodes: vec![],
         edges: vec![],

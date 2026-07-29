@@ -139,8 +139,8 @@
       "arrow_style": "normal"
     }
   },
-  "kind_styles": {
-    "leaf": {
+  "variants": {
+    "muted": {
       "fill": "#FFFFFF"
     }
   }

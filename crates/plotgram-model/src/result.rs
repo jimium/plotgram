@@ -1,10 +1,11 @@
 //! Layout result: geometry output from the engine.
 //!
 //! Minimal viable structure: node frames, edge polylines, label slots.
-//! The renderer also needs the original [`crate::graph::Graph`] (shape / kind /
+//! The renderer also needs the original [`crate::graph::Graph`] (shape / variant /
 //! arrow / style) plus [`crate::render::RenderMeta`] — see [`crate::render::RenderInput`].
 
 use crate::geometry::{Point, Rect};
+use crate::port::PortRef;
 
 /// Placement result for a single node.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -33,6 +34,14 @@ pub struct EdgePlacement {
     pub target: String,
     /// The routed polyline.
     pub path: EdgePath,
+    /// Resolved source port. Written by the layout composition phase
+    /// (port decision, dsl-spec §7.4.1); `None` = layout did not decide
+    /// ports (legacy paths). Ink must not invent or rewrite ports.
+    #[serde(default)]
+    pub from_port: Option<PortRef>,
+    /// Resolved target port (same write-discipline as `from_port`).
+    #[serde(default)]
+    pub to_port: Option<PortRef>,
 }
 
 /// Who owns a label slot.

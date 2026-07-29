@@ -146,12 +146,12 @@
       "stroke_width": "{strokes.normal}"
     }
   },
-  "kind_styles": {
-    "leaf": {
-      "fill": "#F5F3FF"
-    },
-    "main": {
+  "variants": {
+    "default": {
       "font_weight": "bold"
+    },
+    "muted": {
+      "fill": "#F5F3FF"
     }
   }
 }
