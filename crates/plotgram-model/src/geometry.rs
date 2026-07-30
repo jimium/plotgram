@@ -7,6 +7,19 @@ pub struct Point {
     pub y: f64,
 }
 
+/// Width × height (no position). Used for preferred node sizes before layout.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Size {
+    pub width: f64,
+    pub height: f64,
+}
+
+impl Size {
+    pub fn new(width: f64, height: f64) -> Self {
+        Self { width, height }
+    }
+}
+
 /// An axis-aligned rectangle.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Rect {
@@ -19,6 +32,19 @@ pub struct Rect {
 impl Rect {
     pub fn new(x: f64, y: f64, width: f64, height: f64) -> Self {
         Self { x, y, width, height }
+    }
+
+    pub fn from_origin_size(x: f64, y: f64, size: Size) -> Self {
+        Self {
+            x,
+            y,
+            width: size.width,
+            height: size.height,
+        }
+    }
+
+    pub fn size(&self) -> Size {
+        Size::new(self.width, self.height)
     }
 
     pub fn center(&self) -> Point {

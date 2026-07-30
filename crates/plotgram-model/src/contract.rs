@@ -1,12 +1,14 @@
 //! LayoutContract: the engine entry point.
 //!
 //! Per ADR-001 and dsl-spec §8: the engine receives an algorithm name + parameters + graph model.
-//! It does NOT receive `diagram_type`. All profile defaults are already expanded before this point.
+//! It does NOT receive `diagram_type` / `profile`. All profile defaults are already expanded.
 //!
 //! Theme / title / render_style never appear here — see [`crate::render::RenderMeta`].
+//! Preferred sizes are measured before layout — see [`crate::sizes::NodeSizes`].
 
 use crate::attr::AttrMap;
 use crate::graph::Graph;
+use crate::sizes::{MissingNodeSize, NodeSizes};
 
 /// An algorithm reference: name + free-form options.
 ///
@@ -38,9 +40,9 @@ impl AlgorithmRef {
 
 /// The layout contract handed to the engine.
 ///
-/// Pipeline: `.pgm → parse → profile expand → LayoutContract → engine`
+/// Pipeline: `.pgm → parse → profile expand → measure sizes → LayoutContract → engine`
 ///
-/// Contains everything the engine needs; contains nothing it shouldn't (no diagram_type).
+/// Contains everything the engine needs; contains nothing it shouldn't (no profile name).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LayoutContract {
     /// Layout algorithm (e.g. "hierarchical", "tree", "circular", "sequence").
@@ -53,4 +55,13 @@ pub struct LayoutContract {
     pub edge_routing: Option<AlgorithmRef>,
     /// The graph model (nodes, edges, groups).
     pub graph: Graph,
+    /// Preferred size for every leaf node (including `group_anchor`). Required.
+    pub node_sizes: NodeSizes,
+}
+
+impl LayoutContract {
+    /// Validate that every node in [`Self::graph`] has a preferred size.
+    pub fn validate_sizes(&self) -> Result<(), MissingNodeSize> {
+        self.node_sizes.require_all(&self.graph)
+    }
 }

@@ -3,6 +3,9 @@ resolver = "2"
 members = [
     "crates/plotgram-model",
     "crates/plotgram-content",
+    "crates/plotgram-parse",
+    "crates/plotgram-pipeline",
+    "crates/plotgram-engine-api",
     "crates/plotgram-engine",
     "crates/plotgram-render",
     "crates/plotgram-cli",
@@ -19,6 +22,9 @@ description = "A chart description language and rendering engine designed for AI
 [workspace.dependencies]
 plotgram-model = { path = "crates/plotgram-model" }
 plotgram-content = { path = "crates/plotgram-content" }
+plotgram-parse = { path = "crates/plotgram-parse" }
+plotgram-pipeline = { path = "crates/plotgram-pipeline" }
+plotgram-engine-api = { path = "crates/plotgram-engine-api" }
 plotgram-engine = { path = "crates/plotgram-engine" }
 plotgram-render = { path = "crates/plotgram-render" }
 serde = { version = "1", features = ["derive"] }

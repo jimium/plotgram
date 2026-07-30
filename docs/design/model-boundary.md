@@ -15,10 +15,14 @@ model 是**纯数据层**：定义所有 crate 共享的类型，不含布局/�
 | `attr` | `AttrValue`, `AttrMap` | 全部（样式/meta/开放扩展） |
 | `graph` | `Node`（含 `role`/`host_group`/`anchor`）, `Edge`, `Group`, `Graph`, `Arrow` | engine, render |
 | `port` | `Side`, `PortConstraint`（作者钉死）, `PortRef`（已决议） | engine |
-| `contract` | `AlgorithmRef`, `LayoutContract` | **engine 入口** |
+| `contract` | `AlgorithmRef`, `LayoutContract`（含 `node_sizes`） | **engine 入口** |
+| `sizes` | `NodeSizes`, `Size`（geometry） | 编排度量 → engine |
 | `result` | `LayoutResult`, placements（含决议后的 `PortRef`） | engine 产出 |
 | `render` | `RenderMeta`, `RenderInput` | **render 入口** |
-| `profile` | `DiagramType`, `Profile` | **仅** DSL / profile（engine 禁止 import） |
+| `profile` | `DiagramType`, `Profile` | **仅** DSL / parse / 编排（engine 禁止 import） |
+
+编排入口：[`plotgram-pipeline`](../../crates/plotgram-pipeline)（parse → measure → engine → render）。  
+CLI 仅做参数与文件 I/O，调用 pipeline，不写编排逻辑。
 
 ## `Edge` 一等结构字段（写权）
 
@@ -75,6 +79,12 @@ model 是**纯数据层**：定义所有 crate 共享的类型，不含布局/�
 - 布局前须有 **MeasureParams**（字号/行高/padding…）；engine **不**依赖完整 render 主题。
 - 详见 [`adr/005-content-measure-params.md`](adr/005-content-measure-params.md)。
 
+## Engine 入口（ADR-006）
+
+- [`LayoutContract`](../../crates/plotgram-model/src/contract.rs) = `layout` + `edge_routing?` + `graph` + **`node_sizes`**。
+- `edge_routing: None` → Layout 内建写边；`Some` → `EdgeRouter` 写边（端口仍由 Layout 决议）。
+- Crate：`engine-api`（Trait）→ `plotgram-engine`（`run` + in-tree `layout/` / `route/`；长大再拆）。详见 [`adr/006-engine-io-and-crates.md`](adr/006-engine-io-and-crates.md)。
+
 ## 管线位置
 
 ```
@@ -84,9 +94,9 @@ model 是**纯数据层**：定义所有 crate 共享的类型，不含布局/�
   → lift_all_node_structural_attrs / lift_all_edge_structural_attrs
   → profile expand
   → compile MeasureParams（主题中的度量字段；ADR-005）
-  → 度量：preferred size / ContentLayout
-  → LayoutContract { layout, edge_routing?, graph }（尺寸已定）
-  → engine（组合相：端口决议 → … → 落笔；anchor 几何由组框派生）
+  → 度量：preferred size → NodeSizes（+ ContentLayout）
+  → LayoutContract { layout, edge_routing?, graph, node_sizes }
+  → plotgram_engine::run（Layout / 可选 EdgeRouter；group 包络）
   → LayoutResult（EdgePlacement 含 PortRef）
   → RenderInput { graph, layout, meta }
   → SVG（跳过 group_anchor 形体；内容块展开 ContentLayout）

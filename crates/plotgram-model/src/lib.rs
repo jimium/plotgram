@@ -5,7 +5,8 @@
 //! - `attr`: AttrValue, AttrMap (free-form attribute maps)
 //! - `graph`: Node (role / host_group / anchor), Edge (ports / edge_group), Group, Graph
 //! - `port`: Side, PortConstraint, PortRef (dsl-spec §7.4)
-//! - `contract`: AlgorithmRef, LayoutContract (engine entry — no diagram_type)
+//! - `contract`: AlgorithmRef, LayoutContract (engine entry — no profile name)
+//! - `sizes`: NodeSizes (preferred sizes measured before layout)
 //! - `result`: LayoutResult (geometry; EdgePlacement carries resolved PortRef)
 //! - `render`: RenderMeta, RenderInput (renderer entry — graph + layout + chrome)
 //! - `profile`: DiagramType, Profile (DSL-layer only; must not leak into engine)
@@ -20,3 +21,6 @@ pub mod port;
 pub mod profile;
 pub mod render;
 pub mod result;
+pub mod sizes;
+
+pub use sizes::{MissingNodeSize, NodeSizes};

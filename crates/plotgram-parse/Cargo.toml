@@ -1,0 +1,10 @@
+[package]
+name = "plotgram-parse"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Plotgram DSL (.pgm) parser: source → Graph + profile expand"
+
+[dependencies]
+plotgram-model = { workspace = true }
+thiserror = { workspace = true }

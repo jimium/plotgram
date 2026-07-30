@@ -1,8 +1,22 @@
-//! Plotgram layout and edge routing engine.
+//! Plotgram layout engine facade: registry + `run`.
 //!
-//! Architecture follows yFiles principles:
-//! - Layout: places nodes (hierarchical, tree, circular, sequence, …)
-//! - Routing: computes edge geometry with frozen nodes (orthogonal, organic, straight, …)
+//! Layout / route **implementations** live under [`layout`] and [`route`] as
+//! in-tree modules (extract to separate crates when large). They depend on
+//! `plotgram-engine-api` + `plotgram-model` only — never reverse-depend on this
+//! facade's `run` wiring (ADR-006).
 
+#![forbid(unsafe_code)]
+
+mod finalize;
 pub mod layout;
+mod registry;
 pub mod route;
+mod run;
+
+pub use plotgram_engine_api::{
+    EdgeGeometryMode, EdgeRouter, LayoutAlgorithm, LayoutError, LayoutInput, LayoutOutput,
+    RouteInput,
+};
+pub use layout::HierarchicalLayout;
+pub use route::OrthogonalEdgeRouter;
+pub use run::run;

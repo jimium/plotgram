@@ -3,8 +3,8 @@ name = "plotgram-engine"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Plotgram layout and edge routing engine"
+description = "Plotgram layout engine: facade + in-tree hierarchical / orthogonal"
 
 [dependencies]
-plotgram-model = { path = "../plotgram-model" }
-indexmap = "2"
+plotgram-model = { workspace = true }
+plotgram-engine-api = { workspace = true }

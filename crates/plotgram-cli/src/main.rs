@@ -1,3 +1,57 @@
-fn main() {
-    println!("plotgram v2 — under construction");
+//! Thin CLI: args + file I/O only. Orchestration lives in `plotgram-pipeline`.
+
+use std::fs;
+use std::path::PathBuf;
+use std::process::ExitCode;
+
+use clap::Parser;
+use plotgram_pipeline::{compile_svg, PipelineOptions};
+
+#[derive(Debug, Parser)]
+#[command(name = "plotgram", about = "Plotgram DSL → SVG")]
+struct Args {
+    /// Input `.pgm` file
+    input: PathBuf,
+
+    /// Output SVG path (default: stdout)
+    #[arg(short, long)]
+    output: Option<PathBuf>,
+
+    /// Theme id override
+    #[arg(long)]
+    theme: Option<String>,
+}
+
+fn main() -> ExitCode {
+    let args = Args::parse();
+    let source = match fs::read_to_string(&args.input) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("read {}: {e}", args.input.display());
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let options = PipelineOptions {
+        theme: args.theme,
+        ..PipelineOptions::default()
+    };
+
+    match compile_svg(&source, &options) {
+        Ok(svg) => {
+            if let Some(path) = args.output {
+                if let Err(e) = fs::write(&path, svg) {
+                    eprintln!("write {}: {e}", path.display());
+                    return ExitCode::FAILURE;
+                }
+            } else {
+                print!("{svg}");
+            }
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("plotgram: {e}");
+            ExitCode::FAILURE
+        }
+    }
 }

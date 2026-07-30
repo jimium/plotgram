@@ -1,0 +1,14 @@
+[package]
+name = "plotgram-pipeline"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Plotgram orchestration: parse → measure → layout → render"
+
+[dependencies]
+plotgram-model = { workspace = true }
+plotgram-parse = { workspace = true }
+plotgram-content = { workspace = true }
+plotgram-engine = { workspace = true }
+plotgram-render = { workspace = true }
+thiserror = { workspace = true }

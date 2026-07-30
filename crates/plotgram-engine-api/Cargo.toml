@@ -1,0 +1,10 @@
+[package]
+name = "plotgram-engine-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Plotgram layout/routing plugin traits (no algorithms)"
+
+[dependencies]
+plotgram-model = { workspace = true }
+thiserror = { workspace = true }

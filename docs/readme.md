@@ -17,6 +17,79 @@ docs/
 
 ---
 
+## Workspace crates（现行）
+
+> 依赖与边界见 [ADR-006](design/adr/006-engine-io-and-crates.md)、[model-boundary](design/model-boundary.md)。  
+> `v1/` 下旧实现只读，不在本表。
+
+| Crate | 路径 | 职责 |
+|-------|------|------|
+| **plotgram-model** | `crates/plotgram-model` | 纯数据：Graph / Contract / Result / Port / Profile |
+| **plotgram-content** | `crates/plotgram-content` | 框内瘦 MD：parse → measure → SVG 片段 |
+| **plotgram-parse** | `crates/plotgram-parse` | `.pgm` → Graph + profile 展开（骨架） |
+| **plotgram-pipeline** | `crates/plotgram-pipeline` | 编排：parse → measure → engine → render |
+| **plotgram-engine-api** | `crates/plotgram-engine-api` | `LayoutAlgorithm` / `EdgeRouter` Trait（无算法） |
+| **plotgram-engine** | `crates/plotgram-engine` | `run` + 注册表；内含 layout/route **模块** |
+| **plotgram-render** | `crates/plotgram-render` | SVG / ASCII 出图 + theme |
+| **plotgram-cli** | `crates/plotgram-cli` | 薄 CLI：参数与文件 I/O |
+
+### `plotgram-engine` 内模块（可后拆 crate）
+
+| 模块 | 将来可抽为 | 职责 |
+|------|------------|------|
+| `layout/hierarchical` | `plotgram-layout-hierarchical` | Hier + 内建正交 Ink |
+| `route/core` | `plotgram-route-core` | 正交无策略原语 |
+| `route/orthogonal` | `plotgram-route-orthogonal` | 独立 EdgeRouter |
+
+### 依赖关系
+
+```mermaid
+flowchart BT
+  model[plotgram-model]
+  api[plotgram-engine-api]
+  content[plotgram-content]
+  parse[plotgram-parse]
+  engine[plotgram-engine]
+  render[plotgram-render]
+  pipeline[plotgram-pipeline]
+  cli[plotgram-cli]
+
+  api --> model
+  content --> model
+  parse --> model
+  engine --> api
+  engine --> model
+  render --> model
+  pipeline --> parse
+  pipeline --> content
+  pipeline --> engine
+  pipeline --> render
+  pipeline --> model
+  cli --> pipeline
+```
+
+文字版（箭头 = 「依赖于」）：
+
+```text
+cli            → pipeline
+pipeline       → parse, content, engine, render, model
+parse          → model
+content        → model
+engine         → engine-api, model
+engine-api     → model
+render         → model
+```
+
+管线方向（数据流，与上图依赖相反）：
+
+```text
+.pgm → parse → pipeline(measure/content) → engine::run → render → SVG
+         ↑                                      ↑
+       model                              engine-api Traits
+```
+
+---
+
 ## design/ — 架构设计
 
 > 重新设计阶段的产出物。设计约束与方案文档放这里。
@@ -30,6 +103,7 @@ docs/
 | [adr/003…](design/adr/003-edge-structural-fields.md) | Edge 结构一等字段与时序边序 |
 | [adr/004…](design/adr/004-group-anchor-nodes.md) | 组间边经由 group_anchor 隐形节点 |
 | [adr/005…](design/adr/005-content-measure-params.md) | 内容块、启发式度量与布局前 MeasureParams |
+| [adr/006…](design/adr/006-engine-io-and-crates.md) | Engine 入口、边写者与 crate 拆分 |
 
 ---
 
