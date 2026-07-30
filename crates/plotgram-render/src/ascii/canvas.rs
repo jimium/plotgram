@@ -24,20 +24,16 @@ pub(super) struct GridRect {
 }
 
 /// Maps layout pixel coordinates to character grid coordinates.
-pub(super) struct GridMapper {
-    title_rows: usize,
-}
+pub(super) struct GridMapper;
 
 impl GridMapper {
-    pub(super) fn new(has_title: bool) -> Self {
-        Self {
-            title_rows: if has_title { 2 } else { 0 },
-        }
+    pub(super) fn new() -> Self {
+        Self
     }
 
     pub(super) fn to_grid(&self, x: f64, y: f64) -> (usize, usize) {
         let gx = (x / SCALE_X).round() as usize + PADDING;
-        let gy = (y / SCALE_Y).round() as usize + PADDING + self.title_rows;
+        let gy = (y / SCALE_Y).round() as usize + PADDING;
         (gx, gy)
     }
 }

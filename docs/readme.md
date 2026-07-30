@@ -24,6 +24,10 @@ docs/
 | 文档 | 内容 |
 |------|------|
 | [yFiles第一性原理与写权纪律-2026-07.md](design/yFiles第一性原理与写权纪律-2026-07.md) | 设计约束 — 单写者、落笔零新决策、判断句 |
+| [model-boundary.md](design/model-boundary.md) | plotgram-model 边界 — Graph / 端口 / 边组 / 时序边序 |
+| [adr/001…](design/adr/001-diagram-type-not-in-engine.md) | 图类型不进引擎 |
+| [adr/002…](design/adr/002-no-config-block-freeform-options.md) | 废除 config 块 |
+| [adr/003…](design/adr/003-edge-structural-fields.md) | Edge 结构一等字段与时序边序 |
 
 ---
 

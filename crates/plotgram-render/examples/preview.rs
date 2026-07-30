@@ -39,6 +39,9 @@ fn edge_with(id: &str, source: &str, target: &str, arrow: Arrow) -> Edge {
         label: None,
         head_label: None,
         tail_label: None,
+        from_port: None,
+        to_port: None,
+        edge_group: None,
         attrs: AttrMap::new(),
     }
 }

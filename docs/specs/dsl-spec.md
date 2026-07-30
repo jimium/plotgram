@@ -612,15 +612,17 @@ api -> db {
 | **head_label** | `head_label: <string>` | 靠近**目标**端标签（如 ER 基数 `1`） |
 | **tail_label** | `tail_label: <string>` | 靠近**源**端标签（如 ER 基数 `N`） |
 | **variant** | `variant: <atom>` | 视觉变体（颜料）；查主题 `variants`（§14.7 封闭集） |
-| **from_side** / **to_side** / **from_slot** / **to_slot** | 见 §7.4 | 端口约束（**`planned`**） |
+| **from_side** / **to_side** / **from_slot** / **to_slot** | 见 §7.4 | 端口约束 → 提升为 `Edge.from_port` / `to_port`（**`active`**） |
+| **edge_group** | `edge_group: <atom\|string>` | 边组/总线 id → 提升为 `Edge.edge_group`（**`active`**） |
 | **style.\*** | `style.<prop>: …` | 内联颜料；词表见 style-sheet-spec §5 |
 | **meta.\*** | `meta.<key>: …` | 渲染器忽略 |
 
-边**没有** `shape` / `icon` / `archetype` / `layout`。
+边**没有** `shape` / `icon` / `archetype` / `layout` / `seq`。
 
 - 未写 `variant` → `default`
 - 三处标签互不推导；需要端点文案时显式写 `head_label:` / `tail_label:`
 - 封闭集与 cascade：§14.4；`variant` resolve 见 style-sheet-spec §6.2
+- 端口 / `edge_group` 经 parse 提升为一等字段后**不得**再留在 attrs 供引擎读取（见 ADR-003）
 
 ### 7.4 端口（side + slot）
 
@@ -628,30 +630,30 @@ api -> db {
 
 #### 7.4.1 模型（IR / 引擎）
 
-每条边两端各有一个端口引用（概念类型，落地在 model / Plan）：
-
 ```
-PortRef = { side: Side, slot: u32 }
-Side    = north | south | east | west
+PortConstraint = { side: Side, slot: Option<u32> }   // 作者钉死；落在 Edge.from_port / to_port
+PortRef        = { side: Side, slot: u32 }           // 已决议；落在 EdgePlacement
+Side           = north | south | east | west
 ```
 
 | 字段 | 含义 |
 |------|------|
 | `side` | 锚在节点的哪条边（封闭四向） |
-| `slot` | 同侧多条边的离散档位（`0, 1, 2, …`），用于错开 |
+| `slot` | 同侧离散档位；约束里可省略（算法在该侧内分配）；决议后必有值 |
 
 **写权（硬纪律）：**
 
-- 端口的 **side / slot 由布局组合相（端口决策）写入**；度量相只算像素锚点；**Ink / 落笔不得发明或改写端口**。
-- DSL 未写明的端口 → 解析后为「未指定」→ **算法推断并写入**，不是渲染器猜测。
+- 作者约束写在 **`Edge.from_port` / `to_port`**（DSL 四键提升而来）。
+- **决议** `PortRef` 由布局**组合相**写入 `EdgePlacement`；度量只算像素；**Ink 不得发明或改写端口**。
+- DSL 未写 → 字段为 `None` → 算法推断并写入决议端口。
 
-坐标系约定：与 `layout: hierarchical { direction: … }` 独立——`north/south/east/west` 相对**节点自身框**，不随画布转置改名；画布 LTR/TTB 只影响默认推断策略。
+坐标系约定：`north/south/east/west` 相对**节点自身框**；画布 LTR/TTB 只影响默认推断策略。
 
 #### 7.4.2 DSL 表面
 
-> **状态：`planned`** —— 下述四个属性键当前**无任何消费者**：`Edge` 尚无端口字段，引擎不读 attrs，写了不报错也不钉住端口。本节描述的是目标契约；转 `active` 的前置条件见 §14.4.1。
+> **状态：`active`（模型字段）** —— parse 须提升进 `Edge`；引擎组合相须读约束。组合相未实现前，未钉死的端仍可临时降级，但**已提升的约束不得被 Ink 静默改侧**。
 
-**默认：不写端口。** `a -> b` 合法；推断交给 Hier（或当前 layout）。
+**默认：不写端口。** `a -> b` 合法。
 
 需要钉死时，写在属性块中（均为可选）：
 
@@ -672,17 +674,28 @@ Side    = north | south | east | west
 
 不引入 `@south` 箭头后缀；端口只走属性块。
 
-#### 7.4.3 示例（正反边错开）
+#### 7.4.3 边组 / 总线
+
+| 属性键 | 类型 | 说明 |
+|--------|------|------|
+| `edge_group` | atom 或 string | 同 id 的边可共享合流主干（bus）；省略 = 不分组 |
+
+提升为 `Edge.edge_group: Option<String>`。几何合流由路由/Ink 消费；**不是**新的 layout 算法名。
+
+```plotgram
+a -> hub { label: "in1", edge_group: bus_auth }
+b -> hub { label: "in2", edge_group: bus_auth }
+```
+
+#### 7.4.4 示例（正反边错开）
 
 ```plotgram
 node a { label: "A" }
 node b { label: "B" }
 
-// 默认：端口由 hierarchical 推断（推荐）
 a -> b { label: "req" }
 b --> a { label: "resp" }
 
-// 显式钉死：同侧不同 slot，避免重合
 a -> b {
     label: "req"
     from_side: south
@@ -698,8 +711,6 @@ b --> a {
     to_slot: 1
 }
 ```
-
-示意（算法或显式指定后）：
 
 ```
     ┌───────┐
@@ -777,17 +788,18 @@ db -> api {
     label: "回写"
     from_side: north
     to_side: south
-}                                       // 端口：planned
+}                                       // 端口 → Edge.from_port / to_port
 ```
 
-标 `planned` 的写法语法合法、解析接受，但当前**无消费者**（见 §14.4）。
+结构键（端口 / `edge_group`）parse 后提升为一等字段；引擎不读 attrs 中的同名残留。
 
 ### 7.7 规则
 
 - 两端必须是已声明的 **node**（不能是 group）
 - 允许同一对 node 多条边（靠解析器分配的稳定 `edge id` 区分；端口/slot 负责几何错开）
 - **自环**（`a -> a`）：默认禁止；flowchart / state 等 profile 可显式允许（见 §8）
-- 端口属性遵守 §7.4.2；Ink 不得补端口
+- 端口属性遵守 §7.4.2；提升进 `Edge.from_port` / `to_port`；Ink 不得补端口
+- **无** `seq` 属性；时序时间轴见 §8.1
 
 ---
 
@@ -796,15 +808,16 @@ db -> api {
 ```
 .pgm
   → parse（AST 可保留 diagram_type，供诊断 / profile）
+  → lift Edge 结构字段（from_side… / edge_group → Edge 一等字段）
   → archetype expand（见 archetype-spec：只填空写入 shape / variant / icon）
   → profile expand（默认 layout / edge_routing、可选默认 shape、自环策略、图种约束）
-  → LayoutContract（算法名 + 参数 + 图模型；边可含未决或已钉死的端口）
+  → LayoutContract（算法名 + 参数 + 图模型）
   → layout / routing 引擎（组合相补全端口 → 度量 → 落笔）
 ```
 
 - 引擎入口**不**按图名分支（禁图名特判）；差异只来自 contract / profile 已展开的字段
 - 默认算法与约束表由引擎注册表维护；本规范只要求「有 profile、可展开」
-- **端口**：DSL 可选约束；Hier 主路径必须在落笔前完成端口决策（见 §7.4）
+- **端口 / 边组**：DSL 可选；提升后为一等字段（见 §7.4、ADR-003）
 - 示意（非封闭承诺，以实现注册表为准）：
 
 | diagram_type | 默认 layout（示意） | 默认 edge_routing（示意） | 自环 |
@@ -818,7 +831,16 @@ db -> api {
 
 显式写 `edge_routing: orthogonal` 表示节点冻结后的**独立**路由器，与内建正交不是同一条路径（见 [`model-boundary.md`](../design/model-boundary.md)）。
 
-图种专用结构（时序消息语义、思维导图树、ER 字段表等）**另文**；本草案仅保证统一的 node / edge / group 骨架。
+### 8.1 时序：边声明序 = 时间轴
+
+当 `layout` 为 `sequence`（含 profile 默认）：
+
+- 消息时间序 = 图中边的**声明序**（顶层 `edges` 向量序，再按 group 声明序深度优先）。对应 model：`Graph::edges_in_declaration_order()`。
+- **不**提供 `seq:` / `Edge::seq`；调整时间 = 调整 DSL 中边的书写顺序。
+- 生命线、激活条等为 layout/render **派生几何**，不进入 `Graph`。
+- 产品上消息写在顶层；组内消息非一等时序能力。
+
+ER 字段表、fragment、tabular 等**另文**；本草案保证统一的 node / edge / group 骨架 + 端口/边组一等字段。
 
 ---
 
@@ -919,13 +941,15 @@ true, false
 | 7 | 自环默认非法；仅 profile 允许时合法 |
 | 8 | 形状未识别 → 渲染回退圆角 `rect`（封闭集见 §14.6） |
 | 9 | 无声明式样式；仅 `style.*` / `theme` / `render_style` |
-| 10 | 边端口：`from_slot`/`to_slot` 不得单独出现；`*_side` 必须是四向封闭集（**`planned`**，校验尚未实现） |
-| 11 | 端口写者是布局组合相；落笔不得发明 side/slot（**`planned`**） |
+| 10 | 边端口：`from_slot`/`to_slot` 不得单独出现；`*_side` 必须是四向封闭集；提升为 `Edge.from_port`/`to_port` |
+| 11 | 端口决议写者是布局组合相（`EdgePlacement` 上的 `PortRef`）；落笔不得发明 side/slot |
 | 12 | node / group / edge 属性块内同一键不可重复；糖写入的 `label` 与块内 `label:` 冲突为错 |
 | 13 | node 规范形态为 `node id { … }`；位置糖见 §5.5（须先有 string，禁止 `node id <atom>`） |
 | 14 | group 规范形态为 `group id { … }`；组级属性与成员同块；位置 label 糖见 §6.5 |
 | 15 | edge 规范形态为 `src arrow tgt { … }`；允许省略空 `{}`；中点 label 糖见 §7.5 |
 | 16 | edge 禁止 `>"` / `<"` 端点糖；端点文案只认 `head_label:` / `tail_label:` |
+| 17 | `layout: sequence` 时消息时间序 = 边声明序；禁止另立 `seq` 双真源（§8.1） |
+| 18 | `edge_group` 提升为 `Edge.edge_group`；引擎不从 attrs 读结构键 |
 
 ---
 
@@ -961,7 +985,7 @@ diagram flowchart {
 }
 ```
 
-端口显式示例见 §7.4.3；上例故意不写端口，由 hierarchical 推断。
+端口显式示例见 §7.4.4；上例故意不写端口，由 hierarchical 推断。
 
 ---
 
@@ -1128,25 +1152,27 @@ variant **只**贡献 fill / stroke / font / dash / radius 等颜料；**不**�
 | `tail_label` | string | `active`（模型字段） | DSL 作者 | 提升为 `Edge.tail_label`；靠近源端 |
 | `variant` | atom（封闭集，见 §14.7） | **`planned`** | DSL 作者 | 主题 `variants` → 边颜料（仅 edge 适用键）；见 style-sheet-spec §6.2 |
 | `style.*` | 见 §14.9 | `active` | DSL 作者 | `apply_inline_edge_styles` |
-| `from_side` | atom：`north`/`south`/`east`/`west` | **`planned`** | DSL 作者（可选约束） | **无** |
-| `to_side` | 同上 | **`planned`** | DSL 作者（可选约束） | **无** |
-| `from_slot` | number（非负整数） | **`planned`** | DSL 作者（可选约束） | **无** |
-| `to_slot` | 同上 | **`planned`** | DSL 作者（可选约束） | **无** |
+| `from_side` | atom：`north`/`south`/`east`/`west` | **`active`（模型字段）** | DSL 作者（可选约束） | 提升为 `Edge.from_port`；组合相读约束 |
+| `to_side` | 同上 | **`active`（模型字段）** | DSL 作者 | 提升为 `Edge.to_port` |
+| `from_slot` | number（非负整数） | **`active`（模型字段）** | DSL 作者 | 并入 `from_port.slot` |
+| `to_slot` | 同上 | **`active`（模型字段）** | DSL 作者 | 并入 `to_port.slot` |
+| `edge_group` | atom 或 string | **`active`（模型字段）** | DSL 作者 | 提升为 `Edge.edge_group`；路由/Ink 合流 |
 | `meta.*` | 任意 | — | DSL 作者 | 无 |
 
 `source` / `target` / 箭头语义（`->` / `-->` / `<->`）是**语法**，落在 `Edge::source` / `target` / `arrow`；**不得**在属性块用 `source:` / `target:` / `arrow:` 覆盖。三处标签只经 `label` / `head_label` / `tail_label`（或 §7.5 中点糖）；**已废弃** `>"` / `<"` 端点标记。
 
-**已废弃**：`>"head"` / `<"tail"` 端点糖；位置 string 作为规范中点标签（降为 §7.5 糖）。
+**已废弃**：`>"head"` / `<"tail"` 端点糖；位置 string 作为规范中点标签（降为 §7.5 糖）。**不提供** `seq:`（时序用边声明序，§8.1）。
 
-#### 14.4.1 端口四键转 `active` 的前置条件
+#### 14.4.1 端口 / 边组落地状态
 
-dsl-spec §7.4 已经写定了端口的模型与写权纪律，但落地缺三件：
+| 项 | 状态 |
+|----|------|
+| `Edge.from_port` / `to_port` / `edge_group` 一等字段 | **已落地**（plotgram-model） |
+| DSL 四键 + `edge_group` 校验与提升（`lift_structural_attrs`） | **已落地**（model API；parser 须调用） |
+| 布局组合相写入 `EdgePlacement` 的 `PortRef` | **待引擎** |
+| Ink 零发明端口 | **纪律已定**；引擎实现时强制 |
 
-1. `Edge`（或 Plan 层）具备端口字段承载 `PortRef { side, slot }`
-2. 布局组合相实现端口决策（未指定 → 算法写入；已钉死 → 尊重或显式降级告警）
-3. 校验：`*_slot` 不得单独出现；`*_side` 属四向封闭集，越界即错
-
-三者齐备前，这四个键**必须**保持 `planned`——否则作者会以为钉住了端口，实际由落笔猜侧，正是 dsl-spec §7.4 要防的那个坑。
+作者已钉死的 `PortConstraint` 在组合相落地前不得被渲染层「猜侧」冒充已决议。
 
 #### 14.4.2 `-->` 的虚线来自主题
 
@@ -1276,10 +1302,10 @@ style-sheet-spec  视觉属性词表 + 主题 JSON + cascade
 | 5 | model / dsl 示例：`kind` → `archetype` / 显式三轴 | 文档与代码一致 |
 | 6 | 把 shape 封闭集提为常量 + 表驱动 test | §14.6 以常量为准 |
 | 7 | variant 封闭集常量 + 主题 compile 缺键即错 | §14.7 机械锁定 |
-| 8 | 端口四键落地（见 §14.4.1）后转 `active` | 兑现 §7.4 |
+| 8 | 引擎组合相：读 `PortConstraint` → 写 `EdgePlacement` 的 `PortRef`；尊重钉死约束 | 兑现 §7.4 写权 |
 | 9 | `status` 要么给消费者，要么从本文语法节删除 | 消除纸面属性 |
 | 10 | `variant` / `archetype` 消费者落地后标 `active` | 关闭 §14.1.3 漂移 |
-| 11 | parser：边废除 `label_marker`；三标签提升；`group` / `edge` 位置 label 糖 | §6 / §7 语法对齐 |
+| 11 | parser：边废除 `label_marker`；三标签提升；`group` / `edge` 位置 label 糖；调用 `lift_structural_attrs` | §6 / §7 / ADR-003 |
 | 12 | resolve：`group.variant` / `edge.variant` cascade | style-sheet §6 |
 
 ---
@@ -1294,7 +1320,9 @@ style-sheet-spec  视觉属性词表 + 主题 JSON + cascade
 | 边表面 | 中点 string + `>"1" <"N"` | **规范** `a -> b { label/head_label/tail_label/… }`；中点 string 糖见 §7.5 |
 | 语义 / 视觉标注 | `entity[database]` / `type:` / 曾用 `kind:` | **`archetype:`** 或显式 **`variant:`** + **`icon:`**；废弃 `kind` |
 | 形状 | 多由 type / kind 推断 / style.shape | 属性块 **`shape:`**；与 variant 正交；archetype 可填缺省 |
-| 边端口 | 无（落笔易猜中点） | **`from_side`/`to_side` + slot**；默认算法推断 |
+| 边端口 | 无（落笔易猜中点） | **`Edge.from_port`/`to_port`**；DSL 四键提升；决议在 `EdgePlacement` |
+| 边组 / 总线 | 无 | **`Edge.edge_group`** |
+| 时序时间 | （图种特判） | **边声明序**；无 `seq` 字段（§8.1） |
 | 声明式样式 | `node_style` / `edge_style` | **删除**；仅内联 `style.*` |
 | ER `field` | （旧亦弱） | **本草案不做**；另文 |
 | 自环 | decision 例外 | 默认禁，profile 可开 |

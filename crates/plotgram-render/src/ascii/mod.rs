@@ -35,33 +35,21 @@ const ARROW_RIGHT: char = '▶';
 const ARROW_DOWN: char = '▼';
 const ARROW_LEFT: char = '◀';
 const ARROW_UP: char = '▲';
-const DASH_H: char = '·';
-const DASH_V: char = '¦';
+const DASH_H: char = '╌';
+const DASH_V: char = '╎';
 
 /// Render a complete diagram to Unicode text.
+///
+/// The title (if any) is intentionally not rendered: text diagrams are
+/// usually embedded where a heading already exists.
 pub fn render_ascii(input: &RenderInput) -> String {
-    let title = input
-        .meta
-        .title
-        .as_deref()
-        .map(str::trim)
-        .filter(|t| !t.is_empty());
-    let mapper = GridMapper::new(title.is_some());
-    let title_rows = if title.is_some() { 2 } else { 0 };
+    let mapper = GridMapper::new();
 
     // ── Canvas size: quantized layout canvas + padding, with a sane floor ──
     let width = ((input.layout.canvas_width / SCALE_X).ceil() as usize + PADDING * 2 + 4).max(40);
     let height =
-        ((input.layout.canvas_height / SCALE_Y).ceil() as usize + PADDING * 2 + title_rows + 4)
-            .max(20);
+        ((input.layout.canvas_height / SCALE_Y).ceil() as usize + PADDING * 2 + 4).max(20);
     let mut cv = DisplayCanvas::new(width, height);
-
-    // ── Title: centered `=== title ===` on the first row ──
-    if let Some(t) = title {
-        let text = format!("=== {} ===", clean_label(t));
-        let x = width.saturating_sub(text_width(&text)) / 2;
-        cv.write_text(x, 0, &text);
-    }
 
     // ── Nodes: every shape becomes a rectangular box ──
     // (box geometry is computed first so edges can skip interiors/boundaries)
@@ -205,6 +193,9 @@ mod tests {
             label: None,
             head_label: None,
             tail_label: None,
+            from_port: None,
+            to_port: None,
+            edge_group: None,
             attrs: AttrMap::new(),
         }
     }
@@ -298,12 +289,11 @@ mod tests {
     }
 
     #[test]
-    fn title_renders_on_first_line() {
+    fn title_is_not_rendered() {
         let out = render_ascii(&two_node_input(Arrow::Forward, ("A", "B"), Some("登录流程")));
-        let first = out.lines().next().unwrap_or("");
         assert!(
-            first.contains("=== 登录流程 ==="),
-            "title missing from first line:\n{out}"
+            !out.contains("登录流程") && !out.contains("==="),
+            "title should not appear in ascii output:\n{out}"
         );
     }
 

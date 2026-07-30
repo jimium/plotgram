@@ -482,6 +482,9 @@ mod tests {
                 label: None,
                 head_label: None,
                 tail_label: None,
+                from_port: None,
+                to_port: None,
+                edge_group: None,
                 attrs,
             }
         };

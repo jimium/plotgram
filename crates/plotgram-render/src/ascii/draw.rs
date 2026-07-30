@@ -102,11 +102,41 @@ pub(super) fn draw_edge_route(
         draw_segment(canvas, x1, y1, x2, y2, dashed, node_rects);
     }
 
+    // Draw corner characters at interior waypoints (direction changes).
+    // draw_segment uses exclusive ranges so the waypoint cell itself is missed.
+    for i in 1..points.len().saturating_sub(1) {
+        let (px, py) = points[i - 1];
+        let (cx, cy) = points[i];
+        let (nx, ny) = points[i + 1];
+        if canvas.is_interior(cx, cy, node_rects) || is_on_rect_boundary(cx, cy, node_rects) {
+            continue;
+        }
+        let dirs = direction_bit((cx, cy), (px, py)) | direction_bit((cx, cy), (nx, ny));
+        if dirs.count_ones() >= 2 {
+            canvas.ensure(cy, cx);
+            canvas.set_char(cx, cy, directions_to_char(dirs));
+        }
+    }
+
     let n = points.len();
     if n >= 2 {
         let (x1, y1) = points[n - 2];
         let (x2, y2) = points[n - 1];
-        if let Some((ax, ay, ch)) = arrow_before_end(x1, y1, x2, y2) {
+        if let Some((mut ax, mut ay, ch)) = arrow_before_end(x1, y1, x2, y2) {
+            // Fallback: if arrow lands on a boundary, step back one cell.
+            if is_on_rect_boundary(ax, ay, node_rects) {
+                if x1 == x2 {
+                    if y2 > y1 { ay = ay.saturating_sub(1); } else { ay += 1; }
+                } else if y1 == y2 {
+                    if x2 > x1 { ax = ax.saturating_sub(1); } else { ax += 1; }
+                }
+            }
+            // A horizontal arrow snug against a box corner reads badly (`▶└`);
+            // step back one cell and blank the gap. Plain borders stay snug (`▶│`).
+            if y1 == y2 && is_box_corner(canvas, x2, y2) {
+                canvas.clear_span(ay, ax, 1);
+                if x2 > x1 { ax = ax.saturating_sub(1); } else { ax += 1; }
+            }
             if !canvas.is_interior(ax, ay, node_rects)
                 && !is_on_rect_boundary(ax, ay, node_rects)
             {
@@ -117,7 +147,18 @@ pub(super) fn draw_edge_route(
         if bidirectional {
             let (x0, y0) = points[0];
             let (bx, by) = points[1];
-            if let Some((ax, ay, ch)) = arrow_before_end(bx, by, x0, y0) {
+            if let Some((mut ax, mut ay, ch)) = arrow_before_end(bx, by, x0, y0) {
+                if is_on_rect_boundary(ax, ay, node_rects) {
+                    if bx == x0 {
+                        if y0 > by { ay = ay.saturating_sub(1); } else { ay += 1; }
+                    } else if by == y0 {
+                        if x0 > bx { ax = ax.saturating_sub(1); } else { ax += 1; }
+                    }
+                }
+                if by == y0 && is_box_corner(canvas, x0, y0) {
+                    canvas.clear_span(ay, ax, 1);
+                    if x0 > bx { ax = ax.saturating_sub(1); } else { ax += 1; }
+                }
                 if !canvas.is_interior(ax, ay, node_rects)
                     && !is_on_rect_boundary(ax, ay, node_rects)
                 {
@@ -140,9 +181,6 @@ pub(super) fn draw_segment(
     if x1 == x2 {
         let (start, end) = if y1 <= y2 { (y1, y2) } else { (y2, y1) };
         for y in start..end {
-            if dashed && (y - start) % 2 == 1 {
-                continue;
-            }
             if !canvas.is_interior(x1, y, node_rects)
                 && !is_on_rect_boundary(x1, y, node_rects)
             {
@@ -153,9 +191,6 @@ pub(super) fn draw_segment(
     } else if y1 == y2 {
         let (start, end) = if x1 <= x2 { (x1, x2) } else { (x2, x1) };
         for x in start..end {
-            if dashed && (x - start) % 2 == 1 {
-                continue;
-            }
             if !canvas.is_interior(x, y1, node_rects)
                 && !is_on_rect_boundary(x, y1, node_rects)
             {
@@ -166,9 +201,6 @@ pub(super) fn draw_segment(
     } else {
         // Diagonal in grid space: draw as horizontal-then-vertical elbow.
         for x in x1.min(x2)..x1.max(x2) {
-            if dashed && (x - x1.min(x2)) % 2 == 1 {
-                continue;
-            }
             if !canvas.is_interior(x, y1, node_rects)
                 && !is_on_rect_boundary(x, y1, node_rects)
             {
@@ -176,9 +208,6 @@ pub(super) fn draw_segment(
             }
         }
         for y in y1.min(y2)..y1.max(y2) {
-            if dashed && (y - y1.min(y2)) % 2 == 1 {
-                continue;
-            }
             if !canvas.is_interior(x2, y, node_rects)
                 && !is_on_rect_boundary(x2, y, node_rects)
             {
@@ -234,6 +263,12 @@ pub(super) fn render_junctions(
         }
         if dirs.count_ones() >= 2 {
             canvas.ensure(*y, *x);
+            // Don't overwrite arrow characters placed by draw_edge_route.
+            if let Cell::Char(existing) = canvas.rows[*y][*x] {
+                if matches!(existing, '▶' | '◀' | '▲' | '▼') {
+                    continue;
+                }
+            }
             canvas.set_char(*x, *y, directions_to_char(*dirs));
         }
     }
@@ -284,6 +319,14 @@ pub(super) fn is_on_rect_boundary(x: usize, y: usize, rects: &[GridRect]) -> boo
     })
 }
 
+/// Whether the canvas cell currently holds a box corner glyph.
+fn is_box_corner(canvas: &DisplayCanvas, x: usize, y: usize) -> bool {
+    matches!(
+        canvas.rows.get(y).and_then(|row| row.get(x)),
+        Some(Cell::Char('┌' | '┐' | '└' | '┘'))
+    )
+}
+
 fn draw_line_char(canvas: &mut DisplayCanvas, x: usize, y: usize, ch: char) {
     canvas.ensure(y, x);
     let merged = match canvas.rows[y][x] {
@@ -310,7 +353,7 @@ fn merge_line_char(existing: char, incoming: char) -> char {
 }
 
 fn is_line(ch: char) -> bool {
-    matches!(ch, '─' | '│' | '·' | '¦')
+    matches!(ch, '─' | '│' | '╌' | '╎')
 }
 
 fn is_junction(ch: char) -> bool {
@@ -324,8 +367,8 @@ fn char_directions(ch: char) -> u8 {
     const LEFT: u8 = 4;
     const RIGHT: u8 = 8;
     match ch {
-        '│' | '¦' => UP | DOWN,
-        '─' | '·' => LEFT | RIGHT,
+        '│' | '╎' => UP | DOWN,
+        '─' | '╌' => LEFT | RIGHT,
         '┌' => DOWN | RIGHT,
         '┐' => DOWN | LEFT,
         '└' => UP | RIGHT,

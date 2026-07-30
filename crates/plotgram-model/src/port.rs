@@ -1,14 +1,13 @@
 //! Edge port model: side + slot (dsl-spec §7.4).
 //!
-//! An edge connects not just "which node" but "which side of the node, at
-//! which discrete slot on that side". Two layers:
+//! Two layers:
 //!
-//! - [`PortConstraint`]: the *author's* optional pin, parsed from edge attrs
-//!   (`from_side` / `to_side` / `from_slot` / `to_slot`, dsl-spec §7.4.2).
-//!   Side without slot is legal (slot stays algorithm-assignable).
-//! - [`PortRef`]: the *resolved* port. Written by the layout composition
-//!   phase (port decision) — never invented by measure or ink (§7.4.1
-//!   write-discipline). Carried on `result::EdgePlacement`.
+//! - [`PortConstraint`]: the *author's* optional pin. Carried as first-class
+//!   fields on [`crate::graph::Edge`] (`from_port` / `to_port`). DSL keys
+//!   `from_side` / … are lifted by [`crate::graph::Edge::lift_structural_attrs`].
+//! - [`PortRef`]: the *resolved* port (side + slot). Written by the layout
+//!   composition phase onto [`crate::result::EdgePlacement`] — never invented
+//!   by measure or ink.
 //!
 //! Sides are node-frame relative and do not rename under canvas transposition
 //! (LTR/TTB only affects the default inference strategy).
