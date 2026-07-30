@@ -28,6 +28,8 @@ docs/
 | [adr/001…](design/adr/001-diagram-type-not-in-engine.md) | 图类型不进引擎 |
 | [adr/002…](design/adr/002-no-config-block-freeform-options.md) | 废除 config 块 |
 | [adr/003…](design/adr/003-edge-structural-fields.md) | Edge 结构一等字段与时序边序 |
+| [adr/004…](design/adr/004-group-anchor-nodes.md) | 组间边经由 group_anchor 隐形节点 |
+| [adr/005…](design/adr/005-content-measure-params.md) | 内容块、启发式度量与布局前 MeasureParams |
 
 ---
 

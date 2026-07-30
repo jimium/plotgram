@@ -180,6 +180,9 @@ mod tests {
             id: id.to_string(),
             label: Some(label.to_string()),
             shape: None,
+            role: Default::default(),
+            host_group: None,
+            anchor: None,
             attrs: AttrMap::new(),
         }
     }

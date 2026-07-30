@@ -3,7 +3,7 @@
 //! Core types shared across all crates:
 //! - `geometry`: Point, Rect primitives
 //! - `attr`: AttrValue, AttrMap (free-form attribute maps)
-//! - `graph`: Node, Edge (ports / edge_group first-class), Group, Graph
+//! - `graph`: Node (role / host_group / anchor), Edge (ports / edge_group), Group, Graph
 //! - `port`: Side, PortConstraint, PortRef (dsl-spec §7.4)
 //! - `contract`: AlgorithmRef, LayoutContract (engine entry — no diagram_type)
 //! - `result`: LayoutResult (geometry; EdgePlacement carries resolved PortRef)

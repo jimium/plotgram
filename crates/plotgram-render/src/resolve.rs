@@ -393,6 +393,9 @@ mod tests {
             id: "n".to_string(),
             label: None,
             shape: shape.map(str::to_string),
+            role: Default::default(),
+            host_group: None,
+            anchor: None,
             attrs,
         }
     }

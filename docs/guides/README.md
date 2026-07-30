@@ -30,6 +30,8 @@
 | 文档 | 内容 |
 |------|------|
 | [layout-lint.md](layout-lint.md) | LayoutLint — 布局静态质量检查 |
+| [content-blocks.md](content-blocks.md) | 节点内容块 MD 子集用户手册（语法 / 降级 / 换行对齐截断 / 颜色） |
+| [content-blocks-agent.md](content-blocks-agent.md) | 同上的 Agent 极简速查版 |
 | [layout-intent.md](layout-intent.md) | Layout Intent 快速入门 |
 | [group-layout-and-frame.md](group-layout-and-frame.md) | Group `layout` + Group Frame；含 architecture macro rank 与场景短名 |
 | [theme-and-style.md](theme-and-style.md) | Theme 与 Graphic Style |

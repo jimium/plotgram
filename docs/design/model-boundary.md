@@ -13,7 +13,7 @@ model 是**纯数据层**：定义所有 crate 共享的类型，不含布局/�
 |------|----------|--------|
 | `geometry` | `Point`, `Rect` | 全部 |
 | `attr` | `AttrValue`, `AttrMap` | 全部（样式/meta/开放扩展） |
-| `graph` | `Node`, `Edge`, `Group`, `Graph`, `Arrow` | engine, render |
+| `graph` | `Node`（含 `role`/`host_group`/`anchor`）, `Edge`, `Group`, `Graph`, `Arrow` | engine, render |
 | `port` | `Side`, `PortConstraint`（作者钉死）, `PortRef`（已决议） | engine |
 | `contract` | `AlgorithmRef`, `LayoutContract` | **engine 入口** |
 | `result` | `LayoutResult`, placements（含决议后的 `PortRef`） | engine 产出 |
@@ -41,6 +41,22 @@ model 是**纯数据层**：定义所有 crate 共享的类型，不含布局/�
 
 生命线 / 激活条是 layout/render **派生几何**，不进入 `Graph`。
 
+## 组间边（ADR-004）
+
+- **不**把 group 当作边端点。
+- 区到区连线经由 **`group_anchor` 隐形节点**：`Node.role = GroupAnchor`，必填 `host_group` + `anchor`（`side`/`slot`）。
+- DSL：手写见 dsl-spec §5.7；推荐糖 `@group -> @group`（§7.6）由 parse 展开。
+- 几何由组框派生；禁止 Ink 特判挪点。详见 [`adr/004-group-anchor-nodes.md`](adr/004-group-anchor-nodes.md)。
+
+### `Node` 结构字段（写权）
+
+| 字段 | 含义 | 写者 |
+|------|------|------|
+| `role` | `Entity`（默认）/ `GroupAnchor` | DSL→parse 提升 |
+| `host_group` | 锚点所属 group id | 同上；仅 GroupAnchor |
+| `anchor` | `Option<PortConstraint>`：贴框侧/槽 | 同上；仅 GroupAnchor |
+| `attrs` | 样式/meta 等 | **不得**再承载 `role` / `host_group` / `side` / `slot`（提升后剥除） |
+
 ## 硬约束
 
 1. **`DiagramType` 不得出现在 engine**（ADR-001）。入口只认 `LayoutContract`。
@@ -48,20 +64,32 @@ model 是**纯数据层**：定义所有 crate 共享的类型，不含布局/�
 3. **model 不依赖其它 workspace crate**。
 4. **边用稳定 `Edge.id`**；placement / label 用同一 id。
 5. **端口**：作者约束在 `Edge`；决议 `PortRef` 在 `EdgePlacement`；Ink 不得发明。
-6. **结构字段一等**：端口 / 边组不靠引擎读自由 attrs。
+6. **结构字段一等**：端口 / 边组 / `group_anchor` 不靠引擎读自由 attrs。
+
+## 内容块与度量（ADR-005）
+
+- 框内**通用富文本**（说明、列表等）：瘦 MD → Content AST → **`ContentLayout`（度量相唯一写者）**；主路径为 SVG。
+- **ASCII 只支持 label**，不做内容块。
+- **不**用 MD 解决 ER 字段表（ER 另案）。
+- **不读字体文件**；码点分档启发式 + padding 预算。
+- 布局前须有 **MeasureParams**（字号/行高/padding…）；engine **不**依赖完整 render 主题。
+- 详见 [`adr/005-content-measure-params.md`](adr/005-content-measure-params.md)。
 
 ## 管线位置
 
 ```
 .pgm
-  → parse（attrs 含 from_side / edge_group …）
-  → lift_structural_attrs（升到 Edge 字段并剥 attrs）
+  → parse（attrs 含 from_side / edge_group / role …；可选 @group 端点）
+  → 展开 @group 糖（→ group_anchor nodes）
+  → lift_all_node_structural_attrs / lift_all_edge_structural_attrs
   → profile expand
-  → LayoutContract { layout, edge_routing?, graph }
-  → engine（组合相：端口决议 → … → 落笔）
+  → compile MeasureParams（主题中的度量字段；ADR-005）
+  → 度量：preferred size / ContentLayout
+  → LayoutContract { layout, edge_routing?, graph }（尺寸已定）
+  → engine（组合相：端口决议 → … → 落笔；anchor 几何由组框派生）
   → LayoutResult（EdgePlacement 含 PortRef）
   → RenderInput { graph, layout, meta }
-  → SVG
+  → SVG（跳过 group_anchor 形体；内容块展开 ContentLayout）
 ```
 
 ## `edge_routing` 语义

@@ -18,5 +18,5 @@
 ## 后果
 
 - model / dsl-spec / model-boundary 对齐；端口四键可标为模型字段 `active`（引擎端口决策实现前，未指定端仍由算法填；已提升的约束须被尊重或显式降级）。
-- ER 字段表、fragment、接到 group 框等仍不进本 IR。
+- ER 字段表、fragment 等仍不进本 IR；组间「框到框」见 ADR-004（`group_anchor`），不引入 group 端点。
 - 增量 mental map 仍走 `prev` API，不改 `Graph` 形状。

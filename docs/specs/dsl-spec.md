@@ -1,12 +1,13 @@
 # Plotgram DSL 规范
 
-> 版本：2.4-draft  
+> 版本：2.5-draft  
 > 状态：语法契约草案（相对 v1 `language-spec.md` 的瘦身重设计；该文档已删除）  
 > 定稿选择：node / group / edge **规范形态**为声明头 + `{ … }`（`label` / `variant` / `style.*` 等进花括号）；node 另有三轴 + `archetype`；边箭头 `->` / `-->` / `<->` 保留语法；边端口 `side` + `slot`；无声明式样式；ER 另文；自环默认禁  
 > 2.1：废弃 `kind`；三轴 + archetype  
 > 2.2：node 废除 `: shape` 后缀；规范一切进 `{}`；§5.5 糖  
 > 2.3：group 废除位置 string 标签；`label` / `variant` 进 `{}`；§6.5 糖  
-> 2.4：edge 标签一律进 `{}`；废除 `>"` / `<"` 端点糖；§7.5 仅保留中点 string 糖；允许省略空 `{}`
+> 2.4：edge 标签一律进 `{}`；废除 `>"` / `<"` 端点糖；§7.5 仅保留中点 string 糖；允许省略空 `{}`  
+> 2.5：`group_anchor` 一等字段 + `@group` 组框边糖（ADR-004）
 
 **本文档定义**：DSL **语法形态**，以及 **属性注册表**（§14：写者/消费者/状态、shape / variant 封闭集）。  
 archetype 展开与 CSV 见 [`archetype-spec.md`](archetype-spec.md)；视觉属性词表见 [`style-sheet-spec.md`](style-sheet-spec.md) §5。
@@ -287,6 +288,9 @@ node spacer {
 |-----|--------|------|------|
 | `label` | `"用户库"` | `active`（模型字段） | 显示文案 |
 | `shape` | `cylinder`, `diamond` | `active`（模型字段） | 几何；封闭集见 §14.6 |
+| `role` | `entity`, `group_anchor` | `active`（模型字段） | 结构角色；见 §5.7 |
+| `host_group` | group id | `active`（模型字段） | 仅 `group_anchor`；见 §5.7 |
+| `side` / `slot` | 四向 / 非负整数 | `active`（模型字段） | 仅 `group_anchor` 贴框；提升为 `Node.anchor` |
 | `archetype` | `database`, `gateway` | **`planned`** | 展开糖；纪律与目录见 [`archetype-spec.md`](archetype-spec.md) |
 | `variant` | `primary`, `info`, … | **`planned`** | 颜料槽；封闭集见 §14.7 |
 | `icon` | `none`, 图标名 | `active` | 装饰 |
@@ -408,6 +412,45 @@ node db "" database                             // 无文案 + archetype
 `archetype:` 为展开糖（不是第四轴）。**展开纪律、CSV 真源、编译进二进制**见 [`archetype-spec.md`](archetype-spec.md)。  
 属性键登记见本文 §14；位置糖见 §5.5.2。
 
+### 5.7 `group_anchor`（组框锚点节点）
+
+> ADR-004：组间「框到框」边仍只连 **node**；用隐形锚点贴在 group 框上，不把 group 当作边端点。
+
+#### 5.7.1 规范形态
+
+```plotgram
+group frontend {
+    label: "前端"
+    node web { label: "Web" }
+
+    // 进阶手写：贴东侧的隐形锚点（通常由 §7.6 糖生成）
+    node ga_fe_e {
+        role: group_anchor
+        host_group: frontend
+        side: east
+        // slot: 0          // 可选；同侧多锚时去重叠
+    }
+}
+```
+
+| 键 | 提升字段 | 规则 |
+|----|----------|------|
+| `role: group_anchor` | `Node.role` | 封闭集：`entity`（默认）/ `group_anchor`；未知 atom → 错 |
+| `host_group` | `Node.host_group` | **必填**（且须是已声明 group id） |
+| `side` | `Node.anchor.side` | **必填**；四向封闭集（同 §7.4） |
+| `slot` | `Node.anchor.slot` | 可选；写了 `slot` 必须同时有 `side` |
+
+- parse 后调用 `Node::lift_structural_attrs`（或 `Graph::lift_all_node_structural_attrs`）；上述键从 `attrs` **剥除**。
+- `entity` 节点不得残留 `host_group` / `side` / `slot`。
+- 锚点节点**必须是** `host_group` 的成员（直接子 node；糖展开时注入该组）。
+- **不绘制**形体；逻辑尺寸由引擎取最小非零占位（禁止依赖 0×0）。
+- **不参与** Sugiyama 叶层/序；几何 = 组框定稿 bbox + `side`/`slot` **派生**；Ink 禁止「发现是 anchor 再挪到框边」。
+- 勿写 `label` / `shape` / `archetype` / `icon`（无业务外观）；写了由实现忽略或告警，不改变锚点语义。
+
+#### 5.7.2 与边端口的关系
+
+边仍可用 `from_side` / `to_side` 钉死端口。对锚点端，作者侧通常与 `Node.anchor.side` **一致**（糖展开时同步写入）。决议 `PortRef` 仍由布局组合相写出到 `EdgePlacement`。
+
 ---
 
 ## 6. Group 声明
@@ -476,7 +519,7 @@ group **没有** `shape` / `icon` / `archetype`（容器不是节点几何）。
 - 嵌套深度 DSL 不限制
 - 内部边的两端必须都属于当前 group 的后代 node；跨组边写在顶层（或共同祖先 group）
 - group ID 与 node ID 全局不重复
-- group 不能作为边的端点
+- group **不能**作为边的端点（IR 层）；组框连线用 §5.7 锚点或 §7.6 `@group` 糖
 
 ### 6.4 示例
 
@@ -551,15 +594,17 @@ group frame "" {
 **拓扑与箭头是语法；文案与颜料进属性块。** 废除 `>"` / `<"` 端点标签糖。
 
 ```
-<relation_declaration> ::= <identifier> <arrow> <identifier> [<attribute_block>]
-<attribute_block>      ::= "{" <attribute>* "}"
+<relation_declaration> ::= <endpoint> <arrow> <endpoint> [<attribute_block>]
+<endpoint>             ::= <identifier> | "@" <identifier>
 <arrow>                ::= "->" | "-->" | "<->"
+<attribute_block>      ::= "{" <attribute>* "}"
 ```
 
 | 部分 | 含义 |
 |------|------|
-| `source arrow target` | **语法**：端点 node id + 箭头语义（封闭 3 种） |
-| `attribute_block` | 边上唯一作者面：`label` / `head_label` / `tail_label` / `variant` / 端口 / `style.*` / … |
+| `endpoint` | 源/目标：node id，或 `@group_id`（§7.6 糖，展开为 `group_anchor`） |
+| `arrow` | 三种之一（见 §7.2） |
+| `attribute_block` | 边上唯一作者面：`label` / `head_label` / `tail_label` / `variant` / 端口 / `style.*` / …；可省略空块（§7.5.1） |
 
 最小边（无标签、无覆盖）：
 
@@ -772,7 +817,70 @@ api -> db {
 - ~~位置 string 作为规范中点标签~~（降为糖）
 - 边上的 `shape` / `icon` / `archetype`
 
-### 7.6 示例
+### 7.6 `@group` 组框边糖（ADR-004）
+
+> 目标：作者可写「区到区」连线；parse **展开**为两个（或一侧）`group_anchor` node + 一条普通边。  
+> IR **仍**遵守「边只连 node」；展开后与手写 §5.7 无法区分。
+
+#### 7.6.1 语法
+
+边端点前缀 `@` 表示「接到该 **group** 的框」，不是 node id：
+
+```
+<endpoint> ::= <identifier> | "@" <identifier>
+```
+
+- `@gid`：`gid` 必须是已声明的 **group** id  
+- 无 `@`：必须是已声明的 **node** id（含既有 `group_anchor`）  
+- 允许混合：`@frontend -> api`、`web -> @backend`
+
+```plotgram
+group frontend {
+    label: "前端"
+    node web { label: "Web" }
+}
+group backend {
+    label: "后端"
+    node api { label: "API" }
+}
+
+@frontend -> @backend {
+    label: "调用"
+    from_side: east
+    to_side: west
+}
+
+web -> @backend {
+    label: "直连框"
+    to_side: north
+}
+```
+
+#### 7.6.2 展开规则
+
+对每个 `@gid` 端：
+
+1. 取该端对应的侧：源端用 `from_side`（及可选 `from_slot`），目标端用 `to_side` / `to_slot`。  
+2. **`@` 端缺少对应 `*_side` → 解析/校验错误**（锚点 `side` 必填，不发明默认侧）。  
+3. 在 group `gid` 内注入（或复用）一个 node：
+   - `role: group_anchor`
+   - `host_group: gid`
+   - `side` / `slot` = 上一步的侧/槽
+   - 合成 id：实现自定，须全局唯一；推荐稳定派生，例如 `ga_<gid>_<side>[_<slot>]`，冲突时加边 id 后缀  
+4. 同 `(host_group, side, slot)` 的锚点 **可合并复用**（多条边共享同一框上档位）。  
+5. 把边的该端改写为上述 node id；边属性中的 `from_side`/`to_side` **保留**并提升为 `Edge.from_port`/`to_port`（与锚点侧一致）。  
+6. 边声明位置不变（通常在共同祖先 / 顶层）。
+
+展开后须再跑 `lift_all_node_structural_attrs` + `lift_all_edge_structural_attrs`。
+
+#### 7.6.3 明确不做
+
+- 裸写 `frontend -> backend`（两端是 group id、无 `@`）——**非法**（避免与漏写 node 混淆）；必须 `@frontend -> @backend` 或手写锚点  
+- 把 group 留在 IR 端点（`Endpoint::Group`）  
+- 渲染期把线「贴」到组框而不生成锚点  
+- `@` 用在非边端点位置
+
+### 7.7 示例
 
 ```plotgram
 user -> api "请求"
@@ -791,15 +899,16 @@ db -> api {
 }                                       // 端口 → Edge.from_port / to_port
 ```
 
-结构键（端口 / `edge_group`）parse 后提升为一等字段；引擎不读 attrs 中的同名残留。
+结构键（端口 / `edge_group` / `role`…）parse 后提升为一等字段；引擎不读 attrs 中的同名残留。
 
-### 7.7 规则
+### 7.8 规则
 
-- 两端必须是已声明的 **node**（不能是 group）
+- 两端必须是已声明的 **node**（不能是 group）；`@group` 仅存在于糖面，展开后变为 node
 - 允许同一对 node 多条边（靠解析器分配的稳定 `edge id` 区分；端口/slot 负责几何错开）
 - **自环**（`a -> a`）：默认禁止；flowchart / state 等 profile 可显式允许（见 §8）
 - 端口属性遵守 §7.4.2；提升进 `Edge.from_port` / `to_port`；Ink 不得补端口
 - **无** `seq` 属性；时序时间轴见 §8.1
+- `group_anchor` 遵守 §5.7；组框边糖遵守 §7.6
 
 ---
 
@@ -808,6 +917,8 @@ db -> api {
 ```
 .pgm
   → parse（AST 可保留 diagram_type，供诊断 / profile）
+  → 展开 @group 糖（§7.6 → group_anchor nodes + 普通边）
+  → lift Node 结构字段（role / host_group / side / slot）
   → lift Edge 结构字段（from_side… / edge_group → Edge 一等字段）
   → archetype expand（见 archetype-spec：只填空写入 shape / variant / icon）
   → profile expand（默认 layout / edge_routing、可选默认 shape、自环策略、图种约束）
@@ -817,7 +928,7 @@ db -> api {
 
 - 引擎入口**不**按图名分支（禁图名特判）；差异只来自 contract / profile 已展开的字段
 - 默认算法与约束表由引擎注册表维护；本规范只要求「有 profile、可展开」
-- **端口 / 边组**：DSL 可选；提升后为一等字段（见 §7.4、ADR-003）
+- **端口 / 边组 / group_anchor**：DSL 可选；提升后为一等字段（见 §5.7、§7.4、ADR-003/004）
 - 示意（非封闭承诺，以实现注册表为准）：
 
 | diagram_type | 默认 layout（示意） | 默认 edge_routing（示意） | 自环 |
@@ -907,9 +1018,11 @@ true, false
                           | <relation_declaration>
                           | <group_declaration>)*
 
-<relation_declaration> ::= <identifier> <arrow> <identifier> [<string>] [<attribute_block>]
+<relation_declaration> ::= <endpoint> <arrow> <endpoint> [<string>] [<attribute_block>]
                           // 规范：src arrow tgt { label / variant / … }
-                          // 糖：省略空块；或 string 注入 label（§7.5）
+                          // 糖：省略空块；或 string 注入 label（§7.5）；@group 端点见 §7.6
+<endpoint>             ::= <identifier> | "@" <identifier>
+                          // @gid = 组框端点糖；展开为 group_anchor（§7.6）
 <arrow>                ::= "->" | "-->" | "<->"
 
 <attribute_block>      ::= "{" <attribute>* "}"
@@ -934,8 +1047,8 @@ true, false
 |---|------|
 | 1 | 一个文件恰好一个 `diagram` |
 | 2 | node / group id 全局唯一，且不互相撞名 |
-| 3 | 边端点必须是已声明 node |
-| 4 | group 不可作边端点 |
+| 3 | 边端点（展开后）必须是已声明 node |
+| 4 | group 不可作 IR 边端点；组框连线用 `group_anchor` 或 `@group` 糖（§5.7 / §7.6） |
 | 5 | 组内边两端须为该组后代 node |
 | 6 | diagram 固定属性不可重复；未知 diagram key 警告忽略 |
 | 7 | 自环默认非法；仅 profile 允许时合法 |
@@ -946,10 +1059,12 @@ true, false
 | 12 | node / group / edge 属性块内同一键不可重复；糖写入的 `label` 与块内 `label:` 冲突为错 |
 | 13 | node 规范形态为 `node id { … }`；位置糖见 §5.5（须先有 string，禁止 `node id <atom>`） |
 | 14 | group 规范形态为 `group id { … }`；组级属性与成员同块；位置 label 糖见 §6.5 |
-| 15 | edge 规范形态为 `src arrow tgt { … }`；允许省略空 `{}`；中点 label 糖见 §7.5 |
+| 15 | edge 规范形态为 `src arrow tgt { … }`；允许省略空 `{}`；中点 label 糖见 §7.5；`@group` 见 §7.6 |
 | 16 | edge 禁止 `>"` / `<"` 端点糖；端点文案只认 `head_label:` / `tail_label:` |
 | 17 | `layout: sequence` 时消息时间序 = 边声明序；禁止另立 `seq` 双真源（§8.1） |
 | 18 | `edge_group` 提升为 `Edge.edge_group`；引擎不从 attrs 读结构键 |
+| 19 | `role: group_anchor` 须有 `host_group` + `side`；提升为 `Node` 一等字段；锚点须为 host 组成员（§5.7） |
+| 20 | `@gid` 端点须对应已声明 group；该端缺少 `*_side` → 错；禁止无 `@` 的裸 group id 作端点（§7.6） |
 
 ---
 
@@ -1072,6 +1187,10 @@ node legacy { label: "ERP", shape: rounded_rect, variant: muted, icon: external 
 |-----|----|------|------|--------|
 | `label` | string | `active` | DSL 作者（或 §5.5 位置糖） | 提升为 `Node.label`；render 画文案 |
 | `shape` | atom（封闭集，见 §14.6） | `active` | DSL 作者 / archetype / profile | 提升为 `Node.shape`；resolve 几何链 |
+| `role` | atom：`entity` / `group_anchor` | **`active`（模型字段）** | DSL 作者（或 §7.6 糖） | 提升为 `Node.role`；见 §5.7 / ADR-004 |
+| `host_group` | atom（group id） | **`active`（模型字段）** | DSL 作者（或 §7.6 糖） | 提升为 `Node.host_group`；仅 `group_anchor` |
+| `side` | atom：`north`/`south`/`east`/`west` | **`active`（模型字段）** | DSL 作者（或 §7.6 糖） | 并入 `Node.anchor`；仅 `group_anchor` |
+| `slot` | number（非负整数） | **`active`（模型字段）** | DSL 作者（或 §7.6 糖） | 并入 `Node.anchor.slot`；须有 `side` |
 | `archetype` | atom（开放集；目录见 [`archetype-spec.md`](archetype-spec.md)） | **`planned`** | DSL 作者 | **展开器**（parse/profile）：只填空写入 shape / variant / icon；**render / theme / engine 不读** |
 | `variant` | atom（封闭集，见 §14.7） | **`planned`**（规范已定；实现仍读 `kind`） | DSL 作者 / archetype 展开 | 主题 `variants` 查表（`resolve.rs`，待迁） |
 | `icon` | atom：`none` / icon id / alias | `active` | DSL 作者 / archetype 展开 | `icons::resolve_icon`（`icons/mod.rs`） |
@@ -1169,8 +1288,10 @@ variant **只**贡献 fill / stroke / font / dash / radius 等颜料；**不**�
 |----|------|
 | `Edge.from_port` / `to_port` / `edge_group` 一等字段 | **已落地**（plotgram-model） |
 | DSL 四键 + `edge_group` 校验与提升（`lift_structural_attrs`） | **已落地**（model API；parser 须调用） |
+| `Node.role` / `host_group` / `anchor`（group_anchor） | **已落地**（plotgram-model；见 §5.7 / ADR-004） |
+| `@group` 糖展开（§7.6） | **待 parser** |
 | 布局组合相写入 `EdgePlacement` 的 `PortRef` | **待引擎** |
-| Ink 零发明端口 | **纪律已定**；引擎实现时强制 |
+| Ink 零发明端口 / 锚点几何 | **纪律已定**；引擎实现时强制 |
 
 作者已钉死的 `PortConstraint` 在组合相落地前不得被渲染层「猜侧」冒充已决议。
 

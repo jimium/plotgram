@@ -1,0 +1,10 @@
+[package]
+name = "plotgram-content"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Node content blocks: MD subset parse -> Content AST -> heuristic measure (ContentLayout) -> SVG <g> emit"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }

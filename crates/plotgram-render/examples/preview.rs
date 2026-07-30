@@ -22,6 +22,9 @@ fn node(id: &str, label: &str, shape: Option<&str>, variant: Option<&str>) -> No
         id: id.to_string(),
         label: Some(label.to_string()),
         shape: shape.map(|s| s.to_string()),
+        role: Default::default(),
+        host_group: None,
+        anchor: None,
         attrs,
     }
 }

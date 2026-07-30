@@ -9,8 +9,9 @@
 | [dsl-spec.md](dsl-spec.md) | DSL 2.4 — 语法形态（node / group / edge `{}` + 糖）+ **§14 属性注册表** | **语法 + 语义属性** |
 | [archetype-spec.md](archetype-spec.md) | Archetype 展开糖 — CSV 真源、只填空、编译进二进制 | **archetype 目录 / 展开** |
 | [style-sheet-spec.md](style-sheet-spec.md) | Theme 2.4 — 视觉属性词表 + 主题 JSON（`variants`）+ cascade | **视觉属性 / 主题** |
+| [content-md-spec.md](content-md-spec.md) | 内容块 MD 瘦子集 — 行级 / 行内语法、降级规则、Content AST（ADR-005） | **内容块语法 / Content AST** |
 
-三者互不重叠：一个属性只在一处被定义，跨文档只引用、不复制表格（见 dsl-spec §14.10）。
+四者互不重叠：一个属性只在一处被定义，跨文档只引用、不复制表格（见 dsl-spec §14.10）。
 
 CSV 真源：`crates/plotgram-model/assets/archetypes.csv`。
 

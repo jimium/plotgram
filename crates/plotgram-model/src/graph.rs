@@ -10,7 +10,7 @@
 //! There is no per-edge `seq` field.
 
 use crate::attr::AttrMap;
-use crate::port::{PortConstraint, PortConstraintError, port_constraint};
+use crate::port::{PortConstraint, PortConstraintError, Side, port_constraint};
 
 /// Arrow semantics (dsl-spec §7.2: exactly 3 kinds).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -23,6 +23,97 @@ pub enum Arrow {
     Bidirectional,
 }
 
+/// Structural role of a node (ADR-004 / dsl-spec §5.7).
+///
+/// Default is a normal content node. [`NodeRole::GroupAnchor`] is an invisible
+/// frame attachment point for group-to-group edges — not a business entity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NodeRole {
+    /// Ordinary diagram node (default).
+    #[default]
+    Entity,
+    /// Invisible anchor on a group's frame (`host_group` + [`Node::anchor`]).
+    GroupAnchor,
+}
+
+impl NodeRole {
+    /// Parse a DSL `role:` atom. Unknown atoms are errors (closed set for now).
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "entity" => Some(Self::Entity),
+            "group_anchor" => Some(Self::GroupAnchor),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Entity => "entity",
+            Self::GroupAnchor => "group_anchor",
+        }
+    }
+}
+
+/// Validation / lift errors for node structural fields (ADR-004).
+#[derive(Debug, Clone, PartialEq)]
+pub enum NodeStructuralError {
+    /// `role:` atom outside the closed set.
+    InvalidRole { value: String },
+    /// `group_anchor` missing `host_group`.
+    AnchorMissingHostGroup { node_id: String },
+    /// `group_anchor` missing `side` (anchor port).
+    AnchorMissingSide { node_id: String },
+    /// `entity` node still carries `host_group` / anchor keys after lift.
+    EntityHasAnchorFields { node_id: String },
+    /// Reused edge-port style errors when lifting node `side` / `slot`.
+    Port(PortConstraintError),
+}
+
+impl std::fmt::Display for NodeStructuralError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidRole { value } => {
+                write!(f, "`role`: `{value}` is not one of entity/group_anchor")
+            }
+            Self::AnchorMissingHostGroup { node_id } => {
+                write!(
+                    f,
+                    "node `{node_id}`: `role: group_anchor` requires `host_group`"
+                )
+            }
+            Self::AnchorMissingSide { node_id } => {
+                write!(
+                    f,
+                    "node `{node_id}`: `role: group_anchor` requires `side`"
+                )
+            }
+            Self::EntityHasAnchorFields { node_id } => {
+                write!(
+                    f,
+                    "node `{node_id}`: `host_group` / `side` / `slot` only valid with `role: group_anchor`"
+                )
+            }
+            Self::Port(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for NodeStructuralError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Port(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl From<PortConstraintError> for NodeStructuralError {
+    fn from(value: PortConstraintError) -> Self {
+        Self::Port(value)
+    }
+}
+
 /// A graph node (dsl-spec §5).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Node {
@@ -32,7 +123,20 @@ pub struct Node {
     pub label: Option<String>,
     /// Explicit rendering shape override (closed set; `None` = resolved via shape chain).
     pub shape: Option<String>,
+    /// Structural role (default [`NodeRole::Entity`]).
+    #[serde(default)]
+    pub role: NodeRole,
+    /// Host group id when [`Self::role`] is [`NodeRole::GroupAnchor`].
+    #[serde(default)]
+    pub host_group: Option<String>,
+    /// Attachment on the host group frame (`side` + optional `slot`).
+    ///
+    /// Required (at least `side`) for [`NodeRole::GroupAnchor`]. Geometry is
+    /// derived from the host group's finalized bbox — ink must not invent it.
+    #[serde(default)]
+    pub anchor: Option<PortConstraint>,
     /// Free-form attributes (`variant`, `icon`, `status`, `style.*`, `meta.*`, …).
+    /// Must **not** carry `role` / `host_group` / `side` / `slot` after lift.
     pub attrs: AttrMap,
 }
 
@@ -40,6 +144,76 @@ impl Node {
     /// Visual variant from attrs (`variant:`), if present.
     pub fn variant(&self) -> Option<&str> {
         self.attrs.get("variant").and_then(|v| v.as_str())
+    }
+
+    /// Whether this node is a [`NodeRole::GroupAnchor`].
+    pub fn is_group_anchor(&self) -> bool {
+        self.role == NodeRole::GroupAnchor
+    }
+
+    /// Lift DSL structural keys from `attrs` into first-class fields, then remove
+    /// them from `attrs`. Idempotent if fields already set (fields win; conflicting
+    /// attr keys are still stripped).
+    ///
+    /// Keys handled: `role`, `host_group`, `side`, `slot`.
+    pub fn lift_structural_attrs(&mut self) -> Result<(), NodeStructuralError> {
+        if matches!(self.role, NodeRole::Entity) {
+            if let Some(v) = self.attrs.get("role") {
+                let atom = v.as_str().unwrap_or_default();
+                self.role = NodeRole::parse(atom).ok_or_else(|| {
+                    NodeStructuralError::InvalidRole {
+                        value: v.to_string(),
+                    }
+                })?;
+            }
+        }
+        if self.host_group.is_none() {
+            if let Some(v) = self.attrs.get("host_group") {
+                if let Some(s) = v.as_str() {
+                    self.host_group = Some(s.to_string());
+                }
+            }
+        }
+        if self.anchor.is_none() {
+            self.anchor = port_constraint(&self.attrs, "side", "slot")?;
+        }
+        for k in ["role", "host_group", "side", "slot"] {
+            self.attrs.remove(k);
+        }
+        self.validate_role_fields()
+    }
+
+    /// Check role ↔ host_group / anchor consistency (call after lift or when
+    /// constructing IR by hand).
+    pub fn validate_role_fields(&self) -> Result<(), NodeStructuralError> {
+        match self.role {
+            NodeRole::Entity => {
+                if self.host_group.is_some() || self.anchor.is_some() {
+                    return Err(NodeStructuralError::EntityHasAnchorFields {
+                        node_id: self.id.clone(),
+                    });
+                }
+                Ok(())
+            }
+            NodeRole::GroupAnchor => {
+                if self.host_group.as_ref().map(|s| s.is_empty()).unwrap_or(true) {
+                    return Err(NodeStructuralError::AnchorMissingHostGroup {
+                        node_id: self.id.clone(),
+                    });
+                }
+                if self.anchor.is_none() {
+                    return Err(NodeStructuralError::AnchorMissingSide {
+                        node_id: self.id.clone(),
+                    });
+                }
+                Ok(())
+            }
+        }
+    }
+
+    /// Convenience: host side when this is a group anchor.
+    pub fn anchor_side(&self) -> Option<Side> {
+        self.anchor.map(|a| a.side)
     }
 }
 
@@ -196,6 +370,18 @@ impl Graph {
         Ok(())
     }
 
+    /// Lift structural attrs on every node (recursive). Call after parse
+    /// (and after `@group` sugar expansion into `group_anchor` nodes).
+    pub fn lift_all_node_structural_attrs(&mut self) -> Result<(), NodeStructuralError> {
+        for n in &mut self.nodes {
+            n.lift_structural_attrs()?;
+        }
+        for g in &mut self.groups {
+            g.lift_all_node_structural_attrs()?;
+        }
+        Ok(())
+    }
+
     /// Look up a node by id (top-level first, then groups in declaration order).
     pub fn find_node(&self, id: &str) -> Option<&Node> {
         if let Some(n) = self.nodes.iter().find(|n| n.id == id) {
@@ -257,6 +443,16 @@ impl Group {
         Ok(())
     }
 
+    fn lift_all_node_structural_attrs(&mut self) -> Result<(), NodeStructuralError> {
+        for n in &mut self.nodes {
+            n.lift_structural_attrs()?;
+        }
+        for g in &mut self.groups {
+            g.lift_all_node_structural_attrs()?;
+        }
+        Ok(())
+    }
+
     /// Look up a node by id within this group subtree.
     pub fn find_node(&self, id: &str) -> Option<&Node> {
         if let Some(n) = self.nodes.iter().find(|n| n.id == id) {
@@ -295,6 +491,9 @@ mod tests {
             id: id.to_string(),
             label: Some(id.to_string()),
             shape: None,
+            role: NodeRole::Entity,
+            host_group: None,
+            anchor: None,
             attrs: AttrMap::new(),
         }
     }
@@ -412,5 +611,64 @@ mod tests {
         assert!(!e.attrs.contains_key("from_side"));
         assert!(!e.attrs.contains_key("edge_group"));
         assert!(e.attrs.contains_key("style.stroke"));
+    }
+
+    #[test]
+    fn lift_node_group_anchor_structural_attrs() {
+        let mut n = node("ga_fe");
+        n.attrs.insert("role".into(), AttrValue::Atom("group_anchor".into()));
+        n.attrs
+            .insert("host_group".into(), AttrValue::Atom("frontend".into()));
+        n.attrs.insert("side".into(), AttrValue::Atom("east".into()));
+        n.attrs.insert("slot".into(), AttrValue::Num(0.0));
+        n.attrs
+            .insert("style.fill".into(), AttrValue::Str("#fff".into()));
+
+        n.lift_structural_attrs().unwrap();
+
+        assert_eq!(n.role, NodeRole::GroupAnchor);
+        assert_eq!(n.host_group.as_deref(), Some("frontend"));
+        assert_eq!(
+            n.anchor,
+            Some(PortConstraint {
+                side: Side::East,
+                slot: Some(0)
+            })
+        );
+        assert!(!n.attrs.contains_key("role"));
+        assert!(!n.attrs.contains_key("host_group"));
+        assert!(!n.attrs.contains_key("side"));
+        assert!(n.attrs.contains_key("style.fill"));
+        assert!(n.is_group_anchor());
+    }
+
+    #[test]
+    fn entity_rejects_anchor_fields() {
+        let mut n = node("x");
+        n.host_group = Some("g".into());
+        assert!(matches!(
+            n.validate_role_fields(),
+            Err(NodeStructuralError::EntityHasAnchorFields { .. })
+        ));
+    }
+
+    #[test]
+    fn group_anchor_requires_host_and_side() {
+        let mut n = node("ga");
+        n.role = NodeRole::GroupAnchor;
+        assert!(matches!(
+            n.validate_role_fields(),
+            Err(NodeStructuralError::AnchorMissingHostGroup { .. })
+        ));
+        n.host_group = Some("g".into());
+        assert!(matches!(
+            n.validate_role_fields(),
+            Err(NodeStructuralError::AnchorMissingSide { .. })
+        ));
+        n.anchor = Some(PortConstraint {
+            side: Side::West,
+            slot: None,
+        });
+        n.validate_role_fields().unwrap();
     }
 }
