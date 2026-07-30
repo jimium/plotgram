@@ -59,7 +59,7 @@ model 是**纯数据层**：定义所有 crate 共享的类型，不含布局/�
 
 ## 硬约束
 
-1. **`DiagramType` 不得出现在 engine**（ADR-001）。入口只认 `LayoutContract`。
+1. **`DiagramType` / profile 名不得出现在 engine**（ADR-001）。入口只认 `LayoutContract`。DSL 表面键为 `profile:`。
 2. **`AttrMap` 用 `BTreeMap`**（确定性）。
 3. **model 不依赖其它 workspace crate**。
 4. **边用稳定 `Edge.id`**；placement / label 用同一 id。

@@ -1,17 +1,18 @@
-//! Profile: diagram type → default algorithm configuration.
+//! Profile: DSL `profile:` atom → default algorithm configuration.
 //!
-//! Per dsl-spec §8 and ADR-001: expansion happens BEFORE the engine sees the contract.
-//! **Engine code must not `use plotgram_model::profile`** (no diagram-type branching).
+//! Per dsl-spec §4 / §8 and ADR-001: expansion happens BEFORE the engine sees the contract.
+//! **Engine code must not `use plotgram_model::profile`** (no profile-name branching).
 //!
 //! During rebuild, [`Profile::for_type`] in this module is the working source of defaults.
 //! A future engine algorithm registry may override names/options; it still must not take
-//! [`DiagramType`] as an input.
+//! [`DiagramType`] (profile id) as an input.
 
 use crate::contract::AlgorithmRef;
 
-/// The six supported diagram types (dsl-spec §1.2).
+/// Closed set of DSL `profile:` atoms (dsl-spec §1.2).
 ///
 /// Lives in the DSL/profile layer only. Must NOT leak into layout/routing engine code.
+/// (Rust name remains `DiagramType` for now; DSL surface key is `profile`.)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum DiagramType {
     Flowchart,

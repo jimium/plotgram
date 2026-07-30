@@ -1,13 +1,14 @@
 # Plotgram DSL 规范
 
-> 版本：2.5-draft  
+> 版本：2.6-draft  
 > 状态：语法契约草案（相对 v1 `language-spec.md` 的瘦身重设计；该文档已删除）  
 > 定稿选择：node / group / edge **规范形态**为声明头 + `{ … }`（`label` / `variant` / `style.*` 等进花括号）；node 另有三轴 + `archetype`；边箭头 `->` / `-->` / `<->` 保留语法；边端口 `side` + `slot`；无声明式样式；ER 另文；自环默认禁  
 > 2.1：废弃 `kind`；三轴 + archetype  
 > 2.2：node 废除 `: shape` 后缀；规范一切进 `{}`；§5.5 糖  
 > 2.3：group 废除位置 string 标签；`label` / `variant` 进 `{}`；§6.5 糖  
 > 2.4：edge 标签一律进 `{}`；废除 `>"` / `<"` 端点糖；§7.5 仅保留中点 string 糖；允许省略空 `{}`  
-> 2.5：`group_anchor` 一等字段 + `@group` 组框边糖（ADR-004）
+> 2.5：`group_anchor` 一等字段 + `@group` 组框边糖（ADR-004）  
+> 2.6：废除 `diagram <type>` 位置；改为属性 `profile:`（ADR-001）
 
 **本文档定义**：DSL **语法形态**，以及 **属性注册表**（§14：写者/消费者/状态、shape / variant 封闭集）。  
 archetype 展开与 CSV 见 [`archetype-spec.md`](archetype-spec.md)；视觉属性词表见 [`style-sheet-spec.md`](style-sheet-spec.md) §5。
@@ -27,19 +28,22 @@ archetype 展开与 CSV 见 [`archetype-spec.md`](archetype-spec.md)；视觉属
 ```plotgram
 // 文档注释（可选）
 
-diagram flowchart {
+diagram {
+    profile: flowchart
     // 图表内容
 }
 ```
 
-### 1.2 图表类型
+### 1.2 Profile 预设
 
 ```
-<diagram_type> ::= "flowchart" | "sequence" | "architecture"
-                 | "state"     | "er"       | "mindmap"
+<profile_id> ::= "flowchart" | "sequence" | "architecture"
+               | "state"     | "er"       | "mindmap"
 ```
 
-图表类型是 DSL 层的 **profile 预设**。解析后展开为默认的 `layout` + `edge_routing` 及图种约束；**布局/路由引擎不接收 diagram type**，只认算法名与参数（见 §8）。
+`profile:` 是 DSL 层的 **算法/约束预设名**（写在 diagram 属性块内，见 §4）。解析后展开为默认的 `layout` + `edge_routing` 及图种约束；**布局/路由引擎不接收 profile / 图种名**，只认算法名与参数（见 §8、ADR-001）。
+
+**已废弃**：`diagram flowchart { … }` 位置 type（须写成 `diagram { profile: flowchart … }`）。
 
 ### 1.3 图表体
 
@@ -151,7 +155,8 @@ diagram flowchart {
 // 用户认证流程
 // 作者：平台团队
 
-diagram flowchart {
+diagram {
+    profile: flowchart
     ...
 }
 ```
@@ -178,28 +183,36 @@ node api "API 服务"   // 行尾注释
 ### 4.1 语法
 
 ```
-<diagram_declaration> ::= "diagram" <diagram_type> "{" <diagram_body> "}"
+<diagram_declaration> ::= "diagram" "{" <diagram_body> "}"
 <diagram_attribute>   ::= <attribute_key> ":" <attribute_value>
 ```
 
-### 4.2 图表属性（固定 5 个）
+规范形态与 node/group 一致：**头只有 `diagram`，其余进花括号**。不做 `diagram flowchart {` 位置糖。
+
+### 4.2 图表属性
 
 | 属性 | 类型 | 说明 |
 |------|------|------|
+| **`profile`** | atom（§1.2 封闭集） | 算法/约束预设；展开默认 `layout` / `edge_routing` / 自环等 |
 | `title` | string | 图表标题 |
-| `layout` | algorithm_config | 布局算法及参数 |
+| `layout` | algorithm_config | 布局算法及参数（覆盖 profile 默认） |
 | `edge_routing` | algorithm_config | 边路由算法及参数；可与布局内建路由二选一或配合（见引擎注册表） |
 | `theme` | atom | 颜色/字体主题 |
 | `render_style` | atom | 笔触皮肤 |
 
-- 所有属性可选；未声明时由 diagram type profile 提供默认值
-- 同一属性不可重复声明
-- 未识别的 diagram 级 key 产生警告，忽略
+- 所有属性可选  
+- 未写 `profile` 且未写 `layout` → 默认按 `profile: flowchart` 展开  
+- 写了 `profile` → 先灌预设，再被显式 `layout` / `edge_routing` **覆盖**  
+- 只写 `layout`、不写 `profile` → 允许（纯算法驱动）；自环等未由 profile 给出的约束用引擎/规范默认（自环默认禁）  
+- 同一属性不可重复声明  
+- 未识别的 diagram 级 key 产生警告，忽略  
+- 未知 `profile` atom → **错误**（封闭集）
 
 ### 4.3 示例
 
 ```plotgram
-diagram flowchart {
+diagram {
+    profile: flowchart
     title: "用户登录流程"
     layout: hierarchical { direction: top-to-bottom }
     edge_routing: orthogonal
@@ -209,6 +222,19 @@ diagram flowchart {
     node login "登录"
     node auth "认证"
     login -> auth
+}
+```
+
+纯算法、不绑预设名：
+
+```plotgram
+diagram {
+    layout: hierarchical { direction: left-to-right }
+    theme: common.clean-light
+
+    node a { label: "A" }
+    node b { label: "B" }
+    a -> b
 }
 ```
 
@@ -916,23 +942,23 @@ db -> api {
 
 ```
 .pgm
-  → parse（AST 可保留 diagram_type，供诊断 / profile）
+  → parse（AST 可保留 profile id，供诊断 / 展开）
   → 展开 @group 糖（§7.6 → group_anchor nodes + 普通边）
   → lift Node 结构字段（role / host_group / side / slot）
   → lift Edge 结构字段（from_side… / edge_group → Edge 一等字段）
   → archetype expand（见 archetype-spec：只填空写入 shape / variant / icon）
-  → profile expand（默认 layout / edge_routing、可选默认 shape、自环策略、图种约束）
-  → LayoutContract（算法名 + 参数 + 图模型）
+  → profile expand（`profile:` 预设 → 默认 layout / edge_routing、可选默认 shape、自环策略、图种约束；显式 layout 覆盖）
+  → LayoutContract（算法名 + 参数 + 图模型；**无** profile / 图种名）
   → layout / routing 引擎（组合相补全端口 → 度量 → 落笔）
 ```
 
-- 引擎入口**不**按图名分支（禁图名特判）；差异只来自 contract / profile 已展开的字段
-- 默认算法与约束表由引擎注册表维护；本规范只要求「有 profile、可展开」
+- 引擎入口**不**按图名 / profile 名分支（禁图名特判）；差异只来自 contract 已展开的字段
+- 默认算法与约束表由 profile 表 + 引擎注册表维护；本规范只要求「有 profile、可展开」
 - **端口 / 边组 / group_anchor**：DSL 可选；提升后为一等字段（见 §5.7、§7.4、ADR-003/004）
 - 示意（非封闭承诺，以实现注册表为准）：
 
-| diagram_type | 默认 layout（示意） | 默认 edge_routing（示意） | 自环 |
-|--------------|---------------------|---------------------------|------|
+| `profile` | 默认 layout（示意） | 默认 edge_routing（示意） | 自环 |
+|-----------|---------------------|---------------------------|------|
 | flowchart | hierarchical | **None**（布局内建正交） | 可允许 |
 | architecture | hierarchical | **None**（布局内建正交） | 禁止 |
 | state | hierarchical 或 circular | **None**（依布局内建） | 可允许 |
@@ -998,14 +1024,15 @@ true, false
 <doc_comment>          ::= <comment_line>+        // 文件首、连续 //，空行中断
 <comment_line>         ::= "//" [^\n]*
 
-<diagram_declaration>  ::= "diagram" <diagram_type> "{" <diagram_body> "}"
-<diagram_type>         ::= "flowchart" | "sequence" | "architecture"
-                         | "state" | "er" | "mindmap"
+<diagram_declaration>  ::= "diagram" "{" <diagram_body> "}"
 <diagram_body>         ::= (<diagram_attribute>
                           | <node_declaration>
                           | <relation_declaration>
                           | <group_declaration>)*
 <diagram_attribute>    ::= <attribute_key> ":" <attribute_value>
+                          // 含 profile: <profile_id>（§1.2 / §4.2）
+<profile_id>           ::= "flowchart" | "sequence" | "architecture"
+                         | "state" | "er" | "mindmap"
 
 <node_declaration>     ::= "node" <identifier> [<string> [<atom> [<atom>]]] [<attribute_block>]
                           // 规范：node id { … }
@@ -1050,7 +1077,7 @@ true, false
 | 3 | 边端点（展开后）必须是已声明 node |
 | 4 | group 不可作 IR 边端点；组框连线用 `group_anchor` 或 `@group` 糖（§5.7 / §7.6） |
 | 5 | 组内边两端须为该组后代 node |
-| 6 | diagram 固定属性不可重复；未知 diagram key 警告忽略 |
+| 6 | diagram 属性不可重复；未知 diagram key 警告忽略；`profile` 须为 §1.2 封闭集 |
 | 7 | 自环默认非法；仅 profile 允许时合法 |
 | 8 | 形状未识别 → 渲染回退圆角 `rect`（封闭集见 §14.6） |
 | 9 | 无声明式样式；仅 `style.*` / `theme` / `render_style` |
@@ -1065,6 +1092,7 @@ true, false
 | 18 | `edge_group` 提升为 `Edge.edge_group`；引擎不从 attrs 读结构键 |
 | 19 | `role: group_anchor` 须有 `host_group` + `side`；提升为 `Node` 一等字段；锚点须为 host 组成员（§5.7） |
 | 20 | `@gid` 端点须对应已声明 group；该端缺少 `*_side` → 错；禁止无 `@` 的裸 group id 作端点（§7.6） |
+| 21 | diagram 规范为 `diagram { … }`；预设用属性 `profile:`；禁止位置 `diagram flowchart {`（§4） |
 
 ---
 
@@ -1073,7 +1101,8 @@ true, false
 ```plotgram
 // 登录认证示意
 
-diagram flowchart {
+diagram {
+    profile: flowchart
     title: "用户登录"
     layout: hierarchical { direction: top-to-bottom }
     theme: common.clean-light
@@ -1447,7 +1476,7 @@ style-sheet-spec  视觉属性词表 + 主题 JSON + cascade
 | 声明式样式 | `node_style` / `edge_style` | **删除**；仅内联 `style.*` |
 | ER `field` | （旧亦弱） | **本草案不做**；另文 |
 | 自环 | decision 例外 | 默认禁，profile 可开 |
-| diagram → 引擎 | 易渗入图名 | profile 展开后引擎不收 type |
+| diagram → 引擎 | 易渗入图名 | `profile:` 展开后引擎不收 profile / 图种名 |
 
 旧文档 `language-spec.md`（v1，已删除）不再可对照，**以本文件为准**。
 
@@ -1486,3 +1515,17 @@ style-sheet-spec  视觉属性词表 + 主题 JSON + cascade
 | edge 端点标签 | `>"head"` / `<"tail"` | **`head_label:`** / **`tail_label:`**（废除端点糖） |
 | 空边 | 隐式无块 | **`a -> b`** ≡ 空属性块 |
 | edge 颜料 | 仅 `style.*` + `defaults.edge` | 可选 **`variant:`**（与 node 共用 §14.7 封闭集） |
+
+### A.5 2.4 → 2.5
+
+| 项 | 2.4 | 2.5 |
+|----|-----|-----|
+| 组间边 | 仅连组内 node | **`group_anchor`** + `@group` 糖（§5.7 / §7.6） |
+
+### A.6 2.5 → 2.6
+
+| 项 | 2.5 | 2.6 |
+|----|-----|-----|
+| diagram 头 | `diagram <type> { … }` | **`diagram { … }`** |
+| 图种预设 | 位置 type | 属性 **`profile:`**（封闭集同旧 type） |
+| 位置糖 | — | **不做** `diagram flowchart {` |

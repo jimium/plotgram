@@ -24,14 +24,15 @@ V1 的 `config { }` 块将布局/路由等引擎参数收纳在一个额外嵌�
 ## 示例
 
 ```plotgram
-diagram flowchart {
+diagram {
+    profile: flowchart
     title: "用户登录"
     layout: hierarchical { direction: top-to-bottom, group_padding: 20 }
     edge_routing: orthogonal
     theme: common.clean-light
 
-    entity login "登录"
-    entity auth "认证"
+    node login { label: "登录" }
+    node auth { label: "认证" }
     login -> auth
 }
 ```
