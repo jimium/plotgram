@@ -1,0 +1,216 @@
+{
+  "summary": {
+    "projectName": "Plotgram",
+    "locale": "zh-CN",
+    "modelId": "agent-work-loop-v4",
+    "reportContractVersion": 25,
+    "overview": "AGENTS.md 把写权纪律、确定性与验真红线写成了可静态检查的硬约束，benchmarks 棘轮脚本与 250+ 基线快照也成体系；但 2026-07-29 的 v1 迁移之后，CI、验真 CLI、前端启动脚本与规则指针仍停在旧坐标，导致当前重建代码既没有机械门禁，也没有可运行的验真与启动路线。本次评审为 session-limited：qoder 会话证据源在窗口内不可达（0 个合格会话、0 个 Task Episode），所有结论均来自项目静态证据与确定性资产信封，任何关于代理实际行为、CI 运行结果、命令实际输出的判断都保持未观察。104 条项目 Memory 仅复核标题/类别元数据（0 精确标题碰撞、0 相似候选、无截断），正文未授权、检索与应用链条未观察，故不产生 Memory 相关结论；项目 Skill 为零也未生成覆盖类问题——因为零 Task Episode 无法支撑任何重复流程需求的两次可比证据。",
+    "aiAgentPractice": {
+      "inspectedSurfaces": [
+        "Rules",
+        "Workflows"
+      ],
+      "coverageRows": [
+        {
+          "surface": "Rules",
+          "scopes": [
+            "Project"
+          ],
+          "count": 1,
+          "paths": [
+            "AGENTS.md"
+          ]
+        },
+        {
+          "surface": "Workflows",
+          "scopes": [
+            "Project"
+          ],
+          "count": 1,
+          "paths": [
+            ".github/workflows/ci.yml"
+          ]
+        },
+        {
+          "surface": "Memories",
+          "scopes": [
+            "Project"
+          ],
+          "count": 104
+        },
+        {
+          "surface": "Custom Agents",
+          "scopes": [
+            "Project"
+          ],
+          "count": 0
+        }
+      ]
+    },
+    "assignmentSummaries": [],
+    "dimensions": [
+      {
+        "id": "task-understanding",
+        "label": "任务理解",
+        "score": 55,
+        "summary": "唯一规则文档现行且方向明确，但核心 DSL 契约指针失效、双份 agent 骨架无权威归属、索引里存在不可见的暂存增量，权威上下文与效果边界都有确证缺口。",
+        "findingRefs": [
+          "staged-only-docs-invisible",
+          "agents-md-dsl-spec-deadlink",
+          "duplicate-agent-skeleton-ownership"
+        ]
+      },
+      {
+        "id": "controlled-execution",
+        "label": "可控执行",
+        "score": 45,
+        "summary": "playground/start.sh 等启动与发布入口指向已不存在的 wasm crate，干净检出下没有可复现的前端启动路线；权限与操作边界未观察。",
+        "findingRefs": [
+          "wasm-crate-path-drift"
+        ]
+      },
+      {
+        "id": "change-validation",
+        "label": "改动验证",
+        "score": 50,
+        "summary": "新 crate 有 42 个单元测试与 insta 快照可用，但 AGENTS.md 指定的验真命令落到 3 行 stub 并返回成功，churn 最高的前端文件则完全没有项目自有检查。",
+        "findingRefs": [
+          "cli-stub-returns-success",
+          "frontend-hotspots-without-owned-check"
+        ]
+      },
+      {
+        "id": "reliable-delivery",
+        "label": "可靠交付",
+        "score": 38,
+        "summary": "唯一 CI 工作流验证的是已迁出 workspace 的旧包，重建代码无任何验收门禁；deploy 脚本直推生产但依赖同一条失效链路，回滚证据未观察。",
+        "findingRefs": [
+          "ci-targets-removed-crates"
+        ]
+      },
+      {
+        "id": "learning-capture",
+        "label": "经验沉淀",
+        "score": 42,
+        "summary": "同一类引用漂移在 CI、启动脚本、规则指针三处并发出现，说明迁移类改动缺少可重复的引用一致性巡检；会话侧无 Episode，重复劳动与后续效果均无法评估。",
+        "findingRefs": [
+          "no-reference-drift-inspection"
+        ]
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "ci-targets-removed-crates",
+      "title": "CI 唯一工作流仍验证已迁出 workspace 的旧包，重建的 5 个 crate 无门禁",
+      "severity": "High",
+      "reason": "事实：.github/workflows/ci.yml 的 test job 首步执行 `cargo test -p plotgram-core --lib` 与 `cargo test -p plotgram-eval --lib deterministic`，而根 Cargo.toml 的 members 只有 crates/plotgram-{model,content,engine,render,cli}；plotgram-core / plotgram-eval 已随迁移进入 crates/v1/，既不是成员也未 exclude，Cargo.lock 中也不含这两个包名。其后 7 个棘轮步骤断言的 crates/plotgram-core/... 路径同样不存在。推断：push 到 main/develop 或任何 PR 上，该 job 在第一步即因包无法解析而中止，后续 7 个门禁不会执行，AGENTS.md §2「验真」红线在自动化层没有落点。归属：.github/workflows/ci.yml 的 test job 步骤，对照根 Cargo.toml members。不确定：未打开外部 CI 运行记录（Unobserved），无法断言历史 run 全部失败，也未观察是否存在分支保护或替代流水线。",
+      "expectedOutput": [
+        "让下一个提交者拿到一条能在本地按原样跑通、且只引用现存包与路径的 CI 验证清单。"
+      ],
+      "expectedArtifact": "CI 工作流",
+      "aiFixPrompt": "/better-harness fix this issue\n\n把 .github/workflows/ci.yml 的验证目标改到根 Cargo.toml 现有 members 上：用当前 5 个 crate 的最小测试步骤替换 `-p plotgram-core` / `-p plotgram-eval`，并逐个核对 7 个 benchmarks/scripts/check-*.sh 断言的源码路径；对确认只适用于 crates/v1 的棘轮，先从工作流移除并在脚本内注明适用范围，不要为了让门禁变绿而放宽断言。同时决定 crates/v1 的 workspace 关系（exclude 或纳入），使其不再处于既非成员也未排除的状态。仅修改工作流、脚本与 Cargo.toml，不触碰引擎代码。\n\n## Validation\n\n- `cargo metadata --no-deps --format-version 1 | rg -o '\"name\":\"plotgram-[a-z]+\"'` 确认工作流引用的每个包都在 workspace 内\n- 对改后的每条步骤在本地按原样执行一次（如 `cargo test -p plotgram-render --lib`），保留退出码\n- `bash -n .github/workflows/ci.yml` 无法校验 YAML，请改用 `rg -n 'cargo test|check-' .github/workflows/ci.yml` 逐条对照仓库现存路径",
+      "dimensionRefs": [
+        "reliable-delivery"
+      ]
+    },
+    {
+      "id": "cli-stub-returns-success",
+      "title": "plotgram-cli 是 3 行 stub 却返回成功，验真、渲染、发布链路会静默假绿",
+      "severity": "High",
+      "reason": "事实：crates/plotgram-cli/src/main.rs 全文只有一次 println!，不解析 argv、不设非零退出码；该包与 crates/v1/plotgram-cli 同名 plotgram-cli，迁移后只有新 stub 能被 `-p plotgram-cli` 解析。以退出码判定成功的调用方包括 AGENTS.md §2 指定的日常验真命令、showcase/render-all.sh:104、benchmarks/scripts/check-group-writes.sh:25、benchmarks/scripts/check-product-penetration.sh:29，以及 deploy/deploy-showcase.sh:55 之后的渲染与站点同步。推断：这些位置会从「失败」退化为「成功但零产出」，即代理与人都会收到虚假的验真通过信号，而发布链路可能把空产物同步出去。归属：crates/plotgram-cli/src/main.rs 未以非零码拒绝未实现子命令，以及上述四处调用点的退出码判定写法。不确定：本轮未执行任何构建或 CLI（Unobserved），deploy/deploy-showcase.sh 是否另有产物非空校验未逐行核实。",
+      "expectedOutput": [
+        "让任何依赖退出码的验真或发布步骤在 CLI 未实现时立即失败，而不是收到成功信号。"
+      ],
+      "expectedArtifact": "CLI 契约",
+      "aiFixPrompt": "/better-harness fix this issue\n\n让 crates/plotgram-cli/src/main.rs 对任何未实现的子命令以非零退出码失败，并在 stderr 打印「v2 重建中，该子命令尚未实现」；不要顺手实现 render/lint。随后为把退出码当验真信号的调用方补上最小硬化：showcase/render-all.sh 与 benchmarks/scripts/check-group-writes.sh、check-product-penetration.sh 在拿到非零码时明确报错退出，deploy/deploy-showcase.sh 在同步前增加产物存在且非空的检查。\n\n## Validation\n\n- `cargo run -q -p plotgram-cli -- render sample.pgm -o out.svg; echo $?` 期望非零\n- `cargo run -q -p plotgram-cli -- --help; echo $?` 与新契约一致\n- `bash -n showcase/render-all.sh deploy/deploy-showcase.sh benchmarks/scripts/check-group-writes.sh benchmarks/scripts/check-product-penetration.sh`\n- deploy/deploy-showcase.sh 的实际发布需单独授权，本次只验证其前置检查分支（可用 dry-run 或注入空产物触发失败路径）",
+      "dimensionRefs": [
+        "change-validation"
+      ]
+    },
+    {
+      "id": "wasm-crate-path-drift",
+      "title": "三个启动与发布入口指向已不存在的 crates/plotgram-wasm，前端无法从干净检出跑起来",
+      "severity": "High",
+      "reason": "事实：playground/start.sh:8、deploy/deploy-wasm.sh:46、editors/vscode/scripts/build-wasm.sh:7 都把 wasm crate 常量指向 crates/plotgram-wasm；该目录不存在（现位于 crates/v1/plotgram-wasm），.gitignore:23-24 也仍在忽略旧路径的 pkg/ 与 dist/。同时 playground/plotgram-wasm/ 被 .gitignore 忽略、不在版本控制内。推断：start.sh 带 set -e，会在 wasm-pack 构建处中止；干净检出的代理既拿不到 wasm 产物也无法自行构建，playground / website / studio / agent-demo 的「跑起来看一眼」路径全部断裂，Fast Feedback 退化为纯静态阅读。归属：上述三处常量赋值与 .gitignore:23-24。不确定：本机是否残留历史 wasm 产物、wasm-pack 是否已安装均未核实（Unobserved），故「完全不可运行」限定在干净检出场景。",
+      "expectedOutput": [
+        "让干净检出的下一位操作者用一条项目自有命令把前端跑起来，并在失败时得到确切的缺失前置条件。"
+      ],
+      "expectedArtifact": "启动脚本",
+      "aiFixPrompt": "/better-harness fix this issue\n\n把 playground/start.sh、deploy/deploy-wasm.sh、editors/vscode/scripts/build-wasm.sh 的 wasm crate 路径改到当前真实位置，并同步 .gitignore 中的旧忽略路径。若 v1 的 wasm crate 只是过渡产物，请在脚本内注明其临时性与后续接管者，不要在三处各写一份新的路径推断逻辑。\n\n## Validation\n\n- `rg -n 'plotgram-wasm' playground/start.sh deploy/deploy-wasm.sh editors/vscode/scripts/build-wasm.sh .gitignore` 逐条对照 `ls crates` 的真实目录\n- `bash -n playground/start.sh deploy/deploy-wasm.sh editors/vscode/scripts/build-wasm.sh`\n- 在本地执行 playground/start.sh 至 wasm 构建完成（需已安装 wasm-pack），保留首个失败点或成功后的产物路径；部署脚本的实际执行需单独授权",
+      "dimensionRefs": [
+        "controlled-execution"
+      ]
+    },
+    {
+      "id": "staged-only-docs-invisible",
+      "title": "索引里有 12 个暂存文件对 git diff HEAD 不可见，下一次提交会复活 4033 行重复文档",
+      "severity": "Medium",
+      "reason": "事实：git status --porcelain 有 12 条 AD 记录，`git diff --cached --stat HEAD` 尾行为「12 files changed, 4033 insertions(+)」，而 `git diff HEAD` 为空；这些路径在 HEAD 中不存在、工作区文件已删除，内容与 docs/archive/atlas/ 下同名文件重复（抽验 README.md 的 blob 哈希一致）。推断：任何代理执行 git commit（无论是否 -a）都会把这 12 个文件一并提交，用旧拼写目录复活一份归档副本；而所有以 worktree-vs-HEAD 为唯一变更来源的检查（本次证据包 diffImpact.changedFiles=0、changeDrift.findingCount=0 即是例证）都会报告「无变更」，提交者不会意识到效果已越界。归属：git 索引中的 12 条暂存条目，以及把 `git diff HEAD` 当作唯一变更来源的检查口径。不确定：仅抽验 1 个文件的哈希一致性，其余 11 个是否逐字节重复未验证；这些暂存是有意保留还是遗留无提交记录可判。",
+      "expectedOutput": [
+        "让下一次提交前能一眼看出索引里是否还有 worktree 差异看不见的增量，并附带逐文件的重复判定。"
+      ],
+      "expectedArtifact": "索引核对清单",
+      "aiFixPrompt": "/better-harness fix this issue\n\n先只做判定、不做删除：对 12 条暂存条目逐一比对其索引内容与 docs/archive/atlas/ 下同名文件的 blob 哈希，产出一份「重复/差异」清单。清单确认全部重复后，取消暂存这批路径（保持工作区现状不变）需人工确认后再执行；若存在差异文件，先把差异内容合并回 docs/archive/atlas/ 的现行文档。同时给变更检查补上索引清洁性判断（例如在提交前校验 `git diff --cached --stat HEAD` 为空或已被显式确认）。\n\n## Validation\n\n- `git status --porcelain | rg '^AD'` 与 `git diff --cached --stat HEAD | tail -1` 记录处理前后的差值\n- 逐个执行 `git show \":<path>\" | git hash-object --stdin` 与 `git hash-object docs/archive/atlas/<name>` 比对，输出 DUP/DIFF 清单\n- 取消暂存与任何历史改写属高风险操作，需单独授权后执行",
+      "dimensionRefs": [
+        "task-understanding"
+      ]
+    },
+    {
+      "id": "agents-md-dsl-spec-deadlink",
+      "title": "AGENTS.md 指向的 DSL 语法契约路径不存在，权威上下文的第一跳落空",
+      "severity": "Medium",
+      "reason": "事实：AGENTS.md §3「读什么」第 2 条把 DSL 语法契约与属性注册表指向 docs/specs/dsl/dsl-spec.md，该路径不存在；真实文件为 docs/specs/dsl-spec.md。资产 lint 信封同样报告 8 个引用中 1 个 missingReference，两条通道相互印证。另外 docs/specs/ 下 README.md、ast-spec.md、error-model.md 仍引用已迁出的 crates/plotgram-core 坐标。推断：代理按唯一规则文档加载核心契约时会直接落空，转而自行搜索，可能命中 docs/archive/ 或 backups/ 中被明令「只读、不驱动实现」的旧版本。归属：AGENTS.md §3 第 2 条的链接文本。不确定：无会话证据可证明代理实际因此走偏（Unobserved）。",
+      "expectedOutput": [
+        "让代理从唯一规则文档出发的每一跳都能打开真实的现行契约，而不是靠搜索命中归档副本。"
+      ],
+      "expectedArtifact": "规则指针",
+      "aiFixPrompt": "/better-harness fix this issue\n\n修正 AGENTS.md §3 第 2 条的 dsl-spec 链接到真实路径，并把 §3 全部 8 个引用逐一做存在性核对；同时更新 docs/specs/{README,ast-spec,error-model}.md 中指向 crates/plotgram-core 的旧坐标，使其落在当前 5 个 crate 上。只改指针与坐标，不改写契约内容。\n\n## Validation\n\n- `rg -o '\\((docs|crates|benchmarks)/[^)]+\\)' AGENTS.md | tr -d '()' | xargs -I{} sh -c 'test -e {} || echo MISSING {}'` 期望无输出\n- `rg -n 'plotgram-core' docs/specs/` 期望无残留\n- `test -e docs/specs/dsl-spec.md`",
+      "dimensionRefs": [
+        "task-understanding"
+      ]
+    },
+    {
+      "id": "frontend-hotspots-without-owned-check",
+      "title": "近 30 天 churn 最高的前端文件没有任何项目自有检查",
+      "severity": "Medium",
+      "reason": "事实：30 天窗口（145 个 commit）churn 前列为 website/src/pages/Home.tsx（10 commits / churn 1156）、website/src/components/HeroPlayground.tsx（10 / 819）、playground/src/App.tsx（8 / 681）、agent-demo/src/agent/prompt.ts（8 / 553）。git ls-files 下唯一的 5 个测试文件全在 studio/tests/，只有 studio/package.json 声明 test 脚本，.github/workflows/ci.yml 中 npm/node/vitest/eslint/tsc 命中数为 0。推断：代理改动这些最活跃文件后，仓库内没有任何可执行检查能判定是否回归，验真只能依赖人工肉眼与手动预览。归属：playground/website/agent-demo 三个 package.json 缺 test 脚本，以及 .github/workflows/ci.yml 缺 JS 检查步骤；studio 的 vitest + wasm mock 已是可复制的现成模板。不确定：这些前端是否另有仓库外检查、agent-demo 是否已被判为退役均未观察（Unobserved）。",
+      "expectedOutput": [
+        "让改动最频繁的前端文件有一条能在本地跑完并给出明确失败的项目自有检查。"
+      ],
+      "expectedArtifact": "前端检查",
+      "aiFixPrompt": "/better-harness fix this issue\n\n先给 churn 最高的那一个前端（website）建立最小可执行检查：按 studio 的 vitest + tests/mocks 隔离 wasm 依赖的做法，加 test 脚本与一个覆盖当前热点行为的用例，并把 typecheck 纳入同一条命令。不要一次给四个前端铺测试框架，也不要在没有 JS 检查可跑之前修改 CI 步骤。\n\n## Validation\n\n- 在 website 目录执行新增的 test 与 typecheck 命令，保留退出码与用例名\n- `rg -n '\"test\"|\"typecheck\"' website/package.json`\n- `git ls-files | rg -i '\\.(test|spec)\\.(ts|tsx)$'` 确认新增用例已被追踪",
+      "dimensionRefs": [
+        "change-validation"
+      ]
+    },
+    {
+      "id": "duplicate-agent-skeleton-ownership",
+      "title": "agent-demo 与 studio 存在同名 agent 骨架且已分叉，没有权威归属声明",
+      "severity": "Low",
+      "reason": "事实：agent-demo/src/agent/ 与 studio/src/agent/ 拥有完全同名的 6 个模块（AgentLoop / context / index / prompt / tools / types），但内容已分叉——prompt.ts 分别为 487 行与 102 行；AGENTS.md 对 npm / node / vite / playground / studio / agent-demo / website / deploy 的提及次数为 0，仓库内没有 tracked 文档说明哪一份是现行实现。推断：代理接到「改 agent 提示词」这类任务时缺少权威归属线索，有实质概率改到非现行的那一份，改动无法被任何检查发现（该区域也无测试）。归属：AGENTS.md 缺少前端与 agent 应用的归属/路由说明，或两个目录缺少各自的作用域说明。不确定：无 tracked 依据可判定其中任一已退役，也不能断言 studio 是继任者；实际改错发生率无会话证据（Unobserved）。",
+      "expectedOutput": [
+        "让代理在动 agent 骨架前，从唯一规则文档就能确定哪一份是现行实现。"
+      ],
+      "expectedArtifact": "归属声明",
+      "aiFixPrompt": "/better-harness fix this issue\n\n在 AGENTS.md 增加一小节，声明四个前端子项目（playground / website / studio / agent-demo）各自的用途与现行状态，并明确 agent 骨架的权威归属者与另一份的定位（示例、冻结或待删）。若结论是其中一份已退役，按仓库「无向后兼容、直接删旧代码」的红线处理而非留下 deprecated 说明；删除需人工确认。\n\n## Validation\n\n- `rg -ni 'playground|website|studio|agent-demo' AGENTS.md` 期望命中新增小节\n- `diff -rq agent-demo/src/agent studio/src/agent` 的差异清单与声明的归属一致",
+      "dimensionRefs": [
+        "task-understanding"
+      ]
+    },
+    {
+      "id": "no-reference-drift-inspection",
+      "title": "迁移类改动没有引用一致性巡检，同一类漂移已在三处并发出现",
+      "severity": "Medium",
+      "reason": "事实：同一个不变量——「项目自有命令与脚本引用的包名/路径必须存在于当前 workspace 与文件系统」——在三个互不相同的归属者上同时被打破：.github/workflows/ci.yml 引用不存在的包，三个启动/发布脚本引用不存在的 crates/plotgram-wasm，AGENTS.md 与 docs/specs/ 引用不存在的文档与旧 crate 坐标。仓库已有 benchmarks/scripts/check-*.sh 七个 rg 断言式棘轮与 gate-switch.sh 统一开关，具备承接这类巡检的现成载体。推断：这不是三个孤立笔误，而是缺少一条在迁移/重命名后可重复运行、能返回 clean/gap 的引用一致性检查；缺它则每次目录搬迁都要靠人回忆去改所有引用点。归属：benchmarks/scripts/ 下缺一个引用一致性棘轮（按已有 gate_skip_unless_enabled 约定扩展现有脚本族，而非新建独立机制）。不确定：会话证据不可达，无法证明这类漂移曾造成过实际返工，也无法评估修复后的后续效果（Longitudinal Validation 为 Unobserved）。",
+      "expectedOutput": [
+        "让下一次目录搬迁后有一条可重复运行、能返回 clean 或具体 gap 清单的引用一致性检查。"
+      ],
+      "expectedArtifact": "巡检脚本",
+      "aiFixPrompt": "/better-harness fix this issue\n\n在 benchmarks/scripts/ 按现有棘轮约定（source gate-switch.sh、gate_skip_unless_enabled、失败即非零退出）新增一个引用一致性检查：断言 .github/workflows/ci.yml 与 deploy/、playground/、editors/ 下脚本引用的每个 cargo 包名都能在 `cargo metadata --no-deps` 中解析，且引用的每个仓库内路径都存在；断言 AGENTS.md 与 docs/specs/ 中的仓库相对链接都能打开。先让它在当前仓库如实报 gap，修完上述问题后再纳入 CI；不要为了让它通过而放宽断言范围。\n\n## Validation\n\n- 直接执行新脚本，确认它在当前仓库以非零码列出已知的失效引用\n- 修复后再次执行，期望退出码 0\n- `PLOTGRAM_GATES=off ./benchmarks/scripts/<new-script>.sh` 确认沿用统一开关语义",
+      "dimensionRefs": [
+        "learning-capture"
+      ]
+    }
+  ]
+}
