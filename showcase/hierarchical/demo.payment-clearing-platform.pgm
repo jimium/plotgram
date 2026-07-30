@@ -1,0 +1,59 @@
+// Enterprise payment and clearing platform with real-time and batch settlement paths
+// Mermaid mapping: complex architecture graph for financial transaction processing
+diagram {
+    profile: architecture
+    title: "支付清结算平台"
+
+    group channels {
+        label: "支付渠道"
+        node merchant { label: "商户接入", archetype: external }
+        node cashier { label: "收银台", archetype: frontend }
+        node partner { label: "外部支付机构", archetype: external }
+
+        merchant -> cashier
+    }
+
+    group core_txn {
+        label: "交易核心"
+        node gateway { label: "Payment Gateway", archetype: gateway }
+        node order { label: "Order Service", archetype: service }
+        node ledger { label: "Ledger Service", archetype: service }
+        node routing { label: "Routing Engine", archetype: service }
+        node risk { label: "Risk Decision Engine", archetype: service }
+
+        gateway -> order "create payment"
+        order -> routing "select channel"
+        routing -> risk "risk check"
+        gateway -> ledger "post accounting"
+    }
+
+    group clearing {
+        label: "清结算中心"
+        node clearing_engine { label: "Clearing Engine", archetype: service }
+        node settlement { label: "Settlement Engine", archetype: service }
+        node recon { label: "Reconciliation Service", archetype: service }
+        node dispute { label: "Dispute Service", archetype: service }
+
+        clearing_engine -> settlement
+        settlement -> recon "daily reconcile"
+        recon -> dispute "exception case"
+    }
+
+    group data_layer {
+        label: "账务与数据"
+        node txn_db { label: "Transaction DB", archetype: database }
+        node ledger_db { label: "Ledger DB", archetype: database }
+        node mq { label: "Event Bus", archetype: queue }
+        node warehouse { label: "Finance Warehouse", archetype: database }
+    }
+
+    cashier -> gateway
+    routing -> partner "submit payment"
+    partner --> gateway "payment callback"
+    ledger -> ledger_db
+    order -> txn_db
+    gateway -> mq "payment event"
+    mq --> clearing_engine "clearing event"
+    recon -> warehouse "daily report"
+    ledger -> warehouse "account export"
+}

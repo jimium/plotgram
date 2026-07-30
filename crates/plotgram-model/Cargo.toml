@@ -7,4 +7,4 @@ description = "Plotgram data model: geometry primitives, AST, style types, error
 
 [dependencies]
 serde = { workspace = true }
-serde_json = { workspace = true }
+#serde_json = { workspace = true }

@@ -1,0 +1,31 @@
+// 退款审批流程（日常规模）
+// 与 c.customer-refund-process 互补：本图无分组泳道，聚焦金额决策 + 审核驳回重提回环
+// Mermaid 对照: graph TD 决策分支 + 回环
+diagram {
+    profile: flowchart
+    title: "退款审批流程"
+    layout: hierarchical { direction: top-to-bottom }
+
+    node start { label: "用户申请退款", archetype: start }
+    node submit { label: "提交退款申请", archetype: process }
+    node check_amount { label: "金额是否超 1000", archetype: decision }
+    node auto_approve { label: "自动通过", archetype: process }
+    node manual_review { label: "人工审核", archetype: process }
+    node review_result { label: "审核结果", archetype: decision }
+    node refund { label: "执行退款", archetype: process }
+    node revise { label: "修改申请", archetype: process }
+    node end_ok { label: "退款完成", archetype: end }
+    node end_fail { label: "申请关闭", archetype: end }
+
+    start -> submit
+    submit -> check_amount
+    check_amount -> auto_approve "否"
+    check_amount -> manual_review "是"
+    manual_review -> review_result
+    review_result -> refund "通过"
+    review_result -> revise "驳回可改"
+    review_result -> end_fail "驳回关闭"
+    revise -> submit "重新提交"
+    auto_approve -> refund
+    refund -> end_ok
+}

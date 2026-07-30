@@ -159,6 +159,7 @@ fn build_input() -> RenderInput {
             title: Some("登录流程".to_string()),
             theme: None,
             render_style: None,
+            extra: Default::default(),
         },
     }
 }

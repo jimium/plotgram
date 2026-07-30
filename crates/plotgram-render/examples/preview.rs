@@ -204,6 +204,7 @@ fn build_input(theme: Option<&str>, render_style: Option<&str>) -> RenderInput {
             title: None,
             theme: theme.map(|s| s.to_string()),
             render_style: render_style.map(|s| s.to_string()),
+            extra: Default::default(),
         },
     }
 }

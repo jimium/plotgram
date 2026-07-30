@@ -1,0 +1,73 @@
+// 云原生技术栈：K8s + 可观测性
+// Mermaid 对照: 复杂 C4/架构图
+diagram {
+    profile: architecture
+    title: "云原生技术栈"
+
+    group ingress {
+        label: "入口"
+        node ingress_ctrl { label: "Ingress Controller", archetype: gateway
+            meta.semantic: ingress
+        }
+        node cert_mgr { label: "证书管理", archetype: service
+            meta.semantic: cert_manager
+        }
+    }
+
+    group k8s {
+        label: "Kubernetes 集群"
+        group apps {
+            label: "应用 Pod"
+            node api { label: "API 服务", archetype: service
+                status: healthy
+            }
+            node worker { label: "后台 Worker", archetype: service }
+        }
+        group platform {
+            label: "平台组件"
+            node config_center { label: "配置中心", archetype: service }
+            node discovery { label: "服务发现", archetype: service }
+        }
+    }
+
+    group observability {
+        label: "可观测性"
+        node metrics { label: "Prometheus", archetype: service
+            meta.semantic: prometheus
+        }
+        node logs { label: "Loki", archetype: service
+            meta.semantic: loki
+        }
+        node traces { label: "Jaeger", archetype: service
+            meta.semantic: jaeger
+        }
+        node grafana { label: "Grafana", archetype: frontend
+            meta.semantic: grafana
+        }
+    }
+
+    group data {
+        label: "持久化"
+        node pg { label: "PostgreSQL", archetype: database
+            meta.semantic: postgres
+        }
+        node s3 { label: "对象存储", archetype: storage
+            meta.semantic: s3
+        }
+    }
+
+    ingress_ctrl -> api
+    cert_mgr -> ingress_ctrl
+    api -> discovery
+    api -> config_center
+    worker -> config_center
+    api -> pg
+    worker -> s3
+    api -> metrics
+    worker -> metrics
+    api -> logs
+    api -> traces
+    metrics --> grafana
+    logs --> grafana
+    traces --> grafana
+}

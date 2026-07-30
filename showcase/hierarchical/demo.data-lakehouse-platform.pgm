@@ -1,0 +1,63 @@
+// 数据湖仓平台架构：接入 → 存储 → 计算 → 服务
+// 业务场景: 企业级数据湖仓一体（Lakehouse）平台的分层拓扑
+// Mermaid 对照: 复杂 graph + 多 subgraph 数据平台
+diagram {
+    profile: architecture
+    title: "数据湖仓一体平台"
+    layout: architecture
+theme: common.clean-light
+
+    group ingest {
+        label: "数据接入"
+        node app_db { label: "业务库", archetype: external
+            meta.semantic: mysql
+        }
+        node logs { label: "日志源", archetype: external }
+        node kafka { label: "Kafka", archetype: queue
+            meta.semantic: kafka
+        }
+        node cdc { label: "CDC 采集", archetype: service }
+    }
+
+    group storage {
+        label: "湖仓存储"
+        node lake { label: "数据湖", archetype: storage
+            meta.semantic: s3
+        }
+        node iceberg { label: "表格式层", archetype: storage }
+        node warehouse { label: "数据仓库", archetype: database
+            meta.semantic: clickhouse
+        }
+    }
+
+    group compute {
+        label: "计算引擎"
+        node spark { label: "批处理", archetype: service
+            meta.semantic: spark
+        }
+        node flink { label: "流处理", archetype: service
+            meta.semantic: flink
+        }
+    }
+
+    group serve {
+        label: "数据服务"
+        node bi { label: "BI 报表", archetype: service }
+        node api { label: "数据 API", archetype: service }
+        node dashboard { label: "数据看板", archetype: frontend }
+    }
+
+    app_db -> cdc "变更捕获"
+    cdc -> kafka "写入"
+    logs -> kafka "采集"
+    kafka -> flink "实时消费"
+    kafka -> lake "落地原始层"
+    lake -> iceberg "构建表"
+    iceberg -> spark "批量计算"
+    spark -> warehouse "写入宽表"
+    flink -> warehouse "实时更新"
+    warehouse -> bi "分析查询"
+    warehouse -> api "数据接口"
+    bi -> dashboard "展示"
+    api -> dashboard "取数"
+}

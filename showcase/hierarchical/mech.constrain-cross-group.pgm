@@ -1,0 +1,25 @@
+// architecture 跨组 constrain：强制 storage 在 ingress 下游
+diagram {
+    profile: architecture
+    title: "constrain cross-group"
+
+    group ingress {
+        label: "入口"
+        node api { label: "API", archetype: service }
+        node gw { label: "Gateway", archetype: service }
+        api -> gw
+    }
+
+    group storage {
+        label: "存储"
+        node db { label: "DB", archetype: database }
+        node cache { label: "Cache", archetype: cache }
+        cache -> db
+    }
+
+    gw -> cache
+
+    // 隐形硬约束：即使业务边稀疏，也强制 storage 侧在下游
+    // constrain（旧语法，新规范暂无对应；保留注释）
+    // constrain gw -> db
+}

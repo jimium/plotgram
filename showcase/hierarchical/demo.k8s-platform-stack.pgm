@@ -1,0 +1,97 @@
+// Platform team view of a large K8s cluster stack
+// Mermaid mapping: layered architecture with infra and workload groups
+diagram {
+    profile: architecture
+    title: "K8s 平台栈与业务工作负载"
+
+    group client_layer {
+        label: "入口与访问"
+        node mobile { label: "Mobile App", archetype: frontend }
+        node web { label: "Web Portal", archetype: frontend }
+        node api_gateway { label: "API Gateway", archetype: gateway }
+
+        mobile -> api_gateway
+        web -> api_gateway
+    }
+
+    group workload_layer {
+        label: "业务命名空间"
+        group commerce_ns {
+            label: "commerce"
+            node cart_svc { label: "cart-service x8", archetype: service }
+            node checkout_svc { label: "checkout-service x12", archetype: service }
+            node pricing_svc { label: "pricing-service x6", archetype: service }
+
+            cart_svc -> pricing_svc
+            checkout_svc -> pricing_svc
+        }
+
+        group ops_ns {
+            label: "ops"
+            node ops_console { label: "ops-console x3", archetype: frontend }
+            node report_svc { label: "report-service x5", archetype: service }
+            node audit_svc { label: "audit-service x4", archetype: service }
+        }
+
+        // 跨子 group 的边：写在父 group 内
+        checkout_svc -> audit_svc
+    }
+
+    group platform_layer {
+        label: "平台能力"
+        node ingress_nginx { label: "Ingress NGINX", archetype: gateway }
+        node cert_manager { label: "cert-manager", archetype: service }
+        node cni { label: "CNI Plugin", archetype: service }
+        node csi { label: "CSI Driver", archetype: service }
+        node external_dns { label: "external-dns", archetype: service }
+        node argo_rollouts { label: "Argo Rollouts", archetype: service }
+
+        cert_manager -> ingress_nginx
+        external_dns -> ingress_nginx
+    }
+
+    group obs_layer {
+        label: "可观测与运维"
+        node prometheus { label: "Prometheus", archetype: service }
+        node loki { label: "Loki", archetype: service }
+        node tempo { label: "Tempo", archetype: service }
+        node grafana { label: "Grafana", archetype: frontend }
+
+        prometheus --> grafana
+        loki --> grafana
+        tempo --> grafana
+    }
+
+    group data_layer {
+        label: "数据与中间件"
+        node mysql { label: "MySQL Cluster", archetype: database }
+        node redis { label: "Redis", archetype: cache }
+        node kafka { label: "Kafka", archetype: queue }
+        node minio { label: "MinIO", archetype: storage }
+    }
+
+    api_gateway -> ingress_nginx
+    ingress_nginx -> cart_svc
+    ingress_nginx -> checkout_svc
+    ingress_nginx -> ops_console
+
+    report_svc -> kafka
+    audit_svc -> kafka
+
+    cart_svc -> redis
+    checkout_svc -> mysql
+    pricing_svc -> redis
+    report_svc -> mysql
+    audit_svc -> minio
+
+    cni -> cart_svc
+    cni -> checkout_svc
+    csi -> mysql
+    argo_rollouts -> checkout_svc "canary"
+    argo_rollouts -> ops_console "blue-green"
+
+    cart_svc -> prometheus
+    checkout_svc -> prometheus
+    audit_svc -> loki
+    checkout_svc -> tempo
+}

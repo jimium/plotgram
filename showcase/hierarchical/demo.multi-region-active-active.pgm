@@ -1,0 +1,55 @@
+// 多区域双活架构：两地数据中心 + 全局流量调度 + 数据同步
+// 业务场景: 高可用多区域（Active-Active）容灾部署拓扑
+// Mermaid 对照: 复杂 graph + 多 subgraph 双活容灾
+diagram {
+    profile: architecture
+    title: "多区域双活架构"
+    layout: architecture
+theme: common.clean-light
+
+    group global {
+        label: "全局接入"
+        node client { label: "用户", archetype: frontend
+            meta.semantic: user
+        }
+        node gslb { label: "全局流量调度", archetype: gateway
+            meta.semantic: nginx
+        }
+    }
+
+    group region_a {
+        label: "区域 A（华东）"
+        node lb_a { label: "区域负载均衡", archetype: gateway }
+        node app_a { label: "应用集群 A", archetype: service }
+        node db_a { label: "主数据库 A", archetype: database
+            meta.semantic: postgres
+        }
+        node cache_a { label: "缓存 A", archetype: cache
+            meta.semantic: redis
+        }
+    }
+
+    group region_b {
+        label: "区域 B（华北）"
+        node lb_b { label: "区域负载均衡", archetype: gateway }
+        node app_b { label: "应用集群 B", archetype: service }
+        node db_b { label: "主数据库 B", archetype: database
+            meta.semantic: postgres
+        }
+        node cache_b { label: "缓存 B", archetype: cache
+            meta.semantic: redis
+        }
+    }
+
+    client -> gslb "就近解析"
+    gslb -> lb_a "路由到 A"
+    gslb -> lb_b "路由到 B"
+    lb_a -> app_a
+    lb_b -> app_b
+    app_a -> db_a "读写"
+    app_a -> cache_a
+    app_b -> db_b "读写"
+    app_b -> cache_b
+    db_a --> db_b "双向数据同步"
+    db_b --> db_a "双向数据同步"
+}

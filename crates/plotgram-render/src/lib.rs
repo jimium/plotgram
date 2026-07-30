@@ -195,7 +195,7 @@ mod tests {
         RenderInput {
             graph,
             layout,
-            meta: RenderMeta { title: None, theme: None, render_style: None },
+            meta: RenderMeta { title: None, theme: None, render_style: None, extra: Default::default() },
         }
     }
 

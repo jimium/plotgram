@@ -1,0 +1,51 @@
+// 保险理赔流程：报案 → 定损 → 核赔 → 赔付
+// 业务场景: 车险理赔端到端流程，含查勘定损与核赔分级
+// Mermaid 对照: 复杂 graph TD，含 group 分段与拒赔回环
+diagram {
+    profile: flowchart
+    title: "保险理赔流程"
+    layout: hierarchical { direction: top-to-bottom }
+
+    group report_stage {
+        label: "报案受理"
+        node report { label: "客户报案", archetype: start }
+        node register { label: "登记案件", archetype: process }
+        node cover_gate { label: "是否在保障范围？", archetype: decision }
+    }
+
+    group survey_stage {
+        label: "查勘定损"
+        node dispatch { label: "派遣查勘员", archetype: process }
+        node survey { label: "现场查勘", archetype: process }
+        node assess { label: "损失评估", archetype: process }
+        node amount_gate { label: "损失金额？", archetype: decision }
+    }
+
+    group settle {
+        label: "核赔理算"
+        node junior_audit { label: "初级核赔", archetype: process }
+        node senior_audit { label: "高级核赔", archetype: process }
+        node audit_gate { label: "核赔结论？", archetype: decision }
+        node pay { label: "赔款支付", archetype: process }
+        node closed { label: "结案", archetype: end }
+        node declined { label: "拒赔", archetype: end }
+    }
+
+    report -> register
+    register -> cover_gate
+    cover_gate -> dispatch "承保"
+    cover_gate -> declined "免责"
+
+    dispatch -> survey
+    survey -> assess
+    assess -> amount_gate
+    amount_gate -> junior_audit "小额"
+    amount_gate -> senior_audit "大额"
+    junior_audit -> audit_gate
+    senior_audit -> audit_gate
+    audit_gate -> pay "核准"
+    audit_gate -> declined "拒赔"
+    audit_gate -> survey "需复勘"
+
+    pay -> closed
+}

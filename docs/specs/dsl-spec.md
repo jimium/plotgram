@@ -43,6 +43,8 @@ diagram {
 
 `profile:` 是 DSL 层的 **算法/约束预设名**（写在 diagram 属性块内，见 §4）。解析后展开为默认的 `layout` + `edge_routing` 及图种约束；**布局/路由引擎不接收 profile / 图种名**，只认算法名与参数（见 §8、ADR-001）。
 
+**算法默认 ≠ 约束默认**：未写 `profile:` 时，解析器仍可按 flowchart **算法**预设填充 `layout` / `edge_routing`（见 §4.2、§8 表），但**不**继承 flowchart 的约束包（如自环许可）。图种约束须作者**显式**写 `profile:` 才生效。
+
 **已废弃**：`diagram flowchart { … }` 位置 type（须写成 `diagram { profile: flowchart … }`）。
 
 ### 1.3 图表体
@@ -81,6 +83,7 @@ diagram {
 
 - 小写字母开头，可含 `-` 和 `.`（不允许首尾或连续点号）
 - 长度 1–64
+- 词法层校验：`.` 不得出现在 atom 首尾，不得出现 `..`
 - 无需引号；引号形式语义等价
 - 用于：属性值（`archetype`、`variant`、`icon`、`status`、算法名、主题 ID、形状名等）
 - 合法性由引擎 / profile 后置校验；`variant` / shape 为封闭集（见 §14），DSL 语法层不枚举
@@ -136,6 +139,7 @@ diagram {
 - 简写：`layout: hierarchical`
 - 带参数：`layout: hierarchical { direction: top-to-bottom }`
 - `{ }` 内为自由 map，DSL 不枚举字段；各算法自行校验，未知 key 警告
+- `<algorithm_config>` 形态（带 `{ }` 参数块）**仅对** diagram / group 级的 `layout:` 与 `edge_routing:` 合法；其它属性的值只能是四种字面量之一（string / atom / number / boolean）
 
 ---
 
@@ -193,7 +197,7 @@ node api "API 服务"   // 行尾注释
 
 | 属性 | 类型 | 说明 |
 |------|------|------|
-| **`profile`** | atom（§1.2 封闭集） | 算法/约束预设；展开默认 `layout` / `edge_routing` / 自环等 |
+| **`profile`** | atom（§1.2 封闭集） | 算法与图种约束预设；展开 `layout` / `edge_routing` 及自环等约束；**须显式声明**才启用约束（隐式 flowchart 算法默认不含约束包，见 §1.2） |
 | `title` | string | 图表标题 |
 | `layout` | algorithm_config | 布局算法及参数（覆盖 profile 默认） |
 | `edge_routing` | algorithm_config | 边路由算法及参数；可与布局内建路由二选一或配合（见引擎注册表） |
@@ -201,9 +205,10 @@ node api "API 服务"   // 行尾注释
 | `render_style` | atom | 笔触皮肤 |
 
 - 所有属性可选  
-- 未写 `profile` 且未写 `layout` → 默认按 `profile: flowchart` 展开  
-- 写了 `profile` → 先灌预设，再被显式 `layout` / `edge_routing` **覆盖**  
-- 只写 `layout`、不写 `profile` → 允许（纯算法驱动）；自环等未由 profile 给出的约束用引擎/规范默认（自环默认禁）  
+- 未写 `profile` 且未写 `layout` → **算法默认**按 flowchart 预设展开 `layout` / `edge_routing`（见 §8 表）  
+- 写了 `profile` → 先灌该预设的算法与约束，再被显式 `layout` / `edge_routing` **覆盖**  
+- 只写 `layout`、不写 `profile` → 允许（纯算法驱动）  
+- **算法默认 ≠ 约束默认**：未写 `profile` 时，即使算法走 flowchart 预设，**profile 级约束**（如自环许可）仍不适用；须显式写 `profile: flowchart` 或 `profile: state` 等才启用对应约束（见 §7.8、§8）  
 - 同一属性不可重复声明  
 - 未识别的 diagram 级 key 产生警告，忽略  
 - 未知 `profile` atom → **错误**（封闭集）
@@ -407,6 +412,7 @@ node db "" database mysql               // → { archetype: database, icon: mysq
 1. `node` `<id>` 之后：若下一 token 是 `{` 或语句结束 → 无位置糖  
 2. 若下一 token 是 **string** → 进入本小节；再读 0～2 个 atom（第 1 = archetype，第 2 = icon）；再可选 `{`  
 3. **禁止** `node <id> <atom>…`（无 string 却写裸 atom）——避免与 id 后直接跟块/换行的歧义，也避免实现上难切分
+4. 位置糖的 0～2 个 atom 必须与 string **同一行**；换行即终止位置糖——避免下一条语句的裸标识符（如边源）被误读为 archetype
 
 ```plotgram
 node login                                      // 省空块
@@ -931,7 +937,7 @@ db -> api {
 
 - 两端必须是已声明的 **node**（不能是 group）；`@group` 仅存在于糖面，展开后变为 node
 - 允许同一对 node 多条边（靠解析器分配的稳定 `edge id` 区分；端口/slot 负责几何错开）
-- **自环**（`a -> a`）：默认禁止；flowchart / state 等 profile 可显式允许（见 §8）
+- **自环**（`a -> a`）：默认禁止；须**显式**写 `profile: flowchart` 或 `profile: state` 才允许（隐式 flowchart 算法默认不算；见 §4.2、§8）
 - 端口属性遵守 §7.4.2；提升进 `Edge.from_port` / `to_port`；Ink 不得补端口
 - **无** `seq` 属性；时序时间轴见 §8.1
 - `group_anchor` 遵守 §5.7；组框边糖遵守 §7.6
@@ -947,7 +953,7 @@ db -> api {
   → lift Node 结构字段（role / host_group / side / slot）
   → lift Edge 结构字段（from_side… / edge_group → Edge 一等字段）
   → archetype expand（见 archetype-spec：只填空写入 shape / variant / icon）
-  → profile expand（`profile:` 预设 → 默认 layout / edge_routing、可选默认 shape、自环策略、图种约束；显式 layout 覆盖）
+  → profile expand（显式 `profile:` → 默认 layout / edge_routing、自环策略、图种约束；无 `profile:` 时仅算法字段走 flowchart 预设；显式 layout 覆盖）
   → LayoutContract（算法名 + 参数 + 图模型；**无** profile / 图种名）
   → layout / routing 引擎（组合相补全端口 → 度量 → 落笔）
 ```
@@ -965,6 +971,8 @@ db -> api {
 | sequence | sequence | **None**（布局自带边几何） | 禁止 |
 | mindmap | tree | **None**（依布局） | 禁止 |
 | er | circular 等 | **None**（依布局） | 禁止 |
+
+上表「自环」列仅当 diagram **显式**写了对应 `profile:` 时生效；未写 `profile` 时自环一律禁止（§4.2）。
 
 显式写 `edge_routing: orthogonal` 表示节点冻结后的**独立**路由器，与内建正交不是同一条路径（见 [`model-boundary.md`](../design/model-boundary.md)）。
 
@@ -1052,12 +1060,17 @@ true, false
                           // @gid = 组框端点糖；展开为 group_anchor（§7.6）
 <arrow>                ::= "->" | "-->" | "<->"
 
-<attribute_block>      ::= "{" <attribute>* "}"
+<attribute_block>      ::= "{" <attribute_list> "}"
+<attribute_list>       ::= <attribute> ("," <attribute>)*
 <attribute>            ::= <attribute_key> ":" <attribute_value>
 <attribute_key>        ::= <identifier> | "style." <identifier> | "meta." <identifier>
 <attribute_value>      ::= <string> | <atom> | <number> | <boolean> | <algorithm_config>
 <algorithm_config>     ::= <atom> ["{" <option_pair>* "}"]
 <option_pair>          ::= <identifier> ":" <attribute_value>
+
+注：`<algorithm_config>` 形态仅对 diagram / group 级 `layout:` / `edge_routing:` 合法（见 §2.7）。
+
+属性块内属性之间可用逗号 `,` 分隔（可选，纯语法糖；`{ label: "A" archetype: start }` 与 `{ label: "A", archetype: start }` 等价）。
 
 <identifier>           ::= [a-z][a-z0-9_]*
 <atom>                 ::= [a-z][a-z0-9_.-]*
@@ -1078,7 +1091,7 @@ true, false
 | 4 | group 不可作 IR 边端点；组框连线用 `group_anchor` 或 `@group` 糖（§5.7 / §7.6） |
 | 5 | 组内边两端须为该组后代 node |
 | 6 | diagram 属性不可重复；未知 diagram key 警告忽略；`profile` 须为 §1.2 封闭集 |
-| 7 | 自环默认非法；仅 profile 允许时合法 |
+| 7 | 自环默认非法；须显式 `profile: flowchart` / `state` 等允许自环的预设才合法（隐式 flowchart 算法默认不适用，§4.2） |
 | 8 | 形状未识别 → 渲染回退圆角 `rect`（封闭集见 §14.6） |
 | 9 | 无声明式样式；仅 `style.*` / `theme` / `render_style` |
 | 10 | 边端口：`from_slot`/`to_slot` 不得单独出现；`*_side` 必须是四向封闭集；提升为 `Edge.from_port`/`to_port` |
@@ -1125,7 +1138,7 @@ diagram {
     login -> api { label: "提交" }
     api --> login { label: "结果" }
     login -> ok
-    ok -> start "重试"    // 回边；自环仍依 §7.7
+    ok -> start "重试"    // 回边（非自环）；自环须显式 profile（§7.8）
 }
 ```
 
@@ -1475,7 +1488,7 @@ style-sheet-spec  视觉属性词表 + 主题 JSON + cascade
 | 时序时间 | （图种特判） | **边声明序**；无 `seq` 字段（§8.1） |
 | 声明式样式 | `node_style` / `edge_style` | **删除**；仅内联 `style.*` |
 | ER `field` | （旧亦弱） | **本草案不做**；另文 |
-| 自环 | decision 例外 | 默认禁，profile 可开 |
+| 自环 | decision 例外 | 默认禁；须显式 `profile:` 可开（隐式 flowchart 算法默认不含约束包） |
 | diagram → 引擎 | 易渗入图名 | `profile:` 展开后引擎不收 profile / 图种名 |
 
 旧文档 `language-spec.md`（v1，已删除）不再可对照，**以本文件为准**。

@@ -3,6 +3,7 @@
 //! Layout engine does not consume these types. Theme / title / render_style are
 //! dsl-spec diagram attributes that never enter [`crate::contract::LayoutContract`].
 
+use crate::attr::AttrMap;
 use crate::graph::Graph;
 use crate::result::LayoutResult;
 
@@ -14,6 +15,9 @@ pub struct RenderMeta {
     pub theme: Option<String>,
     /// Pen/skin atom (e.g. `standard`).
     pub render_style: Option<String>,
+    /// Leftover diagram attrs incl. `meta.*` namespace (dsl-spec §14.1).
+    #[serde(default)]
+    pub extra: AttrMap,
 }
 
 /// Everything the renderer needs to produce SVG (or other backends).

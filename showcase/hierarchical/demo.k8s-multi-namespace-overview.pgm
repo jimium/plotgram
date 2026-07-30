@@ -1,0 +1,99 @@
+// Large K8s cluster overview with namespace to deployment aggregation
+// Mermaid mapping: complex architecture graph with nested subgraphs
+diagram {
+    profile: architecture
+    title: "K8s 多命名空间生产集群总览"
+
+    group edge {
+        label: "流量入口"
+        node cdn { label: "Global CDN", archetype: external }
+        node waf { label: "WAF", archetype: gateway }
+        node ingress { label: "Ingress Gateway", archetype: gateway }
+        node dns { label: "DNS", archetype: external }
+    }
+
+    group payment_ns {
+        label: "payment-prod"
+        node pay_gateway { label: "pay-gateway x6", archetype: service }
+        node pay_core { label: "pay-core x18", archetype: service }
+        node pay_risk { label: "pay-risk x8", archetype: service }
+        node pay_worker { label: "pay-worker x24", archetype: service }
+    }
+
+    group order_ns {
+        label: "order-prod"
+        node order_api { label: "order-api x10", archetype: service }
+        node order_core { label: "order-core x16", archetype: service }
+        node order_fulfill { label: "order-fulfillment x12", archetype: service }
+        node order_worker { label: "order-worker x20", archetype: service }
+    }
+
+    group user_ns {
+        label: "user-prod"
+        node user_api { label: "user-api x8", archetype: service }
+        node profile_svc { label: "profile-service x6", archetype: service }
+        node auth_svc { label: "auth-service x12", archetype: service }
+        node session_svc { label: "session-service x10", archetype: service }
+    }
+
+    group platform_ns {
+        label: "platform-system"
+        node service_mesh { label: "Service Mesh", archetype: service }
+        node config_center { label: "Config Center", archetype: service }
+        node secrets { label: "Secrets Manager", archetype: service }
+        node argo { label: "Argo CD", archetype: service }
+        node metrics { label: "Prometheus", archetype: service }
+        node logs { label: "Loki", archetype: service }
+    }
+
+    group data_ns {
+        label: "stateful-data"
+        node postgres { label: "PostgreSQL Cluster", archetype: database }
+        node redis { label: "Redis Cluster", archetype: cache }
+        node kafka { label: "Kafka", archetype: queue }
+        node object_store { label: "Object Storage", archetype: storage }
+    }
+
+    dns -> cdn
+    cdn -> waf
+    waf -> ingress
+    ingress -> pay_gateway
+    ingress -> order_api
+    ingress -> user_api
+
+    pay_gateway -> pay_core "sync payment"
+    pay_gateway -> pay_risk "fraud check"
+    pay_core -> pay_worker "async jobs"
+    pay_core -> postgres
+    pay_core -> redis
+    pay_worker -> kafka
+
+    order_api -> order_core
+    order_core -> order_fulfill
+    order_core -> postgres
+    order_core -> kafka "order events"
+    order_worker -> kafka
+    order_fulfill -> object_store
+
+    user_api -> profile_svc
+    user_api -> auth_svc
+    auth_svc -> session_svc
+    auth_svc -> redis
+    profile_svc -> postgres
+
+    pay_core -> service_mesh
+    order_core -> service_mesh
+    user_api -> service_mesh
+    service_mesh -> config_center
+    service_mesh -> secrets
+    argo -> pay_gateway "deploy"
+    argo -> order_api "deploy"
+    argo -> user_api "deploy"
+
+    pay_core -> metrics
+    order_core -> metrics
+    user_api -> metrics
+    pay_core -> logs
+    order_core -> logs
+    user_api -> logs
+}

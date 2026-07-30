@@ -61,8 +61,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn compile_svg_surfaces_parse_not_implemented() {
-        let err = compile_svg("diagram { profile: flowchart }", &PipelineOptions::default())
+    fn compile_svg_end_to_end() {
+        let svg = compile_svg(
+            "diagram {\n  profile: flowchart\n  node a \"A\"\n  node b \"B\"\n  a -> b\n}",
+            &PipelineOptions::default(),
+        )
+        .expect("pipeline should compile a minimal diagram");
+        assert!(svg.starts_with("<svg"));
+    }
+
+    #[test]
+    fn compile_svg_surfaces_parse_error() {
+        let err = compile_svg("diagram { node a { label: 42 } }", &PipelineOptions::default())
             .unwrap_err();
         assert!(matches!(err, PipelineError::Parse(_)));
     }

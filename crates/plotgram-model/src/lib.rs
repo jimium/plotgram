@@ -10,9 +10,11 @@
 //! - `result`: LayoutResult (geometry; EdgePlacement carries resolved PortRef)
 //! - `render`: RenderMeta, RenderInput (renderer entry — graph + layout + chrome)
 //! - `profile`: DiagramType, Profile (DSL-layer only; must not leak into engine)
+//! - `archetype`: ArchetypeDef, ARCHETYPES (named shape×variant×icon packs; fill-only expansion)
 //!
 //! Sequence time axis = [`graph::Graph::edges_in_declaration_order`] (no `Edge::seq`).
 
+pub mod archetype;
 pub mod attr;
 pub mod contract;
 pub mod geometry;

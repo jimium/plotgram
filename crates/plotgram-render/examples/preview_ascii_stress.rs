@@ -150,6 +150,7 @@ fn build_input() -> RenderInput {
             title: Some("CI/CD 部署流水线".to_string()),
             theme: None,
             render_style: None,
+            extra: Default::default(),
         },
     }
 }

@@ -1,0 +1,90 @@
+// Multi-cluster production topology across regions
+// Mermaid mapping: complex architecture graph with regional groups
+diagram {
+    profile: architecture
+    title: "K8s 多集群跨地域拓扑"
+
+    group global_edge {
+        label: "全球接入"
+        node global_dns { label: "Global DNS", archetype: external }
+        node traffic_mgr { label: "Traffic Manager", archetype: gateway }
+        node edge_waf { label: "Edge WAF", archetype: gateway }
+    }
+
+    group cn_east {
+        label: "华东主集群"
+        node east_ingress { label: "Ingress East", archetype: gateway }
+        node east_gateway { label: "api-gateway x8", archetype: service }
+        node east_order { label: "order-core x14", archetype: service }
+        node east_payment { label: "payment-core x12", archetype: service }
+        node east_user { label: "user-core x10", archetype: service }
+    }
+
+    group cn_north {
+        label: "华北灾备集群"
+        node north_ingress { label: "Ingress North", archetype: gateway }
+        node north_gateway { label: "api-gateway x4", archetype: service }
+        node north_order { label: "order-core x8", archetype: service }
+        node north_payment { label: "payment-core x6", archetype: service }
+        node north_user { label: "user-core x6", archetype: service }
+    }
+
+    group global_platform {
+        label: "全局平台能力"
+        node mesh_cp { label: "Service Mesh Control Plane", archetype: service }
+        node gitops { label: "GitOps Controller", archetype: service }
+        node registry { label: "Container Registry", archetype: storage }
+        node monitor { label: "Unified Monitoring", archetype: service }
+    }
+
+    group shared_data {
+        label: "共享数据与消息"
+        node mysql_primary { label: "MySQL Primary", archetype: database }
+        node mysql_replica { label: "MySQL Replica", archetype: database }
+        node redis_global { label: "Redis Global Cache", archetype: cache }
+        node mq_global { label: "Global Event Bus", archetype: queue }
+    }
+
+    global_dns -> traffic_mgr
+    traffic_mgr -> edge_waf
+    edge_waf -> east_ingress "primary traffic"
+    edge_waf -> north_ingress "failover traffic"
+
+    east_ingress -> east_gateway
+    east_gateway -> east_order
+    east_gateway -> east_payment
+    east_gateway -> east_user
+
+    north_ingress -> north_gateway
+    north_gateway -> north_order
+    north_gateway -> north_payment
+    north_gateway -> north_user
+
+    east_order -> mysql_primary
+    east_payment -> mysql_primary
+    east_user -> redis_global
+    east_order -> mq_global
+
+    north_order -> mysql_replica
+    north_payment -> mysql_replica
+    north_user -> redis_global
+    north_order -> mq_global
+
+    mesh_cp -> east_gateway
+    mesh_cp -> east_order
+    mesh_cp -> north_gateway
+    mesh_cp -> north_order
+    gitops -> east_gateway "sync"
+    gitops -> north_gateway "sync"
+    registry -> east_gateway "image pull"
+    registry -> north_gateway "image pull"
+
+    east_gateway -> monitor
+    east_order -> monitor
+    north_gateway -> monitor
+    north_order -> monitor
+
+    mysql_primary --> mysql_replica "replication"
+    east_order --> north_order "cross-region replay"
+    east_payment --> north_payment "cold standby"
+}

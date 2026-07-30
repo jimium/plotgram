@@ -1,0 +1,54 @@
+// 开咖啡店政务流程：多决策分支、交叉回环
+// Mermaid 对照: 复杂 graph TD，大量菱形节点与条件边
+diagram {
+    profile: flowchart
+    title: "开咖啡店流程"
+    layout: hierarchical { direction: top-to-bottom }
+
+    node n0 { label: "触发意图", archetype: start }
+    node n1 { label: "给前端提示进入开咖啡店流程", archetype: process }
+    node n9 { label: "最后完成赋值", archetype: process }
+    node n11 { label: "AssignNode", archetype: process }
+    node n13 { label: "AssignNode", archetype: process }
+    node n16 { label: "购物车:酒类商品零售许可证", archetype: process }
+    node n18 { label: "购物车加入营业执照事项", archetype: process }
+    node n10 { label: "ResponseNode", archetype: end }
+    node n21 { label: "ResponseNode", archetype: end }
+    node n2 { label: "提前告知", archetype: decision }
+    node n4 { label: "选择：是否申领了营业执照", archetype: decision }
+    node n5 { label: "选择：酒类商品", archetype: decision }
+    node n6 { label: "选择题:店铺所在位置", archetype: decision }
+    node n7 { label: "选择题：使用面300平方米", archetype: decision }
+    node n8 { label: "是否委托他人办理？", archetype: decision }
+    node n14 { label: "选择店铺产权类型", archetype: decision }
+    node n15 { label: "是否属于钢结构的户外招牌", archetype: decision }
+    node n17 { label: "选择题:法人类型", archetype: decision }
+    node n19 { label: "是否以登陆的法人身份进行申请", archetype: decision }
+    node n3 { label: "分支", archetype: decision }
+
+    n0 -> n1
+    n1 -> n2
+    n2 -> n3 "继续"
+    n2 -> n21 "放弃"
+    n3 -> n4 "个人"
+    n3 -> n19 "法人"
+    n4 -> n18 "否"
+    n4 -> n5 "Other"
+    n5 -> n16 "是"
+    n5 -> n6 "Other"
+    n6 -> n13 "沿街店铺"
+    n6 -> n7 "商城内店铺"
+    n7 -> n11 "否"
+    n7 -> n8 "Other"
+    n8 -> n9
+    n9 -> n10
+    n11 -> n8
+    n13 -> n14
+    n14 -> n15
+    n15 -> n7
+    n16 -> n17
+    n17 -> n6
+    n18 -> n5
+    n19 -> n4 "是"
+    n19 -> n5 "Other"
+}

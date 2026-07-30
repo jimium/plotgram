@@ -12,11 +12,22 @@ pub struct FileAst {
     pub diagram: DiagramAst,
 }
 
+/// Algorithm config block (dsl-spec §2.7): `atom ["{" option_pair* "}"]`.
+#[derive(Debug, Clone)]
+pub struct AlgorithmConfigAst {
+    pub name: String,
+    pub options: AttrMap,
+}
+
 /// `diagram { … }` body.
 #[derive(Debug, Clone)]
 pub struct DiagramAst {
-    /// Diagram-level attributes (`profile`, `title`, `layout`, …) in source order.
+    /// Diagram-level attributes (`profile`, `title`, `theme`, `render_style`, …).
     pub attrs: AttrMap,
+    /// `layout:` algorithm config (dsl-spec §4.2).
+    pub layout: Option<AlgorithmConfigAst>,
+    /// `edge_routing:` algorithm config.
+    pub edge_routing: Option<AlgorithmConfigAst>,
     pub items: Vec<DiagramItem>,
 }
 

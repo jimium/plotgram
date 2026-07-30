@@ -1,0 +1,48 @@
+// 事故管理流程：告警 → 定级 → 响应 → 恢复 → 复盘
+// 业务场景: SRE 生产事故（Incident）响应闭环，含分级与升级
+// Mermaid 对照: 复杂 graph TD，含 group 分段与升级回环
+diagram {
+    profile: flowchart
+    title: "生产事故管理流程"
+    layout: hierarchical { direction: top-to-bottom }
+
+    group detect {
+        label: "发现与定级"
+        node alert { label: "监控告警触发", archetype: start }
+        node ack { label: "值班确认", archetype: process }
+        node severity_gate { label: "事故等级？", archetype: decision }
+        node p1_war_room { label: "P1 应急作战室", archetype: process }
+        node p2_handle { label: "P2 常规响应", archetype: process }
+    }
+
+    group response {
+        label: "响应处置"
+        node mitigate { label: "止血缓解", archetype: process }
+        node mitigate_gate { label: "是否恢复？", archetype: decision }
+        node escalate { label: "升级专家团队", archetype: process }
+        node rollback { label: "回滚变更", archetype: process }
+        node recover { label: "服务恢复", archetype: process }
+    }
+
+    group review {
+        label: "复盘改进"
+        node postmortem { label: "事故复盘", archetype: process }
+        node action { label: "改进项跟踪", archetype: process }
+        node closed { label: "事故关闭", archetype: end }
+    }
+
+    alert -> ack
+    ack -> severity_gate
+    severity_gate -> p1_war_room "P1"
+    severity_gate -> p2_handle "P2/P3"
+    p1_war_room -> mitigate
+    p2_handle -> mitigate
+    mitigate -> mitigate_gate
+    mitigate_gate -> recover "已恢复"
+    mitigate_gate -> escalate "未恢复"
+    escalate -> rollback
+    rollback -> mitigate "再次尝试"
+    recover -> postmortem
+    postmortem -> action
+    action -> closed
+}

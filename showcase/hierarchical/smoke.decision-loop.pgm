@@ -1,0 +1,17 @@
+// 决策回环：认证失败时返回起点
+// Mermaid 对照: graph LR + 菱形节点 + 条件边
+diagram {
+    profile: flowchart
+    title: "登录决策回环"
+    layout: hierarchical { direction: left-to-right }
+
+    node request { label: "用户请求", archetype: client }
+    node gateway { label: "API 网关", archetype: gateway }
+    node auth { label: "认证服务", archetype: service }
+    node db { label: "数据库", archetype: database }
+
+    request -> gateway
+    gateway -> auth
+    auth -> db "成功"
+    auth -> request "失败"
+}

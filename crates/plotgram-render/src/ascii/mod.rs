@@ -254,6 +254,7 @@ mod tests {
                 title: title.map(|t| t.to_string()),
                 theme: None,
                 render_style: None,
+                extra: Default::default(),
             },
         }
     }
@@ -336,7 +337,7 @@ mod tests {
         let input = RenderInput {
             graph,
             layout,
-            meta: RenderMeta { title: None, theme: None, render_style: None },
+            meta: RenderMeta { title: None, theme: None, render_style: None, extra: Default::default() },
         };
         let out = render_ascii(&input);
         let lines: Vec<&str> = out.lines().collect();

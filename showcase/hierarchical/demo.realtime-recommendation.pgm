@@ -1,0 +1,55 @@
+// 实时推荐系统架构：埋点 → 特征 → 召回 → 排序 → 下发
+// 业务场景: 电商/内容平台的实时个性化推荐系统拓扑
+// Mermaid 对照: 复杂 graph + 多 subgraph 推荐链路
+diagram {
+    profile: architecture
+    title: "实时推荐系统架构"
+    layout: architecture
+theme: common.clean-light
+
+    group client {
+        label: "客户端"
+        node app { label: "移动 App", archetype: frontend
+            meta.semantic: mobile
+        }
+    }
+
+    group stream {
+        label: "实时数据"
+        node event_bus { label: "行为事件流", archetype: queue
+            meta.semantic: kafka
+        }
+        node feature { label: "特征计算", archetype: service
+            meta.semantic: flink
+        }
+        node feature_store { label: "特征存储", archetype: cache
+            meta.semantic: redis
+        }
+    }
+
+    group engine {
+        label: "推荐引擎"
+        node recall { label: "召回服务", archetype: service }
+        node rank { label: "排序服务", archetype: service }
+        node rerank { label: "重排与打散", archetype: service }
+    }
+
+    group model {
+        label: "模型与存储"
+        node model_store { label: "模型仓库", archetype: storage }
+        node item_db { label: "物料库", archetype: database
+            meta.semantic: mongodb
+        }
+    }
+
+    app -> event_bus "上报行为"
+    event_bus -> feature "实时计算"
+    feature -> feature_store "写特征"
+    app -> recall "请求推荐"
+    recall -> item_db "候选物料"
+    recall -> feature_store "读特征"
+    recall -> rank "候选集"
+    rank -> model_store "加载模型"
+    rank -> rerank "排序结果"
+    rerank -> app "下发推荐列表"
+}

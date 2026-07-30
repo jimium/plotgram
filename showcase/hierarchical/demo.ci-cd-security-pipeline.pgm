@@ -1,0 +1,74 @@
+// CI/CD 安全流水线：源码 → 安全扫描 → 部署三段
+// Mermaid 对照: 复杂 DevSecOps 流水线，含 group 分段与回环
+diagram {
+    profile: flowchart
+    title: "CI/CD 安全流水线"
+    layout: hierarchical { direction: top-to-bottom }
+
+    group source {
+        label: "源码阶段"
+        node commit { label: "代码提交", archetype: start }
+        node lint { label: "静态检查", archetype: process }
+        node lint_gate { label: "检查通过？", archetype: decision }
+        node build { label: "构建镜像", archetype: process }
+        node unit_test { label: "单元测试", archetype: process }
+        node test_gate { label: "测试通过？", archetype: decision }
+        node notify_dev { label: "通知开发修复", archetype: process }
+    }
+
+    group security {
+        label: "安全扫描阶段"
+        node sast { label: "SAST 静态扫描", archetype: process }
+        node sast_gate { label: "SAST 通过？", archetype: decision }
+        node sca { label: "依赖与许可证扫描", archetype: process }
+        node sca_gate { label: "许可证合规？", archetype: decision }
+        node image_scan { label: "镜像漏洞扫描", archetype: process }
+        node image_gate { label: "镜像合规？", archetype: decision }
+        node sign { label: "镜像签名", archetype: process }
+        node security_review { label: "安全评审", archetype: process }
+    }
+
+    group deploy {
+        label: "部署阶段"
+        node stage { label: "预发部署", archetype: process }
+        node smoke { label: "冒烟测试", archetype: process }
+        node smoke_gate { label: "冒烟通过？", archetype: decision }
+        node canary { label: "金丝雀发布", archetype: process }
+        node canary_gate { label: "金丝雀健康？", archetype: decision }
+        node prod { label: "全量上线", archetype: process }
+        node rollback { label: "自动回滚", archetype: process }
+        node done { label: "发布完成", archetype: end }
+    }
+
+    commit -> lint
+    lint -> lint_gate
+    lint_gate -> build "是"
+    lint_gate -> notify_dev "否"
+    build -> unit_test
+    unit_test -> test_gate
+    test_gate -> sast "是"
+    test_gate -> notify_dev "否"
+
+    sast -> sast_gate
+    sast_gate -> sca "是"
+    sast_gate -> security_review "否，高危待评审"
+    sca -> sca_gate
+    sca_gate -> image_scan "是"
+    sca_gate -> security_review "否"
+    image_scan -> image_gate
+    image_gate -> sign "是"
+    image_gate -> security_review "否"
+    sign -> stage
+    security_review -> commit "评审后修复重提"
+
+    stage -> smoke
+    smoke -> smoke_gate
+    smoke_gate -> canary "是"
+    smoke_gate -> rollback "否"
+    canary -> canary_gate
+    canary_gate -> prod "是"
+    canary_gate -> rollback "否"
+    prod -> done
+    rollback -> notify_dev
+    notify_dev -> commit "修复后重试"
+}
