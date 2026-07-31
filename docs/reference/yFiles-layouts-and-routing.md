@@ -4,7 +4,7 @@
 > 定位：plotgram 架构决策的**基础信息参考**（学理念与能力边界，不复刻全量栈）  
 > 可读版：[layouts-and-routing.html](layouts-and-routing.html)  
 > 上游产品文档：[yFiles Automatic Layouts](https://docs.yfiles.com/yfiles-html/dguide/automatic-layouts-main-chapter/)  
-> 仓库纪律：[`AGENTS.md`](../../AGENTS.md) §1 · [`yFiles第一性原理与写权纪律`](../总结经验/yFiles第一性原理与写权纪律-2026-07.md)
+> 仓库纪律：[`AGENTS.md`](../../AGENTS.md) §1 · [`写权纪律`](../design/layout/write-authority.md)
 
 ---
 
@@ -202,4 +202,4 @@ yFiles for HTML 把自动图布局分成三类，**不要混用职责**：
 - [yFiles Automatic Layouts](https://docs.yfiles.com/yfiles-html/dguide/automatic-layouts-main-chapter/)  
 - [Hierarchical Layout](https://docs.yfiles.com/yfiles-html/dguide/hierarchical_layout/)  
 - [Edge Routing](https://docs.yfiles.com/yfiles-html/dguide/polyline_router/)  
-- 仓库：[`AGENTS.md`](../../AGENTS.md) §1 · [`docs/总结经验/yFiles第一性原理与写权纪律-2026-07.md`](../总结经验/yFiles第一性原理与写权纪律-2026-07.md) · [`docs/新架构/README.md`](../altlas/README.md)
+- 仓库：[`AGENTS.md`](../../AGENTS.md) §1 · [`写权纪律`](../design/layout/write-authority.md) · [`layout/`](../design/layout/README.md) · [`archive/atlas`](../archive/atlas/README.md)

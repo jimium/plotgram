@@ -13,7 +13,7 @@ plotgram 由 yFiles 经验孵化：轻量 DSL 画图引擎。设计布局与边�
 - **落笔相零新决策**：Ink / 事后修只展开上游；若需要「发明」端口、肘点、track 等，先上提写者
 - **下游不得推翻上游，只得展开上游**。判断句：修法若是「再加一个特判」，先问「这个自由度的写者应该是谁」
 
-细则：[`docs/design/yFiles第一性原理与写权纪律-2026-07.md`](docs/design/yFiles第一性原理与写权纪律-2026-07.md)。  
+细则：[`docs/design/layout/write-authority.md`](docs/design/layout/write-authority.md)。  
 重建可推翻管线或换生成器，**不豁免**本条。
 
 ## 2. 工程红线
@@ -26,10 +26,10 @@ plotgram 由 yFiles 经验孵化：轻量 DSL 画图引擎。设计布局与边�
 
 ## 3. 读什么
 
-1. [`docs/design/`](docs/design/) — 现行设计与 ADR  
-2. [`docs/specs/dsl/dsl-spec.md`](docs/specs/dsl/dsl-spec.md) — DSL 语法契约 + 属性注册表（§14）；[`archetype-spec.md`](docs/specs/archetype-spec.md) — archetype / CSV
-3. [`docs/specs/style-sheet-spec.md`](docs/specs/style-sheet-spec.md) — 主题与视觉词表
-4. [`docs/reference/yFiles-layouts-and-routing.md`](docs/reference/yFiles-layouts-and-routing.md) — yFiles 产品能力参考
+1. [`docs/design/`](docs/design/) — 现行设计与 ADR；布局内核见 [`docs/design/layout/`](docs/design/layout/)  
+2. [`docs/specs/dsl/dsl-spec.md`](docs/specs/dsl/dsl-spec.md) — DSL 语法契约 + 属性注册表（§14）；[`archetype-spec.md`](docs/specs/archetype-spec.md) — archetype / CSV  
+3. [`docs/specs/style-sheet-spec.md`](docs/specs/style-sheet-spec.md) — 主题与视觉词表  
+4. [`docs/reference/yFiles-layouts-and-routing.md`](docs/reference/yFiles-layouts-and-routing.md) — yFiles 产品能力参考  
 5. [`docs/archive/`](docs/archive/) — 历史设计（**只读**，不驱动实现）
 
 ## 4. 单元测试

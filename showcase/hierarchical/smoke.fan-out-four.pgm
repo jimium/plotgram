@@ -2,13 +2,14 @@
 diagram {
     profile: flowchart
     title: "四路同源扇出"
-    layout: hierarchical { direction: left-to-right }
+    layout: hierarchical { direction: top-to-down }
 
     node hub { label: "API 网关", archetype: process }
     node svc_a { label: "用户服务", archetype: process }
     node svc_b { label: "订单服务", archetype: process }
     node svc_c { label: "支付服务", archetype: process }
     node svc_d { label: "通知服务", archetype: process }
+ 
 
     hub -> svc_a
     hub -> svc_b

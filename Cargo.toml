@@ -6,6 +6,7 @@ members = [
     "crates/plotgram-parse",
     "crates/plotgram-pipeline",
     "crates/plotgram-engine-api",
+    "crates/plotgram-algo",
     "crates/plotgram-engine",
     "crates/plotgram-render",
     "crates/plotgram-cli",
@@ -25,6 +26,7 @@ plotgram-content = { path = "crates/plotgram-content" }
 plotgram-parse = { path = "crates/plotgram-parse" }
 plotgram-pipeline = { path = "crates/plotgram-pipeline" }
 plotgram-engine-api = { path = "crates/plotgram-engine-api" }
+plotgram-algo = { path = "crates/plotgram-algo" }
 plotgram-engine = { path = "crates/plotgram-engine" }
 plotgram-render = { path = "crates/plotgram-render" }
 serde = { version = "1", features = ["derive"] }

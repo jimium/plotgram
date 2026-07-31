@@ -1,7 +1,7 @@
 # ADR-006: Engine 入口、边写者与 crate 拆分
 
 > 状态：accepted  
-> 日期：2026-07-30（修订：算法实现收拢为 engine 内模块）  
+> 日期：2026-07-30（修订：算法实现收拢为 engine 内模块；2026-07-31 增加 `plotgram-algo` 零件 crate）  
 > 关联：ADR-001、ADR-005、[`model-boundary.md`](../model-boundary.md)
 
 ## 背景
@@ -33,7 +33,8 @@
 |-------|------|
 | `plotgram-model` | 数据 |
 | `plotgram-engine-api` | `LayoutAlgorithm` / `EdgeRouter` / `LayoutError`（**禁止**放进 model 或门面） |
-| `plotgram-engine` | `run` + 注册表 + **in-tree** `layout::*` / `route::*` |
+| `plotgram-algo` | **共享算法零件**（VPSC / FAS / 交叉计数 / orientation / track / 正交规范化等）；无管线、无 Contract；见 [`PARTS.md`](../../crates/plotgram-algo/PARTS.md) |
+| `plotgram-engine` | `run` + 注册表 + **in-tree** `layout::*` / `route::*`（消费 algo） |
 | `plotgram-pipeline` | 编排 |
 | `plotgram-parse` / `content` / `render` / `cli` | 各司其职 |
 
@@ -47,20 +48,24 @@ plotgram-engine
   run / registry / finalize
 ```
 
-依赖纪律（抽出时仍成立）：
+依赖纪律：
 
 ```text
-model ← engine-api ← layout/route 实现
-                         ↑
-                      engine 门面（只组装，实现不依赖 run）
+model ← engine-api
+         algo（零件；当前可不依赖 model）
+              ↑
+         layout/route 实现 ← engine 门面（只组装，实现不依赖 run）
 ```
 
 - **禁止**实现模块依赖 `run` / 注册表的「门面逻辑」形成环。  
-- 内建 Ink 属于 hierarchical，调用 `route::core`；不是 `EdgeRouter`。
+- **禁止** `plotgram-algo` 依赖 `plotgram-engine`。  
+- 内建 Ink 属于 hierarchical，可调用 `algo` 与 `route::core`；不是 `EdgeRouter`。
 
-### 4. 何时再拆 crate
+### 4. 何时再拆 layout/route crate
 
 当某个 `layout/*` 或 `route/*` **体量与编译时间**明显拖累 engine、或需独立发布/feature 裁剪时，再抽成 workspace 成员；Trait 已在 `engine-api`，搬迁成本可控。
+
+**例外（已提前拆）**：`plotgram-algo` 在零件阶段即独立 —— 理由是编译隔离（v1 教训）与 M0 地基可并行验收；**不**再拆成多个微 crate（禁止 `plotgram-vpsc` 等）。
 
 ### 5. Group 尺寸
 
@@ -68,7 +73,8 @@ model ← engine-api ← layout/route 实现
 
 ## 含义
 
-- 新算法：先加 `engine` 内模块 + 注册；长大再 extract。  
+- **零件**：优先落在 `plotgram-algo`（见 PARTS.md），带表驱动单测；再由 layout/route 接线。  
+- **布局/路由算法**：先加 `engine` 内模块 + 注册；长大再 extract。  
 - 编排：`pipeline`（parse → measure → `engine::run` → render）；CLI 保持薄。
 
 ## 备选方案（未采用）

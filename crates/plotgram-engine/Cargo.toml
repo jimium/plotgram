@@ -8,3 +8,4 @@ description = "Plotgram layout engine: facade + in-tree hierarchical / orthogona
 [dependencies]
 plotgram-model = { workspace = true }
 plotgram-engine-api = { workspace = true }
+plotgram-algo = { workspace = true }
