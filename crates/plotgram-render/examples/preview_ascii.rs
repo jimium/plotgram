@@ -22,6 +22,7 @@ fn node(id: &str, label: &str) -> Node {
         role: Default::default(),
         host_group: None,
         anchor: None,
+        partition_cell: None,
         attrs: AttrMap::new(),
     }
 }
@@ -98,7 +99,8 @@ fn build_input() -> RenderInput {
             edge("e6", "home", "session", Arrow::Bidirectional),
         ],
         groups: vec![],
-    };
+            partition: None,
+        };
 
     // ── Hand-laid geometry (px, 1 char ≈ 6×12) ──
     // Column centers: left branch x=90, right branch x=330.

@@ -12,6 +12,7 @@ pub enum TokenKind {
     Diagram,
     Node,
     Group,
+    Partition,
     // Booleans
     True,
     False,
@@ -43,6 +44,7 @@ impl TokenKind {
             Self::Diagram => "'diagram'",
             Self::Node => "'node'",
             Self::Group => "'group'",
+            Self::Partition => "'partition'",
             Self::True => "'true'",
             Self::False => "'false'",
             Self::Ident(_) => "identifier",
@@ -442,6 +444,7 @@ impl<'a> Lexer<'a> {
             "diagram" => TokenKind::Diagram,
             "node" => TokenKind::Node,
             "group" => TokenKind::Group,
+            "partition" => TokenKind::Partition,
             "true" => TokenKind::True,
             "false" => TokenKind::False,
             _ => TokenKind::Ident(word),

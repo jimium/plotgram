@@ -396,6 +396,7 @@ mod tests {
             role: Default::default(),
             host_group: None,
             anchor: None,
+            partition_cell: None,
             attrs,
         }
     }

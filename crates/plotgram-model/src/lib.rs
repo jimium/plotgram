@@ -3,7 +3,8 @@
 //! Core types shared across all crates:
 //! - `geometry`: Point, Rect primitives
 //! - `attr`: AttrValue, AttrMap (free-form attribute maps)
-//! - `graph`: Node (role / host_group / anchor), Edge (ports / edge_group), Group, Graph
+//! - `graph`: Node (role / host_group / anchor / partition_cell), Edge, Group, Graph, Arrow
+//! - `partition`: PartitionGrid / PartitionCell (ADR-008 orthogonal swimlanes / matrix)
 //! - `port`: Side, PortConstraint, PortRef (dsl-spec §7.4)
 //! - `contract`: AlgorithmRef, LayoutContract (engine entry — no profile name)
 //! - `sizes`: NodeSizes (preferred sizes measured before layout)
@@ -19,6 +20,7 @@ pub mod attr;
 pub mod contract;
 pub mod geometry;
 pub mod graph;
+pub mod partition;
 pub mod port;
 pub mod profile;
 pub mod render;

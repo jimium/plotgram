@@ -11,7 +11,8 @@
 | Proper hierarchy | 跨层边经虚节点切段（组合/度量需要时） |
 | 坐标与间距 | 节点不重叠；主/次轴与 track/缝宽可发布给 Ink |
 | Group 一等公民 | 组框尺寸与位置由布局写出；跨组边经 gate/锚点策略，非纯后验描边 |
-| Group policy | **Weak**（组内可分层）与 **StrongMacro**（宏层/条带感）均为本核 **profile 参数**，不是第二套布局器 |
+| Group policy | **Weak** / **StrongMacro** 均为本核 **profile 参数**，不是第二套布局器 |
+| **PartitionGrid** | 正交列/行（ADR-008）；model/DSL 已定；组合/度量消费 **planned** |
 | 端口 | 作者约束（`PortConstraint`）+ 算法决议（`PortRef`）；along 在组合相 |
 | 内建正交边 | Channel/走廊拓扑 + Ink 展开；可选 bus/bundle（`edge_group`） |
 | 独立路由衔接 | `DeferToRouter`：本核写节点与端口决议，边路径交给 router |
@@ -24,7 +25,7 @@
 | 纯树 / 径向思维导图 | [Tree](../tree/) |
 | 状态机默认「只圆环」 | [Circular](../circular/) 为 state 另一路径；本核保留分层路径 |
 | 独立 `ArchitectureLayout` | 禁止；architecture = Hierarchical + StrongMacro 等 profile |
-| DSL `swimlane` / `table` 一等语法 | 非本期；泳道观感优先用 group + partition/track policy |
+| DSL `swimlane` / `table` 关键字糖 | 非本期；正交分区用 **PartitionGrid**（[ADR-008](../../adr/008-partition-grid.md)、[shared/partition](../shared/partition.md)）；`group` 不演泳道 |
 | 力导向 / 全图 Ortho-TSM 主路径 | 非本核；正交紧凑见 reference TSM，不冒充 Hier |
 | 真全局 MCF 作为 MVP 阻塞 | 可渐进；有界返工优先于「先上真 MCF」 |
 | 图种名分支 | 引擎内禁止；见 ADR-001 |
@@ -47,7 +48,7 @@
 
 1. **Integrated labeling** — 完整联合求解可渐进；至少 label 需求进度量。  
 2. **组合相单一产出类型** — Weak/StrongMacro 仅为收缩策略；输出字段路径间一致。  
-3. **Partition / 泳道轴** — 无新 DSL 前提下由 group+policy 表达；Horizontal 堆叠 ≠ 轴转置 Sugiyama。  
+3. **PartitionGrid 引擎消费** — DSL/model 已定（ADR-008）；Hier 连续块 / 层区间接线仍 **planned**。  
 4. **增量 / from-sketch** — 非 MVP 阻塞。
 
 细节实现债见 `docs/archive/atlas/30`（只读）；本表只约束「设计上要收敛到哪」。

@@ -237,6 +237,7 @@ fn resolve_endpoint(
                 role: NodeRole::GroupAnchor,
                 host_group: Some(gid.clone()),
                 anchor: Some(PortConstraint { side, slot }),
+                partition_cell: None,
                 attrs: AttrMap::new(),
             };
 

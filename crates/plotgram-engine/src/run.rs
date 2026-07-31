@@ -67,6 +67,7 @@ mod tests {
             role: NodeRole::Entity,
             host_group: None,
             anchor: None,
+            partition_cell: None,
             attrs: AttrMap::new(),
         }
     }
@@ -101,6 +102,7 @@ mod tests {
             nodes: vec![node("a"), node("b")],
             edges: vec![edge("e0", "a", "b")],
             groups: vec![],
+            partition: None,
         };
         let contract = LayoutContract {
             layout: AlgorithmRef::new("hierarchical"),
@@ -122,6 +124,7 @@ mod tests {
             nodes: vec![node("a"), node("b")],
             edges: vec![edge("e0", "a", "b")],
             groups: vec![],
+            partition: None,
         };
         let contract = LayoutContract {
             layout: AlgorithmRef::new("hierarchical"),
@@ -140,6 +143,7 @@ mod tests {
             nodes: vec![node("a"), node("b")],
             edges: vec![],
             groups: vec![],
+            partition: None,
         };
         let contract = LayoutContract {
             layout: AlgorithmRef::new("hierarchical"),

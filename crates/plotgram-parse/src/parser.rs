@@ -14,7 +14,7 @@ use crate::lexer::{Lexer, Token, TokenKind};
 /// Reserved words that cannot be used as identifiers (dsl-spec §10).
 /// They remain valid as atom *values* (e.g. `profile: flowchart`).
 const RESERVED_WORDS: &[&str] = &[
-    "diagram", "node", "group",
+    "diagram", "node", "group", "partition",
     "flowchart", "sequence", "architecture", "state", "er", "mindmap",
     "true", "false",
 ];
@@ -203,6 +203,7 @@ impl Parser {
         let mut attrs = AttrMap::new();
         let mut layout: Option<AlgorithmConfigAst> = None;
         let mut edge_routing: Option<AlgorithmConfigAst> = None;
+        let mut partition: Option<PartitionAst> = None;
         let mut items: Vec<DiagramItem> = Vec::new();
 
         while !self.at_eof() && !matches!(self.peek_kind(), TokenKind::RBrace) {
@@ -212,6 +213,17 @@ impl Parser {
                 }
                 TokenKind::Group => {
                     items.push(DiagramItem::Group(self.parse_group()?));
+                }
+                TokenKind::Partition => {
+                    if partition.is_some() {
+                        let tok = self.current();
+                        return Err(ParseError::syntax(
+                            tok.line,
+                            tok.column,
+                            "duplicate `partition` block; at most one is allowed per diagram (dsl-spec §11.10)",
+                        ));
+                    }
+                    partition = Some(self.parse_partition()?);
                 }
                 TokenKind::Ident(_) | TokenKind::Atom(_) if self.lookahead_is_colon() => {
                     let (key, algo_config, plain_value) = self.parse_diagram_attr_special()?;
@@ -277,6 +289,7 @@ impl Parser {
             attrs,
             layout,
             edge_routing,
+            partition,
             items,
         })
     }
@@ -296,6 +309,94 @@ impl Parser {
                 Ok((key, None, Some(value)))
             }
         }
+    }
+
+    // ── Partition (dsl-spec §11.10) ─────────────────────
+
+    /// Parse `partition { (column|row <id> [{ label: "…" }])* }`.
+    fn parse_partition(&mut self) -> Result<PartitionAst, ParseError> {
+        self.advance(); // consume 'partition'
+        self.expect(&TokenKind::LBrace)?;
+
+        let mut axes: Vec<PartitionAxisAst> = Vec::new();
+        let mut seen_ids: HashSet<String> = HashSet::new();
+
+        while !self.at_eof() && !matches!(self.peek_kind(), TokenKind::RBrace) {
+            // Expect `column` or `row` as contextual keyword (lexed as Ident)
+            let (is_column, kw_line, kw_col) = match self.peek_kind().clone() {
+                TokenKind::Ident(ref name) if name == "column" => (true, self.current().line, self.current().column),
+                TokenKind::Ident(ref name) if name == "row" => (false, self.current().line, self.current().column),
+                _ => {
+                    let tok = self.current();
+                    return Err(ParseError::syntax(
+                        tok.line,
+                        tok.column,
+                        format!("expected `column` or `row` in partition body, found {}", self.peek_kind().display_name()),
+                    ));
+                }
+            };
+            self.advance(); // consume 'column' / 'row'
+
+            let (id, id_line, _id_col) = self.expect_ident()?;
+
+            // Duplicate axis id check
+            if !seen_ids.insert(id.clone()) {
+                return Err(ParseError::DuplicateId {
+                    id: id.clone(),
+                    first_line: kw_line,
+                });
+            }
+            // Axis id shares namespace with node/group
+            self.register_id(&id, id_line)?;
+
+            // Optional attribute block: { label: "…" }
+            let mut label: Option<String> = None;
+            if matches!(self.peek_kind(), TokenKind::LBrace) {
+                self.advance(); // consume '{'
+                while !self.at_eof() && !matches!(self.peek_kind(), TokenKind::RBrace) {
+                    let (key, value) = self.parse_attribute()?;
+                    match key.as_str() {
+                        "label" => {
+                            if label.is_some() {
+                                return Err(ParseError::DuplicateAttr {
+                                    key: "label".into(),
+                                    context: format!("partition axis {id}"),
+                                });
+                            }
+                            match value {
+                                AttrValue::Str(s) => label = Some(s),
+                                AttrValue::Atom(s) => label = Some(s),
+                                other => {
+                                    return Err(ParseError::Semantic(format!(
+                                        "partition axis `{id}`: `label` must be a string, got {other}"
+                                    )));
+                                }
+                            }
+                        }
+                        _ => {
+                            return Err(ParseError::Semantic(format!(
+                                "partition axis `{id}`: unknown attribute `{key}`; only `label` is supported (dsl-spec §11.10)"
+                            )));
+                        }
+                    }
+                    self.skip_optional_commas();
+                }
+                self.expect(&TokenKind::RBrace)?;
+            }
+
+            let _ = (kw_line, kw_col); // used above for error context
+            axes.push(PartitionAxisAst { is_column, id, label });
+        }
+
+        self.expect(&TokenKind::RBrace)?;
+
+        if axes.is_empty() {
+            return Err(ParseError::Semantic(
+                "partition block must declare at least one `column` or `row` (dsl-spec §11.10)".into(),
+            ));
+        }
+
+        Ok(PartitionAst { axes })
     }
 
     // ── Node ─────────────────────────────────────────────
@@ -923,5 +1024,124 @@ mod tests {
             }
             _ => panic!("expected edge"),
         }
+    }
+
+    // ── Partition tests ─────────────────────────────────
+
+    #[test]
+    fn partition_columns_only() {
+        let ast = parse_ok(r#"diagram {
+            partition {
+                column customer { label: "客户" }
+                column sales { label: "销售" }
+                column warehouse { label: "仓库" }
+            }
+            node a {}
+        }"#);
+        let p = ast.diagram.partition.unwrap();
+        assert_eq!(p.axes.len(), 3);
+        assert!(p.axes.iter().all(|a| a.is_column));
+        assert_eq!(p.axes[0].id, "customer");
+        assert_eq!(p.axes[0].label.as_deref(), Some("客户"));
+        assert_eq!(p.axes[1].id, "sales");
+        assert_eq!(p.axes[2].id, "warehouse");
+    }
+
+    #[test]
+    fn partition_matrix_columns_and_rows() {
+        let ast = parse_ok(r#"diagram {
+            partition {
+                column sales { label: "销售" }
+                column support { label: "支持" }
+                row intake { label: "接入" }
+                row process { label: "处理" }
+            }
+            node a {}
+        }"#);
+        let p = ast.diagram.partition.unwrap();
+        assert_eq!(p.axes.len(), 4);
+        let cols: Vec<_> = p.axes.iter().filter(|a| a.is_column).collect();
+        let rows: Vec<_> = p.axes.iter().filter(|a| !a.is_column).collect();
+        assert_eq!(cols.len(), 2);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].id, "intake");
+        assert_eq!(rows[1].label.as_deref(), Some("处理"));
+    }
+
+    #[test]
+    fn partition_axis_without_label() {
+        let ast = parse_ok(r#"diagram {
+            partition {
+                column lane_a
+                column lane_b
+            }
+            node x {}
+        }"#);
+        let p = ast.diagram.partition.unwrap();
+        assert_eq!(p.axes[0].label, None);
+        assert_eq!(p.axes[1].id, "lane_b");
+    }
+
+    #[test]
+    fn partition_duplicate_block_error() {
+        let err = parse_err(r#"diagram {
+            partition { column a }
+            partition { column b }
+            node x {}
+        }"#);
+        assert!(matches!(&err, ParseError::Syntax { message, .. } if message.contains("duplicate `partition`")));
+    }
+
+    #[test]
+    fn partition_duplicate_axis_id_error() {
+        let err = parse_err(r#"diagram {
+            partition { column dup { label: "A" } column dup { label: "B" } }
+            node x {}
+        }"#);
+        assert!(matches!(err, ParseError::DuplicateId { id, .. } if id == "dup"));
+    }
+
+    #[test]
+    fn partition_axis_id_conflicts_with_node() {
+        let err = parse_err(r#"diagram {
+            partition { column sales }
+            node sales {}
+        }"#);
+        assert!(matches!(err, ParseError::DuplicateId { id, .. } if id == "sales"));
+    }
+
+    #[test]
+    fn partition_duplicate_label_key_error() {
+        let err = parse_err(r#"diagram {
+            partition { column a { label: "X" label: "Y" } }
+            node x {}
+        }"#);
+        assert!(matches!(err, ParseError::DuplicateAttr { key, .. } if key == "label"));
+    }
+
+    #[test]
+    fn partition_unknown_attr_error() {
+        let err = parse_err(r#"diagram {
+            partition { column a { color: red } }
+            node x {}
+        }"#);
+        assert!(matches!(&err, ParseError::Semantic(msg) if msg.contains("unknown attribute `color`")));
+    }
+
+    #[test]
+    fn partition_empty_block_error() {
+        let err = parse_err(r#"diagram {
+            partition { }
+            node x {}
+        }"#);
+        assert!(matches!(&err, ParseError::Semantic(msg) if msg.contains("at least one")));
+    }
+
+    #[test]
+    fn partition_invalid_body_token_error() {
+        let err = parse_err(r#"diagram {
+            partition { node a {} }
+        }"#);
+        assert!(matches!(&err, ParseError::Syntax { message, .. } if message.contains("expected `column` or `row`")));
     }
 }

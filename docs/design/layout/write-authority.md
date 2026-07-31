@@ -20,7 +20,7 @@ Hier / 正交主路径只有两条硬约束：
 ⑤ 标注    与几何联合求解，或至少进 Demand
 ```
 
-各内核的相切分见 [`layout/`](README.md)；Hier 细节见 [hierarchical/pipeline](hierarchical/pipeline.md)。
+各内核的相切分见 [`layout/`](README.md)；Hier 细节见 [hierarchical/architecture](hierarchical/architecture.md)。
 
 ---
 

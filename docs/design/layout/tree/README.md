@@ -35,6 +35,6 @@
 
 ## 待写
 
-- [ ] `pipeline.md` — placer 写权、根选择、非树边策略  
+- [ ] `architecture.md`（或并入 README）— placer 写权、根选择、非树边策略  
 - [ ] `scope.md` — radial vs 正交树 profile 表  
 - [ ] 与重建 `layout/tree` 模块对齐后补代码链

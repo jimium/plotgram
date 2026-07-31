@@ -13,7 +13,8 @@ model 是**纯数据层**：定义所有 crate 共享的类型，不含布局/�
 |------|----------|--------|
 | `geometry` | `Point`, `Rect` | 全部 |
 | `attr` | `AttrValue`, `AttrMap` | 全部（样式/meta/开放扩展） |
-| `graph` | `Node`（含 `role`/`host_group`/`anchor`）, `Edge`, `Group`, `Graph`, `Arrow` | engine, render |
+| `graph` | `Node`（含 `role`/`host_group`/`anchor`/`partition_cell`）, `Edge`, `Group`, `Graph`（含 `partition`）, `Arrow` | engine, render |
+| `partition` | `PartitionGrid`, `PartitionAxis`, `PartitionCell`, `validate_graph_partition` | parse / engine（消费 planned） |
 | `port` | `Side`, `PortConstraint`（作者钉死）, `PortRef`（已决议） | engine |
 | `contract` | `AlgorithmRef`, `LayoutContract`（含 `node_sizes`） | **engine 入口** |
 | `sizes` | `NodeSizes`, `Size`（geometry） | 编排度量 → engine |
@@ -59,7 +60,18 @@ CLI 仅做参数与文件 I/O，调用 pipeline，不写编排逻辑。
 | `role` | `Entity`（默认）/ `GroupAnchor` | DSL→parse 提升 |
 | `host_group` | 锚点所属 group id | 同上；仅 GroupAnchor |
 | `anchor` | `Option<PortConstraint>`：贴框侧/槽 | 同上；仅 GroupAnchor |
-| `attrs` | 样式/meta 等 | **不得**再承载 `role` / `host_group` / `side` / `slot`（提升后剥除） |
+| `partition_cell` | `Option<PartitionCell>`：正交分区格 | DSL→parse 提升（`cell_col`/`cell_row`）；引擎只读 |
+| `attrs` | 样式/meta 等 | **不得**再承载 `role` / `host_group` / `side` / `slot` / `cell_col` / `cell_row`（提升后剥除） |
+
+### PartitionGrid（ADR-008）
+
+| 字段 | 含义 | 写者 |
+|------|------|------|
+| `Graph.partition` | 有序 columns/rows 轴 | DSL `partition { … }`（parse planned）/ 手写 IR |
+| 轴声明序 | 几何轴序（稳定） | 作者 |
+| 校验 | `Graph::validate_partition` | parse / 编排在 lift 后调用 |
+
+与 group **正交**：group 不演泳道。详见 [`adr/008-partition-grid.md`](adr/008-partition-grid.md)、[`layout/shared/partition.md`](layout/shared/partition.md)。
 
 ## 硬约束
 
@@ -68,7 +80,7 @@ CLI 仅做参数与文件 I/O，调用 pipeline，不写编排逻辑。
 3. **model 不依赖其它 workspace crate**。
 4. **边用稳定 `Edge.id`**；placement / label 用同一 id。
 5. **端口**：作者约束在 `Edge`；决议 `PortRef` 在 `EdgePlacement`；Ink 不得发明。
-6. **结构字段一等**：端口 / 边组 / `group_anchor` 不靠引擎读自由 attrs。
+6. **结构字段一等**：端口 / 边组 / `group_anchor` / **partition cell** 不靠引擎读自由 attrs。
 
 ## 内容块与度量（ADR-005）
 
@@ -92,6 +104,7 @@ CLI 仅做参数与文件 I/O，调用 pipeline，不写编排逻辑。
   → parse（attrs 含 from_side / edge_group / role …；可选 @group 端点）
   → 展开 @group 糖（→ group_anchor nodes）
   → lift_all_node_structural_attrs / lift_all_edge_structural_attrs
+  → Graph::validate_partition（若有 cell / grid）
   → profile expand
   → compile MeasureParams（主题中的度量字段；ADR-005）
   → 度量：preferred size → NodeSizes（+ ContentLayout）

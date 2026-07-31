@@ -25,6 +25,7 @@ fn node(id: &str, label: &str, shape: Option<&str>, variant: Option<&str>) -> No
         role: Default::default(),
         host_group: None,
         anchor: None,
+        partition_cell: None,
         attrs,
     }
 }
@@ -106,7 +107,8 @@ fn build_input(theme: Option<&str>, render_style: Option<&str>) -> RenderInput {
             edge_with("e6", "cdn", "plain", Arrow::Bidirectional),
         ],
         groups: vec![],
-    };
+            partition: None,
+        };
 
     // ── Hand layout ──
     let nodes = vec![

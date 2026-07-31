@@ -22,7 +22,7 @@
 
 - [ADR-006](../../adr/006-engine-io-and-crates.md)  
 - [03 正交边路由](../../../reference/yfiles/03-正交边路由.md)  
-- Hier [pipeline](../hierarchical/pipeline.md)
+- Hier [architecture](../hierarchical/architecture.md)
 
 ## 待写
 

@@ -153,6 +153,7 @@ mod tests {
             role: Default::default(),
             host_group: None,
             anchor: None,
+            partition_cell: None,
             attrs: AttrMap::new(),
         };
         let graph = Graph {
@@ -171,6 +172,7 @@ mod tests {
                 attrs: AttrMap::new(),
             }],
             groups: vec![],
+            partition: None,
         };
         let layout = LayoutResult {
             nodes: vec![

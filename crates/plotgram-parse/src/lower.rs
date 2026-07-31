@@ -7,6 +7,7 @@ use std::collections::HashSet;
 use plotgram_model::attr::{AttrMap, AttrValue};
 use plotgram_model::contract::AlgorithmRef;
 use plotgram_model::graph::{Arrow, Edge, Graph, Group, Node, NodeRole};
+use plotgram_model::partition::{PartitionAxis, PartitionGrid};
 use plotgram_model::profile::DiagramType;
 
 use crate::ast::*;
@@ -52,8 +53,13 @@ pub(crate) fn take_string_attr(
 /// Lower AST to a graph + metadata.
 pub fn lower(ast: &FileAst) -> Result<Lowered, ParseError> {
     let mut ctx = LowerCtx::new();
-    let graph = ctx.lower_items(&ast.diagram.items)?;
+    let mut graph = ctx.lower_items(&ast.diagram.items)?;
     let meta = ctx.lower_meta(&ast.diagram)?;
+
+    // Lower partition block → Graph.partition
+    if let Some(partition_ast) = &ast.diagram.partition {
+        graph.partition = Some(lower_partition(partition_ast));
+    }
 
     // Self-loop check
     let allows_self_loop = meta.profile.map(|p| p.allows_self_loop()).unwrap_or(false);
@@ -66,6 +72,23 @@ pub fn lower(ast: &FileAst) -> Result<Lowered, ParseError> {
         meta,
         pending_group_edges: ctx.pending_group_edges,
     })
+}
+
+/// Convert [`PartitionAst`] → model [`PartitionGrid`].
+fn lower_partition(ast: &PartitionAst) -> PartitionGrid {
+    let mut grid = PartitionGrid::default();
+    for axis in &ast.axes {
+        let entry = match &axis.label {
+            Some(l) => PartitionAxis::with_label(&axis.id, l),
+            None => PartitionAxis::new(&axis.id),
+        };
+        if axis.is_column {
+            grid.columns.push(entry);
+        } else {
+            grid.rows.push(entry);
+        }
+    }
+    grid
 }
 
 struct LowerCtx {
@@ -201,6 +224,7 @@ impl LowerCtx {
             role: NodeRole::Entity,
             host_group: None,
             anchor: None,
+            partition_cell: None,
             attrs,
         })
     }

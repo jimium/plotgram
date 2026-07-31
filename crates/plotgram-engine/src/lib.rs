@@ -9,6 +9,7 @@
 
 mod finalize;
 pub mod layout;
+pub mod params;
 mod registry;
 pub mod route;
 mod run;
@@ -20,6 +21,10 @@ pub use plotgram_engine_api::{
     EdgeGeometryMode, EdgeRouter, LayoutAlgorithm, LayoutError, LayoutInput, LayoutOutput,
     RouteInput,
 };
-pub use layout::HierarchicalLayout;
+pub use layout::{
+    GroupAlign, GroupPolicy, GroupSizing, HierarchicalLayout, HierarchicalParams,
+    HierarchicalPreset, Orientation, RoutingStyle,
+};
+pub use params::{BindError, BindWarning, OptionsBinder};
 pub use route::OrthogonalEdgeRouter;
 pub use run::run;

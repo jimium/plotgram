@@ -20,6 +20,7 @@ fn node(id: &str, label: &str) -> Node {
         role: Default::default(),
         host_group: None,
         anchor: None,
+        partition_cell: None,
         attrs: AttrMap::new(),
     }
 }
@@ -88,7 +89,8 @@ fn build_input() -> RenderInput {
             edge("e8", "notify", "commit", Arrow::Response),
         ],
         groups: vec![],
-    };
+            partition: None,
+        };
 
     // Layout: main pipeline vertical at x=120, branches to the right at x=360
     let n_commit  = Rect::new(72.0, 12.0, 96.0, 36.0);

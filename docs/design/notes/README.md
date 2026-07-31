@@ -6,5 +6,6 @@
 | 笔记 | 一句话 |
 |------|--------|
 | [v1-atlas-solver-vs-vpsc.md](v1-atlas-solver-vs-vpsc.md) | v1 坐标求解器与 `algo::vpsc`：同问题族；实现不双轨长期并存 |
+| （相关 ADR）[008-partition-grid](../adr/008-partition-grid.md) | PartitionGrid 一等；group 不演泳道 |
 
 成文标准：能回答「以后还要不要 / 迁什么 / 删什么」；细节算法仍指向 `docs/reference/yfiles/` 或 `layout/`。

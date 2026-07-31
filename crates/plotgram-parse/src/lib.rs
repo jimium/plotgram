@@ -344,4 +344,69 @@ diagram {
         assert!(unk.shape.is_none());
         assert!(!unk.attrs.contains_key("variant"));
     }
+
+    #[test]
+    fn end_to_end_partition_swimlane() {
+        let source = r#"diagram {
+    profile: flowchart
+    layout: hierarchical { direction: top-to-bottom }
+
+    partition {
+        column customer { label: "客户" }
+        column sales { label: "销售" }
+        column warehouse { label: "仓库" }
+    }
+
+    node order { label: "下单" cell_col: customer }
+    node confirm { label: "确认" cell_col: sales }
+    node ship { label: "发货" cell_col: warehouse }
+
+    order -> confirm
+    confirm -> ship
+}"#;
+        let out = parse(source).unwrap();
+
+        // Graph.partition filled
+        let grid = out.graph.partition.as_ref().expect("partition should be set");
+        assert_eq!(grid.columns.len(), 3);
+        assert!(grid.rows.is_empty());
+        assert_eq!(grid.columns[0].id, "customer");
+        assert_eq!(grid.columns[0].label.as_deref(), Some("客户"));
+        assert_eq!(grid.columns[1].id, "sales");
+        assert_eq!(grid.columns[2].id, "warehouse");
+        assert_eq!(grid.columns[2].label.as_deref(), Some("仓库"));
+
+        // cell_col lifted on nodes
+        let order = &out.graph.nodes[0];
+        assert_eq!(
+            order.partition_cell.as_ref().and_then(|c| c.column.as_deref()),
+            Some("customer")
+        );
+        let ship = &out.graph.nodes[2];
+        assert_eq!(
+            ship.partition_cell.as_ref().and_then(|c| c.column.as_deref()),
+            Some("warehouse")
+        );
+    }
+
+    #[test]
+    fn end_to_end_partition_matrix() {
+        let source = r#"diagram {
+    partition {
+        column col_a { label: "A" }
+        row row_x { label: "X" }
+    }
+    node n1 { cell_col: col_a cell_row: row_x }
+}"#;
+        let out = parse(source).unwrap();
+        let grid = out.graph.partition.as_ref().unwrap();
+        assert_eq!(grid.columns.len(), 1);
+        assert_eq!(grid.rows.len(), 1);
+        assert_eq!(grid.rows[0].id, "row_x");
+
+        let n1 = &out.graph.nodes[0];
+        let cell = n1.partition_cell.as_ref().unwrap();
+        assert_eq!(cell.column.as_deref(), Some("col_a"));
+        assert_eq!(cell.row.as_deref(), Some("row_x"));
+    }
 }

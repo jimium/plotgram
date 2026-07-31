@@ -113,6 +113,7 @@ mod tests {
             role: NodeRole::Entity,
             host_group: None,
             anchor: None,
+            partition_cell: None,
             attrs: AttrMap::new(),
         }
     }
@@ -130,6 +131,7 @@ mod tests {
                 edges: vec![],
                 groups: vec![],
             }],
+            partition: None,
         };
         let mut sizes = NodeSizes::new();
         sizes.insert("a", Size::new(40.0, 20.0));

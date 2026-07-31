@@ -183,6 +183,7 @@ mod tests {
             role: Default::default(),
             host_group: None,
             anchor: None,
+            partition_cell: None,
             attrs: AttrMap::new(),
         }
     }
@@ -235,6 +236,7 @@ mod tests {
             nodes: vec![node("a", labels.0), node("b", labels.1)],
             edges: vec![edge("e1", "a", "b", arrow)],
             groups: vec![],
+            partition: None,
         };
         let layout = LayoutResult {
             nodes: vec![place("a", 0.0, 24.0, 96.0, 36.0), place("b", 240.0, 24.0, 96.0, 36.0)],
@@ -322,6 +324,7 @@ mod tests {
             nodes: vec![node("a", "Top"), node("b", "Bottom")],
             edges: vec![],
             groups: vec![],
+            partition: None,
         };
         let layout = LayoutResult {
             nodes: vec![place("a", 0.0, 0.0, 96.0, 36.0), place("b", 0.0, 120.0, 96.0, 36.0)],

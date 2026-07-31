@@ -1,6 +1,6 @@
 # Plotgram DSL 规范
 
-> 版本：2.6-draft  
+> 版本：2.7-draft  
 > 状态：语法契约草案（相对 v1 `language-spec.md` 的瘦身重设计；该文档已删除）  
 > 定稿选择：node / group / edge **规范形态**为声明头 + `{ … }`（`label` / `variant` / `style.*` 等进花括号）；node 另有三轴 + `archetype`；边箭头 `->` / `-->` / `<->` 保留语法；边端口 `side` + `slot`；无声明式样式；ER 另文；自环默认禁  
 > 2.1：废弃 `kind`；三轴 + archetype  
@@ -8,7 +8,8 @@
 > 2.3：group 废除位置 string 标签；`label` / `variant` 进 `{}`；§6.5 糖  
 > 2.4：edge 标签一律进 `{}`；废除 `>"` / `<"` 端点糖；§7.5 仅保留中点 string 糖；允许省略空 `{}`  
 > 2.5：`group_anchor` 一等字段 + `@group` 组框边糖（ADR-004）  
-> 2.6：废除 `diagram <type>` 位置；改为属性 `profile:`（ADR-001）
+> 2.6：废除 `diagram <type>` 位置；改为属性 `profile:`（ADR-001）  
+> 2.7：`partition` / `cell_col` / `cell_row`（ADR-008 PartitionGrid）
 
 **本文档定义**：DSL **语法形态**，以及 **属性注册表**（§14：写者/消费者/状态、shape / variant 封闭集）。  
 archetype 展开与 CSV 见 [`archetype-spec.md`](archetype-spec.md)；视觉属性词表见 [`style-sheet-spec.md`](style-sheet-spec.md) §5。
@@ -213,7 +214,53 @@ node api "API 服务"   // 行尾注释
 - 未识别的 diagram 级 key 产生警告，忽略  
 - 未知 `profile` atom → **错误**（封闭集）
 
-### 4.3 示例
+### 4.3 PartitionGrid 声明（ADR-008）
+
+正交分区网格（泳道 / 矩阵）。**不是** `group`，也不是 Channel 走廊 `lane`。
+
+```
+<partition_declaration> ::= "partition" "{" <partition_body> "}"
+<partition_body>        ::= (<partition_axis>)*
+<partition_axis>        ::= ("column" | "row") <identifier> "{" <partition_axis_body> "}"
+<partition_axis_body>   ::= (<partition_axis_attribute>)*
+<partition_axis_attribute> ::= "label" ":" <string>
+```
+
+- 至多一个 diagram 级 `partition` 块。  
+- `column` / `row` **声明序** = 几何轴序（稳定）。  
+- 轴 `id` 与 node / group id **同一命名空间，禁止冲突**。  
+- 仅 columns（或仅 rows）= 泳道；两者都有 = 矩阵。  
+- **首期不做**：`swimlane` 关键字、`group` 自动成列。  
+- **Parser**：块解析 **active**（model 类型 + parser 均已落地）。
+
+```plotgram
+diagram {
+    profile: flowchart
+    layout: hierarchical { direction: top-to-bottom }
+
+    partition {
+        column customer { label: "客户" }
+        column sales    { label: "销售" }
+        column warehouse { label: "仓库" }
+    }
+
+    node place_order {
+        label: "下单"
+        archetype: start
+        cell_col: customer
+    }
+    node verify_order {
+        label: "审核"
+        cell_col: sales
+    }
+
+    place_order -> verify_order
+}
+```
+
+矩阵示例（阶段 × 角色）另加 `row` 轴，节点同时写 `cell_col` 与 `cell_row`。
+
+### 4.4 示例
 
 ```plotgram
 diagram {
@@ -322,6 +369,8 @@ node spacer {
 | `role` | `entity`, `group_anchor` | `active`（模型字段） | 结构角色；见 §5.7 |
 | `host_group` | group id | `active`（模型字段） | 仅 `group_anchor`；见 §5.7 |
 | `side` / `slot` | 四向 / 非负整数 | `active`（模型字段） | 仅 `group_anchor` 贴框；提升为 `Node.anchor` |
+| `cell_col` | atom（partition column id） | **`active`（模型字段）** | → `Node.partition_cell.column`；见 §4.3 / ADR-008 |
+| `cell_row` | atom（partition row id） | **`active`（模型字段）** | → `Node.partition_cell.row`；Hier 消费 **`planned`** |
 | `archetype` | `database`, `gateway` | **`planned`** | 展开糖；纪律与目录见 [`archetype-spec.md`](archetype-spec.md) |
 | `variant` | `primary`, `info`, … | **`planned`** | 颜料槽；封闭集见 §14.7 |
 | `icon` | `none`, 图标名 | `active` | 装饰 |
@@ -951,6 +1000,8 @@ db -> api {
   → parse（AST 可保留 profile id，供诊断 / 展开）
   → 展开 @group 糖（§7.6 → group_anchor nodes + 普通边）
   → lift Node 结构字段（role / host_group / side / slot）
+  → lift Node 结构字段（role / host_group / side / slot / cell_col / cell_row）
+  → validate_partition（有 cell 则须有 grid；轴 id 冲突检查）
   → lift Edge 结构字段（from_side… / edge_group → Edge 一等字段）
   → archetype expand（见 archetype-spec：只填空写入 shape / variant / icon）
   → profile expand（显式 `profile:` → 默认 layout / edge_routing、自环策略、图种约束；无 `profile:` 时仅算法字段走 flowchart 预设；显式 layout 覆盖）
@@ -1015,10 +1066,12 @@ api -> db {
 不可用作 identifier：
 
 ```
-diagram, node, group,
+diagram, node, group, partition,
 flowchart, sequence, architecture, state, er, mindmap,
 true, false
 ```
+
+`column` / `row` 仅在 `partition { … }` 块内为轴声明头（与 `node` / `group` 类似的结构关键字）；不作全局 identifier 禁词以外的额外保留——但轴 id 仍不得与 node/group 撞名。
 
 箭头 token（`->` `-->` `<->`）不是 identifier。
 
@@ -1034,6 +1087,7 @@ true, false
 
 <diagram_declaration>  ::= "diagram" "{" <diagram_body> "}"
 <diagram_body>         ::= (<diagram_attribute>
+                          | <partition_declaration>
                           | <node_declaration>
                           | <relation_declaration>
                           | <group_declaration>)*
@@ -1041,6 +1095,9 @@ true, false
                           // 含 profile: <profile_id>（§1.2 / §4.2）
 <profile_id>           ::= "flowchart" | "sequence" | "architecture"
                          | "state" | "er" | "mindmap"
+<partition_declaration> ::= "partition" "{" (<partition_axis>)* "}"
+<partition_axis>       ::= ("column" | "row") <identifier> "{" (<partition_axis_attribute>)* "}"
+<partition_axis_attribute> ::= "label" ":" <string>
 
 <node_declaration>     ::= "node" <identifier> [<string> [<atom> [<atom>]]] [<attribute_block>]
                           // 规范：node id { … }
@@ -1105,6 +1162,7 @@ true, false
 | 18 | `edge_group` 提升为 `Edge.edge_group`；引擎不从 attrs 读结构键 |
 | 19 | `role: group_anchor` 须有 `host_group` + `side`；提升为 `Node` 一等字段；锚点须为 host 组成员（§5.7） |
 | 20 | `@gid` 端点须对应已声明 group；该端缺少 `*_side` → 错；禁止无 `@` 的裸 group id 作端点（§7.6） |
+| 21 | `partition` 轴 id 与 node/group 不撞名；`cell_col`/`cell_row` 须引用已声明轴；无 grid 不得写 cell（§4.3 / ADR-008） |
 | 21 | diagram 规范为 `diagram { … }`；预设用属性 `profile:`；禁止位置 `diagram flowchart {`（§4） |
 
 ---
@@ -1233,6 +1291,8 @@ node legacy { label: "ERP", shape: rounded_rect, variant: muted, icon: external 
 | `host_group` | atom（group id） | **`active`（模型字段）** | DSL 作者（或 §7.6 糖） | 提升为 `Node.host_group`；仅 `group_anchor` |
 | `side` | atom：`north`/`south`/`east`/`west` | **`active`（模型字段）** | DSL 作者（或 §7.6 糖） | 并入 `Node.anchor`；仅 `group_anchor` |
 | `slot` | number（非负整数） | **`active`（模型字段）** | DSL 作者（或 §7.6 糖） | 并入 `Node.anchor.slot`；须有 `side` |
+| `cell_col` | atom（column id） | **`active`（模型字段）** | DSL 作者 | 提升为 `Node.partition_cell.column`；见 §4.3 / ADR-008 |
+| `cell_row` | atom（row id） | **`active`（模型字段）** | DSL 作者 | 提升为 `Node.partition_cell.row`；Hier 消费 **`planned`** |
 | `archetype` | atom（开放集；目录见 [`archetype-spec.md`](archetype-spec.md)） | **`planned`** | DSL 作者 | **展开器**（parse/profile）：只填空写入 shape / variant / icon；**render / theme / engine 不读** |
 | `variant` | atom（封闭集，见 §14.7） | **`planned`**（规范已定；实现仍读 `kind`） | DSL 作者 / archetype 展开 | 主题 `variants` 查表（`resolve.rs`，待迁） |
 | `icon` | atom：`none` / icon id / alias | `active` | DSL 作者 / archetype 展开 | `icons::resolve_icon`（`icons/mod.rs`） |
@@ -1331,6 +1391,9 @@ variant **只**贡献 fill / stroke / font / dash / radius 等颜料；**不**�
 | `Edge.from_port` / `to_port` / `edge_group` 一等字段 | **已落地**（plotgram-model） |
 | DSL 四键 + `edge_group` 校验与提升（`lift_structural_attrs`） | **已落地**（model API；parser 须调用） |
 | `Node.role` / `host_group` / `anchor`（group_anchor） | **已落地**（plotgram-model；见 §5.7 / ADR-004） |
+| `Graph.partition` / `Node.partition_cell`（ADR-008） | **已落地**（plotgram-model + `validate_partition`；`cell_*` lift 已接） |
+| `partition { column/row … }` 块 parse | **planned** |
+| Hier 消费 PartitionGrid（连续块 / 层区间） | **planned** |
 | `@group` 糖展开（§7.6） | **待 parser** |
 | 布局组合相写入 `EdgePlacement` 的 `PortRef` | **待引擎** |
 | Ink 零发明端口 / 锚点几何 | **纪律已定**；引擎实现时强制 |

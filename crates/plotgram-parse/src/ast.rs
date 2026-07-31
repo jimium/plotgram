@@ -28,7 +28,26 @@ pub struct DiagramAst {
     pub layout: Option<AlgorithmConfigAst>,
     /// `edge_routing:` algorithm config.
     pub edge_routing: Option<AlgorithmConfigAst>,
+    /// `partition { … }` block (dsl-spec §11.10 / ADR-008).
+    pub partition: Option<PartitionAst>,
     pub items: Vec<DiagramItem>,
+}
+
+/// `partition { (column|row <id> { … })* }` (dsl-spec §11.10).
+#[derive(Debug, Clone)]
+pub struct PartitionAst {
+    /// Axis declarations in source order.
+    pub axes: Vec<PartitionAxisAst>,
+}
+
+/// One axis entry inside a partition block.
+#[derive(Debug, Clone)]
+pub struct PartitionAxisAst {
+    /// `true` = column, `false` = row.
+    pub is_column: bool,
+    pub id: String,
+    /// Optional `label: "…"` attribute.
+    pub label: Option<String>,
 }
 
 #[derive(Debug, Clone)]

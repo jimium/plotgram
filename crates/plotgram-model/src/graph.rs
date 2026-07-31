@@ -10,6 +10,7 @@
 //! There is no per-edge `seq` field.
 
 use crate::attr::AttrMap;
+use crate::partition::{PartitionCell, PartitionGrid};
 use crate::port::{PortConstraint, PortConstraintError, Side, port_constraint};
 
 /// Arrow semantics (dsl-spec §7.2: exactly 3 kinds).
@@ -135,8 +136,12 @@ pub struct Node {
     /// derived from the host group's finalized bbox — ink must not invent it.
     #[serde(default)]
     pub anchor: Option<PortConstraint>,
+    /// Orthogonal partition cell (`cell_col` / `cell_row` after lift). ADR-008.
+    #[serde(default)]
+    pub partition_cell: Option<PartitionCell>,
     /// Free-form attributes (`variant`, `icon`, `status`, `style.*`, `meta.*`, …).
-    /// Must **not** carry `role` / `host_group` / `side` / `slot` after lift.
+    /// Must **not** carry `role` / `host_group` / `side` / `slot` /
+    /// `cell_col` / `cell_row` after lift.
     pub attrs: AttrMap,
 }
 
@@ -155,7 +160,7 @@ impl Node {
     /// them from `attrs`. Idempotent if fields already set (fields win; conflicting
     /// attr keys are still stripped).
     ///
-    /// Keys handled: `role`, `host_group`, `side`, `slot`.
+    /// Keys handled: `role`, `host_group`, `side`, `slot`, `cell_col`, `cell_row`.
     pub fn lift_structural_attrs(&mut self) -> Result<(), NodeStructuralError> {
         if matches!(self.role, NodeRole::Entity) {
             if let Some(v) = self.attrs.get("role") {
@@ -177,7 +182,29 @@ impl Node {
         if self.anchor.is_none() {
             self.anchor = port_constraint(&self.attrs, "side", "slot")?;
         }
-        for k in ["role", "host_group", "side", "slot"] {
+        if self.partition_cell.is_none() {
+            let column = self
+                .attrs
+                .get("cell_col")
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+            let row = self
+                .attrs
+                .get("cell_row")
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+            if column.is_some() || row.is_some() {
+                self.partition_cell = Some(PartitionCell { column, row });
+            }
+        }
+        for k in [
+            "role",
+            "host_group",
+            "side",
+            "slot",
+            "cell_col",
+            "cell_row",
+        ] {
             self.attrs.remove(k);
         }
         self.validate_role_fields()
@@ -323,6 +350,9 @@ pub struct Graph {
     pub edges: Vec<Edge>,
     /// Top-level groups.
     pub groups: Vec<Group>,
+    /// Orthogonal partition grid (swimlanes / matrix). ADR-008.
+    #[serde(default)]
+    pub partition: Option<PartitionGrid>,
 }
 
 impl Graph {
@@ -331,7 +361,23 @@ impl Graph {
             nodes: Vec::new(),
             edges: Vec::new(),
             groups: Vec::new(),
+            partition: None,
         }
+    }
+
+    /// All nodes in declaration order (top-level, then groups depth-first).
+    pub fn all_nodes(&self) -> Vec<&Node> {
+        let mut out = Vec::with_capacity(self.node_count());
+        out.extend(self.nodes.iter());
+        for g in &self.groups {
+            g.collect_nodes_in_declaration_order(&mut out);
+        }
+        out
+    }
+
+    /// Validate [`Self::partition`] against every node's [`Node::partition_cell`].
+    pub fn validate_partition(&self) -> Result<(), crate::partition::PartitionError> {
+        crate::partition::validate_graph_partition(self)
     }
 
     /// Total node count (recursive into groups).
@@ -426,6 +472,13 @@ impl Group {
         self.edges.len() + self.groups.iter().map(|g| g.edge_count()).sum::<usize>()
     }
 
+    fn collect_nodes_in_declaration_order<'a>(&'a self, out: &mut Vec<&'a Node>) {
+        out.extend(self.nodes.iter());
+        for g in &self.groups {
+            g.collect_nodes_in_declaration_order(out);
+        }
+    }
+
     fn collect_edges_in_declaration_order<'a>(&'a self, out: &mut Vec<&'a Edge>) {
         out.extend(self.edges.iter());
         for g in &self.groups {
@@ -494,6 +547,7 @@ mod tests {
             role: NodeRole::Entity,
             host_group: None,
             anchor: None,
+            partition_cell: None,
             attrs: AttrMap::new(),
         }
     }
@@ -544,6 +598,7 @@ mod tests {
                     groups: vec![],
                 }],
             }],
+            partition: None,
         };
 
         for (id, want_node, want_edge) in cases {
@@ -573,6 +628,7 @@ mod tests {
                 edges: vec![edge("e2", Arrow::Forward)],
                 groups: vec![],
             }],
+            partition: None,
         };
         let ids: Vec<_> = graph
             .edges_in_declaration_order()
@@ -650,6 +706,27 @@ mod tests {
             n.validate_role_fields(),
             Err(NodeStructuralError::EntityHasAnchorFields { .. })
         ));
+    }
+
+    #[test]
+    fn lift_node_partition_cell_attrs() {
+        let mut n = node("place_order");
+        n.attrs
+            .insert("cell_col".into(), AttrValue::Atom("customer".into()));
+        n.attrs
+            .insert("cell_row".into(), AttrValue::Atom("intake".into()));
+        n.attrs
+            .insert("style.fill".into(), AttrValue::Str("#fff".into()));
+
+        n.lift_structural_attrs().unwrap();
+
+        assert_eq!(
+            n.partition_cell,
+            Some(crate::partition::PartitionCell::at("customer", "intake"))
+        );
+        assert!(!n.attrs.contains_key("cell_col"));
+        assert!(!n.attrs.contains_key("cell_row"));
+        assert!(n.attrs.contains_key("style.fill"));
     }
 
     #[test]

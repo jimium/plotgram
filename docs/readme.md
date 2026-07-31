@@ -113,6 +113,7 @@ render         → model
 | [adr/004…](design/adr/004-group-anchor-nodes.md) | 组间边经由 group_anchor 隐形节点 |
 | [adr/005…](design/adr/005-content-measure-params.md) | 内容块、启发式度量与布局前 MeasureParams |
 | [adr/006…](design/adr/006-engine-io-and-crates.md) | Engine 入口、边写者与 crate 拆分 |
+| [adr/008…](design/adr/008-partition-grid.md) | PartitionGrid — 正交分区 DSL/model；与 group/rank 三分 |
 
 ---
 

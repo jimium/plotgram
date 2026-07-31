@@ -38,6 +38,6 @@
 
 ## 待写
 
-- [ ] `pipeline.md` — 参与者序、消息 y、激活条写权  
+- [ ] `architecture.md`（或并入 README）— 参与者序、消息 y、激活条写权  
 - [ ] `scope.md` — fragment/alt/loop 等范围边界  
 - [ ] group 在 sequence 中的弱需求与非目标

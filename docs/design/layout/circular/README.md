@@ -35,6 +35,6 @@ state 图种可在 **Hierarchical（分层）** 与 **本核（环形）** 间�
 
 ## 待写
 
-- [ ] `pipeline.md` — 分量、环序、半径写权  
+- [ ] `architecture.md`（或并入 README）— 分量、环序、半径写权  
 - [ ] `scope.md` — 与 Hier 双路径的 profile 约定  
 - [ ] balloon / radial tree 与本核边界（避免与 Tree 重叠）

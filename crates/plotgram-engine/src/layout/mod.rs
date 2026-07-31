@@ -2,4 +2,7 @@
 
 pub mod hierarchical;
 
-pub use hierarchical::HierarchicalLayout;
+pub use hierarchical::{
+    GroupAlign, GroupPolicy, GroupSizing, HierarchicalLayout, HierarchicalParams,
+    HierarchicalPreset, Orientation, RoutingStyle,
+};

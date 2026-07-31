@@ -1,46 +1,27 @@
 //! Pack nodes by rank into frames.
 
 use plotgram_engine_api::LayoutError;
-use plotgram_model::attr::AttrMap;
 use plotgram_model::geometry::Rect;
 use plotgram_model::graph::Graph;
 use plotgram_model::result::NodePlacement;
 use plotgram_model::sizes::NodeSizes;
 
+use super::params::HierarchicalParams;
 use super::rank::RankMap;
 
 /// Hierarchical layout plugin.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct HierarchicalLayout;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Direction {
-    TopToBottom,
-    LeftToRight,
-}
-
-fn direction_from_options(options: &AttrMap) -> Direction {
-    match options.get("direction").and_then(|v| v.as_str()) {
-        Some("left-to-right") | Some("ltr") => Direction::LeftToRight,
-        _ => Direction::TopToBottom,
-    }
-}
-
 pub fn place_nodes(
     graph: &Graph,
     sizes: &NodeSizes,
-    options: &AttrMap,
+    params: &HierarchicalParams,
     ranks: &RankMap,
 ) -> Result<Vec<NodePlacement>, LayoutError> {
-    let dir = direction_from_options(options);
-    let layer_gap = options
-        .get("layer_gap")
-        .and_then(|v| v.as_f64())
-        .unwrap_or(40.0);
-    let node_gap = options
-        .get("node_gap")
-        .and_then(|v| v.as_f64())
-        .unwrap_or(24.0);
+    let vertical = params.orientation.is_vertical();
+    let layer_gap = params.layer_gap;
+    let node_gap = params.node_gap;
 
     let ids = graph.all_node_ids();
     let mut by_rank: std::collections::BTreeMap<u32, Vec<String>> =
@@ -63,19 +44,17 @@ pub fn place_nodes(
                     node_id: id.clone(),
                 })
             })?;
-            let (x, y) = match dir {
-                Direction::TopToBottom => {
-                    layer_thickness = layer_thickness.max(size.height);
-                    let p = (cursor_cross, cursor_main);
-                    cursor_cross += size.width + node_gap;
-                    p
-                }
-                Direction::LeftToRight => {
-                    layer_thickness = layer_thickness.max(size.width);
-                    let p = (cursor_main, cursor_cross);
-                    cursor_cross += size.height + node_gap;
-                    p
-                }
+            // BT / RL flips belong to an Orientation Stage later; stub packs TB / LR axes.
+            let (x, y) = if vertical {
+                layer_thickness = layer_thickness.max(size.height);
+                let p = (cursor_cross, cursor_main);
+                cursor_cross += size.width + node_gap;
+                p
+            } else {
+                layer_thickness = layer_thickness.max(size.width);
+                let p = (cursor_main, cursor_cross);
+                cursor_cross += size.height + node_gap;
+                p
             };
             placements.push(NodePlacement {
                 id: id.clone(),

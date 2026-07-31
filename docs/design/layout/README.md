@@ -63,5 +63,5 @@ state(环形)                             → circular
 ## 阅读建议
 
 1. 先读 [写权纪律](write-authority.md)。  
-2. 做 Hier：本目录 [hierarchical/](hierarchical/) → 启发纪要 [from-yfiles-reference](hierarchical/from-yfiles-reference.md) → reference [01](../../reference/yfiles/01-sugiyama分层布局.md) / [13](../../reference/yfiles/13-实现路线图与选型.md)。  
+2. 做 Hier：本目录 [hierarchical/](hierarchical/) → **目标架构** [architecture](hierarchical/architecture.md) → 启发纪要 [from-yfiles-reference](hierarchical/from-yfiles-reference.md) → reference [01](../../reference/yfiles/01-sugiyama分层布局.md) / [13](../../reference/yfiles/13-实现路线图与选型.md)。  
 3. 回溯 Atlas 决策动机时再翻 `docs/archive/atlas/`（21 立场 → 22 总纲）。
