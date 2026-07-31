@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>19 · 序列图与一维排列布局 — yFiles 参考文库 ebook</title>
+<link rel="stylesheet" href="_assets/style.css">
+<!-- highlight.js 主题（浅色 + 暗色） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+  /* 代码块在浅/暗色下都可用；highlight.js 主题负责 token 颜色，本 CSS 负责容器 */
+  pre code.hljs { background: transparent; padding: 0; border: none; font-size: 13px; }
+  pre code.hljs .comment { font-style: italic; }
+</style>
+</head>
+<body data-page="19">
+
+<div class="layout">
+  <div class="content">
+    <article>
+
+      <h1>19 · 序列图与一维排列类布局（Sequence Diagram &amp; 1D Arrangement）</h1>
+      <p class="subtitle">对应 UML 2.5 Interactions / MSC ITU Z.120 / 甘特图 / 火焰图 / 事件溯源 的共同算法骨架：一维排列 + 主轴离散化 + 区间嵌套</p>
+
+      <div class="meta-bar">
+        <span class="pill">应用</span>
+        <span>原始出处：Diaz–Petit–Serna 2002（MinLA 综述）、Juvan–Mohar 1992（谱方法）、Safro–Ron–Brandt 2006（多级 MinLA）、UML 2.5 §17、ITU Z.120、Gregg 2016（火焰图）</span>
+        <span class="src">~240 行 · 8.5k 字</span>
+      </div>
+
+      <div class="prose">
+
+        <!-- ============ §1 ============ -->
+        <h2 id="sec-1"><span class="h2-num">1</span>共同抽象</h2>
+
+        <div class="code-block">
+          <span class="lang-tag">text</span>
+          <pre><code class="language-plaintext">主轴（major axis）：由语义固定的离散序列（时间步 / 消息序号 / 任务顺序）
+次轴（minor axis）：需要优化的一维排列（生命线顺序 / 泳道顺序 / 资源顺序）
+元素：
+  - 轴线（lifeline / lane / resource row）：占次轴一个位置，沿主轴延伸
+  - 事件（message / activation / task）：连接一或两条轴线，占主轴一个区间
+  - 区间容器（combined fragment / 阶段 / 里程碑）：占主轴一个区间 × 次轴一个连续区间</code></pre>
+        </div>
+
+        <p>一旦这样抽象，序列图 / 甘特 / 泳道时序 / 火焰图就是<strong>同一个布局器 + 不同参数</strong>（对应 ADR-001：不按图种分支）。</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>图种</th><th>主轴</th><th>次轴</th><th>事件</th></tr></thead>
+            <tbody>
+              <tr><td>UML 序列图</td><td>时间（向下）</td><td>生命线顺序（左右）</td><td>消息（箭头）</td></tr>
+              <tr><td>MSC</td><td>同上</td><td>同上</td><td>消息 + 定时器</td></tr>
+              <tr><td>甘特图</td><td>时间（向右）</td><td>任务/资源行</td><td>条形 + 依赖箭头</td></tr>
+              <tr><td>泳道流程时序</td><td>阶段（向右）</td><td>泳道</td><td>活动 + 流转</td></tr>
+              <tr><td>火焰图</td><td>栈深度（向上）</td><td>时间/样本（向右）</td><td>帧矩形（纯嵌套，无边）</td></tr>
+              <tr><td>事件溯源</td><td>版本序</td><td>聚合根</td><td>事件</td></tr>
+              <tr><td>网络时序图（Wireshark 风格）</td><td>时间</td><td>主机</td><td>数据包</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 图解：UML 序列图示意 -->
+        <figure>
+          <svg viewBox="0 0 480 340" aria-label="UML 序列图：生命线、消息、激活条、组合片段">
+            <defs>
+              <marker id="arr-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink)"/></marker>
+              <marker id="arr-open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10" fill="none" stroke="var(--ink)" stroke-width="1.4"/></marker>
+            </defs>
+            <!-- Header boxes -->
+            <rect class="node" x="25" y="20" width="90" height="28" rx="4"/>
+            <text x="70" y="39" text-anchor="middle" class="label">User</text>
+            <rect class="node" x="135" y="20" width="90" height="28" rx="4"/>
+            <text x="180" y="39" text-anchor="middle" class="label">Service</text>
+            <rect class="node" x="245" y="20" width="90" height="28" rx="4"/>
+            <text x="290" y="39" text-anchor="middle" class="label">DB</text>
+            <rect class="node" x="355" y="20" width="90" height="28" rx="4"/>
+            <text x="400" y="39" text-anchor="middle" class="label">Log</text>
+            <!-- Lifelines (dashed) -->
+            <line x1="70" y1="48" x2="70" y2="300" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="4 3"/>
+            <line x1="180" y1="48" x2="180" y2="300" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="4 3"/>
+            <line x1="290" y1="48" x2="290" y2="300" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="4 3"/>
+            <line x1="400" y1="48" x2="400" y2="300" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="4 3"/>
+            <!-- Combined fragment (alt) -->
+            <rect x="135" y="158" width="205" height="92" fill="none" stroke="var(--ink)" stroke-width="1.4"/>
+            <rect x="135" y="158" width="78" height="18" fill="var(--code-bg)" stroke="var(--ink)" stroke-width="1.4"/>
+            <text x="142" y="171" class="label" font-size="10">alt [found]</text>
+            <line x1="135" y1="212" x2="340" y2="212" stroke="var(--ink)" stroke-width="1" stroke-dasharray="4 3"/>
+            <!-- Activation bars -->
+            <rect class="node-muted" x="174" y="85" width="12" height="195"/>
+            <rect class="dummy" x="186" y="120" width="10" height="55"/>
+            <rect class="node-muted" x="284" y="178" width="12" height="42"/>
+            <!-- Messages -->
+            <line class="edge" x1="70" y1="88" x2="174" y2="88" marker-end="url(#arr-solid)"/>
+            <text x="122" y="83" text-anchor="middle" class="label" font-size="10">login()</text>
+            <path class="edge" d="M186,123 L214,123 L214,143 L196,143" marker-end="url(#arr-solid)"/>
+            <text x="222" y="136" class="label" font-size="10">validate()</text>
+            <line class="edge" x1="186" y1="182" x2="284" y2="182" marker-end="url(#arr-solid)"/>
+            <text x="235" y="177" text-anchor="middle" class="label" font-size="10">query()</text>
+            <line x1="284" y1="228" x2="186" y2="228" stroke="var(--ink)" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#arr-open)"/>
+            <text x="235" y="223" text-anchor="middle" class="muted" font-size="10">rows</text>
+            <line class="edge" x1="186" y1="275" x2="400" y2="275" marker-end="url(#arr-solid)"/>
+            <text x="293" y="270" text-anchor="middle" class="label" font-size="10">audit()</text>
+            <text x="240" y="325" text-anchor="middle" class="muted" font-size="10">生命线（虚线）· 激活条（实矩形）· 自消息（回环）· alt 片段（带分区线）</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 19.1</span>UML 序列图的标准构件：主轴=时间（向下），次轴=生命线顺序（左右）</div>
+        </figure>
+
+        <p><strong>工程结论</strong>：本项目已有 <code>docs/design/layout/sequence/</code>，其内核应设计成"一维排列 + 主轴离散化 + 区间嵌套"三件套，使甘特/时间轴图种后续零算法成本接入。</p>
+
+        <!-- ============ §2 ============ -->
+        <h2 id="sec-2"><span class="h2-num">2</span>次轴：一维排列问题（这是唯一的"难"部分）</h2>
+
+        <h3>2.1 问题定义（MinLA）</h3>
+        <p>给定图 <span class="katex-inline" data-tex="G=(V,E)"></span>，求排列 <span class="katex-inline" data-tex="\pi: V \to \{1..n\}"></span> 最小化</p>
+
+        <div class="formula" data-tex="\text{MinLA}(\pi) = \sum_{(u,v)\in E} w_{uv}\,|\pi(u)-\pi(v)|"></div>
+
+        <ul>
+          <li><strong>NP 难</strong>（Garey–Johnson–Stockmeyer 1976）；</li>
+          <li>序列图语义：<span class="katex-inline" data-tex="w_{uv}"></span> = 两条生命线之间的消息数 → 最小化"消息跨越的生命线距离"= 最小化长箭头与交叉。</li>
+        </ul>
+
+        <p>相关变体（各有用途）：</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>问题</th><th>目标</th><th>布局含义</th></tr></thead>
+            <tbody>
+              <tr><td>MinLA</td><td><span class="katex-inline" data-tex="\sum |\pi(u)-\pi(v)|"></span></td><td>总箭头长度最短（<strong>主目标</strong>）</td></tr>
+              <tr><td>Bandwidth</td><td><span class="katex-inline" data-tex="\max |\pi(u)-\pi(v)|"></span></td><td>最长箭头最短（避免横跨全图的箭头）</td></tr>
+              <tr><td>Cutwidth</td><td><span class="katex-inline" data-tex="\max_i |\{(u,v): \pi(u)\le i&lt;\pi(v)\}|"></span></td><td>任一竖直切面上的箭头数最少（<strong>决定通道宽度</strong>）</td></tr>
+              <tr><td>Vertex Separation</td><td>同上的顶点版</td><td>活动条并发数</td></tr>
+              <tr><td>Profile / SumCut</td><td><span class="katex-inline" data-tex="\sum_i(\dots)"></span></td><td>综合</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout info">
+          <div class="ct-title"><span class="icon">ℹ</span>主目标 + 次级 tie-break 的选择</div>
+          <p><strong>建议</strong>：主目标用 MinLA，用 cutwidth 作为<strong>次级 tie-break</strong>（同等 MinLA 下选 cutwidth 小的），因为 cutwidth 直接决定"某个时间点有多少箭头并行"，影响可读性最大。</p>
+        </div>
+
+        <h3>2.2 求解阶梯（按实现成本）</h3>
+
+        <p><strong>L1 · 语义序（必做，零成本）</strong><br>
+        用户书写顺序 / 首次出现顺序 / 显式声明顺序。<strong>多数序列图这就是最优答案</strong> —— 用户按叙事顺序写，天然合理。<br>
+        <strong>纪律：显式声明必须绝对优先，永不被优化覆盖。</strong> 这是产品要求，不是算法问题。</p>
+
+        <p><strong>L2 · 首次出现 + 贪心插入（推荐默认）</strong></p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">order = []
+for msg in messages（按时间序）:
+    for lifeline in [msg.from, msg.to] 中未放置者:
+        pos = argmin_{插入位置 p} Δcost(order 插入 lifeline 于 p)
+        order.insert(pos, lifeline)</code></pre>
+        </div>
+        <p><span class="katex-inline" data-tex="O(n^2 \cdot \bar{d})"></span>，<span class="katex-inline" data-tex="n"></span> 通常 &lt; 30 → 完全够用，且结果符合"按叙事展开"的直觉。</p>
+
+        <p><strong>L3 · 局部搜索（相邻交换 / 插入移动）</strong></p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">loop:
+    for each 相邻对 (i, i+1):
+        if swap 降低 cost: swap
+    for each 节点:
+        尝试移动到所有其它位置，取最优
+    until 无改进</code></pre>
+        </div>
+        <p><span class="katex-inline" data-tex="\Delta"></span>cost 可 <span class="katex-inline" data-tex="O(\deg)"></span> 增量计算（只涉及该节点的边）。这是性价比最高的质量提升。</p>
+
+        <p><strong>L4 · 谱方法初值（Juvan–Mohar 1992）</strong><br>
+        用 Fiedler 向量排序作为 MinLA 的初值（14 篇 §5.1），再跑 L3。理论依据：MinLA 的 <span class="katex-inline" data-tex="L_2"></span> 松弛的最优解就是 Fiedler 向量。<span class="katex-inline" data-tex="n"></span> 大（&gt;100 生命线）时明显优于贪心。</p>
+
+        <p><strong>L5 · 多级（Safro–Ron–Brandt 2006）+ 模拟退火</strong><br>
+        只在 <span class="katex-inline" data-tex="n"></span> &gt; 数百时需要。序列图基本用不到 —— 但<strong>甘特图的资源行</strong>可能有上千行，那时有用。</p>
+
+        <p><strong>L6 · 精确（DP over subsets，<span class="katex-inline" data-tex="O(2^n n)"></span>）</strong><br>
+        <span class="katex-inline" data-tex="n \le 16"></span> 时可给出最优解。可作为<strong>单测的 oracle</strong>：小实例上验证启发式的差距。这个用法很值钱。</p>
+
+        <!-- 图解：MinLA 优化前后 -->
+        <figure>
+          <svg viewBox="0 0 440 240" aria-label="MinLA 优化前后对比">
+            <text x="100" y="18" text-anchor="middle" class="muted">前：自然序 [A,B,C,D,E]，总长 = 13</text>
+            <g>
+              <path class="edge-muted" d="M40,80 Q200,15 360,80"/>
+              <path class="edge-muted" d="M120,80 Q240,25 360,80"/>
+              <path class="edge" d="M40,80 Q120,35 200,80"/>
+              <path class="edge" d="M120,80 Q200,40 280,80"/>
+              <path class="edge" d="M200,80 Q280,45 360,80"/>
+              <circle class="node" cx="40" cy="80" r="12"/>
+              <text x="40" y="84" text-anchor="middle" font-size="11">A</text>
+              <circle class="node" cx="120" cy="80" r="12"/>
+              <text x="120" y="84" text-anchor="middle" font-size="11">B</text>
+              <circle class="node" cx="200" cy="80" r="12"/>
+              <text x="200" y="84" text-anchor="middle" font-size="11">C</text>
+              <circle class="node" cx="280" cy="80" r="12"/>
+              <text x="280" y="84" text-anchor="middle" font-size="11">D</text>
+              <circle class="node" cx="360" cy="80" r="12"/>
+              <text x="360" y="84" text-anchor="middle" font-size="11">E</text>
+            </g>
+            <text x="100" y="132" text-anchor="middle" class="hi">后：优化序 [A,C,E,D,B]，总长 = 7</text>
+            <g>
+              <path class="edge" d="M40,190 Q120,145 200,190"/>
+              <path class="edge" d="M360,190 Q280,145 200,190"/>
+              <path class="edge" d="M40,190 Q80,160 120,190"/>
+              <path class="edge" d="M360,190 Q320,160 280,190"/>
+              <path class="edge" d="M120,190 Q160,165 200,190"/>
+              <circle class="node" cx="40" cy="190" r="12"/>
+              <text x="40" y="194" text-anchor="middle" font-size="11">A</text>
+              <circle class="node" cx="120" cy="190" r="12"/>
+              <text x="120" y="194" text-anchor="middle" font-size="11">C</text>
+              <circle class="node" cx="200" cy="190" r="12"/>
+              <text x="200" y="194" text-anchor="middle" font-size="11">E</text>
+              <circle class="node" cx="280" cy="190" r="12"/>
+              <text x="280" y="194" text-anchor="middle" font-size="11">D</text>
+              <circle class="node" cx="360" cy="190" r="12"/>
+              <text x="360" y="194" text-anchor="middle" font-size="11">B</text>
+            </g>
+            <text x="220" y="228" text-anchor="middle" class="muted" font-size="10">MinLA：最小化 Σ|π(u)−π(v)|，箭头总长更短 → 交叉更少</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 19.2</span>MinLA 优化前后：同一条边集，重排生命线顺序使总跨越距离从 13 降到 7</div>
+        </figure>
+
+        <h3>2.3 约束下的排列</h3>
+        <p>现实中次轴常有硬约束：</p>
+        <ul>
+          <li>生命线属于某个组/泳道 → 组内必须连续（08 篇的连续块约束）；</li>
+          <li>显式 <code>before</code> 声明 → 偏序约束；</li>
+          <li>actor 必须在最左、数据库必须在最右 → 端点固定。</li>
+        </ul>
+
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>层级分解，不要上通用求解器</div>
+          <p>处理：<strong>在组内做 MinLA + 在组之间做 MinLA（层级式）</strong>，端点固定的元素先钉住再排其余。不要试图用一个通用带约束优化器 —— 层级分解足够且可预测。</p>
+        </div>
+
+        <!-- ============ §3 ============ -->
+        <h2 id="sec-3"><span class="h2-num">3</span>主轴：时间轴离散化与坐标</h2>
+
+        <h3>3.1 事件排序与并发</h3>
+        <p>序列图的消息<strong>不总是全序</strong>：</p>
+        <ul>
+          <li>同步调用：<code>send</code> 与 <code>recv</code> 同一时刻（水平箭头）；</li>
+          <li>异步：<code>send</code> &lt; <code>recv</code>（可倾斜箭头，或仍水平但 recv 落在更下的行）；</li>
+          <li>并发生命线上的独立消息：偏序 → 需要<strong>线性扩展</strong>（拓扑排序）。</li>
+        </ul>
+
+        <p>做法：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">1. 建事件偏序图：
+     同一生命线上的事件按其顺序连边（本地全序）
+     每条消息 send → recv 连边
+     创建/销毁、片段边界加边
+2. 检测环 → 语义错误，报诊断（不要静默修正）
+3. 拓扑排序 → 得到"行号"（可用最长路分层，与 Sugiyama 的 P2 同构！）</code></pre>
+        </div>
+
+        <div class="callout info">
+          <div class="ct-title"><span class="icon">ℹ</span>关键认知：主轴行号 = 分层问题</div>
+          <p><strong>主轴的行号分配就是分层问题</strong>（最长路 = ASAP，或 network simplex 最小化总跨度）。可以复用 14 篇的分层零件，而不是写第二套。</p>
+        </div>
+
+        <h3>3.2 行高与 y 坐标</h3>
+        <p>行号 → y 坐标要考虑：</p>
+        <ul>
+          <li>该行事件的标签高度（消息文本可能多行）；</li>
+          <li>自消息（self message）需要额外高度（回环占 2 行或加高）；</li>
+          <li>片段边界（<code>alt</code> / <code>loop</code> 的框线与标题）需要 padding；</li>
+          <li>激活条（activation bar）的起止；</li>
+          <li><strong>最小行距</strong>（主题参数）。</li>
+        </ul>
+        <p>写法：<code>row_height[i] = max(各元素在该行的高度需求)</code>，再前缀和。这是<strong>一维 VPSC 的退化情形</strong>（只有相邻约束），前缀和即最优，不需要求解器。</p>
+
+        <h3>3.3 水平坐标与箭头</h3>
+        <ul>
+          <li>生命线 x = 次轴排列 → 累积宽度（宽度 = max(生命线头部框宽, 其激活条宽)）；</li>
+          <li>消息箭头就是水平段，起止 x = 两生命线 x（含激活条偏移）；</li>
+          <li><strong>激活条嵌套</strong>：同一生命线上嵌套调用 → 激活条向右偏移 <code>depth * offset</code>，生命线宽度需容纳最大嵌套深度；</li>
+          <li>长标签超过箭头长度 → 三种策略：加宽生命线间距（<strong>推荐</strong>，回写次轴间距参数）、标签换行、标签外移。</li>
+        </ul>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>写权纪律：下游需求回写上游参数</div>
+          <p>长标签加宽间距是"下游需求回写上游参数"，必须在 x 坐标确定<strong>之前</strong>完成（写权纪律）。不能在路由阶段"为了不溢出"再挪生命线 —— 那是 P5 推翻 P4，违反每相只写一个自由度的硬约束。</p>
+        </div>
+
+        <h3>3.4 自消息与找回消息</h3>
+        <ul>
+          <li><strong>自消息</strong>：右侧回环，宽度为参数，高度 = 标签高 + padding，占 2 个行号；</li>
+          <li><strong>找回消息（reply）</strong>：虚线 + 开放箭头；</li>
+          <li><strong>消息跨越其它生命线</strong>：不可避免（生命线是竖线，箭头必然穿过中间生命线）。惯例：<strong>箭头画在生命线之上</strong>（不断线），因为读者理解这是穿越而非连接。可选风格：在穿越处画小跳线（与 15 篇 §3.3 同一机制）。</li>
+        </ul>
+
+        <!-- ============ §4 ============ -->
+        <h2 id="sec-4"><span class="h2-num">4</span>区间容器（combined fragment / 阶段）</h2>
+
+        <p><code>alt</code> / <code>opt</code> / <code>loop</code> / <code>par</code> / <code>critical</code> 框：</p>
+        <div class="code-block">
+          <span class="lang-tag">text</span>
+          <pre><code class="language-plaintext">框的主轴范围 = [其内最早事件行, 最晚事件行] 外扩 padding
+框的次轴范围 = [其涉及的最左生命线, 最右生命线] 外扩 padding</code></pre>
+        </div>
+        <p>要点：</p>
+        <ol>
+          <li><strong>嵌套的框必须严格包含</strong> → 嵌套深度决定 padding 累加（外层 padding = 内层 + step）；</li>
+          <li><code>alt</code> 的分区线（虚线）位置 = 各分支的边界行；</li>
+          <li>框的标题（<code>alt [cond]</code>）占额外高度，需在行高需求中计入；</li>
+          <li>框涉及的生命线<strong>应该连续</strong> → 这是次轴排列的一个<strong>约束</strong>（与组约束同构，§2.3）。若不连续 → 框会包住无关生命线。处理：作为软约束加入 MinLA 代价（惩罚项），或作为硬约束用连续块机制。</li>
+          <li>框相互交叠（部分重叠而非嵌套）在 UML 里是非法的 → 检测并报诊断。</li>
+        </ol>
+
+        <div class="callout info">
+          <div class="ct-title"><span class="icon">ℹ</span>火焰图：区间嵌套的纯粹形态</div>
+          <p><strong>火焰图</strong>是这个机制的纯粹形态（只有嵌套矩形、无边）：主轴 = 时间/样本，次轴 = 栈深度，矩形 = 帧。布局退化为"前缀和 + 深度"，<span class="katex-inline" data-tex="O(n)"></span>，不需要任何优化 —— 但<strong>它验证了抽象的正确性</strong>：同一套区间嵌套代码能画火焰图，说明抽象没有耦合序列图特有概念。</p>
+        </div>
+
+        <!-- ============ §5 ============ -->
+        <h2 id="sec-5"><span class="h2-num">5</span>甘特图 / 时间轴的差异点</h2>
+
+        <p>主轴变成<strong>连续的真实时间</strong>而非离散序号，带来三个新问题：</p>
+
+        <h3>5.1 时间→像素映射</h3>
+        <ul>
+          <li>线性映射：<code>x = (t - t0) * scale</code>；</li>
+          <li>非线性（对数、分段）：用于跨度极大的时间线（毫秒级与月级混排）；</li>
+          <li><strong>时间刻度分级</strong>（tick 选择）：给定像素跨度选"好看的时间间隔"（1/2/5/10 × {秒,分,时,天,周,月,季,年}）。算法：候选间隔表 + 选择"tick 数落在 [5,15] 且最接近目标密度"者。这是 D3 <code>time.ticks</code> 的做法。</li>
+        </ul>
+
+        <h3>5.2 重叠条的行分配</h3>
+        <p>同一资源上时间重叠的任务 → 必须分行。<strong>这就是区间图着色</strong>（14 篇 §4.2）：按开始时间排序 + 最小可用行，最优。行数 = 最大并发数。</p>
+
+        <!-- 图解：甘特图区间着色 -->
+        <figure>
+          <svg viewBox="0 0 480 200" aria-label="甘特图：区间图着色分配行">
+            <text x="240" y="18" text-anchor="middle" class="hi" font-size="11">最大并发 = 2 → 需 2 行（区间图着色）</text>
+            <!-- Vertical overlap guides -->
+            <line class="gridline" x1="128" y1="45" x2="128" y2="167" stroke-dasharray="2 3"/>
+            <line class="gridline" x1="216" y1="45" x2="216" y2="167" stroke-dasharray="2 3"/>
+            <line class="gridline" x1="304" y1="45" x2="304" y2="167" stroke-dasharray="2 3"/>
+            <!-- Row 1: T1 [t0, t1.5], T3 [t2, t3] -->
+            <rect class="node" x="40" y="50" width="132" height="26" rx="3"/>
+            <text x="106" y="67" text-anchor="middle" class="label" font-size="11">T1</text>
+            <rect class="node" x="216" y="50" width="88" height="26" rx="3"/>
+            <text x="260" y="67" text-anchor="middle" class="label" font-size="11">T3</text>
+            <text x="35" y="42" text-anchor="end" class="muted" font-size="10">行 1</text>
+            <!-- Row 2: T2 [t1, t2.5], T4 [t3, t4] -->
+            <rect class="node-muted" x="128" y="95" width="132" height="26" rx="3"/>
+            <text x="194" y="112" text-anchor="middle" class="label" font-size="11">T2</text>
+            <rect class="node-muted" x="304" y="95" width="88" height="26" rx="3"/>
+            <text x="348" y="112" text-anchor="middle" class="label" font-size="11">T4</text>
+            <text x="35" y="87" text-anchor="end" class="muted" font-size="10">行 2</text>
+            <!-- Time axis -->
+            <line class="axis" x1="40" y1="167" x2="450" y2="167"/>
+            <g font-size="10" class="muted">
+              <line class="gridline" x1="40" y1="164" x2="40" y2="170"/>
+              <text x="40" y="182" text-anchor="middle">t0</text>
+              <line class="gridline" x1="128" y1="164" x2="128" y2="170"/>
+              <text x="128" y="182" text-anchor="middle">t1</text>
+              <line class="gridline" x1="216" y1="164" x2="216" y2="170"/>
+              <text x="216" y="182" text-anchor="middle">t2</text>
+              <line class="gridline" x1="304" y1="164" x2="304" y2="170"/>
+              <text x="304" y="182" text-anchor="middle">t3</text>
+              <line class="gridline" x1="392" y1="164" x2="392" y2="170"/>
+              <text x="392" y="182" text-anchor="middle">t4</text>
+            </g>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 19.3</span>甘特图行分配 = 区间图着色：按开始时间贪心，行数 = 最大并发数</div>
+        </figure>
+
+        <h3>5.3 依赖箭头</h3>
+        <p>甘特的依赖（FS/SS/FF/SF 四种）画成正交折线：</p>
+        <ul>
+          <li>起止点由依赖类型决定（条的头/尾）；</li>
+          <li>路由用普通正交路由（03 篇），走廊 = 行间空隙；</li>
+          <li>密集时用总线（18 篇）。</li>
+        </ul>
+
+        <!-- ============ §6 ============ -->
+        <h2 id="sec-6"><span class="h2-num">6</span>常见 bug 与根因</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>症状</th><th>根因</th><th>正解</th></tr></thead>
+            <tbody>
+              <tr><td>生命线顺序每次不同</td><td>用了 HashMap 遍历收集生命线</td><td>IndexMap + 首次出现序（确定性红线）</td></tr>
+              <tr><td>显式声明的顺序被"优化"掉</td><td>优化器没有把声明当硬约束</td><td>声明 = 固定，优化只作用于未声明者</td></tr>
+              <tr><td>长消息标签溢出到相邻生命线</td><td>标签宽度未回写到间距</td><td>在 x 坐标确定前回写间距参数</td></tr>
+              <tr><td>嵌套框错位/相交</td><td>框范围用了"直接子元素"而非"全部后代"</td><td>递归取后代的 min/max</td></tr>
+              <tr><td>自消息压住下一条消息</td><td>自消息高度未计入行高需求</td><td>行高 = max(所有元素需求)，自消息占 2 行</td></tr>
+              <tr><td>激活条重叠</td><td>嵌套深度未计入生命线宽度</td><td>生命线宽 ≥ 2*max_depth*offset + 头部宽</td></tr>
+              <tr><td>异步消息倾斜后与其它消息交叉</td><td>倾斜是落笔层"发明"的</td><td>倾斜量应是上游决定的自由度（recv 行号差）</td></tr>
+              <tr><td>时间轴 tick 重叠</td><td>tick 密度未按标签宽度选择</td><td>tick 选择要基于"标签宽度 vs 可用像素"</td></tr>
+              <tr><td>大量生命线时排列很差</td><td>只用了首次出现序</td><td>加 L3 局部搜索（成本很低）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ============ §7 ============ -->
+        <h2 id="sec-7"><span class="h2-num">7</span>给本项目的实现建议</h2>
+
+        <h3>7.1 内核三件套（复用而非新写）</h3>
+        <ol>
+          <li><strong>一维排列器</strong>：输入加权图 + 约束（固定位置、连续块、偏序），输出排列。实现 L1+L2+L3（约 200 行），保留 L6 精确解作为测试 oracle。<strong>同一个排列器</strong>服务：生命线排序、泳道排序、组内节点排序、circular 排序。</li>
+          <li><strong>主轴分层器</strong>：复用 14 篇的分层零件（最长路 / network simplex），输入事件偏序图。</li>
+          <li><strong>区间嵌套器</strong>：递归求后代范围 + padding 累加 + 行高/列宽需求汇总（前缀和）。</li>
+        </ol>
+
+        <h3>7.2 参数化（20 篇）</h3>
+        <p>序列图 / 甘特 / 火焰图的差异应全部落在参数：主轴方向、主轴是否连续时间、是否有事件边、容器是否可嵌套、行高来源、次轴排列策略、箭头风格。</p>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>引擎里不出现 if diagram == sequence</div>
+          <p><strong>引擎里不出现 <code>if diagram == sequence</code></strong>。图种差异只经 profile 展开进算法参数（ADR-001）。这是 plotgram 区别于"按图种写特判"的工程分水岭，也是这一章抽象能成立的判据。</p>
+        </div>
+
+        <h3>7.3 测试</h3>
+        <ul>
+          <li>一维排列器：对 <span class="katex-inline" data-tex="n\le 10"></span> 的随机图，比对 L2/L3 结果与 DP 精确解，断言相对差距 &lt; 阈值（如 15%）；</li>
+          <li>事件偏序：构造带环输入，断言报诊断而非 panic 或静默；</li>
+          <li>区间嵌套：3 层嵌套的 case，断言严格包含 + 无相交；</li>
+          <li>坐标快照：<code>insta::assert_json_snapshot!</code>（AGENTS.md 约定）；</li>
+          <li>确定性：同输入两次一致。</li>
+        </ul>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>一句话收敛</div>
+          <p>序列图、甘特、火焰图看似异质，内核却是<strong>"一维排列 + 主轴离散化 + 区间嵌套"三件套</strong>。把这三件套做成不按图种分支的通用零件，是这一章能落到 plotgram 的工程价值所在。</p>
+        </div>
+
+      </div>
+
+      <div class="foot">
+        本文为 <a href="../19-序列图与一维排列.md">19-序列图与一维排列.md</a> 的 HTML 图文版。
+        配套：<a href="00-索引与阅读指南.html">索引</a> ·
+        <a href="../21-术语表.html">术语表图解</a> ·
+        <a href="../../../../design/layout/write-authority.md">写权纪律</a>
+      </div>
+
+    </article>
+  </div>
+</div>
+
+<script src="_assets/nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

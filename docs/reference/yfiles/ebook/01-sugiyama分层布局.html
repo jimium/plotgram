@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>01 · Sugiyama 分层布局 — yFiles 参考文库 ebook</title>
+<link rel="stylesheet" href="_assets/style.css">
+<!-- highlight.js 主题（浅色 + 暗色） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+  /* 代码块在浅/暗色下都可用；highlight.js 主题负责 token 颜色，本 CSS 负责容器 */
+  pre code.hljs { background: transparent; padding: 0; border: none; font-size: 13px; }
+  pre code.hljs .comment { font-style: italic; }
+</style>
+</head>
+<body data-page="01">
+
+<div class="layout">
+  <div class="content">
+    <article>
+
+      <h1>01 · Sugiyama 分层布局（Hierarchical Layout）算法详解</h1>
+      <p class="subtitle">对应 yFiles <code>HierarchicLayout</code> / Graphviz <code>dot</code> / ELK <code>layered</code> / OGDF <code>SugiyamaLayout</code> 的共同算法骨架</p>
+
+      <div class="meta-bar">
+        <span class="pill">核心算法</span>
+        <span>原始出处：Sugiyama, Tagawa, Toda, <em>Methods for Visual Understanding of Hierarchical System Structures</em>, IEEE SMC 1981</span>
+        <span class="src">~306 行 · 11.5k 字</span>
+      </div>
+
+      <div class="prose">
+
+        <!-- ============ §0 ============ -->
+        <h2 id="sec-1"><span class="h2-num">0</span>全局视角：为什么是四相（+1）</h2>
+
+        <p>分层布局把「画一张有向图」这个 NP 难的整体问题，<strong>贪心地切成一串各自可控的子问题</strong>，每相只写少数几个自由度：</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>相</th><th>名称</th><th>输入</th><th>输出（写的自由度）</th><th>该相的目标函数</th></tr></thead>
+            <tbody>
+              <tr><td><code>P1</code></td><td>Cycle removal / acyclic</td><td>有向图</td><td>每条边的「是否反向」布尔位</td><td>反向边权重和最小（Feedback Arc Set）</td></tr>
+              <tr><td><code>P2</code></td><td>Layer assignment</td><td>DAG</td><td>每个节点的 <code>layer: i32</code></td><td>边跨度和 / 层数 / 层宽平衡</td></tr>
+              <tr><td><code>P3</code></td><td>Ordering (crossing minimization)</td><td>分层 DAG（含虚节点）</td><td>每层内节点的 <code>position: usize</code></td><td>相邻层交叉数</td></tr>
+              <tr><td><code>P4</code></td><td>Coordinate assignment</td><td>定序分层图</td><td>每个节点的 <code>x</code>（次轴坐标）</td><td>边的平直度 / 对称性 / 总宽度</td></tr>
+              <tr><td><code>P5</code></td><td>Edge routing / drawing</td><td>带坐标的分层图</td><td>折线控制点、端口位置</td><td>弯折数、间距、可读性</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 图解：五相流水线 -->
+        <figure>
+          <svg viewBox="0 0 720 200" aria-label="Sugiyama 五相流水线">
+            <g transform="translate(10,30)">
+              <rect class="highlight-bg" x="0" y="0" width="120" height="140" rx="6"/>
+              <text x="60" y="18" text-anchor="middle" class="label">P1 · 去环</text>
+              <rect class="node" x="15" y="40" width="30" height="18" rx="3"/>
+              <rect class="node" x="75" y="40" width="30" height="18" rx="3"/>
+              <rect class="node" x="45" y="100" width="30" height="18" rx="3"/>
+              <path class="edge" d="M30,58 L30,80 L55,100" marker-end="url(#a1)"/>
+              <path class="edge" d="M90,58 L90,80 L65,100" marker-end="url(#a1)"/>
+              <path class="edge-hi" d="M75,49 L45,49" marker-end="url(#a1r)"/>
+              <text x="60" y="135" text-anchor="middle" class="muted" font-size="10">反向回边</text>
+            </g>
+            <path d="M135,100 L155,100" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#am)"/>
+            <g transform="translate(160,30)">
+              <rect class="highlight-bg" x="0" y="0" width="120" height="140" rx="6"/>
+              <text x="60" y="18" text-anchor="middle" class="label">P2 · 分层</text>
+              <rect class="layer-bg" x="10" y="40" width="100" height="22" rx="3"/>
+              <rect class="layer-bg" x="10" y="80" width="100" height="22" rx="3"/>
+              <rect class="node" x="20" y="44" width="30" height="14" rx="3"/>
+              <rect class="node" x="70" y="44" width="30" height="14" rx="3"/>
+              <rect class="node" x="45" y="84" width="30" height="14" rx="3"/>
+              <text x="60" y="135" text-anchor="middle" class="muted" font-size="10">分配层号</text>
+            </g>
+            <path d="M285,100 L305,100" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#am)"/>
+            <g transform="translate(310,30)">
+              <rect class="highlight-bg" x="0" y="0" width="120" height="140" rx="6"/>
+              <text x="60" y="18" text-anchor="middle" class="label">P3 · 定序</text>
+              <rect class="layer-bg" x="10" y="40" width="100" height="22" rx="3"/>
+              <rect class="layer-bg" x="10" y="80" width="100" height="22" rx="3"/>
+              <rect class="node" x="20" y="44" width="26" height="14" rx="3"/>
+              <rect class="node" x="74" y="44" width="26" height="14" rx="3"/>
+              <rect class="node" x="47" y="84" width="26" height="14" rx="3"/>
+              <path class="edge-muted" d="M33,58 L60,84" stroke-dasharray="2 2"/>
+              <path class="edge-muted" d="M87,58 L60,84" stroke-dasharray="2 2"/>
+              <text x="60" y="135" text-anchor="middle" class="muted" font-size="10">层内换位减叉</text>
+            </g>
+            <path d="M435,100 L455,100" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#am)"/>
+            <g transform="translate(460,30)">
+              <rect class="highlight-bg" x="0" y="0" width="120" height="140" rx="6"/>
+              <text x="60" y="18" text-anchor="middle" class="label">P4 · 坐标</text>
+              <rect class="layer-bg" x="10" y="40" width="100" height="22" rx="3"/>
+              <rect class="layer-bg" x="10" y="80" width="100" height="22" rx="3"/>
+              <rect class="node" x="22" y="44" width="26" height="14" rx="3"/>
+              <rect class="node" x="72" y="44" width="26" height="14" rx="3"/>
+              <rect class="node" x="47" y="84" width="26" height="14" rx="3"/>
+              <line class="edge" x1="35" y1="58" x2="55" y2="84"/>
+              <line class="edge" x1="85" y1="58" x2="65" y2="84"/>
+              <text x="60" y="135" text-anchor="middle" class="muted" font-size="10">定像素坐标</text>
+            </g>
+            <path d="M585,100 L605,100" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#am)"/>
+            <g transform="translate(610,30)">
+              <rect class="highlight-bg" x="0" y="0" width="100" height="140" rx="6"/>
+              <text x="50" y="18" text-anchor="middle" class="label">P5 · 画边</text>
+              <rect class="layer-bg" x="8" y="40" width="84" height="22" rx="3"/>
+              <rect class="layer-bg" x="8" y="80" width="84" height="22" rx="3"/>
+              <rect class="node" x="18" y="44" width="22" height="14" rx="3"/>
+              <rect class="node" x="60" y="44" width="22" height="14" rx="3"/>
+              <rect class="node" x="39" y="84" width="22" height="14" rx="3"/>
+              <path class="edge-hi" d="M29,58 L29,72 L50,72 L50,84"/>
+              <path class="edge-hi" d="M71,58 L71,72 L50,72"/>
+              <text x="50" y="135" text-anchor="middle" class="muted" font-size="10">正交路由</text>
+            </g>
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink)"/></marker>
+              <marker id="a1r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--bad)"/></marker>
+              <marker id="am" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+            </defs>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 1.1</span>Sugiyama 五相流水线：每相只写一个自由度，下游不得推翻上游</div>
+        </figure>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>核心纪律（与 AGENTS.md 一致）</div>
+          <ul>
+            <li>层号只由 P2 写；层内序只由 P3 写；次轴坐标只由 P4 写；主轴坐标由 layer→y 映射函数写。</li>
+            <li>P5 <strong>不得</strong>推翻 P3 的序或 P4 的坐标；如果 P5 想动，必须上提到 P4（例如把「边要直」变成 P4 的约束）。</li>
+            <li>违背这条的典型症状：路由阶段"为了避让"把边穿过别的节点，或者悄悄挪节点导致 P3 的交叉数失效。</li>
+          </ul>
+        </div>
+
+        <p><strong>关键机制：虚节点（dummy / bend node）。</strong>
+        P2 之后所有跨层数 &gt;1 的边被切成一串长度为 1 的段，每段之间插入虚节点。此后 P3/P4 只处理 "proper hierarchy"（所有边只连相邻层）。虚节点数量是复杂度的主要来源：</p>
+
+        <div class="formula" data-tex="|V_{dummy}| = \sum_{(u,v)\in E}(|layer(v)-layer(u)|-1)"></div>
+
+        <!-- 图解：虚节点 -->
+        <figure>
+          <svg viewBox="0 0 360 200" aria-label="长边穿越中间层时插入虚节点">
+            <rect class="layer-bg" x="20" y="30" width="320" height="34" rx="4"/>
+            <rect class="layer-bg" x="20" y="80" width="320" height="34" rx="4"/>
+            <rect class="layer-bg" x="20" y="130" width="320" height="34" rx="4"/>
+            <text x="28" y="50" class="muted">Layer 0</text>
+            <text x="28" y="100" class="muted">Layer 1</text>
+            <text x="28" y="150" class="muted">Layer 2</text>
+            <rect class="node" x="120" y="35" width="50" height="24" rx="4"/>
+            <rect class="node" x="220" y="85" width="50" height="24" rx="4"/>
+            <line class="edge" x1="145" y1="59" x2="245" y2="85"/>
+            <rect class="node" x="60" y="35" width="50" height="24" rx="4"/>
+            <circle class="dummy" cx="85" cy="97" r="9"/>
+            <rect class="node" x="60" y="135" width="50" height="24" rx="4"/>
+            <line class="edge-hi" x1="85" y1="59" x2="85" y2="88"/>
+            <line class="edge-hi" x1="85" y1="106" x2="85" y2="135"/>
+            <text x="100" y="101" class="hi" font-size="10">dummy</text>
+            <text x="180" y="186" text-anchor="middle" class="muted" font-size="11">长边链 = 同一条边产生的 dummy 序列，应作为整体处理</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 1.2</span>长边穿越中间层时插入虚节点，使每条边都变成"相邻层"问题</div>
+        </figure>
+
+        <!-- ============ §1 P1 ============ -->
+        <h2 id="sec-2"><span class="h2-num">1</span>P1 · 去环（Cycle Removal / Feedback Arc Set）</h2>
+
+        <h3>1.1 问题</h3>
+        <p>找最小权边集使反向后图无环 = <strong>Minimum Feedback Arc Set (MFAS)</strong>，NP 难（Karp 1972）。等价于求顶点线序使逆序边权和最小。</p>
+
+        <h3>1.2 DFS 反向法（Graphviz dot 的做法）</h3>
+        <div class="code-block">
+          <span class="lang-tag">rust</span>
+          <pre><code class="language-rust">fn acyclic_dfs(g: &amp;Graph) -&gt; HashSet&lt;EdgeId&gt; {
+    let mut on_stack = bitset(); let mut done = bitset();
+    let mut reversed = HashSet::new();
+    for r in roots_then_rest_in_stable_order(g) {   // ← 稳定序！
+        dfs(r, |e| {
+            if on_stack.contains(e.target) { reversed.insert(e.id); } // back edge
+        });
+    }
+    reversed
+}</code></pre>
+        </div>
+        <ul>
+          <li>复杂度 <span class="katex-inline" data-tex="O(V+E)"></span>。</li>
+          <li><strong>决定性陷阱</strong>：起点集合与邻接遍历序若来自 <code>HashMap</code>，输出不确定 → 必须显式排序（本仓库已有踩坑记录）。</li>
+          <li>质量：可能反向远多于最优的边数。最坏 <span class="katex-inline" data-tex="O(E)"></span> 倍差。</li>
+        </ul>
+
+        <h3>1.3 Greedy-Cycle-Removal（Eades–Lin–Smyth 1993）</h3>
+        <p>效果显著优于 DFS，仍线性时间，OGDF / ELK 默认之一。</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">S_left = [], S_right = []
+while G 非空:
+    while 存在 sink u:  移出 u, push_front(S_right, u)
+    while 存在 source u: 移出 u, push_back(S_left, u)
+    if G 非空:
+        u = argmax_{v} (outdeg(v) - indeg(v))    // 平局需稳定 tie-break
+        移出 u, push_back(S_left, u)
+order = S_left ++ S_right
+反向所有在 order 中逆序的边</code></pre>
+        </div>
+        <ul>
+          <li>保证：反向边数 <span class="katex-inline" data-tex="\le |E|/2 - |V|/6"></span>。</li>
+          <li>用桶（bucket）按 <code>outdeg-indeg</code> 组织可做到 <span class="katex-inline" data-tex="O(V+E)"></span>。</li>
+          <li><strong>平局 tie-break 必须确定</strong>（按节点稳定 id 最小）——否则同一输入两次运行出不同图。</li>
+        </ul>
+
+        <h3>1.4 更强的启发式（需要更好质量时）</h3>
+        <ul>
+          <li><strong>Berger–Shor</strong>（1990）：随机化，期望保留 <span class="katex-inline" data-tex="\ge |E|/2 + \Omega(E/\sqrt{\Delta})"></span> 条边。</li>
+          <li><strong>Sorting-based / Insertion</strong>：把 MFAS 看成"最小逆序对排序"，用 KwikSort 类近似。</li>
+          <li><strong>精确解</strong>：ILP / 分支定界，只在 <span class="katex-inline" data-tex="|V|\lesssim 50"></span> 可用；cutting plane 用 cycle 不等式 <span class="katex-inline" data-tex="\sum_{e\in C} x_e \ge 1"></span>。</li>
+          <li><strong>实践建议</strong>：图小（&lt;200 边）时可用 greedy + 局部 2-opt（尝试把某节点移到别处看逆序边是否减少）。</li>
+        </ul>
+
+        <h3>1.5 工程要点</h3>
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>退化情形处理（必须有专门的 stage）</div>
+          <ul>
+            <li><strong>自环</strong>：直接摘出，P5 单独画成小圆弧；不进 P2。</li>
+            <li><strong>平行边</strong>：合并为一条带 multiplicity 的边进入 P2/P3，P5 再散开（否则虚节点翻倍）。</li>
+            <li><strong>双向对边</strong> <code>a→b</code> 与 <code>b→a</code>：一条必被反向；P5 要保证两条不重合（本仓库已有"反向对边重合"修复记录，根因常在这里：反向标记丢失导致两条边路由到同一通道）。</li>
+            <li><strong>反向位要一路保留到 P5</strong>：绘制时箭头方向按原始方向，几何按反向后的层序。忘记还原 = 箭头画反。</li>
+          </ul>
+        </div>
+
+        <!-- ============ §2 P2 ============ -->
+        <h2 id="sec-3"><span class="h2-num">2</span>P2 · 分层（Layer Assignment / Ranking）</h2>
+
+        <p>给每个节点整数层 <span class="katex-inline" data-tex="l(v)"></span>，要求每条边 <span class="katex-inline" data-tex="l(v) \ge l(u)+1"></span>（proper DAG 约束）。</p>
+
+        <h3>2.1 三个经典目标</h3>
+
+        <p><strong>(a) Longest-Path Layering</strong> —— 最少层数</p>
+        <div class="code-block">
+          <span class="lang-tag">rust</span>
+          <pre><code class="language-rust">l(v) = if preds(v).is_empty() { 0 } else { 1 + max(l(u) for u in preds(v)) }</code></pre>
+        </div>
+        <p><span class="katex-inline" data-tex="O(V+E)"></span>，层数 = 最长路长度（最优高度）。缺点：<strong>层宽极不均衡</strong>，源节点全挤在第 0 层，虚节点多。</p>
+
+        <p><strong>(b) Coffman–Graham Layering</strong> —— 宽度受限</p>
+        <p>给定每层最大节点数 <span class="katex-inline" data-tex="W"></span>，产生高度 <span class="katex-inline" data-tex="\le (2-2/W)\cdot h_{opt}"></span> 的分层。</p>
+        <ol>
+          <li>传递归约（transitive reduction）。</li>
+          <li>用 lexicographic 标号给节点排序：节点 <span class="katex-inline" data-tex="u"></span> 的键 = 其已标号后继的标号集合（降序），字典序最小者先标。</li>
+          <li>从底向上按标号逆序贪心填层，层满 <span class="katex-inline" data-tex="W"></span> 或有后继在当前层则开新层。</li>
+        </ol>
+        <p>复杂度 <span class="katex-inline" data-tex="O(V^2)"></span>（含传递归约）。适合"层不能太宽"的画布约束。</p>
+
+        <p><strong>(c) 最小边跨度 Layering</strong> —— 虚节点最少（<strong>质量最好，dot 采用</strong>）</p>
+        <div class="formula" data-tex="\min \sum_{(u,v)\in E} \omega(u,v)\,(l(v)-l(u)) \quad \text{s.t.} \quad l(v)-l(u)\ge \delta(u,v)"></div>
+        <p>这是<strong>对偶于最小费用流</strong>的 LP，且约束矩阵是网络矩阵 → 整数最优解可由网络单纯形高效求得。</p>
+
+        <p>Gansner et al. 1993 的实现（<code>dot</code> 的 <code>rank.c</code>）：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">1. tight_tree(): 取一棵所有边都"紧"（l(v)-l(u)==δ）的最大生成树
+2. init_cutvalues(): 对树边算 cut value = 跨割的边权净差
+3. while 存在 cut value < 0 的树边 e:
+       f = 找一条能替换 e 的非树边（跨同一割，方向相反，slack 最小）
+       exchange(e, f); 更新 cut values（增量 O(树路径长)）
+4. normalize(); balance()   // 把可自由移动的节点放到较空的层</code></pre>
+        </div>
+        <ul>
+          <li>实际近线性；论文报告对真实图迭代次数很少。</li>
+          <li><code>δ(u,v)</code> 可 &gt;1：这就是"至少跨 2 层"约束的挂点，用于 <code>minlen</code>。</li>
+          <li><strong>balance 阶段</strong>：入度=出度且有多层可选的节点，放到最空层——这是"层宽均衡"的免费收益。</li>
+        </ul>
+
+        <h3>2.2 层间距（主轴坐标）</h3>
+        <p><span class="katex-inline" data-tex="y(v) = \sum_{i&lt;l(v)} (h_i + gap_i)"></span>，其中 <span class="katex-inline" data-tex="h_i"></span> = 该层最高节点高度。</p>
+        <div class="callout info">
+          <div class="ct-title"><span class="icon">ℹ</span>可变层间距（P2/P5 耦合点）</div>
+          <p>若某两层之间要塞很多水平走的边（路由通道），<code>gap</code> 需按"该层间的边通道数 × 通道宽"加宽。<strong>推荐做法：P5 先做"通道需求估计"，把 demand 回写为 P2 的层间距参数，而不是 P5 自己挪节点</strong>（本仓库"水平 demand 缝预留"即此思路）。</p>
+        </div>
+
+        <h3>2.3 分层的扩展约束</h3>
+        <ul>
+          <li><strong>同层约束（same-layer / rank=same）</strong>：等价于把节点缩成一个超点，或加两条 <span class="katex-inline" data-tex="\delta=0"></span> 的双向约束。</li>
+          <li><strong>层上界/下界（min/max/source/sink rank）</strong>：LP 里加 <span class="katex-inline" data-tex="l(v)=c"></span> 或 <span class="katex-inline" data-tex="l(v)\ge c"></span>。</li>
+          <li><strong>分组（group）</strong>：见 08 篇；分层要求组内节点层区间连续 → 转成额外的不等式或递归分层。</li>
+          <li><strong>泳道（swimlane）</strong>：泳道是<strong>次轴分区</strong>，与层正交，见 08 篇 partition grid。</li>
+        </ul>
+
+        <h3>2.4 工程坑</h3>
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>P2 常见坑</div>
+          <ul>
+            <li>长边（跨 30 层）在稠密图里产生海量虚节点 → P3/P4 复杂度爆炸。缓解：把长边整段视为一个"链"对象，P3 中链只需一个序变量（ELK 有 <code>nodePlacement</code> 的 linear segment 概念，dot 的 <code>virtual chain</code> 亦然）。</li>
+            <li>反向边在 P2 中按反向后方向算，输出时才还原。</li>
+            <li>层号必须<strong>归一化</strong>（最小层 = 0）后再用；否则负数层导致数组下标越界。</li>
+          </ul>
+        </div>
+
+        <!-- ============ §3 P3 ============ -->
+        <h2 id="sec-4"><span class="h2-num">3</span>P3 · 层内定序（Crossing Minimization）</h2>
+
+        <h3>3.1 问题难度</h3>
+        <ul>
+          <li>两层图（bipartite）<strong>一侧固定另一侧排</strong>：One-Sided Crossing Minimization，NP 难（Eades–Wormald 1994），即使树也难。</li>
+          <li>多层同时优化：更难。因此所有实现都用 <strong>layer-by-layer sweep</strong>。</li>
+        </ul>
+
+        <h3>3.2 交叉数计数</h3>
+        <p>给定两层的序，跨层交叉数 = 邻接序列中的<strong>逆序对数</strong>：</p>
+        <ul>
+          <li>朴素 <span class="katex-inline" data-tex="O(|E_{ij}|^2)"></span>。</li>
+          <li><strong>Barth–Jünger–Mutzel 2002 累加树法</strong>：<span class="katex-inline" data-tex="O(|E|\log|V_{small}|)"></span>，用 BIT/accumulator tree。工程上强烈建议实现这个，因为 sweep 里要反复计数。</li>
+        </ul>
+        <div class="code-block">
+          <span class="lang-tag">rust</span>
+          <pre><code class="language-rust">// 计数 (layer_i 序固定, layer_j 序固定) 之间交叉
+fn cross_count(south_seq: &amp;[usize] /* 按北层序展开的南层位置流 */) -&gt; u64 {
+    let mut tree = Bit::new(next_pow2(len));
+    let mut cross = 0;
+    for &amp;p in south_seq {
+        cross += tree.query_greater_than(p); // 已插入且位置更大者 = 逆序
+        tree.add(p, 1);
+    }
+    cross
+}</code></pre>
+        </div>
+
+        <h3>3.3 初始序</h3>
+        <ul>
+          <li><strong>BFS/DFS 序</strong>（dot 用 BFS 的 <code>init_order</code>）：稳定、质量尚可。</li>
+          <li>多次随机重启取最优（OGDF 默认多 run）→ <strong>牺牲决定性</strong>，若要确定性就固定种子且记录。</li>
+        </ul>
+
+        <h3>3.4 单层重排启发式（sweep 的内核）</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>方法</th><th>规则</th><th>复杂度</th><th>质量</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Barycenter</strong>（Sugiyama 1981）</td><td><span class="katex-inline" data-tex="b(v)=\frac{1}{deg}\sum pos(u)"></span>，按 <span class="katex-inline" data-tex="b"></span> 排序</td><td><span class="katex-inline" data-tex="O(E + V\log V)"></span></td><td>好，最常用</td></tr>
+              <tr><td><strong>Median</strong>（Eades–Wormald 1994）</td><td><span class="katex-inline" data-tex="m(v)"></span> = 邻居位置中位数</td><td>同上</td><td>略优于 barycenter，有 3-近似保证</td></tr>
+              <tr><td><strong>Greedy switch</strong></td><td>相邻对交换若减少交叉则交换，直到稳定</td><td>每轮 <span class="katex-inline" data-tex="O(V^2)"></span> 或 <span class="katex-inline" data-tex="O(E)"></span> 增量</td><td>局部最优，作为 barycenter 的 post-pass</td></tr>
+              <tr><td><strong>Greedy insert</strong></td><td>逐个把节点插到交叉最少的位置</td><td><span class="katex-inline" data-tex="O(V^2)"></span></td><td>好但慢</td></tr>
+              <tr><td><strong>Split</strong>（类快排）</td><td>选 pivot，按与 pivot 的交叉方向二分</td><td><span class="katex-inline" data-tex="O(V\log V)"></span></td><td>中等</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 图解：交叉最小化前后 -->
+        <figure>
+          <svg viewBox="0 0 360 200" aria-label="Barycenter/Median 启发式减少交叉">
+            <text x="90" y="20" text-anchor="middle" class="muted">前（2 个交叉）</text>
+            <text x="270" y="20" text-anchor="middle" class="label">后（0 个交叉）</text>
+            <g transform="translate(20,30)">
+              <rect class="node" x="0" y="0" width="34" height="20" rx="4"/>
+              <rect class="node" x="60" y="0" width="34" height="20" rx="4"/>
+              <rect class="node" x="100" y="0" width="34" height="20" rx="4"/>
+              <rect class="node" x="0" y="110" width="34" height="20" rx="4"/>
+              <rect class="node" x="60" y="110" width="34" height="20" rx="4"/>
+              <rect class="node" x="100" y="110" width="34" height="20" rx="4"/>
+              <line class="edge" x1="17" y1="20" x2="77" y2="110"/>
+              <line class="edge" x1="77" y1="20" x2="117" y2="110"/>
+              <line class="edge" x1="117" y1="20" x2="17" y2="110"/>
+              <circle cx="58" cy="75" r="3" fill="var(--bad)"/>
+              <circle cx="74" cy="60" r="3" fill="var(--bad)"/>
+            </g>
+            <g transform="translate(200,30)">
+              <rect class="node" x="0" y="0" width="34" height="20" rx="4"/>
+              <rect class="node" x="60" y="0" width="34" height="20" rx="4"/>
+              <rect class="node" x="100" y="0" width="34" height="20" rx="4"/>
+              <rect class="node" x="100" y="110" width="34" height="20" rx="4"/>
+              <rect class="node" x="60" y="110" width="34" height="20" rx="4"/>
+              <rect class="node" x="0" y="110" width="34" height="20" rx="4"/>
+              <line class="edge" x1="17" y1="20" x2="17" y2="110"/>
+              <line class="edge" x1="77" y1="20" x2="77" y2="110"/>
+              <line class="edge" x1="117" y1="20" x2="117" y2="110"/>
+            </g>
+            <text x="90" y="180" text-anchor="middle" class="muted" font-size="10.5">两层版本已 NP 难 → 层间来回 sweep</text>
+            <text x="270" y="180" text-anchor="middle" class="muted" font-size="10.5">barycenter / median 启发式</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 1.3</span>交叉最小化：固定一层、优化下一层顺序，来回多轮 sweep</div>
+        </figure>
+
+        <p><strong>dot 的 <code>mincross</code> 组合</strong>（工业级配方，建议照抄思路）：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">init_order()                     // BFS
+for pass in 0..MaxIter(24):
+    wmedian(pass)                // 交替 forward/backward sweep 的 median 排序
+    transpose(reverse = pass%4 >= 2)   // greedy switch，含"相等也交换"的抖动
+    if crossings < best { save_best(); }
+    if crossings == 0 { break }
+restore_best()</code></pre>
+        </div>
+        <p>细节要点：</p>
+        <ul>
+          <li><code>wmedian</code> 的中位数定义：偶数邻居时按左右两侧"拉力"加权插值（dot 用 <span class="katex-inline" data-tex="\frac{m_l\cdot right + m_r\cdot left}{left+right}"></span> 形式），比简单取中位数更平滑。</li>
+          <li>度为 0 或无邻居的节点<strong>保持原位</strong>（median = -1 表示"不动"），否则会乱跑。</li>
+          <li><code>transpose</code> 里"交叉数相等时也交换"（reverse 模式）用于跳出平台期，但必须<strong>每 4 轮才开</strong>，否则不收敛。</li>
+        </ul>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>被反复忘记的一条</div>
+          <p><strong>保存最优解</strong>：sweep 不单调下降，必须记 best。最后一轮不一定最优 —— 这条在多个开源库里都被漏掉过。</p>
+        </div>
+
+        <h3>3.5 虚节点的特殊处理</h3>
+        <p>虚节点间交叉（dummy-dummy）在 P4 会变成"长边的弯折"，视觉代价高于普通交叉 → 给它更高的交叉权重（dot 中 <code>virtual-virtual</code> 权重 8，<code>virtual-real</code> 2，<code>real-real</code> 1）。这一权重设计是可读性大幅提升的关键，<strong>容易被忽略</strong>。</p>
+        <p>同理 P4 的对齐优先级也偏向虚节点链（保证长边直）。</p>
+
+        <h3>3.6 精确 / 更强方法</h3>
+        <ul>
+          <li>ILP：变量 <span class="katex-inline" data-tex="x_{uv}\in\{0,1\}"></span>（u 在 v 前）+ 传递性三角约束 + 交叉变量 <span class="katex-inline" data-tex="c_{uvwz}"></span>；分支切割可解 <span class="katex-inline" data-tex="|V|\sim 100"></span> 的两层实例（Jünger–Mutzel 1997）。</li>
+          <li><strong>Planarization 路线</strong>（见 02 篇）：先求最大平面子图再插边，适合正交布局而非分层。</li>
+          <li>近年：<strong>sifting</strong>（Matuszewski et al. 1999）—— 把单个节点在整层里滑过所有位置取最优，<span class="katex-inline" data-tex="O(deg\cdot V)"></span>，质量优于 barycenter，OGDF 有实现。值得实现，因为它对"长链"友好。</li>
+        </ul>
+
+        <h3>3.7 约束定序</h3>
+        <ul>
+          <li><strong>顺序约束（sequence constraint）</strong>：某些节点必须相邻/有先后 → 在排序时用受约束拓扑排序，或把 barycenter 值做"投影"（先算无约束值，再按约束链做 pool adjacent violators 投影，等价于 isotonic regression）。</li>
+          <li>端口约束（左出右进等）会限制虚节点的插入位置，见 08 篇。</li>
+        </ul>
+
+        <!-- ============ §4 P4 ============ -->
+        <h2 id="sec-5"><span class="h2-num">4</span>P4 · 次轴坐标分配（X-Coordinate Assignment）</h2>
+
+        <h3>4.1 目标</h3>
+        <p>在保持层内序不变的前提下，给每节点 <span class="katex-inline" data-tex="x"></span>，使</p>
+        <ol>
+          <li>同层相邻节点间距 <span class="katex-inline" data-tex="\ge"></span> 最小间距（含节点宽/标签）</li>
+          <li>边尽量竖直（虚节点链尽量共线）</li>
+          <li>图尽量窄</li>
+          <li>结构对称的子图看起来对称</li>
+        </ol>
+        <p>这是<strong>二次规划 / LP</strong> 问题。三条主流路线：</p>
+
+        <h3>4.2 路线 A：Priority Method（Sugiyama 原版 / 快而糙）</h3>
+        <p>迭代 sweep：按层扫，每个节点想移到邻居重心位置，能否移动取决于"优先级"（度数高者优先，虚节点最高），高优先级可推低优先级。</p>
+        <ul>
+          <li>简单、<span class="katex-inline" data-tex="O(iter\cdot V)"></span>，但结果依赖迭代次数，易产生"锯齿"。</li>
+          <li>仍被用于超大图的快速模式。</li>
+        </ul>
+
+        <h3>4.3 路线 B：网络单纯形 / LP（Gansner et al. 1993，dot 默认）</h3>
+        <p>把"边平直"写成绝对值目标：</p>
+        <div class="formula" data-tex="\min \sum_{(u,v)\in E}\Omega(u,v)\,\omega(u,v)\,|x(u)-x(v)| \quad \text{s.t.} \quad x(v_{i+1}) - x(v_i) \ge \rho(v_i,v_{i+1})"></div>
+        <ul>
+          <li><span class="katex-inline" data-tex="|x_u-x_v|"></span> 线性化：引入辅助节点，转成与 P2 同构的<strong>最小费用流对偶</strong> → 复用网络单纯形代码（这是 dot 设计的优雅之处：ranking 与 x-coord 用同一个求解器）。</li>
+          <li><span class="katex-inline" data-tex="\Omega"></span> 是边类型权重：real-real = 1, real-virtual = 2, virtual-virtual = 8（同 P3 的偏好）。</li>
+          <li>输出质量最好之一；对大图偏慢（网络单纯形迭代次数不可控），dot 有 <code>nslimit</code> 截断。</li>
+        </ul>
+
+        <h3>4.4 路线 C：Brandes–Köpf（2002）线性时间对齐法（<strong>推荐首实现</strong>）</h3>
+        <p><em>Fast and Simple Horizontal Coordinate Assignment</em>。保证：</p>
+        <ul>
+          <li><span class="katex-inline" data-tex="O(V+E)"></span>；</li>
+          <li>每条边最多 2 个弯折（长边"直到底"）；</li>
+          <li>结果左右/上下对称美观。</li>
+        </ul>
+
+        <!-- 图解：BK 四方向对齐 -->
+        <figure>
+          <svg viewBox="0 0 360 180" aria-label="BK 四方向对齐取中位">
+            <text x="180" y="18" text-anchor="middle" class="label">4 次对齐（上/下 × 左/右）+ 紧致化 + 取中位平均</text>
+            <g transform="translate(30,40)">
+              <text x="40" y="0" text-anchor="middle" class="muted" font-size="10">上-左</text>
+              <rect class="node" x="0" y="10" width="22" height="14" rx="3"/>
+              <rect class="node" x="40" y="40" width="22" height="14" rx="3"/>
+              <rect class="node" x="80" y="70" width="22" height="14" rx="3"/>
+              <line class="edge-muted" x1="11" y1="24" x2="51" y2="40" stroke-dasharray="2 2"/>
+              <line class="edge-muted" x1="51" y1="54" x2="91" y2="70" stroke-dasharray="2 2"/>
+            </g>
+            <g transform="translate(150,40)">
+              <text x="40" y="0" text-anchor="middle" class="muted" font-size="10">下-左</text>
+              <rect class="node" x="0" y="70" width="22" height="14" rx="3"/>
+              <rect class="node" x="40" y="40" width="22" height="14" rx="3"/>
+              <rect class="node" x="80" y="10" width="22" height="14" rx="3"/>
+              <line class="edge-muted" x1="11" y1="70" x2="51" y2="54" stroke-dasharray="2 2"/>
+              <line class="edge-muted" x1="51" y1="40" x2="91" y2="24" stroke-dasharray="2 2"/>
+            </g>
+            <g transform="translate(270,40)">
+              <text x="40" y="0" text-anchor="middle" class="hi" font-size="10">取中位 → 最终</text>
+              <rect class="node" x="0" y="40" width="22" height="14" rx="3"/>
+              <rect class="node" x="40" y="40" width="22" height="14" rx="3"/>
+              <rect class="node" x="80" y="40" width="22" height="14" rx="3"/>
+              <line class="edge" x1="11" y1="54" x2="51" y2="54"/>
+              <line class="edge" x1="51" y1="54" x2="91" y2="54"/>
+            </g>
+            <text x="180" y="160" text-anchor="middle" class="hi" font-size="11">⚠ 必读 2020 勘误：原文 compaction 伪代码有错，多库因此节点重叠</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 1.4</span>Brandes–Köpf：4 次对齐 + 紧致化 + 取中位平均，线性时间</div>
+        </figure>
+
+        <p>四步：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">1. 标记 type-1 conflicts：内部段(inner segment，即 dummy-dummy 边) 与
+   非内部段交叉时，非内部段让路（不允许对齐）。
+2. 四遍 vertical alignment + horizontal compaction：
+   方向 ∈ {down, up} × {left, right}，共 4 个候选布局
+   - vertical_alignment: 每层节点尝试与其 median 邻居对齐，形成"blocks"
+     （链表 align/root 表示），若与已对齐的边冲突（会交叉）则跳过
+   - horizontal_compaction: 对每个 block 求 class 内最紧坐标，
+     再在 block 类之间做偏移传播（sink 图上的最短路）
+3. 4 个候选中取宽度最小者为基准，把另外 3 个对齐到它（左右翻转/上下翻转还原）
+4. 逐节点取 4 个候选坐标的**中位数平均**（两个中间值的均值）</code></pre>
+        </div>
+
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>实现者常错的点</div>
+          <ul>
+            <li><strong>median 邻居</strong>：偶数邻居时 down 遍取下中位、up 遍取上中位，这样 4 遍才互补对称。</li>
+            <li><strong>type-1 conflict</strong> 的定义必须精确：内部段是两端都是 dummy 的段。检测用一次 <span class="katex-inline" data-tex="O(E)"></span> 扫描（对每层维护 <span class="katex-inline" data-tex="k_0,k_1"></span> 上界指针）。</li>
+            <li><strong>type-2 conflict</strong>（两内部段相交）在正确的 P3 里不会出现；若出现说明 P3 允许了 dummy-dummy 交叉，需在此阶段任选一条让路，否则死循环。</li>
+            <li>compaction 用的是「块图」上的最长路（DAG 上 DP），不是通用 LP。</li>
+            <li>4 候选平均会略微牺牲"绝对直"，换来对称。若你更想"直"，可只取最小宽度候选（有些实现提供开关）。</li>
+          </ul>
+        </div>
+
+        <h3>4.5 路线 D：QP / 约束求解（现代，质量最高但重）</h3>
+        <ul>
+          <li><strong>Linear-segment / IPSEP</strong> 风格：把每条长边的所有 dummy 绑成一个变量（linear segment），目标 = <span class="katex-inline" data-tex="\sum w(x_u-x_v)^2"></span>，约束 = 层内分隔不等式，用<strong>主动集法 + 分离约束求解器（satisfy_VPSC）</strong>求解（Dwyer/Marriott 的 VPSC，见 07 篇）。</li>
+          <li>ELK 的 <code>BRANDES_KOEPF</code> / <code>LINEAR_SEGMENTS</code> / <code>NETWORK_SIMPLEX</code> 三个选项就分别对应 C / D 变体 / B。</li>
+          <li>好处：可自然加入"端口对齐""标签占位""组框内边距"等额外不等式，这正是产品级需求的落点。<strong>如果你预见到大量额外约束，直接上 VPSC 比在 Brandes–Köpf 上打补丁更省事。</strong></li>
+        </ul>
+
+        <h3>4.6 层内间距 ρ 的构成（易漏项清单）</h3>
+        <div class="formula" data-tex="\rho(v_i,v_{i+1}) = \frac{w_i}{2}+\frac{w_{i+1}}{2} + \max(\text{node gap}, \text{label 需求}, \text{端口外伸}, \text{自环预留}, \text{边通道需求})"></div>
+        <ul>
+          <li>虚节点"宽度"应等于<strong>该边的线宽 + 边间距</strong>，不是 0；否则两条长边贴在一起。</li>
+          <li>若边带标签，标签在分层布局里常实现为<strong>尺寸等于标签的虚节点</strong>（label dummy），这样间距自动预留 —— 这是很干净的技巧（ELK/yFiles 均如此）。</li>
+        </ul>
+
+        <!-- ============ §5 P5 ============ -->
+        <h2 id="sec-6"><span class="h2-num">5</span>P5 · 边绘制（在分层框架内）</h2>
+
+        <p>分层布局的边绘制有三种风格，选择影响前面各相的参数：</p>
+        <ol>
+          <li><strong>Polyline（折线）</strong>：直接连 dummy 点。最简单，但相邻长边会"发散"，需要 nudging。</li>
+          <li><strong>Orthogonal（正交）</strong>：边只走水平/竖直段。需要在层间预留<strong>水平通道（channel）</strong>并做通道分配（见 03 篇）。分层 + 正交是架构图/流程图的主流形态。</li>
+          <li><strong>Spline（贝塞尔）</strong>：Graphviz 的 <code>piecewise spline in a polygonal region</code>（Gansner 1993 §5）：
+            <ul>
+              <li>先由 dummy 链和相邻节点边界构造一个<strong>通道多边形（region）</strong>；</li>
+              <li>在该多边形内用递归"分裂-拟合"算法找不出界的 Bezier：<code>fit(region, p0, p1)</code>：先试直线，不行则在最"顶"的障碍点分裂递归。</li>
+              <li>优点：视觉柔和；缺点：难以做端口精确对齐。</li>
+            </ul>
+          </li>
+        </ol>
+
+        <div class="callout info">
+          <div class="ct-title"><span class="icon">ℹ</span>正交分层的通道模型（重点，架构图核心）</div>
+          <ul>
+            <li>层间空隙被离散成 <span class="katex-inline" data-tex="k"></span> 条水平 track；每条要"横向走一段"的边占用一条 track。</li>
+            <li>track 数 = 该层间的"重叠区间集合"的最大团 ≈ <strong>区间图着色</strong>问题 → 贪心按左端点排序着色即最优（区间图是 perfect graph），<span class="katex-inline" data-tex="O(m\log m)"></span>。</li>
+            <li>分配好 track 后回写"该层间需要 <span class="katex-inline" data-tex="k\cdot \text{trackGap}"></span> 的额外高度" → <strong>回到 P2 调整 y</strong>。</li>
+          </ul>
+        </div>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>唯一合法的"下游影响上游"方式</div>
+          <p><strong>以参数回写，而不是直接改坐标。</strong>这是写权纪律的硬约束：P5 不能挪节点，只能把"我需要多宽通道"回写给 P2。</p>
+        </div>
+
+        <!-- ============ §6 复杂度 ============ -->
+        <h2 id="sec-7"><span class="h2-num">6</span>复杂度与规模总表</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>相</th><th>推荐算法</th><th>复杂度</th><th>决定性</th></tr></thead>
+            <tbody>
+              <tr><td><code>P1</code></td><td>Greedy-Cycle-Removal</td><td><span class="katex-inline" data-tex="O(V+E)"></span></td><td>需稳定 tie-break</td></tr>
+              <tr><td><code>P2</code></td><td>Network simplex ranking</td><td>~<span class="katex-inline" data-tex="O(VE)"></span> 最坏，实测近线性</td><td>是（若初始树稳定）</td></tr>
+              <tr><td><code>P3</code></td><td>median sweep + transpose，24 轮</td><td><span class="katex-inline" data-tex="O(iter\cdot E\log V)"></span></td><td>是（固定初始序）</td></tr>
+              <tr><td><code>P4</code></td><td>Brandes–Köpf</td><td><span class="katex-inline" data-tex="O(V+E)"></span></td><td>是</td></tr>
+              <tr><td><code>P5</code></td><td>区间着色 + nudging</td><td><span class="katex-inline" data-tex="O(E\log E)"></span></td><td>是</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>规模经验值（单线程、release）：10k 节点 / 20k 边的分层图，纯 P1–P4 应在 ~1s 内；瓶颈通常是<strong>虚节点数</strong>和 P3 的轮数。优化顺序：先砍虚节点（P2 目标里加大权重 / 链聚合），再降 P3 轮数（早停：交叉数无改进连续 4 轮即停）。</p>
+
+        <!-- ============ §7 与 plotgram 对照 ============ -->
+        <h2 id="sec-8"><span class="h2-num">7</span>与 plotgram 的对照与建议</h2>
+
+        <ol>
+          <li><strong>写权表</strong>照第 0 节建立，编译期就把"谁能写 x"约束住（例如坐标字段只在对应 phase 的模块可变）。</li>
+          <li><strong>P4 建议起步用 Brandes–Köpf</strong>，把"端口/标签/组框"的额外需求先塞进层内间距 <span class="katex-inline" data-tex="\rho"></span>；等约束多到打补丁时再整体换成 VPSC（路线 D），接口保持 <code>assign_x(order, spacing_provider) -&gt; Coords</code> 不变。</li>
+          <li><strong>P3 一定要实现边类型权重（1/2/8）与 best-snapshot</strong>，这两项是"看起来专业"的最大性价比来源。</li>
+          <li><strong>通道 demand 回写 P2</strong> 作为唯一合法的反向影响通路，写进架构约束。</li>
+          <li><strong>确定性</strong>：P1 的 tie-break、P3 的初始序、P4 的 4-候选合并全部要显式排序；测试里对同一输入跑两次比较 JSON 快照。</li>
+        </ol>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>一句话收敛</div>
+          <p>Sugiyama 的价值不在某一相的算法多巧，而在<strong>五相之间严格的写权分工</strong>。把这个分工编译期固化，是 plotgram 区别于"在路由阶段加特判"的工程分水岭。</p>
+        </div>
+
+      </div>
+
+      <div class="foot">
+        本文为 <a href="../00-索引与阅读指南.md">01-sugiyama分层布局.md</a> 的 HTML 图文版。
+        配套：<a href="00-索引与阅读指南.html">索引</a> ·
+        <a href="../21-术语表.html">术语表图解</a> ·
+        <a href="../../../../design/layout/write-authority.md">写权纪律</a>
+      </div>
+
+    </article>
+  </div>
+</div>
+
+<script src="_assets/nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

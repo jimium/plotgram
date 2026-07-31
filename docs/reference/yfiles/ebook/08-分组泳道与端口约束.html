@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>08 · 分组、泳道与端口约束 — yFiles 参考文库 ebook</title>
+<link rel="stylesheet" href="_assets/style.css">
+<!-- highlight.js 主题（浅色 + 暗色） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+  /* 代码块在浅/暗色下都可用；highlight.js 主题负责 token 颜色，本 CSS 负责容器 */
+  pre code.hljs { background: transparent; padding: 0; border: none; font-size: 13px; }
+  pre code.hljs .comment { font-style: italic; }
+</style>
+</head>
+<body data-page="08">
+
+<div class="layout">
+  <div class="content">
+    <article>
+
+      <h1>08 · 分组、泳道与端口约束（Groups, Swimlanes &amp; Port Constraints）</h1>
+      <p class="subtitle">对应 yFiles <code>GroupNode</code> / <code>RecursiveGroupLayout</code> / <code>PartitionGrid</code>（swimlane）/ <code>PortConstraint</code> / <code>PortCandidateSet</code> / <code>EdgePortCandidates</code>、<code>BusRouter</code> 的 edge grouping；ELK <code>layered</code> + <code>portConstraints</code>；Graphviz <code>cluster</code>；cytoscape.js compound nodes</p>
+
+      <div class="meta-bar">
+        <span class="pill">核心算法</span>
+        <span>主线论文：Sugiyama–Misue 1991（<em>compound graph</em> 原文）、Sander 1996（clustered hierarchical）、Forster 2002（<em>Applying Crossing Reduction Strategies to Layered Compound Graphs</em>）、Dogrusoz et al. 2009（CoSE：compound spring embedder）、Schulze–Spönemann–von Hanxleden 2014（ELK 的 layered + ports）</span>
+        <span class="src">~186 行 · 7.2k 字</span>
+      </div>
+
+      <div class="prose">
+
+        <p>这三件事（分组、泳道、端口）是<strong>产品级布局与玩具级布局的分界线</strong>。它们的共同特点：都是把额外的离散结构注入已有管线，且<strong>必须在正确的相注入</strong>。</p>
+
+        <!-- ============ §1 ============ -->
+        <h2 id="sec-1"><span class="h2-num">1</span>复合图（Compound / Clustered Graph）</h2>
+
+        <!-- 图解：复合图 -->
+        <figure>
+          <svg viewBox="0 0 480 240" aria-label="复合图：嵌套组框与跨组边">
+            <!-- 外层组 G1 -->
+            <rect x="20" y="30" width="270" height="180" rx="8" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="5 3"/>
+            <text x="32" y="48" class="label" font-size="11">G1</text>
+            <!-- 内层组 G2 -->
+            <rect x="190" y="60" width="90" height="140" rx="6" fill="none" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="5 3"/>
+            <text x="200" y="78" class="label" font-size="11">G2</text>
+            <!-- G1 内节点 -->
+            <rect class="node" x="40" y="80" width="46" height="24" rx="4"/>
+            <text x="63" y="96" text-anchor="middle" font-size="10">A</text>
+            <rect class="node" x="110" y="80" width="46" height="24" rx="4"/>
+            <text x="133" y="96" text-anchor="middle" font-size="10">B</text>
+            <rect class="node" x="40" y="160" width="46" height="24" rx="4"/>
+            <text x="63" y="176" text-anchor="middle" font-size="10">A2</text>
+            <!-- G2 内节点 -->
+            <rect class="node" x="210" y="95" width="50" height="22" rx="4"/>
+            <text x="235" y="110" text-anchor="middle" font-size="10">C</text>
+            <rect class="node" x="210" y="155" width="50" height="22" rx="4"/>
+            <text x="235" y="170" text-anchor="middle" font-size="10">D</text>
+            <!-- 外部节点 E -->
+            <rect class="node-muted" x="350" y="92" width="46" height="24" rx="4"/>
+            <text x="373" y="108" text-anchor="middle" font-size="10">E</text>
+            <!-- 边 -->
+            <line class="edge" x1="86" y1="92" x2="110" y2="92"/>
+            <line class="edge" x1="133" y1="104" x2="133" y2="160"/>
+            <path class="edge" d="M86,172 L160,172 L210,166"/>
+            <line class="edge" x1="235" y1="117" x2="235" y2="155"/>
+            <path class="edge-hi" d="M350,104 L300,104 L300,92 L255,95" marker-end="url(#a8r)"/>
+            <line class="edge" x1="86" y1="92" x2="160" y2="92" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="2 2"/>
+            <text x="150" y="220" class="muted" font-size="10">实线 = 组内/跨层级边；红边 = 跨组边（穿越组框边界）</text>
+            <defs>
+              <marker id="a8r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--bad)"/></marker>
+            </defs>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 8.1</span>复合图：组框嵌套形成包含树，边可跨层级与跨组；跨组边穿越组框边界处需开口</div>
+        </figure>
+
+        <h3>1.1 模型</h3>
+        <ul>
+          <li>节点集 <span class="katex-inline" data-tex="V"></span> 上有一棵<strong>包含树</strong>（inclusion tree）：组节点有子节点，叶节点是普通节点。</li>
+          <li>边可以连任意两个节点（含组节点本身，以及跨层级）。</li>
+          <li>组框（group bounds）= 其内容包围盒 + padding + 标题栏高度。<strong>组框尺寸是被推导出的，不是输入</strong>（除非用户固定）。</li>
+        </ul>
+
+        <h3>1.2 三种实现策略</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>策略</th><th>做法</th><th>优点</th><th>缺点</th></tr></thead>
+            <tbody>
+              <tr><td><strong>A. 递归（recursive）</strong></td><td>自底向上：先布局最内层组 → 该组收缩成一个"大节点" → 上层布局</td><td>实现简单，组框天然紧凑</td><td><strong>跨组边被忽视</strong>，跨层级边质量差；组内看不到外部关系</td></tr>
+              <tr><td><strong>B. 全局 + 组约束（flat with constraints）</strong></td><td>一次布局全部叶节点，组关系作为约束（同组节点相邻/在同层区间内）</td><td>跨组边质量好</td><td>需要在每相处理组约束，实现复杂</td></tr>
+              <tr><td><strong>C. 混合</strong></td><td>递归得到组内布局作为"初值/形状"，再全局微调</td><td>平衡</td><td>最复杂</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>yFiles <code>RecursiveGroupLayout</code> 是 A（并允许每组用不同算法，这是很好的产品特性）；其 <code>HierarchicLayout</code> 内置的分组支持是 B。</p>
+
+        <div class="callout info">
+          <div class="ct-title"><span class="icon">ℹ</span>策略选型建议</div>
+          <p><strong>分层图种用 B（下面详述），organic 用 A/CoSE。</strong>递归策略 A 在 organic 上能借力 CoSE 的多级思想，而在分层图上会丢失跨组边质量。</p>
+        </div>
+
+        <h3>1.3 分层布局中的分组（策略 B 详解）</h3>
+        <p>这是 Sander 1996 / Forster 2002 的核心内容。</p>
+
+        <p><strong>(a) 分层相（P2）</strong>：组内节点应占据<strong>连续的层区间</strong>。</p>
+        <ul>
+          <li>若允许组跨层（通常允许），只需保证"组的层区间不与其它同级组交错"吗？——不需要，交错在分层上是允许的；问题出在层内序。</li>
+          <li>若要求组框是矩形且不与其它组重叠，则组内节点在每一层上必须<strong>连续</strong>（层内序上连续）。这是关键约束。</li>
+        </ul>
+
+        <p><strong>(b) 定序相（P3）</strong>：<strong>核心难点</strong>。要求：同一组的节点在每层内连续成块。</p>
+        <p>Forster 2002 的做法：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">把每层的节点按"所属组的路径"分段（segment）：
+  同组连续块 = 一个 segment
+交叉最小化在两个粒度上交替进行：
+  1. segment 之间的排序（把整个 segment 当一个超节点做 barycenter）
+  2. segment 内部的排序（递归）
+关键：barycenter 计算时，跨组的边贡献给"组超节点"，组内边贡献给内部</code></pre>
+        </div>
+        <p>更简洁的等价实现（ELK 的做法）：</p>
+        <ul>
+          <li>引入 <strong>组边界 dummy 节点</strong>：每个组在其占据的每一层上插入"左边界 dummy"和"右边界 dummy"，并用序约束把组内节点夹在两者之间。</li>
+          <li>之后 P3 照常跑（barycenter + transpose），只需在交换时检查"不越过边界 dummy"。</li>
+          <li>这样<strong>不需要改交叉最小化算法本身</strong>，只需加序约束（回到 07 篇 §3.1 的受约束排序）。<strong>推荐这个做法：改动小、复用强。</strong></li>
+        </ul>
+
+        <p><strong>(c) 坐标相（P4）</strong>：</p>
+        <ul>
+          <li>组框左右边界 = 组内节点 x 范围 ± padding；</li>
+          <li>相邻组之间的间距 ≥ groupGap（两个组框不重叠）⇒ 在 VPSC 里加"边界变量之间的分隔约束"；</li>
+          <li>组标题占用组框顶部高度 ⇒ 组的第一层需要额外的 y 偏移（或把标题当一个占位 dummy 放在组内第一层之上）。</li>
+        </ul>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>组框防重叠的正解形态</div>
+          <p><strong>组框的包围盒不能事后"算出来发现重叠再挪"</strong> —— 边界应作为变量参与求解（这是 VPSC 的价值，也是仓库里"组框防重叠调整"的正解形态）。事后挪会把已确定的边弯折与坐标推翻，破坏 P3/P4 的写权分工。</p>
+        </div>
+
+        <p><strong>(d) 路由相（P5）</strong>：</p>
+        <ul>
+          <li>跨组边穿越组框边界：应在<strong>边界上开口</strong>，且开口位置参与端口分配；</li>
+          <li>组内边不得跑出组框；</li>
+          <li>组框边界本身是路由障碍（对不涉及该组的边）。见 03 篇 §1.4。</li>
+        </ul>
+
+        <h3>1.4 Organic 的分组：CoSE（Dogrusoz et al. 2009）</h3>
+        <p>Compound Spring Embedder：</p>
+        <ul>
+          <li>在力模型里增加：
+            <ul>
+              <li>组内节点受"向组重心"的额外引力；</li>
+              <li>组框之间的斥力（按框而非点）；</li>
+              <li>跨组边的引力作用在<strong>组框</strong>上而非节点上（多级思想）。</li>
+            </ul>
+          </li>
+          <li>用"多级 + 组收缩"提速：先把每个组当一个点布局，再展开。</li>
+          <li>Cytoscape.js 的 <code>cose-bilkent</code> 即此，效果相当好，值得参考其参数体系。</li>
+        </ul>
+
+        <h3>1.5 组的折叠/展开（产品必备）</h3>
+        <ul>
+          <li>折叠：组变成一个普通节点，跨组边聚合到该节点（多条边合并成一条带计数的边）。</li>
+          <li>展开：需要"在原位展开"—— 用 07 篇的 PartialLayout / 增量布局，把新出现的内容塞进腾出的空间。</li>
+          <li><strong>稳定性</strong>：折叠再展开应回到（近似）原布局 ⇒ 缓存组内布局。</li>
+        </ul>
+
+        <!-- ============ §2 ============ -->
+        <h2 id="sec-2"><span class="h2-num">2</span>泳道（Swimlane）与 Partition Grid</h2>
+
+        <!-- 图解：泳道 / Partition Grid -->
+        <figure>
+          <svg viewBox="0 0 460 240" aria-label="泳道与 Partition Grid：列分区 + 全局层">
+            <!-- 网格背景：2 列 × 3 行 -->
+            <rect class="layer-bg" x="60" y="50" width="170" height="50" rx="2"/>
+            <rect class="layer-bg" x="240" y="50" width="170" height="50" rx="2"/>
+            <rect class="layer-bg" x="60" y="105" width="170" height="50" rx="2"/>
+            <rect class="layer-bg" x="240" y="105" width="170" height="50" rx="2"/>
+            <rect class="layer-bg" x="60" y="160" width="170" height="50" rx="2"/>
+            <rect class="layer-bg" x="240" y="160" width="170" height="50" rx="2"/>
+            <!-- 列标题（泳道） -->
+            <text x="145" y="40" text-anchor="middle" class="label" font-size="11">泳道 1（列）</text>
+            <text x="325" y="40" text-anchor="middle" class="label" font-size="11">泳道 2（列）</text>
+            <!-- 行标签（全局层） -->
+            <text x="50" y="80" text-anchor="end" class="muted" font-size="10">L0</text>
+            <text x="50" y="135" text-anchor="end" class="muted" font-size="10">L1</text>
+            <text x="50" y="190" text-anchor="end" class="muted" font-size="10">L2</text>
+            <!-- 节点 -->
+            <rect class="node" x="100" y="62" width="46" height="22" rx="4"/>
+            <text x="123" y="77" text-anchor="middle" font-size="10">n1</text>
+            <rect class="node" x="100" y="117" width="46" height="22" rx="4"/>
+            <text x="123" y="132" text-anchor="middle" font-size="10">n2</text>
+            <rect class="node" x="100" y="172" width="46" height="22" rx="4"/>
+            <text x="123" y="187" text-anchor="middle" font-size="10">n3</text>
+            <rect class="node" x="290" y="62" width="46" height="22" rx="4"/>
+            <text x="313" y="77" text-anchor="middle" font-size="10">n4</text>
+            <rect class="node" x="290" y="172" width="46" height="22" rx="4"/>
+            <text x="313" y="187" text-anchor="middle" font-size="10">n5</text>
+            <!-- 边 -->
+            <line class="edge" x1="123" y1="84" x2="123" y2="117"/>
+            <line class="edge" x1="123" y1="139" x2="123" y2="172"/>
+            <path class="edge-hi" d="M146,73 L290,73" marker-end="url(#a8b)"/>
+            <path class="edge-hi" d="M146,128 L290,183" marker-end="url(#a8b)"/>
+            <defs>
+              <marker id="a8b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--bad)"/></marker>
+            </defs>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 8.2</span>Partition Grid：泳道是<strong>列分区</strong>，层是<strong>全局</strong>的——所有泳道共享同一套层；跨泳道边穿越列边界</div>
+        </figure>
+
+        <h3>2.1 模型</h3>
+        <p>泳道 = 与流向<strong>正交</strong>的分区。若图自上而下（层沿 y），泳道沿 x 划分列。</p>
+        <p>yFiles 的抽象是 <strong>PartitionGrid</strong>：<span class="katex-inline" data-tex="rows \times columns"></span> 的网格，每个节点指定其 cell（行、列）。</p>
+        <ul>
+          <li>泳道 = 只用列（或只用行）；</li>
+          <li>矩阵式布局（如"阶段 × 责任人"的 BPMN）= 同时用行和列。</li>
+        </ul>
+
+        <h3>2.2 算法落点</h3>
+        <ol>
+          <li><strong>分层（P2）</strong>：行约束 = 层约束（若行对应阶段，节点必须在该行的层区间内）。实现：给每行分配连续的层区间，节点的层被限制在其行的区间内 ⇒ LP 加上下界。
+            <ul>
+              <li>行区间长度未知（取决于内容）→ 两趟：先无约束分层看每行需要几层，再分配区间。</li>
+            </ul>
+          </li>
+          <li><strong>定序（P3）</strong>：列约束 = 层内序的分段约束。<strong>与分组的处理完全同构</strong>：同一列的节点在每层内连续。因此可复用组边界 dummy 机制。</li>
+          <li><strong>坐标（P4）</strong>：
+            <ul>
+              <li>每列有一个 x 区间 <span class="katex-inline" data-tex="[l_c, r_c]"></span>，列宽 = 该列内容宽 + padding，列之间不重叠；</li>
+              <li>列宽应满足"所有列内节点都在区间内" ⇒ 又是 VPSC 的分隔约束；</li>
+              <li><strong>空列</strong>也要有最小宽度（否则泳道标题放不下）。</li>
+            </ul>
+          </li>
+          <li><strong>路由（P5）</strong>：跨泳道边穿越泳道边界（允许），但通常要求"垂直穿越"（不要沿泳道边界走），可通过给"沿边界走"加惩罚实现。</li>
+        </ol>
+
+        <h3>2.3 常见陷阱</h3>
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>泳道工程坑清单</div>
+          <ul>
+            <li>泳道高度/宽度必须容纳<strong>泳道标题</strong>（旋转 90° 的文字），标题尺寸要进 measure 相。</li>
+            <li>泳道内为空时布局塌陷 → 设最小尺寸。</li>
+            <li>泳道顺序由用户给定（不是算法优化的），必须严格保持 ⇒ 序约束优先级最高。</li>
+          </ul>
+        </div>
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>最容易做错的点</div>
+          <p>层跨泳道对齐：BPMN 里"同一阶段的活动应水平对齐" ⇒ 行区间必须<strong>全局一致</strong>（所有泳道共享同一套层），不能每泳道各自分层。<strong>泳道是列，层是全局的</strong>——这条搞反就会得到"每条泳道独立分层、横向无法对齐"的错图。</p>
+        </div>
+
+        <!-- ============ §3 ============ -->
+        <h2 id="sec-3"><span class="h2-num">3</span>端口（Port）与端口约束</h2>
+
+        <!-- 图解：端口约束 -->
+        <figure>
+          <svg viewBox="0 0 460 220" aria-label="端口约束：FIXED_SIDE 与 FREE 按对侧 x 排序">
+            <!-- 左：FIXED_SIDE -->
+            <text x="100" y="20" text-anchor="middle" class="label" font-size="11">FIXED_SIDE（只约束侧）</text>
+            <g transform="translate(40,40)">
+              <rect class="node-muted" x="0" y="20" width="40" height="18" rx="3"/>
+              <text x="20" y="33" text-anchor="middle" font-size="9">src</text>
+              <rect class="node-muted" x="120" y="20" width="40" height="18" rx="3"/>
+              <text x="140" y="33" text-anchor="middle" font-size="9">src</text>
+              <rect class="node-muted" x="0" y="100" width="40" height="18" rx="3"/>
+              <text x="20" y="113" text-anchor="middle" font-size="9">src</text>
+              <rect class="node-muted" x="120" y="100" width="40" height="18" rx="3"/>
+              <text x="140" y="113" text-anchor="middle" font-size="9">src</text>
+              <!-- 目标节点 -->
+              <rect class="node" x="55" y="55" width="50" height="30" rx="4"/>
+              <text x="80" y="74" text-anchor="middle" font-size="11">v</text>
+              <!-- 端口点 N/S/E/W -->
+              <circle cx="80" cy="55" r="3" fill="var(--bad)"/>
+              <circle cx="80" cy="85" r="3" fill="var(--bad)"/>
+              <circle cx="105" cy="70" r="3" fill="var(--bad)"/>
+              <circle cx="55" cy="70" r="3" fill="var(--bad)"/>
+              <!-- 边 -->
+              <path class="edge" d="M20,38 L20,50 L55,70"/>
+              <path class="edge" d="M140,38 L140,50 L105,70"/>
+              <path class="edge" d="M20,118 L20,90 L55,70"/>
+              <path class="edge" d="M140,118 L140,90 L105,70"/>
+              <text x="80" y="50" text-anchor="middle" class="hi" font-size="9">N</text>
+              <text x="80" y="98" text-anchor="middle" class="hi" font-size="9">S</text>
+              <text x="111" y="74" class="hi" font-size="9">E</text>
+              <text x="49" y="74" text-anchor="end" class="hi" font-size="9">W</text>
+            </g>
+            <!-- 右：FREE + 按对侧 x 排序 -->
+            <text x="345" y="20" text-anchor="middle" class="label" font-size="11">FREE · 按对侧 x 排序分配</text>
+            <g transform="translate(230,40)">
+              <!-- 目标节点 -->
+              <rect class="node" x="35" y="10" width="120" height="24" rx="4"/>
+              <text x="95" y="26" text-anchor="middle" font-size="11">v</text>
+              <!-- 南侧端口 -->
+              <circle cx="50" cy="34" r="2.6" fill="var(--accent)"/>
+              <circle cx="75" cy="34" r="2.6" fill="var(--accent)"/>
+              <circle cx="105" cy="34" r="2.6" fill="var(--accent)"/>
+              <circle cx="135" cy="34" r="2.6" fill="var(--accent)"/>
+              <!-- 源节点（x 任意） -->
+              <rect class="node-muted" x="35" y="120" width="32" height="18" rx="3"/>
+              <rect class="node-muted" x="72" y="120" width="32" height="18" rx="3"/>
+              <rect class="node-muted" x="105" y="120" width="32" height="18" rx="3"/>
+              <rect class="node-muted" x="140" y="120" width="32" height="18" rx="3"/>
+              <!-- 排序后的边（不交叉） -->
+              <path class="edge-hi" d="M51,120 L50,34"/>
+              <path class="edge-hi" d="M88,120 L75,34"/>
+              <path class="edge-hi" d="M121,120 L105,34"/>
+              <path class="edge-hi" d="M156,120 L135,34"/>
+              <text x="95" y="155" text-anchor="middle" class="muted" font-size="10">按对侧 x 升序分配 ⇒ 0 交叉</text>
+            </g>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 8.3</span>端口约束两档对照：FIXED_SIDE 只锁定侧（位置自由）；FREE 默认按"对侧端点 x"排序并均匀分布，得到 0 交叉的不变式</div>
+        </figure>
+
+        <h3>3.1 为什么端口必须是一等公民</h3>
+        <p>边从节点的哪个位置出发，决定了：</p>
+        <ul>
+          <li>弯折数（从错误的侧出发必然绕行）；</li>
+          <li>交叉数（端口序错了会凭空产生交叉）；</li>
+          <li>语义正确性（BPMN gateway 的 yes/no 分支、UML 的组合端、电路的引脚）。</li>
+        </ul>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>端口必须上提到布局阶段</div>
+          <p><strong>若端口在路由阶段"临时发明"，就会出现无法修复的绕行与交叉。</strong> 端口分配必须上提到布局阶段（这正是仓库纪律的原话：落笔相零新决策——下游不得发明端口，必须由上游写者确定）。</p>
+        </div>
+
+        <h3>3.2 端口模型的层次</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>级别</th><th>语义</th><th>谁写</th></tr></thead>
+            <tbody>
+              <tr><td><strong>PortConstraint: side</strong></td><td>只约束"哪一侧"（north/south/east/west），位置自由</td><td>用户/DSL 指定</td></tr>
+              <tr><td><strong>PortCandidate 集合</strong></td><td>给出若干候选位置，算法挑一个</td><td>用户给候选，算法挑</td></tr>
+              <tr><td><strong>Fixed port</strong></td><td>位置完全固定（电路引脚）</td><td>用户</td></tr>
+              <tr><td><strong>Free port</strong></td><td>完全由算法决定</td><td>布局算法</td></tr>
+              <tr><td><strong>Port group</strong></td><td>一组边共享一个端口/相邻端口</td><td>用户声明，算法落位</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>ELK 的对应概念是 <code>portConstraints ∈ {FREE, FIXED_SIDE, FIXED_ORDER, FIXED_RATIO, FIXED_POS}</code> —— <strong>这个五档分级设计非常好，建议直接采用</strong>。</p>
+
+        <h3>3.3 分层布局中的端口处理（ELK 的做法，值得照抄）</h3>
+        <ol>
+          <li><strong>P2 之后</strong>：若边因端口侧约束而"必须绕行"（例如从 north 侧出发但目标在下方），插入额外的 dummy 层/北向 dummy 节点，把绕行显式化 —— 这叫 <strong>north/south port dummy</strong>。ELK 会为节点北侧/南侧的端口创建"端口 dummy"参与定序。</li>
+          <li><strong>P3 定序</strong>：
+            <ul>
+              <li>若 <code>FIXED_ORDER</code> 或更强，节点的邻边在层内序中的相对位置由端口序决定 ⇒ 交叉计数要按端口位次而非节点位次；</li>
+              <li>实现：把节点"展开"成一串端口 dummy（类似 02 篇的顶点膨胀技巧），barycenter 作用在端口上。</li>
+              <li><code>FREE</code> 时反之：先定序，再按邻居 x 序分配端口（这是最常见的默认行为，效果好且简单）。</li>
+            </ul>
+          </li>
+          <li><strong>P4 坐标</strong>：端口偏移进入 x 的计算（节点锚点 vs 端口锚点）；对齐目标应是"端口对齐"而不是"节点中心对齐"，否则长边不直。</li>
+          <li><strong>P5 路由</strong>：端口位置作为输入，只求路径。</li>
+        </ol>
+
+        <h3>3.4 自由端口的分配算法（默认路径的核心）</h3>
+        <p>给定节点 v 与其在某侧的边集，按"对侧端点的 x 坐标"排序，然后均匀分布在该侧：</p>
+        <div class="code-block">
+          <span class="lang-tag">rust</span>
+          <pre><code class="language-rust">fn assign_ports(v: &amp;Node, side: Side, edges: &amp;mut [Edge]) {
+    edges.sort_by_key(|e| (opposite_anchor_x(e), e.id));   // 稳定
+    let n = edges.len();
+    let span = v.width - 2.0 * PORT_MARGIN;
+    for (i, e) in edges.iter_mut().enumerate() {
+        let t = if n == 1 { 0.5 } else { PORT_MARGIN + span * (i as f64) / (n - 1) as f64 };
+        e.set_port(v, side, t);
+    }
+}</code></pre>
+        </div>
+        <ul>
+          <li><strong>按对侧 x 排序</strong>保证不交叉（这是一个简单但强力的不变式）；</li>
+          <li>端口数多时节点需<strong>加宽</strong>（最小宽度 = n × portGap） ⇒ 端口需求回写节点尺寸 ⇒ 必须在 measure/尺寸相之前知道端口数。这是又一处"上游留位"。</li>
+          <li>变体：<strong>集中式端口</strong>（所有边接同一点，如流程图的简单风格）与<strong>分散式端口</strong>是产品选项，不是算法差异。</li>
+        </ul>
+
+        <h3>3.5 Edge grouping（边聚合）</h3>
+        <p>yFiles 的 source/target group id：同一 group 的边在其源/目标处<strong>共享端口并汇聚</strong>：</p>
+        <ul>
+          <li>实现：先各自路由，再在靠近共享端口的一段做"合并"（找公共前缀，取中线）；</li>
+          <li>或直接用 bus routing（03 篇 §2.4）；</li>
+          <li>视觉上非常干净，是"一对多"关系（继承、汇总）的标准画法。</li>
+        </ul>
+
+        <!-- ============ §4 ============ -->
+        <h2 id="sec-4"><span class="h2-num">4</span>三者交互时的处理顺序（重要）</h2>
+
+        <p>分组 + 泳道 + 端口同时存在时，约束可能冲突。推荐的注入顺序与优先级：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">1. 泳道（行/列）约束      —— 最高优先级（用户显式指定的画布结构）
+2. 组包含约束             —— 次高（语义结构）
+3. 层/序约束（用户指定）  —— 再次
+4. 端口约束               —— 在上述框架内落位
+5. 算法自身的优化目标     —— 最低（交叉、边长）</code></pre>
+        </div>
+        <p>冲突检测与降级策略必须显式（07 篇 §7.5）：例如"节点 A 在泳道 1 但被要求与泳道 2 的 B 同层"是可行的（层是全局的）；而"A 在组 G 内但被要求在 G 外某节点的左边且该节点在 G 的右边"是不可行的 → 报告并丢弃低优先约束。</p>
+
+        <!-- ============ §5 ============ -->
+        <h2 id="sec-5"><span class="h2-num">5</span>plotgram 落地清单</h2>
+
+        <ol>
+          <li><strong>组与泳道复用同一套"层内连续块"机制</strong>（边界 dummy + 受约束排序）。不要写两份。</li>
+          <li><strong>组框边界作为 VPSC 变量</strong>，不要事后调整包围盒。这解决"组框重叠"和"组框把边挤出去"两类顽疾。</li>
+          <li><strong>端口五档模型</strong>（FREE / FIXED_SIDE / FIXED_ORDER / FIXED_RATIO / FIXED_POS）先落 DSL 与 IR，算法逐步支持；默认 FREE + "按对侧 x 排序分配"就能覆盖大多数图。</li>
+          <li><strong>端口数回写节点最小尺寸</strong>，在 measure 相处理。</li>
+          <li><strong>约束优先级表</strong>写进设计文档，冲突时的降级路径可观测（诊断输出）。</li>
+          <li>测试：对每个特性做"约束满足性断言"（组内节点确在组框内、泳道内节点确在列区间内、端口序与邻居序一致），而不是只看图好不好看。</li>
+        </ol>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>一句话收敛</div>
+          <p>分组、泳道、端口的共同点是<strong>把离散结构在正确相注入既有管线</strong>：组与泳道复用"层内连续块 + 边界 dummy"机制，端口用五档模型上提到布局阶段。三者都不在路由相"临时发明"，否则必然产生无法修复的绕行与交叉。</p>
+        </div>
+
+      </div>
+
+      <div class="foot">
+        本文为 <a href="../08-分组泳道与端口约束.md">08-分组泳道与端口约束.md</a> 的 HTML 图文版。
+        配套：<a href="00-索引与阅读指南.html">索引</a> ·
+        <a href="../21-术语表.html">术语表图解</a> ·
+        <a href="../../../../design/layout/write-authority.md">写权纪律</a>
+      </div>
+
+    </article>
+  </div>
+</div>
+
+<script src="_assets/nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

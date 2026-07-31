@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>yFiles 参考文库 · ebook</title>
+<link rel="stylesheet" href="_assets/style.css">
+<style>
+  /* 封面页特有：无左侧目录，主区全宽 */
+  .layout { margin-left: 0; }
+  .topbar { justify-content: space-between; }
+  .topbar .brand { font-size: 15px; }
+  .hero {
+    padding: 72px 32px 40px;
+    max-width: 980px; margin: 0 auto;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .hero .eyebrow {
+    font-size: 13px; color: var(--accent); font-weight: 600;
+    letter-spacing: .12em; text-transform: uppercase; margin-bottom: 12px;
+  }
+  .hero h1 { font-size: 44px; margin: 0 0 16px; letter-spacing: -.02em; line-height: 1.15; }
+  .hero .lede { font-size: 17px; color: var(--muted); line-height: 1.75; max-width: 62ch; margin: 0 0 24px; }
+  .hero .meta { font-size: 13px; color: var(--muted); }
+  .hero .meta a { color: var(--accent); }
+
+  .section-title {
+    font-size: 13px; font-weight: 700; color: var(--muted);
+    letter-spacing: .1em; text-transform: uppercase;
+    margin: 0 0 14px;
+  }
+  .cover-section { padding: 40px 32px; max-width: 980px; margin: 0 auto; }
+
+  .features {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    margin-bottom: 20px;
+  }
+  .feature-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .feature-card .ft-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 10px;
+  }
+  .feature-card .ft-icon svg { width: 18px; height: 18px; }
+  .feature-card h3 { margin: 0 0 6px; font-size: 15px; }
+  .feature-card p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+  @media (max-width: 920px) {
+    .hero { padding: 48px 18px 30px; }
+    .hero h1 { font-size: 32px; }
+    .features { grid-template-columns: 1fr; }
+    .cover-section { padding: 30px 18px; }
+  }
+</style>
+</head>
+<body data-page="index">
+
+<!-- 顶栏（封面页简化版） -->
+<div class="topbar">
+  <div class="brand"><a href="index.html">yFiles 参考文库</a><span class="vol">· ebook</span></div>
+  <div class="spacer"></div>
+  <button class="icon-btn theme-btn" onclick="toggleTheme()" title="切换暗色 / 浅色">
+    <span class="theme-icon"></span>
+  </button>
+</div>
+
+<div class="layout">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="eyebrow">Graph Drawing · 算法级参考</div>
+    <h1>把图绘制领域<br>读成一本 ebook</h1>
+    <p class="lede">
+      为 plotgram 自研布局 / 路由算法沉淀的公开知识库。21 篇文档覆盖分层、正交、力导向、树、路由、约束、分组、引擎架构、性能、WASM、动画、EDA、序列图全谱，
+      每篇配可视化图解、KaTeX 公式、工程坑 callout。图文阅读，左侧目录导航，暗色友好，键盘 ← → 翻页。
+    </p>
+    <p class="meta">
+      2026-07-31 ·
+      <a href="../00-索引与阅读指南.md">原始 Markdown</a> ·
+      <a href="../21-术语表.html">术语表图解版</a> ·
+      <a href="../../yFiles-layouts-and-routing.html">yFiles 产品能力</a>
+    </p>
+  </section>
+
+  <!-- 统计 -->
+  <section class="cover-section">
+    <div class="stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
+      <div class="stat"><div class="v">21</div><div class="l">篇章</div></div>
+      <div class="stat"><div class="v">18万</div><div class="l">字</div></div>
+      <div class="stat"><div class="v">5</div><div class="l">主题模块</div></div>
+      <div class="stat"><div class="v">260+</div><div class="l">术语词条</div></div>
+    </div>
+  </section>
+
+  <!-- 阅读特性 -->
+  <section class="cover-section">
+    <div class="section-title">阅读体感</div>
+    <div class="features">
+      <div class="feature-card">
+        <div class="ft-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></div>
+        <h3>左侧目录 + 上下篇</h3>
+        <p>固定章节树，当前页高亮；页内 H2 自动列入二级目录，滚动跟随。键盘 ← → 翻页。</p>
+      </div>
+      <div class="feature-card">
+        <div class="ft-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2"/></svg></div>
+        <h3>图文并茂 + 暗色</h3>
+        <p>关键概念配手绘 SVG 图解；数学公式 KaTeX 渲染；代码块语法高亮；浅 / 暗色一键切换。</p>
+      </div>
+      <div class="feature-card">
+        <div class="ft-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 6.253v13M12 6.253c-2.5-2.5-6.5-2.5-9 0v13c2.5-2.5 6.5-2.5 9 0zM12 6.253c2.5-2.5 6.5-2.5 9 0v13c-2.5-2.5-6.5-2.5-9 0z"/></svg></div>
+        <h3>工程坑显式标注</h3>
+        <p>info / warn / bad / good 四色 callout 把"被反复忘记"的教训标红，不只是释义。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 推荐阅读路径 -->
+  <section class="cover-section">
+    <div class="section-title">推荐阅读路径</div>
+    <div class="path-list">
+      <div class="path-item">
+        <span class="tag">入门</span>
+        <div class="desc"><strong>第一次进这个领域</strong>：先建词汇表再读算法。<span class="seq">21 术语表 → 01 分层 → 03 路由</span></div>
+      </div>
+      <div class="path-item">
+        <span class="tag">开工</span>
+        <div class="desc"><strong>直接开工</strong>：选型 + 架构 + 零件库。<span class="seq">13 路线图 → 09 架构 → 14 工具箱</span></div>
+      </div>
+      <div class="path-item">
+        <span class="tag">Hier 主路径</span>
+        <div class="desc"><strong>做架构图 / 流程图</strong>：Sugiyama 是骨架，正交路由决定观感。<span class="seq">01 → 03 → 08 → 09 → 11</span></div>
+      </div>
+      <div class="path-item">
+        <span class="tag">正交紧凑</span>
+        <div class="desc"><strong>做 ER 图 / 电路类</strong>：TSM 三段式 + 标签 + EDA。<span class="seq">02 → 03 → 06 → 18</span></div>
+      </div>
+      <div class="path-item">
+        <span class="tag">Organic</span>
+        <div class="desc"><strong>做知识图谱 / 社交网络</strong>：力导向 + 稳定性。<span class="seq">04 → 07 → 11</span></div>
+      </div>
+      <div class="path-item">
+        <span class="tag">序列图</span>
+        <div class="desc"><strong>做时序 / 甘特</strong>：一维排列是共同抽象。<span class="seq">19 → 06 → 08</span></div>
+      </div>
+      <div class="path-item">
+        <span class="tag">引擎</span>
+        <div class="desc"><strong>定架构</strong>：图种不进引擎 + 写权纪律。<span class="seq">09 + 20 必读</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 21 篇目录 -->
+  <section class="cover-section">
+    <div class="section-title">全 21 篇目录</div>
+    <div class="toc-grid">
+      <a class="toc-card" href="00-索引与阅读指南.html">
+        <div class="row"><span class="n">00</span><span class="t">索引与阅读指南</span></div>
+        <div class="d">文库定位、文档清单、推荐阅读路径、与仓库其它文档的关系</div>
+      </a>
+      <a class="toc-card" href="01-sugiyama分层布局.html">
+        <div class="row"><span class="n">01</span><span class="t">Sugiyama 分层布局</span></div>
+        <div class="d">四阶段管线逐相拆解：去环 / 分层 / 定序 / 坐标；每相主流算法伪代码与工程坑</div>
+      </a>
+      <a class="toc-card" href="02-正交布局与TSM.html">
+        <div class="row"><span class="n">02</span><span class="t">正交布局与 TSM</span></div>
+        <div class="d">Topology–Shape–Metrics 三段式；Tamassia 最小弯折流模型、Kandinsky、紧致化</div>
+      </a>
+      <a class="toc-card" href="03-正交边路由.html">
+        <div class="row"><span class="n">03</span><span class="t">正交边路由</span></div>
+        <div class="d">独立于布局的边路由：正交可见图（OVG）、A*/Dijkstra 搜索、nudging、通道分配</div>
+      </a>
+      <a class="toc-card" href="04-力导向与stress布局.html">
+        <div class="row"><span class="n">04</span><span class="t">力导向与 stress 布局</span></div>
+        <div class="d">弹簧模型、FR、KK、stress majorization、SGD、多级方法、Barnes–Hut</div>
+      </a>
+      <a class="toc-card" href="05-树与径向布局.html">
+        <div class="row"><span class="n">05</span><span class="t">树与径向布局</span></div>
+        <div class="d">Reingold–Tilford、Walker/Buchheim 线性时间、balloon、radial、紧凑树</div>
+      </a>
+      <a class="toc-card" href="06-标签放置.html">
+        <div class="row"><span class="n">06</span><span class="t">标签放置</span></div>
+        <div class="d">节点/边标签模型（4-position、slider）、NP 难性、贪心/模拟退火/整数规划解法</div>
+      </a>
+      <a class="toc-card" href="07-约束增量与mentalmap.html">
+        <div class="row"><span class="n">07</span><span class="t">约束、增量与 mental map</span></div>
+        <div class="d">交互式布局、from-sketch、IPSEP-COLA、稳定性度量</div>
+      </a>
+      <a class="toc-card" href="08-分组泳道与端口约束.html">
+        <div class="row"><span class="n">08</span><span class="t">分组、泳道与端口约束</span></div>
+        <div class="d">复合图布局（递归 vs 全局）、swimlane/partition grid、PortConstraint 语义</div>
+      </a>
+      <a class="toc-card" href="09-yfiles类引擎架构.html">
+        <div class="row"><span class="n">09</span><span class="t">yFiles 类引擎架构</span></div>
+        <div class="d">布局引擎的工程架构：图模型、layout stage 装饰器链、数据提供者、坐标写权</div>
+      </a>
+      <a class="toc-card" href="10-行业图应用.html">
+        <div class="row"><span class="n">10</span><span class="t">行业图应用</span></div>
+        <div class="d">BPMN / UML / 网络拓扑 / 生物通路(SBGN) / EDA / 数据流 各行业图形约定与布局诉求</div>
+      </a>
+      <a class="toc-card" href="11-质量度量与基准.html">
+        <div class="row"><span class="n">11</span><span class="t">质量度量与基准</span></div>
+        <div class="d">美学准则的实证研究、可计算指标、Rome/AT&T 基准集、确定性与稳定性</div>
+      </a>
+      <a class="toc-card" href="12-论文书目.html">
+        <div class="row"><span class="n">12</span><span class="t">论文书目（带注解）</span></div>
+        <div class="d">按主题组织的关键论文清单，每篇一段"读它拿什么"</div>
+      </a>
+      <a class="toc-card" href="13-实现路线图与选型.html">
+        <div class="row"><span class="n">13</span><span class="t">实现路线图与选型</span></div>
+        <div class="d">前 12 篇的收敛：一页选型表（含"为什么不选"）+ M0–M6 路线图 + 反模式清单</div>
+      </a>
+      <a class="toc-card" href="14-图论与优化工具箱.html">
+        <div class="row"><span class="n">14</span><span class="t">图论与优化基础工具箱</span></div>
+        <div class="d">布局算法的"零件库"：最小费用流 / network simplex / 匹配 / BCC / SPQR / 扫描线 / 区间着色</div>
+      </a>
+      <a class="toc-card" href="15-几何与落笔层.html">
+        <div class="row"><span class="n">15</span><span class="t">几何与落笔层</span></div>
+        <div class="d">Ink 相：形状裁剪、正交路径规范化、圆角、Bézier、箭头、自环、平行边、数值稳定</div>
+      </a>
+      <a class="toc-card" href="16-大图性能与wasm.html">
+        <div class="row"><span class="n">16</span><span class="t">大图性能与 WASM 工程</span></div>
+        <div class="d">复杂度预算、热点、空间索引、门控降级、并行、WASM 限制与内存布局</div>
+      </a>
+      <a class="toc-card" href="17-动画过渡与视图.html">
+        <div class="row"><span class="n">17</span><span class="t">动画、过渡与视图交互</span></div>
+        <div class="d">layout morphing、边形变、视口与焦点、命中测试、增量动画的稳定性</div>
+      </a>
+      <a class="toc-card" href="18-超图总线与eda路由.html">
+        <div class="row"><span class="n">18</span><span class="t">超图、总线与 EDA 路由</span></div>
+        <div class="d">hyperedge 建模、bus routing、Steiner 树、引脚固定、通道/开关盒布线</div>
+      </a>
+      <a class="toc-card" href="19-序列图与一维排列.html">
+        <div class="row"><span class="n">19</span><span class="t">序列图与一维排列布局</span></div>
+        <div class="d">生命线排序（MinLA）、消息时间轴、片段嵌套、甘特/时间轴的共同抽象</div>
+      </a>
+      <a class="toc-card" href="20-图种profile与参数映射.html">
+        <div class="row"><span class="n">20</span><span class="t">图种 profile 与参数映射</span></div>
+        <div class="d">如何在"不按图种分支"的前提下表达图种差异：参数域、覆盖层级、回写协议</div>
+      </a>
+      <a class="toc-card" href="../21-术语表.html">
+        <div class="row"><span class="n">21</span><span class="t">专业术语表（图解版）</span></div>
+        <div class="d">约 260 条术语：英文原词 + 中文 + 一句话本质 + 为什么重要，20 个核心概念配 SVG 图解</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- 底部 -->
+  <section class="cover-section">
+    <div class="section-title">关于本 ebook</div>
+    <p style="font-size:14px;color:var(--ink-soft);line-height:1.8;max-width:70ch;">
+      本 ebook 是
+      <a href="../00-索引与阅读指南.md" style="color:var(--accent);">yFiles 参考文库</a>
+      的 HTML 图文版，为 plotgram 自研布局 / 路由算法沉淀。内容来源：图绘制（Graph Drawing）领域公开论文、教科书
+      （di Battista et al. <em>Graph Drawing</em>、Kaufmann & Wagner <em>Drawing Graphs</em>）、Graphviz / OGDF / ELK / adaptagrams
+      等开源实现的公开文档，以及 yFiles 公开文档与白皮书中可见的产品行为。
+      <strong>不含任何 yFiles 私有源码信息</strong>——涉及 yFiles 的部分均为对其公开 API 语义与可观测行为的逆向归纳。
+    </p>
+    <p style="font-size:13px;color:var(--muted);margin-top:18px;">
+      配套阅读：
+      <a href="../../yFiles-layouts-and-routing.html" style="color:var(--accent);">yFiles 布局算法与路由风格</a> ·
+      <a href="../../../../design/layout/write-authority.md" style="color:var(--accent);">写权纪律细则</a> ·
+      <a href="../../../../AGENTS.md" style="color:var(--accent);">AGENTS.md</a>
+    </p>
+  </section>
+
+</div>
+
+<script src="_assets/nav.js"></script>
+</body>
+</html>

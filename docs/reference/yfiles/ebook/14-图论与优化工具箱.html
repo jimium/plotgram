@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>14 · 图论与优化基础工具箱 — yFiles 参考文库 ebook</title>
+<link rel="stylesheet" href="_assets/style.css">
+<!-- highlight.js 主题（浅色 + 暗色） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+  /* 代码块在浅/暗色下都可用；highlight.js 主题负责 token 颜色，本 CSS 负责容器 */
+  pre code.hljs { background: transparent; padding: 0; border: none; font-size: 13px; }
+  pre code.hljs .comment { font-style: italic; }
+</style>
+</head>
+<body data-page="14">
+
+<div class="layout">
+  <div class="content">
+    <article>
+
+      <h1>14 · 图论与优化基础工具箱（Graph &amp; Optimization Toolkit）</h1>
+      <p class="subtitle">布局算法不是一整块，而是<strong>十来个经典零件的组合</strong>。本篇把这些零件单独讲清楚：输入输出、复杂度、实现要点、在布局管线里被谁调用。判断标准：读完这篇后，01–08 篇里出现的每个"用某某算法解"都能自己写出来。</p>
+
+      <div class="meta-bar">
+        <span class="pill">参考</span>
+        <span>综合：Gansner 1993（Network Simplex）· Hopcroft–Tarjan（SPQR / BCC）· Boyer–Myrvold 2004 · Yoshimura–Kuh 1982 等</span>
+        <span class="src">~290 行 · 5.5k 字</span>
+      </div>
+
+      <div class="prose">
+
+        <p><strong>依赖地图</strong>（谁用谁）：</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>零件</th><th>被哪些相使用</th></tr></thead>
+            <tbody>
+              <tr><td>拓扑排序 / SCC</td><td>P1 去环、DAG 校验、层级传播</td></tr>
+              <tr><td>最小费用流</td><td>P2 分层（network simplex）、Tamassia 正交化、紧致化</td></tr>
+              <tr><td>二分匹配 / 最大流</td><td>标签放置（Kakoulis–Tollis）、端口分配、平面化中的匹配启发式</td></tr>
+              <tr><td>BCC / 割点</td><td>circular 布局、平面化分治、组件分解</td></tr>
+              <tr><td>SPQR-tree</td><td>正交布局的可变嵌入</td></tr>
+              <tr><td>扫描线</td><td>交叉计数、重叠检测、OVG 构造</td></tr>
+              <tr><td>区间图着色</td><td>边路由 track 分配、泳道通道分配</td></tr>
+              <tr><td>累加树（Fenwick）</td><td>双层交叉计数 <span class="katex-inline" data-tex="O(E\log V)"></span></td></tr>
+              <tr><td>VPSC / QP</td><td>坐标分配、消重叠、nudging（见 07 篇）</td></tr>
+              <tr><td>谱方法（Fiedler 向量）</td><td>circular 排序、PivotMDS、初始布局</td></tr>
+              <tr><td>Union-Find</td><td>组件、多级 coarsening、matching</td></tr>
+              <tr><td>R-tree / 网格哈希</td><td>命中测试、局部重叠查询、增量路由</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ============ §1 ============ -->
+        <h2 id="sec-1"><span class="h2-num">1</span>最小费用流（Min-Cost Flow）——布局里最重要的优化零件</h2>
+
+        <p>三处核心用途完全同构，值得实现<strong>一份</strong>通用求解器：</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>用途</th><th>节点</th><th>弧</th><th>目标</th></tr></thead>
+            <tbody>
+              <tr><td>P2 分层（dot）</td><td>图节点</td><td>边（下界 = minlen，费用 = 边权）</td><td>最小加权总跨度</td></tr>
+              <tr><td>Tamassia 正交化</td><td>顶点 + 面</td><td>顶点↔面、面↔面</td><td>最小弯折数</td></tr>
+              <tr><td>一维紧致化</td><td>段</td><td>相邻约束</td><td>最小总长度</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>1.1 问题形式（本项目只需这一种）</h3>
+        <p>带下界的最小费用可行流 / 或其对偶——<strong>最小加权跨度</strong>：</p>
+
+        <div class="formula" data-tex="\min \sum_{(u,v)\in E} w_{uv}\,(\lambda_v - \lambda_u) \quad \text{s.t.}\ \lambda_v - \lambda_u \ge \delta_{uv},\ \lambda \in \mathbb{Z}"></div>
+
+        <p>这是<strong>对偶于最小费用流</strong>的问题，也正是 VPSC 的整数/线性版本。注意：</p>
+        <ul>
+          <li>目标线性 → 用 network simplex（整数最优）；</li>
+          <li>目标二次（最小化偏离期望位置的平方）→ 用 VPSC（07 篇）。</li>
+        </ul>
+        <p>两者不要混用求解器。</p>
+
+        <h3>1.2 Network Simplex（dot 的分层实现）</h3>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">1. feasible_tree():
+     init_rank()                      // longest-path 初值
+     while tight_tree() 未覆盖全图:
+         e = 非树边中 slack 最小者（一端在树内）
+         delta = slack(e) * (方向符号)
+         对树内所有节点 rank += delta   // 把 e 拉紧
+     init_cutvalues()
+2. loop:
+     e = 树边中 cut_value &lt; 0 的一条    // 有则说明可改进
+     if 无: break
+     f = enter_edge(e)                 // 在 e 的两个分量间找 slack 最小的非树边
+     exchange(e, f)                    // 换基 + 增量更新 cut values
+3. normalize(); balance()              // 顶端对齐 / 同 slack 节点居中</code></pre>
+        </div>
+
+        <!-- 图解：Network Simplex 树与负割边 -->
+        <figure>
+          <svg viewBox="0 0 480 220" aria-label="Network Simplex 树与负割边">
+            <g transform="translate(20,40)">
+              <text x="60" y="0" text-anchor="middle" class="label">T_tail</text>
+              <rect class="node" x="40" y="15" width="40" height="22" rx="4"/>
+              <rect class="node" x="10" y="85" width="40" height="22" rx="4"/>
+              <rect class="node" x="70" y="85" width="40" height="22" rx="4"/>
+              <line class="edge" x1="60" y1="37" x2="30" y2="85"/>
+              <line class="edge" x1="60" y1="37" x2="90" y2="85"/>
+            </g>
+            <g transform="translate(260,40)">
+              <text x="60" y="0" text-anchor="middle" class="label">T_head</text>
+              <rect class="node" x="40" y="15" width="40" height="22" rx="4"/>
+              <rect class="node" x="10" y="85" width="40" height="22" rx="4"/>
+              <rect class="node" x="70" y="85" width="40" height="22" rx="4"/>
+              <line class="edge" x1="60" y1="37" x2="30" y2="85"/>
+              <line class="edge" x1="60" y1="37" x2="90" y2="85"/>
+            </g>
+            <line class="edge-hi" x1="140" y1="28" x2="260" y2="28" marker-end="url(#ah14)"/>
+            <text x="200" y="20" text-anchor="middle" class="hi" font-size="11">cut(e) &lt; 0</text>
+            <text x="240" y="175" text-anchor="middle" class="muted" font-size="10.5">删去树边 e 后树分成 T_tail / T_head；cut&lt;0 表示把 T_tail 整体平移可减少总代价</text>
+            <defs>
+              <marker id="ah14" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--bad)"/></marker>
+            </defs>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 14.1</span>Network Simplex 的核心操作：找一条 cut_value &lt; 0 的树边换基</div>
+        </figure>
+
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>关键实现细节（写错必踩）</div>
+          <ol>
+            <li><strong>cut value 的定义</strong>：把树边 <span class="katex-inline" data-tex="e"></span> 去掉后树分成两块 <span class="katex-inline" data-tex="(T_{tail}, T_{head})"></span>；
+              <span class="katex-inline" data-tex="\text{cut}(e) = \sum_{\text{tail}\to\text{head}} w - \sum_{\text{head}\to\text{tail}} w"></span>。
+              <span class="katex-inline" data-tex="&lt;0"></span> 说明把 head 侧整体移动可以减少总代价。</li>
+            <li><strong>增量维护</strong>：叶子向内递推——一个节点只有一条未算的邻接树边时可 <span class="katex-inline" data-tex="O(\deg)"></span> 得出。
+              工程建议：<strong>先实现全量重算版本</strong>（<span class="katex-inline" data-tex="O(VE)"></span>）跑通，做完正确性测试再上增量。</li>
+            <li><strong>lim / low 区间</strong>：对树做 DFS 后序编号，<code>low[v]..lim[v]</code> 表示子树区间；
+              判断"某节点在 <span class="katex-inline" data-tex="e"></span> 的哪一侧"变成 <span class="katex-inline" data-tex="O(1)"></span> 的区间包含测试。<code>enter_edge</code> 靠它剪枝。</li>
+            <li><strong>迭代上限</strong>：dot 有 <code>nslimit</code> / <code>nslimit1</code>，超限就用当前可行解。<strong>必须有上限</strong>，否则病态图会卡死。</li>
+            <li><strong>确定性</strong>：所有"选 slack 最小者"都要有稳定 tie-break（用边 id）。</li>
+          </ol>
+        </div>
+
+        <p>复杂度：理论无强多项式界，实践近线性。dot 在数万节点上仍可用。</p>
+
+        <h3>1.3 SSP（连续最短路增广）用于 Tamassia</h3>
+        <p>Tamassia 的流网络规模小（面数 = <span class="katex-inline" data-tex="E - V + 2"></span>），用 SSP + Johnson 势（避免负边）即可：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">while 存在供给未清:
+    用 Dijkstra(带势) 在残量网络上求最短费用路
+    沿路增广 min(残量, 剩余供给)
+    更新势</code></pre>
+        </div>
+        <p>复杂度 <span class="katex-inline" data-tex="O(F \cdot E\log V)"></span>，<span class="katex-inline" data-tex="F"></span> = 总供给（<span class="katex-inline" data-tex="O(V)"></span> 级）。</p>
+
+        <p><strong>建模备忘（02 篇的流网络）</strong>：</p>
+        <ul>
+          <li>每个顶点 <span class="katex-inline" data-tex="v"></span> 提供 <span class="katex-inline" data-tex="4 - \deg(v)"></span> 单位流（度 ≤4 时非负）；</li>
+          <li>每个面 <span class="katex-inline" data-tex="f"></span> 需求 <span class="katex-inline" data-tex="2\deg(f) - 4"></span>（内面）/ <span class="katex-inline" data-tex="2\deg(f) + 4"></span>（外面）；</li>
+          <li>顶点→其入射面的弧容量 1、费用 0（表示该角是 90° 还是 180°）；</li>
+          <li>相邻面之间双向弧容量 ∞、费用 1（每单位流 = 一个弯折）。</li>
+          <li>求得的流量 = 每条边上的弯折序列。</li>
+        </ul>
+
+        <!-- ============ §2 ============ -->
+        <h2 id="sec-2"><span class="h2-num">2</span>匹配与流的其它用法</h2>
+
+        <h3>2.1 二分最大匹配（Hopcroft–Karp，<span class="katex-inline" data-tex="O(E\sqrt V)"></span>）</h3>
+        <ul>
+          <li><strong>标签放置</strong>：候选位置 ↔ 标签，冲突图上求"每个标签选一个无冲突位置" → 匹配/独立集近似（06 篇）。</li>
+          <li><strong>端口分配</strong>：边 ↔ 固定端口槽位，最小化交叉的代价 → 变成<strong>指派问题</strong>（见下）。</li>
+          <li><strong>平面化</strong>：某些启发式用匹配挑选要删的边。</li>
+        </ul>
+
+        <!-- 图解：二分匹配增广路径 -->
+        <figure>
+          <svg viewBox="0 0 420 210" aria-label="二分匹配增广路径">
+            <text x="60" y="22" text-anchor="middle" class="label">L</text>
+            <text x="360" y="22" text-anchor="middle" class="label">R</text>
+            <circle cx="60" cy="70" r="18" class="node"/>
+            <text x="60" y="74" text-anchor="middle" font-size="11">u1</text>
+            <circle cx="60" cy="150" r="18" class="node-muted"/>
+            <text x="60" y="154" text-anchor="middle" font-size="11">u2</text>
+            <circle cx="360" cy="70" r="18" class="node"/>
+            <text x="360" y="74" text-anchor="middle" font-size="11">v1</text>
+            <circle cx="360" cy="150" r="18" class="node-muted"/>
+            <text x="360" y="154" text-anchor="middle" font-size="11">v2</text>
+            <!-- match edge (currently matched): u1-v1 -->
+            <line class="edge-hi" x1="78" y1="70" x2="342" y2="70"/>
+            <!-- non-match edges in augmenting path: u2-v1, u1-v2 -->
+            <line class="edge-hi" x1="78" y1="150" x2="342" y2="70"/>
+            <line class="edge-hi" x1="78" y1="70" x2="342" y2="150"/>
+            <!-- non-match edge not on path -->
+            <line class="edge-muted" x1="78" y1="150" x2="342" y2="150" stroke-dasharray="3 3"/>
+            <text x="60" y="190" text-anchor="middle" class="muted" font-size="10">未匹配点</text>
+            <text x="360" y="190" text-anchor="middle" class="muted" font-size="10">未匹配点</text>
+            <text x="210" y="203" text-anchor="middle" class="hi" font-size="10.5">增广路径 u2→v1→u1→v2：非匹配 ↔ 匹配 交替</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 14.2</span>二分匹配的增广路径：交替翻转匹配/非匹配边，匹配数 +1</div>
+        </figure>
+
+        <h3>2.2 指派问题（Hungarian / KM，<span class="katex-inline" data-tex="O(n^3)"></span>）</h3>
+        <p>端口槽位分配的精确解：代价 = 该边接到该槽位产生的交叉/长度代价。
+        <span class="katex-inline" data-tex="n"></span> = 单侧端口数，通常 &lt; 20，<span class="katex-inline" data-tex="O(n^3)"></span> 完全可接受。
+        <strong>但</strong>：多数情况下"按对侧锚点坐标排序"就是最优解（因为代价矩阵满足 Monge 条件 → 保序最优），所以先用排序，只在有 FIXED_ORDER 混合约束时上 KM。</p>
+
+        <h3>2.3 最小割 / 最大流</h3>
+        <ul>
+          <li><strong>图分割</strong>（用于泳道自动推断、社区分组的初值）；</li>
+          <li><strong>k-way 分割</strong>建议用 METIS 风格的多级方法而非纯最大流。</li>
+        </ul>
+
+        <!-- ============ §3 ============ -->
+        <h2 id="sec-3"><span class="h2-num">3</span>分解类算法</h2>
+
+        <h3>3.1 连通分量 / 强连通分量</h3>
+        <ul>
+          <li>连通分量：BFS/DFS 或 Union-Find。用于<strong>分量分别布局 + 装箱</strong>（09 篇 ComponentLayout stage）。</li>
+          <li>SCC（Tarjan，<span class="katex-inline" data-tex="O(V+E)"></span>）：
+            <ul>
+              <li>去环前先求 SCC：<strong>只有 SCC 内部才需要反向边</strong>，跨 SCC 的边天然无环。这能把 Greedy-FAS 的工作量限制在各 SCC 内，且质量更好。</li>
+              <li>缩点后得到 DAG → 可先在 DAG 上分层，再展开 SCC。</li>
+            </ul>
+          </li>
+        </ul>
+
+        <h3>3.2 双连通分量与块割树（BCC / block-cut tree，Tarjan <span class="katex-inline" data-tex="O(V+E)"></span>）</h3>
+        <ul>
+          <li><strong>circular 布局</strong>：每个 BCC 画成一个圆，块割树上做树布局（Six–Tollis）。</li>
+          <li><strong>平面化</strong>：平面性可按 BCC 独立判定。</li>
+          <li>实现要点：用边栈而非节点栈；割点会属于多个块。</li>
+        </ul>
+
+        <h3>3.3 SPQR-tree（三连通分量分解）</h3>
+        <p>表示图的<strong>所有平面嵌入</strong>：</p>
+        <ul>
+          <li><strong>S</strong> 节点 = 串联（环），R = 刚性（唯一嵌入，可翻转），P = 并联（可任意排列并联边），Q = 单边。</li>
+          <li>用途：可变嵌入的最优边插入（Gutwenger–Mutzel–Weiskircher）——枚举 P/R 节点的选择做动态规划，在<strong>所有</strong>嵌入中找最短插入路径。</li>
+          <li>复杂度：构造 <span class="katex-inline" data-tex="O(V+E)"></span>（Hopcroft–Tarjan / Gutwenger–Mutzel 2000）。</li>
+          <li><strong>实现难度是本篇最高的</strong>。建议：先用固定嵌入（Boyer–Myrvold 给出的一个嵌入）+ remove-reinsert，只有在正交图种成为重点时才上 SPQR。</li>
+        </ul>
+
+        <!-- 图解：SPQR-tree 分解 -->
+        <figure>
+          <svg viewBox="0 0 480 240" aria-label="SPQR-tree 分解">
+            <!-- Root R node -->
+            <circle cx="240" cy="40" r="22" class="node"/>
+            <text x="240" y="45" text-anchor="middle" class="label" font-size="13">R</text>
+            <!-- Children: S, P, R -->
+            <circle cx="100" cy="130" r="20" class="node"/>
+            <text x="100" y="135" text-anchor="middle" class="label" font-size="12">S</text>
+            <circle cx="240" cy="130" r="20" class="node"/>
+            <text x="240" y="135" text-anchor="middle" class="label" font-size="12">P</text>
+            <circle cx="380" cy="130" r="20" class="node"/>
+            <text x="380" y="135" text-anchor="middle" class="label" font-size="12">R</text>
+            <line class="edge" x1="226" y1="58" x2="114" y2="114"/>
+            <line class="edge" x1="240" y1="62" x2="240" y2="110"/>
+            <line class="edge" x1="254" y1="58" x2="366" y2="114"/>
+            <!-- Q leaves under S -->
+            <circle cx="40" cy="210" r="14" class="node-muted"/>
+            <text x="40" y="214" text-anchor="middle" class="muted" font-size="10">Q</text>
+            <circle cx="100" cy="210" r="14" class="node-muted"/>
+            <text x="100" y="214" text-anchor="middle" class="muted" font-size="10">Q</text>
+            <circle cx="160" cy="210" r="14" class="node-muted"/>
+            <text x="160" y="214" text-anchor="middle" class="muted" font-size="10">Q</text>
+            <line class="edge-muted" x1="88" y1="144" x2="48" y2="198"/>
+            <line class="edge-muted" x1="100" y1="150" x2="100" y2="196"/>
+            <line class="edge-muted" x1="112" y1="144" x2="152" y2="198"/>
+            <!-- P children: parallel Q -->
+            <circle cx="220" cy="210" r="14" class="node-muted"/>
+            <text x="220" y="214" text-anchor="middle" class="muted" font-size="10">Q</text>
+            <circle cx="260" cy="210" r="14" class="node-muted"/>
+            <text x="260" y="214" text-anchor="middle" class="muted" font-size="10">Q</text>
+            <line class="edge-muted" x1="232" y1="144" x2="216" y2="198"/>
+            <line class="edge-muted" x1="248" y1="144" x2="264" y2="198"/>
+            <!-- R leaf single Q -->
+            <circle cx="380" cy="210" r="14" class="node-muted"/>
+            <text x="380" y="214" text-anchor="middle" class="muted" font-size="10">Q</text>
+            <line class="edge-muted" x1="380" y1="150" x2="380" y2="196"/>
+            <text x="240" y="235" text-anchor="middle" class="muted" font-size="10">S=串联 · P=并联(可任意排列) · R=刚性(唯一嵌入,可翻转) · Q=单边</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 14.3</span>SPQR-tree：把图分解为 S/P/R/Q 节点，枚举各嵌入做最优边插入</div>
+        </figure>
+
+        <h3>3.4 平面性测试与嵌入</h3>
+        <p>首选 <strong>Boyer–Myrvold 2004</strong>（edge addition，<span class="katex-inline" data-tex="O(V)"></span>）：</p>
+        <ul>
+          <li>同时给出嵌入（旋转系统）或 Kuratowski 子图（不平面的证据）；</li>
+          <li>比 LR-planarity / PQ-tree 更易实现，且直接给嵌入。</li>
+        </ul>
+        <p>次选 <strong>Left-Right planarity</strong>（de Fraysseix–Rosenstiehl，实现最短，约 200 行）。</p>
+
+        <!-- ============ §4 ============ -->
+        <h2 id="sec-4"><span class="h2-num">4</span>几何算法零件</h2>
+
+        <h3>4.1 扫描线（Bentley–Ottmann 家族）</h3>
+        <p>三个变体，共用一套事件队列 + 状态结构：</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>任务</th><th>状态结构</th><th>复杂度</th></tr></thead>
+            <tbody>
+              <tr><td>线段交点枚举</td><td>按 y 排序的活动线段（平衡树）</td><td><span class="katex-inline" data-tex="O((n+k)\log n)"></span></td></tr>
+              <tr><td>矩形重叠检测</td><td>区间树 / 有序集合</td><td><span class="katex-inline" data-tex="O(n\log n + k)"></span></td></tr>
+              <tr><td>OVG 可见性构造</td><td>活动区间集合</td><td><span class="katex-inline" data-tex="O(n\log n + \|E_{vis}\|)"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p><strong>实现要点</strong>：</p>
+        <ul>
+          <li>事件按 <code>(x, type, id)</code> 排序，<code>id</code> 保证确定性；</li>
+          <li>退化情形（共线、重合端点、垂直段）是 bug 温床 → 用<strong>整数/定点坐标</strong>或统一 epsilon 比较器；</li>
+          <li>只需"是否存在交点"时用早退版本，快得多。</li>
+        </ul>
+
+        <h3>4.2 区间图着色（= 通道分配 / track 分配）</h3>
+        <p>问题：给一组区间染色，重叠区间不同色，最小化颜色数。
+        <strong>贪心按左端点排序 + 最小可用颜色 = 最优</strong>（区间图是完美图，团数 = 色数）。</p>
+        <div class="code-block">
+          <span class="lang-tag">rust</span>
+          <pre><code class="language-rust">segs.sort_by_key(|s| (s.lo, s.id));           // 稳定
+let mut free: BinaryHeap&lt;Reverse&lt;(Ord, Track)&gt;&gt; = ...;  // 按释放位置
+for s in &amp;mut segs {
+    match free.peek() {
+        Some(&amp;Reverse((end, t))) if end + gap &lt;= s.lo =&gt; { free.pop(); s.track = t; }
+        _ =&gt; s.track = new_track(),
+    }
+    free.push(Reverse((s.hi, s.track)));
+}</code></pre>
+        </div>
+        <p>出处：Yoshimura–Kuh 1982 的 left-edge algorithm（VLSI 通道布线）。
+        用于：03 篇的层间 track、08 篇的泳道通道、06 篇的标签行分配。</p>
+
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>只有"区间"才最优</div>
+          <p>一旦加上"某些段必须在某些段之上"的偏序约束，就变成图着色（NP 难）→ 改用 nudging 的约束图 + 拓扑排序。<strong>不要把 left-edge 套到带偏序的场景</strong>，会得到错解。</p>
+        </div>
+
+        <h3>4.3 累加树（Fenwick / BIT）与交叉计数</h3>
+        <p>Barth–Jünger–Mutzel 双层交叉计数：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">固定上层序，把每条边记为下层位置 p
+按 (上层位置, 下层位置) 遍历边:
+    crossings += query(p+1 .. maxIndex)   // 已插入且下层位置更大者
+    insert(p)</code></pre>
+        </div>
+        <p><span class="katex-inline" data-tex="O(E\log V)"></span>。这是 P3 sweep 的内循环，必须高效。
+        <strong>同类技巧</strong>：用同一棵树可以增量算"交换相邻两点后交叉数变化"（transpose 的 <span class="katex-inline" data-tex="O(\deg)"></span> 判定）。</p>
+
+        <h3>4.4 空间索引</h3>
+        <ul>
+          <li><strong>R-tree</strong>（bulk-load 用 STR 打包）：适合静态查询多、更新少；</li>
+          <li><strong>均匀网格哈希</strong>：实现 30 行，在节点尺寸差异不大时比 R-tree 更快；</li>
+          <li><strong>四叉树</strong>：Barnes–Hut 复用（04 篇）。</li>
+        </ul>
+        <p>建议：先做网格哈希；只有在节点尺寸跨 2 个数量级时才换 R-tree。</p>
+
+        <h3>4.5 凸包与多边形</h3>
+        <ul>
+          <li>凸包（Andrew monotone chain，<span class="katex-inline" data-tex="O(n\log n)"></span>）：组框的紧凑轮廓、分量装箱的形状近似；</li>
+          <li>多边形布尔运算（用于组框合并）：建议<strong>避免</strong>——用轴对齐矩形 + 圆角就够，引入通用布尔库（clipper 类）会带来数值和体积成本。</li>
+        </ul>
+
+        <!-- ============ §5 ============ -->
+        <h2 id="sec-5"><span class="h2-num">5</span>谱与线性代数零件</h2>
+
+        <h3>5.1 Fiedler 向量（第二小拉普拉斯特征向量）</h3>
+        <p>用途：</p>
+        <ul>
+          <li><strong>circular 布局的节点排序</strong>（把相连节点排近）；</li>
+          <li><strong>谱分割</strong>（组自动推断）；</li>
+          <li><strong>一维排列的松弛解</strong>（19 篇 MinLA 的下界与初值）。</li>
+        </ul>
+        <p>计算：不要求解完整特征分解。用 <strong>power iteration on deflated operator</strong> 或 Lanczos：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">去掉全 1 方向：v ← v - (1ᵀv/n)·1
+迭代 v ← (I - L/λ_max) v，归一化</code></pre>
+        </div>
+        <p><span class="katex-inline" data-tex="O(kE)"></span>。ARPACK 级精度不必要——排序只需相对大小。</p>
+
+        <h3>5.2 PivotMDS 的 Householder 技巧</h3>
+        <p>见 04 篇。要点：<span class="katex-inline" data-tex="k"></span> 个 pivot 的距离矩阵 <span class="katex-inline" data-tex="C"></span>（<span class="katex-inline" data-tex="n\times k"></span>），双中心化后取 <span class="katex-inline" data-tex="C^TC"></span> 的前 2 个特征向量。<span class="katex-inline" data-tex="O(kE + k^2n)"></span>。</p>
+
+        <h3>5.3 共轭梯度 / Cholesky</h3>
+        <p>SMACOF 每步要解 <span class="katex-inline" data-tex="L^w X = b"></span>。<span class="katex-inline" data-tex="L^w"></span> 是稀疏对称半正定：</p>
+        <ul>
+          <li>小图（&lt;5k）：稀疏 Cholesky（一次分解多次回代，因为 <span class="katex-inline" data-tex="L^w"></span> 在迭代中不变）；</li>
+          <li>大图：CG + Jacobi 预条件，10–20 次迭代足够（内层不需精确）。</li>
+        </ul>
+        <p><strong>如果用 SGD stress（推荐），这一节可以跳过</strong>——这是选 SGD 的一大理由。</p>
+
+        <!-- ============ §6 ============ -->
+        <h2 id="sec-6"><span class="h2-num">6</span>组合优化的近似与启发式模式</h2>
+
+        <p>三种反复出现的模式，值得抽象成公共写法：</p>
+
+        <h3>6.1 "扫一遍 + 局部交换"（sweep + transpose）</h3>
+        <p>用于 P3 定序、标签、端口。骨架：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">best = current
+for iter in 0..MAX:
+    global_pass()          // barycenter/median：跳出局部最优
+    local_improve()        // transpose/swap：贪心下降
+    if cost &lt; best_cost { best = snapshot() }
+    if cost == 0 || 无改进连续 N 轮 { break }
+restore(best)</code></pre>
+        </div>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>必须保留 best snapshot</div>
+          <p>global_pass 可能变差，<strong>最后一轮不一定最优</strong>。这条被反复忘记——多个开源库都因此把已经更好的中间解丢掉。每次迭代结束都比较并保存最优快照，最后 <code>restore(best)</code>。</p>
+        </div>
+
+        <h3>6.2 多级（coarsen → solve → refine）</h3>
+        <p>用于 organic 布局、图分割、大图路由。骨架：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">levels = [G]
+while |levels.last| &gt; threshold:
+    levels.push(coarsen(levels.last))     // matching / MIS / 聚类
+solve(levels.last)                        // 小图上精确/多迭代
+for level in levels.rev().skip(1):
+    interpolate(coarse → fine)            // 位置继承 + 扰动
+    refine(level)                         // 少量迭代</code></pre>
+        </div>
+        <p>coarsen 的三种选择：heavy-edge matching（最常用）、MIS filtration（sfdp）、solar system（FMMM）。</p>
+
+        <h3>6.3 投影法（交替满足约束）</h3>
+        <p>用于 IPSEP-COLA、消重叠、受约束排序：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">loop:
+    x ← 无约束优化一步（stress 梯度 / majorization）
+    x ← project(x)          // VPSC 或 PAV，保证约束满足
+    until 收敛</code></pre>
+        </div>
+        <p>关键：<strong>project 必须是"最近可行点"投影</strong>（欧氏投影），否则不保证收敛。这就是为什么要用 VPSC 而不是启发式挪位。</p>
+
+        <!-- ============ §7 ============ -->
+        <h2 id="sec-7"><span class="h2-num">7</span>实现取舍建议（针对本项目）</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>零件</th><th>是否自研</th><th>理由与规模</th></tr></thead>
+            <tbody>
+              <tr><td>拓扑排序 / SCC / BCC</td><td>自研</td><td>各 50–100 行，无依赖</td></tr>
+              <tr><td>Union-Find</td><td>自研</td><td>30 行</td></tr>
+              <tr><td>Fenwick + 交叉计数</td><td>自研</td><td>80 行，热点路径要可控</td></tr>
+              <tr><td>区间着色 track 分配</td><td>自研</td><td>50 行</td></tr>
+              <tr><td>Network Simplex（分层）</td><td>自研</td><td>400–600 行，是 P2 的核心，值得投入</td></tr>
+              <tr><td>VPSC</td><td>自研</td><td>300–500 行，服务 5+ 处（见 13 篇投入产出比 #3）</td></tr>
+              <tr><td>扫描线（交叉/重叠）</td><td>自研</td><td>200 行，度量与断言都要用</td></tr>
+              <tr><td>网格哈希空间索引</td><td>自研</td><td>50 行</td></tr>
+              <tr><td>A*（带方向状态）</td><td>自研</td><td>150 行</td></tr>
+              <tr><td>Hopcroft–Karp / KM</td><td>按需</td><td>只在标签精确解、混合端口约束时需要</td></tr>
+              <tr><td>SSP 最小费用流</td><td>按需</td><td>只在做 TSM 正交布局时需要</td></tr>
+              <tr><td>SPQR-tree</td><td>暂不</td><td>复杂度最高、收益最窄；先用固定嵌入</td></tr>
+              <tr><td>稀疏 Cholesky / CG</td><td>不做</td><td>选 SGD stress 即可绕过</td></tr>
+              <tr><td>多边形布尔</td><td>不做</td><td>用矩形 + 圆角</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout note">
+          <div class="ct-title"><span class="icon">·</span>共同纪律</div>
+          <ul>
+            <li>所有"选最小/最大"必须有 id 级 tie-break（确定性红线）；</li>
+            <li>所有迭代算法必须有显式上限 + 超限诊断输出；</li>
+            <li>所有零件写表驱动单测，断言可观测输出（不断言内部计数器）。</li>
+          </ul>
+        </div>
+
+      </div>
+
+      <div class="foot">
+        本文为 <a href="../14-图论与优化工具箱.md">14-图论与优化工具箱.md</a> 的 HTML 图文版。
+        配套：<a href="00-索引与阅读指南.html">索引</a> ·
+        <a href="../21-术语表.html">术语表图解</a> ·
+        <a href="../../../../design/layout/write-authority.md">写权纪律</a>
+      </div>
+
+    </article>
+  </div>
+</div>
+
+<script src="_assets/nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

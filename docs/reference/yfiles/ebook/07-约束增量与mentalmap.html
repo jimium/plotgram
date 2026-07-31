@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>07 · 约束、增量与 mental map — yFiles 参考文库 ebook</title>
+<link rel="stylesheet" href="_assets/style.css">
+<!-- highlight.js 主题（浅色 + 暗色） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+  /* 代码块在浅/暗色下都可用；highlight.js 主题负责 token 颜色，本 CSS 负责容器 */
+  pre code.hljs { background: transparent; padding: 0; border: none; font-size: 13px; }
+  pre code.hljs .comment { font-style: italic; }
+</style>
+</head>
+<body data-page="07">
+
+<div class="layout">
+  <div class="content">
+    <article>
+
+      <h1>07 · 约束、增量与 mental map（Constraints, Incremental &amp; Mental Map）</h1>
+      <p class="subtitle">对应 yFiles <code>LayoutConstraints</code>（sequence/layer constraints）、<code>FixNodeLayoutStage</code>、<code>InteractiveOrganicLayout</code>、<code>PartialLayout</code>、"from sketch" 模式</p>
+
+      <div class="meta-bar">
+        <span class="pill">核心算法</span>
+        <span>主线论文：Dwyer–Koren–Marriott 2006（<em>IPSEP-COLA</em>）、Dwyer–Marriott–Stuckey 2006（<em>VPSC</em>）、Misue–Eades–Lai–Sugiyama 1995（<em>Mental Map</em>）、Brandes–Wagner 1997（Bayesian 动态布局）、Dwyer et al. 2008（Dunnart）、Diehl–Görg 2002（foresighted layout）</span>
+        <span class="src">~175 行 · 6.5k 字</span>
+      </div>
+
+      <div class="prose">
+
+        <p>自动布局在产品里从不是"一次算完"。用户会拖、会加节点、会要求"这两个必须并排"。本篇讲怎么把这些做成<strong>一等约束</strong>而不是补丁。</p>
+
+        <!-- ============ §1 VPSC ============ -->
+        <h2 id="sec-1"><span class="h2-num">1</span>核心武器：VPSC（Variable Placement with Separation Constraints）</h2>
+
+        <p><strong>这是约束布局的基础设施，建议作为 plotgram 的公共求解器。</strong></p>
+
+        <h3>1.1 问题</h3>
+        <div class="formula" data-tex="\min \sum_i w_i (x_i - x_i^{des})^2 \quad\text{s.t.}\quad x_j - x_i \ge g_{ij}\ \forall (i,j)\in C"></div>
+        <p>即"在满足一组一维分隔约束的前提下，让每个变量尽量靠近其期望位置"。</p>
+
+        <p>用途极广：</p>
+        <ul>
+          <li>消除节点重叠（x 方向：<span class="katex-inline" data-tex="x_j - x_i \ge (w_i+w_j)/2"></span>）；</li>
+          <li>层内间距（01 篇 P4）；</li>
+          <li>正交紧致化（02 篇 Step 3）；</li>
+          <li>nudging（03 篇 L4）；</li>
+          <li>对齐约束（等式 = 两个不等式）；</li>
+          <li>组框内边距、泳道边界。</li>
+        </ul>
+
+        <!-- 图解：VPSC 分隔约束 -->
+        <figure>
+          <svg viewBox="0 0 480 200" aria-label="VPSC 一维分隔约束示意">
+            <line class="axis" x1="30" y1="120" x2="450" y2="120"/>
+            <text x="20" y="124" text-anchor="end" class="muted" font-size="10">x</text>
+            <!-- 变量 x_i 与 x_j -->
+            <rect class="node" x="80" y="100" width="50" height="40" rx="4"/>
+            <text x="105" y="124" text-anchor="middle" class="label">x_i</text>
+            <rect class="node" x="240" y="100" width="50" height="40" rx="4"/>
+            <text x="265" y="124" text-anchor="middle" class="label">x_j</text>
+            <!-- 期望位置（虚线） -->
+            <rect class="node-muted" x="60" y="100" width="50" height="40" rx="4"/>
+            <text x="85" y="155" text-anchor="middle" class="muted" font-size="10">des_i</text>
+            <rect class="node-muted" x="290" y="100" width="50" height="40" rx="4"/>
+            <text x="315" y="155" text-anchor="middle" class="muted" font-size="10">des_j</text>
+            <line class="edge-muted" x1="105" y1="100" x2="85" y2="100" stroke-dasharray="3 2"/>
+            <line class="edge-muted" x1="265" y1="100" x2="315" y2="100" stroke-dasharray="3 2"/>
+            <!-- 分隔约束 g_ij -->
+            <path class="edge-hi" d="M132,120 L240,120" marker-end="url(#a7r)"/>
+            <path class="edge-hi" d="M238,114 L238,126" stroke="var(--bad)"/>
+            <text x="186" y="110" text-anchor="middle" class="hi" font-size="11">x_j − x_i ≥ g_ij</text>
+            <!-- 第二对约束链 -->
+            <rect class="node" x="350" y="100" width="50" height="40" rx="4"/>
+            <text x="375" y="124" text-anchor="middle" class="label">x_k</text>
+            <path class="edge" d="M292,120 L350,120" marker-end="url(#a7k)"/>
+            <text x="321" y="110" text-anchor="middle" class="muted" font-size="10">≥ g_jk</text>
+            <defs>
+              <marker id="a7r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--bad)"/></marker>
+              <marker id="a7k" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink)"/></marker>
+            </defs>
+            <text x="240" y="190" text-anchor="middle" class="muted" font-size="11">活动集法：把违反约束的变量合并成 block，块内位移由 gap 决定</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 7.1</span>VPSC：在满足一维分隔约束 <span class="katex-inline" data-tex="x_j - x_i \ge g_{ij}"></span> 的前提下，让每个变量尽量靠近其期望位置</div>
+        </figure>
+
+        <h3>1.2 算法（Dwyer–Marriott–Stuckey 2006）</h3>
+        <p>活动集法 + <strong>块合并（block merging）</strong>：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">1. 每个变量初始为独立 block，位置 = desired
+2. 找违反的约束 c=(i→j)：把 i、j 所在 block 合并成一个 block，
+   block 内相对位移固定（由 c 的 gap 决定），block 位置 = 加权最优点
+   （block 最优位置 = Σ w_k(des_k - offset_k) / Σ w_k）
+3. 合并可能引入新违反 → 重复
+4. 若 block 内某约束出现"负 Lagrange 乘子"（想拉开），拆分 block（split）
+5. 无违反且无负乘子 → 最优</code></pre>
+        </div>
+        <ul>
+          <li>复杂度：<span class="katex-inline" data-tex="O(|C|\log|C|)"></span> 摊还（优先队列 + 并查集式 block），实践极快。</li>
+          <li><strong>保证全局最优</strong>（凸 QP + 线性约束）。</li>
+          <li>约束图有环（矛盾约束）时需检测并报告不可行 —— 实践中按优先级丢弃冲突约束。</li>
+        </ul>
+
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>不可行约束必须显式处理</div>
+          <p>约束图有环意味着约束集矛盾。生产实现不能崩、也不能静默忽略 —— 要给约束定优先级，冲突时按优先级丢弃，并在诊断输出里报告。详见 §7 第 5 条。</p>
+        </div>
+
+        <h3>1.3 二维：交替 x/y（Dwyer 的 "satisfy_VPSC"）</h3>
+        <p>2D 重叠消除不是凸问题。做法：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">loop {
+   生成 x 方向分隔约束（对每对重叠矩形，选"位移更小"的方向 x 或 y）
+   solve_VPSC(x)
+   同理 y
+} until 无重叠</code></pre>
+        </div>
+        <ul>
+          <li>每对重叠矩形只在<strong>一个</strong>方向加约束（选代价小者）→ 这是唯一的启发式成分。</li>
+          <li>通常 2–5 轮收敛。</li>
+          <li>用扫描线生成约束（<span class="katex-inline" data-tex="O(n\log n)"></span>）而不是 <span class="katex-inline" data-tex="O(n^2)"></span> 枚举。</li>
+        </ul>
+
+        <!-- ============ §2 IPSEP-COLA ============ -->
+        <h2 id="sec-2"><span class="h2-num">2</span>约束布局：IPSEP-COLA</h2>
+
+        <p>Dwyer–Koren–Marriott 2006 <em>IPSep-CoLa: Incremental Procedure for Separation Constraint Layout</em>。把 stress majorization（04 篇 §2.3）与 VPSC 结合：</p>
+
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">每轮 SMACOF 迭代：
+   1. 计算无约束的理想位置（解 L^w x = L^Z z）
+   2. 把它作为 desired，跑 VPSC 投影到约束可行域
+   3. 保证 stress 仍单调下降（投影是非扩张映射，配合 majorization 可证收敛）</code></pre>
+        </div>
+        <p>支持的约束类型：</p>
+        <ul>
+          <li><strong>分隔（separation）</strong>：<span class="katex-inline" data-tex="x_j - x_i \ge g"></span>。</li>
+          <li><strong>对齐（alignment）</strong>：<span class="katex-inline" data-tex="x_i = x_j"></span>（同轴），实现为一对分隔约束或引入"对齐变量"。</li>
+          <li><strong>层次/流向（directed edge constraint）</strong>：<span class="katex-inline" data-tex="y_v - y_u \ge g"></span> 对每条有向边 ⇒ <strong>在力导向图上强加流向</strong>。这是 IPSEP 最漂亮的能力：无需分层就得到"总体向下流"的 organic 图。</li>
+          <li><strong>不重叠</strong>：交替 x/y 生成。</li>
+          <li><strong>包含（containment）</strong>：组内节点在组框内 ⇒ 组框边界作为变量参与。</li>
+          <li><strong>页面边界</strong>。</li>
+        </ul>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>organic + 语义约束的最佳落点</div>
+          <p>这是 WebCola 的核心。若 plotgram 要做"知识图谱但要体现层级"，此路线优于强行分层。</p>
+        </div>
+
+        <!-- ============ §3 yFiles 离散约束 ============ -->
+        <h2 id="sec-3"><span class="h2-num">3</span>yFiles 风格的离散约束（分层布局里的）</h2>
+
+        <p>分层布局的约束不是几何而是<strong>离散序</strong>：</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>约束</th><th>语义</th><th>实现落点</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Layer constraint</strong></td><td>同层 / 之上 / 固定层号 / 最上层 / 最下层</td><td>P2 分层 LP 的额外不等式；同层 = 合并超点</td></tr>
+              <tr><td><strong>Sequence constraint</strong></td><td>层内顺序：a 在 b 左边 / 固定位次 / 头尾</td><td>P3 定序时的受约束排序（见下）</td></tr>
+              <tr><td><strong>Port constraint</strong></td><td>边必须从节点某侧/某点出入</td><td>P3 交叉计数 + P4 端口偏移 + 路由端口（见 08 篇）</td></tr>
+              <tr><td><strong>Edge grouping</strong></td><td>一组边共享同一端口/汇聚</td><td>端口分配 + bus routing</td></tr>
+              <tr><td><strong>Critical path</strong></td><td>指定路径应画直、优先</td><td>提高该路径边权（P2 与 P4 的目标权重）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>3.1 受约束的层内排序</h3>
+        <p>P3 用 barycenter 排序，加约束后需<strong>保序投影</strong>：</p>
+        <ol>
+          <li>无约束地算出每个节点的 barycenter 值；</li>
+          <li>把序约束视为偏序，对每个约束链做 <strong>PAV（Pool Adjacent Violators）</strong> 合并：违反顺序的相邻组合并为一个"超组"，取加权平均值；</li>
+          <li>按最终值排序，组内按约束序展开。</li>
+        </ol>
+
+        <p>这正是 isotonic regression 的算法，<span class="katex-inline" data-tex="O(n)"></span>，<strong>保证在满足约束下最接近无约束解</strong>。比"排完再冒泡修"干净得多。</p>
+
+        <h3>3.2 关键路径拉直（critical path）</h3>
+        <p>给指定路径上的边设置极高权重（P2 的边跨度权重 + P4 的对齐权重）→ 该路径自然变成直线主干。</p>
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>禁止事后强制对齐</div>
+          <p><strong>不要</strong>用"事后把这些节点强制对齐"，那会破坏别处间距。要么在 P2/P4 通过权重体现，要么作为分隔约束喂给 VPSC，而不是在路由阶段补丁。</p>
+        </div>
+
+        <!-- ============ §4 Partial Layout ============ -->
+        <h2 id="sec-4"><span class="h2-num">4</span>增量 / 局部布局（Partial Layout）</h2>
+
+        <p>场景：图上加了几个新节点，已有部分不能动（或尽量少动）。</p>
+
+        <h3>4.1 yFiles <code>PartialLayout</code> 的模型</h3>
+        <ul>
+          <li>节点分为 <strong>fixed</strong>（不动）与 <strong>partial</strong>（待布局）。</li>
+          <li>步骤：
+            <ol>
+              <li>把 fixed 部分当障碍；</li>
+              <li>对 partial 节点做<strong>子图分组</strong>（连通性 + 与 fixed 的连接关系）；</li>
+              <li>为每组找放置位置（候选：靠近其 fixed 邻居的重心、空白区域；用网格/象限搜索 + 打分）；</li>
+              <li>组内用常规布局（分层/organic）；</li>
+              <li>边路由（只重路由受影响边）。</li>
+            </ol>
+          </li>
+          <li>打分项：与 fixed 邻居的距离、与已放组的重叠、方向一致性（若整图自上而下，新节点应遵循）。</li>
+        </ul>
+
+        <!-- 图解：增量布局 fixed vs partial -->
+        <figure>
+          <svg viewBox="0 0 480 220" aria-label="增量布局：fixed 节点冻结，partial 节点重新放置">
+            <text x="120" y="20" text-anchor="middle" class="muted">布局前（加入新节点）</text>
+            <text x="360" y="20" text-anchor="middle" class="label">布局后</text>
+            <!-- 左：before -->
+            <g transform="translate(20,40)">
+              <rect class="node" x="20" y="20" width="44" height="24" rx="4"/>
+              <text x="42" y="36" text-anchor="middle" class="muted" font-size="10">A</text>
+              <rect class="node" x="120" y="20" width="44" height="24" rx="4"/>
+              <text x="142" y="36" text-anchor="middle" class="muted" font-size="10">B</text>
+              <rect class="node" x="70" y="100" width="44" height="24" rx="4"/>
+              <text x="92" y="116" text-anchor="middle" class="muted" font-size="10">C</text>
+              <line class="edge" x1="42" y1="44" x2="92" y2="100"/>
+              <line class="edge" x1="142" y1="44" x2="92" y2="100"/>
+              <!-- 新节点散落 -->
+              <rect class="dummy" x="180" y="60" width="44" height="24" rx="4"/>
+              <text x="202" y="76" text-anchor="middle" class="hi" font-size="10">D?</text>
+              <rect class="dummy" x="190" y="120" width="44" height="24" rx="4"/>
+              <text x="212" y="136" text-anchor="middle" class="hi" font-size="10">E?</text>
+              <path class="edge-muted" d="M142,44 L180,72" stroke-dasharray="2 2"/>
+              <path class="edge-muted" d="M114,124 L190,132" stroke-dasharray="2 2"/>
+              <text x="115" y="180" text-anchor="middle" class="muted" font-size="10">A/B/C = fixed；D/E = partial</text>
+            </g>
+            <!-- 右：after -->
+            <g transform="translate(260,40)">
+              <rect class="node" x="20" y="20" width="44" height="24" rx="4"/>
+              <text x="42" y="36" text-anchor="middle" class="muted" font-size="10">A</text>
+              <rect class="node" x="120" y="20" width="44" height="24" rx="4"/>
+              <text x="142" y="36" text-anchor="middle" class="muted" font-size="10">B</text>
+              <rect class="node" x="70" y="100" width="44" height="24" rx="4"/>
+              <text x="92" y="116" text-anchor="middle" class="muted" font-size="10">C</text>
+              <line class="edge" x1="42" y1="44" x2="92" y2="100"/>
+              <line class="edge" x1="142" y1="44" x2="92" y2="100"/>
+              <!-- 新节点就位 -->
+              <rect class="node" x="135" y="100" width="44" height="24" rx="4"/>
+              <text x="157" y="116" text-anchor="middle" class="label" font-size="10">D</text>
+              <rect class="node" x="105" y="160" width="44" height="24" rx="4"/>
+              <text x="127" y="176" text-anchor="middle" class="label" font-size="10">E</text>
+              <path class="edge-hi" d="M157,100 L142,44" stroke="var(--accent)" stroke-width="1.6"/>
+              <path class="edge-hi" d="M114,124 L127,160" stroke="var(--accent)" stroke-width="1.6"/>
+              <text x="115" y="200" text-anchor="middle" class="muted" font-size="10">partial 节点就位于 fixed 邻近</text>
+            </g>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 7.2</span>增量布局：<strong>fixed</strong> 节点冻结当障碍，<strong>partial</strong> 节点按连通性分组后重新放置</div>
+        </figure>
+
+        <h3>4.2 "From Sketch" 模式（用户草图作为提示）</h3>
+        <p>用户已手拖大致位置，希望"整理但保持我的意图"：</p>
+        <ul>
+          <li>分层布局：用当前 y 坐标推导层号（聚类 y 值），用当前 x 排序推导层内序 ⇒ 后续正常跑 P4。这是 ELK 的 <code>INTERACTIVE</code> 策略 / yFiles 的 <code>fromSketchMode</code>。<strong>实现成本低、用户价值极高，强烈推荐</strong>。</li>
+          <li>Organic：用当前坐标作为 stress 的初值（而非随机），并给"离原位远"加惩罚：
+            <div class="formula" data-tex="\sigma'(X)=\sigma(X)+\alpha\sum_i \lVert x_i - x_i^{orig}\rVert^2"></div>
+            <span class="katex-inline" data-tex="\alpha"></span> 即"保持原样的强度"，做成用户滑杆。</li>
+        </ul>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>from-sketch 优先级高</div>
+          <p>从当前坐标反推层与序，成本低、用户感知强。这是"用户拖完点一下整理"功能最高性价比的实现路径。</p>
+        </div>
+
+        <h3>4.3 增量的稳定性技巧</h3>
+        <ul>
+          <li><strong>锚定（anchoring）</strong>：固定图的"重心"或用户选中节点（yFiles <code>FixNodeLayoutStage</code>），避免整图平移导致视口跳变。</li>
+          <li><strong>hysteresis</strong>：路由/序在两方案代价接近时保持旧方案（03 篇 §5）。</li>
+          <li><strong>温度分区</strong>：交互式力导向中，离改动点远的节点温度置 0（不动）。</li>
+        </ul>
+
+        <!-- ============ §5 Mental Map ============ -->
+        <h2 id="sec-5"><span class="h2-num">5</span>Mental Map（心智地图）保持</h2>
+
+        <p>Misue–Eades–Lai–Sugiyama 1995 定义三个需保持的性质：</p>
+        <ol>
+          <li><strong>Orthogonal ordering</strong>：任意两点的上下/左右关系不变（a 在 b 左，之后仍在左）。</li>
+          <li><strong>Proximity relations</strong>：邻近关系不变（Delaunay/Voronoi 邻接不变）。</li>
+          <li><strong>Topology</strong>（层次/聚类结构）不变。</li>
+        </ol>
+
+        <!-- 图解：mental map 位移向量 -->
+        <figure>
+          <svg viewBox="0 0 480 220" aria-label="mental map 保持：节点位移向量最小化">
+            <text x="120" y="22" text-anchor="middle" class="muted">布局变更前</text>
+            <text x="360" y="22" text-anchor="middle" class="label">布局变更后</text>
+            <!-- 左：before -->
+            <g transform="translate(20,40)">
+              <rect class="node" x="20" y="20" width="40" height="22" rx="4"/>
+              <text x="40" y="35" text-anchor="middle" font-size="10">u</text>
+              <rect class="node" x="140" y="20" width="40" height="22" rx="4"/>
+              <text x="160" y="35" text-anchor="middle" font-size="10">v</text>
+              <rect class="node" x="80" y="110" width="40" height="22" rx="4"/>
+              <text x="100" y="125" text-anchor="middle" font-size="10">w</text>
+              <line class="edge" x1="40" y1="42" x2="100" y2="110"/>
+              <line class="edge" x1="160" y1="42" x2="100" y2="110"/>
+              <text x="100" y="170" text-anchor="middle" class="muted" font-size="10">u 在 v 左；w 在 u/v 下</text>
+            </g>
+            <!-- 右：after with displacement vectors -->
+            <g transform="translate(260,40)">
+              <rect class="node-muted" x="20" y="20" width="40" height="22" rx="4" opacity="0.4"/>
+              <rect class="node-muted" x="140" y="20" width="40" height="22" rx="4" opacity="0.4"/>
+              <rect class="node-muted" x="80" y="110" width="40" height="22" rx="4" opacity="0.4"/>
+              <!-- 新位置 -->
+              <rect class="node" x="35" y="32" width="40" height="22" rx="4"/>
+              <text x="55" y="47" text-anchor="middle" font-size="10">u'</text>
+              <rect class="node" x="160" y="14" width="40" height="22" rx="4"/>
+              <text x="180" y="29" text-anchor="middle" font-size="10">v'</text>
+              <rect class="node" x="70" y="125" width="40" height="22" rx="4"/>
+              <text x="90" y="140" text-anchor="middle" font-size="10">w'</text>
+              <!-- 位移向量 -->
+              <path class="edge-hi" d="M40,31 L55,43" marker-end="url(#a7v)"/>
+              <path class="edge-hi" d="M160,31 L180,25" marker-end="url(#a7v)"/>
+              <path class="edge-hi" d="M100,121 L90,135" marker-end="url(#a7v)"/>
+              <line class="edge" x1="55" y1="54" x2="90" y2="125"/>
+              <line class="edge" x1="180" y1="36" x2="90" y2="125"/>
+              <text x="120" y="180" text-anchor="middle" class="hi" font-size="10">位移向量 = new − old</text>
+              <defs>
+                <marker id="a7v" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--bad)"/></marker>
+              </defs>
+            </g>
+            <text x="240" y="210" text-anchor="middle" class="muted" font-size="11">min Σ ‖x_new − x_old‖²；正交序（左/右、上/下）不变</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 7.3</span>mental map 保持：用位移惩罚 + 正交序约束，让"改了之后还是用户认识的那张图"</div>
+        </figure>
+
+        <h3>5.1 可实施的手段</h3>
+        <ul>
+          <li><strong>正交序保持</strong>：把"a 在 b 左"作为分隔约束喂 VPSC ⇒ 直接保证。这是 PRISM/VPSC 消重叠优于 scanline-push 的原因。</li>
+          <li><strong>邻近保持</strong>：PRISM（04 篇 §4.1）在 Delaunay 三角化上施加约束，天然保邻近。</li>
+          <li><strong>变化最小化</strong>：目标里加 <span class="katex-inline" data-tex="\alpha\lVert X-X_{old}\rVert^2"></span>。</li>
+          <li><strong>动画过渡</strong>：即使位置变了，平滑动画（staged animation：淡出→移动→淡入；或 Diehl–Görg 的 foresighted layout 多帧联合优化）也能大幅降低认知负担。</li>
+        </ul>
+
+        <h3>5.2 稳定性度量（可自动断言）</h3>
+        <ul>
+          <li><strong>位移</strong>：<span class="katex-inline" data-tex="\frac{1}{n}\sum\lVert x_i^{new}-x_i^{old}\rVert"></span>，归一化到图直径。</li>
+          <li><strong>正交序违反数</strong>：对点对统计 sign(dx)/sign(dy) 变化数（<span class="katex-inline" data-tex="O(n^2)"></span>，抽样即可）。</li>
+          <li><strong>邻接保持率</strong>：k-NN 集合的 Jaccard 相似度。</li>
+        </ul>
+
+        <p>把这三项加入回归基准 ⇒ "改了算法会不会让用户的图大变"变成可测的（见 11 篇）。</p>
+
+        <!-- ============ §6 动态图布局 ============ -->
+        <h2 id="sec-6"><span class="h2-num">6</span>动态图布局（时间序列）</h2>
+
+        <ul>
+          <li><strong>离线（offline / foresighted）</strong>：已知全部帧 → 联合优化。把所有帧的节点副本放进一个超级图，同一节点跨帧副本之间加"弹簧"（时间正则项），一次求解。质量最好（Diehl–Görg 2002；Brandes–Corman 2003 <em>Visual Unrolling</em>）。</li>
+          <li><strong>在线（online）</strong>：只知过去 → 用前帧作初值 + 位移惩罚。</li>
+          <li><strong>Supergraph 方案</strong>：对所有帧的并图布局一次，每帧只显示子集 ⇒ 完美稳定但单帧质量差。折中：并图布局作为"锚"，每帧在锚附近微调。</li>
+        </ul>
+
+        <!-- ============ §7 与 plotgram 对接 ============ -->
+        <h2 id="sec-7"><span class="h2-num">7</span>与 plotgram 的对接建议</h2>
+
+        <ol>
+          <li><strong>把 VPSC 做成 crate 内的公共求解器</strong>（<code>plotgram-engine</code> 的 <code>solver</code> 模块），供：层内间距、消重叠、nudging、正交紧致化、组框边距共用。这是本文库里<strong>投入产出比最高的单一建议</strong>。</li>
+          <li><strong>约束分两类明确区分</strong>：
+            <ul>
+              <li><em>离散约束</em>（层、序、端口）→ 影响 P2/P3，必须在对应相实现（受约束排序用 PAV 投影）；</li>
+              <li><em>几何约束</em>（对齐、间距、包含、边界）→ 统一进 VPSC。</li>
+            </ul>
+            不要混：几何约束去改层号 = 破坏写权。</li>
+          <li><strong>from-sketch 模式优先级高</strong>：从当前坐标反推层与序，成本低、用户感知强。</li>
+          <li><strong>稳定性作为一等指标</strong>：任何"改善观感"的改动都要报告位移与正交序违反数，防止改一个图种毁掉另一个（本仓库已有 route_snapshot / benchmarks 基础设施，接上这三个指标即可）。</li>
+          <li><strong>不可行约束的处理策略要显式</strong>：给约束定优先级，冲突时按优先级丢弃并在诊断输出里报告，而不是静默忽略或崩溃。</li>
+        </ol>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>写权红线（与 AGENTS.md 一致）</div>
+          <p>几何约束（对齐、间距、包含）<strong>只能</strong>进 VPSC 这一类几何求解器；离散约束（层、序）<strong>只能</strong>进对应 phase。让几何约束去改层号、或让路由阶段补丁对齐，都是<strong>下游推翻上游</strong>的写权违例 —— 应上提到对应写者。</p>
+        </div>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>一句话收敛</div>
+          <p>把"约束""增量""稳定性"三件事统一到 <strong>VPSC + PAV + 位移惩罚</strong> 三件套上，是 plotgram 把补丁式 hack 升级为一等工程的分水岭。</p>
+        </div>
+
+      </div>
+
+      <div class="foot">
+        本文为 <a href="../07-约束增量与mentalmap.md">07-约束增量与mentalmap.md</a> 的 HTML 图文版。
+        配套：<a href="00-索引与阅读指南.html">索引</a> ·
+        <a href="../21-术语表.html">术语表图解</a> ·
+        <a href="../../../../design/layout/write-authority.md">写权纪律</a>
+      </div>
+
+    </article>
+  </div>
+</div>
+
+<script src="_assets/nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

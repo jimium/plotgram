@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>10 · 行业图应用 — yFiles 参考文库 ebook</title>
+<link rel="stylesheet" href="_assets/style.css">
+<!-- highlight.js 主题（浅色 + 暗色） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+  /* 代码块在浅/暗色下都可用；highlight.js 主题负责 token 颜色，本 CSS 负责容器 */
+  pre code.hljs { background: transparent; padding: 0; border: none; font-size: 13px; }
+  pre code.hljs .comment { font-style: italic; }
+</style>
+</head>
+<body data-page="10">
+
+<div class="layout">
+  <div class="content">
+    <article>
+
+      <h1>10 · 行业图应用（Domain-Specific Diagrams）</h1>
+      <p class="subtitle">本篇回答"为什么 yFiles 值那么多钱"：不是算法更炫，而是<strong>把各行业的图形约定翻译成了布局约束</strong>。对 plotgram 的意义：每个行业的约定 = 一组 profile 参数 + 一小组必需的约束能力；本篇为每个行业列出<strong>必需能力清单</strong>。</p>
+
+      <div class="meta-bar">
+        <span class="pill">应用</span>
+        <span>原始出处：plotgram 行业图能力清单（参考 yFiles / Graphviz / ELK / SBGN 等产品文档）</span>
+        <span class="src">~230 行 · 6.5k 字</span>
+      </div>
+
+      <div class="prose">
+
+        <!-- ============ §1 软件工程 ============ -->
+        <h2 id="sec-1"><span class="h2-num">1</span>软件工程</h2>
+
+        <h3>1.1 UML 类图 / 包图</h3>
+        <ul>
+          <li>约定：继承向上（泛化箭头朝父类）、关联带多重度标签、包嵌套。</li>
+          <li><strong>布局诉求</strong>：分层（继承方向）+ 正交边 + 继承边<strong>汇聚成树干</strong>（多个子类的继承箭头合并到父类一个端口，形成"Λ"形）。</li>
+          <li>必需能力：<code>edge grouping</code>（3.5/08）、分组（包）、端口约束、边标签（多重度在两端）。</li>
+          <li>经典处理：把继承关系与关联关系<strong>分开处理</strong>——继承树用树/分层布局定骨架，关联边事后正交路由。这是 yFiles UML demo 的做法。</li>
+        </ul>
+
+        <h3>1.2 UML 序列图</h3>
+        <ul>
+          <li>约定：参与者在顶部一行、生命线竖直向下、消息水平箭头、激活条、组合片段（alt/loop）嵌套框。</li>
+          <li><strong>布局诉求</strong>：完全<strong>不是</strong>通用图布局！是"一维序列 + 一维时间"的调度问题：
+            <ul>
+              <li>x：参与者顺序（可优化以减少消息跨度 = 一维排列问题，等价于最小线性排列 MinLA，NP 难，用 barycenter/谱序启发式）；</li>
+              <li>y：事件时间序（拓扑序 + 每个消息的高度需求 + 片段框的 padding）。</li>
+            </ul>
+          </li>
+          <li>必需能力：定序 + 一维坐标累加 + 嵌套框（组）。<strong>不需要</strong>通用路由。</li>
+        </ul>
+
+        <h3>1.3 状态机 / Statechart</h3>
+        <ul>
+          <li>约定：初始态实心圆、复合状态嵌套、自转移、迁移标签（event[guard]/action）。</li>
+          <li>布局诉求：分层（若有明显流向）或正交紧凑（状态机常有环）；自环必须优雅；嵌套复合状态 = 组。</li>
+          <li>必需能力：自环路由、组、边标签（标签常很长 → 空间预留是刚需）。</li>
+        </ul>
+
+        <h3>1.4 数据流 / 编译器 IR / 计算图（TensorFlow 类）</h3>
+        <ul>
+          <li>约定：节点有明确的输入/输出端口（有序！）、常量折叠、子图（scope）折叠。</li>
+          <li>布局诉求：<strong>端口序是硬约束</strong>（矩阵乘的两个输入不能换）→ <code>FIXED_ORDER</code> 端口；分层 + 正交。</li>
+          <li>必需能力：端口五档模型（08 篇）、组折叠/展开、边捆绑（大量 tensor 边）。</li>
+          <li>参考：TensorBoard 的图可视化用的正是 dot 系分层 + 结构抽取（把重复的子结构折叠成一个）。</li>
+        </ul>
+
+        <h3>1.5 依赖图 / Monorepo 架构图</h3>
+        <ul>
+          <li>规模大（数千节点）、环多（循环依赖是要发现的缺陷）。</li>
+          <li>诉求：分层以暴露层级违规、环高亮、聚合到模块级（层次折叠）。</li>
+          <li>必需能力：FAS（环检测的副产品要<strong>报告</strong>给用户，不只是内部反转）、多级折叠、规模门控。</li>
+        </ul>
+
+        <!-- ============ §2 业务流程 ============ -->
+        <h2 id="sec-2"><span class="h2-num">2</span>业务流程（BPM）</h2>
+
+        <h3>2.1 BPMN 2.0</h3>
+        <ul>
+          <li>约定：泳道/池（Pool/Lane）、网关（菱形，含分支标签 yes/no）、事件（圆）、任务（圆角矩形）、边界事件、子流程。</li>
+          <li><strong>布局诉求</strong>（最苛刻的图种之一）：
+            <ul>
+              <li>主流程<strong>水平笔直贯穿</strong>（happy path 一条直线）；</li>
+              <li>网关分支上下分开、回边（loop）走在下方/上方绕行；</li>
+              <li>严格遵守泳道分区（08 篇 §2）；</li>
+              <li>边界事件的边从任务边框上的特定位置出发（固定端口）。</li>
+            </ul>
+          </li>
+          <li>必需能力：泳道（partition grid）、critical path 拉直（07 §3.2）、固定端口、正交路由 + 回边特殊处理、分支标签放置。</li>
+        </ul>
+
+        <!-- 图解：BPMN 主流程 -->
+        <figure>
+          <svg viewBox="0 0 720 200" aria-label="BPMN 主流程水平贯穿 + 网关分支">
+            <!-- 泳道背景 -->
+            <rect class="layer-bg" x="10" y="20" width="700" height="160" rx="4"/>
+            <line class="gridline" x1="10" y1="100" x2="710" y2="100"/>
+            <text x="20" y="40" class="muted" font-size="10">Lane · 主流程</text>
+            <text x="20" y="120" class="muted" font-size="10">Lane · 异常/回边</text>
+
+            <!-- happy path: Start → Task A → Gateway → Task B → End（一条水平直线） -->
+            <circle class="node" cx="70" cy="70" r="14"/>
+            <text x="70" y="74" text-anchor="middle" class="muted" font-size="9">start</text>
+
+            <rect class="node" x="120" y="58" width="70" height="24" rx="12"/>
+            <text x="155" y="74" text-anchor="middle" font-size="11">Task A</text>
+
+            <!-- 分支网关 -->
+            <polygon class="node" points="240,70 260,50 280,70 260,90"/>
+            <text x="260" y="74" text-anchor="middle" font-size="10">◇</text>
+            <text x="260" y="42" text-anchor="middle" class="label" font-size="10">yes</text>
+            <text x="260" y="108" text-anchor="middle" class="muted" font-size="10">no</text>
+
+            <rect class="node" x="320" y="58" width="70" height="24" rx="12"/>
+            <text x="355" y="74" text-anchor="middle" font-size="11">Task B</text>
+
+            <!-- 汇合网关 -->
+            <polygon class="node" points="440,70 460,50 480,70 460,90"/>
+            <text x="460" y="74" text-anchor="middle" font-size="10">◇</text>
+
+            <rect class="node" x="520" y="58" width="70" height="24" rx="12"/>
+            <text x="555" y="74" text-anchor="middle" font-size="11">Task C</text>
+
+            <circle class="node" cx="650" cy="70" r="14" stroke-width="2.5"/>
+            <circle cx="650" cy="70" r="8" class="node" stroke="none"/>
+            <text x="650" y="100" text-anchor="middle" class="muted" font-size="9">end</text>
+
+            <!-- happy path 边（水平直线，加粗高亮） -->
+            <line class="edge-hi" x1="84" y1="70" x2="120" y2="70"/>
+            <line class="edge-hi" x1="190" y1="70" x2="240" y2="70"/>
+            <line class="edge-hi" x1="280" y1="70" x2="320" y2="70"/>
+            <line class="edge-hi" x1="390" y1="70" x2="440" y2="70"/>
+            <line class="edge-hi" x1="480" y1="70" x2="520" y2="70"/>
+            <line class="edge-hi" x1="590" y1="70" x2="636" y2="70"/>
+
+            <!-- 异常分支：下方绕行回边 -->
+            <path class="edge" d="M260,90 L260,140 L460,140 L460,90"/>
+            <text x="360" y="135" text-anchor="middle" class="muted" font-size="10">回边 loop</text>
+
+            <text x="360" y="190" text-anchor="middle" class="hi" font-size="11">主流程一条水平直线 = "专业感"的核心评价标准</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 10.1</span>BPMN 主流程水平贯穿（happy path 加粗），网关分支上下分开、回边走下方绕行</div>
+        </figure>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>典型评价标准</div>
+          <p>主流程是否一条直线；这一项做好，整张图立刻"专业"。BPMN 是把"业务约定"翻译成 <code>partition_grid + critical_path 拉直 + 固定端口 + 回边侧通道</code> 的组合。</p>
+        </div>
+
+        <h3>2.2 审批流 / 工作流引擎（国内产品的高频需求）</h3>
+        <ul>
+          <li>简化版 BPMN：开始/结束、审批节点、条件分支、并行分支、回退。</li>
+          <li>诉求：紧凑竖排、分支对称（左右对称的并行分支是强视觉期待）、回退边走侧边。</li>
+          <li>必需能力：<strong>对称性</strong>（Brandes–Köpf 的 4-run 平均恰好给对称，01 篇 §4.4）、分支合并点对齐、侧边通道。</li>
+        </ul>
+
+        <h3>2.3 价值流图 / 泳道流程</h3>
+        <ul>
+          <li>诉求：阶段（列）× 角色（行）的矩阵定位。</li>
+          <li>必需能力：双向 partition grid。</li>
+        </ul>
+
+        <!-- ============ §3 网络与 IT 运维 ============ -->
+        <h2 id="sec-3"><span class="h2-num">3</span>网络与 IT 运维</h2>
+
+        <h3>3.1 网络拓扑</h3>
+        <ul>
+          <li>约定：设备图标、层级（core/aggregation/access 三层）、链路带宽用线宽、冗余链路成对。</li>
+          <li>布局诉求：分层（按网络层级）或<strong>圆形/星形</strong>（环网、星型接入）；平行链路清晰分开；子网分组。</li>
+          <li>必需能力：circular（05 篇 §4）、平行边散开、分组、bus routing（机架内多条上行链路）。</li>
+        </ul>
+
+        <h3>3.2 云架构图（AWS/Azure 风格）</h3>
+        <ul>
+          <li>约定：VPC/子网/可用区的嵌套框、图标化节点、区域标签。</li>
+          <li>布局诉求：嵌套组（3+ 层）+ 组内正交、跨区域连线走边框开口。</li>
+          <li>必需能力：多层嵌套组、组框标题、组内 padding、跨组边的边界穿越点。</li>
+        </ul>
+
+        <h3>3.3 服务依赖 / 微服务调用链</h3>
+        <ul>
+          <li>规模大、动态更新（实时）。</li>
+          <li>诉求：稳定性（数据刷新不能整图跳，07 篇 §5）、异常路径高亮、按调用量粗细。</li>
+          <li>必需能力：增量布局 + mental map 保持。</li>
+        </ul>
+
+        <h3>3.4 攻击图 / 事件关联（安全领域）</h3>
+        <ul>
+          <li>诉求：从"入口"到"资产"的路径清晰（分层 + critical path）、时间轴维度。</li>
+          <li>必需能力：分层 + 泳道（时间）+ 路径高亮。</li>
+        </ul>
+
+        <!-- ============ §4 数据与知识 ============ -->
+        <h2 id="sec-4"><span class="h2-num">4</span>数据与知识</h2>
+
+        <h3>4.1 ER 图 / 数据库 schema</h3>
+        <ul>
+          <li>约定：实体表格（字段列表）、关系带基数（1:N crow's foot）、外键连到具体字段行。</li>
+          <li>布局诉求：<strong>边连到表内某一行</strong>（字段级端口！）→ 端口数多且固定序；节点很高（字段多）；正交边。</li>
+          <li>必需能力：<code>FIXED_POS</code> 端口（字段行的 y 偏移）、大高宽比节点的分层布局、正交路由 + nudging。</li>
+          <li>这是<strong>正交布局（02 篇）的经典应用</strong>，也是端口能力的试金石。</li>
+        </ul>
+
+        <h3>4.2 数据血缘（Data Lineage）</h3>
+        <ul>
+          <li>诉求：严格左右流向、列级血缘（端口级）、可折叠（表级/列级切换）、大规模。</li>
+          <li>必需能力：LR 方向（Orientation Stage）、端口级连接、折叠、bus routing（一张表数百列时必须捆绑）。</li>
+        </ul>
+
+        <h3>4.3 知识图谱 / 实体关系网络</h3>
+        <ul>
+          <li>诉求：organic 布局 + 聚类可见、hub 节点突出、大规模（万级）。</li>
+          <li>必需能力：多级 stress / ForceAtlas2、社区检测着色、消重叠、边捆绑。</li>
+        </ul>
+
+        <h3>4.4 ETL / 数据管道</h3>
+        <ul>
+          <li>类似数据流图，见 1.4。</li>
+        </ul>
+
+        <!-- ============ §5 生命科学 ============ -->
+        <h2 id="sec-5"><span class="h2-num">5</span>生命科学</h2>
+
+        <h3>5.1 生物通路（SBGN — Systems Biology Graphical Notation）</h3>
+        <ul>
+          <li>约定极其严格（SBGN 有正式规范）：三种子语言（Process Description / Entity Relationship / Activity Flow）、
+            节点形状有语义（macromolecule 圆角矩形、simple chemical 椭圆…）、<strong>过程节点是小方块，反应物/产物必须连到它两侧的特定端口</strong>、
+            复合物是嵌套、区室（compartment）是大框。</li>
+          <li>布局诉求：区室边界不可穿越（除转运）、过程节点左右对称（底物在左、产物在右）、辅因子在上下、通路主链应可辨识（横向长链）。</li>
+          <li>必需能力：固定端口（过程节点的 4 个端口有语义）、嵌套区室（组）、对称性、长链拉直。</li>
+          <li>参考：<code>SBGN-ED</code>、Cytoscape 的相关布局；yFiles 有 SBGN demo。<strong>这是"图种约定驱动布局"最极端的例子，非常值得读其规范来理解产品化深度。</strong></li>
+        </ul>
+
+        <!-- 图解：SBGN 过程节点 -->
+        <figure>
+          <svg viewBox="0 0 560 220" aria-label="SBGN 过程节点的左右对称布局">
+            <!-- 区室 compartment -->
+            <rect class="layer-bg" x="20" y="20" width="520" height="180" rx="10"/>
+            <text x="36" y="42" class="muted" font-size="11">compartment · cytosol</text>
+
+            <!-- 底物：macromolecule 圆角矩形 -->
+            <rect class="node" x="60" y="100" width="90" height="32" rx="16"/>
+            <text x="105" y="120" text-anchor="middle" font-size="11">ATP</text>
+
+            <!-- 过程节点：小方块 -->
+            <rect class="node" x="250" y="108" width="20" height="20"/>
+            <text x="260" y="148" text-anchor="middle" class="label" font-size="10">process</text>
+
+            <!-- 产物：simple chemical 椭圆 -->
+            <ellipse class="node" cx="430" cy="118" rx="48" ry="18"/>
+            <text x="430" y="122" text-anchor="middle" font-size="11">ADP</text>
+
+            <!-- 辅因子：上下连入过程节点 -->
+            <ellipse class="node-muted" cx="260" cy="55" rx="34" ry="14"/>
+            <text x="260" y="59" text-anchor="middle" font-size="10">enzyme</text>
+            <ellipse class="node-muted" cx="260" cy="180" rx="34" ry="14"/>
+            <text x="260" y="184" text-anchor="middle" font-size="10">Pi</text>
+
+            <!-- 消耗弧（左 → 过程） -->
+            <path class="edge" d="M150,116 L250,118" marker-end="url(#s10a)"/>
+            <!-- 生成弧（过程 → 右） -->
+            <path class="edge-hi" d="M270,118 L382,118" marker-end="url(#s10ar)"/>
+            <!-- 辅因子催化（上下，无箭头） -->
+            <line class="edge-muted" x1="260" y1="69" x2="260" y2="108"/>
+            <line class="edge-muted" x1="260" y1="128" x2="260" y2="166"/>
+
+            <text x="180" y="108" text-anchor="middle" class="muted" font-size="10">消耗</text>
+            <text x="335" y="108" text-anchor="middle" class="hi" font-size="10">生成</text>
+
+            <defs>
+              <marker id="s10a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink)"/></marker>
+              <marker id="s10ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--bad)"/></marker>
+            </defs>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 10.2</span>SBGN 过程节点：底物在左、产物在右、辅因子在上下；过程节点的 4 个端口有语义</div>
+        </figure>
+
+        <h3>5.2 代谢网络 / 蛋白互作（PPI）</h3>
+        <ul>
+          <li>规模大、无明显流向 → organic + 聚类。</li>
+          <li>必需能力：多级力导向、消重叠、按属性着色/尺寸。</li>
+        </ul>
+
+        <h3>5.3 系统发生树（Phylogenetic Tree）</h3>
+        <ul>
+          <li>约定：分支长度编码进化距离（<strong>边长有语义，不能为美观改</strong>！）、支持率标注、圆形/矩形/无根三种画法。</li>
+          <li>必需能力：dendrogram（叶对齐）+ <strong>固定边长</strong>布局 + radial/unrooted 变体。</li>
+        </ul>
+
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>边长是硬约束，不是美学参数</div>
+          <p>这里"边长有语义"违背了通用布局的假设（通用布局把边长当成可优化的自由度），必须支持"边长作为硬约束"。否则画出的树在进化距离上误导读者，是科学性错误而非美观问题。</p>
+        </div>
+
+        <h3>5.4 临床路径 / 诊疗流程</h3>
+        <ul>
+          <li>就是流程图，但对"分支完整性"要求高（每个判断都要有全部分支）。</li>
+        </ul>
+
+        <!-- ============ §6 电子设计（EDA） ============ -->
+        <h2 id="sec-6"><span class="h2-num">6</span>电子设计（EDA）</h2>
+
+        <h3>6.1 原理图（Schematic）</h3>
+        <ul>
+          <li>约定：引脚固定（元件符号的引脚位置是符号定义的一部分）、网络（net）而非边（一个 net 连多个引脚）、
+            总线用粗线、电源/地用符号而非连线、正交走线、导线交叉用跨越标记、T 型连接用实心点。</li>
+          <li>布局诉求：<strong>这是 hypergraph 布局</strong>（net = 超边）+ 正交总线路由 + 元件方向（旋转/镜像也是自由度）。</li>
+          <li>必需能力：固定端口、超边（Steiner tree 路由）、元件旋转、跨越标记。</li>
+        </ul>
+
+        <div class="callout info">
+          <div class="ct-title"><span class="icon">ℹ</span>VLSI 文献与本文库的对接</div>
+          <ul>
+            <li>参考文献方向：VLSI placement &amp; routing（Kernighan–Lin 划分、模拟退火放置、channel routing、Lee 迷宫算法 / A*）。</li>
+            <li><strong>VLSI 的 channel routing 与 03 篇的 track 分配是同一个问题</strong>，其文献（Yoshimura–Kuh 1982 的 left-edge algorithm）就是区间图着色。</li>
+          </ul>
+        </div>
+
+        <h3>6.2 PCB / 布线</h3>
+        <ul>
+          <li>与图绘制交集在"正交/45° 路由 + 通道容量"，但优化目标是电气性能，超出本文库范围。</li>
+        </ul>
+
+        <h3>6.3 FPGA / 数据通路框图</h3>
+        <ul>
+          <li>约定：模块框 + 有序端口 + 总线宽度标注。</li>
+          <li>必需能力：端口序固定、bus routing、端口标签。</li>
+        </ul>
+
+        <!-- ============ §7 制造与工程 ============ -->
+        <h2 id="sec-7"><span class="h2-num">7</span>制造与工程</h2>
+
+        <h3>7.1 P&amp;ID（管道仪表流程图）/ 工艺流程</h3>
+        <ul>
+          <li>约定：设备符号、管线（带流向、规格标注）、仪表回路、正交走线、跨越优先规则。</li>
+          <li>必需能力：固定端口（设备接口）、正交路由、管线标签沿线放置、跨越标记。</li>
+        </ul>
+
+        <h3>7.2 故障树 / FMEA</h3>
+        <ul>
+          <li>树布局 + 逻辑门符号；要求"同层对齐、子树紧凑"。</li>
+          <li>必需能力：树布局（05 篇）、多父节点（DAG 化的故障树）→ 退化为分层。</li>
+        </ul>
+
+        <h3>7.3 供应链 / 物流网络</h3>
+        <ul>
+          <li>地理位置约束（节点位置由经纬度固定！）→ <strong>完全固定节点 + 只路由边</strong>。</li>
+          <li>必需能力：固定节点 + 边路由（03 篇）+ 边捆绑（减少视觉噪声）。<strong>这是"路由独立于布局"价值的最好证明。</strong></li>
+        </ul>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>路由独立于布局</div>
+          <p>供应链地图把节点位置完全交给地理坐标，<strong>布局器无事可做</strong>，只剩边路由 + 边捆绑。这是验证架构分层是否干净的最好场景：如果路由模块还偷偷依赖布局器，这里会立刻暴露。</p>
+        </div>
+
+        <!-- ============ §8 金融与商业 ============ -->
+        <h2 id="sec-8"><span class="h2-num">8</span>金融与商业</h2>
+
+        <h3>8.1 组织架构图</h3>
+        <ul>
+          <li>树布局 + 助理岗（侧挂）+ 虚线汇报（非树边）+ 照片/多行信息节点。</li>
+          <li>必需能力：树布局多种 NodePlacer（05 篇 §1.5）、非树边路由、节点内容自适应尺寸。</li>
+        </ul>
+
+        <h3>8.2 股权结构 / 关联方图谱</h3>
+        <ul>
+          <li>DAG（可能有环 = 交叉持股）、比例标注在边上、层级 = 控股层级。</li>
+          <li>必需能力：分层 + 边标签 + 环检测报告。</li>
+        </ul>
+
+        <h3>8.3 反欺诈 / 资金流向</h3>
+        <ul>
+          <li>organic + 时间序（动态）+ 交易额编码；社区发现（团伙）。</li>
+          <li>必需能力：organic 大图 + 增量 + 聚类。</li>
+        </ul>
+
+        <h3>8.4 决策树 / 归因分析</h3>
+        <ul>
+          <li>树 + 节点内含图表（sparkline/饼图）→ 节点内容复杂，尺寸由内容定。</li>
+        </ul>
+
+        <!-- ============ §9 通用能力矩阵 ============ -->
+        <h2 id="sec-9"><span class="h2-num">9</span>通用能力矩阵（从行业反推优先级）</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>能力</th><th>需要它的行业数</th><th>优先级</th></tr></thead>
+            <tbody>
+              <tr><td>分层布局 + 正交路由</td><td>几乎全部</td><td><strong>P0</strong></td></tr>
+              <tr><td>端口（≥ FIXED_SIDE）</td><td>UML、数据流、ER、EDA、P&amp;ID、SBGN</td><td><strong>P0</strong></td></tr>
+              <tr><td>分组 / 嵌套框</td><td>云架构、UML 包、SBGN 区室、状态机、子流程</td><td><strong>P0</strong></td></tr>
+              <tr><td>边标签空间预留</td><td>状态机、ER、BPMN、股权</td><td><strong>P0</strong></td></tr>
+              <tr><td>泳道 / partition grid</td><td>BPMN、审批流、价值流、时间轴</td><td>P1</td></tr>
+              <tr><td>树布局（多 placer）</td><td>组织图、故障树、目录、系统发生树</td><td>P1</td></tr>
+              <tr><td>边聚合 / bus routing</td><td>UML 继承、网络上行链路、数据血缘、EDA 总线</td><td>P1</td></tr>
+              <tr><td>固定节点 + 纯路由</td><td>供应链地图、用户手工排版</td><td>P1</td></tr>
+              <tr><td>Critical path 拉直</td><td>BPMN、审批流、通路图</td><td>P1</td></tr>
+              <tr><td>organic（stress/多级）</td><td>知识图谱、PPI、反欺诈、服务依赖</td><td>P2</td></tr>
+              <tr><td>增量 / from-sketch</td><td>所有交互式编辑场景</td><td>P2（但用户感知强）</td></tr>
+              <tr><td>端口级（FIXED_POS）</td><td>ER 字段级、数据血缘列级、EDA 引脚</td><td>P2</td></tr>
+              <tr><td>circular</td><td>网络环、社交子群</td><td>P3</td></tr>
+              <tr><td>超边 / hypergraph</td><td>EDA net、P&amp;ID 管网</td><td>P3</td></tr>
+              <tr><td>固定边长</td><td>系统发生树</td><td>P3</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>读法</div>
+          <p>P0 四项是"能不能用"的底线；P1 六项是"专业不专业"的分界；P2/P3 按目标行业选做。</p>
+        </div>
+
+        <!-- ============ §10 对 plotgram profile 设计的启示 ============ -->
+        <h2 id="sec-10"><span class="h2-num">10</span>对 plotgram profile 设计的启示</h2>
+
+        <p>每个图种的 profile 应显式声明它需要的能力与参数，例如：</p>
+
+        <div class="code-block">
+          <span class="lang-tag">hcl</span>
+          <pre><code class="language-hcl">profile "bpmn" {
+  orientation      = LR
+  partition_grid   = lanes          # 泳道
+  critical_path    = auto_main_flow # 主流程拉直
+  ports            = FIXED_SIDE     # 网关分支上下出
+  routing          = orthogonal { back_edge_side = below }
+  edge_labels      = reserve_space
+  group            = subprocess_box
+}
+profile "er" {
+  orientation      = LR
+  ports            = FIXED_POS      # 字段行
+  routing          = orthogonal { nudge = uniform }
+  node_size        = content_driven { rows = fields }
+}</code></pre>
+        </div>
+
+        <p>这样"图种差异"完全落在参数上，引擎无需知道 <code>bpmn</code> 这个词——正是 <a href="../../../design/adr/001-diagram-type-not-in-engine.md">ADR-001</a> 的要求。同时这张表也是<strong>产品路线图</strong>：能力矩阵 P0/P1 做完，就能宣称支持上述大部分行业图。</p>
+
+      </div>
+
+      <div class="foot">
+        本文为 <a href="../10-行业图应用.md">10-行业图应用.md</a> 的 HTML 图文版。
+        配套：<a href="00-索引与阅读指南.html">索引</a> ·
+        <a href="../21-术语表.html">术语表图解</a> ·
+        <a href="../../../../design/layout/write-authority.md">写权纪律</a>
+      </div>
+
+    </article>
+  </div>
+</div>
+
+<script src="_assets/nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

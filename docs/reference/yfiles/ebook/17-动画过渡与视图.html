@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>17 · 动画、过渡与视图交互 — yFiles 参考文库 ebook</title>
+<link rel="stylesheet" href="_assets/style.css">
+<!-- highlight.js 主题（浅色 + 暗色） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+  /* 代码块在浅/暗色下都可用；highlight.js 主题负责 token 颜色，本 CSS 负责容器 */
+  pre code.hljs { background: transparent; padding: 0; border: none; font-size: 13px; }
+  pre code.hljs .comment { font-style: italic; }
+</style>
+</head>
+<body data-page="17">
+
+<div class="layout">
+  <div class="content">
+    <article>
+
+      <h1>17 · 动画、过渡与视图交互（Animation, Morphing &amp; View）</h1>
+      <p class="subtitle">布局算完不是终点 ——「图怎么变过去」与「图长什么样」同等重要</p>
+
+      <div class="meta-bar">
+        <span class="pill">工程</span>
+        <span>综述：layout morphing / 视口导航 / 命中测试的工程模式</span>
+        <span class="src">~235 行 · 6.7k 字</span>
+      </div>
+
+      <div class="prose">
+
+        <div class="callout note">
+          <div class="ct-title"><span class="icon">§</span>主线文献</div>
+          <p>布局算完不是终点。用户在动画中理解结构变化，在视口交互中导航大图。本篇覆盖：layout morphing、边形变、视口与焦点技术、命中测试，以及「增量布局 + 动画」的稳定性要求。</p>
+          <ul>
+            <li><strong>Friedrich–Eades 2002</strong>（<em>Graph Drawing in Motion</em>）、<strong>Friedrich–Houle 2002</strong>（<em>Graph Drawing in Motion II</em>）—— layout morphing 工程框架</li>
+            <li><strong>Misue et al. 1995</strong>（mental map）、<strong>Bederson–Boltman 1999</strong>（动画对空间记忆的作用）、<strong>Archambault–Purchase 2013</strong>（mental map preservation helps user orientation）</li>
+            <li><strong>Heer–Robertson 2007</strong>（<em>Animated Transitions in Statistical Data Graphics</em>）—— staged 优于 simultaneous</li>
+            <li><strong>Lamping–Rao–Pirolli 1995</strong>（双曲浏览器）、<strong>Furnas 1986</strong>（fisheye）、<strong>Sarkar–Brown 1992</strong>（graphical fisheye）</li>
+          </ul>
+        </div>
+
+        <!-- ============ §1 ============ -->
+        <h2 id="sec-1"><span class="h2-num">1</span>为什么要动画（有实证依据的部分）</h2>
+
+        <ul>
+          <li><strong>Bederson–Boltman 1999</strong>：动画过渡显著提升用户对空间布局的记忆，即使动画只有 ~1s。</li>
+          <li><strong>Heer–Robertson 2007</strong>：分阶段（staged）过渡优于同时（simultaneous）过渡 —— 把「移动」和「出现/消失」分开做，用户跟得上。</li>
+          <li><strong>Archambault–Purchase 2013</strong>：动态图中保持 mental map 有助于定位任务；但如果保持 mental map 导致布局质量明显下降，收益会被抵消。
+            <strong>结论：先保证新布局质量可接受，再在此约束下最大化稳定性</strong>（而不是反过来）。</li>
+          <li><strong>Friedrich–Eades 2002</strong>：给出了 layout morphing 的工程框架 —— 分阶段、聚类移动、避免路径交叉。</li>
+        </ul>
+
+        <p><strong>工程含义</strong>：动画不是「锦上添花」，是「让增量布局可用」的必要条件。没有动画，节点跳变会让用户彻底失去上下文。</p>
+
+        <!-- ============ §2 ============ -->
+        <h2 id="sec-2"><span class="h2-num">2</span>节点的过渡</h2>
+
+        <h3>2.1 最简：线性插值 + 缓动</h3>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">p(t) = p_old + (p_new - p_old) * ease(t),  t ∈ [0,1]</code></pre>
+        </div>
+        <p>缓动建议 <code>cubic-in-out</code>（对称、无过冲）。<strong>不要用带弹性/回弹的缓动</strong>：图元素众多时回弹会造成视觉噪音。时长：300–600ms；节点数多时略长（但不超过 1s，超过用户会失去耐心）。</p>
+
+        <h3>2.2 分阶段过渡（推荐）</h3>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">Stage 1 (0–30%):   删除的节点/边淡出 + 收缩
+Stage 2 (25–75%):  保留的节点移动（可重叠 Stage 1/3 少量）
+Stage 3 (70–100%): 新增的节点/边淡入 + 展开</code></pre>
+        </div>
+        <p>理由：同时做三件事，用户无法追踪任何一件。分阶段后「什么消失了、什么移动了、什么出现了」清晰可读。额外好处：Stage 2 中间不会出现「新节点从 (0,0) 飞入」这种伪运动。</p>
+
+        <!-- 图解：三阶段过渡时间轴 -->
+        <figure>
+          <svg viewBox="0 0 720 320" aria-label="三阶段过渡时间轴">
+            <!-- Panel 1: t=0 -->
+            <g transform="translate(20,30)">
+              <rect class="highlight-bg" x="0" y="0" width="200" height="140" rx="6"/>
+              <text x="100" y="18" text-anchor="middle" class="label">t = 0（旧布局）</text>
+              <rect class="node" x="30" y="50" width="36" height="20" rx="3"/>
+              <rect class="node" x="90" y="50" width="36" height="20" rx="3"/>
+              <rect class="node" x="150" y="50" width="36" height="20" rx="3"/>
+              <rect class="node-muted" x="90" y="100" width="36" height="20" rx="3" opacity="0.6"/>
+              <line class="edge" x1="66" y1="60" x2="90" y2="60"/>
+              <line class="edge" x1="126" y1="60" x2="150" y2="60"/>
+              <line class="edge-muted" x1="108" y1="70" x2="108" y2="100" stroke-dasharray="3 2"/>
+              <text x="100" y="132" text-anchor="middle" class="muted" font-size="10">D 待删除</text>
+            </g>
+            <path d="M225,100 L255,100" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#am17)"/>
+            <!-- Panel 2: t=0.5 -->
+            <g transform="translate(260,30)">
+              <rect class="highlight-bg" x="0" y="0" width="200" height="140" rx="6"/>
+              <text x="100" y="18" text-anchor="middle" class="label">t = 0.5（插值）</text>
+              <rect class="node" x="40" y="45" width="36" height="20" rx="3"/>
+              <rect class="node" x="100" y="45" width="36" height="20" rx="3"/>
+              <rect class="node" x="160" y="45" width="36" height="20" rx="3" opacity="0.5"/>
+              <rect class="node" x="40" y="100" width="36" height="20" rx="3" opacity="0.5"/>
+              <line class="edge-muted" x1="76" y1="55" x2="100" y2="55" stroke-dasharray="2 2"/>
+              <line class="edge-muted" x1="136" y1="55" x2="160" y2="55" stroke-dasharray="2 2"/>
+              <text x="100" y="132" text-anchor="middle" class="muted" font-size="10">D 半透明 / E 半透明</text>
+            </g>
+            <path d="M465,100 L495,100" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#am17)"/>
+            <!-- Panel 3: t=1 -->
+            <g transform="translate(500,30)">
+              <rect class="highlight-bg" x="0" y="0" width="200" height="140" rx="6"/>
+              <text x="100" y="18" text-anchor="middle" class="label">t = 1（新布局）</text>
+              <rect class="node" x="30" y="45" width="36" height="20" rx="3"/>
+              <rect class="node" x="90" y="45" width="36" height="20" rx="3"/>
+              <rect class="node" x="150" y="45" width="36" height="20" rx="3"/>
+              <rect class="node" x="90" y="100" width="36" height="20" rx="3"/>
+              <line class="edge" x1="66" y1="55" x2="90" y2="55"/>
+              <line class="edge" x1="126" y1="55" x2="150" y2="55"/>
+              <line class="edge-hi" x1="108" y1="65" x2="108" y2="100"/>
+              <text x="100" y="132" text-anchor="middle" class="muted" font-size="10">E 新增</text>
+            </g>
+            <!-- Timeline -->
+            <g transform="translate(60,210)">
+              <text x="0" y="0" class="muted" font-size="11">0%</text>
+              <text x="600" y="0" text-anchor="end" class="muted" font-size="11">100%</text>
+              <rect x="0" y="10" width="180" height="22" fill="var(--warn-soft)" stroke="var(--warn)" rx="3"/>
+              <text x="90" y="26" text-anchor="middle" class="muted" font-size="11">Stage 1 淡出删除</text>
+              <rect x="150" y="40" width="300" height="22" fill="var(--accent-soft)" stroke="var(--accent)" rx="3"/>
+              <text x="300" y="56" text-anchor="middle" class="label" font-size="11">Stage 2 移动保留</text>
+              <rect x="420" y="70" width="180" height="22" fill="var(--good-soft)" stroke="var(--good)" rx="3"/>
+              <text x="510" y="86" text-anchor="middle" class="muted" font-size="11">Stage 3 淡入新增</text>
+              <text x="300" y="108" text-anchor="middle" class="muted" font-size="10">三阶段时间重叠（25–30%、70–75%）—— 不要同时做三件事</text>
+            </g>
+            <defs>
+              <marker id="am17" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+            </defs>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 17.1</span>三阶段过渡：先淡出删除项 → 再移动保留项 → 最后淡入新增项，阶段间少量重叠</div>
+        </figure>
+
+        <h3>2.3 聚类移动（Friedrich–Eades）</h3>
+        <p>当一大片节点整体平移时，逐个插值会让中间帧显得混乱。改进：</p>
+        <ul>
+          <li>检测「位移向量近似相同」的节点组（k-means on displacement 或简单的网格量化）；</li>
+          <li>组内同步移动（同一时间曲线），组间可错开出发时间（stagger 30–80ms）。</li>
+        </ul>
+        <p>效果：观感从「粒子云」变成「板块移动」，可理解性明显提升。</p>
+
+        <h3>2.4 避免中间帧穿越</h3>
+        <p>线性插值可能让节点在中途穿过其它节点甚至穿出画布。三种缓解：</p>
+        <ul>
+          <li><strong>两阶段路径</strong>（先散开再聚合）：对交换位置的节点对，让一个走弧线；</li>
+          <li><strong>按需绕行</strong>：只对「中间帧重叠面积超阈值」的节点做弧线插值（检测成本 = 采样 3–5 个中间帧 + 扫描线）；</li>
+          <li><strong>接受它</strong>：多数场景下短时重叠不影响理解 —— 建议先接受，只在 demo 级场景做优化。</li>
+        </ul>
+
+        <!-- ============ §3 ============ -->
+        <h2 id="sec-3"><span class="h2-num">3</span>边的过渡（比节点难）</h2>
+
+        <p>难点：边的<strong>拐点数在过渡前后不同</strong>（3 拐点 → 5 拐点）。</p>
+
+        <h3>3.1 拐点对齐（path resampling）</h3>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">1. 把 old_path 与 new_path 都按弧长重采样为 N 个点（N = max(len_old, len_new) 或固定 16）
+2. 逐点线性插值
+3. 中间帧不做正交约束（允许斜线），末帧回到严格正交</code></pre>
+        </div>
+        <p>优点：实现简单、无退化。缺点：中间帧不正交（视觉上「边在扭动」）—— 多数用户接受，因为很快。</p>
+
+        <h3>3.2 保持正交的形变（更贵）</h3>
+        <ul>
+          <li>找 old/new 路径的<strong>最长公共正交结构</strong>（共有的走廊序列），只对差异段做插值；</li>
+          <li>拐点数变化用「零长段插入」表示：在 old_path 中插入长度 0 的段，使拐点数与 new 相同，再逐点插值。这样中间帧始终正交。<strong>推荐做法</strong>，实现约 100 行。</li>
+        </ul>
+
+        <!-- 图解：边路径形变 -->
+        <figure>
+          <svg viewBox="0 0 720 220" aria-label="边路径重采样与形变">
+            <!-- Old path -->
+            <g transform="translate(20,30)">
+              <rect class="highlight-bg" x="0" y="0" width="200" height="160" rx="6"/>
+              <text x="100" y="18" text-anchor="middle" class="label">old_path（3 拐点）</text>
+              <path class="edge-hi" d="M30,40 L30,80 L100,80 L100,120 L170,120"/>
+              <circle cx="30" cy="40" r="3" fill="var(--accent)"/>
+              <circle cx="30" cy="60" r="2.5" fill="var(--muted)"/>
+              <circle cx="30" cy="80" r="3" fill="var(--accent)"/>
+              <circle cx="65" cy="80" r="2.5" fill="var(--muted)"/>
+              <circle cx="100" cy="80" r="3" fill="var(--accent)"/>
+              <circle cx="100" cy="100" r="2.5" fill="var(--muted)"/>
+              <circle cx="100" cy="120" r="3" fill="var(--accent)"/>
+              <circle cx="135" cy="120" r="2.5" fill="var(--muted)"/>
+              <circle cx="170" cy="120" r="3" fill="var(--accent)"/>
+              <text x="100" y="150" text-anchor="middle" class="muted" font-size="10">严格正交</text>
+            </g>
+            <!-- Middle: interpolated -->
+            <g transform="translate(260,30)">
+              <rect class="highlight-bg" x="0" y="0" width="200" height="160" rx="6"/>
+              <text x="100" y="18" text-anchor="middle" class="label">中间帧（重采样插值）</text>
+              <path class="edge-muted" d="M30,40 L45,55 L60,72 L75,78 L100,82 L115,95 L130,108 L145,114 L170,120" stroke-dasharray="3 2"/>
+              <circle cx="30" cy="40" r="3" fill="var(--accent)"/>
+              <circle cx="60" cy="72" r="2.5" fill="var(--muted)"/>
+              <circle cx="100" cy="82" r="3" fill="var(--accent)"/>
+              <circle cx="145" cy="114" r="2.5" fill="var(--muted)"/>
+              <circle cx="170" cy="120" r="3" fill="var(--accent)"/>
+              <text x="100" y="150" text-anchor="middle" class="hi" font-size="10">非正交（边在扭动）</text>
+            </g>
+            <!-- New path -->
+            <g transform="translate(500,30)">
+              <rect class="highlight-bg" x="0" y="0" width="200" height="160" rx="6"/>
+              <text x="100" y="18" text-anchor="middle" class="label">new_path（5 拐点）</text>
+              <path class="edge-hi" d="M30,40 L30,55 L70,55 L70,80 L100,80 L100,100 L130,100 L130,120 L170,120"/>
+              <circle cx="30" cy="40" r="3" fill="var(--accent)"/>
+              <circle cx="30" cy="55" r="3" fill="var(--accent)"/>
+              <circle cx="70" cy="55" r="3" fill="var(--accent)"/>
+              <circle cx="70" cy="80" r="3" fill="var(--accent)"/>
+              <circle cx="100" cy="80" r="3" fill="var(--accent)"/>
+              <circle cx="100" cy="100" r="3" fill="var(--accent)"/>
+              <circle cx="130" cy="100" r="3" fill="var(--accent)"/>
+              <circle cx="130" cy="120" r="3" fill="var(--accent)"/>
+              <circle cx="170" cy="120" r="3" fill="var(--accent)"/>
+              <text x="100" y="150" text-anchor="middle" class="muted" font-size="10">严格正交</text>
+            </g>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 17.2</span>边路径形变：重采样为同点数后逐点插值，中间帧不正交；零长段插入可保持正交</div>
+        </figure>
+
+        <h3>3.3 简化策略（性价比最高）</h3>
+        <p>边数多时：</p>
+        <ul>
+          <li>过渡期间<strong>边淡出，只动画节点，末帧边淡入</strong>；</li>
+          <li>或过渡期间边退化为直线（起终点插值），末帧切回正交路径。</li>
+        </ul>
+        <p>用户注意力在节点上，这个偷懒几乎不被察觉，且省掉全部边形变逻辑。<strong>建议作为默认，正交形变作为高质量模式。</strong></p>
+
+        <h3>3.4 标签</h3>
+        <p>标签跟随其宿主（节点/边锚点），不单独做动画。文字内容变化时用交叉淡入淡出，不要做字符级形变。</p>
+
+        <!-- ============ §4 ============ -->
+        <h2 id="sec-4"><span class="h2-num">4</span>稳定性要求（动画的前提）</h2>
+
+        <p>动画只能「演示」变化，不能「掩盖」抖动。如果新布局与旧布局无关，动画反而放大混乱。所以：</p>
+
+        <h3>4.1 必须成立的性质（见 07 篇）</h3>
+        <ol>
+          <li><strong>正交序保持</strong>：旧布局中 <span class="katex-inline" data-tex="a"></span> 在 <span class="katex-inline" data-tex="b"></span> 左边，新布局尽量仍在左边；</li>
+          <li><strong>邻近保持</strong>：相邻节点仍相邻；</li>
+          <li><strong>拓扑保持</strong>：不引入新的「跨越」关系。</li>
+        </ol>
+
+        <h3>4.2 实现路径（按代价排序）</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>手段</th><th>代价</th><th>效果</th></tr></thead>
+            <tbody>
+              <tr><td><strong>from-sketch</strong>：由旧坐标反推层与层内序作为 P2/P3 初值</td><td>低（约 100 行）</td><td>效果最好的单一手段</td></tr>
+              <tr><td><strong>固定未受影响区域</strong>：只对受影响子图重算，其余 pin 住</td><td>中</td><td>位移=0 的保证</td></tr>
+              <tr><td><strong>旧坐标作为 P4 的期望位置</strong>（VPSC 的 <span class="katex-inline" data-tex="x^{des}"></span>）</td><td>低</td><td>坐标层面平滑</td></tr>
+              <tr><td><strong>约束式稳定</strong>：把「正交序」加成 VPSC 分隔约束</td><td>中</td><td>硬保证，但可能牺牲质量</td></tr>
+              <tr><td><strong>增量路由 + hysteresis</strong>：只重路由受影响边，且旧路径有「粘性」加成</td><td>中</td><td>避免边全体跳变</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>4.3 hysteresis 的具体做法</h3>
+        <p>在 A* 的代价里给「旧路径经过的边」一个折扣：</p>
+        <div class="code-block">
+          <span class="lang-tag">rust</span>
+          <pre><code class="language-rust">cost(e) = base_cost(e) * (if old_path.contains(e) { 1.0 - HYST } else { 1.0 })</code></pre>
+        </div>
+        <p><code>HYST ≈ 0.15–0.3</code>。效果：小扰动时路径完全不变，大扰动时仍会重选。</p>
+
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>折扣会破坏 A* 启发式的可采纳性</div>
+          <p>给旧路径打折后，<span class="katex-inline" data-tex="h"></span> 不再是下界 → 要么同步缩放 <span class="katex-inline" data-tex="h"></span>，要么接受次优（实践中可接受）。<strong>不能假装 A* 仍最优</strong>：要么补偿启发式，要么明确标注这是「带偏好的 A*」并接受次优解，二者选其一。</p>
+        </div>
+
+        <h3>4.4 度量（进基准）</h3>
+        <ul>
+          <li>平均归一化位移 <span class="katex-inline" data-tex="\frac{1}{n}\sum \|p_i^{new}-p_i^{old}\| / \text{diag}"></span>；</li>
+          <li>正交序违反率（旧 x 序对 vs 新 x 序对的逆序对比例）；</li>
+          <li>k-NN 保持率（Jaccard）；</li>
+          <li><strong>重路由边数 / 总边数</strong>（增量路由的直接指标）。</li>
+        </ul>
+
+        <!-- ============ §5 ============ -->
+        <h2 id="sec-5"><span class="h2-num">5</span>视口与导航</h2>
+
+        <h3>5.1 基础</h3>
+        <ul>
+          <li><strong>fit-to-view</strong>：包围盒 + padding → scale = min(vw/bw, vh/bh)，clamp 到 [minZoom, maxZoom]；</li>
+          <li><strong>zoom-to-cursor</strong>：缩放时保持鼠标下的图坐标不变：
+            <div class="code-block">
+              <span class="lang-tag">rust</span>
+              <pre><code class="language-rust">world = screen_to_world(cursor)
+scale *= factor
+translate = cursor - world * scale</code></pre>
+            </div>
+            这条公式写错是最常见的交互 bug（表现为「缩放时图会漂」）。</li>
+          <li><strong>平滑 zoom/pan</strong>：对 <code>log(scale)</code> 做插值（不是 scale 本身），否则感觉不匀速。</li>
+        </ul>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>最常见的交互 bug：zoom-to-cursor 公式写错</div>
+          <p>表现：缩放时图会「漂」。根因几乎总是<strong>更新 translate 时用的是旧 scale 或旧 world 坐标</strong>。正确顺序：先用旧 scale 求 world，再更新 scale，最后用<strong>新 scale</strong> 反算 translate。测试：随机 cursor/scale，断言光标下的世界坐标不变（eps 内）。</p>
+        </div>
+
+        <h3>5.2 语义缩放（LOD）</h3>
+        <p>大图必须做，否则缩小后是一团糊：</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>缩放级别</th><th>显示</th></tr></thead>
+            <tbody>
+              <tr><td>&lt; 0.3</td><td>只画节点色块，无文字、无箭头、边为细直线（或聚合边）</td></tr>
+              <tr><td>0.3–0.7</td><td>节点 + 简化标签（截断）+ 边无圆角</td></tr>
+              <tr><td>&gt; 0.7</td><td>全细节</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>实现要点：<strong>LOD 阈值切换要有 hysteresis</strong>（0.28 进 / 0.32 出），否则在阈值附近抖动会闪烁。</p>
+
+        <h3>5.3 焦点 + 上下文技术</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>技术</th><th>出处</th><th>适用</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Fisheye</strong>（图形鱼眼）</td><td>Sarkar–Brown 1992</td><td>局部放大 + 保持全局；对节点链接图效果好，但正交边会被扭曲成曲线 → <strong>与正交风格冲突，慎用</strong></td></tr>
+              <tr><td><strong>双曲浏览器</strong></td><td>Lamping et al. 1995</td><td>大树导航；数学优雅但用户容易迷失</td></tr>
+              <tr><td><strong>Degree-of-Interest 图</strong></td><td>van Ham–Perer 2009</td><td>按兴趣度剪裁子图 —— <strong>更适合正交/分层风格</strong>（不扭曲几何，只增删元素）</td></tr>
+              <tr><td><strong>概览 + 细节</strong>（minimap）</td><td>通用</td><td>实现最简、效果稳定。<strong>首选</strong></td></tr>
+              <tr><td><strong>邻居高亮 / 路径高亮</strong></td><td>通用</td><td>成本极低、用户价值极高。<strong>必做</strong></td></tr>
+              <tr><td><strong>折叠 / 展开组</strong></td><td>—</td><td>大图的主力手段（见 08 篇），配合动画</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p><strong>建议优先级</strong>：邻居高亮 &gt; minimap &gt; 折叠展开 &gt; LOD &gt; DOI 剪裁 &gt; fisheye/双曲（后两者基本不做）。</p>
+
+        <!-- ============ §6 ============ -->
+        <h2 id="sec-6"><span class="h2-num">6</span>命中测试与拾取</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>元素</th><th>方法</th></tr></thead>
+            <tbody>
+              <tr><td>节点</td><td>空间索引（网格哈希/R-tree）查询点所在矩形 → 再做形状精确测试（菱形/椭圆需要）</td></tr>
+              <tr><td>边</td><td>点到折线段距离 &lt; tolerance（≈ 5px / scale）；先用段的包围盒过滤</td></tr>
+              <tr><td>标签</td><td>矩形测试；标签在最上层，优先命中</td></tr>
+              <tr><td>组框</td><td>只命中<strong>标题栏与边框带</strong>，不命中组内空白（否则无法框选组内）</td></tr>
+              <tr><td>端口</td><td>小半径圆，命中优先级高于节点（用于连线交互）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 图解：命中测试 z 序 -->
+        <figure>
+          <svg viewBox="0 0 720 240" aria-label="命中测试 z 序与 tolerance">
+            <!-- Left: scene -->
+            <g transform="translate(20,30)">
+              <rect class="highlight-bg" x="0" y="0" width="320" height="180" rx="6"/>
+              <text x="160" y="18" text-anchor="middle" class="label">渲染场景与 tolerance 带</text>
+              <!-- edge with tolerance band -->
+              <path d="M20,140 L120,140 L120,60 L300,60" stroke="var(--accent)" stroke-width="14" stroke-opacity="0.15" fill="none"/>
+              <path class="edge" d="M20,140 L120,140 L120,60 L300,60"/>
+              <text x="30" y="158" class="muted" font-size="10">tolerance 带（5px / scale）</text>
+              <!-- node -->
+              <rect class="node" x="150" y="90" width="60" height="36" rx="4"/>
+              <text x="180" y="112" text-anchor="middle" class="label" font-size="11">node</text>
+              <!-- port -->
+              <circle cx="210" cy="108" r="5" fill="var(--bad)" stroke="var(--ink)" stroke-width="1"/>
+              <text x="222" y="112" class="hi" font-size="10">port</text>
+              <!-- label -->
+              <rect x="150" y="70" width="60" height="16" fill="var(--warn-soft)" stroke="var(--warn)" stroke-width="1" rx="2"/>
+              <text x="180" y="82" text-anchor="middle" class="muted" font-size="10">label</text>
+            </g>
+            <!-- Right: z-order stack -->
+            <g transform="translate(380,30)">
+              <text x="160" y="14" text-anchor="middle" class="label">z 序（顶层先命中）</text>
+              <rect x="40" y="30" width="240" height="26" fill="var(--warn-soft)" stroke="var(--warn)" rx="4"/>
+              <text x="160" y="47" text-anchor="middle" font-size="12" class="muted">① label（最上层）</text>
+              <rect x="40" y="62" width="240" height="26" fill="var(--bad-soft)" stroke="var(--bad)" rx="4"/>
+              <text x="160" y="79" text-anchor="middle" font-size="12" class="muted">② port（小半径，优先于 node）</text>
+              <rect x="40" y="94" width="240" height="26" fill="var(--accent-soft)" stroke="var(--accent)" rx="4"/>
+              <text x="160" y="111" text-anchor="middle" font-size="12" class="muted">③ node（形状精确测试）</text>
+              <rect x="40" y="126" width="240" height="26" fill="var(--code-bg)" stroke="var(--muted)" rx="4"/>
+              <text x="160" y="143" text-anchor="middle" font-size="12" class="muted">④ edge（点到折线距离）</text>
+              <line x1="160" y1="156" x2="160" y2="168" stroke="var(--muted)" stroke-width="1.4"/>
+              <path d="M154,166 L166,166 L160,174 z" fill="var(--muted)"/>
+              <text x="160" y="188" text-anchor="middle" class="muted" font-size="10">倒序遍历，首个命中即返回</text>
+            </g>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 17.3</span>命中测试 z 序：label &gt; port &gt; node &gt; edge，与渲染顺序相反；tolerance 必须除以 scale</div>
+        </figure>
+
+        <p>要点：</p>
+        <ul>
+          <li><strong>z 序倒序遍历</strong>（最上层优先命中），与渲染顺序相反；</li>
+          <li>tolerance 必须除以 scale（缩小后仍好点中）；</li>
+          <li>边命中要用<strong>渲染后的路径</strong>（含圆角），或用折线近似 + 稍大 tolerance；</li>
+          <li>命中测试是交互热路径（mousemove），必须 <span class="katex-inline" data-tex="O(\log n)"></span>，不能全量扫。</li>
+        </ul>
+
+        <!-- ============ §7 ============ -->
+        <h2 id="sec-7"><span class="h2-num">7</span>交互式编辑与布局的关系</h2>
+
+        <p>用户拖动节点后，三种产品策略：</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>策略</th><th>行为</th><th>适用</th></tr></thead>
+            <tbody>
+              <tr><td><strong>自由放置</strong></td><td>完全接受用户坐标，只重路由受影响边</td><td>图编辑器（Dunnart 风格）</td></tr>
+              <tr><td><strong>约束吸附</strong></td><td>接受用户意图但投影到约束可行域（VPSC 投影：不重叠、对齐、组内）</td><td><strong>推荐默认</strong></td></tr>
+              <tr><td><strong>重新布局</strong></td><td>用新位置作为 sketch 重跑布局</td><td>「整理」按钮的显式动作</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>关键设计：</p>
+        <ul>
+          <li>拖动过程中<strong>只做轻量更新</strong>（受影响边直线化 + 60fps），松手后再做完整重路由 + 动画；</li>
+          <li>用户手工调整过的元素应打 <code>pinned</code> 标记，后续自动布局尊重它（PartialLayout 的 fixed 集合）；</li>
+          <li><strong>「整理」必须是显式动作</strong>，不能因为用户加了一个节点就重排全图 —— 这是最招骂的行为。</li>
+        </ul>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>「整理」必须是显式动作</div>
+          <p>用户加一个节点就触发全图重排，是图编辑器<strong>最招骂的行为</strong>。自动布局只应作用于「未 pinned」的子图，全图重排必须由用户点「整理」按钮显式触发。pin 标记要持久化（写入模型层），不能只在布局器内存里。</p>
+        </div>
+
+        <!-- ============ §8 ============ -->
+        <h2 id="sec-8"><span class="h2-num">8</span>实现架构建议</h2>
+
+        <div class="code-block">
+          <span class="lang-tag">plaintext</span>
+          <pre><code class="language-plaintext">Layout Result (t=0) ──┐
+                      ├─→ Transition Planner ─→ Frame Interpolator ─→ Renderer
+Layout Result (t=1) ──┘        │
+                               ├ 节点配对（by stable id）
+                               ├ 分类：kept / added / removed
+                               ├ 聚类移动检测
+                               ├ 边路径重采样或零长段插入
+                               └ 阶段时间轴</code></pre>
+        </div>
+
+        <p>要点：</p>
+        <ul>
+          <li><strong>稳定 ID 是一切的前提</strong>：过渡靠 id 配对。id 由 DSL/模型层保证（不能用数组下标）；</li>
+          <li>Transition Planner 是<strong>纯函数</strong>（两个布局结果 → 一个动画计划），可单测；</li>
+          <li>动画计划应可序列化（便于录制回放、便于测试断言）；</li>
+          <li>渲染层只按 <code>t</code> 求值，不含逻辑；</li>
+          <li><strong>可关闭动画</strong>（<code>prefers-reduced-motion</code> + 用户设置 + 测试环境）—— 测试必须能跑 <code>t=1</code> 的终态。</li>
+        </ul>
+
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>稳定 ID 是一切的前提</div>
+          <p>过渡靠 id 配对 —— id 由 DSL / 模型层保证，<strong>不能用数组下标</strong>。任何一层用下标代替 id 都会让动画与增量失效。id 必须贯穿 DSL → 模型 → 布局 → 渲染全链路，且在增删节点时保持既有 id 不变。</p>
+        </div>
+
+        <!-- ============ §9 ============ -->
+        <h2 id="sec-9"><span class="h2-num">9</span>测试策略</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>测什么</th><th>怎么测</th></tr></thead>
+            <tbody>
+              <tr><td>过渡计划正确</td><td>表驱动：给定两个布局，断言 kept/added/removed 分类与阶段时间</td></tr>
+              <tr><td>插值端点</td><td><span class="katex-inline" data-tex="t=0"></span> 等于旧布局、<span class="katex-inline" data-tex="t=1"></span> 等于新布局（逐字段）</td></tr>
+              <tr><td>中间帧有限</td><td>采样 <span class="katex-inline" data-tex="t \in \{0.1..0.9\}"></span>，断言所有坐标为有限数、在合理范围内</td></tr>
+              <tr><td>边形变不退化</td><td>断言中间帧拐点数一致、无 NaN、（正交模式下）所有段轴对齐</td></tr>
+              <tr><td>稳定性指标</td><td>对「加一个节点」「删一条边」「改标签」三类微扰动，断言位移与重路由边数低于阈值</td></tr>
+              <tr><td>视口数学</td><td>zoom-to-cursor：随机 cursor/scale，断言光标下的世界坐标不变（eps 内）</td></tr>
+              <tr><td>命中测试</td><td>随机点 + 暴力全量比对，断言结果一致</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ============ §10 ============ -->
+        <h2 id="sec-10"><span class="h2-num">10</span>给本项目的建议</h2>
+
+        <ol>
+          <li><strong>先做稳定性，后做动画</strong>：from-sketch + 增量路由 hysteresis + 稳定性指标（13 篇 M6）。动画建立在稳定之上，顺序反了会做无用功。</li>
+          <li><strong>动画从「节点动、边淡」起步</strong>（§3.3），把正交边形变（§3.2）列为后续增强。</li>
+          <li><strong>Transition Planner 做成纯函数并单测</strong>，不要把插值逻辑散在渲染层。</li>
+          <li><strong>必做的交互三件套</strong>：邻居高亮、minimap、折叠展开 —— 每件成本都远低于一个布局算法，用户价值更高。</li>
+          <li><strong>命中测试用网格哈希</strong>（16 篇 §复用），z 序倒序，tolerance/scale。</li>
+          <li><strong>稳定 ID 贯穿 DSL → 模型 → 布局 → 渲染</strong>，任何一层用下标代替 id 都会让动画与增量失效。</li>
+        </ol>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>一句话收敛</div>
+          <p>动画不是「锦上添花」，是「让增量布局可用」的必要条件；但动画只能<strong>演示</strong>变化，不能<strong>掩盖</strong>抖动 —— 顺序永远是「先稳定，后动画」，并把 Transition Planner 做成可单测的纯函数。</p>
+        </div>
+
+      </div>
+
+      <div class="foot">
+        本文为 <a href="../17-动画过渡与视图.md">17-动画过渡与视图.md</a> 的 HTML 图文版。
+        配套：<a href="00-索引与阅读指南.html">索引</a> ·
+        <a href="../21-术语表.html">术语表图解</a> ·
+        <a href="../../../../design/layout/write-authority.md">写权纪律</a>
+      </div>
+
+    </article>
+  </div>
+</div>
+
+<script src="_assets/nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

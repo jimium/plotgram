@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>04 · 力导向与 stress 布局 — yFiles 参考文库 ebook</title>
+<link rel="stylesheet" href="_assets/style.css">
+<!-- highlight.js 主题（浅色 + 暗色） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+  /* 代码块在浅/暗色下都可用；highlight.js 主题负责 token 颜色，本 CSS 负责容器 */
+  pre code.hljs { background: transparent; padding: 0; border: none; font-size: 13px; }
+  pre code.hljs .comment { font-style: italic; }
+</style>
+</head>
+<body data-page="04">
+
+<div class="layout">
+  <div class="content">
+    <article>
+
+      <h1>04 · 力导向、Stress 与多级布局（Organic Layout）</h1>
+      <p class="subtitle">对应 yFiles <code>OrganicLayout</code> / <code>SmartOrganicLayout</code> / <code>InteractiveOrganicLayout</code>，Graphviz <code>neato</code>(stress) / <code>sfdp</code>(multilevel FR)，OGDF <code>FMMM</code>，D3 <code>forceSimulation</code>、<code>ForceAtlas2</code>。主线论文：Eades 1984（Spring embedder）、Fruchterman–Reingold 1991、Kamada–Kawai 1989、Barnes–Hut 1986、Hu 2005（multilevel + octree）、Gansner–Koren–North 2004（stress majorization）、Zheng–Pawar–Goodman 2018（SGD stress）。</p>
+
+      <div class="meta-bar">
+        <span class="pill">核心算法</span>
+        <span>主线论文：Eades 1984 · Fruchterman–Reingold 1991 · Kamada–Kawai 1989 · Gansner–Koren–North 2004 · Zheng–Pawar–Goodman 2018</span>
+        <span class="src">~221 行 · 9k 字</span>
+      </div>
+
+      <div class="prose">
+
+        <!-- ============ §0 ============ -->
+        <h2 id="sec-1"><span class="h2-num">0</span>两个家族：Spring 模型 vs Stress 模型</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th></th><th>Spring/Force（FR、ForceAtlas2）</th><th>Stress/MDS（KK、neato、SMACOF）</th></tr></thead>
+            <tbody>
+              <tr><td>目标</td><td>无显式全局目标，靠力平衡</td><td>显式：<span class="katex-inline" data-tex="\text{stress}(X)=\sum_{i<j} w_{ij}(\lVert x_i-x_j\rVert - d_{ij})^2"></span></td></tr>
+              <tr><td>距离</td><td>只用邻接（局部）</td><td>用<strong>图论最短路</strong> <span class="katex-inline" data-tex="d_{ij}"></span>（全局）</td></tr>
+              <tr><td>收敛</td><td>需退火/阻尼，易震荡</td><td>majorization 单调下降，<strong>保证收敛</strong></td></tr>
+              <tr><td>复杂度</td><td>每轮 <span class="katex-inline" data-tex="O(V^2)"></span> → BH 后 <span class="katex-inline" data-tex="O(V\log V)"></span></td><td>需全对最短路 <span class="katex-inline" data-tex="O(V^2\log V)"></span> 或采样</td></tr>
+              <tr><td>质量</td><td>局部结构好，全局可能扭</td><td>全局距离忠实，聚类清晰</td></tr>
+              <tr><td>适合</td><td>交互、动态、超大图</td><td>中等规模、静态、质量优先</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 图 4.1：弹簧-电斥模型 -->
+        <figure>
+          <svg viewBox="0 0 380 220" aria-label="弹簧-电斥模型">
+            <text x="190" y="22" text-anchor="middle" class="label">弹簧-电斥模型（Spring–Electrical）</text>
+            <!-- 4 节点 -->
+            <circle class="node" cx="80" cy="80" r="14"/>
+            <circle class="node" cx="300" cy="80" r="14"/>
+            <circle class="node" cx="300" cy="170" r="14"/>
+            <circle class="node" cx="80" cy="170" r="14"/>
+            <!-- 引力边（仅 3 对有边） -->
+            <line class="edge" x1="94" y1="80" x2="286" y2="80"/>
+            <line class="edge" x1="300" y1="94" x2="300" y2="156"/>
+            <line class="edge" x1="286" y1="170" x2="94" y2="170"/>
+            <!-- 斥力（虚线，标在非边对上；实际作用于所有 6 对） -->
+            <line class="edge-hi" x1="92" y1="92" x2="288" y2="158" stroke-dasharray="4 3"/>
+            <line class="edge-hi" x1="288" y1="92" x2="92" y2="158" stroke-dasharray="4 3"/>
+            <!-- 图例 -->
+            <line class="edge" x1="40" y1="200" x2="70" y2="200"/>
+            <text x="76" y="204" class="muted" font-size="10.5">引力（仅边）</text>
+            <line class="edge-hi" x1="200" y1="200" x2="230" y2="200" stroke-dasharray="4 3"/>
+            <text x="236" y="204" class="muted" font-size="10.5">斥力（每对）</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 4.1</span>弹簧-电斥模型：每对节点相互排斥，仅有边的两端相互吸引；平衡态即布局</div>
+        </figure>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>结论：stress 优先</div>
+          <p>如果要"一个 organic 布局"，<strong>优先实现 stress majorization（+ 多级 + 采样）</strong>，它有明确目标函数、可复现、可加约束（07 篇）。力导向留给交互式实时场景。</p>
+        </div>
+
+        <!-- ============ §1 ============ -->
+        <h2 id="sec-2"><span class="h2-num">1</span>Spring Embedder 家族</h2>
+
+        <h3>1.1 Eades 1984</h3>
+        <ul>
+          <li>边 = 弹簧：<span class="katex-inline" data-tex="f_{spring} = c_1 \log(d/c_2)"></span>（对数，避免长边过强）</li>
+          <li>非邻接点 = 电斥：<span class="katex-inline" data-tex="f_{rep} = c_3/\sqrt{d}"></span></li>
+          <li>每轮所有点按合力移动 <span class="katex-inline" data-tex="c_4 \cdot F"></span>，跑 100 轮。</li>
+        </ul>
+
+        <h3>1.2 Fruchterman–Reingold 1991（最广为实现）</h3>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">k = C * sqrt(area / |V|)                  // 理想边长
+for iter in 0..N:
+    // 斥力：所有点对
+    for (v,u) in pairs:
+        d = pos[v]-pos[u]
+        disp[v] += (d/|d|) * k*k/|d|
+    // 引力：仅边
+    for (v,u) in edges:
+        d = pos[v]-pos[u]
+        disp[v] -= (d/|d|) * |d|*|d|/k
+        disp[u] += ...
+    // 移动，受温度限制
+    for v: pos[v] += (disp[v]/|disp[v]|) * min(|disp[v]|, temp)
+    temp = cool(temp)                     // 线性退火到 0</code></pre>
+        </div>
+        <ul>
+          <li><strong>退火（temperature）是 FR 的灵魂</strong>：初期允许大跳跃跳出局部最优，末期只微调。退火太快 → 卡在乱麻；太慢 → 抖动不收敛。</li>
+          <li>复杂度 <span class="katex-inline" data-tex="O(iter\cdot V^2)"></span>。</li>
+          <li><strong>grid variant</strong>：只算相邻网格单元内的斥力，<span class="katex-inline" data-tex="O(V)"></span> 每轮，但会产生"格子伪影"。</li>
+        </ul>
+
+        <h3>1.3 ForceAtlas2（Jacomy et al. 2014）—— Gephi 默认</h3>
+        <p>生产级改良集合，每一项都值得抄：</p>
+        <ul>
+          <li><strong>degree-based 引力/斥力缩放</strong>：斥力 <span class="katex-inline" data-tex="\propto (\deg_i+1)(\deg_j+1)"></span> ⇒ hub 自动被推开，形成清晰的星形结构。</li>
+          <li><strong>LinLog 模式</strong>（Noack 2007）：引力用 <span class="katex-inline" data-tex="\log"></span> 而非线性 ⇒ 强化<strong>聚类分离</strong>。Noack 证明 LinLog 的能量最小化等价于最大化 modularity 的连续版本——即"力导向布局的最优解就是社区检测"。这是理论上最漂亮的结果之一。</li>
+          <li><strong>自适应局部步长（local speed）</strong>：每个节点独立步长，按其"摇摆度"（swinging = 本轮力与上轮力的方向差）缩放：
+            <div class="formula" data-tex="\text{speed}_i = \frac{k_s\cdot \text{globalSpeed}}{1+\text{globalSpeed}\sqrt{\text{swinging}_i}}"></div>
+            ⇒ 消除全局退火调参，收敛稳定。<strong>强烈推荐实现这一项</strong>。</li>
+          <li><strong>防重叠模式</strong>：斥力按节点半径修正（<span class="katex-inline" data-tex="d \to d - r_i - r_j"></span>，若 &lt;0 则强斥力）。</li>
+        </ul>
+
+        <h3>1.4 Barnes–Hut / FMM 加速（必须做）</h3>
+        <p>斥力是 n-body 问题：</p>
+        <ul>
+          <li><strong>Barnes–Hut</strong>（四叉树）：把远处的一簇点用其质心近似，判据 <span class="katex-inline" data-tex="s/d &lt; \theta"></span>（<span class="katex-inline" data-tex="\theta \approx 0.5\!-\!1.2"></span>）。<span class="katex-inline" data-tex="O(V\log V)"></span>。</li>
+          <li><strong>FMM / 多极展开</strong>（OGDF <code>FMMM</code>，Hachul–Jünger 2004）：<span class="katex-inline" data-tex="O(V\log V)"></span> 但常数更好，精度可控。</li>
+          <li>实现要点：四叉树每轮重建（点动了）；重建 <span class="katex-inline" data-tex="O(V\log V)"></span>，与遍历同阶。用 Morton code 排序可做到近线性且 cache 友好。</li>
+        </ul>
+
+        <!-- 图 4.2：Barnes-Hut 四叉树 -->
+        <figure>
+          <svg viewBox="0 0 380 250" aria-label="Barnes-Hut 四叉树">
+            <text x="190" y="22" text-anchor="middle" class="label">Barnes–Hut 四叉树：远处一簇 → 一个质心</text>
+            <!-- 根方框 -->
+            <rect x="40" y="40" width="180" height="180" fill="none" stroke="var(--muted)" stroke-width="1"/>
+            <!-- 一级划分 -->
+            <line x1="130" y1="40" x2="130" y2="220" stroke="var(--muted)" stroke-width="0.8"/>
+            <line x1="40" y1="130" x2="220" y2="130" stroke="var(--muted)" stroke-width="0.8"/>
+            <!-- 右上象限再分（簇在内） -->
+            <line x1="175" y1="40" x2="175" y2="130" stroke="var(--muted)" stroke-width="0.5" stroke-dasharray="2 2"/>
+            <line x1="130" y1="85" x2="220" y2="85" stroke="var(--muted)" stroke-width="0.5" stroke-dasharray="2 2"/>
+            <!-- 散落节点 -->
+            <circle class="node" cx="65" cy="65" r="3.5"/>
+            <circle class="node" cx="95" cy="90" r="3.5"/>
+            <circle class="node" cx="60" cy="115" r="3.5"/>
+            <circle class="node" cx="110" cy="60" r="3.5"/>
+            <circle class="node" cx="85" cy="170" r="3.5"/>
+            <circle class="node" cx="105" cy="200" r="3.5"/>
+            <circle class="node" cx="60" cy="195" r="3.5"/>
+            <circle class="node" cx="180" cy="180" r="3.5"/>
+            <circle class="node" cx="200" cy="200" r="3.5"/>
+            <!-- 右上簇 -->
+            <circle class="node" cx="145" cy="55" r="3.5"/>
+            <circle class="node" cx="160" cy="65" r="3.5"/>
+            <circle class="node" cx="155" cy="50" r="3.5"/>
+            <circle class="node" cx="170" cy="60" r="3.5"/>
+            <circle class="node" cx="180" cy="75" r="3.5"/>
+            <circle class="node" cx="195" cy="65" r="3.5"/>
+            <circle class="node" cx="165" cy="80" r="3.5"/>
+            <!-- 质心 -->
+            <circle cx="167" cy="64" r="6" fill="var(--bad)" stroke="var(--bad)" stroke-width="1.5"/>
+            <text x="195" y="35" text-anchor="middle" class="hi" font-size="10">质心（近似整簇）</text>
+            <line class="edge-hi" x1="183" y1="38" x2="170" y2="58" stroke-dasharray="2 2"/>
+            <!-- 查询点 -->
+            <circle class="dummy" cx="70" cy="200" r="5"/>
+            <text x="45" y="218" class="muted" font-size="10">查询点</text>
+            <text x="190" y="240" text-anchor="middle" class="muted" font-size="10.5">远处一簇用质心近似，判据 s/d &lt; θ（θ ≈ 0.5–1.2）</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 4.2</span>Barnes–Hut：把远处的一簇点用其质心近似，将 n-body 斥力降到 <span class="katex-inline" data-tex="O(V\log V)"></span></div>
+        </figure>
+
+        <!-- ============ §2 ============ -->
+        <h2 id="sec-3"><span class="h2-num">2</span>Stress 模型（推荐主力）</h2>
+
+        <h3>2.1 目标函数</h3>
+        <div class="formula" data-tex="\sigma(X)=\sum_{i<j} w_{ij}\,(\lVert x_i-x_j\rVert - d_{ij})^2,\quad w_{ij}=d_{ij}^{-2}"></div>
+        <ul>
+          <li><span class="katex-inline" data-tex="d_{ij}"></span> = 图论最短路 × 理想边长；<span class="katex-inline" data-tex="w_{ij}=d_{ij}^{-2}"></span> 使短距离更重要（这是标准选择，来自 Kruskal 的 stress-1）。</li>
+        </ul>
+
+        <h3>2.2 Kamada–Kawai 1989</h3>
+        <p>用牛顿–拉夫森逐点优化，每次挑"力最大"的点优化到局部最优。收敛慢，仅小图。</p>
+
+        <h3>2.3 Stress Majorization / SMACOF（Gansner–Koren–North 2004）——<strong>核心算法</strong></h3>
+        <p>用二次上界函数（majorizer）替代 stress，每轮解一个加权拉普拉斯线性系统：</p>
+        <div class="formula" data-tex="L^w X^{(t+1)} = L^{Z} Z,\quad Z=X^{(t)}"></div>
+        <p>其中</p>
+        <ul>
+          <li><span class="katex-inline" data-tex="L^w"></span>：<span class="katex-inline" data-tex="L^w_{ij}=-w_{ij}"></span>，<span class="katex-inline" data-tex="L^w_{ii}=\sum_{j\ne i}w_{ij}"></span>（固定，可预分解）</li>
+          <li><span class="katex-inline" data-tex="L^Z_{ij} = -w_{ij}d_{ij}/\lVert z_i-z_j\rVert"></span>，<span class="katex-inline" data-tex="L^Z_{ii}=-\sum_{j\ne i}L^Z_{ij}"></span></li>
+        </ul>
+        <p><strong>逐坐标独立求解</strong>（x、y 分开），每轮：</p>
+        <div class="code-block">
+          <span class="lang-tag">rust</span>
+          <pre><code class="language-rust">fn smacof_iter(x: &amp;mut Vec&lt;f64&gt;, y: &amp;mut Vec&lt;f64&gt;, d: &amp;Dist, w: &amp;Weights) {
+    // 每维一个 |V|x|V| 稀疏(实际稠密)线性系统，用共轭梯度或 Cholesky
+    let (bx, by) = compute_rhs(x, y, d, w);   // L^Z Z
+    solve_in_place(&amp;L_w_factorized, &amp;mut bx); // 固定 1 个点消除平移自由度
+    ...
+}</code></pre>
+        </div>
+        <ul>
+          <li><strong>单调下降保证</strong>：<span class="katex-inline" data-tex="\sigma(X^{(t+1)}) \le \sigma(X^{(t)})"></span>。无需退火、无需调步长。<strong>这是它压倒 FR 的关键工程优势。</strong></li>
+          <li><span class="katex-inline" data-tex="L^w"></span> 秩亏 1（平移不变），固定一个点或用伪逆。</li>
+          <li>每轮 <span class="katex-inline" data-tex="O(V^2)"></span>（稠密 rhs）+ 线性解。用 CG 且预分解 <span class="katex-inline" data-tex="L^w"></span>（Cholesky 一次 <span class="katex-inline" data-tex="O(V^3)"></span> 太贵）→ 实际用 <strong>CG + Jacobi 预条件</strong>，每轮 <span class="katex-inline" data-tex="O(V^2)"></span>。</li>
+        </ul>
+
+        <h3>2.4 大图化：Sparse Stress</h3>
+        <p>全对最短路 <span class="katex-inline" data-tex="O(V^2)"></span> 存不下。两条路线：</p>
+        <ul>
+          <li><strong>Pivot MDS / PivotMDS</strong>（Brandes–Pich 2007）：选 <span class="katex-inline" data-tex="k"></span> 个 pivot（k-center 贪心：每次选离已选集最远的点），只算 pivot 到全体的 BFS 距离（<span class="katex-inline" data-tex="O(kE)"></span>），用经典 MDS 的 Nyström 近似求初始坐标。<strong>极快，质量好，最适合当初始布局。</strong></li>
+          <li><strong>Sparse Stress Model</strong>（Ortmann–Klimenta–Brandes 2016）：只保留每点到 pivot 的项 + 邻接项，把 stress 项数从 <span class="katex-inline" data-tex="O(V^2)"></span> 降到 <span class="katex-inline" data-tex="O(kV)"></span>，用加权补偿保持无偏。<span class="katex-inline" data-tex="O(kV)"></span> 每轮。</li>
+          <li><strong>SGD stress</strong>（Zheng–Pawar–Goodman 2018）：随机抽 pair，对每对做一步"沿连线拉/推到目标距离"的投影更新，步长 <span class="katex-inline" data-tex="\mu=\min(w_{ij}\eta, 1)"></span>，<span class="katex-inline" data-tex="\eta"></span> 按 schedule 衰减。</li>
+        </ul>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">for each epoch with step η:
+    shuffle all pairs (or sampled pairs)
+    for (i,j):
+        r = (|x_i-x_j| - d_ij)/2 * unit(x_i-x_j)
+        μ = min(w_ij * η, 1)
+        x_i -= μ*r; x_j += μ*r</code></pre>
+        </div>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>SGD stress：首选 stress 求解器</div>
+          <p><strong>实现只有 20 行、收敛比 SMACOF 快、质量更好</strong>（论文实测）。若只实现一个 stress 求解器，选这个。</p>
+        </div>
+
+        <h3>2.5 初始化很重要</h3>
+        <ul>
+          <li>随机初始化 → 易缠绕、结果不确定。</li>
+          <li><strong>推荐</strong>：PivotMDS 或谱布局（拉普拉斯特征向量，用幂迭代/Lanczos）作为初值，再跑 stress。这样结果<strong>近乎确定</strong>（只依赖 pivot 选择，而 pivot 用确定性 k-center）。</li>
+        </ul>
+
+        <!-- ============ §3 ============ -->
+        <h2 id="sec-4"><span class="h2-num">3</span>多级方法（Multilevel）—— 大图的唯一正解</h2>
+
+        <p>思路：粗化 → 在最粗层布局 → 逐层细化并局部优化。使全局结构在小图上确定，避免大图陷局部最优。</p>
+        <div class="code-block">
+          <span class="lang-tag">rust</span>
+          <pre><code class="language-rust">fn multilevel(g: Graph) -&gt; Coords {
+    let mut levels = vec![g];
+    while levels.last().len() &gt; THRESHOLD {
+        levels.push(coarsen(levels.last()));
+    }
+    let mut pos = layout_small(levels.last());     // 最粗层随便跑
+    for lvl in levels.iter().rev().skip(1) {
+        pos = interpolate(pos, lvl);               // 把粗层坐标撒给细层
+        pos = refine(lvl, pos);                    // 少量 FR/stress 迭代
+    }
+    pos
+}</code></pre>
+        </div>
+
+        <!-- 图 4.3：多级方法 -->
+        <figure>
+          <svg viewBox="0 0 560 200" aria-label="多级方法">
+            <text x="280" y="20" text-anchor="middle" class="label">多级方法：粗化 → 最粗层布局 → 逐层细化插值</text>
+            <!-- 细层 -->
+            <g transform="translate(10,40)">
+              <text x="60" y="-5" text-anchor="middle" class="muted" font-size="10">细层（原图）</text>
+              <circle class="node" cx="20" cy="20" r="4.5"/>
+              <circle class="node" cx="50" cy="15" r="4.5"/>
+              <circle class="node" cx="80" cy="30" r="4.5"/>
+              <circle class="node" cx="30" cy="55" r="4.5"/>
+              <circle class="node" cx="70" cy="60" r="4.5"/>
+              <circle class="node" cx="100" cy="50" r="4.5"/>
+              <circle class="node" cx="55" cy="85" r="4.5"/>
+              <circle class="node" cx="90" cy="95" r="4.5"/>
+              <line class="edge-muted" x1="20" y1="20" x2="50" y2="15" stroke-width="0.7"/>
+              <line class="edge-muted" x1="50" y1="15" x2="80" y2="30" stroke-width="0.7"/>
+              <line class="edge-muted" x1="20" y1="20" x2="30" y2="55" stroke-width="0.7"/>
+              <line class="edge-muted" x1="30" y1="55" x2="70" y2="60" stroke-width="0.7"/>
+              <line class="edge-muted" x1="80" y1="30" x2="100" y2="50" stroke-width="0.7"/>
+              <line class="edge-muted" x1="70" y1="60" x2="55" y2="85" stroke-width="0.7"/>
+              <line class="edge-muted" x1="55" y1="85" x2="90" y2="95" stroke-width="0.7"/>
+            </g>
+            <path d="M125,90 L155,90" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#am4)"/>
+            <text x="140" y="80" text-anchor="middle" class="muted" font-size="10">粗化</text>
+            <!-- 中层 -->
+            <g transform="translate(170,55)">
+              <text x="50" y="-10" text-anchor="middle" class="muted" font-size="10">中层</text>
+              <circle class="node" cx="20" cy="20" r="6.5"/>
+              <circle class="node" cx="80" cy="20" r="6.5"/>
+              <circle class="node" cx="30" cy="60" r="6.5"/>
+              <circle class="node" cx="75" cy="65" r="6.5"/>
+              <line class="edge-muted" x1="20" y1="20" x2="80" y2="20" stroke-width="0.8"/>
+              <line class="edge-muted" x1="20" y1="20" x2="30" y2="60" stroke-width="0.8"/>
+              <line class="edge-muted" x1="30" y1="60" x2="75" y2="65" stroke-width="0.8"/>
+              <line class="edge-muted" x1="80" y1="20" x2="75" y2="65" stroke-width="0.8"/>
+            </g>
+            <path d="M295,90 L325,90" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#am4)"/>
+            <text x="310" y="80" text-anchor="middle" class="muted" font-size="10">粗化</text>
+            <!-- 最粗层 -->
+            <g transform="translate(335,70)">
+              <text x="50" y="-15" text-anchor="middle" class="label" font-size="10">最粗层</text>
+              <circle class="node" cx="20" cy="20" r="8.5"/>
+              <circle class="node" cx="80" cy="20" r="8.5"/>
+              <line class="edge" x1="29" y1="20" x2="71" y2="20"/>
+            </g>
+            <path d="M445,90 L475,90" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#am4)"/>
+            <text x="460" y="80" text-anchor="middle" class="hi" font-size="10">布局+插值回</text>
+            <!-- 最终 -->
+            <g transform="translate(485,40)">
+              <text x="40" y="-5" text-anchor="middle" class="label" font-size="10">最终</text>
+              <circle class="node" cx="20" cy="20" r="4"/>
+              <circle class="node" cx="50" cy="15" r="4"/>
+              <circle class="node" cx="75" cy="30" r="4"/>
+              <circle class="node" cx="25" cy="55" r="4"/>
+              <circle class="node" cx="60" cy="65" r="4"/>
+              <line class="edge" x1="20" y1="20" x2="50" y2="15"/>
+              <line class="edge" x1="50" y1="15" x2="75" y2="30"/>
+              <line class="edge" x1="20" y1="20" x2="25" y2="55"/>
+              <line class="edge" x1="25" y1="55" x2="60" y2="65"/>
+              <line class="edge" x1="75" y1="30" x2="60" y2="65"/>
+            </g>
+            <defs>
+              <marker id="am4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+            </defs>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 4.3</span>多级方法：在小图上确定全局结构，逐层细化插值回原规模，避免大图陷局部最优</div>
+        </figure>
+
+        <h3>3.1 粗化策略</h3>
+        <ul>
+          <li><strong>Edge collapsing / Heavy-edge matching</strong>：求极大匹配（优先收缩权重大的边），把匹配的两点合并。<span class="katex-inline" data-tex="O(E)"></span>。ELK/FMMM 用之。</li>
+          <li><strong>Maximal Independent Set (MIS) filtration</strong>（Hu 2005 / sfdp）：取极大独立集作为下一层顶点，距离用 3-hop 近似。收缩率更稳定（~1/3）。</li>
+          <li><strong>Solar system / galaxy 划分</strong>（FMMM）：选 "太阳"节点，把周围 2-hop 内的节点归给它，形成 solar system 收缩。</li>
+          <li>关键指标：<strong>每层收缩率</strong>应稳定在 0.4–0.6，否则层数不可控。</li>
+        </ul>
+
+        <h3>3.2 细化</h3>
+        <ul>
+          <li>插值：合并节点的坐标 + 小随机扰动（避免完全重合导致斥力爆炸）。</li>
+          <li>每层只跑少量迭代（FR 温度按层重置为该层理想边长的一个比例）。</li>
+          <li>总复杂度：<span class="katex-inline" data-tex="O(V\log V)"></span>（BH）或 <span class="katex-inline" data-tex="O(V + E)"></span> 每层，层数 <span class="katex-inline" data-tex="O(\log V)"></span>。</li>
+        </ul>
+
+        <h3>3.3 多级 + Stress</h3>
+        <ul>
+          <li>Hu 2005 (<code>sfdp</code>) 是多级 FR + BH。</li>
+          <li><strong>Maxent-stress</strong>（Gansner–Hu–North 2013）：把 stress 与最大熵原则结合，只用短距离项 + 熵项撑开远处，避免全对最短路。质量接近全 stress，复杂度近线性。这是"大图 organic"当前最佳权衡之一。</li>
+        </ul>
+
+        <!-- ============ §4 ============ -->
+        <h2 id="sec-5"><span class="h2-num">4</span>节点重叠消除（真实节点有尺寸）</h2>
+
+        <p>力导向/stress 把节点当质点，落地必须消重叠：</p>
+        <ol>
+          <li><strong>PRISM</strong>（Gansner–Hu 2009）：Delaunay 三角化 → 对每条三角边施加"至少分开"的比例约束 → stress 式求解 → 迭代直到无重叠。质量最好（保持相对位置/mental map），<span class="katex-inline" data-tex="O(V\log V)"></span> 每轮。<strong>推荐。</strong></li>
+          <li><strong>VPSC / 分离约束</strong>（Dwyer–Marriott–Stuckey 2006）：x、y 交替求解一维最小位移分离（见 07 篇），<span class="katex-inline" data-tex="O(V\log V)"></span>。可与 stress 联合（IPSEP-COLA）。</li>
+          <li><strong>Scan-line + push</strong>：按 x 扫描发现重叠就推开。快但破坏结构、易震荡。</li>
+          <li><strong>在力模型里加斥力项</strong>：简单但只能"缓解"，无法保证零重叠。</li>
+        </ol>
+
+        <div class="callout info">
+          <div class="ct-title"><span class="icon">ℹ</span>架构建议</div>
+          <p>把"消重叠"做成独立的 post-stage（yFiles 的 <code>RemoveOverlapsStage</code> 即此），输入=坐标+尺寸，输出=坐标；<strong>不与布局算法耦合</strong>。</p>
+        </div>
+
+        <!-- ============ §5 ============ -->
+        <h2 id="sec-6"><span class="h2-num">5</span>其它 organic 变体（yFiles 有对应能力）</h2>
+
+        <ul>
+          <li><strong>Clustering-aware organic</strong>：先社区检测（Louvain / label propagation / betweenness），把社区当超点布局，再展开——本质是"语义驱动的一层多级"。</li>
+          <li><strong>Circular layout</strong>：把双连通分量各自排成圆，分量间用树布局连接（yFiles <code>CircularLayout</code>）。适合网络拓扑环。</li>
+          <li><strong>Substructure detection</strong>（yFiles Organic 的杀手特性）：识别<strong>星形（star）</strong>、<strong>链（chain）</strong>、<strong>环（cycle）</strong>、<strong>并行结构</strong>，对这些子结构用专门的精确布局（星形放辐射状、链拉直），其余用力导向。视觉提升巨大且实现不难：
+            <div class="code-block">
+              <span class="lang-tag">pseudo</span>
+              <pre><code class="language-plaintext">detect_stars: 度=1 的叶子挂在同一个中心 → 把叶子均匀铺在中心周围扇形
+detect_chains: 度=2 的路径 → 拉成直线/圆弧
+detect_cycles: 无弦环 → 排成正多边形</code></pre>
+            </div>
+            这些子结构在布局主循环中被"冻结成刚体"（rigid body），只优化刚体的位置和旋转 ⇒ 自由度大减，收敛更快。</li>
+          <li><strong>Interactive/organic 增量</strong>：持续跑的物理模拟，用户拖动=施加外力。需要"分层锁定"（未动的区域降温），见 07 篇。</li>
+        </ul>
+
+        <!-- ============ §6 ============ -->
+        <h2 id="sec-7"><span class="h2-num">6</span>参数标定与陷阱</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>参数</th><th>含义</th><th>经验值/说明</th></tr></thead>
+            <tbody>
+              <tr><td>理想边长 <span class="katex-inline" data-tex="k"></span></td><td>决定整体尺度</td><td>≈ 平均节点直径 × 1.5–3；或 <span class="katex-inline" data-tex="\sqrt{\text{area}/V}"></span></td></tr>
+              <tr><td>迭代次数</td><td>FR: 50–300；SGD: 15–30 epoch</td><td>早停：位移中位数 &lt; ε</td></tr>
+              <tr><td>BH <span class="katex-inline" data-tex="\theta"></span></td><td>精度/速度</td><td>0.9 平衡，1.2 快，0.5 精</td></tr>
+              <tr><td>权重 <span class="katex-inline" data-tex="w_{ij}"></span></td><td>stress 中的距离偏好</td><td><span class="katex-inline" data-tex="d^{-2}"></span> 标准；<span class="katex-inline" data-tex="d^{-1}"></span> 更重视远距离</td></tr>
+              <tr><td>pivot 数 <span class="katex-inline" data-tex="k"></span></td><td>sparse stress</td><td>50–200，与 <span class="katex-inline" data-tex="V"></span> 弱相关</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>陷阱清单</div>
+          <ul>
+            <li>完全重合的点 → 力为 NaN。必须对 <span class="katex-inline" data-tex="d=0"></span> 加 <span class="katex-inline" data-tex="\epsilon"></span> 抖动（且抖动要用<strong>确定性 PRNG + 固定种子</strong>）。</li>
+            <li>不连通图：<span class="katex-inline" data-tex="d_{ij}=\infty"></span>。做法：分量各自布局 + 装箱（packing），或给跨分量对赋一个大常数距离。</li>
+            <li><strong>确定性</strong>：随机初始化、随机 pair 抽样、四叉树遍历序都要固定种子/固定序。要求"同输入同输出"就必须把 PRNG 作为显式参数传递，禁止全局 rng。</li>
+            <li>悬挂叶子（度 1）大量存在时 stress 会把它们堆在一起 → 先摘叶子布局主体，再把叶子扇形铺开（Graphviz 的 <code>-Gmode=hier</code> 类技巧 / "leaf bundling"）。</li>
+          </ul>
+        </div>
+
+        <!-- ============ §7 ============ -->
+        <h2 id="sec-8"><span class="h2-num">7</span>装箱（Component Packing）</h2>
+
+        <p>多个连通分量各自布局后要拼在一起：</p>
+        <ul>
+          <li><strong>多边形近似 + 贪心装箱</strong>：算每个分量的凸包/包围盒，按面积降序用 "first-fit decreasing on shelves" 或 <strong>多边形装箱</strong>（Freivalds–Dogrusoz–Kikusts 2002 的 polyomino packing）。</li>
+          <li>目标：总包围盒接近给定长宽比。</li>
+          <li>yFiles <code>ComponentLayout</code> 提供多种 style（rows / packed rectangles / packed circles / nested rows）。</li>
+          <li>实现优先级：先 rows/grid（10 行代码），再 polyomino。</li>
+        </ul>
+
+        <!-- ============ §8 ============ -->
+        <h2 id="sec-9"><span class="h2-num">8</span>plotgram 落地建议</h2>
+
+        <ol>
+          <li><strong>只实现一条 organic 主线</strong>：<code>PivotMDS 初始化 → SGD stress（sparse pairs）→ PRISM 消重叠 → 装箱</code>。全链确定性可控、无退火调参、代码量可控。</li>
+          <li>需要交互实时时，另加 <code>ForceAtlas2 + BH + local speed</code> 的模拟器，与静态布局共用坐标模型。</li>
+          <li><strong>substructure detection（星/链/环）优先级高于力模型调参</strong>：同样的工作量，视觉收益大得多。</li>
+          <li>消重叠必须是独立 stage，不要写进力循环。</li>
+          <li>所有随机性通过显式 <code>seed</code> 传递；测试断言 stress 值单调下降 + 最终坐标 JSON 快照。</li>
+        </ol>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>一句话收敛</div>
+          <p>plotgram 的 organic 主线 = <strong>PivotMDS → SGD stress → PRISM → 装箱</strong>，全程确定性、无退火、可测试。交互式场景另起 ForceAtlas2 + BH + local speed 模拟器，与静态布局共用坐标模型。</p>
+        </div>
+
+      </div>
+
+      <div class="foot">
+        本文为 <a href="../04-力导向与stress布局.md">04-力导向与stress布局.md</a> 的 HTML 图文版。
+        配套：<a href="00-索引与阅读指南.html">索引</a> ·
+        <a href="../21-术语表.html">术语表图解</a> ·
+        <a href="../../../../design/layout/write-authority.md">写权纪律</a>
+      </div>
+
+    </article>
+  </div>
+</div>
+
+<script src="_assets/nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

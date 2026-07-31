@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>16 · 大图性能与 WASM 工程 — yFiles 参考文库 ebook</title>
+<link rel="stylesheet" href="_assets/style.css">
+<!-- highlight.js 主题（浅色 + 暗色） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+  /* 代码块在浅/暗色下都可用；highlight.js 主题负责 token 颜色，本 CSS 负责容器 */
+  pre code.hljs { background: transparent; padding: 0; border: none; font-size: 13px; }
+  pre code.hljs .comment { font-style: italic; }
+</style>
+</head>
+<body data-page="16">
+
+<div class="layout">
+  <div class="content">
+    <article>
+
+      <h1>16 · 大图性能、门控降级与 WASM 工程（Large Graph Performance &amp; WASM）</h1>
+      <p class="subtitle">布局是<strong>超线性</strong>算法的集合，规模一上来就会有「某一相突然吃掉 90% 时间」的现象。本篇给出各相复杂度预算、已知热点与优化手段、规模门控与降级策略、并行化的可行边界，以及 WASM 环境的具体限制（本项目的主要交付环境）。</p>
+
+      <div class="meta-bar">
+        <span class="pill">工程</span>
+        <span>对应 yFiles <code>LayoutExecutor</code> / Graphviz <code>dot</code> 性能档位 · 本仓库 <code>AGENTS.md</code> §2 工程红线</span>
+        <span class="src">~226 行 · 7.2k 字</span>
+      </div>
+
+      <div class="prose">
+
+        <!-- ============ §1 ============ -->
+        <h2 id="sec-1"><span class="h2-num">1</span>复杂度预算表</h2>
+
+        <p>设 <span class="katex-inline" data-tex="V"></span> 节点、<span class="katex-inline" data-tex="E"></span> 边、<span class="katex-inline" data-tex="L"></span> 层、<span class="katex-inline" data-tex="W"></span> 最大层宽、<span class="katex-inline" data-tex="D"></span> = dummy 节点数。</p>
+        <p><strong>关键事实：分层布局的真实规模是 <span class="katex-inline" data-tex="V + D"></span>，而 <span class="katex-inline" data-tex="D"></span> 可以是 <span class="katex-inline" data-tex="V"></span> 的数倍</strong>（长边多时）。</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>相</th><th>理论复杂度</th><th>实测占比（<span class="katex-inline" data-tex="V\approx"></span> 数千的 DAG）</th><th>主要热点</th></tr></thead>
+            <tbody>
+              <tr><td>解析 / 建模</td><td><span class="katex-inline" data-tex="O(\text{src})"></span></td><td>&lt; 2%</td><td>字符串分配</td></tr>
+              <tr><td>文本度量</td><td><span class="katex-inline" data-tex="O(\text{chars})"></span></td><td><strong>5–25%</strong></td><td>字体 shaping（CJK 尤重）</td></tr>
+              <tr><td>P1 去环</td><td><span class="katex-inline" data-tex="O(V+E)"></span></td><td>&lt; 1%</td><td>—</td></tr>
+              <tr><td>P2 分层（NS）</td><td>实践近线性，最坏无强多项式界</td><td>3–15%</td><td><code>enter_edge</code> 搜索</td></tr>
+              <tr><td>dummy 化</td><td><span class="katex-inline" data-tex="O(D)"></span></td><td>2%</td><td>内存分配</td></tr>
+              <tr><td><strong>P3 定序</strong></td><td><span class="katex-inline" data-tex="O(\text{iter}\cdot E\log W)"></span></td><td><strong>30–60%</strong></td><td>交叉计数 + transpose</td></tr>
+              <tr><td>P4 坐标（BK）</td><td><span class="katex-inline" data-tex="O(V+D+E)"></span></td><td>5%</td><td>—</td></tr>
+              <tr><td><strong>边路由</strong></td><td><span class="katex-inline" data-tex="O(E \cdot \text{search})"></span>，OVG 最坏 <span class="katex-inline" data-tex="O(V^2)"></span></td><td><strong>20–50%</strong></td><td>A* 搜索、可见图构造</td></tr>
+              <tr><td>nudging（VPSC）</td><td><span class="katex-inline" data-tex="O(C\log C)"></span> 每维</td><td>3–8%</td><td>约束构造</td></tr>
+              <tr><td>标签</td><td><span class="katex-inline" data-tex="O(n\log n)"></span> ~ <span class="katex-inline" data-tex="O(n^2)"></span></td><td>2–10%</td><td>冲突检测</td></tr>
+              <tr><td>落笔 + SVG</td><td><span class="katex-inline" data-tex="O(\text{output})"></span></td><td>5–15%</td><td>字符串拼接</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p><strong>结论：优化只有两个真目标 —— P3 定序与边路由。</strong>其它相的优化基本是浪费（除文本度量在 CJK 场景）。</p>
+
+        <!-- 图解：复杂度预算条形图 -->
+        <figure>
+          <svg viewBox="0 0 720 360" aria-label="各相实测耗时占比（典型数千节点 DAG）">
+            <text x="360" y="20" text-anchor="middle" class="label">各相实测耗时占比（典型 V≈数千的 DAG，取区间中位）</text>
+            <line class="axis" x1="150" y1="40" x2="150" y2="340"/>
+            <line class="axis" x1="150" y1="340" x2="640" y2="340"/>
+            <!-- 网格 0/15/30/45/60% -->
+            <g class="gridline">
+              <line x1="270" y1="40" x2="270" y2="340"/>
+              <line x1="390" y1="40" x2="390" y2="340"/>
+              <line x1="510" y1="40" x2="510" y2="340"/>
+              <line x1="630" y1="40" x2="630" y2="340"/>
+            </g>
+            <text x="150" y="354" text-anchor="middle" class="muted" font-size="10">0%</text>
+            <text x="270" y="354" text-anchor="middle" class="muted" font-size="10">15%</text>
+            <text x="390" y="354" text-anchor="middle" class="muted" font-size="10">30%</text>
+            <text x="510" y="354" text-anchor="middle" class="muted" font-size="10">45%</text>
+            <text x="630" y="354" text-anchor="middle" class="muted" font-size="10">60%</text>
+            <!-- 11 条横向柱：每柱高 18，间距 26；起点 y=48 -->
+            <!-- 1. 解析/建模 1% -->
+            <text x="144" y="61" text-anchor="end" class="muted" font-size="10.5">解析/建模</text>
+            <rect class="node-muted" x="150" y="48" width="8" height="18"/>
+            <!-- 2. 文本度量 15% -->
+            <text x="144" y="87" text-anchor="end" class="muted" font-size="10.5">文本度量</text>
+            <rect class="node" x="150" y="74" width="120" height="18"/>
+            <!-- 3. P1 去环 0.5% -->
+            <text x="144" y="113" text-anchor="end" class="muted" font-size="10.5">P1 去环</text>
+            <rect class="node-muted" x="150" y="100" width="4" height="18"/>
+            <!-- 4. P2 分层 9% -->
+            <text x="144" y="139" text-anchor="end" class="muted" font-size="10.5">P2 分层</text>
+            <rect class="node-muted" x="150" y="126" width="72" height="18"/>
+            <!-- 5. dummy 化 2% -->
+            <text x="144" y="165" text-anchor="end" class="muted" font-size="10.5">dummy 化</text>
+            <rect class="node-muted" x="150" y="152" width="16" height="18"/>
+            <!-- 6. P3 定序 45% （HOT） -->
+            <text x="144" y="191" text-anchor="end" class="hi" font-size="10.5">P3 定序</text>
+            <rect class="node" x="150" y="178" width="360" height="18" fill="var(--bad-soft)" stroke="var(--bad)"/>
+            <text x="518" y="191" class="hi" font-size="10.5">30–60%</text>
+            <!-- 7. P4 坐标 5% -->
+            <text x="144" y="217" text-anchor="end" class="muted" font-size="10.5">P4 坐标</text>
+            <rect class="node-muted" x="150" y="204" width="40" height="18"/>
+            <!-- 8. 边路由 35% （HOT） -->
+            <text x="144" y="243" text-anchor="end" class="hi" font-size="10.5">边路由</text>
+            <rect class="node" x="150" y="230" width="280" height="18" fill="var(--bad-soft)" stroke="var(--bad)"/>
+            <text x="438" y="243" class="hi" font-size="10.5">20–50%</text>
+            <!-- 9. nudging 5.5% -->
+            <text x="144" y="269" text-anchor="end" class="muted" font-size="10.5">nudging</text>
+            <rect class="node-muted" x="150" y="256" width="44" height="18"/>
+            <!-- 10. 标签 6% -->
+            <text x="144" y="295" text-anchor="end" class="muted" font-size="10.5">标签</text>
+            <rect class="node-muted" x="150" y="282" width="48" height="18"/>
+            <!-- 11. 落笔+SVG 10% -->
+            <text x="144" y="321" text-anchor="end" class="muted" font-size="10.5">落笔+SVG</text>
+            <rect class="node-muted" x="150" y="308" width="80" height="18"/>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 16.1</span>复杂度预算：P3 定序与边路由合计可吃掉 50–90% 时间，是唯二值得优化的相</div>
+        </figure>
+
+        <!-- ============ §2 ============ -->
+        <h2 id="sec-2"><span class="h2-num">2</span>P3 定序的优化</h2>
+
+        <h3>2.1 必做（数量级级别）</h3>
+        <ol>
+          <li><strong>Barth–Jünger–Mutzel 交叉计数</strong>（<span class="katex-inline" data-tex="O(E\log V)"></span> 替代 <span class="katex-inline" data-tex="O(E^2)"></span>）——见 14 篇 §4.3。</li>
+          <li><strong>transpose 的局部判定</strong>：交换相邻两点的交叉数变化只依赖这两点的邻接，<span class="katex-inline" data-tex="O(\deg_u+\deg_v)"></span>，不要全层重算。</li>
+          <li><strong>提前收敛</strong>：连续 N 轮无改进就停；交叉数为 0 立即停。dot 默认 24 轮，多数图 4–8 轮就收敛。</li>
+          <li><strong>长边链抽象</strong>：跨 <span class="katex-inline" data-tex="k"></span> 层的边产生 <span class="katex-inline" data-tex="k-1"></span> 个 dummy，它们的序应作为<strong>一个整体</strong>处理（块级 sifting，Bachmaier 2010），否则宽层上 dummy 数量主导一切。哪怕不做块级 sifting，也应给 dummy 设置更高边权（1/2/8 中的 8）让它们自然对齐。</li>
+        </ol>
+
+        <h3>2.2 可选</h3>
+        <ul>
+          <li><strong>sifting</strong> 替代/补充 transpose：质量更好但更慢，建议只在 <span class="katex-inline" data-tex="V"></span> 小于阈值或「质量模式」下开。</li>
+          <li><strong>只在变化的层上迭代</strong>（增量场景）：维护 dirty 层集合。</li>
+          <li><strong>分块并行</strong>：sweep 本质是串行（第 <span class="katex-inline" data-tex="i"></span> 层依赖 <span class="katex-inline" data-tex="i-1"></span> 层），但<strong>同一层内的 transpose 可以按不相交对并行</strong> —— 收益有限，不建议先做。</li>
+        </ul>
+
+        <h3>2.3 内存</h3>
+        <p>dummy 节点用<strong>紧凑数组</strong>（SoA）而非每个一个堆对象：</p>
+        <div class="code-block">
+          <span class="lang-tag">rust</span>
+          <pre><code class="language-rust">struct LayerOrder { nodes: Vec&lt;NodeRef&gt;, pos: Vec&lt;u32&gt; }   // pos 是 nodes 的逆映射</code></pre>
+        </div>
+        <p><code>pos</code> 逆映射数组是必需的（交叉计数与 transpose 都要 <span class="katex-inline" data-tex="O(1)"></span> 查位置）。</p>
+
+        <!-- ============ §3 ============ -->
+        <h2 id="sec-3"><span class="h2-num">3</span>边路由的优化</h2>
+
+        <h3>3.1 选对图（最大收益）</h3>
+        <ul>
+          <li><strong>规则布局（分层结果）用通道图</strong>：节点数级别的顶点，比 OVG 小一到两个数量级；</li>
+          <li><strong>只在自由布局 / 拖动后用 OVG</strong>；</li>
+          <li>OVG 构造用扫描线 <span class="katex-inline" data-tex="O(n\log n + |E_{vis}|)"></span>，不要 <span class="katex-inline" data-tex="O(n^2)"></span> 双循环。</li>
+        </ul>
+
+        <h3>3.2 A* 的加速</h3>
+        <ol>
+          <li><strong>状态含方向</strong>（正确性要求，见 03 篇）→ 状态数 ×4，必须用高效容器：<code>dist: Vec&lt;f64&gt;</code> 索引为 <code>vertex*4 + dir</code>，而不是 HashMap。</li>
+          <li><strong>可采纳启发式</strong>：<span class="katex-inline" data-tex="h = |dx| + |dy| + \lambda_{bend}\cdot b_{min}"></span>，其中 <span class="katex-inline" data-tex="b_{min}"></span> 是「从当前方向到达目标至少需要的转弯数」（0/1/2，查表）。这个 <span class="katex-inline" data-tex="b_{min}"></span> 项让搜索显著收窄，且仍可采纳。</li>
+          <li><strong>双向搜索</strong>：长距离边收益明显（约 2×）。</li>
+          <li><strong>共享数据结构</strong>：所有边复用一个 <code>dist</code>/<code>visited</code> 缓冲，用<strong>时间戳标记</strong>避免每次清零：
+            <div class="code-block">
+              <span class="lang-tag">rust</span>
+              <pre><code class="language-rust">if stamp[i] != cur_stamp { dist[i] = INF; stamp[i] = cur_stamp; }</code></pre>
+            </div>
+          </li>
+          <li><strong>批量排序</strong>：按「长度降序」路由（长边先占好走廊），短边后路由更容易绕开 —— 也是质量优化。</li>
+        </ol>
+
+        <h3>3.3 nudging 的规模控制</h3>
+        <p>nudging 的约束数与「同走廊段对数」成平方关系。对策：</p>
+        <ul>
+          <li>只在<strong>同一走廊</strong>内构造约束（走廊分组后各自求解，天然并行）；</li>
+          <li>每个走廊内先按区间着色分 track，<strong>只对同 track 的相邻段</strong>加约束；</li>
+          <li>走廊内段数超阈值 → 降级为均匀分布（放弃最优 nudging，但仍无重合）。</li>
+        </ul>
+
+        <!-- ============ §4 ============ -->
+        <h2 id="sec-4"><span class="h2-num">4</span>规模门控与降级（Graceful Degradation）</h2>
+
+        <p><strong>核心思想</strong>：不承诺「任意规模都最优」，而是承诺「任意规模都在有限时间内给出可用结果，并如实报告降级」。</p>
+
+        <h3>4.1 门控设计</h3>
+        <div class="code-block">
+          <span class="lang-tag">rust</span>
+          <pre><code class="language-rust">struct Budget {
+    max_nodes_full_quality: usize,   // 例：2_000
+    max_edges_orthogonal: usize,     // 例：5_000
+    max_total_ms: u64,               // 软预算
+}</code></pre>
+        </div>
+        <p>降级阶梯（从轻到重）：</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>级别</th><th>动作</th><th>观感损失</th></tr></thead>
+            <tbody>
+              <tr><td><code>L0</code></td><td>全质量</td><td>—</td></tr>
+              <tr><td><code>L1</code></td><td>关闭 sifting，降低 sweep 轮数（24→8）</td><td>交叉略增</td></tr>
+              <tr><td><code>L2</code></td><td>关闭精确 nudging，改均匀分布</td><td>边间距不最优</td></tr>
+              <tr><td><code>L3</code></td><td>边路由改「直角三段折线」（不搜索）</td><td>可能穿越空隙</td></tr>
+              <tr><td><code>L4</code></td><td>边改直线（无正交）</td><td>风格改变</td></tr>
+              <tr><td><code>L5</code></td><td>关闭标签避让，只放不重叠的标签，其余隐藏</td><td>信息缺失（需 UI 提示）</td></tr>
+              <tr><td><code>L6</code></td><td>边捆绑 / 聚合（把同源同宿的边聚成一束）</td><td>抽象化</td></tr>
+              <tr><td><code>L7</code></td><td>节点聚合（按组折叠）</td><td>需交互展开</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 图解：门控降级阶梯 -->
+        <figure>
+          <svg viewBox="0 0 720 240" aria-label="规模门控降级阶梯 L0→L7">
+            <text x="360" y="20" text-anchor="middle" class="label">规模 ↑ / 预算超时 → 沿阶梯逐级降级，每级都需在诊断输出显式记录</text>
+            <!-- 阶梯：L0 在左上（最优），L7 在右下（最简） -->
+            <g>
+              <rect class="node" x="20"  y="40"  width="74" height="34" rx="4"/>
+              <text x="57"  y="61"  text-anchor="middle" class="label">L0</text>
+              <text x="57"  y="86"  text-anchor="middle" class="muted" font-size="9.5">全质量</text>
+            </g>
+            <g>
+              <rect class="node" x="104" y="62"  width="74" height="34" rx="4"/>
+              <text x="141" y="83"  text-anchor="middle" class="label">L1</text>
+              <text x="141" y="108" text-anchor="middle" class="muted" font-size="9.5">减轮次</text>
+            </g>
+            <g>
+              <rect class="node" x="188" y="84"  width="74" height="34" rx="4"/>
+              <text x="225" y="105" text-anchor="middle" class="label">L2</text>
+              <text x="225" y="130" text-anchor="middle" class="muted" font-size="9.5">均匀 nudging</text>
+            </g>
+            <g>
+              <rect class="node" x="272" y="106" width="74" height="34" rx="4"/>
+              <text x="309" y="127" text-anchor="middle" class="label">L3</text>
+              <text x="309" y="152" text-anchor="middle" class="muted" font-size="9.5">三段折线</text>
+            </g>
+            <g>
+              <rect class="node-muted" x="356" y="128" width="74" height="34" rx="4"/>
+              <text x="393" y="149" text-anchor="middle" class="label">L4</text>
+              <text x="393" y="174" text-anchor="middle" class="muted" font-size="9.5">直线</text>
+            </g>
+            <g>
+              <rect class="node-muted" x="440" y="150" width="74" height="34" rx="4"/>
+              <text x="477" y="171" text-anchor="middle" class="label">L5</text>
+              <text x="477" y="196" text-anchor="middle" class="muted" font-size="9.5">隐藏部分标签</text>
+            </g>
+            <g>
+              <rect class="node-muted" x="524" y="172" width="74" height="34" rx="4"/>
+              <text x="561" y="193" text-anchor="middle" class="label">L6</text>
+              <text x="561" y="218" text-anchor="middle" class="muted" font-size="9.5">边捆绑</text>
+            </g>
+            <g>
+              <rect class="node-muted" x="608" y="194" width="74" height="34" rx="4" fill="var(--bad-soft)" stroke="var(--bad)"/>
+              <text x="645" y="215" text-anchor="middle" class="hi">L7</text>
+              <text x="645" y="232" text-anchor="middle" class="muted" font-size="9.5">节点聚合</text>
+            </g>
+            <!-- 阶梯连接线 -->
+            <path class="edge-muted" d="M94,57 L104,79 M178,79 L188,101 M262,101 L272,123 M346,123 L356,145 M430,145 L440,167 M514,167 L524,189 M598,189 L608,211" stroke-dasharray="3 2"/>
+            <!-- 轴标注 -->
+            <text x="20"  y="34" class="muted" font-size="10">规模小 / 快</text>
+            <text x="700" y="238" text-anchor="end" class="muted" font-size="10">规模大 / 慢</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 16.2</span>门控降级阶梯：阈值是 profile 参数，触发哪一级必须写进诊断输出</div>
+        </figure>
+
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>降级纪律（容易腐化的部分）</div>
+          <ul>
+            <li>降级必须<strong>在诊断输出中显式记录</strong>（哪一级、被哪个阈值触发），否则用户会以为「算法就这水平」；</li>
+            <li>降级阈值是<strong>参数</strong>，走 profile（20 篇），不写死；</li>
+            <li>每个降级级别都要有基准 case，避免降级路径本身腐化（降级路径最容易 bit-rot）。</li>
+          </ul>
+        </div>
+
+        <h3>4.2 时间预算的实现</h3>
+        <p>不要在算法内部到处查时钟（WASM 下时钟调用有成本，且违反 §6 的纪律）。做法：</p>
+        <ul>
+          <li>在<strong>相边界</strong>检查预算（每相开始/结束）；</li>
+          <li>迭代型相在<strong>每轮迭代</strong>结束检查（轮次是天然的检查点）；</li>
+          <li>通过项目的 perf 抽象取时间，不用裸 <code>Instant</code>。</li>
+        </ul>
+
+        <!-- ============ §5 ============ -->
+        <h2 id="sec-5"><span class="h2-num">5</span>并行化的可行边界</h2>
+
+        <p>Rust 下用 rayon 很方便，但布局的可并行点比想象的少：</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>可并行</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>✅ <strong>连通分量分别布局</strong></td><td>天然独立，收益随分量数线性。最值钱的并行点。</td></tr>
+              <tr><td>✅ <strong>各走廊的 nudging</strong></td><td>走廊间无约束（前提：走廊划分正确）。</td></tr>
+              <tr><td>✅ <strong>边路由</strong>（只读走廊图 + 后置冲突消解）</td><td>需要「先并行搜路径、再串行分配 track」的两段式。</td></tr>
+              <tr><td>✅ <strong>文本度量</strong></td><td>纯函数，按标签并行。CJK 场景收益大。</td></tr>
+              <tr><td>✅ <strong>度量/指标计算</strong></td><td>基准脚本里并行跑 case。</td></tr>
+              <tr><td>⚠️ 力导向的斥力计算</td><td>可并行，但 Barnes–Hut 树构造是串行瓶颈。</td></tr>
+              <tr><td>❌ P3 sweep</td><td>层间严格串行依赖。</td></tr>
+              <tr><td>❌ Network Simplex</td><td>换基串行。</td></tr>
+              <tr><td>❌ VPSC</td><td>block merge 串行（可分维度并行 x/y，但交替算法要求顺序）。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>确定性要求下的并行纪律</div>
+          <ul>
+            <li>并行只允许在「结果与顺序无关」的地方；</li>
+            <li>归约必须<strong>先按 id 排序再合并</strong>（不能靠 rayon 的 reduce 顺序）；</li>
+            <li>并行浮点求和顺序不确定 → 力导向的并行斥力累加会破坏确定性。对策：分块固定划分 + 块内固定顺序 + 块间按块号有序合并。</li>
+            <li><strong>WASM 默认单线程</strong>（见 §6），所以并行只对 CLI / 服务端有效 → 优先级低于算法优化。</li>
+          </ul>
+        </div>
+
+        <!-- ============ §6 ============ -->
+        <h2 id="sec-6"><span class="h2-num">6</span>WASM 工程约束（本项目的主战场）</h2>
+
+        <h3>6.1 时间</h3>
+        <ul>
+          <li><code>std::time::Instant</code> 在 wasm32-unknown-unknown 上<strong>panic 或返回无意义值</strong>；</li>
+          <li>AGENTS.md 已定纪律：会编到 WASM 的布局代码禁止裸 <code>Instant/SystemTime</code>，统一走项目 perf 抽象。</li>
+          <li>perf 抽象的形态建议：
+            <div class="code-block">
+              <span class="lang-tag">rust</span>
+              <pre><code class="language-rust">// 原生：Instant；wasm：performance.now()；或 no-op 特性关闭
+pub fn now_ms() -&gt; f64;</code></pre>
+            </div>
+            并让「计时」成为可编译期关闭的特性（<code>--no-default-features</code> 下变 no-op），避免为计时付出跨 FFI 成本。
+          </li>
+        </ul>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>AGENTS.md 硬约束：WASM 计时纪律</div>
+          <p>会编到 WASM 的布局 / 引擎代码内<strong>禁止裸 <code>std::time::{Instant, SystemTime}</code></strong>；统一走项目的 perf 抽象（勿钉死 v1 路径）。原因：<code>Instant</code> 在 <code>wasm32-unknown-unknown</code> 上会 panic 或返回无意义值，且每次跨 FFI 取时钟都有成本。落地形态：<code>now_ms() -&gt; f64</code>，并允许编译期关闭以省 FFI 开销。</p>
+        </div>
+
+        <h3>6.2 线程</h3>
+        <ul>
+          <li>需要 <code>SharedArrayBuffer</code> + COOP/COEP 头 + <code>wasm-bindgen-rayon</code> 才能多线程；</li>
+          <li>站点部署要改 nginx 头（本项目 <code>deploy/nginx/</code>），且 iframe 嵌入场景常不可用；</li>
+          <li><strong>结论：把单线程性能当作唯一目标</strong>，多线程当作可选加速。</li>
+        </ul>
+
+        <h3>6.3 二进制体积</h3>
+        <p>布局引擎进 WASM 后体积敏感（首屏加载）：</p>
+        <ul>
+          <li><code>opt-level = "z"</code> 或 <code>"s"</code>，<code>lto = true</code>，<code>codegen-units = 1</code>，<code>panic = "abort"</code>；</li>
+          <li><code>wasm-opt -Oz</code>；</li>
+          <li>避免拉入重依赖：<strong>正则、通用 QP 求解器、多边形布尔库、完整字体栈</strong>是常见体积杀手；</li>
+          <li>字体：只嵌入子集，或让宿主页面提供度量（但会带来「布局依赖 DOM」的耦合，不推荐）；</li>
+          <li>用 <code>twiggy</code> 定位体积。</li>
+        </ul>
+
+        <h3>6.4 内存</h3>
+        <ul>
+          <li>WASM 线性内存增长不可收缩 → <strong>峰值内存决定一切</strong>。避免「一次性构造全量 OVG」这类峰值结构；</li>
+          <li>建议为大结构提供 arena/复用（dummy 节点、A* 缓冲、约束数组）；</li>
+          <li><code>Vec::with_capacity</code> 预留（节点数已知），减少 realloc 拷贝。</li>
+        </ul>
+
+        <!-- 图解：WASM 线性内存布局 -->
+        <figure>
+          <svg viewBox="0 0 720 200" aria-label="WASM 线性内存布局与峰值">
+            <text x="360" y="20" text-anchor="middle" class="label">WASM 线性内存：只增不减，峰值决定一切</text>
+            <!-- 内存条 -->
+            <rect class="layer-bg" x="40" y="50" width="640" height="56" rx="4"/>
+            <!-- 区段 -->
+            <rect class="node" x="40" y="50" width="200" height="56" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+            <text x="140" y="74" text-anchor="middle" class="label" font-size="11">graph 数据（SoA）</text>
+            <text x="140" y="92" text-anchor="middle" class="muted" font-size="10">nodes / edges / layers</text>
+
+            <rect class="node-muted" x="240" y="50" width="240" height="56" rx="4" fill="var(--warn-soft)" stroke="var(--warn)"/>
+            <text x="360" y="74" text-anchor="middle" class="label" font-size="11" fill="var(--warn)">scratch（峰值所在）</text>
+            <text x="360" y="92" text-anchor="middle" class="muted" font-size="10">A* dist/visited · 约束数组 · OVG</text>
+
+            <rect class="node" x="480" y="50" width="140" height="56" rx="4" fill="var(--good-soft)" stroke="var(--good)"/>
+            <text x="550" y="74" text-anchor="middle" class="label" font-size="11" fill="var(--good)">output</text>
+            <text x="550" y="92" text-anchor="middle" class="muted" font-size="10">SVG string buffer</text>
+
+            <rect class="node-muted" x="620" y="50" width="60" height="56" rx="4" stroke-dasharray="3 2"/>
+            <text x="650" y="82" text-anchor="middle" class="muted" font-size="10">free</text>
+
+            <!-- 峰值标线 -->
+            <line class="edge-hi" x1="480" y1="40" x2="480" y2="116"/>
+            <text x="480" y="34" text-anchor="middle" class="hi" font-size="10.5">↑ 峰值 = scratch 顶峰</text>
+
+            <!-- 增长箭头 -->
+            <path class="edge-muted" d="M50,128 L660,128" marker-end="url(#am16)"/>
+            <text x="360" y="146" text-anchor="middle" class="muted" font-size="10.5">线性内存只增不减（grow only，无 shrink）</text>
+
+            <!-- 对策 -->
+            <text x="40" y="172" class="muted" font-size="10.5">对策：arena 复用 · Vec::with_capacity · 避免一次性全量 OVG</text>
+            <text x="40" y="190" class="muted" font-size="10.5">输出：紧凑二进制或字符串化 SVG，<tspan class="hi">只跨一次 FFI 边界</tspan></text>
+
+            <defs>
+              <marker id="am16" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+            </defs>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 16.3</span>WASM 线性内存布局：scratch 区是峰值来源，必须复用而非每次新建</div>
+        </figure>
+
+        <h3>6.5 跨 FFI 边界</h3>
+        <ul>
+          <li>一次调用传全图 JSON 是最省心的做法，但序列化可能占总时间 20%+；优化：输出用紧凑二进制或字符串化 SVG（只跨一次边界），<strong>不要每个节点一次调用</strong>。</li>
+          <li>不要在布局循环里回调 JS（度量文本尤其忌讳）→ 文本度量必须在 Rust 侧完成（这也是选择 <code>ttf-parser</code>/<code>rustybuzz</code> 的理由）。</li>
+        </ul>
+
+        <h3>6.6 数值一致性</h3>
+        <ul>
+          <li>WASM 的 f64 遵循 IEEE754，与原生一致；但 <strong><code>f32</code> 的 SIMD 与数学库（sin/cos/exp）实现可能不同</strong>；</li>
+          <li>数学库差异会让快照测试在原生与 WASM 下不一致 → 对策：布局关键路径避免超越函数，或统一用自实现的多项式近似，或量化后再断言（15 篇 §7.2）。</li>
+        </ul>
+
+        <!-- ============ §7 ============ -->
+        <h2 id="sec-7"><span class="h2-num">7</span>性能测量纪律</h2>
+
+        <ul>
+          <li>只用 <code>--release</code> 测（AGENTS.md）；debug 下的 Rust 慢 10–50×，结论完全无效；</li>
+          <li><strong>报 p50 / p95</strong>，不报均值；</li>
+          <li><strong>分相计时</strong>（09 篇诊断输出）：没有分相数据的性能讨论都是猜；</li>
+          <li>固定机器、固定线程数，把绝对值当趋势；</li>
+          <li>WASM 与原生分别测，比值本身是有用指标（正常 1.5–3×；若某相 &gt;5× 说明该相踩了 WASM 的坑）；</li>
+          <li>火焰图：原生用 <code>cargo flamegraph</code> / <code>samply</code>；WASM 用浏览器 Performance 面板（需 <code>debug = true</code> 保留符号）。</li>
+        </ul>
+
+        <!-- ============ §8 ============ -->
+        <h2 id="sec-8"><span class="h2-num">8</span>优化决策流程（避免瞎优化）</h2>
+
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">1. 先有基准集与分相计时（11 篇）
+2. 找到占比 &gt; 20% 的相 —— 只优化它
+3. 判断是"算法复杂度问题"还是"实现常数问题"
+     复杂度问题 → 换算法（如 O(E²) 交叉计数 → BJM）
+     常数问题   → 数据结构（HashMap → Vec 索引）、减少分配、缓存友好
+4. 改一件事，重跑基准，记录 delta
+5. 若收益 &lt; 5%，回滚（复杂度不值得）</code></pre>
+        </div>
+
+        <p><strong>常见的常数级优化（收益大、风险低）</strong>：</p>
+        <ul>
+          <li><code>HashMap&lt;NodeId, T&gt;</code> → <code>Vec&lt;T&gt;</code> 按稠密索引（NodeId 需连续化）——通常 2–5×，且顺便解决确定性问题；</li>
+          <li>避免每轮迭代重新分配 Vec（复用缓冲 + <code>clear()</code>）；</li>
+          <li>结构体拆成 SoA（提高 cache 命中）——只对最热的循环做；</li>
+          <li>字符串：SVG 输出一个 <code>String</code> 预留容量 + <code>write!</code>，不要 <code>format!</code> 拼接；</li>
+          <li>排序键预计算（避免比较器里做浮点运算）。</li>
+        </ul>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>反模式</div>
+          <p>在没有分相数据时「顺手优化」解析器/落笔层 —— 它们<strong>从来不是瓶颈</strong>。§1 的预算表已经写明：解析 &lt;2%、落笔 5–15%，而 P3 + 路由合计 50–90%。优化非热点相 = 给确定性测试添麻烦却不收益。</p>
+        </div>
+
+        <!-- ============ §9 ============ -->
+        <h2 id="sec-9"><span class="h2-num">9</span>给本项目的建议</h2>
+
+        <ol>
+          <li><strong>先把分相计时与规模指标（V/E/D、各相耗时、峰值内存估算）打进诊断输出</strong>，进基准报告（11 篇）。</li>
+          <li><strong>P3 优先</strong>：确认已用 BJM 计数 + 局部 transpose 判定 + 提前收敛 + dummy 边权；这是最大头。</li>
+          <li><strong>路由第二</strong>：分层图确认走的是通道图而非 OVG；A* 用数组 + 时间戳，不用 HashMap。</li>
+          <li><strong>门控降级表落地</strong>（§4.1 的 L0–L7），阈值进 profile，触发写诊断。</li>
+          <li><strong>NodeId 连续化 + Vec 索引</strong>替换热点里的 HashMap —— 同时满足性能与确定性两条要求。</li>
+          <li><strong>WASM 侧</strong>：perf 抽象、体积预算（设一个 KB 上限并在 CI 中检查）、避免 JS 回调、量化输出。</li>
+        </ol>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>一句话收敛</div>
+          <p>大图性能的真问题不是「让算法更快」，而是「<strong>把预算花在 P3 与路由两相</strong>，其余相用门控降级兜底，并在 WASM 这种峰值敏感、单线程、无裸时钟的环境里把上述纪律编译期固化」。</p>
+        </div>
+
+      </div>
+
+      <div class="foot">
+        本文为 <a href="../16-大图性能与wasm.md">16-大图性能与wasm.md</a> 的 HTML 图文版。
+        配套：<a href="00-索引与阅读指南.html">索引</a> ·
+        <a href="../21-术语表.html">术语表图解</a> ·
+        <a href="../../../../design/layout/write-authority.md">写权纪律</a>
+      </div>
+
+    </article>
+  </div>
+</div>
+
+<script src="_assets/nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

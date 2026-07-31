@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>20 · 图种 profile 与参数映射 — yFiles 参考文库 ebook</title>
+<link rel="stylesheet" href="_assets/style.css">
+<!-- highlight.js 主题（浅色 + 暗色） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+  /* 代码块在浅/暗色下都可用；highlight.js 主题负责 token 颜色，本 CSS 负责容器 */
+  pre code.hljs { background: transparent; padding: 0; border: none; font-size: 13px; }
+  pre code.hljs .comment { font-style: italic; }
+</style>
+</head>
+<body data-page="20">
+
+<div class="layout">
+  <div class="content">
+    <article>
+
+      <h1>20 · 图种 profile 与参数映射（Diagram Profile &amp; Parameter Mapping）</h1>
+      <p class="subtitle">对应 <code>ADR-001</code>「图种不入引擎」的工程化解法：把图种差异完整表达为参数域；yFiles <code>HierarchicLayout</code> + <code>LayoutData</code> + 各种 <code>*Descriptor</code> 即一个精心设计的参数域</p>
+
+      <div class="meta-bar">
+        <span class="pill">工程</span>
+        <span>本仓库 <code>ADR-001</code> / AGENTS.md 红线「禁止图名特判」的工程落地</span>
+        <span class="src">~235 行 · 7.2k 字</span>
+      </div>
+
+      <div class="prose">
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>核心矛盾与唯一解法（ADR-001 / AGENTS.md）</div>
+          <p>不同图种确实需要不同的布局行为，但<strong>引擎里不能出现</strong> <code>if diagram_type ==</code>。唯一解法：把「图种差异」<strong>完整地表达为参数</strong>，并让参数域设计得足够表达力，使得任何图种差异都能落在参数上，而不需要新分支。本篇给出参数域设计方法、覆盖层级、回写协议、参数域够不够的判定方法，以及各图种 profile 的具体取值。</p>
+        </div>
+
+        <!-- ============ §1 ============ -->
+        <h2 id="sec-1"><span class="h2-num">1</span>为什么「参数化」是唯一正解</h2>
+
+        <p>历史教训（V1 的六条平行管线）与业界共识一致：</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>做法</th><th>复杂度</th><th>新图种成本</th><th>跨图种复用</th></tr></thead>
+            <tbody>
+              <tr><td>每图种一条管线</td><td><span class="katex-inline" data-tex="O(\text{图种} \times \text{特性})"></span></td><td>一整条管线</td><td>无</td></tr>
+              <tr><td>引擎内 hint 分支</td><td>同上，只是分支位置换了</td><td>每处特性加一个分支</td><td>名义上有</td></tr>
+              <tr><td><strong>参数化 profile</strong></td><td><span class="katex-inline" data-tex="O(\text{图种} + \text{特性})"></span></td><td>一张参数表</td><td>完全</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p><strong>判断句</strong>：如果加一个图种需要改引擎代码，说明参数域不够；正确反应是<strong>扩展参数域</strong>（一个新参数服务所有图种），而不是加一个分支（一个分支只服务一个图种）。</p>
+
+        <!-- ============ §2 ============ -->
+        <h2 id="sec-2"><span class="h2-num">2</span>参数域的三条设计准则</h2>
+
+        <h3>准则 1：参数必须是「机制维度」，不是「图种名的别名」</h3>
+        <div class="code-block">
+          <span class="lang-tag">text</span>
+          <pre><code class="language-plaintext">❌ layout.style: "er_style"          // 这是图种名换了个马甲
+✅ layout.node_order_source: Declaration | Barycenter | Sketch
+✅ layout.self_loop_placement: Side(Right) | Corner | Inline</code></pre>
+        </div>
+        <p>检验方法：<strong>这个参数的每个取值，是否至少有两个图种可能用到？</strong> 若某取值只服务一个图种，它大概率是伪参数。（允许例外：确实只有一个图种需要该取值，但机制本身是通用的 —— 如 <code>sequence</code> 的连续时间主轴。）</p>
+
+        <h3>准则 2：参数必须落在明确的自由度上</h3>
+        <p>每个参数要能回答「它影响哪个自由度的哪个写者」。参数表应按<strong>相</strong>组织，不按图种组织：</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>相</th><th>参数示例</th></tr></thead>
+            <tbody>
+              <tr><td>measure</td><td><code>min_node_size</code>、<code>padding</code>、<code>label_wrap_width</code>、<code>font</code></td></tr>
+              <tr><td>P1 去环</td><td><code>cycle_removal</code>（GreedyFAS / DFS / None）、<code>preferred_direction</code></td></tr>
+              <tr><td>P2 分层</td><td><code>layering</code>（NetworkSimplex / LongestPath / CoffmanGraham / FromSketch）、<code>min_layer_span</code>、<code>max_layer_width</code></td></tr>
+              <tr><td>P3 定序</td><td><code>order_source</code>（Declaration / Barycenter / Median / Sketch）、<code>sweeps</code>、<code>use_sifting</code>、<code>edge_weight_{real,dummy,label}</code></td></tr>
+              <tr><td>P4 坐标</td><td><code>coord</code>（BrandesKopf / VPSC / Priority）、<code>node_gap</code>、<code>layer_gap</code>、<code>align_priority</code></td></tr>
+              <tr><td>端口</td><td><code>default_port_policy</code>、<code>port_side_policy</code>、<code>port_distribution</code></td></tr>
+              <tr><td>路由</td><td><code>router</code>（Orthogonal / Polyline / Straight / Bus）、<code>bend_penalty</code>、<code>corner_radius</code>、<code>min_segment</code>、<code>nudge_gap</code></td></tr>
+              <tr><td>标签</td><td><code>edge_label_placement</code>、<code>node_label_position</code>、<code>reserve_space</code></td></tr>
+              <tr><td>组</td><td><code>group_padding</code>、<code>group_title_height</code>、<code>group_order_policy</code></td></tr>
+              <tr><td>全局</td><td><code>orientation</code>（TB/BT/LR/RL）、<code>component_arrangement</code>、<code>budget/*</code>（降级阈值）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>准则 3：参数要有正交性</h3>
+        <p>两个参数不应互相隐含。例如：</p>
+        <div class="code-block">
+          <span class="lang-tag">text</span>
+          <pre><code class="language-plaintext">❌ router: "orthogonal_with_bundling"      // 混了两个维度
+✅ router: Orthogonal + bundling: Ordered</code></pre>
+        </div>
+        <p>正交化的收益：<span class="katex-inline" data-tex="n"></span> 个维度各 <span class="katex-inline" data-tex="k"></span> 个取值 → <span class="katex-inline" data-tex="k^n"></span> 种组合免费获得，而代码只有 <span class="katex-inline" data-tex="nk"></span> 处。</p>
+
+        <!-- ============ §3 ============ -->
+        <h2 id="sec-3"><span class="h2-num">3</span>覆盖层级（四层，从弱到强）</h2>
+
+        <div class="code-block">
+          <span class="lang-tag">text</span>
+          <pre><code class="language-plaintext">1. 引擎默认值（algorithm defaults）        —— 每个算法自己的合理默认
+2. profile 预设（解析层展开）              —— flowchart/sequence/er/... 的推荐组合
+3. 图级显式属性（diagram { ... }）         —— 用户对整图的覆盖
+4. 元素级属性（node/edge/group 上的属性）  —— 最强，逐元素</code></pre>
+        </div>
+
+        <!-- 图解：四层覆盖栈 -->
+        <figure>
+          <svg viewBox="0 0 580 310" aria-label="参数覆盖的四层层级">
+            <!-- 覆盖方向箭头（左侧） -->
+            <text x="22" y="40" class="hi" font-size="11" text-anchor="middle">强</text>
+            <path d="M22,54 L22,250" stroke="var(--bad)" stroke-width="2.5" marker-end="url(#ov1)"/>
+            <text x="22" y="270" class="muted" font-size="11" text-anchor="middle">弱</text>
+            <text x="44" y="150" class="hi" font-size="10.5" transform="rotate(-90, 44, 150)">覆盖方向</text>
+
+            <!-- 4 layers -->
+            <g transform="translate(80,30)">
+              <rect class="highlight-bg" x="0" y="0" width="440" height="48" rx="6"/>
+              <text x="16" y="22" class="label" font-size="13">4 · 元素级属性（最强）</text>
+              <text x="16" y="40" class="muted" font-size="11">node / edge / group 上的属性 — 逐元素稀疏覆盖</text>
+            </g>
+            <g transform="translate(80,90)">
+              <rect class="layer-bg" x="0" y="0" width="440" height="48" rx="6"/>
+              <text x="16" y="22" class="label" font-size="13">3 · 图级显式属性</text>
+              <text x="16" y="40" class="muted" font-size="11">diagram { ... } — 用户对整图的字段级覆盖</text>
+            </g>
+            <g transform="translate(80,150)">
+              <rect class="layer-bg" x="0" y="0" width="440" height="48" rx="6"/>
+              <text x="16" y="22" class="label" font-size="13">2 · profile 预设（解析层展开）</text>
+              <text x="16" y="40" class="muted" font-size="11">flowchart / sequence / er / state / mindmap / architecture</text>
+            </g>
+            <g transform="translate(80,210)">
+              <rect class="layer-bg" x="0" y="0" width="440" height="48" rx="6"/>
+              <text x="16" y="22" class="label" font-size="13">1 · 引擎默认值（最弱）</text>
+              <text x="16" y="40" class="muted" font-size="11">algorithm defaults — 每个算法自己的合理默认</text>
+            </g>
+
+            <text x="300" y="290" text-anchor="middle" class="muted" font-size="11">后者覆盖前者 · 逐字段（不整块替换）；引擎侧参数结构体无 Option</text>
+
+            <defs>
+              <marker id="ov1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--bad)"/></marker>
+            </defs>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 20.1</span>四层覆盖栈：后者覆盖前者、逐字段；profile 只在解析/编排层展开，引擎收到的已是合并后的完整参数</div>
+        </figure>
+
+        <p>规则：</p>
+        <ul>
+          <li><strong>后者覆盖前者，逐字段（不是整块替换）</strong>；</li>
+          <li>profile 只在<strong>解析层/编排层</strong>展开，引擎收到的是已展开的完整参数（ADR-001 的直接推论）；</li>
+          <li>引擎侧的参数结构体应是 <strong>完全确定的</strong>（无 <code>Option</code> 的「未定」状态），把「未定→默认」的解析全部在展开时做完。这样引擎里不存在「这个参数没给，我猜一下」的逻辑。</li>
+          <li>元素级参数应有明确的作用域语义（组上的 <code>node_gap</code> 是否影响子节点？—— 需明确回答并写进 spec）。</li>
+        </ul>
+
+        <div class="callout info">
+          <div class="ct-title"><span class="icon">ℹ</span>引擎侧参数结构体必须完全确定</div>
+          <p>展开完成后引擎收到的 <code>LayoutParams</code> / <code>RoutingParams</code> 应<strong>无 <code>Option</code> 字段</strong>。「未定 → 默认」的解析全部在解析/编排层做完，引擎里不存在「这个参数没给，我猜一下」的逻辑 —— 这是 ADR-001 在数据结构层面的直接投射。</p>
+        </div>
+
+        <h3>3.1 参数展开的实现形态</h3>
+        <div class="code-block">
+          <span class="lang-tag">rust</span>
+          <pre><code class="language-rust">// 解析/编排层
+pub struct LayoutContract {
+    pub layout: LayoutParams,      // 全部字段有值
+    pub routing: RoutingParams,
+    pub overrides: ElementOverrides, // 逐元素的稀疏覆盖（IndexMap&lt;Id, PartialParams&gt;）
+}</code></pre>
+        </div>
+        <ul>
+          <li>引擎读 <code>overrides</code> 时用 <code>params_for(node)</code> 之类的查询函数，内部做「元素级 → 图级」的回退；</li>
+          <li><strong><code>params_hash</code> 进诊断输出</strong>（09 篇）：让「结果变了」能归因到「参数变了」还是「代码变了」。这条极其实用。</li>
+        </ul>
+
+        <!-- ============ §4 ============ -->
+        <h2 id="sec-4"><span class="h2-num">4</span>回写协议（下游需求 → 上游参数）</h2>
+
+        <p>写权纪律允许的唯一「反向影响」是<strong>参数回写</strong>，且必须在上游相执行<strong>之前</strong>完成。需要一个显式的机制而不是散落的赋值：</p>
+
+        <div class="code-block">
+          <span class="lang-tag">rust</span>
+          <pre><code class="language-rust">/// 由下游相在「预算阶段」贡献需求，上游相在执行前汇总
+pub struct DemandBoard {
+    layer_gap_demand: BTreeMap&lt;(LayerIdx, LayerIdx), f64&gt;,  // 走廊需求
+    node_size_demand: BTreeMap&lt;NodeId, Size&gt;,               // 端口数/标签
+    node_gap_demand:  BTreeMap&lt;(NodeId, NodeId), f64&gt;,       // 标签宽度
+}</code></pre>
+        </div>
+
+        <!-- 图解：DemandBoard 回写协议 -->
+        <figure>
+          <svg viewBox="0 0 620 280" aria-label="DemandBoard 回写协议">
+            <!-- 上方：相流水线 -->
+            <g transform="translate(20,30)">
+              <rect class="layer-bg" x="0" y="0" width="100" height="50" rx="6"/>
+              <text x="50" y="22" text-anchor="middle" class="label" font-size="12">P2 分层</text>
+              <text x="50" y="38" text-anchor="middle" class="muted" font-size="10">layer</text>
+            </g>
+            <path d="M120,55 L150,55" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#dm1)"/>
+            <g transform="translate(155,30)">
+              <rect class="layer-bg" x="0" y="0" width="100" height="50" rx="6"/>
+              <text x="50" y="22" text-anchor="middle" class="label" font-size="12">P3 定序</text>
+              <text x="50" y="38" text-anchor="middle" class="muted" font-size="10">order</text>
+            </g>
+            <path d="M255,55 L285,55" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#dm1)"/>
+            <g transform="translate(290,30)">
+              <rect class="layer-bg" x="0" y="0" width="100" height="50" rx="6"/>
+              <text x="50" y="22" text-anchor="middle" class="label" font-size="12">P4 坐标</text>
+              <text x="50" y="38" text-anchor="middle" class="muted" font-size="10">coord</text>
+            </g>
+            <path d="M390,55 L420,55" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#dm1)"/>
+            <g transform="translate(425,30)">
+              <rect class="layer-bg" x="0" y="0" width="100" height="50" rx="6"/>
+              <text x="50" y="22" text-anchor="middle" class="label" font-size="12">P5 路由</text>
+              <text x="50" y="38" text-anchor="middle" class="muted" font-size="10">router</text>
+            </g>
+
+            <!-- 下方：DemandBoard -->
+            <g transform="translate(130,170)">
+              <rect class="highlight-bg" x="0" y="0" width="340" height="68" rx="8"/>
+              <text x="170" y="24" text-anchor="middle" class="label" font-size="14">DemandBoard</text>
+              <text x="170" y="42" text-anchor="middle" class="muted" font-size="10.5">layer_gap_demand / node_size_demand / node_gap_demand</text>
+              <text x="170" y="58" text-anchor="middle" class="hi" font-size="10.5">max 合并（下界） · 单写者汇总</text>
+            </g>
+
+            <!-- 回写箭头：P5 → DemandBoard -->
+            <path class="edge-hi" d="M475,80 C475,120 360,140 360,170" marker-end="url(#dm2)"/>
+            <text x="442" y="128" class="hi" font-size="10">需求贡献</text>
+
+            <!-- DemandBoard → P2 -->
+            <path class="edge-hi" d="M170,170 C170,130 90,110 70,80" marker-end="url(#dm2)"/>
+            <text x="78" y="128" class="hi" font-size="10">回写 P2</text>
+
+            <!-- DemandBoard → P4 -->
+            <path class="edge-hi" d="M300,170 C300,140 320,120 340,80" marker-end="url(#dm2)"/>
+            <text x="318" y="128" class="hi" font-size="10">回写 P4 之前</text>
+
+            <text x="310" y="262" text-anchor="middle" class="muted" font-size="11">回写必须在上游相执行之前完成；下游不得直接改坐标，只能提需求</text>
+
+            <defs>
+              <marker id="dm1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+              <marker id="dm2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--bad)"/></marker>
+            </defs>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 20.2</span>DemandBoard 回写协议：下游相在预算阶段贡献需求，上游相在执行前汇总；唯一合法的「下游影响上游」通路</div>
+        </figure>
+
+        <p>已知的回写项（应全部走 DemandBoard）：</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>需求来源</th><th>回写目标</th><th>时机</th></tr></thead>
+            <tbody>
+              <tr><td>层间边数 × track 间距</td><td><code>layer_gap[i][i+1]</code></td><td>P4 坐标之前</td></tr>
+              <tr><td>端口数量 × 最小端口间距</td><td>节点最小宽/高</td><td>measure 之后、P4 之前</td></tr>
+              <tr><td>边标签尺寸</td><td>层间距 / 节点间距（或 label dummy 尺寸）</td><td>P2 dummy 化时</td></tr>
+              <tr><td>节点标签尺寸</td><td>节点尺寸</td><td>measure 相内</td></tr>
+              <tr><td>自环数量与尺寸</td><td>节点有效包围盒</td><td>P4 之前</td></tr>
+              <tr><td>组标题与 padding</td><td>组框最小尺寸</td><td>组坐标之前</td></tr>
+              <tr><td>消息标签宽度（序列图）</td><td>生命线间距</td><td>次轴坐标之前</td></tr>
+              <tr><td>嵌套激活条深度</td><td>生命线宽度</td><td>同上</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>DemandBoard 三条纪律</div>
+          <ul>
+            <li>只允许 <strong>max 合并</strong>（需求是下界），不允许覆盖 —— 保证合并顺序无关（确定性）；</li>
+            <li>汇总后写入参数的动作<strong>只有一个写者</strong>（参数写者）；</li>
+            <li>若某个需求在上游已执行后才产生 → 是<strong>设计错误</strong>，说明相顺序需调整，不是「就地挪一下」。</li>
+          </ul>
+        </div>
+
+        <!-- ============ §5 ============ -->
+        <h2 id="sec-5"><span class="h2-num">5</span>各 profile 的具体取值（对照表）</h2>
+
+        <p>ADR-001 的封闭集：<code>flowchart | sequence | architecture | state | er | mindmap</code>。下表是<strong>参数取值</strong>，不是代码分支 —— 引擎对每一行的处理完全相同。</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>参数</th><th>flowchart</th><th>architecture</th><th>state</th><th>er</th><th>mindmap</th><th>sequence</th></tr></thead>
+            <tbody>
+              <tr><td><code>orientation</code></td><td>TB</td><td>TB 或 LR</td><td>LR</td><td>LR</td><td>LR（双向）</td><td>TB（主轴）</td></tr>
+              <tr><td><code>layering</code></td><td>NetworkSimplex</td><td>NetworkSimplex</td><td>NetworkSimplex</td><td>NetworkSimplex</td><td>TreeDepth</td><td>EventPartialOrder</td></tr>
+              <tr><td><code>order_source</code></td><td>Median+Transpose</td><td>Median+Transpose</td><td>Median+Transpose</td><td>Median</td><td>Declaration</td><td>Declaration→MinLA</td></tr>
+              <tr><td><code>coord</code></td><td>BrandesKopf</td><td>BrandesKopf+VPSC</td><td>BrandesKopf</td><td>BrandesKopf</td><td>TreeNodePlacer</td><td>PrefixSum</td></tr>
+              <tr><td><code>router</code></td><td>Orthogonal</td><td>Orthogonal</td><td>Polyline/Curved</td><td>Orthogonal</td><td>Curved/Polyline</td><td>Straight(水平)</td></tr>
+              <tr><td><code>corner_radius</code></td><td>中</td><td>中</td><td>大（状态用圆润）</td><td>0（工程感）</td><td>—</td><td>0</td></tr>
+              <tr><td><code>default_port_policy</code></td><td>FREE</td><td>FIXED_SIDE</td><td>FREE</td><td><strong>FIXED_POS</strong>（字段级）</td><td>FREE</td><td>—</td></tr>
+              <tr><td><code>self_loop_placement</code></td><td>Side</td><td>Side</td><td><strong>Corner（显著）</strong></td><td>Side</td><td>—</td><td><strong>Inline（2 行回环）</strong></td></tr>
+              <tr><td><code>edge_label_placement</code></td><td>中点上方</td><td>中点</td><td><strong>靠源端</strong>（转移条件）</td><td>端点附近（基数）</td><td>无</td><td>中点上方</td></tr>
+              <tr><td><code>group_support</code></td><td>有</td><td><strong>强（嵌套+泳道）</strong></td><td>有（复合状态）</td><td>弱</td><td>无</td><td>片段容器</td></tr>
+              <tr><td><code>bundling</code></td><td>无</td><td>Ordered（可选）</td><td>无</td><td>无</td><td>无</td><td>无</td></tr>
+              <tr><td><code>node_gap / layer_gap</code></td><td>中/中</td><td>大/大</td><td>中/大</td><td>小/中</td><td>小/中</td><td>由标签决定</td></tr>
+              <tr><td>特有机制</td><td>—</td><td>组边界穿越</td><td>初/终态形状</td><td>crow-foot 箭头</td><td>左右分支平衡</td><td>主轴离散化</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p><strong>注意最后一行</strong>：「特有机制」仍必须是参数化的能力（如 <code>mindmap</code> 的左右分支 = <code>tree.balance: TwoSided</code>，<code>sequence</code> 的主轴 = <code>major_axis: Discrete{...}</code>），而不是图种专属代码路径。</p>
+
+        <!-- ============ §6 ============ -->
+        <h2 id="sec-6"><span class="h2-num">6</span>判定「参数域够不够」的方法</h2>
+
+        <p>这是本篇最实用的部分。三个可执行的检验：</p>
+
+        <h3>检验 1：新图种落地测试</h3>
+        <p>选一个尚未支持的图种（如 BPMN、SBGN、甘特、数据血缘），尝试<strong>只用参数表达它</strong>。写出参数取值表，然后问：哪些格填不出来？</p>
+        <ul>
+          <li>填不出来的格 = 缺失的参数维度（应新增参数）；</li>
+          <li>填得出来但「需要代码支持某个取值」 = 缺失的机制（应新增机制，服务所有图种）。</li>
+        </ul>
+
+        <p>已知的检验结果（来自 10 / 18 / 19 篇）：</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>目标图种</th><th>缺什么</th><th>应新增的<strong>通用</strong>能力</th></tr></thead>
+            <tbody>
+              <tr><td>BPMN</td><td>泳道 + 主流程直线优先</td><td><code>swimlane</code>（=PartitionGrid）、<code>straighten_path: Option&lt;PathSpec&gt;</code></td></tr>
+              <tr><td>SBGN</td><td>严格形状语义 + 反应节点</td><td>纯样式层，无需布局参数</td></tr>
+              <tr><td>甘特</td><td>连续时间主轴 + 区间行分配</td><td><code>major_axis: Continuous</code>、<code>row_assignment: IntervalColoring</code></td></tr>
+              <tr><td>数据血缘</td><td>列级端口 + 总线</td><td><code>port_granularity: Field</code>、<code>bundling: Bus</code>（18 篇）</td></tr>
+              <tr><td>EDA 原理图</td><td>引脚固定 + 器件翻转</td><td><code>node_flip: Allowed</code>、<code>port_policy: FixedPos</code></td></tr>
+              <tr><td>网络拓扑</td><td>固定坐标 + 纯路由</td><td><code>layering: Fixed</code>、<code>coord: Fixed</code>（即 PartialLayout）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p><strong>这张表就是路线图</strong>：每一行右列的能力都服务多个图种，值得做；没有一行需要「图种分支」。</p>
+
+        <h3>检验 2：反向审计（grep 测试）</h3>
+        <div class="code-block">
+          <span class="lang-tag">shell</span>
+          <pre><code class="language-plaintext">在 plotgram-engine 里 grep：diagram_type | profile | DiagramType
+                            "flowchart" | "sequence" | "er" | "mindmap"
+期望结果：0 命中</code></pre>
+        </div>
+
+        <!-- 图解：引擎不识图种 -->
+        <figure>
+          <svg viewBox="0 0 620 290" aria-label="同一引擎代码路径，不同 profile 参数产生不同图种结果">
+            <!-- 左侧：参数表 -->
+            <g transform="translate(20,30)">
+              <rect class="node-muted" x="0" y="0" width="180" height="30" rx="4"/>
+              <text x="90" y="19" text-anchor="middle" class="label" font-size="11">flowchart profile</text>
+
+              <rect class="node-muted" x="0" y="42" width="180" height="30" rx="4"/>
+              <text x="90" y="61" text-anchor="middle" class="label" font-size="11">sequence profile</text>
+
+              <rect class="node-muted" x="0" y="84" width="180" height="30" rx="4"/>
+              <text x="90" y="103" text-anchor="middle" class="label" font-size="11">er profile</text>
+
+              <rect class="node-muted" x="0" y="126" width="180" height="30" rx="4"/>
+              <text x="90" y="145" text-anchor="middle" class="label" font-size="11">state / mindmap / architecture</text>
+            </g>
+
+            <!-- 箭头到引擎 -->
+            <path d="M205,96 L255,96" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#eg1)"/>
+            <text x="230" y="88" text-anchor="middle" class="muted" font-size="10">参数</text>
+
+            <!-- 中间：引擎 -->
+            <g transform="translate(260,55)">
+              <rect class="highlight-bg" x="0" y="0" width="160" height="82" rx="8"/>
+              <text x="80" y="28" text-anchor="middle" class="label" font-size="13">plotgram-engine</text>
+              <text x="80" y="48" text-anchor="middle" class="hi" font-size="11">零 diagram_type 分支</text>
+              <text x="80" y="66" text-anchor="middle" class="muted" font-size="10">同一代码路径</text>
+            </g>
+
+            <!-- 箭头到输出 -->
+            <path d="M425,96 L475,96" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#eg1)"/>
+            <text x="450" y="88" text-anchor="middle" class="muted" font-size="10">布局</text>
+
+            <!-- 右侧：输出（不同图种示意） -->
+            <g transform="translate(480,30)">
+              <rect class="layer-bg" x="0" y="0" width="110" height="30" rx="4"/>
+              <rect class="node" x="8" y="8" width="14" height="14" rx="2"/>
+              <rect class="node" x="48" y="8" width="14" height="14" rx="2"/>
+              <rect class="node" x="88" y="8" width="14" height="14" rx="2"/>
+              <line class="edge" x1="22" y1="15" x2="48" y2="15"/>
+              <line class="edge" x1="62" y1="15" x2="88" y2="15"/>
+
+              <rect class="layer-bg" x="0" y="42" width="110" height="30" rx="4"/>
+              <line class="edge" x1="20" y1="46" x2="20" y2="68"/>
+              <line class="edge" x1="55" y1="46" x2="55" y2="68"/>
+              <line class="edge" x1="90" y1="46" x2="90" y2="68"/>
+              <line class="edge-hi" x1="20" y1="54" x2="55" y2="54"/>
+
+              <rect class="layer-bg" x="0" y="84" width="110" height="30" rx="4"/>
+              <rect class="node" x="8" y="92" width="14" height="14" rx="2"/>
+              <rect class="node" x="48" y="92" width="14" height="14" rx="2"/>
+              <rect class="node" x="88" y="92" width="14" height="14" rx="2"/>
+              <line class="edge" x1="22" y1="99" x2="48" y2="99"/>
+              <line class="edge" x1="62" y1="99" x2="88" y2="99"/>
+
+              <rect class="layer-bg" x="0" y="126" width="110" height="30" rx="4"/>
+              <text x="55" y="145" text-anchor="middle" class="muted" font-size="10">…</text>
+            </g>
+
+            <!-- 下方：CI 守卫 -->
+            <g transform="translate(60,205)">
+              <rect class="node-muted" x="0" y="0" width="500" height="62" rx="6"/>
+              <text x="250" y="22" text-anchor="middle" class="label" font-size="12">CI 守卫（ADR-001 唯一可执行守卫）</text>
+              <text x="250" y="42" text-anchor="middle" class="muted" font-size="11">grep 'diagram_type | flowchart | sequence | er | mindmap' plotgram-engine  ⇒  0 命中</text>
+              <text x="250" y="56" text-anchor="middle" class="hi" font-size="10">且引擎 crate 不依赖 plotgram-model::profile</text>
+            </g>
+
+            <defs>
+              <marker id="eg1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+            </defs>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 20.3</span>同一引擎、同一代码路径，不同 profile 参数 → 不同图种结果；grep 守卫是 ADR-001 唯一可执行守卫</div>
+        </figure>
+
+        <p>可以做成 CI 检查（一个几行的脚本 + <code>#[deny]</code>/<code>grep</code> gate）。<strong>这是 ADR-001 唯一的可执行守卫。</strong> 建议同时禁止引擎依赖 <code>plotgram-model::profile</code>（crate 依赖层面的硬约束，比 grep 更强）。</p>
+
+        <h3>检验 3：参数正交性审计</h3>
+        <p>对参数表两两检查：</p>
+        <ul>
+          <li>是否存在「设了 A 就必须设 B」的隐含依赖？→ 应合并为一个枚举，或明确文档化为约束并在展开层校验；</li>
+          <li>是否存在无效组合（如 <code>router: Straight</code> + <code>corner_radius: 8</code>）？→ 展开层应<strong>报诊断</strong>（而非静默忽略），静默忽略会让用户以为参数生效了。</li>
+        </ul>
+
+        <!-- ============ §7 ============ -->
+        <h2 id="sec-7"><span class="h2-num">7</span>参数的文档化与演进</h2>
+
+        <ul>
+          <li><strong>单一真源</strong>：参数注册表放在 dsl-spec §14（属性注册表）。代码里的默认值应从注册表生成或与之做一致性测试（一个「注册表 vs 代码默认值」的单测，防止两处漂移）。</li>
+          <li><strong>无向后兼容</strong>（AGENTS.md 红线）→ 参数可自由重命名删除，但<strong>每次改动要同步注册表 + profile 表 + 基准报告</strong>。</li>
+          <li>参数变更应体现在 <code>params_hash</code>：基准对比时能区分「参数变了」与「算法变了」。</li>
+        </ul>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>禁止「万能逃生舱」参数</div>
+          <p>不要提供 <code>extra_options: Map&lt;String, String&gt;</code> 之类的自由形式选项（见 <a href="../../../../design/adr/002-no-config-block-freeform-options.md">ADR-002</a>）。自由形式选项会变成<strong>隐藏的图种分支</strong>，绕过整个参数域纪律 —— 等价于把 <code>if diagram_type ==</code> 偷偷塞回引擎。</p>
+        </div>
+
+        <!-- ============ §8 ============ -->
+        <h2 id="sec-8"><span class="h2-num">8</span>与 yFiles 的对照（作为参数域完备性的参考）</h2>
+
+        <p>yFiles 的参数结构值得逐项对照检查自己有没有漏（以下为其公开 API 的概念，非源码）：</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>yFiles 概念</th><th>本项目对应</th></tr></thead>
+            <tbody>
+              <tr><td><code>HierarchicLayout</code> 的 <code>LayoutOrientation</code></td><td><code>orientation</code> + Orientation Stage（09 篇）</td></tr>
+              <tr><td><code>NodeLayoutDescriptor</code>（每节点的层对齐、最小距离、端口分布）</td><td>元素级 overrides</td></tr>
+              <tr><td><code>EdgeLayoutDescriptor</code>（每边的最小长度、路由风格、优先级、可否分组）</td><td>元素级 overrides</td></tr>
+              <tr><td><code>LayoutData</code>（强类型的逐元素数据映射）</td><td><code>ElementOverrides</code> + IndexMap</td></tr>
+              <tr><td><code>PortConstraint</code> / <code>PortCandidate</code></td><td>端口五档模型（08 篇）</td></tr>
+              <tr><td><code>LayerConstraintData</code> / <code>SequenceConstraintData</code></td><td>层/序约束（07 篇）</td></tr>
+              <tr><td><code>PartitionGridData</code></td><td>swimlane / PartitionGrid</td></tr>
+              <tr><td><code>*Stage</code>（各种装饰器）</td><td>Stage 装饰器链（09 篇）</td></tr>
+              <tr><td><code>EdgeRouter</code> 的 <code>scope</code> / <code>Grid</code> / <code>PenaltySettings</code></td><td>路由参数组（<code>bend_penalty</code> 等）</td></tr>
+              <tr><td><code>LayoutExecutor</code>（动画、视口、边缓存）</td><td>17 篇的 Transition Planner</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p><strong>这张对照表的用法</strong>：右列为空的行 = 参数域的空洞。当前已知空洞：<code>EdgeLayoutDescriptor</code> 级别的<strong>逐边路由优先级</strong>（哪条边优先占好走廊）尚未参数化 —— 它是 18 篇「拆线重布」的输入，建议随路由优化一起补上。</p>
+
+        <!-- ============ §9 ============ -->
+        <h2 id="sec-9"><span class="h2-num">9</span>落地清单（给本项目）</h2>
+
+        <ol>
+          <li><strong>参数表按相组织</strong>（§2 准则 2 的表），一次写全，作为 dsl-spec §14 的骨架。</li>
+          <li><strong>展开层实现四层覆盖</strong>（§3），引擎侧参数结构体<strong>无 Option</strong>。</li>
+          <li><strong>DemandBoard 机制</strong>（§4）替代散落的回写赋值，只允许 max 合并。</li>
+          <li><strong>CI 加 ADR-001 守卫</strong>（§6 检验 2）：引擎不依赖 profile crate + grep 图种名 0 命中。</li>
+          <li><strong><code>params_hash</code> 进诊断输出</strong>，基准报告里展示。</li>
+          <li><strong>无效参数组合报诊断</strong>，不静默忽略。</li>
+          <li><strong>按 §6 检验 1 做一次「新图种落地测试」</strong>（建议用 BPMN 与甘特），把缺口列成参数域的 TODO —— 这是判断「参数域够不够」最快的一次性投入。</li>
+        </ol>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>一句话收敛</div>
+          <p>「禁止图名特判」不是一句口号，而是<strong>参数域是否足够表达图种差异</strong>的工程问题。把图种差异完整表达为参数 + 用 CI grep 守住边界 + 用 <code>params_hash</code> 让变更可追溯 —— 三件事齐备，「图种不入引擎」才从约束变成现实。</p>
+        </div>
+
+      </div>
+
+      <div class="foot">
+        本文为 <a href="../20-图种profile与参数映射.md">20-图种profile与参数映射.md</a> 的 HTML 图文版。
+        配套：<a href="00-索引与阅读指南.html">索引</a> ·
+        <a href="../21-术语表.html">术语表图解</a> ·
+        <a href="../../../../design/layout/write-authority.md">写权纪律</a>
+      </div>
+
+    </article>
+  </div>
+</div>
+
+<script src="_assets/nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

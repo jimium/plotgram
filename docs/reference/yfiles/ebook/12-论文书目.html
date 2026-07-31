@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>12 · 论文书目（带注解） — yFiles 参考文库 ebook</title>
+<link rel="stylesheet" href="_assets/style.css">
+<!-- highlight.js 主题（浅色 + 暗色） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+  /* 代码块在浅/暗色下都可用；highlight.js 主题负责 token 颜色，本 CSS 负责容器 */
+  pre code.hljs { background: transparent; padding: 0; border: none; font-size: 13px; }
+  pre code.hljs .comment { font-style: italic; }
+  /* 书目条目样式 */
+  .bib-list { list-style: none; padding-left: 0; margin: 16px 0; }
+  .bib-list li { margin: 10px 0; padding: 10px 14px; background: var(--quote-bg); border-left: 3px solid var(--line); border-radius: 0 6px 6px 0; }
+  .bib-list li.starred { border-left-color: var(--accent); }
+  .bib-list li .star { color: var(--warn); font-weight: 700; margin-right: 5px; font-size: 14px; }
+  .bib-list li .annot { display: block; margin-top: 5px; font-size: 14px; color: var(--ink-soft); line-height: 1.7; }
+</style>
+</head>
+<body data-page="12">
+
+<div class="layout">
+  <div class="content">
+    <article>
+
+      <h1>12 · 论文与资料书目（带注解）</h1>
+      <p class="subtitle">每条注明「读它拿什么」。标 ★ 的是「自研布局引擎前必须读」的核心文献</p>
+
+      <div class="meta-bar">
+        <span class="pill">参考</span>
+        <span>图绘制领域核心文献 · 16 个主题方向 · ~130 条目</span>
+        <span class="src">~310 行 · 8.5k 字</span>
+      </div>
+
+      <div class="prose">
+
+        <div class="callout note">
+          <div class="ct-title"><span class="icon">📋</span>检索提示</div>
+          <p>绝大多数条目可在 <strong>DBLP</strong>（<code>dblp.org</code>）搜作者+年份找到；GD（Graph Drawing 会议）论文多在 Springer LNCS，作者主页常有 PDF；Graphviz / OGDF / ELK / adaptagrams 的技术报告在各自项目站点。</p>
+        </div>
+
+        <!-- 图解：关键论文时间线 -->
+        <figure>
+          <svg viewBox="0 0 720 200" aria-label="图绘制关键论文时间线 1970–2020">
+            <!-- 时代背景带 -->
+            <rect x="20" y="10" width="220" height="155" fill="var(--code-bg)" opacity="0.5" rx="6"/>
+            <rect x="250" y="10" width="250" height="155" fill="var(--accent-soft)" opacity="0.35" rx="6"/>
+            <rect x="510" y="10" width="190" height="155" fill="var(--good-soft)" opacity="0.35" rx="6"/>
+            <text x="130" y="28" text-anchor="middle" class="muted" font-size="10.5" font-weight="600">奠基期 · 理论与模型</text>
+            <text x="375" y="28" text-anchor="middle" class="muted" font-size="10.5" font-weight="600">框架期 · 工业级算法</text>
+            <text x="605" y="28" text-anchor="middle" class="muted" font-size="10.5" font-weight="600">精化期 · 规模与约束</text>
+            <!-- 时间轴 -->
+            <line x1="40" y1="100" x2="690" y2="100" stroke="var(--muted)" stroke-width="1.5"/>
+            <!-- 主里程碑（上方） -->
+            <g>
+              <circle cx="70" cy="100" r="4" fill="var(--accent)"/>
+              <text x="70" y="88" text-anchor="middle" font-size="10">Hopcroft–Tarjan</text>
+              <text x="70" y="78" text-anchor="middle" class="muted" font-size="8.5">平面性 · DFS</text>
+              <text x="70" y="118" text-anchor="middle" class="muted" font-size="9">1972</text>
+            </g>
+            <g>
+              <circle cx="150" cy="100" r="4" fill="var(--accent)"/>
+              <text x="150" y="88" text-anchor="middle" font-size="10">Sugiyama</text>
+              <text x="150" y="78" text-anchor="middle" class="muted" font-size="8.5">分层框架</text>
+              <text x="150" y="118" text-anchor="middle" class="muted" font-size="9">1981</text>
+            </g>
+            <g>
+              <circle cx="225" cy="100" r="4" fill="var(--accent)"/>
+              <text x="225" y="88" text-anchor="middle" font-size="10">Tamassia</text>
+              <text x="225" y="78" text-anchor="middle" class="muted" font-size="8.5">最小弯折</text>
+              <text x="225" y="118" text-anchor="middle" class="muted" font-size="9">1987</text>
+            </g>
+            <g>
+              <circle cx="300" cy="100" r="4" fill="var(--accent)"/>
+              <text x="300" y="88" text-anchor="middle" font-size="10">FR</text>
+              <text x="300" y="78" text-anchor="middle" class="muted" font-size="8.5">力导向</text>
+              <text x="300" y="118" text-anchor="middle" class="muted" font-size="9">1991</text>
+            </g>
+            <g>
+              <circle cx="370" cy="100" r="5" fill="var(--bad)"/>
+              <text x="370" y="88" text-anchor="middle" font-size="10" font-weight="600">Gansner (dot)</text>
+              <text x="370" y="78" text-anchor="middle" class="hi" font-size="8.5">★★★</text>
+              <text x="370" y="118" text-anchor="middle" class="muted" font-size="9">1993</text>
+            </g>
+            <g>
+              <circle cx="440" cy="100" r="5" fill="var(--bad)"/>
+              <text x="440" y="88" text-anchor="middle" font-size="10" font-weight="600">Brandes–Köpf</text>
+              <text x="440" y="78" text-anchor="middle" class="hi" font-size="8.5">★★★</text>
+              <text x="440" y="118" text-anchor="middle" class="muted" font-size="9">2002</text>
+            </g>
+            <g>
+              <circle cx="540" cy="100" r="5" fill="var(--bad)"/>
+              <text x="540" y="88" text-anchor="middle" font-size="10" font-weight="600">Wybrow</text>
+              <text x="540" y="78" text-anchor="middle" class="hi" font-size="8.5">★★★ 路由</text>
+              <text x="540" y="118" text-anchor="middle" class="muted" font-size="9">2009</text>
+            </g>
+            <g>
+              <circle cx="610" cy="100" r="4" fill="var(--accent)"/>
+              <text x="610" y="88" text-anchor="middle" font-size="10">Schulze</text>
+              <text x="610" y="78" text-anchor="middle" class="muted" font-size="8.5">端口约束</text>
+              <text x="610" y="118" text-anchor="middle" class="muted" font-size="9">2014</text>
+            </g>
+            <g>
+              <circle cx="670" cy="100" r="4" fill="var(--accent)"/>
+              <text x="670" y="88" text-anchor="middle" font-size="10">Zheng</text>
+              <text x="670" y="78" text-anchor="middle" class="muted" font-size="8.5">SGD</text>
+              <text x="670" y="118" text-anchor="middle" class="muted" font-size="9">2018</text>
+            </g>
+            <!-- 次要论文（下方） -->
+            <g>
+              <circle cx="110" cy="100" r="3" fill="var(--muted)"/>
+              <text x="110" y="142" text-anchor="middle" class="muted" font-size="9">Reingold–Tilford</text>
+              <text x="110" y="154" text-anchor="middle" class="muted" font-size="8">1981 · 树</text>
+            </g>
+            <g>
+              <circle cx="185" cy="100" r="3" fill="var(--muted)"/>
+              <text x="185" y="142" text-anchor="middle" class="muted" font-size="9">Yoshimura–Kuh</text>
+              <text x="185" y="154" text-anchor="middle" class="muted" font-size="8">1982 · 通道</text>
+            </g>
+            <g>
+              <circle cx="335" cy="100" r="3" fill="var(--muted)"/>
+              <text x="335" y="142" text-anchor="middle" class="muted" font-size="9">McMurchie</text>
+              <text x="335" y="154" text-anchor="middle" class="muted" font-size="8">1995 · PathFinder</text>
+            </g>
+            <g>
+              <circle cx="475" cy="100" r="3" fill="var(--muted)"/>
+              <text x="475" y="142" text-anchor="middle" class="muted" font-size="9">Gansner (SM)</text>
+              <text x="475" y="154" text-anchor="middle" class="muted" font-size="8">2004 · stress</text>
+            </g>
+            <g>
+              <circle cx="640" cy="100" r="3" fill="var(--muted)"/>
+              <text x="640" y="142" text-anchor="middle" class="muted" font-size="9">BK 勘误</text>
+              <text x="640" y="154" text-anchor="middle" class="muted" font-size="8">2020</text>
+            </g>
+            <!-- 图例 -->
+            <g transform="translate(40, 185)">
+              <circle cx="0" cy="0" r="4" fill="var(--accent)"/>
+              <text x="10" y="3" class="muted" font-size="9.5">里程碑论文</text>
+              <circle cx="90" cy="0" r="5" fill="var(--bad)"/>
+              <text x="100" y="3" class="muted" font-size="9.5">★★★ 自研前必读</text>
+              <circle cx="210" cy="0" r="3" fill="var(--muted)"/>
+              <text x="220" y="3" class="muted" font-size="9.5">重要参考</text>
+            </g>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 12.1</span>图绘制关键论文时间线（1972–2020）：奠基期奠定理论模型，框架期产出工业级算法，精化期解决规模与约束</div>
+        </figure>
+
+        <!-- ============ §0 ============ -->
+        <h2 id="sec-1"><span class="h2-num">0</span>教科书与综述（先读这两本，能省下几十篇论文）</h2>
+
+        <ul class="bib-list">
+          <li class="starred">
+            <span class="star">★</span><strong>Di Battista, Eades, Tamassia, Tollis — <em>Graph Drawing: Algorithms for the Visualization of Graphs</em>, Prentice Hall 1999.</strong>
+            <span class="annot">领域标准教科书。分层、正交、平面性、树、力导向各占一章，理论完整。读它建立术语体系。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Kaufmann, Wagner (eds.) — <em>Drawing Graphs: Methods and Models</em>, LNCS 2025, Springer 2001.</strong>
+            <span class="annot">各章由该子领域作者亲写，比上书更贴近实现。分层章（Sugiyama 框架）与正交章尤佳。</span>
+          </li>
+          <li>
+            <strong>Tamassia (ed.) — <em>Handbook of Graph Drawing and Visualization</em>, CRC 2013.</strong>
+            <span class="annot">最新、最全的手册。第 13 章（Hierarchical Drawing Algorithms，Healy–Nikolov）、第 5 章（Planarity）、第 12 章（Force-Directed，Kobourov）、第 17 章（Labeling，Wolff）都值得单独读。<strong>如果只买一本，买这本。</strong></span>
+          </li>
+          <li>
+            <strong>Kobourov — <em>Force-Directed Drawing Algorithms</em>（Handbook 第 12 章，也有独立 arXiv 版）</strong>
+            <span class="annot">力导向家族最好的综述。</span>
+          </li>
+          <li>
+            <strong>Nikolov, Healy — <em>Hierarchical Drawing Algorithms</em>（Handbook 第 13 章）</strong>
+            <span class="annot">Sugiyama 各相的算法对照表。</span>
+          </li>
+          <li>
+            <strong>Bennett, Ryall, Spalteholz, Gooch 2007 — <em>The Aesthetics of Graph Visualization</em>.</strong>
+            <span class="annot">美学准则的综述与实证汇总。</span>
+          </li>
+        </ul>
+
+        <!-- ============ §1 ============ -->
+        <h2 id="sec-2"><span class="h2-num">1</span>分层布局（Sugiyama 家族）★</h2>
+
+        <ul class="bib-list">
+          <li class="starred">
+            <span class="star">★</span><strong>Sugiyama, Tagawa, Toda 1981 — <em>Methods for Visual Understanding of Hierarchical System Structures</em>, IEEE Trans. SMC 11(2).</strong>
+            <span class="annot">框架原文：四相分解、barycenter、priority 坐标法。读它理解"为什么这样切相"。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Gansner, Koutsofios, North, Vo 1993 — <em>A Technique for Drawing Directed Graphs</em>, IEEE TSE 19(3).</strong>
+            <span class="annot"><strong>本领域最有工程价值的单篇论文</strong>（dot 的实现说明）。含：network simplex 分层的完整伪代码与 cut value 增量维护、mincross 的 median+transpose 配方与边权 1/2/8 设计、x 坐标的辅助图建模、多边形通道内的 Bézier 拟合。附录必读。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Brandes, Köpf 2002 — <em>Fast and Simple Horizontal Coordinate Assignment</em>, GD 2001, LNCS 2265.</strong>
+            <span class="annot">线性时间 x 坐标分配（4-run 对齐 + 紧致化 + 中位平均）。工业默认。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Brandes, Walter, Zink 2020 — <em>Erratum: Fast and Simple Horizontal Coordinate Assignment</em>（arXiv）.</strong>
+            <span class="annot">修正原文 compaction 伪代码的错误。<strong>不读会写出节点重叠的实现</strong>，多个开源库踩过。</span>
+          </li>
+          <li>
+            <strong>Eades, Lin, Smyth 1993 — <em>A Fast and Effective Heuristic for the Feedback Arc Set Problem</em>, Inf. Process. Lett.</strong>
+            <span class="annot">Greedy-FAS，去环的工业标准，带质量下界证明。</span>
+          </li>
+          <li>
+            <strong>Eades, Wormald 1994 — <em>Edge Crossings in Drawings of Bipartite Graphs</em>, Algorithmica.</strong>
+            <span class="annot">两层交叉最小化 NP 难 + median 启发式的 3-近似界。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Barth, Jünger, Mutzel 2002 — <em>Simple and Efficient Bilayer Cross Counting</em>, GD 2002.</strong>
+            <span class="annot"><span class="katex-inline" data-tex="O(E\log V)"></span> 交叉计数。sweep 里要反复计数，没这个会很慢。</span>
+          </li>
+          <li>
+            <strong>Matuszewski, Schönfeld, Molitor 1999 — <em>Using Sifting for k-Layer Straightline Crossing Minimization</em>, GD 1999.</strong>
+            <span class="annot">sifting：质量优于 transpose，对长链友好。</span>
+          </li>
+          <li>
+            <strong>Coffman, Graham 1972 — <em>Optimal Scheduling for Two-Processor Systems</em>.</strong>
+            <span class="annot">限宽分层的来源（调度算法的移植）。</span>
+          </li>
+          <li>
+            <strong>Nikolov, Tarassov, Branke 2005 — <em>In Search for Efficient Heuristics for Minimum-Width Graph Layering with Consideration of Dummy Nodes</em>.</strong>
+            <span class="annot">层宽与 dummy 数的权衡；node promotion 技巧。</span>
+          </li>
+          <li>
+            <strong>Sander 1996 — <em>A Fast Heuristic for Hierarchical Manhattan Layout</em>, GD 1995.</strong>
+            <span class="annot">分层 + 正交 + 分组的早期完整方案。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Forster 2002 — <em>Applying Crossing Reduction Strategies to Layered Compound Graphs</em>, GD 2002.</strong>
+            <span class="annot">复合图（分组）的交叉最小化，08 篇的理论来源。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Schulze, Spönemann, von Hanxleden 2014 — <em>Drawing Layered Graphs with Port Constraints</em>, JVLC 25(2).</strong>
+            <span class="annot">端口约束在分层管线中的完整处理（ELK 的依据）。<strong>做端口必读。</strong></span>
+          </li>
+          <li>
+            <strong>Sugiyama, Misue 1991 — <em>Visualization of Structural Information: Automatic Drawing of Compound Digraphs</em>, IEEE SMC.</strong>
+            <span class="annot">复合图（compound digraph）模型原文。</span>
+          </li>
+          <li>
+            <strong>Bachmaier, Brandenburg, Brunner, Hübner 2010/2011 — <em>Global k-Level Crossing Reduction</em>.</strong>
+            <span class="annot">块级（长边整体）sifting。</span>
+          </li>
+          <li>
+            <strong>Chimani, Gutwenger, Mutzel, Wong 2010 — <em>Layer-Free Upward Crossing Minimization</em>.</strong>
+            <span class="annot">另一条思路：先最小化交叉再分层。</span>
+          </li>
+        </ul>
+
+        <!-- ============ §2 ============ -->
+        <h2 id="sec-3"><span class="h2-num">2</span>正交布局与平面性</h2>
+
+        <ul class="bib-list">
+          <li class="starred">
+            <span class="star">★</span><strong>Tamassia 1987 — <em>On Embedding a Graph in the Grid with the Minimum Number of Bends</em>, SIAM J. Comput. 16(3).</strong>
+            <span class="annot">最小弯折的最小费用流模型。正交布局的理论基石。</span>
+          </li>
+          <li>
+            <strong>Batini, Nardelli, Tamassia 1986 — <em>A Layout Algorithm for Data Flow Diagrams</em>, IEEE TSE.</strong>
+            <span class="annot">TSM 三段式框架的提出。</span>
+          </li>
+          <li>
+            <strong>Fößmeier, Kaufmann 1996 — <em>Drawing High Degree Graphs with Low Bend Numbers</em>, GD 1995.</strong>
+            <span class="annot">Kandinsky 模型（度 &gt;4）。</span>
+          </li>
+          <li>
+            <strong>Bläsius, Krug, Rutter, Wagner 2012/2014 — <em>Orthogonal Graph Drawing with Flexibility Constraints</em> / Kandinsky 复杂度.</strong>
+            <span class="annot">证明 Kandinsky 最小弯折 NP 难；给出 flexibility 模型的多项式子类。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Bridgeman, Fanto, Garg, Tamassia, Vismara 1997 — <em>Turn-Regularity and Optimal Area Compaction of Orthogonal Representations</em>, GD 1997.</strong>
+            <span class="annot">紧致化的正确判据（kitty corner）。<strong>这篇解释了"为什么紧致化会算错导致重叠"。</strong></span>
+          </li>
+          <li>
+            <strong>Klau, Mutzel 1999 — <em>Optimal Compaction of Orthogonal Grid Drawings</em>, IPCO.</strong>
+            <span class="annot">流模型的面积最优紧致化。</span>
+          </li>
+          <li>
+            <strong>Hopcroft, Tarjan 1974 — <em>Efficient Planarity Testing</em>.</strong>
+            <span class="annot">线性平面性测试。</span>
+          </li>
+          <li>
+            <strong>Boyer, Myrvold 2004 — <em>On the Cutting Edge: Simplified O(n) Planarity by Edge Addition</em>, JGAA.</strong>
+            <span class="annot">现代实现首选。</span>
+          </li>
+          <li>
+            <strong>Di Battista, Tamassia 1996 — <em>On-line Planarity Testing</em> / SPQR-tree.</strong>
+            <span class="annot">所有平面嵌入的表示。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Gutwenger, Mutzel, Weiskircher 2001 — <em>Inserting an Edge into a Planar Graph</em>, SODA.</strong>
+            <span class="annot">可变嵌入的最优单边插入。</span>
+          </li>
+          <li>
+            <strong>Chimani, Gutwenger, Mutzel 2007+ — OGDF 的 planarization 系列.</strong>
+            <span class="annot">remove-reinsert 的工程化。</span>
+          </li>
+          <li>
+            <strong>Papakostas, Tollis 1998 — <em>Algorithms for Area-Efficient Orthogonal Drawings</em>.</strong>
+            <span class="annot">面积界。</span>
+          </li>
+          <li>
+            <strong>Purchase 1997/2002 — 见 §6。</strong>
+            <span class="annot">弯折 vs 交叉的实证权衡。</span>
+          </li>
+        </ul>
+
+        <!-- ============ §3 ============ -->
+        <h2 id="sec-4"><span class="h2-num">3</span>边路由</h2>
+
+        <ul class="bib-list">
+          <li class="starred">
+            <span class="star">★</span><strong>Wybrow, Marriott, Stuckey 2009/2010 — <em>Orthogonal Connector Routing</em>, GD 2009 / 期刊版.</strong>
+            <span class="annot">libavoid 的核心：正交可见图构造、含方向状态的 A*、nudging 的偏序约束与环检测。<strong>做正交路由必读。</strong></span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Wybrow, Marriott, Stuckey 2006 — <em>Incremental Connector Routing</em>, GD 2005.</strong>
+            <span class="annot">增量重路由（交互场景）。</span>
+          </li>
+          <li>
+            <strong>Miriyala, Hornick, Tamassia 1993 — <em>An Incremental Approach to Aesthetic Graph Layout</em>.</strong>
+            <span class="annot">channel routing 的早期方案。</span>
+          </li>
+          <li>
+            <strong>Yoshimura, Kuh 1982 — <em>Efficient Algorithms for Channel Routing</em>, IEEE TCAD.</strong>
+            <span class="annot">VLSI 通道布线的 left-edge algorithm = 区间图着色。<strong>03 篇 track 分配的原始出处。</strong></span>
+          </li>
+          <li>
+            <strong>Lee 1961 — <em>An Algorithm for Path Connections and Its Applications</em>.</strong>
+            <span class="annot">迷宫路由（BFS）的祖宗。</span>
+          </li>
+          <li>
+            <strong>Hart, Nilsson, Raphael 1968 — A* 原文。</strong>
+            <span class="annot">A* 搜索算法的原始论文。</span>
+          </li>
+          <li>
+            <strong>Holten 2006 — <em>Hierarchical Edge Bundles</em>, IEEE TVCG.</strong>
+            <span class="annot">层次边捆绑，性价比极高。</span>
+          </li>
+          <li>
+            <strong>Holten, van Wijk 2009 — <em>Force-Directed Edge Bundling for Graph Visualization</em>, EuroVis.</strong>
+            <span class="annot">无层次时的捆绑。</span>
+          </li>
+          <li>
+            <strong>Pupyrev, Nachmanson, Bereg, Holroyd 2011 — <em>Edge Routing with Ordered Bundles</em>, GD 2011.</strong>
+            <span class="annot">有序捆绑（MSAGL 的做法）。</span>
+          </li>
+          <li>
+            <strong>Dwyer, Nachmanson 2009 — <em>Fast Edge-Routing for Large Graphs</em>, GD 2009.</strong>
+            <span class="annot">用稀疏可见图 + Sparse Visibility Spanner 加速。</span>
+          </li>
+        </ul>
+
+        <!-- ============ §4 ============ -->
+        <h2 id="sec-5"><span class="h2-num">4</span>力导向与 Stress</h2>
+
+        <ul class="bib-list">
+          <li>
+            <strong>Eades 1984 — <em>A Heuristic for Graph Drawing</em>, Congressus Numerantium.</strong>
+            <span class="annot">弹簧模型原文。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Fruchterman, Reingold 1991 — <em>Graph Drawing by Force-Directed Placement</em>, Software: Practice &amp; Experience.</strong>
+            <span class="annot">FR 算法 + 退火，最广泛实现。</span>
+          </li>
+          <li>
+            <strong>Kamada, Kawai 1989 — <em>An Algorithm for Drawing General Undirected Graphs</em>, IPL.</strong>
+            <span class="annot">基于图论距离的能量模型。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Gansner, Koren, North 2004 — <em>Graph Drawing by Stress Majorization</em>, GD 2004.</strong>
+            <span class="annot">SMACOF 在图绘制中的应用，单调收敛保证。neato 的 <code>mode=major</code>。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Brandes, Pich 2007 — <em>Eigensolver Methods for Progressive Multidimensional Scaling of Large Data</em>, GD 2006.</strong>
+            <span class="annot">PivotMDS：<span class="katex-inline" data-tex="O(kE)"></span> 得到高质量初始布局。<strong>大图必备。</strong></span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Ortmann, Klimenta, Brandes 2016 — <em>A Sparse Stress Model</em>, GD 2016.</strong>
+            <span class="annot"><span class="katex-inline" data-tex="O(kV)"></span> 的 stress 近似。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Zheng, Pawar, Goodman 2018 — <em>Graph Drawing by Stochastic Gradient Descent</em>, IEEE TVCG.</strong>
+            <span class="annot">SGD stress：20 行代码、比 SMACOF 快且好。<strong>推荐作为主力实现。</strong></span>
+          </li>
+          <li>
+            <strong>Barnes, Hut 1986 — <em>A Hierarchical O(N log N) Force-Calculation Algorithm</em>, Nature.</strong>
+            <span class="annot">四/八叉树近似。</span>
+          </li>
+          <li>
+            <strong>Hachul, Jünger 2004 — <em>Drawing Large Graphs with a Potential-Field-Based Multilevel Algorithm</em>（FMMM）, GD 2004.</strong>
+            <span class="annot">FMMM 多级力导向算法。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Hu 2005 — <em>Efficient, High-Quality Force-Directed Graph Drawing</em>, Mathematica Journal（sfdp）.</strong>
+            <span class="annot">多级 + BH + MIS filtration，工程细节丰富，易读。</span>
+          </li>
+          <li>
+            <strong>Noack 2007 — <em>Energy Models for Graph Clustering</em>, JGAA.</strong>
+            <span class="annot">LinLog：证明力模型最优解 ≈ 社区结构。理论亮点。</span>
+          </li>
+          <li>
+            <strong>Jacomy et al. 2014 — <em>ForceAtlas2</em>, PLoS ONE.</strong>
+            <span class="annot">生产级力导向的参数与自适应步长设计。</span>
+          </li>
+          <li>
+            <strong>Gansner, Hu, North 2013 — <em>A Maxent-Stress Model for Graph Layout</em>, IEEE TVCG.</strong>
+            <span class="annot">大图 stress 的近线性替代。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Gansner, Hu 2009 — <em>Efficient Node Overlap Removal Using a Proximity Stress Model</em>（PRISM）, GD 2008.</strong>
+            <span class="annot">消重叠的最佳质量方案（保 mental map）。</span>
+          </li>
+          <li>
+            <strong>Freivalds, Dogrusoz, Kikusts 2002 — <em>Disconnected Graph Layout and the Polyomino Packing Approach</em>, GD 2001.</strong>
+            <span class="annot">分量装箱。</span>
+          </li>
+        </ul>
+
+        <!-- ============ §5 ============ -->
+        <h2 id="sec-6"><span class="h2-num">5</span>树与其它</h2>
+
+        <ul class="bib-list">
+          <li class="starred">
+            <span class="star">★</span><strong>Reingold, Tilford 1981 — <em>Tidier Drawings of Trees</em>, IEEE TSE.</strong>
+            <span class="annot">树布局的美学准则与轮廓法。</span>
+          </li>
+          <li>
+            <strong>Walker 1990 — <em>A Node-Positioning Algorithm for General Trees</em>, Software: Practice &amp; Experience.</strong>
+            <span class="annot">推广到任意度。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Buchheim, Jünger, Leipert 2002 — <em>Improving Walker's Algorithm to Run in Linear Time</em>, GD 2002.</strong>
+            <span class="annot"><strong>树布局的正确实现依据</strong>（thread / ancestor / shift-change）。D3 <code>d3.tree</code> 即此。</span>
+          </li>
+          <li>
+            <strong>Wetherell, Shannon 1979 — <em>Tidy Drawings of Trees</em>.</strong>
+            <span class="annot">历史对照（不对称问题）。</span>
+          </li>
+          <li>
+            <strong>Eades 1992 — <em>Drawing Free Trees</em>.</strong>
+            <span class="annot">radial / balloon 的来源。</span>
+          </li>
+          <li>
+            <strong>Six, Tollis 1999 — <em>A Framework for Circular Drawings of Networks</em>, GD 1999.</strong>
+            <span class="annot">圆形布局。</span>
+          </li>
+          <li>
+            <strong>Shneiderman 1992 — <em>Tree Visualization with Tree-maps</em>.</strong>
+            <span class="annot">Treemap 可视化的开创性工作。</span>
+          </li>
+          <li>
+            <strong>Bruls, Huizing, van Wijk 2000 — <em>Squarified Treemaps</em>.</strong>
+            <span class="annot">Squarified treemap 算法，改善宽高比。</span>
+          </li>
+          <li>
+            <strong>Wang, Wang, Dai, Wang 2006 — <em>Visualization of Large Hierarchical Data by Circle Packing</em>, CHI.</strong>
+            <span class="annot">圆形打包布局。</span>
+          </li>
+        </ul>
+
+        <!-- ============ §6 ============ -->
+        <h2 id="sec-7"><span class="h2-num">6</span>约束、交互、动态、心智地图</h2>
+
+        <ul class="bib-list">
+          <li class="starred">
+            <span class="star">★</span><strong>Dwyer, Marriott, Stuckey 2006 — <em>Fast Node Overlap Removal</em>, GD 2005（含 VPSC）.</strong>
+            <span class="annot">分隔约束求解器。<strong>建议作为公共基础设施实现。</strong></span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Dwyer, Koren, Marriott 2006 — <em>IPSep-CoLa: An Incremental Procedure for Separation Constraint Layout of Graphs</em>, IEEE TVCG.</strong>
+            <span class="annot">stress + 约束的统一框架（WebCola 的核心）。</span>
+          </li>
+          <li>
+            <strong>Dwyer, Marriott, Wybrow 2008 — <em>Dunnart: A Constraint-Based Network Diagram Authoring Tool</em>, GD 2008.</strong>
+            <span class="annot">约束式图编辑器的完整设计，产品层面很有启发。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Misue, Eades, Lai, Sugiyama 1995 — <em>Layout Adjustment and the Mental Map</em>, JVLC.</strong>
+            <span class="annot">mental map 三性质原文。</span>
+          </li>
+          <li>
+            <strong>Brandes, Wagner 1997 — <em>A Bayesian Paradigm for Dynamic Graph Layout</em>, GD 1997.</strong>
+            <span class="annot">动态布局的统一框架。</span>
+          </li>
+          <li>
+            <strong>Diehl, Görg 2002 — <em>Graphs, They Are Changing — Dynamic Graph Drawing for a Sequence of Graphs</em>, GD 2002.</strong>
+            <span class="annot">foresighted layout。</span>
+          </li>
+          <li>
+            <strong>Brandes, Corman 2003 — <em>Visual Unrolling of Network Evolution</em>.</strong>
+            <span class="annot">时间维展开。</span>
+          </li>
+          <li>
+            <strong>Beck, Burch, Diehl, Weiskopf 2014 — <em>A Taxonomy and Survey of Dynamic Graph Visualization</em>.</strong>
+            <span class="annot">动态图综述。</span>
+          </li>
+          <li>
+            <strong>He, Marriott 1998 — <em>Constrained Graph Layout</em>, Constraints.</strong>
+            <span class="annot">约束布局早期系统化工作。</span>
+          </li>
+        </ul>
+
+        <!-- ============ §7 ============ -->
+        <h2 id="sec-8"><span class="h2-num">7</span>标签放置</h2>
+
+        <ul class="bib-list">
+          <li class="starred">
+            <span class="star">★</span><strong>Formann, Wagner 1991 — <em>A Packing Problem with Applications to Lettering of Maps</em>, SoCG.</strong>
+            <span class="annot">NP 难 + 2-近似。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Kakoulis, Tollis 2001/2003 — <em>A Unified Approach to Automatic Label Placement</em> / <em>Algorithms for Labeling Focus Regions</em>.</strong>
+            <span class="annot">图标注的通用框架（候选 + 冲突图 + 匹配）。<strong>做标签必读。</strong></span>
+          </li>
+          <li>
+            <strong>Klau, Mutzel 2003 — <em>Optimal Labeling of Point Features in Rectangular Labeling Models</em>, Math. Programming.</strong>
+            <span class="annot">ILP 精确解。</span>
+          </li>
+          <li>
+            <strong>Christensen, Marks, Shieber 1995 — <em>An Empirical Study of Algorithms for Point-Feature Label Placement</em>, ACM TOG.</strong>
+            <span class="annot">五种算法实测对比，模拟退火胜出。<strong>选算法前读它可省很多试错。</strong></span>
+          </li>
+          <li>
+            <strong>van Kreveld, Strijk, Wolff 1999 — <em>Point Labeling with Sliding Labels</em>, CGTA.</strong>
+            <span class="annot">slider 模型。</span>
+          </li>
+          <li>
+            <strong>Wolff, Strijk — <em>The Map Labeling Bibliography</em>（在线）.</strong>
+            <span class="annot">该子领域最全书目。</span>
+          </li>
+          <li>
+            <strong>Knuth, Plass 1981 — <em>Breaking Paragraphs into Lines</em>.</strong>
+            <span class="annot">若要做高质量文本换行。</span>
+          </li>
+          <li>
+            <strong>UAX #14 — <em>Unicode Line Breaking Algorithm</em>.</strong>
+            <span class="annot">CJK 混排断行的规范依据。</span>
+          </li>
+        </ul>
+
+        <!-- ============ §8 ============ -->
+        <h2 id="sec-9"><span class="h2-num">8</span>度量与实证研究</h2>
+
+        <ul class="bib-list">
+          <li class="starred">
+            <span class="star">★</span><strong>Purchase 1997 — <em>Which Aesthetic Has the Greatest Effect on Human Understanding?</em>, GD 1997.</strong>
+            <span class="annot">交叉 &gt; 弯折 &gt; 其它。</span>
+          </li>
+          <li>
+            <strong>Purchase 2002 — <em>Metrics for Graph Drawing Aesthetics</em>, JVLC.</strong>
+            <span class="annot">可计算指标的定义（含对称性度量）。</span>
+          </li>
+          <li>
+            <strong>Ware, Purchase, Colpoys, McGill 2002 — <em>Cognitive Measurements of Graph Aesthetics</em>, Information Visualization.</strong>
+            <span class="annot">路径查找任务下"连续性/路径长度"比交叉更重要——对流程图有直接启示。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Huang, Hong, Eades 2008 — <em>Effects of Crossing Angles</em>, PacificVis.</strong>
+            <span class="annot">交叉角度 ≥ 70° 几乎无害。<strong>便宜的优化点。</strong></span>
+          </li>
+          <li>
+            <strong>Di Battista, Garg, Liotta, Tamassia, Tassinari, Vargiu 1997 — <em>An Experimental Comparison of Four Graph Drawing Algorithms</em>, CGTA.</strong>
+            <span class="annot">Rome 图集的来源与四种正交算法的量化对照。方法论值得学。</span>
+          </li>
+          <li>
+            <strong>Dwyer et al. 2009 — <em>A Comparison of User-Generated and Automatic Graph Layouts</em>, IEEE TVCG.</strong>
+            <span class="annot">人排 vs 机排：机器不输，但人更会用分组与对齐。</span>
+          </li>
+          <li>
+            <strong>Klapaukh 2014 — <em>An Empirical Evaluation of Force-Directed Graph Layout</em>（PhD thesis, VUW）.</strong>
+            <span class="annot">力导向参数的系统实验。</span>
+          </li>
+          <li>
+            <strong>Kieffer, Dwyer, Marriott, Wybrow 2013 — <em>Incremental Grid-Like Layout Using Soft and Hard Constraints</em>.</strong>
+            <span class="annot">网格化对齐的度量与实现。</span>
+          </li>
+        </ul>
+
+        <!-- ============ §9 ============ -->
+        <h2 id="sec-10"><span class="h2-num">9</span>超图、总线与 VLSI 布线（对应 18 篇）</h2>
+
+        <ul class="bib-list">
+          <li>
+            <strong>Mäkinen 1990 — <em>How to Draw a Hypergraph</em>, Int. J. Computer Math.</strong>
+            <span class="annot">subset standard vs edge standard 的原初区分。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Eschbach, Günther, Becker 2006 — <em>Orthogonal Hypergraph Drawing for Improved Visibility</em>, JGAA.</strong>
+            <span class="annot">正交超边（总线形态）的完整建模与优化。<strong>做总线必读。</strong></span>
+          </li>
+          <li>
+            <strong>Sander 2004 — <em>Layout of Directed Hypergraphs with Orthogonal Hyperedges</em>, GD 2003.</strong>
+            <span class="annot">有向超图的分层绘制。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Lengauer 1990 — <em>Combinatorial Algorithms for Integrated Circuit Layout</em>, Wiley.</strong>
+            <span class="annot">VLSI 布局经典教材。分割、布置、全局/详细布线、通道布线——<strong>图布局的很多"新"问题在这里已被解决四十年。</strong></span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Yoshimura, Kuh 1982 — <em>Efficient Algorithms for Channel Routing</em>, IEEE TCAD.</strong>
+            <span class="annot">left-edge algorithm（区间图着色）+ 垂直约束图。<strong>分层图的层间路由 = 通道布线。</strong></span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>McMurchie, Ebeling 1995 — <em>PathFinder: A Negotiation-Based Performance-Driven Router for FPGAs</em>, FPGA'95.</strong>
+            <span class="annot"><strong>history cost + 拆线重布</strong>——拥塞消解的正确机制，可直接移植到走廊拥塞。</span>
+          </li>
+          <li>
+            <strong>Kernighan, Lin 1970 — <em>An Efficient Heuristic Procedure for Partitioning Graphs</em>, Bell System Tech. J.</strong>
+            <span class="annot">KL 分割算法。</span>
+          </li>
+          <li>
+            <strong>Fiduccia, Mattheyses 1982 — <em>A Linear-Time Heuristic for Improving Network Partitions</em>, DAC.</strong>
+            <span class="annot">FM 的 gain bucket 结构值得学。</span>
+          </li>
+          <li>
+            <strong>Karypis, Kumar 1998 — <em>METIS / hMETIS</em>（多级分割）.</strong>
+            <span class="annot">分组推断与大图 coarsening 的工业标准。</span>
+          </li>
+          <li>
+            <strong>Ho, Sangiovanni-Vincentelli, et al. — Steiner 树在布线中的应用</strong>
+            <span class="annot">工程上只需 rectilinear Steiner 的近似（median trunk 即可）。</span>
+          </li>
+          <li>
+            <strong>Pupyrev, Nachmanson, Bereg, Holroyd 2011 — <em>Edge Routing with Ordered Bundles</em>, GD 2011.</strong>
+            <span class="annot">有序捆绑：比力导向 bundling 更适合工程图风格。</span>
+          </li>
+        </ul>
+
+        <!-- ============ §10 ============ -->
+        <h2 id="sec-11"><span class="h2-num">10</span>一维排列、序列图与时间轴（对应 19 篇）</h2>
+
+        <ul class="bib-list">
+          <li class="starred">
+            <span class="star">★</span><strong>Díaz, Petit, Serna 2002 — <em>A Survey of Graph Layout Problems</em>, ACM Computing Surveys 34(3).</strong>
+            <span class="annot">MinLA / bandwidth / cutwidth / vertex separation 的统一综述。<strong>次轴排列的理论底层。</strong></span>
+          </li>
+          <li>
+            <strong>Garey, Johnson, Stockmeyer 1976 — <em>Some Simplified NP-Complete Graph Problems</em>.</strong>
+            <span class="annot">MinLA NP 难的出处。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Juvan, Mohar 1992 — <em>Optimal Linear Labelings and Eigenvalues of Graphs</em>, Discrete Applied Math.</strong>
+            <span class="annot">Fiedler 向量作为 MinLA 的 <span class="katex-inline" data-tex="L_2"></span> 松弛最优解。谱方法做排序的依据。</span>
+          </li>
+          <li>
+            <strong>Safro, Ron, Brandt 2006 — <em>Multilevel Algorithms for Linear Ordering Problems</em>, ACM JEA.</strong>
+            <span class="annot">千级以上的 MinLA。</span>
+          </li>
+          <li>
+            <strong>Harper 1964 — <em>Optimal Assignments of Numbers to Vertices</em>.</strong>
+            <span class="annot">带宽下界的经典结果。</span>
+          </li>
+          <li>
+            <strong>ITU-T Z.120 — <em>Message Sequence Chart (MSC)</em>.</strong>
+            <span class="annot">序列图语义的正式规范（比 UML 更严谨）。</span>
+          </li>
+          <li>
+            <strong>OMG UML 2.5.1 §17 — <em>Interactions</em>.</strong>
+            <span class="annot">组合片段（alt/loop/par）的完整语义与图形约定。</span>
+          </li>
+          <li>
+            <strong>Gregg 2016 — <em>The Flame Graph</em>, CACM.</strong>
+            <span class="annot">区间嵌套可视化的极简形态；验证抽象是否解耦。</span>
+          </li>
+          <li>
+            <strong>Nagamochi, Kuroya 2007 — <em>Convex Drawing for c-Planar Biconnected Clustered Graphs</em>.</strong>
+            <span class="annot">排列与聚类的交互。</span>
+          </li>
+        </ul>
+
+        <!-- ============ §11 ============ -->
+        <h2 id="sec-12"><span class="h2-num">11</span>动画、导航与交互（对应 17 篇）</h2>
+
+        <ul class="bib-list">
+          <li class="starred">
+            <span class="star">★</span><strong>Friedrich, Eades 2002 — <em>Graph Drawing in Motion</em>, JGAA 6(3).</strong>
+            <span class="annot">layout morphing 的工程框架（分阶段、聚类移动）。</span>
+          </li>
+          <li>
+            <strong>Friedrich, Houle 2002 — <em>Graph Drawing in Motion II</em>, GD 2001.</strong>
+            <span class="annot">聚类移动的具体算法。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Heer, Robertson 2007 — <em>Animated Transitions in Statistical Data Graphics</em>, IEEE TVCG.</strong>
+            <span class="annot"><strong>分阶段过渡优于同时过渡</strong>的实证依据。直接指导过渡时间轴设计。</span>
+          </li>
+          <li>
+            <strong>Bederson, Boltman 1999 — <em>Does Animation Help Users Build Mental Maps of Spatial Information?</em>, InfoVis.</strong>
+            <span class="annot">动画对心智地图建构的影响的实证研究。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>Archambault, Purchase 2013 — <em>Mental Map Preservation Helps User Orientation in Dynamic Graphs</em>, GD 2012.</strong>
+            <span class="annot">稳定性与质量的权衡结论：先保质量，再在此约束下求稳定。</span>
+          </li>
+          <li>
+            <strong>Furnas 1986 — <em>Generalized Fisheye Views</em>, CHI.</strong>
+            <span class="annot">鱼眼视图的开创性工作。</span>
+          </li>
+          <li>
+            <strong>Sarkar, Brown 1992 — <em>Graphical Fisheye Views of Graphs</em>, CHI.</strong>
+            <span class="annot">图上的鱼眼视图。</span>
+          </li>
+          <li>
+            <strong>Lamping, Rao, Pirolli 1995 — <em>A Focus+Context Technique Based on Hyperbolic Geometry</em>, CHI.</strong>
+            <span class="annot">双曲几何的焦点+上下文。</span>
+          </li>
+          <li class="starred">
+            <span class="star">★</span><strong>van Ham, Perer 2009 — <em>"Search, Show Context, Expand on Demand": Supporting Large Graph Exploration with Degree-of-Interest</em>, IEEE TVCG.</strong>
+            <span class="annot">DOI 剪裁——<strong>比 fisheye 更适合正交/工程图风格</strong>（不扭曲几何，只增删元素）。</span>
+          </li>
+          <li>
+            <strong>Dwyer, Marriott, Wybrow 2008 — <em>Dunnart</em>, GD 2008.</strong>
+            <span class="annot">约束式编辑器的交互设计（拖动→投影）。</span>
+          </li>
+        </ul>
+
+        <!-- ============ §12 ============ -->
+        <h2 id="sec-13"><span class="h2-num">12</span>计算几何、数值与零件（对应 14 / 15 篇）</h2>
+
+        <ul class="bib-list">
+          <li>
+            <strong>Bentley, Ottmann 1979 — <em>Algorithms for Reporting and Counting Geometric Intersections</em>, IEEE Trans. Computers.</strong>
+            <span class="annot">扫描线。</span>
+          </li>
+          <li>
+            <strong>de Berg, Cheong, van Kreveld, Overmars — <em>Computational Geometry: Algorithms and Applications</em>, Springer.</strong>
+            <span class="annot">扫描线、可见性图、区间树、正交范围查询的标准参考。</span>
+          </li>
+          <li>
+            <strong>Guttman 1984 — <em>R-Trees</em>, SIGMOD.</strong>
+            <span class="annot">R 树空间索引。</span>
+          </li>
+          <li>
+            <strong>Leutenegger et al. 1997 — <em>STR bulk-loading</em>.</strong>
+            <span class="annot">R 树的批量加载算法。</span>
+          </li>
+          <li>
+            <strong>Fenwick 1994 — <em>A New Data Structure for Cumulative Frequency Tables</em>.</strong>
+            <span class="annot">BIT（交叉计数的底层）。</span>
+          </li>
+          <li>
+            <strong>Tarjan 1972 — <em>Depth-First Search and Linear Graph Algorithms</em>.</strong>
+            <span class="annot">SCC / BCC 的出处。</span>
+          </li>
+          <li>
+            <strong>Gutwenger, Mutzel 2000 — <em>A Linear Time Implementation of SPQR-Trees</em>, GD 2000.</strong>
+            <span class="annot">SPQR 实现细节。</span>
+          </li>
+          <li>
+            <strong>Ahuja, Magnanti, Orlin — <em>Network Flows: Theory, Algorithms, and Applications</em>, Prentice Hall 1993.</strong>
+            <span class="annot">最小费用流 / network simplex 的权威参考（dot 的 rank.c 就是它的应用）。</span>
+          </li>
+          <li>
+            <strong>Hopcroft, Karp 1973 — <em>An <span class="katex-inline" data-tex="n^{5/2}"></span> Algorithm for Maximum Matchings in Bipartite Graphs</em>.</strong>
+            <span class="annot">二部图最大匹配。</span>
+          </li>
+          <li>
+            <strong>Kuhn 1955 / Munkres 1957 — 指派问题（Hungarian）.</strong>
+            <span class="annot">端口槽位分配的精确解。</span>
+          </li>
+          <li>
+            <strong>Shewchuk 1994 — <em>An Introduction to the Conjugate Gradient Method Without the Agonizing Pain</em>.</strong>
+            <span class="annot">若做 SMACOF。</span>
+          </li>
+          <li>
+            <strong>Shewchuk 1997 — <em>Adaptive Precision Floating-Point Arithmetic and Fast Robust Geometric Predicates</em>.</strong>
+            <span class="annot">几何谓词的数值健壮性；若遇到退化共线/重合导致的诡异 bug，读它。</span>
+          </li>
+          <li>
+            <strong>Catmull, Rom 1974 — 样条</strong>
+            <span class="annot">工程上用 centripetal 参数化（Yuksel et al. 2011）避免过冲。</span>
+          </li>
+        </ul>
+
+        <!-- ============ §13 ============ -->
+        <h2 id="sec-14"><span class="h2-num">13</span>开源实现（读代码比读论文快）</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>项目</th><th>语言</th><th>读它学什么</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Graphviz</strong>（<code>lib/dotgen</code>）</td><td>C</td><td>dot 的分层全流程；<code>rank.c</code>（network simplex）、<code>mincross.c</code>、<code>position.c</code> 是教科书级</td></tr>
+              <tr><td><strong>Graphviz</strong>（<code>lib/neatogen</code>）</td><td>C</td><td>stress majorization、sfdp 多级、PRISM 消重叠</td></tr>
+              <tr><td><strong>Eclipse ELK</strong>（<code>elk.alg.layered</code>）</td><td>Java</td><td><strong>当代最完整的分层实现</strong>：processor 依赖体系、端口约束、分组、from-sketch。强烈推荐通读其 processor 列表</td></tr>
+              <tr><td><strong>OGDF</strong></td><td>C++</td><td>平面化、TSM、FMMM、SPQR-tree；学术算法最全</td></tr>
+              <tr><td><strong>adaptagrams</strong>（libavoid / libcola / libvpsc）</td><td>C++</td><td>正交路由、VPSC、IPSEP-COLA 的参考实现</td></tr>
+              <tr><td><strong>WebCola</strong></td><td>TS</td><td>IPSEP-COLA 的可读实现</td></tr>
+              <tr><td><strong>d3-force / d3-hierarchy</strong></td><td>JS</td><td>FR 简化版；Buchheim 树、treemap、pack 的干净实现</td></tr>
+              <tr><td><strong>cytoscape.js + cose-bilkent</strong></td><td>JS</td><td>复合图力导向（CoSE）</td></tr>
+              <tr><td><strong>MSAGL</strong>（Microsoft Automatic Graph Layout）</td><td>C#</td><td>分层 + 有序捆绑路由；Nachmanson 的工作</td></tr>
+              <tr><td><strong>dagre</strong></td><td>JS</td><td>Gansner 1993 的简洁移植，代码量小，适合快速理解</td></tr>
+              <tr><td><strong>mermaid / plantuml</strong></td><td>JS/Java</td><td>产品级 DSL→图的完整链路（可对照本项目定位）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout info">
+          <div class="ct-title"><span class="icon">ℹ</span>阅读建议</div>
+          <p>先读 <code>dagre</code>（小、全）→ 再读 <code>Graphviz dotgen</code>（经典、细）→ 再读 <code>ELK layered</code>（最全、工程化）。正交路由直接读 <code>libavoid</code>。VPSC 读 <code>libvpsc</code>（只几百行）。</p>
+        </div>
+
+        <!-- ============ §14 ============ -->
+        <h2 id="sec-15"><span class="h2-num">14</span>行业规范（做行业图种时的"需求文档"）</h2>
+
+        <ul class="bib-list">
+          <li>
+            <strong>BPMN 2.0 规范</strong>（OMG）
+            <span class="annot">含 BPMN DI（Diagram Interchange）—— 定义了图形约定与坐标交换格式。</span>
+          </li>
+          <li>
+            <strong>UML 2.x 规范</strong>（OMG）+ <strong>UML Diagram Interchange</strong>
+            <span class="annot">UML 图的图形约定与交换格式。</span>
+          </li>
+          <li>
+            <strong>SBGN 规范</strong>（Process Description / Entity Relationship / Activity Flow 三册）
+            <span class="annot"><strong>图形约定最严格的范例</strong>，读它能理解"产品化到极致"是什么样。</span>
+          </li>
+          <li>
+            <strong>ArchiMate 规范</strong>（The Open Group）
+            <span class="annot">企业架构图的元模型与视觉约定。</span>
+          </li>
+          <li>
+            <strong>ISA-5.1</strong>（P&amp;ID 仪表符号）、<strong>IEC 60617</strong>（电气符号）
+            <span class="annot">工业仪表与电气图形符号标准。</span>
+          </li>
+          <li>
+            <strong>C4 Model</strong>（Simon Brown）
+            <span class="annot">软件架构图的分层叙事约定，对架构图种的信息组织很有参考价值。</span>
+          </li>
+        </ul>
+
+        <!-- ============ §15 ============ -->
+        <h2 id="sec-16"><span class="h2-num">15</span>阅读优先级（如果时间只够读 10 篇）</h2>
+
+        <ol>
+          <li>Gansner et al. 1993（dot）★★★</li>
+          <li>Brandes–Köpf 2002 + 2020 勘误 ★★★</li>
+          <li>Wybrow et al. 2010（正交路由）★★★</li>
+          <li>Schulze et al. 2014（端口约束）★★</li>
+          <li>Forster 2002（分组交叉最小化）★★</li>
+          <li>Dwyer–Marriott–Stuckey 2006（VPSC）★★</li>
+          <li>Zheng et al. 2018（SGD stress）★★</li>
+          <li>Buchheim et al. 2002（线性时间树）★★</li>
+          <li>Kakoulis–Tollis 2001（标签）★</li>
+          <li>Purchase 1997 + Huang 2008（度量与美学实证）★</li>
+        </ol>
+
+        <p>配合两本参考：Handbook of Graph Drawing（查阅）+ ELK <code>elk.alg.layered</code> 源码（对照）。</p>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>若还能多读三篇（针对本项目的具体短板）</div>
+          <ol>
+            <li><strong>McMurchie–Ebeling 1995</strong>（history cost + 拆线重布）——拥塞消解的正确机制，直接取代"加特判"。</li>
+            <li><strong>Yoshimura–Kuh 1982</strong>（通道布线）——层间路由的四十年前完成品。</li>
+            <li><strong>Heer–Robertson 2007</strong>（分阶段过渡）——动画与增量布局的可用性前提。</li>
+          </ol>
+        </div>
+
+      </div>
+
+      <div class="foot">
+        本文为 <a href="../12-论文书目.md">12-论文书目.md</a> 的 HTML 图文版。
+        配套：<a href="00-索引与阅读指南.html">索引</a> ·
+        <a href="../21-术语表.html">术语表图解</a> ·
+        <a href="../../../../design/layout/write-authority.md">写权纪律</a>
+      </div>
+
+    </article>
+  </div>
+</div>
+
+<script src="_assets/nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

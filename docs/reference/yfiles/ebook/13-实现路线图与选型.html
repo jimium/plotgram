@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>13 · 实现路线图与选型 — yFiles 参考文库 ebook</title>
+<link rel="stylesheet" href="_assets/style.css">
+<!-- highlight.js 主题（浅色 + 暗色） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+  /* 代码块在浅/暗色下都可用；highlight.js 主题负责 token 颜色，本 CSS 负责容器 */
+  pre code.hljs { background: transparent; padding: 0; border: none; font-size: 13px; }
+  pre code.hljs .comment { font-style: italic; }
+</style>
+</head>
+<body data-page="13">
+
+<div class="layout">
+  <div class="content">
+    <article>
+
+      <h1>13 · 实现路线图与选型（Roadmap &amp; Selection）</h1>
+      <p class="subtitle">本篇是前 12 篇的收敛：<strong>如果现在从零开始做 plotgram 的布局层，具体该做什么、按什么顺序、每步怎么验收。</strong> 所有选型都给出"为什么不选另一个"，避免后续反复。</p>
+
+      <div class="meta-bar">
+        <span class="pill">工程</span>
+        <span>来源：plotgram 布局层重建路线图（基于 01–12 篇收敛 + AGENTS.md 红线）</span>
+        <span class="src">~196 行 · 9.5k 字</span>
+      </div>
+
+      <div class="prose">
+
+        <!-- ============ §1 ============ -->
+        <h2 id="sec-1"><span class="h2-num">1</span>一页选型表（决策已定，不再讨论）</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>子问题</th><th>选型</th><th>为什么不选替代方案</th></tr></thead>
+            <tbody>
+              <tr><td>主图种骨架</td><td><strong>Sugiyama 分层</strong>（01 篇）</td><td>TSM 正交（02）丢失流向语义、实现重；organic 无法表达层级</td></tr>
+              <tr><td>去环</td><td><strong>Greedy-FAS</strong>（Eades–Lin–Smyth）</td><td>DFS 反向质量差；精确 MFAS 是 NP 难</td></tr>
+              <tr><td>分层</td><td><strong>Network Simplex</strong>（最小加权跨度）</td><td>longest-path 太扁、dummy 多；Coffman–Graham 只在限宽场景优</td></tr>
+              <tr><td>层内定序</td><td><strong>median sweep + transpose + best snapshot + 边权 1/2/8</strong></td><td>纯 barycenter 质量差一档；ILP 不实用；sifting 可作后续增强</td></tr>
+              <tr><td>交叉计数</td><td><strong>Barth–Jünger–Mutzel 累加树</strong> <span class="katex-inline" data-tex="O(E\log V)"></span></td><td>朴素 <span class="katex-inline" data-tex="O(E^2)"></span> 在宽层上是热点</td></tr>
+              <tr><td>次轴坐标</td><td><strong>Brandes–Köpf</strong>（含 2020 勘误）起步，约束变多后换 <strong>VPSC</strong></td><td>dot 的 network-simplex-x 慢；priority 法质量差</td></tr>
+              <tr><td>通用约束求解</td><td><strong>VPSC</strong>（Dwyer–Marriott–Stuckey）</td><td>通用 QP 求解器过重；手写贪心必然长出特判</td></tr>
+              <tr><td>边路由（分层图）</td><td><strong>通道图 + A*(带方向状态) + 区间着色 track + VPSC nudging</strong></td><td>OVG 在规则布局上是浪费；网格法有假阻塞</td></tr>
+              <tr><td>边路由（自由/拖动后）</td><td><strong>OVG（扫描线构造）+ 同上下游</strong></td><td>通道图不适用于任意位置</td></tr>
+              <tr><td>树图种</td><td><strong>Buchheim–Jünger–Leipert</strong></td><td>朴素 RT 是 <span class="katex-inline" data-tex="O(n^2)"></span></td></tr>
+              <tr><td>organic 图种</td><td><strong>PivotMDS 初值 → SGD stress → PRISM 消重叠 → 装箱</strong></td><td>FR 需退火调参、不确定；SMACOF 慢于 SGD</td></tr>
+              <tr><td>标签</td><td><strong>空间预留（label dummy / 间距计入）+ 末尾 greedy labeling</strong></td><td>纯事后标注必然重叠</td></tr>
+              <tr><td>端口</td><td><strong>五档模型</strong>（FREE/FIXED_SIDE/FIXED_ORDER/FIXED_RATIO/FIXED_POS），默认 FREE+按对侧序分配</td><td>路由阶段发明端口 = 不可修复的绕行</td></tr>
+              <tr><td>分组/泳道</td><td><strong>边界 dummy + 受约束排序（PAV 投影）+ 组框作为 VPSC 变量</strong></td><td>递归布局丢跨组边；事后调包围盒会重叠</td></tr>
+              <tr><td>四方向</td><td><strong>Orientation Stage 坐标变换</strong>，核心只实现 TB</td><td>四套代码不可维护</td></tr>
+              <tr><td>引擎结构</td><td><strong>Stage 装饰器链 + 强类型 LayoutData + Writer 类型化写权</strong></td><td>平铺管线容易漏还原；字符串 KEY 的 DataProvider 易错</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 图解：选型决策树 -->
+        <figure>
+          <svg viewBox="0 0 720 260" aria-label="图种到算法族的选型决策树">
+            <!-- 根节点 -->
+            <rect class="highlight-bg" x="300" y="20" width="120" height="34" rx="6"/>
+            <text x="360" y="42" text-anchor="middle" class="label">图的形态？</text>
+
+            <!-- 4 条分支线 -->
+            <path class="edge" d="M360,54 L120,90"/>
+            <path class="edge" d="M360,54 L280,90"/>
+            <path class="edge" d="M360,54 L440,90"/>
+            <path class="edge" d="M360,54 L600,90"/>
+
+            <!-- 分支标签 -->
+            <text x="200" y="76" class="muted" font-size="10">有向 / 分层</text>
+            <text x="330" y="76" class="muted" font-size="10">树形</text>
+            <text x="492" y="76" class="muted" font-size="10">网状</text>
+            <text x="610" y="76" class="muted" font-size="10">自由布局</text>
+
+            <!-- 4 个叶子 -->
+            <rect class="node" x="60" y="90" width="120" height="42" rx="4"/>
+            <text x="120" y="110" text-anchor="middle" class="label" font-size="11">Sugiyama 5 相</text>
+            <text x="120" y="124" text-anchor="middle" class="muted" font-size="9">01 篇 · 主路径</text>
+
+            <rect class="node" x="220" y="90" width="120" height="42" rx="4"/>
+            <text x="280" y="110" text-anchor="middle" class="label" font-size="11">Buchheim</text>
+            <text x="280" y="124" text-anchor="middle" class="muted" font-size="9">05 篇 · 树</text>
+
+            <rect class="node" x="380" y="90" width="120" height="42" rx="4"/>
+            <text x="440" y="110" text-anchor="middle" class="label" font-size="11">PivotMDS→SGD→PRISM</text>
+            <text x="440" y="124" text-anchor="middle" class="muted" font-size="9">04 篇 · organic</text>
+
+            <rect class="node" x="540" y="90" width="120" height="42" rx="4"/>
+            <text x="600" y="110" text-anchor="middle" class="label" font-size="11">OVG 路由</text>
+            <text x="600" y="124" text-anchor="middle" class="muted" font-size="9">03 篇 · 自由位置</text>
+
+            <!-- Sugiyama 子分支：分层图边路由 -->
+            <path class="edge-muted" d="M120,132 L120,162"/>
+            <rect class="node-muted" x="20" y="162" width="200" height="48" rx="4"/>
+            <text x="120" y="180" text-anchor="middle" font-size="10.5">边路由：通道图 + A* +</text>
+            <text x="120" y="196" text-anchor="middle" font-size="10.5">区间着色 track + VPSC nudging</text>
+
+            <!-- OVG 子分支：自由位置边路由 -->
+            <path class="edge-muted" d="M600,132 L600,162"/>
+            <rect class="node-muted" x="500" y="162" width="200" height="48" rx="4"/>
+            <text x="600" y="180" text-anchor="middle" font-size="10.5">扫描线构造 OVG +</text>
+            <text x="600" y="196" text-anchor="middle" font-size="10.5">同上下游 channel</text>
+
+            <!-- 底部注释 -->
+            <text x="360" y="240" text-anchor="middle" class="hi" font-size="10">⚠ 引擎不按图种分支；图种差异全部走 profile → 参数（ADR-001）</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 13.1</span>选型决策树：按图种选算法族，引擎核心不分图种</div>
+        </figure>
+
+        <!-- ============ §2 ============ -->
+        <h2 id="sec-2"><span class="h2-num">2</span>分阶段路线图</h2>
+
+        <p>每个阶段给出：交付物、验收标准（可自动检查）、预期难点。</p>
+
+        <!-- 图解：M0–M6 里程碑时间线 -->
+        <figure>
+          <svg viewBox="0 0 760 255" aria-label="M0–M6 里程碑时间线">
+            <!-- 度量先行标注 -->
+            <text x="140" y="18" class="hi" font-size="10.5">↓ 度量模块（§5 第 10 项）须先于一切落地</text>
+
+            <!-- 时间轴 -->
+            <line class="axis" x1="140" y1="225" x2="740" y2="225"/>
+            <text x="140" y="243" class="muted" font-size="10">阶段起点</text>
+            <text x="740" y="243" text-anchor="end" class="muted" font-size="10">交付完整能力</text>
+
+            <!-- M0 -->
+            <rect class="highlight-bg" x="140" y="30" width="70" height="22" rx="4"/>
+            <text x="10" y="46" class="label">M0 地基</text>
+            <text x="175" y="46" text-anchor="middle" font-size="10">VPSC · Writer</text>
+
+            <!-- M1 -->
+            <rect class="node" x="210" y="58" width="120" height="22" rx="4"/>
+            <text x="10" y="74" class="label">M1 分层主路径</text>
+            <text x="270" y="74" text-anchor="middle" font-size="10">P1–P5 · BK · 长边链</text>
+
+            <!-- M2 -->
+            <rect class="node" x="330" y="86" width="90" height="22" rx="4"/>
+            <text x="10" y="102" class="label">M2 正交路由</text>
+            <text x="375" y="102" text-anchor="middle" font-size="10">通道图 · A* · track</text>
+
+            <!-- M3 -->
+            <rect class="node" x="420" y="114" width="90" height="22" rx="4"/>
+            <text x="10" y="130" class="label">M3 端口与标签</text>
+            <text x="465" y="130" text-anchor="middle" font-size="10">五档端口 · label dummy</text>
+
+            <!-- M4 -->
+            <rect class="node" x="510" y="142" width="90" height="22" rx="4"/>
+            <text x="10" y="158" class="label">M4 分组与泳道</text>
+            <text x="555" y="158" text-anchor="middle" font-size="10">边界 dummy · PAV</text>
+
+            <!-- M5 -->
+            <rect class="node" x="600" y="170" width="80" height="22" rx="4"/>
+            <text x="10" y="186" class="label">M5 其它图种</text>
+            <text x="640" y="186" text-anchor="middle" font-size="10">Buchheim · PRISM</text>
+
+            <!-- M6 -->
+            <rect class="node" x="680" y="198" width="60" height="22" rx="4"/>
+            <text x="10" y="214" class="label">M6 交互稳定性</text>
+            <text x="710" y="214" text-anchor="middle" font-size="10">增量 · hysteresis</text>
+
+            <!-- 依赖箭头 -->
+            <defs>
+              <marker id="arr13d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+            </defs>
+            <path class="edge-muted" d="M210,41 L210,58" marker-end="url(#arr13d)"/>
+            <path class="edge-muted" d="M330,69 L330,86" marker-end="url(#arr13d)"/>
+            <path class="edge-muted" d="M420,97 L420,114" marker-end="url(#arr13d)"/>
+            <path class="edge-muted" d="M510,125 L510,142" marker-end="url(#arr13d)"/>
+            <path class="edge-muted" d="M600,153 L600,170" marker-end="url(#arr13d)"/>
+            <path class="edge-muted" d="M680,181 L680,198" marker-end="url(#arr13d)"/>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 13.2</span>M0–M6 里程碑：每阶段交付一个可验收的能力切片，度量模块须最先落地</div>
+        </figure>
+
+        <h3>M0 · 地基（无算法）</h3>
+        <p><strong>交付</strong></p>
+        <ul>
+          <li><code>LayoutGraph</code> 纯几何模型（IndexMap 存储，稳定 ID）；</li>
+          <li>Writer 类型（<code>LayerWriter</code> / <code>OrderWriter</code> / <code>CoordWriter</code> / <code>RouteWriter</code>），每个自由度一个；</li>
+          <li>Stage 装饰器 trait + 流水线构建器；</li>
+          <li>诊断输出结构（分相耗时、指标、门控命中、约束报告）；</li>
+          <li><strong>VPSC 求解器</strong>（约 300–500 行，含 block merge/split、不可行检测）；</li>
+          <li>度量模块：交叉数（Bentley–Ottmann）、重叠检测（扫描线）、弯折统计。</li>
+        </ul>
+        <p><strong>验收</strong></p>
+        <ul>
+          <li>VPSC 单元测试：随机约束集，断言 (a) 所有约束满足，(b) 目标值 ≤ 任意可行解（对小实例枚举验证）；</li>
+          <li>度量模块对手工构造图给出已知正确值；</li>
+          <li>同一输入连跑两次，<code>LayoutGraph</code> JSON 完全一致。</li>
+        </ul>
+        <p><strong>难点</strong>：Writer 改造要一次做对，后期补很痛。VPSC 的 split（负乘子）容易漏，漏了会在"约束冗余"场景给出次优解。</p>
+
+        <h3>M1 · 分层主路径（能出图）</h3>
+        <p><strong>交付</strong>：P1 Greedy-FAS → P2 Network Simplex → 长边 dummy 化 → P3 median+transpose(+边权 1/2/8, best snapshot) → P4 Brandes–Köpf → P5 dummy 链还原为折线。Orientation Stage、自环 stage、平行边 stage、分量 stage + 行装箱、NormalizeCoordinates。</p>
+        <p><strong>验收</strong></p>
+        <ul>
+          <li>硬断言：节点无重叠、边不穿节点、确定性双跑一致；</li>
+          <li>软指标基线：在 AT&amp;T DAG 集（或自建 DAG 集）上记录 crossings / bends / edge_len / area / dummy 数；</li>
+          <li>长边直线率 &gt; 90%（BK 应该做到）；</li>
+          <li>微型手工集的坐标 insta 快照。</li>
+        </ul>
+        <p><strong>难点</strong></p>
+        <ol>
+          <li>Network Simplex 的 cut value 增量维护（lim/low 区间）容易写错 → 用"全量重算 cut value"版本先跑通，再优化；</li>
+          <li>Brandes–Köpf 的 type-1 conflict 标记与 compaction，<strong>务必对照 2020 勘误</strong>；</li>
+          <li>dummy 数爆炸：先加"长边链"抽象，别让 P3 每层独立处理。</li>
+        </ol>
+
+        <h3>M2 · 正交路由（决定观感）</h3>
+        <p><strong>交付</strong>：通道图构造（层间/层内空隙）→ A*(状态含方向) → 区间着色 track 分配 → VPSC nudging（端口对齐 + 最小段长 + 标签避让）→ 圆角/箭头装饰。走廊 demand 回写层间距。</p>
+        <p><strong>验收</strong></p>
+        <ul>
+          <li>硬断言：无边穿节点、无两条边完全重合、圆角段长足够；</li>
+          <li>指标：总弯折数、<code>&lt;30°</code> 交叉占比（正交图应≈0）、总曼哈顿长度；</li>
+          <li>门控：边数超阈值时降级并在诊断中报告。</li>
+        </ul>
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>M2 实现难点</div>
+          <ol>
+            <li>A* 状态忘记含方向 → 弯折惩罚失效（<strong>最常见 bug</strong>）；</li>
+            <li>走廊 demand 回写必须是"参数回写"而非"路由阶段挪节点"，否则打破写权；</li>
+            <li>反向对边重合：根因在端口分配而非路由（见 03 篇 §7 表）。</li>
+          </ol>
+        </div>
+
+        <h3>M3 · 端口与标签（专业度分水岭）</h3>
+        <p><strong>交付</strong>：端口五档模型落 IR + DSL；FREE 端口的"按对侧 x 排序 + 均匀分布"；端口数回写节点最小尺寸；FIXED_ORDER 的端口 dummy 参与定序；label dummy（边标签）+ 节点标签计入有效包围盒 + 末尾 greedy labeling。文本测量（真实字体度量 + CJK 断行）。</p>
+        <p><strong>验收</strong></p>
+        <ul>
+          <li>端口序与邻居序一致性断言（不产生"凭空交叉"）；</li>
+          <li>标签重叠面积 = 0；标签压边长度指标；</li>
+          <li>中英混排标签的尺寸跨平台一致（WASM 与原生一致）。</li>
+        </ul>
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>M3 难点：文本测量常被低估</div>
+          <p>文本测量的工作量常被低估（字体加载、kerning、CJK 断行、WASM 字体分发）。建议尽早做，因为它是节点尺寸的输入，<strong>影响一切</strong>。</p>
+        </div>
+
+        <h3>M4 · 分组与泳道（结构表达力）</h3>
+        <p><strong>交付</strong>：包含树模型；组边界 dummy + 受约束排序（PAV 投影）；组框作为 VPSC 变量（含 padding、标题高度、组间距）；跨组边的边界穿越点；PartitionGrid（行=层区间、列=层内分段）；组折叠/展开 + 布局缓存。</p>
+        <p><strong>验收</strong></p>
+        <ul>
+          <li>约束满足断言：组内节点确在组框内、组框互不重叠、泳道内节点确在列区间内、层跨泳道全局一致；</li>
+          <li>嵌套 3 层以上的 case 无重叠；</li>
+          <li>折叠→展开→折叠的布局稳定（位移 ≈ 0）。</li>
+        </ul>
+        <p><strong>难点</strong>：组与泳道要复用同一套"层内连续块"机制，否则两套逻辑会互相冲突。约束冲突的优先级与降级必须显式（08 篇 §4）。</p>
+
+        <h3>M5 · 树 / organic / 其它图种</h3>
+        <p><strong>交付</strong>：Buchheim 树 + NodePlacer 策略集（centered/bus/double-line/dendrogram）；TreeReductionStage；Radial（角需求自底向上传播）；Balloon；PivotMDS + SGD stress + PRISM + 装箱；circular（谱序 + BCC 树）。</p>
+        <p><strong>验收</strong>：各图种硬断言 + 各自的专属指标（树：宽度/对称；organic：stress 值单调下降、消重叠后重叠=0）。</p>
+
+        <h3>M6 · 交互与稳定性</h3>
+        <p><strong>交付</strong>：from-sketch（由当前坐标反推层与序）；PartialLayout（fixed/partial）；增量路由（依赖索引 + hysteresis）；FixNode 锚定；稳定性指标（位移、正交序违反率、k-NN 保持）。</p>
+        <p><strong>验收</strong>：拖一个节点后，未受影响区域位移 = 0；正交序违反率低于阈值；重路由只涉及受影响边（可断言重路由边数）。</p>
+
+        <!-- ============ §3 ============ -->
+        <h2 id="sec-3"><span class="h2-num">3</span>贯穿全程的三条纪律（对应 AGENTS.md）</h2>
+
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>三条硬纪律（与 AGENTS.md 一致）</div>
+          <ol>
+            <li><strong>每个自由度一个写者</strong>：用 Writer 类型强制。新增机制前先回答"这个自由度的写者是谁"。</li>
+            <li><strong>下游只展开、不推翻</strong>：唯一允许的反向影响是<strong>参数回写</strong>（走廊 demand → 层间距；端口数 → 节点尺寸；标签尺寸 → 间距），且必须发生在上游相执行<strong>之前</strong>。</li>
+            <li><strong>不按图种分支</strong>：图种差异全部走 profile → 参数。看到 <code>if diagram_type ==</code> 就是设计出问题了。</li>
+          </ol>
+        </div>
+
+        <p><strong>自检清单</strong>（每次修 bug 前问自己）：</p>
+        <ul>
+          <li>这个症状是"上游决策错"还是"下游落笔错"？</li>
+          <li>我的修法是"加特判"还是"把自由度上提"？</li>
+          <li>这个修法在别的图种上会不会反噬（基准分图种报告能否证明）？</li>
+        </ul>
+
+        <!-- ============ §4 ============ -->
+        <h2 id="sec-4"><span class="h2-num">4</span>反模式清单（历史上反复出现的坑）</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>反模式</th><th>后果</th><th>正解</th></tr></thead>
+            <tbody>
+              <tr><td>路由阶段发现重叠就挪节点</td><td>交叉数/序失效，改一处坏两处</td><td>走廊 demand 回写层间距</td></tr>
+              <tr><td>事后调整组框包围盒</td><td>组框互相重叠或把边挤出去</td><td>组框边界作为 VPSC 变量</td></tr>
+              <tr><td>用 HashMap 迭代驱动算法</td><td>同输入不同输出，不可调试</td><td>IndexMap/BTreeMap + 稳定 tie-break</td></tr>
+              <tr><td>标签事后避让</td><td>必然重叠或飘远</td><td>空间预留（label dummy）</td></tr>
+              <tr><td>四方向写四套代码</td><td>特性只在一个方向可用</td><td>Orientation Stage</td></tr>
+              <tr><td>路由阶段临时发明端口</td><td>无法修复的绕行与交叉</td><td>端口分配上提为独立相</td></tr>
+              <tr><td>只看总指标平均值</td><td>一个图种改善掩盖另一个退化</td><td>分图种报告 + top-N 退化榜</td></tr>
+              <tr><td>用 <code>--release</code> 之外的构建测性能 / 信旧 binary</td><td>结论错误</td><td>按 AGENTS.md 的验真纪律</td></tr>
+              <tr><td>在会进 WASM 的代码里用 <code>Instant</code></td><td>WASM panic / 非确定</td><td>项目 perf 抽象</td></tr>
+              <tr><td>一次改多个相然后跑基准</td><td>无法归因</td><td>一次只改一个机制</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 图解：反模式 vs 正解 -->
+        <figure>
+          <svg viewBox="0 0 720 230" aria-label="反模式与正解对比">
+            <!-- 列标题 -->
+            <rect class="highlight-bg" x="20" y="14" width="300" height="26" rx="4"/>
+            <text x="170" y="32" text-anchor="middle" class="hi" font-size="12" font-weight="600">反模式（下游推翻上游）</text>
+            <rect x="400" y="14" width="300" height="26" rx="4" style="fill: var(--good-soft); stroke: var(--good); stroke-width: 1.2;"/>
+            <text x="550" y="32" text-anchor="middle" class="label" font-size="12" font-weight="600" style="fill: var(--good);">正解（上提写者 / 参数回写）</text>
+
+            <!-- 行 1 -->
+            <rect class="highlight-bg" x="20" y="50" width="300" height="32" rx="4"/>
+            <text x="170" y="70" text-anchor="middle" font-size="11">路由阶段发现重叠就挪节点</text>
+            <rect x="400" y="50" width="300" height="32" rx="4" style="fill: var(--good-soft); stroke: var(--good); stroke-width: 1;"/>
+            <text x="550" y="70" text-anchor="middle" font-size="11">走廊 demand 回写层间距</text>
+            <path d="M325,66 L395,66" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#arr13m)"/>
+
+            <!-- 行 2 -->
+            <rect class="highlight-bg" x="20" y="88" width="300" height="32" rx="4"/>
+            <text x="170" y="108" text-anchor="middle" font-size="11">事后调整组框包围盒</text>
+            <rect x="400" y="88" width="300" height="32" rx="4" style="fill: var(--good-soft); stroke: var(--good); stroke-width: 1;"/>
+            <text x="550" y="108" text-anchor="middle" font-size="11">组框作为 VPSC 变量</text>
+            <path d="M325,104 L395,104" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#arr13m)"/>
+
+            <!-- 行 3 -->
+            <rect class="highlight-bg" x="20" y="126" width="300" height="32" rx="4"/>
+            <text x="170" y="146" text-anchor="middle" font-size="11">HashMap 迭代驱动算法</text>
+            <rect x="400" y="126" width="300" height="32" rx="4" style="fill: var(--good-soft); stroke: var(--good); stroke-width: 1;"/>
+            <text x="550" y="146" text-anchor="middle" font-size="11">IndexMap + 稳定 tie-break</text>
+            <path d="M325,142 L395,142" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#arr13m)"/>
+
+            <!-- 行 4 -->
+            <rect class="highlight-bg" x="20" y="164" width="300" height="32" rx="4"/>
+            <text x="170" y="184" text-anchor="middle" font-size="11">路由阶段临时发明端口</text>
+            <rect x="400" y="164" width="300" height="32" rx="4" style="fill: var(--good-soft); stroke: var(--good); stroke-width: 1;"/>
+            <text x="550" y="184" text-anchor="middle" font-size="11">端口分配上提为独立相</text>
+            <path d="M325,180 L395,180" stroke="var(--muted)" stroke-width="1.4" marker-end="url(#arr13m)"/>
+
+            <defs>
+              <marker id="arr13m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+            </defs>
+
+            <text x="360" y="218" text-anchor="middle" class="muted" font-size="10">共同根因：下游试图推翻上游 → 必须改为参数回写或上提写者</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 13.3</span>四组反模式 → 正解：根因都在"下游推翻上游"</div>
+        </figure>
+
+        <!-- ============ §5 ============ -->
+        <h2 id="sec-5"><span class="h2-num">5</span>投入产出比排序（如果资源有限）</h2>
+
+        <p>按"每单位工作量的观感/能力提升"排序：</p>
+        <ol>
+          <li><strong>P3 的边权 1/2/8 + best snapshot</strong>（几十行）——立刻让长边变直、图变整齐。</li>
+          <li><strong>Orientation Stage</strong>（一百多行）——一次拿到四个方向。</li>
+          <li><strong>VPSC</strong>（几百行）——服务五处需求（间距、消重叠、nudging、紧致化、组框）。</li>
+          <li><strong>端口按对侧序排序分配</strong>（几十行）——消除大量"凭空交叉"。</li>
+          <li><strong>label dummy 预留标签空间</strong>（几十行）——彻底解决标签重叠。</li>
+          <li><strong>走廊 demand 回写层间距</strong>（上百行）——解决"边挤在一起/穿节点"。</li>
+          <li><strong>层次边捆绑</strong>（约五十行）——大边数图的可读性质变。</li>
+          <li><strong>substructure detection（星/链/环）</strong>（数百行）——organic 图种观感质变。</li>
+          <li><strong>from-sketch</strong>（上百行）——交互场景的用户价值极高。</li>
+          <li><strong>分图种基准报告</strong>（脚本层）——让上述每一项的收益可证明。</li>
+        </ol>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>建议顺序</div>
+          <p>先做第 10 项（度量），再按 1–6 依次做，每做一项跑一次基准并记录。这样每一步都有证据，也不会互相掩盖。</p>
+        </div>
+
+        <!-- ============ §6 ============ -->
+        <h2 id="sec-6"><span class="h2-num">6</span>延伸篇目（14–20）与本路线图的对应</h2>
+
+        <p>本篇成稿后补充的 7 篇，把上面每个阶段的"怎么做"落到更细：</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>阶段</th><th>配套篇目</th><th>直接用得上的内容</th></tr></thead>
+            <tbody>
+              <tr><td>M0 地基</td><td><a href="14-图论与优化工具箱.md">14 · 零件库</a></td><td>Network Simplex / VPSC / 扫描线 / 区间着色 / Fenwick 的实现要点与"自研 or 不做"决策表</td></tr>
+              <tr><td>M0 地基</td><td><a href="20-图种profile与参数映射.md">20 · 参数映射</a></td><td>参数域设计三准则、四层覆盖、<strong>DemandBoard 回写机制</strong>、ADR-001 的 CI 守卫</td></tr>
+              <tr><td>M1/M2</td><td><a href="16-大图性能与wasm.md">16 · 性能与 WASM</a></td><td>复杂度预算表（<strong>优化只有 P3 与路由两个真目标</strong>）、L0–L7 降级阶梯、WASM 红线</td></tr>
+              <tr><td>M2 路由</td><td><a href="18-超图总线与eda路由.md">18 · 超图与 EDA</a></td><td><strong>层间路由 = 通道布线</strong>、全局/详细两段式、history cost + 拆线重布、总线主干 = 加权中位数</td></tr>
+              <tr><td>M2/M3 落笔</td><td><a href="15-几何与落笔层.md">15 · 落笔层</a></td><td>形状裁剪、规范化六步流水线、圆角降半径、箭头族、退化清单、量化与确定性</td></tr>
+              <tr><td>M5 图种</td><td><a href="19-序列图与一维排列.md">19 · 序列图与一维排列</a></td><td>一维排列器（MinLA，服务生命线/泳道/组内序）、主轴分层、区间嵌套器</td></tr>
+              <tr><td>M6 交互</td><td><a href="17-动画过渡与视图.md">17 · 动画与视图</a></td><td>分阶段过渡、边形变的三种策略、hysteresis 折扣、zoom-to-cursor、命中测试</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>对 §5 投入产出比排序的两处补充</h3>
+        <p>读完 14–20 后，有两项应插进前列：</p>
+        <ul>
+          <li><strong>插在第 3 位之后：一维排列器（约 200 行）</strong> —— 一份实现服务生命线排序、泳道排序、组内排序、circular 排序四处（19 篇 §7.1）。</li>
+          <li><strong>插在第 6 位（走廊 demand 回写）之后：history cost + 拆线重布（约 150 行）</strong> —— 它是"某处走廊挤爆"的<strong>正确</strong>解法，取代反模式清单里的"给某条边加特判"（18 篇 §5.3）。</li>
+        </ul>
+
+        <h3>一个建议尽早做的一次性投入</h3>
+        <p><a href="20-图种profile与参数映射.md">20 篇 §6 检验 1</a> 的"新图种落地测试"：拿 BPMN 与甘特图，只用参数表达它们，把填不出来的格列成参数域 TODO。成本约半天，收益是<strong>提前知道参数域的空洞在哪</strong>，避免 M3/M4 做到一半才发现要重构参数结构。</p>
+
+      </div>
+
+      <div class="foot">
+        本文为 <a href="../13-实现路线图与选型.md">13-实现路线图与选型.md</a> 的 HTML 图文版。
+        配套：<a href="00-索引与阅读指南.html">索引</a> ·
+        <a href="../21-术语表.html">术语表图解</a> ·
+        <a href="../../../../design/layout/write-authority.md">写权纪律</a>
+      </div>
+
+    </article>
+  </div>
+</div>
+
+<script src="_assets/nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

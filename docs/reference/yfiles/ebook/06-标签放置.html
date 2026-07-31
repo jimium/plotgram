@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>06 · 标签放置 — yFiles 参考文库 ebook</title>
+<link rel="stylesheet" href="_assets/style.css">
+<!-- highlight.js 主题（浅色 + 暗色） -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<style>
+  /* 代码块在浅/暗色下都可用；highlight.js 主题负责 token 颜色，本 CSS 负责容器 */
+  pre code.hljs { background: transparent; padding: 0; border: none; font-size: 13px; }
+  pre code.hljs .comment { font-style: italic; }
+</style>
+</head>
+<body data-page="06">
+
+<div class="layout">
+  <div class="content">
+    <article>
+
+      <h1>06 · 标签放置（Label Placement）</h1>
+      <p class="subtitle">对应 yFiles <code>GenericLabeling</code> / <code>LabelingBase</code> / 各布局内置的 <code>LabelLayoutData</code>（PreferredPlacement）</p>
+
+      <div class="meta-bar">
+        <span class="pill">核心算法</span>
+        <span>主线论文：Formann–Wagner 1991（点标注 NP 难 + 2-近似）、Wagner–Wolff 1997（实用启发式）、Kakoulis–Tollis 1997/2001/2003（图标注通用框架，<strong>本篇主干</strong>）、Klau–Mutzel 2003（ILP 精确解）、Christensen–Marks–Shieber 1995（模拟退火，实证对比）</span>
+        <span class="src">~176 行 · 5.8k 字</span>
+      </div>
+
+      <div class="prose">
+
+        <p>标签是“图看不看得懂”的核心，却常被当成渲染层的事后补丁。<strong>正确做法：标签需求参与布局，标签位置由独立求解相决定。</strong></p>
+
+        <!-- ============ §1 ============ -->
+        <h2 id="sec-1"><span class="h2-num">1</span>问题模型</h2>
+
+        <h3>1.1 三类标签</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>类型</th><th>自由度</th><th>候选空间</th></tr></thead>
+            <tbody>
+              <tr><td><strong>节点标签</strong></td><td>内部（居中/上/下…）或外部（8 方位 + 自由）</td><td>离散 8–9 位；或连续（节点周边）</td></tr>
+              <tr><td><strong>边标签</strong></td><td>沿边的位置 <span class="katex-inline" data-tex="t\in[0,1]"></span> + 侧偏（左/右/居中）+ 距离</td><td>连续 slider 或离散候选点</td></tr>
+              <tr><td><strong>端口/端点标签</strong></td><td>靠近某端点的小范围</td><td>离散小集合</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>1.2 硬/软约束</h3>
+        <ul>
+          <li><strong>硬</strong>：标签矩形之间不重叠；标签不压节点；标签不压边（可放宽为“惩罚”）。</li>
+          <li><strong>软</strong>：标签靠近其宿主（距离最小）；符合偏好方位（PreferredPlacement）；同类标签风格一致（都在边上方）。</li>
+        </ul>
+
+        <h3>1.3 复杂度</h3>
+        <ul>
+          <li><strong>点特征标注（4-position model）判定可行性即 NP 完全</strong>（Formann–Wagner 1991）；</li>
+          <li>最大化“能放下的标签数”是 NP 难，最大化“统一缩放因子”有 2-近似且 <span class="katex-inline" data-tex="(2-\epsilon)"></span> 不可近似；</li>
+          <li>边标注同样 NP 难（Kakoulis–Tollis）。</li>
+        </ul>
+        <div class="callout note">
+          <div class="ct-title"><span class="icon">▸</span>结论</div>
+          <p>⇒ <strong>一律启发式 + 可选 ILP 精确小实例。</strong></p>
+        </div>
+
+        <!-- ============ §2 ============ -->
+        <h2 id="sec-2"><span class="h2-num">2</span>候选位置生成（Candidate Generation）</h2>
+
+        <p>好的候选集比好的求解器更重要。</p>
+
+        <h3>2.1 节点标签</h3>
+        <ul>
+          <li><strong>离散 8/9 位</strong>：N, NE, E, SE, S, SW, W, NW, Center（各带 offset）。工业默认。</li>
+          <li><strong>加密候选</strong>：每边中点 + 两端 → 12–16 位，质量提升明显，成本线性。</li>
+          <li><strong>连续</strong>：沿节点边界滑动（slider model），求解转为区间问题。</li>
+        </ul>
+
+        <!-- 图解：节点标签位置模型 -->
+        <figure>
+          <svg viewBox="0 0 380 180" aria-label="节点标签位置模型：8 方位 + 中心 / slider">
+            <g transform="translate(20,30)">
+              <text x="80" y="0" text-anchor="middle" class="muted" font-size="10">离散 8/9 位（工业默认）</text>
+              <rect class="node" x="50" y="60" width="60" height="36" rx="4"/>
+              <text x="80" y="82" text-anchor="middle" font-size="10">node</text>
+              <rect class="node-muted" x="66" y="42" width="28" height="12" rx="2"/>
+              <text x="80" y="51" text-anchor="middle" class="muted" font-size="8">N</text>
+              <rect class="node-muted" x="116" y="42" width="28" height="12" rx="2"/>
+              <text x="130" y="51" text-anchor="middle" class="muted" font-size="8">NE</text>
+              <rect class="node-muted" x="116" y="72" width="28" height="12" rx="2"/>
+              <text x="130" y="81" text-anchor="middle" class="muted" font-size="8">E</text>
+              <rect class="node-muted" x="116" y="102" width="28" height="12" rx="2"/>
+              <text x="130" y="111" text-anchor="middle" class="muted" font-size="8">SE</text>
+              <rect class="node-muted" x="66" y="102" width="28" height="12" rx="2"/>
+              <text x="80" y="111" text-anchor="middle" class="muted" font-size="8">S</text>
+              <rect class="node-muted" x="16" y="102" width="28" height="12" rx="2"/>
+              <text x="30" y="111" text-anchor="middle" class="muted" font-size="8">SW</text>
+              <rect class="node-muted" x="16" y="72" width="28" height="12" rx="2"/>
+              <text x="30" y="81" text-anchor="middle" class="muted" font-size="8">W</text>
+              <rect class="node-muted" x="16" y="42" width="28" height="12" rx="2"/>
+              <text x="30" y="51" text-anchor="middle" class="muted" font-size="8">NW</text>
+              <rect class="dummy" x="66" y="72" width="28" height="12" rx="2"/>
+              <text x="80" y="81" text-anchor="middle" class="hi" font-size="8">C</text>
+              <text x="80" y="135" text-anchor="middle" class="muted" font-size="9">8 方位 + 中心 = 9 位</text>
+            </g>
+            <g transform="translate(220,30)">
+              <text x="80" y="0" text-anchor="middle" class="muted" font-size="10">slider（沿边连续滑动）</text>
+              <rect class="node" x="50" y="60" width="60" height="36" rx="4"/>
+              <text x="80" y="82" text-anchor="middle" font-size="10">node</text>
+              <line class="axis" x1="50" y1="44" x2="110" y2="44" stroke-dasharray="3 2"/>
+              <polygon points="48,44 54,41 54,47" fill="var(--muted)"/>
+              <polygon points="112,44 106,41 106,47" fill="var(--muted)"/>
+              <text x="38" y="38" class="muted" font-size="8">t=0</text>
+              <text x="114" y="38" class="muted" font-size="8">t=1</text>
+              <rect class="dummy" x="64" y="38" width="32" height="12" rx="2"/>
+              <text x="80" y="47" text-anchor="middle" class="hi" font-size="8">label</text>
+              <path class="edge-muted" d="M64,44 L58,41 M64,44 L58,47"/>
+              <path class="edge-muted" d="M96,44 L102,41 M96,44 L102,47"/>
+              <text x="80" y="135" text-anchor="middle" class="muted" font-size="9">1D slider：O(n log n) 可行性判定</text>
+            </g>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 6.1</span>节点标签位置模型：左为离散 8 方位 + 中心；右为 slider 连续模型</div>
+        </figure>
+
+        <h3>2.2 边标签（关键）</h3>
+        <ul>
+          <li><strong>沿边采样</strong>：把边的折线按弧长离散成 <span class="katex-inline" data-tex="k"></span> 个位置（<span class="katex-inline" data-tex="k"></span>=10–30），每个位置 × {左, 右, 中} × {距离档} → 候选。</li>
+          <li><strong>优先选“长直段的中点”</strong>：短段/弯折附近的标签极难读。给候选打分：<code>score = segLen 奖励 - 距端点惩罚 - 距理想位置(中点)惩罚</code>。</li>
+          <li><strong>正交路由的特例</strong>：标签占位作为 nudging 的约束（03 篇 §4.2），使段之间自然留出标签宽度。</li>
+        </ul>
+
+        <div class="callout info">
+          <div class="ct-title"><span class="icon">ℹ</span>分层布局的特例：label dummy 节点（重要技巧）</div>
+          <p>把边标签实现为<strong>尺寸 = 标签尺寸的 dummy 节点</strong>，插入长边的中间层。这样：</p>
+          <ul>
+            <li>标签空间由 P4 坐标相自动预留（不会重叠）；</li>
+            <li>标签自动落在边上、水平居中；</li>
+            <li>层间距自动加大以容纳标签高度。</li>
+          </ul>
+          <p>这是 ELK / yFiles 分层布局的实际做法，<strong>远优于事后避让</strong>。代价：需要边跨度 ≥2（不够时强制拉开一层）。</p>
+        </div>
+
+        <!-- 图解：边标签候选位置 -->
+        <figure>
+          <svg viewBox="0 0 380 200" aria-label="边标签候选位置：沿边采样 + 长直段优先">
+            <rect class="node" x="10" y="30" width="40" height="20" rx="4"/>
+            <rect class="node" x="330" y="150" width="40" height="20" rx="4"/>
+            <path class="edge" d="M50,40 L180,40 L180,160 L330,160" fill="none"/>
+            <circle cx="80" cy="40" r="2.5" fill="var(--muted)"/>
+            <circle cx="110" cy="40" r="2.5" fill="var(--muted)"/>
+            <circle cx="140" cy="40" r="2.5" fill="var(--muted)"/>
+            <circle cx="180" cy="70" r="2.5" fill="var(--muted)"/>
+            <circle cx="180" cy="100" r="2.5" fill="var(--muted)"/>
+            <circle cx="180" cy="130" r="2.5" fill="var(--muted)"/>
+            <circle cx="220" cy="160" r="2.5" fill="var(--muted)"/>
+            <circle cx="260" cy="160" r="2.5" fill="var(--muted)"/>
+            <circle cx="300" cy="160" r="2.5" fill="var(--muted)"/>
+            <rect class="dummy" x="96" y="20" width="36" height="16" rx="2"/>
+            <text x="114" y="32" text-anchor="middle" class="hi" font-size="9">label ✓</text>
+            <text x="195" y="103" class="hi" font-size="12">✕</text>
+            <text x="202" y="118" class="muted" font-size="8">弯折处难读</text>
+            <rect class="node-muted" x="242" y="166" width="36" height="16" rx="2"/>
+            <text x="260" y="178" text-anchor="middle" class="muted" font-size="9">label</text>
+            <text x="190" y="194" text-anchor="middle" class="muted" font-size="10">score = segLen 奖励 − 距端点惩罚 − 距中点惩罚</text>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 6.2</span>边标签候选：沿边弧长采样，长直段中点优先，弯折处打 ✕</div>
+        </figure>
+
+        <h3>2.3 候选的合法性预筛</h3>
+        <p>每个候选先做碰撞检查（与节点、与其它已知固定物）→ 打上 <code>hard_invalid</code> 标记，减小搜索空间。用 R-tree / 网格索引做 <span class="katex-inline" data-tex="O(\log n)"></span> 查询。</p>
+
+        <!-- ============ §3 ============ -->
+        <h2 id="sec-3"><span class="h2-num">3</span>求解算法</h2>
+
+        <h3>3.1 Kakoulis–Tollis 的通用框架（推荐主线）</h3>
+        <p>把标签放置归约为<strong>二分图匹配 / 冲突图上的独立集</strong>：</p>
+        <div class="code-block">
+          <span class="lang-tag">pseudo</span>
+          <pre><code class="language-plaintext">1. 生成候选：每个标签 l 有候选集 C(l)
+2. 建冲突图 H：顶点 = (l, c) 候选对；
+   边 = 两候选几何冲突（重叠）或属于同一标签（互斥）
+3. 求最大权独立集 / 或者：
+   3'. 若冲突图退化为二分图（候选按"槽位"划分），用最大二分匹配 O(E√V) 精确求解
+4. 剩余未放置标签：放到"最少冲突"位置并标记 overlap（不丢失信息）</code></pre>
+        </div>
+        <p>Kakoulis–Tollis 的贡献在于证明了：对相当一类候选构造（每个标签的候选位于互不相交的“区域”），问题可以退化成匹配问题从而精确求解。工程上直接用“贪心 + 局部搜索”逼近即可。</p>
+
+        <!-- 图解：冲突图 -->
+        <figure>
+          <svg viewBox="0 0 380 190" aria-label="候选冲突图：重叠候选构成冲突边">
+            <text x="190" y="16" text-anchor="middle" class="muted" font-size="11">两标签各 2 候选；内侧候选几何重叠 → 冲突边</text>
+            <rect class="node" x="80" y="50" width="50" height="28" rx="4"/>
+            <text x="105" y="68" text-anchor="middle" font-size="10">host1</text>
+            <rect class="node" x="220" y="50" width="50" height="28" rx="4"/>
+            <text x="245" y="68" text-anchor="middle" font-size="10">host2</text>
+            <rect class="node-muted" x="22" y="88" width="50" height="14" rx="2"/>
+            <text x="47" y="98" text-anchor="middle" class="muted" font-size="9">L1:W</text>
+            <rect class="dummy" x="134" y="88" width="50" height="14" rx="2"/>
+            <text x="159" y="98" text-anchor="middle" class="hi" font-size="9">L1:E</text>
+            <rect class="dummy" x="166" y="88" width="50" height="14" rx="2"/>
+            <text x="191" y="98" text-anchor="middle" class="hi" font-size="9">L2:W</text>
+            <rect class="node-muted" x="278" y="88" width="50" height="14" rx="2"/>
+            <text x="303" y="98" text-anchor="middle" class="muted" font-size="9">L2:E</text>
+            <rect x="166" y="86" width="18" height="18" fill="none" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="2 2"/>
+            <text x="175" y="120" text-anchor="middle" class="hi" font-size="9">overlap</text>
+            <g transform="translate(70,135)">
+              <text x="0" y="0" class="muted" font-size="10">冲突图 H：</text>
+              <circle cx="60" cy="20" r="11" class="node-muted" fill="var(--code-bg)" stroke="var(--muted)"/>
+              <text x="60" y="24" text-anchor="middle" font-size="8">C1a</text>
+              <circle cx="115" cy="20" r="11" class="dummy"/>
+              <text x="115" y="24" text-anchor="middle" font-size="8">C1b</text>
+              <circle cx="185" cy="20" r="11" class="dummy"/>
+              <text x="185" y="24" text-anchor="middle" font-size="8">C2a</text>
+              <circle cx="240" cy="20" r="11" class="node-muted" fill="var(--code-bg)" stroke="var(--muted)"/>
+              <text x="240" y="24" text-anchor="middle" font-size="8">C2b</text>
+              <line x1="71" y1="20" x2="104" y2="20" class="edge-muted"/>
+              <line x1="196" y1="20" x2="229" y2="20" class="edge-muted"/>
+              <path class="edge-hi" d="M115,31 Q150,48 185,31" fill="none"/>
+              <text x="150" y="50" text-anchor="middle" class="hi" font-size="8">conflict</text>
+              <text x="87" y="14" text-anchor="middle" class="muted" font-size="7">互斥</text>
+              <text x="212" y="14" text-anchor="middle" class="muted" font-size="7">互斥</text>
+            </g>
+          </svg>
+          <div class="fig-caption"><span class="fnum">图 6.3</span>冲突图 H：同标签候选互斥（灰边），跨标签几何重叠为冲突（红边）→ 求最大权独立集</div>
+        </figure>
+
+        <h3>3.2 贪心 + 局部搜索（工业默认，先实现这个）</h3>
+        <div class="code-block">
+          <span class="lang-tag">rust</span>
+          <pre><code class="language-rust">fn place_labels(labels: &amp;[Label]) -&gt; Placement {
+    // 1. 按"难度"降序处理：候选数少的、标签大的、宿主拥挤的先放
+    let mut order = labels.to_vec();
+    order.sort_by_key(|l| (l.candidates.len(), Reverse(l.area), l.id)); // 稳定
+    let mut idx = SpatialIndex::new();
+    let mut result = Placement::new();
+    for l in &amp;order {
+        let best = l.candidates.iter()
+            .map(|c| (cost(c, &amp;idx), c))
+            .min_by(|a,b| a.0.partial_cmp(&amp;b.0).unwrap().then(a.1.id.cmp(&amp;b.1.id)))
+            .unwrap().1;
+        idx.insert(best.rect); result.set(l, best);
+    }
+    // 2. 局部改进：对有冲突的标签尝试换位（含"交换两个标签的位置"）
+    for _ in 0..MAX_ROUNDS { if !improve_conflicted(&amp;mut result, &amp;mut idx) { break } }
+    result
+}
+
+fn cost(c: &amp;Candidate, idx: &amp;SpatialIndex) -&gt; f64 {
+      W_OVERLAP_LABEL * idx.overlap_area_with_labels(c.rect)
+    + W_OVERLAP_NODE  * overlap_area_with_nodes(c.rect)
+    + W_OVERLAP_EDGE  * crossed_edge_length(c.rect)
+    + W_PREF          * preference_penalty(c)      // 偏离 PreferredPlacement
+    + W_DIST          * dist_to_host(c)
+}</code></pre>
+        </div>
+        <p>关键点：</p>
+        <ul>
+          <li><strong>处理序决定质量</strong>：候选少者先放（最受限优先），这是约束满足的标准启发式（most-constrained-variable）。</li>
+          <li><strong>代价用“重叠面积”而非布尔</strong>，梯度更平滑，局部搜索有方向可走。</li>
+        </ul>
+        <div class="callout bad">
+          <div class="ct-title"><span class="icon">⚠</span>产品硬要求：不能丢标签</div>
+          <p>必须允许“放不下就重叠但标记 <code>overlap</code>”，<strong>不能丢标签</strong>。少一个标签比标签重叠严重得多——这是标签放置与“求最优解”的工程分界线。</p>
+        </div>
+
+        <h3>3.3 模拟退火（Christensen–Marks–Shieber 1995）</h3>
+        <p>实证研究表明，对点标注 SA 明显优于各种贪心（论文对比了 5 种方法）。</p>
+        <ul>
+          <li>状态 = 每个标签的候选选择；邻域 = 随机换一个标签的位置；能量 = 冲突数（含加权）。</li>
+          <li>降温：<span class="katex-inline" data-tex="T \leftarrow 0.9T"></span>，每温度 <span class="katex-inline" data-tex="20n"></span> 次尝试。</li>
+          <li>成本可控（每次移动只需局部重算冲突），<strong>质量最好的启发式之一</strong>。若贪心不够用，直接上 SA 而不是继续调贪心。</li>
+        </ul>
+
+        <h3>3.4 ILP 精确（Klau–Mutzel 2003）</h3>
+        <p>变量 <span class="katex-inline" data-tex="x_{l,c}\in\{0,1\}"></span>，约束 <span class="katex-inline" data-tex="\sum_c x_{l,c}=1"></span>（或 ≤1 允许丢），冲突对 <span class="katex-inline" data-tex="x_{l,c}+x_{l',c'}\le 1"></span>。</p>
+        <ul>
+          <li>加“最大化统一缩放因子 <span class="katex-inline" data-tex="\sigma"></span>”的目标可做“字号自适应”。</li>
+          <li>分支切割在几百标签内可解。适合离线高质量导出。</li>
+        </ul>
+
+        <h3>3.5 Slider model（连续位置）</h3>
+        <p>Van Kreveld–Strijk–Wolff 1999：标签可沿特征边界连续滑动。</p>
+        <ul>
+          <li>1D slider（只沿一个方向滑）有 <span class="katex-inline" data-tex="O(n\log n)"></span> 的可行性判定与 2-近似；</li>
+          <li>实际对<strong>边标签</strong>特别合适（沿边滑动）。实现：把每条边的可用区间做区间调度（与 03 篇的 track 分配同构）。</li>
+        </ul>
+
+        <!-- ============ §4 ============ -->
+        <h2 id="sec-4"><span class="h2-num">4</span>与布局的耦合（架构决策）</h2>
+
+        <p>三种耦合程度，从弱到强：</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>模式</th><th>做法</th><th>优缺点</th></tr></thead>
+            <tbody>
+              <tr><td><strong>A. 事后标注</strong></td><td>布局完成 → 独立 labeling 相</td><td>实现简单；空间可能根本不够 → 必有重叠</td></tr>
+              <tr><td><strong>B. 空间预留</strong></td><td>布局阶段把标签尺寸计入节点/边的间距需求</td><td><strong>推荐</strong>。标签当 dummy 节点或计入 <span class="katex-inline" data-tex="\rho"></span>；之后再精细放置</td></tr>
+              <tr><td><strong>C. 联合优化</strong></td><td>标签位置作为变量进入布局的约束系统（VPSC/QP）</td><td>质量最好，复杂度与耦合度高</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p><strong>yFiles 的实际做法接近 B + A</strong>：布局算法接受 <code>LabelLayoutData</code>（含 preferred placement），内部为标签预留空间，最后可再跑 <code>GenericLabeling</code> 精修未固定的标签。</p>
+
+        <div class="callout good">
+          <div class="ct-title"><span class="icon">✓</span>plotgram 建议：直接做 B</div>
+          <ol>
+            <li>测量相（measure）计算所有标签尺寸（含字体度量、换行）；</li>
+            <li>分层布局：边标签 → label dummy 节点；节点外部标签 → 计入节点的“有效包围盒”；</li>
+            <li>正交路由：标签矩形作为 nudging 的避让约束；</li>
+            <li>末尾跑一次 greedy labeling 处理剩余自由标签（如组标题、端口标签）。</li>
+          </ol>
+        </div>
+
+        <!-- ============ §5 ============ -->
+        <h2 id="sec-5"><span class="h2-num">5</span>文本测量与排版（容易低估的工程量）</h2>
+
+        <p>标签放置的前置条件是<strong>准确的文本尺寸</strong>：</p>
+        <ul>
+          <li><strong>字体度量</strong>：需要真实字体的 advance width；用 <code>ttf-parser</code>/<code>rustybuzz</code>/<code>fontdue</code> 读 hmtx + kerning。WASM 环境下不能依赖系统字体 → <strong>必须内嵌或按需加载字体</strong>。</li>
+          <li><strong>CJK 与混排</strong>：CJK 全宽、无空格断行；换行需按 UAX#14 line breaking（至少实现“CJK 任意处可断 + 拉丁按空格/连字符断”）。</li>
+          <li><strong>换行与自动尺寸</strong>：给定最大宽度做贪心换行（或 Knuth–Plass 最优换行，视觉更佳但需要更多工作）；节点尺寸由文本尺寸反推 ⇒ 这就是“content-based sizing 作为独立 measure 相”的必要性（仓库已有相关记录）。</li>
+          <li><strong>缩放</strong>：标签字号随缩放变化时，若“标签尺寸影响布局”，缩放会导致重排 → 约定<strong>布局用固定基准字号</strong>，视觉缩放不重排。</li>
+        </ul>
+        <div class="callout warn">
+          <div class="ct-title"><span class="icon">⚠</span>测量必须确定性</div>
+          <p>同一文本 + 字体 + 字号 → 完全相同的尺寸，且<strong>跨平台一致</strong>（不要走系统渲染栈）。否则同一布局在不同环境输出不同结果，回归测试无法断言。</p>
+        </div>
+
+        <!-- ============ §6 ============ -->
+        <h2 id="sec-6"><span class="h2-num">6</span>质量检查与回归</h2>
+
+        <p>自动可断言的指标：</p>
+        <ol>
+          <li>标签–标签重叠面积总和（目标 0）；</li>
+          <li>标签–节点重叠面积（目标 0）；</li>
+          <li>标签压边的总长度（目标小）；</li>
+          <li>标签到宿主的平均距离（越小越好）；</li>
+          <li>偏好方位满足率；</li>
+          <li>未放置/强制重叠标签数（目标 0）。</li>
+        </ol>
+        <p>把这 6 项做成基准脚本输出，即可在算法改动时定量比较（见 11 篇）。</p>
+
+        <!-- ============ §7 ============ -->
+        <h2 id="sec-7"><span class="h2-num">7</span>常见失败模式</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>症状</th><th>根因</th><th>修法</th></tr></thead>
+            <tbody>
+              <tr><td>边标签叠在节点上</td><td>事后标注 + 空间未预留</td><td>改用 label dummy（模式 B）</td></tr>
+              <tr><td>长边标签飘到很远</td><td>候选只在边中点，中点恰在弯折处</td><td>候选打分加“长直段优先”</td></tr>
+              <tr><td>同类边标签一会儿上一会儿下</td><td>无一致性项</td><td>加“与同批标签同侧”的软约束/后处理统一</td></tr>
+              <tr><td>标签在缩放时抖动</td><td>布局依赖当前视觉字号</td><td>布局固定基准字号</td></tr>
+              <tr><td>中文标签测不准导致节点忽大忽小</td><td>用了近似字宽表</td><td>上真实字体度量</td></tr>
+              <tr><td>两次运行标签位置不同</td><td>候选遍历序/平局无 tie-break</td><td>全链稳定排序</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <div class="foot">
+        本文为 <a href="../06-标签放置.md">06-标签放置.md</a> 的 HTML 图文版。
+        配套：<a href="00-索引与阅读指南.html">索引</a> ·
+        <a href="../21-术语表.html">术语表图解</a> ·
+        <a href="../../../../design/layout/write-authority.md">写权纪律</a>
+      </div>
+
+    </article>
+  </div>
+</div>
+
+<script src="_assets/nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/common.min.js"></script>
+<script>hljs.highlightAll();</script>
+</body>
+</html>
