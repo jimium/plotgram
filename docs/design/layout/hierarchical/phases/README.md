@@ -1,0 +1,32 @@
+# Hierarchical · 相级设计索引
+
+> 父页：[architecture.md](../architecture.md)  
+> 状态：目标契约的细化；不记录实现进度
+
+本目录展开 `architecture.md` 已决定的契约。发生冲突时以父页的写权、IR 与失败语义为准；相级文档不得另造第二套 Plan 或修改 Writer 归属。
+
+| 文档 | 回答的问题 |
+|------|------------|
+| [contracts-and-ir](contracts-and-ir.md) | 跨 crate 输入输出、稳定 key、Stage 外壳、Diagnostics |
+| [composition](composition.md) | FAS、ranking、properify、ordering、约束投影与 Plan freeze |
+| [ports-and-channel](ports-and-channel.md) | 五档端口、gate/scope、Channel、track、bundle、DeferToRouter |
+| [coordinate-and-demand](coordinate-and-demand.md) | Demand epoch、BK/VPSC、组框、PartitionGrid、Orientation |
+| [ink-and-verification](ink-and-verification.md) | Ink 纯展开、规范化与分相 verifier |
+
+## 共同格式
+
+每篇至少写清：
+
+1. 输入与输出类型；
+2. 本相拥有的自由度；
+3. 稳定迭代序与 tie-break；
+4. 构造不变量；
+5. 失败类别；
+6. 下游只读哪些字段。
+
+## 禁止
+
+- 用实现文件名替代相契约；
+- 在 phase 文档声明 profile / diagram type 分支；
+- 以「后续修一下」绕过 Plan/Metric verifier；
+- 为 stub 保留兼容字段或双真源。

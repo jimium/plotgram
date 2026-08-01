@@ -55,20 +55,21 @@ Sugiyama 骨架 + Atlas 三相写权（组合 → 度量 → Ink）。
 
 | 文档 | 用途 |
 |------|------|
-| **[architecture.md](architecture.md)** | **最终架构**：IR、算法表、Channel、组/分区、参数、里程碑 |
-| [from-yfiles-reference.md](from-yfiles-reference.md) | yFiles 参考文库启发纪要 |
+| **[architecture.md](architecture.md)** | **目标架构真源**：IR、算法表、Channel、组/分区、参数、里程碑 |
+| [phases/](phases/README.md) | 跨 crate 契约与各相可执行细节 |
+| [from-yfiles-reference.md](nodes/from-yfiles-reference.md) | yFiles 参考文库启发纪要 |
 | [01 Sugiyama](../../../reference/yfiles/01-sugiyama分层布局.md) | P1–P5 算法证据 |
 | [08 分组·泳道·端口](../../../reference/yfiles/08-分组泳道与端口约束.md) | group / partition / port |
 | [archive/atlas 21](../../../archive/atlas/21-Hierarchical统一内核与泳道语义-可行性与演进建议-2026-07.md) | 统一内核立场（只读） |
 | [archive/atlas 22](../../../archive/atlas/22-Atlas下一代布局与路由架构-总纲-2026-07.md) | 三相总纲（只读） |
 | [shared/](../shared/) | group / port / label 共享语义 |
 
-## 待展开（phases）
+## 相级设计（phases）
 
-按需增加，不提前空文件（细节从 architecture 下沉）：
+细节从 architecture 下沉，不另造写权：
 
-- `phases/ranking.md` — layering 策略与约束  
-- `phases/ordering.md` — 交叉最小化与 group 连续性  
-- `phases/ports-and-channel.md` — 端口、gate、channel、bundle  
-- `phases/coordinate.md` — BK / Main·Cross track  
-- `phases/ink.md` — 落笔与自反证门禁
+- [contracts-and-ir](phases/contracts-and-ir.md) — LayoutOutput/RouteScene、稳定 key、Stage、Diagnostics
+- [composition](phases/composition.md) — FAS、ranking、properify、ordering、Plan freeze
+- [ports-and-channel](phases/ports-and-channel.md) — 五档端口、gate/scope、Channel、track、bundle
+- [coordinate-and-demand](phases/coordinate-and-demand.md) — Demand epoch、BK/VPSC、组框、PartitionGrid、Orientation
+- [ink-and-verification](phases/ink-and-verification.md) — Ink 纯展开与分相 verifier

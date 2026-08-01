@@ -37,6 +37,22 @@ Hier / 正交主路径只有两条硬约束：
 |----------|----------|
 | 正交肘点展开、bundle 纯几何接合、orientation 转置 | 端口 along、track 真源、路径拓扑洞 |
 
+### 2.1 唯一合法的反向影响：DemandBoard
+
+下游机制可以在**预算阶段**向尚未执行的上游消费者贡献 typed 下界；这不是执行后的回调：
+
+```text
+producer 局部聚合（可 sum/count）
+  → DemandBoard 对同一 key 仅 max 合并下界
+  → consumer 执行前 freeze
+  → freeze 后禁止再写该类需求
+```
+
+- 走廊 track → layer gap、端口数 → node min size、标签/组标题 → band/group min size 均走 Board；
+- 覆盖赋值、消费者运行后补需求、路由阶段就地挪节点都违规；
+- 两块必须同时占用的空间应由生产者先求和，不能误用 `max`；
+- 具体 epoch/key 见 [Hier coordinate-and-demand](hierarchical/phases/coordinate-and-demand.md)。
+
 ---
 
 ## 3. 动手前四问
@@ -63,5 +79,5 @@ Hier / 正交主路径只有两条硬约束：
 |------|--------|
 | **本文** | 尺子、判断句 |
 | [`layout/`](README.md) | 各内核：逻辑、范围、典型域、相写权 |
-| [`hierarchical/from-yfiles-reference`](hierarchical/from-yfiles-reference.md) | 参考文库对 Hier / Atlas 迁移的启发纪要 |
+| [`hierarchical/from-yfiles-reference`](hierarchical/nodes/from-yfiles-reference.md) | 参考文库对 Hier / Atlas 迁移的启发纪要 |
 | [`archive/atlas/`](../../archive/atlas/README.md) | 历史总纲与债单（只读） |
