@@ -1,0 +1,79 @@
+{
+  "name": "narrow_corridor",
+  "description": "Two obstacles with a narrow corridor (1x spacing) between them.",
+  "requires": "search",
+  "scene": {
+    "obstacles": [
+      {
+        "id": "a",
+        "rect": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 60.0,
+          "height": 40.0
+        }
+      },
+      {
+        "id": "b",
+        "rect": {
+          "x": 250.0,
+          "y": 0.0,
+          "width": 60.0,
+          "height": 40.0
+        }
+      },
+      {
+        "id": "wall_top",
+        "rect": {
+          "x": 100.0,
+          "y": -100.0,
+          "width": 50.0,
+          "height": 110.0
+        }
+      },
+      {
+        "id": "wall_bot",
+        "rect": {
+          "x": 100.0,
+          "y": 30.0,
+          "width": 50.0,
+          "height": 100.0
+        }
+      }
+    ],
+    "terminals": {
+      "e0": {
+        "source": {
+          "point": {
+            "x": 60.0,
+            "y": 20.0
+          },
+          "side": "east",
+          "node_id": "a"
+        },
+        "target": {
+          "point": {
+            "x": 250.0,
+            "y": 20.0
+          },
+          "side": "west",
+          "node_id": "b"
+        }
+      }
+    },
+    "edge_order": [
+      "e0"
+    ],
+    "group_boundaries": [],
+    "boundary_permissions": {},
+    "params": {
+      "spacing": 20.0,
+      "port_stub": 10.0,
+      "bend_penalty": 100.0,
+      "shared_penalty": 0.0,
+      "min_segment": 4.0,
+      "max_search_nodes": 0,
+      "route_rounds": 1
+    }
+  }
+}

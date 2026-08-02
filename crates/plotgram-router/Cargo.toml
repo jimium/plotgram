@@ -1,0 +1,15 @@
+[package]
+name = "plotgram-router"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Independent orthogonal edge router (OVG/A* + verify + score)"
+
+[dependencies]
+plotgram-model = { workspace = true }
+plotgram-engine-api = { workspace = true }
+plotgram-algo = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

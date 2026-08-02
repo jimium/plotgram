@@ -1,11 +1,17 @@
 //! `run(LayoutContract) -> LayoutResult`.
 
-use plotgram_engine_api::{EdgeGeometryMode, LayoutError, LayoutInput, RouteInput};
+use std::collections::BTreeMap;
+
+use plotgram_engine_api::{
+    EdgeGeometryMode, LayoutError, LayoutInput, Obstacle, OrthogonalRouteParams, PortAnchor,
+    RouteScene, TerminalPair,
+};
 use plotgram_model::contract::LayoutContract;
-use plotgram_model::result::LayoutResult;
+use plotgram_model::result::{EdgePlacement, LayoutResult, NodePlacement};
 
 use crate::finalize::finalize;
 use crate::registry::Registry;
+use plotgram_router::core::port_anchor;
 
 /// Run layout (+ optional independent edge router) for a contract.
 pub fn run(contract: &LayoutContract) -> Result<LayoutResult, LayoutError> {
@@ -37,17 +43,93 @@ pub fn run(contract: &LayoutContract) -> Result<LayoutResult, LayoutError> {
             .ok_or_else(|| LayoutError::UnknownRouter {
                 name: routing.name.clone(),
             })?;
-        router.route(RouteInput {
-            graph: &contract.graph,
-            nodes: &output.nodes,
-            edges: &output.edges,
-            options: &routing.options,
-        })?
+        let scene = project_route_scene(&output.nodes, &output.edges)?;
+        router.route(&scene)?
     } else {
         output.edges
     };
 
     Ok(finalize(&contract.graph, output.nodes, edges))
+}
+
+/// Project layout output into a self-contained [`RouteScene`].
+///
+/// This is the **only** place that translates node frames + resolved ports
+/// into the router's algorithm-facing input. Routers never see `Graph` or
+/// `NodePlacement` directly.
+fn project_route_scene(
+    nodes: &[NodePlacement],
+    edges: &[EdgePlacement],
+) -> Result<RouteScene, LayoutError> {
+    let frames: BTreeMap<&str, &NodePlacement> =
+        nodes.iter().map(|n| (n.id.as_str(), n)).collect();
+
+    // Obstacles = all node frames (not inflated here; router inflates internally).
+    let obstacles: Vec<Obstacle> = nodes
+        .iter()
+        .map(|n| Obstacle {
+            id: n.id.clone(),
+            rect: n.frame,
+        })
+        .collect();
+
+    // Terminals: project resolved ports → absolute anchor points.
+    let mut terminals = BTreeMap::new();
+    let mut edge_order = Vec::with_capacity(edges.len());
+
+    for edge in edges {
+        let from_port = edge.from_port.ok_or_else(|| {
+            LayoutError::message(format!(
+                "projection: edge `{}` missing from_port (layout must resolve ports before routing)",
+                edge.id
+            ))
+        })?;
+        let to_port = edge.to_port.ok_or_else(|| {
+            LayoutError::message(format!(
+                "projection: edge `{}` missing to_port (layout must resolve ports before routing)",
+                edge.id
+            ))
+        })?;
+
+        let src_node = frames.get(edge.source.as_str()).ok_or_else(|| {
+            LayoutError::message(format!(
+                "projection: edge `{}` references missing node `{}`",
+                edge.id, edge.source
+            ))
+        })?;
+        let tgt_node = frames.get(edge.target.as_str()).ok_or_else(|| {
+            LayoutError::message(format!(
+                "projection: edge `{}` references missing node `{}`",
+                edge.id, edge.target
+            ))
+        })?;
+
+        terminals.insert(
+            edge.id.clone(),
+            TerminalPair {
+                source: PortAnchor {
+                    point: port_anchor(&src_node.frame, from_port),
+                    side: from_port.side,
+                    node_id: edge.source.clone(),
+                },
+                target: PortAnchor {
+                    point: port_anchor(&tgt_node.frame, to_port),
+                    side: to_port.side,
+                    node_id: edge.target.clone(),
+                },
+            },
+        );
+        edge_order.push(edge.id.clone());
+    }
+
+    Ok(RouteScene {
+        obstacles,
+        terminals,
+        edge_order,
+        group_boundaries: Vec::new(),
+        boundary_permissions: BTreeMap::new(),
+        params: OrthogonalRouteParams::default(),
+    })
 }
 
 #[cfg(test)]

@@ -1,0 +1,80 @@
+{
+  "name": "parallel_two_edges",
+  "description": "Two edges between the same pair of nodes (parallel).",
+  "requires": "none",
+  "scene": {
+    "obstacles": [
+      {
+        "id": "a",
+        "rect": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 80.0,
+          "height": 60.0
+        }
+      },
+      {
+        "id": "b",
+        "rect": {
+          "x": 200.0,
+          "y": 0.0,
+          "width": 80.0,
+          "height": 60.0
+        }
+      }
+    ],
+    "terminals": {
+      "e0": {
+        "source": {
+          "point": {
+            "x": 80.0,
+            "y": 20.0
+          },
+          "side": "east",
+          "node_id": "a"
+        },
+        "target": {
+          "point": {
+            "x": 200.0,
+            "y": 20.0
+          },
+          "side": "west",
+          "node_id": "b"
+        }
+      },
+      "e1": {
+        "source": {
+          "point": {
+            "x": 80.0,
+            "y": 40.0
+          },
+          "side": "east",
+          "node_id": "a"
+        },
+        "target": {
+          "point": {
+            "x": 200.0,
+            "y": 40.0
+          },
+          "side": "west",
+          "node_id": "b"
+        }
+      }
+    },
+    "edge_order": [
+      "e0",
+      "e1"
+    ],
+    "group_boundaries": [],
+    "boundary_permissions": {},
+    "params": {
+      "spacing": 20.0,
+      "port_stub": 10.0,
+      "bend_penalty": 100.0,
+      "shared_penalty": 0.0,
+      "min_segment": 4.0,
+      "max_search_nodes": 0,
+      "route_rounds": 1
+    }
+  }
+}

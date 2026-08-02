@@ -1,0 +1,162 @@
+[
+  {
+    "algorithm": "orthogonal",
+    "scene": "blocker_center",
+    "requires": "search",
+    "applicable": false,
+    "clearance": "FAIL(1)",
+    "scene_name": "blocker_center",
+    "edge_count": 1,
+    "total_bends": 0,
+    "total_length": 220.0,
+    "crossings": 0,
+    "shared_segments": 0,
+    "max_bends_single_edge": 0,
+    "bbox": [
+      80.0,
+      100.0,
+      300.0,
+      100.0
+    ]
+  },
+  {
+    "algorithm": "orthogonal",
+    "scene": "four_boxes_cross",
+    "requires": "none",
+    "applicable": true,
+    "clearance": "PASS",
+    "scene_name": "four_boxes_cross",
+    "edge_count": 2,
+    "total_bends": 0,
+    "total_length": 300.0,
+    "crossings": 1,
+    "shared_segments": 0,
+    "max_bends_single_edge": 0,
+    "bbox": [
+      60.0,
+      40.0,
+      200.0,
+      200.0
+    ]
+  },
+  {
+    "algorithm": "orthogonal",
+    "scene": "grid_3x3",
+    "requires": "search",
+    "applicable": false,
+    "clearance": "FAIL(1)",
+    "scene_name": "grid_3x3",
+    "edge_count": 1,
+    "total_bends": 1,
+    "total_length": 360.0,
+    "crossings": 0,
+    "shared_segments": 0,
+    "max_bends_single_edge": 1,
+    "bbox": [
+      80.0,
+      30.0,
+      240.0,
+      230.0
+    ]
+  },
+  {
+    "algorithm": "orthogonal",
+    "scene": "narrow_corridor",
+    "requires": "search",
+    "applicable": false,
+    "clearance": "FAIL(1)",
+    "scene_name": "narrow_corridor",
+    "edge_count": 1,
+    "total_bends": 0,
+    "total_length": 190.0,
+    "crossings": 0,
+    "shared_segments": 0,
+    "max_bends_single_edge": 0,
+    "bbox": [
+      60.0,
+      20.0,
+      250.0,
+      20.0
+    ]
+  },
+  {
+    "algorithm": "orthogonal",
+    "scene": "parallel_two_edges",
+    "requires": "none",
+    "applicable": true,
+    "clearance": "PASS",
+    "scene_name": "parallel_two_edges",
+    "edge_count": 2,
+    "total_bends": 0,
+    "total_length": 240.0,
+    "crossings": 0,
+    "shared_segments": 0,
+    "max_bends_single_edge": 0,
+    "bbox": [
+      80.0,
+      20.0,
+      200.0,
+      40.0
+    ]
+  },
+  {
+    "algorithm": "orthogonal",
+    "scene": "two_boxes_clear",
+    "requires": "none",
+    "applicable": true,
+    "clearance": "PASS",
+    "scene_name": "two_boxes_clear",
+    "edge_count": 1,
+    "total_bends": 0,
+    "total_length": 120.0,
+    "crossings": 0,
+    "shared_segments": 0,
+    "max_bends_single_edge": 0,
+    "bbox": [
+      80.0,
+      20.0,
+      200.0,
+      20.0
+    ]
+  },
+  {
+    "algorithm": "orthogonal",
+    "scene": "two_boxes_vertical",
+    "requires": "none",
+    "applicable": true,
+    "clearance": "PASS",
+    "scene_name": "two_boxes_vertical",
+    "edge_count": 1,
+    "total_bends": 0,
+    "total_length": 80.0,
+    "crossings": 0,
+    "shared_segments": 0,
+    "max_bends_single_edge": 0,
+    "bbox": [
+      40.0,
+      40.0,
+      40.0,
+      120.0
+    ]
+  },
+  {
+    "algorithm": "orthogonal",
+    "scene": "u_turn",
+    "requires": "none",
+    "applicable": true,
+    "clearance": "PASS",
+    "scene_name": "u_turn",
+    "edge_count": 1,
+    "total_bends": 0,
+    "total_length": 80.0,
+    "crossings": 0,
+    "shared_segments": 0,
+    "max_bends_single_edge": 0,
+    "bbox": [
+      80.0,
+      20.0,
+      80.0,
+      100.0
+    ]
+  }
+]
