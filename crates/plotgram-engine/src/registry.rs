@@ -16,8 +16,16 @@ pub struct Registry {
 impl Registry {
     pub fn standard() -> Self {
         let mut layouts: BTreeMap<&'static str, Arc<dyn LayoutAlgorithm>> = BTreeMap::new();
-        let hier = Arc::new(HierarchicalLayout);
-        layouts.insert(hier.name(), hier);
+        let hier: Arc<dyn LayoutAlgorithm> = Arc::new(HierarchicalLayout);
+        layouts.insert(hier.name(), hier.clone());
+        // `architecture` names the same algorithm (architecture.md: "architecture
+        // = Hierarchical + StrongMacro 等 profile" — no separate ArchitectureLayout).
+        // The DSL profile layer is meant to expand `profile: architecture` into
+        // `layout: hierarchical` + params, but several showcase fixtures still
+        // write `layout: architecture` literally; alias it here rather than
+        // leave them unrenderable. Not a diagram-type branch inside the
+        // algorithm (ADR-001) — both names resolve to the identical struct.
+        layouts.insert("architecture", hier);
 
         let mut routers: BTreeMap<&'static str, Arc<dyn EdgeRouter>> = BTreeMap::new();
         let ortho = Arc::new(OrthogonalEdgeRouter);
