@@ -1,0 +1,31 @@
+{
+  "id": "G06",
+  "name": "group_leave_outside",
+  "level": 3,
+  "requires": "group",
+  "expect": "ok",
+  "description": "Source inside, target outside; Leave via south gate.",
+  "cell": 10.0,
+  "obstacles": [
+    { "id": "a", "r": 10, "c": 16, "w": 6, "h": 4 },
+    { "id": "b", "r": 22, "c": 14, "w": 6, "h": 4 }
+  ],
+  "groups": [
+    { "id": "g0", "r": 8, "c": 10, "w": 16, "h": 10 }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": ["a", "south"],
+      "to": ["b", "north"],
+      "crossings": [
+        {
+          "group": "g0",
+          "dir": "leave",
+          "gate": { "r": 17, "c": 14, "w": 6, "h": 1 }
+        }
+      ]
+    }
+  ],
+  "params": null
+}

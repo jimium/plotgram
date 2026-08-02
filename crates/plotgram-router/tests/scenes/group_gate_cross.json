@@ -1,0 +1,36 @@
+{
+  "id": "G02",
+  "name": "group_gate_cross",
+  "level": 3,
+  "requires": "group",
+  "expect": "ok",
+  "description": "Group blocks the corridor; explicit Enter+Leave via a mid-height gate seam → path may cross through the gate.",
+  "cell": 10.0,
+  "obstacles": [
+    { "id": "a", "r": 4, "c": 0, "w": 8, "h": 4 },
+    { "id": "b", "r": 4, "c": 30, "w": 8, "h": 4 }
+  ],
+  "groups": [
+    { "id": "g0", "r": 2, "c": 12, "w": 10, "h": 8 }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": ["a", "east"],
+      "to": ["b", "west"],
+      "crossings": [
+        {
+          "group": "g0",
+          "dir": "enter",
+          "gate": { "r": 5, "c": 12, "w": 10, "h": 1 }
+        },
+        {
+          "group": "g0",
+          "dir": "leave",
+          "gate": { "r": 5, "c": 12, "w": 10, "h": 1 }
+        }
+      ]
+    }
+  ],
+  "params": null
+}

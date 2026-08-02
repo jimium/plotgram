@@ -1,19 +1,18 @@
 //! Independent orthogonal [`EdgeRouter`](plotgram_engine_api::EdgeRouter).
 //!
-//! Status: **M0 + M1 已落地** — reduced-interesting-line OVG + A* search
-//! with obstacle avoidance; M1 adds a second routing round with a
-//! shared-segment penalty, corridor track separation (uniform offsets), a
-//! node-budget gate, and a `min_segment` short-segment post-pass (see
-//! `docs/design/routing/orthogonal/architecture.md` §10). L3 track ordering
-//! beyond uniform offsets and L4 VPSC nudging / groups are M2+ and
-//! intentionally absent.
+//! Status: **M0 + M1 + M2-group + L4 VPSC nudge 已落地** — reduced-
+//! interesting-line OVG + A* with obstacle avoidance; M1 shared-segment /
+//! track separation; M2-group single-layer gates; L3 interval coloring +
+//! L4 VPSC nudging (see `nudge.rs`, `plotgram_algo::{interval_color,vpsc}`).
+//! Nested group scope is intentionally absent.
 //!
 //! Write authority (R1/R2): the router only writes `EdgePlacement.path`;
 //! terminals, obstacles and ports are read-only. Honesty (§3.4): an edge
 //! with no collision-free path (or one exceeding the node budget) is a hard
 //! error — never a degenerate obstacle-crossing elbow.
 
-mod ovg;
+pub(crate) mod ovg;
+mod nudge;
 mod search;
 mod track;
 
@@ -26,7 +25,7 @@ use plotgram_model::result::{EdgePath, EdgePlacement};
 
 use crate::core::normalize_polyline;
 
-use ovg::{outward, segment_blocked, stub_point, Grid};
+use ovg::{all_gate_rects, outward, step_blocked, stub_point, Grid};
 use search::{astar, SearchOutcome};
 use track::spread_tracks;
 
@@ -65,7 +64,14 @@ impl EdgeRouter for OrthogonalEdgeRouter {
             extra.push(pair.target.point);
             extra.push(stub_point(pair.target.point, pair.target.side, stub_len));
         }
-        let grid = Grid::build(&scene.obstacles, &extra, line_offset);
+        let gates = all_gate_rects(scene);
+        let grid = Grid::build(
+            &scene.obstacles,
+            &scene.group_boundaries,
+            &gates,
+            &extra,
+            line_offset,
+        );
 
         // Round 1 (M1 §5.2): no shared-segment penalty. Any failure is a hard
         // error — round 1 is the honest baseline.
@@ -82,7 +88,7 @@ impl EdgeRouter for OrthogonalEdgeRouter {
             route_edges(scene, &grid, Some(&round1_segments), Some(&round1))?
         };
 
-        // L3-M1: spread edges that still share a corridor onto distinct tracks.
+        // L3-M1 / L4: interval-colour tracks, then VPSC-nudge offsets.
         let mut result = result;
         spread_tracks(scene, &mut result);
         Ok(result)
@@ -134,20 +140,18 @@ fn route_edge(
     budget: Option<u32>,
 ) -> Result<EdgePlacement, LayoutError> {
     let params = &scene.params;
-    let exempt = [pair.source.node_id.as_str(), pair.target.node_id.as_str()];
 
     // Step cost: collision gate → `None`; otherwise length + (round 2)
     // shared-segment penalty. Bend cost is added by the search itself.
     let step_cost = |a: Point, b: Point| -> Option<f64> {
-        if segment_blocked(a, b, &scene.obstacles, &exempt, params.spacing) {
+        if step_blocked(a, b, scene, edge_id) {
             return None;
         }
         let len = (b.x - a.x).abs() + (b.y - a.y).abs();
         let shared = round1.map_or(0.0, |prev| prev.shared_overlap(edge_id, a, b));
         Some(len + params.shared_penalty * shared)
     };
-    let blocked =
-        |a: Point, b: Point| segment_blocked(a, b, &scene.obstacles, &exempt, params.spacing);
+    let blocked = |a: Point, b: Point| step_blocked(a, b, scene, edge_id);
 
     // Port stub: at least `min_segment` long so the departure segment can
     // carry a corner radius (M1 rounded-corner budget).
@@ -536,15 +540,34 @@ mod tests {
     }
 
     #[test]
-    fn group_scene_is_honestly_unsupported() {
+    fn group_bypass_routes_around() {
         let mut sc = two_boxes_clear();
+        // Leave clearance from node a (right=80) so the stub is not inside
+        // the inflated group: group.x >= 80 + spacing(=20) + margin.
         sc.group_boundaries.push(GroupBoundary {
             group_id: "g".to_string(),
+            rect: Rect::new(120.0, -10.0, 40.0, 60.0),
+        });
+        let placements = OrthogonalEdgeRouter.route(&sc).unwrap();
+        assert!(verify_all(&sc, &placements).all_pass);
+        let pts = &placements[0].path.points;
+        assert!(pts.len() > 2, "expected detour around group: {pts:?}");
+    }
+
+    #[test]
+    fn nested_groups_are_unsupported() {
+        let mut sc = two_boxes_clear();
+        sc.group_boundaries.push(GroupBoundary {
+            group_id: "outer".to_string(),
             rect: Rect::new(-10.0, -10.0, 300.0, 60.0),
+        });
+        sc.group_boundaries.push(GroupBoundary {
+            group_id: "inner".to_string(),
+            rect: Rect::new(0.0, 0.0, 80.0, 40.0),
         });
         match OrthogonalEdgeRouter.route(&sc) {
             Err(LayoutError::UnsupportedRouteScene { .. }) => {}
-            other => panic!("groups must be unsupported at M0/M1, got {other:?}"),
+            other => panic!("nested groups must be unsupported, got {other:?}"),
         }
     }
 
@@ -576,7 +599,7 @@ mod tests {
 
     #[test]
     fn shared_corridor_edges_are_separated() {
-        // Default params (single round): corridor track separation must put
+        // Default params (single round): L3 colouring + L4 VPSC must put
         // the two fully-overlapping edges onto distinct tracks.
         let sc = shared_corridor();
         let p = OrthogonalEdgeRouter.route(&sc).unwrap();
@@ -586,17 +609,21 @@ mod tests {
         );
         let report = verify_all(&sc, &p);
         assert!(report.all_pass, "failures: {:?}", report.failures());
-        // First edge (in order) keeps the straight line; e1 rides track 1.
-        assert_eq!(p[0].path.points.len(), 2, "e0 stays straight");
+        // VPSC centres the bundle: both edges leave the backbone (or one
+        // stays if only one shifted) — at least one corridor run is offset
+        // by about spacing/2, and the two runs differ by ≥ spacing.
+        let run_y = |pts: &[Point]| -> f64 {
+            pts.windows(2)
+                .find(|w| (w[0].y - w[1].y).abs() < 1e-9 && (w[1].x - w[0].x).abs() > 1.0)
+                .map(|w| w[0].y)
+                .unwrap_or(pts[0].y)
+        };
+        let y0 = run_y(&p[0].path.points);
+        let y1 = run_y(&p[1].path.points);
         assert!(
-            p[1].path.points.len() > 2,
-            "e1 rides a track: {:?}",
-            p[1].path.points
-        );
-        // Track offset = spacing (20): e1's corridor run leaves backbone y=70.
-        assert!(
-            (p[1].path.points[1].y - 70.0).abs() > 19.9,
-            "e1 must leave the backbone y=70: {:?}",
+            (y0 - y1).abs() >= sc.params.spacing - 1e-6,
+            "track gap too small: y0={y0} y1={y1} pts0={:?} pts1={:?}",
+            p[0].path.points,
             p[1].path.points
         );
     }

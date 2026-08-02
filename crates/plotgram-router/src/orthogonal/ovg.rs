@@ -10,8 +10,8 @@
 //!
 //! See `docs/design/routing/orthogonal/architecture.md` §5 (搜索图主选).
 
-use plotgram_engine_api::Obstacle;
-use plotgram_model::geometry::Point;
+use plotgram_engine_api::{BoundaryCrossing, GroupBoundary, Obstacle, RouteScene};
+use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::port::Side;
 
 use crate::core::{padding_rect, segment_intersects_rect};
@@ -96,16 +96,35 @@ pub struct Grid {
 }
 
 impl Grid {
-    /// Build the line set: obstacle edges ± `line_offset`, plus every extra
+    /// Build the line set: obstacle + group edges ± `line_offset`, gate rect
+    /// edges (raw + padded so the seam is searchable), plus every extra
     /// point's coordinates (terminal anchors and stub ends).
-    pub fn build(obstacles: &[Obstacle], extra_points: &[Point], line_offset: f64) -> Grid {
-        let mut xs = Vec::with_capacity(obstacles.len() * 2 + extra_points.len());
-        let mut ys = Vec::with_capacity(obstacles.len() * 2 + extra_points.len());
+    pub fn build(
+        obstacles: &[Obstacle],
+        groups: &[GroupBoundary],
+        gate_rects: &[Rect],
+        extra_points: &[Point],
+        line_offset: f64,
+    ) -> Grid {
+        let mut xs = Vec::with_capacity(
+            (obstacles.len() + groups.len()) * 2 + gate_rects.len() * 4 + extra_points.len(),
+        );
+        let mut ys = Vec::with_capacity(xs.capacity());
+        let push_rect_lines = |xs: &mut Vec<f64>, ys: &mut Vec<f64>, r: Rect, offset: f64| {
+            xs.push(r.x - offset);
+            xs.push(r.right() + offset);
+            ys.push(r.y - offset);
+            ys.push(r.bottom() + offset);
+        };
         for o in obstacles {
-            xs.push(o.rect.x - line_offset);
-            xs.push(o.rect.right() + line_offset);
-            ys.push(o.rect.y - line_offset);
-            ys.push(o.rect.bottom() + line_offset);
+            push_rect_lines(&mut xs, &mut ys, o.rect, line_offset);
+        }
+        for g in groups {
+            push_rect_lines(&mut xs, &mut ys, g.rect, line_offset);
+        }
+        for gate in gate_rects {
+            push_rect_lines(&mut xs, &mut ys, *gate, 0.0);
+            push_rect_lines(&mut xs, &mut ys, *gate, line_offset);
         }
         for p in extra_points {
             xs.push(p.x);
@@ -153,6 +172,32 @@ impl Grid {
 
 // ─── Collision model ────────────────────────────────────────
 
+const EPS: f64 = 1e-9;
+
+/// Full step collision for one edge: node obstacles + group boundaries
+/// (group-crossing.md §3.2). Shared by the router and `verify`.
+pub fn step_blocked(a: Point, b: Point, scene: &RouteScene, edge_id: &str) -> bool {
+    let exempt = match scene.terminals.get(edge_id) {
+        Some(pair) => [pair.source.node_id.as_str(), pair.target.node_id.as_str()],
+        None => return true,
+    };
+    if segment_blocked(a, b, &scene.obstacles, &exempt, scene.params.spacing) {
+        return true;
+    }
+    let crossings = scene
+        .boundary_permissions
+        .get(edge_id)
+        .map(|v| v.as_slice())
+        .unwrap_or(&[]);
+    group_blocks_segment(
+        a,
+        b,
+        &scene.group_boundaries,
+        crossings,
+        scene.params.spacing,
+    )
+}
+
 /// Closed-collision test: does segment `a → b` touch any non-exempt obstacle
 /// inflated by `inflate`?
 ///
@@ -170,6 +215,69 @@ pub fn segment_blocked(
         .iter()
         .filter(|o| o.id != exempt[0] && o.id != exempt[1])
         .any(|o| segment_intersects_rect(a, b, padding_rect(o.rect, inflate)))
+}
+
+/// Group-boundary collision (group-crossing.md §3.2).
+///
+/// Without permission: any touch of `inflate(group)` is blocked.
+/// With permission: allowed through the padded gate corridor, or when both
+/// endpoints lie inside the raw group rect (interior travel after entry).
+pub fn group_blocks_segment(
+    a: Point,
+    b: Point,
+    groups: &[GroupBoundary],
+    crossings: &[BoundaryCrossing],
+    inflate: f64,
+) -> bool {
+    for g in groups {
+        let inflated = padding_rect(g.rect, inflate);
+        if !segment_intersects_rect(a, b, inflated) {
+            continue;
+        }
+        let gates: Vec<Rect> = crossings
+            .iter()
+            .filter(|c| c.group_id == g.group_id)
+            .filter_map(|c| c.gate_region)
+            .collect();
+        if gates.is_empty() {
+            return true; // no permission for this group
+        }
+        // Through gate corridor?
+        let via_gate = gates
+            .iter()
+            .any(|gate| segment_intersects_rect(a, b, padding_rect(*gate, inflate)));
+        if via_gate {
+            continue;
+        }
+        // Interior travel: both endpoints inside the raw group rect.
+        if point_in_rect(a, g.rect) && point_in_rect(b, g.rect) {
+            continue;
+        }
+        return true;
+    }
+    false
+}
+
+fn point_in_rect(p: Point, r: Rect) -> bool {
+    p.x >= r.x - EPS
+        && p.x <= r.right() + EPS
+        && p.y >= r.y - EPS
+        && p.y <= r.bottom() + EPS
+}
+
+/// Collect every gate rect from the scene (stable edge_order then crossing order).
+pub fn all_gate_rects(scene: &RouteScene) -> Vec<Rect> {
+    let mut out = Vec::new();
+    for eid in &scene.edge_order {
+        if let Some(crossings) = scene.boundary_permissions.get(eid) {
+            for c in crossings {
+                if let Some(g) = c.gate_region {
+                    out.push(g);
+                }
+            }
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -199,7 +307,7 @@ mod tests {
             obs("b", 200.0, 0.0, 80.0, 40.0),
         ];
         let extra = [Point { x: 90.0, y: 20.0 }, Point { x: 190.0, y: 20.0 }];
-        let g = Grid::build(&obstacles, &extra, 20.0);
+        let g = Grid::build(&obstacles, &[], &[], &extra, 20.0);
         // x lines: -20, 100, 180, 300 + extras 90, 190
         let (nx, ny) = g.dims();
         assert_eq!((nx, ny), (6, 3));

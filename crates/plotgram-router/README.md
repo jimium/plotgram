@@ -24,7 +24,7 @@ plotgram-engine         (facade; 消费 router)
 src/
   lib.rs            # crate 入口
   core/             # 无策略几何原语（port_anchor, orthogonal_elbow, rect 工具）
-  orthogonal/       # OrthogonalEdgeRouter 实现
+  orthogonal/       # OrthogonalEdgeRouter（ovg / search / track / nudge）
   verify.rs         # 几何不变量验证（正交、附着、净空、确定性）
   score.rs          # 质量度量（弯折、长度、交叉、共线）
   fixture.rs        # 场景夹具文件格式（BoardFixture 离散网格 + SceneFixture legacy + Requires 能力标记）
@@ -34,7 +34,7 @@ src/
 
 | 名称 | 注册名 | 状态 | 说明 |
 |------|--------|------|------|
-| OrthogonalEdgeRouter | `orthogonal` | **M0 + M1 已落地** | reduced interesting lines OVG + A* 避障；两轮 shared / 走廊 track 分离 / 规模门控 / min_segment；L4 nudging / 组穿越未做 |
+| OrthogonalEdgeRouter | `orthogonal` | **M0–M2 已落地** | OVG+A*；两轮 shared；L3 `interval_color` + L4 VPSC nudge；单层组+gate；嵌套 scope 未做 |
 
 新算法在 `examples/bench.rs` 和 `examples/viz.rs` 的 `lookup_algorithm()` 中注册即可被所有脚本自动发现。
 
@@ -51,6 +51,7 @@ cargo test -p plotgram-router
 - `requires: none` 场景：全项通过（含障碍净空）
 - `requires: search` 场景：`fixture_clearance_m0` 全项通过（M0 已解锁）
 - `requires: track` 场景：`fixture_track_separation` 全项通过 + 多边不完全重合（M1 已解锁）
+- `requires: group` 场景：`fixture_group_crossing` 全项通过（含 `group_clearance`）；`expect: no_path|unsupported` 由 `fixture_group_expect_fail` 验收
 
 场景文件：`tests/scenes/*.json`（文本真源，可直接编辑/diff）。采用 **BoardFixture** 离散网格格式：
 

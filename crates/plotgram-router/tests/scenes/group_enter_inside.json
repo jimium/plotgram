@@ -1,0 +1,31 @@
+{
+  "id": "G05",
+  "name": "group_enter_inside",
+  "level": 3,
+  "requires": "group",
+  "expect": "ok",
+  "description": "Source outside, target inside; Enter via north gate, then interior walk to target.",
+  "cell": 10.0,
+  "obstacles": [
+    { "id": "a", "r": 0, "c": 14, "w": 6, "h": 4 },
+    { "id": "b", "r": 10, "c": 16, "w": 6, "h": 4 }
+  ],
+  "groups": [
+    { "id": "g0", "r": 8, "c": 10, "w": 16, "h": 10 }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": ["a", "south"],
+      "to": ["b", "north"],
+      "crossings": [
+        {
+          "group": "g0",
+          "dir": "enter",
+          "gate": { "r": 8, "c": 14, "w": 6, "h": 1 }
+        }
+      ]
+    }
+  ],
+  "params": null
+}

@@ -1,0 +1,26 @@
+{
+  "id": "G04",
+  "name": "group_nested_unsupported",
+  "level": 3,
+  "requires": "group",
+  "expect": "unsupported",
+  "description": "Nested group rects are out of M2-group scope → UnsupportedRouteScene.",
+  "cell": 10.0,
+  "obstacles": [
+    { "id": "a", "r": 4, "c": 0, "w": 8, "h": 4 },
+    { "id": "b", "r": 4, "c": 30, "w": 8, "h": 4 }
+  ],
+  "groups": [
+    { "id": "outer", "r": 1, "c": 10, "w": 16, "h": 10 },
+    { "id": "inner", "r": 3, "c": 12, "w": 8, "h": 6 }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": ["a", "east"],
+      "to": ["b", "west"],
+      "crossings": []
+    }
+  ],
+  "params": null
+}

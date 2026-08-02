@@ -1,0 +1,44 @@
+{
+  "id": "G08",
+  "name": "group_shared_gate_two_edges",
+  "level": 3,
+  "requires": "group",
+  "expect": "ok",
+  "description": "Two edges enter the same north gate to different interior targets; must stay group-legal and not fully overlap.",
+  "cell": 10.0,
+  "obstacles": [
+    { "id": "a", "r": 0, "c": 14, "w": 6, "h": 4 },
+    { "id": "b", "r": 10, "c": 12, "w": 5, "h": 4 },
+    { "id": "c", "r": 10, "c": 20, "w": 5, "h": 4 }
+  ],
+  "groups": [
+    { "id": "g0", "r": 8, "c": 10, "w": 16, "h": 10 }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": ["a", "south", -1],
+      "to": ["b", "north"],
+      "crossings": [
+        {
+          "group": "g0",
+          "dir": "enter",
+          "gate": { "r": 8, "c": 14, "w": 6, "h": 1 }
+        }
+      ]
+    },
+    {
+      "id": "e1",
+      "from": ["a", "south", 1],
+      "to": ["c", "north"],
+      "crossings": [
+        {
+          "group": "g0",
+          "dir": "enter",
+          "gate": { "r": 8, "c": 14, "w": 6, "h": 1 }
+        }
+      ]
+    }
+  ],
+  "params": null
+}

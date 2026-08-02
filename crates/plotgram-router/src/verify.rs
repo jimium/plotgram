@@ -8,6 +8,7 @@ use plotgram_model::geometry::Point;
 use plotgram_model::result::EdgePlacement;
 
 use crate::core::{padding_rect, segment_intersects_rect};
+use crate::orthogonal::ovg::group_blocks_segment;
 
 /// Tolerance for geometric comparisons.
 const EPS: f64 = 1e-6;
@@ -65,6 +66,7 @@ pub fn verify_edge(scene: &RouteScene, edge_id: &str, path: &[Point]) -> EdgeVer
     if let Some(pair) = scene.terminals.get(edge_id) {
         checks.push(check_endpoint_attach(path, &pair.source.point, &pair.target.point));
         checks.push(check_obstacle_clearance(scene, edge_id, path));
+        checks.push(check_group_clearance(scene, edge_id, path));
     }
 
     let pass = checks.iter().all(|c| c.pass);
@@ -232,6 +234,44 @@ fn check_obstacle_clearance(scene: &RouteScene, edge_id: &str, path: &[Point]) -
     }
     CheckOutcome {
         name: "obstacle_clearance",
+        pass: true,
+        detail: String::new(),
+    }
+}
+
+fn check_group_clearance(scene: &RouteScene, edge_id: &str, path: &[Point]) -> CheckOutcome {
+    if scene.group_boundaries.is_empty() {
+        return CheckOutcome {
+            name: "group_clearance",
+            pass: true,
+            detail: String::new(),
+        };
+    }
+    let crossings = scene
+        .boundary_permissions
+        .get(edge_id)
+        .map(|v| v.as_slice())
+        .unwrap_or(&[]);
+    for (i, w) in path.windows(2).enumerate() {
+        if group_blocks_segment(
+            w[0],
+            w[1],
+            &scene.group_boundaries,
+            crossings,
+            scene.params.spacing,
+        ) {
+            return CheckOutcome {
+                name: "group_clearance",
+                pass: false,
+                detail: format!(
+                    "segment {} ({:?} → {:?}) illegally crosses a group boundary",
+                    i, w[0], w[1]
+                ),
+            };
+        }
+    }
+    CheckOutcome {
+        name: "group_clearance",
         pass: true,
         detail: String::new(),
     }

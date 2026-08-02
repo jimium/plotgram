@@ -1,0 +1,40 @@
+{
+  "id": "G07",
+  "name": "group_two_gates",
+  "level": 3,
+  "requires": "group",
+  "expect": "ok",
+  "description": "Sealed chamber split by a group; Enter on west gate and Leave on east gate (distinct seams).",
+  "cell": 10.0,
+  "obstacles": [
+    { "id": "a", "r": 8, "c": 6, "w": 4, "h": 4 },
+    { "id": "b", "r": 8, "c": 30, "w": 4, "h": 4 },
+    { "id": "wall_n", "r": 0, "c": 0, "w": 40, "h": 4 },
+    { "id": "wall_s", "r": 16, "c": 0, "w": 40, "h": 4 },
+    { "id": "wall_w", "r": 0, "c": 0, "w": 4, "h": 20 },
+    { "id": "wall_e", "r": 0, "c": 36, "w": 4, "h": 20 }
+  ],
+  "groups": [
+    { "id": "g0", "r": 6, "c": 14, "w": 12, "h": 8 }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": ["a", "east"],
+      "to": ["b", "west"],
+      "crossings": [
+        {
+          "group": "g0",
+          "dir": "enter",
+          "gate": { "r": 8, "c": 14, "w": 1, "h": 4 }
+        },
+        {
+          "group": "g0",
+          "dir": "leave",
+          "gate": { "r": 8, "c": 26, "w": 1, "h": 4 }
+        }
+      ]
+    }
+  ],
+  "params": null
+}

@@ -40,7 +40,7 @@
 
 ### 1.1 状态词
 
-**目标 / 已落地 / 过渡 / 后置**。M0 + M1 = **已落地**（reduced lines OVG + A*、两轮 shared、走廊 track 分离、规模门控、min_segment；`cargo test -p plotgram-router` 全绿，14 场景）。M2 的类型层（`GroupBoundary` / `BoundaryCrossing`）与诚实拒绝已就位、穿越模型未做；M3 的 Hier `DeferToRouter` 投影集成已通、Tree 接入与 FacadeVerifier 未做。L4 VPSC nudging / 组穿越 = **目标 / 后置**（逐项状态见 §10）。
+**目标 / 已落地 / 过渡 / 后置**。M0 + M1 + M2（组穿越首期 + L3/L4 VPSC nudge）= **已落地**。M3 的 Hier `DeferToRouter` 投影集成已通、Tree 接入 / Facade 组框投影 / FacadeVerifier 未做。嵌套组 scope / 交叉感知 track 序 = **后置**（逐项状态见 §10）。
 
 ---
 
@@ -171,9 +171,9 @@ port stub 出针（展开端子）
 | 搜索图 | **Reduced interesting lines → OVG**（障碍边 ± margin、端子坐标、组框） | 全量 OVG | 均匀网格（仅原型） |
 | 路径搜索 | **A\***，状态 `(vertex, Dir4)`；代价 = 长 + λ·弯 | Dijkstra 批量距离场 | 带交叉惩罚的非马尔可夫主搜（默认关） |
 | 边序 | **EdgeId 稳定序**；可选两轮（第二轮共享段惩罚） | — | HashMap 序 |
-| Track 定序 | 区间着色 + 必要偏序；平局用边 id | 单边场景跳过 | 事后贪心挪交叉 |
-| Nudging | 均匀 track 间距（M1）；VPSC 最小位移（M2） | — | 发现重叠就「挪一点」 |
-| 组穿越 | permission 列表驱动的可走 gate；违约高罚或禁边 | 无组场景跳过 | silent 穿组 |
+| Track 定序 | 区间着色 + **垂向偏好空间序**；平局用色 id | 单边场景跳过 | 事后贪心挪交叉 |
+| Nudging | **VPSC 最小位移**（`nudge.rs` + `plotgram_algo::vpsc`）；L3 用 `interval_color` | 均匀 track 间距（已替换） | 发现重叠就「挪一点」 |
+| 组穿越 | permission 列表驱动的可走 gate；**首期硬禁违约**（见 [group-crossing](phases/group-crossing.md)） | 无组场景跳过 | silent 穿组；`gate_region: None` 整边穿 |
 | Bus | — | — | Steiner / BusRouter（后置） |
 
 ### 5.1 障碍与出针
@@ -276,12 +276,11 @@ crates/plotgram-router/src/
   core/           # 无策略：anchor、elbow、rect、polyline normalize
   orthogonal/
     mod.rs        # EdgeRouter impl
-    params.rs     # （目标）
-    ovg.rs        # interesting lines / visibility（目标）
-    search.rs     # A* (vertex, dir)（目标）
-    order.rs      # L3 track（目标）
-    nudge.rs      # L4（目标）
-  verify.rs       # 正交性、碰撞、端口附着自检
+    ovg.rs        # interesting lines / visibility
+    search.rs     # A* (vertex, dir)
+    track.rs      # L3 corridor detect + interval_color
+    nudge.rs      # L4 VPSC track coordinates
+  verify.rs       # 正交性、碰撞、端口附着、组穿越自检
   score.rs        # 质量度量（弯折 / 长度 / 交叉 / 共线）
 
 crates/plotgram-router/tests/
@@ -319,7 +318,7 @@ layout Builtin Ink → plotgram_router::core（可）；↛ orthogonal 策略
 |--------|------|------|------|
 | **M0** | **已落地** | `RouteScene` 类型 + 夹具 API；reduced lines + A\*；无组；单轮；无 L3/L4（单边走廊可共线） | 手写障碍绕行正确；确定性；不穿障 |
 | **M1** | **已落地** | inflate/stub 标定；两轮 shared（`route_rounds=2` + `shared_penalty`）；走廊 track 分离（均匀偏移 `k×spacing`，`track.rs`）；规模门控（`max_search_nodes`）；min_segment（stub 拉长 + 驼峰消除）；替换 stub 主路径 | 多边不完全重合；门控可观测 |
-| **M2** | **部分** | `group_boundaries` + `permissions` 类型与诚实拒绝（`UnsupportedRouteScene`）已落地；穿越模型 / VPSC nudging 未做 | 组场景不 silent 穿（已达成）；端口对齐改善 |
+| **M2** | **已落地** | 组穿越首期 + L3 `interval_color` + L4 VPSC nudging（[group-crossing](phases/group-crossing.md) · [track-and-nudge](phases/track-and-nudge.md)） | 组场景验收全绿；共享走廊 track 间距 ≥ `spacing` |
 | **M3** | **部分** | Hier `DeferToRouter` 投影集成已落地（`run.rs::project_route_scene` + registry 注册 `orthogonal`，集成测通过）；Tree 接入 / FacadeVerifier 端口回传检查未做 | layout 冻节点后 path 可换（已达成）；ports 不变 |
 | **后置** | 未做 | 增量路由、Bus、交叉进主搜 | — |
 
@@ -344,6 +343,8 @@ layout Builtin Ink → plotgram_router::core（可）；↛ orthogonal 策略
 | 文档 | 用途 |
 |------|------|
 | [scope](scope.md) | 能力 / 非目标 |
+| [group-crossing](phases/group-crossing.md) | M2-group 穿越契约 + 夹具字段 |
+| [track-and-nudge](phases/track-and-nudge.md) | L3 区间着色 + L4 VPSC |
 | [ADR-006](../../adr/006-engine-io-and-crates.md) | Trait / crate 边界 |
 | [write-authority](../../layout/write-authority.md) | 单写者尺子 |
 | Hier [contracts-and-ir](../../layout/hierarchical/phases/contracts-and-ir.md) | `RouteScene` 与 Facade |

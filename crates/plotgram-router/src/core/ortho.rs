@@ -67,10 +67,9 @@ pub fn orthogonal_elbow(from: Point, to: Point) -> Vec<Point> {
 }
 
 /// Normalize an orthogonal polyline: drop consecutive duplicate points and
-/// merge collinear consecutive segments. Geometry-preserving: a middle point
-/// is removed only when it lies exactly on the segment between its kept
-/// neighbours (exact float compare — path coordinates come from a discrete
-/// line set, so equality is exact).
+/// merge axis-collinear consecutive triples (including reverse spurs
+/// `a → b → c` where `c` lies between `a` and `b`). Exact float compare —
+/// path coordinates come from a discrete line set, so equality is exact.
 pub fn normalize_polyline(points: &[Point]) -> Vec<Point> {
     // Drop consecutive duplicates.
     let mut out: Vec<Point> = Vec::with_capacity(points.len());
@@ -80,12 +79,13 @@ pub fn normalize_polyline(points: &[Point]) -> Vec<Point> {
         }
         out.push(p);
     }
-    // Merge collinear runs (axis-aligned segments only).
+    // Merge collinear runs (axis-aligned segments only). Reverse spurs on the
+    // same line collapse to the direct segment `a → c`.
     let mut i = 1;
     while i + 1 < out.len() {
         let (a, b, c) = (out[i - 1], out[i], out[i + 1]);
-        let collinear_vertical = a.x == b.x && b.x == c.x && between(a.y, b.y, c.y);
-        let collinear_horizontal = a.y == b.y && b.y == c.y && between(a.x, b.x, c.x);
+        let collinear_vertical = a.x == b.x && b.x == c.x;
+        let collinear_horizontal = a.y == b.y && b.y == c.y;
         if collinear_vertical || collinear_horizontal {
             out.remove(i);
         } else {
@@ -93,12 +93,6 @@ pub fn normalize_polyline(points: &[Point]) -> Vec<Point> {
         }
     }
     out
-}
-
-/// Is `b` strictly between `a` and `c` (1-D)? Guards against erasing a
-/// backtracking spur (a → b → c with c between a and b).
-fn between(a: f64, b: f64, c: f64) -> bool {
-    (a < b && b < c) || (c < b && b < a)
 }
 
 #[cfg(test)]
@@ -148,10 +142,31 @@ mod tests {
                 ],
                 vec![p(0.0, 0.0), p(10.0, 0.0), p(10.0, 8.0)],
             ),
-            // backtracking spur is preserved
+            // reverse spur collapses (overshoot then back)
             (
                 vec![p(0.0, 0.0), p(10.0, 0.0), p(5.0, 0.0)],
-                vec![p(0.0, 0.0), p(10.0, 0.0), p(5.0, 0.0)],
+                vec![p(0.0, 0.0), p(5.0, 0.0)],
+            ),
+            // reverse spur then continues on the same line → single segment
+            (
+                vec![p(0.0, 0.0), p(10.0, 0.0), p(5.0, 0.0), p(15.0, 0.0)],
+                vec![p(0.0, 0.0), p(15.0, 0.0)],
+            ),
+            // state_machine-style port approach spur
+            (
+                vec![
+                    p(140.0, 70.0),
+                    p(190.0, 70.0),
+                    p(180.0, 70.0),
+                    p(180.0, 60.0),
+                    p(190.0, 60.0),
+                ],
+                vec![
+                    p(140.0, 70.0),
+                    p(180.0, 70.0),
+                    p(180.0, 60.0),
+                    p(190.0, 60.0),
+                ],
             ),
             // genuine bend is preserved
             (

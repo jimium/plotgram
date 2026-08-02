@@ -204,7 +204,7 @@ mod tests {
             .iter()
             .flat_map(|&x| ys.iter().map(move |&y| Point { x, y }))
             .collect();
-        Grid::build(&[], &extra, 0.0)
+        Grid::build(&[], &[], &[], &extra, 0.0)
     }
 
     fn never_blocked(_: Point, _: Point) -> bool {

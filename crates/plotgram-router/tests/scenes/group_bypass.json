@@ -1,0 +1,25 @@
+{
+  "id": "G01",
+  "name": "group_bypass",
+  "level": 3,
+  "requires": "group",
+  "expect": "ok",
+  "description": "Group blocks the straight corridor; edge has no crossings → must detour outside the inflated group.",
+  "cell": 10.0,
+  "obstacles": [
+    { "id": "a", "r": 4, "c": 0, "w": 8, "h": 4 },
+    { "id": "b", "r": 4, "c": 30, "w": 8, "h": 4 }
+  ],
+  "groups": [
+    { "id": "g0", "r": 2, "c": 12, "w": 10, "h": 8 }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": ["a", "east"],
+      "to": ["b", "west"],
+      "crossings": []
+    }
+  ],
+  "params": null
+}

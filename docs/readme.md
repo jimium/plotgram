@@ -11,6 +11,7 @@ docs/
 │   ├── layout/               布局内核设计档（hierarchical / tree / …）
 │   └── notes/                设计笔记（短纪要）
 ├── specs/                    语言规范、AST、样式系统、视觉语言
+├── explainers/               设计解读（图文并茂，帮助理解已落地的设计）
 ├── guides/                   使用指南（实操文档）
 ├── reference/                外部参考与调研（yFiles、Graphviz、Cytoscape）
 └── archive/                  历史设计文档（只读参考，不再维护）
@@ -144,6 +145,17 @@ render         → model
 | [state.md](specs/visual-language/diagrams/state.md) | 状态图 |
 | [er.md](specs/visual-language/diagrams/er.md) | ER 图 |
 | [mindmap.md](specs/visual-language/diagrams/mindmap.md) | 思维导图 |
+
+---
+
+## explainers/ — 设计解读
+
+> 图文并茂地带你读懂代码里某个具体设计。解释性读物，**不驱动实现**（与 design/ 的区别）。
+> 详细索引：[explainers/README.md](explainers/README.md)
+
+| 编号 | 主题 | 对应源码 | 页面 |
+|------|------|----------|------|
+| 001 | EdgeRouter trait 与 RouteScene 生态 | `crates/plotgram-engine-api/src/traits.rs` L54-62 | [edge-router-trait.html](explainers/001-edge-router-trait.html) |
 
 ---
 

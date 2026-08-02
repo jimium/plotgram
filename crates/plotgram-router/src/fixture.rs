@@ -35,7 +35,10 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use plotgram_engine_api::{Obstacle, OrthogonalRouteParams, PortAnchor, RouteScene, TerminalPair};
+use plotgram_engine_api::{
+    BoundaryCrossing, CrossingDirection, GroupBoundary, Obstacle, OrthogonalRouteParams,
+    PortAnchor, RouteScene, TerminalPair,
+};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::port::Side;
 
@@ -68,6 +71,21 @@ impl std::fmt::Display for Requires {
     }
 }
 
+/// Expected routing outcome for a fixture (group-crossing.md §5.3).
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteExpect {
+    /// Route succeeds and passes verify.
+    #[default]
+    Ok,
+    /// Route hard-fails with no collision-free path.
+    NoPath,
+    /// Scene rejected as unsupported (`UnsupportedRouteScene`).
+    Unsupported,
+}
+
 // ─── Legacy explicit-coordinate fixture ─────────────────────
 
 /// A self-contained scene fixture with metadata (legacy format).
@@ -82,6 +100,9 @@ pub struct SceneFixture {
     pub description: String,
     /// Minimum capability an algorithm must have to pass this fixture.
     pub requires: Requires,
+    /// Expected routing outcome (default: success).
+    #[serde(default)]
+    pub expect: RouteExpect,
     /// The routing scene (algorithm input).
     pub scene: RouteScene,
 }
@@ -143,6 +164,39 @@ pub struct BoardEdge {
     pub id: String,
     pub from: BoardEnd,
     pub to: BoardEnd,
+    /// Permitted group crossings (M2). Default empty = no permission.
+    #[serde(default)]
+    pub crossings: Vec<BoardCrossing>,
+}
+
+/// One permitted group-boundary crossing in board-cell units.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BoardCrossing {
+    pub group: String,
+    /// `"enter"` | `"leave"`.
+    pub dir: CrossingDirection,
+    /// Gate region in cell units (required for M2).
+    pub gate: BoardRect,
+}
+
+/// Axis-aligned rectangle in cell units (no id).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BoardRect {
+    pub r: u32,
+    pub c: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
+impl BoardRect {
+    fn to_world(&self, cell: f64) -> Rect {
+        Rect::new(
+            self.c as f64 * cell,
+            self.r as f64 * cell,
+            self.w as f64 * cell,
+            self.h as f64 * cell,
+        )
+    }
 }
 
 /// Compact discrete-grid fixture format.
@@ -160,6 +214,9 @@ pub struct BoardFixture {
     pub level: u8,
     /// Minimum algorithm capability required.
     pub requires: Requires,
+    /// Expected routing outcome. Default [`RouteExpect::Ok`].
+    #[serde(default)]
+    pub expect: RouteExpect,
     /// Human-readable description.
     pub description: String,
     /// World units per grid cell. Defaults to 10 if absent.
@@ -167,6 +224,9 @@ pub struct BoardFixture {
     pub cell: f64,
     /// Obstacle rectangles in cell units.
     pub obstacles: Vec<BoardObstacle>,
+    /// Group boundary rectangles in cell units (M2). Default empty.
+    #[serde(default)]
+    pub groups: Vec<BoardObstacle>,
     /// Edges (port anchors auto-computed from node rect + side midpoint).
     pub edges: Vec<BoardEdge>,
     /// Optional params override. Defaults if absent.
@@ -182,16 +242,27 @@ impl BoardFixture {
     /// Convert to the algorithm-facing [`RouteScene`].
     pub fn to_route_scene(&self) -> RouteScene {
         let cell = self.cell;
-        let obstacles: Vec<Obstacle> = self
-            .obstacles
+        let board_to_obstacle = |o: &BoardObstacle| Obstacle {
+            id: o.id.clone(),
+            rect: Rect::new(
+                o.c as f64 * cell,
+                o.r as f64 * cell,
+                o.w as f64 * cell,
+                o.h as f64 * cell,
+            ),
+        };
+        let obstacles: Vec<Obstacle> = self.obstacles.iter().map(board_to_obstacle).collect();
+
+        let group_boundaries: Vec<GroupBoundary> = self
+            .groups
             .iter()
-            .map(|o| Obstacle {
-                id: o.id.clone(),
+            .map(|g| GroupBoundary {
+                group_id: g.id.clone(),
                 rect: Rect::new(
-                    o.c as f64 * cell,
-                    o.r as f64 * cell,
-                    o.w as f64 * cell,
-                    o.h as f64 * cell,
+                    g.c as f64 * cell,
+                    g.r as f64 * cell,
+                    g.w as f64 * cell,
+                    g.h as f64 * cell,
                 ),
             })
             .collect();
@@ -214,6 +285,7 @@ impl BoardFixture {
             .collect();
 
         let mut terminals: BTreeMap<String, TerminalPair> = BTreeMap::new();
+        let mut boundary_permissions: BTreeMap<String, Vec<BoundaryCrossing>> = BTreeMap::new();
         for e in &self.edges {
             let src_rect = *node_rect.get(e.from.node()).unwrap_or_else(|| {
                 panic!(
@@ -246,6 +318,18 @@ impl BoardFixture {
                     },
                 },
             );
+            if !e.crossings.is_empty() {
+                let crossings: Vec<BoundaryCrossing> = e
+                    .crossings
+                    .iter()
+                    .map(|c| BoundaryCrossing {
+                        group_id: c.group.clone(),
+                        direction: c.dir,
+                        gate_region: Some(c.gate.to_world(cell)),
+                    })
+                    .collect();
+                boundary_permissions.insert(e.id.clone(), crossings);
+            }
         }
 
         let edge_order: Vec<String> = self.edges.iter().map(|e| e.id.clone()).collect();
@@ -254,8 +338,8 @@ impl BoardFixture {
             obstacles,
             terminals,
             edge_order,
-            group_boundaries: Vec::new(),
-            boundary_permissions: BTreeMap::new(),
+            group_boundaries,
+            boundary_permissions,
             params: self.params.unwrap_or_default(),
         }
     }
@@ -267,6 +351,7 @@ impl BoardFixture {
             name: self.name.clone(),
             description: self.description.clone(),
             requires: self.requires,
+            expect: self.expect,
             scene: self.to_route_scene(),
         }
     }
