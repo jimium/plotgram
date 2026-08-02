@@ -77,7 +77,7 @@ cargo test -p plotgram-router
 - **端口**：`[node_id, side]` 自动取边中点；可选第三元素 `slot`（整数格偏移，正 = 下/右），如 `["a", "east", -1]`，用于并行边错开端口。
 - **params**：`null` = 默认；可填 `OrthogonalRouteParams` 覆盖。
 
-> ⚠ 棋盘是**夹具记法**，不是路由搜索图。路由仍走 reduced interesting lines OVG + A*（见 `docs/design/layout/routing/architecture.md` §5），不违反 AGENTS.md §2"均匀网格禁作产品路径"。
+> ⚠ 棋盘是**夹具记法**，不是路由搜索图。路由仍走 reduced interesting lines OVG + A*（见 `docs/design/routing/orthogonal/architecture.md` §5），不违反 AGENTS.md §2"均匀网格禁作产品路径"。
 
 ## 脚本工具
 
@@ -115,7 +115,7 @@ cargo test -p plotgram-router
 
 ## 里程碑
 
-与 [architecture.md](../docs/design/layout/routing/architecture.md) §10 同步：
+与 [architecture.md](../docs/design/routing/orthogonal/architecture.md) §10 同步：
 
 | 阶段 | 状态 | 目标 | 解锁 |
 |------|------|------|------|

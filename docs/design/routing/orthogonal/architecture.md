@@ -4,7 +4,7 @@
 > 日期：2026-08-02
 > 引擎注册名：`orthogonal`
 > 代码落点：`crates/plotgram-router/`（`core` + `orthogonal` + `verify` + `score`）
-> 约束入口：[写权纪律](../write-authority.md) · [AGENTS.md](../../../../AGENTS.md) §1 · [ADR-006](../../adr/006-engine-io-and-crates.md)
+> 约束入口：[写权纪律](../../layout/write-authority.md) · [AGENTS.md](../../../../AGENTS.md) §1 · [ADR-006](../../adr/006-engine-io-and-crates.md)
 > 证据：[03 正交边路由](../../../reference/yfiles/03-正交边路由.md) · libavoid / Wybrow et al.
 > 姊妹页：[README](README.md) · [scope](scope.md)
 
@@ -66,7 +66,7 @@ LayoutAlgorithm（任意核，DeferToRouter）
 | 何时用 | `edge_routing: None` | `edge_routing: Some("orthogonal")` |
 | 节点假设 | 分层规则缝 | **自由位置**亦可 |
 
-Facade 细则与 `RouteScene` 字段真源亦见 Hier [contracts-and-ir](../hierarchical/phases/contracts-and-ir.md) §2；本文是 Router 侧消费契约。
+Facade 细则与 `RouteScene` 字段真源亦见 Hier [contracts-and-ir](../../layout/hierarchical/phases/contracts-and-ir.md) §2；本文是 Router 侧消费契约。
 
 ---
 
@@ -345,10 +345,10 @@ layout Builtin Ink → plotgram_router::core（可）；↛ orthogonal 策略
 |------|------|
 | [scope](scope.md) | 能力 / 非目标 |
 | [ADR-006](../../adr/006-engine-io-and-crates.md) | Trait / crate 边界 |
-| [write-authority](../write-authority.md) | 单写者尺子 |
-| Hier [contracts-and-ir](../hierarchical/phases/contracts-and-ir.md) | `RouteScene` 与 Facade |
-| Hier [ports-and-channel](../hierarchical/phases/ports-and-channel.md) §9 | Builtin vs Defer |
-| Sequence [message-routing](../sequence/phases/message-routing.md) | **对照**：非本路径 |
+| [write-authority](../../layout/write-authority.md) | 单写者尺子 |
+| Hier [contracts-and-ir](../../layout/hierarchical/phases/contracts-and-ir.md) | `RouteScene` 与 Facade |
+| Hier [ports-and-channel](../../layout/hierarchical/phases/ports-and-channel.md) §9 | Builtin vs Defer |
+| Sequence [message-routing](../../layout/sequence/phases/message-routing.md) | **对照**：非本路径 |
 | [03 正交边路由](../../../reference/yfiles/03-正交边路由.md) | 算法证据 |
 
 ---

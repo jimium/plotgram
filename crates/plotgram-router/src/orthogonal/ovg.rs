@@ -8,7 +8,7 @@
 //! intersections; two adjacent intersections are connected when the segment
 //! between them is collision-free (checked lazily by the search).
 //!
-//! See `docs/design/layout/routing/architecture.md` §5 (搜索图主选).
+//! See `docs/design/routing/orthogonal/architecture.md` §5 (搜索图主选).
 
 use plotgram_engine_api::Obstacle;
 use plotgram_model::geometry::Point;

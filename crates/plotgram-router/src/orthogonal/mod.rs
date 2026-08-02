@@ -4,7 +4,7 @@
 //! with obstacle avoidance; M1 adds a second routing round with a
 //! shared-segment penalty, corridor track separation (uniform offsets), a
 //! node-budget gate, and a `min_segment` short-segment post-pass (see
-//! `docs/design/layout/routing/architecture.md` §10). L3 track ordering
+//! `docs/design/routing/orthogonal/architecture.md` §10). L3 track ordering
 //! beyond uniform offsets and L4 VPSC nudging / groups are M2+ and
 //! intentionally absent.
 //!

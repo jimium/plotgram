@@ -40,7 +40,7 @@
 | 夹 | 用途 |
 |----|------|
 | [shared/](shared/) | group / port / label 等共享语义如何被各核消费 |
-| [routing/](routing/) | 独立 `EdgeRouter`（正交）与原语 · [架构](routing/architecture.md) |
+| [routing/](../routing/) | 独立 `EdgeRouter`（正交）与原语 · [架构](../routing/orthogonal/architecture.md) |
 | 实现零件 | [`crates/plotgram-algo`](../../../crates/plotgram-algo/PARTS.md) — VPSC / FAS 等可单测组件 |
 
 新建内核时照 [_template.md](_template.md) 起夹。
@@ -64,5 +64,5 @@ state(环形)                             → circular
 
 1. 先读 [写权纪律](write-authority.md)。
 2. 做 Hier：本目录 [hierarchical/](hierarchical/) → **目标架构** [architecture](hierarchical/architecture.md) → [相级契约](hierarchical/phases/README.md) → 启发纪要 [from-yfiles-reference](hierarchical/nodes/from-yfiles-reference.md) → reference [01](../../reference/yfiles/01-sugiyama分层布局.md) / [13](../../reference/yfiles/13-实现路线图与选型.md)。
-3. 做独立正交路由： [routing/](routing/) → [architecture](routing/architecture.md) → reference [03](../../reference/yfiles/03-正交边路由.md)。可手写 `RouteScene` 夹具，不经布局核。
+3. 做独立正交路由： [routing/](../routing/) → [orthogonal/](../routing/orthogonal/) → [architecture](../routing/orthogonal/architecture.md) → reference [03](../../reference/yfiles/03-正交边路由.md)。可手写 `RouteScene` 夹具，不经布局核。
 4. 回溯 Atlas 决策动机时再翻 `docs/archive/atlas/`（21 立场 → 22 总纲）。

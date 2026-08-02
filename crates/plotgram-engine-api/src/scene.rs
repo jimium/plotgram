@@ -5,7 +5,7 @@
 //! `NodePlacement` slices. The engine facade (or test fixtures) projects
 //! upstream data into a scene before invoking [`crate::EdgeRouter::route`].
 //!
-//! See `docs/design/layout/routing/architecture.md` §3.1.
+//! See `docs/design/routing/orthogonal/architecture.md` §3.1.
 
 use std::collections::BTreeMap;
 

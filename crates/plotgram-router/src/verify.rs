@@ -1,7 +1,7 @@
 //! Geometric invariant verification for routed edge paths.
 //!
 //! Library code — usable from tests, CLI, and benchmark binaries.
-//! Checks correspond to `docs/design/layout/routing/architecture.md` §9.
+//! Checks correspond to `docs/design/routing/orthogonal/architecture.md` §9.
 
 use plotgram_engine_api::{EdgeRouter, RouteScene};
 use plotgram_model::geometry::Point;

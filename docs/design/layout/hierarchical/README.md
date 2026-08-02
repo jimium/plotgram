@@ -37,7 +37,7 @@ Sugiyama 骨架 + Atlas 三相写权（组合 → 度量 → Ink）。
 
 - **默认**：内建正交 Ink（`EdgeGeometryMode::Builtin`），组合相决定端口/通道拓扑；`routing_style` 可选 polyline 等。  
 - **可选**：节点冻结后交给独立 `EdgeRouter`（`DeferToRouter`）。  
-- 二者契约见 [../routing/](../routing/)。
+- 二者契约见 [../../routing/](../../routing/)。
 
 ## 写权（本核）
 
