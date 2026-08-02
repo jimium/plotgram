@@ -6,7 +6,7 @@ use std::sync::Arc;
 use plotgram_engine_api::{EdgeRouter, LayoutAlgorithm};
 
 use crate::layout::HierarchicalLayout;
-use crate::route::OrthogonalEdgeRouter;
+use plotgram_router::OrthogonalEdgeRouter;
 
 pub struct Registry {
     layouts: BTreeMap<&'static str, Arc<dyn LayoutAlgorithm>>,

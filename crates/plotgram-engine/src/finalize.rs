@@ -5,7 +5,7 @@ use plotgram_model::graph::Graph;
 use plotgram_model::result::{
     GroupPlacement, LabelOwner, LabelSlot, LayoutResult, NodePlacement,
 };
-use crate::route::core::expand_union;
+use plotgram_router::core::expand_union;
 
 const GROUP_PAD: f64 = 16.0;
 const CANVAS_PAD: f64 = 24.0;
@@ -145,7 +145,7 @@ fn find_group<'a>(
 fn canvas_size(nodes: &[NodePlacement], groups: &[GroupPlacement]) -> (f64, f64) {
     let mut rects: Vec<Rect> = nodes.iter().map(|n| n.frame).collect();
     rects.extend(groups.iter().map(|g| g.frame));
-    match crate::route::core::union_rects(&rects) {
+    match plotgram_router::core::union_rects(&rects) {
         Some(u) => (
             u.right() + CANVAS_PAD,
             u.bottom() + CANVAS_PAD,

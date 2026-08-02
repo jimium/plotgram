@@ -244,6 +244,7 @@ dependencies = [
  "plotgram-algo",
  "plotgram-engine-api",
  "plotgram-model",
+ "plotgram-router",
 ]
 
 [[package]]
@@ -251,6 +252,7 @@ name = "plotgram-engine-api"
 version = "0.1.0"
 dependencies = [
  "plotgram-model",
+ "serde",
  "thiserror",
 ]
 
@@ -290,6 +292,17 @@ dependencies = [
  "serde",
  "serde_json",
  "unicode-width",
+]
+
+[[package]]
+name = "plotgram-router"
+version = "0.1.0"
+dependencies = [
+ "plotgram-algo",
+ "plotgram-engine-api",
+ "plotgram-model",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

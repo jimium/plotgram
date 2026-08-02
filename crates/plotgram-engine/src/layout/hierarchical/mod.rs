@@ -1,7 +1,7 @@
 //! Hierarchical layout algorithm (Sugiyama-style subset).
 //!
 //! Stub: longest-path ranks, packing from preferred sizes, port inference,
-//! built-in orthogonal ink via [`crate::route::core`]. Extract to
+//! built-in orthogonal ink via [`plotgram_router::core`]. Extract to
 //! `plotgram-layout-hierarchical` when this tree grows large.
 
 mod ink;

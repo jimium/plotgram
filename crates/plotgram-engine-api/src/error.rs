@@ -17,6 +17,12 @@ pub enum LayoutError {
     #[error("layout `{layout}` does not support deferred edge routing")]
     LayoutCannotDeferEdges { layout: String },
 
+    /// The route scene contains features the router cannot handle (e.g. groups
+    /// without permission support). Routers must fail honestly, never silently
+    /// ignore unsupported constraints (R5).
+    #[error("unsupported route scene: {reason}")]
+    UnsupportedRouteScene { reason: String },
+
     #[error("{0}")]
     Message(String),
 }

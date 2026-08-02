@@ -32,9 +32,10 @@
 | Crate | 职责 |
 |-------|------|
 | `plotgram-model` | 数据 |
-| `plotgram-engine-api` | `LayoutAlgorithm` / `EdgeRouter` / `LayoutError`（**禁止**放进 model 或门面） |
+| `plotgram-engine-api` | `LayoutAlgorithm` / `EdgeRouter` / `LayoutError` / `RouteScene`（**禁止**放进 model 或门面） |
 | `plotgram-algo` | **共享算法零件**（VPSC / FAS / 交叉计数 / orientation / track / 正交规范化等）；无管线、无 Contract；见 [`PARTS.md`](../../crates/plotgram-algo/PARTS.md) |
-| `plotgram-engine` | `run` + 注册表 + **in-tree** `layout::*` / `route::*`（消费 algo） |
+| `plotgram-router` | **独立边路由**：`core`（无策略原语）+ `orthogonal`（OVG/A* router）+ `verify` + `score`；不依赖 engine 门面 |
+| `plotgram-engine` | `run` + 注册表 + **in-tree** `layout::*`（消费 algo + router） |
 | `plotgram-pipeline` | 编排 |
 | `plotgram-parse` / `content` / `render` / `cli` | 各司其职 |
 
@@ -43,8 +44,6 @@
 ```text
 plotgram-engine
   layout/hierarchical/     → 将来 plotgram-layout-hierarchical
-  route/core/              → 将来 plotgram-route-core
-  route/orthogonal.rs      → 将来 plotgram-route-orthogonal
   run / registry / finalize
 ```
 
@@ -54,12 +53,15 @@ plotgram-engine
 model ← engine-api
          algo（零件；当前可不依赖 model）
               ↑
-         layout/route 实现 ← engine 门面（只组装，实现不依赖 run）
+         plotgram-router（core + orthogonal + verify + score）
+              ↑
+         layout 实现 ← engine 门面（只组装，实现不依赖 run）
 ```
 
 - **禁止**实现模块依赖 `run` / 注册表的「门面逻辑」形成环。  
 - **禁止** `plotgram-algo` 依赖 `plotgram-engine`。  
-- 内建 Ink 属于 hierarchical，可调用 `algo` 与 `route::core`；不是 `EdgeRouter`。
+- **禁止** `plotgram-router` 依赖 `plotgram-engine`（只能反向）。  
+- 内建 Ink 属于 hierarchical，可调用 `algo` 与 `plotgram_router::core`；不是 `EdgeRouter`。
 
 ### 4. 何时再拆 layout/route crate
 

@@ -7,4 +7,5 @@ description = "Plotgram layout/routing plugin traits (no algorithms)"
 
 [dependencies]
 plotgram-model = { workspace = true }
+serde = { workspace = true }
 thiserror = { workspace = true }

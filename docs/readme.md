@@ -114,6 +114,7 @@ render         → model
 | [adr/005…](design/adr/005-content-measure-params.md) | 内容块、启发式度量与布局前 MeasureParams |
 | [adr/006…](design/adr/006-engine-io-and-crates.md) | Engine 入口、边写者与 crate 拆分 |
 | [adr/008…](design/adr/008-partition-grid.md) | PartitionGrid — 正交分区 DSL/model；与 group/rank 三分 |
+| [adr/009…](design/adr/009-layout-result-decorations.md) | LayoutResult.decorations — 派生几何（生命线等）；layout 写、render 画 |
 
 ---
 

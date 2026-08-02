@@ -8,7 +8,7 @@ use plotgram_model::port::PortRef;
 use plotgram_model::result::{EdgePath, EdgePlacement, NodePlacement};
 
 use super::params::RoutingStyle;
-use crate::route::core::{orthogonal_elbow, port_anchor};
+use plotgram_router::core::{orthogonal_elbow, port_anchor};
 
 pub fn route_builtin(
     nodes: &[NodePlacement],

@@ -1,11 +1,11 @@
 # 布局写权纪律
 
-> 现行设计尺子 · [`AGENTS.md`](../../../AGENTS.md) §1  
+> 现行设计尺子 · [`AGENTS.md`](../../../AGENTS.md) §1
 > 学 yFiles 的**理念与纪律**，不复刻全量布局栈。
 
 Hier / 正交主路径只有两条硬约束：
 
-1. **单写者** — 每个几何自由度有且只有一个写者  
+1. **单写者** — 每个几何自由度有且只有一个写者
 2. **落笔零新决策** — Ink / 事后修只展开上游，不得发明
 
 ---
@@ -57,18 +57,18 @@ producer 局部聚合（可 sum/count）
 
 ## 3. 动手前四问
 
-1. **写者是谁？** Plan / 度量相是否已有名义主人？  
-2. **落笔是否在发明？** 猜中点 / 肘点 / Main 轴 → 缺决策，不是启发式。  
-3. **是否多写者？** 间隙、track、ports、label 带是否一处 publish、他处只读？  
+1. **写者是谁？** Plan / 度量相是否已有名义主人？
+2. **落笔是否在发明？** 猜中点 / 肘点 / Main 轴 → 缺决策，不是启发式。
+3. **是否多写者？** 间隙、track、ports、label 带是否一处 publish、他处只读？
 4. **是否事后硬修？** 不回写 Plan 的 repair 破坏自反证；正确性靠构造 + verify。
 
 ---
 
 ## 4. 优先级
 
-- 有界返工、端点序、单一真源 **先于**「先上真 MCF / 加深全局优化」。  
-- 不为消 stress / lint 在 Ink 打补丁；禁止图名特判（[AGENTS.md](../../../AGENTS.md) §2）。  
-- **删冗余优于叠阶段**；不要用兼容层续命第二宇宙。  
+- 有界返工、端点序、单一真源 **先于**「先上真 MCF / 加深全局优化」。
+- 不为消 stress / lint 在 Ink 打补丁；禁止图名特判（[AGENTS.md](../../../AGENTS.md) §2）。
+- **删冗余优于叠阶段**；不要用兼容层续命第二宇宙。
 - **组合相最终应是一个**：weak/strong 是收缩参数，不是平行宇宙；输出类型不一致则组合相尚未存在。
 
 ---
@@ -79,5 +79,6 @@ producer 局部聚合（可 sum/count）
 |------|--------|
 | **本文** | 尺子、判断句 |
 | [`layout/`](README.md) | 各内核：逻辑、范围、典型域、相写权 |
+| [`routing/architecture`](routing/architecture.md) | 独立 EdgeRouter：只写 path；L2–L4；可夹具开发 |
 | [`hierarchical/from-yfiles-reference`](hierarchical/nodes/from-yfiles-reference.md) | 参考文库对 Hier / Atlas 迁移的启发纪要 |
 | [`archive/atlas/`](../../archive/atlas/README.md) | 历史总纲与债单（只读） |

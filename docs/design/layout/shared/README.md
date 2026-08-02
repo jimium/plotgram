@@ -12,6 +12,7 @@
 | Port | `PortConstraint`（作者）→ `PortRef`（决议）；along 属组合相 | model `port`、[写权纪律](../write-authority.md) |
 | Label | Demand 进缝宽；完整 integrated labeling 渐进 | Hier [scope](../hierarchical/scope.md) 记债 |
 | Edge group | `edge_group` 合流/总线；由路由/Ink 消费 | [ADR-003](../../adr/003-edge-structural-fields.md) |
+| **Decoration** | 布局派生几何（生命线/激活条等）；不进 Graph | [ADR-009](../../adr/009-layout-result-decorations.md) |
 
 ## 原则
 

@@ -1,6 +1,6 @@
 # Hierarchical · 边界契约、IR 与 Stage
 
-> 父页：[architecture](../architecture.md) §2–§3、§9–§10  
+> 父页：[architecture](../architecture.md) §2–§3、§9–§10
 > 相关：[composition](composition.md) · [coordinate-and-demand](coordinate-and-demand.md)
 
 ## 1. Engine 边界
@@ -53,8 +53,10 @@ RouteScene
   terminals: EdgeId → { source: PortPoint, target: PortPoint }
 ```
 
-`BoundaryCrossing` 按原始 source→target 顺序列出 `(group_id, enter|leave, gate_region)`。  
+`BoundaryCrossing` 按原始 source→target 顺序列出 `(group_id, enter|leave, gate_region)`。
 自由位置 OVG Router 可以不用 Hier 的 Channel topology，但必须遵守同一组边界许可。Router 若不支持该 scene，返回 `UnsupportedRouteScene`，不得忽略 groups。
+
+Router 侧完整契约、算法选型与夹具开发方式：[routing/architecture](../../routing/architecture.md)。
 
 ## 3. 稳定 key
 

@@ -44,7 +44,7 @@ CLI 仅做参数与文件 I/O，调用 pipeline，不写编排逻辑。
 - **无** `seq` 字段；重排时间 = 重排 DSL 中边的书写顺序。
 - 产品上消息写在顶层；组内消息不是一等时序能力。
 
-生命线 / 激活条是 layout/render **派生几何**，不进入 `Graph`。
+生命线 / 激活条是 layout **派生几何**，不进入 `Graph`；须经 `LayoutResult.decorations` 交给 render，禁止 render 按图种猜坐标。详见 [ADR-009](adr/009-layout-result-decorations.md)。
 
 ## 组间边（ADR-004）
 
@@ -110,9 +110,9 @@ CLI 仅做参数与文件 I/O，调用 pipeline，不写编排逻辑。
   → 度量：preferred size → NodeSizes（+ ContentLayout）
   → LayoutContract { layout, edge_routing?, graph, node_sizes }
   → plotgram_engine::run（Layout / 可选 EdgeRouter；group 包络）
-  → LayoutResult（EdgePlacement 含 PortRef）
+  → LayoutResult（EdgePlacement 含 PortRef；可选 decorations，见 ADR-009）
   → RenderInput { graph, layout, meta }
-  → SVG（跳过 group_anchor 形体；内容块展开 ContentLayout）
+  → SVG（跳过 group_anchor 形体；画 decorations；内容块展开 ContentLayout）
 ```
 
 ## `edge_routing` 语义

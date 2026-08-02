@@ -8,9 +8,12 @@
 #![forbid(unsafe_code)]
 
 mod error;
+pub mod scene;
 mod traits;
 
 pub use error::LayoutError;
-pub use traits::{
-    EdgeGeometryMode, EdgeRouter, LayoutAlgorithm, LayoutInput, LayoutOutput, RouteInput,
+pub use scene::{
+    BoundaryCrossing, CrossingDirection, GroupBoundary, Obstacle, OrthogonalRouteParams,
+    PortAnchor, RouteScene, TerminalPair,
 };
+pub use traits::{EdgeGeometryMode, EdgeRouter, LayoutAlgorithm, LayoutInput, LayoutOutput};

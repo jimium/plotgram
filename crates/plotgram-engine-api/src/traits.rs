@@ -5,6 +5,7 @@ use plotgram_model::graph::Graph;
 use plotgram_model::result::{EdgePlacement, NodePlacement};
 use plotgram_model::sizes::NodeSizes;
 
+use crate::scene::RouteScene;
 use crate::LayoutError;
 
 /// Whether the layout must write final edge geometry or defer to an [`EdgeRouter`].
@@ -45,19 +46,17 @@ pub trait LayoutAlgorithm: Send + Sync {
     fn layout(&self, input: LayoutInput<'_>) -> Result<LayoutOutput, LayoutError>;
 }
 
-/// Input to [`EdgeRouter::route`] after nodes are frozen.
-#[derive(Debug, Clone, Copy)]
-pub struct RouteInput<'a> {
-    pub graph: &'a Graph,
-    pub nodes: &'a [NodePlacement],
-    /// Edge stubs from layout (ids / endpoints / optional ports); paths replaced.
-    pub edges: &'a [EdgePlacement],
-    pub options: &'a AttrMap,
-}
-
 /// Independent edge router: nodes frozen, writes final edge paths.
+///
+/// Consumes a [`RouteScene`] (obstacles + terminals + params) and produces
+/// one [`EdgePlacement`] per edge in `scene.edge_order`. Must not modify
+/// nodes, ports, or invent terminals — only writes `path`.
 pub trait EdgeRouter: Send + Sync {
+    /// Registry key (e.g. `"orthogonal"`).
     fn name(&self) -> &'static str;
 
-    fn route(&self, input: RouteInput<'_>) -> Result<Vec<EdgePlacement>, LayoutError>;
+    /// Route all edges described in `scene`.
+    ///
+    /// Output order matches `scene.edge_order`.
+    fn route(&self, scene: &RouteScene) -> Result<Vec<EdgePlacement>, LayoutError>;
 }

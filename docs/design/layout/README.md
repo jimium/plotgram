@@ -1,7 +1,7 @@
 # 布局内核设计档
 
-> 状态：现行  
-> 位置：`docs/design/layout/`  
+> 状态：现行
+> 位置：`docs/design/layout/`
 > 约束入口：[AGENTS.md](../../../AGENTS.md) §1、[写权纪律](write-authority.md)
 
 本目录按**布局内核**立档（不按图种）。每个内核一个文件夹，描述 plotgram **要做什么**：基本逻辑、能力范围、典型域，以及可展开的相级设计。
@@ -32,7 +32,7 @@
 |------|----------------|--------|------|----------------|
 | Hierarchical | `hierarchical` | 有向分层；主核 | [hierarchical/](hierarchical/) | `plotgram-engine` → `layout/hierarchical` |
 | Tree | `tree` | 树形递归放置 | [tree/](tree/) | 待建 |
-| Sequence | `sequence` | 参与者轴 + 消息时间序 | [sequence/](sequence/) | 待建 |
+| Sequence | `sequence` | 参与者轴 + 消息时间序；Builtin 边 | [sequence/](sequence/) · [架构](sequence/architecture.md) | 待建 |
 | Circular | `circular` | 圆环 / 分量环 | [circular/](circular/) | 待建 |
 
 横切（按需生长，避免在每个内核里重复）：
@@ -40,7 +40,7 @@
 | 夹 | 用途 |
 |----|------|
 | [shared/](shared/) | group / port / label 等共享语义如何被各核消费 |
-| [routing/](routing/) | 内建边 vs 独立 `EdgeRouter`、正交原语 |
+| [routing/](routing/) | 独立 `EdgeRouter`（正交）与原语 · [架构](routing/architecture.md) |
 | 实现零件 | [`crates/plotgram-algo`](../../../crates/plotgram-algo/PARTS.md) — VPSC / FAS 等可单测组件 |
 
 新建内核时照 [_template.md](_template.md) 起夹。
@@ -62,6 +62,7 @@ state(环形)                             → circular
 
 ## 阅读建议
 
-1. 先读 [写权纪律](write-authority.md)。  
+1. 先读 [写权纪律](write-authority.md)。
 2. 做 Hier：本目录 [hierarchical/](hierarchical/) → **目标架构** [architecture](hierarchical/architecture.md) → [相级契约](hierarchical/phases/README.md) → 启发纪要 [from-yfiles-reference](hierarchical/nodes/from-yfiles-reference.md) → reference [01](../../reference/yfiles/01-sugiyama分层布局.md) / [13](../../reference/yfiles/13-实现路线图与选型.md)。
-3. 回溯 Atlas 决策动机时再翻 `docs/archive/atlas/`（21 立场 → 22 总纲）。
+3. 做独立正交路由： [routing/](routing/) → [architecture](routing/architecture.md) → reference [03](../../reference/yfiles/03-正交边路由.md)。可手写 `RouteScene` 夹具，不经布局核。
+4. 回溯 Atlas 决策动机时再翻 `docs/archive/atlas/`（21 立场 → 22 总纲）。
