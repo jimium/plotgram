@@ -1,0 +1,21 @@
+{
+  "id": "L16",
+  "name": "ring_entry",
+  "level": 4,
+  "requires": "search",
+  "description": "A rectangular ring of walls encloses the target with a single narrow opening reachable only from above; path must locate the entry and thread inside.",
+  "cell": 10.0,
+  "obstacles": [
+    {"id": "a", "r": 14, "c": 0, "w": 6, "h": 4},
+    {"id": "b", "r": 16, "c": 16, "w": 8, "h": 8},
+    {"id": "top", "r": 10, "c": 10, "w": 24, "h": 2},
+    {"id": "bot", "r": 28, "c": 10, "w": 24, "h": 2},
+    {"id": "left", "r": 12, "c": 10, "w": 2, "h": 16},
+    {"id": "rt_top", "r": 12, "c": 32, "w": 2, "h": 4},
+    {"id": "rt_bot", "r": 22, "c": 32, "w": 2, "h": 6}
+  ],
+  "edges": [
+    {"id": "e0", "from": ["a", "east"], "to": ["b", "west"]}
+  ],
+  "params": null
+}

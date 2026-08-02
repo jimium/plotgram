@@ -1,14 +1,14 @@
 {
-  "id": "L09",
-  "name": "parallel_two_edges",
-  "level": 1,
-  "requires": "none",
-  "description": "Two edges between the same pair of nodes (parallel).",
+  "id": "L10",
+  "name": "shared_corridor_split",
+  "level": 3,
+  "requires": "track",
+  "description": "Two edges share one corridor, then split to targets above and below.",
   "cell": 10.0,
   "obstacles": [
     {
       "id": "a",
-      "r": 0,
+      "r": 12,
       "c": 0,
       "w": 8,
       "h": 6
@@ -18,7 +18,14 @@
       "r": 0,
       "c": 20,
       "w": 8,
-      "h": 6
+      "h": 4
+    },
+    {
+      "id": "c",
+      "r": 20,
+      "c": 20,
+      "w": 8,
+      "h": 4
     }
   ],
   "edges": [
@@ -26,26 +33,22 @@
       "id": "e0",
       "from": [
         "a",
-        "east",
-        -1
+        "east"
       ],
       "to": [
         "b",
-        "west",
-        -1
+        "west"
       ]
     },
     {
       "id": "e1",
       "from": [
         "a",
-        "east",
-        1
+        "east"
       ],
       "to": [
-        "b",
-        "west",
-        1
+        "c",
+        "west"
       ]
     }
   ],

@@ -1,0 +1,74 @@
+{
+  "id": "L02",
+  "name": "fanout_three",
+  "level": 3,
+  "requires": "track",
+  "description": "One source fans out to three targets; the first corridor run is shared.",
+  "cell": 10.0,
+  "obstacles": [
+    {
+      "id": "a",
+      "r": 8,
+      "c": 0,
+      "w": 8,
+      "h": 6
+    },
+    {
+      "id": "b",
+      "r": 0,
+      "c": 20,
+      "w": 8,
+      "h": 4
+    },
+    {
+      "id": "c",
+      "r": 8,
+      "c": 30,
+      "w": 8,
+      "h": 4
+    },
+    {
+      "id": "d",
+      "r": 20,
+      "c": 20,
+      "w": 8,
+      "h": 4
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": [
+        "a",
+        "east"
+      ],
+      "to": [
+        "b",
+        "west"
+      ]
+    },
+    {
+      "id": "e1",
+      "from": [
+        "a",
+        "east"
+      ],
+      "to": [
+        "c",
+        "west"
+      ]
+    },
+    {
+      "id": "e2",
+      "from": [
+        "a",
+        "east"
+      ],
+      "to": [
+        "d",
+        "west"
+      ]
+    }
+  ],
+  "params": null
+}

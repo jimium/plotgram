@@ -3,22 +3,46 @@
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::port::{PortRef, Side};
 
+/// Length of the collinear overlap between two segments (0 if not collinear
+/// or disjoint). Grid coordinates are exact, so `1e-9` only guards float
+/// jitter from normalization.
+///
+/// Single geometry truth for shared-corridor detection (M1 track separation)
+/// and shared-segment scoring; also the base of `segments_overlap` in `score`.
+pub fn overlap_len(a: Point, b: Point, c: Point, d: Point) -> f64 {
+    const EPS: f64 = 1e-9;
+    let a_horiz = (a.y - b.y).abs() < EPS;
+    let b_horiz = (c.y - d.y).abs() < EPS;
+    if a_horiz != b_horiz {
+        return 0.0;
+    }
+    if a_horiz {
+        if (a.y - c.y).abs() > EPS {
+            return 0.0;
+        }
+        let lo = a.x.min(b.x).max(c.x.min(d.x));
+        let hi = a.x.max(b.x).min(c.x.max(d.x));
+        (hi - lo).max(0.0)
+    } else {
+        if (a.x - c.x).abs() > EPS {
+            return 0.0;
+        }
+        let lo = a.y.min(b.y).max(c.y.min(d.y));
+        let hi = a.y.max(b.y).min(c.y.max(d.y));
+        (hi - lo).max(0.0)
+    }
+}
+
 /// Anchor point on a node frame for a resolved port (slot ignored in stub geometry).
 pub fn port_anchor(frame: &Rect, port: PortRef) -> Point {
     let c = frame.center();
     match port.side {
-        Side::North => Point {
-            x: c.x,
-            y: frame.y,
-        },
+        Side::North => Point { x: c.x, y: frame.y },
         Side::South => Point {
             x: c.x,
             y: frame.bottom(),
         },
-        Side::West => Point {
-            x: frame.x,
-            y: c.y,
-        },
+        Side::West => Point { x: frame.x, y: c.y },
         Side::East => Point {
             x: frame.right(),
             y: c.y,
@@ -34,16 +58,10 @@ pub fn orthogonal_elbow(from: Point, to: Point) -> Vec<Point> {
     }
     // Prefer horizontal-first when |dx| >= |dy|.
     if (to.x - from.x).abs() >= (to.y - from.y).abs() {
-        let mid = Point {
-            x: to.x,
-            y: from.y,
-        };
+        let mid = Point { x: to.x, y: from.y };
         vec![from, mid, to]
     } else {
-        let mid = Point {
-            x: from.x,
-            y: to.y,
-        };
+        let mid = Point { x: from.x, y: to.y };
         vec![from, mid, to]
     }
 }
@@ -89,14 +107,45 @@ mod tests {
     use plotgram_model::port::Side;
 
     #[test]
+    fn overlap_len_cases() {
+        let p = |x: f64, y: f64| Point { x, y };
+        let cases: &[((Point, Point, Point, Point), f64)] = &[
+            // full overlap (same direction)
+            ((p(0.0, 0.0), p(10.0, 0.0), p(0.0, 0.0), p(10.0, 0.0)), 10.0),
+            // partial overlap
+            ((p(0.0, 0.0), p(10.0, 0.0), p(5.0, 0.0), p(20.0, 0.0)), 5.0),
+            // opposite direction still overlaps
+            ((p(0.0, 0.0), p(10.0, 0.0), p(10.0, 0.0), p(2.0, 0.0)), 8.0),
+            // disjoint
+            ((p(0.0, 0.0), p(10.0, 0.0), p(12.0, 0.0), p(20.0, 0.0)), 0.0),
+            // vertical overlap
+            ((p(5.0, 0.0), p(5.0, 10.0), p(5.0, 4.0), p(5.0, 8.0)), 4.0),
+            // not collinear (crossing) → 0
+            ((p(0.0, 5.0), p(10.0, 5.0), p(5.0, 0.0), p(5.0, 10.0)), 0.0),
+        ];
+        for (i, ((a, b, c, d), want)) in cases.iter().enumerate() {
+            assert_eq!(overlap_len(*a, *b, *c, *d), *want, "case {i}");
+        }
+    }
+
+    #[test]
     fn normalize_cases() {
         let p = |x: f64, y: f64| Point { x, y };
         let cases: &[(Vec<Point>, Vec<Point>)] = &[
             // consecutive duplicates collapse
-            (vec![p(0.0, 0.0), p(0.0, 0.0), p(10.0, 0.0)], vec![p(0.0, 0.0), p(10.0, 0.0)]),
+            (
+                vec![p(0.0, 0.0), p(0.0, 0.0), p(10.0, 0.0)],
+                vec![p(0.0, 0.0), p(10.0, 0.0)],
+            ),
             // collinear middle point merges (horizontal and vertical)
             (
-                vec![p(0.0, 0.0), p(5.0, 0.0), p(10.0, 0.0), p(10.0, 4.0), p(10.0, 8.0)],
+                vec![
+                    p(0.0, 0.0),
+                    p(5.0, 0.0),
+                    p(10.0, 0.0),
+                    p(10.0, 4.0),
+                    p(10.0, 8.0),
+                ],
                 vec![p(0.0, 0.0), p(10.0, 0.0), p(10.0, 8.0)],
             ),
             // backtracking spur is preserved

@@ -1,29 +1,29 @@
 {
-  "id": "L01",
-  "name": "blocker_center",
+  "id": "L11",
+  "name": "staggered_ports",
   "level": 2,
   "requires": "search",
-  "description": "A blocker obstacle between source and target, forcing a detour.",
+  "description": "Source and target ports face different directions behind a blocker.",
   "cell": 10.0,
   "obstacles": [
     {
       "id": "a",
-      "r": 2,
+      "r": 0,
       "c": 0,
-      "w": 8,
+      "w": 6,
       "h": 4
     },
     {
       "id": "b",
-      "r": 2,
+      "r": 6,
       "c": 30,
-      "w": 8,
+      "w": 6,
       "h": 4
     },
     {
       "id": "blocker",
       "r": 0,
-      "c": 15,
+      "c": 14,
       "w": 8,
       "h": 8
     }
@@ -37,7 +37,7 @@
       ],
       "to": [
         "b",
-        "west"
+        "north"
       ]
     }
   ],

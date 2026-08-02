@@ -1,0 +1,30 @@
+{
+  "id": "L18",
+  "name": "quad_fanout",
+  "level": 5,
+  "requires": "track",
+  "description": "One center source fans out to eight targets (two per compass direction); each corridor carries two edges that must be track-separated.",
+  "cell": 10.0,
+  "obstacles": [
+    {"id": "src", "r": 16, "c": 16, "w": 8, "h": 8},
+    {"id": "n_a", "r": 0, "c": 12, "w": 6, "h": 4},
+    {"id": "n_b", "r": 0, "c": 22, "w": 6, "h": 4},
+    {"id": "s_a", "r": 36, "c": 12, "w": 6, "h": 4},
+    {"id": "s_b", "r": 36, "c": 22, "w": 6, "h": 4},
+    {"id": "w_a", "r": 12, "c": 0, "w": 4, "h": 6},
+    {"id": "w_b", "r": 22, "c": 0, "w": 4, "h": 6},
+    {"id": "e_a", "r": 12, "c": 36, "w": 4, "h": 6},
+    {"id": "e_b", "r": 22, "c": 36, "w": 4, "h": 6}
+  ],
+  "edges": [
+    {"id": "n0", "from": ["src", "north", -2], "to": ["n_a", "south"]},
+    {"id": "n1", "from": ["src", "north", 2], "to": ["n_b", "south"]},
+    {"id": "s0", "from": ["src", "south", -2], "to": ["s_a", "north"]},
+    {"id": "s1", "from": ["src", "south", 2], "to": ["s_b", "north"]},
+    {"id": "w0", "from": ["src", "west", -2], "to": ["w_a", "east"]},
+    {"id": "w1", "from": ["src", "west", 2], "to": ["w_b", "east"]},
+    {"id": "e0", "from": ["src", "east", -2], "to": ["e_a", "west"]},
+    {"id": "e1", "from": ["src", "east", 2], "to": ["e_b", "west"]}
+  ],
+  "params": null
+}

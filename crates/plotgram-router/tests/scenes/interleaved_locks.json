@@ -1,0 +1,32 @@
+{
+  "id": "L23",
+  "name": "interleaved_locks",
+  "level": 6,
+  "requires": "track",
+  "description": "Two diagonal crossing pairs through a central structure; edges must route around each other.",
+  "cell": 10.0,
+  "obstacles": [
+    {"id": "nw", "r": 4, "c": 4, "w": 6, "h": 6},
+    {"id": "ne", "r": 4, "c": 28, "w": 6, "h": 6},
+    {"id": "sw", "r": 28, "c": 4, "w": 6, "h": 6},
+    {"id": "se", "r": 28, "c": 28, "w": 6, "h": 6},
+    {"id": "core", "r": 15, "c": 15, "w": 8, "h": 8},
+    {"id": "block_n", "r": 4, "c": 15, "w": 8, "h": 3},
+    {"id": "block_s", "r": 31, "c": 15, "w": 8, "h": 3},
+    {"id": "block_w", "r": 15, "c": 4, "w": 3, "h": 8},
+    {"id": "block_e", "r": 15, "c": 31, "w": 3, "h": 8}
+  ],
+  "edges": [
+    {"id": "e0", "from": ["nw", "south"], "to": ["se", "north"]},
+    {"id": "e1", "from": ["ne", "south"], "to": ["sw", "north"]}
+  ],
+  "params": {
+    "spacing": 10.0,
+    "port_stub": 10.0,
+    "bend_penalty": 100.0,
+    "shared_penalty": 300.0,
+    "min_segment": 4.0,
+    "max_search_nodes": 30000,
+    "route_rounds": 2
+  }
+}

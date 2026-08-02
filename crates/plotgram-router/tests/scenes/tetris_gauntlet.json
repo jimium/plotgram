@@ -1,0 +1,46 @@
+{
+  "id": "L25",
+  "name": "tetris_gauntlet",
+  "level": 7,
+  "requires": "track",
+  "description": "Tightly packed obstacles form narrow gaps; eight edges fan out from a central source to peripheral targets through different channels.",
+  "cell": 10.0,
+  "obstacles": [
+    {"id": "src", "r": 18, "c": 18, "w": 4, "h": 4},
+    {"id": "t_nw", "r": 2, "c": 2, "w": 4, "h": 4},
+    {"id": "t_n", "r": 2, "c": 18, "w": 4, "h": 4},
+    {"id": "t_ne", "r": 2, "c": 34, "w": 4, "h": 4},
+    {"id": "t_w", "r": 18, "c": 2, "w": 4, "h": 4},
+    {"id": "t_e", "r": 18, "c": 34, "w": 4, "h": 4},
+    {"id": "t_sw", "r": 34, "c": 2, "w": 4, "h": 4},
+    {"id": "t_s", "r": 34, "c": 18, "w": 4, "h": 4},
+    {"id": "t_se", "r": 34, "c": 34, "w": 4, "h": 4},
+    {"id": "b1", "r": 8, "c": 6, "w": 6, "h": 3},
+    {"id": "b2", "r": 8, "c": 28, "w": 6, "h": 3},
+    {"id": "b3", "r": 29, "c": 6, "w": 6, "h": 3},
+    {"id": "b4", "r": 29, "c": 28, "w": 6, "h": 3},
+    {"id": "b5", "r": 12, "c": 12, "w": 3, "h": 8},
+    {"id": "b6", "r": 12, "c": 25, "w": 3, "h": 8},
+    {"id": "b7", "r": 20, "c": 12, "w": 3, "h": 8},
+    {"id": "b8", "r": 20, "c": 25, "w": 3, "h": 8}
+  ],
+  "edges": [
+    {"id": "e0", "from": ["src", "north", -2], "to": ["t_nw", "south"]},
+    {"id": "e1", "from": ["src", "north"], "to": ["t_n", "south"]},
+    {"id": "e2", "from": ["src", "north", 2], "to": ["t_ne", "south"]},
+    {"id": "e3", "from": ["src", "west"], "to": ["t_w", "east"]},
+    {"id": "e4", "from": ["src", "east"], "to": ["t_e", "west"]},
+    {"id": "e5", "from": ["src", "south", 2], "to": ["t_se", "north"]},
+    {"id": "e6", "from": ["src", "south"], "to": ["t_s", "north"]},
+    {"id": "e7", "from": ["src", "south", -2], "to": ["t_sw", "north"]}
+  ],
+  "params": {
+    "spacing": 10.0,
+    "port_stub": 10.0,
+    "bend_penalty": 120.0,
+    "shared_penalty": 400.0,
+    "min_segment": 4.0,
+    "max_search_nodes": 50000,
+    "route_rounds": 2
+  }
+}

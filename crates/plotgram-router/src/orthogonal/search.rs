@@ -1,6 +1,8 @@
 //! A* path search over `(vertex, Dir4)` states — the L2 topology writer.
 //!
-//! Cost = Σ segment length + `bend_penalty` × #bends (architecture.md §5.2).
+//! Cost = Σ segment cost + `bend_penalty` × #bends (architecture.md §5.2).
+//! The segment cost is supplied by the caller (length, plus the M1
+//! shared-segment penalty in round 2), so the search stays strategy-free.
 //! The bend at the goal vertex (between arrival direction and the target
 //! stub's approach direction) is folded into the cost of *entering* the goal,
 //! so the first goal state popped is globally optimal (consistent heuristic).
@@ -9,6 +11,9 @@
 //! `(f, h, insertion_seq)` with `f64::total_cmp`; equal-cost ties resolve by
 //! insertion order, fixed by the fixed neighbour expansion order
 //! ([`Dir4::ALL`]). No `HashMap` iteration anywhere.
+//!
+//! M1: an optional node-expansion budget gates runaway searches
+//! (`max_search_nodes`; `0` = unlimited).
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -50,6 +55,17 @@ impl Ord for Open {
     }
 }
 
+/// Outcome of a bounded A* search.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SearchOutcome {
+    /// Collision-free path from `start` to `goal` inclusive (grid points).
+    Found(Vec<Point>),
+    /// Search space exhausted with no collision-free path.
+    NoPath,
+    /// Open-list expansion exceeded the node budget (M1 gate).
+    BudgetExceeded,
+}
+
 /// Least-cost orthogonal path on `grid` from `start` to `goal`.
 ///
 /// - `start_dir`: direction the edge arrives at `start` (source stub
@@ -57,11 +73,11 @@ impl Ord for Open {
 /// - `approach_dir`: direction of travel from `goal` to the target anchor
 ///   (opposite of the target's outward normal); the bend at `goal` between
 ///   the arrival direction and `approach_dir` is folded into the entry cost.
-/// - `blocked`: closed-collision predicate for one grid step (lazy
-///   visibility check with the edge's own-node exemption).
-///
-/// Returns grid points from `start` to `goal` inclusive, or `None` when no
-/// collision-free path exists.
+/// - `step_cost`: per-step base cost `(from, to) -> Some(cost)`; `None` =
+///   the step is blocked (closed collision predicate with the edge's own-node
+///   exemption). The caller folds segment length and (round 2) shared-segment
+///   penalty into the returned cost.
+/// - `budget`: max node expansions; `None` = unlimited.
 pub fn astar(
     grid: &Grid,
     start: (u32, u32),
@@ -69,12 +85,13 @@ pub fn astar(
     goal: (u32, u32),
     approach_dir: Dir4,
     bend_penalty: f64,
-    blocked: impl Fn(Point, Point) -> bool,
-) -> Option<Vec<Point>> {
+    step_cost: &dyn Fn(Point, Point) -> Option<f64>,
+    budget: Option<u32>,
+) -> SearchOutcome {
     let (nx, ny) = grid.dims();
     let vertex_count = nx * ny;
     if vertex_count == 0 {
-        return None;
+        return SearchOutcome::NoPath;
     }
     let vidx = |xi: u32, yi: u32| (yi as usize) * nx + (xi as usize);
     let state_of = |v: usize, d: Dir4| v * 4 + d as usize;
@@ -105,14 +122,21 @@ pub fn astar(
     });
     seq += 1;
 
+    let mut expanded = 0u32;
     while let Some(open) = heap.pop() {
         if open.g > best[open.state] {
             continue; // stale entry superseded by a cheaper push
         }
+        if let Some(budget) = budget {
+            expanded += 1;
+            if expanded > budget {
+                return SearchOutcome::BudgetExceeded;
+            }
+        }
         let v = open.state / 4;
         let dir = Dir4::from_index(open.state % 4);
         if v == goal_v {
-            return Some(reconstruct(grid, nx, &parent, open.state));
+            return SearchOutcome::Found(reconstruct(grid, nx, &parent, open.state));
         }
         let xi = (v % nx) as u32;
         let yi = (v / nx) as u32;
@@ -122,10 +146,9 @@ pub fn astar(
                 continue;
             };
             let to = grid.point(nxi, nyi);
-            if blocked(from, to) {
+            let Some(step_len) = step_cost(from, to) else {
                 continue;
-            }
-            let step_len = (to.x - from.x).abs() + (to.y - from.y).abs();
+            };
             let mut ng = open.g + step_len;
             if nd != dir {
                 ng += bend_penalty; // bend at `from`
@@ -150,7 +173,7 @@ pub fn astar(
             }
         }
     }
-    None
+    SearchOutcome::NoPath
 }
 
 /// Walk parent pointers from the goal state back to the start state.
@@ -188,11 +211,34 @@ mod tests {
         false
     }
 
+    /// Step cost: blocked → `None`, else the Manhattan segment length.
+    fn cost_len(blocked: impl Fn(Point, Point) -> bool) -> impl Fn(Point, Point) -> Option<f64> {
+        move |a: Point, b: Point| {
+            if blocked(a, b) {
+                None
+            } else {
+                Some((b.x - a.x).abs() + (b.y - a.y).abs())
+            }
+        }
+    }
+
     #[test]
     fn straight_when_clear() {
         let g = test_grid(&[0.0, 10.0, 20.0], &[5.0]);
-        let path = astar(&g, (0, 0), Dir4::East, (2, 0), Dir4::East, 100.0, never_blocked)
-            .expect("reachable");
+        let step = cost_len(never_blocked);
+        let path = match astar(
+            &g,
+            (0, 0),
+            Dir4::East,
+            (2, 0),
+            Dir4::East,
+            100.0,
+            &step,
+            None,
+        ) {
+            SearchOutcome::Found(p) => p,
+            other => panic!("expected path, got {other:?}"),
+        };
         assert_eq!(
             path,
             vec![
@@ -209,12 +255,23 @@ mod tests {
         // resolve identically on every run (fixed expansion order + seq).
         let run = || {
             let g = test_grid(&[0.0, 10.0], &[0.0, 10.0]);
-            astar(&g, (0, 0), Dir4::East, (1, 1), Dir4::South, 100.0, never_blocked)
-                .expect("reachable")
+            let step = cost_len(never_blocked);
+            astar(
+                &g,
+                (0, 0),
+                Dir4::East,
+                (1, 1),
+                Dir4::South,
+                100.0,
+                &step,
+                None,
+            )
         };
-        let p1 = run();
+        let SearchOutcome::Found(p1) = run() else {
+            panic!("expected path")
+        };
         let p2 = run();
-        assert_eq!(p1, p2);
+        assert_eq!(SearchOutcome::Found(p1.clone()), p2);
         assert_eq!(p1.len(), 3);
         assert_eq!(p1.first().copied(), Some(Point { x: 0.0, y: 0.0 }));
         assert_eq!(p1.last().copied(), Some(Point { x: 10.0, y: 10.0 }));
@@ -231,8 +288,20 @@ mod tests {
             (a == Point { x: 0.0, y: 10.0 } && b == Point { x: 10.0, y: 10.0 })
                 || (a == Point { x: 10.0, y: 10.0 } && b == Point { x: 0.0, y: 10.0 })
         };
-        let path = astar(&g, (0, 1), Dir4::East, (2, 1), Dir4::East, 100.0, blocked)
-            .expect("detour exists");
+        let step = cost_len(blocked);
+        let path = match astar(
+            &g,
+            (0, 1),
+            Dir4::East,
+            (2, 1),
+            Dir4::East,
+            100.0,
+            &step,
+            None,
+        ) {
+            SearchOutcome::Found(p) => p,
+            other => panic!("expected detour, got {other:?}"),
+        };
         assert_eq!(path.first().copied(), Some(Point { x: 0.0, y: 10.0 }));
         assert_eq!(path.last().copied(), Some(Point { x: 20.0, y: 10.0 }));
         // Must leave the middle row to get around the blocked step.
@@ -244,10 +313,19 @@ mod tests {
         // Goal (1,0) is isolated: both its incident steps are blocked.
         let g = test_grid(&[0.0, 10.0, 20.0], &[0.0]);
         let goal = Point { x: 10.0, y: 0.0 };
-        let blocked = move |a: Point, b: Point| a == goal || b == goal;
+        let step = cost_len(move |a: Point, b: Point| a == goal || b == goal);
         assert_eq!(
-            astar(&g, (0, 0), Dir4::East, (1, 0), Dir4::East, 100.0, blocked),
-            None
+            astar(
+                &g,
+                (0, 0),
+                Dir4::East,
+                (1, 0),
+                Dir4::East,
+                100.0,
+                &step,
+                None,
+            ),
+            SearchOutcome::NoPath
         );
     }
 
@@ -256,9 +334,58 @@ mod tests {
         // With bend_penalty = 0 the L path and straight-ish paths tie on
         // length; result is still deterministic and endpoint-correct.
         let g = test_grid(&[0.0, 10.0], &[0.0, 10.0]);
-        let p = astar(&g, (0, 0), Dir4::East, (1, 1), Dir4::South, 0.0, never_blocked)
-            .expect("reachable");
+        let step = cost_len(never_blocked);
+        let p = match astar(
+            &g,
+            (0, 0),
+            Dir4::East,
+            (1, 1),
+            Dir4::South,
+            0.0,
+            &step,
+            None,
+        ) {
+            SearchOutcome::Found(p) => p,
+            other => panic!("expected path, got {other:?}"),
+        };
         assert_eq!(p.first().copied(), Some(Point { x: 0.0, y: 0.0 }));
         assert_eq!(p.last().copied(), Some(Point { x: 10.0, y: 10.0 }));
+    }
+
+    #[test]
+    fn budget_gates_expansion() {
+        // A 5x3 open grid; a tiny budget must abort before finding the goal.
+        let g = test_grid(&[0.0, 10.0, 20.0, 30.0, 40.0], &[0.0, 10.0, 20.0]);
+        let step = cost_len(never_blocked);
+        assert_eq!(
+            astar(
+                &g,
+                (0, 0),
+                Dir4::East,
+                (4, 0),
+                Dir4::East,
+                100.0,
+                &step,
+                Some(1)
+            ),
+            SearchOutcome::BudgetExceeded
+        );
+        // Generous budget still finds the path.
+        match astar(
+            &g,
+            (0, 0),
+            Dir4::East,
+            (4, 0),
+            Dir4::East,
+            100.0,
+            &step,
+            Some(1000),
+        ) {
+            SearchOutcome::Found(p) => {
+                assert_eq!(p.first().copied(), Some(Point { x: 0.0, y: 0.0 }));
+                assert_eq!(p.last().copied(), Some(Point { x: 40.0, y: 0.0 }));
+            }
+            other => panic!("expected path, got {other:?}"),
+        }
     }
 }

@@ -1,9 +1,9 @@
 {
-  "id": "L12",
-  "name": "two_boxes_clear",
-  "level": 1,
-  "requires": "none",
-  "description": "Two nodes side by side, no obstacles between them.",
+  "id": "L08",
+  "name": "parallel_same_port",
+  "level": 3,
+  "requires": "track",
+  "description": "Two edges share one anchor pair; without track separation they fully overlap.",
   "cell": 10.0,
   "obstacles": [
     {
@@ -11,19 +11,30 @@
       "r": 0,
       "c": 0,
       "w": 8,
-      "h": 4
+      "h": 6
     },
     {
       "id": "b",
       "r": 0,
       "c": 20,
       "w": 8,
-      "h": 4
+      "h": 6
     }
   ],
   "edges": [
     {
       "id": "e0",
+      "from": [
+        "a",
+        "east"
+      ],
+      "to": [
+        "b",
+        "west"
+      ]
+    },
+    {
+      "id": "e1",
       "from": [
         "a",
         "east"

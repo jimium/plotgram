@@ -1,0 +1,18 @@
+{
+  "id": "L15",
+  "name": "narrow_diagonal",
+  "level": 4,
+  "requires": "search",
+  "description": "Two large blocks placed diagonally with a narrow gap between their corners; path must thread the tight L-shaped passage, testing spatial reasoning.",
+  "cell": 10.0,
+  "obstacles": [
+    {"id": "a", "r": 0, "c": 0, "w": 6, "h": 4},
+    {"id": "b", "r": 36, "c": 36, "w": 4, "h": 4},
+    {"id": "blk1", "r": 8, "c": 8, "w": 9, "h": 9},
+    {"id": "blk2", "r": 24, "c": 24, "w": 9, "h": 9}
+  ],
+  "edges": [
+    {"id": "e0", "from": ["a", "east"], "to": ["b", "west"]}
+  ],
+  "params": null
+}

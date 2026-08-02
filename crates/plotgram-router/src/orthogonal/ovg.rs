@@ -1,4 +1,5 @@
-//! Orthogonal visibility graph over reduced interesting lines (M0 search graph).
+//! Orthogonal visibility graph over reduced interesting lines — the search
+//! graph of the main routing path (M0+; see architecture.md §5).
 //!
 //! Line set: every obstacle edge offset outward by `line_offset`
 //! (`spacing + ε`, so routed segments keep strictly positive clearance from
@@ -193,7 +194,10 @@ mod tests {
 
     #[test]
     fn grid_lines_sorted_deduped_and_findable() {
-        let obstacles = [obs("a", 0.0, 0.0, 80.0, 40.0), obs("b", 200.0, 0.0, 80.0, 40.0)];
+        let obstacles = [
+            obs("a", 0.0, 0.0, 80.0, 40.0),
+            obs("b", 200.0, 0.0, 80.0, 40.0),
+        ];
         let extra = [Point { x: 90.0, y: 20.0 }, Point { x: 190.0, y: 20.0 }];
         let g = Grid::build(&obstacles, &extra, 20.0);
         // x lines: -20, 100, 180, 300 + extras 90, 190
@@ -205,8 +209,93 @@ mod tests {
     }
 
     #[test]
+    fn segment_blocked_matches_verify_gate() {
+        // The router's collision model and the verify acceptance gate are two
+        // implementations of the same clearance rule; a test locks them to the
+        // same geometry truth (ovg.rs doc: "Mirrors verify exactly").
+        use crate::verify::verify_edge;
+        use plotgram_engine_api::{PortAnchor, RouteScene, TerminalPair};
+        use plotgram_model::port::Side;
+        use std::collections::BTreeMap;
+
+        let obstacles = vec![
+            obs("a", 0.0, 0.0, 80.0, 40.0),
+            obs("b", 200.0, 0.0, 80.0, 40.0),
+            obs("blk", 100.0, -20.0, 40.0, 60.0),
+        ];
+        let mut terminals = BTreeMap::new();
+        terminals.insert(
+            "e0".to_string(),
+            TerminalPair {
+                source: PortAnchor {
+                    point: Point { x: 80.0, y: 20.0 },
+                    side: Side::East,
+                    node_id: "a".to_string(),
+                },
+                target: PortAnchor {
+                    point: Point { x: 200.0, y: 20.0 },
+                    side: Side::West,
+                    node_id: "b".to_string(),
+                },
+            },
+        );
+        let scene = RouteScene {
+            obstacles,
+            terminals,
+            edge_order: vec!["e0".to_string()],
+            group_boundaries: vec![],
+            boundary_permissions: BTreeMap::new(),
+            params: Default::default(),
+        };
+        let spacing = scene.params.spacing;
+
+        // Crosses the inflated blocker: both sides must flag it.
+        let blocked_line = [Point { x: 80.0, y: 20.0 }, Point { x: 200.0, y: 20.0 }];
+        let report = verify_edge(&scene, "e0", &blocked_line);
+        let clearance = report
+            .checks
+            .iter()
+            .find(|c| c.name == "obstacle_clearance")
+            .expect("obstacle_clearance check exists");
+        assert!(!clearance.pass, "verify must flag the blocked line");
+        assert!(
+            segment_blocked(
+                blocked_line[0],
+                blocked_line[1],
+                &scene.obstacles,
+                &["a", "b"],
+                spacing
+            ),
+            "collision model must agree"
+        );
+
+        // Far above every inflate: both sides must pass.
+        let clear_line = [Point { x: 0.0, y: -60.0 }, Point { x: 300.0, y: -60.0 }];
+        let report = verify_edge(&scene, "e0", &clear_line);
+        let clearance = report
+            .checks
+            .iter()
+            .find(|c| c.name == "obstacle_clearance")
+            .expect("obstacle_clearance check exists");
+        assert!(clearance.pass, "verify must pass the clear line");
+        assert!(
+            !segment_blocked(
+                clear_line[0],
+                clear_line[1],
+                &scene.obstacles,
+                &["a", "b"],
+                spacing
+            ),
+            "collision model must agree"
+        );
+    }
+
+    #[test]
     fn segment_blocked_cases() {
-        let obstacles = [obs("a", 0.0, 0.0, 80.0, 40.0), obs("blk", 150.0, 60.0, 80.0, 80.0)];
+        let obstacles = [
+            obs("a", 0.0, 0.0, 80.0, 40.0),
+            obs("blk", 150.0, 60.0, 80.0, 80.0),
+        ];
         let inflate = 20.0;
         let cases: &[(Point, Point, [&str; 2], bool)] = &[
             // grazing "a" — exempt because "a" is an own node
@@ -239,7 +328,11 @@ mod tests {
             ),
         ];
         for (i, (a, b, exempt, want)) in cases.iter().enumerate() {
-            assert_eq!(segment_blocked(*a, *b, &obstacles, exempt, inflate), *want, "case {i}");
+            assert_eq!(
+                segment_blocked(*a, *b, &obstacles, exempt, inflate),
+                *want,
+                "case {i}"
+            );
         }
     }
 }

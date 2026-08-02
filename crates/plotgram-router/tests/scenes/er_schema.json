@@ -1,0 +1,29 @@
+{
+  "id": "R01",
+  "name": "er_schema",
+  "level": 4,
+  "requires": "track",
+  "description": "Database ER schema: 8 table nodes (square) with foreign-key relationships; resembles a real database diagram with cross-references between tables.",
+  "cell": 10.0,
+  "obstacles": [
+    {"id": "users", "r": 2, "c": 2, "w": 6, "h": 6},
+    {"id": "orders", "r": 2, "c": 20, "w": 6, "h": 6},
+    {"id": "products", "r": 2, "c": 32, "w": 6, "h": 6},
+    {"id": "categories", "r": 14, "c": 32, "w": 6, "h": 6},
+    {"id": "order_items", "r": 14, "c": 20, "w": 6, "h": 6},
+    {"id": "addresses", "r": 14, "c": 2, "w": 6, "h": 6},
+    {"id": "reviews", "r": 28, "c": 10, "w": 6, "h": 6},
+    {"id": "payments", "r": 28, "c": 26, "w": 6, "h": 6}
+  ],
+  "edges": [
+    {"id": "fk1", "from": ["orders", "west"], "to": ["users", "east"]},
+    {"id": "fk2", "from": ["order_items", "north"], "to": ["orders", "south"]},
+    {"id": "fk3", "from": ["order_items", "east"], "to": ["products", "south"]},
+    {"id": "fk4", "from": ["products", "south"], "to": ["categories", "north"]},
+    {"id": "fk5", "from": ["addresses", "north"], "to": ["users", "south"]},
+    {"id": "fk6", "from": ["reviews", "north", -2], "to": ["users", "south"]},
+    {"id": "fk7", "from": ["reviews", "north", 2], "to": ["products", "west"]},
+    {"id": "fk8", "from": ["payments", "north"], "to": ["orders", "south", 2]}
+  ],
+  "params": null
+}

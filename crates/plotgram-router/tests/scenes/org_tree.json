@@ -1,0 +1,38 @@
+{
+  "id": "R03",
+  "name": "org_tree",
+  "level": 3,
+  "requires": "track",
+  "description": "Organization chart tree: CEO at top, VPs below, managers and team leads in a hierarchical structure with cross-department communication lines.",
+  "cell": 10.0,
+  "obstacles": [
+    {"id": "ceo", "r": 2, "c": 16, "w": 6, "h": 4},
+    {"id": "vp_eng", "r": 10, "c": 4, "w": 6, "h": 4},
+    {"id": "vp_prod", "r": 10, "c": 16, "w": 6, "h": 4},
+    {"id": "vp_ops", "r": 10, "c": 28, "w": 6, "h": 4},
+    {"id": "eng_mgr1", "r": 20, "c": 0, "w": 6, "h": 4},
+    {"id": "eng_mgr2", "r": 20, "c": 8, "w": 6, "h": 4},
+    {"id": "prod_mgr", "r": 20, "c": 16, "w": 6, "h": 4},
+    {"id": "ops_mgr1", "r": 20, "c": 26, "w": 6, "h": 4},
+    {"id": "ops_mgr2", "r": 20, "c": 34, "w": 6, "h": 4},
+    {"id": "lead1", "r": 30, "c": 0, "w": 6, "h": 4},
+    {"id": "lead2", "r": 30, "c": 8, "w": 6, "h": 4},
+    {"id": "lead3", "r": 30, "c": 34, "w": 6, "h": 4}
+  ],
+  "edges": [
+    {"id": "hier1", "from": ["ceo", "south", -3], "to": ["vp_eng", "north"]},
+    {"id": "hier2", "from": ["ceo", "south"], "to": ["vp_prod", "north"]},
+    {"id": "hier3", "from": ["ceo", "south", 3], "to": ["vp_ops", "north"]},
+    {"id": "hier4", "from": ["vp_eng", "south", -1], "to": ["eng_mgr1", "north"]},
+    {"id": "hier5", "from": ["vp_eng", "south", 1], "to": ["eng_mgr2", "north"]},
+    {"id": "hier6", "from": ["vp_prod", "south"], "to": ["prod_mgr", "north"]},
+    {"id": "hier7", "from": ["vp_ops", "south", -1], "to": ["ops_mgr1", "north"]},
+    {"id": "hier8", "from": ["vp_ops", "south", 1], "to": ["ops_mgr2", "north"]},
+    {"id": "hier9", "from": ["eng_mgr1", "south"], "to": ["lead1", "north"]},
+    {"id": "hier10", "from": ["eng_mgr2", "south"], "to": ["lead2", "north"]},
+    {"id": "hier11", "from": ["ops_mgr2", "south"], "to": ["lead3", "north"]},
+    {"id": "cross1", "from": ["eng_mgr2", "east"], "to": ["prod_mgr", "west"]},
+    {"id": "cross2", "from": ["prod_mgr", "east"], "to": ["ops_mgr1", "west"]}
+  ],
+  "params": null
+}

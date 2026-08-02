@@ -1,0 +1,38 @@
+{
+  "id": "L24",
+  "name": "serpentine_race",
+  "level": 6,
+  "requires": "track",
+  "description": "Long zig-zag corridor with four parallel edges requiring track separation through multiple turns.",
+  "cell": 10.0,
+  "obstacles": [
+    {"id": "s1", "r": 2, "c": 0, "w": 4, "h": 4},
+    {"id": "s2", "r": 8, "c": 0, "w": 4, "h": 4},
+    {"id": "s3", "r": 14, "c": 0, "w": 4, "h": 4},
+    {"id": "s4", "r": 20, "c": 0, "w": 4, "h": 4},
+    {"id": "t1", "r": 32, "c": 36, "w": 4, "h": 4},
+    {"id": "t2", "r": 26, "c": 36, "w": 4, "h": 4},
+    {"id": "t3", "r": 14, "c": 36, "w": 4, "h": 4},
+    {"id": "t4", "r": 8, "c": 36, "w": 4, "h": 4},
+    {"id": "wa", "r": 0, "c": 10, "w": 2, "h": 14},
+    {"id": "wb", "r": 12, "c": 10, "w": 22, "h": 2},
+    {"id": "wc", "r": 6, "c": 30, "w": 2, "h": 20},
+    {"id": "wd", "r": 24, "c": 10, "w": 22, "h": 2},
+    {"id": "we", "r": 24, "c": 10, "w": 2, "h": 14}
+  ],
+  "edges": [
+    {"id": "e0", "from": ["s1", "east"], "to": ["t1", "west"]},
+    {"id": "e1", "from": ["s2", "east"], "to": ["t2", "west"]},
+    {"id": "e2", "from": ["s3", "east"], "to": ["t3", "west"]},
+    {"id": "e3", "from": ["s4", "east"], "to": ["t4", "west"]}
+  ],
+  "params": {
+    "spacing": 10.0,
+    "port_stub": 10.0,
+    "bend_penalty": 60.0,
+    "shared_penalty": 250.0,
+    "min_segment": 4.0,
+    "max_search_nodes": 0,
+    "route_rounds": 2
+  }
+}

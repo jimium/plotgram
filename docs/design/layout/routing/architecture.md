@@ -40,7 +40,7 @@
 
 ### 1.1 状态词
 
-**目标 / 已落地 / 过渡 / 后置**。M0（reduced lines OVG + A*、无组、单轮、无 L3/L4）= **已落地**；L3 track 定序 / L4 nudging / 组穿越 = **目标 / 后置**。
+**目标 / 已落地 / 过渡 / 后置**。M0 + M1 = **已落地**（reduced lines OVG + A*、两轮 shared、走廊 track 分离、规模门控、min_segment；`cargo test -p plotgram-router` 全绿，14 场景）。M2 的类型层（`GroupBoundary` / `BoundaryCrossing`）与诚实拒绝已就位、穿越模型未做；M3 的 Hier `DeferToRouter` 投影集成已通、Tree 接入与 FacadeVerifier 未做。L4 VPSC nudging / 组穿越 = **目标 / 后置**（逐项状态见 §10）。
 
 ---
 
@@ -103,7 +103,7 @@ RouteInput<'a>   # plotgram-engine-api 现行
 ```
 
 现行 stub 从 `nodes[].frame` + `edges[].from_port/to_port` 推导端子。
-目标：Facade 或 Router 入口把 `RouteInput` **投影**为 `RouteScene`，避免算法直接依赖 Graph 全貌。
+**已落地**：`engine/src/run.rs::project_route_scene` 把 layout 输出（nodes + edges）**投影**为 `RouteScene`（见 §10 M3）；Router 不直接依赖 Graph 全貌。
 
 投影规则（目标）：
 
@@ -315,13 +315,13 @@ layout Builtin Ink → plotgram_router::core（可）；↛ orthogonal 策略
 
 ## 10. 里程碑（设计口径）
 
-| 里程碑 | 交付 | 验收 |
-|--------|------|------|
-| **M0** | `RouteScene` 类型 + 夹具 API；reduced lines + A\*；无组；单轮；无 L3/L4（单边走廊可共线） | 手写障碍绕行正确；确定性；不穿障 |
-| **M1** | inflate/stub 标定；两轮 shared；简单 track 分离；规模门控；替换 stub 主路径 | 多边不完全重合；门控可观测 |
-| **M2** | group_boundaries + permissions；Unsupported 诚实；VPSC nudging | 组场景不 silent 穿；端口对齐改善 |
-| **M3** | 与 Hier/Tree `DeferToRouter` 集成；FacadeVerifier | layout 冻节点后 path 可换；ports 不变 |
-| **后置** | 增量路由、Bus、交叉进主搜 | — |
+| 里程碑 | 状态 | 交付 | 验收 |
+|--------|------|------|------|
+| **M0** | **已落地** | `RouteScene` 类型 + 夹具 API；reduced lines + A\*；无组；单轮；无 L3/L4（单边走廊可共线） | 手写障碍绕行正确；确定性；不穿障 |
+| **M1** | **已落地** | inflate/stub 标定；两轮 shared（`route_rounds=2` + `shared_penalty`）；走廊 track 分离（均匀偏移 `k×spacing`，`track.rs`）；规模门控（`max_search_nodes`）；min_segment（stub 拉长 + 驼峰消除）；替换 stub 主路径 | 多边不完全重合；门控可观测 |
+| **M2** | **部分** | `group_boundaries` + `permissions` 类型与诚实拒绝（`UnsupportedRouteScene`）已落地；穿越模型 / VPSC nudging 未做 | 组场景不 silent 穿（已达成）；端口对齐改善 |
+| **M3** | **部分** | Hier `DeferToRouter` 投影集成已落地（`run.rs::project_route_scene` + registry 注册 `orthogonal`，集成测通过）；Tree 接入 / FacadeVerifier 端口回传检查未做 | layout 冻节点后 path 可换（已达成）；ports 不变 |
+| **后置** | 未做 | 增量路由、Bus、交叉进主搜 | — |
 
 ---
 

@@ -9,7 +9,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use plotgram_engine_api::EdgeRouter;
-use plotgram_router::fixture::{Requires, SceneFixture};
+use plotgram_router::fixture::{load_dir, Requires, SceneFixture};
 use plotgram_router::score::{score_scene, SceneScore};
 use plotgram_router::verify::verify_all;
 use plotgram_router::OrthogonalEdgeRouter;
@@ -28,7 +28,7 @@ fn lookup_algorithm(name: &str) -> AlgoEntry {
         "orthogonal" => AlgoEntry {
             name: "orthogonal",
             router: Box::new(OrthogonalEdgeRouter),
-            capability: Requires::None, // M0 后改为 Requires::Search
+            capability: Requires::Track, // M1: 避障 + 走廊 track 分离（组场景仍不支持，走诚实拒绝）
         },
         _ => {
             eprintln!("unknown algorithm: {name}");
@@ -42,21 +42,7 @@ fn lookup_algorithm(name: &str) -> AlgoEntry {
 
 fn load_fixtures() -> Vec<SceneFixture> {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/scenes");
-    let mut paths: Vec<_> = fs::read_dir(&dir)
-        .expect("tests/scenes/ must exist")
-        .filter_map(|e| e.ok())
-        .map(|e| e.path())
-        .filter(|p| p.extension().is_some_and(|ext| ext == "json"))
-        .collect();
-    paths.sort();
-
-    paths
-        .iter()
-        .map(|p| {
-            let text = fs::read_to_string(p).unwrap();
-            serde_json::from_str(&text).unwrap()
-        })
-        .collect()
+    load_dir(&dir)
 }
 
 // ─── Result row ─────────────────────────────────────────────

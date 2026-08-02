@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 use plotgram_engine_api::EdgeRouter;
 use plotgram_model::result::EdgePlacement;
-use plotgram_router::fixture::SceneFixture;
+use plotgram_router::fixture::{load_dir_board, BoardFixture, SceneFixture};
 use plotgram_router::verify::verify_all;
 use plotgram_router::OrthogonalEdgeRouter;
 
@@ -33,20 +33,9 @@ fn lookup_algorithm(name: &str) -> Box<dyn EdgeRouter> {
 
 fn load_fixtures() -> Vec<SceneFixture> {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/scenes");
-    let mut paths: Vec<_> = fs::read_dir(&dir)
-        .expect("tests/scenes/ must exist")
-        .filter_map(|e| e.ok())
-        .map(|e| e.path())
-        .filter(|p| p.extension().is_some_and(|ext| ext == "json"))
-        .collect();
-    paths.sort();
-    paths
-        .iter()
-        .map(|p| {
-            let text = fs::read_to_string(p).unwrap();
-            serde_json::from_str(&text).unwrap()
-        })
-        .collect()
+    let mut boards: Vec<BoardFixture> = load_dir_board(&dir);
+    boards.sort_by(|a, b| a.id.cmp(&b.id));
+    boards.into_iter().map(|b| b.to_scene_fixture()).collect()
 }
 
 // ─── SVG rendering ──────────────────────────────────────────

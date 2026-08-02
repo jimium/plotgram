@@ -1,9 +1,9 @@
 {
-  "id": "L04",
-  "name": "grid_3x3",
+  "id": "L05",
+  "name": "grid_4x4_diag",
   "level": 2,
   "requires": "search",
-  "description": "3x3 grid of obstacles, route from top-left to bottom-right.",
+  "description": "4x4 grid of obstacles, two crossing diagonal edges.",
   "cell": 10.0,
   "obstacles": [
     {
@@ -24,6 +24,13 @@
       "id": "g02",
       "r": 0,
       "c": 24,
+      "w": 8,
+      "h": 6
+    },
+    {
+      "id": "g03",
+      "r": 0,
+      "c": 36,
       "w": 8,
       "h": 6
     },
@@ -49,6 +56,13 @@
       "h": 6
     },
     {
+      "id": "g13",
+      "r": 10,
+      "c": 36,
+      "w": 8,
+      "h": 6
+    },
+    {
       "id": "g20",
       "r": 20,
       "c": 0,
@@ -68,17 +82,63 @@
       "c": 24,
       "w": 8,
       "h": 6
+    },
+    {
+      "id": "g23",
+      "r": 20,
+      "c": 36,
+      "w": 8,
+      "h": 6
+    },
+    {
+      "id": "g30",
+      "r": 30,
+      "c": 0,
+      "w": 8,
+      "h": 6
+    },
+    {
+      "id": "g31",
+      "r": 30,
+      "c": 12,
+      "w": 8,
+      "h": 6
+    },
+    {
+      "id": "g32",
+      "r": 30,
+      "c": 24,
+      "w": 8,
+      "h": 6
+    },
+    {
+      "id": "g33",
+      "r": 30,
+      "c": 36,
+      "w": 8,
+      "h": 6
     }
   ],
   "edges": [
     {
-      "id": "diag",
+      "id": "d0",
       "from": [
         "g00",
         "east"
       ],
       "to": [
-        "g22",
+        "g33",
+        "west"
+      ]
+    },
+    {
+      "id": "d1",
+      "from": [
+        "g03",
+        "east"
+      ],
+      "to": [
+        "g30",
         "west"
       ]
     }

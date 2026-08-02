@@ -1,0 +1,31 @@
+{
+  "id": "R02",
+  "name": "flow_chart",
+  "level": 3,
+  "requires": "search",
+  "description": "Business process flow chart: decision points, process steps, and terminators arranged in a realistic top-to-bottom flow with branching paths.",
+  "cell": 10.0,
+  "obstacles": [
+    {"id": "start", "r": 2, "c": 16, "w": 6, "h": 4},
+    {"id": "input", "r": 10, "c": 16, "w": 6, "h": 4},
+    {"id": "validate", "r": 18, "c": 16, "w": 6, "h": 4},
+    {"id": "process_a", "r": 18, "c": 4, "w": 6, "h": 4},
+    {"id": "process_b", "r": 18, "c": 28, "w": 6, "h": 4},
+    {"id": "merge", "r": 26, "c": 16, "w": 6, "h": 4},
+    {"id": "output", "r": 34, "c": 16, "w": 6, "h": 4},
+    {"id": "end", "r": 34, "c": 28, "w": 6, "h": 4},
+    {"id": "error", "r": 10, "c": 28, "w": 6, "h": 4}
+  ],
+  "edges": [
+    {"id": "e1", "from": ["start", "south"], "to": ["input", "north"]},
+    {"id": "e2", "from": ["input", "south"], "to": ["validate", "north"]},
+    {"id": "e3", "from": ["validate", "west"], "to": ["process_a", "east"]},
+    {"id": "e4", "from": ["validate", "east"], "to": ["process_b", "west"]},
+    {"id": "e5", "from": ["process_a", "south"], "to": ["merge", "west"]},
+    {"id": "e6", "from": ["process_b", "south"], "to": ["merge", "east"]},
+    {"id": "e7", "from": ["merge", "south"], "to": ["output", "north"]},
+    {"id": "e8", "from": ["validate", "north", 2], "to": ["error", "west"]},
+    {"id": "e9", "from": ["output", "east"], "to": ["end", "west"]}
+  ],
+  "params": null
+}

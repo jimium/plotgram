@@ -27,14 +27,14 @@ src/
   orthogonal/       # OrthogonalEdgeRouter 实现
   verify.rs         # 几何不变量验证（正交、附着、净空、确定性）
   score.rs          # 质量度量（弯折、长度、交叉、共线）
-  fixture.rs        # 场景夹具文件格式（SceneFixture + Requires 能力标记）
+  fixture.rs        # 场景夹具文件格式（BoardFixture 离散网格 + SceneFixture legacy + Requires 能力标记）
 ```
 
 ## 算法列表
 
 | 名称 | 注册名 | 状态 | 说明 |
 |------|--------|------|------|
-| OrthogonalEdgeRouter | `orthogonal` | **stub** | 单弯折 L 形直连，无避障。M0 将替换为 OVG + A* |
+| OrthogonalEdgeRouter | `orthogonal` | **M0 + M1 已落地** | reduced interesting lines OVG + A* 避障；两轮 shared / 走廊 track 分离 / 规模门控 / min_segment；L4 nudging / 组穿越未做 |
 
 新算法在 `examples/bench.rs` 和 `examples/viz.rs` 的 `lookup_algorithm()` 中注册即可被所有脚本自动发现。
 
@@ -49,9 +49,35 @@ cargo test -p plotgram-router
 
 - 所有场景：正交性 + 端点附着 + 确定性
 - `requires: none` 场景：全项通过（含障碍净空）
-- `requires: search` 场景：`#[ignore]`，M0 实现后解锁
+- `requires: search` 场景：`fixture_clearance_m0` 全项通过（M0 已解锁）
+- `requires: track` 场景：`fixture_track_separation` 全项通过 + 多边不完全重合（M1 已解锁）
 
-场景文件：`tests/scenes/*.json`（文本真源，可直接编辑/diff）。
+场景文件：`tests/scenes/*.json`（文本真源，可直接编辑/diff）。采用 **BoardFixture** 离散网格格式：
+
+```json
+{
+  "id": "L01",
+  "name": "blocker_center",
+  "level": 2,
+  "requires": "search",
+  "description": "...",
+  "cell": 10.0,
+  "obstacles": [
+    {"id": "a", "r": 2, "c": 0, "w": 8, "h": 4},
+    {"id": "blocker", "r": 0, "c": 15, "w": 8, "h": 8}
+  ],
+  "edges": [
+    {"id": "e0", "from": ["a", "east"], "to": ["b", "west"]}
+  ]
+}
+```
+
+- **坐标**：`r` = 行（y，向下增长），`c` = 列（x，向右增长）；世界坐标 = `(c*cell, r*cell)`，`cell` 默认 10。
+- **障碍物**：矩形 `(r, c, w, h)`，单位为格。
+- **端口**：`[node_id, side]` 自动取边中点；可选第三元素 `slot`（整数格偏移，正 = 下/右），如 `["a", "east", -1]`，用于并行边错开端口。
+- **params**：`null` = 默认；可填 `OrthogonalRouteParams` 覆盖。
+
+> ⚠ 棋盘是**夹具记法**，不是路由搜索图。路由仍走 reduced interesting lines OVG + A*（见 `docs/design/layout/routing/architecture.md` §5），不违反 AGENTS.md §2"均匀网格禁作产品路径"。
 
 ## 脚本工具
 
@@ -78,14 +104,6 @@ cargo test -p plotgram-router
 - 对比输出：终端表格 + stderr JSON（agent 可解析）
 - Exit code：`0` = 无回归，`1` = 净空回归，`2` = 无基线文件
 
-### gen-scenes（example）
-
-```bash
-cargo run -p plotgram-router --example gen-scenes
-```
-
-从程序化定义导出 `tests/scenes/*.json`。一次性生成器，日常直接编辑 JSON。
-
 ## 开发循环
 
 ```text
@@ -97,9 +115,11 @@ cargo run -p plotgram-router --example gen-scenes
 
 ## 里程碑
 
-| 阶段 | 目标 | 解锁 |
-|------|------|------|
-| 当前 | stub + 测试基础设施 | `requires: none` 场景全绿 |
-| M0 | OVG + A* 避障搜索 | `fixture_clearance_m0` 解锁，全 8 场景 PASS |
-| M1 | 多边分离（track/nudging） | parallel 场景不重合 |
-| M2 | 组边界穿越 | `requires: group` 场景 |
+与 [architecture.md](../docs/design/layout/routing/architecture.md) §10 同步：
+
+| 阶段 | 状态 | 目标 | 解锁 |
+|------|------|------|------|
+| M0 | **已落地** | OVG + A* 避障搜索 | search 场景全 PASS（`fixture_clearance_m0`） |
+| M1 | **已落地** | 两轮 shared / 走廊 track 分离 / 规模门控 / min_segment | track 场景不重合（`fixture_track_separation`，全 20 场景 PASS） |
+| M2 | **部分** | 组边界穿越（类型 + 诚实拒绝已落地；穿越模型 / L4 VPSC nudging 未做） | `requires: group` 场景 |
+| M3 | **部分** | Hier `DeferToRouter` 投影集成已通；Tree 接入 / FacadeVerifier 未做 | layout 冻节点后 path 可换 |

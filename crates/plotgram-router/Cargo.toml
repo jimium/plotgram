@@ -10,6 +10,6 @@ plotgram-model = { workspace = true }
 plotgram-engine-api = { workspace = true }
 plotgram-algo = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
-serde_json = { workspace = true }

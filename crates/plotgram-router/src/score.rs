@@ -7,6 +7,8 @@ use plotgram_engine_api::RouteScene;
 use plotgram_model::geometry::Point;
 use plotgram_model::result::EdgePlacement;
 
+use crate::core::overlap_len;
+
 // ─── Score types ────────────────────────────────────────────
 
 /// Aggregate quality metrics for a routed scene.
@@ -168,36 +170,11 @@ fn shared_between(path_a: &[Point], path_b: &[Point]) -> usize {
 }
 
 /// Test if two collinear segments overlap (share a sub-segment of positive length).
+///
+/// Single geometry truth: delegates to [`crate::core::overlap_len`]; a
+/// positive-length overlap is one strictly above the collinearity epsilon.
 fn segments_overlap(a0: Point, a1: Point, b0: Point, b1: Point) -> bool {
-    let eps = 1e-9;
-    let a_horiz = (a1.y - a0.y).abs() < eps;
-    let b_horiz = (b1.y - b0.y).abs() < eps;
-
-    if a_horiz != b_horiz {
-        return false; // Not collinear.
-    }
-
-    if a_horiz {
-        // Both horizontal: same y?
-        if (a0.y - b0.y).abs() > eps {
-            return false;
-        }
-        let a_min = a0.x.min(a1.x);
-        let a_max = a0.x.max(a1.x);
-        let b_min = b0.x.min(b1.x);
-        let b_max = b0.x.max(b1.x);
-        a_min < b_max - eps && b_min < a_max - eps
-    } else {
-        // Both vertical: same x?
-        if (a0.x - b0.x).abs() > eps {
-            return false;
-        }
-        let a_min = a0.y.min(a1.y);
-        let a_max = a0.y.max(a1.y);
-        let b_min = b0.y.min(b1.y);
-        let b_max = b0.y.max(b1.y);
-        a_min < b_max - eps && b_min < a_max - eps
-    }
+    overlap_len(a0, a1, b0, b1) > 1e-9
 }
 
 fn compute_bbox(placements: &[EdgePlacement]) -> [f64; 4] {

@@ -1,0 +1,35 @@
+{
+  "id": "L22",
+  "name": "pinhole_corridor",
+  "level": 6,
+  "requires": "track",
+  "description": "Two single-cell pinholes in a wall; four edges must share these narrow corridors with proper track separation.",
+  "cell": 10.0,
+  "obstacles": [
+    {"id": "wall_upper", "r": 0, "c": 18, "w": 4, "h": 10},
+    {"id": "wall_lower", "r": 18, "c": 18, "w": 4, "h": 10},
+    {"id": "n1", "r": 2, "c": 0, "w": 6, "h": 4},
+    {"id": "n2", "r": 12, "c": 0, "w": 6, "h": 4},
+    {"id": "n3", "r": 22, "c": 0, "w": 6, "h": 4},
+    {"id": "n4", "r": 6, "c": 0, "w": 6, "h": 4},
+    {"id": "m1", "r": 2, "c": 32, "w": 6, "h": 4},
+    {"id": "m2", "r": 12, "c": 32, "w": 6, "h": 4},
+    {"id": "m3", "r": 22, "c": 32, "w": 6, "h": 4},
+    {"id": "m4", "r": 6, "c": 32, "w": 6, "h": 4}
+  ],
+  "edges": [
+    {"id": "e0", "from": ["n1", "east"], "to": ["m1", "west"]},
+    {"id": "e1", "from": ["n2", "east"], "to": ["m2", "west"]},
+    {"id": "e2", "from": ["n3", "east"], "to": ["m3", "west"]},
+    {"id": "e3", "from": ["n4", "east"], "to": ["m4", "west"]}
+  ],
+  "params": {
+    "spacing": 10.0,
+    "port_stub": 10.0,
+    "bend_penalty": 80.0,
+    "shared_penalty": 200.0,
+    "min_segment": 4.0,
+    "max_search_nodes": 0,
+    "route_rounds": 2
+  }
+}

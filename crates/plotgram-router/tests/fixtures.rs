@@ -3,11 +3,10 @@
 //! Scenes live as JSON in `tests/scenes/*.json` (see [`plotgram_router::fixture`]).
 //! Tests load all scenes, filter by capability level, and verify invariants.
 
-use std::fs;
 use std::path::PathBuf;
 
 use plotgram_engine_api::EdgeRouter;
-use plotgram_router::fixture::{Requires, SceneFixture};
+use plotgram_router::fixture::{load_dir, Requires, SceneFixture};
 use plotgram_router::verify::{verify_all, verify_determinism};
 use plotgram_router::OrthogonalEdgeRouter;
 
@@ -19,33 +18,31 @@ fn scenes_dir() -> PathBuf {
 
 /// Load all `tests/scenes/*.json` fixtures, sorted by filename for determinism.
 fn load_all_fixtures() -> Vec<SceneFixture> {
-    let dir = scenes_dir();
-    let mut paths: Vec<_> = fs::read_dir(dir)
-        .expect("tests/scenes/ must exist")
-        .filter_map(|e| e.ok())
-        .map(|e| e.path())
-        .filter(|p| p.extension().is_some_and(|ext| ext == "json"))
-        .collect();
-    paths.sort();
-
-    paths
-        .iter()
-        .map(|p| {
-            let text = fs::read_to_string(p).unwrap_or_else(|e| panic!("read {}: {e}", p.display()));
-            serde_json::from_str(&text)
-                .unwrap_or_else(|e| panic!("parse {}: {e}", p.display()))
-        })
-        .collect()
+    load_dir(&scenes_dir())
 }
 
 /// Fixtures passable by the stub (no search needed).
 fn stub_passable(fixtures: &[SceneFixture]) -> Vec<&SceneFixture> {
-    fixtures.iter().filter(|f| f.requires == Requires::None).collect()
+    fixtures
+        .iter()
+        .filter(|f| f.requires == Requires::None)
+        .collect()
 }
 
 /// Fixtures requiring obstacle-avoiding search.
 fn search_required(fixtures: &[SceneFixture]) -> Vec<&SceneFixture> {
-    fixtures.iter().filter(|f| f.requires >= Requires::Search).collect()
+    fixtures
+        .iter()
+        .filter(|f| f.requires >= Requires::Search)
+        .collect()
+}
+
+/// Fixtures requiring corridor track separation (M1).
+fn track_required(fixtures: &[SceneFixture]) -> Vec<&SceneFixture> {
+    fixtures
+        .iter()
+        .filter(|f| f.requires >= Requires::Track)
+        .collect()
 }
 
 // ─── Tests ──────────────────────────────────────────────────
@@ -63,9 +60,12 @@ fn fixture_ortho_and_attach() {
         let report = verify_all(&fix.scene, &placements);
         for r in &report.edge_results {
             for c in &r.checks {
-                if c.name == "orthogonal" || c.name == "endpoint_attach" || c.name == "min_points"
-                {
-                    assert!(c.pass, "{} [{}]: {} — {}", fix.name, r.edge_id, c.name, c.detail);
+                if c.name == "orthogonal" || c.name == "endpoint_attach" || c.name == "min_points" {
+                    assert!(
+                        c.pass,
+                        "{} [{}]: {} — {}",
+                        fix.name, r.edge_id, c.name, c.detail
+                    );
                 }
             }
         }
@@ -105,6 +105,35 @@ fn fixture_clearance_m0() {
             fix.name,
             report.failures()
         );
+    }
+}
+
+/// M1: corridor track separation — edges sharing a corridor must not fully
+/// overlap (M1 acceptance: 多边不完全重合).
+#[test]
+fn fixture_track_separation() {
+    let router = OrthogonalEdgeRouter;
+    for fix in track_required(&load_all_fixtures()) {
+        let placements = router
+            .route(&fix.scene)
+            .unwrap_or_else(|e| panic!("{}: {e}", fix.name));
+        let report = verify_all(&fix.scene, &placements);
+        assert!(
+            report.all_pass,
+            "{} failures: {:?}",
+            fix.name,
+            report.failures()
+        );
+        // Any pair of edges must not fully overlap on a shared corridor.
+        for i in 0..placements.len() {
+            for j in (i + 1)..placements.len() {
+                assert_ne!(
+                    placements[i].path.points, placements[j].path.points,
+                    "{}: edges {} and {} fully overlap",
+                    fix.name, placements[i].id, placements[j].id
+                );
+            }
+        }
     }
 }
 

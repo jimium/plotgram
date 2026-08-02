@@ -1,98 +1,63 @@
 {
+  "id": "L03",
   "name": "four_boxes_cross",
-  "description": "Four nodes in a cross pattern with edges that cross.",
+  "level": 1,
   "requires": "none",
-  "scene": {
-    "obstacles": [
-      {
-        "id": "n",
-        "rect": {
-          "x": 100.0,
-          "y": 0.0,
-          "width": 60.0,
-          "height": 40.0
-        }
-      },
-      {
-        "id": "s",
-        "rect": {
-          "x": 100.0,
-          "y": 200.0,
-          "width": 60.0,
-          "height": 40.0
-        }
-      },
-      {
-        "id": "w",
-        "rect": {
-          "x": 0.0,
-          "y": 100.0,
-          "width": 60.0,
-          "height": 40.0
-        }
-      },
-      {
-        "id": "e",
-        "rect": {
-          "x": 200.0,
-          "y": 100.0,
-          "width": 60.0,
-          "height": 40.0
-        }
-      }
-    ],
-    "terminals": {
-      "ns": {
-        "source": {
-          "point": {
-            "x": 130.0,
-            "y": 40.0
-          },
-          "side": "south",
-          "node_id": "n"
-        },
-        "target": {
-          "point": {
-            "x": 130.0,
-            "y": 200.0
-          },
-          "side": "north",
-          "node_id": "s"
-        }
-      },
-      "we": {
-        "source": {
-          "point": {
-            "x": 60.0,
-            "y": 120.0
-          },
-          "side": "east",
-          "node_id": "w"
-        },
-        "target": {
-          "point": {
-            "x": 200.0,
-            "y": 120.0
-          },
-          "side": "west",
-          "node_id": "e"
-        }
-      }
+  "description": "Four nodes in a cross pattern with edges that cross.",
+  "cell": 10.0,
+  "obstacles": [
+    {
+      "id": "n",
+      "r": 0,
+      "c": 10,
+      "w": 6,
+      "h": 4
     },
-    "edge_order": [
-      "ns",
-      "we"
-    ],
-    "group_boundaries": [],
-    "boundary_permissions": {},
-    "params": {
-      "spacing": 20.0,
-      "port_stub": 10.0,
-      "bend_penalty": 100.0,
-      "shared_penalty": 0.0,
-      "min_segment": 4.0,
-      "max_search_nodes": 0,
-      "route_rounds": 1
+    {
+      "id": "s",
+      "r": 20,
+      "c": 10,
+      "w": 6,
+      "h": 4
+    },
+    {
+      "id": "w",
+      "r": 10,
+      "c": 0,
+      "w": 6,
+      "h": 4
+    },
+    {
+      "id": "e",
+      "r": 10,
+      "c": 20,
+      "w": 6,
+      "h": 4
     }
-  }
+  ],
+  "edges": [
+    {
+      "id": "ns",
+      "from": [
+        "n",
+        "south"
+      ],
+      "to": [
+        "s",
+        "north"
+      ]
+    },
+    {
+      "id": "we",
+      "from": [
+        "w",
+        "east"
+      ],
+      "to": [
+        "e",
+        "west"
+      ]
+    }
+  ],
+  "params": null
 }

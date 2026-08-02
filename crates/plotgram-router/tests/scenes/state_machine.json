@@ -1,0 +1,33 @@
+{
+  "id": "R05",
+  "name": "state_machine",
+  "level": 4,
+  "requires": "track",
+  "description": "Finite state machine for an order processing system: states as square nodes, transitions as edges with various orientations including self-loops and back-edges.",
+  "cell": 10.0,
+  "obstacles": [
+    {"id": "idle", "r": 2, "c": 16, "w": 6, "h": 4},
+    {"id": "pending", "r": 10, "c": 4, "w": 6, "h": 4},
+    {"id": "paid", "r": 10, "c": 16, "w": 6, "h": 4},
+    {"id": "shipping", "r": 10, "c": 28, "w": 6, "h": 4},
+    {"id": "fulfilled", "r": 22, "c": 28, "w": 6, "h": 4},
+    {"id": "cancelled", "r": 22, "c": 4, "w": 6, "h": 4},
+    {"id": "refunded", "r": 32, "c": 16, "w": 6, "h": 4},
+    {"id": "failed", "r": 22, "c": 16, "w": 6, "h": 4}
+  ],
+  "edges": [
+    {"id": "t1", "from": ["idle", "west"], "to": ["pending", "north"]},
+    {"id": "t2", "from": ["pending", "east"], "to": ["paid", "west"]},
+    {"id": "t3", "from": ["paid", "east"], "to": ["shipping", "west"]},
+    {"id": "t4", "from": ["shipping", "south"], "to": ["fulfilled", "north"]},
+    {"id": "t5", "from": ["pending", "south"], "to": ["cancelled", "north"]},
+    {"id": "t6", "from": ["paid", "south"], "to": ["failed", "north"]},
+    {"id": "t7", "from": ["fulfilled", "west"], "to": ["refunded", "east"]},
+    {"id": "t8", "from": ["cancelled", "east"], "to": ["refunded", "west"]},
+    {"id": "t9", "from": ["failed", "south"], "to": ["refunded", "north"]},
+    {"id": "t10", "from": ["refunded", "north"], "to": ["idle", "south"]},
+    {"id": "t11", "from": ["paid", "north", 2], "to": ["idle", "south", 2]},
+    {"id": "t12", "from": ["shipping", "west"], "to": ["paid", "north"]}
+  ],
+  "params": null
+}

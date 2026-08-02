@@ -1,0 +1,22 @@
+{
+  "id": "L17",
+  "name": "cross_junction",
+  "level": 4,
+  "requires": "track",
+  "description": "Four nodes at compass positions around a central blocker; four edges (two crossing through center, two diagonal) must route through narrow corridors without excessive overlap.",
+  "cell": 10.0,
+  "obstacles": [
+    {"id": "n", "r": 4, "c": 16, "w": 8, "h": 4},
+    {"id": "s", "r": 32, "c": 16, "w": 8, "h": 4},
+    {"id": "w", "r": 18, "c": 0, "w": 8, "h": 4},
+    {"id": "e", "r": 18, "c": 32, "w": 8, "h": 4},
+    {"id": "center", "r": 16, "c": 16, "w": 8, "h": 8}
+  ],
+  "edges": [
+    {"id": "ns", "from": ["n", "south"], "to": ["s", "north"]},
+    {"id": "we", "from": ["w", "east"], "to": ["e", "west"]},
+    {"id": "nw", "from": ["n", "west"], "to": ["w", "north"]},
+    {"id": "se", "from": ["s", "east"], "to": ["e", "south"]}
+  ],
+  "params": null
+}
