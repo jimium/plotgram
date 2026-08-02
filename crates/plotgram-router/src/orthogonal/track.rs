@@ -17,7 +17,7 @@
 use plotgram_algo::interval_color::{color_intervals, Interval};
 use plotgram_engine_api::RouteScene;
 use plotgram_model::geometry::Point;
-use plotgram_model::result::EdgePlacement;
+use plotgram_model::result::{EdgePath, EdgePlacement};
 
 use crate::core::{normalize_polyline, overlap_len};
 
@@ -41,7 +41,7 @@ pub fn spread_tracks(scene: &RouteScene, placements: &mut [EdgePlacement]) {
     }
     let segments: Vec<Vec<(Point, Point)>> = placements
         .iter()
-        .map(|p| p.path.points.windows(2).map(|w| (w[0], w[1])).collect())
+        .map(|p| p.path.polyline_points().unwrap().windows(2).map(|w| (w[0], w[1])).collect())
         .collect();
 
     let mut corridors: Vec<Corridor> = Vec::new();
@@ -108,7 +108,7 @@ pub fn spread_tracks(scene: &RouteScene, placements: &mut [EdgePlacement]) {
             .iter()
             .map(|&e| {
                 preferred_perp(
-                    &placements[e].path.points,
+                    &placements[e].path.polyline_points().unwrap(),
                     cor.horizontal,
                     cor.coord,
                 )
@@ -127,9 +127,9 @@ pub fn spread_tracks(scene: &RouteScene, placements: &mut [EdgePlacement]) {
             }
             let edge_id = placements[e].id.as_str();
             let shifted =
-                shift_on_line(&placements[e].path.points, cor.horizontal, cor.coord, offset);
+                shift_on_line(&placements[e].path.polyline_points().unwrap(), cor.horizontal, cor.coord, offset);
             if path_clear(&shifted, scene, edge_id) {
-                placements[e].path.points = shifted;
+                placements[e].path = EdgePath::polyline(shifted);
             }
         }
     }
@@ -377,11 +377,11 @@ mod tests {
         let report = crate::verify::verify_all(&scene, &p);
         assert!(report.all_pass, "failures: {:?}", report.failures());
         // e0/e1/e2 must not fully coincide after L3+L4 separation.
-        assert_ne!(p[0].path.points, p[1].path.points);
-        assert_ne!(p[0].path.points, p[2].path.points);
+        assert_ne!(p[0].path.polyline_points().unwrap(), p[1].path.polyline_points().unwrap());
+        assert_ne!(p[0].path.polyline_points().unwrap(), p[2].path.polyline_points().unwrap());
         // e2's shifted corridor run must not dip back to the shared backbone:
         // after leaving the stub, the long horizontal run stays on one y.
-        let pts = &p[2].path.points;
+        let pts = &p[2].path.polyline_points().unwrap();
         assert!(pts.len() >= 4, "e2 too short: {pts:?}");
         // Find the longest horizontal segment — it is the corridor ride.
         let mut best: Option<(usize, f64)> = None;
@@ -496,14 +496,12 @@ mod tests {
                 id: "e0".into(),
                 source: "bl".into(),
                 target: "br".into(),
-                path: EdgePath {
-                    points: vec![
+                path: EdgePath::polyline(vec![
                         p(50.0, 150.0),
                         p(50.0, 100.0),
                         p(250.0, 100.0),
                         p(250.0, 150.0),
-                    ],
-                },
+                    ]),
                 from_port: None,
                 to_port: None,
             },
@@ -511,14 +509,12 @@ mod tests {
                 id: "e1".into(),
                 source: "tl".into(),
                 target: "tr".into(),
-                path: EdgePath {
-                    points: vec![
+                path: EdgePath::polyline(vec![
                         p(50.0, 50.0),
                         p(50.0, 100.0),
                         p(250.0, 100.0),
                         p(250.0, 50.0),
-                    ],
-                },
+                    ]),
                 from_port: None,
                 to_port: None,
             },
@@ -579,8 +575,8 @@ mod tests {
                 .map(|w| w[0].y)
                 .unwrap()
         };
-        let y0 = run_y(&placements[0].path.points);
-        let y1 = run_y(&placements[1].path.points);
+        let y0 = run_y(&placements[0].path.polyline_points().unwrap());
+        let y1 = run_y(&placements[1].path.polyline_points().unwrap());
         assert!(y1 < 100.0, "e1 (from above) must ride north of backbone: {y1}");
         assert!(y0 > 100.0, "e0 (from below) must ride south of backbone: {y0}");
         assert!(

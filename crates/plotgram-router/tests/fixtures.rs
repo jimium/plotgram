@@ -141,7 +141,7 @@ fn fixture_track_separation() {
         for i in 0..placements.len() {
             for j in (i + 1)..placements.len() {
                 assert_ne!(
-                    placements[i].path.points, placements[j].path.points,
+                    placements[i].path.polyline_points().unwrap(), placements[j].path.polyline_points().unwrap(),
                     "{}: edges {} and {} fully overlap",
                     fix.name, placements[i].id, placements[j].id
                 );

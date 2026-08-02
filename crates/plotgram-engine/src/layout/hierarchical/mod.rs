@@ -13,7 +13,7 @@ mod rank;
 use plotgram_engine_api::{
     EdgeGeometryMode, LayoutAlgorithm, LayoutError, LayoutInput, LayoutOutput,
 };
-use plotgram_model::result::EdgePlacement;
+use plotgram_model::result::{EdgePath, EdgePlacement};
 
 pub use params::{
     BindResult, GroupAlign, GroupPolicy, GroupSizing, HierarchicalParams, HierarchicalPreset,
@@ -42,7 +42,7 @@ impl LayoutAlgorithm for HierarchicalLayout {
             EdgeGeometryMode::DeferToRouter => edges
                 .into_iter()
                 .map(|mut e| {
-                    e.path.points.clear();
+                    e.path = EdgePath::polyline(vec![]);
                     e
                 })
                 .collect::<Vec<EdgePlacement>>(),

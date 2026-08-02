@@ -39,7 +39,7 @@ pub struct EdgeScore {
 pub fn score_scene(name: &str, _scene: &RouteScene, placements: &[EdgePlacement]) -> SceneScore {
     let edge_scores: Vec<EdgeScore> = placements
         .iter()
-        .map(|p| score_edge(&p.id, &p.path.points))
+        .map(|p| score_edge(&p.id, &p.path.samples()))
         .collect();
 
     let total_bends: usize = edge_scores.iter().map(|s| s.bends).sum();
@@ -96,7 +96,7 @@ fn count_crossings(placements: &[EdgePlacement]) -> usize {
     let mut count = 0;
     for i in 0..placements.len() {
         for j in (i + 1)..placements.len() {
-            count += crossings_between(&placements[i].path.points, &placements[j].path.points);
+            count += crossings_between(&placements[i].path.samples(), &placements[j].path.samples());
         }
     }
     count
@@ -151,7 +151,7 @@ fn count_shared_segments(placements: &[EdgePlacement]) -> usize {
     let mut count = 0;
     for i in 0..placements.len() {
         for j in (i + 1)..placements.len() {
-            count += shared_between(&placements[i].path.points, &placements[j].path.points);
+            count += shared_between(&placements[i].path.samples(), &placements[j].path.samples());
         }
     }
     count
@@ -184,7 +184,7 @@ fn compute_bbox(placements: &[EdgePlacement]) -> [f64; 4] {
     let mut y_max = f64::MIN;
 
     for p in placements {
-        for pt in &p.path.points {
+        for pt in &p.path.samples() {
             x_min = x_min.min(pt.x);
             y_min = y_min.min(pt.y);
             x_max = x_max.max(pt.x);

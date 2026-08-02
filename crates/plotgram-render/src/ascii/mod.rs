@@ -106,7 +106,7 @@ pub fn render_ascii(input: &RenderInput) -> String {
     for ep in &input.layout.edges {
         let points: Vec<(usize, usize)> = ep
             .path
-            .points
+            .samples()
             .iter()
             .map(|p| mapper.to_grid(p.x, p.y))
             .collect();
@@ -213,9 +213,7 @@ mod tests {
             id: id.to_string(),
             source: source.to_string(),
             target: target.to_string(),
-            path: EdgePath {
-                points: pts.iter().map(|&(x, y)| Point { x, y }).collect(),
-            },
+            path: EdgePath::polyline(pts.iter().map(|&(x, y)| Point { x, y }).collect()),
             from_port: None,
             to_port: None,
         }

@@ -66,6 +66,68 @@ pub enum SearchOutcome {
     BudgetExceeded,
 }
 
+/// Reusable A* state arrays — allocated once, reset via generation counter.
+///
+/// Avoids O(vertex_count × 4) allocation + memset per edge (perf).
+pub struct SearchState {
+    best: Vec<f64>,
+    parent: Vec<u32>,
+    gen: Vec<u32>,
+    current_gen: u32,
+}
+
+impl SearchState {
+    /// Allocate for `state_count` states (vertex_count × 4).
+    pub fn new(state_count: usize) -> Self {
+        Self {
+            best: vec![0.0; state_count],
+            parent: vec![0; state_count],
+            gen: vec![0; state_count],
+            current_gen: 1,
+        }
+    }
+
+    /// Advance generation (invalidates all previous entries without memset).
+    #[inline]
+    fn next_gen(&mut self) {
+        self.current_gen = self.current_gen.wrapping_add(1);
+        if self.current_gen == 0 {
+            // Wraparound: full reset (astronomically unlikely).
+            self.gen.fill(0);
+            self.current_gen = 1;
+        }
+    }
+
+    #[inline]
+    fn get_best(&self, state: usize) -> f64 {
+        if self.gen[state] == self.current_gen {
+            self.best[state]
+        } else {
+            f64::INFINITY
+        }
+    }
+
+    #[inline]
+    fn set_best(&mut self, state: usize, val: f64) {
+        self.gen[state] = self.current_gen;
+        self.best[state] = val;
+    }
+
+    #[inline]
+    fn get_parent(&self, state: usize) -> u32 {
+        if self.gen[state] == self.current_gen {
+            self.parent[state]
+        } else {
+            u32::MAX
+        }
+    }
+
+    #[inline]
+    fn set_parent(&mut self, state: usize, val: u32) {
+        self.parent[state] = val;
+    }
+}
+
 /// Least-cost orthogonal path on `grid` from `start` to `goal`.
 ///
 /// - `start_dir`: direction the edge arrives at `start` (source stub
@@ -78,6 +140,7 @@ pub enum SearchOutcome {
 ///   exemption). The caller folds segment length and (round 2) shared-segment
 ///   penalty into the returned cost.
 /// - `budget`: max node expansions; `None` = unlimited.
+/// - `state`: reusable search arrays (generation-based reset, no realloc).
 pub fn astar(
     grid: &Grid,
     start: (u32, u32),
@@ -87,6 +150,7 @@ pub fn astar(
     bend_penalty: f64,
     step_cost: &dyn Fn(Point, Point) -> Option<f64>,
     budget: Option<u32>,
+    state: &mut SearchState,
 ) -> SearchOutcome {
     let (nx, ny) = grid.dims();
     let vertex_count = nx * ny;
@@ -105,13 +169,14 @@ pub fn astar(
     };
 
     const NONE: u32 = u32::MAX;
-    let mut best = vec![f64::INFINITY; vertex_count * 4];
-    let mut parent = vec![NONE; vertex_count * 4];
+    // Advance generation: all previous entries become "unset" without memset.
+    state.next_gen();
     let mut heap = BinaryHeap::new();
     let mut seq = 0u64;
 
     let start_state = state_of(vidx(start.0, start.1), start_dir);
-    best[start_state] = 0.0;
+    state.set_best(start_state, 0.0);
+    state.set_parent(start_state, NONE);
     let h0 = h(vidx(start.0, start.1));
     heap.push(Open {
         f: h0,
@@ -124,7 +189,7 @@ pub fn astar(
 
     let mut expanded = 0u32;
     while let Some(open) = heap.pop() {
-        if open.g > best[open.state] {
+        if open.g > state.get_best(open.state) {
             continue; // stale entry superseded by a cheaper push
         }
         if let Some(budget) = budget {
@@ -136,7 +201,7 @@ pub fn astar(
         let v = open.state / 4;
         let dir = Dir4::from_index(open.state % 4);
         if v == goal_v {
-            return SearchOutcome::Found(reconstruct(grid, nx, &parent, open.state));
+            return SearchOutcome::Found(reconstruct(grid, nx, state, open.state));
         }
         let xi = (v % nx) as u32;
         let yi = (v / nx) as u32;
@@ -158,9 +223,9 @@ pub fn astar(
                 ng += bend_penalty; // bend at `goal` (folded into entry cost)
             }
             let nstate = state_of(nv, nd);
-            if ng < best[nstate] {
-                best[nstate] = ng;
-                parent[nstate] = open.state as u32;
+            if ng < state.get_best(nstate) {
+                state.set_best(nstate, ng);
+                state.set_parent(nstate, open.state as u32);
                 let nh = h(nv);
                 heap.push(Open {
                     f: ng + nh,
@@ -177,13 +242,13 @@ pub fn astar(
 }
 
 /// Walk parent pointers from the goal state back to the start state.
-fn reconstruct(grid: &Grid, nx: usize, parent: &[u32], goal_state: usize) -> Vec<Point> {
+fn reconstruct(grid: &Grid, nx: usize, state: &SearchState, goal_state: usize) -> Vec<Point> {
     let mut pts = Vec::new();
     let mut cur = goal_state;
     loop {
         let v = cur / 4;
         pts.push(grid.point((v % nx) as u32, (v / nx) as u32));
-        let par = parent[cur];
+        let par = state.get_parent(cur);
         if par == u32::MAX {
             break;
         }
@@ -222,11 +287,27 @@ mod tests {
         }
     }
 
+    /// Helper: run astar with a fresh SearchState sized for the grid.
+    fn run_astar(
+        grid: &Grid,
+        start: (u32, u32),
+        start_dir: Dir4,
+        goal: (u32, u32),
+        approach_dir: Dir4,
+        bend_penalty: f64,
+        step_cost: &dyn Fn(Point, Point) -> Option<f64>,
+        budget: Option<u32>,
+    ) -> SearchOutcome {
+        let (nx, ny) = grid.dims();
+        let mut state = SearchState::new(nx * ny * 4);
+        astar(grid, start, start_dir, goal, approach_dir, bend_penalty, step_cost, budget, &mut state)
+    }
+
     #[test]
     fn straight_when_clear() {
         let g = test_grid(&[0.0, 10.0, 20.0], &[5.0]);
         let step = cost_len(never_blocked);
-        let path = match astar(
+        let path = match run_astar(
             &g,
             (0, 0),
             Dir4::East,
@@ -256,7 +337,7 @@ mod tests {
         let run = || {
             let g = test_grid(&[0.0, 10.0], &[0.0, 10.0]);
             let step = cost_len(never_blocked);
-            astar(
+            run_astar(
                 &g,
                 (0, 0),
                 Dir4::East,
@@ -289,7 +370,7 @@ mod tests {
                 || (a == Point { x: 10.0, y: 10.0 } && b == Point { x: 0.0, y: 10.0 })
         };
         let step = cost_len(blocked);
-        let path = match astar(
+        let path = match run_astar(
             &g,
             (0, 1),
             Dir4::East,
@@ -315,7 +396,7 @@ mod tests {
         let goal = Point { x: 10.0, y: 0.0 };
         let step = cost_len(move |a: Point, b: Point| a == goal || b == goal);
         assert_eq!(
-            astar(
+            run_astar(
                 &g,
                 (0, 0),
                 Dir4::East,
@@ -335,7 +416,7 @@ mod tests {
         // length; result is still deterministic and endpoint-correct.
         let g = test_grid(&[0.0, 10.0], &[0.0, 10.0]);
         let step = cost_len(never_blocked);
-        let p = match astar(
+        let p = match run_astar(
             &g,
             (0, 0),
             Dir4::East,
@@ -358,7 +439,7 @@ mod tests {
         let g = test_grid(&[0.0, 10.0, 20.0, 30.0, 40.0], &[0.0, 10.0, 20.0]);
         let step = cost_len(never_blocked);
         assert_eq!(
-            astar(
+            run_astar(
                 &g,
                 (0, 0),
                 Dir4::East,
@@ -371,7 +452,7 @@ mod tests {
             SearchOutcome::BudgetExceeded
         );
         // Generous budget still finds the path.
-        match astar(
+        match run_astar(
             &g,
             (0, 0),
             Dir4::East,

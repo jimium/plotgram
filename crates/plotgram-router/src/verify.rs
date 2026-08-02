@@ -87,7 +87,7 @@ pub fn verify_all(scene: &RouteScene, placements: &[EdgePlacement]) -> VerifyRep
     let conservation_pass = placement_ids == order_ids;
 
     for p in placements {
-        edge_results.push(verify_edge(scene, &p.id, &p.path.points));
+        edge_results.push(verify_edge(scene, &p.id, &p.path.samples()));
     }
 
     // If conservation fails, add a synthetic failing result.
@@ -123,7 +123,7 @@ pub fn verify_determinism(scene: &RouteScene, router: &dyn EdgeRouter) -> bool {
                 return false;
             }
             a.iter().zip(b.iter()).all(|(ea, eb)| {
-                ea.id == eb.id && ea.path.points == eb.path.points
+                ea.id == eb.id && ea.path == eb.path
             })
         }
         (Err(_), Err(_)) => true, // Both fail consistently.

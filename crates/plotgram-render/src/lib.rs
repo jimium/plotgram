@@ -183,9 +183,10 @@ mod tests {
                 id: "e1".to_string(),
                 source: "a".to_string(),
                 target: "b".to_string(),
-                path: EdgePath {
-                    points: vec![Point { x: 50.0, y: 50.0 }, Point { x: 50.0, y: 110.0 }],
-                },
+                path: EdgePath::polyline(vec![
+                    Point { x: 50.0, y: 50.0 },
+                    Point { x: 50.0, y: 110.0 },
+                ]),
                 from_port: None,
                 to_port: None,
             }],
@@ -336,9 +337,10 @@ mod tests {
             id: "e2".to_string(),
             source: "b".to_string(),
             target: "a".to_string(),
-            path: EdgePath {
-                points: vec![Point { x: 60.0, y: 110.0 }, Point { x: 60.0, y: 50.0 }],
-            },
+            path: EdgePath::polyline(vec![
+                Point { x: 60.0, y: 110.0 },
+                Point { x: 60.0, y: 50.0 },
+            ]),
             from_port: None,
             to_port: None,
         });

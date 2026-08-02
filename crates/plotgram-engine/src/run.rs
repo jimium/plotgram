@@ -195,7 +195,7 @@ mod tests {
         let result = run(&contract).unwrap();
         assert_eq!(result.nodes.len(), 2);
         assert_eq!(result.edges.len(), 1);
-        assert!(result.edges[0].path.points.len() >= 2);
+        assert!(result.edges[0].path.samples().len() >= 2);
         assert!(result.edges[0].from_port.is_some());
         assert!(result.canvas_width > 0.0);
     }
@@ -216,7 +216,91 @@ mod tests {
         };
         let result = run(&contract).unwrap();
         assert_eq!(result.edges.len(), 1);
-        assert!(result.edges[0].path.points.len() >= 2);
+        assert!(result.edges[0].path.samples().len() >= 2);
+    }
+
+    #[test]
+    fn hierarchical_with_independent_straight_router() {
+        let graph = Graph {
+            nodes: vec![node("a"), node("b")],
+            edges: vec![edge("e0", "a", "b")],
+            groups: vec![],
+            partition: None,
+        };
+        let contract = LayoutContract {
+            layout: AlgorithmRef::new("hierarchical"),
+            edge_routing: Some(AlgorithmRef::new("straight")),
+            graph,
+            node_sizes: sizes(&["a", "b"]),
+        };
+        let result = run(&contract).unwrap();
+        assert_eq!(result.edges.len(), 1);
+        assert_eq!(
+            result.edges[0].path.polyline_points().map(|p| p.len()),
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn hierarchical_with_independent_polyline_router() {
+        let graph = Graph {
+            nodes: vec![node("a"), node("b")],
+            edges: vec![edge("e0", "a", "b")],
+            groups: vec![],
+            partition: None,
+        };
+        let contract = LayoutContract {
+            layout: AlgorithmRef::new("hierarchical"),
+            edge_routing: Some(AlgorithmRef::new("polyline")),
+            graph,
+            node_sizes: sizes(&["a", "b"]),
+        };
+        let result = run(&contract).unwrap();
+        assert_eq!(result.edges.len(), 1);
+        assert!(result.edges[0].path.samples().len() >= 2);
+    }
+
+    #[test]
+    fn hierarchical_with_independent_octilinear_router() {
+        let graph = Graph {
+            nodes: vec![node("a"), node("b")],
+            edges: vec![edge("e0", "a", "b")],
+            groups: vec![],
+            partition: None,
+        };
+        let contract = LayoutContract {
+            layout: AlgorithmRef::new("hierarchical"),
+            edge_routing: Some(AlgorithmRef::new("octilinear")),
+            graph,
+            node_sizes: sizes(&["a", "b"]),
+        };
+        let result = run(&contract).unwrap();
+        assert_eq!(result.edges.len(), 1);
+        assert!(result.edges[0].path.samples().len() >= 2);
+    }
+
+    #[test]
+    fn hierarchical_with_independent_curved_router() {
+        let graph = Graph {
+            nodes: vec![node("a"), node("b")],
+            edges: vec![edge("e0", "a", "b")],
+            groups: vec![],
+            partition: None,
+        };
+        let contract = LayoutContract {
+            layout: AlgorithmRef::new("hierarchical"),
+            edge_routing: Some(AlgorithmRef::new("curved")),
+            graph,
+            node_sizes: sizes(&["a", "b"]),
+        };
+        let result = run(&contract).unwrap();
+        assert_eq!(result.edges.len(), 1);
+        assert!(result.edges[0].path.samples().len() >= 2);
+        assert!(matches!(
+            result.edges[0].path,
+            plotgram_model::result::EdgePath::Cubic { .. }
+                | plotgram_model::result::EdgePath::Polyline { .. }
+        ));
     }
 
     #[test]

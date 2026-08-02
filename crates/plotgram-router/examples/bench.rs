@@ -12,7 +12,10 @@ use plotgram_engine_api::EdgeRouter;
 use plotgram_router::fixture::{load_dir, Requires, SceneFixture};
 use plotgram_router::score::{score_scene, SceneScore};
 use plotgram_router::verify::verify_all;
-use plotgram_router::OrthogonalEdgeRouter;
+use plotgram_router::{
+    CurvedEdgeRouter, OctilinearEdgeRouter, OrthogonalEdgeRouter, PolylineEdgeRouter,
+    StraightEdgeRouter,
+};
 
 // ─── Algorithm registry ─────────────────────────────────────
 
@@ -30,9 +33,33 @@ fn lookup_algorithm(name: &str) -> AlgoEntry {
             router: Box::new(OrthogonalEdgeRouter),
             capability: Requires::Track, // M1: 避障 + 走廊 track 分离（组场景仍不支持，走诚实拒绝）
         },
+        "straight" => AlgoEntry {
+            name: "straight",
+            router: Box::new(StraightEdgeRouter),
+            // Direct terminal→terminal; no search / track / group.
+            capability: Requires::None,
+        },
+        "polyline" => AlgoEntry {
+            name: "polyline",
+            router: Box::new(PolylineEdgeRouter),
+            // Visibility search + obstacle avoidance; no track / group yet.
+            capability: Requires::Search,
+        },
+        "octilinear" => AlgoEntry {
+            name: "octilinear",
+            router: Box::new(OctilinearEdgeRouter),
+            // Octilinear visibility + obstacle avoidance; no track / group yet.
+            capability: Requires::Search,
+        },
+        "curved" => AlgoEntry {
+            name: "curved",
+            router: Box::new(CurvedEdgeRouter),
+            // Bézier / smoothed polyline; obstacle fallback via polyline.
+            capability: Requires::Search,
+        },
         _ => {
             eprintln!("unknown algorithm: {name}");
-            eprintln!("available: orthogonal");
+            eprintln!("available: orthogonal, straight, polyline, octilinear, curved");
             std::process::exit(1);
         }
     }

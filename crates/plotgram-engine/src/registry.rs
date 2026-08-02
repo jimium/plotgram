@@ -6,7 +6,10 @@ use std::sync::Arc;
 use plotgram_engine_api::{EdgeRouter, LayoutAlgorithm};
 
 use crate::layout::HierarchicalLayout;
-use plotgram_router::OrthogonalEdgeRouter;
+use plotgram_router::{
+    CurvedEdgeRouter, OctilinearEdgeRouter, OrthogonalEdgeRouter, PolylineEdgeRouter,
+    StraightEdgeRouter,
+};
 
 pub struct Registry {
     layouts: BTreeMap<&'static str, Arc<dyn LayoutAlgorithm>>,
@@ -20,8 +23,15 @@ impl Registry {
         layouts.insert(hier.name(), hier);
 
         let mut routers: BTreeMap<&'static str, Arc<dyn EdgeRouter>> = BTreeMap::new();
-        let ortho = Arc::new(OrthogonalEdgeRouter);
-        routers.insert(ortho.name(), ortho);
+        for router in [
+            Arc::new(OrthogonalEdgeRouter) as Arc<dyn EdgeRouter>,
+            Arc::new(StraightEdgeRouter),
+            Arc::new(PolylineEdgeRouter),
+            Arc::new(OctilinearEdgeRouter),
+            Arc::new(CurvedEdgeRouter),
+        ] {
+            routers.insert(router.name(), router);
+        }
 
         Self { layouts, routers }
     }

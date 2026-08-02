@@ -16,7 +16,7 @@ mod run;
 /// Shared graph-drawing algorithm parts (see `plotgram-algo` / `PARTS.md`).
 pub use plotgram_algo as algo;
 
-/// Independent edge router crate (core primitives + orthogonal router + verify + score).
+/// Independent edge router crate (core primitives + routers + verify + score).
 pub use plotgram_router as router;
 
 pub use plotgram_engine_api::{
@@ -28,5 +28,8 @@ pub use layout::{
     HierarchicalPreset, Orientation, RoutingStyle,
 };
 pub use params::{BindError, BindWarning, OptionsBinder};
-pub use plotgram_router::OrthogonalEdgeRouter;
+pub use plotgram_router::{
+    CurvedEdgeRouter, OctilinearEdgeRouter, OrthogonalEdgeRouter, PolylineEdgeRouter,
+    StraightEdgeRouter,
+};
 pub use run::run;

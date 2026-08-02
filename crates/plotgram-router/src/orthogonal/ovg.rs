@@ -170,6 +170,138 @@ impl Grid {
     }
 }
 
+// ─── Spatial index ─────────────────────────────────────────
+
+/// Uniform-grid spatial hash over inflated obstacle rects.
+///
+/// Built once per scene; answers axis-aligned segment queries in O(k)
+/// where k = nearby obstacles, instead of O(N) full scan.
+pub struct ObstacleIndex {
+    /// Cell size (world units).
+    cell: f64,
+    /// World-space origin (min x, min y) of the grid.
+    ox: f64,
+    oy: f64,
+    /// Grid dimensions.
+    cols: usize,
+    rows: usize,
+    /// Per-cell list of obstacle indices (into the original slice).
+    cells: Vec<Vec<usize>>,
+    /// Pre-inflated rects (inflated by `spacing`) for fast intersection.
+    inflated: Vec<Rect>,
+}
+
+impl ObstacleIndex {
+    /// Build from obstacles inflated by `spacing`.
+    pub fn build(obstacles: &[Obstacle], spacing: f64) -> Self {
+        if obstacles.is_empty() {
+            return Self {
+                cell: 1.0,
+                ox: 0.0,
+                oy: 0.0,
+                cols: 1,
+                rows: 1,
+                cells: vec![vec![]],
+                inflated: vec![],
+            };
+        }
+        let inflated: Vec<Rect> = obstacles
+            .iter()
+            .map(|o| padding_rect(o.rect, spacing))
+            .collect();
+
+        // Determine world bounds.
+        let mut min_x = f64::INFINITY;
+        let mut min_y = f64::INFINITY;
+        let mut max_x = f64::NEG_INFINITY;
+        let mut max_y = f64::NEG_INFINITY;
+        for r in &inflated {
+            min_x = min_x.min(r.x);
+            min_y = min_y.min(r.y);
+            max_x = max_x.max(r.right());
+            max_y = max_y.max(r.bottom());
+        }
+
+        // Cell size: aim for ~4-16 obstacles per cell on average.
+        let total_area = (max_x - min_x).max(1.0) * (max_y - min_y).max(1.0);
+        let avg_obs_area = total_area / obstacles.len() as f64;
+        let cell = avg_obs_area.sqrt().max(spacing).max(1.0) * 2.0;
+
+        let cols = ((max_x - min_x) / cell).ceil().max(1.0) as usize + 1;
+        let rows = ((max_y - min_y) / cell).ceil().max(1.0) as usize + 1;
+
+        let mut cells = vec![Vec::new(); cols * rows];
+        for (i, r) in inflated.iter().enumerate() {
+            let c0 = ((r.x - min_x) / cell).floor().max(0.0) as usize;
+            let c1 = ((r.right() - min_x) / cell).floor().max(0.0) as usize;
+            let r0 = ((r.y - min_y) / cell).floor().max(0.0) as usize;
+            let r1 = ((r.bottom() - min_y) / cell).floor().max(0.0) as usize;
+            let c0 = c0.min(cols - 1);
+            let c1 = c1.min(cols - 1);
+            let r0 = r0.min(rows - 1);
+            let r1 = r1.min(rows - 1);
+            for ri in r0..=r1 {
+                for ci in c0..=c1 {
+                    cells[ri * cols + ci].push(i);
+                }
+            }
+        }
+
+        Self {
+            cell,
+            ox: min_x,
+            oy: min_y,
+            cols,
+            rows,
+            cells,
+            inflated,
+        }
+    }
+
+    /// Query: does segment `a→b` (axis-aligned) intersect any non-exempt
+    /// inflated obstacle? Returns `true` if blocked.
+    ///
+    /// `exempt_indices` are obstacle indices to skip (own-node exemption).
+    #[inline]
+    pub fn segment_blocked(
+        &self,
+        a: Point,
+        b: Point,
+        exempt_i: usize,
+        exempt_j: usize,
+    ) -> bool {
+        // Segment bounding box.
+        let sx0 = a.x.min(b.x);
+        let sx1 = a.x.max(b.x);
+        let sy0 = a.y.min(b.y);
+        let sy1 = a.y.max(b.y);
+
+        // Cell range overlapping the segment bbox.
+        let c0 = ((sx0 - self.ox) / self.cell).floor().max(0.0) as usize;
+        let c1 = ((sx1 - self.ox) / self.cell).floor().max(0.0) as usize;
+        let r0 = ((sy0 - self.oy) / self.cell).floor().max(0.0) as usize;
+        let r1 = ((sy1 - self.oy) / self.cell).floor().max(0.0) as usize;
+        let c0 = c0.min(self.cols - 1);
+        let c1 = c1.min(self.cols - 1);
+        let r0 = r0.min(self.rows - 1);
+        let r1 = r1.min(self.rows - 1);
+
+        for ri in r0..=r1 {
+            for ci in c0..=c1 {
+                for &idx in &self.cells[ri * self.cols + ci] {
+                    if idx == exempt_i || idx == exempt_j {
+                        continue;
+                    }
+                    if segment_intersects_rect(a, b, self.inflated[idx]) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+}
+
 // ─── Collision model ────────────────────────────────────────
 
 const EPS: f64 = 1e-9;
@@ -222,7 +354,7 @@ pub fn segment_blocked(
 /// Without permission: any touch of `inflate(group)` is blocked.
 /// With permission: allowed through the padded gate corridor, or when both
 /// endpoints lie inside the raw group rect (interior travel after entry).
-pub fn group_blocks_segment(
+pub(crate) fn group_blocks_segment(
     a: Point,
     b: Point,
     groups: &[GroupBoundary],

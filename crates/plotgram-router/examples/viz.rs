@@ -13,19 +13,26 @@ use std::path::PathBuf;
 
 use plotgram_engine_api::EdgeRouter;
 use plotgram_model::geometry::Rect;
-use plotgram_model::result::EdgePlacement;
+use plotgram_model::result::{EdgePath, EdgePlacement};
 use plotgram_router::fixture::{load_dir_board, BoardFixture, RouteExpect, SceneFixture};
 use plotgram_router::verify::verify_all;
-use plotgram_router::OrthogonalEdgeRouter;
+use plotgram_router::{
+    CurvedEdgeRouter, OctilinearEdgeRouter, OrthogonalEdgeRouter, PolylineEdgeRouter,
+    StraightEdgeRouter,
+};
 
 // ─── Algorithm registry ─────────────────────────────────────
 
 fn lookup_algorithm(name: &str) -> Box<dyn EdgeRouter> {
     match name {
         "orthogonal" => Box::new(OrthogonalEdgeRouter),
+        "straight" => Box::new(StraightEdgeRouter),
+        "polyline" => Box::new(PolylineEdgeRouter),
+        "octilinear" => Box::new(OctilinearEdgeRouter),
+        "curved" => Box::new(CurvedEdgeRouter),
         _ => {
             eprintln!("unknown algorithm: {name}");
-            eprintln!("available: orthogonal");
+            eprintln!("available: orthogonal, straight, polyline, octilinear, curved");
             std::process::exit(1);
         }
     }
@@ -69,7 +76,7 @@ fn compute_bbox(fix: &SceneFixture, placements: &[EdgePlacement]) -> (f64, f64, 
         }
     }
     for p in placements {
-        for pt in &p.path.points {
+        for pt in p.path.samples() {
             bbox.0 = bbox.0.min(pt.x);
             bbox.1 = bbox.1.min(pt.y);
             bbox.2 = bbox.2.max(pt.x);
@@ -208,27 +215,54 @@ fn render_panel(
     if let Some(placements) = placements {
         for (i, p) in placements.iter().enumerate() {
             let color = COLORS[i % COLORS.len()];
-            if p.path.points.len() >= 2 {
-                let points: Vec<String> = p
-                    .path
-                    .points
-                    .iter()
-                    .map(|pt| format!("{},{}", pt.x, pt.y))
-                    .collect();
-                let _ = writeln!(
-                    svg,
-                    r#"<polyline points="{}" fill="none" stroke="{color}" stroke-width="2" stroke-linejoin="round"/>"#,
-                    points.join(" ")
-                );
-                for pt in &p.path.points[1..p.path.points.len() - 1] {
+            match &p.path {
+                EdgePath::Polyline { points } if points.len() >= 2 => {
+                    let pts: Vec<String> = points
+                        .iter()
+                        .map(|pt| format!("{},{}", pt.x, pt.y))
+                        .collect();
                     let _ = writeln!(
                         svg,
-                        r#"<circle cx="{}" cy="{}" r="2.5" fill="{color}"/>"#,
-                        pt.x, pt.y
+                        r#"<polyline points="{}" fill="none" stroke="{color}" stroke-width="2" stroke-linejoin="round"/>"#,
+                        pts.join(" ")
                     );
+                    for pt in &points[1..points.len() - 1] {
+                        let _ = writeln!(
+                            svg,
+                            r#"<circle cx="{}" cy="{}" r="2.5" fill="{color}"/>"#,
+                            pt.x, pt.y
+                        );
+                    }
                 }
+                EdgePath::Cubic {
+                    start,
+                    end,
+                    controls,
+                } => {
+                    let _ = writeln!(
+                        svg,
+                        r#"<path d="M {} {} C {} {} {} {} {} {}" fill="none" stroke="{color}" stroke-width="2"/>"#,
+                        start.x,
+                        start.y,
+                        controls[0].x,
+                        controls[0].y,
+                        controls[1].x,
+                        controls[1].y,
+                        end.x,
+                        end.y
+                    );
+                    for pt in controls {
+                        let _ = writeln!(
+                            svg,
+                            r#"<circle cx="{}" cy="{}" r="2.5" fill="{color}" opacity="0.5"/>"#,
+                            pt.x, pt.y
+                        );
+                    }
+                }
+                _ => {}
             }
-            if let Some(mid) = p.path.points.get(p.path.points.len() / 2) {
+            let samples = p.path.samples();
+            if let Some(mid) = samples.get(samples.len() / 2) {
                 let _ = writeln!(
                     svg,
                     r#"<text x="{}" y="{}" font-size="9" fill="{color}" font-weight="bold">{}</text>"#,
@@ -304,7 +338,14 @@ svg {{ display: block; width: 100%; height: 260px; }}
         fixtures.len()
     );
 
-    for fix in fixtures {
+    for (i, fix) in fixtures.iter().enumerate() {
+        eprint!(
+            "\r  [{}/{}] {} ...                    ",
+            i + 1,
+            fixtures.len(),
+            fix.name
+        );
+        let _ = std::io::Write::flush(&mut std::io::stderr());
         let result = router.route(&fix.scene);
         match &result {
             Ok(placements) => {
@@ -317,6 +358,7 @@ svg {{ display: block; width: 100%; height: 260px; }}
             }
         }
     }
+    eprintln!();
 
     let _ = writeln!(
         html,
@@ -333,7 +375,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let algo_name = args.get(1).map(|s| s.as_str()).unwrap_or_else(|| {
         eprintln!("usage: viz <algorithm>");
-        eprintln!("available: orthogonal");
+        eprintln!("available: orthogonal, straight, polyline, octilinear, curved");
         std::process::exit(1);
     });
 

@@ -47,7 +47,7 @@ pub fn build_edge_stubs(
             id: e.id.clone(),
             source: e.source.clone(),
             target: e.target.clone(),
-            path: EdgePath { points: vec![] },
+            path: EdgePath::polyline(vec![]),
             from_port: Some(from_port),
             to_port: Some(to_port),
         });

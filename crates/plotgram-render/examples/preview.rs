@@ -59,9 +59,7 @@ fn route(id: &str, source: &str, target: &str, pts: &[(f64, f64)]) -> EdgePlacem
         id: id.to_string(),
         source: source.to_string(),
         target: target.to_string(),
-        path: EdgePath {
-            points: pts.iter().map(|&(x, y)| Point { x, y }).collect(),
-        },
+        path: EdgePath::polyline(pts.iter().map(|&(x, y)| Point { x, y }).collect()),
         from_port: None,
         to_port: None,
     }

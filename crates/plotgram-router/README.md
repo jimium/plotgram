@@ -1,6 +1,6 @@
 # plotgram-router
 
-独立正交边路由 crate。与 `plotgram-engine`（布局 facade）物理隔离，只依赖底层 API 和算法库。
+独立边路由 crate。与 `plotgram-engine`（布局 facade）物理隔离，只依赖底层 API 和算法库。
 
 ## 依赖关系
 
@@ -25,6 +25,10 @@ src/
   lib.rs            # crate 入口
   core/             # 无策略几何原语（port_anchor, orthogonal_elbow, rect 工具）
   orthogonal/       # OrthogonalEdgeRouter（ovg / search / track / nudge）
+  straight.rs       # StraightEdgeRouter（端子直连）
+  polyline.rs       # PolylineEdgeRouter（可见性图 + Dijkstra）
+  octilinear.rs     # OctilinearEdgeRouter（H/V/45° + 线桶）
+  curved.rs         # CurvedEdgeRouter（贝塞尔 / Chaikin）
   verify.rs         # 几何不变量验证（正交、附着、净空、确定性）
   score.rs          # 质量度量（弯折、长度、交叉、共线）
   fixture.rs        # 场景夹具文件格式（BoardFixture 离散网格 + SceneFixture legacy + Requires 能力标记）
@@ -35,6 +39,10 @@ src/
 | 名称 | 注册名 | 状态 | 说明 |
 |------|--------|------|------|
 | OrthogonalEdgeRouter | `orthogonal` | **M0–M2 已落地** | OVG+A*；两轮 shared；L3 `interval_color` + L4 VPSC nudge；单层组+gate；嵌套 scope 未做 |
+| StraightEdgeRouter | `straight` | **已落地** | 端子两点直连；不避障；有组场景诚实拒绝 |
+| PolylineEdgeRouter | `polyline` | **MVP 已落地** | 角点可见性图 + 欧氏 Dijkstra；组场景诚实拒绝 |
+| OctilinearEdgeRouter | `octilinear` | **MVP 已落地** | H/V/45°；interesting-line + 线桶；组场景诚实拒绝 |
+| CurvedEdgeRouter | `curved` | **MVP 已落地** | 端口贝塞尔采样；穿障回退 polyline+Chaikin |
 
 新算法在 `examples/bench.rs` 和 `examples/viz.rs` 的 `lookup_algorithm()` 中注册即可被所有脚本自动发现。
 
@@ -87,7 +95,7 @@ cargo test -p plotgram-router
 ### viz.sh — 可视化
 
 ```bash
-./scripts/viz.sh [algorithm]    # 默认 orthogonal
+./scripts/viz.sh [algorithm]    # 默认 orthogonal；内部 --release（debug 全量夹具会极慢）
 ```
 
 生成自包含 HTML（SVG 绘制 node + edge path），自动打开浏览器。

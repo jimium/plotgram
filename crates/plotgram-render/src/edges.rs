@@ -1,7 +1,8 @@
-//! Edge rendering: polyline → SVG path + arrow markers + labels.
+//! Edge rendering: polyline / cubic → SVG path + arrow markers + labels.
 
+use plotgram_model::geometry::Point;
 use plotgram_model::graph::Arrow;
-use plotgram_model::result::EdgePlacement;
+use plotgram_model::result::{EdgePath, EdgePlacement};
 
 use crate::resolve::ResolvedGraph;
 use crate::strategy::Strategy;
@@ -16,19 +17,34 @@ pub fn render_edge(
     theme: &CompiledTheme,
     strategy: &Strategy,
 ) {
-    let points = &placement.path.points;
-    if points.len() < 2 {
-        return;
-    }
-
     let style = match resolved.edges.get(&placement.id) {
         Some(s) => s,
         None => return,
     };
 
     let seed = crate::util::hash_id(&placement.id, 7);
-    let transformed = strategy.transform_path(points, seed);
-    let d = build_path_d(&transformed);
+    let d = match &placement.path {
+        EdgePath::Polyline { points } => {
+            if points.len() < 2 {
+                return;
+            }
+            let transformed = strategy.transform_path(points, seed);
+            build_polyline_d(&transformed)
+        }
+        EdgePath::Cubic {
+            start,
+            end,
+            controls,
+        } => {
+            // Sketch strategy: jitter the four Bezier points as a short polyline.
+            let raw = [*start, controls[0], controls[1], *end];
+            let t = strategy.transform_path(&raw, seed);
+            if t.len() < 4 {
+                return;
+            }
+            build_cubic_d(t[0], t[1], t[2], t[3])
+        }
+    };
 
     let mut attrs = format!(
         r#"fill="none" stroke="{}" stroke-width="{}""#,
@@ -67,8 +83,8 @@ pub fn render_edge(
     svg.add_element(format!(r#"<path d="{d}" {attrs}/>"#));
 }
 
-/// Build SVG path `d` from points (M ... L ...).
-fn build_path_d(points: &[plotgram_model::geometry::Point]) -> String {
+/// Build SVG path `d` from polyline points (M ... L ...).
+fn build_polyline_d(points: &[Point]) -> String {
     let mut d = String::new();
     for (i, p) in points.iter().enumerate() {
         if i == 0 {
@@ -78,6 +94,13 @@ fn build_path_d(points: &[plotgram_model::geometry::Point]) -> String {
         }
     }
     d
+}
+
+fn build_cubic_d(p0: Point, p1: Point, p2: Point, p3: Point) -> String {
+    format!(
+        "M {:.1} {:.1} C {:.1} {:.1}, {:.1} {:.1}, {:.1} {:.1}",
+        p0.x, p0.y, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y
+    )
 }
 
 /// Stable marker id derived from arrow style + fill color (cf. hatch ids).

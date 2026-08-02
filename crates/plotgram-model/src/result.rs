@@ -1,6 +1,6 @@
 //! Layout result: geometry output from the engine.
 //!
-//! Minimal viable structure: node frames, edge polylines, label slots.
+//! Minimal viable structure: node frames, edge paths, label slots.
 //! The renderer also needs the original [`crate::graph::Graph`] (shape / variant /
 //! arrow / style) plus [`crate::render::RenderMeta`] — see [`crate::render::RenderInput`].
 
@@ -16,11 +16,96 @@ pub struct NodePlacement {
     pub frame: Rect,
 }
 
-/// A bend point in an edge path.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct EdgePath {
-    /// Ordered points: source anchor → bends → target anchor.
-    pub points: Vec<Point>,
+/// Edge geometry as a tagged sum type.
+///
+/// - [`EdgePath::Polyline`]: orthogonal / polyline / octilinear / straight
+/// - [`EdgePath::Cubic`]: cubic Bézier (P0=start, P3=end, controls=[P1,P2]);
+///   render draws SVG `C`, verify may sample
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EdgePath {
+    /// Ordered polyline: source anchor → bends → target anchor.
+    Polyline { points: Vec<Point> },
+    /// Single cubic Bézier segment.
+    Cubic {
+        start: Point,
+        end: Point,
+        /// Control points `[P1, P2]`.
+        controls: [Point; 2],
+    },
+}
+
+impl EdgePath {
+    pub fn polyline(points: Vec<Point>) -> Self {
+        Self::Polyline { points }
+    }
+
+    pub fn cubic(start: Point, end: Point, controls: [Point; 2]) -> Self {
+        Self::Cubic {
+            start,
+            end,
+            controls,
+        }
+    }
+
+    /// Borrow polyline vertices; `None` for [`EdgePath::Cubic`].
+    pub fn polyline_points(&self) -> Option<&[Point]> {
+        match self {
+            Self::Polyline { points } => Some(points.as_slice()),
+            Self::Cubic { .. } => None,
+        }
+    }
+
+    /// Mutable polyline vertices; `None` for [`EdgePath::Cubic`].
+    pub fn polyline_points_mut(&mut self) -> Option<&mut Vec<Point>> {
+        match self {
+            Self::Polyline { points } => Some(points),
+            Self::Cubic { .. } => None,
+        }
+    }
+
+    /// Endpoints `(start, end)` when the path has a defined span.
+    pub fn start_end(&self) -> Option<(Point, Point)> {
+        match self {
+            Self::Polyline { points } if points.len() >= 2 => {
+                Some((points[0], *points.last().unwrap()))
+            }
+            Self::Polyline { .. } => None,
+            Self::Cubic { start, end, .. } => Some((*start, *end)),
+        }
+    }
+
+    /// Polyline approximation for verify / score / ascii.
+    ///
+    /// Cubic is sampled with a fixed count (deterministic).
+    pub fn samples(&self) -> Vec<Point> {
+        match self {
+            Self::Polyline { points } => points.clone(),
+            Self::Cubic {
+                start,
+                end,
+                controls,
+            } => sample_cubic_bezier(*start, controls[0], controls[1], *end, CUBIC_SAMPLE_COUNT),
+        }
+    }
+}
+
+const CUBIC_SAMPLE_COUNT: usize = 24;
+
+fn sample_cubic_bezier(p0: Point, p1: Point, p2: Point, p3: Point, samples: usize) -> Vec<Point> {
+    let n = samples.max(2);
+    let mut out = Vec::with_capacity(n);
+    for i in 0..n {
+        let t = i as f64 / (n - 1) as f64;
+        let u = 1.0 - t;
+        let uu = u * u;
+        let tt = t * t;
+        out.push(Point {
+            x: uu * u * p0.x + 3.0 * uu * t * p1.x + 3.0 * u * tt * p2.x + tt * t * p3.x,
+            y: uu * u * p0.y + 3.0 * uu * t * p1.y + 3.0 * u * tt * p2.y + tt * t * p3.y,
+        });
+    }
+    out
 }
 
 /// Placement result for a single edge.
@@ -32,7 +117,7 @@ pub struct EdgePlacement {
     pub source: String,
     /// Target node id.
     pub target: String,
-    /// The routed polyline.
+    /// Routed geometry (polyline or cubic).
     pub path: EdgePath,
     /// Resolved source port. Written by the layout composition phase
     /// (port decision, dsl-spec §7.4.1); `None` = layout did not decide
@@ -78,18 +163,13 @@ pub struct GroupPlacement {
 /// Complete layout result — geometry only.
 ///
 /// Does **not** carry shape / kind / style / theme; pair with `Graph` + `RenderMeta`
-/// via [`crate::render::RenderInput`].
+/// for rendering ([`crate::render::RenderInput`]).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LayoutResult {
-    /// Node placements (all nodes, flat — including those inside groups).
     pub nodes: Vec<NodePlacement>,
-    /// Edge placements (all edges, flat).
     pub edges: Vec<EdgePlacement>,
-    /// Group bounding boxes (all groups, flat).
     pub groups: Vec<GroupPlacement>,
-    /// Label slots (node labels, edge labels, group headers).
     pub labels: Vec<LabelSlot>,
-    /// Total canvas size.
     pub canvas_width: f64,
     pub canvas_height: f64,
 }

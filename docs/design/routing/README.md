@@ -29,11 +29,11 @@
 
 | 算法 | 注册名 | 状态 | 搜索图 / 策略 | 典型场景 | 文档 |
 |------|--------|------|---------------|---------|------|
-| **正交** | `orthogonal` | M0+M1 已落地 | reduced OVG + A* + track 分离 | 流程图、ER 图、网络拓扑 | [orthogonal/](orthogonal/) |
-| 折线 | `polyline` | 未做 | — | Hier 内建 routing_style | — |
-| 八方向 | `octilinear` | 未做 | — | 电路图、地铁图 | — |
-| 曲线 | `curved` | 未做 | — | 有机图、美化输出 | — |
-| 直线 | `straight` | 未做 | — | 最简连接、调试 | — |
+| **正交** | `orthogonal` | M0–M2 已落地 | reduced OVG + A* + track 分离 | 流程图、ER 图、网络拓扑 | [orthogonal/](orthogonal/) |
+| **直线** | `straight` | 已落地 | 端子直连（两点折线） | 最简连接、调试、ER | — |
+| **折线** | `polyline` | MVP 已落地 | 角点可见性图 + Dijkstra | 自由位置避障折线 | [polyline/](polyline/) |
+| **八方向** | `octilinear` | MVP 已落地 | interesting-line + 线桶（H/V/45°） | 电路图、地铁图 | [octilinear/](octilinear/) |
+| **曲线** | `curved` | MVP 已落地 | Cubic IR / polyline+Chaikin 回退 | 有机图、美化输出 | [curved/](curved/) |
 | 总线 | `bus` | 后置 | — | 超图、EDA 总线聚合 | — |
 
 > 未实现的算法：bind 时失败或显式 unsupported，禁止静默 no-op。
@@ -114,6 +114,10 @@ Router **不得**改端口或节点。纪律：[write-authority](../layout/write
 | `plotgram-router/src/{verify,score}` | 几何验收门 + 质量度量（所有算法共用） |
 | `plotgram-algo` | 可复用零件（VPSC nudging、交叉计数等） |
 | `plotgram-router/src/orthogonal` | 正交 Router 实现（ovg / search / track） |
+| `plotgram-router/src/straight` | 直线 Router（端子直连） |
+| `plotgram-router/src/polyline` | 折线 Router（可见性图） |
+| `plotgram-router/src/octilinear` | 八方向 Router（H/V/45°） |
+| `plotgram-router/src/curved` | 曲线 Router（Cubic IR / Chaikin 回退） |
 
 ---
 
@@ -122,6 +126,9 @@ Router **不得**改端口或节点。纪律：[write-authority](../layout/write
 | 文档 | 内容 |
 |------|------|
 | [orthogonal/](orthogonal/) | 正交路由：契约、L2–L4、算法选型、夹具、里程碑 |
+| [polyline/](polyline/) | 折线路由：可见性图 MVP、与 Builtin/straight/ortho 边界 |
+| [octilinear/](octilinear/) | 八方向路由：H/V/45° Steiner via MVP |
+| [curved/](curved/) | 曲线路由：`EdgePath::Cubic` + polyline/Chaikin 回退 |
 | [ADR-006](../adr/006-engine-io-and-crates.md) | `EdgeRouter` Trait / crate 边界 |
 | [03 正交边路由](../../reference/yfiles/03-正交边路由.md) | 算法证据（yFiles 参考） |
 | [写权纪律](../layout/write-authority.md) | 单写者尺子 |

@@ -40,9 +40,7 @@ pub fn route_builtin(
 
         let a = port_anchor(&src.frame, from);
         let b = port_anchor(&tgt.frame, to);
-        e.path = EdgePath {
-            points: expand_path(a, b, routing_style)?,
-        };
+        e.path = EdgePath::polyline(expand_path(a, b, routing_style)?);
         out.push(e);
     }
     Ok(out)
