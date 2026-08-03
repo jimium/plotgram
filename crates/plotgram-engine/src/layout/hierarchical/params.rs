@@ -138,8 +138,6 @@ pub struct HierarchicalParams {
     pub group_policy: GroupPolicy,
     pub group_sizing: GroupSizing,
     pub group_align: GroupAlign,
-    /// Hub-centered + client colinearity (architecture-style).
-    pub hub_client_align: bool,
 }
 
 impl Default for HierarchicalParams {
@@ -153,7 +151,6 @@ impl Default for HierarchicalParams {
             group_policy: GroupPolicy::Weak,
             group_sizing: GroupSizing::Fit,
             group_align: GroupAlign::Center,
-            hub_client_align: false,
         }
     }
 }
@@ -266,10 +263,6 @@ impl HierarchicalParams {
         {
             params.group_align = a;
         }
-        if let Some(h) = binder.get_bool("hub_client_align").map_err(bind_err)? {
-            params.hub_client_align = h;
-        }
-
         Ok(BindResult {
             params,
             preset,

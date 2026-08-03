@@ -1,14 +1,16 @@
 //! Group envelopes, labels, canvas — after nodes/edges are final.
 
+use crate::route::core::union_rects;
 use plotgram_model::geometry::Rect;
 use plotgram_model::graph::Graph;
-use plotgram_model::result::{
-    GroupPlacement, LabelOwner, LabelSlot, LayoutResult, NodePlacement,
-};
-use plotgram_router::core::expand_union;
+use plotgram_model::result::{GroupPlacement, LabelOwner, LabelSlot, LayoutResult, NodePlacement};
 
 const GROUP_PAD: f64 = 16.0;
 const CANVAS_PAD: f64 = 24.0;
+/// Must stay >= the label band height `simple_labels` draws (18.0) plus a
+/// little breathing room, or the band overlaps the topmost member — a plain
+/// `GROUP_PAD` on all sides isn't tall enough for a labeled group's top.
+const GROUP_LABEL_TOP_PAD: f64 = 24.0;
 
 pub fn finalize(
     graph: &Graph,
@@ -63,7 +65,18 @@ fn collect_group(
     let mut all = frames;
     all.extend(nested);
 
-    if let Some(frame) = expand_union(&all, GROUP_PAD) {
+    if let Some(bbox) = union_rects(&all) {
+        let top_pad = if group.label.is_some() {
+            GROUP_LABEL_TOP_PAD
+        } else {
+            GROUP_PAD
+        };
+        let frame = Rect::new(
+            bbox.x - GROUP_PAD,
+            bbox.y - top_pad,
+            bbox.width + GROUP_PAD * 2.0,
+            bbox.height + top_pad + GROUP_PAD,
+        );
         out.push(GroupPlacement {
             id: group.id.clone(),
             frame,
@@ -116,10 +129,7 @@ fn simple_labels(
     labels
 }
 
-fn find_group<'a>(
-    graph: &'a Graph,
-    id: &str,
-) -> Option<&'a plotgram_model::graph::Group> {
+fn find_group<'a>(graph: &'a Graph, id: &str) -> Option<&'a plotgram_model::graph::Group> {
     fn walk<'a>(
         g: &'a plotgram_model::graph::Group,
         id: &str,
@@ -145,11 +155,8 @@ fn find_group<'a>(
 fn canvas_size(nodes: &[NodePlacement], groups: &[GroupPlacement]) -> (f64, f64) {
     let mut rects: Vec<Rect> = nodes.iter().map(|n| n.frame).collect();
     rects.extend(groups.iter().map(|g| g.frame));
-    match plotgram_router::core::union_rects(&rects) {
-        Some(u) => (
-            u.right() + CANVAS_PAD,
-            u.bottom() + CANVAS_PAD,
-        ),
+    match crate::route::core::union_rects(&rects) {
+        Some(u) => (u.right() + CANVAS_PAD, u.bottom() + CANVAS_PAD),
         None => (CANVAS_PAD * 2.0, CANVAS_PAD * 2.0),
     }
 }
