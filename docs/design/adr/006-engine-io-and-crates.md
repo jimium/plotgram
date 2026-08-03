@@ -36,7 +36,7 @@
 | `plotgram-algo` | **共享算法零件**（VPSC / FAS / 交叉计数 / orientation / track / 正交规范化等）；无管线、无 Contract；见 [`PARTS.md`](../../crates/plotgram-algo/PARTS.md) |
 | `plotgram-router` | **独立边路由**：`core`（无策略原语）+ `orthogonal`（OVG/A* router）+ `verify` + `score`；不依赖 engine 门面 |
 | `plotgram-engine` | `run` + 注册表 + **in-tree** `layout::*`（消费 algo + router） |
-| `plotgram-pipeline` | 编排 |
+| `plotgram-compile` | 构建 |
 | `plotgram-parse` / `content` / `render` / `cli` | 各司其职 |
 
 **engine 内模块（可后拆）：**
@@ -77,7 +77,7 @@ model ← engine-api
 
 - **零件**：优先落在 `plotgram-algo`（见 PARTS.md），带表驱动单测；再由 layout/route 接线。  
 - **布局/路由算法**：先加 `engine` 内模块 + 注册；长大再 extract。  
-- 编排：`pipeline`（parse → measure → `engine::run` → render）；CLI 保持薄。
+- 构建：`compile`（parse → measure → `engine::run` → render）；CLI 保持薄。
 
 ## 备选方案（未采用）
 

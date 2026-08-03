@@ -226,7 +226,19 @@ name = "plotgram-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
- "plotgram-pipeline",
+ "plotgram-compile",
+]
+
+[[package]]
+name = "plotgram-compile"
+version = "0.1.0"
+dependencies = [
+ "plotgram-content",
+ "plotgram-engine",
+ "plotgram-model",
+ "plotgram-parse",
+ "plotgram-render",
+ "thiserror",
 ]
 
 [[package]]
@@ -243,6 +255,7 @@ version = "0.1.0"
 dependencies = [
  "plotgram-algo",
  "plotgram-engine-api",
+ "plotgram-layout",
  "plotgram-model",
  "plotgram-router",
 ]
@@ -257,6 +270,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "plotgram-layout"
+version = "0.1.0"
+dependencies = [
+ "plotgram-algo",
+ "plotgram-engine-api",
+ "plotgram-model",
+]
+
+[[package]]
 name = "plotgram-model"
 version = "0.1.0"
 dependencies = [
@@ -268,18 +290,6 @@ name = "plotgram-parse"
 version = "0.1.0"
 dependencies = [
  "plotgram-model",
- "thiserror",
-]
-
-[[package]]
-name = "plotgram-pipeline"
-version = "0.1.0"
-dependencies = [
- "plotgram-content",
- "plotgram-engine",
- "plotgram-model",
- "plotgram-parse",
- "plotgram-render",
  "thiserror",
 ]
 

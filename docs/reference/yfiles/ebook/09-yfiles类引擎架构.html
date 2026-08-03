@@ -431,8 +431,8 @@ impl LayoutAlgorithm for RemoveSelfLoopsStage {
               <tr><td>Domain Model（DSL AST、图种、主题）</td><td><code>plotgram-model</code> + <code>plotgram-parse</code></td></tr>
               <tr><td><strong>Layout Graph（纯几何）</strong></td><td><code>plotgram-engine-api</code>（类型）+ <code>plotgram-engine</code>（算法）</td></tr>
               <tr><td>LayoutData（约束、权重）</td><td><code>plotgram-engine-api</code></td></tr>
-              <tr><td>Stage 链 / 装饰器</td><td><code>plotgram-pipeline</code></td></tr>
-              <tr><td>Profile → 参数展开</td><td><code>plotgram-pipeline</code>（读 model，产出 engine 参数）</td></tr>
+              <tr><td>Stage 链 / 装饰器</td><td><code>plotgram-compile</code></td></tr>
+              <tr><td>Profile → 参数展开</td><td><code>plotgram-compile</code>（读 model，产出 engine 参数）</td></tr>
               <tr><td>文本测量 / content sizing</td><td><code>plotgram-content</code>（measure 相，见 06 篇 §5）</td></tr>
               <tr><td>VPSC / 公共求解器</td><td><code>plotgram-engine::solver</code></td></tr>
               <tr><td>渲染</td><td><code>plotgram-render</code></td></tr>

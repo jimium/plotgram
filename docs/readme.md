@@ -30,7 +30,7 @@ docs/
 | **plotgram-model** | `crates/plotgram-model` | 纯数据：Graph / Contract / Result / Port / Profile |
 | **plotgram-content** | `crates/plotgram-content` | 框内瘦 MD：parse → measure → SVG 片段 |
 | **plotgram-parse** | `crates/plotgram-parse` | `.pgm` → Graph + profile 展开（骨架） |
-| **plotgram-pipeline** | `crates/plotgram-pipeline` | 编排：parse → measure → engine → render |
+| **plotgram-compile** | `crates/plotgram-compile` | 构建：parse → measure → engine → render |
 | **plotgram-engine-api** | `crates/plotgram-engine-api` | `LayoutAlgorithm` / `EdgeRouter` Trait（无算法） |
 | **plotgram-algo** | `crates/plotgram-algo` | 共享 GD 零件（VPSC / FAS / …）；见 [PARTS.md](../crates/plotgram-algo/PARTS.md) |
 | **plotgram-engine** | `crates/plotgram-engine` | `run` + 注册表；内含 layout/route **模块**（消费 algo） |
@@ -56,7 +56,7 @@ flowchart BT
   parse[plotgram-parse]
   engine[plotgram-engine]
   render[plotgram-render]
-  pipeline[plotgram-pipeline]
+  compile[plotgram-compile]
   cli[plotgram-cli]
 
   api --> model
@@ -66,19 +66,19 @@ flowchart BT
   engine --> model
   engine --> algo
   render --> model
-  pipeline --> parse
-  pipeline --> content
-  pipeline --> engine
-  pipeline --> render
-  pipeline --> model
-  cli --> pipeline
+  compile --> parse
+  compile --> content
+  compile --> engine
+  compile --> render
+  compile --> model
+  cli --> compile
 ```
 
 文字版（箭头 = 「依赖于」）：
 
 ```text
-cli            → pipeline
-pipeline       → parse, content, engine, render, model
+cli            → compile
+compile        → parse, content, engine, render, model
 parse          → model
 content        → model
 engine         → engine-api, model, algo
@@ -90,7 +90,7 @@ render         → model
 管线方向（数据流，与上图依赖相反）：
 
 ```text
-.pgm → parse → pipeline(measure/content) → engine::run → render → SVG
+.pgm → parse → compile(measure/content) → engine::run → render → SVG
          ↑                                      ↑
        model                              engine-api Traits
 ```

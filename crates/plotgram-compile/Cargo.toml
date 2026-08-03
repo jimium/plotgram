@@ -1,9 +1,9 @@
 [package]
-name = "plotgram-pipeline"
+name = "plotgram-compile"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Plotgram orchestration: parse → measure → layout → render"
+description = "Plotgram build pipeline: parse → measure → layout → render"
 
 [dependencies]
 plotgram-model = { workspace = true }

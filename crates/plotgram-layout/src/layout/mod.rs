@@ -1,4 +1,4 @@
-//! Layout algorithms (in-tree; extract to `plotgram-layout-*` when large enough).
+//! Layout algorithm modules.
 
 pub mod hierarchical;
 

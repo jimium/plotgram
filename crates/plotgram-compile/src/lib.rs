@@ -1,4 +1,4 @@
-//! End-to-end orchestration (ADR-005 / ADR-006).
+//! End-to-end build (ADR-005 / ADR-006).
 //!
 //! ```text
 //! .pgm source
@@ -18,8 +18,8 @@ mod error;
 mod measure_graph;
 mod options;
 
-pub use error::PipelineError;
-pub use options::PipelineOptions;
+pub use error::BuildError;
+pub use options::BuildOptions;
 
 use plotgram_engine::run as run_layout;
 use plotgram_model::render::RenderInput;
@@ -28,8 +28,8 @@ use plotgram_render::render_svg;
 
 use crate::measure_graph::measure_node_sizes;
 
-/// Compile `.pgm` source to an SVG string.
-pub fn compile_svg(source: &str, options: &PipelineOptions) -> Result<String, PipelineError> {
+/// Build `.pgm` source into an SVG string.
+pub fn build_svg(source: &str, options: &BuildOptions) -> Result<String, BuildError> {
     let parsed = parse(source)?;
     let node_sizes = measure_node_sizes(&parsed.graph, options)?;
 
@@ -45,11 +45,11 @@ pub fn compile_svg(source: &str, options: &PipelineOptions) -> Result<String, Pi
     Ok(render_svg(&input))
 }
 
-/// Compile source to [`plotgram_model::result::LayoutResult`] only (no SVG).
-pub fn compile_layout(
+/// Build source into [`plotgram_model::result::LayoutResult`] only (no SVG).
+pub fn build_layout(
     source: &str,
-    options: &PipelineOptions,
-) -> Result<plotgram_model::result::LayoutResult, PipelineError> {
+    options: &BuildOptions,
+) -> Result<plotgram_model::result::LayoutResult, BuildError> {
     let parsed = parse(source)?;
     let node_sizes = measure_node_sizes(&parsed.graph, options)?;
     let contract = parsed.into_contract(node_sizes);
@@ -61,19 +61,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn compile_svg_end_to_end() {
-        let svg = compile_svg(
+    fn build_svg_end_to_end() {
+        let svg = build_svg(
             "diagram {\n  profile: flowchart\n  node a \"A\"\n  node b \"B\"\n  a -> b\n}",
-            &PipelineOptions::default(),
+            &BuildOptions::default(),
         )
-        .expect("pipeline should compile a minimal diagram");
+        .expect("build should produce a minimal diagram");
         assert!(svg.starts_with("<svg"));
     }
 
     #[test]
-    fn compile_svg_surfaces_parse_error() {
-        let err = compile_svg("diagram { node a { label: 42 } }", &PipelineOptions::default())
+    fn build_svg_surfaces_parse_error() {
+        let err = build_svg("diagram { node a { label: 42 } }", &BuildOptions::default())
             .unwrap_err();
-        assert!(matches!(err, PipelineError::Parse(_)));
+        assert!(matches!(err, BuildError::Parse(_)));
     }
 }

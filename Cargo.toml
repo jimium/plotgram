@@ -4,10 +4,11 @@ members = [
     "crates/plotgram-model",
     "crates/plotgram-content",
     "crates/plotgram-parse",
-    "crates/plotgram-pipeline",
+    "crates/plotgram-compile",
     "crates/plotgram-engine-api",
     "crates/plotgram-algo",
     "crates/plotgram-router",
+    "crates/plotgram-layout",
     "crates/plotgram-engine",
     "crates/plotgram-render",
     "crates/plotgram-cli",
@@ -25,10 +26,11 @@ description = "A chart description language and rendering engine designed for AI
 plotgram-model = { path = "crates/plotgram-model" }
 plotgram-content = { path = "crates/plotgram-content" }
 plotgram-parse = { path = "crates/plotgram-parse" }
-plotgram-pipeline = { path = "crates/plotgram-pipeline" }
+plotgram-compile = { path = "crates/plotgram-compile" }
 plotgram-engine-api = { path = "crates/plotgram-engine-api" }
 plotgram-algo = { path = "crates/plotgram-algo" }
 plotgram-router = { path = "crates/plotgram-router" }
+plotgram-layout = { path = "crates/plotgram-layout" }
 plotgram-engine = { path = "crates/plotgram-engine" }
 plotgram-render = { path = "crates/plotgram-render" }
 serde = { version = "1", features = ["derive"] }

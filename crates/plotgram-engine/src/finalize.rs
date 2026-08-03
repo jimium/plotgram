@@ -1,6 +1,6 @@
 //! Group envelopes, labels, canvas — after nodes/edges are final.
 
-use crate::route::core::union_rects;
+use plotgram_router::core::union_rects;
 use plotgram_model::geometry::Rect;
 use plotgram_model::graph::Graph;
 use plotgram_model::result::{GroupPlacement, LabelOwner, LabelSlot, LayoutResult, NodePlacement};
@@ -155,7 +155,7 @@ fn find_group<'a>(graph: &'a Graph, id: &str) -> Option<&'a plotgram_model::grap
 fn canvas_size(nodes: &[NodePlacement], groups: &[GroupPlacement]) -> (f64, f64) {
     let mut rects: Vec<Rect> = nodes.iter().map(|n| n.frame).collect();
     rects.extend(groups.iter().map(|g| g.frame));
-    match crate::route::core::union_rects(&rects) {
+    match union_rects(&rects) {
         Some(u) => (u.right() + CANVAS_PAD, u.bottom() + CANVAS_PAD),
         None => (CANVAS_PAD * 2.0, CANVAS_PAD * 2.0),
     }

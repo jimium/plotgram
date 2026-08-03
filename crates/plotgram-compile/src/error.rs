@@ -1,9 +1,9 @@
-//! Pipeline errors.
+//! Build errors.
 
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum PipelineError {
+pub enum BuildError {
     #[error(transparent)]
     Parse(#[from] plotgram_parse::ParseError),
 
@@ -13,6 +13,6 @@ pub enum PipelineError {
     #[error("measure: {0}")]
     Measure(String),
 
-    #[error("pipeline stage `{stage}` not implemented: {detail}")]
+    #[error("build stage `{stage}` not implemented: {detail}")]
     NotImplemented { stage: &'static str, detail: String },
 }

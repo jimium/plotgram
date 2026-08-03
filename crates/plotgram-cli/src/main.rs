@@ -1,11 +1,11 @@
-//! Thin CLI: args + file I/O only. Orchestration lives in `plotgram-pipeline`.
+//! Thin CLI: args + file I/O only. Build orchestration lives in `plotgram-compile`.
 
 use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::Parser;
-use plotgram_pipeline::{compile_svg, PipelineOptions};
+use plotgram_compile::{build_svg, BuildOptions};
 
 #[derive(Debug, Parser)]
 #[command(name = "plotgram", about = "Plotgram DSL → SVG")]
@@ -32,12 +32,12 @@ fn main() -> ExitCode {
         }
     };
 
-    let options = PipelineOptions {
+    let options = BuildOptions {
         theme: args.theme,
-        ..PipelineOptions::default()
+        ..BuildOptions::default()
     };
 
-    match compile_svg(&source, &options) {
+    match build_svg(&source, &options) {
         Ok(svg) => {
             if let Some(path) = args.output {
                 if let Err(e) = fs::write(&path, svg) {

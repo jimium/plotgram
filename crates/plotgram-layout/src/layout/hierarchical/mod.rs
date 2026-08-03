@@ -127,7 +127,7 @@ impl LayoutAlgorithm for HierarchicalLayout {
                     id: ce.id,
                     source: ce.source,
                     target: ce.target,
-                    path: EdgePath { points },
+                    path: EdgePath::polyline(points),
                     from_port: Some(PortRef {
                         side: orient::from_algo_side(orientation.from_tb_side(ce.from_port.side)),
                         slot: ce.from_port.slot,
@@ -147,7 +147,7 @@ impl LayoutAlgorithm for HierarchicalLayout {
             EdgeGeometryMode::DeferToRouter => edges
                 .into_iter()
                 .map(|mut e| {
-                    e.path.points.clear();
+                    e.path = EdgePath::polyline(Vec::new());
                     e
                 })
                 .collect(),
@@ -211,7 +211,7 @@ fn normalize_to_origin(nodes: &mut [NodePlacement], edges: &mut [EdgePlacement])
         min_y = min_y.min(n.frame.y);
     }
     for e in edges.iter() {
-        for p in &e.path.points {
+        for p in e.path.samples() {
             min_x = min_x.min(p.x);
             min_y = min_y.min(p.y);
         }
@@ -227,9 +227,31 @@ fn normalize_to_origin(nodes: &mut [NodePlacement], edges: &mut [EdgePlacement])
         n.frame.y -= min_y;
     }
     for e in edges.iter_mut() {
-        for p in &mut e.path.points {
-            p.x -= min_x;
-            p.y -= min_y;
+        translate_edge_path(&mut e.path, -min_x, -min_y);
+    }
+}
+
+fn translate_edge_path(path: &mut EdgePath, dx: f64, dy: f64) {
+    match path {
+        EdgePath::Polyline { points } => {
+            for p in points {
+                p.x += dx;
+                p.y += dy;
+            }
+        }
+        EdgePath::Cubic {
+            start,
+            end,
+            controls,
+        } => {
+            start.x += dx;
+            start.y += dy;
+            end.x += dx;
+            end.y += dy;
+            controls[0].x += dx;
+            controls[0].y += dy;
+            controls[1].x += dx;
+            controls[1].y += dy;
         }
     }
 }

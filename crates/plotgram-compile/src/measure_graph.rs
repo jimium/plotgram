@@ -5,8 +5,8 @@ use plotgram_model::geometry::Size;
 use plotgram_model::graph::Graph;
 use plotgram_model::sizes::NodeSizes;
 
-use crate::error::PipelineError;
-use crate::options::PipelineOptions;
+use crate::error::BuildError;
+use crate::options::BuildOptions;
 
 /// Default box when a node has only a short label (heuristic stub).
 const DEFAULT_W: f64 = 72.0;
@@ -35,14 +35,14 @@ fn default_measure_params() -> MeasureParams {
 /// in attrs as `content` string. Full theme → MeasureParams mapping is TODO.
 pub fn measure_node_sizes(
     graph: &Graph,
-    options: &PipelineOptions,
-) -> Result<NodeSizes, PipelineError> {
+    options: &BuildOptions,
+) -> Result<NodeSizes, BuildError> {
     let params = default_measure_params();
     let mut sizes = NodeSizes::new();
 
     for id in graph.all_node_ids() {
         let node = graph.find_node(&id).ok_or_else(|| {
-            PipelineError::Measure(format!("node `{id}` listed but not found"))
+            BuildError::Measure(format!("node `{id}` listed but not found"))
         })?;
 
         let size = if !options.labels_only {
@@ -61,7 +61,7 @@ pub fn measure_node_sizes(
 
     sizes
         .require_all(graph)
-        .map_err(|e| PipelineError::Measure(e.to_string()))?;
+        .map_err(|e| BuildError::Measure(e.to_string()))?;
     Ok(sizes)
 }
 

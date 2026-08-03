@@ -22,7 +22,7 @@ use std::path::PathBuf;
 
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::result::LayoutResult;
-use plotgram_pipeline::{compile_layout, PipelineOptions};
+use plotgram_compile::{build_layout, BuildOptions};
 
 const EPS: f64 = 1e-6;
 
@@ -100,7 +100,7 @@ fn hierarchical_showcase_geometry_invariants() {
     for path in &entries {
         let name = path.file_stem().unwrap().to_string_lossy().to_string();
         let source = fs::read_to_string(path).unwrap();
-        let result = match compile_layout(&source, &PipelineOptions::default()) {
+        let result = match build_layout(&source, &BuildOptions::default()) {
             Ok(r) => r,
             Err(e) => {
                 hard_failures.push(format!("{name}: pipeline error: {e}"));
@@ -150,7 +150,7 @@ fn check_orthogonal_and_ports(name: &str, result: &LayoutResult, failures: &mut 
         .collect();
 
     for e in &result.edges {
-        let pts = &e.path.points;
+        let pts = e.path.samples();
         if pts.len() < 2 {
             continue; // degenerate edge type, not this layout's output shape
         }
@@ -190,7 +190,7 @@ fn compute_metrics(name: &str, result: &LayoutResult) -> FileMetrics {
 
     let mut segments: Vec<(Point, Point)> = Vec::new();
     for e in &result.edges {
-        let pts = &e.path.points;
+        let pts = e.path.samples();
         if pts.len() >= 2 {
             max_bends = max_bends.max(pts.len() - 2);
         }

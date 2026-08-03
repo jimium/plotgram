@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 将单个 .pgm 编译为 SVG（plotgram-cli → plotgram-pipeline 全链路）
+# 将单个 .pgm 构建为 SVG（plotgram-cli → plotgram-compile 全链路）
 #
 # 用法:
 #   scripts/compile_pgm.sh                          # 默认示例图

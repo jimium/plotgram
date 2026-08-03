@@ -244,8 +244,8 @@ pub struct HierarchicLayoutData {
 | Domain Model（DSL AST、图种、主题） | `plotgram-model` + `plotgram-parse` |
 | **Layout Graph（纯几何）** | `plotgram-engine-api`（类型）+ `plotgram-engine`（算法） |
 | LayoutData（约束、权重） | `plotgram-engine-api` |
-| Stage 链 / 装饰器 | `plotgram-pipeline` |
-| Profile → 参数展开 | `plotgram-pipeline`（读 model，产出 engine 参数） |
+| Stage 链 / 装饰器 | `plotgram-compile` |
+| Profile → 参数展开 | `plotgram-compile`（读 model，产出 engine 参数） |
 | 文本测量 / content sizing | `plotgram-content`（measure 相，见 06 篇 §5） |
 | VPSC / 公共求解器 | `plotgram-engine::solver` |
 | 渲染 | `plotgram-render` |

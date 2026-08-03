@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use plotgram_engine_api::{EdgeRouter, LayoutAlgorithm};
 
-use crate::layout::HierarchicalLayout;
+use plotgram_layout::HierarchicalLayout;
 use plotgram_router::{
     CurvedEdgeRouter, OctilinearEdgeRouter, OrthogonalEdgeRouter, PolylineEdgeRouter,
     StraightEdgeRouter,

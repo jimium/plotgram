@@ -22,8 +22,8 @@ model 是**纯数据层**：定义所有 crate 共享的类型，不含布局/�
 | `render` | `RenderMeta`, `RenderInput` | **render 入口** |
 | `profile` | `DiagramType`, `Profile` | **仅** DSL / parse / 编排（engine 禁止 import） |
 
-编排入口：[`plotgram-pipeline`](../../crates/plotgram-pipeline)（parse → measure → engine → render）。  
-CLI 仅做参数与文件 I/O，调用 pipeline，不写编排逻辑。
+构建入口：[`plotgram-compile`](../../crates/plotgram-compile)（parse → measure → engine → render）。  
+CLI 仅做参数与文件 I/O，调用 compile，不写构建逻辑。
 
 ## `Edge` 一等结构字段（写权）
 
