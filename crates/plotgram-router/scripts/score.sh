@@ -22,7 +22,7 @@ ALGO="${2:-orthogonal}"
 
 case "$cmd" in
   baseline|update)
-    cargo run -q -p plotgram-router --example bench -- "$ALGO" --json > "$BASELINE"
+    cargo run -q -p plotgram-router --example router_bench -- "$ALGO" --json > "$BASELINE"
     echo "baseline saved: $BASELINE ($ALGO, $(wc -c < "$BASELINE" | tr -d ' ') bytes)"
     ;;
   compare)
@@ -31,7 +31,7 @@ case "$cmd" in
       echo "run: ./scripts/score.sh baseline" >&2
       exit 2
     fi
-    cargo run -q -p plotgram-router --example bench -- "$ALGO" --baseline "$BASELINE"
+    cargo run -q -p plotgram-router --example router_bench -- "$ALGO" --baseline "$BASELINE"
     ;;
   *)
     echo "usage: score.sh {baseline|compare|update} [algorithm]" >&2

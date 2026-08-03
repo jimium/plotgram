@@ -116,7 +116,7 @@ fn node_sugar_conflict_icon() {
 
 #[test]
 fn node_block_only_attrs() {
-    let out = p(r##"diagram { node a { label: "Block" variant: primary style.fill: "#FFF" } }"##);
+    let out = p(r##"diagram { node a { label: "Block", variant: primary, style.fill: "#FFF" } }"##);
     let n = node(&out, "a");
     assert_eq!(n.label.as_deref(), Some("Block"));
     assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("primary"));
@@ -184,7 +184,7 @@ fn group_sugar_plus_block_label_conflict() {
 
 #[test]
 fn group_block_attrs() {
-    let out = p(r#"diagram { group g { label: "G" variant: secondary node a {} } }"#);
+    let out = p(r#"diagram { group g { label: "G", variant: secondary node a {} } }"#);
     let g = &out.graph.groups[0];
     assert_eq!(g.label.as_deref(), Some("G"));
     assert_eq!(g.attrs.get("variant").and_then(|v| v.as_str()), Some("secondary"));
@@ -272,7 +272,7 @@ fn edge_sugar_label_conflict() {
 
 #[test]
 fn edge_block_only() {
-    let out = p(r#"diagram { node a {} node b {} a -> b { label: "Block" head_label: "H" tail_label: "T" } }"#);
+    let out = p(r#"diagram { node a {} node b {} a -> b { label: "Block", head_label: "H", tail_label: "T" } }"#);
     let e = edge_at(&out, 0);
     assert_eq!(e.label.as_deref(), Some("Block"));
     assert_eq!(e.head_label.as_deref(), Some("H"));
@@ -287,10 +287,10 @@ fn edge_port_lift_combinations() {
     let cases: &[(&str, Option<Side>, Option<u32>, Option<Side>, Option<u32>)] = &[
         ("from_side: north", Some(Side::North), None, None, None),
         ("to_side: south", None, None, Some(Side::South), None),
-        ("from_side: east to_side: west", Some(Side::East), None, Some(Side::West), None),
-        ("from_side: north from_slot: 2", Some(Side::North), Some(2), None, None),
+        ("from_side: east, to_side: west", Some(Side::East), None, Some(Side::West), None),
+        ("from_side: north, from_slot: 2", Some(Side::North), Some(2), None, None),
         (
-            "from_side: south from_slot: 0 to_side: north to_slot: 1",
+            "from_side: south, from_slot: 0, to_side: north, to_slot: 1",
             Some(Side::South),
             Some(0),
             Some(Side::North),
@@ -326,7 +326,7 @@ fn group_frame_edge_basic() {
     let out = p(r#"diagram {
         group fe { node web {} }
         group be { node api {} }
-        @fe -> @be { from_side: east to_side: west label: "HTTP" }
+        @fe -> @be { from_side: east, to_side: west, label: "HTTP" }
     }"#);
     assert_eq!(out.graph.edges.len(), 1);
     let e = edge_at(&out, 0);
@@ -371,8 +371,8 @@ fn group_frame_anchor_different_slots() {
     let out = p(r#"diagram {
         group g { node x {} }
         node a {} node b {}
-        a -> @g { to_side: west to_slot: 0 }
-        b -> @g { to_side: west to_slot: 1 }
+        a -> @g { to_side: west, to_slot: 0 }
+        b -> @g { to_side: west, to_slot: 1 }
     }"#);
     let e0 = edge_at(&out, 0);
     let e1 = edge_at(&out, 1);
@@ -395,7 +395,7 @@ fn group_frame_with_sugar_label() {
 
 #[test]
 fn diagram_layout_with_options() {
-    let out = p("diagram { layout: hierarchical { direction: left-to-right spacing: 20 } node a {} }");
+    let out = p("diagram { layout: hierarchical { direction: left-to-right, spacing: 20 } node a {} }");
     assert_eq!(out.layout.name, "hierarchical");
     assert_eq!(
         out.layout.options.get("direction"),
@@ -409,7 +409,7 @@ fn diagram_layout_with_options() {
 
 #[test]
 fn diagram_profile_plus_layout_override() {
-    let out = p("diagram { profile: sequence layout: custom node a {} }");
+    let out = p("diagram { profile: sequence, layout: custom node a {} }");
     assert_eq!(out.profile, Some(plotgram_model::profile::DiagramType::Sequence));
     assert_eq!(out.layout.name, "custom"); // explicit overrides profile default
 }
@@ -417,8 +417,8 @@ fn diagram_profile_plus_layout_override() {
 #[test]
 fn diagram_meta_fields() {
     let out = p(r#"diagram {
-        title: "My Diagram"
-        theme: dark
+        title: "My Diagram",
+        theme: dark,
         render_style: sketch
         node a {}
     }"#);
@@ -431,7 +431,7 @@ fn diagram_meta_fields() {
 fn diagram_meta_namespace_attrs() {
     // §14.1: meta.<identifier> namespace — arbitrary metadata stored in extra.
     let out = p(r#"diagram {
-        meta.author: "jane"
+        meta.author: "jane",
         meta.version: 2
         node a {}
     }"#);
@@ -487,7 +487,7 @@ fn node_role_lift() {
     let out = p(r#"diagram {
         group g {
             node x {}
-            node a { role: group_anchor host_group: g side: north }
+            node a { role: group_anchor, host_group: g, side: north }
         }
     }"#);
     let g = &out.graph.groups[0];
@@ -645,7 +645,7 @@ fn archetype_expansion_all_builtin() {
 #[test]
 fn archetype_fill_only_never_overrides() {
     // All three axes explicitly set → archetype changes nothing
-    let out = p(r#"diagram { node n { archetype: service shape: circle variant: primary icon: custom } }"#);
+    let out = p(r#"diagram { node n { archetype: service, shape: circle, variant: primary, icon: custom } }"#);
     let n = node(&out, "n");
     assert_eq!(n.shape.as_deref(), Some("circle"));
     assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("primary"));
@@ -657,8 +657,8 @@ fn archetype_fill_only_never_overrides() {
 #[test]
 fn combined_real_world_flowchart() {
     let out = p(r##"diagram {
-    profile: flowchart
-    title: "订单处理"
+    profile: flowchart,
+    title: "订单处理",
     layout: hierarchical { direction: top-to-bottom }
 
     /// 开始节点
@@ -678,7 +678,7 @@ fn combined_real_world_flowchart() {
     start -> check
     check -> ok "有货"
     check -> fail "无货"
-    ok -> pay { from_side: south to_side: north }
+    ok -> pay { from_side: south, to_side: north }
     pay --> ok "支付成功"
     ok -> db { label: "写入" }
 }"##);
@@ -730,7 +730,7 @@ fn edge_routing_explicit_with_options() {
 fn edge_routing_overrides_profile_default() {
     // 显式 edge_routing 覆盖 profile 默认（作者覆盖 > profile 默认）
     let out = p(r#"diagram {
-        profile: flowchart
+        profile: flowchart,
         edge_routing: straight
         node a {} node b {}
         a -> b

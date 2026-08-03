@@ -9,4 +9,4 @@
 pub mod layout;
 mod params;
 
-pub use layout::HierarchicalLayout;
+pub use layout::{build_debug_trace, HierarchicalLayout, LayoutDebugTrace};

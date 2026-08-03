@@ -1,0 +1,46 @@
+// Unite Config 发布与热加载：Console 发布链路 → 运行时双模式拉取
+// Mermaid 对照:
+// flowchart TB
+//     subgraph Console
+//         A[业务 Service] --> B[UniteConfigPublishService]
+//         B --> C[(MySQL)] B --> D[(Cassandra)] B --> E[MandaConsoleNotifyService]
+//         E --> G D --> F[unite-config-server REST] --> H
+//     end
+//     subgraph Runtime
+//         G[DB 模式 data-server] --> I H[HTTP 模式 app-engine] --> I[UniteConfigMap + Listener] --> J[热加载业务逻辑]
+//     end
+diagram {
+    profile: architecture,
+    title: "Unite Config 发布与热加载"
+
+    group console {
+        label: "Console"
+        node biz_services { label: "业务 Service\nDictService / RazorEnginePublish 等", archetype: service }
+        node publish_svc { label: "UniteConfigPublishService", archetype: service }
+        node mysql_configs { label: "MySQL unite_configs", archetype: database,
+            meta.semantic: mysql
+        }
+        node cassandra_config { label: "Cassandra unite_config", archetype: database }
+        node notify_svc { label: "MandaConsoleNotifyService", archetype: service }
+        node config_server { label: "unite-config-server REST", archetype: gateway }
+    }
+
+    group runtime {
+        label: "运行时服务"
+        node db_client { label: "DB 模式客户端\ndata-server", archetype: service }
+        node http_client { label: "HTTP 模式客户端\napp-engine", archetype: service }
+        node config_map { label: "UniteConfigMap + Listener", archetype: service }
+        node hot_reload { label: "热加载业务逻辑", archetype: service }
+    }
+
+    biz_services -> publish_svc
+    publish_svc -> mysql_configs
+    publish_svc -> cassandra_config
+    publish_svc -> notify_svc
+    notify_svc -> db_client
+    cassandra_config -> config_server
+    config_server -> http_client
+    db_client -> config_map
+    http_client -> config_map
+    config_map -> hot_reload
+}

@@ -1,0 +1,24 @@
+// 订单审批：决策分支 + 回环
+// Mermaid 对照: graph TD + 菱形决策节点
+diagram {
+    profile: flowchart,
+    title: "订单审批流程",
+    layout: hierarchical { direction: top-to-bottom }
+
+    node submit { label: "提交订单", archetype: start }
+    node review { label: "经理审核", archetype: process }
+    node approved { label: "审批通过", archetype: process }
+    node rejected { label: "驳回修改", archetype: process }
+    node done { label: "完成", archetype: end }
+    node check { label: "金额是否超限", archetype: decision }
+    node finance { label: "财务复核", archetype: process }
+
+    submit -> review
+    review -> check
+    check -> finance "是"
+    check -> approved "否"
+    finance -> approved "通过"
+    finance -> rejected "驳回"
+    approved -> done
+    rejected -> submit "重新提交"
+}

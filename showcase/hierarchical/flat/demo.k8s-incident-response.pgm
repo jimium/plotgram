@@ -1,0 +1,56 @@
+// Incident response workflow for large K8s production clusters
+// Mermaid mapping: complex troubleshooting flowchart with rollback and scaling branches
+diagram {
+    profile: flowchart,
+    title: "K8s 生产集群故障响应流程",
+    layout: hierarchical { direction: top-to-bottom }
+
+    node alert { label: "告警触发", archetype: start }
+    node identify { label: "识别异常服务", archetype: process }
+    node classify { label: "故障类型判断", archetype: decision }
+    node node_check { label: "节点健康检查", archetype: process }
+    node release_check { label: "近期发布检查", archetype: process }
+    node traffic_check { label: "流量与依赖检查", archetype: process }
+    node node_gate { label: "节点异常？", archetype: decision }
+    node release_gate { label: "发布导致？", archetype: decision }
+    node traffic_gate { label: "流量激增？", archetype: decision }
+    node cordon { label: "隔离异常节点", archetype: process }
+    node reschedule { label: "迁移工作负载", archetype: process }
+    node rollback { label: "执行回滚", archetype: process }
+    node freeze { label: "冻结继续发布", archetype: process }
+    node scale { label: "扩容关键服务", archetype: process }
+    node rate_limit { label: "启用限流与降级", archetype: process }
+    node dependency { label: "通知依赖团队排查", archetype: process }
+    node verify { label: "恢复验证", archetype: process }
+    node resolved { label: "故障恢复", archetype: end }
+    node postmortem { label: "复盘与补救项", archetype: process }
+
+    alert -> identify
+    identify -> classify
+    classify -> node_check "基础设施告警"
+    classify -> release_check "发布后异常"
+    classify -> traffic_check "延迟与错误率上升"
+
+    node_check -> node_gate
+    node_gate -> cordon "是"
+    node_gate -> traffic_check "否"
+    cordon -> reschedule
+    reschedule -> verify
+
+    release_check -> release_gate
+    release_gate -> rollback "是"
+    release_gate -> traffic_check "否"
+    rollback -> freeze
+    freeze -> verify
+
+    traffic_check -> traffic_gate
+    traffic_gate -> scale "是"
+    traffic_gate -> dependency "否"
+    scale -> rate_limit
+    rate_limit -> verify
+    dependency -> verify
+
+    verify -> resolved "恢复完成"
+    resolved -> postmortem
+    postmortem -> alert "跟踪改进项"
+}

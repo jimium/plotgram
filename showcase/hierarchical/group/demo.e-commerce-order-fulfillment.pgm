@@ -1,0 +1,67 @@
+// 电商订单履端到端流程：支付 → 仓储 → 物流三段
+// Mermaid 对照: 复杂电商履约流程图，含 group 分段与回环
+diagram {
+    profile: flowchart,
+    title: "电商订单履端到端流程",
+    layout: hierarchical { direction: top-to-bottom }
+
+    group payment {
+        label: "支付阶段"
+        node place_order { label: "下单", archetype: start }
+        node risk_check { label: "风控核查", archetype: process }
+        node risk_gate { label: "风控通过？", archetype: decision }
+        node pay { label: "执行支付", archetype: process }
+        node pay_gate { label: "支付成功？", archetype: decision }
+        node retry_pay { label: "重试支付", archetype: process }
+        node cancel { label: "订单取消", archetype: process }
+    }
+
+    group warehouse {
+        label: "仓储阶段"
+        node alloc { label: "库存分配", archetype: process }
+        node pick { label: "拣货", archetype: process }
+        node pack { label: "打包", archetype: process }
+        node stock_gate { label: "有库存？", archetype: decision }
+        node restock { label: "补货", archetype: process }
+        node qc { label: "质检", archetype: process }
+        node qc_gate { label: "质检通过？", archetype: decision }
+    }
+
+    group logistics {
+        label: "物流阶段"
+        node dispatch { label: "分拣出库", archetype: process }
+        node ship { label: "揽收发运", archetype: process }
+        node transit { label: "运输中", archetype: process }
+        node deliver { label: "派送", archetype: process }
+        node sign_gate { label: "签收成功？", archetype: decision }
+        node retry_deliver { label: "再次派送", archetype: process }
+        node done { label: "订单完成", archetype: end }
+    }
+
+    place_order -> risk_check
+    risk_check -> risk_gate
+    risk_gate -> pay "是"
+    risk_gate -> cancel "否"
+    pay -> pay_gate
+    pay_gate -> retry_pay "否"
+    retry_pay -> pay_gate "再次校验"
+    pay_gate -> alloc "是"
+
+    alloc -> stock_gate
+    stock_gate -> pick "是"
+    stock_gate -> restock "否"
+    restock -> pick "补货完成"
+    pick -> pack
+    pack -> qc
+    qc -> qc_gate
+    qc_gate -> dispatch "是"
+    qc_gate -> pick "否，重新拣货"
+
+    dispatch -> ship
+    ship -> transit
+    transit -> deliver
+    deliver -> sign_gate
+    sign_gate -> done "是"
+    sign_gate -> retry_deliver "否"
+    retry_deliver -> deliver "重新派送"
+}

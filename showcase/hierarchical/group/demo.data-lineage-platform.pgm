@@ -1,0 +1,63 @@
+// Enterprise data lineage platform across ingestion, governance, and analytics
+// Mermaid mapping: complex architecture graph with domain groups and lineage services
+diagram {
+    profile: architecture,
+    title: "企业数据血缘平台"
+
+    group sources {
+        label: "数据源"
+        node app_db { label: "业务数据库", archetype: database }
+        node crm { label: "CRM 系统", archetype: service }
+        node data_lake { label: "对象存储湖仓", archetype: storage }
+        node logs { label: "应用日志", archetype: service }
+    }
+
+    group ingest {
+        label: "采集与处理"
+        node cdc { label: "CDC Connector", archetype: service }
+        node kafka { label: "Kafka", archetype: queue }
+        node flink { label: "Flink", archetype: service }
+        node batch { label: "Batch ETL", archetype: service }
+
+        cdc -> kafka "change events"
+        kafka -> flink "stream processing"
+        kafka -> batch "replay data"
+    }
+
+    group governance {
+        label: "治理与血缘"
+        node catalog { label: "Metadata Catalog", archetype: service }
+        node lineage { label: "Lineage Engine", archetype: service }
+        node quality { label: "Data Quality Rules", archetype: service }
+        node policy { label: "Access Policy Engine", archetype: service }
+
+        quality -> catalog "quality status"
+        catalog -> policy "classified assets"
+    }
+
+    group analytics {
+        label: "分析与消费"
+        node warehouse { label: "Data Warehouse", archetype: database }
+        node semantic { label: "Semantic Layer", archetype: service }
+        node bi { label: "BI Dashboard", archetype: frontend }
+        node ml { label: "Feature Store", archetype: database }
+
+        warehouse -> semantic
+        semantic -> bi
+        warehouse -> ml "feature export"
+    }
+
+    app_db -> cdc "binlog"
+    crm -> cdc "entity sync"
+    logs -> kafka "log stream"
+    data_lake -> batch "raw files"
+    flink -> warehouse "curated tables"
+    batch -> warehouse "daily snapshot"
+
+    cdc -> catalog "register source"
+    flink -> lineage "job lineage"
+    batch -> lineage "table lineage"
+    warehouse -> quality "quality scan"
+    policy -> bi "access control"
+    lineage -> bi "column lineage"
+}

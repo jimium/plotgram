@@ -1,0 +1,37 @@
+// AML case investigation workflow with screening, escalation, and reporting
+// Mermaid mapping: complex compliance flowchart for anti-money laundering review
+diagram {
+    profile: flowchart,
+    title: "反洗钱案件调查流程",
+    layout: hierarchical { direction: top-to-bottom }
+
+    node alert { label: "命中可疑告警", archetype: start }
+    node collect { label: "收集交易与客户信息", archetype: process }
+    node screen { label: "名单与规则复筛", archetype: process }
+    node false_gate { label: "是否误报？", archetype: decision }
+    node close_case { label: "关闭案件", archetype: process }
+    node analyst { label: "人工调查", archetype: process }
+    node risk_gate { label: "是否高风险？", archetype: decision }
+    node freeze { label: "冻结账户或交易", archetype: process }
+    node escalate { label: "升级合规经理", archetype: process }
+    node report_gate { label: "需要监管报送？", archetype: decision }
+    node sar { label: "提交可疑报告", archetype: process }
+    node archive { label: "归档证据与结论", archetype: process }
+    node done { label: "调查完成", archetype: end }
+
+    alert -> collect
+    collect -> screen
+    screen -> false_gate
+    false_gate -> close_case "是"
+    false_gate -> analyst "否"
+    close_case -> archive
+    analyst -> risk_gate
+    risk_gate -> freeze "是"
+    risk_gate -> archive "否"
+    freeze -> escalate
+    escalate -> report_gate
+    report_gate -> sar "是"
+    report_gate -> archive "否"
+    sar -> archive
+    archive -> done
+}

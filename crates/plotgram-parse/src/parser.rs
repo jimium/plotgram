@@ -196,6 +196,28 @@ impl Parser {
 
     // ── Diagram ──────────────────────────────────────────
 
+    fn after_body_attribute(&mut self, context: &str) -> Result<(), ParseError> {
+        if matches!(self.peek_kind(), TokenKind::Comma) {
+            self.advance();
+            if !self.lookahead_is_body_attribute() {
+                let tok = self.current();
+                return Err(ParseError::syntax(
+                    tok.line,
+                    tok.column,
+                    format!("unexpected comma in {context}"),
+                ));
+            }
+        } else if self.lookahead_is_body_attribute() {
+            self.expect_attr_comma(context)?;
+        }
+        Ok(())
+    }
+
+    /// Lookahead: next item is a diagram/group body attribute (`key: value`), not a member declaration.
+    fn lookahead_is_body_attribute(&self) -> bool {
+        matches!(self.peek_kind(), TokenKind::Ident(_) | TokenKind::Atom(_)) && self.lookahead_is_colon()
+    }
+
     fn parse_diagram(&mut self) -> Result<DiagramAst, ParseError> {
         self.expect(&TokenKind::Diagram)?;
         self.expect(&TokenKind::LBrace)?;
@@ -258,6 +280,7 @@ impl Parser {
                         }
                         attrs.insert(key, value);
                     }
+                    self.after_body_attribute("diagram")?;
                 }
                 TokenKind::Ident(_) | TokenKind::At => {
                     // Edge declaration
@@ -379,7 +402,9 @@ impl Parser {
                             )));
                         }
                     }
-                    self.skip_optional_commas();
+                    if !matches!(self.peek_kind(), TokenKind::RBrace) {
+                        self.expect_attr_comma(&format!("partition axis {id}"))?;
+                    }
                 }
                 self.expect(&TokenKind::RBrace)?;
             }
@@ -510,6 +535,7 @@ impl Parser {
                         });
                     }
                     attrs.insert(key, value);
+                    self.after_body_attribute(&format!("group {id}"))?;
                 }
                 TokenKind::Ident(_) | TokenKind::At => {
                     // Edge within group
@@ -732,18 +758,38 @@ impl Parser {
         }
     }
 
-    fn skip_optional_commas(&mut self) {
-        while matches!(self.peek_kind(), TokenKind::Comma) {
+    fn expect_attr_comma(&mut self, context: &str) -> Result<(), ParseError> {
+        if matches!(self.peek_kind(), TokenKind::Comma) {
             self.advance();
+            Ok(())
+        } else {
+            let tok = self.current();
+            Err(ParseError::syntax(
+                tok.line,
+                tok.column,
+                format!(
+                    "expected comma between attributes in {context}; \
+                     attribute blocks require comma-separated entries (dsl-spec §11)"
+                ),
+            ))
         }
     }
 
-    /// Parse an attribute block `{ (key: value [,])* }`.
+    /// Parse an attribute block `{ key: value (, key: value)* }`.
     fn parse_attribute_block(&mut self, context: &str) -> Result<AttrMap, ParseError> {
         self.expect(&TokenKind::LBrace)?;
         let mut attrs = AttrMap::new();
 
-        while !self.at_eof() && !matches!(self.peek_kind(), TokenKind::RBrace) {
+        if matches!(self.peek_kind(), TokenKind::RBrace) {
+            self.expect(&TokenKind::RBrace)?;
+            return Ok(attrs);
+        }
+
+        let (key, value) = self.parse_attribute()?;
+        attrs.insert(key, value);
+
+        while !matches!(self.peek_kind(), TokenKind::RBrace) {
+            self.expect_attr_comma(context)?;
             let (key, value) = self.parse_attribute()?;
             if attrs.contains_key(&key) {
                 return Err(ParseError::DuplicateAttr {
@@ -752,7 +798,6 @@ impl Parser {
                 });
             }
             attrs.insert(key, value);
-            self.skip_optional_commas();
         }
 
         self.expect(&TokenKind::RBrace)?;
@@ -766,10 +811,14 @@ impl Parser {
 
         if matches!(self.peek_kind(), TokenKind::LBrace) {
             self.advance(); // consume '{'
-            while !self.at_eof() && !matches!(self.peek_kind(), TokenKind::RBrace) {
+            if !matches!(self.peek_kind(), TokenKind::RBrace) {
                 let (key, value) = self.parse_attribute()?;
                 options.insert(key, value);
-                self.skip_optional_commas();
+                while !matches!(self.peek_kind(), TokenKind::RBrace) {
+                    self.expect_attr_comma("algorithm config")?;
+                    let (key, value) = self.parse_attribute()?;
+                    options.insert(key, value);
+                }
             }
             self.expect(&TokenKind::RBrace)?;
         }
@@ -802,8 +851,8 @@ mod tests {
     #[test]
     fn diagram_with_profile_and_attrs() {
         let ast = parse_ok(r#"diagram {
-            profile: flowchart
-            title: "Test"
+            profile: flowchart,
+            title: "Test",
             theme: common.clean-light
             node a { label: "A" }
         }"#);
@@ -905,7 +954,7 @@ mod tests {
     fn group_canonical() {
         let ast = parse_ok(r#"diagram {
             group compute {
-                label: "计算层"
+                label: "计算层",
                 variant: muted
                 node spark { label: "Spark" }
             }
@@ -935,7 +984,7 @@ mod tests {
     fn edge_with_block() {
         let ast = parse_ok(r#"diagram {
             node a {} node b {}
-            a --> b { label: "响应" variant: secondary }
+            a --> b { label: "响应", variant: secondary }
         }"#);
         match &ast.diagram.items[2] {
             DiagramItem::Edge(e) => {
@@ -952,7 +1001,7 @@ mod tests {
         let ast = parse_ok(r#"diagram {
             group fe { node web {} }
             group be { node api {} }
-            @fe -> @be { from_side: east to_side: west }
+            @fe -> @be { from_side: east, to_side: west }
         }"#);
         match &ast.diagram.items[2] {
             DiagramItem::Edge(e) => {
@@ -968,6 +1017,12 @@ mod tests {
     fn node_bare_archetype_rejected() {
         let err = parse_err("diagram { node db database }");
         assert!(matches!(&err, ParseError::Syntax { message, .. } if message.contains("bare atom")));
+    }
+
+    #[test]
+    fn attribute_block_requires_commas() {
+        let err = parse_err(r#"diagram { node a { label: "X" archetype: start } }"#);
+        assert!(matches!(&err, ParseError::Syntax { message, .. } if message.contains("comma")));
     }
 
     #[test]
@@ -1015,7 +1070,7 @@ mod tests {
     fn edge_port_attrs() {
         let ast = parse_ok(r#"diagram {
             node a {} node b {}
-            a -> b { from_side: south to_side: north from_slot: 0 to_slot: 1 }
+            a -> b { from_side: south, to_side: north, from_slot: 0, to_slot: 1 }
         }"#);
         match &ast.diagram.items[2] {
             DiagramItem::Edge(e) => {
@@ -1113,7 +1168,7 @@ mod tests {
     #[test]
     fn partition_duplicate_label_key_error() {
         let err = parse_err(r#"diagram {
-            partition { column a { label: "X" label: "Y" } }
+            partition { column a { label: "X", label: "Y" } }
             node x {}
         }"#);
         assert!(matches!(err, ParseError::DuplicateAttr { key, .. } if key == "label"));

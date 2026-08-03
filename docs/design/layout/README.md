@@ -40,6 +40,7 @@
 | 夹 | 用途 |
 |----|------|
 | [shared/](shared/) | group / port / label 等共享语义如何被各核消费 |
+| [debug-inspector.md](debug-inspector.md) | **跨核**布局调试 Trace 信封 + 检视 UI 壳（各核写 extension profile） |
 | [routing/](../routing/) | 独立 `EdgeRouter`（正交）与原语 · [架构](../routing/orthogonal/architecture.md) |
 | 实现零件 | [`crates/plotgram-algo`](../../../crates/plotgram-algo/PARTS.md) — VPSC / FAS 等可单测组件 |
 

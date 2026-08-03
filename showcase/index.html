@@ -3,2304 +3,949 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Plotgram Showcase · 可视化语法画廊</title>
-  <link rel="icon" href="assets/brand/logo-icon-16.svg" type="image/svg+xml" />
+  <title>Plotgram Showcase</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     :root {
       color-scheme: light;
-      --bg: #f4f6fb;
-      --panel: #ffffff;
-      --panel-soft: rgba(255, 255, 255, 0.82);
-      --border: rgba(15, 23, 42, 0.08);
-      --border-strong: rgba(15, 23, 42, 0.14);
-      --text: #0f172a;
-      --muted: #475569;
-      --muted-soft: #64748b;
-      --shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
-      --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
-      --blue: #2563eb;
-      --blue-strong: #1d4ed8;
-      --blue-soft: rgba(37, 99, 235, 0.1);
-      --chip: #e8edf5;
-      --chip-active: #dbeafe;
-      --chip-text: #1e293b;
-      --radius: 16px;
-      --radius-sm: 11px;
-      --preview-bg: #f8fafc;
-
-      /* 代码高亮（GitHub light 风格） */
-      --code-bg: #f6f8fa;
-      --code-text: #1f2328;
-      --tok-comment: #6e7781;
-      --tok-string: #0a3069;
-      --tok-keyword: #cf222e;
-      --tok-type: #953800;
-      --tok-number: #0550ae;
-      --tok-arrow: #cf222e;
-      --tok-property: #8250df;
-      --tok-bracket: #6e7781;
-      --tok-bool: #0550ae;
-      --tok-ident: #1f2328;
+      --ink: #14181f;
+      --ink-soft: #3d4654;
+      --muted: #6b7380;
+      --line: rgba(20, 24, 31, 0.10);
+      --line-strong: rgba(20, 24, 31, 0.18);
+      --paper: #eef1f4;
+      --panel: #f7f8fa;
+      --panel-raise: #ffffff;
+      --accent: #0f766e;
+      --accent-soft: rgba(15, 118, 110, 0.12);
+      --accent-ink: #0a5c56;
+      --ok: #1a7f4b;
+      --warn: #b45309;
+      --bad: #b42318;
+      --changed: #0e7490;
+      --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+      --sans: "Sora", "PingFang SC", "Hiragino Sans GB", sans-serif;
+      --rail: 248px;
+      --radius: 10px;
+      --shadow: 0 1px 0 rgba(20,24,31,0.04), 0 12px 28px rgba(20,24,31,0.06);
     }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html {
-      scroll-behavior: smooth;
-    }
-
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
       margin: 0;
-      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: var(--text);
+      font-family: var(--sans);
+      color: var(--ink);
       background:
-        radial-gradient(circle at top, rgba(59, 130, 246, 0.07), transparent 30%),
-        linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
-      min-height: 100vh;
+        linear-gradient(90deg, rgba(20,24,31,0.035) 1px, transparent 1px) 0 0 / 28px 28px,
+        linear-gradient(rgba(20,24,31,0.035) 1px, transparent 1px) 0 0 / 28px 28px,
+        radial-gradient(1200px 600px at 10% -10%, rgba(15,118,110,0.08), transparent 55%),
+        var(--paper);
       -webkit-font-smoothing: antialiased;
     }
 
-    a {
-      color: inherit;
-      text-decoration: none;
-    }
-
-    button {
-      font-family: inherit;
-    }
-
-    .shell {
-      max-width: 1480px;
-      margin: 0 auto;
-      padding: 16px 22px 48px;
-    }
-
-    /* ─── 工作区 ───────────────────────────── */
-    .workspace {
+    .app {
       display: grid;
-      grid-template-columns: 300px minmax(0, 1fr);
-      gap: 24px;
-      align-items: start;
+      grid-template-columns: var(--rail) 1fr;
+      min-height: 100%;
     }
 
-    .sidebar {
-      position: sticky;
-      top: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      max-height: calc(100vh - 32px);
+    /* ── rail ── */
+    .rail {
+      position: sticky; top: 0; align-self: start; height: 100vh;
+      padding: 22px 16px 28px;
+      border-right: 1px solid var(--line);
+      background: color-mix(in srgb, var(--panel) 88%, transparent);
+      backdrop-filter: blur(10px);
       overflow: auto;
-      padding-right: 2px;
+      display: flex; flex-direction: column; gap: 18px;
+    }
+    .brand {
+      display: flex; flex-direction: column; gap: 4px;
+      padding: 0 4px 4px;
+    }
+    .brand-mark {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--accent);
+    }
+    .brand-title {
+      font-size: 22px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1;
+    }
+    .brand-sub {
+      font-size: 12px; color: var(--muted); line-height: 1.45;
     }
 
-    .sidebar-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 4px 2px;
+    .stats {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
     }
-
-    .sidebar-header .brand-logo {
-      height: 26px;
-      width: auto;
-      display: block;
-      user-select: none;
-      -webkit-user-drag: none;
-      flex: 0 0 auto;
-    }
-
-    .sidebar-header .brand-text {
-      display: flex;
-      flex-direction: column;
-      line-height: 1.2;
-      min-width: 0;
-    }
-
-    .sidebar-header .brand-text strong {
-      font-size: 15px;
-      letter-spacing: -0.01em;
-    }
-
-    .sidebar-header .brand-text span {
-      color: var(--muted-soft);
-      font-size: 11px;
-      margin-top: 1px;
-    }
-
-    .sidebar-card {
-      padding: 16px;
-      border-radius: var(--radius);
-      background: var(--panel-soft);
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow-soft);
-      backdrop-filter: blur(14px);
-    }
-
-    .search-box {
-      position: relative;
-      margin-bottom: 16px;
-    }
-
-    .search-box input {
-      width: 100%;
-      height: 36px;
-      border: 1px solid var(--border-strong);
-      border-radius: 10px;
-      background: #fff;
-      padding: 0 12px 0 36px;
-      color: var(--text);
-      font-size: 13.5px;
-      outline: none;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .search-box input:focus {
-      border-color: rgba(37, 99, 235, 0.45);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-    }
-
-    .search-box svg {
-      position: absolute;
-      left: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 16px;
-      height: 16px;
-      color: var(--muted-soft);
-      pointer-events: none;
-    }
-
-    .filter-section {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-bottom: 14px;
-    }
-
-    .filter-section:last-child {
-      margin-bottom: 0;
-    }
-
-    .filter-label {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      font-size: 11.5px;
-      font-weight: 700;
-      color: var(--muted-soft);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-
-    .filter-label .filter-count {
-      color: var(--blue);
-      font-size: 11px;
-    }
-
-    .chip-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 6px 10px;
-      border: 1px solid transparent;
-      border-radius: 999px;
-      background: var(--chip);
-      color: var(--chip-text);
-      font-size: 12.5px;
-      font-weight: 600;
-      cursor: pointer;
-      user-select: none;
-      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
-    }
-
-    .chip:hover {
-      transform: translateY(-1px);
-    }
-
-    .chip.active {
-      background: var(--chip-active);
-      color: var(--blue);
-      border-color: rgba(59, 130, 246, 0.22);
-    }
-
-    .chip small {
-      color: var(--muted-soft);
-      font-size: 11px;
-      font-weight: 700;
-    }
-
-    .chip.active small {
-      color: var(--blue);
-    }
-
-    .segmented {
-      display: inline-flex;
-      gap: 3px;
-      padding: 3px;
-      border-radius: 11px;
-      background: var(--chip);
-      border: 1px solid var(--border);
-    }
-
-    .segmented button {
-      flex: 1;
-      border: 0;
-      padding: 6px 8px;
+    .stat {
+      background: var(--panel-raise);
+      border: 1px solid var(--line);
       border-radius: 8px;
-      background: transparent;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease;
+      padding: 10px 11px;
     }
-
-    .segmented button.active {
-      background: #fff;
-      color: var(--blue);
-      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
-    }
-
-    details.filter-section > summary {
-      cursor: pointer;
-      list-style: none;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      padding: 4px 0;
-    }
-
-    details.filter-section > summary::-webkit-details-marker {
-      display: none;
-    }
-
-    details.filter-section > summary .caret {
-      color: var(--muted-soft);
-      font-size: 12px;
-      transition: transform 0.2s ease;
-    }
-
-    details.filter-section[open] > summary .caret {
-      transform: rotate(180deg);
-    }
-
-    .sidebar-foot {
-      display: flex;
-      gap: 8px;
-      margin-top: 4px;
-    }
-
-    .sidebar-btn {
-      flex: 1;
-      height: 38px;
-      border: 1px solid var(--border-strong);
-      border-radius: 10px;
-      background: #fff;
-      color: var(--muted);
-      font-size: 12.5px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: border-color 0.18s ease, color 0.18s ease, transform 0.12s ease;
-    }
-
-    .sidebar-btn:hover {
-      border-color: rgba(59, 130, 246, 0.3);
-      color: var(--blue);
-      transform: translateY(-1px);
-    }
-
-    .sidebar-btn.primary {
-      background: linear-gradient(135deg, var(--blue-strong), var(--blue));
-      color: #fff;
-      border-color: transparent;
-      box-shadow: 0 8px 16px rgba(37, 99, 235, 0.2);
-    }
-
-    /* ─── 内容区 ───────────────────────────── */
-    .content {
-      min-width: 0;
-      position: relative;
-    }
-
-    .gallery-view,
-    .detail-view {
-      display: none;
-    }
-
-    .content[data-mode="gallery"] .gallery-view {
-      display: block;
-    }
-
-    .content[data-mode="detail"] .detail-view {
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* 画廊视图 */
-    .gallery-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      gap: 16px;
-      margin: 2px 2px 14px;
-      flex-wrap: wrap;
-    }
-
-    .gallery-head h2 {
-      margin: 0;
-      font-size: 20px;
+    .stat b {
+      display: block; font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums;
       letter-spacing: -0.02em;
     }
+    .stat span { font-size: 11px; color: var(--muted); }
+    .stat.warn b { color: var(--warn); }
+    .stat.bad b { color: var(--bad); }
+    .stat.changed b { color: var(--changed); }
 
-    .gallery-head p {
-      margin: 4px 0 0;
-      color: var(--muted);
-      font-size: 13px;
+    .filter-block { display: flex; flex-direction: column; gap: 8px; }
+    .filter-label {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--muted); padding: 0 2px;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      font: inherit; font-size: 12px; font-weight: 500;
+      padding: 5px 9px; border-radius: 7px;
+      border: 1px solid var(--line);
+      background: var(--panel-raise);
+      color: var(--ink-soft);
+      cursor: pointer;
+      transition: border-color 0.12s, background 0.12s, color 0.12s;
+    }
+    .chip:hover { border-color: var(--line-strong); color: var(--ink); }
+    .chip.active {
+      background: var(--accent-soft);
+      border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+      color: var(--accent-ink);
+    }
+    .chip .n {
+      margin-left: 4px; opacity: 0.55; font-variant-numeric: tabular-nums;
+      font-family: var(--mono); font-size: 10.5px;
+    }
+    .chip:disabled { opacity: 0.4; cursor: default; }
+
+    .search-wrap { position: relative; }
+    .search-wrap input {
+      width: 100%; font: inherit; font-size: 13px;
+      padding: 9px 10px 9px 32px;
+      border-radius: 8px; border: 1px solid var(--line);
+      background: var(--panel-raise); color: var(--ink);
+    }
+    .search-wrap input:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .search-wrap::before {
+      content: "/";
+      position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+      font-family: var(--mono); font-size: 12px; color: var(--muted);
     }
 
-    .active-filters {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      max-width: 60%;
-      justify-content: flex-end;
+    .rail-actions {
+      margin-top: auto; display: flex; flex-direction: column; gap: 8px;
+    }
+    .linkish {
+      font: inherit; font-size: 12px; color: var(--accent-ink);
+      background: none; border: none; padding: 0; cursor: pointer; text-align: left;
+    }
+    .linkish:hover { text-decoration: underline; }
+    .meta-foot {
+      font-size: 11px; color: var(--muted); line-height: 1.45;
+      font-family: var(--mono);
     }
 
-    .active-filter {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 10px;
-      border-radius: 999px;
-      background: var(--blue-soft);
-      color: var(--blue-strong);
-      font-size: 12px;
-      font-weight: 700;
+    /* ── main ── */
+    .main { padding: 22px 26px 64px; min-width: 0; }
+    .toolbar {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      margin-bottom: 16px;
     }
-
-    .active-filter.muted {
-      background: #f1f5f9;
-      color: var(--muted-soft);
+    .result-count {
+      font-size: 13px; color: var(--muted);
     }
+    .result-count b { color: var(--ink); font-variant-numeric: tabular-nums; }
+    .spacer { flex: 1; }
+    .seg {
+      display: inline-flex; border: 1px solid var(--line); border-radius: 8px;
+      overflow: hidden; background: var(--panel-raise);
+    }
+    .seg button {
+      font: inherit; font-size: 12px; font-weight: 500;
+      padding: 6px 11px; border: none; background: transparent;
+      color: var(--muted); cursor: pointer;
+    }
+    .seg button + button { border-left: 1px solid var(--line); }
+    .seg button.active { background: var(--accent-soft); color: var(--accent-ink); }
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .grid.compact {
+      grid-template-columns: 1fr;
+      gap: 6px;
     }
 
     .card {
-      display: flex;
-      flex-direction: column;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 16px;
+      background: var(--panel-raise);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
       overflow: hidden;
-      box-shadow: var(--shadow-soft);
       cursor: pointer;
-      transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, border-color 0.2s ease;
+      transition: border-color 0.12s, transform 0.12s, box-shadow 0.12s;
+      display: flex; flex-direction: column;
+      animation: rise 0.28s ease both;
     }
-
     .card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(59, 130, 246, 0.1);
-      border-color: rgba(59, 130, 246, 0.24);
+      border-color: var(--line-strong);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow);
     }
-
-    .card-preview {
-      position: relative;
-      aspect-ratio: 16 / 10;
-      padding: 12px;
-      background: var(--preview-bg);
-      border-bottom: 1px solid var(--border);
-      overflow: hidden;
+    .card.changed {
+      border-color: color-mix(in srgb, var(--changed) 45%, var(--line));
     }
-
-    .card-preview img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      display: block;
-      transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    .card.compact-row {
+      flex-direction: row; align-items: center; gap: 12px;
+      padding: 8px 12px; min-height: 52px;
     }
+    .card.compact-row .thumb { display: none; }
+    .card.compact-row .card-body { padding: 0; flex: 1; min-width: 0; }
 
-    .card:hover .card-preview img {
-      transform: scale(1.03);
+    .thumb {
+      aspect-ratio: 16 / 11;
+      background:
+        linear-gradient(135deg, #f3f5f7 0%, #e8ecf0 100%);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; border-bottom: 1px solid var(--line);
     }
-
-    .card-featured-badge {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      padding: 4px 9px;
-      border-radius: 999px;
-      background: rgba(37, 99, 235, 0.92);
-      color: #fff;
-      font-size: 10.5px;
-      font-weight: 800;
-      letter-spacing: 0.04em;
-      backdrop-filter: blur(8px);
-      z-index: 2;
+    .thumb img {
+      width: 100%; height: 100%; object-fit: contain; background: #fff;
     }
-
-    .card-body {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      padding: 13px 14px 14px;
-      flex: 1;
+    .thumb .ph {
+      padding: 16px; text-align: center; font-size: 12px; color: var(--muted);
+      line-height: 1.5; max-width: 90%;
     }
+    .thumb .ph.err { color: var(--bad); }
 
+    .card-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
     .card-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: flex-start;
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
     }
-
-    .card-title {
-      margin: 0;
-      font-size: 15.5px;
-      line-height: 1.3;
-      letter-spacing: -0.01em;
+    .card-name {
+      font-family: var(--mono); font-size: 12px; font-weight: 500;
+      line-height: 1.35; word-break: break-all; color: var(--ink);
     }
-
-    .card:hover .card-title {
-      color: var(--blue);
-    }
-
     .card-path {
-      margin: 3px 0 0;
-      color: var(--muted-soft);
-      font-size: 11px;
-      line-height: 1.4;
-      word-break: break-all;
+      font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-
-    .role-badge {
-      flex: 0 0 auto;
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: 10.5px;
-      font-weight: 800;
-      letter-spacing: 0.04em;
+    .badges { display: flex; flex-wrap: wrap; gap: 4px; flex-shrink: 0; }
+    .badge {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.02em;
+      padding: 2px 6px; border-radius: 5px; line-height: 1.5;
       text-transform: uppercase;
     }
-
-    .role-badge.smoke {
-      color: #166534;
-      background: rgba(34, 197, 94, 0.14);
-    }
-
-    .role-badge.product {
-      color: var(--blue-strong);
-      background: rgba(59, 130, 246, 0.14);
-    }
-
-    .role-badge.demo {
-      color: #6b21a8;
-      background: rgba(168, 85, 247, 0.16);
-    }
-
-    .role-badge.stress {
-      color: #9a3412;
-      background: rgba(249, 115, 22, 0.16);
-    }
-
-    .role-badge.mech {
-      color: #155e75;
-      background: rgba(6, 182, 212, 0.16);
-    }
-
-    .role-badge.dim {
-      opacity: 0.55;
-      filter: saturate(0.7);
-    }
-
-    .tag-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 5px;
-    }
-
-    .tag-pill {
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      color: #1e3a8a;
-      background: var(--blue-soft);
-    }
-
-    .card-cta {
-      margin-top: auto;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      color: var(--blue);
-      font-size: 12px;
-      font-weight: 700;
-    }
+    .badge.ok { background: rgba(26,127,75,0.12); color: var(--ok); }
+    .badge.parse-error { background: rgba(180,83,9,0.12); color: var(--warn); }
+    .badge.render-error { background: rgba(180,35,24,0.12); color: var(--bad); }
+    .badge.changed { background: rgba(14,116,144,0.12); color: var(--changed); }
+    .badge.facet { background: rgba(20,24,31,0.06); color: var(--ink-soft); text-transform: none; }
+    .badge.role { background: var(--accent-soft); color: var(--accent-ink); text-transform: none; }
 
     .empty {
-      display: none;
-      margin-top: 14px;
-      padding: 44px 22px;
-      text-align: center;
+      grid-column: 1 / -1;
+      text-align: center; padding: 56px 16px;
+      color: var(--muted); font-size: 14px;
+      background: var(--panel-raise); border: 1px dashed var(--line);
       border-radius: var(--radius);
-      background: rgba(255, 255, 255, 0.7);
-      border: 1px dashed var(--border-strong);
-      color: var(--muted);
+    }
+    .loading { color: var(--muted); font-size: 13px; padding: 40px; text-align: center; }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: none; }
     }
 
-    .empty strong {
-      display: block;
-      color: var(--text);
-      font-size: 17px;
-      margin-bottom: 6px;
-    }
-
-    /* ─── 详情视图（左右分栏） ─────────────── */
-    .detail-view {
-      gap: 14px;
-    }
-
-    .detail-head {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 14px 16px;
-      border-radius: var(--radius);
-      background: var(--panel-soft);
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow-soft);
-      backdrop-filter: blur(14px);
-      flex-wrap: wrap;
-    }
-
-    .back-btn {
-      flex: 0 0 auto;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      height: 38px;
-      padding: 0 14px;
-      border: 1px solid var(--border-strong);
-      border-radius: 10px;
-      background: #fff;
-      color: var(--text);
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: border-color 0.18s ease, color 0.18s ease, transform 0.12s ease;
-    }
-
-    .back-btn:hover {
-      border-color: rgba(59, 130, 246, 0.3);
-      color: var(--blue);
-      transform: translateX(-2px);
-    }
-
-    .detail-title {
-      flex: 1 1 auto;
-      min-width: 0;
-    }
-
-    .detail-title h2 {
-      margin: 0;
-      font-size: 18px;
-      letter-spacing: -0.01em;
-      line-height: 1.25;
-    }
-
-    .detail-title p {
-      margin: 3px 0 0;
-      color: var(--muted-soft);
-      font-size: 12px;
-      word-break: break-all;
-    }
-
-    .detail-nav {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex: 0 0 auto;
-    }
-
-    .detail-nav button {
-      width: 34px;
-      height: 34px;
-      border: 1px solid var(--border-strong);
-      border-radius: 9px;
-      background: #fff;
-      color: var(--text);
-      font-size: 16px;
-      line-height: 1;
-      cursor: pointer;
-      transition: border-color 0.18s ease, color 0.18s ease;
-    }
-
-    .detail-nav button:hover:not(:disabled) {
-      border-color: rgba(59, 130, 246, 0.3);
-      color: var(--blue);
-    }
-
-    .detail-nav button:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    .detail-nav .counter {
-      padding: 0 8px;
-      color: var(--muted-soft);
-      font-size: 12px;
-      font-weight: 700;
-      min-width: 64px;
-      text-align: center;
-    }
-
-    .detail-links {
-      display: flex;
-      gap: 6px;
-      flex: 0 0 auto;
-    }
-
-    .detail-links a {
-      height: 34px;
-      padding: 0 12px;
-      display: inline-flex;
-      align-items: center;
-      border-radius: 9px;
-      font-size: 12.5px;
-      font-weight: 700;
-      transition: transform 0.12s ease;
-    }
-
-    .detail-links a:hover {
-      transform: translateY(-1px);
-    }
-
-    .detail-links a.primary {
-      background: linear-gradient(135deg, var(--blue-strong), var(--blue));
-      color: #fff;
-    }
-
-    .detail-links a.secondary {
-      background: #fff;
-      color: var(--text);
-      border: 1px solid var(--border-strong);
-    }
-
-    .detail-highlight {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 14px;
-      border-radius: 12px;
-      background: linear-gradient(90deg, rgba(37, 99, 235, 0.08), rgba(139, 92, 246, 0.05));
-      border: 1px solid rgba(59, 130, 246, 0.16);
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    .detail-highlight .hl-icon {
-      flex: 0 0 auto;
-      width: 26px;
-      height: 26px;
-      border-radius: 8px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--blue);
-      color: #fff;
-      font-size: 14px;
-    }
-
-    .detail-highlight strong {
-      color: var(--text);
-      font-weight: 700;
-    }
-
-    .detail-body {
-      display: grid;
-      grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-      gap: 14px;
-      min-height: 540px;
-      height: calc(100vh - 230px);
-    }
-
-    .pane {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-      min-height: 0;
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-      background: var(--panel);
-      box-shadow: var(--shadow-soft);
-      overflow: hidden;
-    }
-
-    .pane-label {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--border);
-      background: rgba(248, 250, 252, 0.8);
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      flex: 0 0 auto;
-    }
-
-    .pane-label .pane-tag {
-      text-transform: none;
-      letter-spacing: 0;
-      color: var(--muted-soft);
-      font-weight: 600;
-      font-size: 11.5px;
-    }
-
-    .copy-btn {
-      height: 28px;
-      padding: 0 12px;
-      border: 1px solid var(--border-strong);
-      border-radius: 8px;
-      background: #fff;
-      color: var(--muted);
-      font-size: 11.5px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
-    }
-
-    .copy-btn:hover {
-      border-color: rgba(59, 130, 246, 0.3);
-      color: var(--blue);
-    }
-
-    .copy-btn.copied {
-      background: rgba(34, 197, 94, 0.12);
-      border-color: rgba(34, 197, 94, 0.3);
-      color: #166534;
-    }
-
-    .pane-content {
-      flex: 1;
-      min-height: 0;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .pane-viz .pane-content {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 18px;
-      background: #f8fafc;
-    }
-
-    .pane-viz img {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-      display: block;
-      cursor: zoom-in;
-      transition: opacity 0.15s ease;
-    }
-
-    .pane-viz img:hover {
-      opacity: 0.88;
-    }
-
-    /* 图片放大灯箱 —— 支持滚轮缩放 + 拖拽平移 */
+    /* ── lightbox ── */
     .lightbox {
-      position: fixed;
-      inset: 0;
-      z-index: 100;
-      background: rgba(15, 23, 42, 0.92);
-      backdrop-filter: blur(20px);
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.25s ease, visibility 0.25s ease;
-      overflow: hidden;
-      cursor: grab;
-      user-select: none;
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(12, 16, 22, 0.88);
+      display: none; flex-direction: column;
     }
-
-    .lightbox.open {
-      opacity: 1;
-      visibility: visible;
+    .lightbox.open { display: flex; }
+    .lb-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; color: #e8edf2; flex-shrink: 0;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
     }
-
-    .lightbox.dragging {
-      cursor: grabbing;
+    .lb-title {
+      font-family: var(--mono); font-size: 12.5px; flex: 1; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-
-    .lightbox img {
-      position: absolute;
-      top: 0;
-      left: 0;
-      display: block;
-      border-radius: 12px;
-      background: #fff;
-      box-shadow: 0 28px 64px rgba(0, 0, 0, 0.4);
-      max-width: none;
-      transform-origin: 0 0;
-      will-change: transform;
+    .lb-toolbar { display: flex; gap: 6px; align-items: center; }
+    .lb-toolbar button, .lb-close {
+      font: inherit; font-size: 13px; color: #e8edf2;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 6px;
+      padding: 4px 10px; cursor: pointer;
     }
-
-    .lightbox-close {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      z-index: 2;
-      width: 42px;
-      height: 42px;
-      border: 0;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.18);
-      color: #fff;
-      font-size: 24px;
-      line-height: 1;
-      cursor: pointer;
-      transition: background 0.2s ease, transform 0.15s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      user-select: none;
+    .lb-toolbar button:hover, .lb-close:hover { background: rgba(255,255,255,0.14); }
+    .lb-toolbar .zoom-pct {
+      font-family: var(--mono); font-size: 11px; color: #9aa4b2;
+      min-width: 44px; text-align: center;
     }
-
-    .lightbox-close:hover {
-      background: rgba(255, 255, 255, 0.32);
-      transform: scale(1.1);
+    .lb-close { font-size: 18px; line-height: 1; padding: 2px 10px; }
+    .lb-body { flex: 1; display: flex; min-height: 0; }
+    .lb-svg-pane {
+      flex: 1; overflow: hidden; background: #fff; position: relative;
+      touch-action: none; cursor: grab;
     }
-
-    .lightbox-toolbar {
-      position: absolute;
-      bottom: 24px;
-      right: 24px;
-      z-index: 2;
-      display: flex;
-      gap: 8px;
-      user-select: none;
+    .lb-svg-pane.panning { cursor: grabbing; }
+    .lb-svg-pane img {
+      position: absolute; top: 0; left: 0; transform-origin: 0 0;
+      max-width: none; display: block;
     }
-
-    .lightbox-toolbar button {
-      padding: 6px 14px;
-      border: 0;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.16);
-      color: rgba(255, 255, 255, 0.85);
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      backdrop-filter: blur(12px);
-      transition: background 0.2s ease;
+    .lb-dsl-pane {
+      width: min(42vw, 520px); flex-shrink: 0;
+      background: #0f141a; border-left: 1px solid rgba(255,255,255,0.08);
+      overflow: auto; margin: 0; display: flex; flex-direction: column;
     }
-
-    .lightbox-toolbar button:hover {
-      background: rgba(255, 255, 255, 0.28);
+    .lb-dsl-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.08);
+      color: #9aa4b2; font-size: 11px; font-family: var(--mono);
     }
-
-    .lightbox-toolbar .zoom-pct {
-      padding: 6px 12px;
-      border: 0;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.16);
-      color: rgba(255, 255, 255, 0.75);
-      font-size: 12px;
-      font-weight: 600;
-      backdrop-filter: blur(12px);
-      display: flex;
-      align-items: center;
-      min-width: 48px;
-      justify-content: center;
-      cursor: pointer;
-      font-family: inherit;
+    .lb-dsl-pane pre {
+      margin: 0; padding: 14px 16px;
+      font: 12.5px/1.55 var(--mono);
+      color: #d7dee7; white-space: pre; tab-size: 2;
     }
-
-    .lightbox-toolbar .zoom-pct:hover {
-      background: rgba(255, 255, 255, 0.28);
+    .lb-hint {
+      position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+      background: rgba(12,16,22,0.72); color: #e8edf2; font-size: 11px;
+      padding: 5px 11px; border-radius: 999px; pointer-events: none;
+      opacity: 0.85; transition: opacity 0.4s;
     }
+    .lb-hint.hide { opacity: 0; }
 
-    /* 详情视图：全宽开关 */
-    .detail-body.full-viz {
-      grid-template-columns: 1fr;
-    }
-
-    .detail-body.full-viz .pane-code {
-      display: none;
-    }
-
-    .full-viz-btn {
-      height: 28px;
-      padding: 0 12px;
-      border: 1px solid var(--border-strong);
-      border-radius: 8px;
-      background: #fff;
-      color: var(--muted);
-      font-size: 11.5px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
-      margin-left: 8px;
-    }
-
-    .full-viz-btn:hover {
-      border-color: rgba(59, 130, 246, 0.3);
-      color: var(--blue);
-    }
-
-    .full-viz-btn.active {
-      background: rgba(37, 99, 235, 0.1);
-      border-color: rgba(59, 130, 246, 0.3);
-      color: var(--blue);
-    }
-
-    .viz-placeholder {
-      text-align: center;
-      color: var(--muted-soft);
-      font-size: 14px;
-    }
-
-    /* 代码区 */
-    .code-pane {
-      background: var(--code-bg);
-      overflow: auto;
-    }
-
-    .code-pane .pane-content {
-      overflow: auto;
-    }
-
-    .code-listing {
-      margin: 0;
-      padding: 12px 0;
-      font-family: "JetBrains Mono", "SF Mono", Monaco, Menlo, Consolas, monospace;
-      font-size: 12.5px;
-      line-height: 1.65;
-      color: var(--code-text);
-      counter-reset: ln;
-    }
-
-    .code-line {
-      display: flex;
-      align-items: flex-start;
-      padding: 0 14px 0 0;
-    }
-
-    .code-line::before {
-      counter-increment: ln;
-      content: counter(ln);
-      flex: 0 0 44px;
-      padding-right: 12px;
-      text-align: right;
-      color: #8c959f;
-      user-select: none;
-      font-size: 11.5px;
-    }
-
-    .code-line .lc {
-      white-space: pre;
-      tab-size: 4;
-      min-width: 0;
-    }
-
-    .tok-comment { color: var(--tok-comment); font-style: italic; }
-    .tok-string { color: var(--tok-string); }
-    .tok-keyword { color: var(--tok-keyword); font-weight: 600; }
-    .tok-type { color: var(--tok-type); font-weight: 600; }
-    .tok-number { color: var(--tok-number); }
-    .tok-arrow { color: var(--tok-arrow); font-weight: 600; }
-    .tok-property { color: var(--tok-property); }
-    .tok-bracket { color: var(--tok-bracket); }
-    .tok-bool { color: var(--tok-bool); }
-    .tok-ident { color: var(--tok-ident); }
-
-    .code-loading {
-      padding: 24px;
-      color: var(--muted-soft);
-      font-size: 13px;
-    }
-
-    .code-error {
-      padding: 24px;
-      color: #b91c1c;
-      font-size: 13px;
-    }
-
-    .footer-note {
-      margin-top: 22px;
-      color: var(--muted-soft);
-      font-size: 12px;
-      text-align: center;
-    }
-
-    /* ─── 响应式 ───────────────────────────── */
-    @media (max-width: 1180px) {
-      .workspace {
-        grid-template-columns: 1fr;
+    @media (max-width: 960px) {
+      .app { grid-template-columns: 1fr; }
+      .rail {
+        position: relative; height: auto; max-height: none;
+        border-right: none; border-bottom: 1px solid var(--line);
       }
-
-      .sidebar {
-        position: static;
-        max-height: none;
-        overflow: visible;
-      }
-
-      .sidebar-card {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 14px;
-      }
-
-      .sidebar-card .search-box {
-        grid-column: 1 / -1;
-      }
-
-      .sidebar-foot {
-        grid-column: 1 / -1;
-      }
-
-      .detail-body {
-        height: auto;
-      }
-    }
-
-    @media (max-width: 860px) {
-      .shell {
-        padding: 12px 12px 36px;
-      }
-
-      .sidebar-header .brand-text strong {
-        font-size: 14px;
-      }
-
-      .sidebar-card {
-        grid-template-columns: 1fr;
-      }
-
-      .gallery-head {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
-      .active-filters {
-        max-width: 100%;
-        justify-content: flex-start;
-      }
-
-      .detail-head {
-        padding: 12px;
-      }
-
-      .detail-body {
-        grid-template-columns: 1fr;
-        min-height: auto;
-      }
-
-      .pane-viz .pane-content {
-        min-height: 280px;
-      }
-
-      .code-pane .pane-content {
-        max-height: 420px;
-      }
-
-      .grid {
-        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-        gap: 12px;
-      }
+      .rail-actions { margin-top: 8px; }
+      .lb-body { flex-direction: column; }
+      .lb-dsl-pane { width: 100%; height: 38%; border-left: none; border-top: 1px solid rgba(255,255,255,0.08); }
     }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <section class="workspace">
-      <aside class="sidebar">
-        <div class="sidebar-header">
-          <a href="/" title="返回 Plotgram 主站" style="display:flex;align-items:center;gap:10px;">
-            <img class="brand-logo" src="assets/brand/logo-icon-32.svg" width="26" height="26" alt="Plotgram" />
-          </a>
-          <div class="brand-text">
-            <strong>Plotgram Showcase</strong>
-            <span id="topbarStats">加载中...</span>
-          </div>
+  <div class="app">
+    <aside class="rail">
+      <div class="brand">
+        <div class="brand-mark">Plotgram</div>
+        <div class="brand-title">Showcase</div>
+        <div class="brand-sub">布局视觉监视 · layout → facet → role</div>
+      </div>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="search-wrap">
+        <input type="search" id="search" placeholder="搜索路径或 slug…" autocomplete="off" />
+      </div>
+
+      <div class="filter-block">
+        <div class="filter-label">Layout</div>
+        <div class="chips" id="layout-chips"></div>
+      </div>
+      <div class="filter-block" id="facet-block" hidden>
+        <div class="filter-label">Facet</div>
+        <div class="chips" id="facet-chips"></div>
+      </div>
+      <div class="filter-block">
+        <div class="filter-label">Role</div>
+        <div class="chips" id="role-chips"></div>
+      </div>
+      <div class="filter-block">
+        <div class="filter-label">Status</div>
+        <div class="chips" id="status-chips"></div>
+      </div>
+
+      <div class="rail-actions">
+        <button class="linkish" id="clearFilters" type="button">清除全部筛选</button>
+        <button class="linkish" id="failOnly" type="button">只看失败</button>
+        <div class="meta-foot" id="meta-foot"></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="toolbar">
+        <div class="result-count" id="result-count"></div>
+        <div class="spacer"></div>
+        <div class="seg" id="view-seg">
+          <button type="button" data-view="grid" class="active">网格</button>
+          <button type="button" data-view="list">列表</button>
         </div>
-        <div class="sidebar-card">
-          <div class="search-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="7"></circle>
-              <path d="m20 20-3.5-3.5"></path>
-            </svg>
-            <input id="searchInput" type="search" placeholder="搜索示例名称、类型、标签..." aria-label="搜索示例" />
-          </div>
-
-          <div class="filter-section">
-            <div class="filter-label">
-              <span>图类型</span>
-              <span class="filter-count" id="typeFilterCount"></span>
-            </div>
-            <div class="chip-row" id="typeFilters"></div>
-          </div>
-
-          <div class="filter-section">
-            <div class="filter-label">
-              <span>角色</span>
-              <span class="filter-count" id="roleFilterCount"></span>
-            </div>
-            <div class="chip-row" id="roleFilters"></div>
-          </div>
-
-          <details class="filter-section" id="probeDetails">
-            <summary>
-              <span class="filter-label" style="text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--muted);">
-                工程探针 <span class="filter-count" id="probeFilterCount"></span>
-              </span>
-              <span class="caret">⌃</span>
-            </summary>
-            <div class="chip-row" id="probeFilters" style="margin-top:8px;"></div>
-          </details>
-
-          <details class="filter-section" id="tagDetails">
-            <summary>
-              <span class="filter-label" style="text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--muted);">
-                场景标签 <span class="filter-count" id="tagFilterCount"></span>
-              </span>
-              <span class="caret">⌃</span>
-            </summary>
-            <div class="chip-row" id="tagFilters" style="margin-top:8px;"></div>
-          </details>
-
-          <div class="sidebar-foot">
-            <button class="sidebar-btn primary" id="scrollFeatured" type="button">精选示例</button>
-            <button class="sidebar-btn" id="resetFilters" type="button">重置筛选</button>
-            <a class="sidebar-btn" href="/editor/" title="图表调校" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">Editor</a>
-            <a class="sidebar-btn" href="/" title="返回 Plotgram 主站" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">主站</a>
-          </div>
-        </div>
-      </aside>
-
-      <main class="content" id="content" data-mode="gallery">
-        <!-- 画廊视图 -->
-        <section class="gallery-view">
-          <div class="gallery-head">
-            <div>
-              <h2 id="resultTitle">全部示例</h2>
-              <p id="resultMeta">正在整理样例索引...</p>
-            </div>
-            <div class="active-filters" id="activeFilters"></div>
-          </div>
-          <div class="grid" id="galleryGrid"></div>
-          <div class="empty" id="emptyState">
-            <strong>没有匹配的示例</strong>
-            <span>可以尝试清空关键词，或者取消部分筛选标签。</span>
-          </div>
-        </section>
-
-        <!-- 详情视图：左右分栏 -->
-        <section class="detail-view">
-          <div class="detail-head">
-            <button class="back-btn" id="backBtn" type="button">← 返回画廊</button>
-            <div class="detail-title">
-              <h2 id="detailTitle"></h2>
-              <p id="detailPath"></p>
-            </div>
-            <div class="detail-nav">
-              <button id="detailPrev" type="button" aria-label="上一个">‹</button>
-              <span class="counter" id="detailCounter"></span>
-              <button id="detailNext" type="button" aria-label="下一个">›</button>
-            </div>
-            <div class="detail-links">
-              <a class="primary" id="detailOpenEditor" target="_blank" rel="noopener">在 Editor 中打开</a>
-              <a class="secondary" id="detailOpenSvg" target="_blank" rel="noopener">打开 SVG</a>
-              <a class="secondary" id="detailOpenDsl" target="_blank" rel="noopener">.pgm 源文件</a>
-            </div>
-          </div>
-          <div class="detail-highlight" id="detailHighlight">
-            <span class="hl-icon">✦</span>
-            <span id="detailHighlightText"></span>
-          </div>
-          <div class="detail-body">
-            <div class="pane pane-viz">
-              <div class="pane-label">
-                <span>可视化效果</span>
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <button class="full-viz-btn" id="fullVizBtn" type="button" title="全宽模式（隐藏代码面板）">全宽</button>
-                  <span class="pane-tag" id="detailVizTag"></span>
-                </div>
-              </div>
-              <div class="pane-content" id="detailViz">
-                <div class="viz-placeholder">加载中...</div>
-              </div>
-            </div>
-            <div class="pane pane-code code-pane">
-              <div class="pane-label">
-                <span>DSL 源码</span>
-                <button class="copy-btn" id="copyCode" type="button">复制代码</button>
-              </div>
-              <div class="pane-content" id="detailCode">
-                <div class="code-loading">加载 DSL 源码...</div>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-    </section>
-
-    <div class="footer-note">
-      Plotgram — 用一份 DSL 描述六类图：架构图 / 时序图 / 流程图 / 状态图 / ER 图 / 思维导图。点击任意卡片查看「可视化 ↔ DSL」对照。
-    </div>
+      </div>
+      <div class="grid" id="grid">
+        <div class="loading">加载 manifest…</div>
+      </div>
+    </main>
   </div>
 
   <div class="lightbox" id="lightbox" aria-hidden="true">
-    <button class="lightbox-close" id="lightboxClose" aria-label="关闭放大">×</button>
-    <img id="lightboxImg" alt="" />
-    <div class="lightbox-toolbar">
-      <button id="lbZoomOut" aria-label="缩小">−</button>
-      <button class="zoom-pct" id="lbZoomPct" aria-label="重置为 100%">100%</button>
-      <button id="lbZoomIn" aria-label="放大">+</button>
-      <button id="lbZoomFit" aria-label="适应屏幕">适应</button>
-      <button id="lbZoom1" aria-label="原始大小">1:1</button>
+    <div class="lb-header">
+      <span class="lb-title" id="lb-title"></span>
+      <div class="lb-toolbar">
+        <button id="lb-prev" type="button" title="上一个 (k)">↑</button>
+        <button id="lb-next" type="button" title="下一个 (j)">↓</button>
+        <button id="lb-zoom-out" type="button" title="缩小 (-)">−</button>
+        <span class="zoom-pct" id="lb-zoom-pct">100%</span>
+        <button id="lb-zoom-in" type="button" title="放大 (+)">+</button>
+        <button id="lb-fit" type="button" title="适应 (0)">适应</button>
+        <button id="lb-actual" type="button" title="1:1">1:1</button>
+      </div>
+      <button class="lb-close" id="lb-close" type="button" title="关闭 (Esc)">×</button>
+    </div>
+    <div class="lb-body">
+      <div class="lb-svg-pane" id="lb-svg-pane">
+        <img id="lb-img" alt="" />
+        <div class="lb-hint" id="lb-hint">j/k 切换 · 拖拽平移 · 滚轮缩放 · Esc 关闭</div>
+      </div>
+      <div class="lb-dsl-pane">
+        <div class="lb-dsl-bar">
+          <span>DSL</span>
+          <button class="linkish" id="lb-copy" type="button" style="color:#9ec8c3">复制路径</button>
+        </div>
+        <pre id="lb-dsl"></pre>
+      </div>
     </div>
   </div>
 
   <script>
-    // cdn:start
-    const CDN_BASE = "";
-    // cdn:end
-    const BUILD_HASH = "{{BUILD_HASH}}";
+    "use strict";
 
-    function assetUrl(path) {
-      const isSvg = path.endsWith(".svg");
-      const cacheBust = BUILD_HASH && !BUILD_HASH.includes("{{") ? BUILD_HASH : "";
-      const suffix = cacheBust && isSvg ? `?v=${cacheBust}` : "";
-      // 只有 SVG 走 CDN,其他资源(.pgm / .json 等)走 demo 站相对路径
-      if (!CDN_BASE || !isSvg) return path + suffix;
-      const normalized = path.startsWith("/") ? path.slice(1) : path;
-      return `${CDN_BASE}showcase/${normalized}${suffix}`;
-    }
-
-    /** Showcase → Editor：仅传样例路径，不传预览缩放倍率等参数。 */
-    function buildEditorHref(pgmPath) {
-      return `/editor/?pgm=${encodeURIComponent(pgmPath)}`;
-    }
-
-    // manifest:start
-    const SAMPLE_PATHS = [
-      "architecture/demo.ai-agent-docops-pipeline.pgm",
-      "architecture/demo.data-lakehouse-platform.pgm",
-      "architecture/demo.data-lineage-platform.pgm",
-      "architecture/demo.fintech-payment-platform.pgm",
-      "architecture/demo.flat-realtime-recommendation.pgm",
-      "architecture/demo.hybrid-cloud-dr-topology.pgm",
-      "architecture/demo.k8s-blue-green-release-topology.pgm",
-      "architecture/demo.k8s-multi-cluster-federation.pgm",
-      "architecture/demo.k8s-multi-namespace-overview.pgm",
-      "architecture/demo.k8s-platform-stack.pgm",
-      "architecture/demo.k8s-tenant-isolation.pgm",
-      "architecture/demo.mcp-server-cluster-architecture.pgm",
-      "architecture/demo.multi-region-active-active.pgm",
-      "architecture/demo.payment-clearing-platform.pgm",
-      "architecture/demo.plotgram-core-mod-deps.pgm",
-      "architecture/demo.realtime-recommendation.pgm",
-      "architecture/demo.supply-chain-control-tower.pgm",
-      "architecture/mech.constrain-cross-group.pgm",
-      "architecture/mech.constrain-flat-chain.pgm",
-      "architecture/product.cdn-cache.pgm",
-      "architecture/product.cloud-native.pgm",
-      "architecture/product.compiler-pipeline.pgm",
-      "architecture/product.d2-cell-tower-network.pgm",
-      "architecture/product.data-pipeline.pgm",
-      "architecture/product.ecommerce-platform.pgm",
-      "architecture/product.event-driven.pgm",
-      "architecture/product.flat-rest-api.pgm",
-      "architecture/product.message-queue-pipeline.pgm",
-      "architecture/product.microservices.pgm",
-      "architecture/product.monitoring-stack.pgm",
-      "architecture/product.narrow-corridor.pgm",
-      "architecture/product.rest-api-backend.pgm",
-      "architecture/product.serverless-web-app.pgm",
-      "architecture/product.three-tier.pgm",
-      "architecture/product.typical-microservice-architecture.pgm",
-      "architecture/product.unite-config-publish.pgm",
-      "architecture/smoke.client-api-db.pgm",
-      "architecture/smoke.flat-gateway-fanout.pgm",
-      "architecture/stress.layout-stress-flat-mesh.pgm",
-      "architecture/stress.layout-stress-nested.pgm",
-      "er/demo.ecommerce-schema.pgm",
-      "er/demo.hospital-system.pgm",
-      "er/demo.library-management.pgm",
-      "er/product.blog-schema.pgm",
-      "er/product.crm-schema.pgm",
-      "er/product.forum-schema.pgm",
-      "er/product.inventory-schema.pgm",
-      "er/product.saas-schema.pgm",
-      "er/product.school-schema.pgm",
-      "er/product.social-network.pgm",
-      "er/smoke.two-tables.pgm",
-      "er/smoke.user-post.pgm",
-      "er/stress.layout-stress-dense.pgm",
-      "flowchart/demo.aml-case-investigation.pgm",
-      "flowchart/demo.caffe-shop.pgm",
-      "flowchart/demo.change-approval-workflow.pgm",
-      "flowchart/demo.ci-cd-security-pipeline.pgm",
-      "flowchart/demo.customer-refund-process.pgm",
-      "flowchart/demo.data-etl-pipeline.pgm",
-      "flowchart/demo.e-commerce-order-fulfillment.pgm",
-      "flowchart/demo.incident-management.pgm",
-      "flowchart/demo.insurance-claim-process.pgm",
-      "flowchart/demo.k8s-incident-response.pgm",
-      "flowchart/demo.loan-approval-workflow.pgm",
-      "flowchart/demo.pr-architecture-review.pgm",
-      "flowchart/demo.software-release.pgm",
-      "flowchart/mech.constrain-sink.pgm",
-      "flowchart/product.employee-onboarding.pgm",
-      "flowchart/product.expense-reimbursement.pgm",
-      "flowchart/product.leave-approval-process.pgm",
-      "flowchart/product.linear-chain.pgm",
-      "flowchart/product.order-approval.pgm",
-      "flowchart/product.password-reset.pgm",
-      "flowchart/product.refund-process.pgm",
-      "flowchart/product.self-loop-retry.pgm",
-      "flowchart/product.swimlane-order-process.pgm",
-      "flowchart/product.symmetric-fanout.pgm",
-      "flowchart/product.ticket-triage.pgm",
-      "flowchart/product.user-auth.pgm",
-      "flowchart/smoke.decision-loop.pgm",
-      "flowchart/smoke.fan-out-four.pgm",
-      "flowchart/stress.layout-stress-dag.pgm",
-      "flowchart/stress.layout-stress-yfiles-pipeline.pgm",
-      "mindmap/demo.ai-learning-roadmap.pgm",
-      "mindmap/demo.knowledge-map.pgm",
-      "mindmap/demo.product-roadmap.pgm",
-      "mindmap/product.marketing-plan.pgm",
-      "mindmap/product.product-requirements.pgm",
-      "mindmap/product.programming-learning.pgm",
-      "mindmap/product.project-plan.pgm",
-      "mindmap/product.tech-stack.pgm",
-      "mindmap/smoke.brainstorm.pgm",
-      "mindmap/smoke.root-branches.pgm",
-      "mindmap/stress.layout-stress-deep.pgm",
-      "sequence/demo.ai-agent-change-loop.pgm",
-      "sequence/demo.cross-team-incident-escalation.pgm",
-      "sequence/demo.distributed-saga.pgm",
-      "sequence/demo.grpc-service-mesh.pgm",
-      "sequence/demo.iot-device-provisioning.pgm",
-      "sequence/demo.k8s-canary-rollback.pgm",
-      "sequence/demo.k8s-node-failure-recovery.pgm",
-      "sequence/demo.k8s-rolling-update.pgm",
-      "sequence/demo.microservice-checkout.pgm",
-      "sequence/demo.microservice-tracing.pgm",
-      "sequence/demo.real-time-risk-decisioning.pgm",
-      "sequence/demo.video-streaming-session.pgm",
-      "sequence/product.api-call-chain.pgm",
-      "sequence/product.file-upload-s3.pgm",
-      "sequence/product.jwt-refresh-token.pgm",
-      "sequence/product.oauth-login.pgm",
-      "sequence/product.payment-gateway.pgm",
-      "sequence/product.shopping-cart-checkout.pgm",
-      "sequence/product.sms-verification.pgm",
-      "sequence/smoke.ping-pong.pgm",
-      "sequence/smoke.request-response.pgm",
-      "sequence/stress.layout-stress-lifelines.pgm",
-      "state/demo.document-sync-lifecycle.pgm",
-      "state/demo.k8s-node-pressure-lifecycle.pgm",
-      "state/demo.k8s-rollout-state-machine.pgm",
-      "state/demo.service-degradation-lifecycle.pgm",
-      "state/demo.settlement-reconciliation-lifecycle.pgm",
-      "state/demo.tcp-connection.pgm",
-      "state/product.delivery-tracking.pgm",
-      "state/product.document-review.pgm",
-      "state/product.notification-flow.pgm",
-      "state/product.order-lifecycle.pgm",
-      "state/product.payment-flow.pgm",
-      "state/product.subscription-lifecycle.pgm",
-      "state/product.ticket-workflow.pgm",
-      "state/product.user-session.pgm",
-      "state/smoke.on-off.pgm",
-      "state/smoke.traffic-light.pgm",
-      "state/stress.layout-stress-transitions.pgm"
-    ];
-// manifest:end
-
-    const TYPE_LABELS = {
-      architecture: "Architecture",
-      sequence: "Sequence",
-      flowchart: "Flowchart",
-      state: "State",
-      er: "ER",
-      mindmap: "Mindmap"
+    const STATUS_META = {
+      "ok":           { label: "ok", cls: "ok" },
+      "parse-error":  { label: "parse", cls: "parse-error" },
+      "render-error": { label: "render", cls: "render-error" },
     };
-
-    const TYPE_CN = {
-      architecture: "架构图",
-      sequence: "时序图",
-      flowchart: "流程图",
-      state: "状态图",
-      er: "ER 图",
-      mindmap: "思维导图"
-    };
-
-    const TYPE_HIGHLIGHTS = {
-      architecture: "层次化分组 · 跨群组正交布线 · 平台全景拓扑",
-      sequence: "生命线布局 · 跨团队协同 · 消息时序编排",
-      flowchart: "智能正交边路由 · 决策分支 · 泳道流程",
-      state: "状态机转移 · 守卫条件 · 生命周期建模",
-      er: "实体关系建模 · 基数标注 · Schema 可视化",
-      mindmap: "放射式层级布局 · 知识组织 · 分支收敛"
-    };
-
-    // ─── 角色系统（文件名首段即角色）─────────────
-    // 旧前缀 s./n./c./x. 已废弃；UI 由文件名第一段解析角色。
-    const ROLE_LABELS = {
-      smoke: "Smoke",
-      product: "Product",
-      demo: "Demo",
-      stress: "Stress",
-      mech: "Mech"
-    };
-
-    const ROLE_CN = {
-      smoke: "冒烟",
-      product: "产品",
-      demo: "演示",
-      stress: "压力",
-      mech: "机制"
-    };
-
-    const ROLE_ORDER = ["product", "smoke", "demo", "stress", "mech"];
-
-    // 主区角色（chip 列表）：product / smoke / demo
-    const PRIMARY_ROLES = ["product", "smoke", "demo"];
-    // 工程探针（默认折叠）：stress / mech
-    const PROBE_ROLES = ["stress", "mech"];
-
-    // 默认选中的角色集（product + demo；smoke 默认不展示但可勾选）
-    const DEFAULT_ROLES = new Set(["product", "demo"]);
-
-    const FEATURED_FILES = new Set([
-      "state/demo.k8s-rollout-state-machine.pgm",
-      "architecture/demo.ai-agent-docops-pipeline.pgm",
-      "architecture/product.microservices.pgm",
-      "architecture/product.three-tier.pgm",
-      "architecture/product.data-pipeline.pgm",
-      "mindmap/demo.ai-learning-roadmap.pgm",
-      "state/smoke.on-off.pgm",
-      "sequence/product.payment-gateway.pgm"
-    ]);
-
-    const TITLE_OVERRIDES = {
-      "architecture/demo.k8s-multi-namespace-overview.pgm": "K8s 多命名空间生产集群总览",
-      "architecture/demo.k8s-multi-cluster-federation.pgm": "K8s 多集群跨地域拓扑",
-      "architecture/demo.k8s-platform-stack.pgm": "K8s 平台栈与业务工作负载",
-      "architecture/demo.k8s-blue-green-release-topology.pgm": "K8s 蓝绿发布拓扑",
-      "architecture/demo.k8s-tenant-isolation.pgm": "K8s 多租户隔离拓扑",
-      "architecture/demo.hybrid-cloud-dr-topology.pgm": "混合云灾备拓扑",
-      "architecture/demo.data-lineage-platform.pgm": "企业数据血缘平台",
-      "architecture/demo.ai-agent-docops-pipeline.pgm": "AI Agent 文档自动化管线",
-      "architecture/demo.payment-clearing-platform.pgm": "支付清结算平台",
-      "architecture/demo.supply-chain-control-tower.pgm": "供应链控制塔",
-      "architecture/demo.plotgram-core-mod-deps.pgm": "Plotgram 模块依赖结构",
-      "architecture/demo.mcp-server-cluster-architecture.pgm": "MCP Server 集群架构",
-      "architecture/product.typical-microservice-architecture.pgm": "典型微服务架构图",
-      "architecture/product.d2-cell-tower-network.pgm": "D2 对照 · 基站网络拓扑",
-      "architecture/product.cdn-cache.pgm": "CDN 多级缓存架构",
-      "architecture/product.compiler-pipeline.pgm": "编译器流水线",
-      "architecture/product.event-driven.pgm": "事件驱动架构",
-      "architecture/product.unite-config-publish.pgm": "配置统一发布",
-      "architecture/product.cloud-native.pgm": "云原生全栈架构",
-      "architecture/product.ecommerce-platform.pgm": "电商平台全栈架构",
-      "architecture/mech.constrain-cross-group.pgm": "机制 · 跨组约束",
-      "sequence/demo.k8s-rolling-update.pgm": "K8s 滚动发布链路",
-      "sequence/demo.k8s-node-failure-recovery.pgm": "K8s 节点故障恢复链路",
-      "sequence/demo.k8s-canary-rollback.pgm": "K8s 金丝雀回滚链路",
-      "sequence/demo.cross-team-incident-escalation.pgm": "跨团队故障升级协同",
-      "sequence/demo.ai-agent-change-loop.pgm": "AI Agent 变更分析闭环",
-      "sequence/demo.real-time-risk-decisioning.pgm": "实时风控决策链路",
-      "sequence/demo.distributed-saga.pgm": "分布式 Saga 事务",
-      "sequence/demo.microservice-checkout.pgm": "微服务下单结算链路",
-      "sequence/product.api-call-chain.pgm": "API 调用链",
-      "sequence/product.oauth-login.pgm": "OAuth 第三方登录",
-      "sequence/product.payment-gateway.pgm": "支付网关交互",
-      "flowchart/demo.aml-case-investigation.pgm": "反洗钱案件调查流程",
-      "flowchart/demo.caffe-shop.pgm": "咖啡馆点单流程",
-      "flowchart/demo.change-approval-workflow.pgm": "生产变更审批流程",
-      "flowchart/demo.ci-cd-security-pipeline.pgm": "CI/CD 安全流水线",
-      "flowchart/demo.customer-refund-process.pgm": "客户退款流程",
-      "flowchart/demo.e-commerce-order-fulfillment.pgm": "电商订单履约流程",
-      "flowchart/demo.k8s-incident-response.pgm": "K8s 生产集群故障响应流程",
-      "flowchart/demo.pr-architecture-review.pgm": "PR 架构评审流程",
-      "flowchart/demo.software-release.pgm": "软件发布流程",
-      "flowchart/product.swimlane-order-process.pgm": "泳道订单流程",
-      "flowchart/product.user-auth.pgm": "用户认证流程",
-      "flowchart/product.order-approval.pgm": "订单审批流程",
-      "flowchart/product.refund-process.pgm": "退款流程",
-      "flowchart/product.employee-onboarding.pgm": "员工入职流程",
-      "flowchart/product.linear-chain.pgm": "线性链",
-      "flowchart/mech.constrain-sink.pgm": "机制 · Sink 约束",
-      "state/demo.k8s-rollout-state-machine.pgm": "K8s 发布状态机",
-      "state/demo.k8s-node-pressure-lifecycle.pgm": "K8s 节点压力与恢复状态机",
-      "state/demo.service-degradation-lifecycle.pgm": "服务降级生命周期",
-      "state/demo.document-sync-lifecycle.pgm": "文档同步生命周期",
-      "state/demo.settlement-reconciliation-lifecycle.pgm": "清结算对账生命周期",
-      "state/demo.tcp-connection.pgm": "TCP 连接状态机",
-      "state/product.order-lifecycle.pgm": "订单生命周期",
-      "state/product.user-session.pgm": "用户会话",
-      "state/product.payment-flow.pgm": "支付流程",
-      "state/product.ticket-workflow.pgm": "工单工作流",
-      "state/product.notification-flow.pgm": "通知流程",
-      "er/demo.ecommerce-schema.pgm": "电商 Schema",
-      "er/demo.hospital-system.pgm": "医院信息系统 Schema",
-      "er/demo.library-management.pgm": "图书馆管理 Schema",
-      "er/product.saas-schema.pgm": "SaaS 多租户 Schema",
-      "er/product.blog-schema.pgm": "博客 Schema",
-      "er/product.school-schema.pgm": "学校 Schema",
-      "er/product.social-network.pgm": "社交网络 Schema",
-      "mindmap/demo.ai-learning-roadmap.pgm": "AI 学习路线",
-      "mindmap/demo.knowledge-map.pgm": "知识地图",
-      "mindmap/demo.product-roadmap.pgm": "产品路线图",
-      "mindmap/product.tech-stack.pgm": "技术栈",
-      "mindmap/product.project-plan.pgm": "项目计划",
-      "mindmap/product.programming-learning.pgm": "编程学习大纲"
-    };
-
-    function humanizeSlug(slug) {
-      return slug
-        .replace(/-/g, " ")
-        .replace(/\b\w/g, (ch) => ch.toUpperCase());
-    }
-
-    function deriveTags(path) {
-      const tags = new Set();
-      const lower = path.toLowerCase();
-
-      if (lower.includes("k8s")) tags.add("K8s");
-      if (lower.includes("cluster")) tags.add("平台工程");
-      if (lower.includes("rollout") || lower.includes("rollback") || lower.includes("release") || lower.includes("canary") || lower.includes("blue-green")) tags.add("发布治理");
-      if (lower.includes("incident") || lower.includes("failure") || lower.includes("degradation") || lower.includes("pressure")) tags.add("稳定性");
-      if (lower.includes("tenant") || lower.includes("hybrid-cloud") || lower.includes("approval")) tags.add("合规");
-      if (lower.includes("ai-agent") || lower.includes("pr-architecture") || lower.includes("document-sync") || lower.includes("docops")) tags.add("AI Agent");
-      if (lower.includes("data-lineage") || lower.includes("data-pipeline")) tags.add("数据治理");
-      if (lower.includes("payment") || lower.includes("settlement") || lower.includes("aml") || lower.includes("risk")) tags.add("金融");
-      if (lower.includes("supply-chain")) tags.add("供应链");
-      if (lower.includes("mindmap")) tags.add("知识组织");
-      if (lower.includes("layout-stress")) tags.add("布局压力");
-      if (lower.includes("ecommerce")) tags.add("电商");
-      if (lower.includes("microservice")) tags.add("微服务");
-      if (lower.includes("compiler")) tags.add("工程系统");
-      if (lower.includes("oauth") || lower.includes("auth")) tags.add("认证");
-      if (lower.includes("social-network") || lower.includes("blog") || lower.includes("school")) tags.add("业务建模");
-
-      if (!tags.size) tags.add("通用");
-      return Array.from(tags);
-    }
-
-    const samples = SAMPLE_PATHS.map((path) => {
-      const [type, file] = path.split("/");
-      // 文件名首段即角色：{role}.{slug}.pgm
-      const [role, ...slugParts] = file.replace(".pgm", "").split(".");
-      const slug = slugParts.join(".");
-      const title = TITLE_OVERRIDES[path] || humanizeSlug(slug);
-      const svgPath = path.replace(/\.pgm$/, ".svg");
-      const tags = deriveTags(path);
-      return {
-        path,
-        svgPath,
-        type,
-        typeLabel: TYPE_LABELS[type] || type,
-        typeCn: TYPE_CN[type] || type,
-        role,
-        roleLabel: ROLE_LABELS[role] || role.toUpperCase(),
-        roleCn: ROLE_CN[role] || role,
-        slug,
-        title,
-        tags,
-        featured: FEATURED_FILES.has(path),
-        highlight: TYPE_HIGHLIGHTS[type] || ""
-      };
-    });
+    const ROLE_ORDER = ["smoke", "product", "demo", "stress", "mech"];
+    const STATUS_ORDER = ["ok", "parse-error", "render-error", "changed"];
+    const FACET_ORDER = ["flat", "group", "partition", "plain", "compound", "fragment", "single", "components"];
 
     const state = {
+      manifest: null,
+      layout: new Set(),
+      facet: new Set(),
+      role: new Set(),
+      status: new Set(),
       search: "",
-      type: "all",
-      // 多选角色集；默认 product + demo（主区）
-      roles: new Set(DEFAULT_ROLES),
-      tag: "all",
-      mode: "gallery",
-      detailIndex: -1
+      view: "grid",
+      filtered: [],
+      lbIndex: -1,
+      scale: 1, tx: 0, ty: 0, isFit: true,
+      hintTimer: null,
     };
 
-    // ─── DOM 引用 ─────────────────────────────
-    const topbarStats = document.getElementById("topbarStats");
-    const typeFilters = document.getElementById("typeFilters");
-    const roleFilters = document.getElementById("roleFilters");
-    const probeFilters = document.getElementById("probeFilters");
-    const tagFilters = document.getElementById("tagFilters");
-    const typeFilterCount = document.getElementById("typeFilterCount");
-    const roleFilterCount = document.getElementById("roleFilterCount");
-    const probeFilterCount = document.getElementById("probeFilterCount");
-    const tagFilterCount = document.getElementById("tagFilterCount");
-    const galleryGrid = document.getElementById("galleryGrid");
-    const resultTitle = document.getElementById("resultTitle");
-    const resultMeta = document.getElementById("resultMeta");
-    const activeFilters = document.getElementById("activeFilters");
-    const emptyState = document.getElementById("emptyState");
-    const searchInput = document.getElementById("searchInput");
-    const content = document.getElementById("content");
-    const backBtn = document.getElementById("backBtn");
-    const detailTitle = document.getElementById("detailTitle");
-    const detailPath = document.getElementById("detailPath");
-    const detailPrev = document.getElementById("detailPrev");
-    const detailNext = document.getElementById("detailNext");
-    const detailCounter = document.getElementById("detailCounter");
-    const detailOpenEditor = document.getElementById("detailOpenEditor");
-    const detailOpenSvg = document.getElementById("detailOpenSvg");
-    const detailOpenDsl = document.getElementById("detailOpenDsl");
-    const detailViz = document.getElementById("detailViz");
-    const detailVizTag = document.getElementById("detailVizTag");
-    const detailCode = document.getElementById("detailCode");
-    const detailHighlightText = document.getElementById("detailHighlightText");
-    const copyCodeBtn = document.getElementById("copyCode");
-    const lightbox = document.getElementById("lightbox");
-    const lightboxClose = document.getElementById("lightboxClose");
-    const lightboxImg = document.getElementById("lightboxImg");
-    const lbZoomOut = document.getElementById("lbZoomOut");
-    const lbZoomIn = document.getElementById("lbZoomIn");
-    const lbZoomFit = document.getElementById("lbZoomFit");
-    const lbZoom1 = document.getElementById("lbZoom1");
-    const lbZoomPct = document.getElementById("lbZoomPct");
-    const fullVizBtn = document.getElementById("fullVizBtn");
-    const detailBody = document.querySelector(".detail-body");
+    const $ = (id) => document.getElementById(id);
+    const grid = $("grid");
 
-    let currentVisibleSamples = [];
-    let dslCodeCache = {};
-
-    // ─── 渲染：顶栏统计 ───────────────────────
-    function renderTopbarStats() {
-      const total = samples.length;
-      const featured = samples.filter((s) => s.featured).length;
-      const types = new Set(samples.map((s) => s.type)).size;
-      const productCount = samples.filter((s) => s.role === "product").length;
-      const demoCount = samples.filter((s) => s.role === "demo").length;
-      const stressCount = samples.filter((s) => s.role === "stress").length;
-      const mechCount = samples.filter((s) => s.role === "mech").length;
-      topbarStats.textContent = `${total} 个示例 · ${featured} 精选 · ${types} 种图类型 · product ${productCount} / demo ${demoCount} / stress ${stressCount} / mech ${mechCount}`;
-    }
-
-    // ─── 渲染：筛选器 ─────────────────────────
-    function countBy(items, getter) {
-      return items.reduce((acc, item) => {
-        const key = getter(item);
-        acc[key] = (acc[key] || 0) + 1;
-        return acc;
-      }, {});
-    }
-
-    function createChip(label, value, group, count) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "chip";
-      if (state[group] === value) btn.classList.add("active");
-      btn.innerHTML = `<span>${label}</span>${typeof count === "number" ? `<small>${count}</small>` : ""}`;
-      btn.addEventListener("click", () => {
-        state[group] = value;
-        if (state.mode === "detail") showGallery();
-        renderFilters();
-        renderCards();
-      });
-      return btn;
-    }
-
-    function createRoleChip(label, role, count, dim) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "chip";
-      if (state.roles.has(role)) btn.classList.add("active");
-      if (dim) btn.classList.add("muted");
-      btn.innerHTML = `<span>${label}</span>${typeof count === "number" ? `<small>${count}</small>` : ""}`;
-      btn.addEventListener("click", () => {
-        if (state.roles.has(role)) {
-          // 不允许清空：至少留一个角色
-          if (state.roles.size > 1) state.roles.delete(role);
-        } else {
-          state.roles.add(role);
+    function parseHash() {
+      const h = location.hash.replace(/^#/, "");
+      state.layout.clear();
+      state.facet.clear();
+      state.role.clear();
+      state.status.clear();
+      state.search = "";
+      state.view = "grid";
+      if (h) {
+        const params = new URLSearchParams(h);
+        for (const [k, set] of [
+          ["layout", state.layout],
+          ["facet", state.facet],
+          ["role", state.role],
+          ["status", state.status],
+        ]) {
+          const v = params.get(k);
+          if (v) v.split(",").filter(Boolean).forEach((x) => set.add(x));
         }
-        if (state.mode === "detail") showGallery();
-        renderFilters();
-        renderCards();
-      });
-      return btn;
-    }
-
-    function renderFilters() {
-      const typeCounts = countBy(samples, (s) => s.type);
-      const roleCounts = countBy(samples, (s) => s.role);
-      const tagCounts = countBy(samples.flatMap((s) => s.tags), (t) => t);
-
-      // ── 图类型筛选 ──
-      typeFilters.innerHTML = "";
-      typeFilters.appendChild(createChip("全部", "all", "type", samples.length));
-      Object.keys(TYPE_LABELS).forEach((type) => {
-        if (typeCounts[type]) {
-          typeFilters.appendChild(createChip(TYPE_LABELS[type], type, "type", typeCounts[type]));
-        }
-      });
-      typeFilterCount.textContent = state.type === "all" ? "" : TYPE_LABELS[state.type];
-
-      // ── 角色筛选（主区：product / smoke / demo）──
-      roleFilters.innerHTML = "";
-      PRIMARY_ROLES.forEach((role) => {
-        // smoke 默认不展示但放在主区供用户勾选
-        const count = roleCounts[role] || 0;
-        roleFilters.appendChild(createRoleChip(ROLE_LABELS[role], role, count, !state.roles.has(role)));
-      });
-      const activeRoles = Array.from(state.roles).sort((a, b) => ROLE_ORDER.indexOf(a) - ROLE_ORDER.indexOf(b));
-      roleFilterCount.textContent = state.roles.size === ROLE_ORDER.length ? "全部" : activeRoles.map((r) => ROLE_LABELS[r]).join("·");
-
-      // ── 工程探针（stress / mech）──
-      probeFilters.innerHTML = "";
-      PROBE_ROLES.forEach((role) => {
-        const count = roleCounts[role] || 0;
-        probeFilters.appendChild(createRoleChip(ROLE_LABELS[role], role, count, !state.roles.has(role)));
-      });
-      const activeProbes = PROBE_ROLES.filter((r) => state.roles.has(r));
-      probeFilterCount.textContent = activeProbes.length === 0 ? "隐藏" : activeProbes.map((r) => ROLE_LABELS[r]).join("·");
-      // 自动展开工程探针折叠区（如果用户已勾选其中任一角色）
-      const probeDetails = document.getElementById("probeDetails");
-      if (probeDetails && activeProbes.length > 0) probeDetails.open = true;
-
-      // ── 场景标签 ──
-      tagFilters.innerHTML = "";
-      tagFilters.appendChild(createChip("全部", "all", "tag", samples.length));
-      Object.entries(tagCounts)
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh-CN"))
-        .forEach(([tag, count]) => {
-          tagFilters.appendChild(createChip(tag, tag, "tag", count));
-        });
-      tagFilterCount.textContent = state.tag === "all" ? "" : state.tag;
-    }
-
-    function renderActiveFilters() {
-      const filters = [];
-      if (state.type !== "all") filters.push(`类型: ${TYPE_LABELS[state.type]}`);
-      const roleArr = Array.from(state.roles).sort((a, b) => ROLE_ORDER.indexOf(a) - ROLE_ORDER.indexOf(b));
-      if (state.roles.size !== ROLE_ORDER.length) {
-        filters.push(`角色: ${roleArr.map((r) => ROLE_LABELS[r]).join("·")}`);
+        state.search = params.get("q") || "";
+        state.view = params.get("view") === "list" ? "list" : "grid";
       }
-      if (state.tag !== "all") filters.push(`标签: ${state.tag}`);
-      if (state.search.trim()) filters.push(`关键词: ${state.search.trim()}`);
-
-      activeFilters.innerHTML = filters.length
-        ? filters.map((f) => `<span class="active-filter">${f}</span>`).join("")
-        : '<span class="active-filter muted">未启用筛选</span>';
+      $("search").value = state.search;
     }
 
-    // ─── 筛选与排序 ───────────────────────────
-    function matches(sample) {
-      const haystack = [sample.title, sample.path, sample.typeLabel, sample.typeCn, sample.roleLabel, sample.roleCn, ...sample.tags]
-        .join(" ")
-        .toLowerCase();
-      const keyword = state.search.trim().toLowerCase();
+    function applyHashToUi() {
+      if (!state.manifest) return;
+      parseHash();
+      syncViewSeg();
+      buildFilters();
+      renderAll();
+    }
 
-      if (keyword && !haystack.includes(keyword)) return false;
-      if (state.type !== "all" && sample.type !== state.type) return false;
-      if (!state.roles.has(sample.role)) return false;
-      if (state.tag !== "all" && !sample.tags.includes(state.tag)) return false;
+    function writeHash() {
+      const params = new URLSearchParams();
+      const put = (k, set) => { if (set.size) params.set(k, [...set].sort().join(",")); };
+      put("layout", state.layout);
+      put("facet", state.facet);
+      put("role", state.role);
+      put("status", state.status);
+      if (state.search) params.set("q", state.search);
+      if (state.view !== "grid") params.set("view", state.view);
+      const s = params.toString();
+      const next = s ? `#${s}` : "#";
+      if (location.hash !== next && !(location.hash === "" && next === "#")) {
+        history.replaceState(null, "", next === "#" ? location.pathname + location.search : next);
+      }
+    }
+
+    window.addEventListener("hashchange", () => {
+      if (!state.manifest) return;
+      applyHashToUi();
+    });
+
+    async function loadManifest() {
+      try {
+        const r = await fetch("_out/manifest.json", { cache: "no-cache" });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        state.manifest = await r.json();
+        for (const s of state.manifest.samples) {
+          if (s.facet === undefined) s.facet = facetFromPath(s.path);
+        }
+      } catch (e) {
+        grid.innerHTML = `<div class="empty">无法加载 <code>_out/manifest.json</code>。<br>请先运行 <code>./showcase/render.sh --serve</code>。<br><br><small>${e}</small></div>`;
+        return;
+      }
+      applyHashToUi();
+    }
+
+    function facetFromPath(path) {
+      const parts = path.split("/");
+      return parts.length >= 3 ? parts[1] : null;
+    }
+
+    function sortKeys(keys, order) {
+      return [...keys].sort((a, b) => {
+        const ia = order.indexOf(a), ib = order.indexOf(b);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || String(a).localeCompare(b);
+      });
+    }
+
+    function layoutScopedSamples() {
+      return state.manifest.samples.filter((s) =>
+        !state.layout.size || state.layout.has(s.layout)
+      );
+    }
+
+    function buildFilters() {
+      const samples = state.manifest.samples;
+      const layouts = new Map();
+      const roles = new Map();
+      const statuses = new Map();
+      for (const s of samples) {
+        layouts.set(s.layout, (layouts.get(s.layout) || 0) + 1);
+        roles.set(s.role, (roles.get(s.role) || 0) + 1);
+        statuses.set(s.status, (statuses.get(s.status) || 0) + 1);
+        if (s.changed) statuses.set("changed", (statuses.get("changed") || 0) + 1);
+      }
+      renderChips("layout-chips", state.layout, sortKeys(layouts.keys(), [...layouts.keys()].sort()), layouts);
+      renderChips("role-chips", state.role, sortKeys(roles.keys(), ROLE_ORDER), roles);
+      renderChips("status-chips", state.status, STATUS_ORDER.filter((k) => statuses.has(k)), statuses, (k) =>
+        k === "changed" ? "changed" : (STATUS_META[k]?.label || k)
+      );
+      rebuildFacetChips();
+    }
+
+    function rebuildFacetChips() {
+      const scoped = layoutScopedSamples();
+      const facets = new Map();
+      for (const s of scoped) {
+        if (s.facet) facets.set(s.facet, (facets.get(s.facet) || 0) + 1);
+      }
+      const block = $("facet-block");
+      if (!facets.size) {
+        block.hidden = true;
+        state.facet.clear();
+        return;
+      }
+      block.hidden = false;
+      // drop facet selections that are no longer visible
+      for (const f of [...state.facet]) {
+        if (!facets.has(f)) state.facet.delete(f);
+      }
+      renderChips("facet-chips", state.facet, sortKeys(facets.keys(), FACET_ORDER), facets);
+    }
+
+    function renderChips(containerId, activeSet, keys, counts, labelFn) {
+      const el = $(containerId);
+      el.innerHTML = "";
+      for (const k of keys) {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "chip" + (activeSet.has(k) ? " active" : "");
+        const label = labelFn ? labelFn(k) : k;
+        chip.innerHTML = `${label}<span class="n">${counts.get(k) || 0}</span>`;
+        chip.onclick = () => {
+          if (activeSet.has(k)) activeSet.delete(k);
+          else activeSet.add(k);
+          if (containerId === "layout-chips") rebuildFacetChips();
+          else renderChips(containerId, activeSet, keys, counts, labelFn);
+          renderAll();
+        };
+        el.appendChild(chip);
+      }
+    }
+
+    function matchesFilters(s) {
+      if (state.layout.size && !state.layout.has(s.layout)) return false;
+      if (state.facet.size && !state.facet.has(s.facet || "")) return false;
+      if (state.role.size && !state.role.has(s.role)) return false;
+      if (state.status.size) {
+        let ok = false;
+        for (const st of state.status) {
+          if (st === "changed") { if (s.changed) ok = true; }
+          else if (s.status === st) ok = true;
+        }
+        if (!ok) return false;
+      }
+      if (state.search) {
+        const q = state.search.toLowerCase();
+        if (!s.path.toLowerCase().includes(q)) return false;
+      }
       return true;
     }
 
-    function sortSamples(items) {
-      return items.sort((a, b) => {
-        if (a.featured !== b.featured) return a.featured ? -1 : 1;
-        // 角色优先级：product < smoke < demo < stress < mech
-        const ra = ROLE_ORDER.indexOf(a.role);
-        const rb = ROLE_ORDER.indexOf(b.role);
-        if (ra !== rb) return ra - rb;
-        if (a.type !== b.type) return a.type.localeCompare(b.type);
-        return a.title.localeCompare(b.title, "zh-CN");
-      });
+    function renderStats() {
+      const subs = layoutScopedSamples();
+      const total = subs.length;
+      const pe = subs.filter((s) => s.status === "parse-error").length;
+      const re = subs.filter((s) => s.status === "render-error").length;
+      const changed = subs.filter((s) => s.changed).length;
+      const fail = pe + re;
+      $("stats").innerHTML = `
+        <div class="stat"><b>${total}</b><span>样例</span></div>
+        <div class="stat${fail ? " bad" : ""}"><b>${fail}</b><span>失败</span></div>
+        <div class="stat${pe ? " warn" : ""}"><b>${pe}</b><span>parse</span></div>
+        <div class="stat${changed ? " changed" : ""}"><b>${changed}</b><span>变化</span></div>
+      `;
+      const ts = state.manifest.generated_at || "";
+      const hash = (state.manifest.binary_hash || "").slice(0, 8);
+      $("meta-foot").textContent = `${hash || "—"}\n${ts}`;
     }
 
-    // ─── 渲染：卡片网格 ───────────────────────
-    function renderCards() {
-      const visible = sortSamples(samples.filter(matches));
-      currentVisibleSamples = visible;
-      const featuredVisible = visible.filter((s) => s.featured).length;
-      const filtering = state.search || state.type !== "all" || state.roles.size !== ROLE_ORDER.length || state.tag !== "all";
-
-      resultTitle.textContent = filtering ? "筛选结果" : "全部示例";
-      resultMeta.textContent = `共 ${visible.length} 个示例${featuredVisible ? `，其中 ${featuredVisible} 个精选` : ""}。点击任意卡片查看「可视化 ↔ DSL」对照。`;
-      renderActiveFilters();
-
-      galleryGrid.innerHTML = "";
-      emptyState.style.display = visible.length ? "none" : "block";
-
-      visible.forEach((sample) => {
-        const card = document.createElement("article");
-        card.className = "card";
-        if (sample.featured) card.dataset.featured = "true";
-
-        const tagsMarkup = sample.tags.slice(0, 3).map((t) => `<span class="tag-pill">${t}</span>`).join("");
-
-        card.innerHTML = `
-          <div class="card-preview">
-            ${sample.featured ? '<span class="card-featured-badge">精选</span>' : ""}
-            <img src="${assetUrl(sample.svgPath)}" alt="${sample.title}" loading="lazy" />
-          </div>
-          <div class="card-body">
-            <div class="card-top">
-              <div>
-                <h3 class="card-title">${sample.title}</h3>
-                <p class="card-path">${sample.typeCn} · ${sample.roleCn}</p>
-              </div>
-              <span class="role-badge ${sample.role}">${sample.roleLabel}</span>
-            </div>
-            <div class="tag-row">${tagsMarkup}</div>
-            <span class="card-cta">查看可视化 ↔ DSL →</span>
-          </div>
-        `;
-
-        const img = card.querySelector("img");
-        img.addEventListener("error", () => {
-          img.alt = `${sample.title} (SVG not found)`;
-          img.src =
-            "data:image/svg+xml;utf8," +
-            encodeURIComponent(`
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480">
-                <rect width="800" height="480" rx="20" fill="#f8fafc"/>
-                <rect x="24" y="24" width="752" height="432" rx="16" fill="#ffffff" stroke="#cbd5e1" stroke-dasharray="8 8"/>
-                <text x="50%" y="46%" text-anchor="middle" font-size="26" font-family="Arial, sans-serif" fill="#0f172a">SVG not found</text>
-                <text x="50%" y="56%" text-anchor="middle" font-size="16" font-family="Arial, sans-serif" fill="#64748b">${sample.svgPath}</text>
-              </svg>
-            `);
-        });
-
-        card.addEventListener("click", () => {
-          const idx = currentVisibleSamples.indexOf(sample);
-          openDetail(idx);
-        });
-
-        galleryGrid.appendChild(card);
-      });
-    }
-
-    // ─── DSL 语法高亮（轻量自实现） ───────────
-    const PG_KEYWORDS = new Set(["diagram", "entity", "group", "relation", "node_style", "edge_style", "meta"]);
-    const PG_TYPES = new Set(["flowchart", "sequence", "architecture", "state", "er", "mindmap"]);
-    const PG_BOOLS = new Set(["true", "false"]);
-
-    function escapeHtml(s) {
-      return s
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-    }
-
-    function highlightPgm(code) {
-      // 逐行处理：注释整行、字符串单行；其余按 token 切分
-      const lines = code.split("\n");
-      const outLines = [];
-
-      for (const line of lines) {
-        let i = 0;
-        let html = "";
-        const n = line.length;
-
-        while (i < n) {
-          const rest = line.slice(i);
-
-          // 空白
-          const ws = /^[ \t]+/.exec(rest);
-          if (ws) { html += ws[0]; i += ws[0].length; continue; }
-
-          // 注释
-          if (rest.startsWith("//")) {
-            html += `<span class="tok-comment">${escapeHtml(rest)}</span>`;
-            i = n;
-            continue;
-          }
-
-          // 字符串
-          if (rest[0] === '"') {
-            const m = /^"(?:[^"\\]|\\.)*"?/.exec(rest);
-            const txt = m ? m[0] : '"';
-            html += `<span class="tok-string">${escapeHtml(txt)}</span>`;
-            i += txt.length;
-            continue;
-          }
-
-          // 箭头（先匹配多字符）
-          const arr = /^(?:<->|-->|->)/.exec(rest);
-          if (arr) {
-            html += `<span class="tok-arrow">${escapeHtml(arr[0])}</span>`;
-            i += arr[0].length;
-            continue;
-          }
-
-          // 数字
-          const num = /^-?\d+(?:\.\d+)?/.exec(rest);
-          if (num) {
-            html += `<span class="tok-number">${escapeHtml(num[0])}</span>`;
-            i += num[0].length;
-            continue;
-          }
-
-          // 括号
-          if (/^[{}[\]()]/.test(rest[0])) {
-            html += `<span class="tok-bracket">${escapeHtml(rest[0])}</span>`;
-            i += 1;
-            continue;
-          }
-
-          // 标点
-          if (/^[:,]/.test(rest[0])) {
-            html += `<span class="tok-bracket">${escapeHtml(rest[0])}</span>`;
-            i += 1;
-            continue;
-          }
-
-          // 标识符
-          const id = /^[A-Za-z_]\w*/.exec(rest);
-          if (id) {
-            const word = id[0];
-            const after = rest.slice(word.length);
-            const isProp = /^\s*:/.test(after);
-            let cls;
-            if (isProp) cls = "tok-property";
-            else if (PG_KEYWORDS.has(word)) cls = "tok-keyword";
-            else if (PG_TYPES.has(word)) cls = "tok-type";
-            else if (PG_BOOLS.has(word)) cls = "tok-bool";
-            else cls = "tok-ident";
-            html += `<span class="${cls}">${escapeHtml(word)}</span>`;
-            i += word.length;
-            continue;
-          }
-
-          // 其他字符直接输出
-          html += escapeHtml(rest[0]);
-          i += 1;
-        }
-
-        outLines.push(html || " ");
-      }
-
-      // 生成带行号的 HTML
-      return outLines
-        .map((lc) => `<div class="code-line"><span class="lc">${lc}</span></div>`)
-        .join("");
-    }
-
-    async function loadDsl(sample) {
-      const path = assetUrl(sample.path);
-      if (dslCodeCache[path]) return dslCodeCache[path];
-      const response = await fetch(path, { cache: "no-cache" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const text = await response.text();
-      dslCodeCache[path] = text;
-      return text;
-    }
-
-    // ─── 详情视图 ─────────────────────────────
-    function showGallery() {
-      state.mode = "gallery";
-      content.dataset.mode = "gallery";
-      state.detailIndex = -1;
-      // 回到画廊时滚动到顶部内容区
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-
-    function openDetail(index) {
-      if (index < 0 || index >= currentVisibleSamples.length) return;
-      state.mode = "detail";
-      state.detailIndex = index;
-      content.dataset.mode = "detail";
-      renderDetail();
-      content.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-
-    function renderDetail() {
-      const sample = currentVisibleSamples[state.detailIndex];
-      if (!sample) return;
-
-      detailTitle.textContent = sample.title;
-      detailPath.textContent = `${sample.path} · ${sample.typeCn} · ${sample.roleCn}`;
-      detailVizTag.textContent = `${sample.typeLabel} / ${sample.roleLabel}`;
-
-      detailHighlightText.innerHTML = `<strong>${sample.typeCn}能力</strong> · ${sample.highlight}${sample.featured ? ' · <strong style="color:var(--blue)">精选案例</strong>' : ""}`;
-
-      // 可视化
-      detailViz.innerHTML = `<img src="${assetUrl(sample.svgPath)}" alt="${sample.title}" />`;
-      const img = detailViz.querySelector("img");
-      img.addEventListener("error", () => {
-        detailViz.innerHTML = `<div class="viz-placeholder">SVG 加载失败：${escapeHtml(sample.svgPath)}</div>`;
-      });
-      img.addEventListener("click", () => {
-        openLightbox(assetUrl(sample.svgPath), sample.title);
-      });
-
-      // DSL
-      detailCode.innerHTML = '<div class="code-loading">加载 DSL 源码...</div>';
-      loadDsl(sample)
-        .then((code) => {
-          detailCode.innerHTML = `<pre class="code-listing">${highlightPgm(code)}</pre>`;
-        })
-        .catch((err) => {
-          detailCode.innerHTML = `<div class="code-error">DSL 源码加载失败：${escapeHtml(String(err))}<br><br>路径：${escapeHtml(sample.path)}</div>`;
-        });
-
-      // 链接
-      detailOpenEditor.href = buildEditorHref(sample.path);
-      detailOpenSvg.href = assetUrl(sample.svgPath);
-      detailOpenDsl.href = assetUrl(sample.path);
-
-      // 导航按钮
-      detailPrev.disabled = state.detailIndex <= 0;
-      detailNext.disabled = state.detailIndex >= currentVisibleSamples.length - 1;
-      detailCounter.textContent = `${state.detailIndex + 1} / ${currentVisibleSamples.length}`;
-
-      copyCodeBtn.classList.remove("copied");
-      copyCodeBtn.textContent = "复制代码";
-    }
-
-    function navigateDetail(direction) {
-      const next = state.detailIndex + direction;
-      if (next < 0 || next >= currentVisibleSamples.length) return;
-      state.detailIndex = next;
-      renderDetail();
-    }
-
-    // ─── 复制代码 ─────────────────────────────
-    copyCodeBtn.addEventListener("click", async () => {
-      const sample = currentVisibleSamples[state.detailIndex];
-      if (!sample) return;
-      try {
-        const code = dslCodeCache[assetUrl(sample.path)] || "";
-        if (!code) return;
-        await navigator.clipboard.writeText(code);
-        copyCodeBtn.classList.add("copied");
-        copyCodeBtn.textContent = "已复制 ✓";
-        setTimeout(() => {
-          copyCodeBtn.classList.remove("copied");
-          copyCodeBtn.textContent = "复制代码";
-        }, 1800);
-      } catch {
-        copyCodeBtn.textContent = "复制失败";
-        setTimeout(() => { copyCodeBtn.textContent = "复制代码"; }, 1800);
-      }
-    });
-
-    // ─── 事件绑定 ─────────────────────────────
-    searchInput.addEventListener("input", (e) => {
-      state.search = e.target.value;
-      if (state.mode === "detail") showGallery();
-      renderCards();
-    });
-
-    document.getElementById("resetFilters").addEventListener("click", () => {
-      state.search = "";
-      state.type = "all";
-      state.roles = new Set(DEFAULT_ROLES);
-      state.tag = "all";
-      searchInput.value = "";
-      if (state.mode === "detail") showGallery();
-      renderAll();
-    });
-
-    document.getElementById("scrollFeatured").addEventListener("click", () => {
-      if (state.mode !== "gallery") {
-        showGallery();
-        renderAll();
-      }
-      // 滚动到第一个精选卡片
-      setTimeout(() => {
-        const firstFeatured = document.querySelector('[data-featured="true"]');
-        if (firstFeatured) {
-          firstFeatured.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }, 50);
-    });
-
-    backBtn.addEventListener("click", showGallery);
-    detailPrev.addEventListener("click", () => navigateDetail(-1));
-    detailNext.addEventListener("click", () => navigateDetail(1));
-
-    document.addEventListener("keydown", (e) => {
-      if (lightbox.classList.contains("open")) {
-        if (e.key === "Escape") closeLightbox();
+    function renderGrid() {
+      const samples = state.manifest.samples.filter(matchesFilters);
+      state.filtered = samples;
+      $("result-count").innerHTML = `显示 <b>${samples.length}</b> / ${state.manifest.samples.length}`;
+      grid.className = "grid" + (state.view === "list" ? " compact" : "");
+      grid.innerHTML = "";
+      if (!samples.length) {
+        grid.innerHTML = `<div class="empty">无匹配样例。<br><button class="linkish" id="emptyClear" type="button">清除筛选</button></div>`;
+        const ec = $("emptyClear");
+        if (ec) ec.onclick = clearAll;
         return;
       }
-      if (state.mode !== "detail") return;
-      if (e.key === "Escape") showGallery();
-      if (e.key === "ArrowLeft") navigateDetail(-1);
-      if (e.key === "ArrowRight") navigateDetail(1);
-    });
+      const compact = state.view === "list";
+      samples.forEach((s, i) => {
+        const card = document.createElement("article");
+        card.className = "card" + (s.changed ? " changed" : "") + (compact ? " compact-row" : "");
+        card.style.animationDelay = Math.min(i, 24) * 12 + "ms";
 
-    function renderAll() {
-      renderFilters();
-      renderCards();
+        if (!compact) {
+          const thumb = document.createElement("div");
+          thumb.className = "thumb";
+          if (s.status === "ok" && s.svg) {
+            const img = document.createElement("img");
+            img.src = s.svg;
+            img.alt = s.path;
+            img.loading = "lazy";
+            img.decoding = "async";
+            thumb.appendChild(img);
+          } else {
+            const ph = document.createElement("div");
+            ph.className = "ph err";
+            ph.textContent = s.error ? s.error.slice(0, 180) : "无 SVG";
+            thumb.appendChild(ph);
+          }
+          card.appendChild(thumb);
+        }
+
+        const body = document.createElement("div");
+        body.className = "card-body";
+        const top = document.createElement("div");
+        top.className = "card-top";
+        const name = document.createElement("div");
+        name.className = "card-name";
+        name.textContent = s.path.split("/").pop();
+        top.appendChild(name);
+
+        const badges = document.createElement("div");
+        badges.className = "badges";
+        const sm = STATUS_META[s.status] || STATUS_META["render-error"];
+        badges.innerHTML = `<span class="badge ${sm.cls}">${sm.label}</span>`;
+        if (s.facet) badges.innerHTML += `<span class="badge facet">${s.facet}</span>`;
+        badges.innerHTML += `<span class="badge role">${s.role}</span>`;
+        if (s.changed) badges.innerHTML += `<span class="badge changed">Δ</span>`;
+        top.appendChild(badges);
+        body.appendChild(top);
+
+        const pathEl = document.createElement("div");
+        pathEl.className = "card-path";
+        pathEl.textContent = s.path;
+        pathEl.title = s.path;
+        body.appendChild(pathEl);
+        card.appendChild(body);
+
+        card.onclick = () => openLightbox(s.path);
+        grid.appendChild(card);
+      });
     }
 
-    // ─── 图片灯箱（滚轮缩放 + 拖拽平移）─────────
-    let lbScale = 1;
-    let lbPanX = 0, lbPanY = 0;
-    let lbStartX = 0, lbStartY = 0, lbPanStartX = 0, lbPanStartY = 0;
-    let lbDragging = false;
-    let lbImgNaturalW = 0, lbImgNaturalH = 0;
+    function renderAll() {
+      writeHash();
+      renderStats();
+      renderGrid();
+    }
 
-    function openLightbox(src, alt) {
-      lightboxImg.src = src;
-      lightboxImg.alt = alt;
-      lightbox.classList.add("open");
-      lightbox.setAttribute("aria-hidden", "false");
-      document.body.style.overflow = "hidden";
-      lightboxImg.onload = () => { requestAnimationFrame(() => lbFitToScreen()); };
-      if (lightboxImg.complete) requestAnimationFrame(() => lbFitToScreen());
+    function clearAll() {
+      state.layout.clear(); state.facet.clear(); state.role.clear(); state.status.clear();
+      state.search = "";
+      $("search").value = "";
+      buildFilters();
+      renderAll();
+    }
+
+    function syncViewSeg() {
+      for (const btn of $("view-seg").querySelectorAll("button")) {
+        btn.classList.toggle("active", btn.dataset.view === state.view);
+      }
+    }
+
+    $("view-seg").onclick = (e) => {
+      const btn = e.target.closest("button[data-view]");
+      if (!btn) return;
+      state.view = btn.dataset.view;
+      syncViewSeg();
+      renderAll();
+    };
+
+    $("clearFilters").onclick = clearAll;
+    $("failOnly").onclick = () => {
+      state.status = new Set(["parse-error", "render-error"]);
+      buildFilters();
+      renderAll();
+    };
+
+    let searchTimer = null;
+    $("search").addEventListener("input", (e) => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        state.search = e.target.value.trim();
+        renderAll();
+      }, 100);
+    });
+
+    // ── lightbox ──
+    const lb = $("lightbox");
+    const lbImg = $("lb-img");
+    const lbDsl = $("lb-dsl");
+    const lbTitle = $("lb-title");
+    const lbZoomPct = $("lb-zoom-pct");
+    const lbSvgPane = $("lb-svg-pane");
+    const lbHint = $("lb-hint");
+
+    async function openLightbox(path) {
+      const idx = state.filtered.findIndex((s) => s.path === path);
+      if (idx < 0) return;
+      state.lbIndex = idx;
+      await renderLightbox();
+      lb.classList.add("open");
+      lb.setAttribute("aria-hidden", "false");
+      lbHint.classList.remove("hide");
+      clearTimeout(state.hintTimer);
+      state.hintTimer = setTimeout(() => lbHint.classList.add("hide"), 2200);
+      if (state.isFit) requestAnimationFrame(fitToView);
+    }
+
+    async function renderLightbox() {
+      const s = state.filtered[state.lbIndex];
+      if (!s) return;
+      lbTitle.textContent = s.path;
+      lbDsl.textContent = "加载 DSL…";
+      lbImg.removeAttribute("src");
+      lbImg.style.visibility = "hidden";
+      state.scale = 1; state.tx = 0; state.ty = 0; state.isFit = true;
+      lbZoomPct.textContent = "适应";
+      if (s.status === "ok" && s.svg) {
+        lbImg.src = s.svg;
+        lbImg.alt = s.path;
+      }
+      try {
+        const r = await fetch(s.path, { cache: "no-cache" });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        lbDsl.textContent = await r.text();
+      } catch (e) {
+        lbDsl.textContent = `// 无法加载 ${s.path}: ${e}`;
+      }
+      if (state.isFit) requestAnimationFrame(fitToView);
     }
 
     function closeLightbox() {
-      lightbox.classList.remove("open");
-      lightbox.setAttribute("aria-hidden", "true");
-      document.body.style.overflow = "";
-      setTimeout(() => { lightboxImg.removeAttribute("src"); }, 300);
+      lb.classList.remove("open");
+      lb.setAttribute("aria-hidden", "true");
+      state.lbIndex = -1;
+      lbImg.removeAttribute("src");
     }
 
-    function lbFitToScreen() {
-      lbImgNaturalW = lightboxImg.naturalWidth || lightboxImg.offsetWidth;
-      lbImgNaturalH = lightboxImg.naturalHeight || lightboxImg.offsetHeight;
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const pad = 64;
-      const fitScale = Math.min((vw - pad) / lbImgNaturalW, (vh - pad) / lbImgNaturalH, 1);
-      lbScale = fitScale;
-      lbPanX = (vw - lbImgNaturalW * lbScale) / 2;
-      lbPanY = (vh - lbImgNaturalH * lbScale) / 2;
-      lbApplyTransform();
+    function moveLightbox(delta) {
+      if (state.lbIndex < 0) return;
+      const n = state.lbIndex + delta;
+      if (n < 0 || n >= state.filtered.length) return;
+      state.lbIndex = n;
+      renderLightbox();
     }
 
-    function lbApplyTransform() {
-      lightboxImg.style.transform = `translate(${lbPanX}px, ${lbPanY}px) scale(${lbScale})`;
-      lbZoomPct.textContent = Math.round(lbScale * 100) + "%";
+    const MIN_SCALE = 0.1, MAX_SCALE = 8, PAN_MARGIN = 0.3;
+    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+    function imgNaturalSize() {
+      return { w: lbImg.naturalWidth || 800, h: lbImg.naturalHeight || 600 };
+    }
+    function clampPan(newTx, newTy, s) {
+      const { w: nw, h: nh } = imgNaturalSize();
+      if (!nw || !nh) return { tx: newTx, ty: newTy };
+      const cw = lbSvgPane.clientWidth, ch = lbSvgPane.clientHeight;
+      const sw = nw * s, sh = nh * s;
+      const ovX = PAN_MARGIN * Math.min(sw, cw);
+      const ovY = PAN_MARGIN * Math.min(sh, ch);
+      return {
+        tx: clamp(newTx, ovX - sw, cw - ovX),
+        ty: clamp(newTy, ovY - sh, ch - ovY),
+      };
+    }
+    function applyTransform() {
+      const { w: nw } = imgNaturalSize();
+      lbImg.style.width = nw + "px";
+      lbImg.style.height = "auto";
+      lbImg.style.transform = `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})`;
+      lbImg.style.visibility = "visible";
+      lbZoomPct.textContent = state.isFit ? "适应" : Math.round(state.scale * 100) + "%";
+    }
+    function fitToView() {
+      const { w: nw, h: nh } = imgNaturalSize();
+      const cw = lbSvgPane.clientWidth, ch = lbSvgPane.clientHeight;
+      if (!nw || !nh || !cw || !ch) return;
+      const fitScale = Math.min((cw - 48) / nw, (ch - 48) / nh);
+      const next = clamp(Math.min(fitScale, 1), MIN_SCALE, MAX_SCALE);
+      state.scale = next;
+      state.tx = (cw - nw * next) / 2;
+      state.ty = (ch - nh * next) / 2;
+      state.isFit = true;
+      applyTransform();
+    }
+    function resetView() {
+      const { w: nw } = imgNaturalSize();
+      state.scale = 1;
+      state.tx = (lbSvgPane.clientWidth - nw) / 2;
+      state.ty = 24;
+      state.isFit = false;
+      applyTransform();
+    }
+    function zoomBy(factor, originX, originY) {
+      const rect = lbSvgPane.getBoundingClientRect();
+      const px = originX ?? rect.width / 2;
+      const py = originY ?? rect.height / 2;
+      const prev = state.scale;
+      const next = clamp(prev * factor, MIN_SCALE, MAX_SCALE);
+      const ratio = next / prev;
+      const clamped = clampPan(px - (px - state.tx) * ratio, py - (py - state.ty) * ratio, next);
+      state.scale = next; state.tx = clamped.tx; state.ty = clamped.ty; state.isFit = false;
+      applyTransform();
+    }
+    function panBy(dx, dy) {
+      const clamped = clampPan(state.tx + dx, state.ty + dy, state.scale);
+      state.tx = clamped.tx; state.ty = clamped.ty; state.isFit = false;
+      applyTransform();
     }
 
-    function lbZoom(centerX, centerY, factor) {
-      const newScale = Math.min(Math.max(lbScale * factor, 0.15), 8);
-      const ratio = newScale / lbScale;
-      lbPanX = centerX - (centerX - lbPanX) * ratio;
-      lbPanY = centerY - (centerY - lbPanY) * ratio;
-      lbScale = newScale;
-      lbApplyTransform();
-    }
+    $("lb-zoom-in").onclick = () => zoomBy(1.2);
+    $("lb-zoom-out").onclick = () => zoomBy(1 / 1.2);
+    $("lb-fit").onclick = () => fitToView();
+    $("lb-actual").onclick = () => resetView();
+    $("lb-close").onclick = closeLightbox;
+    $("lb-prev").onclick = () => moveLightbox(-1);
+    $("lb-next").onclick = () => moveLightbox(1);
+    $("lb-copy").onclick = async () => {
+      const s = state.filtered[state.lbIndex];
+      if (!s) return;
+      try { await navigator.clipboard.writeText(s.path); } catch (_) {}
+    };
 
-    lightbox.addEventListener("wheel", (e) => {
+    let panMoved = false;
+    lb.addEventListener("click", (e) => {
+      if (panMoved) { panMoved = false; return; }
+      if (e.target === lb || e.target === lbSvgPane) closeLightbox();
+    });
+
+    lbSvgPane.addEventListener("wheel", (e) => {
+      if (!lb.classList.contains("open")) return;
       e.preventDefault();
       if (e.ctrlKey) {
-        // pinch zoom：以光标为中心缩放
-        const factor = Math.exp(-e.deltaY * 0.01);
-        lbZoom(e.clientX, e.clientY, factor);
+        const rect = lbSvgPane.getBoundingClientRect();
+        zoomBy(Math.exp(-e.deltaY * 0.01), e.clientX - rect.left, e.clientY - rect.top);
       } else {
-        // 普通滚动：平移画面
-        lbPanX -= e.deltaX;
-        lbPanY -= e.deltaY;
-        lbApplyTransform();
+        panBy(-e.deltaX, -e.deltaY);
       }
     }, { passive: false });
 
-    lightbox.addEventListener("pointerdown", (e) => {
-      if (e.target.tagName === "BUTTON") return;
-      lbDragging = true;
-      lbStartX = e.clientX;
-      lbStartY = e.clientY;
-      lbPanStartX = lbPanX;
-      lbPanStartY = lbPanY;
-      lightbox.classList.add("dragging");
+    let panState = null;
+    lbSvgPane.addEventListener("pointerdown", (e) => {
+      if (!lb.classList.contains("open")) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      lbSvgPane.setPointerCapture(e.pointerId);
+      panState = { x: e.clientX, y: e.clientY, tx: state.tx, ty: state.ty };
+      panMoved = false;
+      lbSvgPane.classList.add("panning");
     });
-
-    document.addEventListener("pointermove", (e) => {
-      if (!lbDragging) return;
-      lbPanX = lbPanStartX + (e.clientX - lbStartX);
-      lbPanY = lbPanStartY + (e.clientY - lbStartY);
-      lbApplyTransform();
+    lbSvgPane.addEventListener("pointermove", (e) => {
+      if (!panState) return;
+      const dx = e.clientX - panState.x, dy = e.clientY - panState.y;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) panMoved = true;
+      const clamped = clampPan(panState.tx + dx, panState.ty + dy, state.scale);
+      state.tx = clamped.tx; state.ty = clamped.ty; state.isFit = false;
+      applyTransform();
     });
-
-    document.addEventListener("pointerup", () => {
-      if (!lbDragging) return;
-      lbDragging = false;
-      lightbox.classList.remove("dragging");
+    const endPan = (e) => {
+      if (!panState) return;
+      panState = null;
+      lbSvgPane.classList.remove("panning");
+      if (e && lbSvgPane.hasPointerCapture?.(e.pointerId)) lbSvgPane.releasePointerCapture(e.pointerId);
+    };
+    lbSvgPane.addEventListener("pointerup", endPan);
+    lbSvgPane.addEventListener("pointercancel", endPan);
+    lbImg.addEventListener("load", () => { if (state.isFit) requestAnimationFrame(fitToView); });
+    window.addEventListener("resize", () => {
+      if (lb.classList.contains("open") && state.isFit) fitToView();
     });
+    new ResizeObserver(() => {
+      if (lb.classList.contains("open") && state.isFit) fitToView();
+    }).observe(lbSvgPane);
 
-    lightbox.addEventListener("dblclick", (e) => {
-      if (e.target.tagName === "BUTTON") return;
-      if (lbScale < 0.99) {
-        lbFitToScreen();
-      } else {
-        lbZoom(e.clientX, e.clientY, 2 / lbScale);
+    document.addEventListener("keydown", (e) => {
+      if (lb.classList.contains("open")) {
+        if (e.key === "Escape") { e.preventDefault(); closeLightbox(); }
+        else if (e.key === "j") { e.preventDefault(); moveLightbox(1); }
+        else if (e.key === "k") { e.preventDefault(); moveLightbox(-1); }
+        else if (e.key === "+" || e.key === "=") { e.preventDefault(); zoomBy(1.2); }
+        else if (e.key === "-") { e.preventDefault(); zoomBy(1 / 1.2); }
+        else if (e.key === "0") { e.preventDefault(); fitToView(); }
+        return;
+      }
+      if (e.key === "/" && document.activeElement !== $("search")) {
+        e.preventDefault(); $("search").focus();
       }
     });
 
-    lightboxClose.addEventListener("click", closeLightbox);
-    lightbox.addEventListener("click", (e) => {
-      if (e.target === lightbox) closeLightbox();
-    });
-
-    lbZoomOut.addEventListener("click", (e) => {
-      e.stopPropagation();
-      lbZoom(window.innerWidth / 2, window.innerHeight / 2, 1 / 1.3);
-    });
-    lbZoomIn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      lbZoom(window.innerWidth / 2, window.innerHeight / 2, 1.3);
-    });
-    lbZoomFit.addEventListener("click", (e) => {
-      e.stopPropagation();
-      lbFitToScreen();
-    });
-    lbZoom1.addEventListener("click", (e) => {
-      e.stopPropagation();
-      lbScale = 1;
-      lbPanX = (window.innerWidth - lbImgNaturalW) / 2;
-      lbPanY = (window.innerHeight - lbImgNaturalH) / 2;
-      lbApplyTransform();
-    });
-
-    // 点击百分比文字重置为 100% 并居中
-    lbZoomPct.addEventListener("click", (e) => {
-      e.stopPropagation();
-      lbScale = 1;
-      lbPanX = (window.innerWidth - lbImgNaturalW) / 2;
-      lbPanY = (window.innerHeight - lbImgNaturalH) / 2;
-      lbApplyTransform();
-    });
-
-    // ─── 全宽模式 ─────────────────────────────
-    let fullViz = false;
-    fullVizBtn.addEventListener("click", () => {
-      fullViz = !fullViz;
-      detailBody.classList.toggle("full-viz", fullViz);
-      fullVizBtn.classList.toggle("active", fullViz);
-      fullVizBtn.textContent = fullViz ? "分栏" : "全宽";
-    });
-
-    // ─── 启动 ─────────────────────────────────
-    renderTopbarStats();
-    renderAll();
+    loadManifest();
   </script>
 </body>
 </html>

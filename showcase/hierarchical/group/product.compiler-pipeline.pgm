@@ -1,0 +1,39 @@
+// Drawify 编译管线与分散关注点（架构痛点示意）
+// Mermaid 对照: 同目录 compiler-pipeline.mermaid
+diagram {
+    profile: architecture,
+    title: "Drawify 编译管线与分散关注点"
+
+    group pipeline {
+        label: "编译主流程"
+        node parser_lexer { label: "Parser/Lexer", archetype: service }
+        node ast { label: "AST", archetype: service }
+        node validator { label: "Validator", archetype: service }
+        node layout_mod { label: "Layout", archetype: service }
+        node renderer_diagram { label: "Renderer.diagram", archetype: service }
+        node renderer_format { label: "Renderer.format", archetype: service }
+    }
+
+    group concerns {
+        label: "分散关注点"
+        node diagram_semantics { label: "图表类型语义", archetype: external }
+        node default_layout { label: "默认布局配置", archetype: external }
+        node style_extension { label: "样式扩展", archetype: external }
+        node output_contract { label: "输出契约", archetype: external }
+    }
+
+    // 主流程
+    parser_lexer -> ast
+    ast -> validator
+    ast -> layout_mod
+    layout_mod -> renderer_diagram
+    renderer_diagram -> renderer_format
+
+    // 分散关注点（虚线 = 当前问题标注）
+    diagram_semantics --> validator "当前分散"
+    diagram_semantics --> renderer_diagram "当前分散"
+    default_layout --> layout_mod "三处定义"
+    default_layout --> renderer_diagram "三处定义"
+    style_extension --> renderer_diagram "声明未落地"
+    output_contract --> renderer_format "String 混合文本/二进制"
+}

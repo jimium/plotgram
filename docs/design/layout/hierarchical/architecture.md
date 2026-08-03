@@ -10,7 +10,7 @@
 本文钉死 Hier 的**目标形态与跨相契约**：管线、IR、算法选型、通道路由、组/分区、参数、Stage、验真与落地顺序。  
 相级细节见 [`phases/`](phases/README.md)；实现进度不进本文，当前实现能力以代码与里程碑验收为准。
 
-姊妹页：[README](README.md) · [scope](scope.md) · [shared/partition](../shared/partition.md)
+姊妹页：[README](README.md) · [scope](scope.md) · [shared/partition](../shared/partition.md) · [debug-profile](debug-profile.md)（hier Trace 扩展；壳见 [../debug-inspector.md](../debug-inspector.md)）
 
 ---
 

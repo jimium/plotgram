@@ -33,17 +33,14 @@ fn default_measure_params() -> MeasureParams {
 ///
 /// Skeleton: label-width heuristic; `content:` MD via `plotgram-content` when present
 /// in attrs as `content` string. Full theme → MeasureParams mapping is TODO.
-pub fn measure_node_sizes(
-    graph: &Graph,
-    options: &BuildOptions,
-) -> Result<NodeSizes, BuildError> {
+pub fn measure_node_sizes(graph: &Graph, options: &BuildOptions) -> Result<NodeSizes, BuildError> {
     let params = default_measure_params();
     let mut sizes = NodeSizes::new();
 
     for id in graph.all_node_ids() {
-        let node = graph.find_node(&id).ok_or_else(|| {
-            BuildError::Measure(format!("node `{id}` listed but not found"))
-        })?;
+        let node = graph
+            .find_node(&id)
+            .ok_or_else(|| BuildError::Measure(format!("node `{id}` listed but not found")))?;
 
         let size = if !options.labels_only {
             if let Some(raw) = node.attrs.get("content").and_then(|v| v.as_str()) {

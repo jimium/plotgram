@@ -428,7 +428,7 @@ mod tests {
         let graph = parse_and_expand(r#"diagram {
             group fe { node web {} }
             group be { node api {} }
-            @fe -> @be { from_side: east to_side: west }
+            @fe -> @be { from_side: east, to_side: west }
         }"#);
 
         // Should have 1 edge at top level
@@ -450,7 +450,7 @@ mod tests {
         let graph = parse_and_expand(r#"diagram {
             group fe { node web {} }
             group be { node api {} node db {} }
-            @fe -> @be { from_side: east to_side: west }
+            @fe -> @be { from_side: east, to_side: west }
             web -> @be { to_side: west }
         }"#);
 
@@ -497,7 +497,7 @@ mod tests {
     fn validate_group_anchors_rejects_outside_host() {
         let ast = parse_file(r#"diagram {
             group g { node x {} }
-            node a { role: group_anchor host_group: g side: north }
+            node a { role: group_anchor, host_group: g, side: north }
         }"#).unwrap();
         let lowered = lower(&ast).unwrap();
         let mut graph = lowered.graph;
@@ -553,7 +553,7 @@ mod tests {
     #[test]
     fn archetype_fills_shape_variant_icon() {
         let graph = parse_lift_and_archetype(
-            r#"diagram { node db { label: "DB" archetype: database } }"#,
+            r#"diagram { node db { label: "DB", archetype: database } }"#,
         );
         let n = &graph.nodes[0];
         assert_eq!(n.shape.as_deref(), Some("cylinder"));
@@ -565,7 +565,7 @@ mod tests {
     #[test]
     fn archetype_with_icon_fills_icon() {
         let graph = parse_lift_and_archetype(
-            r#"diagram { node svc { label: "Svc" archetype: service } }"#,
+            r#"diagram { node svc { label: "Svc", archetype: service } }"#,
         );
         let n = &graph.nodes[0];
         assert_eq!(n.shape.as_deref(), Some("rounded_rect"));
@@ -576,7 +576,7 @@ mod tests {
     #[test]
     fn archetype_does_not_override_explicit_shape() {
         let graph = parse_lift_and_archetype(
-            r#"diagram { node db { archetype: database shape: rounded_rect } }"#,
+            r#"diagram { node db { archetype: database, shape: rounded_rect } }"#,
         );
         let n = &graph.nodes[0];
         // Explicit shape wins over archetype default
@@ -588,7 +588,7 @@ mod tests {
     #[test]
     fn archetype_does_not_override_explicit_variant() {
         let graph = parse_lift_and_archetype(
-            r#"diagram { node db { archetype: database variant: primary } }"#,
+            r#"diagram { node db { archetype: database, variant: primary } }"#,
         );
         let n = &graph.nodes[0];
         assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("primary"));
@@ -597,7 +597,7 @@ mod tests {
     #[test]
     fn archetype_does_not_override_explicit_icon_none() {
         let graph = parse_lift_and_archetype(
-            r#"diagram { node svc { archetype: service icon: none } }"#,
+            r#"diagram { node svc { archetype: service, icon: none } }"#,
         );
         let n = &graph.nodes[0];
         // `icon: none` counts as "already set" — archetype must not overwrite

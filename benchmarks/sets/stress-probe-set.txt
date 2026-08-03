@@ -1,13 +1,9 @@
 # Stress-probe：正确性硬 + 质量观测（不挡日常质量棘轮）
-# 路径相对仓库根目录。文件名角色 = stress。
-# 在 compare.sh 中：正确性轨硬 fail；质量轨默认 WARN（可加 --strict-stress 改硬）。
-# 来源：docs/architecture/重构方案/casev2/gates/stress-probe-set.txt
+# 路径相对 showcase/；必须含 layout 前缀（§8.1 showcase-redesign-2026-08.md）。
+# 文件名角色 = stress。
+# 在 compare.sh 中：正确性轨硬 fail；质量轨默认 WARN（--strict-stress 改硬）。
 
-showcase/architecture/stress.layout-stress-nested.pgm
-showcase/architecture/stress.layout-stress-flat-mesh.pgm
-showcase/er/stress.layout-stress-dense.pgm
-showcase/flowchart/stress.layout-stress-dag.pgm
-showcase/flowchart/stress.layout-stress-yfiles-pipeline.pgm
-showcase/sequence/stress.layout-stress-lifelines.pgm
-showcase/state/stress.layout-stress-transitions.pgm
-showcase/mindmap/stress.layout-stress-deep.pgm
+hierarchical/group/stress.layout-stress-nested.pgm
+hierarchical/flat/stress.layout-stress-flat-mesh.pgm
+hierarchical/flat/stress.layout-stress-dag.pgm
+hierarchical/flat/stress.layout-stress-yfiles-pipeline.pgm

@@ -25,6 +25,15 @@ impl Orientation {
     pub fn is_horizontal(self) -> bool {
         !self.is_vertical()
     }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::TopToBottom => "top-to-bottom",
+            Self::BottomToTop => "bottom-to-top",
+            Self::LeftToRight => "left-to-right",
+            Self::RightToLeft => "right-to-left",
+        }
+    }
 }
 
 /// Group contraction policy (profile parameter — not a second layouter).
@@ -132,11 +141,20 @@ pub struct HierarchicalParams {
     /// Main-axis gap between consecutive layers.
     pub layer_gap: f64,
     /// Reserved edge/track spacing demand (routing / measure).
+    ///
+    /// **Not consumed in this build** — no Channel/track machinery exists yet
+    /// (mvp-scope note §2.5). Explicit DSL options are therefore rejected in
+    /// [`Self::bind`] (architecture.md §1.1: a bindable-but-unconsumed
+    /// parameter counts as unsupported); the field stays as the future
+    /// demand channel and is only ever written by preset packs.
     pub edge_gap: f64,
     /// Built-in ink style (ignored when layout defers to an independent EdgeRouter).
     pub routing_style: RoutingStyle,
     pub group_policy: GroupPolicy,
+    /// **Not consumed in this build** (no group-frame writer yet) — explicit
+    /// options rejected in [`Self::bind`]; see `edge_gap` above.
     pub group_sizing: GroupSizing,
+    /// **Not consumed in this build** — same treatment as `group_sizing`.
     pub group_align: GroupAlign,
 }
 
@@ -161,6 +179,19 @@ impl HierarchicalParams {
     /// Order: algorithm [`Default`] ← optional `preset` overlays ← explicit fields.
     /// Unknown keys become warnings (not errors). Bad types / bad atoms → error.
     pub fn bind(options: &AttrMap) -> Result<BindResult, LayoutError> {
+        // Options this build cannot consume must not bind silently
+        // (architecture.md §1.1 + anti-pattern #13). Hard-fail like
+        // `group_policy: strong-macro` — a warning could not surface anyway
+        // (`LayoutOutput` has no diagnostics channel, mvp-scope note §0.1).
+        for key in ["edge_gap", "edge_distance", "group_sizing", "group_align"] {
+            if options.contains_key(key) {
+                return Err(LayoutError::message(format!(
+                    "hierarchical: option `{key}` is unsupported in this build \
+                     (no consumer yet; see docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md §2.7)"
+                )));
+            }
+        }
+
         let mut binder = OptionsBinder::new(options);
 
         let preset = match binder.get_atom("preset").map_err(bind_err)? {
@@ -206,12 +237,6 @@ impl HierarchicalParams {
         {
             params.layer_gap = v;
         }
-        if let Some(v) = binder
-            .get_f64_any(&["edge_gap", "edge_distance"])
-            .map_err(bind_err)?
-        {
-            params.edge_gap = v;
-        }
 
         if let Some(rs) = binder
             .get_enum(
@@ -240,28 +265,6 @@ impl HierarchicalParams {
             .map_err(bind_err)?
         {
             params.group_policy = p;
-        }
-        if let Some(s) = binder
-            .get_enum(
-                "group_sizing",
-                &[("fit", GroupSizing::Fit), ("equal", GroupSizing::Equal)],
-            )
-            .map_err(bind_err)?
-        {
-            params.group_sizing = s;
-        }
-        if let Some(a) = binder
-            .get_enum(
-                "group_align",
-                &[
-                    ("start", GroupAlign::Start),
-                    ("center", GroupAlign::Center),
-                    ("end", GroupAlign::End),
-                ],
-            )
-            .map_err(bind_err)?
-        {
-            params.group_align = a;
         }
         Ok(BindResult {
             params,

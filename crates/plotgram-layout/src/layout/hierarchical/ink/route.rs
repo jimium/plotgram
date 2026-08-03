@@ -22,7 +22,7 @@ pub struct CanonicalEdge {
     pub to_port: ResolvedPort,
 }
 
-fn port_anchor(frame: Rect, port: ResolvedPort) -> Point {
+pub(crate) fn port_anchor(frame: Rect, port: ResolvedPort) -> Point {
     use plotgram_algo::orientation::Side::*;
     let t = (port.slot as f64 + 1.0) / (port.count as f64 + 1.0);
     match port.side {

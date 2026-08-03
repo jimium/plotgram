@@ -1,0 +1,42 @@
+// CDN 边缘缓存架构
+// Mermaid 对照: graph + subgraph 边缘/源站分组
+diagram {
+    profile: architecture,
+    title: "CDN 边缘缓存架构"
+
+    group edge {
+        label: "边缘节点"
+        node user { label: "终端用户", archetype: frontend,
+            meta.semantic: browser
+        }
+        node edge_pop { label: "边缘 POP", archetype: gateway,
+            meta.semantic: nginx
+        }
+        node edge_cache { label: "边缘缓存", archetype: cache,
+            meta.semantic: redis
+        }
+    }
+
+    group origin {
+        label: "源站"
+        node origin_lb { label: "回源负载均衡", archetype: gateway,
+            meta.semantic: nginx
+        }
+        node origin_svc { label: "源站服务", archetype: service }
+        node origin_db { label: "源站数据库", archetype: database,
+            meta.semantic: postgres
+        }
+    }
+
+    node dns { label: "DNS 调度", archetype: external }
+
+    user -> dns "域名解析"
+    dns -> edge_pop "就近调度"
+    user -> edge_pop "请求"
+    edge_pop -> edge_cache "查询缓存"
+    edge_cache --> edge_pop "命中"
+    edge_pop -> origin_lb "未命中回源"
+    origin_lb -> origin_svc
+    origin_svc -> origin_db
+    origin_svc --> edge_cache "回源填充缓存"
+}

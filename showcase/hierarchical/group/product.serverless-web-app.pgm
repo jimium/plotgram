@@ -1,0 +1,49 @@
+// Serverless Web 应用架构：CDN + 函数计算 + 托管数据库
+// 业务场景: 无服务器 Web 应用，前端静态托管 + FaaS 后端
+// Mermaid 对照: graph + subgraph Serverless 拓扑
+diagram {
+    profile: architecture,
+    title: "Serverless Web 应用架构",
+    layout: hierarchical,
+theme: common.clean-light
+
+    group client {
+        label: "客户端"
+        node spa { label: "SPA 前端", archetype: frontend,
+            meta.semantic: browser
+        }
+    }
+
+    group edge {
+        label: "边缘接入"
+        node cdn { label: "CDN", archetype: external }
+        node apigw { label: "API 网关", archetype: gateway }
+    }
+
+    group compute {
+        label: "函数计算"
+        node fn_auth { label: "认证函数", archetype: service }
+        node fn_order { label: "订单函数", archetype: service }
+        node fn_notify { label: "通知函数", archetype: service }
+    }
+
+    group backend {
+        label: "托管后端"
+        node dynamo { label: "文档数据库", archetype: database,
+            meta.semantic: mongodb
+        }
+        node mq { label: "事件队列", archetype: queue }
+        node bucket { label: "对象存储", archetype: storage,
+            meta.semantic: s3
+        }
+    }
+
+    spa -> cdn "静态资源"
+    spa -> apigw "API 请求"
+    apigw -> fn_auth "鉴权"
+    apigw -> fn_order "下单"
+    fn_order -> dynamo "读写订单"
+    fn_order -> mq "发布事件"
+    mq -> fn_notify "触发通知"
+    fn_order -> bucket "存储附件"
+}

@@ -1,0 +1,39 @@
+// 泳道图：跨部门订单处理流程
+// 结构靠 group 分区表达；泳道几何语义留给后续 DSL（本阶段不写 group_frame）
+diagram {
+    profile: flowchart,
+    title: "跨部门订单处理（泳道图）",
+    layout: hierarchical { direction: top-to-bottom }
+
+    group customer {
+        label: "客户"
+        node place_order { label: "下单", archetype: start }
+        node receive_goods { label: "收货", archetype: end }
+    }
+
+    group sales {
+        label: "销售"
+        node verify_order { label: "审核订单", archetype: process }
+        node confirm_order { label: "确认订单", archetype: process }
+    }
+
+    group warehouse {
+        label: "仓库"
+        node pick_goods { label: "拣货", archetype: process }
+        node pack_goods { label: "打包", archetype: process }
+    }
+
+    group shipping {
+        label: "物流"
+        node dispatch { label: "发货", archetype: process }
+        node deliver { label: "配送", archetype: process }
+    }
+
+    place_order -> verify_order
+    verify_order -> confirm_order
+    confirm_order -> pick_goods
+    pick_goods -> pack_goods
+    pack_goods -> dispatch
+    dispatch -> deliver
+    deliver -> receive_goods
+}

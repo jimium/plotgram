@@ -1,0 +1,37 @@
+// PR architecture review workflow with AI-generated diagrams and reviewer gates
+// Mermaid mapping: complex flowchart for review automation and human approval
+diagram {
+    profile: flowchart,
+    title: "PR 架构评审流程",
+    layout: hierarchical { direction: top-to-bottom }
+
+    node pr_open { label: "PR 创建", archetype: start }
+    node collect { label: "收集变更上下文", archetype: process }
+    node generate { label: "生成架构图草稿", archetype: process }
+    node validate { label: "校验 Drawify 语法", archetype: process }
+    node valid_gate { label: "语法通过？", archetype: decision }
+    node repair { label: "自动修复图表", archetype: process }
+    node render { label: "渲染 SVG 与摘要", archetype: process }
+    node review_gate { label: "需要人工评审？", archetype: decision }
+    node human_review { label: "架构师评审", archetype: process }
+    node approval_gate { label: "评审通过？", archetype: decision }
+    node comment { label: "回写 PR 评论", archetype: process }
+    node update { label: "开发者更新实现", archetype: process }
+    node done { label: "评审完成", archetype: end }
+
+    pr_open -> collect
+    collect -> generate
+    generate -> validate
+    validate -> valid_gate
+    valid_gate -> render "是"
+    valid_gate -> repair "否"
+    repair -> generate
+    render -> review_gate
+    review_gate -> human_review "是"
+    review_gate -> comment "否"
+    human_review -> approval_gate
+    approval_gate -> comment "是"
+    approval_gate -> update "否"
+    update -> collect "重新分析"
+    comment -> done
+}

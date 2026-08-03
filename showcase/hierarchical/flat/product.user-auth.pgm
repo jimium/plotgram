@@ -1,0 +1,26 @@
+// 用户认证流程：多实体 + 响应箭头
+// Mermaid 对照: graph TD + 多节点带标签连线
+diagram {
+    profile: flowchart,
+    title: "用户认证流程",
+    layout: hierarchical { direction: top-to-bottom }
+
+    node client { label: "移动客户端", archetype: client }
+    node gateway { label: "API 网关", archetype: gateway,
+        status: healthy
+    }
+    node auth { label: "认证服务", archetype: service,
+        meta.owner: "安全团队"
+    }
+    node db { label: "用户数据库", archetype: database }
+    node cache { label: "Token 缓存", archetype: cache }
+
+    client -> gateway "HTTPS 请求"
+    gateway -> auth "转发认证请求"
+    auth -> db "查询用户信息"
+    db --> auth "返回用户记录"
+    auth -> cache "存储 Token"
+    cache --> auth "返回缓存结果"
+    auth --> gateway "认证结果"
+    gateway --> client "响应"
+}

@@ -1,45 +1,23 @@
 # Product-gate：日常质量硬门禁（精选）
-# 路径相对仓库根目录。宣称「无退化」默认只引用本集。
+# 路径相对 showcase/；必须含 layout 前缀（§8.1 showcase-redesign-2026-08.md）。
 # 文件名角色 = product；本清单只挑选进硬门禁的子集。
+# 新布局内核毕业后，向同一文件追加 hierarchical/ 之外的 {layout}/ 行即可。
 
-# --- architecture ---
-showcase/architecture/product.three-tier.pgm
-showcase/architecture/product.typical-microservice-architecture.pgm
-showcase/architecture/product.flat-rest-api.pgm
-showcase/architecture/product.microservices.pgm
-showcase/architecture/product.cdn-cache.pgm
-showcase/architecture/product.cloud-native.pgm
-showcase/architecture/product.ecommerce-platform.pgm
-showcase/architecture/product.message-queue-pipeline.pgm
-showcase/architecture/product.monitoring-stack.pgm
-showcase/architecture/product.narrow-corridor.pgm
-
-# --- flowchart ---
-showcase/flowchart/product.linear-chain.pgm
-showcase/flowchart/product.user-auth.pgm
-showcase/flowchart/product.refund-process.pgm
-showcase/flowchart/product.swimlane-order-process.pgm
-showcase/flowchart/product.password-reset.pgm
-showcase/flowchart/product.leave-approval-process.pgm
-showcase/flowchart/product.self-loop-retry.pgm
-showcase/flowchart/product.symmetric-fanout.pgm
-
-# --- sequence ---
-showcase/sequence/product.oauth-login.pgm
-showcase/sequence/product.payment-gateway.pgm
-showcase/sequence/product.sms-verification.pgm
-showcase/sequence/product.jwt-refresh-token.pgm
-
-# --- state ---
-showcase/state/product.order-lifecycle.pgm
-showcase/state/product.user-session.pgm
-showcase/state/product.payment-flow.pgm
-showcase/state/product.delivery-tracking.pgm
-
-# --- er ---
-showcase/er/product.blog-schema.pgm
-showcase/er/product.saas-schema.pgm
-showcase/er/product.crm-schema.pgm
-
-# --- mindmap ---
-showcase/mindmap/product.tech-stack.pgm
+hierarchical/flat/product.three-tier.pgm
+hierarchical/flat/product.typical-microservice-architecture.pgm
+hierarchical/flat/product.flat-rest-api.pgm
+hierarchical/group/product.microservices.pgm
+hierarchical/group/product.cdn-cache.pgm
+hierarchical/group/product.cloud-native.pgm
+hierarchical/group/product.ecommerce-platform.pgm
+hierarchical/group/product.message-queue-pipeline.pgm
+hierarchical/group/product.monitoring-stack.pgm
+hierarchical/group/product.narrow-corridor.pgm
+hierarchical/flat/product.linear-chain.pgm
+hierarchical/flat/product.user-auth.pgm
+hierarchical/flat/product.refund-process.pgm
+hierarchical/group/product.swimlane-order-process.pgm
+hierarchical/flat/product.password-reset.pgm
+hierarchical/flat/product.leave-approval-process.pgm
+hierarchical/flat/product.self-loop-retry.pgm
+hierarchical/flat/product.symmetric-fanout.pgm

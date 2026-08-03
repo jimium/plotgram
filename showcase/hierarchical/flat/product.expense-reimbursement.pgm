@@ -1,0 +1,29 @@
+// 费用报销流程：提交单据 → 财务审核 → 支付
+// 业务场景: 企业费用报销，含金额阈值分级审批与票据驳回
+// Mermaid 对照: graph TD + 多级审批分支
+diagram {
+    profile: flowchart,
+    title: "费用报销流程",
+    layout: hierarchical { direction: top-to-bottom }
+
+    node start { label: "发起报销", archetype: start }
+    node upload { label: "上传发票与单据", archetype: process }
+    node check_gate { label: "票据是否齐全？", archetype: decision }
+    node finance_audit { label: "财务初审", archetype: process }
+    node amount_gate { label: "金额 > 5000？", archetype: decision }
+    node manager_approve { label: "经理审批", archetype: process }
+    node cfo_approve { label: "财务总监审批", archetype: process }
+    node pay { label: "打款到账户", archetype: process }
+    node done { label: "报销完成", archetype: end }
+
+    start -> upload
+    upload -> check_gate
+    check_gate -> finance_audit "齐全"
+    check_gate -> upload "缺失，补充"
+    finance_audit -> amount_gate
+    amount_gate -> manager_approve "否"
+    amount_gate -> cfo_approve "是"
+    manager_approve -> pay
+    cfo_approve -> pay
+    pay -> done
+}

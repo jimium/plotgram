@@ -1,0 +1,44 @@
+// REST API 后端分层架构：接入层 + 业务层 + 数据层
+// 业务场景: 典型单体 REST 后端服务的分层拓扑
+// Mermaid 对照: graph + subgraph 分层
+diagram {
+    profile: architecture,
+    title: "REST API 后端分层架构",
+    layout: hierarchical,
+theme: common.clean-light
+
+    group edge {
+        label: "接入层"
+        node web { label: "Web 客户端", archetype: frontend,
+            meta.semantic: browser
+        }
+        node lb { label: "负载均衡", archetype: gateway,
+            meta.semantic: nginx
+        }
+    }
+
+    group app {
+        label: "业务层"
+        node api { label: "REST API 服务", archetype: service }
+        node auth { label: "认证鉴权", archetype: service }
+        node biz { label: "业务逻辑服务", archetype: service }
+    }
+
+    group data {
+        label: "数据层"
+        node db { label: "MySQL", archetype: database,
+            meta.semantic: mysql
+        }
+        node redis { label: "Redis 缓存", archetype: cache,
+            meta.semantic: redis
+        }
+    }
+
+    web -> lb "HTTPS"
+    lb -> api "反向代理"
+    api -> auth "鉴权校验"
+    api -> biz "调用业务"
+    biz -> db "读写数据"
+    biz -> redis "读写缓存"
+    auth -> redis "会话存储"
+}

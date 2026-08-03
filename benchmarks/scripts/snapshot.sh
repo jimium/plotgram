@@ -1,55 +1,50 @@
 #!/usr/bin/env bash
-# 门禁基线快照：质量指标（gate-baseline）+ 性能（bench-phases）+ 确定性
+# v2 门禁快照：批量调 `plotgram measure --json` 采集指标，归档到 baselines/。
 #
 # 用法（仓库根目录）:
 #   ./benchmarks/snapshot.sh
-#   ./benchmarks/snapshot.sh --runs 5
-#   ./benchmarks/snapshot.sh --tag after-stub-fix
-#   ./benchmarks/snapshot.sh --set benchmarks/sets/product-regression-set.txt
+#   ./benchmarks/snapshot.sh --tag v2-initial
+#   ./benchmarks/snapshot.sh --set benchmarks/sets/smoke-set.txt
+#   ./benchmarks/snapshot.sh --out benchmarks/baselines/current --set ... --set ...
 #
-# 默认采集 product-gate + stress-probe（角色感知 baseline）。
-# 每条样本在 JSON 内补 role 字段（取文件名第一段：product/stress/demo/mech/smoke）。
-#
+# 默认遍历所有 benchmarks/sets/*.txt；每行路径相对 showcase/，必须含 layout 前缀。
 # 输出（同日多次不互相覆盖）:
-#   benchmarks/baselines/YYYY-MM-DD-HHMMSS.json
-#   benchmarks/baselines/YYYY-MM-DD-HHMMSS.md
-#   benchmarks/baselines/YYYY-MM-DD-HHMMSS-<tag>.*   # 若传 --tag
+#   benchmarks/baselines/YYYY-MM-DD-HHMMSS[-tag].json
+#   benchmarks/baselines/YYYY-MM-DD-HHMMSS[-tag].md
 #   benchmarks/baselines/latest.{json,md}            # 始终指向最近一次
+#
+# --out BASE  CI 模式：只写 BASE.json，不写 .md，不 sync latest（避免覆盖已提交基线）
+#
+# 单样例 `plotgram measure` 在硬失败（parse-error / render-error / det=false /
+# 任何 overlap > 0）时 exit ≠ 0；本脚本捕获 stdout JSON 不被 pipefail 杀掉。
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BM="$(cd "$SCRIPT_DIR/.." && pwd)"
 ROOT="$(cd "$BM/.." && pwd)"
-cd "$ROOT"
+SHOWCASE="$ROOT/showcase"
 
-RUNS=5
 TAG=""
-DEFAULT_SET_FILES=(
-  "$BM/sets/product-regression-set.txt"
-  "$BM/sets/stress-probe-set.txt"
-)
 SET_FILES=()
+OUT_BASE=""   # 自定义输出路径前缀（不含 .json/.md）；默认 baselines/{stamp}
 STAMP="$(date +%Y-%m-%d-%H%M%S)"
-JSON_LATEST="$BM/baselines/latest.json"
-MD_LATEST="$BM/baselines/latest.md"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --runs) RUNS="$2"; shift 2 ;;
     --tag)
-      TAG="$2"
-      shift 2
-      ;;
+      TAG="$2"; shift 2 ;;
     --set)
-      SET_FILES+=("$2")
-      shift 2
-      ;;
+      SET_FILES+=("$2"); shift 2 ;;
+    --out)
+      OUT_BASE="$2"; shift 2 ;;
+    -h|--help)
+      sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0 ;;
     *) echo "未知参数: $1" >&2; exit 1 ;;
   esac
 done
 
-# --tag 仅允许安全字符，便于文件名与 viewer 识别
 if [[ -n "$TAG" ]]; then
   if [[ ! "$TAG" =~ ^[A-Za-z0-9._-]+$ ]]; then
     echo "error: --tag 仅允许字母数字 / . _ -" >&2
@@ -58,147 +53,234 @@ if [[ -n "$TAG" ]]; then
   STAMP="${STAMP}-${TAG}"
 fi
 
-JSON_OUT="$BM/baselines/${STAMP}.json"
-MD_OUT="$BM/baselines/${STAMP}.md"
-
-# 用户未传 --set 时使用默认集（product + stress）
+# 默认：所有 sets/*.txt（按文件名排序，确定性）
 if [[ ${#SET_FILES[@]} -eq 0 ]]; then
-  SET_FILES=("${DEFAULT_SET_FILES[@]}")
+  while IFS= read -r sf; do
+    SET_FILES+=("$sf")
+  done < <(find "$BM/sets" -maxdepth 1 -name '*.txt' -type f | sort)
 fi
 
-export PLOTGRAM_FONTS_DIR="${PLOTGRAM_FONTS_DIR:-$ROOT/fonts}"
-# 避免 Cursor/沙箱注入的 CARGO_TARGET_DIR 把产物写到临时目录
-unset CARGO_TARGET_DIR || true
-
-echo "▶ 构建 gate-baseline / bench-phases / plotgram (release)..."
-cargo build --release -p plotgram-core --bin gate-baseline --bin bench-phases -p plotgram-cli 2>&1 | tail -5
-
-GATE="$ROOT/target/release/gate-baseline"
-BENCH="$ROOT/target/release/bench-phases"
-PLOTGRAM="$ROOT/target/release/plotgram"
-
-if [[ ! -x "$GATE" || ! -x "$BENCH" || ! -x "$PLOTGRAM" ]]; then
-  echo "error: 缺少 release 二进制（$GATE / $BENCH / $PLOTGRAM）" >&2
+if [[ ${#SET_FILES[@]} -eq 0 ]]; then
+  echo "error: 没有找到 benchmarks/sets/*.txt" >&2
   exit 1
 fi
 
-# 合并多个 --set 文件，去重，保持顺序（product 优先）
+# 合并 set 文件：去重保序，跳过注释 / 空行
 TMP_LIST="$(mktemp)"
+trap 'rm -f "$TMP_LIST"' EXIT
+
 for sf in "${SET_FILES[@]}"; do
   [[ -f "$sf" ]] || { echo "warn: 缺失 set 文件 $sf，跳过" >&2; continue; }
   while IFS= read -r line || [[ -n "$line" ]]; do
     [[ "$line" =~ ^[[:space:]]*# ]] && continue
-    [[ -z "${line// }" ]] && continue
+    line="$(echo "$line" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+    [[ -z "$line" ]] && continue
     echo "$line"
   done < "$sf"
 done | awk '!seen[$0]++' > "$TMP_LIST"
 
 FILES=()
-while IFS= read -r f; do
-  FILES+=("$f")
+while IFS= read -r line; do
+  [[ -n "$line" ]] && FILES+=("$line")
 done < "$TMP_LIST"
+
+if [[ ${#FILES[@]} -eq 0 ]]; then
+  echo "error: set 文件中没有有效样例路径" >&2
+  exit 1
+fi
+
+# 1. build
+echo "▶ 构建 plotgram-cli (release)..."
+# 避免沙箱注入 CARGO_TARGET_DIR 把产物写到临时目录
+unset CARGO_TARGET_DIR || true
+( cd "$ROOT" && cargo build --release -p plotgram-cli ) 2>&1 | tail -3
+PLOTGRAM="$ROOT/target/release/plotgram"
+[[ -x "$PLOTGRAM" ]] || { echo "error: plotgram 二进制缺失 ($PLOTGRAM)" >&2; exit 1; }
+echo
 
 echo "▶ 共 ${#FILES[@]} 个样例（来自 ${#SET_FILES[@]} 个 set 文件）"
 echo "▶ 归档名: ${STAMP}"
+echo
 
-echo "▶ 质量指标（gate-baseline）..."
-# gate-baseline 接受 [file.pgm ...]，跳过 --set 自动扫描，直接传文件列表
-# --date 写入 JSON 的 date 字段（与文件名 stamp 一致，便于同日多次排序）
-"$GATE" --runs 1 --date "$STAMP" "${FILES[@]}" >"$JSON_OUT"
+JSON_OUT="$BM/baselines/${STAMP}.json"
+MD_OUT="$BM/baselines/${STAMP}.md"
+if [[ -n "$OUT_BASE" ]]; then
+  # --out 模式：写自定义路径，不写 .md，不 sync latest（CI 使用）
+  JSON_OUT="${OUT_BASE}.json"
+  MD_OUT=""
+fi
 
-echo "▶ 性能 + 确定性..."
-TMP_PERF="$(mktemp)"
-{
-  echo "{"
-  first=1
-  for f in "${FILES[@]}"; do
-    name="$(basename "$f" .pgm)"
-    if ! out="$("$BENCH" "$f" "$RUNS" 2>/dev/null)"; then
-      med="null"; minv="null"; maxv="null"
-    else
-      med=$(echo "$out" | grep '中位数:' | sed -E 's/.*中位数:[[:space:]]*([0-9.]+)ms.*/\1/')
-      minv=$(echo "$out" | grep '最小值:' | sed -E 's/.*最小值:[[:space:]]*([0-9.]+)ms.*/\1/')
-      maxv=$(echo "$out" | grep '最大值:' | sed -E 's/.*最大值:[[:space:]]*([0-9.]+)ms.*/\1/')
-    fi
-    h1=$("$PLOTGRAM" render "$f" -f svg 2>/dev/null | shasum -a 256 | awk '{print $1}')
-    h2=$("$PLOTGRAM" render "$f" -f svg 2>/dev/null | shasum -a 256 | awk '{print $1}')
-    if [[ "$h1" == "$h2" && -n "$h1" ]]; then det="true"; else det="false"; fi
-    if [[ $first -eq 0 ]]; then echo ","; fi
-    first=0
-    printf '  "%s": {"median_ms": %s, "min_ms": %s, "max_ms": %s, "det": %s}' \
-      "$f" "${med:-null}" "${minv:-null}" "${maxv:-null}" "$det"
-    echo "  bench $name: ${med:-FAIL}ms det=$det" >&2
-  done
-  echo
-  echo "}"
-} >"$TMP_PERF"
+# 2. run measure for each sample, capture stdout regardless of exit code.
+# argv layout: plotgram / showcase / json / stamp / n_sets / sets... / files...
+python3 - "$PLOTGRAM" "$SHOWCASE" "$JSON_OUT" "$STAMP" "${#SET_FILES[@]}" "${SET_FILES[@]}" "${FILES[@]}" <<'PY'
+import json, subprocess, sys, os, time
 
-python3 - "$JSON_OUT" "$TMP_PERF" "$RUNS" <<'PY'
-import json, sys, os
-with open(sys.argv[1]) as fh:
+plotgram  = sys.argv[1]
+showcase  = sys.argv[2]
+out_json  = sys.argv[3]
+stamp     = sys.argv[4]
+n_sets    = int(sys.argv[5])
+set_files = sys.argv[6:6 + n_sets]
+files     = sys.argv[6 + n_sets:]
+
+def derive(path):
+    layout = path.split("/")[0] if "/" in path else ""
+    role = path.rsplit("/", 1)[-1].split(".")[0]
+    return layout, role
+
+reports = []
+for i, f in enumerate(files, 1):
+    layout, role = derive(f)
+    t0 = time.time()
+    try:
+        proc = subprocess.run(
+            [plotgram, "measure", f, "--json"],
+            cwd=showcase,
+            capture_output=True, text=True,
+        )
+        stdout = proc.stdout.strip()
+    except Exception as e:
+        reports.append({
+            "schema_version": 1,
+            "path": f, "layout": layout, "role": role,
+            "status": "render-error",
+            "error": f"snapshot invocation failed: {e}",
+            "elapsed_ms": int((time.time() - t0) * 1000),
+            "correctness": None, "quality": None, "observation": None,
+        })
+        print(f"  [{i}/{len(files)}] {f.split('/')[-1]}: INVOCATION-FAIL", file=sys.stderr)
+        continue
+
+    wall_ms = int((time.time() - t0) * 1000)
+    if not stdout:
+        # measure 没写 stdout（理论上不应该）：构造 render-error 占位
+        reports.append({
+            "schema_version": 1,
+            "path": f, "layout": layout, "role": role,
+            "status": "render-error",
+            "error": f"no stdout from `plotgram measure` (rc={proc.returncode}, stderr={proc.stderr[:300]})",
+            "elapsed_ms": wall_ms,
+            "correctness": None, "quality": None, "observation": None,
+        })
+    else:
+        try:
+            report = json.loads(stdout)
+            # 防御：CLI 输出的 path/layout/role 应该与 set 文件行一致；
+            # 若不一致，用 set 文件的版本覆盖（保证 compare by path 可靠）。
+            report["path"] = f
+            report["layout"] = layout
+            report["role"] = role
+            reports.append(report)
+        except json.JSONDecodeError as e:
+            reports.append({
+                "schema_version": 1,
+                "path": f, "layout": layout, "role": role,
+                "status": "render-error",
+                "error": f"non-JSON stdout: {e}; first 200 chars: {stdout[:200]}",
+                "elapsed_ms": wall_ms,
+                "correctness": None, "quality": None, "observation": None,
+            })
+    name = f.split("/")[-1]
+    status = reports[-1].get("status", "?")
+    ms = reports[-1].get("elapsed_ms", wall_ms)
+    print(f"  [{i}/{len(files)}] {name}: {status} (rc={proc.returncode}, {ms}ms)", file=sys.stderr)
+
+snap = {
+    "schema_version": 1,
+    "date": stamp,
+    "tag": None,  # filled below if --tag was given
+    "set_files": [os.path.relpath(s, os.getcwd()) for s in set_files],
+    "samples": reports,
+}
+with open(out_json, "w") as fh:
+    json.dump(snap, fh, indent=2, ensure_ascii=False)
+    fh.write("\n")
+print(f"\n✓ wrote {out_json} ({len(reports)} samples)", file=sys.stderr)
+PY
+
+# Inject tag (if any) into the JSON
+if [[ -n "$TAG" ]]; then
+  python3 - "$JSON_OUT" "$TAG" <<'PY'
+import json, sys
+p, tag = sys.argv[1], sys.argv[2]
+with open(p) as fh:
     snap = json.load(fh)
-with open(sys.argv[2]) as fh:
-    perf = json.load(fh)
-
-ROLE_ORDER = ["smoke", "product", "demo", "stress", "mech"]
-def derive_role(path):
-    name = path.split("/")[-1]
-    head = name.split(".")[0]
-    return head if head in ROLE_ORDER else "product"
-
-for s in snap["samples"]:
-    p = perf.get(s["file"], {})
-    s["median_ms"] = p.get("median_ms")
-    s["min_ms"] = p.get("min_ms")
-    s["max_ms"] = p.get("max_ms")
-    s["det"] = p.get("det")
-    s["role"] = derive_role(s["file"])
-snap["perf_runs"] = int(sys.argv[3])
-with open(sys.argv[1], "w") as fh:
+snap["tag"] = tag
+with open(p, "w") as fh:
     json.dump(snap, fh, indent=2, ensure_ascii=False)
     fh.write("\n")
 PY
-rm -f "$TMP_PERF" "$TMP_LIST"
+fi
 
+# 3. .md summary（--out 模式下跳过）
+if [[ -n "$MD_OUT" ]]; then
 python3 - "$JSON_OUT" "$MD_OUT" <<'PY'
 import json, sys
 from collections import defaultdict
 with open(sys.argv[1]) as fh:
     snap = json.load(fh)
+md = sys.argv[2]
+samples = snap.get("samples", [])
 lines = []
-lines.append(f"# Gate baseline {snap.get('date')}")
+lines.append(f"# Snapshot {snap.get('date','?')}")
+if snap.get("tag"):
+    lines.append(f"tag: `{snap['tag']}`")
+sf = snap.get("set_files") or []
+if sf:
+    lines.append("set_files: " + ", ".join(f"`{s}`" for s in sf))
 lines.append("")
-lines.append(f"- note: {snap.get('note')}")
-lines.append(f"- perf_runs: {snap.get('perf_runs')}")
-lines.append(f"- samples: {len(snap.get('samples', []))}")
+lines.append(f"- samples: {len(samples)}")
 by_role = defaultdict(list)
-for s in snap.get("samples", []):
-    by_role[s.get("role", "product")].append(s)
+for s in samples:
+    by_role[s.get("role", "?")].append(s)
 for role in ["smoke", "product", "demo", "stress", "mech"]:
     if role in by_role:
         lines.append(f"  - {role}: {len(by_role[role])}")
+ok = sum(1 for s in samples if s.get("status") == "ok")
+pe = sum(1 for s in samples if s.get("status") == "parse-error")
+re = sum(1 for s in samples if s.get("status") == "render-error")
+lines.append(f"- status: ok={ok}, parse-error={pe}, render-error={re}")
 lines.append("")
-lines.append("| role | file | nodes | edges | exact_sev | tight_sev | exact_pairs | unrelated_trunk | lint_err | median_ms | det | node_fp |")
-lines.append("|------|------|------:|------:|----------:|----------:|------------:|----------------:|---------:|----------:|:---:|---------|")
+lines.append("| role | file | status | det | node_ovl | edge_grp | label_ovl | crossings | edge_len | canvas | aspect | n/e | ms |")
+lines.append("|---|---|---|:---:|---:|---:|---:|---:|---:|---:|---:|---|---:|")
+def fmt(v):
+    if v is None:
+        return "-"
+    if isinstance(v, float):
+        return f"{v:.1f}"
+    return str(v)
 for role in ["smoke", "product", "demo", "stress", "mech"]:
     for s in by_role.get(role, []):
-        name = s["file"].split("/")[-1]
-        lint = s.get("lint") or {}
+        name = s["path"].rsplit("/", 1)[-1]
+        c = s.get("correctness") or {}
+        q = s.get("quality") or {}
+        o = s.get("observation") or {}
+        det = c.get("det") if c else None
+        det_s = "✓" if det is True else ("✗" if det is False else "-")
         lines.append(
-            f"| {role} | `{name}` | {s['nodes']} | {s['edges']} | {s['exact_sev']:.1f} | {s['tight_sev']:.1f} | "
-            f"{s['exact_pairs']} | {lint.get('unrelated_edge_trunk_merge', 0)} | {lint.get('error_count', 0)} | "
-            f"{s.get('median_ms')} | {s.get('det')} | `{s['node_fp'][:12]}` |"
+            f"| {role} | `{name}` | {s.get('status','?')} | {det_s} | "
+            f"{fmt(c.get('node_overlap_count'))} | {fmt(c.get('edge_crosses_group_interior'))} | "
+            f"{fmt(c.get('label_overlap_count'))} | {fmt(q.get('edge_crossing_count'))} | "
+            f"{fmt(q.get('total_edge_length'))} | {fmt(q.get('canvas_area'))} | "
+            f"{fmt(q.get('aspect_ratio'))} | "
+            f"{fmt(o.get('node_count'))}/{fmt(o.get('edge_count'))} | "
+            f"{fmt(s.get('elapsed_ms'))} |"
         )
 lines.append("")
 lines.append("复跑: `./benchmarks/snapshot.sh`")
 lines.append("对比: `./benchmarks/compare.sh <baseline.json> <current.json>`")
-with open(sys.argv[2], "w") as fh:
+with open(md, "w") as fh:
     fh.write("\n".join(lines) + "\n")
 PY
+fi
 
-cp "$JSON_OUT" "$JSON_LATEST"
-cp "$MD_OUT" "$MD_LATEST"
+# 4. sync latest（--out 模式下跳过）
+if [[ -z "$OUT_BASE" ]]; then
+  cp "$JSON_OUT" "$BM/baselines/latest.json"
+  cp "$MD_OUT" "$BM/baselines/latest.md"
+fi
+
 echo
 echo "✓ $JSON_OUT"
-echo "✓ $MD_OUT"
-echo "✓ synced latest"
+[[ -n "$MD_OUT" ]] && echo "✓ $MD_OUT"
+[[ -z "$OUT_BASE" ]] && echo "✓ synced latest"

@@ -566,7 +566,7 @@ group lane {}
 
 ```plotgram
 group compute {
-    label: "计算层"
+    label: "计算层",
     variant: muted
     layout: horizontal
 
@@ -1086,7 +1086,7 @@ true, false
 <comment_line>         ::= "//" [^\n]*
 
 <diagram_declaration>  ::= "diagram" "{" <diagram_body> "}"
-<diagram_body>         ::= (<diagram_attribute>
+<diagram_body>         ::= (<diagram_attribute> ("," <diagram_attribute>)*
                           | <partition_declaration>
                           | <node_declaration>
                           | <relation_declaration>
@@ -1105,7 +1105,7 @@ true, false
 <group_declaration>    ::= "group" <identifier> [<string>] "{" <group_body> "}"
                           // 规范：group id { label / variant / … ; members… }
                           // 糖：string 注入 label（§6.5）
-<group_body>           ::= (<group_attribute>
+<group_body>           ::= (<group_attribute> ("," <group_attribute>)*
                           | <node_declaration>
                           | <relation_declaration>
                           | <group_declaration>)*
@@ -1127,7 +1127,7 @@ true, false
 
 注：`<algorithm_config>` 形态仅对 diagram / group 级 `layout:` / `edge_routing:` 合法（见 §2.7）。
 
-属性块内属性之间可用逗号 `,` 分隔（可选，纯语法糖；`{ label: "A" archetype: start }` 与 `{ label: "A", archetype: start }` 等价）。
+属性块及 diagram / group 花括号体内的同级属性之间必须用逗号 `,` 分隔（`{ label: "A", archetype: start }`；`diagram { profile: flowchart, title: "T" }`）；无逗号写法不再合法。
 
 <identifier>           ::= [a-z][a-z0-9_]*
 <atom>                 ::= [a-z][a-z0-9_.-]*

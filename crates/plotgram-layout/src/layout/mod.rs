@@ -3,6 +3,6 @@
 pub mod hierarchical;
 
 pub use hierarchical::{
-    GroupAlign, GroupPolicy, GroupSizing, HierarchicalLayout, HierarchicalParams,
-    HierarchicalPreset, Orientation, RoutingStyle,
+    build_debug_trace, GroupAlign, GroupPolicy, GroupSizing, HierarchicalLayout,
+    HierarchicalParams, HierarchicalPreset, LayoutDebugTrace, Orientation, RoutingStyle,
 };

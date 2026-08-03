@@ -1,0 +1,1605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hierarchical 布局模块设计解读 · Plotgram Explainers 002</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --panel: #ffffff;
+    --ink: #1f2430;
+    --muted: #5b6472;
+    --line: #e3e7ee;
+    --blue: #2563eb;       /* Compose 相 */
+    --amber: #d97706;      /* Metric 相 */
+    --green: #059669;      /* Ink 相 */
+    --purple: #7c3aed;     /* Orient 边界 / 转换 */
+    --red: #dc2626;
+    --teal: #0d9488;       /* 写权强调 */
+    --code-bg: #0f172a;
+    --code-ink: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.75;
+    font-size: 16px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px 80px; }
+
+  /* ── 头部 ── */
+  header.hero {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    color: #f1f5f9;
+    padding: 56px 24px 48px;
+    margin-bottom: 40px;
+  }
+  .hero .wrap { padding-bottom: 0; }
+  .hero .kicker {
+    display: inline-block;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #93c5fd;
+    border: 1px solid #33507a;
+    border-radius: 999px;
+    padding: 3px 14px;
+    margin-bottom: 18px;
+  }
+  .hero h1 { font-size: 34px; margin: 0 0 12px; line-height: 1.3; }
+  .hero p.sub { color: #cbd5e1; font-size: 17px; margin: 0 0 20px; max-width: 820px; }
+  .hero .meta { font-size: 13.5px; color: #94a3b8; }
+  .hero .meta code {
+    background: #1e3a5f; color: #bfdbfe; padding: 2px 8px; border-radius: 6px;
+    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+  }
+
+  /* ── 目录 ── */
+  nav.toc {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin-bottom: 44px;
+  }
+  nav.toc h2 { font-size: 14px; color: var(--muted); margin: 0 0 10px;
+    letter-spacing: 0.08em; text-transform: uppercase; }
+  nav.toc ol { margin: 0; padding-left: 22px; columns: 2; column-gap: 40px; }
+  nav.toc li { margin: 4px 0; break-inside: avoid; }
+  nav.toc a { color: var(--blue); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+
+  /* ── 章节 ── */
+  section { margin-bottom: 56px; }
+  h2.sec {
+    font-size: 25px; margin: 0 0 6px;
+    padding-bottom: 10px; border-bottom: 2px solid var(--line);
+  }
+  h2.sec .num { color: var(--blue); margin-right: 10px; font-weight: 700; }
+  h3 { font-size: 19px; margin: 30px 0 10px; }
+  h3 .ph { display: inline-block; font-size: 12px; font-weight: 700;
+    padding: 2px 9px; border-radius: 4px; vertical-align: middle; margin-left: 8px; }
+  h3 .ph.compose { background: #dbeafe; color: #1d4ed8; }
+  h3 .ph.metric  { background: #fef3c7; color: #b45309; }
+  h3 .ph.ink     { background: #d1fae5; color: #047857; }
+  h3 .ph.orient  { background: #ede9fe; color: #6d28d9; }
+  p.lead { color: var(--muted); margin: 8px 0 20px; font-size: 15.5px; }
+
+  /* ── 代码块 ── */
+  pre {
+    background: var(--code-bg); color: var(--code-ink);
+    border-radius: 12px; padding: 20px 24px; overflow-x: auto;
+    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 13.5px; line-height: 1.7;
+  }
+  code.inline {
+    background: #eef1f6; color: #0f172a; padding: 1px 7px; border-radius: 6px;
+    font-family: "SF Mono", "Cascadia Code", Consolas, monospace; font-size: 0.88em;
+  }
+  .kw  { color: #c084fc; }
+  .ty  { color: #67e8f9; }
+  .fn  { color: #86efac; }
+  .str { color: #fcd34d; }
+  .cm  { color: #64748b; font-style: italic; }
+  .lt  { color: #fda4af; }
+
+  /* ── 图容器 ── */
+  figure.diagram {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px;
+    margin: 24px 0;
+  }
+  figure.diagram svg { width: 100%; height: auto; display: block; }
+  figure.diagram figcaption {
+    font-size: 13.5px; color: var(--muted); margin-top: 14px;
+    text-align: center;
+  }
+
+  /* ── 卡片 / 表格 ── */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 16px; margin: 22px 0; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-left: 4px solid var(--blue); border-radius: 10px; padding: 16px 18px;
+  }
+  .card.amber  { border-left-color: var(--amber); }
+  .card.green  { border-left-color: var(--green); }
+  .card.purple { border-left-color: var(--purple); }
+  .card.red    { border-left-color: var(--red); }
+  .card.teal   { border-left-color: var(--teal); }
+  .card h4 { margin: 0 0 6px; font-size: 15.5px; }
+  .card p  { margin: 0; font-size: 13.5px; color: var(--muted); }
+  .card .sig { font-family: "SF Mono", Consolas, monospace; font-size: 12.5px;
+    color: var(--blue); display: block; margin-top: 8px; word-break: break-all; }
+
+  table.ref {
+    width: 100%; border-collapse: collapse; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+    font-size: 14px; margin: 20px 0;
+  }
+  table.ref th, table.ref td { padding: 10px 14px; text-align: left;
+    border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.ref th { background: #eef1f6; font-weight: 600; }
+  table.ref tr:last-child td { border-bottom: none; }
+  table.ref code { font-family: "SF Mono", Consolas, monospace; font-size: 12.5px; }
+
+  /* ── 提示框 ── */
+  .note {
+    border-radius: 10px; padding: 14px 18px; margin: 20px 0; font-size: 14.5px;
+    border: 1px solid;
+  }
+  .note.key  { background: #eff6ff; border-color: #bfdbfe; }
+  .note.warn { background: #fef2f2; border-color: #fecaca; }
+  .note.tip  { background: #ecfdf5; border-color: #a7f3d0; }
+  .note b { display: block; margin-bottom: 4px; }
+
+  .pill {
+    display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px;
+    padding: 2px 10px; vertical-align: middle;
+  }
+  .pill.compose { background: #dbeafe; color: #1d4ed8; }
+  .pill.metric  { background: #fef3c7; color: #b45309; }
+  .pill.ink     { background: #d1fae5; color: #047857; }
+  .pill.orient  { background: #ede9fe; color: #6d28d9; }
+  .pill.write   { background: #d1fae5; color: #047857; }
+  .pill.read    { background: #dbeafe; color: #1d4ed8; }
+
+  footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line);
+    padding-top: 20px; }
+  a { color: var(--blue); }
+  <img src="../../showcase/hierarchical/flat/demo.flat-realtime-recommendation.pgm"/></style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Plotgram Explainers · 002</span>
+    <h1>Hierarchical 布局模块设计解读</h1>
+    <p class="sub">一个 Sugiyama 风格的分层布局器如何把有向图变成像素坐标——
+      <b>Compose → Metric → Ink</b> 三相写权、canonical-TB 单核 + 四方向投影、
+      FAS 去环 / 简化 Network Simplex / median+transpose 定序 / VPSC 次轴。
+      本页带你逐文件读懂 <code class="inline">layout/hierarchical/</code>。</p>
+    <div class="meta">
+      对应源码：<code>crates/plotgram-layout/src/layout/hierarchical/</code>
+      &nbsp;·&nbsp; 目标架构真源：<code>docs/design/layout/hierarchical/architecture.md</code>
+      &nbsp;·&nbsp; 取舍记录：<code>docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md</code>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>目录</h2>
+  <ol>
+    <li><a href="#s1">这个 mod 是什么</a></li>
+    <li><a href="#s2">全景：三相 + Orient 边界</a></li>
+    <li><a href="#s3">数据结构谱系</a></li>
+    <li><a href="#s4">执行流程总览</a></li>
+    <li><a href="#s5">Compose 相：拓扑决定</a></li>
+    <li><a href="#s5-1">5.1 graph_index — 索引与自环提取</a></li>
+    <li><a href="#s5-2">5.2 cycle — Greedy-FAS 去环</a></li>
+    <li><a href="#s5-3">5.3 rank — 简化 Network Simplex</a></li>
+    <li><a href="#s5-4">5.4 properify — dummy 链展开</a></li>
+    <li><a href="#s5-5">5.5 order — median + transpose + 组块</a></li>
+    <li><a href="#s5-6">5.6 ports — 端口 side 与 slot</a></li>
+    <li><a href="#s6">Metric 相：像素坐标</a></li>
+    <li><a href="#s7">Ink 相：折线展开</a></li>
+    <li><a href="#s8">Orientation 转换</a></li>
+    <li><a href="#s9">写权纪律</a></li>
+    <li><a href="#s10">MVP 取舍清单</a></li>
+    <li><a href="#s11">术语速查表</a></li>
+  </ol>
+</nav>
+
+<!-- ═══════════════ 1 ═══════════════ -->
+<section id="s1">
+  <h2 class="sec"><span class="num">1</span>这个 mod 是什么</h2>
+  <p class="lead">一句话：<b>plotgram 的主布局核</b>，把任意有向图（含环、长边、自环、组）
+  排成"主流方向同向、层内少交叉、边走正交"的可读图。</p>
+
+  <div class="cards">
+    <div class="card">
+      <h4>算法骨架</h4>
+      <p>Sugiyama 五段式：去环 → 分层 → properify → 定序 → 坐标。在此基础上落
+        yFiles 经验沉淀的三相写权纪律。</p>
+    </div>
+    <div class="card amber">
+      <h4>实现位置</h4>
+      <p>单独 crate：<code>plotgram-layout</code> 下的 <code>layout/hierarchical/</code>。
+        通过 <code>LayoutAlgorithm</code> trait 接入 engine。</p>
+      <span class="sig">crates/plotgram-layout/src/layout/hierarchical/</span>
+    </div>
+    <div class="card green">
+      <h4>注册名</h4>
+      <p><code>"hierarchical"</code>（核心）。另外 <code>"architecture"</code> 是
+        临时别名——同一份实现，不按名字分支。</p>
+    </div>
+    <div class="card purple">
+      <h4>方向支持</h4>
+      <p>核心<b>只实现 canonical TB</b>（自上而下）；LR/RL/BT 通过
+        <code>plotgram_algo::orientation</code> 在入/出口做坐标变换。</p>
+    </div>
+  </div>
+
+  <div class="note key">
+    <b>它不是 yFiles 的全量复刻</b>
+    AGENTS.md §1 明确："轻量 DSL 画图引擎……不复刻全量复杂布局栈"。
+    本模块在 Network Simplex、Brandes–Köpf、Channel rip-up 等子问题上做了
+    <b>有记录的简化</b>（见 §10），目标是"够用且可读"，而不是"和 yFiles 像素一致"。
+  </div>
+</section>
+
+<!-- ═══════════════ 2 ═══════════════ -->
+<section id="s2">
+  <h2 class="sec"><span class="num">2</span>全景：三相 + Orient 边界</h2>
+  <p class="lead">整个模块按 <b>Compose / Metric / Ink</b> 三相切分，外加一个
+    <b>Orientation 边界</b>把"canonical TB 内核"和"四方向物理输出"隔开。</p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 1000 520" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'PingFang SC',sans-serif">
+      <defs>
+        <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#64748b"/>
+        </marker>
+        <marker id="arrC" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#2563eb"/>
+        </marker>
+        <marker id="arrM" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#d97706"/>
+        </marker>
+        <marker id="arrI" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#059669"/>
+        </marker>
+        <marker id="arrP" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#7c3aed"/>
+        </marker>
+      </defs>
+
+      <!-- 外层：LayoutAlgorithm -->
+      <rect x="20" y="20" width="960" height="480" rx="16" fill="#fafbfc" stroke="#cbd5e1" stroke-width="1.5"/>
+      <text x="40" y="48" font-size="13" fill="#5b6472" font-weight="700">
+        HierarchicalLayout::layout(input) → Result&lt;LayoutOutput&gt;
+      </text>
+      <text x="40" y="68" font-size="11.5" fill="#94a3b8">
+        crates/plotgram-layout/src/layout/hierarchical/mod.rs
+      </text>
+
+      <!-- 输入 -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="40" y="90" width="160" height="60" rx="10" fill="#f1f5f9" stroke="#cbd5e1"/>
+        <text x="120" y="116" font-weight="700" fill="#475569">LayoutInput</text>
+        <text x="120" y="136" font-size="11.5" fill="#5b6472">Graph · node_sizes · options</text>
+      </g>
+
+      <!-- bind -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="230" y="90" width="170" height="60" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+        <text x="315" y="116" font-weight="700" fill="#b45309">HierarchicalParams::bind</text>
+        <text x="315" y="136" font-size="11.5" fill="#5b6472">preset → overlay → typed params</text>
+      </g>
+      <line x1="200" y1="120" x2="227" y2="120" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- orient in -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="420" y="90" width="170" height="60" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="505" y="116" font-weight="700" fill="#6d28d9">orient::to_algo_orientation</text>
+        <text x="505" y="136" font-size="11.5" fill="#5b6472">物理方向 → TB 变换器</text>
+      </g>
+      <line x1="400" y1="120" x2="417" y2="120" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- canonical TB core box -->
+      <rect x="40" y="180" width="780" height="280" rx="14" fill="#f0f9ff" stroke="#93c5fd" stroke-width="1.5" stroke-dasharray="6 4"/>
+      <text x="60" y="204" font-size="13" fill="#1d4ed8" font-weight="700">
+        canonical TB 内核（main = y↓, cross = x→）
+      </text>
+      <text x="60" y="220" font-size="11.5" fill="#64748b">
+        全部 rank/order/port/coord/ink 决策都在这个空间里做，不知道物理方向
+      </text>
+
+      <!-- Compose -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="60" y="240" width="230" height="200" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="175" y="266" font-weight="700" fill="#1d4ed8">Compose 相</text>
+        <text x="175" y="284" font-size="11.5" fill="#5b6472">拓扑决定：rank / order / port</text>
+        <text x="70" y="306" text-anchor="start" font-size="12" fill="#1e3a5f">· graph_index (建索引)</text>
+        <text x="70" y="324" text-anchor="start" font-size="12" fill="#1e3a5f">· cycle (Greedy-FAS)</text>
+        <text x="70" y="342" text-anchor="start" font-size="12" fill="#1e3a5f">· rank (Network Simplex)</text>
+        <text x="70" y="360" text-anchor="start" font-size="12" fill="#1e3a5f">· properify (dummy 链)</text>
+        <text x="70" y="378" text-anchor="start" font-size="12" fill="#1e3a5f">· order (median+transpose)</text>
+        <text x="70" y="396" text-anchor="start" font-size="12" fill="#1e3a5f">· ports (side + slot)</text>
+        <text x="70" y="420" text-anchor="start" font-size="11" fill="#64748b" font-style="italic">产出 PlanGraph + ports</text>
+      </g>
+
+      <!-- Metric -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="320" y="240" width="220" height="200" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="430" y="266" font-weight="700" fill="#b45309">Metric 相</text>
+        <text x="430" y="284" font-size="11.5" fill="#5b6472">像素坐标：节点框</text>
+        <text x="330" y="320" text-anchor="start" font-size="12" fill="#7c2d12">· main_axis</text>
+        <text x="330" y="338" text-anchor="start" font-size="11.5" fill="#9a3412">  层栈：layer_gap 间隔</text>
+        <text x="330" y="368" text-anchor="start" font-size="12" fill="#7c2d12">· cross_axis</text>
+        <text x="330" y="386" text-anchor="start" font-size="11.5" fill="#9a3412">  median 松弛 + VPSC 求解</text>
+        <text x="330" y="420" text-anchor="start" font-size="11" fill="#64748b" font-style="italic">产出 canonical_frames[]</text>
+      </g>
+
+      <!-- Ink -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="570" y="240" width="230" height="200" rx="10" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+        <text x="685" y="266" font-weight="700" fill="#047857">Ink 相</text>
+        <text x="685" y="284" font-size="11.5" fill="#5b6472">纯展开：折线 / 自环</text>
+        <text x="580" y="318" text-anchor="start" font-size="12" fill="#065f46">· route</text>
+        <text x="580" y="336" text-anchor="start" font-size="11.5" fill="#047857">  waypoint + 中点双折角</text>
+        <text x="580" y="354" text-anchor="start" font-size="11.5" fill="#047857">  + normalize_orthogonal</text>
+        <text x="580" y="378" text-anchor="start" font-size="12" fill="#065f46">· selfloop</text>
+        <text x="580" y="396" text-anchor="start" font-size="11.5" fill="#047857">  East 侧小回路桩</text>
+        <text x="580" y="420" text-anchor="start" font-size="11" fill="#64748b" font-style="italic">零新决策，只展开上游</text>
+      </g>
+
+      <line x1="290" y1="340" x2="317" y2="340" stroke="#d97706" stroke-width="2" marker-end="url(#arrM)"/>
+      <line x1="540" y1="340" x2="567" y2="340" stroke="#059669" stroke-width="2" marker-end="url(#arrI)"/>
+
+      <!-- Compose 接收输入 -->
+      <path d="M120,150 Q120,200 175,238" stroke="#2563eb" stroke-width="2" fill="none" marker-end="url(#arrC)"/>
+      <!-- orient 投入内核 -->
+      <path d="M505,150 Q505,180 430,238" stroke="#7c3aed" stroke-width="2" fill="none" marker-end="url(#arrP)"/>
+
+      <!-- 输出：orient out -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="840" y="240" width="130" height="80" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+        <text x="905" y="266" font-weight="700" fill="#6d28d9">orient out</text>
+        <text x="905" y="284" font-size="11.5" fill="#5b6472">canonical → 物理</text>
+        <text x="905" y="302" font-size="11.5" fill="#5b6472">rect 4 角 bbox</text>
+      </g>
+      <line x1="800" y1="280" x2="837" y2="280" stroke="#7c3aed" stroke-width="2" marker-end="url(#arrP)"/>
+
+      <!-- normalize -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="840" y="340" width="130" height="60" rx="10" fill="#f1f5f9" stroke="#cbd5e1"/>
+        <text x="905" y="366" font-weight="700" fill="#475569">normalize</text>
+        <text x="905" y="384" font-size="11.5" fill="#5b6472">平移到原点</text>
+      </g>
+      <line x1="905" y1="320" x2="905" y2="337" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- output -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="840" y="420" width="130" height="60" rx="10" fill="#f1f5f9" stroke="#cbd5e1"/>
+        <text x="905" y="446" font-weight="700" fill="#475569">LayoutOutput</text>
+        <text x="905" y="464" font-size="11.5" fill="#5b6472">nodes · edges</text>
+      </g>
+      <line x1="905" y1="400" x2="905" y2="417" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- 颜色图例 -->
+      <g font-size="12">
+        <text x="40" y="490" font-weight="700" fill="#5b6472">颜色：</text>
+        <rect x="90"  y="480" width="14" height="14" rx="3" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="110" y="491">Compose（拓扑）</text>
+        <rect x="230" y="480" width="14" height="14" rx="3" fill="#fef3c7" stroke="#d97706"/>
+        <text x="250" y="491">Metric（坐标）</text>
+        <rect x="365" y="480" width="14" height="14" rx="3" fill="#d1fae5" stroke="#059669"/>
+        <text x="385" y="491">Ink（折线）</text>
+        <rect x="465" y="480" width="14" height="14" rx="3" fill="#ede9fe" stroke="#7c3aed"/>
+        <text x="485" y="491">Orient（方向变换）</text>
+      </g>
+    </svg>
+    <figcaption>图 1 · 模块全景。<b>canonical TB 内核</b>是虚线框内的三相继流水——
+    所有几何决策都在自上而下的标准空间里完成，物理方向只是出入口的一次坐标变换。</figcaption>
+  </figure>
+
+  <div class="note key">
+    <b>为什么要把方向"挡在门外"？</b>
+    Sugiyama 的 rank / order / median / VPSC 全部以"层 + 层内序"为输入，方向只是
+    把 (main, cross) 映射到 (x, y) 的旋钮。若让算法内部到处出现 <code>if lr { ... }</code>
+    分支，每个子问题都要写四遍。把方向收敛到 <code>orient.rs</code> 一个文件，是
+    <b>每个几何自由度有且只有一个写者</b>（AGENTS.md §1）的最具体落地。
+  </div>
+</section>
+
+<!-- ═══════════════ 3 ═══════════════ -->
+<section id="s3">
+  <h2 class="sec"><span class="num">3</span>数据结构谱系</h2>
+  <p class="lead">从一个 <code class="inline">plotgram_model::Graph</code> 进来，
+    最终吐出 <code class="inline">LayoutOutput</code>。中间经过三种内部 IR，每个都
+    有明确的"什么时候被填满、什么时候只读"。</p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 1000 460" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'PingFang SC',sans-serif">
+      <defs>
+        <marker id="arr3" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#64748b"/>
+        </marker>
+      </defs>
+
+      <!-- Graph -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="20" y="40" width="180" height="120" rx="10" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+        <text x="110" y="64" font-weight="700" fill="#475569">plotgram_model::Graph</text>
+        <text x="110" y="86" font-size="11.5" fill="#5b6472" text-anchor="start" x="30">nodes: Vec&lt;Node&gt;</text>
+        <text x="110" y="104" font-size="11.5" fill="#5b6472" text-anchor="start" x="30">edges: Vec&lt;Edge&gt;</text>
+        <text x="110" y="122" font-size="11.5" fill="#5b6472" text-anchor="start" x="30">groups: Vec&lt;Group&gt;</text>
+        <text x="110" y="140" font-size="11.5" fill="#5b6472" text-anchor="start" x="30">partition: Option&lt;_&gt;</text>
+        <text x="30" y="156" font-size="11" fill="#64748b" font-style="italic" text-anchor="start">DSL 解析产物</text>
+      </g>
+
+      <!-- RealGraph -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="240" y="40" width="220" height="160" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="350" y="64" font-weight="700" fill="#1d4ed8">RealGraph</text>
+        <text x="350" y="82" font-size="11.5" fill="#5b6472">dense-indexed，real 节点 only</text>
+        <text x="250" y="106" text-anchor="start" font-size="12" fill="#1e3a5f">ids: Vec&lt;String&gt;</text>
+        <text x="250" y="124" text-anchor="start" font-size="12" fill="#1e3a5f">index_of: BTreeMap</text>
+        <text x="250" y="142" text-anchor="start" font-size="12" fill="#1e3a5f">group_path: Vec&lt;Vec&lt;String&gt;&gt;</text>
+        <text x="250" y="160" text-anchor="start" font-size="12" fill="#1e3a5f">edges: Vec&lt;RealEdge&gt;</text>
+        <text x="250" y="178" text-anchor="start" font-size="12" fill="#1e3a5f">  + working_source/target</text>
+        <text x="250" y="196" text-anchor="start" font-size="12" fill="#1e3a5f">self_loops: Vec&lt;(id, idx)&gt;</text>
+      </g>
+      <line x1="200" y1="100" x2="237" y2="100" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <text x="218" y="92" font-size="10.5" fill="#64748b" text-anchor="middle">graph_index</text>
+
+      <!-- PlanGraph -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="500" y="40" width="240" height="200" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="620" y="64" font-weight="700" fill="#1d4ed8">PlanGraph</text>
+        <text x="620" y="82" font-size="11.5" fill="#5b6472">properified：real + dummy 统一为 Elem</text>
+        <text x="510" y="106" text-anchor="start" font-size="12" fill="#1e3a5f">elems: Vec&lt;Elem&gt;</text>
+        <text x="510" y="124" text-anchor="start" font-size="12" fill="#1e3a5f">  key: ElemKey::Real | Virtual</text>
+        <text x="510" y="142" text-anchor="start" font-size="12" fill="#1e3a5f">  group_path, rank</text>
+        <text x="510" y="160" text-anchor="start" font-size="12" fill="#1e3a5f">segments: Vec&lt;Segment&gt;</text>
+        <text x="510" y="178" text-anchor="start" font-size="12" fill="#1e3a5f">  (rank-相邻的 from→to 一跳)</text>
+        <text x="510" y="196" text-anchor="start" font-size="12" fill="#1e3a5f">layers: Vec&lt;Vec&lt;usize&gt;&gt;</text>
+        <text x="510" y="214" text-anchor="start" font-size="12" fill="#1e3a5f">  rank → 有序 elem 索引</text>
+        <text x="510" y="232" text-anchor="start" font-size="12" fill="#1e3a5f">decl_index: 稳定 tie-break</text>
+      </g>
+      <line x1="460" y1="120" x2="497" y2="120" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <text x="478" y="112" font-size="10.5" fill="#64748b" text-anchor="middle">properify</text>
+
+      <!-- ports -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="500" y="270" width="240" height="80" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="620" y="296" font-weight="700" fill="#b45309">BTreeMap&lt;EdgeId, EdgePorts&gt;</text>
+        <text x="620" y="314" font-size="11.5" fill="#5b6472">side + slot + count（canonical）</text>
+        <text x="620" y="332" font-size="11.5" fill="#5b6472">每边按对侧 (rank,order,EdgeId) 排序</text>
+      </g>
+      <line x1="620" y1="240" x2="620" y2="267" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <text x="640" y="258" font-size="10.5" fill="#64748b">ports</text>
+
+      <!-- canonical_frames -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="780" y="40" width="200" height="120" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="880" y="64" font-weight="700" fill="#b45309">Vec&lt;Rect&gt; canonical_frames</text>
+        <text x="880" y="86" font-size="11.5" fill="#5b6472">每个 Elem 一个 TB 矩形</text>
+        <text x="880" y="104" font-size="11.5" fill="#5b6472">real: 节点框</text>
+        <text x="880" y="122" font-size="11.5" fill="#5b6472">virtual: 0×0 点</text>
+        <text x="880" y="148" font-size="11" fill="#64748b" font-style="italic">main + cross 合成</text>
+      </g>
+      <line x1="740" y1="100" x2="777" y2="100" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <text x="758" y="92" font-size="10.5" fill="#64748b" text-anchor="middle">metric</text>
+
+      <!-- CanonicalEdge -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="780" y="180" width="200" height="120" rx="10" fill="#d1fae5" stroke="#059669" stroke-width="2"/>
+        <text x="880" y="204" font-weight="700" fill="#047857">Vec&lt;CanonicalEdge&gt;</text>
+        <text x="880" y="226" font-size="11.5" fill="#5b6472">id, source, target</text>
+        <text x="880" y="244" font-size="11.5" fill="#5b6472">path: Vec&lt;Point&gt; (TB)</text>
+        <text x="880" y="262" font-size="11.5" fill="#5b6472">from_port / to_port</text>
+        <text x="880" y="288" font-size="11" fill="#64748b" font-style="italic">ink 展开</text>
+      </g>
+      <line x1="880" y1="160" x2="880" y2="177" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr3)"/>
+      <line x1="780" y1="240" x2="740" y2="200" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#arr3)"/>
+
+      <!-- LayoutOutput -->
+      <g font-size="13" text-anchor="middle">
+        <rect x="780" y="330" width="200" height="100" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+        <text x="880" y="356" font-weight="700" fill="#6d28d9">LayoutOutput</text>
+        <text x="880" y="378" font-size="11.5" fill="#5b6472">nodes: Vec&lt;NodePlacement&gt;</text>
+        <text x="880" y="396" font-size="11.5" fill="#5b6472">edges: Vec&lt;EdgePlacement&gt;</text>
+        <text x="880" y="416" font-size="11" fill="#64748b" font-style="italic">物理坐标 + 已 normalize</text>
+      </g>
+      <line x1="880" y1="300" x2="880" y2="327" stroke="#7c3aed" stroke-width="2" marker-end="url(#arr3)"/>
+      <text x="900" y="316" font-size="10.5" fill="#7c3aed">orient out</text>
+    </svg>
+    <figcaption>图 2 · 数据结构谱系。<b>RealGraph</b> 是去自环后的稠密索引视图；
+    <b>PlanGraph</b> 是 properify 后的"real + dummy 统一"视图；
+    <b>canonical_frames / CanonicalEdge</b> 是 metric/ink 相的产物，仍在 TB 空间；
+    最后由 <b>orient out</b> 一次性翻成物理方向。</figcaption>
+  </figure>
+
+  <div class="note tip">
+    <b>为什么 ElemKey 同时有 Real 和 Virtual？</b>
+    properify 把跨多 rank 的长边拆成一串"rank-相邻的小段"，中间插入 dummy 节点。
+    把 real 和 dummy 用同一个 <code>ElemKey</code> 枚举表达，后续 order / metric / ink
+    就可以<b>不区分</b>地处理它们——dummy 只是"宽度=0、无 group 的节点"。
+    这是 Sugiyama 框架的核心简化。
+  </div>
+</section>
+
+<!-- ═══════════════ 4 ═══════════════ -->
+<section id="s4">
+  <h2 class="sec"><span class="num">4</span>执行流程总览</h2>
+  <p class="lead"><code class="inline">HierarchicalLayout::layout</code> 的 25 行函数体，
+    每一行都对应一个明确的算法步骤。下面把它和源文件一一对应。</p>
+
+  <pre><span class="cm">// crates/plotgram-layout/src/layout/hierarchical/mod.rs</span>
+<span class="kw">fn</span> <span class="fn">layout</span>(&<span class="lt">self</span>, input: LayoutInput&lt;<span class="kw">'_</span>&gt;) -&gt; <span class="ty">Result</span>&lt;LayoutOutput, LayoutError&gt; {
+    <span class="kw">let</span> bound = HierarchicalParams::<span class="fn">bind</span>(input.options)?;          <span class="cm">// params.rs</span>
+    <span class="kw">let</span> orientation = orient::<span class="fn">to_algo_orientation</span>(params.orientation); <span class="cm">// orient.rs</span>
+
+    <span class="cm">// --- Compose ---------------------------------------------------</span>
+    <span class="kw">let</span> <span class="kw">mut</span> real_graph = compose::graph_index::<span class="fn">build_real_graph</span>(input.graph); <span class="cm">// graph_index.rs</span>
+    compose::cycle::<span class="fn">remove_cycles</span>(&<span class="kw">mut</span> real_graph);                 <span class="cm">// cycle.rs (Greedy-FAS)</span>
+    <span class="kw">let</span> ranks = compose::rank::<span class="fn">assign_ranks</span>(&real_graph)?;                <span class="cm">// rank.rs (Network Simplex)</span>
+    <span class="kw">let</span> <span class="kw">mut</span> plan = compose::properify::<span class="fn">properify</span>(&real_graph, &ranks);    <span class="cm">// properify.rs</span>
+    compose::order::<span class="fn">order_layers</span>(&<span class="kw">mut</span> plan);                          <span class="cm">// order.rs (median+transpose)</span>
+    <span class="kw">let</span> ports = compose::ports::<span class="fn">assign_ports</span>(&real_graph, &plan);         <span class="cm">// ports.rs</span>
+
+    <span class="cm">// --- Metric ------------------------------------------------------</span>
+    <span class="kw">let</span> main = metric::main_axis::<span class="fn">assign_main_axis</span>(&plan, &size_of, layer_gap); <span class="cm">// main_axis.rs</span>
+    <span class="kw">let</span> cross = metric::cross_axis::<span class="fn">assign_cross_axis</span>(&plan, &size_of, node_gap); <span class="cm">// cross_axis.rs (relax+VPSC)</span>
+    <span class="kw">let</span> canonical_frames = <span class="fn">zip</span>(cross, main).<span class="fn">map</span>(|..| Rect::new(..));
+
+    <span class="cm">// --- Ink -----------------------------------------------------------</span>
+    <span class="kw">let</span> <span class="kw">mut</span> canonical_edges = ink::route::<span class="fn">route_edges</span>(&real_graph, &plan, &ports, &frames); <span class="cm">// route.rs</span>
+    canonical_edges.<span class="fn">extend</span>(ink::selfloop::<span class="fn">self_loop_edges</span>(..));           <span class="cm">// selfloop.rs</span>
+
+    <span class="cm">// --- Orientation-out + assemble the public contract ----------------</span>
+    <span class="kw">let</span> nodes = real_graph.ids.<span class="fn">iter</span>().<span class="fn">map</span>(|id| NodePlacement { .. <span class="fn">canonical_rect_to_physical</span>(..) });
+    <span class="kw">let</span> edges = canonical_edges.<span class="fn">into_iter</span>().<span class="fn">map</span>(|ce| EdgePlacement { .. <span class="fn">from_algo_point</span>(..) });
+    <span class="fn">normalize_to_origin</span>(&<span class="kw">mut</span> nodes, &<span class="kw">mut</span> edges);
+
+    <span class="ty">Ok</span>(LayoutOutput { nodes, edges })
+}</pre>
+
+  <table class="ref">
+    <thead><tr><th>步骤</th><th>源文件</th><th>读</th><th>写</th><th>关键算法</th></tr></thead>
+    <tbody>
+      <tr><td>bind params</td><td><code>params.rs</code></td><td>AttrMap</td><td>HierarchicalParams</td><td>preset → overlay</td></tr>
+      <tr><td>build_real_graph</td><td><code>compose/graph_index.rs</code></td><td>Graph</td><td>RealGraph</td><td>声明序 + 自环提取</td></tr>
+      <tr><td>remove_cycles</td><td><code>compose/cycle.rs</code></td><td>RealGraph</td><td>working_*, reversed</td><td>Greedy-FAS</td></tr>
+      <tr><td>assign_ranks</td><td><code>compose/rank.rs</code></td><td>RealGraph (working)</td><td>RankMap</td><td>longest-path + NS pivot</td></tr>
+      <tr><td>properify</td><td><code>compose/properify.rs</code></td><td>RealGraph + ranks</td><td>PlanGraph</td><td>dummy 链展开</td></tr>
+      <tr><td>order_layers</td><td><code>compose/order.rs</code></td><td>PlanGraph</td><td>plan.layers (mut)</td><td>median + transpose + 块</td></tr>
+      <tr><td>assign_ports</td><td><code>compose/ports.rs</code></td><td>RealGraph + PlanGraph</td><td>EdgePorts map</td><td>side 推断 + slot 分配</td></tr>
+      <tr><td>assign_main_axis</td><td><code>metric/main_axis.rs</code></td><td>PlanGraph + sizes</td><td>Vec&lt;f64&gt; top</td><td>层栈，layer_gap</td></tr>
+      <tr><td>assign_cross_axis</td><td><code>metric/cross_axis.rs</code></td><td>PlanGraph + sizes</td><td>Vec&lt;f64&gt; center</td><td>median 松弛 + VPSC</td></tr>
+      <tr><td>route_edges</td><td><code>ink/route.rs</code></td><td>PlanGraph + ports + frames</td><td>Vec&lt;CanonicalEdge&gt;</td><td>waypoint + 中点双折 + normalize</td></tr>
+      <tr><td>self_loop_edges</td><td><code>ink/selfloop.rs</code></td><td>self_loops + frames</td><td>Vec&lt;CanonicalEdge&gt;</td><td>East 侧小回路桩</td></tr>
+      <tr><td>orient out + normalize</td><td><code>mod.rs</code></td><td>canonical_frames/edges</td><td>LayoutOutput</td><td>4 角 bbox + 平移到原点</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════ 5 ═══════════════ -->
+<section id="s5">
+  <h2 class="sec"><span class="num">5</span>Compose 相：拓扑决定</h2>
+  <p class="lead">这一相只决定"谁在第几层、层内什么顺序、从哪一侧出入"——
+    <b>完全不碰像素</b>。所有几何自由度（坐标、间距、折点）都留给下游 Metric / Ink。</p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 1000 240" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'PingFang SC',sans-serif">
+      <defs>
+        <marker id="arr5" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#2563eb"/>
+        </marker>
+      </defs>
+      <g font-size="13" text-anchor="middle">
+        <rect x="20"  y="80" width="140" height="80" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="90" y="108" font-weight="700" fill="#1d4ed8">graph_index</text>
+        <text x="90" y="128" font-size="11.5" fill="#5b6472">建索引</text>
+        <text x="90" y="146" font-size="11.5" fill="#5b6472">抽自环</text>
+
+        <rect x="180" y="80" width="120" height="80" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="240" y="108" font-weight="700" fill="#1d4ed8">cycle</text>
+        <text x="240" y="128" font-size="11.5" fill="#5b6472">Greedy-FAS</text>
+        <text x="240" y="146" font-size="11.5" fill="#5b6472">working 方向</text>
+
+        <rect x="320" y="80" width="120" height="80" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="380" y="108" font-weight="700" fill="#1d4ed8">rank</text>
+        <text x="380" y="128" font-size="11.5" fill="#5b6472">Network</text>
+        <text x="380" y="146" font-size="11.5" fill="#5b6472">Simplex</text>
+
+        <rect x="460" y="80" width="120" height="80" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="520" y="108" font-weight="700" fill="#1d4ed8">properify</text>
+        <text x="520" y="128" font-size="11.5" fill="#5b6472">dummy 链</text>
+        <text x="520" y="146" font-size="11.5" fill="#5b6472">PlanGraph</text>
+
+        <rect x="600" y="80" width="140" height="80" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="670" y="108" font-weight="700" fill="#1d4ed8">order</text>
+        <text x="670" y="128" font-size="11.5" fill="#5b6472">median +</text>
+        <text x="670" y="146" font-size="11.5" fill="#5b6472">transpose</text>
+
+        <rect x="760" y="80" width="120" height="80" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="820" y="108" font-weight="700" fill="#1d4ed8">ports</text>
+        <text x="820" y="128" font-size="11.5" fill="#5b6472">side + slot</text>
+
+        <rect x="900" y="80" width="80" height="80" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="940" y="116" font-weight="700" fill="#b45309">→</text>
+        <text x="940" y="138" font-size="11" fill="#5b6472">Metric</text>
+      </g>
+      <g stroke="#2563eb" stroke-width="1.5" fill="none">
+        <line x1="160" y1="120" x2="177" y2="120" marker-end="url(#arr5)"/>
+        <line x1="300" y1="120" x2="317" y2="120" marker-end="url(#arr5)"/>
+        <line x1="440" y1="120" x2="457" y2="120" marker-end="url(#arr5)"/>
+        <line x1="580" y1="120" x2="597" y2="120" marker-end="url(#arr5)"/>
+        <line x1="740" y1="120" x2="757" y2="120" marker-end="url(#arr5)"/>
+        <line x1="880" y1="120" x2="897" y2="120" marker-end="url(#arr5)"/>
+      </g>
+      <text x="500" y="210" font-size="12" fill="#64748b" text-anchor="middle" font-style="italic">
+        全程在 canonical TB 空间；产出 PlanGraph（rank + order）+ ports map
+      </text>
+    </svg>
+    <figcaption>图 3 · Compose 相内部流水。六个步骤，每步只写一个自由度。</figcaption>
+  </figure>
+</section>
+
+<!-- ═══════════════ 5.1 ═══════════════ -->
+<section id="s5-1">
+  <h3>5.1 graph_index — 索引与自环提取 <span class="ph compose">Compose</span></h3>
+  <p class="lead">把 <code class="inline">Graph</code> 翻译成 dense-indexed 的
+    <code class="inline">RealGraph</code>。两件关键事：抽自环、记 group_path。</p>
+
+  <div class="cards">
+    <div class="card">
+      <h4>自环抽离</h4>
+      <p><code>source == target</code> 的边<b>不进</b> edges 列表，只记到
+        <code>self_loops: Vec&lt;(edge_id, node_idx)&gt;</code>。理由：自环没有 rank 差，
+        参与 rank/order 没意义；Ink 阶段单独画。</p>
+    </div>
+    <div class="card purple">
+      <h4>group_path 记录</h4>
+      <p>每个节点存 root..leaf 的 group id 路径（<code>Vec&lt;String&gt;</code>）。
+        这是后续 order 相"组内连续"约束的唯一输入。</p>
+    </div>
+    <div class="card green">
+      <h4>声明序 = 稳定 tie-break</h4>
+      <p><code>ids: Vec&lt;String&gt;</code> 严格按 <code>Graph::all_node_ids()</code>
+        的声明序，<code>index_of</code> 是 BTreeMap。<b>所有</b>后续 sort 的最终
+        tie-break 都回退到这里——确定性（AGENTS.md §2）的根基。</p>
+    </div>
+  </div>
+
+  <div class="note warn">
+    <b>RealEdge 双向字段</b>
+    每条边同时存 <code>original_source/target</code>（DSL 写的方向，永不改）和
+    <code>working_source/target</code>（去环后的工作方向）。<b>下游所有 arrow / label /
+    port 决策都只读 original_*</b>；working_* 只供 rank/order 用。这是 cycle 相不
+    "污染"语义的关键。
+  </div>
+</section>
+
+<!-- ═══════════════ 5.2 ═══════════════ -->
+<section id="s5-2">
+  <h3>5.2 cycle — Greedy-FAS 去环 <span class="ph compose">Compose</span></h3>
+  <p class="lead">Sugiyama 框架要求 DAG，所以有环图必须先反转一部分边。
+    实现直接复用 <code class="inline">plotgram_algo::fas::greedy_fas</code>。</p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 800 280" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'PingFang SC',sans-serif">
+      <defs>
+        <marker id="arrR" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#1f2430"/>
+        </marker>
+        <marker id="arrRev" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#dc2626"/>
+        </marker>
+      </defs>
+      <!-- 原图 -->
+      <text x="100" y="40" font-size="13" font-weight="700" fill="#5b6472">原图（含环 a→b→a）</text>
+      <g font-size="14" text-anchor="middle">
+        <circle cx="60"  cy="100" r="22" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="60"  y="105">a</text>
+        <circle cx="180" cy="100" r="22" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="180" y="105">b</text>
+        <circle cx="300" cy="100" r="22" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="300" y="105">c</text>
+      </g>
+      <line x1="82"  y1="100" x2="158" y2="100" stroke="#1f2430" stroke-width="2" marker-end="url(#arrR)"/>
+      <line x1="180" y1="78"  x2="60"  y2="78"  stroke="#1f2430" stroke-width="2" marker-end="url(#arrR)"/>
+      <line x1="202" y1="100" x2="278" y2="100" stroke="#1f2430" stroke-width="2" marker-end="url(#arrR)"/>
+      <text x="120" y="135" font-size="11" fill="#64748b">e0: a→b</text>
+      <text x="120" y="68"  font-size="11" fill="#64748b">e1: b→a</text>
+      <text x="240" y="135" font-size="11" fill="#64748b">e2: b→c</text>
+
+      <!-- FAS 后 -->
+      <text x="560" y="40" font-size="13" font-weight="700" fill="#5b6472">FAS 后（e1 被反转）</text>
+      <g font-size="14" text-anchor="middle">
+        <circle cx="500" cy="100" r="22" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="500" y="105">a</text>
+        <circle cx="620" cy="100" r="22" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="620" y="105">b</text>
+        <circle cx="740" cy="100" r="22" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="740" y="105">c</text>
+      </g>
+      <line x1="522" y1="100" x2="598" y2="100" stroke="#1f2430" stroke-width="2" marker-end="url(#arrR)"/>
+      <line x1="500" y1="78"  x2="620" y2="78"  stroke="#dc2626" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#arrRev)"/>
+      <line x1="642" y1="100" x2="718" y2="100" stroke="#1f2430" stroke-width="2" marker-end="url(#arrR)"/>
+      <text x="560" y="135" font-size="11" fill="#64748b">e0: a→b (working=a→b)</text>
+      <text x="560" y="68"  font-size="11" fill="#dc2626">e1: original b→a / working a→b</text>
+      <text x="680" y="135" font-size="11" fill="#64748b">e2: b→c</text>
+
+      <!-- 箭头 -->
+      <path d="M340,100 L460,100" stroke="#7c3aed" stroke-width="2" fill="none" marker-end="url(#arrRev)"/>
+      <text x="400" y="92" font-size="11" fill="#7c3aed" text-anchor="middle">greedy_fas</text>
+
+      <!-- 说明 -->
+      <text x="400" y="200" font-size="12.5" fill="#5b6472" text-anchor="middle">
+        反转集 = FAS（feedback arc set）≈ 最小边集使图成 DAG
+      </text>
+      <text x="400" y="222" font-size="12" fill="#64748b" text-anchor="middle">
+        <tspan fill="#dc2626" font-weight="700">red dashed</tspan> = working 方向与 original 相反；arrow/label 仍按 original
+      </text>
+      <text x="400" y="244" font-size="11.5" fill="#64748b" text-anchor="middle" font-style="italic">
+        tie-break = 最小 node index（声明序）→ 确定
+      </text>
+    </svg>
+    <figcaption>图 4 · Greedy-FAS 反转环上某条边，使图变 DAG。
+    <b>original_* 永不改</b>，只有 working_* 翻转——这是后续端口/箭头方向正确的根基。</figcaption>
+  </figure>
+
+  <div class="note tip">
+    <b>为什么用 Greedy-FAS 而不是精确 FAS？</b>
+    精确 FAS 是 NP-hard。Greedy-FAS（Eades 1993）在实践中给出非常接近最优的反转集，
+    且实现简单、确定。<code>plotgram_algo::fas</code> 已经提供，本模块直接复用。
+  </div>
+</section>
+
+<!-- ═══════════════ 5.3 ═══════════════ -->
+<section id="s5-3">
+  <h3>5.3 rank — 简化 Network Simplex <span class="ph compose">Compose</span></h3>
+  <p class="lead">给每个节点一个 <code class="inline">rank: u32</code>（层号），
+    使每条 working 边满足 <code>rank(target) - rank(source) ≥ 1</code>，并尽量短。
+    目标是最小化 <b>总边长加权和</b>。</p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 1000 380" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'PingFang SC',sans-serif">
+      <defs>
+        <marker id="arrN" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#1f2430"/>
+        </marker>
+      </defs>
+
+      <!-- Step 1: longest path -->
+      <text x="20" y="30" font-size="13" font-weight="700" fill="#1d4ed8">① longest-path（初始可行）</text>
+      <text x="20" y="48" font-size="11.5" fill="#64748b">Kahn 拓扑序，rank[v] = max(rank[u]+1)。可行但不一定最优。</text>
+      <g font-size="13" text-anchor="middle">
+        <circle cx="80"  cy="100" r="18" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="80"  y="105">s</text>
+        <circle cx="80"  cy="170" r="18" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="80"  y="175">b</text>
+        <circle cx="180" cy="170" r="18" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="180" y="175">a1</text>
+        <circle cx="280" cy="170" r="18" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="280" y="175">a2</text>
+        <circle cx="380" cy="170" r="18" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="380" y="175">t1</text>
+      </g>
+      <g stroke="#1f2430" stroke-width="1.5" fill="none">
+        <line x1="80" y1="118" x2="80" y2="152" marker-end="url(#arrN)"/>
+        <line x1="98" y1="100" x2="162" y2="170" marker-end="url(#arrN)"/>
+        <line x1="198" y1="170" x2="262" y2="170" marker-end="url(#arrN)"/>
+        <line x1="298" y1="170" x2="362" y2="170" marker-end="url(#arrN)"/>
+      </g>
+      <text x="80" y="135" font-size="10" fill="#64748b">rank 0</text>
+      <text x="80" y="200" font-size="10" fill="#64748b">rank 1（最长路给 b 的初始位置）</text>
+
+      <!-- Step 2: tight tree -->
+      <text x="500" y="30" font-size="13" font-weight="700" fill="#1d4ed8">② tight tree（紧生成树）</text>
+      <text x="500" y="48" font-size="11.5" fill="#64748b">从单点生长，优先 slack=0 的边；卡住时整体平移再继续。</text>
+      <g font-size="13" text-anchor="middle">
+        <circle cx="540" cy="100" r="18" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="540" y="105">s</text>
+        <circle cx="640" cy="170" r="18" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="640" y="175">b</text>
+        <circle cx="740" cy="170" r="18" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="740" y="175">a1</text>
+        <circle cx="840" cy="170" r="18" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="840" y="175">a2</text>
+        <circle cx="940" cy="170" r="18" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="940" y="175">t1</text>
+      </g>
+      <g stroke="#2563eb" stroke-width="2.5" fill="none">
+        <line x1="540" y1="118" x2="640" y2="152"/>
+        <line x1="640" y1="170" x2="722" y2="170"/>
+        <line x1="758" y1="170" x2="822" y2="170"/>
+        <line x1="858" y1="170" x2="922" y2="170"/>
+      </g>
+      <text x="690" y="160" font-size="10" fill="#1d4ed8" font-weight="700">tight tree edges</text>
+
+      <!-- Step 3: NS pivot -->
+      <text x="20" y="250" font-size="13" font-weight="700" fill="#1d4ed8">③ cut-value pivot（迭代优化）</text>
+      <text x="20" y="268" font-size="11.5" fill="#64748b">找 cut value &lt; 0 的树边（离开），用 slack 最小的反向跨子树边（进入），平移子树。</text>
+      <g font-size="13" text-anchor="middle">
+        <circle cx="80"  cy="320" r="18" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="80"  y="325">s</text>
+        <circle cx="80"  cy="320" r="26" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="3 2"/>
+        <circle cx="180" cy="320" r="18" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="180" y="325">b</text>
+        <circle cx="280" cy="320" r="18" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="280" y="325">t1</text>
+      </g>
+      <text x="80"  y="358" font-size="10" fill="#64748b">rank 0</text>
+      <text x="180" y="358" font-size="10" fill="#dc2626" font-weight="700">rank 2 ← 被 pivot 拉下来</text>
+      <text x="280" y="358" font-size="10" fill="#64748b">rank 3</text>
+
+      <text x="450" y="280" font-size="12" fill="#5b6472">
+        <tspan x="450" dy="0">cut value &lt; 0 = 删了这条树边，</tspan>
+        <tspan x="450" dy="18">沿原方向穿过的边 &lt; 反方向穿过的边</tspan>
+        <tspan x="450" dy="18">→ 反转它能减少总长度</tspan>
+      </text>
+    </svg>
+    <figcaption>图 5 · 简化 Network Simplex 三步。
+    ① longest-path 给可行初始秩；② 构造紧生成树；
+    ③ 反复 pivot 负 cut value 的树边，直到无改进或耗尽预算（<code>8 * (V+E) + 64</code>）。</figcaption>
+  </figure>
+
+  <div class="note key">
+    <b>为什么是"简化版"？</b>
+    生产级 NS 用 low/lim/lim1 三个数组把 cut value 计算做到 O(V+E) 增量。
+    本实现每次 pivot 都重新线性扫描所有边算 cut value，复杂度 O(V·(V+E))。
+    <b>这是有意的取舍</b>（见 MVP scope §2.1）：layout fixture 规模下（≤几十节点），
+    简化版的代码可读性远胜增量簿记的复杂度，性能完全够用。
+  </div>
+
+  <div class="note tip">
+    <b>测试里的反例</b>
+    <code>network_simplex_balances_beyond_longest_path</code> 构造了"3 条出边 + 1 入边"
+    的图，longest-path 会把 b 放在 rank 1（最早可行），但总长度目标
+    <code>3*(3-b) + b = 9-2b</code> 在 b=2 时更小——NS 必须把 b 拉到 rank 2 才算正确。
+    这是验证 NS 真的在优化的最小反例。
+  </div>
+</section>
+
+<!-- ═══════════════ 5.4 ═══════════════ -->
+<section id="s5-4">
+  <h3>5.4 properify — dummy 链展开 <span class="ph compose">Compose</span></h3>
+  <p class="lead">Network Simplex 后会有"跨多 rank 的长边"。Sugiyama 框架要求
+    <b>每条边只跨 1 个 rank</b>，所以中间插入 dummy 节点，把它拆成 rank-相邻的小段。</p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'PingFang SC',sans-serif">
+      <defs>
+        <marker id="arrP4" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#1f2430"/>
+        </marker>
+      </defs>
+
+      <!-- Before -->
+      <text x="40" y="30" font-size="13" font-weight="700" fill="#5b6472">properify 前</text>
+      <text x="40" y="48" font-size="11.5" fill="#64748b">长边 a→d 跨 3 个 rank</text>
+
+      <line x1="40" y1="80"  x2="380" y2="80"  stroke="#e3e7ee" stroke-width="1"/>
+      <text x="20" y="84" font-size="11" fill="#94a3b8">rank 0</text>
+      <line x1="40" y1="140" x2="380" y2="140" stroke="#e3e7ee" stroke-width="1"/>
+      <text x="20" y="144" font-size="11" fill="#94a3b8">rank 1</text>
+      <line x1="40" y1="200" x2="380" y2="200" stroke="#e3e7ee" stroke-width="1"/>
+      <text x="20" y="204" font-size="11" fill="#94a3b8">rank 2</text>
+      <line x1="40" y1="260" x2="380" y2="260" stroke="#e3e7ee" stroke-width="1"/>
+      <text x="20" y="264" font-size="11" fill="#94a3b8">rank 3</text>
+
+      <g font-size="13" text-anchor="middle">
+        <rect x="80" y="65" width="50" height="30" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="105" y="85">a</text>
+        <rect x="300" y="245" width="50" height="30" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="325" y="265">d</text>
+      </g>
+      <line x1="130" y1="80" x2="300" y2="260" stroke="#1f2430" stroke-width="2" marker-end="url(#arrP4)"/>
+      <text x="220" y="170" font-size="11" fill="#64748b">edge a→d, span = 3</text>
+
+      <!-- Arrow -->
+      <path d="M420,160 L470,160" stroke="#7c3aed" stroke-width="2" fill="none" marker-end="url(#arrP4)"/>
+      <text x="445" y="152" font-size="11" fill="#7c3aed" text-anchor="middle">properify</text>
+
+      <!-- After -->
+      <text x="500" y="30" font-size="13" font-weight="700" fill="#5b6472">properify 后</text>
+      <text x="500" y="48" font-size="11.5" fill="#64748b">长边被拆成 3 段，中间插 2 个 dummy</text>
+
+      <line x1="500" y1="80"  x2="860" y2="80"  stroke="#e3e7ee" stroke-width="1"/>
+      <text x="480" y="84" font-size="11" fill="#94a3b8">rank 0</text>
+      <line x1="500" y1="140" x2="860" y2="140" stroke="#e3e7ee" stroke-width="1"/>
+      <text x="480" y="144" font-size="11" fill="#94a3b8">rank 1</text>
+      <line x1="500" y1="200" x2="860" y2="200" stroke="#e3e7ee" stroke-width="1"/>
+      <text x="480" y="204" font-size="11" fill="#94a3b8">rank 2</text>
+      <line x1="500" y1="260" x2="860" y2="260" stroke="#e3e7ee" stroke-width="1"/>
+      <text x="480" y="264" font-size="11" fill="#94a3b8">rank 3</text>
+
+      <g font-size="13" text-anchor="middle">
+        <rect x="550" y="65" width="50" height="30" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="575" y="85">a</text>
+        <rect x="780" y="245" width="50" height="30" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="805" y="265">d</text>
+        <!-- dummies -->
+        <circle cx="660" cy="140" r="6" fill="#94a3b8" stroke="#64748b" stroke-width="1.5" stroke-dasharray="2 2"/>
+        <circle cx="720" cy="200" r="6" fill="#94a3b8" stroke="#64748b" stroke-width="1.5" stroke-dasharray="2 2"/>
+      </g>
+      <g stroke="#1f2430" stroke-width="2" fill="none">
+        <line x1="600" y1="80" x2="654" y2="140" marker-end="url(#arrP4)"/>
+        <line x1="666" y1="140" x2="714" y2="200" marker-end="url(#arrP4)"/>
+        <line x1="726" y1="200" x2="780" y2="260" marker-end="url(#arrP4)"/>
+      </g>
+      <text x="660" y="130" font-size="10" fill="#64748b">v0 (Virtual)</text>
+      <text x="720" y="190" font-size="10" fill="#64748b">v1 (Virtual)</text>
+      <text x="640" y="320" font-size="11" fill="#64748b" font-style="italic">
+        ElemKey::Virtual { edge_id, ordinal } —— 稳定身份，可寻址
+      </text>
+    </svg>
+    <figcaption>图 6 · properify 把跨 rank 长边拆成 dummy 链。
+    每个 dummy 是 <code>ElemKey::Virtual { edge_id, ordinal }</code>，
+    在后续 order/metric/ink 中和 real 节点<b>统一处理</b>（宽度=0、无 group）。</figcaption>
+  </figure>
+
+  <div class="note key">
+    <b>Segment 的定义</b>
+    <code>Segment { edge_id, ordinal, from, to }</code> 是"rank-相邻的一跳"。
+    span=1 的短边有 1 个 segment；span=N 的长边有 N 个 segment、N-1 个 dummy。
+    所有 segment 存储为 <b>working 方向</b>（rank 升序），Ink 相在画路径时会按
+    <code>reversed</code> 标志把它翻回 original 方向。
+  </div>
+</section>
+
+<!-- ═══════════════ 5.5 ═══════════════ -->
+<section id="s5-5">
+  <h3>5.5 order — median + transpose + 组块 <span class="ph compose">Compose</span></h3>
+  <p class="lead">每层内重排元素，<b>最小化相邻层之间的边交叉数</b>。
+    核心：median barycenter 启发式 + adjacent transpose 局部优化 + best-snapshot。</p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 900 360" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'PingFang SC',sans-serif">
+      <defs>
+        <marker id="arrO" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#1f2430"/>
+        </marker>
+      </defs>
+
+      <!-- Before ordering: 1 crossing -->
+      <text x="40" y="30" font-size="13" font-weight="700" fill="#5b6472">定序前（1 交叉）</text>
+      <g font-size="13" text-anchor="middle">
+        <rect x="80"  y="60"  width="40" height="30" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="100" y="80">a0</text>
+        <rect x="160" y="60"  width="40" height="30" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="180" y="80">a1</text>
+
+        <rect x="80"  y="180" width="40" height="30" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="100" y="200">b0</text>
+        <rect x="160" y="180" width="40" height="30" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="180" y="200">b1</text>
+      </g>
+      <g stroke="#1f2430" stroke-width="1.8" fill="none">
+        <line x1="100" y1="90" x2="180" y2="180" marker-end="url(#arrO)"/>
+        <line x1="180" y1="90" x2="100" y2="180" marker-end="url(#arrO)"/>
+      </g>
+      <circle cx="140" cy="135" r="6" fill="none" stroke="#dc2626" stroke-width="2"/>
+      <text x="155" y="140" font-size="11" fill="#dc2626">crossing!</text>
+
+      <!-- After ordering: 0 crossing -->
+      <text x="500" y="30" font-size="13" font-weight="700" fill="#5b6472">定序后（0 交叉）</text>
+      <g font-size="13" text-anchor="middle">
+        <rect x="540" y="60"  width="40" height="30" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="560" y="80">a0</text>
+        <rect x="620" y="60"  width="40" height="30" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="640" y="80">a1</text>
+
+        <rect x="540" y="180" width="40" height="30" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="560" y="200">b1</text>
+        <rect x="620" y="180" width="40" height="30" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="640" y="200">b0</text>
+      </g>
+      <g stroke="#1f2430" stroke-width="1.8" fill="none">
+        <line x1="560" y1="90" x2="560" y2="180" marker-end="url(#arrO)"/>
+        <line x1="640" y1="90" x2="640" y2="180" marker-end="url(#arrO)"/>
+      </g>
+      <text x="560" y="222" font-size="10" fill="#64748b">b1↔b0 互换</text>
+
+      <path d="M260,135 L490,135" stroke="#7c3aed" stroke-width="2" fill="none" marker-end="url(#arrO)"/>
+      <text x="375" y="127" font-size="11" fill="#7c3aed" text-anchor="middle">order_layers</text>
+
+      <!-- 流程说明 -->
+      <text x="40" y="280" font-size="12.5" font-weight="700" fill="#1d4ed8">流程：</text>
+      <g font-size="12">
+        <rect x="100" y="268" width="120" height="32" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="160" y="288" text-anchor="middle" fill="#1d4ed8">build_blocks</text>
+        <rect x="240" y="268" width="100" height="32" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="290" y="288" text-anchor="middle" fill="#1d4ed8">median sort</text>
+        <rect x="360" y="268" width="110" height="32" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="415" y="288" text-anchor="middle" fill="#1d4ed8">transpose</text>
+        <rect x="490" y="268" width="100" height="32" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="540" y="288" text-anchor="middle" fill="#1d4ed8">snapshot</text>
+        <rect x="610" y="268" width="110" height="32" rx="6" fill="#d1fae5" stroke="#059669"/>
+        <text x="665" y="288" text-anchor="middle" fill="#047857">best 快照</text>
+      </g>
+      <g stroke="#2563eb" stroke-width="1.2" fill="none">
+        <line x1="220" y1="284" x2="238" y2="284" marker-end="url(#arrO)"/>
+        <line x1="340" y1="284" x2="358" y2="284" marker-end="url(#arrO)"/>
+        <line x1="470" y1="284" x2="488" y2="284" marker-end="url(#arrO)"/>
+        <line x1="590" y1="284" x2="608" y2="284" marker-end="url(#arrO)"/>
+      </g>
+      <text x="380" y="332" font-size="11.5" fill="#64748b" text-anchor="middle" font-style="italic">
+        最多 16 sweeps；连续 2 次无改进或交叉=0 时提前停
+      </text>
+    </svg>
+    <figcaption>图 7 · 定序减交叉。median 给初始启发序，transpose 做相邻交换局部优化，
+    best-snapshot 保留整个过程中交叉最少的层序。</figcaption>
+  </figure>
+
+  <h3 style="margin-top:32px">组连续性：递归块排序</h3>
+  <p class="lead">同组节点在层内必须<b>连续</b>。本实现没有用"边界 dummy 节点"机制
+    （architecture.md 设想的），而是用等价的<b>递归块排序</b>。</p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 900 280" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'PingFang SC',sans-serif">
+      <!-- layer with group -->
+      <text x="40" y="30" font-size="13" font-weight="700" fill="#5b6472">层内成员（含组 g={g0,g1}）</text>
+      <g font-size="13" text-anchor="middle">
+        <rect x="60"  y="50" width="50" height="32" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="85" y="71">s0</text>
+        <rect x="130" y="50" width="50" height="32" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+        <text x="155" y="71">g0</text>
+        <rect x="200" y="50" width="50" height="32" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="225" y="71">u</text>
+        <rect x="270" y="50" width="50" height="32" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+        <text x="295" y="71">g1</text>
+        <rect x="340" y="50" width="50" height="32" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="365" y="71">s2</text>
+      </g>
+
+      <!-- build_blocks -->
+      <text x="40" y="120" font-size="13" font-weight="700" fill="#1d4ed8">build_blocks →</text>
+      <g font-size="12.5" text-anchor="middle">
+        <rect x="60"  y="140" width="50" height="32" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="85" y="161">s0</text>
+        <rect x="125" y="135" width="140" height="42" rx="8" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="4 3"/>
+        <text x="195" y="128" font-size="10.5" fill="#7c3aed">Group "g"</text>
+        <rect x="135" y="140" width="50" height="32" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+        <text x="160" y="161">g0</text>
+        <rect x="205" y="140" width="50" height="32" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+        <text x="230" y="161">g1</text>
+        <rect x="280" y="140" width="50" height="32" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="305" y="161">u</text>
+        <rect x="345" y="140" width="50" height="32" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="370" y="161">s2</text>
+      </g>
+
+      <text x="40" y="210" font-size="12" fill="#5b6472">
+        <tspan x="40" dy="0">排序时：<b>块作为整体移动</b>，median 在块级计算（块内成员位置汇总）；</tspan>
+        <tspan x="40" dy="20">transpose <b>只允许交换同一父块下的相邻兄弟</b>，永不打散块边界。</tspan>
+      </g>
+
+      <g font-size="12.5" text-anchor="middle">
+        <rect x="500" y="135" width="50" height="32" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="525" y="156">s0</text>
+        <rect x="560" y="135" width="50" height="32" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="585" y="156">u</text>
+        <rect x="625" y="130" width="140" height="42" rx="8" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="4 3"/>
+        <text x="695" y="123" font-size="10.5" fill="#7c3aed">Group "g"</text>
+        <rect x="635" y="135" width="50" height="32" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+        <text x="660" y="156">g0</text>
+        <rect x="705" y="135" width="50" height="32" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+        <text x="730" y="156">g1</text>
+        <rect x="785" y="135" width="50" height="32" rx="6" fill="#dbeafe" stroke="#2563eb"/>
+        <text x="810" y="156">s2</text>
+      </g>
+      <text x="650" y="210" font-size="12" fill="#5b6472">
+        <tspan x="500" dy="0">结果：g0/g1 <b>始终相邻</b>，无论 median 怎么算。</tspan>
+      </text>
+    </svg>
+    <figcaption>图 8 · 递归块排序保证组内连续。
+    架构文档设想的"边界 dummy 节点"机制能保证同样的性质，但需要插入可寻址的
+    <code>GroupBoundary</code> 节点；本实现用块排序等价达成，<b>不产生</b>额外节点。
+    代价：未来若要给组框做 VPSC 变量，需要重新评估（见 MVP scope §2.2）。</figcaption>
+  </figure>
+
+  <div class="note key">
+    <b>edge_weight：dummy 链权重更高</b>
+    median 计算时给邻接边加权：<code>real-real=1, real-virtual=2, virtual-virtual=8</code>。
+    这样长边的 dummy 链更"努力"地对齐，避免长边在中间层被无关节点挤歪。
+  </div>
+</section>
+
+<!-- ═══════════════ 5.6 ═══════════════ -->
+<section id="s5-6">
+  <h3>5.6 ports — 端口 side 与 slot <span class="ph compose">Compose</span></h3>
+  <p class="lead">每条边的两端各解析出一个 <code class="inline">ResolvedPort { side, slot, count }</code>。
+    side 由"对侧 rank + 作者约束"决定，slot 由"对侧 (rank, order, EdgeId)"决定。</p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 900 340" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'PingFang SC',sans-serif">
+      <defs>
+        <marker id="arrPt" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#1f2430"/>
+        </marker>
+      </defs>
+
+      <!-- Node with 2 ports on South -->
+      <text x="40" y="30" font-size="13" font-weight="700" fill="#5b6472">side 推断（FREE 端口）</text>
+      <g font-size="13" text-anchor="middle">
+        <rect x="100" y="50" width="120" height="60" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="160" y="84">a (rank 0)</text>
+      </g>
+      <!-- ports on south -->
+      <circle cx="135" cy="110" r="4" fill="#dc2626"/>
+      <circle cx="185" cy="110" r="4" fill="#dc2626"/>
+      <text x="135" y="128" font-size="10" fill="#dc2626">slot 0</text>
+      <text x="185" y="128" font-size="10" fill="#dc2626">slot 1</text>
+
+      <g font-size="13" text-anchor="middle">
+        <rect x="80"  y="200" width="80" height="50" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="120" y="230">b (rank 1)</text>
+        <rect x="180" y="200" width="80" height="50" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="220" y="230">c (rank 1)</text>
+      </g>
+      <line x1="135" y1="110" x2="120" y2="200" stroke="#1f2430" stroke-width="1.8" marker-end="url(#arrPt)"/>
+      <line x1="185" y1="110" x2="220" y2="200" stroke="#1f2430" stroke-width="1.8" marker-end="url(#arrPt)"/>
+      <text x="40" y="160" font-size="11.5" fill="#5b6472">
+        <tspan x="40" dy="0">a 的两个出边都向"对侧 rank 更大"方向走</tspan>
+        <tspan x="40" dy="18">→ side = South（出）</tspan>
+        <tspan x="40" dy="18">b/c 的入边对侧 rank 更小 → side = North（入）</tspan>
+      </text>
+
+      <!-- slot assignment -->
+      <text x="540" y="30" font-size="13" font-weight="700" fill="#5b6472">slot 分配（同 side 组内）</text>
+      <g font-size="12.5">
+        <rect x="540" y="50" width="320" height="180" rx="8" fill="#f0f9ff" stroke="#93c5fd"/>
+        <text x="560" y="76" font-weight="700" fill="#1d4ed8">组 (node=a, side=South) 的成员：</text>
+        <text x="560" y="100" fill="#5b6472">e0: neighbor=(rank1, order0, "e0")</text>
+        <text x="560" y="120" fill="#5b6472">e1: neighbor=(rank1, order1, "e1")</text>
+        <text x="560" y="148" font-weight="700" fill="#1d4ed8">按 sort_key 排序：</text>
+        <text x="570" y="168" font-family="SF Mono,Consolas,monospace" font-size="11.5" fill="#0f172a">(1, 0, "e0") &lt; (1, 1, "e1")</text>
+        <text x="560" y="196" font-weight="700" fill="#1d4ed8">分配：</text>
+        <text x="570" y="216" fill="#5b6472">e0 → slot 0；e1 → slot 1</text>
+      </g>
+
+      <!-- FIXED -->
+      <text x="40" y="290" font-size="13" font-weight="700" fill="#5b6472">FIXED 端口约束</text>
+      <text x="40" y="312" font-size="12" fill="#5b6472">
+        <tspan x="40" dy="0">作者写了 <code>from_port: {side: South, slot: Some(0)}</code> 时：</tspan>
+        <tspan x="40" dy="18">该 slot 被"占用"，FREE 端口在分配时 <b>跳过 taken 集合</b>。</tspan>
+      </text>
+    </svg>
+    <figcaption>图 9 · 端口解析。<b>side</b> 由对侧 rank 决定（更大→South，更小→North）；
+    <b>slot</b> 由对侧 (rank, order, EdgeId) 在同 (node, side) 组内排序得到。
+    FIXED 约束直接吃掉对应 slot，FREE 在剩余 slot 中按序分配。</figcaption>
+  </figure>
+
+  <div class="note warn">
+    <b>当前模型只有两档</b>
+    <code>PortConstraint { side, slot: Option&lt;u32&gt; }</code> 只能表达 FREE 和 FIXED。
+    架构文档设想的 FIXED_RATIO / FIXED_POS / Candidates 五档端口<b>没有 model 层字段可落</b>
+    （见 MVP scope §0.2），本轮不做。
+  </div>
+</section>
+
+<!-- ═══════════════ 6 ═══════════════ -->
+<section id="s6">
+  <h2 class="sec"><span class="num">6</span>Metric 相：像素坐标 <span class="pill metric">Metric</span></h2>
+  <p class="lead">这一相把"层号 + 层内序"翻译成像素坐标。主轴（y）= 层栈；
+    次轴（x）= median 松弛得 ideal + VPSC 求解防重叠。</p>
+
+  <h3>6.1 main_axis — 层栈 <span class="ph metric">Metric</span></h3>
+  <p>逐层向下叠：每层厚度 = 层内最高节点的高度（dummy=0）；层间加 <code>layer_gap</code>。
+    末层后不留 gap。每个 elem 得到自己的 <code>top: f64</code>（顶边 y 坐标）。</p>
+
+  <h3>6.2 cross_axis — median 松弛 + VPSC <span class="ph metric">Metric</span></h3>
+  <p class="lead">两步：先用相邻层邻居的 median 松弛出"理想位置"，再用 VPSC 在每层内求解
+    防重叠的最终坐标。</p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 1000 380" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'PingFang SC',sans-serif">
+      <defs>
+        <marker id="arrX" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#d97706"/>
+        </marker>
+      </defs>
+
+      <!-- Step 1: packed initial -->
+      <text x="20" y="30" font-size="13" font-weight="700" fill="#b45309">① packed 初始</text>
+      <text x="20" y="48" font-size="11.5" fill="#64748b">每个 elem 按 order 紧挨排列</text>
+      <g font-size="12" text-anchor="middle">
+        <rect x="30"  y="70" width="40" height="30" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="50"  y="90">a</text>
+        <rect x="80"  y="70" width="40" height="30" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="100" y="90">b</text>
+        <rect x="130" y="70" width="40" height="30" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="150" y="90">c</text>
+      </g>
+      <text x="30" y="120" font-size="11" fill="#64748b">理想位置 = packed center</text>
+
+      <!-- Step 2: relax -->
+      <text x="280" y="30" font-size="13" font-weight="700" fill="#b45309">② median 松弛（6 轮，damping=0.5）</text>
+      <text x="280" y="48" font-size="11.5" fill="#64748b">每个 elem 被邻居拉过去一点；dummy 链自然拉直</text>
+      <g font-size="12" text-anchor="middle">
+        <rect x="290" y="70" width="40" height="30" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="310" y="90">a</text>
+        <rect x="380" y="70" width="40" height="30" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="400" y="90">b</text>
+        <rect x="470" y="70" width="40" height="30" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+        <text x="490" y="90">c</text>
+        <text x="310" y="120" font-size="10">←</text>
+        <text x="400" y="120" font-size="10">←</text>
+        <text x="490" y="120" font-size="10">←</text>
+      </g>
+      <g font-size="12" text-anchor="middle">
+        <circle cx="320" cy="170" r="5" fill="#94a3b8" stroke="#64748b" stroke-dasharray="2 2"/>
+        <circle cx="400" cy="170" r="5" fill="#94a3b8" stroke="#64748b" stroke-dasharray="2 2"/>
+        <text x="360" y="190" font-size="11" fill="#64748b">dummy 链被两端 real 的中位拉直</text>
+      </g>
+
+      <!-- Step 3: VPSC -->
+      <text x="600" y="30" font-size="13" font-weight="700" fill="#b45309">③ VPSC 求解（每层内）</text>
+      <text x="600" y="48" font-size="11.5" fill="#64748b">相邻序约束 + 拉向 ideal 的加权最小二乘</text>
+      <g font-size="11.5" font-family="SF Mono,Consolas,monospace">
+        <rect x="600" y="62" width="380" height="120" rx="8" fill="#fffbeb" stroke="#fcd34d"/>
+        <text x="615" y="84" fill="#7c2d12">Variable { desired: ideal, weight }</text>
+        <text x="615" y="104" fill="#7c2d12">  real: weight = 1.0</text>
+        <text x="615" y="124" fill="#7c2d12">  virtual: weight = 4.0  (优先保直)</text>
+        <text x="615" y="148" fill="#7c2d12">Constraint(l, r, gap = w_l/2 + w_r/2 + node_gap)</text>
+        <text x="615" y="168" fill="#7c2d12">→ solve() → 最终 center x</text>
+      </g>
+
+      <!-- Result -->
+      <text x="20" y="240" font-size="13" font-weight="700" fill="#5b6472">最终结果</text>
+      <g font-size="12" text-anchor="middle">
+        <line x1="20" y1="270" x2="980" y2="270" stroke="#e3e7ee"/>
+        <text x="20" y="284" font-size="11" fill="#94a3b8">rank 0</text>
+        <rect x="60"  y="260" width="50" height="30" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="85" y="280">a</text>
+        <rect x="200" y="260" width="50" height="30" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="225" y="280">b</text>
+        <rect x="340" y="260" width="50" height="30" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="365" y="280">c</text>
+
+        <line x1="20" y1="320" x2="980" y2="320" stroke="#e3e7ee"/>
+        <text x="20" y="334" font-size="11" fill="#94a3b8">rank 1</text>
+        <rect x="60"  y="310" width="50" height="30" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="85" y="330">d</text>
+        <rect x="200" y="310" width="50" height="30" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="225" y="330">e</text>
+        <rect x="340" y="310" width="50" height="30" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="365" y="330">f</text>
+      </g>
+      <g stroke="#1f2430" stroke-width="1.5" fill="none">
+        <line x1="85" y1="290" x2="85" y2="310"/>
+        <line x1="225" y1="290" x2="225" y2="310"/>
+        <line x1="365" y1="290" x2="365" y2="310"/>
+      </g>
+      <text x="600" y="350" font-size="11.5" fill="#64748b" font-style="italic">
+        VPSC 保证同层无重叠；ideal 松弛保证跨层对齐（dummy 链竖直）
+      </text>
+    </svg>
+    <figcaption>图 10 · cross_axis 三步。
+    <b>packed → ideal（松弛）→ VPSC 求解</b>。dummy 节点权重更高（4.0 vs 1.0），
+    所以长边在 VPSC 中被优先保直。</figcaption>
+  </figure>
+
+  <div class="note key">
+    <b>为什么不用完整的 Brandes–Köpf？</b>
+    BK 四遍法能给出"上下对齐 + 上下平衡"的次轴坐标，但实现复杂、且需要特殊处理
+    "对齐冲突"（align conflict）和 group box。本实现复用同一颗 VPSC 求解器
+    （<code>plotgram_algo::vpsc</code>），用 ideal 松弛承担跨层对齐，VPSC 承担
+    防重叠。简单、足够好。这是 MVP scope §2.3 明确记录的取舍。
+  </div>
+</section>
+
+<!-- ═══════════════ 7 ═══════════════ -->
+<section id="s7">
+  <h2 class="sec"><span class="num">7</span>Ink 相：折线展开 <span class="pill ink">Ink</span></h2>
+  <p class="lead">这一相<b>零新决策</b>。它只把 PlanGraph 的 dummy 链 + ports 的锚点
+    + Metric 的 frames 机械地展开成折线。</p>
+
+  <h3>7.1 route — waypoint + 中点双折 + normalize <span class="ph ink">Ink</span></h3>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'PingFang SC',sans-serif">
+      <defs>
+        <marker id="arrI7" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#059669"/>
+        </marker>
+      </defs>
+
+      <!-- Waypoints -->
+      <text x="20" y="30" font-size="13" font-weight="700" fill="#047857">① 收集 waypoint</text>
+      <text x="20" y="48" font-size="11.5" fill="#64748b">起点端口锚 → dummy center → 终点端口锚</text>
+      <g font-size="12" text-anchor="middle">
+        <rect x="60" y="70" width="60" height="40" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="90" y="95">a (S)</text>
+        <circle cx="90" cy="110" r="4" fill="#dc2626"/>
+        <circle cx="200" cy="140" r="5" fill="#94a3b8" stroke="#64748b" stroke-dasharray="2 2"/>
+        <circle cx="280" cy="170" r="5" fill="#94a3b8" stroke="#64748b" stroke-dasharray="2 2"/>
+        <rect x="370" y="200" width="60" height="40" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="400" y="225">d (N)</text>
+        <circle cx="400" cy="200" r="4" fill="#dc2626"/>
+      </g>
+      <g stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="3 3" fill="none">
+        <line x1="90" y1="110" x2="200" y2="140"/>
+        <line x1="200" y1="140" x2="280" y2="170"/>
+        <line x1="280" y1="170" x2="400" y2="200"/>
+      </g>
+      <text x="150" y="135" font-size="10" fill="#64748b">wp[0]</text>
+      <text x="240" y="165" font-size="10" fill="#64748b">wp[1]</text>
+      <text x="340" y="195" font-size="10" fill="#64748b">wp[2]</text>
+
+      <!-- Bend insertion -->
+      <text x="500" y="30" font-size="13" font-weight="700" fill="#047857">② 中点双折角</text>
+      <text x="500" y="48" font-size="11.5" fill="#64748b">相邻 wp 不共享轴时，在 y 中点插两个折点</text>
+      <g font-size="12" text-anchor="middle">
+        <rect x="540" y="70" width="60" height="40" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="570" y="95">a</text>
+        <circle cx="570" cy="110" r="4" fill="#dc2626"/>
+        <rect x="780" y="200" width="60" height="40" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="810" y="225">d</text>
+        <circle cx="810" cy="200" r="4" fill="#dc2626"/>
+      </g>
+      <g stroke="#059669" stroke-width="2" fill="none">
+        <line x1="570" y1="110" x2="570" y2="155"/>
+        <line x1="570" y1="155" x2="810" y2="155"/>
+        <line x1="810" y1="155" x2="810" y2="200" marker-end="url(#arrI7)"/>
+      </g>
+      <circle cx="570" cy="155" r="4" fill="#059669"/>
+      <circle cx="810" cy="155" r="4" fill="#059669"/>
+      <text x="585" y="150" font-size="10" fill="#059669">bend 1</text>
+      <text x="825" y="150" font-size="10" fill="#059669">bend 2</text>
+      <text x="650" y="180" font-size="10.5" fill="#64748b">mid_y = (y_from + y_to) / 2</text>
+
+      <!-- Why two bends -->
+      <text x="40" y="290" font-size="13" font-weight="700" fill="#dc2626">为什么是<b>双折</b>而不是单折？</text>
+      <g font-size="12">
+        <rect x="40" y="305" width="380" height="60" rx="8" fill="#fef2f2" stroke="#fecaca"/>
+        <text x="55" y="328" fill="#7c2d12">所有 real 端口都是 North/South（main 轴）</text>
+        <text x="55" y="348" fill="#7c2d12">→ 出/入线必须竖直。单折只能保一端竖直，</text>
+        <text x="55" y="362" fill="#7c2d12">   另一端会"斜着扎进"节点。双折两端都竖直。</text>
+      </g>
+
+      <g font-size="12">
+        <rect x="460" y="305" width="420" height="60" rx="8" fill="#ecfdf5" stroke="#a7f3d0"/>
+        <text x="475" y="328" fill="#065f46">③ normalize_orthogonal 清理：</text>
+        <text x="475" y="348" fill="#065f46">去共线点、吸收短段、保证端点像素不变</text>
+        <text x="475" y="362" fill="#065f46">（复用 plotgram_algo::path_ortho）</text>
+      </g>
+    </svg>
+    <figcaption>图 11 · Ink 折线展开。waypoint 收集 → 中点双折 → 正交清理。
+    <b>双折</b>的目的是让两端都竖直进出 North/South 端口——这是开发过程中真实踩过的坑
+    （见 MVP scope §5 bug 1：单折导致箭头"斜着扎进"节点）。</figcaption>
+  </figure>
+
+  <h3>7.2 selfloop — East 侧小回路桩 <span class="ph ink">Ink</span></h3>
+  <p>自环在 graph_index 阶段就被抽离，<b>不参与</b> rank/order/coord。
+    Ink 阶段单独画：节点 East 侧伸出一个固定尺寸的小矩形回路，多个自环按
+    <code>OUT_STEP=10</code> 像素错开。无严格防碰撞证明（已知局限，见 MVP scope §2.5）。</p>
+
+  <div class="note tip">
+    <b>Ink 的写权纪律</b>
+    Ink <b>不发明</b>端口、不发明折点。它只展开上游已经决定好的 waypoint + port。
+    如果发现 Ink 想"再加一个特判"（比如避让某条边），正确的问题是：
+    <i>这个自由度的写者应该是谁？</i>——通常答案是上游的 Channel/Gate 机制，
+    而 Channel 在本轮 MVP 没实现（见 §10）。
+  </div>
+</section>
+
+<!-- ═══════════════ 8 ═══════════════ -->
+<section id="s8">
+  <h2 class="sec"><span class="num">8</span>Orientation 转换 <span class="pill orient">Orient</span></h2>
+  <p class="lead">核心只在 canonical TB 空间工作。物理方向（LR/RL/BT）通过
+    <code class="inline">plotgram_algo::orientation</code> 在入口/出口做一次变换。</p>
+
+  <figure class="diagram">
+    <svg viewBox="0 0 900 320" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,'PingFang SC',sans-serif">
+      <defs>
+        <marker id="arrOR" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="#7c3aed"/>
+        </marker>
+      </defs>
+
+      <!-- TB -->
+      <text x="40" y="30" font-size="13" font-weight="700" fill="#6d28d9">canonical TB（内核）</text>
+      <g font-size="12" text-anchor="middle">
+        <line x1="20" y1="60"  x2="200" y2="60"  stroke="#e3e7ee"/>
+        <line x1="20" y1="120" x2="200" y2="120" stroke="#e3e7ee"/>
+        <text x="10" y="64" font-size="10" fill="#94a3b8">rank 0</text>
+        <text x="10" y="124" font-size="10" fill="#94a3b8">rank 1</text>
+        <rect x="80"  y="50" width="50" height="30" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="105" y="70">a</text>
+        <rect x="80"  y="110" width="50" height="30" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="105" y="130">b</text>
+        <line x1="105" y1="80" x2="105" y2="110" stroke="#1f2430" stroke-width="1.5"/>
+        <text x="160" y="95" font-size="10" fill="#64748b">main=y↓, cross=x→</text>
+      </g>
+
+      <!-- arrow -->
+      <path d="M260,90 L340,90" stroke="#7c3aed" stroke-width="2" fill="none" marker-end="url(#arrOR)"/>
+      <text x="300" y="82" font-size="11" fill="#7c3aed" text-anchor="middle">orient out</text>
+
+      <!-- LR -->
+      <text x="380" y="30" font-size="13" font-weight="700" fill="#6d28d9">LR 投影（物理）</text>
+      <g font-size="12" text-anchor="middle">
+        <line x1="380" y1="50"  x2="380" y2="140" stroke="#e3e7ee"/>
+        <line x1="470" y1="50"  x2="470" y2="140" stroke="#e3e7ee"/>
+        <text x="375" y="55" font-size="10" fill="#94a3b8" text-anchor="end">rank 0</text>
+        <text x="475" y="55" font-size="10" fill="#94a3b8">rank 1</text>
+        <rect x="385" y="75" width="30" height="50" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="400" y="105">a</text>
+        <rect x="445" y="75" width="30" height="50" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="460" y="105">b</text>
+        <line x1="415" y1="100" x2="445" y2="100" stroke="#1f2430" stroke-width="1.5"/>
+        <text x="430" y="160" font-size="10" fill="#64748b">main=x→, cross=y↓</text>
+      </g>
+
+      <!-- RL -->
+      <text x="580" y="30" font-size="13" font-weight="700" fill="#6d28d9">RL 投影</text>
+      <g font-size="12" text-anchor="middle">
+        <line x1="660" y1="50"  x2="660" y2="140" stroke="#e3e7ee"/>
+        <line x1="750" y1="50"  x2="750" y2="140" stroke="#e3e7ee"/>
+        <text x="755" y="55" font-size="10" fill="#94a3b8">rank 0</text>
+        <text x="655" y="55" font-size="10" fill="#94a3b8" text-anchor="end">rank 1</text>
+        <rect x="725" y="75" width="30" height="50" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="740" y="105">a</text>
+        <rect x="665" y="75" width="30" height="50" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="680" y="105">b</text>
+        <line x1="725" y1="100" x2="695" y2="100" stroke="#1f2430" stroke-width="1.5"/>
+        <text x="705" y="160" font-size="10" fill="#64748b">main=x←, cross=y↓</text>
+      </g>
+
+      <!-- BT -->
+      <text x="40" y="200" font-size="13" font-weight="700" fill="#6d28d9">BT 投影</text>
+      <g font-size="12" text-anchor="middle">
+        <line x1="20" y1="220" x2="200" y2="220" stroke="#e3e7ee"/>
+        <line x1="20" y1="280" x2="200" y2="280" stroke="#e3e7ee"/>
+        <text x="10" y="284" font-size="10" fill="#94a3b8">rank 0</text>
+        <text x="10" y="224" font-size="10" fill="#94a3b8">rank 1</text>
+        <rect x="80"  y="270" width="50" height="30" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="105" y="290">a</text>
+        <rect x="80"  y="210" width="50" height="30" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+        <text x="105" y="230">b</text>
+        <line x1="105" y1="270" x2="105" y2="240" stroke="#1f2430" stroke-width="1.5"/>
+        <text x="160" y="255" font-size="10" fill="#64748b">main=y↑</text>
+      </g>
+
+      <!-- normalize -->
+      <g font-size="12.5">
+        <rect x="500" y="200" width="380" height="100" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="520" y="226" font-weight="700" fill="#6d28d9">canonical_rect_to_physical</text>
+        <text x="520" y="248" fill="#5b6472">取 canonical rect 的 4 个角，分别变换，</text>
+        <text x="520" y="268" fill="#5b6472">再取 bbox —— Bt/Rl 会产生负坐标</text>
+        <text x="520" y="288" fill="#5b6472">→ normalize_to_origin 平移回原点</text>
+      </g>
+    </svg>
+    <figcaption>图 12 · 四方向投影。同一份 canonical TB 几何，
+    通过 <code>orientation.from_tb_point / from_tb_side</code> 翻成 LR/RL/BT 物理坐标。
+    <b>rect 用 4 角 bbox 重建</b>，因为 Bt/Rl 变换不保号——"左上角"不一定是 min 角。</figcaption>
+  </figure>
+
+  <div class="note key">
+    <b>为什么 rect 要用 4 角 bbox？</b>
+    <code>canonical_rect_to_physical</code> 不直接变换 (x, y, w, h)，而是取 4 个角分别变换、
+    再取外接 bbox。原因：Bt/Rl 变换会翻转坐标轴符号，"左上角"经过变换后不一定是 min 角。
+    直接搬 (x, y) 会导致 rect 跑到负坐标或方向错乱。4 角 bbox 是唯一安全做法。
+  </div>
+</section>
+
+<!-- ═══════════════ 9 ═══════════════ -->
+<section id="s9">
+  <h2 class="sec"><span class="num">9</span>写权纪律 <span class="pill write">Write Authority</span></h2>
+  <p class="lead">AGENTS.md §1 的硬约束：<b>每个几何自由度有且只有一个写者</b>。
+    下游不得推翻上游，只得展开上游。本模块如何落地：</p>
+
+  <table class="ref">
+    <thead><tr><th>自由度</th><th>写者</th><th>读者（只展开）</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>边反向（working 方向）</td><td><code>cycle.rs</code></td><td>rank / order</td><td>original_* 永不改</td></tr>
+      <tr><td>rank（层号）</td><td><code>rank.rs</code></td><td>properify / order / metric</td><td>Network Simplex</td></tr>
+      <tr><td>层内 order</td><td><code>order.rs</code></td><td>ports / metric / ink</td><td>median + transpose</td></tr>
+      <tr><td>port side / slot</td><td><code>ports.rs</code></td><td>ink</td><td>对侧 rank + 作者约束</td></tr>
+      <tr><td>main 轴坐标（y）</td><td><code>main_axis.rs</code></td><td>ink</td><td>层栈</td></tr>
+      <tr><td>cross 轴坐标（x）</td><td><code>cross_axis.rs</code></td><td>ink</td><td>松弛 + VPSC</td></tr>
+      <tr><td>折点像素路径</td><td><code>route.rs</code> / <code>selfloop.rs</code></td><td>—</td><td><b>只展开</b>上游 waypoint + port</td></tr>
+      <tr><td>物理方向投影</td><td><code>mod.rs</code>（orient out）</td><td>—</td><td>出口一次性变换</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note warn">
+    <b>判断句（AGENTS.md §1）</b>
+    修法若是"再加一个特判"，先问：<i>这个自由度的写者应该是谁？</i>
+    <br>例：Ink 想避让一条边 → 不是 Ink 的写权 → 应该由上游 Channel/Gate 机制决定。
+    本轮 Channel 未实现，所以这种避让<b>不做</b>，记为已知局限而不是临时打补丁。
+  </div>
+</section>
+
+<!-- ═══════════════ 10 ═══════════════ -->
+<section id="s10">
+  <h2 class="sec"><span class="num">10</span>MVP 取舍清单</h2>
+  <p class="lead">本实现相对 architecture.md 目标架构做出的<b>有记录的简化</b>。
+    完整记录见 <code class="inline">notes/2026-08-02-mvp-scope.md</code>。</p>
+
+  <table class="ref">
+    <thead><tr><th>子问题</th><th>目标架构</th><th>本实现</th><th>理由</th></tr></thead>
+    <tbody>
+      <tr><td>去环</td><td>Greedy-FAS</td><td>同</td><td>—</td></tr>
+      <tr><td>分层</td><td>Network Simplex（增量 cut value）</td><td>简化 NS（线性扫描 cut value）</td><td>fixture 规模够用，可读性胜出</td></tr>
+      <tr><td>定序</td><td>median + transpose + 边界 dummy</td><td>median + transpose + <b>递归块排序</b></td><td>等价保证组连续，不产生 GroupBoundary 节点</td></tr>
+      <tr><td>端口</td><td>五档（FREE/FIXED_RATIO/FIXED_POS/Candidates/FIXED）</td><td>两档（FREE/FIXED）</td><td>model 层无字段可落</td></tr>
+      <tr><td>次轴坐标</td><td>Brandes–Köpf 四遍 + VPSC（含组框变量）</td><td>median 松弛 + VPSC（仅节点变量）</td><td>复用 VPSC 求解器，跨层对齐由松弛承担</td></tr>
+      <tr><td>组框</td><td>Metric 相写、finalize 不重算</td><td><b>finalize 后验 bbox</b></td><td>LayoutOutput 无 groups 字段（trait 边界限制）</td></tr>
+      <tr><td>Ink</td><td>Channel 走廊搜索 + rip-up + bundle</td><td>dummy 链 waypoint + 中点双折 + normalize</td><td>够用；Channel 留给下一轮</td></tr>
+      <tr><td>组策略</td><td>Weak + StrongMacro</td><td>仅 Weak；StrongMacro = <code>Unsupported</code> 硬失败</td><td>showcase 无 strong-macro 用例</td></tr>
+      <tr><td>PartitionGrid</td><td>消费</td><td>不消费</td><td>DSL parser 未接入，无输入面</td></tr>
+      <tr><td>Diagnostics</td><td>LayoutDiagnostics 字段</td><td>无（仅 bind 阶段 warning 收集）</td><td>LayoutOutput 无字段</td></tr>
+      <tr><td>自环防碰撞</td><td>多自环共节点防碰撞</td><td>简单偏移错开</td><td>showcase 无真自环</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note tip">
+    <b>验收</b>（MVP scope §5）
+    <code>cargo test --workspace</code> 全绿；69 个 showcase 文件全部通过硬不变量
+    （零重叠、全正交、端口锚点精确落界）；交叉数 0～22 区间，随图复杂度自然增长。
+  </div>
+</section>
+
+<!-- ═══════════════ 11 ═══════════════ -->
+<section id="s11">
+  <h2 class="sec"><span class="num">11</span>术语速查表</h2>
+
+  <table class="ref">
+    <thead><tr><th>术语</th><th>含义</th><th>出处</th></tr></thead>
+    <tbody>
+      <tr><td><b>canonical TB</b></td><td>自上而下的标准空间（main=y↓, cross=x→）。内核只在这个空间工作。</td><td>orient.rs</td></tr>
+      <tr><td><b>main axis / cross axis</b></td><td>主流方向（层栈方向）/ 层内排列方向。TB 下 main=y, cross=x。</td><td>metric/</td></tr>
+      <tr><td><b>RealGraph</b></td><td>去自环后的稠密索引图。real 节点 only。</td><td>model.rs</td></tr>
+      <tr><td><b>PlanGraph</b></td><td>properify 后的 IR：real + dummy 统一为 Elem，含 layers / segments。</td><td>model.rs</td></tr>
+      <tr><td><b>ElemKey</b></td><td>Elem 的稳定身份：<code>Real(id)</code> 或 <code>Virtual { edge_id, ordinal }</code>。</td><td>model.rs</td></tr>
+      <tr><td><b>dummy / virtual</b></td><td>properify 为长边中间 rank 插入的 0×0 节点，让每条边只跨 1 rank。</td><td>properify.rs</td></tr>
+      <tr><td><b>Segment</b></td><td>rank-相邻的一跳：<code>{ edge_id, ordinal, from, to }</code>。span=N 的边有 N 个 segment。</td><td>model.rs</td></tr>
+      <tr><td><b>layer / rank</b></td><td>同义词。rank 是层号（u32）；layer 是该 rank 上的有序 elem 列表。</td><td>—</td></tr>
+      <tr><td><b>original_* / working_*</b></td><td>边的原始方向（DSL）/ 去环后工作方向。arrow/label/port 只读 original。</td><td>model.rs</td></tr>
+      <tr><td><b>FAS</b></td><td>Feedback Arc Set。使图成 DAG 需反转的最小边集（NP-hard，用 Greedy 近似）。</td><td>cycle.rs</td></tr>
+      <tr><td><b>Network Simplex</b></td><td>Gansner 1993。最小化总边长加权和的分层算法，基于 cut value pivot。</td><td>rank.rs</td></tr>
+      <tr><td><b>cut value</b></td><td>树边对总长度的贡献。负值 → 删了它总长减少 → 应该 pivot。</td><td>rank.rs</td></tr>
+      <tr><td><b>properify</b></td><td>把跨多 rank 的长边拆成 dummy 链，使每条边只跨 1 rank。</td><td>properify.rs</td></tr>
+      <tr><td><b>median barycenter</b></td><td>定序启发式：按邻接位置的中位数排序层内元素。</td><td>order.rs</td></tr>
+      <tr><td><b>transpose</b></td><td>定序局部优化：相邻交换，仅当严格减少交叉。</td><td>order.rs</td></tr>
+      <tr><td><b>块排序（BlockNode）</b></td><td>组连续性机制：同组元素作为整体块移动，transpose 不打散块边界。</td><td>order.rs</td></tr>
+      <tr><td><b>ResolvedPort</b></td><td>解析后的端口：<code>{ side, slot, count }</code>，仍在 canonical 空间。</td><td>ports.rs</td></tr>
+      <tr><td><b>VPSC</b></td><td>Variable Placement with Separation Constraints。1-D 变量放置 + 分隔约束 QP。</td><td>cross_axis.rs</td></tr>
+      <tr><td><b>ideal 位置</b></td><td>cross_axis 第 2 步的产物：median 松弛后的"理想"次轴坐标。</td><td>cross_axis.rs</td></tr>
+      <tr><td><b>canonical_frames</b></td><td>每个 Elem 的 TB 矩形（real=节点框，virtual=0×0 点）。</td><td>mod.rs</td></tr>
+      <tr><td><b>CanonicalEdge</b></td><td>Ink 的产物：仍在 TB 空间的折线 + 端口。</td><td>route.rs</td></tr>
+      <tr><td><b>waypoint</b></td><td>Ink 收集的路径点：起点端口锚 → dummy center → 终点端口锚。</td><td>route.rs</td></tr>
+      <tr><td><b>中点双折</b></td><td>相邻 waypoint 不共享轴时，在 y 中点插两个折点，保两端竖直进出 N/S 端口。</td><td>route.rs</td></tr>
+      <tr><td><b>normalize_orthogonal</b></td><td>正交路径清理：去共线点、吸收短段、保端点像素不变。</td><td>plotgram_algo::path_ortho</td></tr>
+      <tr><td><b>Channel / Gate</b></td><td>走廊搜索 / 组穿越许可机制。<b>本轮未实现</b>。</td><td>architecture.md（目标）</td></tr>
+      <tr><td><b>StrongMacro</b></td><td>组强收缩策略。<b>本轮 Unsupported 硬失败</b>。</td><td>params.rs</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>
+  <p>本解读对应 <code>crates/plotgram-layout/src/layout/hierarchical/</code> 当前实现。
+  若与 <code>docs/design/layout/hierarchical/architecture.md</code> 冲突，以设计档为准。
+  实现取舍记录见 <code>docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md</code>。</p>
+</footer>
+
+</div>
+</body>
+</html>

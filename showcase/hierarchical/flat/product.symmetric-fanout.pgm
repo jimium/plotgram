@@ -1,0 +1,21 @@
+// 对称 fan-out：决策分支应左右对称
+diagram {
+    profile: flowchart,
+    title: "审批决策流程",
+    layout: hierarchical { direction: top-to-bottom }
+
+    node submit { label: "提交申请", archetype: start }
+    node review { label: "主管审批", archetype: decision }
+    node approve { label: "批准执行", archetype: process }
+    node reject { label: "驳回修改", archetype: process }
+    node defer { label: "暂缓处理", archetype: process }
+    node notify { label: "通知申请人", archetype: end }
+
+    submit -> review
+    review -> approve "同意"
+    review -> reject "驳回"
+    review -> defer "暂缓"
+    approve -> notify
+    reject -> notify
+    defer -> notify
+}

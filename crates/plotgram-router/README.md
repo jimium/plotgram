@@ -44,7 +44,7 @@ src/
 | OctilinearEdgeRouter | `octilinear` | **MVP 已落地** | H/V/45°；interesting-line + 线桶；组场景诚实拒绝 |
 | CurvedEdgeRouter | `curved` | **MVP 已落地** | 端口贝塞尔采样；穿障回退 polyline+Chaikin |
 
-新算法在 `examples/bench.rs` 和 `examples/viz.rs` 的 `lookup_algorithm()` 中注册即可被所有脚本自动发现。
+新算法在 `examples/router_bench.rs` 和 `examples/viz.rs` 的 `lookup_algorithm()` 中注册即可被所有脚本自动发现。
 
 ## 测试
 

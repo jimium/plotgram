@@ -1,0 +1,40 @@
+// 无 group 演示大图：实时推荐链路扁平拓扑
+// 对照：demo.realtime-recommendation.pgm（同业务带 group）
+// 用途：销售/官网场景下测单层布局是否仍好看
+diagram {
+    profile: architecture,
+    title: "无分组：实时推荐系统",
+    layout: hierarchical,
+theme: common.clean-light
+
+    node app { label: "移动 App", archetype: frontend,
+        meta.semantic: mobile
+    }
+    node event_bus { label: "行为事件流", archetype: queue,
+        meta.semantic: kafka
+    }
+    node feature { label: "特征计算", archetype: service,
+        meta.semantic: flink
+    }
+    node feature_store { label: "特征存储", archetype: cache,
+        meta.semantic: redis
+    }
+    node recall { label: "召回服务", archetype: service }
+    node rank { label: "排序服务", archetype: service }
+    node rerank { label: "重排与打散", archetype: service }
+    node model_store { label: "模型仓库", archetype: storage }
+    node item_db { label: "物料库", archetype: database,
+        meta.semantic: mongodb
+    }
+
+    app -> event_bus "上报行为"
+    event_bus -> feature "实时计算"
+    feature -> feature_store "写特征"
+    app -> recall "请求推荐"
+    recall -> item_db "候选物料"
+    recall -> feature_store "读特征"
+    recall -> rank "候选集"
+    rank -> model_store "加载模型"
+    rank -> rerank "排序结果"
+    rerank -> app "下发推荐列表"
+}

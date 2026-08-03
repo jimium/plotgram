@@ -1,7 +1,8 @@
 //! Hierarchical layout regression/scoring check.
 //!
 //! Runs the full pipeline (parse → measure → `hierarchical` layout) over
-//! every fixture in `showcase/hierarchical/` and asserts hard geometric
+//! every fixture in `showcase/hierarchical/` (recursively: fixtures live in
+//! category subdirectories like `flat/`, `group/`, `partition/`) and asserts hard geometric
 //! invariants the layout must never violate, independent of visual
 //! inspection:
 //!
@@ -18,11 +19,11 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use plotgram_compile::{build_layout, BuildOptions};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::result::LayoutResult;
-use plotgram_compile::{build_layout, BuildOptions};
 
 const EPS: f64 = 1e-6;
 
@@ -33,6 +34,18 @@ fn showcase_dir() -> PathBuf {
         .parent()
         .unwrap()
         .join("showcase/hierarchical")
+}
+
+fn collect_pgm(dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(rd) = fs::read_dir(dir) else { return };
+    for entry in rd.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_pgm(&path, out);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("pgm") {
+            out.push(path);
+        }
+    }
 }
 
 fn rects_overlap(a: Rect, b: Rect) -> bool {
@@ -82,23 +95,24 @@ struct FileMetrics {
 #[test]
 fn hierarchical_showcase_geometry_invariants() {
     let dir = showcase_dir();
-    let mut entries: Vec<PathBuf> = fs::read_dir(&dir)
-        .unwrap_or_else(|e| panic!("read_dir {dir:?}: {e}"))
-        .filter_map(|e| e.ok())
-        .map(|e| e.path())
-        .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("pgm"))
-        .collect();
+    let mut entries: Vec<PathBuf> = Vec::new();
+    collect_pgm(&dir, &mut entries);
     entries.sort();
     assert!(
         !entries.is_empty(),
-        "expected showcase/hierarchical/*.pgm fixtures"
+        "expected showcase/hierarchical/**/*.pgm fixtures"
     );
 
     let mut all_metrics = Vec::new();
     let mut hard_failures: Vec<String> = Vec::new();
 
     for path in &entries {
-        let name = path.file_stem().unwrap().to_string_lossy().to_string();
+        let name = path
+            .strip_prefix(&dir)
+            .unwrap_or(path)
+            .with_extension("")
+            .display()
+            .to_string();
         let source = fs::read_to_string(path).unwrap();
         let result = match build_layout(&source, &BuildOptions::default()) {
             Ok(r) => r,

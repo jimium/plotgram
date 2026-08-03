@@ -34,12 +34,6 @@ pub struct BindError {
 }
 
 impl BindError {
-    pub fn message(msg: impl Into<String>) -> Self {
-        Self {
-            message: msg.into(),
-        }
-    }
-
     pub fn bad_type(key: &str, expected: &str, value: &AttrValue) -> Self {
         Self {
             message: format!("option `{key}`: expected {expected}, got {value}"),
@@ -91,16 +85,6 @@ impl<'a> OptionsBinder<'a> {
         found
     }
 
-    pub fn get_f64(&mut self, key: &'static str) -> Result<Option<f64>, BindError> {
-        match self.take(key) {
-            None => Ok(None),
-            Some(v) => v
-                .as_f64()
-                .map(Some)
-                .ok_or_else(|| BindError::bad_type(key, "number", v)),
-        }
-    }
-
     pub fn get_f64_any(&mut self, keys: &[&'static str]) -> Result<Option<f64>, BindError> {
         let Some(key) = keys.iter().copied().find(|k| self.options.contains_key(*k)) else {
             return Ok(None);
@@ -111,16 +95,6 @@ impl<'a> OptionsBinder<'a> {
                 .as_f64()
                 .map(Some)
                 .ok_or_else(|| BindError::bad_type(key, "number", v)),
-        }
-    }
-
-    pub fn get_bool(&mut self, key: &'static str) -> Result<Option<bool>, BindError> {
-        match self.take(key) {
-            None => Ok(None),
-            Some(v) => v
-                .as_bool()
-                .map(Some)
-                .ok_or_else(|| BindError::bad_type(key, "boolean", v)),
         }
     }
 

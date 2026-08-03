@@ -23,7 +23,7 @@ usage() {
   cat <<'EOF'
 用法: deploy/deploy-showcase.sh [选项]
 
-渲染 showcase SVG（cargo build + render-all.sh）并同步到 plotgram.cn 与 CDN。
+渲染 showcase SVG（cargo build + render.sh）并同步到 plotgram.cn 与 CDN。
 
 选项:
   --skip-render   跳过 SVG 渲染，使用已有 SVG 同步
@@ -55,7 +55,7 @@ render_svgs() {
   (cd "$ROOT_DIR" && cargo build --release -q -p plotgram-cli)
 
   log "渲染 showcase SVG"
-  PLOTGRAM_PROFILE=release "$SHOWCASE_DIR/render-all.sh"
+  "$SHOWCASE_DIR/render.sh" --force
 }
 
 # ─── patch CDN_BASE 与 BUILD_HASH ──────────────────────

@@ -459,7 +459,7 @@ mod tests {
 
     #[test]
     fn node_label_and_shape_lifted() {
-        let lowered = lower_ok(r#"diagram { node x { label: "Hello" shape: diamond } }"#);
+        let lowered = lower_ok(r#"diagram { node x { label: "Hello", shape: diamond } }"#);
         let n = &lowered.graph.nodes[0];
         assert_eq!(n.label.as_deref(), Some("Hello"));
         assert_eq!(n.shape.as_deref(), Some("diamond"));
@@ -509,7 +509,7 @@ mod tests {
 
     #[test]
     fn edge_label_lifted() {
-        let lowered = lower_ok(r#"diagram { node a {} node b {} a -> b { label: "req" head_label: "1" } }"#);
+        let lowered = lower_ok(r#"diagram { node a {} node b {} a -> b { label: "req", head_label: "1" } }"#);
         let e = &lowered.graph.edges[0];
         assert_eq!(e.label.as_deref(), Some("req"));
         assert_eq!(e.head_label.as_deref(), Some("1"));
@@ -528,7 +528,7 @@ mod tests {
         let lowered = lower_ok(r#"diagram {
             group fe { node web {} }
             group be { node api {} }
-            @fe -> @be { from_side: east to_side: west }
+            @fe -> @be { from_side: east, to_side: west }
         }"#);
         assert_eq!(lowered.graph.edges.len(), 0);
         assert_eq!(lowered.pending_group_edges.len(), 1);

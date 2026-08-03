@@ -42,6 +42,10 @@ Thumbs.db
 .env
 .env.local
 
+# CI-generated current.json (snapshot.sh --out) — never commit; baselines/latest.json is the source of truth
+/benchmarks/baselines/current.json
+/benchmarks/baselines/current.md
+
 # Root node_modules (temp tooling)
 /node_modules/
 /package.json

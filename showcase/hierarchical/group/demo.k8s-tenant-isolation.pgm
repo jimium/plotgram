@@ -1,0 +1,75 @@
+// Multi-tenant SaaS cluster with shared platform and strict isolation
+// Mermaid mapping: complex architecture graph with tenant groups and shared services
+diagram {
+    profile: architecture,
+    title: "K8s 多租户隔离拓扑"
+
+    group edge {
+        label: "统一入口"
+        node global_dns { label: "Global DNS", archetype: external }
+        node api_gateway { label: "Tenant API Gateway", archetype: gateway }
+        node auth_proxy { label: "Auth Proxy", archetype: gateway }
+    }
+
+    group tenant_a {
+        label: "tenant-a"
+        node a_web { label: "tenant-a-web x4", archetype: frontend }
+        node a_api { label: "tenant-a-api x8", archetype: service }
+        node a_worker { label: "tenant-a-worker x12", archetype: service }
+        node a_cache { label: "tenant-a-redis", archetype: cache }
+    }
+
+    group tenant_b {
+        label: "tenant-b"
+        node b_web { label: "tenant-b-web x4", archetype: frontend }
+        node b_api { label: "tenant-b-api x8", archetype: service }
+        node b_worker { label: "tenant-b-worker x12", archetype: service }
+        node b_cache { label: "tenant-b-redis", archetype: cache }
+    }
+
+    group shared_platform {
+        label: "共享平台"
+        node tenant_ctrl { label: "Tenant Control Plane", archetype: service }
+        node policy { label: "Policy Engine", archetype: service }
+        node secrets { label: "Secrets Manager", archetype: service }
+        node billing { label: "Billing Service", archetype: service }
+        node audit { label: "Audit Log Service", archetype: service }
+    }
+
+    group shared_data {
+        label: "共享数据层"
+        node postgres { label: "Shared PostgreSQL", archetype: database }
+        node kafka { label: "Shared Kafka", archetype: queue }
+        node object_store { label: "Object Storage", archetype: storage }
+    }
+
+    global_dns -> api_gateway
+    api_gateway -> auth_proxy
+    auth_proxy -> a_web "tenant-a route"
+    auth_proxy -> b_web "tenant-b route"
+
+    a_web -> a_api
+    a_api -> a_worker "async jobs"
+    a_api -> a_cache
+    a_api -> postgres
+    a_worker -> kafka
+    a_worker -> object_store
+
+    b_web -> b_api
+    b_api -> b_worker "async jobs"
+    b_api -> b_cache
+    b_api -> postgres
+    b_worker -> kafka
+    b_worker -> object_store
+
+    tenant_ctrl -> a_api "provision"
+    tenant_ctrl -> b_api "provision"
+    policy -> a_api "enforce quota"
+    policy -> b_api "enforce quota"
+    secrets -> a_api
+    secrets -> b_api
+    billing -> postgres
+    audit -> kafka
+    a_api -> audit "tenant events"
+    b_api -> audit "tenant events"
+}

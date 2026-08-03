@@ -1,0 +1,56 @@
+// AI-powered docops pipeline for generating, validating, and publishing diagrams
+// Mermaid mapping: complex architecture graph for agent workflow and documentation automation
+diagram {
+    profile: architecture,
+    title: "AI Agent 文档自动化管线"
+
+    group inputs {
+        label: "输入源"
+        node repo { label: "代码仓库", archetype: storage }
+        node pr { label: "Pull Request", archetype: service }
+        node cmdb { label: "服务目录 / CMDB", archetype: service }
+        node prompt_lib { label: "Prompt Library", archetype: storage }
+    }
+
+    group agent_runtime {
+        label: "Agent 运行时"
+        node orchestrator { label: "Agent Orchestrator", archetype: service }
+        node planner { label: "Planning Agent", archetype: service }
+        node graph_agent { label: "Diagram Agent", archetype: service }
+        node patch_agent { label: "Patch Agent", archetype: service }
+    }
+
+    group drawify_stack {
+        label: "Drawify 栈"
+        node validate { label: "Drawify Validator", archetype: service }
+        node render { label: "Drawify Renderer", archetype: service }
+        node diff { label: "Diagram Diff Engine", archetype: service }
+        node artifact { label: "Diagram Artifact Store", archetype: storage }
+    }
+
+    group delivery {
+        label: "交付与反馈"
+        node docs { label: "Docs Portal", archetype: frontend }
+        node review { label: "PR Review Bot", archetype: service }
+        node wiki { label: "Knowledge Base", archetype: frontend }
+        node telemetry { label: "Agent Telemetry", archetype: service }
+    }
+
+    repo -> orchestrator "code context"
+    pr -> orchestrator "change event"
+    cmdb -> planner "service metadata"
+    prompt_lib -> planner "prompt templates"
+    orchestrator -> planner "analysis request"
+    planner -> graph_agent "generate draft"
+    graph_agent -> validate "diagram source"
+    validate -> patch_agent "structured errors"
+    patch_agent -> graph_agent "repair hints"
+    validate -> render "validated diagram"
+    render -> artifact "svg and json"
+    artifact -> diff "baseline compare"
+    diff -> review "change summary"
+    artifact -> docs "publish diagram"
+    artifact -> wiki "embed diagram"
+    orchestrator -> telemetry "run metrics"
+    review -> telemetry "review feedback"
+}

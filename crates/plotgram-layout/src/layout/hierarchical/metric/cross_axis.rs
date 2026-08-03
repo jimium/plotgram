@@ -1,8 +1,13 @@
-//! P4.2 cross axis: iterative neighbor-median relaxation for an "ideal"
-//! position (straightens dummy chains), then a per-layer VPSC solve for the
-//! final non-overlapping coordinate (separation by order, soft-pulled to
-//! ideal — dummies weighted higher so long edges stay straighter). See
+//! P4.2 cross axis: iterative *damped barycenter* relaxation (each elem is
+//! pulled halfway toward the mean of its adjacent-layer neighbors) for an
+//! "ideal" position (straightens dummy chains), then a per-layer VPSC solve
+//! for the final non-overlapping coordinate (separation by order, soft-pulled
+//! to ideal — dummies weighted higher so long edges stay straighter). See
 //! `docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md` §2.3.
+//!
+//! Note: this is *not* the median heuristic despite older wording — it is a
+//! mean + damping scheme; neither is the target Brandes–Köpf (accounted in
+//! the mvp-scope note).
 
 use plotgram_algo::orientation::Size;
 use plotgram_algo::vpsc::{self, Constraint, Variable};
@@ -39,7 +44,8 @@ pub fn assign_cross_axis(
     }
     let packed = ideal.clone();
 
-    // 2) neighbor-median relaxation.
+    // 2) Damped barycenter relaxation: pull each elem halfway toward the
+    // mean of its neighbors' current positions (not a median — see module doc).
     for _ in 0..RELAX_ITERS {
         let mut next = ideal.clone();
         for e in 0..n {

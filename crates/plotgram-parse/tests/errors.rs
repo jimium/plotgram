@@ -182,13 +182,13 @@ fn group_missing_body() {
 
 #[test]
 fn duplicate_attr_in_node_block() {
-    let e = expect_err(r#"diagram { node a { label: "X" label: "Y" } }"#);
+    let e = expect_err(r#"diagram { node a { label: "X", label: "Y" } }"#);
     assert!(matches!(e, ParseError::DuplicateAttr { .. }), "got: {e:?}");
 }
 
 #[test]
 fn duplicate_attr_in_edge_block() {
-    let e = expect_err("diagram { node a {} node b {} a -> b { from_side: north from_side: south } }");
+    let e = expect_err("diagram { node a {} node b {} a -> b { from_side: north, from_side: south } }");
     assert!(matches!(e, ParseError::DuplicateAttr { .. }), "got: {e:?}");
 }
 
@@ -217,7 +217,7 @@ fn entity_with_host_group_rejected() {
 
 #[test]
 fn group_anchor_missing_side() {
-    let e = expect_err("diagram { group g { node x {} } node a { role: group_anchor host_group: g } }");
+    let e = expect_err("diagram { group g { node x {} } node a { role: group_anchor, host_group: g } }");
     assert!(
         matches!(&e, ParseError::NodeStructural(_) | ParseError::Semantic(_)),
         "got: {e:?}"
@@ -454,7 +454,7 @@ fn node_bare_archetype_atom_rejected() {
 #[test]
 fn group_anchor_unknown_host_group() {
     let e = expect_err(
-        "diagram { node a { role: group_anchor host_group: missing side: north } }",
+        "diagram { node a { role: group_anchor, host_group: missing, side: north } }",
     );
     assert!(
         matches!(&e, ParseError::Semantic(msg) if msg.contains("missing")),
@@ -466,7 +466,7 @@ fn group_anchor_unknown_host_group() {
 fn group_anchor_not_in_host_group() {
     let e = expect_err(r#"diagram {
         group g { node x {} }
-        node a { role: group_anchor host_group: g side: north }
+        node a { role: group_anchor, host_group: g, side: north }
     }"#);
     assert!(
         matches!(&e, ParseError::Semantic(msg) if msg.contains("direct member")),
@@ -511,7 +511,7 @@ fn atom_trailing_dot_rejected() {
 
 #[test]
 fn slot_fractional_rejected() {
-    let e = expect_err("diagram { node a {} node b {} a -> b { from_side: north from_slot: 1.5 } }");
+    let e = expect_err("diagram { node a {} node b {} a -> b { from_side: north, from_slot: 1.5 } }");
     assert!(matches!(e, ParseError::Port(_)), "got: {e:?}");
 }
 
@@ -521,7 +521,7 @@ fn slot_negative_rejected() {
     // with a value that reaches parse_slot as negative: not directly possible via DSL.
     // The model's parse_slot rejects n < 0.
     // Here we just verify the port error path works for non-integer.
-    let e = expect_err("diagram { node a {} node b {} a -> b { from_side: north from_slot: 0.1 } }");
+    let e = expect_err("diagram { node a {} node b {} a -> b { from_side: north, from_slot: 0.1 } }");
     assert!(matches!(e, ParseError::Port(_)), "got: {e:?}");
 }
 
@@ -548,9 +548,9 @@ fn edge_block_forbidden_keys_rejected() {
 #[test]
 fn diagram_duplicate_attrs_rejected() {
     let cases = [
-        r#"diagram { title: "A" title: "B" node a {} }"#,
-        r#"diagram { layout: hierarchical layout: organic node a {} }"#,
-        r#"diagram { edge_routing: orthogonal edge_routing: straight node a {} }"#,
+        r#"diagram { title: "A", title: "B" node a {} }"#,
+        r#"diagram { layout: hierarchical, layout: organic node a {} }"#,
+        r#"diagram { edge_routing: orthogonal, edge_routing: straight node a {} }"#,
     ];
     for src in cases {
         let e = expect_err(src);
@@ -570,7 +570,7 @@ fn non_string_label_rejected_everywhere() {
         "diagram { group g { label: 42 node x {} } }",
         "diagram { node a {} node b {} a -> b { label: 42 } }",
         "diagram { node a {} node b {} a -> b { head_label: true } }",
-        "diagram { group g { node x {} } node a {} a -> @g { to_side: west label: 42 } }",
+        "diagram { group g { node x {} } node a {} a -> @g { to_side: west, label: 42 } }",
     ];
     for src in cases {
         let e = expect_err(src);

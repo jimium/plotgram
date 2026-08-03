@@ -1,14 +1,16 @@
 //! P7 port finalize: FREE ports inferred from rank direction (canonical
 //! North/South only — this runs *inside* the TB-canonical core, see
-//! `orient.rs`); FIXED side/slot honored as authored (any of the 4 canonical
-//! sides, already converted by the caller via `orient::to_algo_side`).
+//! `orient.rs`); FIXED side/slot honored as authored (any of the 4 physical
+//! sides — converted into canonical TB space here via
+//! `Orientation::to_tb_side`, mirroring the `from_tb_side` pass in `mod.rs`
+//! on the way out; architecture.md §9.3).
 //!
 //! Slot order within a (node, side) group: opposite endpoint's
 //! `(neighbor_rank, neighbor_order, EdgeId)` (ports-and-channel.md §2 step 4).
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use plotgram_algo::orientation::Side;
+use plotgram_algo::orientation::{Orientation as AlgoOrientation, Side};
 
 use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealGraph};
 use crate::layout::hierarchical::orient::to_algo_side;
@@ -60,7 +62,11 @@ struct EndPoint {
     sort_key: (u32, usize, String), // (neighbor_rank, neighbor_order, edge_id)
 }
 
-pub fn assign_ports(graph: &RealGraph, plan: &PlanGraph) -> BTreeMap<String, EdgePorts> {
+pub fn assign_ports(
+    graph: &RealGraph,
+    plan: &PlanGraph,
+    orientation: AlgoOrientation,
+) -> BTreeMap<String, EdgePorts> {
     let pos = positions_within_layer(plan);
     let real_idx_of = |id: &str| plan.index_of[&ElemKey::Real(id.to_string())];
 
@@ -76,7 +82,8 @@ pub fn assign_ports(graph: &RealGraph, plan: &PlanGraph) -> BTreeMap<String, Edg
             let neighbor_rank = plan.elems[neighbor].rank;
 
             let (side, fixed_slot) = match constraint {
-                Some(c) => (to_algo_side(c.side), c.slot),
+                // Authored sides are physical; the core is canonical TB.
+                Some(c) => (orientation.to_tb_side(to_algo_side(c.side)), c.slot),
                 None => {
                     let inferred = if neighbor_rank > own_rank {
                         Side::South
@@ -257,7 +264,7 @@ mod tests {
     #[test]
     fn free_ports_infer_south_for_downstream_north_for_upstream() {
         let (graph, plan) = small_plan_and_graph();
-        let ports = assign_ports(&graph, &plan);
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb);
         assert_eq!(ports["e0"].source.side, Side::South);
         assert_eq!(ports["e0"].target.side, Side::North);
         assert_eq!(ports["e1"].source.side, Side::South);
@@ -276,11 +283,63 @@ mod tests {
             slot: Some(0),
         });
         let _ = &mut plan;
-        let ports = assign_ports(&graph, &plan);
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb);
         assert_eq!(ports["e1"].source.slot, 0);
         assert_eq!(
             ports["e0"].source.slot, 1,
             "free slot must skip the taken fixed slot 0"
         );
+    }
+
+    /// Regression: an authored (physical) fixed side must enter the canonical
+    /// TB core through `to_tb_side` — with `Tb` the identity hid the bug.
+    /// Table-driven over the four orientations (architecture.md §9.3).
+    #[test]
+    fn fixed_side_is_converted_into_canonical_space() {
+        // Lr maps physical South → canonical East (point transform (x,y)→(y,x));
+        // Bt flips North↔South; Rl ((x,y)→(y,-x)) maps South → East as well
+        // but via the 4-cycle North→West→South→East; Tb is the identity.
+        let cases = [
+            (
+                AlgoOrientation::Tb,
+                plotgram_model::port::Side::South,
+                Side::South,
+            ),
+            (
+                AlgoOrientation::Lr,
+                plotgram_model::port::Side::South,
+                Side::East,
+            ),
+            (
+                AlgoOrientation::Bt,
+                plotgram_model::port::Side::South,
+                Side::North,
+            ),
+            (
+                AlgoOrientation::Rl,
+                plotgram_model::port::Side::South,
+                Side::East,
+            ),
+        ];
+        for (orientation, authored, expected_canonical) in cases {
+            let (mut graph, plan) = small_plan_and_graph();
+            graph.edges[0].from_port = Some(plotgram_model::port::PortConstraint {
+                side: authored,
+                slot: None,
+            });
+            let ports = assign_ports(&graph, &plan, orientation);
+            assert_eq!(
+                ports["e0"].source.side,
+                expected_canonical,
+                "orientation {orientation:?}: authored {authored:?}"
+            );
+            // Round-trip through mod.rs's output transform must recover the
+            // authored physical side.
+            assert_eq!(
+                orientation.from_tb_side(ports["e0"].source.side),
+                to_algo_side(authored),
+                "output transform must round-trip the authored side"
+            );
+        }
     }
 }

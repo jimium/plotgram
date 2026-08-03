@@ -9,3 +9,4 @@ description = "Plotgram layout algorithms (hierarchical, …)"
 plotgram-model = { workspace = true }
 plotgram-engine-api = { workspace = true }
 plotgram-algo = { workspace = true }
+serde = { workspace = true }

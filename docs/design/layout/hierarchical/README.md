@@ -56,6 +56,8 @@ Sugiyama 骨架 + Atlas 三相写权（组合 → 度量 → Ink）。
 | 文档 | 用途 |
 |------|------|
 | **[architecture.md](architecture.md)** | **目标架构真源**：IR、算法表、Channel、组/分区、参数、里程碑 |
+| [debug-profile.md](debug-profile.md) | Hier 的 DebugTrace **扩展剖面**（rank/dummy/…） |
+| [../debug-inspector.md](../debug-inspector.md) | **跨核**调试检视器信封 + UI 壳 |
 | [phases/](phases/README.md) | 跨 crate 契约与各相可执行细节 |
 | [from-yfiles-reference.md](nodes/from-yfiles-reference.md) | yFiles 参考文库启发纪要 |
 | [01 Sugiyama](../../../reference/yfiles/01-sugiyama分层布局.md) | P1–P5 算法证据 |

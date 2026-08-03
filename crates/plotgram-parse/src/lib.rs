@@ -119,22 +119,22 @@ mod tests {
 // 登录认证示意
 
 diagram {
-    profile: flowchart
-    title: "用户登录"
-    layout: hierarchical { direction: top-to-bottom }
-    theme: common.clean-light
+    profile: flowchart,
+    title: "用户登录",
+    layout: hierarchical { direction: top-to-bottom },
+    theme: common.clean-light,
     render_style: standard
 
-    node start { label: "开始" archetype: start }
+    node start { label: "开始", archetype: start }
     node login { label: "登录" }
-    node ok { label: "成功？" archetype: decision }
+    node ok { label: "成功？", archetype: decision }
 
     group auth {
-        label: "认证服务"
+        label: "认证服务",
         variant: secondary
 
-        node api { label: "API" archetype: service status: healthy }
-        node db { label: "用户库" archetype: database }
+        node api { label: "API", archetype: service, status: healthy }
+        node db { label: "用户库", archetype: database }
         api -> db { label: "查询" }
     }
 
@@ -185,8 +185,8 @@ diagram {
         node api { label: "API" }
     }
 
-    @frontend -> @backend { label: "调用" from_side: east to_side: west }
-    web -> @backend { label: "直连框" to_side: north }
+    @frontend -> @backend { label: "调用", from_side: east, to_side: west }
+    web -> @backend { label: "直连框", to_side: north }
 }"#;
         let out = parse(source).unwrap();
 
@@ -211,7 +211,7 @@ diagram {
         let source = r#"diagram {
     node a { label: "A" }
     node b { label: "B" }
-    a -> b { from_side: south to_side: north from_slot: 0 to_slot: 1 }
+    a -> b { from_side: south, to_side: north, from_slot: 0, to_slot: 1 }
 }"#;
         let out = parse(source).unwrap();
         let edge = &out.graph.edges[0];
@@ -308,10 +308,10 @@ diagram {
     #[test]
     fn end_to_end_archetype_expansion() {
         let source = r#"diagram {
-    node db { label: "DB" archetype: database }
-    node gw { label: "GW" archetype: gateway icon: none }
+    node db { label: "DB", archetype: database }
+    node gw { label: "GW", archetype: gateway, icon: none }
     node svc "Service" service
-    node custom { archetype: database shape: rounded_rect variant: primary }
+    node custom { archetype: database, shape: rounded_rect, variant: primary }
     node unknown_arch { archetype: foobar }
 }"#;
         let out = parse(source).unwrap();
@@ -348,7 +348,7 @@ diagram {
     #[test]
     fn end_to_end_partition_swimlane() {
         let source = r#"diagram {
-    profile: flowchart
+    profile: flowchart,
     layout: hierarchical { direction: top-to-bottom }
 
     partition {
@@ -357,9 +357,9 @@ diagram {
         column warehouse { label: "仓库" }
     }
 
-    node order { label: "下单" cell_col: customer }
-    node confirm { label: "确认" cell_col: sales }
-    node ship { label: "发货" cell_col: warehouse }
+    node order { label: "下单", cell_col: customer }
+    node confirm { label: "确认", cell_col: sales }
+    node ship { label: "发货", cell_col: warehouse }
 
     order -> confirm
     confirm -> ship
@@ -396,7 +396,7 @@ diagram {
         column col_a { label: "A" }
         row row_x { label: "X" }
     }
-    node n1 { cell_col: col_a cell_row: row_x }
+    node n1 { cell_col: col_a, cell_row: row_x }
 }"#;
         let out = parse(source).unwrap();
         let grid = out.graph.partition.as_ref().unwrap();

@@ -1,9 +1,11 @@
 //! Group envelopes, labels, canvas — after nodes/edges are final.
 
 use plotgram_router::core::union_rects;
-use plotgram_model::geometry::Rect;
+use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::graph::Graph;
-use plotgram_model::result::{GroupPlacement, LabelOwner, LabelSlot, LayoutResult, NodePlacement};
+use plotgram_model::result::{
+    EdgePath, EdgePlacement, GroupPlacement, LabelOwner, LabelSlot, LayoutResult, NodePlacement,
+};
 
 const GROUP_PAD: f64 = 16.0;
 const CANVAS_PAD: f64 = 24.0;
@@ -14,10 +16,29 @@ const GROUP_LABEL_TOP_PAD: f64 = 24.0;
 
 pub fn finalize(
     graph: &Graph,
-    nodes: Vec<NodePlacement>,
-    edges: Vec<plotgram_model::result::EdgePlacement>,
+    mut nodes: Vec<NodePlacement>,
+    mut edges: Vec<EdgePlacement>,
 ) -> LayoutResult {
-    let groups = group_frames(graph, &nodes);
+    let mut groups = group_frames(graph, &nodes);
+
+    // Uniform whole-graph translate: move the content bbox so its top-left
+    // sits at (CANVAS_PAD, CANVAS_PAD). `canvas_size` then adds the same
+    // padding to the right/bottom, yielding symmetric margins on all sides.
+    let (dx, dy) = content_shift(&nodes, &groups);
+    if dx != 0.0 || dy != 0.0 {
+        for n in &mut nodes {
+            n.frame.x += dx;
+            n.frame.y += dy;
+        }
+        for e in &mut edges {
+            translate_edge_path(&mut e.path, dx, dy);
+        }
+        for g in &mut groups {
+            g.frame.x += dx;
+            g.frame.y += dy;
+        }
+    }
+
     let labels = simple_labels(graph, &nodes, &groups);
     let (canvas_width, canvas_height) = canvas_size(&nodes, &groups);
 
@@ -28,6 +49,43 @@ pub fn finalize(
         labels,
         canvas_width,
         canvas_height,
+    }
+}
+
+/// Shift that moves the content bounding box origin to (CANVAS_PAD, CANVAS_PAD).
+/// Layouts normalize their output to start at (0, 0); this adds the uniform
+/// canvas padding on every side.
+fn content_shift(nodes: &[NodePlacement], groups: &[GroupPlacement]) -> (f64, f64) {
+    let mut rects: Vec<Rect> = nodes.iter().map(|n| n.frame).collect();
+    rects.extend(groups.iter().map(|g| g.frame));
+    match union_rects(&rects) {
+        Some(u) => (CANVAS_PAD - u.x, CANVAS_PAD - u.y),
+        None => (0.0, 0.0),
+    }
+}
+
+fn translate_edge_path(path: &mut EdgePath, dx: f64, dy: f64) {
+    let shift = |p: &mut Point| {
+        p.x += dx;
+        p.y += dy;
+    };
+    match path {
+        EdgePath::Polyline { points } => {
+            for p in points {
+                shift(p);
+            }
+        }
+        EdgePath::Cubic {
+            start,
+            end,
+            controls,
+        } => {
+            shift(start);
+            shift(end);
+            for c in controls {
+                shift(c);
+            }
+        }
     }
 }
 

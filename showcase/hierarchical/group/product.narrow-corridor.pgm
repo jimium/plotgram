@@ -1,0 +1,29 @@
+// 窄组间隙：边不应贴组边框走
+diagram {
+    profile: architecture,
+    title: "窄走廊穿越"
+
+    group frontend {
+        label: "前端"
+        node web { label: "Web", archetype: frontend }
+        node mobile { label: "Mobile", archetype: frontend }
+    }
+
+    group backend {
+        label: "后端"
+        node api { label: "API", archetype: service }
+        node worker { label: "Worker", archetype: service }
+    }
+
+    group storage {
+        label: "存储"
+        node db { label: "DB", archetype: database }
+        node cache { label: "Cache", archetype: cache }
+    }
+
+    web -> api
+    mobile -> api
+    api -> db
+    api -> cache
+    worker -> db
+}

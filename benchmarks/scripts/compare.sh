@@ -1,329 +1,258 @@
 #!/usr/bin/env bash
-# 对比两份门禁 baseline JSON；按正确性轨 / 质量轨分层报告。
+# v2 门禁比对：角色分轨棘轮（showcase-redesign-2026-08.md §8.1）。
 #
 # 用法:
 #   ./benchmarks/compare.sh baseline.json current.json
-#   ./benchmarks/compare.sh --allow-node-fp baseline.json current.json
-#   ./benchmarks/compare.sh --allow-quality-debt baseline.json current.json
 #   ./benchmarks/compare.sh --strict-stress baseline.json current.json
 #
-# 产品验收语言（Allowed / NeedsSeparation / Degraded）见:
-#   docs/architecture/方案计划/collinear-and-arrow-merge-comparison.md §2
-# 成功标准是「严重度与可归类」，不是「共线计数归零」。
-#
-# 门禁分层（角色感知）:
-#   正确性轨（硬，全角色）: edge_crosses_group_interior 不升；det 必须为 true
+# 门禁分层（按角色，基于 path 键比对）:
+#   正确性轨（硬，全角色）:
+#     - status != "ok"
+#     - correctness.det == false
+#     - node_overlap_count > 0
+#     - edge_crosses_group_interior > 0
+#     - label_overlap_count > 0
 #   质量轨（按角色）:
-#     product / smoke  → 硬 FAIL
-#     stress           → 默认 WARN（观测，不挡）；--strict-stress 时改硬 FAIL
-#     demo             → 默认 WARN（可债）
-#     mech             → 默认不门禁（仅正确性）
-#   观测（WARN，不单独失败）:
-#     allowed_share_len 可升；若 allowed↑ 且 exact 未降 → 提示抽检误标
-#   默认: 正确性 FAIL → exit 1；product 质量 FAIL → exit 1
-#   --allow-quality-debt: 所有质量轨转 WARN（exit 0，显式债）
-#   --strict-stress: stress 质量轨也走硬 FAIL
+#     product / smoke  → 硬 FAIL（任何质量指标恶化）
+#     stress            → 默认 WARN（--strict-stress 改硬）
+#     demo              → 默认 WARN
+#     mech              → 跳过质量门禁（仅正确性）
 #
-# 抬基线 note 强制带角色（手册 §1）:
-#   raise product: …原因…；残余: product.cdn-cache
-#   raise stress (expected): …探针可接受…；残余: stress.layout-stress-nested
+# 恶化判定（棘轮：current 不得比 baseline 差）:
+#   - edge_crossing_count: 整数计数上升（容差 0）
+#   - total_edge_length:   浮点上升（容差 1.0 px）
+#   - canvas_area:         浮点上升（容差 10.0 px²）
+#   - aspect_ratio:        浮点上升（容差 0.05；>=1，越大越差）
+#   改进（current 更好）只记 INFO，不阻门禁。
 #
-# 读法示例（group↓、sev↑）:
-#   正确性轨 PASS: lint.edge_crosses_group_interior 2 → 1
-#   质量轨 FAIL（product）: exact_sev 上升 … → 须 note 残余边后显式抬基线
-#   质量轨 WARN（stress）: exact_sev 上升 … → 探针可接受；提示抽检
+# Exit code:
+#   0 = clean pass（无硬退化、无 WARN）
+#   1 = 硬退化（任何角色）
+#   2 = 仅 WARN（无硬退化；存在 soft WARN）
+#   3 = 用法错误 / 文件读取失败
+#
+# 抬基线 note 强制带 layout/role（§8.2）:
+#   raise hierarchical/smoke: …原因…；残余: hierarchical/smoke.foo
 
-set -euo pipefail
+set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BM="$(cd "$SCRIPT_DIR/.." && pwd)"
-# shellcheck source=benchmarks/scripts/gate-switch.sh
-source "$SCRIPT_DIR/gate-switch.sh"
-# 门禁关闭时（PLOTGRAM_GATES=off）：仍跑全部对比并打印，但不以非零码阻断。
-REPORT_ONLY=0
-gate_enabled || REPORT_ONLY=1
-ALLOW_NODE_FP=0
-ALLOW_QUALITY_DEBT=0
 STRICT_STRESS=0
 ARGS=()
 for a in "$@"; do
   case "$a" in
-    --allow-node-fp) ALLOW_NODE_FP=1 ;;
-    --allow-quality-debt) ALLOW_QUALITY_DEBT=1 ;;
     --strict-stress) STRICT_STRESS=1 ;;
+    -h|--help)
+      sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0 ;;
     *) ARGS+=("$a") ;;
   esac
 done
 
-BASE="${ARGS[0]:-$BM/baselines/latest.json}"
-CUR="${ARGS[1]:-}"
-
-if [[ -z "$CUR" ]]; then
-  echo "用法: $0 [--allow-node-fp] [--allow-quality-debt] [--strict-stress] <baseline.json> <current.json>" >&2
-  exit 2
+if [[ ${#ARGS[@]} -lt 2 ]]; then
+  echo "用法: $0 [--strict-stress] <baseline.json> <current.json>" >&2
+  exit 3
 fi
 
-python3 - "$BASE" "$CUR" "$ALLOW_NODE_FP" "$ALLOW_QUALITY_DEBT" "$STRICT_STRESS" "$REPORT_ONLY" <<'PY'
+BASE="${ARGS[0]}"
+CUR="${ARGS[1]}"
+
+[[ -f "$BASE" ]] || { echo "error: baseline 不存在: $BASE" >&2; exit 3; }
+[[ -f "$CUR" ]]  || { echo "error: current 不存在: $CUR"  >&2; exit 3; }
+
+python3 - "$BASE" "$CUR" "$STRICT_STRESS" <<'PY'
 import json, sys
 
-PERF_BUDGET = 0.10
-EPS = 1.0  # 严重度浮点容差（px·加权）
-ALLOW_NODE_FP = sys.argv[3] == "1"
-ALLOW_QUALITY_DEBT = sys.argv[4] == "1"
-STRICT_STRESS = sys.argv[5] == "1"
-REPORT_ONLY = sys.argv[6] == "1"
+base_path, cur_path, strict_stress = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
+
+with open(base_path) as fh:
+    base = json.load(fh)
+with open(cur_path) as fh:
+    cur = json.load(fh)
+
+# schema_version 校验（双方都要有，且相等）
+bv = base.get("schema_version")
+cv = cur.get("schema_version")
+if bv is None or cv is None:
+    print("WARN: 缺 schema_version 字段（旧 v1 baseline？）", file=sys.stderr)
+elif bv != cv:
+    print(f"error: schema_version 不匹配 (baseline={bv}, current={cv})", file=sys.stderr)
+    sys.exit(3)
+
+base_samples = base.get("samples", [])
+cur_samples  = cur.get("samples", [])
+
+# 按 path 键索引（path 是 layout-prefixed showcase-relative 路径，唯一）
+base_map = {}
+for s in base_samples:
+    p = s.get("path")
+    if p is not None:
+        base_map[p] = s
+cur_map = {}
+for s in cur_samples:
+    p = s.get("path")
+    if p is not None:
+        cur_map[p] = s
 
 ROLE_ORDER = ["smoke", "product", "demo", "stress", "mech"]
-def derive_role(path):
-    name = path.split("/")[-1]
+def role_of(s):
+    r = s.get("role")
+    if r in ROLE_ORDER:
+        return r
+    # 兜底：按文件名推导
+    name = (s.get("path") or "").rsplit("/", 1)[-1]
     head = name.split(".")[0]
     return head if head in ROLE_ORDER else "product"
 
-# 质量轨是否硬 fail 的角色判定
+# 棘轮容差
+EPS_LEN     = 1.0    # total_edge_length
+EPS_AREA    = 10.0   # canvas_area
+EPS_ASPECT  = 0.05   # aspect_ratio
+
+# 质量轨是否硬 fail
 def quality_is_hard(role):
-    if ALLOW_QUALITY_DEBT:
-        return False
     if role in ("product", "smoke"):
         return True
-    if role == "stress" and STRICT_STRESS:
+    if role == "stress" and strict_stress:
         return True
     return False
 
-with open(sys.argv[1]) as fh:
-    base = json.load(fh)
-with open(sys.argv[2]) as fh:
-    cur = json.load(fh)
-
-# 兼容旧 baseline：缺 role 字段时按文件名推导
-for snap in (base, cur):
-    for s in snap.get("samples", []):
-        if "role" not in s:
-            s["role"] = derive_role(s["file"])
-
-base_map = {s["file"]: s for s in base["samples"]}
-cur_map = {s["file"]: s for s in cur["samples"]}
-
-correctness = []      # 硬 fail（全角色）
-quality_hard = []     # 硬 fail（product/smoke；或 stress 当 --strict-stress）
-quality_soft = []     # WARN（stress/demo；或 product 当 --allow-quality-debt）
-aesthetics_warn = []  # 美学轨 WARN（stress/demo/mech）
-aesthetics_hard = []  # 美学轨硬 FAIL（product/smoke：crossings + bends）
-warns = []
-
-# 缺样例按角色归类
-def role_of(f):
-    return base_map.get(f, cur_map.get(f, {})).get("role", "product")
+# 收集结果
+hard_fail = []     # 硬退化（exit 1）
+soft_warn = []     # 软退化（exit 2）
+infos = []         # 改进 / 信息
+new_samples = []   # current 新增
+missing_samples = []  # current 缺失
 
 only_base = sorted(set(base_map) - set(cur_map))
-only_cur = sorted(set(cur_map) - set(base_map))
-if only_base:
-    for f in only_base:
-        correctness.append(f"{f}: current 缺少样例（role={role_of(f)}）")
-if only_cur:
-    for f in only_cur:
-        warns.append(f"{f}: current 新增样例（未对比，role={role_of(f)}）")
+only_cur  = sorted(set(cur_map) - set(base_map))
 
-for f in sorted(set(base_map) & set(cur_map)):
-    b, c = base_map[f], cur_map[f]
-    name = f.split("/")[-1]
-    role = c.get("role", "product")
+for p in only_base:
+    s = base_map[p]
+    role = role_of(s)
+    missing_samples.append((p, role))
+for p in only_cur:
+    s = cur_map[p]
+    role = role_of(s)
+    new_samples.append((p, role))
 
-    if b.get("node_fp") != c.get("node_fp"):
-        msg = f"{name}: node_fp 变化 {b.get('node_fp')} → {c.get('node_fp')}"
-        if ALLOW_NODE_FP:
-            warns.append(msg + " （允许：轴 B）")
-        else:
-            (quality_hard if role in ("product", "smoke") else quality_soft).append(msg)
+# 缺失/新增样例 = INFO（CI 可能只跑 smoke+product 子集；本地全量 snapshot 才会真正丢覆盖）
+# 不进 WARN/FAIL，避免 subset CI 假阳性。
+for p, role in missing_samples:
+    infos.append(f"{p}: current 缺失 (role={role})（CI 子集跑属正常；本地全量跑若仍缺，请显式删除）")
+for p, role in new_samples:
+    infos.append(f"{p}: current 新增 (role={role})（首次基线后纳入下次比对）")
 
-    be = float(b.get("exact_sev", 0) or 0)
-    ce = float(c.get("exact_sev", 0) or 0)
-    bt = float(b.get("tight_sev", 0) or 0)
-    ct = float(c.get("tight_sev", 0) or 0)
-    if ce > be + EPS:
-        msg = f"{name}: exact_sev 上升 {be:.3f} → {ce:.3f} (role={role})"
-        (quality_hard if quality_is_hard(role) else quality_soft).append(msg)
-    if ct > bt + EPS:
-        msg = f"{name}: tight_sev 上升 {bt:.3f} → {ct:.3f} (role={role})"
-        (quality_hard if quality_is_hard(role) else quality_soft).append(msg)
+# 比对公共样例
+for p in sorted(set(base_map) & set(cur_map)):
+    b, c = base_map[p], cur_map[p]
+    name = p.rsplit("/", 1)[-1]
+    role = role_of(c)
 
-    # allowed_share_len：合法合流可升（观测）；与 exact 交叉提示误标风险
-    ba = float(b.get("allowed_share_len", 0) or 0)
-    ca = float(c.get("allowed_share_len", 0) or 0)
-    if ca > ba + EPS:
-        warns.append(
-            f"{name}: allowed_share_len 上升 {ba:.3f} → {ca:.3f}"
-            f"（Allowed 可升；对应产品「有意合流」，role={role}）"
-        )
-        if ce >= be - EPS:
-            warns.append(
-                f"{name}: allowed↑ 但 exact_sev 未降（{be:.3f} → {ce:.3f}）"
-                f"— 抽检是否误标 Allowed 掩盖 NeedsSeparation"
-            )
+    # ── 正确性轨（全角色硬）──
+    bs = b.get("status", "ok")
+    cs = c.get("status", "ok")
+    if cs != "ok":
+        hard_fail.append(f"{name}: status={cs} (role={role})" +
+                          (f" (baseline={bs})" if bs != cs else ""))
+    else:
+        bc = b.get("correctness") or {}
+        cc = c.get("correctness") or {}
+        # det 必须 true
+        bd = bc.get("det")
+        cd = cc.get("det")
+        if cd is not True:
+            hard_fail.append(f"{name}: det={cd} (role={role})")
+        # overlap 计数：棘轮，current 不得 > baseline；且 baseline=0 时 current 必须仍 0
+        for key in ("node_overlap_count", "edge_crosses_group_interior", "label_overlap_count"):
+            bv = int(bc.get(key) or 0)
+            cv = int(cc.get(key) or 0)
+            if cv > bv:
+                hard_fail.append(f"{name}: {key} 上升 {bv} → {cv} (role={role})")
+            elif cv < bv:
+                infos.append(f"{name}: {key} 下降 {bv} → {cv}（正确性改进）")
 
-    # ortho.degraded_count：空间不够时的可解释残余；计数不升（尚无 reason 分布）
-    # 基线无 ortho（null/{}）时视为「首次接通 A6 可见性」，记 WARN 不挡——避免 null→N 假回归。
-    bo_raw = b.get("ortho")
-    co_raw = c.get("ortho")
-    bo = bo_raw or {}
-    co = co_raw or {}
-    if "degraded_count" in bo or "degraded_count" in co:
-        bd = int(bo.get("degraded_count") or 0)
-        cd = int(co.get("degraded_count") or 0)
-        baseline_missing = bo_raw is None or (
-            isinstance(bo_raw, dict) and "degraded_count" not in bo_raw and not bo_raw
-        )
-        if baseline_missing and cd > 0:
-            warns.append(
-                f"{name}: ortho.degraded_count 首次可见 → {cd} (role={role})（A6 接通，非质量上升）"
-            )
-        elif cd > bd:
-            msg = f"{name}: ortho.degraded_count 上升 {bd} → {cd} (role={role})"
-            (quality_hard if quality_is_hard(role) else quality_soft).append(msg + "（Degraded 可不归零，但不得无说明地变多）")
-        elif cd < bd:
-            warns.append(f"{name}: ortho.degraded_count 下降 {bd} → {cd}（收敛改进）")
+    # ── 质量轨（按角色分级）──
+    # mech 跳过
+    if role == "mech":
+        continue
+    bq = b.get("quality") or {}
+    cq = c.get("quality") or {}
+    # 若 current 解析/渲染错，quality 可能为 null；上面正确性轨已硬 fail，这里跳过
+    if cq is None:
+        continue
 
-    bl = b.get("lint") or {}
-    cl = c.get("lint") or {}
+    def check_float(key, eps, label):
+        bv = float(bq.get(key) or 0) if bq.get(key) is not None else None
+        cv = float(cq.get(key) or 0) if cq.get(key) is not None else None
+        if cv is None or bv is None:
+            return
+        if cv > bv + eps:
+            msg = f"{name}: {label} 上升 {bv:.3f} → {cv:.3f} (role={role}, +{cv-bv:.3f})"
+            if quality_is_hard(role):
+                hard_fail.append(msg)
+            else:
+                soft_warn.append(msg)
+        elif cv < bv - eps:
+            infos.append(f"{name}: {label} 下降 {bv:.3f} → {cv:.3f}（改进）")
 
-    # 正确性轨：穿组（全角色硬）
-    bv, cv = int(bl.get("edge_crosses_group_interior", 0)), int(
-        cl.get("edge_crosses_group_interior", 0)
-    )
-    if cv > bv:
-        correctness.append(f"{name}: lint.edge_crosses_group_interior 上升 {bv} → {cv} (role={role})")
-    elif cv < bv:
-        warns.append(f"{name}: lint.edge_crosses_group_interior 下降 {bv} → {cv}（正确性改进）")
-
-    for key in ("error_count", "unrelated_edge_trunk_merge", "edge_through_node"):
-        bv, cv = int(bl.get(key, 0)), int(cl.get(key, 0))
+    def check_int(key, label):
+        bv = int(bq.get(key) or 0) if bq.get(key) is not None else 0
+        cv = int(cq.get(key) or 0) if cq.get(key) is not None else 0
         if cv > bv:
-            msg = f"{name}: lint.{key} 上升 {bv} → {cv} (role={role})"
-            (quality_hard if quality_is_hard(role) else quality_soft).append(msg)
-
-    bm, cm = b.get("median_ms"), c.get("median_ms")
-    if bm is not None and cm is not None and bm > 0:
-        if bm < 10.0:
-            if cm > bm + 5.0:
-                msg = f"{name}: median_ms 退化 {bm} → {cm} (绝对 +{cm - bm:.2f}ms > +5ms，基线 <10ms)"
-                (quality_hard if quality_is_hard(role) else quality_soft).append(msg)
-        else:
-            ratio = cm / bm
-            if ratio > 1.0 + PERF_BUDGET + 1e-9:
-                msg = f"{name}: median_ms 退化 {bm} → {cm} ({ratio:.2%} > +{PERF_BUDGET:.0%})"
-                (quality_hard if quality_is_hard(role) else quality_soft).append(msg)
-
-    if c.get("det") is False:
-        correctness.append(f"{name}: det=false（非确定，role={role}）")
-
-    # ── 美学轨（product/smoke 硬：crossings + bends；其余 WARN）──
-    ba = b.get("aesthetics") or {}
-    ca = c.get("aesthetics") or {}
-    if ba and ca:
-        # 弯折数不升（容差 0.2）—— product/smoke 硬
-        b_bends = (ba.get("bends") or {}).get("avg_per_edge", 0)
-        c_bends = (ca.get("bends") or {}).get("avg_per_edge", 0)
-        if c_bends > b_bends + 0.2:
-            msg = f"{name}: avg_bends_per_edge 上升 {b_bends:.2f} → {c_bends:.2f} (role={role})"
-            if role in ("product", "smoke"):
-                aesthetics_hard.append(msg)
+            msg = f"{name}: {label} 上升 {bv} → {cv} (role={role})"
+            if quality_is_hard(role):
+                hard_fail.append(msg)
             else:
-                aesthetics_warn.append(msg)
-        # 贴边违规不升（WARN）
-        b_hug = (ba.get("border_proximity") or {}).get("hugging_violations", 0)
-        c_hug = (ca.get("border_proximity") or {}).get("hugging_violations", 0)
-        if c_hug > b_hug:
-            aesthetics_warn.append(f"{name}: hugging_violations 上升 {b_hug} → {c_hug} (role={role})")
-        # 对称偏差不升（容差 0.05，WARN）
-        b_sym = (ba.get("symmetry") or {}).get("avg_deviation", 0)
-        c_sym = (ca.get("symmetry") or {}).get("avg_deviation", 0)
-        if c_sym > b_sym + 0.05:
-            aesthetics_warn.append(f"{name}: symmetry_deviation 上升 {b_sym:.3f} → {c_sym:.3f} (role={role})")
-        # 边交叉数不升 —— product/smoke 硬
-        b_cross = (ba.get("crossings") or {}).get("total", 0)
-        c_cross = (ca.get("crossings") or {}).get("total", 0)
-        if c_cross > b_cross:
-            msg = f"{name}: total_crossings 上升 {b_cross} → {c_cross} (role={role})"
-            if role in ("product", "smoke"):
-                aesthetics_hard.append(msg)
-            else:
-                aesthetics_warn.append(msg)
-        # 绕行比不升（容差 0.1，WARN）
-        b_det = (ba.get("detour") or {}).get("avg_ratio", 0)
-        c_det = (ca.get("detour") or {}).get("avg_ratio", 0)
-        if c_det > b_det + 0.1:
-            aesthetics_warn.append(f"{name}: avg_detour_ratio 上升 {b_det:.2f} → {c_det:.2f} (role={role})")
+                soft_warn.append(msg)
+        elif cv < bv:
+            infos.append(f"{name}: {label} 下降 {bv} → {cv}（改进）")
 
-# 按角色汇总
-roles_present = sorted({s.get("role", "product") for s in cur["samples"]})
+    check_int("edge_crossing_count", "edge_crossing_count")
+    check_float("total_edge_length", EPS_LEN, "total_edge_length")
+    check_float("canvas_area",       EPS_AREA, "canvas_area")
+    check_float("aspect_ratio",      EPS_ASPECT, "aspect_ratio")
 
-print(f"对比: {sys.argv[1]}  vs  {sys.argv[2]}")
-print(f"共同样例: {len(set(base_map)&set(cur_map))}")
-cur_samples = cur["samples"]
-role_counts = ", ".join(
-    f"{r}={sum(1 for s in cur_samples if s.get('role') == r)}"
-    for r in roles_present
-)
-print(f"角色分布 (current): {role_counts}")
+# ── 报告 ──
+print(f"对比: {base_path}")
+print(f"  vs: {cur_path}")
+common = len(set(base_map) & set(cur_map))
+print(f"共同样例: {common}; baseline 独有: {len(missing_samples)}; current 独有: {len(new_samples)}")
+
+# 角色分布
+from collections import Counter
+role_counts = Counter(role_of(s) for s in cur_samples)
+roles_present = [r for r in ROLE_ORDER if r in role_counts]
+print(f"角色分布 (current): " + ", ".join(f"{r}={role_counts[r]}" for r in roles_present))
 print()
-for w in warns:
-    print(f"WARN: {w}")
 
-print("--- 正确性轨（硬：穿组 / 确定性，全角色）---")
-if correctness:
+if infos:
+    print("--- INFO（改进 / 信息）---")
+    for s in infos:
+        print(f"  - {s}")
+    print()
+
+if soft_warn:
+    print("--- WARN（软退化，非阻断）---")
+    for s in soft_warn:
+        print(f"  WARN: {s}")
+    print()
+
+print("--- 正确性轨（硬：status / det / overlap，全角色）---")
+if hard_fail:
     print("FAIL:")
-    for e in correctness:
+    for e in hard_fail:
         print(f"  - {e}")
 else:
     print("PASS")
 
-print("--- 质量轨（product/smoke 硬；stress/demo/mech 软）---")
-if quality_hard:
-    print("FAIL:")
-    for e in quality_hard:
-        print(f"  - {e}")
-else:
-    print("PASS (product/smoke)")
-if quality_soft:
-    label = "FAIL（债）" if STRICT_STRESS else "WARN（观测，不挡）"
-    print(f"{label}:")
-    for e in quality_soft:
-        print(f"  - {e}")
-else:
-    print("PASS (stress/demo/mech)")
-
-print("--- 美学轨（product/smoke 硬：crossings+bends；其余 WARN）---")
-if aesthetics_hard:
-    print("FAIL (product/smoke):")
-    for e in aesthetics_hard:
-        print(f"  - {e}")
-else:
-    print("PASS (product/smoke)")
-if aesthetics_warn:
-    print("WARN (stress/demo/mech):")
-    for e in aesthetics_warn:
-        print(f"  - {e}")
-else:
-    print("PASS (stress/demo/mech)")
-
-if REPORT_ONLY:
-    blocked = bool(correctness) or bool(quality_hard) or bool(aesthetics_hard)
-    if blocked:
-        print("REPORT-ONLY: 上述本应阻断的项已降为观测（新架构期门禁关闭；PLOTGRAM_GATES=on 可恢复）")
-    else:
-        print("REPORT-ONLY: 无阻断项（新架构期门禁关闭）")
-    sys.exit(0)
-
-if correctness:
+# ── Exit code ──
+if hard_fail:
     sys.exit(1)
-if quality_hard:
-    sys.exit(1)
-if aesthetics_hard:
-    sys.exit(1)
-if quality_soft and STRICT_STRESS:
-    sys.exit(1)
-if quality_soft and ALLOW_QUALITY_DEBT:
-    print("PASS: 正确性轨通过；质量轨债已显式允许（--allow-quality-debt）")
-    sys.exit(0)
-print("PASS: 正确性、product 质量与美学门禁通过")
+if soft_warn:
+    print()
+    print("RESULT: WARN-only（exit 2）")
+    sys.exit(2)
+print()
+print("RESULT: clean PASS（exit 0）")
 sys.exit(0)
 PY

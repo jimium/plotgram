@@ -8,7 +8,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEFAULT_INPUT="$ROOT/showcase/hierarchical/smoke.fan-out-four.pgm"
+DEFAULT_INPUT="$ROOT/showcase/hierarchical/flat/smoke.fan-out-four.pgm"
 
 INPUT="${1:-$DEFAULT_INPUT}"
 OUTPUT=""
