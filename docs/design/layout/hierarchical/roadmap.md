@@ -1,0 +1,165 @@
+# Hierarchical · 重建阶段路线
+
+> 目的：在 [architecture.md](architecture.md) §12 里程碑之上，写清 **MVP 之后各阶段做什么、大致朝哪走**。  
+> 不替代目标架构；不写进度日记。实现取舍真源仍见 [notes/2026-08-02-mvp-scope.md](notes/2026-08-02-mvp-scope.md)。  
+> 写权尺子：[write-authority.md](../write-authority.md)。
+
+---
+
+## 0. 当前位置（MVP 已交付）
+
+已具备可跑的 Sugiyama 主路径子集：
+
+```text
+FAS → Network Simplex → properify → median(+权+snapshot)
+  → 阻尼重心 + 每层 VPSC → 端口（Free / FixedSide）→ dummy 链 Ink 正交展开
+```
+
+硬不变量（无重叠、全正交、端口落界）已由 `hier_eval` 守住。
+
+相对目标架构的主要缺口：
+
+| 缺口 | 观感 / 产品影响 |
+|------|-----------------|
+| 次轴未严格拉直长 dummy 链；无端口对齐目标 | 长回边「楼梯」折点、近距边小 Z |
+| 无完整 Channel / track / rip-up | 密边拥塞只能硬挤 |
+| 组框后验 bbox；无 Gate/Scope | 跨组边可贴框 / 穿框 |
+| StrongMacro / PartitionGrid 未消费 | 架构图 / 泳道类能力未到位 |
+| 无 Diagnostics 出口 | relaxation / Unsupported 不可观测 |
+
+**总方向**：先收口「长边更直」与可观测性，再按产品主痛点二选一推进 Channel 或组框写权；StrongMacro / Partition / 完整 labeling 后置。
+
+---
+
+## 1. 阶段总览
+
+```text
+MVP ──► A 次轴拉直 ──► B 端口补齐 ──► C 诊断出口
+              │
+              └─► D₁ Channel 正交    或    D₂ 组框 + Gate
+                              │
+                              └─► E StrongMacro / Partition / labeling …
+```
+
+| 阶段 | 对齐 architecture | 一句话方向 |
+|------|-------------------|------------|
+| **A** | 收口 M1 视觉债 | Metric 把长链与端口列对齐；折点明显下降 |
+| **B** | 补齐 M2 | 端口决议更稳；Ink 零猜测 |
+| **C** | 补齐 M0 契约债 | Layout 输出可诊断、可回归 |
+| **D₁** | M3 | 走廊拓扑 + track；拥塞有界返工 |
+| **D₂** | M4 | 组框进求解；跨组只经 Gate |
+| **E** | M4+/M5/后置 | StrongMacro、PartitionGrid、integrated labeling |
+
+**约束**：A → B → C 顺序建议串行收口；**D₁ 与 D₂ 不要并行开两条**——先定产品主痛点（密边路由 vs 架构组框）再选。E 不挡 D 的主路径闭环。
+
+---
+
+## 2. 阶段 A — 次轴拉直（优先）
+
+**方向**：折点问题的主写者在 Metric，不在 Ink。把「长边更直、端口可列对齐」做成可验收的度量目标。
+
+**做什么（概要）**：
+
+- Ideal 质量向 Brandes–Köpf 靠拢（四候选按固定规则合并）；阻尼重心视为过渡。注：dummy 高权重（virtual 4.0）现状已有，不是本阶段新增项
+- 长 proper / dummy 链：**BK block 内硬共线（由构造保证可行）+ block 外强软对齐**；VPSC 从「仅层内」升为跨层统一求解。硬共线等式只加在 block 的 **virtual-virtual 相邻对**上——dummy 主干由此笔直；block 内 real 节点保持软目标，否则第二遍端口锚点拉动会拖着 real 节点走、端口对齐失效。禁止对 block 外的链直接加跨层等式约束——交叉链会使其不可行；不可行时报 `InfeasibleConstraint`，不得静默降级为特判
+- 端口对齐进次轴目标（不只拉节点中心）。锚点依赖节点 frame，展开顺序钉死为两遍：先解节点中心 → 按 `along_spec` 展开锚点 → 以锚点为 desired 第二遍拉 dummy 链；写者全程只有 CoordWriter，Metric 不读 Ink 输出
+- `hier_eval`：开工前先记录 per-fixture 折点基线，再按 fixture 建回归阈值；同时记 sum_bends，防止「最大折点降、总折点涨」的假改善
+
+**刻意不做**：改 Ink 发明拓扑；上完整 Channel；为消楼梯在 Ink 叠 dogleg 特判。
+
+**验收**：含长回边的目标 fixture max_bends / sum_bends 明显下降（以开工前基线为准）；69 个 fixture 硬不变量全绿；crossings 与画布宽度无显著恶化（拉直链可能拉宽图，需守住）。
+
+---
+
+## 3. 阶段 B — 端口补齐
+
+**方向**：Compose 继续是端口唯一写者；Metric 只展开；减少无意义微偏。
+
+**做什么（概要）**：
+
+- FREE 单边 / 少边时偏向中心（或稳定中心 slot）
+- 在 model 字段允许的范围内补强约束档位；缺字段则先扩 IR，禁止静默 no-op
+- 保持四向 Orientation 下 fixed side 正确（已有回归须守住）
+
+**刻意不做**：Ink `unwrap_or` 默认侧；用 slot 同时当像素真源。
+
+---
+
+## 4. 阶段 C — 诊断与契约出口
+
+**方向**：没有 diagnostics，后面的 Channel / Gate 返工只能靠肉眼。
+
+**做什么（概要）**：
+
+- `LayoutOutput`（或等价通道）暴露 warnings / relaxations / params_hash
+- Unsupported / Infeasible 硬失败语义保持；软放宽必须进诊断
+- 为后续 verifier（Plan / Metric / Ink）留稳定报告字段
+
+**刻意不做**：用墙钟超时改变布局结果；用日志替代结构化诊断。
+
+---
+
+## 5. 阶段 D — 二选一深挖
+
+### D₁ · Channel 正交（密边 / 走廊）
+
+**方向**：组合相写路径拓扑与 track 序；Metric 写 track 像素；Ink 只展开。
+
+**做什么（概要）**：
+
+- Substrate + Channel 搜索（折点优先于长度）
+- track order + DemandBoard（MetricBudget）
+- 有界 rip-up / history cost；InkVerifier（不穿节点、非 bundle 不非法重合）
+- 恢复并真正消费 `edge_gap` 等 track 相关参数
+
+**何时选**：产品痛点是边挤、弯多、需要走廊分配，而不是组框合法性。
+
+### D₂ · 组框写权 + Gate（架构 / 跨组）
+
+**方向**：组框由 Metric 写出，finalize 不重算；跨组边只经合法 Gate。
+
+**做什么（概要）**：
+
+- 组框进 VPSC（含 / 分隔 / title demand）
+- Gate / Scope 三道防线；`verify_no_group_penetration`
+- Weak 连续块与目标 Plan schema 对齐；为 StrongMacro 留同一产出类型
+
+**何时选**：产品痛点是组框位置、跨组穿框、架构分层子系统。
+
+---
+
+## 6. 阶段 E — 后置能力
+
+**方向**：图种差异只经 profile 进参数；不新增第二套布局器。
+
+| 项 | 方向摘要 |
+|----|----------|
+| **StrongMacro** | 组树后序局部 Plan → macro 进父层 → 展开为与 Weak **同一 Plan schema** |
+| **PartitionGrid** | 引擎消费 cell / band；与 Orientation 轴语义一致；非 `group` 冒充泳道 |
+| **Bundle / edge_group** | Compose 写合流事实；Ink 只接合干线 |
+| **Integrated labeling** | 至少 label 需求进 Demand；完整联合求解可渐进 |
+| **真 MCF / from-sketch / octilinear** | 明确不挡主路径闭环 |
+
+---
+
+## 7. 原则（各阶段共用）
+
+1. **单写者 / 落笔零新决策** — 修楼梯先问 Metric，不在 Ink 加特判。  
+2. **有界返工优先于真全局优化** — Channel 用 rip-up，不上真 MCF 挡闭环。  
+3. **禁止图名特判** — architecture = Hierarchical + profile 参数，不是 `ArchitectureLayout`。  
+4. **参数能 bind 就必须被消费** — 否则 bind 硬失败（见 MVP 对 `edge_gap` 等的处理）。  
+5. **Weak / Strong 不得永久两套产出类型** — 收缩策略不同，Plan schema 必须同一。
+
+---
+
+## 8. 与现有文档的关系
+
+| 文档 | 角色 |
+|------|------|
+| **本文** | MVP 之后的**阶段路线与方向** |
+| [architecture.md](architecture.md) | 目标架构与 M0–M5 设计里程碑 |
+| [notes/2026-08-02-mvp-scope.md](notes/2026-08-02-mvp-scope.md) | MVP 实现相对架构的取舍记录 |
+| [scope.md](scope.md) | 能力 / 非目标 / 典型域 |
+| [phases/](phases/) | 相级可执行契约 |
+
+代码入口（重建）：`crates/plotgram-layout/src/layout/hierarchical/`。

@@ -1,0 +1,485 @@
+{
+  "flat/demo.aml-case-investigation": {
+    "bbox_h": 810.7999999999998,
+    "bbox_w": 182.9818795628561,
+    "crossings": 0,
+    "max_bends": 12,
+    "sum_bends": 50
+  },
+  "flat/demo.change-approval-workflow": {
+    "bbox_h": 881.6999999999998,
+    "bbox_w": 284.27733705873845,
+    "crossings": 0,
+    "max_bends": 16,
+    "sum_bends": 54
+  },
+  "flat/demo.flat-realtime-recommendation": {
+    "bbox_h": 243.60000000000002,
+    "bbox_w": 383.452067733405,
+    "crossings": 1,
+    "max_bends": 6,
+    "sum_bends": 26
+  },
+  "flat/demo.k8s-incident-response": {
+    "bbox_h": 810.7999999999998,
+    "bbox_w": 398.40301939949154,
+    "crossings": 4,
+    "max_bends": 22,
+    "sum_bends": 82
+  },
+  "flat/demo.pr-architecture-review": {
+    "bbox_h": 598.0999999999999,
+    "bbox_w": 385.0467279362515,
+    "crossings": 3,
+    "max_bends": 16,
+    "sum_bends": 58
+  },
+  "flat/demo.software-release": {
+    "bbox_h": 810.7999999999998,
+    "bbox_w": 236.0,
+    "crossings": 0,
+    "max_bends": 22,
+    "sum_bends": 88
+  },
+  "flat/mech.constrain-flat-chain": {
+    "bbox_h": 243.60000000000002,
+    "bbox_w": 135.44,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 8
+  },
+  "flat/mech.constrain-sink": {
+    "bbox_h": 172.70000000000002,
+    "bbox_w": 112.0,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 8
+  },
+  "flat/product.employee-onboarding": {
+    "bbox_h": 456.29999999999995,
+    "bbox_w": 214.48000000000002,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 18
+  },
+  "flat/product.expense-reimbursement": {
+    "bbox_h": 527.1999999999999,
+    "bbox_w": 196.0,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 20
+  },
+  "flat/product.flat-rest-api": {
+    "bbox_h": 314.5,
+    "bbox_w": 196.0,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 14
+  },
+  "flat/product.leave-approval-process": {
+    "bbox_h": 385.4,
+    "bbox_w": 379.70000000000005,
+    "crossings": 0,
+    "max_bends": 8,
+    "sum_bends": 28
+  },
+  "flat/product.linear-chain": {
+    "bbox_h": 30.900000000000006,
+    "bbox_w": 212.0,
+    "crossings": 0,
+    "max_bends": 0,
+    "sum_bends": 0
+  },
+  "flat/product.order-approval": {
+    "bbox_h": 385.4,
+    "bbox_w": 170.95805623874742,
+    "crossings": 0,
+    "max_bends": 8,
+    "sum_bends": 24
+  },
+  "flat/product.password-reset": {
+    "bbox_h": 456.29999999999995,
+    "bbox_w": 386.0,
+    "crossings": 0,
+    "max_bends": 4,
+    "sum_bends": 26
+  },
+  "flat/product.refund-process": {
+    "bbox_h": 456.29999999999995,
+    "bbox_w": 267.1337834529589,
+    "crossings": 0,
+    "max_bends": 8,
+    "sum_bends": 30
+  },
+  "flat/product.self-loop-retry": {
+    "bbox_h": 314.5,
+    "bbox_w": 173.73819015775035,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 16
+  },
+  "flat/product.symmetric-fanout": {
+    "bbox_h": 243.60000000000002,
+    "bbox_w": 264.0,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 14
+  },
+  "flat/product.three-tier": {
+    "bbox_h": 172.70000000000002,
+    "bbox_w": 74.94,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 8
+  },
+  "flat/product.ticket-triage": {
+    "bbox_h": 456.29999999999995,
+    "bbox_w": 306.0,
+    "crossings": 0,
+    "max_bends": 4,
+    "sum_bends": 26
+  },
+  "flat/product.typical-microservice-architecture": {
+    "bbox_h": 243.60000000000002,
+    "bbox_w": 421.68,
+    "crossings": 4,
+    "max_bends": 4,
+    "sum_bends": 38
+  },
+  "flat/product.user-auth": {
+    "bbox_h": 243.60000000000002,
+    "bbox_w": 197.26000000000002,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 16
+  },
+  "flat/smoke.client-api-db": {
+    "bbox_h": 172.70000000000002,
+    "bbox_w": 72.0,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 4
+  },
+  "flat/smoke.decision-loop": {
+    "bbox_h": 62.61895290798611,
+    "bbox_w": 396.94,
+    "crossings": 0,
+    "max_bends": 4,
+    "sum_bends": 10
+  },
+  "flat/smoke.fan-out-four": {
+    "bbox_h": 101.80000000000001,
+    "bbox_w": 360.0,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 8
+  },
+  "flat/smoke.flat-gateway-fanout": {
+    "bbox_h": 172.70000000000002,
+    "bbox_w": 136.92000000000002,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 8
+  },
+  "flat/stress.layout-stress-dag": {
+    "bbox_h": 668.9999999999999,
+    "bbox_w": 182.68,
+    "crossings": 2,
+    "max_bends": 16,
+    "sum_bends": 62
+  },
+  "flat/stress.layout-stress-flat-mesh": {
+    "bbox_h": 456.29999999999995,
+    "bbox_w": 379.2085680244202,
+    "crossings": 9,
+    "max_bends": 4,
+    "sum_bends": 52
+  },
+  "flat/stress.layout-stress-yfiles-pipeline": {
+    "bbox_h": 598.0999999999999,
+    "bbox_w": 412.5880184704664,
+    "crossings": 11,
+    "max_bends": 16,
+    "sum_bends": 112
+  },
+  "group/demo.ai-agent-docops-pipeline": {
+    "bbox_h": 668.9999999999999,
+    "bbox_w": 555.7389089675178,
+    "crossings": 0,
+    "max_bends": 16,
+    "sum_bends": 50
+  },
+  "group/demo.ci-cd-security-pipeline": {
+    "bbox_h": 1378.0000000000002,
+    "bbox_w": 281.3371601604176,
+    "crossings": 3,
+    "max_bends": 38,
+    "sum_bends": 182
+  },
+  "group/demo.customer-refund-process": {
+    "bbox_h": 810.7999999999998,
+    "bbox_w": 486.48925576723013,
+    "crossings": 0,
+    "max_bends": 8,
+    "sum_bends": 68
+  },
+  "group/demo.data-etl-pipeline": {
+    "bbox_h": 598.0999999999999,
+    "bbox_w": 314.31338801547497,
+    "crossings": 0,
+    "max_bends": 10,
+    "sum_bends": 34
+  },
+  "group/demo.data-lakehouse-platform": {
+    "bbox_h": 598.0999999999999,
+    "bbox_w": 164.77556838989256,
+    "crossings": 0,
+    "max_bends": 6,
+    "sum_bends": 30
+  },
+  "group/demo.data-lineage-platform": {
+    "bbox_h": 598.0999999999999,
+    "bbox_w": 483.36,
+    "crossings": 4,
+    "max_bends": 10,
+    "sum_bends": 58
+  },
+  "group/demo.e-commerce-order-fulfillment": {
+    "bbox_h": 952.5999999999998,
+    "bbox_w": 207.26277116689172,
+    "crossings": 0,
+    "max_bends": 6,
+    "sum_bends": 56
+  },
+  "group/demo.fintech-payment-platform": {
+    "bbox_h": 598.0999999999999,
+    "bbox_w": 275.26676953125,
+    "crossings": 0,
+    "max_bends": 12,
+    "sum_bends": 48
+  },
+  "group/demo.hybrid-cloud-dr-topology": {
+    "bbox_h": 527.1999999999999,
+    "bbox_w": 846.2338239329364,
+    "crossings": 5,
+    "max_bends": 4,
+    "sum_bends": 62
+  },
+  "group/demo.incident-management": {
+    "bbox_h": 668.9999999999999,
+    "bbox_w": 246.9232810842255,
+    "crossings": 0,
+    "max_bends": 6,
+    "sum_bends": 32
+  },
+  "group/demo.insurance-claim-process": {
+    "bbox_h": 385.4,
+    "bbox_w": 344.0,
+    "crossings": 2,
+    "max_bends": 8,
+    "sum_bends": 38
+  },
+  "group/demo.k8s-blue-green-release-topology": {
+    "bbox_h": 668.9999999999999,
+    "bbox_w": 503.6729485910073,
+    "crossings": 14,
+    "max_bends": 16,
+    "sum_bends": 128
+  },
+  "group/demo.k8s-multi-cluster-federation": {
+    "bbox_h": 527.1999999999999,
+    "bbox_w": 847.4337549148393,
+    "crossings": 16,
+    "max_bends": 6,
+    "sum_bends": 92
+  },
+  "group/demo.k8s-multi-namespace-overview": {
+    "bbox_h": 527.1999999999999,
+    "bbox_w": 1332.44,
+    "crossings": 11,
+    "max_bends": 4,
+    "sum_bends": 82
+  },
+  "group/demo.k8s-platform-stack": {
+    "bbox_h": 456.29999999999995,
+    "bbox_w": 767.3021347291658,
+    "crossings": 5,
+    "max_bends": 4,
+    "sum_bends": 68
+  },
+  "group/demo.k8s-tenant-isolation": {
+    "bbox_h": 456.29999999999995,
+    "bbox_w": 988.8000000000002,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 52
+  },
+  "group/demo.loan-approval-workflow": {
+    "bbox_h": 881.6999999999998,
+    "bbox_w": 204.1991169410151,
+    "crossings": 0,
+    "max_bends": 10,
+    "sum_bends": 48
+  },
+  "group/demo.mcp-server-cluster-architecture": {
+    "bbox_h": 262.5,
+    "bbox_w": 488.28,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 22
+  },
+  "group/demo.multi-region-active-active": {
+    "bbox_h": 385.4,
+    "bbox_w": 301.8573688903127,
+    "crossings": 0,
+    "max_bends": 4,
+    "sum_bends": 24
+  },
+  "group/demo.payment-clearing-platform": {
+    "bbox_h": 527.1999999999999,
+    "bbox_w": 561.0223710676137,
+    "crossings": 1,
+    "max_bends": 8,
+    "sum_bends": 44
+  },
+  "group/demo.plotgram-core-mod-deps": {
+    "bbox_h": 607.5,
+    "bbox_w": 1352.226737852288,
+    "crossings": 22,
+    "max_bends": 10,
+    "sum_bends": 88
+  },
+  "group/demo.realtime-recommendation": {
+    "bbox_h": 243.60000000000002,
+    "bbox_w": 383.452067733405,
+    "crossings": 1,
+    "max_bends": 6,
+    "sum_bends": 26
+  },
+  "group/demo.supply-chain-control-tower": {
+    "bbox_h": 952.5999999999998,
+    "bbox_w": 344.3445759657119,
+    "crossings": 0,
+    "max_bends": 20,
+    "sum_bends": 66
+  },
+  "group/mech.constrain-cross-group": {
+    "bbox_h": 243.60000000000002,
+    "bbox_w": 71.44000000000003,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 6
+  },
+  "group/product.cdn-cache": {
+    "bbox_h": 385.4,
+    "bbox_w": 208.3488997083262,
+    "crossings": 0,
+    "max_bends": 6,
+    "sum_bends": 28
+  },
+  "group/product.cloud-native": {
+    "bbox_h": 314.5,
+    "bbox_w": 665.78,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 28
+  },
+  "group/product.compiler-pipeline": {
+    "bbox_h": 314.5,
+    "bbox_w": 405.79775415494487,
+    "crossings": 4,
+    "max_bends": 4,
+    "sum_bends": 26
+  },
+  "group/product.d2-cell-tower-network": {
+    "bbox_h": 314.5,
+    "bbox_w": 166.88000000000005,
+    "crossings": 0,
+    "max_bends": 8,
+    "sum_bends": 20
+  },
+  "group/product.data-pipeline": {
+    "bbox_h": 385.4,
+    "bbox_w": 256.48,
+    "crossings": 0,
+    "max_bends": 4,
+    "sum_bends": 18
+  },
+  "group/product.ecommerce-platform": {
+    "bbox_h": 527.1999999999999,
+    "bbox_w": 547.0,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 38
+  },
+  "group/product.event-driven": {
+    "bbox_h": 172.70000000000002,
+    "bbox_w": 264.0,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 10
+  },
+  "group/product.message-queue-pipeline": {
+    "bbox_h": 243.60000000000002,
+    "bbox_w": 264.0,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 14
+  },
+  "group/product.microservices": {
+    "bbox_h": 385.4,
+    "bbox_w": 195.86,
+    "crossings": 0,
+    "max_bends": 6,
+    "sum_bends": 24
+  },
+  "group/product.monitoring-stack": {
+    "bbox_h": 243.60000000000002,
+    "bbox_w": 301.38,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 12
+  },
+  "group/product.narrow-corridor": {
+    "bbox_h": 172.70000000000002,
+    "bbox_w": 141.1299378967285,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 10
+  },
+  "group/product.rest-api-backend": {
+    "bbox_h": 314.5,
+    "bbox_w": 196.0,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 14
+  },
+  "group/product.serverless-web-app": {
+    "bbox_h": 314.5,
+    "bbox_w": 278.0,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 16
+  },
+  "group/product.swimlane-order-process": {
+    "bbox_h": 527.1999999999999,
+    "bbox_w": 73.46630859375,
+    "crossings": 0,
+    "max_bends": 2,
+    "sum_bends": 14
+  },
+  "group/product.unite-config-publish": {
+    "bbox_h": 513.0,
+    "bbox_w": 611.8999999999999,
+    "crossings": 0,
+    "max_bends": 4,
+    "sum_bends": 22
+  },
+  "group/stress.layout-stress-nested": {
+    "bbox_h": 527.1999999999999,
+    "bbox_w": 384.52,
+    "crossings": 0,
+    "max_bends": 8,
+    "sum_bends": 42
+  }
+}
