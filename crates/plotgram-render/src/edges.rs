@@ -122,15 +122,19 @@ pub fn arrow_marker_id(arrow_style: &str, fill: &str) -> String {
 /// - `normal` (default): filled triangle
 /// - `hollow`: outlined triangle filled with the canvas color
 ///
+/// Uses a square `viewBox` and equal `markerWidth`/`markerHeight` so the
+/// head is not stretched along the edge direction.
+///
 /// A single marker with `orient="auto-start-reverse"` serves both
 /// `marker-end` and `marker-start` (bidirectional edges).
 pub fn arrow_marker_def(id: &str, arrow_style: &str, fill: &str, canvas: &str) -> String {
+    // Footprint is 2/3 of v1 standard (8×8 normal, 7×7 hollow).
     match arrow_style {
         "hollow" => format!(
-            r#"<marker id="{id}" markerWidth="12" markerHeight="9" refX="10.5" refY="4.5" orient="auto-start-reverse"><polygon points="1 1, 11 4.5, 1 8" fill="{canvas}" stroke="{fill}" stroke-width="1.2" stroke-linejoin="miter"/></marker>"#
+            r#"<marker id="{id}" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="4.67" markerHeight="4.67" orient="auto-start-reverse"><polygon points="1 1, 10 5, 1 9" fill="{canvas}" stroke="{fill}" stroke-width="0.8" stroke-linejoin="miter"/></marker>"#
         ),
         _ => format!(
-            r#"<marker id="{id}" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto-start-reverse"><polygon points="0 0, 10 3.5, 0 7" fill="{fill}"/></marker>"#
+            r#"<marker id="{id}" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5.33" markerHeight="5.33" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="{fill}"/></marker>"#
         ),
     }
 }

@@ -23,7 +23,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BM="$(cd "$SCRIPT_DIR/.." && pwd)"
 ROOT="$(cd "$BM/.." && pwd)"
-SHOWCASE="$ROOT/showcase"
+SHOWCASE="$ROOT/apps/showcase"
 
 TAG=""
 SET_FILES=()

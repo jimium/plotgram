@@ -16,6 +16,12 @@
 //!
 //! This is a coarse "does the geometry make sense" check, not a substitute
 //! for visual review (see `docs/design/layout/hierarchical/notes/`).
+//!
+//! Bend regression gate: per-fixture `max_bends` / `sum_bends` must not
+//! exceed the checked-in baseline in `tests/hier_eval_baseline.json`
+//! (crossings / canvas bbox are printed as observational deltas). Regenerate
+//! the baseline only when a bend change is *intended*:
+//! `HIER_EVAL_WRITE_BASELINE=1 cargo test -p plotgram-compile --test hier_eval`.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -24,6 +30,7 @@ use std::path::{Path, PathBuf};
 use plotgram_compile::{build_layout, BuildOptions};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::result::LayoutResult;
+use serde_json::{json, Value};
 
 const EPS: f64 = 1e-6;
 
@@ -33,7 +40,7 @@ fn showcase_dir() -> PathBuf {
         .unwrap()
         .parent()
         .unwrap()
-        .join("showcase/hierarchical")
+        .join("apps/showcase/hierarchical")
 }
 
 fn collect_pgm(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -90,6 +97,23 @@ struct FileMetrics {
     edges: usize,
     crossings: usize,
     max_bends: usize,
+    sum_bends: usize,
+    bbox_w: f64,
+    bbox_h: f64,
+}
+
+fn baseline_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/hier_eval_baseline.json")
+}
+
+fn metrics_to_value(m: &FileMetrics) -> Value {
+    json!({
+        "max_bends": m.max_bends,
+        "sum_bends": m.sum_bends,
+        "crossings": m.crossings,
+        "bbox_w": m.bbox_w,
+        "bbox_h": m.bbox_h,
+    })
 }
 
 #[test]
@@ -128,14 +152,40 @@ fn hierarchical_showcase_geometry_invariants() {
     }
 
     println!(
-        "\n{:<45} {:>6} {:>6} {:>10} {:>10}",
-        "fixture", "nodes", "edges", "crossings", "max_bends"
+        "\n{:<45} {:>6} {:>6} {:>10} {:>10} {:>10} {:>14}",
+        "fixture", "nodes", "edges", "crossings", "max_bends", "sum_bends", "bbox (w x h)"
     );
     for m in &all_metrics {
         println!(
-            "{:<45} {:>6} {:>6} {:>10} {:>10}",
-            m.name, m.nodes, m.edges, m.crossings, m.max_bends
+            "{:<45} {:>6} {:>6} {:>10} {:>10} {:>10} {:>14}",
+            m.name,
+            m.nodes,
+            m.edges,
+            m.crossings,
+            m.max_bends,
+            m.sum_bends,
+            format!("{:.0} x {:.0}", m.bbox_w, m.bbox_h)
         );
+    }
+
+    let write_baseline = std::env::var("HIER_EVAL_WRITE_BASELINE")
+        .map(|v| v == "1")
+        .unwrap_or(false);
+    if write_baseline {
+        let mut baseline = serde_json::Map::new();
+        for m in &all_metrics {
+            baseline.insert(m.name.clone(), metrics_to_value(m));
+        }
+        let path = baseline_path();
+        fs::write(&path, serde_json::to_string_pretty(&Value::Object(baseline)).unwrap())
+            .unwrap_or_else(|e| panic!("writing baseline {}: {e}", path.display()));
+        println!(
+            "\nhier_eval: wrote baseline for {} fixtures to {}",
+            all_metrics.len(),
+            path.display()
+        );
+    } else {
+        check_bend_gate(&all_metrics, &mut hard_failures);
     }
 
     assert!(
@@ -201,12 +251,15 @@ fn check_orthogonal_and_ports(name: &str, result: &LayoutResult, failures: &mut 
 fn compute_metrics(name: &str, result: &LayoutResult) -> FileMetrics {
     let mut crossings = 0usize;
     let mut max_bends = 0usize;
+    let mut sum_bends = 0usize;
 
     let mut segments: Vec<(Point, Point)> = Vec::new();
     for e in &result.edges {
         let pts = e.path.samples();
         if pts.len() >= 2 {
-            max_bends = max_bends.max(pts.len() - 2);
+            let bends = pts.len() - 2;
+            max_bends = max_bends.max(bends);
+            sum_bends += bends;
         }
         for w in pts.windows(2) {
             segments.push((w[0], w[1]));
@@ -222,11 +275,104 @@ fn compute_metrics(name: &str, result: &LayoutResult) -> FileMetrics {
         }
     }
 
+    let (mut min_x, mut min_y) = (f64::INFINITY, f64::INFINITY);
+    let (mut max_x, mut max_y) = (f64::NEG_INFINITY, f64::NEG_INFINITY);
+    let mut grow = |p: Point| {
+        min_x = min_x.min(p.x);
+        min_y = min_y.min(p.y);
+        max_x = max_x.max(p.x);
+        max_y = max_y.max(p.y);
+    };
+    for n in &result.nodes {
+        grow(Point {
+            x: n.frame.x,
+            y: n.frame.y,
+        });
+        grow(Point {
+            x: n.frame.right(),
+            y: n.frame.bottom(),
+        });
+    }
+    for e in &result.edges {
+        for p in e.path.samples() {
+            grow(p);
+        }
+    }
+    let (bbox_w, bbox_h) = if min_x.is_finite() {
+        (max_x - min_x, max_y - min_y)
+    } else {
+        (0.0, 0.0)
+    };
+
     FileMetrics {
         name: name.to_string(),
         nodes: result.nodes.len(),
         edges: result.edges.len(),
         crossings,
         max_bends,
+        sum_bends,
+        bbox_w,
+        bbox_h,
+    }
+}
+
+/// Bend regression gate against `tests/hier_eval_baseline.json`: per-fixture
+/// `max_bends` / `sum_bends` must not exceed the baseline (hard failure).
+/// Crossings and canvas bbox are observational: printed as deltas only, since
+/// a dense graph legitimately crosses and straightening may widen the canvas.
+fn check_bend_gate(metrics: &[FileMetrics], failures: &mut Vec<String>) {
+    let path = baseline_path();
+    let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
+        panic!(
+            "missing bend baseline {}: {e} — regenerate with \
+             HIER_EVAL_WRITE_BASELINE=1 cargo test -p plotgram-compile --test hier_eval",
+            path.display()
+        )
+    });
+    let baseline: Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("corrupt bend baseline {}: {e}", path.display()));
+
+    println!(
+        "\n{:<45} {:>14} {:>14} {:>12} {:>16}",
+        "fixture", "d max_bends", "d sum_bends", "d crossings", "d bbox (w x h)"
+    );
+    for m in metrics {
+        let Some(entry) = baseline.get(&m.name) else {
+            failures.push(format!(
+                "{}: missing from bend baseline — regenerate it",
+                m.name
+            ));
+            continue;
+        };
+        let base_max = entry["max_bends"].as_u64().unwrap_or(0) as usize;
+        let base_sum = entry["sum_bends"].as_u64().unwrap_or(0) as usize;
+        let base_cross = entry["crossings"].as_u64().unwrap_or(0) as isize;
+        let base_w = entry["bbox_w"].as_f64().unwrap_or(0.0);
+        let base_h = entry["bbox_h"].as_f64().unwrap_or(0.0);
+
+        if m.max_bends > base_max {
+            failures.push(format!(
+                "{}: bend regression — max_bends {} > baseline {}",
+                m.name, m.max_bends, base_max
+            ));
+        }
+        if m.sum_bends > base_sum {
+            failures.push(format!(
+                "{}: bend regression — sum_bends {} > baseline {}",
+                m.name, m.sum_bends, base_sum
+            ));
+        }
+        println!(
+            "{:<45} {:>+14} {:>+14} {:>+12} {:>+16}",
+            m.name,
+            m.max_bends as isize - base_max as isize,
+            m.sum_bends as isize - base_sum as isize,
+            m.crossings as isize - base_cross,
+            format!(
+                "{:+.0} x {:+.0}",
+                m.bbox_w - base_w,
+                m.bbox_h - base_h
+            )
+        );
     }
 }

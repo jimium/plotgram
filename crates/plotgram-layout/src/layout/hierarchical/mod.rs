@@ -1,6 +1,6 @@
 //! Hierarchical layout algorithm (Sugiyama-style): FAS → Network-Simplex
 //! ranking → properify → median+transpose ordering → port finalize → main/
-//! cross-axis coordinates (damped barycenter relaxation + VPSC) → orthogonal Ink.
+//! cross-axis coordinates (BK ideal + global VPSC, two passes) → orthogonal Ink.
 //!
 //! The core (`compose` / `metric` / `ink`) runs entirely in canonical
 //! top-to-bottom space; this module is the only place that converts to/from
@@ -98,7 +98,19 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     };
 
     let main = metric::main_axis::assign_main_axis(&plan, &size_of, params.layer_gap);
-    let cross = metric::cross_axis::assign_cross_axis(&plan, &size_of, params.node_gap);
+    // Infeasibility here can only come from crossing BK blocks — a bug, not
+    // a layout contingency: fail hard, never fall back (architecture.md §3.4).
+    let cross = metric::cross_axis::assign_cross_axis(
+        &plan,
+        &real_graph,
+        &ports,
+        &size_of,
+        &main,
+        params.node_gap,
+    )
+    .map_err(|e| {
+        LayoutError::message(format!("hierarchical: cross-axis VPSC solve failed: {e}"))
+    })?;
 
     let canonical_frames: Vec<Rect> = (0..plan.elems.len())
         .map(|i| {

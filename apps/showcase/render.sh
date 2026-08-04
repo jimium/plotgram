@@ -5,15 +5,13 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 TARGET_DIR="$ROOT_DIR/target"
 SCRIPTS="$SCRIPT_DIR/scripts"
 
 PROFILE=release
 LAYOUT_FILTER=""
 FORCE=false
-SERVE=false
-SERVE_PORT=4173
 
 usage() {
   cat <<EOF
@@ -21,11 +19,12 @@ usage() {
 
 增量渲染激活布局目录下的 .pgm -> _out/{path 去 .pgm}.svg（镜像 facet），并写 manifest。
 
+渲染完成后通过 ./apps/serve.sh 提供的 HTTP 服务访问画廊。
+
 选项:
   --layout NAME    只渲一个布局族（如 hierarchical / tree）
   --force          全量重渲（跳过 mtime 增量判定）
   --debug          用 debug 二进制（默认 release）
-  --serve [PORT]   渲染后起静态服务（默认 4173）打开画廊
   -h, --help       显示此帮助
 EOF
 }
@@ -35,10 +34,6 @@ while [[ $# -gt 0 ]]; do
     --layout) LAYOUT_FILTER="$2"; shift 2 ;;
     --force) FORCE=true; shift ;;
     --debug) PROFILE=debug; shift ;;
-    --serve)
-      SERVE=true
-      if [[ "${2:-}" =~ ^[0-9]+$ ]]; then SERVE_PORT="$2"; shift 2; else shift; fi
-      ;;
     -h|--help) usage; exit 0 ;;
     *) echo "未知选项: $1" >&2; usage >&2; exit 1 ;;
   esac
@@ -212,12 +207,10 @@ if [[ $SUMMARY_RC -ne 0 ]]; then
   echo "存在失败样例（见上方）" >&2
 fi
 
-# 8. serve
-if $SERVE; then
-  echo
-  echo "静态服务: http://localhost:${SERVE_PORT}/index.html"
-  echo "Ctrl+C 停止。"
-  python3 -m http.server --directory "$SCRIPT_DIR" "$SERVE_PORT"
-fi
+# 8. 提示访问地址（HTTP 服务由 apps/serve.sh 统一提供，端口 8030）
+echo
+echo "渲染完成。"
+echo "画廊访问地址（请先运行 ./apps/serve.sh）:"
+echo "  http://localhost:8030/showcase/index.html"
 
 exit $SUMMARY_RC

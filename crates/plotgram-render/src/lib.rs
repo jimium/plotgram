@@ -282,7 +282,7 @@ mod tests {
         input.meta.theme = Some("common.blueprint".to_string());
         let svg = render_svg(&input);
         assert!(
-            svg.contains(r#"points="1 1, 11 4.5, 1 8""#),
+            svg.contains(r#"points="1 1, 10 5, 1 9""#),
             "blueprint theme should emit hollow marker:\n{svg}"
         );
 
@@ -307,7 +307,7 @@ mod tests {
         );
         let svg = render_svg(&input);
         assert!(
-            svg.contains(r##"points="0 0, 10 3.5, 0 7" fill="#C62828""##),
+            svg.contains(r##"d="M 0 0 L 10 5 L 0 10 z" fill="#C62828""##),
             "marker fill should follow inline stroke:\n{svg}"
         );
 

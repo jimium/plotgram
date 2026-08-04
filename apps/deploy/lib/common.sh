@@ -19,7 +19,7 @@
 # ─── 路径常量 ───────────────────────────────────────────
 DEPLOY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_DIR="$(cd "$DEPLOY_LIB_DIR/.." && pwd)"
-ROOT_DIR="$(cd "$DEPLOY_DIR/.." && pwd)"
+ROOT_DIR="$(cd "$DEPLOY_DIR/../.." && pwd)"
 NGINX_CONF_DIR="$DEPLOY_DIR/nginx"
 
 # ─── 默认部署目标（适用于 website / playground / showcase / agent-demo）────────

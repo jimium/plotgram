@@ -9,9 +9,9 @@
 # 本脚本不构建 wasm，只负责 agent-demo 自身的 vite build 与同步。
 #
 # 用法:
-#   ./deploy/deploy-agent-demo.sh              # 构建 + 同步
-#   ./deploy/deploy-agent-demo.sh --skip-build # 跳过构建，用已有 dist 同步
-#   ./deploy/deploy-agent-demo.sh --setup-nginx # 同步 nginx 配置
+#   ./apps/deploy/deploy-agent-demo.sh              # 构建 + 同步
+#   ./apps/deploy/deploy-agent-demo.sh --skip-build # 跳过构建，用已有 dist 同步
+#   ./apps/deploy/deploy-agent-demo.sh --setup-nginx # 同步 nginx 配置
 
 set -euo pipefail
 
@@ -22,11 +22,11 @@ SETUP_NGINX=false
 
 usage() {
   cat <<'EOF'
-用法: deploy/deploy-agent-demo.sh [选项]
+用法: apps/deploy/deploy-agent-demo.sh [选项]
 
 构建 Agent Demo（vite build）并同步到 plotgram.cn/agent/ 与 CDN。
 
-前置：需先运行 ./deploy/deploy-wasm.sh 生成 agent-demo/plotgram-wasm/。
+前置：需先运行 ./apps/deploy/deploy-wasm.sh 生成 apps/agent-demo/plotgram-wasm/。
 
 选项:
   --skip-build    跳过 vite build，用已有 dist 同步
@@ -47,7 +47,7 @@ done
 trap cleanup_staging EXIT
 trap 'close_ssh_multiplexing "$DEPLOY_HOST" "$ASSET_HOST"' EXIT
 
-AGENT_DIR="$ROOT_DIR/agent-demo"
+AGENT_DIR="$ROOT_DIR/apps/agent-demo"
 AGENT_BASE="/agent/"
 AGENT_CDN_BASE="${CDN_BASE}agent/"
 AGENT_API="https://api.pg.agcli.cn/agent/chat"
@@ -58,7 +58,7 @@ CDN_AGENT_REMOTE="$ASSET_HOST:$ASSET_REMOTE_DIR/agent/"
 build() {
   # vite build 时 alias 需要 plotgram-wasm/ 存在（开发中间件源，生产走 CDN）
   if [[ ! -f "$AGENT_DIR/plotgram-wasm/plotgram_wasm_bg.wasm" ]]; then
-    die "缺少 agent-demo/plotgram-wasm/，请先运行 ./deploy/deploy-wasm.sh"
+    die "缺少 apps/agent-demo/plotgram-wasm/，请先运行 ./apps/deploy/deploy-wasm.sh"
   fi
 
   log "构建 agent-demo (base=${AGENT_BASE}, cdn=${AGENT_CDN_BASE})"
@@ -145,8 +145,8 @@ main() {
   if [[ "$SKIP_BUILD" == false ]]; then
     build
   else
-    log "跳过构建（使用已有 agent-demo/dist）"
-    [[ -d "$AGENT_DIR/dist" ]] || die "缺少 agent-demo/dist，请先去掉 --skip-build 运行一次"
+    log "跳过构建（使用已有 apps/agent-demo/dist）"
+    [[ -d "$AGENT_DIR/dist" ]] || die "缺少 apps/agent-demo/dist，请先去掉 --skip-build 运行一次"
   fi
 
   stage_artifacts

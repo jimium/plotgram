@@ -6,10 +6,10 @@
 #   - 其他站点之间相互独立
 #
 # 用法:
-#   ./deploy/deploy-all.sh                  # 全量发布（含 showcase SVG 渲染）
-#   ./deploy/deploy-all.sh --skip-render    # 跳过 showcase SVG 渲染
-#   ./deploy/deploy-all.sh --skip-api       # 跳过 agent-api（不编译 Rust 服务端）
-#   ./deploy/deploy-all.sh --only wasm,agent-demo  # 只发布指定站点
+#   ./apps/deploy/deploy-all.sh                  # 全量发布（含 showcase SVG 渲染）
+#   ./apps/deploy/deploy-all.sh --skip-render    # 跳过 showcase SVG 渲染
+#   ./apps/deploy/deploy-all.sh --skip-api       # 跳过 agent-api（不编译 Rust 服务端）
+#   ./apps/deploy/deploy-all.sh --only wasm,agent-demo  # 只发布指定站点
 #
 # 环境变量：与各子脚本相同（DEPLOY_HOST / ASSET_HOST 等）
 
@@ -23,7 +23,7 @@ ONLY=""
 
 usage() {
   cat <<'EOF'
-用法: deploy/deploy-all.sh [选项]
+用法: apps/deploy/deploy-all.sh [选项]
 
 按依赖顺序调用各站点发布脚本，全量发布。
 

@@ -8,9 +8,9 @@
 # 流程：cargo build plotgram-cli → 渲染 SVG → patch CDN/BUILD_HASH → 同步
 #
 # 用法:
-#   ./deploy/deploy-showcase.sh                  # 渲染 SVG + 同步
-#   ./deploy/deploy-showcase.sh --skip-render    # 跳过 SVG 渲染，用已有 SVG 同步
-#   ./deploy/deploy-showcase.sh --setup-nginx     # 同步 nginx 配置
+#   ./apps/deploy/deploy-showcase.sh                  # 渲染 SVG + 同步
+#   ./apps/deploy/deploy-showcase.sh --skip-render    # 跳过 SVG 渲染，用已有 SVG 同步
+#   ./apps/deploy/deploy-showcase.sh --setup-nginx     # 同步 nginx 配置
 
 set -euo pipefail
 
@@ -21,7 +21,7 @@ SETUP_NGINX=false
 
 usage() {
   cat <<'EOF'
-用法: deploy/deploy-showcase.sh [选项]
+用法: apps/deploy/deploy-showcase.sh [选项]
 
 渲染 showcase SVG（cargo build + render.sh）并同步到 plotgram.cn 与 CDN。
 
@@ -44,7 +44,7 @@ done
 trap cleanup_staging EXIT
 trap 'close_ssh_multiplexing "$DEPLOY_HOST" "$ASSET_HOST"' EXIT
 
-SHOWCASE_DIR="$ROOT_DIR/showcase"
+SHOWCASE_DIR="$ROOT_DIR/apps/showcase"
 SHOWCASE_REMOTE="$DEPLOY_HOST:$REMOTE_DIR/showcase/"
 CDN_SHOWCASE_REMOTE="$ASSET_HOST:$ASSET_REMOTE_DIR/showcase/"
 
@@ -59,7 +59,7 @@ render_svgs() {
 }
 
 # ─── patch CDN_BASE 与 BUILD_HASH ──────────────────────
-# 把 showcase/index.html 里的 CDN_BASE 占位符替换为真实 CDN 地址
+# 把 apps/showcase/index.html 里的 CDN_BASE 占位符替换为真实 CDN 地址
 patch_showcase_cdn() {
   local index_html="$1"
   python3 - "$CDN_BASE" "$index_html" <<'PY'
@@ -75,7 +75,7 @@ pattern = re.compile(
 )
 updated, count = pattern.subn(rf'\1"{cdn_base}"\2', text, count=1)
 if count != 1:
-    raise SystemExit("showcase/index.html: 未找到 CDN 标记")
+    raise SystemExit("apps/showcase/index.html: 未找到 CDN 标记")
 Path(path).write_text(updated, encoding="utf-8")
 PY
 }
@@ -134,7 +134,7 @@ upload() {
   # BUILD_HASH 依赖 SVG 内容，必须在 stage 后计算
   patch_build_hash "$STAGING_DIR/showcase/index.html"
   # 注入 ICP 备案号
-  log "注入 ICP 备案号 → showcase/index.html"
+  log "注入 ICP 备案号 → apps/showcase/index.html"
   inject_icp_badge "$STAGING_DIR/showcase/index.html"
 
   # 主站（plotgram.cn）

@@ -3,7 +3,7 @@
 > 状态：**现行目标架构 v1**（驱动重建；非当前能力声明）  
 > 日期：2026-08-01  
 > 引擎注册名：`hierarchical`  
-> 代码落点：`crates/plotgram-engine/src/layout/hierarchical/`  
+> 代码落点：`crates/plotgram-layout/src/layout/hierarchical/`  
 > 约束入口：[写权纪律](../write-authority.md) · [AGENTS.md](../../../../AGENTS.md) §1  
 > 证据与启发：[from-yfiles-reference](nodes/from-yfiles-reference.md) · [`docs/reference/yfiles/`](../../../reference/yfiles/00-索引与阅读指南.md) · v1 Atlas（功能真源，非目录真源）
 
@@ -122,7 +122,7 @@ LayoutAlgorithm
 ### 2.4 模块边界（代码）
 
 ```text
-plotgram-engine/layout/hierarchical/
+plotgram-layout/src/layout/hierarchical/
   params.rs          # HierarchicalParams / Preset / bind（入口一次）
   compose/           # contraction · ranking · ordering · ports · channel
   plan/              # Plan IR（稳定字段；禁止 HashMap 序）

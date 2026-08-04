@@ -16,7 +16,8 @@ use plotgram_model::graph::Graph;
 use serde::Serialize;
 
 use super::compose::ports::EdgePorts;
-use super::ink::route::{port_anchor, CanonicalEdge};
+use super::ink::route::CanonicalEdge;
+use super::metric::anchor::port_anchor;
 use super::model::{ElemKey, PlanGraph, RealGraph, Segment};
 use super::orient::{from_algo_point, from_algo_side, to_algo_orientation, to_algo_point};
 use super::params::{HierarchicalParams, Orientation};

@@ -118,7 +118,7 @@ ssh shanxun 'systemctl stop nginx && \
 # 3. 同步 nginx 配置（此时 plotgram.cn 证书已存在，nginx -t 可通过；
 #    assets.pg.agcli.cn.conf 也已添加 assets.plotgram.cn server_name，
 #    443 块暂时证书不匹配但 nginx -t 不校验 SAN 覆盖，能通过）
-./deploy/deploy-website.sh --setup-nginx
+./apps/deploy/deploy-website.sh --setup-nginx
 
 # 4. 扩展 agcli.cn 证书以覆盖 plotgram.cn 的 api/assets 别名
 #    （webroot 方式，port 80 块已在上一步同步并 reload，可服务 acme-challenge）
@@ -137,7 +137,7 @@ ssh shanxun 'sed -i "s|^DEMO_ALLOWED_ORIGINS=.*|DEMO_ALLOWED_ORIGINS=https://dem
 ssh shanxun 'cd /opt/plotgram-agent-api && ./stop.sh && ./start.sh'
 
 # 8. 全量发布
-./deploy/deploy-all.sh
+./apps/deploy/deploy-all.sh
 ```
 
 ---
@@ -267,10 +267,10 @@ ssh shanxun 'tail -f /opt/plotgram-agent-api/server.log'
 
 ```bash
 # 1. 同步 nginx 配置 + 申请 certbot 证书
-./deploy/deploy-agent-api.sh --setup-nginx
+./apps/deploy/deploy-agent-api.sh --setup-nginx
 
 # 2. 同步代码 + 编译 + 部署 + 重启
-./deploy/deploy-agent-api.sh
+./apps/deploy/deploy-agent-api.sh
 
 # 3. 登录服务器填入真实 API Key（如未在 .env 中）
 ssh shanxun 'vim /opt/plotgram-agent-api/.env'
@@ -284,16 +284,16 @@ ssh shanxun 'cd /opt/plotgram-agent-api && ./stop.sh && ./start.sh'
 
 ```bash
 # 同步代码 + 编译 + 部署 + 重启（每次改代码后执行）
-./deploy/deploy-agent-api.sh
+./apps/deploy/deploy-agent-api.sh
 
 # 跳过 rsync，用服务器上已有代码编译 + 部署
-./deploy/deploy-agent-api.sh --skip-sync
+./apps/deploy/deploy-agent-api.sh --skip-sync
 
 # 跳过编译，仅重启（用已有二进制）
-./deploy/deploy-agent-api.sh --skip-build
+./apps/deploy/deploy-agent-api.sh --skip-build
 
 # 只同步代码不编译/不重启
-./deploy/deploy-agent-api.sh --dry-run
+./apps/deploy/deploy-agent-api.sh --dry-run
 ```
 
 ### 编译流程（shanxun 本地编译）
@@ -339,21 +339,21 @@ Agent Demo（对话即画图）部署在 demo 站的 `/agent/` 子路径下，�
 
 ```bash
 # 1. 确保 Agent API 已部署（见第 4 节）
-./deploy/deploy-agent-api.sh
+./apps/deploy/deploy-agent-api.sh
 
 # 2. 同步 nginx 配置（添加 /agent/ location + CDN agent 路径 + plotgram.cn 镜像）
-./deploy/deploy-agent-demo.sh --setup-nginx
+./apps/deploy/deploy-agent-demo.sh --setup-nginx
 
 # 3. 构建 + 部署
-./deploy/deploy-agent-demo.sh
+./apps/deploy/deploy-agent-demo.sh
 ```
 
 ### 后续发布
 
 ```bash
-./deploy/deploy-agent-demo.sh                # 构建 + 同步
-./deploy/deploy-agent-demo.sh --skip-build   # 跳过构建，用已有 dist 同步
-./deploy/deploy-agent-demo.sh --setup-nginx  # 同步 nginx 配置（配置变更时）
+./apps/deploy/deploy-agent-demo.sh                # 构建 + 同步
+./apps/deploy/deploy-agent-demo.sh --skip-build   # 跳过构建，用已有 dist 同步
+./apps/deploy/deploy-agent-demo.sh --setup-nginx  # 同步 nginx 配置（配置变更时）
 ```
 
 ### WASM 加载策略
@@ -381,10 +381,10 @@ Agent Demo（对话即画图）部署在 demo 站的 `/agent/` 子路径下，�
 ### 全量发布
 
 ```bash
-./deploy/deploy-all.sh                        # 全量发布（含 showcase SVG 渲染）
-./deploy/deploy-all.sh --skip-render          # 跳过 showcase SVG 渲染
-./deploy/deploy-all.sh --skip-api             # 跳过 agent-api（不编译 Rust 服务端）
-./deploy/deploy-all.sh --only wasm,agent-demo # 只发布指定站点
+./apps/deploy/deploy-all.sh                        # 全量发布（含 showcase SVG 渲染）
+./apps/deploy/deploy-all.sh --skip-render          # 跳过 showcase SVG 渲染
+./apps/deploy/deploy-all.sh --skip-api             # 跳过 agent-api（不编译 Rust 服务端）
+./apps/deploy/deploy-all.sh --only wasm,agent-demo # 只发布指定站点
 ```
 
 发布顺序：wasm → website → playground → showcase → agent-demo → agent-api
@@ -394,29 +394,29 @@ Agent Demo（对话即画图）部署在 demo 站的 `/agent/` 子路径下，�
 
 ```bash
 # WASM（playground / agent-demo 三端共用，靠 ETag 控制缓存）
-./deploy/deploy-wasm.sh
-./deploy/deploy-wasm.sh --skip-build
+./apps/deploy/deploy-wasm.sh
+./apps/deploy/deploy-wasm.sh --skip-build
 
 # Website（landing page）
-./deploy/deploy-website.sh
-./deploy/deploy-website.sh --skip-build
+./apps/deploy/deploy-website.sh
+./apps/deploy/deploy-website.sh --skip-build
 
 # Playground
-./deploy/deploy-playground.sh                 # 前置：需先 deploy-wasm.sh
-./deploy/deploy-playground.sh --skip-build
+./apps/deploy/deploy-playground.sh                 # 前置：需先 deploy-wasm.sh
+./apps/deploy/deploy-playground.sh --skip-build
 
 # Showcase
-./deploy/deploy-showcase.sh
-./deploy/deploy-showcase.sh --skip-render     # 跳过 SVG 渲染
+./apps/deploy/deploy-showcase.sh
+./apps/deploy/deploy-showcase.sh --skip-render     # 跳过 SVG 渲染
 
 # Agent Demo
-./deploy/deploy-agent-demo.sh                 # 前置：需先 deploy-wasm.sh
-./deploy/deploy-agent-demo.sh --skip-build
+./apps/deploy/deploy-agent-demo.sh                 # 前置：需先 deploy-wasm.sh
+./apps/deploy/deploy-agent-demo.sh --skip-build
 
 # Agent API（shanxun 远程编译 + 重启）
-./deploy/deploy-agent-api.sh
-./deploy/deploy-agent-api.sh --skip-sync      # 跳过 rsync，用服务器已有代码编译
-./deploy/deploy-agent-api.sh --skip-build     # 跳过编译，仅重启
+./apps/deploy/deploy-agent-api.sh
+./apps/deploy/deploy-agent-api.sh --skip-sync      # 跳过 rsync，用服务器已有代码编译
+./apps/deploy/deploy-agent-api.sh --skip-build     # 跳过编译，仅重启
 ```
 
 所有前端站点脚本支持 `--setup-nginx` 同步 nginx 配置（首次部署或配置变更时使用）。

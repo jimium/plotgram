@@ -4,31 +4,31 @@
 # 来源：docs/architecture/重构方案/casev2/gates/product-regression-set.txt
 
 # --- architecture ---
-showcase/architecture/product.three-tier.pgm
-showcase/architecture/product.typical-microservice-architecture.pgm
-showcase/architecture/product.microservices.pgm
-showcase/architecture/product.cdn-cache.pgm
-showcase/architecture/product.cloud-native.pgm
-showcase/architecture/product.ecommerce-platform.pgm
+apps/showcase/architecture/product.three-tier.pgm
+apps/showcase/architecture/product.typical-microservice-architecture.pgm
+apps/showcase/architecture/product.microservices.pgm
+apps/showcase/architecture/product.cdn-cache.pgm
+apps/showcase/architecture/product.cloud-native.pgm
+apps/showcase/architecture/product.ecommerce-platform.pgm
 
 # --- flowchart ---
-showcase/flowchart/product.linear-chain.pgm
-showcase/flowchart/product.user-auth.pgm
-showcase/flowchart/product.refund-process.pgm
-showcase/flowchart/product.swimlane-order-process.pgm
+apps/showcase/flowchart/product.linear-chain.pgm
+apps/showcase/flowchart/product.user-auth.pgm
+apps/showcase/flowchart/product.refund-process.pgm
+apps/showcase/flowchart/product.swimlane-order-process.pgm
 
 # --- sequence ---
-showcase/sequence/product.oauth-login.pgm
-showcase/sequence/product.payment-gateway.pgm
+apps/showcase/sequence/product.oauth-login.pgm
+apps/showcase/sequence/product.payment-gateway.pgm
 
 # --- state ---
-showcase/state/product.order-lifecycle.pgm
-showcase/state/product.user-session.pgm
-showcase/state/product.payment-flow.pgm
+apps/showcase/state/product.order-lifecycle.pgm
+apps/showcase/state/product.user-session.pgm
+apps/showcase/state/product.payment-flow.pgm
 
 # --- er ---
-showcase/er/product.blog-schema.pgm
-showcase/er/product.saas-schema.pgm
+apps/showcase/er/product.blog-schema.pgm
+apps/showcase/er/product.saas-schema.pgm
 
 # --- mindmap ---
-showcase/mindmap/product.tech-stack.pgm
+apps/showcase/mindmap/product.tech-stack.pgm

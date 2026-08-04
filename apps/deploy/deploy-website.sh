@@ -9,9 +9,9 @@
 #       否则会误删其他站点（历史上 agent/ 曾因此被清空；editor/ 曾因未排除而被 website 发布删掉）。
 #
 # 用法:
-#   ./deploy/deploy-website.sh              # 构建 + 同步
-#   ./deploy/deploy-website.sh --skip-build # 跳过构建，用已有 dist 同步
-#   ./deploy/deploy-website.sh --setup-nginx # 同步 nginx 配置
+#   ./apps/deploy/deploy-website.sh              # 构建 + 同步
+#   ./apps/deploy/deploy-website.sh --skip-build # 跳过构建，用已有 dist 同步
+#   ./apps/deploy/deploy-website.sh --setup-nginx # 同步 nginx 配置
 
 set -euo pipefail
 
@@ -22,7 +22,7 @@ SETUP_NGINX=false
 
 usage() {
   cat <<'EOF'
-用法: deploy/deploy-website.sh [选项]
+用法: apps/deploy/deploy-website.sh [选项]
 
 构建 website（landing page）并同步到 plotgram.cn 根路径与 CDN。
 
@@ -45,7 +45,7 @@ done
 trap cleanup_staging EXIT
 trap 'close_ssh_multiplexing "$DEPLOY_HOST" "$ASSET_HOST"' EXIT
 
-WEBSITE_DIR="$ROOT_DIR/website"
+WEBSITE_DIR="$ROOT_DIR/apps/website"
 WEBSITE_CDN_BASE="${CDN_BASE}website/"
 ROOT_REMOTE="$DEPLOY_HOST:$REMOTE_DIR/"
 CDN_WEBSITE_REMOTE="$ASSET_HOST:$ASSET_REMOTE_DIR/website/"
@@ -123,8 +123,8 @@ main() {
   if [[ "$SKIP_BUILD" == false ]]; then
     build
   else
-    log "跳过构建（使用已有 website/dist）"
-    [[ -d "$WEBSITE_DIR/dist" ]] || die "缺少 website/dist，请先去掉 --skip-build 运行一次"
+    log "跳过构建（使用已有 apps/website/dist）"
+    [[ -d "$WEBSITE_DIR/dist" ]] || die "缺少 apps/website/dist，请先去掉 --skip-build 运行一次"
   fi
 
   stage_artifacts

@@ -7,7 +7,7 @@ hierarchical 布局的调试检视页：wasm 桥在浏览器里实时跑完整
 ## 构建
 
 ```bash
-./scripts/build-inspector.sh        # wasm-pack build → showcase/debug/pkg/
+./scripts/build-inspector.sh        # wasm-pack build → apps/inspector/pkg/
 ```
 
 产物 `pkg/` 不入库（本目录 .gitignore）。
@@ -17,7 +17,7 @@ hierarchical 布局的调试检视页：wasm 桥在浏览器里实时跑完整
 ES module + wasm 需要 HTTP 环境（file:// 不行）：
 
 ```bash
-python3 -m http.server -d showcase/debug 8090
+python3 -m http.server -d apps/inspector 8090
 # 打开 http://localhost:8090
 ```
 

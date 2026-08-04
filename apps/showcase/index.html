@@ -513,7 +513,7 @@
           if (s.facet === undefined) s.facet = facetFromPath(s.path);
         }
       } catch (e) {
-        grid.innerHTML = `<div class="empty">无法加载 <code>_out/manifest.json</code>。<br>请先运行 <code>./showcase/render.sh --serve</code>。<br><br><small>${e}</small></div>`;
+        grid.innerHTML = `<div class="empty">无法加载 <code>_out/manifest.json</code>。<br>请先运行 <code>./apps/showcase/render.sh</code>（渲染）再启动 <code>./apps/serve.sh</code>，然后打开 <code>http://localhost:8030/showcase/index.html</code>。<br><br><small>${e}</small></div>`;
         return;
       }
       applyHashToUi();

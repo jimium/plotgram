@@ -296,10 +296,12 @@ dependencies = [
 name = "plotgram-layout"
 version = "0.1.0"
 dependencies = [
+ "insta",
  "plotgram-algo",
  "plotgram-engine-api",
  "plotgram-model",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -1,5 +1,8 @@
 //! Metric phase: main-axis stacking + cross-axis coordinate assignment
-//! (median relaxation + VPSC). Canonical (TB) space only.
+//! (BK ideal + cross-layer VPSC) + port point expansion. Canonical (TB)
+//! space only.
 
+pub mod anchor;
+pub mod bk;
 pub mod cross_axis;
 pub mod main_axis;

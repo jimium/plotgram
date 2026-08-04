@@ -11,11 +11,11 @@ source "$(dirname "$0")/gate-switch.sh"
 gate_skip_unless_enabled "check-product-penetration.sh"
 
 SAMPLES=(
-  showcase/flowchart/product.linear-chain.pgm
-  showcase/flowchart/product.user-auth.pgm
-  showcase/flowchart/product.swimlane-order-process.pgm
-  showcase/architecture/product.ecommerce-platform.pgm
-  showcase/architecture/product.cloud-native.pgm
+  apps/showcase/flowchart/product.linear-chain.pgm
+  apps/showcase/flowchart/product.user-auth.pgm
+  apps/showcase/flowchart/product.swimlane-order-process.pgm
+  apps/showcase/architecture/product.ecommerce-platform.pgm
+  apps/showcase/architecture/product.cloud-native.pgm
 )
 
 fail=0

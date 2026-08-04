@@ -9,6 +9,7 @@ use plotgram_algo::path_ortho::{normalize_orthogonal, NormalizeOptions};
 use plotgram_model::geometry::{Point, Rect};
 
 use crate::layout::hierarchical::compose::ports::{EdgePorts, ResolvedPort};
+use crate::layout::hierarchical::metric::anchor::port_anchor;
 use crate::layout::hierarchical::model::{PlanGraph, RealGraph, Segment};
 use crate::layout::hierarchical::orient::{from_algo_point, to_algo_point};
 
@@ -20,29 +21,6 @@ pub struct CanonicalEdge {
     pub path: Vec<Point>,
     pub from_port: ResolvedPort,
     pub to_port: ResolvedPort,
-}
-
-pub(crate) fn port_anchor(frame: Rect, port: ResolvedPort) -> Point {
-    use plotgram_algo::orientation::Side::*;
-    let t = (port.slot as f64 + 1.0) / (port.count as f64 + 1.0);
-    match port.side {
-        North => Point {
-            x: frame.x + t * frame.width,
-            y: frame.y,
-        },
-        South => Point {
-            x: frame.x + t * frame.width,
-            y: frame.bottom(),
-        },
-        West => Point {
-            x: frame.x,
-            y: frame.y + t * frame.height,
-        },
-        East => Point {
-            x: frame.right(),
-            y: frame.y + t * frame.height,
-        },
-    }
 }
 
 /// Elem indices along `edge_id`'s dummy chain in **original** source->target

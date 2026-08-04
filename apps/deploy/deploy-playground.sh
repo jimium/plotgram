@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 构建并发布 Plotgram Editor（代码目录 playground/）到 plotgram.cn/editor/
+# 构建并发布 Plotgram Editor（代码目录 apps/playground/）到 plotgram.cn/editor/
 #
 # 产物：
 #   - 主站:  /var/www/plotgram.cn/editor/  （HTML、favicon、logo，不含 assets/、plotgram-wasm/）
@@ -7,12 +7,12 @@
 #
 # 兼容：nginx 将 /playground/ 301 重定向到 /editor/
 #
-# 前置条件：playground/plotgram-wasm/ 必须存在（由 deploy-wasm.sh 构建）。
+# 前置条件：apps/playground/plotgram-wasm/ 必须存在（由 deploy-wasm.sh 构建）。
 #
 # 用法:
-#   ./deploy/deploy-playground.sh              # 构建 + 同步
-#   ./deploy/deploy-playground.sh --skip-build # 跳过构建，用已有 dist 同步
-#   ./deploy/deploy-playground.sh --setup-nginx # 同步 nginx 配置
+#   ./apps/deploy/deploy-playground.sh              # 构建 + 同步
+#   ./apps/deploy/deploy-playground.sh --skip-build # 跳过构建，用已有 dist 同步
+#   ./apps/deploy/deploy-playground.sh --setup-nginx # 同步 nginx 配置
 
 set -euo pipefail
 
@@ -23,11 +23,11 @@ SETUP_NGINX=false
 
 usage() {
   cat <<'EOF'
-用法: deploy/deploy-playground.sh [选项]
+用法: apps/deploy/deploy-playground.sh [选项]
 
-构建 Editor（playground/）并同步到 plotgram.cn/editor/ 与 CDN。
+构建 Editor（apps/playground/）并同步到 plotgram.cn/editor/ 与 CDN。
 
-前置：需先运行 ./deploy/deploy-wasm.sh 生成 playground/plotgram-wasm/。
+前置：需先运行 ./apps/deploy/deploy-wasm.sh 生成 apps/playground/plotgram-wasm/。
 
 选项:
   --skip-build    跳过 vite build，用已有 dist 同步
@@ -48,7 +48,7 @@ done
 trap cleanup_staging EXIT
 trap 'close_ssh_multiplexing "$DEPLOY_HOST" "$ASSET_HOST"' EXIT
 
-PLAYGROUND_DIR="$ROOT_DIR/playground"
+PLAYGROUND_DIR="$ROOT_DIR/apps/playground"
 EDITOR_BASE="/editor/"
 EDITOR_CDN_BASE="${CDN_BASE}editor/"
 EDITOR_REMOTE="$DEPLOY_HOST:$REMOTE_DIR/editor/"
@@ -57,7 +57,7 @@ CDN_EDITOR_REMOTE="$ASSET_HOST:$ASSET_REMOTE_DIR/editor/"
 # ─── 构建 ───────────────────────────────────────────────
 build() {
   if [[ ! -f "$PLAYGROUND_DIR/plotgram-wasm/plotgram_wasm_bg.wasm" ]]; then
-    die "缺少 playground/plotgram-wasm/，请先运行 ./deploy/deploy-wasm.sh"
+    die "缺少 apps/playground/plotgram-wasm/，请先运行 ./apps/deploy/deploy-wasm.sh"
   fi
 
   log "构建 Editor (base=${EDITOR_BASE}, cdn=${EDITOR_CDN_BASE})"
@@ -118,8 +118,8 @@ main() {
   if [[ "$SKIP_BUILD" == false ]]; then
     build
   else
-    log "跳过构建（使用已有 playground/dist）"
-    [[ -d "$PLAYGROUND_DIR/dist" ]] || die "缺少 playground/dist，请先去掉 --skip-build 运行一次"
+    log "跳过构建（使用已有 apps/playground/dist）"
+    [[ -d "$PLAYGROUND_DIR/dist" ]] || die "缺少 apps/playground/dist，请先去掉 --skip-build 运行一次"
   fi
 
   stage_artifacts

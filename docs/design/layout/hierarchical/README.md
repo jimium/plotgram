@@ -2,7 +2,7 @@
 
 > 状态：现行设计档（重建中；v1 Atlas 为功能参考真源）  
 > 引擎注册名：`hierarchical`  
-> 代码：`crates/plotgram-engine/src/layout/hierarchical/`（stub）  
+> 代码：`crates/plotgram-layout/src/layout/hierarchical/`  
 > 参考实现：`crates/v1/plotgram-core/src/layout/atlas/` + `layout/kernel/layered/`  
 > **目标架构真源**：[architecture.md](architecture.md)
 
@@ -56,6 +56,7 @@ Sugiyama 骨架 + Atlas 三相写权（组合 → 度量 → Ink）。
 | 文档 | 用途 |
 |------|------|
 | **[architecture.md](architecture.md)** | **目标架构真源**：IR、算法表、Channel、组/分区、参数、里程碑 |
+| **[roadmap.md](roadmap.md)** | MVP 之后的**阶段路线与方向**（A 拉直 → B 端口 → C 诊断 → D Channel/组框） |
 | [debug-profile.md](debug-profile.md) | Hier 的 DebugTrace **扩展剖面**（rank/dummy/…） |
 | [../debug-inspector.md](../debug-inspector.md) | **跨核**调试检视器信封 + UI 壳 |
 | [phases/](phases/README.md) | 跨 crate 契约与各相可执行细节 |

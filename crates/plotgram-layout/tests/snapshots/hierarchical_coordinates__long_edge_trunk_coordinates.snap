@@ -1,0 +1,186 @@
+---
+source: crates/plotgram-layout/tests/hierarchical_coordinates.rs
+expression: "layout_json(graph, Size::new(120.0, 40.0))"
+---
+{
+  "edges": [
+    {
+      "from_port": {
+        "side": "south",
+        "slot": 0
+      },
+      "id": "e0",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 95.4,
+              "y": 40.0
+            },
+            {
+              "x": 95.4,
+              "y": 60.0
+            },
+            {
+              "x": 60.0,
+              "y": 60.0
+            },
+            {
+              "x": 60.0,
+              "y": 80.0
+            }
+          ]
+        }
+      },
+      "source": "a",
+      "target": "b",
+      "to_port": {
+        "side": "north",
+        "slot": 0
+      }
+    },
+    {
+      "from_port": {
+        "side": "south",
+        "slot": 0
+      },
+      "id": "e1",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 60.0,
+              "y": 120.0
+            },
+            {
+              "x": 60.0,
+              "y": 160.0
+            }
+          ]
+        }
+      },
+      "source": "b",
+      "target": "c",
+      "to_port": {
+        "side": "north",
+        "slot": 0
+      }
+    },
+    {
+      "from_port": {
+        "side": "south",
+        "slot": 0
+      },
+      "id": "e2",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 60.0,
+              "y": 200.0
+            },
+            {
+              "x": 60.0,
+              "y": 220.0
+            },
+            {
+              "x": 95.4,
+              "y": 220.0
+            },
+            {
+              "x": 95.4,
+              "y": 240.0
+            }
+          ]
+        }
+      },
+      "source": "c",
+      "target": "d",
+      "to_port": {
+        "side": "north",
+        "slot": 0
+      }
+    },
+    {
+      "from_port": {
+        "side": "south",
+        "slot": 1
+      },
+      "id": "e3",
+      "path": {
+        "polyline": {
+          "points": [
+            {
+              "x": 135.4,
+              "y": 40.0
+            },
+            {
+              "x": 135.4,
+              "y": 60.0
+            },
+            {
+              "x": 144.0,
+              "y": 60.0
+            },
+            {
+              "x": 144.0,
+              "y": 200.0
+            },
+            {
+              "x": 135.4,
+              "y": 200.0
+            },
+            {
+              "x": 135.4,
+              "y": 240.0
+            }
+          ]
+        }
+      },
+      "source": "a",
+      "target": "d",
+      "to_port": {
+        "side": "north",
+        "slot": 1
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "frame": {
+        "height": 40.0,
+        "width": 120.0,
+        "x": 55.400000000000006,
+        "y": 0.0
+      },
+      "id": "a"
+    },
+    {
+      "frame": {
+        "height": 40.0,
+        "width": 120.0,
+        "x": 0.0,
+        "y": 80.0
+      },
+      "id": "b"
+    },
+    {
+      "frame": {
+        "height": 40.0,
+        "width": 120.0,
+        "x": 0.0,
+        "y": 160.0
+      },
+      "id": "c"
+    },
+    {
+      "frame": {
+        "height": 40.0,
+        "width": 120.0,
+        "x": 55.400000000000006,
+        "y": 240.0
+      },
+      "id": "d"
+    }
+  ]
+}

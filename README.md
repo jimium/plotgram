@@ -52,7 +52,7 @@ diagram flowchart {
 Render it:
 
 ```bash
-cargo run -p plotgram-cli -- render showcase/flowchart/product.linear-chain.pgm -f svg -o output.svg
+cargo run -p plotgram-cli -- render apps/showcase/flowchart/product.linear-chain.pgm -f svg -o output.svg
 ```
 
 ---
@@ -119,13 +119,13 @@ cargo run -p plotgram-server
 Browser-based live editor powered by WASM:
 
 ```bash
-cd playground
+cd apps/playground
 npm install
 npm run dev
 # Open http://localhost:3000
 ```
 
-See [playground/README.md](playground/README.md) for details.
+See [apps/playground/README.md](apps/playground/README.md) for details.
 
 ---
 
@@ -140,7 +140,7 @@ See [playground/README.md](playground/README.md) for details.
 | ER diagram | `er` | Beta |
 | Mind map | `mindmap` | Beta |
 
-Browse [showcase/](showcase/) for examples. Files use complexity prefixes: `s.` (simple), `n.` (normal), `c.` (complex).
+Browse [apps/showcase/](apps/showcase/) for examples. Files use complexity prefixes: `s.` (simple), `n.` (normal), `c.` (complex).
 
 ---
 
@@ -154,12 +154,15 @@ plotgram/
 │   ├── plotgram-server/   # HTTP API service
 │   ├── plotgram-wasm/     # WASM bindings for the browser
 │   └── plotgram-eval/     # Evaluation metrics
+├── apps/
+│   ├── showcase/          # Example diagrams by type (.pgm)
+│   ├── playground/        # React + WASM live editor
+│   ├── website/           # Landing page
+│   └── editors/           # IDE extensions (VSCode)
 ├── docs/
 │   ├── specs/            # Language and style specifications
 │   ├── product/          # Vision, features, and use cases
 │   └── architecture/     # Design philosophy and layout algorithms
-├── showcase/             # Example diagrams by type (.pgm)
-├── playground/           # React + WASM live editor
 └── Cargo.toml            # Rust workspace
 ```
 

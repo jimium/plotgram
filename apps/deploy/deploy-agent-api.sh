@@ -5,11 +5,11 @@
 # （shanxun 已装 Rust 1.96 + rsproxy.cn 镜像，2 核 1.8G 编译约 4-5 分钟）
 #
 # 用法:
-#   ./deploy/deploy-agent-api.sh              # 同步代码 + 编译 + 重启
-#   ./deploy/deploy-agent-api.sh --skip-sync  # 跳过 rsync，用服务器上已有代码编译
-#   ./deploy/deploy-agent-api.sh --skip-build # 跳过编译，仅重启（用已有二进制）
-#   ./deploy/deploy-agent-api.sh --setup-nginx # 同步 nginx 配置
-#   ./deploy/deploy-agent-api.sh --dry-run     # 只同步代码不上传/重启
+#   ./apps/deploy/deploy-agent-api.sh              # 同步代码 + 编译 + 重启
+#   ./apps/deploy/deploy-agent-api.sh --skip-sync  # 跳过 rsync，用服务器上已有代码编译
+#   ./apps/deploy/deploy-agent-api.sh --skip-build # 跳过编译，仅重启（用已有二进制）
+#   ./apps/deploy/deploy-agent-api.sh --setup-nginx # 同步 nginx 配置
+#   ./apps/deploy/deploy-agent-api.sh --dry-run     # 只同步代码不上传/重启
 #
 # 环境变量:
 #   DEPLOY_HOST   SSH 目标（默认 shanxun）
@@ -33,7 +33,7 @@ DRY_RUN=false
 
 usage() {
   cat <<'EOF'
-用法: deploy/deploy-agent-api.sh [选项]
+用法: apps/deploy/deploy-agent-api.sh [选项]
 
 同步源码到 shanxun:/opt/plotgram，本地编译，部署到 /opt/plotgram-agent-api 并重启。
 
@@ -66,12 +66,12 @@ sync_source() {
   rsync -az --delete \
     --exclude='target' \
     --exclude='node_modules' \
-    --exclude='agent-demo/plotgram-wasm' \
-    --exclude='playground/plotgram-wasm' \
-    --exclude='studio/plotgram-wasm' \
-    --exclude='agent-demo/dist' \
-    --exclude='playground/dist' \
-    --exclude='website/dist' \
+    --exclude='apps/agent-demo/plotgram-wasm' \
+    --exclude='apps/playground/plotgram-wasm' \
+    --exclude='apps/studio/plotgram-wasm' \
+    --exclude='apps/agent-demo/dist' \
+    --exclude='apps/playground/dist' \
+    --exclude='apps/website/dist' \
     --exclude='.git' \
     "$ROOT_DIR/" "$DEPLOY_HOST:$REMOTE_SRC/"
   log "源码同步完成"
