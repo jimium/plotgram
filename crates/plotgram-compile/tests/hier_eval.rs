@@ -17,17 +17,19 @@
 //! This is a coarse "does the geometry make sense" check, not a substitute
 //! for visual review (see `docs/design/layout/hierarchical/notes/`).
 //!
-//! Bend regression gate: per-fixture `max_bends` / `sum_bends` must not
-//! exceed the checked-in baseline in `tests/hier_eval_baseline.json`
-//! (crossings / canvas bbox are printed as observational deltas). Regenerate
-//! the baseline only when a bend change is *intended*:
+//! Bend regression gate: per-fixture `max_bends` / `sum_bends` /
+//! `reversed_count` must not exceed the checked-in baseline in
+//! `tests/hier_eval_baseline.json` (crossings / canvas bbox are printed as
+//! observational deltas). `reversed_count` guards the FAS cycle-entry rule:
+//! swapping the cut edge of a cycle never adds reversals. Regenerate the
+//! baseline only when a change is *intended*:
 //! `HIER_EVAL_WRITE_BASELINE=1 cargo test -p plotgram-compile --test hier_eval`.
 
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use plotgram_compile::{build_layout, BuildOptions};
+use plotgram_compile::{build_debug_trace, build_layout, BuildOptions};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::result::LayoutResult;
 use serde_json::{json, Value};
@@ -98,6 +100,7 @@ struct FileMetrics {
     crossings: usize,
     max_bends: usize,
     sum_bends: usize,
+    reversed_count: usize,
     bbox_w: f64,
     bbox_h: f64,
 }
@@ -111,6 +114,7 @@ fn metrics_to_value(m: &FileMetrics) -> Value {
         "max_bends": m.max_bends,
         "sum_bends": m.sum_bends,
         "crossings": m.crossings,
+        "reversed_count": m.reversed_count,
         "bbox_w": m.bbox_w,
         "bbox_h": m.bbox_h,
     })
@@ -148,22 +152,40 @@ fn hierarchical_showcase_geometry_invariants() {
 
         check_no_node_overlaps(&name, &result, &mut hard_failures);
         check_orthogonal_and_ports(&name, &result, &mut hard_failures);
-        all_metrics.push(compute_metrics(&name, &result));
+        let reversed_count = match build_debug_trace(&source, &BuildOptions::default()) {
+            Ok(trace) => serde_json::to_value(&trace)
+                .ok()
+                .and_then(|v| v.pointer("/extension/edge_plans").cloned())
+                .and_then(|plans| plans.as_array().cloned())
+                .map(|plans| {
+                    plans
+                        .iter()
+                        .filter(|p| p["reversed"].as_bool().unwrap_or(false))
+                        .count()
+                })
+                .unwrap_or(0),
+            Err(e) => {
+                hard_failures.push(format!("{name}: debug trace error: {e}"));
+                0
+            }
+        };
+        all_metrics.push(compute_metrics(&name, &result, reversed_count));
     }
 
     println!(
-        "\n{:<45} {:>6} {:>6} {:>10} {:>10} {:>10} {:>14}",
-        "fixture", "nodes", "edges", "crossings", "max_bends", "sum_bends", "bbox (w x h)"
+        "\n{:<45} {:>6} {:>6} {:>10} {:>10} {:>10} {:>10} {:>14}",
+        "fixture", "nodes", "edges", "crossings", "max_bends", "sum_bends", "reversed", "bbox (w x h)"
     );
     for m in &all_metrics {
         println!(
-            "{:<45} {:>6} {:>6} {:>10} {:>10} {:>10} {:>14}",
+            "{:<45} {:>6} {:>6} {:>10} {:>10} {:>10} {:>10} {:>14}",
             m.name,
             m.nodes,
             m.edges,
             m.crossings,
             m.max_bends,
             m.sum_bends,
+            m.reversed_count,
             format!("{:.0} x {:.0}", m.bbox_w, m.bbox_h)
         );
     }
@@ -248,7 +270,7 @@ fn check_orthogonal_and_ports(name: &str, result: &LayoutResult, failures: &mut 
     }
 }
 
-fn compute_metrics(name: &str, result: &LayoutResult) -> FileMetrics {
+fn compute_metrics(name: &str, result: &LayoutResult, reversed_count: usize) -> FileMetrics {
     let mut crossings = 0usize;
     let mut max_bends = 0usize;
     let mut sum_bends = 0usize;
@@ -311,15 +333,17 @@ fn compute_metrics(name: &str, result: &LayoutResult) -> FileMetrics {
         crossings,
         max_bends,
         sum_bends,
+        reversed_count,
         bbox_w,
         bbox_h,
     }
 }
 
 /// Bend regression gate against `tests/hier_eval_baseline.json`: per-fixture
-/// `max_bends` / `sum_bends` must not exceed the baseline (hard failure).
-/// Crossings and canvas bbox are observational: printed as deltas only, since
-/// a dense graph legitimately crosses and straightening may widen the canvas.
+/// `max_bends` / `sum_bends` / `reversed_count` must not exceed the baseline
+/// (hard failure). Crossings and canvas bbox are observational: printed as
+/// deltas only, since a dense graph legitimately crosses and straightening
+/// may widen the canvas.
 fn check_bend_gate(metrics: &[FileMetrics], failures: &mut Vec<String>) {
     let path = baseline_path();
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
@@ -333,8 +357,8 @@ fn check_bend_gate(metrics: &[FileMetrics], failures: &mut Vec<String>) {
         .unwrap_or_else(|e| panic!("corrupt bend baseline {}: {e}", path.display()));
 
     println!(
-        "\n{:<45} {:>14} {:>14} {:>12} {:>16}",
-        "fixture", "d max_bends", "d sum_bends", "d crossings", "d bbox (w x h)"
+        "\n{:<45} {:>14} {:>14} {:>12} {:>12} {:>16}",
+        "fixture", "d max_bends", "d sum_bends", "d crossings", "d reversed", "d bbox (w x h)"
     );
     for m in metrics {
         let Some(entry) = baseline.get(&m.name) else {
@@ -347,6 +371,7 @@ fn check_bend_gate(metrics: &[FileMetrics], failures: &mut Vec<String>) {
         let base_max = entry["max_bends"].as_u64().unwrap_or(0) as usize;
         let base_sum = entry["sum_bends"].as_u64().unwrap_or(0) as usize;
         let base_cross = entry["crossings"].as_u64().unwrap_or(0) as isize;
+        let base_rev = entry["reversed_count"].as_u64().unwrap_or(0) as usize;
         let base_w = entry["bbox_w"].as_f64().unwrap_or(0.0);
         let base_h = entry["bbox_h"].as_f64().unwrap_or(0.0);
 
@@ -362,12 +387,19 @@ fn check_bend_gate(metrics: &[FileMetrics], failures: &mut Vec<String>) {
                 m.name, m.sum_bends, base_sum
             ));
         }
+        if m.reversed_count > base_rev {
+            failures.push(format!(
+                "{}: FAS regression — reversed_count {} > baseline {}",
+                m.name, m.reversed_count, base_rev
+            ));
+        }
         println!(
-            "{:<45} {:>+14} {:>+14} {:>+12} {:>+16}",
+            "{:<45} {:>+14} {:>+14} {:>+12} {:>+12} {:>+16}",
             m.name,
             m.max_bends as isize - base_max as isize,
             m.sum_bends as isize - base_sum as isize,
             m.crossings as isize - base_cross,
+            m.reversed_count as isize - base_rev as isize,
             format!(
                 "{:+.0} x {:+.0}",
                 m.bbox_w - base_w,

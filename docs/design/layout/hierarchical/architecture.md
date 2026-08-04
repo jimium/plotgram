@@ -177,6 +177,16 @@ SegmentKey = { edge_id, segment_ordinal }
 - 端口偏好可根据 working 流向求出，但冻结 Plan 前必须映射回 original source/target。
 - bundle 的 source-prefix / target-suffix 也按 original 语义命名；不得因 FAS 偷换箭头或标签。
 
+#### 环入口规则（声明序优先，环 reroot）
+
+**声明序靠前的节点，布局上优先靠上。** 作者的声明顺序即叙述顺序，是布局的一等确定性信号：
+
+- 主算法仍是标准 Greedy-FAS（ELS），反转数上界（≤ E/2 − V/6）与质量特性不变。
+- 得到反转集后做一次**环 reroot**：若 0 号节点（声明最前）还不是工作源点、且它恰有一条未反转的原始入边，则把切边旋转到这条入边上——同时取消一条现有反转，经无环性校验后接受（候选按最小边序确定性选取）。
+- 旋转不改变反转数，只改变环在哪条边被切开：回边落在「回归段」而非「入口段」，声明最前的节点因此 rank 居顶。不满足条件（已居顶、入边不唯一、无合法旋转）时保持 ELS 结果。
+
+反转数回涨由 hier_eval 基线的 `reversed_count` 门禁守住。作者想改环的入口，重排声明即可，无需新语法。
+
 ### 3.2 Metric
 
 | 字段 | 写者 |
@@ -276,7 +286,7 @@ III.4 InkVerifier（硬 FAIL）
 
 | 相 | **主选** | 可接受替代 | 明确不做 / 后置 |
 |----|----------|------------|-----------------|
-| P1 去环 | **Greedy-FAS**（Eades–Lin–Smyth） | DFS 反向（仅诊断对照） | 精确 MFAS（NP；非主路径） |
+| P1 去环 | **Greedy-FAS**（ELS 骨架 + 声明序环入口规则，见 §3.1） | DFS 反向（仅诊断对照） | 精确 MFAS（NP；非主路径） |
 | P2 分层 | **Network Simplex**（最小加权跨度） | Longest-path（仅 stub/极小图） | 每泳道独立分层 |
 | P3 定序 | **median sweep + transpose + best snapshot** | barycenter（质量差一档） | 纯 ILP |
 | P3 计数 | Barth–Jünger–Mutzel 累加树 | 朴素 $O(E^2)$（窄层） | — |

@@ -2,10 +2,21 @@
 //!
 //! [`greedy_fas`] computes the set of edges to *mark as reversed* so the
 //! remaining orientation is acyclic, via the Eades–Lin–Smyth 1993 greedy
-//! heuristic (guarantee: ≤ E/2 − V/6 reversed edges). Callers keep the edges
-//! and only flip their direction for layering; arrows are still drawn along
-//! the original direction (P5 restores them). Deterministic: stable
+//! skeleton with a declaration-order cycle rule (see below). Callers keep the
+//! edges and only flip their direction for layering; arrows are still drawn
+//! along the original direction (P5 restores them). Deterministic: stable
 //! tie-breaks by smallest node id.
+//!
+//! Cycle-entry rule (cycle reroot): the author's declaration order is the
+//! layout's narrative priority. After the standard greedy walk, if node 0
+//! (earliest declared) is not yet a working source and has exactly one
+//! unreversed original in-edge, the cut is rotated onto that in-edge:
+//! one reversed edge is un-reversed in exchange, verified acyclic by an
+//! explicit check. Node 0 then ranks at the top and the back edge lands on
+//! the return hop, not on the entry hop. A rotation never changes the
+//! reversal count, so the ≤ E/2 − V/6 bound still holds; the choice is
+//! deterministic (smallest edge index first) and the hier_eval
+//! `reversed_count` baseline guards against regressions.
 
 use std::collections::BTreeSet;
 
@@ -177,12 +188,78 @@ pub fn greedy_fas(num_nodes: usize, edges: &[(usize, usize)]) -> BTreeSet<usize>
     for (p, &v) in s_left.iter().chain(s_right_rev.iter().rev()).enumerate() {
         pos[v] = p;
     }
-    edges
+    let mut reversed: BTreeSet<usize> = edges
         .iter()
         .enumerate()
         .filter(|&(_, &(u, v))| u != v && pos[u] > pos[v])
         .map(|(i, _)| i)
-        .collect()
+        .collect();
+
+    reroot_cycle_at(num_nodes, edges, &mut reversed);
+    reversed
+}
+
+/// Cycle reroot (cycle-entry rule, module doc): rotate the cut onto the
+/// unique edge entering node 0, so node 0 becomes a working source and the
+/// author's narrative start ranks at the top.
+///
+/// Applies only when node 0 has exactly one original in-edge and it is
+/// currently unreversed (otherwise node 0 is already well-placed or the
+/// rotation is ambiguous). Each candidate swap exchanges that in-edge for
+/// one currently-reversed edge (smallest edge index first) and is accepted
+/// only if the resulting orientation is acyclic — a rotation keeps the
+/// reversal count intact. No acyclic swap means the ELS result stands.
+fn reroot_cycle_at(num_nodes: usize, edges: &[(usize, usize)], reversed: &mut BTreeSet<usize>) {
+    let in_edges: Vec<usize> = edges
+        .iter()
+        .enumerate()
+        .filter(|&(_, &(u, v))| v == 0 && u != 0)
+        .map(|(i, _)| i)
+        .collect();
+    if in_edges.len() != 1 {
+        return;
+    }
+    let e_in = in_edges[0];
+    if reversed.contains(&e_in) {
+        return; // node 0 is already a working source
+    }
+
+    for &f in reversed.iter() {
+        // BTreeSet iteration is ascending edge index — deterministic.
+        let mut candidate = reversed.clone();
+        candidate.remove(&f);
+        candidate.insert(e_in);
+        if is_acyclic(num_nodes, edges, &candidate) {
+            *reversed = candidate;
+            return;
+        }
+    }
+}
+
+/// Kahn's algorithm over the working orientation (self-loops ignored).
+fn is_acyclic(num_nodes: usize, edges: &[(usize, usize)], reversed: &BTreeSet<usize>) -> bool {
+    let mut indeg = vec![0usize; num_nodes];
+    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); num_nodes];
+    for (i, &(u, v)) in edges.iter().enumerate() {
+        if u == v {
+            continue;
+        }
+        let (s, t) = if reversed.contains(&i) { (v, u) } else { (u, v) };
+        adj[s].push(t);
+        indeg[t] += 1;
+    }
+    let mut queue: Vec<usize> = (0..num_nodes).filter(|&v| indeg[v] == 0).collect();
+    let mut seen = 0;
+    while let Some(v) = queue.pop() {
+        seen += 1;
+        for &w in &adj[v] {
+            indeg[w] -= 1;
+            if indeg[w] == 0 {
+                queue.push(w);
+            }
+        }
+    }
+    seen == num_nodes
 }
 
 #[cfg(test)]
@@ -247,7 +324,8 @@ mod tests {
                 name: "2-cycle reverses exactly one edge",
                 num_nodes: 2,
                 edges: vec![(0, 1), (1, 0)],
-                // ELS puts node 0 first (tie → smallest id), so (1,0) flips.
+                // ELS flips (1,0); node 0's in-edge is already the cut, so
+                // the reroot leaves it — node 0 is a working source.
                 expect: Some(vec![1]),
             },
             Case {
@@ -281,6 +359,34 @@ mod tests {
                 edges: vec![(3, 2), (2, 1), (1, 0)],
                 // A backwards-labelled chain is still acyclic → no reversal.
                 expect: Some(vec![]),
+            },
+            Case {
+                name: "pipeline + retry loop reroots onto the return hop",
+                // software-release shape: 0..12 main chain, 13→0 retry
+                // loop. ELS alone cuts the cycle at (1,9); the reroot then
+                // rotates the cut onto the return hop (13,0), so node 0
+                // becomes the working source and ranks at the top.
+                num_nodes: 14,
+                edges: vec![
+                    (0, 1),
+                    (1, 9),
+                    (9, 2),
+                    (9, 13),
+                    (2, 10),
+                    (10, 3),
+                    (10, 13),
+                    (3, 4),
+                    (4, 11),
+                    (11, 5),
+                    (11, 13),
+                    (5, 12),
+                    (12, 6),
+                    (12, 7),
+                    (6, 8),
+                    (7, 13),
+                    (13, 0),
+                ],
+                expect: Some(vec![16]),
             },
         ];
         for case in &cases {
@@ -339,7 +445,9 @@ mod tests {
 
     /// Exact minimum FAS size for tiny graphs: minimum backward-edge count
     /// over all node orderings (every FAS corresponds to some linear order,
-    /// so this is the true optimum). Self-loops excluded.
+    /// so this is the true optimum). Self-loops excluded. The cycle reroot
+    /// rotates an existing cut without changing the reversal count, so the
+    /// ELS-quality gap assertions still apply.
     fn exact_min_fas(num_nodes: usize, edges: &[(usize, usize)]) -> usize {
         fn recurse(
             order: &mut Vec<usize>,

@@ -7,8 +7,11 @@
 use crate::layout::hierarchical::model::RealGraph;
 
 /// Run Greedy-FAS over `graph.edges` and set `working_*` / `reversed` in
-/// place. Deterministic: `plotgram_algo::fas::greedy_fas` ties break by
-/// smallest node index, which here is declaration order (`RealGraph::ids`).
+/// place. Deterministic: `plotgram_algo::fas::greedy_fas` breaks ties by
+/// smallest node index, which here is declaration order (`RealGraph::ids`);
+/// its cycle reroot then rotates the cut onto the unique edge entering the
+/// earliest-declared node when that keeps the orientation acyclic
+/// (fas.rs module doc), so the author's narrative start ranks at the top.
 pub fn remove_cycles(graph: &mut RealGraph) {
     let pairs: Vec<(usize, usize)> = graph
         .edges
