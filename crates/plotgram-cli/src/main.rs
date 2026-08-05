@@ -129,8 +129,13 @@ fn run_render(input: &PathBuf, output: Option<PathBuf>, theme: Option<String>) -
         theme,
         ..BuildOptions::default()
     };
-    match build_svg(&source, &options) {
-        Ok(svg) => {
+    match build_svg_with_layout(&source, &options) {
+        Ok((layout, svg)) => {
+            // Layout diagnostics exit (roadmap phase C): warnings never
+            // affect geometry or exit code — structured output to stderr.
+            for w in &layout.diagnostics.warnings {
+                eprintln!("warning: {}: {}", input.display(), w.message);
+            }
             if let Some(path) = output {
                 if let Err(e) = fs::write(&path, svg) {
                     eprintln!("write {}: {e}", path.display());
@@ -177,6 +182,7 @@ fn run_measure(input: &PathBuf, json: bool) -> ExitCode {
                 Err(_) => false, // second render failed → non-deterministic by definition
             };
             let m = compute_metrics(&layout_result);
+            let diag = &layout_result.diagnostics;
             json!({
                 "schema_version": METRICS_SCHEMA_VERSION,
                 "path": path_str,
@@ -201,6 +207,12 @@ fn run_measure(input: &PathBuf, json: bool) -> ExitCode {
                 "observation": {
                     "node_count": m.node_count,
                     "edge_count": m.edge_count,
+                },
+                // Layout diagnostics (roadmap phase C): attribute regressions
+                // to params vs code; warnings count the non-fatal observations.
+                "diagnostics": {
+                    "warning_count": diag.warnings.len(),
+                    "params_hash": diag.params_hash,
                 },
             })
         }

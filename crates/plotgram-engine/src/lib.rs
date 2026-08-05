@@ -18,8 +18,9 @@ pub use plotgram_algo as algo;
 pub use plotgram_router as router;
 
 pub use plotgram_engine_api::{
-    EdgeGeometryMode, EdgeRouter, LayoutAlgorithm, LayoutError, LayoutInput, LayoutOutput,
-    OrthogonalRouteParams, PortAnchor, RouteScene, TerminalPair,
+    EdgeGeometryMode, EdgeRouter, LayoutAlgorithm, LayoutDiagnostics, LayoutError, LayoutInput,
+    LayoutOutput, LayoutWarning, OrthogonalRouteParams, PortAnchor, Relaxation, RouteScene,
+    TerminalPair,
 };
 pub use plotgram_router::{
     CurvedEdgeRouter, OctilinearEdgeRouter, OrthogonalEdgeRouter, PolylineEdgeRouter,

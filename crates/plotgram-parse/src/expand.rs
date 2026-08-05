@@ -236,7 +236,10 @@ fn resolve_endpoint(
                 shape: None,
                 role: NodeRole::GroupAnchor,
                 host_group: Some(gid.clone()),
-                anchor: Some(PortConstraint { side, slot }),
+                anchor: Some(match slot {
+                    Some(order) => PortConstraint::FixedOrder { side, order },
+                    None => PortConstraint::FixedSide { side },
+                }),
                 partition_cell: None,
                 attrs: AttrMap::new(),
             };

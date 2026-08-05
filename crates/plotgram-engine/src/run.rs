@@ -49,7 +49,14 @@ pub fn run(contract: &LayoutContract) -> Result<LayoutResult, LayoutError> {
         output.edges
     };
 
-    Ok(finalize(&contract.graph, output.nodes, edges))
+    // Router rewrites edge paths only; the layout's diagnostics pass through
+    // unchanged (routers produce no diagnostics in this build).
+    Ok(finalize(
+        &contract.graph,
+        output.nodes,
+        edges,
+        output.diagnostics,
+    ))
 }
 
 /// Project layout output into a self-contained [`RouteScene`].

@@ -2,6 +2,10 @@
 //! the dummy-chain waypoints and finalized ports; never invents a port side
 //! or a new bend beyond the mechanical elbow needed to connect two points
 //! that don't already share an axis (ink-and-verification.md §1, §4).
+//!
+//! Port anchors come exclusively from `metric::anchor::port_anchor` — Ink
+//! has no default-side fallback and never re-derives an anchor (M2: 无 Ink
+//! fallback / Ink 零猜测).
 
 use std::collections::BTreeMap;
 
@@ -115,6 +119,7 @@ mod tests {
     use super::*;
     use crate::layout::hierarchical::model::{Elem, ElemKey, RealEdge};
     use plotgram_algo::orientation::Side;
+    use plotgram_model::port::AlongSpec;
 
     fn simple_setup() -> (RealGraph, PlanGraph, BTreeMap<String, EdgePorts>, Vec<Rect>) {
         let ids = vec!["a".to_string(), "b".to_string()];
@@ -179,13 +184,11 @@ mod tests {
             EdgePorts {
                 source: ResolvedPort {
                     side: Side::South,
-                    slot: 0,
-                    count: 1,
+                    along: AlongSpec::Ordered { order: 0, count: 1 },
                 },
                 target: ResolvedPort {
                     side: Side::North,
-                    slot: 0,
-                    count: 1,
+                    along: AlongSpec::Ordered { order: 0, count: 1 },
                 },
             },
         );

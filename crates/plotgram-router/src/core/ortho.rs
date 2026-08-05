@@ -33,7 +33,8 @@ pub fn overlap_len(a: Point, b: Point, c: Point, d: Point) -> f64 {
     }
 }
 
-/// Anchor point on a node frame for a resolved port (slot ignored in stub geometry).
+/// Anchor point on a node frame for a resolved port (along-spec ignored in
+/// stub geometry — routers anchor at the side midpoint).
 pub fn port_anchor(frame: &Rect, port: PortRef) -> Point {
     let c = frame.center();
     match port.side {
@@ -193,7 +194,7 @@ mod tests {
             &frame,
             PortRef {
                 side: Side::South,
-                slot: 0,
+                along: plotgram_model::port::AlongSpec::Ordered { order: 0, count: 1 },
             },
         );
         assert_eq!(p, Point { x: 10.0, y: 10.0 });

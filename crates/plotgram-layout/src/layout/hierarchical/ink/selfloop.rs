@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 
 use plotgram_algo::orientation::Side;
 use plotgram_model::geometry::{Point, Rect};
+use plotgram_model::port::AlongSpec;
 
 use crate::layout::hierarchical::compose::ports::ResolvedPort;
 use crate::layout::hierarchical::ink::route::CanonicalEdge;
@@ -58,15 +59,22 @@ pub fn self_loop_edges(
             source: id.clone(),
             target: id,
             path,
+            // Self-loop stubs are fixed-geometry: record the exact path
+            // endpoints as LocalOffset pins so the emitted PortRef is
+            // truthful (the path is not derived from port anchors here).
             from_port: ResolvedPort {
                 side: Side::East,
-                slot: 2 * idx,
-                count: 2 * idx + 2,
+                along: AlongSpec::LocalOffset(Point {
+                    x: frame.width,
+                    y: frame.height * 0.3,
+                }),
             },
             to_port: ResolvedPort {
                 side: Side::East,
-                slot: 2 * idx + 1,
-                count: 2 * idx + 2,
+                along: AlongSpec::LocalOffset(Point {
+                    x: frame.width,
+                    y: frame.height * 0.7,
+                }),
             },
         });
     }

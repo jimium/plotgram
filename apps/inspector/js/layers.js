@@ -170,13 +170,13 @@ function paintPorts(trace) {
     const sel = `port:${p.edge_id}@${p.end}`;
     g.appendChild(el("circle", {
       cx: p.point.x, cy: p.point.y, r: 2.5,
-      fill: p.constraint === "fixed" ? "#c00" : "#0a7",
+      fill: p.constraint === "free" ? "#0a7" : "#c00",
       class: "sel-hit", "data-sel": sel,
     }));
     g.appendChild(el("text", {
       x: p.point.x + 4, y: p.point.y + 3, "font-size": 6.5, fill: "#0a7",
       "pointer-events": "none",
-    }, `${p.side}${p.slot}`));
+    }, `${p.side}${p.slot ?? ""}`));
   }
   return g;
 }

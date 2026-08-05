@@ -21,10 +21,11 @@ pub use debug::{build_debug_trace, LayoutDebugTrace};
 
 use plotgram_algo::orientation::{self as algo_orient, Orientation as AlgoOrientation};
 use plotgram_engine_api::{
-    EdgeGeometryMode, LayoutAlgorithm, LayoutError, LayoutInput, LayoutOutput,
+    EdgeGeometryMode, LayoutAlgorithm, LayoutError, LayoutInput, LayoutOutput, LayoutWarning,
 };
+use plotgram_model::diagnostics::LayoutDiagnostics;
 use plotgram_model::geometry::{Point, Rect};
-use plotgram_model::port::PortRef;
+use plotgram_model::port::{AlongSpec, PortRef};
 use plotgram_model::result::{EdgePath, EdgePlacement, NodePlacement};
 
 pub use params::{
@@ -33,6 +34,7 @@ pub use params::{
 };
 
 use model::ElemKey;
+use compose::ports::ResolvedPort;
 use orient::{from_algo_point, to_algo_point, to_algo_size};
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -56,6 +58,20 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     let bound = HierarchicalParams::bind(input.options)?;
     let params = &bound.params;
 
+    // Diagnostics exit (roadmap phase C): bind warnings surface here instead
+    // of being dropped; hard failures above/below stay hard failures.
+    let diagnostics = LayoutDiagnostics {
+        warnings: bound
+            .warnings
+            .iter()
+            .map(|w| LayoutWarning {
+                message: w.message.clone(),
+            })
+            .collect(),
+        relaxations: Vec::new(), // no soft relaxation in this build — channel reserved
+        params_hash: params.hash(),
+    };
+
     if params.group_policy == GroupPolicy::StrongMacro {
         return Err(LayoutError::message(
             "hierarchical: group_policy `strong-macro` is Unsupported in this build \
@@ -77,9 +93,9 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     let ranks = compose::rank::assign_ranks(&real_graph)?;
     let mut plan = compose::properify::properify(&real_graph, &ranks);
     compose::order::order_layers(&mut plan);
-    let ports = compose::ports::assign_ports(&real_graph, &plan, orientation);
 
-    // --- Metric ------------------------------------------------------
+    // Canonical node sizes are needed before port finalize (FIXED_POS
+    // boundary validation) — measured sizes, never invented.
     let mut canonical_size = vec![algo_orient::Size::new(0.0, 0.0); real_graph.ids.len()];
     for (i, id) in real_graph.ids.iter().enumerate() {
         let size = input
@@ -90,6 +106,10 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
             })?;
         canonical_size[i] = orientation.to_tb_size(to_algo_size(size));
     }
+
+    let ports = compose::ports::assign_ports(&real_graph, &plan, orientation, &canonical_size)?;
+
+    // --- Metric ------------------------------------------------------
     let size_of = |elem_idx: usize| -> algo_orient::Size {
         match &plan.elems[elem_idx].key {
             ElemKey::Real(id) => canonical_size[real_graph.index_of[id]],
@@ -152,14 +172,8 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
                 source: ce.source.clone(),
                 target: ce.target.clone(),
                 path: EdgePath::polyline(points),
-                from_port: Some(PortRef {
-                    side: orient::from_algo_side(orientation.from_tb_side(ce.from_port.side)),
-                    slot: ce.from_port.slot,
-                }),
-                to_port: Some(PortRef {
-                    side: orient::from_algo_side(orientation.from_tb_side(ce.to_port.side)),
-                    slot: ce.to_port.slot,
-                }),
+                from_port: Some(port_ref_out(orientation, ce.from_port)),
+                to_port: Some(port_ref_out(orientation, ce.to_port)),
             }
         })
         .collect();
@@ -189,7 +203,31 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         shift,
     };
 
-    Ok((LayoutOutput { nodes, edges }, captures))
+    Ok((
+        LayoutOutput {
+            nodes,
+            edges,
+            diagnostics,
+        },
+        captures,
+    ))
+}
+
+/// Canonical resolved port → physical [`PortRef`] (orientation-out pass).
+/// Side round-trips through `from_tb_side`; `LocalOffset` is a node-local
+/// vector, so the same point transform's inverse takes it back to physical
+/// local coordinates.
+fn port_ref_out(orientation: AlgoOrientation, rp: ResolvedPort) -> PortRef {
+    let along = match rp.along {
+        AlongSpec::Ordered { .. } | AlongSpec::Ratio(_) => rp.along,
+        AlongSpec::LocalOffset(p) => AlongSpec::LocalOffset(from_algo_point(
+            orientation.from_tb_point(to_algo_point(p)),
+        )),
+    };
+    PortRef {
+        side: orient::from_algo_side(orientation.from_tb_side(rp.side)),
+        along,
+    }
 }
 
 /// Orientation transforms are bit-exact but not sign-preserving (Bt/Rl can
@@ -290,5 +328,92 @@ fn translate_edge_path(path: &mut EdgePath, dx: f64, dy: f64) {
             controls[1].x += dx;
             controls[1].y += dy;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use plotgram_model::attr::{AttrMap, AttrValue};
+    use plotgram_model::geometry::Size;
+    use plotgram_model::graph::{Arrow, Edge, Graph, Node, NodeRole};
+    use plotgram_model::sizes::NodeSizes;
+
+    fn layout_with_options(options: AttrMap) -> LayoutOutput {
+        let node = |id: &str| Node {
+            id: id.to_string(),
+            label: None,
+            shape: None,
+            role: NodeRole::Entity,
+            host_group: None,
+            anchor: None,
+            partition_cell: None,
+            attrs: AttrMap::new(),
+        };
+        let graph = Graph {
+            nodes: vec![node("a"), node("b")],
+            edges: vec![Edge {
+                id: "e0".to_string(),
+                source: "a".to_string(),
+                target: "b".to_string(),
+                arrow: Arrow::Forward,
+                label: None,
+                head_label: None,
+                tail_label: None,
+                from_port: None,
+                to_port: None,
+                edge_group: None,
+                attrs: AttrMap::new(),
+            }],
+            groups: vec![],
+            partition: None,
+        };
+        let mut sizes = NodeSizes::new();
+        sizes.insert("a", Size::new(60.0, 30.0));
+        sizes.insert("b", Size::new(60.0, 30.0));
+        HierarchicalLayout
+            .layout(LayoutInput {
+                graph: &graph,
+                node_sizes: &sizes,
+                options: &options,
+                edge_geometry: EdgeGeometryMode::Builtin,
+            })
+            .expect("minimal two-node layout must succeed")
+    }
+
+    #[test]
+    fn diagnostics_carry_bind_warnings_and_params_hash() {
+        // Table: (extra option keys, expected warning count).
+        let cases: &[(&[&str], usize)] = &[(&[], 0), (&["bogus"], 1), (&["aaa", "zzz"], 2)];
+        for (keys, expected) in cases {
+            let options: AttrMap = keys
+                .iter()
+                .map(|k| ((*k).to_string(), AttrValue::Num(1.0)))
+                .collect();
+            let out = layout_with_options(options);
+            assert_eq!(
+                out.diagnostics.warnings.len(),
+                *expected,
+                "keys={keys:?}"
+            );
+            for (w, key) in out.diagnostics.warnings.iter().zip(*keys) {
+                assert!(w.message.contains(key), "{}", w.message);
+            }
+            // No soft relaxation exists in this build — the channel stays empty.
+            assert!(out.diagnostics.relaxations.is_empty());
+            assert_eq!(out.diagnostics.params_hash.len(), 16);
+        }
+    }
+
+    #[test]
+    fn params_hash_attributes_layout_changes_to_params() {
+        let base = layout_with_options(AttrMap::new());
+        let same = layout_with_options(AttrMap::new());
+        assert_eq!(base.diagnostics.params_hash, same.diagnostics.params_hash);
+
+        let mut changed = AttrMap::new();
+        changed.insert("node_gap".to_string(), AttrValue::Num(99.0));
+        let other = layout_with_options(changed);
+        assert_ne!(base.diagnostics.params_hash, other.diagnostics.params_hash);
     }
 }

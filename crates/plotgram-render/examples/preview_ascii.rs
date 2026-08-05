@@ -150,6 +150,7 @@ fn build_input() -> RenderInput {
         ],
         canvas_width: 420.0,
         canvas_height: 300.0,
+        diagnostics: Default::default(),
     };
 
     RenderInput {

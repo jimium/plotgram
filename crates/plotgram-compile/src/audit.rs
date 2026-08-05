@@ -224,6 +224,7 @@ mod tests {
             labels: vec![],
             canvas_width: 100.0,
             canvas_height: 100.0,
+            diagnostics: Default::default(),
         }
     }
 

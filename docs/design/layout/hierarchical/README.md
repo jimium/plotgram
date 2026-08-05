@@ -60,7 +60,8 @@ Sugiyama 骨架 + Atlas 三相写权（组合 → 度量 → Ink）。
 | [debug-profile.md](debug-profile.md) | Hier 的 DebugTrace **扩展剖面**（rank/dummy/…） |
 | [../debug-inspector.md](../debug-inspector.md) | **跨核**调试检视器信封 + UI 壳 |
 | [phases/](phases/README.md) | 跨 crate 契约与各相可执行细节 |
-| [from-yfiles-reference.md](nodes/from-yfiles-reference.md) | yFiles 参考文库启发纪要 |
+| [from-yfiles-reference.md](notes/from-yfiles-reference.md) | yFiles 参考文库启发纪要 |
+| [edge-parameters.md](edge-parameters.md) | 边参数支持研究（对照 yFiles Edges 分组）+ 分批实施路线 |
 | [01 Sugiyama](../../../reference/yfiles/01-sugiyama分层布局.md) | P1–P5 算法证据 |
 | [08 分组·泳道·端口](../../../reference/yfiles/08-分组泳道与端口约束.md) | group / partition / port |
 | [archive/atlas 21](../../../archive/atlas/21-Hierarchical统一内核与泳道语义-可行性与演进建议-2026-07.md) | 统一内核立场（只读） |

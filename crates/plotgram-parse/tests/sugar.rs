@@ -258,7 +258,7 @@ fn edge_sugar_plus_block() {
     let out = p(r#"diagram { node a {} node b {} a -> b "Call" { from_side: east } }"#);
     let e = edge_at(&out, 0);
     assert_eq!(e.label.as_deref(), Some("Call"));
-    assert_eq!(e.from_port.unwrap().side, Side::East);
+    assert_eq!(e.from_port.as_ref().unwrap().pinned_side(), Some(Side::East));
 }
 
 #[test]
@@ -302,12 +302,12 @@ fn edge_port_lift_combinations() {
         let src = format!("diagram {{ node a {{}} node b {{}} a -> b {{ {attrs} }} }}");
         let out = p(&src);
         let e = edge_at(&out, 0);
-        let fp = e.from_port;
-        let tp = e.to_port;
-        assert_eq!(fp.map(|p| p.side), *fs, "from_side for: {attrs}");
-        assert_eq!(fp.and_then(|p| p.slot), *fsl, "from_slot for: {attrs}");
-        assert_eq!(tp.map(|p| p.side), *ts, "to_side for: {attrs}");
-        assert_eq!(tp.and_then(|p| p.slot), *tsl, "to_slot for: {attrs}");
+        let fp = e.from_port.as_ref();
+        let tp = e.to_port.as_ref();
+        assert_eq!(fp.and_then(|p| p.pinned_side()), *fs, "from_side for: {attrs}");
+        assert_eq!(fp.and_then(|p| p.order_key()), *fsl, "from_slot for: {attrs}");
+        assert_eq!(tp.and_then(|p| p.pinned_side()), *ts, "to_side for: {attrs}");
+        assert_eq!(tp.and_then(|p| p.order_key()), *tsl, "to_slot for: {attrs}");
     }
 }
 
@@ -494,7 +494,7 @@ fn node_role_lift() {
     let n = g.nodes.iter().find(|n| n.id == "a").unwrap();
     assert_eq!(n.role, NodeRole::GroupAnchor);
     assert_eq!(n.host_group.as_deref(), Some("g"));
-    assert_eq!(n.anchor.unwrap().side, Side::North);
+    assert_eq!(n.anchor.as_ref().unwrap().pinned_side(), Some(Side::North));
     // Structural keys removed from attrs
     assert!(!n.attrs.contains_key("role"));
     assert!(!n.attrs.contains_key("host_group"));
@@ -565,8 +565,8 @@ fn group_frame_edge_ports_lifted() {
         @fe -> @be { from_side: east, to_side: west }
     }"#);
     let e = &out.graph.edges[0];
-    assert_eq!(e.from_port.as_ref().map(|p| p.side), Some(Side::East));
-    assert_eq!(e.to_port.as_ref().map(|p| p.side), Some(Side::West));
+    assert_eq!(e.from_port.as_ref().and_then(|p| p.pinned_side()), Some(Side::East));
+    assert_eq!(e.to_port.as_ref().and_then(|p| p.pinned_side()), Some(Side::West));
 }
 
 #[test]
@@ -705,8 +705,8 @@ fn combined_real_world_flowchart() {
 
     // Port lift on ok->pay
     let ok_pay = out.graph.edges.iter().find(|e| e.source == "ok" && e.target == "pay").unwrap();
-    assert_eq!(ok_pay.from_port.unwrap().side, Side::South);
-    assert_eq!(ok_pay.to_port.unwrap().side, Side::North);
+    assert_eq!(ok_pay.from_port.as_ref().unwrap().pinned_side(), Some(Side::South));
+    assert_eq!(ok_pay.to_port.as_ref().unwrap().pinned_side(), Some(Side::North));
 }
 
 // ─── edge_routing 声明（§10.2）─────────────────────────────────────────────────────────

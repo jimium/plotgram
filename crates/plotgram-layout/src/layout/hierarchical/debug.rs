@@ -188,9 +188,11 @@ pub struct PortDebug {
     pub end: &'static str,
     pub node: String,
     pub side: String,
-    pub slot: u32,
+    /// Relative order within the (node, side) group; `None` for
+    /// Ratio / LocalOffset pins (they carry no order).
+    pub slot: Option<u32>,
     pub point: Point,
-    /// Fixed vocabulary aligned with the two-tier `PortConstraint`.
+    /// Fixed vocabulary aligned with the five-tier `PortConstraint`.
     pub constraint: &'static str,
 }
 
@@ -493,8 +495,8 @@ fn project_ports(
             None => continue,
         };
         for (end, node_idx, resolved, constraint) in [
-            ("source", e.original_source, edge_ports.source, e.from_port),
-            ("target", e.original_target, edge_ports.target, e.to_port),
+            ("source", e.original_source, edge_ports.source, e.from_port.clone()),
+            ("target", e.original_target, edge_ports.target, e.to_port.clone()),
         ] {
             let elem = cap.plan.index_of
                 [&ElemKey::Real(cap.real_graph.ids[node_idx].clone())];
@@ -505,13 +507,28 @@ fn project_ports(
                 end,
                 node: cap.real_graph.ids[node_idx].clone(),
                 side: side_str(side),
-                slot: resolved.slot,
+                slot: match resolved.along {
+                    plotgram_model::port::AlongSpec::Ordered { order, .. } => Some(order),
+                    _ => None,
+                },
                 point: phys_point(canonical_anchor),
-                constraint: if constraint.is_some() { "fixed" } else { "free" },
+                constraint: constraint_str(constraint.as_ref()),
             });
         }
     }
     out
+}
+
+fn constraint_str(constraint: Option<&plotgram_model::port::PortConstraint>) -> &'static str {
+    use plotgram_model::port::PortConstraint::*;
+    match constraint {
+        None => "free",
+        Some(FixedSide { .. }) => "fixed-side",
+        Some(FixedOrder { .. }) => "fixed-order",
+        Some(FixedRatio { .. }) => "fixed-ratio",
+        Some(FixedPos { .. }) => "fixed-pos",
+        Some(Candidates { .. }) => "candidates",
+    }
 }
 
 fn side_str(side: plotgram_model::port::Side) -> String {

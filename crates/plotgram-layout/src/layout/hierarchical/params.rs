@@ -43,11 +43,29 @@ pub enum GroupPolicy {
     StrongMacro,
 }
 
+impl GroupPolicy {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Weak => "weak",
+            Self::StrongMacro => "strong-macro",
+        }
+    }
+}
+
 /// Same-rank group frame width policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GroupSizing {
     Fit,
     Equal,
+}
+
+impl GroupSizing {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Fit => "fit",
+            Self::Equal => "equal",
+        }
+    }
 }
 
 /// Macro-row / inter-group alignment.
@@ -56,6 +74,16 @@ pub enum GroupAlign {
     Start,
     Center,
     End,
+}
+
+impl GroupAlign {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Start => "start",
+            Self::Center => "center",
+            Self::End => "end",
+        }
+    }
 }
 
 /// Built-in edge geometry style when Hier owns ink (`edge_routing` absent).
@@ -180,9 +208,9 @@ impl HierarchicalParams {
     /// Unknown keys become warnings (not errors). Bad types / bad atoms → error.
     pub fn bind(options: &AttrMap) -> Result<BindResult, LayoutError> {
         // Options this build cannot consume must not bind silently
-        // (architecture.md §1.1 + anti-pattern #13). Hard-fail like
-        // `group_policy: strong-macro` — a warning could not surface anyway
-        // (`LayoutOutput` has no diagnostics channel, mvp-scope note §0.1).
+        // (architecture.md §1.1 + anti-pattern #13). Unsupported stays a hard
+        // failure even though `LayoutDiagnostics` now exists — a warning is
+        // reserved for non-fatal observations, never for unsupported options.
         for key in ["edge_gap", "edge_distance", "group_sizing", "group_align"] {
             if options.contains_key(key) {
                 return Err(LayoutError::message(format!(
@@ -272,6 +300,39 @@ impl HierarchicalParams {
             warnings: binder.unknown_warnings(),
         })
     }
+
+    /// Deterministic `params_hash` (roadmap phase C; architecture.md §3.4:
+    /// attribute layout regressions to params vs code).
+    ///
+    /// FNV-1a 64 over a fixed-order canonical string — dependency-free and
+    /// stable across platforms/toolchains (`std::hash::DefaultHasher` gives
+    /// no such guarantee), WASM-safe. f64 fields use scientific notation so
+    /// formatting never diverges between builds.
+    pub fn hash(&self) -> String {
+        let canonical = format!(
+            "orientation={}|node_gap={:e}|layer_gap={:e}|edge_gap={:e}|\
+             routing_style={}|group_policy={}|group_sizing={}|group_align={}",
+            self.orientation.as_str(),
+            self.node_gap,
+            self.layer_gap,
+            self.edge_gap,
+            self.routing_style.as_str(),
+            self.group_policy.as_str(),
+            self.group_sizing.as_str(),
+            self.group_align.as_str(),
+        );
+        format!("{:016x}", fnv1a_64(canonical.as_bytes()))
+    }
+}
+
+/// FNV-1a 64-bit — small, deterministic, no deps (see [`HierarchicalParams::hash`]).
+fn fnv1a_64(bytes: &[u8]) -> u64 {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for &b in bytes {
+        hash ^= u64::from(b);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash
 }
 
 /// Result of [`HierarchicalParams::bind`].
@@ -285,4 +346,77 @@ pub struct BindResult {
 
 fn bind_err(err: BindError) -> LayoutError {
     LayoutError::message(err.message)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use plotgram_model::attr::AttrValue;
+
+    fn options_with(keys: &[&str]) -> AttrMap {
+        keys.iter()
+            .map(|k| ((*k).to_string(), AttrValue::Num(1.0)))
+            .collect()
+    }
+
+    #[test]
+    fn params_hash_is_deterministic_and_param_sensitive() {
+        let a = HierarchicalParams::default();
+        assert_eq!(a.hash(), a.hash());
+        assert_eq!(a.hash().len(), 16);
+        assert!(a.hash().chars().all(|c| c.is_ascii_hexdigit()));
+
+        // Any bound field change must move the hash (table over fields).
+        let variants = [
+            HierarchicalParams {
+                node_gap: a.node_gap + 1.0,
+                ..a
+            },
+            HierarchicalParams {
+                layer_gap: a.layer_gap + 1.0,
+                ..a
+            },
+            HierarchicalParams {
+                orientation: Orientation::LeftToRight,
+                ..a
+            },
+            HierarchicalParams {
+                routing_style: RoutingStyle::Polyline,
+                ..a
+            },
+            HierarchicalParams {
+                group_policy: GroupPolicy::StrongMacro,
+                ..a
+            },
+        ];
+        for v in &variants {
+            assert_ne!(a.hash(), v.hash(), "hash must track {v:?}");
+        }
+    }
+
+    #[test]
+    fn bind_surfaces_unknown_option_warnings() {
+        // Table: unknown keys in → one warning per key out (BTreeMap order).
+        let cases: &[(&[&str], &[&str])] = &[
+            (&[], &[]),
+            (&["bogus"], &["bogus"]),
+            (&["aaa", "zzz"], &["aaa", "zzz"]),
+        ];
+        for (keys, expected) in cases {
+            let bound = HierarchicalParams::bind(&options_with(keys)).unwrap();
+            assert_eq!(bound.warnings.len(), expected.len(), "keys={keys:?}");
+            for (w, key) in bound.warnings.iter().zip(*expected) {
+                assert!(w.message.contains(key), "{}", w.message);
+            }
+        }
+    }
+
+    #[test]
+    fn known_options_bind_without_warnings() {
+        let mut options = AttrMap::new();
+        options.insert("node_gap".to_string(), AttrValue::Num(30.0));
+        let bound = HierarchicalParams::bind(&options).unwrap();
+        assert!(bound.warnings.is_empty());
+        assert_eq!(bound.params.node_gap, 30.0);
+    }
 }

@@ -287,11 +287,11 @@ fn route_edge(
         path: EdgePath::polyline(points),
         from_port: Some(PortRef {
             side: pair.source.side,
-            slot: 0,
+            along: plotgram_model::port::AlongSpec::Ordered { order: 0, count: 1 },
         }),
         to_port: Some(PortRef {
             side: pair.target.side,
-            slot: 0,
+            along: plotgram_model::port::AlongSpec::Ordered { order: 0, count: 1 },
         }),
     })
 }

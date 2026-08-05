@@ -50,8 +50,8 @@ pub fn build_real_graph(graph: &Graph) -> RealGraph {
             working_source: s,
             working_target: t,
             reversed: false,
-            from_port: e.from_port,
-            to_port: e.to_port,
+            from_port: e.from_port.clone(),
+            to_port: e.to_port.clone(),
         });
     }
 

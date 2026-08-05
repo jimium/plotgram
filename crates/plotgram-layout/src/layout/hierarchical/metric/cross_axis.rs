@@ -373,7 +373,13 @@ mod tests {
         let segments = vec![seg("e0", 0, 0, 2), seg("e1", 0, 1, 3)];
         let plan = build_plan(elems, layers, segments);
         let graph = real_graph(&["a", "b", "c", "d"], &[("e0", 0, 2), ("e1", 1, 3)]);
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb);
+        let ports = assign_ports(
+            &graph,
+            &plan,
+            AlgoOrientation::Tb,
+            &vec![Size::new(20.0, 10.0); graph.ids.len()],
+        )
+        .unwrap();
 
         let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
             .expect("feasible");
@@ -409,7 +415,13 @@ mod tests {
         let segments = vec![seg("e0", 0, 0, 1), seg("e0", 1, 1, 2), seg("e0", 2, 2, 3)];
         let plan = build_plan(elems, layers, segments);
         let graph = real_graph(&["a", "b"], &[("e0", 0, 1)]);
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb);
+        let ports = assign_ports(
+            &graph,
+            &plan,
+            AlgoOrientation::Tb,
+            &vec![Size::new(20.0, 10.0); graph.ids.len()],
+        )
+        .unwrap();
 
         let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
             .expect("feasible");
@@ -445,7 +457,13 @@ mod tests {
             &["a", "b", "c", "done"],
             &[("e0", 0, 1), ("e1", 1, 2), ("e2", 2, 3)],
         );
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb);
+        let ports = assign_ports(
+            &graph,
+            &plan,
+            AlgoOrientation::Tb,
+            &vec![Size::new(20.0, 10.0); graph.ids.len()],
+        )
+        .unwrap();
 
         // Unequal widths make the packed-center ideals differ per elem, so
         // only the hard equality (not the soft ideal) can keep them aligned.
@@ -496,7 +514,13 @@ mod tests {
             &["hub", "a", "b", "c", "d", "b2"],
             &[("e0", 0, 1), ("e1", 0, 2), ("e2", 0, 3), ("e3", 0, 4), ("e4", 2, 5)],
         );
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb);
+        let ports = assign_ports(
+            &graph,
+            &plan,
+            AlgoOrientation::Tb,
+            &vec![Size::new(20.0, 10.0); graph.ids.len()],
+        )
+        .unwrap();
 
         let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
             .expect("feasible");
@@ -550,7 +574,13 @@ mod tests {
         ];
         let plan = build_plan(elems, layers, segments);
         let graph = real_graph(&["a", "b", "ca", "cb"], &[("ea", 0, 2), ("eb", 1, 3)]);
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb);
+        let ports = assign_ports(
+            &graph,
+            &plan,
+            AlgoOrientation::Tb,
+            &vec![Size::new(20.0, 10.0); graph.ids.len()],
+        )
+        .unwrap();
 
         let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
             .expect("crossing chains must not make the equality system infeasible");
@@ -589,7 +619,13 @@ mod tests {
             &["A", "B0", "B1", "B2"],
             &[("e0", 0, 1), ("e1", 0, 2), ("e2", 0, 3)],
         );
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb);
+        let ports = assign_ports(
+            &graph,
+            &plan,
+            AlgoOrientation::Tb,
+            &vec![Size::new(20.0, 10.0); graph.ids.len()],
+        )
+        .unwrap();
 
         let width = |e: usize| {
             if plan.elems[e].key.is_virtual() {
@@ -642,7 +678,13 @@ mod tests {
         let segments = vec![seg("e0", 0, 0, 1), seg("e0", 1, 1, 2), seg("e0", 2, 2, 3)];
         let plan = build_plan(elems, layers, segments);
         let graph = real_graph(&["A", "B"], &[("e0", 0, 1)]);
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb);
+        let ports = assign_ports(
+            &graph,
+            &plan,
+            AlgoOrientation::Tb,
+            &vec![Size::new(20.0, 10.0); graph.ids.len()],
+        )
+        .unwrap();
 
         let run = || {
             assign_cross_axis(

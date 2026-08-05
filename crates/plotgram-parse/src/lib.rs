@@ -215,15 +215,67 @@ diagram {
 }"#;
         let out = parse(source).unwrap();
         let edge = &out.graph.edges[0];
-        let from_port = edge.from_port.unwrap();
-        assert_eq!(from_port.side, Side::South);
-        assert_eq!(from_port.slot, Some(0));
-        let to_port = edge.to_port.unwrap();
-        assert_eq!(to_port.side, Side::North);
-        assert_eq!(to_port.slot, Some(1));
+        assert_eq!(
+            edge.from_port,
+            Some(plotgram_model::port::PortConstraint::FixedOrder {
+                side: Side::South,
+                order: 0
+            })
+        );
+        assert_eq!(
+            edge.to_port,
+            Some(plotgram_model::port::PortConstraint::FixedOrder {
+                side: Side::North,
+                order: 1
+            })
+        );
         // Structural keys removed from attrs
         assert!(!edge.attrs.contains_key("from_side"));
         assert!(!edge.attrs.contains_key("to_slot"));
+    }
+
+    #[test]
+    fn end_to_end_new_port_tier_lift() {
+        use plotgram_model::port::PortConstraint::*;
+        let source = r#"diagram {
+    node a { label: "A" }
+    node b { label: "B" }
+    node c { label: "C" }
+    a -> b { from_side: south, from_ratio: 0.25 }
+    b -> c { from_x: 12.0, from_y: 0.0 }
+    c -> a { to_sides: "south, east" }
+}"#;
+        let out = parse(source).unwrap();
+        let edges = &out.graph.edges;
+        assert_eq!(
+            edges[0].from_port,
+            Some(FixedRatio {
+                side: Side::South,
+                ratio: 0.25
+            })
+        );
+        assert_eq!(
+            edges[1].from_port,
+            Some(FixedPos {
+                local: plotgram_model::geometry::Point { x: 12.0, y: 0.0 }
+            })
+        );
+        assert_eq!(
+            edges[2].to_port,
+            Some(Candidates {
+                sides: vec![Side::South, Side::East]
+            })
+        );
+        // Tier keys are structural: lifted out of attrs.
+        assert!(!edges[0].attrs.contains_key("from_ratio"));
+        assert!(!edges[1].attrs.contains_key("from_x"));
+        assert!(!edges[2].attrs.contains_key("to_sides"));
+    }
+
+    #[test]
+    fn end_to_end_ratio_without_side_is_an_error() {
+        let err = parse("diagram { node a {} node b {} a -> b { from_ratio: 0.5 } }").unwrap_err();
+        assert!(matches!(err, ParseError::Port(_)));
     }
 
     #[test]

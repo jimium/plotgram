@@ -7,6 +7,7 @@
 //! - `partition`: PartitionGrid / PartitionCell (ADR-008 orthogonal swimlanes / matrix)
 //! - `port`: Side, PortConstraint, PortRef (dsl-spec §7.4)
 //! - `contract`: AlgorithmRef, LayoutContract (engine entry — no profile name)
+//! - `diagnostics`: LayoutDiagnostics (warnings / relaxations / params_hash)
 //! - `sizes`: NodeSizes (preferred sizes measured before layout)
 //! - `result`: LayoutResult (geometry; EdgePlacement carries resolved PortRef)
 //! - `render`: RenderMeta, RenderInput (renderer entry — graph + layout + chrome)
@@ -18,6 +19,7 @@
 pub mod archetype;
 pub mod attr;
 pub mod contract;
+pub mod diagnostics;
 pub mod geometry;
 pub mod graph;
 pub mod partition;

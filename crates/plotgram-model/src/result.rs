@@ -4,6 +4,7 @@
 //! The renderer also needs the original [`crate::graph::Graph`] (shape / variant /
 //! arrow / style) plus [`crate::render::RenderMeta`] — see [`crate::render::RenderInput`].
 
+use crate::diagnostics::LayoutDiagnostics;
 use crate::geometry::{Point, Rect};
 use crate::port::PortRef;
 
@@ -172,4 +173,8 @@ pub struct LayoutResult {
     pub labels: Vec<LabelSlot>,
     pub canvas_width: f64,
     pub canvas_height: f64,
+    /// Structured observations from the layout run (roadmap phase C).
+    /// Never affects geometry; `#[serde(default)]` keeps older JSON readable.
+    #[serde(default)]
+    pub diagnostics: LayoutDiagnostics,
 }

@@ -24,12 +24,12 @@ FAS 含环入口规则：声明序靠前的节点优先靠上（环 reroot，[ar
 
 | 缺口 | 观感 / 产品影响 |
 |------|-----------------|
-| 端口侧别推断仅 North/South（写者 ports.rs）；反向走廊边无 East/West 入口 | 回边被迫从节点头顶进入，多两折点 |
+| 多 rank 反向走廊边仍走 rank 方向侧别（写者 ports.rs）；跨轴出针需 Channel 消费才不增折点（阶段 B 已落地无 dummy 链回边的 East/West，见 G3） | 长回边走 dummy 链走廊；Channel（D₁）前跨轴侧别会增折点，故暂不启用 |
+| strong-port projection（port dummy 进 ordering）与 label/loop reserve（M2 余项） | 端口序不参与列位决议；标签/自环保留空间未建模（留 C/D 阶段） |
 | ordering 落选孩子 / 多父节点的列位（写者 order.rs） | 分支边大 Z（如落选孩子不在父节点出端口正下方） |
 | 无完整 Channel / track / rip-up | 密边拥塞只能硬挤 |
 | 组框后验 bbox；无 Gate/Scope | 跨组边可贴框 / 穿框 |
 | StrongMacro / PartitionGrid 未消费 | 架构图 / 泳道类能力未到位 |
-| 无 Diagnostics 出口 | relaxation / Unsupported 不可观测 |
 
 **总方向**：先收口「长边更直」与可观测性，再按产品主痛点二选一推进 Channel 或组框写权；StrongMacro / Partition / 完整 labeling 后置。
 
@@ -87,6 +87,8 @@ MVP ──► A 次轴拉直 ──► B 端口补齐 ──► C 诊断出口
 
 **刻意不做**：Ink `unwrap_or` 默认侧；用 slot 同时当像素真源。
 
+**已收口（阶段 B 落地摘要）**：五档 `PortConstraint`/`AlongSpec` IR（Free/FixedSide/FixedOrder/FixedRatio/FixedPos/Candidates）；DSL 十二键 lift + 同端档位互斥校验；Compose 决议（FREE 中心偏好、G3 仅对无 dummy 链回边选 East/West、FixedPos 实测尺寸硬校验、同侧强约束相容性硬失败）；Metric 按 `Ordered` 相对序稠密居中 / `Ratio` / `LocalOffset` 展开；Ink 只读零猜测。多 rank 回边的 East/West 与 strong-port projection / label-loop reserve 归入 §0 缺口表（留 C/D）。
+
 ---
 
 ## 4. 阶段 C — 诊断与契约出口
@@ -100,6 +102,15 @@ MVP ──► A 次轴拉直 ──► B 端口补齐 ──► C 诊断出口
 - 为后续 verifier（Plan / Metric / Ink）留稳定报告字段
 
 **刻意不做**：用墙钟超时改变布局结果；用日志替代结构化诊断。
+
+**已收口（阶段 C 落地摘要）**：`plotgram-model::diagnostics::LayoutDiagnostics`
+（warnings / relaxations / params_hash）进 `LayoutOutput` 与 `LayoutResult`；
+hierarchical bind 的未知 option warning 透出（此前被丢弃），`params_hash`
+为 FNV-1a 64 对 canonical 参数串的确定性哈希（归因参数 vs 代码）。
+Unsupported / Infeasible 硬失败语义不变；relaxations 通道已立、暂无生产方
+（D 阶段 rip-up 等首批消费）。出口：CLI render stderr warnings、measure
+JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
+（debug-inspector.md §5.5）。验收：hier_eval 与全部快照几何零变化。
 
 ---
 
@@ -115,6 +126,7 @@ MVP ──► A 次轴拉直 ──► B 端口补齐 ──► C 诊断出口
 - track order + DemandBoard（MetricBudget）
 - 有界 rip-up / history cost；InkVerifier（不穿节点、非 bundle 不非法重合）
 - 恢复并真正消费 `edge_gap` 等 track 相关参数
+- 同批获得真消费方的边参数（写权与验收见 [edge-parameters.md](edge-parameters.md) §4 第四批）：回边外侧走廊（backloop 语义）、`min_first/last_segment`、`bus_routing`
 
 **何时选**：产品痛点是边挤、弯多、需要走廊分配，而不是组框合法性。
 
@@ -164,6 +176,7 @@ MVP ──► A 次轴拉直 ──► B 端口补齐 ──► C 诊断出口
 | [architecture.md](architecture.md) | 目标架构与 M0–M5 设计里程碑 |
 | [notes/2026-08-02-mvp-scope.md](notes/2026-08-02-mvp-scope.md) | MVP 实现相对架构的取舍记录 |
 | [scope.md](scope.md) | 能力 / 非目标 / 典型域 |
+| [edge-parameters.md](edge-parameters.md) | 边参数支持研究（对照 yFiles Edges 分组）+ 分批实施路线 |
 | [phases/](phases/) | 相级可执行契约 |
 
 代码入口（重建）：`crates/plotgram-layout/src/layout/hierarchical/`。

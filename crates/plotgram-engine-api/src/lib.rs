@@ -12,6 +12,7 @@ pub mod scene;
 mod traits;
 
 pub use error::LayoutError;
+pub use plotgram_model::diagnostics::{LayoutDiagnostics, LayoutWarning, Relaxation};
 pub use scene::{
     BoundaryCrossing, CrossingDirection, GroupBoundary, Obstacle, OrthogonalRouteParams,
     PortAnchor, RouteScene, TerminalPair,

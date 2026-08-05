@@ -195,6 +195,7 @@ fn build_input(theme: Option<&str>, render_style: Option<&str>) -> RenderInput {
         labels,
         canvas_width: 740.0,
         canvas_height: 420.0,
+        diagnostics: Default::default(),
     };
 
     RenderInput {

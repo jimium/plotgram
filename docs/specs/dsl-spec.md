@@ -738,7 +738,7 @@ api -> db {
 | **head_label** | `head_label: <string>` | 靠近**目标**端标签（如 ER 基数 `1`） |
 | **tail_label** | `tail_label: <string>` | 靠近**源**端标签（如 ER 基数 `N`） |
 | **variant** | `variant: <atom>` | 视觉变体（颜料）；查主题 `variants`（§14.7 封闭集） |
-| **from_side** / **to_side** / **from_slot** / **to_slot** | 见 §7.4 | 端口约束 → 提升为 `Edge.from_port` / `to_port`（**`active`**） |
+| **from_side** / **to_side** / **from_slot** / **to_slot** / **from_ratio** / **to_ratio** / **from_x**+**from_y** / **to_x**+**to_y** / **from_sides** / **to_sides** | 见 §7.4 | 端口约束（五档）→ 提升为 `Edge.from_port` / `to_port`（**`active`**） |
 | **edge_group** | `edge_group: <atom\|string>` | 边组/总线 id → 提升为 `Edge.edge_group`（**`active`**） |
 | **style.\*** | `style.<prop>: …` | 内联颜料；词表见 style-sheet-spec §5 |
 | **meta.\*** | `meta.<key>: …` | 渲染器忽略 |
@@ -757,15 +757,27 @@ api -> db {
 #### 7.4.1 模型（IR / 引擎）
 
 ```
-PortConstraint = { side: Side, slot: Option<u32> }   // 作者钉死；落在 Edge.from_port / to_port
-PortRef        = { side: Side, slot: u32 }           // 已决议；落在 EdgePlacement
-Side           = north | south | east | west
+PortConstraint =                               // 作者钉死；落在 Edge.from_port / to_port
+    | FixedSide   { side }
+    | FixedOrder  { side, order: u32 }         // order 只表达同侧相对序，不是像素真源
+    | FixedRatio  { side, ratio: f64 }         // 有限且 ∈ [0,1]
+    | FixedPos    { local: Point }             // 节点局部坐标；须落在边界容差内
+    | Candidates  { sides: Vec<Side> }         // 候选侧集；非空、去重
+// 未写端口 = FREE（None）：侧别与档位全部由算法推断
+
+PortRef = { side: Side, along: AlongSpec }     // 已决议；落在 EdgePlacement
+AlongSpec =
+    | Ordered { order: u32, count: u32 }       // 组内相对序；Metric 按 (order+1)/(count+1) 展开
+    | Ratio(f64)                               // 沿边线性比例落点
+    | LocalOffset(Point)                       // 节点局部边界点
+Side    = north | south | east | west
 ```
 
 | 字段 | 含义 |
 |------|------|
 | `side` | 锚在节点的哪条边（封闭四向） |
-| `slot` | 同侧离散档位；约束里可省略（算法在该侧内分配）；决议后必有值 |
+| `order` | 同侧**相对序**档位；约束里可省略（算法在该侧内分配）。只表达顺序，**不是像素坐标** |
+| `along` | 决议后的沿边规格；像素由 Metric 展开（`Ordered` 稠密居中 / `Ratio` / `LocalOffset`） |
 
 **写权（硬纪律）：**
 
@@ -785,18 +797,30 @@ Side           = north | south | east | west
 
 | 属性键 | 类型 | 说明 |
 |--------|------|------|
-| `from_side` | atom（`north`/`south`/`east`/`west`） | 源端侧 |
+| `from_side` | atom（`north`/`south`/`east`/`west`） | 源端侧（FixedSide） |
 | `to_side` | atom（同上） | 目标端侧 |
-| `from_slot` | number（非负整数） | 源端档位；省略则算法可在该侧内分配 |
-| `to_slot` | number（非负整数） | 目标端档位 |
+| `from_slot` | number（非负整数） | 源端相对序档位（FixedOrder）；省略则算法可在该侧内分配 |
+| `to_slot` | number（非负整数） | 目标端相对序档位 |
+| `from_ratio` | number（∈ [0,1]） | 源端沿边比例（FixedRatio）；须与 `from_side` 同写 |
+| `to_ratio` | number（同上） | 目标端沿边比例 |
+| `from_x` + `from_y` | number（成对） | 源端节点局部坐标（FixedPos）；须落在节点边界容差内，缺一即错 |
+| `to_x` + `to_y` | number（成对） | 目标端节点局部坐标 |
+| `from_sides` | string（逗号分隔 atom，如 `"south, east"`） | 源端候选侧集（Candidates）；封闭集校验、去重、非空 |
+| `to_sides` | string（同上） | 目标端候选侧集 |
 
 规则：
 
-1. **四者皆省略** → 两端端口完全由算法决定。  
-2. **只写 `*_side`** → 该端侧固定；`slot` 仍可由算法在该侧内分配。  
-3. **写了 `*_slot` 必须同时写对应 `*_side`** → 否则解析/校验错误。  
-4. **side + slot 都写** → 该端端口固定（布局须尊重；无法满足时显式降级/告警，禁止静默改侧）。  
-5. 未识别的 side atom → 校验错误（封闭集，不回退）。
+1. **全省略** → FREE：两端端口完全由算法决定（FREE 侧别推断：正排边沿 rank 方向；无 dummy 链的回边按对端 order 位选 East/West，见 roadmap G3）。  
+2. **只写 `*_side`** → 该端侧固定（FixedSide）；档位仍可由算法在该侧内分配。  
+3. **写了 `*_slot` 必须同时写对应 `*_side`** → 否则解析错误；`slot` 语义为同侧**相对序**（FixedOrder）。  
+4. **同一端档位键互斥**：`*_slot` / `*_ratio` / `*_x`+`*_y` / `*_sides` 只能选一档；既写 ratio 又写 slot 等冲突 → 解析错误。  
+5. **`*_ratio` 须配 `*_side`**，且值有限、∈ [0,1]；越界 → 校验错误。  
+6. **`*_x` / `*_y` 必须成对**（缺一即错）；组合相按实测节点尺寸校验点落在边界容差内，越界**硬失败**（不静默降级）。  
+7. **`*_sides`** 接受逗号分隔的 atom 字符串（AttrValue 无 list 类型）；空集或含未识别 side → 校验错误（封闭集，不回退）。  
+8. side + slot 都写 → 该端端口固定（布局须尊重；无法满足时显式降级/告警，禁止静默改侧）。  
+9. 未识别的 side atom → 校验错误（封闭集，不回退）。
+
+`Node.anchor` 复用同一档位枚举，但**仅允许 FixedSide / FixedOrder**；其余档位 → 校验错误。
 
 不引入 `@south` 箭头后缀；端口只走属性块。
 
@@ -1373,10 +1397,16 @@ variant **只**贡献 fill / stroke / font / dash / radius 等颜料；**不**�
 | `tail_label` | string | `active`（模型字段） | DSL 作者 | 提升为 `Edge.tail_label`；靠近源端 |
 | `variant` | atom（封闭集，见 §14.7） | **`planned`** | DSL 作者 | 主题 `variants` → 边颜料（仅 edge 适用键）；见 style-sheet-spec §6.2 |
 | `style.*` | 见 §14.9 | `active` | DSL 作者 | `apply_inline_edge_styles` |
-| `from_side` | atom：`north`/`south`/`east`/`west` | **`active`（模型字段）** | DSL 作者（可选约束） | 提升为 `Edge.from_port`；组合相读约束 |
+| `from_side` | atom：`north`/`south`/`east`/`west` | **`active`（模型字段）** | DSL 作者（可选约束） | 提升为 `Edge.from_port`（FixedSide）；组合相读约束 |
 | `to_side` | 同上 | **`active`（模型字段）** | DSL 作者 | 提升为 `Edge.to_port` |
-| `from_slot` | number（非负整数） | **`active`（模型字段）** | DSL 作者 | 并入 `from_port.slot` |
-| `to_slot` | 同上 | **`active`（模型字段）** | DSL 作者 | 并入 `to_port.slot` |
+| `from_slot` | number（非负整数） | **`active`（模型字段）** | DSL 作者 | 并入 `from_port`（FixedOrder；order 为相对序） |
+| `to_slot` | 同上 | **`active`（模型字段）** | DSL 作者 | 并入 `to_port`（FixedOrder） |
+| `from_ratio` | number（∈ [0,1]） | **`active`（模型字段）** | DSL 作者 | 并入 `from_port`（FixedRatio）；须配 `from_side` |
+| `to_ratio` | 同上 | **`active`（模型字段）** | DSL 作者 | 并入 `to_port`（FixedRatio） |
+| `from_x` / `from_y` | number（成对） | **`active`（模型字段）** | DSL 作者 | 并入 `from_port`（FixedPos）；边界容差校验，越界硬失败 |
+| `to_x` / `to_y` | number（成对） | **`active`（模型字段）** | DSL 作者 | 并入 `to_port`（FixedPos） |
+| `from_sides` | string（逗号分隔 atom） | **`active`（模型字段）** | DSL 作者 | 并入 `from_port`（Candidates）；封闭集、去重、非空 |
+| `to_sides` | string（同上） | **`active`（模型字段）** | DSL 作者 | 并入 `to_port`（Candidates） |
 | `edge_group` | atom 或 string | **`active`（模型字段）** | DSL 作者 | 提升为 `Edge.edge_group`；路由/Ink 合流 |
 | `meta.*` | 任意 | — | DSL 作者 | 无 |
 
@@ -1388,14 +1418,14 @@ variant **只**贡献 fill / stroke / font / dash / radius 等颜料；**不**�
 
 | 项 | 状态 |
 |----|------|
-| `Edge.from_port` / `to_port` / `edge_group` 一等字段 | **已落地**（plotgram-model） |
-| DSL 四键 + `edge_group` 校验与提升（`lift_structural_attrs`） | **已落地**（model API；parser 须调用） |
+| `Edge.from_port` / `to_port` / `edge_group` 一等字段（五档 `PortConstraint`） | **已落地**（plotgram-model） |
+| DSL 十二键（side/slot/ratio/x/y/sides × from/to）+ `edge_group` 校验与提升（`lift_structural_attrs`） | **已落地**（model API；parser 须调用；同端档位键互斥） |
 | `Node.role` / `host_group` / `anchor`（group_anchor） | **已落地**（plotgram-model；见 §5.7 / ADR-004） |
 | `Graph.partition` / `Node.partition_cell`（ADR-008） | **已落地**（plotgram-model + `validate_partition`；`cell_*` lift 已接） |
 | `partition { column/row … }` 块 parse | **planned** |
 | Hier 消费 PartitionGrid（连续块 / 层区间） | **planned** |
 | `@group` 糖展开（§7.6） | **待 parser** |
-| 布局组合相写入 `EdgePlacement` 的 `PortRef` | **待引擎** |
+| 布局组合相写入 `EdgePlacement` 的 `PortRef`（`side` + `along`：Ordered/Ratio/LocalOffset） | **已落地**（Hierarchical Compose `ports.rs` 唯一写者；Metric 展开像素；Ink 零猜测） |
 | Ink 零发明端口 / 锚点几何 | **纪律已定**；引擎实现时强制 |
 
 作者已钉死的 `PortConstraint` 在组合相落地前不得被渲染层「猜侧」冒充已决议。

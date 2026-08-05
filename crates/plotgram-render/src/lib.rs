@@ -194,6 +194,7 @@ mod tests {
             labels: vec![],
             canvas_width: 200.0,
             canvas_height: 200.0,
+            diagnostics: Default::default(),
         };
         RenderInput {
             graph,

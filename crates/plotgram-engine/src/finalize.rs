@@ -1,6 +1,7 @@
 //! Group envelopes, labels, canvas — after nodes/edges are final.
 
 use plotgram_router::core::union_rects;
+use plotgram_model::diagnostics::LayoutDiagnostics;
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::graph::Graph;
 use plotgram_model::result::{
@@ -18,6 +19,7 @@ pub fn finalize(
     graph: &Graph,
     mut nodes: Vec<NodePlacement>,
     mut edges: Vec<EdgePlacement>,
+    diagnostics: LayoutDiagnostics,
 ) -> LayoutResult {
     let mut groups = group_frames(graph, &nodes);
 
@@ -49,6 +51,7 @@ pub fn finalize(
         labels,
         canvas_width,
         canvas_height,
+        diagnostics,
     }
 }
 

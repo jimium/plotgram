@@ -246,6 +246,7 @@ mod tests {
             ],
             canvas_width: 360.0,
             canvas_height: 96.0,
+            diagnostics: Default::default(),
         };
         RenderInput {
             graph,
@@ -334,6 +335,7 @@ mod tests {
             ],
             canvas_width: 96.0,
             canvas_height: 156.0,
+            diagnostics: Default::default(),
         };
         let input = RenderInput {
             graph,

@@ -1,29 +1,45 @@
-//! P7 port finalize: FREE ports inferred from rank direction (canonical
-//! North/South only — this runs *inside* the TB-canonical core, see
-//! `orient.rs`); FIXED side/slot honored as authored (any of the 4 physical
-//! sides — converted into canonical TB space here via
-//! `Orientation::to_tb_side`, mirroring the `from_tb_side` pass in `mod.rs`
-//! on the way out; architecture.md §9.3).
+//! P7 port finalize — the single port writer (architecture.md §7,
+//! ports-and-channel.md §1–§2). Runs *inside* the TB-canonical core (see
+//! `orient.rs`); authored sides / local points are converted into canonical
+//! space here via `Orientation::to_tb_side` / `to_tb_point`, mirroring the
+//! `from_tb_*` pass in `mod.rs` on the way out (architecture.md §9.3).
 //!
-//! Slot order within a (node, side) group: opposite endpoint's
-//! `(neighbor_rank, neighbor_order, EdgeId)` (ports-and-channel.md §2 step 4).
+//! Five author tiers (plotgram_model::port::PortConstraint):
+//!
+//! - FREE (`None`) — side inferred; reversed (back) edges prefer the
+//!   cross-axis side facing their chain head so the corridor does not enter
+//!   the node over its head (roadmap G3);
+//! - FIXED_SIDE / FIXED_ORDER / FIXED_RATIO / FIXED_POS — honored as
+//!   authored; `Candidates` scores within the author's side set with the
+//!   same preference;
+//! - every tier resolves to a canonical `ResolvedPort` whose `along` spec is
+//!   expanded to pixels only by Metric (`metric/anchor.rs`) — never here.
+//!
+//! Ordered slot order within a (node, side) group: opposite endpoint's
+//! `(neighbor_rank, neighbor_order, EdgeId)` (ports-and-channel.md §2
+//! step 4). FREE ordered members take a centered slot run around pinned
+//! order keys (roadmap phase B: reduce meaningless micro-offsets).
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use plotgram_algo::orientation::{Orientation as AlgoOrientation, Side};
+use plotgram_algo::orientation::{Orientation as AlgoOrientation, Side, Size};
+use plotgram_engine_api::LayoutError;
+use plotgram_model::geometry::Point;
+use plotgram_model::port::{AlongSpec, PortConstraint};
 
 use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealGraph};
-use crate::layout::hierarchical::orient::to_algo_side;
+use crate::layout::hierarchical::orient::{from_algo_point, to_algo_point, to_algo_side};
+
+/// Tolerance for FIXED_POS boundary validation (px, canonical space).
+const POS_BOUNDARY_TOL: f64 = 1e-6;
 
 /// A finalized port, still in canonical (TB) space — `mod.rs`'s final
-/// orientation pass converts `side` to the physical `plotgram_model::port::Side`.
-/// `count` is the number of ports sharing this (node, side), needed by Ink to
-/// place the pixel anchor along the side.
+/// orientation pass converts `side` (and `LocalOffset`) back to physical
+/// space. Metric expands `along` to the pixel anchor; Ink only reads it.
 #[derive(Debug, Clone, Copy)]
 pub struct ResolvedPort {
     pub side: Side,
-    pub slot: u32,
-    pub count: u32,
+    pub along: AlongSpec,
 }
 
 pub struct EdgePorts {
@@ -51,46 +67,215 @@ fn immediate_neighbor(plan: &PlanGraph, edge_id: &str, real_idx: usize) -> usize
         .expect("real endpoint must have exactly one adjacent segment for its own edge")
 }
 
-/// One end (source or target) of one edge, resolved to a canonical side
-/// before slot assignment.
+/// FREE side inference (canonical TB). Forward edges follow the rank
+/// direction (downstream → South, upstream → North). Reversed (back) edges
+/// that have no dummy chain prefer the cross-axis side facing the opposite
+/// endpoint's order position — the corridor leaves
+/// sideways instead of over the node's head (roadmap G3). Multi-rank back
+/// edges keep the rank-direction side: their corridor runs through the
+/// dummy chain, and a sideways exit would add jogs until Channel routing
+/// (phase D) consumes cross-axis ports (roadmap §0: East/West coupled to
+/// Channel). Order positions are plan facts; no pixels are read
+/// (architecture.md §7.2).
+fn free_side(plan: &PlanGraph, pos: &[usize], node_real: usize, neighbor: usize, reversed: bool) -> Side {
+    let own_rank = plan.elems[node_real].rank;
+    let neighbor_rank = plan.elems[neighbor].rank;
+    let rank_dir = if neighbor_rank > own_rank {
+        Side::South
+    } else {
+        Side::North
+    };
+    if !reversed {
+        return rank_dir;
+    }
+    // G3 applies only to back edges without a dummy chain: the chain
+    // neighbor is then the other real endpoint (a virtual neighbor means a
+    // multi-rank span routed through dummies).
+    let no_dummy_chain = matches!(plan.elems[neighbor].key, ElemKey::Real(_));
+    if !no_dummy_chain {
+        return rank_dir;
+    }
+    match pos[neighbor].cmp(&pos[node_real]) {
+        std::cmp::Ordering::Less => Side::West,
+        std::cmp::Ordering::Greater => Side::East,
+        // Same order slot: fall back to the rank-direction side.
+        std::cmp::Ordering::Equal => rank_dir,
+    }
+}
+
+/// Full deterministic side preference given a primary pick: the primary
+/// first, then the remaining sides in fixed `Side` order (ties follow the
+/// fixed Side order — ports-and-channel.md §2 step 3).
+fn side_preference(primary: Side) -> [Side; 4] {
+    let rest: Vec<Side> = [Side::North, Side::South, Side::East, Side::West]
+        .into_iter()
+        .filter(|s| *s != primary)
+        .collect();
+    [primary, rest[0], rest[1], rest[2]]
+}
+
+/// One end (source or target) of one edge after tier resolution, still
+/// awaiting slot assignment for ordered tiers.
 struct EndPoint {
     edge_id: String,
     is_source_end: bool,
     node_real: usize,
     side: Side,
-    fixed_slot: Option<u32>,
+    /// Author order key (FIXED_ORDER only).
+    fixed_order: Option<u32>,
+    /// Non-ordered tiers resolve their `along` spec directly (Ratio /
+    /// LocalOffset); they do not participate in slot grouping.
+    along_fixed: Option<AlongSpec>,
     sort_key: (u32, usize, String), // (neighbor_rank, neighbor_order, edge_id)
 }
 
+/// Resolve the author constraint of one endpoint into a canonical side +
+/// tier facts. `node_id` / `real_idx` are only used for error messages.
+fn resolve_constraint(
+    constraint: Option<PortConstraint>,
+    orientation: AlgoOrientation,
+    canonical_size: Size,
+    node_id: &str,
+    edge_id: &str,
+    end: &str,
+) -> Result<(Side, Option<u32>, Option<AlongSpec>), LayoutError> {
+    let Some(c) = constraint else {
+        // FREE — the caller infers the side from the graph shape.
+        return Ok((Side::North, None, None));
+    };
+    match c {
+        PortConstraint::FixedSide { side } => {
+            Ok((orientation.to_tb_side(to_algo_side(side)), None, None))
+        }
+        PortConstraint::FixedOrder { side, order } => Ok((
+            orientation.to_tb_side(to_algo_side(side)),
+            Some(order),
+            None,
+        )),
+        PortConstraint::FixedRatio { side, ratio } => Ok((
+            orientation.to_tb_side(to_algo_side(side)),
+            None,
+            Some(AlongSpec::Ratio(ratio)),
+        )),
+        PortConstraint::FixedPos { local } => {
+            let canonical = from_algo_point(orientation.to_tb_point(to_algo_point(local)));
+            let (side, clamped) =
+                pos_on_boundary(canonical, canonical_size).ok_or_else(|| {
+                    LayoutError::message(format!(
+                        "hierarchical: edge `{edge_id}` {end} port FIXED_POS ({}, {}) \
+                         is not on node `{node_id}`'s boundary ({} x {} canonical); \
+                         refusing to silently drop the constraint",
+                        local.x, local.y, canonical_size.width, canonical_size.height
+                    ))
+                })?;
+            Ok((side, None, Some(AlongSpec::LocalOffset(clamped))))
+        }
+        PortConstraint::Candidates { .. } => {
+            // Handled by the caller (needs graph-shape scoring); unreachable here.
+            unreachable!("Candidates resolved by caller")
+        }
+    }
+}
+
+/// Side + clamped canonical local point for a FIXED_POS constraint.
+/// Returns `None` when the point is off-frame or in the interior. Corner
+/// points resolve by fixed priority: North, South, West, East.
+fn pos_on_boundary(p: Point, size: Size) -> Option<(Side, Point)> {
+    let w = size.width;
+    let h = size.height;
+    if w <= 0.0 || h <= 0.0 {
+        return None;
+    }
+    if p.x < -POS_BOUNDARY_TOL
+        || p.x > w + POS_BOUNDARY_TOL
+        || p.y < -POS_BOUNDARY_TOL
+        || p.y > h + POS_BOUNDARY_TOL
+    {
+        return None;
+    }
+    let x = p.x.clamp(0.0, w);
+    let y = p.y.clamp(0.0, h);
+    let on_left = x <= POS_BOUNDARY_TOL;
+    let on_right = x >= w - POS_BOUNDARY_TOL;
+    let on_top = y <= POS_BOUNDARY_TOL;
+    let on_bottom = y >= h - POS_BOUNDARY_TOL;
+    if !(on_left || on_right || on_top || on_bottom) {
+        return None; // interior point
+    }
+    let side = if on_top {
+        Side::North
+    } else if on_bottom {
+        Side::South
+    } else if on_left {
+        Side::West
+    } else {
+        Side::East
+    };
+    // Snap to the owning edge so Metric's anchor lands exactly on it.
+    let snapped = match side {
+        Side::North => Point { x, y: 0.0 },
+        Side::South => Point { x, y: h },
+        Side::West => Point { x: 0.0, y },
+        Side::East => Point { x: w, y },
+    };
+    Some((side, snapped))
+}
+
+/// P7 port finalize. `canonical_size` is indexed by real-node index
+/// (`graph.ids` order) and needed only for FIXED_POS validation.
 pub fn assign_ports(
     graph: &RealGraph,
     plan: &PlanGraph,
     orientation: AlgoOrientation,
-) -> BTreeMap<String, EdgePorts> {
+    canonical_size: &[Size],
+) -> Result<BTreeMap<String, EdgePorts>, LayoutError> {
     let pos = positions_within_layer(plan);
     let real_idx_of = |id: &str| plan.index_of[&ElemKey::Real(id.to_string())];
 
     let mut endpoints = Vec::with_capacity(graph.edges.len() * 2);
     for e in &graph.edges {
         for (is_source_end, node_id, constraint) in [
-            (true, &graph.ids[e.original_source], e.from_port),
-            (false, &graph.ids[e.original_target], e.to_port),
+            (true, &graph.ids[e.original_source], e.from_port.clone()),
+            (false, &graph.ids[e.original_target], e.to_port.clone()),
         ] {
             let node_real = real_idx_of(node_id);
             let neighbor = immediate_neighbor(plan, &e.edge_id, node_real);
-            let own_rank = plan.elems[node_real].rank;
             let neighbor_rank = plan.elems[neighbor].rank;
+            let real_idx = graph.index_of[node_id];
+            let end = if is_source_end { "source" } else { "target" };
 
-            let (side, fixed_slot) = match constraint {
-                // Authored sides are physical; the core is canonical TB.
-                Some(c) => (orientation.to_tb_side(to_algo_side(c.side)), c.slot),
-                None => {
-                    let inferred = if neighbor_rank > own_rank {
-                        Side::South
+            let (side, fixed_order, along_fixed) = match &constraint {
+                Some(PortConstraint::Candidates { sides }) => {
+                    let canonical: Vec<Side> = sides
+                        .iter()
+                        .map(|s| orientation.to_tb_side(to_algo_side(*s)))
+                        .collect();
+                    let primary = free_side(plan, &pos, node_real, neighbor, e.reversed);
+                    let pick = side_preference(primary)
+                        .into_iter()
+                        .find(|s| canonical.contains(s))
+                        .expect("candidate set is non-empty and covers all four sides' domain");
+                    (pick, None, None)
+                }
+                _ => {
+                    let (side, fixed_order, along_fixed) = resolve_constraint(
+                        constraint.clone(),
+                        orientation,
+                        canonical_size[real_idx],
+                        node_id,
+                        &e.edge_id,
+                        end,
+                    )?;
+                    if constraint.is_none() {
+                        // FREE: side from graph shape.
+                        (
+                            free_side(plan, &pos, node_real, neighbor, e.reversed),
+                            None,
+                            None,
+                        )
                     } else {
-                        Side::North
-                    };
-                    (inferred, None)
+                        (side, fixed_order, along_fixed)
+                    }
                 }
             };
 
@@ -99,32 +284,78 @@ pub fn assign_ports(
                 is_source_end,
                 node_real,
                 side,
-                fixed_slot,
+                fixed_order,
+                along_fixed,
                 sort_key: (neighbor_rank, pos[neighbor], e.edge_id.clone()),
             });
         }
     }
 
-    // Group by (node, side); assign slots within each group.
-    let mut groups: BTreeMap<(usize, Side), Vec<usize>> = BTreeMap::new(); // -> indices into `endpoints`
-    for (i, ep) in endpoints.iter().enumerate() {
-        groups.entry((ep.node_real, ep.side)).or_default().push(i);
+    // Strong-constraint compatibility on the same (node, side): identical
+    // Ratio / LocalOffset pins collide and are an input error — hard fail,
+    // never a silent merge (ports-and-channel.md §1.1).
+    let mut ratio_seen: BTreeSet<(usize, Side, u64)> = BTreeSet::new();
+    let mut pos_seen: BTreeSet<(usize, Side, u64, u64)> = BTreeSet::new();
+    for ep in &endpoints {
+        let key_node = ep.node_real;
+        match ep.along_fixed {
+            Some(AlongSpec::Ratio(r)) => {
+                let key = (key_node, ep.side, r.to_bits());
+                if !ratio_seen.insert(key) {
+                    return Err(LayoutError::message(format!(
+                        "hierarchical: edge `{}` pins ratio {r} on a side already pinned \
+                         with the same ratio; same-side strong constraints must be compatible",
+                        ep.edge_id
+                    )));
+                }
+            }
+            Some(AlongSpec::LocalOffset(p)) => {
+                let key = (key_node, ep.side, p.x.to_bits(), p.y.to_bits());
+                if !pos_seen.insert(key) {
+                    return Err(LayoutError::message(format!(
+                        "hierarchical: edge `{}` pins the same FIXED_POS point on the same \
+                         side as another edge; same-side strong constraints must be compatible",
+                        ep.edge_id
+                    )));
+                }
+            }
+            _ => {}
+        }
     }
 
-    let mut slot_of: Vec<u32> = vec![0; endpoints.len()];
-    let mut count_of: Vec<u32> = vec![0; endpoints.len()];
+    // Group ordered members by (node, side); assign slots within each group.
+    let mut groups: BTreeMap<(usize, Side), Vec<usize>> = BTreeMap::new(); // -> indices into `endpoints`
+    for (i, ep) in endpoints.iter().enumerate() {
+        if ep.along_fixed.is_none() {
+            groups.entry((ep.node_real, ep.side)).or_default().push(i);
+        }
+    }
+
+    let mut along_of: Vec<AlongSpec> = vec![AlongSpec::Ordered { order: 0, count: 1 }; endpoints.len()];
     for members in groups.into_values() {
         let taken: BTreeSet<u32> = members
             .iter()
-            .filter_map(|&i| endpoints[i].fixed_slot)
+            .filter_map(|&i| endpoints[i].fixed_order)
             .collect();
+
+        // FREE (unpinned) members in sort_key order take a slot run centered
+        // around the pinned order keys; with no pins the run starts at 0.
         let mut order = members.clone();
         order.sort_by(|&a, &b| endpoints[a].sort_key.cmp(&endpoints[b].sort_key));
+        let free_count = order.iter().filter(|&&i| endpoints[i].fixed_order.is_none()).count();
+        let start = match taken.iter().max() {
+            None => 0u32,
+            Some(&m) => {
+                let center = m as f64 / 2.0;
+                let s = (center - (free_count as f64 - 1.0) / 2.0).round();
+                (s.max(0.0)) as u32
+            }
+        };
 
-        let mut next_free = 0u32;
-        let mut max_slot = 0u32;
+        let mut slot_of_member: Vec<(u32, usize)> = Vec::with_capacity(members.len());
+        let mut next_free = start;
         for &i in &order {
-            let s = match endpoints[i].fixed_slot {
+            let s = match endpoints[i].fixed_order {
                 Some(s) => s,
                 None => {
                     while taken.contains(&next_free) {
@@ -135,12 +366,18 @@ pub fn assign_ports(
                     s
                 }
             };
-            slot_of[i] = s;
-            max_slot = max_slot.max(s);
+            slot_of_member.push((s, i));
         }
-        let count = (max_slot + 1).max(order.len() as u32);
-        for &i in &order {
-            count_of[i] = count;
+        // Rank = position in slot order (stable on slot ties → declaration
+        // order). Slots express relative order only; Metric expands the
+        // dense, centered pixel anchor from (order, count).
+        slot_of_member.sort_by_key(|&(s, _)| s);
+        let count = slot_of_member.len() as u32;
+        for (rank, &(_, i)) in slot_of_member.iter().enumerate() {
+            along_of[i] = AlongSpec::Ordered {
+                order: rank as u32,
+                count,
+            };
         }
     }
 
@@ -148,19 +385,16 @@ pub fn assign_ports(
     for (i, ep) in endpoints.iter().enumerate() {
         let port = ResolvedPort {
             side: ep.side,
-            slot: slot_of[i],
-            count: count_of[i],
+            along: ep.along_fixed.unwrap_or(along_of[i]),
         };
         let entry = out.entry(ep.edge_id.clone()).or_insert(EdgePorts {
             source: ResolvedPort {
                 side: Side::South,
-                slot: 0,
-                count: 1,
+                along: AlongSpec::Ordered { order: 0, count: 1 },
             },
             target: ResolvedPort {
                 side: Side::North,
-                slot: 0,
-                count: 1,
+                along: AlongSpec::Ordered { order: 0, count: 1 },
             },
         });
         if ep.is_source_end {
@@ -169,13 +403,14 @@ pub fn assign_ports(
             entry.target = port;
         }
     }
-    out
+    Ok(out)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::layout::hierarchical::model::{Elem, RealEdge, Segment};
+    use plotgram_model::port::Side as ModelSide;
 
     fn small_plan_and_graph() -> (RealGraph, PlanGraph) {
         let ids = vec!["a".to_string(), "b".to_string(), "c".to_string()];
@@ -261,33 +496,45 @@ mod tests {
         (graph, plan)
     }
 
+    fn sizes(n: usize) -> Vec<Size> {
+        vec![Size::new(40.0, 20.0); n]
+    }
+
+    fn ordered(port: ResolvedPort) -> (u32, u32) {
+        match port.along {
+            AlongSpec::Ordered { order, count } => (order, count),
+            other => panic!("expected Ordered, got {other:?}"),
+        }
+    }
+
     #[test]
     fn free_ports_infer_south_for_downstream_north_for_upstream() {
         let (graph, plan) = small_plan_and_graph();
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb);
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3)).unwrap();
         assert_eq!(ports["e0"].source.side, Side::South);
         assert_eq!(ports["e0"].target.side, Side::North);
         assert_eq!(ports["e1"].source.side, Side::South);
         // a has two outgoing (South) edges to b (order0) and c (order1):
-        // slots assigned by neighbor order.
-        assert_eq!(ports["e0"].source.slot, 0);
-        assert_eq!(ports["e1"].source.slot, 1);
+        // dense relative order follows the neighbor order.
+        assert_eq!(ordered(ports["e0"].source), (0, 2));
+        assert_eq!(ordered(ports["e1"].source), (1, 2));
     }
 
     #[test]
-    fn fixed_constraint_is_honored_and_free_slots_avoid_it() {
+    fn fixed_order_is_honored_and_free_orders_avoid_it() {
         let (graph, mut plan) = small_plan_and_graph();
         let mut graph = graph;
-        graph.edges[1].from_port = Some(plotgram_model::port::PortConstraint {
-            side: plotgram_model::port::Side::South,
-            slot: Some(0),
+        graph.edges[1].from_port = Some(PortConstraint::FixedOrder {
+            side: ModelSide::South,
+            order: 0,
         });
         let _ = &mut plan;
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb);
-        assert_eq!(ports["e1"].source.slot, 0);
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3)).unwrap();
+        assert_eq!(ordered(ports["e1"].source), (0, 2));
         assert_eq!(
-            ports["e0"].source.slot, 1,
-            "free slot must skip the taken fixed slot 0"
+            ordered(ports["e0"].source),
+            (1, 2),
+            "free member must sort after the pinned order key 0"
         );
     }
 
@@ -300,34 +547,15 @@ mod tests {
         // Bt flips North↔South; Rl ((x,y)→(y,-x)) maps South → East as well
         // but via the 4-cycle North→West→South→East; Tb is the identity.
         let cases = [
-            (
-                AlgoOrientation::Tb,
-                plotgram_model::port::Side::South,
-                Side::South,
-            ),
-            (
-                AlgoOrientation::Lr,
-                plotgram_model::port::Side::South,
-                Side::East,
-            ),
-            (
-                AlgoOrientation::Bt,
-                plotgram_model::port::Side::South,
-                Side::North,
-            ),
-            (
-                AlgoOrientation::Rl,
-                plotgram_model::port::Side::South,
-                Side::East,
-            ),
+            (AlgoOrientation::Tb, ModelSide::South, Side::South),
+            (AlgoOrientation::Lr, ModelSide::South, Side::East),
+            (AlgoOrientation::Bt, ModelSide::South, Side::North),
+            (AlgoOrientation::Rl, ModelSide::South, Side::East),
         ];
         for (orientation, authored, expected_canonical) in cases {
             let (mut graph, plan) = small_plan_and_graph();
-            graph.edges[0].from_port = Some(plotgram_model::port::PortConstraint {
-                side: authored,
-                slot: None,
-            });
-            let ports = assign_ports(&graph, &plan, orientation);
+            graph.edges[0].from_port = Some(PortConstraint::FixedSide { side: authored });
+            let ports = assign_ports(&graph, &plan, orientation, &sizes(3)).unwrap();
             assert_eq!(
                 ports["e0"].source.side,
                 expected_canonical,
@@ -341,5 +569,280 @@ mod tests {
                 "output transform must round-trip the authored side"
             );
         }
+    }
+
+    /// FREE center preference: a single free port is the group's center by
+    /// construction (dense expansion); around a high pinned key the free run
+    /// starts centered, not packed at slot 0.
+    #[test]
+    fn free_slots_center_around_pinned_order_keys() {
+        let (graph, plan) = small_plan_and_graph();
+        let mut graph = graph;
+        // Pin e1's source at order key 4 — two free? no: e0 free + e1 pinned.
+        graph.edges[1].from_port = Some(PortConstraint::FixedOrder {
+            side: ModelSide::South,
+            order: 4,
+        });
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3)).unwrap();
+        // Free run centered at 4/2 = 2 → e0 slot 2 < pinned 4 → order 0.
+        assert_eq!(ordered(ports["e0"].source), (0, 2));
+        assert_eq!(ordered(ports["e1"].source), (1, 2));
+    }
+
+    /// G3: a reversed (back) edge without a dummy chain has its FREE
+    /// endpoints leave via the cross-axis side facing the opposite
+    /// endpoint's order position — not over the node head.
+    #[test]
+    fn reversed_edge_free_ports_prefer_cross_axis_side() {
+        // Back edge a(rank 1) ← b(rank 0) reversed into working b→a; the
+        // single segment connects them directly. Layer positions: b at 0 in
+        // its layer, a at 1 in its layer (c occupies position 0) → at a the
+        // neighbor b (pos 0 < 1) is left → West; at b the neighbor a
+        // (pos 1 > 0) is right → East.
+        let ids = vec!["a".to_string(), "b".to_string()];
+        let index_of = ids
+            .iter()
+            .enumerate()
+            .map(|(i, id)| (id.clone(), i))
+            .collect();
+        let graph = RealGraph {
+            ids,
+            index_of,
+            group_path: vec![Vec::new(); 2],
+            edges: vec![RealEdge {
+                edge_id: "back".into(),
+                original_source: 0, // a
+                original_target: 1, // b
+                working_source: 1,
+                working_target: 0,
+                reversed: true,
+                from_port: None,
+                to_port: None,
+            }],
+            self_loops: Vec::new(),
+        };
+        let elems = vec![
+            Elem {
+                key: ElemKey::Real("b".into()),
+                group_path: Vec::new(),
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Real("c".into()),
+                group_path: Vec::new(),
+                rank: 1,
+            },
+            Elem {
+                key: ElemKey::Real("a".into()),
+                group_path: Vec::new(),
+                rank: 1,
+            },
+        ];
+        let plan_index = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of: plan_index,
+            decl_index: vec![0, 2],
+            segments: vec![Segment {
+                edge_id: "back".into(),
+                ordinal: 0,
+                from: 0, // working: b → a
+                to: 2,
+            }],
+            layers: vec![vec![0], vec![1, 2]],
+        };
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(2)).unwrap();
+        // a (node pos 1; neighbor b at pos 0 → left) → West.
+        assert_eq!(ports["back"].source.side, Side::West);
+        // b (node pos 0; neighbor a at pos 1 → right) → East.
+        assert_eq!(ports["back"].target.side, Side::East);
+    }
+
+    /// Multi-rank reversed edges (dummy chain present) keep the
+    /// rank-direction side — the cross-axis preference waits for Channel
+    /// routing (see `free_side` doc).
+    #[test]
+    fn long_reversed_edge_keeps_rank_direction_side() {
+        let ids = vec!["a".to_string(), "b".to_string()];
+        let index_of = ids
+            .iter()
+            .enumerate()
+            .map(|(i, id)| (id.clone(), i))
+            .collect();
+        let graph = RealGraph {
+            ids,
+            index_of,
+            group_path: vec![Vec::new(); 2],
+            edges: vec![RealEdge {
+                edge_id: "back".into(),
+                original_source: 0, // a (rank 2)
+                original_target: 1, // b (rank 0)
+                working_source: 1,
+                working_target: 0,
+                reversed: true,
+                from_port: None,
+                to_port: None,
+            }],
+            self_loops: Vec::new(),
+        };
+        // working b → a spans ranks 0..2 through a dummy at rank 1.
+        let elems = vec![
+            Elem {
+                key: ElemKey::Real("b".into()),
+                group_path: Vec::new(),
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Virtual {
+                    edge_id: "back".into(),
+                    ordinal: 0,
+                },
+                group_path: Vec::new(),
+                rank: 1,
+            },
+            Elem {
+                key: ElemKey::Real("a".into()),
+                group_path: Vec::new(),
+                rank: 2,
+            },
+        ];
+        let plan_index = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of: plan_index,
+            decl_index: vec![0, 2],
+            segments: vec![
+                Segment {
+                    edge_id: "back".into(),
+                    ordinal: 0,
+                    from: 0,
+                    to: 1,
+                },
+                Segment {
+                    edge_id: "back".into(),
+                    ordinal: 1,
+                    from: 1,
+                    to: 2,
+                },
+            ],
+            layers: vec![vec![0], vec![1], vec![2]],
+        };
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(2)).unwrap();
+        // a's chain neighbor is the rank-1 dummy (upstream) → North.
+        assert_eq!(ports["back"].source.side, Side::North);
+        // b's chain neighbor is the rank-1 dummy (downstream) → South.
+        assert_eq!(ports["back"].target.side, Side::South);
+    }
+
+    /// Candidates restrict the FREE scoring to the author's side set; the
+    /// primary (rank-direction) side wins when offered, otherwise the next
+    /// side in the fixed preference order.
+    #[test]
+    fn candidates_restrict_free_side_choice() {
+        let (graph, plan) = small_plan_and_graph();
+        let mut graph = graph;
+        // e0 source is downstream-preferring South; candidates without South
+        // → next in preference order (North).
+        graph.edges[0].from_port = Some(PortConstraint::Candidates {
+            sides: vec![ModelSide::West, ModelSide::North],
+        });
+        // e1 source offered South → keeps the primary.
+        graph.edges[1].from_port = Some(PortConstraint::Candidates {
+            sides: vec![ModelSide::South, ModelSide::East],
+        });
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3)).unwrap();
+        assert_eq!(ports["e0"].source.side, Side::North);
+        assert_eq!(ports["e1"].source.side, Side::South);
+    }
+
+    #[test]
+    fn fixed_ratio_resolves_to_ratio_along_spec() {
+        let (graph, plan) = small_plan_and_graph();
+        let mut graph = graph;
+        graph.edges[0].to_port = Some(PortConstraint::FixedRatio {
+            side: ModelSide::North,
+            ratio: 0.25,
+        });
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3)).unwrap();
+        assert_eq!(ports["e0"].target.side, Side::North);
+        assert_eq!(ports["e0"].target.along, AlongSpec::Ratio(0.25));
+    }
+
+    /// FIXED_POS table: boundary points resolve to the owning side and a
+    /// snapped local offset; interior / off-frame points are hard errors.
+    #[test]
+    fn fixed_pos_resolves_side_and_validates_boundary() {
+        // Canonical node size is 40 x 20 for all fixtures.
+        let cases = [
+            // (local point, expected side, expected offset)
+            (Point { x: 12.0, y: 0.0 }, Side::North, Point { x: 12.0, y: 0.0 }),
+            (Point { x: 12.0, y: 20.0 }, Side::South, Point { x: 12.0, y: 20.0 }),
+            (Point { x: 0.0, y: 7.0 }, Side::West, Point { x: 0.0, y: 7.0 }),
+            (Point { x: 40.0, y: 7.0 }, Side::East, Point { x: 40.0, y: 7.0 }),
+            // Corner: North wins by fixed priority.
+            (Point { x: 0.0, y: 0.0 }, Side::North, Point { x: 0.0, y: 0.0 }),
+        ];
+        for (local, want_side, want_offset) in cases {
+            let (graph, plan) = small_plan_and_graph();
+            let mut graph = graph;
+            graph.edges[0].from_port = Some(PortConstraint::FixedPos { local });
+            let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3)).unwrap();
+            assert_eq!(ports["e0"].source.side, want_side, "local {local:?}");
+            assert_eq!(
+                ports["e0"].source.along,
+                AlongSpec::LocalOffset(want_offset),
+                "local {local:?}"
+            );
+        }
+
+        for bad in [Point { x: 12.0, y: 10.0 }, Point { x: 99.0, y: 0.0 }] {
+            let (graph, plan) = small_plan_and_graph();
+            let mut graph = graph;
+            graph.edges[0].from_port = Some(PortConstraint::FixedPos { local: bad });
+            assert!(
+                assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3)).is_err(),
+                "FIXED_POS {bad:?} must hard-fail"
+            );
+        }
+    }
+
+    /// FIXED_POS canonicalizes through the orientation: authored physical
+    /// (0, 5) under Lr ((x,y)→(y,x)) lands at canonical (5, 0) = North edge.
+    #[test]
+    fn fixed_pos_is_canonicalized_for_orientation() {
+        let (graph, plan) = small_plan_and_graph();
+        let mut graph = graph;
+        graph.edges[0].from_port = Some(PortConstraint::FixedPos {
+            local: Point { x: 0.0, y: 5.0 },
+        });
+        // Lr canonical size swaps axes: 20 x 40.
+        let lr_sizes = vec![Size::new(20.0, 40.0); 3];
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Lr, &lr_sizes).unwrap();
+        assert_eq!(ports["e0"].source.side, Side::North);
+        assert_eq!(
+            ports["e0"].source.along,
+            AlongSpec::LocalOffset(Point { x: 5.0, y: 0.0 })
+        );
+    }
+
+    #[test]
+    fn duplicate_ratio_on_same_side_is_a_hard_error() {
+        let (graph, plan) = small_plan_and_graph();
+        let mut graph = graph;
+        for e in graph.edges.iter_mut() {
+            e.from_port = Some(PortConstraint::FixedRatio {
+                side: ModelSide::South,
+                ratio: 0.5,
+            });
+        }
+        assert!(assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3)).is_err());
     }
 }

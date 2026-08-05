@@ -7,8 +7,13 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
   "edges": [
     {
       "from_port": {
-        "side": "south",
-        "slot": 0
+        "along": {
+          "Ordered": {
+            "count": 2,
+            "order": 0
+          }
+        },
+        "side": "south"
       },
       "id": "e0",
       "path": {
@@ -36,14 +41,24 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "source": "a",
       "target": "b",
       "to_port": {
-        "side": "north",
-        "slot": 0
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "north"
       }
     },
     {
       "from_port": {
-        "side": "south",
-        "slot": 0
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "south"
       },
       "id": "e1",
       "path": {
@@ -63,14 +78,24 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "source": "b",
       "target": "c",
       "to_port": {
-        "side": "north",
-        "slot": 0
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "north"
       }
     },
     {
       "from_port": {
-        "side": "south",
-        "slot": 0
+        "along": {
+          "Ordered": {
+            "count": 1,
+            "order": 0
+          }
+        },
+        "side": "south"
       },
       "id": "e2",
       "path": {
@@ -98,14 +123,24 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "source": "c",
       "target": "d",
       "to_port": {
-        "side": "north",
-        "slot": 0
+        "along": {
+          "Ordered": {
+            "count": 2,
+            "order": 0
+          }
+        },
+        "side": "north"
       }
     },
     {
       "from_port": {
-        "side": "south",
-        "slot": 1
+        "along": {
+          "Ordered": {
+            "count": 2,
+            "order": 1
+          }
+        },
+        "side": "south"
       },
       "id": "e3",
       "path": {
@@ -141,8 +176,13 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "source": "a",
       "target": "d",
       "to_port": {
-        "side": "north",
-        "slot": 1
+        "along": {
+          "Ordered": {
+            "count": 2,
+            "order": 1
+          }
+        },
+        "side": "north"
       }
     }
   ],

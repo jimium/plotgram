@@ -175,7 +175,7 @@ ExtensionDebug =
 1. `extension.kind` 必须等于实现的**规范名**（Registry 主注册名）；`layout` 如实记录注册名。别名存在时（`architecture` → hierarchical 实现）`layout != kind` 合法；UI / 插件表按 `kind` 装载。  
 2. Common **不**承载 rank/lifeline 等算法私有概念。  
 3. 未知 `kind`：检视器仍可浏览 common + 原始 extension JSON；不得猜测叠层。  
-4. 字段原则：能算则填、不能则无——不设「占位」伪值（D6）；不为未来能力预立空字段（如参数 hash，待 Diagnostics 落地时一并加）。
+4. 字段原则：能算则填、不能则无——不设「占位」伪值（D6）；不为未来能力预立空字段（参数 hash 已随 Diagnostics 落地在 `LayoutDiagnostics.params_hash`，不进 Trace，见 §5.5）。
 
 ### 5.2 Common 字段（最小）
 
@@ -263,7 +263,7 @@ LayoutDiagnostics   → 警告 / 放宽 / 不可行（跨核目标）
 LayoutDebugTrace    → 决策结构可视化
 ```
 
-注意：`LayoutDiagnostics` 目前**尚无输出通道**（`LayoutOutput` 无此字段，见 hier mvp-scope §0.1），是未来项；Trace 不依赖它、不等它。两者落地后并列产出，不合并成单一根对象；UI 可分栏。
+注意：`LayoutDiagnostics` 已随 hier 阶段 C 落地（`plotgram-model::diagnostics`，经 `LayoutOutput` / `LayoutResult` 透出，见 hier roadmap §4）；Trace 不依赖它、不携带它。两者并列产出，不合并成单一根对象；UI 可分栏。
 
 ---
 

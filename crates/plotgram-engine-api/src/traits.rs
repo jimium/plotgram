@@ -1,6 +1,7 @@
 //! LayoutAlgorithm / EdgeRouter traits (yFiles-style roles).
 
 use plotgram_model::attr::AttrMap;
+use plotgram_model::diagnostics::LayoutDiagnostics;
 use plotgram_model::graph::Graph;
 use plotgram_model::result::{EdgePlacement, NodePlacement};
 use plotgram_model::sizes::NodeSizes;
@@ -36,6 +37,9 @@ pub struct LayoutOutput {
     /// When [`EdgeGeometryMode::DeferToRouter`], paths may be empty; ports should
     /// still be resolved when the layout owns port decisions.
     pub edges: Vec<EdgePlacement>,
+    /// Structured observations (warnings / relaxations / params_hash).
+    /// Never affects geometry; empty default for layouts without diagnostics.
+    pub diagnostics: LayoutDiagnostics,
 }
 
 /// Places nodes (and optionally routes edges with built-in ink).
