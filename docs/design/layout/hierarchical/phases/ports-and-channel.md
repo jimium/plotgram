@@ -82,6 +82,8 @@ Nested crossing 的序列必须与 scope path 一一对应。组内边不得离�
 
 ## 4. Channel Substrate
 
+> **D₁ 分阶段落地**见 [channel-d1.md](channel-d1.md)：D1.0 仅层间 TrackOrder（无全图 Substrate）；D1.1 起 root-scope-only Substrate；D1.2 接 Gate。本节描述目标全貌。
+
 Channel 在离散骨架上搜索：
 
 ```text
@@ -110,6 +112,8 @@ cost =
 - 禁止墙钟超时决定返回哪条 path。
 
 ## 6. TrackOrder
+
+> D1.0 先在 `RankGap(r)` 水平走廊上落地本节子集（固定拓扑模板 + 区间着色）；完整「先搜索再着色」自 D1.1。算法细则与 Bus 边界见 [channel-d1.md](channel-d1.md) §3、§5.1。
 
 搜索得到 L2 segment sequence 后，L3 写 track 次序：
 

@@ -1,0 +1,22 @@
+// auto_edge_grouping + bus_routing 同时开启
+// - 编排器扇出：端总线 SharedPort→Trunk→Bus→Stub（相邻层）
+// - 跨层汇入：Channel SharedCorridor（长程后缀轨）
+diagram {
+    profile: flowchart,
+    title: "端总线 + Channel 走廊（双开关）",
+    layout: hierarchical { auto_edge_grouping: true, bus_routing: true }
+
+    node orch { label: "编排器", archetype: process }
+    node pay { label: "支付", archetype: service }
+    node inv { label: "库存", archetype: service }
+    node ship { label: "物流", archetype: service }
+    node sink { label: "对账汇聚", archetype: process }
+
+    orch -> pay
+    orch -> inv
+    orch -> ship
+    // 长边直达汇点：走 Channel，可被 bus_routing 检测后缀合流
+    pay -> sink
+    inv -> sink
+    ship -> sink
+}

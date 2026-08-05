@@ -44,7 +44,7 @@ pub struct LayoutDiagnostics {
 ```
 
 - `params_hash` 是 FNV-1a 64 对 canonical 参数串的哈希：同一组绑定参数永远得到同一个值，任一参数变化都会换值。跨平台、跨工具链稳定（不用 `DefaultHasher`）。
-- **硬失败不进诊断**：Unsupported / Infeasible 永远是 `Err`（如 `edge_gap` 这类当前无消费者的 option、VPSC 不可行），不会悄悄变成 warning。
+- **硬失败不进诊断**：Unsupported / Infeasible 永远是 `Err`（如 `group_sizing` 这类当前无消费者的 option、VPSC 不可行），不会悄悄变成 warning。`edge_gap` 自 D1.0 起已有 TrackOrder 消费者，可正常 bind。
 
 ---
 

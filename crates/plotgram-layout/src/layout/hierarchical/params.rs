@@ -168,13 +168,10 @@ pub struct HierarchicalParams {
     pub node_gap: f64,
     /// Main-axis gap between consecutive layers.
     pub layer_gap: f64,
-    /// Reserved edge/track spacing demand (routing / measure).
+    /// Track pitch / edge-corridor spacing (D1.0 Channel TrackOrder).
     ///
-    /// **Not consumed in this build** — no Channel/track machinery exists yet
-    /// (mvp-scope note §2.5). Explicit DSL options are therefore rejected in
-    /// [`Self::bind`] (architecture.md §1.1: a bindable-but-unconsumed
-    /// parameter counts as unsupported); the field stays as the future
-    /// demand channel and is only ever written by preset packs.
+    /// Consumed as pitch between parallel horizontal tracks and as
+    /// MetricBudget LayerGap demand: `layer_gap + (track_count-1)×edge_gap`.
     pub edge_gap: f64,
     /// Built-in ink style (ignored when layout defers to an independent EdgeRouter).
     pub routing_style: RoutingStyle,
@@ -183,9 +180,20 @@ pub struct HierarchicalParams {
     /// share one port + bus trunk (SharedPort → Trunk → Bus → Stub).
     /// Default off.
     pub auto_edge_grouping: bool,
+    /// Channel-track long-range shared corridors (edge-parameters.md §2.4).
+    /// When on, shared ChannelPath suffixes become [`BundlePlan`] SharedCorridor
+    /// facts; TrackOrder forces one lane; Ink Verifier exempts co-members.
+    /// Independent of `auto_edge_grouping` (adjacent-layer end-bus).
+    pub bus_routing: bool,
+    /// Minimum length of the first segment leaving the source port (pixels).
+    /// `0` = off. Soft preference in Channel search (D1.2).
+    pub min_first_segment: f64,
+    /// Minimum length of the last segment entering the target port (pixels).
+    /// `0` = off.
+    pub min_last_segment: f64,
     pub group_policy: GroupPolicy,
     /// **Not consumed in this build** (no group-frame writer yet) — explicit
-    /// options rejected in [`Self::bind`]; see `edge_gap` above.
+    /// options rejected in [`Self::bind`].
     pub group_sizing: GroupSizing,
     /// **Not consumed in this build** — same treatment as `group_sizing`.
     pub group_align: GroupAlign,
@@ -200,6 +208,9 @@ impl Default for HierarchicalParams {
             edge_gap: 16.0,
             routing_style: RoutingStyle::Orthogonal,
             auto_edge_grouping: false,
+            bus_routing: false,
+            min_first_segment: 0.0,
+            min_last_segment: 0.0,
             group_policy: GroupPolicy::Weak,
             group_sizing: GroupSizing::Fit,
             group_align: GroupAlign::Center,
@@ -217,7 +228,7 @@ impl HierarchicalParams {
         // (architecture.md §1.1 + anti-pattern #13). Unsupported stays a hard
         // failure even though `LayoutDiagnostics` now exists — a warning is
         // reserved for non-fatal observations, never for unsupported options.
-        for key in ["edge_gap", "edge_distance", "group_sizing", "group_align"] {
+        for key in ["group_sizing", "group_align"] {
             if options.contains_key(key) {
                 return Err(LayoutError::message(format!(
                     "hierarchical: option `{key}` is unsupported in this build \
@@ -285,6 +296,12 @@ impl HierarchicalParams {
         {
             params.layer_gap = v;
         }
+        if let Some(v) = binder
+            .get_f64_any(&["edge_gap", "edge_distance"])
+            .map_err(bind_err)?
+        {
+            params.edge_gap = v;
+        }
 
         if let Some(rs) = binder
             .get_enum(
@@ -303,6 +320,22 @@ impl HierarchicalParams {
 
         if let Some(v) = binder.get_bool("auto_edge_grouping").map_err(bind_err)? {
             params.auto_edge_grouping = v;
+        }
+        if let Some(v) = binder.get_bool("bus_routing").map_err(bind_err)? {
+            params.bus_routing = v;
+        }
+
+        if let Some(v) = binder
+            .get_f64_any(&["min_first_segment"])
+            .map_err(bind_err)?
+        {
+            params.min_first_segment = v;
+        }
+        if let Some(v) = binder
+            .get_f64_any(&["min_last_segment"])
+            .map_err(bind_err)?
+        {
+            params.min_last_segment = v;
         }
 
         // Invalid combination (edge-parameters.md §2.4 discipline): grouping
@@ -345,7 +378,8 @@ impl HierarchicalParams {
     pub fn hash(&self) -> String {
         let canonical = format!(
             "orientation={}|node_gap={:e}|layer_gap={:e}|edge_gap={:e}|\
-             routing_style={}|auto_edge_grouping={}|\
+             routing_style={}|auto_edge_grouping={}|bus_routing={}|\
+             min_first_segment={:e}|min_last_segment={:e}|\
              group_policy={}|group_sizing={}|group_align={}",
             self.orientation.as_str(),
             self.node_gap,
@@ -353,6 +387,9 @@ impl HierarchicalParams {
             self.edge_gap,
             self.routing_style.as_str(),
             self.auto_edge_grouping,
+            self.bus_routing,
+            self.min_first_segment,
+            self.min_last_segment,
             self.group_policy.as_str(),
             self.group_sizing.as_str(),
             self.group_align.as_str(),
@@ -426,6 +463,18 @@ mod tests {
             },
             HierarchicalParams {
                 auto_edge_grouping: true,
+                ..a
+            },
+            HierarchicalParams {
+                bus_routing: true,
+                ..a
+            },
+            HierarchicalParams {
+                min_first_segment: 8.0,
+                ..a
+            },
+            HierarchicalParams {
+                min_last_segment: 8.0,
                 ..a
             },
         ];

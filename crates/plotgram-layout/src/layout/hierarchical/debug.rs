@@ -38,6 +38,11 @@ pub struct Captures<'a> {
     pub ports: BTreeMap<String, EdgePorts>,
     pub canonical_frames: Vec<Rect>,
     pub canonical_edges: Vec<CanonicalEdge>,
+    /// D1.2 Channel routes (edge_id → track id sequence).
+    pub channel_routes: BTreeMap<String, Vec<u32>>,
+    pub channel_track_count: usize,
+    /// True when group-cut Gate IR was active for this run.
+    pub channel_used_gates: bool,
     /// Normalize-stage translate applied to the product output; the
     /// projection applies the identical shift so trace geometry matches the
     /// product pixel-for-pixel.
@@ -104,11 +109,19 @@ pub struct HierarchicalExtension {
     pub metrics: MetricDebug,
 }
 
-/// Placeholder for M3; never constructed in this build.
-#[allow(dead_code)]
+/// D1.1 Channel debug sketch (root-scope; no Gate yet).
 #[derive(Debug, Clone, Serialize)]
 pub struct ChannelDebug {
     pub status: String,
+    pub substrate_tracks: usize,
+    pub routed_edges: usize,
+    pub routes: Vec<ChannelRouteDebug>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ChannelRouteDebug {
+    pub edge_id: String,
+    pub track_ids: Vec<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -370,14 +383,31 @@ fn project(layout_name: &str, cap: Captures<'_>) -> LayoutDebugTrace {
             layers,
             edge_plans,
             ports,
-            channels: None,
+            channels: Some(ChannelDebug {
+                status: if cap.channel_used_gates {
+                    "d1.2-gate".into()
+                } else {
+                    "d1.2-root-scope".into()
+                },
+                substrate_tracks: cap.channel_track_count,
+                routed_edges: cap.channel_routes.len(),
+                routes: cap
+                    .channel_routes
+                    .iter()
+                    .map(|(id, tracks)| ChannelRouteDebug {
+                        edge_id: id.clone(),
+                        track_ids: tracks.clone(),
+                    })
+                    .collect(),
+            }),
             metrics: MetricDebug {
                 node_gap: cap.params.node_gap,
                 layer_gap: cap.params.layer_gap,
             },
         },
         notes: vec![
-            "hierarchical: channel routing not implemented in this build".to_string(),
+            "hierarchical: D1.2 Channel (Gate/ScopeMask when group rects nest; bounded rip-up)"
+                .to_string(),
         ],
     }
 }

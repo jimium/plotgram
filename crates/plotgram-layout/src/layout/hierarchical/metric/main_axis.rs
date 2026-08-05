@@ -7,10 +7,13 @@ use crate::layout::hierarchical::model::PlanGraph;
 
 /// Per-elem canonical main-axis start (top edge for real nodes; the point's
 /// own coordinate for dummies, since their height is 0).
+///
+/// `layer_gaps[r]` is the main-axis gap between layer `r` and `r+1`
+/// (DemandBoard-resolved; length `layers.len() - 1`).
 pub fn assign_main_axis(
     plan: &PlanGraph,
     size_of: &dyn Fn(usize) -> Size,
-    layer_gap: f64,
+    layer_gaps: &[f64],
 ) -> Vec<f64> {
     let mut top = vec![0.0; plan.elems.len()];
     let mut cursor = 0.0;
@@ -24,7 +27,8 @@ pub fn assign_main_axis(
         }
         cursor += thickness;
         if r + 1 < plan.layers.len() {
-            cursor += layer_gap;
+            let gap = layer_gaps.get(r).copied().unwrap_or(0.0);
+            cursor += gap;
         }
     }
     top
@@ -73,7 +77,7 @@ mod tests {
             Size::new(10.0, 30.0),
             Size::new(10.0, 15.0),
         ];
-        let top = assign_main_axis(&plan, &|e| sizes[e], 40.0);
+        let top = assign_main_axis(&plan, &|e| sizes[e], &[40.0]);
         assert_eq!(top[0], 0.0);
         assert_eq!(top[1], 0.0);
         // layer0 thickness = max(20,30) = 30; next layer starts at 30+40
@@ -84,7 +88,21 @@ mod tests {
     fn no_trailing_gap_after_last_layer() {
         let plan = plan_with_ranks(&[0, 1]);
         let sizes = [Size::new(10.0, 10.0), Size::new(10.0, 10.0)];
-        let top = assign_main_axis(&plan, &|e| sizes[e], 5.0);
+        let top = assign_main_axis(&plan, &|e| sizes[e], &[5.0]);
         assert_eq!(top, vec![0.0, 15.0]);
+    }
+
+    #[test]
+    fn per_gap_demands_expand_later_layers() {
+        let plan = plan_with_ranks(&[0, 1, 2]);
+        let sizes = [
+            Size::new(10.0, 10.0),
+            Size::new(10.0, 10.0),
+            Size::new(10.0, 10.0),
+        ];
+        let top = assign_main_axis(&plan, &|e| sizes[e], &[40.0, 72.0]);
+        assert_eq!(top[0], 0.0);
+        assert_eq!(top[1], 50.0);
+        assert_eq!(top[2], 50.0 + 10.0 + 72.0);
     }
 }

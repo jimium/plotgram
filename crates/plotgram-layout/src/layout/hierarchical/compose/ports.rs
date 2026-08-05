@@ -48,7 +48,7 @@ pub struct EdgePorts {
     pub target: ResolvedPort,
     /// Automatic edge-grouping membership at the source end (edge-parameters
     /// §2.3 / yFiles bus-style). Members share one `PortPoint` and one
-    /// `BusPrefix` trunk; `index` is only the stable stub order.
+    /// [`BundlePlan`] trunk; `index` is only the stable stub order.
     pub source_cluster: Option<EndCluster>,
     pub target_cluster: Option<EndCluster>,
 }
@@ -61,22 +61,12 @@ pub struct EndCluster {
     pub index: u32,
 }
 
-/// Compose topology fact: ≥2 edges share a bus prefix/suffix at one end
-/// (SharedPort → Trunk → Bus → Stub). Ink joins; Metric writes `bus` main
-/// coordinate. Never invented in Ink.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BusPrefix {
-    /// `true` = source-end bus (fan-out); `false` = target-end (fan-in).
-    pub at_source: bool,
-    /// Edge ids in cluster neighbor-order (stable stub order).
-    pub members: Vec<String>,
-}
-
-/// Result of P7 port finalize: per-edge ports plus bus topology facts.
+/// Result of P7 port finalize: per-edge ports plus end-bus BundlePlan facts.
 #[derive(Debug)]
 pub struct PortAssignment {
     pub ports: BTreeMap<String, EdgePorts>,
-    pub bus_prefixes: Vec<BusPrefix>,
+    /// End-bus bundles from `auto_edge_grouping` (SourcePrefix / TargetSuffix).
+    pub bundles: Vec<crate::layout::hierarchical::compose::bundle::BundlePlan>,
 }
 
 fn positions_within_layer(plan: &PlanGraph) -> Vec<usize> {
@@ -371,7 +361,8 @@ pub fn assign_ports(
 
     let mut along_of: Vec<AlongSpec> = vec![AlongSpec::Ordered { order: 0, count: 1 }; endpoints.len()];
     let mut cluster_of: Vec<Option<EndCluster>> = vec![None; endpoints.len()];
-    let mut bus_prefixes: Vec<BusPrefix> = Vec::new();
+    let mut bundles: Vec<crate::layout::hierarchical::compose::bundle::BundlePlan> =
+        Vec::new();
     for members in groups.into_values() {
         let taken: BTreeSet<u32> = members
             .iter()
@@ -483,10 +474,27 @@ pub fn assign_ports(
                             index: idx as u32,
                         });
                     }
-                    bus_prefixes.push(BusPrefix {
-                        at_source: endpoints[c[0]].is_source_end,
-                        members: c.iter().map(|&i| endpoints[i].edge_id.clone()).collect(),
-                    });
+                    let members: Vec<String> =
+                        c.iter().map(|&i| endpoints[i].edge_id.clone()).collect();
+                    let at_source = endpoints[c[0]].is_source_end;
+                    let kind = if at_source {
+                        crate::layout::hierarchical::compose::bundle::BundleKind::SourcePrefix
+                    } else {
+                        crate::layout::hierarchical::compose::bundle::BundleKind::TargetSuffix
+                    };
+                    let id = format!(
+                        "end:{}:{}",
+                        if at_source { "src" } else { "tgt" },
+                        members.join("+")
+                    );
+                    bundles.push(
+                        crate::layout::hierarchical::compose::bundle::BundlePlan {
+                            id,
+                            kind,
+                            member_edges: members,
+                            shared_track_ids: Vec::new(),
+                        },
+                    );
                     slot_of_member.push((s, c.clone()));
                 }
             }
@@ -536,7 +544,7 @@ pub fn assign_ports(
 
     Ok(PortAssignment {
         ports: out,
-        bus_prefixes,
+        bundles,
     })
 }
 

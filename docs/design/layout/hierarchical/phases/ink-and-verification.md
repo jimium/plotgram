@@ -18,6 +18,8 @@ Ink 的职责是把 `Plan + Metric` 展开成可渲染几何。它可以写最�
 
 任一字段缺失是 `InternalInvariant`。禁止 `unwrap_or(default_side)`、猜中点或临时加 dogleg。
 
+orthogonal 路径**禁止**用两端中点 `mid_y`（或等价缺省）发明水平轨；弯折主轴坐标必须来自 Plan track order + Metric `track_coord`（D₁ 契约见 [channel-d1.md](channel-d1.md)）。缺 track 字段与缺 `RouteTopology` 同等对待 → `InternalInvariant`。
+
 ## 2. 展开流程
 
 ```text

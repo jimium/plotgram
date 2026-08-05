@@ -1,7 +1,7 @@
-//! Bus main-axis levels for automatic edge grouping (yFiles bus-style).
+//! Bus main-axis levels for end-bus BundlePlan (yFiles bus-style).
 //!
-//! Compose writes [`BusPrefix`] topology; Metric expands the shared trunk
-//! length into a main-axis coordinate. Ink only joins
+//! Compose writes [`BundlePlan`] SourcePrefix / TargetSuffix; Metric expands
+//! the shared trunk length into a main-axis coordinate. Ink only joins
 //! `SharedPort → Trunk → Bus → Stub` — it does not invent bus height.
 
 use std::collections::BTreeMap;
@@ -9,7 +9,8 @@ use std::collections::BTreeMap;
 use plotgram_algo::orientation::Side;
 use plotgram_model::geometry::Rect;
 
-use crate::layout::hierarchical::compose::ports::{BusPrefix, EdgePorts};
+use crate::layout::hierarchical::compose::bundle::BundlePlan;
+use crate::layout::hierarchical::compose::ports::EdgePorts;
 use crate::layout::hierarchical::metric::anchor::port_anchor;
 use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealGraph};
 
@@ -37,10 +38,9 @@ fn side_normal_y(side: Side) -> f64 {
     }
 }
 
-/// Expand each [`BusPrefix`] into a shared bus main-axis coordinate for all
-/// members. Frames must already be known (post cross-axis).
+/// Expand each end-bus [`BundlePlan`] into a shared bus main-axis coordinate.
 pub fn assign_bus_levels(
-    prefixes: &[BusPrefix],
+    bundles: &[BundlePlan],
     ports: &BTreeMap<String, EdgePorts>,
     graph: &RealGraph,
     plan: &PlanGraph,
@@ -48,18 +48,17 @@ pub fn assign_bus_levels(
     layer_gap: f64,
 ) -> BusLevels {
     let mut out = BusLevels::default();
-    for prefix in prefixes {
-        if prefix.members.len() < 2 {
+    for bundle in bundles {
+        if !bundle.is_end_bus() || bundle.member_edges.len() < 2 {
             continue;
         }
-        let lead = &prefix.members[0];
+        let lead = &bundle.member_edges[0];
         let rp = &ports[lead];
-        let (port, at_source) = if prefix.at_source {
+        let (port, at_source) = if bundle.at_source() {
             (rp.source, true)
         } else {
             (rp.target, false)
         };
-        // Only main-axis sides get a bus (Compose eligibility); skip others.
         if !matches!(port.side, Side::North | Side::South) {
             continue;
         }
@@ -75,14 +74,14 @@ pub fn assign_bus_levels(
         };
         let elem = plan.index_of[&ElemKey::Real(graph.ids[node_idx].clone())];
         let anchor = port_anchor(frames[elem], port);
-        let trunk = trunk_length(layer_gap, prefix.members.len());
+        let trunk = trunk_length(layer_gap, bundle.member_edges.len());
         let bus_y = anchor.y + side_normal_y(port.side) * trunk;
         let map = if at_source {
             &mut out.source
         } else {
             &mut out.target
         };
-        for id in &prefix.members {
+        for id in &bundle.member_edges {
             map.insert(id.clone(), bus_y);
         }
     }
@@ -95,9 +94,9 @@ mod tests {
 
     #[test]
     fn trunk_length_is_clamped_and_deterministic() {
-        assert_eq!(trunk_length(40.0, 2), 14.0); // 0.35*40=14
-        assert_eq!(trunk_length(10.0, 2), 12.0); // floor
-        assert_eq!(trunk_length(200.0, 2), 32.0); // ceil
-        assert_eq!(trunk_length(40.0, 4), 18.0); // +2 per extra beyond 2
+        assert_eq!(trunk_length(40.0, 2), 14.0);
+        assert_eq!(trunk_length(10.0, 2), 12.0);
+        assert_eq!(trunk_length(200.0, 2), 32.0);
+        assert_eq!(trunk_length(40.0, 4), 18.0);
     }
 }

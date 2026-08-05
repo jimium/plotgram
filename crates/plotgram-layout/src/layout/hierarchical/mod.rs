@@ -1,5 +1,6 @@
 //! Hierarchical layout algorithm (Sugiyama-style): FAS → Network-Simplex
-//! ranking → properify → median+transpose ordering → port finalize → main/
+//! ranking → properify → median+transpose ordering → port finalize →
+//! preliminary Metric → D1.0 TrackOrder + DemandBoard LayerGap → main/
 //! cross-axis coordinates (BK ideal + global VPSC, two passes) → orthogonal Ink.
 //!
 //! The core (`compose` / `metric` / `ink`) runs entirely in canonical
@@ -9,8 +10,10 @@
 //! contract and `docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md`
 //! for this implementation's scope decisions relative to it.
 
+mod channel;
 mod compose;
 mod debug;
+mod demand;
 mod ink;
 mod metric;
 mod model;
@@ -27,6 +30,7 @@ use plotgram_model::diagnostics::LayoutDiagnostics;
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::port::{AlongSpec, PortRef};
 use plotgram_model::result::{EdgePath, EdgePlacement, NodePlacement};
+use std::collections::BTreeMap;
 
 pub use params::{
     BindResult, GroupAlign, GroupPolicy, GroupSizing, HierarchicalParams, HierarchicalPreset,
@@ -60,7 +64,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
 
     // Diagnostics exit (roadmap phase C): bind warnings surface here instead
     // of being dropped; hard failures above/below stay hard failures.
-    let diagnostics = LayoutDiagnostics {
+    let mut diagnostics = LayoutDiagnostics {
         warnings: bound
             .warnings
             .iter()
@@ -68,7 +72,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
                 message: w.message.clone(),
             })
             .collect(),
-        relaxations: Vec::new(), // no soft relaxation in this build — channel reserved
+        relaxations: Vec::new(),
         params_hash: params.hash(),
     };
 
@@ -122,7 +126,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     )?;
     let compose::ports::PortAssignment {
         ports,
-        bus_prefixes,
+        bundles: end_bundles,
     } = port_assignment;
 
     // --- Metric ------------------------------------------------------
@@ -133,7 +137,19 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         }
     };
 
-    let main = metric::main_axis::assign_main_axis(&plan, &size_of, params.layer_gap);
+    // D1.2: Channel search + rip-up; BundlePlan (end-bus + optional corridor).
+    let route_plan =
+        channel::route_edges_channel(&plan, &real_graph, &ports, &end_bundles, params)?;
+    diagnostics.relaxations.extend(route_plan.relaxations.iter().cloned());
+
+    // Preliminary main (base layer_gap) so cross-axis pass-2 can expand
+    // port anchors; TrackOrder then reads pixel X and Demand expands gaps.
+    let prelim_gaps: Vec<f64> = if plan.layers.len() > 1 {
+        vec![params.layer_gap; plan.layers.len() - 1]
+    } else {
+        Vec::new()
+    };
+    let main_prelim = metric::main_axis::assign_main_axis(&plan, &size_of, &prelim_gaps);
     // Infeasibility here can only come from crossing BK blocks — a bug, not
     // a layout contingency: fail hard, never fall back (architecture.md §3.4).
     let cross = metric::cross_axis::assign_cross_axis(
@@ -141,12 +157,41 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         &real_graph,
         &ports,
         &size_of,
-        &main,
+        &main_prelim,
         params.node_gap,
     )
     .map_err(|e| {
         LayoutError::message(format!("hierarchical: cross-axis VPSC solve failed: {e}"))
     })?;
+
+    let prelim_frames: Vec<Rect> = (0..plan.elems.len())
+        .map(|i| {
+            let s = size_of(i);
+            Rect::new(
+                cross[i] - s.width / 2.0,
+                main_prelim[i],
+                s.width,
+                s.height,
+            )
+        })
+        .collect();
+
+    // D1.1 TrackOrder (L3) on substrate tracks from pixel spans.
+    let track_order = compose::track_order::assign_track_order(
+        &plan,
+        &real_graph,
+        &ports,
+        &prelim_frames,
+        &route_plan.bundles,
+        &route_plan,
+    );
+    let layer_gaps = demand::resolved_layer_gaps(
+        plan.layers.len(),
+        params.layer_gap,
+        params.edge_gap,
+        &track_order,
+    );
+    let main = metric::main_axis::assign_main_axis(&plan, &size_of, &layer_gaps);
 
     let canonical_frames: Vec<Rect> = (0..plan.elems.len())
         .map(|i| {
@@ -155,8 +200,18 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         })
         .collect();
 
+    let track_coords = metric::track::assign_track_coords(
+        &plan,
+        &main,
+        &cross,
+        &size_of,
+        &track_order,
+        &route_plan,
+        params.edge_gap,
+    );
+
     let bus_levels = metric::bus::assign_bus_levels(
-        &bus_prefixes,
+        &route_plan.bundles,
         &ports,
         &real_graph,
         &plan,
@@ -171,10 +226,14 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         &ports,
         &canonical_frames,
         &bus_levels,
+        &route_plan,
+        &track_order,
+        &track_coords,
         params.routing_style,
         params.layer_gap,
         params.node_gap,
     )?;
+    ink::verify::verify_no_illegal_overlap(&canonical_edges, &route_plan.bundles)?;
     canonical_edges.extend(ink::selfloop::self_loop_edges(
         &real_graph.self_loops,
         &real_graph.ids,
@@ -234,6 +293,20 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
             .collect(),
     };
 
+    let channel_track_count = route_plan.substrate.tracks().count();
+    let channel_used_gates = route_plan.used_gates;
+    let channel_routes: BTreeMap<String, Vec<u32>> = route_plan
+        .routes
+        .iter()
+        .map(|(id, topo)| {
+            let channel::RouteTopology::Orthogonal(path) = topo;
+            (
+                id.clone(),
+                path.tracks.iter().map(|t| t.0).collect(),
+            )
+        })
+        .collect();
+
     let captures = debug::Captures {
         orientation: params.orientation,
         params: *params,
@@ -243,6 +316,9 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         ports,
         canonical_frames,
         canonical_edges,
+        channel_routes,
+        channel_track_count,
+        channel_used_gates,
         shift,
     };
 

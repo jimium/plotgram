@@ -1,15 +1,15 @@
 //! P5 Ink: pure expansion of Plan + Metric into edge paths. Reads the
-//! dummy-chain waypoints and finalized ports; never invents a port side or a
-//! new bend beyond the mechanical elbow needed to connect two points that
-//! don't already share an axis (ink-and-verification.md §1, §4).
+//! dummy-chain waypoints, finalized ports, and D1.0 TrackOrder /
+//! TrackCoords; never invents a port side or a horizontal-track Y
+//! (ink-and-verification.md §1; channel-d1.md §5.1).
 //!
 //! Port anchors come exclusively from `metric::anchor::port_anchor` — Ink
 //! has no default-side fallback and never re-derives an anchor (M2: 无 Ink
 //! fallback / Ink 零猜测).
 //!
 //! Routing styles (edge-parameters.md §2.1):
-//! - **orthogonal** — elbow machinery + `normalize_orthogonal`; bus-grouped
-//!   ends join Compose `BusPrefix` + Metric bus levels into
+//! - **orthogonal** — TrackOrder rails + `normalize_orthogonal`; bus-grouped
+//!   ends join Compose [`BundlePlan`] + Metric bus levels into
 //!   SharedPort → Trunk → Bus → Stub (yFiles AutomaticEdgeGrouping);
 //! - **polyline** — waypoints connected by straight segments, no bend logic;
 //! - **curved** — one cubic Bézier between the two anchors; only main-axis
@@ -23,9 +23,14 @@ use plotgram_algo::orientation::Side;
 use plotgram_engine_api::LayoutError;
 use plotgram_model::geometry::{Point, Rect};
 
+use crate::layout::hierarchical::channel::{
+    ChannelPath, ChannelRoutePlan, RouteTopology, Substrate, TrackId, TrackOrient,
+};
 use crate::layout::hierarchical::compose::ports::{EdgePorts, ResolvedPort};
+use crate::layout::hierarchical::compose::track_order::TrackOrderPlan;
 use crate::layout::hierarchical::metric::anchor::port_anchor;
 use crate::layout::hierarchical::metric::bus::BusLevels;
+use crate::layout::hierarchical::metric::track::TrackCoords;
 use crate::layout::hierarchical::model::{PlanGraph, RealGraph, Segment};
 use crate::layout::hierarchical::orient::{from_algo_point, to_algo_point};
 use crate::layout::hierarchical::params::RoutingStyle;
@@ -96,17 +101,208 @@ fn chain_in_original_order(plan: &PlanGraph, edge_id: &str, reversed: bool) -> V
     chain
 }
 
-/// Jog between `from` and `to` when they don't already share an axis, via
-/// **two** bends at the vertical midpoint rather than one.
-fn append_bend(path: &mut Vec<Point>, to: Point) {
+/// Jog between `from` and `to` via a Metric track Y when they don't share
+/// an axis. Missing track when a jog is required is `InternalInvariant`.
+fn append_tracked(
+    path: &mut Vec<Point>,
+    to: Point,
+    track_y: Option<f64>,
+    edge_id: &str,
+) -> Result<(), LayoutError> {
     let from = *path.last().unwrap();
     if (from.x - to.x).abs() > 1e-9 && (from.y - to.y).abs() > 1e-9 {
-        let mid_y = (from.y + to.y) / 2.0;
+        let mid_y = track_y.ok_or_else(|| {
+            LayoutError::message(format!(
+                "hierarchical: edge `{edge_id}` needs a horizontal track but TrackOrder \
+                 has no assignment (InternalInvariant; channel-d1.md)"
+            ))
+        })?;
         path.push(Point {
             x: from.x,
             y: mid_y,
         });
         path.push(Point { x: to.x, y: mid_y });
+    }
+    path.push(to);
+    Ok(())
+}
+
+fn lane_coord(
+    edge_id: &str,
+    tid: TrackId,
+    track_order: &TrackOrderPlan,
+    track_coords: &TrackCoords,
+) -> Result<f64, LayoutError> {
+    let hop = track_order.assignments.get(&(edge_id.to_string(), tid));
+    let idx = hop.map(|h| h.track_index).unwrap_or(0);
+    track_coords.lane(tid, idx).ok_or_else(|| {
+        LayoutError::message(format!(
+            "hierarchical: edge `{edge_id}` missing Metric coord for track {:?}",
+            tid
+        ))
+    })
+}
+
+/// Expand a ChannelPath into an orthogonal polyline (D1.1).
+fn expand_channel_path(
+    start: Point,
+    end: Point,
+    channel: &ChannelPath,
+    substrate: &Substrate,
+    track_order: &TrackOrderPlan,
+    track_coords: &TrackCoords,
+    edge_id: &str,
+) -> Result<Vec<Point>, LayoutError> {
+    let tracks = &channel.tracks;
+    if tracks.is_empty() {
+        return Err(LayoutError::message(format!(
+            "hierarchical: edge `{edge_id}` has empty ChannelPath"
+        )));
+    }
+
+    // Fast path: single Cross rail (adjacent-layer template = D1.0).
+    if tracks.len() == 1 {
+        let tid = tracks[0];
+        let orient = substrate
+            .track(tid)
+            .map(|t| t.orient)
+            .ok_or_else(|| LayoutError::message("channel: unknown track"))?;
+        let mut path = vec![start];
+        match orient {
+            TrackOrient::Cross => {
+                let y = lane_coord(edge_id, tid, track_order, track_coords)?;
+                append_tracked(&mut path, end, Some(y), edge_id)?;
+            }
+            TrackOrient::Main => {
+                let x = lane_coord(edge_id, tid, track_order, track_coords)?;
+                if (start.x - x).abs() > 1e-9 {
+                    path.push(Point { x, y: start.y });
+                }
+                if (end.y - path.last().unwrap().y).abs() > 1e-9 {
+                    path.push(Point { x, y: end.y });
+                }
+                if path.last() != Some(&end) {
+                    path.push(end);
+                }
+            }
+        }
+        if path.last() != Some(&end) {
+            path.push(end);
+        }
+        return Ok(path);
+    }
+
+    // Multi-track: walk Main↔Cross junctions.
+    let mut path = vec![start];
+    let first = tracks[0];
+    let first_orient = substrate.track(first).unwrap().orient;
+    let first_c = lane_coord(edge_id, first, track_order, track_coords)?;
+    match first_orient {
+        TrackOrient::Cross => {
+            if (start.y - first_c).abs() > 1e-9 {
+                path.push(Point {
+                    x: start.x,
+                    y: first_c,
+                });
+            }
+        }
+        TrackOrient::Main => {
+            if (start.x - first_c).abs() > 1e-9 {
+                path.push(Point {
+                    x: first_c,
+                    y: start.y,
+                });
+            }
+        }
+    }
+
+    for w in tracks.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let ta = substrate.track(a).unwrap();
+        let tb = substrate.track(b).unwrap();
+        let ca = lane_coord(edge_id, a, track_order, track_coords)?;
+        let cb = lane_coord(edge_id, b, track_order, track_coords)?;
+        let prev = *path.last().unwrap();
+        match (ta.orient, tb.orient) {
+            (TrackOrient::Cross, TrackOrient::Main) => {
+                let junction = Point { x: cb, y: ca };
+                if (prev.x - junction.x).abs() > 1e-9 || (prev.y - junction.y).abs() > 1e-9 {
+                    if (prev.y - ca).abs() > 1e-9 {
+                        path.push(Point { x: prev.x, y: ca });
+                    }
+                    path.push(junction);
+                }
+            }
+            (TrackOrient::Main, TrackOrient::Cross) => {
+                let junction = Point { x: ca, y: cb };
+                if (prev.x - junction.x).abs() > 1e-9 || (prev.y - junction.y).abs() > 1e-9 {
+                    if (prev.x - ca).abs() > 1e-9 {
+                        path.push(Point { x: ca, y: prev.y });
+                    }
+                    path.push(junction);
+                }
+            }
+            // Gate: same-orient adjacent segments across a group boundary.
+            (TrackOrient::Cross, TrackOrient::Cross) => {
+                if (prev.y - ca).abs() > 1e-9 {
+                    path.push(Point { x: prev.x, y: ca });
+                }
+                if (ca - cb).abs() > 1e-9 {
+                    let cur = *path.last().unwrap();
+                    path.push(Point { x: cur.x, y: cb });
+                }
+            }
+            (TrackOrient::Main, TrackOrient::Main) => {
+                if (prev.x - ca).abs() > 1e-9 {
+                    path.push(Point { x: ca, y: prev.y });
+                }
+                if (ca - cb).abs() > 1e-9 {
+                    let cur = *path.last().unwrap();
+                    path.push(Point { x: cb, y: cur.y });
+                }
+            }
+        }
+    }
+
+    let last = *tracks.last().unwrap();
+    let last_orient = substrate.track(last).unwrap().orient;
+    let last_c = lane_coord(edge_id, last, track_order, track_coords)?;
+    let prev = *path.last().unwrap();
+    match last_orient {
+        TrackOrient::Cross => {
+            if (prev.x - end.x).abs() > 1e-9 {
+                path.push(Point {
+                    x: end.x,
+                    y: last_c,
+                });
+            }
+        }
+        TrackOrient::Main => {
+            if (prev.y - end.y).abs() > 1e-9 {
+                path.push(Point {
+                    x: last_c,
+                    y: end.y,
+                });
+            }
+        }
+    }
+    if path.last() != Some(&end) {
+        path.push(end);
+    }
+    Ok(path)
+}
+
+/// Bus-internal jog: horizontal rail is the bus Y already on the path, so a
+/// mid-gap track is not required. Still no invented mid_y — uses the last
+/// point's Y when already on a horizontal, otherwise requires axis share.
+fn append_bus_bend(path: &mut Vec<Point>, to: Point) {
+    let from = *path.last().unwrap();
+    if (from.x - to.x).abs() > 1e-9 && (from.y - to.y).abs() > 1e-9 {
+        // Prefer staying on current Y (bus rail) then vertical into `to`.
+        path.push(Point {
+            x: to.x,
+            y: from.y,
+        });
     }
     path.push(to);
 }
@@ -147,7 +343,7 @@ fn orthogonal_bus_path(
                 path.push(Point { x: wp.x, y: by });
             }
         }
-        append_bend(&mut path, wp);
+        append_bus_bend(&mut path, wp);
     }
     match tgt_bus_y {
         Some(by) => {
@@ -168,7 +364,7 @@ fn orthogonal_bus_path(
                     path.push(Point { x: end.x, y: by });
                 }
             }
-            append_bend(&mut path, end);
+            append_bus_bend(&mut path, end);
         }
     }
     path
@@ -181,6 +377,9 @@ pub fn route_edges(
     ports: &BTreeMap<String, EdgePorts>,
     frames: &[Rect],
     bus_levels: &BusLevels,
+    route_plan: &ChannelRoutePlan,
+    track_order: &TrackOrderPlan,
+    track_coords: &TrackCoords,
     routing_style: RoutingStyle,
     layer_gap: f64,
     node_gap: f64,
@@ -248,12 +447,23 @@ pub fn route_edges(
                 let path = if src_bus.is_some() || tgt_bus.is_some() {
                     orthogonal_bus_path(start, end, mid, src_bus, tgt_bus)
                 } else {
-                    let mut path = vec![start];
-                    for &wp in mid {
-                        append_bend(&mut path, wp);
-                    }
-                    append_bend(&mut path, end);
-                    path
+                    let topo = route_plan.routes.get(&e.edge_id).ok_or_else(|| {
+                        LayoutError::message(format!(
+                            "hierarchical: edge `{}` missing Channel RouteTopology \
+                             (InternalInvariant; channel-d1.md D1.1)",
+                            e.edge_id
+                        ))
+                    })?;
+                    let RouteTopology::Orthogonal(ref channel) = topo;
+                    expand_channel_path(
+                        start,
+                        end,
+                        channel,
+                        &route_plan.substrate,
+                        track_order,
+                        track_coords,
+                        &e.edge_id,
+                    )?
                 };
 
                 let algo_pts: Vec<_> = path.iter().map(|&p| to_algo_point(p)).collect();
@@ -277,12 +487,68 @@ pub fn route_edges(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::layout::hierarchical::channel::{
+        derive_root_substrate, ChannelPath, ChannelRoutePlan, RouteTopology,
+    };
+    use crate::layout::hierarchical::compose::track_order::HopTrack;
     use crate::layout::hierarchical::model::{Elem, ElemKey, RealEdge};
     use plotgram_algo::orientation::Side;
     use plotgram_model::port::AlongSpec;
 
     fn empty_bus() -> BusLevels {
         BusLevels::default()
+    }
+
+    /// Minimal Channel plan: single Cross track for `e0` (adjacent-layer).
+    fn single_cross_route(plan: &PlanGraph, track_y: f64) -> (ChannelRoutePlan, TrackOrderPlan, TrackCoords) {
+        let (substrate, index) = derive_root_substrate(plan);
+        let cross_id = index
+            .cross_lines
+            .get(&1)
+            .and_then(|v| v.first().copied())
+            .map(|s| s.id)
+            .expect("cross line 1");
+        let mut routes = BTreeMap::new();
+        routes.insert(
+            "e0".into(),
+            RouteTopology::Orthogonal(ChannelPath {
+                tracks: vec![cross_id],
+                gates: Vec::new(),
+            }),
+        );
+        let route_plan = ChannelRoutePlan {
+            substrate,
+            index,
+            routes,
+            bundles: Vec::new(),
+            relaxations: Vec::new(),
+            used_gates: false,
+        };
+        let mut track_order = TrackOrderPlan::default();
+        track_order.assignments.insert(
+            ("e0".into(), cross_id),
+            HopTrack {
+                track: cross_id,
+                track_index: 0,
+            },
+        );
+        track_order.track_counts.insert(cross_id, 1);
+        track_order.rank_gap_track_counts.insert(0, 1);
+        let mut track_coords = TrackCoords::default();
+        track_coords.coords.insert(cross_id, vec![track_y]);
+        (route_plan, track_order, track_coords)
+    }
+
+    fn empty_channel(plan: &PlanGraph) -> ChannelRoutePlan {
+        let (substrate, index) = derive_root_substrate(plan);
+        ChannelRoutePlan {
+            substrate,
+            index,
+            routes: BTreeMap::new(),
+            bundles: Vec::new(),
+            relaxations: Vec::new(),
+            used_gates: false,
+        }
     }
 
     fn route(
@@ -293,7 +559,36 @@ mod tests {
         style: RoutingStyle,
         bus: &BusLevels,
     ) -> Vec<CanonicalEdge> {
-        route_edges(graph, plan, ports, frames, bus, style, 60.0, 24.0).unwrap()
+        let (rp, to, tc) = if style == RoutingStyle::Orthogonal && bus.source.is_empty() && bus.target.is_empty() {
+            // Aligned / bus tests: provide a Cross route when orthogonal.
+            single_cross_route(plan, 25.0)
+        } else {
+            (
+                empty_channel(plan),
+                TrackOrderPlan::default(),
+                TrackCoords::default(),
+            )
+        };
+        route_edges(
+            graph, plan, ports, frames, bus, &rp, &to, &tc, style, 60.0, 24.0,
+        )
+        .unwrap()
+    }
+
+    fn route_with(
+        graph: &RealGraph,
+        plan: &PlanGraph,
+        ports: &BTreeMap<String, EdgePorts>,
+        frames: &[Rect],
+        style: RoutingStyle,
+        bus: &BusLevels,
+        track_y: f64,
+    ) -> Vec<CanonicalEdge> {
+        let (rp, to, tc) = single_cross_route(plan, track_y);
+        route_edges(
+            graph, plan, ports, frames, bus, &rp, &to, &tc, style, 60.0, 24.0,
+        )
+        .unwrap()
     }
 
     fn simple_setup() -> (RealGraph, PlanGraph, BTreeMap<String, EdgePorts>, Vec<Rect>) {
@@ -397,30 +692,38 @@ mod tests {
     #[test]
     fn elbow_inserted_when_axes_differ() {
         let (graph, plan, ports, frames) = simple_setup();
-        let routed = route(
+        let routed = route_with(
             &graph,
             &plan,
             &ports,
             &frames,
             RoutingStyle::Orthogonal,
             &empty_bus(),
+            25.0,
         );
         let pts = routed[0].path.polyline_points();
         assert!(pts.len() >= 3, "expected an elbow bend, got {:?}", pts);
         assert_eq!(pts.first().copied().unwrap().y, 10.0);
         assert_eq!(pts.last().copied().unwrap().y, 40.0);
+        // Horizontal rail at Metric track Y (not mid_y invention).
+        assert!(
+            pts.iter().any(|p| (p.y - 25.0).abs() < 1e-9),
+            "expected track y=25 in {:?}",
+            pts
+        );
     }
 
     #[test]
     fn path_endpoints_are_exact_port_anchors() {
         let (graph, plan, ports, frames) = simple_setup();
-        let routed = route(
+        let routed = route_with(
             &graph,
             &plan,
             &ports,
             &frames,
             RoutingStyle::Orthogonal,
             &empty_bus(),
+            25.0,
         );
         let pts = routed[0].path.polyline_points();
         assert_eq!(
@@ -486,12 +789,20 @@ mod tests {
             side: Side::West,
             along: AlongSpec::Ordered { order: 0, count: 1 },
         };
+        let (rp, to, tc) = (
+            empty_channel(&plan),
+            TrackOrderPlan::default(),
+            TrackCoords::default(),
+        );
         let err = route_edges(
             &graph,
             &plan,
             &ports,
             &frames,
             &empty_bus(),
+            &rp,
+            &to,
+            &tc,
             RoutingStyle::Curved,
             60.0,
             24.0,

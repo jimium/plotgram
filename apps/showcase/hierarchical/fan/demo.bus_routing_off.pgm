@@ -1,0 +1,18 @@
+// 对照件：与 demo.bus_routing 同拓扑，关闭 bus_routing
+// 期望：无 SharedCorridor；汇入边在层间走廊分轨（不故意共线）
+diagram {
+    profile: flowchart,
+    title: "对照：关 bus_routing（分轨）",
+    layout: hierarchical { auto_edge_grouping: false, bus_routing: false }
+
+    node west { label: "西区接入", archetype: process }
+    node east { label: "东区接入", archetype: process }
+    node core { label: "核心交换", archetype: process }
+    node store { label: "统一落库", archetype: storage }
+
+    west -> store
+    east -> store
+    west -> core
+    east -> core
+    core -> store
+}

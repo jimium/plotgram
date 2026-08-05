@@ -1,6 +1,5 @@
 ---
 source: crates/plotgram-layout/tests/hierarchical_coordinates.rs
-assertion_line: 77
 expression: "layout_json(graph, Size::new(120.0, 40.0))"
 ---
 {
@@ -155,16 +154,16 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
               "y": 60.0
             },
             {
-              "x": 144.0,
+              "x": 59.99999999999999,
               "y": 60.0
             },
             {
-              "x": 144.0,
-              "y": 200.0
+              "x": 59.99999999999999,
+              "y": 220.0
             },
             {
               "x": 80.0,
-              "y": 200.0
+              "y": 220.0
             },
             {
               "x": 80.0,

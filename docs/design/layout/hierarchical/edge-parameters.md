@@ -227,14 +227,18 @@ orthogonal 几何零变化；`octilinear` 仍硬失败（明示后置）。
 **验收**：min_edge_length fixture（相邻层直连被撑开，撑开量进快照）；
 unsupported 键硬失败测试。
 
-### 第四批 · Channel 能力（随 D₁，不在本文展开实施细节）
+### 第四批 · Channel 能力（随 D₁）
 
-D₁ 落地时本批参数获得真消费者：
+实施切片与写权见 [phases/channel-d1.md](phases/channel-d1.md)。参数 ↔ 子里程碑：
 
-- 回边外侧走廊（backloop 语义，默认开启）
-- `min_first/last_segment` 进 Channel 搜索约束
-- `bus_routing`：track 干线 + 支线展开（依赖 grouping 的 PortGroup 事实）
-- grouping 升级为 track 后缀 Bundle；critical 的 priority 进 rip-up 排序
+| 参数 / 行为 | 子里程碑 | 说明 |
+|-------------|----------|------|
+| `edge_gap` | **D1.0** | track pitch；LayerGap demand 真消费；恢复 bind |
+| 关 grouping 分轨（修假 bus） | **D1.0** | TrackOrder；非参数开关 |
+| 回边外侧走廊（默认，无布尔开关） | D1.2 | Channel L2；D1.1 可先占位代价 |
+| `min_first_segment` / `min_last_segment` | D1.2 | 搜索约束；此前 bind unsupported |
+| `bus_routing` | D1.2 | track 干线 + 支线；依赖 grouping / Bundle |
+| grouping → `BundlePlan`；critical → rip-up | D1.2 | BusPrefix 升格；priority 进边选择序 |
 
 ---
 

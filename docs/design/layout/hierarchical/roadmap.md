@@ -127,13 +127,20 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 
 **方向**：组合相写路径拓扑与 track 序；Metric 写 track 像素；Ink 只展开。
 
+**可执行契约**：[phases/channel-d1.md](phases/channel-d1.md)（分三子里程碑，禁止 Ink `mid_y` 特判）。
+
+| 子里程碑 | 摘要 |
+|----------|------|
+| **D1.0** | 层间走廊 TrackOrder + 最小 DemandBoard；修关 `auto_edge_grouping` 后的假 bus；恢复消费 `edge_gap` |
+| **D1.1** | 顶层 scope-only Substrate + 词典序搜索；完整 `RouteTopology::Orthogonal` |
+| **D1.2** | Gate / ScopeMask / 有界 rip-up；`min_first/last_segment`、回边外侧走廊、`bus_routing`、Bundle 升格 |
+
 **做什么（概要）**：
 
-- Substrate + Channel 搜索（折点优先于长度）
-- track order + DemandBoard（MetricBudget）
-- 有界 rip-up / history cost；InkVerifier（不穿节点、非 bundle 不非法重合）
-- 恢复并真正消费 `edge_gap` 等 track 相关参数
-- 同批获得真消费方的边参数（写权与验收见 [edge-parameters.md](edge-parameters.md) §4 第四批）：回边外侧走廊（backloop 语义）、`min_first/last_segment`、`bus_routing`
+- Substrate + Channel 搜索（折点优先于长度）——自 D1.1
+- track order + DemandBoard（MetricBudget）——自 D1.0
+- 有界 rip-up / history cost；InkVerifier（不穿节点、非 bundle 不非法重合）——D1.2
+- 恢复并真正消费 `edge_gap` 等 track 相关参数——`edge_gap` 在 D1.0；其余见 [edge-parameters.md](edge-parameters.md) §4 第四批
 
 **何时选**：产品痛点是边挤、弯多、需要走廊分配，而不是组框合法性。
 
@@ -185,6 +192,7 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 | [scope.md](scope.md) | 能力 / 非目标 / 典型域 |
 | [edge-parameters.md](edge-parameters.md) | 边参数支持研究（对照 yFiles Edges 分组）+ 分批实施路线 |
 | [phases/](phases/) | 相级可执行契约 |
+| [phases/channel-d1.md](phases/channel-d1.md) | D₁ Channel 分阶段契约（D1.0–D1.2） |
 
 代码入口（重建）：`crates/plotgram-layout/src/layout/hierarchical/`。
 

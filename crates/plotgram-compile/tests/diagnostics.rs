@@ -196,3 +196,60 @@ fn critical_marked_path_not_worse_than_control() {
         sum_bends(&control)
     );
 }
+
+// ─── D1.0 TrackOrder ────────────────────────────────────────────────────
+
+#[test]
+fn edge_gap_binds_and_affects_params_hash() {
+    let opts = BuildOptions::default();
+    let a = build_layout(&source_with(""), &opts).unwrap();
+    let b = build_layout(&source_with("edge_gap: 24"), &opts).unwrap();
+    assert_ne!(
+        a.diagnostics.params_hash, b.diagnostics.params_hash,
+        "edge_gap must be consumed in params_hash"
+    );
+}
+
+/// Horizontal rails of a grouping-off fan must not all share one Y
+/// (channel-d1.md D1.0 acceptance — no fake bus via mid_y).
+#[test]
+fn fan_out_without_grouping_uses_distinct_horizontal_tracks() {
+    let src = r#"diagram {
+  layout: hierarchical { auto_edge_grouping: false }
+  node hub {}
+  node a {}
+  node b {}
+  node c {}
+  node d {}
+  hub -> a
+  hub -> b
+  hub -> c
+  hub -> d
+}"#;
+    let r = build_layout(src, &BuildOptions::default()).unwrap();
+    assert_eq!(r.edges.len(), 4);
+
+    let mut rail_ys: Vec<f64> = Vec::new();
+    for e in &r.edges {
+        let pts = e
+            .path
+            .polyline_points()
+            .expect("orthogonal fan edges are polylines");
+        // Collect Y of every strictly horizontal segment.
+        for w in pts.windows(2) {
+            if (w[0].y - w[1].y).abs() < 1e-6 && (w[0].x - w[1].x).abs() > 1e-6 {
+                rail_ys.push(w[0].y);
+            }
+        }
+    }
+    assert!(
+        !rail_ys.is_empty(),
+        "fan-out must produce horizontal rails"
+    );
+    rail_ys.sort_by(|a, b| a.total_cmp(b));
+    rail_ys.dedup_by(|a, b| (*a - *b).abs() < 1e-6);
+    assert!(
+        rail_ys.len() >= 2,
+        "grouping-off fan must use ≥2 distinct track Y, got {rail_ys:?}"
+    );
+}
