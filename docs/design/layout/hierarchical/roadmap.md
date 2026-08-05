@@ -11,9 +11,12 @@
 已具备可跑的 Sugiyama 主路径子集：
 
 ```text
-FAS → Network Simplex → properify → median(+权+snapshot)
+FAS(+环 reroot) → Network Simplex → properify → median(+权+snapshot)
   → 阻尼重心 + 每层 VPSC → 端口（Free / FixedSide）→ dummy 链 Ink 正交展开
 ```
+
+FAS 含环入口规则：声明序靠前的节点优先靠上（环 reroot，[architecture.md](architecture.md) §3.1）；
+反转数回涨由 `hier_eval` 基线的 `reversed_count` 门禁守住。
 
 硬不变量（无重叠、全正交、端口落界）已由 `hier_eval` 守住。
 

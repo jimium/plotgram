@@ -243,7 +243,7 @@ DemandBoard 是显式数据流，不是运行完成后的回调。分两个 free
 I.0   Bind + validate      typed params；拒绝未支持组合
 I.1   Stage projection     orientation / self-loop / parallel / component facts
 I.2   Contraction          group_policy → 收缩图 + meta（Weak | StrongMacro）
-I.3   Cycle removal        Greedy-FAS → working direction / reversed
+I.3   Cycle removal        Greedy-FAS + 环 reroot（§3.1）→ working direction / reversed
 I.4   Ranking              Network Simplex（组连续层、partition 主轴区间）
 I.5   Properify + strong-port projection
                             长边、强侧/FIXED_ORDER+ port dummy

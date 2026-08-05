@@ -35,7 +35,7 @@
 
 ## 3. Cycle removal
 
-主选 Greedy-FAS。输出：
+主选 Greedy-FAS（ELS 骨架）+ **环 reroot**（环入口规则，[architecture.md](../architecture.md) §3.1）。输出：
 
 ```text
 EdgeId → { working_source, working_target, reversed }
@@ -45,6 +45,7 @@ EdgeId → { working_source, working_target, reversed }
 
 - self-loop 已由 Stage 提取；
 - 平局按 `(score, declaration_index, EdgeId)`；
+- **声明序靠前的节点，布局上优先靠上**：反转集确定后，若 0 号节点（声明最前）非工作源点且恰有一条未反转原始入边，则把切边旋转到该入边（同时取消一条现有反转，经无环校验，候选按最小边序）；旋转不改反转数，ELS 上界保留；条件不满足时保持 ELS 结果；
 - bidirectional/response 仍以 Graph 的 source→target 作为声明方向参与工作图，渲染语义保留在 original edge；
 - 作者若提供 hard preferred direction，与 FAS 冲突时报告不可行或按明确的 soft priority 计费，不得静默翻转硬约束。
 
