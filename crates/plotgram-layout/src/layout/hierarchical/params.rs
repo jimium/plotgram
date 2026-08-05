@@ -180,11 +180,6 @@ pub struct HierarchicalParams {
     /// share one port + bus trunk (SharedPort → Trunk → Bus → Stub).
     /// Default off.
     pub auto_edge_grouping: bool,
-    /// Channel-track long-range shared corridors (edge-parameters.md §2.4).
-    /// When on, shared ChannelPath suffixes become [`BundlePlan`] SharedCorridor
-    /// facts; TrackOrder forces one lane; Ink Verifier exempts co-members.
-    /// Independent of `auto_edge_grouping` (adjacent-layer end-bus).
-    pub bus_routing: bool,
     /// Minimum length of the first segment leaving the source port (pixels).
     /// `0` = off. Soft preference in Channel search (D1.2).
     pub min_first_segment: f64,
@@ -208,7 +203,6 @@ impl Default for HierarchicalParams {
             edge_gap: 16.0,
             routing_style: RoutingStyle::Orthogonal,
             auto_edge_grouping: false,
-            bus_routing: false,
             min_first_segment: 0.0,
             min_last_segment: 0.0,
             group_policy: GroupPolicy::Weak,
@@ -235,6 +229,16 @@ impl HierarchicalParams {
                      (no consumer yet; see docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md §2.7)"
                 )));
             }
+        }
+        if options.contains_key("bus_routing") {
+            return Err(LayoutError::message(
+                "hierarchical: option `bus_routing` was removed — it mirrored a \
+                 yFiles Layout Styles *demo* checkbox (heuristic GridComponent / \
+                 BusDescriptor fill), not a HierarchicalLayout API. Use \
+                 `auto_edge_grouping` for Hier bus-style edge grouping; explicit \
+                 grid/bus substructures are a separate future feature"
+                    .to_string(),
+            ));
         }
         if options.contains_key("edge_grouping") {
             return Err(LayoutError::message(
@@ -321,9 +325,6 @@ impl HierarchicalParams {
         if let Some(v) = binder.get_bool("auto_edge_grouping").map_err(bind_err)? {
             params.auto_edge_grouping = v;
         }
-        if let Some(v) = binder.get_bool("bus_routing").map_err(bind_err)? {
-            params.bus_routing = v;
-        }
 
         if let Some(v) = binder
             .get_f64_any(&["min_first_segment"])
@@ -378,7 +379,7 @@ impl HierarchicalParams {
     pub fn hash(&self) -> String {
         let canonical = format!(
             "orientation={}|node_gap={:e}|layer_gap={:e}|edge_gap={:e}|\
-             routing_style={}|auto_edge_grouping={}|bus_routing={}|\
+             routing_style={}|auto_edge_grouping={}|\
              min_first_segment={:e}|min_last_segment={:e}|\
              group_policy={}|group_sizing={}|group_align={}",
             self.orientation.as_str(),
@@ -387,7 +388,6 @@ impl HierarchicalParams {
             self.edge_gap,
             self.routing_style.as_str(),
             self.auto_edge_grouping,
-            self.bus_routing,
             self.min_first_segment,
             self.min_last_segment,
             self.group_policy.as_str(),
@@ -463,10 +463,6 @@ mod tests {
             },
             HierarchicalParams {
                 auto_edge_grouping: true,
-                ..a
-            },
-            HierarchicalParams {
-                bus_routing: true,
                 ..a
             },
             HierarchicalParams {

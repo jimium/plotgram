@@ -133,7 +133,7 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 |----------|------|
 | **D1.0** | 层间走廊 TrackOrder + 最小 DemandBoard；修关 `auto_edge_grouping` 后的假 bus；恢复消费 `edge_gap` |
 | **D1.1** | 顶层 scope-only Substrate + 词典序搜索；完整 `RouteTopology::Orthogonal` |
-| **D1.2** | Gate / ScopeMask / 有界 rip-up；`min_first/last_segment`、回边外侧走廊、`bus_routing`、Bundle 升格 |
+| **D1.2** | Gate / ScopeMask / 有界 rip-up；`min_first/last_segment`、回边外侧走廊、端总线 `BundlePlan` 升格 |
 
 **做什么（概要）**：
 

@@ -843,7 +843,7 @@ hub -> c
 
 - 对应 yFiles `automaticEdgeGrouping`：算法按公共源/汇自动成组，**不**要求作者逐边标记。
 - DSL 键 `edge_group` **已移除**；写了 → 解析错误（提示改用本开关）。
-- 更强的干线总线几何（`bus_routing`）后置，见 edge-parameters.md §2.4。
+- 勿使用已撤销的 `bus_routing`（Layout Styles demo 误映射；见 edge-parameters.md §2.4）。
 
 #### 7.4.4 示例（正反边错开）
 

@@ -34,7 +34,7 @@
   "flat/demo.flat-realtime-recommendation": {
     "bbox_h": 323.6,
     "bbox_w": 378.3941666666667,
-    "crossings": 15,
+    "crossings": 12,
     "max_bends": 4,
     "reversed_count": 1,
     "sum_bends": 22
@@ -122,7 +122,7 @@
   "flat/product.order-approval": {
     "bbox_h": 401.4,
     "bbox_w": 170.0,
-    "crossings": 1,
+    "crossings": 2,
     "max_bends": 4,
     "reversed_count": 1,
     "sum_bends": 20
@@ -226,7 +226,7 @@
   "flat/stress.layout-stress-dag": {
     "bbox_h": 716.9999999999999,
     "bbox_w": 206.70597916666668,
-    "crossings": 12,
+    "crossings": 13,
     "max_bends": 4,
     "reversed_count": 2,
     "sum_bends": 44
@@ -266,7 +266,7 @@
   "group/demo.customer-refund-process": {
     "bbox_h": 906.7999999999998,
     "bbox_w": 465.0,
-    "crossings": 13,
+    "crossings": 11,
     "max_bends": 4,
     "reversed_count": 3,
     "sum_bends": 42
@@ -306,7 +306,7 @@
   "group/demo.fintech-payment-platform": {
     "bbox_h": 520.3,
     "bbox_w": 325.25658761528325,
-    "crossings": 8,
+    "crossings": 12,
     "max_bends": 4,
     "reversed_count": 2,
     "sum_bends": 30
@@ -330,7 +330,7 @@
   "group/demo.insurance-claim-process": {
     "bbox_h": 433.4,
     "bbox_w": 325.71614583333337,
-    "crossings": 7,
+    "crossings": 5,
     "max_bends": 4,
     "reversed_count": 1,
     "sum_bends": 28
@@ -418,7 +418,7 @@
   "group/demo.realtime-recommendation": {
     "bbox_h": 323.6,
     "bbox_w": 378.3941666666667,
-    "crossings": 15,
+    "crossings": 12,
     "max_bends": 4,
     "reversed_count": 1,
     "sum_bends": 22

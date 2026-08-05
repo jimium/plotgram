@@ -6,7 +6,6 @@ use plotgram_algo::orientation::Side;
 use plotgram_engine_api::LayoutError;
 use plotgram_model::diagnostics::Relaxation;
 
-use super::bundle::detect_corridor_bundles;
 use super::derive::derive_substrate;
 use super::graph::{ChannelGraph, Occupancy};
 use super::search::{route_edge, ChannelPath, LexCost, RouteHints, ScopeMask};
@@ -32,7 +31,7 @@ pub struct ChannelRoutePlan {
     pub index: BlueprintIndex,
     /// edge_id → topology (end-bus members omitted — Ink joins BundlePlan).
     pub routes: BTreeMap<String, RouteTopology>,
-    /// End-bus bundles (Compose) + optional SharedCorridor (`bus_routing`).
+    /// End-bus bundles from Compose (`auto_edge_grouping`).
     pub bundles: Vec<BundlePlan>,
     /// Soft relaxations produced by bounded rip-up.
     pub relaxations: Vec<Relaxation>,
@@ -224,24 +223,11 @@ pub fn route_edges_channel(
         routes.insert(eid.clone(), RouteTopology::Orthogonal(st.path.clone()));
     }
 
-    let mut bundles = end_bundles.to_vec();
-    if params.bus_routing {
-        let path_refs: Vec<(String, Vec<TrackId>)> = states
-            .iter()
-            .map(|(id, st)| (id.clone(), st.path.tracks.clone()))
-            .collect();
-        let slices: Vec<(String, &[TrackId])> = path_refs
-            .iter()
-            .map(|(id, tracks)| (id.clone(), tracks.as_slice()))
-            .collect();
-        bundles.extend(detect_corridor_bundles(&slices, 2));
-    }
-
     Ok(ChannelRoutePlan {
         substrate,
         index,
         routes,
-        bundles,
+        bundles: end_bundles.to_vec(),
         relaxations,
         used_gates,
     })

@@ -1,22 +1,22 @@
-//! BundlePlan: intentional shared-trunk / shared-corridor topology facts.
+//! BundlePlan: intentional shared-trunk topology from `auto_edge_grouping`.
 //!
-//! Compose writes end-bus bundles (`SourcePrefix` / `TargetSuffix`) from
-//! `auto_edge_grouping`. Channel may append `SharedCorridor` bundles when
-//! `bus_routing` is on (shared ChannelPath suffix). Ink joins declared
-//! geometry only; Verifier treats BundlePlan as the sole complete-overlap
-//! exemption (ink-and-verification.md §5).
+//! Compose writes end-bus bundles (`SourcePrefix` / `TargetSuffix`). Ink joins
+//! declared geometry only; Verifier treats BundlePlan as the sole
+//! complete-overlap exemption (ink-and-verification.md §5).
+//!
+//! Note: yFiles Layout Styles demo's "Automatic Bus Routing" is *not* a Hier
+//! API — it heuristically fills `gridComponents` / BusDescriptor. That is a
+//! separate future feature; do not revive a `bus_routing` boolean.
 
 use std::collections::BTreeSet;
 
-/// How a bundle shares geometry.
+/// How a bundle shares geometry at an edge end.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BundleKind {
     /// Fan-out at original source: SharedPort → Trunk → Bus → Stub.
     SourcePrefix,
     /// Fan-in at original target.
     TargetSuffix,
-    /// ≥2 Channel paths share a track-id suffix (`bus_routing`).
-    SharedCorridor,
 }
 
 /// Plan-level confluence fact (≥2 edges).
@@ -24,11 +24,8 @@ pub enum BundleKind {
 pub struct BundlePlan {
     pub id: String,
     pub kind: BundleKind,
-    /// Member edge ids (declaration / stub order for end-buses).
+    /// Member edge ids (declaration / stub order).
     pub member_edges: Vec<String>,
-    /// Shared substrate track ids (`TrackId.0`) for [`BundleKind::SharedCorridor`].
-    /// Empty for end-bus kinds (Metric `bus_y` is the shared rail).
-    pub shared_track_ids: Vec<u32>,
 }
 
 impl BundlePlan {

@@ -80,20 +80,23 @@ yFiles：同源/同汇的多条边在端口附近合并成一股（共享端口 
     （拓扑：SharedPort → Trunk → Bus → Stub）
   - **Metric**：同簇同 `PortPoint`；写确定性 `bus_y`（层间 trunk 长度）
   - **Ink**：只接合共享干线 / 总线 / stub，不发明合流点
-- **边界**：相邻层扇出即可得到图二观感；跨多层 track 级 Bundle 仍归
-  Channel / 日后 `bus_routing`。
+- **边界**：相邻层扇出即可得到图二观感；跨层显式 bus / grid 子结构
+  （yFiles `gridComponents` / 独立 `BusRouter`）另册，**不是** Hier 布尔开关。
 - **判断**：**已落地**（bus-style v1）。
 
-### 2.4 Automatic Bus Routing —— Channel track 级长程干线
+### 2.4 ~~Automatic Bus Routing~~ —— 已撤销（误映射）
 
-yFiles 独立 `BusRouter` / Channel 上的长程共享 track，**不是** Hier
-`automaticEdgeGrouping` 的相邻层扇出（那已由 §2.3 覆盖）。
+yFiles Layout Styles showcase 面板上有 **「Automatic Bus Routing」** 开关，
+但它**不是** `HierarchicalLayout` 的 API：demo 代码在勾选后启发式挑选
+度数 ≥ 4 的节点，填入 `layoutData.gridComponents` / `BusDescriptor`。
+文档真源只有：
 
-- **映射**：日后 `bus_routing`（可选），语义 = 跨层 / 拥塞走廊上的
-  Bundle track 干线。
-- **写者**：Channel track 分配 + Ink trunk/stub 展开；Compose 写 Bundle
-  拓扑事实。
-- **判断**：依赖 D₁ Channel；与 §2.3 相邻层 bus 几何不冲突。
+- Hier：`automaticEdgeGrouping` + 显式 edge/port group IDs + `gridComponents`
+- 独立路由：`BusRouter` / `EdgeRouter` buses（节点坐标已定）
+
+本仓库曾误映射为 `bus_routing: bool` + Channel 后缀检测；**已删除该选项**。
+bind 时若仍写 `bus_routing` → 硬失败并提示改用 `auto_edge_grouping`。
+未来若做「显式 grid/bus 子结构」，另立 IR，勿复活图级布尔冒充。
 
 ### 2.5 Highlight Critical Path —— 边权重进排序/坐标目标（已落地）
 
@@ -151,7 +154,7 @@ yFiles：整条边总长下限；短跨（相邻层直连）被撑开，影响�
 | Routing Style | `routing_style`（已有） | Ink 展开 / Compose 拓扑 | polyline/curved 无硬依赖；octilinear 依赖 Channel | ★★ 第一批 | **已落地**（orthogonal/polyline/curved） |
 | Backloop Routing | 不做开关 | Channel（D₁） | D₁ | D₁ 随附（默认行为） | 待 D₁ |
 | Automatic Edge Grouping | `auto_edge_grouping` | Compose + Metric + Ink | 无（Channel 前做 bus v1） | ★★ 第二批 | **已落地**（bus-style） |
-| Automatic Bus Routing | `bus_routing`（Channel track） | Channel + Ink | D₁ | 第四批 | 待 D₁ |
+| ~~Automatic Bus Routing~~ | ~~`bus_routing`~~ | — | — | — | **已撤销**（demo 误映射；见 §2.4） |
 | Highlight Critical Path | 边级 `critical: bool` | P3 ordering / P4 坐标 | 无 | ★★ 第二批（搭阶段 A） | **已落地** |
 | Min First Segment | `min_first_segment` | Channel 搜索约束 | D₁ | 第三批（bind 前硬失败） | 待 D₁ |
 | Min Last Segment | `min_last_segment` | Channel 搜索约束 | D₁ | 第三批（同上） | 待 D₁ |
@@ -237,8 +240,8 @@ unsupported 键硬失败测试。
 | 关 grouping 分轨（修假 bus） | **D1.0** | TrackOrder；非参数开关 |
 | 回边外侧走廊（默认，无布尔开关） | D1.2 | Channel L2；D1.1 可先占位代价 |
 | `min_first_segment` / `min_last_segment` | D1.2 | 搜索约束；此前 bind unsupported |
-| `bus_routing` | D1.2 | track 干线 + 支线；依赖 grouping / Bundle |
-| grouping → `BundlePlan`；critical → rip-up | D1.2 | BusPrefix 升格；priority 进边选择序 |
+| ~~`bus_routing`~~ | — | **已撤销**（Layout Styles demo 误映射；见 §2.4） |
+| grouping → `BundlePlan`；critical → rip-up | D1.2 | 端总线 Bundle；priority 进边选择序 |
 
 ---
 

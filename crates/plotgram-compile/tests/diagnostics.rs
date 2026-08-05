@@ -112,6 +112,19 @@ fn auto_edge_grouping_octilinear_is_rejected() {
 }
 
 #[test]
+fn bus_routing_option_is_rejected_as_mistaken_mapping() {
+    let src = fan_with("bus_routing: true");
+    let err = build_layout(&src, &BuildOptions::default())
+        .expect_err("bus_routing must hard-fail (demo mis-mapping)");
+    let msg = err.to_string();
+    assert!(msg.contains("bus_routing"), "got: {msg}");
+    assert!(
+        msg.contains("auto_edge_grouping") || msg.contains("removed"),
+        "got: {msg}"
+    );
+}
+
+#[test]
 fn auto_edge_grouping_fans_share_source_port_and_bus() {
     let opts = BuildOptions::default();
     let src = r#"diagram {

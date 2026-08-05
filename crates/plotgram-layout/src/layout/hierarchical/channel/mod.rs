@@ -3,7 +3,6 @@
 //! Atlas shape reference:
 //! `docs/design/layout/hierarchical/atlas-reference/channel-*.md`.
 
-mod bundle;
 mod derive;
 mod graph;
 mod route_all;

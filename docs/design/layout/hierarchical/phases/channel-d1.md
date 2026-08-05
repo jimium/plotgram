@@ -156,7 +156,7 @@ Bundle / Bus 共享轨只计 **1** 个容量单位。恢复 `edge_gap` bind 并�
 
 #### D1.0 明确不做
 
-Substrate 全图、Gate、ScopeMask、rip-up、多 rank 回边外侧走廊、`min_first/last_segment`、`bus_routing`、octilinear、`BundlePlan` 升格。
+Substrate 全图、Gate、ScopeMask、rip-up、多 rank 回边外侧走廊、`min_first/last_segment`、octilinear、`BundlePlan` 升格。
 
 #### 验收
 
@@ -218,9 +218,8 @@ Substrate 全图、Gate、ScopeMask、rip-up、多 rank 回边外侧走廊、`mi
 | `edge_gap` | Track pitch / Demand | **D1.0** |
 | 回边外侧走廊（默认，无布尔开关） | Channel L2 | D1.2（D1.1 可先占位代价） |
 | `min_first_segment` / `min_last_segment` | Channel 搜索约束 | D1.2（此前 bind unsupported） |
-| `bus_routing` | Channel track 干线 + Ink | D1.2 |
 | critical → rip-up priority | Rip-up 排序 | D1.2 |
-| `BusPrefix` → `BundlePlan` 后缀合流 | Compose + Ink 接合 | D1.2 |
+| `BusPrefix` → `BundlePlan` 端总线 | Compose + Ink 接合 | D1.2 |
 | `octilinear` | Channel 45° 骨架 | D1.2 后或阶段 E |
 
 ---

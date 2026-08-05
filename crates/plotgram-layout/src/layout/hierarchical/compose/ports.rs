@@ -492,7 +492,6 @@ pub fn assign_ports(
                             id,
                             kind,
                             member_edges: members,
-                            shared_track_ids: Vec::new(),
                         },
                     );
                     slot_of_member.push((s, c.clone()));

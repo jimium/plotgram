@@ -1,7 +1,6 @@
 //! D1.1 TrackOrder (L3): colour overlapping spans on each substrate track.
 //!
 //! End-bus BundlePlan members are skipped (intentional bus collinearity).
-//! SharedCorridor members share one track_index on declared shared tracks.
 //! Cross-track lane counts feed LayerGap Demand via the track's rank-gap line.
 
 use std::collections::BTreeMap;
@@ -12,7 +11,7 @@ use plotgram_model::geometry::Rect;
 use crate::layout::hierarchical::channel::{
     ChannelPath, ChannelRoutePlan, RouteTopology, TrackId, TrackOrient,
 };
-use crate::layout::hierarchical::compose::bundle::{end_bus_edge_ids, BundleKind, BundlePlan};
+use crate::layout::hierarchical::compose::bundle::{end_bus_edge_ids, BundlePlan};
 use crate::layout::hierarchical::compose::ports::EdgePorts;
 use crate::layout::hierarchical::metric::anchor::port_anchor;
 use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealGraph};
@@ -142,32 +141,6 @@ pub fn assign_track_order(
                     let gap = (t.line - 1) as u32;
                     let e = rank_gap_track_counts.entry(gap).or_insert(0);
                     *e = (*e).max(count);
-                }
-            }
-        }
-    }
-
-    // SharedCorridor: force members onto one lane per declared shared track
-    // (intentional collinearity; Verifier exemption key).
-    for bundle in bundles {
-        if bundle.kind != BundleKind::SharedCorridor {
-            continue;
-        }
-        for &tid_raw in &bundle.shared_track_ids {
-            let tid = TrackId(tid_raw);
-            let mut indices = Vec::new();
-            for eid in &bundle.member_edges {
-                if let Some(ht) = assignments.get(&(eid.clone(), tid)) {
-                    indices.push(ht.track_index);
-                }
-            }
-            if indices.is_empty() {
-                continue;
-            }
-            let shared = *indices.iter().min().unwrap();
-            for eid in &bundle.member_edges {
-                if let Some(ht) = assignments.get_mut(&(eid.clone(), tid)) {
-                    ht.track_index = shared;
                 }
             }
         }

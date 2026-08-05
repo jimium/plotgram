@@ -102,7 +102,6 @@ mod tests {
             id: "b".into(),
             kind: BundleKind::SourcePrefix,
             member_edges: vec!["e0".into(), "e1".into()],
-            shared_track_ids: vec![],
         }];
         assert!(verify_no_illegal_overlap(&edges, &bundles).is_ok());
     }
