@@ -2,18 +2,31 @@
 //! solve, run twice (roadmap phase A). Replaces the MVP's damped-barycenter
 //! ideal + per-layer VPSC (notes/2026-08-02-mvp-scope.md §2.3):
 //!
-//! - Hard collinearity for BK primary blocks — but only over **virtual
-//!   member pairs**. Real nodes stay soft: they are pulled toward the chain
-//!   via their BK ideal in pass 1, and pass 2's port-anchor pull must not
-//!   drag real nodes around. The dummy-chain trunk stays straight either
-//!   way, which is the staircase fix.
+//! - Hard collinearity for BK primary blocks — over **same-type member
+//!   pairs**: virtual-virtual keeps long-edge trunks straight, and
+//!   real-real straightens 1:1 real chains (a spine must not zigzag,
+//!   and a leaf must land under its only neighbor). A real pair is only
+//!   hardened directionally 1:1 or over a binary split; fans of ≥ 3 real
+//!   neighbors split by parity — odd fans harden the block pair (the
+//!   median child carries the straight spine through the junction, and
+//!   for a symmetric fan that column is the fan's center), while even
+//!   fans harden nothing, so pass 2 can center the junction between its
+//!   two middle neighbors — and pairs only harden when *neither* member
+//!   aligned with a dummy anywhere in the primary alignment: a real node
+//!   that won a dummy as its median belongs to that chain's column
+//!   battle, and hardening it would drag the whole chain off its
+//!   corridor. All other pairs stay soft: pass 2's port-anchor pull on
+//!   chain-end dummies must not drag real nodes around.
 //! - Everything else is soft: `desired` = 4-candidate merged BK ideal,
 //!   dummies weighted higher so long edges keep their columns.
-//! - Pass 2 expands port anchors ([`super::anchor`], Metric's own expansion
-//!   — never read from Ink) and re-solves with chain-end dummies pulled
-//!   onto their anchors. On single-dummy chains both ends address the same
-//!   elem; the source anchor wins (target applied first, source overwrites)
-//!   — a fixed, deterministic rule.
+//! - Pass 2 expands two upstream decisions (Metric's own expansions —
+//!   never read from Ink): even-fan junctions (≥ 4 real neighbors) get
+//!   their desired rewritten to the midpoint of their two middle
+//!   neighbors' pass-1 positions — the BK ideal can only align a
+//!   junction with one median child, which for even fans is off-center —
+//!   and chain-end dummies are pulled onto their port anchors. On single-dummy chains both ends address the
+//!   same elem; the source anchor wins (target applied first, source
+//!   overwrites) — a fixed, deterministic rule.
 //!
 //! Feasibility: equality pairs are a subset of one BK alignment's edges,
 //! whose blocks never cross — so the constraint system is feasible by
@@ -53,7 +66,17 @@ pub fn assign_cross_axis(
     }
 
     let bk = bk::bk_ideal(plan, size_of, node_gap);
-    let constraints = build_constraints(plan, size_of, node_gap, &bk.primary_blocks);
+    let dummy_aligned = dummy_aligned_reals(plan, &bk.primary_blocks);
+    let (down_deg, up_deg) = real_degrees(plan);
+    let constraints = build_constraints(
+        plan,
+        size_of,
+        node_gap,
+        &bk.primary_blocks,
+        &dummy_aligned,
+        &down_deg,
+        &up_deg,
+    );
     let weights: Vec<f64> = (0..n)
         .map(|e| {
             if plan.elems[e].key.is_virtual() {
@@ -67,9 +90,13 @@ pub fn assign_cross_axis(
     // Pass 1: node centers toward the merged BK ideal.
     let pass1 = solve_once(n, &bk.ideal, &weights, &constraints)?;
 
-    // Pass 2: pull chain-end dummies onto their port anchors. Target ends
-    // are applied first so the source anchor wins on single-dummy chains.
+    // Pass 2: fan junctions center over their fan; chain-end dummies are
+    // pulled onto their port anchors. Target ends are applied first so
+    // the source anchor wins on single-dummy chains.
     let mut desired = bk.ideal;
+    for (e, center) in fan_centers(plan, &pass1, &down_deg, &up_deg) {
+        desired[e] = center;
+    }
     let frame_of = |e: usize| -> Rect {
         let s = size_of(e);
         Rect::new(pass1[e] - s.width / 2.0, main[e], s.width, s.height)
@@ -105,14 +132,107 @@ fn solve_once(
     vpsc::solve(&vars, constraints)
 }
 
-/// Intra-layer separation + hard collinearity over the virtual member pairs
-/// of each BK primary block (equality = opposing zero-gap constraint pairs,
-/// which `vpsc::solve` supports directly).
+/// Real block members that sit next to a virtual member in the primary
+/// alignment — i.e., real nodes whose median was a dummy. They keep the
+/// soft treatment (see module doc).
+fn dummy_aligned_reals(plan: &PlanGraph, blocks: &[Vec<usize>]) -> Vec<bool> {
+    let mut marked = vec![false; plan.elems.len()];
+    for block in blocks {
+        for pair in block.windows(2) {
+            let (a, b) = (pair[0], pair[1]);
+            let a_virtual = plan.elems[a].key.is_virtual();
+            if a_virtual != plan.elems[b].key.is_virtual() {
+                if !a_virtual {
+                    marked[a] = true;
+                } else {
+                    marked[b] = true;
+                }
+            }
+        }
+    }
+    marked
+}
+
+/// Per real elem: how many real neighbors it has one rank below / above
+/// (real-real segments only — dummies belong to their edge's chain).
+fn real_degrees(plan: &PlanGraph) -> (Vec<usize>, Vec<usize>) {
+    let n = plan.elems.len();
+    let (mut down, mut up) = (vec![0usize; n], vec![0usize; n]);
+    for s in &plan.segments {
+        if !plan.elems[s.from].key.is_virtual() && !plan.elems[s.to].key.is_virtual() {
+            down[s.from] += 1;
+            up[s.to] += 1;
+        }
+    }
+    (down, up)
+}
+
+/// Fan-centering targets for pass 2: a real junction with an **even**
+/// fan of ≥ 4 real neighbors on one side wants the midpoint of its two
+/// middle neighbors' pass-1 positions (odd fans need no target — their
+/// median block pair stays hardened, which is both centered and
+/// straight). A junction fanned evenly on both sides takes the mean of
+/// both midpoints. Neighbor order: pass-1 position, elem index
+/// tie-break.
+fn fan_centers(
+    plan: &PlanGraph,
+    pass1: &[f64],
+    down_deg: &[usize],
+    up_deg: &[usize],
+) -> Vec<(usize, f64)> {
+    // e -> real neighbors below / above (segment adjacency).
+    let n = plan.elems.len();
+    let (mut down_nbs, mut up_nbs) = (vec![Vec::new(); n], vec![Vec::new(); n]);
+    for s in &plan.segments {
+        if !plan.elems[s.from].key.is_virtual() && !plan.elems[s.to].key.is_virtual() {
+            down_nbs[s.from].push(s.to);
+            up_nbs[s.to].push(s.from);
+        }
+    }
+    let middle = |nbs: &mut Vec<usize>| {
+        nbs.sort_by(|a, b| {
+            pass1[*a]
+                .partial_cmp(&pass1[*b])
+                .unwrap()
+                .then(a.cmp(b))
+        });
+        let m = nbs.len() / 2;
+        (pass1[nbs[m - 1]] + pass1[nbs[m]]) / 2.0
+    };
+    let mut targets = Vec::new();
+    for e in 0..n {
+        if plan.elems[e].key.is_virtual() {
+            continue;
+        }
+        let mut middles: Vec<f64> = Vec::new();
+        if down_deg[e] >= 4 && down_deg[e] % 2 == 0 {
+            middles.push(middle(&mut down_nbs[e]));
+        }
+        if up_deg[e] >= 4 && up_deg[e] % 2 == 0 {
+            middles.push(middle(&mut up_nbs[e]));
+        }
+        if !middles.is_empty() {
+            targets.push((e, middles.iter().sum::<f64>() / middles.len() as f64));
+        }
+    }
+    targets
+}
+
+/// Intra-layer separation + hard collinearity over the same-type member
+/// pairs of each BK primary block (equality = opposing zero-gap constraint
+/// pairs, which `vpsc::solve` supports directly). A real pair touching
+/// an **even** fan of ≥ 4 real neighbors stays soft so pass 2 can center
+/// the junction between its two middle neighbors; odd fans keep their
+/// median pair hardened (that column is the fan's center). Pairs touching
+/// a dummy-aligned member stay soft too (chain-drag guard, module doc).
 fn build_constraints(
     plan: &PlanGraph,
     size_of: &dyn Fn(usize) -> Size,
     node_gap: f64,
     blocks: &[Vec<usize>],
+    dummy_aligned: &[bool],
+    down_deg: &[usize],
+    up_deg: &[usize],
 ) -> Vec<Constraint> {
     let mut constraints = Vec::new();
     for layer in &plan.layers {
@@ -125,7 +245,27 @@ fn build_constraints(
     for block in blocks {
         for pair in block.windows(2) {
             let (a, b) = (pair[0], pair[1]);
-            if plan.elems[a].key.is_virtual() && plan.elems[b].key.is_virtual() {
+            let a_virtual = plan.elems[a].key.is_virtual();
+            if a_virtual == plan.elems[b].key.is_virtual() {
+                if !a_virtual {
+                    let (upper, lower) = if plan.elems[a].rank < plan.elems[b].rank {
+                        (a, b)
+                    } else {
+                        (b, a)
+                    };
+                    // Even fans stay soft for pass-2 centering; odd fans
+                    // keep their median block pair hardened.
+                    let even_fan = |d: usize| d >= 4 && d % 2 == 0;
+                    if even_fan(down_deg[upper]) || even_fan(up_deg[lower]) {
+                        continue;
+                    }
+                    // Chain-drag guard: a real pair hardened across a
+                    // dummy-aligned member would drag that member's chain
+                    // off its corridor.
+                    if dummy_aligned[a] || dummy_aligned[b] {
+                        continue;
+                    }
+                }
                 constraints.push(Constraint::new(a, b, 0.0));
                 constraints.push(Constraint::new(b, a, 0.0));
             }
@@ -284,6 +424,102 @@ mod tests {
             (coords[1] - expected).abs() < 1e-9,
             "chain column must sit at the mean of the endpoint anchors: {} vs {expected}",
             coords[1]
+        );
+    }
+
+    /// All-real 1:1 chain with a leaf at the end (the commit→…→prod→done
+    /// shape): same-type hard collinearity must place every member — leaf
+    /// included — on one column, even though the packed-center ideals
+    /// differ per width.
+    #[test]
+    fn real_chain_and_leaf_share_one_column() {
+        let elems = vec![real("a", 0), real("b", 1), real("c", 2), real("done", 3)];
+        let layers = vec![vec![0], vec![1], vec![2], vec![3]];
+        let segments = vec![
+            seg("e0", 0, 0, 1),
+            seg("e1", 0, 1, 2),
+            seg("e2", 0, 2, 3),
+        ];
+        let plan = build_plan(elems, layers, segments);
+        let graph = real_graph(
+            &["a", "b", "c", "done"],
+            &[("e0", 0, 1), ("e1", 1, 2), ("e2", 2, 3)],
+        );
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb);
+
+        // Unequal widths make the packed-center ideals differ per elem, so
+        // only the hard equality (not the soft ideal) can keep them aligned.
+        let widths = [20.0, 60.0, 40.0, 30.0];
+        let coords = assign_cross_axis(
+            &plan,
+            &graph,
+            &ports,
+            &|e| Size::new(widths[e], 10.0),
+            &main_of(&plan),
+            10.0,
+        )
+        .expect("feasible");
+        for i in 1..4 {
+            assert!(
+                (coords[i] - coords[0]).abs() < 1e-6,
+                "elem {i} must share the chain column: {} vs {}",
+                coords[i],
+                coords[0]
+            );
+        }
+    }
+
+    /// Fan-out junction (the API gateway over 4 services shape): the
+    /// junction must not be welded to one median child — it centers over
+    /// its fan, and a child's own 1:1 chain below stays straight.
+    #[test]
+    fn fan_out_junction_centers_over_its_children() {
+        // hub -> {a, b, c, d}; b continues to b2 (1:1 below the fan).
+        let elems = vec![
+            real("hub", 0),
+            real("a", 1),
+            real("b", 1),
+            real("c", 1),
+            real("d", 1),
+            real("b2", 2),
+        ];
+        let layers = vec![vec![0], vec![1, 2, 3, 4], vec![5]];
+        let segments = vec![
+            seg("e0", 0, 0, 1),
+            seg("e1", 0, 0, 2),
+            seg("e2", 0, 0, 3),
+            seg("e3", 0, 0, 4),
+            seg("e4", 0, 2, 5),
+        ];
+        let plan = build_plan(elems, layers, segments);
+        let graph = real_graph(
+            &["hub", "a", "b", "c", "d", "b2"],
+            &[("e0", 0, 1), ("e1", 0, 2), ("e2", 0, 3), ("e3", 0, 4), ("e4", 2, 5)],
+        );
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb);
+
+        let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
+            .expect("feasible");
+        // Even fan of four equal-width children: hub sits at the midpoint
+        // of the two middle children (= midpoint of the outer two).
+        let expected = (coords[2] + coords[3]) / 2.0;
+        assert!(
+            (coords[0] - expected).abs() < 1e-6,
+            "hub must center over its fan: {} vs {expected}",
+            coords[0]
+        );
+        let outer = (coords[1] + coords[4]) / 2.0;
+        assert!(
+            (coords[0] - outer).abs() < 1e-6,
+            "hub must sit at the fan's middle: {} vs {outer}",
+            coords[0]
+        );
+        // b's own chain below the fan stays straight.
+        assert!(
+            (coords[5] - coords[2]).abs() < 1e-6,
+            "b2 must stay under b: {} vs {}",
+            coords[5],
+            coords[2]
         );
     }
 

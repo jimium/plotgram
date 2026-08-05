@@ -24,7 +24,8 @@ FAS 含环入口规则：声明序靠前的节点优先靠上（环 reroot，[ar
 
 | 缺口 | 观感 / 产品影响 |
 |------|-----------------|
-| 次轴未严格拉直长 dummy 链；无端口对齐目标 | 长回边「楼梯」折点、近距边小 Z |
+| 端口侧别推断仅 North/South（写者 ports.rs）；反向走廊边无 East/West 入口 | 回边被迫从节点头顶进入，多两折点 |
+| ordering 落选孩子 / 多父节点的列位（写者 order.rs） | 分支边大 Z（如落选孩子不在父节点出端口正下方） |
 | 无完整 Channel / track / rip-up | 密边拥塞只能硬挤 |
 | 组框后验 bbox；无 Gate/Scope | 跨组边可贴框 / 穿框 |
 | StrongMacro / PartitionGrid 未消费 | 架构图 / 泳道类能力未到位 |
@@ -64,7 +65,7 @@ MVP ──► A 次轴拉直 ──► B 端口补齐 ──► C 诊断出口
 **做什么（概要）**：
 
 - Ideal 质量向 Brandes–Köpf 靠拢（四候选按固定规则合并）；阻尼重心视为过渡。注：dummy 高权重（virtual 4.0）现状已有，不是本阶段新增项
-- 长 proper / dummy 链：**BK block 内硬共线（由构造保证可行）+ block 外强软对齐**；VPSC 从「仅层内」升为跨层统一求解。硬共线等式只加在 block 的 **virtual-virtual 相邻对**上——dummy 主干由此笔直；block 内 real 节点保持软目标，否则第二遍端口锚点拉动会拖着 real 节点走、端口对齐失效。禁止对 block 外的链直接加跨层等式约束——交叉链会使其不可行；不可行时报 `InfeasibleConstraint`，不得静默降级为特判
+- 长 proper / dummy 链：**BK block 内硬共线（由构造保证可行）+ block 外强软对齐**；VPSC 从「仅层内」升为跨层统一求解。硬共线等式加在 block 的**同类型相邻对**上：virtual-virtual 保 dummy 主干笔直；real-real 拉直 1:1 主链（主链不得微 Z、叶节点必须落在唯一邻居正下方）。例外有二：**链拖拽守卫**——与 dummy 相邻过的 real 成员（median 抢到了 dummy 的）保持软目标，否则硬等式会把整条链拖离走廊，且第二遍端口锚点拉动会拖着 real 节点走、端口对齐失效；**偶扇守卫**——real 对任一侧有 ≥4 的偶数 real 邻居时松开，junction 改由第二遍居中 desired（中间两个邻居 pass-1 位的中点）落位，因为 BK 只能把 junction 焊在一个 median 孩子列上，偶扇时该列必然偏心中。奇扇（≥3 奇数）与二分叉保持硬化：median 对所在列就是扇的中心，且主链可直穿 junction。两个守卫不是独立特判，而是单写者纪律在等式约束上的推论：**硬等式 = 熔成刚体、共享一个列自由度；任一成员的列已属别的写者（dummy 走廊列位争夺 / 偶扇中心展开）时对不得硬化**。熔断：若将来需要第三个守卫，不再往约束循环加排除条件，而是把「刚体成员资格」上提为显式决策步（单谓词产出成员表，约束构造只消费）。禁止对 block 外的链直接加跨层等式约束——交叉链会使其不可行；不可行时报 `InfeasibleConstraint`，不得静默降级为特判
 - 端口对齐进次轴目标（不只拉节点中心）。锚点依赖节点 frame，展开顺序钉死为两遍：先解节点中心 → 按 `along_spec` 展开锚点 → 以锚点为 desired 第二遍拉 dummy 链；写者全程只有 CoordWriter，Metric 不读 Ink 输出
 - `hier_eval`：开工前先记录 per-fixture 折点基线，再按 fixture 建回归阈值；同时记 sum_bends，防止「最大折点降、总折点涨」的假改善
 

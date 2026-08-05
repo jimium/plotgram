@@ -265,6 +265,7 @@ I.10  Freeze + PlanVerifier
 II.0  Freeze MetricBudget（端口 / 标注 / 自环 / channel / group title）
 II.1  主轴：layer → main；应用主轴 partition band / layer gap 下界
 II.2  次轴：BK 生成理想位置 → VPSC 统一解组框、节点、cross-axis band
+                            （BK block 同类型相邻对硬共线；链拖拽守卫、偶扇居中守卫见 roadmap 阶段 A）
 II.3  展开 PortPlan → port_points；publish track 坐标与缝宽
 II.4  MetricVerifier；冻结 Metric
 ```

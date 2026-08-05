@@ -9,8 +9,9 @@
 //!   (architecture.md §10.2).
 //! - Type-1 conflict marking: an inner (dummy–dummy) segment crossing a
 //!   non-inner segment is excluded from alignment.
-//! - The **primary** alignment — whose virtual-to-virtual member pairs
-//!   become hard collinearity constraints downstream — is fixed to
+//! - The **primary** alignment — whose same-type (virtual-virtual and
+//!   real-real) member pairs become hard collinearity constraints
+//!   downstream — is fixed to
 //!   upper-neighbors + left bias (`VARIANTS[0]`). Blocks of one BK
 //!   alignment never cross each other, which keeps those equality systems
 //!   feasible by construction (see `cross_axis.rs`).
