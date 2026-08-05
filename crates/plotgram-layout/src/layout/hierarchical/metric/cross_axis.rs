@@ -6,26 +6,26 @@
 //!   pairs**: virtual-virtual keeps long-edge trunks straight, and
 //!   real-real straightens 1:1 real chains (a spine must not zigzag,
 //!   and a leaf must land under its only neighbor). A real pair is only
-//!   hardened directionally 1:1; fans of ≥ 2 real neighbors split by
-//!   parity — odd fans harden the block pair (the median child carries
-//!   the straight spine through the junction, and for a symmetric fan
-//!   that column is the fan's center), while even fans (2, 4, 6, …)
-//!   harden nothing, so pass 2 can center the junction between its two
-//!   middle neighbors — and pairs only harden when *neither* member
-//!   aligned with a dummy anywhere in the primary alignment: a real node
-//!   that won a dummy as its median belongs to that chain's column
-//!   battle, and hardening it would drag the whole chain off its
-//!   corridor. All other pairs stay soft: pass 2's port-anchor pull on
-//!   chain-end dummies must not drag real nodes around.
+//!   hardened when both sides are directionally 1:1; any fan of ≥ 2
+//!   real neighbors stays soft so pass 2 can place the junction on the
+//!   fan's center — BK's layer sweep welds a fan-out hub to its
+//!   *leftmost* child under left bias (each child has one upper
+//!   neighbor), so odd fans are not "already centered" by hardening a
+//!   median block pair. Pairs only harden when *neither* member aligned
+//!   with a dummy anywhere in the primary alignment: a real node that
+//!   won a dummy as its median belongs to that chain's column battle,
+//!   and hardening it would drag the whole chain off its corridor. All
+//!   other pairs stay soft: pass 2's port-anchor pull on chain-end
+//!   dummies must not drag real nodes around.
 //! - Everything else is soft: `desired` = 4-candidate merged BK ideal,
 //!   dummies weighted higher so long edges keep their columns.
 //! - Pass 2 expands two upstream decisions (Metric's own expansions —
-//!   never read from Ink): even-fan junctions (≥ 2 real neighbors, even
-//!   count) get their desired rewritten to the midpoint of their two
-//!   middle neighbors' pass-1 positions — the BK ideal can only align a
-//!   junction with one median child, which for even fans is off-center —
-//!   and chain-end dummies are pulled onto their port anchors. On single-dummy chains both ends address the
-//!   same elem; the source anchor wins (target applied first, source
+//!   never read from Ink): fan junctions (≥ 2 real neighbors on a side)
+//!   get their desired rewritten to the fan center of their neighbors'
+//!   pass-1 positions (odd → single median; even → midpoint of the two
+//!   middle neighbors) — and chain-end dummies are pulled onto their
+//!   port anchors. On single-dummy chains both ends address the same
+//!   elem; the source anchor wins (target applied first, source
 //!   overwrites) — a fixed, deterministic rule.
 //!
 //! Feasibility: equality pairs are a subset of one BK alignment's edges,
@@ -182,13 +182,13 @@ fn real_degrees(plan: &PlanGraph) -> (Vec<usize>, Vec<usize>) {
     (down, up)
 }
 
-/// Fan-centering targets for pass 2: a real junction with an **even**
-/// fan of ≥ 2 real neighbors on one side wants the midpoint of its two
-/// middle neighbors' pass-1 positions (odd fans need no target — their
-/// median block pair stays hardened, which is both centered and
-/// straight). A junction fanned evenly on both sides takes the mean of
-/// both midpoints. Neighbor order: pass-1 position, elem index
-/// tie-break.
+/// Fan-centering targets for pass 2: a real junction with ≥ 2 real
+/// neighbors on one side wants the fan center of those neighbors'
+/// pass-1 positions — odd count → single median; even → midpoint of the
+/// two middle neighbors. (BK left-bias welds a fan-out hub to its
+/// leftmost child, so odd fans need an explicit target just like even
+/// ones.) A junction fanned on both sides takes the mean of both side
+/// centers. Neighbor order: pass-1 position, elem index tie-break.
 fn fan_centers(
     plan: &PlanGraph,
     pass1: &[f64],
@@ -204,7 +204,7 @@ fn fan_centers(
             up_nbs[s.to].push(s.from);
         }
     }
-    let middle = |nbs: &mut Vec<usize>| {
+    let fan_center = |nbs: &mut Vec<usize>| {
         nbs.sort_by(|a, b| {
             pass1[*a]
                 .partial_cmp(&pass1[*b])
@@ -212,22 +212,26 @@ fn fan_centers(
                 .then(a.cmp(b))
         });
         let m = nbs.len() / 2;
-        (pass1[nbs[m - 1]] + pass1[nbs[m]]) / 2.0
+        if nbs.len() % 2 == 1 {
+            pass1[nbs[m]]
+        } else {
+            (pass1[nbs[m - 1]] + pass1[nbs[m]]) / 2.0
+        }
     };
     let mut targets = Vec::new();
     for e in 0..n {
         if plan.elems[e].key.is_virtual() {
             continue;
         }
-        let mut middles: Vec<f64> = Vec::new();
-        if down_deg[e] >= 2 && down_deg[e] % 2 == 0 {
-            middles.push(middle(&mut down_nbs[e]));
+        let mut centers: Vec<f64> = Vec::new();
+        if down_deg[e] >= 2 {
+            centers.push(fan_center(&mut down_nbs[e]));
         }
-        if up_deg[e] >= 2 && up_deg[e] % 2 == 0 {
-            middles.push(middle(&mut up_nbs[e]));
+        if up_deg[e] >= 2 {
+            centers.push(fan_center(&mut up_nbs[e]));
         }
-        if !middles.is_empty() {
-            targets.push((e, middles.iter().sum::<f64>() / middles.len() as f64));
+        if !centers.is_empty() {
+            targets.push((e, centers.iter().sum::<f64>() / centers.len() as f64));
         }
     }
     targets
@@ -235,11 +239,10 @@ fn fan_centers(
 
 /// Intra-layer separation + hard collinearity over the same-type member
 /// pairs of each BK primary block (equality = opposing zero-gap constraint
-/// pairs, which `vpsc::solve` supports directly). A real pair touching
-/// an **even** fan of ≥ 2 real neighbors stays soft so pass 2 can center
-/// the junction between its two middle neighbors; odd fans keep their
-/// median pair hardened (that column is the fan's center). Pairs touching
-/// a dummy-aligned member stay soft too (chain-drag guard, module doc).
+/// pairs, which `vpsc::solve` supports directly). A real pair touching a
+/// fan of ≥ 2 real neighbors stays soft so pass 2 can place the junction
+/// on the fan center. Pairs touching a dummy-aligned member stay soft too
+/// (chain-drag guard, module doc).
 fn build_constraints(
     plan: &PlanGraph,
     size_of: &dyn Fn(usize) -> Size,
@@ -268,10 +271,10 @@ fn build_constraints(
                     } else {
                         (b, a)
                     };
-                    // Even fans (2, 4, …) stay soft for pass-2 centering;
-                    // odd fans keep their median block pair hardened.
-                    let even_fan = |d: usize| d >= 2 && d % 2 == 0;
-                    if even_fan(down_deg[upper]) || even_fan(up_deg[lower]) {
+                    // Any fan (≥ 2) stays soft for pass-2 centering —
+                    // including odd fan-out, which BK welds leftmost.
+                    let is_fan = |d: usize| d >= 2;
+                    if is_fan(down_deg[upper]) || is_fan(up_deg[lower]) {
                         continue;
                     }
                     // Chain-drag guard: a real pair hardened across a
@@ -511,7 +514,7 @@ mod tests {
 
     /// Binary fan (gateway → {A, B} → database): both the source hub and
     /// the sink must sit at the midpoint of the two middle-layer nodes —
-    /// degree-2 is an even fan and must not stay welded to the left child
+    /// degree-2 must not stay welded to the left child
     /// (smoke.flat-gateway-fanout asymmetry).
     #[test]
     fn binary_fan_diamond_centers_hub_and_sink() {
@@ -557,6 +560,73 @@ mod tests {
             (coords[3] - mid).abs() < 1e-6,
             "db must center under {{a,b}}: {} vs {mid}",
             coords[3]
+        );
+    }
+
+    /// Odd fan-out/in (hub → {a,b,c} → sink): both junctions sit on the
+    /// middle child's column — not welded to the leftmost child by BK
+    /// left bias (auto_edge_grouping.pgm / orch asymmetry).
+    #[test]
+    fn odd_fan_diamond_centers_hub_and_sink() {
+        // hub=0, a=1, b=2, c=3, sink=4
+        let elems = vec![
+            real("hub", 0),
+            real("a", 1),
+            real("b", 1),
+            real("c", 1),
+            real("sink", 2),
+        ];
+        let layers = vec![vec![0], vec![1, 2, 3], vec![4]];
+        let segments = vec![
+            seg("e0", 0, 0, 1),
+            seg("e1", 0, 0, 2),
+            seg("e2", 0, 0, 3),
+            seg("e3", 0, 1, 4),
+            seg("e4", 0, 2, 4),
+            seg("e5", 0, 3, 4),
+        ];
+        let plan = build_plan(elems, layers, segments);
+        let graph = real_graph(
+            &["hub", "a", "b", "c", "sink"],
+            &[
+                ("e0", 0, 1),
+                ("e1", 0, 2),
+                ("e2", 0, 3),
+                ("e3", 1, 4),
+                ("e4", 2, 4),
+                ("e5", 3, 4),
+            ],
+        );
+        let ports = assign_ports(
+            &graph,
+            &plan,
+            AlgoOrientation::Tb,
+            &vec![Size::new(20.0, 10.0); graph.ids.len()],
+            false,
+        )
+        .unwrap()
+        .ports;
+
+        let coords =
+            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
+                .expect("feasible");
+        let mid = coords[2]; // median child `b`
+        assert!(
+            (coords[0] - mid).abs() < 1e-6,
+            "hub must sit on median child: {} vs {mid}",
+            coords[0]
+        );
+        assert!(
+            (coords[4] - mid).abs() < 1e-6,
+            "sink must sit on median parent: {} vs {mid}",
+            coords[4]
+        );
+        // Outer span midpoint equals median for equal-width packing.
+        let outer = (coords[1] + coords[3]) / 2.0;
+        assert!(
+            (coords[0] - outer).abs() < 1e-6,
+            "hub must also be the fan's geometric middle: {} vs {outer}",
+            coords[0]
         );
     }
 

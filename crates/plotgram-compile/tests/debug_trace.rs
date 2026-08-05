@@ -67,8 +67,8 @@ fn check_envelope(v: serde_json::Value) {
     assert_eq!(v["space"], "physical");
     assert_eq!(v["orientation"], "top-to-bottom");
     assert!(
-        v["extension"]["channels"].is_null(),
-        "channels must stay null"
+        v["extension"]["channels"].is_object(),
+        "D1.2 ChannelDebug must be present"
     );
     // Dense indices never leak into element keys (acceptance 2 is enforced by
     // the type shape; the snapshot review double-checks).

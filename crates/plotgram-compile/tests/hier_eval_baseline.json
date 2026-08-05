@@ -137,16 +137,16 @@
   },
   "flat/product.refund-process": {
     "bbox_h": 472.29999999999995,
-    "bbox_w": 264.0,
+    "bbox_w": 269.0761188271605,
     "crossings": 4,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 20
+    "sum_bends": 22
   },
   "flat/product.self-loop-retry": {
-    "bbox_h": 330.5,
-    "bbox_w": 257.0,
-    "crossings": 2,
+    "bbox_h": 314.5,
+    "bbox_w": 217.1875,
+    "crossings": 0,
     "max_bends": 2,
     "reversed_count": 2,
     "sum_bends": 12
@@ -169,16 +169,16 @@
   },
   "flat/product.ticket-triage": {
     "bbox_h": 488.29999999999995,
-    "bbox_w": 313.0,
+    "bbox_w": 306.0,
     "crossings": 3,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 20
+    "sum_bends": 22
   },
   "flat/product.typical-microservice-architecture": {
     "bbox_h": 307.6,
-    "bbox_w": 373.67999999999995,
-    "crossings": 19,
+    "bbox_w": 373.68000000000006,
+    "crossings": 20,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 38
@@ -232,28 +232,28 @@
     "sum_bends": 44
   },
   "flat/stress.layout-stress-flat-mesh": {
-    "bbox_h": 632.3,
-    "bbox_w": 375.5726138861139,
-    "crossings": 52,
+    "bbox_h": 648.3,
+    "bbox_w": 379.8495294705295,
+    "crossings": 51,
     "max_bends": 4,
     "reversed_count": 2,
     "sum_bends": 50
   },
   "flat/stress.layout-stress-yfiles-pipeline": {
-    "bbox_h": 758.0999999999999,
+    "bbox_h": 742.0999999999999,
     "bbox_w": 448.0,
-    "crossings": 40,
+    "crossings": 38,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 66
   },
   "group/demo.ai-agent-docops-pipeline": {
     "bbox_h": 732.9999999999999,
-    "bbox_w": 580.8600000000001,
-    "crossings": 12,
+    "bbox_w": 606.6525613695092,
+    "crossings": 10,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 30
+    "sum_bends": 32
   },
   "group/demo.ci-cd-security-pipeline": {
     "bbox_h": 1490.0000000000005,
@@ -264,12 +264,12 @@
     "sum_bends": 52
   },
   "group/demo.customer-refund-process": {
-    "bbox_h": 906.7999999999998,
-    "bbox_w": 465.0,
-    "crossings": 11,
+    "bbox_h": 890.7999999999998,
+    "bbox_w": 458.0,
+    "crossings": 9,
     "max_bends": 4,
     "reversed_count": 3,
-    "sum_bends": 42
+    "sum_bends": 44
   },
   "group/demo.data-etl-pipeline": {
     "bbox_h": 614.0999999999999,
@@ -313,8 +313,8 @@
   },
   "group/demo.hybrid-cloud-dr-topology": {
     "bbox_h": 655.1999999999999,
-    "bbox_w": 911.55,
-    "crossings": 26,
+    "bbox_w": 934.7066060606061,
+    "crossings": 23,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 58
@@ -328,9 +328,9 @@
     "sum_bends": 20
   },
   "group/demo.insurance-claim-process": {
-    "bbox_h": 433.4,
-    "bbox_w": 325.71614583333337,
-    "crossings": 5,
+    "bbox_h": 449.4,
+    "bbox_w": 327.3820652173913,
+    "crossings": 6,
     "max_bends": 4,
     "reversed_count": 1,
     "sum_bends": 28
@@ -346,34 +346,34 @@
   "group/demo.k8s-multi-cluster-federation": {
     "bbox_h": 735.1999999999999,
     "bbox_w": 826.8600000000001,
-    "crossings": 79,
+    "crossings": 77,
     "max_bends": 4,
     "reversed_count": 0,
-    "sum_bends": 80
+    "sum_bends": 82
   },
   "group/demo.k8s-multi-namespace-overview": {
-    "bbox_h": 799.1999999999999,
-    "bbox_w": 1615.3824019871108,
-    "crossings": 154,
+    "bbox_h": 767.1999999999999,
+    "bbox_w": 1614.267691326531,
+    "crossings": 121,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 72
   },
   "group/demo.k8s-platform-stack": {
-    "bbox_h": 616.3,
-    "bbox_w": 869.5354699248121,
-    "crossings": 40,
+    "bbox_h": 568.3,
+    "bbox_w": 808.2244663461539,
+    "crossings": 36,
     "max_bends": 4,
     "reversed_count": 0,
-    "sum_bends": 64
+    "sum_bends": 68
   },
   "group/demo.k8s-tenant-isolation": {
     "bbox_h": 552.3,
-    "bbox_w": 1038.112348214286,
-    "crossings": 26,
+    "bbox_w": 988.8000000000002,
+    "crossings": 22,
     "max_bends": 2,
     "reversed_count": 0,
-    "sum_bends": 46
+    "sum_bends": 48
   },
   "group/demo.loan-approval-workflow": {
     "bbox_h": 913.6999999999998,
@@ -385,8 +385,8 @@
   },
   "group/demo.mcp-server-cluster-architecture": {
     "bbox_h": 294.5,
-    "bbox_w": 490.24,
-    "crossings": 5,
+    "bbox_w": 536.2997222222223,
+    "crossings": 3,
     "max_bends": 2,
     "reversed_count": 0,
     "sum_bends": 22
@@ -400,9 +400,9 @@
     "sum_bends": 18
   },
   "group/demo.payment-clearing-platform": {
-    "bbox_h": 591.1999999999999,
-    "bbox_w": 652.73,
-    "crossings": 10,
+    "bbox_h": 575.1999999999999,
+    "bbox_w": 645.0300000000002,
+    "crossings": 6,
     "max_bends": 4,
     "reversed_count": 1,
     "sum_bends": 32
@@ -410,10 +410,10 @@
   "group/demo.plotgram-core-mod-deps": {
     "bbox_h": 799.4999999999999,
     "bbox_w": 1323.276771428572,
-    "crossings": 71,
+    "crossings": 73,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 76
+    "sum_bends": 74
   },
   "group/demo.realtime-recommendation": {
     "bbox_h": 323.6,
@@ -448,12 +448,12 @@
     "sum_bends": 22
   },
   "group/product.cloud-native": {
-    "bbox_h": 362.5,
-    "bbox_w": 716.2595833333332,
-    "crossings": 16,
+    "bbox_h": 378.5,
+    "bbox_w": 720.084,
+    "crossings": 14,
     "max_bends": 2,
     "reversed_count": 0,
-    "sum_bends": 22
+    "sum_bends": 24
   },
   "group/product.compiler-pipeline": {
     "bbox_h": 394.5,
@@ -480,25 +480,25 @@
     "sum_bends": 14
   },
   "group/product.ecommerce-platform": {
-    "bbox_h": 559.1999999999999,
-    "bbox_w": 633.0600000000001,
-    "crossings": 5,
+    "bbox_h": 575.1999999999999,
+    "bbox_w": 559.5376785714286,
+    "crossings": 9,
     "max_bends": 2,
     "reversed_count": 0,
-    "sum_bends": 26
+    "sum_bends": 28
   },
   "group/product.event-driven": {
     "bbox_h": 188.70000000000002,
-    "bbox_w": 276.0,
+    "bbox_w": 264.0,
     "crossings": 2,
     "max_bends": 2,
     "reversed_count": 0,
     "sum_bends": 10
   },
   "group/product.message-queue-pipeline": {
-    "bbox_h": 259.6,
+    "bbox_h": 243.60000000000002,
     "bbox_w": 264.0,
-    "crossings": 2,
+    "crossings": 0,
     "max_bends": 2,
     "reversed_count": 0,
     "sum_bends": 14
@@ -512,9 +512,9 @@
     "sum_bends": 20
   },
   "group/product.monitoring-stack": {
-    "bbox_h": 275.6,
-    "bbox_w": 312.65000000000003,
-    "crossings": 2,
+    "bbox_h": 243.60000000000002,
+    "bbox_w": 301.38000000000005,
+    "crossings": 0,
     "max_bends": 2,
     "reversed_count": 0,
     "sum_bends": 10
@@ -536,9 +536,9 @@
     "sum_bends": 10
   },
   "group/product.serverless-web-app": {
-    "bbox_h": 330.5,
-    "bbox_w": 367.0,
-    "crossings": 2,
+    "bbox_h": 314.5,
+    "bbox_w": 302.13166666666666,
+    "crossings": 0,
     "max_bends": 2,
     "reversed_count": 0,
     "sum_bends": 14
@@ -552,9 +552,9 @@
     "sum_bends": 0
   },
   "group/product.unite-config-publish": {
-    "bbox_h": 529.0,
-    "bbox_w": 669.0899999999999,
-    "crossings": 3,
+    "bbox_h": 513.0,
+    "bbox_w": 611.8999999999999,
+    "crossings": 1,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 14
@@ -576,8 +576,8 @@
     "sum_bends": 0
   },
   "styles/polyline": {
-    "bbox_h": 188.70000000000002,
-    "bbox_w": 265.47,
+    "bbox_h": 172.70000000000002,
+    "bbox_w": 264.0,
     "crossings": 0,
     "max_bends": 0,
     "reversed_count": 0,
