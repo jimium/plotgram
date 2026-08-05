@@ -1,10 +1,16 @@
-// bus_routing — Channel 长程走廊合流（edge-parameters §2.4）
-// 两条跨多层边汇入同一汇点：共享 ChannelPath 后缀 → BundlePlan SharedCorridor；
-// TrackOrder 在共享 track 上强制同轨；Ink Verifier 允许故意共线。
-// 对照：关 bus_routing 时同拓扑会分轨（无 SharedCorridor）。
+// bus_routing 探针（当前实现下多为 no-op）
+//
+// 实测（debug-layout ON vs OFF）：本图 5 条边 ChannelPath 开/关完全一致。
+// 长边 west→store / east→store 的 track 序列形如 [Cross, Main_L, Cross]
+// 与 [Cross, Main_R, Cross]——只共享末段 Cross，后缀长度 = 1；
+// detect_corridor_bundles 要求 min_suffix ≥ 2，故写不出 SharedCorridor。
+// 图中末段看似共水平轨，来自 TrackOrder 在同一 Cross track 上的分轨/同轨，
+// 不是 BundlePlan。
+//
+// 可见的「总线」请看 auto_edge_grouping.pgm（端总线 SharedPort→Trunk→Bus→Stub）。
 diagram {
     profile: flowchart,
-    title: "Channel 走廊合流（bus_routing）",
+    title: "bus_routing 探针（当前无 SharedCorridor）",
     layout: hierarchical { auto_edge_grouping: false, bus_routing: true }
 
     node west { label: "西区接入", archetype: process }
@@ -12,7 +18,6 @@ diagram {
     node core { label: "核心交换", archetype: process }
     node store { label: "统一落库", archetype: storage }
 
-    // 跨两层长边：Channel 走 Cross→Main→Cross…，近汇点易共享后缀轨
     west -> store
     east -> store
     west -> core

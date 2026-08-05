@@ -1,8 +1,8 @@
-// 对照件：与 demo.bus_routing 同拓扑，关闭 bus_routing
-// 期望：无 SharedCorridor；汇入边在层间走廊分轨（不故意共线）
+// 对照：与 demo.bus_routing 同拓扑，bus_routing: false
+// 期望：与 ON 版像素一致（证明当前拓扑下开关无差分）。
 diagram {
     profile: flowchart,
-    title: "对照：关 bus_routing（分轨）",
+    title: "对照：关 bus_routing（应与 ON 版同形）",
     layout: hierarchical { auto_edge_grouping: false, bus_routing: false }
 
     node west { label: "西区接入", archetype: process }

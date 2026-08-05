@@ -1,9 +1,9 @@
-// auto_edge_grouping + bus_routing 同时开启
-// - 编排器扇出：端总线 SharedPort→Trunk→Bus→Stub（相邻层）
-// - 跨层汇入：Channel SharedCorridor（长程后缀轨）
+// 可见合流：靠 auto_edge_grouping（端总线），不是 bus_routing
+// orch 扇出三条边 → SharedPort → Trunk → Bus → Stub（Metric bus_y）
+// bus_routing 仍打开，但跨层汇入边通常仍写不出 SharedCorridor（见 demo.bus_routing 注释）
 diagram {
     profile: flowchart,
-    title: "端总线 + Channel 走廊（双开关）",
+    title: "端总线合流（auto_edge_grouping）",
     layout: hierarchical { auto_edge_grouping: true, bus_routing: true }
 
     node orch { label: "编排器", archetype: process }
@@ -15,7 +15,6 @@ diagram {
     orch -> pay
     orch -> inv
     orch -> ship
-    // 长边直达汇点：走 Channel，可被 bus_routing 检测后缀合流
     pay -> sink
     inv -> sink
     ship -> sink
