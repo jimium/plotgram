@@ -739,16 +739,17 @@ api -> db {
 | **tail_label** | `tail_label: <string>` | 靠近**源**端标签（如 ER 基数 `N`） |
 | **variant** | `variant: <atom>` | 视觉变体（颜料）；查主题 `variants`（§14.7 封闭集） |
 | **from_side** / **to_side** / **from_slot** / **to_slot** / **from_ratio** / **to_ratio** / **from_x**+**from_y** / **to_x**+**to_y** / **from_sides** / **to_sides** | 见 §7.4 | 端口约束（五档）→ 提升为 `Edge.from_port` / `to_port`（**`active`**） |
-| **edge_group** | `edge_group: <atom\|string>` | 边组/总线 id → 提升为 `Edge.edge_group`（**`active`**） |
+| **critical** | `critical: <bool>` | 关键路径标记 → 提升为 `Edge.critical`（**`active`**） |
 | **style.\*** | `style.<prop>: …` | 内联颜料；词表见 style-sheet-spec §5 |
 | **meta.\*** | `meta.<key>: …` | 渲染器忽略 |
 
-边**没有** `shape` / `icon` / `archetype` / `layout` / `seq`。
+边**没有** `shape` / `icon` / `archetype` / `layout` / `seq` / `edge_group`。
 
 - 未写 `variant` → `default`
 - 三处标签互不推导；需要端点文案时显式写 `head_label:` / `tail_label:`
 - 封闭集与 cascade：§14.4；`variant` resolve 见 style-sheet-spec §6.2
-- 端口 / `edge_group` 经 parse 提升为一等字段后**不得**再留在 attrs 供引擎读取（见 ADR-003）
+- 端口 / `critical` 经 parse 提升为一等字段后**不得**再留在 attrs 供引擎读取（见 ADR-003）
+- 边合流不写边级键：开 `layout: hierarchical { auto_edge_grouping: true }`（见 §7.4.3）
 
 ### 7.4 端口（side + slot）
 
@@ -824,18 +825,25 @@ Side    = north | south | east | west
 
 不引入 `@south` 箭头后缀；端口只走属性块。
 
-#### 7.4.3 边组 / 总线
+#### 7.4.3 自动边合流（auto_edge_grouping）
 
-| 属性键 | 类型 | 说明 |
-|--------|------|------|
-| `edge_group` | atom 或 string | 同 id 的边可共享合流主干（bus）；省略 = 不分组 |
-
-提升为 `Edge.edge_group: Option<String>`。几何合流由路由/Ink 消费；**不是**新的 layout 算法名。
+一对多 / 多对一扇出的端口合流**不**用手写边级组 id。开布局开关即可：
 
 ```plotgram
-a -> hub { label: "in1", edge_group: bus_auth }
-b -> hub { label: "in2", edge_group: bus_auth }
+layout: hierarchical { auto_edge_grouping: true }
+
+hub -> a
+hub -> b
+hub -> c
 ```
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `auto_edge_grouping` | bool | 同源扇出 / 同汇扇入：共享端口 + 干线 + 水平总线 + stub（yFiles bus）；默认 `false` |
+
+- 对应 yFiles `automaticEdgeGrouping`：算法按公共源/汇自动成组，**不**要求作者逐边标记。
+- DSL 键 `edge_group` **已移除**；写了 → 解析错误（提示改用本开关）。
+- 更强的干线总线几何（`bus_routing`）后置，见 edge-parameters.md §2.4。
 
 #### 7.4.4 示例（正反边错开）
 
@@ -1004,7 +1012,7 @@ db -> api {
 }                                       // 端口 → Edge.from_port / to_port
 ```
 
-结构键（端口 / `edge_group` / `role`…）parse 后提升为一等字段；引擎不读 attrs 中的同名残留。
+结构键（端口 / `critical` / `role`…）parse 后提升为一等字段；引擎不读 attrs 中的同名残留。
 
 ### 7.8 规则
 
@@ -1026,7 +1034,7 @@ db -> api {
   → lift Node 结构字段（role / host_group / side / slot）
   → lift Node 结构字段（role / host_group / side / slot / cell_col / cell_row）
   → validate_partition（有 cell 则须有 grid；轴 id 冲突检查）
-  → lift Edge 结构字段（from_side… / edge_group → Edge 一等字段）
+  → lift Edge 结构字段（from_side… / critical → Edge 一等字段）
   → archetype expand（见 archetype-spec：只填空写入 shape / variant / icon）
   → profile expand（显式 `profile:` → 默认 layout / edge_routing、自环策略、图种约束；无 `profile:` 时仅算法字段走 flowchart 预设；显式 layout 覆盖）
   → LayoutContract（算法名 + 参数 + 图模型；**无** profile / 图种名）
@@ -1183,7 +1191,7 @@ true, false
 | 15 | edge 规范形态为 `src arrow tgt { … }`；允许省略空 `{}`；中点 label 糖见 §7.5；`@group` 见 §7.6 |
 | 16 | edge 禁止 `>"` / `<"` 端点糖；端点文案只认 `head_label:` / `tail_label:` |
 | 17 | `layout: sequence` 时消息时间序 = 边声明序；禁止另立 `seq` 双真源（§8.1） |
-| 18 | `edge_group` 提升为 `Edge.edge_group`；引擎不从 attrs 读结构键 |
+| 18 | 边合流改布局开关 `auto_edge_grouping`；边级 `edge_group` 移除 |
 | 19 | `role: group_anchor` 须有 `host_group` + `side`；提升为 `Node` 一等字段；锚点须为 host 组成员（§5.7） |
 | 20 | `@gid` 端点须对应已声明 group；该端缺少 `*_side` → 错；禁止无 `@` 的裸 group id 作端点（§7.6） |
 | 21 | `partition` 轴 id 与 node/group 不撞名；`cell_col`/`cell_row` 须引用已声明轴；无 grid 不得写 cell（§4.3 / ADR-008） |
@@ -1407,19 +1415,20 @@ variant **只**贡献 fill / stroke / font / dash / radius 等颜料；**不**�
 | `to_x` / `to_y` | number（成对） | **`active`（模型字段）** | DSL 作者 | 并入 `to_port`（FixedPos） |
 | `from_sides` | string（逗号分隔 atom） | **`active`（模型字段）** | DSL 作者 | 并入 `from_port`（Candidates）；封闭集、去重、非空 |
 | `to_sides` | string（同上） | **`active`（模型字段）** | DSL 作者 | 并入 `to_port`（Candidates） |
-| `edge_group` | atom 或 string | **`active`（模型字段）** | DSL 作者 | 提升为 `Edge.edge_group`；路由/Ink 合流 |
+| `critical` | bool | **`active`（模型字段）** | DSL 作者 | 提升为 `Edge.critical`；Hier 排序/对齐加权 |
 | `meta.*` | 任意 | — | DSL 作者 | 无 |
 
 `source` / `target` / 箭头语义（`->` / `-->` / `<->`）是**语法**，落在 `Edge::source` / `target` / `arrow`；**不得**在属性块用 `source:` / `target:` / `arrow:` 覆盖。三处标签只经 `label` / `head_label` / `tail_label`（或 §7.5 中点糖）；**已废弃** `>"` / `<"` 端点标记。
 
 **已废弃**：`>"head"` / `<"tail"` 端点糖；位置 string 作为规范中点标签（降为 §7.5 糖）。**不提供** `seq:`（时序用边声明序，§8.1）。
 
-#### 14.4.1 端口 / 边组落地状态
+#### 14.4.1 端口 / 自动合流落地状态
 
 | 项 | 状态 |
 |----|------|
-| `Edge.from_port` / `to_port` / `edge_group` 一等字段（五档 `PortConstraint`） | **已落地**（plotgram-model） |
-| DSL 十二键（side/slot/ratio/x/y/sides × from/to）+ `edge_group` 校验与提升（`lift_structural_attrs`） | **已落地**（model API；parser 须调用；同端档位键互斥） |
+| `Edge.from_port` / `to_port` 一等字段（五档 `PortConstraint`） | **已落地**（plotgram-model） |
+| DSL 十二键（side/slot/ratio/x/y/sides × from/to）校验与提升（`lift_structural_attrs`） | **已落地**（model API；parser 须调用；同端档位键互斥） |
+| 布局 `auto_edge_grouping`（同源/同汇自动合流）；边级 `edge_group` **已移除** | **已落地** |
 | `Node.role` / `host_group` / `anchor`（group_anchor） | **已落地**（plotgram-model；见 §5.7 / ADR-004） |
 | `Graph.partition` / `Node.partition_cell`（ADR-008） | **已落地**（plotgram-model + `validate_partition`；`cell_*` lift 已接） |
 | `partition { column/row … }` 块 parse | **planned** |
@@ -1577,7 +1586,7 @@ style-sheet-spec  视觉属性词表 + 主题 JSON + cascade
 | 语义 / 视觉标注 | `entity[database]` / `type:` / 曾用 `kind:` | **`archetype:`** 或显式 **`variant:`** + **`icon:`**；废弃 `kind` |
 | 形状 | 多由 type / kind 推断 / style.shape | 属性块 **`shape:`**；与 variant 正交；archetype 可填缺省 |
 | 边端口 | 无（落笔易猜中点） | **`Edge.from_port`/`to_port`**；DSL 四键提升；决议在 `EdgePlacement` |
-| 边组 / 总线 | 无 | **`Edge.edge_group`** |
+| 边组 / 总线 | 无 | 布局 **`auto_edge_grouping`**（无边级 `edge_group`） |
 | 时序时间 | （图种特判） | **边声明序**；无 `seq` 字段（§8.1） |
 | 声明式样式 | `node_style` / `edge_style` | **删除**；仅内联 `style.*` |
 | ER `field` | （旧亦弱） | **本草案不做**；另文 |

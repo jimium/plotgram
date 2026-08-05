@@ -7,7 +7,9 @@
 //! inspection:
 //!
 //! - no two node frames overlap;
-//! - every edge path segment is axis-aligned (orthogonal);
+//! - every edge path segment is axis-aligned (orthogonal) — asserted only
+//!   for the default/`orthogonal` routing style; fixtures that declare
+//!   `routing_style: polyline` / `routing_style: curved` opt out;
 //! - every edge path's first/last point lands exactly on its source/target
 //!   node frame boundary (the port anchor, not just "near" it);
 //! - a self-contained segment-intersection crossing count and max-bend count
@@ -151,7 +153,7 @@ fn hierarchical_showcase_geometry_invariants() {
         };
 
         check_no_node_overlaps(&name, &result, &mut hard_failures);
-        check_orthogonal_and_ports(&name, &result, &mut hard_failures);
+        check_orthogonal_and_ports(&name, &source, &result, &mut hard_failures);
         let reversed_count = match build_debug_trace(&source, &BuildOptions::default()) {
             Ok(trace) => serde_json::to_value(&trace)
                 .ok()
@@ -228,7 +230,18 @@ fn check_no_node_overlaps(name: &str, result: &LayoutResult, failures: &mut Vec<
     }
 }
 
-fn check_orthogonal_and_ports(name: &str, result: &LayoutResult, failures: &mut Vec<String>) {
+fn check_orthogonal_and_ports(
+    name: &str,
+    source: &str,
+    result: &LayoutResult,
+    failures: &mut Vec<String>,
+) {
+    // Orthogonality is a property of the default/`orthogonal` ink style only;
+    // fixtures that opt into `polyline` / `curved` declare it in the source
+    // and legitimately emit diagonal / curved segments.
+    let orthogonal_style = !source.contains("routing_style: polyline")
+        && !source.contains("routing_style: curved");
+
     let frame_of: BTreeMap<&str, Rect> = result
         .nodes
         .iter()
@@ -240,13 +253,15 @@ fn check_orthogonal_and_ports(name: &str, result: &LayoutResult, failures: &mut 
         if pts.len() < 2 {
             continue; // degenerate edge type, not this layout's output shape
         }
-        for w in pts.windows(2) {
-            let (a, b) = (w[0], w[1]);
-            if (a.x - b.x).abs() > EPS && (a.y - b.y).abs() > EPS {
-                failures.push(format!(
-                    "{name}: edge `{}` has a non-orthogonal segment {:?} -> {:?}",
-                    e.id, a, b
-                ));
+        if orthogonal_style {
+            for w in pts.windows(2) {
+                let (a, b) = (w[0], w[1]);
+                if (a.x - b.x).abs() > EPS && (a.y - b.y).abs() > EPS {
+                    failures.push(format!(
+                        "{name}: edge `{}` has a non-orthogonal segment {:?} -> {:?}",
+                        e.id, a, b
+                    ));
+                }
             }
         }
         if let Some(&src_frame) = frame_of.get(e.source.as_str()) {
@@ -279,7 +294,13 @@ fn compute_metrics(name: &str, result: &LayoutResult, reversed_count: usize) -> 
     for e in &result.edges {
         let pts = e.path.samples();
         if pts.len() >= 2 {
-            let bends = pts.len() - 2;
+            // A cubic Bézier has no bends (its 24 samples are one smooth
+            // segment); only polyline waypoints carry bend counts.
+            let bends = if e.path.polyline_points().is_some() {
+                pts.len() - 2
+            } else {
+                0
+            };
             max_bends = max_bends.max(bends);
             sum_bends += bends;
         }

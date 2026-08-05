@@ -178,6 +178,11 @@ pub struct HierarchicalParams {
     pub edge_gap: f64,
     /// Built-in ink style (ignored when layout defers to an independent EdgeRouter).
     pub routing_style: RoutingStyle,
+    /// Automatic edge grouping (edge-parameters.md §2.3 / yFiles
+    /// `automaticEdgeGrouping`): same-source fan-out / same-target fan-in
+    /// share one port + bus trunk (SharedPort → Trunk → Bus → Stub).
+    /// Default off.
+    pub auto_edge_grouping: bool,
     pub group_policy: GroupPolicy,
     /// **Not consumed in this build** (no group-frame writer yet) — explicit
     /// options rejected in [`Self::bind`]; see `edge_gap` above.
@@ -194,6 +199,7 @@ impl Default for HierarchicalParams {
             layer_gap: 40.0,
             edge_gap: 16.0,
             routing_style: RoutingStyle::Orthogonal,
+            auto_edge_grouping: false,
             group_policy: GroupPolicy::Weak,
             group_sizing: GroupSizing::Fit,
             group_align: GroupAlign::Center,
@@ -218,6 +224,20 @@ impl HierarchicalParams {
                      (no consumer yet; see docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md §2.7)"
                 )));
             }
+        }
+        if options.contains_key("edge_grouping") {
+            return Err(LayoutError::message(
+                "hierarchical: option `edge_grouping` was renamed to `auto_edge_grouping`"
+                    .to_string(),
+            ));
+        }
+        if options.contains_key("cluster_pitch") {
+            return Err(LayoutError::message(
+                "hierarchical: option `cluster_pitch` was removed; \
+                 `auto_edge_grouping` uses yFiles bus geometry (shared port + trunk), \
+                 stub spacing comes from target columns"
+                    .to_string(),
+            ));
         }
 
         let mut binder = OptionsBinder::new(options);
@@ -281,6 +301,20 @@ impl HierarchicalParams {
             params.routing_style = rs;
         }
 
+        if let Some(v) = binder.get_bool("auto_edge_grouping").map_err(bind_err)? {
+            params.auto_edge_grouping = v;
+        }
+
+        // Invalid combination (edge-parameters.md §2.4 discipline): grouping
+        // geometry is defined for the orthogonal main path only.
+        if params.auto_edge_grouping && matches!(params.routing_style, RoutingStyle::Octilinear) {
+            return Err(LayoutError::message(
+                "hierarchical: `auto_edge_grouping` is unsupported with routing_style `octilinear` \
+                 (grouping geometry is defined for the orthogonal main path only)"
+                    .to_string(),
+            ));
+        }
+
         if let Some(p) = binder
             .get_enum(
                 "group_policy",
@@ -311,12 +345,14 @@ impl HierarchicalParams {
     pub fn hash(&self) -> String {
         let canonical = format!(
             "orientation={}|node_gap={:e}|layer_gap={:e}|edge_gap={:e}|\
-             routing_style={}|group_policy={}|group_sizing={}|group_align={}",
+             routing_style={}|auto_edge_grouping={}|\
+             group_policy={}|group_sizing={}|group_align={}",
             self.orientation.as_str(),
             self.node_gap,
             self.layer_gap,
             self.edge_gap,
             self.routing_style.as_str(),
+            self.auto_edge_grouping,
             self.group_policy.as_str(),
             self.group_sizing.as_str(),
             self.group_align.as_str(),
@@ -386,6 +422,10 @@ mod tests {
             },
             HierarchicalParams {
                 group_policy: GroupPolicy::StrongMacro,
+                ..a
+            },
+            HierarchicalParams {
+                auto_edge_grouping: true,
                 ..a
             },
         ];

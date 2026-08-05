@@ -312,11 +312,33 @@ fn edge_port_lift_combinations() {
 }
 
 #[test]
-fn edge_group_lift() {
-    let out = p("diagram { node a {} node b {} a -> b { edge_group: bus1 } }");
-    let e = edge_at(&out, 0);
-    assert_eq!(e.edge_group.as_deref(), Some("bus1"));
-    assert!(!e.attrs.contains_key("edge_group"));
+fn edge_group_is_rejected() {
+    let err = parse("diagram { node a {} node b {} a -> b { edge_group: bus1 } }").unwrap_err();
+    assert!(err.to_string().contains("edge_group"), "unexpected: {err}");
+}
+
+#[test]
+fn critical_lift() {
+    // Default: absent key → false.
+    let out = p("diagram { node a {} node b {} a -> b }");
+    assert!(!edge_at(&out, 0).critical);
+
+    // Table: (bool literal, expected flag).
+    let cases: &[(&str, bool)] = &[("critical: true", true), ("critical: false", false)];
+    for (attrs, expected) in cases {
+        let src = format!("diagram {{ node a {{}} node b {{}} a -> b {{ {attrs} }} }}");
+        let out = p(&src);
+        let e = edge_at(&out, 0);
+        assert_eq!(e.critical, *expected, "attrs=`{attrs}`");
+        assert!(!e.attrs.contains_key("critical"), "attrs=`{attrs}`");
+    }
+}
+
+#[test]
+fn critical_non_bool_rejected() {
+    let err = parse("diagram { node a {} node b {} a -> b { critical: yes } }")
+        .expect_err("non-bool `critical` must fail");
+    assert!(err.to_string().contains("critical"), "unexpected: {err}");
 }
 
 // ─── §7.6 @group frame edges ────────────────────────────────────────────────

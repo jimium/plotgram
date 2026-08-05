@@ -311,8 +311,9 @@ III.4 InkVerifier（硬 FAIL）
 | 值 | 语义 | 落地 |
 |----|------|------|
 | `orthogonal`（默认） | 通道拓扑 + 正交展开 | **主路径** |
-| `polyline` | Compose 明写 `RouteTopology::Polyline(DirectOrVia)`；Ink 只展开 | 支持；质量次之 |
-| `octilinear` / `curved` | 产品面保留 | 可后置；未实现须显式错误 |
+| `polyline` | waypoints（源锚点 → dummy 中心 → 目标锚点）直连折线；Ink 不插 bend | 支持 |
+| `curved` | 正交骨架首末锚点间单段 cubic，控制点沿端口法线外推 | 支持（限主轴向 North/South 端口，见 [edge-parameters](edge-parameters.md) §4） |
+| `octilinear` | 45° 骨架，依赖 Channel | 未实现；bind 后硬失败（明示后置） |
 
 与 diagram 级 `edge_routing:` **正交**：后者是独立 EdgeRouter；前者是 Builtin Ink 风格。
 `routing_style` 可被 bind 不等于已支持；若对应 Plan 生成器未注册，I.0 直接 `Unsupported`。
@@ -457,7 +458,7 @@ P4：组框边、列带边 = **VPSC 变量**，禁止事后包围盒当真源。
 `profile:`（flowchart 等）在**解析层**展开为 `layout: hierarchical` + 若干字段/preset；**不是** `HierarchicalPreset` 本身。  
 Preset = 对默认值的命名补丁（如只改 gaps）；**不**夹带 group_policy 语义包。
 
-结构事实继续放 Graph（group tree、PartitionGrid、端口约束、edge_group）；Hier 专属的 node/edge/group 偏好进入 typed `HierarchicalLayoutData`，不得让算法从元素 `attrs` 临时猜键：
+结构事实继续放 Graph（group tree、PartitionGrid、端口约束）；Hier 专属的 node/edge/group 偏好进入 typed `HierarchicalLayoutData`，不得让算法从元素 `attrs` 临时猜键：
 
 ```text
 HierarchicalLayoutData {
@@ -498,7 +499,7 @@ HierarchicalLayoutData {
 | `layering` | P2 | NetworkSimplex / FromSketch… |
 | `crossing` | P3 | median 配方开关 |
 | `coord` | P4 | BK / VPSC 策略阈 |
-| `edge_grouping` / `bus` | Compose | 自动边组 / bus |
+| `auto_edge_grouping` / `bus` | Compose | 自动边组 / bus |
 | `port_policy` | Port | 默认 FREE 粒度 |
 | `component_arrangement` | Stage | 分量拼合 |
 | `failure_policy` | 全局 | BudgetExceeded 时 hard-fail / verified-best |

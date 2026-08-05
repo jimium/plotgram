@@ -12,7 +12,7 @@ use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::port::AlongSpec;
 
 use crate::layout::hierarchical::compose::ports::ResolvedPort;
-use crate::layout::hierarchical::ink::route::CanonicalEdge;
+use crate::layout::hierarchical::ink::route::{CanonicalEdge, InkPath};
 
 const BASE_OUT: f64 = 24.0;
 const OUT_STEP: f64 = 10.0;
@@ -40,7 +40,7 @@ pub fn self_loop_edges(
             x: frame.right(),
             y: frame.y + frame.height * 0.7,
         };
-        let path = vec![
+        let path = InkPath::Polyline(vec![
             top,
             Point {
                 x: top.x + out_dist,
@@ -51,7 +51,7 @@ pub fn self_loop_edges(
                 y: bottom.y,
             },
             bottom,
-        ];
+        ]);
 
         let id = ids[*node_idx].clone();
         out.push(CanonicalEdge {
@@ -95,7 +95,7 @@ mod tests {
         let e = &edges[0];
         assert_eq!(e.source, "a");
         assert_eq!(e.target, "a");
-        assert!(e.path.iter().all(|p| p.x >= frames[0].right()));
+        assert!(e.path.samples().iter().all(|p| p.x >= frames[0].right()));
     }
 
     #[test]
@@ -104,8 +104,8 @@ mod tests {
         let frames = vec![Rect::new(0.0, 0.0, 20.0, 10.0)];
         let loops = vec![("e0".to_string(), 0usize), ("e1".to_string(), 0usize)];
         let edges = self_loop_edges(&loops, &ids, &frames, 24.0);
-        let max_x0 = edges[0].path.iter().map(|p| p.x).fold(0.0_f64, f64::max);
-        let max_x1 = edges[1].path.iter().map(|p| p.x).fold(0.0_f64, f64::max);
+        let max_x0 = edges[0].path.samples().iter().map(|p| p.x).fold(0.0_f64, f64::max);
+        let max_x1 = edges[1].path.samples().iter().map(|p| p.x).fold(0.0_f64, f64::max);
         assert!(max_x1 > max_x0, "second loop should extend further out");
     }
 }

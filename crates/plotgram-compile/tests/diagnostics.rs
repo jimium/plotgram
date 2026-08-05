@@ -4,6 +4,7 @@
 //! `hier_eval` and the coordinate snapshots.
 
 use plotgram_compile::{build_layout, BuildOptions};
+use plotgram_model::result::{EdgePath, LayoutResult};
 
 const BASE: &str = "diagram {\n  layout: hierarchical { %OPTIONS% }\n  node a \"A\"\n  node b \"B\"\n  a -> b\n}";
 
@@ -49,4 +50,149 @@ fn layout_result_json_round_trip_keeps_diagnostics() {
     let json = serde_json::to_string(&result).unwrap();
     let back: plotgram_model::result::LayoutResult = serde_json::from_str(&json).unwrap();
     assert_eq!(back.diagnostics, result.diagnostics);
+}
+
+// ─── routing_style (batch 1) ─────────────────────────────────────────────
+
+const FAN: &str = "diagram {\n  layout: hierarchical { %OPTIONS% }\n  node s {}\n  node a {}\n  node b {}\n  node c {}\n  s -> a\n  s -> b\n  s -> c\n}";
+
+fn fan_with(options: &str) -> String {
+    FAN.replace("%OPTIONS%", options)
+}
+
+#[test]
+fn routing_style_builtin_styles_end_to_end() {
+    let opts = BuildOptions::default();
+
+    // Default: orthogonal — every segment axis-aligned.
+    let r = build_layout(&fan_with(""), &opts).unwrap();
+    assert!(!r.edges.is_empty());
+    for e in &r.edges {
+        let pts = e.path.polyline_points().expect("orthogonal emits polylines");
+        for w in pts.windows(2) {
+            let orthogonal = (w[0].x - w[1].x).abs() < 1e-6 || (w[0].y - w[1].y).abs() < 1e-6;
+            assert!(orthogonal, "default style must stay orthogonal");
+        }
+    }
+
+    // Polyline: straight waypoint chains; the outer fan edges are diagonal.
+    let r = build_layout(&fan_with("routing_style: polyline"), &opts).unwrap();
+    let mut any_diagonal = false;
+    for e in &r.edges {
+        let pts = e.path.polyline_points().expect("polyline emits polylines");
+        assert!(pts.len() >= 2);
+        any_diagonal |= pts.windows(2).any(|w| {
+            (w[0].x - w[1].x).abs() > 1e-6 && (w[0].y - w[1].y).abs() > 1e-6
+        });
+    }
+    assert!(any_diagonal, "fan edges should run diagonally in polyline style");
+
+    // Curved: every edge is a single cubic between its port anchors.
+    let r = build_layout(&fan_with("routing_style: curved"), &opts).unwrap();
+    for e in &r.edges {
+        assert!(
+            matches!(e.path, EdgePath::Cubic { .. }),
+            "curved style must emit cubics, got polyline for `{}`",
+            e.id
+        );
+    }
+}
+
+// ─── auto_edge_grouping (batch 2) ────────────────────────────────────────
+
+#[test]
+fn auto_edge_grouping_octilinear_is_rejected() {
+    let src = fan_with("routing_style: octilinear, auto_edge_grouping: true");
+    let err = build_layout(&src, &BuildOptions::default())
+        .expect_err("auto_edge_grouping + octilinear must fail at bind");
+    assert!(
+        err.to_string().contains("auto_edge_grouping"),
+        "unexpected: {err}"
+    );
+}
+
+#[test]
+fn auto_edge_grouping_fans_share_source_port_and_bus() {
+    let opts = BuildOptions::default();
+    let src = r#"diagram {
+  layout: hierarchical { auto_edge_grouping: true }
+  node hub {}
+  node a {}
+  node b {}
+  node c {}
+  hub -> a
+  hub -> b
+  hub -> c
+}"#;
+    let r = build_layout(src, &opts).unwrap();
+    assert_eq!(r.edges.len(), 3);
+
+    // Shared source PortPoint (yFiles bus): all members start at the same point.
+    let starts: Vec<_> = r
+        .edges
+        .iter()
+        .map(|e| e.path.samples()[0])
+        .collect();
+    assert!(
+        starts.iter().all(|p| (p.x - starts[0].x).abs() < 1e-6 && (p.y - starts[0].y).abs() < 1e-6),
+        "clustered fan must share one source port, got {starts:?}"
+    );
+
+    // Shared trunk tip: some vertex on each path has (start.x, bus_y).
+    let start = starts[0];
+    for e in &r.edges {
+        let pts = e.path.samples();
+        assert!(
+            pts.iter()
+                .any(|p| (p.x - start.x).abs() < 1e-6 && (p.y - start.y).abs() > 1.0),
+            "edge {} must leave the shared port along a trunk, got {pts:?}",
+            e.id
+        );
+    }
+}
+
+// ─── critical (batch 2) ─────────────────────────────────────────────────
+
+fn sum_bends(result: &LayoutResult) -> usize {
+    result
+        .edges
+        .iter()
+        .map(|e| {
+            e.path
+                .polyline_points()
+                .map(|pts| pts.len().saturating_sub(2))
+                .unwrap_or(0)
+        })
+        .sum()
+}
+
+#[test]
+fn critical_marked_path_not_worse_than_control() {
+    // Diamond plus a competing chain crossing one arm; the marked arm must
+    // never bend more than the identical unmarked control (observable
+    // acceptance, edge-parameters §2.4).
+    let src = |critical: bool| {
+        let mark = if critical { " { critical: true }" } else { "" };
+        format!(
+            "diagram {{
+  layout: hierarchical {{ }}
+  node s {{}} node m1 {{}} node m2 {{}} node t {{}} node c {{}} node d {{}}
+  s -> m1{mark}
+  m1 -> t{mark}
+  s -> m2
+  m2 -> t
+  c -> m2
+  m2 -> d
+}}"
+        )
+    };
+    let opts = BuildOptions::default();
+    let marked = build_layout(&src(true), &opts).unwrap();
+    let control = build_layout(&src(false), &opts).unwrap();
+    assert!(
+        sum_bends(&marked) <= sum_bends(&control),
+        "critical marking must not worsen bends: {} > {}",
+        sum_bends(&marked),
+        sum_bends(&control)
+    );
 }

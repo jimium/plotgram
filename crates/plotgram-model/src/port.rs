@@ -159,11 +159,25 @@ pub enum PortConstraintError {
     ConflictingTier { keys: Vec<&'static str> },
     /// Candidate side list is empty.
     EmptyCandidates { sides_key: &'static str },
+    /// `critical` present but not a boolean literal.
+    InvalidCritical { value: String },
+    /// Manual `edge_group` was removed; use layout `auto_edge_grouping`.
+    UnsupportedEdgeGroup,
 }
 
 impl fmt::Display for PortConstraintError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InvalidCritical { value } => {
+                write!(f, "`critical` expects a boolean, got {value}")
+            }
+            Self::UnsupportedEdgeGroup => {
+                write!(
+                    f,
+                    "`edge_group` is unsupported; enable layout `auto_edge_grouping` \
+                     for automatic fan-in/fan-out merging (dsl-spec §7.4.3)"
+                )
+            }
             Self::SlotWithoutSide { slot_key } => {
                 write!(f, "`{slot_key}` requires its matching side key (dsl-spec §7.4.2)")
             }

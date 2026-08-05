@@ -459,6 +459,7 @@ mod tests {
                     reversed: false,
                     from_port: None,
                     to_port: None,
+                    critical: false,
                 },
             )
             .collect();

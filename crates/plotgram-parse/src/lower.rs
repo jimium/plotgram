@@ -344,7 +344,7 @@ impl LowerCtx {
             tail_label,
             from_port: None,
             to_port: None,
-            edge_group: None,
+            critical: false,
             attrs,
         });
 

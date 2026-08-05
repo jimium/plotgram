@@ -78,7 +78,7 @@ pub fn parse(source: &str) -> Result<ParseOutput, ParseError> {
     // 3. expand @group sugar (inject group_anchor nodes, rewrite edges)
     expand::expand_group_frame_sugar(&mut graph, &lowered.pending_group_edges)?;
 
-    // 4. lift structural attrs (role/host_group/side/slot on nodes; ports/edge_group on edges)
+    // 4. lift structural attrs (role/host_group/side/slot on nodes; ports/critical on edges)
     expand::lift_structural(&mut graph)?;
 
     // 5. archetype expand (fill shape/variant/icon from named packs; fill-only)
@@ -279,15 +279,19 @@ diagram {
     }
 
     #[test]
-    fn end_to_end_edge_group_lift() {
-        let source = r#"diagram {
+    fn end_to_end_edge_group_is_rejected() {
+        let err = parse(
+            r#"diagram {
     node a {} node hub {}
     a -> hub { edge_group: bus_auth }
-}"#;
-        let out = parse(source).unwrap();
-        let edge = &out.graph.edges[0];
-        assert_eq!(edge.edge_group.as_deref(), Some("bus_auth"));
-        assert!(!edge.attrs.contains_key("edge_group"));
+}"#,
+        )
+        .unwrap_err();
+        assert!(matches!(err, ParseError::Port(_)));
+        assert!(
+            err.to_string().contains("edge_group"),
+            "unexpected: {err}"
+        );
     }
 
     #[test]

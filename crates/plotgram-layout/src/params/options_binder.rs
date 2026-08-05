@@ -98,6 +98,17 @@ impl<'a> OptionsBinder<'a> {
         }
     }
 
+    /// Boolean scalar (`true` / `false` atoms; [`AttrValue::as_bool`]).
+    pub fn get_bool(&mut self, key: &'static str) -> Result<Option<bool>, BindError> {
+        match self.take(key) {
+            None => Ok(None),
+            Some(v) => v
+                .as_bool()
+                .map(Some)
+                .ok_or_else(|| BindError::bad_type(key, "boolean", v)),
+        }
+    }
+
     /// Atom or string scalar.
     pub fn get_atom(&mut self, key: &'static str) -> Result<Option<&'a str>, BindError> {
         match self.take(key) {

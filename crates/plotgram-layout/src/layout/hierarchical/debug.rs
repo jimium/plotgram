@@ -347,7 +347,7 @@ fn project(layout_name: &str, cap: Captures<'_>) -> LayoutDebugTrace {
             edge_id: ce.id.clone(),
             source: ce.source.clone(),
             target: ce.target.clone(),
-            path: ce.path.iter().map(|&p| phys_point(p)).collect(),
+            path: ce.path.samples().iter().copied().map(phys_point).collect(),
         })
         .collect();
 

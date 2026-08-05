@@ -1,0 +1,20 @@
+// auto_edge_grouping — same-source fan-out edges share one port + bus trunk
+// (SharedPort → Trunk → Bus → Stub), matching yFiles AutomaticEdgeGrouping.
+diagram {
+    profile: flowchart,
+    title: "边自动分组合流",
+    layout: hierarchical { auto_edge_grouping: true }
+
+    node orch { label: "编排器", archetype: process }
+    node pay { label: "支付服务", archetype: service }
+    node inv { label: "库存服务", archetype: service }
+    node ship { label: "物流服务", archetype: service }
+    node agg { label: "结果聚合", archetype: process }
+
+    orch -> pay
+    orch -> inv
+    orch -> ship
+    pay -> agg
+    inv -> agg
+    ship -> agg
+}

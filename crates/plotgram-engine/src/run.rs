@@ -7,6 +7,7 @@ use plotgram_engine_api::{
     RouteScene, TerminalPair,
 };
 use plotgram_model::contract::LayoutContract;
+use plotgram_model::diagnostics::LayoutWarning;
 use plotgram_model::result::{EdgePlacement, LayoutResult, NodePlacement};
 
 use crate::finalize::finalize;
@@ -30,12 +31,31 @@ pub fn run(contract: &LayoutContract) -> Result<LayoutResult, LayoutError> {
         EdgeGeometryMode::Builtin
     };
 
-    let output = layout.layout(LayoutInput {
+    let mut output = layout.layout(LayoutInput {
         graph: &contract.graph,
         node_sizes: &contract.node_sizes,
         options: &contract.layout.options,
         edge_geometry,
     })?;
+
+    // Conflict semantics (edge-parameters §2.1): an explicit independent
+    // edge router takes over edge geometry; an explicitly declared
+    // non-default `routing_style` is then ignored — surface that instead of
+    // dropping it silently. The check lives here because only the engine
+    // sees both the contract's router and the layout options.
+    if let Some(ref routing) = contract.edge_routing {
+        if let Some(v) = contract.layout.options.get("routing_style") {
+            if v.as_str().is_some_and(|s| s != "orthogonal") {
+                output.diagnostics.warnings.push(LayoutWarning {
+                    message: format!(
+                        "layout option `routing_style` is ignored: the independent edge \
+                         router `{}` takes over edge geometry",
+                        routing.name
+                    ),
+                });
+            }
+        }
+    }
 
     let edges = if let Some(ref routing) = contract.edge_routing {
         let router = registry
@@ -172,7 +192,7 @@ mod tests {
             tail_label: None,
             from_port: None,
             to_port: None,
-            edge_group: None,
+            critical: false,
             attrs: AttrMap::new(),
         }
     }
@@ -328,5 +348,75 @@ mod tests {
             run(&contract),
             Err(LayoutError::MissingNodeSize(_))
         ));
+    }
+
+    /// Conflict semantics: an explicit independent router ignores a
+    /// non-default `routing_style` option and must say so (edge-parameters
+    /// §2.1). Orthogonal (= the builtin default shape family) stays silent.
+    #[test]
+    fn routing_style_conflict_warns_when_router_takes_over() {
+        use plotgram_model::attr::AttrValue;
+        let graph = || Graph {
+            nodes: vec![node("a"), node("b")],
+            edges: vec![edge("e0", "a", "b")],
+            groups: vec![],
+            partition: None,
+        };
+        let layout_with_style = |style: &str| {
+            AlgorithmRef::with_options(
+                "hierarchical",
+                [(
+                    "routing_style".to_string(),
+                    AttrValue::Atom(style.to_string()),
+                )]
+                .into_iter()
+                .collect(),
+            )
+        };
+
+        // Non-default style + explicit router → warning.
+        let contract = LayoutContract {
+            layout: layout_with_style("polyline"),
+            edge_routing: Some(AlgorithmRef::new("orthogonal")),
+            graph: graph(),
+            node_sizes: sizes(&["a", "b"]),
+        };
+        let result = run(&contract).unwrap();
+        assert!(
+            result
+                .diagnostics
+                .warnings
+                .iter()
+                .any(|w| w.message.contains("routing_style")),
+            "expected a routing_style conflict warning, got {:?}",
+            result.diagnostics.warnings
+        );
+
+        // Orthogonal style or no router → no conflict warning.
+        for contract in [
+            LayoutContract {
+                layout: layout_with_style("orthogonal"),
+                edge_routing: Some(AlgorithmRef::new("orthogonal")),
+                graph: graph(),
+                node_sizes: sizes(&["a", "b"]),
+            },
+            LayoutContract {
+                layout: layout_with_style("polyline"),
+                edge_routing: None,
+                graph: graph(),
+                node_sizes: sizes(&["a", "b"]),
+            },
+        ] {
+            let result = run(&contract).unwrap();
+            assert!(
+                !result
+                    .diagnostics
+                    .warnings
+                    .iter()
+                    .any(|w| w.message.contains("routing_style")),
+                "no conflict warning expected, got {:?}",
+                result.diagnostics.warnings
+            );
+        }
     }
 }

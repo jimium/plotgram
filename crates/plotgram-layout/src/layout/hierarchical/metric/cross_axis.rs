@@ -6,12 +6,12 @@
 //!   pairs**: virtual-virtual keeps long-edge trunks straight, and
 //!   real-real straightens 1:1 real chains (a spine must not zigzag,
 //!   and a leaf must land under its only neighbor). A real pair is only
-//!   hardened directionally 1:1 or over a binary split; fans of ≥ 3 real
-//!   neighbors split by parity — odd fans harden the block pair (the
-//!   median child carries the straight spine through the junction, and
-//!   for a symmetric fan that column is the fan's center), while even
-//!   fans harden nothing, so pass 2 can center the junction between its
-//!   two middle neighbors — and pairs only harden when *neither* member
+//!   hardened directionally 1:1; fans of ≥ 2 real neighbors split by
+//!   parity — odd fans harden the block pair (the median child carries
+//!   the straight spine through the junction, and for a symmetric fan
+//!   that column is the fan's center), while even fans (2, 4, 6, …)
+//!   harden nothing, so pass 2 can center the junction between its two
+//!   middle neighbors — and pairs only harden when *neither* member
 //!   aligned with a dummy anywhere in the primary alignment: a real node
 //!   that won a dummy as its median belongs to that chain's column
 //!   battle, and hardening it would drag the whole chain off its
@@ -20,9 +20,9 @@
 //! - Everything else is soft: `desired` = 4-candidate merged BK ideal,
 //!   dummies weighted higher so long edges keep their columns.
 //! - Pass 2 expands two upstream decisions (Metric's own expansions —
-//!   never read from Ink): even-fan junctions (≥ 4 real neighbors) get
-//!   their desired rewritten to the midpoint of their two middle
-//!   neighbors' pass-1 positions — the BK ideal can only align a
+//!   never read from Ink): even-fan junctions (≥ 2 real neighbors, even
+//!   count) get their desired rewritten to the midpoint of their two
+//!   middle neighbors' pass-1 positions — the BK ideal can only align a
 //!   junction with one median child, which for even fans is off-center —
 //!   and chain-end dummies are pulled onto their port anchors. On single-dummy chains both ends address the
 //!   same elem; the source anchor wins (target applied first, source
@@ -51,7 +51,8 @@ const VIRTUAL_WEIGHT: f64 = 4.0;
 /// Per-elem canonical cross-axis center coordinate.
 ///
 /// `main` is the main-axis (layer-top) position per elem, needed to expand
-/// port anchors for the second pass.
+/// port anchors for the second pass. Clustered ends share one `PortPoint`
+/// (yFiles bus-style — no pitch spread).
 pub fn assign_cross_axis(
     plan: &PlanGraph,
     graph: &RealGraph,
@@ -77,13 +78,22 @@ pub fn assign_cross_axis(
         &down_deg,
         &up_deg,
     );
+    // Critical-marked edges (edge-parameters §2.5): their dummy chains hold
+    // their desired with doubled VPSC soft weight, pulling the corridor
+    // harder toward the port anchors set in pass 2.
+    let critical_edges: std::collections::BTreeSet<&str> = graph
+        .edges
+        .iter()
+        .filter(|e| e.critical)
+        .map(|e| e.edge_id.as_str())
+        .collect();
     let weights: Vec<f64> = (0..n)
-        .map(|e| {
-            if plan.elems[e].key.is_virtual() {
-                VIRTUAL_WEIGHT
-            } else {
-                REAL_WEIGHT
+        .map(|e| match &plan.elems[e].key {
+            ElemKey::Virtual { edge_id, .. } if critical_edges.contains(edge_id.as_str()) => {
+                VIRTUAL_WEIGHT * 2.0
             }
+            ElemKey::Virtual { .. } => VIRTUAL_WEIGHT,
+            ElemKey::Real(_) => REAL_WEIGHT,
         })
         .collect();
 
@@ -103,7 +113,10 @@ pub fn assign_cross_axis(
     };
     for e in &graph.edges {
         let rp = &ports[&e.edge_id];
-        for (real_idx, port) in [(e.original_target, rp.target), (e.original_source, rp.source)] {
+        for (real_idx, port, _cluster) in [
+            (e.original_target, rp.target, rp.target_cluster),
+            (e.original_source, rp.source, rp.source_cluster),
+        ] {
             let real_elem = plan.index_of[&ElemKey::Real(graph.ids[real_idx].clone())];
             let Some(nb) = chain_neighbor(plan, &e.edge_id, real_elem) else {
                 continue;
@@ -111,6 +124,8 @@ pub fn assign_cross_axis(
             if !plan.elems[nb].key.is_virtual() {
                 continue; // single-hop edge: nothing to pull
             }
+            // Clustered ends share one PortPoint — pull the chain-end dummy
+            // onto that shared anchor (no member pitch offset).
             desired[nb] = port_anchor(frame_of(real_elem), port).x;
         }
     }
@@ -168,7 +183,7 @@ fn real_degrees(plan: &PlanGraph) -> (Vec<usize>, Vec<usize>) {
 }
 
 /// Fan-centering targets for pass 2: a real junction with an **even**
-/// fan of ≥ 4 real neighbors on one side wants the midpoint of its two
+/// fan of ≥ 2 real neighbors on one side wants the midpoint of its two
 /// middle neighbors' pass-1 positions (odd fans need no target — their
 /// median block pair stays hardened, which is both centered and
 /// straight). A junction fanned evenly on both sides takes the mean of
@@ -205,10 +220,10 @@ fn fan_centers(
             continue;
         }
         let mut middles: Vec<f64> = Vec::new();
-        if down_deg[e] >= 4 && down_deg[e] % 2 == 0 {
+        if down_deg[e] >= 2 && down_deg[e] % 2 == 0 {
             middles.push(middle(&mut down_nbs[e]));
         }
-        if up_deg[e] >= 4 && up_deg[e] % 2 == 0 {
+        if up_deg[e] >= 2 && up_deg[e] % 2 == 0 {
             middles.push(middle(&mut up_nbs[e]));
         }
         if !middles.is_empty() {
@@ -221,7 +236,7 @@ fn fan_centers(
 /// Intra-layer separation + hard collinearity over the same-type member
 /// pairs of each BK primary block (equality = opposing zero-gap constraint
 /// pairs, which `vpsc::solve` supports directly). A real pair touching
-/// an **even** fan of ≥ 4 real neighbors stays soft so pass 2 can center
+/// an **even** fan of ≥ 2 real neighbors stays soft so pass 2 can center
 /// the junction between its two middle neighbors; odd fans keep their
 /// median pair hardened (that column is the fan's center). Pairs touching
 /// a dummy-aligned member stay soft too (chain-drag guard, module doc).
@@ -253,9 +268,9 @@ fn build_constraints(
                     } else {
                         (b, a)
                     };
-                    // Even fans stay soft for pass-2 centering; odd fans
-                    // keep their median block pair hardened.
-                    let even_fan = |d: usize| d >= 4 && d % 2 == 0;
+                    // Even fans (2, 4, …) stay soft for pass-2 centering;
+                    // odd fans keep their median block pair hardened.
+                    let even_fan = |d: usize| d >= 2 && d % 2 == 0;
                     if even_fan(down_deg[upper]) || even_fan(up_deg[lower]) {
                         continue;
                     }
@@ -338,6 +353,7 @@ mod tests {
                     reversed: false,
                     from_port: None,
                     to_port: None,
+                    critical: false,
                 })
                 .collect(),
             self_loops: Vec::new(),
@@ -378,8 +394,10 @@ mod tests {
             &plan,
             AlgoOrientation::Tb,
             &vec![Size::new(20.0, 10.0); graph.ids.len()],
+            false,
         )
-        .unwrap();
+        .unwrap()
+        .ports;
 
         let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
             .expect("feasible");
@@ -420,8 +438,10 @@ mod tests {
             &plan,
             AlgoOrientation::Tb,
             &vec![Size::new(20.0, 10.0); graph.ids.len()],
+            false,
         )
-        .unwrap();
+        .unwrap()
+        .ports;
 
         let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
             .expect("feasible");
@@ -462,8 +482,10 @@ mod tests {
             &plan,
             AlgoOrientation::Tb,
             &vec![Size::new(20.0, 10.0); graph.ids.len()],
+            false,
         )
-        .unwrap();
+        .unwrap()
+        .ports;
 
         // Unequal widths make the packed-center ideals differ per elem, so
         // only the hard equality (not the soft ideal) can keep them aligned.
@@ -485,6 +507,57 @@ mod tests {
                 coords[0]
             );
         }
+    }
+
+    /// Binary fan (gateway → {A, B} → database): both the source hub and
+    /// the sink must sit at the midpoint of the two middle-layer nodes —
+    /// degree-2 is an even fan and must not stay welded to the left child
+    /// (smoke.flat-gateway-fanout asymmetry).
+    #[test]
+    fn binary_fan_diamond_centers_hub_and_sink() {
+        // gw=0, a=1, b=2, db=3
+        let elems = vec![
+            real("gw", 0),
+            real("a", 1),
+            real("b", 1),
+            real("db", 2),
+        ];
+        let layers = vec![vec![0], vec![1, 2], vec![3]];
+        let segments = vec![
+            seg("e0", 0, 0, 1),
+            seg("e1", 0, 0, 2),
+            seg("e2", 0, 1, 3),
+            seg("e3", 0, 2, 3),
+        ];
+        let plan = build_plan(elems, layers, segments);
+        let graph = real_graph(
+            &["gw", "a", "b", "db"],
+            &[("e0", 0, 1), ("e1", 0, 2), ("e2", 1, 3), ("e3", 2, 3)],
+        );
+        let ports = assign_ports(
+            &graph,
+            &plan,
+            AlgoOrientation::Tb,
+            &vec![Size::new(20.0, 10.0); graph.ids.len()],
+            false,
+        )
+        .unwrap()
+        .ports;
+
+        let coords =
+            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
+                .expect("feasible");
+        let mid = (coords[1] + coords[2]) / 2.0;
+        assert!(
+            (coords[0] - mid).abs() < 1e-6,
+            "gw must center over {{a,b}}: {} vs {mid}",
+            coords[0]
+        );
+        assert!(
+            (coords[3] - mid).abs() < 1e-6,
+            "db must center under {{a,b}}: {} vs {mid}",
+            coords[3]
+        );
     }
 
     /// Fan-out junction (the API gateway over 4 services shape): the
@@ -519,8 +592,10 @@ mod tests {
             &plan,
             AlgoOrientation::Tb,
             &vec![Size::new(20.0, 10.0); graph.ids.len()],
+            false,
         )
-        .unwrap();
+        .unwrap()
+        .ports;
 
         let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
             .expect("feasible");
@@ -579,8 +654,10 @@ mod tests {
             &plan,
             AlgoOrientation::Tb,
             &vec![Size::new(20.0, 10.0); graph.ids.len()],
+            false,
         )
-        .unwrap();
+        .unwrap()
+        .ports;
 
         let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
             .expect("crossing chains must not make the equality system infeasible");
@@ -624,8 +701,10 @@ mod tests {
             &plan,
             AlgoOrientation::Tb,
             &vec![Size::new(20.0, 10.0); graph.ids.len()],
+            false,
         )
-        .unwrap();
+        .unwrap()
+        .ports;
 
         let width = |e: usize| {
             if plan.elems[e].key.is_virtual() {
@@ -683,8 +762,10 @@ mod tests {
             &plan,
             AlgoOrientation::Tb,
             &vec![Size::new(20.0, 10.0); graph.ids.len()],
+            false,
         )
-        .unwrap();
+        .unwrap()
+        .ports;
 
         let run = || {
             assign_cross_axis(

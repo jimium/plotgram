@@ -168,7 +168,7 @@ mod tests {
                 tail_label: None,
                 from_port: None,
                 to_port: None,
-                edge_group: None,
+                critical: false,
                 attrs: AttrMap::new(),
             }],
             groups: vec![],
@@ -324,7 +324,7 @@ mod tests {
             tail_label: None,
             from_port: None,
             to_port: None,
-            edge_group: None,
+            critical: false,
             attrs: {
                 let mut a = AttrMap::new();
                 a.insert(

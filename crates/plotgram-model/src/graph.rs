@@ -281,9 +281,9 @@ impl Node {
 ///
 /// Parallel edges (same source/target) are distinguished by [`Edge::id`].
 ///
-/// Structural layout fields (`from_port` / `to_port` / `edge_group`) are
-/// **first-class** — not read from [`Self::attrs`] by the engine. The parser
-/// lifts DSL keys into these fields (see [`Edge::lift_structural_attrs`]).
+/// Structural layout fields (`from_port` / `to_port`) are **first-class** —
+/// not read from [`Self::attrs`] by the engine. The parser lifts DSL keys into
+/// these fields (see [`Edge::lift_structural_attrs`]).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Edge {
     /// Stable unique id within the graph (parser-assigned; not the DSL surface).
@@ -310,14 +310,16 @@ pub struct Edge {
     /// Author port pin at the target end.
     #[serde(default)]
     pub to_port: Option<PortConstraint>,
-    /// Edge-group / bus id: edges sharing the same id may merge into a shared trunk.
-    ///
-    /// `None` = not grouped. Layout/routing is the writer for geometry; this field
-    /// is the author's (or future auto-bundler's) structural hint.
+    /// Critical-path mark: the author wants this edge drawn straighter /
+    /// more prominently (a layout *preference*, not a render highlight).
+    /// Consumed as extra ordering / alignment weight by the hierarchical
+    /// layout (edge-parameters.md §2.5). Default false.
     #[serde(default)]
-    pub edge_group: Option<String>,
+    pub critical: bool,
     /// Free-form attributes (`variant`, `style.*`, `meta.*`, …).
-    /// Must **not** carry `from_side` / `edge_group` after lift — those are fields above.
+    /// Must **not** carry `from_side` / `critical` after lift — those are
+    /// fields above. Manual `edge_group` is rejected (use layout
+    /// `auto_edge_grouping`).
     pub attrs: AttrMap,
 }
 
@@ -327,18 +329,26 @@ impl Edge {
     /// are still stripped).
     ///
     /// Keys handled: `from_side`, `from_slot`, `from_ratio`, `from_x`, `from_y`,
-    /// `from_sides` (and `to_*` mirrors), `edge_group` (dsl-spec §7.4.2).
+    /// `from_sides` (and `to_*` mirrors), `critical` (dsl-spec §7.4.2).
+    /// `edge_group` is rejected — fan merge is layout `auto_edge_grouping` only.
     pub fn lift_structural_attrs(&mut self) -> Result<(), PortConstraintError> {
+        if self.attrs.contains_key("edge_group") {
+            return Err(PortConstraintError::UnsupportedEdgeGroup);
+        }
         if self.from_port.is_none() {
             self.from_port = port_constraint(&self.attrs, FROM_PORT_KEYS)?;
         }
         if self.to_port.is_none() {
             self.to_port = port_constraint(&self.attrs, TO_PORT_KEYS)?;
         }
-        if self.edge_group.is_none() {
-            if let Some(v) = self.attrs.get("edge_group") {
-                if let Some(s) = v.as_str() {
-                    self.edge_group = Some(s.to_string());
+        if !self.critical {
+            if let Some(v) = self.attrs.get("critical") {
+                if let Some(b) = v.as_bool() {
+                    self.critical = b;
+                } else {
+                    return Err(PortConstraintError::InvalidCritical {
+                        value: v.to_string(),
+                    });
                 }
             }
         }
@@ -355,7 +365,7 @@ impl Edge {
             TO_PORT_KEYS.x,
             TO_PORT_KEYS.y,
             TO_PORT_KEYS.sides,
-            "edge_group",
+            "critical",
         ] {
             self.attrs.remove(k);
         }
@@ -579,7 +589,7 @@ impl Group {
 mod tests {
     use super::*;
     use crate::attr::AttrValue;
-    use crate::port::Side;
+    use crate::port::{PortConstraintError, Side};
 
     fn node(id: &str) -> Node {
         Node {
@@ -605,7 +615,7 @@ mod tests {
             tail_label: None,
             from_port: None,
             to_port: None,
-            edge_group: None,
+            critical: false,
             attrs: AttrMap::new(),
         }
     }
@@ -686,7 +696,6 @@ mod tests {
         e.attrs.insert("from_side".into(), AttrValue::Atom("south".into()));
         e.attrs.insert("from_slot".into(), AttrValue::Num(1.0));
         e.attrs.insert("to_side".into(), AttrValue::Atom("north".into()));
-        e.attrs.insert("edge_group".into(), AttrValue::Atom("bus_a".into()));
         e.attrs.insert("style.stroke".into(), AttrValue::Str("#f00".into()));
 
         e.lift_structural_attrs().unwrap();
@@ -702,10 +711,19 @@ mod tests {
             e.to_port,
             Some(PortConstraint::FixedSide { side: Side::North })
         );
-        assert_eq!(e.edge_group.as_deref(), Some("bus_a"));
         assert!(!e.attrs.contains_key("from_side"));
-        assert!(!e.attrs.contains_key("edge_group"));
         assert!(e.attrs.contains_key("style.stroke"));
+    }
+
+    #[test]
+    fn lift_rejects_manual_edge_group() {
+        let mut e = edge("e", Arrow::Forward);
+        e.attrs
+            .insert("edge_group".into(), AttrValue::Atom("bus_a".into()));
+        assert!(matches!(
+            e.lift_structural_attrs(),
+            Err(PortConstraintError::UnsupportedEdgeGroup)
+        ));
     }
 
     #[test]

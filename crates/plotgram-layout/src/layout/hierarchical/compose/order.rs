@@ -9,7 +9,7 @@
 //! an unrelated element.
 
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::layout::hierarchical::model::{Elem, PlanGraph};
 
@@ -17,7 +17,7 @@ const EPS: f64 = 1e-9;
 const MAX_SWEEPS: usize = 16;
 const NO_IMPROVE_STOP: usize = 2;
 
-/// real-real / real-virtual / virtual-virtual edge weight (composition.md §6).
+/// real-real / real-virtual / virtual-virtual base weight (composition.md §6).
 fn edge_weight(a: &Elem, b: &Elem) -> f64 {
     match (a.key.is_virtual(), b.key.is_virtual()) {
         (false, false) => 1.0,
@@ -26,32 +26,50 @@ fn edge_weight(a: &Elem, b: &Elem) -> f64 {
     }
 }
 
-struct Adjacency {
-    /// elem -> neighbor elems one rank above.
-    up: Vec<Vec<usize>>,
-    /// elem -> neighbor elems one rank below.
-    down: Vec<Vec<usize>>,
+/// Segment weight with the author critical-path mark: chain segments of a
+/// critical edge pull twice as hard (real-real / real-virtual only — the
+/// virtual-virtual corridor weight stays 8.0 so corridor shaping is not
+/// out-weighted; edge-parameters §2.5).
+fn segment_weight(a: &Elem, b: &Elem, critical: bool) -> f64 {
+    let base = edge_weight(a, b);
+    if critical && !matches!((a.key.is_virtual(), b.key.is_virtual()), (true, true)) {
+        base * 2.0
+    } else {
+        base
+    }
 }
 
-fn build_adjacency(plan: &PlanGraph) -> Adjacency {
+struct Adjacency {
+    /// elem -> (neighbor elem, segment weight) one rank above.
+    up: Vec<Vec<(usize, f64)>>,
+    /// elem -> (neighbor elem, segment weight) one rank below.
+    down: Vec<Vec<(usize, f64)>>,
+}
+
+fn build_adjacency(plan: &PlanGraph, critical: &BTreeSet<String>) -> Adjacency {
     let n = plan.elems.len();
     let mut up = vec![Vec::new(); n];
     let mut down = vec![Vec::new(); n];
     for s in &plan.segments {
-        down[s.from].push(s.to);
-        up[s.to].push(s.from);
+        let w = segment_weight(
+            &plan.elems[s.from],
+            &plan.elems[s.to],
+            critical.contains(&s.edge_id),
+        );
+        down[s.from].push((s.to, w));
+        up[s.to].push((s.from, w));
     }
     for v in up.iter_mut().chain(down.iter_mut()) {
-        v.sort_unstable();
+        v.sort_unstable_by_key(|&(e, _)| e);
     }
     Adjacency { up, down }
 }
 
-pub fn order_layers(plan: &mut PlanGraph) {
+pub fn order_layers(plan: &mut PlanGraph, critical: &BTreeSet<String>) {
     if plan.layers.len() < 2 {
         return; // nothing to reorder
     }
-    let adj = build_adjacency(plan);
+    let adj = build_adjacency(plan, critical);
 
     // Contiguity is a hard invariant, not a crossing-driven preference: make
     // every layer block-contiguous *before* the crossing-minimizing sweeps
@@ -169,8 +187,7 @@ struct Key {
 
 fn pooled_neighbor_positions(
     block: &BlockNode,
-    elems: &[Elem],
-    neighbors_of: &[Vec<usize>],
+    neighbors_of: &[Vec<(usize, f64)>],
     ref_pos: &BTreeMap<usize, usize>,
     decl_index: &[usize],
     out: &mut Vec<(f64, f64)>, // (position, weight)
@@ -179,9 +196,9 @@ fn pooled_neighbor_positions(
     match block {
         BlockNode::Leaf(e) => {
             *repr_decl = (*repr_decl).min(decl_index[*e]);
-            for &n in &neighbors_of[*e] {
+            for &(n, w) in &neighbors_of[*e] {
                 if let Some(&p) = ref_pos.get(&n) {
-                    out.push((p as f64, edge_weight(&elems[*e], &elems[n])));
+                    out.push((p as f64, w));
                 }
             }
         }
@@ -189,7 +206,6 @@ fn pooled_neighbor_positions(
             for c in children {
                 pooled_neighbor_positions(
                     c,
-                    elems,
                     neighbors_of,
                     ref_pos,
                     decl_index,
@@ -234,14 +250,13 @@ fn weighted_barycenter(pairs: &[(f64, f64)]) -> Option<f64> {
 
 fn sort_blocks(
     blocks: &mut Vec<BlockNode>,
-    elems: &[Elem],
-    neighbors_of: &[Vec<usize>],
+    neighbors_of: &[Vec<(usize, f64)>],
     ref_pos: &BTreeMap<usize, usize>,
     decl_index: &[usize],
 ) {
     for b in blocks.iter_mut() {
         if let BlockNode::Group { children } = b {
-            sort_blocks(children, elems, neighbors_of, ref_pos, decl_index);
+            sort_blocks(children, neighbors_of, ref_pos, decl_index);
         }
     }
 
@@ -253,7 +268,6 @@ fn sort_blocks(
             let mut repr_decl = usize::MAX;
             pooled_neighbor_positions(
                 &b,
-                elems,
                 neighbors_of,
                 ref_pos,
                 decl_index,
@@ -297,7 +311,7 @@ fn reorder_layer(plan: &mut PlanGraph, adj: &Adjacency, r: usize, dir: Direction
         Direction::Down => &plan.layers[r + 1],
     };
     let ref_pos = reference_positions(ref_layer);
-    let neighbors_of: &[Vec<usize>] = match dir {
+    let neighbors_of: &[Vec<(usize, f64)>] = match dir {
         Direction::Up => &adj.up,
         Direction::Down => &adj.down,
     };
@@ -305,7 +319,6 @@ fn reorder_layer(plan: &mut PlanGraph, adj: &Adjacency, r: usize, dir: Direction
     let mut blocks = build_blocks(&plan.layers[r], 0, &plan.elems);
     sort_blocks(
         &mut blocks,
-        &plan.elems,
         neighbors_of,
         &ref_pos,
         &plan.decl_index,
@@ -460,7 +473,7 @@ mod tests {
     fn ordering_removes_a_crossing() {
         let mut plan = crossing_plan();
         assert_eq!(total_crossings(&plan), 1);
-        order_layers(&mut plan);
+        order_layers(&mut plan, &BTreeSet::new());
         assert_eq!(total_crossings(&plan), 0);
     }
 
@@ -512,7 +525,7 @@ mod tests {
             layers,
         };
 
-        order_layers(&mut plan);
+        order_layers(&mut plan, &BTreeSet::new());
 
         let layer1 = &plan.layers[1];
         let g_positions: Vec<usize> = layer1
@@ -534,8 +547,89 @@ mod tests {
     fn deterministic_rerun() {
         let mut p1 = crossing_plan();
         let mut p2 = crossing_plan();
-        order_layers(&mut p1);
-        order_layers(&mut p2);
+        order_layers(&mut p1, &BTreeSet::new());
+        order_layers(&mut p2, &BTreeSet::new());
         assert_eq!(p1.layers, p2.layers);
+    }
+
+    /// Critical marks double the ordering pull of real-real / real-virtual
+    /// segments (edge-parameters §2.5): a tie-broken sibling order flips
+    /// toward the critical source once its weight doubles.
+    #[test]
+    fn critical_edge_doubles_ordering_weight() {
+        // layer0 = [a0, a1] (positions 0, 1); layer1 = [m0, m1] where m0 is
+        // wired to both sources. m0's neighbor median/barycenter is 0.5 for
+        // equal weights, exactly between m0 (prev_pos 0) and m1 (prev_pos 1):
+        // both keys tie → stable prev_pos keeps [m0, m1]. Critical `e0`
+        // shifts the barycenter to 1/3 and (as the sole median) sorts m0 to
+        // the left; symmetric inputs with the mark on `e1` instead sort m1's
+        // pull harder — observed via m0 moving right.
+        let elems = vec![
+            plain_elem("a0", 0, &[]),
+            plain_elem("a1", 0, &[]),
+            plain_elem("m0", 1, &[]),
+            plain_elem("m1", 1, &[]),
+        ];
+        let segments = vec![
+            Segment {
+                edge_id: "e0".into(),
+                ordinal: 0,
+                from: 0,
+                to: 2,
+            },
+            Segment {
+                edge_id: "e1".into(),
+                ordinal: 0,
+                from: 1,
+                to: 2,
+            },
+        ];
+        let layers = vec![vec![0, 1], vec![2, 3]];
+        let index_of: BTreeMap<ElemKey, usize> = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan_of = || PlanGraph {
+            elems: elems.clone(),
+            index_of: index_of.clone(),
+            decl_index: vec![0, 1, 2, 3],
+            segments: segments.clone(),
+            layers: layers.clone(),
+        };
+
+        // Baseline: no critical marks → tie keeps declaration order.
+        let mut p = plan_of();
+        order_layers(&mut p, &BTreeSet::new());
+        assert_eq!(p.layers[1], vec![2, 3]);
+
+        // Weight sanity: the critical segment's weight doubles.
+        let crit: BTreeSet<String> = ["e0".to_string()].into_iter().collect();
+        let adj = build_adjacency(&plan_of(), &crit);
+        let ups: Vec<f64> = adj.up[2].iter().map(|&(_, w)| w).collect();
+        assert_eq!(ups, vec![2.0, 1.0], "critical real-real must weigh 2x");
+
+        // Virtual-virtual segments never scale (corridor weight stays 8.0).
+        let virt_a = Elem {
+            key: ElemKey::Virtual {
+                edge_id: "va".into(),
+                ordinal: 0,
+            },
+            group_path: Vec::new(),
+            rank: 1,
+        };
+        let virt_b = Elem {
+            key: ElemKey::Virtual {
+                edge_id: "vb".into(),
+                ordinal: 1,
+            },
+            group_path: Vec::new(),
+            rank: 2,
+        };
+        assert_eq!(
+            segment_weight(&virt_a, &virt_b, true),
+            8.0,
+            "virtual-virtual corridor weight must not scale"
+        );
     }
 }

@@ -18,7 +18,14 @@ FAS(+环 reroot) → Network Simplex → properify → median(+权+snapshot)
 FAS 含环入口规则：声明序靠前的节点优先靠上（环 reroot，[architecture.md](architecture.md) §3.1）；
 反转数回涨由 `hier_eval` 基线的 `reversed_count` 门禁守住。
 
-硬不变量（无重叠、全正交、端口落界）已由 `hier_eval` 守住。
+硬不变量（无重叠、端口落界）已由 `hier_eval` 守住；全正交断言仅对
+默认/`orthogonal` 风格成立（`routing_style: polyline/curved` 见
+[edge-parameters](edge-parameters.md)）。
+
+边参数产品补齐（不归入新阶段，属既有批次的参数收口，见
+[edge-parameters](edge-parameters.md) §4）：`routing_style` 三档
+（orthogonal/polyline/curved）、`auto_edge_grouping` 端口合流（bus-style）、
+边级 `critical` 权重均已落地。
 
 相对目标架构的主要缺口：
 
@@ -152,7 +159,7 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 |----|----------|
 | **StrongMacro** | 组树后序局部 Plan → macro 进父层 → 展开为与 Weak **同一 Plan schema** |
 | **PartitionGrid** | 引擎消费 cell / band；与 Orientation 轴语义一致；非 `group` 冒充泳道 |
-| **Bundle / edge_group** | Compose 写合流事实；Ink 只接合干线 |
+| **Bundle / auto_edge_grouping** | Compose 写合流事实；Ink 只接合干线 |
 | **Integrated labeling** | 至少 label 需求进 Demand；完整联合求解可渐进 |
 | **真 MCF / from-sketch / octilinear** | 明确不挡主路径闭环 |
 

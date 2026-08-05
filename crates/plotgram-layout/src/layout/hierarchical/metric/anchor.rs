@@ -7,6 +7,9 @@
 //! (roadmap phase B): Metric expands the dense, centered anchor
 //! `(order + 1) / (count + 1)` against the final frame. `Ratio` /
 //! `LocalOffset` are author-pinned pins resolved by Compose.
+//!
+//! Automatic edge grouping (yFiles bus-style): cluster members share one
+//! `PortPoint` — no pitch spread at the port (edge-parameters §2.3).
 
 use plotgram_algo::orientation::Side::*;
 use plotgram_model::geometry::{Point, Rect};

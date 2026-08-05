@@ -52,6 +52,7 @@ pub fn build_real_graph(graph: &Graph) -> RealGraph {
             reversed: false,
             from_port: e.from_port.clone(),
             to_port: e.to_port.clone(),
+            critical: e.critical,
         });
     }
 
@@ -94,7 +95,7 @@ mod tests {
             tail_label: None,
             from_port: None,
             to_port: None,
-            edge_group: None,
+            critical: false,
             attrs: AttrMap::new(),
         }
     }

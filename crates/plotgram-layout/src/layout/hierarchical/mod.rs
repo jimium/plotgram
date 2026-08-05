@@ -78,11 +78,10 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
              (see docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md §0.4)",
         ));
     }
-    if !matches!(params.routing_style, RoutingStyle::Orthogonal) {
-        return Err(LayoutError::message(format!(
-            "hierarchical routing_style `{}` is not implemented yet",
-            params.routing_style.as_str()
-        )));
+    if matches!(params.routing_style, RoutingStyle::Octilinear) {
+        return Err(LayoutError::message(
+            "hierarchical routing_style `octilinear` is not implemented yet",
+        ));
     }
 
     let orientation = orient::to_algo_orientation(params.orientation);
@@ -92,7 +91,14 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     compose::cycle::remove_cycles(&mut real_graph);
     let ranks = compose::rank::assign_ranks(&real_graph)?;
     let mut plan = compose::properify::properify(&real_graph, &ranks);
-    compose::order::order_layers(&mut plan);
+    // Author critical-path marks feed P3 ordering weights (edge-parameters §2.5).
+    let critical_edges: std::collections::BTreeSet<String> = real_graph
+        .edges
+        .iter()
+        .filter(|e| e.critical)
+        .map(|e| e.edge_id.clone())
+        .collect();
+    compose::order::order_layers(&mut plan, &critical_edges);
 
     // Canonical node sizes are needed before port finalize (FIXED_POS
     // boundary validation) — measured sizes, never invented.
@@ -107,7 +113,17 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         canonical_size[i] = orientation.to_tb_size(to_algo_size(size));
     }
 
-    let ports = compose::ports::assign_ports(&real_graph, &plan, orientation, &canonical_size)?;
+    let port_assignment = compose::ports::assign_ports(
+        &real_graph,
+        &plan,
+        orientation,
+        &canonical_size,
+        params.auto_edge_grouping,
+    )?;
+    let compose::ports::PortAssignment {
+        ports,
+        bus_prefixes,
+    } = port_assignment;
 
     // --- Metric ------------------------------------------------------
     let size_of = |elem_idx: usize| -> algo_orient::Size {
@@ -139,9 +155,26 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         })
         .collect();
 
+    let bus_levels = metric::bus::assign_bus_levels(
+        &bus_prefixes,
+        &ports,
+        &real_graph,
+        &plan,
+        &canonical_frames,
+        params.layer_gap,
+    );
+
     // --- Ink -----------------------------------------------------------
-    let mut canonical_edges =
-        ink::route::route_edges(&real_graph, &plan, &ports, &canonical_frames);
+    let mut canonical_edges = ink::route::route_edges(
+        &real_graph,
+        &plan,
+        &ports,
+        &canonical_frames,
+        &bus_levels,
+        params.routing_style,
+        params.layer_gap,
+        params.node_gap,
+    )?;
     canonical_edges.extend(ink::selfloop::self_loop_edges(
         &real_graph.self_loops,
         &real_graph.ids,
@@ -162,16 +195,26 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     let mut edges: Vec<EdgePlacement> = canonical_edges
         .iter()
         .map(|ce| {
-            let points: Vec<Point> = ce
-                .path
-                .iter()
-                .map(|&p| from_algo_point(orientation.from_tb_point(to_algo_point(p))))
-                .collect();
+            let transform = |p: Point| from_algo_point(orientation.from_tb_point(to_algo_point(p)));
+            let path = match &ce.path {
+                ink::route::InkPath::Polyline(points) => {
+                    EdgePath::polyline(points.iter().copied().map(transform).collect())
+                }
+                ink::route::InkPath::Cubic {
+                    start,
+                    end,
+                    controls,
+                } => EdgePath::cubic(
+                    transform(*start),
+                    transform(*end),
+                    [transform(controls[0]), transform(controls[1])],
+                ),
+            };
             EdgePlacement {
                 id: ce.id.clone(),
                 source: ce.source.clone(),
                 target: ce.target.clone(),
-                path: EdgePath::polyline(points),
+                path,
                 from_port: Some(port_ref_out(orientation, ce.from_port)),
                 to_port: Some(port_ref_out(orientation, ce.to_port)),
             }
@@ -362,7 +405,7 @@ mod tests {
                 tail_label: None,
                 from_port: None,
                 to_port: None,
-                edge_group: None,
+                critical: false,
                 attrs: AttrMap::new(),
             }],
             groups: vec![],

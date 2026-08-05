@@ -1,0 +1,20 @@
+// routing_style: polyline — waypoints connected by straight segments
+// (no orthogonal bend insertion). Fan-out edges run diagonally.
+diagram {
+    profile: flowchart,
+    title: "直连折线风格",
+    layout: hierarchical { routing_style: polyline }
+
+    node gw { label: "API 网关", archetype: process }
+    node auth { label: "认证服务", archetype: process }
+    node users { label: "用户服务", archetype: process }
+    node orders { label: "订单服务", archetype: process }
+    node db { label: "数据库", archetype: database }
+
+    gw -> auth
+    gw -> users
+    gw -> orders
+    auth -> db
+    users -> db
+    orders -> db
+}

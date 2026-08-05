@@ -1,7 +1,7 @@
 # Hierarchical · 边参数支持研究（对照 yFiles Edges 分组）
 
 > 日期：2026-08-05  
-> 状态：设计研究（未实施；实施按本文 §4 分阶段，各阶段开工前单独细化验收）  
+> 状态：设计研究；第一批（routing_style 补齐）与第二批（auto_edge_grouping / critical）已落地（见 §4 落地摘要），其余批次实施前单独细化验收  
 > 对照：yFiles HierarchicalLayout 的 Edges 配置面板  
 > 依据：[architecture.md](architecture.md) · [roadmap.md](roadmap.md) · [写权纪律](../write-authority.md)  
 > 相关：[layout-diagnostics 指南](../../../guides/layout-diagnostics.md)
@@ -22,12 +22,13 @@ yFiles 的 8 个 Edges 参数，我们**按写权归位**后没有一个需要�
 
 | 既有能力 | 位置 | 与本文关系 |
 |----------|------|-----------|
-| `routing_style` 四值枚举已 bind | `params.rs` | 仅 `orthogonal` 有实现；其余硬失败（mod.rs） |
+| `routing_style` 四值枚举已 bind | `params.rs` | `orthogonal` / `polyline` / `curved` 三档已落地；`octilinear` 仍硬失败（依赖 Channel） |
 | dummy 链正交 Ink（中点双折点 jog） | `ink/route.rs` | 回边、跨层边共用同一展开；无走廊概念 |
 | FAS 反转 + 回边走廊侧别（G3） | `compose/cycle.rs` / `ports.rs` | 回边「能画」，但走 rank 方向、折点无界 |
 | 自环 | `ink/selfloop.rs` | 已支持 |
-| `Edge.edge_group` 结构字段 | `plotgram-model/graph.rs` | 作者显式分组已有载体；**自动**分组无 |
-| `HierarchicalLayoutData.edge { min_span?, weight?, priority? }` | architecture.md §9.2 | **目标 IR 已设计、未实现**——critical path / min length 的落点 |
+| `Edge.critical` 结构字段 | `plotgram-model/graph.rs` | 作者关键路径标记 |
+| 布局 `auto_edge_grouping` | `HierarchicalParams` | **自动**同源/同汇合流（§2.3）；无边级 `edge_group` |
+| `HierarchicalLayoutData.edge { min_span?, weight?, priority? }` | architecture.md §9.2 | critical 已落地（`Edge.critical` → `RealEdge.critical`，P3/P4 消费）；min length 仍待 DemandBoard |
 | DemandBoard | architecture.md §3.3 | 目标协议、代码未立——层间距 demand 回写的唯一合法通道 |
 | Channel / track / rip-up | roadmap D₁ | 未实现——segment 约束、bus 干线、边优先级抢占都依赖它 |
 | diagram 级 `edge_routing:` 独立 EdgeRouter | `plotgram-router` | 五路由器齐备；与内建 `routing_style` **正交**（architecture.md §5.3） |
@@ -38,7 +39,7 @@ yFiles 的 8 个 Edges 参数，我们**按写权归位**后没有一个需要�
 
 每个参数回答三问：**映射到什么概念**、**写者是谁**、**现在能不能做**。
 
-### 2.1 Routing Style —— 已有框架，缺非正交实现
+### 2.1 Routing Style —— 已有框架，缺非正交实现（polyline/curved 已落地）
 
 yFiles：边路径几何风格（Orthogonal / Polyline / Octilinear / Curved）。
 
@@ -47,12 +48,12 @@ yFiles：边路径几何风格（Orthogonal / Polyline / Octilinear / Curved）�
   `polyline` = Compose 明写 `RouteTopology::Polyline(DirectOrVia)`，Ink 只展开
   （architecture.md §5.3）；`curved` = 正交骨架上做圆滑（Bezier/圆角曲线），
   属 Ink 落笔变换，不改变拓扑；`octilinear` 需 45° 骨架，**依赖 Channel**。
-- **判断**：polyline 与 curved 可在无 Channel 的前提下先做（见 §4 第一批）；
-  octilinear 明确后置（roadmap §6 已列）。
+- **判断**：polyline 与 curved 可在无 Channel 的前提下先做（见 §4 第一批）——
+  **已落地**；octilinear 明确后置（roadmap §6 已列）。
 - **交互约束**：diagram 级 `edge_routing:` 若显式声明，独立 EdgeRouter 接管，
   内建 `routing_style` 被忽略（现状即如此）。两者同时显式声明时的冲突语义
-  第一批实施时定死（建议：显式 `edge_routing` 优先 + diagnostics warning，
-  不硬失败——`edge_routing: none` 是合法用法）。
+  **已定死并落地**：显式 `edge_routing` 优先 + diagnostics warning
+  （engine run.rs 判定，不硬失败——`edge_routing: none` 是合法用法）。
 
 ### 2.2 Backloop Routing —— 缺走廊，不是缺开关
 
@@ -67,36 +68,34 @@ yFiles：回边（指向更上层的边）绕节点侧面/外侧，少穿层、�
   能力随 D₁ 落地后**默认开启**（回边自动走外侧走廊），无需用户开关——
   若将来确需降级行为，再加参数，bind 之前必须有消费者。
 
-### 2.3 Automatic Edge Grouping —— Compose 聚类 + PortGroup
+### 2.3 Automatic Edge Grouping —— Compose 聚类 + Bus 几何（已落地）
 
-yFiles：同源/同汇的多条边在端口附近合并成一股（共享端口 + 公共前缀）。
+yFiles：同源/同汇的多条边在端口附近合并成一股（共享端口 + 公共干线 +
+水平总线 + stub）。开关名：`automaticEdgeGrouping`。
 
-- **映射**：`edge_grouping: bool`（图级参数，对应 architecture.md §9.2
-  候选字段 `edge_grouping`）+ 元素级 `Edge.edge_group`（作者显式分组，模型已有）。
-- **写者**：**Compose** 是端口唯一写者——聚类发生在组合相：把
-  `(source, target 的 layer/order 邻域)` 相近的同源/同汇边归为一个
-  `PortGroup`，写进 Plan 的 `PortPlan.group`（architecture.md §7.1 已有
-  `group: PortGroupId?` 槽位）。Metric 把组内端口展开为共享锚点 + 扇形前缀；
-  Ink 只接合，不发明合流点。
-- **边界**：只合「端口附近的一股」，不做长程 bundle——长程共享 track 是
-  Channel 的 Bundle 概念（architecture.md §6.2），两者在 D₁ 后自然对接。
-- **判断**：可在 Channel 之前做一版（端口合流 + 公共第一段），质量上限受
-  Ink jog 机械折点限制；Channel 后升级为 track 后缀共享。
+- **映射**：`auto_edge_grouping: bool`（图级参数）。**不**提供边级
+  `edge_group`；**不**再用 `cluster_pitch` 在源端口散开出口。
+- **写者**：
+  - **Compose**：同 `(node, North|South)` FREE 端 → `PortGroup` + `BusPrefix`
+    （拓扑：SharedPort → Trunk → Bus → Stub）
+  - **Metric**：同簇同 `PortPoint`；写确定性 `bus_y`（层间 trunk 长度）
+  - **Ink**：只接合共享干线 / 总线 / stub，不发明合流点
+- **边界**：相邻层扇出即可得到图二观感；跨多层 track 级 Bundle 仍归
+  Channel / 日后 `bus_routing`。
+- **判断**：**已落地**（bus-style v1）。
 
-### 2.4 Automatic Bus Routing —— 分组之上的干线几何
+### 2.4 Automatic Bus Routing —— Channel track 级长程干线
 
-yFiles：共享干线 + 短支线（电路总线画法）。
+yFiles 独立 `BusRouter` / Channel 上的长程共享 track，**不是** Hier
+`automaticEdgeGrouping` 的相邻层扇出（那已由 §2.3 覆盖）。
 
-- **映射**：`bus_routing: bool`，语义 = grouping 的几何变体：组内边共享一段
-  **干线 track**，各自伸出垂直短支线。
-- **写者**：干线是一条 track → 本质是 Channel 的 track 分配 + Ink 的
-  trunk/stub 展开。Compose 写「这些边构成 bus」的拓扑事实（复用 PortGroup /
-  Bundle 结构），不得让 Ink 从几何上猜哪条是干线。
-- **判断**：**依赖 grouping 先落地**，且完整形态依赖 D₁。与 curved 叠用时
-  观感需斟酌——实施时明确：bus 仅在 `routing_style: orthogonal` 下生效，
-  其余组合 bind 硬失败（无效组合即错误，architecture.md §9.2）。
+- **映射**：日后 `bus_routing`（可选），语义 = 跨层 / 拥塞走廊上的
+  Bundle track 干线。
+- **写者**：Channel track 分配 + Ink trunk/stub 展开；Compose 写 Bundle
+  拓扑事实。
+- **判断**：依赖 D₁ Channel；与 §2.3 相邻层 bus 几何不冲突。
 
-### 2.5 Highlight Critical Path —— 边权重进排序/坐标目标
+### 2.5 Highlight Critical Path —— 边权重进排序/坐标目标（已落地）
 
 yFiles：让关键路径更直、更优先；是**布局偏好**，不是渲染描边。
 
@@ -111,7 +110,8 @@ yFiles：让关键路径更直、更优先；是**布局偏好**，不是渲染�
   事实，算法不应猜。自动推断（最长路径等）明确不做：不可验证语义不进引擎。
 - **判断**：消费点在 P3（ordering）与 P4（坐标），与阶段 A 的「长边更直」
   目标函数是同一批代码路径——搭车实施 ROI 最高。可观测验收：标记边相对
-  未标记边的 bend 数 / 列偏移 delta。
+  未标记边的 bend 数 / 列偏移 delta。**已落地**（`Edge.critical` 一等字段；
+  P3 链段权重 ×2、P4 VPSC desired 权重 ×2，见 §4 第二批落地摘要）。
 
 ### 2.6 / 2.7 Minimum First / Last Segment Length —— Channel 转弯约束
 
@@ -146,16 +146,16 @@ yFiles：整条边总长下限；短跨（相邻层直连）被撑开，影响�
 
 ## 3. 支持矩阵（总览）
 
-| yFiles 参数 | 我们的参数名 | 写者/相 | 依赖 | 优先级 |
-|-------------|--------------|---------|------|--------|
-| Routing Style | `routing_style`（已有） | Ink 展开 / Compose 拓扑 | polyline/curved 无硬依赖；octilinear 依赖 Channel | ★★ 第一批 |
-| Backloop Routing | 不做开关 | Channel（D₁） | D₁ | D₁ 随附（默认行为） |
-| Automatic Edge Grouping | `edge_grouping` | Compose + Metric + Ink | 无（Channel 前做 v1） | ★★ 第二批 |
-| Automatic Bus Routing | `bus_routing` | Channel track + Ink | grouping + D₁ | 第四批 |
-| Highlight Critical Path | 边级 `critical` 标记 → typed `priority/weight` | P3 ordering / P4 坐标 | 无 | ★★ 第二批（搭阶段 A） |
-| Min First Segment | `min_first_segment` | Channel 搜索约束 | D₁ | 第三批（bind 前硬失败） |
-| Min Last Segment | `min_last_segment` | Channel 搜索约束 | D₁ | 第三批（同上） |
-| Min Edge Length | `min_edge_length` | DemandBoard → P4 | DemandBoard | 第三批（随 Board） |
+| yFiles 参数 | 我们的参数名 | 写者/相 | 依赖 | 优先级 | 状态 |
+|-------------|--------------|---------|------|--------|------|
+| Routing Style | `routing_style`（已有） | Ink 展开 / Compose 拓扑 | polyline/curved 无硬依赖；octilinear 依赖 Channel | ★★ 第一批 | **已落地**（orthogonal/polyline/curved） |
+| Backloop Routing | 不做开关 | Channel（D₁） | D₁ | D₁ 随附（默认行为） | 待 D₁ |
+| Automatic Edge Grouping | `auto_edge_grouping` | Compose + Metric + Ink | 无（Channel 前做 bus v1） | ★★ 第二批 | **已落地**（bus-style） |
+| Automatic Bus Routing | `bus_routing`（Channel track） | Channel + Ink | D₁ | 第四批 | 待 D₁ |
+| Highlight Critical Path | 边级 `critical: bool` | P3 ordering / P4 坐标 | 无 | ★★ 第二批（搭阶段 A） | **已落地** |
+| Min First Segment | `min_first_segment` | Channel 搜索约束 | D₁ | 第三批（bind 前硬失败） | 待 D₁ |
+| Min Last Segment | `min_last_segment` | Channel 搜索约束 | D₁ | 第三批（同上） | 待 D₁ |
+| Min Edge Length | `min_edge_length` | DemandBoard → P4 | DemandBoard | 第三批（随 Board） | 待 DemandBoard |
 
 ---
 
@@ -163,7 +163,7 @@ yFiles：整条边总长下限；短跨（相邻层直连）被撑开，影响�
 
 与 roadmap 的 A/B/C/D/E 对齐；每批**开工前**再细化验收 fixture。
 
-### 第一批 · 边风格补齐（无新基建）
+### 第一批 · 边风格补齐（无新基建）——已收口
 
 **目标**：`routing_style` 四值里补上产品最常用的两档。
 
@@ -177,18 +177,43 @@ yFiles：整条边总长下限；短跨（相邻层直连）被撑开，影响�
 **验收**：polyline/curved fixture 进 hier_eval（硬不变量全绿）+ 快照；
 orthogonal 几何零变化；`octilinear` 仍硬失败（明示后置）。
 
-### 第二批 · 端口合流与关键路径（Compose / 目标函数）
+**落地摘要**：
+
+- `polyline`：Ink 直接把 waypoints（源锚点 → dummy 中心 → 目标锚点）直线
+  相连，不做 bend 插入 / 正交归一（`ink/route.rs`）。
+- `curved`：受控限制——仅当两端端口的 canonical side 均为 North/South
+  （主轴向）时生效，发射单段 `EdgePath::Cubic`，控制点沿端口法线外推
+  `clamp(跨度/3, 24, layer_gap+node_gap)`；含 East/West 端口（G3 无链回边）
+  的边硬失败，指向 roadmap D₁。自环恒走 polyline。
+- 冲突 warning：engine `run.rs` 判定显式 `edge_routing` + 显式非默认
+  `routing_style` → `LayoutDiagnostics.warnings`。
+- Ink 内部 `InkPath { Polyline, Cubic }` 枚举，orientation-out 时映射到
+  `EdgePath`；模型层 `EdgePath::Cubic` + `samples()` 24 点采样就绪。
+
+### 第二批 · 端口合流与关键路径（Compose / 目标函数）——已收口
 
 **目标**：一对多/多对一的观感 + 主流程视觉主干。
 
-1. `edge_grouping: bool`：Compose 自动聚类同源/同汇边 → `PortGroup`；
-   Metric 共享锚点展开；Ink 公共第一段。作者显式 `edge_group` 优先于自动聚类
-   （结构事实 > 算法偏好，architecture.md §9.1）。
+1. `auto_edge_grouping: bool`：Compose 自动聚类同源/同汇边 → `PortGroup` +
+   `BusPrefix`；Metric 同锚点 + `bus_y`；Ink 接合干线/总线/stub。
 2. 边级 critical 标记 lift 进 `HierarchicalLayoutData.edge.priority/weight`；
    P3 median 权重与 P4 对齐目标消费。
 
-**验收**：fan-out/fan-in fixture 合流可见；标记 critical 的链 bend 数不劣于
-未标记基线；69 fixture 零回归。
+**验收**：fan-out/fan-in fixture 呈 yFiles bus 观感（单出口 + 单干线 +
+水平总线）；标记 critical 的链 bend 数不劣于未标记基线。
+
+**落地摘要**：
+
+- **聚类**（compose/ports.rs）：`auto_edge_grouping=true` 时，同一
+  `(node, North|South)` 上的 FREE 端合并为一簇并写出 `BusPrefix`。
+- **锚点**：同簇成员共享同一 `PortPoint`（无 pitch 散开）。
+- **bus_y**（metric/bus.rs）：`port.y + sign(side) * trunk`，
+  `trunk = clamp(0.35·layer_gap + …, 12, 32)`。
+- **Ink**：`[shared_port, (shared_x, bus_y), (target_x, bus_y), target]`。
+- **无效组合**：`auto_edge_grouping=true` × `routing_style=octilinear`；
+  键 `cluster_pitch` / `edge_grouping` / `edge_group` 硬失败。
+- **验收落地**：`fan/auto_edge_grouping.pgm`、`flat/smoke.fan-out-four.pgm`；
+  集成测试断言同源簇成员 `samples()[0]` 相等。
 
 ### 第三批 · Demand 与 Channel 前置参数
 

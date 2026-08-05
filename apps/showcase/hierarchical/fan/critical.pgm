@@ -1,0 +1,23 @@
+// critical — the diamond's left arm is marked `critical: true`; ordering
+// and cross-axis alignment weight its segments higher, keeping it at least
+// as straight as the unmarked arm (compare against the unmarked control in
+// tests/diagnostics.rs).
+diagram {
+    profile: flowchart,
+    title: "关键路径优先",
+    layout: hierarchical { }
+
+    node s { label: "开始", archetype: start }
+    node fast { label: "快速通道", archetype: process }
+    node slow { label: "人工通道", archetype: process }
+    node t { label: "汇合", archetype: process }
+    node audit { label: "审计记录", archetype: process }
+    node arch { label: "归档", archetype: end }
+
+    s -> fast { critical: true }
+    fast -> t { critical: true }
+    s -> slow
+    slow -> t
+    audit -> slow
+    slow -> arch
+}

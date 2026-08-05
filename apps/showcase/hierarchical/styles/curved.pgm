@@ -1,0 +1,19 @@
+// routing_style: curved — single cubic Bézier per edge, control points
+// extruded along the port normals (main-axis ports only; no back edges).
+diagram {
+    profile: flowchart,
+    title: "曲线风格",
+    layout: hierarchical { routing_style: curved }
+
+    node intake { label: "接收请求", archetype: start }
+    node parse { label: "解析参数", archetype: process }
+    node validate { label: "校验规则", archetype: process }
+    node persist { label: "持久化", archetype: process }
+    node done { label: "完成", archetype: end }
+
+    intake -> parse
+    intake -> validate
+    parse -> persist
+    validate -> persist
+    persist -> done
+}
