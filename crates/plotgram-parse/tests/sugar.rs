@@ -130,7 +130,7 @@ fn node_sugar_archetype_expands_axes() {
     // Positional archetype triggers expansion in pipeline
     let out = p(r#"diagram { node db "Users" database }"#);
     let n = node(&out, "db");
-    assert_eq!(n.shape.as_deref(), Some("cylinder"));
+    assert_eq!(n.shape, Some(plotgram_model::NodeShape::Cylinder));
     assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("info"));
     // database has no icon → not filled
     assert!(!n.attrs.contains_key("icon"));
@@ -143,7 +143,7 @@ fn node_sugar_icon_blocks_archetype_icon() {
     let n = node(&out, "svc");
     assert_eq!(n.attrs.get("icon").and_then(|v| v.as_str()), Some("custom_icon"));
     // shape/variant still filled from archetype
-    assert_eq!(n.shape.as_deref(), Some("rounded_rect"));
+    assert_eq!(n.shape, Some(plotgram_model::NodeShape::RoundedRect));
     assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("default"));
 }
 
@@ -151,7 +151,7 @@ fn node_sugar_icon_blocks_archetype_icon() {
 fn node_explicit_shape_in_block_overrides_archetype() {
     let out = p(r#"diagram { node db "DB" database { shape: rounded_rect } }"#);
     let n = node(&out, "db");
-    assert_eq!(n.shape.as_deref(), Some("rounded_rect"));
+    assert_eq!(n.shape, Some(plotgram_model::NodeShape::RoundedRect));
     // variant still filled
     assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("info"));
 }
@@ -283,31 +283,22 @@ fn edge_block_only() {
 
 #[test]
 fn edge_port_lift_combinations() {
-    // Table: (attrs_src, expect_from_side, expect_from_slot, expect_to_side, expect_to_slot)
-    let cases: &[(&str, Option<Side>, Option<u32>, Option<Side>, Option<u32>)] = &[
-        ("from_side: north", Some(Side::North), None, None, None),
-        ("to_side: south", None, None, Some(Side::South), None),
-        ("from_side: east, to_side: west", Some(Side::East), None, Some(Side::West), None),
-        ("from_side: north, from_slot: 2", Some(Side::North), Some(2), None, None),
-        (
-            "from_side: south, from_slot: 0, to_side: north, to_slot: 1",
-            Some(Side::South),
-            Some(0),
-            Some(Side::North),
-            Some(1),
-        ),
+    let cases: &[(&str, Option<Side>, Option<Side>)] = &[
+        ("from_side: north", Some(Side::North), None),
+        ("to_side: south", None, Some(Side::South)),
+        ("from_side: east, to_side: west", Some(Side::East), Some(Side::West)),
     ];
 
-    for (attrs, fs, fsl, ts, tsl) in cases {
+    for (attrs, fs, ts) in cases {
         let src = format!("diagram {{ node a {{}} node b {{}} a -> b {{ {attrs} }} }}");
         let out = p(&src);
         let e = edge_at(&out, 0);
         let fp = e.from_port.as_ref();
         let tp = e.to_port.as_ref();
         assert_eq!(fp.and_then(|p| p.pinned_side()), *fs, "from_side for: {attrs}");
-        assert_eq!(fp.and_then(|p| p.order_key()), *fsl, "from_slot for: {attrs}");
         assert_eq!(tp.and_then(|p| p.pinned_side()), *ts, "to_side for: {attrs}");
-        assert_eq!(tp.and_then(|p| p.order_key()), *tsl, "to_slot for: {attrs}");
+        assert!(fp.map(|p| p.order_key().is_none()).unwrap_or(true));
+        assert!(tp.map(|p| p.order_key().is_none()).unwrap_or(true));
     }
 }
 
@@ -389,16 +380,17 @@ fn group_frame_anchor_reuse() {
 }
 
 #[test]
-fn group_frame_anchor_different_slots() {
+fn group_frame_anchor_same_side_reused() {
+    // Same (group, side) → same synthesized anchor (no edge slot anymore).
     let out = p(r#"diagram {
         group g { node x {} }
         node a {} node b {}
-        a -> @g { to_side: west, to_slot: 0 }
-        b -> @g { to_side: west, to_slot: 1 }
+        a -> @g { to_side: west }
+        b -> @g { to_side: west }
     }"#);
     let e0 = edge_at(&out, 0);
     let e1 = edge_at(&out, 1);
-    assert_ne!(e0.target, e1.target, "different slots → different anchors");
+    assert_eq!(e0.target, e1.target, "same side → same anchor");
 }
 
 #[test]
@@ -635,7 +627,7 @@ fn archetype_expansion_all_builtin() {
 
         // Shape filled from archetype
         assert_eq!(
-            n.shape.as_deref(),
+            n.shape,
             def.shape,
             "shape for archetype `{}`",
             def.id
@@ -669,7 +661,7 @@ fn archetype_fill_only_never_overrides() {
     // All three axes explicitly set → archetype changes nothing
     let out = p(r#"diagram { node n { archetype: service, shape: circle, variant: primary, icon: custom } }"#);
     let n = node(&out, "n");
-    assert_eq!(n.shape.as_deref(), Some("circle"));
+    assert_eq!(n.shape, Some(plotgram_model::NodeShape::Circle));
     assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("primary"));
     assert_eq!(n.attrs.get("icon").and_then(|v| v.as_str()), Some("custom"));
 }
@@ -710,10 +702,10 @@ fn combined_real_world_flowchart() {
     assert_eq!(out.meta.title.as_deref(), Some("订单处理"));
 
     // Archetype expansion checks
-    assert_eq!(node(&out, "start").shape.as_deref(), Some("circle"));
-    assert_eq!(node(&out, "check").shape.as_deref(), Some("diamond"));
-    assert_eq!(node(&out, "db").shape.as_deref(), Some("cylinder"));
-    assert_eq!(node(&out, "pay").shape.as_deref(), Some("diamond"));
+    assert_eq!(node(&out, "start").shape, Some(plotgram_model::NodeShape::Circle));
+    assert_eq!(node(&out, "check").shape, Some(plotgram_model::NodeShape::Diamond));
+    assert_eq!(node(&out, "db").shape, Some(plotgram_model::NodeShape::Cylinder));
+    assert_eq!(node(&out, "pay").shape, Some(plotgram_model::NodeShape::Diamond));
 
     // Group structure
     assert_eq!(out.graph.groups.len(), 1);

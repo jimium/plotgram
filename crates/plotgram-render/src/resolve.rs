@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 
 use plotgram_model::attr::{AttrMap, AttrValue};
 use plotgram_model::graph::{Arrow, Edge, Graph, Group, Node};
+use plotgram_model::NodeShape;
 
 use crate::icons::{self, IconDef};
 use crate::theme::{CompiledTheme, VariantStyle};
@@ -25,7 +26,7 @@ pub struct ResolvedNodeStyle {
     pub fill: String,
     pub stroke: String,
     pub stroke_width: f64,
-    pub shape: String,
+    pub shape: NodeShape,
     pub text_fill: String,
     pub font_size: f64,
     pub font_weight: Option<String>,
@@ -133,7 +134,7 @@ pub fn resolve_node(node: &Node, theme: &CompiledTheme) -> ResolvedNodeStyle {
     apply_inline_node_styles(&mut style, &node.attrs);
 
     // Icon: explicit only, against final shape (dsl-spec §14.3.1)
-    style.icon = icons::resolve_icon(node, &style.shape);
+    style.icon = icons::resolve_icon(node, style.shape);
 
     style
 }
@@ -213,7 +214,7 @@ fn resolve_group_style(group: &Group, theme: &CompiledTheme) -> ResolvedGroupSty
     style
 }
 
-fn variant_style_to_resolved(vs: &VariantStyle, shape: String) -> ResolvedNodeStyle {
+fn variant_style_to_resolved(vs: &VariantStyle, shape: NodeShape) -> ResolvedNodeStyle {
     ResolvedNodeStyle {
         fill: vs.fill.clone(),
         stroke: vs.stroke.clone(),
@@ -381,7 +382,7 @@ fn apply_inline_group_styles(style: &mut ResolvedGroupStyle, attrs: &AttrMap) {
 mod tests {
     use super::*;
 
-    fn node(variant: Option<&str>, shape: Option<&str>, styles: &[(&str, AttrValue)]) -> Node {
+    fn node(variant: Option<&str>, shape: Option<NodeShape>, styles: &[(&str, AttrValue)]) -> Node {
         let mut attrs = AttrMap::new();
         if let Some(v) = variant {
             attrs.insert("variant".to_string(), AttrValue::Atom(v.to_string()));
@@ -392,7 +393,7 @@ mod tests {
         Node {
             id: "n".to_string(),
             label: None,
-            shape: shape.map(str::to_string),
+            shape,
             role: Default::default(),
             host_group: None,
             anchor: None,
@@ -422,15 +423,15 @@ mod tests {
         assert_eq!(r.shape, theme.defaults.node_shape);
 
         // Layer 3: explicit DSL shape overrides default shape, paint from variant
-        let r = resolve_node(&node(Some("primary"), Some("hexagon"), &[]), &theme);
-        assert_eq!(r.shape, "hexagon");
+        let r = resolve_node(&node(Some("primary"), Some(NodeShape::Hexagon), &[]), &theme);
+        assert_eq!(r.shape, NodeShape::Hexagon);
         assert_eq!(r.fill, primary.fill);
 
         // Layer 4: inline style.* beats everything below
         let r = resolve_node(
             &node(
                 Some("primary"),
-                Some("hexagon"),
+                Some(NodeShape::Hexagon),
                 &[
                     ("style.fill", AttrValue::Str("#123456".to_string())),
                     ("style.stroke_width", AttrValue::Num(3.0)),
@@ -440,7 +441,7 @@ mod tests {
             &theme,
         );
         assert_eq!(r.fill, "#123456");
-        assert_eq!(r.shape, "hexagon");
+        assert_eq!(r.shape, NodeShape::Hexagon);
         assert_eq!(r.stroke_width, 3.0);
         assert_eq!(r.stroke_dasharray.as_deref(), Some("4,3"));
 

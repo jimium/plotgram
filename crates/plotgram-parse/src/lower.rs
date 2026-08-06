@@ -204,10 +204,17 @@ impl LowerCtx {
         let mut attrs = n.attrs.clone();
         // §14.3: label type = string (Str or Atom accepted; Num/Bool rejected)
         let label = take_string_attr(&mut attrs, "label", &format!("node `{}`", n.id))?;
-        // §14.3: shape type = atom (closed set validated later by render)
+        // §14.3 / §14.6: shape type = atom from the closed NodeShape set.
         let shape = match attrs.remove("shape") {
-            Some(AttrValue::Atom(s)) => Some(s),
-            Some(AttrValue::Str(s)) => Some(s), // quoted form is equivalent
+            Some(AttrValue::Atom(s)) | Some(AttrValue::Str(s)) => {
+                let Some(parsed) = plotgram_model::NodeShape::parse(&s) else {
+                    return Err(ParseError::Semantic(format!(
+                        "node `{}`: unknown shape `{s}` (dsl-spec §14.6)",
+                        n.id
+                    )));
+                };
+                Some(parsed)
+            }
             Some(other) => {
                 return Err(ParseError::Semantic(format!(
                     "node `{}`: `shape` must be an atom, got {}",
@@ -462,7 +469,7 @@ mod tests {
         let lowered = lower_ok(r#"diagram { node x { label: "Hello", shape: diamond } }"#);
         let n = &lowered.graph.nodes[0];
         assert_eq!(n.label.as_deref(), Some("Hello"));
-        assert_eq!(n.shape.as_deref(), Some("diamond"));
+        assert_eq!(n.shape, Some(plotgram_model::NodeShape::Diamond));
         assert!(!n.attrs.contains_key("label"));
         assert!(!n.attrs.contains_key("shape"));
     }

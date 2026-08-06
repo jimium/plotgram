@@ -11,9 +11,10 @@ use plotgram_model::render::{RenderInput, RenderMeta};
 use plotgram_model::result::{
     EdgePath, EdgePlacement, GroupPlacement, LabelOwner, LabelSlot, LayoutResult, NodePlacement,
 };
+use plotgram_model::NodeShape;
 use plotgram_render::render_svg;
 
-fn node(id: &str, label: &str, shape: Option<&str>, variant: Option<&str>) -> Node {
+fn node(id: &str, label: &str, shape: Option<plotgram_model::NodeShape>, variant: Option<&str>) -> Node {
     let mut attrs = AttrMap::new();
     if let Some(v) = variant {
         attrs.insert("variant".to_string(), AttrValue::Atom(v.to_string()));
@@ -21,7 +22,7 @@ fn node(id: &str, label: &str, shape: Option<&str>, variant: Option<&str>) -> No
     Node {
         id: id.to_string(),
         label: Some(label.to_string()),
-        shape: shape.map(|s| s.to_string()),
+        shape,
         role: Default::default(),
         host_group: None,
         anchor: None,
@@ -79,20 +80,20 @@ fn build_input(theme: Option<&str>, render_style: Option<&str>) -> RenderInput {
     let graph = Graph {
         nodes: vec![
             // Row 1: a small flow
-            node("start", "开始", Some("stadium"), None),
-            node("check", "库存足够?", Some("diamond"), Some("info")),
-            node("svc", "订单服务", Some("rounded_rect"), Some("primary")),
-            node("db", "订单库", Some("cylinder"), Some("secondary")),
+            node("start", "开始", Some(NodeShape::Stadium), None),
+            node("check", "库存足够?", Some(NodeShape::Diamond), Some("info")),
+            node("svc", "订单服务", Some(NodeShape::RoundedRect), Some("primary")),
+            node("db", "订单库", Some(NodeShape::Cylinder), Some("secondary")),
             // Row 2: process-ish shapes
-            node("doc", "对账单", Some("document"), None),
-            node("sub", "扣减库存", Some("subprocess"), None),
-            node("para", "导入数据", Some("parallelogram"), None),
-            node("gw", "网关", Some("hexagon"), Some("info")),
+            node("doc", "对账单", Some(NodeShape::Document), None),
+            node("sub", "扣减库存", Some(NodeShape::Subprocess), None),
+            node("para", "导入数据", Some(NodeShape::Parallelogram), None),
+            node("gw", "网关", Some(NodeShape::Hexagon), Some("info")),
             // Row 3: actors & misc
-            node("buyer", "买家", Some("person"), Some("secondary")),
-            node("cache", "缓存", Some("circle"), Some("primary")),
-            node("cdn", "CDN", Some("cloud"), Some("muted")),
-            node("plain", "普通矩形", Some("rect"), None),
+            node("buyer", "买家", Some(NodeShape::Person), Some("secondary")),
+            node("cache", "缓存", Some(NodeShape::Circle), Some("primary")),
+            node("cdn", "CDN", Some(NodeShape::Cloud), Some("muted")),
+            node("plain", "普通矩形", Some(NodeShape::Rect), None),
         ],
         edges: vec![
             edge("e1", "start", "check"),

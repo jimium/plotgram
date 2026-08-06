@@ -74,7 +74,7 @@ Sugiyama 骨架 + Atlas 三相写权（组合 → 度量 → Ink）。
 
 - [contracts-and-ir](phases/contracts-and-ir.md) — LayoutOutput/RouteScene、稳定 key、Stage、Diagnostics
 - [composition](phases/composition.md) — FAS、ranking、properify、ordering、Plan freeze
-- [ports-and-channel](phases/ports-and-channel.md) — 五档端口、gate/scope、Channel、track、bundle
+- [ports-and-channel](phases/ports-and-channel.md) — 边侧约束 + FREE、gate/scope、Channel、track、bundle
 - [channel-d1](phases/channel-d1.md) — D₁ 分阶段契约（D1.0–D1.2）
 - [channel-corridor-allocator](phases/channel-corridor-allocator.md) — D1.3 Corridor Allocator 执行方案（①–⑤）
 - [coordinate-and-demand](phases/coordinate-and-demand.md) — Demand epoch、BK/VPSC、组框、PartitionGrid、Orientation

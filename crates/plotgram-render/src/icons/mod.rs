@@ -9,6 +9,7 @@ pub use catalog::{IconCategory, IconDef};
 pub use render::IconLayout;
 
 use plotgram_model::graph::Node;
+use plotgram_model::NodeShape;
 
 /// Resolve the icon for a node, considering shape compatibility.
 ///
@@ -17,7 +18,7 @@ use plotgram_model::graph::Node;
 /// 3. No icon attribute → None
 ///
 /// No inference from variant or other attributes (dsl-spec §14.3.1).
-pub fn resolve_icon(node: &Node, shape: &str) -> Option<&'static IconDef> {
+pub fn resolve_icon(node: &Node, shape: NodeShape) -> Option<&'static IconDef> {
     // Check explicit icon attribute
     if let Some(icon_val) = node.attrs.get("icon").and_then(|v| v.as_str()) {
         if icon_val == "none" {

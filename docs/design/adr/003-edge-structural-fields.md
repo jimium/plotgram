@@ -1,7 +1,7 @@
 # ADR-003: Edge 结构一等字段与时序边序
 
 > 状态：accepted  
-> 日期：2026-07-30（修订 2026-08-05：移除 `edge_group`）  
+> 日期：2026-07-30（修订 2026-08-06：边端口只留 `from_side`/`to_side`；移除 `edge_group`）  
 > 关联：ADR-001、dsl-spec §7.4、[`model-boundary.md`](../model-boundary.md)
 
 ## 背景
@@ -10,13 +10,16 @@
 
 边合流曾用作者 `edge_group` id；与 yFiles AutomaticEdgeGrouping 不对齐，且强迫作者逐边标记。改为布局开关 `auto_edge_grouping`，算法按同源/同汇自动成组。
 
+边级精细端口（slot/ratio/pos/sides）对 AI 写 DSL 几乎用不到，且与 shape→port policy 的 FREE 选侧叠床架屋；收敛为只留侧约束。
+
 ## 决策
 
-1. **`Edge` 一等字段**：`from_port` / `to_port`（`Option<PortConstraint>`）、`critical`（`bool`）。
-2. **DSL 键** `from_side` / `from_slot` / `to_side` / `to_slot` / … / `critical` 由解析器 **提升** 进字段（`Edge::lift_structural_attrs`），之后从 attrs 剥除；引擎只读字段。
-3. **边合流**：`layout: hierarchical { auto_edge_grouping: true }`；**不**提供边级 `edge_group`（写了 → 解析错误）。
-4. **决议端口** `PortRef` 写在 `EdgePlacement`，由布局组合相写入；Ink 只读。
-5. **时序时间轴**：`layout: sequence` 时 = `Graph::edges_in_declaration_order()`；**不**设 `Edge::seq`。
+1. **`Edge` 一等字段**：`from_port` / `to_port`（`Option<PortConstraint>`，边端仅 FREE / `FixedSide`）、`critical`（`bool`）。
+2. **DSL 键** 仅 `from_side` / `to_side` / `critical` 由解析器 **提升** 进字段（`Edge::lift_structural_attrs`），之后从 attrs 剥除；引擎只读字段。`*_slot` / `*_ratio` / `*_x,*_y` / `*_sides` → 硬错误。
+3. **`FixedOrder`** 保留给 `group_anchor`（节点 `side` + 可选 `slot`），不经边 DSL。
+4. **边合流**：`layout: hierarchical { auto_edge_grouping: true }`；**不**提供边级 `edge_group`（写了 → 解析错误）。
+5. **决议端口** `PortRef` 写在 `EdgePlacement`，由布局组合相写入；Ink 只读。
+6. **时序时间轴**：`layout: sequence` 时 = `Graph::edges_in_declaration_order()`；**不**设 `Edge::seq`。
 
 ## 后果
 

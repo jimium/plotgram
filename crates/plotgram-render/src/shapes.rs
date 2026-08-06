@@ -1,10 +1,10 @@
-//! Node shape rendering: shape name → SVG element.
+//! Node shape rendering: NodeShape → SVG element.
 //!
-//! Migrated from V1 `paint/shapes.rs`. V2 uses `&str` matching (dsl-spec closed set)
-//! with fallback to rect for unrecognized shapes.
+//! Closed set from `plotgram_model::NodeShape` (dsl-spec §14.6).
 
 use plotgram_model::geometry::Rect;
 use plotgram_model::result::NodePlacement;
+use plotgram_model::NodeShape;
 
 use crate::outline::{self, closed_path_d};
 use crate::resolve::{ResolvedGraph, ResolvedNodeStyle};
@@ -41,13 +41,13 @@ pub fn render_node(
         style
     };
 
-    let elem = shape_svg(&style.shape, frame, style, strategy, seed);
+    let elem = shape_svg(style.shape, frame, style, strategy, seed);
     svg.add_element(elem);
 }
 
 /// Generate SVG element(s) for a shape.
 pub fn shape_svg(
-    shape: &str,
+    shape: NodeShape,
     frame: &Rect,
     style: &ResolvedNodeStyle,
     strategy: &Strategy,
@@ -64,21 +64,21 @@ pub fn shape_svg(
     let extra = extra_attrs(style);
 
     match shape {
-        "rect" => {
+        NodeShape::Rect => {
             let rx = style.radius.unwrap_or(0.0);
             format!(
                 r#"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
                 fill = style.fill, stroke = style.stroke, sw = style.stroke_width
             )
         }
-        "rounded_rect" => {
-            let rx = style.radius.unwrap_or(8.0);
+        NodeShape::RoundedRect => {
+            let rx = style.radius.unwrap_or(4.0);
             format!(
                 r#"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
                 fill = style.fill, stroke = style.stroke, sw = style.stroke_width
             )
         }
-        "circle" => {
+        NodeShape::Circle => {
             let r = w.min(h) / 2.0;
             let cx = x + w / 2.0;
             let cy = y + h / 2.0;
@@ -87,7 +87,7 @@ pub fn shape_svg(
                 fill = style.fill, stroke = style.stroke, sw = style.stroke_width
             )
         }
-        "diamond" => {
+        NodeShape::Diamond => {
             let cx = x + w / 2.0;
             let cy = y + h / 2.0;
             let points = format!("{cx},{y} {},{cy} {cx},{} {x},{cy}", x + w, y + h);
@@ -96,7 +96,7 @@ pub fn shape_svg(
                 fill = style.fill, stroke = style.stroke, sw = style.stroke_width
             )
         }
-        "cylinder" => {
+        NodeShape::Cylinder => {
             let ry = 8.0_f64.min(h / 4.0);
             let cx = x + w / 2.0;
             let rx = w / 2.0;
@@ -106,7 +106,7 @@ pub fn shape_svg(
                 fill = style.fill, stroke = style.stroke, sw = style.stroke_width
             )
         }
-        "hexagon" => {
+        NodeShape::Hexagon => {
             let hm = h / 2.0;
             let w4 = w / 4.0;
             let points = format!(
@@ -118,7 +118,7 @@ pub fn shape_svg(
                 fill = style.fill, stroke = style.stroke, sw = style.stroke_width
             )
         }
-        "person" => {
+        NodeShape::Person => {
             // Bust silhouette: head circle + rounded-shoulder torso (cf. C4 / draw.io person)
             let head_r = (w * 0.30).min(h * 0.24);
             let cx = x + w / 2.0;
@@ -134,14 +134,14 @@ pub fn shape_svg(
                 fill = style.fill, stroke = style.stroke, sw = style.stroke_width
             )
         }
-        "stadium" => {
+        NodeShape::Stadium => {
             let rx = h.min(w) / 2.0;
             format!(
                 r#"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
                 fill = style.fill, stroke = style.stroke, sw = style.stroke_width
             )
         }
-        "parallelogram" => {
+        NodeShape::Parallelogram => {
             let skew = w * 0.15;
             let points = format!(
                 "{},{} {},{} {},{} {},{}",
@@ -152,7 +152,7 @@ pub fn shape_svg(
                 fill = style.fill, stroke = style.stroke, sw = style.stroke_width
             )
         }
-        "document" => {
+        NodeShape::Document => {
             let wave_y = y + h * 0.85;
             let wave_h = h * 0.15;
             let x1 = x + w;
@@ -170,7 +170,7 @@ pub fn shape_svg(
                 fill = style.fill, stroke = style.stroke, sw = style.stroke_width
             )
         }
-        "cloud" => {
+        NodeShape::Cloud => {
             let cx = x + w / 2.0;
             let cy = y + h * 0.55;
             let rx = w / 2.0;
@@ -193,7 +193,7 @@ pub fn shape_svg(
                 fill = style.fill, stroke = style.stroke, sw = style.stroke_width
             )
         }
-        "subprocess" => {
+        NodeShape::Subprocess => {
             let pad = (w.min(h) * 0.08).clamp(4.0, 10.0);
             let ix = x + pad;
             let iy = y + pad;
@@ -201,14 +201,6 @@ pub fn shape_svg(
             let ih = h - pad * 2.0;
             format!(
                 r#"<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/><rect x="{ix}" y="{iy}" width="{iw}" height="{ih}" fill="none" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
-                fill = style.fill, stroke = style.stroke, sw = style.stroke_width
-            )
-        }
-        // Fallback: unrecognized shapes render as rect
-        _ => {
-            let rx = style.radius.unwrap_or(4.0);
-            format!(
-                r#"<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>"#,
                 fill = style.fill, stroke = style.stroke, sw = style.stroke_width
             )
         }
@@ -220,7 +212,7 @@ pub fn shape_svg(
 /// Sketch mode: sample the shape outline into polylines, jitter them via the
 /// strategy, and render as closed `<path>` subpaths.
 fn sketch_shape_svg(
-    shape: &str,
+    shape: NodeShape,
     frame: &Rect,
     style: &ResolvedNodeStyle,
     strategy: &Strategy,

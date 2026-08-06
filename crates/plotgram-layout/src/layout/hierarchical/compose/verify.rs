@@ -133,6 +133,7 @@ mod tests {
             ids: vec!["a".into(), "b".into()],
             index_of: ids,
             group_path: vec![vec![], vec![]],
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; 2],
             edges: vec![RealEdge {
                 edge_id: "e0".into(),
                 original_source: 0,

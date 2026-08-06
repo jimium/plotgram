@@ -365,42 +365,41 @@ Channel 搜索只在离散 `Substrate` 上工作，不读取尚未产生的像�
 
 ## 7. 端口
 
-### 7.1 五档（对标 ELK / yFiles）
+### 7.1 作者约束与 Plan（对标 yFiles 侧约束子集）
 
-| 档 | 最低 IR 载体 | 语义 |
-|----|---------------|------|
-| FREE | `PortConstraint::Free` / `None` | 算法写 side + order |
-| FIXED_SIDE | `{ side }` | 作者固定 side；算法写 order |
-| FIXED_ORDER | `{ side, order_key }` | 作者固定同侧相对序；像素位置由 Metric 展开 |
-| FIXED_RATIO | `{ side, ratio ∈ [0,1] }` | 作者固定沿边比例 |
-| FIXED_POS | `{ local_point }` | 作者固定节点局部坐标；必须在边界上 |
+| 档 | IR 载体 | 语义 | DSL |
+|----|---------|------|-----|
+| FREE | `None` | 算法写 side + order（shape→port policy） | 边未写 `*_side` |
+| FIXED_SIDE | `FixedSide { side }` | 作者固定 side；算法写 order | `from_side` / `to_side` |
+| FIXED_ORDER | `FixedOrder { side, order_key }` | 同侧相对序；像素由 Metric 展开 | 仅 `group_anchor`（`side` + 可选 `slot`） |
+
+边级**不**提供 FIXED_RATIO / FIXED_POS / Candidates（写了 → 解析错误）。
 
 目标 `PortPlan`：
 
 ```text
 PortPlan {
   side: Side,
-  along_spec: Ordered(slot) | Ratio(f64) | LocalOffset(f64),
+  along_spec: Ordered(slot) | LocalOffset(px),
   group: PortGroupId?,
 }
 ```
 
 `slot` 只表达稳定次序，不是像素真源；Metric 根据最终节点尺寸把 `Ordered(slot)` 展开成唯一 `port_point`。  
-候选端口是作者约束输入，冻结 Plan 时必须已选成一个 `PortPlan`。`port group` 是多边共享同一 `PortPlan` 的显式事实。
+`port group` 是多边共享同一 `PortPlan` 的显式事实（如 auto_edge_grouping）。
 
 ### 7.2 时机
 
 | 时机 | 动作 |
 |------|------|
 | P2 后 | 强侧约束可插 port dummy |
-| P3 | FIXED_ORDER+ 在端口 dummy 上排序；FREE 可先序后按对侧分配 |
+| P3 | FIXED_ORDER 在端口 dummy 上排序；FREE 可先序后按对侧分配 |
 | P4 | **端口对齐**进目标，非仅节点中心 |
 | P5 / Ink | 端口只读 |
 | MetricBudget | 同侧独立端口数 × pitch → 节点最小尺寸 |
 
-FREE 默认算法：按对侧端点的 `(layer, order, EdgeId)` 稳定排序，在候选 side 上分配 order；不得读取尚未产生的像素 x/y。
+FREE 默认算法：按对侧端点的 `(layer, order, EdgeId)` 稳定排序，在 shape policy 允许的 side 上分配 order；不得读取尚未产生的像素 x/y。
 
-现有 `PortConstraint { side, slot }` / `PortRef { side, slot }` 只能覆盖五档子集，属于待替换过渡模型，不得据此宣称五档已落地。  
 详见 [ports-and-channel](phases/ports-and-channel.md)。
 
 ---
@@ -570,7 +569,7 @@ Stage 只写自己拥有的变换自由度：核心写 component-local 坐标，
 |--------|------|----------|
 | **M0** | LayoutOutput/RouteInput/Diagnostics 目标契约 · typed Writer · Demand epoch · VPSC · Orientation Stage | warning 可观测；组框可由 Layout 输出；四向变换 round-trip；确定性 |
 | **M1** | EdgePlan/FAS · NS · properify · median(+权+snapshot) · BK · Plan/Metric verifier | 无重叠；反向边语义保持；长边更直 |
-| **M2** | 五档 Port IR · strong-port projection · FREE finalize · label/loop reserve | 端口序一致；无 Ink fallback |
+| **M2** | 边侧 Port IR · strong-port projection · FREE finalize · label/loop reserve | 端口序一致；无 Ink fallback |
 | **M3** | Channel topology · track order · demand · 有界 rip-up · InkVerifier | 不穿节点；无非法重合 |
 | **M4** | 组 scope/gate · 连续块统一壳 · 组框进 VPSC · Weak/Strong 同 Plan | 不穿组；一组 Plan schema；finalize 不重算组框 |
 | **M5** | PartitionGrid 引擎消费 + Orientation 映射 | cell 落带；全局层跨泳道一致；四向轴语义正确 |

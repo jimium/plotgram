@@ -348,7 +348,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
 /// local coordinates.
 fn port_ref_out(orientation: AlgoOrientation, rp: ResolvedPort) -> PortRef {
     let along = match rp.along {
-        AlongSpec::Ordered { .. } | AlongSpec::Ratio(_) => rp.along,
+        AlongSpec::Ordered { .. } => rp.along,
         AlongSpec::LocalOffset(p) => AlongSpec::LocalOffset(from_algo_point(
             orientation.from_tb_point(to_algo_point(p)),
         )),

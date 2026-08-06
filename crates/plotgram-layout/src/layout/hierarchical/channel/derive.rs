@@ -540,6 +540,7 @@ mod tests {
                 vec!["g1".into()],
                 vec!["g2".into()],
             ],
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; 4],
             edges: vec![RealEdge {
                 edge_id: "cross".into(),
                 original_source: 0,

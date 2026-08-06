@@ -102,8 +102,8 @@ pub fn render_icon(def: &IconDef, x: f64, y: f64, size: f64, color: &str) -> Str
 }
 
 /// Check whether an icon is compatible with the given shape.
-pub fn is_compatible(def: &IconDef, shape: &str) -> bool {
-    !def.incompatible_shapes.contains(&shape)
+pub fn is_compatible(def: &IconDef, shape: plotgram_model::NodeShape) -> bool {
+    !def.incompatible_shapes.contains(&shape.as_str())
 }
 
 /// Extra width needed for icon inside a node (icon_size + gap).

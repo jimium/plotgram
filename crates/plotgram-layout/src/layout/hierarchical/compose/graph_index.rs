@@ -4,6 +4,7 @@
 use std::collections::BTreeMap;
 
 use plotgram_model::graph::{Graph, Group};
+use plotgram_model::NodeShape;
 
 use crate::layout::hierarchical::model::{RealEdge, RealGraph};
 
@@ -34,6 +35,16 @@ pub fn build_real_graph(graph: &Graph) -> RealGraph {
         .map(|id| paths.get(id).cloned().unwrap_or_default())
         .collect();
 
+    let shapes: Vec<NodeShape> = ids
+        .iter()
+        .map(|id| {
+            graph
+                .find_node(id)
+                .and_then(|n| n.shape)
+                .unwrap_or(NodeShape::DEFAULT)
+        })
+        .collect();
+
     let mut edges = Vec::new();
     let mut self_loops = Vec::new();
     for e in graph.edges_in_declaration_order() {
@@ -60,6 +71,7 @@ pub fn build_real_graph(graph: &Graph) -> RealGraph {
         ids,
         index_of,
         group_path,
+        shapes,
         edges,
         self_loops,
     }
@@ -70,6 +82,7 @@ mod tests {
     use super::*;
     use plotgram_model::attr::AttrMap;
     use plotgram_model::graph::{Arrow, Edge, Node, NodeRole};
+    use plotgram_model::NodeShape;
 
     fn node(id: &str) -> Node {
         Node {
@@ -117,6 +130,7 @@ mod tests {
         };
         let rg = build_real_graph(&graph);
         assert_eq!(rg.ids, vec!["a".to_string(), "b".to_string()]);
+        assert_eq!(rg.shapes, vec![NodeShape::DEFAULT, NodeShape::DEFAULT]);
         assert_eq!(rg.self_loops, vec![("e0".to_string(), rg.index_of["a"])]);
         assert_eq!(rg.edges.len(), 1);
         assert_eq!(rg.edges[0].edge_id, "e1");

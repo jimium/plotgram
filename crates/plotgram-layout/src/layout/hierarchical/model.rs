@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 
 use plotgram_model::port::PortConstraint;
+use plotgram_model::NodeShape;
 
 /// Stable identity for a node-shaped element in the working graph: a real
 /// graph node, or a dummy inserted while properifying a long edge.
@@ -41,6 +42,8 @@ pub struct RealGraph {
     pub index_of: BTreeMap<String, usize>,
     /// index -> root..leaf group id path (empty = top-level).
     pub group_path: Vec<Vec<String>>,
+    /// index -> resolved node shape (`None` on the IR → [`NodeShape::DEFAULT`]).
+    pub shapes: Vec<NodeShape>,
     /// Declaration order; self-loops excluded.
     pub edges: Vec<RealEdge>,
     /// `(edge_id, node_idx)` for edges with `source == target`, declaration order.

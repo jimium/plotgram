@@ -738,7 +738,7 @@ api -> db {
 | **head_label** | `head_label: <string>` | 靠近**目标**端标签（如 ER 基数 `1`） |
 | **tail_label** | `tail_label: <string>` | 靠近**源**端标签（如 ER 基数 `N`） |
 | **variant** | `variant: <atom>` | 视觉变体（颜料）；查主题 `variants`（§14.7 封闭集） |
-| **from_side** / **to_side** / **from_slot** / **to_slot** / **from_ratio** / **to_ratio** / **from_x**+**from_y** / **to_x**+**to_y** / **from_sides** / **to_sides** | 见 §7.4 | 端口约束（五档）→ 提升为 `Edge.from_port` / `to_port`（**`active`**） |
+| **from_side** / **to_side** | 见 §7.4 | 端口侧约束 → 提升为 `Edge.from_port` / `to_port`（**`active`**）；仅 FixedSide / FREE |
 | **critical** | `critical: <bool>` | 关键路径标记 → 提升为 `Edge.critical`（**`active`**） |
 | **style.\*** | `style.<prop>: …` | 内联颜料；词表见 style-sheet-spec §5 |
 | **meta.\*** | `meta.<key>: …` | 渲染器忽略 |
@@ -751,38 +751,33 @@ api -> db {
 - 端口 / `critical` 经 parse 提升为一等字段后**不得**再留在 attrs 供引擎读取（见 ADR-003）
 - 边合流不写边级键：开 `layout: hierarchical { auto_edge_grouping: true }`（见 §7.4.3）
 
-### 7.4 端口（side + slot）
+### 7.4 端口（side）
 
-边不仅连接「哪个 node」，还连接「节点的哪一侧、侧上第几档」。这是 Hierarchical 正交主路径的**结构性**字段：避免落笔猜侧中点导致正反边重合。
+边不仅连接「哪个 node」，还可钉死「节点的哪一侧」。同侧多边的沿边序由布局自动分配（`AlongSpec::Ordered`），**不**暴露边级 `*_slot` / ratio / 局部坐标 DSL。
 
 #### 7.4.1 模型（IR / 引擎）
 
 ```
 PortConstraint =                               // 作者钉死；落在 Edge.from_port / to_port
-    | FixedSide   { side }
-    | FixedOrder  { side, order: u32 }         // order 只表达同侧相对序，不是像素真源
-    | FixedRatio  { side, ratio: f64 }         // 有限且 ∈ [0,1]
-    | FixedPos    { local: Point }             // 节点局部坐标；须落在边界容差内
-    | Candidates  { sides: Vec<Side> }         // 候选侧集；非空、去重
-// 未写端口 = FREE（None）：侧别与档位全部由算法推断
+    | FixedSide   { side }                     // 边 DSL 仅此档
+    | FixedOrder  { side, order: u32 }         // 仅 group_anchor（side + 可选 slot）
+// 未写端口 = FREE（None）：侧别与档位全部由算法推断（+ shape port policy）
 
 PortRef = { side: Side, along: AlongSpec }     // 已决议；落在 EdgePlacement
 AlongSpec =
     | Ordered { order: u32, count: u32 }       // 组内相对序；Metric 按 (order+1)/(count+1) 展开
-    | Ratio(f64)                               // 沿边线性比例落点
-    | LocalOffset(Point)                       // 节点局部边界点
+    | LocalOffset(Point)                       // 算法自用（如自环）；非边 DSL
 Side    = north | south | east | west
 ```
 
 | 字段 | 含义 |
 |------|------|
 | `side` | 锚在节点的哪条边（封闭四向） |
-| `order` | 同侧**相对序**档位；约束里可省略（算法在该侧内分配）。只表达顺序，**不是像素坐标** |
-| `along` | 决议后的沿边规格；像素由 Metric 展开（`Ordered` 稠密居中 / `Ratio` / `LocalOffset`） |
+| `along` | 决议后的沿边规格；像素由 Metric 展开 |
 
 **写权（硬纪律）：**
 
-- 作者约束写在 **`Edge.from_port` / `to_port`**（DSL 四键提升而来）。
+- 边作者约束只经 **`from_side` / `to_side`** 提升进 `Edge.from_port` / `to_port`。
 - **决议** `PortRef` 由布局**组合相**写入 `EdgePlacement`；度量只算像素；**Ink 不得发明或改写端口**。
 - DSL 未写 → 字段为 `None` → 算法推断并写入决议端口。
 
@@ -790,40 +785,31 @@ Side    = north | south | east | west
 
 #### 7.4.2 DSL 表面
 
-> **状态：`active`（模型字段）** —— parse 须提升进 `Edge`；引擎组合相须读约束。组合相未实现前，未钉死的端仍可临时降级，但**已提升的约束不得被 Ink 静默改侧**。
+> **状态：`active`（模型字段）** —— parse 须提升进 `Edge`；引擎组合相须读约束。
 
 **默认：不写端口。** `a -> b` 合法。
 
-需要钉死时，写在属性块中（均为可选）：
+需要钉侧时，写在属性块中（均为可选）：
 
 | 属性键 | 类型 | 说明 |
 |--------|------|------|
 | `from_side` | atom（`north`/`south`/`east`/`west`） | 源端侧（FixedSide） |
 | `to_side` | atom（同上） | 目标端侧 |
-| `from_slot` | number（非负整数） | 源端相对序档位（FixedOrder）；省略则算法可在该侧内分配 |
-| `to_slot` | number（非负整数） | 目标端相对序档位 |
-| `from_ratio` | number（∈ [0,1]） | 源端沿边比例（FixedRatio）；须与 `from_side` 同写 |
-| `to_ratio` | number（同上） | 目标端沿边比例 |
-| `from_x` + `from_y` | number（成对） | 源端节点局部坐标（FixedPos）；须落在节点边界容差内，缺一即错 |
-| `to_x` + `to_y` | number（成对） | 目标端节点局部坐标 |
-| `from_sides` | string（逗号分隔 atom，如 `"south, east"`） | 源端候选侧集（Candidates）；封闭集校验、去重、非空 |
-| `to_sides` | string（同上） | 目标端候选侧集 |
+
+**已移除**（写了 → 解析错误）：`from_slot` / `to_slot` / `from_ratio` / `to_ratio` / `from_x`+`from_y` / `to_x`+`to_y` / `from_sides` / `to_sides`。
+
+组锚点手写节点仍可用 `side` + 可选 `slot`（§5.7）；`@group` 糖只读对应 `*_side`，同 `(group, side)` 复用同一锚点。
 
 规则：
 
-1. **全省略** → FREE：两端端口完全由算法决定（FREE 侧别推断：正排边沿 rank 方向；无 dummy 链的回边按对端 order 位选 East/West，见 roadmap G3）。  
-2. **只写 `*_side`** → 该端侧固定（FixedSide）；档位仍可由算法在该侧内分配。  
-3. **写了 `*_slot` 必须同时写对应 `*_side`** → 否则解析错误；`slot` 语义为同侧**相对序**（FixedOrder）。  
-4. **同一端档位键互斥**：`*_slot` / `*_ratio` / `*_x`+`*_y` / `*_sides` 只能选一档；既写 ratio 又写 slot 等冲突 → 解析错误。  
-5. **`*_ratio` 须配 `*_side`**，且值有限、∈ [0,1]；越界 → 校验错误。  
-6. **`*_x` / `*_y` 必须成对**（缺一即错）；组合相按实测节点尺寸校验点落在边界容差内，越界**硬失败**（不静默降级）。  
-7. **`*_sides`** 接受逗号分隔的 atom 字符串（AttrValue 无 list 类型）；空集或含未识别 side → 校验错误（封闭集，不回退）。  
-8. side + slot 都写 → 该端端口固定（布局须尊重；无法满足时显式降级/告警，禁止静默改侧）。  
-9. 未识别的 side atom → 校验错误（封闭集，不回退）。
+1. 未写侧 → FREE。  
+2. 侧 atom 必须是四向封闭集。  
+3. 移除的键 → 校验错误（不静默忽略）。  
+4. 提升后不得再留在 attrs 供引擎读取。
 
-`Node.anchor` 复用同一档位枚举，但**仅允许 FixedSide / FixedOrder**；其余档位 → 校验错误。
+`Node.anchor` 可用 FixedSide / FixedOrder（`side` + 可选 `slot`）。
 
-不引入 `@south` 箭头后缀；端口只走属性块。
+不引入 `@south` 箭头后缀；边端口只走 `from_side` / `to_side`。
 
 #### 7.4.3 自动边合流（auto_edge_grouping）
 
@@ -845,7 +831,7 @@ hub -> c
 - DSL 键 `edge_group` **已移除**；写了 → 解析错误（提示改用本开关）。
 - 勿使用已撤销的 `bus_routing`（Layout Styles demo 误映射；见 edge-parameters.md §2.4）。
 
-#### 7.4.4 示例（正反边错开）
+#### 7.4.4 示例（正反边固定侧）
 
 ```plotgram
 node a { label: "A" }
@@ -858,22 +844,18 @@ a -> b {
     label: "req"
     from_side: south
     to_side: north
-    from_slot: 0
-    to_slot: 0
 }
 b --> a {
     label: "resp"
     from_side: north
     to_side: south
-    from_slot: 1
-    to_slot: 1
 }
 ```
 
 ```
     ┌───────┐
     │   A   │
-    └──┬─┬──┘  south slot0 / slot1
+    └──┬─┬──┘  south（侧内序由算法分配）
        │ │
     ┌──┴─┴──┐
     │   B   │
@@ -973,14 +955,14 @@ web -> @backend {
 
 对每个 `@gid` 端：
 
-1. 取该端对应的侧：源端用 `from_side`（及可选 `from_slot`），目标端用 `to_side` / `to_slot`。  
+1. 取该端对应的侧：源端用 `from_side`，目标端用 `to_side`（**不**读 `*_slot`）。  
 2. **`@` 端缺少对应 `*_side` → 解析/校验错误**（锚点 `side` 必填，不发明默认侧）。  
 3. 在 group `gid` 内注入（或复用）一个 node：
    - `role: group_anchor`
    - `host_group: gid`
-   - `side` / `slot` = 上一步的侧/槽
-   - 合成 id：实现自定，须全局唯一；推荐稳定派生，例如 `ga_<gid>_<side>[_<slot>]`，冲突时加边 id 后缀  
-4. 同 `(host_group, side, slot)` 的锚点 **可合并复用**（多条边共享同一框上档位）。  
+   - `side` = 上一步的侧（`@group` 糖不写 `slot`）
+   - 合成 id：实现自定，须全局唯一；推荐稳定派生，例如 `ga_<gid>_<side>`，冲突时加边 id 后缀  
+4. 同 `(host_group, side)` 的锚点 **可合并复用**（多条边共享同一框上侧）。  
 5. 把边的该端改写为上述 node id；边属性中的 `from_side`/`to_side` **保留**并提升为 `Edge.from_port`/`to_port`（与锚点侧一致）。  
 6. 边声明位置不变（通常在共同祖先 / 顶层）。
 
@@ -1181,9 +1163,9 @@ true, false
 | 5 | 组内边两端须为该组后代 node |
 | 6 | diagram 属性不可重复；未知 diagram key 警告忽略；`profile` 须为 §1.2 封闭集 |
 | 7 | 自环默认非法；须显式 `profile: flowchart` / `state` 等允许自环的预设才合法（隐式 flowchart 算法默认不适用，§4.2） |
-| 8 | 形状未识别 → 渲染回退圆角 `rect`（封闭集见 §14.6） |
+| 8 | 形状未识别 → 解析错误（封闭集见 §14.6；不静默回退） |
 | 9 | 无声明式样式；仅 `style.*` / `theme` / `render_style` |
-| 10 | 边端口：`from_slot`/`to_slot` 不得单独出现；`*_side` 必须是四向封闭集；提升为 `Edge.from_port`/`to_port` |
+| 10 | 边端口：仅 `from_side`/`to_side`（→ FixedSide）或省略（→ FREE）；`*_slot`/`*_ratio`/`*_x,*_y`/`*_sides` 写了 → 错；提升为 `Edge.from_port`/`to_port` |
 | 11 | 端口决议写者是布局组合相（`EdgePlacement` 上的 `PortRef`）；落笔不得发明 side/slot |
 | 12 | node / group / edge 属性块内同一键不可重复；糖写入的 `label` 与块内 `label:` 冲突为错 |
 | 13 | node 规范形态为 `node id { … }`；位置糖见 §5.5（须先有 string，禁止 `node id <atom>`） |
@@ -1407,14 +1389,7 @@ variant **只**贡献 fill / stroke / font / dash / radius 等颜料；**不**�
 | `style.*` | 见 §14.9 | `active` | DSL 作者 | `apply_inline_edge_styles` |
 | `from_side` | atom：`north`/`south`/`east`/`west` | **`active`（模型字段）** | DSL 作者（可选约束） | 提升为 `Edge.from_port`（FixedSide）；组合相读约束 |
 | `to_side` | 同上 | **`active`（模型字段）** | DSL 作者 | 提升为 `Edge.to_port` |
-| `from_slot` | number（非负整数） | **`active`（模型字段）** | DSL 作者 | 并入 `from_port`（FixedOrder；order 为相对序） |
-| `to_slot` | 同上 | **`active`（模型字段）** | DSL 作者 | 并入 `to_port`（FixedOrder） |
-| `from_ratio` | number（∈ [0,1]） | **`active`（模型字段）** | DSL 作者 | 并入 `from_port`（FixedRatio）；须配 `from_side` |
-| `to_ratio` | 同上 | **`active`（模型字段）** | DSL 作者 | 并入 `to_port`（FixedRatio） |
-| `from_x` / `from_y` | number（成对） | **`active`（模型字段）** | DSL 作者 | 并入 `from_port`（FixedPos）；边界容差校验，越界硬失败 |
-| `to_x` / `to_y` | number（成对） | **`active`（模型字段）** | DSL 作者 | 并入 `to_port`（FixedPos） |
-| `from_sides` | string（逗号分隔 atom） | **`active`（模型字段）** | DSL 作者 | 并入 `from_port`（Candidates）；封闭集、去重、非空 |
-| `to_sides` | string（同上） | **`active`（模型字段）** | DSL 作者 | 并入 `to_port`（Candidates） |
+| `from_slot` / `to_slot` / `from_ratio` / `to_ratio` / `from_x`+`from_y` / `to_x`+`to_y` / `from_sides` / `to_sides` | — | **`removed`** | — | 写了 → 解析错误；边端口只留 side（见 §7.4） |
 | `critical` | bool | **`active`（模型字段）** | DSL 作者 | 提升为 `Edge.critical`；Hier 排序/对齐加权 |
 | `meta.*` | 任意 | — | DSL 作者 | 无 |
 
@@ -1426,15 +1401,15 @@ variant **只**贡献 fill / stroke / font / dash / radius 等颜料；**不**�
 
 | 项 | 状态 |
 |----|------|
-| `Edge.from_port` / `to_port` 一等字段（五档 `PortConstraint`） | **已落地**（plotgram-model） |
-| DSL 十二键（side/slot/ratio/x/y/sides × from/to）校验与提升（`lift_structural_attrs`） | **已落地**（model API；parser 须调用；同端档位键互斥） |
+| `Edge.from_port` / `to_port`（FREE / FixedSide） | **已落地**（plotgram-model） |
+| DSL 仅 `from_side`/`to_side` 校验与提升；其余边端口键硬拒绝 | **已落地** |
 | 布局 `auto_edge_grouping`（同源/同汇自动合流）；边级 `edge_group` **已移除** | **已落地** |
-| `Node.role` / `host_group` / `anchor`（group_anchor） | **已落地**（plotgram-model；见 §5.7 / ADR-004） |
+| `Node.role` / `host_group` / `anchor`（group_anchor；可 FixedOrder） | **已落地**（plotgram-model；见 §5.7 / ADR-004） |
 | `Graph.partition` / `Node.partition_cell`（ADR-008） | **已落地**（plotgram-model + `validate_partition`；`cell_*` lift 已接） |
 | `partition { column/row … }` 块 parse | **planned** |
 | Hier 消费 PartitionGrid（连续块 / 层区间） | **planned** |
 | `@group` 糖展开（§7.6） | **待 parser** |
-| 布局组合相写入 `EdgePlacement` 的 `PortRef`（`side` + `along`：Ordered/Ratio/LocalOffset） | **已落地**（Hierarchical Compose `ports.rs` 唯一写者；Metric 展开像素；Ink 零猜测） |
+| 布局组合相写入 `EdgePlacement` 的 `PortRef`（`side` + `along`：Ordered / LocalOffset） | **已落地**（Hierarchical Compose `ports.rs` 唯一写者；Metric 展开像素；Ink 零猜测） |
 | Ink 零发明端口 / 锚点几何 | **纪律已定**；引擎实现时强制 |
 
 作者已钉死的 `PortConstraint` 在组合相落地前不得被渲染层「猜侧」冒充已决议。
@@ -1473,7 +1448,7 @@ parallelogram   document        cloud           subprocess
 
 | 规则 | 说明 |
 |------|------|
-| 未识别值 | 回退为圆角 `rect`（`radius` 缺省 4.0），不报错 |
+| 未识别值 | **解析错误**（封闭集，不静默回退） |
 | 缺省值 | 见 §14.3.2 链条，最终兜底 `rounded_rect`（**不是** `rect`） |
 | 半径语义 | `rect` 默认 `radius: 0`；`rounded_rect` 默认 `8`；主题 `defaults.node.radius` 可覆盖 |
 | 与 icon | 部分 shape 会否决 icon，见 §14.3.1 |

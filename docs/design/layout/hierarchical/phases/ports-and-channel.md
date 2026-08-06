@@ -9,30 +9,24 @@
 
 ```text
 PortConstraint =
-  Free
-  FixedSide { side }
-  FixedOrder { side, order_key }
-  FixedRatio { side, ratio }
-  FixedPos { local_point }
-  Candidates { candidates[] }
+  Free                              // 边未写 from_side/to_side
+  FixedSide { side }                // 边 DSL 仅此档
+  FixedOrder { side, order_key }    // 仅 group_anchor（side + 可选 slot）
 ```
 
-- `ratio` 有限且在 `[0,1]`；
-- `local_point` 使用节点未做 Orientation 变换前的局部坐标，必须落在节点边界容差内；
-- Candidates 为空是输入错误；
-- 同一 port group 的强约束必须相容。
+边级已移除：`*_slot` / `*_ratio` / FixedPos / Candidates。
 
 ### 1.2 Plan 决议
 
 ```text
 PortPlan
   side
-  along_spec: Ordered(slot) | Ratio(r) | LocalOffset(px)
+  along_spec: Ordered(slot) | LocalOffset(px)
   group?
 ```
 
 Compose 写 `along_spec`；Metric 写导出的 `PortPoint`。  
-`Ordered(slot)` 的 slot 只定义同侧相对序。若有 `n` 个独立 port group，Metric 在可用边长内按 pitch 与 padding 展开。
+`Ordered(slot)` 的 slot 只定义同侧相对序（算法分配，非边 DSL）。
 
 ## 2. FREE 分配
 
@@ -176,3 +170,18 @@ BundlePlan
 | DeferToRouter | terminals + BoundaryCrossing | 独立 Router 写 path |
 
 Defer 模式可跳过 Hier Channel 搜索，但不能跳过端口、组框与 boundary permission。Router 不得修改端口以迁就自己的算法。
+
+## 10. Shape port policy
+
+内建表：`plotgram_model::policy_for(NodeShape)` → `ShapePortPolicy { allowed, preference, capacity_per_side }`。无 DSL。
+
+| 规则 | 说明 |
+|------|------|
+| 写者 | 仍是 Compose I.7 `assign_ports`；表只提供默认侧策略 |
+| FREE | 拓扑 `free_side` 得 primary → 在 `allowed` 内按 preference/容量选侧 |
+| FixedSide | 作者胜出；不读 allowed、不计入 FREE 容量账 |
+| 容量满 | **软溢出**到 attempt 下一侧（本阶段不 Infeasible） |
+| `Node.shape == None` | 按 `NodeShape::DEFAULT`（`rounded_rect`）查表 |
+| 非本阶段 | DSL 扩展、MetricBudget、轮廓锚点、Channel 硬容量 |
+
+产品差异点：`Diamond` 每侧容量 1；`Person` 禁 North；其余多为开放四侧。

@@ -94,7 +94,7 @@ MVP ──► A 次轴拉直 ──► B 端口补齐 ──► C 诊断出口
 
 **刻意不做**：Ink `unwrap_or` 默认侧；用 slot 同时当像素真源。
 
-**已收口（阶段 B 落地摘要）**：五档 `PortConstraint`/`AlongSpec` IR（Free/FixedSide/FixedOrder/FixedRatio/FixedPos/Candidates）；DSL 十二键 lift + 同端档位互斥校验；Compose 决议（FREE 中心偏好、G3 仅对无 dummy 链回边选 East/West、FixedPos 实测尺寸硬校验、同侧强约束相容性硬失败）；Metric 按 `Ordered` 相对序稠密居中 / `Ratio` / `LocalOffset` 展开；Ink 只读零猜测。多 rank 回边的 East/West 与 strong-port projection / label-loop reserve 归入 §0 缺口表（留 C/D）。
+**已收口（阶段 B 落地摘要）**：边端口收敛为 FREE / `FixedSide`（DSL 仅 `from_side`/`to_side`）；`FixedOrder` 仅 group_anchor；已移除边级 slot/ratio/pos/sides。Compose 决议（FREE 走 shape→port policy + 拓扑选侧、G3 仅对无 dummy 链回边选 East/West）；Metric 按 `Ordered` 相对序稠密居中 / `LocalOffset` 展开；Ink 只读零猜测。多 rank 回边的 East/West 与 strong-port projection / label-loop reserve 归入 §0 缺口表（留 C/D）。
 
 ---
 
@@ -134,7 +134,7 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 | **D1.0** | 层间走廊 TrackOrder + 最小 DemandBoard；修关 `auto_edge_grouping` 后的假 bus；恢复消费 `edge_gap` |
 | **D1.1** | 顶层 scope-only Substrate + 词典序搜索；完整 `RouteTopology::Orthogonal` |
 | **D1.2** | Gate / ScopeMask / 有界 rip-up；`min_first/last_segment`、回边外侧走廊、端总线 `BundlePlan` 升格 |
-| **D1.3** | Corridor Allocator：span 亲和 → 内层走廊优先 → RouteOrder+多轮 rip-up → Corridor Demand → 回边侧别统一代价。可执行方案见 [phases/channel-corridor-allocator.md](phases/channel-corridor-allocator.md) |
+| **D1.3** | Corridor Allocator：span 亲和 → 内层走廊优先 → RouteOrder+多轮 rip-up → Corridor Demand → 回边侧别统一代价。可执行方案见 [phases/channel-corridor-allocator.md](phases/channel-corridor-allocator.md)。**D1.3.1–D1.3.5 已交付** |
 
 **做什么（概要）**：
 

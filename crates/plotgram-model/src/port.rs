@@ -1,25 +1,15 @@
-//! Edge port model: five-tier author constraint + resolved port (dsl-spec §7.4).
+//! Edge / anchor port model (dsl-spec §7.4).
 //!
 //! Two layers:
 //!
-//! - [`PortConstraint`]: the *author's* optional pin — five tiers aligned with
-//!   ELK/yFiles (architecture.md §7.1): FREE (`None`), [`FixedSide`],
-//!   [`FixedOrder`], [`FixedRatio`], [`FixedPos`], plus [`Candidates`] side
-//!   sets. Carried as first-class fields on [`crate::graph::Edge`]
-//!   (`from_port` / `to_port`). DSL keys `from_side` / … are lifted by
-//!   [`crate::graph::Edge::lift_structural_attrs`].
-//! - [`PortRef`]: the *resolved* port (side + [`AlongSpec`]). Written by the
-//!   layout composition phase onto [`crate::result::EdgePlacement`] — never
-//!   invented by measure or ink.
-//!
-//! Sides are node-frame relative and do not rename under canvas transposition
-//! (LTR/TTB only affects the default inference strategy).
+//! - [`PortConstraint`]: author pin. Edges: FREE (`None`) or [`FixedSide`]
+//!   via `from_side` / `to_side`. Group anchors may also use [`FixedOrder`]
+//!   (`side` + optional `slot`). No ratio / pos / candidate-side DSL on edges.
+//! - [`PortRef`]: resolved port (`side` + [`AlongSpec`]). Written by Compose
+//!   onto [`crate::result::EdgePlacement`]; ink must not invent ports.
 //!
 //! [`FixedSide`]: PortConstraint::FixedSide
 //! [`FixedOrder`]: PortConstraint::FixedOrder
-//! [`FixedRatio`]: PortConstraint::FixedRatio
-//! [`FixedPos`]: PortConstraint::FixedPos
-//! [`Candidates`]: PortConstraint::Candidates
 
 use std::fmt;
 
@@ -37,8 +27,7 @@ pub enum Side {
 }
 
 impl Side {
-    /// Parse a side atom. Closed set — unknown atoms are an error, no fallback
-    /// (dsl-spec §7.4.2 rule 5).
+    /// Parse a side atom. Closed set — unknown atoms are an error, no fallback.
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "north" => Some(Self::North),
@@ -65,100 +54,63 @@ impl fmt::Display for Side {
     }
 }
 
-/// How a resolved port sits along its side (architecture.md §7.1 `along_spec`).
+/// How a resolved port sits along its side.
 ///
-/// `Ordered.order` expresses **relative order only** — it is not a pixel
-/// truth. Metric expands the dense, centered pixel anchor from `(order,
-/// count)` against the final node frame.
+/// `Ordered.order` is relative order only — Metric expands dense centered
+/// pixels. `LocalOffset` is algorithm-owned (e.g. self-loop), not DSL.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum AlongSpec {
-    /// Stable relative order within the (node, side) group; `count` is the
-    /// number of ordered ports sharing the side.
+    /// Stable relative order within the (node, side) group.
     Ordered { order: u32, count: u32 },
-    /// Author-pinned ratio along the side (`∈ [0,1]`, FIXED_RATIO).
-    Ratio(f64),
-    /// Author-pinned node-local point on the frame boundary (FIXED_POS),
-    /// relative to the frame's origin in the resolved orientation space.
+    /// Node-local point on the frame boundary (self-loop etc.).
     LocalOffset(Point),
 }
 
-/// A resolved edge port: side + along-spec (dsl-spec §7.4.1).
-///
-/// Written by the layout composition phase; layout must honor a fully pinned
-/// author constraint or degrade *explicitly* (no silent side changes).
+/// A resolved edge port: side + along-spec.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PortRef {
-    /// Which side of the node frame.
     pub side: Side,
-    /// How the port sits along that side.
     pub along: AlongSpec,
 }
 
-/// An author port constraint parsed from edge attrs (dsl-spec §7.4.2).
+/// Author port constraint.
 ///
-/// Five tiers (architecture.md §7.1); `None` on the edge field = FREE.
-/// Sides / local points are in the node's *physical* frame — layout
-/// canonicalizes them (architecture.md §9.3).
+/// Edges only lift [`FixedSide`] (or FREE). [`FixedOrder`] is for
+/// `group_anchor` nodes (`side` + optional `slot`).
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PortConstraint {
-    /// FIXED_SIDE: author pins the side; the algorithm assigns the order.
+    /// Pin the side; Compose assigns along-side order.
     FixedSide { side: Side },
-    /// FIXED_ORDER: author pins the side and a relative order key on it
-    /// (smaller keys come first). Pixel position is Metric's expansion.
+    /// Pin side + relative order key (group anchors only).
     FixedOrder { side: Side, order: u32 },
-    /// FIXED_RATIO: author pins the along-side ratio (`∈ [0,1]`).
-    FixedRatio { side: Side, ratio: f64 },
-    /// FIXED_POS: author pins a node-local point; it must lie on the node
-    /// boundary (validated by layout against the measured size — hard fail,
-    /// never a silent no-op).
-    FixedPos { local: Point },
-    /// Author offers a candidate side set; the algorithm scores and picks one
-    /// (ports-and-channel.md §2). Empty sets are rejected at parse time.
-    Candidates { sides: Vec<Side> },
 }
 
 impl PortConstraint {
-    /// The pinned side for tiers that have exactly one (FixedSide /
-    /// FixedOrder / FixedRatio); `None` for FixedPos / Candidates.
     pub fn pinned_side(&self) -> Option<Side> {
         match self {
-            Self::FixedSide { side } | Self::FixedOrder { side, .. } | Self::FixedRatio { side, .. } => {
-                Some(*side)
-            }
-            Self::FixedPos { .. } | Self::Candidates { .. } => None,
+            Self::FixedSide { side } | Self::FixedOrder { side, .. } => Some(*side),
         }
     }
 
-    /// The author order key (FIXED_ORDER only).
     pub fn order_key(&self) -> Option<u32> {
         match self {
             Self::FixedOrder { order, .. } => Some(*order),
-            _ => None,
+            Self::FixedSide { .. } => None,
         }
     }
 }
 
-/// Port constraint validation error (dsl-spec §7.4.2).
+/// Port constraint validation error.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PortConstraintError {
-    /// `*_slot` present without its `*_side` (rule 3).
-    SlotWithoutSide { slot_key: &'static str },
-    /// `*_ratio` present without its `*_side`.
-    RatioWithoutSide { ratio_key: &'static str },
-    /// Side atom outside the closed set (rule 5), or non-atom value.
+    /// Side atom outside the closed set, or non-atom value.
     InvalidSide { side_key: &'static str, value: String },
-    /// Slot/order is not a non-negative integer number.
+    /// Slot/order is not a non-negative integer (anchor `slot` only).
     InvalidSlot { slot_key: &'static str, value: String },
-    /// Ratio is not a finite number in `[0,1]`.
-    InvalidRatio { ratio_key: &'static str, value: String },
-    /// `*_x` / `*_y` given without its partner (FIXED_POS needs both).
-    PosPartial { present_key: &'static str, missing_key: &'static str },
-    /// Coordinate for FIXED_POS is not a finite number.
-    InvalidPosCoord { key: &'static str, value: String },
-    /// Keys from more than one tier on the same end (tiers are exclusive).
-    ConflictingTier { keys: Vec<&'static str> },
-    /// Candidate side list is empty.
-    EmptyCandidates { sides_key: &'static str },
+    /// `slot` without `side` on a group anchor.
+    SlotWithoutSide { slot_key: &'static str },
+    /// Removed edge port key still present (`from_slot`, `from_ratio`, …).
+    UnsupportedEdgePortKey { key: &'static str },
     /// `critical` present but not a boolean literal.
     InvalidCritical { value: String },
     /// Manual `edge_group` was removed; use layout `auto_edge_grouping`.
@@ -178,39 +130,21 @@ impl fmt::Display for PortConstraintError {
                      for automatic fan-in/fan-out merging (dsl-spec §7.4.3)"
                 )
             }
-            Self::SlotWithoutSide { slot_key } => {
-                write!(f, "`{slot_key}` requires its matching side key (dsl-spec §7.4.2)")
-            }
-            Self::RatioWithoutSide { ratio_key } => {
-                write!(f, "`{ratio_key}` requires its matching side key (dsl-spec §7.4.2)")
-            }
             Self::InvalidSide { side_key, value } => {
                 write!(f, "`{side_key}`: `{value}` is not one of north/south/east/west")
             }
             Self::InvalidSlot { slot_key, value } => {
                 write!(f, "`{slot_key}`: `{value}` is not a non-negative integer")
             }
-            Self::InvalidRatio { ratio_key, value } => {
-                write!(f, "`{ratio_key}`: `{value}` is not a finite number in [0,1]")
+            Self::SlotWithoutSide { slot_key } => {
+                write!(f, "`{slot_key}` requires `side` on a group_anchor (dsl-spec §5.7)")
             }
-            Self::PosPartial {
-                present_key,
-                missing_key,
-            } => {
-                write!(f, "`{present_key}` requires its partner `{missing_key}` (FIXED_POS needs both)")
-            }
-            Self::InvalidPosCoord { key, value } => {
-                write!(f, "`{key}`: `{value}` is not a finite number")
-            }
-            Self::ConflictingTier { keys } => {
+            Self::UnsupportedEdgePortKey { key } => {
                 write!(
                     f,
-                    "port keys {} span more than one constraint tier; tiers are exclusive (dsl-spec §7.4.2)",
-                    keys.iter().map(|k| format!("`{k}`")).collect::<Vec<_>>().join(", ")
+                    "`{key}` is unsupported; edge ports only accept `from_side` / `to_side` \
+                     (dsl-spec §7.4)"
                 )
-            }
-            Self::EmptyCandidates { sides_key } => {
-                write!(f, "`{sides_key}`: candidate side list must not be empty")
             }
         }
     }
@@ -218,127 +152,64 @@ impl fmt::Display for PortConstraintError {
 
 impl std::error::Error for PortConstraintError {}
 
-/// The attr keys one port end is lifted from (dsl-spec §7.4.2).
-#[derive(Debug, Clone, Copy)]
-pub struct PortKeys {
-    pub side: &'static str,
-    pub slot: &'static str,
-    pub ratio: &'static str,
-    pub x: &'static str,
-    pub y: &'static str,
-    pub sides: &'static str,
-}
+/// Edge DSL keys that used to encode finer port tiers — hard-rejected now.
+pub const REMOVED_EDGE_PORT_KEYS: &[&str] = &[
+    "from_slot",
+    "to_slot",
+    "from_ratio",
+    "to_ratio",
+    "from_x",
+    "from_y",
+    "to_x",
+    "to_y",
+    "from_sides",
+    "to_sides",
+];
 
-/// Edge-end key sets (dsl-spec §7.4.2).
-pub const FROM_PORT_KEYS: PortKeys = PortKeys {
-    side: "from_side",
-    slot: "from_slot",
-    ratio: "from_ratio",
-    x: "from_x",
-    y: "from_y",
-    sides: "from_sides",
-};
+pub const FROM_SIDE_KEY: &str = "from_side";
+pub const TO_SIDE_KEY: &str = "to_side";
 
-/// Edge-end key sets (dsl-spec §7.4.2).
-pub const TO_PORT_KEYS: PortKeys = PortKeys {
-    side: "to_side",
-    slot: "to_slot",
-    ratio: "to_ratio",
-    x: "to_x",
-    y: "to_y",
-    sides: "to_sides",
-};
-
-/// Extract and validate one end's port constraint from an attr map.
-///
-/// Returns `Ok(None)` when no key is present (port fully algorithm-decided,
-/// FREE). Tiers are exclusive: mixing keys from different tiers is an error,
-/// never a silent pick.
-pub fn port_constraint(
+/// Lift an edge-end constraint: FREE or FixedSide only.
+pub fn edge_port_constraint(
     attrs: &AttrMap,
-    keys: PortKeys,
+    side_key: &'static str,
 ) -> Result<Option<PortConstraint>, PortConstraintError> {
-    let present: Vec<&'static str> = [keys.side, keys.slot, keys.ratio, keys.x, keys.y, keys.sides]
-        .into_iter()
-        .filter(|k| attrs.contains_key(*k))
-        .collect();
-    if present.is_empty() {
-        return Ok(None);
-    }
-
-    let side = parse_side_opt(attrs, keys.side)?;
-    let slot = parse_slot_opt(attrs, keys.slot)?;
-    let ratio = parse_ratio_opt(attrs, keys.ratio)?;
-    let x = parse_coord_opt(attrs, keys.x)?;
-    let y = parse_coord_opt(attrs, keys.y)?;
-    let sides = parse_sides_opt(attrs, keys.sides)?;
-
-    // FIXED_POS tier: x + y, nothing else.
-    if x.is_some() || y.is_some() {
-        let conflicts: Vec<&'static str> = [keys.side, keys.slot, keys.ratio, keys.sides]
-            .into_iter()
-            .filter(|k| attrs.contains_key(*k))
-            .collect();
-        if !conflicts.is_empty() {
-            return Err(PortConstraintError::ConflictingTier {
-                keys: merge_present([keys.x, keys.y], &conflicts),
-            });
+    for &key in REMOVED_EDGE_PORT_KEYS {
+        if attrs.contains_key(key) {
+            return Err(PortConstraintError::UnsupportedEdgePortKey { key });
         }
-        let x = x.ok_or(PortConstraintError::PosPartial {
-            present_key: keys.y,
-            missing_key: keys.x,
-        })?;
-        let y = y.ok_or(PortConstraintError::PosPartial {
-            present_key: keys.x,
-            missing_key: keys.y,
-        })?;
-        return Ok(Some(PortConstraint::FixedPos {
-            local: Point { x, y },
-        }));
     }
-
-    // CANDIDATES tier: sides list, nothing else.
-    if let Some(sides) = sides {
-        let conflicts: Vec<&'static str> = [keys.side, keys.slot, keys.ratio]
-            .into_iter()
-            .filter(|k| attrs.contains_key(*k))
-            .collect();
-        if !conflicts.is_empty() {
-            return Err(PortConstraintError::ConflictingTier {
-                keys: merge_present([keys.sides], &conflicts),
-            });
+    match attrs.get(side_key) {
+        None => Ok(None),
+        Some(v) => {
+            let atom = v.as_str().unwrap_or_default();
+            let side = Side::parse(atom).ok_or_else(|| PortConstraintError::InvalidSide {
+                side_key,
+                value: v.to_string(),
+            })?;
+            Ok(Some(PortConstraint::FixedSide { side }))
         }
-        if sides.is_empty() {
-            return Err(PortConstraintError::EmptyCandidates {
-                sides_key: keys.sides,
-            });
-        }
-        return Ok(Some(PortConstraint::Candidates { sides }));
-    }
-
-    // Side-based tiers.
-    match (side, slot, ratio) {
-        (None, Some(_), _) => Err(PortConstraintError::SlotWithoutSide { slot_key: keys.slot }),
-        (None, _, Some(_)) => Err(PortConstraintError::RatioWithoutSide {
-            ratio_key: keys.ratio,
-        }),
-        (Some(side), Some(order), None) => Ok(Some(PortConstraint::FixedOrder { side, order })),
-        (Some(side), None, Some(ratio)) => Ok(Some(PortConstraint::FixedRatio { side, ratio })),
-        (Some(_), Some(_), Some(_)) => Err(PortConstraintError::ConflictingTier {
-            keys: merge_present([keys.side], &[keys.slot, keys.ratio]),
-        }),
-        (Some(side), None, None) => Ok(Some(PortConstraint::FixedSide { side })),
-        (None, None, None) => Ok(None),
     }
 }
 
-fn merge_present(
-    head: impl IntoIterator<Item = &'static str>,
-    tail: &[&'static str],
-) -> Vec<&'static str> {
-    let mut out: Vec<&'static str> = head.into_iter().collect();
-    out.extend_from_slice(tail);
-    out
+/// Group-anchor keys: `side` (required with role) + optional `slot`.
+pub const ANCHOR_SIDE_KEY: &str = "side";
+pub const ANCHOR_SLOT_KEY: &str = "slot";
+
+/// Lift a group_anchor port constraint from node attrs.
+pub fn anchor_port_constraint(
+    attrs: &AttrMap,
+) -> Result<Option<PortConstraint>, PortConstraintError> {
+    let side = parse_side_opt(attrs, ANCHOR_SIDE_KEY)?;
+    let slot = parse_slot_opt(attrs, ANCHOR_SLOT_KEY)?;
+    match (side, slot) {
+        (None, None) => Ok(None),
+        (None, Some(_)) => Err(PortConstraintError::SlotWithoutSide {
+            slot_key: ANCHOR_SLOT_KEY,
+        }),
+        (Some(side), None) => Ok(Some(PortConstraint::FixedSide { side })),
+        (Some(side), Some(order)) => Ok(Some(PortConstraint::FixedOrder { side, order })),
+    }
 }
 
 fn parse_side_opt(attrs: &AttrMap, key: &'static str) -> Result<Option<Side>, PortConstraintError> {
@@ -372,66 +243,6 @@ fn parse_slot_opt(attrs: &AttrMap, key: &'static str) -> Result<Option<u32>, Por
     }
 }
 
-fn parse_ratio_opt(attrs: &AttrMap, key: &'static str) -> Result<Option<f64>, PortConstraintError> {
-    match attrs.get(key) {
-        None => Ok(None),
-        Some(v) => {
-            let n = v.as_f64();
-            if !n.is_some_and(|n| n.is_finite() && (0.0..=1.0).contains(&n)) {
-                return Err(PortConstraintError::InvalidRatio {
-                    ratio_key: key,
-                    value: v.to_string(),
-                });
-            }
-            Ok(Some(n.unwrap()))
-        }
-    }
-}
-
-fn parse_coord_opt(attrs: &AttrMap, key: &'static str) -> Result<Option<f64>, PortConstraintError> {
-    match attrs.get(key) {
-        None => Ok(None),
-        Some(v) => {
-            let n = v.as_f64();
-            if !n.is_some_and(f64::is_finite) {
-                return Err(PortConstraintError::InvalidPosCoord {
-                    key,
-                    value: v.to_string(),
-                });
-            }
-            Ok(Some(n.unwrap()))
-        }
-    }
-}
-
-/// Candidate side list: one atom or a comma-separated atom list (AttrValue
-/// has no list type). Closed set; duplicates are dropped keeping first
-/// occurrence order.
-fn parse_sides_opt(
-    attrs: &AttrMap,
-    key: &'static str,
-) -> Result<Option<Vec<Side>>, PortConstraintError> {
-    let Some(v) = attrs.get(key) else { return Ok(None) };
-    let raw = v.as_str().unwrap_or_default();
-    let mut sides = Vec::new();
-    for atom in raw.split(',') {
-        let atom = atom.trim();
-        if atom.is_empty() {
-            continue;
-        }
-        let side = Side::parse(atom).ok_or_else(|| PortConstraintError::InvalidSide {
-            side_key: key,
-            value: atom.to_string(),
-        })?;
-        if !sides.contains(&side) {
-            sides.push(side);
-        }
-    }
-    // Empty here (e.g. `""` or only commas) is validated by the caller via
-    // `EmptyCandidates` once tier selection knows `sides` was authored.
-    Ok(Some(sides))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -446,155 +257,61 @@ mod tests {
         for s in ["north", "south", "east", "west"] {
             assert_eq!(Side::parse(s).unwrap().as_str(), s);
         }
-        assert_eq!(Side::parse("up"), None, "closed set: no fallback");
-        assert_eq!(Side::parse("North"), None, "atoms are case-sensitive");
+        assert_eq!(Side::parse("up"), None);
+        assert_eq!(Side::parse("North"), None);
     }
 
     #[test]
-    fn constraint_extraction_rules() {
-        let k = FROM_PORT_KEYS;
-
-        // Rule 1: all absent → None (FREE)
-        assert_eq!(port_constraint(&attrs(&[]), k), Ok(None));
-
-        // Rule 2: side only → FIXED_SIDE
+    fn edge_side_only() {
+        assert_eq!(edge_port_constraint(&attrs(&[]), FROM_SIDE_KEY), Ok(None));
         let a = attrs(&[("from_side", AttrValue::Atom("south".into()))]);
         assert_eq!(
-            port_constraint(&a, k),
+            edge_port_constraint(&a, FROM_SIDE_KEY),
             Ok(Some(PortConstraint::FixedSide { side: Side::South }))
         );
-
-        // Rule 4: side + slot → FIXED_ORDER (slot = relative order key)
-        let a = attrs(&[
-            ("from_side", AttrValue::Atom("south".into())),
-            ("from_slot", AttrValue::Num(1.0)),
-        ]);
-        assert_eq!(
-            port_constraint(&a, k),
-            Ok(Some(PortConstraint::FixedOrder {
-                side: Side::South,
-                order: 1
-            }))
-        );
-
-        // Rule 3: slot without side → error
-        let a = attrs(&[("from_slot", AttrValue::Num(0.0))]);
-        assert_eq!(
-            port_constraint(&a, k),
-            Err(PortConstraintError::SlotWithoutSide { slot_key: "from_slot" })
-        );
-
-        // Rule 5: unknown side atom → error, no fallback
         let a = attrs(&[("from_side", AttrValue::Atom("center".into()))]);
         assert!(matches!(
-            port_constraint(&a, k),
+            edge_port_constraint(&a, FROM_SIDE_KEY),
             Err(PortConstraintError::InvalidSide { .. })
         ));
     }
 
     #[test]
-    fn new_tier_extraction() {
-        let k = TO_PORT_KEYS;
+    fn removed_edge_keys_rejected() {
+        for key in ["from_slot", "from_ratio", "from_x", "from_sides", "to_slot"] {
+            let a = attrs(&[(key, AttrValue::Num(0.0))]);
+            assert_eq!(
+                edge_port_constraint(&a, FROM_SIDE_KEY),
+                Err(PortConstraintError::UnsupportedEdgePortKey { key }),
+                "{key}"
+            );
+        }
+    }
 
-        // FIXED_RATIO
+    #[test]
+    fn anchor_side_and_optional_slot() {
+        let a = attrs(&[("side", AttrValue::Atom("west".into()))]);
+        assert_eq!(
+            anchor_port_constraint(&a),
+            Ok(Some(PortConstraint::FixedSide { side: Side::West }))
+        );
         let a = attrs(&[
-            ("to_side", AttrValue::Atom("north".into())),
-            ("to_ratio", AttrValue::Num(0.25)),
+            ("side", AttrValue::Atom("west".into())),
+            ("slot", AttrValue::Num(2.0)),
         ]);
         assert_eq!(
-            port_constraint(&a, k),
-            Ok(Some(PortConstraint::FixedRatio {
-                side: Side::North,
-                ratio: 0.25
+            anchor_port_constraint(&a),
+            Ok(Some(PortConstraint::FixedOrder {
+                side: Side::West,
+                order: 2
             }))
         );
-
-        // FIXED_POS
-        let a = attrs(&[("to_x", AttrValue::Num(12.0)), ("to_y", AttrValue::Num(0.0))]);
+        let a = attrs(&[("slot", AttrValue::Num(0.0))]);
         assert_eq!(
-            port_constraint(&a, k),
-            Ok(Some(PortConstraint::FixedPos {
-                local: Point { x: 12.0, y: 0.0 }
-            }))
+            anchor_port_constraint(&a),
+            Err(PortConstraintError::SlotWithoutSide {
+                slot_key: "slot"
+            })
         );
-
-        // CANDIDATES (comma list, duplicate dropped)
-        let a = attrs(&[("to_sides", AttrValue::Atom("south, east, south".into()))]);
-        assert_eq!(
-            port_constraint(&a, k),
-            Ok(Some(PortConstraint::Candidates {
-                sides: vec![Side::South, Side::East]
-            }))
-        );
-    }
-
-    #[test]
-    fn slot_must_be_non_negative_integer() {
-        let k = TO_PORT_KEYS;
-        for bad in [AttrValue::Num(-1.0), AttrValue::Num(1.5), AttrValue::Str("2".into())] {
-            let a = attrs(&[
-                ("to_side", AttrValue::Atom("north".into())),
-                ("to_slot", bad),
-            ]);
-            assert!(matches!(
-                port_constraint(&a, k),
-                Err(PortConstraintError::InvalidSlot { .. })
-            ));
-        }
-    }
-
-    #[test]
-    fn validation_errors_table() {
-        let k = FROM_PORT_KEYS;
-        let cases: Vec<(AttrMap, PortConstraintError)> = vec![
-            (
-                attrs(&[("from_ratio", AttrValue::Num(0.5))]),
-                PortConstraintError::RatioWithoutSide { ratio_key: "from_ratio" },
-            ),
-            (
-                attrs(&[
-                    ("from_side", AttrValue::Atom("east".into())),
-                    ("from_ratio", AttrValue::Num(1.5)),
-                ]),
-                PortConstraintError::InvalidRatio {
-                    ratio_key: "from_ratio",
-                    value: "1.5".into(),
-                },
-            ),
-            (
-                attrs(&[("from_x", AttrValue::Num(3.0))]),
-                PortConstraintError::PosPartial {
-                    present_key: "from_x",
-                    missing_key: "from_y",
-                },
-            ),
-            (
-                attrs(&[
-                    ("from_side", AttrValue::Atom("east".into())),
-                    ("from_x", AttrValue::Num(3.0)),
-                    ("from_y", AttrValue::Num(0.0)),
-                ]),
-                PortConstraintError::ConflictingTier {
-                    keys: vec!["from_x", "from_y", "from_side"],
-                },
-            ),
-            (
-                attrs(&[
-                    ("from_sides", AttrValue::Atom("north".into())),
-                    ("from_slot", AttrValue::Num(0.0)),
-                    ("from_side", AttrValue::Atom("north".into())),
-                ]),
-                PortConstraintError::ConflictingTier {
-                    keys: vec!["from_sides", "from_side", "from_slot"],
-                },
-            ),
-            (
-                attrs(&[("from_sides", AttrValue::Atom(" , ".into()))]),
-                PortConstraintError::EmptyCandidates { sides_key: "from_sides" },
-            ),
-        ];
-        for (i, (a, expected)) in cases.into_iter().enumerate() {
-            assert_eq!(port_constraint(&a, k), Err(expected), "case {i}");
-        }
     }
 }

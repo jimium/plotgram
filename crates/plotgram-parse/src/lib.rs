@@ -211,71 +211,37 @@ diagram {
         let source = r#"diagram {
     node a { label: "A" }
     node b { label: "B" }
-    a -> b { from_side: south, to_side: north, from_slot: 0, to_slot: 1 }
+    a -> b { from_side: south, to_side: north }
 }"#;
         let out = parse(source).unwrap();
         let edge = &out.graph.edges[0];
         assert_eq!(
             edge.from_port,
-            Some(plotgram_model::port::PortConstraint::FixedOrder {
+            Some(plotgram_model::port::PortConstraint::FixedSide {
                 side: Side::South,
-                order: 0
             })
         );
         assert_eq!(
             edge.to_port,
-            Some(plotgram_model::port::PortConstraint::FixedOrder {
+            Some(plotgram_model::port::PortConstraint::FixedSide {
                 side: Side::North,
-                order: 1
             })
         );
-        // Structural keys removed from attrs
         assert!(!edge.attrs.contains_key("from_side"));
-        assert!(!edge.attrs.contains_key("to_slot"));
+        assert!(!edge.attrs.contains_key("to_side"));
     }
 
     #[test]
-    fn end_to_end_new_port_tier_lift() {
-        use plotgram_model::port::PortConstraint::*;
-        let source = r#"diagram {
-    node a { label: "A" }
-    node b { label: "B" }
-    node c { label: "C" }
-    a -> b { from_side: south, from_ratio: 0.25 }
-    b -> c { from_x: 12.0, from_y: 0.0 }
-    c -> a { to_sides: "south, east" }
-}"#;
-        let out = parse(source).unwrap();
-        let edges = &out.graph.edges;
-        assert_eq!(
-            edges[0].from_port,
-            Some(FixedRatio {
-                side: Side::South,
-                ratio: 0.25
-            })
-        );
-        assert_eq!(
-            edges[1].from_port,
-            Some(FixedPos {
-                local: plotgram_model::geometry::Point { x: 12.0, y: 0.0 }
-            })
-        );
-        assert_eq!(
-            edges[2].to_port,
-            Some(Candidates {
-                sides: vec![Side::South, Side::East]
-            })
-        );
-        // Tier keys are structural: lifted out of attrs.
-        assert!(!edges[0].attrs.contains_key("from_ratio"));
-        assert!(!edges[1].attrs.contains_key("from_x"));
-        assert!(!edges[2].attrs.contains_key("to_sides"));
-    }
-
-    #[test]
-    fn end_to_end_ratio_without_side_is_an_error() {
-        let err = parse("diagram { node a {} node b {} a -> b { from_ratio: 0.5 } }").unwrap_err();
-        assert!(matches!(err, ParseError::Port(_)));
+    fn end_to_end_removed_port_keys_are_errors() {
+        for src in [
+            "diagram { node a {} node b {} a -> b { from_slot: 0 } }",
+            "diagram { node a {} node b {} a -> b { from_ratio: 0.5 } }",
+            "diagram { node a {} node b {} a -> b { from_x: 1.0, from_y: 0.0 } }",
+            "diagram { node a {} node b {} a -> b { to_sides: \"south, east\" } }",
+        ] {
+            let err = parse(src).unwrap_err();
+            assert!(matches!(err, ParseError::Port(_)), "src={src} got {err:?}");
+        }
     }
 
     #[test]
@@ -324,10 +290,10 @@ diagram {
     }
 
     #[test]
-    fn error_slot_without_side() {
+    fn error_removed_edge_port_key() {
         let err = parse("diagram { node a {} node b {} a -> b { from_slot: 0 } }").unwrap_err();
-        // PortConstraintError::SlotWithoutSide wrapped in ParseError::Port
         assert!(matches!(err, ParseError::Port(_)));
+        assert!(err.to_string().contains("unsupported"));
     }
 
     #[test]
@@ -374,25 +340,25 @@ diagram {
 
         // db: archetype fills shape + variant, no icon (database has icon: None)
         let db = &out.graph.nodes[0];
-        assert_eq!(db.shape.as_deref(), Some("cylinder"));
+        assert_eq!(db.shape, Some(plotgram_model::NodeShape::Cylinder));
         assert_eq!(db.attrs.get("variant").and_then(|v| v.as_str()), Some("info"));
         assert!(!db.attrs.contains_key("icon"));
 
         // gw: explicit `icon: none` blocks archetype icon fill (gateway has no icon anyway)
         let gw = &out.graph.nodes[1];
-        assert_eq!(gw.shape.as_deref(), Some("diamond"));
+        assert_eq!(gw.shape, Some(plotgram_model::NodeShape::Diamond));
         assert_eq!(gw.attrs.get("icon").and_then(|v| v.as_str()), Some("none"));
 
         // svc: positional sugar → archetype: service → fills shape/variant/icon
         let svc = &out.graph.nodes[2];
         assert_eq!(svc.label.as_deref(), Some("Service"));
-        assert_eq!(svc.shape.as_deref(), Some("rounded_rect"));
+        assert_eq!(svc.shape, Some(plotgram_model::NodeShape::RoundedRect));
         assert_eq!(svc.attrs.get("variant").and_then(|v| v.as_str()), Some("default"));
         assert_eq!(svc.attrs.get("icon").and_then(|v| v.as_str()), Some("service"));
 
         // custom: explicit shape + variant override archetype defaults
         let custom = &out.graph.nodes[3];
-        assert_eq!(custom.shape.as_deref(), Some("rounded_rect"));
+        assert_eq!(custom.shape, Some(plotgram_model::NodeShape::RoundedRect));
         assert_eq!(custom.attrs.get("variant").and_then(|v| v.as_str()), Some("primary"));
 
         // unknown_arch: no expansion, no error

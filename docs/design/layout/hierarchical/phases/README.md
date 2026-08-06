@@ -9,7 +9,7 @@
 |------|------------|
 | [contracts-and-ir](contracts-and-ir.md) | 跨 crate 输入输出、稳定 key、Stage 外壳、Diagnostics |
 | [composition](composition.md) | FAS、ranking、properify、ordering、约束投影与 Plan freeze |
-| [ports-and-channel](ports-and-channel.md) | 五档端口、gate/scope、Channel、track、bundle、DeferToRouter |
+| [ports-and-channel](ports-and-channel.md) | 边侧约束 + FREE、gate/scope、Channel、track、bundle、DeferToRouter |
 | [channel-d1](channel-d1.md) | D₁ 分阶段契约（D1.0 TrackOrder → D1.1 Substrate 搜索 → D1.2 Gate/rip-up） |
 | [channel-corridor-allocator](channel-corridor-allocator.md) | D1.3 Corridor Allocator 执行方案（span 亲和 → 内层优先 → RouteOrder → Demand → 回边侧别） |
 | [coordinate-and-demand](coordinate-and-demand.md) | Demand epoch、BK/VPSC、组框、PartitionGrid、Orientation |

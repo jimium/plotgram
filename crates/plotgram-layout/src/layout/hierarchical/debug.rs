@@ -202,10 +202,10 @@ pub struct PortDebug {
     pub node: String,
     pub side: String,
     /// Relative order within the (node, side) group; `None` for
-    /// Ratio / LocalOffset pins (they carry no order).
+    /// LocalOffset pins (they carry no order).
     pub slot: Option<u32>,
     pub point: Point,
-    /// Fixed vocabulary aligned with the five-tier `PortConstraint`.
+    /// Fixed vocabulary aligned with edge/anchor `PortConstraint`.
     pub constraint: &'static str,
 }
 
@@ -555,9 +555,6 @@ fn constraint_str(constraint: Option<&plotgram_model::port::PortConstraint>) -> 
         None => "free",
         Some(FixedSide { .. }) => "fixed-side",
         Some(FixedOrder { .. }) => "fixed-order",
-        Some(FixedRatio { .. }) => "fixed-ratio",
-        Some(FixedPos { .. }) => "fixed-pos",
-        Some(Candidates { .. }) => "candidates",
     }
 }
 

@@ -83,9 +83,10 @@ fn edge_unknown_group_frame() {
 // ─── Port constraint errors ─────────────────────────────────────────────────
 
 #[test]
-fn slot_without_side() {
+fn removed_edge_port_key_rejected() {
     let e = expect_err("diagram { node a {} node b {} a -> b { from_slot: 0 } }");
     assert!(matches!(e, ParseError::Port(_)), "got: {e:?}");
+    assert!(e.to_string().contains("unsupported"), "got: {e}");
 }
 
 #[test]
@@ -438,6 +439,15 @@ fn shape_boolean_rejected() {
     );
 }
 
+#[test]
+fn shape_unknown_atom_rejected() {
+    let e = expect_err("diagram { node a { shape: triangle } }");
+    assert!(
+        matches!(&e, ParseError::Semantic(msg) if msg.contains("unknown shape") && msg.contains("triangle")),
+        "got: {e:?}"
+    );
+}
+
 // ─── P3d: node bare archetype sugar (§5.5.3) ────────────────────────────────
 
 #[test]
@@ -507,21 +517,17 @@ fn atom_trailing_dot_rejected() {
     assert!(matches!(e, ParseError::Lex { .. }), "got: {e:?}");
 }
 
-// ─── P3c: slot non-integer (§7.4.2) ─────────────────────────────────────────
+// ─── P3c: removed edge port keys (§7.4) ─────────────────────────────────────
 
 #[test]
-fn slot_fractional_rejected() {
-    let e = expect_err("diagram { node a {} node b {} a -> b { from_side: north, from_slot: 1.5 } }");
+fn removed_slot_key_rejected_even_with_side() {
+    let e = expect_err("diagram { node a {} node b {} a -> b { from_side: north, from_slot: 1 } }");
     assert!(matches!(e, ParseError::Port(_)), "got: {e:?}");
 }
 
 #[test]
-fn slot_negative_rejected() {
-    // -1 is parsed as a lex error (unexpected '-'), so this tests the model path
-    // with a value that reaches parse_slot as negative: not directly possible via DSL.
-    // The model's parse_slot rejects n < 0.
-    // Here we just verify the port error path works for non-integer.
-    let e = expect_err("diagram { node a {} node b {} a -> b { from_side: north, from_slot: 0.1 } }");
+fn removed_ratio_key_rejected() {
+    let e = expect_err("diagram { node a {} node b {} a -> b { from_ratio: 0.5 } }");
     assert!(matches!(e, ParseError::Port(_)), "got: {e:?}");
 }
 

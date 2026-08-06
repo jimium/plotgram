@@ -1070,12 +1070,12 @@ mod tests {
     fn edge_port_attrs() {
         let ast = parse_ok(r#"diagram {
             node a {} node b {}
-            a -> b { from_side: south, to_side: north, from_slot: 0, to_slot: 1 }
+            a -> b { from_side: south, to_side: north }
         }"#);
         match &ast.diagram.items[2] {
             DiagramItem::Edge(e) => {
                 assert_eq!(e.attrs.get("from_side"), Some(&AttrValue::Atom("south".into())));
-                assert_eq!(e.attrs.get("to_slot"), Some(&AttrValue::Num(1.0)));
+                assert_eq!(e.attrs.get("to_side"), Some(&AttrValue::Atom("north".into())));
             }
             _ => panic!("expected edge"),
         }

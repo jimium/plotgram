@@ -24,8 +24,8 @@ pub struct CompiledDefaults {
     pub canvas_background: String,
     pub title_fill: String,
     pub title_font_size: f64,
-    /// Global default node shape (from `defaults.node.shape`; fallback "rounded_rect").
-    pub node_shape: String,
+    /// Global default node shape (from `defaults.node.shape`; fallback `NodeShape::DEFAULT`).
+    pub node_shape: plotgram_model::NodeShape,
     pub node: VariantStyle,
     pub edge: EdgeDefaults,
     pub group: GroupDefaults,

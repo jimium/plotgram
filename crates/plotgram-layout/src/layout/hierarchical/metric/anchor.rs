@@ -1,15 +1,9 @@
 //! Port point expansion: the single implementation of `along_spec × frame`
-//! (architecture.md §3.2 — `port_points` is Metric's deterministic expansion
-//! of the Compose-frozen `PortPlan`; Ink reads the same function, never owns
-//! the formula). Canonical (TB) space.
+//! (architecture.md §3.2). Canonical (TB) space.
 //!
-//! `Ordered` carries **relative order only** — it is never a pixel truth
-//! (roadmap phase B): Metric expands the dense, centered anchor
-//! `(order + 1) / (count + 1)` against the final frame. `Ratio` /
-//! `LocalOffset` are author-pinned pins resolved by Compose.
-//!
-//! Automatic edge grouping (yFiles bus-style): cluster members share one
-//! `PortPoint` — no pitch spread at the port (edge-parameters §2.3).
+//! `Ordered` carries **relative order only** — Metric expands the dense,
+//! centered anchor `(order + 1) / (count + 1)` against the final frame.
+//! `LocalOffset` is algorithm-owned (e.g. self-loop).
 
 use plotgram_algo::orientation::Side::*;
 use plotgram_model::geometry::{Point, Rect};
@@ -24,9 +18,6 @@ pub fn port_anchor(frame: Rect, port: ResolvedPort) -> Point {
             let t = (order as f64 + 1.0) / (count as f64 + 1.0);
             side_point(frame, port.side, t)
         }
-        AlongSpec::Ratio(r) => side_point(frame, port.side, r),
-        // Compose validated + snapped the point onto the boundary; Metric
-        // only translates it onto the frame (no new decisions).
         AlongSpec::LocalOffset(offset) => Point {
             x: frame.x + offset.x,
             y: frame.y + offset.y,
@@ -83,24 +74,6 @@ mod tests {
             let p = port_anchor(f, ordered(Side::South, order, 3));
             assert_eq!(p.x, want_x, "order {order}");
             assert_eq!(p.y, 60.0);
-        }
-    }
-
-    #[test]
-    fn ratio_lands_linearly_along_the_side() {
-        let f = frame();
-        let cases = [
-            (Side::North, 0.25, Point { x: 30.0, y: 20.0 }),
-            (Side::South, 0.0, Point { x: 10.0, y: 60.0 }),
-            (Side::West, 0.5, Point { x: 10.0, y: 40.0 }),
-            (Side::East, 1.0, Point { x: 90.0, y: 60.0 }),
-        ];
-        for (side, r, want) in cases {
-            let port = ResolvedPort {
-                side,
-                along: AlongSpec::Ratio(r),
-            };
-            assert_eq!(port_anchor(f, port), want, "{side:?} ratio {r}");
         }
     }
 

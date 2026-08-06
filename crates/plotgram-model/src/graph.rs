@@ -12,20 +12,8 @@
 use crate::attr::AttrMap;
 use crate::partition::{PartitionCell, PartitionGrid};
 use crate::port::{
-    FROM_PORT_KEYS, PortConstraint, PortConstraintError, PortKeys, Side, TO_PORT_KEYS,
-    port_constraint,
-};
-
-/// Node-anchor lift keys: group anchors attach by `side` + optional `slot`
-/// only (dsl-spec §7.6). The other tier keys are reserved names that never
-/// appear in the DSL — anchors are FixedSide/FixedOrder tiers only.
-const NODE_ANCHOR_KEYS: PortKeys = PortKeys {
-    side: "side",
-    slot: "slot",
-    ratio: "anchor_ratio",
-    x: "anchor_x",
-    y: "anchor_y",
-    sides: "anchor_sides",
+    ANCHOR_SIDE_KEY, ANCHOR_SLOT_KEY, FROM_SIDE_KEY, TO_SIDE_KEY, PortConstraint,
+    PortConstraintError, Side, anchor_port_constraint, edge_port_constraint,
 };
 
 /// Arrow semantics (dsl-spec §7.2: exactly 3 kinds).
@@ -84,8 +72,6 @@ pub enum NodeStructuralError {
     EntityHasAnchorFields { node_id: String },
     /// Reused edge-port style errors when lifting node `side` / `slot`.
     Port(PortConstraintError),
-    /// Group-anchor port uses a tier beyond FixedSide/FixedOrder.
-    AnchorUnsupportedTier { node_id: String },
 }
 
 impl std::fmt::Display for NodeStructuralError {
@@ -113,12 +99,6 @@ impl std::fmt::Display for NodeStructuralError {
                 )
             }
             Self::Port(e) => write!(f, "{e}"),
-            Self::AnchorUnsupportedTier { node_id } => {
-                write!(
-                    f,
-                    "node `{node_id}`: group-anchor port supports only side/slot tiers (FixedSide/FixedOrder)"
-                )
-            }
         }
     }
 }
@@ -146,7 +126,7 @@ pub struct Node {
     /// Display label; `None` = unlabeled pure shape.
     pub label: Option<String>,
     /// Explicit rendering shape override (closed set; `None` = resolved via shape chain).
-    pub shape: Option<String>,
+    pub shape: Option<crate::shape::NodeShape>,
     /// Structural role (default [`NodeRole::Entity`]).
     #[serde(default)]
     pub role: NodeRole,
@@ -203,7 +183,7 @@ impl Node {
             }
         }
         if self.anchor.is_none() {
-            self.anchor = port_constraint(&self.attrs, NODE_ANCHOR_KEYS)?;
+            self.anchor = anchor_port_constraint(&self.attrs)?;
         }
         if self.partition_cell.is_none() {
             let column = self
@@ -223,8 +203,8 @@ impl Node {
         for k in [
             "role",
             "host_group",
-            "side",
-            "slot",
+            ANCHOR_SIDE_KEY,
+            ANCHOR_SLOT_KEY,
             "cell_col",
             "cell_row",
         ] {
@@ -253,16 +233,6 @@ impl Node {
                 }
                 if self.anchor.is_none() {
                     return Err(NodeStructuralError::AnchorMissingSide {
-                        node_id: self.id.clone(),
-                    });
-                }
-                if !matches!(
-                    self.anchor,
-                    Some(
-                        PortConstraint::FixedSide { .. } | PortConstraint::FixedOrder { .. }
-                    )
-                ) {
-                    return Err(NodeStructuralError::AnchorUnsupportedTier {
                         node_id: self.id.clone(),
                     });
                 }
@@ -328,18 +298,18 @@ impl Edge {
     /// from `attrs`. Idempotent if fields already set (fields win; conflicting attr keys
     /// are still stripped).
     ///
-    /// Keys handled: `from_side`, `from_slot`, `from_ratio`, `from_x`, `from_y`,
-    /// `from_sides` (and `to_*` mirrors), `critical` (dsl-spec §7.4.2).
+    /// Keys handled: `from_side`, `to_side`, `critical` (dsl-spec §7.4).
+    /// Removed keys (`from_slot`, `from_ratio`, …) are hard errors.
     /// `edge_group` is rejected — fan merge is layout `auto_edge_grouping` only.
     pub fn lift_structural_attrs(&mut self) -> Result<(), PortConstraintError> {
         if self.attrs.contains_key("edge_group") {
             return Err(PortConstraintError::UnsupportedEdgeGroup);
         }
         if self.from_port.is_none() {
-            self.from_port = port_constraint(&self.attrs, FROM_PORT_KEYS)?;
+            self.from_port = edge_port_constraint(&self.attrs, FROM_SIDE_KEY)?;
         }
         if self.to_port.is_none() {
-            self.to_port = port_constraint(&self.attrs, TO_PORT_KEYS)?;
+            self.to_port = edge_port_constraint(&self.attrs, TO_SIDE_KEY)?;
         }
         if !self.critical {
             if let Some(v) = self.attrs.get("critical") {
@@ -352,21 +322,11 @@ impl Edge {
                 }
             }
         }
-        for k in [
-            FROM_PORT_KEYS.side,
-            FROM_PORT_KEYS.slot,
-            FROM_PORT_KEYS.ratio,
-            FROM_PORT_KEYS.x,
-            FROM_PORT_KEYS.y,
-            FROM_PORT_KEYS.sides,
-            TO_PORT_KEYS.side,
-            TO_PORT_KEYS.slot,
-            TO_PORT_KEYS.ratio,
-            TO_PORT_KEYS.x,
-            TO_PORT_KEYS.y,
-            TO_PORT_KEYS.sides,
-            "critical",
-        ] {
+        for k in [FROM_SIDE_KEY, TO_SIDE_KEY, "critical"] {
+            self.attrs.remove(k);
+        }
+        // Strip removed keys only after error check above — they must not linger.
+        for &k in crate::port::REMOVED_EDGE_PORT_KEYS {
             self.attrs.remove(k);
         }
         Ok(())
@@ -694,7 +654,6 @@ mod tests {
     fn lift_structural_attrs_to_first_class_fields() {
         let mut e = edge("e", Arrow::Forward);
         e.attrs.insert("from_side".into(), AttrValue::Atom("south".into()));
-        e.attrs.insert("from_slot".into(), AttrValue::Num(1.0));
         e.attrs.insert("to_side".into(), AttrValue::Atom("north".into()));
         e.attrs.insert("style.stroke".into(), AttrValue::Str("#f00".into()));
 
@@ -702,10 +661,7 @@ mod tests {
 
         assert_eq!(
             e.from_port,
-            Some(PortConstraint::FixedOrder {
-                side: Side::South,
-                order: 1
-            })
+            Some(PortConstraint::FixedSide { side: Side::South })
         );
         assert_eq!(
             e.to_port,
@@ -713,6 +669,16 @@ mod tests {
         );
         assert!(!e.attrs.contains_key("from_side"));
         assert!(e.attrs.contains_key("style.stroke"));
+    }
+
+    #[test]
+    fn lift_rejects_removed_edge_port_keys() {
+        let mut e = edge("e", Arrow::Forward);
+        e.attrs.insert("from_slot".into(), AttrValue::Num(1.0));
+        assert!(matches!(
+            e.lift_structural_attrs(),
+            Err(PortConstraintError::UnsupportedEdgePortKey { key: "from_slot" })
+        ));
     }
 
     #[test]
@@ -801,13 +767,5 @@ mod tests {
         ));
         n.anchor = Some(PortConstraint::FixedSide { side: Side::West });
         n.validate_role_fields().unwrap();
-        n.anchor = Some(PortConstraint::FixedRatio {
-            side: Side::West,
-            ratio: 0.5,
-        });
-        assert!(matches!(
-            n.validate_role_fields(),
-            Err(NodeStructuralError::AnchorUnsupportedTier { .. })
-        ));
     }
 }

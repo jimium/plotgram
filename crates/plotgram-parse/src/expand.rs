@@ -71,8 +71,8 @@ pub fn expand_group_frame_sugar(
         return Ok(());
     }
 
-    // Cache: (group_id, side_str, slot) → anchor node id (for reuse)
-    let mut anchor_cache: BTreeMap<(String, String, Option<u32>), String> = BTreeMap::new();
+    // Cache: (group_id, side_str) → anchor node id (for reuse)
+    let mut anchor_cache: BTreeMap<(String, String), String> = BTreeMap::new();
     // Collected anchor nodes per group id
     let mut anchors_to_inject: BTreeMap<String, Vec<Node>> = BTreeMap::new();
     // Expanded edges to add at top level
@@ -84,7 +84,6 @@ pub fn expand_group_frame_sugar(
         let source_id = resolve_endpoint(
             &pe.source,
             "from_side",
-            "from_slot",
             &pe.attrs,
             &pe.id,
             &mut anchor_cache,
@@ -94,7 +93,6 @@ pub fn expand_group_frame_sugar(
         let target_id = resolve_endpoint(
             &pe.target,
             "to_side",
-            "to_slot",
             &pe.attrs,
             &pe.id,
             &mut anchor_cache,
@@ -164,21 +162,19 @@ fn collect_used_ids(graph: &Graph) -> std::collections::HashSet<String> {
 }
 
 /// Resolve one endpoint: if `@group`, create/reuse an anchor node; if node, return id directly.
-#[allow(clippy::too_many_arguments)]
 fn resolve_endpoint(
     endpoint: &EndpointAst,
     side_key: &'static str,
-    slot_key: &'static str,
     edge_attrs: &AttrMap,
     edge_id: &str,
-    anchor_cache: &mut BTreeMap<(String, String, Option<u32>), String>,
+    anchor_cache: &mut BTreeMap<(String, String), String>,
     anchors_to_inject: &mut BTreeMap<String, Vec<Node>>,
     used_ids: &mut std::collections::HashSet<String>,
 ) -> Result<String, ParseError> {
     match endpoint {
         EndpointAst::Node(id) => Ok(id.clone()),
         EndpointAst::GroupFrame(gid) => {
-            // §7.6.2 rule 2: @group endpoint MUST have corresponding *_side
+            // §7.6.2: @group endpoint MUST have corresponding *_side
             let side_atom = edge_attrs
                 .get(side_key)
                 .and_then(|v| v.as_str())
@@ -192,31 +188,14 @@ fn resolve_endpoint(
                     "`{side_key}`: `{side_atom}` is not one of north/south/east/west"
                 ))
             })?;
-            let slot = edge_attrs
-                .get(slot_key)
-                .and_then(|v| v.as_f64())
-                .map(|n| {
-                    if n >= 0.0 && n.fract() == 0.0 && n <= u32::MAX as f64 {
-                        Ok(n as u32)
-                    } else {
-                        Err(ParseError::Semantic(format!(
-                            "`{slot_key}`: `{n}` is not a non-negative integer"
-                        )))
-                    }
-                })
-                .transpose()?;
 
-            let cache_key = (gid.clone(), side.as_str().to_string(), slot);
+            let cache_key = (gid.clone(), side.as_str().to_string());
             if let Some(existing_id) = anchor_cache.get(&cache_key) {
                 return Ok(existing_id.clone());
             }
 
-            // Synthesize anchor id: ga_{gid}_{side}[_{slot}]; on collision with a
-            // declared id, append the edge id suffix (§7.6.2 #3).
-            let base_id = match slot {
-                Some(s) => format!("ga_{gid}_{}_{s}", side.as_str()),
-                None => format!("ga_{gid}_{}", side.as_str()),
-            };
+            // Synthesize anchor id: ga_{gid}_{side}; on collision append edge id.
+            let base_id = format!("ga_{gid}_{}", side.as_str());
             let anchor_id = if used_ids.contains(&base_id) {
                 let suffixed = format!("{base_id}_{edge_id}");
                 if used_ids.contains(&suffixed) {
@@ -236,10 +215,7 @@ fn resolve_endpoint(
                 shape: None,
                 role: NodeRole::GroupAnchor,
                 host_group: Some(gid.clone()),
-                anchor: Some(match slot {
-                    Some(order) => PortConstraint::FixedOrder { side, order },
-                    None => PortConstraint::FixedSide { side },
-                }),
+                anchor: Some(PortConstraint::FixedSide { side }),
                 partition_cell: None,
                 attrs: AttrMap::new(),
             };
@@ -393,7 +369,7 @@ fn expand_archetypes_in_nodes(nodes: &mut [Node]) {
         // Fill shape (Node::shape field)
         if node.shape.is_none() {
             if let Some(s) = def.shape {
-                node.shape = Some(s.to_string());
+                node.shape = Some(s);
             }
         }
         // Fill variant (attrs)
@@ -559,7 +535,7 @@ mod tests {
             r#"diagram { node db { label: "DB", archetype: database } }"#,
         );
         let n = &graph.nodes[0];
-        assert_eq!(n.shape.as_deref(), Some("cylinder"));
+        assert_eq!(n.shape, Some(plotgram_model::NodeShape::Cylinder));
         assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("info"));
         // database has icon: None → no icon filled
         assert!(!n.attrs.contains_key("icon"));
@@ -571,7 +547,7 @@ mod tests {
             r#"diagram { node svc { label: "Svc", archetype: service } }"#,
         );
         let n = &graph.nodes[0];
-        assert_eq!(n.shape.as_deref(), Some("rounded_rect"));
+        assert_eq!(n.shape, Some(plotgram_model::NodeShape::RoundedRect));
         assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("default"));
         assert_eq!(n.attrs.get("icon").and_then(|v| v.as_str()), Some("service"));
     }
@@ -583,7 +559,7 @@ mod tests {
         );
         let n = &graph.nodes[0];
         // Explicit shape wins over archetype default
-        assert_eq!(n.shape.as_deref(), Some("rounded_rect"));
+        assert_eq!(n.shape, Some(plotgram_model::NodeShape::RoundedRect));
         // variant still filled (not explicitly set)
         assert_eq!(n.attrs.get("variant").and_then(|v| v.as_str()), Some("info"));
     }
@@ -626,7 +602,7 @@ mod tests {
             }
         }"#);
         let n = &graph.groups[0].nodes[0];
-        assert_eq!(n.shape.as_deref(), Some("cylinder"));
+        assert_eq!(n.shape, Some(plotgram_model::NodeShape::Cylinder));
         assert_eq!(n.attrs.get("icon").and_then(|v| v.as_str()), Some("cache"));
     }
 

@@ -66,6 +66,7 @@ mod tests {
         RealGraph {
             ids,
             index_of,
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; group_path.len()],
             group_path,
             edges,
             self_loops: Vec::new(),

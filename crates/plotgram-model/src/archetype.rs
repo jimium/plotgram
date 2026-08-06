@@ -7,6 +7,8 @@
 //! Compile-time static table — no CSV, no build.rs, no runtime IO.
 //! WASM-safe. Deterministic order = declaration order (AGENTS.md §2).
 
+use crate::shape::NodeShape;
+
 /// A named combination pack expanding into shape / variant / icon defaults.
 ///
 /// Semantics: **fill-only** — never overrides an axis the author already set.
@@ -15,7 +17,7 @@ pub struct ArchetypeDef {
     /// Normalized id (lowercase, `-` → `_`).
     pub id: &'static str,
     /// Default shape (closed set; `None` = not provided by this pack).
-    pub shape: Option<&'static str>,
+    pub shape: Option<NodeShape>,
     /// Default variant (closed set; `None` = not provided).
     pub variant: Option<&'static str>,
     /// Default icon id or literal `none` (`None` = not provided).
@@ -26,19 +28,84 @@ pub struct ArchetypeDef {
 ///
 /// Order = canonical declaration order; lookup is linear (≤ 32 entries).
 pub static ARCHETYPES: &[ArchetypeDef] = &[
-    ArchetypeDef { id: "database",  shape: Some("cylinder"),      variant: Some("info"),    icon: None },
-    ArchetypeDef { id: "cache",     shape: Some("cylinder"),      variant: Some("info"),    icon: Some("cache") },
-    ArchetypeDef { id: "queue",     shape: Some("stadium"),       variant: Some("info"),    icon: Some("queue") },
-    ArchetypeDef { id: "storage",   shape: Some("cylinder"),      variant: Some("info"),    icon: Some("storage") },
-    ArchetypeDef { id: "gateway",   shape: Some("diamond"),       variant: Some("default"), icon: None },
-    ArchetypeDef { id: "external",  shape: Some("rounded_rect"),  variant: Some("muted"),   icon: Some("external") },
-    ArchetypeDef { id: "service",   shape: Some("rounded_rect"),  variant: Some("default"), icon: Some("service") },
-    ArchetypeDef { id: "client",    shape: Some("rounded_rect"),  variant: Some("default"), icon: Some("client") },
-    ArchetypeDef { id: "decision",  shape: Some("diamond"),       variant: Some("default"), icon: None },
-    ArchetypeDef { id: "start",     shape: Some("circle"),        variant: Some("primary"), icon: None },
-    ArchetypeDef { id: "end",       shape: Some("circle"),        variant: Some("muted"),   icon: None },
-    ArchetypeDef { id: "actor",     shape: Some("person"),        variant: Some("default"), icon: None },
-    ArchetypeDef { id: "root",      shape: Some("rounded_rect"),  variant: Some("primary"), icon: None },
+    ArchetypeDef {
+        id: "database",
+        shape: Some(NodeShape::Cylinder),
+        variant: Some("info"),
+        icon: None,
+    },
+    ArchetypeDef {
+        id: "cache",
+        shape: Some(NodeShape::Cylinder),
+        variant: Some("info"),
+        icon: Some("cache"),
+    },
+    ArchetypeDef {
+        id: "queue",
+        shape: Some(NodeShape::Stadium),
+        variant: Some("info"),
+        icon: Some("queue"),
+    },
+    ArchetypeDef {
+        id: "storage",
+        shape: Some(NodeShape::Cylinder),
+        variant: Some("info"),
+        icon: Some("storage"),
+    },
+    ArchetypeDef {
+        id: "gateway",
+        shape: Some(NodeShape::Diamond),
+        variant: Some("default"),
+        icon: None,
+    },
+    ArchetypeDef {
+        id: "external",
+        shape: Some(NodeShape::RoundedRect),
+        variant: Some("muted"),
+        icon: Some("external"),
+    },
+    ArchetypeDef {
+        id: "service",
+        shape: Some(NodeShape::RoundedRect),
+        variant: Some("default"),
+        icon: Some("service"),
+    },
+    ArchetypeDef {
+        id: "client",
+        shape: Some(NodeShape::RoundedRect),
+        variant: Some("default"),
+        icon: Some("client"),
+    },
+    ArchetypeDef {
+        id: "decision",
+        shape: Some(NodeShape::Diamond),
+        variant: Some("default"),
+        icon: None,
+    },
+    ArchetypeDef {
+        id: "start",
+        shape: Some(NodeShape::Circle),
+        variant: Some("primary"),
+        icon: None,
+    },
+    ArchetypeDef {
+        id: "end",
+        shape: Some(NodeShape::Circle),
+        variant: Some("muted"),
+        icon: None,
+    },
+    ArchetypeDef {
+        id: "actor",
+        shape: Some(NodeShape::Person),
+        variant: Some("default"),
+        icon: None,
+    },
+    ArchetypeDef {
+        id: "root",
+        shape: Some(NodeShape::RoundedRect),
+        variant: Some("primary"),
+        icon: None,
+    },
 ];
 
 /// Normalize an archetype id: lowercase, trim, `-` → `_`.
@@ -61,17 +128,15 @@ mod tests {
     #[test]
     fn lookup_basic() {
         let def = archetype_by_id("database").unwrap();
-        assert_eq!(def.shape, Some("cylinder"));
+        assert_eq!(def.shape, Some(NodeShape::Cylinder));
         assert_eq!(def.variant, Some("info"));
         assert_eq!(def.icon, None);
     }
 
     #[test]
     fn lookup_normalizes_case_and_hyphen() {
-        // Case normalization
         assert_eq!(archetype_by_id("GATEWAY").unwrap().id, "gateway");
         assert_eq!(archetype_by_id("DataBase").unwrap().id, "database");
-        // Hyphen → underscore (e.g. if we had a hyphenated id)
         assert_eq!(normalize_id("My-Arch"), "my_arch");
     }
 
@@ -91,7 +156,6 @@ mod tests {
 
     #[test]
     fn all_entries_have_shape() {
-        // Every built-in archetype should provide at least a shape.
         for def in ARCHETYPES {
             assert!(def.shape.is_some(), "archetype `{}` missing shape", def.id);
         }

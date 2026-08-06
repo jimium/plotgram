@@ -232,9 +232,12 @@ fn compile_defaults(file: &ThemeFile, tokens: &BTreeMap<String, String>) -> Comp
         .unwrap_or_else(|| "#18181B".to_string());
     let title_font_size = get_f64(&d.title, "font_size", tokens).unwrap_or(21.0);
 
-    // Extract node shape separately (variants must not contain shape)
+    // Extract node shape separately (variants must not contain shape).
+    // Theme files are trusted; unknown atoms fall back to NodeShape::DEFAULT.
     let node_shape = get_resolved(&d.node, "shape", tokens)
-        .unwrap_or_else(|| "rounded_rect".to_string());
+        .as_deref()
+        .and_then(plotgram_model::NodeShape::parse)
+        .unwrap_or(plotgram_model::NodeShape::DEFAULT);
 
     let node = compile_variant_style(&d.node, tokens, &default_node_style());
 

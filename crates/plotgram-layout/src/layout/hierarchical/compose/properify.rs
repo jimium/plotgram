@@ -129,6 +129,7 @@ mod tests {
             ids,
             index_of,
             group_path,
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; n],
             edges,
             self_loops: Vec::new(),
         }

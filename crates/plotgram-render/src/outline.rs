@@ -1,6 +1,7 @@
 //! Shared outline sampling for sketch-mode shapes (and group frames).
 
 use plotgram_model::geometry::{Point, Rect};
+use plotgram_model::NodeShape;
 
 use crate::resolve::ResolvedNodeStyle;
 
@@ -12,7 +13,7 @@ pub type OutlineSubpath = (Vec<Point>, Option<String>);
 /// Standard mode keeps native SVG primitives; this is only used when
 /// `strategy.sample_outlines()` is true.
 pub fn shape_outlines(
-    shape: &str,
+    shape: NodeShape,
     frame: &Rect,
     style: &ResolvedNodeStyle,
 ) -> Vec<OutlineSubpath> {
@@ -24,18 +25,20 @@ pub fn shape_outlines(
     let cy = y + h / 2.0;
 
     match shape {
-        "rect" => vec![(sample_rounded_rect(x, y, w, h, style.radius.unwrap_or(0.0)), None)],
-        "rounded_rect" => vec![(sample_rounded_rect(x, y, w, h, style.radius.unwrap_or(8.0)), None)],
-        "stadium" => vec![(sample_rounded_rect(x, y, w, h, h.min(w) / 2.0), None)],
-        "circle" => {
+        NodeShape::Rect => vec![(sample_rounded_rect(x, y, w, h, style.radius.unwrap_or(0.0)), None)],
+        NodeShape::RoundedRect => {
+            vec![(sample_rounded_rect(x, y, w, h, style.radius.unwrap_or(4.0)), None)]
+        }
+        NodeShape::Stadium => vec![(sample_rounded_rect(x, y, w, h, h.min(w) / 2.0), None)],
+        NodeShape::Circle => {
             let r = w.min(h) / 2.0;
             vec![(sample_ellipse(cx, cy, r, r, 20), None)]
         }
-        "diamond" => vec![(
+        NodeShape::Diamond => vec![(
             sample_polygon(&[(cx, y), (x + w, cy), (cx, y + h), (x, cy)]),
             None,
         )],
-        "hexagon" => {
+        NodeShape::Hexagon => {
             let hm = h / 2.0;
             let w4 = w / 4.0;
             vec![(
@@ -50,14 +53,14 @@ pub fn shape_outlines(
                 None,
             )]
         }
-        "parallelogram" => {
+        NodeShape::Parallelogram => {
             let skew = w * 0.15;
             vec![(
                 sample_polygon(&[(x + skew, y), (x + w, y), (x + w - skew, y + h), (x, y + h)]),
                 None,
             )]
         }
-        "person" => {
+        NodeShape::Person => {
             let head_r = (w * 0.30).min(h * 0.24);
             let ty = y + head_r * 2.2;
             let tw = w.min(head_r * 4.4);
@@ -76,7 +79,7 @@ pub fn shape_outlines(
                 (torso, None),
             ]
         }
-        "cylinder" => {
+        NodeShape::Cylinder => {
             let ry = 8.0_f64.min(h / 4.0);
             let rx = w / 2.0;
             let mut body = Vec::new();
@@ -89,7 +92,7 @@ pub fn shape_outlines(
                 (sample_ellipse(cx, y + ry, rx, ry, 16), None),
             ]
         }
-        "document" => {
+        NodeShape::Document => {
             let wave_y = y + h * 0.85;
             let wave_h = h * 0.15;
             let mut pts = Vec::new();
@@ -105,7 +108,7 @@ pub fn shape_outlines(
             push_line(&mut pts, (x, wave_y), (x, y));
             vec![(pts, None)]
         }
-        "cloud" => {
+        NodeShape::Cloud => {
             let ccy = y + h * 0.55;
             let rx = w / 2.0;
             let ry = h * 0.42;
@@ -123,7 +126,7 @@ pub fn shape_outlines(
                 .collect();
             vec![(pts, None)]
         }
-        "subprocess" => {
+        NodeShape::Subprocess => {
             let pad = (w.min(h) * 0.08).clamp(4.0, 10.0);
             vec![
                 (sample_polygon(&[(x, y), (x + w, y), (x + w, y + h), (x, y + h)]), None),
@@ -138,7 +141,6 @@ pub fn shape_outlines(
                 ),
             ]
         }
-        _ => vec![(sample_rounded_rect(x, y, w, h, style.radius.unwrap_or(4.0)), None)],
     }
 }
 
@@ -259,32 +261,33 @@ mod tests {
         // every other shape must stay inside. This is the safety net against
         // sketch-vs-standard geometry drift (the hexagon lesson).
         let cases = [
-            ("rect", 1, 0.5),
-            ("rounded_rect", 1, 0.5),
-            ("stadium", 1, 0.5),
-            ("circle", 1, 0.5),
-            ("diamond", 1, 0.5),
-            ("hexagon", 1, 0.5),
-            ("parallelogram", 1, 0.5),
-            ("person", 2, 0.5),
-            ("cylinder", 2, 0.5),
-            ("document", 1, 0.5),
-            ("cloud", 1, 45.0),
-            ("subprocess", 2, 0.5),
+            (NodeShape::Rect, 1, 0.5),
+            (NodeShape::RoundedRect, 1, 0.5),
+            (NodeShape::Stadium, 1, 0.5),
+            (NodeShape::Circle, 1, 0.5),
+            (NodeShape::Diamond, 1, 0.5),
+            (NodeShape::Hexagon, 1, 0.5),
+            (NodeShape::Parallelogram, 1, 0.5),
+            (NodeShape::Person, 2, 0.5),
+            (NodeShape::Cylinder, 2, 0.5),
+            (NodeShape::Document, 1, 0.5),
+            (NodeShape::Cloud, 1, 45.0),
+            (NodeShape::Subprocess, 2, 0.5),
         ];
         for (shape, subpaths, overshoot) in cases {
+            let name = shape.as_str();
             let outlines = shape_outlines(shape, &frame, &style);
-            assert_eq!(outlines.len(), subpaths, "{shape}: subpath count");
+            assert_eq!(outlines.len(), subpaths, "{name}: subpath count");
             for (pts, _) in &outlines {
-                assert!(pts.len() >= 8, "{shape}: sampling too sparse ({} pts)", pts.len());
+                assert!(pts.len() >= 8, "{name}: sampling too sparse ({} pts)", pts.len());
                 for p in pts {
-                    assert!(p.x.is_finite() && p.y.is_finite(), "{shape}: NaN/inf point");
+                    assert!(p.x.is_finite() && p.y.is_finite(), "{name}: NaN/inf point");
                     assert!(
                         p.x >= frame.x - overshoot
                             && p.x <= frame.x + frame.width + overshoot
                             && p.y >= frame.y - overshoot
                             && p.y <= frame.y + frame.height + overshoot,
-                        "{shape}: point ({:.1}, {:.1}) escapes frame",
+                        "{name}: point ({:.1}, {:.1}) escapes frame",
                         p.x,
                         p.y
                     );
@@ -294,7 +297,7 @@ mod tests {
 
         // Subprocess inner frame is a stroke-only accent: repainting fill
         // there would cover the hatch pattern in sketch mode.
-        let sp = shape_outlines("subprocess", &frame, &style);
+        let sp = shape_outlines(NodeShape::Subprocess, &frame, &style);
         assert_eq!(sp[1].1.as_deref(), Some("none"));
     }
 }
