@@ -1,15 +1,23 @@
 # Sequence · 目标架构设计
 
 > 状态：**现行目标架构 v1**（驱动重建；非当前能力声明）
-> 日期：2026-08-02
+> 日期：2026-08-02（修订：2026-08-06，对齐 `plotgram-engine-api` Trait / `plotgram-model` 现状）
 > 引擎注册名：`sequence`
-> 代码落点（目标）：`crates/plotgram-engine/src/layout/sequence/`
+> 代码落点（目标）：`crates/plotgram-layout/src/layout/sequence/`（与 Hier 同 crate；见 [ADR-006](../../adr/006-engine-io-and-crates.md)）
 > 约束入口：[写权纪律](../write-authority.md) · [AGENTS.md](../../../../AGENTS.md) §1
 > 证据：[19 序列图与一维排列](../../../reference/yfiles/19-序列图与一维排列.md) · dsl-spec §8.1 · [model-boundary 时序](../../model-boundary.md)
 > v1 参考（功能与坑，非目录真源）：`crates/v1/.../recipes/sequence.rs`
 
 本文钉死 Sequence 的**目标形态与跨相契约**，重点是**消息边几何（Builtin 路由）**：它与 Hier 的 Channel/OVG 不是同一条路径。
 相级细节：[phases/](phases/README.md)。姊妹页：[README](README.md) · [scope](scope.md)。
+
+> **前置依赖（落地前必读）**：
+>
+> 1. **[ADR-009](../../adr/009-layout-result-decorations.md) 尚未在 model/engine-api 落地**。当前 [`LayoutResult`](../../../../crates/plotgram-model/src/result.rs) 没有 `decorations` 字段，[`LayoutOutput`](../../../../crates/plotgram-engine-api/src/traits.rs) 也没有。生命线 / 激活条 / 片段框等派生几何**无处可发**——见 §2.2 的二段式落地。
+> 2. [`LayoutError`](../../../../crates/plotgram-engine-api/src/error.rs) 当前变体不足以表达 §11 失败表所需类别（`Unsupported` / `InvalidInput` / `InternalInvariant` 均不存在）。落地前须扩展或全部塞 `Message(String)`（见 §11）。
+> 3. [`model::port::Side`](../../../../crates/plotgram-model/src/port.rs) 是封闭四值枚举（`North/South/East/West`），无 `Center`。Sequence 的「附着侧」用本核私有 `LifelineSide`（见 §3.1），不污染 model。
+>
+> 以上三项不解决，里程碑 M1 之后无法推进。M0 可在「只发 nodes+edges、暂不发生命线 decoration」的窗口内启动。
 
 ---
 
@@ -37,12 +45,27 @@
 | S3 | **DemandBoard** | 标签宽、激活嵌套深、自调用高度 → 在上游坐标前 `max` 合并 |
 | S4 | **确定性** | 禁止 `HashMap` 迭代驱动序；生命线/消息遍历稳定 |
 | S5 | **无图种分支** | 引擎只认 `layout: sequence` + typed params（ADR-001） |
-| S6 | **BuiltinEdges** | 本核写出最终消息 path；`edge_routing: Some` → `Unsupported` |
+| S6 | **BuiltinEdges** | 本核写出最终消息 path；`edge_routing: Some` → 由本核 `layout()` 入口返回 [`LayoutError::LayoutCannotDeferEdges`](../../../../crates/plotgram-engine-api/src/error.rs) |
 | S7 | **声明序 = 时间轴** | 无 `Edge::seq`；重排时间 = 重排 DSL 边序 |
 
 ### 1.1 状态词
 
 与 Hier 相同：**目标 / 已落地 / 过渡 / 后置**。bind 成功但未消费的参数 = 未支持。
+
+### 1.2 禁 Router 的执行点
+
+引擎门面 [`run`](../../../../crates/plotgram-engine/src/run.rs) 在 `edge_routing.is_some()` 时设 `EdgeGeometryMode::DeferToRouter` 后**无条件**调用 router 覆盖 `output.edges`——它不替 layout 拒绝。因此 S6 的「禁独立 Router」检查**必须由本核 `layout()` 入口自己做**：
+
+```rust
+fn layout(&self, input: LayoutInput<'_>) -> Result<LayoutOutput, LayoutError> {
+    if input.edge_geometry == EdgeGeometryMode::DeferToRouter {
+        return Err(LayoutError::LayoutCannotDeferEdges { layout: "sequence".into() });
+    }
+    // ...
+}
+```
+
+门面 [`LayoutError::LayoutCannotDeferEdges`](../../../../crates/plotgram-engine-api/src/error.rs) 的语义（"layout does not support deferred edge routing"）正好对上。本核不得依赖门面拦截。
 
 ---
 
@@ -79,22 +102,45 @@ Domain / DSL ──────►│
 
 ### 2.2 输出契约
 
+**目标形态**（ADR-009 落地后）：
+
 ```text
-LayoutOutput
+LayoutResult
   nodes:       参与者头部框（Metric）
-  groups:      片段框 / 弱 group 框（Metric；无则空）
+  groups:      片段框 / 弱 group 框（finalize 从 Graph::groups 包络；本核不直写）
   edges:       消息 EdgePlacement（path 必填）
-  decorations: LifelineDecoration[] / ActivationBar[]   # 或进专用字段
+  decorations: LifelineDecoration[] / ActivationBar[] / FragmentFrame[]
   diagnostics: LayoutDiagnostics
 ```
 
-生命线与激活条是**派生几何**，不进入 `Graph`；须有稳定 id（如 `lifeline:{node_id}`、`activation:{edge_id}:{ordinal}`），供 render 与 verifier 引用。  
+**当前现实**（[`LayoutOutput`](../../../../crates/plotgram-engine-api/src/traits.rs) / [`LayoutResult`](../../../../crates/plotgram-model/src/result.rs)）：
+
+```text
+LayoutOutput { nodes, edges, diagnostics }   // 本核出口
+LayoutResult { nodes, edges, groups, labels, canvas_width, canvas_height, diagnostics }
+                                            // 门面 finalize 出口；groups 由 Graph::groups 包络
+```
+
+差异三处，决定**二段式落地**：
+
+| 通道 | 当前状态 | 落地路径 |
+|------|----------|----------|
+| `groups`（片段框） | `LayoutResult.groups` 存在，但**只能**从 [`Graph::groups`](../../../../crates/plotgram-model/src/graph.rs) 经 [`finalize`](../../../../crates/plotgram-engine/src/finalize.rs) 包络产生；`LayoutOutput` 不带 `groups`。 | 片段框若走 `Graph::groups` → finalize 自动包络；若不想进 `Graph`（组合片段非业务实体），**等 ADR-009 decorations**。M0 不做片段。 |
+| `decorations`（生命线/激活条） | **不存在**。ADR-009 状态 = planned。 | 阻塞 M1。见下方"二段式"。 |
+| `LayoutOutput` → `LayoutResult` 合并 | 门面 [`finalize`](../../../../crates/plotgram-engine/src/finalize.rs) 只接 `nodes/edges/diagnostics`，加 `groups/labels/canvas`。 | 若 ADR-009 让 `LayoutOutput` 携带 decorations，finalize 须新增合并逻辑。 |
+
+**二段式落地（M0 先行窗口）**：
+
+- **M0**：本核只产 `nodes`（参与者头部）+ `edges`（消息 path）+ `diagnostics`。**不发生命线、激活条、片段框**。Render 端可临时按 `layout.name == "sequence"` 画一根「从头部底到 canvas 底」的占位竖线——但这是 **M0 临时渲染降级**，不是 ADR-009 的几何真源，须在 render 源码注释标 `// M0 placeholder; replace by LayoutResult.decorations.lifeline`。
+- **M1 起**：ADR-009 落地后，本核 Metric/Ink 写 `Lifeline` / `Activation` decoration，render 改为消费 decorations，删除 M0 占位。
+
+生命线与激活条是**派生几何**，不进入 `Graph`；须有稳定 id（如 `lifeline:{node_id}`、`activation:{edge_id}:{ordinal}`），供 render 与 verifier 引用。
 契约真源：[ADR-009](../../adr/009-layout-result-decorations.md)（`LayoutResult.decorations`）；禁止仅靠 render 再猜激活区间。
 
 ### 2.3 模块边界（目标）
 
 ```text
-plotgram-engine/layout/sequence/
+plotgram-layout/layout/sequence/
   params.rs
   compose/     # lifeline order · message rows · route topo · attachments
   plan/
@@ -105,6 +151,8 @@ plotgram-engine/layout/sequence/
 
 plotgram-algo/   # 1D arranger（复用）；非 sequence 私有第二宇宙
 ```
+
+落点与 Hier 同 crate（[`plotgram-layout`](../../../../crates/plotgram-layout/src/layout/)），注册经 [`Registry::standard`](../../../../crates/plotgram-engine/src/registry.rs)；不依赖门面 `run`。
 
 ---
 
@@ -132,8 +180,8 @@ MessagePlan {
 
 AttachSpec {
   lifeline: NodeId
-  side: East | West | Center   # 相对生命线中心轴
-  activation_depth: u32        # 0 = 贴生命线；>0 = 嵌套条外缘
+  side: LifelineSide         # East | West | Center（本核私有枚举；见下）
+  activation_depth: u32      # 0 = 贴生命线；>0 = 嵌套条外缘
 }
 
 MessageRouteTopo =
@@ -142,6 +190,12 @@ MessageRouteTopo =
   Slanted                      # 仅当 Async 且 send_row != recv_row；行列已定
   StubLost | StubFound         # 后置
 ```
+
+**`LifelineSide` 是本核私有枚举，不映射到 [`model::port::Side`](../../../../crates/plotgram-model/src/port.rs)**（后者封闭四值 `North/South/East/West`，无 `Center`，且 `Side::parse` 对未知 atom 直接报错）。原因：
+
+- 序列图附着侧语义是「相对生命线中心轴的左/右/中」，与节点框的 NSEW 端口模型不同构；
+- 不污染 model 的端口词表，避免影响 Hier 的 PortRef/PortConstraint/render 端口逻辑；
+- 对外（`EdgePlacement.from_port / to_port`）若需统一 render，由 Ink 把 `LifelineSide::East/West` 映射为合成 `PortRef { side: Side::East/West, along: Ordered{order=depth,count=…} }`；`Center` 不映射到 PortRef（仅用于 stub / Lost-Found，见 [message-routing §3.3](phases/message-routing.md)）。
 
 **禁止**：Ink 在缺少 `MessageRouteTopo` 时 `unwrap_or(Horizontal)`；禁止把 `Arrow::Response` 误当成另一套拓扑（样式 ≠ 拓扑）。
 
@@ -317,14 +371,14 @@ Sequence **不得**把消息委托给 Hier Channel：时间轴与生命线穿越
 
 ## 10. 里程碑
 
-| 里程碑 | 交付 | 验收 |
-|--------|------|------|
-| **M0** | Params bind · 声明序生命线 · 声明序消息行 · Horizontal + SelfLoop Ink | 简单时序可出图；禁 Router |
-| **M1** | Demand（标签宽→间距、自调用行高）· Plan/Metric/Ink verifier | 长标签不压邻线 |
-| **M2** | 激活条派生与附着 depth · lifeline crossings/notch | 嵌套调用可读 |
-| **M3** | 一维排列可选策略 · 显式 pin | 优化不破坏声明硬约束 |
-| **M4** | 组合片段框 | 嵌套包含、无非法交叠 |
-| **后置** | Async slanted · Lost/Found · 甘特连续轴 | 显式 Unsupported 直至落地 |
+| 里程碑 | 交付 | 验收 | 前置 |
+|--------|------|------|------|
+| **M0** | Params bind · 声明序生命线 · 声明序消息行 · Horizontal + SelfLoop Ink | 简单时序可出图；禁 Router；本核只产 nodes+edges+diagnostics（生命线 render 占位） | 无 |
+| **M1** | Demand（标签宽→间距、自调用行高）· Plan/Metric/Ink verifier · **ADR-009 落地：`LayoutOutput.decorations` + finalize 合并** · 生命线/激活条 decoration | 长标签不压邻线；render 删除 M0 占位、改消费 decorations | **ADR-009 model+engine-api 落地** |
+| **M2** | 激活条派生与附着 depth · lifeline crossings/notch | 嵌套调用可读 | M1 |
+| **M3** | 一维排列可选策略 · 显式 pin | 优化不破坏声明硬约束 | M0 |
+| **M4** | 组合片段框（走 decorations.FragmentFrame，**不**进 `Graph::groups`） | 嵌套包含、无非法交叠 | M1 |
+| **后置** | Async slanted · Lost/Found · 甘特连续轴 | 显式 `LayoutError` 直至落地 | — |
 
 ---
 

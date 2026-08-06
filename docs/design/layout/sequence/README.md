@@ -2,9 +2,11 @@
 
 > 状态：现行设计档（重建中；目标架构已立）
 > 引擎注册名：`sequence`
-> 代码（目标）：`crates/plotgram-engine/src/layout/sequence/`
+> 代码（目标）：`crates/plotgram-layout/src/layout/sequence/`（与 Hier 同 crate）
 > 参考实现：`crates/v1/plotgram-core/src/layout/recipes/sequence.rs`
 > **目标架构真源**：[architecture.md](architecture.md)
+
+> **落地前置**：M1 起的生命线/激活条/片段框依赖 [ADR-009](../../adr/009-layout-result-decorations.md) 在 `plotgram-model` / `plotgram-engine-api` 落地 `decorations` 通道；M0 可在「只发 nodes+edges」窗口启动。详见 architecture.md 顶部「前置依赖」。
 
 ## 签名
 

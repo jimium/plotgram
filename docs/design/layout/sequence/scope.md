@@ -9,10 +9,26 @@
 | 参与者 / 生命线 | 节点 = 参与者；布局派生生命线竖线；声明序为默认次轴序 |
 | 消息时间轴 | 边声明序 = 时间序（无 `Edge::seq`）；布局写出消息边几何 |
 | 内建消息路由 | **BuiltinEdges**：水平消息、自调用 U 形、返回消息同几何异样式 |
+| 自调用（SelfCall） | `from == to` 的消息；走 `SelfLoop` 拓扑，是 sequence 一等能力（见下「自调用 vs profile 自环」） |
 | 激活条（目标） | 由调用/返回配对派生；嵌套深度影响生命线有效宽 |
 | 消息标签预留 | 标签宽进 Demand → 生命线间距 / 行高 |
 | 穿越生命线 | 中间生命线不断开语义连接；可选缺口/跳线风格 |
 | 组合片段（渐进） | `alt` / `loop` 等区间框：主轴区间 × 次轴连续生命线带 |
+
+### 自调用 vs profile 自环
+
+[`profile.rs`](../../../../crates/plotgram-model/src/profile.rs) 给 `DiagramType::Sequence` 设了 `allow_self_loop: false`。这**不**与 SelfCall 矛盾，原因是二者不在同一层闸门：
+
+- `allow_self_loop` 是 profile 层的「是否允许 `A -> A` 进入图模型」开关。Sequence 关闭它，是因为 v1 把 self-loop 当作通用图的「孤立回环」语义（dsl-spec §4.2 / W003），而 sequence 的自调用是**消息时间轴上的自调用消息**，语义不同。
+- **Sequence 的 SelfCall 走另一条解析路径**：DSL 中 `A -> A` 在 `profile: sequence` 下应被当作 **SelfCall 消息**（`MessagePlan.kind = SelfCall`，`route = SelfLoop`），而不是被 profile 自环闸门拒绝。
+
+落地要求（**待实现时钉死**）：
+
+1. parse/lift 阶段：`profile: sequence` + `A -> A` → 不走 `allow_self_loop` 拒绝分支，直接进 `Graph::edges`。
+2. Compose 阶段：`from == to` 的边分类为 `SelfCall`，挂 `SelfLoop { East }` 拓扑。
+3. 若 `allow_self_loop` 闸门后续被接到 parse/lift，须为 sequence 显式豁免，或在 profile 层把 Sequence 的 `allow_self_loop` 改为 `true` 并在文档注明「sequence 自环 = SelfCall」。
+
+> **当前 `allow_self_loop` 字段在重建代码里 defined-but-unused**（全仓仅 `profile.rs` 提及，未接校验）。这是潜在矛盾点：一旦接上校验，`A -> A` 会被拒，SelfLoop 拓扑不可达。本核实现前必须确认闸门归属。
 
 ## 2. 非目标（故意不做）
 

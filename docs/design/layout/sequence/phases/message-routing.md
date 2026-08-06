@@ -5,6 +5,8 @@
 
 本文是 Sequence **边几何**的真源。它不是 Hier Channel，也不是独立 `EdgeRouter`。
 
+> **前置**：本文 `AttachSpec.side` 用本核私有 `LifelineSide`（`East | West | Center`），**不**是 [`model::port::Side`](../../../../crates/plotgram-model/src/port.rs)（封闭四值，无 `Center`）。§3.3 说明对外 `PortRef` 的映射规则。§11 失败表已对齐当前 [`LayoutError`](../../../../crates/plotgram-engine-api/src/error.rs) 变体。
+
 ---
 
 ## 1. 问题定义
@@ -66,9 +68,11 @@ x_terminal = lifeline_x[id]
 y_terminal = row_y[row]
 ```
 
-| `side` | 含义 |
-|--------|------|
-| `Center` | 落在轴上（少见；一般用于 stub） |
+`side: LifelineSide` 是本核私有枚举（见 [architecture §3.1](../architecture.md)），不是 `model::port::Side`：
+
+| `LifelineSide` | 含义 |
+|----------------|------|
+| `Center` | 落在轴上（少见；一般用于 stub / Lost-Found） |
 | `East` | 轴右侧（去程朝右 / 自调用探出） |
 | `West` | 轴左侧 |
 
@@ -88,10 +92,17 @@ else:
 
 ### 3.3 与 PortRef 的关系
 
-对外 `EdgePlacement.from_port / to_port`：
+对外 [`EdgePlacement.from_port / to_port`](../../../../crates/plotgram-model/src/result.rs) 是 `Option<PortRef>`，`PortRef.side: model::port::Side`（封闭四值 NSEW）。映射规则：
 
-- Sequence **可以**映射为合成 `PortRef`（例如虚拟 side East/West + slot=depth），供统一 render；
-- **真源**仍是 `AttachSpec`，不得让 Hier 式 FREE 端口分配改写消息端点。
+| `AttachSpec.side` (`LifelineSide`) | `PortRef` | 说明 |
+|-------------------------------------|-----------|------|
+| `East` | `Some(PortRef { side: Side::East, along: Ordered{order=depth, count=…} })` | 合成端口供统一 render |
+| `West` | `Some(PortRef { side: Side::West, along: Ordered{order=depth, count=…} })` | 同上 |
+| `Center` | `None` | **不映射到 PortRef**：`Center` 仅用于 stub / Lost-Found，无对应 NSEW 端口；`EdgePlacement.from_port/to_port` 留 `None`，render 按 `LifelineSide::Center` 自行处理 |
+
+- **真源**是 `AttachSpec`（含 `LifelineSide` + `activation_depth`）；`PortRef` 是派生投影，不得让 Hier 式 FREE 端口分配改写消息端点。
+- M0 若不接激活条（depth 恒 0），`along` 用 `Ordered{order:0, count:1}` 占位即可。
+- 禁止为 `Center` 强行塞 `Side::East` 之类的「兜底」——会在 verifier 里误判端点侧。
 
 ---
 
@@ -267,11 +278,18 @@ lifeline_crossings[L].push(row_or_segment_key)
 
 ## 11. 失败表
 
-| 情况 | 类别 |
-|------|------|
-| `edge_routing: Some(_)` | `Unsupported` |
-| 消息端点不是参与者节点 | `InvalidInput` |
-| Self 但 route ≠ SelfLoop | `InternalInvariant` |
-| Sync 但 y 不共线 | `InternalInvariant` |
-| Async 未实现却 bind 开启 | `Unsupported` |
-| 标签 Demand 未满足导致溢出 | `InternalInvariant`（预算相序错误） |
+对齐当前 [`LayoutError`](../../../../crates/plotgram-engine-api/src/error.rs) 变体。当前变体：`MissingNodeSize` / `UnknownLayout` / `UnknownRouter` / `LayoutCannotDeferEdges` / `UnsupportedRouteScene` / `Message(String)`。
+
+| 情况 | 当前 `LayoutError` 变体 | 备注 |
+|------|--------------------------|------|
+| `edge_routing: Some(_)`（S6 禁 Router） | [`LayoutCannotDeferEdges { layout: "sequence" }`](../../../../crates/plotgram-engine-api/src/error.rs) | 本核 `layout()` 入口自检（见 [architecture §1.2](../architecture.md)），门面不替 layout 拦 |
+| 消息端点不是参与者节点（非顶层 Entity / 是 GroupAnchor） | `Message(String)` | 建议后续扩展为 `InvalidInput { .. }` 结构化变体 |
+| Self 但 route ≠ SelfLoop | `Message(String)` | 建议后续扩展为 `InternalInvariant { .. }` |
+| Sync 但 y 不共线（InkVerifier） | `Message(String)` | 同上 |
+| Async 未实现却 bind 开启 | `Message(String)` 或 `UnsupportedRouteScene { reason }` | Async 不走 RouteScene，倾向 `Message`；建议后续 `Unsupported { feature }` |
+| Lost/Found 未实现却触发 | `Message(String)` | 同上 |
+| 标签 Demand 未满足导致溢出 | `Message(String)` | 建议后续 `InternalInvariant { .. }`（预算相序错误） |
+| 激活 depth 负 / span 起止倒序 | `Message(String)` | 建议后续 `InternalInvariant { .. }` |
+| 生命线序 pin 冲突 | `Message(String)` | 建议后续 `InfeasibleConstraint { .. }` |
+
+**落地建议**：M0 先全用 `Message(String)`（字符串里带稳定前缀，如 `"unsupported: async not implemented"`），verifier 按前缀分类断言。M1 起若 `LayoutError` 扩展（加 `Unsupported` / `InvalidInput` / `InternalInvariant` 变体），再迁移。**禁止**在文档里写不存在的设计类目当已落地。

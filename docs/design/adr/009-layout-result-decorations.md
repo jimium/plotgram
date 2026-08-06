@@ -92,12 +92,28 @@ Decoration =
 | 项 | 状态 |
 |----|------|
 | 本文契约 | **accepted** |
-| `plotgram-model` 类型 | **planned** |
-| Sequence layout 写出 | **planned**（见 sequence architecture） |
+| `plotgram-model` 类型 | **planned**（`LayoutResult.decorations` + `Decoration` 枚举未定义） |
+| `plotgram-engine-api` `LayoutOutput` 通道 | **planned**——二选一未钉死（见下「§7.1 通道选择」） |
+| Sequence layout 写出 | **planned**（M1 起阻塞，见 [sequence architecture](../layout/sequence/architecture.md) 顶部「前置依赖」） |
 | `plotgram-render` 消费 | **planned** |
 | 删除 v1 式 diagram-type paint 几何 | 重建达到后禁止回归 |
 
 未实现前：不得用 render 特判冒充已完成；不得再扩大 `LayoutHints` 旁路。
+
+### 7.1 `LayoutOutput` 通道选择（未钉死，待落地时决）
+
+当前 [`LayoutOutput`](../../crates/plotgram-engine-api/src/traits.rs) 只有 `nodes / edges / diagnostics`，[`finalize`](../../crates/plotgram-engine/src/finalize.rs) 只接这三项 + 从 `Graph::groups` 包络 `groups`。decoration 落地有两种方案：
+
+| 方案 | 改动 | 优点 | 缺点 |
+|------|------|------|------|
+| **A：`LayoutOutput` 增 `decorations: Vec<Decoration>`** | engine-api Trait 加字段；finalize 增合并逻辑（translate + 透传） | layout 直接写，无需绕路 | 所有 layout 实现都要填 `decorations`（Hier 填 `vec![]`） |
+| **B：finalize 从 `Graph` + `output` 重新投影 decoration** | 不改 Trait；finalize 内调 layout 私有投影 | Trait 不动 | 双真源风险：layout 算了坐标，finalize 再算一遍；违反「finalize 只组装不发明几何」 |
+
+**倾向 A**（与「layout 写全部语义几何、render 只消费」的写权纪律一致）。落地时在本文钉死，并更新 [sequence architecture §2.2](../layout/sequence/architecture.md) 的「当前现实」一栏。
+
+### 7.2 Sequence 阻塞关系
+
+Sequence 的 M1（生命线/激活条 decoration）**硬阻塞**于本 ADR 的 model + engine-api 落地。Sequence M0 可在「只发 nodes+edges、render 临时占位生命线」窗口启动（见 sequence architecture §2.2 二段式）。本 ADR 不落地 ≠ sequence M0 不能动，但 sequence M1 必须等本 ADR。
 
 ## 含义
 
