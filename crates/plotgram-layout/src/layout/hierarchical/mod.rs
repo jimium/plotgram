@@ -1,6 +1,6 @@
 //! Hierarchical layout algorithm (Sugiyama-style): FAS → Network-Simplex
 //! ranking → properify → median+transpose ordering → port finalize →
-//! preliminary Metric → D1.0 TrackOrder + DemandBoard LayerGap → main/
+//! preliminary Metric → D1.0 TrackOrder + D1.3.4 DemandBoard LayerGap → main/
 //! cross-axis coordinates (BK ideal + global VPSC, two passes) → orthogonal Ink.
 //!
 //! The core (`compose` / `metric` / `ink`) runs entirely in canonical
@@ -186,12 +186,17 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         &route_plan.bundles,
         &route_plan,
     );
-    let layer_gaps = demand::resolved_layer_gaps(
-        plan.layers.len(),
+    // D1.3.4 MetricBudget DemandBoard: Channel lane counts → LayerGap, then freeze.
+    let mut demand_board = demand::DemandBoard::new();
+    demand::publish_channel_layer_gap_demand(
+        &mut demand_board,
+        &track_order,
         params.layer_gap,
         params.edge_gap,
-        &track_order,
     );
+    demand_board.freeze();
+    let layer_gaps =
+        demand::resolved_layer_gaps(plan.layers.len(), params.layer_gap, &demand_board);
     let main = metric::main_axis::assign_main_axis(&plan, &size_of, &layer_gaps);
 
     let canonical_frames: Vec<Rect> = (0..plan.elems.len())
@@ -305,6 +310,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
 
     let channel_track_count = route_plan.substrate.tracks().count();
     let channel_used_gates = route_plan.used_gates;
+    let channel_route_order = route_plan.route_order.clone();
     let channel_routes: BTreeMap<String, Vec<u32>> = route_plan
         .routes
         .iter()
@@ -329,6 +335,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         channel_routes,
         channel_track_count,
         channel_used_gates,
+        channel_route_order,
         shift,
     };
 
@@ -528,7 +535,8 @@ mod tests {
             for (w, key) in out.diagnostics.warnings.iter().zip(*keys) {
                 assert!(w.message.contains(key), "{}", w.message);
             }
-            // No soft relaxation exists in this build — the channel stays empty.
+            // Soft relaxations only appear when Channel rip-up fires; this
+            // two-node fixture stays empty.
             assert!(out.diagnostics.relaxations.is_empty());
             assert_eq!(out.diagnostics.params_hash.len(), 16);
         }

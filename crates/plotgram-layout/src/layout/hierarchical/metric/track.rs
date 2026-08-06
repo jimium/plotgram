@@ -97,13 +97,39 @@ pub fn assign_track_coords(
                 let mut backbone =
                     main_line_backbone_x(plan, cross_centers, size_of, og, edge_gap);
                 backbone = clear_main_x(backbone, &obstacles, edge_gap);
-                let span = (count.saturating_sub(1) as f64) * edge_gap;
-                let start = backbone - span * 0.5;
-                (0..count)
-                    .map(|i| {
-                        clear_main_x(start + i as f64 * edge_gap, &obstacles, edge_gap)
-                    })
-                    .collect()
+                let max_cols = plan.layers.iter().map(|l| l.len()).max().unwrap_or(0);
+                let ys: Vec<f64> = if og == 0 {
+                    // West outer: pack further left so parallel returns stay outside.
+                    (0..count)
+                        .map(|i| {
+                            clear_main_x(
+                                backbone - i as f64 * edge_gap,
+                                &obstacles,
+                                edge_gap,
+                            )
+                        })
+                        .collect()
+                } else if og >= max_cols {
+                    // East outer: pack further right.
+                    (0..count)
+                        .map(|i| {
+                            clear_main_x(
+                                backbone + i as f64 * edge_gap,
+                                &obstacles,
+                                edge_gap,
+                            )
+                        })
+                        .collect()
+                } else {
+                    let span = (count.saturating_sub(1) as f64) * edge_gap;
+                    let start = backbone - span * 0.5;
+                    (0..count)
+                        .map(|i| {
+                            clear_main_x(start + i as f64 * edge_gap, &obstacles, edge_gap)
+                        })
+                        .collect()
+                };
+                ys
             }
         };
         out.coords.insert(tid, ys);

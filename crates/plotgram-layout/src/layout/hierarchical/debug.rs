@@ -43,6 +43,8 @@ pub struct Captures<'a> {
     pub channel_track_count: usize,
     /// True when group-cut Gate IR was active for this run.
     pub channel_used_gates: bool,
+    /// D1.3.3 RouteOrderWriter commit order.
+    pub channel_route_order: Vec<String>,
     /// Normalize-stage translate applied to the product output; the
     /// projection applies the identical shift so trace geometry matches the
     /// product pixel-for-pixel.
@@ -109,12 +111,14 @@ pub struct HierarchicalExtension {
     pub metrics: MetricDebug,
 }
 
-/// D1.1 Channel debug sketch (root-scope; no Gate yet).
+/// D1.3 Channel debug sketch (RouteOrder + Gate/rip-up).
 #[derive(Debug, Clone, Serialize)]
 pub struct ChannelDebug {
     pub status: String,
     pub substrate_tracks: usize,
     pub routed_edges: usize,
+    /// D1.3.3 deterministic commit order.
+    pub route_order: Vec<String>,
     pub routes: Vec<ChannelRouteDebug>,
 }
 
@@ -385,12 +389,13 @@ fn project(layout_name: &str, cap: Captures<'_>) -> LayoutDebugTrace {
             ports,
             channels: Some(ChannelDebug {
                 status: if cap.channel_used_gates {
-                    "d1.2-gate".into()
+                    "d1.3-gate".into()
                 } else {
-                    "d1.2-root-scope".into()
+                    "d1.3-root-scope".into()
                 },
                 substrate_tracks: cap.channel_track_count,
                 routed_edges: cap.channel_routes.len(),
+                route_order: cap.channel_route_order.clone(),
                 routes: cap
                     .channel_routes
                     .iter()
@@ -406,7 +411,7 @@ fn project(layout_name: &str, cap: Captures<'_>) -> LayoutDebugTrace {
             },
         },
         notes: vec![
-            "hierarchical: D1.2 Channel (Gate/ScopeMask when group rects nest; bounded rip-up)"
+            "hierarchical: D1.3 Channel (RouteOrder + Gate/ScopeMask + bounded rip-up)"
                 .to_string(),
         ],
     }

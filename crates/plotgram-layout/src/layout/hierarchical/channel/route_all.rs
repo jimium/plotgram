@@ -1,5 +1,6 @@
-//! Route every non-bus edge on the Channel graph (D1.2: Gate + rip-up).
+//! Route every non-bus edge on the Channel graph (D1.2 Gate + D1.3.3 RouteOrder).
 
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 use plotgram_algo::orientation::Side;
@@ -8,14 +9,14 @@ use plotgram_model::diagnostics::Relaxation;
 
 use super::derive::derive_substrate;
 use super::graph::{ChannelGraph, Occupancy};
-use super::search::{route_edge, ChannelPath, LexCost, RouteHints, ScopeMask};
+use super::search::{route_edge, ChannelPath, LexCost, RouteHints, ScopeMask, SpanAffinity};
 use super::substrate::{BlueprintIndex, PortSide, Substrate, TrackId};
 use crate::layout::hierarchical::compose::bundle::{end_bus_edge_ids, BundlePlan};
 use crate::layout::hierarchical::compose::ports::EdgePorts;
 use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealEdge, RealGraph};
 use crate::layout::hierarchical::params::HierarchicalParams;
 
-const MAX_RIPUP_ROUNDS: u32 = 2;
+const MAX_RIPUP_ROUNDS: u32 = 4;
 const MAX_RIPUP_EDGES: usize = 8;
 
 /// Orthogonal Channel topology for one edge.
@@ -24,7 +25,7 @@ pub enum RouteTopology {
     Orthogonal(ChannelPath),
 }
 
-/// Full D1.2 route plan: substrate + per-edge topology + BundlePlan facts.
+/// Full Channel route plan: substrate + per-edge topology + BundlePlan facts.
 #[derive(Debug, Clone)]
 pub struct ChannelRoutePlan {
     pub substrate: Substrate,
@@ -37,6 +38,8 @@ pub struct ChannelRoutePlan {
     pub relaxations: Vec<Relaxation>,
     /// True when group-cut Gate IR was used (false = root-scope fallback).
     pub used_gates: bool,
+    /// D1.3.3 deterministic commit order (RouteOrderWriter).
+    pub route_order: Vec<String>,
 }
 
 fn layer_order(plan: &PlanGraph, elem: usize) -> usize {
@@ -99,8 +102,38 @@ fn scope_mask_for_edge(
     ScopeMask::for_scopes(substrate, index.node_scope(from), index.node_scope(to))
 }
 
-fn hints_for_edge(params: &HierarchicalParams, edge: &RealEdge, order_count: usize) -> RouteHints {
+fn endpoint_rank_order(plan: &PlanGraph, graph: &RealGraph, node_idx: usize) -> (usize, usize) {
+    let id = &graph.ids[node_idx];
+    let elem = plan.index_of[&ElemKey::Real(id.clone())];
+    let rank = plan.elems[elem].rank as usize;
+    let order = layer_order(plan, elem);
+    (rank, order)
+}
+
+fn edge_rank_span(plan: &PlanGraph, graph: &RealGraph, edge: &RealEdge) -> usize {
+    let (sr, _) = endpoint_rank_order(plan, graph, edge.original_source);
+    let (tr, _) = endpoint_rank_order(plan, graph, edge.original_target);
+    sr.abs_diff(tr)
+}
+
+fn dummy_chain_len(plan: &PlanGraph, edge_id: &str) -> usize {
+    plan.segments
+        .iter()
+        .filter(|s| s.edge_id == edge_id)
+        .count()
+        .saturating_sub(1)
+}
+
+fn hints_for_edge(
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    params: &HierarchicalParams,
+    edge: &RealEdge,
+    order_count: usize,
+) -> RouteHints {
     let pitch = params.edge_gap.max(1e-9);
+    let (src_rank, src_order) = endpoint_rank_order(plan, graph, edge.original_source);
+    let (tgt_rank, tgt_order) = endpoint_rank_order(plan, graph, edge.original_target);
     RouteHints {
         min_first_span: if params.min_first_segment > 0.0 {
             (params.min_first_segment / pitch).max(1.0)
@@ -112,8 +145,15 @@ fn hints_for_edge(params: &HierarchicalParams, edge: &RealEdge, order_count: usi
         } else {
             0.0
         },
-        prefer_outer_main: edge.reversed,
+        // D1.3.2: outer Main is overflow for every edge, not a reversed-edge preference.
+        outer_main_as_overflow: true,
         order_count,
+        span: Some(SpanAffinity {
+            src_rank,
+            tgt_rank,
+            src_order,
+            tgt_order,
+        }),
     }
 }
 
@@ -135,11 +175,42 @@ fn path_lane_load(occupancy: &Occupancy, tracks: &[TrackId]) -> u32 {
         .sum::<u32>()
 }
 
+/// Sort key for RouteOrderWriter (D1.3.3). Higher priority sorts first.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RouteOrderEntry {
+    pub edge_id: String,
+    pub critical: bool,
+    pub span: usize,
+    pub reversed: bool,
+    pub dummy_len: usize,
+    pub decl_index: usize,
+}
+
+impl RouteOrderEntry {
+    fn cmp_priority(&self, other: &Self) -> Ordering {
+        other
+            .critical
+            .cmp(&self.critical)
+            .then_with(|| other.span.cmp(&self.span))
+            .then_with(|| other.reversed.cmp(&self.reversed))
+            .then_with(|| other.dummy_len.cmp(&self.dummy_len))
+            .then_with(|| self.decl_index.cmp(&other.decl_index))
+            .then_with(|| self.edge_id.cmp(&other.edge_id))
+    }
+}
+
+/// Deterministic commit order: critical ↓, span ↓, reversed ↓, dummy ↓, decl ↑.
+pub fn compute_route_order(mut entries: Vec<RouteOrderEntry>) -> Vec<RouteOrderEntry> {
+    entries.sort_by(|a, b| a.cmp_priority(b));
+    entries
+}
+
 struct EdgeRouteState {
     path: ChannelPath,
     cost: LexCost,
     failure_count: u32,
     critical: bool,
+    span: usize,
     decl_index: usize,
     start: TrackId,
     goal: TrackId,
@@ -147,7 +218,15 @@ struct EdgeRouteState {
     hints: RouteHints,
 }
 
-/// Derive substrate and route all non-end-bus edges (declaration order + rip-up).
+struct PreparedEdge {
+    entry: RouteOrderEntry,
+    start: TrackId,
+    goal: TrackId,
+    mask: ScopeMask,
+    hints: RouteHints,
+}
+
+/// Derive substrate and route all non-end-bus edges (RouteOrder + rip-up).
 pub fn route_edges_channel(
     plan: &PlanGraph,
     graph: &RealGraph,
@@ -161,7 +240,7 @@ pub fn route_edges_channel(
 
     let bus_edges = end_bus_edge_ids(end_bundles);
 
-    let mut states: BTreeMap<String, EdgeRouteState> = BTreeMap::new();
+    let mut prepared: Vec<PreparedEdge> = Vec::new();
     for (decl_index, e) in graph.edges.iter().enumerate() {
         if bus_edges.contains(&e.edge_id) {
             continue;
@@ -169,35 +248,64 @@ pub fn route_edges_channel(
         let start = host_track_for_end(&index, plan, graph, ports, &e.edge_id, true)?;
         let goal = host_track_for_end(&index, plan, graph, ports, &e.edge_id, false)?;
         let mask = scope_mask_for_edge(&substrate, &index, graph, e);
-        let hints = hints_for_edge(params, e, index.order_count);
-        let outcome = route_edge(
-            &channel_graph,
+        let hints = hints_for_edge(plan, graph, params, e, index.order_count);
+        prepared.push(PreparedEdge {
+            entry: RouteOrderEntry {
+                edge_id: e.edge_id.clone(),
+                critical: e.critical,
+                span: edge_rank_span(plan, graph, e),
+                reversed: e.reversed,
+                dummy_len: dummy_chain_len(plan, &e.edge_id),
+                decl_index,
+            },
             start,
             goal,
+            mask,
+            hints,
+        });
+    }
+
+    let ordered = compute_route_order(prepared.iter().map(|p| p.entry.clone()).collect());
+    let route_order: Vec<String> = ordered.iter().map(|e| e.edge_id.clone()).collect();
+    let mut by_id: BTreeMap<String, PreparedEdge> = prepared
+        .into_iter()
+        .map(|p| (p.entry.edge_id.clone(), p))
+        .collect();
+
+    let mut states: BTreeMap<String, EdgeRouteState> = BTreeMap::new();
+    for entry in &ordered {
+        let prep = by_id
+            .remove(&entry.edge_id)
+            .expect("prepared edge present");
+        let outcome = route_edge(
+            &channel_graph,
+            prep.start,
+            prep.goal,
             &occupancy,
             true,
-            &mask,
-            hints,
+            &prep.mask,
+            prep.hints,
         );
         if !outcome.feasible {
             return Err(LayoutError::message(format!(
                 "channel: no path for edge `{}` (Infeasible)",
-                e.edge_id
+                entry.edge_id
             )));
         }
         occupancy.commit(&outcome.path.tracks, &outcome.path.gates);
         states.insert(
-            e.edge_id.clone(),
+            entry.edge_id.clone(),
             EdgeRouteState {
                 path: outcome.path,
                 cost: outcome.cost,
                 failure_count: 0,
-                critical: e.critical,
-                decl_index,
-                start,
-                goal,
-                mask,
-                hints,
+                critical: entry.critical,
+                span: entry.span,
+                decl_index: entry.decl_index,
+                start: prep.start,
+                goal: prep.goal,
+                mask: prep.mask,
+                hints: prep.hints,
             },
         );
     }
@@ -230,6 +338,7 @@ pub fn route_edges_channel(
         bundles: end_bundles.to_vec(),
         relaxations,
         used_gates,
+        route_order,
     })
 }
 
@@ -251,7 +360,6 @@ fn bounded_ripup(
             break;
         }
 
-        // Peak tracks → candidates on them, sorted by D1.2 key then LexCost.
         let mut peak_tracks = Vec::new();
         for t in substrate.tracks() {
             if occupancy.lane_demand(t.id) == peak {
@@ -265,17 +373,16 @@ fn bounded_ripup(
             .filter(|(_, st)| st.path.tracks.iter().any(|t| peak_tracks.contains(t)))
             .map(|(id, _)| id.clone())
             .collect();
+        // Sacrifice: non-critical first, shorter span first, then failure/decl.
         on_peak.sort_by(|a, b| {
             let sa = &states[a];
             let sb = &states[b];
-            // Prefer ripping non-critical first so critical stay on preferred paths;
-            // selection key: failure_count desc, edge_priority(critical) desc, decl, id.
-            sb.failure_count
-                .cmp(&sa.failure_count)
-                .then_with(|| (sb.critical as u8).cmp(&(sa.critical as u8)))
+            (sa.critical as u8)
+                .cmp(&(sb.critical as u8))
+                .then_with(|| sa.span.cmp(&sb.span))
+                .then_with(|| sb.failure_count.cmp(&sa.failure_count))
                 .then_with(|| sa.decl_index.cmp(&sb.decl_index))
                 .then_with(|| a.cmp(b))
-                .then_with(|| sb.cost.cmp(&sa.cost))
         });
         on_peak.truncate(MAX_RIPUP_EDGES);
 
@@ -338,16 +445,104 @@ fn bounded_ripup(
         }
     }
 
+    let (peak_final, _) = occupancy_peak_sum(occupancy, substrate);
+    if peak_final > 1 {
+        relaxations.push(Relaxation {
+            rule: "channel-rip-up-budget".into(),
+            detail: format!(
+                "peak occupancy {peak_final} remains after {MAX_RIPUP_ROUNDS} rounds"
+            ),
+        });
+    }
+
     relaxations
 }
 
 #[cfg(test)]
 mod tests {
-    use super::MAX_RIPUP_ROUNDS;
+    use super::{compute_route_order, RouteOrderEntry, MAX_RIPUP_ROUNDS};
 
     #[test]
     fn ripup_budget_is_bounded() {
         assert!(MAX_RIPUP_ROUNDS <= 4, "rip-up must stay bounded");
         assert!(MAX_RIPUP_ROUNDS >= 1);
+    }
+
+    #[test]
+    fn route_order_ignores_declaration_shuffle() {
+        // Same topology keys, opposite declaration indices → identical order.
+        let a = vec![
+            RouteOrderEntry {
+                edge_id: "short".into(),
+                critical: false,
+                span: 1,
+                reversed: false,
+                dummy_len: 0,
+                decl_index: 0,
+            },
+            RouteOrderEntry {
+                edge_id: "long_rev".into(),
+                critical: false,
+                span: 4,
+                reversed: true,
+                dummy_len: 3,
+                decl_index: 1,
+            },
+        ];
+        let b = vec![
+            RouteOrderEntry {
+                edge_id: "long_rev".into(),
+                critical: false,
+                span: 4,
+                reversed: true,
+                dummy_len: 3,
+                decl_index: 0,
+            },
+            RouteOrderEntry {
+                edge_id: "short".into(),
+                critical: false,
+                span: 1,
+                reversed: false,
+                dummy_len: 0,
+                decl_index: 1,
+            },
+        ];
+        let oa: Vec<_> = compute_route_order(a)
+            .into_iter()
+            .map(|e| e.edge_id)
+            .collect();
+        let ob: Vec<_> = compute_route_order(b)
+            .into_iter()
+            .map(|e| e.edge_id)
+            .collect();
+        assert_eq!(oa, ob);
+        assert_eq!(oa, vec!["long_rev".to_string(), "short".to_string()]);
+    }
+
+    #[test]
+    fn route_order_critical_outranks_span() {
+        let entries = vec![
+            RouteOrderEntry {
+                edge_id: "long".into(),
+                critical: false,
+                span: 9,
+                reversed: false,
+                dummy_len: 8,
+                decl_index: 0,
+            },
+            RouteOrderEntry {
+                edge_id: "crit".into(),
+                critical: true,
+                span: 1,
+                reversed: false,
+                dummy_len: 0,
+                decl_index: 1,
+            },
+        ];
+        let ids: Vec<_> = compute_route_order(entries)
+            .into_iter()
+            .map(|e| e.edge_id)
+            .collect();
+        assert_eq!(ids, vec!["crit".to_string(), "long".to_string()]);
     }
 }

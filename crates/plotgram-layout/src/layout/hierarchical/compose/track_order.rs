@@ -2,6 +2,8 @@
 //!
 //! End-bus BundlePlan members are skipped (intentional bus collinearity).
 //! Cross-track lane counts feed LayerGap Demand via the track's rank-gap line.
+//! Main corridors colour by **rank occupancy** (half-open `[min_rank, max_rank+1)`);
+//! Cross corridors colour by cross-axis pixel span.
 
 use std::collections::BTreeMap;
 
@@ -100,14 +102,15 @@ pub fn assign_track_order(
                     }
                 }
                 TrackOrient::Main => {
-                    // Vertical corridor: interval along main uses endpoint Y
-                    // span as a soft separator (degenerate → share lane 0).
-                    let ay = endpoint_main_y(plan, graph, ports, frames, edge_id, true);
-                    let by = endpoint_main_y(plan, graph, ports, frames, edge_id, false);
-                    by_track
-                        .entry(tid)
-                        .or_default()
-                        .push((edge_id.clone(), ay.min(by), ay.max(by)));
+                    // Vertical corridor: conflict when rank bands overlap.
+                    // Half-open [lo, hi+1) as closed [lo, hi+1] so shared
+                    // endpoint ranks collide; abutting bands may share a lane.
+                    let (lo_r, hi_r) = endpoint_ranks(plan, graph, edge_id);
+                    by_track.entry(tid).or_default().push((
+                        edge_id.clone(),
+                        lo_r as f64,
+                        (hi_r + 1) as f64,
+                    ));
                 }
             }
         }
@@ -136,8 +139,9 @@ pub fn assign_track_order(
         }
         if let Some(t) = route_plan.substrate.track(*tid) {
             if matches!(t.orient, TrackOrient::Cross) {
-                // Cross line k (1..=rank_count) sits in RankGap(k-1).
-                if t.line >= 1 && t.line <= route_plan.index.rank_count {
+                // Interior Cross only: line k∈[1, rank_count) sits in RankGap(k-1).
+                // Outer lines 0 / rank_count must not inflate LayerGap (D1.3.4).
+                if t.line >= 1 && t.line < route_plan.index.rank_count {
                     let gap = (t.line - 1) as u32;
                     let e = rank_gap_track_counts.entry(gap).or_insert(0);
                     *e = (*e).max(count);
@@ -153,29 +157,17 @@ pub fn assign_track_order(
     }
 }
 
-fn endpoint_main_y(
-    plan: &PlanGraph,
-    graph: &RealGraph,
-    ports: &BTreeMap<String, EdgePorts>,
-    frames: &[Rect],
-    edge_id: &str,
-    at_source: bool,
-) -> f64 {
+fn endpoint_ranks(plan: &PlanGraph, graph: &RealGraph, edge_id: &str) -> (usize, usize) {
     let edge = graph
         .edges
         .iter()
         .find(|e| e.edge_id == edge_id)
         .expect("edge must exist");
-    let node_idx = if at_source {
-        edge.original_source
-    } else {
-        edge.original_target
-    };
-    let id = &graph.ids[node_idx];
-    let elem = plan.index_of[&ElemKey::Real(id.clone())];
-    let rp = &ports[edge_id];
-    let port = if at_source { rp.source } else { rp.target };
-    port_anchor(frames[elem], port).y
+    let src = plan.index_of[&ElemKey::Real(graph.ids[edge.original_source].clone())];
+    let tgt = plan.index_of[&ElemKey::Real(graph.ids[edge.original_target].clone())];
+    let sr = plan.elems[src].rank as usize;
+    let tr = plan.elems[tgt].rank as usize;
+    (sr.min(tr), sr.max(tr))
 }
 
 #[cfg(test)]
@@ -245,6 +237,7 @@ mod tests {
             ids: vec!["a".into(), "b".into(), "c".into(), "d".into()],
             index_of: ids,
             group_path: vec![vec![]; 4],
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; 4],
             edges: vec![
                 RealEdge {
                     edge_id: "e0".into(),
@@ -305,6 +298,7 @@ mod tests {
             bundles: vec![],
             relaxations: vec![],
             used_gates: false,
+            route_order: vec![],
         };
         let frames = vec![
             Rect::new(0.0, 0.0, 20.0, 10.0),
@@ -318,5 +312,139 @@ mod tests {
         assert!(a.track_counts.get(&cross).copied().unwrap_or(0) >= 1);
         let _ = TrackOrient::Cross;
         let _: BTreeMap<String, EdgePorts> = ports;
+    }
+
+    /// Stacked same-Main reverses that share a rank must get distinct lanes
+    /// (three-tier parallel returns); abutting rank bands may share.
+    #[test]
+    fn main_lanes_split_on_shared_rank_not_abutting() {
+        // Ranks 0-1-2, single column. Two reverse edges on the outer Main:
+        // e_low: 2→1, e_high: 1→0 — share rank 1 → 2 lanes.
+        let elems = vec![
+            Elem {
+                key: ElemKey::Real("a".into()),
+                group_path: vec![],
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Real("b".into()),
+                group_path: vec![],
+                rank: 1,
+            },
+            Elem {
+                key: ElemKey::Real("c".into()),
+                group_path: vec![],
+                rank: 2,
+            },
+        ];
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: (0..3).collect(),
+            segments: vec![
+                Segment {
+                    edge_id: "e_low".into(),
+                    ordinal: 0,
+                    from: 2,
+                    to: 1,
+                },
+                Segment {
+                    edge_id: "e_high".into(),
+                    ordinal: 0,
+                    from: 1,
+                    to: 0,
+                },
+            ],
+            layers: vec![vec![0], vec![1], vec![2]],
+        };
+        let mut ids = BTreeMap::new();
+        for (i, id) in ["a", "b", "c"].iter().enumerate() {
+            ids.insert((*id).into(), i);
+        }
+        let graph = RealGraph {
+            ids: vec!["a".into(), "b".into(), "c".into()],
+            index_of: ids,
+            group_path: vec![vec![]; 3],
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; 3],
+            edges: vec![
+                RealEdge {
+                    edge_id: "e_low".into(),
+                    original_source: 2,
+                    original_target: 1,
+                    working_source: 2,
+                    working_target: 1,
+                    reversed: true,
+                    from_port: None,
+                    to_port: None,
+                    critical: false,
+                },
+                RealEdge {
+                    edge_id: "e_high".into(),
+                    original_source: 1,
+                    original_target: 0,
+                    working_source: 1,
+                    working_target: 0,
+                    reversed: true,
+                    from_port: None,
+                    to_port: None,
+                    critical: false,
+                },
+            ],
+            self_loops: vec![],
+        };
+        let (sub, idx) = derive_root_substrate(&plan);
+        let ports = assign_ports(
+            &graph,
+            &plan,
+            AlgoOrientation::Tb,
+            &vec![Size::new(20.0, 10.0); 3],
+            false,
+        )
+        .unwrap()
+        .ports;
+        // Outer Main: order_gap == column count == 1 → line 1.
+        let main_id = sub
+            .tracks()
+            .find(|t| t.orient == TrackOrient::Main && t.line == 1)
+            .map(|t| t.id)
+            .expect("outer Main");
+        let mut routes = BTreeMap::new();
+        for eid in ["e_low", "e_high"] {
+            routes.insert(
+                eid.into(),
+                RouteTopology::Orthogonal(ChannelPath {
+                    tracks: vec![main_id],
+                    gates: vec![],
+                }),
+            );
+        }
+        let route_plan = ChannelRoutePlan {
+            substrate: sub,
+            index: idx,
+            routes,
+            bundles: vec![],
+            relaxations: vec![],
+            used_gates: false,
+            route_order: vec![],
+        };
+        let frames = vec![
+            Rect::new(0.0, 0.0, 20.0, 10.0),
+            Rect::new(0.0, 40.0, 20.0, 10.0),
+            Rect::new(0.0, 80.0, 20.0, 10.0),
+        ];
+        let order = assign_track_order(&plan, &graph, &ports, &frames, &[], &route_plan);
+        assert_eq!(
+            order.track_counts.get(&main_id).copied(),
+            Some(2),
+            "shared rank must force 2 Main lanes"
+        );
+        let i0 = order.assignments[&("e_low".into(), main_id)].track_index;
+        let i1 = order.assignments[&("e_high".into(), main_id)].track_index;
+        assert_ne!(i0, i1);
     }
 }

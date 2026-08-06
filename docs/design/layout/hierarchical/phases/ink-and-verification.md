@@ -20,6 +20,8 @@ Ink 的职责是把 `Plan + Metric` 展开成可渲染几何。它可以写最�
 
 orthogonal 路径**禁止**用两端中点 `mid_y`（或等价缺省）发明水平轨；弯折主轴坐标必须来自 Plan track order + Metric `track_coord`（D₁ 契约见 [channel-d1.md](channel-d1.md)）。缺 track 字段与缺 `RouteTopology` 同等对待 → `InternalInvariant`。
 
+Main 走廊出桩：若在 port 中线水平出轨会穿同层兄弟，可先竖直落到 Metric layer-gap Y 再出轨（逃生）。**入桩优先沿端口法向**——East/West 在 stub 清空时最后一跳水平，North/South 最后一跳竖直；E/W stub 不清时回退 gap 入桩（宁可法向妥协，禁止穿模）。
+
 ## 2. 展开流程
 
 ```text

@@ -23,10 +23,11 @@
 //!   never read from Ink): fan junctions (≥ 2 real neighbors on a side)
 //!   get their desired rewritten to the fan center of their neighbors'
 //!   pass-1 positions (odd → single median; even → midpoint of the two
-//!   middle neighbors) — and chain-end dummies are pulled onto their
-//!   port anchors. On single-dummy chains both ends address the same
-//!   elem; the source anchor wins (target applied first, source
-//!   overwrites) — a fixed, deterministic rule.
+//!   middle neighbors); exclusive degree-1 neighbors on the **non-fan**
+//!   side follow that axis (spine above/below a fan); and chain-end
+//!   dummies are pulled onto their port anchors. On single-dummy chains
+//!   both ends address the same elem; the source anchor wins (target
+//!   applied first, source overwrites) — a fixed, deterministic rule.
 //!
 //! Feasibility: equality pairs are a subset of one BK alignment's edges,
 //! whose blocks never cross — so the constraint system is feasible by
@@ -100,13 +101,16 @@ pub fn assign_cross_axis(
     // Pass 1: node centers toward the merged BK ideal.
     let pass1 = solve_once(n, &bk.ideal, &weights, &constraints)?;
 
-    // Pass 2: fan junctions center over their fan; chain-end dummies are
-    // pulled onto their port anchors. Target ends are applied first so
-    // the source anchor wins on single-dummy chains.
+    // Pass 2: fan junctions center over their fan; exclusive degree-1
+    // chain neighbors follow that axis; chain-end dummies are pulled
+    // onto their port anchors. Target ends are applied first so the
+    // source anchor wins on single-dummy chains.
     let mut desired = bk.ideal;
-    for (e, center) in fan_centers(plan, &pass1, &down_deg, &up_deg) {
+    let fan_targets = fan_centers(plan, &pass1, &down_deg, &up_deg);
+    for &(e, center) in &fan_targets {
         desired[e] = center;
     }
+    pull_fan_chain_followers(plan, &fan_targets, &down_deg, &up_deg, &mut desired);
     let frame_of = |e: usize| -> Rect {
         let s = size_of(e);
         Rect::new(pass1[e] - s.width / 2.0, main[e], s.width, s.height)
@@ -266,17 +270,16 @@ fn build_constraints(
             let a_virtual = plan.elems[a].key.is_virtual();
             if a_virtual == plan.elems[b].key.is_virtual() {
                 if !a_virtual {
-                    let (upper, lower) = if plan.elems[a].rank < plan.elems[b].rank {
-                        (a, b)
-                    } else {
-                        (b, a)
-                    };
-                    // Any fan (≥ 2) stays soft for pass-2 centering —
-                    // including odd fan-out, which BK welds leftmost.
+                    // Any fan junction (deg≥2 on either side of either end)
+                    // stays soft for pass-2 centering — including a hub
+                    // whose fan is opposite the BK block edge (e.g. submit
+                    // welded to review while review fans downward).
                     if !hardenable_real_pair(
                         dummy_aligned[a] || dummy_aligned[b],
-                        down_deg[upper],
-                        up_deg[lower],
+                        down_deg[a],
+                        up_deg[a],
+                        down_deg[b],
+                        up_deg[b],
                     ) {
                         continue;
                     }
@@ -290,18 +293,61 @@ fn build_constraints(
 }
 
 /// Whether a same-type real–real BK block pair should receive hard
-/// collinearity. Fans (`deg ≥ 2` on either side) stay soft for pass-2
-/// centering; dummy-aligned members stay soft (chain-drag guard).
+/// collinearity. Either endpoint that is a fan junction (`down≥2` or
+/// `up≥2`) stays soft for pass-2 centering; dummy-aligned members stay
+/// soft (chain-drag guard).
 pub(crate) fn hardenable_real_pair(
     either_dummy_aligned: bool,
-    upper_down_deg: usize,
-    lower_up_deg: usize,
+    a_down: usize,
+    a_up: usize,
+    b_down: usize,
+    b_up: usize,
 ) -> bool {
     if either_dummy_aligned {
         return false;
     }
-    let is_fan = |d: usize| d >= 2;
-    !is_fan(upper_down_deg) && !is_fan(lower_up_deg)
+    let is_fan = |down: usize, up: usize| down >= 2 || up >= 2;
+    !is_fan(a_down, a_up) && !is_fan(b_down, b_up)
+}
+
+/// After fan hubs get a target, pull exclusive degree-1 real neighbors on
+/// the **non-fan** side onto the same axis (e.g. `submit` above a fan-out
+/// `review`). Fan members themselves are never pulled — that would collapse
+/// the pack toward the hub.
+fn pull_fan_chain_followers(
+    plan: &PlanGraph,
+    fan_targets: &[(usize, f64)],
+    down_deg: &[usize],
+    up_deg: &[usize],
+    desired: &mut [f64],
+) {
+    let n = plan.elems.len();
+    let (mut down_nbs, mut up_nbs) = (vec![Vec::new(); n], vec![Vec::new(); n]);
+    for s in &plan.segments {
+        if !plan.elems[s.from].key.is_virtual() && !plan.elems[s.to].key.is_virtual() {
+            down_nbs[s.from].push(s.to);
+            up_nbs[s.to].push(s.from);
+        }
+    }
+    let is_fan = |e: usize| down_deg[e] >= 2 || up_deg[e] >= 2;
+    for &(hub, center) in fan_targets {
+        let mut candidates = Vec::new();
+        // Fan below → exclusive parents may follow; fan above → exclusive children.
+        if down_deg[hub] >= 2 {
+            candidates.extend(up_nbs[hub].iter().copied());
+        }
+        if up_deg[hub] >= 2 {
+            candidates.extend(down_nbs[hub].iter().copied());
+        }
+        for nb in candidates {
+            if is_fan(nb) {
+                continue;
+            }
+            if down_deg[nb] + up_deg[nb] == 1 {
+                desired[nb] = center;
+            }
+        }
+    }
 }
 
 /// The elem adjacent to `real_elem` along `edge_id`'s chain (its only
@@ -357,6 +403,7 @@ mod tests {
                 .map(|(i, s)| (s.to_string(), i))
                 .collect(),
             group_path: vec![Vec::new(); ids.len()],
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; ids.len()],
             edges: edges
                 .iter()
                 .map(|(id, s, t)| RealEdge {
@@ -526,19 +573,20 @@ mod tests {
 
     #[test]
     fn hardenable_real_pair_matrix() {
-        // (dummy_aligned, upper_down, lower_up, expect_harden)
-        let cases: &[(bool, usize, usize, bool)] = &[
-            (false, 1, 1, true),  // 1:1 chain
-            (false, 2, 1, false), // even fan-out
-            (false, 3, 1, false), // odd fan-out
-            (false, 1, 2, false), // even fan-in
-            (false, 1, 3, false), // odd fan-in
-            (true, 1, 1, false),  // chain-drag guard
-            (false, 0, 1, true),  // leaf / non-fan
+        // (dummy, a_down, a_up, b_down, b_up, expect_harden)
+        let cases: &[(bool, usize, usize, usize, usize, bool)] = &[
+            (false, 1, 1, 1, 1, true),  // 1:1 chain
+            (false, 2, 1, 1, 1, false), // a fan-out
+            (false, 3, 1, 1, 1, false), // a odd fan-out
+            (false, 1, 1, 1, 2, false), // b fan-in
+            (false, 1, 1, 1, 3, false), // b odd fan-in
+            (false, 1, 1, 3, 1, false), // b fan-out (opposite BK edge)
+            (true, 1, 1, 1, 1, false),  // chain-drag guard
+            (false, 0, 1, 1, 0, true),  // leaf / non-fan
         ];
-        for (i, &(dummy, down, up, want)) in cases.iter().enumerate() {
+        for (i, &(dummy, ad, au, bd, bu, want)) in cases.iter().enumerate() {
             assert_eq!(
-                hardenable_real_pair(dummy, down, up),
+                hardenable_real_pair(dummy, ad, au, bd, bu),
                 want,
                 "case {i}"
             );
@@ -661,6 +709,66 @@ mod tests {
             "hub must also be the fan's geometric middle: {} vs {outer}",
             coords[0]
         );
+    }
+
+    /// Spine above an odd fan (`submit → review → {L,M,R} → notify`) must
+    /// follow the fan axis — not stay welded left by BK + hard collinearity
+    /// (product.symmetric-fanout centering).
+    #[test]
+    fn fan_spine_chain_follows_median() {
+        // submit=0, review=1, L=2, M=3, R=4, notify=5
+        let elems = vec![
+            real("submit", 0),
+            real("review", 1),
+            real("L", 2),
+            real("M", 2),
+            real("R", 2),
+            real("notify", 3),
+        ];
+        let layers = vec![vec![0], vec![1], vec![2, 3, 4], vec![5]];
+        let segments = vec![
+            seg("e0", 0, 0, 1),
+            seg("e1", 0, 1, 2),
+            seg("e2", 0, 1, 3),
+            seg("e3", 0, 1, 4),
+            seg("e4", 0, 2, 5),
+            seg("e5", 0, 3, 5),
+            seg("e6", 0, 4, 5),
+        ];
+        let plan = build_plan(elems, layers, segments);
+        let graph = real_graph(
+            &["submit", "review", "L", "M", "R", "notify"],
+            &[
+                ("e0", 0, 1),
+                ("e1", 1, 2),
+                ("e2", 1, 3),
+                ("e3", 1, 4),
+                ("e4", 2, 5),
+                ("e5", 3, 5),
+                ("e6", 4, 5),
+            ],
+        );
+        let ports = assign_ports(
+            &graph,
+            &plan,
+            AlgoOrientation::Tb,
+            &vec![Size::new(20.0, 10.0); graph.ids.len()],
+            false,
+        )
+        .unwrap()
+        .ports;
+
+        let coords =
+            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
+                .expect("feasible");
+        let mid = coords[3]; // median child M
+        for (i, name) in [(0, "submit"), (1, "review"), (5, "notify")] {
+            assert!(
+                (coords[i] - mid).abs() < 1e-6,
+                "{name} must sit on median fan axis: {} vs {mid}",
+                coords[i]
+            );
+        }
     }
 
     /// Fan-out junction (the API gateway over 4 services shape): the

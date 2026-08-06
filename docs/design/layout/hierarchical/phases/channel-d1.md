@@ -131,7 +131,9 @@ Port → VerticalToTrack → HorizontalOnTrack(corridor, track_index) → Vertic
 #### TrackOrder 算法
 
 1. 按 `RankGap(r)` 收集需水平 jog 的边。
-2. 每条边占用区间（cross 轴）= `[min(src_cross, tgt_cross), max(...)]`。  
+2. 分道键：
+   - **Cross**：横切像素区间 `[min(src_cross, tgt_cross), max(...)]`（假 bus 修复）。
+   - **Main**：rank 占用半开区间 `[min_rank, max_rank+1)`（同层带堆叠回边平行分道；仅端点相接的层带可共 lane）。
    D1.0 实现：先用 base `layer_gap` 跑一轮次轴得像素帧，再在该帧上着色；随后 Demand 撑开层缝并重算主轴（cross 不变）。不得在 Ink 改 `track_index`。
 3. `plotgram-algo::interval_color` 求最少 track 数。
 4. 偏序 / 外内轨：源与汇端口 `Ordered.slot` + `(declaration_index, EdgeId)` 稳定决定「外轨优先于内轨」（对齐 yFiles 嵌套横杠）。
@@ -276,3 +278,9 @@ Substrate 全图、Gate、ScopeMask、rip-up、多 rank 回边外侧走廊、`mi
 
 D1.2 闭环之后，Channel 仍缺「端点诱导的层间资源分配」（showcase：冲顶 Cross、Main og=0 垄断、声明序拥塞级联）。  
 能力增强（非补丁）执行方案见 **[channel-corridor-allocator.md](channel-corridor-allocator.md)**（① span 亲和 → ② 内层优先 → ③ RouteOrder → ④ Corridor Demand → ⑤ 回边侧别统一）。
+
+**已交付**：D1.3.1 SpanAffinity — 词典序加入 `span_affinity`；跨层边优先内层缝 Cross，禁止空闲即选栈顶 k=0。  
+**已交付**：D1.3.2 InnerCorridorFirst — `outer_main_as_overflow` 取代 `prefer_outer_main`；外侧 Main 为溢出容量。  
+**已交付**：D1.3.3 RouteOrderWriter — 按 critical↓ span↓ reversed↓ dummy↓ decl↑ 提交；rip-up 优先牺牲短/非 critical；debug 暴露 `route_order`。  
+**已交付**：D1.3.4 Corridor DemandBoard — `DemandBoard` max-merge + freeze；Channel 仅抬内层缝 LayerGap；外沿 Cross 不进 Demand。  
+**已交付**：D1.3.5 UnifiedBackEdgeSideCost — FREE 回边统一 `pick_reversed_side`；同列默认 East；FixedSide 不受覆盖。

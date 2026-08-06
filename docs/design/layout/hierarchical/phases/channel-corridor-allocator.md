@@ -420,11 +420,21 @@ HIER_EVAL_WRITE_BASELINE=1 cargo test -p plotgram-compile --test hier_eval
 
 ## 10. 开工检查清单（步 ①）
 
-- [ ] 在 `channel/search.rs` 钉死 lex 维顺序与 `span_dist` 公式（含 orientation 无关的 rank/line 映射）  
-- [ ] 表驱动单测：空图跨层边不选 k=0  
-- [ ] 跑 flat 全量 debug 统计 `cross0_midgraph_edges` 前后对比  
-- [ ] 更新 `hier_eval` 基线（若 bends 改善）  
+- [x] 在 `channel/search.rs` 钉死 lex 维顺序与 `span_dist` 公式（含 orientation 无关的 rank/line 映射）  
+- [x] 表驱动单测：空图跨层边不选 k=0  
+- [x] 跑 flat 全量 debug 统计 `cross0_midgraph_edges` 前后对比（`product.refund-process` e8：`[10,0,9]` → `[10,2,9]`，path 不再触 y=0）  
+- [x] 更新 `hier_eval` 基线（refund `max_bends`/`sum_bends` 下降）  
 - [ ] PR 描述引用本文 §2，声明非补丁  
+
+**D1.3.1 已交付**（2026-08-06）：`LexCost` 为 `bends ≻ length ≻ span_affinity ≻ congestion`；`RouteHints.span` 由 `route_all` 写入端点 rank/order；`cross_span_dist` / `main_span_dist` 为公开公式。
+
+**D1.3.2 已交付**（2026-08-06）：`prefer_outer_main` → `outer_main_as_overflow`；外侧 Main 在内侧 order-gap 仍空闲时受软罚，内侧饱和后允许溢出。
+
+**D1.3.3 已交付**（2026-08-06）：`compute_route_order`（critical↓ span↓ reversed↓ dummy↓ decl↑）；commit 按 RouteOrder；rip-up 优先牺牲短 span / 非 critical；`ChannelDebug.route_order`；stress crossings 下降（flat-mesh −2，yfiles-pipeline −6）。
+
+**D1.3.4 已交付**（2026-08-06）：`demand::DemandBoard`（`DemandKey::LayerGap` max-merge + freeze）；`publish_channel_layer_gap_demand` 仅内层缝；外沿 Cross 不抬 LayerGap；freeze 后再 publish / 未 freeze 就 resolve → panic。
+
+**D1.3.5 已交付**（2026-08-06）：`pick_reversed_side` 统一 FREE 回边侧别；同列默认 East（不再 N/S 顶头）；FixedSide 尊守；`user-auth` crossings −5。
 
 ---
 

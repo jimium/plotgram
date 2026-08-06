@@ -143,11 +143,191 @@ fn lane_coord(
     })
 }
 
+/// Own-node frame whose East or West face sits at `port_x` (within eps).
+fn face_frame_at_x<'a>(
+    plan: &PlanGraph,
+    frames: &'a [Rect],
+    rank: usize,
+    port_x: f64,
+) -> Option<&'a Rect> {
+    let layer = plan.layers.get(rank)?;
+    for &ei in layer {
+        let r = frames.get(ei)?;
+        let east = r.x + r.width;
+        let west = r.x;
+        if (east - port_x).abs() < 1e-6 || (west - port_x).abs() < 1e-6 {
+            return Some(r);
+        }
+    }
+    None
+}
+
+/// Stub from a side port to a Main rail must leave the node outward
+/// (East port → rail further East; West → further West).
+fn stub_outward_to_rail(port_x: f64, rail_x: f64, frame: &Rect) -> bool {
+    let east = frame.x + frame.width;
+    let west = frame.x;
+    if (east - port_x).abs() < 1e-6 {
+        rail_x >= port_x - 1e-9
+    } else if (west - port_x).abs() < 1e-6 {
+        rail_x <= port_x + 1e-9
+    } else {
+        false
+    }
+}
+
+/// True when the open horizontal `(from_x, to_x)` at `y` does not enter any
+/// real-node body other than the outward stub's own face. Scans all frames
+/// (not only `rank`) so a side stub cannot skim a neighbor on another band
+/// that still overlaps `y`.
+fn horizontal_clear_at_y(
+    plan: &PlanGraph,
+    frames: &[Rect],
+    _rank: usize,
+    from_x: f64,
+    to_x: f64,
+    y: f64,
+) -> bool {
+    let lo = from_x.min(to_x);
+    let hi = from_x.max(to_x);
+    for (ei, r) in frames.iter().enumerate() {
+        if plan.elems.get(ei).is_some_and(|e| e.key.is_virtual()) {
+            continue;
+        }
+        if y + 1e-9 < r.y || y > r.y + r.height + 1e-9 {
+            continue;
+        }
+        let nl = r.x;
+        let nr = r.x + r.width;
+        if nr <= lo + 1e-9 || nl >= hi - 1e-9 {
+            continue;
+        }
+        if (nr - from_x).abs() < 1e-6 || (nl - from_x).abs() < 1e-6 {
+            continue;
+        }
+        return false;
+    }
+    true
+}
+
+fn is_cross_axis_side(side: Side) -> bool {
+    matches!(side, Side::East | Side::West)
+}
+
+/// Clear outward horizontal stub from a cross-axis port to a Main rail.
+fn cross_axis_stub_clear(
+    plan: &PlanGraph,
+    frames: &[Rect],
+    rank: usize,
+    port: Point,
+    rail_x: f64,
+) -> bool {
+    let Some(frame) = face_frame_at_x(plan, frames, rank, port.x) else {
+        return false;
+    };
+    stub_outward_to_rail(port.x, rail_x, frame)
+        && horizontal_clear_at_y(plan, frames, rank, port.x, rail_x, port.y)
+}
+
+/// Leave a node onto a Main rail. Cross-axis ports prefer a horizontal stub
+/// at port Y when clear; otherwise drop to `src_gap` first (sibling escape).
+fn leave_to_main(
+    path: &mut Vec<Point>,
+    start: Point,
+    src_side: Side,
+    src_rank: usize,
+    rail_x: f64,
+    src_gap: f64,
+    plan: &PlanGraph,
+    frames: &[Rect],
+) {
+    let at_port_y = is_cross_axis_side(src_side)
+        && cross_axis_stub_clear(plan, frames, src_rank, start, rail_x);
+    if at_port_y {
+        if (start.x - rail_x).abs() > 1e-9 {
+            path.push(Point {
+                x: rail_x,
+                y: start.y,
+            });
+        }
+    } else {
+        if (start.y - src_gap).abs() > 1e-9 {
+            path.push(Point {
+                x: start.x,
+                y: src_gap,
+            });
+        }
+        if (path.last().unwrap().x - rail_x).abs() > 1e-9 {
+            path.push(Point {
+                x: rail_x,
+                y: path.last().unwrap().y,
+            });
+        }
+    }
+}
+
+/// Arrive from a Main rail into a port. Final segment follows the port
+/// normal when the cross-axis stub is clear (E/W → horizontal at `end.y`).
+/// Otherwise fall back to a layer-gap join (may end with a vertical onto
+/// the face) so we never pierce siblings just to keep the normal.
+fn arrive_from_main(
+    path: &mut Vec<Point>,
+    end: Point,
+    tgt_side: Side,
+    tgt_rank: usize,
+    rail_x: f64,
+    tgt_gap: f64,
+    plan: &PlanGraph,
+    frames: &[Rect],
+) {
+    // Ensure we are on the rail first.
+    let cur = *path.last().unwrap();
+    if (cur.x - rail_x).abs() > 1e-9 {
+        path.push(Point {
+            x: rail_x,
+            y: cur.y,
+        });
+    }
+
+    if is_cross_axis_side(tgt_side)
+        && cross_axis_stub_clear(plan, frames, tgt_rank, end, rail_x)
+    {
+        if (path.last().unwrap().y - end.y).abs() > 1e-9 {
+            path.push(Point {
+                x: rail_x,
+                y: end.y,
+            });
+        }
+        if (path.last().unwrap().x - end.x).abs() > 1e-9
+            || (path.last().unwrap().y - end.y).abs() > 1e-9
+        {
+            path.push(end);
+        }
+    } else {
+        // N/S, or E/W stub blocked: gap join then into the port.
+        if (path.last().unwrap().y - tgt_gap).abs() > 1e-9 {
+            path.push(Point {
+                x: rail_x,
+                y: tgt_gap,
+            });
+        }
+        if (path.last().unwrap().x - end.x).abs() > 1e-9 {
+            path.push(Point {
+                x: end.x,
+                y: tgt_gap,
+            });
+        }
+        if path.last() != Some(&end) {
+            path.push(end);
+        }
+    }
+}
+
 /// Expand a ChannelPath into an orthogonal polyline (D1.1).
 ///
-/// Horizontals that reach a Main corridor never travel at the port's Y (node
-/// mid-line) — that would pierce same-layer siblings. They drop onto the
-/// Metric frame-derived layer-gap Y for the endpoint's rank first.
+/// Leaving onto Main may drop to a layer-gap Y first so horizontals do not
+/// pierce same-layer siblings. Arriving from Main always ends along the
+/// port normal (E/W horizontal, N/S vertical) — ink-and-verification §4.
 fn expand_channel_path(
     start: Point,
     end: Point,
@@ -160,6 +340,8 @@ fn expand_channel_path(
     frames: &[Rect],
     src_rank: usize,
     tgt_rank: usize,
+    src_side: Side,
+    tgt_side: Side,
     layer_gap: f64,
 ) -> Result<Vec<Point>, LayoutError> {
     let tracks = &channel.tracks;
@@ -194,30 +376,12 @@ fn expand_channel_path(
                 let x = lane_coord(edge_id, tid, track_order, track_coords)?;
                 let src_gap = gap_y(src_rank, end, start);
                 let tgt_gap = gap_y(tgt_rank, start, end);
-                if (start.y - src_gap).abs() > 1e-9 {
-                    path.push(Point {
-                        x: start.x,
-                        y: src_gap,
-                    });
-                }
-                if (path.last().unwrap().x - x).abs() > 1e-9 {
-                    path.push(Point {
-                        x,
-                        y: path.last().unwrap().y,
-                    });
-                }
-                if (path.last().unwrap().y - tgt_gap).abs() > 1e-9 {
-                    path.push(Point { x, y: tgt_gap });
-                }
-                if (path.last().unwrap().x - end.x).abs() > 1e-9 {
-                    path.push(Point {
-                        x: end.x,
-                        y: tgt_gap,
-                    });
-                }
-                if path.last() != Some(&end) {
-                    path.push(end);
-                }
+                leave_to_main(
+                    &mut path, start, src_side, src_rank, x, src_gap, plan, frames,
+                );
+                arrive_from_main(
+                    &mut path, end, tgt_side, tgt_rank, x, tgt_gap, plan, frames,
+                );
             }
         }
         if path.last() != Some(&end) {
@@ -241,18 +405,9 @@ fn expand_channel_path(
         }
         TrackOrient::Main => {
             let src_gap = gap_y(src_rank, end, start);
-            if (start.y - src_gap).abs() > 1e-9 {
-                path.push(Point {
-                    x: start.x,
-                    y: src_gap,
-                });
-            }
-            if (path.last().unwrap().x - first_c).abs() > 1e-9 {
-                path.push(Point {
-                    x: first_c,
-                    y: path.last().unwrap().y,
-                });
-            }
+            leave_to_main(
+                &mut path, start, src_side, src_rank, first_c, src_gap, plan, frames,
+            );
         }
     }
 
@@ -306,9 +461,9 @@ fn expand_channel_path(
     let last = *tracks.last().unwrap();
     let last_orient = substrate.track(last).unwrap().orient;
     let last_c = lane_coord(edge_id, last, track_order, track_coords)?;
-    let prev = *path.last().unwrap();
     match last_orient {
         TrackOrient::Cross => {
+            let prev = *path.last().unwrap();
             if (prev.x - end.x).abs() > 1e-9 {
                 path.push(Point {
                     x: end.x,
@@ -318,25 +473,9 @@ fn expand_channel_path(
         }
         TrackOrient::Main => {
             let tgt_gap = gap_y(tgt_rank, start, end);
-            if (prev.x - last_c).abs() > 1e-9 {
-                path.push(Point {
-                    x: last_c,
-                    y: prev.y,
-                });
-            }
-            let cur = *path.last().unwrap();
-            if (cur.y - tgt_gap).abs() > 1e-9 {
-                path.push(Point {
-                    x: last_c,
-                    y: tgt_gap,
-                });
-            }
-            if (path.last().unwrap().x - end.x).abs() > 1e-9 {
-                path.push(Point {
-                    x: end.x,
-                    y: tgt_gap,
-                });
-            }
+            arrive_from_main(
+                &mut path, end, tgt_side, tgt_rank, last_c, tgt_gap, plan, frames,
+            );
         }
     }
     if path.last() != Some(&end) {
@@ -552,6 +691,8 @@ pub fn route_edges(
                         frames,
                         plan.elems[chain[0]].rank as usize,
                         plan.elems[*chain.last().unwrap()].rank as usize,
+                        rp.source.side,
+                        rp.target.side,
                         layer_gap,
                     )?
                 };
@@ -613,6 +754,7 @@ mod tests {
             bundles: Vec::new(),
             relaxations: Vec::new(),
             used_gates: false,
+            route_order: Vec::new(),
         };
         let mut track_order = TrackOrderPlan::default();
         track_order.assignments.insert(
@@ -638,6 +780,7 @@ mod tests {
             bundles: Vec::new(),
             relaxations: Vec::new(),
             used_gates: false,
+            route_order: Vec::new(),
         }
     }
 
@@ -703,6 +846,7 @@ mod tests {
             ids,
             index_of,
             group_path: vec![Vec::new(); 2],
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; 2],
             edges,
             self_loops: Vec::new(),
         };
