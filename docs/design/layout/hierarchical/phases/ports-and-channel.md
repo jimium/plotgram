@@ -34,12 +34,13 @@ Compose 写 `along_spec`；Metric 写导出的 `PortPoint`。
 
 1. 排除违反 fixed side、scope 出针或 group boundary 的 side；
 2. 以 working 流向估计逆向出针与最小 bend；
-3. 平局按固定 Side 顺序；
-4. 同侧边按对侧 `(layer, order, declaration_index, EdgeId)` 排序；
-5. edge_group / port_group 先折叠成一个端口单位，再分 slot；
-6. 映射回 original source/target 后写 Plan。
+3. **回边走廊角色**（`pick_reversed_side`）：`span≥2` → E/W；`has_twin ∧ span=1 ∧ Δorder≤1` → N/S（平行）；无 twin 短回边 → E/W；FixedSide 尊守；
+4. 平局按固定 Side 顺序；
+5. 同侧边按对侧 `(layer, order, declaration_index, EdgeId)` 排序；
+6. edge_group / port_group 先折叠成一个端口单位，再分 slot；
+7. 映射回 original source/target 后写 Plan。
 
-反向边不得交换最终 source/target port；只允许 working 流向参与 side 评分。
+反向边不得交换最终 source/target port；只允许 working 流向参与 side 评分。`has_twin` = 同无向端点对上存在 `!reversed` 边（与 `-->` 正交）。
 
 ## 3. Scope 与 Gate
 

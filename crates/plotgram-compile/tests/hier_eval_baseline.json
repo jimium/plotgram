@@ -74,18 +74,18 @@
   "flat/mech.constrain-sink": {
     "bbox_h": 172.70000000000002,
     "bbox_w": 112.0,
-    "crossings": 1,
+    "crossings": 0,
     "max_bends": 2,
     "reversed_count": 1,
     "sum_bends": 6
   },
   "flat/product.employee-onboarding": {
     "bbox_h": 456.29999999999995,
-    "bbox_w": 222.48000000000002,
+    "bbox_w": 230.48000000000002,
     "crossings": 0,
-    "max_bends": 2,
+    "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 12
+    "sum_bends": 17
   },
   "flat/product.expense-reimbursement": {
     "bbox_h": 543.1999999999999,
@@ -93,7 +93,7 @@
     "crossings": 1,
     "max_bends": 3,
     "reversed_count": 1,
-    "sum_bends": 13
+    "sum_bends": 16
   },
   "flat/product.flat-rest-api": {
     "bbox_h": 314.5,
@@ -147,9 +147,9 @@
     "bbox_h": 456.29999999999995,
     "bbox_w": 94.0,
     "crossings": 0,
-    "max_bends": 2,
+    "max_bends": 3,
     "reversed_count": 2,
-    "sum_bends": 4
+    "sum_bends": 10
   },
   "flat/product.symmetric-fanout": {
     "bbox_h": 259.6,
@@ -161,11 +161,11 @@
   },
   "flat/product.three-tier": {
     "bbox_h": 172.70000000000002,
-    "bbox_w": 98.94,
+    "bbox_w": 74.94,
     "crossings": 0,
     "max_bends": 2,
     "reversed_count": 2,
-    "sum_bends": 4
+    "sum_bends": 8
   },
   "flat/product.ticket-triage": {
     "bbox_h": 472.29999999999995,
@@ -184,10 +184,10 @@
     "sum_bends": 41
   },
   "flat/product.user-auth": {
-    "bbox_h": 259.6,
-    "bbox_w": 229.26,
-    "crossings": 2,
-    "max_bends": 4,
+    "bbox_h": 275.6,
+    "bbox_w": 213.26,
+    "crossings": 3,
+    "max_bends": 3,
     "reversed_count": 4,
     "sum_bends": 18
   },
@@ -306,10 +306,10 @@
   "group/demo.customer-refund-process": {
     "bbox_h": 1284.2,
     "bbox_w": 274.0975935828877,
-    "crossings": 11,
-    "max_bends": 5,
+    "crossings": 12,
+    "max_bends": 3,
     "reversed_count": 3,
-    "sum_bends": 43
+    "sum_bends": 44
   },
   "group/demo.data-etl-pipeline": {
     "bbox_h": 614.0999999999999,
@@ -349,7 +349,7 @@
     "crossings": 8,
     "max_bends": 6,
     "reversed_count": 2,
-    "sum_bends": 33
+    "sum_bends": 32
   },
   "group/demo.hybrid-cloud-dr-topology": {
     "bbox_h": 655.1999999999999,
@@ -437,7 +437,7 @@
     "crossings": 0,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 22
+    "sum_bends": 21
   },
   "group/demo.payment-clearing-platform": {
     "bbox_h": 575.1999999999999,

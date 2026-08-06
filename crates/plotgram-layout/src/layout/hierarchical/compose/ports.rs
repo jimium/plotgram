@@ -81,11 +81,49 @@ fn immediate_neighbor(plan: &PlanGraph, edge_id: &str, real_idx: usize) -> usize
         .expect("real endpoint must have exactly one adjacent segment for its own edge")
 }
 
+/// Undirected original-endpoint key for twin detection.
+fn undirected_pair(a: usize, b: usize) -> (usize, usize) {
+    if a <= b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
+/// Original endpoint pairs that carry at least one non-reversed edge.
+/// A reversed edge on the same pair is a req-resp / 2-cycle twin.
+fn forward_twin_pairs(graph: &RealGraph) -> BTreeSet<(usize, usize)> {
+    let mut set = BTreeSet::new();
+    for e in &graph.edges {
+        if !e.reversed {
+            set.insert(undirected_pair(e.original_source, e.original_target));
+        }
+    }
+    set
+}
+
+/// FREE ends already assigned to the flow-spine faces (N+S) on one node.
+fn spine_ns_load(usage: &BTreeMap<(usize, Side), u32>, node_real: usize) -> u32 {
+    usage.get(&(node_real, Side::North)).copied().unwrap_or(0)
+        + usage.get(&(node_real, Side::South)).copied().unwrap_or(0)
+}
+
+/// Spine load threshold: same-column short reverse without a twin prefers
+/// the side corridor once the spine already has this many FREE ends.
+const NS_LOAD_SPINE_THRESHOLD: u32 = 2;
+
 /// FREE side inference (canonical TB). Forward edges follow the rank
 /// direction (downstream → South, upstream → North). Reversed (back) edges
-/// pick between rank-direction and cross-axis via [`pick_reversed_side`]
-/// (D1.3.5 unified cost — no Channel call).
-fn free_side(plan: &PlanGraph, pos: &[usize], node_real: usize, neighbor: usize, reversed: bool) -> Side {
+/// pick spine vs side corridor via [`pick_reversed_side`] (no Channel call).
+fn free_side(
+    plan: &PlanGraph,
+    pos: &[usize],
+    node_real: usize,
+    neighbor: usize,
+    reversed: bool,
+    has_twin: bool,
+    ns_load: u32,
+) -> Side {
     let own_rank = plan.elems[node_real].rank;
     let neighbor_rank = plan.elems[neighbor].rank;
     let rank_dir = if neighbor_rank > own_rank {
@@ -108,34 +146,62 @@ fn free_side(plan: &PlanGraph, pos: &[usize], node_real: usize, neighbor: usize,
     let cross_axis = match peer_order.cmp(&own_order) {
         std::cmp::Ordering::Less => Side::West,
         std::cmp::Ordering::Greater => Side::East,
-        // Same column: stable default face (not N/S over the node head).
+        // Side-corridor default face when EW wins (stable, not N/S).
         std::cmp::Ordering::Equal => Side::East,
     };
     let span = (own_rank as usize).abs_diff(peer_rank as usize);
-    pick_reversed_side(rank_dir, cross_axis, span, own_order, peer_order)
+    pick_reversed_side(
+        rank_dir,
+        cross_axis,
+        span,
+        own_order,
+        peer_order,
+        has_twin,
+        ns_load,
+    )
 }
 
-/// Static cost pick for FREE reversed ends (D1.3.5).
+/// Corridor-role pick for FREE reversed ends (Compose-only; no Channel).
 ///
-/// - `C_ns`: reverse on the flow spine is expensive (higher when same-column).
-/// - `C_ew`: cross-axis is the reverse-edge home corridor (base cost 0);
-///   column separation is handled by Channel, not by falling back to N/S.
-/// - Tie → cross-axis (showcase: short same-col and multi-rank reverse).
+/// - Twin short (span=1, Δorder≤1): flow spine (`rank_dir`) — parallel aesthetics.
+/// - Long reverse (span≥2): side corridor (`cross_axis`).
+/// - Short without twin: side corridor (workflow feedback); crowded spine too.
 fn pick_reversed_side(
-    _rank_dir: Side,
+    rank_dir: Side,
     cross_axis: Side,
-    _span: usize,
+    span: usize,
     own_order: usize,
     peer_order: usize,
+    has_twin: bool,
+    ns_load: u32,
 ) -> Side {
     let delta_order = own_order.abs_diff(peer_order);
-    let c_ns: u32 = 2 + if delta_order == 0 { 2 } else { 0 };
-    let c_ew: u32 = 0;
-    // rank_dir kept as API fallback if costs ever invert; today EW always wins.
+
+    if span >= 2 {
+        return cross_axis;
+    }
+    if has_twin && span == 1 && delta_order <= 1 {
+        return rank_dir;
+    }
+    if !has_twin && span == 1 {
+        // Short feedback without a forward twin → side corridor
+        // (also covers same-column crowded spine: ns_load ≥ threshold).
+        return cross_axis;
+    }
+
+    // Remainder: soft costs; twin-like prefers spine, else side corridor.
+    let c_ns: u32 = if has_twin { 0 } else { 2 }
+        + if delta_order == 0 { 1 } else { 0 }
+        + if ns_load >= NS_LOAD_SPINE_THRESHOLD {
+            2
+        } else {
+            0
+        };
+    let c_ew: u32 = if has_twin { 2 } else { 0 } + if delta_order >= 2 { 0 } else { 1 };
     if c_ew <= c_ns {
         cross_axis
     } else {
-        _rank_dir
+        rank_dir
     }
 }
 
@@ -275,11 +341,13 @@ pub fn assign_ports(
 ) -> Result<PortAssignment, LayoutError> {
     let pos = positions_within_layer(plan);
     let real_idx_of = |id: &str| plan.index_of[&ElemKey::Real(id.to_string())];
+    let twin_pairs = forward_twin_pairs(graph);
     // FREE capacity ledger only (FixedSide does not charge).
     let mut free_usage: BTreeMap<(usize, Side), u32> = BTreeMap::new();
 
     let mut endpoints = Vec::with_capacity(graph.edges.len() * 2);
     for e in &graph.edges {
+        let has_twin = twin_pairs.contains(&undirected_pair(e.original_source, e.original_target));
         for (is_source_end, node_id, constraint) in [
             (true, &graph.ids[e.original_source], e.from_port.clone()),
             (false, &graph.ids[e.original_target], e.to_port.clone()),
@@ -294,7 +362,23 @@ pub fn assign_ports(
             let side = match &constraint {
                 Some(c) => fixed_side_canonical(c, orientation),
                 None => {
-                    let primary = free_side(plan, &pos, node_real, neighbor, e.reversed);
+                    let peer = match &plan.elems[neighbor].key {
+                        ElemKey::Real(_) => neighbor,
+                        ElemKey::Virtual { edge_id, .. } => {
+                            far_real_endpoint(plan, edge_id, node_real).unwrap_or(neighbor)
+                        }
+                    };
+                    let ns_load = spine_ns_load(&free_usage, node_real)
+                        + spine_ns_load(&free_usage, peer);
+                    let primary = free_side(
+                        plan,
+                        &pos,
+                        node_real,
+                        neighbor,
+                        e.reversed,
+                        has_twin,
+                        ns_load,
+                    );
                     pick_side_with_policy(primary, policy, node_real, &mut free_usage, None)
                 }
             };
@@ -779,8 +863,7 @@ mod tests {
         );
     }
 
-    /// Multi-rank reversed with aligned columns also takes cross-axis
-    /// (D1.3.5: same-column default East, not N/S over the node head).
+    /// Multi-rank reversed (span≥2) takes the side corridor even when columns align.
     #[test]
     fn long_reversed_edge_same_column_prefers_cross_axis() {
         let ids = vec!["a".to_string(), "b".to_string()];
@@ -857,9 +940,9 @@ mod tests {
         assert_eq!(ports["back"].target.side, Side::East);
     }
 
-    /// Short same-column reverse (no dummy) also prefers East, not N/S.
+    /// Short same-column reverse **without** a forward twin → side corridor.
     #[test]
-    fn short_same_column_reversed_prefers_cross_axis() {
+    fn short_same_column_reversed_without_twin_prefers_cross_axis() {
         let ids = vec!["a".to_string(), "b".to_string()];
         let index_of = ids
             .iter()
@@ -920,7 +1003,124 @@ mod tests {
         assert_eq!(ports["back"].target.side, Side::East);
     }
 
-    /// Author FixedSide is never overridden by the FREE reverse cost model.
+    /// Table-driven corridor roles for [`pick_reversed_side`].
+    #[test]
+    fn pick_reversed_side_corridor_roles() {
+        let ns = Side::North;
+        let ew = Side::East;
+        let cases: &[(
+            &str,
+            usize,
+            usize,
+            usize,
+            bool,
+            u32,
+            Side,
+        )] = &[
+            ("long span → EW", 2, 0, 0, false, 0, ew),
+            ("long + twin → EW", 2, 0, 0, true, 0, ew),
+            ("twin short same-col → NS", 1, 0, 0, true, 0, ns),
+            ("twin short Δorder=1 → NS", 1, 0, 1, true, 0, ns),
+            ("no twin short → EW", 1, 0, 0, false, 0, ew),
+            ("no twin short crowded → EW", 1, 0, 0, false, 2, ew),
+        ];
+        for (label, span, own_o, peer_o, twin, load, want) in cases {
+            let got = pick_reversed_side(ns, ew, *span, *own_o, *peer_o, *twin, *load);
+            assert_eq!(got, *want, "{label}");
+        }
+    }
+
+    /// Twin short reverse (req-resp on same column) stays on the flow spine.
+    #[test]
+    fn twin_short_same_column_reversed_prefers_rank_dir() {
+        // a (rank 0) -> b (rank 1) forward; b --> a reversed twin.
+        let ids = vec!["a".to_string(), "b".to_string()];
+        let index_of = ids
+            .iter()
+            .enumerate()
+            .map(|(i, id)| (id.clone(), i))
+            .collect();
+        let graph = RealGraph {
+            ids,
+            index_of,
+            group_path: vec![Vec::new(); 2],
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; 2],
+            edges: vec![
+                RealEdge {
+                    edge_id: "fwd".into(),
+                    original_source: 0,
+                    original_target: 1,
+                    working_source: 0,
+                    working_target: 1,
+                    reversed: false,
+                    from_port: None,
+                    to_port: None,
+                    critical: false,
+                },
+                RealEdge {
+                    edge_id: "back".into(),
+                    original_source: 1,
+                    original_target: 0,
+                    working_source: 0,
+                    working_target: 1,
+                    reversed: true,
+                    from_port: None,
+                    to_port: None,
+                    critical: false,
+                },
+            ],
+            self_loops: Vec::new(),
+        };
+        let elems = vec![
+            Elem {
+                key: ElemKey::Real("a".into()),
+                group_path: Vec::new(),
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Real("b".into()),
+                group_path: Vec::new(),
+                rank: 1,
+            },
+        ];
+        let plan_index = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of: plan_index,
+            decl_index: vec![0, 1],
+            segments: vec![
+                Segment {
+                    edge_id: "fwd".into(),
+                    ordinal: 0,
+                    from: 0,
+                    to: 1,
+                },
+                Segment {
+                    edge_id: "back".into(),
+                    ordinal: 0,
+                    from: 0,
+                    to: 1,
+                },
+            ],
+            layers: vec![vec![0], vec![1]],
+        };
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(2), false)
+            .unwrap()
+            .ports;
+        // Forward: a South → b North.
+        assert_eq!(ports["fwd"].source.side, Side::South);
+        assert_eq!(ports["fwd"].target.side, Side::North);
+        // Twin reverse on spine: b North (toward a) / a South (toward b) —
+        // parallel with the request, not East side corridor.
+        assert_eq!(ports["back"].source.side, Side::North);
+        assert_eq!(ports["back"].target.side, Side::South);
+    }
+
+    /// Author FixedSide is never overridden by the FREE reverse corridor model.
     #[test]
     fn fixed_side_on_reversed_edge_is_honored() {
         let ids = vec!["a".to_string(), "b".to_string()];

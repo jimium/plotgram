@@ -308,52 +308,50 @@ Consumer（Metric track.rs / main_axis layer gap）:
 
 ---
 
-## 6. 步 ⑤ — 回边侧别统一代价
+## 6. 步 ⑤ — 回边走廊角色（非一刀切 E/W）
 
 ### 6.1 问题
 
-- 有 dummy 的多 rank 回边：`free_side` → E/W（已落地）。  
-- 无 dummy / 同列短回边：仍 N/S → `user-auth` 类交叉、`smoke.decision-loop` 扁宽水平绕行。  
-侧别与走廊未同一代价模型。
+- 有 dummy 的多 rank 回边：应走侧廊 E/W。  
+- 同列 req-resp **双胞胎**（存在 `!reversed` 对边）：应走脊 N/S 平行（`three-tier` / `user-auth`）。  
+- 无 twin 的短反馈回边：应走侧廊，避免与主流程互穿。  
+早期「同列默认 East」恒胜会毁掉平行美学；全 N/S 又会抬高审批流 crossings。
 
 ### 6.2 写者
 
 - **写者**：`compose/ports.rs`（PortWriter）。  
-- **只读输入**：层内 order、是否 reversed、span、以及（若 ④ 已有）**预占用 / 静态拥塞摘要**——不得在 ports 里跑完整 Channel 搜索。  
-- **禁止**：Channel 改 side；Ink 改 side。
+- **只读输入**：层内 order、`reversed`、span、`has_twin`（同无向端点对上存在 `!reversed` 边）、脊面 FREE 占用（`ns_load`）——不得在 ports 里跑完整 Channel 搜索。  
+- **禁止**：Channel 改 side；Ink 改 side；用 `-->` / 图名特判。
 
-### 6.3 算法要点
+### 6.3 算法要点（走廊角色表）
 
-对每条边两端独立决议（保持现有 FIXED_* 尊重用户约束）：
+对每条边两端独立决议（FIXED_* 尊守）：
 
 ```text
-候选侧别集合:
-  rank_dir = 主方向出入侧（N/S 或 E/W by orientation）
-  cross_axis = 由 peer order 决定的 W/E（现 free_side 逻辑）
-
-代价（静态、可表驱动）:
-  C_ns = 估计交叉：同侧槽位冲突 + 同列回边对数
-  C_ew = 估计绕行：|Δorder| + 是否迫使外侧 Main
-
-选 argmin；平局 → 稳定规则（span≥2 偏 cross_axis；span≤1 偏 rank_dir 或相反——开工用 showcase 标定后钉死）
+FixedSide                         → 尊守
+span ≥ 2                          → cross_axis (E/W)
+has_twin ∧ span=1 ∧ Δorder≤1      → rank_dir (N/S)   # 平行美学
+¬twin ∧ span=1                    → cross_axis       # 短反馈默认侧廊
+其余                              → 软代价 argmin；平局跟已上规则
 ```
 
-短同列回边（span=1、同 order）：默认评估 cross_axis，避免无脑 N/S。  
-长 reversed：保持跨轴，与 ② 的内侧 Main 配合。
+`Arrow::Response` **不**进决策（与 FAS `reversed` 正交）。
 
 ### 6.4 验收
 
 | 门禁 | 标准 |
 |------|------|
-| 单测 | 表驱动：同列短回边选 E/W；用户 FixedSide 不被覆盖 |
-| Showcase | `product.user-auth` crossings 下降；`smoke.decision-loop` 纵横比恢复合理（非 ~397×31） |
-| 回归 | 多 rank 回边端口仍跨轴；`hier_eval` reversed_count 不变 |
-| 写权 | ports 单测断言 Channel 未调用 |
+| 单测 | 表驱动：twin 短→N/S；span≥2→E/W；无 twin 短→E/W；FixedSide 不被覆盖 |
+| Showcase A | `product.three-tier` 响应边 N/S 平行，非默认右绕 |
+| Showcase B | `smoke.multi-rank-backedge` 长回边仍 E/W |
+| 回归 | `hier_eval`；`user-auth` twin 优先 N/S（crossings 允许相对全 EW 小幅回升） |
+| 写权 | ports 不调用 Channel |
 
 ### 6.5 刻意不做
 
 - 逐 fixture 特判侧别。  
-- 在 Channel 失败后回写端口（破坏单写者）。
+- 在 Channel 失败后回写端口（破坏单写者）。  
+- 再用常数把 EW 或 N/S 写成恒胜。
 
 ---
 
@@ -434,7 +432,7 @@ HIER_EVAL_WRITE_BASELINE=1 cargo test -p plotgram-compile --test hier_eval
 
 **D1.3.4 已交付**（2026-08-06）：`demand::DemandBoard`（`DemandKey::LayerGap` max-merge + freeze）；`publish_channel_layer_gap_demand` 仅内层缝；外沿 Cross 不抬 LayerGap；freeze 后再 publish / 未 freeze 就 resolve → panic。
 
-**D1.3.5 已交付**（2026-08-06）：`pick_reversed_side` 统一 FREE 回边侧别；同列默认 East（不再 N/S 顶头）；FixedSide 尊守；`user-auth` crossings −5。
+**D1.3.5 已交付**（2026-08-06；2026-08-06 修订为走廊角色表）：`pick_reversed_side` 按 twin/span/Δorder 分脊（N/S）与侧廊（E/W）；twin 短回边平行；长/无 twin 短回边走侧廊；FixedSide 尊守。
 
 ---
 
