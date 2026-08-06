@@ -269,3 +269,10 @@ Substrate 全图、Gate、ScopeMask、rip-up、多 rank 回边外侧走廊、`mi
 | `ink/route.rs` | 删除 mid_y 发明；展开 ChannelPath |
 | `params.rs` | `edge_gap` 恢复消费；D1.2 段长键 |
 | `plotgram-algo::interval_color` | L3 着色 |
+
+---
+
+## 10. 后续：D1.3 Corridor Allocator
+
+D1.2 闭环之后，Channel 仍缺「端点诱导的层间资源分配」（showcase：冲顶 Cross、Main og=0 垄断、声明序拥塞级联）。  
+能力增强（非补丁）执行方案见 **[channel-corridor-allocator.md](channel-corridor-allocator.md)**（① span 亲和 → ② 内层优先 → ③ RouteOrder → ④ Corridor Demand → ⑤ 回边侧别统一）。
