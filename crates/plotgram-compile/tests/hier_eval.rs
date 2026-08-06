@@ -12,6 +12,8 @@
 //!   `routing_style: polyline` / `routing_style: curved` opt out;
 //! - every edge path's first/last point lands exactly on its source/target
 //!   node frame boundary (the port anchor, not just "near" it);
+//! - orthogonal edge segments must not penetrate the open interior of any
+//!   non-endpoint node (same rule as InkVerifier);
 //! - a self-contained segment-intersection crossing count and max-bend count
 //!   are printed per file as an informational regression signal (not a hard
 //!   failure — a dense graph legitimately has crossings).
@@ -154,6 +156,7 @@ fn hierarchical_showcase_geometry_invariants() {
 
         check_no_node_overlaps(&name, &result, &mut hard_failures);
         check_orthogonal_and_ports(&name, &source, &result, &mut hard_failures);
+        check_no_edge_node_penetration(&name, &source, &result, &mut hard_failures);
         let reversed_count = match build_debug_trace(&source, &BuildOptions::default()) {
             Ok(trace) => serde_json::to_value(&trace)
                 .ok()
@@ -282,6 +285,78 @@ fn check_orthogonal_and_ports(
                 ));
             }
         }
+    }
+}
+
+fn check_no_edge_node_penetration(
+    name: &str,
+    source: &str,
+    result: &LayoutResult,
+    failures: &mut Vec<String>,
+) {
+    // Same orthogonal-only scope as check_orthogonal_and_ports.
+    if source.contains("routing_style: polyline") || source.contains("routing_style: curved") {
+        return;
+    }
+    const INSET: f64 = 1e-3;
+    let frames: Vec<(&str, Rect)> = result
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.frame))
+        .collect();
+
+    for e in &result.edges {
+        let pts = e.path.samples();
+        if pts.len() < 2 {
+            continue;
+        }
+        for w in pts.windows(2) {
+            let (a, b) = (w[0], w[1]);
+            let ortho = (a.x - b.x).abs() <= EPS || (a.y - b.y).abs() <= EPS;
+            if !ortho {
+                continue;
+            }
+            for &(nid, frame) in &frames {
+                if nid == e.source || nid == e.target {
+                    continue;
+                }
+                if segment_hits_rect_interior(a, b, frame, INSET) {
+                    failures.push(format!(
+                        "{name}: edge `{}` penetrates node `{nid}`",
+                        e.id
+                    ));
+                }
+            }
+        }
+    }
+}
+
+fn segment_hits_rect_interior(a: Point, b: Point, frame: Rect, inset: f64) -> bool {
+    let left = frame.x + inset;
+    let right = frame.right() - inset;
+    let top = frame.y + inset;
+    let bottom = frame.bottom() - inset;
+    if left >= right - EPS || top >= bottom - EPS {
+        return false;
+    }
+    if (a.x - b.x).abs() <= EPS {
+        let vx = a.x;
+        if vx <= left + EPS || vx >= right - EPS {
+            return false;
+        }
+        let y0 = a.y.min(b.y);
+        let y1 = a.y.max(b.y);
+        y0 < bottom - EPS && y1 > top + EPS
+    } else if (a.y - b.y).abs() <= EPS {
+        let hy = a.y;
+        if hy <= top + EPS || hy >= bottom - EPS {
+            return false;
+        }
+        let x0 = a.x.min(b.x);
+        let x1 = a.x.max(b.x);
+        x0 < right - EPS && x1 > left + EPS
+    } else {
+        false
     }
 }
 

@@ -1,0 +1,12 @@
+// flat 探针：真自环 source==target
+diagram {
+    profile: flowchart,
+    title: "flat · true self-loop",
+    layout: hierarchical
+
+    node a { label: "Retry", archetype: process }
+    node b { label: "Next", archetype: process }
+
+    a -> a
+    a -> b
+}

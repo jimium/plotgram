@@ -33,6 +33,25 @@ pub fn assign_track_coords(
     route_plan: &ChannelRoutePlan,
     edge_gap: f64,
 ) -> TrackCoords {
+    // Real-node frames for Main-lane clearance (InkVerifier node-penetration).
+    let mut obstacles: Vec<(f64, f64, f64, f64)> = Vec::new(); // l,t,r,b
+    for layer in &plan.layers {
+        for &e in layer {
+            if plan.elems[e].key.is_virtual() {
+                continue;
+            }
+            let s = size_of(e);
+            let cx = cross_centers[e];
+            let y = main[e];
+            obstacles.push((
+                cx - s.width / 2.0,
+                y,
+                cx + s.width / 2.0,
+                y + s.height,
+            ));
+        }
+    }
+
     let mut out = TrackCoords::default();
     for (&tid, &count) in &track_order.track_counts {
         if count == 0 {
@@ -44,7 +63,7 @@ pub fn assign_track_coords(
         let ys = match t.orient {
             TrackOrient::Cross => {
                 let line = t.line;
-                if line == 0 || line > plan.layers.len() {
+                if line == 0 || line >= plan.layers.len() {
                     // Outside the stack — park at mid of adjacent layer if any.
                     let y = if line == 0 {
                         main.get(plan.layers[0][0]).copied().unwrap_or(0.0) - edge_gap
@@ -71,13 +90,19 @@ pub fn assign_track_coords(
                 }
             }
             TrackOrient::Main => {
-                // Vertical corridor X: center between order columns, then pitch.
+                // Vertical corridor X: sit in order *gaps* (or outside the
+                // outer columns), never on a node center — otherwise a
+                // full-height Main rail penetrates intermediate nodes.
                 let og = t.line;
-                let backbone = main_line_backbone_x(plan, cross_centers, size_of, og);
+                let mut backbone =
+                    main_line_backbone_x(plan, cross_centers, size_of, og, edge_gap);
+                backbone = clear_main_x(backbone, &obstacles, edge_gap);
                 let span = (count.saturating_sub(1) as f64) * edge_gap;
                 let start = backbone - span * 0.5;
                 (0..count)
-                    .map(|i| start + i as f64 * edge_gap)
+                    .map(|i| {
+                        clear_main_x(start + i as f64 * edge_gap, &obstacles, edge_gap)
+                    })
                     .collect()
             }
         };
@@ -91,25 +116,100 @@ fn main_line_backbone_x(
     cross_centers: &[f64],
     size_of: &dyn Fn(usize) -> Size,
     order_gap: usize,
+    edge_gap: f64,
 ) -> f64 {
-    let _ = size_of;
-    // order_gap `og` sits between column og-1 and og (outside → inset).
+    let margin = edge_gap.max(1.0) * 0.5;
+    let max_cols = plan.layers.iter().map(|l| l.len()).max().unwrap_or(0);
     let mut xs = Vec::new();
     for layer in &plan.layers {
         if layer.is_empty() {
             continue;
         }
         if order_gap == 0 {
-            xs.push(cross_centers[layer[0]]);
+            let e = layer[0];
+            xs.push(cross_centers[e] - size_of(e).width / 2.0 - margin);
         } else if order_gap >= layer.len() {
-            xs.push(cross_centers[*layer.last().unwrap()]);
+            let e = *layer.last().unwrap();
+            xs.push(cross_centers[e] + size_of(e).width / 2.0 + margin);
         } else {
-            xs.push(0.5 * (cross_centers[layer[order_gap - 1]] + cross_centers[layer[order_gap]]));
+            let l = layer[order_gap - 1];
+            let r = layer[order_gap];
+            let left_face = cross_centers[l] + size_of(l).width / 2.0;
+            let right_face = cross_centers[r] - size_of(r).width / 2.0;
+            xs.push(0.5 * (left_face + right_face));
         }
     }
     if xs.is_empty() {
         0.0
+    } else if order_gap == 0 {
+        xs.iter().cloned().fold(f64::INFINITY, f64::min)
+    } else if order_gap >= max_cols {
+        xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
     } else {
         xs.iter().sum::<f64>() / xs.len() as f64
+    }
+}
+
+/// Nudge a candidate Main-lane X until it does not pierce any node interior.
+///
+/// Overlapping X-projections (same column / tight neighbors) are merged so we
+/// cannot oscillate between faces of two overlapping intervals.
+fn clear_main_x(x: f64, obstacles: &[(f64, f64, f64, f64)], edge_gap: f64) -> f64 {
+    const EPS: f64 = 1e-6;
+    let margin = edge_gap.max(1.0) * 0.5;
+    let mut intervals: Vec<(f64, f64)> = obstacles.iter().map(|&(l, _, r, _)| (l, r)).collect();
+    intervals.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap().then(a.1.partial_cmp(&b.1).unwrap()));
+    let mut merged: Vec<(f64, f64)> = Vec::new();
+    for (l, r) in intervals {
+        if let Some(last) = merged.last_mut() {
+            // Merge if overlapping or closer than 2*margin (no room for a lane).
+            if l <= last.1 + 2.0 * margin {
+                last.1 = last.1.max(r);
+            } else {
+                merged.push((l, r));
+            }
+        } else {
+            merged.push((l, r));
+        }
+    }
+    for &(l, r) in &merged {
+        if x > l + EPS && x < r - EPS {
+            return if (x - l) <= (r - x) {
+                l - margin
+            } else {
+                r + margin
+            };
+        }
+    }
+    x
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clear_main_x;
+
+    #[test]
+    fn clear_main_x_pushes_off_node_body() {
+        let obstacles = vec![(10.0, 0.0, 30.0, 20.0)];
+        let x = clear_main_x(20.0, &obstacles, 8.0);
+        assert!(x <= 10.0 - 4.0 + 1e-9 || x >= 30.0 + 4.0 - 1e-9, "x={x}");
+    }
+
+    #[test]
+    fn clear_main_x_leaves_gap_alone() {
+        let obstacles = vec![(10.0, 0.0, 30.0, 20.0), (50.0, 0.0, 70.0, 20.0)];
+        let x = clear_main_x(40.0, &obstacles, 8.0);
+        assert!((x - 40.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn clear_main_x_handles_overlapping_projections() {
+        // Two columns whose X-ranges overlap — naive push oscillates.
+        let obstacles = vec![(0.0, 0.0, 100.0, 10.0), (90.0, 20.0, 190.0, 30.0)];
+        let x = clear_main_x(95.0, &obstacles, 8.0);
+        assert!(
+            x <= 0.0 - 4.0 + 1e-9 || x >= 190.0 + 4.0 - 1e-9,
+            "must escape merged block, got {x}"
+        );
     }
 }

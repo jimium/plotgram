@@ -200,16 +200,13 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 
 ## 9. 改善性重构 backlog（轻量）
 
-**待办：刚体判定谓词提取 + 表驱动测试**（阶段 A 硬共线规则的可测性重构，非能力变更）。
-
-**现状**：硬化判定埋在 `cross_axis.rs` `build_constraints` 的循环里，两个 `continue`（链拖拽守卫、偶扇守卫）交织，只能靠端到端测试（hier_eval / 快照）覆盖。这条规则是两轮反例调试才收敛的，值得成为可直接测试的一等单元。
+**现状**：硬化判定经具名谓词 [`hardenable_real_pair`](../../../crates/plotgram-layout/src/layout/hierarchical/metric/cross_axis.rs)（`build_constraints` 只调用谓词）。**凡 fan `deg≥2`（奇偶皆然）松开**，由 pass-2 `fan_centers` 居中；链拖拽守卫仍排除 dummy-aligned 成员。
 
 **做什么**：
 
-- 把判定逻辑提取为具名谓词（如 `hardenable_real_pair(plan, a, b, dummy_aligned, down_deg, up_deg) -> bool`），`build_constraints` 只调用谓词，不内联条件
-- 表驱动测试钉死判定矩阵：virtual-virtual 恒硬化 / 1:1 real 链 / 二分叉 / 奇扇（硬化 median 对）/ 偶扇（松开）/ dummy 相邻 real（链拖拽守卫）——每条规则一行 case（AGENTS.md §4 表驱动风格）
+- 谓词表驱动测试钉死判定矩阵：virtual-virtual 恒硬化 / 1:1 real 链 / 凡 fan≥2 松开 / dummy 相邻 real（链拖拽守卫）
 - **不做**完整版上提（显式决策步产出成员表）——那是第三个守卫触发时的熔断动作，见阶段 A 硬共线条目
 
-**验收**：行为零变化——重构后 hier_eval 全零 delta、全部快照不动；新增谓词测试绿。
+**验收**：行为与现行规则一致；谓词测试绿。
 
-**何时做**：下次触碰该区域（G3 端口侧别 / G4 ordering 列位）前顺手做，或单独安排；无阻塞依赖。
+**何时做**：已落地（flat 夯实 M1）。

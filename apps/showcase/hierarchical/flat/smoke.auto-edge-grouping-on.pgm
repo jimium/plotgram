@@ -1,0 +1,15 @@
+// flat 探针：auto_edge_grouping on（端总线）
+diagram {
+    profile: flowchart,
+    title: "flat · auto_edge_grouping on",
+    layout: hierarchical { auto_edge_grouping: true }
+
+    node hub { label: "Hub", archetype: process }
+    node a { label: "A", archetype: service }
+    node b { label: "B", archetype: service }
+    node c { label: "C", archetype: service }
+
+    hub -> a
+    hub -> b
+    hub -> c
+}

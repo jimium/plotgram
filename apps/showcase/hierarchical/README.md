@@ -12,6 +12,16 @@
 
 角色前缀仍为 `smoke.` / `product.` / `demo.` / `stress.` / `mech.`。
 
+### `flat/` 夯实探针（M1）
+
+| 文件 | 开关 / 主题 |
+|------|-------------|
+| [`smoke.auto-edge-grouping-on.pgm`](flat/smoke.auto-edge-grouping-on.pgm) | `auto_edge_grouping: true` |
+| [`smoke.auto-edge-grouping-off.pgm`](flat/smoke.auto-edge-grouping-off.pgm) | 对照 off |
+| [`smoke.critical.pgm`](flat/smoke.critical.pgm) | `critical` 边 |
+| [`smoke.self-loop.pgm`](flat/smoke.self-loop.pgm) | 真自环 `a → a` |
+| [`smoke.multi-rank-backedge.pgm`](flat/smoke.multi-rank-backedge.pgm) | 多 rank 回边 |
+
 ### `fan/` 开关对照
 
 | 文件 | 开关 | 观感 |

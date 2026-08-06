@@ -112,6 +112,65 @@ pub fn order_layers(plan: &mut PlanGraph, critical: &BTreeSet<String>) {
     }
 
     plan.layers = best;
+    tighten_one_to_one(plan, &adj);
+}
+
+/// G4: pull 1:1 real leaves under their only neighbor by adjacent swaps that
+/// do not increase crossings (and prefer reducing |Δorder|).
+fn tighten_one_to_one(plan: &mut PlanGraph, adj: &Adjacency) {
+    let _ = adj;
+    let n = plan.elems.len();
+    let mut down_real = vec![Vec::new(); n];
+    let mut up_real = vec![Vec::new(); n];
+    for s in &plan.segments {
+        if !plan.elems[s.from].key.is_virtual() && !plan.elems[s.to].key.is_virtual() {
+            down_real[s.from].push(s.to);
+            up_real[s.to].push(s.from);
+        }
+    }
+    let base = total_crossings(plan);
+    for r in 0..plan.layers.len() {
+        let layer_len = plan.layers[r].len();
+        for i in 0..layer_len.saturating_sub(1) {
+            let a = plan.layers[r][i];
+            let b = plan.layers[r][i + 1];
+            if plan.elems[a].key.is_virtual() || plan.elems[b].key.is_virtual() {
+                continue;
+            }
+            let a_up = up_real[a].len() == 1;
+            let b_up = up_real[b].len() == 1;
+            let a_dn = down_real[a].len() == 1;
+            let b_dn = down_real[b].len() == 1;
+            if !(a_up && b_up) && !(a_dn && b_dn) {
+                continue;
+            }
+            let order_of = |p: &PlanGraph, e: usize| -> isize {
+                let rank = p.elems[e].rank as usize;
+                p.layers[rank].iter().position(|&x| x == e).unwrap_or(0) as isize
+            };
+            let score = |p: &PlanGraph| -> isize {
+                let mut s = 0isize;
+                for &e in &p.layers[r] {
+                    if up_real[e].len() == 1 {
+                        s += (order_of(p, e) - order_of(p, up_real[e][0])).abs();
+                    }
+                    if down_real[e].len() == 1 {
+                        s += (order_of(p, e) - order_of(p, down_real[e][0])).abs();
+                    }
+                }
+                s
+            };
+            let before = score(plan);
+            plan.layers[r].swap(i, i + 1);
+            let blocks = build_blocks(&plan.layers[r], 0, &plan.elems);
+            let mut flat = Vec::new();
+            flatten(&blocks, &mut flat);
+            let layer_now = plan.layers[r].clone();
+            if flat != layer_now || total_crossings(plan) > base || score(plan) > before {
+                plan.layers[r].swap(i, i + 1);
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

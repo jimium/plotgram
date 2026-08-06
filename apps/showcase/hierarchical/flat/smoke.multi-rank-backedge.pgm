@@ -1,0 +1,17 @@
+// flat 探针：多 rank 回边（为 M2 外侧走廊留基线）
+diagram {
+    profile: flowchart,
+    title: "flat · multi-rank back-edge",
+    layout: hierarchical
+
+    node top { label: "Top", archetype: process }
+    node mid { label: "Mid", archetype: process }
+    node bot { label: "Bot", archetype: process }
+    node side { label: "Side", archetype: process }
+
+    top -> mid
+    mid -> bot
+    bot -> top
+    top -> side
+    side -> bot
+}

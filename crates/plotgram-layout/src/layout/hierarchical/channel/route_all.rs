@@ -340,3 +340,14 @@ fn bounded_ripup(
 
     relaxations
 }
+
+#[cfg(test)]
+mod tests {
+    use super::MAX_RIPUP_ROUNDS;
+
+    #[test]
+    fn ripup_budget_is_bounded() {
+        assert!(MAX_RIPUP_ROUNDS <= 4, "rip-up must stay bounded");
+        assert!(MAX_RIPUP_ROUNDS >= 1);
+    }
+}

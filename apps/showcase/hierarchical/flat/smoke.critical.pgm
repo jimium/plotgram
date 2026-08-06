@@ -1,0 +1,16 @@
+// flat 探针：critical 边权重
+diagram {
+    profile: flowchart,
+    title: "flat · critical path",
+    layout: hierarchical
+
+    node start { label: "Start", archetype: start }
+    node mid { label: "Mid", archetype: process }
+    node side { label: "Side", archetype: process }
+    node end { label: "End", archetype: end }
+
+    start -> mid { critical: true }
+    start -> side
+    mid -> end { critical: true }
+    side -> end
+}

@@ -26,7 +26,10 @@ pub fn finalize(
     // Uniform whole-graph translate: move the content bbox so its top-left
     // sits at (CANVAS_PAD, CANVAS_PAD). `canvas_size` then adds the same
     // padding to the right/bottom, yielding symmetric margins on all sides.
-    let (dx, dy) = content_shift(&nodes, &groups);
+    // Content includes edge paths (self-loops / outer corridors often stick
+    // past node frames — omitting them makes the stroke sit on the canvas
+    // edge when out_dist ≈ CANVAS_PAD).
+    let (dx, dy) = content_shift(&nodes, &groups, &edges);
     if dx != 0.0 || dy != 0.0 {
         for n in &mut nodes {
             n.frame.x += dx;
@@ -42,7 +45,7 @@ pub fn finalize(
     }
 
     let labels = simple_labels(graph, &nodes, &groups);
-    let (canvas_width, canvas_height) = canvas_size(&nodes, &groups);
+    let (canvas_width, canvas_height) = canvas_size(&nodes, &groups, &edges);
 
     LayoutResult {
         nodes,
@@ -58,13 +61,63 @@ pub fn finalize(
 /// Shift that moves the content bounding box origin to (CANVAS_PAD, CANVAS_PAD).
 /// Layouts normalize their output to start at (0, 0); this adds the uniform
 /// canvas padding on every side.
-fn content_shift(nodes: &[NodePlacement], groups: &[GroupPlacement]) -> (f64, f64) {
-    let mut rects: Vec<Rect> = nodes.iter().map(|n| n.frame).collect();
-    rects.extend(groups.iter().map(|g| g.frame));
-    match union_rects(&rects) {
+fn content_shift(
+    nodes: &[NodePlacement],
+    groups: &[GroupPlacement],
+    edges: &[EdgePlacement],
+) -> (f64, f64) {
+    match content_bbox(nodes, groups, edges) {
         Some(u) => (CANVAS_PAD - u.x, CANVAS_PAD - u.y),
         None => (0.0, 0.0),
     }
+}
+
+/// Axis-aligned union of node frames, group frames, and edge path extents.
+fn content_bbox(
+    nodes: &[NodePlacement],
+    groups: &[GroupPlacement],
+    edges: &[EdgePlacement],
+) -> Option<Rect> {
+    let mut rects: Vec<Rect> = nodes.iter().map(|n| n.frame).collect();
+    rects.extend(groups.iter().map(|g| g.frame));
+    for e in edges {
+        if let Some(r) = path_bbox(&e.path) {
+            rects.push(r);
+        }
+    }
+    union_rects(&rects)
+}
+
+fn path_bbox(path: &EdgePath) -> Option<Rect> {
+    let pts = match path {
+        EdgePath::Polyline { points } => points.as_slice(),
+        EdgePath::Cubic {
+            start,
+            end,
+            controls,
+        } => {
+            // Convex hull of the control polygon contains the curve.
+            return Some(point_bbox(&[*start, controls[0], controls[1], *end]));
+        }
+    };
+    if pts.is_empty() {
+        return None;
+    }
+    Some(point_bbox(pts))
+}
+
+fn point_bbox(pts: &[Point]) -> Rect {
+    let mut min_x = pts[0].x;
+    let mut min_y = pts[0].y;
+    let mut max_x = pts[0].x;
+    let mut max_y = pts[0].y;
+    for p in &pts[1..] {
+        min_x = min_x.min(p.x);
+        min_y = min_y.min(p.y);
+        max_x = max_x.max(p.x);
+        max_y = max_y.max(p.y);
+    }
+    Rect::new(min_x, min_y, max_x - min_x, max_y - min_y)
 }
 
 fn translate_edge_path(path: &mut EdgePath, dx: f64, dy: f64) {
@@ -213,10 +266,12 @@ fn find_group<'a>(graph: &'a Graph, id: &str) -> Option<&'a plotgram_model::grap
     None
 }
 
-fn canvas_size(nodes: &[NodePlacement], groups: &[GroupPlacement]) -> (f64, f64) {
-    let mut rects: Vec<Rect> = nodes.iter().map(|n| n.frame).collect();
-    rects.extend(groups.iter().map(|g| g.frame));
-    match union_rects(&rects) {
+fn canvas_size(
+    nodes: &[NodePlacement],
+    groups: &[GroupPlacement],
+    edges: &[EdgePlacement],
+) -> (f64, f64) {
+    match content_bbox(nodes, groups, edges) {
         Some(u) => (u.right() + CANVAS_PAD, u.bottom() + CANVAS_PAD),
         None => (CANVAS_PAD * 2.0, CANVAS_PAD * 2.0),
     }

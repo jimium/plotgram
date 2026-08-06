@@ -177,3 +177,146 @@ fn endpoint_main_y(
     let port = if at_source { rp.source } else { rp.target };
     port_anchor(frames[elem], port).y
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::layout::hierarchical::channel::{
+        derive_root_substrate, ChannelPath, ChannelRoutePlan, RouteTopology, TrackOrient,
+    };
+    use crate::layout::hierarchical::compose::ports::{assign_ports, EdgePorts};
+    use crate::layout::hierarchical::model::{Elem, ElemKey, RealEdge, RealGraph, Segment};
+    use plotgram_algo::orientation::{Orientation as AlgoOrientation, Size};
+
+    #[test]
+    fn track_order_is_deterministic_and_assigns_lanes() {
+        let elems = vec![
+            Elem {
+                key: ElemKey::Real("a".into()),
+                group_path: vec![],
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Real("b".into()),
+                group_path: vec![],
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Real("c".into()),
+                group_path: vec![],
+                rank: 1,
+            },
+            Elem {
+                key: ElemKey::Real("d".into()),
+                group_path: vec![],
+                rank: 1,
+            },
+        ];
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: (0..4).collect(),
+            segments: vec![
+                Segment {
+                    edge_id: "e0".into(),
+                    ordinal: 0,
+                    from: 0,
+                    to: 2,
+                },
+                Segment {
+                    edge_id: "e1".into(),
+                    ordinal: 0,
+                    from: 1,
+                    to: 3,
+                },
+            ],
+            layers: vec![vec![0, 1], vec![2, 3]],
+        };
+        let mut ids = BTreeMap::new();
+        for (i, id) in ["a", "b", "c", "d"].iter().enumerate() {
+            ids.insert((*id).into(), i);
+        }
+        let graph = RealGraph {
+            ids: vec!["a".into(), "b".into(), "c".into(), "d".into()],
+            index_of: ids,
+            group_path: vec![vec![]; 4],
+            edges: vec![
+                RealEdge {
+                    edge_id: "e0".into(),
+                    original_source: 0,
+                    original_target: 2,
+                    working_source: 0,
+                    working_target: 2,
+                    reversed: false,
+                    from_port: None,
+                    to_port: None,
+                    critical: false,
+                },
+                RealEdge {
+                    edge_id: "e1".into(),
+                    original_source: 1,
+                    original_target: 3,
+                    working_source: 1,
+                    working_target: 3,
+                    reversed: false,
+                    from_port: None,
+                    to_port: None,
+                    critical: false,
+                },
+            ],
+            self_loops: vec![],
+        };
+        let (sub, idx) = derive_root_substrate(&plan);
+        let ports = assign_ports(
+            &graph,
+            &plan,
+            AlgoOrientation::Tb,
+            &vec![Size::new(20.0, 10.0); 4],
+            false,
+        )
+        .unwrap()
+        .ports;
+        // Adjacent-layer: one Cross track between ranks.
+        let cross = idx.cross_at(1, 0).expect("cross gap");
+        let mut routes = BTreeMap::new();
+        routes.insert(
+            "e0".into(),
+            RouteTopology::Orthogonal(ChannelPath {
+                tracks: vec![cross],
+                gates: vec![],
+            }),
+        );
+        routes.insert(
+            "e1".into(),
+            RouteTopology::Orthogonal(ChannelPath {
+                tracks: vec![cross],
+                gates: vec![],
+            }),
+        );
+        let route_plan = ChannelRoutePlan {
+            substrate: sub,
+            index: idx,
+            routes,
+            bundles: vec![],
+            relaxations: vec![],
+            used_gates: false,
+        };
+        let frames = vec![
+            Rect::new(0.0, 0.0, 20.0, 10.0),
+            Rect::new(40.0, 0.0, 20.0, 10.0),
+            Rect::new(0.0, 50.0, 20.0, 10.0),
+            Rect::new(40.0, 50.0, 20.0, 10.0),
+        ];
+        let a = assign_track_order(&plan, &graph, &ports, &frames, &[], &route_plan);
+        let b = assign_track_order(&plan, &graph, &ports, &frames, &[], &route_plan);
+        assert_eq!(a.assignments, b.assignments);
+        assert!(a.track_counts.get(&cross).copied().unwrap_or(0) >= 1);
+        let _ = TrackOrient::Cross;
+        let _: BTreeMap<String, EdgePorts> = ports;
+    }
+}

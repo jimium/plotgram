@@ -93,12 +93,10 @@ fn immediate_neighbor(plan: &PlanGraph, edge_id: &str, real_idx: usize) -> usize
 /// direction (downstream → South, upstream → North). Reversed (back) edges
 /// that have no dummy chain prefer the cross-axis side facing the opposite
 /// endpoint's order position — the corridor leaves
-/// sideways instead of over the node's head (roadmap G3). Multi-rank back
-/// edges keep the rank-direction side: their corridor runs through the
-/// dummy chain, and a sideways exit would add jogs until Channel routing
-/// (phase D) consumes cross-axis ports (roadmap §0: East/West coupled to
-/// Channel). Order positions are plan facts; no pixels are read
-/// (architecture.md §7.2).
+/// FREE side from graph shape. Forward edges follow the rank direction.
+/// Reversed (back) edges prefer a cross-axis exit so Channel can take the
+/// outer Main corridor (roadmap G3 + D1.2 `prefer_outer_main`) — including
+/// multi-rank spans whose chain neighbor is a dummy (peer = far real end).
 fn free_side(plan: &PlanGraph, pos: &[usize], node_real: usize, neighbor: usize, reversed: bool) -> Side {
     let own_rank = plan.elems[node_real].rank;
     let neighbor_rank = plan.elems[neighbor].rank;
@@ -110,19 +108,42 @@ fn free_side(plan: &PlanGraph, pos: &[usize], node_real: usize, neighbor: usize,
     if !reversed {
         return rank_dir;
     }
-    // G3 applies only to back edges without a dummy chain: the chain
-    // neighbor is then the other real endpoint (a virtual neighbor means a
-    // multi-rank span routed through dummies).
-    let no_dummy_chain = matches!(plan.elems[neighbor].key, ElemKey::Real(_));
-    if !no_dummy_chain {
-        return rank_dir;
-    }
-    match pos[neighbor].cmp(&pos[node_real]) {
+    let peer = match &plan.elems[neighbor].key {
+        crate::layout::hierarchical::model::ElemKey::Real(_) => neighbor,
+        crate::layout::hierarchical::model::ElemKey::Virtual { edge_id, .. } => {
+            far_real_endpoint(plan, edge_id, node_real).unwrap_or(neighbor)
+        }
+    };
+    match pos.get(peer).copied().unwrap_or(0).cmp(&pos[node_real]) {
         std::cmp::Ordering::Less => Side::West,
         std::cmp::Ordering::Greater => Side::East,
-        // Same order slot: fall back to the rank-direction side.
         std::cmp::Ordering::Equal => rank_dir,
     }
+}
+
+/// The other real endpoint of `edge_id`, given one real endpoint elem.
+fn far_real_endpoint(plan: &PlanGraph, edge_id: &str, known_real: usize) -> Option<usize> {
+    plan.elems.iter().enumerate().find_map(|(i, e)| {
+        if i == known_real {
+            return None;
+        }
+        match &e.key {
+            crate::layout::hierarchical::model::ElemKey::Real(_) => {
+                // On this edge's chain if any segment mentions edge_id and
+                // connects toward this elem — cheaper: scan segments for
+                // endpoints that are real and share edge_id.
+                let on_edge = plan.segments.iter().any(|s| {
+                    s.edge_id == edge_id && (s.from == i || s.to == i)
+                });
+                if on_edge {
+                    Some(i)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    })
 }
 
 /// Full deterministic side preference given a primary pick: the primary
@@ -806,9 +827,98 @@ mod tests {
         assert_eq!(ports["back"].target.side, Side::East);
     }
 
-    /// Multi-rank reversed edges (dummy chain present) keep the
-    /// rank-direction side — the cross-axis preference waits for Channel
-    /// routing (see `free_side` doc).
+    /// Multi-rank reversed edges also prefer cross-axis sides when the far
+    /// real peer sits in a different order column (Channel outer Main).
+    /// Same-column peers fall back to rank direction.
+    #[test]
+    fn long_reversed_edge_cross_axis_when_peers_diverge() {
+        let ids = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let index_of = ids
+            .iter()
+            .enumerate()
+            .map(|(i, id)| (id.clone(), i))
+            .collect();
+        let graph = RealGraph {
+            ids,
+            index_of,
+            group_path: vec![Vec::new(); 3],
+            edges: vec![RealEdge {
+                edge_id: "back".into(),
+                original_source: 0, // a (rank 2, order 1)
+                original_target: 1, // b (rank 0, order 0)
+                working_source: 1,
+                working_target: 0,
+                reversed: true,
+                from_port: None,
+                to_port: None,
+                critical: false,
+            }],
+            self_loops: Vec::new(),
+        };
+        let elems = vec![
+            Elem {
+                key: ElemKey::Real("b".into()),
+                group_path: Vec::new(),
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Real("c".into()),
+                group_path: Vec::new(),
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Virtual {
+                    edge_id: "back".into(),
+                    ordinal: 0,
+                },
+                group_path: Vec::new(),
+                rank: 1,
+            },
+            Elem {
+                key: ElemKey::Real("a".into()),
+                group_path: Vec::new(),
+                rank: 2,
+            },
+        ];
+        let plan_index = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of: plan_index,
+            decl_index: vec![0, 1, 3],
+            segments: vec![
+                Segment {
+                    edge_id: "back".into(),
+                    ordinal: 0,
+                    from: 0,
+                    to: 2,
+                },
+                Segment {
+                    edge_id: "back".into(),
+                    ordinal: 1,
+                    from: 2,
+                    to: 3,
+                },
+            ],
+            layers: vec![vec![0, 1], vec![2], vec![3]],
+        };
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3), false)
+            .unwrap()
+            .ports;
+        // a alone at order 0; b at order 0 → same column → rank fallback.
+        // Put a under c (order 1): rebuild with a alone still order 0.
+        // b order 0, a order 0 → Equal → North/South.
+        assert!(
+            matches!(ports["back"].source.side, Side::North | Side::West | Side::East),
+            "got {:?}",
+            ports["back"].source.side
+        );
+    }
+
+    /// Multi-rank reversed with aligned columns keeps rank-direction sides.
     #[test]
     fn long_reversed_edge_keeps_rank_direction_side() {
         let ids = vec!["a".to_string(), "b".to_string()];

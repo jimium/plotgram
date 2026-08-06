@@ -141,6 +141,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     let route_plan =
         channel::route_edges_channel(&plan, &real_graph, &ports, &end_bundles, params)?;
     diagnostics.relaxations.extend(route_plan.relaxations.iter().cloned());
+    compose::verify::verify_plan(&plan, &real_graph, &ports, &route_plan)?;
 
     // Preliminary main (base layer_gap) so cross-axis pass-2 can expand
     // port anchors; TrackOrder then reads pixel X and Demand expands gaps.
@@ -234,6 +235,15 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         params.node_gap,
     )?;
     ink::verify::verify_no_illegal_overlap(&canonical_edges, &route_plan.bundles)?;
+    let real_frames: Vec<(String, Rect)> = real_graph
+        .ids
+        .iter()
+        .map(|id| {
+            let ei = plan.index_of[&ElemKey::Real(id.clone())];
+            (id.clone(), canonical_frames[ei])
+        })
+        .collect();
+    ink::verify::verify_no_node_penetration(&canonical_edges, &real_frames)?;
     canonical_edges.extend(ink::selfloop::self_loop_edges(
         &real_graph.self_loops,
         &real_graph.ids,

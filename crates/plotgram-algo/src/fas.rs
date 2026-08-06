@@ -8,15 +8,17 @@
 //! tie-breaks by smallest node id.
 //!
 //! Cycle-entry rule (cycle reroot): the author's declaration order is the
-//! layout's narrative priority. After the standard greedy walk, if node 0
-//! (earliest declared) is not yet a working source and has exactly one
-//! unreversed original in-edge, the cut is rotated onto that in-edge:
-//! one reversed edge is un-reversed in exchange, verified acyclic by an
-//! explicit check. Node 0 then ranks at the top and the back edge lands on
-//! the return hop, not on the entry hop. A rotation never changes the
-//! reversal count, so the ≤ E/2 − V/6 bound still holds; the choice is
-//! deterministic (smallest edge index first) and the hier_eval
-//! `reversed_count` baseline guards against regressions.
+//! layout's narrative priority. After the standard greedy walk, for every
+//! non-trivial SCC of the **original** digraph, if the earliest-declared
+//! node in that SCC has exactly one original in-edge from within the SCC
+//! and that edge is not yet the cut, the cut is rotated onto it: one
+//! reversed edge inside the SCC is un-reversed in exchange, verified
+//! acyclic by an explicit check. That node then ranks as the cycle entry
+//! and the back edge lands on the return hop, not on a forward hop
+//! (e.g. password-reset: cut `show_error→input_email`, not
+//! `input_email→email_gate`). A rotation never changes the reversal count;
+//! the choice is deterministic (SCCs by min member, then smallest edge
+//! index) and the hier_eval `reversed_count` baseline guards regressions.
 
 use std::collections::BTreeSet;
 
@@ -195,45 +197,135 @@ pub fn greedy_fas(num_nodes: usize, edges: &[(usize, usize)]) -> BTreeSet<usize>
         .map(|(i, _)| i)
         .collect();
 
-    reroot_cycle_at(num_nodes, edges, &mut reversed);
+    reroot_cycles_at_scc_entries(num_nodes, edges, &mut reversed);
     reversed
 }
 
-/// Cycle reroot (cycle-entry rule, module doc): rotate the cut onto the
-/// unique edge entering node 0, so node 0 becomes a working source and the
-/// author's narrative start ranks at the top.
-///
-/// Applies only when node 0 has exactly one original in-edge and it is
-/// currently unreversed (otherwise node 0 is already well-placed or the
-/// rotation is ambiguous). Each candidate swap exchanges that in-edge for
-/// one currently-reversed edge (smallest edge index first) and is accepted
-/// only if the resulting orientation is acyclic — a rotation keeps the
-/// reversal count intact. No acyclic swap means the ELS result stands.
-fn reroot_cycle_at(num_nodes: usize, edges: &[(usize, usize)], reversed: &mut BTreeSet<usize>) {
-    let in_edges: Vec<usize> = edges
-        .iter()
-        .enumerate()
-        .filter(|&(_, &(u, v))| v == 0 && u != 0)
-        .map(|(i, _)| i)
-        .collect();
-    if in_edges.len() != 1 {
-        return;
-    }
-    let e_in = in_edges[0];
-    if reversed.contains(&e_in) {
-        return; // node 0 is already a working source
-    }
-
-    for &f in reversed.iter() {
-        // BTreeSet iteration is ascending edge index — deterministic.
-        let mut candidate = reversed.clone();
-        candidate.remove(&f);
-        candidate.insert(e_in);
-        if is_acyclic(num_nodes, edges, &candidate) {
-            *reversed = candidate;
-            return;
+/// Cycle reroot (cycle-entry rule, module doc): for each non-trivial SCC,
+/// rotate the cut onto the unique in-SCC edge entering that SCC's
+/// earliest-declared node.
+fn reroot_cycles_at_scc_entries(
+    num_nodes: usize,
+    edges: &[(usize, usize)],
+    reversed: &mut BTreeSet<usize>,
+) {
+    let sccs = strongly_connected_components(num_nodes, edges);
+    // Process SCCs in ascending entry-node order for determinism.
+    let mut sccs: Vec<Vec<usize>> = sccs.into_iter().filter(|c| c.len() > 1).collect();
+    sccs.sort_by_key(|c| c[0]); // each SCC already sorted; [0] = earliest member
+    for scc in sccs {
+        let entry = scc[0];
+        let in_scc: BTreeSet<usize> = scc.iter().copied().collect();
+        let in_edges: Vec<usize> = edges
+            .iter()
+            .enumerate()
+            .filter(|&(_, &(u, v))| v == entry && u != v && in_scc.contains(&u))
+            .map(|(i, _)| i)
+            .collect();
+        if in_edges.len() != 1 {
+            continue; // ambiguous or no internal return hop
+        }
+        let e_in = in_edges[0];
+        if reversed.contains(&e_in) {
+            continue; // already cut at the cycle entry
+        }
+        // Candidate swaps: only currently-reversed edges with both ends in SCC.
+        let candidates: Vec<usize> = reversed
+            .iter()
+            .copied()
+            .filter(|&ei| {
+                let (u, v) = edges[ei];
+                in_scc.contains(&u) && in_scc.contains(&v)
+            })
+            .collect();
+        for f in candidates {
+            let mut candidate = reversed.clone();
+            candidate.remove(&f);
+            candidate.insert(e_in);
+            if is_acyclic(num_nodes, edges, &candidate) {
+                *reversed = candidate;
+                break;
+            }
         }
     }
+}
+
+/// Tarjan SCCs on the original digraph (self-loops ignored). Each component
+/// is sorted by node id; the component list is unsorted (caller sorts).
+fn strongly_connected_components(num_nodes: usize, edges: &[(usize, usize)]) -> Vec<Vec<usize>> {
+    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); num_nodes];
+    for &(u, v) in edges {
+        if u != v {
+            adj[u].push(v);
+        }
+    }
+    for a in &mut adj {
+        a.sort_unstable();
+        a.dedup();
+    }
+
+    let mut index_of = vec![None; num_nodes];
+    let mut lowlink = vec![0usize; num_nodes];
+    let mut on_stack = vec![false; num_nodes];
+    let mut stack: Vec<usize> = Vec::new();
+    let mut index = 0usize;
+    let mut sccs: Vec<Vec<usize>> = Vec::new();
+
+    fn strongconnect(
+        v: usize,
+        adj: &[Vec<usize>],
+        index_of: &mut [Option<usize>],
+        lowlink: &mut [usize],
+        on_stack: &mut [bool],
+        stack: &mut Vec<usize>,
+        index: &mut usize,
+        sccs: &mut Vec<Vec<usize>>,
+    ) {
+        index_of[v] = Some(*index);
+        lowlink[v] = *index;
+        *index += 1;
+        stack.push(v);
+        on_stack[v] = true;
+
+        for &w in &adj[v] {
+            if index_of[w].is_none() {
+                strongconnect(w, adj, index_of, lowlink, on_stack, stack, index, sccs);
+                lowlink[v] = lowlink[v].min(lowlink[w]);
+            } else if on_stack[w] {
+                lowlink[v] = lowlink[v].min(index_of[w].unwrap());
+            }
+        }
+
+        if lowlink[v] == index_of[v].unwrap() {
+            let mut comp = Vec::new();
+            loop {
+                let w = stack.pop().unwrap();
+                on_stack[w] = false;
+                comp.push(w);
+                if w == v {
+                    break;
+                }
+            }
+            comp.sort_unstable();
+            sccs.push(comp);
+        }
+    }
+
+    for v in 0..num_nodes {
+        if index_of[v].is_none() {
+            strongconnect(
+                v,
+                &adj,
+                &mut index_of,
+                &mut lowlink,
+                &mut on_stack,
+                &mut stack,
+                &mut index,
+                &mut sccs,
+            );
+        }
+    }
+    sccs
 }
 
 /// Kahn's algorithm over the working orientation (self-loops ignored).
@@ -487,6 +579,43 @@ mod tests {
             &mut best,
         );
         best
+    }
+
+    #[test]
+    fn password_reset_cuts_return_hops_not_forward() {
+        // flat/product.password-reset.pgm declaration order.
+        // Two SCCs: {input_email,email_gate,show_error} and
+        // {send_link,click_link,token_gate}. Cuts must land on the return
+        // hops (show_error→input_email, token_gate→send_link), never on the
+        // forward hop input_email→email_gate — that wrong cut pushed
+        // email_gate to rank 0 above start.
+        let edges = [
+            (0, 1), // start → input_email
+            (1, 2), // input_email → email_gate  (must NOT reverse)
+            (2, 3), // email_gate → send_link
+            (2, 8), // email_gate → show_error
+            (8, 1), // show_error → input_email  (must reverse)
+            (3, 4), // send_link → click_link
+            (4, 5), // click_link → token_gate
+            (5, 6), // token_gate → set_new
+            (5, 3), // token_gate → send_link    (must reverse)
+            (6, 7), // set_new → update_db
+            (7, 9), // update_db → done
+        ];
+        let rev = greedy_fas(10, &edges);
+        assert_acyclic_after_reversal(10, &edges, &rev);
+        assert!(
+            !rev.contains(&1),
+            "must not cut forward hop input_email→email_gate: {rev:?}"
+        );
+        assert!(
+            rev.contains(&4),
+            "must cut return hop show_error→input_email: {rev:?}"
+        );
+        assert!(
+            rev.contains(&8),
+            "must cut return hop token_gate→send_link: {rev:?}"
+        );
     }
 
     #[test]

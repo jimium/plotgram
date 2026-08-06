@@ -19,19 +19,19 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
         "polyline": {
           "points": [
             {
-              "x": 40.0,
+              "x": 48.0,
               "y": 40.0
             },
             {
-              "x": 40.0,
+              "x": 48.0,
               "y": 60.0
             },
             {
-              "x": 60.0,
+              "x": 68.0,
               "y": 60.0
             },
             {
-              "x": 60.0,
+              "x": 68.0,
               "y": 80.0
             }
           ]
@@ -64,11 +64,11 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
         "polyline": {
           "points": [
             {
-              "x": 60.0,
+              "x": 68.0,
               "y": 120.0
             },
             {
-              "x": 60.0,
+              "x": 68.0,
               "y": 160.0
             }
           ]
@@ -101,19 +101,19 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
         "polyline": {
           "points": [
             {
-              "x": 60.0,
+              "x": 68.0,
               "y": 200.0
             },
             {
-              "x": 60.0,
+              "x": 68.0,
               "y": 220.0
             },
             {
-              "x": 40.0,
+              "x": 48.0,
               "y": 220.0
             },
             {
-              "x": 40.0,
+              "x": 48.0,
               "y": 240.0
             }
           ]
@@ -146,27 +146,27 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
         "polyline": {
           "points": [
             {
-              "x": 80.0,
+              "x": 88.0,
               "y": 40.0
             },
             {
-              "x": 80.0,
+              "x": 88.0,
               "y": 60.0
             },
             {
-              "x": 59.99999999999999,
+              "x": 0.0,
               "y": 60.0
             },
             {
-              "x": 59.99999999999999,
+              "x": 0.0,
               "y": 220.0
             },
             {
-              "x": 80.0,
+              "x": 88.0,
               "y": 220.0
             },
             {
-              "x": 80.0,
+              "x": 88.0,
               "y": 240.0
             }
           ]
@@ -190,7 +190,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "frame": {
         "height": 40.0,
         "width": 120.0,
-        "x": 0.0,
+        "x": 8.0,
         "y": 0.0
       },
       "id": "a"
@@ -199,7 +199,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "frame": {
         "height": 40.0,
         "width": 120.0,
-        "x": 0.0,
+        "x": 8.0,
         "y": 80.0
       },
       "id": "b"
@@ -208,7 +208,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "frame": {
         "height": 40.0,
         "width": 120.0,
-        "x": 0.0,
+        "x": 8.0,
         "y": 160.0
       },
       "id": "c"
@@ -217,7 +217,7 @@ expression: "layout_json(graph, Size::new(120.0, 40.0))"
       "frame": {
         "height": 40.0,
         "width": 120.0,
-        "x": 0.0,
+        "x": 8.0,
         "y": 240.0
       },
       "id": "d"

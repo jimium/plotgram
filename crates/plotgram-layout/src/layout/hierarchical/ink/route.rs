@@ -144,6 +144,10 @@ fn lane_coord(
 }
 
 /// Expand a ChannelPath into an orthogonal polyline (D1.1).
+///
+/// Horizontals that reach a Main corridor never travel at the port's Y (node
+/// mid-line) — that would pierce same-layer siblings. They drop onto the
+/// Metric frame-derived layer-gap Y for the endpoint's rank first.
 fn expand_channel_path(
     start: Point,
     end: Point,
@@ -152,6 +156,11 @@ fn expand_channel_path(
     track_order: &TrackOrderPlan,
     track_coords: &TrackCoords,
     edge_id: &str,
+    plan: &PlanGraph,
+    frames: &[Rect],
+    src_rank: usize,
+    tgt_rank: usize,
+    layer_gap: f64,
 ) -> Result<Vec<Point>, LayoutError> {
     let tracks = &channel.tracks;
     if tracks.is_empty() {
@@ -160,7 +169,15 @@ fn expand_channel_path(
         )));
     }
 
-    // Fast path: single Cross rail (adjacent-layer template = D1.0).
+    let gap_y = |rank: usize, toward_end: Point, from: Point| -> f64 {
+        let line = if toward_end.y + 1e-9 < from.y {
+            rank
+        } else {
+            rank + 1
+        };
+        layer_gap_y(plan, frames, line, layer_gap)
+    };
+
     if tracks.len() == 1 {
         let tid = tracks[0];
         let orient = substrate
@@ -175,11 +192,28 @@ fn expand_channel_path(
             }
             TrackOrient::Main => {
                 let x = lane_coord(edge_id, tid, track_order, track_coords)?;
-                if (start.x - x).abs() > 1e-9 {
-                    path.push(Point { x, y: start.y });
+                let src_gap = gap_y(src_rank, end, start);
+                let tgt_gap = gap_y(tgt_rank, start, end);
+                if (start.y - src_gap).abs() > 1e-9 {
+                    path.push(Point {
+                        x: start.x,
+                        y: src_gap,
+                    });
                 }
-                if (end.y - path.last().unwrap().y).abs() > 1e-9 {
-                    path.push(Point { x, y: end.y });
+                if (path.last().unwrap().x - x).abs() > 1e-9 {
+                    path.push(Point {
+                        x,
+                        y: path.last().unwrap().y,
+                    });
+                }
+                if (path.last().unwrap().y - tgt_gap).abs() > 1e-9 {
+                    path.push(Point { x, y: tgt_gap });
+                }
+                if (path.last().unwrap().x - end.x).abs() > 1e-9 {
+                    path.push(Point {
+                        x: end.x,
+                        y: tgt_gap,
+                    });
                 }
                 if path.last() != Some(&end) {
                     path.push(end);
@@ -192,7 +226,6 @@ fn expand_channel_path(
         return Ok(path);
     }
 
-    // Multi-track: walk Main↔Cross junctions.
     let mut path = vec![start];
     let first = tracks[0];
     let first_orient = substrate.track(first).unwrap().orient;
@@ -207,10 +240,17 @@ fn expand_channel_path(
             }
         }
         TrackOrient::Main => {
-            if (start.x - first_c).abs() > 1e-9 {
+            let src_gap = gap_y(src_rank, end, start);
+            if (start.y - src_gap).abs() > 1e-9 {
+                path.push(Point {
+                    x: start.x,
+                    y: src_gap,
+                });
+            }
+            if (path.last().unwrap().x - first_c).abs() > 1e-9 {
                 path.push(Point {
                     x: first_c,
-                    y: start.y,
+                    y: path.last().unwrap().y,
                 });
             }
         }
@@ -242,7 +282,6 @@ fn expand_channel_path(
                     path.push(junction);
                 }
             }
-            // Gate: same-orient adjacent segments across a group boundary.
             (TrackOrient::Cross, TrackOrient::Cross) => {
                 if (prev.y - ca).abs() > 1e-9 {
                     path.push(Point { x: prev.x, y: ca });
@@ -278,10 +317,24 @@ fn expand_channel_path(
             }
         }
         TrackOrient::Main => {
-            if (prev.y - end.y).abs() > 1e-9 {
+            let tgt_gap = gap_y(tgt_rank, start, end);
+            if (prev.x - last_c).abs() > 1e-9 {
                 path.push(Point {
                     x: last_c,
-                    y: end.y,
+                    y: prev.y,
+                });
+            }
+            let cur = *path.last().unwrap();
+            if (cur.y - tgt_gap).abs() > 1e-9 {
+                path.push(Point {
+                    x: last_c,
+                    y: tgt_gap,
+                });
+            }
+            if (path.last().unwrap().x - end.x).abs() > 1e-9 {
+                path.push(Point {
+                    x: end.x,
+                    y: tgt_gap,
                 });
             }
         }
@@ -290,6 +343,38 @@ fn expand_channel_path(
         path.push(end);
     }
     Ok(path)
+}
+
+/// Mid-Y of the layer gap at `gap_line` (0 = above first layer), expanded
+/// from Metric node frames.
+fn layer_gap_y(plan: &PlanGraph, frames: &[Rect], gap_line: usize, layer_gap: f64) -> f64 {
+    let n = plan.layers.len();
+    if n == 0 {
+        return 0.0;
+    }
+    if gap_line == 0 {
+        let top = plan.layers[0]
+            .iter()
+            .map(|&e| frames[e].y)
+            .fold(f64::INFINITY, f64::min);
+        return top - layer_gap.max(1.0) * 0.5;
+    }
+    if gap_line >= n {
+        let bot = plan.layers[n - 1]
+            .iter()
+            .map(|&e| frames[e].bottom())
+            .fold(f64::NEG_INFINITY, f64::max);
+        return bot + layer_gap.max(1.0) * 0.5;
+    }
+    let above = plan.layers[gap_line - 1]
+        .iter()
+        .map(|&e| frames[e].bottom())
+        .fold(f64::NEG_INFINITY, f64::max);
+    let below = plan.layers[gap_line]
+        .iter()
+        .map(|&e| frames[e].y)
+        .fold(f64::INFINITY, f64::min);
+    0.5 * (above + below)
 }
 
 /// Bus-internal jog: horizontal rail is the bus Y already on the path, so a
@@ -463,6 +548,11 @@ pub fn route_edges(
                         track_order,
                         track_coords,
                         &e.edge_id,
+                        plan,
+                        frames,
+                        plan.elems[chain[0]].rank as usize,
+                        plan.elems[*chain.last().unwrap()].rank as usize,
+                        layer_gap,
                     )?
                 };
 

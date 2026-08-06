@@ -273,14 +273,11 @@ fn build_constraints(
                     };
                     // Any fan (≥ 2) stays soft for pass-2 centering —
                     // including odd fan-out, which BK welds leftmost.
-                    let is_fan = |d: usize| d >= 2;
-                    if is_fan(down_deg[upper]) || is_fan(up_deg[lower]) {
-                        continue;
-                    }
-                    // Chain-drag guard: a real pair hardened across a
-                    // dummy-aligned member would drag that member's chain
-                    // off its corridor.
-                    if dummy_aligned[a] || dummy_aligned[b] {
+                    if !hardenable_real_pair(
+                        dummy_aligned[a] || dummy_aligned[b],
+                        down_deg[upper],
+                        up_deg[lower],
+                    ) {
                         continue;
                     }
                 }
@@ -290,6 +287,21 @@ fn build_constraints(
         }
     }
     constraints
+}
+
+/// Whether a same-type real–real BK block pair should receive hard
+/// collinearity. Fans (`deg ≥ 2` on either side) stay soft for pass-2
+/// centering; dummy-aligned members stay soft (chain-drag guard).
+pub(crate) fn hardenable_real_pair(
+    either_dummy_aligned: bool,
+    upper_down_deg: usize,
+    lower_up_deg: usize,
+) -> bool {
+    if either_dummy_aligned {
+        return false;
+    }
+    let is_fan = |d: usize| d >= 2;
+    !is_fan(upper_down_deg) && !is_fan(lower_up_deg)
 }
 
 /// The elem adjacent to `real_elem` along `edge_id`'s chain (its only
@@ -508,6 +520,27 @@ mod tests {
                 "elem {i} must share the chain column: {} vs {}",
                 coords[i],
                 coords[0]
+            );
+        }
+    }
+
+    #[test]
+    fn hardenable_real_pair_matrix() {
+        // (dummy_aligned, upper_down, lower_up, expect_harden)
+        let cases: &[(bool, usize, usize, bool)] = &[
+            (false, 1, 1, true),  // 1:1 chain
+            (false, 2, 1, false), // even fan-out
+            (false, 3, 1, false), // odd fan-out
+            (false, 1, 2, false), // even fan-in
+            (false, 1, 3, false), // odd fan-in
+            (true, 1, 1, false),  // chain-drag guard
+            (false, 0, 1, true),  // leaf / non-fan
+        ];
+        for (i, &(dummy, down, up, want)) in cases.iter().enumerate() {
+            assert_eq!(
+                hardenable_real_pair(dummy, down, up),
+                want,
+                "case {i}"
             );
         }
     }
