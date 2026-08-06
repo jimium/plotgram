@@ -262,7 +262,7 @@ fn compile_defaults(file: &ThemeFile, tokens: &BTreeMap<String, String>) -> Comp
         stroke: get_resolved(&d.group, "stroke", tokens).unwrap_or_else(|| "#B0B0B8".to_string()),
         stroke_width: get_f64(&d.group, "stroke_width", tokens).unwrap_or(1.25),
         text_fill: get_resolved(&d.group, "text_fill", tokens).unwrap_or_else(|| "#71717A".to_string()),
-        radius: get_f64(&d.group, "radius", tokens).unwrap_or(10.0),
+        radius: get_f64(&d.group, "radius", tokens).unwrap_or(6.0),
         stroke_dasharray: get_resolved(&d.group, "stroke_dasharray", tokens)
             .filter(|s| s != "none"),
         fill_opacity: get_f64(&d.group, "fill_opacity", tokens),
@@ -317,7 +317,7 @@ fn default_node_style() -> VariantStyle {
         text_fill: "#18181B".to_string(),
         font_size: 17.0,
         font_weight: None,
-        radius: Some(10.0),
+        radius: Some(6.0),
         stroke_dasharray: None,
         stroke_linecap: Some("round".to_string()),
         stroke_linejoin: Some("round".to_string()),
