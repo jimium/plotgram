@@ -39,6 +39,7 @@
 //! (`smoke.flat-gateway-fanout`).
 //! TrackOrder Cross nest: `smoke.fan-out-four` outer/inner horizontals
 //! share rails symmetrically (no right-half cross).
+//! Side-corridor polarity: `product.ticket-triage` escalate→handle both East.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -46,7 +47,7 @@ use std::path::{Path, PathBuf};
 
 use plotgram_compile::{build_debug_trace, build_layout, BuildOptions};
 use plotgram_model::geometry::{Point, Rect};
-use plotgram_model::port::AlongSpec;
+use plotgram_model::port::{AlongSpec, Side};
 use plotgram_model::result::LayoutResult;
 use serde_json::{json, Value};
 
@@ -904,5 +905,33 @@ fn fan_out_four_cross_rails_nest_outer_inner() {
         failures.is_empty(),
         "fan-out-four Cross nest gate:\n{}",
         failures.join("\n")
+    );
+}
+
+/// Side-corridor polarity: right-tip feedback uses East on both ends
+/// (`product.ticket-triage` escalate → handle).
+#[test]
+fn ticket_triage_escalate_handle_side_corridor_east() {
+    let path = showcase_dir().join("flat/product.ticket-triage.pgm");
+    let source = fs::read_to_string(&path).expect("ticket-triage fixture");
+    let result = build_layout(&source, &BuildOptions::default()).expect("layout");
+    let e = result
+        .edges
+        .iter()
+        .find(|e| e.source == "escalate" && e.target == "handle")
+        .expect("escalate→handle edge");
+    let from = e.from_port.as_ref().expect("from_port");
+    let to = e.to_port.as_ref().expect("to_port");
+    assert_eq!(
+        from.side,
+        Side::East,
+        "escalate (right tip) must exit East, got {:?}",
+        from.side
+    );
+    assert_eq!(
+        to.side,
+        Side::East,
+        "handle must enter East (shared right corridor), got {:?}",
+        to.side
     );
 }

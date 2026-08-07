@@ -29,12 +29,12 @@
     "crossings": 1,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 25
+    "sum_bends": 24
   },
   "flat/demo.flat-realtime-recommendation": {
     "bbox_h": 307.6,
-    "bbox_w": 395.60286458333337,
-    "crossings": 10,
+    "bbox_w": 379.82552083333337,
+    "crossings": 4,
     "max_bends": 5,
     "reversed_count": 1,
     "sum_bends": 23
@@ -57,11 +57,11 @@
   },
   "flat/demo.software-release": {
     "bbox_h": 858.7999999999998,
-    "bbox_w": 323.93819076038903,
-    "crossings": 10,
+    "bbox_w": 331.93819076038903,
+    "crossings": 11,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 27
+    "sum_bends": 28
   },
   "flat/mech.constrain-flat-chain": {
     "bbox_h": 243.60000000000002,
@@ -105,11 +105,11 @@
   },
   "flat/product.leave-approval-process": {
     "bbox_h": 527.1999999999999,
-    "bbox_w": 307.9489285714286,
+    "bbox_w": 292.5417857142857,
     "crossings": 0,
-    "max_bends": 3,
+    "max_bends": 2,
     "reversed_count": 1,
-    "sum_bends": 15
+    "sum_bends": 14
   },
   "flat/product.linear-chain": {
     "bbox_h": 30.900000000000006,
@@ -122,26 +122,26 @@
   "flat/product.order-approval": {
     "bbox_h": 401.4,
     "bbox_w": 266.70588235294116,
-    "crossings": 1,
-    "max_bends": 4,
+    "crossings": 0,
+    "max_bends": 5,
     "reversed_count": 1,
-    "sum_bends": 12
+    "sum_bends": 15
   },
   "flat/product.password-reset": {
     "bbox_h": 598.0999999999999,
     "bbox_w": 261.0,
     "crossings": 0,
-    "max_bends": 3,
+    "max_bends": 4,
     "reversed_count": 2,
-    "sum_bends": 10
+    "sum_bends": 11
   },
   "flat/product.refund-process": {
     "bbox_h": 456.29999999999995,
-    "bbox_w": 282.16611111111115,
-    "crossings": 1,
+    "bbox_w": 283.64583333333337,
+    "crossings": 0,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 16
+    "sum_bends": 18
   },
   "flat/product.self-loop-retry": {
     "bbox_h": 456.29999999999995,
@@ -171,9 +171,9 @@
     "bbox_h": 456.29999999999995,
     "bbox_w": 314.0,
     "crossings": 0,
-    "max_bends": 3,
+    "max_bends": 2,
     "reversed_count": 1,
-    "sum_bends": 17
+    "sum_bends": 16
   },
   "flat/product.typical-microservice-architecture": {
     "bbox_h": 339.6,
@@ -264,20 +264,20 @@
     "sum_bends": 2
   },
   "flat/stress.layout-stress-dag": {
-    "bbox_h": 716.9999999999999,
+    "bbox_h": 732.9999999999999,
     "bbox_w": 230.04234904188945,
-    "crossings": 7,
+    "crossings": 10,
     "max_bends": 4,
     "reversed_count": 2,
     "sum_bends": 38
   },
   "flat/stress.layout-stress-flat-mesh": {
-    "bbox_h": 600.3,
+    "bbox_h": 584.3,
     "bbox_w": 375.3214545454545,
-    "crossings": 40,
-    "max_bends": 6,
+    "crossings": 56,
+    "max_bends": 5,
     "reversed_count": 2,
-    "sum_bends": 51
+    "sum_bends": 49
   },
   "flat/stress.layout-stress-yfiles-pipeline": {
     "bbox_h": 774.0999999999999,
@@ -293,7 +293,7 @@
     "crossings": 4,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 31
+    "sum_bends": 30
   },
   "group/demo.ci-cd-security-pipeline": {
     "bbox_h": 1442.0000000000005,
@@ -305,19 +305,19 @@
   },
   "group/demo.customer-refund-process": {
     "bbox_h": 1252.2,
-    "bbox_w": 310.7520176544767,
-    "crossings": 4,
+    "bbox_w": 318.7520176544767,
+    "crossings": 2,
     "max_bends": 4,
     "reversed_count": 3,
-    "sum_bends": 27
+    "sum_bends": 28
   },
   "group/demo.data-etl-pipeline": {
-    "bbox_h": 614.0999999999999,
+    "bbox_h": 598.0999999999999,
     "bbox_w": 345.08347902097904,
-    "crossings": 1,
-    "max_bends": 3,
+    "crossings": 0,
+    "max_bends": 2,
     "reversed_count": 1,
-    "sum_bends": 17
+    "sum_bends": 16
   },
   "group/demo.data-lakehouse-platform": {
     "bbox_h": 598.0999999999999,
@@ -336,20 +336,20 @@
     "sum_bends": 44
   },
   "group/demo.e-commerce-order-fulfillment": {
-    "bbox_h": 1268.2000000000003,
+    "bbox_h": 1284.2000000000003,
     "bbox_w": 200.41,
     "crossings": 2,
     "max_bends": 4,
     "reversed_count": 3,
-    "sum_bends": 25
+    "sum_bends": 24
   },
   "group/demo.fintech-payment-platform": {
-    "bbox_h": 504.29999999999995,
-    "bbox_w": 305.2765151515151,
+    "bbox_h": 488.29999999999995,
+    "bbox_w": 303.00320512820514,
     "crossings": 5,
-    "max_bends": 6,
+    "max_bends": 4,
     "reversed_count": 2,
-    "sum_bends": 26
+    "sum_bends": 23
   },
   "group/demo.hybrid-cloud-dr-topology": {
     "bbox_h": 687.1999999999999,
@@ -362,10 +362,10 @@
   "group/demo.incident-management": {
     "bbox_h": 668.9999999999999,
     "bbox_w": 285.3840816326531,
-    "crossings": 1,
-    "max_bends": 3,
+    "crossings": 0,
+    "max_bends": 2,
     "reversed_count": 1,
-    "sum_bends": 17
+    "sum_bends": 16
   },
   "group/demo.insurance-claim-process": {
     "bbox_h": 771.8999999999999,
@@ -378,7 +378,7 @@
   "group/demo.k8s-blue-green-release-topology": {
     "bbox_h": 876.9999999999999,
     "bbox_w": 666.8304773622048,
-    "crossings": 41,
+    "crossings": 45,
     "max_bends": 6,
     "reversed_count": 1,
     "sum_bends": 78
@@ -421,7 +421,7 @@
     "crossings": 0,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 23
+    "sum_bends": 22
   },
   "group/demo.mcp-server-cluster-architecture": {
     "bbox_h": 294.5,
@@ -440,9 +440,9 @@
     "sum_bends": 14
   },
   "group/demo.payment-clearing-platform": {
-    "bbox_h": 559.1999999999999,
+    "bbox_h": 543.1999999999999,
     "bbox_w": 690.3549597338938,
-    "crossings": 8,
+    "crossings": 7,
     "max_bends": 4,
     "reversed_count": 1,
     "sum_bends": 27
@@ -450,15 +450,15 @@
   "group/demo.plotgram-core-mod-deps": {
     "bbox_h": 847.4999999999999,
     "bbox_w": 1314.9176564542486,
-    "crossings": 61,
+    "crossings": 60,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 73
+    "sum_bends": 72
   },
   "group/demo.realtime-recommendation": {
     "bbox_h": 307.6,
-    "bbox_w": 395.60286458333337,
-    "crossings": 10,
+    "bbox_w": 379.82552083333337,
+    "crossings": 4,
     "max_bends": 5,
     "reversed_count": 1,
     "sum_bends": 23
@@ -481,11 +481,11 @@
   },
   "group/product.cdn-cache": {
     "bbox_h": 401.4,
-    "bbox_w": 204.8243125,
+    "bbox_w": 220.8243125,
     "crossings": 1,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 21
+    "sum_bends": 20
   },
   "group/product.cloud-native": {
     "bbox_h": 362.5,

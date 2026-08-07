@@ -287,4 +287,4 @@ D1.2 闭环之后，Channel 仍缺「端点诱导的层间资源分配」（show
 **已交付**：D1.3.2 InnerCorridorFirst — `outer_main_as_overflow` 取代 `prefer_outer_main`；外侧 Main 为溢出容量。  
 **已交付**：D1.3.3 RouteOrderWriter — 按 critical↓ span↓ reversed↓ dummy↓ decl↑ 提交；rip-up 优先牺牲短/非 critical；debug 暴露 `route_order`。  
 **已交付**：D1.3.4 Corridor DemandBoard — `DemandBoard` max-merge + freeze；Channel 仅抬内层缝 LayerGap；外沿 Cross 不进 Demand。  
-**已交付**：D1.3.5 UnifiedBackEdgeSideCost — FREE 回边走廊角色表（twin 短→N/S；span≥2 / 无 twin 短→E/W）；FixedSide 不受覆盖。
+**已交付**：D1.3.5 UnifiedBackEdgeSideCost — FREE 回边走廊角色表（twin 短→N/S；span≥2 / 无 twin 短→E/W）；E/W 极性由下游 tip 相对对端 order 边级同写（非朝 peer）；FixedSide 不受覆盖。

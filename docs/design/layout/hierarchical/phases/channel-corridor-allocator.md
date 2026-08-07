@@ -333,6 +333,12 @@ span ≥ 2                          → cross_axis (E/W)
 has_twin ∧ span=1 ∧ Δorder≤1      → rank_dir (N/S)   # 平行美学
 ¬twin ∧ span=1                    → cross_axis       # 短反馈默认侧廊
 其余                              → 软代价 argmin；平局跟已上规则
+
+# cross_axis 极性（边级，两端同脸；非朝 peer）
+tip = max-rank real 端；peer = 另一端
+tip.order > peer.order → East
+tip.order < peer.order → West
+equal                  → East
 ```
 
 `Arrow::Response` **不**进决策（与 FAS `reversed` 正交）。

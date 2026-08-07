@@ -143,12 +143,10 @@ fn free_side(
     let peer_rank = plan.elems[peer].rank;
     let own_order = pos[node_real];
     let peer_order = pos.get(peer).copied().unwrap_or(0);
-    let cross_axis = match peer_order.cmp(&own_order) {
-        std::cmp::Ordering::Less => Side::West,
-        std::cmp::Ordering::Greater => Side::East,
-        // Side-corridor default face when EW wins (stable, not N/S).
-        std::cmp::Ordering::Equal => Side::East,
-    };
+    // Side-corridor polarity is edge-level (both ends same face): tip = the
+    // lower-on-TB real endpoint; East/West from tip vs peer layer order —
+    // outer leaf side, not "toward peer" (expectations §3 闭环走侧廊).
+    let cross_axis = side_corridor_polarity(plan, pos, node_real, peer);
     let span = (own_rank as usize).abs_diff(peer_rank as usize);
     pick_reversed_side(
         rank_dir,
@@ -159,6 +157,28 @@ fn free_side(
         has_twin,
         ns_load,
     )
+}
+
+/// Shared E/W face for a side-corridor reverse: tip is the higher-rank real
+/// end; polarity follows tip's order relative to the other end.
+fn side_corridor_polarity(
+    plan: &PlanGraph,
+    pos: &[usize],
+    a: usize,
+    b: usize,
+) -> Side {
+    let (tip, other) = match plan.elems[a].rank.cmp(&plan.elems[b].rank) {
+        std::cmp::Ordering::Greater => (a, b),
+        std::cmp::Ordering::Less => (b, a),
+        std::cmp::Ordering::Equal => return Side::East,
+    };
+    let tip_o = pos.get(tip).copied().unwrap_or(0);
+    let other_o = pos.get(other).copied().unwrap_or(0);
+    match tip_o.cmp(&other_o) {
+        std::cmp::Ordering::Greater => Side::East,
+        std::cmp::Ordering::Less => Side::West,
+        std::cmp::Ordering::Equal => Side::East,
+    }
 }
 
 /// Corridor-role pick for FREE reversed ends (Compose-only; no Channel).
@@ -710,11 +730,8 @@ mod tests {
 
     #[test]
     fn reversed_edge_free_ports_prefer_cross_axis_side() {
-        // Back edge a(rank 1) ← b(rank 0) reversed into working b→a; the
-        // single segment connects them directly. Layer positions: b at 0 in
-        // its layer, a at 1 in its layer (c occupies position 0) → at a the
-        // neighbor b (pos 0 < 1) is left → West; at b the neighbor a
-        // (pos 1 > 0) is right → East.
+        // Back edge a(rank 1) ← b(rank 0). tip=a (lower on TB) sits right of
+        // b's column (layer order 1 vs 0) → shared East corridor both ends.
         let ids = vec!["a".to_string(), "b".to_string()];
         let index_of = ids
             .iter()
@@ -774,10 +791,77 @@ mod tests {
             layers: vec![vec![0], vec![1, 2]],
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(2), false).unwrap().ports;
-        // a (node pos 1; neighbor b at pos 0 → left) → West.
-        assert_eq!(ports["back"].source.side, Side::West);
-        // b (node pos 0; neighbor a at pos 1 → right) → East.
+        assert_eq!(ports["back"].source.side, Side::East);
         assert_eq!(ports["back"].target.side, Side::East);
+    }
+
+    /// Left-tip reverse (tip order < peer) → shared West corridor.
+    #[test]
+    fn side_corridor_left_tip_both_ends_west() {
+        // tip=a at rank 1 order 0; peer=b at rank 0 order 1 → West/West.
+        let ids = vec!["a".to_string(), "b".to_string()];
+        let index_of = ids
+            .iter()
+            .enumerate()
+            .map(|(i, id)| (id.clone(), i))
+            .collect();
+        let graph = RealGraph {
+            ids,
+            index_of,
+            group_path: vec![Vec::new(); 2],
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; 2],
+            edges: vec![RealEdge {
+                edge_id: "back".into(),
+                original_source: 0,
+                original_target: 1,
+                working_source: 1,
+                working_target: 0,
+                reversed: true,
+                from_port: None,
+                to_port: None,
+                critical: false,
+            }],
+            self_loops: Vec::new(),
+        };
+        let elems = vec![
+            Elem {
+                key: ElemKey::Real("c".into()),
+                group_path: Vec::new(),
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Real("b".into()),
+                group_path: Vec::new(),
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Real("a".into()),
+                group_path: Vec::new(),
+                rank: 1,
+            },
+        ];
+        let plan_index = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of: plan_index,
+            decl_index: vec![2, 1],
+            segments: vec![Segment {
+                edge_id: "back".into(),
+                ordinal: 0,
+                from: 1, // working b → a
+                to: 2,
+            }],
+            layers: vec![vec![0, 1], vec![2]],
+        };
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(2), false)
+            .unwrap()
+            .ports;
+        assert_eq!(ports["back"].source.side, Side::West);
+        assert_eq!(ports["back"].target.side, Side::West);
     }
 
     /// Multi-rank reversed edges also prefer cross-axis sides when the far
