@@ -14,7 +14,8 @@ pub struct ShapePortPolicy {
     pub allowed: &'static [Side],
     /// Overflow / fallback attempt order; must cover `allowed`.
     pub preference: &'static [Side],
-    /// Max FREE endpoints per side before soft overflow; `None` = unbounded.
+    /// Soft per-side FREE budget before same-face overflow counting;
+    /// does **not** force a face change when primary is allowed (`None` = unbounded).
     pub capacity_per_side: Option<u32>,
 }
 

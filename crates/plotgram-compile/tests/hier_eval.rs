@@ -35,6 +35,8 @@
 //! `smoke.multi-rank-backedge` hub on final fan midpoint with mirrored leaves;
 //! twin spine — `mech.constrain-sink` twin on hub column, free sink offset;
 //! PortLane face order — sink exit outside twin block on hub South.
+//! Diamond capacity: gateway fan-out sources stay on South
+//! (`smoke.flat-gateway-fanout`).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -745,6 +747,56 @@ fn port_lane_three_tier_has_no_mid_gap_horizontal_jogs() {
     assert!(
         failures.is_empty(),
         "PortLane three-tier gate:\n{}",
+        failures.join("\n")
+    );
+}
+
+/// Diamond capacity soft-overflow stays on the flow face: gateway fan-out
+/// sources are all South (`smoke.flat-gateway-fanout`).
+#[test]
+fn diamond_fanout_gateway_sources_stay_on_south() {
+    let path = showcase_dir().join("flat/smoke.flat-gateway-fanout.pgm");
+    let source = fs::read_to_string(&path).expect("gateway-fanout fixture");
+    let result = build_layout(&source, &BuildOptions::default()).expect("layout");
+    let gw = result
+        .nodes
+        .iter()
+        .find(|n| n.id == "gw")
+        .expect("gw node");
+    let mut failures = Vec::new();
+    let mut fan = 0usize;
+    for e in &result.edges {
+        if e.source != "gw" {
+            continue;
+        }
+        fan += 1;
+        let Some(fp) = e.from_port.as_ref() else {
+            failures.push(format!("{}→{}: missing from_port", e.source, e.target));
+            continue;
+        };
+        if fp.side != plotgram_model::port::Side::South {
+            failures.push(format!(
+                "{}→{}: expected South source, got {:?}",
+                e.source, e.target, fp.side
+            ));
+        }
+        let top = gw.frame.y;
+        for p in e.path.samples() {
+            if p.y < top - 1.0 {
+                failures.push(format!(
+                    "{}→{}: path climbs above gateway top (y={:.3} < {:.3})",
+                    e.source, e.target, p.y, top
+                ));
+                break;
+            }
+        }
+    }
+    if fan < 2 {
+        failures.push(format!("expected ≥2 gw fan-out edges, got {fan}"));
+    }
+    assert!(
+        failures.is_empty(),
+        "diamond gateway fan-out gate:\n{}",
         failures.join("\n")
     );
 }

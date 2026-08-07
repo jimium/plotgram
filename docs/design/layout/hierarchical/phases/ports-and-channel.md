@@ -182,8 +182,8 @@ Defer 模式可跳过 Hier Channel 搜索，但不能跳过端口、组框与 bo
 | 写者 | 仍是 Compose I.7 `assign_ports`；表只提供默认侧策略 |
 | FREE | 拓扑 `free_side` 得 primary → 在 `allowed` 内按 preference/容量选侧 |
 | FixedSide | 作者胜出；不读 allowed、不计入 FREE 容量账 |
-| 容量满 | **软溢出**到 attempt 下一侧（本阶段不 Infeasible） |
+| 容量满 | **同脸软超容**：primary ∈ allowed 时不因容量换脸（Ordered 错开）；换脸仅当 primary ∉ allowed |
 | `Node.shape == None` | 按 `NodeShape::DEFAULT`（`rounded_rect`）查表 |
 | 非本阶段 | DSL 扩展、MetricBudget、轮廓锚点、Channel 硬容量 |
 
-产品差异点：`Diamond` 每侧容量 1；`Person` 禁 North；其余多为开放四侧。
+产品差异点：`Diamond` 每侧容量 1（容满仍钉拓扑 primary，扇出共底边）；`Person` 禁 North；其余多为开放四侧。

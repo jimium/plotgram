@@ -230,15 +230,18 @@ fn far_real_endpoint(plan: &PlanGraph, edge_id: &str, known_real: usize) -> Opti
     })
 }
 
-/// Full deterministic side preference given a primary pick: the primary
-/// first, then the remaining sides in fixed `Side` order (ties follow the
-/// fixed Side order — ports-and-channel.md §2 step 3).
+/// Full deterministic side preference given a primary pick:
+/// `primary` → perpendicular pair → opposite (anti-flow last).
+///
+/// Used when `primary` is **not** allowed (e.g. Person forbids North):
+/// fall back without preferring the anti-flow face first.
 fn side_preference(primary: Side) -> [Side; 4] {
-    let rest: Vec<Side> = [Side::North, Side::South, Side::East, Side::West]
-        .into_iter()
-        .filter(|s| *s != primary)
-        .collect();
-    [primary, rest[0], rest[1], rest[2]]
+    match primary {
+        Side::North => [Side::North, Side::East, Side::West, Side::South],
+        Side::South => [Side::South, Side::East, Side::West, Side::North],
+        Side::East => [Side::East, Side::North, Side::South, Side::West],
+        Side::West => [Side::West, Side::North, Side::South, Side::East],
+    }
 }
 
 fn model_side(s: Side) -> ModelSide {
@@ -252,7 +255,7 @@ fn model_side(s: Side) -> ModelSide {
 
 /// Attempt order for FREE under a shape policy: topology
 /// `side_preference(primary)` filtered to `allowed`, then remaining
-/// `policy.preference` sides.
+/// `policy.preference` sides. Only used when primary itself is disallowed.
 fn attempt_sides(primary: Side, policy: ShapePortPolicy) -> Vec<Side> {
     let mut out = Vec::with_capacity(4);
     for s in side_preference(primary) {
@@ -271,8 +274,9 @@ fn attempt_sides(primary: Side, policy: ShapePortPolicy) -> Vec<Side> {
 
 /// Pick a side under shape policy + soft per-side capacity.
 ///
-/// When every allowed side is at capacity, soft-overflow onto the last
-/// attempt side (still increments usage) — never hard-fails layout.
+/// `capacity_per_side` does **not** drive a face change: when `primary` is
+/// allowed, capacity-full means same-face soft overflow (Ordered spreads
+/// endpoints). Face changes only when primary ∉ allowed (e.g. Person North).
 fn pick_side_with_policy(
     primary: Side,
     policy: ShapePortPolicy,
@@ -281,6 +285,14 @@ fn pick_side_with_policy(
     // Optional side restrict (unused on edges; kept for pick helper).
     restrict: Option<&[Side]>,
 ) -> Side {
+    let primary_ok = policy.allows(model_side(primary))
+        && restrict.map(|r| r.contains(&primary)).unwrap_or(true);
+    if primary_ok {
+        // Same-face soft overflow when over capacity — keep topological flow face.
+        *usage.entry((node_real, primary)).or_insert(0) += 1;
+        return primary;
+    }
+
     let attempts = attempt_sides(primary, policy);
     let attempts: Vec<Side> = match restrict {
         Some(r) => attempts.into_iter().filter(|s| r.contains(s)).collect(),
@@ -288,20 +300,17 @@ fn pick_side_with_policy(
     };
     debug_assert!(!attempts.is_empty(), "caller must ensure non-empty attempt set");
 
-    let mut soft: Option<Side> = None;
-    for s in attempts {
-        soft = Some(s);
-        let used = usage.get(&(node_real, s)).copied().unwrap_or(0);
+    for s in &attempts {
+        let used = usage.get(&(node_real, *s)).copied().unwrap_or(0);
         if let Some(cap) = policy.capacity_per_side {
             if used >= cap {
                 continue;
             }
         }
-        *usage.entry((node_real, s)).or_insert(0) += 1;
-        return s;
+        *usage.entry((node_real, *s)).or_insert(0) += 1;
+        return *s;
     }
-    // Soft overflow: last attempt side.
-    let s = soft.expect("non-empty attempts");
+    let s = attempts[0];
     *usage.entry((node_real, s)).or_insert(0) += 1;
     s
 }
@@ -1326,18 +1335,15 @@ mod tests {
     }
 
     #[test]
-    fn diamond_capacity_overflows_second_free_on_same_side() {
+    fn diamond_capacity_soft_overflows_same_face_primary() {
         let (mut graph, plan) = small_plan_and_graph();
         graph.shapes[0] = plotgram_model::NodeShape::Diamond; // a: two FREE South outs
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3), false)
             .unwrap()
             .ports;
-        assert_ne!(
-            ports["e0"].source.side, ports["e1"].source.side,
-            "diamond capacity=1 must overflow the second FREE endpoint"
-        );
-        // First edge keeps topology South; second soft-overflows.
+        // Capacity=1 does not force a face change — both stay on topological South.
         assert_eq!(ports["e0"].source.side, Side::South);
+        assert_eq!(ports["e1"].source.side, Side::South);
     }
 
     #[test]
