@@ -5,17 +5,18 @@
 //! BK ideal
 //!   → pass1_constraints (layer sep + VV hard + non-fan 1:1 hard)
 //!   → pass1 = VPSC(bk.ideal)
-//!   → compute_symmetry_plan(pass1) → axes + RigidColumnClass
+//!   → compute_symmetry_plan(pass1) → axes + RigidColumnClass + FanPack
 //!   → pass2_constraints (layer sep + VV + class hard + non-class BK 1:1)
-//!   → desired: class members = axis.coord; then port-anchor dummies
+//!   → desired: class = axis; FanPack leaves = slot.desired; port-anchor dummies
 //!   → pass2 = VPSC(desired, pass2_constraints)
 //! ```
 //!
 //! Pass-1 may soft-treat fan endpoints so packing can breathe; pass-2
 //! **only consumes** the symmetry tables (no deg≥2 / degree-1 pull as
-//! final policy). Dummy-aligned reals stay soft in BK pairs (chain-drag
-//! guard). On single-dummy chains both ends address the same elem; the
-//! source anchor wins (target applied first, source overwrites).
+//! final policy). FanPack leaf desired **covers** BK ideal so final fan
+//! center stays on the axis. Dummy-aligned reals stay soft in BK pairs
+//! (chain-drag guard). On single-dummy chains both ends address the same
+//! elem; the source anchor wins (target applied first, source overwrites).
 //!
 //! Feasibility: equality pairs are a subset of one BK alignment's edges
 //! plus class-adjacent pairs that share one axis — infeasible VPSC is a
@@ -93,7 +94,7 @@ pub fn assign_cross_axis(
     );
     let pass1 = solve_once(n, &bk.ideal, &weights, &pass1_constraints)?;
 
-    let sym = compute_symmetry_plan(plan, graph, &pass1, &dummy_aligned);
+    let sym = compute_symmetry_plan(plan, graph, &pass1, &dummy_aligned, size_of, node_gap);
 
     // Pass 2: consume symmetry tables + port-anchor expansion.
     let pass2_constraints = build_pass2_constraints(
@@ -110,12 +111,21 @@ pub fn assign_cross_axis(
             desired[e] = coord;
         }
     }
+    // FanPack leaves: cover BK ideal so final fan center stays on the axis.
+    for e in 0..n {
+        if let Some(coord) = sym.fan_desired_for(e) {
+            desired[e] = coord;
+        }
+    }
     // Port anchors expand from the hub's *intended* cross column (symmetry
     // axis when present), not stale pass-1 — otherwise dummies stay on the
     // old column while the hub slides onto the fan axis.
     let frame_of = |e: usize| -> Rect {
         let s = size_of(e);
-        let cx = sym.axis_coord_for(e).unwrap_or(pass1[e]);
+        let cx = sym
+            .axis_coord_for(e)
+            .or_else(|| sym.fan_desired_for(e))
+            .unwrap_or(pass1[e]);
         Rect::new(cx - s.width / 2.0, main[e], s.width, s.height)
     };
     for e in &graph.edges {
@@ -133,7 +143,11 @@ pub fn assign_cross_axis(
             }
             // Clustered ends share one PortPoint — pull the chain-end dummy
             // onto that shared anchor (no member pitch offset).
-            desired[nb] = port_anchor(frame_of(real_elem), port).x;
+            let mut anchor = port_anchor(frame_of(real_elem), port).x;
+            // Keep dummy soft-target outside FanPack leaf span on the same
+            // layer so high virtual weight cannot collapse mirrored leaves.
+            anchor = exteriorize_dummy_desired(plan, size_of, node_gap, &desired, nb, anchor);
+            desired[nb] = anchor;
         }
     }
     solve_once(n, &desired, &weights, &pass2_constraints)
@@ -265,12 +279,18 @@ fn build_pass2_constraints(
                 continue;
             }
             // real–real: harden only when neither is in any class and
-            // neither is dummy-aligned (pure 1:1 away from fans).
+            // neither is dummy-aligned. Distinct FanPack slots must not
+            // weld (would collapse the mirror); same-slot leaf+follower
+            // may harden so the chain stays straight under the leaf.
             if dummy_aligned[a] || dummy_aligned[b] {
                 continue;
             }
             if sym.class_of(a).is_some() || sym.class_of(b).is_some() {
                 continue;
+            }
+            match (sym.fan_desired_for(a), sym.fan_desired_for(b)) {
+                (Some(da), Some(db)) if (da - db).abs() > 1e-9 => continue,
+                _ => {}
             }
             harden_equal(&mut constraints, a, b);
         }
@@ -301,6 +321,36 @@ fn chain_neighbor(plan: &PlanGraph, edge_id: &str, real_elem: usize) -> Option<u
         .iter()
         .find(|s| s.edge_id == edge_id && (s.from == real_elem || s.to == real_elem))
         .map(|s| if s.from == real_elem { s.to } else { s.from })
+}
+
+/// Push a same-layer dummy's soft desired outside neighbors that already
+/// carry FanPack / axis absolute desired, matching layer order + sep gap.
+fn exteriorize_dummy_desired(
+    plan: &PlanGraph,
+    size_of: &dyn Fn(usize) -> Size,
+    node_gap: f64,
+    desired: &[f64],
+    dummy: usize,
+    mut anchor: f64,
+) -> f64 {
+    let rank = plan.elems[dummy].rank as usize;
+    let Some(layer) = plan.layers.get(rank) else {
+        return anchor;
+    };
+    let Some(pos) = layer.iter().position(|&e| e == dummy) else {
+        return anchor;
+    };
+    if pos > 0 {
+        let left = layer[pos - 1];
+        let gap = size_of(left).width / 2.0 + size_of(dummy).width / 2.0 + node_gap;
+        anchor = anchor.max(desired[left] + gap);
+    }
+    if pos + 1 < layer.len() {
+        let right = layer[pos + 1];
+        let gap = size_of(dummy).width / 2.0 + size_of(right).width / 2.0 + node_gap;
+        anchor = anchor.min(desired[right] - gap);
+    }
+    anchor
 }
 
 #[cfg(test)]

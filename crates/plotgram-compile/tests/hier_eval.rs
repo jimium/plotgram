@@ -29,9 +29,10 @@
 //! baseline only when a change is *intended*:
 //! `HIER_EVAL_WRITE_BASELINE=1 cargo test -p plotgram-compile --test hier_eval`.
 //!
-//! SymmetryAxis D2 gate ([phases/symmetry-axis.md](../../../docs/design/layout/hierarchical/phases/symmetry-axis.md)):
-//! three representative spines must stay collinear on the cross axis
-//! (`flat-rest-api`, `constrain-flat-chain`, `order-approval`).
+//! SymmetryAxis D2/D3 gates ([phases/symmetry-axis.md](../../../docs/design/layout/hierarchical/phases/symmetry-axis.md)):
+//! D2 — three representative spines collinear (`flat-rest-api`,
+//! `constrain-flat-chain`, `order-approval`); D3 FanPack —
+//! `smoke.multi-rank-backedge` hub on final fan midpoint with mirrored leaves.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -550,6 +551,55 @@ fn symmetry_axis_d2_representative_spines_collinear() {
     assert!(
         failures.is_empty(),
         "SymmetryAxis D2 spine gate:\n{}",
+        failures.join("\n")
+    );
+}
+
+/// SymmetryAxis D3 FanPack: hub on final fan midpoint; leaves mirrored about hub.
+#[test]
+fn symmetry_axis_d3_fan_pack_multi_rank_backedge() {
+    let path = showcase_dir().join("flat/smoke.multi-rank-backedge.pgm");
+    let source = fs::read_to_string(&path).expect("multi-rank-backedge fixture");
+    let result = build_layout(&source, &BuildOptions::default()).expect("layout");
+    let cx = |id: &str| -> f64 {
+        let n = result
+            .nodes
+            .iter()
+            .find(|n| n.id == id)
+            .unwrap_or_else(|| panic!("missing node {id}"));
+        n.frame.x + n.frame.width / 2.0
+    };
+    let top = cx("top");
+    let mid = cx("mid");
+    let bot = cx("bot");
+    let side = cx("side");
+    let fan_mid = (side + mid) / 2.0;
+    let mut failures = Vec::new();
+    for (id, x) in [("top", top), ("bot", bot)] {
+        let drift = (x - fan_mid).abs();
+        if drift > 1.0 {
+            failures.push(format!(
+                "{id} not on final fan midpoint (x={x:.3}, fan_mid={fan_mid:.3}, drift={drift:.3})"
+            ));
+        }
+    }
+    let dx_side = side - top;
+    let dx_mid = mid - top;
+    if dx_side * dx_mid >= 0.0 {
+        failures.push(format!(
+            "leaves not on opposite sides of hub: side_dx={dx_side:.3}, mid_dx={dx_mid:.3}"
+        ));
+    } else {
+        let ratio = dx_side.abs() / dx_mid.abs();
+        if !(0.5..=2.0).contains(&ratio) {
+            failures.push(format!(
+                "leaf distance ratio vs hub out of [0.5, 2.0]: ratio={ratio:.3} (side={dx_side:.3}, mid={dx_mid:.3})"
+            ));
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "SymmetryAxis D3 FanPack gate:\n{}",
         failures.join("\n")
     );
 }

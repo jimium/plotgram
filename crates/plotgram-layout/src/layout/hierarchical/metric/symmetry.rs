@@ -5,6 +5,7 @@
 //! After pass-1 (BK ideal + soft VPSC), this writer emits:
 //! - [`SymmetryAxis`] per fan hub (odd/even axis formula from pass-1 neighbors)
 //! - [`RigidColumnClass`] membership (hub + non-fan-side 1:1 chain)
+//! - [`FanPack`] leaf slots (`axis ± k·pitch`) covering BK ideal on pass-2
 //!
 //! Fan adjacency is **forward real endpoints** on [`RealGraph`] (non-reversed
 //! edges): long edges still count as one hop, so a decision that spans ranks
@@ -12,6 +13,8 @@
 //! path does not invent a spurious fan at the loop head.
 //!
 //! Downstream constraints / desired must **only consume** these tables.
+
+use plotgram_algo::orientation::Size;
 
 use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealGraph};
 
@@ -30,10 +33,25 @@ pub struct RigidColumnClass {
     pub members: Vec<usize>,
 }
 
+/// Absolute cross-axis desired for one fan leaf.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FanPackSlot {
+    pub elem: usize,
+    pub desired: f64,
+}
+
+/// Fan leaves packed symmetrically about a hub's axis.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FanPack {
+    pub hub: usize,
+    pub slots: Vec<FanPackSlot>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SymmetryPlan {
     pub axes: Vec<SymmetryAxis>,
     pub classes: Vec<RigidColumnClass>,
+    pub packs: Vec<FanPack>,
 }
 
 impl SymmetryPlan {
@@ -47,6 +65,18 @@ impl SymmetryPlan {
         let ci = self.class_of(elem)?;
         let hub = self.classes[ci].axis_hub;
         self.axes.iter().find(|a| a.hub == hub).map(|a| a.coord)
+    }
+
+    /// FanPack absolute desired for a leaf, if any.
+    pub fn fan_desired_for(&self, elem: usize) -> Option<f64> {
+        for pack in &self.packs {
+            for slot in &pack.slots {
+                if slot.elem == elem {
+                    return Some(slot.desired);
+                }
+            }
+        }
+        None
     }
 }
 
@@ -88,12 +118,14 @@ pub fn degrees_of(nbs: &[Vec<usize>]) -> Vec<usize> {
     nbs.iter().map(|v| v.len()).collect()
 }
 
-/// Build symmetry axes and rigid column classes from pass-1 centers.
+/// Build symmetry axes, rigid column classes, and FanPack slots from pass-1.
 pub fn compute_symmetry_plan(
     plan: &PlanGraph,
     graph: &RealGraph,
     pass1: &[f64],
     dummy_aligned: &[bool],
+    size_of: &dyn Fn(usize) -> Size,
+    node_gap: f64,
 ) -> SymmetryPlan {
     let n = plan.elems.len();
     let (down_nbs, up_nbs) = forward_real_adjacency(plan, graph);
@@ -102,8 +134,9 @@ pub fn compute_symmetry_plan(
 
     let mut axes = Vec::new();
     let mut classes = Vec::new();
+    let mut packs = Vec::new();
 
-    // Hubs in ascending elem index — smaller hub wins contested members.
+    // Hubs in ascending elem index — smaller hub wins contested members / leaves.
     let mut hubs: Vec<usize> = (0..n)
         .filter(|&e| {
             !plan.elems[e].key.is_virtual() && (down_deg[e] >= 2 || up_deg[e] >= 2)
@@ -112,6 +145,7 @@ pub fn compute_symmetry_plan(
     hubs.sort_unstable();
 
     let mut claimed = vec![false; n];
+    let mut fan_claimed = vec![false; n];
 
     for &hub in &hubs {
         let mut centers = Vec::new();
@@ -172,9 +206,57 @@ pub fn compute_symmetry_plan(
             axis_hub: hub,
             members,
         });
+
+        // FanPack: leaf slots about this hub's axis, then exclusive 1:1
+        // followers under each leaf share the leaf's desired (straight chain).
+        let mut slots = Vec::new();
+        if down_deg[hub] >= 2 {
+            append_fan_slots(
+                plan,
+                &down_nbs[hub],
+                /*toward_down=*/ true,
+                coord,
+                pass1,
+                size_of,
+                node_gap,
+                &down_nbs,
+                &up_nbs,
+                &down_deg,
+                &up_deg,
+                &claimed,
+                &mut fan_claimed,
+                &mut slots,
+            );
+        }
+        if up_deg[hub] >= 2 {
+            append_fan_slots(
+                plan,
+                &up_nbs[hub],
+                /*toward_down=*/ false,
+                coord,
+                pass1,
+                size_of,
+                node_gap,
+                &down_nbs,
+                &up_nbs,
+                &down_deg,
+                &up_deg,
+                &claimed,
+                &mut fan_claimed,
+                &mut slots,
+            );
+        }
+        if !slots.is_empty() {
+            slots.sort_by_key(|s| s.elem);
+            packs.push(FanPack { hub, slots });
+        }
     }
 
-    SymmetryPlan { axes, classes }
+    SymmetryPlan {
+        axes,
+        classes,
+        packs,
+    }
 }
 
 /// Odd → median neighbor center; even → midpoint of two middle neighbors.
@@ -238,6 +320,153 @@ fn walk_chain(
             break;
         }
         members.push(next);
+        cur = next;
+    }
+}
+
+/// Compose layer order key: `(rank, index_in_layer, elem)`.
+fn compose_order_key(plan: &PlanGraph, e: usize) -> (u32, usize, usize) {
+    let rank = plan.elems[e].rank;
+    let order = plan
+        .layers
+        .get(rank as usize)
+        .and_then(|layer| layer.iter().position(|&x| x == e))
+        .unwrap_or(usize::MAX);
+    (rank, order, e)
+}
+
+/// Relative slot offsets: `i - (n-1)/2` in pitch units (odd median 0; even ±0.5…).
+pub fn slot_multipliers(n: usize) -> Vec<f64> {
+    if n == 0 {
+        return Vec::new();
+    }
+    let center = (n as f64 - 1.0) / 2.0;
+    (0..n).map(|i| i as f64 - center).collect()
+}
+
+/// Pitch large enough for layer sep and not tighter than pass-1 adjacent gaps.
+pub fn fan_pitch(
+    leaves: &[usize],
+    pass1: &[f64],
+    size_of: &dyn Fn(usize) -> Size,
+    node_gap: f64,
+) -> f64 {
+    if leaves.len() < 2 {
+        return node_gap;
+    }
+    let mut width_need = 0.0_f64;
+    let mut pass1_gaps = Vec::with_capacity(leaves.len() - 1);
+    for w in leaves.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        width_need = width_need.max(node_gap + size_of(a).width / 2.0 + size_of(b).width / 2.0);
+        pass1_gaps.push((pass1[b] - pass1[a]).abs());
+    }
+    pass1_gaps.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let mid = pass1_gaps.len() / 2;
+    let from_pass1 = if pass1_gaps.len() % 2 == 1 {
+        pass1_gaps[mid]
+    } else {
+        (pass1_gaps[mid - 1] + pass1_gaps[mid]) / 2.0
+    };
+    width_need.max(from_pass1).max(node_gap)
+}
+
+fn append_fan_slots(
+    plan: &PlanGraph,
+    neighbors: &[usize],
+    toward_down: bool,
+    axis: f64,
+    pass1: &[f64],
+    size_of: &dyn Fn(usize) -> Size,
+    node_gap: f64,
+    down_nbs: &[Vec<usize>],
+    up_nbs: &[Vec<usize>],
+    down_deg: &[usize],
+    up_deg: &[usize],
+    class_claimed: &[bool],
+    fan_claimed: &mut [bool],
+    slots: &mut Vec<FanPackSlot>,
+) {
+    let mut leaves: Vec<usize> = neighbors
+        .iter()
+        .copied()
+        .filter(|&e| {
+            !plan.elems[e].key.is_virtual() && !class_claimed[e] && !fan_claimed[e]
+        })
+        .collect();
+    if leaves.len() < 2 {
+        // Contested down to <2: no pack for this side (not a usable fan packing).
+        return;
+    }
+    leaves.sort_by(|&a, &b| compose_order_key(plan, a).cmp(&compose_order_key(plan, b)));
+    let pitch = fan_pitch(&leaves, pass1, size_of, node_gap);
+    let mults = slot_multipliers(leaves.len());
+    for (i, &leaf) in leaves.iter().enumerate() {
+        fan_claimed[leaf] = true;
+        let desired = axis + mults[i] * pitch;
+        slots.push(FanPackSlot {
+            elem: leaf,
+            desired,
+        });
+        // Exclusive 1:1 chain continuing away from the hub stays on the leaf column.
+        append_leaf_followers(
+            leaf,
+            toward_down,
+            desired,
+            plan,
+            down_nbs,
+            up_nbs,
+            down_deg,
+            up_deg,
+            class_claimed,
+            fan_claimed,
+            slots,
+        );
+    }
+}
+
+fn append_leaf_followers(
+    start: usize,
+    toward_down: bool,
+    desired: f64,
+    plan: &PlanGraph,
+    down_nbs: &[Vec<usize>],
+    up_nbs: &[Vec<usize>],
+    down_deg: &[usize],
+    up_deg: &[usize],
+    class_claimed: &[bool],
+    fan_claimed: &mut [bool],
+    slots: &mut Vec<FanPackSlot>,
+) {
+    let mut cur = start;
+    loop {
+        let nbs = if toward_down {
+            &down_nbs[cur]
+        } else {
+            &up_nbs[cur]
+        };
+        if nbs.len() != 1 {
+            break;
+        }
+        let next = nbs[0];
+        if plan.elems[next].key.is_virtual() {
+            break;
+        }
+        if class_claimed[next] || fan_claimed[next] {
+            break;
+        }
+        if is_fan(next, down_deg, up_deg) {
+            break;
+        }
+        let deg = down_deg[next] + up_deg[next];
+        if deg > 2 {
+            break;
+        }
+        fan_claimed[next] = true;
+        slots.push(FanPackSlot {
+            elem: next,
+            desired,
+        });
         cur = next;
     }
 }
@@ -326,20 +555,31 @@ mod tests {
         }
     }
 
+    fn unit_size(_: usize) -> Size {
+        Size::new(20.0, 10.0)
+    }
+
+    fn sym(p: &PlanGraph, g: &RealGraph, pass1: &[f64], dummy: &[bool]) -> SymmetryPlan {
+        compute_symmetry_plan(p, g, pass1, dummy, &unit_size, 10.0)
+    }
+
     #[test]
     fn axis_formula_odd_and_even() {
         let pass1 = [0.0, 10.0, 20.0, 30.0, 40.0];
-        // odd 3: median neighbor center
         assert!((axis_from_neighbors(&[0, 1, 2], &pass1) - 10.0).abs() < 1e-9);
-        // even 2: midpoint
         assert!((axis_from_neighbors(&[1, 2], &pass1) - 15.0).abs() < 1e-9);
-        // even 4: midpoint of two middle
         assert!((axis_from_neighbors(&[0, 1, 2, 3], &pass1) - 15.0).abs() < 1e-9);
     }
 
     #[test]
+    fn slot_multipliers_odd_even() {
+        assert_eq!(slot_multipliers(2), vec![-0.5, 0.5]);
+        assert_eq!(slot_multipliers(3), vec![-1.0, 0.0, 1.0]);
+        assert_eq!(slot_multipliers(4), vec![-1.5, -0.5, 0.5, 1.5]);
+    }
+
+    #[test]
     fn multi_hop_spine_joins_down_fan_class() {
-        // gw=0 → api=1 → worker=2 → {3,4}
         let elems = vec![
             real("gw", 0),
             real("api", 1),
@@ -366,10 +606,10 @@ mod tests {
         );
         let pass1 = [0.0, 0.0, 0.0, -10.0, 10.0];
         let dummy = vec![false; 5];
-        let sym = compute_symmetry_plan(&p, &g, &pass1, &dummy);
-        assert_eq!(sym.axes.len(), 1);
-        assert!((sym.axes[0].coord - 0.0).abs() < 1e-9);
-        let mem = &sym.classes[0].members;
+        let plan_sym = sym(&p, &g, &pass1, &dummy);
+        assert_eq!(plan_sym.axes.len(), 1);
+        assert!((plan_sym.axes[0].coord - 0.0).abs() < 1e-9);
+        let mem = &plan_sym.classes[0].members;
         assert!(mem.contains(&0) && mem.contains(&1) && mem.contains(&2));
         assert!(!mem.contains(&3) && !mem.contains(&4));
     }
@@ -400,19 +640,14 @@ mod tests {
         let pass1 = [0.0, 0.0, -5.0, 5.0];
         let mut dummy = vec![false; 4];
         dummy[0] = true;
-        let sym = compute_symmetry_plan(&p, &g, &pass1, &dummy);
-        let mem = &sym.classes[0].members;
+        let plan_sym = sym(&p, &g, &pass1, &dummy);
+        let mem = &plan_sym.classes[0].members;
         assert!(mem.contains(&1));
         assert!(!mem.contains(&0));
     }
 
-    /// Decision fan with a long edge (`check → approved` via dummy) must still
-    /// treat `check` as hub and pull the upstream spine into the class.
-    /// Reversed back-edges must not invent a fan at the loop head.
     #[test]
     fn long_edge_fan_and_reversed_backedge() {
-        // submit=0, review=1, check=2, finance=3, approved=4, rejected=5,
-        // d_approved=6 (dummy on check→approved)
         let elems = vec![
             real("submit", 0),
             real("review", 1),
@@ -437,7 +672,6 @@ mod tests {
             seg("e_ca", 1, 6, 4),
             seg("e_fa", 0, 3, 4),
             seg("e_fr", 0, 3, 5),
-            // reversed rejected→submit as working submit→… omitted; graph marks reversed
         ];
         let p = plan(elems, layers, segments);
         let g = graph(
@@ -446,19 +680,18 @@ mod tests {
                 ("e_sr", 0, 1, false),
                 ("e_rc", 1, 2, false),
                 ("e_cf", 2, 3, false),
-                ("e_ca", 2, 4, false), // long, still a fan leg
+                ("e_ca", 2, 4, false),
                 ("e_fa", 3, 4, false),
                 ("e_fr", 3, 5, false),
-                ("e_rs", 5, 0, true), // reverse — must not fan submit
+                ("e_rs", 5, 0, true),
             ],
         );
         let pass1 = [0.0, 0.0, 0.0, 10.0, -10.0, 10.0, -10.0];
         let dummy = vec![false; 7];
-        let sym = compute_symmetry_plan(&p, &g, &pass1, &dummy);
-        // check is a hub (forward down to finance+approved)
-        let check_axis = sym.axes.iter().find(|a| a.hub == 2);
+        let plan_sym = sym(&p, &g, &pass1, &dummy);
+        let check_axis = plan_sym.axes.iter().find(|a| a.hub == 2);
         assert!(check_axis.is_some(), "check must be a fan hub despite long edge");
-        let check_class = sym.classes.iter().find(|c| c.axis_hub == 2).unwrap();
+        let check_class = plan_sym.classes.iter().find(|c| c.axis_hub == 2).unwrap();
         assert!(
             check_class.members.contains(&0)
                 && check_class.members.contains(&1)
@@ -466,10 +699,111 @@ mod tests {
             "spine submit→review→check must join class: {:?}",
             check_class.members
         );
-        // submit must not become a hub solely from the reversed back-edge
         assert!(
-            !sym.axes.iter().any(|a| a.hub == 0),
+            !plan_sym.axes.iter().any(|a| a.hub == 0),
             "reversed back-edge must not invent a submit fan"
         );
+    }
+
+    #[test]
+    fn fan_pack_even_two_leaves_symmetric() {
+        let elems = vec![real("hub", 0), real("left", 1), real("right", 1)];
+        let layers = vec![vec![0], vec![1, 2]];
+        let segments = vec![seg("e0", 0, 0, 1), seg("e1", 0, 0, 2)];
+        let p = plan(elems, layers, segments);
+        let g = graph(
+            &["hub", "left", "right"],
+            &[("e0", 0, 1, false), ("e1", 0, 2, false)],
+        );
+        let pass1 = [0.0, -20.0, 20.0];
+        let dummy = vec![false; 3];
+        let plan_sym = sym(&p, &g, &pass1, &dummy);
+        assert_eq!(plan_sym.packs.len(), 1);
+        let pack = &plan_sym.packs[0];
+        assert_eq!(pack.hub, 0);
+        let left = pack.slots.iter().find(|s| s.elem == 1).unwrap();
+        let right = pack.slots.iter().find(|s| s.elem == 2).unwrap();
+        let axis = plan_sym.axes[0].coord;
+        assert!((axis - 0.0).abs() < 1e-9);
+        assert!((left.desired + right.desired - 2.0 * axis).abs() < 1e-9);
+        assert!(left.desired < axis && right.desired > axis);
+        let pitch = right.desired - left.desired;
+        assert!(pitch >= 30.0 - 1e-9, "pitch must cover sep: {pitch}");
+    }
+
+    #[test]
+    fn fan_pack_odd_median_on_axis() {
+        let elems = vec![
+            real("hub", 0),
+            real("a", 1),
+            real("b", 1),
+            real("c", 1),
+        ];
+        let layers = vec![vec![0], vec![1, 2, 3]];
+        let segments = vec![
+            seg("e0", 0, 0, 1),
+            seg("e1", 0, 0, 2),
+            seg("e2", 0, 0, 3),
+        ];
+        let p = plan(elems, layers, segments);
+        let g = graph(
+            &["hub", "a", "b", "c"],
+            &[
+                ("e0", 0, 1, false),
+                ("e1", 0, 2, false),
+                ("e2", 0, 3, false),
+            ],
+        );
+        let pass1 = [0.0, -30.0, 0.0, 30.0];
+        let dummy = vec![false; 4];
+        let plan_sym = sym(&p, &g, &pass1, &dummy);
+        let pack = &plan_sym.packs[0];
+        let mid = pack.slots.iter().find(|s| s.elem == 2).unwrap();
+        assert!(
+            (mid.desired - plan_sym.axes[0].coord).abs() < 1e-9,
+            "odd median leaf sits on axis"
+        );
+    }
+
+    #[test]
+    fn fan_pack_smaller_hub_wins_contested_leaf() {
+        let elems = vec![
+            real("top", 0),
+            real("mid", 1),
+            real("bot", 2),
+            real("side", 1),
+        ];
+        let layers = vec![vec![0], vec![3, 1], vec![2]];
+        let segments = vec![
+            seg("e0", 0, 0, 1),
+            seg("e1", 0, 1, 2),
+            seg("e3", 0, 0, 3),
+            seg("e4", 0, 3, 2),
+        ];
+        let p = plan(elems, layers, segments);
+        let g = graph(
+            &["top", "mid", "bot", "side"],
+            &[
+                ("e0", 0, 1, false),
+                ("e1", 1, 2, false),
+                ("e3", 0, 3, false),
+                ("e4", 3, 2, false),
+            ],
+        );
+        let pass1 = [0.0, 10.0, 0.0, -10.0];
+        let dummy = vec![false; 4];
+        let plan_sym = sym(&p, &g, &pass1, &dummy);
+        assert!(plan_sym.axes.iter().any(|a| a.hub == 0));
+        assert!(plan_sym.axes.iter().any(|a| a.hub == 2));
+        let top_pack = plan_sym.packs.iter().find(|pk| pk.hub == 0);
+        let bot_pack = plan_sym.packs.iter().find(|pk| pk.hub == 2);
+        assert!(top_pack.is_some(), "top should own FanPack");
+        assert!(
+            bot_pack.is_none() || bot_pack.unwrap().slots.is_empty(),
+            "bot must not double-write contested leaves: {:?}",
+            bot_pack
+        );
+        assert!(plan_sym.fan_desired_for(1).is_some());
+        assert!(plan_sym.fan_desired_for(3).is_some());
     }
 }
