@@ -56,6 +56,7 @@ Sugiyama 骨架 + Atlas 三相写权（组合 → 度量 → Ink）。
 | 文档 | 用途 |
 |------|------|
 | **[architecture.md](architecture.md)** | **目标架构真源**：IR、算法表、Channel、组/分区、参数、里程碑 |
+| **[expectations.md](expectations.md)** | **视觉期待**：用户看见什么 × 写者 × 冲突裁定 |
 | **[roadmap.md](roadmap.md)** | MVP 之后的**阶段路线与方向**（A 拉直 → B 端口 → C 诊断 → D Channel/组框） |
 | [debug-profile.md](debug-profile.md) | Hier 的 DebugTrace **扩展剖面**（rank/dummy/…） |
 | [../debug-inspector.md](../debug-inspector.md) | **跨核**调试检视器信封 + UI 壳 |
@@ -78,4 +79,5 @@ Sugiyama 骨架 + Atlas 三相写权（组合 → 度量 → Ink）。
 - [channel-d1](phases/channel-d1.md) — D₁ 分阶段契约（D1.0–D1.2）
 - [channel-corridor-allocator](phases/channel-corridor-allocator.md) — D1.3 Corridor Allocator 执行方案（①–⑤）
 - [coordinate-and-demand](phases/coordinate-and-demand.md) — Demand epoch、BK/VPSC、组框、PartitionGrid、Orientation
+- [symmetry-axis](phases/symmetry-axis.md) — 次轴对称轴 / 刚体列（主轴共线 ∩ 扇出对称）
 - [ink-and-verification](phases/ink-and-verification.md) — Ink 纯展开与分相 verifier

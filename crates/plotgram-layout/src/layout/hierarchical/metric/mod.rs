@@ -7,4 +7,5 @@ pub mod bk;
 pub mod bus;
 pub mod cross_axis;
 pub mod main_axis;
+pub mod symmetry;
 pub mod track;

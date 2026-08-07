@@ -117,7 +117,9 @@ main_start[i+1] ≥ main_end[i] + resolved_layer_gap[i]
 
 ## 5. 次轴：BK 理想值 + VPSC 约束
 
-BK 生成每个 node/dummy 的理想 cross coordinate；VPSC 统一求解硬分隔与软对齐：
+BK 生成每个 node/dummy 的理想 cross coordinate；VPSC 统一求解硬分隔与软对齐。
+
+**主轴共线 ∩ 扇出对称**不由 BK 焊点兼任：目标由显式 **SymmetryAxisWriter** 产出对称轴与刚体列成员表，约束/desired 只消费该表。见 [symmetry-axis.md](symmetry-axis.md)；视觉裁定见 [expectations §6.1](../expectations.md)。
 
 ### 5.1 变量
 

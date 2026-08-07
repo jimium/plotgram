@@ -201,13 +201,17 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 
 ## 9. 改善性重构 backlog（轻量）
 
-**现状**：硬化判定经具名谓词 [`hardenable_real_pair`](../../../crates/plotgram-layout/src/layout/hierarchical/metric/cross_axis.rs)（`build_constraints` 只调用谓词）。**凡 fan `deg≥2`（奇偶皆然）松开**，由 pass-2 `fan_centers` 居中；链拖拽守卫仍排除 dummy-aligned 成员。
+**过渡现状（D2 已落地）**：[`metric/symmetry.rs`](../../../crates/plotgram-layout/src/layout/hierarchical/metric/symmetry.rs) 产出 `SymmetryAxis` + `RigidColumnClass`（正向 real 端点邻接；长边算扇、回边不算）；[`cross_axis`](../../../crates/plotgram-layout/src/layout/hierarchical/metric/cross_axis.rs) pass-2 只消费表。三图主链共线门禁在 `hier_eval::symmetry_axis_d2_representative_spines_collinear`。
+
+**目标**：Metric 显式 **SymmetryAxisWriter** — 产出 `SymmetryAxis` + `RigidColumnClass`；约束与 desired 只消费表。契约见 [phases/symmetry-axis.md](phases/symmetry-axis.md)；视觉裁定见 [expectations §6.1](expectations.md)。
 
 **做什么**：
 
-- 谓词表驱动测试钉死判定矩阵：virtual-virtual 恒硬化 / 1:1 real 链 / 凡 fan≥2 松开 / dummy 相邻 real（链拖拽守卫）
-- **不做**完整版上提（显式决策步产出成员表）——那是第三个守卫触发时的熔断动作，见阶段 A 硬共线条目
+- ~~D1：成员表 + 约束/desired 消费；删除散落的 `deg>=2` / `even_fan` 终态逻辑~~  
+- ~~D2：代表图主链共线门禁（`flat-rest-api` / `constrain-flat-chain` / `order-approval`）+ `hier_eval`~~  
+- ~~谓词/表驱动单测钉死：轴公式（奇/偶）、多跳上游进 class、dummy-aligned 截断~~  
+- D3（可选）：扇叶相对轴对称铺开；组边界截断细则  
 
-**验收**：行为与现行规则一致；谓词测试绿。
+**不做（本期）**：孩子相对轴完整重打包（属 D3）；Channel/Ink 改列；图名特判。
 
-**何时做**：已落地（flat 夯实 M1）。
+**何时做**：D1/D2 已合；D3 按需。

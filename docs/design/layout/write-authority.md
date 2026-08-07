@@ -78,6 +78,7 @@ producer 局部聚合（可 sum/count）
 | 文档 | 读什么 |
 |------|--------|
 | **本文** | 尺子、判断句 |
+| [`hierarchical/expectations.md`](hierarchical/expectations.md) | Hier **视觉期待**：对称 / 主轴 / 平行 vs 侧绕 等 + 冲突裁定 |
 | [`layout/`](README.md) | 各内核：逻辑、范围、典型域、相写权 |
 | [`routing/orthogonal/architecture`](../routing/orthogonal/architecture.md) | 独立 EdgeRouter：只写 path；L2–L4；可夹具开发 |
 | [`hierarchical/from-yfiles-reference`](hierarchical/nodes/from-yfiles-reference.md) | 参考文库对 Hier / Atlas 迁移的启发纪要 |

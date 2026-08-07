@@ -28,6 +28,10 @@
 //! swapping the cut edge of a cycle never adds reversals. Regenerate the
 //! baseline only when a change is *intended*:
 //! `HIER_EVAL_WRITE_BASELINE=1 cargo test -p plotgram-compile --test hier_eval`.
+//!
+//! SymmetryAxis D2 gate ([phases/symmetry-axis.md](../../../docs/design/layout/hierarchical/phases/symmetry-axis.md)):
+//! three representative spines must stay collinear on the cross axis
+//! (`flat-rest-api`, `constrain-flat-chain`, `order-approval`).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -503,4 +507,49 @@ fn check_bend_gate(metrics: &[FileMetrics], failures: &mut Vec<String>) {
             )
         );
     }
+}
+
+/// SymmetryAxis D2: main-chain centers collinear (no staircase fold).
+#[test]
+fn symmetry_axis_d2_representative_spines_collinear() {
+    // (relative path under showcase/hierarchical, spine node ids in TB order)
+    const CASES: &[(&str, &[&str])] = &[
+        ("flat/product.flat-rest-api.pgm", &["web", "lb", "api"]),
+        ("flat/mech.constrain-flat-chain.pgm", &["gw", "api", "worker"]),
+        ("flat/product.order-approval.pgm", &["submit", "review", "check"]),
+    ];
+    let dir = showcase_dir();
+    let mut failures = Vec::new();
+    for &(rel, spine) in CASES {
+        let path = dir.join(rel);
+        let source = fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let result = build_layout(&source, &BuildOptions::default())
+            .unwrap_or_else(|e| panic!("{rel}: layout error: {e}"));
+        let by_id: BTreeMap<&str, &plotgram_model::result::NodePlacement> =
+            result.nodes.iter().map(|n| (n.id.as_str(), n)).collect();
+        let mut xs = Vec::with_capacity(spine.len());
+        for &id in spine {
+            let Some(n) = by_id.get(id) else {
+                failures.push(format!("{rel}: missing spine node `{id}`"));
+                continue;
+            };
+            xs.push(n.frame.x + n.frame.width / 2.0);
+        }
+        if xs.len() != spine.len() {
+            continue;
+        }
+        let spread = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+            - xs.iter().cloned().fold(f64::INFINITY, f64::min);
+        if spread > 1e-3 {
+            failures.push(format!(
+                "{rel}: spine {spine:?} cross-centers not collinear (spread={spread:.4}, xs={xs:?})"
+            ));
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "SymmetryAxis D2 spine gate:\n{}",
+        failures.join("\n")
+    );
 }
