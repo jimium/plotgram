@@ -37,6 +37,8 @@
 //! PortLane face order — sink exit outside twin block on hub South.
 //! Diamond capacity: gateway fan-out sources stay on South
 //! (`smoke.flat-gateway-fanout`).
+//! TrackOrder Cross nest: `smoke.fan-out-four` outer/inner horizontals
+//! share rails symmetrically (no right-half cross).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -44,6 +46,7 @@ use std::path::{Path, PathBuf};
 
 use plotgram_compile::{build_debug_trace, build_layout, BuildOptions};
 use plotgram_model::geometry::{Point, Rect};
+use plotgram_model::port::AlongSpec;
 use plotgram_model::result::LayoutResult;
 use serde_json::{json, Value};
 
@@ -797,6 +800,109 @@ fn diamond_fanout_gateway_sources_stay_on_south() {
     assert!(
         failures.is_empty(),
         "diamond gateway fan-out gate:\n{}",
+        failures.join("\n")
+    );
+}
+
+/// Longest axis-aligned horizontal segment Y (Cross rail for adjacent-layer fan).
+fn primary_horiz_y(samples: &[Point]) -> Option<f64> {
+    let mut best: Option<(f64, f64)> = None;
+    for w in samples.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        if (a.y - b.y).abs() >= EPS {
+            continue;
+        }
+        let len = (a.x - b.x).abs();
+        if len < EPS {
+            continue;
+        }
+        if best.map_or(true, |(l, _)| len > l) {
+            best = Some((len, a.y));
+        }
+    }
+    best.map(|(_, y)| y)
+}
+
+/// TrackOrder outer/inner nest on `smoke.fan-out-four` (grouping off):
+/// outer leaves share the upper Cross rail, inner share the lower; no fan
+/// path-segment crossings.
+#[test]
+fn fan_out_four_cross_rails_nest_outer_inner() {
+    let path = showcase_dir().join("flat/smoke.fan-out-four.pgm");
+    let source = fs::read_to_string(&path).expect("fan-out-four fixture");
+    let result = build_layout(&source, &BuildOptions::default()).expect("layout");
+
+    let mut fan: Vec<(u32, u32, String, f64, Vec<Point>)> = Vec::new();
+    for e in &result.edges {
+        if e.source != "hub" {
+            continue;
+        }
+        let Some(fp) = e.from_port.as_ref() else {
+            panic!("hub→{} missing from_port", e.target);
+        };
+        let AlongSpec::Ordered { order, count } = fp.along else {
+            panic!("hub→{} expected Ordered along, got {:?}", e.target, fp.along);
+        };
+        assert!(count >= 2, "hub→{} Ordered.count={count}", e.target);
+        let nest = order.min(count - 1 - order);
+        let samples = e.path.samples();
+        let y = primary_horiz_y(&samples).unwrap_or_else(|| {
+            panic!("hub→{}: no horizontal segment", e.target);
+        });
+        fan.push((nest, order, e.target.clone(), y, samples));
+    }
+    assert_eq!(fan.len(), 4, "expected 4 hub fan-out edges");
+
+    let mut by_nest: BTreeMap<u32, Vec<(String, f64)>> = BTreeMap::new();
+    for (nest, _, tgt, y, _) in &fan {
+        by_nest.entry(*nest).or_default().push((tgt.clone(), *y));
+    }
+    assert!(
+        by_nest.contains_key(&0) && by_nest.contains_key(&1),
+        "expected nest 0 and 1, got {:?}",
+        by_nest.keys().collect::<Vec<_>>()
+    );
+
+    let mut failures = Vec::new();
+    for (nest, members) in &by_nest {
+        let y0 = members[0].1;
+        for (tgt, y) in members.iter().skip(1) {
+            if (y - y0).abs() > 1e-3 {
+                failures.push(format!(
+                    "nest {nest}: {} y={y:.3} ≠ peer y={y0:.3} (outer/inner must share rail)",
+                    tgt
+                ));
+            }
+        }
+    }
+    let outer_y = by_nest[&0][0].1;
+    let inner_y = by_nest[&1][0].1;
+    if !(outer_y < inner_y - 1e-3) {
+        failures.push(format!(
+            "outer rail y={outer_y:.3} must be above (smaller than) inner y={inner_y:.3}"
+        ));
+    }
+
+    for i in 0..fan.len() {
+        for j in i + 1..fan.len() {
+            let si = &fan[i].4;
+            let sj = &fan[j].4;
+            for wi in si.windows(2) {
+                for wj in sj.windows(2) {
+                    if segments_cross(wi[0], wi[1], wj[0], wj[1]) {
+                        failures.push(format!(
+                            "hub→{} crosses hub→{}",
+                            fan[i].2, fan[j].2
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    assert!(
+        failures.is_empty(),
+        "fan-out-four Cross nest gate:\n{}",
         failures.join("\n")
     );
 }

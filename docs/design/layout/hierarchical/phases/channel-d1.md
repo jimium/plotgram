@@ -135,8 +135,12 @@ Port → VerticalToTrack → HorizontalOnTrack(corridor, track_index) → Vertic
    - **Cross**：横切像素区间 `[min(src_cross, tgt_cross), max(...)]`（假 bus 修复）。
    - **Main**：rank 占用半开区间 `[min_rank, max_rank+1)`（同层带堆叠回边平行分道；仅端点相接的层带可共 lane）。
    D1.0 实现：先用 base `layer_gap` 跑一轮次轴得像素帧，再在该帧上着色；随后 Demand 撑开层缝并重算主轴（cross 不变）。不得在 Ink 改 `track_index`。
-3. `plotgram-algo::interval_color` 求最少 track 数。
-4. 偏序 / 外内轨：源与汇端口 `Ordered.slot` + `(declaration_index, EdgeId)` 稳定决定「外轨优先于内轨」（对齐 yFiles 嵌套横杠）。
+3. 冲突图：span 重叠 ⇒ 不得同 lane；lane 数 ≥ clique（可用 first-fit 得到）。
+4. **外内嵌套**（对齐 yFiles；关 grouping）：对同脸扇出取  
+   `nest = min(Ordered.order, count - 1 - order)`（`count ≥ 2` 的那一端；两端皆扇取更小 nest）。  
+   着色顺序键 `(nest, order, EdgeId)` **升序（外先）**，再 first-fit 最小可用 lane —— 外叶得低 `track_index`（靠上游横杠）。  
+   非扇出：`(0, 0, EdgeId)`，次键 span 宽降序。  
+   **禁止**仅按左端点贪心复用（会把右内外轨反转，见 `smoke.fan-out-four`）。
 5. 硬端口序成环 → `Infeasible`；本阶段无软偏好环、无 rip-up。
 6. `BusPrefix` 成员共享 `track_index`，不参与分轨着色。
 
