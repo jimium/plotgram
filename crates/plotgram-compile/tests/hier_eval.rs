@@ -32,7 +32,9 @@
 //! SymmetryAxis D2/D3 gates ([phases/symmetry-axis.md](../../../docs/design/layout/hierarchical/phases/symmetry-axis.md)):
 //! D2 — three representative spines collinear (`flat-rest-api`,
 //! `constrain-flat-chain`, `order-approval`); D3 FanPack —
-//! `smoke.multi-rank-backedge` hub on final fan midpoint with mirrored leaves.
+//! `smoke.multi-rank-backedge` hub on final fan midpoint with mirrored leaves;
+//! twin spine — `mech.constrain-sink` twin on hub column, free sink offset;
+//! PortLane face order — sink exit outside twin block on hub South.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -601,6 +603,97 @@ fn symmetry_axis_d3_fan_pack_multi_rank_backedge() {
         failures.is_empty(),
         "SymmetryAxis D3 FanPack gate:\n{}",
         failures.join("\n")
+    );
+}
+
+/// Twin spine privilege: 2-cycle peer stays on hub column; free sink offsets
+/// (yFiles / expectations §6.1 — not even-fan mirrored off the return path).
+#[test]
+fn twin_spine_constrain_sink_side_on_axis() {
+    let path = showcase_dir().join("flat/mech.constrain-sink.pgm");
+    let source = fs::read_to_string(&path).expect("constrain-sink fixture");
+    let result = build_layout(&source, &BuildOptions::default()).expect("layout");
+    let cx = |id: &str| -> f64 {
+        let n = result
+            .nodes
+            .iter()
+            .find(|n| n.id == id)
+            .unwrap_or_else(|| panic!("missing node {id}"));
+        n.frame.x + n.frame.width / 2.0
+    };
+    let a = cx("a");
+    let side = cx("side");
+    let end = cx("end");
+    let mut failures = Vec::new();
+    let twin_drift = (side - a).abs();
+    if twin_drift > 1.0 {
+        failures.push(format!(
+            "twin side not on hub column (a={a:.3}, side={side:.3}, drift={twin_drift:.3})"
+        ));
+    }
+    let sink_dx = (end - a).abs();
+    if sink_dx < 8.0 {
+        failures.push(format!(
+            "offset sink end should leave the spine (a={a:.3}, end={end:.3}, |dx|={sink_dx:.3})"
+        ));
+    }
+    assert!(
+        failures.is_empty(),
+        "twin spine constrain-sink gate:\n{}",
+        failures.join("\n")
+    );
+}
+
+/// PortLane face order: on hub South, sink exit must sit outside the twin
+/// corridor block (expectations §6.2 — no Ordered/LocalOffset sandwich).
+#[test]
+fn port_lane_constrain_sink_outer_leaf_outside_twin_block() {
+    let path = showcase_dir().join("flat/mech.constrain-sink.pgm");
+    let source = fs::read_to_string(&path).expect("constrain-sink fixture");
+    let result = build_layout(&source, &BuildOptions::default()).expect("layout");
+    let by_id: BTreeMap<&str, Rect> = result
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.frame))
+        .collect();
+    let a = by_id["a"];
+    let mut twin_xs = Vec::new();
+    let mut end_x = None;
+    for e in &result.edges {
+        let pts = e.path.samples();
+        if pts.is_empty() {
+            continue;
+        }
+        let pair = (e.source.as_str(), e.target.as_str());
+        // Port on `a`'s south: first sample if a is source, last if a is target.
+        let on_a = if e.source == "a" {
+            pts[0]
+        } else if e.target == "a" {
+            *pts.last().unwrap()
+        } else {
+            continue;
+        };
+        // South face: y ≈ a.bottom()
+        if (on_a.y - a.bottom()).abs() > 1.0 {
+            continue;
+        }
+        match pair {
+            ("a", "side") | ("side", "a") => twin_xs.push(on_a.x),
+            ("a", "end") => end_x = Some(on_a.x),
+            _ => {}
+        }
+    }
+    assert!(
+        twin_xs.len() >= 2,
+        "expected both twin ports on a South, got {}",
+        twin_xs.len()
+    );
+    let end_x = end_x.expect("a→end port on a South");
+    let twin_lo = twin_xs.iter().cloned().fold(f64::INFINITY, f64::min);
+    let twin_hi = twin_xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    assert!(
+        end_x > twin_hi + 0.5 || end_x < twin_lo - 0.5,
+        "end port must sit outside twin block: end={end_x:.3}, twin=[{twin_lo:.3},{twin_hi:.3}]"
     );
 }
 

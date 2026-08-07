@@ -9,14 +9,14 @@
   },
   "fan/critical": {
     "bbox_h": 172.70000000000002,
-    "bbox_w": 181.5,
+    "bbox_w": 216.0,
     "crossings": 0,
     "max_bends": 2,
     "reversed_count": 0,
     "sum_bends": 12
   },
   "flat/demo.aml-case-investigation": {
-    "bbox_h": 842.7999999999998,
+    "bbox_h": 858.7999999999998,
     "bbox_w": 271.1837121212121,
     "crossings": 4,
     "max_bends": 4,
@@ -40,24 +40,24 @@
     "sum_bends": 23
   },
   "flat/demo.k8s-incident-response": {
-    "bbox_h": 890.7999999999998,
-    "bbox_w": 358.0,
-    "crossings": 23,
+    "bbox_h": 922.7999999999998,
+    "bbox_w": 372.3202026468156,
+    "crossings": 27,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 43
+    "sum_bends": 45
   },
   "flat/demo.pr-architecture-review": {
-    "bbox_h": 630.0999999999999,
-    "bbox_w": 388.62,
-    "crossings": 4,
+    "bbox_h": 646.0999999999999,
+    "bbox_w": 396.7615669811321,
+    "crossings": 5,
     "max_bends": 4,
     "reversed_count": 1,
     "sum_bends": 28
   },
   "flat/demo.software-release": {
     "bbox_h": 842.7999999999998,
-    "bbox_w": 330.69726352079294,
+    "bbox_w": 331.6845435455349,
     "crossings": 16,
     "max_bends": 3,
     "reversed_count": 1,
@@ -72,12 +72,12 @@
     "sum_bends": 4
   },
   "flat/mech.constrain-sink": {
-    "bbox_h": 172.70000000000002,
+    "bbox_h": 188.70000000000002,
     "bbox_w": 112.0,
-    "crossings": 0,
+    "crossings": 1,
     "max_bends": 2,
     "reversed_count": 1,
-    "sum_bends": 6
+    "sum_bends": 2
   },
   "flat/product.employee-onboarding": {
     "bbox_h": 472.29999999999995,
@@ -121,11 +121,11 @@
   },
   "flat/product.order-approval": {
     "bbox_h": 385.4,
-    "bbox_w": 240.23529411764707,
-    "crossings": 1,
+    "bbox_w": 258.70588235294116,
+    "crossings": 3,
     "max_bends": 3,
     "reversed_count": 1,
-    "sum_bends": 12
+    "sum_bends": 11
   },
   "flat/product.password-reset": {
     "bbox_h": 598.0999999999999,
@@ -176,20 +176,20 @@
     "sum_bends": 22
   },
   "flat/product.typical-microservice-architecture": {
-    "bbox_h": 371.6,
-    "bbox_w": 474.11125000000004,
-    "crossings": 38,
+    "bbox_h": 355.6,
+    "bbox_w": 440.13030000000003,
+    "crossings": 25,
     "max_bends": 4,
     "reversed_count": 0,
-    "sum_bends": 40
+    "sum_bends": 41
   },
   "flat/product.user-auth": {
-    "bbox_h": 259.6,
-    "bbox_w": 213.26,
-    "crossings": 1,
+    "bbox_h": 275.6,
+    "bbox_w": 205.26000000000002,
+    "crossings": 2,
     "max_bends": 3,
     "reversed_count": 4,
-    "sum_bends": 18
+    "sum_bends": 14
   },
   "flat/smoke.auto-edge-grouping-off": {
     "bbox_h": 101.80000000000001,
@@ -265,19 +265,19 @@
   },
   "flat/stress.layout-stress-dag": {
     "bbox_h": 764.9999999999999,
-    "bbox_w": 244.62984904188943,
+    "bbox_w": 254.04234904188945,
     "crossings": 14,
     "max_bends": 5,
     "reversed_count": 2,
     "sum_bends": 50
   },
   "flat/stress.layout-stress-flat-mesh": {
-    "bbox_h": 584.3,
-    "bbox_w": 420.0,
-    "crossings": 35,
-    "max_bends": 5,
+    "bbox_h": 600.3,
+    "bbox_w": 381.85818181818183,
+    "crossings": 50,
+    "max_bends": 6,
     "reversed_count": 2,
-    "sum_bends": 52
+    "sum_bends": 48
   },
   "flat/stress.layout-stress-yfiles-pipeline": {
     "bbox_h": 774.0999999999999,
@@ -297,7 +297,7 @@
   },
   "group/demo.ci-cd-security-pipeline": {
     "bbox_h": 1426.0000000000002,
-    "bbox_w": 288.0,
+    "bbox_w": 351.2244389310207,
     "crossings": 25,
     "max_bends": 4,
     "reversed_count": 1,
@@ -305,7 +305,7 @@
   },
   "group/demo.customer-refund-process": {
     "bbox_h": 1284.2,
-    "bbox_w": 322.47744755244753,
+    "bbox_w": 333.6519230769231,
     "crossings": 12,
     "max_bends": 3,
     "reversed_count": 3,
@@ -328,24 +328,24 @@
     "sum_bends": 22
   },
   "group/demo.data-lineage-platform": {
-    "bbox_h": 646.0999999999999,
+    "bbox_h": 662.0999999999999,
     "bbox_w": 475.36,
-    "crossings": 6,
+    "crossings": 8,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 44
   },
   "group/demo.e-commerce-order-fulfillment": {
     "bbox_h": 1284.2000000000003,
-    "bbox_w": 256.85,
+    "bbox_w": 208.41,
     "crossings": 4,
     "max_bends": 4,
     "reversed_count": 3,
     "sum_bends": 34
   },
   "group/demo.fintech-payment-platform": {
-    "bbox_h": 520.3,
-    "bbox_w": 319.52640374331554,
+    "bbox_h": 504.29999999999995,
+    "bbox_w": 305.2765151515151,
     "crossings": 8,
     "max_bends": 6,
     "reversed_count": 2,
@@ -369,40 +369,40 @@
   },
   "group/demo.insurance-claim-process": {
     "bbox_h": 803.8999999999999,
-    "bbox_w": 291.3732769423559,
+    "bbox_w": 331.3732769423559,
     "crossings": 11,
     "max_bends": 4,
     "reversed_count": 1,
     "sum_bends": 26
   },
   "group/demo.k8s-blue-green-release-topology": {
-    "bbox_h": 876.9999999999999,
+    "bbox_h": 892.9999999999999,
     "bbox_w": 666.8304773622048,
-    "crossings": 44,
-    "max_bends": 5,
+    "crossings": 62,
+    "max_bends": 6,
     "reversed_count": 1,
-    "sum_bends": 80
+    "sum_bends": 81
   },
   "group/demo.k8s-multi-cluster-federation": {
-    "bbox_h": 783.1999999999999,
-    "bbox_w": 965.6557988095241,
-    "crossings": 98,
+    "bbox_h": 831.1999999999999,
+    "bbox_w": 981.6557988095241,
+    "crossings": 92,
     "max_bends": 4,
     "reversed_count": 0,
-    "sum_bends": 83
+    "sum_bends": 84
   },
   "group/demo.k8s-multi-namespace-overview": {
     "bbox_h": 815.1999999999999,
-    "bbox_w": 1393.61921875,
-    "crossings": 139,
+    "bbox_w": 1340.4400000000003,
+    "crossings": 137,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 77
   },
   "group/demo.k8s-platform-stack": {
     "bbox_h": 664.3,
-    "bbox_w": 1022.5803125000002,
-    "crossings": 46,
+    "bbox_w": 1028.0528125,
+    "crossings": 48,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 77
@@ -433,15 +433,15 @@
   },
   "group/demo.multi-region-active-active": {
     "bbox_h": 401.4,
-    "bbox_w": 331.0236394557823,
+    "bbox_w": 298.4883630952381,
     "crossings": 0,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 19
+    "sum_bends": 15
   },
   "group/demo.payment-clearing-platform": {
     "bbox_h": 559.1999999999999,
-    "bbox_w": 683.7900000000002,
+    "bbox_w": 730.3549597338938,
     "crossings": 11,
     "max_bends": 4,
     "reversed_count": 1,
@@ -449,11 +449,11 @@
   },
   "group/demo.plotgram-core-mod-deps": {
     "bbox_h": 847.4999999999999,
-    "bbox_w": 1348.072850898693,
-    "crossings": 56,
-    "max_bends": 5,
+    "bbox_w": 1314.9176564542486,
+    "crossings": 65,
+    "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 75
+    "sum_bends": 73
   },
   "group/demo.realtime-recommendation": {
     "bbox_h": 307.6,
@@ -465,7 +465,7 @@
   },
   "group/demo.supply-chain-control-tower": {
     "bbox_h": 984.5999999999999,
-    "bbox_w": 337.61250000000007,
+    "bbox_w": 398.31360294117655,
     "crossings": 0,
     "max_bends": 4,
     "reversed_count": 0,
@@ -480,33 +480,33 @@
     "sum_bends": 0
   },
   "group/product.cdn-cache": {
-    "bbox_h": 401.4,
-    "bbox_w": 256.0419926470588,
-    "crossings": 7,
+    "bbox_h": 385.4,
+    "bbox_w": 244.82431250000002,
+    "crossings": 5,
     "max_bends": 5,
     "reversed_count": 1,
-    "sum_bends": 23
+    "sum_bends": 22
   },
   "group/product.cloud-native": {
     "bbox_h": 362.5,
-    "bbox_w": 737.712,
-    "crossings": 12,
+    "bbox_w": 694.3641666666666,
+    "crossings": 10,
     "max_bends": 2,
     "reversed_count": 0,
     "sum_bends": 24
   },
   "group/product.compiler-pipeline": {
     "bbox_h": 346.5,
-    "bbox_w": 342.3,
-    "crossings": 7,
+    "bbox_w": 424.3294047619048,
+    "crossings": 9,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 24
   },
   "group/product.d2-cell-tower-network": {
     "bbox_h": 378.5,
-    "bbox_w": 204.38600000000002,
-    "crossings": 3,
+    "bbox_w": 260.27600000000007,
+    "crossings": 5,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 16
@@ -545,11 +545,11 @@
   },
   "group/product.microservices": {
     "bbox_h": 417.4,
-    "bbox_w": 235.86,
-    "crossings": 1,
+    "bbox_w": 226.4579057734205,
+    "crossings": 5,
     "max_bends": 4,
     "reversed_count": 0,
-    "sum_bends": 22
+    "sum_bends": 23
   },
   "group/product.monitoring-stack": {
     "bbox_h": 243.60000000000002,
@@ -561,7 +561,7 @@
   },
   "group/product.narrow-corridor": {
     "bbox_h": 172.70000000000002,
-    "bbox_w": 162.38,
+    "bbox_w": 185.16750000000002,
     "crossings": 0,
     "max_bends": 2,
     "reversed_count": 0,
@@ -600,9 +600,9 @@
     "sum_bends": 10
   },
   "group/stress.layout-stress-nested": {
-    "bbox_h": 575.1999999999999,
-    "bbox_w": 452.849891025641,
-    "crossings": 3,
+    "bbox_h": 607.1999999999999,
+    "bbox_w": 464.46200384615383,
+    "crossings": 7,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 26

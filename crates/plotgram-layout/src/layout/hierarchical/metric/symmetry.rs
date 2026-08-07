@@ -12,7 +12,14 @@
 //! via dummies remains a fan. Reversed back-edges are excluded so a return
 //! path does not invent a spurious fan at the loop head.
 //!
+//! **Twin spine privilege**: a forward neighbor that also has a reversed edge
+//! on the same undirected pair (req–resp / 2-cycle) joins the rigid column on
+//! the axis instead of taking a mirrored FanPack slot — matching yFiles and
+//! expectations §6 parallel fold-back (see `mech.constrain-sink`).
+//!
 //! Downstream constraints / desired must **only consume** these tables.
+
+use std::collections::BTreeSet;
 
 use plotgram_algo::orientation::Size;
 
@@ -118,6 +125,55 @@ pub fn degrees_of(nbs: &[Vec<usize>]) -> Vec<usize> {
     nbs.iter().map(|v| v.len()).collect()
 }
 
+fn undirected_real_pair(a: usize, b: usize) -> (usize, usize) {
+    if a <= b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
+/// Undirected original-endpoint pairs that carry both a forward and a reversed
+/// edge (2-cycle / req–resp twin).
+fn twin_real_pairs(graph: &RealGraph) -> BTreeSet<(usize, usize)> {
+    let mut fwd = BTreeSet::new();
+    let mut rev = BTreeSet::new();
+    for e in &graph.edges {
+        let p = undirected_real_pair(e.original_source, e.original_target);
+        if e.reversed {
+            rev.insert(p);
+        } else {
+            fwd.insert(p);
+        }
+    }
+    fwd.into_iter().filter(|p| rev.contains(p)).collect()
+}
+
+/// Map twin pairs from RealGraph id indices → PlanGraph elem indices.
+fn twin_plan_pairs(plan: &PlanGraph, graph: &RealGraph) -> BTreeSet<(usize, usize)> {
+    let mut out = BTreeSet::new();
+    for (a, b) in twin_real_pairs(graph) {
+        let Some(&ea) = plan
+            .index_of
+            .get(&ElemKey::Real(graph.ids[a].clone()))
+        else {
+            continue;
+        };
+        let Some(&eb) = plan
+            .index_of
+            .get(&ElemKey::Real(graph.ids[b].clone()))
+        else {
+            continue;
+        };
+        out.insert(undirected_real_pair(ea, eb));
+    }
+    out
+}
+
+fn is_twin_peer(hub: usize, peer: usize, twins: &BTreeSet<(usize, usize)>) -> bool {
+    twins.contains(&undirected_real_pair(hub, peer))
+}
+
 /// Build symmetry axes, rigid column classes, and FanPack slots from pass-1.
 pub fn compute_symmetry_plan(
     plan: &PlanGraph,
@@ -131,6 +187,7 @@ pub fn compute_symmetry_plan(
     let (down_nbs, up_nbs) = forward_real_adjacency(plan, graph);
     let down_deg = degrees_of(&down_nbs);
     let up_deg = degrees_of(&up_nbs);
+    let twin_pairs = twin_plan_pairs(plan, graph);
 
     let mut axes = Vec::new();
     let mut classes = Vec::new();
@@ -150,10 +207,20 @@ pub fn compute_symmetry_plan(
     for &hub in &hubs {
         let mut centers = Vec::new();
         if down_deg[hub] >= 2 {
-            centers.push(axis_from_neighbors(&down_nbs[hub], pass1));
+            centers.push(axis_coord_for_side(
+                hub,
+                &down_nbs[hub],
+                pass1,
+                &twin_pairs,
+            ));
         }
         if up_deg[hub] >= 2 {
-            centers.push(axis_from_neighbors(&up_nbs[hub], pass1));
+            centers.push(axis_coord_for_side(
+                hub,
+                &up_nbs[hub],
+                pass1,
+                &twin_pairs,
+            ));
         }
         if centers.is_empty() {
             continue;
@@ -189,6 +256,35 @@ pub fn compute_symmetry_plan(
                 &mut members,
             );
         }
+        // Twin forward peers sit on the spine (not FanPack-mirrored).
+        // Same-layer twins cannot all share a zero-gap column (layer sep);
+        // keep at most one twin per rank, preferring the pass-1-closest to hub.
+        let mut twin_cands: Vec<usize> = down_nbs[hub]
+            .iter()
+            .chain(up_nbs[hub].iter())
+            .copied()
+            .filter(|&nb| {
+                !plan.elems[nb].key.is_virtual() && is_twin_peer(hub, nb, &twin_pairs)
+            })
+            .collect();
+        twin_cands.sort_by(|&a, &b| {
+            let da = (pass1[a] - pass1[hub]).abs();
+            let db = (pass1[b] - pass1[hub]).abs();
+            da.partial_cmp(&db)
+                .unwrap()
+                .then(compose_order_key(plan, a).cmp(&compose_order_key(plan, b)))
+        });
+        twin_cands.dedup();
+        for nb in twin_cands {
+            let r = plan.elems[nb].rank;
+            if members
+                .iter()
+                .any(|&m| m != hub && plan.elems[m].rank == r)
+            {
+                continue;
+            }
+            members.push(nb);
+        }
 
         // Drop members already claimed by an earlier (smaller-index) hub.
         members.retain(|&e| e == hub || !claimed[e]);
@@ -207,12 +303,13 @@ pub fn compute_symmetry_plan(
             members,
         });
 
-        // FanPack: leaf slots about this hub's axis, then exclusive 1:1
+        // FanPack: non-twin leaves about this hub's axis; exclusive 1:1
         // followers under each leaf share the leaf's desired (straight chain).
         let mut slots = Vec::new();
         if down_deg[hub] >= 2 {
             append_fan_slots(
                 plan,
+                hub,
                 &down_nbs[hub],
                 /*toward_down=*/ true,
                 coord,
@@ -231,6 +328,7 @@ pub fn compute_symmetry_plan(
         if up_deg[hub] >= 2 {
             append_fan_slots(
                 plan,
+                hub,
                 &up_nbs[hub],
                 /*toward_down=*/ false,
                 coord,
@@ -256,6 +354,24 @@ pub fn compute_symmetry_plan(
         axes,
         classes,
         packs,
+    }
+}
+
+/// With a twin on this side, keep the hub's pass-1 column (spine); otherwise
+/// odd/even neighbor formula.
+fn axis_coord_for_side(
+    hub: usize,
+    neighbors: &[usize],
+    pass1: &[f64],
+    twins: &BTreeSet<(usize, usize)>,
+) -> f64 {
+    if neighbors
+        .iter()
+        .any(|&nb| is_twin_peer(hub, nb, twins))
+    {
+        pass1[hub]
+    } else {
+        axis_from_neighbors(neighbors, pass1)
     }
 }
 
@@ -373,6 +489,7 @@ pub fn fan_pitch(
 
 fn append_fan_slots(
     plan: &PlanGraph,
+    hub: usize,
     neighbors: &[usize],
     toward_down: bool,
     axis: f64,
@@ -394,11 +511,43 @@ fn append_fan_slots(
             !plan.elems[e].key.is_virtual() && !class_claimed[e] && !fan_claimed[e]
         })
         .collect();
-    if leaves.len() < 2 {
-        // Contested down to <2: no pack for this side (not a usable fan packing).
+    if leaves.is_empty() {
         return;
     }
     leaves.sort_by(|&a, &b| compose_order_key(plan, a).cmp(&compose_order_key(plan, b)));
+
+    // Twin peers already occupy the axis via RigidColumnClass. A single
+    // remaining free leaf still packs off-axis (yFiles: spine twin + offset sink).
+    if leaves.len() == 1 {
+        let leaf = leaves[0];
+        let pitch = (node_gap + size_of(hub).width / 2.0 + size_of(leaf).width / 2.0).max(node_gap);
+        let sign = if pass1[leaf] + 1e-9 < axis {
+            -1.0
+        } else {
+            1.0
+        };
+        fan_claimed[leaf] = true;
+        let desired = axis + sign * pitch;
+        slots.push(FanPackSlot {
+            elem: leaf,
+            desired,
+        });
+        append_leaf_followers(
+            leaf,
+            toward_down,
+            desired,
+            plan,
+            down_nbs,
+            up_nbs,
+            down_deg,
+            up_deg,
+            class_claimed,
+            fan_claimed,
+            slots,
+        );
+        return;
+    }
+
     let pitch = fan_pitch(&leaves, pass1, size_of, node_gap);
     let mults = slot_multipliers(leaves.len());
     for (i, &leaf) in leaves.iter().enumerate() {
@@ -729,6 +878,75 @@ mod tests {
         assert!(left.desired < axis && right.desired > axis);
         let pitch = right.desired - left.desired;
         assert!(pitch >= 30.0 - 1e-9, "pitch must cover sep: {pitch}");
+    }
+
+    /// constrain-sink shape: hub↔twin 2-cycle + offset sink — twin on axis,
+    /// free leaf off-axis (not even-fan mirrored).
+    #[test]
+    fn twin_peer_joins_rigid_column_free_leaf_offsets() {
+        let elems = vec![
+            real("start", 0),
+            real("hub", 1),
+            real("twin", 2),
+            real("sink", 2),
+        ];
+        let layers = vec![vec![0], vec![1], vec![2, 3]];
+        let segments = vec![
+            seg("e0", 0, 0, 1),
+            seg("e1", 0, 1, 2),
+            seg("e2", 0, 1, 3),
+        ];
+        let p = plan(elems, layers, segments);
+        let g = graph(
+            &["start", "hub", "twin", "sink"],
+            &[
+                ("e0", 0, 1, false),
+                ("e1", 1, 2, false),
+                ("e_back", 2, 1, true),
+                ("e2", 1, 3, false),
+            ],
+        );
+        let pass1 = [0.0, 0.0, -20.0, 20.0];
+        let dummy = vec![false; 4];
+        let plan_sym = sym(&p, &g, &pass1, &dummy);
+        let hub = 1usize;
+        let twin = 2usize;
+        let sink = 3usize;
+        let class = plan_sym
+            .classes
+            .iter()
+            .find(|c| c.axis_hub == hub)
+            .expect("hub class");
+        assert!(
+            class.members.contains(&twin),
+            "twin must join rigid column: {:?}",
+            class.members
+        );
+        assert!(
+            !class.members.contains(&sink),
+            "offset sink must not join column: {:?}",
+            class.members
+        );
+        let axis = plan_sym.axes.iter().find(|a| a.hub == hub).unwrap().coord;
+        assert!(
+            (axis - 0.0).abs() < 1e-9,
+            "twin side keeps hub pass-1 axis, got {axis}"
+        );
+        assert!(
+            plan_sym.fan_desired_for(twin).is_none(),
+            "twin must not take a FanPack slot"
+        );
+        let sink_d = plan_sym
+            .fan_desired_for(sink)
+            .expect("sink FanPack slot");
+        assert!(
+            (sink_d - axis).abs() > 1e-6,
+            "sink must sit off axis: sink={sink_d}, axis={axis}"
+        );
+        assert!(
+            sink_d > axis,
+            "sink inherits pass-1 east of axis: sink={sink_d}, axis={axis}"
+        );
     }
 
     #[test]

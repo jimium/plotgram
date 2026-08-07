@@ -46,12 +46,13 @@ SymmetryAxis
 
 **轴怎么算**（不依赖 BK 焊点）：
 
-1. 取 hub 该侧 real 邻居，按 pass-1 横坐标排序（平局 elem index）；  
-2. **奇数**个：`coord =` 中位邻居的 pass-1 中心；  
-3. **偶数**个：`coord =` 两中位邻居中心的中点；  
-4. 若 Down 与 Up 皆扇：`coord =` 两侧轴的均值。
+1. 若该侧邻居含**双胞胎**对端：`coord =` hub 自身的 pass-1 中心（守脊）；  
+2. 否则取该侧 real 邻居按 pass-1 横坐标排序（平局 elem index）：  
+   - **奇数**个：`coord =` 中位邻居的 pass-1 中心；  
+   - **偶数**个：`coord =` 两中位邻居中心的中点；  
+3. 若 Down 与 Up 皆扇：`coord =` 两侧轴的均值。
 
-奇偶只影响**轴公式**，不分别决定「硬/软」散落在约束循环里。
+奇偶只影响**无 twin 时的轴公式**，不分别决定「硬/软」散落在约束循环里。
 
 ### 3.2 RigidColumnClass
 
@@ -71,7 +72,7 @@ RigidColumnClass
    - 下一节点是另一扇结；  
    - 节点为 dummy-aligned（median 抢过 dummy 的 real）；  
    - 组边界策略点（后续接 group band；本期可先截断）；  
-4. **扇的孩子不进 class**（避免扇叶塌向轴；叶位由 FanPack 写）。
+4. **扇的孩子不进 class**（避免扇叶塌向轴；叶位由 FanPack 写）——**例外**：与 hub 构成**双胞胎**（同无向端点对上既有正向边又有 reversed 边）的 forward 邻居**进入 class**，钉在轴上；**同一 rank 至多一个** twin（同层分离 gap 与零间隙共线不可并存；多 twin 时取 pass-1 距 hub 最近者）。对齐 yFiles：回环对端占脊，其余叶侧置（`mech.constrain-sink`）。
 
 **邻接真源**：扇判定与 walk 读 `RealGraph` **正向**边的 real 端点（跨层长边仍算一跳，dummy 不藏扇）；**reversed 回边不计入**（避免环头被误判为扇）。
 
@@ -91,12 +92,12 @@ FanPack
 
 **槽位怎么算**（构造时一次算清）：
 
-1. 取 hub 该侧 forward 邻居，按 **Compose 层内序**（`plan.layers` index）排序；跨层邻居按 `(rank, layer_order, elem)`；  
-2. 奇扇：中位槽 offset `0`，两侧 `±k·pitch`；偶扇：`±0.5, ±1.5, …` 倍 pitch；  
-3. `pitch = max(node_gap + 相邻半宽和, pass-1 相邻叶距中位数下界)` —— 分离可行，不追极限压窄；  
-4. `desired = axis.coord + offset`；  
-5. **叶争抢**与 class 同构：更小 hub index 先写；已 claimed 的叶跳过；  
-6. 叶的 **非扇侧 exclusive 1:1 下游** 写入同一 `desired`（叶下直链跟列，如 `b→b2`）。
+1. 取 hub 该侧 forward 邻居中**尚未进 RigidColumnClass** 的叶（双胞胎已占脊，不进本表），按 **Compose 层内序**排序；跨层按 `(rank, layer_order, elem)`；  
+2. 该侧若含双胞胎：`axis.coord =` hub 的 pass-1 次轴（守脊）；否则仍用奇/偶邻居公式；  
+3. **≥2** 自由叶：奇扇中位 `0`、两侧 `±k·pitch`；偶扇 `±0.5, ±1.5, …`；  
+4. **恰 1** 自由叶（脊已被 twin 占用）：`desired = axis ± pitch`（符号取 pass-1 相对轴的侧）；  
+5. `pitch = max(node_gap + 相邻半宽和, pass-1 相邻叶距中位数下界)`（单叶时用 hub/叶半宽 + gap）；  
+6. `desired = axis.coord + offset`；叶争抢与 class 同构；叶下 exclusive 1:1 下游跟列。
 
 回边 dummy 不进 FanPack（仍走 port-anchor）。
 
