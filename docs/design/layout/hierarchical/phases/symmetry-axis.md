@@ -69,14 +69,16 @@ RigidColumnClass
 2. 沿**非扇侧**走 forward real–real 1:1 链（见下「邻接真源」）：当前节点在路径前进方向上保持链状邻接，则整段加入同一 class  
    - 例：`Gateway → API → Worker(扇向下)` → `{Gateway, API, Worker}` 同 class（API 度数=2 也必须进，不能只收度数=1）；  
 3. **截断**（升格后的链拖拽 / 边界守卫，不再是第三个 continue）：  
-   - 下一节点是另一扇结；  
+   - 下一节点是另一扇结——**例外（向下）**：`down_deg[cur]==1` 且下一 real 满足 `up_deg==1` 且为扇 hub 时，**将该子扇 hub 收入本 class（同轴）后停止**（不收扇叶；上定心）；  
    - 节点为 dummy-aligned（median 抢过 dummy 的 real）；  
    - 组边界策略点（后续接 group band；本期可先截断）；  
 4. **扇的孩子不进 class**（避免扇叶塌向轴；叶位由 FanPack 写）——**例外**：与 hub 构成**双胞胎**（同无向端点对上既有正向边又有 reversed 边）的 forward 邻居**进入 class**，钉在轴上；**同一 rank 至多一个** twin（同层分离 gap 与零间隙共线不可并存；多 twin 时取 pass-1 距 hub 最近者）。对齐 yFiles：回环对端占脊，其余叶侧置（`mech.constrain-sink`）。
 
+**轴坐标（上定心）**：hub 按 `(rank asc, elem index)` 处理。若 `up_deg==1` 且唯一上游 U 已有轴（U ∈ 某 RigidColumnClass，或 U 已是 axis hub）→ **继承该轴**；否则奇/偶邻居公式（含 twin 侧守 pass-1）。偶扇「两中位中点」**只用于尚无上游轴可继承的 hub**。**禁止**用下游叶中点反拉上游汇入结。
+
 **邻接真源**：扇判定与 walk 读 `RealGraph` **正向**边的 real 端点（跨层长边仍算一跳，dummy 不藏扇）；**reversed 回边不计入**（避免环头被误判为扇）。
 
-同一 elem 若被多把轴争抢：稳定规则取 **更小 hub elem index**，禁止静默双写。
+同一 elem 若被多把轴争抢：稳定规则取 **更小 hub elem index**（同 rank 时；整体先上后下），禁止静默双写。已被上游 class 吸收的子扇 hub 不再另开刚体列，仍可写 FanPack。
 
 ### 3.3 FanPack
 
@@ -124,8 +126,8 @@ FanPack
 | | 早期奇偶 | 本方案 |
 |--|----------|--------|
 | 奇扇轴 | 希望 = median 列 | 显式用中位孩子 pass-1 中心，**不**信 BK 焊点 |
-| 偶扇轴 | pass-2 两中位中点 | 同上，写入 Axis 表 |
-| 主轴共线 | 奇扇靠硬锁；偶扇靠结移动 | **整条 RigidColumnClass 跟轴** |
+| 偶扇轴 | pass-2 两中位中点 | 无上游轴时两中位中点；**有唯一上游轴则继承** |
+| 主轴共线 | 奇扇靠硬锁；偶扇靠结移动 | **整条 RigidColumnClass 跟轴**（含向下吸收唯一子扇 hub） |
 | 扇叶镜像 | 无 / 靠 BK 偶然 | **FanPack 槽位覆盖 BK** |
 | 扩展 | 再加守卫 → 约束循环 continue | 改成员谓词 / FanPack / 截断条件 |
 

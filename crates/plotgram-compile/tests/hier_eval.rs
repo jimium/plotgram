@@ -40,6 +40,7 @@
 //! TrackOrder Cross nest: `smoke.fan-out-four` outer/inner horizontals
 //! share rails symmetrically (no right-half cross).
 //! Side-corridor polarity: `product.ticket-triage` escalate→handle both East.
+//! Upstream axis inheritance: `ticket-triage` resolve_gate shares handle cx.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -933,5 +934,30 @@ fn ticket_triage_escalate_handle_side_corridor_east() {
         Side::East,
         "handle must enter East (shared right corridor), got {:?}",
         to.side
+    );
+}
+
+/// Upstream axis inheritance: `resolve_gate` stays on the same cross-axis as
+/// `handle` (`product.ticket-triage`).
+#[test]
+fn ticket_triage_resolve_gate_centered_under_handle() {
+    let path = showcase_dir().join("flat/product.ticket-triage.pgm");
+    let source = fs::read_to_string(&path).expect("ticket-triage fixture");
+    let result = build_layout(&source, &BuildOptions::default()).expect("layout");
+    let handle = result
+        .nodes
+        .iter()
+        .find(|n| n.id == "handle")
+        .expect("handle");
+    let gate = result
+        .nodes
+        .iter()
+        .find(|n| n.id == "resolve_gate")
+        .expect("resolve_gate");
+    let hx = handle.frame.x + handle.frame.width / 2.0;
+    let gx = gate.frame.x + gate.frame.width / 2.0;
+    assert!(
+        (gx - hx).abs() < 1.0,
+        "resolve_gate cx={gx:.3} must match handle cx={hx:.3} (upstream axis inherit)"
     );
 }

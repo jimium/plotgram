@@ -25,35 +25,35 @@
   },
   "flat/demo.change-approval-workflow": {
     "bbox_h": 1039.5,
-    "bbox_w": 316.55,
+    "bbox_w": 263.46,
     "crossings": 1,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 24
+    "sum_bends": 22
   },
   "flat/demo.flat-realtime-recommendation": {
     "bbox_h": 307.6,
-    "bbox_w": 379.82552083333337,
-    "crossings": 4,
+    "bbox_w": 394.7509765625,
+    "crossings": 6,
     "max_bends": 5,
     "reversed_count": 1,
     "sum_bends": 23
   },
   "flat/demo.k8s-incident-response": {
     "bbox_h": 890.7999999999998,
-    "bbox_w": 380.3202026468156,
+    "bbox_w": 380.0,
     "crossings": 9,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 42
+    "sum_bends": 38
   },
   "flat/demo.pr-architecture-review": {
-    "bbox_h": 614.0999999999999,
-    "bbox_w": 372.7615669811321,
-    "crossings": 1,
+    "bbox_h": 598.0999999999999,
+    "bbox_w": 397.55831794460056,
+    "crossings": 4,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 26
+    "sum_bends": 28
   },
   "flat/demo.software-release": {
     "bbox_h": 858.7999999999998,
@@ -120,9 +120,9 @@
     "sum_bends": 0
   },
   "flat/product.order-approval": {
-    "bbox_h": 401.4,
-    "bbox_w": 266.70588235294116,
-    "crossings": 0,
+    "bbox_h": 433.4,
+    "bbox_w": 280.0,
+    "crossings": 4,
     "max_bends": 5,
     "reversed_count": 1,
     "sum_bends": 15
@@ -173,12 +173,12 @@
     "crossings": 0,
     "max_bends": 2,
     "reversed_count": 1,
-    "sum_bends": 16
+    "sum_bends": 14
   },
   "flat/product.typical-microservice-architecture": {
     "bbox_h": 339.6,
-    "bbox_w": 408.13030000000003,
-    "crossings": 26,
+    "bbox_w": 412.47800000000007,
+    "crossings": 25,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 36
@@ -264,48 +264,48 @@
     "sum_bends": 2
   },
   "flat/stress.layout-stress-dag": {
-    "bbox_h": 732.9999999999999,
-    "bbox_w": 230.04234904188945,
-    "crossings": 10,
+    "bbox_h": 748.9999999999999,
+    "bbox_w": 216.75282976827094,
+    "crossings": 11,
     "max_bends": 4,
     "reversed_count": 2,
     "sum_bends": 38
   },
   "flat/stress.layout-stress-flat-mesh": {
     "bbox_h": 584.3,
-    "bbox_w": 375.3214545454545,
-    "crossings": 56,
-    "max_bends": 5,
+    "bbox_w": 391.3214545454545,
+    "crossings": 35,
+    "max_bends": 4,
     "reversed_count": 2,
     "sum_bends": 49
   },
   "flat/stress.layout-stress-yfiles-pipeline": {
-    "bbox_h": 774.0999999999999,
-    "bbox_w": 570.3655471769252,
-    "crossings": 39,
+    "bbox_h": 822.0999999999999,
+    "bbox_w": 539.1113525604417,
+    "crossings": 33,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 66
   },
   "group/demo.ai-agent-docops-pipeline": {
     "bbox_h": 700.9999999999999,
-    "bbox_w": 648.7924799836603,
+    "bbox_w": 644.3610078197947,
     "crossings": 4,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 30
+    "sum_bends": 28
   },
   "group/demo.ci-cd-security-pipeline": {
-    "bbox_h": 1442.0000000000005,
-    "bbox_w": 341.9451539954037,
-    "crossings": 20,
+    "bbox_h": 1458.0000000000005,
+    "bbox_w": 336.1236048150231,
+    "crossings": 22,
     "max_bends": 4,
     "reversed_count": 1,
     "sum_bends": 48
   },
   "group/demo.customer-refund-process": {
     "bbox_h": 1252.2,
-    "bbox_w": 318.7520176544767,
+    "bbox_w": 309.87239316239317,
     "crossings": 2,
     "max_bends": 4,
     "reversed_count": 3,
@@ -313,9 +313,9 @@
   },
   "group/demo.data-etl-pipeline": {
     "bbox_h": 598.0999999999999,
-    "bbox_w": 345.08347902097904,
+    "bbox_w": 331.0,
     "crossings": 0,
-    "max_bends": 2,
+    "max_bends": 4,
     "reversed_count": 1,
     "sum_bends": 16
   },
@@ -330,18 +330,18 @@
   "group/demo.data-lineage-platform": {
     "bbox_h": 662.0999999999999,
     "bbox_w": 475.36,
-    "crossings": 8,
+    "crossings": 5,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 44
   },
   "group/demo.e-commerce-order-fulfillment": {
-    "bbox_h": 1284.2000000000003,
-    "bbox_w": 200.41,
-    "crossings": 2,
+    "bbox_h": 1252.2,
+    "bbox_w": 218.425,
+    "crossings": 1,
     "max_bends": 4,
     "reversed_count": 3,
-    "sum_bends": 24
+    "sum_bends": 22
   },
   "group/demo.fintech-payment-platform": {
     "bbox_h": 488.29999999999995,
@@ -352,20 +352,20 @@
     "sum_bends": 23
   },
   "group/demo.hybrid-cloud-dr-topology": {
-    "bbox_h": 687.1999999999999,
-    "bbox_w": 1039.1729375000002,
-    "crossings": 28,
+    "bbox_h": 703.1999999999999,
+    "bbox_w": 915.6728472222223,
+    "crossings": 31,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 58
   },
   "group/demo.incident-management": {
     "bbox_h": 668.9999999999999,
-    "bbox_w": 285.3840816326531,
+    "bbox_w": 238.7942857142857,
     "crossings": 0,
     "max_bends": 2,
     "reversed_count": 1,
-    "sum_bends": 16
+    "sum_bends": 14
   },
   "group/demo.insurance-claim-process": {
     "bbox_h": 771.8999999999999,
@@ -376,41 +376,41 @@
     "sum_bends": 20
   },
   "group/demo.k8s-blue-green-release-topology": {
-    "bbox_h": 876.9999999999999,
-    "bbox_w": 666.8304773622048,
-    "crossings": 45,
+    "bbox_h": 844.9999999999999,
+    "bbox_w": 833.3000000000002,
+    "crossings": 55,
     "max_bends": 6,
     "reversed_count": 1,
     "sum_bends": 78
   },
   "group/demo.k8s-multi-cluster-federation": {
-    "bbox_h": 831.1999999999999,
-    "bbox_w": 981.6557988095241,
-    "crossings": 79,
+    "bbox_h": 799.1999999999999,
+    "bbox_w": 858.8600000000001,
+    "crossings": 74,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 82
   },
   "group/demo.k8s-multi-namespace-overview": {
-    "bbox_h": 799.1999999999999,
-    "bbox_w": 1332.4400000000003,
-    "crossings": 117,
+    "bbox_h": 783.1999999999999,
+    "bbox_w": 1332.44,
+    "crossings": 94,
     "max_bends": 4,
     "reversed_count": 0,
-    "sum_bends": 74
+    "sum_bends": 72
   },
   "group/demo.k8s-platform-stack": {
-    "bbox_h": 600.3,
+    "bbox_h": 616.3,
     "bbox_w": 1028.0528125,
-    "crossings": 22,
+    "crossings": 28,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 68
   },
   "group/demo.k8s-tenant-isolation": {
-    "bbox_h": 584.3,
-    "bbox_w": 988.8,
-    "crossings": 26,
+    "bbox_h": 600.3,
+    "bbox_w": 1054.4142708333334,
+    "crossings": 34,
     "max_bends": 2,
     "reversed_count": 0,
     "sum_bends": 48
@@ -426,7 +426,7 @@
   "group/demo.mcp-server-cluster-architecture": {
     "bbox_h": 294.5,
     "bbox_w": 518.1700000000001,
-    "crossings": 9,
+    "crossings": 5,
     "max_bends": 2,
     "reversed_count": 0,
     "sum_bends": 20
@@ -441,24 +441,24 @@
   },
   "group/demo.payment-clearing-platform": {
     "bbox_h": 543.1999999999999,
-    "bbox_w": 690.3549597338938,
-    "crossings": 7,
+    "bbox_w": 674.6328257894069,
+    "crossings": 3,
     "max_bends": 4,
     "reversed_count": 1,
     "sum_bends": 27
   },
   "group/demo.plotgram-core-mod-deps": {
-    "bbox_h": 847.4999999999999,
-    "bbox_w": 1314.9176564542486,
-    "crossings": 60,
-    "max_bends": 4,
+    "bbox_h": 831.4999999999999,
+    "bbox_w": 1423.3250280420998,
+    "crossings": 66,
+    "max_bends": 5,
     "reversed_count": 1,
-    "sum_bends": 72
+    "sum_bends": 73
   },
   "group/demo.realtime-recommendation": {
     "bbox_h": 307.6,
-    "bbox_w": 379.82552083333337,
-    "crossings": 4,
+    "bbox_w": 394.7509765625,
+    "crossings": 6,
     "max_bends": 5,
     "reversed_count": 1,
     "sum_bends": 23
@@ -497,19 +497,19 @@
   },
   "group/product.compiler-pipeline": {
     "bbox_h": 346.5,
-    "bbox_w": 424.3294047619048,
-    "crossings": 10,
+    "bbox_w": 371.7296428571429,
+    "crossings": 7,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 24
   },
   "group/product.d2-cell-tower-network": {
     "bbox_h": 362.5,
-    "bbox_w": 236.27600000000007,
+    "bbox_w": 236.78000000000003,
     "crossings": 4,
     "max_bends": 4,
     "reversed_count": 0,
-    "sum_bends": 14
+    "sum_bends": 12
   },
   "group/product.data-pipeline": {
     "bbox_h": 385.4,
@@ -522,7 +522,7 @@
   "group/product.ecommerce-platform": {
     "bbox_h": 575.1999999999999,
     "bbox_w": 547.0,
-    "crossings": 9,
+    "crossings": 7,
     "max_bends": 2,
     "reversed_count": 0,
     "sum_bends": 28
@@ -545,8 +545,8 @@
   },
   "group/product.microservices": {
     "bbox_h": 417.4,
-    "bbox_w": 214.35980824682815,
-    "crossings": 2,
+    "bbox_w": 218.335,
+    "crossings": 0,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 20
@@ -600,9 +600,9 @@
     "sum_bends": 10
   },
   "group/stress.layout-stress-nested": {
-    "bbox_h": 607.1999999999999,
-    "bbox_w": 464.46200384615383,
-    "crossings": 8,
+    "bbox_h": 559.1999999999999,
+    "bbox_w": 495.41972756410246,
+    "crossings": 5,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 26

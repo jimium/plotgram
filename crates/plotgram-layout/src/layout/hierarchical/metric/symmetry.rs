@@ -3,8 +3,10 @@
 //! Contract: [`docs/design/layout/hierarchical/phases/symmetry-axis.md`]
 //!
 //! After pass-1 (BK ideal + soft VPSC), this writer emits:
-//! - [`SymmetryAxis`] per fan hub (odd/even axis formula from pass-1 neighbors)
-//! - [`RigidColumnClass`] membership (hub + non-fan-side 1:1 chain)
+//! - [`SymmetryAxis`] per fan hub (inherit unique upstream axis when present;
+//!   else odd/even formula from pass-1 neighbors)
+//! - [`RigidColumnClass`] membership (hub + non-fan-side 1:1 chain; downward
+//!   absorb of a unique child fan hub)
 //! - [`FanPack`] leaf slots (`axis ± k·pitch`) covering BK ideal on pass-2
 //!
 //! Fan adjacency is **forward real endpoints** on [`RealGraph`] (non-reversed
@@ -193,118 +195,130 @@ pub fn compute_symmetry_plan(
     let mut classes = Vec::new();
     let mut packs = Vec::new();
 
-    // Hubs in ascending elem index — smaller hub wins contested members / leaves.
+    // Top-down: rank then elem — upstream axes exist before downstream hubs inherit.
     let mut hubs: Vec<usize> = (0..n)
         .filter(|&e| {
             !plan.elems[e].key.is_virtual() && (down_deg[e] >= 2 || up_deg[e] >= 2)
         })
         .collect();
-    hubs.sort_unstable();
+    hubs.sort_by(|&a, &b| {
+        plan.elems[a]
+            .rank
+            .cmp(&plan.elems[b].rank)
+            .then(a.cmp(&b))
+    });
 
     let mut claimed = vec![false; n];
     let mut fan_claimed = vec![false; n];
 
     for &hub in &hubs {
-        let mut centers = Vec::new();
-        if down_deg[hub] >= 2 {
-            centers.push(axis_coord_for_side(
-                hub,
-                &down_nbs[hub],
-                pass1,
-                &twin_pairs,
-            ));
-        }
-        if up_deg[hub] >= 2 {
-            centers.push(axis_coord_for_side(
-                hub,
-                &up_nbs[hub],
-                pass1,
-                &twin_pairs,
-            ));
-        }
-        if centers.is_empty() {
-            continue;
-        }
-        let coord = centers.iter().sum::<f64>() / centers.len() as f64;
+        let already_claimed = claimed[hub];
+
+        let coord = inherited_axis_coord(hub, &up_nbs, &up_deg, &classes, &axes)
+            .unwrap_or_else(|| {
+                let mut centers = Vec::new();
+                if down_deg[hub] >= 2 {
+                    centers.push(axis_coord_for_side(
+                        hub,
+                        &down_nbs[hub],
+                        pass1,
+                        &twin_pairs,
+                    ));
+                }
+                if up_deg[hub] >= 2 {
+                    centers.push(axis_coord_for_side(
+                        hub,
+                        &up_nbs[hub],
+                        pass1,
+                        &twin_pairs,
+                    ));
+                }
+                if centers.is_empty() {
+                    pass1[hub]
+                } else {
+                    centers.iter().sum::<f64>() / centers.len() as f64
+                }
+            });
         axes.push(SymmetryAxis { hub, coord });
 
-        let mut members = vec![hub];
-        // Non-fan side walks: fan below → walk up; fan above → walk down.
-        if down_deg[hub] >= 2 {
-            walk_chain(
-                hub,
-                /*toward_up=*/ true,
-                plan,
-                &down_nbs,
-                &up_nbs,
-                &down_deg,
-                &up_deg,
-                dummy_aligned,
-                &mut members,
-            );
-        }
-        if up_deg[hub] >= 2 {
-            walk_chain(
-                hub,
-                /*toward_up=*/ false,
-                plan,
-                &down_nbs,
-                &up_nbs,
-                &down_deg,
-                &up_deg,
-                dummy_aligned,
-                &mut members,
-            );
-        }
-        // Twin forward peers sit on the spine (not FanPack-mirrored).
-        // Same-layer twins cannot all share a zero-gap column (layer sep);
-        // keep at most one twin per rank, preferring the pass-1-closest to hub.
-        let mut twin_cands: Vec<usize> = down_nbs[hub]
-            .iter()
-            .chain(up_nbs[hub].iter())
-            .copied()
-            .filter(|&nb| {
-                !plan.elems[nb].key.is_virtual() && is_twin_peer(hub, nb, &twin_pairs)
-            })
-            .collect();
-        twin_cands.sort_by(|&a, &b| {
-            let da = (pass1[a] - pass1[hub]).abs();
-            let db = (pass1[b] - pass1[hub]).abs();
-            da.partial_cmp(&db)
-                .unwrap()
-                .then(compose_order_key(plan, a).cmp(&compose_order_key(plan, b)))
-        });
-        twin_cands.dedup();
-        for nb in twin_cands {
-            let r = plan.elems[nb].rank;
-            if members
-                .iter()
-                .any(|&m| m != hub && plan.elems[m].rank == r)
-            {
-                continue;
+        if !already_claimed {
+            let mut members = vec![hub];
+            // Non-fan side walks: fan below → walk up; fan above → walk down
+            // (downward may absorb a unique child fan hub onto this spine).
+            if down_deg[hub] >= 2 {
+                walk_chain(
+                    hub,
+                    /*toward_up=*/ true,
+                    /*absorb_unique_child_fan=*/ false,
+                    plan,
+                    &down_nbs,
+                    &up_nbs,
+                    &down_deg,
+                    &up_deg,
+                    dummy_aligned,
+                    &mut members,
+                );
             }
-            members.push(nb);
+            if up_deg[hub] >= 2 {
+                walk_chain(
+                    hub,
+                    /*toward_up=*/ false,
+                    /*absorb_unique_child_fan=*/ true,
+                    plan,
+                    &down_nbs,
+                    &up_nbs,
+                    &down_deg,
+                    &up_deg,
+                    dummy_aligned,
+                    &mut members,
+                );
+            }
+            // Twin forward peers sit on the spine (not FanPack-mirrored).
+            let mut twin_cands: Vec<usize> = down_nbs[hub]
+                .iter()
+                .chain(up_nbs[hub].iter())
+                .copied()
+                .filter(|&nb| {
+                    !plan.elems[nb].key.is_virtual() && is_twin_peer(hub, nb, &twin_pairs)
+                })
+                .collect();
+            twin_cands.sort_by(|&a, &b| {
+                let da = (pass1[a] - pass1[hub]).abs();
+                let db = (pass1[b] - pass1[hub]).abs();
+                da.partial_cmp(&db)
+                    .unwrap()
+                    .then(compose_order_key(plan, a).cmp(&compose_order_key(plan, b)))
+            });
+            twin_cands.dedup();
+            for nb in twin_cands {
+                let r = plan.elems[nb].rank;
+                if members
+                    .iter()
+                    .any(|&m| m != hub && plan.elems[m].rank == r)
+                {
+                    continue;
+                }
+                members.push(nb);
+            }
+
+            members.retain(|&e| e == hub || !claimed[e]);
+            for &e in &members {
+                claimed[e] = true;
+            }
+            members.sort_by(|&a, &b| {
+                plan.elems[a]
+                    .rank
+                    .cmp(&plan.elems[b].rank)
+                    .then(a.cmp(&b))
+            });
+            members.dedup();
+            classes.push(RigidColumnClass {
+                axis_hub: hub,
+                members,
+            });
         }
 
-        // Drop members already claimed by an earlier (smaller-index) hub.
-        members.retain(|&e| e == hub || !claimed[e]);
-        for &e in &members {
-            claimed[e] = true;
-        }
-        members.sort_by(|&a, &b| {
-            plan.elems[a]
-                .rank
-                .cmp(&plan.elems[b].rank)
-                .then(a.cmp(&b))
-        });
-        members.dedup();
-        classes.push(RigidColumnClass {
-            axis_hub: hub,
-            members,
-        });
-
-        // FanPack: non-twin leaves about this hub's axis; exclusive 1:1
-        // followers under each leaf share the leaf's desired (straight chain).
+        // FanPack even when hub was absorbed into an upstream class.
         let mut slots = Vec::new();
         if down_deg[hub] >= 2 {
             append_fan_slots(
@@ -357,6 +371,24 @@ pub fn compute_symmetry_plan(
     }
 }
 
+/// Inherit spine axis when this hub has a unique upstream real with a known axis.
+fn inherited_axis_coord(
+    hub: usize,
+    up_nbs: &[Vec<usize>],
+    up_deg: &[usize],
+    classes: &[RigidColumnClass],
+    axes: &[SymmetryAxis],
+) -> Option<f64> {
+    if up_deg.get(hub).copied().unwrap_or(0) != 1 {
+        return None;
+    }
+    let u = *up_nbs.get(hub)?.first()?;
+    if let Some(c) = classes.iter().find(|c| c.members.contains(&u)) {
+        return axes.iter().find(|a| a.hub == c.axis_hub).map(|a| a.coord);
+    }
+    axes.iter().find(|a| a.hub == u).map(|a| a.coord)
+}
+
 /// With a twin on this side, keep the hub's pass-1 column (spine); otherwise
 /// odd/even neighbor formula.
 fn axis_coord_for_side(
@@ -397,9 +429,14 @@ fn is_fan(e: usize, down_deg: &[usize], up_deg: &[usize]) -> bool {
 }
 
 /// Walk exclusive 1:1 chain on the non-fan side of `start` (already in members).
+///
+/// When walking down (`toward_up == false`) with `absorb_unique_child_fan`, a
+/// unique child that is itself a fan hub is included then the walk stops —
+/// spine inheritance without pulling fan leaves into the class.
 fn walk_chain(
     start: usize,
     toward_up: bool,
+    absorb_unique_child_fan: bool,
     plan: &PlanGraph,
     down_nbs: &[Vec<usize>],
     up_nbs: &[Vec<usize>],
@@ -424,6 +461,13 @@ fn walk_chain(
             break;
         }
         if is_fan(next, down_deg, up_deg) {
+            if absorb_unique_child_fan
+                && !toward_up
+                && down_deg[cur] == 1
+                && up_deg[next] == 1
+            {
+                members.push(next);
+            }
             break;
         }
         if dummy_aligned.get(next).copied().unwrap_or(false) {
@@ -878,6 +922,113 @@ mod tests {
         assert!(left.desired < axis && right.desired > axis);
         let pitch = right.desired - left.desired;
         assert!(pitch >= 30.0 - 1e-9, "pitch must cover sep: {pitch}");
+    }
+
+    /// Merge hub → even fan: fan hub inherits upstream axis (not leaf midpoint).
+    #[test]
+    fn even_fan_inherits_upstream_merge_axis() {
+        // p0,p1,p2 → handle → gate → L,R. Leaf mid = -5; handle median parents = 0.
+        let elems = vec![
+            real("p0", 0),
+            real("p1", 0),
+            real("p2", 0),
+            real("handle", 1),
+            real("gate", 2),
+            real("left", 3),
+            real("right", 3),
+        ];
+        let layers = vec![
+            vec![0, 1, 2],
+            vec![3],
+            vec![4],
+            vec![5, 6],
+        ];
+        let segments = vec![
+            seg("e0", 0, 0, 3),
+            seg("e1", 0, 1, 3),
+            seg("e2", 0, 2, 3),
+            seg("e3", 0, 3, 4),
+            seg("e4", 0, 4, 5),
+            seg("e5", 0, 4, 6),
+        ];
+        let p = plan(elems, layers, segments);
+        let g = graph(
+            &["p0", "p1", "p2", "handle", "gate", "left", "right"],
+            &[
+                ("e0", 0, 3, false),
+                ("e1", 1, 3, false),
+                ("e2", 2, 3, false),
+                ("e3", 3, 4, false),
+                ("e4", 4, 5, false),
+                ("e5", 4, 6, false),
+            ],
+        );
+        let pass1 = [-30.0, 0.0, 30.0, 0.0, -5.0, -20.0, 10.0];
+        let dummy = vec![false; 7];
+        let plan_sym = sym(&p, &g, &pass1, &dummy);
+        let handle = 3usize;
+        let gate = 4usize;
+        let handle_axis = plan_sym
+            .axes
+            .iter()
+            .find(|a| a.hub == handle)
+            .expect("handle axis")
+            .coord;
+        assert!(
+            (handle_axis - 0.0).abs() < 1e-9,
+            "handle axis from parent median, got {handle_axis}"
+        );
+        let gate_axis = plan_sym
+            .axes
+            .iter()
+            .find(|a| a.hub == gate)
+            .expect("gate axis")
+            .coord;
+        assert!(
+            (gate_axis - handle_axis).abs() < 1e-9,
+            "gate must inherit handle axis ({handle_axis}), not leaf mid; got {gate_axis}"
+        );
+        let handle_class = plan_sym
+            .classes
+            .iter()
+            .find(|c| c.axis_hub == handle)
+            .expect("handle class");
+        assert!(
+            handle_class.members.contains(&gate),
+            "unique child fan hub absorbed into upstream class: {:?}",
+            handle_class.members
+        );
+        assert!(
+            plan_sym.classes.iter().all(|c| c.axis_hub != gate),
+            "absorbed gate must not open a second rigid column"
+        );
+        let pack = plan_sym
+            .packs
+            .iter()
+            .find(|pk| pk.hub == gate)
+            .expect("gate FanPack");
+        let left = pack.slots.iter().find(|s| s.elem == 5).unwrap();
+        let right = pack.slots.iter().find(|s| s.elem == 6).unwrap();
+        assert!((left.desired + right.desired - 2.0 * gate_axis).abs() < 1e-9);
+    }
+
+    /// Root even fan (no upstream) still uses leaf-midpoint axis.
+    #[test]
+    fn root_even_fan_keeps_leaf_midpoint_axis() {
+        let elems = vec![real("hub", 0), real("left", 1), real("right", 1)];
+        let layers = vec![vec![0], vec![1, 2]];
+        let segments = vec![seg("e0", 0, 0, 1), seg("e1", 0, 0, 2)];
+        let p = plan(elems, layers, segments);
+        let g = graph(
+            &["hub", "left", "right"],
+            &[("e0", 0, 1, false), ("e1", 0, 2, false)],
+        );
+        // Skewed leaves: mid = 5, not hub pass1 0.
+        let pass1 = [0.0, -10.0, 20.0];
+        let dummy = vec![false; 3];
+        let plan_sym = sym(&p, &g, &pass1, &dummy);
+        assert_eq!(plan_sym.axes.len(), 1);
+        assert!((plan_sym.axes[0].coord - 5.0).abs() < 1e-9);
     }
 
     /// constrain-sink shape: hub↔twin 2-cycle + offset sink — twin on axis,
