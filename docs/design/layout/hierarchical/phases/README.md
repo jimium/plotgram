@@ -14,6 +14,7 @@
 | [channel-corridor-allocator](channel-corridor-allocator.md) | D1.3 Corridor Allocator 执行方案（span 亲和 → 内层优先 → RouteOrder → Demand → 回边侧别） |
 | [coordinate-and-demand](coordinate-and-demand.md) | Demand epoch、BK/VPSC、组框、PartitionGrid、Orientation |
 | [symmetry-axis](symmetry-axis.md) | 次轴对称轴 / 刚体列成员表（主轴共线 ∩ 扇出对称） |
+| [port-lanes](port-lanes.md) | 双胞胎 N/S 走廊端口绝对列（无 grid；对照 yFiles PortAlignment） |
 | [ink-and-verification](ink-and-verification.md) | Ink 纯展开、规范化与分相 verifier |
 
 ## 共同格式

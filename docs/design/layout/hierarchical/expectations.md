@@ -1,10 +1,10 @@
 # Hierarchical · 视觉期待
 
-> 状态：草案（沟通用）；**§6.1 对称轴裁定已落地**（D2 三图主链共线门禁；扇叶相对轴属后续）  
+> 状态：草案（沟通用）；**§6.1 对称轴已落地**；**§6.2 PortLane 已落地**（不依赖 grid）  
 > 日期：2026-08-07  
 > 读者：产品 / 设计 / 实现 — **先谈用户看见什么**，再谈写者  
 > 写权尺子：[write-authority](../write-authority.md) · 架构：[architecture](architecture.md)  
-> 次轴对称算法契约：[phases/symmetry-axis.md](phases/symmetry-axis.md)（D2 已落地）
+> 次轴对称：[phases/symmetry-axis.md](phases/symmetry-axis.md) · 端口列：[phases/port-lanes.md](phases/port-lanes.md)
 
 本文只列 **Hier 图在用户眼里应像什么**。  
 每条期待附带：谁负责把自由度写对、和哪条视觉期待容易打架。  
@@ -42,7 +42,7 @@
 
 | 视觉期待 | 用户看见什么 | 主要写者 | 易冲突 |
 |----------|--------------|----------|--------|
-| **请求–响应平行** | 同列一去一回走主轴两侧错开的平行线，而不是一侧大弯绕行 | Compose 端口侧（双胞胎短回边走脊） | **与「回边走侧廊」直接冲突** → 见 §6 |
+| **请求–响应平行** | 同列一去一回走主轴两侧错开的平行线，而不是一侧大弯绕行；**不等宽节点上也不因端口比例展开打出层间小折** | Compose 端口侧（双胞胎短回边走脊）+ **Metric PortLane（绝对列）** | **与「回边走侧廊」直接冲突** → 见 §6；与「框内比例端口」冲突 → 见 §6.2 |
 | **闭环走侧廊** | 驳回重提、跨多层跳回等从两侧绕，不压在主轴顶头互穿 | Compose 端口侧（长回边 / 无对边短回边） | 与平行期待分域 |
 | **正交干净** | 边横平竖直，折点少、不无故蛇形 | Channel 拓扑 + Ink 展开 | 过窄缝逼出多余折 |
 | **不穿节点** | 边不从节点框中间穿过 | Channel / Ink 出桩与避障 | 缝太窄时与「图不要太宽」冲突 |
@@ -113,6 +113,26 @@
 
 裁定变更时只改本节，并同步改 `symmetry-axis.md` / 实现；禁止只改常数不改裁定。
 
+### 6.2 平行走廊直 vs 节点框比例端口
+
+**裁定**：请求–响应（双胞胎短折返）走廊两端端口必须落在**同一条世界坐标列**上，**不依赖**全局 grid 开关。  
+节点中心共线不够；若端口仍按各节点 `Ordered×width` 比例展开，不等宽时必然打出层间小折。
+
+采用 Metric **PortLaneWriter**（对照 yFiles PortAlignmentIds）：为走廊写绝对 cross 列，再展开为 `LocalOffset`。算法契约见 [port-lanes.md](phases/port-lanes.md)。
+
+用户可见结果：
+
+- 三层架构一类图：一去一回左右平行、横平竖直，不因中间节点更宽而「拧一下」；  
+- **不开 grid** 也成立；全局贴网是另一产品选项，单开。
+
+**明确废弃**
+
+| 废弃 | 原因 |
+|------|------|
+| 在 Ink 里特判抹掉端口 Δx | 落笔零新决策；列位写者应在 Metric |
+| 仅靠 Ordered 比例展开作为平行终态 | 随节点宽度漂移 |
+| 把本需求绑死在「必须开 grid」 | 与 yFiles 对齐能力（alignment）混淆 |
+
 ---
 
 ## 7. 和实现文档的分工
@@ -121,6 +141,7 @@
 |------|--------|
 | **本文** | 用户视觉期待 + 冲突裁定 |
 | [phases/symmetry-axis.md](phases/symmetry-axis.md) | 对称轴 / 刚体列：写者、表、谓词、落地阶段（D2 已落地） |
+| [phases/port-lanes.md](phases/port-lanes.md) | 双胞胎走廊端口绝对列（PortLane；无 grid） |
 | [write-authority](../write-authority.md) | 单写者 / 落笔零新决策 |
 | [phases/](phases/README.md) | 端口、Channel、Metric、Ink 怎么写 |
 | [roadmap](roadmap.md) | 阶段做什么，不替代 §6 裁定 |

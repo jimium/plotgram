@@ -125,7 +125,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         params.auto_edge_grouping,
     )?;
     let compose::ports::PortAssignment {
-        ports,
+        mut ports,
         bundles: end_bundles,
     } = port_assignment;
 
@@ -176,6 +176,16 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
             )
         })
         .collect();
+
+    // Twin N/S corridors: absolute port lanes (expectations §6.2 / port-lanes.md).
+    // Must run after cross frames exist; before TrackOrder / Ink read anchors.
+    metric::port_lane::apply_port_lanes(
+        &plan,
+        &real_graph,
+        &mut ports,
+        &prelim_frames,
+        params.edge_gap,
+    );
 
     // D1.1 TrackOrder (L3) on substrate tracks from pixel spans.
     let track_order = compose::track_order::assign_track_order(

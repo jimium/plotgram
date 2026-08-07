@@ -553,3 +553,55 @@ fn symmetry_axis_d2_representative_spines_collinear() {
         failures.join("\n")
     );
 }
+
+/// PortLane: twin N/S corridors must not invent mid-gap horizontal jogs
+/// from unequal-width Ordered×width expansion (expectations §6.2).
+#[test]
+fn port_lane_three_tier_has_no_mid_gap_horizontal_jogs() {
+    let path = showcase_dir().join("flat/product.three-tier.pgm");
+    let source = fs::read_to_string(&path).expect("three-tier fixture");
+    let result = build_layout(&source, &BuildOptions::default()).expect("layout");
+    let by_id: BTreeMap<&str, Rect> = result
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.frame))
+        .collect();
+    let mut failures = Vec::new();
+    for e in &result.edges {
+        let pts = e.path.samples();
+        if pts.len() < 2 {
+            continue;
+        }
+        let Some(sf) = by_id.get(e.source.as_str()) else {
+            continue;
+        };
+        let Some(tf) = by_id.get(e.target.as_str()) else {
+            continue;
+        };
+        let (upper, lower) = if sf.y <= tf.y { (sf, tf) } else { (tf, sf) };
+        let gap_top = upper.bottom();
+        let gap_bot = lower.y;
+        if gap_bot <= gap_top + EPS {
+            continue;
+        }
+        for w in pts.windows(2) {
+            let (a, b) = (w[0], w[1]);
+            let dx = (b.x - a.x).abs();
+            let dy = (b.y - a.y).abs();
+            if dy < EPS && dx > EPS {
+                let y = a.y;
+                if y > gap_top + EPS && y < gap_bot - EPS {
+                    failures.push(format!(
+                        "{}->{}: mid-gap horizontal jog Δx={dx:.4} at y={y:.4}",
+                        e.source, e.target
+                    ));
+                }
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "PortLane three-tier gate:\n{}",
+        failures.join("\n")
+    );
+}

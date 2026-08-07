@@ -215,3 +215,10 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 **不做（本期）**：孩子相对轴完整重打包（属 D3）；Channel/Ink 改列；图名特判。
 
 **何时做**：D1/D2 已合；D3 按需。
+
+---
+
+## 10. 端口列 / Grid backlog（轻量）
+
+- **PortLane（已落地）**：双胞胎 N/S 走廊绝对端口列，无 grid；见 [phases/port-lanes.md](phases/port-lanes.md)、[expectations §6.2](expectations.md)。  
+- **全局 Grid**（单开）：节点参考点贴网 + 端口 `ON_GRID` 类策略；**不**作为 PortLane 的前提。

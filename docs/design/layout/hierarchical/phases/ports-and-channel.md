@@ -26,7 +26,8 @@ PortPlan
 ```
 
 Compose 写 `along_spec`；Metric 写导出的 `PortPoint`。  
-`Ordered(slot)` 的 slot 只定义同侧相对序（算法分配，非边 DSL）。
+`Ordered(slot)` 的 slot 只定义同侧相对序（算法分配，非边 DSL）。  
+双胞胎 N/S 平行走廊的**绝对列位**由 Metric [PortLane](port-lanes.md) 在 frames 之后改写为 `LocalOffset`（不依赖全局 grid）。
 
 ## 2. FREE 分配
 
