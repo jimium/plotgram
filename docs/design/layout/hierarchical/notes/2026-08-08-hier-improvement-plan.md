@@ -469,16 +469,14 @@ Ink 在 `route.rs:146-230` 有一整套避障判定 + 拓扑分支，违反 H2�
 
 #### P5-1 Substrate 建模节点占位（前置，不可跳过）· R§4.6
 
-- [ ] 复用 `derive.rs` 已有的 `cut_line` 机制（现在只按 group 边界切，扩展为按「节点占位」也切）
-- [ ] Main track（`line = og`）：若第 `og-1` 与 `og` 列之间没有实际间隙，该段 ext 不可用
-- [ ] Cross track（`line = k`）：天然位于层缝中，由 Metric 的 `LayerGap` demand 保证不被侵入
-
-做完之后 Channel 搜出的路径**天然不穿节点**。
+- [x] 复用 `derive.rs` 已有的 `cut_line`（root / group 统一）
+- [ ] Main track 按节点奇格切开 — **未做**：贯通 Main 被切开后 Cross–Main–Cross 多跳不可行；列缝清障仍靠 Metric `clear_main_x`
+- [x] Cross track：继续靠 Metric `LayerGap` demand
 
 #### P5-2 删除下游的两处补丁
 
-- [ ] `metric/track.rs:183-211` `clear_main_x` **整段删除**——竖廊 X 直接由 substrate 切分结果决定，不需要事后找缝
-- [ ] 相应地，`hier_eval` 里那条 `check→approved stays near left leaf (not canvas x≈0)` 的断言应该自动成立，不再是「按住症状」
+- [ ] `clear_main_x` **整段删除** — **保留**（见上；写者仍是 Metric Main-X）
+- [x] Ink 扫框拓扑删除（`horizontal_clear_at_y` 等）
 
 #### P5-3 EscapePlan 上提 · R§4.6
 
@@ -488,37 +486,37 @@ ChannelPath { tracks: [...], escape: EscapePlan {
     target: AtPortNormal | ViaGap(gap_line) } }
 ```
 
-- [ ] `EscapePlan` 由 Channel 在搜索时决定
-- [ ] Ink 只做 `match`，删除 `horizontal_clear_at_y` / `cross_axis_stub_clear` / `face_frame_at_x` / `stub_outward_to_rail`（`route.rs:146-230`，约 90 行）
-- [ ] `compose/verify.rs::verify_routes_connected` 增断言：每条边的 `escape` 与两端 `PortPlan.side` 相容
+- [x] `EscapePlan` 由 Channel 决定
+- [x] Ink 只做 `match`，删除扫框拓扑 helpers
+- [x] `compose/verify.rs::verify_routes_connected`：escape ↔ `PortPlan.side`
 
 #### P5-4 Channel 代价函数 · R§4.5.1 / §4.5.2
 
 当前 `bends ≻ length ≻ span_affinity ≻ congestion` 是**严格字典序**：折点绝对优先，为省一个弯可以绕很远；congestion 排最后，实际不起作用；代价里完全没有交叉项。
 
-- [ ] 改为加权标量 + 字典序 tiebreak（保确定性）
-- [ ] 默认权重：`w_bend = 10·edge_gap`、`w_len = 1`、`w_cross = 3·edge_gap`
-- [ ] 交叉项：`Occupancy` 上记录每条 track 已占区间端点，扩展一跳时统计穿越数
+- [x] 改为加权标量 + 字典序 tiebreak（保确定性）
+- [x] 默认权重：`w_bend = 10·edge_gap`、`w_len = 1`、`w_cross = 3·edge_gap`（typed `route_w_*`）
+- [x] 交叉项：`Occupancy` 上记录每条 track 已占区间端点，扩展一跳时统计穿越数
 
 #### P5-5 Verifier 补强 · R§4.7
 
-- [ ] **段级重叠**：`verify_no_illegal_overlap` 从「整条折线相同」改成「存在长度 > `edge_gap/2` 的共线重合段」。实现：按 (方向, 常量坐标) 分桶 + 桶内区间求交，O(E log E)
-- [ ] **正交断言进 Ink**：从 `hier_eval` 搬进 `ink/verify.rs`
-- [ ] **端点精确落界**：容差从 1.0px 收到 1e-9
-- [ ] **折点上界**：`max_bends_budget`（typed param，默认 6），超出报 relaxation
+- [x] **段级重叠**：检测已落地；**硬失败**仍为整线相同（段级目前报 `ink-segment-overlap` relaxation，待 Cross 分轨把 `overlap_len` 压到 0 再升硬门）
+- [x] **正交断言进 Ink**：`verify_no_node_penetration(..., require_orthogonal)`
+- [x] **端点精确落界**：`verify_endpoints_exact` 容差 `1e-9`
+- [x] **折点上界**：`max_bends_budget`（默认 6），超出报 relaxation
 
 #### P5-6 收尾裁定
 
-- [ ] `GateCapacity`：真启用（按 crossing 数估容量）还是删掉 `Fixed` 变体。**不留半截抽象**
-- [ ] `verify_no_group_penetration`（L6 第三道防线）：实现或明确记为 D₂ 遗留
-- [ ] `fan_nest` 加 hub 标识前缀（R§2.12）：多 hub 共享 Cross 走廊时源级分区
+- [x] `GateCapacity`：**删除** `Fixed` 变体（gates unbounded）
+- [x] `verify_no_group_penetration`：明确记为 **D₂ 遗留**
+- [x] `fan_nest` 加 hub 标识前缀（R§2.12）
 
 ### 验收
 
-- [ ] Ink 中不存在任何读取节点框做拓扑判断的代码
-- [ ] `clear_main_x` 已删除，且相关断言仍绿
-- [ ] `overlap_len` 度量降到 0
-- [ ] `sum_bends` 与 `crossings` 的权衡可调（改权重能看到两者此消彼长）
+- [x] Ink 中不存在任何读取节点框做拓扑判断的代码（`EscapePlan` match）
+- [ ] `clear_main_x` 已删除 — **未删**：P5-1 无法在不破坏 Channel 搜索的前提下切开 Main 奇格，竖廊清障仍由 Metric Main-X 写者执行（见 `track.rs` 注释）
+- [ ] `overlap_len` 度量降到 0 — 观测改进中；段级硬门待升
+- [x] `sum_bends` 与 `crossings` 的权衡可调（`route_w_bend` / `route_w_cross`）
 
 ### 刻意不做
 

@@ -200,6 +200,14 @@ pub struct HierarchicalParams {
     /// Minimum length of the last segment entering the target port (pixels).
     /// `0` = off.
     pub min_last_segment: f64,
+    /// Channel search bend weight factor: `w_bend = route_w_bend · edge_gap` (P5-4).
+    pub route_w_bend: f64,
+    /// Channel search length weight (P5-4).
+    pub route_w_len: f64,
+    /// Channel search crossing weight factor: `w_cross = route_w_cross · edge_gap`.
+    pub route_w_cross: f64,
+    /// Soft bend budget; exceeding emits a relaxation (P5-5).
+    pub max_bends_budget: u32,
     pub group_policy: GroupPolicy,
     /// **Not consumed in this build** (no group-frame writer yet) — explicit
     /// options rejected in [`Self::bind`].
@@ -225,6 +233,10 @@ impl Default for HierarchicalParams {
             auto_edge_grouping: false,
             min_first_segment: 0.0,
             min_last_segment: 0.0,
+            route_w_bend: 10.0,
+            route_w_len: 1.0,
+            route_w_cross: 3.0,
+            max_bends_budget: 6,
             group_policy: GroupPolicy::Weak,
             group_sizing: GroupSizing::Fit,
             group_align: GroupAlign::Center,
@@ -388,6 +400,21 @@ impl HierarchicalParams {
         {
             params.min_last_segment = v;
         }
+        if let Some(v) = binder.get_f64_any(&["route_w_bend"]).map_err(bind_err)? {
+            params.route_w_bend = v.max(0.0);
+        }
+        if let Some(v) = binder.get_f64_any(&["route_w_len"]).map_err(bind_err)? {
+            params.route_w_len = v.max(0.0);
+        }
+        if let Some(v) = binder.get_f64_any(&["route_w_cross"]).map_err(bind_err)? {
+            params.route_w_cross = v.max(0.0);
+        }
+        if let Some(v) = binder
+            .get_f64_any(&["max_bends_budget"])
+            .map_err(bind_err)?
+        {
+            params.max_bends_budget = v.round().max(0.0) as u32;
+        }
 
         // Invalid combination (edge-parameters.md §2.4 discipline): grouping
         // geometry is defined for the orthogonal main path only.
@@ -433,6 +460,7 @@ impl HierarchicalParams {
              primary_arm_boost={:e}|symmetry_iters={}|\
              routing_style={}|auto_edge_grouping={}|\
              min_first_segment={:e}|min_last_segment={:e}|\
+             route_w_bend={:e}|route_w_len={:e}|route_w_cross={:e}|max_bends_budget={}|\
              group_policy={}|group_sizing={}|group_align={}",
             self.orientation.as_str(),
             self.node_gap,
@@ -448,6 +476,10 @@ impl HierarchicalParams {
             self.auto_edge_grouping,
             self.min_first_segment,
             self.min_last_segment,
+            self.route_w_bend,
+            self.route_w_len,
+            self.route_w_cross,
+            self.max_bends_budget,
             self.group_policy.as_str(),
             self.group_sizing.as_str(),
             self.group_align.as_str(),

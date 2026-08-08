@@ -1,13 +1,17 @@
 //! Minimal PlanVerifier after Compose + Channel (ink-and-verification.md §7.1).
 //!
 //! Flat subset: proper hierarchy, port completeness, orthogonal route
-//! connectivity. Group/gate/scope checks are deferred to D₂.
+//! connectivity, EscapePlan ↔ PortPlan.side compatibility (P5-3).
+//! Group/gate/scope checks are deferred to D₂.
 
 use std::collections::BTreeMap;
 
+use plotgram_algo::orientation::Side;
 use plotgram_engine_api::LayoutError;
 
-use crate::layout::hierarchical::channel::{ChannelRoutePlan, RouteTopology};
+use crate::layout::hierarchical::channel::{
+    ChannelRoutePlan, EscapeEnd, RouteTopology,
+};
 use crate::layout::hierarchical::compose::ports::EdgePorts;
 use crate::layout::hierarchical::model::{PlanGraph, RealGraph};
 
@@ -54,6 +58,16 @@ fn verify_ports_complete(
     Ok(())
 }
 
+fn escape_compatible(end: EscapeEnd, side: Side) -> bool {
+    match (end, side) {
+        (EscapeEnd::AtPortNormal, Side::North | Side::South) => true,
+        (EscapeEnd::ViaGap(_), Side::East | Side::West) => true,
+        // Same-face / mixed plans may still use ViaGap on N/S in future; for
+        // now decide_escape only emits these pairings.
+        _ => false,
+    }
+}
+
 fn verify_routes_connected(
     graph: &RealGraph,
     route_plan: &ChannelRoutePlan,
@@ -86,7 +100,23 @@ fn verify_routes_connected(
                 )));
             }
         }
-        let _ = ports; // ports already checked; keep signature parallel
+        let Some(ep) = ports.get(&e.edge_id) else {
+            continue;
+        };
+        if !escape_compatible(path.escape.source, ep.source.side) {
+            return Err(LayoutError::message(format!(
+                "hierarchical PlanVerifier: edge `{}` escape.source {:?} incompatible with \
+                 source PortPlan.side {:?}",
+                e.edge_id, path.escape.source, ep.source.side
+            )));
+        }
+        if !escape_compatible(path.escape.target, ep.target.side) {
+            return Err(LayoutError::message(format!(
+                "hierarchical PlanVerifier: edge `{}` escape.target {:?} incompatible with \
+                 target PortPlan.side {:?}",
+                e.edge_id, path.escape.target, ep.target.side
+            )));
+        }
     }
     Ok(())
 }

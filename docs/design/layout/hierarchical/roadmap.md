@@ -152,7 +152,7 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 **做什么（概要）**：
 
 - 组框进 VPSC（含 / 分隔 / title demand）
-- Gate / Scope 三道防线；`verify_no_group_penetration`
+- Gate / Scope 三道防线；`verify_no_group_penetration`（**P5 明确留到本阶段**，本仓库尚未实现）
 - Weak 连续块与目标 Plan schema 对齐；为 StrongMacro 留同一产出类型
 
 **何时选**：产品痛点是组框位置、跨组穿框、架构分层子系统。

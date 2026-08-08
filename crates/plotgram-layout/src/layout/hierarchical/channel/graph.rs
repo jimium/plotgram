@@ -1,6 +1,6 @@
 //! Channel adjacency graph + occupancy (links + gates).
 
-use super::substrate::{GateCapacity, GateId, Substrate, TrackId};
+use super::substrate::{GateId, Substrate, TrackId};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,6 +77,8 @@ impl<'s> ChannelGraph<'s> {
 pub struct Occupancy {
     track_usage: BTreeMap<TrackId, u32>,
     gate_usage: BTreeMap<GateId, u32>,
+    /// Per-track occupied plan-grid intervals (from committed paths).
+    track_intervals: BTreeMap<TrackId, Vec<(usize, usize)>>,
 }
 
 impl Occupancy {
@@ -88,20 +90,36 @@ impl Occupancy {
         self.track_usage.get(&track).copied().unwrap_or(0)
     }
 
+    #[allow(dead_code)]
     pub fn gate_load(&self, gate: GateId) -> u32 {
         self.gate_usage.get(&gate).copied().unwrap_or(0)
     }
 
+    /// Gates are unbounded (P5-6 deleted `GateCapacity::Fixed`).
     pub fn gate_open(&self, substrate: &Substrate, gate: GateId) -> bool {
-        substrate.gate(gate).is_some_and(|g| match g.capacity {
-            GateCapacity::Unbounded => true,
-            GateCapacity::Fixed(c) => self.gate_load(gate) < c,
-        })
+        substrate.gate(gate).is_some()
     }
 
-    pub fn commit(&mut self, tracks: &[TrackId], gates: &[GateId]) {
+    /// Count how many committed intervals on `track` properly overlap `ext`.
+    pub fn crossing_count(&self, track: TrackId, ext: (usize, usize)) -> u32 {
+        let Some(ivs) = self.track_intervals.get(&track) else {
+            return 0;
+        };
+        ivs.iter()
+            .filter(|&&(a, b)| {
+                let lo = a.max(ext.0);
+                let hi = b.min(ext.1);
+                hi > lo
+            })
+            .count() as u32
+    }
+
+    pub fn commit(&mut self, substrate: &Substrate, tracks: &[TrackId], gates: &[GateId]) {
         for &t in tracks {
             *self.track_usage.entry(t).or_default() += 1;
+            if let Some(tr) = substrate.track(t) {
+                self.track_intervals.entry(t).or_default().push(tr.ext);
+            }
         }
         let mut seen: BTreeSet<GateId> = BTreeSet::new();
         for &g in gates {
@@ -111,10 +129,17 @@ impl Occupancy {
         }
     }
 
-    pub fn release(&mut self, tracks: &[TrackId], gates: &[GateId]) {
+    pub fn release(&mut self, substrate: &Substrate, tracks: &[TrackId], gates: &[GateId]) {
         for &t in tracks {
             if let Some(u) = self.track_usage.get_mut(&t) {
                 *u = u.saturating_sub(1);
+            }
+            if let Some(tr) = substrate.track(t) {
+                if let Some(ivs) = self.track_intervals.get_mut(&t) {
+                    if let Some(pos) = ivs.iter().rposition(|&iv| iv == tr.ext) {
+                        ivs.remove(pos);
+                    }
+                }
             }
         }
         let mut seen: BTreeSet<GateId> = BTreeSet::new();

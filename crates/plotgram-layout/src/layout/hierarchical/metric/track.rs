@@ -64,15 +64,19 @@ pub fn assign_track_coords(
             TrackOrient::Cross => {
                 let line = t.line;
                 if line == 0 || line >= plan.layers.len() {
-                    // Outside the stack — park at mid of adjacent layer if any.
-                    let y = if line == 0 {
+                    // Outside the stack — park near adjacent layer; still
+                    // separate lanes (P5-5).
+                    let base = if line == 0 {
                         main.get(plan.layers[0][0]).copied().unwrap_or(0.0) - edge_gap
                     } else {
                         let last = plan.layers.len() - 1;
                         let e = plan.layers[last][0];
                         main[e] + size_of(e).height + edge_gap
                     };
-                    vec![y; count]
+                    let mid = (count.saturating_sub(1) as f64) * 0.5;
+                    (0..count)
+                        .map(|i| base + (i as f64 - mid) * edge_gap)
+                        .collect()
                 } else {
                     let r = line - 1;
                     let thickness = plan.layers[r]
@@ -177,6 +181,10 @@ fn main_line_backbone_x(
 }
 
 /// Nudge a candidate Main-lane X until it does not pierce any node interior.
+///
+/// P5-2 wanted this deleted after substrate node occupancy; P5-1 could not
+/// punch Main odd cells without breaking Channel search, so clearance stays
+/// in the Metric Main-X writer (sole writer — not Ink).
 ///
 /// Overlapping X-projections (same column / tight neighbors) are merged so we
 /// cannot oscillate between faces of two overlapping intervals.

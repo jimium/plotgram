@@ -178,14 +178,11 @@ Substrate 全图、Gate、ScopeMask、rip-up、多 rank 回边外侧走廊、`mi
 
 ### 5.2 D1.1 · 顶层 Substrate + Channel 搜索
 
-**实现状态（代码）**：`crates/plotgram-layout/.../hierarchical/channel/` — root-scope Substrate + 词典序 Dijkstra；Ink 展开 `ChannelPath`；debug `channels` 非 null。
+**实现状态（代码）**：`crates/plotgram-layout/.../hierarchical/channel/` — root/group `cut_line` Substrate；**加权标量** Dijkstra（`route_w_*`，Occupancy 交叉项）；`ChannelPath.escape: EscapePlan`；Ink 只 `match` 展开（无扫框拓扑）。Gate 无容量上限（已删 `GateCapacity::Fixed`）。
 
-- 从 `PlanGraph` ranks / orders 派生 **root-scope-only** Substrate。奇偶 `ext` 编码与切割规则参考 Atlas；**无组边界切割**，Segment 仍注册但 `scope = None`。
-- L2：词典序 Dijkstra；代价键 **折点 > 长度 > 拥塞软偏好**；邻接按 TrackId 稳定序。
-- 产出完整 `RouteTopology::Orthogonal(ChannelPath)`；相邻层单 Cross 轨是「直连层间 hop」特化。
-- TrackOrder 泛化到任意 substrate track（仍区间着色）；Cross 轨 lane 数回写 RankGap Demand。
-- **Gate / ScopeMask 仍不做**；跨组边保持今日「允许」语义，由 D1.2 / D₂ 接管。
-- 非法 scope arc 在本阶段不适用；仍禁止墙钟超时决定返回哪条 path。
+- L2：`scalar = w_bend·bends + w_len·length + w_cross·crossings + …`，tiebreak 保确定性。
+- `EscapePlan`：E/W → `ViaGap`，N/S → `AtPortNormal`；PlanVerifier 校验与 `PortPlan.side` 相容。
+- **`verify_no_group_penetration`：D₂ 遗留**（本阶段不做）。
 
 #### 验收（增量）
 

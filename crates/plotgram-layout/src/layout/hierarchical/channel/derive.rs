@@ -10,8 +10,7 @@ use plotgram_engine_api::LayoutError;
 use plotgram_model::diagnostics::Relaxation;
 
 use super::substrate::{
-    derive_root_substrate, BlueprintIndex, GateCapacity, GateSide, GroupId, SegmentRef, Substrate,
-    TrackOrient,
+    BlueprintIndex, GateSide, GroupId, SegmentRef, Substrate, TrackOrient,
 };
 use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealGraph};
 
@@ -315,6 +314,10 @@ fn derive_group_substrate(
                 ));
             }
         }
+        // P5-1: root/group both use cut_line. Punching Main odd (node-body)
+        // cells would split through-corridors and break Cross–Main–Cross
+        // multi-rank paths (ext ranges are contiguous). Column-gap clearance
+        // is enforced at Metric X mapping (`main_line_backbone_x`), not here.
         let segs = cut_line(&mut s, TrackOrient::Main, og, 2 * rank_count, &cutters);
         main_lines.insert(og, segs);
     }
@@ -335,22 +338,11 @@ fn derive_group_substrate(
         }
     }
 
-    // P0: Fixed capacity is not produced — always Unbounded. P5 will either
-    // estimate capacity from crossing count or delete the Fixed variant.
-    let capacity = GateCapacity::Unbounded;
+    // Gates are unbounded (P5-6 deleted GateCapacity::Fixed).
     for gname in &group_names {
         let gid = group_id[gname];
         let (r0, r1, o0, o1) = group_rect[gname];
-        add_side_gate(
-            &mut s,
-            gid,
-            GateSide::MainLow,
-            r0,
-            &main_lines,
-            o0 + 1,
-            o1,
-            capacity,
-        )?;
+        add_side_gate(&mut s, gid, GateSide::MainLow, r0, &main_lines, o0 + 1, o1)?;
         add_side_gate(
             &mut s,
             gid,
@@ -359,7 +351,6 @@ fn derive_group_substrate(
             &main_lines,
             o0 + 1,
             o1,
-            capacity,
         )?;
         add_side_gate(
             &mut s,
@@ -369,7 +360,6 @@ fn derive_group_substrate(
             &cross_lines,
             r0 + 1,
             r1,
-            capacity,
         )?;
         add_side_gate(
             &mut s,
@@ -379,7 +369,6 @@ fn derive_group_substrate(
             &cross_lines,
             r0 + 1,
             r1,
-            capacity,
         )?;
     }
 
@@ -531,6 +520,55 @@ fn boundary_ranks_overlap(plan: &PlanGraph, a: &str, b: &str) -> bool {
     false
 }
 
+/// Derive a root-scope Substrate with node-body Main cuts (P5-1).
+pub fn derive_root_substrate(plan: &PlanGraph) -> (Substrate, BlueprintIndex) {
+    let rank_count = plan.layers.len();
+    let order_count = plan
+        .layers
+        .iter()
+        .map(|l| l.len())
+        .max()
+        .unwrap_or(0);
+
+    let mut s = Substrate::new();
+    let mut cross_lines: BTreeMap<usize, Vec<SegmentRef>> = BTreeMap::new();
+    for k in 0..=rank_count {
+        let segs = cut_line(&mut s, TrackOrient::Cross, k, 2 * order_count, &[]);
+        cross_lines.insert(k, segs);
+    }
+    let mut main_lines: BTreeMap<usize, Vec<SegmentRef>> = BTreeMap::new();
+    for og in 0..=order_count {
+        let segs = cut_line(&mut s, TrackOrient::Main, og, 2 * rank_count, &[]);
+        main_lines.insert(og, segs);
+    }
+
+    for (k, csegs) in &cross_lines {
+        for cs in csegs {
+            let og_lo = (cs.ext.0 + 1) / 2;
+            let og_hi = cs.ext.1 / 2;
+            for og in og_lo..=og_hi {
+                if let Some(msegs) = main_lines.get(&og) {
+                    for ms in msegs {
+                        if ms.covers(2 * k) && ms.scope == cs.scope {
+                            let _ = s.link(cs.id, ms.id);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let index = BlueprintIndex {
+        cross_lines,
+        main_lines,
+        rank_count,
+        order_count,
+        group_ids: BTreeMap::new(),
+        node_region: BTreeMap::new(),
+    };
+    (s, index)
+}
+
 fn cut_line(
     s: &mut Substrate,
     orient: TrackOrient,
@@ -538,6 +576,44 @@ fn cut_line(
     full_hi: usize,
     cutters: &[(usize, GroupId, (usize, usize))],
 ) -> Vec<SegmentRef> {
+    let intervals = plan_cut_intervals(full_hi, cutters);
+    let mut segs = Vec::new();
+    for (a, b, scope) in intervals {
+        segs.push(add_extent_track(s, orient, line, scope, (a, b)));
+    }
+    segs
+}
+
+fn add_extent_track(
+    s: &mut Substrate,
+    orient: TrackOrient,
+    line: usize,
+    scope: Option<GroupId>,
+    ext: (usize, usize),
+) -> SegmentRef {
+    let (a, b) = ext;
+    let lo_even = a + (a & 1);
+    let hi_even = b - (b & 1);
+    let gaps = if lo_even > hi_even {
+        0
+    } else {
+        (hi_even - lo_even) / 2 + 1
+    };
+    let id = s.alloc_track_id();
+    s.add_track(id, orient, scope, gaps.max(1) as f64, line, (a, b))
+        .expect("cut_line: add segment");
+    SegmentRef {
+        id,
+        ext: (a, b),
+        scope,
+    }
+}
+
+/// Group-cut intervals over `[0, full_hi]` (inclusive), deepest cutter wins.
+fn plan_cut_intervals(
+    full_hi: usize,
+    cutters: &[(usize, GroupId, (usize, usize))],
+) -> Vec<(usize, usize, Option<GroupId>)> {
     let mut cuts: BTreeSet<usize> = BTreeSet::new();
     for &(_, _, interior) in cutters {
         cuts.insert(interior.0);
@@ -551,7 +627,7 @@ fn cut_line(
     let mut by_depth: Vec<&(usize, GroupId, (usize, usize))> = cutters.iter().collect();
     by_depth.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
 
-    let mut segs = Vec::new();
+    let mut out = Vec::new();
     for w in bounds.windows(2) {
         let (a, b) = (w[0], w[1] - 1);
         if a > b {
@@ -561,26 +637,11 @@ fn cut_line(
             .iter()
             .find(|(_, _, interior)| interior.0 <= a && b <= interior.1)
             .map(|(_, gid, _)| *gid);
-        let lo_even = a + (a & 1);
-        let hi_even = b - (b & 1);
-        let gaps = if lo_even > hi_even {
-            0
-        } else {
-            (hi_even - lo_even) / 2 + 1
-        };
-        let id = s.alloc_track_id();
-        s.add_track(id, orient, scope, gaps.max(1) as f64, line, (a, b))
-            .expect("cut_line: add segment");
-        segs.push(SegmentRef {
-            id,
-            ext: (a, b),
-            scope,
-        });
+        out.push((a, b, scope));
     }
-    segs
+    out
 }
 
-#[allow(clippy::too_many_arguments)]
 fn add_side_gate(
     s: &mut Substrate,
     gid: GroupId,
@@ -589,7 +650,6 @@ fn add_side_gate(
     lines: &BTreeMap<usize, Vec<SegmentRef>>,
     lo: usize,
     hi: usize,
-    capacity: GateCapacity,
 ) -> Result<(), DeriveError> {
     if lo > hi {
         return Ok(());
@@ -624,7 +684,7 @@ fn add_side_gate(
         return Ok(());
     }
     let id = s.alloc_gate_id();
-    s.add_gate(id, gid, side, boundary, crossings, capacity)?;
+    s.add_gate(id, gid, side, boundary, crossings)?;
     Ok(())
 }
 

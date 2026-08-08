@@ -91,17 +91,12 @@ pub fn assign_track_order(
             };
             match t.orient {
                 TrackOrient::Cross => {
-                    // Horizontal corridor occupancy along the cross axis
-                    // (including zero-width / straight vertical jogs).
                     by_track
                         .entry(tid)
                         .or_default()
                         .push((edge_id.clone(), lo, hi));
                 }
                 TrackOrient::Main => {
-                    // Vertical corridor: conflict when rank bands overlap.
-                    // Half-open [lo, hi+1) as closed [lo, hi+1] so shared
-                    // endpoint ranks collide; abutting bands may share a lane.
                     let (lo_r, hi_r) = endpoint_ranks(plan, graph, &edge_of, edge_id);
                     by_track.entry(tid).or_default().push((
                         edge_id.clone(),
@@ -123,7 +118,7 @@ pub fn assign_track_order(
             .track(*tid)
             .is_some_and(|t| matches!(t.orient, TrackOrient::Cross));
         let colors = if is_cross {
-            color_cross_outer_first(members, ports)
+            color_cross_outer_first(members, ports, graph, &edge_of)
         } else {
             let intervals: Vec<Interval> = members
                 .iter()
@@ -177,28 +172,41 @@ fn endpoint_ranks(
     (sr.min(tr), sr.max(tr))
 }
 
-/// `(nest, order)` from the Ordered end with `count ≥ 2`; both ends fan →
-/// smaller nest. Non-fan → `(0, 0)`.
-fn fan_nest(ports: &BTreeMap<String, EdgePorts>, edge_id: &str) -> (u32, u32) {
+/// `(hub_decl, nest, order)` — hub partitions multi-source fans on a shared
+/// Cross corridor (R§2.12 / P5-6); nest is outer-first from Ordered count.
+fn fan_nest(
+    ports: &BTreeMap<String, EdgePorts>,
+    graph: &RealGraph,
+    edge_of: &BTreeMap<String, usize>,
+    edge_id: &str,
+) -> (u32, u32, u32) {
     let Some(ep) = ports.get(edge_id) else {
-        return (0, 0);
+        return (0, 0, 0);
     };
-    let pick = |along: AlongSpec| match along {
+    let Some(&ei) = edge_of.get(edge_id) else {
+        return (0, 0, 0);
+    };
+    let edge = &graph.edges[ei];
+    let pick = |along: AlongSpec, hub: usize| match along {
         AlongSpec::Ordered { order, count } if count >= 2 => {
-            Some((order.min(count - 1 - order), order))
+            Some((hub as u32, order.min(count - 1 - order), order))
         }
         _ => None,
     };
-    match (pick(ep.source.along), pick(ep.target.along)) {
+    match (
+        pick(ep.source.along, edge.original_source),
+        pick(ep.target.along, edge.original_target),
+    ) {
         (Some(a), Some(b)) => {
-            if a.0 < b.0 || (a.0 == b.0 && a.1 <= b.1) {
+            // Prefer the tighter nest; hub still prefixes so sources partition.
+            if (a.1, a.2) <= (b.1, b.2) {
                 a
             } else {
                 b
             }
         }
         (Some(a), None) | (None, Some(a)) => a,
-        (None, None) => (0, 0),
+        (None, None) => (0, 0, 0),
     }
 }
 
@@ -207,15 +215,18 @@ fn fan_nest(ports: &BTreeMap<String, EdgePorts>, edge_id: &str) -> (u32, u32) {
 fn color_cross_outer_first(
     members: &[(String, f64, f64)],
     ports: &BTreeMap<String, EdgePorts>,
+    graph: &RealGraph,
+    edge_of: &BTreeMap<String, usize>,
 ) -> Vec<usize> {
     let n = members.len();
     let mut order: Vec<usize> = (0..n).collect();
     order.sort_by(|&a, &b| {
-        let (na, oa) = fan_nest(ports, &members[a].0);
-        let (nb, ob) = fan_nest(ports, &members[b].0);
+        let (ha, na, oa) = fan_nest(ports, graph, edge_of, &members[a].0);
+        let (hb, nb, ob) = fan_nest(ports, graph, edge_of, &members[b].0);
         let wa = members[a].2 - members[a].1;
         let wb = members[b].2 - members[b].1;
-        na.cmp(&nb)
+        ha.cmp(&hb)
+            .then(na.cmp(&nb))
             .then(oa.cmp(&ob))
             .then(wb.total_cmp(&wa))
             .then(members[a].0.cmp(&members[b].0))
@@ -228,7 +239,7 @@ fn color_cross_outer_first(
         let (lo, hi) = (members[i].1, members[i].2);
         let track = tracks
             .iter()
-            .position(|ivs| ivs.iter().all(|&(a, b)| b <= lo || hi <= a))
+            .position(|ivs| ivs.iter().all(|&(a, b)| b + 1e-9 < lo || hi + 1e-9 < a))
             .unwrap_or_else(|| {
                 tracks.push(Vec::new());
                 tracks.len() - 1
@@ -347,17 +358,11 @@ mod tests {
         let mut routes = BTreeMap::new();
         routes.insert(
             "e0".into(),
-            RouteTopology::Orthogonal(ChannelPath {
-                tracks: vec![cross],
-                gates: vec![],
-            }),
+            RouteTopology::Orthogonal(ChannelPath::new(vec![cross], vec![],)),
         );
         routes.insert(
             "e1".into(),
-            RouteTopology::Orthogonal(ChannelPath {
-                tracks: vec![cross],
-                gates: vec![],
-            }),
+            RouteTopology::Orthogonal(ChannelPath::new(vec![cross], vec![],)),
         );
         let route_plan = ChannelRoutePlan {
             substrate: sub,
@@ -485,10 +490,7 @@ mod tests {
         for eid in ["e_low", "e_high"] {
             routes.insert(
                 eid.into(),
-                RouteTopology::Orthogonal(ChannelPath {
-                    tracks: vec![main_id],
-                    gates: vec![],
-                }),
+                RouteTopology::Orthogonal(ChannelPath::new(vec![main_id], vec![],)),
             );
         }
         let route_plan = ChannelRoutePlan {
@@ -637,10 +639,7 @@ mod tests {
         for eid in edge_ids {
             routes.insert(
                 eid.into(),
-                RouteTopology::Orthogonal(ChannelPath {
-                    tracks: vec![cross],
-                    gates: vec![],
-                }),
+                RouteTopology::Orthogonal(ChannelPath::new(vec![cross], vec![],)),
             );
         }
         let route_plan = ChannelRoutePlan {

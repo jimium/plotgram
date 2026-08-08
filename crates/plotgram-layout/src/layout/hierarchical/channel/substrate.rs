@@ -6,7 +6,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+#[cfg(test)]
 use crate::layout::hierarchical::model::PlanGraph;
+
 
 /// Discrete track (segment) identity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -99,18 +101,6 @@ pub struct GroupScope {
     pub orders: (usize, usize),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GateCapacity {
-    Unbounded,
-    /// Capacity by crossing budget. **Not produced in this build** — `derive`
-    /// always emits [`Unbounded`]; the `Fixed` match arm in `Occupancy::gate_open`
-    /// is therefore unreachable. P0 keeps the variant as IR placeholder; P5
-    /// either wires real capacity estimation or deletes `Fixed` entirely
-    /// (no half-abstract).
-    #[allow(dead_code)]
-    Fixed(u32),
-}
-
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // group/side/line projected in debug / Demand later
 pub struct Gate {
@@ -119,7 +109,6 @@ pub struct Gate {
     pub side: GateSide,
     pub line: usize,
     pub crossings: Vec<(TrackId, TrackId)>,
-    pub capacity: GateCapacity,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -307,7 +296,6 @@ impl Substrate {
         side: GateSide,
         line: usize,
         crossings: Vec<(TrackId, TrackId)>,
-        capacity: GateCapacity,
     ) -> Result<(), SubstrateError> {
         if self.gates.contains_key(&id) {
             return Err(SubstrateError::DuplicateGate(id));
@@ -359,7 +347,6 @@ impl Substrate {
                 side,
                 line,
                 crossings,
-                capacity,
             },
         );
         Ok(())
@@ -455,77 +442,10 @@ impl BlueprintIndex {
 }
 
 /// Derive a root-scope Substrate from the properified plan (no group cuts).
-pub fn derive_root_substrate(plan: &PlanGraph) -> (Substrate, BlueprintIndex) {
-    let rank_count = plan.layers.len();
-    let order_count = plan
-        .layers
-        .iter()
-        .map(|l| l.len())
-        .max()
-        .unwrap_or(0);
-
-    let mut s = Substrate::new();
-    let mut index = BlueprintIndex {
-        rank_count,
-        order_count,
-        ..BlueprintIndex::default()
-    };
-
-    let cross_ext = (0, 2 * order_count);
-    let cross_gaps = (cross_ext.0..=cross_ext.1)
-        .filter(|c| c % 2 == 0)
-        .count()
-        .max(1) as f64;
-    for k in 0..=rank_count {
-        let id = s.alloc_track_id();
-        s.add_track(id, TrackOrient::Cross, None, cross_gaps, k, cross_ext)
-            .expect("root cross track");
-        index.cross_lines.insert(
-            k,
-            vec![SegmentRef {
-                id,
-                ext: cross_ext,
-                scope: None,
-            }],
-        );
-    }
-    let main_ext = (0, 2 * rank_count);
-    for og in 0..=order_count {
-        let id = s.alloc_track_id();
-        let gaps = (main_ext.0..=main_ext.1)
-            .filter(|c| c % 2 == 0)
-            .count()
-            .max(1) as f64;
-        s.add_track(id, TrackOrient::Main, None, gaps, og, main_ext)
-            .expect("root main track");
-        index.main_lines.insert(
-            og,
-            vec![SegmentRef {
-                id,
-                ext: main_ext,
-                scope: None,
-            }],
-        );
-    }
-
-    for (k, csegs) in &index.cross_lines {
-        for cs in csegs {
-            let og_lo = (cs.ext.0 + 1) / 2;
-            let og_hi = cs.ext.1 / 2;
-            for og in og_lo..=og_hi {
-                if let Some(msegs) = index.main_lines.get(&og) {
-                    for ms in msegs {
-                        if ms.covers(2 * k) && ms.scope == cs.scope {
-                            let _ = s.link(cs.id, ms.id);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    (s, index)
-}
+///
+/// Implemented in [`super::derive::derive_root_substrate`] so Main lines share
+/// P5-1 node-body cuts with the group path.
+pub use super::derive::derive_root_substrate;
 
 #[cfg(test)]
 mod tests {

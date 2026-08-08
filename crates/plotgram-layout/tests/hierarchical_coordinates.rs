@@ -94,3 +94,5 @@ fn fanout_port_anchor_coordinates() {
     };
     insta::assert_json_snapshot!(layout_json(graph, Size::new(120.0, 40.0)));
 }
+
+

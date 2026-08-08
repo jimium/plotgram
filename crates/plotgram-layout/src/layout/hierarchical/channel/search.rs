@@ -1,7 +1,10 @@
-//! Lexicographic Dijkstra on the ChannelGraph
-//! (`bends ≻ length ≻ span_affinity ≻ congestion`).
+//! Weighted-scalar Dijkstra on the ChannelGraph (P5-4).
 //!
-//! ScopeMask hard-filters foreign group scopes (L8). Gate full → transition gone.
+//! Primary key: `scalar = w_bend·bends + w_len·length + w_cross·crossings
+//! + w_span·span_affinity + w_cong·congestion`. Tiebreak keeps the old
+//! lexicographic order for determinism.
+//!
+//! ScopeMask hard-filters foreign group scopes (L8). Gates are unbounded.
 //! Span affinity (D1.3.1): prefer tracks near the edge's rank/order span so
 //! Cross line 0 / far Main corridors are not free when an interior seam exists.
 
@@ -10,6 +13,56 @@ use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 
 use super::graph::{ChannelGraph, Occupancy, Via};
 use super::substrate::{GateId, GroupId, Substrate, TrackId, TrackOrient};
+use plotgram_algo::orientation::Side;
+
+/// How Ink enters/leaves the first/last corridor (P5-3). Channel decides;
+/// Ink only matches — no frame scanning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EscapeEnd {
+    /// Leave/arrive along the port normal (E/W horizontal at port Y, N/S vertical).
+    AtPortNormal,
+    /// Drop to a layer-gap Cross line first (sibling escape).
+    ViaGap(usize),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EscapePlan {
+    pub source: EscapeEnd,
+    pub target: EscapeEnd,
+}
+
+impl EscapePlan {
+    pub fn both_normal() -> Self {
+        Self {
+            source: EscapeEnd::AtPortNormal,
+            target: EscapeEnd::AtPortNormal,
+        }
+    }
+}
+
+/// Decide escape from port sides + ranks (no node-frame reads).
+///
+/// E/W ports use ViaGap (safe against same-layer pierces); N/S use AtPortNormal.
+pub fn decide_escape(
+    src_side: Side,
+    tgt_side: Side,
+    src_rank: usize,
+    tgt_rank: usize,
+) -> EscapePlan {
+    let end = |side: Side, rank: usize, toward_higher: bool| -> EscapeEnd {
+        match side {
+            Side::East | Side::West => {
+                let line = if toward_higher { rank + 1 } else { rank };
+                EscapeEnd::ViaGap(line)
+            }
+            Side::North | Side::South => EscapeEnd::AtPortNormal,
+        }
+    };
+    EscapePlan {
+        source: end(src_side, src_rank, tgt_rank >= src_rank),
+        target: end(tgt_side, tgt_rank, src_rank > tgt_rank),
+    }
+}
 
 /// Ordered path of substrate tracks (L2 topology).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +70,17 @@ pub struct ChannelPath {
     pub tracks: Vec<TrackId>,
     /// Gates traversed in order (deduped per edge at occupancy commit).
     pub gates: Vec<GateId>,
+    pub escape: EscapePlan,
+}
+
+impl ChannelPath {
+    pub fn new(tracks: Vec<TrackId>, gates: Vec<GateId>) -> Self {
+        Self {
+            tracks,
+            gates,
+            escape: EscapePlan::both_normal(),
+        }
+    }
 }
 
 /// L8 scope mask: allow `{None} ∪ chain(u) ∪ chain(v)` only.
@@ -69,7 +133,7 @@ pub struct SpanAffinity {
 }
 
 /// Soft search preferences (D1.2 params + D1.3 span / inner-corridor).
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct RouteHints {
     /// Minimum first-segment length in logical span units (0 = off).
     pub min_first_span: f64,
@@ -84,6 +148,21 @@ pub struct RouteHints {
     pub order_count: usize,
     /// When set, accumulate per-track span distance into [`LexCost::span_affinity`].
     pub span: Option<SpanAffinity>,
+    /// Weighted-scalar cost weights (P5-4).
+    pub weights: CostWeights,
+}
+
+impl Default for RouteHints {
+    fn default() -> Self {
+        Self {
+            min_first_span: 0.0,
+            min_last_span: 0.0,
+            outer_main_as_overflow: false,
+            order_count: 0,
+            span: None,
+            weights: CostWeights::default(),
+        }
+    }
 }
 
 /// Soft congestion added to an outer Main track while an inner band gap is free.
@@ -95,23 +174,80 @@ const SAME_ORDER_OUTER_OVERFLOW_PENALTY: f64 = 24.0;
 /// Inner Main gap is "occupied" once demand reaches this (overflow unlocked).
 const INNER_SATURATION_DEMAND: u32 = 1;
 
-/// Lexicographic cost: bends ≻ length ≻ span_affinity ≻ congestion.
+/// Typed route cost weights (defaults: `w_bend = 10·edge_gap`, `w_len = 1`,
+/// `w_cross = 3·edge_gap`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CostWeights {
+    pub w_bend: f64,
+    pub w_len: f64,
+    pub w_cross: f64,
+    pub w_span: f64,
+    pub w_cong: f64,
+}
+
+impl CostWeights {
+    pub fn from_edge_gap(edge_gap: f64) -> Self {
+        let g = edge_gap.max(1e-9);
+        Self {
+            w_bend: 10.0 * g,
+            w_len: 1.0,
+            w_cross: 3.0 * g,
+            w_span: g,
+            w_cong: 1.0,
+        }
+    }
+
+    pub fn from_params(edge_gap: f64, bend_factor: f64, w_len: f64, cross_factor: f64) -> Self {
+        let g = edge_gap.max(1e-9);
+        Self {
+            w_bend: bend_factor.max(0.0) * g,
+            w_len: w_len.max(0.0),
+            w_cross: cross_factor.max(0.0) * g,
+            w_span: g,
+            w_cong: 1.0,
+        }
+    }
+}
+
+impl Default for CostWeights {
+    fn default() -> Self {
+        Self::from_edge_gap(16.0)
+    }
+}
+
+/// Weighted scalar + lexicographic tiebreak (P5-4).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LexCost {
+    /// `w_bend·bends + w_len·length + w_cross·crossings + w_span·span + w_cong·cong`.
+    pub scalar: f64,
     pub bends: u32,
     pub length: f64,
     /// Sum of per-track distances from the edge's natural rank/order band.
     pub span_affinity: u32,
     pub congestion: f64,
+    /// Overlaps with committed track intervals encountered while expanding.
+    pub crossings: u32,
+}
+
+impl LexCost {
+    pub fn recompute(&mut self, w: &CostWeights) {
+        self.scalar = w.w_bend * f64::from(self.bends)
+            + w.w_len * self.length
+            + w.w_cross * f64::from(self.crossings)
+            + w.w_span * f64::from(self.span_affinity)
+            + w.w_cong * self.congestion;
+    }
 }
 
 impl Default for LexCost {
     fn default() -> Self {
         Self {
+            scalar: 0.0,
             bends: 0,
             length: 0.0,
             span_affinity: 0,
             congestion: 0.0,
+            crossings: 0,
         }
     }
 }
@@ -126,11 +262,13 @@ impl PartialOrd for LexCost {
 
 impl Ord for LexCost {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.bends
-            .cmp(&other.bends)
+        self.scalar
+            .total_cmp(&other.scalar)
+            .then_with(|| self.bends.cmp(&other.bends))
             .then_with(|| self.length.total_cmp(&other.length))
             .then_with(|| self.span_affinity.cmp(&other.span_affinity))
             .then_with(|| self.congestion.total_cmp(&other.congestion))
+            .then_with(|| self.crossings.cmp(&other.crossings))
     }
 }
 
@@ -230,10 +368,7 @@ pub struct RouteOutcome {
 impl RouteOutcome {
     pub fn infeasible() -> Self {
         Self {
-            path: ChannelPath {
-                tracks: Vec::new(),
-                gates: Vec::new(),
-            },
+            path: ChannelPath::new(Vec::new(), Vec::new()),
             cost: LexCost::default(),
             feasible: false,
         }
@@ -291,20 +426,20 @@ pub fn route_edge(
         } else {
             0.0
         },
+        crossings: occupancy.crossing_count(start, start_t.ext),
         ..LexCost::default()
     };
     start_cost.congestion += soft_penalties(substrate, start, &hints, occupancy);
+    start_cost.recompute(&hints.weights);
 
     if start == goal {
         let mut cost = start_cost;
         if hints.min_last_span > 0.0 && start_t.span_weight + 1e-9 < hints.min_last_span {
             cost.congestion += 1e6;
+            cost.recompute(&hints.weights);
         }
         return RouteOutcome {
-            path: ChannelPath {
-                tracks: vec![start],
-                gates: Vec::new(),
-            },
+            path: ChannelPath::new(vec![start], Vec::new()),
             cost,
             feasible: true,
         };
@@ -332,11 +467,12 @@ pub fn route_edge(
                 if let Some(gt) = substrate.track(goal) {
                     if gt.span_weight + 1e-9 < hints.min_last_span {
                         final_cost.congestion += 1e6;
+                        final_cost.recompute(&hints.weights);
                     }
                 }
             }
             return RouteOutcome {
-                path: ChannelPath { tracks, gates },
+                path: ChannelPath::new(tracks, gates),
                 cost: final_cost,
                 feasible: true,
             };
@@ -377,10 +513,14 @@ pub fn route_edge(
             next.length += to_t.span_weight;
             next.span_affinity =
                 next.span_affinity.saturating_add(track_span_affinity(substrate, tr.to, &hints));
+            next.crossings = next
+                .crossings
+                .saturating_add(occupancy.crossing_count(tr.to, to_t.ext));
             if congestion_bias {
                 next.congestion += occupancy.lane_demand(tr.to) as f64;
             }
             next.congestion += soft_penalties(substrate, tr.to, &hints, occupancy);
+            next.recompute(&hints.weights);
             let replace = match best.get(&tr.to) {
                 None => true,
                 Some((bc, _, _)) => next < *bc,
@@ -831,7 +971,7 @@ mod tests {
         let g = ChannelGraph::from_substrate(&sub);
         let inner = idx.main_at(1, 0).expect("inner Main og=1");
         let mut occ = Occupancy::new();
-        occ.commit(&[inner], &[]);
+        occ.commit(&sub, &[inner], &[]);
         let start = idx.resolve_host_track(0, 0, PortSide::MainHigh).unwrap();
         let goal = idx.resolve_host_track(2, 0, PortSide::MainLow).unwrap();
         let hints = RouteHints {

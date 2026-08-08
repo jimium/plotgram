@@ -278,7 +278,16 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         &canonical_frames,
         params.node_gap,
     ));
-    ink::verify::verify_no_illegal_overlap(&canonical_edges, &route_plan.bundles)?;
+    ink::verify::verify_no_illegal_overlap(
+        &canonical_edges,
+        &route_plan.bundles,
+        params.edge_gap,
+    )?;
+    diagnostics.relaxations.extend(ink::verify::segment_overlap_relaxations(
+        &canonical_edges,
+        &route_plan.bundles,
+        params.edge_gap,
+    ));
     let real_frames: Vec<(String, Rect)> = real_graph
         .ids
         .iter()
@@ -287,6 +296,20 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
             (id.clone(), canonical_frames[ei])
         })
         .collect();
+    ink::verify::verify_endpoints_exact(&canonical_edges, &real_frames)?;
+    for ce in &canonical_edges {
+        if let Some(bends) = ink::verify::polyline_bend_count(&ce.path) {
+            if bends > params.max_bends_budget as usize {
+                diagnostics.relaxations.push(plotgram_model::diagnostics::Relaxation {
+                    rule: "ink-max-bends-budget".into(),
+                    detail: format!(
+                        "edge `{}` has {bends} bends > max_bends_budget={}",
+                        ce.id, params.max_bends_budget
+                    ),
+                });
+            }
+        }
+    }
     match ink::verify::verify_no_node_penetration(
         &canonical_edges,
         &real_frames,

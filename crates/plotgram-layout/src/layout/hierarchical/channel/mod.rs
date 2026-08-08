@@ -11,7 +11,7 @@ pub(crate) mod substrate;
 mod verify;
 
 pub use route_all::{route_edges_channel, ChannelRoutePlan, RouteTopology};
-pub use search::ChannelPath;
+pub use search::{ChannelPath, EscapeEnd};
 pub use substrate::{Substrate, TrackId, TrackOrient};
 
 // Re-exported for ink unit fixtures / debug.

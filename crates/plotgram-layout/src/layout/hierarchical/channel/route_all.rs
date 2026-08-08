@@ -9,7 +9,8 @@ use plotgram_model::diagnostics::Relaxation;
 use super::derive::derive_substrate;
 use super::graph::{ChannelGraph, Occupancy};
 use super::search::{
-    path_used_outer_overflow, route_edge, ChannelPath, LexCost, RouteHints, ScopeMask, SpanAffinity,
+    decide_escape, path_used_outer_overflow, route_edge, ChannelPath, CostWeights, LexCost,
+    RouteHints, ScopeMask, SpanAffinity,
 };
 use super::substrate::{derive_root_substrate, BlueprintIndex, PortSide, Substrate, TrackId};
 use crate::layout::hierarchical::compose::bundle::{end_bus_edge_ids, BundlePlan};
@@ -138,6 +139,44 @@ fn host_tracks_for_edge(
     Ok((start, goal))
 }
 
+fn attach_escape(
+    path: &mut ChannelPath,
+    _index: &BlueprintIndex,
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    ports: &BTreeMap<String, EdgePorts>,
+    edge_id: &str,
+    layer_pos: &[usize],
+) {
+    let edge_of = graph.edge_index_map();
+    let Ok((src_ps, src_rank, _src_order)) =
+        endpoint_side_rank_order(plan, graph, &edge_of, layer_pos, ports, edge_id, true)
+    else {
+        return;
+    };
+    let Ok((tgt_ps, tgt_rank, _tgt_order)) =
+        endpoint_side_rank_order(plan, graph, &edge_of, layer_pos, ports, edge_id, false)
+    else {
+        return;
+    };
+    path.escape = decide_escape(
+        port_side_to_algo(src_ps),
+        port_side_to_algo(tgt_ps),
+        src_rank,
+        tgt_rank,
+    );
+}
+
+fn port_side_to_algo(side: PortSide) -> plotgram_algo::orientation::Side {
+    use plotgram_algo::orientation::Side;
+    match side {
+        PortSide::MainLow => Side::North,
+        PortSide::MainHigh => Side::South,
+        PortSide::CrossLow => Side::West,
+        PortSide::CrossHigh => Side::East,
+    }
+}
+
 fn scope_mask_for_edge(
     substrate: &Substrate,
     index: &BlueprintIndex,
@@ -214,6 +253,12 @@ fn hints_for_edge(
             src_order,
             tgt_order,
         }),
+        weights: CostWeights::from_params(
+            params.edge_gap,
+            params.route_w_bend,
+            params.route_w_len,
+            params.route_w_cross,
+        ),
     }
 }
 
@@ -422,11 +467,21 @@ fn route_on_substrate(
                 entry.edge_id
             )));
         }
-        occupancy.commit(&outcome.path.tracks, &outcome.path.gates);
+        occupancy.commit(&substrate, &outcome.path.tracks, &outcome.path.gates);
+        let mut path = outcome.path;
+        attach_escape(
+            &mut path,
+            &index,
+            plan,
+            graph,
+            ports,
+            &entry.edge_id,
+            &layer_pos,
+        );
         states.insert(
             entry.edge_id.clone(),
             EdgeRouteState {
-                path: outcome.path,
+                path,
                 cost: outcome.cost,
                 failure_count: 0,
                 critical: entry.critical,
@@ -447,6 +502,11 @@ fn route_on_substrate(
         &mut states,
     );
     relaxations.extend(ripup_relaxations);
+
+    // Re-attach escapes after rip-up (paths may have changed).
+    for (eid, st) in states.iter_mut() {
+        attach_escape(&mut st.path, &index, plan, graph, ports, eid, &layer_pos);
+    }
 
     // Outer-overflow: record when the final path sits on outer Main while an
     // inner band gap is free (search soft-penalty already applied; this is
@@ -544,11 +604,11 @@ fn bounded_ripup(
             let hints = st.hints;
 
             let (peak_before, sum_before) = occupancy_peak_sum(occupancy, substrate);
-            occupancy.release(&old_path.tracks, &old_path.gates);
+            occupancy.release(substrate, &old_path.tracks, &old_path.gates);
 
             let outcome = route_edge(graph, start, goal, occupancy, true, &mask, hints);
             if !outcome.feasible {
-                occupancy.commit(&old_path.tracks, &old_path.gates);
+                occupancy.commit(substrate, &old_path.tracks, &old_path.gates);
                 if let Some(st) = states.get_mut(&eid) {
                     st.failure_count = st.failure_count.saturating_add(1);
                 }
@@ -557,11 +617,13 @@ fn bounded_ripup(
 
             let old_path_load = path_lane_load(occupancy, &old_path.tracks);
             let new_path_load = path_lane_load(occupancy, &outcome.path.tracks);
-            occupancy.commit(&outcome.path.tracks, &outcome.path.gates);
+            occupancy.commit(substrate, &outcome.path.tracks, &outcome.path.gates);
 
             let (peak_after, sum_after) = occupancy_peak_sum(occupancy, substrate);
+            // P5-4: accept also when scalar cost improves without raising peak.
             let accept = peak_after < peak_before
-                || (peak_after == peak_before && sum_after < sum_before)
+                || (peak_after == peak_before
+                    && (sum_after < sum_before || outcome.cost < old_cost))
                 || (outcome.path.tracks != old_path.tracks && new_path_load < old_path_load);
 
             if accept {
@@ -575,8 +637,8 @@ fn bounded_ripup(
                     detail: format!("edge `{eid}` re-routed in round {round}"),
                 });
             } else {
-                occupancy.release(&outcome.path.tracks, &outcome.path.gates);
-                occupancy.commit(&old_path.tracks, &old_path.gates);
+                occupancy.release(substrate, &outcome.path.tracks, &outcome.path.gates);
+                occupancy.commit(substrate, &old_path.tracks, &old_path.gates);
                 if let Some(st) = states.get_mut(&eid) {
                     st.path = old_path;
                     st.cost = old_cost;
