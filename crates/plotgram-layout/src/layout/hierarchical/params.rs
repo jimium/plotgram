@@ -168,6 +168,9 @@ pub struct HierarchicalParams {
     pub node_gap: f64,
     /// Main-axis gap between consecutive layers.
     pub layer_gap: f64,
+    /// Within-layer main-axis alignment of shorter nodes: `0` = top of band,
+    /// `0.5` = center, `1` = bottom (yFiles `layerAlignment`).
+    pub layer_alignment: f64,
     /// Track pitch / edge-corridor spacing (D1.0 Channel TrackOrder).
     ///
     /// Consumed as pitch between parallel horizontal tracks and as
@@ -176,6 +179,14 @@ pub struct HierarchicalParams {
     /// Weight of cross-rank segments between matching group-boundary dummies
     /// (architecture §8.3). Default 16.0 — stronger than virtual-virtual (8).
     pub group_boundary_weight: f64,
+    /// Symmetry objective weight on `|x_h − center_h|` (P4).
+    pub lambda_sym: f64,
+    /// Median/VPSC boost for twin (2-cycle) spine pairs.
+    pub twin_spine_boost: f64,
+    /// Median/VPSC boost for unique min-span primary arm.
+    pub primary_arm_boost: f64,
+    /// Fixed iteration budget for symmetry objective solver.
+    pub symmetry_iters: u32,
     /// Built-in ink style (ignored when layout defers to an independent EdgeRouter).
     pub routing_style: RoutingStyle,
     /// Automatic edge grouping (edge-parameters.md §2.3 / yFiles
@@ -203,8 +214,13 @@ impl Default for HierarchicalParams {
             orientation: Orientation::TopToBottom,
             node_gap: 24.0,
             layer_gap: 40.0,
+            layer_alignment: 0.5,
             edge_gap: 16.0,
             group_boundary_weight: 16.0,
+            lambda_sym: 1.0,
+            twin_spine_boost: 8.0,
+            primary_arm_boost: 4.0,
+            symmetry_iters: 8,
             routing_style: RoutingStyle::Orthogonal,
             auto_edge_grouping: false,
             min_first_segment: 0.0,
@@ -305,6 +321,12 @@ impl HierarchicalParams {
             params.layer_gap = v;
         }
         if let Some(v) = binder
+            .get_f64_any(&["layer_alignment"])
+            .map_err(bind_err)?
+        {
+            params.layer_alignment = v.clamp(0.0, 1.0);
+        }
+        if let Some(v) = binder
             .get_f64_any(&["edge_gap", "edge_distance"])
             .map_err(bind_err)?
         {
@@ -315,6 +337,24 @@ impl HierarchicalParams {
             .map_err(bind_err)?
         {
             params.group_boundary_weight = v;
+        }
+        if let Some(v) = binder.get_f64_any(&["lambda_sym"]).map_err(bind_err)? {
+            params.lambda_sym = v.max(0.0);
+        }
+        if let Some(v) = binder
+            .get_f64_any(&["twin_spine_boost"])
+            .map_err(bind_err)?
+        {
+            params.twin_spine_boost = v.max(0.0);
+        }
+        if let Some(v) = binder
+            .get_f64_any(&["primary_arm_boost"])
+            .map_err(bind_err)?
+        {
+            params.primary_arm_boost = v.max(0.0);
+        }
+        if let Some(v) = binder.get_f64_any(&["symmetry_iters"]).map_err(bind_err)? {
+            params.symmetry_iters = v.round().max(1.0) as u32;
         }
 
         if let Some(rs) = binder
@@ -388,16 +428,22 @@ impl HierarchicalParams {
     /// formatting never diverges between builds.
     pub fn hash(&self) -> String {
         let canonical = format!(
-            "orientation={}|node_gap={:e}|layer_gap={:e}|edge_gap={:e}|\
-             group_boundary_weight={:e}|\
+            "orientation={}|node_gap={:e}|layer_gap={:e}|layer_alignment={:e}|edge_gap={:e}|\
+             group_boundary_weight={:e}|lambda_sym={:e}|twin_spine_boost={:e}|\
+             primary_arm_boost={:e}|symmetry_iters={}|\
              routing_style={}|auto_edge_grouping={}|\
              min_first_segment={:e}|min_last_segment={:e}|\
              group_policy={}|group_sizing={}|group_align={}",
             self.orientation.as_str(),
             self.node_gap,
             self.layer_gap,
+            self.layer_alignment,
             self.edge_gap,
             self.group_boundary_weight,
+            self.lambda_sym,
+            self.twin_spine_boost,
+            self.primary_arm_boost,
+            self.symmetry_iters,
             self.routing_style.as_str(),
             self.auto_edge_grouping,
             self.min_first_segment,
@@ -487,6 +533,18 @@ mod tests {
             },
             HierarchicalParams {
                 group_boundary_weight: a.group_boundary_weight + 1.0,
+                ..a
+            },
+            HierarchicalParams {
+                layer_alignment: 1.0,
+                ..a
+            },
+            HierarchicalParams {
+                lambda_sym: a.lambda_sym + 0.5,
+                ..a
+            },
+            HierarchicalParams {
+                twin_spine_boost: a.twin_spine_boost + 1.0,
                 ..a
             },
         ];

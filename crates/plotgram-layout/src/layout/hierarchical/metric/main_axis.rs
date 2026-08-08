@@ -14,6 +14,7 @@ pub fn assign_main_axis(
     plan: &PlanGraph,
     size_of: &dyn Fn(usize) -> Size,
     layer_gaps: &[f64],
+    layer_alignment: f64,
 ) -> Vec<f64> {
     let mut top = vec![0.0; plan.elems.len()];
     let mut cursor = 0.0;
@@ -23,7 +24,15 @@ pub fn assign_main_axis(
             .map(|&e| size_of(e).height)
             .fold(0.0_f64, f64::max);
         for &e in layer {
-            top[e] = cursor;
+            let h = size_of(e).height;
+            // Zero-height elems (dummies / pads) stay on the layer-band leading
+            // edge. Centering them (h=0 → mid-band) puts shared horizontal
+            // corridors through same-layer node interiors.
+            top[e] = if h <= 0.0 {
+                cursor
+            } else {
+                cursor + (thickness - h) * layer_alignment
+            };
         }
         cursor += thickness;
         if r + 1 < plan.layers.len() {
@@ -77,7 +86,7 @@ mod tests {
             Size::new(10.0, 30.0),
             Size::new(10.0, 15.0),
         ];
-        let top = assign_main_axis(&plan, &|e| sizes[e], &[40.0]);
+        let top = assign_main_axis(&plan, &|e| sizes[e], &[40.0], 0.0);
         assert_eq!(top[0], 0.0);
         assert_eq!(top[1], 0.0);
         // layer0 thickness = max(20,30) = 30; next layer starts at 30+40
@@ -85,10 +94,20 @@ mod tests {
     }
 
     #[test]
+    fn layer_alignment_centers_shorter_nodes() {
+        let plan = plan_with_ranks(&[0, 0]);
+        let sizes = [Size::new(10.0, 20.0), Size::new(10.0, 30.0)];
+        let top = assign_main_axis(&plan, &|e| sizes[e], &[], 0.5);
+        // thickness=30; n0 h=20 → offset 5; n1 h=30 → offset 0
+        assert_eq!(top[0], 5.0);
+        assert_eq!(top[1], 0.0);
+    }
+
+    #[test]
     fn no_trailing_gap_after_last_layer() {
         let plan = plan_with_ranks(&[0, 1]);
         let sizes = [Size::new(10.0, 10.0), Size::new(10.0, 10.0)];
-        let top = assign_main_axis(&plan, &|e| sizes[e], &[5.0]);
+        let top = assign_main_axis(&plan, &|e| sizes[e], &[5.0], 0.0);
         assert_eq!(top, vec![0.0, 15.0]);
     }
 
@@ -100,7 +119,7 @@ mod tests {
             Size::new(10.0, 10.0),
             Size::new(10.0, 10.0),
         ];
-        let top = assign_main_axis(&plan, &|e| sizes[e], &[40.0, 72.0]);
+        let top = assign_main_axis(&plan, &|e| sizes[e], &[40.0, 72.0], 0.0);
         assert_eq!(top[0], 0.0);
         assert_eq!(top[1], 50.0);
         assert_eq!(top[2], 50.0 + 10.0 + 72.0);

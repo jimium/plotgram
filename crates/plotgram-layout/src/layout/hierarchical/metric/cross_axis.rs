@@ -1,370 +1,38 @@
-//! P4.2 cross axis: Brandes–Köpf ideal + two global VPSC solves, with
-//! [`super::symmetry`] between them (phases/symmetry-axis.md):
+//! Cross-axis writer: Brandes–Köpf ideal + symmetry objective (P4).
 //!
-//! ```text
-//! BK ideal
-//!   → pass1_constraints (layer sep + VV hard + non-fan 1:1 hard)
-//!   → pass1 = VPSC(bk.ideal)
-//!   → compute_symmetry_plan(pass1) → axes + RigidColumnClass + FanPack
-//!   → pass2_constraints (layer sep + VV + class hard + non-class BK 1:1)
-//!   → desired: class = axis; FanPack leaves = slot.desired; port-anchor dummies
-//!   → pass2 = VPSC(desired, pass2_constraints)
-//! ```
-//!
-//! Pass-1 may soft-treat fan endpoints so packing can breathe; pass-2
-//! **only consumes** the symmetry tables (no deg≥2 / degree-1 pull as
-//! final policy). FanPack leaf desired **covers** BK ideal so final fan
-//! center stays on the axis. Dummy-aligned reals stay soft in BK pairs
-//! (chain-drag guard). On single-dummy chains both ends address the same
-//! elem; the source anchor wins (target applied first, source overwrites).
-//!
-//! Feasibility: equality pairs are a subset of one BK alignment's edges
-//! plus class-adjacent pairs that share one axis — infeasible VPSC is a
-//! bug (architecture.md §3.4).
+//! Sole consumer of [`super::symmetry_objective`]: iterative weighted-median
+//! + VPSC under layer separation and VV equalities. Legacy SymmetryPlan
+//! two-pass (claimed / FanPack / rigid class) was removed in P4-S4.
 
 use std::collections::BTreeMap;
 
 use plotgram_algo::orientation::Size;
-use plotgram_algo::vpsc::{self, Constraint, Variable, VpscError};
-use plotgram_model::geometry::Rect;
+use plotgram_algo::vpsc::VpscError;
 
 use crate::layout::hierarchical::compose::ports::EdgePorts;
-use crate::layout::hierarchical::metric::anchor::port_anchor;
-use crate::layout::hierarchical::metric::bk;
-use crate::layout::hierarchical::metric::symmetry::{
-    compute_symmetry_plan, degrees_of, forward_real_adjacency, SymmetryPlan,
-};
-use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealGraph};
-
-const REAL_WEIGHT: f64 = 1.0;
-const VIRTUAL_WEIGHT: f64 = 4.0;
+use crate::layout::hierarchical::metric::symmetry_objective;
+use crate::layout::hierarchical::model::PlanGraph;
+use crate::layout::hierarchical::model::RealGraph;
+use crate::layout::hierarchical::params::HierarchicalParams;
 
 /// Per-elem canonical cross-axis center coordinate.
 ///
 /// `main` is the main-axis (layer-top) position per elem, needed to expand
-/// port anchors for the second pass. Clustered ends share one `PortPoint`
-/// (yFiles bus-style — no pitch spread).
+/// port anchors. Clustered ends share one `PortPoint` (yFiles bus-style).
 pub fn assign_cross_axis(
     plan: &PlanGraph,
     graph: &RealGraph,
     ports: &BTreeMap<String, EdgePorts>,
     size_of: &dyn Fn(usize) -> Size,
     main: &[f64],
-    node_gap: f64,
+    params: &HierarchicalParams,
 ) -> Result<Vec<f64>, VpscError> {
-    let n = plan.elems.len();
-    if n == 0 {
-        return Ok(Vec::new());
-    }
-
-    let bk = bk::bk_ideal(plan, size_of, node_gap);
-    let dummy_aligned = dummy_aligned_reals(plan, &bk.primary_blocks);
-    // Fan degrees from forward real endpoints (long edges count; reversed do not).
-    let (down_nbs, up_nbs) = forward_real_adjacency(plan, graph);
-    let down_deg = degrees_of(&down_nbs);
-    let up_deg = degrees_of(&up_nbs);
-    // Critical-marked edges (edge-parameters §2.5): their dummy chains hold
-    // their desired with doubled VPSC soft weight, pulling the corridor
-    // harder toward the port anchors set in pass 2.
-    let critical_edges: std::collections::BTreeSet<&str> = graph
-        .edges
-        .iter()
-        .filter(|e| e.critical)
-        .map(|e| e.edge_id.as_str())
-        .collect();
-    let weights: Vec<f64> = (0..n)
-        .map(|e| match &plan.elems[e].key {
-            ElemKey::Virtual { edge_id, .. } if critical_edges.contains(edge_id.as_str()) => {
-                VIRTUAL_WEIGHT * 2.0
-            }
-            ElemKey::Virtual { .. } => VIRTUAL_WEIGHT,
-            // Slightly above Virtual so clamps resist soft packing drift.
-            ElemKey::GroupBoundary { .. } | ElemKey::OrderPad { .. } => 4.0,
-            ElemKey::Real(_) => REAL_WEIGHT,
-        })
-        .collect();
-
-    // Pass 1: BK ideal + soft packing (fan endpoints not hardened).
-    let pass1_constraints = build_pass1_constraints(
-        plan,
-        size_of,
-        node_gap,
-        &bk.primary_blocks,
-        &dummy_aligned,
-        &down_deg,
-        &up_deg,
-    );
-    let pass1 = solve_once(n, &bk.ideal, &weights, &pass1_constraints)?;
-
-    let sym = compute_symmetry_plan(plan, graph, &pass1, &dummy_aligned, size_of, node_gap);
-
-    // Pass 2: consume symmetry tables + port-anchor expansion.
-    let pass2_constraints = build_pass2_constraints(
-        plan,
-        size_of,
-        node_gap,
-        &bk.primary_blocks,
-        &dummy_aligned,
-        &sym,
-    );
-    let mut desired = bk.ideal;
-    for e in 0..n {
-        if let Some(coord) = sym.axis_coord_for(e) {
-            desired[e] = coord;
-        }
-    }
-    // FanPack leaves: cover BK ideal so final fan center stays on the axis.
-    for e in 0..n {
-        if let Some(coord) = sym.fan_desired_for(e) {
-            desired[e] = coord;
-        }
-    }
-    // Port anchors expand from the hub's *intended* cross column (symmetry
-    // axis when present), not stale pass-1 — otherwise dummies stay on the
-    // old column while the hub slides onto the fan axis.
-    let frame_of = |e: usize| -> Rect {
-        let s = size_of(e);
-        let cx = sym
-            .axis_coord_for(e)
-            .or_else(|| sym.fan_desired_for(e))
-            .unwrap_or(pass1[e]);
-        Rect::new(cx - s.width / 2.0, main[e], s.width, s.height)
-    };
-    let segs_by_edge = plan.segments_by_edge();
-    for e in &graph.edges {
-        let rp = &ports[&e.edge_id];
-        for (real_idx, port, _cluster) in [
-            (e.original_target, rp.target, rp.target_cluster),
-            (e.original_source, rp.source, rp.source_cluster),
-        ] {
-            let real_elem = plan.index_of[&ElemKey::Real(graph.ids[real_idx].clone())];
-            let Some(nb) = chain_neighbor(plan, &segs_by_edge, &e.edge_id, real_elem) else {
-                continue;
-            };
-            if !plan.elems[nb].key.is_virtual() {
-                continue; // single-hop edge: nothing to pull
-            }
-            // Clustered ends share one PortPoint — pull the chain-end dummy
-            // onto that shared anchor (no member pitch offset).
-            let mut anchor = port_anchor(frame_of(real_elem), port).x;
-            // Keep dummy soft-target outside FanPack leaf span on the same
-            // layer so high virtual weight cannot collapse mirrored leaves.
-            anchor = exteriorize_dummy_desired(plan, size_of, node_gap, &desired, nb, anchor);
-            desired[nb] = anchor;
-        }
-    }
-    solve_once(n, &desired, &weights, &pass2_constraints)
-}
-
-fn solve_once(
-    n: usize,
-    desired: &[f64],
-    weights: &[f64],
-    constraints: &[Constraint],
-) -> Result<Vec<f64>, VpscError> {
-    let vars: Vec<Variable> = (0..n)
-        .map(|e| Variable {
-            desired: desired[e],
-            weight: weights[e],
-        })
-        .collect();
-    vpsc::solve(&vars, constraints)
-}
-
-/// Real block members that sit next to a virtual member in the primary
-/// alignment — i.e., real nodes whose median was a dummy. They keep the
-/// soft treatment (see module doc).
-fn dummy_aligned_reals(plan: &PlanGraph, blocks: &[Vec<usize>]) -> Vec<bool> {
-    let mut marked = vec![false; plan.elems.len()];
-    for block in blocks {
-        for pair in block.windows(2) {
-            let (a, b) = (pair[0], pair[1]);
-            let a_soft = plan.elems[a].key.is_zero_width();
-            if a_soft != plan.elems[b].key.is_zero_width() {
-                if !a_soft {
-                    marked[a] = true;
-                } else {
-                    marked[b] = true;
-                }
-            }
-        }
-    }
-    marked
-}
-
-fn layer_separation(
-    plan: &PlanGraph,
-    size_of: &dyn Fn(usize) -> Size,
-    node_gap: f64,
-    constraints: &mut Vec<Constraint>,
-) {
-    for layer in &plan.layers {
-        // Group-boundary clamps are order markers only — span separation
-        // across them so zero-width slots cannot create gap/equality cycles.
-        let geometric: Vec<usize> = layer
-            .iter()
-            .copied()
-            .filter(|&e| {
-                !plan.elems[e].key.is_group_boundary()
-                    && !matches!(
-                        &plan.elems[e].key,
-                        crate::layout::hierarchical::model::ElemKey::OrderPad { .. }
-                    )
-            })
-            .collect();
-        for i in 0..geometric.len().saturating_sub(1) {
-            let (l, r) = (geometric[i], geometric[i + 1]);
-            let gap = size_of(l).width / 2.0 + size_of(r).width / 2.0 + node_gap;
-            constraints.push(Constraint::new(l, r, gap));
-        }
-    }
-}
-
-fn harden_equal(constraints: &mut Vec<Constraint>, a: usize, b: usize) {
-    constraints.push(Constraint::new(a, b, 0.0));
-    constraints.push(Constraint::new(b, a, 0.0));
-}
-
-/// Pass-1 packing: layer sep + VV hard + non-fan real–real BK 1:1 hard.
-fn build_pass1_constraints(
-    plan: &PlanGraph,
-    size_of: &dyn Fn(usize) -> Size,
-    node_gap: f64,
-    blocks: &[Vec<usize>],
-    dummy_aligned: &[bool],
-    down_deg: &[usize],
-    up_deg: &[usize],
-) -> Vec<Constraint> {
-    let mut constraints = Vec::new();
-    layer_separation(plan, size_of, node_gap, &mut constraints);
-    for block in blocks {
-        for pair in block.windows(2) {
-            let (a, b) = (pair[0], pair[1]);
-            // Only long-edge virtual corridors get VV hard equal; group
-            // boundaries never join harden_equal (order markers only).
-            let a_virtual = plan.elems[a].key.is_virtual();
-            let b_virtual = plan.elems[b].key.is_virtual();
-            if plan.elems[a].key.is_group_boundary()
-                || plan.elems[b].key.is_group_boundary()
-                || matches!(plan.elems[a].key, crate::layout::hierarchical::model::ElemKey::OrderPad { .. })
-                || matches!(plan.elems[b].key, crate::layout::hierarchical::model::ElemKey::OrderPad { .. })
-            {
-                continue;
-            }
-            if a_virtual != b_virtual {
-                continue;
-            }
-            if a_virtual {
-                harden_equal(&mut constraints, a, b);
-                continue;
-            }
-            // Fan endpoints stay soft so pass-1 packing can breathe.
-            if !pass1_hardenable_real_pair(
-                dummy_aligned[a] || dummy_aligned[b],
-                down_deg[a],
-                up_deg[a],
-                down_deg[b],
-                up_deg[b],
-            ) {
-                continue;
-            }
-            harden_equal(&mut constraints, a, b);
-        }
-    }
-    constraints
-}
-
-/// Pass-2: layer sep + VV hard + class-adjacent hard + non-class BK 1:1.
-fn build_pass2_constraints(
-    plan: &PlanGraph,
-    size_of: &dyn Fn(usize) -> Size,
-    node_gap: f64,
-    blocks: &[Vec<usize>],
-    dummy_aligned: &[bool],
-    sym: &SymmetryPlan,
-) -> Vec<Constraint> {
-    let mut constraints = Vec::new();
-    layer_separation(plan, size_of, node_gap, &mut constraints);
-
-    // Class members (rank-sorted) → adjacent hard collinearity.
-    for class in &sym.classes {
-        for pair in class.members.windows(2) {
-            harden_equal(&mut constraints, pair[0], pair[1]);
-        }
-    }
-
-    for block in blocks {
-        for pair in block.windows(2) {
-            let (a, b) = (pair[0], pair[1]);
-            if plan.elems[a].key.is_group_boundary()
-                || plan.elems[b].key.is_group_boundary()
-                || matches!(plan.elems[a].key, crate::layout::hierarchical::model::ElemKey::OrderPad { .. })
-                || matches!(plan.elems[b].key, crate::layout::hierarchical::model::ElemKey::OrderPad { .. })
-            {
-                continue;
-            }
-            let a_virtual = plan.elems[a].key.is_virtual();
-            if a_virtual != plan.elems[b].key.is_virtual() {
-                continue;
-            }
-            if a_virtual {
-                harden_equal(&mut constraints, a, b);
-                continue;
-            }
-            // real–real: harden only when neither is in any class and
-            // neither is dummy-aligned. Distinct FanPack slots must not
-            // weld (would collapse the mirror); same-slot leaf+follower
-            // may harden so the chain stays straight under the leaf.
-            if dummy_aligned[a] || dummy_aligned[b] {
-                continue;
-            }
-            if sym.class_of(a).is_some() || sym.class_of(b).is_some() {
-                continue;
-            }
-            match (sym.fan_desired_for(a), sym.fan_desired_for(b)) {
-                (Some(da), Some(db)) if (da - db).abs() > 1e-9 => continue,
-                _ => {}
-            }
-            harden_equal(&mut constraints, a, b);
-        }
-    }
-    constraints
-}
-
-/// Pass-1 only: whether a real–real BK pair should harden for packing.
-/// Fan junctions stay soft; dummy-aligned stay soft.
-pub(crate) fn pass1_hardenable_real_pair(
-    either_dummy_aligned: bool,
-    a_down: usize,
-    a_up: usize,
-    b_down: usize,
-    b_up: usize,
-) -> bool {
-    if either_dummy_aligned {
-        return false;
-    }
-    let is_fan = |down: usize, up: usize| down >= 2 || up >= 2;
-    !is_fan(a_down, a_up) && !is_fan(b_down, b_up)
-}
-
-/// The elem adjacent to `real_elem` along `edge_id`'s chain (its only
-/// segment neighbor — dummy or the other real endpoint).
-fn chain_neighbor(
-    plan: &PlanGraph,
-    segs_by_edge: &BTreeMap<String, Vec<usize>>,
-    edge_id: &str,
-    real_elem: usize,
-) -> Option<usize> {
-    let idxs = segs_by_edge.get(edge_id)?;
-    idxs.iter()
-        .map(|&i| &plan.segments[i])
-        .find(|s| s.from == real_elem || s.to == real_elem)
-        .map(|s| if s.from == real_elem { s.to } else { s.from })
+    symmetry_objective::solve_symmetry_objective(plan, graph, ports, size_of, main, params)
 }
 
 /// Push a same-layer dummy's soft desired outside neighbors that already
-/// carry FanPack / axis absolute desired, matching layer order + sep gap.
-fn exteriorize_dummy_desired(
+/// carry absolute desired, matching layer order + sep gap.
+pub(crate) fn exteriorize_dummy_desired(
     plan: &PlanGraph,
     size_of: &dyn Fn(usize) -> Size,
     node_gap: f64,
@@ -396,8 +64,15 @@ fn exteriorize_dummy_desired(
 mod tests {
     use super::*;
     use crate::layout::hierarchical::compose::ports::assign_ports;
-    use crate::layout::hierarchical::model::{Elem, RealEdge, Segment};
+    use crate::layout::hierarchical::model::{Elem, ElemKey, RealEdge, Segment};
     use plotgram_algo::orientation::Orientation as AlgoOrientation;
+
+    fn gap_params(node_gap: f64) -> HierarchicalParams {
+        HierarchicalParams {
+            node_gap,
+            ..HierarchicalParams::default()
+        }
+    }
 
     fn real(id: &str, rank: u32) -> Elem {
         Elem {
@@ -493,7 +168,7 @@ mod tests {
         .unwrap()
         .ports;
 
-        let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
+        let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
             .expect("feasible");
         assert!(
             coords[1] - coords[0] >= 30.0 - 1e-6,
@@ -536,7 +211,7 @@ mod tests {
         .unwrap()
         .ports;
 
-        let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
+        let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
             .expect("feasible");
         assert!(
             (coords[1] - coords[2]).abs() < 1e-9,
@@ -588,7 +263,7 @@ mod tests {
             &ports,
             &|e| Size::new(widths[e], 10.0),
             &main_of(&plan),
-            10.0,
+            &gap_params(10.0),
         )
         .expect("feasible");
         for i in 1..4 {
@@ -597,28 +272,6 @@ mod tests {
                 "elem {i} must share the chain column: {} vs {}",
                 coords[i],
                 coords[0]
-            );
-        }
-    }
-
-    #[test]
-    fn pass1_hardenable_real_pair_matrix() {
-        // Pass-1 packing helper only — pass-2 hardens via RigidColumnClass.
-        let cases: &[(bool, usize, usize, usize, usize, bool)] = &[
-            (false, 1, 1, 1, 1, true),  // 1:1 chain
-            (false, 2, 1, 1, 1, false), // a fan-out
-            (false, 3, 1, 1, 1, false), // a odd fan-out
-            (false, 1, 1, 1, 2, false), // b fan-in
-            (false, 1, 1, 1, 3, false), // b odd fan-in
-            (false, 1, 1, 3, 1, false), // b fan-out (opposite BK edge)
-            (true, 1, 1, 1, 1, false),  // chain-drag guard
-            (false, 0, 1, 1, 0, true),  // leaf / non-fan
-        ];
-        for (i, &(dummy, ad, au, bd, bu, want)) in cases.iter().enumerate() {
-            assert_eq!(
-                pass1_hardenable_real_pair(dummy, ad, au, bd, bu),
-                want,
-                "case {i}"
             );
         }
     }
@@ -656,7 +309,7 @@ mod tests {
         .ports;
 
         let coords =
-            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
+            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
                 .expect("feasible");
         let axis = (coords[3] + coords[4]) / 2.0;
         for (i, name) in [(0, "gw"), (1, "api"), (2, "worker")] {
@@ -703,7 +356,7 @@ mod tests {
         .ports;
 
         let coords =
-            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
+            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
                 .expect("feasible");
         let mid = (coords[1] + coords[2]) / 2.0;
         assert!(
@@ -762,7 +415,7 @@ mod tests {
         .ports;
 
         let coords =
-            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
+            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
                 .expect("feasible");
         let mid = coords[2]; // median child `b`
         assert!(
@@ -831,7 +484,7 @@ mod tests {
         .ports;
 
         let coords =
-            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
+            assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
                 .expect("feasible");
         let mid = coords[3]; // median child M
         for (i, name) in [(0, "submit"), (1, "review"), (5, "notify")] {
@@ -879,7 +532,7 @@ mod tests {
         .unwrap()
         .ports;
 
-        let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
+        let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
             .expect("feasible");
         // Even fan of four equal-width children: hub sits at the midpoint
         // of the two middle children (= midpoint of the outer two).
@@ -940,7 +593,7 @@ mod tests {
         .unwrap()
         .ports;
 
-        let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), 10.0)
+        let coords = assign_cross_axis(&plan, &graph, &ports, &|_| Size::new(20.0, 10.0), &main_of(&plan), &gap_params(10.0))
             .expect("crossing chains must not make the equality system infeasible");
         // L1 order [db1, da1]; L2 order [da2, db2] — dummies are width 0.
         assert!(coords[3] - coords[2] >= 10.0 - 1e-6, "L1 separation");
@@ -1001,7 +654,7 @@ mod tests {
             &ports,
             &|e| Size::new(width(e), 10.0),
             &main_of(&plan),
-            10.0,
+            &gap_params(10.0),
         )
         .expect("feasible");
 
@@ -1053,7 +706,7 @@ mod tests {
                 &ports,
                 &|_| Size::new(20.0, 10.0),
                 &main_of(&plan),
-                10.0,
+                &gap_params(10.0),
             )
             .expect("feasible")
         };
@@ -1063,4 +716,5 @@ mod tests {
         let b2: Vec<u64> = c2.iter().map(|f| f.to_bits()).collect();
         assert_eq!(b1, b2, "cross-axis output must be bit-identical");
     }
+
 }

@@ -169,7 +169,8 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     } else {
         Vec::new()
     };
-    let main_prelim = metric::main_axis::assign_main_axis(&plan, &size_of, &prelim_gaps);
+    let main_prelim =
+        metric::main_axis::assign_main_axis(&plan, &size_of, &prelim_gaps, params.layer_alignment);
     // Infeasibility here can only come from crossing BK blocks — a bug, not
     // a layout contingency: fail hard, never fall back (architecture.md §3.4).
     let cross = metric::cross_axis::assign_cross_axis(
@@ -178,7 +179,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         &ports,
         &size_of,
         &main_prelim,
-        params.node_gap,
+        &params,
     )
     .map_err(|e| {
         LayoutError::message(format!("hierarchical: cross-axis VPSC solve failed: {e}"))
@@ -226,7 +227,8 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     demand_board.freeze();
     let layer_gaps =
         demand::resolved_layer_gaps(plan.layers.len(), params.layer_gap, &demand_board);
-    let main = metric::main_axis::assign_main_axis(&plan, &size_of, &layer_gaps);
+    let main =
+        metric::main_axis::assign_main_axis(&plan, &size_of, &layer_gaps, params.layer_alignment);
 
     let canonical_frames: Vec<Rect> = (0..plan.elems.len())
         .map(|i| {

@@ -9,4 +9,5 @@ pub mod cross_axis;
 pub mod main_axis;
 pub mod port_lane;
 pub mod symmetry;
+pub mod symmetry_objective;
 pub mod track;
