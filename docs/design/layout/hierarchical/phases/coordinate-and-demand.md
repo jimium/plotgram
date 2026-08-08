@@ -119,7 +119,7 @@ main_start[i+1] ≥ main_end[i] + resolved_layer_gap[i]
 
 BK 生成每个 node/dummy 的理想 cross coordinate；VPSC 统一求解硬分隔与软对齐。
 
-**主轴共线 ∩ 扇出对称**不由 BK 焊点兼任：目标由显式 **SymmetryAxisWriter** 产出对称轴、刚体列成员表与 **FanPack** 扇叶槽位，约束/desired 只消费这些表（扇叶 desired 覆盖 BK ideal）。见 [symmetry-axis.md](symmetry-axis.md)；视觉裁定见 [expectations §6.1](../expectations.md)。
+**主轴共线 ∩ 扇出对称**不由 BK 焊点兼任：次轴终局由 **`J(x)` 迭代求解**（加权中位 + VPSC + 扇叶/占脊 snap），硬约束仅层内分离与 VV 共线。见 [symmetry-axis.md](symmetry-axis.md)；视觉裁定见 [expectations §6.1](../expectations.md)。
 
 ### 5.1 变量
 

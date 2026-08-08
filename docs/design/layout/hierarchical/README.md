@@ -79,6 +79,6 @@ Sugiyama 骨架 + Atlas 三相写权（组合 → 度量 → Ink）。
 - [channel-d1](phases/channel-d1.md) — D₁ 分阶段契约（D1.0–D1.2）
 - [channel-corridor-allocator](phases/channel-corridor-allocator.md) — D1.3 Corridor Allocator 执行方案（①–⑤）
 - [coordinate-and-demand](phases/coordinate-and-demand.md) — Demand epoch、BK/VPSC、组框、PartitionGrid、Orientation
-- [symmetry-axis](phases/symmetry-axis.md) — 次轴对称轴 / 刚体列（主轴共线 ∩ 扇出对称）
+- [symmetry-axis](phases/symmetry-axis.md) — 次轴对称目标函数 J(x)（主链共线 ∩ 扇出对称）
 - [port-lanes](phases/port-lanes.md) — 双胞胎走廊端口绝对列（无 grid）
 - [ink-and-verification](phases/ink-and-verification.md) — Ink 纯展开与分相 verifier

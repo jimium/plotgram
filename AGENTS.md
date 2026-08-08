@@ -12,8 +12,9 @@ plotgram 由 yFiles 经验孵化：轻量 DSL 画图引擎。设计布局与边�
 - **每个几何自由度有且只有一个写者**
 - **落笔相零新决策**：Ink / 事后修只展开上游；若需要「发明」端口、肘点、track 等，先上提写者
 - **下游不得推翻上游，只得展开上游**。判断句：修法若是「再加一个特判」，先问「这个自由度的写者应该是谁」
+- **声明表堆谓词先问目标函数**：某自由度靠认领表 / 硬等式 / 再加排除条件维持时，优先改成**可最小化的 `J` + 少量硬约束 + typed 权重**；调不通先改 `J` / 权重，不加第三趟 ad-hoc。细则：[`write-authority.md` §2.2](docs/design/layout/write-authority.md)
 
-细则：[`docs/design/layout/write-authority.md`](docs/design/layout/write-authority.md)。  
+细则（单写者 / 落笔）：[`docs/design/layout/write-authority.md`](docs/design/layout/write-authority.md)。  
 重建可推翻管线或换生成器，**不豁免**本条。
 
 ## 2. 工程红线
