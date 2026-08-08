@@ -25,8 +25,13 @@
 //! `reversed_count` must not exceed the checked-in baseline in
 //! `tests/hier_eval_baseline.json` (crossings / canvas bbox are printed as
 //! observational deltas). `reversed_count` guards the FAS cycle-entry rule:
-//! swapping the cut edge of a cycle never adds reversals. Regenerate the
-//! baseline only when a change is *intended*:
+//! swapping the cut edge of a cycle never adds reversals.
+//!
+//! P1 observation metrics (`symmetry_deviation_*`, `gap_uniformity_max`,
+//! `straightness`, `overlap_len`, `channel_used_gates`, `relaxations`,
+//! `ripup_rounds`) are recorded in the same baseline. `channel_used_gates`
+//! is a **hard gate**: a fixture that was `true` must not regress to `false`.
+//! Regenerate the baseline only when a change is *intended*:
 //! `HIER_EVAL_WRITE_BASELINE=1 cargo test -p plotgram-compile --test hier_eval`.
 //!
 //! SymmetryAxis D2/D3 gates ([phases/symmetry-axis.md](../../../docs/design/layout/hierarchical/phases/symmetry-axis.md)):
@@ -49,7 +54,10 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use plotgram_compile::{build_debug_trace, build_layout, BuildOptions};
+use plotgram_compile::{
+    build_debug_trace, build_layout, compute_hier_metrics, node_gap_from_source, BuildOptions,
+    CrossAxis,
+};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::port::{AlongSpec, Side};
 use plotgram_model::result::LayoutResult;
@@ -124,6 +132,14 @@ struct FileMetrics {
     reversed_count: usize,
     bbox_w: f64,
     bbox_h: f64,
+    symmetry_deviation_max: f64,
+    symmetry_deviation_sum: f64,
+    gap_uniformity_max: f64,
+    straightness: f64,
+    overlap_len: f64,
+    channel_used_gates: bool,
+    relaxations: usize,
+    ripup_rounds: u32,
 }
 
 fn baseline_path() -> PathBuf {
@@ -138,6 +154,14 @@ fn metrics_to_value(m: &FileMetrics) -> Value {
         "reversed_count": m.reversed_count,
         "bbox_w": m.bbox_w,
         "bbox_h": m.bbox_h,
+        "symmetry_deviation_max": m.symmetry_deviation_max,
+        "symmetry_deviation_sum": m.symmetry_deviation_sum,
+        "gap_uniformity_max": m.gap_uniformity_max,
+        "straightness": m.straightness,
+        "overlap_len": m.overlap_len,
+        "channel_used_gates": m.channel_used_gates,
+        "relaxations": m.relaxations,
+        "ripup_rounds": m.ripup_rounds,
     })
 }
 
@@ -191,23 +215,34 @@ fn hierarchical_showcase_geometry_invariants() {
                 0
             }
         };
-        all_metrics.push(compute_metrics(&name, &result, reversed_count));
+        all_metrics.push(compute_metrics(&name, &source, &result, reversed_count));
     }
 
     println!(
-        "\n{:<45} {:>6} {:>6} {:>10} {:>10} {:>10} {:>10} {:>14}",
-        "fixture", "nodes", "edges", "crossings", "max_bends", "sum_bends", "reversed", "bbox (w x h)"
+        "\n{:<45} {:>6} {:>6} {:>10} {:>10} {:>10} {:>6} {:>6} {:>8} {:>14}",
+        "fixture",
+        "nodes",
+        "edges",
+        "crossings",
+        "max_bends",
+        "sum_bends",
+        "gates",
+        "relax",
+        "sym_max",
+        "bbox (w x h)"
     );
     for m in &all_metrics {
         println!(
-            "{:<45} {:>6} {:>6} {:>10} {:>10} {:>10} {:>10} {:>14}",
+            "{:<45} {:>6} {:>6} {:>10} {:>10} {:>10} {:>6} {:>6} {:>8.2} {:>14}",
             m.name,
             m.nodes,
             m.edges,
             m.crossings,
             m.max_bends,
             m.sum_bends,
-            m.reversed_count,
+            m.channel_used_gates as u8,
+            m.relaxations,
+            m.symmetry_deviation_max,
             format!("{:.0} x {:.0}", m.bbox_w, m.bbox_h)
         );
     }
@@ -377,7 +412,12 @@ fn segment_hits_rect_interior(a: Point, b: Point, frame: Rect, inset: f64) -> bo
     }
 }
 
-fn compute_metrics(name: &str, result: &LayoutResult, reversed_count: usize) -> FileMetrics {
+fn compute_metrics(
+    name: &str,
+    source: &str,
+    result: &LayoutResult,
+    reversed_count: usize,
+) -> FileMetrics {
     let mut crossings = 0usize;
     let mut max_bends = 0usize;
     let mut sum_bends = 0usize;
@@ -439,6 +479,12 @@ fn compute_metrics(name: &str, result: &LayoutResult, reversed_count: usize) -> 
         (0.0, 0.0)
     };
 
+    let hq = compute_hier_metrics(
+        result,
+        CrossAxis::from_source(source),
+        node_gap_from_source(source),
+    );
+
     FileMetrics {
         name: name.to_string(),
         nodes: result.nodes.len(),
@@ -449,14 +495,21 @@ fn compute_metrics(name: &str, result: &LayoutResult, reversed_count: usize) -> 
         reversed_count,
         bbox_w,
         bbox_h,
+        symmetry_deviation_max: hq.symmetry_deviation_max,
+        symmetry_deviation_sum: hq.symmetry_deviation_sum,
+        gap_uniformity_max: hq.gap_uniformity_max,
+        straightness: hq.straightness,
+        overlap_len: hq.overlap_len,
+        channel_used_gates: hq.channel_used_gates,
+        relaxations: hq.relaxations,
+        ripup_rounds: hq.ripup_rounds,
     }
 }
 
-/// Bend regression gate against `tests/hier_eval_baseline.json`: per-fixture
-/// `max_bends` / `sum_bends` / `reversed_count` must not exceed the baseline
-/// (hard failure). Crossings and canvas bbox are observational: printed as
-/// deltas only, since a dense graph legitimately crosses and straightening
-/// may widen the canvas.
+/// Bend + P1 observation regression gate against `tests/hier_eval_baseline.json`.
+/// Hard failures: `max_bends` / `sum_bends` / `reversed_count` must not exceed
+/// baseline; `channel_used_gates` must not regress from true → false.
+/// Other P1 fields and crossings / bbox are observational (printed deltas).
 fn check_bend_gate(metrics: &[FileMetrics], failures: &mut Vec<String>) {
     let path = baseline_path();
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
@@ -470,8 +523,15 @@ fn check_bend_gate(metrics: &[FileMetrics], failures: &mut Vec<String>) {
         .unwrap_or_else(|e| panic!("corrupt bend baseline {}: {e}", path.display()));
 
     println!(
-        "\n{:<45} {:>14} {:>14} {:>12} {:>12} {:>16}",
-        "fixture", "d max_bends", "d sum_bends", "d crossings", "d reversed", "d bbox (w x h)"
+        "\n{:<45} {:>14} {:>14} {:>12} {:>12} {:>8} {:>8} {:>16}",
+        "fixture",
+        "d max_bends",
+        "d sum_bends",
+        "d crossings",
+        "d reversed",
+        "d gates",
+        "d relax",
+        "d bbox (w x h)"
     );
     for m in metrics {
         let Some(entry) = baseline.get(&m.name) else {
@@ -487,6 +547,8 @@ fn check_bend_gate(metrics: &[FileMetrics], failures: &mut Vec<String>) {
         let base_rev = entry["reversed_count"].as_u64().unwrap_or(0) as usize;
         let base_w = entry["bbox_w"].as_f64().unwrap_or(0.0);
         let base_h = entry["bbox_h"].as_f64().unwrap_or(0.0);
+        let base_gates = entry["channel_used_gates"].as_bool().unwrap_or(false);
+        let base_relax = entry["relaxations"].as_u64().unwrap_or(0) as isize;
 
         if m.max_bends > base_max {
             failures.push(format!(
@@ -506,13 +568,21 @@ fn check_bend_gate(metrics: &[FileMetrics], failures: &mut Vec<String>) {
                 m.name, m.reversed_count, base_rev
             ));
         }
+        if base_gates && !m.channel_used_gates {
+            failures.push(format!(
+                "{}: channel_used_gates regression — baseline d1.3-gate fell back to root-scope",
+                m.name
+            ));
+        }
         println!(
-            "{:<45} {:>+14} {:>+14} {:>+12} {:>+12} {:>+16}",
+            "{:<45} {:>+14} {:>+14} {:>+12} {:>+12} {:>+8} {:>+8} {:>+16}",
             m.name,
             m.max_bends as isize - base_max as isize,
             m.sum_bends as isize - base_sum as isize,
             m.crossings as isize - base_cross,
             m.reversed_count as isize - base_rev as isize,
+            m.channel_used_gates as isize - base_gates as isize,
+            m.relaxations as isize - base_relax,
             format!(
                 "{:+.0} x {:+.0}",
                 m.bbox_w - base_w,

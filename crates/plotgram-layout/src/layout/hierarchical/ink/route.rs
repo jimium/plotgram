@@ -133,9 +133,13 @@ fn lane_coord(
     track_order: &TrackOrderPlan,
     track_coords: &TrackCoords,
 ) -> Result<f64, LayoutError> {
-    let hop = track_order.assignments.get(&(edge_id.to_string(), tid));
-    let idx = hop.map(|h| h.track_index).unwrap_or(0);
-    track_coords.lane(tid, idx).ok_or_else(|| {
+    let hop = track_order.assignments.get(&(edge_id.to_string(), tid)).ok_or_else(|| {
+        LayoutError::message(format!(
+            "hierarchical: InternalInvariant — edge `{edge_id}` missing TrackOrder \
+             assignment for track {tid:?} (TrackOrder is the sole writer of track_index)"
+        ))
+    })?;
+    track_coords.lane(tid, hop.track_index).ok_or_else(|| {
         LayoutError::message(format!(
             "hierarchical: edge `{edge_id}` missing Metric coord for track {:?}",
             tid
@@ -719,7 +723,7 @@ pub fn route_edges(
 mod tests {
     use super::*;
     use crate::layout::hierarchical::channel::{
-        derive_root_substrate, ChannelPath, ChannelRoutePlan, RouteTopology,
+        substrate::derive_root_substrate, ChannelPath, ChannelRoutePlan, RouteTopology,
     };
     use crate::layout::hierarchical::compose::track_order::HopTrack;
     use crate::layout::hierarchical::model::{Elem, ElemKey, RealEdge};
@@ -753,6 +757,7 @@ mod tests {
             routes,
             bundles: Vec::new(),
             relaxations: Vec::new(),
+            ripup_rounds: 0,
             used_gates: false,
             route_order: Vec::new(),
         };
@@ -779,6 +784,7 @@ mod tests {
             routes: BTreeMap::new(),
             bundles: Vec::new(),
             relaxations: Vec::new(),
+            ripup_rounds: 0,
             used_gates: false,
             route_order: Vec::new(),
         }

@@ -78,7 +78,7 @@ pub fn bk_ideal(plan: &PlanGraph, size_of: &dyn Fn(usize) -> Size, node_gap: f64
             candidates[2][e],
             candidates[3][e],
         ];
-        vals.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        vals.sort_by(f64::total_cmp);
         ideal[e] = (vals[1] + vals[2]) / 2.0;
     }
 
@@ -253,7 +253,7 @@ fn candidate_ideal(root: &[usize], packed: &[f64]) -> Vec<f64> {
     let mut coord_of: Vec<f64> = vec![0.0; root.len()];
     for (&r, members) in &groups {
         let mut vals: Vec<f64> = members.iter().map(|&m| packed[m]).collect();
-        vals.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        vals.sort_by(f64::total_cmp);
         let len = vals.len();
         let med = if len % 2 == 1 {
             vals[len / 2]

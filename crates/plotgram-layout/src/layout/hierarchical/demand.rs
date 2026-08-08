@@ -31,15 +31,18 @@ impl DemandBoard {
         self.frozen
     }
 
-    /// Publish a lower bound. Same key keeps the max. Panics after freeze.
+    /// Publish a lower bound. Same key keeps the max. Panics after freeze
+    /// or when `lower_bound` is non-finite / negative (InternalInvariant).
     pub fn publish(&mut self, key: DemandKey, lower_bound: f64) {
         assert!(
             !self.frozen,
             "DemandBoard: publish after freeze (phase-order invariant)"
         );
-        if !(lower_bound.is_finite() && lower_bound >= 0.0) {
-            return;
-        }
+        assert!(
+            lower_bound.is_finite() && lower_bound >= 0.0,
+            "DemandBoard: InternalInvariant — publish requires finite non-negative \
+             lower_bound, got {lower_bound}"
+        );
         self.values
             .entry(key)
             .and_modify(|v| *v = (*v).max(lower_bound))
@@ -164,6 +167,13 @@ mod tests {
         let mut board = DemandBoard::new();
         board.freeze();
         board.publish(DemandKey::LayerGap(0), 40.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "finite non-negative")]
+    fn publish_rejects_non_finite_or_negative() {
+        let mut board = DemandBoard::new();
+        board.publish(DemandKey::LayerGap(0), f64::NAN);
     }
 
     #[test]

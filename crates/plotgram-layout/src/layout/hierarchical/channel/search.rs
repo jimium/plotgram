@@ -397,6 +397,20 @@ pub fn route_edge(
     RouteOutcome::infeasible()
 }
 
+/// True when `path` uses an outer Main corridor while an inner band gap is
+/// still free (the soft overflow penalty would fire). Diagnostics only —
+/// does not change search costs or geometry.
+pub fn path_used_outer_overflow(
+    substrate: &Substrate,
+    path: &ChannelPath,
+    hints: &RouteHints,
+    occupancy: &Occupancy,
+) -> bool {
+    path.tracks
+        .iter()
+        .any(|&tid| soft_penalties(substrate, tid, hints, occupancy) > 0.0)
+}
+
 fn soft_penalties(
     substrate: &Substrate,
     track: TrackId,

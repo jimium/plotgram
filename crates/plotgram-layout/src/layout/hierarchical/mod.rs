@@ -26,7 +26,7 @@ use plotgram_algo::orientation::{self as algo_orient, Orientation as AlgoOrienta
 use plotgram_engine_api::{
     EdgeGeometryMode, LayoutAlgorithm, LayoutError, LayoutInput, LayoutOutput, LayoutWarning,
 };
-use plotgram_model::diagnostics::LayoutDiagnostics;
+use plotgram_model::diagnostics::{HierarchicalObs, LayoutDiagnostics};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::port::{AlongSpec, PortRef};
 use plotgram_model::result::{EdgePath, EdgePlacement, NodePlacement};
@@ -74,6 +74,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
             .collect(),
         relaxations: Vec::new(),
         params_hash: params.hash(),
+        hierarchical: None,
     };
 
     if params.group_policy == GroupPolicy::StrongMacro {
@@ -121,7 +122,6 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         &real_graph,
         &plan,
         orientation,
-        &canonical_size,
         params.auto_edge_grouping,
     )?;
     let compose::ports::PortAssignment {
@@ -141,6 +141,15 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     let route_plan =
         channel::route_edges_channel(&plan, &real_graph, &ports, &end_bundles, params)?;
     diagnostics.relaxations.extend(route_plan.relaxations.iter().cloned());
+    let mut bus_edge_ids: Vec<String> = compose::bundle::end_bus_edge_ids(&route_plan.bundles)
+        .into_iter()
+        .collect();
+    bus_edge_ids.sort();
+    diagnostics.hierarchical = Some(HierarchicalObs {
+        channel_used_gates: route_plan.used_gates,
+        ripup_rounds: route_plan.ripup_rounds,
+        bus_edge_ids,
+    });
     compose::verify::verify_plan(&plan, &real_graph, &ports, &route_plan)?;
 
     // Preliminary main (base layer_gap) so cross-axis pass-2 can expand
@@ -249,6 +258,14 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         params.layer_gap,
         params.node_gap,
     )?;
+    // Self-loops must pass both InkVerifiers (review §2.8) — extend before
+    // either check so stubs cannot bypass overlap / obstacle assertions.
+    canonical_edges.extend(ink::selfloop::self_loop_edges(
+        &real_graph.self_loops,
+        &real_graph.ids,
+        &canonical_frames,
+        params.node_gap,
+    ));
     ink::verify::verify_no_illegal_overlap(&canonical_edges, &route_plan.bundles)?;
     let real_frames: Vec<(String, Rect)> = real_graph
         .ids
@@ -258,13 +275,11 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
             (id.clone(), canonical_frames[ei])
         })
         .collect();
-    ink::verify::verify_no_node_penetration(&canonical_edges, &real_frames)?;
-    canonical_edges.extend(ink::selfloop::self_loop_edges(
-        &real_graph.self_loops,
-        &real_graph.ids,
-        &canonical_frames,
-        params.node_gap,
-    ));
+    ink::verify::verify_no_node_penetration(
+        &canonical_edges,
+        &real_frames,
+        matches!(params.routing_style, RoutingStyle::Orthogonal),
+    )?;
 
     // --- Orientation-out + assemble the public contract ----------------
     let mut nodes = Vec::with_capacity(real_graph.ids.len());
@@ -545,9 +560,9 @@ mod tests {
             for (w, key) in out.diagnostics.warnings.iter().zip(*keys) {
                 assert!(w.message.contains(key), "{}", w.message);
             }
-            // Soft relaxations only appear when Channel rip-up fires; this
-            // two-node fixture stays empty.
-            assert!(out.diagnostics.relaxations.is_empty());
+        // Soft relaxations only appear for Channel rip-up / group fallback;
+        // this two-node (ungrouped) fixture stays empty.
+        assert!(out.diagnostics.relaxations.is_empty());
             assert_eq!(out.diagnostics.params_hash.len(), 16);
         }
     }

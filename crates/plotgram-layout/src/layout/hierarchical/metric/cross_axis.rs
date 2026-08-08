@@ -449,7 +449,6 @@ mod tests {
             &graph,
             &plan,
             AlgoOrientation::Tb,
-            &vec![Size::new(20.0, 10.0); graph.ids.len()],
             false,
         )
         .unwrap()
@@ -493,7 +492,6 @@ mod tests {
             &graph,
             &plan,
             AlgoOrientation::Tb,
-            &vec![Size::new(20.0, 10.0); graph.ids.len()],
             false,
         )
         .unwrap()
@@ -537,7 +535,6 @@ mod tests {
             &graph,
             &plan,
             AlgoOrientation::Tb,
-            &vec![Size::new(20.0, 10.0); graph.ids.len()],
             false,
         )
         .unwrap()
@@ -614,7 +611,6 @@ mod tests {
             &graph,
             &plan,
             AlgoOrientation::Tb,
-            &vec![Size::new(20.0, 10.0); graph.ids.len()],
             false,
         )
         .unwrap()
@@ -662,7 +658,6 @@ mod tests {
             &graph,
             &plan,
             AlgoOrientation::Tb,
-            &vec![Size::new(20.0, 10.0); graph.ids.len()],
             false,
         )
         .unwrap()
@@ -722,7 +717,6 @@ mod tests {
             &graph,
             &plan,
             AlgoOrientation::Tb,
-            &vec![Size::new(20.0, 10.0); graph.ids.len()],
             false,
         )
         .unwrap()
@@ -792,7 +786,6 @@ mod tests {
             &graph,
             &plan,
             AlgoOrientation::Tb,
-            &vec![Size::new(20.0, 10.0); graph.ids.len()],
             false,
         )
         .unwrap()
@@ -842,7 +835,6 @@ mod tests {
             &graph,
             &plan,
             AlgoOrientation::Tb,
-            &vec![Size::new(20.0, 10.0); graph.ids.len()],
             false,
         )
         .unwrap()
@@ -904,7 +896,6 @@ mod tests {
             &graph,
             &plan,
             AlgoOrientation::Tb,
-            &vec![Size::new(20.0, 10.0); graph.ids.len()],
             false,
         )
         .unwrap()
@@ -951,7 +942,6 @@ mod tests {
             &graph,
             &plan,
             AlgoOrientation::Tb,
-            &vec![Size::new(20.0, 10.0); graph.ids.len()],
             false,
         )
         .unwrap()
@@ -1012,7 +1002,6 @@ mod tests {
             &graph,
             &plan,
             AlgoOrientation::Tb,
-            &vec![Size::new(20.0, 10.0); graph.ids.len()],
             false,
         )
         .unwrap()

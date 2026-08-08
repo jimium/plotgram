@@ -17,7 +17,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use plotgram_algo::orientation::{Orientation as AlgoOrientation, Side, Size};
+use plotgram_algo::orientation::{Orientation as AlgoOrientation, Side};
 use plotgram_engine_api::LayoutError;
 use plotgram_model::port::{AlongSpec, PortConstraint, Side as ModelSide};
 use plotgram_model::{policy_for, ShapePortPolicy};
@@ -365,7 +365,6 @@ pub fn assign_ports(
     graph: &RealGraph,
     plan: &PlanGraph,
     orientation: AlgoOrientation,
-    _canonical_size: &[Size],
     auto_edge_grouping: bool,
 ) -> Result<PortAssignment, LayoutError> {
     let pos = positions_within_layer(plan);
@@ -682,10 +681,6 @@ mod tests {
         (graph, plan)
     }
 
-    fn sizes(n: usize) -> Vec<Size> {
-        vec![Size::new(40.0, 20.0); n]
-    }
-
     fn ordered(port: ResolvedPort) -> (u32, u32) {
         match port.along {
             AlongSpec::Ordered { order, count } => (order, count),
@@ -696,7 +691,7 @@ mod tests {
     #[test]
     fn free_ports_infer_south_for_downstream_north_for_upstream() {
         let (graph, plan) = small_plan_and_graph();
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3), false).unwrap().ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false).unwrap().ports;
         assert_eq!(ports["e0"].source.side, Side::South);
         assert_eq!(ports["e0"].target.side, Side::North);
         assert_eq!(ports["e1"].source.side, Side::South);
@@ -721,7 +716,7 @@ mod tests {
         for (orientation, authored, expected_canonical) in cases {
             let (mut graph, plan) = small_plan_and_graph();
             graph.edges[0].from_port = Some(PortConstraint::FixedSide { side: authored });
-            let ports = assign_ports(&graph, &plan, orientation, &sizes(3), false).unwrap().ports;
+            let ports = assign_ports(&graph, &plan, orientation, false).unwrap().ports;
             assert_eq!(
                 ports["e0"].source.side,
                 expected_canonical,
@@ -800,7 +795,7 @@ mod tests {
             }],
             layers: vec![vec![0], vec![1, 2]],
         };
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(2), false).unwrap().ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false).unwrap().ports;
         assert_eq!(ports["back"].source.side, Side::East);
         assert_eq!(ports["back"].target.side, Side::East);
     }
@@ -867,7 +862,7 @@ mod tests {
             }],
             layers: vec![vec![0, 1], vec![2]],
         };
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(2), false)
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
             .ports;
         assert_eq!(ports["back"].source.side, Side::West);
@@ -953,7 +948,7 @@ mod tests {
             ],
             layers: vec![vec![0, 1], vec![2], vec![3]],
         };
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3), false)
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
             .ports;
         // a alone at order 0; b at order 0 → same column → rank fallback.
@@ -1038,7 +1033,7 @@ mod tests {
             ],
             layers: vec![vec![0], vec![1], vec![2]],
         };
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(2), false).unwrap().ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false).unwrap().ports;
         assert_eq!(ports["back"].source.side, Side::East);
         assert_eq!(ports["back"].target.side, Side::East);
     }
@@ -1099,7 +1094,7 @@ mod tests {
             }],
             layers: vec![vec![0], vec![1]],
         };
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(2), false)
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
             .ports;
         assert_eq!(ports["back"].source.side, Side::East);
@@ -1211,7 +1206,7 @@ mod tests {
             ],
             layers: vec![vec![0], vec![1]],
         };
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(2), false)
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
             .ports;
         // Forward: a South → b North.
@@ -1283,7 +1278,7 @@ mod tests {
             }],
             layers: vec![vec![0], vec![1]],
         };
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(2), false)
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
             .ports;
         assert_eq!(ports["back"].source.side, Side::South);
@@ -1379,7 +1374,7 @@ mod tests {
     #[test]
     fn auto_edge_grouping_clusters_parallel_ends() {
         let (graph, plan) = parallel_plan_and_graph();
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(2), true).unwrap().ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, true).unwrap().ports;
         assert_eq!(ordered(ports["e0"].source), ordered(ports["e1"].source));
         assert_eq!(ordered(ports["e0"].source).1, 1, "cluster takes one slot");
         let (c0, c1) = (
@@ -1391,7 +1386,7 @@ mod tests {
         assert_eq!(ordered(ports["e0"].target), ordered(ports["e1"].target));
         assert!(ports["e0"].target_cluster.is_some());
 
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(2), false).unwrap().ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false).unwrap().ports;
         assert_eq!(ordered(ports["e0"].source).1, 2);
         assert!(ports["e0"].source_cluster.is_none());
     }
@@ -1401,7 +1396,7 @@ mod tests {
     #[test]
     fn auto_edge_grouping_merges_fan_out() {
         let (graph, plan) = small_plan_and_graph(); // a→b, a→c: distinct neighbors
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3), true).unwrap().ports;
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, true).unwrap().ports;
         assert_eq!(ordered(ports["e0"].source), ordered(ports["e1"].source));
         let (c0, c1) = (
             ports["e0"].source_cluster.unwrap(),
@@ -1417,7 +1412,7 @@ mod tests {
         // Targets of a→b / a→c sit upstream of the edge direction as North.
         graph.shapes[1] = plotgram_model::NodeShape::Person; // b
         graph.shapes[2] = plotgram_model::NodeShape::Person; // c
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3), false)
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
             .ports;
         assert_ne!(ports["e0"].target.side, Side::North);
@@ -1432,7 +1427,7 @@ mod tests {
     fn diamond_capacity_soft_overflows_same_face_primary() {
         let (mut graph, plan) = small_plan_and_graph();
         graph.shapes[0] = plotgram_model::NodeShape::Diamond; // a: two FREE South outs
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3), false)
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
             .ports;
         // Capacity=1 does not force a face change — both stay on topological South.
@@ -1443,7 +1438,7 @@ mod tests {
     #[test]
     fn rect_keeps_multiple_free_on_same_side() {
         let (graph, plan) = small_plan_and_graph();
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3), false)
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
             .ports;
         assert_eq!(ports["e0"].source.side, Side::South);
@@ -1458,7 +1453,7 @@ mod tests {
         graph.edges[0].to_port = Some(PortConstraint::FixedSide {
             side: ModelSide::North,
         });
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(3), false)
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
             .ports;
         assert_eq!(ports["e0"].target.side, Side::North);
@@ -1573,7 +1568,7 @@ mod tests {
             ],
             layers: vec![vec![0], vec![1, 2], vec![3, 4]],
         };
-        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(4), false)
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
             .ports;
         let (o_near, _) = ordered(ports["e_near"].source);

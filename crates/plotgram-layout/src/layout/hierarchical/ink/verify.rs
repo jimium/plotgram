@@ -65,9 +65,13 @@ pub fn verify_no_illegal_overlap(
 
 /// Hard-fail when an orthogonal polyline intersects the open interior of a
 /// node that is neither the edge source nor the edge target.
+/// Hard-fail when an orthogonal polyline intersects the open interior of a
+/// non-endpoint node. When `require_orthogonal` is true (orthogonal routing
+/// style), non-axis-aligned segments are also an InternalInvariant failure.
 pub fn verify_no_node_penetration(
     edges: &[CanonicalEdge],
     node_frames: &[(String, Rect)],
+    require_orthogonal: bool,
 ) -> Result<(), LayoutError> {
     for e in edges {
         let Some(pts) = polyline_samples(&e.path) else {
@@ -75,8 +79,15 @@ pub fn verify_no_node_penetration(
         };
         for w in pts.windows(2) {
             let (a, b) = (w[0], w[1]);
-            // Polyline / curved styles may emit non-ortho segments; skip them.
-            if (a.x - b.x).abs() > EPS && (a.y - b.y).abs() > EPS {
+            let non_ortho = (a.x - b.x).abs() > EPS && (a.y - b.y).abs() > EPS;
+            if non_ortho {
+                if require_orthogonal {
+                    return Err(LayoutError::message(format!(
+                        "hierarchical: InternalInvariant — edge `{}` has non-orthogonal \
+                         segment under orthogonal routing_style",
+                        e.id
+                    )));
+                }
                 continue;
             }
             for (nid, frame) in node_frames {
@@ -202,7 +213,7 @@ mod tests {
             ("b".into(), Rect::new(40.0, 100.0, 20.0, 10.0)),
             ("mid".into(), Rect::new(40.0, 40.0, 20.0, 20.0)),
         ];
-        let err = verify_no_node_penetration(&edges, &frames).unwrap_err();
+        let err = verify_no_node_penetration(&edges, &frames, true).unwrap_err();
         assert!(err.to_string().contains("penetrates node `mid`"), "{err}");
     }
 
@@ -223,7 +234,27 @@ mod tests {
             ("b".into(), Rect::new(0.0, 90.0, 20.0, 10.0)),
             ("mid".into(), Rect::new(40.0, 40.0, 20.0, 20.0)),
         ];
-        assert!(verify_no_node_penetration(&edges, &frames).is_ok());
+        assert!(verify_no_node_penetration(&edges, &frames, true).is_ok());
+    }
+
+    #[test]
+    fn non_orthogonal_segment_fails_when_required() {
+        let edges = vec![edge(
+            "e0",
+            "a",
+            "b",
+            vec![
+                Point { x: 0.0, y: 0.0 },
+                Point { x: 10.0, y: 10.0 },
+            ],
+        )];
+        let frames = vec![
+            ("a".into(), Rect::new(-5.0, -5.0, 10.0, 10.0)),
+            ("b".into(), Rect::new(5.0, 5.0, 10.0, 10.0)),
+        ];
+        let err = verify_no_node_penetration(&edges, &frames, true).unwrap_err();
+        assert!(err.to_string().contains("non-orthogonal"), "{err}");
+        assert!(verify_no_node_penetration(&edges, &frames, false).is_ok());
     }
 
     #[test]

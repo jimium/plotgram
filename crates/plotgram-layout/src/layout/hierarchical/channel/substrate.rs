@@ -58,13 +58,6 @@ pub enum PortSide {
 }
 
 impl PortSide {
-    pub fn required_orient(self) -> TrackOrient {
-        match self {
-            PortSide::MainLow | PortSide::MainHigh => TrackOrient::Cross,
-            PortSide::CrossLow | PortSide::CrossHigh => TrackOrient::Main,
-        }
-    }
-
     pub fn from_algo_side(side: plotgram_algo::orientation::Side) -> Self {
         use plotgram_algo::orientation::Side;
         match side {
@@ -95,11 +88,6 @@ impl Track {
         let c = 2 * gap_line;
         self.ext.0 <= c && c <= self.ext.1
     }
-
-    pub fn covers_slot(&self, j: usize) -> bool {
-        let c = 2 * j + 1;
-        self.ext.0 <= c && c <= self.ext.1
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -114,7 +102,12 @@ pub struct GroupScope {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GateCapacity {
     Unbounded,
-    #[allow(dead_code)] // Fixed reserved for diagnostic capacity scans
+    /// Capacity by crossing budget. **Not produced in this build** — `derive`
+    /// always emits [`Unbounded`]; the `Fixed` match arm in `Occupancy::gate_open`
+    /// is therefore unreachable. P0 keeps the variant as IR placeholder; P5
+    /// either wires real capacity estimation or deletes `Fixed` entirely
+    /// (no half-abstract).
+    #[allow(dead_code)]
     Fixed(u32),
 }
 

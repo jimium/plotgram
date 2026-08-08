@@ -8,7 +8,9 @@ use plotgram_model::diagnostics::Relaxation;
 
 use super::derive::derive_substrate;
 use super::graph::{ChannelGraph, Occupancy};
-use super::search::{route_edge, ChannelPath, LexCost, RouteHints, ScopeMask, SpanAffinity};
+use super::search::{
+    path_used_outer_overflow, route_edge, ChannelPath, LexCost, RouteHints, ScopeMask, SpanAffinity,
+};
 use super::substrate::{BlueprintIndex, PortSide, Substrate, TrackId};
 use crate::layout::hierarchical::compose::bundle::{end_bus_edge_ids, BundlePlan};
 use crate::layout::hierarchical::compose::ports::EdgePorts;
@@ -33,8 +35,10 @@ pub struct ChannelRoutePlan {
     pub routes: BTreeMap<String, RouteTopology>,
     /// End-bus bundles from Compose (`auto_edge_grouping`).
     pub bundles: Vec<BundlePlan>,
-    /// Soft relaxations produced by bounded rip-up.
+    /// Soft relaxations produced by bounded rip-up / outer-overflow.
     pub relaxations: Vec<Relaxation>,
+    /// Number of rip-up rounds entered (0 when peak ≤ 1).
+    pub ripup_rounds: u32,
     /// True when group-cut Gate IR was used (false = root-scope fallback).
     pub used_gates: bool,
     /// D1.3.3 deterministic commit order (RouteOrderWriter).
@@ -281,7 +285,7 @@ pub fn route_edges_channel(
     end_bundles: &[BundlePlan],
     params: &HierarchicalParams,
 ) -> Result<ChannelRoutePlan, LayoutError> {
-    let (substrate, index, used_gates) = derive_substrate(plan, graph)?;
+    let (substrate, index, used_gates, mut relaxations) = derive_substrate(plan, graph)?;
     let channel_graph = ChannelGraph::from_substrate(&substrate);
     let mut occupancy = Occupancy::new();
 
@@ -356,12 +360,25 @@ pub fn route_edges_channel(
         );
     }
 
-    let relaxations = bounded_ripup(
+    let (ripup_relaxations, ripup_rounds) = bounded_ripup(
         &channel_graph,
         &substrate,
         &mut occupancy,
         &mut states,
     );
+    relaxations.extend(ripup_relaxations);
+
+    // Outer-overflow: record when the final path sits on outer Main while an
+    // inner band gap is free (search soft-penalty already applied; this is
+    // diagnostics only — geometry unchanged).
+    for (eid, st) in &states {
+        if path_used_outer_overflow(&substrate, &st.path, &st.hints, &occupancy) {
+            relaxations.push(Relaxation {
+                rule: "channel-outer-overflow".into(),
+                detail: format!("edge `{eid}` routed on outer Main while inner band free"),
+            });
+        }
+    }
 
     // Path-level scope verifier (hard FAIL on foreign scope).
     for (eid, st) in &states {
@@ -383,6 +400,7 @@ pub fn route_edges_channel(
         routes,
         bundles: end_bundles.to_vec(),
         relaxations,
+        ripup_rounds,
         used_gates,
         route_order,
     })
@@ -393,18 +411,20 @@ fn bounded_ripup(
     substrate: &Substrate,
     occupancy: &mut Occupancy,
     states: &mut BTreeMap<String, EdgeRouteState>,
-) -> Vec<Relaxation> {
+) -> (Vec<Relaxation>, u32) {
     let mut relaxations = Vec::new();
     let (peak0, _) = occupancy_peak_sum(occupancy, substrate);
     if peak0 <= 1 {
-        return relaxations;
+        return (relaxations, 0);
     }
 
+    let mut rounds_entered = 0u32;
     for round in 0..MAX_RIPUP_ROUNDS {
         let (peak, _) = occupancy_peak_sum(occupancy, substrate);
         if peak <= 1 {
             break;
         }
+        rounds_entered += 1;
 
         let mut peak_tracks = Vec::new();
         for t in substrate.tracks() {
@@ -501,7 +521,7 @@ fn bounded_ripup(
         });
     }
 
-    relaxations
+    (relaxations, rounds_entered)
 }
 
 #[cfg(test)]

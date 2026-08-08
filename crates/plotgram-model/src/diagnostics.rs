@@ -13,13 +13,26 @@ use serde::{Deserialize, Serialize};
 pub struct LayoutDiagnostics {
     /// Non-fatal observations (e.g. unknown option keys at bind time).
     pub warnings: Vec<LayoutWarning>,
-    /// Softened preferences. No producer in this build — the channel is
-    /// reserved for future bounded rework (Channel rip-up, Gate fallback);
-    /// every relaxation must land here (architecture.md §3.4).
+    /// Softened preferences (Channel rip-up, group-substrate fallback, …).
+    /// Every soft relaxation must land here (architecture.md §3.4).
     pub relaxations: Vec<Relaxation>,
     /// Deterministic hash of the bound typed params (16 lowercase hex chars).
     /// Empty string for layouts without typed params (D6: no fake values).
     pub params_hash: String,
+    /// Hierarchical-only observation block. `None` for non-hier layouts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hierarchical: Option<HierarchicalObs>,
+}
+
+/// Hierarchical layout observations (P1). Geometry-neutral; for eval / measure.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct HierarchicalObs {
+    /// True when group-cut Gate IR was used (`d1.3-gate`); false = root-scope.
+    pub channel_used_gates: bool,
+    /// Number of bounded rip-up rounds entered (0 when peak occupancy ≤ 1).
+    pub ripup_rounds: u32,
+    /// End-bus member edge ids (intentional shared corridors for overlap_len).
+    pub bus_edge_ids: Vec<String>,
 }
 
 /// A single non-fatal observation.

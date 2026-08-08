@@ -259,6 +259,7 @@ dependencies = [
  "plotgram-model",
  "plotgram-parse",
  "plotgram-render",
+ "plotgram-router",
  "serde",
  "serde_json",
  "thiserror",

@@ -13,6 +13,7 @@ plotgram-engine = { workspace = true }
 plotgram-engine-api = { workspace = true }
 plotgram-layout = { workspace = true }
 plotgram-render = { workspace = true }
+plotgram-router = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

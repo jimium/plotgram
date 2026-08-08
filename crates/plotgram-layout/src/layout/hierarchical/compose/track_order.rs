@@ -20,8 +20,6 @@ use crate::layout::hierarchical::compose::ports::EdgePorts;
 use crate::layout::hierarchical::metric::anchor::port_anchor;
 use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealGraph};
 
-const JOG_EPS: f64 = 1e-6;
-
 /// L3 assignment for one edge on one substrate track.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HopTrack {
@@ -94,14 +92,12 @@ pub fn assign_track_order(
             };
             match t.orient {
                 TrackOrient::Cross => {
-                    if (hi - lo).abs() < JOG_EPS {
-                        // Straight vertical through this gap — still occupies
-                        // one lane slot for Demand bookkeeping only when other
-                        // edges share the rail; zero-width intervals may share.
-                        by_track.entry(tid).or_default().push((edge_id.clone(), lo, hi));
-                    } else {
-                        by_track.entry(tid).or_default().push((edge_id.clone(), lo, hi));
-                    }
+                    // Horizontal corridor occupancy along the cross axis
+                    // (including zero-width / straight vertical jogs).
+                    by_track
+                        .entry(tid)
+                        .or_default()
+                        .push((edge_id.clone(), lo, hi));
                 }
                 TrackOrient::Main => {
                     // Vertical corridor: conflict when rank bands overlap.
@@ -246,7 +242,7 @@ fn color_cross_outer_first(
 mod tests {
     use super::*;
     use crate::layout::hierarchical::channel::{
-        derive_root_substrate, ChannelPath, ChannelRoutePlan, RouteTopology, TrackOrient,
+        substrate::derive_root_substrate, ChannelPath, ChannelRoutePlan, RouteTopology, TrackOrient,
     };
     use crate::layout::hierarchical::compose::ports::{assign_ports, EdgePorts};
     use crate::layout::hierarchical::model::{Elem, ElemKey, RealEdge, RealGraph, Segment};
@@ -341,7 +337,6 @@ mod tests {
             &graph,
             &plan,
             AlgoOrientation::Tb,
-            &vec![Size::new(20.0, 10.0); 4],
             false,
         )
         .unwrap()
@@ -369,6 +364,7 @@ mod tests {
             routes,
             bundles: vec![],
             relaxations: vec![],
+            ripup_rounds: 0,
             used_gates: false,
             route_order: vec![],
         };
@@ -474,7 +470,6 @@ mod tests {
             &graph,
             &plan,
             AlgoOrientation::Tb,
-            &vec![Size::new(20.0, 10.0); 3],
             false,
         )
         .unwrap()
@@ -501,6 +496,7 @@ mod tests {
             routes,
             bundles: vec![],
             relaxations: vec![],
+            ripup_rounds: 0,
             used_gates: false,
             route_order: vec![],
         };
@@ -652,6 +648,7 @@ mod tests {
             routes,
             bundles: vec![],
             relaxations: vec![],
+            ripup_rounds: 0,
             used_gates: false,
             route_order: vec![],
         };

@@ -27,7 +27,8 @@ fn build_layout_surfaces_unknown_option_warnings() {
             *expected,
             "options=`{options}`"
         );
-        // Relaxations channel exists but has no producer in this build.
+        // Soft relaxations: Channel rip-up / group fallback. This two-node
+        // ungrouped fixture has neither producer.
         assert!(result.diagnostics.relaxations.is_empty());
     }
 }

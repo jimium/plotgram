@@ -16,11 +16,16 @@
 
 mod audit;
 mod error;
+mod hier_metrics;
 mod measure_graph;
 mod options;
 
 pub use audit::{compute as compute_metrics, GeometryMetrics};
 pub use error::BuildError;
+pub use hier_metrics::{
+    compute as compute_hier_metrics, node_gap_from_source, CrossAxis, HierQualityMetrics,
+    DEFAULT_NODE_GAP,
+};
 pub use options::BuildOptions;
 pub use plotgram_layout::LayoutDebugTrace;
 

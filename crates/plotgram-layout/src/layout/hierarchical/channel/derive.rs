@@ -7,6 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use plotgram_engine_api::LayoutError;
+use plotgram_model::diagnostics::Relaxation;
 
 use super::substrate::{
     derive_root_substrate, BlueprintIndex, GateCapacity, GateSide, GroupId, SegmentRef, Substrate,
@@ -48,27 +49,49 @@ impl DeriveError {
 
 /// Build substrate: group-cut when groups form a nested tree; else root-scope.
 ///
-/// Returns `(substrate, index, used_gates)` — `used_gates` is false when we
-/// fell back to root-scope (overlapping / impure group rects).
+/// Returns `(substrate, index, used_gates, relaxations)` — `used_gates` is false
+/// when we fell back to root-scope (overlapping / impure group rects); that
+/// fallback always emits a relaxation so the silent 31/40 gate-off case is
+/// observable (P0-4 / review §2.6).
 pub fn derive_substrate(
     plan: &PlanGraph,
     graph: &RealGraph,
-) -> Result<(Substrate, BlueprintIndex, bool), LayoutError> {
+) -> Result<(Substrate, BlueprintIndex, bool, Vec<Relaxation>), LayoutError> {
     let (nodes, groups) = collect_blueprint(plan, graph);
     if groups.is_empty() {
         let (s, idx) = derive_root_substrate(plan);
-        return Ok((s, idx, false));
+        return Ok((s, idx, false, Vec::new()));
     }
     match derive_group_substrate(plan, &nodes, &groups) {
-        Ok((s, idx)) => Ok((s, idx, true)),
-        Err(DeriveError::OverlappingGroups { .. })
-        | Err(DeriveError::ForeignNodeInGroupRect { .. })
-        | Err(DeriveError::EmptyGroup { .. }) => {
+        Ok((s, idx)) => Ok((s, idx, true, Vec::new())),
+        Err(err @ DeriveError::OverlappingGroups { .. })
+        | Err(err @ DeriveError::ForeignNodeInGroupRect { .. })
+        | Err(err @ DeriveError::EmptyGroup { .. }) => {
             // Weak-group layouts may not yield nested rectangles yet (no
             // group-frame). Fall back to D1.1 root-scope rather than hard-fail
             // the whole diagram; Gate activates when rects nest cleanly.
+            let reason = match &err {
+                DeriveError::OverlappingGroups { a, b } => {
+                    format!("OverlappingGroups({a}, {b})")
+                }
+                DeriveError::ForeignNodeInGroupRect { group, node } => {
+                    format!("ForeignNodeInGroupRect({group}, {node})")
+                }
+                DeriveError::EmptyGroup { group } => format!("EmptyGroup({group})"),
+                DeriveError::Substrate(_) => unreachable!("matched soft derive errors only"),
+            };
             let (s, idx) = derive_root_substrate(plan);
-            Ok((s, idx, false))
+            Ok((
+                s,
+                idx,
+                false,
+                vec![Relaxation {
+                    rule: "channel-group-fallback".into(),
+                    detail: format!(
+                        "group substrate failed ({reason}); fell back to d1.3-root-scope"
+                    ),
+                }],
+            ))
         }
         Err(e) => Err(e.to_layout_error()),
     }
@@ -79,7 +102,7 @@ fn collect_blueprint(
     graph: &RealGraph,
 ) -> (BTreeMap<String, NodeSpec>, BTreeMap<String, GroupSpec>) {
     let mut nodes = BTreeMap::new();
-    for (i, id) in graph.ids.iter().enumerate() {
+    for id in &graph.ids {
         let Some(&elem) = plan.index_of.get(&ElemKey::Real(id.clone())) else {
             continue;
         };
@@ -271,6 +294,8 @@ fn derive_group_substrate(
         }
     }
 
+    // P0: Fixed capacity is not produced — always Unbounded. P5 will either
+    // estimate capacity from crossing count or delete the Fixed variant.
     let capacity = GateCapacity::Unbounded;
     for gname in &group_names {
         let gid = group_id[gname];
@@ -554,7 +579,7 @@ mod tests {
             }],
             self_loops: vec![],
         };
-        let (sub, idx, used) = derive_substrate(&plan, &graph).unwrap();
+        let (sub, idx, used, _relax) = derive_substrate(&plan, &graph).unwrap();
         assert!(used, "clean sibling rects must activate Gate IR");
         assert!(!sub.gates().collect::<Vec<_>>().is_empty());
         assert!(idx.group_ids.contains_key("g1"));

@@ -1,0 +1,106 @@
+// Layout Stress: Wide Layer
+// Algorithm probe: single-layer width ≥32 so median/barycenter sort keys
+// exercise the total-order path (review §2.1; formerly panicked at ≥18).
+diagram {
+    profile: flowchart,
+    layout: hierarchical { direction: top-to-bottom },
+    title: "布局测试：宽层定序全序"
+
+    node a0 { label: "a0", archetype: process }
+    node a1 { label: "a1", archetype: process }
+    node a2 { label: "a2", archetype: process }
+    node a3 { label: "a3", archetype: process }
+    node a4 { label: "a4", archetype: process }
+    node a5 { label: "a5", archetype: process }
+    node a6 { label: "a6", archetype: process }
+    node a7 { label: "a7", archetype: process }
+    node a8 { label: "a8", archetype: process }
+    node a9 { label: "a9", archetype: process }
+    node a10 { label: "a10", archetype: process }
+    node a11 { label: "a11", archetype: process }
+    node a12 { label: "a12", archetype: process }
+    node a13 { label: "a13", archetype: process }
+    node a14 { label: "a14", archetype: process }
+    node a15 { label: "a15", archetype: process }
+    node a16 { label: "a16", archetype: process }
+    node a17 { label: "a17", archetype: process }
+    node a18 { label: "a18", archetype: process }
+    node a19 { label: "a19", archetype: process }
+    node a20 { label: "a20", archetype: process }
+    node a21 { label: "a21", archetype: process }
+    node a22 { label: "a22", archetype: process }
+    node a23 { label: "a23", archetype: process }
+    node a24 { label: "a24", archetype: process }
+    node a25 { label: "a25", archetype: process }
+    node a26 { label: "a26", archetype: process }
+    node a27 { label: "a27", archetype: process }
+    node a28 { label: "a28", archetype: process }
+    node a29 { label: "a29", archetype: process }
+    node a30 { label: "a30", archetype: process }
+    node a31 { label: "a31", archetype: process }
+    node b0 { label: "b0", archetype: process }
+    node b1 { label: "b1", archetype: process }
+    node b2 { label: "b2", archetype: process }
+    node b3 { label: "b3", archetype: process }
+    node b4 { label: "b4", archetype: process }
+    node b5 { label: "b5", archetype: process }
+    node b6 { label: "b6", archetype: process }
+    node b7 { label: "b7", archetype: process }
+    node b8 { label: "b8", archetype: process }
+    node b9 { label: "b9", archetype: process }
+    node b10 { label: "b10", archetype: process }
+    node b11 { label: "b11", archetype: process }
+    node b12 { label: "b12", archetype: process }
+    node b13 { label: "b13", archetype: process }
+    node b14 { label: "b14", archetype: process }
+    node b15 { label: "b15", archetype: process }
+    node b16 { label: "b16", archetype: process }
+    node b17 { label: "b17", archetype: process }
+    node b18 { label: "b18", archetype: process }
+    node b19 { label: "b19", archetype: process }
+    node b20 { label: "b20", archetype: process }
+    node b21 { label: "b21", archetype: process }
+    node b22 { label: "b22", archetype: process }
+    node b23 { label: "b23", archetype: process }
+    node b24 { label: "b24", archetype: process }
+    node b25 { label: "b25", archetype: process }
+    node b26 { label: "b26", archetype: process }
+    node b27 { label: "b27", archetype: process }
+    node b28 { label: "b28", archetype: process }
+    node b29 { label: "b29", archetype: process }
+    node b30 { label: "b30", archetype: process }
+    node b31 { label: "b31", archetype: process }
+
+    a0 -> b3
+    a1 -> b10
+    a2 -> b17
+    a3 -> b24
+    a4 -> b31
+    a5 -> b6
+    a6 -> b13
+    a7 -> b20
+    a8 -> b27
+    a9 -> b2
+    a10 -> b9
+    a11 -> b16
+    a12 -> b23
+    a13 -> b30
+    a14 -> b5
+    a15 -> b12
+    a16 -> b19
+    a17 -> b26
+    a18 -> b1
+    a19 -> b8
+    a20 -> b15
+    a21 -> b22
+    a22 -> b29
+    a23 -> b4
+    a24 -> b11
+    a25 -> b18
+    a26 -> b25
+    a27 -> b0
+    a28 -> b7
+    a29 -> b14
+    a30 -> b21
+    a31 -> b28
+}
