@@ -48,12 +48,12 @@
     "sum_bends": 40
   },
   "flat/demo.pr-architecture-review": {
-    "bbox_h": 630.0999999999999,
-    "bbox_w": 401.2176786431152,
-    "crossings": 7,
+    "bbox_h": 646.0999999999999,
+    "bbox_w": 380.78074413401066,
+    "crossings": 3,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 28
+    "sum_bends": 30
   },
   "flat/demo.software-release": {
     "bbox_h": 890.7999999999998,
@@ -272,9 +272,9 @@
     "sum_bends": 38
   },
   "flat/stress.layout-stress-flat-mesh": {
-    "bbox_h": 568.3,
-    "bbox_w": 380.74285714285713,
-    "crossings": 35,
+    "bbox_h": 552.3,
+    "bbox_w": 322.43428571428575,
+    "crossings": 31,
     "max_bends": 4,
     "reversed_count": 2,
     "sum_bends": 47
@@ -289,7 +289,7 @@
   },
   "group/demo.ai-agent-docops-pipeline": {
     "bbox_h": 700.9999999999999,
-    "bbox_w": 490.7801702786378,
+    "bbox_w": 528.8809558823531,
     "crossings": 4,
     "max_bends": 4,
     "reversed_count": 1,
@@ -297,7 +297,7 @@
   },
   "group/demo.ci-cd-security-pipeline": {
     "bbox_h": 1474.0000000000005,
-    "bbox_w": 313.3732248525752,
+    "bbox_w": 300.5877513628104,
     "crossings": 22,
     "max_bends": 4,
     "reversed_count": 1,
@@ -305,7 +305,7 @@
   },
   "group/demo.customer-refund-process": {
     "bbox_h": 1284.2000000000003,
-    "bbox_w": 285.58838612368027,
+    "bbox_w": 336.0,
     "crossings": 3,
     "max_bends": 4,
     "reversed_count": 3,
@@ -328,9 +328,9 @@
     "sum_bends": 24
   },
   "group/demo.data-lineage-platform": {
-    "bbox_h": 678.0999999999999,
-    "bbox_w": 483.06000000000006,
-    "crossings": 7,
+    "bbox_h": 694.0999999999999,
+    "bbox_w": 505.3751405092594,
+    "crossings": 5,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 44
@@ -345,16 +345,16 @@
   },
   "group/demo.fintech-payment-platform": {
     "bbox_h": 488.29999999999995,
-    "bbox_w": 303.00320512820514,
-    "crossings": 5,
+    "bbox_w": 294.3999518999519,
+    "crossings": 4,
     "max_bends": 4,
     "reversed_count": 2,
-    "sum_bends": 23
+    "sum_bends": 26
   },
   "group/demo.hybrid-cloud-dr-topology": {
-    "bbox_h": 687.1999999999999,
-    "bbox_w": 1059.317701388889,
-    "crossings": 20,
+    "bbox_h": 735.1999999999999,
+    "bbox_w": 911.5500000000002,
+    "crossings": 32,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 58
@@ -376,12 +376,12 @@
     "sum_bends": 22
   },
   "group/demo.k8s-blue-green-release-topology": {
-    "bbox_h": 892.9999999999999,
-    "bbox_w": 721.5900000000001,
-    "crossings": 30,
+    "bbox_h": 844.9999999999999,
+    "bbox_w": 547.5571000876027,
+    "crossings": 23,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 75
+    "sum_bends": 76
   },
   "group/demo.k8s-multi-cluster-federation": {
     "bbox_h": 831.1999999999999,
@@ -392,25 +392,25 @@
     "sum_bends": 82
   },
   "group/demo.k8s-multi-namespace-overview": {
-    "bbox_h": 783.1999999999999,
-    "bbox_w": 1332.44,
-    "crossings": 86,
+    "bbox_h": 767.1999999999999,
+    "bbox_w": 1340.44,
+    "crossings": 94,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 72
   },
   "group/demo.k8s-platform-stack": {
-    "bbox_h": 632.3,
-    "bbox_w": 1028.0528125,
-    "crossings": 35,
+    "bbox_h": 616.3,
+    "bbox_w": 900.9367343750002,
+    "crossings": 24,
     "max_bends": 4,
     "reversed_count": 0,
     "sum_bends": 68
   },
   "group/demo.k8s-tenant-isolation": {
-    "bbox_h": 600.3,
-    "bbox_w": 1054.4142708333334,
-    "crossings": 34,
+    "bbox_h": 584.3,
+    "bbox_w": 1059.8067291666669,
+    "crossings": 31,
     "max_bends": 2,
     "reversed_count": 0,
     "sum_bends": 48
@@ -441,19 +441,19 @@
   },
   "group/demo.payment-clearing-platform": {
     "bbox_h": 559.1999999999999,
-    "bbox_w": 674.4962375222817,
+    "bbox_w": 638.983076923077,
     "crossings": 3,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 29
+    "sum_bends": 28
   },
   "group/demo.plotgram-core-mod-deps": {
-    "bbox_h": 863.4999999999999,
-    "bbox_w": 1420.1909147203005,
-    "crossings": 68,
+    "bbox_h": 831.4999999999999,
+    "bbox_w": 1402.0874460230687,
+    "crossings": 65,
     "max_bends": 4,
     "reversed_count": 1,
-    "sum_bends": 73
+    "sum_bends": 72
   },
   "group/demo.realtime-recommendation": {
     "bbox_h": 291.6,
