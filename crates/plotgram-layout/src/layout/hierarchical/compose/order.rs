@@ -8,7 +8,6 @@
 //! within the same block, so same-group elements can never be split apart by
 //! an unrelated element.
 
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::layout::hierarchical::model::{Elem, PlanGraph};
@@ -244,6 +243,35 @@ struct Key {
     repr_decl: usize,
 }
 
+/// Quantize neighbor positions for a total-order sort key (avoids ε-threshold
+/// non-transitivity in `cmp_key` that panics driftsort at wide layers).
+const QUANT: f64 = 1024.0;
+
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct SortKey {
+    /// `(false, q)` = has value; `(true, 0)` = no neighbors, sorts after all valued keys.
+    median: (bool, i64),
+    barycenter: (bool, i64),
+    prev_pos: usize,
+    repr_decl: usize,
+}
+
+fn quant(v: Option<f64>) -> (bool, i64) {
+    match v {
+        None => (true, 0),
+        Some(x) => (false, (x * QUANT).round() as i64),
+    }
+}
+
+fn sort_key(k: &Key) -> SortKey {
+    SortKey {
+        median: quant(k.median),
+        barycenter: quant(k.barycenter),
+        prev_pos: k.prev_pos,
+        repr_decl: k.repr_decl,
+    }
+}
+
 fn pooled_neighbor_positions(
     block: &BlockNode,
     neighbors_of: &[Vec<(usize, f64)>],
@@ -280,7 +308,7 @@ fn median_of(mut positions: Vec<f64>) -> Option<f64> {
     if positions.is_empty() {
         return None;
     }
-    positions.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    positions.sort_by(f64::total_cmp);
     let m = positions.len();
     if m % 2 == 1 {
         return Some(positions[m / 2]);
@@ -344,24 +372,8 @@ fn sort_blocks(
         })
         .collect();
 
-    keyed.sort_by(|(a, _), (b, _)| cmp_key(a, b));
+    keyed.sort_by_key(|(k, _)| sort_key(k));
     *blocks = keyed.into_iter().map(|(_, b)| b).collect();
-}
-
-fn cmp_key(a: &Key, b: &Key) -> Ordering {
-    if let (Some(x), Some(y)) = (a.median, b.median) {
-        if (x - y).abs() > EPS {
-            return x.partial_cmp(&y).unwrap();
-        }
-    }
-    if let (Some(x), Some(y)) = (a.barycenter, b.barycenter) {
-        if (x - y).abs() > EPS {
-            return x.partial_cmp(&y).unwrap();
-        }
-    }
-    a.prev_pos
-        .cmp(&b.prev_pos)
-        .then(a.repr_decl.cmp(&b.repr_decl))
 }
 
 fn reorder_layer(plan: &mut PlanGraph, adj: &Adjacency, r: usize, dir: Direction) {
@@ -690,5 +702,72 @@ mod tests {
             8.0,
             "virtual-virtual corridor weight must not scale"
         );
+    }
+
+    /// Wide layers (≥18 blocks) used to panic driftsort when `cmp_key` was not a
+    /// total order; regression for review §2.1.
+    fn wide_layer_plan(width: usize) -> PlanGraph {
+        let n = width;
+        let mut elems: Vec<Elem> = Vec::with_capacity(2 * n + 4);
+        for i in 0..n {
+            let id = format!("n{i}");
+            elems.push(plain_elem(&id, 0, &[]));
+        }
+        for i in 0..n {
+            let id = format!("m{i}");
+            elems.push(plain_elem(&id, 1, &[]));
+        }
+        elems.push(plain_elem("iso_l0_a", 0, &[]));
+        elems.push(plain_elem("iso_l0_b", 0, &[]));
+        elems.push(plain_elem("iso_l1_a", 1, &[]));
+        elems.push(plain_elem("iso_l1_b", 1, &[]));
+
+        let iso_l0_a = 2 * n;
+        let iso_l0_b = 2 * n + 1;
+        let iso_l1_a = 2 * n + 2;
+        let iso_l1_b = 2 * n + 3;
+
+        let segments: Vec<Segment> = (0..n)
+            .map(|i| Segment {
+                edge_id: format!("e{i}"),
+                ordinal: 0,
+                from: i,
+                to: n + ((i * 7 + 3) % n),
+            })
+            .collect();
+
+        let layer0: Vec<usize> = (0..n)
+            .chain([iso_l0_a, iso_l0_b])
+            .collect();
+        let layer1: Vec<usize> = (n..2 * n)
+            .chain([iso_l1_a, iso_l1_b])
+            .collect();
+        let layers = vec![layer0, layer1];
+
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let decl_index: Vec<usize> = (0..elems.len()).collect();
+
+        PlanGraph {
+            elems,
+            index_of,
+            decl_index,
+            segments,
+            layers,
+        }
+    }
+
+    #[test]
+    fn ordering_survives_wide_layers() {
+        for width in [18, 32, 64] {
+            let mut plan = wide_layer_plan(width);
+            let layer_len = width + 2;
+            order_layers(&mut plan, &BTreeSet::new());
+            assert_eq!(plan.layers[0].len(), layer_len, "width={width}");
+            assert_eq!(plan.layers[1].len(), layer_len, "width={width}");
+        }
     }
 }
