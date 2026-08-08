@@ -45,6 +45,7 @@ pub fn apply_port_lanes(
         return;
     }
 
+    let edge_of = graph.edge_index_map();
     let corridor_edges: BTreeSet<String> = groups
         .iter()
         .flat_map(|g| g.edges.iter().cloned())
@@ -56,7 +57,7 @@ pub fn apply_port_lanes(
         let Some(ep) = ports.get(edge_id) else {
             continue;
         };
-        let Some((src, tgt)) = endpoint_elems(plan, graph, edge_id) else {
+        let Some((src, tgt)) = endpoint_elems(plan, graph, &edge_of, edge_id) else {
             continue;
         };
         touched.insert((src, ep.source.side));
@@ -117,7 +118,7 @@ pub fn apply_port_lanes(
 
     // Clip each lane into the intersection of both endpoint frames.
     for edge_id in &corridor_edges {
-        let Some((src, tgt)) = endpoint_elems(plan, graph, edge_id) else {
+        let Some((src, tgt)) = endpoint_elems(plan, graph, &edge_of, edge_id) else {
             continue;
         };
         let lo = frames[src].x.max(frames[tgt].x) + PORT_MARGIN;
@@ -329,9 +330,11 @@ fn build_face_ends(
 fn endpoint_elems(
     plan: &PlanGraph,
     graph: &RealGraph,
+    edge_of: &BTreeMap<String, usize>,
     edge_id: &str,
 ) -> Option<(usize, usize)> {
-    let edge = graph.edges.iter().find(|e| e.edge_id == edge_id)?;
+    let &ei = edge_of.get(edge_id)?;
+    let edge = &graph.edges[ei];
     let src = *plan
         .index_of
         .get(&ElemKey::Real(graph.ids[edge.original_source].clone()))?;

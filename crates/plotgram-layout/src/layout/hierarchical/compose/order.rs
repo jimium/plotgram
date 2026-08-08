@@ -66,6 +66,44 @@ fn build_adjacency(
     Adjacency { up, down }
 }
 
+/// Precomputed bipartite segments for crossing counts (gb: excluded).
+/// Valid for the whole ordering phase — segments are immutable then.
+struct CrossingIndex {
+    /// `segs_by_pair[r]` = edges between layers `r` and `r+1` as `(from, to)`.
+    segs_by_pair: Vec<Vec<(usize, usize)>>,
+    /// elem → neighbors one rank above (sources of incoming segs).
+    up: Vec<Vec<usize>>,
+    /// elem → neighbors one rank below (targets of outgoing segs).
+    down: Vec<Vec<usize>>,
+}
+
+fn build_crossing_index(plan: &PlanGraph) -> CrossingIndex {
+    let n = plan.elems.len();
+    let pairs = plan.layers.len().saturating_sub(1);
+    let mut segs_by_pair = vec![Vec::new(); pairs];
+    let mut up = vec![Vec::new(); n];
+    let mut down = vec![Vec::new(); n];
+    for s in &plan.segments {
+        if s.edge_id.starts_with("gb:") {
+            continue;
+        }
+        let r = plan.elems[s.from].rank as usize;
+        if r < pairs && plan.elems[s.to].rank as usize == r + 1 {
+            segs_by_pair[r].push((s.from, s.to));
+            down[s.from].push(s.to);
+            up[s.to].push(s.from);
+        }
+    }
+    for v in up.iter_mut().chain(down.iter_mut()) {
+        v.sort_unstable();
+    }
+    CrossingIndex {
+        segs_by_pair,
+        up,
+        down,
+    }
+}
+
 pub fn order_layers(
     plan: &mut PlanGraph,
     critical: &BTreeSet<String>,
@@ -75,9 +113,10 @@ pub fn order_layers(
         return; // nothing to reorder
     }
     let adj = build_adjacency(plan, critical, group_boundary_weight);
+    let xidx = build_crossing_index(plan);
 
     let mut best = plan.layers.clone();
-    let mut best_crossings = total_crossings(plan);
+    let mut best_crossings = total_crossings(plan, &xidx);
     let mut no_improve = 0usize;
 
     for sweep in 0..MAX_SWEEPS {
@@ -90,12 +129,12 @@ pub fn order_layers(
                 reorder_layer(plan, &adj, r, Direction::Down);
             }
         }
-        transpose_pass(plan);
+        transpose_pass(plan, &xidx);
         for r in 0..plan.layers.len() {
             restore_group_clamps(plan, r);
         }
 
-        let c = total_crossings(plan);
+        let c = total_crossings(plan, &xidx);
         if c < best_crossings {
             best_crossings = c;
             best.clone_from(&plan.layers);
@@ -115,13 +154,12 @@ pub fn order_layers(
     if !super::super::CHANNEL_FORCE_ROOT.get() {
         super::boundary::align_group_left_pads(plan);
     }
-    tighten_one_to_one(plan, &adj);
+    tighten_one_to_one(plan, &xidx);
 }
 
 /// G4: pull 1:1 real leaves under their only neighbor by adjacent swaps that
 /// do not increase crossings (and prefer reducing |Δorder|).
-fn tighten_one_to_one(plan: &mut PlanGraph, adj: &Adjacency) {
-    let _ = adj;
+fn tighten_one_to_one(plan: &mut PlanGraph, xidx: &CrossingIndex) {
     let n = plan.elems.len();
     let mut down_real = vec![Vec::new(); n];
     let mut up_real = vec![Vec::new(); n];
@@ -135,7 +173,8 @@ fn tighten_one_to_one(plan: &mut PlanGraph, adj: &Adjacency) {
             up_real[s.to].push(s.from);
         }
     }
-    let base = total_crossings(plan);
+    let base = total_crossings(plan, xidx);
+    let mut cur = base;
     for r in 0..plan.layers.len() {
         let layer_len = plan.layers[r].len();
         for i in 0..layer_len.saturating_sub(1) {
@@ -168,9 +207,12 @@ fn tighten_one_to_one(plan: &mut PlanGraph, adj: &Adjacency) {
                 s
             };
             let before = score(plan);
+            let d = delta_swap(plan, xidx, r, i);
             plan.layers[r].swap(i, i + 1);
-            if total_crossings(plan) > base || score(plan) > before {
+            if cur as i64 + d > base as i64 || score(plan) > before {
                 plan.layers[r].swap(i, i + 1);
+            } else {
+                cur = (cur as i64 + d) as u64;
             }
         }
     }
@@ -377,46 +419,82 @@ fn restore_group_clamps(plan: &mut PlanGraph, r: usize) {
     }
 }
 
-fn total_crossings(plan: &PlanGraph) -> u64 {
+fn total_crossings(plan: &PlanGraph, xidx: &CrossingIndex) -> u64 {
     let mut total = 0u64;
-    for r in 0..plan.layers.len().saturating_sub(1) {
-        let segs: Vec<(usize, usize)> = plan
-            .segments
-            .iter()
-            .filter(|s| {
-                plan.elems[s.from].rank as usize == r && !s.edge_id.starts_with("gb:")
-            })
-            .map(|s| (s.from, s.to))
-            .collect();
+    for r in 0..xidx.segs_by_pair.len() {
+        let segs = &xidx.segs_by_pair[r];
         if segs.is_empty() {
             continue;
         }
         total += plotgram_algo::crossing::count_bipartite_crossings(
             &plan.layers[r],
             &plan.layers[r + 1],
-            &segs,
+            segs,
         );
     }
     total
 }
 
-/// Adjacent swaps accepted only when they strictly reduce total crossings
+/// Crossing delta if adjacent elems at `layers[r][i]` and `[i+1]` are swapped.
+/// O(deg(u)·deg(v)) against the two neighboring bipartite interfaces.
+fn delta_swap(plan: &PlanGraph, xidx: &CrossingIndex, r: usize, i: usize) -> i64 {
+    let u = plan.layers[r][i];
+    let v = plan.layers[r][i + 1];
+    let mut delta = 0i64;
+
+    if r > 0 {
+        let pos = reference_positions(&plan.layers[r - 1]);
+        for &a in &xidx.up[u] {
+            let Some(&pa) = pos.get(&a) else {
+                continue;
+            };
+            for &b in &xidx.up[v] {
+                let Some(&pb) = pos.get(&b) else {
+                    continue;
+                };
+                delta += match pa.cmp(&pb) {
+                    std::cmp::Ordering::Greater => -1,
+                    std::cmp::Ordering::Less => 1,
+                    std::cmp::Ordering::Equal => 0, // placeholder
+                };
+            }
+        }
+    }
+    if r + 1 < plan.layers.len() {
+        let pos = reference_positions(&plan.layers[r + 1]);
+        for &c in &xidx.down[u] {
+            let Some(&pc) = pos.get(&c) else {
+                continue;
+            };
+            for &d in &xidx.down[v] {
+                let Some(&pd) = pos.get(&d) else {
+                    continue;
+                };
+                delta += match pc.cmp(&pd) {
+                    std::cmp::Ordering::Greater => -1,
+                    std::cmp::Ordering::Less => 1,
+                    std::cmp::Ordering::Equal => 0, // placeholder
+                };
+            }
+        }
+    }
+    delta
+}
+
+/// Adjacent swaps accepted only when they strictly reduce local crossings
 /// against both neighboring layers. No group-path guard — clamps are
 /// re-packed after the pass so intervals stay contiguous.
-fn transpose_pass(plan: &mut PlanGraph) {
+fn transpose_pass(plan: &mut PlanGraph, xidx: &CrossingIndex) {
     let budget = plan.elems.len() + plan.layers.len() * 4 + 32;
     for _ in 0..budget {
         let mut improved = false;
         for r in 0..plan.layers.len() {
             let mut i = 0;
             while i + 1 < plan.layers[r].len() {
-                let before = local_crossings(plan, r);
-                plan.layers[r].swap(i, i + 1);
-                let after = local_crossings(plan, r);
-                if after < before {
+                let d = delta_swap(plan, xidx, r, i);
+                if d < 0 {
+                    plan.layers[r].swap(i, i + 1);
                     improved = true;
-                } else {
-                    plan.layers[r].swap(i, i + 1); // revert
                 }
                 i += 1;
             }
@@ -425,45 +503,6 @@ fn transpose_pass(plan: &mut PlanGraph) {
             break;
         }
     }
-}
-
-fn local_crossings(plan: &PlanGraph, r: usize) -> u64 {
-    let mut total = 0u64;
-    if r > 0 {
-        let segs: Vec<(usize, usize)> = plan
-            .segments
-            .iter()
-            .filter(|s| {
-                plan.elems[s.to].rank as usize == r && !s.edge_id.starts_with("gb:")
-            })
-            .map(|s| (s.from, s.to))
-            .collect();
-        if !segs.is_empty() {
-            total += plotgram_algo::crossing::count_bipartite_crossings(
-                &plan.layers[r - 1],
-                &plan.layers[r],
-                &segs,
-            );
-        }
-    }
-    if r + 1 < plan.layers.len() {
-        let segs: Vec<(usize, usize)> = plan
-            .segments
-            .iter()
-            .filter(|s| {
-                plan.elems[s.from].rank as usize == r && !s.edge_id.starts_with("gb:")
-            })
-            .map(|s| (s.from, s.to))
-            .collect();
-        if !segs.is_empty() {
-            total += plotgram_algo::crossing::count_bipartite_crossings(
-                &plan.layers[r],
-                &plan.layers[r + 1],
-                &segs,
-            );
-        }
-    }
-    total
 }
 
 #[cfg(test)]
@@ -523,9 +562,11 @@ mod tests {
     #[test]
     fn ordering_removes_a_crossing() {
         let mut plan = crossing_plan();
-        assert_eq!(total_crossings(&plan), 1);
+        let xidx = build_crossing_index(&plan);
+        assert_eq!(total_crossings(&plan, &xidx), 1);
         order_layers(&mut plan, &BTreeSet::new(), 16.0);
-        assert_eq!(total_crossings(&plan), 0);
+        let xidx = build_crossing_index(&plan);
+        assert_eq!(total_crossings(&plan, &xidx), 0);
     }
 
     #[test]

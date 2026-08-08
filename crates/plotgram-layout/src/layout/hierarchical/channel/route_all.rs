@@ -1,7 +1,7 @@
 //! Route every non-bus edge on the Channel graph (D1.2 Gate + D1.3.3 RouteOrder).
 
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use plotgram_engine_api::LayoutError;
 use plotgram_model::diagnostics::Relaxation;
@@ -45,26 +45,23 @@ pub struct ChannelRoutePlan {
     pub route_order: Vec<String>,
 }
 
-fn layer_order(plan: &PlanGraph, elem: usize) -> usize {
-    let rank = plan.elems[elem].rank as usize;
-    plan.layers[rank]
-        .iter()
-        .position(|&e| e == elem)
-        .expect("elem must be in its layer")
+fn layer_order(layer_pos: &[usize], elem: usize) -> usize {
+    layer_pos[elem]
 }
 
 fn endpoint_side_rank_order(
     plan: &PlanGraph,
     graph: &RealGraph,
+    edge_of: &BTreeMap<String, usize>,
+    layer_pos: &[usize],
     ports: &BTreeMap<String, EdgePorts>,
     edge_id: &str,
     at_source: bool,
 ) -> Result<(PortSide, usize, usize), LayoutError> {
-    let edge = graph
-        .edges
-        .iter()
-        .find(|e| e.edge_id == edge_id)
-        .ok_or_else(|| LayoutError::message(format!("channel: unknown edge `{edge_id}`")))?;
+    let &ei = edge_of.get(edge_id).ok_or_else(|| {
+        LayoutError::message(format!("channel: unknown edge `{edge_id}`"))
+    })?;
+    let edge = &graph.edges[ei];
     let node_idx = if at_source {
         edge.original_source
     } else {
@@ -73,7 +70,7 @@ fn endpoint_side_rank_order(
     let id = &graph.ids[node_idx];
     let elem = plan.index_of[&ElemKey::Real(id.clone())];
     let rank = plan.elems[elem].rank as usize;
-    let order = layer_order(plan, elem);
+    let order = layer_order(layer_pos, elem);
     let rp = &ports[edge_id];
     let side = if at_source {
         PortSide::from_algo_side(rp.source.side)
@@ -94,13 +91,15 @@ fn host_tracks_for_edge(
     index: &BlueprintIndex,
     plan: &PlanGraph,
     graph: &RealGraph,
+    edge_of: &BTreeMap<String, usize>,
+    layer_pos: &[usize],
     ports: &BTreeMap<String, EdgePorts>,
     edge_id: &str,
 ) -> Result<(TrackId, TrackId), LayoutError> {
     let (src_side, src_rank, src_order) =
-        endpoint_side_rank_order(plan, graph, ports, edge_id, true)?;
+        endpoint_side_rank_order(plan, graph, edge_of, layer_pos, ports, edge_id, true)?;
     let (tgt_side, tgt_rank, tgt_order) =
-        endpoint_side_rank_order(plan, graph, ports, edge_id, false)?;
+        endpoint_side_rank_order(plan, graph, edge_of, layer_pos, ports, edge_id, false)?;
 
     let shared_og = match (src_side, tgt_side) {
         (PortSide::CrossHigh, PortSide::CrossHigh) => Some(src_order.max(tgt_order) + 1),
@@ -153,38 +152,48 @@ fn scope_mask_for_edge(
     ScopeMask::for_scopes(substrate, index.node_scope(from), index.node_scope(to))
 }
 
-fn endpoint_rank_order(plan: &PlanGraph, graph: &RealGraph, node_idx: usize) -> (usize, usize) {
+fn endpoint_rank_order(
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    layer_pos: &[usize],
+    node_idx: usize,
+) -> (usize, usize) {
     let id = &graph.ids[node_idx];
     let elem = plan.index_of[&ElemKey::Real(id.clone())];
     let rank = plan.elems[elem].rank as usize;
-    let order = layer_order(plan, elem);
+    let order = layer_order(layer_pos, elem);
     (rank, order)
 }
 
-fn edge_rank_span(plan: &PlanGraph, graph: &RealGraph, edge: &RealEdge) -> usize {
-    let (sr, _) = endpoint_rank_order(plan, graph, edge.original_source);
-    let (tr, _) = endpoint_rank_order(plan, graph, edge.original_target);
+fn edge_rank_span(
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    layer_pos: &[usize],
+    edge: &RealEdge,
+) -> usize {
+    let (sr, _) = endpoint_rank_order(plan, graph, layer_pos, edge.original_source);
+    let (tr, _) = endpoint_rank_order(plan, graph, layer_pos, edge.original_target);
     sr.abs_diff(tr)
 }
 
-fn dummy_chain_len(plan: &PlanGraph, edge_id: &str) -> usize {
-    plan.segments
-        .iter()
-        .filter(|s| s.edge_id == edge_id)
-        .count()
-        .saturating_sub(1)
+fn dummy_chain_len(segs_by_edge: &BTreeMap<String, Vec<usize>>, edge_id: &str) -> usize {
+    segs_by_edge
+        .get(edge_id)
+        .map(|v| v.len().saturating_sub(1))
+        .unwrap_or(0)
 }
 
 fn hints_for_edge(
     plan: &PlanGraph,
     graph: &RealGraph,
+    layer_pos: &[usize],
     params: &HierarchicalParams,
     edge: &RealEdge,
     order_count: usize,
 ) -> RouteHints {
     let pitch = params.edge_gap.max(1e-9);
-    let (src_rank, src_order) = endpoint_rank_order(plan, graph, edge.original_source);
-    let (tgt_rank, tgt_order) = endpoint_rank_order(plan, graph, edge.original_target);
+    let (src_rank, src_order) = endpoint_rank_order(plan, graph, layer_pos, edge.original_source);
+    let (tgt_rank, tgt_order) = endpoint_rank_order(plan, graph, layer_pos, edge.original_target);
     RouteHints {
         min_first_span: if params.min_first_segment > 0.0 {
             (params.min_first_segment / pitch).max(1.0)
@@ -357,22 +366,26 @@ fn route_on_substrate(
     let mut occupancy = Occupancy::new();
 
     let bus_edges = end_bus_edge_ids(end_bundles);
+    let edge_of = graph.edge_index_map();
+    let layer_pos = plan.layer_positions();
+    let segs_by_edge = plan.segments_by_edge();
 
     let mut prepared: Vec<PreparedEdge> = Vec::new();
     for (decl_index, e) in graph.edges.iter().enumerate() {
         if bus_edges.contains(&e.edge_id) {
             continue;
         }
-        let (start, goal) = host_tracks_for_edge(&index, plan, graph, ports, &e.edge_id)?;
+        let (start, goal) =
+            host_tracks_for_edge(&index, plan, graph, &edge_of, &layer_pos, ports, &e.edge_id)?;
         let mask = scope_mask_for_edge(&substrate, &index, graph, e);
-        let hints = hints_for_edge(plan, graph, params, e, index.order_count);
+        let hints = hints_for_edge(plan, graph, &layer_pos, params, e, index.order_count);
         prepared.push(PreparedEdge {
             entry: RouteOrderEntry {
                 edge_id: e.edge_id.clone(),
                 critical: e.critical,
-                span: edge_rank_span(plan, graph, e),
+                span: edge_rank_span(plan, graph, &layer_pos, e),
                 reversed: e.reversed,
-                dummy_len: dummy_chain_len(plan, &e.edge_id),
+                dummy_len: dummy_chain_len(&segs_by_edge, &e.edge_id),
                 decl_index,
             },
             start,
@@ -493,13 +506,12 @@ fn bounded_ripup(
         }
         rounds_entered += 1;
 
-        let mut peak_tracks = Vec::new();
+        let mut peak_tracks = BTreeSet::new();
         for t in substrate.tracks() {
             if occupancy.lane_demand(t.id) == peak {
-                peak_tracks.push(t.id);
+                peak_tracks.insert(t.id);
             }
         }
-        peak_tracks.sort();
 
         let mut on_peak: Vec<String> = states
             .iter()
@@ -705,7 +717,15 @@ mod tests {
         let (sub, idx) = derive_root_substrate(&plan);
         let mut ports = BTreeMap::new();
         ports.insert("ew".into(), east_ports());
-        let (start, goal) = host_tracks_for_edge(&idx, &plan, &graph, &ports, "ew").unwrap();
+        let (start, goal) = host_tracks_for_edge(
+            &idx,
+            &plan,
+            &graph,
+            &graph.edge_index_map(),
+            &plan.layer_positions(),
+            &ports,
+            "ew",
+        ).unwrap();
         let start_t = sub.track(start).unwrap();
         let goal_t = sub.track(goal).unwrap();
         assert_eq!(start_t.orient, TrackOrient::Main);
@@ -726,7 +746,15 @@ mod tests {
         let (sub, idx) = derive_root_substrate(&plan);
         let mut ports = BTreeMap::new();
         ports.insert("ew".into(), west_ports());
-        let (start, goal) = host_tracks_for_edge(&idx, &plan, &graph, &ports, "ew").unwrap();
+        let (start, goal) = host_tracks_for_edge(
+            &idx,
+            &plan,
+            &graph,
+            &graph.edge_index_map(),
+            &plan.layer_positions(),
+            &ports,
+            "ew",
+        ).unwrap();
         let start_t = sub.track(start).unwrap();
         let goal_t = sub.track(goal).unwrap();
         assert_eq!(start_t.orient, TrackOrient::Main);

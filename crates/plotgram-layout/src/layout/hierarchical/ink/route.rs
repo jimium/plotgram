@@ -85,12 +85,17 @@ pub struct CanonicalEdge {
 /// Elem indices along `edge_id`'s dummy chain in **original** source->target
 /// order (properify stores segments in *working* direction; this un-swaps
 /// them when the edge was reversed by FAS — composition.md's "FAS 方向不变量").
-fn chain_in_original_order(plan: &PlanGraph, edge_id: &str, reversed: bool) -> Vec<usize> {
-    let mut segs: Vec<&Segment> = plan
-        .segments
-        .iter()
-        .filter(|s| s.edge_id == edge_id)
-        .collect();
+fn chain_in_original_order(
+    plan: &PlanGraph,
+    segs_by_edge: &BTreeMap<String, Vec<usize>>,
+    edge_id: &str,
+    reversed: bool,
+) -> Vec<usize> {
+    let idxs = segs_by_edge
+        .get(edge_id)
+        .map(|v| v.as_slice())
+        .unwrap_or(&[]);
+    let mut segs: Vec<&Segment> = idxs.iter().map(|&i| &plan.segments[i]).collect();
     segs.sort_by_key(|s| s.ordinal);
     let mut chain = Vec::with_capacity(segs.len() + 1);
     chain.push(segs[0].from);
@@ -612,9 +617,10 @@ pub fn route_edges(
     layer_gap: f64,
     node_gap: f64,
 ) -> Result<Vec<CanonicalEdge>, LayoutError> {
+    let segs_by_edge = plan.segments_by_edge();
     let mut out = Vec::with_capacity(graph.edges.len());
     for e in &graph.edges {
-        let chain = chain_in_original_order(plan, &e.edge_id, e.reversed);
+        let chain = chain_in_original_order(plan, &segs_by_edge, &e.edge_id, e.reversed);
         let rp = &ports[&e.edge_id];
 
         let last_i = chain.len() - 1;

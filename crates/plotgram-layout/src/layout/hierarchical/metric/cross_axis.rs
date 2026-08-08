@@ -130,6 +130,7 @@ pub fn assign_cross_axis(
             .unwrap_or(pass1[e]);
         Rect::new(cx - s.width / 2.0, main[e], s.width, s.height)
     };
+    let segs_by_edge = plan.segments_by_edge();
     for e in &graph.edges {
         let rp = &ports[&e.edge_id];
         for (real_idx, port, _cluster) in [
@@ -137,7 +138,7 @@ pub fn assign_cross_axis(
             (e.original_source, rp.source, rp.source_cluster),
         ] {
             let real_elem = plan.index_of[&ElemKey::Real(graph.ids[real_idx].clone())];
-            let Some(nb) = chain_neighbor(plan, &e.edge_id, real_elem) else {
+            let Some(nb) = chain_neighbor(plan, &segs_by_edge, &e.edge_id, real_elem) else {
                 continue;
             };
             if !plan.elems[nb].key.is_virtual() {
@@ -348,10 +349,16 @@ pub(crate) fn pass1_hardenable_real_pair(
 
 /// The elem adjacent to `real_elem` along `edge_id`'s chain (its only
 /// segment neighbor — dummy or the other real endpoint).
-fn chain_neighbor(plan: &PlanGraph, edge_id: &str, real_elem: usize) -> Option<usize> {
-    plan.segments
-        .iter()
-        .find(|s| s.edge_id == edge_id && (s.from == real_elem || s.to == real_elem))
+fn chain_neighbor(
+    plan: &PlanGraph,
+    segs_by_edge: &BTreeMap<String, Vec<usize>>,
+    edge_id: &str,
+    real_elem: usize,
+) -> Option<usize> {
+    let idxs = segs_by_edge.get(edge_id)?;
+    idxs.iter()
+        .map(|&i| &plan.segments[i])
+        .find(|s| s.from == real_elem || s.to == real_elem)
         .map(|s| if s.from == real_elem { s.to } else { s.from })
 }
 

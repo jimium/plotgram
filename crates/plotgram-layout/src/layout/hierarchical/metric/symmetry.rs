@@ -227,6 +227,7 @@ pub fn compute_symmetry_plan(
     node_gap: f64,
 ) -> SymmetryPlan {
     let n = plan.elems.len();
+    let layer_pos = plan.layer_positions();
     let (down_nbs, up_nbs) = forward_real_adjacency(plan, graph);
     let down_deg = degrees_of(&down_nbs);
     let up_deg = degrees_of(&up_nbs);
@@ -328,7 +329,7 @@ pub fn compute_symmetry_plan(
                 let db = (pass1[b] - pass1[hub]).abs();
                 da.partial_cmp(&db)
                     .unwrap()
-                    .then(compose_order_key(plan, a).cmp(&compose_order_key(plan, b)))
+                    .then(compose_order_key(plan, &layer_pos, a).cmp(&compose_order_key(plan, &layer_pos, b)))
             });
             twin_cands.dedup();
             for nb in twin_cands {
@@ -410,6 +411,7 @@ pub fn compute_symmetry_plan(
                 &up_deg,
                 &claimed,
                 &mut fan_claimed,
+                &layer_pos,
                 &mut slots,
             );
         }
@@ -429,6 +431,7 @@ pub fn compute_symmetry_plan(
                 &up_deg,
                 &claimed,
                 &mut fan_claimed,
+                &layer_pos,
                 &mut slots,
             );
         }
@@ -559,13 +562,9 @@ fn walk_chain(
 }
 
 /// Compose layer order key: `(rank, index_in_layer, elem)`.
-fn compose_order_key(plan: &PlanGraph, e: usize) -> (u32, usize, usize) {
+fn compose_order_key(plan: &PlanGraph, layer_pos: &[usize], e: usize) -> (u32, usize, usize) {
     let rank = plan.elems[e].rank;
-    let order = plan
-        .layers
-        .get(rank as usize)
-        .and_then(|layer| layer.iter().position(|&x| x == e))
-        .unwrap_or(usize::MAX);
+    let order = layer_pos.get(e).copied().unwrap_or(usize::MAX);
     (rank, order, e)
 }
 
@@ -620,6 +619,7 @@ fn append_fan_slots(
     up_deg: &[usize],
     class_claimed: &[bool],
     fan_claimed: &mut [bool],
+    layer_pos: &[usize],
     slots: &mut Vec<FanPackSlot>,
 ) {
     let mut leaves: Vec<usize> = neighbors
@@ -632,7 +632,9 @@ fn append_fan_slots(
     if leaves.is_empty() {
         return;
     }
-    leaves.sort_by(|&a, &b| compose_order_key(plan, a).cmp(&compose_order_key(plan, b)));
+    leaves.sort_by(|&a, &b| {
+        compose_order_key(plan, layer_pos, a).cmp(&compose_order_key(plan, layer_pos, b))
+    });
 
     // Twin peers already occupy the axis via RigidColumnClass. A single
     // remaining free leaf still packs off-axis (yFiles: spine twin + offset sink).

@@ -1,12 +1,10 @@
-//! P2 ranking: simplified Network Simplex (Gansner, Koutsofios, North, Vo 1993),
+//! Ranking via Network Simplex (Gansner, Koutsofios, North, Vo 1993),
 //! weight = 1 uniform (no dummies exist yet — properify runs after ranking).
 //!
-//! Deliberately O(V·(V+E)) per tighten/pivot step rather than the incremental
-//! O(V+E) low/lim cut-value bookkeeping production implementations use — see
-//! `docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md` §2.1 for
-//! why that's an acceptable trade at layout-fixture scale.
+//! Cut values use GKNV leaf-to-root accumulation (O(V+E) init) and path-only
+//! updates on pivot; `(low, lim)` membership tests are O(1).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use plotgram_engine_api::LayoutError;
 
@@ -31,11 +29,12 @@ pub fn assign_ranks(graph: &RealGraph) -> Result<RankMap, LayoutError> {
         }
     }
 
+    // P3-4 (dot `balance` + per-component / non-compressing normalize) is
+    // deferred: wiring it regresses showcase bend hard-gates while the
+    // performance goals are already met by incremental NS / crossings / indexes.
     Ok(normalize_dense(&rank))
 }
 
-/// Longest-path ranking over the working DAG (Kahn's algorithm). Feasible but
-/// not necessarily tight/minimal — [`refine_component`] improves it.
 fn longest_path_ranks(graph: &RealGraph) -> Vec<i64> {
     let n = graph.ids.len();
     let mut succ: Vec<Vec<usize>> = vec![Vec::new(); n];
@@ -69,8 +68,6 @@ fn longest_path_ranks(graph: &RealGraph) -> Vec<i64> {
     rank
 }
 
-/// Weakly-connected components over `graph.edges`, node indices sorted
-/// ascending within each component, components sorted by minimum member.
 fn weak_components(graph: &RealGraph) -> Vec<Vec<usize>> {
     let n = graph.ids.len();
     let mut parent: Vec<usize> = (0..n).collect();
@@ -89,8 +86,7 @@ fn weak_components(graph: &RealGraph) -> Vec<Vec<usize>> {
             parent[a.max(b)] = a.min(b);
         }
     }
-    let mut groups: std::collections::BTreeMap<usize, Vec<usize>> =
-        std::collections::BTreeMap::new();
+    let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     for v in 0..n {
         let r = find(&mut parent, v);
         groups.entry(r).or_default().push(v);
@@ -102,8 +98,6 @@ fn slack_of(rank: &[i64], src: usize, tgt: usize) -> i64 {
     rank[tgt] - rank[src] - MIN_SPAN
 }
 
-/// Edges (indices into `graph.edges`) with both endpoints in `comp`, in
-/// declaration order.
 fn component_edges(graph: &RealGraph, comp: &BTreeSet<usize>) -> Vec<usize> {
     graph
         .edges
@@ -114,56 +108,60 @@ fn component_edges(graph: &RealGraph, comp: &BTreeSet<usize>) -> Vec<usize> {
         .collect()
 }
 
-/// Build a feasible tight spanning tree over `comp`, then repeatedly pivot on
-/// negative-cut-value tree edges until optimal (or the iteration budget is
-/// exhausted). Mutates `rank` in place for nodes in `comp`.
+fn incident_edges(graph: &RealGraph, n: usize, comp_edges: &[usize]) -> Vec<Vec<usize>> {
+    let mut inc = vec![Vec::new(); n];
+    for &ei in comp_edges {
+        let e = &graph.edges[ei];
+        inc[e.working_source].push(ei);
+        if e.working_source != e.working_target {
+            inc[e.working_target].push(ei);
+        }
+    }
+    inc
+}
+
 fn refine_component(graph: &RealGraph, comp: &[usize], rank: &mut [i64]) {
     let comp_set: BTreeSet<usize> = comp.iter().copied().collect();
     let comp_edges = component_edges(graph, &comp_set);
     if comp_edges.is_empty() {
-        return; // isolated nodes, nothing to tighten
+        return;
     }
 
-    let Some(mut tree_edges) = build_tight_tree(graph, comp, &comp_edges, rank) else {
-        return; // defensive: should not happen for a connected component
+    let Some(tree_edges) = build_tight_tree(graph, comp, &comp_edges, rank) else {
+        return;
     };
 
+    let n = graph.ids.len();
+    let inc = incident_edges(graph, n, &comp_edges);
+    let mut tree = NsTree::build(comp[0], &tree_edges, graph, n);
+    tree.init_cut_values(graph, &inc);
+
     let budget = 8 * (comp.len() + comp_edges.len()) + 64;
-    let mut current_length = total_weighted_length(graph, &comp_edges, rank);
 
     for _ in 0..budget {
-        let tree = TreeShape::build(comp[0], &tree_edges, graph);
-
-        // Most-negative cut value wins; tie-break by the tree edge's index
-        // into `graph.edges` (a stable proxy for declaration order — edges
-        // are pushed in declaration order by `graph_index::build_real_graph`).
-        let mut leave: Option<(
-            usize, /*tree_edges idx*/
-            i64,   /*cut value*/
-            usize, /*edge_idx*/
-        )> = None;
-        for (ti, &edge_idx) in tree_edges.iter().enumerate() {
-            let cv = cut_value(graph, &tree, edge_idx, &comp_edges);
+        let mut leave: Option<(usize, i64)> = None;
+        for &edge_idx in &tree.tree_edges {
+            let cv = tree.cut.get(&edge_idx).copied().unwrap_or(0);
             if cv >= 0 {
                 continue;
             }
             let better = match leave {
                 None => true,
-                Some((_, best_cv, best_edge)) => {
+                Some((best_edge, best_cv)) => {
                     cv < best_cv || (cv == best_cv && edge_idx < best_edge)
                 }
             };
             if better {
-                leave = Some((ti, cv, edge_idx));
+                leave = Some((edge_idx, cv));
             }
         }
-        let Some((leave_ti, _, leave_edge_idx)) = leave else {
-            break; // no negative cut value: optimal
+        let Some((leave_edge_idx, leave_cut)) = leave else {
+            break;
         };
+
         let te = &graph.edges[leave_edge_idx];
-        // Whichever endpoint is the DFS child of this tree edge owns the subtree.
         let head_is_child_subtree =
-            tree.parent_edge.get(&te.working_target) == Some(&leave_edge_idx);
+            tree.parent_edge[te.working_target] == Some(leave_edge_idx);
         let child = if head_is_child_subtree {
             te.working_target
         } else {
@@ -171,10 +169,9 @@ fn refine_component(graph: &RealGraph, comp: &[usize], rank: &mut [i64]) {
         };
         let head_side_is_subtree = te.working_target == child;
 
-        // Entering edge: crosses from head-side back to tail-side, minimal slack.
         let mut enter: Option<(usize, i64)> = None;
         for &ei in &comp_edges {
-            if tree_edges.contains(&ei) {
+            if tree.tree_edge_set.contains(&ei) {
                 continue;
             }
             let e = &graph.edges[ei];
@@ -198,43 +195,31 @@ fn refine_component(graph: &RealGraph, comp: &[usize], rank: &mut [i64]) {
             }
         }
         let Some((enter_idx, delta)) = enter else {
-            break; // defensive: shouldn't happen for a connected component
+            break;
         };
 
         let tail_side_is_subtree = !head_side_is_subtree;
         for &v in comp {
-            let in_subtree = tree.in_subtree(child, v);
-            if in_subtree == tail_side_is_subtree {
+            if tree.in_subtree(child, v) == tail_side_is_subtree {
                 rank[v] -= delta;
             }
         }
 
-        tree_edges[leave_ti] = enter_idx;
+        let f_tail = graph.edges[enter_idx].working_source;
+        let f_head = graph.edges[enter_idx].working_target;
+        let lca = tree.treeupdate(graph, f_tail, f_head, leave_cut, true);
+        let lca2 = tree.treeupdate(graph, f_head, f_tail, leave_cut, false);
+        debug_assert_eq!(lca, lca2);
 
-        let new_length = total_weighted_length(graph, &comp_edges, rank);
-        if new_length > current_length {
-            // Defensive: a correct pivot never increases total length; treat
-            // as a stability guard against float/index edge cases and stop.
-            break;
-        }
-        current_length = new_length;
+        tree.cut.insert(enter_idx, -leave_cut);
+        tree.cut.remove(&leave_edge_idx);
+        tree.exchange_edge(leave_edge_idx, enter_idx, graph);
+        let lca_low = tree.low[lca];
+        let par_lca = tree.parent_edge[lca];
+        tree.dfs_range(lca, par_lca, lca_low);
     }
 }
 
-fn total_weighted_length(graph: &RealGraph, edges: &[usize], rank: &[i64]) -> i64 {
-    edges
-        .iter()
-        .map(|&i| {
-            let e = &graph.edges[i];
-            rank[e.working_target] - rank[e.working_source]
-        })
-        .sum()
-}
-
-/// Grow a spanning tree over `comp` via the classic "grow tight, else shift
-/// and retry" method. Returns the list of tree edges (indices into
-/// `graph.edges`), or `None` if `comp` is not actually connected by
-/// `comp_edges` (should not happen — `comp` comes from [`weak_components`]).
 fn build_tight_tree(
     graph: &RealGraph,
     comp: &[usize],
@@ -250,7 +235,6 @@ fn build_tight_tree(
         if tree_nodes.len() == comp.len() {
             return Some(tree_edges);
         }
-        // 1) grow via any tight edge with exactly one endpoint in the tree.
         let mut grown = false;
         for &ei in comp_edges {
             let e = &graph.edges[ei];
@@ -270,8 +254,7 @@ fn build_tight_tree(
         if grown {
             continue;
         }
-        // 2) stuck: shift the whole current tree by the minimal boundary slack.
-        let mut best: Option<(usize, i64, bool)> = None; // (edge_idx, slack, head_in_tree)
+        let mut best: Option<(usize, i64, bool)> = None;
         for &ei in comp_edges {
             let e = &graph.edges[ei];
             let a_in = tree_nodes.contains(&e.working_source);
@@ -289,7 +272,7 @@ fn build_tight_tree(
             }
         }
         let Some((_, s, head_in_tree)) = best else {
-            return None; // not connected — defensive
+            return None;
         };
         let delta = if head_in_tree { -s } else { s };
         for &v in &tree_nodes {
@@ -299,127 +282,189 @@ fn build_tight_tree(
     None
 }
 
-/// DFS shape of the current tree (rooted arbitrarily at `root`), giving O(1)
-/// subtree-membership queries via preorder (`tin`/`tout`) ranges.
-struct TreeShape {
-    node: Vec<NodeSpan>,
-    parent_edge: std::collections::BTreeMap<usize, usize>,
+struct NsTree {
+    root: usize,
+    parent_edge: Vec<Option<usize>>,
+    low: Vec<usize>,
+    lim: Vec<usize>,
+    tree_adj: Vec<Vec<(usize, usize)>>,
+    tree_edges: Vec<usize>,
+    tree_edge_set: BTreeSet<usize>,
+    cut: BTreeMap<usize, i64>,
 }
 
-#[derive(Clone, Copy)]
-struct NodeSpan {
-    tin: usize,
-    tout: usize,
-}
-
-impl TreeShape {
-    fn build(root: usize, tree_edges: &[usize], graph: &RealGraph) -> Self {
-        let mut adj: std::collections::BTreeMap<usize, Vec<(usize, usize)>> =
-            std::collections::BTreeMap::new();
+impl NsTree {
+    fn build(root: usize, tree_edges: &[usize], graph: &RealGraph, n: usize) -> Self {
+        let mut tree_adj: Vec<Vec<(usize, usize)>> = vec![Vec::new(); n];
+        let mut tree_edge_set = BTreeSet::new();
         for &ei in tree_edges {
             let e = &graph.edges[ei];
-            adj.entry(e.working_source)
-                .or_default()
-                .push((e.working_target, ei));
-            adj.entry(e.working_target)
-                .or_default()
-                .push((e.working_source, ei));
+            tree_adj[e.working_source].push((e.working_target, ei));
+            tree_adj[e.working_target].push((e.working_source, ei));
+            tree_edge_set.insert(ei);
         }
-        for v in adj.values_mut() {
+        for v in &mut tree_adj {
             v.sort_unstable();
         }
 
-        let n = graph.ids.len();
-        let mut node = vec![
-            NodeSpan {
-                tin: usize::MAX,
-                tout: 0
-            };
-            n
-        ];
-        let mut parent_edge = std::collections::BTreeMap::new();
-        let mut timer = 0usize;
-
-        // Explicit-stack DFS (bounded graph size; avoids recursion-depth worries).
-        // Order is a valid preorder because children are only pushed once,
-        // immediately after their parent is popped.
-        let mut order: Vec<usize> = Vec::new();
-        let mut visited = vec![false; n];
-        let mut children: std::collections::BTreeMap<usize, Vec<usize>> =
-            std::collections::BTreeMap::new();
-        let mut dfs_stack = vec![root];
-        visited[root] = true;
-        while let Some(u) = dfs_stack.pop() {
-            order.push(u);
-            if let Some(neis) = adj.get(&u) {
-                for &(v, ei) in neis {
-                    if !visited[v] {
-                        visited[v] = true;
-                        parent_edge.insert(v, ei);
-                        children.entry(u).or_default().push(v);
-                        dfs_stack.push(v);
-                    }
-                }
-            }
-        }
-        for &u in &order {
-            node[u].tin = timer;
-            timer += 1;
-        }
-        // tout via reverse-order accumulation (post-order max over subtree).
-        for &u in order.iter().rev() {
-            let mut hi = node[u].tin;
-            if let Some(ch) = children.get(&u) {
-                for &c in ch {
-                    hi = hi.max(node[c].tout);
-                }
-            }
-            node[u].tout = hi;
-        }
-
-        TreeShape { node, parent_edge }
+        let mut tree = Self {
+            root,
+            parent_edge: vec![None; n],
+            low: vec![0; n],
+            lim: vec![0; n],
+            tree_adj,
+            tree_edges: tree_edges.to_vec(),
+            tree_edge_set,
+            cut: BTreeMap::new(),
+        };
+        tree.dfs_range(root, None, 1);
+        tree
     }
 
     fn in_subtree(&self, subtree_root: usize, x: usize) -> bool {
-        let r = self.node[subtree_root];
-        let n = self.node[x];
-        n.tin != usize::MAX && r.tin <= n.tin && n.tin <= r.tout
+        let lo = self.low[subtree_root];
+        let hi = self.lim[subtree_root];
+        let lx = self.lim[x];
+        lo <= lx && lx <= hi
     }
-}
 
-fn cut_value(
-    graph: &RealGraph,
-    tree: &TreeShape,
-    tree_edge_idx: usize,
-    comp_edges: &[usize],
-) -> i64 {
-    let te = &graph.edges[tree_edge_idx];
-    let head_is_child = tree.parent_edge.get(&te.working_target) == Some(&tree_edge_idx);
-    let child = if head_is_child {
-        te.working_target
-    } else {
-        te.working_source
-    };
-    let head_side_is_subtree = te.working_target == child;
-
-    let mut cv = 0i64;
-    for &ei in comp_edges {
-        let e = &graph.edges[ei];
-        let src_in = tree.in_subtree(child, e.working_source);
-        let tgt_in = tree.in_subtree(child, e.working_target);
-        if src_in == tgt_in {
-            continue;
+    fn dfs_range(&mut self, v: usize, par: Option<usize>, low: usize) -> usize {
+        self.parent_edge[v] = par;
+        self.low[v] = low;
+        let mut next = low;
+        let children: Vec<(usize, usize)> = self.tree_adj[v]
+            .iter()
+            .copied()
+            .filter(|&(_, ei)| Some(ei) != par)
+            .collect();
+        for (w, ei) in children {
+            next = self.dfs_range(w, Some(ei), next);
         }
-        // +1 if this edge goes tail-side -> head-side (same direction as the
-        // tree edge), -1 if head-side -> tail-side.
-        let goes_tail_to_head = if head_side_is_subtree {
-            !src_in && tgt_in
-        } else {
-            src_in && !tgt_in
-        };
-        cv += if goes_tail_to_head { 1 } else { -1 };
+        self.lim[v] = next;
+        next + 1
     }
-    cv
+
+    fn init_cut_values(&mut self, graph: &RealGraph, inc: &[Vec<usize>]) {
+        self.cut.clear();
+        self.dfs_cutval(self.root, None, graph, inc);
+    }
+
+    fn dfs_cutval(
+        &mut self,
+        v: usize,
+        par: Option<usize>,
+        graph: &RealGraph,
+        inc: &[Vec<usize>],
+    ) {
+        let children: Vec<(usize, usize)> = self.tree_adj[v]
+            .iter()
+            .copied()
+            .filter(|&(_, ei)| Some(ei) != par)
+            .collect();
+        for (w, ei) in children {
+            self.dfs_cutval(w, Some(ei), graph, inc);
+        }
+        if let Some(pe) = par {
+            let cv = self.x_cutval(pe, graph, inc);
+            self.cut.insert(pe, cv);
+        }
+    }
+
+    fn x_cutval(&self, f: usize, graph: &RealGraph, inc: &[Vec<usize>]) -> i64 {
+        let e = &graph.edges[f];
+        let (v, dir) = if self.parent_edge[e.working_source] == Some(f) {
+            (e.working_source, 1i32)
+        } else {
+            (e.working_target, -1i32)
+        };
+        let mut sum = 0i64;
+        for &ei in &inc[v] {
+            sum += self.x_val(ei, v, dir, graph);
+        }
+        sum
+    }
+
+    fn x_val(&self, ei: usize, v: usize, dir: i32, graph: &RealGraph) -> i64 {
+        let e = &graph.edges[ei];
+        let other = if e.working_source == v {
+            e.working_target
+        } else {
+            e.working_source
+        };
+        let weight = 1i64;
+        let (f_cross, mut rv) = if !self.in_subtree(v, other) {
+            (true, weight)
+        } else {
+            let rv = if self.tree_edge_set.contains(&ei) {
+                self.cut.get(&ei).copied().unwrap_or(0) - weight
+            } else {
+                -weight
+            };
+            (false, rv)
+        };
+        let mut d = if dir > 0 {
+            if e.working_target == v {
+                1
+            } else {
+                -1
+            }
+        } else if e.working_source == v {
+            1
+        } else {
+            -1
+        };
+        if f_cross {
+            d = -d;
+        }
+        if d < 0 {
+            rv = -rv;
+        }
+        rv
+    }
+
+    /// Graphviz `treeupdate`: walk from `v` toward LCA with `w`.
+    fn treeupdate(
+        &mut self,
+        graph: &RealGraph,
+        mut v: usize,
+        w: usize,
+        cutvalue: i64,
+        dir: bool,
+    ) -> usize {
+        while !(self.low[v] <= self.lim[w] && self.lim[w] <= self.lim[v]) {
+            let ei = self.parent_edge[v].expect("treeupdate walked past root");
+            let e = &graph.edges[ei];
+            let d = if v == e.working_source { dir } else { !dir };
+            let entry = self.cut.entry(ei).or_insert(0);
+            if d {
+                *entry += cutvalue;
+            } else {
+                *entry -= cutvalue;
+            }
+            v = if self.lim[e.working_source] > self.lim[e.working_target] {
+                e.working_source
+            } else {
+                e.working_target
+            };
+        }
+        v
+    }
+
+    fn exchange_edge(&mut self, leave: usize, enter: usize, graph: &RealGraph) {
+        let le = &graph.edges[leave];
+        self.tree_adj[le.working_source].retain(|&(_, e)| e != leave);
+        self.tree_adj[le.working_target].retain(|&(_, e)| e != leave);
+        self.tree_edge_set.remove(&leave);
+        self.tree_edges.retain(|&e| e != leave);
+
+        let ee = &graph.edges[enter];
+        self.tree_adj[ee.working_source].push((ee.working_target, enter));
+        self.tree_adj[ee.working_target].push((ee.working_source, enter));
+        self.tree_adj[ee.working_source].sort_unstable();
+        self.tree_adj[ee.working_target].sort_unstable();
+        self.tree_edge_set.insert(enter);
+        self.tree_edges.push(enter);
+    }
 }
 
 fn normalize_dense(rank: &[i64]) -> RankMap {
@@ -436,7 +481,6 @@ fn normalize_dense(rank: &[i64]) -> RankMap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
 
     fn graph(n: usize, edges: &[(usize, usize)]) -> RealGraph {
         let ids: Vec<String> = (0..n).map(|i| format!("n{i}")).collect();
@@ -511,12 +555,6 @@ mod tests {
 
     #[test]
     fn network_simplex_balances_beyond_longest_path() {
-        // s -> b; s -> {a1->a2->t1, b1->b2->t2, c1->c2->t3} (three length-3
-        // chains from s); b -> t1, b -> t2, b -> t3.
-        // Longest-path pins b at rank 1 (as early as feasible). Minimizing
-        // total edge length (3 outgoing from b + 1 incoming to b) strictly
-        // prefers b at rank 2 (see notes doc §2.1 derivation): objective
-        // 3*(3-b) + b = 9-2b, minimized at the upper feasible bound b=2.
         let s = 0;
         let b = 1;
         let (a1, a2, t1) = (2, 3, 4);

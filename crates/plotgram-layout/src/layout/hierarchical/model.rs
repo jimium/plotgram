@@ -143,3 +143,36 @@ pub struct PlanGraph {
     /// [`crate::layout::hierarchical::compose::order`] rewrites this).
     pub layers: Vec<Vec<usize>>,
 }
+
+impl RealGraph {
+    /// `edge_id` → index into [`Self::edges`]. Built once per phase entry.
+    pub fn edge_index_map(&self) -> BTreeMap<String, usize> {
+        self.edges
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.edge_id.clone(), i))
+            .collect()
+    }
+}
+
+impl PlanGraph {
+    /// `edge_id` → segment indices (declaration / properify order).
+    pub fn segments_by_edge(&self) -> BTreeMap<String, Vec<usize>> {
+        let mut m: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+        for (i, s) in self.segments.iter().enumerate() {
+            m.entry(s.edge_id.clone()).or_default().push(i);
+        }
+        m
+    }
+
+    /// Elem → position within its layer (`usize::MAX` if missing).
+    pub fn layer_positions(&self) -> Vec<usize> {
+        let mut pos = vec![usize::MAX; self.elems.len()];
+        for layer in &self.layers {
+            for (i, &e) in layer.iter().enumerate() {
+                pos[e] = i;
+            }
+        }
+        pos
+    }
+}

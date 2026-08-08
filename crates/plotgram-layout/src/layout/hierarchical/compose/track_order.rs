@@ -41,16 +41,14 @@ pub struct TrackOrderPlan {
 fn endpoint_cross(
     plan: &PlanGraph,
     graph: &RealGraph,
+    edge_of: &BTreeMap<String, usize>,
     ports: &BTreeMap<String, EdgePorts>,
     frames: &[Rect],
     edge_id: &str,
     at_source: bool,
 ) -> f64 {
-    let edge = graph
-        .edges
-        .iter()
-        .find(|e| e.edge_id == edge_id)
-        .expect("edge must exist");
+    let &ei = edge_of.get(edge_id).expect("edge must exist");
+    let edge = &graph.edges[ei];
     let node_idx = if at_source {
         edge.original_source
     } else {
@@ -73,6 +71,7 @@ pub fn assign_track_order(
     route_plan: &ChannelRoutePlan,
 ) -> TrackOrderPlan {
     let bus_edges = end_bus_edge_ids(bundles);
+    let edge_of = graph.edge_index_map();
 
     // Group edge spans by substrate track (Cross tracks only for L3 pitch
     // demand; Main tracks get lanes too for Ink vertical corridors).
@@ -82,8 +81,8 @@ pub fn assign_track_order(
             continue;
         }
         let RouteTopology::Orthogonal(ChannelPath { tracks, .. }) = topo;
-        let ax = endpoint_cross(plan, graph, ports, frames, edge_id, true);
-        let bx = endpoint_cross(plan, graph, ports, frames, edge_id, false);
+        let ax = endpoint_cross(plan, graph, &edge_of, ports, frames, edge_id, true);
+        let bx = endpoint_cross(plan, graph, &edge_of, ports, frames, edge_id, false);
         let lo = ax.min(bx);
         let hi = ax.max(bx);
         for &tid in tracks {
@@ -103,7 +102,7 @@ pub fn assign_track_order(
                     // Vertical corridor: conflict when rank bands overlap.
                     // Half-open [lo, hi+1) as closed [lo, hi+1] so shared
                     // endpoint ranks collide; abutting bands may share a lane.
-                    let (lo_r, hi_r) = endpoint_ranks(plan, graph, edge_id);
+                    let (lo_r, hi_r) = endpoint_ranks(plan, graph, &edge_of, edge_id);
                     by_track.entry(tid).or_default().push((
                         edge_id.clone(),
                         lo_r as f64,
@@ -163,12 +162,14 @@ pub fn assign_track_order(
     }
 }
 
-fn endpoint_ranks(plan: &PlanGraph, graph: &RealGraph, edge_id: &str) -> (usize, usize) {
-    let edge = graph
-        .edges
-        .iter()
-        .find(|e| e.edge_id == edge_id)
-        .expect("edge must exist");
+fn endpoint_ranks(
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    edge_of: &BTreeMap<String, usize>,
+    edge_id: &str,
+) -> (usize, usize) {
+    let &ei = edge_of.get(edge_id).expect("edge must exist");
+    let edge = &graph.edges[ei];
     let src = plan.index_of[&ElemKey::Real(graph.ids[edge.original_source].clone())];
     let tgt = plan.index_of[&ElemKey::Real(graph.ids[edge.original_target].clone())];
     let sr = plan.elems[src].rank as usize;
@@ -246,7 +247,7 @@ mod tests {
     };
     use crate::layout::hierarchical::compose::ports::{assign_ports, EdgePorts};
     use crate::layout::hierarchical::model::{Elem, ElemKey, RealEdge, RealGraph, Segment};
-    use plotgram_algo::orientation::{Orientation as AlgoOrientation, Size};
+    use plotgram_algo::orientation::Orientation as AlgoOrientation;
 
     #[test]
     fn track_order_is_deterministic_and_assigns_lanes() {
