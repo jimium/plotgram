@@ -41,6 +41,9 @@
 //! share rails symmetrically (no right-half cross).
 //! Side-corridor polarity: `product.ticket-triage` escalate→handle both East.
 //! Upstream axis inheritance: `ticket-triage` resolve_gate shares handle cx.
+//! Primary arm on spine: `order-approval` finance under check; approved left;
+//! rejected→submit same-face East corridor (no overshoot past submit East);
+//! check→approved stays near left leaf (not canvas x≈0).
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -959,5 +962,76 @@ fn ticket_triage_resolve_gate_centered_under_handle() {
     assert!(
         (gx - hx).abs() < 1.0,
         "resolve_gate cx={gx:.3} must match handle cx={hx:.3} (upstream axis inherit)"
+    );
+}
+
+/// yFiles-style decision fan: short-span primary on spine, long branch aside
+/// without hugging the canvas left edge (`product.order-approval`).
+/// Same-face East back-edge shares one outer Main (no overshoot past submit).
+#[test]
+fn order_approval_primary_arm_on_spine_approved_left() {
+    let path = showcase_dir().join("flat/product.order-approval.pgm");
+    let source = fs::read_to_string(&path).expect("order-approval fixture");
+    let result = build_layout(&source, &BuildOptions::default()).expect("layout");
+    let cx = |id: &str| {
+        let n = result
+            .nodes
+            .iter()
+            .find(|n| n.id == id)
+            .unwrap_or_else(|| panic!("missing node {id}"));
+        n.frame.x + n.frame.width / 2.0
+    };
+    let check_x = cx("check");
+    let finance_x = cx("finance");
+    let approved_x = cx("approved");
+    assert!(
+        (finance_x - check_x).abs() < 1.0,
+        "finance (short primary) must sit on check spine: finance={finance_x:.3} check={check_x:.3}"
+    );
+    assert!(
+        approved_x < check_x - 1.0,
+        "approved (long side leaf) must sit left of check: approved={approved_x:.3} check={check_x:.3}"
+    );
+    let edge = result
+        .edges
+        .iter()
+        .find(|e| e.source == "check" && e.target == "approved")
+        .expect("check→approved");
+    let pts = edge.path.samples();
+    let min_x = pts.iter().map(|p| p.x).fold(f64::INFINITY, f64::min);
+    let approved = result
+        .nodes
+        .iter()
+        .find(|n| n.id == "approved")
+        .expect("approved");
+    // Side corridor may run slightly left of the leaf, but must not hug x≈0.
+    assert!(
+        min_x >= approved.frame.x - 8.0,
+        "check→approved must stay near the left leaf column (min_x={min_x:.3}, approved.left={:.3})",
+        approved.frame.x
+    );
+
+    let back = result
+        .edges
+        .iter()
+        .find(|e| e.source == "rejected" && e.target == "submit")
+        .expect("rejected→submit");
+    let submit = result
+        .nodes
+        .iter()
+        .find(|n| n.id == "submit")
+        .expect("submit");
+    // East port on submit ≈ right face; top Cross must not overshoot left of it.
+    let submit_east_x = submit.frame.x + submit.frame.width;
+    let back_min_x = back
+        .path
+        .samples()
+        .iter()
+        .map(|p| p.x)
+        .fold(f64::INFINITY, f64::min);
+    assert!(
+        back_min_x >= submit_east_x - 8.0,
+        "rejected→submit same-face East corridor must not cross left of submit East port \
+         (min_x={back_min_x:.3}, submit.east={submit_east_x:.3})"
     );
 }

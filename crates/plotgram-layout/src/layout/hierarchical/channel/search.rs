@@ -88,6 +88,10 @@ pub struct RouteHints {
 
 /// Soft congestion added to an outer Main track while an inner band gap is free.
 const OUTER_OVERFLOW_PENALTY: f64 = 4.0;
+/// Stronger overflow when both ends share one order (leaf column): packing
+/// places Main og=0 / og=order_count on the canvas rim even though affinity
+/// still treats them as in-band.
+const SAME_ORDER_OUTER_OVERFLOW_PENALTY: f64 = 24.0;
 /// Inner Main gap is "occupied" once demand reaches this (overflow unlocked).
 const INNER_SATURATION_DEMAND: u32 = 1;
 
@@ -417,6 +421,8 @@ fn soft_penalties(
     }
     if inner_main_saturated(substrate, occupancy, span, hints.order_count) {
         0.0
+    } else if span.src_order == span.tgt_order {
+        SAME_ORDER_OUTER_OVERFLOW_PENALTY
     } else {
         OUTER_OVERFLOW_PENALTY
     }
@@ -711,6 +717,76 @@ mod tests {
         assert!(
             main_lines.iter().all(|&og| og != 0),
             "empty-graph inner-corridor must avoid Main og=0, got {main_lines:?}"
+        );
+    }
+
+    #[test]
+    fn same_order_outer_overflow_penalty_exceeds_generic() {
+        // Leaf-column (same order) must punish packing-rim Mains harder than
+        // cross-column edges; lex still bends≻length≻affinity≻congestion.
+        assert!(SAME_ORDER_OUTER_OVERFLOW_PENALTY > OUTER_OVERFLOW_PENALTY);
+        assert!(SAME_ORDER_OUTER_OVERFLOW_PENALTY >= 6.0 * OUTER_OVERFLOW_PENALTY);
+    }
+
+    #[test]
+    fn same_order_avoids_right_outer_main_when_inner_free() {
+        let elems = (0..6)
+            .map(|i| Elem {
+                key: ElemKey::Real(format!("n{i}")),
+                group_path: vec![],
+                rank: i / 2,
+            })
+            .collect::<Vec<_>>();
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: (0..6).collect(),
+            segments: vec![],
+            layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
+        };
+        let (sub, idx) = derive_root_substrate(&plan);
+        let g = ChannelGraph::from_substrate(&sub);
+        // Right column hosts: South of order-1 → North of order-1.
+        let start = idx.resolve_host_track(0, 1, PortSide::MainHigh).unwrap();
+        let goal = idx.resolve_host_track(2, 1, PortSide::MainLow).unwrap();
+        let hints = RouteHints {
+            span: Some(SpanAffinity {
+                src_rank: 0,
+                tgt_rank: 2,
+                src_order: 1,
+                tgt_order: 1,
+            }),
+            order_count: idx.order_count,
+            outer_main_as_overflow: true,
+            ..RouteHints::default()
+        };
+        let out = route_edge(
+            &g,
+            start,
+            goal,
+            &Occupancy::new(),
+            true,
+            &ScopeMask::unrestricted(),
+            hints,
+        );
+        assert!(out.feasible, "{out:?}");
+        let main_lines: Vec<usize> = out
+            .path
+            .tracks
+            .iter()
+            .filter_map(|&tid| {
+                let t = sub.track(tid)?;
+                (t.orient == TrackOrient::Main).then_some(t.line)
+            })
+            .collect();
+        assert!(
+            main_lines.iter().all(|&og| og != idx.order_count),
+            "same-order right column must avoid Main og=order_count, got {main_lines:?}"
         );
     }
 

@@ -342,7 +342,7 @@ struct EndPoint {
     is_source_end: bool,
     node_real: usize,
     side: Side,
-    sort_key: (u32, usize, String), // (neighbor_rank, neighbor_order, edge_id)
+    sort_key: (usize, u32, String), // (far_real_layer_order, far_real_rank, edge_id)
 }
 
 /// Author FIXED_SIDE → canonical side. FREE is handled by the caller.
@@ -383,7 +383,12 @@ pub fn assign_ports(
         ] {
             let node_real = real_idx_of(node_id);
             let neighbor = immediate_neighbor(plan, &e.edge_id, node_real);
-            let neighbor_rank = plan.elems[neighbor].rank;
+            let sort_peer = match &plan.elems[neighbor].key {
+                ElemKey::Real(_) => neighbor,
+                ElemKey::Virtual { edge_id, .. } => {
+                    far_real_endpoint(plan, edge_id, node_real).unwrap_or(neighbor)
+                }
+            };
             let real_idx = graph.index_of[node_id];
             let shape = graph.shapes[real_idx];
             let policy = policy_for(shape);
@@ -417,7 +422,12 @@ pub fn assign_ports(
                 is_source_end,
                 node_real,
                 side,
-                sort_key: (neighbor_rank, pos[neighbor], e.edge_id.clone()),
+                // Far-real layer order first so long-edge dummies cannot invert fan ports.
+                sort_key: (
+                    pos.get(sort_peer).copied().unwrap_or(0),
+                    plan.elems[sort_peer].rank,
+                    e.edge_id.clone(),
+                ),
             });
         }
     }
@@ -1452,5 +1462,125 @@ mod tests {
             .unwrap()
             .ports;
         assert_eq!(ports["e0"].target.side, Side::North);
+    }
+
+    /// Long-edge dummy order must not invert fan Ordered vs far-real leaf order.
+    #[test]
+    fn fan_ordered_sort_follows_far_real_not_dummy() {
+        // hub → near (adj); hub → far (long). Layer1: [dummy_far, near] so dummy
+        // is left of near; far sits rightmost on rank2. Immediate-neighbor sort
+        // would put far edge left; far-real sort keeps near left of far.
+        let ids: Vec<String> = vec![
+            "hub".into(),
+            "near".into(),
+            "far".into(),
+            "pad".into(),
+        ];
+        let index_of = ids
+            .iter()
+            .enumerate()
+            .map(|(i, id)| (id.clone(), i))
+            .collect();
+        let graph = RealGraph {
+            ids,
+            index_of,
+            group_path: vec![Vec::new(); 4],
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; 4],
+            edges: vec![
+                RealEdge {
+                    edge_id: "e_near".into(),
+                    original_source: 0,
+                    original_target: 1,
+                    working_source: 0,
+                    working_target: 1,
+                    reversed: false,
+                    from_port: None,
+                    to_port: None,
+                    critical: false,
+                },
+                RealEdge {
+                    edge_id: "e_far".into(),
+                    original_source: 0,
+                    original_target: 2,
+                    working_source: 0,
+                    working_target: 2,
+                    reversed: false,
+                    from_port: None,
+                    to_port: None,
+                    critical: false,
+                },
+            ],
+            self_loops: Vec::new(),
+        };
+        let elems = vec![
+            Elem {
+                key: ElemKey::Real("hub".into()),
+                group_path: Vec::new(),
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Virtual {
+                    edge_id: "e_far".into(),
+                    ordinal: 0,
+                },
+                group_path: Vec::new(),
+                rank: 1,
+            },
+            Elem {
+                key: ElemKey::Real("near".into()),
+                group_path: Vec::new(),
+                rank: 1,
+            },
+            Elem {
+                key: ElemKey::Real("pad".into()),
+                group_path: Vec::new(),
+                rank: 2,
+            },
+            Elem {
+                key: ElemKey::Real("far".into()),
+                group_path: Vec::new(),
+                rank: 2,
+            },
+        ];
+        let plan_index = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of: plan_index,
+            decl_index: vec![0, 2, 3, 4],
+            segments: vec![
+                Segment {
+                    edge_id: "e_near".into(),
+                    ordinal: 0,
+                    from: 0,
+                    to: 2,
+                },
+                Segment {
+                    edge_id: "e_far".into(),
+                    ordinal: 0,
+                    from: 0,
+                    to: 1,
+                },
+                Segment {
+                    edge_id: "e_far".into(),
+                    ordinal: 1,
+                    from: 1,
+                    to: 4,
+                },
+            ],
+            layers: vec![vec![0], vec![1, 2], vec![3, 4]],
+        };
+        let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, &sizes(4), false)
+            .unwrap()
+            .ports;
+        let (o_near, _) = ordered(ports["e_near"].source);
+        let (o_far, _) = ordered(ports["e_far"].source);
+        assert!(
+            o_near < o_far,
+            "near (far-real order 0 on its side of compare) must be left of far; got near={o_near} far={o_far}"
+        );
     }
 }

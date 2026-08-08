@@ -176,6 +176,47 @@ fn is_twin_peer(hub: usize, peer: usize, twins: &BTreeSet<(usize, usize)>) -> bo
     twins.contains(&undirected_real_pair(hub, peer))
 }
 
+/// Unique min-span non-twin real neighbor on one side — primary arm on spine.
+/// Tied minima → `None` (keep even/odd FanPack mirror).
+fn unique_min_span_primary(
+    hub: usize,
+    neighbors: &[usize],
+    plan: &PlanGraph,
+    twins: &BTreeSet<(usize, usize)>,
+) -> Option<usize> {
+    let hub_rank = plan.elems[hub].rank as i64;
+    let mut best_span: Option<i64> = None;
+    let mut best: Option<usize> = None;
+    let mut tied = false;
+    for &nb in neighbors {
+        if plan.elems[nb].key.is_virtual() || is_twin_peer(hub, nb, twins) {
+            continue;
+        }
+        let span = (plan.elems[nb].rank as i64 - hub_rank).abs();
+        match best_span {
+            None => {
+                best_span = Some(span);
+                best = Some(nb);
+                tied = false;
+            }
+            Some(s) if span < s => {
+                best_span = Some(span);
+                best = Some(nb);
+                tied = false;
+            }
+            Some(s) if span == s => {
+                tied = true;
+            }
+            _ => {}
+        }
+    }
+    if tied {
+        None
+    } else {
+        best
+    }
+}
+
 /// Build symmetry axes, rigid column classes, and FanPack slots from pass-1.
 pub fn compute_symmetry_plan(
     plan: &PlanGraph,
@@ -296,6 +337,39 @@ pub fn compute_symmetry_plan(
                     .iter()
                     .any(|&m| m != hub && plan.elems[m].rank == r)
                 {
+                    continue;
+                }
+                members.push(nb);
+            }
+
+            // Primary arm: unique min-span non-twin on a *fan* side joins the
+            // spine (yFiles: adjacent "yes" on axis, long "no" aside). Do not
+            // promote the unique 1:1 back-neighbor (would undo dummy-aligned
+            // / chain truncation).
+            let mut primary_cands = Vec::new();
+            if down_deg[hub] >= 2 {
+                if let Some(nb) =
+                    unique_min_span_primary(hub, &down_nbs[hub], plan, &twin_pairs)
+                {
+                    primary_cands.push(nb);
+                }
+            }
+            if up_deg[hub] >= 2 {
+                if let Some(nb) =
+                    unique_min_span_primary(hub, &up_nbs[hub], plan, &twin_pairs)
+                {
+                    primary_cands.push(nb);
+                }
+            }
+            for nb in primary_cands {
+                let r = plan.elems[nb].rank;
+                if members
+                    .iter()
+                    .any(|&m| m != hub && plan.elems[m].rank == r)
+                {
+                    continue;
+                }
+                if members.contains(&nb) {
                     continue;
                 }
                 members.push(nb);
@@ -1029,6 +1103,81 @@ mod tests {
         let plan_sym = sym(&p, &g, &pass1, &dummy);
         assert_eq!(plan_sym.axes.len(), 1);
         assert!((plan_sym.axes[0].coord - 5.0).abs() < 1e-9);
+    }
+
+    /// Short-span primary joins the rigid column; long-span sibling FanPacks off-axis.
+    #[test]
+    fn unique_min_span_primary_joins_class_long_leaf_offsets() {
+        // hub → near (span 1), hub → far (span 2 via implicit ranks).
+        let elems = vec![
+            real("hub", 0),
+            real("near", 1),
+            real("far", 2),
+            virt("e_far", 0, 1),
+        ];
+        let layers = vec![vec![0], vec![1, 3], vec![2]];
+        let segments = vec![
+            seg("e_near", 0, 0, 1),
+            seg("e_far", 0, 0, 3),
+            seg("e_far", 1, 3, 2),
+        ];
+        let p = plan(elems, layers, segments);
+        let g = graph(
+            &["hub", "near", "far"],
+            &[("e_near", 0, 1, false), ("e_far", 0, 2, false)],
+        );
+        // Far sits left of axis in pass-1 so FanPack sign is west.
+        let pass1 = [0.0, 0.0, -40.0, -20.0];
+        let dummy = vec![false; 4];
+        let plan_sym = sym(&p, &g, &pass1, &dummy);
+        let hub = 0usize;
+        let near = 1usize;
+        let far = 2usize;
+        let class = plan_sym
+            .classes
+            .iter()
+            .find(|c| c.axis_hub == hub)
+            .expect("hub class");
+        assert!(
+            class.members.contains(&near),
+            "min-span primary must join class: {:?}",
+            class.members
+        );
+        assert!(
+            !class.members.contains(&far),
+            "long leaf must not join class: {:?}",
+            class.members
+        );
+        let axis = plan_sym.axes.iter().find(|a| a.hub == hub).unwrap().coord;
+        let far_d = plan_sym.fan_desired_for(far).expect("far FanPack");
+        assert!(
+            (far_d - axis).abs() > 1e-6,
+            "long leaf off axis: far={far_d} axis={axis}"
+        );
+        assert!(plan_sym.fan_desired_for(near).is_none());
+    }
+
+    /// Equal spans → no primary promotion; even FanPack mirror remains.
+    #[test]
+    fn tied_min_span_keeps_even_fan_mirror() {
+        let elems = vec![real("hub", 0), real("left", 1), real("right", 1)];
+        let layers = vec![vec![0], vec![1, 2]];
+        let segments = vec![seg("e0", 0, 0, 1), seg("e1", 0, 0, 2)];
+        let p = plan(elems, layers, segments);
+        let g = graph(
+            &["hub", "left", "right"],
+            &[("e0", 0, 1, false), ("e1", 0, 2, false)],
+        );
+        let pass1 = [0.0, -20.0, 20.0];
+        let dummy = vec![false; 3];
+        let plan_sym = sym(&p, &g, &pass1, &dummy);
+        let class = &plan_sym.classes[0];
+        assert!(
+            !class.members.contains(&1) && !class.members.contains(&2),
+            "tied spans must not promote a primary: {:?}",
+            class.members
+        );
+        assert_eq!(plan_sym.packs[0].slots.len(), 2);
     }
 
     /// constrain-sink shape: hub↔twin 2-cycle + offset sink — twin on axis,

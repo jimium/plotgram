@@ -440,6 +440,8 @@ HIER_EVAL_WRITE_BASELINE=1 cargo test -p plotgram-compile --test hier_eval
 
 **D1.3.5 已交付**（2026-08-06；2026-08-06 修订为走廊角色表）：`pick_reversed_side` 按 twin/span/Δorder 分脊（N/S）与侧廊（E/W）；twin 短回边平行；长/无 twin 短回边走侧廊；FixedSide 尊守。
 
+**同脸 E/W 共廊（host）**：跨列两端同为 East → 共用 `Main(max(src_order,tgt_order)+1)`；同为 West → 共用 `Main(min(...))`。禁止逐端 `order±1` 拆双 Main（否则 Ink 顶缝会越过进港点再折回）。N/S 与异脸仍逐端解析。
+
 ---
 
 ## 11. 参考

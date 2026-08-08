@@ -72,7 +72,9 @@ RigidColumnClass
    - 下一节点是另一扇结——**例外（向下）**：`down_deg[cur]==1` 且下一 real 满足 `up_deg==1` 且为扇 hub 时，**将该子扇 hub 收入本 class（同轴）后停止**（不收扇叶；上定心）；  
    - 节点为 dummy-aligned（median 抢过 dummy 的 real）；  
    - 组边界策略点（后续接 group band；本期可先截断）；  
-4. **扇的孩子不进 class**（避免扇叶塌向轴；叶位由 FanPack 写）——**例外**：与 hub 构成**双胞胎**（同无向端点对上既有正向边又有 reversed 边）的 forward 邻居**进入 class**，钉在轴上；**同一 rank 至多一个** twin（同层分离 gap 与零间隙共线不可并存；多 twin 时取 pass-1 距 hub 最近者）。对齐 yFiles：回环对端占脊，其余叶侧置（`mech.constrain-sink`）。
+4. **扇的孩子不进 class**（避免扇叶塌向轴；叶位由 FanPack 写）——**例外**：  
+   - 与 hub 构成**双胞胎**的 forward 邻居进入 class（同 rank 至多一个 twin；多 twin 取 pass-1 距 hub 最近者）；  
+   - **主臂占脊**：某一侧 forward 邻中 `span=|rank(hub)-rank(leaf)|` **唯一最小**且非 twin 的孩子进入 class（同 rank 已有占脊成员则跳过）。并列最小则不提主臂。对齐 yFiles：邻层主臂占脊，长跨侧支侧置（`order-approval`）。
 
 **轴坐标（上定心）**：hub 按 `(rank asc, elem index)` 处理。若 `up_deg==1` 且唯一上游 U 已有轴（U ∈ 某 RigidColumnClass，或 U 已是 axis hub）→ **继承该轴**；否则奇/偶邻居公式（含 twin 侧守 pass-1）。偶扇「两中位中点」**只用于尚无上游轴可继承的 hub**。**禁止**用下游叶中点反拉上游汇入结。
 
@@ -94,10 +96,10 @@ FanPack
 
 **槽位怎么算**（构造时一次算清）：
 
-1. 取 hub 该侧 forward 邻居中**尚未进 RigidColumnClass** 的叶（双胞胎已占脊，不进本表），按 **Compose 层内序**排序；跨层按 `(rank, layer_order, elem)`；  
-2. 该侧若含双胞胎：`axis.coord =` hub 的 pass-1 次轴（守脊）；否则仍用奇/偶邻居公式；  
-3. **≥2** 自由叶：奇扇中位 `0`、两侧 `±k·pitch`；偶扇 `±0.5, ±1.5, …`；  
-4. **恰 1** 自由叶（脊已被 twin 占用）：`desired = axis ± pitch`（符号取 pass-1 相对轴的侧）；  
+1. 取 hub 该侧 forward 邻居中**尚未进 RigidColumnClass** 的叶（双胞胎 / 主臂已占脊，不进本表），按 **Compose 层内序**排序；跨层按 `(rank, layer_order, elem)`；  
+2. 该侧若含双胞胎：`axis.coord =` hub 的 pass-1 次轴（守脊）；否则仍用奇/偶邻居公式（可被上游轴继承覆盖）；  
+3. **≥2** 自由叶且本侧无占脊成员：奇扇中位 `0`、两侧 `±k·pitch`；偶扇 `±0.5, ±1.5, …`；  
+4. **恰 1** 自由叶（脊已被 twin / 主臂占用）：`desired = axis ± pitch`（符号取 pass-1 相对轴的侧）；  
 5. `pitch = max(node_gap + 相邻半宽和, pass-1 相邻叶距中位数下界)`（单叶时用 hub/叶半宽 + gap）；  
 6. `desired = axis.coord + offset`；叶争抢与 class 同构；叶下 exclusive 1:1 下游跟列。
 

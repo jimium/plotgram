@@ -3,7 +3,6 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
-use plotgram_algo::orientation::Side;
 use plotgram_engine_api::LayoutError;
 use plotgram_model::diagnostics::Relaxation;
 
@@ -50,14 +49,13 @@ fn layer_order(plan: &PlanGraph, elem: usize) -> usize {
         .expect("elem must be in its layer")
 }
 
-fn host_track_for_end(
-    index: &BlueprintIndex,
+fn endpoint_side_rank_order(
     plan: &PlanGraph,
     graph: &RealGraph,
     ports: &BTreeMap<String, EdgePorts>,
     edge_id: &str,
     at_source: bool,
-) -> Result<TrackId, LayoutError> {
+) -> Result<(PortSide, usize, usize), LayoutError> {
     let edge = graph
         .edges
         .iter()
@@ -78,14 +76,63 @@ fn host_track_for_end(
     } else {
         PortSide::from_algo_side(rp.target.side)
     };
-    let _ = Side::North;
-    index.resolve_host_track(rank, order, side).ok_or_else(|| {
-        LayoutError::message(format!(
-            "channel: no host track for edge `{edge_id}` {} side {:?}",
-            if at_source { "source" } else { "target" },
-            side
-        ))
-    })
+    Ok((side, rank, order))
+}
+
+/// Resolve Channel start/goal hosts for one edge.
+///
+/// Same-face East–East / West–West share one outer Main corridor:
+/// - both CrossHigh (East) → `Main(max(order)+1)` at each end's rank
+/// - both CrossLow (West) → `Main(min(order))` at each end's rank
+///
+/// N/S and mixed faces keep per-endpoint `resolve_host_track`.
+fn host_tracks_for_edge(
+    index: &BlueprintIndex,
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    ports: &BTreeMap<String, EdgePorts>,
+    edge_id: &str,
+) -> Result<(TrackId, TrackId), LayoutError> {
+    let (src_side, src_rank, src_order) =
+        endpoint_side_rank_order(plan, graph, ports, edge_id, true)?;
+    let (tgt_side, tgt_rank, tgt_order) =
+        endpoint_side_rank_order(plan, graph, ports, edge_id, false)?;
+
+    let shared_og = match (src_side, tgt_side) {
+        (PortSide::CrossHigh, PortSide::CrossHigh) => Some(src_order.max(tgt_order) + 1),
+        (PortSide::CrossLow, PortSide::CrossLow) => Some(src_order.min(tgt_order)),
+        _ => None,
+    };
+
+    if let Some(og) = shared_og {
+        let start = index.main_at(og, src_rank).ok_or_else(|| {
+            LayoutError::message(format!(
+                "channel: no shared East/West Main host og={og} for edge `{edge_id}` source"
+            ))
+        })?;
+        let goal = index.main_at(og, tgt_rank).ok_or_else(|| {
+            LayoutError::message(format!(
+                "channel: no shared East/West Main host og={og} for edge `{edge_id}` target"
+            ))
+        })?;
+        return Ok((start, goal));
+    }
+
+    let start = index
+        .resolve_host_track(src_rank, src_order, src_side)
+        .ok_or_else(|| {
+            LayoutError::message(format!(
+                "channel: no host track for edge `{edge_id}` source side {src_side:?}"
+            ))
+        })?;
+    let goal = index
+        .resolve_host_track(tgt_rank, tgt_order, tgt_side)
+        .ok_or_else(|| {
+            LayoutError::message(format!(
+                "channel: no host track for edge `{edge_id}` target side {tgt_side:?}"
+            ))
+        })?;
+    Ok((start, goal))
 }
 
 fn scope_mask_for_edge(
@@ -245,8 +292,7 @@ pub fn route_edges_channel(
         if bus_edges.contains(&e.edge_id) {
             continue;
         }
-        let start = host_track_for_end(&index, plan, graph, ports, &e.edge_id, true)?;
-        let goal = host_track_for_end(&index, plan, graph, ports, &e.edge_id, false)?;
+        let (start, goal) = host_tracks_for_edge(&index, plan, graph, ports, &e.edge_id)?;
         let mask = scope_mask_for_edge(&substrate, &index, graph, e);
         let hints = hints_for_edge(plan, graph, params, e, index.order_count);
         prepared.push(PreparedEdge {
@@ -460,12 +506,147 @@ fn bounded_ripup(
 
 #[cfg(test)]
 mod tests {
-    use super::{compute_route_order, RouteOrderEntry, MAX_RIPUP_ROUNDS};
+    use super::{compute_route_order, host_tracks_for_edge, RouteOrderEntry, MAX_RIPUP_ROUNDS};
+    use super::super::substrate::{derive_root_substrate, TrackOrient};
+    use crate::layout::hierarchical::compose::ports::{EdgePorts, ResolvedPort};
+    use crate::layout::hierarchical::model::{Elem, ElemKey, PlanGraph, RealEdge, RealGraph};
+    use plotgram_algo::orientation::Side;
+    use plotgram_model::port::AlongSpec;
+    use std::collections::BTreeMap;
+
+    fn east_ports() -> EdgePorts {
+        EdgePorts {
+            source: ResolvedPort {
+                side: Side::East,
+                along: AlongSpec::Ordered { order: 0, count: 1 },
+            },
+            target: ResolvedPort {
+                side: Side::East,
+                along: AlongSpec::Ordered { order: 0, count: 1 },
+            },
+            source_cluster: None,
+            target_cluster: None,
+        }
+    }
+
+    fn west_ports() -> EdgePorts {
+        EdgePorts {
+            source: ResolvedPort {
+                side: Side::West,
+                along: AlongSpec::Ordered { order: 0, count: 1 },
+            },
+            target: ResolvedPort {
+                side: Side::West,
+                along: AlongSpec::Ordered { order: 0, count: 1 },
+            },
+            source_cluster: None,
+            target_cluster: None,
+        }
+    }
+
+    /// Two ranks × two orders: left/right columns, one edge spanning ranks.
+    fn two_col_plan_graph() -> (PlanGraph, RealGraph) {
+        let elems = vec![
+            Elem {
+                key: ElemKey::Real("a0".into()),
+                group_path: vec![],
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Real("a1".into()),
+                group_path: vec![],
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Real("b0".into()),
+                group_path: vec![],
+                rank: 1,
+            },
+            Elem {
+                key: ElemKey::Real("b1".into()),
+                group_path: vec![],
+                rank: 1,
+            },
+        ];
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: (0..4).collect(),
+            segments: vec![],
+            layers: vec![vec![0, 1], vec![2, 3]],
+        };
+        let mut index_of_ids = BTreeMap::new();
+        for (i, id) in ["a0", "a1", "b0", "b1"].iter().enumerate() {
+            index_of_ids.insert((*id).into(), i);
+        }
+        let graph = RealGraph {
+            ids: vec!["a0".into(), "a1".into(), "b0".into(), "b1".into()],
+            index_of: index_of_ids,
+            group_path: vec![vec![]; 4],
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; 4],
+            edges: vec![RealEdge {
+                edge_id: "ew".into(),
+                // a0 (order0) → b1 (order1): cross-column same-face
+                original_source: 0,
+                original_target: 3,
+                working_source: 0,
+                working_target: 3,
+                reversed: false,
+                from_port: None,
+                to_port: None,
+                critical: false,
+            }],
+            self_loops: vec![],
+        };
+        (plan, graph)
+    }
 
     #[test]
     fn ripup_budget_is_bounded() {
         assert!(MAX_RIPUP_ROUNDS <= 4, "rip-up must stay bounded");
         assert!(MAX_RIPUP_ROUNDS >= 1);
+    }
+
+    #[test]
+    fn same_face_east_hosts_share_max_order_plus_one_main() {
+        let (plan, graph) = two_col_plan_graph();
+        let (sub, idx) = derive_root_substrate(&plan);
+        let mut ports = BTreeMap::new();
+        ports.insert("ew".into(), east_ports());
+        let (start, goal) = host_tracks_for_edge(&idx, &plan, &graph, &ports, "ew").unwrap();
+        let start_t = sub.track(start).unwrap();
+        let goal_t = sub.track(goal).unwrap();
+        assert_eq!(start_t.orient, TrackOrient::Main);
+        assert_eq!(goal_t.orient, TrackOrient::Main);
+        // max(0,1)+1 = 2
+        assert_eq!(start_t.line, 2);
+        assert_eq!(goal_t.line, 2);
+        // Per-end legacy would split Main1 vs Main2.
+        let legacy_src = idx.resolve_host_track(0, 0, super::super::substrate::PortSide::CrossHigh);
+        let legacy_tgt = idx.resolve_host_track(1, 1, super::super::substrate::PortSide::CrossHigh);
+        assert_ne!(legacy_src, legacy_tgt);
+        assert_eq!(start_t.line, legacy_tgt.and_then(|id| sub.track(id)).unwrap().line);
+    }
+
+    #[test]
+    fn same_face_west_hosts_share_min_order_main() {
+        let (plan, graph) = two_col_plan_graph();
+        let (sub, idx) = derive_root_substrate(&plan);
+        let mut ports = BTreeMap::new();
+        ports.insert("ew".into(), west_ports());
+        let (start, goal) = host_tracks_for_edge(&idx, &plan, &graph, &ports, "ew").unwrap();
+        let start_t = sub.track(start).unwrap();
+        let goal_t = sub.track(goal).unwrap();
+        assert_eq!(start_t.orient, TrackOrient::Main);
+        assert_eq!(goal_t.orient, TrackOrient::Main);
+        // min(0,1) = 0
+        assert_eq!(start_t.line, 0);
+        assert_eq!(goal_t.line, 0);
     }
 
     #[test]
