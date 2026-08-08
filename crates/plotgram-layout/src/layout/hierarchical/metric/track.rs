@@ -37,7 +37,7 @@ pub fn assign_track_coords(
     let mut obstacles: Vec<(f64, f64, f64, f64)> = Vec::new(); // l,t,r,b
     for layer in &plan.layers {
         for &e in layer {
-            if plan.elems[e].key.is_virtual() {
+            if plan.elems[e].key.is_zero_width() {
                 continue;
             }
             let s = size_of(e);

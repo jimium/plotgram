@@ -167,6 +167,7 @@ fn derive_group_substrate(
 
     let mut group_rect: BTreeMap<String, (usize, usize, usize, usize)> = BTreeMap::new();
     let mut group_desc: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut boundary_backed: BTreeSet<String> = BTreeSet::new();
     for gname in groups.keys() {
         let descendants = collect_descendants(gname, groups, &children);
         if descendants.is_empty() {
@@ -174,6 +175,7 @@ fn derive_group_substrate(
                 group: gname.clone(),
             });
         }
+        let desc_set: BTreeSet<String> = descendants.iter().cloned().collect();
         let (mut r0, mut r1) = (usize::MAX, 0usize);
         let (mut o0, mut o1) = (usize::MAX, 0usize);
         for m in &descendants {
@@ -185,8 +187,32 @@ fn derive_group_substrate(
             o0 = o0.min(slot.order);
             o1 = o1.max(slot.order);
         }
+        // Prefer shift-aligned boundary span when per-rank clamps are pure.
+        // Try tight intersection first, then union.
+        let mut took_boundary = false;
+        for span in [
+            boundary_order_span(plan, gname),
+            boundary_order_union(plan, gname),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            let (bo0, bo1) = span;
+            let covers = descendants
+                .iter()
+                .all(|m| nodes.get(m).is_some_and(|s| s.order >= bo0 && s.order <= bo1));
+            if covers && boundary_ranks_pure(plan, gname, nodes, &desc_set) {
+                o0 = bo0;
+                o1 = bo1;
+                took_boundary = true;
+                break;
+            }
+        }
+        if took_boundary {
+            boundary_backed.insert(gname.clone());
+        }
         group_rect.insert(gname.clone(), (r0, r1, o0, o1));
-        group_desc.insert(gname.clone(), descendants.into_iter().collect());
+        group_desc.insert(gname.clone(), desc_set);
     }
 
     let rect_names: Vec<&String> = group_rect.keys().collect();
@@ -194,6 +220,17 @@ fn derive_group_substrate(
         for j in i + 1..rect_names.len() {
             let (a, b) = (rect_names[i], rect_names[j]);
             if is_ancestor(a, b, groups) || is_ancestor(b, a, groups) {
+                continue;
+            }
+            let both_boundary =
+                boundary_backed.contains(a.as_str()) && boundary_backed.contains(b.as_str());
+            if both_boundary {
+                if boundary_ranks_overlap(plan, a, b) {
+                    return Err(DeriveError::OverlappingGroups {
+                        a: a.clone(),
+                        b: b.clone(),
+                    });
+                }
                 continue;
             }
             let ra = group_rect[a];
@@ -208,6 +245,10 @@ fn derive_group_substrate(
     }
 
     for (gname, &(r0, r1, o0, o1)) in &group_rect {
+        if boundary_backed.contains(gname) {
+            // Per-rank purity already verified when the boundary span was taken.
+            continue;
+        }
         let desc = &group_desc[gname];
         for (nname, slot) in nodes {
             if r0 <= slot.rank
@@ -361,6 +402,133 @@ fn derive_group_substrate(
         node_region,
     };
     Ok((s, index))
+}
+
+fn boundary_order_span(plan: &PlanGraph, group: &str) -> Option<(usize, usize)> {
+    let (lefts, rights) = boundary_side_orders(plan, group)?;
+    let o0 = *lefts.iter().max()?;
+    let o1 = *rights.iter().min()?;
+    if o0 <= o1 {
+        Some((o0, o1))
+    } else {
+        None
+    }
+}
+
+fn boundary_order_union(plan: &PlanGraph, group: &str) -> Option<(usize, usize)> {
+    let (lefts, rights) = boundary_side_orders(plan, group)?;
+    Some((*lefts.iter().min()?, *rights.iter().max()?))
+}
+
+fn boundary_side_orders(plan: &PlanGraph, group: &str) -> Option<(Vec<usize>, Vec<usize>)> {
+    use crate::layout::hierarchical::model::BoundarySide;
+    let mut lefts = Vec::new();
+    let mut rights = Vec::new();
+    for layer in &plan.layers {
+        let mut lpos = None;
+        let mut rpos = None;
+        for (ord, &ei) in layer.iter().enumerate() {
+            match &plan.elems[ei].key {
+                ElemKey::GroupBoundary {
+                    group: g,
+                    side: BoundarySide::Left,
+                    ..
+                } if g == group => lpos = Some(ord),
+                ElemKey::GroupBoundary {
+                    group: g,
+                    side: BoundarySide::Right,
+                    ..
+                } if g == group => rpos = Some(ord),
+                _ => {}
+            }
+        }
+        if let (Some(l), Some(r)) = (lpos, rpos) {
+            if l <= r {
+                lefts.push(l);
+                rights.push(r);
+            }
+        }
+    }
+    if lefts.is_empty() {
+        None
+    } else {
+        Some((lefts, rights))
+    }
+}
+
+fn boundary_ranks_pure(
+    plan: &PlanGraph,
+    group: &str,
+    nodes: &BTreeMap<String, NodeSpec>,
+    descendants: &BTreeSet<String>,
+) -> bool {
+    use crate::layout::hierarchical::model::BoundarySide;
+    for (rank, layer) in plan.layers.iter().enumerate() {
+        let mut lpos = None;
+        let mut rpos = None;
+        for (ord, &ei) in layer.iter().enumerate() {
+            match &plan.elems[ei].key {
+                ElemKey::GroupBoundary {
+                    group: g,
+                    side: BoundarySide::Left,
+                    ..
+                } if g == group => lpos = Some(ord),
+                ElemKey::GroupBoundary {
+                    group: g,
+                    side: BoundarySide::Right,
+                    ..
+                } if g == group => rpos = Some(ord),
+                _ => {}
+            }
+        }
+        let (Some(l), Some(r)) = (lpos, rpos) else {
+            continue;
+        };
+        for (nname, slot) in nodes {
+            if slot.rank == rank && l <= slot.order && slot.order <= r && !descendants.contains(nname)
+            {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+fn boundary_ranks_overlap(plan: &PlanGraph, a: &str, b: &str) -> bool {
+    use crate::layout::hierarchical::model::BoundarySide;
+    let span_on = |group: &str, rank: usize| -> Option<(usize, usize)> {
+        let layer = &plan.layers[rank];
+        let mut lpos = None;
+        let mut rpos = None;
+        for (ord, &ei) in layer.iter().enumerate() {
+            match &plan.elems[ei].key {
+                ElemKey::GroupBoundary {
+                    group: g,
+                    side: BoundarySide::Left,
+                    ..
+                } if g == group => lpos = Some(ord),
+                ElemKey::GroupBoundary {
+                    group: g,
+                    side: BoundarySide::Right,
+                    ..
+                } if g == group => rpos = Some(ord),
+                _ => {}
+            }
+        }
+        match (lpos, rpos) {
+            (Some(l), Some(r)) if l <= r => Some((l, r)),
+            _ => None,
+        }
+    };
+    for rank in 0..plan.layers.len() {
+        let (Some((a0, a1)), Some((b0, b1))) = (span_on(a, rank), span_on(b, rank)) else {
+            continue;
+        };
+        if a0 <= b1 && b0 <= a1 {
+            return true;
+        }
+    }
+    false
 }
 
 fn cut_line(

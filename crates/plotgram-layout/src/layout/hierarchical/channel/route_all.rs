@@ -11,7 +11,7 @@ use super::graph::{ChannelGraph, Occupancy};
 use super::search::{
     path_used_outer_overflow, route_edge, ChannelPath, LexCost, RouteHints, ScopeMask, SpanAffinity,
 };
-use super::substrate::{BlueprintIndex, PortSide, Substrate, TrackId};
+use super::substrate::{derive_root_substrate, BlueprintIndex, PortSide, Substrate, TrackId};
 use crate::layout::hierarchical::compose::bundle::{end_bus_edge_ids, BundlePlan};
 use crate::layout::hierarchical::compose::ports::EdgePorts;
 use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealEdge, RealGraph};
@@ -278,6 +278,11 @@ struct PreparedEdge {
 }
 
 /// Derive substrate and route all non-end-bus edges (RouteOrder + rip-up).
+///
+/// When group-cut gates make an edge infeasible, fall back to root-scope
+/// substrate (same soft path as impure group rects) so the diagram still
+/// layouts; `used_gates` is false and a `channel-group-fallback` relaxation
+/// records the reason.
 pub fn route_edges_channel(
     plan: &PlanGraph,
     graph: &RealGraph,
@@ -285,7 +290,69 @@ pub fn route_edges_channel(
     end_bundles: &[BundlePlan],
     params: &HierarchicalParams,
 ) -> Result<ChannelRoutePlan, LayoutError> {
-    let (substrate, index, used_gates, mut relaxations) = derive_substrate(plan, graph)?;
+    let (substrate, index, used_gates, relaxations) =
+        if crate::layout::hierarchical::CHANNEL_FORCE_ROOT.get() {
+            let (s, idx) = derive_root_substrate(plan);
+            (
+                s,
+                idx,
+                false,
+                vec![Relaxation {
+                    rule: "channel-group-fallback".into(),
+                    detail: "forced root-scope after gate-route ink penetration".into(),
+                }],
+            )
+        } else {
+            derive_substrate(plan, graph)?
+        };
+    let try_gates = used_gates;
+    match route_on_substrate(
+        plan,
+        graph,
+        ports,
+        end_bundles,
+        params,
+        substrate,
+        index,
+        used_gates,
+        relaxations,
+    ) {
+        Ok(p) => Ok(p),
+        Err(err) if try_gates => {
+            let (substrate, index) = derive_root_substrate(plan);
+            let relaxations = vec![Relaxation {
+                rule: "channel-group-fallback".into(),
+                detail: format!(
+                    "group-gate routing infeasible ({err}); fell back to d1.3-root-scope"
+                ),
+            }];
+            route_on_substrate(
+                plan,
+                graph,
+                ports,
+                end_bundles,
+                params,
+                substrate,
+                index,
+                false,
+                relaxations,
+            )
+        }
+        Err(err) => Err(err),
+    }
+}
+
+fn route_on_substrate(
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    ports: &BTreeMap<String, EdgePorts>,
+    end_bundles: &[BundlePlan],
+    params: &HierarchicalParams,
+    substrate: Substrate,
+    index: BlueprintIndex,
+    used_gates: bool,
+    mut relaxations: Vec<Relaxation>,
+) -> Result<ChannelRoutePlan, LayoutError> {
     let channel_graph = ChannelGraph::from_substrate(&substrate);
     let mut occupancy = Occupancy::new();
 

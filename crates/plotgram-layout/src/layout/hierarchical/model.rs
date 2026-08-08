@@ -12,8 +12,15 @@ use std::collections::BTreeMap;
 use plotgram_model::port::PortConstraint;
 use plotgram_model::NodeShape;
 
+/// Secondary-axis clamp side for a group-boundary dummy (architecture §8.3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum BoundarySide {
+    Left,
+    Right,
+}
+
 /// Stable identity for a node-shaped element in the working graph: a real
-/// graph node, or a dummy inserted while properifying a long edge.
+/// graph node, a long-edge properify dummy, or a group Left/Right clamp.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ElemKey {
     Real(String),
@@ -23,11 +30,37 @@ pub enum ElemKey {
         edge_id: String,
         ordinal: u32,
     },
+    /// Zero-width Left/Right clamp for `(group × rank)`. `rank` is part of
+    /// the key so the same group can own independent clamps on every layer.
+    GroupBoundary {
+        group: String,
+        rank: u32,
+        side: BoundarySide,
+    },
+    /// Zero-width order pad inserted so group Left clamps share a common
+    /// raw layer index across ranks (Channel host tracks stay geometric).
+    OrderPad {
+        rank: u32,
+        ordinal: u32,
+    },
 }
 
 impl ElemKey {
+    /// Long-edge corridor dummy only — group boundaries / pads are **not**
+    /// virtual (BK / symmetry must not treat them as long-edge corridors).
     pub fn is_virtual(&self) -> bool {
         matches!(self, Self::Virtual { .. })
+    }
+
+    pub fn is_group_boundary(&self) -> bool {
+        matches!(self, Self::GroupBoundary { .. })
+    }
+
+    pub fn is_zero_width(&self) -> bool {
+        matches!(
+            self,
+            Self::Virtual { .. } | Self::GroupBoundary { .. } | Self::OrderPad { .. }
+        )
     }
 }
 
@@ -72,13 +105,14 @@ pub struct RealEdge {
     pub critical: bool,
 }
 
-/// One node-shaped element after properify: a real node or an edge dummy.
+/// One node-shaped element after properify: a real node, edge dummy, or
+/// group-boundary clamp.
 #[derive(Debug, Clone)]
 pub struct Elem {
     pub key: ElemKey,
-    /// Root..leaf group id path; empty for top-level real nodes and for every
-    /// virtual (dummies do not carry group membership in this MVP — see
-    /// `docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md` §2.2).
+    /// Root..leaf group id path; empty for top-level real nodes and for
+    /// long-edge virtuals. Group-boundary clamps carry the path of the group
+    /// they clamp (including that group as the leaf).
     pub group_path: Vec<String>,
     pub rank: u32,
 }

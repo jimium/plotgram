@@ -172,6 +172,16 @@ fn packed_centers(plan: &PlanGraph, size_of: &dyn Fn(usize) -> Size, node_gap: f
     for layer in &plan.layers {
         let mut cursor = 0.0;
         for &e in layer {
+            if plan.elems[e].key.is_group_boundary()
+                || matches!(
+                    &plan.elems[e].key,
+                    crate::layout::hierarchical::model::ElemKey::OrderPad { .. }
+                )
+            {
+                // Order marker / pad: sit at the current cursor without consuming gap.
+                packed[e] = cursor;
+                continue;
+            }
             let w = size_of(e).width;
             packed[e] = cursor + w / 2.0;
             cursor += w + node_gap;

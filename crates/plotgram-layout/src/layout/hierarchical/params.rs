@@ -173,6 +173,9 @@ pub struct HierarchicalParams {
     /// Consumed as pitch between parallel horizontal tracks and as
     /// MetricBudget LayerGap demand: `layer_gap + (track_count-1)×edge_gap`.
     pub edge_gap: f64,
+    /// Weight of cross-rank segments between matching group-boundary dummies
+    /// (architecture §8.3). Default 16.0 — stronger than virtual-virtual (8).
+    pub group_boundary_weight: f64,
     /// Built-in ink style (ignored when layout defers to an independent EdgeRouter).
     pub routing_style: RoutingStyle,
     /// Automatic edge grouping (edge-parameters.md §2.3 / yFiles
@@ -201,6 +204,7 @@ impl Default for HierarchicalParams {
             node_gap: 24.0,
             layer_gap: 40.0,
             edge_gap: 16.0,
+            group_boundary_weight: 16.0,
             routing_style: RoutingStyle::Orthogonal,
             auto_edge_grouping: false,
             min_first_segment: 0.0,
@@ -306,6 +310,12 @@ impl HierarchicalParams {
         {
             params.edge_gap = v;
         }
+        if let Some(v) = binder
+            .get_f64_any(&["group_boundary_weight"])
+            .map_err(bind_err)?
+        {
+            params.group_boundary_weight = v;
+        }
 
         if let Some(rs) = binder
             .get_enum(
@@ -379,6 +389,7 @@ impl HierarchicalParams {
     pub fn hash(&self) -> String {
         let canonical = format!(
             "orientation={}|node_gap={:e}|layer_gap={:e}|edge_gap={:e}|\
+             group_boundary_weight={:e}|\
              routing_style={}|auto_edge_grouping={}|\
              min_first_segment={:e}|min_last_segment={:e}|\
              group_policy={}|group_sizing={}|group_align={}",
@@ -386,6 +397,7 @@ impl HierarchicalParams {
             self.node_gap,
             self.layer_gap,
             self.edge_gap,
+            self.group_boundary_weight,
             self.routing_style.as_str(),
             self.auto_edge_grouping,
             self.min_first_segment,
@@ -471,6 +483,10 @@ mod tests {
             },
             HierarchicalParams {
                 min_last_segment: 8.0,
+                ..a
+            },
+            HierarchicalParams {
+                group_boundary_weight: a.group_boundary_weight + 1.0,
                 ..a
             },
         ];

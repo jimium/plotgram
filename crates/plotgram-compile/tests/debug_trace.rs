@@ -74,7 +74,11 @@ fn check_envelope(v: serde_json::Value) {
     // the type shape; the snapshot review double-checks).
     for elem in v["extension"]["elems"].as_array().unwrap() {
         let key = &elem["key"];
-        assert!(key["type"] == "real" || key["type"] == "virtual");
+        assert!(
+            key["type"] == "real"
+                || key["type"] == "virtual"
+                || key["type"] == "group-boundary"
+        );
         assert!(key.get("elem_idx").is_none());
     }
 }

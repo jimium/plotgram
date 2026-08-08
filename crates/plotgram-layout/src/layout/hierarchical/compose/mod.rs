@@ -2,6 +2,7 @@
 //! D1.0 TrackOrder.
 //! Produces the [`super::model::PlanGraph`] every downstream phase reads.
 
+pub mod boundary;
 pub mod bundle;
 pub mod cycle;
 pub mod graph_index;

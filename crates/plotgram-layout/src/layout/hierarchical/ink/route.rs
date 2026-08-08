@@ -195,7 +195,7 @@ fn horizontal_clear_at_y(
     let lo = from_x.min(to_x);
     let hi = from_x.max(to_x);
     for (ei, r) in frames.iter().enumerate() {
-        if plan.elems.get(ei).is_some_and(|e| e.key.is_virtual()) {
+        if plan.elems.get(ei).is_some_and(|e| e.key.is_zero_width()) {
             continue;
         }
         if y + 1e-9 < r.y || y > r.y + r.height + 1e-9 {

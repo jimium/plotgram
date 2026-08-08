@@ -78,6 +78,8 @@ pub fn assign_cross_axis(
                 VIRTUAL_WEIGHT * 2.0
             }
             ElemKey::Virtual { .. } => VIRTUAL_WEIGHT,
+            // Slightly above Virtual so clamps resist soft packing drift.
+            ElemKey::GroupBoundary { .. } | ElemKey::OrderPad { .. } => 4.0,
             ElemKey::Real(_) => REAL_WEIGHT,
         })
         .collect();
@@ -176,9 +178,9 @@ fn dummy_aligned_reals(plan: &PlanGraph, blocks: &[Vec<usize>]) -> Vec<bool> {
     for block in blocks {
         for pair in block.windows(2) {
             let (a, b) = (pair[0], pair[1]);
-            let a_virtual = plan.elems[a].key.is_virtual();
-            if a_virtual != plan.elems[b].key.is_virtual() {
-                if !a_virtual {
+            let a_soft = plan.elems[a].key.is_zero_width();
+            if a_soft != plan.elems[b].key.is_zero_width() {
+                if !a_soft {
                     marked[a] = true;
                 } else {
                     marked[b] = true;
@@ -196,8 +198,21 @@ fn layer_separation(
     constraints: &mut Vec<Constraint>,
 ) {
     for layer in &plan.layers {
-        for i in 0..layer.len().saturating_sub(1) {
-            let (l, r) = (layer[i], layer[i + 1]);
+        // Group-boundary clamps are order markers only — span separation
+        // across them so zero-width slots cannot create gap/equality cycles.
+        let geometric: Vec<usize> = layer
+            .iter()
+            .copied()
+            .filter(|&e| {
+                !plan.elems[e].key.is_group_boundary()
+                    && !matches!(
+                        &plan.elems[e].key,
+                        crate::layout::hierarchical::model::ElemKey::OrderPad { .. }
+                    )
+            })
+            .collect();
+        for i in 0..geometric.len().saturating_sub(1) {
+            let (l, r) = (geometric[i], geometric[i + 1]);
             let gap = size_of(l).width / 2.0 + size_of(r).width / 2.0 + node_gap;
             constraints.push(Constraint::new(l, r, gap));
         }
@@ -224,8 +239,18 @@ fn build_pass1_constraints(
     for block in blocks {
         for pair in block.windows(2) {
             let (a, b) = (pair[0], pair[1]);
+            // Only long-edge virtual corridors get VV hard equal; group
+            // boundaries never join harden_equal (order markers only).
             let a_virtual = plan.elems[a].key.is_virtual();
-            if a_virtual != plan.elems[b].key.is_virtual() {
+            let b_virtual = plan.elems[b].key.is_virtual();
+            if plan.elems[a].key.is_group_boundary()
+                || plan.elems[b].key.is_group_boundary()
+                || matches!(plan.elems[a].key, crate::layout::hierarchical::model::ElemKey::OrderPad { .. })
+                || matches!(plan.elems[b].key, crate::layout::hierarchical::model::ElemKey::OrderPad { .. })
+            {
+                continue;
+            }
+            if a_virtual != b_virtual {
                 continue;
             }
             if a_virtual {
@@ -270,6 +295,13 @@ fn build_pass2_constraints(
     for block in blocks {
         for pair in block.windows(2) {
             let (a, b) = (pair[0], pair[1]);
+            if plan.elems[a].key.is_group_boundary()
+                || plan.elems[b].key.is_group_boundary()
+                || matches!(plan.elems[a].key, crate::layout::hierarchical::model::ElemKey::OrderPad { .. })
+                || matches!(plan.elems[b].key, crate::layout::hierarchical::model::ElemKey::OrderPad { .. })
+            {
+                continue;
+            }
             let a_virtual = plan.elems[a].key.is_virtual();
             if a_virtual != plan.elems[b].key.is_virtual() {
                 continue;

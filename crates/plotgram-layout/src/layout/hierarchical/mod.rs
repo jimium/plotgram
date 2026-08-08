@@ -40,6 +40,13 @@ pub use params::{
 use model::ElemKey;
 use compose::ports::ResolvedPort;
 use orient::{from_algo_point, to_algo_point, to_algo_size};
+use std::cell::Cell;
+
+thread_local! {
+    /// Set when ink penetration is observed under group-gate routing; the
+    /// next `compute` pass forces root-scope Channel (and skips order pads).
+    pub(crate) static CHANNEL_FORCE_ROOT: Cell<bool> = const { Cell::new(false) };
+}
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct HierarchicalLayout;
@@ -103,7 +110,8 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         .filter(|e| e.critical)
         .map(|e| e.edge_id.clone())
         .collect();
-    compose::order::order_layers(&mut plan, &critical_edges);
+    compose::boundary::insert_group_boundaries(&mut plan);
+    compose::order::order_layers(&mut plan, &critical_edges, params.group_boundary_weight);
 
     // Canonical node sizes are needed before port finalize (FIXED_POS
     // boundary validation) — measured sizes, never invented.
@@ -133,7 +141,9 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     let size_of = |elem_idx: usize| -> algo_orient::Size {
         match &plan.elems[elem_idx].key {
             ElemKey::Real(id) => canonical_size[real_graph.index_of[id]],
-            ElemKey::Virtual { .. } => algo_orient::Size::new(0.0, 0.0),
+            ElemKey::Virtual { .. } | ElemKey::GroupBoundary { .. } | ElemKey::OrderPad { .. } => {
+                algo_orient::Size::new(0.0, 0.0)
+            }
         }
     };
 
@@ -275,11 +285,25 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
             (id.clone(), canonical_frames[ei])
         })
         .collect();
-    ink::verify::verify_no_node_penetration(
+    match ink::verify::verify_no_node_penetration(
         &canonical_edges,
         &real_frames,
         matches!(params.routing_style, RoutingStyle::Orthogonal),
-    )?;
+    ) {
+        Ok(()) => {}
+        Err(err)
+            if route_plan.used_gates && !CHANNEL_FORCE_ROOT.get() =>
+        {
+            // Gate corridors + order pads can still produce a legal Channel
+            // path that pens a real node; retry once with root-scope Channel.
+            let _ = err;
+            CHANNEL_FORCE_ROOT.set(true);
+            let out = compute(input);
+            CHANNEL_FORCE_ROOT.set(false);
+            return out;
+        }
+        Err(err) => return Err(err),
+    }
 
     // --- Orientation-out + assemble the public contract ----------------
     let mut nodes = Vec::with_capacity(real_graph.ids.len());

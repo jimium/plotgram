@@ -146,6 +146,12 @@ pub enum ElemKeyDebug {
         kind: &'static str,
         ordinal: u32,
     },
+    #[serde(rename = "group-boundary")]
+    GroupBoundary {
+        group: String,
+        side: &'static str,
+        rank: u32,
+    },
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -273,6 +279,25 @@ fn project(layout_name: &str, cap: Captures<'_>) -> LayoutDebugTrace {
                         ordinal: *ordinal,
                     },
                     vec!["virtual", "long-edge-dummy"],
+                ),
+                ElemKey::GroupBoundary { group, rank, side } => (
+                    ElemKeyDebug::GroupBoundary {
+                        group: group.clone(),
+                        side: match side {
+                            crate::layout::hierarchical::model::BoundarySide::Left => "left",
+                            crate::layout::hierarchical::model::BoundarySide::Right => "right",
+                        },
+                        rank: *rank,
+                    },
+                    vec!["group-boundary"],
+                ),
+                ElemKey::OrderPad { rank, ordinal } => (
+                    ElemKeyDebug::Virtual {
+                        owner_edge: format!("pad:{rank}"),
+                        kind: "order-pad",
+                        ordinal: *ordinal,
+                    },
+                    vec!["order-pad"],
                 ),
             };
             ElemDebug {
@@ -423,6 +448,19 @@ fn elem_key_debug(key: &ElemKey) -> ElemKeyDebug {
         ElemKey::Virtual { edge_id, ordinal } => ElemKeyDebug::Virtual {
             owner_edge: edge_id.clone(),
             kind: "long-edge",
+            ordinal: *ordinal,
+        },
+        ElemKey::GroupBoundary { group, rank, side } => ElemKeyDebug::GroupBoundary {
+            group: group.clone(),
+            side: match side {
+                crate::layout::hierarchical::model::BoundarySide::Left => "left",
+                crate::layout::hierarchical::model::BoundarySide::Right => "right",
+            },
+            rank: *rank,
+        },
+        ElemKey::OrderPad { rank, ordinal } => ElemKeyDebug::Virtual {
+            owner_edge: format!("pad:{rank}"),
+            kind: "order-pad",
             ordinal: *ordinal,
         },
     }

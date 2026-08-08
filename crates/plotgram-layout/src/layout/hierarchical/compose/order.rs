@@ -1,12 +1,8 @@
-//! P6 ordering: median + transpose + best-snapshot, group-contiguous.
+//! P6 ordering: flat median + transpose + best-snapshot.
 //!
-//! Group containment is kept via **recursive block ordering** rather than
-//! literal boundary-dummy nodes (see
-//! `docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md` §2.2):
-//! each layer's elements are grouped into a tree of blocks by
-//! [`Elem::group_path`]; sorting and transpose only ever reorder siblings
-//! within the same block, so same-group elements can never be split apart by
-//! an unrelated element.
+//! Group containment is enforced upstream by
+//! [`super::boundary::insert_group_boundaries`] (Left/Right clamps + high-weight
+//! cross-rank segments). Crossing minimization is fully group-agnostic.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -25,11 +21,12 @@ fn edge_weight(a: &Elem, b: &Elem) -> f64 {
     }
 }
 
-/// Segment weight with the author critical-path mark: chain segments of a
-/// critical edge pull twice as hard (real-real / real-virtual only — the
-/// virtual-virtual corridor weight stays 8.0 so corridor shaping is not
-/// out-weighted; edge-parameters §2.5).
-fn segment_weight(a: &Elem, b: &Elem, critical: bool) -> f64 {
+/// Segment weight: both ends group-boundary → `group_boundary_weight`;
+/// else base + optional critical doubling (vv corridor stays 8.0).
+fn segment_weight(a: &Elem, b: &Elem, critical: bool, group_boundary_weight: f64) -> f64 {
+    if a.key.is_group_boundary() && b.key.is_group_boundary() {
+        return group_boundary_weight;
+    }
     let base = edge_weight(a, b);
     if critical && !matches!((a.key.is_virtual(), b.key.is_virtual()), (true, true)) {
         base * 2.0
@@ -45,7 +42,11 @@ struct Adjacency {
     down: Vec<Vec<(usize, f64)>>,
 }
 
-fn build_adjacency(plan: &PlanGraph, critical: &BTreeSet<String>) -> Adjacency {
+fn build_adjacency(
+    plan: &PlanGraph,
+    critical: &BTreeSet<String>,
+    group_boundary_weight: f64,
+) -> Adjacency {
     let n = plan.elems.len();
     let mut up = vec![Vec::new(); n];
     let mut down = vec![Vec::new(); n];
@@ -54,6 +55,7 @@ fn build_adjacency(plan: &PlanGraph, critical: &BTreeSet<String>) -> Adjacency {
             &plan.elems[s.from],
             &plan.elems[s.to],
             critical.contains(&s.edge_id),
+            group_boundary_weight,
         );
         down[s.from].push((s.to, w));
         up[s.to].push((s.from, w));
@@ -64,22 +66,15 @@ fn build_adjacency(plan: &PlanGraph, critical: &BTreeSet<String>) -> Adjacency {
     Adjacency { up, down }
 }
 
-pub fn order_layers(plan: &mut PlanGraph, critical: &BTreeSet<String>) {
+pub fn order_layers(
+    plan: &mut PlanGraph,
+    critical: &BTreeSet<String>,
+    group_boundary_weight: f64,
+) {
     if plan.layers.len() < 2 {
         return; // nothing to reorder
     }
-    let adj = build_adjacency(plan, critical);
-
-    // Contiguity is a hard invariant, not a crossing-driven preference: make
-    // every layer block-contiguous *before* the crossing-minimizing sweeps
-    // start, so `best` is never overwritten back to a (possibly interleaved)
-    // pre-ordering snapshot when no sweep happens to improve crossings.
-    for r in 0..plan.layers.len() {
-        let blocks = build_blocks(&plan.layers[r], 0, &plan.elems);
-        let mut flat = Vec::with_capacity(plan.layers[r].len());
-        flatten(&blocks, &mut flat);
-        plan.layers[r] = flat;
-    }
+    let adj = build_adjacency(plan, critical, group_boundary_weight);
 
     let mut best = plan.layers.clone();
     let mut best_crossings = total_crossings(plan);
@@ -95,7 +90,10 @@ pub fn order_layers(plan: &mut PlanGraph, critical: &BTreeSet<String>) {
                 reorder_layer(plan, &adj, r, Direction::Down);
             }
         }
-        transpose_pass(plan, &adj);
+        transpose_pass(plan);
+        for r in 0..plan.layers.len() {
+            restore_group_clamps(plan, r);
+        }
 
         let c = total_crossings(plan);
         if c < best_crossings {
@@ -111,6 +109,12 @@ pub fn order_layers(plan: &mut PlanGraph, critical: &BTreeSet<String>) {
     }
 
     plan.layers = best;
+    for r in 0..plan.layers.len() {
+        restore_group_clamps(plan, r);
+    }
+    if !super::super::CHANNEL_FORCE_ROOT.get() {
+        super::boundary::align_group_left_pads(plan);
+    }
     tighten_one_to_one(plan, &adj);
 }
 
@@ -122,7 +126,11 @@ fn tighten_one_to_one(plan: &mut PlanGraph, adj: &Adjacency) {
     let mut down_real = vec![Vec::new(); n];
     let mut up_real = vec![Vec::new(); n];
     for s in &plan.segments {
-        if !plan.elems[s.from].key.is_virtual() && !plan.elems[s.to].key.is_virtual() {
+        if !plan.elems[s.from].key.is_virtual()
+            && !plan.elems[s.from].key.is_group_boundary()
+            && !plan.elems[s.to].key.is_virtual()
+            && !plan.elems[s.to].key.is_group_boundary()
+        {
             down_real[s.from].push(s.to);
             up_real[s.to].push(s.from);
         }
@@ -133,7 +141,7 @@ fn tighten_one_to_one(plan: &mut PlanGraph, adj: &Adjacency) {
         for i in 0..layer_len.saturating_sub(1) {
             let a = plan.layers[r][i];
             let b = plan.layers[r][i + 1];
-            if plan.elems[a].key.is_virtual() || plan.elems[b].key.is_virtual() {
+            if plan.elems[a].key.is_zero_width() || plan.elems[b].key.is_zero_width() {
                 continue;
             }
             let a_up = up_real[a].len() == 1;
@@ -161,11 +169,7 @@ fn tighten_one_to_one(plan: &mut PlanGraph, adj: &Adjacency) {
             };
             let before = score(plan);
             plan.layers[r].swap(i, i + 1);
-            let blocks = build_blocks(&plan.layers[r], 0, &plan.elems);
-            let mut flat = Vec::new();
-            flatten(&blocks, &mut flat);
-            let layer_now = plan.layers[r].clone();
-            if flat != layer_now || total_crossings(plan) > base || score(plan) > before {
+            if total_crossings(plan) > base || score(plan) > before {
                 plan.layers[r].swap(i, i + 1);
             }
         }
@@ -184,67 +188,17 @@ fn reference_positions(layer: &[usize]) -> BTreeMap<usize, usize> {
     layer.iter().enumerate().map(|(i, &e)| (e, i)).collect()
 }
 
-enum BlockNode {
-    Leaf(usize),
-    Group { children: Vec<BlockNode> },
-}
-
-/// Stable-partition `members` by `group_path[depth]` into a block tree —
-/// **all** members sharing a key end up in the same block regardless of
-/// whether they were already adjacent in `members` (a prior sweep's
-/// transpose/median step could have interleaved them), ordered by each key's
-/// first appearance for determinism. This is what actually *establishes* and
-/// then *preserves* group contiguity — see module doc.
-fn build_blocks(members: &[usize], depth: usize, elems: &[Elem]) -> Vec<BlockNode> {
-    let mut key_order: Vec<Option<String>> = Vec::new();
-    let mut buckets: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
-    for &m in members {
-        let seg = elems[m].group_path.get(depth).cloned();
-        let key_idx = match key_order.iter().position(|k| k == &seg) {
-            Some(i) => i,
-            None => {
-                key_order.push(seg);
-                key_order.len() - 1
-            }
-        };
-        buckets.entry(key_idx).or_default().push(m);
-    }
-
-    let mut out = Vec::new();
-    for (key_idx, seg) in key_order.into_iter().enumerate() {
-        let run = &buckets[&key_idx];
-        match seg {
-            None => out.extend(run.iter().map(|&m| BlockNode::Leaf(m))),
-            Some(_) => out.push(BlockNode::Group {
-                children: build_blocks(run, depth + 1, elems),
-            }),
-        }
-    }
-    out
-}
-
-fn flatten(blocks: &[BlockNode], out: &mut Vec<usize>) {
-    for b in blocks {
-        match b {
-            BlockNode::Leaf(e) => out.push(*e),
-            BlockNode::Group { children } => flatten(children, out),
-        }
-    }
-}
-
-/// Median + weighted-barycenter over neighbor positions in the reference
-/// layer, pooled recursively for `Group` blocks.
 struct Key {
     median: Option<f64>,
     barycenter: Option<f64>,
-    /// Position within the sibling list *before* this sort (stable fallback).
+    /// Position within the layer *before* this sort (stable fallback).
     prev_pos: usize,
-    /// Smallest declaration index among this block's leaves (final tie-break).
+    /// Declaration index (final tie-break).
     repr_decl: usize,
 }
 
 /// Quantize neighbor positions for a total-order sort key (avoids ε-threshold
-/// non-transitivity in `cmp_key` that panics driftsort at wide layers).
+/// non-transitivity that panics driftsort at wide layers).
 const QUANT: f64 = 1024.0;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -269,38 +223,6 @@ fn sort_key(k: &Key) -> SortKey {
         barycenter: quant(k.barycenter),
         prev_pos: k.prev_pos,
         repr_decl: k.repr_decl,
-    }
-}
-
-fn pooled_neighbor_positions(
-    block: &BlockNode,
-    neighbors_of: &[Vec<(usize, f64)>],
-    ref_pos: &BTreeMap<usize, usize>,
-    decl_index: &[usize],
-    out: &mut Vec<(f64, f64)>, // (position, weight)
-    repr_decl: &mut usize,
-) {
-    match block {
-        BlockNode::Leaf(e) => {
-            *repr_decl = (*repr_decl).min(decl_index[*e]);
-            for &(n, w) in &neighbors_of[*e] {
-                if let Some(&p) = ref_pos.get(&n) {
-                    out.push((p as f64, w));
-                }
-            }
-        }
-        BlockNode::Group { children } => {
-            for c in children {
-                pooled_neighbor_positions(
-                    c,
-                    neighbors_of,
-                    ref_pos,
-                    decl_index,
-                    out,
-                    repr_decl,
-                );
-            }
-        }
     }
 }
 
@@ -335,47 +257,6 @@ fn weighted_barycenter(pairs: &[(f64, f64)]) -> Option<f64> {
     Some(pairs.iter().map(|(p, w)| p * w).sum::<f64>() / wsum)
 }
 
-fn sort_blocks(
-    blocks: &mut Vec<BlockNode>,
-    neighbors_of: &[Vec<(usize, f64)>],
-    ref_pos: &BTreeMap<usize, usize>,
-    decl_index: &[usize],
-) {
-    for b in blocks.iter_mut() {
-        if let BlockNode::Group { children } = b {
-            sort_blocks(children, neighbors_of, ref_pos, decl_index);
-        }
-    }
-
-    let mut keyed: Vec<(Key, BlockNode)> = std::mem::take(blocks)
-        .into_iter()
-        .enumerate()
-        .map(|(prev_pos, b)| {
-            let mut pooled = Vec::new();
-            let mut repr_decl = usize::MAX;
-            pooled_neighbor_positions(
-                &b,
-                neighbors_of,
-                ref_pos,
-                decl_index,
-                &mut pooled,
-                &mut repr_decl,
-            );
-            let positions: Vec<f64> = pooled.iter().map(|(p, _)| *p).collect();
-            let key = Key {
-                median: median_of(positions),
-                barycenter: weighted_barycenter(&pooled),
-                prev_pos,
-                repr_decl,
-            };
-            (key, b)
-        })
-        .collect();
-
-    keyed.sort_by_key(|(k, _)| sort_key(k));
-    *blocks = keyed.into_iter().map(|(_, b)| b).collect();
-}
-
 fn reorder_layer(plan: &mut PlanGraph, adj: &Adjacency, r: usize, dir: Direction) {
     let ref_layer = match dir {
         Direction::Up => &plan.layers[r - 1],
@@ -387,16 +268,113 @@ fn reorder_layer(plan: &mut PlanGraph, adj: &Adjacency, r: usize, dir: Direction
         Direction::Down => &adj.down,
     };
 
-    let mut blocks = build_blocks(&plan.layers[r], 0, &plan.elems);
-    sort_blocks(
-        &mut blocks,
-        neighbors_of,
-        &ref_pos,
-        &plan.decl_index,
-    );
-    let mut flat = Vec::with_capacity(plan.layers[r].len());
-    flatten(&blocks, &mut flat);
-    plan.layers[r] = flat;
+    let layer = plan.layers[r].clone();
+    let mut keyed: Vec<(Key, usize)> = layer
+        .iter()
+        .enumerate()
+        .map(|(prev_pos, &e)| {
+            let mut pooled = Vec::new();
+            for &(n, w) in &neighbors_of[e] {
+                if let Some(&p) = ref_pos.get(&n) {
+                    pooled.push((p as f64, w));
+                }
+            }
+            let positions: Vec<f64> = pooled.iter().map(|(p, _)| *p).collect();
+            let key = Key {
+                median: median_of(positions),
+                barycenter: weighted_barycenter(&pooled),
+                prev_pos,
+                repr_decl: plan.decl_index[e],
+            };
+            (key, e)
+        })
+        .collect();
+
+    keyed.sort_by_key(|(k, _)| sort_key(k));
+    plan.layers[r] = keyed.into_iter().map(|(_, e)| e).collect();
+    restore_group_clamps(plan, r);
+}
+
+/// Re-pack after a group-agnostic median/transpose: keep Left/Right where
+/// the soft weights placed them (cross-rank alignment), eject foreign elems
+/// from the open interval, and pull any escaped members back inside.
+fn restore_group_clamps(plan: &mut PlanGraph, r: usize) {
+    use crate::layout::hierarchical::model::{BoundarySide, ElemKey};
+
+    let mut clamps: Vec<(usize, String, usize, usize)> = Vec::new();
+    for &ei in &plan.layers[r] {
+        if let ElemKey::GroupBoundary {
+            group,
+            side: BoundarySide::Left,
+            ..
+        } = &plan.elems[ei].key
+        {
+            let right_key = ElemKey::GroupBoundary {
+                group: group.clone(),
+                rank: r as u32,
+                side: BoundarySide::Right,
+            };
+            let Some(&right_ei) = plan.index_of.get(&right_key) else {
+                continue;
+            };
+            let depth = plan.elems[ei].group_path.len();
+            clamps.push((depth, group.clone(), ei, right_ei));
+        }
+    }
+    clamps.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+
+    for (_, group, left_ei, right_ei) in clamps {
+        let layer = plan.layers[r].clone();
+        let Some(mut lpos) = layer.iter().position(|&e| e == left_ei) else {
+            continue;
+        };
+        let Some(mut rpos) = layer.iter().position(|&e| e == right_ei) else {
+            continue;
+        };
+        if lpos > rpos {
+            plan.layers[r].swap(lpos, rpos);
+            std::mem::swap(&mut lpos, &mut rpos);
+        }
+        if lpos == rpos {
+            continue;
+        }
+
+        let is_member = |e: usize| {
+            e != left_ei
+                && e != right_ei
+                && plan.elems[e].group_path.iter().any(|g| g == &group)
+        };
+
+        let mut before = Vec::new();
+        let mut interior = Vec::new();
+        let mut foreign = Vec::new();
+        let mut after = Vec::new();
+        for (i, &e) in layer.iter().enumerate() {
+            if e == left_ei || e == right_ei {
+                continue;
+            }
+            if is_member(e) {
+                interior.push(e);
+            } else if i < lpos {
+                before.push(e);
+            } else if i > rpos {
+                after.push(e);
+            } else {
+                foreign.push(e);
+            }
+        }
+
+        // Keep Left at `before.len()` (same index as before the eject) so
+        // cross-rank high-weight alignment survives the pack.
+        let mut new_layer = Vec::with_capacity(layer.len());
+        new_layer.extend(before);
+        new_layer.push(left_ei);
+        new_layer.extend(interior);
+        new_layer.push(right_ei);
+        new_layer.extend(foreign);
+        new_layer.extend(after);
+        plan.layers[r] = new_layer;
+    }
 }
 
 fn total_crossings(plan: &PlanGraph) -> u64 {
@@ -405,7 +383,9 @@ fn total_crossings(plan: &PlanGraph) -> u64 {
         let segs: Vec<(usize, usize)> = plan
             .segments
             .iter()
-            .filter(|s| plan.elems[s.from].rank as usize == r)
+            .filter(|s| {
+                plan.elems[s.from].rank as usize == r && !s.edge_id.starts_with("gb:")
+            })
             .map(|s| (s.from, s.to))
             .collect();
         if segs.is_empty() {
@@ -420,24 +400,19 @@ fn total_crossings(plan: &PlanGraph) -> u64 {
     total
 }
 
-/// Adjacent-leaf swaps within the same immediate block (same `group_path`),
-/// accepted only when they strictly reduce total crossings against both
-/// neighboring layers.
-fn transpose_pass(plan: &mut PlanGraph, adj: &Adjacency) {
+/// Adjacent swaps accepted only when they strictly reduce total crossings
+/// against both neighboring layers. No group-path guard — clamps are
+/// re-packed after the pass so intervals stay contiguous.
+fn transpose_pass(plan: &mut PlanGraph) {
     let budget = plan.elems.len() + plan.layers.len() * 4 + 32;
     for _ in 0..budget {
         let mut improved = false;
         for r in 0..plan.layers.len() {
             let mut i = 0;
             while i + 1 < plan.layers[r].len() {
-                let (u, v) = (plan.layers[r][i], plan.layers[r][i + 1]);
-                if plan.elems[u].group_path != plan.elems[v].group_path {
-                    i += 1;
-                    continue;
-                }
-                let before = local_crossings(plan, adj, r);
+                let before = local_crossings(plan, r);
                 plan.layers[r].swap(i, i + 1);
-                let after = local_crossings(plan, adj, r);
+                let after = local_crossings(plan, r);
                 if after < before {
                     improved = true;
                 } else {
@@ -452,13 +427,15 @@ fn transpose_pass(plan: &mut PlanGraph, adj: &Adjacency) {
     }
 }
 
-fn local_crossings(plan: &PlanGraph, _adj: &Adjacency, r: usize) -> u64 {
+fn local_crossings(plan: &PlanGraph, r: usize) -> u64 {
     let mut total = 0u64;
     if r > 0 {
         let segs: Vec<(usize, usize)> = plan
             .segments
             .iter()
-            .filter(|s| plan.elems[s.to].rank as usize == r)
+            .filter(|s| {
+                plan.elems[s.to].rank as usize == r && !s.edge_id.starts_with("gb:")
+            })
             .map(|s| (s.from, s.to))
             .collect();
         if !segs.is_empty() {
@@ -473,7 +450,9 @@ fn local_crossings(plan: &PlanGraph, _adj: &Adjacency, r: usize) -> u64 {
         let segs: Vec<(usize, usize)> = plan
             .segments
             .iter()
-            .filter(|s| plan.elems[s.from].rank as usize == r)
+            .filter(|s| {
+                plan.elems[s.from].rank as usize == r && !s.edge_id.starts_with("gb:")
+            })
             .map(|s| (s.from, s.to))
             .collect();
         if !segs.is_empty() {
@@ -490,7 +469,8 @@ fn local_crossings(plan: &PlanGraph, _adj: &Adjacency, r: usize) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layout::hierarchical::model::{ElemKey, Segment};
+    use crate::layout::hierarchical::compose::boundary::insert_group_boundaries;
+    use crate::layout::hierarchical::model::{BoundarySide, ElemKey, Segment};
 
     fn plain_elem(id: &str, rank: u32, group: &[&str]) -> Elem {
         Elem {
@@ -500,9 +480,9 @@ mod tests {
         }
     }
 
-    /// K3,3-ish crossing graph: layer0 = [a0,a1,a2], layer1 = [b0,b1,b2],
+    /// K3,3-ish crossing graph: layer0 = [a0,a1], layer1 = [b0,b1],
     /// edges wired so the identity order has crossings and a rearrangement
-    /// removes them (a "crossing" pattern: a0-b1, a1-b0).
+    /// removes them.
     fn crossing_plan() -> PlanGraph {
         let elems = vec![
             plain_elem("a0", 0, &[]),
@@ -544,15 +524,15 @@ mod tests {
     fn ordering_removes_a_crossing() {
         let mut plan = crossing_plan();
         assert_eq!(total_crossings(&plan), 1);
-        order_layers(&mut plan, &BTreeSet::new());
+        order_layers(&mut plan, &BTreeSet::new(), 16.0);
         assert_eq!(total_crossings(&plan), 0);
     }
 
     #[test]
     fn group_members_stay_contiguous_after_ordering() {
         // Layer 1 has a 2-member group {g0,g1} interleaved (by declaration)
-        // with an ungrouped node u; wiring pulls u between them by median,
-        // but group contiguity must still hold after ordering.
+        // with an ungrouped node u. After boundary insert + ordering, members
+        // must sit between the group's Left/Right clamps.
         let elems = vec![
             plain_elem("s0", 0, &[]),
             plain_elem("s1", 0, &[]),
@@ -596,21 +576,47 @@ mod tests {
             layers,
         };
 
-        order_layers(&mut plan, &BTreeSet::new());
+        insert_group_boundaries(&mut plan);
+        order_layers(&mut plan, &BTreeSet::new(), 16.0);
 
         let layer1 = &plan.layers[1];
-        let g_positions: Vec<usize> = layer1
+        let left = layer1.iter().position(|&e| {
+            matches!(
+                &plan.elems[e].key,
+                ElemKey::GroupBoundary {
+                    group,
+                    side: BoundarySide::Left,
+                    ..
+                } if group == "g"
+            )
+        });
+        let right = layer1.iter().position(|&e| {
+            matches!(
+                &plan.elems[e].key,
+                ElemKey::GroupBoundary {
+                    group,
+                    side: BoundarySide::Right,
+                    ..
+                } if group == "g"
+            )
+        });
+        let (left, right) = (
+            left.expect("g Left boundary"),
+            right.expect("g Right boundary"),
+        );
+        assert!(left < right, "Left must precede Right: {layer1:?}");
+        let members: Vec<usize> = layer1
             .iter()
             .enumerate()
-            .filter(|(_, &e)| plan.elems[e].group_path == vec!["g".to_string()])
+            .filter(|(_, &e)| {
+                matches!(&plan.elems[e].key, ElemKey::Real(id) if id == "g0" || id == "g1")
+            })
             .map(|(i, _)| i)
             .collect();
-        assert_eq!(g_positions.len(), 2);
-        assert_eq!(
-            g_positions[1] - g_positions[0],
-            1,
-            "group members must stay adjacent: {:?}",
-            g_positions
+        assert_eq!(members.len(), 2);
+        assert!(
+            members.iter().all(|&i| i > left && i < right),
+            "members must sit between clamps: left={left} right={right} members={members:?}"
         );
     }
 
@@ -618,23 +624,15 @@ mod tests {
     fn deterministic_rerun() {
         let mut p1 = crossing_plan();
         let mut p2 = crossing_plan();
-        order_layers(&mut p1, &BTreeSet::new());
-        order_layers(&mut p2, &BTreeSet::new());
+        order_layers(&mut p1, &BTreeSet::new(), 16.0);
+        order_layers(&mut p2, &BTreeSet::new(), 16.0);
         assert_eq!(p1.layers, p2.layers);
     }
 
     /// Critical marks double the ordering pull of real-real / real-virtual
-    /// segments (edge-parameters §2.5): a tie-broken sibling order flips
-    /// toward the critical source once its weight doubles.
+    /// segments (edge-parameters §2.5).
     #[test]
     fn critical_edge_doubles_ordering_weight() {
-        // layer0 = [a0, a1] (positions 0, 1); layer1 = [m0, m1] where m0 is
-        // wired to both sources. m0's neighbor median/barycenter is 0.5 for
-        // equal weights, exactly between m0 (prev_pos 0) and m1 (prev_pos 1):
-        // both keys tie → stable prev_pos keeps [m0, m1]. Critical `e0`
-        // shifts the barycenter to 1/3 and (as the sole median) sorts m0 to
-        // the left; symmetric inputs with the mark on `e1` instead sort m1's
-        // pull harder — observed via m0 moving right.
         let elems = vec![
             plain_elem("a0", 0, &[]),
             plain_elem("a1", 0, &[]),
@@ -669,18 +667,15 @@ mod tests {
             layers: layers.clone(),
         };
 
-        // Baseline: no critical marks → tie keeps declaration order.
         let mut p = plan_of();
-        order_layers(&mut p, &BTreeSet::new());
+        order_layers(&mut p, &BTreeSet::new(), 16.0);
         assert_eq!(p.layers[1], vec![2, 3]);
 
-        // Weight sanity: the critical segment's weight doubles.
         let crit: BTreeSet<String> = ["e0".to_string()].into_iter().collect();
-        let adj = build_adjacency(&plan_of(), &crit);
+        let adj = build_adjacency(&plan_of(), &crit, 16.0);
         let ups: Vec<f64> = adj.up[2].iter().map(|&(_, w)| w).collect();
         assert_eq!(ups, vec![2.0, 1.0], "critical real-real must weigh 2x");
 
-        // Virtual-virtual segments never scale (corridor weight stays 8.0).
         let virt_a = Elem {
             key: ElemKey::Virtual {
                 edge_id: "va".into(),
@@ -698,13 +693,13 @@ mod tests {
             rank: 2,
         };
         assert_eq!(
-            segment_weight(&virt_a, &virt_b, true),
+            segment_weight(&virt_a, &virt_b, true, 16.0),
             8.0,
             "virtual-virtual corridor weight must not scale"
         );
     }
 
-    /// Wide layers (≥18 blocks) used to panic driftsort when `cmp_key` was not a
+    /// Wide layers (≥18 elems) used to panic driftsort when `cmp_key` was not a
     /// total order; regression for review §2.1.
     fn wide_layer_plan(width: usize) -> PlanGraph {
         let n = width;
@@ -736,12 +731,8 @@ mod tests {
             })
             .collect();
 
-        let layer0: Vec<usize> = (0..n)
-            .chain([iso_l0_a, iso_l0_b])
-            .collect();
-        let layer1: Vec<usize> = (n..2 * n)
-            .chain([iso_l1_a, iso_l1_b])
-            .collect();
+        let layer0: Vec<usize> = (0..n).chain([iso_l0_a, iso_l0_b]).collect();
+        let layer1: Vec<usize> = (n..2 * n).chain([iso_l1_a, iso_l1_b]).collect();
         let layers = vec![layer0, layer1];
 
         let index_of = elems
@@ -765,7 +756,7 @@ mod tests {
         for width in [18, 32, 64] {
             let mut plan = wide_layer_plan(width);
             let layer_len = width + 2;
-            order_layers(&mut plan, &BTreeSet::new());
+            order_layers(&mut plan, &BTreeSet::new(), 16.0);
             assert_eq!(plan.layers[0].len(), layer_len, "width={width}");
             assert_eq!(plan.layers[1].len(), layer_len, "width={width}");
         }

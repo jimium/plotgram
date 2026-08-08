@@ -139,6 +139,8 @@ fn free_side(
         crate::layout::hierarchical::model::ElemKey::Virtual { edge_id, .. } => {
             far_real_endpoint(plan, edge_id, node_real).unwrap_or(neighbor)
         }
+        crate::layout::hierarchical::model::ElemKey::GroupBoundary { .. }
+        | crate::layout::hierarchical::model::ElemKey::OrderPad { .. } => neighbor,
     };
     let peer_rank = plan.elems[peer].rank;
     let own_order = pos[node_real];
@@ -387,6 +389,7 @@ pub fn assign_ports(
                 ElemKey::Virtual { edge_id, .. } => {
                     far_real_endpoint(plan, edge_id, node_real).unwrap_or(neighbor)
                 }
+                ElemKey::GroupBoundary { .. } | ElemKey::OrderPad { .. } => neighbor,
             };
             let real_idx = graph.index_of[node_id];
             let shape = graph.shapes[real_idx];
@@ -400,6 +403,7 @@ pub fn assign_ports(
                         ElemKey::Virtual { edge_id, .. } => {
                             far_real_endpoint(plan, edge_id, node_real).unwrap_or(neighbor)
                         }
+                        ElemKey::GroupBoundary { .. } | ElemKey::OrderPad { .. } => neighbor,
                     };
                     let ns_load = spine_ns_load(&free_usage, node_real)
                         + spine_ns_load(&free_usage, peer);
