@@ -16,4 +16,6 @@ pub use substrate::{Substrate, TrackId, TrackOrient};
 
 // Re-exported for ink unit fixtures / debug.
 #[allow(unused_imports)]
+pub use search::EscapePlan;
+#[allow(unused_imports)]
 pub use substrate::BlueprintIndex;

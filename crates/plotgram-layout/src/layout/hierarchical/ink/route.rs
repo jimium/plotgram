@@ -153,26 +153,59 @@ fn lane_coord(
 }
 
 /// Leave a node onto a Main rail per Channel [`EscapePlan`] (P5-3).
+///
+/// Side-aware (ink-and-verification §4 — the first segment must follow the
+/// port outward normal): when the escape move runs *along* the node face
+/// (`ViaGap` on E/W ports, `AtPortNormal` on N/S ports), emit a normal stub
+/// of `stub` before the tangential jog; otherwise the escape move itself is
+/// already normal and no stub is needed.
 fn leave_to_main(
     path: &mut Vec<Point>,
     start: Point,
     rail_x: f64,
     src_gap: f64,
     escape: EscapeEnd,
+    side: Side,
+    stub: f64,
 ) {
+    let n = side_normal(side);
     match escape {
         EscapeEnd::AtPortNormal => {
+            let main_axis = matches!(side, Side::North | Side::South);
+            if main_axis {
+                // N/S: moving horizontally to the rail is tangential — stub
+                // along the normal first.
+                let stub_pt = Point {
+                    x: start.x,
+                    y: start.y + n.y * stub,
+                };
+                if (stub_pt.y - start.y).abs() > 1e-9 {
+                    path.push(stub_pt);
+                }
+            }
             if (start.x - rail_x).abs() > 1e-9 {
                 path.push(Point {
                     x: rail_x,
-                    y: start.y,
+                    y: path.last().unwrap().y,
                 });
             }
         }
         EscapeEnd::ViaGap(_) => {
-            if (start.y - src_gap).abs() > 1e-9 {
+            let cross_axis = matches!(side, Side::East | Side::West);
+            if cross_axis {
+                // E/W: moving vertically to the gap line is tangential —
+                // stub along the normal first.
+                let stub_pt = Point {
+                    x: start.x + n.x * stub,
+                    y: start.y,
+                };
+                if (stub_pt.x - start.x).abs() > 1e-9 {
+                    path.push(stub_pt);
+                }
+            }
+            if (path.last().unwrap().y - src_gap).abs() > 1e-9 {
                 path.push(Point {
-                    x: start.x,
+                    x: path.last().unwrap().x,
                     y: src_gap,
                 });
             }
@@ -187,12 +220,18 @@ fn leave_to_main(
 }
 
 /// Arrive from a Main rail into a port per Channel [`EscapePlan`] (P5-3).
+///
+/// Mirror of [`leave_to_main`]: the final segment must enter along the port
+/// outward normal, so when the escape approach runs tangentially to the
+/// node face a normal stub is inserted just before the port.
 fn arrive_from_main(
     path: &mut Vec<Point>,
     end: Point,
     rail_x: f64,
     tgt_gap: f64,
     escape: EscapeEnd,
+    side: Side,
+    stub: f64,
 ) {
     let cur = *path.last().unwrap();
     if (cur.x - rail_x).abs() > 1e-9 {
@@ -202,18 +241,37 @@ fn arrive_from_main(
         });
     }
 
+    let n = side_normal(side);
     match escape {
         EscapeEnd::AtPortNormal => {
-            if (path.last().unwrap().y - end.y).abs() > 1e-9 {
-                path.push(Point {
-                    x: rail_x,
-                    y: end.y,
-                });
-            }
-            if (path.last().unwrap().x - end.x).abs() > 1e-9
-                || (path.last().unwrap().y - end.y).abs() > 1e-9
-            {
-                path.push(end);
+            let main_axis = matches!(side, Side::North | Side::South);
+            if main_axis {
+                // Final segment must be vertical: approach on the port X via
+                // a normal stub Y, then drop straight into the port.
+                if (path.last().unwrap().y - end.y).abs() > 1e-9 {
+                    path.push(Point {
+                        x: rail_x,
+                        y: end.y + n.y * stub,
+                    });
+                }
+                if (path.last().unwrap().x - end.x).abs() > 1e-9 {
+                    path.push(Point {
+                        x: end.x,
+                        y: path.last().unwrap().y,
+                    });
+                }
+            } else {
+                if (path.last().unwrap().y - end.y).abs() > 1e-9 {
+                    path.push(Point {
+                        x: rail_x,
+                        y: end.y,
+                    });
+                }
+                if (path.last().unwrap().x - end.x).abs() > 1e-9
+                    || (path.last().unwrap().y - end.y).abs() > 1e-9
+                {
+                    path.push(end);
+                }
             }
         }
         EscapeEnd::ViaGap(_) => {
@@ -223,7 +281,24 @@ fn arrive_from_main(
                     y: tgt_gap,
                 });
             }
-            if (path.last().unwrap().x - end.x).abs() > 1e-9 {
+            let cross_axis = matches!(side, Side::East | Side::West);
+            if cross_axis {
+                // Final segment must be horizontal: approach the port X via a
+                // normal stub X on the gap line, then enter along the normal.
+                let stub_x = end.x + n.x * stub;
+                if (path.last().unwrap().x - stub_x).abs() > 1e-9 {
+                    path.push(Point {
+                        x: stub_x,
+                        y: tgt_gap,
+                    });
+                }
+                if (path.last().unwrap().y - end.y).abs() > 1e-9 {
+                    path.push(Point {
+                        x: stub_x,
+                        y: end.y,
+                    });
+                }
+            } else if (path.last().unwrap().x - end.x).abs() > 1e-9 {
                 path.push(Point {
                     x: end.x,
                     y: tgt_gap,
@@ -239,8 +314,10 @@ fn arrive_from_main(
 /// Expand a ChannelPath into an orthogonal polyline (D1.1).
 ///
 /// Leaving onto Main may drop to a layer-gap Y first so horizontals do not
-/// pierce same-layer siblings. Arriving from Main always ends along the
-/// port normal (E/W horizontal, N/S vertical) — ink-and-verification §4.
+/// pierce same-layer siblings. First and last segments always follow the
+/// port outward normal — a `port_stub` jog is inserted when the escape move
+/// would otherwise run tangential to the node face (E/W + ViaGap,
+/// N/S + AtPortNormal; ink-and-verification §4).
 fn expand_channel_path(
     start: Point,
     end: Point,
@@ -253,8 +330,10 @@ fn expand_channel_path(
     frames: &[Rect],
     src_rank: usize,
     tgt_rank: usize,
-    _src_side: Side,
-    _tgt_side: Side,
+    src_side: Side,
+    tgt_side: Side,
+    stub_cross: f64,
+    stub_main: f64,
     layer_gap: f64,
 ) -> Result<Vec<Point>, LayoutError> {
     let tracks = &channel.tracks;
@@ -315,8 +394,24 @@ fn expand_channel_path(
                 let x = lane_coord(edge_id, tid, track_order, track_coords)?;
                 let src_gap = escape_gap(channel.escape.source, gap_y(src_rank, end, start));
                 let tgt_gap = escape_gap(channel.escape.target, gap_y(tgt_rank, start, end));
-                leave_to_main(&mut path, start, x, src_gap, channel.escape.source);
-                arrive_from_main(&mut path, end, x, tgt_gap, channel.escape.target);
+                leave_to_main(
+                    &mut path,
+                    start,
+                    x,
+                    src_gap,
+                    channel.escape.source,
+                    src_side,
+                    stub_cross,
+                );
+                arrive_from_main(
+                    &mut path,
+                    end,
+                    x,
+                    tgt_gap,
+                    channel.escape.target,
+                    tgt_side,
+                    stub_cross,
+                );
             }
         }
         if path.last() != Some(&end) {
@@ -346,6 +441,8 @@ fn expand_channel_path(
                 first_c,
                 src_gap,
                 channel.escape.source,
+                src_side,
+                stub_main,
             );
         }
     }
@@ -418,6 +515,8 @@ fn expand_channel_path(
                 last_c,
                 tgt_gap,
                 channel.escape.target,
+                tgt_side,
+                stub_main,
             );
         }
     }
@@ -550,7 +649,13 @@ pub fn route_edges(
     routing_style: RoutingStyle,
     layer_gap: f64,
     node_gap: f64,
+    port_stub: f64,
 ) -> Result<Vec<CanonicalEdge>, LayoutError> {
+    // Clamp the normal stub so it never overshoots the gap it lives in:
+    // cross-axis (E/W) stubs dwell in the node gap, main-axis (N/S) stubs in
+    // the layer gap (ink-and-verification §4).
+    let stub_cross = port_stub.min(node_gap * 0.5);
+    let stub_main = port_stub.min(layer_gap * 0.5);
     let segs_by_edge = plan.segments_by_edge();
     let mut out = Vec::with_capacity(graph.edges.len());
     for e in &graph.edges {
@@ -637,6 +742,8 @@ pub fn route_edges(
                         plan.elems[*chain.last().unwrap()].rank as usize,
                         rp.source.side,
                         rp.target.side,
+                        stub_cross,
+                        stub_main,
                         layer_gap,
                     )?
                 };
@@ -663,7 +770,8 @@ pub fn route_edges(
 mod tests {
     use super::*;
     use crate::layout::hierarchical::channel::{
-        substrate::derive_root_substrate, ChannelPath, ChannelRoutePlan, RouteTopology,
+        substrate::derive_root_substrate, ChannelPath, ChannelRoutePlan, EscapePlan,
+        RouteTopology,
     };
     use crate::layout::hierarchical::compose::track_order::HopTrack;
     use crate::layout::hierarchical::model::{Elem, ElemKey, RealEdge};
@@ -727,6 +835,61 @@ mod tests {
         }
     }
 
+    /// Minimal Channel plan: single Main track on order gap `og` with an
+    /// explicit escape plan (cross-axis / ViaGap fixtures).
+    fn single_main_route(
+        plan: &PlanGraph,
+        og: usize,
+        rail_x: f64,
+        escape: EscapePlan,
+    ) -> (ChannelRoutePlan, TrackOrderPlan, TrackCoords) {
+        let (substrate, index) = derive_root_substrate(plan);
+        let main_id = index.main_at(og, 0).expect("main line");
+        let mut channel = ChannelPath::new(vec![main_id], Vec::new());
+        channel.escape = escape;
+        let mut routes = BTreeMap::new();
+        routes.insert("e0".into(), RouteTopology::Orthogonal(channel));
+        let route_plan = ChannelRoutePlan {
+            substrate,
+            index,
+            routes,
+            bundles: Vec::new(),
+            relaxations: Vec::new(),
+            ripup_rounds: 0,
+            used_gates: false,
+            route_order: Vec::new(),
+        };
+        let mut track_order = TrackOrderPlan::default();
+        track_order.assignments.insert(
+            ("e0".into(), main_id),
+            HopTrack {
+                track: main_id,
+                track_index: 0,
+            },
+        );
+        track_order.track_counts.insert(main_id, 1);
+        let mut track_coords = TrackCoords::default();
+        track_coords.coords.insert(main_id, vec![rail_x]);
+        (route_plan, track_order, track_coords)
+    }
+
+    fn route_main(
+        graph: &RealGraph,
+        plan: &PlanGraph,
+        ports: &BTreeMap<String, EdgePorts>,
+        frames: &[Rect],
+        og: usize,
+        rail_x: f64,
+        escape: EscapePlan,
+    ) -> Vec<CanonicalEdge> {
+        let (rp, to, tc) = single_main_route(plan, og, rail_x, escape);
+        route_edges(
+            graph, plan, ports, frames, &empty_bus(), &rp, &to, &tc, RoutingStyle::Orthogonal,
+            60.0, 24.0, 12.0,
+        )
+        .unwrap()
+    }
+
     fn route(
         graph: &RealGraph,
         plan: &PlanGraph,
@@ -746,7 +909,7 @@ mod tests {
             )
         };
         route_edges(
-            graph, plan, ports, frames, bus, &rp, &to, &tc, style, 60.0, 24.0,
+            graph, plan, ports, frames, bus, &rp, &to, &tc, style, 60.0, 24.0, 12.0,
         )
         .unwrap()
     }
@@ -762,7 +925,7 @@ mod tests {
     ) -> Vec<CanonicalEdge> {
         let (rp, to, tc) = single_cross_route(plan, track_y);
         route_edges(
-            graph, plan, ports, frames, bus, &rp, &to, &tc, style, 60.0, 24.0,
+            graph, plan, ports, frames, bus, &rp, &to, &tc, style, 60.0, 24.0, 12.0,
         )
         .unwrap()
     }
@@ -983,9 +1146,118 @@ mod tests {
             RoutingStyle::Curved,
             60.0,
             24.0,
+            12.0,
         )
         .unwrap_err();
         assert!(format!("{err}").contains("curved"), "unexpected: {err}");
+    }
+
+    /// Side-aware escape expansion: the segment adjacent to each port must
+    /// run along the port's outward normal — never tangential to the node
+    /// face (E/W + ViaGap and N/S + AtPortNormal were the defect classes).
+    #[test]
+    fn escape_stubs_follow_port_normal() {
+        struct Case {
+            label: &'static str,
+            side: Side,
+            escape: EscapeEnd,
+            og: usize,
+            rail_x: f64,
+        }
+        let cases = [
+            Case {
+                label: "E-port ViaGap",
+                side: Side::East,
+                escape: EscapeEnd::ViaGap(1),
+                og: 1,
+                rail_x: 58.0,
+            },
+            Case {
+                label: "W-port ViaGap",
+                side: Side::West,
+                escape: EscapeEnd::ViaGap(1),
+                og: 0,
+                rail_x: -8.0,
+            },
+            Case {
+                label: "N-port AtPortNormal onto Main",
+                side: Side::North,
+                escape: EscapeEnd::AtPortNormal,
+                og: 1,
+                rail_x: 58.0,
+            },
+        ];
+        for case in &cases {
+            let (graph, plan, mut ports, frames) = simple_setup();
+            let ep = ports.get_mut("e0").unwrap();
+            ep.source = ResolvedPort {
+                side: case.side,
+                along: AlongSpec::Ordered {
+                    order: 0,
+                    count: 1,
+                },
+            };
+            ep.target = ResolvedPort {
+                side: case.side,
+                along: AlongSpec::Ordered {
+                    order: 0,
+                    count: 1,
+                },
+            };
+            let escape = EscapePlan {
+                source: case.escape,
+                target: case.escape,
+            };
+            let routed = route_main(&graph, &plan, &ports, &frames, case.og, case.rail_x, escape);
+            let pts = routed[0].path.polyline_points();
+            assert!(pts.len() >= 3, "{}: expected stub + jog, got {:?}", case.label, pts);
+
+            let n = side_normal(case.side);
+            let (dx0, dy0) = (pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+            if n.x != 0.0 {
+                // E/W: first segment horizontal (normal), second vertical.
+                assert!(
+                    dy0.abs() <= 1e-9 && dx0 * n.x > 1e-9,
+                    "{}: first segment ({dx0}, {dy0}) not along {:?} normal",
+                    case.label,
+                    case.side
+                );
+                assert!(
+                    (pts[2].x - pts[1].x).abs() <= 1e-9,
+                    "{}: second segment not vertical: {:?}",
+                    case.label,
+                    pts
+                );
+                // Stub must not ride the source top/bottom face.
+                let f = &frames[0];
+                assert!(
+                    pts[0].y > f.y + 1e-9 && pts[0].y < f.bottom() - 1e-9,
+                    "{}: stub runs along a horizontal face: {:?}",
+                    case.label,
+                    pts
+                );
+            } else {
+                // N/S: first segment vertical (normal), second horizontal.
+                assert!(
+                    dx0.abs() <= 1e-9 && dy0 * n.y > 1e-9,
+                    "{}: first segment ({dx0}, {dy0}) not along {:?} normal",
+                    case.label,
+                    case.side
+                );
+                assert!(
+                    (pts[2].y - pts[1].y).abs() <= 1e-9,
+                    "{}: second segment not horizontal: {:?}",
+                    case.label,
+                    pts
+                );
+            }
+            assert_eq!(
+                *pts.last().unwrap(),
+                port_anchor(frames[1], ports["e0"].target),
+                "{}: target endpoint drifted",
+                case.label
+            );
+        }
     }
 
     /// Bus-grouped source: shared port + trunk to Metric bus_y, then bus

@@ -77,6 +77,15 @@ Ink 只把 Direct 展开为两端点，把 Via 展开为已给 guide point。
 - 最小 stub 长度来自 Metric；
 - 目标端同理。
 
+**port 邻接段法向契约**：首段必须沿 `from_port.side` 外向法向出发，
+末段必须沿 `to_port.side` 外向法向进入——任何切向首/末段（与 node 面
+重合）都是缺陷。当 Channel escape 的展开移动本身沿 node 面切向时
+（E/W 端口 + `ViaGap` 先移向层隙；N/S 端口 + `AtPortNormal` 先移向
+Main rail），Ink 先插入 `port_stub` 法向 stub 再做切向 jog。stub 长度
+来自 typed 参数 `port_stub`（默认 12），Ink 侧 clamp：cross-axis stub
+≤ `node_gap/2`、main-axis stub ≤ `layer_gap/2`，保证 stub 后的主轴段
+只跨越本 rank 带与相邻层隙，不穿同层兄弟。
+
 若 segment sequence 无法连接端口点，是 Plan/Metric 错误；Ink 不增加修复肘点。
 
 ## 5. Bundle
@@ -129,7 +138,9 @@ Ink 只把 Direct 展开为两端点，把 Via 展开为已给 guide point。
 6. 非 bundle 边不完全重合；
 7. 圆角半径不大于相邻段允许值；
 8. 箭头与 head/tail label 没因 FAS 反向；
-9. path 无 NaN、重复零段与未规范化共线点。
+9. path 无 NaN、重复零段与未规范化共线点；
+10. 首/末段方向等于对应 port 的外向法向（`verify_port_stubs_normal`，
+    硬失败；v1 audit E1 的方向部分，不守卫 stub 长度）。
 
 ### 7.4 FacadeVerifier
 

@@ -17,6 +17,13 @@ use plotgram_algo::orientation::Side;
 
 /// How Ink enters/leaves the first/last corridor (P5-3). Channel decides;
 /// Ink only matches — no frame scanning.
+///
+/// Side-aware semantics (Ink inserts a `port_stub` normal jog where the
+/// escape move itself runs tangential to the node face):
+/// - `ViaGap` on E/W ports: normal stub → drop to the gap line;
+/// - `ViaGap` on N/S ports: the gap move already follows the normal;
+/// - `AtPortNormal` on N/S ports: normal stub → jog onto the rail;
+/// - `AtPortNormal` on E/W ports: the rail move already follows the normal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EscapeEnd {
     /// Leave/arrive along the port normal (E/W horizontal at port Y, N/S vertical).
@@ -42,7 +49,9 @@ impl EscapePlan {
 
 /// Decide escape from port sides + ranks (no node-frame reads).
 ///
-/// E/W ports use ViaGap (safe against same-layer pierces); N/S use AtPortNormal.
+/// E/W ports use ViaGap (safe against same-layer pierces; Ink prefixes a
+/// normal `port_stub` since the gap move is tangential to an E/W face);
+/// N/S use AtPortNormal (the gap/rail move is already normal).
 pub fn decide_escape(
     src_side: Side,
     tgt_side: Side,

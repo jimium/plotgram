@@ -269,6 +269,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         params.routing_style,
         params.layer_gap,
         params.node_gap,
+        params.port_stub,
     )?;
     // Self-loops must pass both InkVerifiers (review §2.8) — extend before
     // either check so stubs cannot bypass overlap / obstacle assertions.
@@ -297,6 +298,10 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         })
         .collect();
     ink::verify::verify_endpoints_exact(&canonical_edges, &real_frames)?;
+    ink::verify::verify_port_stubs_normal(
+        &canonical_edges,
+        matches!(params.routing_style, RoutingStyle::Orthogonal),
+    )?;
     for ce in &canonical_edges {
         if let Some(bends) = ink::verify::polyline_bend_count(&ce.path) {
             if bends > params.max_bends_budget as usize {

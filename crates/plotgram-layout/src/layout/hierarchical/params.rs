@@ -200,6 +200,10 @@ pub struct HierarchicalParams {
     /// Minimum length of the last segment entering the target port (pixels).
     /// `0` = off.
     pub min_last_segment: f64,
+    /// Normal stub length emitted from a port before the path jogs onto its
+    /// first track (pixels). Ink clamps it against the adjacent gap so the
+    /// stub never overshoots the layer gap / node gap (ink-and-verification.md §4).
+    pub port_stub: f64,
     /// Channel search bend weight factor: `w_bend = route_w_bend · edge_gap` (P5-4).
     pub route_w_bend: f64,
     /// Channel search length weight (P5-4).
@@ -233,6 +237,7 @@ impl Default for HierarchicalParams {
             auto_edge_grouping: false,
             min_first_segment: 0.0,
             min_last_segment: 0.0,
+            port_stub: 12.0,
             route_w_bend: 10.0,
             route_w_len: 1.0,
             route_w_cross: 3.0,
@@ -400,6 +405,9 @@ impl HierarchicalParams {
         {
             params.min_last_segment = v;
         }
+        if let Some(v) = binder.get_f64_any(&["port_stub"]).map_err(bind_err)? {
+            params.port_stub = v.max(0.0);
+        }
         if let Some(v) = binder.get_f64_any(&["route_w_bend"]).map_err(bind_err)? {
             params.route_w_bend = v.max(0.0);
         }
@@ -459,7 +467,7 @@ impl HierarchicalParams {
              group_boundary_weight={:e}|lambda_sym={:e}|twin_spine_boost={:e}|\
              primary_arm_boost={:e}|symmetry_iters={}|\
              routing_style={}|auto_edge_grouping={}|\
-             min_first_segment={:e}|min_last_segment={:e}|\
+             min_first_segment={:e}|min_last_segment={:e}|port_stub={:e}|\
              route_w_bend={:e}|route_w_len={:e}|route_w_cross={:e}|max_bends_budget={}|\
              group_policy={}|group_sizing={}|group_align={}",
             self.orientation.as_str(),
@@ -476,6 +484,7 @@ impl HierarchicalParams {
             self.auto_edge_grouping,
             self.min_first_segment,
             self.min_last_segment,
+            self.port_stub,
             self.route_w_bend,
             self.route_w_len,
             self.route_w_cross,
@@ -561,6 +570,10 @@ mod tests {
             },
             HierarchicalParams {
                 min_last_segment: 8.0,
+                ..a
+            },
+            HierarchicalParams {
+                port_stub: a.port_stub + 1.0,
                 ..a
             },
             HierarchicalParams {

@@ -7,9 +7,12 @@
 //! - An orthogonal path must not intersect the **open interior** of any
 //!   non-endpoint node obstacle (ink-and-verification.md §7.3 item 4).
 //! - Polyline endpoints must match `port_anchor` within 1e-9 (P5-5).
+//! - The segment adjacent to each port must run along the port's outward
+//!   normal (v1 audit E1 direction clause; ink-and-verification.md §4).
 
 use std::collections::BTreeMap;
 
+use plotgram_algo::orientation::Side;
 use plotgram_engine_api::LayoutError;
 use plotgram_model::diagnostics::Relaxation;
 use plotgram_model::geometry::{Point, Rect};
@@ -258,6 +261,92 @@ pub fn polyline_bend_count(path: &InkPath) -> Option<usize> {
     Some(pts.len().saturating_sub(2))
 }
 
+/// Hard-fail when the segment adjacent to a port does not run along the
+/// port's outward normal (v1 audit E1 direction clause; a tangential stub
+/// rides the node face). Zero-length segments at either end are skipped —
+/// collinear merging does not change direction. Length is deliberately not
+/// guarded here; only direction. When `require_orthogonal` is set, a
+/// non-axis-aligned stub is an InternalInvariant.
+pub fn verify_port_stubs_normal(
+    edges: &[CanonicalEdge],
+    require_orthogonal: bool,
+) -> Result<(), LayoutError> {
+    for e in edges {
+        let Some(pts) = polyline_samples(&e.path) else {
+            continue; // curved paths have no orthogonal stubs
+        };
+        if pts.len() < 2 {
+            continue;
+        }
+        check_stub_dir(&e.id, &pts, e.from_port.side, true, require_orthogonal)?;
+        check_stub_dir(&e.id, &pts, e.to_port.side, false, require_orthogonal)?;
+    }
+    Ok(())
+}
+
+fn check_stub_dir(
+    edge_id: &str,
+    pts: &[Point],
+    side: Side,
+    at_source: bool,
+    require_orthogonal: bool,
+) -> Result<(), LayoutError> {
+    // First non-zero-length segment at the relevant end.
+    let (a, b) = if at_source {
+        let mut i = 0;
+        while i + 1 < pts.len() && seg_len(pts[i], pts[i + 1]) <= EPS {
+            i += 1;
+        }
+        if i + 1 >= pts.len() {
+            return Ok(());
+        }
+        (pts[i], pts[i + 1])
+    } else {
+        let mut i = pts.len();
+        while i >= 2 && seg_len(pts[i - 2], pts[i - 1]) <= EPS {
+            i -= 1;
+        }
+        if i < 2 {
+            return Ok(());
+        }
+        // Outward from the target port: last → second-last.
+        (pts[i - 1], pts[i - 2])
+    };
+    let (dx, dy) = (b.x - a.x, b.y - a.y);
+    let non_ortho = dx.abs() > EPS && dy.abs() > EPS;
+    if non_ortho {
+        if require_orthogonal {
+            return Err(LayoutError::message(format!(
+                "hierarchical: InternalInvariant — edge `{edge_id}` has a \
+                 non-orthogonal port stub under orthogonal routing_style"
+            )));
+        }
+        return Ok(());
+    }
+    if !dir_matches_normal(dx, dy, side) {
+        let end = if at_source { "source" } else { "target" };
+        return Err(LayoutError::message(format!(
+            "hierarchical: edge `{edge_id}` {end} stub ({dx:.3}, {dy:.3}) is not \
+             along the {side:?} port normal — path rides the node face \
+             (ink-and-verification.md §4)"
+        )));
+    }
+    Ok(())
+}
+
+fn seg_len(a: Point, b: Point) -> f64 {
+    (b.x - a.x).abs().max((b.y - a.y).abs())
+}
+
+fn dir_matches_normal(dx: f64, dy: f64, side: Side) -> bool {
+    match side {
+        Side::North => dy < -EPS && dx.abs() <= EPS,
+        Side::South => dy > EPS && dx.abs() <= EPS,
+        Side::West => dx < -EPS && dy.abs() <= EPS,
+        Side::East => dx > EPS && dy.abs() <= EPS,
+    }
+}
+
 /// True when the closed axis-aligned segment intersects the **open** interior
 /// of `frame` (after a tiny inset for float / boundary grazing).
 pub fn segment_hits_rect_interior(a: Point, b: Point, frame: Rect) -> bool {
@@ -299,17 +388,30 @@ mod tests {
     use plotgram_model::port::AlongSpec;
 
     fn edge(id: &str, source: &str, target: &str, pts: Vec<Point>) -> CanonicalEdge {
-        let port = ResolvedPort {
-            side: Side::South,
-            along: AlongSpec::Ordered { order: 0, count: 1 },
-        };
+        edge_sides(id, source, target, Side::South, Side::South, pts)
+    }
+
+    fn edge_sides(
+        id: &str,
+        source: &str,
+        target: &str,
+        from_side: Side,
+        to_side: Side,
+        pts: Vec<Point>,
+    ) -> CanonicalEdge {
         CanonicalEdge {
             id: id.into(),
             source: source.into(),
             target: target.into(),
             path: InkPath::Polyline(pts),
-            from_port: port,
-            to_port: port,
+            from_port: ResolvedPort {
+                side: from_side,
+                along: AlongSpec::Ordered { order: 0, count: 1 },
+            },
+            to_port: ResolvedPort {
+                side: to_side,
+                along: AlongSpec::Ordered { order: 0, count: 1 },
+            },
         }
     }
 
@@ -476,6 +578,98 @@ mod tests {
                 want,
                 "seg {a:?}->{b:?}"
             );
+        }
+    }
+
+    /// Port stub direction audit: tangential first/last segments hard-fail,
+    /// normal ones pass (both ends checked).
+    #[test]
+    fn port_stub_direction_audit() {
+        struct Case {
+            label: &'static str,
+            from_side: Side,
+            to_side: Side,
+            pts: Vec<Point>,
+            ok: bool,
+        }
+        let cases = [
+            Case {
+                label: "S-port tangential first segment",
+                from_side: Side::South,
+                to_side: Side::North,
+                pts: vec![
+                    Point { x: 10.0, y: 10.0 },
+                    Point { x: 30.0, y: 10.0 },
+                    Point { x: 30.0, y: 40.0 },
+                ],
+                ok: false,
+            },
+            Case {
+                label: "S-port normal stub",
+                from_side: Side::South,
+                to_side: Side::North,
+                pts: vec![
+                    Point { x: 10.0, y: 10.0 },
+                    Point { x: 10.0, y: 22.0 },
+                    Point { x: 30.0, y: 22.0 },
+                    Point { x: 30.0, y: 40.0 },
+                ],
+                ok: true,
+            },
+            Case {
+                label: "E-port normal stub",
+                from_side: Side::East,
+                to_side: Side::West,
+                pts: vec![
+                    Point { x: 20.0, y: 5.0 },
+                    Point { x: 32.0, y: 5.0 },
+                    Point { x: 32.0, y: 45.0 },
+                    Point { x: 40.0, y: 45.0 },
+                ],
+                ok: true,
+            },
+            Case {
+                label: "N-port normal last segment",
+                from_side: Side::South,
+                to_side: Side::North,
+                pts: vec![
+                    Point { x: 10.0, y: 10.0 },
+                    Point { x: 10.0, y: 30.0 },
+                    Point { x: 30.0, y: 30.0 },
+                    Point { x: 30.0, y: 40.0 },
+                ],
+                ok: true,
+            },
+            Case {
+                label: "S-port entering from below tangentially",
+                from_side: Side::South,
+                to_side: Side::South,
+                pts: vec![
+                    Point { x: 10.0, y: 10.0 },
+                    Point { x: 10.0, y: 55.0 },
+                    Point { x: 30.0, y: 55.0 },
+                ],
+                ok: false,
+            },
+        ];
+        for case in &cases {
+            let edges = vec![edge_sides(
+                "e0",
+                "a",
+                "b",
+                case.from_side,
+                case.to_side,
+                case.pts.clone(),
+            )];
+            let res = verify_port_stubs_normal(&edges, true);
+            assert_eq!(res.is_ok(), case.ok, "{}: {res:?}", case.label);
+            if !case.ok {
+                assert!(
+                    res.unwrap_err().to_string().contains("port normal"),
+                    "{}: error must name the violated normal",
+                    case.label
+                );
+            }
         }
     }
 }
