@@ -5,7 +5,8 @@
 | 目录 | 含义 |
 |------|------|
 | [`flat/`](flat/) | 无 group、无 PartitionGrid |
-| [`group/`](group/) | 有 group；含用 group 表达分区的旧「泳道」样例 |
+| [`group-weak/`](group-weak/) | `group_policy: weak`（默认）：软聚类，框由成员几何导出；全部聚类语义样例（含嵌套 / 无 label / 单成员 / 孤岛组等机制探针） |
+| [`group-strong-macro/`](group-strong-macro/) | `group_policy: strong-macro` 基准：泳道严格分区 / 组级排序约束等需要宏收缩契约的样例；实现落地前只钉 Unsupported 契约（hier_eval 豁免） |
 | [`fan/`](fan/) | 扇出 / 合流参数演示（`auto_edge_grouping`、`critical`） |
 | [`styles/`](styles/) | `routing_style` 变体 |
 | [`partition/`](partition/) | 真 PartitionGrid 占位（可空，等 M5） |

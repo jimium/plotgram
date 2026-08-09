@@ -1,0 +1,25 @@
+// 单成员组：框即成员 ± pad，与多成员兄弟组同 rank 相邻
+// 覆盖：最小框推导 + 次轴 clamp 分离的极窄组情形
+diagram {
+    profile: flowchart,
+    title: "单成员组"
+
+    group input {
+        node request { label: "请求入口", archetype: start }
+    }
+
+    group core {
+        node auth { label: "鉴权", archetype: process }
+        node logic { label: "业务处理", archetype: process }
+        node persist { label: "持久化", archetype: database }
+    }
+
+    group output {
+        node response { label: "响应出口", archetype: end }
+    }
+
+    request -> auth
+    auth -> logic
+    logic -> persist
+    logic -> response
+}

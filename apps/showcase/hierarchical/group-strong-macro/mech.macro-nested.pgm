@@ -1,0 +1,32 @@
+// 嵌套宏：组内嵌组，宏收缩需递归处理层级包涵
+// strong-macro 基准：嵌套宏的收缩/展开 + 跨层边
+diagram {
+    profile: architecture,
+    title: "嵌套宏（平台栈）",
+    layout: hierarchical { group_policy: strong-macro }
+
+    group platform {
+        label: "平台"
+        group runtime {
+            label: "运行时"
+            node scheduler { label: "调度器", archetype: service }
+            node executor { label: "执行器", archetype: service }
+        }
+        group storage {
+            label: "存储"
+            node meta_db { label: "元数据库", archetype: database }
+        }
+    }
+
+    group workload {
+        label: "工作负载"
+        node job_a { label: "作业 A", archetype: service }
+        node job_b { label: "作业 B", archetype: service }
+    }
+
+    job_a -> scheduler
+    job_b -> scheduler
+    scheduler -> executor
+    scheduler -> meta_db
+    executor -> meta_db
+}

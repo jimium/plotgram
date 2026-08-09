@@ -36,7 +36,7 @@ showcase/
 hierarchical/flat/smoke.decision-loop.pgm
 └ layout ─┘ └facet┘ └role┘ └──── slug ────┘
 
-hierarchical/group/product.cloud-native.pgm
+hierarchical/group-weak/product.cloud-native.pgm
 tree/plain/smoke.basic.pgm          # 将来；tree 自定 facet
 sequence/smoke.basic.pgm            # 将来；无 facet 亦可
 ```
@@ -129,7 +129,7 @@ showcase/
 
 ```text
 hierarchical/flat/smoke.decision-loop.pgm
-hierarchical/group/product.cloud-native.pgm
+hierarchical/group-weak/product.cloud-native.pgm
 ```
 
 | 清单 | 角色 |
@@ -170,7 +170,7 @@ diagram {
 | 冒烟决策环 | `hierarchical/flat/smoke.decision-loop.pgm` | flat |
 | 扁平 REST | `hierarchical/flat/product.flat-rest-api.pgm` | flat |
 | 三层架构 | `hierarchical/flat/product.three-tier.pgm` | flat |
-| 云原生 | `hierarchical/group/product.cloud-native.pgm` | group |
-| 跨部门「泳道」观感 | `hierarchical/group/product.swimlane-order-process.pgm` | group（假泳道） |
+| 云原生 | `hierarchical/group-weak/product.cloud-native.pgm` | group-weak |
+| 跨部门泳道 | `hierarchical/group-strong-macro/product.swimlane-order-process.pgm` | group-strong-macro |
 | yFiles 管道压测 | `hierarchical/flat/stress.layout-stress-yfiles-pipeline.pgm` | flat |
-| D2 对照 | `hierarchical/group/product.d2-cell-tower-network.pgm` | group |
+| D2 对照 | `hierarchical/group-weak/product.d2-cell-tower-network.pgm` | group-weak |

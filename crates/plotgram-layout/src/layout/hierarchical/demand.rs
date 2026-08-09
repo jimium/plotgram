@@ -4,9 +4,11 @@
 //! consumes them. Freeze is the only legal hand-off (write-authority H3):
 //! no publish after freeze, no Metric callback into the board.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::layout::hierarchical::compose::track_order::TrackOrderPlan;
+use crate::layout::hierarchical::group_frame::{group_shell_bands, GROUP_FRAME_GAP};
+use crate::layout::hierarchical::model::PlanGraph;
 
 /// Typed MetricBudget demand keys (coordinate-and-demand.md §1.1 subset).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -80,6 +82,38 @@ pub fn publish_channel_layer_gap_demand(
     }
 }
 
+/// Group shell producer: rank gaps adjacent to a group frame edge must cover
+/// the shell bands plus a corridor core, or frames derived by the engine's
+/// finalize coincide / overlap and Cross lanes pierce the pad bands.
+///
+/// For every gap with a band: `demand = bands + max(GROUP_FRAME_GAP,
+/// (track_count + 1) × edge_gap)` — the track term leaves one `edge_gap`
+/// clearance on each side of the centered lanes. Sibling groups that *share*
+/// a rank are separated on the cross axis instead (symmetry_objective clamp
+/// separation), so they contribute no main-axis demand here.
+pub fn publish_group_layer_gap_demand(
+    board: &mut DemandBoard,
+    plan: &PlanGraph,
+    labeled: &BTreeSet<String>,
+    track_order: &TrackOrderPlan,
+    edge_gap: f64,
+) {
+    let bands = group_shell_bands(plan, labeled);
+    for (r, &(below, above)) in bands.gap.iter().enumerate() {
+        let pads = below + above;
+        if pads <= 0.0 {
+            continue;
+        }
+        let count = track_order
+            .rank_gap_track_counts
+            .get(&(r as u32))
+            .copied()
+            .unwrap_or(0);
+        let core = ((count + 1) as f64 * edge_gap).max(GROUP_FRAME_GAP);
+        board.publish(DemandKey::LayerGap(r as u32), pads + core);
+    }
+}
+
 /// Resolved main-axis gap between layer `r` and `r+1` (length = n_layers - 1).
 ///
 /// Requires a frozen board. Each gap is at least `base_layer_gap`, raised by
@@ -149,6 +183,71 @@ mod tests {
             );
             prev = g;
         }
+    }
+
+    #[test]
+    fn group_band_demand_reserves_frame_pads() {
+        use crate::layout::hierarchical::model::{Elem, ElemKey};
+
+        fn real(id: &str, rank: u32, group: &str) -> Elem {
+            Elem {
+                key: ElemKey::Real(id.into()),
+                group_path: vec![group.into()],
+                rank,
+            }
+        }
+        // g1 ends at rank 0, g2 (labeled) starts at rank 1, g3 shares rank 1
+        // with g2 → seam 0|1 carries both bands; g3's top band adds nothing
+        // (unlabeled 16 < labeled 24).
+        let elems = vec![real("a", 0, "g1"), real("b", 1, "g2"), real("c", 1, "g3")];
+        let layers = vec![vec![0], vec![1, 2]];
+        let plan = crate::layout::hierarchical::model::PlanGraph {
+            elems,
+            index_of: Default::default(),
+            decl_index: vec![0, 1, 2],
+            segments: Vec::new(),
+            layers,
+        };
+        let labeled: BTreeSet<String> = ["g2".to_string()].into_iter().collect();
+        let mut board = DemandBoard::new();
+        publish_group_layer_gap_demand(&mut board, &plan, &labeled, &TrackOrderPlan::default(), 16.0);
+        board.freeze();
+        // bottom band 16 + top band 24 + frame-gap core 16 = 56.
+        assert_eq!(board.get(DemandKey::LayerGap(0)), Some(56.0));
+        assert_eq!(resolved_layer_gaps(2, 40.0, &board), vec![56.0]);
+    }
+
+    #[test]
+    fn group_band_demand_grows_with_tracks() {
+        use crate::layout::hierarchical::model::{Elem, ElemKey};
+
+        let elems = vec![
+            Elem {
+                key: ElemKey::Real("a".into()),
+                group_path: vec!["g1".into()],
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Real("b".into()),
+                group_path: vec!["g2".into()],
+                rank: 1,
+            },
+        ];
+        let plan = crate::layout::hierarchical::model::PlanGraph {
+            elems,
+            index_of: Default::default(),
+            decl_index: vec![0, 1],
+            segments: Vec::new(),
+            layers: vec![vec![0], vec![1]],
+        };
+        let labeled = BTreeSet::new();
+        let mut tracks = TrackOrderPlan::default();
+        tracks.rank_gap_track_counts.insert(0, 2);
+        let mut board = DemandBoard::new();
+        publish_group_layer_gap_demand(&mut board, &plan, &labeled, &tracks, 16.0);
+        board.freeze();
+        // bands 32 + track core (2+1)*16 = 80.
+        assert_eq!(board.get(DemandKey::LayerGap(0)), Some(80.0));
     }
 
     #[test]

@@ -1,0 +1,27 @@
+// 长短组并存：backbone 组跨全部 rank，sidecar 组只占中段 rank
+// 覆盖：长组跨多个缝的壳带 + 兄弟组共享 rank 的次轴分离同时出现
+diagram {
+    profile: flowchart,
+    title: "长短组并存"
+
+    group backbone {
+        label: "主干"
+        node ingest { label: "接入", archetype: process }
+        node normalize { label: "规整", archetype: process }
+        node enrich { label: "增强", archetype: process }
+        node publish { label: "发布", archetype: process }
+    }
+
+    group sidecar {
+        label: "旁路质检"
+        node sample { label: "抽样", archetype: process }
+        node audit { label: "审计", archetype: process }
+    }
+
+    ingest -> normalize
+    normalize -> enrich
+    enrich -> publish
+    normalize -> sample
+    sample -> audit
+    audit -> enrich
+}

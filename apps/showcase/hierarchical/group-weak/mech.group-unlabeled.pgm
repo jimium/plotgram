@@ -1,0 +1,20 @@
+// 无 label 组：顶 pad 走 GROUP_PAD（16）而非标题带（24）
+// 覆盖：壳带 top_pad 分支 + 组缝 demand 的 unlabeled 路径
+diagram {
+    profile: flowchart,
+    title: "无 label 组"
+
+    group phase_a {
+        node scan { label: "扫描", archetype: process }
+        node parse { label: "解析", archetype: process }
+    }
+
+    group phase_b {
+        node verify { label: "校验", archetype: process }
+        node emit { label: "产出", archetype: process }
+    }
+
+    scan -> parse
+    parse -> verify
+    verify -> emit
+}

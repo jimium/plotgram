@@ -6,6 +6,7 @@ use plotgram_algo::orientation::Size;
 
 use crate::layout::hierarchical::channel::{ChannelRoutePlan, TrackId, TrackOrient};
 use crate::layout::hierarchical::compose::track_order::TrackOrderPlan;
+use crate::layout::hierarchical::group_frame::GroupShellBands;
 use crate::layout::hierarchical::model::PlanGraph;
 
 /// Per-substrate-track lane coordinates (main Y for Cross, cross X for Main).
@@ -31,6 +32,7 @@ pub fn assign_track_coords(
     size_of: &dyn Fn(usize) -> Size,
     track_order: &TrackOrderPlan,
     route_plan: &ChannelRoutePlan,
+    shell: &GroupShellBands,
     edge_gap: f64,
 ) -> TrackCoords {
     // Real-node frames for Main-lane clearance (InkVerifier node-penetration).
@@ -65,16 +67,18 @@ pub fn assign_track_coords(
                 let line = t.line;
                 if line == 0 || line >= plan.layers.len() {
                     // Outside the stack — park near adjacent layer; still
-                    // separate lanes (P5-5).
+                    // separate lanes (P5-5). Keep one `edge_gap` clear of the
+                    // group shell band that extends past the outer rank.
+                    let below = line > 0;
                     let base = if line == 0 {
-                        main.get(plan.layers[0][0]).copied().unwrap_or(0.0) - edge_gap
+                        let top = main.get(plan.layers[0][0]).copied().unwrap_or(0.0);
+                        top - edge_gap.max(shell.outer_top + edge_gap)
                     } else {
                         let last = plan.layers.len() - 1;
                         let e = plan.layers[last][0];
-                        main[e] + size_of(e).height + edge_gap
+                        main[e] + size_of(e).height + edge_gap.max(shell.outer_bottom + edge_gap)
                     };
                     let mid = (count.saturating_sub(1) as f64) * 0.5;
-                    let below = line > 0;
                     (0..count)
                         .map(|i| {
                             // A row taller than edge_gap puts the naive parked
@@ -98,9 +102,11 @@ pub fn assign_track_coords(
                         .fold(0.0_f64, f64::max);
                     let gap_top = main[plan.layers[r][0]] + thickness;
                     let gap_bot = main[plan.layers[r + 1][0]];
-                    let usable = (gap_bot - gap_top).max(0.0);
-                    let span = (count.saturating_sub(1) as f64) * edge_gap;
-                    let start = gap_top + (usable - span) * 0.5;
+                    let (below_band, above_band) =
+                        shell.gap.get(r).copied().unwrap_or((0.0, 0.0));
+                    let start = cross_lane_start(
+                        gap_top, gap_bot, below_band, above_band, count, edge_gap,
+                    );
                     (0..count)
                         .map(|i| start + i as f64 * edge_gap)
                         .collect()
@@ -152,6 +158,30 @@ pub fn assign_track_coords(
         out.coords.insert(tid, ys);
     }
     out
+}
+
+/// First lane Y for an interior Cross track: center the lane fan in the
+/// group-shell-free sub-interval of the rank gap (demand reserves room for
+/// it); fall back to centering in the full gap when the free interval is too
+/// narrow (degraded group chains / tight params).
+fn cross_lane_start(
+    gap_top: f64,
+    gap_bot: f64,
+    below_band: f64,
+    above_band: f64,
+    count: usize,
+    edge_gap: f64,
+) -> f64 {
+    let span = (count.saturating_sub(1) as f64) * edge_gap;
+    let free_top = gap_top + below_band;
+    let free_bot = gap_bot - above_band;
+    let (lo, hi) = if free_bot - free_top >= span {
+        (free_top, free_bot)
+    } else {
+        (gap_top, gap_bot)
+    };
+    let usable = (hi - lo).max(0.0);
+    lo + (usable - span) * 0.5
 }
 
 fn main_line_backbone_x(
@@ -268,6 +298,35 @@ fn clear_parked_y(y: f64, obstacles: &[(f64, f64, f64, f64)], edge_gap: f64, bel
 mod tests {
     use super::clear_main_x;
     use super::clear_parked_y;
+    use super::cross_lane_start;
+
+    #[test]
+    fn cross_lane_start_avoids_shell_bands() {
+        // Table: (below_band, above_band, count, expected start).
+        // Gap [100, 180], edge_gap 16.
+        let cases: &[(f64, f64, usize, f64)] = &[
+            // No bands: center in the full gap (single lane).
+            (0.0, 0.0, 1, 140.0),
+            // Bands [100,116] / [156,180]: center in free [116,156].
+            (16.0, 24.0, 1, 136.0),
+            // Two lanes span 16 in free [116,156] → start 128.
+            (16.0, 24.0, 2, 128.0),
+            // Free interval narrower than the fan → fall back to full gap.
+            (40.0, 40.0, 2, 100.0 + (80.0 - 16.0) * 0.5),
+        ];
+        for &(below, above, count, expected) in cases {
+            let start = cross_lane_start(100.0, 180.0, below, above, count, 16.0);
+            assert!(
+                (start - expected).abs() < 1e-9,
+                "below={below} above={above} count={count}: {start} != {expected}"
+            );
+            if below + above < 80.0 {
+                let last = start + (count.saturating_sub(1) as f64) * 16.0;
+                assert!(start >= 100.0 + below - 1e-9, "start pierces below band");
+                assert!(last <= 180.0 - above + 1e-9, "last lane pierces above band");
+            }
+        }
+    }
 
     #[test]
     fn clear_main_x_pushes_off_node_body() {

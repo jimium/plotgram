@@ -6,17 +6,17 @@
 hierarchical/flat/product.three-tier.pgm
 hierarchical/flat/product.typical-microservice-architecture.pgm
 hierarchical/flat/product.flat-rest-api.pgm
-hierarchical/group/product.microservices.pgm
-hierarchical/group/product.cdn-cache.pgm
-hierarchical/group/product.cloud-native.pgm
-hierarchical/group/product.ecommerce-platform.pgm
-hierarchical/group/product.message-queue-pipeline.pgm
-hierarchical/group/product.monitoring-stack.pgm
-hierarchical/group/product.narrow-corridor.pgm
+hierarchical/group-weak/product.microservices.pgm
+hierarchical/group-weak/product.cdn-cache.pgm
+hierarchical/group-weak/product.cloud-native.pgm
+hierarchical/group-weak/product.ecommerce-platform.pgm
+hierarchical/group-weak/product.message-queue-pipeline.pgm
+hierarchical/group-weak/product.monitoring-stack.pgm
+hierarchical/group-weak/mech.narrow-corridor.pgm
 hierarchical/flat/product.linear-chain.pgm
 hierarchical/flat/product.user-auth.pgm
 hierarchical/flat/product.refund-process.pgm
-hierarchical/group/product.swimlane-order-process.pgm
+# hierarchical/group-strong-macro/product.swimlane-order-process.pgm（已转 strong-macro 基准，实现落地前不可渲染）
 hierarchical/flat/product.password-reset.pgm
 hierarchical/flat/product.leave-approval-process.pgm
 hierarchical/flat/product.self-loop-retry.pgm

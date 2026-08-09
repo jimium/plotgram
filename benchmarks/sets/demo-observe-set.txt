@@ -3,23 +3,20 @@
 # 文件名角色 = demo。
 # 在 compare.sh 中：质量轨默认 WARN（可观测/可债），正确性轨仍硬。
 
-hierarchical/group/demo.k8s-multi-namespace-overview.pgm
-hierarchical/group/demo.k8s-multi-cluster-federation.pgm
-hierarchical/group/demo.k8s-platform-stack.pgm
-hierarchical/group/demo.k8s-tenant-isolation.pgm
-hierarchical/group/demo.k8s-blue-green-release-topology.pgm
-hierarchical/group/demo.hybrid-cloud-dr-topology.pgm
-hierarchical/group/demo.data-lineage-platform.pgm
-hierarchical/group/demo.ai-agent-docops-pipeline.pgm
-hierarchical/group/demo.payment-clearing-platform.pgm
-hierarchical/group/demo.supply-chain-control-tower.pgm
-hierarchical/group/demo.mcp-server-cluster-architecture.pgm
-hierarchical/group/demo.plotgram-core-mod-deps.pgm
+hierarchical/group-weak/demo.k8s-multi-namespace-overview.pgm
+hierarchical/group-weak/demo.k8s-platform-stack.pgm
+hierarchical/group-weak/demo.k8s-tenant-isolation.pgm
+hierarchical/group-weak/demo.k8s-blue-green-release-topology.pgm
+hierarchical/group-weak/demo.hybrid-cloud-dr-topology.pgm
+hierarchical/group-weak/demo.data-lineage-platform.pgm
+hierarchical/group-weak/demo.ai-agent-docops-pipeline.pgm
+hierarchical/group-weak/demo.supply-chain-control-tower.pgm
+hierarchical/group-weak/demo.mcp-server-cluster-architecture.pgm
+hierarchical/group-weak/demo.plotgram-core-mod-deps.pgm
 hierarchical/flat/demo.flat-realtime-recommendation.pgm
 hierarchical/flat/demo.aml-case-investigation.pgm
 hierarchical/flat/demo.k8s-incident-response.pgm
 hierarchical/flat/demo.change-approval-workflow.pgm
 hierarchical/flat/demo.pr-architecture-review.pgm
-hierarchical/group/demo.ci-cd-security-pipeline.pgm
-hierarchical/group/demo.e-commerce-order-fulfillment.pgm
-hierarchical/group/demo.customer-refund-process.pgm
+hierarchical/group-weak/demo.ci-cd-security-pipeline.pgm
+hierarchical/group-weak/demo.e-commerce-order-fulfillment.pgm

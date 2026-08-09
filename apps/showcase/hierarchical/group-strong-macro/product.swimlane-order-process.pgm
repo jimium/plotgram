@@ -1,9 +1,9 @@
 // 泳道图：跨部门订单处理流程
-// 结构靠 group 分区表达；泳道几何语义留给后续 DSL（本阶段不写 group_frame）
+// 泳道列严格分区需要宏收缩契约 → strong-macro 基准（weak 无法保泳道几何）
 diagram {
     profile: flowchart,
     title: "跨部门订单处理（泳道图）",
-    layout: hierarchical { direction: top-to-bottom }
+    layout: hierarchical { direction: top-to-bottom, group_policy: strong-macro }
 
     group customer {
         label: "客户"

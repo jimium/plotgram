@@ -1,0 +1,38 @@
+// 多泳道含回环：四泳道 + 驳回重提的回环边
+// strong-macro 基准：泳道列严格分区 + 跨泳道回环的宏级路由
+diagram {
+    profile: flowchart,
+    title: "招聘流程（泳道）",
+    layout: hierarchical { group_policy: strong-macro }
+
+    group hr {
+        label: "人事"
+        node open_req { label: "开放职位", archetype: start }
+        node offer { label: "发放 Offer", archetype: process }
+    }
+
+    group hiring {
+        label: "用人部门"
+        node screen { label: "简历筛选", archetype: process }
+        node interview { label: "面试", archetype: process }
+    }
+
+    group candidate {
+        label: "候选人"
+        node apply { label: "投递", archetype: process }
+        node accept { label: "接受 Offer", archetype: end }
+    }
+
+    group review {
+        label: "评审委员会"
+        node calibrate { label: "定级校准", archetype: process }
+    }
+
+    open_req -> apply
+    apply -> screen
+    screen -> interview
+    interview -> calibrate
+    calibrate -> offer
+    interview -> screen { label: "驳回重筛" }
+    offer -> accept
+}

@@ -1,0 +1,25 @@
+// 孤岛组：一个组与其余组完全无边相连
+// 覆盖：无跨组边时组间分离只靠 clamp/缝 demand，排序自由度最大
+diagram {
+    profile: flowchart,
+    title: "孤岛组"
+
+    group main_flow {
+        label: "主流程"
+        node start { label: "开始", archetype: start }
+        node step1 { label: "处理", archetype: process }
+        node step2 { label: "审核", archetype: process }
+        node finish { label: "结束", archetype: end }
+    }
+
+    group side_tool {
+        label: "独立工具"
+        node tool_a { label: "工具 A", archetype: process }
+        node tool_b { label: "工具 B", archetype: process }
+    }
+
+    start -> step1
+    step1 -> step2
+    step2 -> finish
+    tool_a -> tool_b
+}

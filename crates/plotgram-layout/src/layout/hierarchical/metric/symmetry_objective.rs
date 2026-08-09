@@ -11,6 +11,7 @@ use plotgram_algo::vpsc::{self, Constraint, Variable, VpscError};
 use plotgram_model::geometry::Rect;
 
 use crate::layout::hierarchical::compose::ports::EdgePorts;
+use crate::layout::hierarchical::group_frame::GROUP_PAD;
 use crate::layout::hierarchical::metric::anchor::port_anchor;
 use crate::layout::hierarchical::metric::bk;
 use crate::layout::hierarchical::metric::symmetry::{
@@ -44,22 +45,40 @@ pub fn solve_symmetry_objective(
     let up_deg = degrees_of(&up_nbs);
     let twins = twin_plan_pairs(plan, graph);
     let primary = primary_arm_pairs(plan, &down_nbs, &up_nbs, &down_deg, &up_deg, &twins);
-    let hard_twin = hard_constraints(
-        plan,
-        size_of,
-        params.node_gap,
-        &bk.primary_blocks,
-        &twins,
-        true,
-    );
-    let hard_soft_twin = hard_constraints(
-        plan,
-        size_of,
-        params.node_gap,
-        &bk.primary_blocks,
-        &twins,
-        false,
-    );
+    // Constraint degradation chain: full (twin hard + cross-rank clamp
+    // equalities) → twin soft → no clamp equalities. The gb equalities make
+    // each clamp column the cross-rank frame edge; they can only cycle when
+    // sibling group intervals swap order across ranks, in which case frames
+    // cannot be disjoint anyway and we degrade gracefully.
+    let chains = [
+        hard_constraints(
+            plan,
+            size_of,
+            params.node_gap,
+            &bk.primary_blocks,
+            &twins,
+            true,
+            true,
+        ),
+        hard_constraints(
+            plan,
+            size_of,
+            params.node_gap,
+            &bk.primary_blocks,
+            &twins,
+            false,
+            true,
+        ),
+        hard_constraints(
+            plan,
+            size_of,
+            params.node_gap,
+            &bk.primary_blocks,
+            &twins,
+            false,
+            false,
+        ),
+    ];
     let weights = vpsc_weights(plan, graph);
     let hubs: Vec<usize> = (0..n)
         .filter(|&e| {
@@ -71,16 +90,29 @@ pub fn solve_symmetry_objective(
     let segs_by_edge = plan.segments_by_edge();
     let layer_pos = plan.layer_positions();
 
-    // Prefer twin hard equalities; fall back if they cycle with separation.
-    let (hard, twin_hard_ok) = match solve_once(n, &bk.ideal, &weights, &hard_twin) {
-        Ok(_) => (hard_twin, true),
-        Err(VpscError::Infeasible { .. }) => (hard_soft_twin.clone(), false),
-        Err(e) => return Err(e),
-    };
+    // Prefer the full chain; degrade only when it cycles with separation.
+    let mut chain_idx = 0usize;
+    let mut last_infeasible: Option<VpscError> = None;
+    for (i, c) in chains.iter().enumerate() {
+        match solve_once(n, &bk.ideal, &weights, c) {
+            Ok(_) => {
+                chain_idx = i;
+                last_infeasible = None;
+                break;
+            }
+            Err(e @ VpscError::Infeasible { .. }) => last_infeasible = Some(e),
+            Err(e) => return Err(e),
+        }
+    }
+    if let Some(e) = last_infeasible {
+        return Err(e);
+    }
+    let hard = &chains[chain_idx];
+    let hard_fallback = &chains[(chain_idx + 1).min(2)];
 
     // Feasible start: raw BK ideal may violate separation, so its J is not
     // comparable to post-VPSC iterates (would permanently win the snapshot).
-    let mut x = solve_once(n, &bk.ideal, &weights, &hard)?;
+    let mut x = solve_once(n, &bk.ideal, &weights, hard)?;
     let mut best = x.clone();
     let mut best_j = objective_j(
         plan,
@@ -130,7 +162,7 @@ pub fn solve_symmetry_objective(
             &mut iter_weights,
         );
 
-        x = solve_once(n, &desired, &iter_weights, &hard)?;
+        x = solve_once(n, &desired, &iter_weights, hard)?;
         let j = objective_j(
             plan,
             &x,
@@ -156,12 +188,8 @@ pub fn solve_symmetry_objective(
         params,
         &best,
         &weights,
-        &hard,
-        if twin_hard_ok {
-            &hard_soft_twin
-        } else {
-            &hard
-        },
+        hard,
+        hard_fallback,
         &hubs,
         &down_nbs,
         &up_nbs,
@@ -435,20 +463,29 @@ fn hard_constraints(
     primary_blocks: &[Vec<usize>],
     twins: &BTreeSet<(usize, usize)>,
     twin_hard: bool,
+    gb_hard: bool,
 ) -> Vec<Constraint> {
     let mut constraints = Vec::new();
+    // Group-boundary clamps participate in the hard separation chain: with a
+    // `GROUP_PAD` extra on boundary-adjacent pairs, each clamp sits exactly on
+    // the frame edge its rank implies (finalize draws frames at member ± pad),
+    // and clamp-to-clamp across sibling groups reserves the frame gap.
     for layer in &plan.layers {
         let geometric: Vec<usize> = layer
             .iter()
             .copied()
-            .filter(|&e| {
-                !plan.elems[e].key.is_group_boundary()
-                    && !matches!(&plan.elems[e].key, ElemKey::OrderPad { .. })
-            })
+            .filter(|&e| !matches!(&plan.elems[e].key, ElemKey::OrderPad { .. }))
             .collect();
         for i in 0..geometric.len().saturating_sub(1) {
             let (l, r) = (geometric[i], geometric[i + 1]);
-            let gap = size_of(l).width / 2.0 + size_of(r).width / 2.0 + node_gap;
+            let extra = if plan.elems[l].key.is_group_boundary()
+                || plan.elems[r].key.is_group_boundary()
+            {
+                GROUP_PAD
+            } else {
+                node_gap
+            };
+            let gap = size_of(l).width / 2.0 + size_of(r).width / 2.0 + extra;
             constraints.push(Constraint::new(l, r, gap));
         }
     }
@@ -466,6 +503,16 @@ fn hard_constraints(
             if plan.elems[a].rank != plan.elems[b].rank {
                 constraints.push(Constraint::new(a, b, 0.0));
                 constraints.push(Constraint::new(b, a, 0.0));
+            }
+        }
+    }
+    if gb_hard {
+        // Cross-rank hard equalities tie same-side clamps of one group into a
+        // single column = the cross-rank union edge = the drawn frame edge.
+        for s in &plan.segments {
+            if s.edge_id.starts_with("gb:") {
+                constraints.push(Constraint::new(s.from, s.to, 0.0));
+                constraints.push(Constraint::new(s.to, s.from, 0.0));
             }
         }
     }

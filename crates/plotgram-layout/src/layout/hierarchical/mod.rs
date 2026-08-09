@@ -14,6 +14,7 @@ mod channel;
 mod compose;
 mod debug;
 mod demand;
+mod group_frame;
 mod ink;
 mod metric;
 mod model;
@@ -21,6 +22,7 @@ mod orient;
 mod params;
 
 pub use debug::{build_debug_trace, LayoutDebugTrace};
+pub use group_frame::{GROUP_FRAME_GAP, GROUP_LABEL_TOP_PAD, GROUP_PAD};
 
 use plotgram_algo::orientation::{self as algo_orient, Orientation as AlgoOrientation};
 use plotgram_engine_api::{
@@ -111,6 +113,12 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         .collect();
     compose::boundary::insert_group_boundaries(&mut plan);
     compose::order::order_layers(&mut plan, &edge_weights, params.group_boundary_weight);
+
+    // MetricBudget board: group-shell + channel LayerGap demands publish
+    // before freeze (write-authority H3); the group shell bands also feed the
+    // Cross-track writer below so lanes never pierce frame pads.
+    let mut demand_board = demand::DemandBoard::new();
+    let labeled = collect_labeled_groups(&input.graph.groups);
 
     // Canonical node sizes are needed before port finalize (FIXED_POS
     // boundary validation) — measured sizes, never invented.
@@ -215,12 +223,20 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         &route_plan.bundles,
         &route_plan,
     );
-    // D1.3.4 MetricBudget DemandBoard: Channel lane counts → LayerGap, then freeze.
-    let mut demand_board = demand::DemandBoard::new();
+    // D1.3.4 MetricBudget DemandBoard: Channel lane counts + group shell
+    // bands → LayerGap, then freeze (the band demand is track-count aware,
+    // so it publishes after TrackOrder).
     demand::publish_channel_layer_gap_demand(
         &mut demand_board,
         &track_order,
         params.layer_gap,
+        params.edge_gap,
+    );
+    demand::publish_group_layer_gap_demand(
+        &mut demand_board,
+        &plan,
+        &labeled,
+        &track_order,
         params.edge_gap,
     );
     demand_board.freeze();
@@ -236,6 +252,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         })
         .collect();
 
+    let shell_bands = group_frame::group_shell_bands(&plan, &labeled);
     let track_coords = metric::track::assign_track_coords(
         &plan,
         &main,
@@ -243,6 +260,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         &size_of,
         &track_order,
         &route_plan,
+        &shell_bands,
         params.edge_gap,
     );
 
@@ -425,6 +443,22 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         },
         captures,
     ))
+}
+
+/// Group ids carrying a label (recursive — nested groups included); their
+/// frame top pad reserves the label band.
+fn collect_labeled_groups(groups: &[plotgram_model::graph::Group]) -> std::collections::BTreeSet<String> {
+    let mut out = std::collections::BTreeSet::new();
+    fn walk(groups: &[plotgram_model::graph::Group], out: &mut std::collections::BTreeSet<String>) {
+        for g in groups {
+            if g.label.is_some() {
+                out.insert(g.id.clone());
+            }
+            walk(&g.groups, out);
+        }
+    }
+    walk(groups, &mut out);
+    out
 }
 
 /// Canonical resolved port → physical [`PortRef`] (orientation-out pass).

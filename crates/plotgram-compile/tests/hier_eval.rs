@@ -187,9 +187,29 @@ fn hierarchical_showcase_geometry_invariants() {
             .display()
             .to_string();
         let source = fs::read_to_string(path).unwrap();
+        let macro_baseline = expects_strong_macro_unsupported(&source);
         let result = match build_layout(&source, &BuildOptions::default()) {
-            Ok(r) => r,
+            Ok(r) => {
+                if macro_baseline {
+                    hard_failures.push(format!(
+                        "{name}: expected `strong-macro` Unsupported but layout succeeded"
+                    ));
+                    continue;
+                }
+                r
+            }
             Err(e) => {
+                if macro_baseline {
+                    // Baseline fixture for the upcoming macro contract: only
+                    // the Unsupported boundary is asserted; it carries no
+                    // metrics / baseline entry until the policy lands.
+                    if !e.to_string().contains("Unsupported") {
+                        hard_failures.push(format!(
+                            "{name}: expected `strong-macro` Unsupported, got: {e}"
+                        ));
+                    }
+                    continue;
+                }
                 hard_failures.push(format!("{name}: pipeline error: {e}"));
                 continue;
             }
@@ -272,6 +292,13 @@ fn hierarchical_showcase_geometry_invariants() {
         "hard geometric invariant violations:\n{}",
         hard_failures.join("\n")
     );
+}
+
+/// `group-strong-macro/` fixtures declare the upcoming macro policy; until it
+/// is implemented they only pin the Unsupported contract (no metrics).
+fn expects_strong_macro_unsupported(source: &str) -> bool {
+    source.contains("group_policy: strong-macro")
+        || source.contains("group_policy: strong_macro")
 }
 
 fn check_no_node_overlaps(name: &str, result: &LayoutResult, failures: &mut Vec<String>) {

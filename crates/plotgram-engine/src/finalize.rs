@@ -1,5 +1,6 @@
 //! Group envelopes, labels, canvas — after nodes/edges are final.
 
+use plotgram_layout::layout::hierarchical::{GROUP_LABEL_TOP_PAD, GROUP_PAD};
 use plotgram_router::core::union_rects;
 use plotgram_model::diagnostics::LayoutDiagnostics;
 use plotgram_model::geometry::{Point, Rect};
@@ -8,12 +9,7 @@ use plotgram_model::result::{
     EdgePath, EdgePlacement, GroupPlacement, LabelOwner, LabelSlot, LayoutResult, NodePlacement,
 };
 
-const GROUP_PAD: f64 = 16.0;
 const CANVAS_PAD: f64 = 24.0;
-/// Must stay >= the label band height `simple_labels` draws (18.0) plus a
-/// little breathing room, or the band overlaps the topmost member — a plain
-/// `GROUP_PAD` on all sides isn't tall enough for a labeled group's top.
-const GROUP_LABEL_TOP_PAD: f64 = 24.0;
 
 pub fn finalize(
     graph: &Graph,

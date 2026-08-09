@@ -1,7 +1,9 @@
 // architecture 跨组 constrain：强制 storage 在 ingress 下游
+// strong-macro 基准：组级排序约束需要宏收缩契约（weak 无法表达）
 diagram {
     profile: architecture,
-    title: "constrain cross-group"
+    title: "constrain cross-group",
+    layout: hierarchical { group_policy: strong-macro }
 
     group ingress {
         label: "入口"
