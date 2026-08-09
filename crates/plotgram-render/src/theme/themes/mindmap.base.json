@@ -54,7 +54,6 @@
     "spacing": {
       "node_padding_x": 12,
       "node_padding_y": 8,
-      "group_padding": 16,
       "label_gap": 6
     }
   },

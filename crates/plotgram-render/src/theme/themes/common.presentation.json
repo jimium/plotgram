@@ -123,7 +123,6 @@
     "spacing": {
       "node_padding_x": 16,
       "node_padding_y": 11,
-      "group_padding": 20,
       "label_gap": 8
     }
   },

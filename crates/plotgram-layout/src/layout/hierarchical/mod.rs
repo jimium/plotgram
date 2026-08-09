@@ -35,7 +35,7 @@ use plotgram_model::result::{EdgePath, EdgePlacement, NodePlacement};
 use std::collections::BTreeMap;
 
 pub use params::{
-    BindResult, GroupAlign, GroupPolicy, GroupSizing, HierarchicalParams, HierarchicalPreset,
+    BindResult, GroupPolicy, HierarchicalParams, HierarchicalPreset,
     Orientation, RoutingStyle,
 };
 

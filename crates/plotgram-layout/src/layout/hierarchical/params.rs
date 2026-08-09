@@ -52,40 +52,6 @@ impl GroupPolicy {
     }
 }
 
-/// Same-rank group frame width policy.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GroupSizing {
-    Fit,
-    Equal,
-}
-
-impl GroupSizing {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Fit => "fit",
-            Self::Equal => "equal",
-        }
-    }
-}
-
-/// Macro-row / inter-group alignment.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GroupAlign {
-    Start,
-    Center,
-    End,
-}
-
-impl GroupAlign {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Start => "start",
-            Self::Center => "center",
-            Self::End => "end",
-        }
-    }
-}
-
 /// Built-in edge geometry style when Hier owns ink (`edge_routing` absent).
 ///
 /// Distinct from diagram-level `edge_routing:` (independent EdgeRouter after layout).
@@ -213,11 +179,6 @@ pub struct HierarchicalParams {
     /// Soft bend budget; exceeding emits a relaxation (P5-5).
     pub max_bends_budget: u32,
     pub group_policy: GroupPolicy,
-    /// **Not consumed in this build** (no group-frame writer yet) — explicit
-    /// options rejected in [`Self::bind`].
-    pub group_sizing: GroupSizing,
-    /// **Not consumed in this build** — same treatment as `group_sizing`.
-    pub group_align: GroupAlign,
 }
 
 impl Default for HierarchicalParams {
@@ -243,8 +204,6 @@ impl Default for HierarchicalParams {
             route_w_cross: 3.0,
             max_bends_budget: 6,
             group_policy: GroupPolicy::Weak,
-            group_sizing: GroupSizing::Fit,
-            group_align: GroupAlign::Center,
         }
     }
 }
@@ -259,14 +218,6 @@ impl HierarchicalParams {
         // (architecture.md §1.1 + anti-pattern #13). Unsupported stays a hard
         // failure even though `LayoutDiagnostics` now exists — a warning is
         // reserved for non-fatal observations, never for unsupported options.
-        for key in ["group_sizing", "group_align"] {
-            if options.contains_key(key) {
-                return Err(LayoutError::message(format!(
-                    "hierarchical: option `{key}` is unsupported in this build \
-                     (no consumer yet; see docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md §2.7)"
-                )));
-            }
-        }
         if options.contains_key("bus_routing") {
             return Err(LayoutError::message(
                 "hierarchical: option `bus_routing` was removed — it mirrored a \
@@ -469,7 +420,7 @@ impl HierarchicalParams {
              routing_style={}|auto_edge_grouping={}|\
              min_first_segment={:e}|min_last_segment={:e}|port_stub={:e}|\
              route_w_bend={:e}|route_w_len={:e}|route_w_cross={:e}|max_bends_budget={}|\
-             group_policy={}|group_sizing={}|group_align={}",
+             group_policy={}",
             self.orientation.as_str(),
             self.node_gap,
             self.layer_gap,
@@ -490,8 +441,6 @@ impl HierarchicalParams {
             self.route_w_cross,
             self.max_bends_budget,
             self.group_policy.as_str(),
-            self.group_sizing.as_str(),
-            self.group_align.as_str(),
         );
         format!("{:016x}", fnv1a_64(canonical.as_bytes()))
     }
