@@ -453,22 +453,25 @@ TrackOrder 是 `track_index` 的唯一写者。查不到分配说明上游有 bu
 
 ## 3. 与 yFiles 的能力差距（对照表）
 
-| 能力 | yFiles | 本实现 | 差距 |
+> **§3 修订（2026-08-09）**：对照当前实现（`hierarchical/` ≈17k 行；Channel P5 `EndCandidate` + `couple_main_corridor` 已落地）。§0–§2 的缺陷清单与 §4 方案仍按 **2026-08-08 评审快照** 撰写，下文仅刷新本表；已关闭项在「差距」列标注 **（2026-08 已闭合）**。
+
+| 能力 | yFiles | 本实现（2026-08-09） | 差距 |
 |------|--------|--------|------|
 | 去环 | Greedy-FAS + 用户指定 | Greedy-FAS + 环 reroot | ✅ 对齐（reroot 是加分项） |
-| 分层 | Network Simplex + `minimumLayerDistance` + 层约束 | 简化 NS，均匀 span/weight | 缺 min_span / weight / 层约束；实现是非增量版 |
-| 定序 | median + transpose + 多起点重启 | median + transpose + best snapshot | **transpose 被组块锁死**；无多起点重启 |
-| 交叉计数 | BJM 累加树 | BJM（`plotgram_algo::crossing`） | ✅ |
-| 坐标 | 分段线性 / 简化 BK + 优先级压紧 | BK ideal + 两趟 VPSC + 对称表 | 无全局目标函数；对称靠贪心表 |
-| 层内对齐 | `layerAlignment` 0/0.5/1 | 固定顶对齐 | 缺参数 |
-| 边路由 | 正交 + 通道 + 分组 + 交叉后处理 | 字典序 Dijkstra + 区间着色 | 代价无交叉项；拥塞项形同虚设 |
-| 边分组 | `automaticEdgeGrouping` + 端口分组 | `auto_edge_grouping`（bus） | ✅ 有；但只在端总线 |
-| 回边处理 | back-loop routing，侧廊 | 侧廊（East/West） | ✅ 有 |
-| 组/子图 | 递归布局 + 组框进求解 | 块树连续性，组框后验 bbox | **组框不是求解变量**；Gate/Scope 在 31/40 组图上静默失效 |
+| 分层 | Network Simplex + `minimumLayerDistance` + 层约束 | **增量 NS**（GKNV `low/lim` + 叶到根 cut-value 初始化 + pivot 路径更新）；uniform `MIN_SPAN=1` / weight=1 | 仍缺 per-edge `min_span`/`weight`、dot `balance`、作者层约束 API；`normalize_dense` 仍跨弱连通分量压缩 rank |
+| 定序 | median + transpose + 多起点重启 | `SortKey` 量化全序（`QUANT`）；**组无关 transpose** + best snapshot；组边界 dummy（`boundary.rs`）后 `restore_group_clamps`；宽层 ≥18 有回归测 | **（2026-08 已闭合）** `cmp_key` 全序崩溃、transpose 被组块锁死；仍无多起点重启 |
+| 交叉计数 | BJM 累加树 | BJM + 层内索引（`plotgram_algo::crossing`） | ✅ |
+| 坐标 | 分段线性 / BK + 优先级压紧 | BK ideal + **`J(x)` 次轴迭代**（`symmetry_objective`：边直度 + hub–扇心 + VPSC 分离 + 终局 snap） | **（2026-08 已闭合）** 贪心 `SymmetryPlan` 独占认领；仍无 yFiles 级分段线性引擎，DAG 上 J 权重需持续标定 |
+| 层内对齐 | `layerAlignment` 0/0.5/1 | `params.layer_alignment`（0/0.5/1）→ `main_axis::assign_main_axis` | ✅ 基本对齐 |
+| 边路由 | 正交 + **层间通道分配** + 分组 + 交叉后处理 | **加权标量 `J`** 多源多终点 Dijkstra：`w_bend·bends + w_len·length + w_cross·crossings + w_span·span_affinity + w_cong·congestion`；`EndCandidate` 枚举 host×escape 计入 `J`；`Occupancy` 区间交叉 + **bounded rip-up**（≤4 轮）；span 亲和 + outer Main overflow 软罚；同侧面 `couple_main_corridor` 强制共享 Main `og`；Ink 只展开 `EscapePlan` | **（2026-08 已闭合）** 词典序 Dijkstra、无交叉项、固定 `decide_escape`；仍缺 yFiles 级全局走廊分配器与边交叉后处理；密集 group/k8s 图 crossings 仍偏高 |
+| 边分组 | `automaticEdgeGrouping` + 端口分组 | `auto_edge_grouping`（端总线 `BundlePlan`） | ✅ 有；仍只在端总线，无 mid-graph bus |
+| 回边处理 | back-loop routing，侧廊 | E/W 侧廊 + 同侧面共享走廊 + escape 由 Channel `J` 择优（`AtPortNormal` / `ViaGap`） | ✅ 有；侧廊形态由搜索决定，非固定 detour |
+| 组/子图 | 递归布局 + 组框进求解 | 组边界 dummy + `ScopeMask`/Gate 子strate；组框后验 bbox | 组框仍非求解变量；**32/40** 组 fixture 启用 gate（8 仍 `channel-group-fallback`）；`verify_no_group_penetration` 未实现 | **（2026-08 已闭合）** 31/40 组通道静默失效；组内路由仍弱于 yFiles 递归子布局 |
 | 泳道 | `PartitionGrid` | 未消费 | 后置 |
 | 标签 | integrated labeling | 无 | 后置 |
 | 增量 / from-sketch | 支持 | 无 | 后置 |
-| 规模 | 万级节点秒级 | 1600 节点 11s，≥18 宽层崩溃 | **两个数量级** |
+| 规模 | 万级节点秒级 | 增量 NS + BJM 索引；定序宽层不再 panic；万级仍远 | rank/定序工程化后较评审日更快，整体仍慢 yFiles 约 **1–2 数量级** |
+| Ink 写权 | 路由在通道层闭合 | Channel 写 `ChannelPath` + `EscapePlan`；Ink 按 escape `match` 展开 + 固定 `port_stub` | **（2026-08 已闭合）** `cross_axis_stub_clear` / `horizontal_clear_at_y` 落笔避障；`clear_main_x` / `clear_parked_y` 仍在 Metric 推轨（rim fold 为 Channel 直出服务） |
 
 ---
 

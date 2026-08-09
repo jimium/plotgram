@@ -273,6 +273,10 @@ pub struct RouteHints {
     /// while any inner band gap is still free (D1.3.2). Replaces the old
     /// `prefer_outer_main` preference.
     pub outer_main_as_overflow: bool,
+    /// Same-face E–E / W–W: force start and goal onto one shared Main line
+    /// (run one sub-search per `og`, pick min `J`). Opposite-face Main pairs
+    /// must leave this false — they legitimately use distinct corridors.
+    pub couple_main_corridor: bool,
     /// Order-gap count: Main lines are `0..=order_count`.
     pub order_count: usize,
     /// When set, accumulate per-track span distance into [`LexCost::span_affinity`].
@@ -287,12 +291,16 @@ impl Default for RouteHints {
             min_first_span: 0.0,
             min_last_span: 0.0,
             outer_main_as_overflow: false,
+            couple_main_corridor: false,
             order_count: 0,
             span: None,
             weights: CostWeights::default(),
         }
     }
 }
+
+/// Max bends the spike-fold terminal discount may erase (pair-level).
+const SPIKE_FOLD_BEND_DISCOUNT: u32 = 4;
 
 /// Soft congestion added to an outer Main track while an inner band gap is free.
 const OUTER_OVERFLOW_PENALTY: f64 = 4.0;
@@ -536,7 +544,95 @@ impl Ord for State {
 /// Ink expansion cost; popping any goal track prices in that goal's candidate
 /// cost, and the minimum total wins. The chosen candidates' escapes are
 /// written into `ChannelPath.escape` — the search is the sole escape writer.
+///
+/// When [`RouteHints::couple_main_corridor`] is set, candidates are partitioned
+/// by Main `og` and each partition is solved independently; the min-`J`
+/// feasible outcome wins. That preserves the same-face single-corridor
+/// invariant without letting Dijkstra stitch distinct Main lines together.
 pub fn route_edge(
+    graph: &ChannelGraph<'_>,
+    starts: &[EndCandidate],
+    goals: &[EndCandidate],
+    occupancy: &Occupancy,
+    congestion_bias: bool,
+    allowed: &ScopeMask,
+    hints: RouteHints,
+) -> RouteOutcome {
+    if hints.couple_main_corridor {
+        return route_edge_coupled_main(
+            graph,
+            starts,
+            goals,
+            occupancy,
+            congestion_bias,
+            allowed,
+            hints,
+        );
+    }
+    route_edge_ungated(graph, starts, goals, occupancy, congestion_bias, allowed, hints)
+}
+
+fn route_edge_coupled_main(
+    graph: &ChannelGraph<'_>,
+    starts: &[EndCandidate],
+    goals: &[EndCandidate],
+    occupancy: &Occupancy,
+    congestion_bias: bool,
+    allowed: &ScopeMask,
+    hints: RouteHints,
+) -> RouteOutcome {
+    let substrate = graph.substrate();
+    let line_of = |tid: TrackId| -> Option<usize> {
+        substrate.track(tid).map(|t| t.line)
+    };
+    let mut lines = BTreeSet::new();
+    for c in starts.iter().chain(goals.iter()) {
+        if let Some(line) = line_of(c.track) {
+            lines.insert(line);
+        }
+    }
+    let mut best: Option<RouteOutcome> = None;
+    // Disable nesting: sub-searches must not re-enter this partitioner.
+    let mut sub_hints = hints;
+    sub_hints.couple_main_corridor = false;
+    for line in lines {
+        let s: Vec<EndCandidate> = starts
+            .iter()
+            .copied()
+            .filter(|c| line_of(c.track) == Some(line))
+            .collect();
+        let g: Vec<EndCandidate> = goals
+            .iter()
+            .copied()
+            .filter(|c| line_of(c.track) == Some(line))
+            .collect();
+        if s.is_empty() || g.is_empty() {
+            continue;
+        }
+        let out = route_edge_ungated(
+            graph,
+            &s,
+            &g,
+            occupancy,
+            congestion_bias,
+            allowed,
+            sub_hints,
+        );
+        if !out.feasible {
+            continue;
+        }
+        let replace = match &best {
+            None => true,
+            Some(cur) => out.cost < cur.cost,
+        };
+        if replace {
+            best = Some(out);
+        }
+    }
+    best.unwrap_or_else(RouteOutcome::infeasible)
+}
+
+fn route_edge_ungated(
     graph: &ChannelGraph<'_>,
     starts: &[EndCandidate],
     goals: &[EndCandidate],
@@ -714,7 +810,7 @@ pub fn route_edge(
                         }
                     }
                     if sl == gl && same_corridor && minimal {
-                        total.bends = total.bends.saturating_sub(4);
+                        total.bends = total.bends.saturating_sub(SPIKE_FOLD_BEND_DISCOUNT);
                         total.recompute(&hints.weights);
                     }
                 }
@@ -727,9 +823,12 @@ pub fn route_edge(
                 best_goal = Some((total, track));
             }
         }
-        // Prune: heap pops in ascending scalar, so nothing below remains.
+        // Prune: heap pops in ascending prefix scalar. Spike-fold may subtract
+        // up to SPIKE_FOLD_BEND_DISCOUNT bends at a goal, so a later prefix can
+        // still beat `best_goal` until it exceeds best + that discount.
         if let Some((bt, _)) = &best_goal {
-            if cost.scalar >= bt.scalar {
+            let fold_slack = hints.weights.w_bend * f64::from(SPIKE_FOLD_BEND_DISCOUNT);
+            if cost.scalar >= bt.scalar + fold_slack {
                 break;
             }
         }
@@ -737,8 +836,10 @@ pub fn route_edge(
             Some(t) => t.orient,
             None => continue,
         };
-        let leaving_start = cost.bends == 0
-            && best.get(&track).is_some_and(|e| e.1.is_none());
+        // Still on a start seed (no parent). Do not gate on `cost.bends == 0`:
+        // ViaGap seeds already carry escape bends, but the first corridor
+        // leave must still honor `min_first_span`.
+        let leaving_start = best.get(&track).is_some_and(|e| e.1.is_none());
         for tr in graph.neighbors(track) {
             if let Via::Gate(g) = tr.via {
                 if !occupancy.gate_open(substrate, g) {
@@ -1486,6 +1587,7 @@ mod tests {
             }),
             order_count: idx.order_count,
             outer_main_as_overflow: true,
+            couple_main_corridor: true,
             ..RouteHints::default()
         };
         let out = route_edge(

@@ -104,10 +104,11 @@ fn rank_real_sibling_orders(
 /// allows straight escapes only on the outermost corridor (the only lane
 /// Metric folds past every node face, hence normal-safe for any endpoint)
 /// and prices the ViaGap fallback everywhere else, so the solver alone owns
-/// the escape decision. Same-face edges must
-/// share one Main line, so both ends are restricted to corridors on the normal
-/// side of **both** faces (E–E: `og ≥ max(order)+1`, W–W: `og ≤ min(order)`).
-/// N/S ends keep their adjacent gap-line host.
+/// the escape decision. Same-face edges must share **one** Main line: both
+/// ends are restricted to corridors on the normal side of **both** faces
+/// (E–E: `og ≥ max(order)+1`, W–W: `og ≤ min(order)`), and the returned
+/// `couple_main_corridor` flag makes search solve per-`og` rather than
+/// stitching distinct corridors. N/S ends keep their adjacent gap-line host.
 fn edge_end_candidates(
     index: &BlueprintIndex,
     plan: &PlanGraph,
@@ -116,7 +117,7 @@ fn edge_end_candidates(
     layer_pos: &[usize],
     ports: &BTreeMap<String, EdgePorts>,
     edge_id: &str,
-) -> Result<(Vec<EndCandidate>, Vec<EndCandidate>), LayoutError> {
+) -> Result<(Vec<EndCandidate>, Vec<EndCandidate>, bool), LayoutError> {
     let (src_side, src_rank, src_order) =
         endpoint_side_rank_order(plan, graph, edge_of, layer_pos, ports, edge_id, true)?;
     let (tgt_side, tgt_rank, tgt_order) =
@@ -167,7 +168,7 @@ fn edge_end_candidates(
     );
 
     // Same-face edges share one Main corridor: keep only corridors on the
-    // normal side of both faces.
+    // normal side of both faces, and couple search per og.
     let shared_ogs: Option<std::ops::RangeInclusive<usize>> = match (src_side, tgt_side) {
         (PortSide::CrossHigh, PortSide::CrossHigh) => {
             Some((src_order.max(tgt_order) + 1)..=index.order_count)
@@ -175,6 +176,7 @@ fn edge_end_candidates(
         (PortSide::CrossLow, PortSide::CrossLow) => Some(0..=src_order.min(tgt_order)),
         _ => None,
     };
+    let couple_main_corridor = shared_ogs.is_some();
     if let Some(ogs) = shared_ogs {
         let allowed: std::collections::BTreeSet<TrackId> = ogs
             .flat_map(|og| index.main_lines.get(&og))
@@ -191,7 +193,7 @@ fn edge_end_candidates(
              tgt {tgt_side:?} rank{tgt_rank})"
         )));
     }
-    Ok((starts, goals))
+    Ok((starts, goals, couple_main_corridor))
 }
 
 fn port_side_to_algo(side: PortSide) -> plotgram_algo::orientation::Side {
@@ -273,6 +275,7 @@ fn hints_for_edge(
         },
         // D1.3.2: outer Main is overflow for every edge, not a reversed-edge preference.
         outer_main_as_overflow: true,
+        couple_main_corridor: false,
         order_count,
         span: Some(SpanAffinity {
             src_rank,
@@ -447,11 +450,12 @@ fn route_on_substrate(
         if bus_edges.contains(&e.edge_id) {
             continue;
         }
-        let (starts, goals) = edge_end_candidates(
+        let (starts, goals, couple_main_corridor) = edge_end_candidates(
             &index, plan, graph, &edge_of, &layer_pos, ports, &e.edge_id,
         )?;
         let mask = scope_mask_for_edge(&substrate, &index, graph, e);
-        let hints = hints_for_edge(plan, graph, &layer_pos, params, e, index.order_count);
+        let mut hints = hints_for_edge(plan, graph, &layer_pos, params, e, index.order_count);
+        hints.couple_main_corridor = couple_main_corridor;
         prepared.push(PreparedEdge {
             entry: RouteOrderEntry {
                 edge_id: e.edge_id.clone(),
@@ -792,7 +796,7 @@ mod tests {
         let (sub, idx) = derive_root_substrate(&plan);
         let mut ports = BTreeMap::new();
         ports.insert("ew".into(), east_ports());
-        let (starts, goals) = edge_end_candidates(
+        let (starts, goals, couple) = edge_end_candidates(
             &idx,
             &plan,
             &graph,
@@ -801,6 +805,7 @@ mod tests {
             &ports,
             "ew",
         ).unwrap();
+        assert!(couple, "E–E must couple Main corridors");
         assert!(!starts.is_empty() && !goals.is_empty());
         // max(0,1)+1 = 2 is the only shared normal-side corridor (order_count=2).
         for c in starts.iter().chain(goals.iter()) {
@@ -816,7 +821,7 @@ mod tests {
         let (sub, idx) = derive_root_substrate(&plan);
         let mut ports = BTreeMap::new();
         ports.insert("ew".into(), west_ports());
-        let (starts, goals) = edge_end_candidates(
+        let (starts, goals, couple) = edge_end_candidates(
             &idx,
             &plan,
             &graph,
@@ -825,6 +830,7 @@ mod tests {
             &ports,
             "ew",
         ).unwrap();
+        assert!(couple, "W–W must couple Main corridors");
         assert!(!starts.is_empty() && !goals.is_empty());
         // min(0,1) = 0 is the only shared normal-side corridor.
         for c in starts.iter().chain(goals.iter()) {
@@ -832,6 +838,118 @@ mod tests {
             assert_eq!(t.orient, TrackOrient::Main);
             assert_eq!(t.line, 0, "W–W candidates must stay on og ≤ min: {c:?}");
         }
+    }
+
+    #[test]
+    fn same_face_east_with_multiple_ogs_routes_on_one_corridor() {
+        // 3 columns → order_count=3; E–E from order0→order1 allows og∈{2,3}.
+        // Coupled search must pick one shared line (no Main-line stitch).
+        let elems = (0..6)
+            .map(|i| Elem {
+                key: ElemKey::Real(format!("n{i}")),
+                group_path: vec![],
+                rank: i / 3,
+            })
+            .collect::<Vec<_>>();
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: (0..6).collect(),
+            segments: vec![],
+            layers: vec![vec![0, 1, 2], vec![3, 4, 5]],
+        };
+        let mut ids = BTreeMap::new();
+        for i in 0..6 {
+            ids.insert(format!("n{i}"), i);
+        }
+        let graph = RealGraph {
+            ids: (0..6).map(|i| format!("n{i}")).collect(),
+            index_of: ids,
+            group_path: vec![vec![]; 6],
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; 6],
+            edges: vec![RealEdge {
+                edge_id: "ew".into(),
+                original_source: 0, // rank0 order0
+                original_target: 4, // rank1 order1
+                working_source: 0,
+                working_target: 4,
+                reversed: false,
+                from_port: None,
+                to_port: None,
+                critical: false,
+            }],
+            self_loops: vec![],
+        };
+        let (sub, idx) = derive_root_substrate(&plan);
+        assert_eq!(idx.order_count, 3);
+        let mut ports = BTreeMap::new();
+        ports.insert("ew".into(), east_ports());
+        let (starts, goals, couple) = edge_end_candidates(
+            &idx,
+            &plan,
+            &graph,
+            &graph.edge_index_map(),
+            &plan.layer_positions(),
+            &ports,
+            "ew",
+        )
+        .unwrap();
+        assert!(couple);
+        let lines: std::collections::BTreeSet<usize> = starts
+            .iter()
+            .chain(goals.iter())
+            .map(|c| sub.track(c.track).unwrap().line)
+            .collect();
+        assert_eq!(
+            lines,
+            [2usize, 3].into_iter().collect(),
+            "normal-side pool must include both og=2 and rim og=3"
+        );
+        use super::super::graph::{ChannelGraph, Occupancy};
+        use super::super::search::{route_edge, RouteHints, ScopeMask, SpanAffinity};
+        let g = ChannelGraph::from_substrate(&sub);
+        let hints = RouteHints {
+            couple_main_corridor: true,
+            outer_main_as_overflow: true,
+            order_count: idx.order_count,
+            span: Some(SpanAffinity {
+                src_rank: 0,
+                tgt_rank: 1,
+                src_order: 0,
+                tgt_order: 1,
+            }),
+            ..RouteHints::default()
+        };
+        let out = route_edge(
+            &g,
+            &starts,
+            &goals,
+            &Occupancy::new(),
+            true,
+            &ScopeMask::unrestricted(),
+            hints,
+        );
+        assert!(out.feasible, "{out:?}");
+        let main_lines: std::collections::BTreeSet<usize> = out
+            .path
+            .tracks
+            .iter()
+            .filter_map(|&tid| {
+                let t = sub.track(tid).unwrap();
+                (t.orient == TrackOrient::Main).then_some(t.line)
+            })
+            .collect();
+        assert_eq!(
+            main_lines.len(),
+            1,
+            "coupled E–E must use exactly one Main og, got {main_lines:?} path={:?}",
+            out.path.tracks
+        );
     }
 
     #[test]
