@@ -7,9 +7,10 @@
 //!
 //! Scale: built for layout-sized instances (tens to a few hundred variables
 //! per axis — intra-layer spacing, nudging, group borders). The bookkeeping
-//! (most-violated scan, multiplier checks) is O(n·m) per round rather than
-//! event-queue optimized; do not use it as a large-graph overlap-removal
-//! engine without first porting the libvpsc-style priority structures.
+//! (most-violated scan) is O(m) per merge round; block traversals run in
+//! O(A+B) via a per-call adjacency index (A = active constraints, B = block
+//! vars). Do not use it as a large-graph overlap-removal engine without
+//! first porting the libvpsc-style priority structures.
 
 /// One solver variable: desired position and (positive) weight.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -121,6 +122,10 @@ pub fn solve(vars: &[Variable], constraints: &[Constraint]) -> Result<Vec<f64>, 
     // cycling (AGENTS: no silent infinite loops).
     let budget = 8 * (vs.len() + cons.len()) * (cons.len() + 1) + 64;
     let mut used = 0usize;
+    // TEMP profiling probe — remove after diagnosis.
+    let _t_on = std::env::var("PLOTGRAM_HIER_TIMINGS").is_ok();
+    let mut _rounds = 0usize;
+    let _t0 = std::time::Instant::now();
     const EPS: f64 = 1e-9;
 
     // Outer fixpoint: satisfy all constraints, then deactivate one active
@@ -128,6 +133,7 @@ pub fn solve(vars: &[Variable], constraints: &[Constraint]) -> Result<Vec<f64>, 
     // stretch there) and re-satisfy. No violation + no negative multiplier
     // ⇒ global optimum of the convex QP.
     loop {
+        _rounds += 1;
         satisfy(&mut vs, &mut blocks, &cons, EPS, &mut used, budget)?;
         match find_split(&vs, &blocks, &cons, EPS) {
             Some((b, ai)) => {
@@ -138,6 +144,15 @@ pub fn solve(vars: &[Variable], constraints: &[Constraint]) -> Result<Vec<f64>, 
                 }
             }
             None => {
+                if _t_on {
+                    let mb = blocks.iter().map(|b| b.vars.len()).max().unwrap_or(0);
+                    eprintln!(
+                        "[vpsc] n={} m={} rounds={_rounds} used={used} max_block={mb} {:?}",
+                        vs.len(),
+                        cons.len(),
+                        _t0.elapsed()
+                    );
+                }
                 let mut out = vec![0.0; vs.len()];
                 for (i, v) in vs.iter().enumerate() {
                     out[i] = blocks[v.block].position + v.offset;
@@ -186,11 +201,13 @@ fn satisfy(
             // side would re-violate it and cycle forever. A forward edge
             // always exists here, otherwise the constraints would form a
             // positive-gap cycle already rejected by the feasibility check.
-            let path = active_path(&blocks[bl], cons, c.left, c.right);
+            let n = vs.len();
+            let path = active_path(n, &blocks[bl], cons, c.left, c.right);
+            let adj = build_adjacency(n, &blocks[bl], cons);
             let weakest = path
                 .into_iter()
                 .filter(|&(_, forward)| forward)
-                .map(|(ai, _)| (ai, multiplier(vs, blocks, cons, bl, ai)))
+                .map(|(ai, _)| (ai, multiplier(vs, &blocks[bl], cons, &adj, ai)))
                 .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap().then(a.0.cmp(&b.0)))
                 .map(|(ai, _)| ai);
             let Some(weakest) = weakest else {
@@ -309,19 +326,46 @@ fn check_feasible(n: usize, constraints: &[Constraint]) -> Result<(), VpscError>
     Ok(())
 }
 
+/// Adjacency index over a block's active tree: per-variable list of active
+/// constraint indices. Built from `block.active` in its sorted order, so each
+/// per-variable list inherits that order — traversals discover neighbors in
+/// exactly the order the legacy full-scan did, keeping paths and multiplier
+/// values bit-identical while costing O(A+B) instead of O(A²) per traversal.
+fn build_adjacency(n: usize, block: &Block, cons: &[Constraint]) -> Vec<Vec<usize>> {
+    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
+    for &ai in &block.active {
+        let c = &cons[ai];
+        adj[c.left].push(ai);
+        adj[c.right].push(ai);
+    }
+    adj
+}
+
 /// Active constraints on the (unique) active-tree path between `from` and
 /// `to` inside `block`. Each entry is `(constraint index, forward)` where
 /// `forward` means the edge is traversed from its `left` to its `right`
 /// endpoint when walking `from` → `to`.
-fn active_path(block: &Block, cons: &[Constraint], from: usize, to: usize) -> Vec<(usize, bool)> {
+fn active_path(
+    n: usize,
+    block: &Block,
+    cons: &[Constraint],
+    from: usize,
+    to: usize,
+) -> Vec<(usize, bool)> {
     // BFS over active constraints as undirected edges, remembering the
     // constraint used to reach each variable.
+    let adj = build_adjacency(n, block, cons);
+    let mut seen = vec![false; n];
+    seen[from] = true;
     let mut via: Vec<(usize, usize, usize)> = vec![(from, usize::MAX, usize::MAX)]; // (var, prev var, via ai)
     let mut head = 0;
     while head < via.len() {
         let (v, _, _) = via[head];
         head += 1;
-        for &ai in &block.active {
+        if v == to {
+            break;
+        }
+        for &ai in &adj[v] {
             let c = &cons[ai];
             let other = if c.left == v {
                 c.right
@@ -330,9 +374,10 @@ fn active_path(block: &Block, cons: &[Constraint], from: usize, to: usize) -> Ve
             } else {
                 continue;
             };
-            if via.iter().any(|&(seen, _, _)| seen == other) {
+            if seen[other] {
                 continue;
             }
+            seen[other] = true;
             via.push((other, v, ai));
         }
     }
@@ -398,9 +443,17 @@ fn merge_blocks(
 /// component containing `right` (call it S). Optimality of x wrt the tree
 /// gives λ_ai = Σ_{k∈S} w_k (x_k − d_k) (up to sign convention): a negative
 /// value means the constraint "wants to stretch" and should be deactivated.
-fn multiplier(vs: &[Var], blocks: &[Block], cons: &[Constraint], b: usize, ai: usize) -> f64 {
-    let block = &blocks[b];
-    let side = component_of(block, cons, ai, cons[ai].right);
+/// `adj` is the shared adjacency index of the block (see [`build_adjacency`]);
+/// the sum walks the sorted component, so values are bit-identical to a
+/// from-scratch traversal.
+fn multiplier(
+    vs: &[Var],
+    block: &Block,
+    cons: &[Constraint],
+    adj: &[Vec<usize>],
+    ai: usize,
+) -> f64 {
+    let side = component_of(adj, cons, ai, cons[ai].right);
     let mut lambda = 0.0;
     for &v in &side {
         let x = block.position + vs[v].offset;
@@ -409,13 +462,15 @@ fn multiplier(vs: &[Var], blocks: &[Block], cons: &[Constraint], b: usize, ai: u
     lambda
 }
 
-/// Members of `block` reachable from `seed` through active constraints,
-/// excluding constraint `skip`.
-fn component_of(block: &Block, cons: &[Constraint], skip: usize, seed: usize) -> Vec<usize> {
+/// Members reachable from `seed` through the adjacency index `adj`,
+/// excluding constraint `skip`. Returned sorted for deterministic summation.
+fn component_of(adj: &[Vec<usize>], cons: &[Constraint], skip: usize, seed: usize) -> Vec<usize> {
+    let mut seen = vec![false; adj.len()];
+    seen[seed] = true;
     let mut comp = vec![seed];
     let mut stack = vec![seed];
     while let Some(v) = stack.pop() {
-        for &ai in &block.active {
+        for &ai in &adj[v] {
             if ai == skip {
                 continue;
             }
@@ -427,7 +482,8 @@ fn component_of(block: &Block, cons: &[Constraint], skip: usize, seed: usize) ->
             } else {
                 continue;
             };
-            if !comp.contains(&other) {
+            if !seen[other] {
+                seen[other] = true;
                 comp.push(other);
                 stack.push(other);
             }
@@ -444,9 +500,14 @@ fn find_split(
     cons: &[Constraint],
     eps: f64,
 ) -> Option<(usize, usize)> {
+    let n = vs.len();
     for (b, block) in blocks.iter().enumerate() {
+        if block.active.is_empty() {
+            continue;
+        }
+        let adj = build_adjacency(n, block, cons);
         for &ai in &block.active {
-            if multiplier(vs, blocks, cons, b, ai) < -eps {
+            if multiplier(vs, block, cons, &adj, ai) < -eps {
                 return Some((b, ai));
             }
         }
@@ -463,7 +524,8 @@ fn split_block(
     b: usize,
     ai: usize,
 ) {
-    let right_side = component_of(&blocks[b], cons, ai, cons[ai].right);
+    let adj = build_adjacency(vs.len(), &blocks[b], cons);
+    let right_side = component_of(&adj, cons, ai, cons[ai].right);
     let old_active = std::mem::take(&mut blocks[b].active);
     let all_vars = std::mem::take(&mut blocks[b].vars);
     let old_pos = blocks[b].position;
