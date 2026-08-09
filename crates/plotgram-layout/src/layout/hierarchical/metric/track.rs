@@ -74,8 +74,21 @@ pub fn assign_track_coords(
                         main[e] + size_of(e).height + edge_gap
                     };
                     let mid = (count.saturating_sub(1) as f64) * 0.5;
+                    let below = line > 0;
                     (0..count)
-                        .map(|i| base + (i as f64 - mid) * edge_gap)
+                        .map(|i| {
+                            // A row taller than edge_gap puts the naive parked
+                            // lane inside the adjacent row's Y-projection —
+                            // push further out until clear (mirror of
+                            // clear_main_x; gates-run e21 penetrated a last-
+                            // rank body through such a lane).
+                            clear_parked_y(
+                                base + (i as f64 - mid) * edge_gap,
+                                &obstacles,
+                                edge_gap,
+                                below,
+                            )
+                        })
                         .collect()
                 } else {
                     let r = line - 1;
@@ -156,11 +169,22 @@ fn main_line_backbone_x(
             continue;
         }
         if order_gap == 0 {
-            let e = layer[0];
-            xs.push(cross_centers[e] - size_of(e).width / 2.0 - margin);
+            // West outer: fold over every element's west face so the lane
+            // clears all bodies of every rank (first/last can be a narrow
+            // dummy, and clearance must not push the rim lane inward — the
+            // Channel solver relies on rim lanes sitting on port normals).
+            let face = layer
+                .iter()
+                .map(|&e| cross_centers[e] - size_of(e).width / 2.0)
+                .fold(f64::INFINITY, f64::min);
+            xs.push(face - margin);
         } else if order_gap >= layer.len() {
-            let e = *layer.last().unwrap();
-            xs.push(cross_centers[e] + size_of(e).width / 2.0 + margin);
+            // East outer: symmetric fold over every element's east face.
+            let face = layer
+                .iter()
+                .map(|&e| cross_centers[e] + size_of(e).width / 2.0)
+                .fold(f64::NEG_INFINITY, f64::max);
+            xs.push(face + margin);
         } else {
             let l = layer[order_gap - 1];
             let r = layer[order_gap];
@@ -218,9 +242,32 @@ fn clear_main_x(x: f64, obstacles: &[(f64, f64, f64, f64)], edge_gap: f64) -> f6
     x
 }
 
+/// Clear a parked Cross lane Y out of every node's Y-projection, always
+/// pushing away from the stack (`below` = parked under the last rank).
+/// Repeats until clear — the pushed position can land inside a taller row's
+/// projection further out.
+fn clear_parked_y(y: f64, obstacles: &[(f64, f64, f64, f64)], edge_gap: f64, below: bool) -> f64 {
+    const EPS: f64 = 1e-6;
+    let margin = edge_gap.max(1.0) * 0.5;
+    let mut y = y;
+    loop {
+        let hit = obstacles
+            .iter()
+            .find(|&&(_, t, _, b)| y > t + EPS && y < b - EPS)
+            .map(|&(_, t, _, b)| (t, b));
+        match hit {
+            Some((t, b)) => {
+                y = if below { b + margin } else { t - margin };
+            }
+            None => return y,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::clear_main_x;
+    use super::clear_parked_y;
 
     #[test]
     fn clear_main_x_pushes_off_node_body() {
@@ -234,6 +281,20 @@ mod tests {
         let obstacles = vec![(10.0, 0.0, 30.0, 20.0), (50.0, 0.0, 70.0, 20.0)];
         let x = clear_main_x(40.0, &obstacles, 8.0);
         assert!((x - 40.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn clear_parked_y_pushes_out_of_tall_row() {
+        // Row at y 100..140 (taller than edge_gap): parked lanes inside the
+        // body must move past it, away from the stack.
+        let obstacles = vec![(0.0, 100.0, 50.0, 140.0)];
+        let below = clear_parked_y(116.0, &obstacles, 16.0, true);
+        assert!(below >= 140.0 + 8.0 - 1e-9, "below={below}");
+        let above = clear_parked_y(116.0, &obstacles, 16.0, false);
+        assert!(above <= 100.0 - 8.0 + 1e-9, "above={above}");
+        // Already-clear lanes stay put.
+        let free = clear_parked_y(160.0, &obstacles, 16.0, true);
+        assert!((free - 160.0).abs() < 1e-9);
     }
 
     #[test]

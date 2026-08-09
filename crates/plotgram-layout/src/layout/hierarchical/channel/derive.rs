@@ -814,16 +814,24 @@ mod tests {
         assert!(idx.group_ids.contains_key("g2"));
         // Cross-group path must go through at least one gate.
         use super::super::graph::{ChannelGraph, Occupancy};
-        use super::super::search::{route_edge, RouteHints, ScopeMask};
+        use super::super::search::{route_edge, EndCandidate, EscapeEnd, RouteHints, ScopeMask};
         use super::super::substrate::PortSide;
         let g = ChannelGraph::from_substrate(&sub);
         let start = idx.resolve_host_track(0, 0, PortSide::MainHigh).unwrap();
         let goal = idx.resolve_host_track(1, 1, PortSide::MainLow).unwrap();
+        let cand = |tid| {
+            vec![EndCandidate {
+                track: tid,
+                escape: EscapeEnd::AtPortNormal,
+                extra_bends: 0,
+                extra_len: 0.0,
+            }]
+        };
         let mask = ScopeMask::for_scopes(&sub, idx.node_scope("a"), idx.node_scope("d"));
         let out = route_edge(
             &g,
-            start,
-            goal,
+            &cand(start),
+            &cand(goal),
             &Occupancy::new(),
             true,
             &mask,

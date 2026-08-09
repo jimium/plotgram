@@ -12,10 +12,11 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 
 use super::graph::{ChannelGraph, Occupancy, Via};
-use super::substrate::{GateId, GroupId, Substrate, TrackId, TrackOrient};
+use super::substrate::{BlueprintIndex, GateId, GroupId, Substrate, TrackId, TrackOrient};
 use plotgram_algo::orientation::Side;
 
-/// How Ink enters/leaves the first/last corridor (P5-3). Channel decides;
+/// How Ink enters/leaves the first/last corridor (P5-3). Channel search
+/// picks the per-end option that minimizes `J` (write-authority §2.2);
 /// Ink only matches — no frame scanning.
 ///
 /// Side-aware semantics (Ink inserts a `port_stub` normal jog where the
@@ -47,30 +48,149 @@ impl EscapePlan {
     }
 }
 
-/// Decide escape from port sides + ranks (no node-frame reads).
-///
-/// E/W ports use ViaGap (safe against same-layer pierces; Ink prefixes a
-/// normal `port_stub` since the gap move is tangential to an E/W face);
-/// N/S use AtPortNormal (the gap/rail move is already normal).
-pub fn decide_escape(
-    src_side: Side,
-    tgt_side: Side,
-    src_rank: usize,
-    tgt_rank: usize,
-) -> EscapePlan {
-    let end = |side: Side, rank: usize, toward_higher: bool| -> EscapeEnd {
-        match side {
-            Side::East | Side::West => {
-                let line = if toward_higher { rank + 1 } else { rank };
-                EscapeEnd::ViaGap(line)
-            }
-            Side::North | Side::South => EscapeEnd::AtPortNormal,
-        }
-    };
-    EscapePlan {
-        source: end(src_side, src_rank, tgt_rank >= src_rank),
-        target: end(tgt_side, tgt_rank, src_rank > tgt_rank),
+/// One selectable endpoint landing: host track + escape mode + the discrete
+/// Ink expansion cost the option adds (`leave_to_main`/`arrive_from_main`
+/// mirror, in gap/span units — only relative ordering matters; the existing
+/// typed weights `w_bend`/`w_len` price it into `J`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EndCandidate {
+    pub track: TrackId,
+    pub escape: EscapeEnd,
+    /// Extra bends Ink emits at this end (stub + gap detour).
+    pub extra_bends: u32,
+    /// Extra escape length in order/rank-gap units.
+    pub extra_len: f64,
+}
+
+impl Eq for EndCandidate {}
+
+impl Ord for EndCandidate {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.track
+            .cmp(&other.track)
+            .then_with(|| self.extra_bends.cmp(&other.extra_bends))
+            .then_with(|| self.extra_len.total_cmp(&other.extra_len))
+            .then_with(|| escape_key(&self.escape).cmp(&escape_key(&other.escape)))
     }
+}
+
+impl PartialOrd for EndCandidate {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+fn escape_key(end: &EscapeEnd) -> (u8, usize) {
+    match end {
+        EscapeEnd::AtPortNormal => (0, 0),
+        EscapeEnd::ViaGap(line) => (1, *line),
+    }
+}
+
+/// Enumerate one endpoint's landing candidates (host track × escape).
+///
+/// Hard constraints drop infeasible options instead of predicate tables
+/// (write-authority §2.2):
+/// - `AtPortNormal` on E/W needs (a) no real sibling between the node and
+///   `og` (the straight escape would pierce it) and (b) `og` to be the
+///   outermost corridor (`order_count` east / `0` west): Metric folds the
+///   rim lane over **all** ranks (max/min), so it sits past every node face
+///   and is normal-safe for any endpoint; inner lanes sit at the *average*
+///   of per-rank faces and can land on a port's anti-normal side;
+/// - `ViaGap` on the gap line facing the other endpoint (`rank+1` when the
+///   other end sits at a higher or equal rank, else `rank` — mirrors Ink's
+///   `gap_y` default) is always feasible: the horizontal approach runs on the
+///   rank-gap line, clear of node bodies. The opposite-facing line is never
+///   enumerated: it is weakly dominated (longer approach, identical cost);
+/// - N/S hosts sit on the adjacent gap line: the escape is already normal.
+///
+/// `blocked_east`/`blocked_west` list real-sibling orders of this endpoint's
+/// rank (dummies do not block — Ink runs around them on the shared rail).
+/// `toward_higher` says whether the other endpoint sits at a higher or equal
+/// rank (selects the facing gap line, baseline `decide_escape` semantics).
+pub fn end_candidates(
+    index: &BlueprintIndex,
+    side: Side,
+    rank: usize,
+    order: usize,
+    blocked_east: &std::collections::BTreeSet<usize>,
+    blocked_west: &std::collections::BTreeSet<usize>,
+    order_count: usize,
+    toward_higher: bool,
+) -> Vec<EndCandidate> {
+    let mut out: Vec<EndCandidate> = Vec::new();
+    match side {
+        Side::North | Side::South => {
+            if let Some(tid) = index.resolve_host_track(
+                rank,
+                order,
+                if side == Side::North {
+                    super::substrate::PortSide::MainLow
+                } else {
+                    super::substrate::PortSide::MainHigh
+                },
+            ) {
+                out.push(EndCandidate {
+                    track: tid,
+                    escape: EscapeEnd::AtPortNormal,
+                    extra_bends: 0,
+                    extra_len: 0.0,
+                });
+            }
+        }
+        Side::East => {
+            for og in (order + 1)..=order_count {
+                let Some(tid) = index.main_at(og, rank) else {
+                    continue;
+                };
+                let face_dist = (og - (order + 1)) as f64;
+                let pierced = ((order + 1)..og).any(|o| blocked_east.contains(&o));
+                let rim = og == order_count;
+                if !pierced && rim {
+                    out.push(EndCandidate {
+                        track: tid,
+                        escape: EscapeEnd::AtPortNormal,
+                        extra_bends: 0,
+                        extra_len: face_dist,
+                    });
+                }
+                let line = if toward_higher { rank + 1 } else { rank };
+                out.push(EndCandidate {
+                    track: tid,
+                    escape: EscapeEnd::ViaGap(line),
+                    extra_bends: 2,
+                    extra_len: 1.0 + face_dist,
+                });
+            }
+        }
+        Side::West => {
+            for og in 0..=order {
+                let Some(tid) = index.main_at(og, rank) else {
+                    continue;
+                };
+                let face_dist = (order - og) as f64;
+                let pierced = ((og + 1)..=order).any(|o| blocked_west.contains(&o));
+                let rim = og == 0;
+                if !pierced && rim {
+                    out.push(EndCandidate {
+                        track: tid,
+                        escape: EscapeEnd::AtPortNormal,
+                        extra_bends: 0,
+                        extra_len: face_dist,
+                    });
+                }
+                let line = if toward_higher { rank + 1 } else { rank };
+                out.push(EndCandidate {
+                    track: tid,
+                    escape: EscapeEnd::ViaGap(line),
+                    extra_bends: 2,
+                    extra_len: 1.0 + face_dist,
+                });
+            }
+        }
+    }
+    out.sort();
+    out
 }
 
 /// Ordered path of substrate tracks (L2 topology).
@@ -410,87 +530,215 @@ impl Ord for State {
     }
 }
 
-/// Route from start track to goal track under ScopeMask + hints.
+/// Route between endpoint candidate sets under ScopeMask + hints.
+///
+/// Multi-source / multi-goal: every start candidate seeds the heap with its
+/// Ink expansion cost; popping any goal track prices in that goal's candidate
+/// cost, and the minimum total wins. The chosen candidates' escapes are
+/// written into `ChannelPath.escape` — the search is the sole escape writer.
 pub fn route_edge(
     graph: &ChannelGraph<'_>,
-    start: TrackId,
-    goal: TrackId,
+    starts: &[EndCandidate],
+    goals: &[EndCandidate],
     occupancy: &Occupancy,
     congestion_bias: bool,
     allowed: &ScopeMask,
     hints: RouteHints,
 ) -> RouteOutcome {
     let substrate = graph.substrate();
-    let Some(start_t) = substrate.track(start) else {
-        return RouteOutcome::infeasible();
-    };
-    if !allowed.allows(start_t.scope) {
-        return RouteOutcome::infeasible();
-    }
-    let mut start_cost = LexCost {
-        length: start_t.span_weight,
-        span_affinity: track_span_affinity(substrate, start, &hints),
-        congestion: if congestion_bias {
-            occupancy.lane_demand(start) as f64
-        } else {
-            0.0
-        },
-        crossings: occupancy.crossing_count(start, start_t.ext),
-        ..LexCost::default()
-    };
-    start_cost.congestion += soft_penalties(substrate, start, &hints, occupancy);
-    start_cost.recompute(&hints.weights);
-
-    if start == goal {
-        let mut cost = start_cost;
-        if hints.min_last_span > 0.0 && start_t.span_weight + 1e-9 < hints.min_last_span {
-            cost.congestion += 1e6;
-            cost.recompute(&hints.weights);
+    // Per-track best goal candidate (deterministic pick on duplicates).
+    let mut goal_map: BTreeMap<TrackId, EndCandidate> = BTreeMap::new();
+    for &g in goals {
+        match goal_map.get(&g.track) {
+            Some(cur) if (g.extra_bends, g.extra_len) >= (cur.extra_bends, cur.extra_len) => {}
+            _ => {
+                goal_map.insert(g.track, g);
+            }
         }
-        return RouteOutcome {
-            path: ChannelPath::new(vec![start], Vec::new()),
-            cost,
-            feasible: true,
-        };
     }
+    if goal_map.is_empty() {
+        return RouteOutcome::infeasible();
+    }
+
+    // Endpoint hosts keep the baseline scope contract (verify_route_scope
+    // audits every committed track), but transit between adjacent endpoint
+    // hosts is exempt: a host pair joined by one via always connects even
+    // when the scope chain between them is cut.
+    let direct_via = |a: TrackId, b: TrackId| -> Option<Via> {
+        graph
+            .neighbors(a)
+            .iter()
+            .find(|tr| tr.to == b)
+            .map(|tr| tr.via)
+    };
 
     let mut open = BinaryHeap::new();
-    open.push(State {
-        cost: start_cost,
-        track: start,
-    });
-    // best: track → (cost, parent track, via used to enter)
-    let mut best: BTreeMap<TrackId, (LexCost, Option<TrackId>, Option<Via>)> = BTreeMap::new();
-    best.insert(start, (start_cost, None, None));
+    // best: track → (cost, parent track, via used to enter, start candidate idx)
+    let mut best: BTreeMap<TrackId, (LexCost, Option<TrackId>, Option<Via>, usize)> =
+        BTreeMap::new();
+
+    for (si, sc) in starts.iter().enumerate() {
+        let Some(start_t) = substrate.track(sc.track) else {
+            continue;
+        };
+        if !allowed.allows(start_t.scope) {
+            continue;
+        }
+        let mut start_cost = LexCost {
+            bends: sc.extra_bends,
+            length: start_t.span_weight + sc.extra_len,
+            span_affinity: track_span_affinity(substrate, sc.track, &hints),
+            congestion: if congestion_bias {
+                occupancy.lane_demand(sc.track) as f64
+            } else {
+                0.0
+            },
+            crossings: occupancy.crossing_count(sc.track, start_t.ext),
+            ..LexCost::default()
+        };
+        start_cost.congestion += soft_penalties(substrate, sc.track, &hints, occupancy);
+        start_cost.recompute(&hints.weights);
+        let replace = match best.get(&sc.track) {
+            None => true,
+            Some((bc, _, _, _)) => start_cost < *bc,
+        };
+        if replace {
+            best.insert(sc.track, (start_cost, None, None, si));
+            open.push(State {
+                cost: start_cost,
+                track: sc.track,
+            });
+        }
+        // Direct start↔goal connection bypasses the transit scope filter.
+        for (gt, via) in goal_map
+            .keys()
+            .filter(|&&gt| gt != sc.track)
+            .filter_map(|&gt| direct_via(sc.track, gt).map(|via| (gt, via)))
+        {
+            if let Via::Gate(g) = via {
+                if !occupancy.gate_open(substrate, g) {
+                    continue;
+                }
+            }
+            let Some(to_t) = substrate.track(gt) else {
+                continue;
+            };
+            let mut direct = start_cost;
+            if start_t.orient != to_t.orient {
+                direct.bends += 1;
+            }
+            direct.length += to_t.span_weight;
+            direct.span_affinity = direct
+                .span_affinity
+                .saturating_add(track_span_affinity(substrate, gt, &hints));
+            direct.crossings = direct
+                .crossings
+                .saturating_add(occupancy.crossing_count(gt, to_t.ext));
+            if congestion_bias {
+                direct.congestion += occupancy.lane_demand(gt) as f64;
+            }
+            direct.congestion += soft_penalties(substrate, gt, &hints, occupancy);
+            direct.recompute(&hints.weights);
+            let replace = match best.get(&gt) {
+                None => true,
+                Some((bc, _, _, _)) => direct < *bc,
+            };
+            if replace {
+                best.insert(gt, (direct, Some(sc.track), Some(via), si));
+                open.push(State {
+                    cost: direct,
+                    track: gt,
+                });
+            }
+        }
+    }
+    if best.is_empty() {
+        return RouteOutcome::infeasible();
+    }
+
+    let finish_goal = |track: TrackId, mut cost: LexCost, goal: &EndCandidate| -> LexCost {
+        cost.bends += goal.extra_bends;
+        cost.length += goal.extra_len;
+        if hints.min_last_span > 0.0
+            && substrate
+                .track(track)
+                .is_some_and(|t| t.span_weight + 1e-9 < hints.min_last_span)
+        {
+            cost.congestion += 1e6;
+        }
+        cost.recompute(&hints.weights);
+        cost
+    };
+
+    let mut best_goal: Option<(LexCost, TrackId)> = None;
 
     while let Some(State { cost, track }) = open.pop() {
-        if let Some((bc, _, _)) = best.get(&track) {
+        if let Some((bc, _, _, _)) = best.get(&track) {
             if cost > *bc {
                 continue;
             }
         }
-        if track == goal {
-            let (tracks, gates) = reconstruct(&best, goal);
-            let mut final_cost = cost;
-            if hints.min_last_span > 0.0 {
-                if let Some(gt) = substrate.track(goal) {
-                    if gt.span_weight + 1e-9 < hints.min_last_span {
-                        final_cost.congestion += 1e6;
-                        final_cost.recompute(&hints.weights);
+        if let Some(gc) = goal_map.get(&track) {
+            let mut total = finish_goal(track, cost, gc);
+            // Spike-fold discount (pair-level): when both ends escape via the
+            // *same* gap line onto the *same* corridor through the minimal
+            // Main→Cross→Main chain, Ink's out-and-back rail excursion sits on
+            // one shared gap line and collapses to a removable spike — the
+            // path renders just the two stub-corner bends (baseline e10
+            // shape). The fold erases the 2 transit bends plus one rail-touch
+            // bend per end; price the pair accordingly. Rim AtPortNormal
+            // pairings never fold and keep their full price.
+            if let Some(si) = best.get(&track).map(|e| e.3) {
+                if let (EscapeEnd::ViaGap(sl), EscapeEnd::ViaGap(gl)) =
+                    (starts[si].escape, gc.escape)
+                {
+                    let same_corridor = substrate
+                        .track(starts[si].track)
+                        .zip(substrate.track(gc.track))
+                        .is_some_and(|(s, g)| s.orient == g.orient && s.line == g.line);
+                    // Minimal chain: reach the start entry within 2 hops.
+                    let mut hops = 0usize;
+                    let mut cur = track;
+                    let mut minimal = false;
+                    loop {
+                        match best.get(&cur) {
+                            Some((_, None, _, _)) => {
+                                minimal = true;
+                                break;
+                            }
+                            Some((_, Some(p), _, _)) if hops < 2 => {
+                                cur = *p;
+                                hops += 1;
+                            }
+                            _ => break,
+                        }
+                    }
+                    if sl == gl && same_corridor && minimal {
+                        total.bends = total.bends.saturating_sub(4);
+                        total.recompute(&hints.weights);
                     }
                 }
             }
-            return RouteOutcome {
-                path: ChannelPath::new(tracks, gates),
-                cost: final_cost,
-                feasible: true,
+            let better = match &best_goal {
+                None => true,
+                Some((bt, _)) => total < *bt,
             };
+            if better {
+                best_goal = Some((total, track));
+            }
+        }
+        // Prune: heap pops in ascending scalar, so nothing below remains.
+        if let Some((bt, _)) = &best_goal {
+            if cost.scalar >= bt.scalar {
+                break;
+            }
         }
         let from_orient = match substrate.track(track) {
             Some(t) => t.orient,
             None => continue,
         };
-        let leaving_start = track == start && cost.bends == 0;
+        let leaving_start = cost.bends == 0
+            && best.get(&track).is_some_and(|e| e.1.is_none());
         for tr in graph.neighbors(track) {
             if let Via::Gate(g) = tr.via {
                 if !occupancy.gate_open(substrate, g) {
@@ -509,7 +757,9 @@ pub fn route_edge(
                     next.bends += 1;
                     if leaving_start
                         && hints.min_first_span > 0.0
-                        && start_t.span_weight + 1e-9 < hints.min_first_span
+                        && substrate.track(track).is_some_and(|t| {
+                            t.span_weight + 1e-9 < hints.min_first_span
+                        })
                     {
                         next.congestion += 1e6;
                     }
@@ -532,10 +782,11 @@ pub fn route_edge(
             next.recompute(&hints.weights);
             let replace = match best.get(&tr.to) {
                 None => true,
-                Some((bc, _, _)) => next < *bc,
+                Some((bc, _, _, _)) => next < *bc,
             };
             if replace {
-                best.insert(tr.to, (next, Some(track), Some(tr.via)));
+                let start_idx = best.get(&track).map(|e| e.3).unwrap_or(0);
+                best.insert(tr.to, (next, Some(track), Some(tr.via), start_idx));
                 open.push(State {
                     cost: next,
                     track: tr.to,
@@ -543,7 +794,25 @@ pub fn route_edge(
             }
         }
     }
-    RouteOutcome::infeasible()
+
+    let Some((final_cost, goal_track)) = best_goal else {
+        return RouteOutcome::infeasible();
+    };
+    let (tracks, gates) = reconstruct(&best, goal_track);
+    let start_idx = best.get(&tracks[0]).map(|e| e.3).unwrap_or(0);
+    let path = ChannelPath {
+        tracks,
+        gates,
+        escape: EscapePlan {
+            source: starts[start_idx].escape,
+            target: goal_map[&goal_track].escape,
+        },
+    };
+    RouteOutcome {
+        path,
+        cost: final_cost,
+        feasible: true,
+    }
 }
 
 /// True when `path` uses an outer Main corridor while an inner band gap is
@@ -592,13 +861,13 @@ fn soft_penalties(
 }
 
 fn reconstruct(
-    best: &BTreeMap<TrackId, (LexCost, Option<TrackId>, Option<Via>)>,
+    best: &BTreeMap<TrackId, (LexCost, Option<TrackId>, Option<Via>, usize)>,
     goal: TrackId,
 ) -> (Vec<TrackId>, Vec<GateId>) {
     let mut cur = goal;
     let mut rev_tracks = vec![cur];
     let mut rev_gates = Vec::new();
-    while let Some((_, Some(parent), via)) = best.get(&cur) {
+    while let Some((_, Some(parent), via, _)) = best.get(&cur) {
         if let Some(Via::Gate(g)) = via {
             rev_gates.push(*g);
         }
@@ -639,6 +908,20 @@ mod tests {
         }
     }
 
+    /// Single-candidate adapter for host-resolved tracks (legacy shape).
+    fn normal_cand(tid: TrackId) -> Vec<EndCandidate> {
+        vec![EndCandidate {
+            track: tid,
+            escape: EscapeEnd::AtPortNormal,
+            extra_bends: 0,
+            extra_len: 0.0,
+        }]
+    }
+
+    fn no_blocked() -> std::collections::BTreeSet<usize> {
+        std::collections::BTreeSet::new()
+    }
+
     #[test]
     fn adjacent_layer_same_column_is_single_cross_track() {
         let plan = plan_chain();
@@ -649,8 +932,8 @@ mod tests {
         assert_eq!(start, goal);
         let out = route_edge(
             &g,
-            start,
-            goal,
+            &normal_cand(start),
+            &normal_cand(goal),
             &Occupancy::new(),
             true,
             &ScopeMask::unrestricted(),
@@ -682,8 +965,8 @@ mod tests {
         };
         let out = route_edge(
             &g,
-            start,
-            goal,
+            &normal_cand(start),
+            &normal_cand(goal),
             &Occupancy::new(),
             true,
             &ScopeMask::unrestricted(),
@@ -786,8 +1069,8 @@ mod tests {
         };
         let out = route_edge(
             &g,
-            start,
-            goal,
+            &normal_cand(start),
+            &normal_cand(goal),
             &Occupancy::new(),
             true,
             &ScopeMask::unrestricted(),
@@ -855,8 +1138,8 @@ mod tests {
         };
         let out = route_edge(
             &g,
-            start,
-            goal,
+            &normal_cand(start),
+            &normal_cand(goal),
             &Occupancy::new(),
             true,
             &ScopeMask::unrestricted(),
@@ -930,8 +1213,8 @@ mod tests {
         };
         let out = route_edge(
             &g,
-            start,
-            goal,
+            &normal_cand(start),
+            &normal_cand(goal),
             &Occupancy::new(),
             true,
             &ScopeMask::unrestricted(),
@@ -996,13 +1279,232 @@ mod tests {
         };
         let out = route_edge(
             &g,
-            start,
-            goal,
+            &normal_cand(start),
+            &normal_cand(goal),
             &occ,
             true,
             &ScopeMask::unrestricted(),
             hints,
         );
         assert!(out.feasible, "overflow to outer Main must remain feasible");
+    }
+
+    #[test]
+    fn end_candidates_escape_choice_table() {
+        // Escape option enumeration: normal-side + sibling hard constraints.
+        // 2-col × 3-rank grid, endpoint order 0, East port.
+        let elems = (0..6)
+            .map(|i| Elem {
+                key: ElemKey::Real(format!("n{i}")),
+                group_path: vec![],
+                rank: i / 2,
+            })
+            .collect::<Vec<_>>();
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: (0..6).collect(),
+            segments: vec![],
+            layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
+        };
+        let (sub, idx) = derive_root_substrate(&plan);
+        use plotgram_algo::orientation::Side;
+
+        // Straight exits exist only on the rim corridor (og = order_count =
+        // 2), gated by sibling piercing; inner corridors keep ViaGap only.
+        let cases: [(std::collections::BTreeSet<usize>, bool); 2] = [
+            (no_blocked(), true),
+            ([1usize].into_iter().collect(), false),
+        ];
+        for (blocked, want_straight_rim) in cases {
+            let cands = end_candidates(
+                &idx,
+                Side::East,
+                1,
+                0,
+                &blocked,
+                &no_blocked(),
+                idx.order_count,
+                true,
+            );
+            assert!(!cands.is_empty(), "East port must have candidates");
+            let straight = |line: usize| {
+                cands.iter().any(|c| {
+                    c.escape == EscapeEnd::AtPortNormal
+                        && sub.track(c.track).unwrap().line == line
+                })
+            };
+            assert!(!straight(1), "inner lane is not normal-safe: {cands:?}");
+            assert_eq!(
+                straight(2),
+                want_straight_rim,
+                "rim straight exit, blocked={blocked:?}"
+            );
+            // ViaGap stays feasible (the fallback escape) on the facing gap
+            // line (rank+1 for toward_higher) of every corridor.
+            for line in [1usize, 2] {
+                let gaps: Vec<usize> = cands
+                    .iter()
+                    .filter(|c| {
+                        sub.track(c.track).unwrap().line == line
+                    })
+                    .filter_map(|c| match c.escape {
+                        EscapeEnd::ViaGap(g) => Some(g),
+                        _ => None,
+                    })
+                    .collect();
+                assert_eq!(gaps, vec![2], "ViaGap fallback on og={line}: {cands:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn solver_prefers_normal_escape_over_gap_detour() {
+        // e3 shape: single-node ranks, E–E back edge spanning all ranks.
+        // Both ends have a free normal exit → the solver must pick
+        // AtPortNormal at both ends (zero extra bends), not ViaGap detours.
+        let plan = plan_chain();
+        let (sub, idx) = derive_root_substrate(&plan);
+        let g = ChannelGraph::from_substrate(&sub);
+        use plotgram_algo::orientation::Side;
+        // 1-column chain: the only Main line is og=1.
+        let starts = end_candidates(
+            &idx,
+            Side::East,
+            2,
+            0,
+            &no_blocked(),
+            &no_blocked(),
+            idx.order_count,
+            false, // tgt rank 0 < src rank 2
+        );
+        let goals = end_candidates(
+            &idx,
+            Side::East,
+            0,
+            0,
+            &no_blocked(),
+            &no_blocked(),
+            idx.order_count,
+            true, // src rank 2 >= tgt rank 0
+        );
+        let hints = RouteHints {
+            span: Some(SpanAffinity {
+                src_rank: 2,
+                tgt_rank: 0,
+                src_order: 0,
+                tgt_order: 0,
+            }),
+            order_count: idx.order_count,
+            outer_main_as_overflow: true,
+            ..RouteHints::default()
+        };
+        let out = route_edge(
+            &g,
+            &starts,
+            &goals,
+            &Occupancy::new(),
+            true,
+            &ScopeMask::unrestricted(),
+            hints,
+        );
+        assert!(out.feasible, "{out:?}");
+        assert_eq!(
+            out.path.escape.source,
+            EscapeEnd::AtPortNormal,
+            "single-node rank needs no gap detour: {:?}",
+            out.path
+        );
+        assert_eq!(out.path.escape.target, EscapeEnd::AtPortNormal);
+    }
+
+    #[test]
+    fn solver_picks_normal_side_corridor_for_same_face_back_edge() {
+        // e7 shape: E–E edge whose endpoints sit at different orders; the
+        // shared corridor must land on the normal side of both faces
+        // (og ≥ max(order)+1) and escape straight when no sibling blocks.
+        let elems = (0..6)
+            .map(|i| Elem {
+                key: ElemKey::Real(format!("n{i}")),
+                group_path: vec![],
+                rank: i / 2,
+            })
+            .collect::<Vec<_>>();
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: (0..6).collect(),
+            segments: vec![],
+            layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
+        };
+        let (sub, idx) = derive_root_substrate(&plan);
+        let g = ChannelGraph::from_substrate(&sub);
+        use plotgram_algo::orientation::Side;
+        // Shared corridor of the E–E edge: og ≥ max(order)+1 = 2 (mirrors the
+        // route_all filter). Both ends escape straight when no sibling blocks.
+        let normal_side = |cs: Vec<EndCandidate>| {
+            cs.into_iter()
+                .filter(|c| sub.track(c.track).unwrap().line >= 2)
+                .collect::<Vec<_>>()
+        };
+        let starts = normal_side(end_candidates(
+            &idx,
+            Side::East,
+            0,
+            0,
+            &no_blocked(),
+            &no_blocked(),
+            idx.order_count,
+            true, // tgt rank 2 >= src rank 0
+        ));
+        let goals = normal_side(end_candidates(
+            &idx,
+            Side::East,
+            2,
+            1,
+            &no_blocked(),
+            &no_blocked(),
+            idx.order_count,
+            false, // src rank 0 < tgt rank 2
+        ));
+        let hints = RouteHints {
+            span: Some(SpanAffinity {
+                src_rank: 0,
+                tgt_rank: 2,
+                src_order: 0,
+                tgt_order: 1,
+            }),
+            order_count: idx.order_count,
+            outer_main_as_overflow: true,
+            ..RouteHints::default()
+        };
+        let out = route_edge(
+            &g,
+            &starts,
+            &goals,
+            &Occupancy::new(),
+            true,
+            &ScopeMask::unrestricted(),
+            hints,
+        );
+        assert!(out.feasible, "{out:?}");
+        assert_eq!(out.path.escape.source, EscapeEnd::AtPortNormal);
+        assert_eq!(out.path.escape.target, EscapeEnd::AtPortNormal);
+        for &tid in &out.path.tracks {
+            let t = sub.track(tid).unwrap();
+            if t.orient == TrackOrient::Main {
+                assert!(t.line >= 2, "corridor must stay normal-side: {t:?}");
+            }
+        }
     }
 }

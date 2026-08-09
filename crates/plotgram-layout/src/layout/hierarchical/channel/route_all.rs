@@ -9,8 +9,8 @@ use plotgram_model::diagnostics::Relaxation;
 use super::derive::derive_substrate;
 use super::graph::{ChannelGraph, Occupancy};
 use super::search::{
-    decide_escape, path_used_outer_overflow, route_edge, ChannelPath, CostWeights, LexCost,
-    RouteHints, ScopeMask, SpanAffinity,
+    end_candidates, path_used_outer_overflow, route_edge, ChannelPath, CostWeights, EndCandidate,
+    LexCost, RouteHints, ScopeMask, SpanAffinity,
 };
 use super::substrate::{derive_root_substrate, BlueprintIndex, PortSide, Substrate, TrackId};
 use crate::layout::hierarchical::compose::bundle::{end_bus_edge_ids, BundlePlan};
@@ -81,14 +81,34 @@ fn endpoint_side_rank_order(
     Ok((side, rank, order))
 }
 
-/// Resolve Channel start/goal hosts for one edge.
+/// Real-sibling orders of `elem`'s rank that block a straight E/W escape
+/// (dummies never block — the edge may pass its own chain column).
+fn rank_real_sibling_orders(
+    plan: &PlanGraph,
+    layer_pos: &[usize],
+    elem: usize,
+) -> Vec<usize> {
+    let rank = plan.elems[elem].rank as usize;
+    plan.layers[rank]
+        .iter()
+        .copied()
+        .filter(|&e| e != elem)
+        .filter(|&e| matches!(plan.elems[e].key, ElemKey::Real(_)))
+        .map(|e| layer_pos[e])
+        .collect()
+}
+
+/// Enumerate per-end landing candidates (host track × escape) for one edge.
 ///
-/// Same-face East–East / West–West share one outer Main corridor:
-/// - both CrossHigh (East) → `Main(max(order)+1)` at each end's rank
-/// - both CrossLow (West) → `Main(min(order))` at each end's rank
-///
-/// N/S and mixed faces keep per-endpoint `resolve_host_track`.
-fn host_tracks_for_edge(
+/// E/W ends enumerate every Main corridor on their normal side; `end_candidates`
+/// allows straight escapes only on the outermost corridor (the only lane
+/// Metric folds past every node face, hence normal-safe for any endpoint)
+/// and prices the ViaGap fallback everywhere else, so the solver alone owns
+/// the escape decision. Same-face edges must
+/// share one Main line, so both ends are restricted to corridors on the normal
+/// side of **both** faces (E–E: `og ≥ max(order)+1`, W–W: `og ≤ min(order)`).
+/// N/S ends keep their adjacent gap-line host.
+fn edge_end_candidates(
     index: &BlueprintIndex,
     plan: &PlanGraph,
     graph: &RealGraph,
@@ -96,75 +116,82 @@ fn host_tracks_for_edge(
     layer_pos: &[usize],
     ports: &BTreeMap<String, EdgePorts>,
     edge_id: &str,
-) -> Result<(TrackId, TrackId), LayoutError> {
+) -> Result<(Vec<EndCandidate>, Vec<EndCandidate>), LayoutError> {
     let (src_side, src_rank, src_order) =
         endpoint_side_rank_order(plan, graph, edge_of, layer_pos, ports, edge_id, true)?;
     let (tgt_side, tgt_rank, tgt_order) =
         endpoint_side_rank_order(plan, graph, edge_of, layer_pos, ports, edge_id, false)?;
 
-    let shared_og = match (src_side, tgt_side) {
-        (PortSide::CrossHigh, PortSide::CrossHigh) => Some(src_order.max(tgt_order) + 1),
-        (PortSide::CrossLow, PortSide::CrossLow) => Some(src_order.min(tgt_order)),
+    let &edge_idx = edge_of.get(edge_id).ok_or_else(|| {
+        LayoutError::message(format!("channel: unknown edge `{edge_id}`"))
+    })?;
+    let blocked =
+        |elem: usize| -> (std::collections::BTreeSet<usize>, std::collections::BTreeSet<usize>) {
+            let mut east = std::collections::BTreeSet::new();
+            let mut west = std::collections::BTreeSet::new();
+            for s in rank_real_sibling_orders(plan, layer_pos, elem) {
+                if s > layer_pos[elem] {
+                    east.insert(s);
+                } else {
+                    west.insert(s);
+                }
+            }
+            (east, west)
+        };
+    let (src_be, src_bw) = blocked(graph.edges[edge_idx].original_source);
+    let (tgt_be, tgt_bw) = blocked(graph.edges[edge_idx].original_target);
+
+    // Facing gap line per end (baseline decide_escape semantics, mirrors
+    // Ink's gap_y default).
+    let src_toward_higher = tgt_rank >= src_rank;
+    let tgt_toward_higher = src_rank > tgt_rank;
+    let mut starts = end_candidates(
+        index,
+        port_side_to_algo(src_side),
+        src_rank,
+        src_order,
+        &src_be,
+        &src_bw,
+        index.order_count,
+        src_toward_higher,
+    );
+    let mut goals = end_candidates(
+        index,
+        port_side_to_algo(tgt_side),
+        tgt_rank,
+        tgt_order,
+        &tgt_be,
+        &tgt_bw,
+        index.order_count,
+        tgt_toward_higher,
+    );
+
+    // Same-face edges share one Main corridor: keep only corridors on the
+    // normal side of both faces.
+    let shared_ogs: Option<std::ops::RangeInclusive<usize>> = match (src_side, tgt_side) {
+        (PortSide::CrossHigh, PortSide::CrossHigh) => {
+            Some((src_order.max(tgt_order) + 1)..=index.order_count)
+        }
+        (PortSide::CrossLow, PortSide::CrossLow) => Some(0..=src_order.min(tgt_order)),
         _ => None,
     };
-
-    if let Some(og) = shared_og {
-        let start = index.main_at(og, src_rank).ok_or_else(|| {
-            LayoutError::message(format!(
-                "channel: no shared East/West Main host og={og} for edge `{edge_id}` source"
-            ))
-        })?;
-        let goal = index.main_at(og, tgt_rank).ok_or_else(|| {
-            LayoutError::message(format!(
-                "channel: no shared East/West Main host og={og} for edge `{edge_id}` target"
-            ))
-        })?;
-        return Ok((start, goal));
+    if let Some(ogs) = shared_ogs {
+        let allowed: std::collections::BTreeSet<TrackId> = ogs
+            .flat_map(|og| index.main_lines.get(&og))
+            .flatten()
+            .map(|sg| sg.id)
+            .collect();
+        starts.retain(|c| allowed.contains(&c.track));
+        goals.retain(|c| allowed.contains(&c.track));
     }
 
-    let start = index
-        .resolve_host_track(src_rank, src_order, src_side)
-        .ok_or_else(|| {
-            LayoutError::message(format!(
-                "channel: no host track for edge `{edge_id}` source side {src_side:?}"
-            ))
-        })?;
-    let goal = index
-        .resolve_host_track(tgt_rank, tgt_order, tgt_side)
-        .ok_or_else(|| {
-            LayoutError::message(format!(
-                "channel: no host track for edge `{edge_id}` target side {tgt_side:?}"
-            ))
-        })?;
-    Ok((start, goal))
-}
-
-fn attach_escape(
-    path: &mut ChannelPath,
-    _index: &BlueprintIndex,
-    plan: &PlanGraph,
-    graph: &RealGraph,
-    ports: &BTreeMap<String, EdgePorts>,
-    edge_id: &str,
-    layer_pos: &[usize],
-) {
-    let edge_of = graph.edge_index_map();
-    let Ok((src_ps, src_rank, _src_order)) =
-        endpoint_side_rank_order(plan, graph, &edge_of, layer_pos, ports, edge_id, true)
-    else {
-        return;
-    };
-    let Ok((tgt_ps, tgt_rank, _tgt_order)) =
-        endpoint_side_rank_order(plan, graph, &edge_of, layer_pos, ports, edge_id, false)
-    else {
-        return;
-    };
-    path.escape = decide_escape(
-        port_side_to_algo(src_ps),
-        port_side_to_algo(tgt_ps),
-        src_rank,
-        tgt_rank,
-    );
+    if starts.is_empty() || goals.is_empty() {
+        return Err(LayoutError::message(format!(
+            "channel: no host candidates for edge `{edge_id}` (src {src_side:?} rank{src_rank}, \
+             tgt {tgt_side:?} rank{tgt_rank})"
+        )));
+    }
+    Ok((starts, goals))
 }
 
 fn port_side_to_algo(side: PortSide) -> plotgram_algo::orientation::Side {
@@ -317,16 +344,16 @@ struct EdgeRouteState {
     critical: bool,
     span: usize,
     decl_index: usize,
-    start: TrackId,
-    goal: TrackId,
+    starts: Vec<EndCandidate>,
+    goals: Vec<EndCandidate>,
     mask: ScopeMask,
     hints: RouteHints,
 }
 
 struct PreparedEdge {
     entry: RouteOrderEntry,
-    start: TrackId,
-    goal: TrackId,
+    starts: Vec<EndCandidate>,
+    goals: Vec<EndCandidate>,
     mask: ScopeMask,
     hints: RouteHints,
 }
@@ -420,8 +447,9 @@ fn route_on_substrate(
         if bus_edges.contains(&e.edge_id) {
             continue;
         }
-        let (start, goal) =
-            host_tracks_for_edge(&index, plan, graph, &edge_of, &layer_pos, ports, &e.edge_id)?;
+        let (starts, goals) = edge_end_candidates(
+            &index, plan, graph, &edge_of, &layer_pos, ports, &e.edge_id,
+        )?;
         let mask = scope_mask_for_edge(&substrate, &index, graph, e);
         let hints = hints_for_edge(plan, graph, &layer_pos, params, e, index.order_count);
         prepared.push(PreparedEdge {
@@ -433,8 +461,8 @@ fn route_on_substrate(
                 dummy_len: dummy_chain_len(&segs_by_edge, &e.edge_id),
                 decl_index,
             },
-            start,
-            goal,
+            starts,
+            goals,
             mask,
             hints,
         });
@@ -454,8 +482,8 @@ fn route_on_substrate(
             .expect("prepared edge present");
         let outcome = route_edge(
             &channel_graph,
-            prep.start,
-            prep.goal,
+            &prep.starts,
+            &prep.goals,
             &occupancy,
             true,
             &prep.mask,
@@ -468,27 +496,17 @@ fn route_on_substrate(
             )));
         }
         occupancy.commit(&substrate, &outcome.path.tracks, &outcome.path.gates);
-        let mut path = outcome.path;
-        attach_escape(
-            &mut path,
-            &index,
-            plan,
-            graph,
-            ports,
-            &entry.edge_id,
-            &layer_pos,
-        );
         states.insert(
             entry.edge_id.clone(),
             EdgeRouteState {
-                path,
+                path: outcome.path,
                 cost: outcome.cost,
                 failure_count: 0,
                 critical: entry.critical,
                 span: entry.span,
                 decl_index: entry.decl_index,
-                start: prep.start,
-                goal: prep.goal,
+                starts: prep.starts,
+                goals: prep.goals,
                 mask: prep.mask,
                 hints: prep.hints,
             },
@@ -502,11 +520,6 @@ fn route_on_substrate(
         &mut states,
     );
     relaxations.extend(ripup_relaxations);
-
-    // Re-attach escapes after rip-up (paths may have changed).
-    for (eid, st) in states.iter_mut() {
-        attach_escape(&mut st.path, &index, plan, graph, ports, eid, &layer_pos);
-    }
 
     // Outer-overflow: record when the final path sits on outer Main while an
     // inner band gap is free (search soft-penalty already applied; this is
@@ -598,15 +611,15 @@ fn bounded_ripup(
             };
             let old_path = st.path.clone();
             let old_cost = st.cost;
-            let start = st.start;
-            let goal = st.goal;
+            let starts = st.starts.clone();
+            let goals = st.goals.clone();
             let mask = st.mask.clone();
             let hints = st.hints;
 
             let (peak_before, sum_before) = occupancy_peak_sum(occupancy, substrate);
             occupancy.release(substrate, &old_path.tracks, &old_path.gates);
 
-            let outcome = route_edge(graph, start, goal, occupancy, true, &mask, hints);
+            let outcome = route_edge(graph, &starts, &goals, occupancy, true, &mask, hints);
             if !outcome.feasible {
                 occupancy.commit(substrate, &old_path.tracks, &old_path.gates);
                 if let Some(st) = states.get_mut(&eid) {
@@ -667,7 +680,7 @@ fn bounded_ripup(
 
 #[cfg(test)]
 mod tests {
-    use super::{compute_route_order, host_tracks_for_edge, RouteOrderEntry, MAX_RIPUP_ROUNDS};
+    use super::{compute_route_order, edge_end_candidates, RouteOrderEntry, MAX_RIPUP_ROUNDS};
     use super::super::substrate::{derive_root_substrate, TrackOrient};
     use crate::layout::hierarchical::compose::ports::{EdgePorts, ResolvedPort};
     use crate::layout::hierarchical::model::{Elem, ElemKey, PlanGraph, RealEdge, RealGraph};
@@ -774,12 +787,12 @@ mod tests {
     }
 
     #[test]
-    fn same_face_east_hosts_share_max_order_plus_one_main() {
+    fn same_face_east_candidates_only_normal_side_corridors() {
         let (plan, graph) = two_col_plan_graph();
         let (sub, idx) = derive_root_substrate(&plan);
         let mut ports = BTreeMap::new();
         ports.insert("ew".into(), east_ports());
-        let (start, goal) = host_tracks_for_edge(
+        let (starts, goals) = edge_end_candidates(
             &idx,
             &plan,
             &graph,
@@ -788,27 +801,22 @@ mod tests {
             &ports,
             "ew",
         ).unwrap();
-        let start_t = sub.track(start).unwrap();
-        let goal_t = sub.track(goal).unwrap();
-        assert_eq!(start_t.orient, TrackOrient::Main);
-        assert_eq!(goal_t.orient, TrackOrient::Main);
-        // max(0,1)+1 = 2
-        assert_eq!(start_t.line, 2);
-        assert_eq!(goal_t.line, 2);
-        // Per-end legacy would split Main1 vs Main2.
-        let legacy_src = idx.resolve_host_track(0, 0, super::super::substrate::PortSide::CrossHigh);
-        let legacy_tgt = idx.resolve_host_track(1, 1, super::super::substrate::PortSide::CrossHigh);
-        assert_ne!(legacy_src, legacy_tgt);
-        assert_eq!(start_t.line, legacy_tgt.and_then(|id| sub.track(id)).unwrap().line);
+        assert!(!starts.is_empty() && !goals.is_empty());
+        // max(0,1)+1 = 2 is the only shared normal-side corridor (order_count=2).
+        for c in starts.iter().chain(goals.iter()) {
+            let t = sub.track(c.track).unwrap();
+            assert_eq!(t.orient, TrackOrient::Main);
+            assert_eq!(t.line, 2, "E–E candidates must stay on og ≥ max+1: {c:?}");
+        }
     }
 
     #[test]
-    fn same_face_west_hosts_share_min_order_main() {
+    fn same_face_west_candidates_only_normal_side_corridors() {
         let (plan, graph) = two_col_plan_graph();
         let (sub, idx) = derive_root_substrate(&plan);
         let mut ports = BTreeMap::new();
         ports.insert("ew".into(), west_ports());
-        let (start, goal) = host_tracks_for_edge(
+        let (starts, goals) = edge_end_candidates(
             &idx,
             &plan,
             &graph,
@@ -817,13 +825,13 @@ mod tests {
             &ports,
             "ew",
         ).unwrap();
-        let start_t = sub.track(start).unwrap();
-        let goal_t = sub.track(goal).unwrap();
-        assert_eq!(start_t.orient, TrackOrient::Main);
-        assert_eq!(goal_t.orient, TrackOrient::Main);
-        // min(0,1) = 0
-        assert_eq!(start_t.line, 0);
-        assert_eq!(goal_t.line, 0);
+        assert!(!starts.is_empty() && !goals.is_empty());
+        // min(0,1) = 0 is the only shared normal-side corridor.
+        for c in starts.iter().chain(goals.iter()) {
+            let t = sub.track(c.track).unwrap();
+            assert_eq!(t.orient, TrackOrient::Main);
+            assert_eq!(t.line, 0, "W–W candidates must stay on og ≤ min: {c:?}");
+        }
     }
 
     #[test]

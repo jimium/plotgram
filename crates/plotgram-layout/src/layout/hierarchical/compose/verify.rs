@@ -60,10 +60,10 @@ fn verify_ports_complete(
 
 fn escape_compatible(end: EscapeEnd, side: Side) -> bool {
     match (end, side) {
-        (EscapeEnd::AtPortNormal, Side::North | Side::South) => true,
+        (EscapeEnd::AtPortNormal, _) => true,
         (EscapeEnd::ViaGap(_), Side::East | Side::West) => true,
-        // Same-face / mixed plans may still use ViaGap on N/S in future; for
-        // now decide_escape only emits these pairings.
+        // ViaGap on N/S is never enumerated by the Channel solver: the gap
+        // move would retrace the port normal already covered by AtPortNormal.
         _ => false,
     }
 }

@@ -86,6 +86,10 @@ Main rail），Ink 先插入 `port_stub` 法向 stub 再做切向 jog。stub 长
 ≤ `node_gap/2`、main-axis stub ≤ `layer_gap/2`，保证 stub 后的主轴段
 只跨越本 rank 带与相邻层隙，不穿同层兄弟。
 
+escape 配对（`EscapePlan`）由 Channel 搜索 J 唯一决定：host 走廊与
+escape 方式逐端枚举为候选并计入目标函数，求解器选出配对后直接
+写入；Ink 是纯展开者，不做任何事后判定。
+
 若 segment sequence 无法连接端口点，是 Plan/Metric 错误；Ink 不增加修复肘点。
 
 ## 5. Bundle
