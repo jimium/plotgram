@@ -169,6 +169,7 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: None,
+                undirected: false,
                 attrs: AttrMap::new(),
             }],
             groups: vec![],
@@ -325,6 +326,7 @@ mod tests {
             from_port: None,
             to_port: None,
             weight: None,
+            undirected: false,
             attrs: {
                 let mut a = AttrMap::new();
                 a.insert(

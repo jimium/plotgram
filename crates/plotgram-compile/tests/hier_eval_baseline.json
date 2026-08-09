@@ -832,20 +832,20 @@
     "symmetry_deviation_sum": 7.885788651345287
   },
   "group-weak/demo.multi-region-active-active": {
-    "bbox_h": 425.4,
-    "bbox_w": 384.50747025797534,
+    "bbox_h": 346.5,
+    "bbox_w": 377.84000000000003,
     "channel_used_gates": true,
     "crossings": 1,
     "gap_uniformity_max": 0.0,
-    "max_bends": 5,
-    "overlap_len": 33.789720018915716,
-    "relaxations": 2,
-    "reversed_count": 1,
+    "max_bends": 4,
+    "overlap_len": 0.0,
+    "relaxations": 1,
+    "reversed_count": 0,
     "ripup_rounds": 1,
     "straightness": 0.0,
-    "sum_bends": 23,
-    "symmetry_deviation_max": 2.759583333333334,
-    "symmetry_deviation_sum": 5.288689972911601
+    "sum_bends": 16,
+    "symmetry_deviation_max": 5.419791666666666,
+    "symmetry_deviation_sum": 6.401261238936366
   },
   "group-weak/demo.plotgram-core-mod-deps": {
     "bbox_h": 999.5,

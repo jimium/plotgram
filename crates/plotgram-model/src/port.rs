@@ -113,6 +113,8 @@ pub enum PortConstraintError {
     UnsupportedEdgePortKey { key: &'static str },
     /// `critical` present but not a boolean literal (sugar for `weight: 2.0`).
     InvalidCritical { value: String },
+    /// `undirected` present but not a boolean literal.
+    InvalidUndirected { value: String },
     /// `weight` present but not a positive finite number.
     InvalidWeight { value: String },
     /// Both `critical: true` and `weight` specified — ambiguous.
@@ -126,6 +128,9 @@ impl fmt::Display for PortConstraintError {
         match self {
             Self::InvalidCritical { value } => {
                 write!(f, "`critical` expects a boolean, got {value}")
+            }
+            Self::InvalidUndirected { value } => {
+                write!(f, "`undirected` expects a boolean, got {value}")
             }
             Self::InvalidWeight { value } => {
                 write!(

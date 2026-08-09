@@ -7,21 +7,28 @@
 use crate::layout::hierarchical::model::RealGraph;
 
 /// Run Greedy-FAS over `graph.edges` and set `working_*` / `reversed` in
-/// place. Deterministic: `plotgram_algo::fas::greedy_fas` breaks ties by
+/// place. Undirected edges impose no hierarchy: they never enter the FAS and
+/// are never reversed (keep original working direction).
+/// Deterministic: `plotgram_algo::fas::greedy_fas` breaks ties by
 /// smallest node index, which here is declaration order (`RealGraph::ids`);
 /// its cycle reroot then rotates the cut onto the unique edge entering the
 /// earliest-declared node when that keeps the orientation acyclic
 /// (fas.rs module doc), so the author's narrative start ranks at the top.
 pub fn remove_cycles(graph: &mut RealGraph) {
-    let pairs: Vec<(usize, usize)> = graph
-        .edges
-        .iter()
-        .map(|e| (e.original_source, e.original_target))
-        .collect();
+    let mut pairs: Vec<(usize, usize)> = Vec::new();
+    let mut directed_idx: Vec<usize> = Vec::new();
+    for (i, e) in graph.edges.iter().enumerate() {
+        if e.undirected {
+            continue;
+        }
+        pairs.push((e.original_source, e.original_target));
+        directed_idx.push(i);
+    }
     let reversed = plotgram_algo::fas::greedy_fas(graph.ids.len(), &pairs);
 
-    for (i, e) in graph.edges.iter_mut().enumerate() {
-        if reversed.contains(&i) {
+    for (pair_i, &edge_i) in directed_idx.iter().enumerate() {
+        let e = &mut graph.edges[edge_i];
+        if reversed.contains(&pair_i) {
             e.working_source = e.original_target;
             e.working_target = e.original_source;
             e.reversed = true;
@@ -60,6 +67,7 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
             )
             .collect();
@@ -70,6 +78,7 @@ mod tests {
             group_path,
             edges,
             self_loops: Vec::new(),
+            ..Default::default()
         }
     }
 

@@ -329,6 +329,7 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
                 RealEdge {
                     edge_id: "e1".into(),
@@ -340,9 +341,11 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
             ],
             self_loops: vec![],
+            ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         let ports = assign_ports(
@@ -456,6 +459,7 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
                 RealEdge {
                     edge_id: "e_high".into(),
@@ -467,9 +471,11 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
             ],
             self_loops: vec![],
+            ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         let ports = assign_ports(
@@ -610,9 +616,11 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 })
                 .collect(),
             self_loops: vec![],
+            ..Default::default()
         };
         let mut ports = BTreeMap::new();
         for (i, eid) in edge_ids.iter().enumerate() {

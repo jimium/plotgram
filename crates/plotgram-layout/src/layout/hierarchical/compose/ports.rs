@@ -616,6 +616,7 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: 1.0,
+                ..Default::default()
             },
             RealEdge {
                 edge_id: "e1".into(),
@@ -627,6 +628,7 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: 1.0,
+                ..Default::default()
             },
         ];
         let graph = RealGraph {
@@ -636,6 +638,7 @@ mod tests {
             shapes: vec![plotgram_model::NodeShape::DEFAULT; 3],
             edges,
             self_loops: Vec::new(),
+            ..Default::default()
         };
 
         let elems = vec![
@@ -762,8 +765,10 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: 1.0,
+                ..Default::default()
             }],
             self_loops: Vec::new(),
+            ..Default::default()
         };
         let elems = vec![
             Elem {
@@ -829,8 +834,10 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: 1.0,
+                ..Default::default()
             }],
             self_loops: Vec::new(),
+            ..Default::default()
         };
         let elems = vec![
             Elem {
@@ -899,8 +906,10 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: 1.0,
+                ..Default::default()
             }],
             self_loops: Vec::new(),
+            ..Default::default()
         };
         let elems = vec![
             Elem {
@@ -989,8 +998,10 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: 1.0,
+                ..Default::default()
             }],
             self_loops: Vec::new(),
+            ..Default::default()
         };
         let elems = vec![
             Elem {
@@ -1066,8 +1077,10 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: 1.0,
+                ..Default::default()
             }],
             self_loops: Vec::new(),
+            ..Default::default()
         };
         let elems = vec![
             Elem {
@@ -1158,6 +1171,7 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
                 RealEdge {
                     edge_id: "back".into(),
@@ -1169,9 +1183,11 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
             ],
             self_loops: Vec::new(),
+            ..Default::default()
         };
         let elems = vec![
             Elem {
@@ -1250,8 +1266,10 @@ mod tests {
                     side: ModelSide::North,
                 }),
                 weight: 1.0,
+                ..Default::default()
             }],
             self_loops: Vec::new(),
+            ..Default::default()
         };
         let elems = vec![
             Elem {
@@ -1312,6 +1330,7 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: 1.0,
+                ..Default::default()
             },
             RealEdge {
                 edge_id: "e1".into(),
@@ -1323,6 +1342,7 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: 1.0,
+                ..Default::default()
             },
         ];
         let graph = RealGraph {
@@ -1332,6 +1352,7 @@ mod tests {
             shapes: vec![plotgram_model::NodeShape::DEFAULT; 2],
             edges,
             self_loops: Vec::new(),
+            ..Default::default()
         };
         let elems = vec![
             Elem {
@@ -1496,6 +1517,7 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
                 RealEdge {
                     edge_id: "e_far".into(),
@@ -1507,9 +1529,11 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
             ],
             self_loops: Vec::new(),
+            ..Default::default()
         };
         let elems = vec![
             Elem {

@@ -64,6 +64,7 @@ pub fn build_real_graph(graph: &Graph) -> RealGraph {
             from_port: e.from_port.clone(),
             to_port: e.to_port.clone(),
             weight: e.weight.unwrap_or(1.0),
+            undirected: e.undirected,
         });
     }
 
@@ -74,6 +75,7 @@ pub fn build_real_graph(graph: &Graph) -> RealGraph {
         shapes,
         edges,
         self_loops,
+        intra_layer: Vec::new(),
     }
 }
 
@@ -109,6 +111,7 @@ mod tests {
             from_port: None,
             to_port: None,
             weight: None,
+            undirected: false,
             attrs: AttrMap::new(),
         }
     }

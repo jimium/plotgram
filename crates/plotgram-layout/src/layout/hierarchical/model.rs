@@ -68,7 +68,10 @@ impl ElemKey {
 ///
 /// Self-loops (`source == target`) are extracted out and never appear in
 /// [`Self::edges`] — they do not participate in ranking/ordering (Compose
-/// `SelfLoop` fact, expanded back to geometry only in Ink).
+/// `SelfLoop` fact, expanded back to geometry only in Ink). Undirected edges
+/// with zero rank span follow the same bypass pattern into
+/// [`Self::intra_layer`] (Compose `split_intra_layer`, Ink `intralayer`).
+#[derive(Debug, Default)]
 pub struct RealGraph {
     /// index -> node id, declaration order (`Graph::all_node_ids`).
     pub ids: Vec<String>,
@@ -81,10 +84,13 @@ pub struct RealGraph {
     pub edges: Vec<RealEdge>,
     /// `(edge_id, node_idx)` for edges with `source == target`, declaration order.
     pub self_loops: Vec<(String, usize)>,
+    /// Undirected edges whose endpoints landed on the same rank — excluded
+    /// from ordering/properify/channel, routed as side-links in Ink.
+    pub intra_layer: Vec<RealEdge>,
 }
 
 /// One real-to-real edge before properify.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RealEdge {
     pub edge_id: String,
     /// Always `Graph::Edge` semantics: arrowhead, head/tail label, and the
@@ -104,6 +110,9 @@ pub struct RealEdge {
     /// Default 1.0; `critical: true` sugar lifts to 2.0.
     /// (edge-parameters.md §2.5).
     pub weight: f64,
+    /// Non-hierarchical edge (yFiles `UNDIRECTED_EDGES`): imposes no rank
+    /// constraint — skipped by FAS/ranking; span 0 → [`RealGraph::intra_layer`].
+    pub undirected: bool,
 }
 
 /// One node-shaped element after properify: a real node, edge dummy, or

@@ -778,8 +778,10 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: 1.0,
+                ..Default::default()
             }],
             self_loops: vec![],
+            ..Default::default()
         };
         (plan, graph)
     }
@@ -882,8 +884,10 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: 1.0,
+                ..Default::default()
             }],
             self_loops: vec![],
+            ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         assert_eq!(idx.order_count, 3);

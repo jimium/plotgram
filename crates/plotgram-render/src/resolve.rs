@@ -490,6 +490,7 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: None,
+                undirected: false,
                 attrs,
             }
         };

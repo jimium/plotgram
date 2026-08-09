@@ -6,7 +6,34 @@ use std::collections::BTreeMap;
 
 use crate::layout::hierarchical::compose::rank::RankMap;
 use crate::layout::hierarchical::model::RealGraph;
-use crate::layout::hierarchical::model::{Elem, ElemKey, PlanGraph, Segment};
+use crate::layout::hierarchical::model::{Elem, ElemKey, PlanGraph, RealEdge, Segment};
+
+/// Partition undirected edges after ranking: zero-span ones move to
+/// [`RealGraph::intra_layer`] (Ink routes them as side-links, invisible to
+/// ordering/properify/channel); the rest stay in [`RealGraph::edges`] with
+/// the working direction normalized downward, so [`properify`]'s `r1 > r0`
+/// invariant holds without ever marking them `reversed` (arrowheads and
+/// labels trace `original_*`, which are untouched).
+pub fn split_intra_layer(graph: &mut RealGraph, rank: &RankMap) {
+    let mut kept: Vec<RealEdge> = Vec::with_capacity(graph.edges.len());
+    for mut e in std::mem::take(&mut graph.edges) {
+        if !e.undirected {
+            kept.push(e);
+            continue;
+        }
+        let rs = rank[e.working_source];
+        let rt = rank[e.working_target];
+        if rs == rt {
+            graph.intra_layer.push(e);
+            continue;
+        }
+        if rs > rt {
+            std::mem::swap(&mut e.working_source, &mut e.working_target);
+        }
+        kept.push(e);
+    }
+    graph.edges = kept;
+}
 
 pub fn properify(graph: &RealGraph, rank: &RankMap) -> PlanGraph {
     let mut elems: Vec<Elem> = Vec::with_capacity(graph.ids.len());
@@ -123,6 +150,7 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: 1.0,
+                ..Default::default()
             })
             .collect();
         RealGraph {
@@ -132,6 +160,7 @@ mod tests {
             shapes: vec![plotgram_model::NodeShape::DEFAULT; n],
             edges,
             self_loops: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -175,5 +204,26 @@ mod tests {
         let plan = properify(&g, &rank);
         let dummy = plan.elems.iter().find(|e| e.key.is_virtual()).unwrap();
         assert!(dummy.group_path.is_empty());
+    }
+
+    #[test]
+    fn split_intra_layer_moves_zero_span_and_normalizes_downward() {
+        // e0: undirected 0~1 (same rank) → intra_layer; e1: undirected 2~0
+        // (rank 1 > 0) → kept, working direction swapped downward, never
+        // `reversed`; e2: directed stays untouched.
+        let mut g = graph(3, &[(0, 1), (2, 0), (0, 2)]);
+        g.edges[0].undirected = true;
+        g.edges[1].undirected = true;
+        let rank = vec![0, 0, 1];
+        split_intra_layer(&mut g, &rank);
+        assert_eq!(g.intra_layer.len(), 1);
+        assert_eq!(g.intra_layer[0].edge_id, "e0");
+        assert_eq!(g.edges.len(), 2);
+        let e1 = g.edges.iter().find(|e| e.edge_id == "e1").unwrap();
+        assert_eq!(e1.working_source, 0);
+        assert_eq!(e1.working_target, 2);
+        assert!(!e1.reversed);
+        assert_eq!(e1.original_source, 2);
+        assert_eq!(e1.original_target, 0);
     }
 }

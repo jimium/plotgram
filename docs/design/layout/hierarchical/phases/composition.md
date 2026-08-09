@@ -44,6 +44,7 @@ EdgeId → { working_source, working_target, reversed }
 规则：
 
 - self-loop 已由 Stage 提取；
+- `undirected` 边不进 FAS、永不被反转（见 §5.3）；
 - 平局按 `(score, declaration_index, EdgeId)`；
 - **声明序靠前的节点，布局上优先靠上**：反转集确定后，若 0 号节点（声明最前）非工作源点且恰有一条未反转原始入边，则把切边旋转到该入边（同时取消一条现有反转，经无环校验，候选按最小边序）；旋转不改反转数，ELS 上界保留；条件不满足时保持 ELS 结果；
 - bidirectional/response 仍以 Graph 的 source→target 作为声明方向参与工作图，渲染语义保留在 original edge；
@@ -65,6 +66,8 @@ subject to layer(v) - layer(u) ≥ min_span(e)
 - 显式 rank/rank_range；
 - label/strong-port 需要的逻辑跨度下界。
 
+`undirected` 边不施加 rank 约束：longest-path / NS 建图均跳过它，端点 rank 仅由其它边决定（见 §5.3）。
+
 输出 layer 必须归一为从 0 开始的稠密层；空层若是显式 band/title 需求的一部分，可作为命名虚层保留，否则删除。
 
 ## 5. Properify 与强端口投影
@@ -83,6 +86,13 @@ Plan 最终保留 dummy chain 与 original edge 的映射，Ink 不重新推导�
 
 FIXED_ORDER / FIXED_RATIO / FIXED_POS 可能改变交叉计数。Ordering 前把它们投影成 port dummy / endpoint order constraint。  
 该步骤不写最终 `PortPlan`，只生成排序约束；唯一 PortWriter 在 Ordering 后冻结决议。
+
+### 5.3 Undirected 边（非分层）
+
+语义对齐 yFiles `HierarchicLayouter` 的 `UNDIRECTED_EDGES_DPKEY`：边**不施加 rank 层级**，但仍路由、仍渲染。DSL 面为 `undirected: boolean`（dsl-spec §14.4），`<->` 箭头是糖（显式属性优先）。
+
+- `assign_ranks` 之后、`properify` 之前由 `split_intra_layer` 分流：span == 0 移入 `RealGraph.intra_layer`（对 ordering / properify / channel 不可见）；span ≥ 1 规范化 working 方向朝下（仅交换 `working_*`，`reversed` 恒 false，永不产生回边），properify 的 `r1 > r0` 不变量由此保持；
+- span == 0 边由 Ink 专用写者 `intralayer.rs` 展开为 side-link（跨轴水平直连，或经层缝的避让 U 形），镜像 self-loop 的旁路模式（端点 East/West 中点 port，LocalOffset 真实记录）。
 
 ## 6. Ordering
 

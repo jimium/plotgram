@@ -804,8 +804,10 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: 1.0,
+                ..Default::default()
             }],
             self_loops: vec![],
+            ..Default::default()
         };
         let (sub, idx, used, _relax) = derive_substrate(&plan, &graph).unwrap();
         assert!(used, "clean sibling rects must activate Gate IR");

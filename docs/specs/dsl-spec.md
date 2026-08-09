@@ -726,7 +726,7 @@ api -> db {
 |------|------|
 | `->` | 主动流向 |
 | `-->` | 响应/返回（未设 dash 时由主题补虚线，§14.4.2） |
-| `<->` | 双向 |
+| `<->` | 双向；默认带 `undirected` 非分层语义（糖，等价 `undirected: true`），显式 `undirected:` 属性优先（§14.4） |
 
 箭头是**结构**字段，落在 `Edge::arrow`；**不得**用属性块 `arrow:` 覆盖。
 
@@ -1391,6 +1391,7 @@ variant **只**贡献 fill / stroke / font / dash / radius 等颜料；**不**�
 | `to_side` | 同上 | **`active`（模型字段）** | DSL 作者 | 提升为 `Edge.to_port` |
 | `from_slot` / `to_slot` / `from_ratio` / `to_ratio` / `from_x`+`from_y` / `to_x`+`to_y` / `from_sides` / `to_sides` | — | **`removed`** | — | 写了 → 解析错误；边端口只留 side（见 §7.4） |
 | `weight` | `Option<f64>`（`critical: true` 糖 = `2.0`） | **`active`（模型字段）** | DSL 作者 | 提升为 `Edge.weight`；Hier 排序/对齐加权。`critical` 与 `weight` 同写 → 解析错误（`CriticalWeightConflict`） |
+| `undirected` | boolean | **`active`（模型字段 `Edge.undirected`）** | DSL 作者或 `<->` 糖 | hierarchical rank 建图跳过（FAS/rank 不施加层级）；同 rank 端点由 Ink `intralayer` 路由为 side-link（跨轴直连或避让 U 形）；非 bool → 解析错误（`InvalidUndirected`） |
 | `meta.*` | 任意 | — | DSL 作者 | 无 |
 
 `source` / `target` / 箭头语义（`->` / `-->` / `<->`）是**语法**，落在 `Edge::source` / `target` / `arrow`；**不得**在属性块用 `source:` / `target:` / `arrow:` 覆盖。三处标签只经 `label` / `head_label` / `tail_label`（或 §7.5 中点糖）；**已废弃** `>"` / `<"` 端点标记。

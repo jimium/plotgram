@@ -286,6 +286,12 @@ pub struct Edge {
     /// Consumed by hierarchical layout P3/P4 (edge-parameters.md §2.5).
     #[serde(default)]
     pub weight: Option<f64>,
+    /// Undirected layering semantics (dsl-spec §14.4; yFiles
+    /// `UNDIRECTED_EDGES`): the edge is routed and rendered but imposes no
+    /// rank hierarchy. `<->` is sugar for `undirected: true`; an explicit
+    /// `undirected:` attribute wins over the arrow sugar.
+    #[serde(default)]
+    pub undirected: bool,
     /// Free-form attributes (`variant`, `style.*`, `meta.*`, …).
     /// Must **not** carry `from_side` / `critical` / `weight` after lift —
     /// those are fields above. Manual `edge_group` is rejected (use layout
@@ -299,9 +305,10 @@ impl Edge {
     /// are still stripped).
     ///
     /// Keys handled: `from_side`, `to_side`, `weight`, `critical` (sugar for
-    /// `weight: 2.0`) (dsl-spec §7.4). Removed keys (`from_slot`, `from_ratio`, …)
-    /// are hard errors. `edge_group` is rejected — fan merge is layout
-    /// `auto_edge_grouping` only.
+    /// `weight: 2.0`), `undirected` (`<->` arrow is sugar for `undirected:
+    /// true`; explicit attr wins) (dsl-spec §7.4 / §14.4). Removed keys
+    /// (`from_slot`, `from_ratio`, …) are hard errors. `edge_group` is
+    /// rejected — fan merge is layout `auto_edge_grouping` only.
     pub fn lift_structural_attrs(&mut self) -> Result<(), PortConstraintError> {
         if self.attrs.contains_key("edge_group") {
             return Err(PortConstraintError::UnsupportedEdgeGroup);
@@ -341,7 +348,21 @@ impl Edge {
                 }
             }
         }
-        for k in [FROM_SIDE_KEY, TO_SIDE_KEY, "critical", "weight"] {
+        // `undirected`: `<->` sugar sets it; an explicit attr overrides.
+        if !self.undirected {
+            self.undirected = self.arrow == Arrow::Bidirectional;
+        }
+        if let Some(v) = self.attrs.get("undirected") {
+            match v.as_bool() {
+                Some(b) => self.undirected = b,
+                None => {
+                    return Err(PortConstraintError::InvalidUndirected {
+                        value: v.to_string(),
+                    });
+                }
+            }
+        }
+        for k in [FROM_SIDE_KEY, TO_SIDE_KEY, "critical", "weight", "undirected"] {
             self.attrs.remove(k);
         }
         // Strip removed keys only after error check above — they must not linger.
@@ -595,6 +616,7 @@ mod tests {
             from_port: None,
             to_port: None,
             weight: None,
+            undirected: false,
             attrs: AttrMap::new(),
         }
     }
@@ -688,6 +710,33 @@ mod tests {
         );
         assert!(!e.attrs.contains_key("from_side"));
         assert!(e.attrs.contains_key("style.stroke"));
+    }
+
+    #[test]
+    fn lift_undirected_precedence() {
+        // (arrow, explicit attr, expected undirected, key stripped)
+        let cases: [(Arrow, Option<AttrValue>, bool); 4] = [
+            (Arrow::Forward, None, false),
+            (Arrow::Bidirectional, None, true),
+            (Arrow::Bidirectional, Some(AttrValue::Bool(false)), false),
+            (Arrow::Forward, Some(AttrValue::Bool(true)), true),
+        ];
+        for (arrow, attr, expected) in cases.iter().map(|(a, v, e)| (*a, v.clone(), *e)) {
+            let mut e = edge("e", arrow);
+            if let Some(v) = attr {
+                e.attrs.insert("undirected".into(), v);
+            }
+            e.lift_structural_attrs().unwrap();
+            assert_eq!(e.undirected, expected, "arrow={arrow:?}");
+            assert!(!e.attrs.contains_key("undirected"));
+        }
+
+        let mut e = edge("e", Arrow::Forward);
+        e.attrs.insert("undirected".into(), AttrValue::Str("yes".into()));
+        assert!(matches!(
+            e.lift_structural_attrs(),
+            Err(PortConstraintError::InvalidUndirected { .. })
+        ));
     }
 
     #[test]

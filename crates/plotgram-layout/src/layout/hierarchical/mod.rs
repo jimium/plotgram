@@ -104,6 +104,9 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     let mut real_graph = compose::graph_index::build_real_graph(input.graph);
     compose::cycle::remove_cycles(&mut real_graph);
     let ranks = compose::rank::assign_ranks(&real_graph)?;
+    // Undirected edges: zero-span ones bypass ordering/properify/channel into
+    // `intra_layer` (Ink side-links); the rest flow as normal downward edges.
+    compose::properify::split_intra_layer(&mut real_graph, &ranks);
     let mut plan = compose::properify::properify(&real_graph, &ranks);
     // Author edge weights feed P3 ordering (edge-parameters §2.5).
     let edge_weights: std::collections::BTreeMap<String, f64> = real_graph
@@ -295,6 +298,15 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         &real_graph.ids,
         &canonical_frames,
         params.node_gap,
+    ));
+    // Zero-span undirected edges (side-links) — same rule: extend before the
+    // verifiers so they cannot bypass overlap / endpoint assertions.
+    canonical_edges.extend(ink::intralayer::intra_layer_edges(
+        &real_graph.intra_layer,
+        &real_graph.ids,
+        &plan,
+        &canonical_frames,
+        params.edge_gap,
     ));
     ink::verify::verify_no_illegal_overlap(
         &canonical_edges,
@@ -611,6 +623,7 @@ mod tests {
                 from_port: None,
                 to_port: None,
                 weight: None,
+                undirected: false,
                 attrs: AttrMap::new(),
             }],
             groups: vec![],

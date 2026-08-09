@@ -118,6 +118,7 @@ pub fn expand_group_frame_sugar(
             from_port: None,
             to_port: None,
             weight: None,
+            undirected: false,
             attrs,
         });
     }

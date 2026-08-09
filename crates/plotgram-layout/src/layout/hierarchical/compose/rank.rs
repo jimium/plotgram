@@ -40,6 +40,9 @@ fn longest_path_ranks(graph: &RealGraph) -> Vec<i64> {
     let mut succ: Vec<Vec<usize>> = vec![Vec::new(); n];
     let mut indeg = vec![0u32; n];
     for e in &graph.edges {
+        if e.undirected {
+            continue;
+        }
         succ[e.working_source].push(e.working_target);
         indeg[e.working_target] += 1;
     }
@@ -78,6 +81,9 @@ fn weak_components(graph: &RealGraph) -> Vec<Vec<usize>> {
         parent[x]
     }
     for e in &graph.edges {
+        if e.undirected {
+            continue;
+        }
         let (a, b) = (
             find(&mut parent, e.working_source),
             find(&mut parent, e.working_target),
@@ -103,7 +109,11 @@ fn component_edges(graph: &RealGraph, comp: &BTreeSet<usize>) -> Vec<usize> {
         .edges
         .iter()
         .enumerate()
-        .filter(|(_, e)| comp.contains(&e.working_source) && comp.contains(&e.working_target))
+        .filter(|(_, e)| {
+            !e.undirected
+                && comp.contains(&e.working_source)
+                && comp.contains(&e.working_target)
+        })
         .map(|(i, _)| i)
         .collect()
 }
@@ -160,8 +170,7 @@ fn refine_component(graph: &RealGraph, comp: &[usize], rank: &mut [i64]) {
         };
 
         let te = &graph.edges[leave_edge_idx];
-        let head_is_child_subtree =
-            tree.parent_edge[te.working_target] == Some(leave_edge_idx);
+        let head_is_child_subtree = tree.parent_edge[te.working_target] == Some(leave_edge_idx);
         let child = if head_is_child_subtree {
             te.working_target
         } else {
@@ -349,13 +358,7 @@ impl NsTree {
         self.dfs_cutval(self.root, None, graph, inc);
     }
 
-    fn dfs_cutval(
-        &mut self,
-        v: usize,
-        par: Option<usize>,
-        graph: &RealGraph,
-        inc: &[Vec<usize>],
-    ) {
+    fn dfs_cutval(&mut self, v: usize, par: Option<usize>, graph: &RealGraph, inc: &[Vec<usize>]) {
         let children: Vec<(usize, usize)> = self.tree_adj[v]
             .iter()
             .copied()
@@ -504,6 +507,7 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
             )
             .collect();
@@ -514,6 +518,7 @@ mod tests {
             shapes: vec![plotgram_model::NodeShape::DEFAULT; n],
             edges,
             self_loops: Vec::new(),
+            ..Default::default()
         }
     }
 
@@ -601,5 +606,25 @@ mod tests {
         let g = graph(4, &[(0, 1), (0, 2), (1, 3), (2, 3)]);
         let rank = assign_ranks(&g).unwrap();
         assert_eq!(rank, vec![0, 1, 1, 2]);
+    }
+
+    #[test]
+    fn undirected_only_link_keeps_both_nodes_on_same_rank() {
+        let mut g = graph(2, &[(0, 1)]);
+        g.edges[0].undirected = true;
+        let rank = assign_ranks(&g).unwrap();
+        assert_eq!(rank, vec![0, 0]);
+    }
+
+    #[test]
+    fn undirected_back_edge_is_not_reversed_and_imposes_no_rank() {
+        // 0 -> 1 -> 2 directed chain, plus an undirected 2~0: the FAS never
+        // sees it, so nothing reverses and ranks stay 0,1,2.
+        let mut g = graph(3, &[(0, 1), (1, 2), (2, 0)]);
+        g.edges[2].undirected = true;
+        crate::layout::hierarchical::compose::cycle::remove_cycles(&mut g);
+        assert!(g.edges.iter().all(|e| !e.reversed));
+        let rank = assign_ranks(&g).unwrap();
+        assert_eq!(rank, vec![0, 1, 2]);
     }
 }

@@ -451,6 +451,7 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
                 RealEdge {
                     edge_id: "rev".into(),
@@ -462,9 +463,11 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
             ],
             self_loops: Vec::new(),
+            ..Default::default()
         };
         let mut ports = BTreeMap::new();
         ports.insert(
@@ -576,6 +579,7 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
                 RealEdge {
                     edge_id: "rev".into(),
@@ -587,6 +591,7 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
                 RealEdge {
                     edge_id: "out".into(),
@@ -598,9 +603,11 @@ mod tests {
                     from_port: None,
                     to_port: None,
                     weight: 1.0,
+                    ..Default::default()
                 },
             ],
             self_loops: Vec::new(),
+            ..Default::default()
         };
         let mut ports = BTreeMap::new();
         ports.insert(

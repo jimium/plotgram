@@ -50,6 +50,5 @@ theme: common.clean-light
     app_a -> cache_a
     app_b -> db_b "读写"
     app_b -> cache_b
-    db_a --> db_b "双向数据同步"
-    db_b --> db_a "双向数据同步"
+    db_a <-> db_b "双向数据同步"
 }

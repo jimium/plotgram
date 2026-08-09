@@ -947,6 +947,7 @@ mod tests {
             from_port: None,
             to_port: None,
             weight: 1.0,
+            ..Default::default()
         }];
         let graph = RealGraph {
             ids,
@@ -955,6 +956,7 @@ mod tests {
             shapes: vec![plotgram_model::NodeShape::DEFAULT; 2],
             edges,
             self_loops: Vec::new(),
+            ..Default::default()
         };
 
         let elems = vec![
