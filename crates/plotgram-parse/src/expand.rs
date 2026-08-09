@@ -117,7 +117,7 @@ pub fn expand_group_frame_sugar(
             tail_label,
             from_port: None,
             to_port: None,
-            critical: false,
+            weight: None,
             attrs,
         });
     }

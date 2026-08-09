@@ -4,7 +4,7 @@
 //! [`super::boundary::insert_group_boundaries`] (Left/Right clamps + high-weight
 //! cross-rank segments). Crossing minimization is fully group-agnostic.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use crate::layout::hierarchical::model::{Elem, PlanGraph};
 
@@ -22,16 +22,16 @@ fn edge_weight(a: &Elem, b: &Elem) -> f64 {
 }
 
 /// Segment weight: both ends group-boundary → `group_boundary_weight`;
-/// else base + optional critical doubling (vv corridor stays 8.0).
-fn segment_weight(a: &Elem, b: &Elem, critical: bool, group_boundary_weight: f64) -> f64 {
+/// else base × author weight (vv corridor stays 8.0, weight does not apply).
+fn segment_weight(a: &Elem, b: &Elem, weight: f64, group_boundary_weight: f64) -> f64 {
     if a.key.is_group_boundary() && b.key.is_group_boundary() {
         return group_boundary_weight;
     }
     let base = edge_weight(a, b);
-    if critical && !matches!((a.key.is_virtual(), b.key.is_virtual()), (true, true)) {
-        base * 2.0
-    } else {
+    if matches!((a.key.is_virtual(), b.key.is_virtual()), (true, true)) {
         base
+    } else {
+        base * weight
     }
 }
 
@@ -44,7 +44,7 @@ struct Adjacency {
 
 fn build_adjacency(
     plan: &PlanGraph,
-    critical: &BTreeSet<String>,
+    edge_weights: &BTreeMap<String, f64>,
     group_boundary_weight: f64,
 ) -> Adjacency {
     let n = plan.elems.len();
@@ -54,7 +54,7 @@ fn build_adjacency(
         let w = segment_weight(
             &plan.elems[s.from],
             &plan.elems[s.to],
-            critical.contains(&s.edge_id),
+            edge_weights.get(&s.edge_id).copied().unwrap_or(1.0),
             group_boundary_weight,
         );
         down[s.from].push((s.to, w));
@@ -106,13 +106,13 @@ fn build_crossing_index(plan: &PlanGraph) -> CrossingIndex {
 
 pub fn order_layers(
     plan: &mut PlanGraph,
-    critical: &BTreeSet<String>,
+    edge_weights: &BTreeMap<String, f64>,
     group_boundary_weight: f64,
 ) {
     if plan.layers.len() < 2 {
         return; // nothing to reorder
     }
-    let adj = build_adjacency(plan, critical, group_boundary_weight);
+    let adj = build_adjacency(plan, edge_weights, group_boundary_weight);
     let xidx = build_crossing_index(plan);
 
     let mut best = plan.layers.clone();
@@ -564,7 +564,7 @@ mod tests {
         let mut plan = crossing_plan();
         let xidx = build_crossing_index(&plan);
         assert_eq!(total_crossings(&plan, &xidx), 1);
-        order_layers(&mut plan, &BTreeSet::new(), 16.0);
+        order_layers(&mut plan, &BTreeMap::new(), 16.0);
         let xidx = build_crossing_index(&plan);
         assert_eq!(total_crossings(&plan, &xidx), 0);
     }
@@ -618,7 +618,7 @@ mod tests {
         };
 
         insert_group_boundaries(&mut plan);
-        order_layers(&mut plan, &BTreeSet::new(), 16.0);
+        order_layers(&mut plan, &BTreeMap::new(), 16.0);
 
         let layer1 = &plan.layers[1];
         let left = layer1.iter().position(|&e| {
@@ -665,8 +665,8 @@ mod tests {
     fn deterministic_rerun() {
         let mut p1 = crossing_plan();
         let mut p2 = crossing_plan();
-        order_layers(&mut p1, &BTreeSet::new(), 16.0);
-        order_layers(&mut p2, &BTreeSet::new(), 16.0);
+        order_layers(&mut p1, &BTreeMap::new(), 16.0);
+        order_layers(&mut p2, &BTreeMap::new(), 16.0);
         assert_eq!(p1.layers, p2.layers);
     }
 
@@ -709,13 +709,13 @@ mod tests {
         };
 
         let mut p = plan_of();
-        order_layers(&mut p, &BTreeSet::new(), 16.0);
+        order_layers(&mut p, &BTreeMap::new(), 16.0);
         assert_eq!(p.layers[1], vec![2, 3]);
 
-        let crit: BTreeSet<String> = ["e0".to_string()].into_iter().collect();
-        let adj = build_adjacency(&plan_of(), &crit, 16.0);
+        let weights: BTreeMap<String, f64> = [("e0".to_string(), 2.0)].into_iter().collect();
+        let adj = build_adjacency(&plan_of(), &weights, 16.0);
         let ups: Vec<f64> = adj.up[2].iter().map(|&(_, w)| w).collect();
-        assert_eq!(ups, vec![2.0, 1.0], "critical real-real must weigh 2x");
+        assert_eq!(ups, vec![2.0, 1.0], "weighted real-real must weigh 2x");
 
         let virt_a = Elem {
             key: ElemKey::Virtual {
@@ -734,7 +734,7 @@ mod tests {
             rank: 2,
         };
         assert_eq!(
-            segment_weight(&virt_a, &virt_b, true, 16.0),
+            segment_weight(&virt_a, &virt_b, 2.0, 16.0),
             8.0,
             "virtual-virtual corridor weight must not scale"
         );
@@ -797,7 +797,7 @@ mod tests {
         for width in [18, 32, 64] {
             let mut plan = wide_layer_plan(width);
             let layer_len = width + 2;
-            order_layers(&mut plan, &BTreeSet::new(), 16.0);
+            order_layers(&mut plan, &BTreeMap::new(), 16.0);
             assert_eq!(plan.layers[0].len(), layer_len, "width={width}");
             assert_eq!(plan.layers[1].len(), layer_len, "width={width}");
         }

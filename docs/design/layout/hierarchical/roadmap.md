@@ -25,7 +25,7 @@ FAS 含环入口规则：声明序靠前的节点优先靠上（环 reroot，[ar
 边参数产品补齐（不归入新阶段，属既有批次的参数收口，见
 [edge-parameters](edge-parameters.md) §4）：`routing_style` 三档
 （orthogonal/polyline/curved）、`auto_edge_grouping` 端口合流（bus-style）、
-边级 `critical` 权重均已落地。
+边级 `weight`（`critical: true` 糖 = `2.0`）均已落地。
 
 相对目标架构的主要缺口：
 

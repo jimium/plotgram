@@ -26,9 +26,9 @@ yFiles 的 8 个 Edges 参数，我们**按写权归位**后没有一个需要�
 | dummy 链正交 Ink（中点双折点 jog） | `ink/route.rs` | 回边、跨层边共用同一展开；无走廊概念 |
 | FAS 反转 + 回边走廊侧别（G3） | `compose/cycle.rs` / `ports.rs` | 回边「能画」，但走 rank 方向、折点无界 |
 | 自环 | `ink/selfloop.rs` | 已支持 |
-| `Edge.critical` 结构字段 | `plotgram-model/graph.rs` | 作者关键路径标记 |
+| `Edge.weight` 结构字段（`Option<f64>`；`critical: true` 糖 = `2.0`） | `plotgram-model/graph.rs` | 作者边权重（关键路径偏好） |
 | 布局 `auto_edge_grouping` | `HierarchicalParams` | **自动**同源/同汇合流（§2.3）；无边级 `edge_group` |
-| `HierarchicalLayoutData.edge { min_span?, weight?, priority? }` | architecture.md §9.2 | critical 已落地（`Edge.critical` → `RealEdge.critical`，P3/P4 消费）；min length 仍待 DemandBoard |
+| `HierarchicalLayoutData.edge { min_span?, weight?, priority? }` | architecture.md §9.2 | weight 已落地（`Edge.weight` → `RealEdge.weight: f64`，P3/P4 消费）；min length 仍待 DemandBoard |
 | DemandBoard | architecture.md §3.3 | 目标协议、代码未立——层间距 demand 回写的唯一合法通道 |
 | Channel / track / rip-up | roadmap D₁ | 未实现——segment 约束、bus 干线、边优先级抢占都依赖它 |
 | diagram 级 `edge_routing:` 独立 EdgeRouter | `plotgram-router` | 五路由器齐备；与内建 `routing_style` **正交**（architecture.md §5.3） |
@@ -108,13 +108,15 @@ yFiles：让关键路径更直、更优先；是**布局偏好**，不是渲染�
      cross-axis 对齐目标（端点列对齐），Channel 阶段 priority 进 rip-up
      排序（architecture.md §6.3 已有 `edge priority` 词条）。
   2. **渲染侧**：描边高亮是渲染层/style 的事，与布局无关，不在本文范围。
-- **DSL 形态**：元素级标记（如 `edge a -> b { critical }` lift 进 typed
-  `HierarchicalLayoutData`），**不**做图级布尔——「哪条是关键路径」是作者
-  事实，算法不应猜。自动推断（最长路径等）明确不做：不可验证语义不进引擎。
+- **DSL 形态**：元素级标记（如 `edge a -> b { critical }`（糖 = `weight: 2.0`）
+  或 `edge a -> b { weight: <n> }`，lift 进 typed `HierarchicalLayoutData`），
+  **不**做图级布尔——「哪条是关键路径」是作者事实，算法不应猜。自动推断
+  （最长路径等）明确不做：不可验证语义不进引擎。
 - **判断**：消费点在 P3（ordering）与 P4（坐标），与阶段 A 的「长边更直」
   目标函数是同一批代码路径——搭车实施 ROI 最高。可观测验收：标记边相对
-  未标记边的 bend 数 / 列偏移 delta。**已落地**（`Edge.critical` 一等字段；
-  P3 链段权重 ×2、P4 VPSC desired 权重 ×2，见 §4 第二批落地摘要）。
+  未标记边的 bend 数 / 列偏移 delta。**已落地**（`Edge.weight: Option<f64>`
+  一等字段；作者 `weight`（`critical: true` 糖 = `2.0`）乘 P3 链段权重基 /
+  P4 VPSC desired 权重基，见 §4 第二批落地摘要）。
 
 ### 2.6 / 2.7 Minimum First / Last Segment Length —— Channel 转弯约束
 
@@ -155,7 +157,7 @@ yFiles：整条边总长下限；短跨（相邻层直连）被撑开，影响�
 | Backloop Routing | 不做开关 | Channel（D₁） | D₁ | D₁ 随附（默认行为） | 待 D₁ |
 | Automatic Edge Grouping | `auto_edge_grouping` | Compose + Metric + Ink | 无（Channel 前做 bus v1） | ★★ 第二批 | **已落地**（bus-style） |
 | ~~Automatic Bus Routing~~ | ~~`bus_routing`~~ | — | — | — | **已撤销**（demo 误映射；见 §2.4） |
-| Highlight Critical Path | 边级 `critical: bool` | P3 ordering / P4 坐标 | 无 | ★★ 第二批（搭阶段 A） | **已落地** |
+| Highlight Critical Path | 边级 `weight: Option<f64>`（`critical: true` 糖 = `2.0`） | P3 ordering / P4 坐标 | 无 | ★★ 第二批（搭阶段 A） | **已落地** |
 | Min First Segment | `min_first_segment` | Channel 搜索约束 | D₁ | 第三批（bind 前硬失败） | 待 D₁ |
 | Min Last Segment | `min_last_segment` | Channel 搜索约束 | D₁ | 第三批（同上） | 待 D₁ |
 | Min Edge Length | `min_edge_length` | DemandBoard → P4 | DemandBoard | 第三批（随 Board） | 待 DemandBoard |
@@ -199,11 +201,12 @@ orthogonal 几何零变化；`octilinear` 仍硬失败（明示后置）。
 
 1. `auto_edge_grouping: bool`：Compose 自动聚类同源/同汇边 → `PortGroup` +
    `BusPrefix`；Metric 同锚点 + `bus_y`；Ink 接合干线/总线/stub。
-2. 边级 critical 标记 lift 进 `HierarchicalLayoutData.edge.priority/weight`；
-   P3 median 权重与 P4 对齐目标消费。
+2. 边级 `weight` 标记（`critical: true` 糖 = `2.0`）lift 进
+   `HierarchicalLayoutData.edge.priority/weight`；P3 median 权重与 P4 对齐
+   目标消费。
 
 **验收**：fan-out/fan-in fixture 呈 yFiles bus 观感（单出口 + 单干线 +
-水平总线）；标记 critical 的链 bend 数不劣于未标记基线。
+水平总线）；标记 weight 的链 bend 数不劣于未标记基线。
 
 **落地摘要**：
 

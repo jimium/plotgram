@@ -615,7 +615,7 @@ mod tests {
                 reversed: false,
                 from_port: None,
                 to_port: None,
-                critical: false,
+                weight: 1.0,
             },
             RealEdge {
                 edge_id: "e1".into(),
@@ -626,7 +626,7 @@ mod tests {
                 reversed: false,
                 from_port: None,
                 to_port: None,
-                critical: false,
+                weight: 1.0,
             },
         ];
         let graph = RealGraph {
@@ -761,7 +761,7 @@ mod tests {
                 reversed: true,
                 from_port: None,
                 to_port: None,
-                critical: false,
+                weight: 1.0,
             }],
             self_loops: Vec::new(),
         };
@@ -828,7 +828,7 @@ mod tests {
                 reversed: true,
                 from_port: None,
                 to_port: None,
-                critical: false,
+                weight: 1.0,
             }],
             self_loops: Vec::new(),
         };
@@ -898,7 +898,7 @@ mod tests {
                 reversed: true,
                 from_port: None,
                 to_port: None,
-                critical: false,
+                weight: 1.0,
             }],
             self_loops: Vec::new(),
         };
@@ -988,7 +988,7 @@ mod tests {
                 reversed: true,
                 from_port: None,
                 to_port: None,
-                critical: false,
+                weight: 1.0,
             }],
             self_loops: Vec::new(),
         };
@@ -1065,7 +1065,7 @@ mod tests {
                 reversed: true,
                 from_port: None,
                 to_port: None,
-                critical: false,
+                weight: 1.0,
             }],
             self_loops: Vec::new(),
         };
@@ -1157,7 +1157,7 @@ mod tests {
                     reversed: false,
                     from_port: None,
                     to_port: None,
-                    critical: false,
+                    weight: 1.0,
                 },
                 RealEdge {
                     edge_id: "back".into(),
@@ -1168,7 +1168,7 @@ mod tests {
                     reversed: true,
                     from_port: None,
                     to_port: None,
-                    critical: false,
+                    weight: 1.0,
                 },
             ],
             self_loops: Vec::new(),
@@ -1249,7 +1249,7 @@ mod tests {
                 to_port: Some(PortConstraint::FixedSide {
                     side: ModelSide::North,
                 }),
-                critical: false,
+                weight: 1.0,
             }],
             self_loops: Vec::new(),
         };
@@ -1311,7 +1311,7 @@ mod tests {
                 reversed: false,
                 from_port: None,
                 to_port: None,
-                critical: false,
+                weight: 1.0,
             },
             RealEdge {
                 edge_id: "e1".into(),
@@ -1322,7 +1322,7 @@ mod tests {
                 reversed: false,
                 from_port: None,
                 to_port: None,
-                critical: false,
+                weight: 1.0,
             },
         ];
         let graph = RealGraph {
@@ -1495,7 +1495,7 @@ mod tests {
                     reversed: false,
                     from_port: None,
                     to_port: None,
-                    critical: false,
+                    weight: 1.0,
                 },
                 RealEdge {
                     edge_id: "e_far".into(),
@@ -1506,7 +1506,7 @@ mod tests {
                     reversed: false,
                     from_port: None,
                     to_port: None,
-                    critical: false,
+                    weight: 1.0,
                 },
             ],
             self_loops: Vec::new(),

@@ -34,7 +34,7 @@ fn edge(id: &str, source: &str, target: &str) -> Edge {
         tail_label: None,
         from_port: None,
         to_port: None,
-        critical: false,
+        weight: None,
         attrs: AttrMap::new(),
     }
 }

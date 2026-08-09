@@ -412,18 +412,16 @@ fn solve_or_fallback(
 }
 
 fn vpsc_weights(plan: &PlanGraph, graph: &RealGraph) -> Vec<f64> {
-    let critical: BTreeSet<&str> = graph
+    let weights: BTreeMap<&str, f64> = graph
         .edges
         .iter()
-        .filter(|e| e.critical)
-        .map(|e| e.edge_id.as_str())
+        .map(|e| (e.edge_id.as_str(), e.weight))
         .collect();
     (0..plan.elems.len())
         .map(|e| match &plan.elems[e].key {
-            ElemKey::Virtual { edge_id, .. } if critical.contains(edge_id.as_str()) => {
-                VIRTUAL_WEIGHT * 2.0
+            ElemKey::Virtual { edge_id, .. } => {
+                VIRTUAL_WEIGHT * weights.get(edge_id.as_str()).copied().unwrap_or(1.0)
             }
-            ElemKey::Virtual { .. } => VIRTUAL_WEIGHT,
             ElemKey::GroupBoundary { .. } | ElemKey::OrderPad { .. } => 4.0,
             ElemKey::Real(_) => REAL_WEIGHT,
         })
@@ -474,15 +472,14 @@ fn hard_constraints(
     constraints
 }
 
-/// Neighbor list entry: (neighbor, base edge weight 1/2/8, critical).
-type Nb = (usize, f64, bool);
+/// Neighbor list entry: (neighbor, base edge weight 1/2/8, author weight).
+type Nb = (usize, f64, f64);
 
 fn segment_neighbors(plan: &PlanGraph, graph: &RealGraph) -> Vec<Vec<Nb>> {
-    let critical: BTreeSet<&str> = graph
+    let weights: BTreeMap<&str, f64> = graph
         .edges
         .iter()
-        .filter(|e| e.critical)
-        .map(|e| e.edge_id.as_str())
+        .map(|e| (e.edge_id.as_str(), e.weight))
         .collect();
     let n = plan.elems.len();
     let mut out = vec![Vec::new(); n];
@@ -491,9 +488,9 @@ fn segment_neighbors(plan: &PlanGraph, graph: &RealGraph) -> Vec<Vec<Nb>> {
             continue;
         }
         let base = edge_weight_base(&plan.elems[s.from], &plan.elems[s.to]);
-        let crit = critical.contains(s.edge_id.as_str());
-        out[s.from].push((s.to, base, crit));
-        out[s.to].push((s.from, base, crit));
+        let w = weights.get(s.edge_id.as_str()).copied().unwrap_or(1.0);
+        out[s.from].push((s.to, base, w));
+        out[s.to].push((s.from, base, w));
     }
     out
 }
@@ -547,7 +544,7 @@ fn desired_weight(
     u: usize,
     v: usize,
     base: f64,
-    critical: bool,
+    weight: f64,
     twins: &BTreeSet<(usize, usize)>,
     primary: &BTreeSet<(usize, usize)>,
     params: &HierarchicalParams,
@@ -559,9 +556,7 @@ fn desired_weight(
     if primary.contains(&undirected(u, v)) {
         w *= params.primary_arm_boost;
     }
-    if critical {
-        w *= 2.0;
-    }
+    w *= weight;
     w
 }
 
@@ -576,9 +571,9 @@ fn weighted_median_desired(
     plan: &PlanGraph,
 ) -> f64 {
     let mut weighted: Vec<(f64, f64, usize)> = Vec::new();
-    for &(nb, base, crit) in &nbs[e] {
-        let w = desired_weight(e, nb, base, crit, twins, primary, params);
-        weighted.push((x[nb], w, nb));
+    for &(nb, base, w) in &nbs[e] {
+        let dw = desired_weight(e, nb, base, w, twins, primary, params);
+        weighted.push((x[nb], dw, nb));
     }
     if weighted.is_empty() {
         return x[e];

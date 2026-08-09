@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hierarchical · Group 现状与概念回顾</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --ink: #1f2937;
+    --ink-soft: #4b5563;
+    --ink-faint: #6b7280;
+    --line: #e5e7eb;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --group: #4a90d9;
+    --group-fill: #e8f1fb;
+    --group-nested-fill: #f3f8fd;
+    --dummy: #e67e22;
+    --gate: #16a34a;
+    --gate-fill: #dcfce7;
+    --bad: #dc2626;
+    --bad-fill: #fee2e2;
+    --warn: #d97706;
+    --warn-fill: #fef3c7;
+    --track: #94a3b8;
+    --code-bg: #0f172a;
+    --code-ink: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 40px 28px 96px;
+  }
+  header.page-head {
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 18px;
+    margin-bottom: 28px;
+  }
+  header.page-head h1 {
+    margin: 0 0 6px;
+    font-size: 26px;
+    letter-spacing: 0.5px;
+  }
+  header.page-head .meta {
+    color: var(--ink-faint);
+    font-size: 13px;
+  }
+  header.page-head .meta span { margin-right: 14px; }
+  .lead {
+    background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%);
+    border-left: 4px solid var(--accent);
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin: 20px 0 32px;
+    font-size: 15px;
+  }
+  section {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 26px 28px;
+    margin: 22px 0;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  }
+  section > h2 {
+    margin: 0 0 4px;
+    font-size: 21px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  section > h2 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  section > h3 {
+    margin: 26px 0 10px;
+    font-size: 17px;
+    color: var(--ink);
+    border-left: 3px solid var(--group);
+    padding-left: 10px;
+  }
+  section > h4 {
+    margin: 18px 0 8px;
+    font-size: 15px;
+    color: var(--ink-soft);
+  }
+  p { margin: 10px 0; }
+  code {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    background: #f1f5f9;
+    color: #0f172a;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    padding: 14px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+  pre code { background: transparent; color: inherit; padding: 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    border: 1px solid var(--line);
+    padding: 8px 12px;
+    vertical-align: top;
+  }
+  th {
+    background: #f9fafb;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  tr:nth-child(even) td { background: #fcfdfe; }
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+
+  .callout {
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 14px;
+  }
+  .callout.warn { background: var(--warn-fill); border-left: 4px solid var(--warn); }
+  .callout.bad  { background: var(--bad-fill);  border-left: 4px solid var(--bad); }
+  .callout.ok   { background: var(--gate-fill); border-left: 4px solid var(--gate); }
+  .callout.info { background: var(--accent-soft); border-left: 4px solid var(--accent); }
+  .callout b { color: var(--ink); }
+
+  .figure {
+    margin: 20px 0 8px;
+    background: #fcfdfe;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .figure svg { width: 100%; height: auto; display: block; }
+  .figure .cap {
+    text-align: center;
+    color: var(--ink-faint);
+    font-size: 13px;
+    margin-top: 10px;
+    font-style: italic;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin: 8px 0 0;
+    justify-content: center;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend i {
+    width: 14px; height: 14px; border-radius: 3px;
+    display: inline-block; border: 1px solid rgba(0,0,0,0.1);
+  }
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 720px) {
+    .grid2 { grid-template-columns: 1fr; }
+    .wrap { padding: 24px 14px 64px; }
+    section { padding: 18px 16px; }
+  }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .tag.done { background: var(--gate-fill); color: #166534; }
+  .tag.planned { background: var(--warn-fill); color: #92400e; }
+  .tag.gap { background: var(--bad-fill); color: #991b1b; }
+
+  .toc {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 22px;
+    margin-bottom: 28px;
+  }
+  .toc h2 { margin: 0 0 8px; font-size: 15px; color: var(--ink-soft); }
+  .toc ol { margin: 0; columns: 2; font-size: 14px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  @media (max-width: 720px) { .toc ol { columns: 1; } }
+
+  .svg-label { font: 600 13px -apple-system, sans-serif; fill: var(--ink); }
+  .svg-label-soft { font: 12px -apple-system, sans-serif; fill: var(--ink-soft); }
+  .svg-label-tiny { font: 11px -apple-system, sans-serif; fill: var(--ink-faint); }
+  .svg-mono { font: 12px "JetBrains Mono", monospace; fill: var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page-head">
+  <h1>Hierarchical · Group 现状与概念回顾</h1>
+  <div class="meta">
+    <span>📅 2026-08-09</span>
+    <span>🏷️ 阅读笔记（非契约）</span>
+    <span>📍 docs/design/layout/hierarchical/notes/</span>
+  </div>
+</header>
+
+<div class="lead">
+  <b>一句话总览：</b>DSL / 模型已成型；布局走 <b>Weak</b>（全图 Sugiyama）+ <b>边界 dummy</b> + <b>Channel Gate</b>；组框仍是 finalize 后验 bbox，<b>不是</b> Metric 求解变量。
+  当前策略<b>不是</b> yFiles 式「组内递归子布局再当 macro 嵌回」。跨组路由靠 Gate / ScopeMask；组矩形不纯时触发 <code>channel-group-fallback</code>，退回「当这图没有组」。
+</div>
+
+<div class="toc">
+  <h2>📑 目录</h2>
+  <ol>
+    <li><a href="#s1">DSL：group 怎么设计</a></li>
+    <li><a href="#s2">模型层</a></li>
+    <li><a href="#s3">概念词典（含图解）</a></li>
+    <li><a href="#s4">布局管线：group 出现在哪里</a></li>
+    <li><a href="#s5">与 yFiles / 期望的差距</a></li>
+    <li><a href="#s6">落地 vs 规划总表</a></li>
+    <li><a href="#s8">「基本可用」vs「当优化目标」</a></li>
+  </ol>
+</div>
+
+<!-- ============ Section 1 ============ -->
+<section id="s1">
+  <h2><span class="num">1</span> DSL：group 怎么设计</h2>
+  <p>规范真源：<code>docs/specs/dsl-spec.md</code> §6；组间边 §5.7 / §7.6；ADR-004。</p>
+
+  <h3>1.1 规范形态</h3>
+<pre><code>group frontend {
+    label: "Frontend"
+    variant: primary          // 主题颜料；group 无 shape / archetype
+    // layout: ...            // 规划中，引擎尚未读
+
+    node a { label: "Web" }
+    node b { label: "App" }
+    a -> b                    // 组内边：两端须为本组后代
+
+    group nested { ... }      // 嵌套深度不限制
+}
+
+// 跨组边：写在共同祖先或顶层，连的是 node，不是 group
+a -> db</code></pre>
+
+  <h3>1.2 硬规则</h3>
+  <table>
+    <tr><th>规则</th><th>说明</th></tr>
+    <tr><td>group / node id <b>全局唯一</b>、互不撞名</td><td>—</td></tr>
+    <tr><td>组内边两端须为当前组后代 node</td><td>—</td></tr>
+    <tr><td><b>group 不能作边端点</b>（IR 层）</td><td>见 model-boundary</td></tr>
+    <tr><td>区到区连线</td><td><code>group_anchor</code> 或 <code>@group</code> 糖（ADR-004）</td></tr>
+    <tr><td>group <b>没有</b> <code>shape</code> / <code>icon</code> / <code>archetype</code></td><td>容器非节点几何；<code>archetypes.csv</code> 无 group 行</td></tr>
+  </table>
+
+  <h3>1.3 组级属性</h3>
+  <table>
+    <tr><th>键</th><th>状态</th><th>说明</th></tr>
+    <tr><td><code>label</code></td><td>已落地 <span class="tag done">done</span></td><td>提升为 <code>Group.label</code></td></tr>
+    <tr><td><code>variant</code></td><td>已落地 <span class="tag done">done</span></td><td>主题颜料；resolve 只应用 group 适用字段</td></tr>
+    <tr><td><code>layout:</code></td><td>规划 <span class="tag planned">planned</span></td><td>组内布局 hint；dsl-spec 标 planned，引擎未读</td></tr>
+    <tr><td><code>style.*</code> / <code>meta.*</code></td><td>已落地 / 忽略</td><td>样式 vs 渲染器忽略元数据</td></tr>
+  </table>
+
+  <h3>1.4 <code>group_anchor</code> 与 <code>@group</code> 糖</h3>
+<pre><code>@frontend -> @backend { from_side: east, to_side: west }
+// parse 展开为两个隐形 group_anchor node + 一条普通边</code></pre>
+
+  <div class="figure">
+    <svg viewBox="0 0 760 280" xmlns="http://www.w3.org/2000/svg">
+      <!-- 左：糖写法 -->
+      <text x="120" y="24" class="svg-label" text-anchor="middle">@group 糖（DSL 写法）</text>
+      <rect x="30" y="50" width="180" height="160" rx="10" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2"/>
+      <text x="120" y="72" class="svg-label" text-anchor="middle">frontend</text>
+      <rect x="60" y="120" width="120" height="40" rx="6" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="120" y="145" class="svg-label" text-anchor="middle">web</text>
+
+      <rect x="250" y="50" width="180" height="160" rx="10" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2"/>
+      <text x="340" y="72" class="svg-label" text-anchor="middle">backend</text>
+      <rect x="280" y="120" width="120" height="40" rx="6" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="340" y="145" class="svg-label" text-anchor="middle">db</text>
+
+      <!-- 糖的边 -->
+      <line x1="180" y1="140" x2="280" y2="140" stroke="#7f8c8d" stroke-width="2" stroke-dasharray="6 4"/>
+      <text x="230" y="130" class="svg-label-tiny" text-anchor="middle">@frontend -&gt; @backend</text>
+
+      <!-- 箭头表示展开 -->
+      <path d="M 450 140 L 500 140" stroke="var(--accent)" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="475" y="128" class="svg-label-tiny" text-anchor="middle" fill="var(--accent)">expand</text>
+
+      <!-- 右：展开后 -->
+      <text x="620" y="24" class="svg-label" text-anchor="middle">parse 展开后（IR）</text>
+      <rect x="530" y="50" width="180" height="160" rx="10" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2"/>
+      <text x="620" y="72" class="svg-label" text-anchor="middle">frontend</text>
+      <rect x="560" y="120" width="100" height="36" rx="6" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="610" y="143" class="svg-label" text-anchor="middle">web</text>
+      <!-- anchor: 隐形，虚线 -->
+      <circle cx="700" cy="138" r="7" fill="var(--gate-fill)" stroke="var(--gate)" stroke-width="1.5" stroke-dasharray="2 2"/>
+      <text x="700" y="170" class="svg-label-tiny" text-anchor="middle">anchor_e</text>
+
+      <rect x="530" y="50" width="180" height="160" rx="10" fill="none" stroke="none"/>
+      <!-- 第二组放在右下，简化：用文字说明 -->
+      <text x="620" y="245" class="svg-label-tiny" text-anchor="middle" fill="var(--ink-faint)">（backend 侧对称生成 anchor_w + 一条普通边）</text>
+
+      <defs>
+        <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="var(--accent)"/>
+        </marker>
+      </defs>
+    </svg>
+    <div class="cap">图 1.1 · <code>@group</code> 糖展开为两个隐形 <code>group_anchor</code> node + 一条普通边。边永远只连 node，不引入 <code>Endpoint::Group</code>。</div>
+  </div>
+
+  <table>
+    <tr><th>字段</th><th>含义</th></tr>
+    <tr><td><code>role: group_anchor</code></td><td>结构角色（封闭集：<code>entity</code> / <code>group_anchor</code>）</td></tr>
+    <tr><td><code>host_group</code></td><td>所属 group id（必填）</td></tr>
+    <tr><td><code>side</code></td><td><code>north</code> / <code>south</code> / <code>east</code> / <code>west</code>（必填）</td></tr>
+    <tr><td><code>slot</code></td><td>可选；同侧多锚点序</td></tr>
+  </table>
+
+  <div class="callout info">
+    <b>设计意图（ADR-004）：</b>
+    <ul style="margin:6px 0">
+      <li>边永远只连 node；不引入 <code>Endpoint::Group</code></li>
+      <li>render <b>不绘制</b>锚点形体</li>
+      <li>几何：组框定稿后，由 <code>host_group</code> + side + slot <b>唯一派生</b></li>
+      <li>布局：锚点<b>不应</b>单独占 Sugiyama 叶层/序（收缩进 host）</li>
+    </ul>
+  </div>
+  <div class="callout bad">
+    <b>现行缺口：</b><code>group_anchor</code> 经 <code>all_node_ids()</code> 仍与普通 node 同等进入 rank/order/metric——ADR-004 的「不参与叶分层」<b>未闭合</b>。
+  </div>
+
+  <h3>1.5 与 PartitionGrid 的关系</h3>
+  <p>泳道 / 矩阵是 <b>PartitionGrid</b>（ADR-008：<code>partition</code> / <code>cell_col</code> / <code>cell_row</code>），与 group <b>正交</b>。机制上可与「层内连续块」同构，但 Hier <b>尚未消费</b> partition；不要用 group「演」泳道。</p>
+</section>
+
+<!-- ============ Section 2 ============ -->
+<section id="s2">
+  <h2><span class="num">2</span> 模型层</h2>
+
+  <h3>2.1 <code>Group</code>（plotgram-model）</h3>
+<pre><code>pub struct Group {
+    pub id: String,
+    pub label: Option&lt;String&gt;,
+    pub attrs: AttrMap,
+    pub nodes: Vec&lt;Node&gt;,
+    pub edges: Vec&lt;Edge&gt;,      // 仅组内边
+    pub groups: Vec&lt;Group&gt;,    // 递归嵌套
+}</code></pre>
+  <p>顶层 <code>Graph</code>：<code>nodes</code> / <code>edges</code> / <code>groups</code> + 可选 <code>PartitionGrid</code>。</p>
+
+  <h3>2.2 布局输出中的组框</h3>
+<pre><code>pub struct GroupPlacement {
+    pub id: String,
+    pub frame: Rect,  // 成员包围盒 + padding
+}</code></pre>
+  <div class="callout warn">
+    <b>现行：</b><code>GroupPlacement</code> 由 <code>plotgram-engine::finalize</code> <b>后验</b>计算，<b>不是</b> Hier Metric 求解变量。
+  </div>
+
+  <div class="figure">
+    <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg">
+      <!-- group frame -->
+      <rect x="40" y="40" width="320" height="180" rx="12" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2.5"/>
+      <text x="60" y="66" class="svg-label">GroupPlacement.frame</text>
+      <!-- padding示意 -->
+      <rect x="70" y="80" width="260" height="120" rx="8" fill="none" stroke="var(--group)" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="200" y="76" class="svg-label-tiny" text-anchor="middle">成员 bbox 并集</text>
+      <!-- 节点 -->
+      <rect x="90" y="110" width="70" height="36" rx="6" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="125" y="133" class="svg-label" text-anchor="middle">a</text>
+      <rect x="180" y="100" width="70" height="36" rx="6" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="215" y="123" class="svg-label" text-anchor="middle">b</text>
+      <rect x="240" y="150" width="70" height="36" rx="6" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="275" y="173" class="svg-label" text-anchor="middle">c</text>
+      <line x1="160" y1="128" x2="180" y2="118" stroke="#7f8c8d" stroke-width="1.5"/>
+      <line x1="215" y1="136" x2="245" y2="160" stroke="#7f8c8d" stroke-width="1.5"/>
+
+      <!-- padding 标注 -->
+      <line x1="40" y1="220" x2="70" y2="220" stroke="var(--dummy)" stroke-width="1.5"/>
+      <text x="55" y="238" class="svg-label-tiny" text-anchor="middle" fill="var(--dummy)">pad</text>
+
+      <!-- 右侧：finalize 后验 -->
+      <text x="560" y="60" class="svg-label" text-anchor="middle">finalize 阶段</text>
+      <rect x="430" y="80" width="260" height="120" rx="10" fill="#f9fafb" stroke="var(--line)" stroke-width="1.5"/>
+      <text x="560" y="110" class="svg-label-soft" text-anchor="middle">成员坐标已定（Metric 输出）</text>
+      <path d="M 470 130 L 650 130" stroke="var(--accent)" stroke-width="2" marker-end="url(#arr2)"/>
+      <text x="560" y="148" class="svg-label" text-anchor="middle">bbox 并集 + pad</text>
+      <text x="560" y="180" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">⚠ 不是 VPSC 变量，不参与求解</text>
+
+      <defs>
+        <marker id="arr2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="var(--accent)"/>
+        </marker>
+      </defs>
+    </svg>
+    <div class="cap">图 2.1 · 组框 = 成员 bbox 并集 + padding，由 finalize <b>后验</b>得出；当前不进入 Metric VPSC 求解。</div>
+  </div>
+</section>
+
+<!-- ============ Section 3: 概念词典（核心图解） ============ -->
+<section id="s3">
+  <h2><span class="num">3</span> 概念词典（含图解）</h2>
+  <p>本节是全文重点，对每个关键概念配 SVG 图解。</p>
+
+  <table>
+    <tr><th>概念</th><th>是什么</th><th>写者 / 阶段</th></tr>
+    <tr><td><b>Group</b></td><td>嵌套容器；成员 = nodes + 子 groups + 组内边</td><td>模型；布局只读结构</td></tr>
+    <tr><td><b>group_path</b></td><td>每个 node 的 root→leaf 组链</td><td>Compose <code>graph_index</code></td></tr>
+    <tr><td><b>边界 dummy</b>（<code>GroupBoundary</code>）</td><td>每层每组 Left/Right 零宽夹点，夹住同组成员</td><td>Compose <code>boundary</code> → Order</td></tr>
+    <tr><td><b>组框 (frame)</b></td><td>视觉矩形（含 padding）</td><td><b>现行</b> finalize 后验 bbox；<b>目标</b> Metric VPSC 变量</td></tr>
+    <tr><td><b>Substrate</b></td><td>rank × order 离散走廊骨架</td><td>Channel derive</td></tr>
+    <tr><td><b>Segment</b></td><td>track 被组边界 <code>cut_line</code> 切开后的段</td><td>Channel</td></tr>
+    <tr><td><b>Gate</b></td><td>组边界上「合法进出」口：外侧 segment ↔ 内侧 segment 配对</td><td>Channel derive 注册</td></tr>
+    <tr><td><b>ScopeMask</b></td><td>某条边允许走的 scope 集合（两端祖先链 ∪ 公共祖先）</td><td>Channel 搜索硬过滤</td></tr>
+    <tr><td><b>channel-group-fallback</b></td><td>组矩形不纯 / 路由失败 → 退回 root Substrate，Gate 全无</td><td>Channel；现有 relaxation</td></tr>
+    <tr><td><b>group_policy</b></td><td><code>weak</code>（默认，已落地）/ <code>strong-macro</code>（硬 <code>Unsupported</code>）</td><td><code>params</code></td></tr>
+  </table>
+
+  <!-- 3.A group_path -->
+  <h3>3.A · group_path（每个 node 的 root→leaf 组链）</h3>
+  <p>Compose 阶段的 <code>graph_index</code> 为每个 node 计算它从根组到所属叶组的 id 链。这是后续 ScopeMask / Gate 判定的基础。</p>
+  <div class="figure">
+    <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg">
+      <!-- root group -->
+      <rect x="20" y="20" width="720" height="280" rx="12" fill="var(--group-nested-fill)" stroke="var(--group)" stroke-width="2"/>
+      <text x="40" y="44" class="svg-label">root</text>
+
+      <!-- frontend group -->
+      <rect x="50" y="70" width="330" height="210" rx="10" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2"/>
+      <text x="70" y="94" class="svg-label">frontend</text>
+
+      <!-- nested group inside frontend -->
+      <rect x="80" y="160" width="270" height="100" rx="8" fill="#fff" stroke="var(--group)" stroke-width="1.5" stroke-dasharray="5 3"/>
+      <text x="100" y="182" class="svg-label">nested</text>
+
+      <!-- nodes -->
+      <rect x="100" y="110" width="70" height="34" rx="6" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="135" y="132" class="svg-label" text-anchor="middle">web</text>
+      <rect x="110" y="200" width="80" height="34" rx="6" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="150" y="222" class="svg-label" text-anchor="middle">app</text>
+      <rect x="230" y="200" width="90" height="34" rx="6" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="275" y="222" class="svg-label" text-anchor="middle">api</text>
+
+      <!-- backend group -->
+      <rect x="410" y="70" width="310" height="210" rx="10" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2"/>
+      <text x="430" y="94" class="svg-label">backend</text>
+      <rect x="450" y="120" width="80" height="34" rx="6" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="490" y="142" class="svg-label" text-anchor="middle">db</text>
+      <rect x="560" y="180" width="90" height="34" rx="6" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="605" y="202" class="svg-label" text-anchor="middle">cache</text>
+
+      <!-- group_path 标注 -->
+      <path d="M 150 244 L 150 270 L 380 270" stroke="var(--accent)" stroke-width="2" fill="none" stroke-dasharray="4 3"/>
+      <text x="385" y="274" class="svg-mono" fill="var(--accent)">group_path(app) = [root, frontend, nested]</text>
+
+      <path d="M 490 154 L 490 270 L 380 270" stroke="var(--gate)" stroke-width="2" fill="none" stroke-dasharray="4 3"/>
+      <text x="385" y="290" class="svg-mono" fill="var(--gate)">group_path(db) = [root, backend]</text>
+
+      <path d="M 135 144 L 135 290" stroke="var(--dummy)" stroke-width="2" fill="none" stroke-dasharray="4 3"/>
+      <text x="385" y="306" class="svg-mono" fill="var(--dummy)">group_path(web) = [root, frontend]</text>
+    </svg>
+    <div class="cap">图 3.A · 每个节点都有一条从 root 到所属叶组的 group_path。它定义了「这个节点属于哪些 scope」，是 ScopeMask 与 Gate 判定的输入。</div>
+  </div>
+
+  <!-- 3.B 边界 dummy -->
+  <h3>3.B · 边界 dummy（GroupBoundary）</h3>
+  <p>每层每个 group 插入 Left / Right <b>零宽夹点</b>（dummy），把同组成员夹在中间；跨 rank 用<b>高权段</b>把同组的 L/R 边界对齐到同一 order 区间。这样不改交叉最小化内核，又能让同组在相邻层「连续块」对齐。</p>
+  <div class="figure">
+    <svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg">
+      <!-- Rank 标签 -->
+      <text x="20" y="80" class="svg-label">rank 0</text>
+      <text x="20" y="200" class="svg-label">rank 1</text>
+      <text x="20" y="300" class="svg-label">rank 2</text>
+
+      <!-- rank 0 行 -->
+      <!-- 普通节点 D -->
+      <rect x="60" y="60" width="50" height="34" rx="6" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="85" y="82" class="svg-label" text-anchor="middle">D</text>
+      <!-- L dummy -->
+      <rect x="180" y="60" width="14" height="34" fill="var(--dummy)" stroke="#b3541a" stroke-width="1.5"/>
+      <text x="187" y="50" class="svg-label-tiny" text-anchor="middle" fill="var(--dummy)">L</text>
+      <!-- 组成员 -->
+      <rect x="210" y="60" width="50" height="34" rx="6" fill="var(--group-fill)" stroke="var(--group)" stroke-width="1.5"/>
+      <text x="235" y="82" class="svg-label" text-anchor="middle">A</text>
+      <rect x="270" y="60" width="50" height="34" rx="6" fill="var(--group-fill)" stroke="var(--group)" stroke-width="1.5"/>
+      <text x="295" y="82" class="svg-label" text-anchor="middle">B</text>
+      <rect x="330" y="60" width="50" height="34" rx="6" fill="var(--group-fill)" stroke="var(--group)" stroke-width="1.5"/>
+      <text x="355" y="82" class="svg-label" text-anchor="middle">C</text>
+      <!-- R dummy -->
+      <rect x="396" y="60" width="14" height="34" fill="var(--dummy)" stroke="#b3541a" stroke-width="1.5"/>
+      <text x="403" y="50" class="svg-label-tiny" text-anchor="middle" fill="var(--dummy)">R</text>
+
+      <!-- rank 1 行：组员少一个 -->
+      <rect x="180" y="180" width="14" height="34" fill="var(--dummy)" stroke="#b3541a" stroke-width="1.5"/>
+      <text x="187" y="170" class="svg-label-tiny" text-anchor="middle" fill="var(--dummy)">L</text>
+      <rect x="220" y="180" width="50" height="34" rx="6" fill="var(--group-fill)" stroke="var(--group)" stroke-width="1.5"/>
+      <text x="245" y="202" class="svg-label" text-anchor="middle">A'</text>
+      <rect x="290" y="180" width="50" height="34" rx="6" fill="var(--group-fill)" stroke="var(--group)" stroke-width="1.5"/>
+      <text x="315" y="202" class="svg-label" text-anchor="middle">B'</text>
+      <rect x="396" y="180" width="14" height="34" fill="var(--dummy)" stroke="#b3541a" stroke-width="1.5"/>
+      <text x="403" y="170" class="svg-label-tiny" text-anchor="middle" fill="var(--dummy)">R</text>
+
+      <!-- rank 2 行 -->
+      <rect x="180" y="280" width="14" height="34" fill="var(--dummy)" stroke="#b3541a" stroke-width="1.5"/>
+      <text x="187" y="270" class="svg-label-tiny" text-anchor="middle" fill="var(--dummy)">L</text>
+      <rect x="240" y="280" width="50" height="34" rx="6" fill="var(--group-fill)" stroke="var(--group)" stroke-width="1.5"/>
+      <text x="265" y="302" class="svg-label" text-anchor="middle">A''</text>
+      <rect x="396" y="280" width="14" height="34" fill="var(--dummy)" stroke="#b3541a" stroke-width="1.5"/>
+      <text x="403" y="270" class="svg-label-tiny" text-anchor="middle" fill="var(--dummy)">R</text>
+
+      <!-- 跨 rank 高权对齐段 (L) -->
+      <line x1="187" y1="94" x2="187" y2="180" stroke="var(--dummy)" stroke-width="3"/>
+      <line x1="187" y1="214" x2="187" y2="280" stroke="var(--dummy)" stroke-width="3"/>
+      <!-- (R) -->
+      <line x1="403" y1="94" x2="403" y2="180" stroke="var(--dummy)" stroke-width="3"/>
+      <line x1="403" y1="214" x2="403" y2="280" stroke="var(--dummy)" stroke-width="3"/>
+
+      <!-- 普通边 -->
+      <line x1="85" y1="94" x2="245" y2="180" stroke="#7f8c8d" stroke-width="1.5"/>
+      <line x1="235" y1="94" x2="245" y2="180" stroke="#7f8c8d" stroke-width="1.5"/>
+
+      <!-- 右侧说明 -->
+      <rect x="500" y="60" width="240" height="240" rx="10" fill="#fcfdfe" stroke="var(--line)" stroke-width="1.5"/>
+      <text x="620" y="88" class="svg-label" text-anchor="middle">边界 dummy 的用意</text>
+      <text x="515" y="118" class="svg-label-soft">• L / R 零宽夹点夹住同组</text>
+      <text x="515" y="142" class="svg-label-soft">• 跨 rank 高权段对齐 L↔L、R↔R</text>
+      <text x="515" y="166" class="svg-label-soft">• 同组在相邻 rank 的 order 区间</text>
+      <text x="540" y="184" class="svg-label-soft">  被拉成连续块</text>
+      <text x="515" y="208" class="svg-label-soft">• 不改交叉最小化内核</text>
+      <text x="515" y="240" class="svg-label-tiny" fill="var(--bad)">对齐失败 → 包围盒互咬 →</text>
+      <text x="515" y="256" class="svg-label-tiny" fill="var(--bad)">ForeignNodeInGroupRect → fallback</text>
+      <text x="515" y="284" class="svg-label-tiny" fill="var(--ink-faint)">见 architecture.md §8.3</text>
+    </svg>
+    <div class="cap">图 3.B · 橙色为边界 dummy（L/R）。跨 rank 的粗橙线是高权对齐段，把同组左右边界钉在同一 order 区间，从而形成「连续块」。</div>
+  </div>
+
+  <!-- 3.C Substrate + Segment + Gate -->
+  <h3>3.C · Substrate / Segment / Gate（核心机制）</h3>
+  <p><b>Substrate</b> 是 rank × order 离散走廊骨架；track（两 rank 之间的纵向走廊）被组边界 <code>cut_line</code> 切成多段 <b>Segment</b>；组边界上的「合法穿行口」即 <b>Gate</b>，把外侧 segment 与内侧 segment 配对。</p>
+  <div class="figure">
+    <svg viewBox="0 0 780 380" xmlns="http://www.w3.org/2000/svg">
+      <!-- 坐标轴标注 -->
+      <text x="40" y="30" class="svg-label">order →</text>
+      <text x="10" y="200" class="svg-label" transform="rotate(-90 10 200)">rank ↓</text>
+
+      <!-- 网格背景 -->
+      <g stroke="#eef2f7" stroke-width="1">
+        <line x1="60" y1="60" x2="60" y2="340"/>
+        <line x1="140" y1="60" x2="140" y2="340"/>
+        <line x1="220" y1="60" x2="220" y2="340"/>
+        <line x1="300" y1="60" x2="300" y2="340"/>
+        <line x1="380" y1="60" x2="380" y2="340"/>
+        <line x1="460" y1="60" x2="460" y2="340"/>
+        <line x1="540" y1="60" x2="540" y2="340"/>
+        <line x1="60" y1="60" x2="540" y2="60"/>
+        <line x1="60" y1="140" x2="540" y2="140"/>
+        <line x1="60" y1="220" x2="540" y2="220"/>
+        <line x1="60" y1="300" x2="540" y2="300"/>
+        <line x1="60" y1="340" x2="540" y2="340"/>
+      </g>
+      <text x="100" y="55" class="svg-label-tiny" text-anchor="middle">o0</text>
+      <text x="180" y="55" class="svg-label-tiny" text-anchor="middle">o1</text>
+      <text x="260" y="55" class="svg-label-tiny" text-anchor="middle">o2</text>
+      <text x="340" y="55" class="svg-label-tiny" text-anchor="middle">o3</text>
+      <text x="420" y="55" class="svg-label-tiny" text-anchor="middle">o4</text>
+      <text x="500" y="55" class="svg-label-tiny" text-anchor="middle">o5</text>
+      <text x="50" y="103" class="svg-label-tiny" text-anchor="end">r0</text>
+      <text x="50" y="183" class="svg-label-tiny" text-anchor="end">r1</text>
+      <text x="50" y="263" class="svg-label-tiny" text-anchor="end">r2</text>
+
+      <!-- group 矩形覆盖 r0-r1, o1-o3 -->
+      <rect x="140" y="60" width="160" height="160" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2" rx="4"/>
+      <text x="220" y="80" class="svg-label" text-anchor="middle">group G</text>
+
+      <!-- 节点 -->
+      <circle cx="180" cy="100" r="8" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="180" y="104" class="svg-label-tiny" text-anchor="middle">a</text>
+      <circle cx="260" cy="100" r="8" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="260" y="104" class="svg-label-tiny" text-anchor="middle">b</text>
+      <circle cx="220" cy="180" r="8" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="220" y="184" class="svg-label-tiny" text-anchor="middle">c</text>
+
+      <!-- 外部节点 -->
+      <circle cx="100" cy="180" r="8" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="100" y="184" class="svg-label-tiny" text-anchor="middle">x</text>
+      <circle cx="420" cy="180" r="8" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="420" y="184" class="svg-label-tiny" text-anchor="middle">y</text>
+
+      <!-- tracks (纵向走廊) 灰色虚线 -->
+      <line x1="100" y1="60" x2="100" y2="340" stroke="var(--track)" stroke-width="1" stroke-dasharray="3 3"/>
+      <line x1="180" y1="60" x2="180" y2="340" stroke="var(--track)" stroke-width="1" stroke-dasharray="3 3"/>
+      <line x1="260" y1="60" x2="260" y2="340" stroke="var(--track)" stroke-width="1" stroke-dasharray="3 3"/>
+      <line x1="340" y1="60" x2="340" y2="340" stroke="var(--track)" stroke-width="1" stroke-dasharray="3 3"/>
+      <line x1="420" y1="60" x2="420" y2="340" stroke="var(--track)" stroke-width="1" stroke-dasharray="3 3"/>
+
+      <!-- cut_line: 组上下边界 -->
+      <line x1="140" y1="60" x2="300" y2="60" stroke="var(--dummy)" stroke-width="2.5"/>
+      <line x1="140" y1="220" x2="300" y2="220" stroke="var(--dummy)" stroke-width="2.5"/>
+      <text x="310" y="64" class="svg-label-tiny" fill="var(--dummy)">cut_line (top)</text>
+      <text x="310" y="224" class="svg-label-tiny" fill="var(--dummy)">cut_line (bottom)</text>
+
+      <!-- Gates: 在组边界与 track 交点 -->
+      <!-- 顶部 gate at (180,60) 和 (260,60) -->
+      <circle cx="180" cy="60" r="7" fill="var(--gate-fill)" stroke="var(--gate)" stroke-width="2"/>
+      <circle cx="260" cy="60" r="7" fill="var(--gate-fill)" stroke="var(--gate)" stroke-width="2"/>
+      <!-- 底部 gate -->
+      <circle cx="180" cy="220" r="7" fill="var(--gate-fill)" stroke="var(--gate)" stroke-width="2"/>
+      <circle cx="260" cy="220" r="7" fill="var(--gate-fill)" stroke="var(--gate)" stroke-width="2"/>
+
+      <!-- 一条穿组边: x(r1) -> 经 gate(180,220) -> c -> gate(180,60) -> 某外部 -->
+      <path d="M 100 180 L 100 100 L 173 100" stroke="#7f8c8d" stroke-width="2" fill="none"/>
+      <path d="M 187 100 L 213 180" stroke="#7f8c8d" stroke-width="2" fill="none"/>
+      <path d="M 227 180 L 260 220 L 260 300 L 420 300" stroke="#7f8c8d" stroke-width="2" fill="none"/>
+
+      <!-- 右侧图例 -->
+      <rect x="580" y="70" width="180" height="250" rx="10" fill="#fcfdfe" stroke="var(--line)" stroke-width="1.5"/>
+      <text x="670" y="96" class="svg-label" text-anchor="middle">图例</text>
+      <circle cx="600" cy="124" r="6" fill="var(--gate-fill)" stroke="var(--gate)" stroke-width="2"/>
+      <text x="614" y="128" class="svg-label-soft">Gate（合法穿行口）</text>
+      <rect x="594" y="146" width="14" height="10" fill="var(--dummy)" stroke="#b3541a"/>
+      <text x="614" y="155" class="svg-label-soft">cut_line（组边界）</text>
+      <line x1="594" y1="174" x2="610" y2="174" stroke="var(--track)" stroke-width="1" stroke-dasharray="3 3"/>
+      <text x="614" y="178" class="svg-label-soft">track（走廊）</text>
+      <rect x="594" y="194" width="14" height="10" fill="var(--group-fill)" stroke="var(--group)"/>
+      <text x="614" y="203" class="svg-label-soft">group 矩形</text>
+
+      <text x="594" y="232" class="svg-label-tiny" fill="var(--ink-soft)">Segment = track 被 cut_line</text>
+      <text x="594" y="248" class="svg-label-tiny" fill="var(--ink-soft)">切开后的段</text>
+      <text x="594" y="276" class="svg-label-tiny" fill="var(--ink-soft)">Gate = 外侧 segment ↔</text>
+      <text x="594" y="292" class="svg-label-tiny" fill="var(--ink-soft)">内侧 segment 的配对口</text>
+      <text x="594" y="312" class="svg-label-tiny" fill="var(--gate)">边必须经 Gate 才能穿组</text>
+    </svg>
+    <div class="cap">图 3.C · Substrate（rank×order 走廊）被组边界 cut_line 切成 Segment；Gate 是 cut_line 上的合法穿行口（绿点），边穿组必须经 Gate。</div>
+  </div>
+
+  <!-- 3.D Gate 细节 -->
+  <h3>3.D · Gate 是什么（重点）</h3>
+  <div class="callout info">
+    <b>Gate 不是 UI 控件</b>，而是<b>组边界上的合法穿行口</b>。边要从组外进组内（或反过来），在离散 Substrate 上必须经 Gate。
+  </div>
+  <div class="figure">
+    <svg viewBox="0 0 760 260" xmlns="http://www.w3.org/2000/svg">
+      <!-- 放大组边界 -->
+      <rect x="40" y="60" width="320" height="160" rx="8" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2"/>
+      <text x="60" y="84" class="svg-label">group G 内部</text>
+
+      <!-- 外侧 segment -->
+      <line x1="0" y1="140" x2="200" y2="140" stroke="var(--track)" stroke-width="3"/>
+      <text x="100" y="130" class="svg-label-tiny" text-anchor="middle">外侧 segment</text>
+      <!-- gate -->
+      <circle cx="200" cy="140" r="10" fill="var(--gate-fill)" stroke="var(--gate)" stroke-width="3"/>
+      <text x="200" y="120" class="svg-label" text-anchor="middle" fill="var(--gate)">Gate</text>
+      <!-- 内侧 segment -->
+      <line x1="200" y1="140" x2="360" y2="140" stroke="var(--gate)" stroke-width="3"/>
+      <text x="290" y="130" class="svg-label-tiny" text-anchor="middle" fill="var(--gate)">内侧 segment</text>
+
+      <!-- 节点 -->
+      <circle cx="40" cy="140" r="8" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="40" y="165" class="svg-label-tiny" text-anchor="middle">外部节点 x</text>
+      <circle cx="360" cy="140" r="8" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="360" y="165" class="svg-label-tiny" text-anchor="middle">内部节点 c</text>
+
+      <!-- 右侧三道防线简化 -->
+      <text x="500" y="80" class="svg-label" text-anchor="middle">穿组三道防线</text>
+      <rect x="450" y="95" width="280" height="36" rx="6" fill="var(--gate-fill)" stroke="var(--gate)"/>
+      <text x="590" y="118" class="svg-label" text-anchor="middle">1. 构建期：跨非法 scope link 拒绝（H2）</text>
+      <rect x="450" y="138" width="280" height="36" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <text x="590" y="161" class="svg-label" text-anchor="middle">2. 搜索期：ScopeMask 硬过滤</text>
+      <rect x="450" y="181" width="280" height="36" rx="6" fill="var(--bad-fill)" stroke="var(--bad)" stroke-dasharray="4 3"/>
+      <text x="590" y="204" class="svg-label" text-anchor="middle">3. 检查期：穿透 verifier（未落地）</text>
+      <text x="590" y="240" class="svg-label-tiny" text-anchor="middle" fill="var(--ink-faint)">verify_route_scope 已落地；verify_no_group_penetration 未落地</text>
+    </svg>
+    <div class="cap">图 3.D · Gate 是外侧↔内侧 segment 的配对口；穿组有三道防线，第三道（穿透 verifier）尚未落地。</div>
+  </div>
+  <div class="callout warn">
+    <b>容量：</b><code>GateCapacity::Fixed</code> 已删除；当前 Gate <b>无容量上限</b>。容量作为 Metric 缝宽预算（相 I 累计 demand → 相 II 撑开段长）<b>尚未落地</b>。
+  </div>
+  <div class="callout bad">
+    <b>fallback 后 Gate 消失</b> ≈「布局当这图没有组」——边可任意穿组，交叉容易爆炸。
+  </div>
+
+  <!-- 3.E ScopeMask -->
+  <h3>3.E · ScopeMask（边的合法 scope 集合）</h3>
+  <p>每条边允许走的 scope = <b>两端祖先链 ∪ 公共祖先</b>。Channel 搜索时硬过滤掉非法 scope 的 segment。</p>
+  <div class="figure">
+    <svg viewBox="0 0 780 300" xmlns="http://www.w3.org/2000/svg">
+      <!-- root -->
+      <rect x="20" y="20" width="740" height="260" rx="12" fill="var(--group-nested-fill)" stroke="var(--group)" stroke-width="2"/>
+      <text x="40" y="44" class="svg-label">root（公共祖先 ✓ 在 scope 内）</text>
+
+      <!-- group X -->
+      <rect x="50" y="70" width="300" height="190" rx="10" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2"/>
+      <text x="70" y="94" class="svg-label">X（A 的祖先链 ✓）</text>
+      <rect x="80" y="190" width="80" height="40" rx="6" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="120" y="215" class="svg-label" text-anchor="middle">A</text>
+
+      <!-- group Y -->
+      <rect x="400" y="70" width="320" height="190" rx="10" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2"/>
+      <text x="420" y="94" class="svg-label">Y（B 的祖先链 ✓）</text>
+      <rect x="560" y="190" width="80" height="40" rx="6" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <text x="600" y="215" class="svg-label" text-anchor="middle">B</text>
+
+      <!-- 边 A -> B -->
+      <path d="M 160 210 Q 390 60 560 210" stroke="var(--gate)" stroke-width="3" fill="none"/>
+      <text x="380" y="100" class="svg-label" text-anchor="middle" fill="var(--gate)">edge A -&gt; B</text>
+
+      <!-- scope 标注 -->
+      <text x="200" y="130" class="svg-label-tiny" fill="var(--gate)">✓ 可走 X 内 segment</text>
+      <text x="430" y="130" class="svg-label-tiny" fill="var(--gate)">✓ 可走 Y 内 segment</text>
+      <text x="300" y="160" class="svg-label-tiny" fill="var(--gate)">✓ 可走 root 内 segment（公共祖先）</text>
+
+      <!-- 非法示意 -->
+      <rect x="180" y="120" width="60" height="30" rx="4" fill="none" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="3 2"/>
+      <text x="210" y="139" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">Z (其他组)</text>
+      <text x="210" y="165" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">✗ 不可穿</text>
+    </svg>
+    <div class="cap">图 3.E · 边 A→B 的 ScopeMask = ancestors(A) ∪ ancestors(B) ∪ common_ancestor(root)。其它组（如 Z）的 segment 被硬过滤，边不可穿。</div>
+  </div>
+
+  <!-- 3.F fallback -->
+  <h3>3.F · channel-group-fallback</h3>
+  <p>组矩形<b>不纯</b>（<code>EmptyGroup</code> / <code>OverlappingGroups</code> / <code>ForeignNodeInGroupRect</code>）或路由不可行时，退回 root Substrate，Gate 全部消失，<code>ScopeMask::unrestricted()</code>。</p>
+  <div class="figure grid2">
+    <div>
+      <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg">
+        <rect x="30" y="30" width="300" height="220" rx="10" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2"/>
+        <text x="50" y="54" class="svg-label">group G</text>
+        <!-- 组成员 -->
+        <circle cx="100" cy="120" r="10" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+        <circle cx="160" cy="160" r="10" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+        <!-- foreign node 落在 G 矩形内 -->
+        <circle cx="240" cy="100" r="10" fill="var(--bad-fill)" stroke="var(--bad)" stroke-width="2"/>
+        <text x="240" y="84" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">foreign node</text>
+        <text x="240" y="124" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">不在 G 内</text>
+        <text x="180" y="240" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">⚠ ForeignNodeInGroupRect</text>
+        <text x="180" y="258" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">→ 触发 fallback</text>
+      </svg>
+      <div class="cap" style="text-align:center">左：组矩形不纯</div>
+    </div>
+    <div>
+      <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg">
+        <rect x="30" y="30" width="300" height="220" rx="6" fill="#fcfdfe" stroke="var(--line)" stroke-width="1.5"/>
+        <text x="180" y="54" class="svg-label" text-anchor="middle">root Substrate（无组）</text>
+        <!-- 节点散布 -->
+        <circle cx="90" cy="110" r="10" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+        <circle cx="160" cy="150" r="10" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+        <circle cx="240" cy="100" r="10" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+        <!-- 边任意穿 -->
+        <path d="M 90 110 Q 160 60 240 100" stroke="var(--bad)" stroke-width="2" fill="none"/>
+        <path d="M 90 110 L 160 150" stroke="var(--bad)" stroke-width="2" fill="none"/>
+        <text x="180" y="220" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">Gate 全无；ScopeMask::unrestricted()</text>
+        <text x="180" y="240" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">边可任意穿组</text>
+        <text x="180" y="258" class="svg-label-tiny" text-anchor="middle" fill="var(--ink-faint)">≈ 当这图没有组</text>
+      </svg>
+      <div class="cap" style="text-align:center">右：fallback 后退回 root</div>
+    </div>
+  </div>
+  <table>
+    <tr><th>场景</th><th>行为</th><th>可观测性</th></tr>
+    <tr><td>组矩形不纯（<code>EmptyGroup</code> / <code>OverlappingGroups</code> / <code>ForeignNodeInGroupRect</code>）</td><td>退回 <code>derive_root_substrate</code>；<code>used_gates=false</code></td><td><code>diagnostics.relaxations</code></td></tr>
+    <tr><td>group-gate 路由不可行</td><td>同上二次 fallback</td><td><code>route_all</code></td></tr>
+    <tr><td>Ink 穿真实节点 + 曾用 gate</td><td><code>CHANNEL_FORCE_ROOT</code> 重跑</td><td><code>mod.rs</code></td></tr>
+  </table>
+  <div class="callout info">
+    <b>启用率（2026-08-09 对照表）：</b>组 fixture <b>约 32/40</b> 启用 gate；<b>约 8/40</b> 仍 fallback（典型：多 namespace 跨层区间交叉换位）。
+  </div>
+
+  <!-- 3.G 三条不变量 -->
+  <h3>3.G · 三条不变量</h3>
+  <p>真源：<code>atlas-reference/group-invariants.md</code>。</p>
+  <div class="figure grid2">
+    <div>
+      <svg viewBox="0 0 360 200" xmlns="http://www.w3.org/2000/svg">
+        <text x="180" y="24" class="svg-label" text-anchor="middle">① Containment（成员 ⊂ 组框）</text>
+        <rect x="40" y="50" width="280" height="130" rx="8" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2"/>
+        <text x="60" y="72" class="svg-label">G</text>
+        <circle cx="120" cy="120" r="10" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+        <circle cx="200" cy="140" r="10" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+        <text x="180" y="184" class="svg-label-tiny" text-anchor="middle" fill="var(--gate)">✓ 现：finalize bbox（弱）</text>
+      </svg>
+    </div>
+    <div>
+      <svg viewBox="0 0 360 200" xmlns="http://www.w3.org/2000/svg">
+        <text x="180" y="24" class="svg-label" text-anchor="middle">② Sibling separation（兄弟框不重叠）</text>
+        <rect x="30" y="50" width="140" height="120" rx="8" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2"/>
+        <text x="50" y="72" class="svg-label">G1</text>
+        <rect x="190" y="50" width="140" height="120" rx="8" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2"/>
+        <text x="210" y="72" class="svg-label">G2</text>
+        <text x="180" y="184" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">✗ 现：未做，兄弟框可重叠</text>
+      </svg>
+    </div>
+  </div>
+  <div class="figure">
+    <svg viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg">
+      <text x="380" y="24" class="svg-label" text-anchor="middle">③ No penetration（边不穿组内，只经 Gate）</text>
+      <!-- 左：违规 -->
+      <rect x="40" y="50" width="280" height="140" rx="8" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2"/>
+      <text x="60" y="72" class="svg-label">G</text>
+      <circle cx="100" cy="120" r="8" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <circle cx="260" cy="120" r="8" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <!-- 穿组边 -->
+      <path d="M 20 90 L 180 120 L 340 150" stroke="var(--bad)" stroke-width="2.5" fill="none"/>
+      <text x="180" y="110" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">✗ 边穿过 G 内部（未经 Gate）</text>
+      <text x="180" y="205" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">现：H2 + ScopeMask 部分；穿透 verifier 未做</text>
+
+      <!-- 右：合规 -->
+      <rect x="440" y="50" width="280" height="140" rx="8" fill="var(--group-fill)" stroke="var(--group)" stroke-width="2"/>
+      <text x="460" y="72" class="svg-label">G</text>
+      <circle cx="500" cy="120" r="8" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <circle cx="660" cy="120" r="8" fill="#fff" stroke="#2c3e50" stroke-width="1.5"/>
+      <!-- 经 Gate -->
+      <circle cx="440" cy="120" r="7" fill="var(--gate-fill)" stroke="var(--gate)" stroke-width="2"/>
+      <circle cx="720" cy="120" r="7" fill="var(--gate-fill)" stroke="var(--gate)" stroke-width="2"/>
+      <path d="M 400 120 L 433 120" stroke="var(--gate)" stroke-width="2.5" fill="none"/>
+      <path d="M 447 120 L 653 120" stroke="var(--gate)" stroke-width="2.5" fill="none"/>
+      <path d="M 667 120 L 760 120" stroke="var(--gate)" stroke-width="2.5" fill="none"/>
+      <text x="580" y="110" class="svg-label-tiny" text-anchor="middle" fill="var(--gate)">✓ 经 Gate 进出</text>
+      <text x="580" y="205" class="svg-label-tiny" text-anchor="middle" fill="var(--gate)">目标：verify_no_group_penetration（D₂）</text>
+    </svg>
+    <div class="cap">图 3.G · 三条不变量现状：Containment 弱保证、Sibling separation 未做、No penetration 部分实现。</div>
+  </div>
+  <div class="callout warn">
+    Atlas 曾在 post-Ink 用刚体平移推开兄弟组——新架构<b>禁止下游推翻上游</b>，应在 Metric 保证分离。
+  </div>
+</section>
+
+<!-- ============ Section 4 ============ -->
+<section id="s4">
+  <h2><span class="num">4</span> 布局管线：group 出现在哪里</h2>
+
+  <div class="figure">
+    <svg viewBox="0 0 1000 320" xmlns="http://www.w3.org/2000/svg">
+      <!-- 6 阶段横向流 -->
+      <defs>
+        <marker id="flow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="var(--ink-faint)"/>
+        </marker>
+      </defs>
+
+      <!-- 阶段块 -->
+      <g font-family="-apple-system, sans-serif">
+        <!-- Parse -->
+        <rect x="20" y="120" width="120" height="60" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="80" y="145" class="svg-label" text-anchor="middle">Parse / Expand</text>
+        <text x="80" y="164" class="svg-label-tiny" text-anchor="middle">@group → anchor</text>
+
+        <!-- Compose -->
+        <rect x="180" y="120" width="140" height="60" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="250" y="145" class="svg-label" text-anchor="middle">Compose</text>
+        <text x="250" y="164" class="svg-label-tiny" text-anchor="middle">group_path / 边界 dummy</text>
+
+        <!-- Channel -->
+        <rect x="360" y="120" width="140" height="60" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="430" y="145" class="svg-label" text-anchor="middle">Channel</text>
+        <text x="430" y="164" class="svg-label-tiny" text-anchor="middle">Gate / ScopeMask</text>
+
+        <!-- Metric -->
+        <rect x="540" y="120" width="140" height="60" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="610" y="145" class="svg-label" text-anchor="middle">Metric</text>
+        <text x="610" y="164" class="svg-label-tiny" text-anchor="middle">组框不进 VPSC</text>
+
+        <!-- Ink -->
+        <rect x="720" y="120" width="120" height="60" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="780" y="145" class="svg-label" text-anchor="middle">Ink</text>
+        <text x="780" y="164" class="svg-label-tiny" text-anchor="middle">无组决策</text>
+
+        <!-- finalize -->
+        <rect x="880" y="120" width="100" height="60" rx="8" fill="var(--warn-fill)" stroke="var(--warn)" stroke-width="1.5"/>
+        <text x="930" y="145" class="svg-label" text-anchor="middle">finalize</text>
+        <text x="930" y="164" class="svg-label-tiny" text-anchor="middle">后验 frame</text>
+      </g>
+
+      <!-- 箭头 -->
+      <line x1="140" y1="150" x2="178" y2="150" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#flow)"/>
+      <line x1="320" y1="150" x2="358" y2="150" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#flow)"/>
+      <line x1="500" y1="150" x2="538" y2="150" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#flow)"/>
+      <line x1="680" y1="150" x2="718" y2="150" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#flow)"/>
+      <line x1="840" y1="150" x2="878" y2="150" stroke="var(--ink-faint)" stroke-width="1.5" marker-end="url(#flow)"/>
+
+      <!-- 上方注释：组相关行为 -->
+      <text x="250" y="100" class="svg-label-tiny" text-anchor="middle" fill="var(--group)">graph_index · boundary · order clamp</text>
+      <text x="430" y="100" class="svg-label-tiny" text-anchor="middle" fill="var(--gate)">cut_line · Gate · fallback</text>
+      <text x="610" y="100" class="svg-label-tiny" text-anchor="middle" fill="var(--ink-faint)">只写节点 / track</text>
+      <text x="930" y="100" class="svg-label-tiny" text-anchor="middle" fill="var(--warn)">成员 bbox 并集</text>
+
+      <!-- 下方：fallback 回路 -->
+      <path d="M 430 180 Q 430 240 250 240 Q 250 240 250 180" fill="none" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#flow)"/>
+      <text x="340" y="260" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">channel-group-fallback：退回 root Substrate</text>
+
+      <path d="M 780 180 Q 780 290 430 290" fill="none" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#flow)"/>
+      <text x="600" y="305" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">CHANNEL_FORCE_ROOT：Ink 穿节点 + 曾用 gate → 重跑 Channel</text>
+    </svg>
+    <div class="cap">图 4.1 · 布局管线全景。组在 Compose（结构）/ Channel（路由）/ finalize（组框）三处介入；红色虚线为 fallback 回路。</div>
+  </div>
+
+  <h3>4.1 分相位表</h3>
+  <table>
+    <tr><th>相位</th><th>子步骤</th><th>group 相关行为</th><th>写者</th></tr>
+    <tr><td>Compose</td><td><code>graph_index</code></td><td>为每个 node 算 <code>group_path</code></td><td>—</td></tr>
+    <tr><td>Compose</td><td><code>rank</code></td><td>无组连续层 / rank 区间硬约束</td><td>LayerWriter</td></tr>
+    <tr><td>Compose</td><td><code>boundary::insert_group_boundaries</code></td><td>每层每 group 插 Left/Right 零宽夹点；跨 rank 高权段对齐 order 区间</td><td>OrderWriter（边界结构）</td></tr>
+    <tr><td>Compose</td><td><code>order::order_layers</code></td><td><code>restore_group_clamps</code>；<code>group_boundary_weight</code> 软拉齐</td><td>OrderWriter</td></tr>
+    <tr><td>Compose</td><td><code>ports</code></td><td><code>group_anchor</code> 可走 <code>FixedOrder</code></td><td>PortWriter</td></tr>
+    <tr><td>Channel</td><td><code>derive_substrate</code></td><td>切 segment + 注册 Gate；失败 fallback</td><td>Channel（Gate <b>非</b>独立 Plan 字段）</td></tr>
+    <tr><td>Channel</td><td><code>search</code> / <code>route_all</code></td><td>ScopeMask；不可行则二次 fallback</td><td>Channel</td></tr>
+    <tr><td>Metric</td><td>BK + VPSC + track</td><td><b>组框不进 VPSC</b></td><td>CoordWriter</td></tr>
+    <tr><td>finalize</td><td><code>group_frames</code></td><td>成员 + 嵌套组 frame 的 bbox 并集 + pad</td><td><b>后验</b>（非 Metric）</td></tr>
+    <tr><td>Ink</td><td><code>route</code></td><td>只展开拓扑；无组相关新决策</td><td>InkWriter</td></tr>
+  </table>
+
+  <h3>4.2 现行策略 = Weak</h3>
+  <div class="figure grid2">
+    <div>
+      <svg viewBox="0 0 380 220" xmlns="http://www.w3.org/2000/svg">
+        <text x="190" y="24" class="svg-label" text-anchor="middle">Weak（现行）</text>
+        <rect x="30" y="40" width="320" height="160" rx="8" fill="#fcfdfe" stroke="var(--line)"/>
+        <text x="190" y="64" class="svg-label-tiny" text-anchor="middle">全图一套 Sugiyama</text>
+        <!-- 两个组框 -->
+        <rect x="50" y="80" width="130" height="100" rx="6" fill="var(--group-fill)" stroke="var(--group)" stroke-width="1.5"/>
+        <text x="115" y="100" class="svg-label-tiny" text-anchor="middle">G1（边界 dummy 夹）</text>
+        <rect x="200" y="80" width="130" height="100" rx="6" fill="var(--group-fill)" stroke="var(--group)" stroke-width="1.5"/>
+        <text x="265" y="100" class="svg-label-tiny" text-anchor="middle">G2（边界 dummy 夹）</text>
+        <!-- 跨组边经 gate -->
+        <circle cx="180" cy="130" r="5" fill="var(--gate-fill)" stroke="var(--gate)"/>
+        <circle cx="200" cy="130" r="5" fill="var(--gate-fill)" stroke="var(--gate)"/>
+        <line x1="185" y1="130" x2="195" y2="130" stroke="var(--gate)" stroke-width="2"/>
+        <text x="190" y="200" class="svg-label-tiny" text-anchor="middle" fill="var(--gate)">跨组靠 Gate + ScopeMask</text>
+      </svg>
+    </div>
+    <div>
+      <svg viewBox="0 0 380 220" xmlns="http://www.w3.org/2000/svg">
+        <text x="190" y="24" class="svg-label" text-anchor="middle">Strong-Macro（yFiles 式，未实现）</text>
+        <rect x="30" y="40" width="320" height="160" rx="8" fill="#fcfdfe" stroke="var(--line)"/>
+        <rect x="50" y="80" width="130" height="100" rx="6" fill="var(--group-fill)" stroke="var(--group)" stroke-width="1.5"/>
+        <text x="115" y="100" class="svg-label-tiny" text-anchor="middle">G1 递归子布局</text>
+        <text x="115" y="118" class="svg-label-tiny" text-anchor="middle">→ macro 节点</text>
+        <rect x="200" y="80" width="130" height="100" rx="6" fill="var(--group-fill)" stroke="var(--group)" stroke-width="1.5"/>
+        <text x="265" y="100" class="svg-label-tiny" text-anchor="middle">G2 递归子布局</text>
+        <text x="265" y="118" class="svg-label-tiny" text-anchor="middle">→ macro 节点</text>
+        <line x1="180" y1="130" x2="200" y2="130" stroke="#7f8c8d" stroke-width="2"/>
+        <text x="190" y="200" class="svg-label-tiny" text-anchor="middle" fill="var(--bad)">bind 即 Unsupported</text>
+      </svg>
+    </div>
+  </div>
+  <ul>
+    <li>全图一套 Sugiyama</li>
+    <li>组靠「层内被边界夹住 + 跨层软拉齐」保持连续块</li>
+    <li>跨组路由靠 Gate</li>
+  </ul>
+  <p><code>group_policy: strong-macro</code>（组内分层 → macro → 回填）绑定即 <b>Unsupported</b>。</p>
+
+  <h3>4.3 边界 dummy 的用意</h3>
+  <p><code>architecture.md</code> §8.3：</p>
+  <ul>
+    <li><b>不改</b>交叉最小化内核</li>
+    <li>用夹点 + 高权跨层段，让同组在相邻层的 order 区间对齐</li>
+    <li>对齐失败 → <code>(rank, order)</code> 包围盒互咬 → <code>ForeignNodeInGroupRect</code> → <b>fallback</b></li>
+  </ul>
+  <div class="callout info">
+    这正是 <code>2026-08-08-hier-review.md</code> §2.6 因果链的核心：层内连续不够，必须<b>跨层区间对齐</b>，组通道才能启用。
+  </div>
+
+  <h3>4.4 <code>channel-group-fallback</code> 何时触发</h3>
+  <table>
+    <tr><th>场景</th><th>行为</th><th>可观测性</th></tr>
+    <tr><td>组矩形不纯（<code>EmptyGroup</code> / <code>OverlappingGroups</code> / <code>ForeignNodeInGroupRect</code>）</td><td>退回 <code>derive_root_substrate</code>；<code>used_gates=false</code></td><td><code>diagnostics.relaxations</code></td></tr>
+    <tr><td>group-gate 路由不可行</td><td>同上二次 fallback</td><td><code>route_all</code></td></tr>
+    <tr><td>Ink 穿真实节点 + 曾用 gate</td><td><code>CHANNEL_FORCE_ROOT</code> 重跑</td><td><code>mod.rs</code></td></tr>
+  </table>
+  <p>fallback 后：<code>ScopeMask::unrestricted()</code>，Gate 边消失。</p>
+  <div class="callout info">
+    启用率（2026-08-09 对照表）：组 fixture <b>约 32/40</b> 启用 gate；<b>约 8/40</b> 仍 fallback（典型：多 namespace 跨层区间交叉换位）。
+  </div>
+</section>
+
+<!-- ============ Section 5 ============ -->
+<section id="s5">
+  <h2><span class="num">5</span> 与 yFiles / 期望的差距（组相关）</h2>
+  <table>
+    <tr><th>能力</th><th>yFiles</th><th>现行</th><th>差距</th></tr>
+    <tr><td>组布局</td><td>递归子图 + 组框进求解</td><td>Weak：全局 Sugiyama + 边界 dummy</td><td>无递归子布局</td></tr>
+    <tr><td>组框几何</td><td>求解变量（padding / title demand）</td><td>finalize 后验 bbox</td><td>非 VPSC；<code>group_sizing</code> / <code>group_align</code> bind 即拒</td></tr>
+    <tr><td>跨组路由</td><td>走廊 + gate 闭合</td><td>Gate + ScopeMask（多数图）；部分 fallback</td><td>fallback 时等同无组；无穿透 verifier</td></tr>
+    <tr><td>StrongMacro</td><td>有</td><td><code>Unsupported</code></td><td>未实现</td></tr>
+    <tr><td>组间分离</td><td>求解保证</td><td>无 sibling separation</td><td>兄弟框可重叠</td></tr>
+    <tr><td><code>group_anchor</code></td><td>贴框、不参与分层</td><td>与普通 node 同等分层</td><td>ADR-004 几何写权未闭合</td></tr>
+    <tr><td>PartitionGrid</td><td>泳道/矩阵</td><td>模型有，Hier 未消费</td><td>与 group 正交，均后置</td></tr>
+  </table>
+  <div class="callout info">
+    路线图归属：组框写权 / 穿透 verifier → <b>D₂</b>；Channel Gate 基础 → <b>D1.2 已大部分落地</b>。见 <code>roadmap.md</code>。
+  </div>
+</section>
+
+<!-- ============ Section 6 ============ -->
+<section id="s6">
+  <h2><span class="num">6</span> 落地 vs 规划总表</h2>
+  <table>
+    <tr><th>领域</th><th>已落地</th><th>规划 / 缺口</th></tr>
+    <tr><td>DSL + 模型</td><td>嵌套 group、<code>label</code>/<code>variant</code>、<code>group_anchor</code> 字段、<code>@group</code> 展开</td><td>组级 <code>layout:</code>；anchor 不参与叶分层</td></tr>
+    <tr><td>Compose 连续性</td><td>边界 dummy + <code>restore_group_clamps</code> + 跨层软对齐</td><td>rank 连续层硬约束；<code>GatePlan</code> 进 Plan IR</td></tr>
+    <tr><td>Channel</td><td>cut_line + Gate + ScopeMask + <code>verify_route_scope</code></td><td><code>verify_no_group_penetration</code>；Gate 容量 → Metric</td></tr>
+    <tr><td>组框</td><td>finalize 后验 bbox</td><td><b>D₂</b>：VPSC 组框变量、sibling separation</td></tr>
+    <tr><td>Policy</td><td><code>weak</code></td><td><code>strong-macro</code>；<code>group_sizing</code> / <code>group_align</code></td></tr>
+    <tr><td>可观测性</td><td><code>channel-group-fallback</code> relaxation；<code>channel_used_gates</code></td><td>hier_eval 对 fallback 率设硬门禁（评审建议）</td></tr>
+  </table>
+</section>
+
+<!-- ============ Section 8 ============ -->
+<section id="s8">
+  <h2><span class="num">8</span>「基本可用」vs「当优化目标」（决策备忘）</h2>
+  <p>集中做 group 时，建议拆开两档，避免和全局走廊优化缠在一起：</p>
+  <table>
+    <tr><th></th><th><b>基本可用</b>（建议先做）</th><th><b>当优化目标</b>（可后置）</th></tr>
+    <tr><td>要什么</td><td>组通道能开、少静默 fallback；包围盒/Scope 基本纯；穿透可证</td><td>组框进 VPSC、递归子布局、组内美学 J</td></tr>
+    <tr><td>验收</td><td>fallback 率、<code>channel_used_gates</code>、穿组 verifier</td><td>框对齐、组内紧致、视觉打磨</td></tr>
+    <tr><td>和全局路由关系</td><td><b>前置基板</b></td><td>与 Channel 全局分配器正交、可后做</td></tr>
+  </table>
+
+  <h3>建议顺序（备忘，非契约）</h3>
+  <div class="figure">
+    <svg viewBox="0 0 980 200" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="step" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L8,3 L0,6 Z" fill="var(--accent)"/>
+        </marker>
+      </defs>
+      <!-- 4 步 -->
+      <rect x="20" y="60" width="200" height="80" rx="10" fill="var(--gate-fill)" stroke="var(--gate)" stroke-width="2"/>
+      <text x="120" y="88" class="svg-label" text-anchor="middle">1. 结构</text>
+      <text x="120" y="110" class="svg-label-tiny" text-anchor="middle">跨层边界对齐</text>
+      <text x="120" y="126" class="svg-label-tiny" text-anchor="middle">压掉 fallback</text>
+
+      <rect x="260" y="60" width="200" height="80" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+      <text x="360" y="88" class="svg-label" text-anchor="middle">2. 可证</text>
+      <text x="360" y="110" class="svg-label-tiny" text-anchor="middle">verify_no_group_penetration</text>
+      <text x="360" y="126" class="svg-label-tiny" text-anchor="middle">+ fallback 门禁可见</text>
+
+      <rect x="500" y="60" width="200" height="80" rx="10" fill="var(--warn-fill)" stroke="var(--warn)" stroke-width="2"/>
+      <text x="600" y="88" class="svg-label" text-anchor="middle">3. 写权</text>
+      <text x="600" y="110" class="svg-label-tiny" text-anchor="middle">组框是否进 Metric（D₂）</text>
+      <text x="600" y="126" class="svg-label-tiny" text-anchor="middle">框才有单写者</text>
+
+      <rect x="740" y="60" width="220" height="80" rx="10" fill="#f3f0ff" stroke="#7c3aed" stroke-width="2"/>
+      <text x="850" y="88" class="svg-label" text-anchor="middle">4. anchor</text>
+      <text x="850" y="110" class="svg-label-tiny" text-anchor="middle">按 ADR-004 从叶分层摘掉</text>
+      <text x="850" y="126" class="svg-label-tiny" text-anchor="middle">框定稿后再挂</text>
+
+      <line x1="220" y1="100" x2="258" y2="100" stroke="var(--accent)" stroke-width="2" marker-end="url(#step)"/>
+      <line x1="460" y1="100" x2="498" y2="100" stroke="var(--accent)" stroke-width="2" marker-end="url(#step)"/>
+      <line x1="700" y1="100" x2="738" y2="100" stroke="var(--accent)" stroke-width="2" marker-end="url(#step)"/>
+
+      <text x="490" y="180" class="svg-label-tiny" text-anchor="middle" fill="var(--ink-faint)">── 之后再开全局走廊分配 / 交叉后处理 ──</text>
+    </svg>
+    <div class="cap">图 8.1 · 建议实施顺序：结构 → 可证 → 写权 → anchor，之后才开全局走廊分配。</div>
+  </div>
+  <div class="callout info">
+    全局走廊分配器可以等「基本可用」至少到第 1（最好到第 2）之后；否则密集组图上的 crossings 仍会被 fallback 淹没，路由层收益验不出来。
+  </div>
+
+  <h3>9. 与边路由缺口的关系（上下文）</h3>
+  <p><code>2026-08-08-hier-review.md</code> §3 边路由行：加权 <code>J</code> + Occupancy 交叉项 + bounded rip-up <b>已闭合</b>；仍缺 yFiles 级全局走廊分配器与边交叉后处理。</p>
+  <ul>
+    <li>若 <b>group 尚未作为优化目标</b>，路由主线是「准全局分配 + 廊内 CM + VPSC nudge」，组通道失效图上的高交叉记为 residual。</li>
+    <li>若 <b>先集中把 group 基本可用做好</b>，则上述 residual 会明显缩小，再做全局路由更有验收意义。</li>
+  </ul>
+  <p>本文只做回顾，不裁定二选一；顺序见 §8。</p>
+</section>
+
+<section>
+  <h2><span class="num">7</span> 关键代码与文档入口</h2>
+  <h3>7.1 文档</h3>
+  <table>
+    <tr><th>路径</th><th>职责</th></tr>
+    <tr><td><code>docs/specs/dsl-spec.md</code></td><td>group DSL §6；anchor §5.7；<code>@group</code> §7.6</td></tr>
+    <tr><td><code>docs/design/adr/004-group-anchor-nodes.md</code></td><td>组间边经 anchor</td></tr>
+    <tr><td><code>docs/design/model-boundary.md</code></td><td>group 不作边端点</td></tr>
+    <tr><td><code>docs/design/layout/hierarchical/architecture.md</code></td><td>§6.3 三道防线；§8 组与 partition</td></tr>
+    <tr><td><code>docs/design/layout/hierarchical/atlas-reference/group-invariants.md</code></td><td>containment / separation / penetration</td></tr>
+    <tr><td><code>docs/design/layout/hierarchical/phases/ports-and-channel.md</code></td><td>GatePlan 目标语义</td></tr>
+    <tr><td><code>docs/design/layout/hierarchical/phases/channel-d1.md</code></td><td>D1.0–D1.2；Gate 归属 D1.2</td></tr>
+    <tr><td><code>docs/design/layout/hierarchical/notes/2026-08-08-hier-review.md</code></td><td>fallback 因果链、启用率</td></tr>
+    <tr><td><code>docs/design/layout/hierarchical/roadmap.md</code></td><td>D₂ 组框写权</td></tr>
+  </table>
+  <h3>7.2 模型 / 解析</h3>
+  <table>
+    <tr><th>路径</th><th>职责</th></tr>
+    <tr><td><code>crates/plotgram-model/src/graph.rs</code></td><td><code>Group</code> / <code>Node.role</code> / <code>host_group</code></td></tr>
+    <tr><td><code>crates/plotgram-model/src/result.rs</code></td><td><code>GroupPlacement</code></td></tr>
+    <tr><td><code>crates/plotgram-model/src/diagnostics.rs</code></td><td><code>channel_used_gates</code></td></tr>
+    <tr><td><code>crates/plotgram-parse/src/lower.rs</code></td><td>group 降级；跨组边校验</td></tr>
+    <tr><td><code>crates/plotgram-parse/src/expand.rs</code></td><td><code>@group</code> → <code>group_anchor</code></td></tr>
+  </table>
+  <h3>7.3 布局</h3>
+  <table>
+    <tr><th>路径</th><th>职责</th></tr>
+    <tr><td><code>hierarchical/mod.rs</code></td><td>主管线；<code>CHANNEL_FORCE_ROOT</code>；<code>group_policy</code></td></tr>
+    <tr><td><code>hierarchical/compose/graph_index.rs</code></td><td><code>group_path</code></td></tr>
+    <tr><td><code>hierarchical/compose/boundary.rs</code></td><td>边界 dummy 插入与跨层对齐</td></tr>
+    <tr><td><code>hierarchical/compose/order.rs</code></td><td>定序 + <code>restore_group_clamps</code></td></tr>
+    <tr><td><code>hierarchical/model.rs</code></td><td><code>ElemKey::GroupBoundary</code></td></tr>
+    <tr><td><code>hierarchical/params.rs</code></td><td><code>group_policy</code> / <code>group_boundary_weight</code></td></tr>
+    <tr><td><code>hierarchical/channel/derive.rs</code></td><td>组切 Substrate；Gate；fallback</td></tr>
+    <tr><td><code>hierarchical/channel/substrate.rs</code></td><td>Segment / Gate IR</td></tr>
+    <tr><td><code>hierarchical/channel/search.rs</code></td><td>ScopeMask</td></tr>
+    <tr><td><code>hierarchical/channel/route_all.rs</code></td><td>全图路由与 fallback</td></tr>
+    <tr><td><code>hierarchical/channel/verify.rs</code></td><td><code>verify_route_scope</code></td></tr>
+    <tr><td><code>crates/plotgram-engine/src/finalize.rs</code></td><td><b>后验</b> <code>group_frames()</code></td></tr>
+  </table>
+  <p>v1 Atlas（只读参考）：<code>crates/v1/plotgram-core/src/layout/atlas/channel/</code>。</p>
+</section>
+
+<footer style="text-align:center; color:var(--ink-faint); font-size:13px; margin-top:32px;">
+  本文为阅读笔记，裁定权仍在 <code>architecture.md</code> / <code>expectations.md</code> / <code>dsl-spec.md</code>。
+  <br>配图 HTML 版生成于 2026-08-09。
+</footer>
+
+</div>
+</body>
+</html>

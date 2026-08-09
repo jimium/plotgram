@@ -310,19 +310,36 @@ fn edge_group_is_rejected() {
 
 #[test]
 fn critical_lift() {
-    // Default: absent key → false.
+    // Default: absent key → None (default 1.0).
     let out = p("diagram { node a {} node b {} a -> b }");
-    assert!(!edge_at(&out, 0).critical);
+    assert!(edge_at(&out, 0).weight.is_none());
 
-    // Table: (bool literal, expected flag).
-    let cases: &[(&str, bool)] = &[("critical: true", true), ("critical: false", false)];
-    for (attrs, expected) in cases {
-        let src = format!("diagram {{ node a {{}} node b {{}} a -> b {{ {attrs} }} }}");
-        let out = p(&src);
-        let e = edge_at(&out, 0);
-        assert_eq!(e.critical, *expected, "attrs=`{attrs}`");
-        assert!(!e.attrs.contains_key("critical"), "attrs=`{attrs}`");
-    }
+    // `critical: true` is sugar for `weight: 2.0`.
+    let out = p("diagram { node a {} node b {} a -> b { critical: true } }");
+    let e = edge_at(&out, 0);
+    assert_eq!(e.weight, Some(2.0));
+    assert!(!e.attrs.contains_key("critical"));
+
+    // `critical: false` is a no-op (weight stays None).
+    let out = p("diagram { node a {} node b {} a -> b { critical: false } }");
+    let e = edge_at(&out, 0);
+    assert!(e.weight.is_none());
+    assert!(!e.attrs.contains_key("critical"));
+}
+
+#[test]
+fn weight_lift() {
+    let out = p("diagram { node a {} node b {} a -> b { weight: 4.0 } }");
+    let e = edge_at(&out, 0);
+    assert_eq!(e.weight, Some(4.0));
+    assert!(!e.attrs.contains_key("weight"));
+}
+
+#[test]
+fn critical_weight_conflict_rejected() {
+    let err = parse("diagram { node a {} node b {} a -> b { critical: true, weight: 2.0 } }")
+        .expect_err("critical+weight conflict must fail");
+    assert!(err.to_string().contains("critical"), "unexpected: {err}");
 }
 
 #[test]

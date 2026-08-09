@@ -739,7 +739,7 @@ api -> db {
 | **tail_label** | `tail_label: <string>` | 靠近**源**端标签（如 ER 基数 `N`） |
 | **variant** | `variant: <atom>` | 视觉变体（颜料）；查主题 `variants`（§14.7 封闭集） |
 | **from_side** / **to_side** | 见 §7.4 | 端口侧约束 → 提升为 `Edge.from_port` / `to_port`（**`active`**）；仅 FixedSide / FREE |
-| **critical** | `critical: <bool>` | 关键路径标记 → 提升为 `Edge.critical`（**`active`**） |
+| **weight** | `weight: <number>` / `critical: true`（糖 = `weight: 2.0`） | 边权重 → 提升为 `Edge.weight: Option<f64>`（**`active`**）；`critical` 与 `weight` 同写 → 解析错误（`CriticalWeightConflict`） |
 | **style.\*** | `style.<prop>: …` | 内联颜料；词表见 style-sheet-spec §5 |
 | **meta.\*** | `meta.<key>: …` | 渲染器忽略 |
 
@@ -748,7 +748,7 @@ api -> db {
 - 未写 `variant` → `default`
 - 三处标签互不推导；需要端点文案时显式写 `head_label:` / `tail_label:`
 - 封闭集与 cascade：§14.4；`variant` resolve 见 style-sheet-spec §6.2
-- 端口 / `critical` 经 parse 提升为一等字段后**不得**再留在 attrs 供引擎读取（见 ADR-003）
+- 端口 / `weight`（`critical` 糖）经 parse 提升为一等字段后**不得**再留在 attrs 供引擎读取（见 ADR-003）
 - 边合流不写边级键：开 `layout: hierarchical { auto_edge_grouping: true }`（见 §7.4.3）
 
 ### 7.4 端口（side）
@@ -994,7 +994,7 @@ db -> api {
 }                                       // 端口 → Edge.from_port / to_port
 ```
 
-结构键（端口 / `critical` / `role`…）parse 后提升为一等字段；引擎不读 attrs 中的同名残留。
+结构键（端口 / `weight` / `role`…）parse 后提升为一等字段；引擎不读 attrs 中的同名残留。
 
 ### 7.8 规则
 
@@ -1016,7 +1016,7 @@ db -> api {
   → lift Node 结构字段（role / host_group / side / slot）
   → lift Node 结构字段（role / host_group / side / slot / cell_col / cell_row）
   → validate_partition（有 cell 则须有 grid；轴 id 冲突检查）
-  → lift Edge 结构字段（from_side… / critical → Edge 一等字段）
+  → lift Edge 结构字段（from_side… / weight（含 `critical` 糖）→ Edge 一等字段）
   → archetype expand（见 archetype-spec：只填空写入 shape / variant / icon）
   → profile expand（显式 `profile:` → 默认 layout / edge_routing、自环策略、图种约束；无 `profile:` 时仅算法字段走 flowchart 预设；显式 layout 覆盖）
   → LayoutContract（算法名 + 参数 + 图模型；**无** profile / 图种名）
@@ -1390,7 +1390,7 @@ variant **只**贡献 fill / stroke / font / dash / radius 等颜料；**不**�
 | `from_side` | atom：`north`/`south`/`east`/`west` | **`active`（模型字段）** | DSL 作者（可选约束） | 提升为 `Edge.from_port`（FixedSide）；组合相读约束 |
 | `to_side` | 同上 | **`active`（模型字段）** | DSL 作者 | 提升为 `Edge.to_port` |
 | `from_slot` / `to_slot` / `from_ratio` / `to_ratio` / `from_x`+`from_y` / `to_x`+`to_y` / `from_sides` / `to_sides` | — | **`removed`** | — | 写了 → 解析错误；边端口只留 side（见 §7.4） |
-| `critical` | bool | **`active`（模型字段）** | DSL 作者 | 提升为 `Edge.critical`；Hier 排序/对齐加权 |
+| `weight` | `Option<f64>`（`critical: true` 糖 = `2.0`） | **`active`（模型字段）** | DSL 作者 | 提升为 `Edge.weight`；Hier 排序/对齐加权。`critical` 与 `weight` 同写 → 解析错误（`CriticalWeightConflict`） |
 | `meta.*` | 任意 | — | DSL 作者 | 无 |
 
 `source` / `target` / 箭头语义（`->` / `-->` / `<->`）是**语法**，落在 `Edge::source` / `target` / `arrow`；**不得**在属性块用 `source:` / `target:` / `arrow:` 覆盖。三处标签只经 `label` / `head_label` / `tail_label`（或 §7.5 中点糖）；**已废弃** `>"` / `<"` 端点标记。

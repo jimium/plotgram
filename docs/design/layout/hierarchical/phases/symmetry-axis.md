@@ -52,7 +52,7 @@ J(x) = Σ_seg w_uv · |x_u − x_v|
 | `symmetry_iters` | `8` | 中位迭代轮数 |
 | `layer_alignment` | `0.5` | 主轴：实节点在层带内对齐；**零高 elem 钉层带顶边**（避免中心走廊穿同层节点） |
 
-边权基：`real–real=1` / `real–virt=2` / `virt–virt=8`（critical ×2）。  
+边权基：`real–real=1` / `real–virt=2` / `virt–virt=8`（作者 `weight` 乘基；`critical: true` 糖 = `2.0`）。  
 `center_h`：该 hub 向下/上扇叶的中位或两中位中点（`axis_from_neighbors`）；多父取折中（邻位加权，非先到先得认领）。
 
 **邻接真源**：`RealGraph` **正向** real 端点（长边一跳；**reversed 不计扇**）。辅助谓词仍在 [`metric/symmetry.rs`](../../../../crates/plotgram-layout/src/layout/hierarchical/metric/symmetry.rs)（`forward_real_adjacency` / `twin_plan_pairs` / `unique_min_span_primary` / `fan_pitch` / `slot_multipliers`）。

@@ -459,7 +459,7 @@ fn route_on_substrate(
         prepared.push(PreparedEdge {
             entry: RouteOrderEntry {
                 edge_id: e.edge_id.clone(),
-                critical: e.critical,
+                critical: e.weight > 1.0,
                 span: edge_rank_span(plan, graph, &layer_pos, e),
                 reversed: e.reversed,
                 dummy_len: dummy_chain_len(&segs_by_edge, &e.edge_id),
@@ -777,7 +777,7 @@ mod tests {
                 reversed: false,
                 from_port: None,
                 to_port: None,
-                critical: false,
+                weight: 1.0,
             }],
             self_loops: vec![],
         };
@@ -881,7 +881,7 @@ mod tests {
                 reversed: false,
                 from_port: None,
                 to_port: None,
-                critical: false,
+                weight: 1.0,
             }],
             self_loops: vec![],
         };

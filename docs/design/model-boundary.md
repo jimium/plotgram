@@ -30,9 +30,9 @@ CLI 仅做参数与文件 I/O，调用 compile，不写构建逻辑。
 | 字段 | 含义 | 写者 |
 |------|------|------|
 | `from_port` / `to_port` | `Option<PortConstraint>`：作者侧/槽钉死；`None` = 算法决定 | DSL→parse 提升；布局组合相读约束并写出 **`EdgePlacement.from_port/to_port: PortRef`** |
-| `critical` | `bool`：关键路径偏好 | DSL→parse；Hier P3/P4 加权 |
+| `weight` | `Option<f64>`：边权重（`critical: true` 糖 = `2.0`） | DSL→parse；Hier P3/P4 加权 |
 | `id` / `source` / `target` / `arrow` / labels | 拓扑与标签 | parse |
-| `attrs` | `variant` / `style.*` / `meta.*` 等 | **不得**再承载 `from_side` / `critical`（提升后剥除）；`edge_group` 已移除 |
+| `attrs` | `variant` / `style.*` / `meta.*` 等 | **不得**再承载 `from_side` / `weight`（`critical` 糖提升后剥除）；`edge_group` 已移除 |
 
 **不**为时序增加 `Edge::seq`：见下节。
 
@@ -101,7 +101,7 @@ CLI 仅做参数与文件 I/O，调用 compile，不写构建逻辑。
 
 ```
 .pgm
-  → parse（attrs 含 from_side / critical / role …；可选 @group 端点）
+  → parse（attrs 含 from_side / weight / critical（糖）/ role …；可选 @group 端点）
   → 展开 @group 糖（→ group_anchor nodes）
   → lift_all_node_structural_attrs / lift_all_edge_structural_attrs
   → Graph::validate_partition（若有 cell / grid）

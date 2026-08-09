@@ -14,8 +14,8 @@
 
 ## 决策
 
-1. **`Edge` 一等字段**：`from_port` / `to_port`（`Option<PortConstraint>`，边端仅 FREE / `FixedSide`）、`critical`（`bool`）。
-2. **DSL 键** 仅 `from_side` / `to_side` / `critical` 由解析器 **提升** 进字段（`Edge::lift_structural_attrs`），之后从 attrs 剥除；引擎只读字段。`*_slot` / `*_ratio` / `*_x,*_y` / `*_sides` → 硬错误。
+1. **`Edge` 一等字段**：`from_port` / `to_port`（`Option<PortConstraint>`，边端仅 FREE / `FixedSide`）、`weight`（`Option<f64>`；`critical: true` 糖 = `2.0`，二者同写 → 解析错误 `CriticalWeightConflict`）。
+2. **DSL 键** 仅 `from_side` / `to_side` / `weight` / `critical`（糖 = `weight: 2.0`）由解析器 **提升** 进字段（`Edge::lift_structural_attrs`），之后从 attrs 剥除；引擎只读字段。`critical` 与 `weight` 同写 → 解析错误（`CriticalWeightConflict`）。`*_slot` / `*_ratio` / `*_x,*_y` / `*_sides` → 硬错误。
 3. **`FixedOrder`** 保留给 `group_anchor`（节点 `side` + 可选 `slot`），不经边 DSL。
 4. **边合流**：`layout: hierarchical { auto_edge_grouping: true }`；**不**提供边级 `edge_group`（写了 → 解析错误）。
 5. **决议端口** `PortRef` 写在 `EdgePlacement`，由布局组合相写入；Ink 只读。

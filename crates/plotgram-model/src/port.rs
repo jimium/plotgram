@@ -111,8 +111,12 @@ pub enum PortConstraintError {
     SlotWithoutSide { slot_key: &'static str },
     /// Removed edge port key still present (`from_slot`, `from_ratio`, …).
     UnsupportedEdgePortKey { key: &'static str },
-    /// `critical` present but not a boolean literal.
+    /// `critical` present but not a boolean literal (sugar for `weight: 2.0`).
     InvalidCritical { value: String },
+    /// `weight` present but not a positive finite number.
+    InvalidWeight { value: String },
+    /// Both `critical: true` and `weight` specified — ambiguous.
+    CriticalWeightConflict,
     /// Manual `edge_group` was removed; use layout `auto_edge_grouping`.
     UnsupportedEdgeGroup,
 }
@@ -122,6 +126,19 @@ impl fmt::Display for PortConstraintError {
         match self {
             Self::InvalidCritical { value } => {
                 write!(f, "`critical` expects a boolean, got {value}")
+            }
+            Self::InvalidWeight { value } => {
+                write!(
+                    f,
+                    "`weight` expects a positive finite number, got {value}"
+                )
+            }
+            Self::CriticalWeightConflict => {
+                write!(
+                    f,
+                    "cannot specify both `critical: true` and `weight` on the same edge \
+                     — `critical: true` is sugar for `weight: 2.0`"
+                )
             }
             Self::UnsupportedEdgeGroup => {
                 write!(

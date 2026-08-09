@@ -100,9 +100,10 @@ pub struct RealEdge {
     /// converted to canonical TB before any internal port decision reads it.
     pub from_port: Option<PortConstraint>,
     pub to_port: Option<PortConstraint>,
-    /// Author critical-path mark → extra ordering / alignment weight
+    /// Edge weight for layout optimization (NS / ordering / VPSC).
+    /// Default 1.0; `critical: true` sugar lifts to 2.0.
     /// (edge-parameters.md §2.5).
-    pub critical: bool,
+    pub weight: f64,
 }
 
 /// One node-shaped element after properify: a real node, edge dummy, or

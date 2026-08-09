@@ -946,7 +946,7 @@ mod tests {
             reversed: false,
             from_port: None,
             to_port: None,
-            critical: false,
+            weight: 1.0,
         }];
         let graph = RealGraph {
             ids,

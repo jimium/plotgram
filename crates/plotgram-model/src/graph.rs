@@ -280,15 +280,15 @@ pub struct Edge {
     /// Author port pin at the target end.
     #[serde(default)]
     pub to_port: Option<PortConstraint>,
-    /// Critical-path mark: the author wants this edge drawn straighter /
-    /// more prominently (a layout *preference*, not a render highlight).
-    /// Consumed as extra ordering / alignment weight by the hierarchical
-    /// layout (edge-parameters.md §2.5). Default false.
+    /// Edge weight for layout optimization (NS length cost, ordering /
+    /// alignment strength). `None` = default 1.0. The DSL sugar
+    /// `critical: true` is equivalent to `weight: 2.0`.
+    /// Consumed by hierarchical layout P3/P4 (edge-parameters.md §2.5).
     #[serde(default)]
-    pub critical: bool,
+    pub weight: Option<f64>,
     /// Free-form attributes (`variant`, `style.*`, `meta.*`, …).
-    /// Must **not** carry `from_side` / `critical` after lift — those are
-    /// fields above. Manual `edge_group` is rejected (use layout
+    /// Must **not** carry `from_side` / `critical` / `weight` after lift —
+    /// those are fields above. Manual `edge_group` is rejected (use layout
     /// `auto_edge_grouping`).
     pub attrs: AttrMap,
 }
@@ -298,9 +298,10 @@ impl Edge {
     /// from `attrs`. Idempotent if fields already set (fields win; conflicting attr keys
     /// are still stripped).
     ///
-    /// Keys handled: `from_side`, `to_side`, `critical` (dsl-spec §7.4).
-    /// Removed keys (`from_slot`, `from_ratio`, …) are hard errors.
-    /// `edge_group` is rejected — fan merge is layout `auto_edge_grouping` only.
+    /// Keys handled: `from_side`, `to_side`, `weight`, `critical` (sugar for
+    /// `weight: 2.0`) (dsl-spec §7.4). Removed keys (`from_slot`, `from_ratio`, …)
+    /// are hard errors. `edge_group` is rejected — fan merge is layout
+    /// `auto_edge_grouping` only.
     pub fn lift_structural_attrs(&mut self) -> Result<(), PortConstraintError> {
         if self.attrs.contains_key("edge_group") {
             return Err(PortConstraintError::UnsupportedEdgeGroup);
@@ -311,18 +312,36 @@ impl Edge {
         if self.to_port.is_none() {
             self.to_port = edge_port_constraint(&self.attrs, TO_SIDE_KEY)?;
         }
-        if !self.critical {
-            if let Some(v) = self.attrs.get("critical") {
-                if let Some(b) = v.as_bool() {
-                    self.critical = b;
-                } else {
+        if self.weight.is_none() {
+            if let Some(v) = self.attrs.get("weight") {
+                match v.as_f64() {
+                    Some(w) if w.is_finite() && w > 0.0 => self.weight = Some(w),
+                    _ => {
+                        return Err(PortConstraintError::InvalidWeight {
+                            value: v.to_string(),
+                        });
+                    }
+                }
+            }
+        }
+        // `critical: true` is sugar for `weight: 2.0`; `critical: false` is a no-op.
+        if let Some(v) = self.attrs.get("critical") {
+            match v.as_bool() {
+                Some(true) => {
+                    if self.weight.is_some() {
+                        return Err(PortConstraintError::CriticalWeightConflict);
+                    }
+                    self.weight = Some(2.0);
+                }
+                Some(false) => {}
+                None => {
                     return Err(PortConstraintError::InvalidCritical {
                         value: v.to_string(),
                     });
                 }
             }
         }
-        for k in [FROM_SIDE_KEY, TO_SIDE_KEY, "critical"] {
+        for k in [FROM_SIDE_KEY, TO_SIDE_KEY, "critical", "weight"] {
             self.attrs.remove(k);
         }
         // Strip removed keys only after error check above — they must not linger.
@@ -575,7 +594,7 @@ mod tests {
             tail_label: None,
             from_port: None,
             to_port: None,
-            critical: false,
+            weight: None,
             attrs: AttrMap::new(),
         }
     }

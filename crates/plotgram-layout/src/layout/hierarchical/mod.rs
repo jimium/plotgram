@@ -103,15 +103,14 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     compose::cycle::remove_cycles(&mut real_graph);
     let ranks = compose::rank::assign_ranks(&real_graph)?;
     let mut plan = compose::properify::properify(&real_graph, &ranks);
-    // Author critical-path marks feed P3 ordering weights (edge-parameters §2.5).
-    let critical_edges: std::collections::BTreeSet<String> = real_graph
+    // Author edge weights feed P3 ordering (edge-parameters §2.5).
+    let edge_weights: std::collections::BTreeMap<String, f64> = real_graph
         .edges
         .iter()
-        .filter(|e| e.critical)
-        .map(|e| e.edge_id.clone())
+        .map(|e| (e.edge_id.clone(), e.weight))
         .collect();
     compose::boundary::insert_group_boundaries(&mut plan);
-    compose::order::order_layers(&mut plan, &critical_edges, params.group_boundary_weight);
+    compose::order::order_layers(&mut plan, &edge_weights, params.group_boundary_weight);
 
     // Canonical node sizes are needed before port finalize (FIXED_POS
     // boundary validation) — measured sizes, never invented.
@@ -577,7 +576,7 @@ mod tests {
                 tail_label: None,
                 from_port: None,
                 to_port: None,
-                critical: false,
+                weight: None,
                 attrs: AttrMap::new(),
             }],
             groups: vec![],
