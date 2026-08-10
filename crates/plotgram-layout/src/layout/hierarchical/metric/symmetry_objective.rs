@@ -452,13 +452,12 @@ fn snap_boundaries_to_members(
     }
 }
 
-/// Close excess slack between sibling group frames after VPSC.
+/// Close excess / open shortfall between sibling group frames after VPSC.
 ///
-/// Separation only lower-bounds gaps. When a clamp column parks far from its
-/// members inside that slack, the next group's drawn frame is pushed away.
-/// Slide each right sibling (and further-right siblings in the same set)
-/// leftward until **finalize-drawn** frames are `GROUP_FRAME_GAP` apart.
-/// Deepest siblings first.
+/// Only pairs whose member **rank spans overlap** (true 2D frame collision risk)
+/// are adjusted. Vertically stacked siblings on disjoint ranks (e.g. 接入层
+/// above 业务层) must keep their VPSC x-alignment — treating them as a
+/// left-to-right sequence shove the upper band off to the side.
 fn compact_sibling_frame_gaps(
     plan: &PlanGraph,
     size_of: &dyn Fn(usize) -> Size,
@@ -466,6 +465,7 @@ fn compact_sibling_frame_gaps(
 ) {
     let mut group_path: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut group_members: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+    let mut group_ranks: BTreeMap<String, BTreeSet<u32>> = BTreeMap::new();
     for (e_idx, elem) in plan.elems.iter().enumerate() {
         if !matches!(&elem.key, ElemKey::Real(_)) {
             continue;
@@ -475,6 +475,7 @@ fn compact_sibling_frame_gaps(
                 .entry(g.clone())
                 .or_insert_with(|| elem.group_path[..=depth].to_vec());
             group_members.entry(g.clone()).or_default().push(e_idx);
+            group_ranks.entry(g.clone()).or_default().insert(elem.rank);
         }
     }
     if group_members.len() < 2 {
@@ -496,10 +497,8 @@ fn compact_sibling_frame_gaps(
             if siblings.len() < 2 {
                 continue;
             }
-            // Recompute drawn frames each round — a deeper compact may have
-            // moved members that change parent envelopes.
             let drawn = drawn_frame_x_extents(&group_path, &group_members, size_of, cross);
-            compact_one_sibling_set(siblings, &drawn, plan, cross);
+            compact_one_sibling_set(siblings, &drawn, &group_ranks, plan, cross);
         }
     }
 }
@@ -564,6 +563,7 @@ fn drawn_frame_x_extents(
 fn compact_one_sibling_set(
     groups: &BTreeSet<String>,
     drawn: &BTreeMap<String, (f64, f64)>,
+    group_ranks: &BTreeMap<String, BTreeSet<u32>>,
     plan: &PlanGraph,
     cross: &mut [f64],
 ) {
@@ -579,35 +579,58 @@ fn compact_one_sibling_set(
             .unwrap_or(std::cmp::Ordering::Equal)
             .then(a.0.cmp(&b.0))
     });
-    for i in 0..frames.len().saturating_sub(1) {
-        let left_right = frames[i].2;
-        let right_left = frames[i + 1].1;
-        // Signed: >0 excess slack (slide left), <0 shortfall (slide right).
-        let adjust = right_left - left_right - GROUP_FRAME_GAP;
-        if adjust.abs() <= 1e-6 {
+
+    // Per-rank right frontier: a group only clears prior groups that share a
+    // rank (y-overlap). Disjoint-rank siblings are free to share an x-band.
+    let mut max_right_per_rank: BTreeMap<u32, f64> = BTreeMap::new();
+
+    for i in 0..frames.len() {
+        let g = frames[i].0.clone();
+        let left = frames[i].1;
+        let Some(ranks) = group_ranks.get(&g) else {
             continue;
-        }
-        let shift_groups: BTreeSet<&str> =
-            frames[i + 1..].iter().map(|(g, _, _)| g.as_str()).collect();
-        // Virtuals keyed off the pre-adjust right frame edge.
-        let virt_gate = right_left;
-        for (e_idx, elem) in plan.elems.iter().enumerate() {
-            let move_it = match &elem.key {
-                ElemKey::Real(_) => elem
-                    .group_path
-                    .iter()
-                    .any(|g| shift_groups.contains(g.as_str())),
-                ElemKey::GroupBoundary { group, .. } => shift_groups.contains(group.as_str()),
-                ElemKey::Virtual { .. } => cross[e_idx] >= virt_gate - 1e-6,
-                ElemKey::OrderPad { .. } => false,
-            };
-            if move_it {
-                cross[e_idx] -= adjust;
+        };
+        let relevant_max = ranks
+            .iter()
+            .filter_map(|r| max_right_per_rank.get(r))
+            .copied()
+            .fold(f64::NEG_INFINITY, f64::max);
+        if relevant_max.is_finite() {
+            let target = relevant_max + GROUP_FRAME_GAP;
+            // >0: too far right of target → slide left; <0: too close → slide right.
+            let adjust = left - target;
+            if adjust.abs() > 1e-6 {
+                let shift_groups: BTreeSet<&str> =
+                    frames[i..].iter().map(|(name, _, _)| name.as_str()).collect();
+                let virt_gate = left;
+                for (e_idx, elem) in plan.elems.iter().enumerate() {
+                    let move_it = match &elem.key {
+                        ElemKey::Real(_) => elem
+                            .group_path
+                            .iter()
+                            .any(|gg| shift_groups.contains(gg.as_str())),
+                        ElemKey::GroupBoundary { group, .. } => {
+                            shift_groups.contains(group.as_str())
+                        }
+                        ElemKey::Virtual { .. } => cross[e_idx] >= virt_gate - 1e-6,
+                        ElemKey::OrderPad { .. } => false,
+                    };
+                    if move_it {
+                        cross[e_idx] -= adjust;
+                    }
+                }
+                for f in frames.iter_mut().skip(i) {
+                    f.1 -= adjust;
+                    f.2 -= adjust;
+                }
             }
         }
-        for f in frames.iter_mut().skip(i + 1) {
-            f.1 -= adjust;
-            f.2 -= adjust;
+        let right_now = frames[i].2;
+        for r in ranks {
+            max_right_per_rank
+                .entry(*r)
+                .and_modify(|v| *v = v.max(right_now))
+                .or_insert(right_now);
         }
     }
 }
