@@ -20,9 +20,13 @@ mod metric;
 mod model;
 mod orient;
 mod params;
+mod strong_macro;
 
 pub use debug::{build_debug_trace, LayoutDebugTrace};
 pub use group_frame::{GROUP_FRAME_GAP, GROUP_LABEL_TOP_PAD, GROUP_PAD};
+pub use ink::verify::{
+    group_penetration_violations, verify_no_group_penetration, GroupPenetrationViolation,
+};
 
 use plotgram_algo::orientation::{self as algo_orient, Orientation as AlgoOrientation};
 use plotgram_engine_api::{
@@ -32,7 +36,7 @@ use plotgram_model::diagnostics::{HierarchicalObs, LayoutDiagnostics};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::port::{AlongSpec, PortRef};
 use plotgram_model::result::{EdgePath, EdgePlacement, NodePlacement};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub use params::{
     BindResult, GroupPolicy, HierarchicalParams, HierarchicalPreset,
@@ -40,7 +44,7 @@ pub use params::{
 };
 
 use model::ElemKey;
-use compose::ports::ResolvedPort;
+use compose::ports::{EdgePorts, ResolvedPort};
 use orient::{from_algo_point, to_algo_point, to_algo_size};
 use std::cell::Cell;
 
@@ -73,7 +77,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
 
     // Diagnostics exit (roadmap phase C): bind warnings surface here instead
     // of being dropped; hard failures above/below stay hard failures.
-    let mut diagnostics = LayoutDiagnostics {
+    let diagnostics = LayoutDiagnostics {
         warnings: bound
             .warnings
             .iter()
@@ -86,12 +90,6 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         hierarchical: None,
     };
 
-    if params.group_policy == GroupPolicy::StrongMacro {
-        return Err(LayoutError::message(
-            "hierarchical: group_policy `strong-macro` is Unsupported in this build \
-             (see docs/design/layout/hierarchical/phases/strong-macro.md)",
-        ));
-    }
     if matches!(params.routing_style, RoutingStyle::Octilinear) {
         return Err(LayoutError::message(
             "hierarchical routing_style `octilinear` is not implemented yet",
@@ -100,9 +98,55 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
 
     let orientation = orient::to_algo_orientation(params.orientation);
 
-    // --- Compose ---------------------------------------------------
+    // FAS runs once per policy; the StrongMacro front branches right after
+    // (its ranking happens per block / super-graph, never globally).
     let mut real_graph = compose::graph_index::build_real_graph(input.graph);
     compose::cycle::remove_cycles(&mut real_graph);
+    let canonical_size = canonical_sizes(&real_graph, input.node_sizes, orientation)?;
+
+    if params.group_policy == GroupPolicy::StrongMacro {
+        let (real_graph, plan, ports, end_bundles, frames, labeled) = strong_macro::layout(
+            input, params, orientation, real_graph, &canonical_size,
+        )?;
+        // D1.2: Channel search + rip-up; BundlePlan (end-bus + optional corridor).
+        let route_plan =
+            channel::route_edges_channel(&plan, &real_graph, &ports, &end_bundles, params)?;
+        return compute_channel_ink_tail(
+            input,
+            params,
+            orientation,
+            diagnostics,
+            real_graph,
+            plan,
+            ports,
+            &labeled,
+            canonical_size,
+            route_plan,
+            TailFrames::Fixed(frames),
+        );
+    }
+
+    compute_weak(
+        input,
+        params,
+        orientation,
+        diagnostics,
+        real_graph,
+        canonical_size,
+    )
+}
+
+/// Weak policy: global Sugiyama compose → Metric (`J(x)` + VPSC) → shared
+/// Channel/Ink tail.
+fn compute_weak<'g>(
+    input: LayoutInput<'g>,
+    params: &HierarchicalParams,
+    orientation: algo_orient::Orientation,
+    diagnostics: LayoutDiagnostics,
+    mut real_graph: model::RealGraph,
+    canonical_size: Vec<algo_orient::Size>,
+) -> Result<(LayoutOutput, debug::Captures<'g>), LayoutError> {
+    // --- Compose ---------------------------------------------------
     let ranks = compose::rank::assign_ranks(&real_graph)?;
     // Undirected edges: zero-span ones bypass ordering/properify/channel into
     // `intra_layer` (Ink side-links); the rest flow as normal downward edges.
@@ -117,24 +161,8 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     compose::boundary::insert_group_boundaries(&mut plan);
     compose::order::order_layers(&mut plan, &edge_weights, params.group_boundary_weight);
 
-    // MetricBudget board: group-shell + channel LayerGap demands publish
-    // before freeze (write-authority H3); the group shell bands also feed the
-    // Cross-track writer below so lanes never pierce frame pads.
-    let mut demand_board = demand::DemandBoard::new();
+    // Group ids carrying a label (frame top pad reserves the label band).
     let labeled = collect_labeled_groups(&input.graph.groups);
-
-    // Canonical node sizes are needed before port finalize (FIXED_POS
-    // boundary validation) — measured sizes, never invented.
-    let mut canonical_size = vec![algo_orient::Size::new(0.0, 0.0); real_graph.ids.len()];
-    for (i, id) in real_graph.ids.iter().enumerate() {
-        let size = input
-            .node_sizes
-            .get(id)
-            .ok_or_else(|| plotgram_model::MissingNodeSize {
-                node_id: id.clone(),
-            })?;
-        canonical_size[i] = orientation.to_tb_size(to_algo_size(size));
-    }
 
     let port_assignment = compose::ports::assign_ports(
         &real_graph,
@@ -143,42 +171,28 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         params.auto_edge_grouping,
     )?;
     let compose::ports::PortAssignment {
-        mut ports,
+        ports,
         bundles: end_bundles,
     } = port_assignment;
 
-    // --- Metric ------------------------------------------------------
-    let size_of = |elem_idx: usize| -> algo_orient::Size {
-        match &plan.elems[elem_idx].key {
-            ElemKey::Real(id) => canonical_size[real_graph.index_of[id]],
-            ElemKey::Virtual { .. } | ElemKey::GroupBoundary { .. } | ElemKey::OrderPad { .. } => {
-                algo_orient::Size::new(0.0, 0.0)
-            }
-        }
-    };
-
     // D1.2: Channel search + rip-up; BundlePlan (end-bus + optional corridor).
+    // Runs before the preliminary Metric solve — the original weak ordering,
+    // preserved bit-for-bit (weak outputs must not move).
     let route_plan =
         channel::route_edges_channel(&plan, &real_graph, &ports, &end_bundles, params)?;
-    diagnostics.relaxations.extend(route_plan.relaxations.iter().cloned());
-    let mut bus_edge_ids: Vec<String> = compose::bundle::end_bus_edge_ids(&route_plan.bundles)
-        .into_iter()
-        .collect();
-    bus_edge_ids.sort();
-    diagnostics.hierarchical = Some(HierarchicalObs {
-        channel_used_gates: route_plan.used_gates,
-        ripup_rounds: route_plan.ripup_rounds,
-        bus_edge_ids,
-    });
-    compose::verify::verify_plan(&plan, &real_graph, &ports, &route_plan)?;
 
+    // --- Metric (preliminary pass) ----------------------------------
     // Preliminary main (base layer_gap) so cross-axis pass-2 can expand
     // port anchors; TrackOrder then reads pixel X and Demand expands gaps.
+    // The DemandBoard solve + final frames happen inside the shared tail
+    // (TrackOrder must exist before demand publishes).
     let prelim_gaps: Vec<f64> = if plan.layers.len() > 1 {
         vec![params.layer_gap; plan.layers.len() - 1]
     } else {
         Vec::new()
     };
+    let size_of =
+        |elem_idx: usize| -> algo_orient::Size { elem_size(&plan, &real_graph, &canonical_size, elem_idx) };
     let main_prelim =
         metric::main_axis::assign_main_axis(&plan, &size_of, &prelim_gaps, params.layer_alignment);
     // Infeasibility here can only come from crossing BK blocks — a bug, not
@@ -197,7 +211,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
 
     let prelim_frames: Vec<Rect> = (0..plan.elems.len())
         .map(|i| {
-            let s = size_of(i);
+            let s = elem_size(&plan, &real_graph, &canonical_size, i);
             Rect::new(
                 cross[i] - s.width / 2.0,
                 main_prelim[i],
@@ -207,55 +221,165 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         })
         .collect();
 
-    // Twin N/S corridors: absolute port lanes (expectations §6.2 / port-lanes.md).
-    // Must run after cross frames exist; before TrackOrder / Ink read anchors.
-    metric::port_lane::apply_port_lanes(
-        &plan,
-        &real_graph,
-        &mut ports,
-        &prelim_frames,
-        params.edge_gap,
-    );
-
-    // D1.1 TrackOrder (L3) on substrate tracks from pixel spans.
-    let track_order = compose::track_order::assign_track_order(
-        &plan,
-        &real_graph,
-        &ports,
-        &prelim_frames,
-        &route_plan.bundles,
-        &route_plan,
-    );
-    // D1.3.4 MetricBudget DemandBoard: Channel lane counts + group shell
-    // bands → LayerGap, then freeze (the band demand is track-count aware,
-    // so it publishes after TrackOrder).
-    demand::publish_channel_layer_gap_demand(
-        &mut demand_board,
-        &track_order,
-        params.layer_gap,
-        params.edge_gap,
-    );
-    demand::publish_group_layer_gap_demand(
-        &mut demand_board,
-        &plan,
+    compute_channel_ink_tail(
+        input,
+        params,
+        orientation,
+        diagnostics,
+        real_graph,
+        plan,
+        ports,
         &labeled,
-        &track_order,
-        params.edge_gap,
-    );
-    demand_board.freeze();
-    let layer_gaps =
-        demand::resolved_layer_gaps(plan.layers.len(), params.layer_gap, &demand_board);
-    let main =
-        metric::main_axis::assign_main_axis(&plan, &size_of, &layer_gaps, params.layer_alignment);
+        canonical_size,
+        route_plan,
+        TailFrames::WeakSolve {
+            prelim_frames,
+            prelim_cross: cross,
+        },
+    )
+}
 
-    let canonical_frames: Vec<Rect> = (0..plan.elems.len())
-        .map(|i| {
-            let s = size_of(i);
-            Rect::new(cross[i] - s.width / 2.0, main[i], s.width, s.height)
-        })
+/// How the shared tail obtains final canonical frames.
+enum TailFrames {
+    /// Weak: prelim frames feed PortLanes/TrackOrder; the DemandBoard then
+    /// resolves layer gaps and the final main-axis solve produces frames.
+    /// `prelim_cross` is the raw VPSC cross vector, passed through untouched
+    /// (re-deriving it from `x + w/2` is not float-identical and flips
+    /// downstream tie-breaks — weak output must stay bit-stable).
+    WeakSolve {
+        prelim_frames: Vec<Rect>,
+        prelim_cross: Vec<f64>,
+    },
+    /// StrongMacro: the macro-block writer already placed every frame
+    /// (strong-macro.md §5.2 — the tail never re-solves coordinates).
+    Fixed(Vec<Rect>),
+}
+
+/// Shared Channel → TrackOrder → Bus → Ink → assemble tail, policy-agnostic
+/// (strong-macro.md §5.1: the existing tail runs with no policy branch; only
+/// the frame source differs).
+#[allow(clippy::too_many_arguments)]
+fn compute_channel_ink_tail<'g>(
+    input: LayoutInput<'g>,
+    params: &HierarchicalParams,
+    orientation: algo_orient::Orientation,
+    mut diagnostics: LayoutDiagnostics,
+    real_graph: model::RealGraph,
+    plan: model::PlanGraph,
+    mut ports: BTreeMap<String, EdgePorts>,
+    labeled: &BTreeSet<String>,
+    canonical_size: Vec<algo_orient::Size>,
+    route_plan: channel::ChannelRoutePlan,
+    frames: TailFrames,
+) -> Result<(LayoutOutput, debug::Captures<'g>), LayoutError> {
+    let size_of =
+        |elem_idx: usize| -> algo_orient::Size { elem_size(&plan, &real_graph, &canonical_size, elem_idx) };
+    diagnostics.relaxations.extend(route_plan.relaxations.iter().cloned());
+    let mut bus_edge_ids: Vec<String> = compose::bundle::end_bus_edge_ids(&route_plan.bundles)
+        .into_iter()
         .collect();
+    bus_edge_ids.sort();
+    diagnostics.hierarchical = Some(HierarchicalObs {
+        channel_used_gates: route_plan.used_gates,
+        ripup_rounds: route_plan.ripup_rounds,
+        bus_edge_ids,
+    });
+    compose::verify::verify_plan(&plan, &real_graph, &ports, &route_plan)?;
 
-    let shell_bands = group_frame::group_shell_bands(&plan, &labeled);
+    let (main, cross, canonical_frames, track_order) = match frames {
+        TailFrames::WeakSolve {
+            prelim_frames,
+            prelim_cross,
+        } => {
+            // Twin N/S corridors: absolute port lanes (expectations §6.2 /
+            // port-lanes.md). Must run after cross frames exist; before
+            // TrackOrder / Ink read anchors.
+            metric::port_lane::apply_port_lanes(
+                &plan,
+                &real_graph,
+                &mut ports,
+                &prelim_frames,
+                params.edge_gap,
+            );
+
+            // D1.1 TrackOrder (L3) on substrate tracks from pixel spans.
+            let track_order = compose::track_order::assign_track_order(
+                &plan,
+                &real_graph,
+                &ports,
+                &prelim_frames,
+                &route_plan.bundles,
+                &route_plan,
+            );
+            // D1.3.4 MetricBudget DemandBoard: Channel lane counts + group
+            // shell bands → LayerGap, then freeze (the band demand is
+            // track-count aware, so it publishes after TrackOrder).
+            let mut demand_board = demand::DemandBoard::new();
+            demand::publish_channel_layer_gap_demand(
+                &mut demand_board,
+                &track_order,
+                params.layer_gap,
+                params.edge_gap,
+            );
+            demand::publish_group_layer_gap_demand(
+                &mut demand_board,
+                &plan,
+                labeled,
+                &track_order,
+                params.edge_gap,
+            );
+            demand_board.freeze();
+            let layer_gaps =
+                demand::resolved_layer_gaps(plan.layers.len(), params.layer_gap, &demand_board);
+            let main = metric::main_axis::assign_main_axis(
+                &plan,
+                &size_of,
+                &layer_gaps,
+                params.layer_alignment,
+            );
+            let canonical_frames: Vec<Rect> = (0..plan.elems.len())
+                .map(|i| {
+                    let s = size_of(i);
+                    Rect::new(prelim_frames[i].x, main[i], s.width, s.height)
+                })
+                .collect();
+            (main, prelim_cross, canonical_frames, track_order)
+        }
+        TailFrames::Fixed(canonical_frames) => {
+            metric::port_lane::apply_port_lanes(
+                &plan,
+                &real_graph,
+                &mut ports,
+                &canonical_frames,
+                params.edge_gap,
+            );
+            // StrongMacro: TrackOrder reads the final (macro-placed) frames.
+            let track_order = compose::track_order::assign_track_order(
+                &plan,
+                &real_graph,
+                &ports,
+                &canonical_frames,
+                &route_plan.bundles,
+                &route_plan,
+            );
+            let main: Vec<f64> = canonical_frames.iter().map(|f| f.y).collect();
+            let cross: Vec<f64> = (0..plan.elems.len())
+                .map(|i| canonical_frames[i].x + size_of(i).width / 2.0)
+                .collect();
+            (main, cross, canonical_frames, track_order)
+        }
+    };
+
+    let shell_bands = group_frame::group_shell_bands(&plan, labeled);
+    // SM-4: StrongMacro outer Main rails must clear group envelopes (finalize
+    // pad contract) so long-haul returns never ride inside a foreign group
+    // frame. Weak passes nothing (bit-stable).
+    let group_obstacles: Vec<(f64, f64, f64, f64)> =
+        if params.group_policy == GroupPolicy::StrongMacro {
+            canonical_group_obstacles(&input.graph.groups, &plan, &canonical_frames)
+        } else {
+            Vec::new()
+        };
     let (track_coords, track_relaxations) = metric::track::assign_track_coords(
         &plan,
         &main,
@@ -265,6 +389,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         &route_plan,
         &shell_bands,
         params.edge_gap,
+        &group_obstacles,
     );
     diagnostics.relaxations.extend(track_relaxations);
 
@@ -458,6 +583,41 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     ))
 }
 
+/// Canonical (TB) node sizes, dense over `real_graph.ids` — measured sizes,
+/// never invented.
+fn canonical_sizes(
+    real_graph: &model::RealGraph,
+    node_sizes: &plotgram_model::sizes::NodeSizes,
+    orientation: algo_orient::Orientation,
+) -> Result<Vec<algo_orient::Size>, LayoutError> {
+    let mut out = vec![algo_orient::Size::new(0.0, 0.0); real_graph.ids.len()];
+    for (i, id) in real_graph.ids.iter().enumerate() {
+        let size = node_sizes
+            .get(id)
+            .ok_or_else(|| plotgram_model::MissingNodeSize {
+                node_id: id.clone(),
+            })?;
+        out[i] = orientation.to_tb_size(to_algo_size(size));
+    }
+    Ok(out)
+}
+
+/// Element size: real nodes carry measured size; every zero-width elem
+/// (virtual / boundary / pad) contributes none.
+fn elem_size(
+    plan: &model::PlanGraph,
+    real_graph: &model::RealGraph,
+    canonical_size: &[algo_orient::Size],
+    elem_idx: usize,
+) -> algo_orient::Size {
+    match &plan.elems[elem_idx].key {
+        ElemKey::Real(id) => canonical_size[real_graph.index_of[id]],
+        ElemKey::Virtual { .. } | ElemKey::GroupBoundary { .. } | ElemKey::OrderPad { .. } => {
+            algo_orient::Size::new(0.0, 0.0)
+        }
+    }
+}
+
 /// Group ids carrying a label (recursive — nested groups included); their
 /// frame top pad reserves the label band.
 fn collect_labeled_groups(groups: &[plotgram_model::graph::Group]) -> std::collections::BTreeSet<String> {
@@ -472,6 +632,65 @@ fn collect_labeled_groups(groups: &[plotgram_model::graph::Group]) -> std::colle
     }
     walk(groups, &mut out);
     out
+}
+
+/// Canonical-space group envelopes replicating the engine finalize pad
+/// contract (member frames ∪ nested envelopes, +GROUP_PAD on each side,
+/// label band on top). Outer Main rails clear these so a full-height
+/// return corridor never rides inside a foreign group frame (SM-4).
+fn canonical_group_obstacles(
+    groups: &[plotgram_model::graph::Group],
+    plan: &model::PlanGraph,
+    canonical_frames: &[Rect],
+) -> Vec<(f64, f64, f64, f64)> {
+    let mut out = Vec::new();
+    collect_group_obstacles(groups, plan, canonical_frames, &mut out);
+    out
+}
+
+fn collect_group_obstacles(
+    groups: &[plotgram_model::graph::Group],
+    plan: &model::PlanGraph,
+    canonical_frames: &[Rect],
+    out: &mut Vec<(f64, f64, f64, f64)>,
+) {
+    for g in groups {
+        let nested_start = out.len();
+        collect_group_obstacles(&g.groups, plan, canonical_frames, out);
+
+        let mut min_x = f64::INFINITY;
+        let mut min_y = f64::INFINITY;
+        let mut max_x = f64::NEG_INFINITY;
+        let mut max_y = f64::NEG_INFINITY;
+        let mut union = |r: Rect| {
+            min_x = min_x.min(r.x);
+            min_y = min_y.min(r.y);
+            max_x = max_x.max(r.right());
+            max_y = max_y.max(r.bottom());
+        };
+        for n in &g.nodes {
+            if let Some(&ei) = plan.index_of.get(&ElemKey::Real(n.id.clone())) {
+                union(canonical_frames[ei]);
+            }
+        }
+        for &(l, t, r, b) in &out[nested_start..] {
+            union(Rect::new(l, t, r - l, b - t));
+        }
+        if !min_x.is_finite() {
+            continue; // no placed content — finalize emits no frame either
+        }
+        let top_pad = if g.label.is_some() {
+            group_frame::GROUP_LABEL_TOP_PAD
+        } else {
+            group_frame::GROUP_PAD
+        };
+        out.push((
+            min_x - group_frame::GROUP_PAD,
+            min_y - top_pad,
+            max_x + group_frame::GROUP_PAD,
+            max_y + group_frame::GROUP_PAD,
+        ));
+    }
 }
 
 /// Canonical resolved port → physical [`PortRef`] (orientation-out pass).

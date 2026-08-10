@@ -74,11 +74,12 @@
 
 ### 4.2 缺口
 
-- `group_policy: strong-macro` → 硬失败（`mod.rs`）  
-- 无 intra / super-graph / macro-block / expand 模块  
-- 无与 Weak 共享的「收缩 meta → 展开」IR  
+- ~~`group_policy: strong-macro` → 硬失败（`mod.rs`）~~ **SM-0 已解绑**：入口分派 `strong_macro::layout(...)`  
+- ~~无 intra / super-graph / macro-block / expand 模块~~ **SM-1 已落地**（顶层-only）；嵌套递归 **SM-2 已落地**  
+- ~~无与 Weak 共享的「收缩 meta → 展开」IR~~ **SM-1 形态落地**：`strong_macro` 内部 IR（`IntraResult`/`Block`）不泄漏到 Ink，expand 产出与 Weak 同一 `PlanGraph` schema，共享 Channel/Ink 尾部（`compute_channel_ink_tail`；orchestrator 经 `TailFrames` / `group_obstacles` 等 hook 注入 Strong 定帧，`channel/`/`ink/` 内不读 policy）  
 - `group_sizing` / `group_align` 已从 params 删除（曾 Unsupported）；Strong 第一期**不**恢复，避免空字段  
-- `verify_no_group_penetration` 仍未做（D₂/E 可共享验收）
+- ~~`verify_no_group_penetration` 仍未做（D₂/E 可共享验收）~~ **SM-4 已落地**（`ink/verify.rs`，经 crate 根导出；hier_eval 穿组门禁 strong 硬 / weak 观测）
+- ~~跨组边进目标函数 / DemandBoard 行间 gap（SM-3）~~ **SM-3 已落地**（macro 行对齐 soft 项 + `MacroRowGap`/`MacroColGap` demand）；architecture profile 默认 strong（SM-4）**本轮决定不做**（选型说明见 expectations.md）
 
 ### 4.3 典型验收图（Strong 应对齐的观感）
 
@@ -125,7 +126,10 @@ Graph + HierarchicalParams{ group_policy: strong-macro }
 └──────────────────────────────────────────────────────────────┘
         │
         ▼
-既有 Metric 尾 / Channel / Ink / finalize（无 policy 分支）
+共享 Channel / Ink / finalize 尾部（`compute_channel_ink_tail`）
+  · `channel/` / `ink/` **模块内**禁止读 `group_policy`
+  · orchestrator 可经参数化 hook 注入 Strong 定帧：
+    `TailFrames::Fixed`、`group_obstacles`（外轨避让）等
 ```
 
 ### 5.2 写权表（Strong 路径）
@@ -146,7 +150,7 @@ Graph + HierarchicalParams{ group_policy: strong-macro }
 3. **禁止** 组内另起一套 Sugiyama 委托栈——共享主算法（rank / order / `symmetry_objective`）。  
 4. **禁止** `diagram_type` / architecture recipe 耦合；mode 与 hub 语义只经 profile → params。  
 5. **禁止** 全局可变 override 传 sizing。  
-6. **禁止** Ink / Channel 读取 `group_policy` 分支。
+6. **禁止** Ink / Channel 模块内读取 `group_policy` 分支（orchestrator 参数化 hook 除外，见 §5.1 尾部）。
 
 ### 5.4 与 Weak finalize 双 pad 的关系
 
@@ -161,12 +165,12 @@ Strong 路径上框由 SM-C 一次写定（成员内容 + 一层 pad + label ban
 
 **目标**：`group_policy: strong-macro` 不再硬失败；走空壳分支并落入同一 `LayoutOutput` 类型。
 
-- [ ] `mod.rs`：Strong 入口改为调用 `strong_macro::layout(...)`（可先 stub 转调 Weak 并打 `relaxation`/`warning`，但 **禁止静默当 Weak**——stub 阶段保留显式 `Unsupported` **或** 明确的 `strong-macro-stub` diagnostics；推荐直接 SM-1 最小闭环，不做假 stub）  
-- [ ] 模块落点：`hierarchical/strong_macro/{mod,intra,super_graph,macro_block,expand}.rs`  
-- [ ] 文档/错误信息指向本文，不再指向 mvp-scope「本轮不做」  
-- [ ] `params_hash` 已含 `group_policy`（已有）— 加一条 bind 测试：`strong-macro` 可解析
+- [x] `mod.rs`：Strong 入口改为调用 `strong_macro::layout(...)`（可先 stub 转调 Weak 并打 `relaxation`/`warning`，但 **禁止静默当 Weak**——stub 阶段保留显式 `Unsupported` **或** 明确的 `strong-macro-stub` diagnostics；推荐直接 SM-1 最小闭环，不做假 stub）  
+- [x] 模块落点：`hierarchical/strong_macro/{mod,intra,super_graph,macro_block,expand}.rs`  
+- [x] 文档/错误信息指向本文，不再指向 mvp-scope「本轮不做」  
+- [x] `params_hash` 已含 `group_policy`（已有）— 加一条 bind 测试：`strong-macro` 可解析
 
-**验收**：单元测试 bind + 入口可区分 policy；showcase 指定 strong 时行为可预期（失败信息或真布局）。
+**验收**：单元测试 bind + 入口可区分 policy；showcase 指定 strong 时行为可预期（失败信息或真布局）。✅ 按推荐项未做假 stub，骨架直接由 SM-1 实现填充。
 
 ### SM-1 · 顶层-only 最小闭环（主切片，约 1–2 周）
 
@@ -180,6 +184,11 @@ Strong 路径上框由 SM-C 一次写定（成员内容 + 一层 pad + label ban
 4. **Expand**：平移到全局；填 `PlanGraph`（或先填 `LayoutResult` 节点/组 frame，若 Compose 全量 Plan 过重——**优先仍产出 Plan**，以便 Channel 复用）。  
 5. Channel/Ink：复用现有路径；Gate 不完善时可 fallback，但须打 relaxation。
 
+**状态（2026-08-10）✅ 已落地**，含两个实施中新增的必要机制（未见于初版方案，补记）：
+
+- **块级 FAS**（`super_graph::break_block_cycles`）：节点级 FAS 后工作图无环，但块聚合后可重新成环（泳道回边）；须在超图上再跑一次 `greedy_fas`，翻转选中块对间实际边的 working 方向并 toggle `e.reversed`（Ink `chain_in_original_order` 依赖），`original_*` 不动。
+- **走廊隔离**（`intra::layout_intra` isolate）：块级 FAS 翻转边的两个 working 端点若与兄弟共享局部层，侧廊进场段必穿透兄弟；故该两端点在组内求解时各移入底部独占层。
+
 **非目标**：递归嵌套、equal-track、`group_align`、穿组 verifier、跨组边进组内 J。
 
 **验收图**：
@@ -192,9 +201,17 @@ Strong 路径上框由 SM-C 一次写定（成员内容 + 一层 pad + label ban
 
 **目标**：组树后序；容器组 = 子 macro 的 super + 堆叠；`stress.layout-stress-nested` 云端内子网。
 
-- [ ] `layout_intra_group_recursive` 形状（共享算法栈，无第二 Sugiyama）  
-- [ ] 子框进入父内容区；父 macro 装箱含嵌套  
-- [ ] 展开后全局 key 稳定、确定性（禁止 `HashMap` 迭代序）
+- [x] `layout_intra_group_recursive` 形状（共享算法栈，无第二 Sugiyama）  
+- [x] 子框进入父内容区；父 macro 装箱含嵌套  
+- [x] 展开后全局 key 稳定、确定性（禁止 `HashMap` 迭代序）
+
+**状态（2026-08-10）✅ 已落地**，实施要点（对初版方案的必要具体化，补记）：
+
+- **Block 树递归**：嵌套组自身即 macro block；容器块 scope entries = 子组块 + 直属成员节点单块（声明序：节点先于子组）。节点归属最深块；空组整棵跳过（与 finalize 不画空框一致）。
+- **SM-B 作用域化**（`super_graph::break_scope_cycles` / `assign_scope_ranks`）：slot 映射（`scope_slots` 沿 parent 链解析嵌套后代）；每作用域（容器后序 → 顶层）独立块级 FAS + super ranks；走廊隔离端点集跨作用域累积。
+- **SM-C 递归**（`macro_block::place_scope` + `propagate_origins`）：后序 pack（容器包络 = 已定子框并集）+ 行堆叠（每层同一 mechanics）；全局内容原点自顶向下累积。finalize `union(成员 ∪ 子框) + pad` 逐层还原框树（一圈 pad/层，§5.4 不变）。
+- **SM-D**（`expand::block_layers`）：容器行按 **band 式 offset** 展开（每行起于前序行全深之后，空层留白）——这是跨行边 span ≥ 1 的必要条件，与顶层 band 同一论证；层序归一按 top-block section + `(edge_id, ordinal)` 确定性排序。
+- **验证**：顶层-only 几何 bit 级不变（SM-1 快照原样通过）；weak 75 条 baseline 相对 SM-2 前重建版零变化；新增 strong `stress.layout-stress-nested`（3 层嵌套 + 跨边界回边）进常规硬门禁；showcase 81 张全 ok。
 
 **验收**：`stress.layout-stress-nested` Strong 下父子框无错误重叠；嵌套 label 可读。
 
@@ -202,17 +219,33 @@ Strong 路径上框由 SM-C 一次写定（成员内容 + 一层 pad + label ban
 
 **目标**：消灭「先定框再 nudge」压力。
 
-- [ ] 超边 / 跨组边对 intra 或 macro 定位的 soft 项（typed 权重进 params）  
-- [ ] 行间 / 行内 gap 下限由边计数经 DemandBoard 发布（替换 Atlas 经验 `*8/*12` 常量）  
-- [ ] 仍禁止 post-expand 改组内坐标
+- [x] 超边 / 跨组边对 intra 或 macro 定位的 soft 项（typed 权重进 params）  
+- [x] 行间 / 行内 gap 下限由边计数经 DemandBoard 发布（替换 Atlas 经验 `*8/*12` 常量）  
+- [x] 仍禁止 post-expand 改组内坐标
+
+**状态（2026-08-11）✅ 已落地**，soft 项按「intra 或 macro 二选一」取 **macro 行对齐**（intra 不动）：
+
+- **params**：`macro_align_weight`（默认 1.0；`0` = 纯居中回退 SM-2 形态）进 Default / bind / `params_hash`；weak 从不读 → weak 几何不变。
+- **Demand**：`MacroRowGap(r)`（scope 内 macro 行缝）/ `MacroColGap(k)`（行内相邻 entry）两 key；producer `publish_macro_pair_demand` 以 `base + min((count−1)×edge_gap, 4×edge_gap)` 发布（`MACRO_DEMAND_MAX_EXTRA_LANES = 4`，以 edge_gap 车道计价替代 Atlas 经验 `CROSS_EDGE_GROUP_GAP_SCALE=8.0` 等常量）。
+- **边计数**：每 scope 复用 `scope_slots`，real edge 两端 slot 均 Some 且不同 → pair `(min,max)` 计数 + `e.weight` 权重和（含无向边——demand 是路由关注点非定序）。
+- **SM-C 消费**：`place_rows` 先发布需求 → freeze → 行缝 gap = `max(max(layer_gap, GROUP_FRAME_GAP), seam demand)`（跨空行取区间最大值）、行内邻接 gap = `max(GROUP_FRAME_GAP, col demand)`。同行 col demand **仅**计 row-adjacent entry 对（声明序同 rank 且中间无同 rank 槽）；跨槽长边不加宽中间邻接。  
+- **行对齐 sweep**：`J = Σ w_ab × ((o_a + cx_a) − (o_b + cx_b))²`，自由变量 = 行 offset（块中心与行 offset 无关，差值中相消）；固定 8 趟 Gauss-Seidel（rank 升序），每趟后首个非空行钉回 0（消平移零空间），落框前再 `min_x` 归一；起点 = SM-2 居中结果 → 无跨行边时 bit 级不变（顶层-only 快照原样通过证明居中是对齐 J 的不动点）。写权不变：SM-C 仍是唯一框写者，无 post-expand nudge。  
+- **端口写权（SM-D）**：叶块 intra 的端口 **side** 喂局部 VPSC；expand 后全局 `assign_ports` 负责跨块边与 Ordered/clusters，再 `reconcile_intra_port_sides` 把同叶块边的 side 写回，避免 Channel 与已定坐标分叉。
+- **验证**：行缝/行内 gap 随边数单调增 + 封顶表驱动单测；对齐吸引 + `macro_align_weight: 0` 回退（bind + 几何断言）；嵌套 fixture bit-identical；weak 75 条零变化（SM-3 前重建 baseline 对比），strong 仅 5 条按预期变化。
 
 ### SM-4 · 加固与产品化（持续）
 
-- [ ] architecture profile 默认或显式展开 `group_policy: strong-macro`（解析层，禁引擎图种分支）  
-- [ ] `verify_no_group_penetration`（可与 D₂ 共用实现）  
-- [ ] hier_eval / showcase 门禁：Strong 代表图对齐指标  
-- [ ] 文档：Weak vs Strong 选型说明进 expectations 或 README  
+- [ ] architecture profile 默认或显式展开 `group_policy: strong-macro`（解析层，禁引擎图种分支）——**本轮决定不做**：选型说明进 expectations.md，profile 默认切换留待 strong 语料更大后评估
+- [x] `verify_no_group_penetration`（可与 D₂ 共用实现）  
+- [x] hier_eval / showcase 门禁：Strong 代表图对齐指标  
+- [x] 文档：Weak vs Strong 选型说明进 expectations 或 README  
 - [ ] （可选）再评估 D₂：Weak 路径框真源；Strong 路径保持 MacroBlockWriter
+
+**状态（2026-08-11）✅ 门禁与 verifier 已落地**：
+
+- **verifier**：`ink/verify.rs` `verify_no_group_penetration(edges, groups, allowed)` + 清单形态 `group_penetration_violations`（门禁选硬/软）；语义对齐 v1 substrate L6：段进入「两端点组祖先链之外」组框**开内部**即违规（OBSTACLE_INSET 容差，边界擦过不算）；经 `hierarchical/mod.rs` → crate 根导出，供 plotgram-compile 侧与未来 D₂ 共用。
+- **hier_eval 门禁**：① 穿组——全 fixture 计算，source 含 `group_policy: strong-macro` 硬失败清单，否则打印观测（D₂ 欠账：weak 11 张 fixture 存量穿组，最深 ~190px，如实观测不清零）；② 组包含——子组框 ⊆ 父组框（EPS 容差）硬门禁，finalize 契约决定它恒真，作回归护栏。
+- **存量修复**：strong 2 处穿组（swimlane-recruitment e4 / swimlane-order-process e6）根因 = 外侧回边 Main 竖轨只避节点体不避组框，落在组框 GROUP_PAD 带内 8px；修法 = strong 路径把 finalize pad 契约的组包络（`canonical_group_obstacles`）并入外轨 `clear_outside` 避让（weak 传空表 → bit 不变）；修复后 strong 清零，附 `outer_main_rail_clears_group_envelope` 单测。
 
 ---
 
@@ -274,3 +307,7 @@ ExpandMeta  { block_of: GroupId → MacroBlockId, origin_of: ... }
 | 日期 | 说明 |
 |------|------|
 | 2026-08-10 | 初版：汇总资料、与 Weak/D₂ 边界、SM-0..4 推进步骤；取代「仅 mvp-scope 写不做」的指向 |
+| 2026-08-10 | SM-0 + SM-1 落地：入口分派、共享尾部分拆（`compute_channel_ink_tail`，weak 零变化按「HEAD 重建 vs 当前重建 baseline」对齐验证——注意 checked-in baseline 的观测项存在环境差异，bend gate 只硬管 max_bends/sum/reversed/gates）；`symmetry_objective` compact/snap 守卫为 Weak-only；新增块级 FAS（`break_block_cycles`）与走廊隔离两个计划外机制（见 §6 SM-1 状态）；hier_eval 删除 `expects_strong_macro_unsupported` 特判，5 张 strong fixture 进常规硬门禁与 baseline；showcase render 80 张全 ok |
+| 2026-08-10 | SM-2 嵌套递归落地：Block 树递归 + SM-B 作用域化（块级 FAS/走廊隔离下沉到每层容器）+ SM-C 递归装箱堆叠 + SM-D band 式行 offset（见 §6 SM-2 状态）；顶层-only 几何 bit 级不变，weak baseline 零变化（SM-2 前重建 vs 当前重建对比）；新增 strong `stress.layout-stress-nested` 进硬门禁，baseline 81 条；showcase render 81 张全 ok |
+| 2026-08-11 | SM-3 + SM-4 落地（见 §6 状态补记）：SM-3 `macro_align_weight` 行对齐 sweep + `MacroRowGap`/`MacroColGap` demand（edge_gap 车道计价，封顶 4 车道）；SM-4 `verify_no_group_penetration` + hier_eval 双门禁（穿组 strong 硬/weak 观测 + 组包含恒真护栏）+ strong 2 处存量穿组经外轨组包络避让清零；architecture profile 默认本轮不改（选型说明进 expectations.md）；weak 75 条零变化（SM-3 前重建 baseline 对比），strong 5 条预期变化（缝变宽 / overlap_len 大降 / relaxations 减少） |
+| 2026-08-10 | 评审修：组内端口 side 经 `reconcile_intra_port_sides` 写回全局；expand 虚拟插值 `span==0` 防护；`align_rows` 每趟钉首行；同行 col demand 仅 row-adjacent；文档明确共享尾 + `TailFrames`/`group_obstacles` orchestrator hook |

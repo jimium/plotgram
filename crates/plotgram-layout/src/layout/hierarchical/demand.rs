@@ -15,6 +15,12 @@ use crate::layout::hierarchical::model::PlanGraph;
 pub enum DemandKey {
     /// Main-axis gap between layer `r` and `r+1` (px lower bound).
     LayerGap(u32),
+    /// StrongMacro scope-local: main-axis gap between macro rows `r` and
+    /// `r+1` (px lower bound; one board per scope — SM-3).
+    MacroRowGap(u32),
+    /// StrongMacro scope-local: cross-axis gap between adjacent entries
+    /// `k` and `k+1` within one macro row (px lower bound; SM-3).
+    MacroColGap(u32),
 }
 
 /// Max-merge demand board with a single freeze epoch (MetricBudget).
@@ -138,6 +144,48 @@ pub fn resolved_layer_gaps(
         }
     }
     gaps
+}
+
+/// Cap on demand-driven gap expansion (in `edge_gap` lanes). Replaces the
+/// Atlas-era empirical pixel constants (v1 `CROSS_EDGE_GROUP_GAP_SCALE = 8.0`
+/// / `CROSS_EDGE_PAIR_VERTICAL_GAP_SCALE = 10.0` with `MAX_EXTRA = 56.0`):
+/// lanes are priced at the shared `edge_gap` pitch and bounded, so demand
+/// scales with routing vocabulary instead of magic numbers (SM-3).
+pub const MACRO_DEMAND_MAX_EXTRA_LANES: u32 = 4;
+
+/// StrongMacro producer (SM-3): cross-group edge counts between macro rows /
+/// adjacent row entries → gap lower bounds on a scope-local board.
+///
+/// `row_counts` maps seam index `r` (gap between macro rows `r` and `r+1`)
+/// to the number of edges crossing it; `col_counts` maps the earlier slot
+/// index of a **row-adjacent** entry pair (gap between that entry and the
+/// next same-rank entry in declaration order) likewise. Formula per
+/// gap: `base + min((count − 1) × edge_gap, 4 × edge_gap)` — one free lane
+/// fits in the base gap, every extra edge buys one `edge_gap` lane, capped.
+pub fn publish_macro_pair_demand(
+    board: &mut DemandBoard,
+    row_gap_base: f64,
+    col_gap_base: f64,
+    row_counts: &BTreeMap<u32, usize>,
+    col_counts: &BTreeMap<u32, usize>,
+    edge_gap: f64,
+) {
+    let extra = |count: usize| {
+        ((count.saturating_sub(1)) as f64 * edge_gap)
+            .min(MACRO_DEMAND_MAX_EXTRA_LANES as f64 * edge_gap)
+    };
+    for (&seam, &count) in row_counts {
+        if count <= 1 {
+            continue;
+        }
+        board.publish(DemandKey::MacroRowGap(seam), row_gap_base + extra(count));
+    }
+    for (&adj, &count) in col_counts {
+        if count <= 1 {
+            continue;
+        }
+        board.publish(DemandKey::MacroColGap(adj), col_gap_base + extra(count));
+    }
 }
 
 #[cfg(test)]
@@ -280,5 +328,29 @@ mod tests {
     fn resolve_before_freeze_panics() {
         let board = DemandBoard::new();
         let _ = resolved_layer_gaps(2, 40.0, &board);
+    }
+
+    #[test]
+    fn macro_pair_demand_grows_with_edge_count_and_caps() {
+        // Table: count → expected MacroRowGap / MacroColGap demand.
+        let row_base = 40.0;
+        let col_base = 24.0;
+        let edge_gap = 16.0;
+        let cases: &[(usize, f64, f64)] = &[
+            (1, row_base, col_base),          // single edge → no demand raise
+            (2, row_base + 16.0, col_base + 16.0),
+            (5, row_base + 64.0, col_base + 64.0), // cap = 4 lanes
+            (99, row_base + 64.0, col_base + 64.0), // cap holds
+        ];
+        for &(count, want_row, want_col) in cases {
+            let mut board = DemandBoard::new();
+            let rows = [(0, count)].into_iter().collect();
+            let cols = [(0, count)].into_iter().collect();
+            publish_macro_pair_demand(&mut board, row_base, col_base, &rows, &cols, edge_gap);
+            let row = board.get(DemandKey::MacroRowGap(0)).unwrap_or(row_base);
+            let col = board.get(DemandKey::MacroColGap(0)).unwrap_or(col_base);
+            assert_eq!(row, want_row, "row count {count}");
+            assert_eq!(col, want_col, "col count {count}");
+        }
     }
 }

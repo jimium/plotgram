@@ -32,6 +32,12 @@ impl TrackCoords {
 /// line must map the same lane index to the same Y so gate crossings stay
 /// collinear (channel-d1 §5.1). Returns soft relaxations for shell-band
 /// fallbacks (lanes could not stay inside the band-free sub-interval).
+///
+/// `group_obstacles`: group envelope frames (finalize pad contract,
+/// canonical space). Only the **outer** Main lanes clear them — outer lanes
+/// are the long-haul return corridors, and a full-height rail inside a
+/// foreign group frame is a penetration (strong-macro.md §6 SM-4). Inner
+/// lanes keep node-only clearance. Weak passes an empty list (bit-stable).
 pub fn assign_track_coords(
     plan: &PlanGraph,
     main: &[f64],
@@ -41,6 +47,7 @@ pub fn assign_track_coords(
     route_plan: &ChannelRoutePlan,
     shell: &GroupShellBands,
     edge_gap: f64,
+    group_obstacles: &[(f64, f64, f64, f64)],
 ) -> (TrackCoords, Vec<Relaxation>) {
     // Real-node frames for Main-lane clearance (InkVerifier node-penetration).
     let mut obstacles: Vec<(f64, f64, f64, f64)> = Vec::new(); // l,t,r,b
@@ -160,17 +167,23 @@ pub fn assign_track_coords(
                 // outer columns), never on a node center — otherwise a
                 // full-height Main rail penetrates intermediate nodes.
                 let og = t.line;
+                let max_cols = plan.layers.iter().map(|l| l.len()).max().unwrap_or(0);
                 let mut backbone =
                     main_line_backbone_x(plan, cross_centers, size_of, og, edge_gap);
                 backbone = clear_main_x(backbone, &obstacles, edge_gap);
-                let max_cols = plan.layers.iter().map(|l| l.len()).max().unwrap_or(0);
+                // Outer rails additionally clear group envelopes (SM-4).
+                let outer = og == 0 || og >= max_cols;
+                if outer {
+                    backbone = clear_outside(backbone, &obstacles, group_obstacles, edge_gap);
+                }
                 let ys: Vec<f64> = if og == 0 {
                     // West outer: pack further left so parallel returns stay outside.
                     (0..count)
                         .map(|i| {
-                            clear_main_x(
+                            clear_outside(
                                 backbone - i as f64 * edge_gap,
                                 &obstacles,
+                                group_obstacles,
                                 edge_gap,
                             )
                         })
@@ -179,9 +192,10 @@ pub fn assign_track_coords(
                     // East outer: pack further right.
                     (0..count)
                         .map(|i| {
-                            clear_main_x(
+                            clear_outside(
                                 backbone + i as f64 * edge_gap,
                                 &obstacles,
+                                group_obstacles,
                                 edge_gap,
                             )
                         })
@@ -318,6 +332,25 @@ fn clear_main_x(x: f64, obstacles: &[(f64, f64, f64, f64)], edge_gap: f64) -> f6
     x
 }
 
+/// Outer-rail clearance: [`clear_main_x`] against node bodies **and** group
+/// envelopes, iterated to a fixpoint (pushing out of a group can land
+/// inside a node projection further out, and vice versa).
+fn clear_outside(
+    mut x: f64,
+    obstacles: &[(f64, f64, f64, f64)],
+    group_obstacles: &[(f64, f64, f64, f64)],
+    edge_gap: f64,
+) -> f64 {
+    for _ in 0..16 {
+        let next = clear_main_x(clear_main_x(x, obstacles, edge_gap), group_obstacles, edge_gap);
+        if next == x {
+            return x;
+        }
+        x = next;
+    }
+    x
+}
+
 /// Clear a parked Cross lane Y out of every node's Y-projection, always
 /// pushing away from the stack (`below` = parked under the last rank).
 /// Repeats until clear — the pushed position can land inside a taller row's
@@ -428,6 +461,7 @@ mod tests {
                 &route_plan,
                 &shell,
                 16.0,
+                &[],
             );
             assert_eq!(
                 &coords.coords[&t_wide],
@@ -520,5 +554,90 @@ mod tests {
             x <= 0.0 - 4.0 + 1e-9 || x >= 190.0 + 4.0 - 1e-9,
             "must escape merged block, got {x}"
         );
+    }
+
+    /// SM-4: an East-outer Main rail whose node-only clearance parks it in
+    /// a group's pad band must move outside the group envelope.
+    #[test]
+    fn outer_main_rail_clears_group_envelope() {
+        let elems = vec![
+            Elem {
+                key: ElemKey::Real("a".into()),
+                group_path: vec![],
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Real("b".into()),
+                group_path: vec![],
+                rank: 1,
+            },
+        ];
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: (0..2).collect(),
+            segments: vec![],
+            layers: vec![vec![0], vec![1]],
+        };
+        // East-outer Main track (order gap 1 >= max_cols 1).
+        let mut sub = Substrate::new();
+        let t_main = sub.alloc_track_id();
+        sub.add_track(t_main, TrackOrient::Main, None, 1.0, 1, (0, 1))
+            .unwrap();
+        let route_plan = ChannelRoutePlan {
+            substrate: sub,
+            index: BlueprintIndex::default(),
+            routes: BTreeMap::new(),
+            bundles: vec![],
+            relaxations: vec![],
+            ripup_rounds: 0,
+            used_gates: false,
+            route_order: vec![],
+        };
+        let track_order = TrackOrderPlan {
+            assignments: BTreeMap::new(),
+            track_counts: [(t_main, 1)].into_iter().collect(),
+            rank_gap_track_counts: BTreeMap::new(),
+            cross_line_lane_counts: BTreeMap::new(),
+        };
+        let shell = GroupShellBands {
+            gap: vec![(0.0, 0.0)],
+            outer_top: 0.0,
+            outer_bottom: 0.0,
+        };
+        // Node bodies [0,20]×two rows; group envelope extends to x=36.
+        let group_env = vec![(0.0, -24.0, 36.0, 130.0)];
+        let (with_group, _) = assign_track_coords(
+            &plan,
+            &[0.0, 100.0],
+            &[10.0, 10.0],
+            &|_| Size::new(20.0, 10.0),
+            &track_order,
+            &route_plan,
+            &shell,
+            16.0,
+            &group_env,
+        );
+        // Node-only backbone is 28 (east face 20 + margin 8) — inside the
+        // envelope; clearance pushes past 36 + margin.
+        assert_eq!(with_group.coords[&t_main], vec![44.0]);
+        // Without group obstacles the rail stays at the node-only backbone.
+        let (no_group, _) = assign_track_coords(
+            &plan,
+            &[0.0, 100.0],
+            &[10.0, 10.0],
+            &|_| Size::new(20.0, 10.0),
+            &track_order,
+            &route_plan,
+            &shell,
+            16.0,
+            &[],
+        );
+        assert_eq!(no_group.coords[&t_main], vec![28.0]);
     }
 }

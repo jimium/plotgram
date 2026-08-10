@@ -19,7 +19,7 @@ use crate::layout::hierarchical::metric::symmetry::{
     twin_plan_pairs, unique_min_span_primary,
 };
 use crate::layout::hierarchical::model::{BoundarySide, Elem, ElemKey, PlanGraph, RealGraph};
-use crate::layout::hierarchical::params::HierarchicalParams;
+use crate::layout::hierarchical::params::{GroupPolicy, HierarchicalParams};
 
 const REAL_WEIGHT: f64 = 1.0;
 const VIRTUAL_WEIGHT: f64 = 4.0;
@@ -203,9 +203,14 @@ pub fn solve_symmetry_objective(
     // VPSC separation only lower-bounds the gap between clamps. Clamps with no
     // J(x) neighbors can park in that slack and shove the next group across
     // empty space (drawn frames still hug members). Close leftover inter-frame
-    // slack without touching the hard constraint set.
-    compact_sibling_frame_gaps(plan, size_of, &mut cross);
-    snap_boundaries_to_members(plan, size_of, &mut cross);
+    // slack without touching the hard constraint set. Weak-only hemostasis:
+    // under StrongMacro the macro-block writer owns frame geometry and local
+    // plans carry no boundary clamps (strong-macro.md §5.3 / §8 — compact
+    // stays on the Weak path).
+    if params.group_policy == GroupPolicy::Weak {
+        compact_sibling_frame_gaps(plan, size_of, &mut cross);
+        snap_boundaries_to_members(plan, size_of, &mut cross);
+    }
     Ok(cross)
 }
 

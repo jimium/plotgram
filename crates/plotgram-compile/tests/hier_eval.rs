@@ -14,6 +14,10 @@
 //!   node frame boundary (the port anchor, not just "near" it);
 //! - orthogonal edge segments must not penetrate the open interior of any
 //!   non-endpoint node (same rule as InkVerifier);
+//! - group gates (strong-macro.md §6 SM-4): nested group frames stay inside
+//!   their parent (hard, all grouped fixtures), and `group_policy:
+//!   strong-macro` fixtures must have zero edge/group penetration (weak
+//!   fixtures print the count as an observation);
 //! - a self-contained segment-intersection crossing count and max-bend count
 //!   are printed per file as an informational regression signal (not a hard
 //!   failure — a dense graph legitimately has crossings).
@@ -50,7 +54,7 @@
 //! rejected→submit same-face East corridor (no overshoot past submit East);
 //! check→approved stays near left leaf (not canvas x≈0).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -58,7 +62,9 @@ use plotgram_compile::{
     build_debug_trace, build_layout, compute_hier_metrics, node_gap_from_source, BuildOptions,
     CrossAxis,
 };
+use plotgram_layout::group_penetration_violations;
 use plotgram_model::geometry::{Point, Rect};
+use plotgram_model::graph::{Edge as ModelEdge, Group as ModelGroup};
 use plotgram_model::port::{AlongSpec, Side};
 use plotgram_model::result::LayoutResult;
 use serde_json::{json, Value};
@@ -187,29 +193,9 @@ fn hierarchical_showcase_geometry_invariants() {
             .display()
             .to_string();
         let source = fs::read_to_string(path).unwrap();
-        let macro_baseline = expects_strong_macro_unsupported(&source);
         let result = match build_layout(&source, &BuildOptions::default()) {
-            Ok(r) => {
-                if macro_baseline {
-                    hard_failures.push(format!(
-                        "{name}: expected `strong-macro` Unsupported but layout succeeded"
-                    ));
-                    continue;
-                }
-                r
-            }
+            Ok(r) => r,
             Err(e) => {
-                if macro_baseline {
-                    // Baseline fixture for the upcoming macro contract: only
-                    // the Unsupported boundary is asserted; it carries no
-                    // metrics / baseline entry until the policy lands.
-                    if !e.to_string().contains("Unsupported") {
-                        hard_failures.push(format!(
-                            "{name}: expected `strong-macro` Unsupported, got: {e}"
-                        ));
-                    }
-                    continue;
-                }
                 hard_failures.push(format!("{name}: pipeline error: {e}"));
                 continue;
             }
@@ -218,6 +204,7 @@ fn hierarchical_showcase_geometry_invariants() {
         check_no_node_overlaps(&name, &result, &mut hard_failures);
         check_orthogonal_and_ports(&name, &source, &result, &mut hard_failures);
         check_no_edge_node_penetration(&name, &source, &result, &mut hard_failures);
+        check_group_gates(&name, &source, &result, &mut hard_failures);
         let reversed_count = match build_debug_trace(&source, &BuildOptions::default()) {
             Ok(trace) => serde_json::to_value(&trace)
                 .ok()
@@ -292,13 +279,6 @@ fn hierarchical_showcase_geometry_invariants() {
         "hard geometric invariant violations:\n{}",
         hard_failures.join("\n")
     );
-}
-
-/// `group-strong-macro/` fixtures declare the upcoming macro policy; until it
-/// is implemented they only pin the Unsupported contract (no metrics).
-fn expects_strong_macro_unsupported(source: &str) -> bool {
-    source.contains("group_policy: strong-macro")
-        || source.contains("group_policy: strong_macro")
 }
 
 fn check_no_node_overlaps(name: &str, result: &LayoutResult, failures: &mut Vec<String>) {
@@ -436,6 +416,122 @@ fn segment_hits_rect_interior(a: Point, b: Point, frame: Rect, inset: f64) -> bo
         x0 < right - EPS && x1 > left + EPS
     } else {
         false
+    }
+}
+
+/// SM-4 group gates (strong-macro.md §6):
+/// - containment (hard, every grouped fixture): each nested group frame
+///   must fit inside its parent frame — the finalize union+pad contract
+///   makes this structurally true, so the gate is a regression guardrail;
+/// - penetration: `group_policy: strong-macro` fixtures hard-fail on any
+///   edge segment entering a group frame outside its endpoints' group
+///   ancestor chains; every other fixture only prints the violation count
+///   (D₂ backlog — the Weak path has no no-penetration contract yet).
+fn check_group_gates(
+    name: &str,
+    source: &str,
+    result: &LayoutResult,
+    failures: &mut Vec<String>,
+) {
+    if result.groups.is_empty() {
+        return;
+    }
+    let Ok(parsed) = plotgram_parse::parse(source) else {
+        return;
+    };
+    let graph = &parsed.graph;
+
+    let frame_of: BTreeMap<&str, Rect> = result
+        .groups
+        .iter()
+        .map(|g| (g.id.as_str(), g.frame))
+        .collect();
+
+    // --- containment: child group frame ⊆ parent group frame -------------
+    group_containment(&graph.groups, &frame_of, name, failures);
+
+    // --- penetration: endpoint ancestor chains whitelist ------------------
+    let mut chain_of: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    collect_group_chains(&graph.groups, &mut BTreeSet::new(), &mut chain_of);
+    let mut all_edges: Vec<&ModelEdge> = graph.edges.iter().collect();
+    collect_group_edges(&graph.groups, &mut all_edges);
+    let mut allowed: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for e in all_edges {
+        let mut set = BTreeSet::new();
+        if let Some(c) = chain_of.get(&e.source) {
+            set.extend(c.iter().cloned());
+        }
+        if let Some(c) = chain_of.get(&e.target) {
+            set.extend(c.iter().cloned());
+        }
+        allowed.insert(e.id.clone(), set);
+    }
+    let violations = group_penetration_violations(&result.edges, &result.groups, &allowed);
+    if violations.is_empty() {
+        return;
+    }
+    if source.contains("group_policy: strong-macro") {
+        for v in &violations {
+            failures.push(format!(
+                "{name}: edge `{}` penetrates group `{}` (strong-macro gate)",
+                v.edge, v.group
+            ));
+        }
+    } else {
+        println!(
+            "{name}: [observed] {} group penetration violation(s) (D₂ backlog)",
+            violations.len()
+        );
+    }
+}
+
+fn group_containment(
+    groups: &[ModelGroup],
+    frame_of: &BTreeMap<&str, Rect>,
+    name: &str,
+    failures: &mut Vec<String>,
+) {
+    for g in groups {
+        if let Some(&parent) = frame_of.get(g.id.as_str()) {
+            for c in &g.groups {
+                if let Some(&child) = frame_of.get(c.id.as_str()) {
+                    if child.x < parent.x - EPS
+                        || child.right() > parent.right() + EPS
+                        || child.y < parent.y - EPS
+                        || child.bottom() > parent.bottom() + EPS
+                    {
+                        failures.push(format!(
+                            "{name}: group `{}` frame escapes parent `{}`",
+                            c.id, g.id
+                        ));
+                    }
+                }
+            }
+        }
+        group_containment(&g.groups, frame_of, name, failures);
+    }
+}
+
+/// `node_id → group ancestor chain` (inclusive of the host group).
+fn collect_group_chains(
+    groups: &[ModelGroup],
+    chain: &mut BTreeSet<String>,
+    chain_of: &mut BTreeMap<String, BTreeSet<String>>,
+) {
+    for g in groups {
+        chain.insert(g.id.clone());
+        for n in &g.nodes {
+            chain_of.insert(n.id.clone(), chain.clone());
+        }
+        collect_group_chains(&g.groups, chain, chain_of);
+        chain.remove(&g.id);
+    }
+}
+
+fn collect_group_edges<'a>(groups: &'a [ModelGroup], out: &mut Vec<&'a ModelEdge>) {
+    for g in groups {
+        out.extend(g.edges.iter());
+        collect_group_edges(&g.groups, out);
     }
 }
 

@@ -10,12 +10,13 @@
 //! - The segment adjacent to each port must run along the port's outward
 //!   normal (v1 audit E1 direction clause; ink-and-verification.md §4).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use plotgram_algo::orientation::Side;
 use plotgram_engine_api::LayoutError;
 use plotgram_model::diagnostics::Relaxation;
 use plotgram_model::geometry::{Point, Rect};
+use plotgram_model::result::{EdgePlacement, GroupPlacement};
 
 use crate::layout::hierarchical::compose::bundle::{edges_share_bundle, BundlePlan};
 use crate::layout::hierarchical::ink::route::{CanonicalEdge, InkPath};
@@ -379,6 +380,120 @@ pub fn segment_hits_rect_interior(a: Point, b: Point, frame: Rect) -> bool {
     }
 }
 
+/// One group-penetration violation found by [`group_penetration_violations`].
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct GroupPenetrationViolation {
+    pub edge: String,
+    pub group: String,
+}
+
+/// List form of [`verify_no_group_penetration`] so gates can choose
+/// hard-fail vs observation (strong-macro.md §6 SM-4).
+///
+/// Semantics mirror the v1 substrate L6 checker: an edge segment entering
+/// the **open interior** of a group frame is a violation unless the group
+/// is on either endpoint's group-ancestor chain (`allowed`, computed by the
+/// caller from the parsed graph — descendants of a foreign group are never
+/// whitelisted here). Boundary grazing does not count (OBSTACLE_INSET).
+pub fn group_penetration_violations(
+    edges: &[EdgePlacement],
+    groups: &[GroupPlacement],
+    allowed: &BTreeMap<String, BTreeSet<String>>,
+) -> Vec<GroupPenetrationViolation> {
+    let mut out = Vec::new();
+    for e in edges {
+        let pts = e.path.samples();
+        if pts.len() < 2 {
+            continue;
+        }
+        for g in groups {
+            if let Some(chain) = allowed.get(&e.id) {
+                if chain.contains(&g.id) {
+                    continue;
+                }
+            }
+            let hit = pts
+                .windows(2)
+                .any(|w| segment_hits_open_rect(w[0], w[1], g.frame));
+            if hit {
+                out.push(GroupPenetrationViolation {
+                    edge: e.id.clone(),
+                    group: g.id.clone(),
+                });
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// Hard gate over [`group_penetration_violations`]: any violation fails the
+/// run with the deterministic violation list.
+pub fn verify_no_group_penetration(
+    edges: &[EdgePlacement],
+    groups: &[GroupPlacement],
+    allowed: &BTreeMap<String, BTreeSet<String>>,
+) -> Result<(), LayoutError> {
+    let violations = group_penetration_violations(edges, groups, allowed);
+    if violations.is_empty() {
+        return Ok(());
+    }
+    let head: Vec<String> = violations
+        .iter()
+        .take(5)
+        .map(|v| format!("edge `{}` into group `{}`", v.edge, v.group))
+        .collect();
+    let more = violations.len().saturating_sub(head.len());
+    let suffix = if more > 0 {
+        format!(" (+{more} more)")
+    } else {
+        String::new()
+    };
+    Err(LayoutError::message(format!(
+        "hierarchical: {} edge/group penetration violation(s): {}{suffix} \
+         (strong-macro.md §6 SM-4)",
+        violations.len(),
+        head.join("; ")
+    )))
+}
+
+/// General-segment variant of [`segment_hits_rect_interior`]: true when the
+/// closed segment `a → b` (any orientation) meets the open interior of
+/// `frame`. Parametric t-interval intersection with the inset rectangle.
+fn segment_hits_open_rect(a: Point, b: Point, frame: Rect) -> bool {
+    let left = frame.x + OBSTACLE_INSET;
+    let right = frame.right() - OBSTACLE_INSET;
+    let top = frame.y + OBSTACLE_INSET;
+    let bottom = frame.bottom() - OBSTACLE_INSET;
+    if left >= right || top >= bottom {
+        return false;
+    }
+    let (Some(x), Some(y)) = (
+        open_axis_t_interval(a.x, b.x, left, right),
+        open_axis_t_interval(a.y, b.y, top, bottom),
+    ) else {
+        return false;
+    };
+    x.0 <= y.1 && y.0 <= x.1
+}
+
+/// t ∈ [0,1] where the axis projection `p0 → p1` lies strictly inside
+/// `(lo, hi)`; `None` = never inside.
+fn open_axis_t_interval(p0: f64, p1: f64, lo: f64, hi: f64) -> Option<(f64, f64)> {
+    let d = p1 - p0;
+    if d.abs() <= f64::EPSILON {
+        return (p0 > lo && p0 < hi).then_some((0.0, 1.0));
+    }
+    let mut t_lo = (lo - p0) / d;
+    let mut t_hi = (hi - p0) / d;
+    if t_lo > t_hi {
+        std::mem::swap(&mut t_lo, &mut t_hi);
+    }
+    t_lo = t_lo.max(0.0);
+    t_hi = t_hi.min(1.0);
+    (t_lo <= t_hi).then_some((t_lo, t_hi))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -386,6 +501,7 @@ mod tests {
     use crate::layout::hierarchical::compose::ports::ResolvedPort;
     use plotgram_algo::orientation::Side;
     use plotgram_model::port::AlongSpec;
+    use plotgram_model::result::EdgePath;
 
     fn edge(id: &str, source: &str, target: &str, pts: Vec<Point>) -> CanonicalEdge {
         edge_sides(id, source, target, Side::South, Side::South, pts)
@@ -671,5 +787,70 @@ mod tests {
                 );
             }
         }
+    }
+
+    fn placed_edge(id: &str, pts: Vec<Point>) -> EdgePlacement {
+        EdgePlacement {
+            id: id.into(),
+            source: "a".into(),
+            target: "b".into(),
+            path: EdgePath::polyline(pts),
+            from_port: None,
+            to_port: None,
+        }
+    }
+
+    fn group_at(id: &str, frame: Rect) -> GroupPlacement {
+        GroupPlacement {
+            id: id.into(),
+            frame,
+        }
+    }
+
+    #[test]
+    fn group_penetration_detects_crossing_and_respects_allowed() {
+        let groups = vec![group_at("g1", Rect::new(0.0, 0.0, 100.0, 100.0))];
+        // Straight through g1's interior.
+        let cross = vec![placed_edge(
+            "e0",
+            vec![
+                Point { x: 50.0, y: -20.0 },
+                Point { x: 50.0, y: 120.0 },
+            ],
+        )];
+        let v = group_penetration_violations(&cross, &groups, &BTreeMap::new());
+        assert_eq!(
+            v,
+            vec![GroupPenetrationViolation {
+                edge: "e0".into(),
+                group: "g1".into()
+            }]
+        );
+        assert!(verify_no_group_penetration(&cross, &groups, &BTreeMap::new()).is_err());
+
+        // Same edge with g1 on an endpoint's ancestor chain → legal.
+        let mut allowed = BTreeMap::new();
+        allowed.insert("e0".to_string(), BTreeSet::from(["g1".to_string()]));
+        assert!(group_penetration_violations(&cross, &groups, &allowed).is_empty());
+
+        // Grazing along the frame boundary is not penetration.
+        let graze = vec![placed_edge(
+            "e1",
+            vec![
+                Point { x: 0.0, y: -20.0 },
+                Point { x: 0.0, y: 120.0 },
+            ],
+        )];
+        assert!(group_penetration_violations(&graze, &groups, &BTreeMap::new()).is_empty());
+
+        // Segment ending exactly on the boundary (port entry) is fine.
+        let into = vec![placed_edge(
+            "e2",
+            vec![
+                Point { x: 50.0, y: -20.0 },
+                Point { x: 50.0, y: 0.0 },
+            ],
+        )];
+        assert!(group_penetration_violations(&into, &groups, &BTreeMap::new()).is_empty());
     }
 }

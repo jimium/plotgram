@@ -1,0 +1,59 @@
+// Layout Stress: Nested Groups & Cross-Routing (strong-macro)
+// SM-2 验收：3 层嵌套 + 跨边界回边（mq → async_worker）在嵌套递归下的
+// 父子框包含、兄弟框分离与确定性（美观可妥协；正确性/确定性仍硬盯）。
+diagram {
+    profile: architecture,
+    title: "布局测试：深度嵌套分组与跨组路由",
+    layout: hierarchical { group_policy: strong-macro }
+
+    group external {
+        label: "外部网络"
+        node client { label: "客户端终端", archetype: frontend }
+        node third_party { label: "第三方服务", archetype: external }
+    }
+
+    group cloud {
+        label: "云端基础设施"
+        group public_subnet {
+            label: "公有子网"
+            node gateway { label: "API 网关", archetype: gateway }
+            node lb { label: "负载均衡器", archetype: service }
+        }
+
+        group private_subnet {
+            label: "私有子网"
+            node auth_svc { label: "认证微服务", archetype: service }
+            node biz_svc { label: "核心业务服务", archetype: service }
+            node async_worker { label: "异步任务节点", archetype: service }
+        }
+
+        group data_subnet {
+            label: "数据子网"
+            node db_master { label: "主数据库", archetype: database }
+            node db_replica { label: "只读副本", archetype: database }
+            node redis { label: "Redis 集群", archetype: cache }
+            node mq { label: "消息队列 Kafka", archetype: queue }
+        }
+    }
+
+    // 常规层级流转
+    client -> gateway "HTTPS"
+    gateway -> lb
+    lb -> auth_svc
+    lb -> biz_svc
+
+    // 同组内交互
+    auth_svc -> redis "读写 Token"
+    biz_svc -> db_master "写数据"
+    biz_svc -> db_replica "读数据"
+    db_master -> db_replica "主从同步"
+
+    // 跨组与反向路由
+    biz_svc -> mq "发送事件"
+    mq -> async_worker "消费事件 (跨组回流)"
+    async_worker -> db_master "批量写入"
+
+    // 跨越多个边界的长边路由
+    biz_svc -> third_party "Webhook 通知 (穿透云端与VPC)"
+    client -> third_party "直接调用 (外部互联)"
+}

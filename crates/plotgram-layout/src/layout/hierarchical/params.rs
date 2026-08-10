@@ -179,6 +179,11 @@ pub struct HierarchicalParams {
     /// Soft bend budget; exceeding emits a relaxation (P5-5).
     pub max_bends_budget: u32,
     pub group_policy: GroupPolicy,
+    /// StrongMacro only: weight of the cross-group edge alignment term
+    /// `Σ w_ab × ((o_a + cx_a) − (o_b + cx_b))²` on macro row offsets
+    /// (strong-macro.md §6 SM-3). `0` = pure centering (SM-2 shape). The
+    /// Weak path never reads this field.
+    pub macro_align_weight: f64,
 }
 
 impl Default for HierarchicalParams {
@@ -204,6 +209,7 @@ impl Default for HierarchicalParams {
             route_w_cross: 3.0,
             max_bends_budget: 6,
             group_policy: GroupPolicy::Weak,
+            macro_align_weight: 1.0,
         }
     }
 }
@@ -398,6 +404,12 @@ impl HierarchicalParams {
         {
             params.group_policy = p;
         }
+        if let Some(v) = binder
+            .get_f64_any(&["macro_align_weight"])
+            .map_err(bind_err)?
+        {
+            params.macro_align_weight = v.max(0.0);
+        }
         Ok(BindResult {
             params,
             preset,
@@ -420,7 +432,7 @@ impl HierarchicalParams {
              routing_style={}|auto_edge_grouping={}|\
              min_first_segment={:e}|min_last_segment={:e}|port_stub={:e}|\
              route_w_bend={:e}|route_w_len={:e}|route_w_cross={:e}|max_bends_budget={}|\
-             group_policy={}",
+             group_policy={}|macro_align_weight={:e}",
             self.orientation.as_str(),
             self.node_gap,
             self.layer_gap,
@@ -441,6 +453,7 @@ impl HierarchicalParams {
             self.route_w_cross,
             self.max_bends_budget,
             self.group_policy.as_str(),
+            self.macro_align_weight,
         );
         format!("{:016x}", fnv1a_64(canonical.as_bytes()))
     }
