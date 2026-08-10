@@ -82,3 +82,4 @@ Sugiyama 骨架 + Atlas 三相写权（组合 → 度量 → Ink）。
 - [symmetry-axis](phases/symmetry-axis.md) — 次轴对称目标函数 J(x)（主链共线 ∩ 扇出对称）
 - [port-lanes](phases/port-lanes.md) — 双胞胎走廊端口绝对列（无 grid）
 - [ink-and-verification](phases/ink-and-verification.md) — Ink 纯展开与分相 verifier
+- [strong-macro](phases/strong-macro.md) — **StrongMacro 实现方案**（阶段 E）

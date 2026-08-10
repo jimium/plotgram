@@ -89,7 +89,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     if params.group_policy == GroupPolicy::StrongMacro {
         return Err(LayoutError::message(
             "hierarchical: group_policy `strong-macro` is Unsupported in this build \
-             (see docs/design/layout/hierarchical/notes/2026-08-02-mvp-scope.md §0.4)",
+             (see docs/design/layout/hierarchical/phases/strong-macro.md)",
         ));
     }
     if matches!(params.routing_style, RoutingStyle::Octilinear) {

@@ -129,7 +129,7 @@ pub struct GroupPlacement {
 | **Gate** | 组边界上「合法进出」口：外侧 segment ↔ 内侧 segment 配对 | Channel derive 注册 |
 | **ScopeMask** | 某条边允许走的 scope 集合（两端祖先链 ∪ 公共祖先） | Channel 搜索硬过滤 |
 | **channel-group-fallback** | 组矩形不纯 / 路由失败 → 退回 root Substrate，Gate 全无 | Channel；现有 relaxation |
-| **group_policy** | `weak`（默认，已落地）/ `strong-macro`（硬 `Unsupported`） | `params` |
+| **group_policy** | `weak`（默认，已落地）/ `strong-macro`（硬 `Unsupported`；方案 [phases/strong-macro.md](../phases/strong-macro.md)） | `params` |
 
 ### 3.1 Gate 是什么（重点）
 
@@ -208,7 +208,8 @@ Parse / Expand (@group → group_anchor)
 - 组靠「层内被边界夹住 + 跨层软拉齐」保持连续块  
 - 跨组路由靠 Gate  
 
-`group_policy: strong-macro`（组内分层 → macro → 回填）绑定即 **Unsupported**。
+`group_policy: strong-macro`（组内分层 → macro → 回填）绑定即 **Unsupported**。  
+现行实现方案见 [`phases/strong-macro.md`](../phases/strong-macro.md)（尚未开工；本表仍记现状）。
 
 ### 4.3 边界 dummy 的用意
 
@@ -241,7 +242,7 @@ fallback 后：`ScopeMask::unrestricted()`，Gate 边消失。
 | 组布局 | 递归子图 + 组框进求解 | Weak：全局 Sugiyama + 边界 dummy | 无递归子布局 |
 | 组框几何 | 求解变量（padding / title demand） | finalize 后验 bbox | 非 VPSC；`group_sizing` / `group_align` bind 即拒 |
 | 跨组路由 | 走廊 + gate 闭合 | Gate + ScopeMask（多数图）；部分 fallback | fallback 时等同无组；无穿透 verifier |
-| StrongMacro | 有 | `Unsupported` | 未实现 |
+| StrongMacro | 有 | `Unsupported`（方案：[phases/strong-macro.md](../phases/strong-macro.md)） | 未实现 |
 | 组间分离 | 求解保证 | 无 sibling separation | 兄弟框可重叠 |
 | `group_anchor` | 贴框、不参与分层 | 与普通 node 同等分层 | ADR-004 几何写权未闭合 |
 | PartitionGrid | 泳道/矩阵 | 模型有，Hier 未消费 | 与 group 正交，均后置 |
@@ -258,7 +259,7 @@ fallback 后：`ScopeMask::unrestricted()`，Gate 边消失。
 | Compose 连续性 | 边界 dummy + `restore_group_clamps` + 跨层软对齐 | rank 连续层硬约束；`GatePlan` 进 Plan IR |
 | Channel | cut_line + Gate + ScopeMask + `verify_route_scope` | `verify_no_group_penetration`；Gate 容量 → Metric |
 | 组框 | finalize 后验 bbox | **D₂**：VPSC 组框变量、sibling separation |
-| Policy | `weak` | `strong-macro`；`group_sizing` / `group_align` |
+| Policy | `weak` | `strong-macro`（方案：[phases/strong-macro.md](../phases/strong-macro.md)） |
 | 可观测性 | `channel-group-fallback` relaxation；`channel_used_gates` | hier_eval 对 fallback 率设硬门禁（评审建议） |
 
 ---
@@ -277,7 +278,8 @@ fallback 后：`ScopeMask::unrestricted()`，Gate 边消失。
 | `docs/design/layout/hierarchical/phases/ports-and-channel.md` | GatePlan 目标语义 |
 | `docs/design/layout/hierarchical/phases/channel-d1.md` | D1.0–D1.2；Gate 归属 D1.2 |
 | `docs/design/layout/hierarchical/notes/2026-08-08-hier-review.md` | fallback 因果链、启用率 |
-| `docs/design/layout/hierarchical/roadmap.md` | D₂ 组框写权 |
+| `docs/design/layout/hierarchical/roadmap.md` | D₂ 组框写权；阶段 E |
+| `docs/design/layout/hierarchical/phases/strong-macro.md` | **StrongMacro 实现方案（现行）** |
 
 ### 7.2 模型 / 解析
 

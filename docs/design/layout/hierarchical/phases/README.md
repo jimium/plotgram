@@ -16,6 +16,7 @@
 | [symmetry-axis](symmetry-axis.md) | 次轴对称目标函数 J(x)（主链共线 ∩ 扇出对称；P4） |
 | [port-lanes](port-lanes.md) | 双胞胎 N/S 走廊端口绝对列（无 grid；对照 yFiles PortAlignment） |
 | [ink-and-verification](ink-and-verification.md) | Ink 纯展开、规范化与分相 verifier |
+| [strong-macro](strong-macro.md) | **StrongMacro 实现方案**（阶段 E；与 Weak/D₂ 边界 + SM-0..4） |
 
 ## 共同格式
 

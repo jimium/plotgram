@@ -61,7 +61,7 @@ MVP ──► A 次轴拉直 ──► B 端口补齐 ──► C 诊断出口
 | **D₂** | M4 | 组框进求解；跨组只经 Gate |
 | **E** | M4+/M5/后置 | StrongMacro、PartitionGrid、integrated labeling |
 
-**约束**：A → B → C 顺序建议串行收口；**D₁ 与 D₂ 不要并行开两条**——先定产品主痛点（密边路由 vs 架构组框）再选。E 不挡 D 的主路径闭环。
+**约束**：A → B → C 顺序建议串行收口；**D₁ 与 D₂ 不要并行开两条**——先定产品主痛点（密边路由 vs 架构组框）再选。E 不挡 D 的主路径闭环。StrongMacro 现行方案见 [phases/strong-macro.md](phases/strong-macro.md)。
 
 ---
 
@@ -165,7 +165,7 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 
 | 项 | 方向摘要 |
 |----|----------|
-| **StrongMacro** | 组树后序局部 Plan → macro 进父层 → 展开为与 Weak **同一 Plan schema** |
+| **StrongMacro** | 组树后序局部 Plan → macro 进父层 → 展开为与 Weak **同一 Plan schema**。执行方案：[phases/strong-macro.md](phases/strong-macro.md) |
 | **PartitionGrid** | 引擎消费 cell / band；与 Orientation 轴语义一致；非 `group` 冒充泳道 |
 | **Bundle / auto_edge_grouping** | Compose 写合流事实；Ink 只接合干线 |
 | **Integrated labeling** | 至少 label 需求进 Demand；完整联合求解可渐进 |
@@ -194,6 +194,7 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 | [edge-parameters.md](edge-parameters.md) | 边参数支持研究（对照 yFiles Edges 分组）+ 分批实施路线 |
 | [phases/](phases/) | 相级可执行契约 |
 | [phases/channel-d1.md](phases/channel-d1.md) | D₁ Channel 分阶段契约（D1.0–D1.2） |
+| [phases/strong-macro.md](phases/strong-macro.md) | **StrongMacro 实现方案**（阶段 E；SM-0..4） |
 
 代码入口（重建）：`crates/plotgram-layout/src/layout/hierarchical/`。
 

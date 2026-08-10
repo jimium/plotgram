@@ -33,6 +33,8 @@
 
 禁止让后续 Metric/Ink 根据 policy 选择两套字段。
 
+实现方案与推进步骤：[strong-macro.md](strong-macro.md)。
+
 ## 3. Cycle removal
 
 主选 Greedy-FAS（ELS 骨架）+ **环 reroot**（环入口规则，[architecture.md](../architecture.md) §3.1）。输出：

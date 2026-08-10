@@ -27,7 +27,7 @@ v1 Atlas 是 [architecture.md §12](../architecture.md) 定义的「功能与坑
 | [channel-substrate.md](channel-substrate.md) | Substrate / Segment / Gate 数据结构 + 奇偶坐标编码 + B1–B8 切割 + 构建期防线 | §6.2 空间零件 |
 | [channel-search.md](channel-search.md) | 词典序 Dijkstra + ScopeMask 硬过滤 + LexCost + 有界 rip-up | §6.1 L2/L3 写权 |
 | [ink-verifier.md](ink-verifier.md) | InkPlanViolation 七类 + hard/soft 分割 + 双命中规则 | §11 InkVerifier |
-| [strong-macro-expansion.md](strong-macro-expansion.md) | intra-rank → super-graph → macro-block → phase-D 四步展开 | §8.2 Group policy |
+| [strong-macro-expansion.md](strong-macro-expansion.md) | intra-rank → super-graph → macro-block → phase-D 四步展开（**只读参考**；现行方案见 [phases/strong-macro.md](../phases/strong-macro.md)） | §8.2 Group policy |
 | [plan-ir-diff-fingerprint.md](plan-ir-diff-fingerprint.md) | Plan 字段 + Change 三态 diff + FNV-1a 稳定指纹 | §3.1 Plan IR |
 | [pipeline-phase-order.md](pipeline-phase-order.md) | solve.rs 三路径 + Main LP L0–L3 阶梯 + verify gate 位置 | §4 / §12 落地顺序 |
 | [group-invariants.md](group-invariants.md) | Containment / Sibling separation / verify_no_group_penetration | §6.3 三道防线 |

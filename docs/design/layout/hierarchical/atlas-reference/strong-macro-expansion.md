@@ -2,6 +2,7 @@
 
 > 父页：[atlas-reference/README.md](README.md)  
 > 对应新架构：[architecture.md §8.2 Group policy](../architecture.md)  
+> **现行实现方案**：[phases/strong-macro.md](../phases/strong-macro.md)  
 > Atlas 源：`crates/v1/plotgram-core/src/layout/atlas/dialect/contraction/strong_macro/{mod,intra,phase_d,super_graph,macro_block,intra_builder}.rs`
 
 ## 这是什么
@@ -126,6 +127,8 @@ adaptive_vertical_rank_gap(from_rank, from_pair) =
 10. **`set_override_for_solve` / `clear_override_for_solve`** `[v1-coupled]`：全局可变状态传 GroupSizing——并发不安全。
 
 ## 新实现建议
+
+> **现行实现方案真源**：[phases/strong-macro.md](../phases/strong-macro.md)（推进步骤 SM-0..4）。下文保留为 Atlas 对照要点；与 phases 文冲突时以 phases 为准。
 
 - **保留四步流程的拓扑**（intra → super → macro → expand），但每步用独立 Writer。
 - **intra 布局共享主算法栈**（NS + median + BK + VPSC），不另起 Sugiyama 委托。

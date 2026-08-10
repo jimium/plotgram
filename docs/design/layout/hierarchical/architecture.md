@@ -429,6 +429,9 @@ FREE 默认算法：按对侧端点的 `(layer, order, EdgeId)` 稳定排序，�
 
 目标：`contract → rank/order → expand` 同一套 Plan 类型；差异只在收缩策略与后续约束松紧。
 
+现行实现方案（推进步骤 SM-0..4、与 Weak/D₂ 边界）：[phases/strong-macro.md](phases/strong-macro.md)。  
+Atlas 四步形状（只读）：[atlas-reference/strong-macro-expansion.md](atlas-reference/strong-macro-expansion.md)。
+
 组树与跨 scope 边的最低不变量：
 
 1. 每个 real node 恰有一条 root→leaf scope path；组不可重叠归属。  
