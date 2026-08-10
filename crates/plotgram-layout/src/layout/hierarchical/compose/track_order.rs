@@ -2,9 +2,12 @@
 //!
 //! End-bus BundlePlan members are skipped (intentional bus collinearity).
 //! Cross-track lane counts feed LayerGap Demand via the track's rank-gap line.
-//! Main corridors colour by **rank occupancy** (half-open `[min_rank, max_rank+1)`);
-//! Cross corridors colour by cross-axis pixel span with **outer-first** nest
-//! keys (`min(order, count-1-order)`) so fan-out horizontals nest symmetrically.
+//! Main corridors colour by **rank occupancy** (half-open `[min_rank, max_rank+1)`).
+//! Cross corridors colour **per corridor line** (group cuts split a line into
+//! several scope-cut tracks; one shared colouring keeps lane indices coherent
+//! across gates) with a **span-width primary** outer-first key — longest
+//! crossings take the outermost lane; hub / declared-nest / order remain
+//! tiebreaks (R§2.12 multi-source partition on equal widths).
 
 use std::collections::BTreeMap;
 
@@ -36,6 +39,8 @@ pub struct TrackOrderPlan {
     pub track_counts: BTreeMap<TrackId, usize>,
     /// RankGap(r) → max concurrent lanes on Cross line r+1 (for Demand).
     pub rank_gap_track_counts: BTreeMap<u32, usize>,
+    /// Cross corridor line → total lanes on its shared pitch grid (Metric).
+    pub cross_line_lane_counts: BTreeMap<usize, usize>,
 }
 
 fn endpoint_cross(
@@ -73,9 +78,14 @@ pub fn assign_track_order(
     let bus_edges = end_bus_edge_ids(bundles);
     let edge_of = graph.edge_index_map();
 
-    // Group edge spans by substrate track (Cross tracks only for L3 pitch
-    // demand; Main tracks get lanes too for Ink vertical corridors).
-    let mut by_track: BTreeMap<TrackId, Vec<(String, f64, f64)>> = BTreeMap::new();
+    // Group edge spans: Main keeps per-track rank-occupancy intervals (Ink
+    // vertical corridors); Cross collects per **corridor line** — group cuts
+    // split a line into several scope-cut tracks, and one shared colouring
+    // keeps lane indices coherent across the cuts so gate crossings stay on
+    // one pitch grid (channel-d1 §5.1).
+    let mut main_by_track: BTreeMap<TrackId, Vec<(String, f64, f64)>> = BTreeMap::new();
+    let mut cross_by_line: BTreeMap<usize, BTreeMap<String, (f64, f64)>> = BTreeMap::new();
+    let mut cross_tracks_on_line: BTreeMap<(String, usize), Vec<TrackId>> = BTreeMap::new();
     for (edge_id, topo) in &route_plan.routes {
         if bus_edges.contains(edge_id) {
             continue;
@@ -83,22 +93,25 @@ pub fn assign_track_order(
         let RouteTopology::Orthogonal(ChannelPath { tracks, .. }) = topo;
         let ax = endpoint_cross(plan, graph, &edge_of, ports, frames, edge_id, true);
         let bx = endpoint_cross(plan, graph, &edge_of, ports, frames, edge_id, false);
-        let lo = ax.min(bx);
-        let hi = ax.max(bx);
         for &tid in tracks {
             let Some(t) = route_plan.substrate.track(tid) else {
                 continue;
             };
             match t.orient {
                 TrackOrient::Cross => {
-                    by_track
-                        .entry(tid)
+                    cross_by_line
+                        .entry(t.line)
                         .or_default()
-                        .push((edge_id.clone(), lo, hi));
+                        .entry(edge_id.clone())
+                        .or_insert((ax.min(bx), ax.max(bx)));
+                    cross_tracks_on_line
+                        .entry((edge_id.clone(), t.line))
+                        .or_default()
+                        .push(tid);
                 }
                 TrackOrient::Main => {
                     let (lo_r, hi_r) = endpoint_ranks(plan, graph, &edge_of, edge_id);
-                    by_track.entry(tid).or_default().push((
+                    main_by_track.entry(tid).or_default().push((
                         edge_id.clone(),
                         lo_r as f64,
                         (hi_r + 1) as f64,
@@ -111,21 +124,15 @@ pub fn assign_track_order(
     let mut assignments = BTreeMap::new();
     let mut track_counts = BTreeMap::new();
     let mut rank_gap_track_counts: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut cross_line_lane_counts: BTreeMap<usize, usize> = BTreeMap::new();
 
-    for (tid, members) in &by_track {
-        let is_cross = route_plan
-            .substrate
-            .track(*tid)
-            .is_some_and(|t| matches!(t.orient, TrackOrient::Cross));
-        let colors = if is_cross {
-            color_cross_outer_first(members, ports, graph, &edge_of)
-        } else {
-            let intervals: Vec<Interval> = members
-                .iter()
-                .map(|(_, lo, hi)| Interval::new(*lo, *hi))
-                .collect();
-            color_intervals(&intervals, 0.0)
-        };
+    // Main corridors: per-track rank-occupancy interval colouring.
+    for (tid, members) in &main_by_track {
+        let intervals: Vec<Interval> = members
+            .iter()
+            .map(|(_, lo, hi)| Interval::new(*lo, *hi))
+            .collect();
+        let colors = color_intervals(&intervals, 0.0);
         let count = colors.iter().copied().max().map_or(0, |m| m + 1);
         track_counts.insert(*tid, count);
         for (i, (edge_id, _, _)) in members.iter().enumerate() {
@@ -137,16 +144,37 @@ pub fn assign_track_order(
                 },
             );
         }
-        if let Some(t) = route_plan.substrate.track(*tid) {
-            if matches!(t.orient, TrackOrient::Cross) {
-                // Interior Cross only: line k∈[1, rank_count) sits in RankGap(k-1).
-                // Outer lines 0 / rank_count must not inflate LayerGap (D1.3.4).
-                if t.line >= 1 && t.line < route_plan.index.rank_count {
-                    let gap = (t.line - 1) as u32;
-                    let e = rank_gap_track_counts.entry(gap).or_insert(0);
-                    *e = (*e).max(count);
-                }
+    }
+
+    // Cross corridors: one outer-first colouring per line; every scope-cut
+    // track on the line inherits the same lane index for an edge.
+    for (line, members) in &cross_by_line {
+        let list: Vec<(String, f64, f64)> = members
+            .iter()
+            .map(|(e, &(lo, hi))| (e.clone(), lo, hi))
+            .collect();
+        let colors = color_cross_outer_first(&list, ports, graph, &edge_of);
+        let count = colors.iter().copied().max().map_or(0, |m| m + 1);
+        cross_line_lane_counts.insert(*line, count);
+        for (i, (edge_id, _, _)) in list.iter().enumerate() {
+            let color = colors[i] as u32;
+            let tids = &cross_tracks_on_line[&(edge_id.clone(), *line)];
+            for &tid in tids {
+                assignments.insert(
+                    (edge_id.clone(), tid),
+                    HopTrack {
+                        track: tid,
+                        track_index: color,
+                    },
+                );
+                let e = track_counts.entry(tid).or_insert(0);
+                *e = (*e).max(color as usize + 1);
             }
+        }
+        // Interior Cross only: line k∈[1, rank_count) sits in RankGap(k-1).
+        // Outer lines 0 / rank_count must not inflate LayerGap (D1.3.4).
+        if *line >= 1 && *line < route_plan.index.rank_count {
+            rank_gap_track_counts.insert((*line - 1) as u32, count);
         }
     }
 
@@ -154,6 +182,7 @@ pub fn assign_track_order(
         assignments,
         track_counts,
         rank_gap_track_counts,
+        cross_line_lane_counts,
     }
 }
 
@@ -210,8 +239,12 @@ fn fan_nest(
     }
 }
 
-/// Cross L3: outer-first first-fit (channel-d1 §5.1.4). Not left-edge greedy —
-/// that flips right-half outer/inner nesting on fan-outs.
+/// Cross L3: outer-first first-fit over one corridor line (channel-d1
+/// §5.1.4). Sort key is geometric — span width descending puts the longest
+/// crossing on the outermost lane; hub / declared-nest / order stay
+/// tiebreaks so multi-source fans keep their R§2.12 partition on equal
+/// widths. Not left-edge greedy — that flips right-half outer/inner nesting
+/// on fan-outs.
 fn color_cross_outer_first(
     members: &[(String, f64, f64)],
     ports: &BTreeMap<String, EdgePorts>,
@@ -221,14 +254,14 @@ fn color_cross_outer_first(
     let n = members.len();
     let mut order: Vec<usize> = (0..n).collect();
     order.sort_by(|&a, &b| {
-        let (ha, na, oa) = fan_nest(ports, graph, edge_of, &members[a].0);
-        let (hb, nb, ob) = fan_nest(ports, graph, edge_of, &members[b].0);
         let wa = members[a].2 - members[a].1;
         let wb = members[b].2 - members[b].1;
-        ha.cmp(&hb)
+        let (ha, na, oa) = fan_nest(ports, graph, edge_of, &members[a].0);
+        let (hb, nb, ob) = fan_nest(ports, graph, edge_of, &members[b].0);
+        wb.total_cmp(&wa)
+            .then(ha.cmp(&hb))
             .then(na.cmp(&nb))
             .then(oa.cmp(&ob))
-            .then(wb.total_cmp(&wa))
             .then(members[a].0.cmp(&members[b].0))
     });
 
@@ -685,5 +718,184 @@ mod tests {
             Some(2),
             "four nested spans need exactly 2 lanes"
         );
+    }
+
+    /// Gate-cut corridor: one Cross line split into two scope-cut tracks.
+    /// Lane indices must stay corridor-coherent and span-nested.
+    #[test]
+    fn cross_corridor_colors_gate_cut_tracks_coherently() {
+        use crate::layout::hierarchical::compose::ports::ResolvedPort;
+        use crate::layout::hierarchical::channel::substrate::Substrate;
+        use plotgram_algo::orientation::Side as AlgoSide;
+        use plotgram_model::port::AlongSpec;
+
+        // Two ranks × two orders. Line 1 is cut into a west + east track.
+        let elems = vec![
+            Elem {
+                key: ElemKey::Real("s1".into()),
+                group_path: vec![],
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Real("s2".into()),
+                group_path: vec![],
+                rank: 0,
+            },
+            Elem {
+                key: ElemKey::Real("t1".into()),
+                group_path: vec![],
+                rank: 1,
+            },
+            Elem {
+                key: ElemKey::Real("t2".into()),
+                group_path: vec![],
+                rank: 1,
+            },
+        ];
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: (0..4).collect(),
+            segments: vec![
+                Segment {
+                    edge_id: "e_long".into(),
+                    ordinal: 0,
+                    from: 0,
+                    to: 3,
+                },
+                Segment {
+                    edge_id: "e_west".into(),
+                    ordinal: 0,
+                    from: 0,
+                    to: 2,
+                },
+                Segment {
+                    edge_id: "e_east".into(),
+                    ordinal: 0,
+                    from: 1,
+                    to: 3,
+                },
+            ],
+            layers: vec![vec![0, 1], vec![2, 3]],
+        };
+        let mut ids = BTreeMap::new();
+        for (i, id) in ["s1", "s2", "t1", "t2"].iter().enumerate() {
+            ids.insert((*id).into(), i);
+        }
+        let mk_edge = |id: &str, src: usize, tgt: usize| RealEdge {
+            edge_id: id.into(),
+            original_source: src,
+            original_target: tgt,
+            working_source: src,
+            working_target: tgt,
+            reversed: false,
+            from_port: None,
+            to_port: None,
+            weight: 1.0,
+            ..Default::default()
+        };
+        let graph = RealGraph {
+            ids: vec!["s1".into(), "s2".into(), "t1".into(), "t2".into()],
+            index_of: ids,
+            group_path: vec![vec![]; 4],
+            shapes: vec![plotgram_model::NodeShape::DEFAULT; 4],
+            edges: vec![
+                mk_edge("e_long", 0, 3),
+                mk_edge("e_west", 0, 2),
+                mk_edge("e_east", 1, 3),
+            ],
+            self_loops: vec![],
+            ..Default::default()
+        };
+        let mut ports = BTreeMap::new();
+        for eid in ["e_long", "e_west", "e_east"] {
+            ports.insert(
+                eid.into(),
+                EdgePorts {
+                    source: ResolvedPort {
+                        side: AlgoSide::South,
+                        along: AlongSpec::Ordered { order: 0, count: 1 },
+                    },
+                    target: ResolvedPort {
+                        side: AlgoSide::North,
+                        along: AlongSpec::Ordered { order: 0, count: 1 },
+                    },
+                    source_cluster: None,
+                    target_cluster: None,
+                },
+            );
+        }
+        // Manual gate-cut substrate: two Cross tracks on line 1.
+        let mut sub = Substrate::new();
+        let t_west = sub.alloc_track_id();
+        sub.add_track(t_west, TrackOrient::Cross, None, 1.0, 1, (0, 3))
+            .unwrap();
+        let t_east = sub.alloc_track_id();
+        sub.add_track(t_east, TrackOrient::Cross, None, 1.0, 1, (4, 7))
+            .unwrap();
+        let idx = crate::layout::hierarchical::channel::substrate::BlueprintIndex {
+            rank_count: 2,
+            order_count: 2,
+            ..Default::default()
+        };
+        let mut routes = BTreeMap::new();
+        routes.insert(
+            "e_long".into(),
+            RouteTopology::Orthogonal(ChannelPath::new(vec![t_west, t_east], vec![])),
+        );
+        routes.insert(
+            "e_west".into(),
+            RouteTopology::Orthogonal(ChannelPath::new(vec![t_west], vec![])),
+        );
+        routes.insert(
+            "e_east".into(),
+            RouteTopology::Orthogonal(ChannelPath::new(vec![t_east], vec![])),
+        );
+        let route_plan = ChannelRoutePlan {
+            substrate: sub,
+            index: idx,
+            routes,
+            bundles: vec![],
+            relaxations: vec![],
+            ripup_rounds: 0,
+            used_gates: false,
+            route_order: vec![],
+        };
+        // s1 centre x=10, s2 centre x=210; t1 centre x=10, t2 centre x=210.
+        let frames = vec![
+            Rect::new(0.0, 0.0, 20.0, 10.0),
+            Rect::new(200.0, 0.0, 20.0, 10.0),
+            Rect::new(0.0, 50.0, 20.0, 10.0),
+            Rect::new(200.0, 50.0, 20.0, 10.0),
+        ];
+        let order = assign_track_order(&plan, &graph, &ports, &frames, &[], &route_plan);
+        let lane = |eid: &str, tid| order.assignments[&(eid.into(), tid)].track_index;
+
+        // Gate crossing keeps one lane index across both scope-cut tracks.
+        assert_eq!(
+            lane("e_long", t_west),
+            lane("e_long", t_east),
+            "gate-crossing edge must stay on one corridor lane"
+        );
+        // Longest span nests outermost.
+        assert_eq!(lane("e_long", t_west), 0, "longest crossing takes lane 0");
+        // Overlapping spans split lanes; disjoint spans share across tracks.
+        assert_ne!(lane("e_west", t_west), lane("e_long", t_west));
+        assert_ne!(lane("e_east", t_east), lane("e_long", t_east));
+        assert_eq!(
+            lane("e_west", t_west),
+            lane("e_east", t_east),
+            "x-disjoint edges share a corridor lane across the cut"
+        );
+        // Corridor palette is smaller than the sum of per-track demands.
+        assert_eq!(order.cross_line_lane_counts.get(&1).copied(), Some(2));
+        assert_eq!(order.track_counts.get(&t_west).copied(), Some(2));
+        assert_eq!(order.track_counts.get(&t_east).copied(), Some(2));
+        assert_eq!(order.rank_gap_track_counts.get(&0).copied(), Some(2));
     }
 }

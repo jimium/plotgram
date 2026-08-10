@@ -256,7 +256,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         .collect();
 
     let shell_bands = group_frame::group_shell_bands(&plan, &labeled);
-    let track_coords = metric::track::assign_track_coords(
+    let (track_coords, track_relaxations) = metric::track::assign_track_coords(
         &plan,
         &main,
         &cross,
@@ -266,6 +266,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         &shell_bands,
         params.edge_gap,
     );
+    diagnostics.relaxations.extend(track_relaxations);
 
     let bus_levels = metric::bus::assign_bus_levels(
         &route_plan.bundles,

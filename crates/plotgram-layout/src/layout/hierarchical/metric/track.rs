@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use plotgram_algo::orientation::Size;
+use plotgram_model::diagnostics::Relaxation;
 
 use crate::layout::hierarchical::channel::{ChannelRoutePlan, TrackId, TrackOrient};
 use crate::layout::hierarchical::compose::track_order::TrackOrderPlan;
@@ -25,6 +26,12 @@ impl TrackCoords {
 }
 
 /// Place lanes inside each used substrate track.
+///
+/// Cross lanes sample a **per-corridor-line shared pitch grid**: group cuts
+/// split one rank gap into several scope-cut tracks, and every track on the
+/// line must map the same lane index to the same Y so gate crossings stay
+/// collinear (channel-d1 §5.1). Returns soft relaxations for shell-band
+/// fallbacks (lanes could not stay inside the band-free sub-interval).
 pub fn assign_track_coords(
     plan: &PlanGraph,
     main: &[f64],
@@ -34,7 +41,7 @@ pub fn assign_track_coords(
     route_plan: &ChannelRoutePlan,
     shell: &GroupShellBands,
     edge_gap: f64,
-) -> TrackCoords {
+) -> (TrackCoords, Vec<Relaxation>) {
     // Real-node frames for Main-lane clearance (InkVerifier node-penetration).
     let mut obstacles: Vec<(f64, f64, f64, f64)> = Vec::new(); // l,t,r,b
     for layer in &plan.layers {
@@ -55,6 +62,85 @@ pub fn assign_track_coords(
     }
 
     let mut out = TrackCoords::default();
+    let mut relaxations = Vec::new();
+
+    // One shared lane grid per Cross corridor line.
+    let mut cross_grids: BTreeMap<usize, Vec<f64>> = BTreeMap::new();
+    let mut line_max: BTreeMap<usize, usize> = BTreeMap::new();
+    for (&tid, &count) in &track_order.track_counts {
+        let Some(t) = route_plan.substrate.track(tid) else {
+            continue;
+        };
+        if matches!(t.orient, TrackOrient::Cross) {
+            let e = line_max.entry(t.line).or_insert(0);
+            *e = (*e).max(count);
+        }
+    }
+    for (&line, &track_max) in &line_max {
+        let count = track_order
+            .cross_line_lane_counts
+            .get(&line)
+            .copied()
+            .unwrap_or(track_max);
+        if count == 0 {
+            continue;
+        }
+        let ys = if line == 0 || line >= plan.layers.len() {
+            // Outside the stack — park near adjacent layer; still separate
+            // lanes (P5-5). Keep one `edge_gap` clear of the group shell
+            // band that extends past the outer rank.
+            let below = line > 0;
+            let base = if line == 0 {
+                let top = main.get(plan.layers[0][0]).copied().unwrap_or(0.0);
+                top - edge_gap.max(shell.outer_top + edge_gap)
+            } else {
+                let last = plan.layers.len() - 1;
+                let e = plan.layers[last][0];
+                main[e] + size_of(e).height + edge_gap.max(shell.outer_bottom + edge_gap)
+            };
+            let mid = (count.saturating_sub(1) as f64) * 0.5;
+            (0..count)
+                .map(|i| {
+                    // A row taller than edge_gap puts the naive parked lane
+                    // inside the adjacent row's Y-projection — push further
+                    // out until clear (mirror of clear_main_x; gates-run e21
+                    // penetrated a last-rank body through such a lane).
+                    clear_parked_y(
+                        base + (i as f64 - mid) * edge_gap,
+                        &obstacles,
+                        edge_gap,
+                        below,
+                    )
+                })
+                .collect()
+        } else {
+            let r = line - 1;
+            let thickness = plan.layers[r]
+                .iter()
+                .map(|&e| size_of(e).height)
+                .fold(0.0_f64, f64::max);
+            let gap_top = main[plan.layers[r][0]] + thickness;
+            let gap_bot = main[plan.layers[r + 1][0]];
+            let (below_band, above_band) = shell.gap.get(r).copied().unwrap_or((0.0, 0.0));
+            let (start, fallback) = cross_lane_start(
+                gap_top, gap_bot, below_band, above_band, count, edge_gap,
+            );
+            if fallback {
+                relaxations.push(Relaxation {
+                    rule: "channel-shell-band-fallback".into(),
+                    detail: format!(
+                        "Cross line {line}: {count}-lane fan wider than the \
+                         shell-band-free gap; lanes fall back to the full rank gap"
+                    ),
+                });
+            }
+            (0..count)
+                .map(|i| start + i as f64 * edge_gap)
+                .collect()
+        };
+        cross_grids.insert(line, ys);
+    }
+
     for (&tid, &count) in &track_order.track_counts {
         if count == 0 {
             continue;
@@ -64,53 +150,10 @@ pub fn assign_track_coords(
         };
         let ys = match t.orient {
             TrackOrient::Cross => {
-                let line = t.line;
-                if line == 0 || line >= plan.layers.len() {
-                    // Outside the stack — park near adjacent layer; still
-                    // separate lanes (P5-5). Keep one `edge_gap` clear of the
-                    // group shell band that extends past the outer rank.
-                    let below = line > 0;
-                    let base = if line == 0 {
-                        let top = main.get(plan.layers[0][0]).copied().unwrap_or(0.0);
-                        top - edge_gap.max(shell.outer_top + edge_gap)
-                    } else {
-                        let last = plan.layers.len() - 1;
-                        let e = plan.layers[last][0];
-                        main[e] + size_of(e).height + edge_gap.max(shell.outer_bottom + edge_gap)
-                    };
-                    let mid = (count.saturating_sub(1) as f64) * 0.5;
-                    (0..count)
-                        .map(|i| {
-                            // A row taller than edge_gap puts the naive parked
-                            // lane inside the adjacent row's Y-projection —
-                            // push further out until clear (mirror of
-                            // clear_main_x; gates-run e21 penetrated a last-
-                            // rank body through such a lane).
-                            clear_parked_y(
-                                base + (i as f64 - mid) * edge_gap,
-                                &obstacles,
-                                edge_gap,
-                                below,
-                            )
-                        })
-                        .collect()
-                } else {
-                    let r = line - 1;
-                    let thickness = plan.layers[r]
-                        .iter()
-                        .map(|&e| size_of(e).height)
-                        .fold(0.0_f64, f64::max);
-                    let gap_top = main[plan.layers[r][0]] + thickness;
-                    let gap_bot = main[plan.layers[r + 1][0]];
-                    let (below_band, above_band) =
-                        shell.gap.get(r).copied().unwrap_or((0.0, 0.0));
-                    let start = cross_lane_start(
-                        gap_top, gap_bot, below_band, above_band, count, edge_gap,
-                    );
-                    (0..count)
-                        .map(|i| start + i as f64 * edge_gap)
-                        .collect()
-                }
+                // Lane index is corridor-wide (TrackOrder); sample the line
+                // grid so scope-cut tracks stay collinear across gates.
+                let grid = &cross_grids[&t.line];
+                grid.iter().take(count).copied().collect()
             }
             TrackOrient::Main => {
                 // Vertical corridor X: sit in order *gaps* (or outside the
@@ -157,13 +200,14 @@ pub fn assign_track_coords(
         };
         out.coords.insert(tid, ys);
     }
-    out
+    (out, relaxations)
 }
 
-/// First lane Y for an interior Cross track: center the lane fan in the
+/// First lane Y for an interior Cross corridor: center the lane fan in the
 /// group-shell-free sub-interval of the rank gap (demand reserves room for
 /// it); fall back to centering in the full gap when the free interval is too
-/// narrow (degraded group chains / tight params).
+/// narrow (degraded group chains / tight params) — flagged in the second
+/// return value so the caller can surface a relaxation.
 fn cross_lane_start(
     gap_top: f64,
     gap_bot: f64,
@@ -171,17 +215,19 @@ fn cross_lane_start(
     above_band: f64,
     count: usize,
     edge_gap: f64,
-) -> f64 {
+) -> (f64, bool) {
     let span = (count.saturating_sub(1) as f64) * edge_gap;
     let free_top = gap_top + below_band;
     let free_bot = gap_bot - above_band;
-    let (lo, hi) = if free_bot - free_top >= span {
+    let fits_free = free_bot - free_top >= span;
+    let (lo, hi) = if fits_free {
         (free_top, free_bot)
     } else {
         (gap_top, gap_bot)
     };
     let usable = (hi - lo).max(0.0);
-    lo + (usable - span) * 0.5
+    let fallback = !fits_free && (below_band > 0.0 || above_band > 0.0);
+    (lo + (usable - span) * 0.5, fallback)
 }
 
 fn main_line_backbone_x(
@@ -299,6 +345,112 @@ mod tests {
     use super::clear_main_x;
     use super::clear_parked_y;
     use super::cross_lane_start;
+    use super::*;
+
+    use crate::layout::hierarchical::channel::substrate::{BlueprintIndex, Substrate};
+    use crate::layout::hierarchical::compose::track_order::TrackOrderPlan;
+    use crate::layout::hierarchical::model::{Elem, ElemKey, PlanGraph};
+
+    /// Two scope-cut tracks on one interior Cross line sample one shared
+    /// pitch grid: the 1-lane track takes its grid slot instead of
+    /// re-centering its own fan.
+    #[test]
+    fn cross_tracks_on_one_line_share_a_pitch_grid() {
+        // Table: (below_band, above_band, wide_count, expected ys, fallback).
+        // Ranks at y=0 / y=100, node height 10 → interior gap [10, 100].
+        let cases: &[(f64, f64, usize, &[f64], bool)] = &[
+            // No bands: 3-lane fan centered in the gap.
+            (0.0, 0.0, 3, &[39.0, 55.0, 71.0], false),
+            // Bands squeeze the free interval below the fan span → full-gap
+            // fallback, surfaced as a relaxation.
+            (45.0, 45.0, 2, &[47.0, 63.0], true),
+        ];
+        for &(below, above, count, expected, fallback) in cases {
+            let elems = vec![
+                Elem {
+                    key: ElemKey::Real("a".into()),
+                    group_path: vec![],
+                    rank: 0,
+                },
+                Elem {
+                    key: ElemKey::Real("b".into()),
+                    group_path: vec![],
+                    rank: 1,
+                },
+            ];
+            let index_of = elems
+                .iter()
+                .enumerate()
+                .map(|(i, e)| (e.key.clone(), i))
+                .collect();
+            let plan = PlanGraph {
+                elems,
+                index_of,
+                decl_index: (0..2).collect(),
+                segments: vec![],
+                layers: vec![vec![0], vec![1]],
+            };
+            // One corridor line cut into a wide + narrow scope-cut track.
+            let mut sub = Substrate::new();
+            let t_wide = sub.alloc_track_id();
+            sub.add_track(t_wide, TrackOrient::Cross, None, 1.0, 1, (0, 1))
+                .unwrap();
+            let t_narrow = sub.alloc_track_id();
+            sub.add_track(t_narrow, TrackOrient::Cross, None, 1.0, 1, (2, 3))
+                .unwrap();
+            let route_plan = ChannelRoutePlan {
+                substrate: sub,
+                index: BlueprintIndex::default(),
+                routes: BTreeMap::new(),
+                bundles: vec![],
+                relaxations: vec![],
+                ripup_rounds: 0,
+                used_gates: false,
+                route_order: vec![],
+            };
+            let track_order = TrackOrderPlan {
+                assignments: BTreeMap::new(),
+                track_counts: [(t_wide, count), (t_narrow, 1)].into_iter().collect(),
+                rank_gap_track_counts: BTreeMap::new(),
+                cross_line_lane_counts: [(1usize, count)].into_iter().collect(),
+            };
+            let shell = GroupShellBands {
+                gap: vec![(below, above)],
+                outer_top: 0.0,
+                outer_bottom: 0.0,
+            };
+            let (coords, relaxations) = assign_track_coords(
+                &plan,
+                &[0.0, 100.0],
+                &[0.0, 0.0],
+                &|_| Size::new(20.0, 10.0),
+                &track_order,
+                &route_plan,
+                &shell,
+                16.0,
+            );
+            assert_eq!(
+                &coords.coords[&t_wide],
+                expected,
+                "below={below} above={above} count={count}"
+            );
+            // The single-lane track takes lane 0 of the same grid — never an
+            // independently centered fan.
+            assert_eq!(
+                coords.coords[&t_narrow],
+                vec![expected[0]],
+                "narrow track must sample the corridor grid"
+            );
+            assert_eq!(
+                relaxations.len(),
+                if fallback { 1 } else { 0 },
+                "below={below} above={above} count={count}"
+            );
+            if fallback {
+                assert_eq!(relaxations[0].rule, "channel-shell-band-fallback");
+            }
+        }
+    }
 
     #[test]
     fn cross_lane_start_avoids_shell_bands() {
@@ -315,7 +467,7 @@ mod tests {
             (40.0, 40.0, 2, 100.0 + (80.0 - 16.0) * 0.5),
         ];
         for &(below, above, count, expected) in cases {
-            let start = cross_lane_start(100.0, 180.0, below, above, count, 16.0);
+            let (start, fallback) = cross_lane_start(100.0, 180.0, below, above, count, 16.0);
             assert!(
                 (start - expected).abs() < 1e-9,
                 "below={below} above={above} count={count}: {start} != {expected}"
@@ -324,6 +476,9 @@ mod tests {
                 let last = start + (count.saturating_sub(1) as f64) * 16.0;
                 assert!(start >= 100.0 + below - 1e-9, "start pierces below band");
                 assert!(last <= 180.0 - above + 1e-9, "last lane pierces above band");
+                assert!(!fallback, "free interval fits — no fallback expected");
+            } else {
+                assert!(fallback, "squeezed fan must flag the shell-band fallback");
             }
         }
     }
