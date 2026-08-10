@@ -72,6 +72,19 @@ pub struct ResolvedGroupStyle {
     pub fill_opacity: Option<f64>,
 }
 
+/// Nesting depth per group id (0 = top-level group).
+pub fn group_depth_map(graph: &Graph) -> BTreeMap<String, usize> {
+    let mut depths = BTreeMap::new();
+    fn walk(groups: &[Group], depth: usize, out: &mut BTreeMap<String, usize>) {
+        for group in groups {
+            out.insert(group.id.clone(), depth);
+            walk(&group.groups, depth + 1, out);
+        }
+    }
+    walk(&graph.groups, 0, &mut depths);
+    depths
+}
+
 /// Resolve all element styles in a graph.
 pub fn resolve_graph(graph: &Graph, theme: &CompiledTheme) -> ResolvedGraph {
     let mut nodes = BTreeMap::new();
@@ -85,7 +98,7 @@ pub fn resolve_graph(graph: &Graph, theme: &CompiledTheme) -> ResolvedGraph {
         edges.insert(edge.id.clone(), resolve_edge(edge, theme));
     }
     for group in &graph.groups {
-        resolve_group_recursive(group, theme, &mut nodes, &mut edges, &mut groups);
+        resolve_group_recursive(group, theme, 0, &mut nodes, &mut edges, &mut groups);
     }
 
     ResolvedGraph {
@@ -98,11 +111,12 @@ pub fn resolve_graph(graph: &Graph, theme: &CompiledTheme) -> ResolvedGraph {
 fn resolve_group_recursive(
     group: &Group,
     theme: &CompiledTheme,
+    depth: usize,
     nodes: &mut BTreeMap<String, ResolvedNodeStyle>,
     edges: &mut BTreeMap<String, ResolvedEdgeStyle>,
     groups: &mut BTreeMap<String, ResolvedGroupStyle>,
 ) {
-    groups.insert(group.id.clone(), resolve_group_style(group, theme));
+    groups.insert(group.id.clone(), resolve_group_style(group, theme, depth));
     for node in &group.nodes {
         nodes.insert(node.id.clone(), resolve_node(node, theme));
     }
@@ -110,7 +124,7 @@ fn resolve_group_recursive(
         edges.insert(edge.id.clone(), resolve_edge(edge, theme));
     }
     for child in &group.groups {
-        resolve_group_recursive(child, theme, nodes, edges, groups);
+        resolve_group_recursive(child, theme, depth + 1, nodes, edges, groups);
     }
 }
 
@@ -181,16 +195,17 @@ fn resolve_edge(edge: &Edge, theme: &CompiledTheme) -> ResolvedEdgeStyle {
     style
 }
 
-fn resolve_group_style(group: &Group, theme: &CompiledTheme) -> ResolvedGroupStyle {
+fn resolve_group_style(group: &Group, theme: &CompiledTheme, depth: usize) -> ResolvedGroupStyle {
+    let nest = theme.group_nest_step(depth);
     let g = &theme.defaults.group;
     let mut style = ResolvedGroupStyle {
-        fill: g.fill.clone(),
-        stroke: g.stroke.clone(),
-        stroke_width: g.stroke_width,
+        fill: nest.fill.clone(),
+        stroke: nest.stroke.clone(),
+        stroke_width: nest.stroke_width,
         text_fill: g.text_fill.clone(),
-        radius: g.radius,
-        stroke_dasharray: g.stroke_dasharray.clone(),
-        fill_opacity: g.fill_opacity,
+        radius: nest.radius,
+        stroke_dasharray: nest.stroke_dasharray.clone(),
+        fill_opacity: nest.fill_opacity,
     };
 
     // Variant cascade: pick group-applicable fields from compiled_variants[v]
@@ -400,6 +415,50 @@ mod tests {
             partition_cell: None,
             attrs,
         }
+    }
+
+    #[test]
+    fn nested_groups_use_depth_ladder_before_inline_override() {
+        use plotgram_model::graph::{Graph, Group};
+
+        let theme = crate::theme::load(None);
+        let outer_fill = theme.group_nest[0].fill.clone();
+        let inner_fill = theme.group_nest[1].fill.clone();
+        assert_ne!(outer_fill, inner_fill, "precondition: nest steps differ");
+
+        let graph = Graph {
+            nodes: vec![],
+            edges: vec![],
+            groups: vec![Group {
+                id: "outer".to_string(),
+                label: None,
+                attrs: AttrMap::new(),
+                nodes: vec![],
+                edges: vec![],
+                groups: vec![Group {
+                    id: "inner".to_string(),
+                    label: None,
+                    attrs: AttrMap::new(),
+                    nodes: vec![],
+                    edges: vec![],
+                    groups: vec![],
+                }],
+            }],
+            partition: None,
+        };
+
+        let resolved = resolve_graph(&graph, &theme);
+        assert_eq!(resolved.groups["outer"].fill, outer_fill);
+        assert_eq!(resolved.groups["inner"].fill, inner_fill);
+
+        // Inline style.* still wins over the depth ladder.
+        let mut graph = graph;
+        graph.groups[0].groups[0].attrs.insert(
+            "style.fill".to_string(),
+            AttrValue::Str("#123456".to_string()),
+        );
+        let resolved = resolve_graph(&graph, &theme);
+        assert_eq!(resolved.groups["inner"].fill, "#123456");
     }
 
     #[test]

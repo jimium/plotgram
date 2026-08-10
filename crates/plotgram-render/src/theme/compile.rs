@@ -6,8 +6,10 @@ use std::collections::BTreeMap;
 
 use super::schema::{StyleValue, ThemeFile};
 use super::{
-    CompiledDefaults, CompiledTheme, EdgeDefaults, GroupDefaults, Typography, VariantStyle,
+    CompiledDefaults, CompiledTheme, EdgeDefaults, GroupDefaults, GroupNestStep, Typography,
+    VariantStyle,
 };
+use super::color::darken;
 
 /// Compile a theme, resolving `extends` inheritance chain.
 ///
@@ -133,10 +135,13 @@ fn compile_resolved(file: ThemeFile) -> CompiledTheme {
         })
         .collect();
 
+    let group_nest = synthesize_group_nest(&defaults.group);
+
     CompiledTheme {
         id: file.id,
         name: file.name,
         defaults,
+        group_nest,
         compiled_variants,
         tokens: file.tokens,
     }
@@ -284,6 +289,38 @@ fn compile_defaults(file: &ThemeFile, tokens: &BTreeMap<String, String>) -> Comp
         group,
         typography,
     }
+}
+
+/// Build a 4-step group nest ladder from `defaults.group`.
+///
+/// Deeper groups darken (aligned with v1 `common.clean-light` `group_nest` entries).
+fn synthesize_group_nest(group: &GroupDefaults) -> Vec<GroupNestStep> {
+    const DARKEN: [(f64, f64); 4] = [
+        (0.0, 0.0),
+        (0.04, 0.04),
+        (0.08, 0.08),
+        (0.12, 0.12),
+    ];
+
+    DARKEN
+        .iter()
+        .map(|(fill_amt, stroke_amt)| GroupNestStep {
+            fill: if *fill_amt == 0.0 {
+                group.fill.clone()
+            } else {
+                darken(&group.fill, *fill_amt)
+            },
+            stroke: if *stroke_amt == 0.0 {
+                group.stroke.clone()
+            } else {
+                darken(&group.stroke, *stroke_amt)
+            },
+            stroke_width: group.stroke_width,
+            radius: group.radius,
+            stroke_dasharray: group.stroke_dasharray.clone(),
+            fill_opacity: group.fill_opacity,
+        })
+        .collect()
 }
 
 fn compile_variant_style(

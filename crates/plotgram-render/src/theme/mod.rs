@@ -2,6 +2,7 @@
 //!
 //! V2 themes are flat: no `diagrams` section. Visual variance is driven by `variant`.
 
+pub mod color;
 pub mod compile;
 pub mod schema;
 
@@ -14,8 +15,18 @@ pub struct CompiledTheme {
     pub id: String,
     pub name: String,
     pub defaults: CompiledDefaults,
+    /// Per-nesting-depth group paint ladder (depth 0 = outermost).
+    pub group_nest: Vec<GroupNestStep>,
     pub compiled_variants: BTreeMap<String, VariantStyle>,
     pub tokens: schema::Tokens,
+}
+
+impl CompiledTheme {
+    /// Group paint for nesting depth `depth` (capped at the last ladder step).
+    pub fn group_nest_step(&self, depth: usize) -> &GroupNestStep {
+        let cap = self.group_nest.len().saturating_sub(1);
+        &self.group_nest[depth.min(cap)]
+    }
 }
 
 /// Resolved default styles.
@@ -65,6 +76,17 @@ pub struct EdgeDefaults {
     pub stroke_opacity: Option<f64>,
     pub label_bg: Option<String>,
     pub label_bg_opacity: f64,
+}
+
+/// Group paint for one nesting depth (no `text_fill`; labels stay on `defaults.group`).
+#[derive(Debug, Clone)]
+pub struct GroupNestStep {
+    pub fill: String,
+    pub stroke: String,
+    pub stroke_width: f64,
+    pub radius: f64,
+    pub stroke_dasharray: Option<String>,
+    pub fill_opacity: Option<f64>,
 }
 
 /// Group default styles.
@@ -167,6 +189,11 @@ mod tests {
             assert!(t.defaults.node.font_size > 0.0, "{id}: node font_size");
             assert!(t.defaults.edge.font_size > 0.0, "{id}: edge font_size");
             assert!(!t.defaults.edge.response_dasharray.is_empty(), "{id}: response dasharray");
+            assert_eq!(t.group_nest.len(), 4, "{id}: group_nest ladder");
+            assert_eq!(
+                t.group_nest[0].fill, t.defaults.group.fill,
+                "{id}: depth-0 nest fill must match defaults.group"
+            );
             // Unresolved token refs would leak braces into SVG attributes
             for (variant, vs) in &t.compiled_variants {
                 assert!(

@@ -42,9 +42,12 @@ pub fn render_svg(input: &RenderInput) -> String {
     // NOTE: meta.title is intentionally not drawn: layout does not reserve
     // space for it, so painting it would overlap top-most nodes.
 
-    // Groups (behind nodes)
-    for gp in &input.layout.groups {
-        group::render_group(&mut svg, gp, &resolved, &strategy);
+    // Groups (behind nodes): paint outer frames first so nested fills stay visible.
+    let depths = resolve::group_depth_map(&input.graph);
+    let mut group_order: Vec<usize> = (0..input.layout.groups.len()).collect();
+    group_order.sort_by_key(|&i| depths.get(&input.layout.groups[i].id).copied().unwrap_or(0));
+    for i in group_order {
+        group::render_group(&mut svg, &input.layout.groups[i], &resolved, &strategy);
     }
 
     // Edges (behind nodes)
@@ -480,6 +483,55 @@ mod tests {
         assert!(
             svg.contains(r#"fill-opacity="0.50""#),
             "blueprint group fill_opacity should appear:\n{svg}"
+        );
+    }
+
+    #[test]
+    fn nested_group_inner_fill_paints_above_outer() {
+        use plotgram_model::graph::Group;
+        use plotgram_model::result::GroupPlacement;
+
+        let theme = theme::load(None);
+        let outer_fill = theme.group_nest[0].fill.clone();
+        let inner_fill = theme.group_nest[1].fill.clone();
+        assert_ne!(outer_fill, inner_fill, "precondition: nest steps differ");
+
+        let mut input = minimal_input();
+        input.graph.groups.push(Group {
+            id: "outer".to_string(),
+            label: Some("Outer".to_string()),
+            attrs: AttrMap::new(),
+            nodes: vec![],
+            edges: vec![],
+            groups: vec![Group {
+                id: "inner".to_string(),
+                label: Some("Inner".to_string()),
+                attrs: AttrMap::new(),
+                nodes: vec![],
+                edges: vec![],
+                groups: vec![],
+            }],
+        });
+        // finalize post-order: inner before outer in the vec
+        input.layout.groups.push(GroupPlacement {
+            id: "inner".to_string(),
+            frame: Rect::new(30.0, 30.0, 50.0, 50.0),
+        });
+        input.layout.groups.push(GroupPlacement {
+            id: "outer".to_string(),
+            frame: Rect::new(10.0, 10.0, 100.0, 100.0),
+        });
+
+        let svg = render_svg(&input);
+        let outer_pos = svg
+            .find(&format!(r#"fill="{outer_fill}""#))
+            .expect("outer group fill");
+        let inner_pos = svg
+            .find(&format!(r#"fill="{inner_fill}""#))
+            .expect("inner group fill");
+        assert!(
+            outer_pos < inner_pos,
+            "outer frame must be painted before inner so depth colors stay visible:\n{svg}"
         );
     }
 
