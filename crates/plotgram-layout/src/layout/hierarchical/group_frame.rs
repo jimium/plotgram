@@ -6,10 +6,13 @@
 //! inter-group gap degree of freedom is written here, finalize only expands):
 //!
 //! - cross axis — [`super::metric::symmetry_objective`] includes group-boundary
-//!   clamps in the hard separation chain with `GROUP_PAD` extras (a clamp sits
-//!   exactly on the frame edge its rank implies) and ties same-side clamps
-//!   across ranks with hard equalities, so the clamp column equals the
-//!   cross-rank union edge = the drawn frame edge;
+//!   clamps in the hard separation chain with `GROUP_PAD` extras and ties
+//!   same-side clamps across ranks with hard equalities (rectangular frame
+//!   column). After VPSC, leftover slack between sibling *drawn* frames is
+//!   compacted to [`GROUP_FRAME_GAP`]. Drawn extent must match finalize:
+//!   `union(members ∪ child frames) + pads` — child frames already carry pad,
+//!   so a parent is one pad wider than `union(members)+pad`; compacting with
+//!   the shallow formula leaves drawn siblings flush (gap 0);
 //! - main axis — [`super::demand::publish_group_layer_gap_demand`]
 //!   publishes LayerGap lower bounds from the shell bands below.
 //!
@@ -28,7 +31,9 @@ pub const GROUP_PAD: f64 = 16.0;
 pub const GROUP_LABEL_TOP_PAD: f64 = 24.0;
 
 /// Minimum visual gap reserved between two sibling group frames.
-pub const GROUP_FRAME_GAP: f64 = GROUP_PAD;
+/// Kept above [`GROUP_PAD`] so nested envelopes (finalize unions child frames
+/// that already include pad, then pads again) still show clear breathing room.
+pub const GROUP_FRAME_GAP: f64 = 24.0;
 
 /// Top pad of one group frame: labeled groups reserve the label band.
 pub fn group_top_pad(has_label: bool) -> f64 {

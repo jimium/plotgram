@@ -212,9 +212,9 @@ mod tests {
         let mut board = DemandBoard::new();
         publish_group_layer_gap_demand(&mut board, &plan, &labeled, &TrackOrderPlan::default(), 16.0);
         board.freeze();
-        // bottom band 16 + top band 24 + frame-gap core 16 = 56.
-        assert_eq!(board.get(DemandKey::LayerGap(0)), Some(56.0));
-        assert_eq!(resolved_layer_gaps(2, 40.0, &board), vec![56.0]);
+        // bottom band 16 + top band 24 + frame-gap core 24 = 64.
+        assert_eq!(board.get(DemandKey::LayerGap(0)), Some(64.0));
+        assert_eq!(resolved_layer_gaps(2, 40.0, &board), vec![64.0]);
     }
 
     #[test]

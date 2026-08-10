@@ -11,14 +11,14 @@ use plotgram_algo::vpsc::{self, Constraint, Variable, VpscError};
 use plotgram_model::geometry::Rect;
 
 use crate::layout::hierarchical::compose::ports::EdgePorts;
-use crate::layout::hierarchical::group_frame::GROUP_PAD;
+use crate::layout::hierarchical::group_frame::{GROUP_FRAME_GAP, GROUP_PAD};
 use crate::layout::hierarchical::metric::anchor::port_anchor;
 use crate::layout::hierarchical::metric::bk;
 use crate::layout::hierarchical::metric::symmetry::{
     axis_from_neighbors, degrees_of, fan_pitch, forward_real_adjacency, slot_multipliers,
     twin_plan_pairs, unique_min_span_primary,
 };
-use crate::layout::hierarchical::model::{Elem, ElemKey, PlanGraph, RealGraph};
+use crate::layout::hierarchical::model::{BoundarySide, Elem, ElemKey, PlanGraph, RealGraph};
 use crate::layout::hierarchical::params::HierarchicalParams;
 
 const REAL_WEIGHT: f64 = 1.0;
@@ -179,7 +179,7 @@ pub fn solve_symmetry_objective(
         }
     }
 
-    snap_fan_pack_style(
+    let mut cross = snap_fan_pack_style(
         plan,
         graph,
         ports,
@@ -199,7 +199,14 @@ pub fn solve_symmetry_objective(
         &primary,
         &layer_pos,
         &segs_by_edge,
-    )
+    )?;
+    // VPSC separation only lower-bounds the gap between clamps. Clamps with no
+    // J(x) neighbors can park in that slack and shove the next group across
+    // empty space (drawn frames still hug members). Close leftover inter-frame
+    // slack without touching the hard constraint set.
+    compact_sibling_frame_gaps(plan, size_of, &mut cross);
+    snap_boundaries_to_members(plan, size_of, &mut cross);
+    Ok(cross)
 }
 
 /// Final FanPack-style placement from an iterated seed (review §4.3.3 + §4.3.4).
@@ -406,6 +413,203 @@ fn snap_fan_pack_style(
         }
     }
     solve_or_fallback(n, &desired, &iter_weights, hard, hard_fallback)
+}
+
+/// Snap each group-boundary clamp to the GLOBAL member-derived frame edge.
+fn snap_boundaries_to_members(
+    plan: &PlanGraph,
+    size_of: &dyn Fn(usize) -> Size,
+    cross: &mut [f64],
+) {
+    let mut global_span: BTreeMap<&str, (f64, f64)> = BTreeMap::new();
+    for (e_idx, elem) in plan.elems.iter().enumerate() {
+        if !matches!(&elem.key, ElemKey::Real(_)) {
+            continue;
+        }
+        let w = size_of(e_idx).width;
+        let left = cross[e_idx] - w / 2.0;
+        let right = cross[e_idx] + w / 2.0;
+        for g in &elem.group_path {
+            global_span
+                .entry(g.as_str())
+                .and_modify(|(lo, hi)| {
+                    *lo = lo.min(left);
+                    *hi = hi.max(right);
+                })
+                .or_insert((left, right));
+        }
+    }
+    for (e_idx, elem) in plan.elems.iter().enumerate() {
+        if let ElemKey::GroupBoundary { group, side, .. } = &elem.key {
+            let Some(&(min_left, max_right)) = global_span.get(group.as_str()) else {
+                continue;
+            };
+            cross[e_idx] = match side {
+                BoundarySide::Left => min_left - GROUP_PAD,
+                BoundarySide::Right => max_right + GROUP_PAD,
+            };
+        }
+    }
+}
+
+/// Close excess slack between sibling group frames after VPSC.
+///
+/// Separation only lower-bounds gaps. When a clamp column parks far from its
+/// members inside that slack, the next group's drawn frame is pushed away.
+/// Slide each right sibling (and further-right siblings in the same set)
+/// leftward until **finalize-drawn** frames are `GROUP_FRAME_GAP` apart.
+/// Deepest siblings first.
+fn compact_sibling_frame_gaps(
+    plan: &PlanGraph,
+    size_of: &dyn Fn(usize) -> Size,
+    cross: &mut [f64],
+) {
+    let mut group_path: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut group_members: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+    for (e_idx, elem) in plan.elems.iter().enumerate() {
+        if !matches!(&elem.key, ElemKey::Real(_)) {
+            continue;
+        }
+        for (depth, g) in elem.group_path.iter().enumerate() {
+            group_path
+                .entry(g.clone())
+                .or_insert_with(|| elem.group_path[..=depth].to_vec());
+            group_members.entry(g.clone()).or_default().push(e_idx);
+        }
+    }
+    if group_members.len() < 2 {
+        return;
+    }
+    let max_depth = group_path.values().map(|p| p.len()).max().unwrap_or(0);
+    for depth in (1..=max_depth).rev() {
+        let mut siblings_of: BTreeMap<Vec<String>, BTreeSet<String>> = BTreeMap::new();
+        for (g, path) in &group_path {
+            if path.len() != depth {
+                continue;
+            }
+            siblings_of
+                .entry(path[..depth - 1].to_vec())
+                .or_default()
+                .insert(g.clone());
+        }
+        for siblings in siblings_of.values() {
+            if siblings.len() < 2 {
+                continue;
+            }
+            // Recompute drawn frames each round — a deeper compact may have
+            // moved members that change parent envelopes.
+            let drawn = drawn_frame_x_extents(&group_path, &group_members, size_of, cross);
+            compact_one_sibling_set(siblings, &drawn, plan, cross);
+        }
+    }
+}
+
+/// Cross-axis drawn frame edges matching finalize:
+/// `union(descendant member edges ∪ child drawn frames) ± GROUP_PAD`.
+///
+/// Child frames already include their own pad, so a parent that only contains
+/// nested groups is one pad wider per side than `union(members)±pad`.
+fn drawn_frame_x_extents(
+    group_path: &BTreeMap<String, Vec<String>>,
+    group_members: &BTreeMap<String, Vec<usize>>,
+    size_of: &dyn Fn(usize) -> Size,
+    cross: &[f64],
+) -> BTreeMap<String, (f64, f64)> {
+    let mut children: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    let mut max_depth = 0usize;
+    for (g, path) in group_path {
+        max_depth = max_depth.max(path.len());
+        if path.len() >= 2 {
+            children
+                .entry(path[path.len() - 2].as_str())
+                .or_default()
+                .push(g.as_str());
+        }
+    }
+    let mut by_depth: BTreeMap<usize, Vec<&str>> = BTreeMap::new();
+    for (g, path) in group_path {
+        by_depth.entry(path.len()).or_default().push(g.as_str());
+    }
+    let mut drawn: BTreeMap<String, (f64, f64)> = BTreeMap::new();
+    for depth in (1..=max_depth).rev() {
+        let Some(groups) = by_depth.get(&depth) else {
+            continue;
+        };
+        for &g in groups {
+            let mut lo = f64::INFINITY;
+            let mut hi = f64::NEG_INFINITY;
+            if let Some(members) = group_members.get(g) {
+                for &e in members {
+                    let w = size_of(e).width;
+                    lo = lo.min(cross[e] - w / 2.0);
+                    hi = hi.max(cross[e] + w / 2.0);
+                }
+            }
+            if let Some(kids) = children.get(g) {
+                for &child in kids {
+                    if let Some(&(clo, chi)) = drawn.get(child) {
+                        lo = lo.min(clo);
+                        hi = hi.max(chi);
+                    }
+                }
+            }
+            if lo.is_finite() {
+                drawn.insert(g.to_string(), (lo - GROUP_PAD, hi + GROUP_PAD));
+            }
+        }
+    }
+    drawn
+}
+
+fn compact_one_sibling_set(
+    groups: &BTreeSet<String>,
+    drawn: &BTreeMap<String, (f64, f64)>,
+    plan: &PlanGraph,
+    cross: &mut [f64],
+) {
+    let mut frames: Vec<(String, f64, f64)> = Vec::new();
+    for g in groups {
+        let Some(&(left, right)) = drawn.get(g) else {
+            continue;
+        };
+        frames.push((g.clone(), left, right));
+    }
+    frames.sort_by(|a, b| {
+        a.1.partial_cmp(&b.1)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(a.0.cmp(&b.0))
+    });
+    for i in 0..frames.len().saturating_sub(1) {
+        let left_right = frames[i].2;
+        let right_left = frames[i + 1].1;
+        // Signed: >0 excess slack (slide left), <0 shortfall (slide right).
+        let adjust = right_left - left_right - GROUP_FRAME_GAP;
+        if adjust.abs() <= 1e-6 {
+            continue;
+        }
+        let shift_groups: BTreeSet<&str> =
+            frames[i + 1..].iter().map(|(g, _, _)| g.as_str()).collect();
+        // Virtuals keyed off the pre-adjust right frame edge.
+        let virt_gate = right_left;
+        for (e_idx, elem) in plan.elems.iter().enumerate() {
+            let move_it = match &elem.key {
+                ElemKey::Real(_) => elem
+                    .group_path
+                    .iter()
+                    .any(|g| shift_groups.contains(g.as_str())),
+                ElemKey::GroupBoundary { group, .. } => shift_groups.contains(group.as_str()),
+                ElemKey::Virtual { .. } => cross[e_idx] >= virt_gate - 1e-6,
+                ElemKey::OrderPad { .. } => false,
+            };
+            if move_it {
+                cross[e_idx] -= adjust;
+            }
+        }
+        for f in frames.iter_mut().skip(i + 1) {
+            f.1 -= adjust;
+            f.2 -= adjust;
+        }
+    }
 }
 
 fn solve_once(
