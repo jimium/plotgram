@@ -161,19 +161,19 @@
   },
   "flat/mech.layout-styles": {
     "bbox_h": 639.1999999999999,
-    "bbox_w": 511.1297452919091,
+    "bbox_w": 533.4027756368464,
     "channel_used_gates": false,
-    "crossings": 14,
-    "gap_uniformity_max": 0.27769007554377606,
+    "crossings": 19,
+    "gap_uniformity_max": 0.573845519162929,
     "max_bends": 4,
-    "overlap_len": 173.50264126354205,
-    "relaxations": 8,
+    "overlap_len": 400.5265095811724,
+    "relaxations": 6,
     "reversed_count": 2,
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 74,
-    "symmetry_deviation_max": 5.384213246115226,
-    "symmetry_deviation_sum": 29.584344395157938
+    "symmetry_deviation_max": 4.999519413774493,
+    "symmetry_deviation_sum": 38.193690102618774
   },
   "flat/product.employee-onboarding": {
     "bbox_h": 456.29999999999995,
@@ -577,19 +577,19 @@
   },
   "flat/stress.layout-stress-flat-mesh": {
     "bbox_h": 568.3,
-    "bbox_w": 428.2526192563363,
+    "bbox_w": 375.229942551813,
     "channel_used_gates": false,
-    "crossings": 36,
-    "gap_uniformity_max": 0.7185629431118825,
+    "crossings": 39,
+    "gap_uniformity_max": 0.7771197725316051,
     "max_bends": 4,
-    "overlap_len": 719.4701262793782,
-    "relaxations": 8,
+    "overlap_len": 926.5788837890883,
+    "relaxations": 6,
     "reversed_count": 2,
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 42,
-    "symmetry_deviation_max": 6.184572491335442,
-    "symmetry_deviation_sum": 29.30027020838132
+    "symmetry_deviation_max": 6.590221354166666,
+    "symmetry_deviation_sum": 21.611837527935446
   },
   "flat/stress.layout-stress-wide-layer": {
     "bbox_h": 101.80000000000001,

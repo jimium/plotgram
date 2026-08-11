@@ -4,14 +4,21 @@
 //! `(weighted_crossings, total_span, lex_layers)` — crossings first, then
 //! proper-segment order displacement (straightness), then stable lex.
 //!
+//! **Reverse-edge corridor barriers:** FAS-reversed long-edge dummies are
+//! side-corridor anchors (G3 / back-loop). Sifting and transpose must not
+//! move reals across them — otherwise a single bipartite crossing win can
+//! destroy the leaf | corridor | spine pattern (yFiles Layout Styles L3:
+//! `n23 [e30] n6`). Forward long-edge dummies stay permeable so sifting can
+//! still clear ordinary crossings.
+//!
 //! Group containment is enforced upstream by
 //! [`super::boundary::insert_group_boundaries`] (Left/Right clamps + high-weight
 //! cross-rank segments). Crossing minimization is fully group-agnostic.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::cmp::Ordering;
 
-use crate::layout::hierarchical::model::{Elem, PlanGraph};
+use crate::layout::hierarchical::model::{Elem, ElemKey, PlanGraph};
 
 const EPS: f64 = 1e-9;
 const MAX_SWEEPS: usize = 24;
@@ -113,6 +120,7 @@ pub fn order_layers(
     plan: &mut PlanGraph,
     edge_weights: &BTreeMap<String, f64>,
     group_boundary_weight: f64,
+    reversed_edges: &BTreeSet<String>,
 ) {
     if plan.layers.len() < 2 {
         return; // nothing to reorder
@@ -121,12 +129,21 @@ pub fn order_layers(
     let xidx = build_crossing_index(plan);
     // Span/sift are flat-DAG levers; on grouped plans they fight continuous-block
     // clamps and can push Channel into root-scope fallback (hybrid-cloud etc.).
-    let grouped = plan.elems.iter().any(|e| {
-        e.key.is_group_boundary() || !e.group_path.is_empty()
-    });
+    let grouped = plan
+        .elems
+        .iter()
+        .any(|e| e.key.is_group_boundary() || !e.group_path.is_empty());
+    // Reverse-corridor topology is a flat-DAG lever (same gate as span/sift).
+    // On grouped plans, packing by hub would fight continuous-block clamps.
+    let empty_rev = BTreeSet::new();
+    let reversed = if grouped {
+        &empty_rev
+    } else {
+        reversed_edges
+    };
 
     let mut best = plan.layers.clone();
-    let mut best_score = order_score(plan, &xidx, !grouped);
+    let mut best_score = order_score(plan, &xidx, !grouped, reversed);
     let mut no_improve = 0usize;
 
     for sweep in 0..MAX_SWEEPS {
@@ -139,13 +156,15 @@ pub fn order_layers(
                 reorder_layer(plan, &adj, r, Direction::Down);
             }
         }
-        transpose_pass(plan, &xidx, /*use_span*/ !grouped);
+        transpose_pass(plan, &xidx, /*use_span*/ !grouped, reversed);
         for r in 0..plan.layers.len() {
             restore_group_clamps(plan, r);
         }
+        restore_reverse_corridors(plan, &xidx, reversed);
 
-        let score = order_score(plan, &xidx, !grouped);
-        let lex_better = score.crossings == best_score.crossings
+        let score = order_score(plan, &xidx, !grouped, reversed);
+        let lex_better = score.corridor_breaks == best_score.corridor_breaks
+            && score.crossings == best_score.crossings
             && score.total_span == best_score.total_span
             && plan.layers < best;
         if score < best_score || lex_better {
@@ -164,6 +183,7 @@ pub fn order_layers(
     for r in 0..plan.layers.len() {
         restore_group_clamps(plan, r);
     }
+    restore_reverse_corridors(plan, &xidx, reversed);
     if !super::super::CHANNEL_FORCE_ROOT.get() {
         super::boundary::align_group_left_pads(plan);
     }
@@ -171,12 +191,13 @@ pub fn order_layers(
     if !grouped {
         for _ in 0..8 {
             let before_layers = plan.layers.clone();
-            let before = order_score(plan, &xidx, true);
-            sift_pass(plan, &xidx);
+            let before = order_score(plan, &xidx, true, reversed);
+            sift_pass(plan, &xidx, reversed);
             for r in 0..plan.layers.len() {
                 restore_group_clamps(plan, r);
             }
-            let after = order_score(plan, &xidx, true);
+            restore_reverse_corridors(plan, &xidx, reversed);
+            let after = order_score(plan, &xidx, true, reversed);
             if after > before {
                 plan.layers = before_layers;
                 break;
@@ -189,16 +210,27 @@ pub fn order_layers(
 }
 
 /// Lexicographic ordering objective (composition.md §6).
+///
+/// `corridor_breaks` is primary on flat DAGs: FAS reverse dummies anchor a
+/// side corridor (`leaf* | rev-dummy* | spine-cont*`); clearing a bipartite
+/// crossing by pulling the spine across that dummy is not progress.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct OrderScore {
+    corridor_breaks: u64,
     crossings: u64,
     /// Σ |layer_pos(u) − layer_pos(v)| over proper segments (straightness).
     /// Zeroed when `use_span` is false (grouped plans).
     total_span: u64,
 }
 
-fn order_score(plan: &PlanGraph, xidx: &CrossingIndex, use_span: bool) -> OrderScore {
+fn order_score(
+    plan: &PlanGraph,
+    xidx: &CrossingIndex,
+    use_span: bool,
+    reversed_edges: &BTreeSet<String>,
+) -> OrderScore {
     OrderScore {
+        corridor_breaks: count_corridor_breaks(plan, xidx, reversed_edges),
         crossings: total_crossings(plan, xidx),
         total_span: if use_span {
             total_order_span(plan, xidx)
@@ -206,6 +238,63 @@ fn order_score(plan: &PlanGraph, xidx: &CrossingIndex, use_span: bool) -> OrderS
             0
         },
     }
+}
+
+/// Count hubs whose reverse-corridor pattern is broken on a layer:
+/// some continuing spine sits left of a leaf/rev-dummy of the same hub.
+///
+/// Only scored when the hub has **both** leaves and continuing spines on
+/// that layer — otherwise the reverse dummy's side is left to crossings/span
+/// (east vs west back-loop), matching flowchart feedback edges.
+fn count_corridor_breaks(
+    plan: &PlanGraph,
+    xidx: &CrossingIndex,
+    reversed_edges: &BTreeSet<String>,
+) -> u64 {
+    if reversed_edges.is_empty() {
+        return 0;
+    }
+    let mut breaks = 0u64;
+    for layer in &plan.layers {
+        let mut dummies_by_hub: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+        for &e in layer {
+            if !is_reverse_corridor_dummy(plan, e, reversed_edges) {
+                continue;
+            }
+            let Some(hub) = climb_to_real(plan, xidx, e, true) else {
+                continue;
+            };
+            dummies_by_hub.entry(hub).or_default().push(e);
+        }
+        for (hub, dummies) in dummies_by_hub {
+            let pos = |e: usize| layer.iter().position(|&x| x == e).unwrap_or(usize::MAX);
+            let mut leaf_max = 0usize;
+            let mut has_leaf = false;
+            let mut spine_min = usize::MAX;
+            for &e in layer {
+                if !matches!(plan.elems[e].key, ElemKey::Real(_)) {
+                    continue;
+                }
+                if !xidx.up[e].contains(&hub) {
+                    continue;
+                }
+                if has_real_down(plan, xidx, e) {
+                    spine_min = spine_min.min(pos(e));
+                } else {
+                    has_leaf = true;
+                    leaf_max = leaf_max.max(pos(e));
+                }
+            }
+            if !has_leaf || spine_min == usize::MAX {
+                continue;
+            }
+            let left_max = leaf_max.max(dummies.iter().map(|&e| pos(e)).max().unwrap_or(0));
+            if left_max > spine_min {
+                breaks += 1;
+            }
+        }
+    }
+    breaks
 }
 
 fn total_order_span(plan: &PlanGraph, xidx: &CrossingIndex) -> u64 {
@@ -555,13 +644,25 @@ fn delta_swap(plan: &PlanGraph, xidx: &CrossingIndex, r: usize, i: usize) -> i64
 
 /// Adjacent swaps: always accept crossing reductions; when `use_span` and
 /// crossings are flat, accept span reductions.
-fn transpose_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, use_span: bool) {
+/// Never swap a real across a FAS-reversed corridor dummy.
+fn transpose_pass(
+    plan: &mut PlanGraph,
+    xidx: &CrossingIndex,
+    use_span: bool,
+    reversed_edges: &BTreeSet<String>,
+) {
     let budget = plan.elems.len() + plan.layers.len() * 4 + 32;
     for _ in 0..budget {
         let mut improved = false;
         for r in 0..plan.layers.len() {
             let mut i = 0;
             while i + 1 < plan.layers[r].len() {
+                let u = plan.layers[r][i];
+                let v = plan.layers[r][i + 1];
+                if real_rev_corridor_adjacent(plan, u, v, reversed_edges) {
+                    i += 1;
+                    continue;
+                }
                 let d = delta_swap(plan, xidx, r, i);
                 if d < 0 {
                     plan.layers[r].swap(i, i + 1);
@@ -585,9 +686,163 @@ fn transpose_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, use_span: bool) {
     }
 }
 
+fn climb_to_real(plan: &PlanGraph, xidx: &CrossingIndex, start: usize, up: bool) -> Option<usize> {
+    let mut e = start;
+    for _ in 0..plan.layers.len().saturating_add(1) {
+        if matches!(plan.elems[e].key, ElemKey::Real(_)) {
+            return Some(e);
+        }
+        let next = if up {
+            xidx.up[e].first().copied()
+        } else {
+            xidx.down[e].first().copied()
+        }?;
+        e = next;
+    }
+    None
+}
+
+fn has_real_down(plan: &PlanGraph, xidx: &CrossingIndex, e: usize) -> bool {
+    xidx.down[e]
+        .iter()
+        .any(|&n| matches!(plan.elems[n].key, ElemKey::Real(_)))
+}
+
+/// Pack FAS-reversed corridor dummies between leaf children and continuing
+/// children of the same hub (working-source real above the dummy).
+///
+/// Pattern: `… leaf*  [rev-corridor]*  spine-cont* …`
+/// Mirrors yFiles back-loop corridors: a single crossing is not worth
+/// pulling the downward spine inside the reverse dummy (write-authority:
+/// corridor topology stays with Compose, not Ink).
+///
+/// Reorders **in place** over the slots already occupied by that hub's
+/// related elems — unrelated nodes keep their indices (avoids scattering
+/// the rest of the layer).
+fn restore_reverse_corridors(
+    plan: &mut PlanGraph,
+    xidx: &CrossingIndex,
+    reversed_edges: &BTreeSet<String>,
+) {
+    if reversed_edges.is_empty() {
+        return;
+    }
+    for r in 0..plan.layers.len() {
+        let layer = plan.layers[r].clone();
+        let mut dummies_by_hub: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+        for &e in &layer {
+            if !is_reverse_corridor_dummy(plan, e, reversed_edges) {
+                continue;
+            }
+            let Some(hub) = climb_to_real(plan, xidx, e, true) else {
+                continue;
+            };
+            dummies_by_hub.entry(hub).or_default().push(e);
+        }
+        if dummies_by_hub.is_empty() {
+            continue;
+        }
+
+        let mut new_layer = layer.clone();
+        for (hub, dummies) in &dummies_by_hub {
+            let mut leaves = Vec::new();
+            let mut cont = Vec::new();
+            for &e in &layer {
+                if !matches!(plan.elems[e].key, ElemKey::Real(_)) {
+                    continue;
+                }
+                if !xidx.up[e].contains(hub) {
+                    continue;
+                }
+                if has_real_down(plan, xidx, e) {
+                    cont.push(e);
+                } else {
+                    leaves.push(e);
+                }
+            }
+            // No leaves ⇒ side of the reverse corridor is free (east/west);
+            // do not pin dummies left of the spine.
+            if leaves.is_empty() || cont.is_empty() {
+                continue;
+            }
+            // Preserve relative order already present in `layer`.
+            let order_of = |ids: &[usize]| -> Vec<usize> {
+                layer.iter().copied().filter(|e| ids.contains(e)).collect()
+            };
+            let packed: Vec<usize> = {
+                let mut v = order_of(&leaves);
+                v.extend(order_of(dummies));
+                v.extend(order_of(&cont));
+                v
+            };
+            if packed.is_empty() {
+                continue;
+            }
+            let mut slots: Vec<usize> = packed
+                .iter()
+                .filter_map(|&e| layer.iter().position(|&x| x == e))
+                .collect();
+            slots.sort_unstable();
+            slots.dedup();
+            if slots.len() != packed.len() {
+                continue;
+            }
+            for (slot, &elem) in slots.iter().zip(packed.iter()) {
+                new_layer[*slot] = elem;
+            }
+        }
+        debug_assert_eq!(new_layer.len(), layer.len());
+        plan.layers[r] = new_layer;
+    }
+}
+
+fn is_reverse_corridor_dummy(
+    plan: &PlanGraph,
+    elem: usize,
+    reversed_edges: &BTreeSet<String>,
+) -> bool {
+    match &plan.elems[elem].key {
+        ElemKey::Virtual { edge_id, .. } => reversed_edges.contains(edge_id),
+        _ => false,
+    }
+}
+
+fn real_rev_corridor_adjacent(
+    plan: &PlanGraph,
+    a: usize,
+    b: usize,
+    reversed_edges: &BTreeSet<String>,
+) -> bool {
+    let a_rev = is_reverse_corridor_dummy(plan, a, reversed_edges);
+    let b_rev = is_reverse_corridor_dummy(plan, b, reversed_edges);
+    let a_real = matches!(plan.elems[a].key, ElemKey::Real(_));
+    let b_real = matches!(plan.elems[b].key, ElemKey::Real(_));
+    (a_rev && b_real) || (b_rev && a_real)
+}
+
+/// Inclusive-exclusive pocket `[lo, hi)` of `layer` containing `pos`, bounded
+/// by reverse-corridor dummies (layer ends if none).
+fn corridor_pocket(layer: &[usize], pos: usize, plan: &PlanGraph, reversed: &BTreeSet<String>) -> (usize, usize) {
+    let mut lo = 0;
+    for i in (0..pos).rev() {
+        if is_reverse_corridor_dummy(plan, layer[i], reversed) {
+            lo = i + 1;
+            break;
+        }
+    }
+    let mut hi = layer.len();
+    for i in (pos + 1)..layer.len() {
+        if is_reverse_corridor_dummy(plan, layer[i], reversed) {
+            hi = i;
+            break;
+        }
+    }
+    (lo, hi)
+}
+
 /// Sifting: slide each non-zero-width elem through its layer, keep best `J_order`.
-/// Crosses zero-width dummies that block adjacent transpose.
-fn sift_pass(plan: &mut PlanGraph, xidx: &CrossingIndex) {
+/// Forward dummies are permeable; FAS-reversed corridor dummies bound the pocket.
+fn sift_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, reversed_edges: &BTreeSet<String>) {
     let layer_count = plan.layers.len();
     for r in 0..layer_count {
         if plan.layers[r].len() < 2 {
@@ -601,26 +856,32 @@ fn sift_pass(plan: &mut PlanGraph, xidx: &CrossingIndex) {
         candidates.sort_by_key(|&e| plan.decl_index[e]);
 
         for elem in candidates {
-            if !plan.layers[r].iter().any(|&e| e == elem) {
+            let Some(from) = plan.layers[r].iter().position(|&e| e == elem) else {
                 continue;
-            }
+            };
+            let (pocket_lo, pocket_hi) =
+                corridor_pocket(&plan.layers[r], from, plan, reversed_edges);
             let without: Vec<usize> = plan.layers[r]
                 .iter()
                 .copied()
                 .filter(|&e| e != elem)
                 .collect();
+            // Map full-layer pocket to insert indices in `without`.
+            let insert_lo = pocket_lo;
+            let insert_hi = pocket_hi.saturating_sub(1); // exclusive end after removal
             let mut best_layer = plan.layers[r].clone();
-            let mut best = order_score(plan, xidx, true);
+            let mut best = order_score(plan, xidx, true, reversed_edges);
 
-            for to in 0..=without.len() {
+            for to in insert_lo..=insert_hi {
+                if to > without.len() {
+                    break;
+                }
                 let mut trial = without.clone();
                 trial.insert(to, elem);
                 plan.layers[r] = trial;
                 restore_group_clamps(plan, r);
-                let score = order_score(plan, xidx, true);
-                if score < best
-                    || (score == best && plan.layers[r] < best_layer)
-                {
+                let score = order_score(plan, xidx, true, reversed_edges);
+                if score < best || (score == best && plan.layers[r] < best_layer) {
                     best = score;
                     best_layer = plan.layers[r].clone();
                 }
@@ -690,7 +951,7 @@ mod tests {
         let mut plan = crossing_plan();
         let xidx = build_crossing_index(&plan);
         assert_eq!(total_crossings(&plan, &xidx), 1);
-        order_layers(&mut plan, &BTreeMap::new(), 16.0);
+        order_layers(&mut plan, &BTreeMap::new(), 16.0, &BTreeSet::new());
         let xidx = build_crossing_index(&plan);
         assert_eq!(total_crossings(&plan, &xidx), 0);
     }
@@ -744,7 +1005,7 @@ mod tests {
         };
 
         insert_group_boundaries(&mut plan);
-        order_layers(&mut plan, &BTreeMap::new(), 16.0);
+        order_layers(&mut plan, &BTreeMap::new(), 16.0, &BTreeSet::new());
 
         let layer1 = &plan.layers[1];
         let left = layer1.iter().position(|&e| {
@@ -791,8 +1052,8 @@ mod tests {
     fn deterministic_rerun() {
         let mut p1 = crossing_plan();
         let mut p2 = crossing_plan();
-        order_layers(&mut p1, &BTreeMap::new(), 16.0);
-        order_layers(&mut p2, &BTreeMap::new(), 16.0);
+        order_layers(&mut p1, &BTreeMap::new(), 16.0, &BTreeSet::new());
+        order_layers(&mut p2, &BTreeMap::new(), 16.0, &BTreeSet::new());
         assert_eq!(p1.layers, p2.layers);
     }
 
@@ -835,7 +1096,7 @@ mod tests {
         };
 
         let mut p = plan_of();
-        order_layers(&mut p, &BTreeMap::new(), 16.0);
+        order_layers(&mut p, &BTreeMap::new(), 16.0, &BTreeSet::new());
         assert_eq!(p.layers[1], vec![2, 3]);
 
         let weights: BTreeMap<String, f64> = [("e0".to_string(), 2.0)].into_iter().collect();
@@ -923,14 +1184,14 @@ mod tests {
         for width in [18, 32, 64] {
             let mut plan = wide_layer_plan(width);
             let layer_len = width + 2;
-            order_layers(&mut plan, &BTreeMap::new(), 16.0);
+            order_layers(&mut plan, &BTreeMap::new(), 16.0, &BTreeSet::new());
             assert_eq!(plan.layers[0].len(), layer_len, "width={width}");
             assert_eq!(plan.layers[1].len(), layer_len, "width={width}");
         }
     }
 
     /// Dummy between two reals must not freeze a crossing that sifting can clear
-    /// (mech.layout-styles L3: n23 | virt | n6 vs n26→n6 × n5→n23).
+    /// (forward long-edge dummy — permeable).
     #[test]
     fn sifting_clears_crossing_across_dummy() {
         let elems = vec![
@@ -940,7 +1201,7 @@ mod tests {
             plain_elem("n23", 1, &[]),
             Elem {
                 key: ElemKey::Virtual {
-                    edge_id: "e30".into(),
+                    edge_id: "e_fwd".into(),
                     ordinal: 0,
                 },
                 group_path: Vec::new(),
@@ -990,13 +1251,112 @@ mod tests {
         };
         let xidx = build_crossing_index(&plan);
         assert_eq!(total_crossings(&plan, &xidx), 1);
-        order_layers(&mut plan, &BTreeMap::new(), 16.0);
+        order_layers(&mut plan, &BTreeMap::new(), 16.0, &BTreeSet::new());
         let xidx = build_crossing_index(&plan);
         assert_eq!(
             total_crossings(&plan, &xidx),
             0,
-            "sifting should move n6 left of n23 across the dummy: {:?}",
+            "sifting should move n6 left of n23 across a forward dummy: {:?}",
             plan.layers[1]
+        );
+    }
+
+    /// FAS-reversed dummies are side-corridor anchors: reals must not sift
+    /// across them even when that would clear a bipartite crossing
+    /// (layout-styles L3: keep `n23 [e30] n6`, not `n6 n23 [e30]`).
+    #[test]
+    fn reverse_corridor_dummy_blocks_sift_across() {
+        let elems = vec![
+            plain_elem("n26", 0, &[]),
+            plain_elem("n5", 0, &[]),
+            plain_elem("n25", 1, &[]),
+            plain_elem("n23", 1, &[]),
+            Elem {
+                key: ElemKey::Virtual {
+                    edge_id: "e30".into(),
+                    ordinal: 0,
+                },
+                group_path: Vec::new(),
+                rank: 1,
+            },
+            plain_elem("n6", 1, &[]),
+            plain_elem("n10", 2, &[]),
+        ];
+        let segments = vec![
+            Segment {
+                edge_id: "a".into(),
+                ordinal: 0,
+                from: 0,
+                to: 2,
+            },
+            Segment {
+                edge_id: "b".into(),
+                ordinal: 0,
+                from: 0,
+                to: 5,
+            },
+            Segment {
+                edge_id: "c".into(),
+                ordinal: 0,
+                from: 1,
+                to: 3,
+            },
+            Segment {
+                edge_id: "d".into(),
+                ordinal: 0,
+                from: 1,
+                to: 5,
+            },
+            Segment {
+                edge_id: "e30".into(),
+                ordinal: 0,
+                from: 1,
+                to: 4,
+            },
+            Segment {
+                edge_id: "spine".into(),
+                ordinal: 0,
+                from: 5,
+                to: 6,
+            },
+        ];
+        let layers = vec![vec![0, 1], vec![2, 3, 4, 5], vec![6]];
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let mut plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: (0..7).collect(),
+            segments,
+            layers,
+        };
+        let reversed: BTreeSet<String> = ["e30".into()].into_iter().collect();
+        order_layers(&mut plan, &BTreeMap::new(), 16.0, &reversed);
+        let layer1 = &plan.layers[1];
+        let pos = |id: &str| {
+            layer1
+                .iter()
+                .position(|&e| match &plan.elems[e].key {
+                    ElemKey::Real(x) => x == id,
+                    ElemKey::Virtual { edge_id, .. } => edge_id == id,
+                    _ => false,
+                })
+                .unwrap()
+        };
+        assert!(
+            pos("n23") < pos("e30") && pos("e30") < pos("n6"),
+            "leaf | reverse-corridor | spine must hold, got {:?}",
+            layer1
+                .iter()
+                .map(|&e| match &plan.elems[e].key {
+                    ElemKey::Real(id) => id.clone(),
+                    ElemKey::Virtual { edge_id, .. } => format!("[{edge_id}]"),
+                    _ => "?".into(),
+                })
+                .collect::<Vec<_>>()
         );
     }
 
@@ -1039,9 +1399,12 @@ mod tests {
             segments,
             layers,
         };
-        order_layers(&mut plan, &BTreeMap::new(), 16.0);
+        order_layers(&mut plan, &BTreeMap::new(), 16.0, &BTreeSet::new());
         assert_eq!(plan.layers[1], vec![2, 3]);
         let xidx = build_crossing_index(&plan);
-        assert_eq!(order_score(&plan, &xidx, true).total_span, 0);
+        assert_eq!(
+            order_score(&plan, &xidx, true, &BTreeSet::new()).total_span,
+            0
+        );
     }
 }
