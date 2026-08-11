@@ -5,6 +5,8 @@
 > 裁定权仍在 [`architecture.md`](../architecture.md)、[`expectations.md`](../expectations.md)、[`dsl-spec.md`](../../../../specs/dsl-spec.md)。  
 > 相关评审：[`2026-08-08-hier-review.md`](2026-08-08-hier-review.md) §2.6 / §3（组通道 fallback、与 yFiles 差距）。
 
+> ⚠️ **补丁（2026-08-11，D₂ 里程碑关闭后）**：本文为 2026-08-09 快照，以下陈述已过时，以 [`phases/group-frame-d2.md`](../phases/group-frame-d2.md) 为准：① 「组框是 finalize 后验 bbox」（§0/§2/§4）——D₂.0 起框真源 = Metric VPSC 变量（`metric/group_frames.rs`），finalize 只透传；② 「sibling separation 未做 / 靠 compact」（§3.3/§5）——D₂.1 起兄弟硬分隔进 VPSC + hier_eval 硬门禁；③ 「穿组 verifier 未落地 / 仅观测」（§3.2/§3.3/§5）——D₂.2a 起 Weak 穿组硬门禁（C 类豁免登记 §8.10）；④ 「Gate 无容量上限」（§3.1）——D₂.2b 起 Gate 容量进 Demand（`publish_gate_capacity_demand`）+ Demand 下界 verifier；⑤ fallback 触发已全量可观测（`gate_fallback_events`）。
+
 ---
 
 ## 0. 一句话总览

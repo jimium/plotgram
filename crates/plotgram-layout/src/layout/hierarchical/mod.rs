@@ -14,7 +14,7 @@ mod channel;
 mod compose;
 mod debug;
 mod demand;
-mod group_frame;
+pub mod group_frame;
 mod ink;
 mod metric;
 mod model;
@@ -35,7 +35,7 @@ use plotgram_engine_api::{
 use plotgram_model::diagnostics::{HierarchicalObs, LayoutDiagnostics};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::port::{AlongSpec, PortRef};
-use plotgram_model::result::{EdgePath, EdgePlacement, NodePlacement};
+use plotgram_model::result::{EdgePath, EdgePlacement, GroupPlacement, NodePlacement};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub use params::{
@@ -105,7 +105,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
     let canonical_size = canonical_sizes(&real_graph, input.node_sizes, orientation)?;
 
     if params.group_policy == GroupPolicy::StrongMacro {
-        let (real_graph, plan, ports, end_bundles, frames, labeled) = strong_macro::layout(
+        let (real_graph, plan, ports, end_bundles, frames, groups, labeled) = strong_macro::layout(
             input, params, orientation, real_graph, &canonical_size,
         )?;
         // D1.2: Channel search + rip-up; BundlePlan (end-bus + optional corridor).
@@ -122,7 +122,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
             &labeled,
             canonical_size,
             route_plan,
-            TailFrames::Fixed(frames),
+            TailFrames::Fixed { frames, groups },
         );
     }
 
@@ -239,20 +239,25 @@ fn compute_weak<'g>(
     )
 }
 
-/// How the shared tail obtains final canonical frames.
+/// How the shared tail obtains final canonical frames / group frames.
 enum TailFrames {
     /// Weak: prelim frames feed PortLanes/TrackOrder; the DemandBoard then
     /// resolves layer gaps and the final main-axis solve produces frames.
     /// `prelim_cross` is the raw VPSC cross vector, passed through untouched
     /// (re-deriving it from `x + w/2` is not float-identical and flips
     /// downstream tie-breaks — weak output must stay bit-stable).
+    /// Group frames are solved afterwards via [`metric::group_frames`].
     WeakSolve {
         prelim_frames: Vec<Rect>,
         prelim_cross: Vec<f64>,
     },
-    /// StrongMacro: the macro-block writer already placed every frame
-    /// (strong-macro.md §5.2 — the tail never re-solves coordinates).
-    Fixed(Vec<Rect>),
+    /// StrongMacro: the macro-block writer already placed every node frame
+    /// and every group frame (strong-macro.md §5.2 / group-frame-d2.md §6.3
+    /// — the tail never re-solves coordinates or group envelopes).
+    Fixed {
+        frames: Vec<Rect>,
+        groups: Vec<GroupPlacement>,
+    },
 }
 
 /// Shared Channel → TrackOrder → Bus → Ink → assemble tail, policy-agnostic
@@ -279,14 +284,23 @@ fn compute_channel_ink_tail<'g>(
         .into_iter()
         .collect();
     bus_edge_ids.sort();
+    let gate_fallback_events = route_plan
+        .relaxations
+        .iter()
+        .filter(|r| r.rule == "channel-group-fallback")
+        .count();
     diagnostics.hierarchical = Some(HierarchicalObs {
         channel_used_gates: route_plan.used_gates,
         ripup_rounds: route_plan.ripup_rounds,
         bus_edge_ids,
+        gate_fallback_events,
+        layer_gap_demands: BTreeMap::new(),
+        layer_gaps: Vec::new(),
+        gate_capacity_seams: 0,
     });
     compose::verify::verify_plan(&plan, &real_graph, &ports, &route_plan)?;
 
-    let (main, cross, canonical_frames, track_order) = match frames {
+    let (main, cross, canonical_frames, track_order, canonical_group_placements) = match frames {
         TailFrames::WeakSolve {
             prelim_frames,
             prelim_cross,
@@ -328,9 +342,31 @@ fn compute_channel_ink_tail<'g>(
                 &track_order,
                 params.edge_gap,
             );
+            // D₂.2b §8.11: per-gate crossing counts raise the adjacent seams
+            // (Macro-aligned cap) — a pre-route floor next to the channel /
+            // shell producers. Only when gates are actually used: a
+            // root-scope fallback diagram has no gate lanes to budget.
+            let gate_capacity_seams = if route_plan.used_gates {
+                demand::publish_gate_capacity_demand(
+                    &mut demand_board,
+                    &plan,
+                    &real_graph,
+                    params.layer_gap,
+                    params.edge_gap,
+                )
+            } else {
+                0
+            };
             demand_board.freeze();
             let layer_gaps =
                 demand::resolved_layer_gaps(plan.layers.len(), params.layer_gap, &demand_board);
+            // MetricVerifier demand floor (coordinate-and-demand.md §9):
+            // expose published demands + resolved gaps for eval gates.
+            if let Some(obs) = diagnostics.hierarchical.as_mut() {
+                obs.layer_gap_demands = demand_board.layer_gap_lower_bounds();
+                obs.layer_gaps = layer_gaps.clone();
+                obs.gate_capacity_seams = gate_capacity_seams;
+            }
             let main = metric::main_axis::assign_main_axis(
                 &plan,
                 &size_of,
@@ -343,14 +379,25 @@ fn compute_channel_ink_tail<'g>(
                     Rect::new(prelim_frames[i].x, main[i], s.width, s.height)
                 })
                 .collect();
-            (main, prelim_cross, canonical_frames, track_order)
+            // D₂.0: Weak group-frame true source = Metric Fit VPSC
+            // (group-frame-d2.md §6.2). Strong never enters this arm.
+            let groups = metric::group_frames::solve_group_frames(
+                &input.graph.groups,
+                &plan,
+                &canonical_frames,
+                labeled,
+            )
+            .map_err(|e| {
+                LayoutError::message(format!("hierarchical: group frame solve failed: {e}"))
+            })?;
+            (main, prelim_cross, canonical_frames, track_order, groups)
         }
-        TailFrames::Fixed(canonical_frames) => {
+        TailFrames::Fixed { frames, groups } => {
             metric::port_lane::apply_port_lanes(
                 &plan,
                 &real_graph,
                 &mut ports,
-                &canonical_frames,
+                &frames,
                 params.edge_gap,
             );
             // StrongMacro: TrackOrder reads the final (macro-placed) frames.
@@ -358,28 +405,25 @@ fn compute_channel_ink_tail<'g>(
                 &plan,
                 &real_graph,
                 &ports,
-                &canonical_frames,
+                &frames,
                 &route_plan.bundles,
                 &route_plan,
             );
-            let main: Vec<f64> = canonical_frames.iter().map(|f| f.y).collect();
+            let main: Vec<f64> = frames.iter().map(|f| f.y).collect();
             let cross: Vec<f64> = (0..plan.elems.len())
-                .map(|i| canonical_frames[i].x + size_of(i).width / 2.0)
+                .map(|i| frames[i].x + size_of(i).width / 2.0)
                 .collect();
-            (main, cross, canonical_frames, track_order)
+            (main, cross, frames, track_order, groups)
         }
     };
-
     let shell_bands = group_frame::group_shell_bands(&plan, labeled);
-    // SM-4: StrongMacro outer Main rails must clear group envelopes (finalize
-    // pad contract) so long-haul returns never ride inside a foreign group
-    // frame. Weak passes nothing (bit-stable).
-    let group_obstacles: Vec<(f64, f64, f64, f64)> =
-        if params.group_policy == GroupPolicy::StrongMacro {
-            canonical_group_obstacles(&input.graph.groups, &plan, &canonical_frames)
-        } else {
-            Vec::new()
-        };
+    // SM-4 + D₂.0 §8.4: outer Main rails clear the layout-owned group
+    // envelopes (Weak: Metric Fit; Strong: MacroBlockWriter — never a second
+    // VPSC frame solve on Strong).
+    let group_obstacles: Vec<(f64, f64, f64, f64)> = canonical_group_placements
+        .iter()
+        .map(|g| (g.frame.x, g.frame.y, g.frame.right(), g.frame.bottom()))
+        .collect();
     let (track_coords, track_relaxations) = metric::track::assign_track_coords(
         &plan,
         &main,
@@ -531,6 +575,21 @@ fn compute_channel_ink_tail<'g>(
 
     let shift = normalize_to_origin(&mut nodes, &mut edges);
 
+    // Orientation-out for group frames + the same whole-graph shift applied
+    // to nodes/edges (finalize passes these through unchanged).
+    let groups: Vec<GroupPlacement> = canonical_group_placements
+        .iter()
+        .map(|g| {
+            let mut frame = canonical_rect_to_physical(orientation, g.frame);
+            frame.x += shift.0;
+            frame.y += shift.1;
+            GroupPlacement {
+                id: g.id.clone(),
+                frame,
+            }
+        })
+        .collect();
+
     let edges = match input.edge_geometry {
         EdgeGeometryMode::Builtin => edges,
         EdgeGeometryMode::DeferToRouter => edges
@@ -577,6 +636,8 @@ fn compute_channel_ink_tail<'g>(
         LayoutOutput {
             nodes,
             edges,
+            groups,
+            owns_group_frames: true,
             diagnostics,
         },
         captures,
@@ -632,65 +693,6 @@ fn collect_labeled_groups(groups: &[plotgram_model::graph::Group]) -> std::colle
     }
     walk(groups, &mut out);
     out
-}
-
-/// Canonical-space group envelopes replicating the engine finalize pad
-/// contract (member frames ∪ nested envelopes, +GROUP_PAD on each side,
-/// label band on top). Outer Main rails clear these so a full-height
-/// return corridor never rides inside a foreign group frame (SM-4).
-fn canonical_group_obstacles(
-    groups: &[plotgram_model::graph::Group],
-    plan: &model::PlanGraph,
-    canonical_frames: &[Rect],
-) -> Vec<(f64, f64, f64, f64)> {
-    let mut out = Vec::new();
-    collect_group_obstacles(groups, plan, canonical_frames, &mut out);
-    out
-}
-
-fn collect_group_obstacles(
-    groups: &[plotgram_model::graph::Group],
-    plan: &model::PlanGraph,
-    canonical_frames: &[Rect],
-    out: &mut Vec<(f64, f64, f64, f64)>,
-) {
-    for g in groups {
-        let nested_start = out.len();
-        collect_group_obstacles(&g.groups, plan, canonical_frames, out);
-
-        let mut min_x = f64::INFINITY;
-        let mut min_y = f64::INFINITY;
-        let mut max_x = f64::NEG_INFINITY;
-        let mut max_y = f64::NEG_INFINITY;
-        let mut union = |r: Rect| {
-            min_x = min_x.min(r.x);
-            min_y = min_y.min(r.y);
-            max_x = max_x.max(r.right());
-            max_y = max_y.max(r.bottom());
-        };
-        for n in &g.nodes {
-            if let Some(&ei) = plan.index_of.get(&ElemKey::Real(n.id.clone())) {
-                union(canonical_frames[ei]);
-            }
-        }
-        for &(l, t, r, b) in &out[nested_start..] {
-            union(Rect::new(l, t, r - l, b - t));
-        }
-        if !min_x.is_finite() {
-            continue; // no placed content — finalize emits no frame either
-        }
-        let top_pad = if g.label.is_some() {
-            group_frame::GROUP_LABEL_TOP_PAD
-        } else {
-            group_frame::GROUP_PAD
-        };
-        out.push((
-            min_x - group_frame::GROUP_PAD,
-            min_y - top_pad,
-            max_x + group_frame::GROUP_PAD,
-            max_y + group_frame::GROUP_PAD,
-        ));
-    }
 }
 
 /// Canonical resolved port → physical [`PortRef`] (orientation-out pass).

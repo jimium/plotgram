@@ -366,7 +366,10 @@ struct PreparedEdge {
 /// When group-cut gates make an edge infeasible, fall back to root-scope
 /// substrate (same soft path as impure group rects) so the diagram still
 /// layouts; `used_gates` is false and a `channel-group-fallback` relaxation
-/// records the reason.
+/// records the reason. (A per-edge scope widening was trialed in D₂.2b and
+/// reverted: widened edges re-use root tracks on the group substrate, so
+/// penetration counts stayed while bends/canvas regressed — see
+/// group-frame-d2.md §8.12 落地记录.)
 pub fn route_edges_channel(
     plan: &PlanGraph,
     graph: &RealGraph,

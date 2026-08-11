@@ -15,7 +15,9 @@
 //! - orthogonal edge segments must not penetrate the open interior of any
 //!   non-endpoint node (same rule as InkVerifier);
 //! - group gates (strong-macro.md §6 SM-4): nested group frames stay inside
-//!   their parent (hard, all grouped fixtures), and `group_policy:
+//!   their parent (hard, all grouped fixtures); unrelated sibling frames
+//!   sharing a main-axis band keep a gap ≥ GROUP_FRAME_GAP (hard, D₂.1);
+//!   and `group_policy:
 //!   strong-macro` fixtures must have zero edge/group penetration (weak
 //!   fixtures print the count as an observation);
 //! - a self-contained segment-intersection crossing count and max-bend count
@@ -62,7 +64,7 @@ use plotgram_compile::{
     build_debug_trace, build_layout, compute_hier_metrics, node_gap_from_source, BuildOptions,
     CrossAxis,
 };
-use plotgram_layout::group_penetration_violations;
+use plotgram_layout::{group_penetration_violations, GROUP_FRAME_GAP};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::graph::{Edge as ModelEdge, Group as ModelGroup};
 use plotgram_model::port::{AlongSpec, Side};
@@ -146,6 +148,7 @@ struct FileMetrics {
     channel_used_gates: bool,
     relaxations: usize,
     ripup_rounds: u32,
+    gate_fallback_events: usize,
 }
 
 fn baseline_path() -> PathBuf {
@@ -205,6 +208,7 @@ fn hierarchical_showcase_geometry_invariants() {
         check_orthogonal_and_ports(&name, &source, &result, &mut hard_failures);
         check_no_edge_node_penetration(&name, &source, &result, &mut hard_failures);
         check_group_gates(&name, &source, &result, &mut hard_failures);
+        check_demand_floor(&name, &result, &mut hard_failures);
         let reversed_count = match build_debug_trace(&source, &BuildOptions::default()) {
             Ok(trace) => serde_json::to_value(&trace)
                 .ok()
@@ -223,10 +227,30 @@ fn hierarchical_showcase_geometry_invariants() {
             }
         };
         all_metrics.push(compute_metrics(&name, &source, &result, reversed_count));
+        // D₂.2b §8.12 observability: every gate-fallback event stays loud
+        // (per-edge widening trial, derive-level impure rects, whole-diagram
+        // gate-route fallback all record under this rule).
+        let fb = all_metrics.last().map(|m| m.gate_fallback_events).unwrap_or(0);
+        if fb > 0 {
+            println!("{name}: [fallback] {fb} channel-group-fallback event(s)");
+            for r in &result.diagnostics.relaxations {
+                if r.rule == "channel-group-fallback" {
+                    println!("{name}:   fallback: {}", r.detail);
+                }
+            }
+        }
+        if let Some(obs) = result.diagnostics.hierarchical.as_ref() {
+            if obs.gate_capacity_seams > 0 {
+                println!(
+                    "{name}: [gate-capacity] published on {} seam(s)",
+                    obs.gate_capacity_seams
+                );
+            }
+        }
     }
 
     println!(
-        "\n{:<45} {:>6} {:>6} {:>10} {:>10} {:>10} {:>6} {:>6} {:>8} {:>14}",
+        "\n{:<45} {:>6} {:>6} {:>10} {:>10} {:>10} {:>6} {:>6} {:>4} {:>8} {:>14}",
         "fixture",
         "nodes",
         "edges",
@@ -235,12 +259,13 @@ fn hierarchical_showcase_geometry_invariants() {
         "sum_bends",
         "gates",
         "relax",
+        "fb",
         "sym_max",
         "bbox (w x h)"
     );
     for m in &all_metrics {
         println!(
-            "{:<45} {:>6} {:>6} {:>10} {:>10} {:>10} {:>6} {:>6} {:>8.2} {:>14}",
+            "{:<45} {:>6} {:>6} {:>10} {:>10} {:>10} {:>6} {:>6} {:>4} {:>8.2} {:>14}",
             m.name,
             m.nodes,
             m.edges,
@@ -249,6 +274,7 @@ fn hierarchical_showcase_geometry_invariants() {
             m.sum_bends,
             m.channel_used_gates as u8,
             m.relaxations,
+            m.gate_fallback_events,
             m.symmetry_deviation_max,
             format!("{:.0} x {:.0}", m.bbox_w, m.bbox_h)
         );
@@ -420,13 +446,18 @@ fn segment_hits_rect_interior(a: Point, b: Point, frame: Rect, inset: f64) -> bo
 }
 
 /// SM-4 group gates (strong-macro.md §6):
-/// - containment (hard, every grouped fixture): each nested group frame
-///   must fit inside its parent frame — the finalize union+pad contract
-///   makes this structurally true, so the gate is a regression guardrail;
-/// - penetration: `group_policy: strong-macro` fixtures hard-fail on any
-///   edge segment entering a group frame outside its endpoints' group
-///   ancestor chains; every other fixture only prints the violation count
-///   (D₂ backlog — the Weak path has no no-penetration contract yet).
+/// - containment (hard, every grouped fixture): nested group ⊆ parent **and**
+///   each direct member node ⊆ its host group frame (D₂.0 Metric / MacroBlock
+///   writers); the gate is a regression guardrail;
+/// - sibling separation (hard, D₂.1): unrelated frames sharing a main-axis
+///   band keep a cross-axis gap ≥ GROUP_FRAME_GAP (written by the VPSC hard
+///   set since D₂.1 moved sibling push-apart into the solve);
+/// - penetration (hard, D₂.2a): any edge segment entering a group frame
+///   outside its endpoints' group ancestor chains fails — strong-macro and
+///   weak alike. A fixture may carry a source annotation
+///   `// d2-exempt: group-penetration — <reason>` (class-C registry,
+///   group-frame-d2.md §8.10) to downgrade to observation; exemptions are
+///   never silent — the count and details stay printed.
 fn check_group_gates(
     name: &str,
     source: &str,
@@ -447,8 +478,12 @@ fn check_group_gates(
         .map(|g| (g.id.as_str(), g.frame))
         .collect();
 
-    // --- containment: child group frame ⊆ parent group frame -------------
+    // --- containment (hard): nested group ⊆ parent; member node ⊆ host ----
     group_containment(&graph.groups, &frame_of, name, failures);
+    member_containment(&graph.groups, result, &frame_of, name, failures);
+
+    // --- sibling separation: unrelated frames sharing a main-axis band ----
+    sibling_separation(&graph.groups, &frame_of, source, name, failures);
 
     // --- penetration: endpoint ancestor chains whitelist ------------------
     let mut chain_of: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -477,11 +512,135 @@ fn check_group_gates(
                 v.edge, v.group
             ));
         }
-    } else {
+    } else if penetration_exempt(source) {
+        // D₂.2a class-C registry (group-frame-d2.md §8.10): documented
+        // exemption, observation stays loud — count + details + the
+        // relaxations that explain the residual routing.
         println!(
-            "{name}: [observed] {} group penetration violation(s) (D₂ backlog)",
+            "{name}: [exempt] {} group penetration violation(s) (D₂.2a class-C registry)",
             violations.len()
         );
+        for v in &violations {
+            println!("{name}:   pen: edge `{}` -> group `{}`", v.edge, v.group);
+        }
+        for r in &result.diagnostics.relaxations {
+            println!("{name}:   relax: [{}] {}", r.rule, r.detail);
+        }
+    } else {
+        for v in &violations {
+            failures.push(format!(
+                "{name}: edge `{}` penetrates group `{}` (weak gate; \
+                 class-C exemption via `// d2-exempt: group-penetration`) ",
+                v.edge, v.group
+            ));
+        }
+    }
+}
+
+/// D₂.2a exemption marker (group-frame-d2.md §8.10): a fixture source
+/// comment downgrades the weak penetration gate to observation. Only
+/// class-C registry entries may carry it; each must state the reason.
+fn penetration_exempt(source: &str) -> bool {
+    source.contains("d2-exempt: group-penetration")
+}
+
+/// D₂.2b MetricVerifier demand floor (coordinate-and-demand.md §9,
+/// group-frame-d2.md §8.13): every published LayerGap demand must be met by
+/// the resolved gap — the resolution is max-based by construction, so this
+/// gate guards against future producers bypassing the DemandBoard.
+fn check_demand_floor(name: &str, result: &LayoutResult, failures: &mut Vec<String>) {
+    let Some(obs) = result.diagnostics.hierarchical.as_ref() else {
+        return;
+    };
+    for (&seam, &demand) in &obs.layer_gap_demands {
+        let got = obs.layer_gaps.get(seam as usize).copied().unwrap_or(0.0);
+        if got + EPS < demand {
+            failures.push(format!(
+                "{name}: demand floor violated — seam {seam} resolved {got} < demand {demand}"
+            ));
+        }
+    }
+}
+
+/// D₂.2a canvas-bloat guard (group-frame-d2.md §8.10: no fake clearance by
+/// enlarging frames): a weak fixture bbox dimension beyond +10% of the
+/// checked-in baseline fails.
+fn bbox_over_guard(w: f64, h: f64, base_w: f64, base_h: f64) -> bool {
+    const GUARD: f64 = 1.10;
+    w > base_w * GUARD + EPS || h > base_h * GUARD + EPS
+}
+
+/// D₂.1 sibling separation gate (group-frame-d2.md §8.9): unrelated group
+/// frames whose main-axis projections intersect must keep a cross-axis gap
+/// ≥ `GROUP_FRAME_GAP` — the cross-axis VPSC hard set writes that degree of
+/// freedom since D₂.1 moved sibling push-apart into the solve. Stacked siblings on
+/// disjoint main-axis bands are exempt (their main-axis gap is
+/// `layer_gap − 2×GROUP_PAD`, intentionally tighter).
+fn sibling_separation(
+    groups: &[ModelGroup],
+    frame_of: &BTreeMap<&str, Rect>,
+    source: &str,
+    name: &str,
+    failures: &mut Vec<String>,
+) {
+    // All showcase fixtures are top-to-bottom; scan for LR aliases anyway.
+    let lr = source.contains("left-to-right") || source.contains("ltr");
+
+    // Flatten to (id, frame, strict ancestor ids).
+    let mut flat: Vec<(String, Rect, BTreeSet<String>)> = Vec::new();
+    fn flatten(
+        groups: &[ModelGroup],
+        ancestors: &mut BTreeSet<String>,
+        frame_of: &BTreeMap<&str, Rect>,
+        flat: &mut Vec<(String, Rect, BTreeSet<String>)>,
+    ) {
+        for g in groups {
+            if let Some(&frame) = frame_of.get(g.id.as_str()) {
+                flat.push((g.id.clone(), frame, ancestors.clone()));
+            }
+            ancestors.insert(g.id.clone());
+            flatten(&g.groups, ancestors, frame_of, flat);
+            ancestors.remove(&g.id);
+        }
+    }
+    flatten(groups, &mut BTreeSet::new(), frame_of, &mut flat);
+
+    let main_band = |r: Rect| (if lr { r.x } else { r.y }, if lr { r.right() } else { r.bottom() });
+    let cross_edge = |r: Rect| (if lr { r.y } else { r.x }, if lr { r.bottom() } else { r.right() });
+
+    let mut checked = 0usize;
+    for i in 0..flat.len() {
+        for j in (i + 1)..flat.len() {
+            let (id_a, a, anc_a) = &flat[i];
+            let (id_b, b, anc_b) = &flat[j];
+            if anc_a.contains(id_b) || anc_b.contains(id_a) {
+                continue; // nested pair: containment, not sibling
+            }
+            let (a_main_lo, a_main_hi) = main_band(*a);
+            let (b_main_lo, b_main_hi) = main_band(*b);
+            if b_main_lo >= a_main_hi - EPS || a_main_lo >= b_main_hi - EPS {
+                continue; // disjoint main-axis bands
+            }
+            checked += 1;
+            let (a_cross_lo, a_cross_hi) = cross_edge(*a);
+            let (b_cross_lo, b_cross_hi) = cross_edge(*b);
+            let gap = if b_cross_lo >= a_cross_hi {
+                b_cross_lo - a_cross_hi
+            } else if a_cross_lo >= b_cross_hi {
+                a_cross_lo - b_cross_hi
+            } else {
+                -1.0 // cross-axis projections overlap: illegal sibling overlap
+            };
+            if gap < GROUP_FRAME_GAP - EPS {
+                failures.push(format!(
+                    "{name}: sibling groups `{id_a}` / `{id_b}` frames closer than \
+                     GROUP_FRAME_GAP (gap {gap:.3})"
+                ));
+            }
+        }
+    }
+    if checked > 0 {
+        println!("{name}: [observed] {checked} sibling separation pair(s) checked");
     }
 }
 
@@ -510,6 +669,51 @@ fn group_containment(
         }
         group_containment(&g.groups, frame_of, name, failures);
     }
+}
+
+/// D₂.0 containment (group-frame-d2.md §8.5): each direct member node frame
+/// must sit inside its host group's frame (pad already baked into the frame).
+fn member_containment(
+    groups: &[ModelGroup],
+    result: &LayoutResult,
+    frame_of: &BTreeMap<&str, Rect>,
+    name: &str,
+    failures: &mut Vec<String>,
+) {
+    let node_of: BTreeMap<&str, Rect> = result
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.frame))
+        .collect();
+    fn walk(
+        groups: &[ModelGroup],
+        node_of: &BTreeMap<&str, Rect>,
+        frame_of: &BTreeMap<&str, Rect>,
+        name: &str,
+        failures: &mut Vec<String>,
+    ) {
+        for g in groups {
+            if let Some(&gf) = frame_of.get(g.id.as_str()) {
+                for n in &g.nodes {
+                    let Some(&nf) = node_of.get(n.id.as_str()) else {
+                        continue;
+                    };
+                    if nf.x < gf.x - EPS
+                        || nf.right() > gf.right() + EPS
+                        || nf.y < gf.y - EPS
+                        || nf.bottom() > gf.bottom() + EPS
+                    {
+                        failures.push(format!(
+                            "{name}: node `{}` escapes host group `{}`",
+                            n.id, g.id
+                        ));
+                    }
+                }
+            }
+            walk(&g.groups, node_of, frame_of, name, failures);
+        }
+    }
+    walk(groups, &node_of, frame_of, name, failures);
 }
 
 /// `node_id → group ancestor chain` (inclusive of the host group).
@@ -626,13 +830,15 @@ fn compute_metrics(
         channel_used_gates: hq.channel_used_gates,
         relaxations: hq.relaxations,
         ripup_rounds: hq.ripup_rounds,
+        gate_fallback_events: hq.gate_fallback_events,
     }
 }
 
 /// Bend + P1 observation regression gate against `tests/hier_eval_baseline.json`.
 /// Hard failures: `max_bends` / `sum_bends` / `reversed_count` must not exceed
-/// baseline; `channel_used_gates` must not regress from true → false.
-/// Other P1 fields and crossings / bbox are observational (printed deltas).
+/// baseline; `channel_used_gates` must not regress from true → false; weak
+/// fixtures keep their bbox within +10% of baseline (D₂.2a canvas-bloat
+/// guard). Other P1 fields and crossings are observational (printed deltas).
 fn check_bend_gate(metrics: &[FileMetrics], failures: &mut Vec<String>) {
     let path = baseline_path();
     let raw = fs::read_to_string(&path).unwrap_or_else(|e| {
@@ -695,6 +901,17 @@ fn check_bend_gate(metrics: &[FileMetrics], failures: &mut Vec<String>) {
             failures.push(format!(
                 "{}: channel_used_gates regression — baseline d1.3-gate fell back to root-scope",
                 m.name
+            ));
+        }
+        // D₂.2a canvas-bloat guard (group-frame-d2.md §8.10): penetration
+        // clearance must not be bought by enlarging the canvas.
+        if m.name.starts_with("group-weak/")
+            && bbox_over_guard(m.bbox_w, m.bbox_h, base_w, base_h)
+        {
+            failures.push(format!(
+                "{}: canvas-bloat guard — bbox {:.0} x {:.0} exceeds baseline \
+                 {:.0} x {:.0} by more than 10%",
+                m.name, m.bbox_w, m.bbox_h, base_w, base_h
             ));
         }
         println!(
@@ -1227,4 +1444,103 @@ fn order_approval_primary_arm_on_spine_approved_left() {
         "rejected→submit same-face East corridor must not cross left of submit East port \
          (min_x={back_min_x:.3}, submit.east={submit_east_x:.3})"
     );
+}
+
+/// D₂.2a table-driven: exemption marker parsing + canvas-bloat guard.
+#[test]
+fn d22a_exemption_marker_and_bbox_guard() {
+    // Exemption marker: exact phrase only, position-agnostic.
+    let cases: &[(&str, bool)] = &[
+        ("diagram { }", false),
+        ("// d2-exempt: group-penetration — C-fallback", true),
+        ("// d2-exempt: group-penetration", true),
+        ("// d2-exempt: something-else", false),
+        ("diagram { // d2-exempt: group-penetration — reason }", true),
+    ];
+    for (source, want) in cases {
+        assert_eq!(penetration_exempt(source), *want, "source: {source:?}");
+    }
+
+    // Canvas-bloat guard: +10% per dimension, independent axes.
+    let cases: &[(f64, f64, f64, f64, bool)] = &[
+        (100.0, 100.0, 100.0, 100.0, false), // unchanged
+        (109.0, 109.0, 100.0, 100.0, false), // under the bar
+        (111.0, 100.0, 100.0, 100.0, true),  // width over
+        (100.0, 111.0, 100.0, 100.0, true),  // height over
+        (90.0, 90.0, 100.0, 100.0, false),   // shrink is fine
+    ];
+    for (w, h, bw, bh, want) in cases {
+        assert_eq!(bbox_over_guard(*w, *h, *bw, *bh), *want, "({w}, {h}) vs ({bw}, {bh})");
+    }
+}
+
+/// D₂.2b table-driven (group-frame-d2.md §8.12/§8.13):
+/// - fallback observability: every `channel-group-fallback` relaxation is
+///   counted into `gate_fallback_events` (whole-diagram gate-route fallback
+///   and derive-level impure rects alike), and fixtures without fallback
+///   report zero;
+/// - MetricVerifier demand floor: on every fixture, each published LayerGap
+///   demand (channel / group shell / gate producers merged) is met by the
+///   resolved gap. Gate capacity monotonicity itself is covered by the
+///   demand.rs table-driven unit tests (§8.13-2).
+#[test]
+fn d22b_fallback_observability_and_demand_floor() {
+    // (fixture, expect_fallback) — the five D₂.2a class-C-fallback fixtures
+    // plus the derive-level one; two gate-on fixtures stay clean.
+    let cases: &[(&str, bool)] = &[
+        ("group-weak/demo.k8s-blue-green-release-topology", true),
+        ("group-weak/demo.k8s-multi-namespace-overview", true),
+        ("group-weak/demo.k8s-platform-stack", true),
+        ("group-weak/demo.k8s-tenant-isolation", true),
+        ("group-weak/demo.plotgram-core-mod-deps", true),
+        ("group-weak/product.d2-cell-tower-network", true),
+        ("group-weak/demo.ai-agent-docops-pipeline", false),
+        ("group-weak/demo.hybrid-cloud-dr-topology", false),
+    ];
+    let mut demand_seen = 0usize;
+    for &(rel, expect_fb) in cases {
+        let path = showcase_dir().join(format!("{rel}.pgm"));
+        let source = fs::read_to_string(&path).unwrap_or_else(|e| panic!("{rel}: {e}"));
+        let result = build_layout(&source, &BuildOptions::default())
+            .unwrap_or_else(|e| panic!("{rel}: layout: {e}"));
+        let obs = result
+            .diagnostics
+            .hierarchical
+            .as_ref()
+            .unwrap_or_else(|| panic!("{rel}: no hierarchical obs"));
+        let rule_count = result
+            .diagnostics
+            .relaxations
+            .iter()
+            .filter(|r| r.rule == "channel-group-fallback")
+            .count();
+        assert_eq!(
+            obs.gate_fallback_events,
+            rule_count,
+            "{rel}: events must equal relaxation count"
+        );
+        assert_eq!(obs.gate_fallback_events > 0, expect_fb, "{rel}: fallback expectation");
+        // §8.11: gate capacity publishes only when gates are in use.
+        if obs.channel_used_gates {
+            assert!(
+                obs.gate_capacity_seams > 0,
+                "{rel}: gate-on fixture must publish gate capacity demand"
+            );
+        } else {
+            assert_eq!(
+                obs.gate_capacity_seams, 0,
+                "{rel}: fallback diagram must skip gate capacity demand"
+            );
+        }
+        // Demand floor (MetricVerifier §9): every published lower bound met.
+        for (&seam, &demand) in &obs.layer_gap_demands {
+            let got = obs.layer_gaps.get(seam as usize).copied().unwrap_or(0.0);
+            assert!(
+                got + EPS >= demand,
+                "{rel}: seam {seam} resolved {got} < demand {demand}"
+            );
+        }
+        demand_seen += obs.layer_gap_demands.len();
+    }
+    assert!(demand_seen > 0, "weak fixtures must publish LayerGap demands");
 }

@@ -6,6 +6,7 @@ pub mod anchor;
 pub mod bk;
 pub mod bus;
 pub mod cross_axis;
+pub mod group_frames;
 pub mod main_axis;
 pub mod port_lane;
 pub mod symmetry;

@@ -57,7 +57,7 @@ MVP ──► A 次轴 ──► B 端口 ──► C 诊断     ✅
               │
               ├─► D₁ Channel（D1.0–D1.3.5）  ✅ 主路径；余量收口
               │
-              ├─► D₂ Weak 组框写权           ◻ 现行主缺口（见 §5.2）
+              ├─► D₂ Weak 组框写权           ✅ 已关闭（见 §5.2）
               │
               └─► E StrongMacro ✅ · Partition / labeling …
 ```
@@ -68,7 +68,7 @@ MVP ──► A 次轴 ──► B 端口 ──► C 诊断     ✅
 | **B** | M2 | ✅（余项见 §0.2） | 端口决议；Ink 零猜测 |
 | **C** | M0 契约 | ✅ | diagnostics / params_hash |
 | **D₁** | M3 | ✅ 主路径 | 走廊 + track + rip-up + allocator |
-| **D₂** | M4（Weak 半） | ◻ | **仅 Weak**：框进 Metric；穿组由构造 + 门禁硬化 |
+| **D₂** | M4（Weak 半） | ✅ | **仅 Weak**：框进 Metric；穿组由构造 + 门禁硬化（残留 C 类豁免登记，见 group-frame-d2.md §8.10） |
 | **E** | M4+/M5/后置 | Strong ✅；其余 ◻ | PartitionGrid、labeling、… |
 
 **约束**：历史「D₁ 与 D₂ 不要并行」仍成立——D₁ 主路径已完，开 D₂ 时不要再开第二条大 Channel。E 不挡 D；StrongMacro 与 D₂ 都碰「组框写者」时：**Strong = MacroBlockWriter；Weak+D₂ = VPSC 框变量**（[strong-macro.md](phases/strong-macro.md) §3 / §8）。
@@ -158,22 +158,22 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 **方向（缩小后）**：仅 **Weak** 路径——组框由 Metric 写出，finalize 不重算；穿组由构造 + 已有 verifier 门禁硬化。  
 **不再**把 StrongMacro /「同一 Plan」/ verifier 首实现算进 D₂——这些已由 E / SM-4 / 共享尾完成。
 
-**可执行方案**：[phases/group-frame-d2.md](phases/group-frame-d2.md)（**D₂.0 → D₂.1 → D₂.2**）。产品已裁定 Weak 框要可证 → **开 D₂.0**。
+**可执行方案**：[phases/group-frame-d2.md](phases/group-frame-d2.md)（**D₂.0 → D₂.1 → D₂.2**）。已交付：D₂.0 框真源进 Metric；D₂.1 sibling 硬分隔；D₂.2 穿组硬门禁 + Gate 容量 + fallback 收口（**D₂ 里程碑关闭**，验收记录见 group-frame-d2.md §8.13）。
 
 | 子切片 | 摘要 | 状态 |
 |--------|------|------|
-| **D₂.0** | 框真源进 Metric（Fit 含约束）；finalize 透传；外轨可读框 | ◻ 下一刀 |
-| **D₂.1** | sibling 硬分隔 + title/min Demand；退役 compact 主路径 | ◻ |
-| **D₂.2** | Weak 穿组硬门禁；Gate 容量 → Demand；fallback 收口 | ◻ |
+| **D₂.0** | 框真源进 Metric（Fit 含约束）；finalize 透传；外轨可读框 | ✅ 76 fixture 零 delta |
+| **D₂.1** | sibling 硬分隔 + title/min Demand；退役 compact 主路径 | ✅ VPSC 硬分隔 + hier_eval 门禁 |
+| **D₂.2** | Weak 穿组硬门禁；Gate 容量 → Demand；fallback 收口 | ✅ a 门禁硬化 + b 容量/观测/verifier（per-edge 试验撤回；穿组清零归基片 blocked region 未来工作） |
 
 | 原 D₂ 条目 | 现状 | D₂ 是否还做 |
 |------------|------|-------------|
 | StrongMacro 同 Plan schema | ✅ expand → 全局 `PlanGraph` | 否 |
-| `verify_no_group_penetration` | ✅ SM-4；strong 硬 / weak 观测 | 共用已有；**Weak 门禁硬化** → D₂.2 |
-| Gate / ScopeMask / `verify_route_scope` | ✅ 大体在 D1.2 | 否（从零做 Gate） |
-| **组框进 VPSC**（含 / 分隔 / title demand） | Weak = finalize 后验 + compact | **D₂.0–D₂.1** |
-| 兄弟框硬分隔 | compact 止血 | **D₂.1** |
-| Weak 穿组由构造成立 | ~11 fixture 仍观测穿组 | **D₂.2** |
+| `verify_no_group_penetration` | ✅ SM-4；strong 硬 / weak 观测 | ✅ D₂.2a Weak 硬门禁（C 类豁免登记） |
+| Gate / ScopeMask / `verify_route_scope` | ✅ 大体在 D1.2 | 否（从零做 Gate）；D₂.2b 补 Gate 容量 demand |
+| **组框进 VPSC**（含 / 分隔 / title demand） | Weak = finalize 后验 + compact | ✅ D₂.0–D₂.1 |
+| 兄弟框硬分隔 | compact 止血 | ✅ D₂.1 |
+| Weak 穿组由构造成立 | ~11 fixture 仍观测穿组 | ✅ D₂.2 硬门禁；残留 68 处 C 类豁免登记（清零归基片 blocked region 未来工作） |
 
 **刻意不做**：第二套 `ArchitectureLayout`；Ink 事后挪组；用 StrongMacro 冒充 Weak 框真源；Strong 路径叠 VPSC 框变量。
 
@@ -255,3 +255,4 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 |------|------|
 | 2026-08-11 | 同步现状：A–C / D₁ / StrongMacro / 穿组 verifier 已交付；§0 缺口表重写；D₂ 缩小为 Weak 框写权；E 表标 Strong ✅ |
 | 2026-08-11 | 产品裁定 Weak 框要可证；§5.2 挂 [group-frame-d2.md](phases/group-frame-d2.md)（D₂.0–D₂.2） |
+| 2026-08-11 | D₂ 里程碑关闭：D₂.0/D₂.1/D₂.2 全部落地（框真源 / sibling 硬分隔 / 穿组硬门禁 + Gate 容量 demand + fallback 可观测 + Demand 下界 verifier）；§5.2 勾完；穿组残留 68 处 C 类豁免登记，清零归基片 blocked region（未来工作） |

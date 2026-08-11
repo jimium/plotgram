@@ -1,5 +1,6 @@
 // Large K8s cluster overview with namespace to deployment aggregation
 // Mermaid mapping: complex architecture graph with nested subgraphs
+// d2-exempt: group-penetration — C-fallback: gate 路由不可行(ScopeMask)整体回退 root-scope；清零归 D₂.2b（group-frame-d2.md §8.10 登记表）
 diagram {
     profile: architecture,
     title: "K8s 多命名空间生产集群总览"

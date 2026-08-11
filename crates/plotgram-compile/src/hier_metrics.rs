@@ -85,6 +85,9 @@ pub struct HierQualityMetrics {
     pub channel_used_gates: bool,
     pub relaxations: usize,
     pub ripup_rounds: u32,
+    /// `channel-group-fallback` relaxation count (per-edge widenings plus
+    /// any whole-diagram gate-route fallback; group-frame-d2.md §8.12).
+    pub gate_fallback_events: usize,
 }
 
 /// Compute P1 metrics from a finished layout.
@@ -133,6 +136,7 @@ pub fn compute(
         channel_used_gates: obs.channel_used_gates,
         relaxations: result.diagnostics.relaxations.len(),
         ripup_rounds: obs.ripup_rounds,
+        gate_fallback_events: obs.gate_fallback_events,
     }
 }
 

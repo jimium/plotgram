@@ -6,6 +6,8 @@
 //! layout regressions to params vs code). Hard failures (`Unsupported` /
 //! `InfeasibleConstraint`) stay hard errors — they never become diagnostics.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 /// Observations from one layout run. Empty by default; never affects geometry.
@@ -33,6 +35,23 @@ pub struct HierarchicalObs {
     pub ripup_rounds: u32,
     /// End-bus member edge ids (intentional shared corridors for overlap_len).
     pub bus_edge_ids: Vec<String>,
+    /// Count of `channel-group-fallback` relaxations (whole-diagram gate-route
+    /// or derive-level impure-group fallbacks; group-frame-d2.md §8.12).
+    /// Per-edge ScopeMask widenings were trialled and withdrawn — do not
+    /// interpret this counter as a per-edge count.
+    #[serde(default)]
+    pub gate_fallback_events: usize,
+    /// Published `LayerGap` demand lower bounds keyed by seam index
+    /// (MetricVerifier demand floor, coordinate-and-demand.md §9).
+    #[serde(default)]
+    pub layer_gap_demands: BTreeMap<u32, f64>,
+    /// Number of seams the gate capacity producer published on
+    /// (group-frame-d2.md §8.11/§8.13 observability; 0 off the Weak path).
+    #[serde(default)]
+    pub gate_capacity_seams: usize,
+    /// Resolved main-axis gaps, index = seam (length = n_layers - 1).
+    #[serde(default)]
+    pub layer_gaps: Vec<f64>,
 }
 
 /// A single non-fatal observation.

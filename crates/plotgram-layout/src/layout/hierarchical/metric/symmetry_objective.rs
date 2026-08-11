@@ -11,7 +11,7 @@ use plotgram_algo::vpsc::{self, Constraint, Variable, VpscError};
 use plotgram_model::geometry::Rect;
 
 use crate::layout::hierarchical::compose::ports::EdgePorts;
-use crate::layout::hierarchical::group_frame::{GROUP_FRAME_GAP, GROUP_PAD};
+use crate::layout::hierarchical::group_frame::{GROUP_FRAME_GAP, GROUP_LABEL_TOP_PAD, GROUP_PAD};
 use crate::layout::hierarchical::metric::anchor::port_anchor;
 use crate::layout::hierarchical::metric::bk;
 use crate::layout::hierarchical::metric::symmetry::{
@@ -200,15 +200,18 @@ pub fn solve_symmetry_objective(
         &layer_pos,
         &segs_by_edge,
     )?;
-    // VPSC separation only lower-bounds the gap between clamps. Clamps with no
-    // J(x) neighbors can park in that slack and shove the next group across
-    // empty space (drawn frames still hug members). Close leftover inter-frame
-    // slack without touching the hard constraint set. Weak-only hemostasis:
-    // under StrongMacro the macro-block writer owns frame geometry and local
-    // plans carry no boundary clamps (strong-macro.md §5.3 / §8 — compact
-    // stays on the Weak path).
+    // Sibling frame separation is guaranteed by the hard constraint set
+    // (unrelated boundary-clamp pairs reserve GROUP_FRAME_GAP — D₂.1): the
+    // post-VPSC step never pushes groups apart, it only rigidly closes
+    // leftover excess slack down to GROUP_FRAME_GAP (separation is a lower
+    // bound; median desired leaves slack that would balloon the canvas —
+    // the J-side compactness term is the D₂.2 backlog item). Clamps are then
+    // snapped onto the member-derived frame edges (boundary follows members;
+    // frames already include pad — option B ruling). Weak-only: under
+    // StrongMacro the macro-block writer owns frame geometry and local plans
+    // carry no boundary clamps (strong-macro.md §5.3 / §8).
     if params.group_policy == GroupPolicy::Weak {
-        compact_sibling_frame_gaps(plan, size_of, &mut cross);
+        close_sibling_frame_slack(plan, size_of, params.node_gap, main, &mut cross);
         snap_boundaries_to_members(plan, size_of, &mut cross);
     }
     Ok(cross)
@@ -421,6 +424,11 @@ fn snap_fan_pack_style(
 }
 
 /// Snap each group-boundary clamp to the GLOBAL member-derived frame edge.
+///
+/// Sole post-solve writer of clamp positions (D₂.1): separation between
+/// sibling frames is already hard-constrained in the VPSC set, so this only
+/// moves clamps inward onto the frame edge their members imply — it never
+/// widens or narrows a frame gap.
 fn snap_boundaries_to_members(
     plan: &PlanGraph,
     size_of: &dyn Fn(usize) -> Size,
@@ -457,15 +465,22 @@ fn snap_boundaries_to_members(
     }
 }
 
-/// Close excess / open shortfall between sibling group frames after VPSC.
+/// Rigidly close excess slack between sibling group frames after VPSC
+/// (D₂.1 writer: pull-left only).
 ///
-/// Only pairs whose member **rank spans overlap** (true 2D frame collision risk)
-/// are adjusted. Vertically stacked siblings on disjoint ranks (e.g. 接入层
-/// above 业务层) must keep their VPSC x-alignment — treating them as a
-/// left-to-right sequence shove the upper band off to the side.
-fn compact_sibling_frame_gaps(
+/// Push-apart is the hard constraint set's job (unrelated clamp pairs
+/// reserve GROUP_FRAME_GAP), so this pass only slides a trailing sibling set
+/// LEFT when its frame sits further right than frontier + GROUP_FRAME_GAP —
+/// it never widens a gap and never overrides the solve's separation. Slack
+/// closure stays here until J(x) grows a compactness term (D₂.2 backlog).
+/// Only pairs whose member **rank spans overlap** (true 2D frame collision
+/// risk) are adjusted. Vertically stacked siblings on disjoint ranks keep
+/// their VPSC x-alignment.
+fn close_sibling_frame_slack(
     plan: &PlanGraph,
     size_of: &dyn Fn(usize) -> Size,
+    node_gap: f64,
+    main: &[f64],
     cross: &mut [f64],
 ) {
     let mut group_path: BTreeMap<String, Vec<String>> = BTreeMap::new();
@@ -502,8 +517,19 @@ fn compact_sibling_frame_gaps(
             if siblings.len() < 2 {
                 continue;
             }
-            let drawn = drawn_frame_x_extents(&group_path, &group_members, size_of, cross);
-            compact_one_sibling_set(siblings, &drawn, &group_ranks, plan, cross);
+            let mut drawn = drawn_frame_x_extents(&group_path, &group_members, size_of, cross);
+            close_slack_one_sibling_set(
+                siblings,
+                &mut drawn,
+                &group_ranks,
+                &group_path,
+                &group_members,
+                plan,
+                size_of,
+                node_gap,
+                main,
+                cross,
+            );
         }
     }
 }
@@ -565,13 +591,55 @@ fn drawn_frame_x_extents(
     drawn
 }
 
-fn compact_one_sibling_set(
+fn close_slack_one_sibling_set(
     groups: &BTreeSet<String>,
-    drawn: &BTreeMap<String, (f64, f64)>,
+    drawn: &mut BTreeMap<String, (f64, f64)>,
     group_ranks: &BTreeMap<String, BTreeSet<u32>>,
+    group_path: &BTreeMap<String, Vec<String>>,
+    group_members: &BTreeMap<String, Vec<usize>>,
     plan: &PlanGraph,
+    size_of: &dyn Fn(usize) -> Size,
+    node_gap: f64,
+    main: &[f64],
     cross: &mut [f64],
 ) {
+    // Main-axis (y) bands of drawn frames — static in this pass (x-only
+    // writer). Bottom-up like `drawn_frame_x_extents`: child frames are
+    // already padded, the parent wraps their union + its own pads. Top pad
+    // is conservatively the labeled value (label presence is not visible
+    // here; over-approximating the band only blocks more closures).
+    let mut y_band: BTreeMap<String, (f64, f64)> = BTreeMap::new();
+    let max_depth = group_path.values().map(|p| p.len()).max().unwrap_or(0);
+    for depth in (1..=max_depth).rev() {
+        for (g, path) in group_path {
+            if path.len() != depth {
+                continue;
+            }
+            let mut top = f64::INFINITY;
+            let mut bottom = f64::NEG_INFINITY;
+            if let Some(members) = group_members.get(g) {
+                for &e in members {
+                    top = top.min(main[e]);
+                    bottom = bottom.max(main[e] + size_of(e).height);
+                }
+            }
+            for (child, cpath) in group_path {
+                if cpath.len() < 2 || cpath[cpath.len() - 2] != g.as_str() {
+                    continue;
+                }
+                if let Some(&(ct, cb)) = y_band.get(child) {
+                    top = top.min(ct);
+                    bottom = bottom.max(cb);
+                }
+            }
+            if top.is_finite() {
+                y_band.insert(
+                    g.clone(),
+                    (top - GROUP_LABEL_TOP_PAD, bottom + GROUP_PAD),
+                );
+            }
+        }
+    }
     let mut frames: Vec<(String, f64, f64)> = Vec::new();
     for g in groups {
         let Some(&(left, right)) = drawn.get(g) else {
@@ -602,31 +670,172 @@ fn compact_one_sibling_set(
             .fold(f64::NEG_INFINITY, f64::max);
         if relevant_max.is_finite() {
             let target = relevant_max + GROUP_FRAME_GAP;
-            // >0: too far right of target → slide left; <0: too close → slide right.
+            // >0 only: too far right of target → slide left. The shortfall
+            // direction (too close) is infeasible by construction since the
+            // hard set reserves GROUP_FRAME_GAP, and this pass never pushes.
             let adjust = left - target;
-            if adjust.abs() > 1e-6 {
-                let shift_groups: BTreeSet<&str> =
-                    frames[i..].iter().map(|(name, _, _)| name.as_str()).collect();
+            if adjust > 1e-6 {
+                let shift_groups: BTreeSet<String> =
+                    frames[i..].iter().map(|(name, _, _)| name.clone()).collect();
                 let virt_gate = left;
-                for (e_idx, elem) in plan.elems.iter().enumerate() {
-                    let move_it = match &elem.key {
+                let move_it: Vec<bool> = plan
+                    .elems
+                    .iter()
+                    .enumerate()
+                    .map(|(e_idx, elem)| match &elem.key {
                         ElemKey::Real(_) => elem
                             .group_path
                             .iter()
-                            .any(|gg| shift_groups.contains(gg.as_str())),
-                        ElemKey::GroupBoundary { group, .. } => {
-                            shift_groups.contains(group.as_str())
-                        }
+                            .any(|gg| shift_groups.contains(gg)),
+                        ElemKey::GroupBoundary { group, .. } => shift_groups.contains(group),
                         ElemKey::Virtual { .. } => cross[e_idx] >= virt_gate - 1e-6,
                         ElemKey::OrderPad { .. } => false,
-                    };
-                    if move_it {
-                        cross[e_idx] -= adjust;
+                    })
+                    .collect();
+                // Safety clamp: the rigid shift set tracks groups, not
+                // group-less / non-moving same-rank elements, so a full
+                // left-pull can run a mover into a stationary neighbor.
+                // Judge collisions on RANK-LOCAL surfaces: a group only
+                // occupies ranks where it has members (its global frame
+                // rectangle spans the rank union and would false-block), and
+                // boundary clamps are zero-width ghosts the final snap
+                // rewrites. Capping only reduces the left shift, so no
+                // separation shrinks below what the solve already
+                // guaranteed.
+                let mut max_ok = adjust;
+                for (e_idx, elem) in plan.elems.iter().enumerate() {
+                    // Only real members drive collisions: clamps snap onto
+                    // members afterwards, dummies are zero-width.
+                    if !move_it[e_idx] || !matches!(&elem.key, ElemKey::Real(_)) {
+                        continue;
+                    }
+                    let rank = elem.rank;
+                    // The one shifting-set group this mover belongs to.
+                    let mover_group = elem
+                        .group_path
+                        .iter()
+                        .find(|gg| shift_groups.contains(*gg));
+                    // Mover surface: left edge of its (moving) frame on this
+                    // rank, else its own left edge.
+                    let mut e_surface = cross[e_idx] - size_of(e_idx).width / 2.0;
+                    let mut e_framed = false;
+                    for gg in &elem.group_path {
+                        if !shift_groups.contains(gg) {
+                            continue;
+                        }
+                        if let Some(lo) = group_rank_edge(
+                            gg, false, rank, group_path, group_members, plan, size_of, cross,
+                        ) {
+                            e_surface = e_surface.min(lo);
+                            e_framed = true;
+                        }
+                    }
+                    for (o_idx, other) in plan.elems.iter().enumerate() {
+                        if move_it[o_idx] || !matches!(&other.key, ElemKey::Real(_)) {
+                            continue;
+                        }
+                        // Stationary obstacles are real members only: clamps
+                        // are snap-rewritten ghosts, dummies/pads zero-width
+                        // (the retired compact pass crossed them freely and
+                        // stayed green; edges re-route in compose).
+                        // A pull-left only collides with stationary elements
+                        // on the mover's left; right-side ones open up.
+                        if cross[o_idx] >= cross[e_idx] {
+                            continue;
+                        }
+                        if other.rank != rank {
+                            // Different rank: members never collide; the only
+                            // risk is the sibling gate — frames whose
+                            // y-bands intersect must keep GLOBAL x-gap ≥
+                            // GROUP_FRAME_GAP. y-bands are static here.
+                            let Some(mg) = mover_group else {
+                                continue;
+                            };
+                            let Some(&(et, eb)) = y_band.get(mg.as_str()) else {
+                                continue;
+                            };
+                            // Outermost stationary ancestor of `other` (its
+                            // band superset-contains all inner frames).
+                            let mut o_hi: Option<f64> = None;
+                            let mut o_intersects = false;
+                            for gg in &other.group_path {
+                                if shift_groups.contains(gg) {
+                                    continue;
+                                }
+                                if let Some(&(_, hi)) = drawn.get(gg.as_str()) {
+                                    o_hi = Some(o_hi.map_or(hi, |c| c.max(hi)));
+                                }
+                                if let Some(&(ot, ob)) = y_band.get(gg.as_str()) {
+                                    o_intersects |= et < ob && ot < eb;
+                                }
+                                break;
+                            }
+                            if !o_intersects {
+                                continue;
+                            }
+                            let Some(hi) = o_hi else {
+                                continue;
+                            };
+                            let e_lo = drawn
+                                .get(mg.as_str())
+                                .map(|&(lo, _)| lo)
+                                .unwrap_or(e_surface);
+                            let limit = e_lo - hi - GROUP_FRAME_GAP;
+                            if limit < max_ok {
+                                max_ok = limit;
+                            }
+                            continue;
+                        }
+                        // Same rank: rank-local surfaces (a group only
+                        // physically occupies ranks with members).
+                        let mut o_surface = cross[o_idx] + size_of(o_idx).width / 2.0;
+                        let mut o_framed = false;
+                        for gg in &other.group_path {
+                            if shift_groups.contains(gg) {
+                                continue;
+                            }
+                            if let Some(hi) = group_rank_edge(
+                                gg, true, rank, group_path, group_members, plan, size_of, cross,
+                            ) {
+                                o_surface = o_surface.max(hi);
+                                o_framed = true;
+                            }
+                        }
+                        let req = match (e_framed, o_framed) {
+                            (true, true) => GROUP_FRAME_GAP,
+                            // Frame edge already carries GROUP_PAD beyond its
+                            // members, so pad + node_gap keeps the bare
+                            // element clear of the frame's members too.
+                            (true, false) | (false, true) => node_gap + GROUP_PAD,
+                            (false, false) => node_gap,
+                        };
+                        let limit = e_surface - o_surface - req;
+                        if limit < max_ok {
+                            max_ok = limit;
+                        }
                     }
                 }
-                for f in frames.iter_mut().skip(i) {
-                    f.1 -= adjust;
-                    f.2 -= adjust;
+                if max_ok > 1e-6 {
+                    for (e_idx, &mv) in move_it.iter().enumerate() {
+                        if mv {
+                            cross[e_idx] -= max_ok;
+                        }
+                    }
+                    for f in frames.iter_mut().skip(i) {
+                        f.1 -= max_ok;
+                        f.2 -= max_ok;
+                    }
+                    // Keep the drawn map coherent: every shifted group and its
+                    // descendants travel rigidly with the movers, so later
+                    // clamps must see the new edges.
+                    for (g, (lo, hi)) in drawn.iter_mut() {
+                        if group_path.get(g.as_str()).is_some_and(|p| {
+                            p.iter().any(|gg| shift_groups.contains(gg))
+                        }) {
+                            *lo -= max_ok;
+                            *hi -= max_ok;
+                        }
+                    }
                 }
             }
         }
@@ -638,6 +847,66 @@ fn compact_one_sibling_set(
                 .or_insert(right_now);
         }
     }
+}
+
+/// Rank-local drawn edge of group `g` on `rank`: union of member edges on
+/// that rank plus nested children's rank-local edges (+pad), matching the
+/// finalize semantics one rank at a time. `None` when the group occupies no
+/// member (directly or via descendants) on `rank` — a frame rectangle spans
+/// its rank union, but on a rank without members it is no physical obstacle.
+fn group_rank_edge(
+    g: &str,
+    side_right: bool,
+    rank: u32,
+    group_path: &BTreeMap<String, Vec<String>>,
+    group_members: &BTreeMap<String, Vec<usize>>,
+    plan: &PlanGraph,
+    size_of: &dyn Fn(usize) -> Size,
+    cross: &[f64],
+) -> Option<f64> {
+    fn pick(acc: Option<f64>, v: f64, side_right: bool) -> f64 {
+        match acc {
+            Some(cur) => {
+                if side_right {
+                    cur.max(v)
+                } else {
+                    cur.min(v)
+                }
+            }
+            None => v,
+        }
+    }
+    let mut edge: Option<f64> = None;
+    if let Some(members) = group_members.get(g) {
+        for &e in members {
+            if plan.elems[e].rank != rank {
+                continue;
+            }
+            let half = size_of(e).width / 2.0;
+            let v = if side_right {
+                cross[e] + half
+            } else {
+                cross[e] - half
+            };
+            edge = Some(pick(edge, v, side_right));
+        }
+    }
+    for (child, path) in group_path {
+        if path.len() < 2 || path[path.len() - 2] != g {
+            continue;
+        }
+        if let Some(child_edge) = group_rank_edge(
+            child, side_right, rank, group_path, group_members, plan, size_of, cross,
+        ) {
+            let padded = if side_right {
+                child_edge + GROUP_PAD
+            } else {
+                child_edge - GROUP_PAD
+            };
+            edge = Some(pick(edge, padded, side_right));
+        }
+    }
+    edge
 }
 
 fn solve_once(
@@ -700,8 +969,13 @@ fn hard_constraints(
     let mut constraints = Vec::new();
     // Group-boundary clamps participate in the hard separation chain: with a
     // `GROUP_PAD` extra on boundary-adjacent pairs, each clamp sits exactly on
-    // the frame edge its rank implies (finalize draws frames at member ± pad),
-    // and clamp-to-clamp across sibling groups reserves the frame gap.
+    // the frame edge its rank implies (frames are drawn at member ± pad).
+    // Unrelated sibling clamp pairs additionally reserve `GROUP_FRAME_GAP`:
+    // the drawn frame gap equals that pair's extra (member edge distance −
+    // 2×pad), so the solve itself guarantees sibling frame separation (D₂.1 —
+    // the post-VPSC step only re-solves tightened desired, never pushes).
+    // Nested parent/child and same-group clamp pairs keep the pad extra:
+    // nesting is containment, not sibling separation.
     for layer in &plan.layers {
         let geometric: Vec<usize> = layer
             .iter()
@@ -710,13 +984,7 @@ fn hard_constraints(
             .collect();
         for i in 0..geometric.len().saturating_sub(1) {
             let (l, r) = (geometric[i], geometric[i + 1]);
-            let extra = if plan.elems[l].key.is_group_boundary()
-                || plan.elems[r].key.is_group_boundary()
-            {
-                GROUP_PAD
-            } else {
-                node_gap
-            };
+            let extra = pair_extra(&plan.elems[l], &plan.elems[r], node_gap);
             let gap = size_of(l).width / 2.0 + size_of(r).width / 2.0 + extra;
             constraints.push(Constraint::new(l, r, gap));
         }
@@ -749,6 +1017,31 @@ fn hard_constraints(
         }
     }
     constraints
+}
+
+/// Separation extra between an adjacent (or clamped-against) pair: unrelated
+/// sibling boundary-clamp pairs reserve `GROUP_FRAME_GAP` (their extra IS the
+/// drawn frame gap), any pair touching a boundary clamp reserves `GROUP_PAD`,
+/// everything else `node_gap`.
+fn pair_extra(l: &Elem, r: &Elem, node_gap: f64) -> f64 {
+    match (&l.key, &r.key) {
+        (ElemKey::GroupBoundary { .. }, ElemKey::GroupBoundary { .. })
+            if !boundary_related(l, r) =>
+        {
+            GROUP_FRAME_GAP
+        }
+        _ if l.key.is_group_boundary() || r.key.is_group_boundary() => GROUP_PAD,
+        _ => node_gap,
+    }
+}
+
+/// True when two boundary clamps belong to the same group or to a nested
+/// parent/child pair (one `group_path` is a prefix of the other).
+fn boundary_related(a: &Elem, b: &Elem) -> bool {
+    fn is_prefix(short: &[String], long: &[String]) -> bool {
+        short.len() <= long.len() && long[..short.len()] == *short
+    }
+    is_prefix(&a.group_path, &b.group_path) || is_prefix(&b.group_path, &a.group_path)
 }
 
 /// Neighbor list entry: (neighbor, base edge weight 1/2/8, author weight).
@@ -1045,6 +1338,110 @@ fn apply_port_anchor_desired(
             desired[nb] = port_anchor(frame_of(real_elem), port).x;
             // Port-anchor dummies must dominate soft median drift.
             weights[nb] = weights[nb].max(VIRTUAL_WEIGHT * 16.0);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::layout::hierarchical::model::BoundarySide;
+
+    fn boundary(group: &str, path: &[&str], side: BoundarySide) -> Elem {
+        Elem {
+            key: ElemKey::GroupBoundary {
+                group: group.to_string(),
+                rank: 0,
+                side,
+            },
+            group_path: path.iter().map(|s| (*s).to_string()).collect(),
+            rank: 0,
+        }
+    }
+
+    fn real(id: &str) -> Elem {
+        Elem {
+            key: ElemKey::Real(id.to_string()),
+            group_path: Vec::new(),
+            rank: 0,
+        }
+    }
+
+    /// Single-layer plan; boundary clamps are zero-width by contract.
+    fn plan_of(elems: Vec<Elem>) -> PlanGraph {
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let layers = vec![(0..elems.len()).collect()];
+        PlanGraph {
+            elems,
+            index_of,
+            decl_index: Vec::new(),
+            segments: Vec::new(),
+            layers,
+        }
+    }
+
+    #[test]
+    fn hard_separation_extras_by_pair_kind() {
+        use BoundarySide::{Left, Right};
+        let cases: Vec<(&str, Vec<Elem>, Vec<f64>, Vec<((usize, usize), f64)>)> = vec![
+            (
+                "unrelated sibling clamp pair reserves GROUP_FRAME_GAP",
+                vec![
+                    boundary("g1", &["g1"], Left),
+                    boundary("g1", &["g1"], Right),
+                    boundary("g2", &["g2"], Left),
+                    boundary("g2", &["g2"], Right),
+                ],
+                vec![0.0; 4],
+                vec![((0, 1), 16.0), ((1, 2), 24.0), ((2, 3), 16.0)],
+            ),
+            (
+                "nested parent/child and same-group pairs keep GROUP_PAD",
+                vec![
+                    boundary("o", &["o"], Left),
+                    boundary("i", &["o", "i"], Left),
+                    boundary("i", &["o", "i"], Right),
+                    boundary("o", &["o"], Right),
+                ],
+                vec![0.0; 4],
+                vec![((0, 1), 16.0), ((1, 2), 16.0), ((2, 3), 16.0)],
+            ),
+            (
+                "plain real pair uses node_gap",
+                vec![real("a"), real("b")],
+                vec![10.0, 10.0],
+                vec![((0, 1), 34.0)],
+            ),
+            (
+                "member-to-own-clamp pair uses GROUP_PAD",
+                vec![real("a"), boundary("g1", &["g1"], Left)],
+                vec![10.0, 0.0],
+                vec![((0, 1), 21.0)],
+            ),
+        ];
+        for (name, elems, widths, expect) in cases {
+            let plan = plan_of(elems);
+            let size_of = |i: usize| Size::new(widths[i], 0.0);
+            let constraints = hard_constraints(
+                &plan,
+                &size_of,
+                24.0,
+                &[],
+                &BTreeSet::new(),
+                false,
+                false,
+            );
+            for ((l, r), gap) in expect {
+                let found = constraints
+                    .iter()
+                    .find(|c| c.left == l && c.right == r)
+                    .map(|c| c.gap);
+                assert_eq!(found, Some(gap), "{name}: pair ({l},{r})");
+            }
         }
     }
 }

@@ -3,7 +3,7 @@
 use plotgram_model::attr::AttrMap;
 use plotgram_model::diagnostics::LayoutDiagnostics;
 use plotgram_model::graph::Graph;
-use plotgram_model::result::{EdgePlacement, NodePlacement};
+use plotgram_model::result::{EdgePlacement, GroupPlacement, NodePlacement};
 use plotgram_model::sizes::NodeSizes;
 
 use crate::scene::RouteScene;
@@ -29,14 +29,26 @@ pub struct LayoutInput<'a> {
 
 /// Partial geometry from a layout algorithm.
 ///
-/// Group frames / canvas / labels are typically finalized by the engine facade
-/// after layout (and optional routing).
+/// Canvas / labels are finalized by the engine facade after layout (and
+/// optional routing). Group frames belong to the layout: a layout that owns
+/// them writes them into [`LayoutOutput::groups`] and sets
+/// [`LayoutOutput::owns_group_frames`]; the facade then passes them through
+/// unchanged — even when the vector is empty — and never re-derives over them
+/// (write-authority: group-frame-d2.md §6.2 / §6.3).
 #[derive(Debug, Clone)]
 pub struct LayoutOutput {
     pub nodes: Vec<NodePlacement>,
     /// When [`EdgeGeometryMode::DeferToRouter`], paths may be empty; ports should
     /// still be resolved when the layout owns port decisions.
     pub edges: Vec<EdgePlacement>,
+    /// Group frames written by the layout (hierarchical Weak: Metric frame
+    /// variables; StrongMacro: MacroBlockWriter). Empty when the graph has no
+    /// framed groups, or when the layout does not own group geometry.
+    pub groups: Vec<GroupPlacement>,
+    /// When `true`, the engine finalize must not fall back to union+pad even if
+    /// `groups` is empty (hierarchical always sets this). When `false`, empty
+    /// `groups` means "layout did not write frames" and the facade may derive.
+    pub owns_group_frames: bool,
     /// Structured observations (warnings / relaxations / params_hash).
     /// Never affects geometry; empty default for layouts without diagnostics.
     pub diagnostics: LayoutDiagnostics,

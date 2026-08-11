@@ -139,6 +139,7 @@ pub(super) fn layout(
         BTreeMap<String, EdgePorts>,
         Vec<BundlePlan>,
         Vec<plotgram_model::geometry::Rect>,
+        Vec<plotgram_model::result::GroupPlacement>,
         BTreeSet<String>,
     ),
     LayoutError,
@@ -247,8 +248,11 @@ pub(super) fn layout(
         )?;
     }
 
-    // SM-C: macro-block writer places every frame (sole frame writer).
+    // SM-C: macro-block writer places every frame (sole frame writer) —
+    // including group frames (group-frame-d2.md §6.3: Strong must not stack a
+    // second VPSC group-frame solve on top of MacroBlockWriter).
     macro_block::place_blocks(&mut blocks, &top_scope, params, &pair_stats);
+    let group_placements = group_placements_from_blocks(&blocks);
 
     // SM-D: normalize to the global Plan schema. Port sides for intra-block
     // edges are owned by the local Metric solve; the global assign fills
@@ -271,8 +275,28 @@ pub(super) fn layout(
         assignment.ports,
         assignment.bundles,
         canonical_frames,
+        group_placements,
         labeled,
     ))
+}
+
+/// Global group frames from the MacroBlockWriter (canonical TB). Block index
+/// order is post-order DFS of the group forest — the same emission order as
+/// the Weak Metric writer / finalize fallback.
+fn group_placements_from_blocks(blocks: &[Block]) -> Vec<plotgram_model::result::GroupPlacement> {
+    blocks
+        .iter()
+        .filter_map(|b| {
+            let id = b.group_id.as_ref()?;
+            // Global frame origin = content origin − pads (SM-C contract).
+            let (ox, oy) = b.content_origin;
+            let (px, py) = b.content_pad;
+            Some(plotgram_model::result::GroupPlacement {
+                id: id.clone(),
+                frame: Rect::new(ox - px, oy - py, b.width, b.height),
+            })
+        })
+        .collect()
 }
 
 /// Restore leaf-intra port **sides** onto the global assignment for edges

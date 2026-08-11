@@ -75,6 +75,8 @@ pub fn run(contract: &LayoutContract) -> Result<LayoutResult, LayoutError> {
         &contract.graph,
         output.nodes,
         edges,
+        output.groups,
+        output.owns_group_frames,
         output.diagnostics,
     ))
 }

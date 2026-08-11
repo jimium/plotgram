@@ -1,18 +1,26 @@
 //! Group frame geometry contract (single source for frame pads).
 //!
-//! The engine's finalize pass derives each group frame as
-//! `union(member frames) + pads`; the hierarchical core reserves the *same*
-//! pads upstream so sibling frames can never overlap (write-authority: the
-//! inter-group gap degree of freedom is written here, finalize only expands):
+//! Write authority (group-frame-d2.md §6.2, D₂.0): the group-frame true
+//! source is the Metric — [`super::metric::group_frames`] solves per-group
+//! frame variables with containment hard constraints + Fit and writes the
+//! `LayoutOutput.groups` that the engine facade passes through unchanged.
+//! Option B ruling (§7.2): `GroupBoundary` clamps keep sandwiching members
+//! in the cross-axis solve; frame variables are solved separately afterwards.
+//! The hierarchical core reserves the *same* pads upstream so sibling frames
+//! can never overlap (the inter-group gap degree of freedom is written by
+//! the cross-axis separation chain below; D₂.1 moves sibling separation
+//! fully into the solve):
 //!
 //! - cross axis — [`super::metric::symmetry_objective`] includes group-boundary
-//!   clamps in the hard separation chain with `GROUP_PAD` extras and ties
-//!   same-side clamps across ranks with hard equalities (rectangular frame
-//!   column). After VPSC, leftover slack between sibling *drawn* frames is
-//!   compacted to [`GROUP_FRAME_GAP`]. Drawn extent must match finalize:
-//!   `union(members ∪ child frames) + pads` — child frames already carry pad,
-//!   so a parent is one pad wider than `union(members)+pad`; compacting with
-//!   the shallow formula leaves drawn siblings flush (gap 0);
+//!   clamps in the hard separation chain and ties same-side clamps across
+//!   ranks with hard equalities (rectangular frame column). Unrelated sibling
+//!   clamp pairs reserve [`GROUP_FRAME_GAP`] directly in the solve — D₂.1
+//!   moved push-apart fully into the hard set; the retired compact pass's
+//!   only survivor is a pull-left-only slack closure (separation is never
+//!   overridden post-solve; compactness in J is the D₂.2 backlog item).
+//!   Drawn extent must match the Metric frame writer: `union(members ∪ child
+//!   frames) + pads` — child frames already carry pad, so a parent is one
+//!   pad wider than `union(members)+pad`;
 //! - main axis — [`super::demand::publish_group_layer_gap_demand`]
 //!   publishes LayerGap lower bounds from the shell bands below.
 //!

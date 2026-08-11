@@ -1,4 +1,10 @@
 //! Group envelopes, labels, canvas — after nodes/edges are final.
+//!
+//! Write authority (group-frame-d2.md §6.2): a layout that owns group
+//! geometry writes frames into `LayoutOutput::groups`; this pass translates
+//! them with the whole-graph shift but never re-derives over them. The
+//! union+pad computation below is only the fallback for layouts without a
+//! group-frame writer.
 
 use plotgram_layout::layout::hierarchical::{GROUP_LABEL_TOP_PAD, GROUP_PAD};
 use plotgram_router::core::union_rects;
@@ -15,9 +21,16 @@ pub fn finalize(
     graph: &Graph,
     mut nodes: Vec<NodePlacement>,
     mut edges: Vec<EdgePlacement>,
+    mut groups: Vec<GroupPlacement>,
+    owns_group_frames: bool,
     diagnostics: LayoutDiagnostics,
 ) -> LayoutResult {
-    let mut groups = group_frames(graph, &nodes);
+    // Write authority (group-frame-d2.md §6.2 / §6.3): layouts that own group
+    // geometry set `owns_group_frames` — pass through even when empty. Only
+    // layouts without a frame writer may fall back to union+pad.
+    if !owns_group_frames && groups.is_empty() {
+        groups = group_frames(graph, &nodes);
+    }
 
     // Uniform whole-graph translate: move the content bbox so its top-left
     // sits at (CANVAS_PAD, CANVAS_PAD). `canvas_size` then adds the same
@@ -270,5 +283,116 @@ fn canvas_size(
     match content_bbox(nodes, groups, edges) {
         Some(u) => (u.right() + CANVAS_PAD, u.bottom() + CANVAS_PAD),
         None => (CANVAS_PAD * 2.0, CANVAS_PAD * 2.0),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use plotgram_model::graph::{Group, Node};
+
+    /// Provided group frames must pass through: finalize may translate them
+    /// with the whole graph but never re-derive over them (group-frame-d2.md
+    /// §8.2 — the deliberately skewed frame below differs from any union+pad
+    /// result, so a recompute would change its shape).
+    #[test]
+    fn provided_groups_are_not_recomputed() {
+        let node = Node {
+            id: "a".into(),
+            label: None,
+            shape: None,
+            role: plotgram_model::graph::NodeRole::Entity,
+            host_group: None,
+            anchor: None,
+            partition_cell: None,
+            attrs: plotgram_model::attr::AttrMap::new(),
+        };
+        let graph = Graph {
+            nodes: vec![node.clone()],
+            edges: vec![],
+            groups: vec![Group {
+                id: "g".into(),
+                label: None,
+                attrs: plotgram_model::attr::AttrMap::new(),
+                nodes: vec![node],
+                edges: vec![],
+                groups: vec![],
+            }],
+            partition: None,
+        };
+        let nodes = vec![NodePlacement {
+            id: "a".into(),
+            frame: Rect::new(0.0, 0.0, 60.0, 30.0),
+        }];
+        let skewed = Rect::new(500.0, 400.0, 7.0, 9.0);
+        let groups = vec![GroupPlacement {
+            id: "g".into(),
+            frame: skewed,
+        }];
+
+        let result = finalize(
+            &graph,
+            nodes.clone(),
+            vec![],
+            groups,
+            true, // layout owns frames — must not recompute
+            LayoutDiagnostics::default(),
+        );
+        assert_eq!(result.groups.len(), 1);
+        let out = result.groups[0].frame;
+        // Shape preserved (a recompute would yield the union+pad envelope).
+        assert_eq!(out.width, skewed.width);
+        assert_eq!(out.height, skewed.height);
+        // Only the uniform content shift applies: node moved by the same delta.
+        let dx = result.nodes[0].frame.x - nodes[0].frame.x;
+        let dy = result.nodes[0].frame.y - nodes[0].frame.y;
+        assert_eq!(out.x, skewed.x + dx);
+        assert_eq!(out.y, skewed.y + dy);
+    }
+
+    /// Hierarchical always sets `owns_group_frames`; an empty vector must not
+    /// trigger the union+pad fallback (would invent frames the layout chose
+    /// not to emit — e.g. all empty groups).
+    #[test]
+    fn owns_group_frames_empty_skips_fallback() {
+        let node = Node {
+            id: "a".into(),
+            label: None,
+            shape: None,
+            role: plotgram_model::graph::NodeRole::Entity,
+            host_group: None,
+            anchor: None,
+            partition_cell: None,
+            attrs: plotgram_model::attr::AttrMap::new(),
+        };
+        let graph = Graph {
+            nodes: vec![node.clone()],
+            edges: vec![],
+            groups: vec![Group {
+                id: "g".into(),
+                label: None,
+                attrs: plotgram_model::attr::AttrMap::new(),
+                nodes: vec![node],
+                edges: vec![],
+                groups: vec![],
+            }],
+            partition: None,
+        };
+        let nodes = vec![NodePlacement {
+            id: "a".into(),
+            frame: Rect::new(0.0, 0.0, 60.0, 30.0),
+        }];
+        let result = finalize(
+            &graph,
+            nodes,
+            vec![],
+            vec![], // layout owned but emitted nothing
+            true,
+            LayoutDiagnostics::default(),
+        );
+        assert!(
+            result.groups.is_empty(),
+            "owns_group_frames must suppress union+pad fallback"
+        );
     }
 }

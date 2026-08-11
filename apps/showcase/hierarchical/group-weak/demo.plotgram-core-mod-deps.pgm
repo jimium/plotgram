@@ -1,5 +1,6 @@
 // drawify-core 内部 mod 依赖关系（编译期 DAG）
 // 说明：箭头表示「use / 依赖」方向（A -> B 表示 A 依赖 B）
+// d2-exempt: group-penetration — C-fallback: gate 路由不可行(ScopeMask)整体回退 root-scope；清零归 D₂.2b（group-frame-d2.md §8.10 登记表）
 diagram {
     profile: architecture,
     title: "drawify-core 模块依赖图"

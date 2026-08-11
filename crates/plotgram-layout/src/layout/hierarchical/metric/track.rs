@@ -37,7 +37,8 @@ impl TrackCoords {
 /// canonical space). Only the **outer** Main lanes clear them — outer lanes
 /// are the long-haul return corridors, and a full-height rail inside a
 /// foreign group frame is a penetration (strong-macro.md §6 SM-4). Inner
-/// lanes keep node-only clearance. Weak passes an empty list (bit-stable).
+/// lanes keep node-only clearance. Both policies pass the Metric group
+/// envelopes (D₂.0 frame true source; Weak previously passed nothing).
 pub fn assign_track_coords(
     plan: &PlanGraph,
     main: &[f64],

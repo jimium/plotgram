@@ -1,5 +1,6 @@
 // CDN 边缘缓存架构
 // Mermaid 对照: graph + subgraph 边缘/源站分组
+// d2-exempt: group-penetration — C-lane: gate 启用但基片轨道无外框避让；清零归 D₂.2b 基片 blocked region（group-frame-d2.md §8.10 登记表）
 diagram {
     profile: architecture,
     title: "CDN 边缘缓存架构"

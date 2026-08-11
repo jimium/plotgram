@@ -1,5 +1,6 @@
 // Platform team view of a large K8s cluster stack
 // Mermaid mapping: layered architecture with infra and workload groups
+// d2-exempt: group-penetration — C-fallback: gate 路由不可行(ScopeMask)整体回退 root-scope；清零归 D₂.2b（group-frame-d2.md §8.10 登记表）
 diagram {
     profile: architecture,
     title: "K8s 平台栈与业务工作负载"

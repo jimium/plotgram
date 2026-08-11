@@ -1,5 +1,6 @@
 // 实时推荐系统架构：埋点 → 特征 → 召回 → 排序 → 下发
 // 业务场景: 电商/内容平台的实时个性化推荐系统拓扑
+// d2-exempt: group-penetration — C-lane: gate 启用但基片轨道无外框避让；清零归 D₂.2b 基片 blocked region（group-frame-d2.md §8.10 登记表）
 // Mermaid 对照: 复杂 graph + 多 subgraph 推荐链路
 diagram {
     profile: architecture,
