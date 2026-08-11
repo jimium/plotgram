@@ -92,7 +92,7 @@ fn escape_key(end: &EscapeEnd) -> (u8, usize) {
 /// Hard constraints drop infeasible options instead of predicate tables
 /// (write-authority §2.2):
 /// - `AtPortNormal` on E/W needs (a) no real sibling between the node and
-///   `og` (the straight escape would pierce it) and (b) `og` to be the
+///   `og` (East: `(order+1)..og`; West: `og..order`) and (b) `og` to be the
 ///   outermost corridor (`order_count` east / `0` west): Metric folds the
 ///   rim lane over **all** ranks (max/min), so it sits past every node face
 ///   and is normal-safe for any endpoint; inner lanes sit at the *average*
@@ -169,7 +169,13 @@ pub fn end_candidates(
                     continue;
                 };
                 let face_dist = (order - og) as f64;
-                let pierced = ((og + 1)..=order).any(|o| blocked_west.contains(&o));
+                // Mirror East's `(order+1)..og`: nodes strictly between the
+                // west rim corridor `og` and this endpoint. The old
+                // `(og+1)..=order` missed the leftmost sibling (order `og`)
+                // and wrongly included the endpoint itself — AtPortNormal
+                // then drew a same-band horizontal through that sibling
+                // (mech e29 → n17 when L7 is `n17 ≺ n14`).
+                let pierced = (og..order).any(|o| blocked_west.contains(&o));
                 let rim = og == 0;
                 if !pierced && rim {
                     out.push(EndCandidate {
@@ -1467,6 +1473,38 @@ mod tests {
                     .collect();
                 assert_eq!(gaps, vec![2], "ViaGap fallback on og={line}: {cands:?}");
             }
+        }
+
+        // West mirror: endpoint at order 1, sibling at order 0 must block
+        // rim AtPortNormal (would draw through that sibling on the node band).
+        let west_cases: [(std::collections::BTreeSet<usize>, bool); 2] = [
+            (no_blocked(), true),
+            ([0usize].into_iter().collect(), false),
+        ];
+        for (blocked, want_straight_rim) in west_cases {
+            let cands = end_candidates(
+                &idx,
+                Side::West,
+                1,
+                1,
+                &no_blocked(),
+                &blocked,
+                idx.order_count,
+                true,
+            );
+            assert!(!cands.is_empty(), "West port must have candidates");
+            let straight = |line: usize| {
+                cands.iter().any(|c| {
+                    c.escape == EscapeEnd::AtPortNormal
+                        && sub.track(c.track).unwrap().line == line
+                })
+            };
+            assert!(!straight(1), "inner West lane is not normal-safe: {cands:?}");
+            assert_eq!(
+                straight(0),
+                want_straight_rim,
+                "West rim straight exit, blocked={blocked:?}"
+            );
         }
     }
 

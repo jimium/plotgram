@@ -200,8 +200,19 @@ pub fn verify_no_node_penetration(
                 if segment_hits_rect_interior(a, b, *frame) {
                     return Err(LayoutError::message(format!(
                         "hierarchical: edge `{}` penetrates node `{}` \
-                         (ink-and-verification.md §7.3)",
-                        e.id, nid
+                         (ink-and-verification.md §7.3) \
+                         seg=({:.3},{:.3})->({:.3},{:.3}) \
+                         frame=[{:.3},{:.3}]x[{:.3},{:.3}]",
+                        e.id,
+                        nid,
+                        a.x,
+                        a.y,
+                        b.x,
+                        b.y,
+                        frame.x,
+                        frame.x + frame.width,
+                        frame.y,
+                        frame.y + frame.height
                     )));
                 }
             }
