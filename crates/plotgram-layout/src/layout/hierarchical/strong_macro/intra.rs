@@ -5,7 +5,7 @@
 //! no intra solve; their envelope comes from the placed child blocks
 //! (SM-C). No second Sugiyama delegation stack (strong-macro.md §5.3 rule 3).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use plotgram_engine_api::LayoutError;
 use plotgram_algo::orientation::Size;
@@ -136,7 +136,13 @@ pub(super) fn layout_intra(
         .collect();
     // No group-boundary dummies inside a block — intra order is written here
     // once; expand keeps it verbatim.
-    compose::order::order_layers(&mut plan, &edge_weights, 0.0);
+    let reversed_edges: BTreeSet<String> = local_graph
+        .edges
+        .iter()
+        .filter(|e| e.reversed)
+        .map(|e| e.edge_id.clone())
+        .collect();
+    compose::order::order_layers(&mut plan, &edge_weights, 0.0, &reversed_edges);
     let assignment = compose::ports::assign_ports(
         &local_graph,
         &plan,

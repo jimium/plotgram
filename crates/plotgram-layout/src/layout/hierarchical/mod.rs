@@ -210,7 +210,18 @@ fn compute_weak<'g>(
     ) {
         compose::partition_boundary::insert_partition_boundaries(&mut plan, &real_graph)?;
     }
-    compose::order::order_layers(&mut plan, &edge_weights, params.group_boundary_weight);
+    let reversed_edges: std::collections::BTreeSet<String> = real_graph
+        .edges
+        .iter()
+        .filter(|e| e.reversed)
+        .map(|e| e.edge_id.clone())
+        .collect();
+    compose::order::order_layers(
+        &mut plan,
+        &edge_weights,
+        params.group_boundary_weight,
+        &reversed_edges,
+    );
 
     // Group ids carrying a label (frame top pad reserves the label band).
     let labeled = collect_labeled_groups(&input.graph.groups);
