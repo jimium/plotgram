@@ -1,16 +1,21 @@
-//! P6 ordering: flat median + transpose + best-snapshot.
+//! P6 ordering: flat median + transpose + sifting + best-snapshot.
+//!
+//! Objective `J_order` (composition.md §6):
+//! `(weighted_crossings, total_span, lex_layers)` — crossings first, then
+//! proper-segment order displacement (straightness), then stable lex.
 //!
 //! Group containment is enforced upstream by
 //! [`super::boundary::insert_group_boundaries`] (Left/Right clamps + high-weight
 //! cross-rank segments). Crossing minimization is fully group-agnostic.
 
 use std::collections::BTreeMap;
+use std::cmp::Ordering;
 
 use crate::layout::hierarchical::model::{Elem, PlanGraph};
 
 const EPS: f64 = 1e-9;
-const MAX_SWEEPS: usize = 16;
-const NO_IMPROVE_STOP: usize = 2;
+const MAX_SWEEPS: usize = 24;
+const NO_IMPROVE_STOP: usize = 4;
 
 /// real-real / real-virtual / virtual-virtual base weight (composition.md §6).
 fn edge_weight(a: &Elem, b: &Elem) -> f64 {
@@ -114,9 +119,14 @@ pub fn order_layers(
     }
     let adj = build_adjacency(plan, edge_weights, group_boundary_weight);
     let xidx = build_crossing_index(plan);
+    // Span/sift are flat-DAG levers; on grouped plans they fight continuous-block
+    // clamps and can push Channel into root-scope fallback (hybrid-cloud etc.).
+    let grouped = plan.elems.iter().any(|e| {
+        e.key.is_group_boundary() || !e.group_path.is_empty()
+    });
 
     let mut best = plan.layers.clone();
-    let mut best_crossings = total_crossings(plan, &xidx);
+    let mut best_score = order_score(plan, &xidx, !grouped);
     let mut no_improve = 0usize;
 
     for sweep in 0..MAX_SWEEPS {
@@ -129,20 +139,23 @@ pub fn order_layers(
                 reorder_layer(plan, &adj, r, Direction::Down);
             }
         }
-        transpose_pass(plan, &xidx);
+        transpose_pass(plan, &xidx, /*use_span*/ !grouped);
         for r in 0..plan.layers.len() {
             restore_group_clamps(plan, r);
         }
 
-        let c = total_crossings(plan, &xidx);
-        if c < best_crossings {
-            best_crossings = c;
+        let score = order_score(plan, &xidx, !grouped);
+        let lex_better = score.crossings == best_score.crossings
+            && score.total_span == best_score.total_span
+            && plan.layers < best;
+        if score < best_score || lex_better {
+            best_score = score;
             best.clone_from(&plan.layers);
             no_improve = 0;
         } else {
             no_improve += 1;
         }
-        if c == 0 || no_improve >= NO_IMPROVE_STOP {
+        if no_improve >= NO_IMPROVE_STOP {
             break;
         }
     }
@@ -155,6 +168,65 @@ pub fn order_layers(
         super::boundary::align_group_left_pads(plan);
     }
     tighten_one_to_one(plan, &xidx);
+    if !grouped {
+        for _ in 0..8 {
+            let before_layers = plan.layers.clone();
+            let before = order_score(plan, &xidx, true);
+            sift_pass(plan, &xidx);
+            for r in 0..plan.layers.len() {
+                restore_group_clamps(plan, r);
+            }
+            let after = order_score(plan, &xidx, true);
+            if after > before {
+                plan.layers = before_layers;
+                break;
+            }
+            if after == before {
+                break;
+            }
+        }
+    }
+}
+
+/// Lexicographic ordering objective (composition.md §6).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct OrderScore {
+    crossings: u64,
+    /// Σ |layer_pos(u) − layer_pos(v)| over proper segments (straightness).
+    /// Zeroed when `use_span` is false (grouped plans).
+    total_span: u64,
+}
+
+fn order_score(plan: &PlanGraph, xidx: &CrossingIndex, use_span: bool) -> OrderScore {
+    OrderScore {
+        crossings: total_crossings(plan, xidx),
+        total_span: if use_span {
+            total_order_span(plan, xidx)
+        } else {
+            0
+        },
+    }
+}
+
+fn total_order_span(plan: &PlanGraph, xidx: &CrossingIndex) -> u64 {
+    let mut span = 0u64;
+    for (r, segs) in xidx.segs_by_pair.iter().enumerate() {
+        if segs.is_empty() {
+            continue;
+        }
+        let pos_a = reference_positions(&plan.layers[r]);
+        let pos_b = reference_positions(&plan.layers[r + 1]);
+        for &(u, v) in segs {
+            let Some(&pa) = pos_a.get(&u) else {
+                continue;
+            };
+            let Some(&pb) = pos_b.get(&v) else {
+                continue;
+            };
+            span += pa.abs_diff(pb) as u64;
+        }
+    }
+    span
 }
 
 /// G4: pull 1:1 real leaves under their only neighbor by adjacent swaps that
@@ -453,9 +525,9 @@ fn delta_swap(plan: &PlanGraph, xidx: &CrossingIndex, r: usize, i: usize) -> i64
                     continue;
                 };
                 delta += match pa.cmp(&pb) {
-                    std::cmp::Ordering::Greater => -1,
-                    std::cmp::Ordering::Less => 1,
-                    std::cmp::Ordering::Equal => 0, // placeholder
+                    Ordering::Greater => -1,
+                    Ordering::Less => 1,
+                    Ordering::Equal => 0,
                 };
             }
         }
@@ -471,9 +543,9 @@ fn delta_swap(plan: &PlanGraph, xidx: &CrossingIndex, r: usize, i: usize) -> i64
                     continue;
                 };
                 delta += match pc.cmp(&pd) {
-                    std::cmp::Ordering::Greater => -1,
-                    std::cmp::Ordering::Less => 1,
-                    std::cmp::Ordering::Equal => 0, // placeholder
+                    Ordering::Greater => -1,
+                    Ordering::Less => 1,
+                    Ordering::Equal => 0,
                 };
             }
         }
@@ -481,10 +553,9 @@ fn delta_swap(plan: &PlanGraph, xidx: &CrossingIndex, r: usize, i: usize) -> i64
     delta
 }
 
-/// Adjacent swaps accepted only when they strictly reduce local crossings
-/// against both neighboring layers. No group-path guard — clamps are
-/// re-packed after the pass so intervals stay contiguous.
-fn transpose_pass(plan: &mut PlanGraph, xidx: &CrossingIndex) {
+/// Adjacent swaps: always accept crossing reductions; when `use_span` and
+/// crossings are flat, accept span reductions.
+fn transpose_pass(plan: &mut PlanGraph, xidx: &CrossingIndex, use_span: bool) {
     let budget = plan.elems.len() + plan.layers.len() * 4 + 32;
     for _ in 0..budget {
         let mut improved = false;
@@ -495,12 +566,67 @@ fn transpose_pass(plan: &mut PlanGraph, xidx: &CrossingIndex) {
                 if d < 0 {
                     plan.layers[r].swap(i, i + 1);
                     improved = true;
+                } else if d == 0 && use_span {
+                    let before = total_order_span(plan, xidx);
+                    plan.layers[r].swap(i, i + 1);
+                    let after = total_order_span(plan, xidx);
+                    if after < before {
+                        improved = true;
+                    } else {
+                        plan.layers[r].swap(i, i + 1);
+                    }
                 }
                 i += 1;
             }
         }
         if !improved {
             break;
+        }
+    }
+}
+
+/// Sifting: slide each non-zero-width elem through its layer, keep best `J_order`.
+/// Crosses zero-width dummies that block adjacent transpose.
+fn sift_pass(plan: &mut PlanGraph, xidx: &CrossingIndex) {
+    let layer_count = plan.layers.len();
+    for r in 0..layer_count {
+        if plan.layers[r].len() < 2 {
+            continue;
+        }
+        let mut candidates: Vec<usize> = plan.layers[r]
+            .iter()
+            .copied()
+            .filter(|&e| !plan.elems[e].key.is_zero_width())
+            .collect();
+        candidates.sort_by_key(|&e| plan.decl_index[e]);
+
+        for elem in candidates {
+            if !plan.layers[r].iter().any(|&e| e == elem) {
+                continue;
+            }
+            let without: Vec<usize> = plan.layers[r]
+                .iter()
+                .copied()
+                .filter(|&e| e != elem)
+                .collect();
+            let mut best_layer = plan.layers[r].clone();
+            let mut best = order_score(plan, xidx, true);
+
+            for to in 0..=without.len() {
+                let mut trial = without.clone();
+                trial.insert(to, elem);
+                plan.layers[r] = trial;
+                restore_group_clamps(plan, r);
+                let score = order_score(plan, xidx, true);
+                if score < best
+                    || (score == best && plan.layers[r] < best_layer)
+                {
+                    best = score;
+                    best_layer = plan.layers[r].clone();
+                }
+            }
+            plan.layers[r] = best_layer;
+            restore_group_clamps(plan, r);
         }
     }
 }
@@ -801,5 +927,121 @@ mod tests {
             assert_eq!(plan.layers[0].len(), layer_len, "width={width}");
             assert_eq!(plan.layers[1].len(), layer_len, "width={width}");
         }
+    }
+
+    /// Dummy between two reals must not freeze a crossing that sifting can clear
+    /// (mech.layout-styles L3: n23 | virt | n6 vs n26→n6 × n5→n23).
+    #[test]
+    fn sifting_clears_crossing_across_dummy() {
+        let elems = vec![
+            plain_elem("n26", 0, &[]),
+            plain_elem("n5", 0, &[]),
+            plain_elem("n25", 1, &[]),
+            plain_elem("n23", 1, &[]),
+            Elem {
+                key: ElemKey::Virtual {
+                    edge_id: "e30".into(),
+                    ordinal: 0,
+                },
+                group_path: Vec::new(),
+                rank: 1,
+            },
+            plain_elem("n6", 1, &[]),
+        ];
+        // n26→n25, n26→n6, n5→n23, n5→n6 — with order [n25,n23,virt,n6] one crossing.
+        let segments = vec![
+            Segment {
+                edge_id: "a".into(),
+                ordinal: 0,
+                from: 0,
+                to: 2,
+            },
+            Segment {
+                edge_id: "b".into(),
+                ordinal: 0,
+                from: 0,
+                to: 5,
+            },
+            Segment {
+                edge_id: "c".into(),
+                ordinal: 0,
+                from: 1,
+                to: 3,
+            },
+            Segment {
+                edge_id: "d".into(),
+                ordinal: 0,
+                from: 1,
+                to: 5,
+            },
+        ];
+        let layers = vec![vec![0, 1], vec![2, 3, 4, 5]];
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let mut plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: vec![0, 1, 2, 3, 4, 5],
+            segments,
+            layers,
+        };
+        let xidx = build_crossing_index(&plan);
+        assert_eq!(total_crossings(&plan, &xidx), 1);
+        order_layers(&mut plan, &BTreeMap::new(), 16.0);
+        let xidx = build_crossing_index(&plan);
+        assert_eq!(
+            total_crossings(&plan, &xidx),
+            0,
+            "sifting should move n6 left of n23 across the dummy: {:?}",
+            plan.layers[1]
+        );
+    }
+
+    #[test]
+    fn span_tiebreak_prefers_straighter_order() {
+        // Two crossings-free orders; span should pull children under parents.
+        let elems = vec![
+            plain_elem("a0", 0, &[]),
+            plain_elem("a1", 0, &[]),
+            plain_elem("b0", 1, &[]),
+            plain_elem("b1", 1, &[]),
+        ];
+        let segments = vec![
+            Segment {
+                edge_id: "e0".into(),
+                ordinal: 0,
+                from: 0,
+                to: 2,
+            },
+            Segment {
+                edge_id: "e1".into(),
+                ordinal: 0,
+                from: 1,
+                to: 3,
+            },
+        ];
+        // Start crossed in position but without crossings if we only had matching —
+        // identity [b0,b1] under [a0,a1] is already optimal span 0.
+        // Start with reversed children: span=2, crossings=2 → must fix both.
+        let layers = vec![vec![0, 1], vec![3, 2]];
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let mut plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: vec![0, 1, 2, 3],
+            segments,
+            layers,
+        };
+        order_layers(&mut plan, &BTreeMap::new(), 16.0);
+        assert_eq!(plan.layers[1], vec![2, 3]);
+        let xidx = build_crossing_index(&plan);
+        assert_eq!(order_score(&plan, &xidx, true).total_span, 0);
     }
 }
