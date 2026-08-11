@@ -2,66 +2,76 @@
 
 > 目的：在 [architecture.md](architecture.md) §12 里程碑之上，写清 **MVP 之后各阶段做什么、大致朝哪走**。  
 > 不替代目标架构；不写进度日记。实现取舍真源仍见 [notes/2026-08-02-mvp-scope.md](notes/2026-08-02-mvp-scope.md)。  
-> 写权尺子：[write-authority.md](../write-authority.md)。
+> 写权尺子：[write-authority.md](../write-authority.md)。  
+> 组策略选型：[expectations.md](expectations.md) §7 · StrongMacro 方案：[phases/strong-macro.md](phases/strong-macro.md)。
 
 ---
 
-## 0. 当前位置（MVP 已交付）
+## 0. 当前位置（2026-08）
 
-已具备可跑的 Sugiyama 主路径子集：
+### 0.1 已交付主路径
+
+主路径已远超当初 MVP 子集：
 
 ```text
-FAS(+环 reroot) → Network Simplex → properify → median(+权+snapshot)
-  → 阻尼重心 + 每层 VPSC → 端口（Free / FixedSide）→ dummy 链 Ink 正交展开
+FAS(+环 reroot) → rank / properify / order
+  → ports（FREE / FixedSide）→ Metric（J(x)+VPSC / PortLane / Track）
+  → Channel（Substrate + TrackOrder + rip-up + Corridor Allocator）
+  → Ink 展开 + diagnostics
 ```
 
-FAS 含环入口规则：声明序靠前的节点优先靠上（环 reroot，[architecture.md](architecture.md) §3.1）；
-反转数回涨由 `hier_eval` 基线的 `reversed_count` 门禁守住。
+| 能力 | 状态 |
+|------|------|
+| 阶段 A–C（次轴拉直 / 端口 / 诊断） | ✅ 已收口（见 §2–§4） |
+| **D₁** Channel（D1.0–D1.3.5） | ✅ 已交付；余量见 §5.1 |
+| **Weak** 组策略（默认） | ✅ 边界 dummy + Gate/ScopeMask + finalize 后验框 + post-VPSC compact |
+| **StrongMacro**（`group_policy: strong-macro`） | ✅ SM-0..4：MacroBlockWriter 写框；与 Weak **同一 Plan schema**；共享 Channel/Ink 尾 |
+| 穿组 verifier | ✅ `verify_no_group_penetration`（strong 硬门禁 / weak 观测） |
+| 边参数三档 + `auto_edge_grouping` + `weight`/`critical` | ✅ |
+| PortLane / 对称轴 `J(x)` | ✅ |
 
-硬不变量（无重叠、端口落界）已由 `hier_eval` 守住；全正交断言仅对
-默认/`orthogonal` 风格成立（`routing_style: polyline/curved` 见
-[edge-parameters](edge-parameters.md)）。
+硬不变量（无重叠、端口落界、组包含）由 `hier_eval` 守住；全正交断言仅对默认/`orthogonal` 成立（`polyline`/`curved` 见 [edge-parameters](edge-parameters.md)）。
 
-边参数产品补齐（不归入新阶段，属既有批次的参数收口，见
-[edge-parameters](edge-parameters.md) §4）：`routing_style` 三档
-（orthogonal/polyline/curved）、`auto_edge_grouping` 端口合流（bus-style）、
-边级 `weight`（`critical: true` 糖 = `2.0`）均已落地。
+### 0.2 相对目标架构的主要缺口
 
-相对目标架构的主要缺口：
+| 缺口 | 观感 / 产品影响 | 归属 |
+|------|-----------------|------|
+| **Weak 组框仍是 finalize 后验 bbox**（非 VPSC 真源）；兄弟分隔靠 compact 止血 | 框可漂移 / 穿组未由构造成立；weak ~11 fixture 穿组仅观测 | **D₂** |
+| Gate 容量 → Metric 缝宽；`channel-group-fallback` 仍偏多 | fallback 后等同无组，交叉易爆 | D₂ ∩ Channel 收口 |
+| `group_anchor` 仍当普通节点分层（ADR-004 未闭合） | 贴框语义不纯 | 组专项 |
+| strong-port projection；label / loop reserve | 端口序不进列位；标签/自环空间未建模 | 余项（原 M2） |
+| ordering 落选孩子 / 多父列位 | 分支边大 Z | Compose `order` |
+| **PartitionGrid** 未消费 | 泳道 / 矩阵不到位 | **E / M5** |
+| architecture profile 默认 strong | 本轮不做（语料小）；须显式 `group_policy` | SM-4 缓项 |
+| Integrated labeling；octilinear / 真 MCF / from-sketch | 不挡主路径闭环 | E / 后置 |
+| 全局 Grid | 与 PortLane 正交，单开 | §10 |
 
-| 缺口 | 观感 / 产品影响 |
-|------|-----------------|
-| 多 rank 反向走廊边仍走 rank 方向侧别（写者 ports.rs）；跨轴出针需 Channel 消费才不增折点（阶段 B 已落地无 dummy 链回边的 East/West，见 G3） | 长回边走 dummy 链走廊；Channel（D₁）前跨轴侧别会增折点，故暂不启用 |
-| strong-port projection（port dummy 进 ordering）与 label/loop reserve（M2 余项） | 端口序不参与列位决议；标签/自环保留空间未建模（留 C/D 阶段） |
-| ordering 落选孩子 / 多父节点的列位（写者 order.rs） | 分支边大 Z（如落选孩子不在父节点出端口正下方） |
-| 无完整 Channel / track / rip-up | 密边拥塞只能硬挤 |
-| 组框后验 bbox；无 Gate/Scope | 跨组边可贴框 / 穿框 |
-| StrongMacro / PartitionGrid 未消费 | 架构图 / 泳道类能力未到位 |
-
-**总方向**：先收口「长边更直」与可观测性，再按产品主痛点二选一推进 Channel 或组框写权；StrongMacro / Partition / 完整 labeling 后置。
+**总方向**：A–C / D₁ / StrongMacro 已过；下一块产品主菜是 **缩小后的 D₂（Weak 框写权）**，或 **PartitionGrid**，按痛点二选一。Strong 路径框写者已是 MacroBlockWriter——**禁止**再叠一套 VPSC 组框变量。
 
 ---
 
 ## 1. 阶段总览
 
 ```text
-MVP ──► A 次轴拉直 ──► B 端口补齐 ──► C 诊断出口
+MVP ──► A 次轴 ──► B 端口 ──► C 诊断     ✅
               │
-              └─► D₁ Channel 正交    或    D₂ 组框 + Gate
-                              │
-                              └─► E StrongMacro / Partition / labeling …
+              ├─► D₁ Channel（D1.0–D1.3.5）  ✅ 主路径；余量收口
+              │
+              ├─► D₂ Weak 组框写权           ◻ 现行主缺口（见 §5.2）
+              │
+              └─► E StrongMacro ✅ · Partition / labeling …
 ```
 
-| 阶段 | 对齐 architecture | 一句话方向 |
-|------|-------------------|------------|
-| **A** | 收口 M1 视觉债 | Metric 把长链与端口列对齐；折点明显下降 |
-| **B** | 补齐 M2 | 端口决议更稳；Ink 零猜测 |
-| **C** | 补齐 M0 契约债 | Layout 输出可诊断、可回归 |
-| **D₁** | M3 | 走廊拓扑 + track；拥塞有界返工 |
-| **D₂** | M4 | 组框进求解；跨组只经 Gate |
-| **E** | M4+/M5/后置 | StrongMacro、PartitionGrid、integrated labeling |
+| 阶段 | 对齐 architecture | 状态 | 一句话 |
+|------|-------------------|------|--------|
+| **A** | M1 | ✅ | Metric 长链 / 端口列对齐 |
+| **B** | M2 | ✅（余项见 §0.2） | 端口决议；Ink 零猜测 |
+| **C** | M0 契约 | ✅ | diagnostics / params_hash |
+| **D₁** | M3 | ✅ 主路径 | 走廊 + track + rip-up + allocator |
+| **D₂** | M4（Weak 半） | ◻ | **仅 Weak**：框进 Metric；穿组由构造 + 门禁硬化 |
+| **E** | M4+/M5/后置 | Strong ✅；其余 ◻ | PartitionGrid、labeling、… |
 
-**约束**：A → B → C 顺序建议串行收口；**D₁ 与 D₂ 不要并行开两条**——先定产品主痛点（密边路由 vs 架构组框）再选。E 不挡 D 的主路径闭环。StrongMacro 现行方案见 [phases/strong-macro.md](phases/strong-macro.md)。
+**约束**：历史「D₁ 与 D₂ 不要并行」仍成立——D₁ 主路径已完，开 D₂ 时不要再开第二条大 Channel。E 不挡 D；StrongMacro 与 D₂ 都碰「组框写者」时：**Strong = MacroBlockWriter；Weak+D₂ = VPSC 框变量**（[strong-macro.md](phases/strong-macro.md) §3 / §8）。
 
 ---
 
@@ -94,7 +104,7 @@ MVP ──► A 次轴拉直 ──► B 端口补齐 ──► C 诊断出口
 
 **刻意不做**：Ink `unwrap_or` 默认侧；用 slot 同时当像素真源。
 
-**已收口（阶段 B 落地摘要）**：边端口收敛为 FREE / `FixedSide`（DSL 仅 `from_side`/`to_side`）；`FixedOrder` 仅 group_anchor；已移除边级 slot/ratio/pos/sides。Compose 决议（FREE 走 shape→port policy + 拓扑选侧、G3 仅对无 dummy 链回边选 East/West）；Metric 按 `Ordered` 相对序稠密居中 / `LocalOffset` 展开；Ink 只读零猜测。多 rank 回边的 East/West 与 strong-port projection / label-loop reserve 归入 §0 缺口表（留 C/D）。
+**已收口（阶段 B 落地摘要）**：边端口收敛为 FREE / `FixedSide`（DSL 仅 `from_side`/`to_side`）；`FixedOrder` 仅 group_anchor；已移除边级 slot/ratio/pos/sides。Compose 决议（FREE 走 shape→port policy + 拓扑选侧、G3 仅对无 dummy 链回边选 East/West）；Metric 按 `Ordered` 相对序稠密居中 / `LocalOffset` 展开；Ink 只读零猜测。多 rank 回边的 East/West 与 strong-port projection / label-loop reserve 归入 §0.2 缺口表。
 
 ---
 
@@ -114,48 +124,60 @@ MVP ──► A 次轴拉直 ──► B 端口补齐 ──► C 诊断出口
 （warnings / relaxations / params_hash）进 `LayoutOutput` 与 `LayoutResult`；
 hierarchical bind 的未知 option warning 透出（此前被丢弃），`params_hash`
 为 FNV-1a 64 对 canonical 参数串的确定性哈希（归因参数 vs 代码）。
-Unsupported / Infeasible 硬失败语义不变；relaxations 通道已立、暂无生产方
-（D 阶段 rip-up 等首批消费）。出口：CLI render stderr warnings、measure
+Unsupported / Infeasible 硬失败语义不变；relaxations 已由 Channel rip-up 等消费。出口：CLI render stderr warnings、measure
 JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 （debug-inspector.md §5.5）。验收：hier_eval 与全部快照几何零变化。
 
 ---
 
-## 5. 阶段 D — 二选一深挖
+## 5. 阶段 D
 
-### D₁ · Channel 正交（密边 / 走廊）
+### 5.1 D₁ · Channel 正交（密边 / 走廊）— 主路径已交付
 
 **方向**：组合相写路径拓扑与 track 序；Metric 写 track 像素；Ink 只展开。
 
-**可执行契约**：[phases/channel-d1.md](phases/channel-d1.md)（分三子里程碑，禁止 Ink `mid_y` 特判）。
+**可执行契约**：[phases/channel-d1.md](phases/channel-d1.md)；走廊分配：[phases/channel-corridor-allocator.md](phases/channel-corridor-allocator.md)。
 
-| 子里程碑 | 摘要 |
-|----------|------|
-| **D1.0** | 层间走廊 TrackOrder + 最小 DemandBoard；修关 `auto_edge_grouping` 后的假 bus；恢复消费 `edge_gap` |
-| **D1.1** | 顶层 scope-only Substrate + 词典序搜索；完整 `RouteTopology::Orthogonal` |
-| **D1.2** | Gate / ScopeMask / 有界 rip-up；`min_first/last_segment`、回边外侧走廊、端总线 `BundlePlan` 升格 |
-| **D1.3** | Corridor Allocator：span 亲和 → 内层走廊优先 → RouteOrder+多轮 rip-up → Corridor Demand → 回边侧别统一代价。可执行方案见 [phases/channel-corridor-allocator.md](phases/channel-corridor-allocator.md)。**D1.3.1–D1.3.5 已交付** |
+| 子里程碑 | 状态 | 摘要 |
+|----------|------|------|
+| **D1.0** | ✅ | 层间走廊 TrackOrder + 最小 DemandBoard；修假 bus；消费 `edge_gap` |
+| **D1.1** | ✅ | Substrate + 词典序搜索；`RouteTopology::Orthogonal` |
+| **D1.2** | ✅ | Gate / ScopeMask / 有界 rip-up；端总线 `BundlePlan`；段长参数 |
+| **D1.3.1–D1.3.5** | ✅ | SpanAffinity → 内层优先 → RouteOrder+rip-up → Corridor Demand → 回边侧别代价 |
 
-**做什么（概要）**：
+**仍属收口（非新开大阶段）**：
 
-- Substrate + Channel 搜索（折点优先于长度）——自 D1.1
-- track order + DemandBoard（MetricBudget）——自 D1.0
-- 有界 rip-up / history cost；InkVerifier（不穿节点、非 bundle 不非法重合）——D1.2
-- 恢复并真正消费 `edge_gap` 等 track 相关参数——`edge_gap` 在 D1.0；其余见 [edge-parameters.md](edge-parameters.md) §4 第四批
+- Gate 容量累计 → Metric 缝宽（架构有、`GateCapacity::Fixed` 已删，尚未进 Demand）
+- 降低 `channel-group-fallback` 频率（依赖组矩形纯度；与 D₂ 框真源联动）
+- 与 Weak 框真源对齐后的外轨 / Scope 一致性
 
-**何时选**：产品痛点是边挤、弯多、需要走廊分配，而不是组框合法性。
+**何时还要动 D₁**：密边路由回归、fallback 噪声、容量预算——**不要**为「架构舞台感」再开 Channel 特判（那是 StrongMacro）。
 
-### D₂ · 组框写权 + Gate（架构 / 跨组）
+### 5.2 D₂ · Weak 组框写权（现行主缺口）
 
-**方向**：组框由 Metric 写出，finalize 不重算；跨组边只经合法 Gate。
+**方向（缩小后）**：仅 **Weak** 路径——组框由 Metric 写出，finalize 不重算；穿组由构造 + 已有 verifier 门禁硬化。  
+**不再**把 StrongMacro /「同一 Plan」/ verifier 首实现算进 D₂——这些已由 E / SM-4 / 共享尾完成。
 
-**做什么（概要）**：
+**可执行方案**：[phases/group-frame-d2.md](phases/group-frame-d2.md)（**D₂.0 → D₂.1 → D₂.2**）。产品已裁定 Weak 框要可证 → **开 D₂.0**。
 
-- 组框进 VPSC（含 / 分隔 / title demand）
-- Gate / Scope 三道防线；`verify_no_group_penetration`（**P5 明确留到本阶段**，本仓库尚未实现）
-- Weak 连续块与目标 Plan schema 对齐；为 StrongMacro 留同一产出类型
+| 子切片 | 摘要 | 状态 |
+|--------|------|------|
+| **D₂.0** | 框真源进 Metric（Fit 含约束）；finalize 透传；外轨可读框 | ◻ 下一刀 |
+| **D₂.1** | sibling 硬分隔 + title/min Demand；退役 compact 主路径 | ◻ |
+| **D₂.2** | Weak 穿组硬门禁；Gate 容量 → Demand；fallback 收口 | ◻ |
 
-**何时选**：产品痛点是组框位置、跨组穿框、架构分层子系统。
+| 原 D₂ 条目 | 现状 | D₂ 是否还做 |
+|------------|------|-------------|
+| StrongMacro 同 Plan schema | ✅ expand → 全局 `PlanGraph` | 否 |
+| `verify_no_group_penetration` | ✅ SM-4；strong 硬 / weak 观测 | 共用已有；**Weak 门禁硬化** → D₂.2 |
+| Gate / ScopeMask / `verify_route_scope` | ✅ 大体在 D1.2 | 否（从零做 Gate） |
+| **组框进 VPSC**（含 / 分隔 / title demand） | Weak = finalize 后验 + compact | **D₂.0–D₂.1** |
+| 兄弟框硬分隔 | compact 止血 | **D₂.1** |
+| Weak 穿组由构造成立 | ~11 fixture 仍观测穿组 | **D₂.2** |
+
+**刻意不做**：第二套 `ArchitectureLayout`；Ink 事后挪组；用 StrongMacro 冒充 Weak 框真源；Strong 路径叠 VPSC 框变量。
+
+**何时选**：产品痛点是 **Weak 下**组框合法性、跨组穿框可证——不是架构分层舞台感（那用 `strong-macro`，见 [expectations §7](expectations.md)）。
 
 ---
 
@@ -163,13 +185,13 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 
 **方向**：图种差异只经 profile 进参数；不新增第二套布局器。
 
-| 项 | 方向摘要 |
-|----|----------|
-| **StrongMacro** | 组树后序局部 Plan → macro 进父层 → 展开为与 Weak **同一 Plan schema**。执行方案：[phases/strong-macro.md](phases/strong-macro.md) |
-| **PartitionGrid** | 引擎消费 cell / band；与 Orientation 轴语义一致；非 `group` 冒充泳道 |
-| **Bundle / auto_edge_grouping** | Compose 写合流事实；Ink 只接合干线 |
-| **Integrated labeling** | 至少 label 需求进 Demand；完整联合求解可渐进 |
-| **真 MCF / from-sketch / octilinear** | 明确不挡主路径闭环 |
+| 项 | 状态 | 方向摘要 |
+|----|------|----------|
+| **StrongMacro** | ✅ SM-0..4 | 组树后序局部 Plan → macro → 与 Weak 同一 Plan。方案：[phases/strong-macro.md](phases/strong-macro.md)。缓项：architecture profile 默认 strong |
+| **PartitionGrid** | ◻ | 引擎消费 cell / band；Orientation 轴语义；非 `group` 冒充泳道（ADR-008） |
+| **Bundle / auto_edge_grouping** | ✅ 端总线主路径 | Compose 写合流；Ink 接合；美学可渐进 |
+| **Integrated labeling** | ◻ | 至少 label 需求进 Demand；完整联合求解可渐进 |
+| **真 MCF / from-sketch / octilinear** | ◻ | 明确不挡主路径闭环；`octilinear` bind 仍硬失败 |
 
 ---
 
@@ -179,7 +201,8 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 2. **有界返工优先于真全局优化** — Channel 用 rip-up，不上真 MCF 挡闭环。  
 3. **禁止图名特判** — architecture = Hierarchical + profile 参数，不是 `ArchitectureLayout`。  
 4. **参数能 bind 就必须被消费** — 否则 bind 硬失败（见 MVP 对 `edge_gap` 等的处理）。  
-5. **Weak / Strong 不得永久两套产出类型** — 收缩策略不同，Plan schema 必须同一。
+5. **Weak / Strong 不得永久两套产出类型** — 收缩策略不同，Plan schema 必须同一（已满足）。  
+6. **组框单写者按 policy** — Strong: MacroBlockWriter；Weak(+D₂): Metric 框变量；禁止同一 policy 双写。
 
 ---
 
@@ -187,14 +210,18 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 
 | 文档 | 角色 |
 |------|------|
-| **本文** | MVP 之后的**阶段路线与方向** |
+| **本文** | MVP 之后的**阶段路线与方向**（含现状快照） |
 | [architecture.md](architecture.md) | 目标架构与 M0–M5 设计里程碑 |
+| [expectations.md](expectations.md) | 视觉期待 + Weak/Strong 选型 |
 | [notes/2026-08-02-mvp-scope.md](notes/2026-08-02-mvp-scope.md) | MVP 实现相对架构的取舍记录 |
+| [notes/2026-08-09-group-state-review.md](notes/2026-08-09-group-state-review.md) | 组现状盘点（部分条目已过时，以本文 + strong-macro 为准） |
 | [scope.md](scope.md) | 能力 / 非目标 / 典型域 |
-| [edge-parameters.md](edge-parameters.md) | 边参数支持研究（对照 yFiles Edges 分组）+ 分批实施路线 |
+| [edge-parameters.md](edge-parameters.md) | 边参数支持研究 + 分批实施路线 |
 | [phases/](phases/) | 相级可执行契约 |
-| [phases/channel-d1.md](phases/channel-d1.md) | D₁ Channel 分阶段契约（D1.0–D1.2） |
-| [phases/strong-macro.md](phases/strong-macro.md) | **StrongMacro 实现方案**（阶段 E；SM-0..4） |
+| [phases/channel-d1.md](phases/channel-d1.md) | D₁ Channel 分阶段契约 |
+| [phases/channel-corridor-allocator.md](phases/channel-corridor-allocator.md) | D1.3 Corridor Allocator |
+| [phases/strong-macro.md](phases/strong-macro.md) | StrongMacro 实现方案（SM-0..4） |
+| [phases/group-frame-d2.md](phases/group-frame-d2.md) | **D₂ Weak 组框写权**（D₂.0–D₂.2） |
 
 代码入口（重建）：`crates/plotgram-layout/src/layout/hierarchical/`。
 
@@ -209,7 +236,7 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 - ~~声明表 D1–D3（历史路径）~~ → ~~P4：目标函数取代声明表（S1–S4）~~  
 - ~~代表图主链共线 / 跨层扇 / twin 占脊门禁~~  
 
-**后续**：组边界 / group band 截断细则（组专项，非再开声明表）。
+**后续**：组边界 / group band 截断细则（组专项，非再开声明表）；与 D₂ Weak 框写权可一并裁定。
 
 **不做**：Channel/Ink 改列；图名特判；VPSC 中点硬等式 / 第三趟 ad-hoc 拉回。
 
@@ -219,3 +246,12 @@ JSON `diagnostics` 段；与 `LayoutDebugTrace` 并列产出、不合并
 
 - **PortLane（已落地）**：双胞胎 N/S 走廊绝对端口列，无 grid；见 [phases/port-lanes.md](phases/port-lanes.md)、[expectations §6.2](expectations.md)。  
 - **全局 Grid**（单开）：节点参考点贴网 + 端口 `ON_GRID` 类策略；**不**作为 PortLane 的前提。
+
+---
+
+## 11. 修订记录
+
+| 日期 | 说明 |
+|------|------|
+| 2026-08-11 | 同步现状：A–C / D₁ / StrongMacro / 穿组 verifier 已交付；§0 缺口表重写；D₂ 缩小为 Weak 框写权；E 表标 Strong ✅ |
+| 2026-08-11 | 产品裁定 Weak 框要可证；§5.2 挂 [group-frame-d2.md](phases/group-frame-d2.md)（D₂.0–D₂.2） |
