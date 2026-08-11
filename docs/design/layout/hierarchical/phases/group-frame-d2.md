@@ -7,7 +7,7 @@
 > 对照边界：[strong-macro](strong-macro.md)（Strong 框写者 = MacroBlockWriter，**不**进本方案）  
 > 选型：[expectations](../expectations.md) §7  
 > 写权尺子：[write-authority](../../write-authority.md)  
-> 状态：**现行实现方案**（可执行推进）；产品已裁定「Weak 框要可证」→ 开 D₂.0
+> 状态：**D₂.0–D₂.2 已落地并关闭**（2026-08-11）；本文保留写权/IR/验收与落地偏差记录。余项：穿组构造清零、GroupMinWidth、`close_sibling`→J(x)。
 
 本文把缩小后的 **D₂ · Weak 组框写权**切成 **D₂.0 → D₂.1 → D₂.2** 三个可串行交付切片，钉死与 StrongMacro / D₁ 的边界、写权、IR、管线序与验收。
 
@@ -71,7 +71,7 @@ Channel / 外轨多半只见节点体
 | **Weak（今日）** | 软聚类 + 后验框 + compact | **改造对象** |
 | **StrongMacro** | 舞台 / MacroBlockWriter | **正交**；同 policy 禁止双写者 |
 | **D₁ Channel** | 走廊 / Gate / rip-up | D₂.0 后框可作障碍；容量/fallback = D₂.2 联调 |
-| **PartitionGrid** | 泳道矩阵 | E / M5；勿用 group 冒充 |
+| **PartitionGrid** | 泳道矩阵 | E / M5；方案 [partition-grid](partition-grid.md)；勿用 group 冒充 |
 
 产品口诀：密边 → D₁；架构舞台 → Strong；**Weak 框可证 → D₂（本文）**。
 

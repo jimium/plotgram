@@ -111,11 +111,12 @@
 
 | 诉求 | 选型 | 理由 |
 |------|------|------|
-| 密边、弯多、扇出扇入重的流程图 | `weak`（默认） | 软聚类：框由成员几何导出，不与边路由争写权；D₁ 走廊/扇形能力全量可用 |
-| Weak 下组框合法性可证（不穿组、兄弟分隔由构造成立） | 仍用 `weak`；欠 **[D₂](phases/group-frame-d2.md)**（开 D₂.0） | D₂ = **仅 Weak** 框进 Metric 作真源 + 穿组门禁硬化（D₂.0–D₂.2）；verifier 已共用。**不是**再做 StrongMacro |
-| 架构图舞台感：子系统严格分区、上下叠放同轴 | `strong-macro`（已落地） | 宏收缩：框由 MacroBlockWriter 一次写定；跨组边走行缝 demand + 行对齐（[strong-macro.md](phases/strong-macro.md)）。泳道矩阵另属 PartitionGrid，勿用 group 冒充 |
+| 密边、弯多、扇出扇入重的流程图 | `weak`（默认） | 软聚类 + D₁ 走廊；框由 Metric Fit 写真源（D₂ 已落地），不与 Strong 舞台争语义 |
+| Weak 下组框合法性可证（不穿组、兄弟分隔） | `weak`（**D₂ 已关闭**） | 框进 Metric + sibling 硬分隔 + 穿组硬门禁；存量穿组见 C 类 `d2-exempt`（[group-frame-d2](phases/group-frame-d2.md)）。**不是**再做 StrongMacro |
+| 架构图舞台感：子系统严格分区、上下叠放同轴 | `strong-macro`（已落地） | 宏收缩：框由 MacroBlockWriter 一次写定；跨组边走行缝 demand + 行对齐（[strong-macro.md](phases/strong-macro.md)）。泳道/矩阵另属 PartitionGrid（[partition-grid](phases/partition-grid.md)），勿用 group 冒充 |
+| 泳道 / 矩阵（全局列行、跨列 rank 对齐） | PartitionGrid（引擎消费进行中） | DSL `partition` + `cell_*`；方案 PG-0–PG-4；**禁止** group Horizontal 冒充 |
 
-**用户应能指着说**：strong 图里每个子系统是一块独立舞台，块间走廊不斜穿别人的框；weak 图里组只是成员周围的一圈底色，边怎么走优先——若还要 Weak「框可证」，等 D₂，而不是改开 strong。
+**用户应能指着说**：strong 图里每个子系统是一块独立舞台；weak 图里组跟着节点，但框包得住、兄弟不叠，穿组在回归里被硬拦（豁免须显式标注）。
 
 **声明方式**：`group_policy` 由作者在 `layout:` 选项里显式给出（解析层 → params，禁引擎图种分支，ADR-001）。architecture profile 默认本轮**不**自动切 strong-macro：strong 语料尚小（6 张基准图），默认切换会把未充分验证的宏收缩行为推给全部 architecture 图；待语料与门禁覆盖更大后再评估（strong-macro.md §6 SM-4）。
 
@@ -130,7 +131,7 @@
 | [phases/port-lanes.md](phases/port-lanes.md) | 双胞胎走廊绝对列 |
 | [write-authority](../write-authority.md) | 单写者 / 落笔零新决策 |
 | [phases/](phases/README.md) | 各相怎么写 |
-| [roadmap](roadmap.md) | 阶段现状与排期；D₂ 细节见 [group-frame-d2](phases/group-frame-d2.md) |
+| [roadmap](roadmap.md) | 阶段现状与排期；D₂ 已关闭，细节见 [group-frame-d2](phases/group-frame-d2.md) |
 
 ## 9. 以后怎么加期待
 

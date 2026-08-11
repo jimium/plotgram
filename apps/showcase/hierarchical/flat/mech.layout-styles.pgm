@@ -1,0 +1,75 @@
+// Layout Styles: yFiles 布局样式示例（正交折线边路由）
+//
+// 来源：yFiles 官方 LayoutStyles.graphml（拓扑转写，节点为无标签 30×30 方块）。
+// 机制探针：27 节点 / 34 边正交折线 DAG —— 多路扇入/扇出、左右口并行通道、
+// bypass 长边、回边、对角扇出扇入，验证 router 的折线约束与通道争用。
+diagram {
+    profile: flowchart,
+    title: "布局样式：正交折线边",
+    layout: hierarchical { direction: top-to-bottom }
+
+    // ── 节点（无标签方块，按源 id 命名）──
+    node n0 { label: "n0", archetype: process }
+    node n1 { label: "n1", archetype: process }
+    node n2 { label: "n2", archetype: process }
+    node n3 { label: "n3", archetype: process }
+    node n4 { label: "n4", archetype: process }
+    node n5 { label: "n5", archetype: process }
+    node n6 { label: "n6", archetype: process }
+    node n7 { label: "n7", archetype: process }
+    node n8 { label: "n8", archetype: process }
+    node n9 { label: "n9", archetype: process }
+    node n10 { label: "n10", archetype: process }
+    node n11 { label: "n11", archetype: process }
+    node n12 { label: "n12", archetype: process }
+    node n13 { label: "n13", archetype: process }
+    node n14 { label: "n14", archetype: process }
+    node n15 { label: "n15", archetype: process }
+    node n16 { label: "n16", archetype: process }
+    node n17 { label: "n17", archetype: process }
+    node n18 { label: "n18", archetype: process }
+    node n19 { label: "n19", archetype: process }
+    node n20 { label: "n20", archetype: process }
+    node n21 { label: "n21", archetype: process }
+    node n22 { label: "n22", archetype: process }
+    node n23 { label: "n23", archetype: process }
+    node n24 { label: "n24", archetype: process }
+    node n25 { label: "n25", archetype: process }
+    node n26 { label: "n26", archetype: process }
+
+    // ── 边（与 graphml e0..e33 一一对应）──
+    n3 -> n7
+    n0 -> n1
+    n0 -> n4
+    n1 -> n2
+    n0 -> n9
+    n6 -> n10
+    n11 -> n12
+    n11 -> n13
+    n8 -> n11
+    n15 -> n16
+    n16 -> n17
+    n18 -> n19
+    n20 -> n21
+    n7 -> n17
+    n9 -> n22
+    n22 -> n3
+    n19 -> n0
+    n8 -> n4
+    n18 -> n25
+    n24 -> n8
+    n26 -> n25
+    n10 -> n20
+    n5 -> n23
+    n25 -> n15
+    n10 -> n15
+    n21 -> n17
+    n26 -> n6
+    n13 -> n12
+    n12 -> n14
+    n14 -> n11
+    n21 -> n5
+    n5 -> n6
+    n9 -> n7
+    n19 -> n24
+}

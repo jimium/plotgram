@@ -17,7 +17,8 @@
 | [port-lanes](port-lanes.md) | 双胞胎 N/S 走廊端口绝对列（无 grid；对照 yFiles PortAlignment） |
 | [ink-and-verification](ink-and-verification.md) | Ink 纯展开、规范化与分相 verifier |
 | [strong-macro](strong-macro.md) | **StrongMacro 实现方案**（阶段 E；与 Weak/D₂ 边界 + SM-0..4） |
-| [group-frame-d2](group-frame-d2.md) | **D₂ Weak 组框写权**（D₂.0 框真源 → D₂.1 sibling → D₂.2 穿组/Gate） |
+| [group-frame-d2](group-frame-d2.md) | **D₂ Weak 组框写权**（D₂.0–D₂.2，**已关闭**；余项见该文 §12） |
+| [partition-grid](partition-grid.md) | **PartitionGrid 引擎消费**（PG-0–PG-4；泳道/矩阵；model/DSL 已备） |
 
 ## 共同格式
 

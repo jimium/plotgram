@@ -12,7 +12,7 @@
 | 坐标与间距 | 节点不重叠；主/次轴与 track/缝宽可发布给 Ink |
 | Group 一等公民 | 组框尺寸与位置由布局写出；跨组边经 gate/锚点策略，非纯后验描边 |
 | Group policy | **Weak** / **StrongMacro** 均为本核 **profile 参数**，不是第二套布局器。Strong 方案：[phases/strong-macro.md](phases/strong-macro.md) |
-| **PartitionGrid** | 正交列/行（ADR-008）；model/DSL 已定；组合/度量消费 **planned** |
+| **PartitionGrid** | 正交列/行（ADR-008）；model/DSL 已定；组合/度量消费 **planned** → [phases/partition-grid.md](phases/partition-grid.md) |
 | 端口 | 作者约束（`PortConstraint`）+ 算法决议（`PortRef`）；along 在组合相 |
 | 内建正交边 | Channel/走廊拓扑 + Ink 展开；可选 bus/bundle（`edge_group`） |
 | 独立路由衔接 | `DeferToRouter`：本核写节点与端口决议，边路径交给 router |
@@ -48,7 +48,7 @@
 
 1. **Integrated labeling** — 完整联合求解可渐进；至少 label 需求进度量。  
 2. **组合相单一产出类型** — Weak/StrongMacro 仅为收缩策略；输出字段路径间一致。  
-3. **PartitionGrid 引擎消费** — DSL/model 已定（ADR-008）；Hier 连续块 / 层区间接线仍 **planned**。  
+3. **PartitionGrid 引擎消费** — DSL/model 已定（ADR-008）；Hier 连续块 / 层区间接线仍 **planned**；切片方案：[phases/partition-grid.md](phases/partition-grid.md)。  
 4. **增量 / from-sketch** — 非 MVP 阻塞。
 
 细节实现债见 `docs/archive/atlas/30`（只读）；本表只约束「设计上要收敛到哪」。

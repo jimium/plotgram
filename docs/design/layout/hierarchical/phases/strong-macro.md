@@ -239,7 +239,7 @@ Strong 路径上框由 SM-C 一次写定（成员内容 + 一层 pad + label ban
 - [x] `verify_no_group_penetration`（可与 D₂ 共用实现）  
 - [x] hier_eval / showcase 门禁：Strong 代表图对齐指标  
 - [x] 文档：Weak vs Strong 选型说明进 expectations 或 README  
-- [ ] （可选）再评估 D₂：Weak 路径框真源；Strong 路径保持 MacroBlockWriter → **已开做**：见 [group-frame-d2.md](group-frame-d2.md)（D₂.0–D₂.2）；Strong 仍禁止叠 VPSC 框
+- [x] （可选）再评估 D₂：Weak 路径框真源；Strong 路径保持 MacroBlockWriter → **已关闭**：见 [group-frame-d2.md](group-frame-d2.md)；Strong = MacroBlock 直接写 `GroupPlacement`，禁止叠 VPSC 框
 
 **状态（2026-08-11）✅ 门禁与 verifier 已落地**：
 
