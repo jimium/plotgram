@@ -204,6 +204,7 @@ mod tests {
             decl_index,
             segments: Vec::new(),
             layers: vec![layer],
+                    ..Default::default()
         };
         let edges = vec![RealEdge {
             edge_id: "e0".into(),

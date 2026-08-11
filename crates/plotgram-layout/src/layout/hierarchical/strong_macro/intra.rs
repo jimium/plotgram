@@ -54,11 +54,13 @@ fn induced_subgraph(real_graph: &RealGraph, keep: &[usize]) -> RealGraph {
     let mut index_of = BTreeMap::new();
     let mut group_path = Vec::new();
     let mut shapes = Vec::new();
+    let mut partition_cell = Vec::new();
     for &gi in keep {
         index_of.insert(real_graph.ids[gi].clone(), ids.len());
         ids.push(real_graph.ids[gi].clone());
         group_path.push(real_graph.group_path[gi].clone());
         shapes.push(real_graph.shapes[gi]);
+        partition_cell.push(real_graph.partition_cell.get(gi).cloned().flatten());
     }
     let mut edges = Vec::new();
     for e in &real_graph.edges {
@@ -86,6 +88,10 @@ fn induced_subgraph(real_graph: &RealGraph, keep: &[usize]) -> RealGraph {
         edges,
         self_loops,
         intra_layer: Vec::new(),
+        // Author facts pass through unchanged (intra plans still read cell;
+        // global band writing happens once after expand — partition-grid §6.3).
+        partition: real_graph.partition.clone(),
+        partition_cell,
     }
 }
 

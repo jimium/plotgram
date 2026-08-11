@@ -16,3 +16,5 @@ pub use layout::{
 
 /// Frame-pad contract constants (see `layout::hierarchical::group_frame`).
 pub use layout::hierarchical::group_frame::GROUP_FRAME_GAP;
+/// Empty partition band width floor (see `layout::hierarchical::metric::partition_bands`).
+pub use layout::hierarchical::PARTITION_EMPTY_BAND_MIN;

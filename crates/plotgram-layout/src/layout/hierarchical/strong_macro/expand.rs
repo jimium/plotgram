@@ -212,8 +212,11 @@ pub(super) fn expand(
                     reals.insert(id.as_str(), e);
                 }
                 ElemKey::Virtual { .. } => virtuals.push(e),
-                ElemKey::GroupBoundary { .. } | ElemKey::OrderPad { .. } => {
-                    // StrongMacro plans never insert boundaries / pads.
+                ElemKey::GroupBoundary { .. }
+                | ElemKey::PartitionBoundary { .. }
+                | ElemKey::OrderPad { .. } => {
+                    // StrongMacro plans never insert boundaries / pads
+                    // (partition + strong-macro hard-fails at the entry gate).
                     unreachable!("strong-macro plan carries no boundary elems");
                 }
             }

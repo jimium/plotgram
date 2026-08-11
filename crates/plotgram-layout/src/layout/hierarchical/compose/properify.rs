@@ -120,6 +120,8 @@ pub fn properify(graph: &RealGraph, rank: &RankMap) -> PlanGraph {
         decl_index,
         segments,
         layers,
+        partition_columns: Vec::new(),
+        partition_elem_col: Vec::new(),
     }
 }
 

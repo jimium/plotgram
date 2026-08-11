@@ -242,6 +242,7 @@ mod tests {
             decl_index: vec![0, 1, 2],
             segments: Vec::new(),
             layers: vec![vec![0], vec![1], vec![], vec![2]],
+                    ..Default::default()
         };
         let twins = BTreeSet::new();
         assert_eq!(
@@ -277,6 +278,7 @@ mod tests {
             decl_index: vec![0, 1, 2],
             segments: Vec::new(),
             layers: vec![vec![0], vec![], vec![1, 2]],
+                    ..Default::default()
         };
         assert_eq!(unique_min_span_primary(0, &[1, 2], &plan2, &twins), None);
     }

@@ -369,8 +369,8 @@ node spacer {
 | `role` | `entity`, `group_anchor` | `active`（模型字段） | 结构角色；见 §5.7 |
 | `host_group` | group id | `active`（模型字段） | 仅 `group_anchor`；见 §5.7 |
 | `side` / `slot` | 四向 / 非负整数 | `active`（模型字段） | 仅 `group_anchor` 贴框；提升为 `Node.anchor` |
-| `cell_col` | atom（partition column id） | **`active`（模型字段）** | → `Node.partition_cell.column`；见 §4.3 / ADR-008 |
-| `cell_row` | atom（partition row id） | **`active`（模型字段）** | → `Node.partition_cell.row`；Hier 消费 **`planned`** |
+| `cell_col` | atom（partition column id） | **`active`（模型字段）** | → `Node.partition_cell.column`；Hier 消费：**TB/BT + Weak 列带已落地（PG-1）**；LR/RL、Strong 见 partition-grid PG-4 |
+| `cell_row` | atom（partition row id） | **`active`（模型字段）** | → `Node.partition_cell.row`；Hier 消费 **`planned`**（见 §14 / partition-grid PG-3） |
 | `archetype` | `database`, `gateway` | **`planned`** | 展开糖；纪律与目录见 [`archetype-spec.md`](archetype-spec.md) |
 | `variant` | `primary`, `info`, … | **`planned`** | 颜料槽；封闭集见 §14.7 |
 | `icon` | `none`, 图标名 | `active` | 装饰 |
@@ -1305,8 +1305,8 @@ node legacy { label: "ERP", shape: rounded_rect, variant: muted, icon: external 
 | `host_group` | atom（group id） | **`active`（模型字段）** | DSL 作者（或 §7.6 糖） | 提升为 `Node.host_group`；仅 `group_anchor` |
 | `side` | atom：`north`/`south`/`east`/`west` | **`active`（模型字段）** | DSL 作者（或 §7.6 糖） | 并入 `Node.anchor`；仅 `group_anchor` |
 | `slot` | number（非负整数） | **`active`（模型字段）** | DSL 作者（或 §7.6 糖） | 并入 `Node.anchor.slot`；须有 `side` |
-| `cell_col` | atom（column id） | **`active`（模型字段）** | DSL 作者 | 提升为 `Node.partition_cell.column`；见 §4.3 / ADR-008 |
-| `cell_row` | atom（row id） | **`active`（模型字段）** | DSL 作者 | 提升为 `Node.partition_cell.row`；Hier 消费 **`planned`** |
+| `cell_col` | atom（column id） | **`active`（模型字段）** | DSL 作者 | 提升为 `Node.partition_cell.column`；parse/lift 已落地；Hier 消费：PG-0 入口校验 + **PG-1 列带已落地**（TB/BT + Weak；LR/RL、Strong → PG-4，见 [partition-grid.md](../design/layout/hierarchical/phases/partition-grid.md)） |
+| `cell_row` | atom（row id） | **`active`（模型字段）** | DSL 作者 | 提升为 `Node.partition_cell.row`；parse/lift 已落地；Hier 消费 **`planned`**（PG-3，见 [partition-grid.md](../design/layout/hierarchical/phases/partition-grid.md)） |
 | `archetype` | atom（开放集；目录见 [`archetype-spec.md`](archetype-spec.md)） | **`planned`** | DSL 作者 | **展开器**（parse/profile）：只填空写入 shape / variant / icon；**render / theme / engine 不读** |
 | `variant` | atom（封闭集，见 §14.7） | **`planned`**（规范已定；实现仍读 `kind`） | DSL 作者 / archetype 展开 | 主题 `variants` 查表（`resolve.rs`，待迁） |
 | `icon` | atom：`none` / icon id / alias | `active` | DSL 作者 / archetype 展开 | `icons::resolve_icon`（`icons/mod.rs`） |

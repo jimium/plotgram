@@ -24,6 +24,7 @@ mod strong_macro;
 
 pub use debug::{build_debug_trace, LayoutDebugTrace};
 pub use group_frame::{GROUP_FRAME_GAP, GROUP_LABEL_TOP_PAD, GROUP_PAD};
+pub use metric::partition_bands::PARTITION_EMPTY_BAND_MIN;
 pub use ink::verify::{
     group_penetration_violations, verify_no_group_penetration, GroupPenetrationViolation,
 };
@@ -32,7 +33,7 @@ use plotgram_algo::orientation::{self as algo_orient, Orientation as AlgoOrienta
 use plotgram_engine_api::{
     EdgeGeometryMode, LayoutAlgorithm, LayoutError, LayoutInput, LayoutOutput, LayoutWarning,
 };
-use plotgram_model::diagnostics::{HierarchicalObs, LayoutDiagnostics};
+use plotgram_model::diagnostics::{HierarchicalObs, LayoutDiagnostics, PartitionBandObs};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::port::{AlongSpec, PortRef};
 use plotgram_model::result::{EdgePath, EdgePlacement, GroupPlacement, NodePlacement};
@@ -77,7 +78,7 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
 
     // Diagnostics exit (roadmap phase C): bind warnings surface here instead
     // of being dropped; hard failures above/below stay hard failures.
-    let diagnostics = LayoutDiagnostics {
+    let mut diagnostics = LayoutDiagnostics {
         warnings: bound
             .warnings
             .iter()
@@ -96,7 +97,46 @@ fn compute(input: LayoutInput<'_>) -> Result<(LayoutOutput, debug::Captures<'_>)
         ));
     }
 
+    // PG-0: partition facts must be consistent before any layout decision
+    // (partition-grid.md) — hard failure, never silent.
+    input.graph.validate_partition().map_err(|e| {
+        LayoutError::message(format!("hierarchical: invalid partition grid: {e}"))
+    })?;
+
     let orientation = orient::to_algo_orientation(params.orientation);
+
+    // PG-1 single consumption gate (partition-grid.md §7): a grid with
+    // columns is consumed only in canonical TB space (TB/BT) under Weak.
+    // Everything outside the gate is either a hard failure (never silent)
+    // or a declared non-consumption warning — no partition code path runs
+    // when the gate is closed (§10 discipline).
+    let has_partition_columns = input
+        .graph
+        .partition
+        .as_ref()
+        .map_or(false, |g| !g.columns.is_empty());
+    let vertical = params.orientation.is_vertical();
+    if has_partition_columns {
+        if params.group_policy == GroupPolicy::StrongMacro {
+            return Err(LayoutError::message(
+                "hierarchical: partition 暂不支持 strong-macro，见 partition-grid.md PG-4",
+            ));
+        }
+        if !vertical {
+            diagnostics.warnings.push(LayoutWarning {
+                message: "hierarchical: partition columns are not consumed in \
+                          left-to-right / right-to-left orientations (PG-4)"
+                    .to_string(),
+            });
+        }
+        if input.graph.partition.as_ref().map_or(false, |g| !g.rows.is_empty()) {
+            diagnostics.warnings.push(LayoutWarning {
+                message: "hierarchical: partition rows are not consumed yet \
+                          (cell_row ignored, PG-3)"
+                    .to_string(),
+            });
+        }
+    }
 
     // FAS runs once per policy; the StrongMacro front branches right after
     // (its ranking happens per block / super-graph, never globally).
@@ -159,6 +199,17 @@ fn compute_weak<'g>(
         .map(|e| (e.edge_id.clone(), e.weight))
         .collect();
     compose::boundary::insert_group_boundaries(&mut plan);
+    // PG-1: partition column clamps ride on top of group clamps (group blocks
+    // nest inside column blocks; a group spanning ≥2 columns fails inside).
+    // Runs only in canonical TB space under Weak — the gate in `compute()`
+    // already rejected StrongMacro and warned LR/RL; no grid / no columns
+    // early-exits inside (idempotent on the CHANNEL_FORCE_ROOT retry pass).
+    if matches!(
+        orientation,
+        algo_orient::Orientation::Tb | algo_orient::Orientation::Bt
+    ) {
+        compose::partition_boundary::insert_partition_boundaries(&mut plan, &real_graph)?;
+    }
     compose::order::order_layers(&mut plan, &edge_weights, params.group_boundary_weight);
 
     // Group ids carrying a label (frame top pad reserves the label band).
@@ -297,6 +348,7 @@ fn compute_channel_ink_tail<'g>(
         layer_gap_demands: BTreeMap::new(),
         layer_gaps: Vec::new(),
         gate_capacity_seams: 0,
+        partition_bands: Vec::new(),
     });
     compose::verify::verify_plan(&plan, &real_graph, &ports, &route_plan)?;
 
@@ -357,6 +409,14 @@ fn compute_channel_ink_tail<'g>(
             } else {
                 0
             };
+            // PG-1: empty partition bands publish their minimum width for
+            // observability / PG-2 — the cross solve reads the band plan
+            // directly, so DemandBoard keeps its LayerGap-only remit.
+            if let Some(bands) =
+                metric::partition_bands::PartitionBandPlan::build(&plan, params.node_gap)
+            {
+                demand::publish_partition_band_demand(&mut demand_board, &bands);
+            }
             demand_board.freeze();
             let layer_gaps =
                 demand::resolved_layer_gaps(plan.layers.len(), params.layer_gap, &demand_board);
@@ -601,6 +661,26 @@ fn compute_channel_ink_tail<'g>(
             .collect(),
     };
 
+    // PG-2: project the solved partition band intervals into physical
+    // space (partition-grid.md). Pure observation — geometry is already
+    // final; the consumption gate guarantees TB/BT, so the physical cross
+    // axis is canonical x + the normalize shift. Unconsumed plans return
+    // an empty Vec (the §10 single gate), Strong never reaches here with a
+    // grid (entry hard-fails).
+    let partition_bands: Vec<PartitionBandObs> =
+        metric::partition_bands::band_coords(&plan, &cross)
+            .into_iter()
+            .map(|b| PartitionBandObs {
+                column: b.column,
+                start: b.start + shift.0,
+                end: b.end + shift.0,
+                empty: b.empty,
+            })
+            .collect();
+    if let Some(obs) = diagnostics.hierarchical.as_mut() {
+        obs.partition_bands = partition_bands.clone();
+    }
+
     let channel_track_count = route_plan.substrate.tracks().count();
     let channel_used_gates = route_plan.used_gates;
     let channel_route_order = route_plan.route_order.clone();
@@ -630,6 +710,7 @@ fn compute_channel_ink_tail<'g>(
         channel_used_gates,
         channel_route_order,
         shift,
+        partition_bands,
     };
 
     Ok((
@@ -673,9 +754,10 @@ fn elem_size(
 ) -> algo_orient::Size {
     match &plan.elems[elem_idx].key {
         ElemKey::Real(id) => canonical_size[real_graph.index_of[id]],
-        ElemKey::Virtual { .. } | ElemKey::GroupBoundary { .. } | ElemKey::OrderPad { .. } => {
-            algo_orient::Size::new(0.0, 0.0)
-        }
+        ElemKey::Virtual { .. }
+        | ElemKey::GroupBoundary { .. }
+        | ElemKey::PartitionBoundary { .. }
+        | ElemKey::OrderPad { .. } => algo_orient::Size::new(0.0, 0.0),
     }
 }
 
@@ -899,5 +981,427 @@ mod tests {
         changed.insert("node_gap".to_string(), AttrValue::Num(99.0));
         let other = layout_with_options(changed);
         assert_ne!(base.diagnostics.params_hash, other.diagnostics.params_hash);
+    }
+
+    /// PG-0: every `PartitionError` class fails hard at the layout entry —
+    /// never silent.
+    #[test]
+    fn invalid_partition_fails_layout_entry() {
+        use plotgram_model::partition::{PartitionAxis, PartitionCell, PartitionGrid};
+
+        fn node_with_cell(id: &str, cell: Option<PartitionCell>) -> Node {
+            Node {
+                id: id.to_string(),
+                label: None,
+                shape: None,
+                role: NodeRole::Entity,
+                host_group: None,
+                anchor: None,
+                partition_cell: cell,
+                attrs: AttrMap::new(),
+            }
+        }
+
+        // (grid, node cell, expected message fragment)
+        let cases: &[(Option<PartitionGrid>, Option<PartitionCell>, &str)] = &[
+            (
+                None,
+                Some(PartitionCell::col("x")),
+                "no `partition` grid",
+            ),
+            (
+                Some(PartitionGrid {
+                    columns: vec![PartitionAxis::new("sales")],
+                    rows: vec![],
+                }),
+                Some(PartitionCell::col("missing")),
+                "unknown partition column `missing`",
+            ),
+            (
+                Some(PartitionGrid {
+                    columns: vec![PartitionAxis::new("sales")],
+                    rows: vec![PartitionAxis::new("intake")],
+                }),
+                Some(PartitionCell::row("missing")),
+                "unknown partition row `missing`",
+            ),
+            (
+                Some(PartitionGrid {
+                    columns: vec![PartitionAxis::new("a"), PartitionAxis::new("a")],
+                    rows: vec![],
+                }),
+                None,
+                "declared more than once",
+            ),
+            (
+                Some(PartitionGrid {
+                    columns: vec![PartitionAxis::new("a")],
+                    rows: vec![],
+                }),
+                None,
+                "conflicts with a node or group id",
+            ),
+        ];
+        for (i, (grid, cell, fragment)) in cases.iter().enumerate() {
+            // Last case relies on node id `a` colliding with column id `a`.
+            let node_id = if i == 4 { "a" } else { "n" };
+            let graph = Graph {
+                nodes: vec![node_with_cell(node_id, cell.clone())],
+                edges: vec![],
+                groups: vec![],
+                partition: grid.clone(),
+            };
+            let mut sizes = NodeSizes::new();
+            sizes.insert(node_id, Size::new(60.0, 30.0));
+            let err = HierarchicalLayout
+                .layout(LayoutInput {
+                    graph: &graph,
+                    node_sizes: &sizes,
+                    options: &AttrMap::new(),
+                    edge_geometry: EdgeGeometryMode::Builtin,
+                })
+                .expect_err("invalid partition must fail hard");
+            let msg = err.to_string();
+            assert!(
+                msg.contains(fragment),
+                "case {i}: `{fragment}` not in `{msg}`"
+            );
+        }
+    }
+
+    /// PG-1 gate rulings: StrongMacro + grid fails hard; LR orientation and
+    /// declared rows do not block layout — they surface as warnings only.
+    #[test]
+    fn partition_consumption_gate_boundaries() {
+        use plotgram_model::partition::{PartitionAxis, PartitionGrid};
+
+        fn graph_with_grid(with_rows: bool) -> Graph {
+            Graph {
+                nodes: vec![Node {
+                    id: "n".to_string(),
+                    label: None,
+                    shape: None,
+                    role: NodeRole::Entity,
+                    host_group: None,
+                    anchor: None,
+                    partition_cell: None,
+                    attrs: AttrMap::new(),
+                }],
+                edges: vec![],
+                groups: vec![],
+                partition: Some(PartitionGrid {
+                    columns: vec![PartitionAxis::new("col")],
+                    rows: if with_rows {
+                        vec![PartitionAxis::new("row")]
+                    } else {
+                        vec![]
+                    },
+                }),
+            }
+        }
+
+        fn run(graph: &Graph, options: AttrMap) -> Result<LayoutOutput, LayoutError> {
+            let mut sizes = NodeSizes::new();
+            sizes.insert("n", Size::new(60.0, 30.0));
+            HierarchicalLayout.layout(LayoutInput {
+                graph,
+                node_sizes: &sizes,
+                options: &options,
+                edge_geometry: EdgeGeometryMode::Builtin,
+            })
+        }
+
+        let opts = |pairs: &[(&str, &str)]| -> AttrMap {
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), AttrValue::Str(v.to_string())))
+                .collect()
+        };
+
+        // StrongMacro + grid → hard failure, never silent.
+        let err = run(&graph_with_grid(false), opts(&[("group_policy", "strong-macro")]))
+            .expect_err("strong-macro + partition must fail hard");
+        assert!(
+            err.to_string().contains("strong-macro"),
+            "unexpected error: {err}"
+        );
+
+        // LR + grid → not consumed (columns are the main axis there), warning.
+        let out = run(&graph_with_grid(false), opts(&[("orientation", "left-to-right")]))
+            .expect("LR + partition must still lay out");
+        assert!(
+            out.diagnostics
+                .warnings
+                .iter()
+                .any(|w| w.message.contains("not consumed in")),
+            "missing LR non-consumption warning: {:?}",
+            out.diagnostics.warnings
+        );
+
+        // Rows declared → columns still consumed, cell_row warned (PG-3).
+        let out = run(&graph_with_grid(true), opts(&[])).expect("rows + TB weak must lay out");
+        assert!(
+            out.diagnostics
+                .warnings
+                .iter()
+                .any(|w| w.message.contains("rows are not consumed")),
+            "missing rows non-consumption warning: {:?}",
+            out.diagnostics.warnings
+        );
+    }
+
+    fn edge(id: &str, s: &str, t: &str) -> Edge {
+        Edge {
+            id: id.to_string(),
+            source: s.to_string(),
+            target: t.to_string(),
+            arrow: Arrow::Forward,
+            label: None,
+            head_label: None,
+            tail_label: None,
+            from_port: None,
+            to_port: None,
+            weight: None,
+            undirected: false,
+            attrs: AttrMap::new(),
+        }
+    }
+
+    /// PG-1 end-to-end: a three-column swimlane lays out with globally
+    /// separated bands in declaration order (snapshot of node frames).
+    #[test]
+    fn three_column_swimlane_layout_matches_snapshot() {
+        use plotgram_model::partition::{PartitionAxis, PartitionCell, PartitionGrid};
+
+        let node = |id: &str, col: Option<&str>| Node {
+            id: id.to_string(),
+            label: None,
+            shape: None,
+            role: NodeRole::Entity,
+            host_group: None,
+            anchor: None,
+            partition_cell: col.map(PartitionCell::col),
+            attrs: AttrMap::new(),
+        };
+        let graph = Graph {
+            nodes: vec![
+                node("place_order", Some("customer")),
+                node("confirm", Some("sales")),
+                node("pick", Some("warehouse")),
+                node("ship", Some("warehouse")),
+            ],
+            edges: vec![
+                edge("e0", "place_order", "confirm"),
+                edge("e1", "confirm", "pick"),
+                edge("e2", "pick", "ship"),
+            ],
+            groups: vec![],
+            partition: Some(PartitionGrid {
+                columns: vec![
+                    PartitionAxis::new("customer"),
+                    PartitionAxis::new("sales"),
+                    PartitionAxis::new("warehouse"),
+                ],
+                rows: vec![],
+            }),
+        };
+        let mut sizes = NodeSizes::new();
+        for id in ["place_order", "confirm", "pick", "ship"] {
+            sizes.insert(id, Size::new(80.0, 32.0));
+        }
+        let out = HierarchicalLayout
+            .layout(LayoutInput {
+                graph: &graph,
+                node_sizes: &sizes,
+                options: &AttrMap::new(),
+                edge_geometry: EdgeGeometryMode::Builtin,
+            })
+            .expect("swimlane layout");
+
+        let mut frames: Vec<(&str, Rect)> = out
+            .nodes
+            .iter()
+            .map(|n| (n.id.as_str(), n.frame))
+            .collect();
+        frames.sort_by(|a, b| a.0.cmp(b.0));
+        insta::assert_json_snapshot!(serde_json::json!(frames
+            .iter()
+            .map(|(id, f)| serde_json::json!({
+                "id": id,
+                "x": f.x,
+                "y": f.y,
+                "w": f.width,
+                "h": f.height,
+            }))
+            .collect::<Vec<_>>()));
+
+        // Bands separate in declaration order: customer < sales < warehouse.
+        let span = |id: &str| {
+            let f = out.nodes.iter().find(|n| n.id == id).unwrap().frame;
+            (f.x, f.right())
+        };
+        let (_, c_r) = span("place_order");
+        let (s_l, s_r) = span("confirm");
+        let (w_l, _) = span("pick");
+        assert!(c_r < s_l, "customer band must sit left of sales");
+        assert!(s_r < w_l, "sales band must sit left of warehouse");
+    }
+
+    /// PG-2: observed band intervals are physical coordinates mirroring the
+    /// solved geometry — every member frame sits inside its band and bands
+    /// separate in declaration order.
+    #[test]
+    fn swimlane_obs_bands_mirror_node_frames() {
+        use plotgram_model::partition::{PartitionAxis, PartitionCell, PartitionGrid};
+
+        let node = |id: &str, col: Option<&str>| Node {
+            id: id.to_string(),
+            label: None,
+            shape: None,
+            role: NodeRole::Entity,
+            host_group: None,
+            anchor: None,
+            partition_cell: col.map(PartitionCell::col),
+            attrs: AttrMap::new(),
+        };
+        let graph = Graph {
+            nodes: vec![
+                node("place_order", Some("customer")),
+                node("confirm", Some("sales")),
+                node("pick", Some("warehouse")),
+                node("ship", Some("warehouse")),
+            ],
+            edges: vec![
+                edge("e0", "place_order", "confirm"),
+                edge("e1", "confirm", "pick"),
+                edge("e2", "pick", "ship"),
+            ],
+            groups: vec![],
+            partition: Some(PartitionGrid {
+                columns: vec![
+                    PartitionAxis::new("customer"),
+                    PartitionAxis::new("sales"),
+                    PartitionAxis::new("warehouse"),
+                ],
+                rows: vec![],
+            }),
+        };
+        let mut sizes = NodeSizes::new();
+        for id in ["place_order", "confirm", "pick", "ship"] {
+            sizes.insert(id, Size::new(80.0, 32.0));
+        }
+        let out = HierarchicalLayout
+            .layout(LayoutInput {
+                graph: &graph,
+                node_sizes: &sizes,
+                options: &AttrMap::new(),
+                edge_geometry: EdgeGeometryMode::Builtin,
+            })
+            .expect("swimlane layout");
+
+        let obs = out
+            .diagnostics
+            .hierarchical
+            .as_ref()
+            .expect("hierarchical obs");
+        let bands = &obs.partition_bands;
+        let ids: Vec<&str> = bands.iter().map(|b| b.column.as_str()).collect();
+        assert_eq!(ids, vec!["customer", "sales", "warehouse"]);
+        assert!(bands.iter().all(|b| !b.empty), "no empty column here");
+        for (id, ci) in [("place_order", 0usize), ("confirm", 1), ("pick", 2), ("ship", 2)] {
+            let f = out.nodes.iter().find(|n| n.id == id).unwrap().frame;
+            let b = &bands[ci];
+            assert!(
+                f.x >= b.start && f.right() <= b.end,
+                "{id} frame [{}, {}] must sit inside band `{}` [{}, {}]",
+                f.x,
+                f.right(),
+                b.column,
+                b.start,
+                b.end
+            );
+        }
+        for w in bands.windows(2) {
+            assert!(
+                w[0].end <= w[1].start,
+                "bands must separate in declaration order: {:?}",
+                bands
+            );
+        }
+    }
+
+    /// §10 discipline: a grid with no columns is NOT consumed — the layout
+    /// stays bit-identical to the same graph without any partition block.
+    #[test]
+    fn empty_partition_grid_is_bit_identical_to_no_partition() {
+        use plotgram_model::partition::PartitionGrid;
+
+        let graph_with = |grid: Option<PartitionGrid>| Graph {
+            nodes: vec![
+                Node {
+                    id: "a".to_string(),
+                    label: None,
+                    shape: None,
+                    role: NodeRole::Entity,
+                    host_group: None,
+                    anchor: None,
+                    partition_cell: None,
+                    attrs: AttrMap::new(),
+                },
+                Node {
+                    id: "b".to_string(),
+                    label: None,
+                    shape: None,
+                    role: NodeRole::Entity,
+                    host_group: None,
+                    anchor: None,
+                    partition_cell: None,
+                    attrs: AttrMap::new(),
+                },
+            ],
+            edges: vec![edge("e0", "a", "b")],
+            groups: vec![],
+            partition: grid,
+        };
+        let run = |grid: Option<PartitionGrid>| {
+            let graph = graph_with(grid);
+            let mut sizes = NodeSizes::new();
+            sizes.insert("a", Size::new(60.0, 30.0));
+            sizes.insert("b", Size::new(60.0, 30.0));
+            HierarchicalLayout
+                .layout(LayoutInput {
+                    graph: &graph,
+                    node_sizes: &sizes,
+                    options: &AttrMap::new(),
+                    edge_geometry: EdgeGeometryMode::Builtin,
+                })
+                .expect("layout")
+        };
+
+        let none = run(None);
+        let empty_grid = run(Some(PartitionGrid::default()));
+        let frames = |o: &LayoutOutput| -> Vec<(String, Rect)> {
+            o.nodes.iter().map(|n| (n.id.clone(), n.frame)).collect()
+        };
+        let paths = |o: &LayoutOutput| -> Vec<(String, plotgram_model::result::EdgePath)> {
+            o.edges.iter().map(|e| (e.id.clone(), e.path.clone())).collect()
+        };
+        assert_eq!(frames(&none), frames(&empty_grid), "node frames must be bit-identical");
+        assert_eq!(paths(&none), paths(&empty_grid), "edge geometry must be bit-identical");
+        // PG-2: unconsumed grids publish no bands (the obs key stays absent)
+        // and diagnostics are bit-identical as well.
+        for o in [&none, &empty_grid] {
+            let bands = o
+                .diagnostics
+                .hierarchical
+                .as_ref()
+                .map(|h| h.partition_bands.is_empty())
+                .unwrap_or(true);
+            assert!(bands, "unconsumed grid must publish no partition bands");
+        }
+        assert_eq!(
+            none.diagnostics, empty_grid.diagnostics,
+            "diagnostics must be bit-identical"
+        );
     }
 }

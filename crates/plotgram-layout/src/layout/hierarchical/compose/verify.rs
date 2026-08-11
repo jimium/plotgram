@@ -155,6 +155,7 @@ mod tests {
                 to: 1,
             }],
             layers: vec![vec![0], vec![1]],
+                    ..Default::default()
         };
         let mut ids = BTreeMap::new();
         ids.insert("a".into(), 0);

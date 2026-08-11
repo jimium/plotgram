@@ -8,6 +8,7 @@ pub mod bus;
 pub mod cross_axis;
 pub mod group_frames;
 pub mod main_axis;
+pub mod partition_bands;
 pub mod port_lane;
 pub mod symmetry;
 pub mod symmetry_objective;

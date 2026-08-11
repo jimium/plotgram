@@ -14,6 +14,9 @@ use crate::layout::hierarchical::compose::ports::EdgePorts;
 use crate::layout::hierarchical::group_frame::{GROUP_FRAME_GAP, GROUP_LABEL_TOP_PAD, GROUP_PAD};
 use crate::layout::hierarchical::metric::anchor::port_anchor;
 use crate::layout::hierarchical::metric::bk;
+use crate::layout::hierarchical::metric::partition_bands::{
+    PartitionBandPlan, PARTITION_EMPTY_BAND_MIN,
+};
 use crate::layout::hierarchical::metric::symmetry::{
     axis_from_neighbors, degrees_of, fan_pitch, forward_real_adjacency, slot_multipliers,
     twin_plan_pairs, unique_min_span_primary,
@@ -49,7 +52,11 @@ pub fn solve_symmetry_objective(
     // equalities) → twin soft → no clamp equalities. The gb equalities make
     // each clamp column the cross-rank frame edge; they can only cycle when
     // sibling group intervals swap order across ranks, in which case frames
-    // cannot be disjoint anyway and we degrade gracefully.
+    // cannot be disjoint anyway and we degrade gracefully. Partition band
+    // separation rides EVERY level and never degrades — an infeasible mix
+    // surfaces as `Infeasible`, never silently (partition-grid.md PG-1).
+    let bands = PartitionBandPlan::build(plan, params.node_gap);
+    let bands = bands.as_ref();
     let chains = [
         hard_constraints(
             plan,
@@ -59,6 +66,7 @@ pub fn solve_symmetry_objective(
             &twins,
             true,
             true,
+            bands,
         ),
         hard_constraints(
             plan,
@@ -68,6 +76,7 @@ pub fn solve_symmetry_objective(
             &twins,
             false,
             true,
+            bands,
         ),
         hard_constraints(
             plan,
@@ -77,6 +86,7 @@ pub fn solve_symmetry_objective(
             &twins,
             false,
             false,
+            bands,
         ),
     ];
     let weights = vpsc_weights(plan, graph);
@@ -213,8 +223,62 @@ pub fn solve_symmetry_objective(
     if params.group_policy == GroupPolicy::Weak {
         close_sibling_frame_slack(plan, size_of, params.node_gap, main, &mut cross);
         snap_boundaries_to_members(plan, size_of, &mut cross);
+        snap_partition_clamps_to_members(plan, size_of, params.node_gap, &mut cross);
     }
     Ok(cross)
+}
+
+/// Snap each partition column clamp onto its members' cross-axis extremes
+/// ± band pad (partition-grid.md PG-1 post-solve step).
+///
+/// Mirrors [`snap_boundaries_to_members`]: clamp-only writer, never
+/// re-solves. Members are hard-confined between their column's clamps and
+/// adjacent bands are hard-separated by ≥ gap = pad, so the snapped edges
+/// keep declaration order. Empty columns keep the solved position (the
+/// `PARTITION_EMPTY_BAND_MIN` floor already shapes them).
+fn snap_partition_clamps_to_members(
+    plan: &PlanGraph,
+    size_of: &dyn Fn(usize) -> Size,
+    band_pad: f64,
+    cross: &mut [f64],
+) {
+    if plan.partition_columns.is_empty() {
+        return;
+    }
+    // column index -> (min member left, max member right) across all ranks.
+    let mut span: Vec<Option<(f64, f64)>> = vec![None; plan.partition_columns.len()];
+    for (e_idx, elem) in plan.elems.iter().enumerate() {
+        if !matches!(&elem.key, ElemKey::Real(_)) {
+            continue;
+        }
+        let Some(&Some(ci)) = plan.partition_elem_col.get(e_idx) else {
+            continue;
+        };
+        let w = size_of(e_idx).width;
+        let left = cross[e_idx] - w / 2.0;
+        let right = cross[e_idx] + w / 2.0;
+        match &mut span[ci] {
+            Some((lo, hi)) => {
+                *lo = lo.min(left);
+                *hi = hi.max(right);
+            }
+            slot => *slot = Some((left, right)),
+        }
+    }
+    for (e_idx, elem) in plan.elems.iter().enumerate() {
+        if let ElemKey::PartitionBoundary { column, side, .. } = &elem.key {
+            let Some(ci) = plan.partition_columns.iter().position(|c| c == column) else {
+                continue;
+            };
+            let Some(&(min_left, max_right)) = span[ci].as_ref() else {
+                continue;
+            };
+            cross[e_idx] = match side {
+                BoundarySide::Left => min_left - band_pad,
+                BoundarySide::Right => max_right + band_pad,
+            };
+        }
+    }
 }
 
 /// Final FanPack-style placement from an iterated seed (review §4.3.3 + §4.3.4).
@@ -688,6 +752,10 @@ fn close_slack_one_sibling_set(
                             .iter()
                             .any(|gg| shift_groups.contains(gg)),
                         ElemKey::GroupBoundary { group, .. } => shift_groups.contains(group),
+                        // Partition clamps never join a group-frame slide;
+                        // the post-solve partition snap re-seats them on
+                        // member extremes ± pad (partition-grid PG-1).
+                        ElemKey::PartitionBoundary { .. } => false,
                         ElemKey::Virtual { .. } => cross[e_idx] >= virt_gate - 1e-6,
                         ElemKey::OrderPad { .. } => false,
                     })
@@ -951,7 +1019,7 @@ fn vpsc_weights(plan: &PlanGraph, graph: &RealGraph) -> Vec<f64> {
             ElemKey::Virtual { edge_id, .. } => {
                 VIRTUAL_WEIGHT * weights.get(edge_id.as_str()).copied().unwrap_or(1.0)
             }
-            ElemKey::GroupBoundary { .. } | ElemKey::OrderPad { .. } => 4.0,
+            ElemKey::GroupBoundary { .. } | ElemKey::PartitionBoundary { .. } | ElemKey::OrderPad { .. } => 4.0,
             ElemKey::Real(_) => REAL_WEIGHT,
         })
         .collect()
@@ -965,6 +1033,7 @@ fn hard_constraints(
     twins: &BTreeSet<(usize, usize)>,
     twin_hard: bool,
     gb_hard: bool,
+    bands: Option<&PartitionBandPlan>,
 ) -> Vec<Constraint> {
     let mut constraints = Vec::new();
     // Group-boundary clamps participate in the hard separation chain: with a
@@ -1009,10 +1078,48 @@ fn hard_constraints(
     if gb_hard {
         // Cross-rank hard equalities tie same-side clamps of one group into a
         // single column = the cross-rank union edge = the drawn frame edge.
+        // Partition `pb:` segments get the same treatment: a column band is
+        // full-height, so its L/R edges stay straight vertical lines
+        // (partition-grid.md PG-1).
         for s in &plan.segments {
-            if s.edge_id.starts_with("gb:") {
+            if s.edge_id.starts_with("gb:") || s.edge_id.starts_with("pb:") {
                 constraints.push(Constraint::new(s.from, s.to, 0.0));
                 constraints.push(Constraint::new(s.to, s.from, 0.0));
+            }
+        }
+    }
+    if let Some(bands) = bands {
+        // Column bands (partition-grid.md PG-1), present on EVERY chain
+        // level: (1) adjacent declared columns stay globally separated on
+        // every rank — members are confined to their band by the layer
+        // separation chain, so this yields whole-band disjointness and
+        // declaration order; (2) a column with no members anywhere keeps a
+        // minimum strip for its title.
+        for rank in 0..plan.layers.len() {
+            for pair in bands.columns.windows(2) {
+                let Some(r) = bands.clamp(plan, &pair[0], rank as u32, BoundarySide::Right)
+                else {
+                    continue;
+                };
+                let Some(l) = bands.clamp(plan, &pair[1], rank as u32, BoundarySide::Left)
+                else {
+                    continue;
+                };
+                constraints.push(Constraint::new(r, l, bands.gap));
+            }
+        }
+        for (ci, col) in bands.columns.iter().enumerate() {
+            if !bands.empty[ci] {
+                continue;
+            }
+            for rank in 0..plan.layers.len() {
+                let (Some(l), Some(r)) = (
+                    bands.clamp(plan, col, rank as u32, BoundarySide::Left),
+                    bands.clamp(plan, col, rank as u32, BoundarySide::Right),
+                ) else {
+                    continue;
+                };
+                constraints.push(Constraint::new(l, r, PARTITION_EMPTY_BAND_MIN));
             }
         }
     }
@@ -1021,8 +1128,9 @@ fn hard_constraints(
 
 /// Separation extra between an adjacent (or clamped-against) pair: unrelated
 /// sibling boundary-clamp pairs reserve `GROUP_FRAME_GAP` (their extra IS the
-/// drawn frame gap), any pair touching a boundary clamp reserves `GROUP_PAD`,
-/// everything else `node_gap`.
+/// drawn frame gap), any pair touching a group boundary clamp reserves
+/// `GROUP_PAD`, a pair touching a partition clamp reserves `node_gap` (band
+/// pad = inter-column gap, partition-grid PG-1), everything else `node_gap`.
 fn pair_extra(l: &Elem, r: &Elem, node_gap: f64) -> f64 {
     match (&l.key, &r.key) {
         (ElemKey::GroupBoundary { .. }, ElemKey::GroupBoundary { .. })
@@ -1030,6 +1138,7 @@ fn pair_extra(l: &Elem, r: &Elem, node_gap: f64) -> f64 {
         {
             GROUP_FRAME_GAP
         }
+        _ if l.key.is_partition_boundary() || r.key.is_partition_boundary() => node_gap,
         _ if l.key.is_group_boundary() || r.key.is_group_boundary() => GROUP_PAD,
         _ => node_gap,
     }
@@ -1056,7 +1165,7 @@ fn segment_neighbors(plan: &PlanGraph, graph: &RealGraph) -> Vec<Vec<Nb>> {
     let n = plan.elems.len();
     let mut out = vec![Vec::new(); n];
     for s in &plan.segments {
-        if s.edge_id.starts_with("gb:") {
+        if s.edge_id.starts_with("gb:") || s.edge_id.starts_with("pb:") {
             continue;
         }
         let base = edge_weight_base(&plan.elems[s.from], &plan.elems[s.to]);
@@ -1206,7 +1315,7 @@ fn objective_j(
 ) -> f64 {
     let mut j = 0.0;
     for s in &plan.segments {
-        if s.edge_id.starts_with("gb:") {
+        if s.edge_id.starts_with("gb:") || s.edge_id.starts_with("pb:") {
             continue;
         }
         let w = edge_weight_base(&plan.elems[s.from], &plan.elems[s.to]);
@@ -1381,6 +1490,7 @@ mod tests {
             decl_index: Vec::new(),
             segments: Vec::new(),
             layers,
+            ..Default::default()
         }
     }
 
@@ -1434,6 +1544,7 @@ mod tests {
                 &BTreeSet::new(),
                 false,
                 false,
+                None,
             );
             for ((l, r), gap) in expect {
                 let found = constraints
@@ -1443,5 +1554,87 @@ mod tests {
                 assert_eq!(found, Some(gap), "{name}: pair ({l},{r})");
             }
         }
+    }
+
+    /// PG-1 band hard constraints: adjacent declared columns separate by the
+    /// band gap on every rank; a column with no member anywhere keeps the
+    /// `PARTITION_EMPTY_BAND_MIN` strip.
+    #[test]
+    fn partition_band_constraints_separate_columns_and_floor_empty() {
+        use crate::layout::hierarchical::compose::partition_boundary::insert_partition_boundaries;
+        use crate::layout::hierarchical::metric::partition_bands::PartitionBandPlan;
+        use crate::layout::hierarchical::model::RealGraph;
+        use plotgram_model::partition::{PartitionAxis, PartitionCell, PartitionGrid};
+
+        // Two columns; only `a` has a member → `b` is empty everywhere.
+        let mut real = RealGraph::default();
+        real.partition = Some(PartitionGrid {
+            columns: vec![PartitionAxis::new("a"), PartitionAxis::new("b")],
+            rows: vec![],
+        });
+        let specs: [(&str, Option<&str>); 2] = [("n1", Some("a")), ("n2", None)];
+        let mut elems = Vec::new();
+        for (i, (id, col)) in specs.iter().enumerate() {
+            real.ids.push((*id).to_string());
+            real.index_of.insert((*id).to_string(), i);
+            real.partition_cell.push(col.map(PartitionCell::col));
+            elems.push(Elem {
+                key: ElemKey::Real((*id).into()),
+                group_path: Vec::new(),
+                rank: 0,
+            });
+        }
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let mut plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: vec![0, 1],
+            segments: Vec::new(),
+            layers: vec![vec![0, 1]],
+            ..Default::default()
+        };
+        insert_partition_boundaries(&mut plan, &real).unwrap();
+
+        let bands = PartitionBandPlan::build(&plan, 24.0).unwrap();
+        // Clamps are zero-width by contract; only reals carry size here
+        // (mirrors `elem_size`), so the layer-separation chain does not
+        // invent width-based extras on top of the band constraints.
+        let size_of = |i: usize| {
+            Size::new(if plan.elems[i].key.is_zero_width() { 0.0 } else { 10.0 }, 10.0)
+        };
+        let constraints = hard_constraints(
+            &plan,
+            &size_of,
+            24.0,
+            &[],
+            &BTreeSet::new(),
+            false,
+            false,
+            Some(&bands),
+        );
+        let gap_of = |l: usize, r: usize| {
+            // A pair can carry both the layer-separation constraint and a
+            // band constraint; VPSC honors the max, so assert on the max.
+            constraints
+                .iter()
+                .filter(|c| c.left == l && c.right == r)
+                .map(|c| c.gap)
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+        };
+        // Adjacent-column separation on rank 0.
+        let a_r = bands.clamp(&plan, "a", 0, BoundarySide::Right).unwrap();
+        let b_l = bands.clamp(&plan, "b", 0, BoundarySide::Left).unwrap();
+        assert_eq!(gap_of(a_r, b_l), Some(24.0), "columns must separate by gap");
+        // Empty-column minimum width on rank 0.
+        let b_r = bands.clamp(&plan, "b", 0, BoundarySide::Right).unwrap();
+        assert_eq!(
+            gap_of(b_l, b_r),
+            Some(PARTITION_EMPTY_BAND_MIN),
+            "empty column keeps its minimum strip"
+        );
     }
 }

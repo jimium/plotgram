@@ -52,6 +52,25 @@ pub struct HierarchicalObs {
     /// Resolved main-axis gaps, index = seam (length = n_layers - 1).
     #[serde(default)]
     pub layer_gaps: Vec<f64>,
+    /// Consumed partition column bands (partition-grid.md PG-2). Cross-axis
+    /// intervals in **physical** coordinates (post normalize shift); empty
+    /// when the partition grid is not consumed (the §10 single gate).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub partition_bands: Vec<PartitionBandObs>,
+}
+
+/// One consumed partition column's band (partition-grid.md PG-2).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PartitionBandObs {
+    /// Column axis id, declaration order = geometric left→right (TB).
+    pub column: String,
+    /// Cross-axis band interval, physical coordinates (post normalize shift).
+    pub start: f64,
+    pub end: f64,
+    /// Column has no assigned member anywhere (kept via the empty-band
+    /// minimum width).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub empty: bool,
 }
 
 /// A single non-fatal observation.

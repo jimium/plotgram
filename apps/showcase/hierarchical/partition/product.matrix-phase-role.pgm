@@ -1,0 +1,39 @@
+// 交付矩阵：阶段（rows）× 角色（columns）（PartitionGrid 矩阵形态）
+// partition-grid.md PG-0 验收图壳：列×行 cell 双指派；行区间约束归 PG-3。
+diagram {
+    profile: flowchart,
+    title: "交付矩阵（阶段×角色）",
+    layout: hierarchical { direction: top-to-bottom }
+
+    partition {
+        column product { label: "产品" }
+        column dev { label: "研发" }
+        column qa { label: "测试" }
+        row intake { label: "接入" }
+        row build { label: "构建" }
+        row release { label: "发布" }
+    }
+
+    node draft_prd { label: "需求草案", archetype: process, cell_col: product, cell_row: intake }
+    node review_prd { label: "评审通过？", archetype: decision, cell_col: product, cell_row: intake }
+    node tech_design { label: "技术方案", archetype: process, cell_col: dev, cell_row: intake }
+    node test_plan { label: "测试计划", archetype: process, cell_col: qa, cell_row: intake }
+
+    node implement { label: "编码实现", archetype: process, cell_col: dev, cell_row: build }
+    node unit_test { label: "单元测试", archetype: process, cell_col: dev, cell_row: build }
+    node regression { label: "回归测试", archetype: process, cell_col: qa, cell_row: build }
+
+    node release_gate { label: "放行？", archetype: decision, cell_col: qa, cell_row: release }
+    node announce { label: "发布公告", archetype: end, cell_col: product, cell_row: release }
+
+    draft_prd -> review_prd
+    review_prd -> tech_design { label: "通过" }
+    review_prd -> draft_prd { label: "返工" }
+    tech_design -> test_plan
+    tech_design -> implement
+    test_plan -> regression
+    implement -> unit_test
+    unit_test -> regression
+    regression -> release_gate
+    release_gate -> announce { label: "放行" }
+}

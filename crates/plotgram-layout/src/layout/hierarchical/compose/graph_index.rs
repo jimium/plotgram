@@ -68,6 +68,15 @@ pub fn build_real_graph(graph: &Graph) -> RealGraph {
         });
     }
 
+    // PG-0: author partition facts enter Hier here (previously dropped).
+    // `all_nodes()` walks the same declaration order as `all_node_ids()`.
+    let partition = graph.partition.clone();
+    let partition_cell: Vec<Option<plotgram_model::partition::PartitionCell>> = graph
+        .all_nodes()
+        .iter()
+        .map(|n| n.partition_cell.clone())
+        .collect();
+
     RealGraph {
         ids,
         index_of,
@@ -76,6 +85,8 @@ pub fn build_real_graph(graph: &Graph) -> RealGraph {
         edges,
         self_loops,
         intra_layer: Vec::new(),
+        partition,
+        partition_cell,
     }
 }
 
@@ -139,5 +150,53 @@ mod tests {
         assert_eq!(rg.edges[0].edge_id, "e1");
         assert!(rg.group_path[rg.index_of["a"]].is_empty());
         assert_eq!(rg.group_path[rg.index_of["b"]], vec!["g".to_string()]);
+        // No partition block: grid absent, cells empty (consumers gate on this).
+        assert!(rg.partition.is_none());
+        assert!(rg.partition_cell.iter().all(Option::is_none));
+    }
+
+    /// PG-0: grid + per-node cells survive into `RealGraph`, dense and in
+    /// declaration order (top-level nodes, then group members depth-first).
+    #[test]
+    fn partition_grid_and_cells_are_carried_into_real_graph() {
+        use plotgram_model::partition::{PartitionAxis, PartitionCell, PartitionGrid};
+
+        let mut in_customer = node("place_order");
+        in_customer.partition_cell = Some(PartitionCell::col("customer"));
+        let mut in_sales = node("verify_order");
+        in_sales.partition_cell = Some(PartitionCell::col("sales"));
+        let unassigned = node("archive"); // no cell — free zone, allowed
+        let graph = Graph {
+            nodes: vec![in_customer, unassigned],
+            edges: vec![],
+            groups: vec![plotgram_model::graph::Group {
+                id: "g".into(),
+                label: None,
+                attrs: AttrMap::new(),
+                nodes: vec![in_sales],
+                edges: vec![],
+                groups: vec![],
+            }],
+            partition: Some(PartitionGrid {
+                columns: vec![PartitionAxis::new("customer"), PartitionAxis::new("sales")],
+                rows: vec![],
+            }),
+        };
+        let rg = build_real_graph(&graph);
+        assert_eq!(rg.ids, vec!["place_order", "archive", "verify_order"]);
+        let grid = rg.partition.as_ref().expect("grid carried through");
+        assert_eq!(
+            grid.columns.iter().map(|a| a.id.as_str()).collect::<Vec<_>>(),
+            vec!["customer", "sales"]
+        );
+        assert_eq!(
+            rg.partition_cell[rg.index_of["place_order"]],
+            Some(PartitionCell::col("customer"))
+        );
+        assert_eq!(rg.partition_cell[rg.index_of["archive"]], None);
+        assert_eq!(
+            rg.partition_cell[rg.index_of["verify_order"]],
+            Some(PartitionCell::col("sales"))
+        );
     }
 }

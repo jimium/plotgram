@@ -9,6 +9,7 @@
 
 use std::collections::BTreeMap;
 
+use plotgram_model::partition::{PartitionCell, PartitionGrid};
 use plotgram_model::port::PortConstraint;
 use plotgram_model::NodeShape;
 
@@ -37,6 +38,17 @@ pub enum ElemKey {
         rank: u32,
         side: BoundarySide,
     },
+    /// Zero-width Left/Right clamp for `(partition column × rank)`
+    /// (partition-grid.md PG-1). Columns are global full-height bands, so
+    /// every column owns L/R clamps on **every** rank (unlike groups, which
+    /// span only their member ranks). Same family as [`Self::GroupBoundary`]:
+    /// zero-width, high-weight `pb:` cross-rank segments, excluded from the
+    /// crossing index.
+    PartitionBoundary {
+        column: String,
+        rank: u32,
+        side: BoundarySide,
+    },
     /// Zero-width order pad inserted so group Left clamps share a common
     /// raw layer index across ranks (Channel host tracks stay geometric).
     OrderPad {
@@ -56,10 +68,23 @@ impl ElemKey {
         matches!(self, Self::GroupBoundary { .. })
     }
 
+    pub fn is_partition_boundary(&self) -> bool {
+        matches!(self, Self::PartitionBoundary { .. })
+    }
+
+    /// Either clamp family (group / partition) — same ordering & metric
+    /// treatment (zero-width, boundary-weight segments, nesting blocks).
+    pub fn is_boundary(&self) -> bool {
+        matches!(self, Self::GroupBoundary { .. } | Self::PartitionBoundary { .. })
+    }
+
     pub fn is_zero_width(&self) -> bool {
         matches!(
             self,
-            Self::Virtual { .. } | Self::GroupBoundary { .. } | Self::OrderPad { .. }
+            Self::Virtual { .. }
+                | Self::GroupBoundary { .. }
+                | Self::PartitionBoundary { .. }
+                | Self::OrderPad { .. }
         )
     }
 }
@@ -87,6 +112,12 @@ pub struct RealGraph {
     /// Undirected edges whose endpoints landed on the same rank — excluded
     /// from ordering/properify/channel, routed as side-links in Ink.
     pub intra_layer: Vec<RealEdge>,
+    /// Orthogonal partition grid (ADR-008; PG-0 input wiring). `None` = the
+    /// diagram has no `partition` block — every consumer gates on this.
+    pub partition: Option<PartitionGrid>,
+    /// index -> author cell assignment (`cell_col` / `cell_row` after lift),
+    /// parallel to `ids`. Never consulted when [`Self::partition`] is `None`.
+    pub partition_cell: Vec<Option<PartitionCell>>,
 }
 
 /// One real-to-real edge before properify.
@@ -142,6 +173,7 @@ pub struct Segment {
 }
 
 /// Properified working graph: dense elements + rank-adjacent segments.
+#[derive(Debug, Default)]
 pub struct PlanGraph {
     pub elems: Vec<Elem>,
     pub index_of: BTreeMap<ElemKey, usize>,
@@ -152,6 +184,16 @@ pub struct PlanGraph {
     /// rank -> ordered element indices (order = declaration order pre-sort;
     /// [`crate::layout::hierarchical::compose::order`] rewrites this).
     pub layers: Vec<Vec<usize>>,
+    /// Consumed partition columns, declaration order (partition-grid.md
+    /// PG-1). Empty = partition NOT consumed: no `pb:` elems, no band
+    /// constraints, no ordering special-casing — the §10 single gate.
+    pub partition_columns: Vec<String>,
+    /// elem index -> index into [`Self::partition_columns`] for elems owned
+    /// by a column block: assigned real nodes and every elem of a group
+    /// block whose members sit in exactly one column. `None` = free zone;
+    /// elems appended after consumption (order pads) read past the end and
+    /// are free by construction.
+    pub partition_elem_col: Vec<Option<usize>>,
 }
 
 impl RealGraph {

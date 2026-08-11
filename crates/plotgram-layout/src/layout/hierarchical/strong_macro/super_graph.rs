@@ -119,6 +119,9 @@ pub(super) fn assign_scope_ranks(
         edges,
         self_loops: Vec::new(),
         intra_layer: Vec::new(),
+        // Derived block-granularity graph — no partition facts of its own.
+        partition: None,
+        partition_cell: Vec::new(),
     };
     rank::assign_ranks(&super_graph)
 }

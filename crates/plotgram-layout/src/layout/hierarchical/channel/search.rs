@@ -1006,6 +1006,7 @@ mod tests {
             decl_index: (0..3).collect(),
             segments: vec![],
             layers: vec![vec![0], vec![1], vec![2]],
+            ..Default::default()
         }
     }
 
@@ -1150,6 +1151,7 @@ mod tests {
             decl_index: (0..6).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
+                    ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         let g = ChannelGraph::from_substrate(&sub);
@@ -1221,6 +1223,7 @@ mod tests {
             decl_index: (0..6).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
+                    ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         let g = ChannelGraph::from_substrate(&sub);
@@ -1295,6 +1298,7 @@ mod tests {
             decl_index: (0..6).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
+                    ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         let g = ChannelGraph::from_substrate(&sub);
@@ -1359,6 +1363,7 @@ mod tests {
             decl_index: (0..6).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
+                    ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         let g = ChannelGraph::from_substrate(&sub);
@@ -1412,6 +1417,7 @@ mod tests {
             decl_index: (0..6).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
+                    ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         use plotgram_algo::orientation::Side;
@@ -1547,6 +1553,7 @@ mod tests {
             decl_index: (0..6).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3], vec![4, 5]],
+                    ..Default::default()
         };
         let (sub, idx) = derive_root_substrate(&plan);
         let g = ChannelGraph::from_substrate(&sub);

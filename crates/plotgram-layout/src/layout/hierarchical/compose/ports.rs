@@ -140,6 +140,7 @@ fn free_side(
             far_real_endpoint(plan, edge_id, node_real).unwrap_or(neighbor)
         }
         crate::layout::hierarchical::model::ElemKey::GroupBoundary { .. }
+        | crate::layout::hierarchical::model::ElemKey::PartitionBoundary { .. }
         | crate::layout::hierarchical::model::ElemKey::OrderPad { .. } => neighbor,
     };
     let peer_rank = plan.elems[peer].rank;
@@ -389,7 +390,9 @@ pub fn assign_ports(
                 ElemKey::Virtual { edge_id, .. } => {
                     far_real_endpoint(plan, edge_id, node_real).unwrap_or(neighbor)
                 }
-                ElemKey::GroupBoundary { .. } | ElemKey::OrderPad { .. } => neighbor,
+                ElemKey::GroupBoundary { .. }
+                | ElemKey::PartitionBoundary { .. }
+                | ElemKey::OrderPad { .. } => neighbor,
             };
             let real_idx = graph.index_of[node_id];
             let shape = graph.shapes[real_idx];
@@ -403,7 +406,9 @@ pub fn assign_ports(
                         ElemKey::Virtual { edge_id, .. } => {
                             far_real_endpoint(plan, edge_id, node_real).unwrap_or(neighbor)
                         }
-                        ElemKey::GroupBoundary { .. } | ElemKey::OrderPad { .. } => neighbor,
+                        ElemKey::GroupBoundary { .. }
+                        | ElemKey::PartitionBoundary { .. }
+                        | ElemKey::OrderPad { .. } => neighbor,
                     };
                     let ns_load = spine_ns_load(&free_usage, node_real)
                         + spine_ns_load(&free_usage, peer);
@@ -684,6 +689,7 @@ mod tests {
             decl_index: vec![0, 1, 2],
             segments,
             layers,
+                    ..Default::default()
         };
         (graph, plan)
     }
@@ -803,6 +809,7 @@ mod tests {
                 to: 2,
             }],
             layers: vec![vec![0], vec![1, 2]],
+                    ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false).unwrap().ports;
         assert_eq!(ports["back"].source.side, Side::East);
@@ -872,6 +879,7 @@ mod tests {
                 to: 2,
             }],
             layers: vec![vec![0, 1], vec![2]],
+                    ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
@@ -960,6 +968,7 @@ mod tests {
                 },
             ],
             layers: vec![vec![0, 1], vec![2], vec![3]],
+                    ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
@@ -1047,6 +1056,7 @@ mod tests {
                 },
             ],
             layers: vec![vec![0], vec![1], vec![2]],
+                    ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false).unwrap().ports;
         assert_eq!(ports["back"].source.side, Side::East);
@@ -1110,6 +1120,7 @@ mod tests {
                 to: 1,
             }],
             layers: vec![vec![0], vec![1]],
+                    ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
@@ -1225,6 +1236,7 @@ mod tests {
                 },
             ],
             layers: vec![vec![0], vec![1]],
+                    ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
@@ -1299,6 +1311,7 @@ mod tests {
                 to: 1,
             }],
             layers: vec![vec![0], vec![1]],
+                    ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()
@@ -1392,6 +1405,7 @@ mod tests {
             decl_index: vec![0, 1],
             segments,
             layers,
+                    ..Default::default()
         };
         (graph, plan)
     }
@@ -1595,6 +1609,7 @@ mod tests {
                 },
             ],
             layers: vec![vec![0], vec![1, 2], vec![3, 4]],
+                    ..Default::default()
         };
         let ports = assign_ports(&graph, &plan, AlgoOrientation::Tb, false)
             .unwrap()

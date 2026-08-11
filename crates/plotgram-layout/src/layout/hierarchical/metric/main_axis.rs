@@ -75,6 +75,7 @@ mod tests {
             decl_index,
             segments: Vec::new(),
             layers,
+            ..Default::default()
         }
     }
 

@@ -7,6 +7,7 @@ pub mod bundle;
 pub mod cycle;
 pub mod graph_index;
 pub mod order;
+pub mod partition_boundary;
 pub mod ports;
 pub mod properify;
 pub mod rank;

@@ -481,6 +481,7 @@ mod tests {
             decl_index: (0..3).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2]],
+            ..Default::default()
         }
     }
 

@@ -237,6 +237,7 @@ mod tests {
             decl_index,
             segments: Vec::new(),
             layers: vec![(0..ids.len()).collect()],
+            ..Default::default()
         }
     }
 

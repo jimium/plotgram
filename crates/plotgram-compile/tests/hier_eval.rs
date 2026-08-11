@@ -64,7 +64,7 @@ use plotgram_compile::{
     build_debug_trace, build_layout, compute_hier_metrics, node_gap_from_source, BuildOptions,
     CrossAxis,
 };
-use plotgram_layout::{group_penetration_violations, GROUP_FRAME_GAP};
+use plotgram_layout::{group_penetration_violations, GROUP_FRAME_GAP, PARTITION_EMPTY_BAND_MIN};
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::graph::{Edge as ModelEdge, Group as ModelGroup};
 use plotgram_model::port::{AlongSpec, Side};
@@ -209,6 +209,8 @@ fn hierarchical_showcase_geometry_invariants() {
         check_no_edge_node_penetration(&name, &source, &result, &mut hard_failures);
         check_group_gates(&name, &source, &result, &mut hard_failures);
         check_demand_floor(&name, &result, &mut hard_failures);
+        check_partition_band_separation(&name, &source, &result, &mut hard_failures);
+        check_partition_bit_identical(&name, &source, &mut hard_failures);
         let reversed_count = match build_debug_trace(&source, &BuildOptions::default()) {
             Ok(trace) => serde_json::to_value(&trace)
                 .ok()
@@ -559,6 +561,199 @@ fn check_demand_floor(name: &str, result: &LayoutResult, failures: &mut Vec<Stri
                 "{name}: demand floor violated — seam {seam} resolved {got} < demand {demand}"
             ));
         }
+    }
+}
+
+/// PG-1 hard gate (partition-grid.md §7): consumed TB/BT partition fixtures
+/// keep globally separated column bands — for every declaration-order column
+/// pair `i < j`, column `i`'s max right edge ≤ column `j`'s min left edge.
+/// Covers both band membership (members land inside their band) and column
+/// order (declaration order never inverts). Unassigned nodes are free to sit
+/// outside all bands (they are not band members). LR/RL and strong-macro
+/// fixtures do not consume columns (PG-4) and are skipped.
+fn check_partition_band_separation(
+    name: &str,
+    source: &str,
+    result: &LayoutResult,
+    failures: &mut Vec<String>,
+) {
+    if source.contains("left-to-right")
+        || source.contains("right-to-left")
+        || source.contains("group_policy: strong-macro")
+    {
+        return;
+    }
+    let Ok(parsed) = plotgram_parse::parse(source) else {
+        return;
+    };
+    let graph = &parsed.graph;
+    let Some(grid) = &graph.partition else {
+        return;
+    };
+    if grid.columns.is_empty() {
+        return;
+    }
+
+    let col_index: BTreeMap<&str, usize> = grid
+        .columns
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.id.as_str(), i))
+        .collect();
+    let frame_of: BTreeMap<&str, Rect> = result
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.frame))
+        .collect();
+
+    let n_cols = grid.columns.len();
+    let mut min_left = vec![f64::INFINITY; n_cols];
+    let mut max_right = vec![f64::NEG_INFINITY; n_cols];
+    for node in graph.all_nodes() {
+        let Some(cell) = &node.partition_cell else {
+            continue;
+        };
+        let Some(col) = &cell.column else {
+            continue;
+        };
+        let Some(&ci) = col_index.get(col.as_str()) else {
+            continue;
+        };
+        let Some(&frame) = frame_of.get(node.id.as_str()) else {
+            continue;
+        };
+        min_left[ci] = min_left[ci].min(frame.x);
+        max_right[ci] = max_right[ci].max(frame.right());
+    }
+    for i in 0..n_cols {
+        if !max_right[i].is_finite() {
+            continue;
+        }
+        for j in i + 1..n_cols {
+            if !min_left[j].is_finite() {
+                continue;
+            }
+            if max_right[i] + EPS > min_left[j] {
+                failures.push(format!(
+                    "{name}: partition column separation violated — column `{}` right \
+                     {:.3} exceeds column `{}` left {:.3}",
+                    grid.columns[i].id, max_right[i], grid.columns[j].id, min_left[j]
+                ));
+            }
+        }
+    }
+
+    // PG-2: the observed band intervals must mirror the solved geometry —
+    // presence + declaration order, member containment, inter-band
+    // separation, and the empty-band width floor.
+    let bands = result
+        .diagnostics
+        .hierarchical
+        .as_ref()
+        .map(|o| o.partition_bands.clone())
+        .unwrap_or_default();
+    if bands.len() != n_cols {
+        failures.push(format!(
+            "{name}: partition obs bands count {} != declared columns {n_cols}",
+            bands.len()
+        ));
+        return;
+    }
+    for (ci, band) in bands.iter().enumerate() {
+        if band.column != grid.columns[ci].id {
+            failures.push(format!(
+                "{name}: partition obs band {ci} column `{}` != declared `{}`",
+                band.column, grid.columns[ci].id
+            ));
+        }
+        if band.empty && band.end - band.start + EPS < PARTITION_EMPTY_BAND_MIN {
+            failures.push(format!(
+                "{name}: partition obs band `{}` width {:.3} < empty-band minimum {:.1}",
+                band.column,
+                band.end - band.start,
+                PARTITION_EMPTY_BAND_MIN
+            ));
+        }
+    }
+    for node in graph.all_nodes() {
+        let Some(cell) = &node.partition_cell else {
+            continue;
+        };
+        let Some(col) = &cell.column else {
+            continue;
+        };
+        let Some(&ci) = col_index.get(col.as_str()) else {
+            continue;
+        };
+        let Some(&frame) = frame_of.get(node.id.as_str()) else {
+            continue;
+        };
+        let band = &bands[ci];
+        if frame.x + EPS < band.start || frame.right() - EPS > band.end {
+            failures.push(format!(
+                "{name}: node `{}` frame [{:.3}, {:.3}] escapes partition band `{}` [{:.3}, {:.3}]",
+                node.id,
+                frame.x,
+                frame.right(),
+                band.column,
+                band.start,
+                band.end
+            ));
+        }
+    }
+    for i in 0..n_cols {
+        for j in i + 1..n_cols {
+            if bands[i].end + EPS > bands[j].start {
+                failures.push(format!(
+                    "{name}: partition obs band separation violated — `{}` end {:.3} \
+                     exceeds `{}` start {:.3}",
+                    bands[i].column, bands[i].end, bands[j].column, bands[j].start
+                ));
+            }
+        }
+    }
+}
+
+/// PG-1 determinism gate: partition fixtures run twice produce bit-identical
+/// geometry (node frames and edge path samples).
+fn check_partition_bit_identical(name: &str, source: &str, failures: &mut Vec<String>) {
+    let Ok(parsed) = plotgram_parse::parse(source) else {
+        return;
+    };
+    let Some(grid) = &parsed.graph.partition else {
+        return;
+    };
+    if grid.columns.is_empty() {
+        return;
+    }
+    let (first, second) = match (
+        build_layout(source, &BuildOptions::default()),
+        build_layout(source, &BuildOptions::default()),
+    ) {
+        (Ok(a), Ok(b)) => (a, b),
+        _ => return, // pipeline errors are reported by the main loop
+    };
+    let frames = |r: &LayoutResult| -> Vec<(String, Rect)> {
+        let mut v: Vec<(String, Rect)> = r.nodes.iter().map(|n| (n.id.clone(), n.frame)).collect();
+        v.sort_by(|a, b| a.0.cmp(&b.0));
+        v
+    };
+    if frames(&first) != frames(&second) {
+        failures.push(format!("{name}: partition layout not bit-identical across two runs"));
+    }
+    let paths = |r: &LayoutResult| -> Vec<(String, Vec<Point>)> {
+        let mut v: Vec<(String, Vec<Point>)> = r
+            .edges
+            .iter()
+            .map(|e| (e.id.clone(), e.path.samples().to_vec()))
+            .collect();
+        v.sort_by(|a, b| a.0.cmp(&b.0));
+        v
+    };
+    if paths(&first) != paths(&second) {
+        failures.push(format!(
+            "{name}: partition edge paths not bit-identical across two runs"
+        ));
     }
 }
 

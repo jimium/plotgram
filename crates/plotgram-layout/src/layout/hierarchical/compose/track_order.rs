@@ -341,6 +341,7 @@ mod tests {
                 },
             ],
             layers: vec![vec![0, 1], vec![2, 3]],
+                    ..Default::default()
         };
         let mut ids = BTreeMap::new();
         for (i, id) in ["a", "b", "c", "d"].iter().enumerate() {
@@ -471,6 +472,7 @@ mod tests {
                 },
             ],
             layers: vec![vec![0], vec![1], vec![2]],
+                    ..Default::default()
         };
         let mut ids = BTreeMap::new();
         for (i, id) in ["a", "b", "c"].iter().enumerate() {
@@ -617,6 +619,7 @@ mod tests {
                 })
                 .collect(),
             layers: vec![vec![0], vec![1, 2, 3, 4]],
+                    ..Default::default()
         };
         let mut ids = BTreeMap::new();
         for (i, id) in ["hub", "svc_b", "svc_c", "svc_d", "svc_a"]
@@ -782,6 +785,7 @@ mod tests {
                 },
             ],
             layers: vec![vec![0, 1], vec![2, 3]],
+                    ..Default::default()
         };
         let mut ids = BTreeMap::new();
         for (i, id) in ["s1", "s2", "t1", "t2"].iter().enumerate() {

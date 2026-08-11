@@ -760,6 +760,7 @@ mod tests {
             decl_index: (0..4).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3]],
+                    ..Default::default()
         };
         let mut index_of_ids = BTreeMap::new();
         for (i, id) in ["a0", "a1", "b0", "b1"].iter().enumerate() {
@@ -867,6 +868,7 @@ mod tests {
             decl_index: (0..6).collect(),
             segments: vec![],
             layers: vec![vec![0, 1, 2], vec![3, 4, 5]],
+                    ..Default::default()
         };
         let mut ids = BTreeMap::new();
         for i in 0..6 {

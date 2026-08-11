@@ -423,6 +423,7 @@ mod tests {
                 decl_index: (0..2).collect(),
                 segments: vec![],
                 layers: vec![vec![0], vec![1]],
+                            ..Default::default()
             };
             // One corridor line cut into a wide + narrow scope-cut track.
             let mut sub = Substrate::new();
@@ -584,6 +585,7 @@ mod tests {
             decl_index: (0..2).collect(),
             segments: vec![],
             layers: vec![vec![0], vec![1]],
+                    ..Default::default()
         };
         // East-outer Main track (order gap 1 >= max_cols 1).
         let mut sub = Substrate::new();

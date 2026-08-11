@@ -778,6 +778,7 @@ mod tests {
             decl_index: (0..4).collect(),
             segments: vec![],
             layers: vec![vec![0, 1], vec![2, 3]],
+                    ..Default::default()
         };
         let mut index_of_ids = BTreeMap::new();
         index_of_ids.insert("a".into(), 0);

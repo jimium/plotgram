@@ -1,0 +1,40 @@
+// 订单履约泳道：客户 / 销售 / 仓储 三列（PartitionGrid columns，TB）
+// partition-grid.md PG-0/PG-1 验收图：同列层内成块、列声明序 = 几何左→右；
+// 含跨列边、回边与一个未指派节点（自由区，ADR-008 §6 默认宽松）。
+diagram {
+    profile: flowchart,
+    title: "订单履约泳道",
+    layout: hierarchical { direction: top-to-bottom }
+
+    partition {
+        column customer { label: "客户" }
+        column sales { label: "销售" }
+        column warehouse { label: "仓储" }
+    }
+
+    node confirm_need { label: "确认需求", archetype: process, cell_col: customer }
+    node place_order { label: "下单", archetype: start, cell_col: customer }
+    node receive { label: "签收", archetype: end, cell_col: customer }
+
+    node verify_order { label: "审核", archetype: process, cell_col: sales }
+    node verify_gate { label: "审核通过？", archetype: decision, cell_col: sales }
+    node collect { label: "收款", archetype: process, cell_col: sales }
+
+    node alloc { label: "库存分配", archetype: process, cell_col: warehouse }
+    node pack { label: "打包", archetype: process, cell_col: warehouse }
+    node ship { label: "出库发运", archetype: process, cell_col: warehouse }
+
+    // 未指派节点：不进任何列块，自由区
+    node audit_log { label: "审计留痕", archetype: process }
+
+    confirm_need -> place_order
+    place_order -> verify_order
+    verify_order -> verify_gate
+    verify_gate -> collect { label: "通过" }
+    verify_gate -> place_order { label: "退回修改" }
+    verify_gate -> audit_log { label: "留痕" }
+    collect -> alloc
+    alloc -> pack
+    pack -> ship
+    ship -> receive
+}

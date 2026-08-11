@@ -8,10 +8,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::layout::hierarchical::compose::track_order::TrackOrderPlan;
 use crate::layout::hierarchical::group_frame::{group_shell_bands, GROUP_FRAME_GAP};
+use crate::layout::hierarchical::metric::partition_bands::{PartitionBandPlan, PARTITION_EMPTY_BAND_MIN};
 use crate::layout::hierarchical::model::{ElemKey, PlanGraph, RealGraph};
 
 /// Typed MetricBudget demand keys (coordinate-and-demand.md §1.1 subset).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DemandKey {
     /// Main-axis gap between layer `r` and `r+1` (px lower bound).
     LayerGap(u32),
@@ -21,6 +22,11 @@ pub enum DemandKey {
     /// StrongMacro scope-local: cross-axis gap between adjacent entries
     /// `k` and `k+1` within one macro row (px lower bound; SM-3).
     MacroColGap(u32),
+    /// Cross-axis minimum band width for a consumed partition column
+    /// (px lower bound; partition-grid.md PG-1). Published for
+    /// observability only — the cross solve reads the band plan
+    /// directly, never through demand resolution.
+    PartitionBandMinSize(String),
 }
 
 /// Max-merge demand board with a single freeze epoch (MetricBudget).
@@ -285,10 +291,47 @@ pub fn publish_gate_capacity_demand(
     published
 }
 
+/// Partition band producer (partition-grid.md PG-1): minimum band width for
+/// consumed columns that have no assigned member anywhere. Non-empty columns
+/// get their minimum size from members inside the cross solve and publish
+/// nothing here. The cross solve reads [`PartitionBandPlan`] directly (hard
+/// constraints in symmetry_objective), so this is observability only —
+/// DemandBoard still resolves main-axis LayerGap seams exclusively.
+pub fn publish_partition_band_demand(board: &mut DemandBoard, bands: &PartitionBandPlan) {
+    for (ci, column) in bands.columns.iter().enumerate() {
+        if bands.empty.get(ci).copied().unwrap_or(false) {
+            board.publish(
+                DemandKey::PartitionBandMinSize(column.clone()),
+                PARTITION_EMPTY_BAND_MIN,
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::layout::hierarchical::compose::track_order::TrackOrderPlan;
+
+    #[test]
+    fn partition_band_demand_publishes_only_empty_columns() {
+        let bands = PartitionBandPlan {
+            columns: vec!["a".to_string(), "b".to_string()],
+            gap: 24.0,
+            empty: vec![false, true],
+        };
+        let mut board = DemandBoard::new();
+        publish_partition_band_demand(&mut board, &bands);
+        board.freeze();
+        assert_eq!(
+            board.get(DemandKey::PartitionBandMinSize("a".to_string())),
+            None
+        );
+        assert_eq!(
+            board.get(DemandKey::PartitionBandMinSize("b".to_string())),
+            Some(PARTITION_EMPTY_BAND_MIN)
+        );
+    }
 
     #[test]
     fn expands_gap_by_track_pitch() {
@@ -352,6 +395,7 @@ mod tests {
             decl_index: vec![0, 1, 2],
             segments: Vec::new(),
             layers,
+                    ..Default::default()
         };
         let labeled: BTreeSet<String> = ["g2".to_string()].into_iter().collect();
         let mut board = DemandBoard::new();
@@ -384,6 +428,7 @@ mod tests {
             decl_index: vec![0, 1],
             segments: Vec::new(),
             layers: vec![vec![0], vec![1]],
+                    ..Default::default()
         };
         let labeled = BTreeSet::new();
         let mut tracks = TrackOrderPlan::default();
@@ -483,6 +528,7 @@ mod tests {
             decl_index: (0..nodes.len()).collect(),
             segments: Vec::new(),
             layers,
+                    ..Default::default()
         };
         let mut id_index = BTreeMap::new();
         for (i, (id, _, _)) in nodes.iter().enumerate() {

@@ -189,14 +189,14 @@ LayoutOutput / LayoutResult:
 
 **目标**：Hier 能**看见** partition；无 grid 时 bit-identical；有 grid 尚未排泳道也不崩溃。
 
-- [ ] `build_real_graph`：从 `Graph` 拷贝 `partition_cell`（dense 并行数组）  
-- [ ] layout 入口：`validate_graph_partition` → `InvalidInput` / `LayoutError`（勿静默）  
-- [ ] 无 `partition` / 全无 cell：现有 fixture **零几何变化**  
-- [ ] showcase：`apps/showcase/hierarchical/partition/` 至少  
+- [x] `build_real_graph`：从 `Graph` 拷贝 `partition_cell`（dense 并行数组）  
+- [x] layout 入口：`validate_graph_partition` → `InvalidInput` / `LayoutError`（勿静默）  
+- [x] 无 `partition` / 全无 cell：现有 fixture **零几何变化**  
+- [x] showcase：`apps/showcase/hierarchical/partition/` 至少  
   - `product.swimlane-order-fulfillment.pgm`（三列 TB）  
   - `product.matrix-phase-role.pgm`（列×行）  
-- [ ] hier_eval：纳入 partition 目录；暂作 smoke（可布局、无 panic）  
-- [ ] 文档：dsl-spec「parse planned」→ 已落地；Hier 消费改为本文 PG-*  
+- [x] hier_eval：纳入 partition 目录；暂作 smoke（可布局、无 panic）  
+- [x] 文档：dsl-spec「parse planned」→ 已落地；Hier 消费改为本文 PG-*  
 
 **验收**：parse 已有测保持绿；新 showcase `cargo run -p plotgram-cli -- render …` 出 SVG；**§10 硬门槛**（无 partition 全量 fixture bit-identical）。
 
@@ -208,13 +208,13 @@ LayoutOutput / LayoutResult:
 
 **目标**：TB + **仅 columns** 时，同列节点层内成块、列声明序 = 几何左→右；跨列边仍走全局 rank。
 
-- [ ] Compose：按 orientation 映射选出 **cross-axis** 轴（TB→columns）  
-- [ ] 插入 Partition 连续块（每 `(column × rank)` Left/Right clamp 或等价）  
-- [ ] `order_layers`：列块 precedence（声明序）；与 group clamp 共存策略写清  
-- [ ] Metric：列 band Fit（含同列成员 ± pad）；空列 `PartitionBandMinSize`（标题/最小宽）  
-- [ ] 未指派 cell：不进列块（自由区）  
-- [ ] hier_eval：同列节点 cross 投影落在列 band 内；列序不颠倒  
-- [ ] 代表图：三列订单泳道 — 同 rank 跨列对齐可读  
+- [x] Compose：按 orientation 映射选出 **cross-axis** 轴（TB→columns）  
+- [x] 插入 Partition 连续块（每 `(column × rank)` Left/Right clamp 或等价）  
+- [x] `order_layers`：列块 precedence（声明序）；与 group clamp 共存策略写清  
+- [x] Metric：列 band Fit（含同列成员 ± pad）；空列 `PartitionBandMinSize`（标题/最小宽）  
+- [x] 未指派 cell：不进列块（自由区）  
+- [x] hier_eval：同列节点 cross 投影落在列 band 内；列序不颠倒  
+- [x] 代表图：三列订单泳道 — 同 rank 跨列对齐可读  
 
 **刻意不做**：rows、LR orientation、Strong 特判、渲染底色。
 
@@ -226,10 +226,10 @@ LayoutOutput / LayoutResult:
 
 **目标**：列 band 成为 Metric 真源字段；Demand 空轴；可选外轨/调试暴露。
 
-- [ ] `PartitionBandCoords` 进 `HierarchicalObs` 或 `LayoutResult`（择一，ADR 倾向可观测）  
-- [ ] 空列保留 label 带宽（常数进 `group_frame` 旁或 `partition` 常量模块）  
-- [ ]（可选）Channel outer rail 避让 column band（对齐 D₂ `group_obstacles` 先例）  
-- [ ] debug-inspector / measure JSON 能看见 band  
+- [x] `PartitionBandCoords` 进 `HierarchicalObs` 或 `LayoutResult`（择一，ADR 倾向可观测）  
+- [x] 空列保留 label 带宽（常数进 `group_frame` 旁或 `partition` 常量模块）  
+- [x]（可选）Channel outer rail 避让 column band（对齐 D₂ `group_obstacles` 先例）——**裁定不做**，见 §13  
+- [x] debug-inspector / measure JSON 能看见 band  
 
 **验收**：空列仍占位；obs 中 band 与节点落带一致；**§10 硬门槛**必过。
 
@@ -373,3 +373,6 @@ Partition 实施是**增量路径**：默认图不得因接线 / 连续块 / ban
 |------|------|
 | 2026-08-11 | 初版：产品选型泳道/矩阵；PG-0–PG-4；钉死与 group/Channel/Strong 边界；parse/model 已备、Hier 丢 cell 为 PG-0 入口 |
 | 2026-08-11 | 增 §10：无 partition 图 bit-identical 硬门槛（适用范围 / 比对物 / 守法 / 切片对照）；写入 DoD |
+| 2026-08-11 | PG-0 落地：`RealGraph` 携 `partition: Option<PartitionGrid>` + `partition_cell`（dense 并行数组，§6.1 备选形式）；`compute()` 入口 `validate_partition` 硬失败；两幅 showcase 入 hier_eval baseline；无 partition 全量图对纯 HEAD bit-identical（§10 过）；dsl-spec §14 更新 |
+| 2026-08-12 | PG-1 落地（TB/BT + Weak，columns only）：单一消费闸（`plan.partition_columns` 空 = 未消费，restore/bands/snap 全 no-op）；`ElemKey::PartitionBoundary`（不复用 GroupBoundary）+ 每 column×rank L/R 零宽 clamp + `pb:` 跨 rank 高权段；`partition_bands` 列带硬约束进 symmetry 降级链（相邻列分离 ≥ node_gap、空列 ≥ 96.0），解后 clamp snap 到成员极值 ± pad；DemandBoard 发布 `PartitionBandMinSize`（观测/PG-2）。**group 共存策略裁定**：组成员全在一个列 → 组块嵌套进列块；跨 ≥2 列 → `LayoutError` 硬失败（不做联合 precedence，PG-4 再议）。**restore 归属修复**：`restore_partition_clamps` 中 owned 元素（已指派成员 + 单列组 clamp）无条件回本带，仅未归属元素走 in-block/eject/自由区。StrongMacro + grid 硬失败；LR/RL、rows 各出一条 warning 不消费。hier_eval 增列带全局分离硬门禁 + 两遍 bit-identical；§10 过（对纯 HEAD 逐条一致；baseline 随本次一并刷新 HEAD 既有的陈旧漂移）。dsl-spec §14 `cell_col` 消费状态更新 |
+| 2026-08-12 | PG-2 落地（纯观测切片，零几何写入）：**载体裁定**——band 坐标进 `HierarchicalObs.partition_bands`（`PartitionBandObs { column, start, end, empty }`，physical 坐标，ADR 倾向可观测；渲染底色归 PG-4+）；真源读取 `band_coords` 从解后 clamp 位置回读（Metric 仍是坐标真源，obs/debug/measure 均为投影）；空列常量 `PARTITION_EMPTY_BAND_MIN = 96.0` 定址 partition_bands.rs（partition 常量模块），经 hierarchical/mod.rs 与 crate 根 re-export；debug trace `extension.partition_bands` + measure JSON `observation.partition_bands`（未消费不发键，非 partition 序列化文本零变化）。**外轨裁定**：Channel outer rail 避让 column band 不做——`group_obstacles` 先例的语义是“组框不可穿”，列 band 非障碍（跨列边须穿行带间空隙，成员体已进节点障碍表），避让无良定义；设计文档该项标（可选），延后至 PG-4 再议。hier_eval 门禁扩展（obs 列数/声明序/成员落带/带间分离/空列宽下界）；§10 过（baseline 不重建零 delta，showcase 两遍 0 changed）；debug-profile.md 字段表同步 |

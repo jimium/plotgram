@@ -432,6 +432,7 @@ mod tests {
                 to: 1,
             }],
             layers: vec![vec![0], vec![1]],
+                    ..Default::default()
         };
         let graph = RealGraph {
             ids: vec!["client".into(), "api".into()],
@@ -556,6 +557,7 @@ mod tests {
             decl_index: vec![0, 1, 2],
             segments: vec![],
             layers: vec![vec![0], vec![1, 2]],
+                    ..Default::default()
         };
         let graph = RealGraph {
             ids: vec!["hub".into(), "twin".into(), "leaf".into()],

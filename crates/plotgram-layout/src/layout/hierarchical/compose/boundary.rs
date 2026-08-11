@@ -113,7 +113,9 @@ pub fn insert_group_boundaries(plan: &mut PlanGraph) {
                     }
                 }
                 ElemKey::Virtual { .. } => ungrouped.push(ei),
-                ElemKey::GroupBoundary { .. } | ElemKey::OrderPad { .. } => {
+                ElemKey::GroupBoundary { .. }
+                | ElemKey::PartitionBoundary { .. }
+                | ElemKey::OrderPad { .. } => {
                     // Should not exist yet in `old`; ignore if re-run.
                 }
             }
@@ -306,6 +308,7 @@ mod tests {
             decl_index: vec![0, 1, 2],
             segments: vec![],
             layers: vec![vec![0], vec![1, 2]],
+                    ..Default::default()
         };
         insert_group_boundaries(&mut plan);
 

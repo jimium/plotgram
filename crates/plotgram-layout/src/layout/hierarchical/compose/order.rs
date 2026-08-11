@@ -21,10 +21,11 @@ fn edge_weight(a: &Elem, b: &Elem) -> f64 {
     }
 }
 
-/// Segment weight: both ends group-boundary → `group_boundary_weight`;
-/// else base × author weight (vv corridor stays 8.0, weight does not apply).
+/// Segment weight: both ends boundary clamps (group `gb:` or partition
+/// `pb:`) → `group_boundary_weight`; else base × author weight (vv corridor
+/// stays 8.0, weight does not apply).
 fn segment_weight(a: &Elem, b: &Elem, weight: f64, group_boundary_weight: f64) -> f64 {
-    if a.key.is_group_boundary() && b.key.is_group_boundary() {
+    if a.key.is_boundary() && b.key.is_boundary() {
         return group_boundary_weight;
     }
     let base = edge_weight(a, b);
@@ -66,7 +67,7 @@ fn build_adjacency(
     Adjacency { up, down }
 }
 
-/// Precomputed bipartite segments for crossing counts (gb: excluded).
+/// Precomputed bipartite segments for crossing counts (gb: / pb: excluded).
 /// Valid for the whole ordering phase — segments are immutable then.
 struct CrossingIndex {
     /// `segs_by_pair[r]` = edges between layers `r` and `r+1` as `(from, to)`.
@@ -84,7 +85,7 @@ fn build_crossing_index(plan: &PlanGraph) -> CrossingIndex {
     let mut up = vec![Vec::new(); n];
     let mut down = vec![Vec::new(); n];
     for s in &plan.segments {
-        if s.edge_id.starts_with("gb:") {
+        if s.edge_id.starts_with("gb:") || s.edge_id.starts_with("pb:") {
             continue;
         }
         let r = plan.elems[s.from].rank as usize;
@@ -131,6 +132,7 @@ pub fn order_layers(
         }
         transpose_pass(plan, &xidx);
         for r in 0..plan.layers.len() {
+            restore_partition_clamps(plan, r);
             restore_group_clamps(plan, r);
         }
 
@@ -149,6 +151,7 @@ pub fn order_layers(
 
     plan.layers = best;
     for r in 0..plan.layers.len() {
+        restore_partition_clamps(plan, r);
         restore_group_clamps(plan, r);
     }
     if !super::super::CHANNEL_FORCE_ROOT.get() {
@@ -165,9 +168,9 @@ fn tighten_one_to_one(plan: &mut PlanGraph, xidx: &CrossingIndex) {
     let mut up_real = vec![Vec::new(); n];
     for s in &plan.segments {
         if !plan.elems[s.from].key.is_virtual()
-            && !plan.elems[s.from].key.is_group_boundary()
+            && !plan.elems[s.from].key.is_boundary()
             && !plan.elems[s.to].key.is_virtual()
-            && !plan.elems[s.to].key.is_group_boundary()
+            && !plan.elems[s.to].key.is_boundary()
         {
             down_real[s.from].push(s.to);
             up_real[s.to].push(s.from);
@@ -334,7 +337,120 @@ fn reorder_layer(plan: &mut PlanGraph, adj: &Adjacency, r: usize, dir: Direction
 
     keyed.sort_by_key(|(k, _)| sort_key(k));
     plan.layers[r] = keyed.into_iter().map(|(_, e)| e).collect();
+    restore_partition_clamps(plan, r);
     restore_group_clamps(plan, r);
+}
+
+/// Re-establish partition column blocks after a group-agnostic median /
+/// transpose pass (partition-grid.md PG-1): column blocks in DECLARATION
+/// order, owned elems ([`PlanGraph::partition_elem_col`]) inside their
+/// column's L/R clamps, everything else ejected to the free zones — same
+/// eject policy as [`restore_group_clamps`]. Runs OUTSIDE group restore:
+/// a column block contains whole group blocks, and group restore then
+/// re-seats the nested clamps.
+fn restore_partition_clamps(plan: &mut PlanGraph, r: usize) {
+    use crate::layout::hierarchical::model::{BoundarySide, ElemKey};
+
+    if plan.partition_columns.is_empty() {
+        return;
+    }
+    let columns = plan.partition_columns.clone();
+    let col_pos: BTreeMap<String, usize> = columns
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.clone(), i))
+        .collect();
+    let clamp_of = |column: &str, side: BoundarySide| -> Option<usize> {
+        plan.index_of
+            .get(&ElemKey::PartitionBoundary {
+                column: column.to_string(),
+                rank: r as u32,
+                side,
+            })
+            .copied()
+    };
+
+    // Normalize inverted clamps first (a sweep may flip L/R) so the scan
+    // below sees one well-formed block per column.
+    for col in &columns {
+        let (Some(l), Some(rr)) = (
+            clamp_of(col, BoundarySide::Left),
+            clamp_of(col, BoundarySide::Right),
+        ) else {
+            continue;
+        };
+        let layer = &mut plan.layers[r];
+        let (Some(lp), Some(rp)) = (
+            layer.iter().position(|&e| e == l),
+            layer.iter().position(|&e| e == rr),
+        ) else {
+            continue;
+        };
+        if lp > rp {
+            layer.swap(lp, rp);
+        }
+    }
+
+    let old = plan.layers[r].clone();
+    let mut blocks: Vec<Vec<usize>> = vec![Vec::new(); columns.len()];
+    let mut ejected: Vec<Vec<usize>> = vec![Vec::new(); columns.len()];
+    let mut free_lead = Vec::new();
+    let mut free_trail = Vec::new();
+    let mut current: Option<usize> = None;
+    let mut seen_block = false;
+    for &e in &old {
+        match &plan.elems[e].key {
+            ElemKey::PartitionBoundary {
+                column,
+                side: BoundarySide::Left,
+                ..
+            } => {
+                current = col_pos.get(column).copied();
+                seen_block = true;
+            }
+            ElemKey::PartitionBoundary {
+                side: BoundarySide::Right,
+                ..
+            } => {
+                current = None;
+            }
+            _ => {
+                // Owned content (assigned members, single-column group
+                // clamps) ALWAYS re-enters its band — a sweep may push an
+                // elem outside the blocks, and free-zone treatment would
+                // strand it there. Only unowned elems (virtuals, unassigned
+                // reals) follow the in-block / eject / free-zone policy.
+                let owned = plan.partition_elem_col.get(e).copied().flatten();
+                match owned {
+                    Some(ci) => blocks[ci].push(e),
+                    None => match current {
+                        Some(ci) => ejected[ci].push(e),
+                        None if seen_block => free_trail.push(e),
+                        None => free_lead.push(e),
+                    },
+                }
+            }
+        }
+    }
+
+    // Keep the leading free zone at its pre-eject size (same cross-rank
+    // alignment argument as `restore_group_clamps`).
+    let mut new_layer = Vec::with_capacity(old.len());
+    new_layer.extend(free_lead);
+    for (ci, col) in columns.iter().enumerate() {
+        let (Some(l), Some(rr)) = (
+            clamp_of(col, BoundarySide::Left),
+            clamp_of(col, BoundarySide::Right),
+        ) else {
+            continue;
+        };
+        new_layer.push(l);
+        new_layer.extend(blocks[ci].iter().copied());
+        new_layer.push(rr);
+        new_layer.extend(ejected[ci].iter().copied());
+    }
+    new_layer.extend(free_trail);
+    plan.layers[r] = new_layer;
 }
 
 /// Re-pack after a group-agnostic median/transpose: keep Left/Right where
@@ -556,6 +672,7 @@ mod tests {
             decl_index,
             segments,
             layers,
+            ..Default::default()
         }
     }
 
@@ -615,6 +732,7 @@ mod tests {
             decl_index,
             segments,
             layers,
+                    ..Default::default()
         };
 
         insert_group_boundaries(&mut plan);
@@ -706,6 +824,7 @@ mod tests {
             decl_index: vec![0, 1, 2, 3],
             segments: segments.clone(),
             layers: layers.clone(),
+                    ..Default::default()
         };
 
         let mut p = plan_of();
@@ -789,6 +908,7 @@ mod tests {
             decl_index,
             segments,
             layers,
+            ..Default::default()
         }
     }
 
@@ -800,6 +920,95 @@ mod tests {
             order_layers(&mut plan, &BTreeMap::new(), 16.0);
             assert_eq!(plan.layers[0].len(), layer_len, "width={width}");
             assert_eq!(plan.layers[1].len(), layer_len, "width={width}");
+        }
+    }
+
+    /// PG-1: crossing sweeps must not break column blocks — after ordering,
+    /// every layer keeps partition clamps in declaration order and assigned
+    /// members sit inside their column's L/R clamps.
+    #[test]
+    fn partition_blocks_survive_crossing_sweeps() {
+        use crate::layout::hierarchical::compose::partition_boundary::insert_partition_boundaries;
+        use crate::layout::hierarchical::model::RealGraph;
+        use plotgram_model::partition::{PartitionAxis, PartitionCell, PartitionGrid};
+
+        // `left` declared before `right`; layer 1 declares the right member
+        // first, and the criss-cross edges push the sweep to swap them.
+        let elems = vec![
+            plain_elem("l0", 0, &[]),
+            plain_elem("r0", 0, &[]),
+            plain_elem("r1", 1, &[]),
+            plain_elem("l1", 1, &[]),
+        ];
+        let segments = vec![
+            Segment { edge_id: "e0".into(), ordinal: 0, from: 0, to: 2 },
+            Segment { edge_id: "e1".into(), ordinal: 0, from: 1, to: 3 },
+        ];
+        let layers = vec![vec![0, 1], vec![2, 3]];
+        let index_of = elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.key.clone(), i))
+            .collect();
+        let mut plan = PlanGraph {
+            elems,
+            index_of,
+            decl_index: vec![0, 1, 2, 3],
+            segments,
+            layers,
+            ..Default::default()
+        };
+
+        let mut real = RealGraph::default();
+        real.partition = Some(PartitionGrid {
+            columns: vec![PartitionAxis::new("left"), PartitionAxis::new("right")],
+            rows: vec![],
+        });
+        real.ids = vec!["l0".into(), "r0".into(), "r1".into(), "l1".into()];
+        for (i, id) in real.ids.iter().enumerate() {
+            real.index_of.insert(id.clone(), i);
+        }
+        real.partition_cell = vec![
+            Some(PartitionCell::col("left")),
+            Some(PartitionCell::col("right")),
+            Some(PartitionCell::col("right")),
+            Some(PartitionCell::col("left")),
+        ];
+
+        insert_partition_boundaries(&mut plan, &real).unwrap();
+        order_layers(&mut plan, &BTreeMap::new(), 16.0);
+
+        let clamp_pos = |layer: &[usize], col: &str, side: BoundarySide| -> usize {
+            layer
+                .iter()
+                .position(|&e| {
+                    matches!(
+                        &plan.elems[e].key,
+                        ElemKey::PartitionBoundary { column, side: s, .. }
+                        if column.as_str() == col && *s == side
+                    )
+                })
+                .unwrap_or_else(|| panic!("missing {col} {side:?} clamp in {layer:?}"))
+        };
+        for layer in &plan.layers {
+            let l_l = clamp_pos(layer, "left", BoundarySide::Left);
+            let l_r = clamp_pos(layer, "left", BoundarySide::Right);
+            let r_l = clamp_pos(layer, "right", BoundarySide::Left);
+            let r_r = clamp_pos(layer, "right", BoundarySide::Right);
+            assert!(
+                l_l < l_r && l_r < r_l && r_l < r_r,
+                "column declaration order broken: {layer:?}"
+            );
+            for (i, &e) in layer.iter().enumerate() {
+                let Some(&Some(ci)) = plan.partition_elem_col.get(e) else {
+                    continue;
+                };
+                let (lo, hi) = if ci == 0 { (l_l, l_r) } else { (r_l, r_r) };
+                assert!(
+                    i > lo && i < hi,
+                    "elem {e} escaped its column band: pos {i}, band [{lo},{hi}]"
+                );
+            }
         }
     }
 }

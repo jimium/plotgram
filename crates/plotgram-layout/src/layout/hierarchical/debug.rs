@@ -11,6 +11,7 @@
 use std::collections::BTreeMap;
 
 use plotgram_engine_api::{LayoutError, LayoutInput};
+use plotgram_model::diagnostics::PartitionBandObs;
 use plotgram_model::geometry::{Point, Rect};
 use plotgram_model::graph::Graph;
 use serde::Serialize;
@@ -49,6 +50,9 @@ pub struct Captures<'a> {
     /// projection applies the identical shift so trace geometry matches the
     /// product pixel-for-pixel.
     pub shift: (f64, f64),
+    /// Consumed partition column bands, physical coordinates (partition-grid
+    /// .md PG-2); empty when the grid is not consumed.
+    pub partition_bands: Vec<PartitionBandObs>,
 }
 
 // ── Envelope (debug-inspector.md §5, debug-profile.md §2) ─────────
@@ -109,6 +113,19 @@ pub struct HierarchicalExtension {
     /// (D6: explicit absence, no fake tracks).
     pub channels: Option<ChannelDebug>,
     pub metrics: MetricDebug,
+    /// Consumed partition column bands, physical cross-axis intervals
+    /// (partition-grid.md PG-2); absent when the grid is not consumed.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub partition_bands: Vec<PartitionBandDebug>,
+}
+
+/// One consumed partition column band (partition-grid.md PG-2).
+#[derive(Debug, Clone, Serialize)]
+pub struct PartitionBandDebug {
+    pub column: String,
+    pub band: Band,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub empty: bool,
 }
 
 /// D1.3 Channel debug sketch (RouteOrder + Gate/rip-up).
@@ -149,6 +166,12 @@ pub enum ElemKeyDebug {
     #[serde(rename = "group-boundary")]
     GroupBoundary {
         group: String,
+        side: &'static str,
+        rank: u32,
+    },
+    #[serde(rename = "partition-boundary")]
+    PartitionBoundary {
+        column: String,
         side: &'static str,
         rank: u32,
     },
@@ -290,6 +313,17 @@ fn project(layout_name: &str, cap: Captures<'_>) -> LayoutDebugTrace {
                         rank: *rank,
                     },
                     vec!["group-boundary"],
+                ),
+                ElemKey::PartitionBoundary { column, rank, side } => (
+                    ElemKeyDebug::PartitionBoundary {
+                        column: column.clone(),
+                        side: match side {
+                            crate::layout::hierarchical::model::BoundarySide::Left => "left",
+                            crate::layout::hierarchical::model::BoundarySide::Right => "right",
+                        },
+                        rank: *rank,
+                    },
+                    vec!["partition-boundary"],
                 ),
                 ElemKey::OrderPad { rank, ordinal } => (
                     ElemKeyDebug::Virtual {
@@ -434,6 +468,18 @@ fn project(layout_name: &str, cap: Captures<'_>) -> LayoutDebugTrace {
                 node_gap: cap.params.node_gap,
                 layer_gap: cap.params.layer_gap,
             },
+            partition_bands: cap
+                .partition_bands
+                .iter()
+                .map(|b| PartitionBandDebug {
+                    column: b.column.clone(),
+                    band: Band {
+                        start: b.start,
+                        end: b.end,
+                    },
+                    empty: b.empty,
+                })
+                .collect(),
         },
         notes: vec![
             "hierarchical: D1.3 Channel (RouteOrder + Gate/ScopeMask + bounded rip-up)"
@@ -452,6 +498,14 @@ fn elem_key_debug(key: &ElemKey) -> ElemKeyDebug {
         },
         ElemKey::GroupBoundary { group, rank, side } => ElemKeyDebug::GroupBoundary {
             group: group.clone(),
+            side: match side {
+                crate::layout::hierarchical::model::BoundarySide::Left => "left",
+                crate::layout::hierarchical::model::BoundarySide::Right => "right",
+            },
+            rank: *rank,
+        },
+        ElemKey::PartitionBoundary { column, rank, side } => ElemKeyDebug::PartitionBoundary {
+            column: column.clone(),
             side: match side {
                 crate::layout::hierarchical::model::BoundarySide::Left => "left",
                 crate::layout::hierarchical::model::BoundarySide::Right => "right",

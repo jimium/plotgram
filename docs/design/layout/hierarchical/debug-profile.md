@@ -38,6 +38,7 @@ HierarchicalExtension {
   ports: PortDebug[]
   channels: ChannelDebug?      # 未实现 → null，notes 说明
   metrics: MetricDebug?
+  partition_bands: PartitionBandDebug[]   # PG-2；未消费 partition → 不发键
 }
 ```
 
@@ -123,6 +124,12 @@ MetricDebug {
   layer_gap: f64
   # 有 ideal / 不可行摘要再加字段
 }
+
+PartitionBandDebug {           # 已消费列带（partition-grid.md PG-2）
+  column: string               # 声明序 = 几何左→右（TB）
+  band: { start: f64, end: f64 }  # physical cross-axis 区间
+  empty?: bool                 # 无成员列（最小宽保留），false 不发
+}
 ```
 
 MVP：`channels = null` 或 `{ status: "absent", reason: "…" }`，与 [mvp-scope](notes/2026-08-02-mvp-scope.md) 一致。
@@ -154,7 +161,7 @@ Common 层 `product` / `groups` 由壳提供，本核不重复注册。
 | rank / order / dummy / reversed / ports | 现行 MVP |
 | 组框 metric 真源 | M4 |
 | channels | M3 |
-| partition band（若进 extension） | M5 |
+| partition band（extension.partition_bands） | PG-2 已落地 |
 
 ---
 

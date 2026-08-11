@@ -159,6 +159,22 @@
     "symmetry_deviation_max": 1.4166666666666667,
     "symmetry_deviation_sum": 1.4166666666666667
   },
+  "flat/mech.layout-styles": {
+    "bbox_h": 639.1999999999999,
+    "bbox_w": 533.4027756368464,
+    "channel_used_gates": false,
+    "crossings": 19,
+    "gap_uniformity_max": 0.573845519162929,
+    "max_bends": 4,
+    "overlap_len": 400.5265095811724,
+    "relaxations": 6,
+    "reversed_count": 2,
+    "ripup_rounds": 1,
+    "straightness": 0.0,
+    "sum_bends": 74,
+    "symmetry_deviation_max": 4.999519413774493,
+    "symmetry_deviation_sum": 38.193690102618774
+  },
   "flat/product.employee-onboarding": {
     "bbox_h": 456.29999999999995,
     "bbox_w": 214.48000000000002,
@@ -705,19 +721,19 @@
   },
   "group-weak/demo.ai-agent-docops-pipeline": {
     "bbox_h": 804.9999999999999,
-    "bbox_w": 837.8743406436005,
+    "bbox_w": 851.4375235979387,
     "channel_used_gates": true,
     "crossings": 7,
-    "gap_uniformity_max": 0.500159752236624,
+    "gap_uniformity_max": 0.5114438544879993,
     "max_bends": 4,
-    "overlap_len": 450.18597202181377,
+    "overlap_len": 462.33129542758286,
     "relaxations": 4,
     "reversed_count": 1,
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 38,
-    "symmetry_deviation_max": 11.661446283111742,
-    "symmetry_deviation_sum": 41.638873601610634
+    "symmetry_deviation_max": 11.944007250743942,
+    "symmetry_deviation_sum": 42.5941477692611
   },
   "group-weak/demo.ci-cd-security-pipeline": {
     "bbox_h": 1594.0000000000005,
@@ -737,7 +753,7 @@
   },
   "group-weak/demo.data-lakehouse-platform": {
     "bbox_h": 718.0999999999999,
-    "bbox_w": 207.88000000000002,
+    "bbox_w": 208.52000000000004,
     "channel_used_gates": true,
     "crossings": 2,
     "gap_uniformity_max": 0.0,
@@ -748,24 +764,24 @@
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 26,
-    "symmetry_deviation_max": 2.9321471679002022,
-    "symmetry_deviation_sum": 4.4380268558518114
+    "symmetry_deviation_max": 2.8029523208792675,
+    "symmetry_deviation_sum": 4.5762072101191205
   },
   "group-weak/demo.data-lineage-platform": {
-    "bbox_h": 806.0999999999999,
-    "bbox_w": 548.484596352496,
+    "bbox_h": 822.0999999999999,
+    "bbox_w": 562.3359742567301,
     "channel_used_gates": true,
-    "crossings": 21,
-    "gap_uniformity_max": 0.6264910202259304,
+    "crossings": 17,
+    "gap_uniformity_max": 0.6307954641292218,
     "max_bends": 6,
-    "overlap_len": 333.03158908975723,
-    "relaxations": 3,
+    "overlap_len": 359.7618213277759,
+    "relaxations": 4,
     "reversed_count": 0,
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 48,
-    "symmetry_deviation_max": 11.088707281414912,
-    "symmetry_deviation_sum": 50.9455918449803
+    "symmetry_deviation_max": 11.076644443401108,
+    "symmetry_deviation_sum": 50.5493717707781
   },
   "group-weak/demo.e-commerce-order-fulfillment": {
     "bbox_h": 1324.2000000000003,
@@ -780,11 +796,11 @@
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 30,
-    "symmetry_deviation_max": 2.8125602115396533,
-    "symmetry_deviation_sum": 8.268914409815615
+    "symmetry_deviation_max": 2.8125639807453857,
+    "symmetry_deviation_sum": 8.148044812098446
   },
   "group-weak/demo.fintech-payment-platform": {
-    "bbox_h": 616.3,
+    "bbox_h": 632.3,
     "bbox_w": 354.4971034272804,
     "channel_used_gates": true,
     "crossings": 5,
@@ -804,23 +820,23 @@
     "bbox_w": 1053.4617499668375,
     "channel_used_gates": true,
     "crossings": 24,
-    "gap_uniformity_max": 0.5891879821299976,
+    "gap_uniformity_max": 0.5891879821299979,
     "max_bends": 6,
-    "overlap_len": 1023.4357499668378,
+    "overlap_len": 1023.4357499668375,
     "relaxations": 8,
     "reversed_count": 0,
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 80,
-    "symmetry_deviation_max": 13.996047419755966,
-    "symmetry_deviation_sum": 28.817540661430677
+    "symmetry_deviation_max": 13.996047419755968,
+    "symmetry_deviation_sum": 28.81754066143068
   },
   "group-weak/demo.incident-management": {
     "bbox_h": 740.9999999999999,
-    "bbox_w": 421.0157244695578,
+    "bbox_w": 419.1862478255554,
     "channel_used_gates": true,
     "crossings": 3,
-    "gap_uniformity_max": 0.3641797779976246,
+    "gap_uniformity_max": 0.3415398398975496,
     "max_bends": 4,
     "overlap_len": 0.0,
     "relaxations": 2,
@@ -828,11 +844,11 @@
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 24,
-    "symmetry_deviation_max": 3.083444520103052,
-    "symmetry_deviation_sum": 4.4195671873078615
+    "symmetry_deviation_max": 3.0251561128029003,
+    "symmetry_deviation_sum": 4.379218566207658
   },
   "group-weak/demo.insurance-claim-process": {
-    "bbox_h": 819.8999999999999,
+    "bbox_h": 835.8999999999999,
     "bbox_w": 244.84343219929772,
     "channel_used_gates": true,
     "crossings": 1,
@@ -849,26 +865,26 @@
   },
   "group-weak/demo.k8s-blue-green-release-topology": {
     "bbox_h": 1117.0,
-    "bbox_w": 1711.7994774740657,
+    "bbox_w": 1711.7995975561648,
     "channel_used_gates": false,
     "crossings": 66,
-    "gap_uniformity_max": 0.8787331638988172,
+    "gap_uniformity_max": 0.8787331731500988,
     "max_bends": 4,
-    "overlap_len": 173.11000000000035,
+    "overlap_len": 173.1099999999999,
     "relaxations": 5,
     "reversed_count": 1,
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 74,
-    "symmetry_deviation_max": 35.10039489475273,
-    "symmetry_deviation_sum": 265.4670162746688
+    "symmetry_deviation_max": 35.100399898173514,
+    "symmetry_deviation_sum": 265.4670412917728
   },
   "group-weak/demo.k8s-multi-namespace-overview": {
-    "bbox_h": 999.1999999999998,
-    "bbox_w": 1766.0502372832661,
+    "bbox_h": 983.1999999999998,
+    "bbox_w": 1765.7110399993433,
     "channel_used_gates": false,
-    "crossings": 118,
-    "gap_uniformity_max": 1.1344278456076227,
+    "crossings": 120,
+    "gap_uniformity_max": 1.135461008604019,
     "max_bends": 4,
     "overlap_len": 296.69999999999993,
     "relaxations": 5,
@@ -876,31 +892,31 @@
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 76,
-    "symmetry_deviation_max": 39.469208153851554,
-    "symmetry_deviation_sum": 343.7700860503753
+    "symmetry_deviation_max": 39.490084504780036,
+    "symmetry_deviation_sum": 321.4520924409602
   },
   "group-weak/demo.k8s-platform-stack": {
     "bbox_h": 848.3,
-    "bbox_w": 1934.154152732613,
+    "bbox_w": 1940.7331559705704,
     "channel_used_gates": false,
-    "crossings": 87,
-    "gap_uniformity_max": 0.4578077245874204,
+    "crossings": 85,
+    "gap_uniformity_max": 0.46084837018276015,
     "max_bends": 4,
-    "overlap_len": 1312.707001117398,
+    "overlap_len": 1325.8650075933133,
     "relaxations": 7,
     "reversed_count": 0,
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 68,
-    "symmetry_deviation_max": 38.8793396971922,
-    "symmetry_deviation_sum": 277.2375721156257
+    "symmetry_deviation_max": 39.1534648321071,
+    "symmetry_deviation_sum": 278.47113522274276
   },
   "group-weak/demo.k8s-tenant-isolation": {
-    "bbox_h": 720.3,
-    "bbox_w": 1597.4003921568626,
+    "bbox_h": 704.3,
+    "bbox_w": 1600.3023529411767,
     "channel_used_gates": false,
     "crossings": 46,
-    "gap_uniformity_max": 0.5636081036708938,
+    "gap_uniformity_max": 0.5650587140289011,
     "max_bends": 2,
     "overlap_len": 0.0,
     "relaxations": 2,
@@ -908,11 +924,11 @@
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 52,
-    "symmetry_deviation_max": 55.84605800653594,
-    "symmetry_deviation_sum": 353.11080566368963
+    "symmetry_deviation_max": 55.966973039215695,
+    "symmetry_deviation_sum": 353.51679221341425
   },
   "group-weak/demo.mcp-server-cluster-architecture": {
-    "bbox_h": 374.50000000000006,
+    "bbox_h": 390.50000000000006,
     "bbox_w": 517.6045595046128,
     "channel_used_gates": true,
     "crossings": 3,
@@ -941,30 +957,30 @@
     "straightness": 0.0,
     "sum_bends": 16,
     "symmetry_deviation_max": 5.586458333333333,
-    "symmetry_deviation_sum": 6.7345945722697
+    "symmetry_deviation_sum": 6.553890838161664
   },
   "group-weak/demo.plotgram-core-mod-deps": {
     "bbox_h": 999.5,
-    "bbox_w": 2749.6439779654083,
+    "bbox_w": 2758.452486777298,
     "channel_used_gates": false,
     "crossings": 84,
-    "gap_uniformity_max": 1.002669781921335,
+    "gap_uniformity_max": 1.0064313449259221,
     "max_bends": 4,
-    "overlap_len": 704.1291544558447,
+    "overlap_len": 713.6218285382076,
     "relaxations": 6,
     "reversed_count": 1,
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 70,
-    "symmetry_deviation_max": 38.1268324152253,
-    "symmetry_deviation_sum": 295.0486423827369
+    "symmetry_deviation_max": 38.493853615720745,
+    "symmetry_deviation_sum": 296.80152568475086
   },
   "group-weak/demo.realtime-recommendation": {
     "bbox_h": 364.70000000000005,
     "bbox_w": 380.0,
     "channel_used_gates": true,
     "crossings": 7,
-    "gap_uniformity_max": 0.04299065420560748,
+    "gap_uniformity_max": 0.028462998102467003,
     "max_bends": 6,
     "overlap_len": 16.0,
     "relaxations": 6,
@@ -972,8 +988,8 @@
     "ripup_rounds": 3,
     "straightness": 0.0,
     "sum_bends": 30,
-    "symmetry_deviation_max": 5.427083333333333,
-    "symmetry_deviation_sum": 15.75476911567462
+    "symmetry_deviation_max": 5.343750000000001,
+    "symmetry_deviation_sum": 15.685724162579191
   },
   "group-weak/demo.supply-chain-control-tower": {
     "bbox_h": 1072.6,
@@ -982,14 +998,14 @@
     "crossings": 2,
     "gap_uniformity_max": 0.0,
     "max_bends": 4,
-    "overlap_len": 66.91695182105047,
+    "overlap_len": 72.22054567468888,
     "relaxations": 2,
     "reversed_count": 0,
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 32,
-    "symmetry_deviation_max": 5.802150014843988,
-    "symmetry_deviation_sum": 13.297837265919036
+    "symmetry_deviation_max": 5.7095960232512155,
+    "symmetry_deviation_sum": 13.009822134503176
   },
   "group-weak/mech.group-island": {
     "bbox_h": 251.60000000000002,
@@ -1009,7 +1025,7 @@
   },
   "group-weak/mech.group-long-short-span": {
     "bbox_h": 409.4,
-    "bbox_w": 144.0,
+    "bbox_w": 152.0,
     "channel_used_gates": true,
     "crossings": 0,
     "gap_uniformity_max": 0.0,
@@ -1020,12 +1036,12 @@
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 8,
-    "symmetry_deviation_max": 1.9166666666666667,
-    "symmetry_deviation_sum": 3.8333333333333335
+    "symmetry_deviation_max": 2.0833333333333335,
+    "symmetry_deviation_sum": 4.166666666666667
   },
   "group-weak/mech.group-single-member": {
     "bbox_h": 275.6,
-    "bbox_w": 218.25989584731371,
+    "bbox_w": 220.08003346808766,
     "channel_used_gates": true,
     "crossings": 0,
     "gap_uniformity_max": 0.0,
@@ -1036,8 +1052,8 @@
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 4,
-    "symmetry_deviation_max": 2.28625216984763,
-    "symmetry_deviation_sum": 2.28625216984763
+    "symmetry_deviation_max": 2.2483326360815057,
+    "symmetry_deviation_sum": 2.2483326360815057
   },
   "group-weak/mech.group-unlabeled": {
     "bbox_h": 267.6,
@@ -1073,26 +1089,26 @@
   },
   "group-weak/product.cdn-cache": {
     "bbox_h": 401.4,
-    "bbox_w": 385.88,
+    "bbox_w": 385.87999999999994,
     "channel_used_gates": true,
     "crossings": 0,
     "gap_uniformity_max": 0.0,
     "max_bends": 4,
-    "overlap_len": 72.70530180323183,
+    "overlap_len": 72.43842467863462,
     "relaxations": 2,
     "reversed_count": 1,
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 24,
     "symmetry_deviation_max": 3.2806249999999992,
-    "symmetry_deviation_sum": 10.848014545766
+    "symmetry_deviation_sum": 10.853574485861774
   },
   "group-weak/product.cloud-native": {
     "bbox_h": 450.5,
-    "bbox_w": 791.4094736842105,
+    "bbox_w": 789.5633198380567,
     "channel_used_gates": true,
     "crossings": 10,
-    "gap_uniformity_max": 0.28986393438445457,
+    "gap_uniformity_max": 0.280467168242704,
     "max_bends": 2,
     "overlap_len": 0.0,
     "relaxations": 1,
@@ -1100,15 +1116,15 @@
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 28,
-    "symmetry_deviation_max": 9.086864035087716,
+    "symmetry_deviation_max": 9.04840249662618,
     "symmetry_deviation_sum": 12.414122807017552
   },
   "group-weak/product.compiler-pipeline": {
     "bbox_h": 434.5,
-    "bbox_w": 707.066586543335,
+    "bbox_w": 715.0644204183413,
     "channel_used_gates": true,
     "crossings": 20,
-    "gap_uniformity_max": 0.7575887762436286,
+    "gap_uniformity_max": 0.7575864842508481,
     "max_bends": 4,
     "overlap_len": 0.0,
     "relaxations": 3,
@@ -1116,8 +1132,8 @@
     "ripup_rounds": 3,
     "straightness": 0.0,
     "sum_bends": 24,
-    "symmetry_deviation_max": 17.97073088906944,
-    "symmetry_deviation_sum": 71.10320144038891
+    "symmetry_deviation_max": 18.13736013951177,
+    "symmetry_deviation_sum": 72.2695533545015
   },
   "group-weak/product.d2-cell-tower-network": {
     "bbox_h": 418.5,
@@ -1140,7 +1156,7 @@
     "bbox_w": 995.0,
     "channel_used_gates": true,
     "crossings": 18,
-    "gap_uniformity_max": 0.23625880423383844,
+    "gap_uniformity_max": 0.2184273175801314,
     "max_bends": 2,
     "overlap_len": 0.0,
     "relaxations": 1,
@@ -1149,7 +1165,7 @@
     "straightness": 0.0,
     "sum_bends": 38,
     "symmetry_deviation_max": 22.80916666666667,
-    "symmetry_deviation_sum": 45.46494627043371
+    "symmetry_deviation_sum": 45.78482259243359
   },
   "group-weak/product.message-queue-pipeline": {
     "bbox_h": 339.6,
@@ -1168,7 +1184,7 @@
     "symmetry_deviation_sum": 0.002200812782911399
   },
   "group-weak/product.microservices": {
-    "bbox_h": 457.4,
+    "bbox_h": 465.4,
     "bbox_w": 248.64467647058822,
     "channel_used_gates": true,
     "crossings": 3,
@@ -1185,10 +1201,10 @@
   },
   "group-weak/product.monitoring-stack": {
     "bbox_h": 331.6,
-    "bbox_w": 381.3540203417153,
+    "bbox_w": 381.9961447928951,
     "channel_used_gates": true,
     "crossings": 2,
-    "gap_uniformity_max": 0.2591899309163316,
+    "gap_uniformity_max": 0.260723056382217,
     "max_bends": 2,
     "overlap_len": 0.0,
     "relaxations": 1,
@@ -1196,8 +1212,8 @@
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 10,
-    "symmetry_deviation_max": 4.915541242880934,
-    "symmetry_deviation_sum": 4.915541242880934
+    "symmetry_deviation_max": 4.902163650148022,
+    "symmetry_deviation_sum": 4.902163650148022
   },
   "group-weak/product.rest-api-backend": {
     "bbox_h": 378.5,
@@ -1217,7 +1233,7 @@
   },
   "group-weak/product.serverless-web-app": {
     "bbox_h": 450.5,
-    "bbox_w": 512.9010989010989,
+    "bbox_w": 522.1318681318681,
     "channel_used_gates": true,
     "crossings": 0,
     "gap_uniformity_max": 0.035175879396984924,
@@ -1228,15 +1244,15 @@
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 16,
-    "symmetry_deviation_max": 10.079212454212453,
-    "symmetry_deviation_sum": 13.145217826147023
+    "symmetry_deviation_max": 10.46382783882784,
+    "symmetry_deviation_sum": 13.540261651546983
   },
   "group-weak/product.unite-config-publish": {
     "bbox_h": 585.0,
-    "bbox_w": 1581.149695883995,
+    "bbox_w": 1589.1487999771691,
     "channel_used_gates": true,
     "crossings": 1,
-    "gap_uniformity_max": 0.037320666925165155,
+    "gap_uniformity_max": 0.037320666925165134,
     "max_bends": 4,
     "overlap_len": 16.0,
     "relaxations": 2,
@@ -1244,15 +1260,15 @@
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 20,
-    "symmetry_deviation_max": 13.555430122969929,
-    "symmetry_deviation_sum": 21.83126345630327
+    "symmetry_deviation_max": 13.722078124911055,
+    "symmetry_deviation_sum": 21.997911458244396
   },
   "group-weak/stress.layout-stress-nested": {
-    "bbox_h": 687.1999999999999,
-    "bbox_w": 837.6381454844238,
+    "bbox_h": 695.1999999999999,
+    "bbox_w": 853.6371216072894,
     "channel_used_gates": true,
     "crossings": 8,
-    "gap_uniformity_max": 1.3147513110785294,
+    "gap_uniformity_max": 1.3180815130473167,
     "max_bends": 4,
     "overlap_len": 0.0,
     "relaxations": 1,
@@ -1260,8 +1276,40 @@
     "ripup_rounds": 1,
     "straightness": 0.0,
     "sum_bends": 32,
-    "symmetry_deviation_max": 10.1579397931335,
-    "symmetry_deviation_sum": 29.97736096630966
+    "symmetry_deviation_max": 10.157939793133503,
+    "symmetry_deviation_sum": 31.14396364065542
+  },
+  "partition/product.matrix-phase-role": {
+    "bbox_h": 527.1999999999999,
+    "bbox_w": 390.8127174194789,
+    "channel_used_gates": false,
+    "crossings": 0,
+    "gap_uniformity_max": 0.0,
+    "max_bends": 4,
+    "overlap_len": 61.198863636363626,
+    "relaxations": 2,
+    "reversed_count": 1,
+    "ripup_rounds": 1,
+    "straightness": 0.0,
+    "sum_bends": 14,
+    "symmetry_deviation_max": 3.5320831280573253,
+    "symmetry_deviation_sum": 9.677916461390659
+  },
+  "partition/product.swimlane-order-fulfillment": {
+    "bbox_h": 598.0999999999999,
+    "bbox_w": 505.7692307692307,
+    "channel_used_gates": false,
+    "crossings": 0,
+    "gap_uniformity_max": 0.4182701288996825,
+    "max_bends": 2,
+    "overlap_len": 0.0,
+    "relaxations": 2,
+    "reversed_count": 1,
+    "ripup_rounds": 1,
+    "straightness": 0.0,
+    "sum_bends": 20,
+    "symmetry_deviation_max": 3.161858974358973,
+    "symmetry_deviation_sum": 5.870192307692307
   },
   "styles/curved": {
     "bbox_h": 243.60000000000002,

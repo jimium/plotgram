@@ -183,6 +183,18 @@ fn run_measure(input: &PathBuf, json: bool) -> ExitCode {
             };
             let m = compute_metrics(&layout_result);
             let diag = &layout_result.diagnostics;
+            // Consumed partition bands (partition-grid.md PG-2): additive
+            // optional key — absent when the grid is not consumed.
+            let mut observation = json!({
+                "node_count": m.node_count,
+                "edge_count": m.edge_count,
+            });
+            if let Some(obs) = diag.hierarchical.as_ref() {
+                if !obs.partition_bands.is_empty() {
+                    observation["partition_bands"] =
+                        serde_json::to_value(&obs.partition_bands).unwrap();
+                }
+            }
             json!({
                 "schema_version": METRICS_SCHEMA_VERSION,
                 "path": path_str,
@@ -204,10 +216,7 @@ fn run_measure(input: &PathBuf, json: bool) -> ExitCode {
                     "canvas_area": m.canvas_area,
                     "aspect_ratio": m.aspect_ratio,
                 },
-                "observation": {
-                    "node_count": m.node_count,
-                    "edge_count": m.edge_count,
-                },
+                "observation": observation,
                 // Layout diagnostics (roadmap phase C): attribute regressions
                 // to params vs code; warnings count the non-fatal observations.
                 "diagnostics": {

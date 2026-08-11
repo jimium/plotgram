@@ -145,6 +145,7 @@ mod tests {
             decl_index,
             segments,
             layers,
+            ..Default::default()
         }
     }
 

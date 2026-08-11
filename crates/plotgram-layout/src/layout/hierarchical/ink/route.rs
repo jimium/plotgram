@@ -989,6 +989,7 @@ mod tests {
             decl_index: vec![0, 1],
             segments,
             layers,
+                    ..Default::default()
         };
 
         let mut ports = BTreeMap::new();
