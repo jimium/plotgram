@@ -127,14 +127,15 @@ pub fn order_layers(
     }
     let adj = build_adjacency(plan, edge_weights, group_boundary_weight);
     let xidx = build_crossing_index(plan);
-    // Span/sift are flat-DAG levers; on grouped plans they fight continuous-block
-    // clamps and can push Channel into root-scope fallback (hybrid-cloud etc.).
+    // Span / sift / reverse-corridor are flat-DAG levers. Gate on **group
+    // boundary dummies** (Weak continuous-block clamps), not mere `group_path`:
+    // StrongMacro intra copies path onto members but inserts no Left/Right
+    // boundaries — that block is a local flat DAG and must share this stack.
+    // Weak global plans with boundaries keep the restricted path (Channel gate).
     let grouped = plan
         .elems
         .iter()
-        .any(|e| e.key.is_group_boundary() || !e.group_path.is_empty());
-    // Reverse-corridor topology is a flat-DAG lever (same gate as span/sift).
-    // On grouped plans, packing by hub would fight continuous-block clamps.
+        .any(|e| e.key.is_group_boundary());
     let empty_rev = BTreeSet::new();
     let reversed = if grouped {
         &empty_rev

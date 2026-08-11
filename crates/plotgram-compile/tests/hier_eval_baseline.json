@@ -675,7 +675,7 @@
     "bbox_h": 426.5,
     "bbox_w": 196.0,
     "channel_used_gates": true,
-    "crossings": 0,
+    "crossings": 1,
     "gap_uniformity_max": 0.0,
     "max_bends": 2,
     "overlap_len": 0.0,
