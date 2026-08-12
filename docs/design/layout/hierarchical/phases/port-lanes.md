@@ -23,7 +23,7 @@
 | 自由度 | 写者 | 不得 |
 |--------|------|------|
 | side + Ordered 相对序 | Compose | 写绝对像素列 |
-| **走廊对齐列 + 触及脸绝对 along** | **PortLaneWriter**（本页） | Ink / Channel 消折 / 消交叉特判 |
+| **走廊对齐列 + 触及脸绝对 along**（非 twin 共享脸可按伙伴列重排左右） | **PortLaneWriter**（本页） | Ink / Channel 消折 / 消交叉特判 |
 | 未触及脸的 `AlongSpec` | 仍为 Compose Ordered（Metric 按框宽展开） | PortLane 改写未触及脸 |
 | 折线 | Ink | 发明列位 |
 
@@ -33,7 +33,7 @@ Compose Ordered（相对序）
   → PortLaneWriter
        1) 合格走廊：两端共 lane_x（对齐）
        2) 触及脸 (node,side)：该脸全部端点 → LocalOffset
-       3) 绝对 x 单调服从 Ordered；走廊块连续；块内分隔 ≥ port_pitch
+       3) 绝对 x 单调：双胞胎脸服从 Compose 序；其余共享脸按伙伴列；走廊块连续；块内分隔 ≥ port_pitch
        4) 非走廊端只落在走廊块外侧的残余区间（不插入两 twin 列之间）
   → TrackOrder / Ink
 ```
@@ -78,7 +78,7 @@ Compose Ordered（相对序）
 
 一期只处理双胞胎走廊。但同样的错位出现在任何**共享脸**上：cross 轴解完之后，两端各自的槽位是按脸宽均分的，与伙伴那一端落在哪一列无关，于是差个十几像素就要在两端各补一折。yFiles 的端口恒在均分槽（导出的 `Ratio` 是 `(2k+1)/2n`），它靠挪节点消掉这段差；我们的层常被压在 `node_gap` 下限上，节点挪不动，只能由脸来吸收。
 
-**写权不变**：Compose 仍独占 side 与相对序，本步只重排**绝对偏移**——它本来就是 PortLane 的自由度。
+**写权不变**：Compose 仍独占 side；双胞胎脸的相对序仍是 Compose 的。非 twin 共享脸的绝对 along（含左右序）在 frames 之后由本步按伙伴列写出——Compose 的跨层 `layer_order` 只是无坐标时的初值。
 
 ### 7.1 单元是槽，不是端
 
@@ -98,7 +98,7 @@ Compose Ordered（相对序）
 无伙伴 → 保持当前均分槽
 ```
 
-投影 = 把目标序列压回「Compose 序 + 槽距 ≥ port_pitch + 落在脸内」，用 PAVA。**池化值取中位数而非均值**：同脸两端不能同时到位时，最小二乘各让一半，两条边都留下亚像素抖动、各自还是两折；中位数至少让其中一条精确对齐。
+投影 = 把目标序列压回「槽距 ≥ port_pitch + 落在脸内」，用 PAVA。槽的左右序跟**伙伴列**（dummy 主干，否则对端节点中心），不是 Compose 的跨层 `layer_order` 下标——那一档在层宽不同时会把回边槽倒到最左（mech n11 的 e29）。双胞胎脸仍守 Compose 序（§3 / expectations §6.2）。**池化值取中位数而非均值**：同脸两端不能同时到位时，最小二乘各让一半，两条边都留下亚像素抖动、各自还是两折；中位数至少让其中一条精确对齐。
 
 脸之间通过边耦合，所以单趟不是不动点；扫到收敛（位移 < 1e-9）。
 

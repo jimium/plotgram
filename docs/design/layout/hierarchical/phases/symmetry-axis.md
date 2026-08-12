@@ -67,7 +67,7 @@ boost_uv = twin_spine_boost | chain_end_boost | primary_arm_boost
 | `lambda_sym` | `1.0` | hub 贴扇心强度 |
 | `twin_spine_boost` | `8.0` | 2-cycle 对端占脊（进 J / L2，不再靠 1e6 desired） |
 | `primary_arm_boost` | `4.0` | 最短跨主臂与 exclusive 1:1 脊进 J；两端都是扇 hub 则不加 |
-| `chain_end_boost` | `8.0` | 悬挂汇点跟长边廊（父非 span-1 扇 hub）；snap 廊跟非叶端 port，叶跟廊 |
+| `chain_end_boost` | `8.0` | 悬挂汇点跟长边廊（父非 span-1 扇 hub）；snap：叶跟廊；恰好一端是扇 hub 时非 hub 写整链（§12 E） |
 | `symmetry_iters` | `8` | IPSEP / 中位迭代轮数 |
 | `symmetry_place` | `ipsep` | 主路径 = 对 J 的 L2 无约束步 + VPSC 投影（§12 A1）。`median` = 旧 desired-packer；`bk` = A0 诊断（BK ideal + 硬约束，跳过迭代与 fan snap）。后两档**不是产品档**。 |
 | `layer_alignment` | `0.5` | 主轴：实节点在层带内对齐；**零高 elem 钉层带顶边**（避免中心走廊穿同层节点） |
@@ -88,7 +88,7 @@ boost_uv = twin_spine_boost | chain_end_boost | primary_arm_boost
 5. exclusive 1:1 spine / follower 跟列；  
 6. port-anchor 覆盖链端 dummy，再 `exteriorize` 同层 dummy。
 
-链列单写者（yfiles/01 §4.5）在约束层而非 desired 层实现：非叶端把邻近链端 dummy 拉向 `port_anchor.x`；悬挂汇点叶不反向拽廊，而是被拉到该 dummy 列。链恒等等式使两端拉力不再各自折链。desired 层的两端均值写法实测否决（fan/spine fixture 回归）。
+链列单写者（yfiles/01 §4.5）分两层：约束层用链恒等把 ≥2 颗 dummy 焊成一个 VPSC 变量；desired 层只在写者无歧义时把**整条链**钉到一端的 `port_anchor.x`——恰好一个非叶端，或两端都非叶、恰好一端是扇 hub 时由**非 hub**写廊（notes §12 E）。两端都是 / 都不是 hub、或只有一颗 dummy，仍逐端写入。悬挂汇点叶不反向拽廊，而是被拉到该 dummy 列。两端等权折中会把焊死的变量停在中间列（mech e30 的 4 折 Z）；把「离链更近」的那端当单写者会漂 D2 脊（order-approval `rejected→submit`）。
 
 纯扇场景下，snap 与旧 FanPack 槽位同构；DAG/多父靠 `J` + 权重折中，不再 `claimed`。
 

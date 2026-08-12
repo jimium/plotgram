@@ -12,7 +12,7 @@ use plotgram_algo::vpsc::{self, Constraint, Variable, VpscError};
 
 use plotgram_model::geometry::Rect;
 
-use crate::layout::hierarchical::compose::ports::EdgePorts;
+use crate::layout::hierarchical::compose::ports::{EdgePorts, ResolvedPort};
 use crate::layout::hierarchical::group_frame::{GROUP_FRAME_GAP, GROUP_LABEL_TOP_PAD, GROUP_PAD};
 use crate::layout::hierarchical::metric::anchor::port_anchor;
 use crate::layout::hierarchical::metric::bk;
@@ -246,6 +246,7 @@ pub fn solve_symmetry_objective(
                     &owner_x,
                     &segs_by_edge,
                     &chain_end_leaves,
+                    &hubs,
                     &mut desired,
                     &mut iter_weights,
                 );
@@ -581,6 +582,7 @@ fn snap_fan_pack_style(
         &owner_x,
         segs_by_edge,
         chain_end_leaves,
+        hubs,
         &mut desired,
         &mut iter_weights,
     );
@@ -700,6 +702,7 @@ fn snap_fan_pack_style(
         &owner_x,
         segs_by_edge,
         chain_end_leaves,
+        hubs,
         &mut desired,
         &mut iter_weights,
     );
@@ -2010,16 +2013,25 @@ fn pull_spine_to_axis(
     }
 }
 
-/// Per-end port anchoring: each end pulls its adjacent dummy onto the
-/// port's anchor column. The chain-column single writer (yfiles/01 §4.5
-/// linear segment) is realized one level down: the chain-identity
-/// equalities bind a long edge's dummies into ONE VPSC variable, so the
-/// two end pulls can no longer zig-zag the chain — they resolve into a
-/// single weighted column for the whole chain. A desired-level mean
-/// writer was measured and rejected (regressed fan/spine fixtures).
+/// Per-end port anchoring, with a **single writer** for the chain column
+/// when a midpoint 4-bend Z would otherwise appear (yfiles/01 §4.5 + notes §12 E).
 ///
-/// Chain-end leaves (notes §12 D) do **not** yank the dummy: the corridor
-/// follows the non-leaf end, and the leaf is pulled onto that dummy column.
+/// Chain identity binds ≥2 dummies into one VPSC variable. Equal-weight
+/// writes from both non-leaf ends park that variable at the midpoint
+/// (mech e30). A single writer is used only when it is unambiguous:
+///
+/// - one non-leaf end → that end writes every dummy (notes §12 D)
+/// - two non-leaf ends, ≥2 dummies, **exactly one** is a fan hub → the
+///   **non-hub** writes (fan dummies track the child; e30's through-node
+///   n21 keeps the left basin). Hub-writes-corridor was tried and
+///   collapsed fan dummies onto the parent column.
+///
+/// Both hubs, neither hub, or a single dummy: keep per-end writes.
+/// Applying the closer-to-x single writer to neither-hub long reverses
+/// (order-approval `rejected→submit`) drifted the D2 spine ~2px.
+///
+/// Chain-end leaves (notes §12 D) still do **not** yank the dummy: they
+/// are pulled onto the anchored column afterwards.
 fn apply_port_anchor_desired(
     plan: &PlanGraph,
     graph: &RealGraph,
@@ -2029,6 +2041,7 @@ fn apply_port_anchor_desired(
     owner_x: &[f64],
     segs_by_edge: &BTreeMap<String, Vec<usize>>,
     chain_end_leaves: &BTreeSet<usize>,
+    hubs: &[usize],
     desired: &mut [f64],
     weights: &mut [f64],
 ) {
@@ -2036,19 +2049,34 @@ fn apply_port_anchor_desired(
         let s = size_of(e);
         Rect::new(owner_x[e] - s.width / 2.0, main[e], s.width, s.height)
     };
+    let hub_set: BTreeSet<usize> = hubs.iter().copied().collect();
     let mut leaf_pulls: Vec<(usize, usize)> = Vec::new();
     for e in &graph.edges {
         let Some(rp) = ports.get(&e.edge_id) else {
             continue;
         };
+        let Some(idxs) = segs_by_edge.get(&e.edge_id) else {
+            continue;
+        };
+        let mut dummies = BTreeSet::new();
+        for &i in idxs {
+            let s = &plan.segments[i];
+            if plan.elems[s.from].key.is_virtual() {
+                dummies.insert(s.from);
+            }
+            if plan.elems[s.to].key.is_virtual() {
+                dummies.insert(s.to);
+            }
+        }
+        if dummies.is_empty() {
+            continue;
+        }
+        let mut nonleaf: Vec<(usize, ResolvedPort, usize)> = Vec::new();
         for (real_idx, port) in [
             (e.original_target, rp.target),
             (e.original_source, rp.source),
         ] {
             let real_elem = plan.index_of[&ElemKey::Real(graph.ids[real_idx].clone())];
-            let Some(idxs) = segs_by_edge.get(&e.edge_id) else {
-                continue;
-            };
             let Some(nb) = idxs
                 .iter()
                 .map(|&i| &plan.segments[i])
@@ -2064,17 +2092,75 @@ fn apply_port_anchor_desired(
                 leaf_pulls.push((real_elem, nb));
                 continue;
             }
-            desired[nb] = port_anchor(frame_of(real_elem), port).x;
-            // Soft pull only: node centers are owned by cross-axis J; port
-            // slots adsorb to corridors later (port_lane). Keep weight at RV
-            // edge-weight scale so anchors cannot yank reals off their parents.
-            weights[nb] = weights[nb].max(VIRTUAL_WEIGHT * 16.0);
+            nonleaf.push((real_elem, port, nb));
+        }
+        let ends: Vec<(usize, ResolvedPort)> =
+            nonleaf.iter().map(|&(r, p, _)| (r, p)).collect();
+        let single_writer = match ends.as_slice() {
+            [_] => true,
+            &[a, b] if dummies.len() >= 2 => {
+                hub_set.contains(&a.0) != hub_set.contains(&b.0)
+            }
+            _ => false,
+        };
+        if single_writer {
+            if let Some((real_elem, port)) =
+                pick_chain_anchor(&ends, &hub_set, owner_x, &dummies, &frame_of)
+            {
+                let ax = port_anchor(frame_of(real_elem), port).x;
+                for &d in &dummies {
+                    desired[d] = ax;
+                    weights[d] = weights[d].max(VIRTUAL_WEIGHT * 16.0);
+                }
+            }
+        } else {
+            for &(real_elem, port, nb) in &nonleaf {
+                desired[nb] = port_anchor(frame_of(real_elem), port).x;
+                weights[nb] = weights[nb].max(VIRTUAL_WEIGHT * 16.0);
+            }
         }
     }
-    // Leaf follows the corridor column (already hub-anchored, or J's dummy x).
     for (real_elem, nb) in leaf_pulls {
         desired[real_elem] = desired[nb];
         weights[real_elem] = weights[real_elem].max(REAL_WEIGHT * 16.0);
+    }
+}
+
+fn pick_chain_anchor(
+    ends: &[(usize, ResolvedPort)],
+    hubs: &BTreeSet<usize>,
+    owner_x: &[f64],
+    dummies: &BTreeSet<usize>,
+    frame_of: &dyn Fn(usize) -> Rect,
+) -> Option<(usize, ResolvedPort)> {
+    match ends {
+        [] => None,
+        &[one] => Some(one),
+        &[a, b] => {
+            let ha = hubs.contains(&a.0);
+            let hb = hubs.contains(&b.0);
+            if ha != hb {
+                return Some(if ha { b } else { a });
+            }
+            let chain_x = dummies.iter().map(|&d| owner_x[d]).sum::<f64>() / dummies.len() as f64;
+            let da = (port_anchor(frame_of(a.0), a.1).x - chain_x).abs();
+            let db = (port_anchor(frame_of(b.0), b.1).x - chain_x).abs();
+            Some(if da.total_cmp(&db).then(a.0.cmp(&b.0)).is_le() {
+                a
+            } else {
+                b
+            })
+        }
+        more => {
+            let chain_x = dummies.iter().map(|&d| owner_x[d]).sum::<f64>() / dummies.len() as f64;
+            more.iter()
+                .copied()
+                .min_by(|a, b| {
+                    let da = (port_anchor(frame_of(a.0), a.1).x - chain_x).abs();
+                    let db = (port_anchor(frame_of(b.0), b.1).x - chain_x).abs();
+                    da.total_cmp(&db).then(a.0.cmp(&b.0))
+                })
+        }
     }
 }
 

@@ -6,7 +6,8 @@
 //! 1. Twin short N/S corridors get a shared world-space `lane_x` at both ends
 //!    (yFiles PortAlignmentIds; **not** grid; **not** forced `axis ± pitch`).
 //! 2. Every end on a touched `(node, side)` is rewritten to `LocalOffset`,
-//!    monotone in Compose `Ordered`, with free ends outside the twin block.
+//!    monotone in Compose `Ordered` on twin faces; other shared faces follow
+//!    the partner column (dummy trunk / peer center).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -165,9 +166,13 @@ pub fn apply_port_lanes(
 ///
 /// Node centers are owned by the cross-axis solve and are frozen by the time we
 /// get here; what is left is a sub-node-width misalignment that costs a jog at
-/// each end. The face has the room to absorb it — a port only has to stay in
-/// Compose order and keep `pitch` from its neighbors, both hard here. An end
-/// with nothing to align to keeps its canonical even slot.
+/// each end. Twin faces keep Compose order (expectations §6.2). On other
+/// shared faces the along order follows the partner column — dummy trunk, or
+/// the peer node's center — because Compose's far-real `layer_order` is a
+/// raw index and incommensurable across layers (mech n11: e29 leftmost on a
+/// 2-node rank, reverse vertical then crossed by every left-going out-edge).
+/// PAVA still enforces pitch and face bounds in that order. An end with
+/// nothing to align to keeps its canonical even slot.
 ///
 /// Faces the twin-corridor pass already wrote are skipped whole: a shared lane
 /// is a stronger statement than per-edge alignment, and re-projecting the face
@@ -195,7 +200,7 @@ fn align_ns_ports(
     //
     // The unit is the Compose slot, not the end: a bundled fan shares one
     // `Ordered` slot and therefore one port point, and must move as one.
-    let faces: BTreeMap<(usize, Side), Vec<Vec<FaceEnd>>> = all_faces
+    let mut faces: BTreeMap<(usize, Side), Vec<Vec<FaceEnd>>> = all_faces
         .iter()
         .filter(|(face, _)| !corridor_faces.contains(face))
         .map(|(face, ends)| (*face, slot_groups(ends)))
@@ -205,13 +210,21 @@ fn align_ns_ports(
         return;
     }
 
+    let anchors = partner_anchors(plan, graph, ports, frames);
+    for slots in faces.values_mut() {
+        slots.sort_by(|a, b| {
+            slot_partner_column(a, &anchors, plan, graph, frames)
+                .total_cmp(&slot_partner_column(b, &anchors, plan, graph, frames))
+                .then(a[0].edge_id.cmp(&b[0].edge_id))
+        });
+    }
+
     let frozen: BTreeSet<(String, bool)> = all_faces
         .iter()
         .filter(|(face, _)| !faces.contains_key(face))
         .flat_map(|(_, ends)| ends.iter().map(|e| (e.edge_id.clone(), e.is_source)))
         .collect();
 
-    let anchors = partner_anchors(plan, graph, ports, frames);
     let mut at: BTreeMap<(String, bool), f64> = BTreeMap::new();
     for (&(elem, _), ends) in &all_faces {
         for end in ends {
@@ -305,6 +318,44 @@ fn slot_groups(ends: &[FaceEnd]) -> Vec<Vec<FaceEnd>> {
         }
     }
     out
+}
+
+/// Column the slot should sit on: dummy trunk if the edge has one at this
+/// end, otherwise the partner node's center. Not the far-real's layer index —
+/// that is incommensurable across ranks.
+fn slot_partner_column(
+    slot: &[FaceEnd],
+    anchors: &BTreeMap<(String, bool), PartnerAnchor>,
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    frames: &[Rect],
+) -> f64 {
+    let xs: Vec<f64> = slot
+        .iter()
+        .map(|end| match anchors.get(&(end.edge_id.clone(), end.is_source)) {
+            Some(PartnerAnchor::Fixed(x)) => *x,
+            _ => partner_node_center(end, plan, graph, frames).unwrap_or(0.0),
+        })
+        .collect();
+    median(&xs)
+}
+
+fn partner_node_center(
+    end: &FaceEnd,
+    plan: &PlanGraph,
+    graph: &RealGraph,
+    frames: &[Rect],
+) -> Option<f64> {
+    let e = graph.edges.iter().find(|e| e.edge_id == end.edge_id)?;
+    let peer = if end.is_source {
+        e.original_target
+    } else {
+        e.original_source
+    };
+    let elem = *plan
+        .index_of
+        .get(&ElemKey::Real(graph.ids[peer].clone()))?;
+    Some(frames[elem].x + frames[elem].width / 2.0)
 }
 
 /// What an end aligns to: a frozen column (its long edge's dummy trunk) or the
